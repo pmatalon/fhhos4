@@ -74,12 +74,33 @@
   <ImportGroup Label="Shared" />
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ProjectPublicIncludePath>
+    </ProjectPublicIncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ProjectPublicIncludePath>
+    </ProjectPublicIncludePath>
+  </PropertyGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="ModalBasis.cpp" />
+    <ClCompile Include="Poisson1D.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ModalBasis.h" />
+    <ClInclude Include="Poisson1D.h" />
   </ItemGroup>
-  <ItemDefinitionGroup />
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>/mnt/c/Users/pierr/Documents/Source/Repos/DGHHO/DGHHO/eigen-eigen-b3f3d4950030;$(ProjectPublicIncludePath);%(ClCompile.AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>/mnt/c/Users/pierr/Documents/Source/Repos/DGHHO/DGHHO/eigen-eigen-b3f3d4950030;$(ProjectPublicIncludePath);%(ClCompile.AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
 </Project>

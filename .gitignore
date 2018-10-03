@@ -259,3 +259,5 @@ paket-files/
 # Python Tools for Visual Studio (PTVS)
 __pycache__/
 *.pyc
+/eigen-eigen-b3f3d4950030.zip
+/Eigen
