@@ -77,10 +77,12 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ProjectPublicIncludePath>
     </ProjectPublicIncludePath>
+    <IncludePath>C:\Users\pierr\Documents\Source\Repos\DGHHO\DGHHO\eigen-eigen-b3f3d4950030;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ProjectPublicIncludePath>
     </ProjectPublicIncludePath>
+    <IncludePath>C:\Users\pierr\Documents\Source\Repos\DGHHO\DGHHO\eigen-eigen-b3f3d4950030;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
@@ -88,6 +90,9 @@
     <ClCompile Include="Poisson1D.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="FileMatrix.h" />
+    <ClInclude Include="FileVector.h" />
+    <ClInclude Include="gauss_legendre.h" />
     <ClInclude Include="ModalBasis.h" />
     <ClInclude Include="Poisson1D.h" />
   </ItemGroup>

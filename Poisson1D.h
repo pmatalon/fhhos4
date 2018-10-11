@@ -1,15 +1,16 @@
 #pragma once
+#include <functional>
+
 class Poisson1D
 {
 private:
 	int _n;
-	int _polyDegree;
+	//double(*_sourceFunction)(double);
+	std::function<double(double)> _sourceFunction;
 	double* _x;
-
-	double* _rhs;
 public:
-	Poisson1D(int n, int polyDegree);
+	Poisson1D(int n, std::function<double(double)> sourceFunction);
 	~Poisson1D();
-	void DiscretizeDG();
+	void DiscretizeDG(int maxPolynomialDegree, int penalizationCoefficient);
 };
 

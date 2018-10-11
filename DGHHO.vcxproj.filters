@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="ModalBasis.cpp" />
+    <ClCompile Include="Poisson1D.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="ModalBasis.h" />
+    <ClInclude Include="Poisson1D.h" />
+    <ClInclude Include="FileMatrix.h" />
+    <ClInclude Include="gauss_legendre.h" />
+    <ClInclude Include="FileVector.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Utils">
+      <UniqueIdentifier>{7079c5d2-4dd6-49f7-a274-83d20735817f}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
