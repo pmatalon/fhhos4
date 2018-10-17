@@ -1,13 +1,12 @@
 #pragma once
 #include <functional>
+#include "CartesianGrid1D.h"
 
 class Poisson1D
 {
 private:
-	int _n;
-	//double(*_sourceFunction)(double);
 	std::function<double(double)> _sourceFunction;
-	double* _x;
+	CartesianGrid1D* _grid;
 public:
 	Poisson1D(int n, std::function<double(double)> sourceFunction);
 	~Poisson1D();

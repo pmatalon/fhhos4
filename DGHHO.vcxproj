@@ -85,11 +85,13 @@
     <IncludePath>C:\Users\pierr\Documents\Source\Repos\DGHHO\DGHHO\eigen-eigen-b3f3d4950030;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemGroup>
+    <ClCompile Include="CartesianGrid1D.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ModalBasis.cpp" />
     <ClCompile Include="Poisson1D.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="CartesianGrid1D.h" />
     <ClInclude Include="FileMatrix.h" />
     <ClInclude Include="FileVector.h" />
     <ClInclude Include="gauss_legendre.h" />

@@ -4,6 +4,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ModalBasis.cpp" />
     <ClCompile Include="Poisson1D.cpp" />
+    <ClCompile Include="CartesianGrid1D.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ModalBasis.h" />
@@ -11,6 +12,7 @@
     <ClInclude Include="FileMatrix.h" />
     <ClInclude Include="gauss_legendre.h" />
     <ClInclude Include="FileVector.h" />
+    <ClInclude Include="CartesianGrid1D.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

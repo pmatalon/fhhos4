@@ -1,10 +1,12 @@
 #include "ModalBasis.h"
 #include <math.h>
 #include "gauss_legendre.h"
+#include "CartesianGrid1D.h"
 
-ModalBasis::ModalBasis(int maxPolynomialDegree, int nIntervals, int penalizationCoefficient, std::function<double(double)> sourceFunction)
+ModalBasis::ModalBasis(int maxPolynomialDegree, CartesianGrid1D* grid, int penalizationCoefficient, std::function<double(double)> sourceFunction)
 {
 	this->_maxPolynomialDegree = maxPolynomialDegree;
+	this->_grid = grid;
 	this->_penalizationCoefficient = penalizationCoefficient;
 	this->_sourceFunction = sourceFunction;
 
@@ -17,65 +19,112 @@ ModalBasis::ModalBasis(int maxPolynomialDegree, int nIntervals, int penalization
 	// Interval [(n-1)/n,   1]: 
 }
 
-double ModalBasis::VolumicTerm(int basisFunctionNumber1, int basisFunctionNumber2, double xLeft, double xRight)
+int ModalBasis::NumberOfLocalFunctionsInElement(int element)
 {
-	if (abs(basisFunctionNumber2 - basisFunctionNumber1) > this->_maxPolynomialDegree)
+	return this->_maxPolynomialDegree + 1;
+}
+
+int ModalBasis::GlobalFunctionNumber(int element, int localFunctionNumber)
+{
+	return element * (this->_maxPolynomialDegree + 1) + localFunctionNumber + 1; // +1 so that the numbers start at 1
+}
+
+double ModalBasis::VolumicTerm(int element, int localFunctionNumber1, int localFunctionNumber2)
+{
+	int i = localFunctionNumber1; // monomial degree 1
+	int j = localFunctionNumber2; // monomial degree 2
+
+	if (i == 0 || j == 0)
 		return 0;
-	int polyDegree1 = basisFunctionNumber1 % (this->_maxPolynomialDegree + 1);
-	int polyDegree2 = basisFunctionNumber2 % (this->_maxPolynomialDegree + 1);
-	if (polyDegree1 == 0 || polyDegree2 == 0)
+	return (double)(i * j) / (double)(i + j - 1) * (pow(this->_grid->XRight(element), i + j - 1) - pow(this->_grid->XLeft(element), i + j - 1));
+}
+
+double ModalBasis::CouplingTerm(int interface, int element1, int localFunctionNumber1, int element2, int localFunctionNumber2)
+{
+	int i = localFunctionNumber1; // monomial degree 1
+	int j = localFunctionNumber2; // monomial degree 2
+
+	// Boundary points
+	if (this->_grid->IsBoundaryLeft(interface))
+	{
+		if (this->_grid->IsFirstElement(element1) && this->_grid->IsFirstElement(element2))
+		{
+			if ((i == 0 && j == 1) || (i == 1 && j == 0))
+				return 1;
+			return 0;
+		}
 		return 0;
-	double integral = (double)(polyDegree1 * polyDegree2) / (double)(polyDegree1 + polyDegree2 - 1) * (pow(xRight, polyDegree1 + polyDegree2 - 1) - pow(xLeft, polyDegree1 + polyDegree2 - 1));
-	return integral;
+	}
+	else if (this->_grid->IsBoundaryRight(interface))
+	{
+		if (this->_grid->IsLastElement(element1) && this->_grid->IsLastElement(element2))
+			return -i-j;
+		return 0;
+	}
+
+	double x = this->_grid->X(interface);
+
+	// Interior points
+	if (element1 == element2)
+	{
+		int factor = this->_grid->IsLeftInterface(element1, interface) ? 1 : -1;
+
+		if (i == 0 && j == 0)
+			return 0;
+		else if (i == 0 && j != 0)
+			return factor * 0.5 * j * pow(x, j - 1);
+		else if (i != 0 && j == 0)
+			return factor * 0.5 * i * pow(x, i - 1);
+		else
+			return factor * (double)(i + j) / 2 * pow(x, i + j - 1);
+	}
+	else if (element1 == element2 - 1)
+	{
+		if (i == 0 && j == 0)
+			return 0;
+		else if (i == 0 && j != 0)
+			return -0.5 * j * pow(x, j - 1);
+		else if (i != 0 && j == 0)
+			return 0.5 * i * pow(x, i - 1);
+		else
+			return (double)(i - j) / 2 * pow(x, i + j - 1);
+	}
+	else if (element1 == element2 + 1)
+	{
+		return this->CouplingTerm(interface, element2, localFunctionNumber2, element1, localFunctionNumber1);
+	}
+	return 0;
 }
 
-double ModalBasis::CouplingTerm(double x, int basisFunctionNumber1, int basisFunctionNumber2)
+double ModalBasis::PenalizationTerm(int point, int element1, int localFunctionNumber1, int element2, int localFunctionNumber2)
 {
-	//if (abs(basisFunctionNumber2 - basisFunctionNumber1) > 2*(this->_maxPolynomialDegree + 1))
-	//	return 0;
-	int polyDegree1 = basisFunctionNumber1 % (this->_maxPolynomialDegree + 1);
-	int polyDegree2 = basisFunctionNumber2 % (this->_maxPolynomialDegree + 1);
+	int i = localFunctionNumber1; // monomial degree 1
+	int j = localFunctionNumber2; // monomial degree 2
 
-	if (polyDegree1 == 0 && polyDegree2 == 0)
-		return -this->_penalizationCoefficient;
-	else if (polyDegree1 == 0 && polyDegree2 != 0)
-		return -0.5* polyDegree2*pow(x, polyDegree2 - 1) - this->_penalizationCoefficient*pow(x, polyDegree2);
-	else if (polyDegree1 != 0 && polyDegree2 == 0)
-		return 0.5*polyDegree1*pow(x, polyDegree1 - 1) - this->_penalizationCoefficient*pow(x, polyDegree1);
+	if (element1 == element2)
+	{
+		return this->_penalizationCoefficient * pow(this->_grid->X(point), i + j);
+	}
+	else if (element2 == element1 - 1)
+	{
+		return -this->_penalizationCoefficient * pow(this->_grid->X(point), i + j);
+	}
+	else if (element2 == element1 + 1)
+	{
+		return this->PenalizationTerm(point, element2, localFunctionNumber2, element1, localFunctionNumber1);
+	}
 	else
-		return 0.5*(polyDegree1 - polyDegree2)*pow(x, polyDegree1 + polyDegree2 - 1) - this->_penalizationCoefficient*pow(x, polyDegree1 + polyDegree2);
+		return 0;
 }
 
-double ModalBasis::PenalizationTerm(double x, int basisFunctionNumber1, int basisFunctionNumber2)
+double ModalBasis::RightHandSide(int element, int localFunctionNumber)
 {
-	int polyDegree1 = basisFunctionNumber1 % (this->_maxPolynomialDegree + 1);
-	int polyDegree2 = basisFunctionNumber2 % (this->_maxPolynomialDegree + 1);
-
-	if (polyDegree1 == 0 && polyDegree2 == 0)
-		return -this->_penalizationCoefficient;
-	else if (polyDegree1 == 0 && polyDegree2 != 0)
-		return -0.5* polyDegree2*pow(x, polyDegree2 - 1) - this->_penalizationCoefficient*pow(x, polyDegree2);
-	else if (polyDegree1 != 0 && polyDegree2 == 0)
-		return 0.5*polyDegree1*pow(x, polyDegree1 - 1) - this->_penalizationCoefficient*pow(x, polyDegree1);
-	else
-		return 0.5*(polyDegree1 - polyDegree2)*pow(x, polyDegree1 + polyDegree2 - 1) - this->_penalizationCoefficient*pow(x, polyDegree1 + polyDegree2);
-}
-
-double ModalBasis::RightHandSide(double xLeft, double xRight, int basisFunctionNumber)
-{
-	int degree = basisFunctionNumber % (this->_maxPolynomialDegree + 1);
+	int degree = localFunctionNumber;
 	std::function<double (double)> sourceTimesBasisFunction = [this, degree](double x) {
 		return this->_sourceFunction(x) * pow(x, degree);
 	};
-	return integral(xLeft, xRight, sourceTimesBasisFunction);
+	return integral(this->_grid->XLeft(element), this->_grid->XRight(element), sourceTimesBasisFunction);
 }
-
-/*double ModalBasis::SourceTimesBasisFunction(double x)
-{
-	this->_sourceFunction(x) * pow(x, p);
-}*/
-
-
 
 ModalBasis::~ModalBasis()
 {
