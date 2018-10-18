@@ -1,6 +1,7 @@
 #pragma once
 #include <functional>
 #include "CartesianGrid1D.h"
+using namespace std;
 
 class Poisson1D
 {
@@ -10,6 +11,6 @@ private:
 public:
 	Poisson1D(int n, std::function<double(double)> sourceFunction);
 	~Poisson1D();
-	void DiscretizeDG(int maxPolynomialDegree, int penalizationCoefficient);
+	void DiscretizeDG(int maxPolynomialDegree, int penalizationCoefficient, string outputDirectory);
 };
 

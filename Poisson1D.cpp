@@ -21,7 +21,7 @@ Poisson1D::Poisson1D(int n, function<double(double)> sourceFunction)
 	cout << "Grid: [0, 1] --> " << (n+1) << " points (" << (n-1) << " interior points + 2 boundary points)" << endl;
 }
 
-void Poisson1D::DiscretizeDG(int maxPolynomialDegree, int penalizationCoefficient)
+void Poisson1D::DiscretizeDG(int maxPolynomialDegree, int penalizationCoefficient, string outputDirectory)
 {
 	cout << "Discretization: Discontinuous Galerkin SIPG" << endl;
 	cout << "\tPolynomial degree: " << maxPolynomialDegree << endl;
@@ -42,12 +42,11 @@ void Poisson1D::DiscretizeDG(int maxPolynomialDegree, int penalizationCoefficien
 	//string terms = "penalization";
 	string terms = "";
 
-	string path = "/mnt/c/Users/pierr/Desktop";
 	string fileName = "Poisson1D_n" + to_string(grid->NElements()) + "_DG_SIPG_p" + to_string(maxPolynomialDegree) + "_pen" + to_string(penalizationCoefficient);
-	string matrixFilePath = path + "/" + fileName + "_A" + terms + ".dat";
+	string matrixFilePath = outputDirectory + "/" + fileName + "_A" + terms + ".dat";
 	FileMatrix* fileMatrix = new FileMatrix(nUnknowns, nUnknowns, matrixFilePath);
 
-	string rhsFilePath = path + "/" + fileName + "_b.dat";
+	string rhsFilePath = outputDirectory + "/" + fileName + "_b.dat";
 	FileVector* fileRHS = new FileVector(rhsFilePath);
 
 	for (int element = 0; element < grid->NElements(); element++) // interval [element/n, (element+1)/n]
