@@ -1,6 +1,6 @@
 #include "Poisson1D.h"
 #include <iostream>
-#include "ModalBasis.h"
+#include "MonomialBasis1D.h"
 #include "FileMatrix.h"
 #include "FileVector.h"
 #include <math.h>
@@ -8,41 +8,39 @@
 
 using namespace std;
 
-Poisson1D::Poisson1D(int n, function<double(double)> sourceFunction)
+Poisson1D::Poisson1D(function<double(double)> sourceFunction)
 {
 	cout << "----------------------------------------" << endl;
-	cout << "Poisson1D(n=" << n << ")" << endl;
+	//cout << "Poisson1D(n=" << n << ")" << endl;
 	cout << "----------------------------------------" << endl;
 	
 	this->_sourceFunction = sourceFunction;
 
-	this->_grid = new CartesianGrid1D(n);
+	//this->_grid = new CartesianGrid1D(n);
 
-	cout << "Grid: [0, 1] --> " << (n+1) << " points (" << (n-1) << " interior points + 2 boundary points)" << endl;
+	//cout << "Grid: [0, 1] --> " << (n+1) << " points (" << (n-1) << " interior points + 2 boundary points)" << endl;
 }
 
-void Poisson1D::DiscretizeDG(int maxPolynomialDegree, int penalizationCoefficient, string outputDirectory)
+void Poisson1D::DiscretizeDG(CartesianGrid1D* grid, FunctionalBasisWithNumbers* basis, int penalizationCoefficient, string outputDirectory)
 {
 	cout << "Discretization: Discontinuous Galerkin SIPG" << endl;
-	cout << "\tPolynomial degree: " << maxPolynomialDegree << endl;
 	cout << "\tPenalization coefficient: " << penalizationCoefficient << endl;
-	cout << "\tBasis of polynomials: monomials" << endl;
+	cout << "\tBasis of polynomials: " << basis->Name() << endl;
 
-	CartesianGrid1D* grid = this->_grid;
+	//CartesianGrid1D* grid = this->_grid;
 
 	// _n subintervals of [0, 1], maxPolynomialDegree + 1 unknowns per subinterval ==> _n * (maxPolynomialDegree + 1) unknowns
-	int nUnknowns = this->_grid->NElements() * (maxPolynomialDegree + 1);
-	cout << "Unknowns: " << nUnknowns << endl;
+	int nUnknowns = grid->NElements() * basis->NumberOfLocalFunctionsInElement(0);
+	//cout << "Unknowns: " << nUnknowns << endl;
 
-	// Modal basis: 1, X, X^2, ..., X^p
-	ModalBasis* basis = new ModalBasis(maxPolynomialDegree, this->_grid, penalizationCoefficient, this->_sourceFunction);
+	
 
 	//string terms = "volumic";
 	//string terms = "coupling";
 	//string terms = "penalization";
 	string terms = "";
 
-	string fileName = "Poisson1D_n" + to_string(grid->NElements()) + "_DG_SIPG_p" + to_string(maxPolynomialDegree) + "_pen" + to_string(penalizationCoefficient);
+	string fileName = "Poisson1D_n" + to_string(grid->NElements()) + "_DG_SIPG_" + basis->Name() + "_pen" + to_string(penalizationCoefficient);
 	string matrixFilePath = outputDirectory + "/" + fileName + "_A" + terms + ".dat";
 	FileMatrix* fileMatrix = new FileMatrix(nUnknowns, nUnknowns, matrixFilePath);
 
@@ -53,7 +51,7 @@ void Poisson1D::DiscretizeDG(int maxPolynomialDegree, int penalizationCoefficien
 	{
 		for (int localFunction1 = 0; localFunction1 < basis->NumberOfLocalFunctionsInElement(element); localFunction1++)
 		{
-			int basisFunction1 = basis->GlobalFunctionNumber(element, localFunction1);
+			BigNumber basisFunction1 = basis->GlobalFunctionNumber(element, localFunction1);
 
 			if (!grid->IsFirstElement(element))
 			{
@@ -65,9 +63,10 @@ void Poisson1D::DiscretizeDG(int maxPolynomialDegree, int penalizationCoefficien
 					double couplingTerm = basis->CouplingTerm(interface, element, localFunction1, neighbour, localFunction2);
 					double penalization = basis->PenalizationTerm(interface, element, localFunction1, neighbour, localFunction2);
 
-					int basisFunction2 = basis->GlobalFunctionNumber(neighbour, localFunction2);
+					BigNumber basisFunction2 = basis->GlobalFunctionNumber(neighbour, localFunction2);
 
-					if (terms.compare("coupling") == 0)
+					if (terms.compare("volumic") == 0) {}
+					else if (terms.compare("coupling") == 0)
 						fileMatrix->Add(basisFunction1, basisFunction2, couplingTerm);
 					else if (terms.compare("penalization") == 0)
 						fileMatrix->Add(basisFunction1, basisFunction2, penalization);
@@ -111,7 +110,8 @@ void Poisson1D::DiscretizeDG(int maxPolynomialDegree, int penalizationCoefficien
 
 					int basisFunction2 = basis->GlobalFunctionNumber(neighbour, localFunction2);
 
-					if (terms.compare("coupling") == 0)
+					if (terms.compare("volumic") == 0) {}
+					else if (terms.compare("coupling") == 0)
 						fileMatrix->Add(basisFunction1, basisFunction2, couplingTerm);
 					else if (terms.compare("penalization") == 0)
 						fileMatrix->Add(basisFunction1, basisFunction2, penalization);
@@ -135,5 +135,4 @@ void Poisson1D::DiscretizeDG(int maxPolynomialDegree, int penalizationCoefficien
 
 Poisson1D::~Poisson1D()
 {
-	delete[] this->_grid;
 }

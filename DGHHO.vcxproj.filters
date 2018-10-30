@@ -2,17 +2,37 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="ModalBasis.cpp" />
     <ClCompile Include="Poisson1D.cpp" />
     <ClCompile Include="CartesianGrid1D.cpp" />
+    <ClCompile Include="MonomialBasis1DOLD.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ModalBasis.h" />
     <ClInclude Include="Poisson1D.h" />
     <ClInclude Include="FileMatrix.h" />
     <ClInclude Include="gauss_legendre.h" />
     <ClInclude Include="FileVector.h" />
     <ClInclude Include="CartesianGrid1D.h" />
+    <ClInclude Include="Poisson2D.h" />
+    <ClInclude Include="CartesianGrid2D.h" />
+    <ClInclude Include="Square.h" />
+    <ClInclude Include="Element.h" />
+    <ClInclude Include="ElementInterface.h" />
+    <ClInclude Include="Monomial1D.h" />
+    <ClInclude Include="MonomialBasis1D.h" />
+    <ClInclude Include="Utils.h" />
+    <ClInclude Include="ReverseMonomial1D.h" />
+    <ClInclude Include="ReverseMonomialBasis1D.h" />
+    <ClInclude Include="MonomialBasis2DOLD.h" />
+    <ClInclude Include="MonomialBasis1DOLD.h" />
+    <ClInclude Include="BasisFunction1D.h" />
+    <ClInclude Include="FunctionalBasis1D.h" />
+    <ClInclude Include="FunctionalBasisWithNumbers.h" />
+    <ClInclude Include="FunctionalBasisWithObjects.h" />
+    <ClInclude Include="FunctionalBasis2D.h" />
+    <ClInclude Include="BasisFunction2D.h" />
+    <ClInclude Include="MonomialBasis2D.h" />
+    <ClInclude Include="Monomial2D.h" />
+    <ClInclude Include="Element2DInterface.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

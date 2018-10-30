@@ -2,10 +2,18 @@
 class CartesianGrid1D
 {
 private:
-	int _n;
+	BigNumber _n;
 	double* _x;
 public:
-	CartesianGrid1D(int n);
+	CartesianGrid1D(BigNumber n)
+	{
+		this->_n = n;
+
+		// [0,1] descretized in 0, 1/n, 2/n, n/n (=> n+1 points)
+		this->_x = new double[n + 1];
+		for (BigNumber k = 0; k < n + 1; k++)
+			this->_x[k] = (double)k / n;
+	}
 
 	inline ~CartesianGrid1D()
 	{
@@ -17,22 +25,22 @@ public:
 		return this->_n;
 	}
 
-	inline double X(int point)
+	inline double X(BigNumber point)
 	{
 		return this->_x[point];
 	}
 
-	inline double XRight(int element)
+	inline double XRight(BigNumber element)
 	{
 		return this->_x[element + 1];
 	}
 
-	inline double XLeft(int element)
+	inline double XLeft(BigNumber element)
 	{
 		return this->_x[element];
 	}
 
-	inline int GetInterface(int element1, int element2)
+	inline int GetInterface(BigNumber element1, BigNumber element2)
 	{
 		if (element1 == element2 + 1)
 			return element1;
@@ -41,40 +49,40 @@ public:
 		return -1;
 	}
 
-	inline int LeftInterface(int element)
+	inline int LeftInterface(BigNumber element)
 	{
 		return element;
 	}
 
-	inline int RightInterface(int element)
+	inline int RightInterface(BigNumber element)
 	{
 		return element + 1;
 	}
 
-	inline bool IsLeftInterface(int element, int point)
+	inline bool IsLeftInterface(BigNumber element, BigNumber point)
 	{
 		return point == element;
 	}
 
-	inline bool IsRightInterface(int element, int point)
+	inline bool IsRightInterface(BigNumber element, BigNumber point)
 	{
 		return point == element + 1;
 	}
 
-	inline bool IsBoundaryLeft(int point)
+	inline bool IsBoundaryLeft(BigNumber point)
 	{
 		return point == 0;
 	}
-	inline bool IsBoundaryRight(int point)
+	inline bool IsBoundaryRight(BigNumber point)
 	{
 		return point == this->_n;
 	}
 
-	inline bool IsFirstElement(int element)
+	inline bool IsFirstElement(BigNumber element)
 	{
 		return element == 0;
 	}
-	inline bool IsLastElement(int element)
+	inline bool IsLastElement(BigNumber element)
 	{
 		return element == this->_n - 1;
 	}

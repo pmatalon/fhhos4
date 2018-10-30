@@ -1,9 +1,9 @@
-#include "ModalBasis.h"
+#include "MonomialBasis1DOLD.h"
 #include <math.h>
 #include "gauss_legendre.h"
 #include "CartesianGrid1D.h"
 
-ModalBasis::ModalBasis(int maxPolynomialDegree, CartesianGrid1D* grid, int penalizationCoefficient, std::function<double(double)> sourceFunction)
+MonomialBasis1DOLD::MonomialBasis1DOLD(int maxPolynomialDegree, CartesianGrid1D* grid, int penalizationCoefficient, std::function<double(double)> sourceFunction)
 {
 	this->_maxPolynomialDegree = maxPolynomialDegree;
 	this->_grid = grid;
@@ -19,17 +19,22 @@ ModalBasis::ModalBasis(int maxPolynomialDegree, CartesianGrid1D* grid, int penal
 	// Interval [(n-1)/n,   1]: 
 }
 
-int ModalBasis::NumberOfLocalFunctionsInElement(int element)
+std::string MonomialBasis1DOLD::Name()
+{
+	return "oldmonomials_p" + std::to_string(this->_maxPolynomialDegree);
+}
+
+int MonomialBasis1DOLD::NumberOfLocalFunctionsInElement(BigNumber element)
 {
 	return this->_maxPolynomialDegree + 1;
 }
 
-int ModalBasis::GlobalFunctionNumber(int element, int localFunctionNumber)
+BigNumber MonomialBasis1DOLD::GlobalFunctionNumber(BigNumber element, int localFunctionNumber)
 {
 	return element * (this->_maxPolynomialDegree + 1) + localFunctionNumber + 1; // +1 so that the numbers start at 1
 }
 
-double ModalBasis::VolumicTerm(int element, int localFunctionNumber1, int localFunctionNumber2)
+double MonomialBasis1DOLD::VolumicTerm(BigNumber element, int localFunctionNumber1, int localFunctionNumber2)
 {
 	int i = localFunctionNumber1; // monomial degree 1
 	int j = localFunctionNumber2; // monomial degree 2
@@ -39,7 +44,7 @@ double ModalBasis::VolumicTerm(int element, int localFunctionNumber1, int localF
 	return (double)(i * j) / (double)(i + j - 1) * (pow(this->_grid->XRight(element), i + j - 1) - pow(this->_grid->XLeft(element), i + j - 1));
 }
 
-double ModalBasis::CouplingTerm(int interface, int element1, int localFunctionNumber1, int element2, int localFunctionNumber2)
+double MonomialBasis1DOLD::CouplingTerm(BigNumber interface, BigNumber element1, int localFunctionNumber1, BigNumber element2, int localFunctionNumber2)
 {
 	int i = localFunctionNumber1; // monomial degree 1
 	int j = localFunctionNumber2; // monomial degree 2
@@ -96,7 +101,7 @@ double ModalBasis::CouplingTerm(int interface, int element1, int localFunctionNu
 	return 0;
 }
 
-double ModalBasis::PenalizationTerm(int point, int element1, int localFunctionNumber1, int element2, int localFunctionNumber2)
+double MonomialBasis1DOLD::PenalizationTerm(BigNumber point, BigNumber element1, int localFunctionNumber1, BigNumber element2, int localFunctionNumber2)
 {
 	int i = localFunctionNumber1; // monomial degree 1
 	int j = localFunctionNumber2; // monomial degree 2
@@ -117,7 +122,7 @@ double ModalBasis::PenalizationTerm(int point, int element1, int localFunctionNu
 		return 0;
 }
 
-double ModalBasis::RightHandSide(int element, int localFunctionNumber)
+double MonomialBasis1DOLD::RightHandSide(BigNumber element, int localFunctionNumber)
 {
 	int degree = localFunctionNumber;
 	std::function<double (double)> sourceTimesBasisFunction = [this, degree](double x) {
@@ -126,6 +131,6 @@ double ModalBasis::RightHandSide(int element, int localFunctionNumber)
 	return integral(this->_grid->XLeft(element), this->_grid->XRight(element), sourceTimesBasisFunction);
 }
 
-ModalBasis::~ModalBasis()
+MonomialBasis1DOLD::~MonomialBasis1DOLD()
 {
 }
