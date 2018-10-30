@@ -77,18 +77,16 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ProjectPublicIncludePath>
     </ProjectPublicIncludePath>
-    <IncludePath>C:\Users\pierr\Documents\Source\Repos\DGHHO\DGHHO\eigen-eigen-b3f3d4950030;$(IncludePath)</IncludePath>
+    <IncludePath>C:\Users\pierr\Documents\Source\Repos\DGHHO\DGHHO\eigen-eigen-b3f3d4950030;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\c++\5;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\c++\5\bits;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ProjectPublicIncludePath>
     </ProjectPublicIncludePath>
-    <IncludePath>C:\Users\pierr\Documents\Source\Repos\DGHHO\DGHHO\eigen-eigen-b3f3d4950030;$(IncludePath)</IncludePath>
+    <IncludePath>C:\Users\pierr\Documents\Source\Repos\DGHHO\DGHHO\eigen-eigen-b3f3d4950030;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\c++\5;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\c++\5\bits;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemGroup>
-    <ClCompile Include="CartesianGrid1D.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MonomialBasis1DOLD.cpp" />
-    <ClCompile Include="Poisson1D.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BasisFunction2D.h" />
@@ -104,16 +102,12 @@
     <ClInclude Include="FunctionalBasisWithObjects.h" />
     <ClInclude Include="gauss_legendre.h" />
     <ClInclude Include="FunctionalBasis1D.h" />
-    <ClInclude Include="Monomial2D.h" />
     <ClInclude Include="MonomialBasis1DOLD.h" />
     <ClInclude Include="MonomialBasis2D.h" />
-    <ClInclude Include="MonomialBasis2DOLD.h" />
-    <ClInclude Include="Monomial1D.h" />
     <ClInclude Include="MonomialBasis1D.h" />
     <ClInclude Include="Poisson1D.h" />
     <ClInclude Include="Poisson2D.h" />
     <ClInclude Include="BasisFunction1D.h" />
-    <ClInclude Include="ReverseMonomial1D.h" />
     <ClInclude Include="ReverseMonomialBasis1D.h" />
     <ClInclude Include="Square.h" />
     <ClInclude Include="Utils.h" />

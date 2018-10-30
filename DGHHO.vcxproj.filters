@@ -2,41 +2,83 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="Poisson1D.cpp" />
-    <ClCompile Include="CartesianGrid1D.cpp" />
-    <ClCompile Include="MonomialBasis1DOLD.cpp" />
+    <ClCompile Include="MonomialBasis1DOLD.cpp">
+      <Filter>FunctionalBasis</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Poisson1D.h" />
-    <ClInclude Include="FileMatrix.h" />
-    <ClInclude Include="gauss_legendre.h" />
-    <ClInclude Include="FileVector.h" />
-    <ClInclude Include="CartesianGrid1D.h" />
     <ClInclude Include="Poisson2D.h" />
-    <ClInclude Include="CartesianGrid2D.h" />
-    <ClInclude Include="Square.h" />
-    <ClInclude Include="Element.h" />
-    <ClInclude Include="ElementInterface.h" />
-    <ClInclude Include="Monomial1D.h" />
-    <ClInclude Include="MonomialBasis1D.h" />
-    <ClInclude Include="Utils.h" />
-    <ClInclude Include="ReverseMonomial1D.h" />
-    <ClInclude Include="ReverseMonomialBasis1D.h" />
-    <ClInclude Include="MonomialBasis2DOLD.h" />
-    <ClInclude Include="MonomialBasis1DOLD.h" />
-    <ClInclude Include="BasisFunction1D.h" />
-    <ClInclude Include="FunctionalBasis1D.h" />
-    <ClInclude Include="FunctionalBasisWithNumbers.h" />
-    <ClInclude Include="FunctionalBasisWithObjects.h" />
-    <ClInclude Include="FunctionalBasis2D.h" />
-    <ClInclude Include="BasisFunction2D.h" />
-    <ClInclude Include="MonomialBasis2D.h" />
-    <ClInclude Include="Monomial2D.h" />
-    <ClInclude Include="Element2DInterface.h" />
+    <ClInclude Include="Utils.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="Element.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="Element2DInterface.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="ElementInterface.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="gauss_legendre.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="Square.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="CartesianGrid1D.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="CartesianGrid2D.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="BasisFunction1D.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="BasisFunction2D.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="FileMatrix.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="FileVector.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="FunctionalBasis1D.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="FunctionalBasis2D.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="FunctionalBasisWithNumbers.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="FunctionalBasisWithObjects.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="MonomialBasis1D.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="MonomialBasis1DOLD.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="MonomialBasis2D.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="ReverseMonomialBasis1D.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
       <UniqueIdentifier>{7079c5d2-4dd6-49f7-a274-83d20735817f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Mesh">
+      <UniqueIdentifier>{089b5862-0021-4e98-a5ab-bd18df16a8d9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="FunctionalBasis">
+      <UniqueIdentifier>{6da564fc-5853-4076-bdfa-41507d49f132}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

@@ -90,9 +90,9 @@ int main(int argc, char* argv[])
 		Poisson2D* problem = new Poisson2D(sourceFunction);
 
 		FunctionalBasisWithObjects* basis;
-		if (basisCode.compare("oldmonomials") == 0)
+		/*if (basisCode.compare("oldmonomials") == 0)
 			basis = new MonomialBasis2DOLD(polyDegree, grid, penalizationCoefficient, sourceFunction);
-		else
+		else*/
 			basis = new MonomialBasis2D(polyDegree, grid, penalizationCoefficient, sourceFunction);
 
 		problem->DiscretizeDG(grid, basis, penalizationCoefficient, outputDirectory);

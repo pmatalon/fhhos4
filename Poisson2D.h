@@ -1,7 +1,7 @@
 #include <iostream>
 #include <functional>
 #include "CartesianGrid2D.h"
-#include "MonomialBasis2DOLD.h"
+#include "FunctionalBasisWithObjects.h"
 #include "ElementInterface.h"
 #include "FileMatrix.h"
 #include "FileVector.h"
@@ -12,15 +12,10 @@ class Poisson2D
 {
 private:
 	function<double(double, double)> _sourceFunction;
-	//CartesianGrid2D* _grid;
 public:
 	Poisson2D(function<double(double, double)> sourceFunction)
 	{
 		this->_sourceFunction = sourceFunction;
-
-		//this->_grid = new CartesianGrid2D(n);
-
-		//cout << "Grid: [0, 1]^2 --> " << ((n + 1)^ (2)) << " vertices (" << ((n - 1)^ (2)) << " interior vertices + " << ((n + 1)^ (2) - (n - 1)^ (2)) << " boundary points)" << endl;
 	}
 
 	void DiscretizeDG(CartesianGrid2D* grid, FunctionalBasisWithObjects* basis, int penalizationCoefficient, string outputDirectory)

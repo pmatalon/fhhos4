@@ -35,7 +35,18 @@ public:
 		return element * NumberOfLocalFunctionsInElement(0) + localFunctionNumber + 1; // +1 so that the numbers start at 1
 	}
 
-	virtual double VolumicTerm(BigNumber element, int localFunctionNumber1, int localFunctionNumber2) = 0;
+	//virtual double VolumicTerm(BigNumber element, int localFunctionNumber1, int localFunctionNumber2) = 0;
+	double VolumicTerm(BigNumber element, int localFunctionNumber1, int localFunctionNumber2)
+	{
+		BasisFunction1D* func1 = this->_localFunctions[localFunctionNumber1];
+		BasisFunction1D* func2 = this->_localFunctions[localFunctionNumber2];
+
+		function<double(double)> functionToIntegrate = [func1, func2](double x) {
+			return func1->EvalGrad(x)*func2->EvalGrad(x);
+		};
+
+		return Utils::Integral(functionToIntegrate, this->_grid->XLeft(element), this->_grid->XRight(element));
+	}
 
 	double CouplingTerm(BigNumber interface, BigNumber element1, int localFunctionNumber1, BigNumber element2, int localFunctionNumber2)
 	{
