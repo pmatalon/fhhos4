@@ -2,7 +2,6 @@
 #include "FunctionalBasis1D.h"
 #include "BasisFunction1D.h"
 #include <math.h>
-
 using namespace std;
 
 class Monomial1D : public BasisFunction1D

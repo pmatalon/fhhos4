@@ -15,14 +15,9 @@ public:
 	Poisson1D(function<double(double)> sourceFunction)
 	{
 		cout << "----------------------------------------" << endl;
-		//cout << "Poisson1D(n=" << n << ")" << endl;
 		cout << "----------------------------------------" << endl;
 
 		this->_sourceFunction = sourceFunction;
-
-		//this->_grid = new CartesianGrid1D(n);
-
-		//cout << "Grid: [0, 1] --> " << (n+1) << " points (" << (n-1) << " interior points + 2 boundary points)" << endl;
 	}
 
 	void DiscretizeDG(CartesianGrid1D* grid, FunctionalBasisWithNumbers* basis, int penalizationCoefficient, string outputDirectory)
@@ -31,9 +26,6 @@ public:
 		cout << "\tPenalization coefficient: " << penalizationCoefficient << endl;
 		cout << "\tBasis of polynomials: " << basis->Name() << endl;
 
-		//CartesianGrid1D* grid = this->_grid;
-
-		// _n subintervals of [0, 1], maxPolynomialDegree + 1 unknowns per subinterval ==> _n * (maxPolynomialDegree + 1) unknowns
 		int nUnknowns = grid->NElements() * basis->NumberOfLocalFunctionsInElement(0);
 		//cout << "Unknowns: " << nUnknowns << endl;
 
@@ -135,7 +127,6 @@ public:
 		cout << "Matrix exported to " << matrixFilePath << endl;
 		cout << "RHS exported to " << rhsFilePath << endl;
 	}
-
 
 	~Poisson1D()
 	{

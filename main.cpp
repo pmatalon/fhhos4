@@ -8,6 +8,7 @@
 #include "MonomialBasis1DOLD.h"
 #include "MonomialBasis1D.h"
 #include "ReverseMonomialBasis1D.h"
+#include "LegendreBasis1D.h"
 #include "MonomialBasis2D.h"
 using namespace std;
 
@@ -17,7 +18,7 @@ void print_usage(int d, int n, string b, int p, int z, string o) {
 	cout << "Arguments:" << endl;
 	cout << "-d {1,2}:\t	space dimension (default: 1)\t--> " << d << endl;
 	cout << "-n NUM:\t		number of subdivisions (default: 5)\t--> " << n << endl;
-	cout << "-b {monomials,reversemonomials,oldmonomials}:	polynomial basis (default: monomials)\t--> " << b << endl;
+	cout << "-b {monomials,reversemonomials,oldmonomials,legendre}:	polynomial basis (default: monomials)\t--> " << b << endl;
 	cout << "-p NUM:\t		max polynomial degree (default: 2)\t--> " << p << endl;
 	cout << "-z NUM:\t		penalization coefficient (default: 100)\t--> " << z << endl;
 	cout << "-o PATH:\t		output directory to export the system (default: ./)\t--> " << o << endl;
@@ -69,12 +70,19 @@ int main(int argc, char* argv[])
 		Poisson1D* problem = new Poisson1D(sourceFunction);
 
 		FunctionalBasisWithNumbers* basis;
-		if (basisCode.compare("reversemonomials") == 0)
+		if (basisCode.compare("monomials") == 0)
+			basis = new MonomialBasis1D(polyDegree, grid, penalizationCoefficient, sourceFunction);
+		else if (basisCode.compare("reversemonomials") == 0)
 			basis = new ReverseMonomialBasis1D(polyDegree, grid, penalizationCoefficient, sourceFunction);
 		else if (basisCode.compare("oldmonomials") == 0)
 			basis = new MonomialBasis1DOLD(polyDegree, grid, penalizationCoefficient, sourceFunction);
+		else if (basisCode.compare("legendre") == 0)
+			basis = new LegendreBasis1D(polyDegree, grid, penalizationCoefficient, sourceFunction);
 		else
-			basis = new MonomialBasis1D(polyDegree, grid, penalizationCoefficient, sourceFunction);
+		{
+			cout << "Basis not managed!";
+			exit(EXIT_FAILURE);
+		}
 
 		problem->DiscretizeDG(grid, basis, penalizationCoefficient, outputDirectory);
 		delete problem;
@@ -90,10 +98,7 @@ int main(int argc, char* argv[])
 		Poisson2D* problem = new Poisson2D(sourceFunction);
 
 		FunctionalBasisWithObjects* basis;
-		/*if (basisCode.compare("oldmonomials") == 0)
-			basis = new MonomialBasis2DOLD(polyDegree, grid, penalizationCoefficient, sourceFunction);
-		else*/
-			basis = new MonomialBasis2D(polyDegree, grid, penalizationCoefficient, sourceFunction);
+		basis = new MonomialBasis2D(polyDegree, grid, penalizationCoefficient, sourceFunction);
 
 		problem->DiscretizeDG(grid, basis, penalizationCoefficient, outputDirectory);
 		delete problem;

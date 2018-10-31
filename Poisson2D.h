@@ -27,10 +27,10 @@ public:
 		BigNumber nUnknowns = static_cast<int>(grid->Elements.size()) * basis->NumberOfLocalFunctionsInElement(0);
 		cout << "Unknowns: " << nUnknowns << endl;
 
-		//string terms = "volumic";
+		string terms = "volumic";
 		//string terms = "coupling";
 		//string terms = "penalization";
-		string terms = "";
+		//string terms = "";
 
 		string fileName = "Poisson2D_n" + to_string(grid->N) + "_DG_SIPG_" + basis->Name() + "_pen" + to_string(penalizationCoefficient);
 		string matrixFilePath = outputDirectory + "/" + fileName + "_A" + terms + ".dat";

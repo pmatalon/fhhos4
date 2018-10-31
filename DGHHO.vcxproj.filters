@@ -69,6 +69,9 @@
     <ClInclude Include="ReverseMonomialBasis1D.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
+    <ClInclude Include="LegendreBasis1D.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
