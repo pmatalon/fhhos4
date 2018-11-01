@@ -8,20 +8,33 @@ class Legendre1D : public BasisFunction1D
 {
 public:
 	int Degree;
+	bool Normalized;
 
 	Legendre1D(int degree)
 	{
 		this->Degree = degree;
 	}
 
-	double Eval(double x)
+	Legendre1D(int degree, bool normalized)
 	{
-		return Legendre(this->Degree, x);
+		this->Degree = degree;
+		this->Normalized = normalized;
 	}
 
-	double EvalGrad(double x)
+	double Eval(double x)
 	{
-		return DLegendre(this->Degree, x);
+		double value = Legendre(this->Degree, x);
+		if (this->Normalized)
+			return sqrt(this->Degree + 0.5) * value;
+		return value;
+	}
+
+	double EvalDerivative(double x)
+	{
+		double value = DLegendre(this->Degree, x);
+		if (this->Normalized)
+			return sqrt(this->Degree + 0.5) * value;
+		return value;
 	}
 
 private:
@@ -37,8 +50,8 @@ private:
 			return 2.5 * pow(x, 3) - 1.5*x;
 		if (n == 4)
 			return 0.125 * (35 * pow(x, 4) - 30 * pow(x, 2) + 3);
-
-		return ((2 * (double)n - 1)*x*Legendre(n - 1, x) - ((double)n - 1)*Legendre(n - 2, x))/n;
+		
+		return ((2 * n - 1)*x*Legendre(n - 1, x) - (n - 1)*Legendre(n - 2, x))/n;
 	}
 
 	static double DLegendre(int n, double x)
@@ -53,8 +66,10 @@ private:
 			return 7.5 * pow(x, 2) - 1.5;
 		if (n == 4)
 			return 17.5 * pow(x, 3) - 7.5 * x;
+		//dy(i + 2) = ((2 * i + 1)*y(i + 1) + (2 * i + 1)*x*dy(i + 1) - i * dy(i)) / (i + 1);
 
-		return DLegendre(n - 2, x) + (2 * (double)n - 1)*Legendre(n - 1, x);
+		//return inverseNorm*DLegendre(n - 2, x) + (2 * n - 1)*Legendre(n - 1, x);
+		return ((2 * n - 1)*Legendre(n - 1, x) + (2 * n - 1)*x*DLegendre(n - 1, x) - (n-1) * DLegendre(n - 2, x)) / n;
 	}
 };
 

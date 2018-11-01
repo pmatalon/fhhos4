@@ -1,4 +1,4 @@
-#pragma once
+/*#pragma once
 #include <functional>
 #include "FunctionalBasisWithNumbers.h"
 #include "CartesianGrid1D.h"
@@ -23,3 +23,4 @@ public:
 	~MonomialBasis1DOLD();
 };
 
+*/

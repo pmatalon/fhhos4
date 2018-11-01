@@ -1,15 +1,23 @@
 #pragma once
 #include <functional>
-
+#include <array>
 
 class Utils
 {
 public:
+	// Integral on [-1, 1]
+	static double IntegralOnReferenceInterval(std::function<double(double)> func)
+	{
+		return GaussLegendre4Point(func);
+	}
+
+	// Integral on [x1, x2]
 	static double Integral(std::function<double(double)> func, double x1, double x2)
 	{
 		return GaussLegendre4Point(func, x1, x2);
 	}
 
+	// Integral on [x1, x2] x [y1, y2]
 	static double Integral(std::function<double(double, double)> func, double x1, double x2, double y1, double y2)
 	{
 		if (x1 == x2)
@@ -30,22 +38,23 @@ public:
 	}
 
 private:
+	// Gauss-Legendre quadrature (4 points) on [-1, 1]
+	static double GaussLegendre4Point(std::function<double(double)> func)
+	{
+		array<double, 4> points = GetGaussLegendrePoints();
+		array<double, 4> weights = GetGaussLegendreWeights();
+
+		double sum = 0;
+		for (int i = 0; i < 4; i++)
+			sum += func(points[i]) * weights[i];
+		return sum;
+	}
+
+	// Gauss-Legendre quadrature (4 points) on [x1, x2]
 	static double GaussLegendre4Point(std::function<double(double)> func, double x1, double x2)
 	{
-		// Gauss-Legendre quadrature (4 points) on [-1, 1]
-
-		double points[4];
-		double weights[4];
-
-		points[0] = -0.3399810435848563;
-		points[1] =  0.3399810435848563;
-		points[2] = -0.8611363115940526;
-		points[3] =  0.8611363115940526;
-
-		weights[0] = 0.6521451548625461;
-		weights[1] = 0.6521451548625461;
-		weights[2] = 0.3478548451374538;
-		weights[3] = 0.3478548451374538;
+		array<double, 4> points = GetGaussLegendrePoints();
+		array<double, 4> weights = GetGaussLegendreWeights();
 
 		double sum = 0;
 		for (int i = 0; i < 4; i++)
@@ -53,22 +62,11 @@ private:
 		return (x2 - x1) / 2 * sum;
 	}
 
+	// Gauss-Legendre quadrature (4 points) on [-1, 1]^2
 	static double GaussLegendre4Point(std::function<double(double, double)> func, double x1, double x2, double y1, double y2)
 	{
-		// Gauss-Legendre quadrature (4 points) on [-1, 1]^2
-
-		double points[4];
-		double weights[4];
-
-		points[0] = -0.3399810435848563;
-		points[1] = 0.3399810435848563;
-		points[2] = -0.8611363115940526;
-		points[3] = 0.8611363115940526;
-
-		weights[0] = 0.6521451548625461;
-		weights[1] = 0.6521451548625461;
-		weights[2] = 0.3478548451374538;
-		weights[3] = 0.3478548451374538;
+		array<double, 4> points = GetGaussLegendrePoints();
+		array<double, 4> weights = GetGaussLegendreWeights();
 
 		double sum = 0;
 		for (int i = 0; i < 4; i++)
@@ -77,5 +75,24 @@ private:
 				sum += func((x2 - x1) / 2 * points[i] + (x1 + x2) / 2, (y2 - y1) / 2 * points[j] + (y1 + y2) / 2) * weights[i] * weights[j];
 		}
 		return (x2 - x1) / 2 * (y2 - y1) / 2 * sum;
+	}
+
+	static array<double,4> GetGaussLegendrePoints()
+	{
+		array<double,4> points;
+		points[0] = -0.3399810435848563;
+		points[1] = 0.3399810435848563;
+		points[2] = -0.8611363115940526;
+		points[3] = 0.8611363115940526;
+		return points;
+	}
+	static array<double, 4> GetGaussLegendreWeights()
+	{
+		array<double, 4> weights;
+		weights[0] = 0.6521451548625461;
+		weights[1] = 0.6521451548625461;
+		weights[2] = 0.3478548451374538;
+		weights[3] = 0.3478548451374538;
+		return weights;
 	}
 };

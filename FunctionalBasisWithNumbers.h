@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include "Element.h"
+#include "BasisFunction1D.h"
 class FunctionalBasisWithNumbers
 {
 public:
@@ -8,15 +9,17 @@ public:
 
 	virtual int NumberOfLocalFunctionsInElement(BigNumber element) = 0;
 
+	virtual BasisFunction1D* GetLocalBasisFunction(BigNumber element, int localFunctionNumber) = 0;
+
 	virtual BigNumber GlobalFunctionNumber(BigNumber element, int localFunctionNumber) = 0;
 
-	virtual double VolumicTerm(BigNumber element, int localFunctionNumber1, int localFunctionNumber2) = 0;
+	virtual double VolumicTerm(BigNumber element, BasisFunction1D* func1, BasisFunction1D* func2) = 0;
 
-	virtual double CouplingTerm(BigNumber interface, BigNumber element1, int localFunctionNumber1, BigNumber element2, int localFunctionNumber2) = 0;
+	virtual double CouplingTerm(BigNumber interface, BigNumber element1, BasisFunction1D* func1, BigNumber element2, BasisFunction1D* func2) = 0;
 
-	virtual double PenalizationTerm(BigNumber point, BigNumber element1, int localFunctionNumber1, BigNumber element2, int localFunctionNumber2) = 0;
+	virtual double PenalizationTerm(BigNumber point, BigNumber element1, BasisFunction1D* func1, BigNumber element2, BasisFunction1D* func2) = 0;
 
-	virtual double RightHandSide(BigNumber element, int localFunctionNumber) = 0;
+	virtual double RightHandSide(BigNumber element, BasisFunction1D* func) = 0;
 
 	virtual ~FunctionalBasisWithNumbers() {}
 };

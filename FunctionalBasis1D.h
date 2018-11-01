@@ -30,65 +30,70 @@ public:
 		return static_cast<int>(this->_localFunctions.size());
 	}
 
+	BasisFunction1D* GetLocalBasisFunction(BigNumber element, int localFunctionNumber)
+	{
+		return this->_localFunctions[localFunctionNumber];
+	}
+
 	BigNumber GlobalFunctionNumber(BigNumber element, int localFunctionNumber)
 	{
 		return element * NumberOfLocalFunctionsInElement(0) + localFunctionNumber + 1; // +1 so that the numbers start at 1
 	}
 
-	//virtual double VolumicTerm(BigNumber element, int localFunctionNumber1, int localFunctionNumber2) = 0;
-	double VolumicTerm(BigNumber element, int localFunctionNumber1, int localFunctionNumber2)
+	double VolumicTerm(BigNumber element, BasisFunction1D* func1, BasisFunction1D* func2)
 	{
-		BasisFunction1D* func1 = this->_localFunctions[localFunctionNumber1];
-		BasisFunction1D* func2 = this->_localFunctions[localFunctionNumber2];
+		double a = this->_grid->XLeft(element);
+		double b = this->_grid->XRight(element);
 
 		function<double(double)> functionToIntegrate = [func1, func2](double x) {
-			return func1->EvalGrad(x)*func2->EvalGrad(x);
+			return func1->EvalDerivative(x)*func2->EvalDerivative(x);
 		};
 
-		return Utils::Integral(functionToIntegrate, this->_grid->XLeft(element), this->_grid->XRight(element));
+		return 2/(b - a) * Utils::IntegralOnReferenceInterval(functionToIntegrate);
 	}
 
-	double CouplingTerm(BigNumber interface, BigNumber element1, int localFunctionNumber1, BigNumber element2, int localFunctionNumber2)
+	double CouplingTerm(BigNumber interface, BigNumber element1, BasisFunction1D* func1, BigNumber element2, BasisFunction1D* func2)
 	{
 		if (element2 > element1 + 1 || element1 > element2 + 1)
 			return 0;
-
-		BasisFunction1D* func1 = this->_localFunctions[localFunctionNumber1];
-		BasisFunction1D* func2 = this->_localFunctions[localFunctionNumber2];
 
 		return MeanGrad(element1, func1, interface) * Jump(element2, func2, interface) + MeanGrad(element2, func2, interface) * Jump(element1, func1, interface);
 	}
 
-	double PenalizationTerm(BigNumber point, BigNumber element1, int localFunctionNumber1, BigNumber element2, int localFunctionNumber2)
+	double PenalizationTerm(BigNumber point, BigNumber element1, BasisFunction1D* func1, BigNumber element2, BasisFunction1D* func2)
 	{
 		if (element2 > element1 + 1 || element1 > element2 + 1)
 			return 0;
 
-		BasisFunction1D* func1 = this->_localFunctions[localFunctionNumber1];
-		BasisFunction1D* func2 = this->_localFunctions[localFunctionNumber2];
-
 		return this->_penalizationCoefficient * Jump(element1, func1, point) * Jump(element2, func2, point);
 	}
 
-	double RightHandSide(BigNumber element, int localFunctionNumber)
+	double RightHandSide(BigNumber element, BasisFunction1D* func)
 	{
-		BasisFunction1D* func1 = this->_localFunctions[localFunctionNumber];
-		function<double(double)> sourceTimesBasisFunction = [this, func1](double x) {
-			return this->_sourceFunction(x) * func1->Eval(x);
+		double a = this->_grid->XLeft(element);
+		double b = this->_grid->XRight(element);
+
+		function<double(double)> sourceTimesBasisFunction = [this, func, a, b](double x) {
+			return this->_sourceFunction((b-a)/2*x + (a+b)/2) * func->Eval(x);
 		};
-		return Utils::Integral(sourceTimesBasisFunction, this->_grid->XLeft(element), this->_grid->XRight(element));
+		return (b - a) / 2 * Utils::IntegralOnReferenceInterval(sourceTimesBasisFunction);
 	}
 
 	double MeanGrad(BigNumber element, BasisFunction1D* func, BigNumber interface)
 	{
+		int xRef = this->_grid->IsLeftInterface(element, interface) ? -1 : 1; // xRef in [-1, 1]
+		double a = this->_grid->XLeft(element);
+		double b = this->_grid->XRight(element);
+
 		if (this->_grid->IsBoundaryLeft(interface) || this->_grid->IsBoundaryRight(interface))
-			return func->EvalGrad(this->_grid->X(interface));
-		return 0.5 * (func->EvalGrad(this->_grid->X(interface)));
+			return 2 / (b - a) * func->EvalDerivative(xRef);
+		return 1 / (b - a) * (func->EvalDerivative(xRef));
 	}
 
 	double Jump(BigNumber element, BasisFunction1D* func, BigNumber interface)
 	{
+		int xRef = this->_grid->IsLeftInterface(element, interface) ? -1 : 1; // xRef in [-1, 1]
 		int factor = this->_grid->IsLeftInterface(element, interface) ? 1 : -1;
-		return factor * (func->Eval(this->_grid->X(interface)));
+		return factor * (func->Eval(xRef));
 	}
 };

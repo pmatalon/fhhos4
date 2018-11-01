@@ -2,6 +2,7 @@
 #include <functional>
 #include "FunctionalBasisWithNumbers.h"
 #include "CartesianGrid1D.h"
+#include "BasisFunction1D.h"
 #include "Element.h"
 #include "FileMatrix.h"
 #include "FileVector.h"
@@ -45,21 +46,25 @@ public:
 
 		for (int element = 0; element < grid->NElements(); element++) // interval [element/n, (element+1)/n]
 		{
-			for (int localFunction1 = 0; localFunction1 < basis->NumberOfLocalFunctionsInElement(element); localFunction1++)
+			for (int localFunctionNumber1 = 0; localFunctionNumber1 < basis->NumberOfLocalFunctionsInElement(element); localFunctionNumber1++)
 			{
-				BigNumber basisFunction1 = basis->GlobalFunctionNumber(element, localFunction1);
+				BasisFunction1D* localFunction1 = basis->GetLocalBasisFunction(element, localFunctionNumber1);
+				BigNumber basisFunction1 = basis->GlobalFunctionNumber(element, localFunctionNumber1);
+
 
 				if (!grid->IsFirstElement(element))
 				{
 					// Left neighbour
 					int neighbour = element - 1;
 					int interface = grid->GetInterface(element, neighbour);
-					for (int localFunction2 = 0; localFunction2 < basis->NumberOfLocalFunctionsInElement(neighbour); localFunction2++)
+					for (int localFunctionNumber2 = 0; localFunctionNumber2 < basis->NumberOfLocalFunctionsInElement(neighbour); localFunctionNumber2++)
 					{
+						BasisFunction1D* localFunction2 = basis->GetLocalBasisFunction(element, localFunctionNumber2);
+
 						double couplingTerm = basis->CouplingTerm(interface, element, localFunction1, neighbour, localFunction2);
 						double penalization = basis->PenalizationTerm(interface, element, localFunction1, neighbour, localFunction2);
 
-						BigNumber basisFunction2 = basis->GlobalFunctionNumber(neighbour, localFunction2);
+						BigNumber basisFunction2 = basis->GlobalFunctionNumber(neighbour, localFunctionNumber2);
 
 						if (terms.compare("volumic") == 0) {}
 						else if (terms.compare("coupling") == 0)
@@ -72,8 +77,10 @@ public:
 				}
 
 				// Current element (block diagonal)
-				for (int localFunction2 = 0; localFunction2 < basis->NumberOfLocalFunctionsInElement(element); localFunction2++)
+				for (int localFunctionNumber2 = 0; localFunctionNumber2 < basis->NumberOfLocalFunctionsInElement(element); localFunctionNumber2++)
 				{
+					BasisFunction1D* localFunction2 = basis->GetLocalBasisFunction(element, localFunctionNumber2);
+
 					double volumicTerm = basis->VolumicTerm(element, localFunction1, localFunction2);
 
 					double couplingTermLeft = basis->CouplingTerm(grid->LeftInterface(element), element, localFunction1, element, localFunction2);
@@ -82,7 +89,7 @@ public:
 					double couplingTermRight = basis->CouplingTerm(grid->RightInterface(element), element, localFunction1, element, localFunction2);
 					double penalizationRight = basis->PenalizationTerm(grid->RightInterface(element), element, localFunction1, element, localFunction2);
 
-					int basisFunction2 = basis->GlobalFunctionNumber(element, localFunction2);
+					int basisFunction2 = basis->GlobalFunctionNumber(element, localFunctionNumber2);
 
 					if (terms.compare("volumic") == 0)
 						fileMatrix->Add(basisFunction1, basisFunction2, volumicTerm);
@@ -99,12 +106,14 @@ public:
 					// Right neighbour
 					int neighbour = element + 1;
 					int interface = grid->GetInterface(element, neighbour);
-					for (int localFunction2 = 0; localFunction2 < basis->NumberOfLocalFunctionsInElement(neighbour); localFunction2++)
+					for (int localFunctionNumber2 = 0; localFunctionNumber2 < basis->NumberOfLocalFunctionsInElement(neighbour); localFunctionNumber2++)
 					{
+						BasisFunction1D* localFunction2 = basis->GetLocalBasisFunction(element, localFunctionNumber2);
+
 						double couplingTerm = basis->CouplingTerm(interface, element, localFunction1, neighbour, localFunction2);
 						double penalization = basis->PenalizationTerm(interface, element, localFunction1, neighbour, localFunction2);
 
-						int basisFunction2 = basis->GlobalFunctionNumber(neighbour, localFunction2);
+						int basisFunction2 = basis->GlobalFunctionNumber(neighbour, localFunctionNumber2);
 
 						if (terms.compare("volumic") == 0) {}
 						else if (terms.compare("coupling") == 0)

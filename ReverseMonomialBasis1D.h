@@ -19,7 +19,7 @@ public:
 		return pow(1 - x, this->Degree);
 	}
 
-	double EvalGrad(double x)
+	double EvalDerivative(double x)
 	{
 		if (this->Degree == 0)
 			return 0;
