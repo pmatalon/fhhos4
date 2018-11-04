@@ -2,6 +2,7 @@
 #include <string>
 #include "Element.h"
 #include "ElementInterface.h"
+#include "BasisFunction2D.h"
 class FunctionalBasisWithObjects
 {
 public:
@@ -9,15 +10,17 @@ public:
 
 	virtual int NumberOfLocalFunctionsInElement(Element* element) = 0;
 
+	virtual BasisFunction2D* GetLocalBasisFunction(Element* element, int localFunctionNumber) = 0;
+
 	virtual BigNumber GlobalFunctionNumber(Element* element, int localFunctionNumber) = 0;
 
-	virtual double VolumicTerm(Element* element, int localFunctionNumber1, int localFunctionNumber2) = 0;
+	virtual double VolumicTerm(Element* element, BasisFunction2D* func1, BasisFunction2D* func2) = 0;
 
-	virtual double CouplingTerm(ElementInterface* interface, Element* element1, int localFunctionNumber1, Element* element2, int localFunctionNumber2) = 0;
+	virtual double CouplingTerm(ElementInterface* interface, Element* element1, BasisFunction2D* func1, Element* element2, BasisFunction2D* func2) = 0;
 
-	virtual double PenalizationTerm(ElementInterface* interface, Element* element1, int localFunctionNumber1, Element* element2, int localFunctionNumber2) = 0;
+	virtual double PenalizationTerm(ElementInterface* interface, Element* element1, BasisFunction2D* func1, Element* element2, BasisFunction2D* func2) = 0;
 
-	virtual double RightHandSide(Element* element, int localFunctionNumber) = 0;
+	virtual double RightHandSide(Element* element, BasisFunction2D* func) = 0;
 
 	virtual ~FunctionalBasisWithObjects() {}
 };

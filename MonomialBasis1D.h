@@ -1,5 +1,6 @@
 #pragma once
 #include "FunctionalBasis1D.h"
+#include "FunctionalGlobalBasis1D.h"
 #include "BasisFunction1D.h"
 #include <math.h>
 using namespace std;
@@ -59,4 +60,26 @@ public:
 			return 0;
 		return (double)(i * j) / (double)(i + j - 1) * (pow(this->_grid->XRight(element), i + j - 1) - pow(this->_grid->XLeft(element), i + j - 1));
 	}*/
+};
+
+
+class MonomialGlobalBasis1D : public FunctionalGlobalBasis1D
+{
+private:
+	int _maxPolynomialDegree;
+
+public:
+	MonomialGlobalBasis1D(int maxPolynomialDegree, CartesianGrid1D* grid, int penalizationCoefficient, function<double(double)> sourceFunction)
+		:FunctionalGlobalBasis1D(grid, penalizationCoefficient, sourceFunction)
+	{
+		this->_maxPolynomialDegree = maxPolynomialDegree;
+
+		for (int i = 0; i <= maxPolynomialDegree; i++)
+			this->_localFunctions[i] = new Monomial1D(i);
+	}
+
+	string Name()
+	{
+		return "globalmonomials_p" + std::to_string(this->_maxPolynomialDegree);
+	}
 };

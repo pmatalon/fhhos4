@@ -2,7 +2,6 @@
 #include "FunctionalBasis2D.h"
 #include "BasisFunction2D.h"
 #include <math.h>
-//#include "Monomial2D.h"
 
 using namespace std;
 

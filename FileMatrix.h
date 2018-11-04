@@ -29,24 +29,3 @@ public:
 		fclose(this->_file);
 	}
 };
-
-/*FileMatrix::FileMatrix(int nRows, int nCols, string filePath)
-{
-	this->_nRows = nRows;
-	this->_nCols = nCols;
-	this->_file = fopen(filePath.c_str(), "w");
-}
-
-void FileMatrix::Add(int i, int j, double value)
-{
-	if (value == 0)
-		return;
-	fprintf(this->_file, "%llu %llu %.17g \n", i, j, value);
-}
-
-FileMatrix::~FileMatrix()
-{
-	this->Add(this->_nRows, this->_nCols, 0);
-	fclose(this->_file);
-}*/
-

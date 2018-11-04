@@ -8,7 +8,7 @@
 #include "Utils.h"
 using namespace std;
 
-class FunctionalBasis1D : public FunctionalBasisWithNumbers
+class FunctionalGlobalBasis1D : public FunctionalBasisWithNumbers
 {
 protected:
 	CartesianGrid1D* _grid;
@@ -18,7 +18,7 @@ protected:
 	map<int, BasisFunction1D*> _localFunctions;
 
 public:
-	FunctionalBasis1D(CartesianGrid1D* grid, int penalizationCoefficient, function<double(double)> sourceFunction)
+	FunctionalGlobalBasis1D(CartesianGrid1D* grid, int penalizationCoefficient, function<double(double)> sourceFunction)
 	{
 		this->_grid = grid;
 		this->_penalizationCoefficient = penalizationCoefficient;
@@ -29,7 +29,7 @@ public:
 	{
 		return static_cast<int>(this->_localFunctions.size());
 	}
-
+	
 	BasisFunction1D* GetLocalBasisFunction(BigNumber element, int localFunctionNumber)
 	{
 		return this->_localFunctions[localFunctionNumber];
@@ -42,14 +42,11 @@ public:
 
 	double VolumicTerm(BigNumber element, BasisFunction1D* func1, BasisFunction1D* func2)
 	{
-		double a = this->_grid->XLeft(element);
-		double b = this->_grid->XRight(element);
-
-		function<double(double)> functionToIntegrate = [func1, func2](double t) {
-			return func1->EvalDerivative(t)*func2->EvalDerivative(t);
+		function<double(double)> functionToIntegrate = [func1, func2](double x) {
+			return func1->EvalDerivative(x)*func2->EvalDerivative(x);
 		};
 
-		return 2/(b - a) * Utils::IntegralOnReferenceInterval(functionToIntegrate);
+		return Utils::Integral(functionToIntegrate, this->_grid->XLeft(element), this->_grid->XRight(element));
 	}
 
 	double CouplingTerm(BigNumber interface, BigNumber element1, BasisFunction1D* func1, BigNumber element2, BasisFunction1D* func2)
@@ -57,7 +54,7 @@ public:
 		if (element2 > element1 + 1 || element1 > element2 + 1)
 			return 0;
 
-		return MeanDerivative(element1, func1, interface) * Jump(element2, func2, interface) + MeanDerivative(element2, func2, interface) * Jump(element1, func1, interface);
+		return MeanGrad(element1, func1, interface) * Jump(element2, func2, interface) + MeanGrad(element2, func2, interface) * Jump(element1, func1, interface);
 	}
 
 	double PenalizationTerm(BigNumber point, BigNumber element1, BasisFunction1D* func1, BigNumber element2, BasisFunction1D* func2)
@@ -70,30 +67,22 @@ public:
 
 	double RightHandSide(BigNumber element, BasisFunction1D* func)
 	{
-		double a = this->_grid->XLeft(element);
-		double b = this->_grid->XRight(element);
-
-		function<double(double)> sourceTimesBasisFunction = [this, func, a, b](double t) {
-			return this->_sourceFunction((b-a)/2*t + (a+b)/2) * func->Eval(t);
+		function<double(double)> sourceTimesBasisFunction = [this, func](double x) {
+			return this->_sourceFunction(x) * func->Eval(x);
 		};
-		return (b - a) / 2 * Utils::IntegralOnReferenceInterval(sourceTimesBasisFunction);
+		return Utils::Integral(sourceTimesBasisFunction, this->_grid->XLeft(element), this->_grid->XRight(element));
 	}
 
-	double MeanDerivative(BigNumber element, BasisFunction1D* func, BigNumber interface)
+	double MeanGrad(BigNumber element, BasisFunction1D* func, BigNumber interface)
 	{
-		int t = this->_grid->IsLeftInterface(element, interface) ? -1 : 1; // t in [-1, 1]
-		double a = this->_grid->XLeft(element);
-		double b = this->_grid->XRight(element);
-
 		if (this->_grid->IsBoundaryLeft(interface) || this->_grid->IsBoundaryRight(interface))
-			return 2 / (b - a) * func->EvalDerivative(t);
-		return 1 / (b - a) * (func->EvalDerivative(t));
+			return func->EvalDerivative(this->_grid->X(interface));
+		return 0.5 * (func->EvalDerivative(this->_grid->X(interface)));
 	}
 
 	double Jump(BigNumber element, BasisFunction1D* func, BigNumber interface)
 	{
-		int t = this->_grid->IsLeftInterface(element, interface) ? -1 : 1; // t in [-1, 1]
 		int factor = this->_grid->IsLeftInterface(element, interface) ? 1 : -1;
-		return factor * (func->Eval(t));
+		return factor * (func->Eval(this->_grid->X(interface)));
 	}
 };

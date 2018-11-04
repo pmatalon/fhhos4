@@ -32,23 +32,24 @@ public:
 		return static_cast<int>(this->_localFunctions.size());
 	}
 
+	BasisFunction2D* GetLocalBasisFunction(Element* element, int localFunctionNumber)
+	{
+		return this->_localFunctions[localFunctionNumber];
+	}
+
 	BigNumber GlobalFunctionNumber(Element* element, int localFunctionNumber)
 	{
 		return element->Number * static_cast<int>(this->_localFunctions.size()) + localFunctionNumber + 1; // +1 so that the numbers start at 1
 	}
 
-	//virtual double VolumicTerm(Element* element, int localFunctionNumber1, int localFunctionNumber2) = 0;
-	double VolumicTerm(Element* element, int localFunctionNumber1, int localFunctionNumber2)
+	double VolumicTerm(Element* element, BasisFunction2D* func1, BasisFunction2D* func2)
 	{
 		Square* square = static_cast<Square*>(element);
-		return this->VolumicTerm(square, localFunctionNumber1, localFunctionNumber2);
+		return this->VolumicTerm(square, func1, func2);
 	}
 
-	double VolumicTerm(Square* element, int localFunctionNumber1, int localFunctionNumber2)
+	double VolumicTerm(Square* element, BasisFunction2D* func1, BasisFunction2D* func2)
 	{
-		BasisFunction2D* func1 = this->_localFunctions[localFunctionNumber1];
-		BasisFunction2D* func2 = this->_localFunctions[localFunctionNumber2];
-
 		function<double(double, double)> functionToIntegrate = [func1, func2](double x, double y) {
 			return func1->EvalGradX(x, y)*func2->EvalGradX(x, y) + func1->EvalGradY(x, y)*func2->EvalGradY(x, y);
 		};
@@ -56,13 +57,10 @@ public:
 		return Utils::Integral(functionToIntegrate, element->X, element->X + element->Width, element->Y, element->Y + element->Width);
 	}
 
-	double CouplingTerm(ElementInterface* interface, Element* element1, int localFunctionNumber1, Element* element2, int localFunctionNumber2)
+	double CouplingTerm(ElementInterface* interface, Element* element1, BasisFunction2D* func1, Element* element2, BasisFunction2D* func2)
 	{
 		if (!interface->IsBetween(element1, element2))
 			return 0;
-
-		BasisFunction2D* func1 = this->_localFunctions[localFunctionNumber1];
-		BasisFunction2D* func2 = this->_localFunctions[localFunctionNumber2];
 
 		auto n1 = element1->OuterNormalVector(interface);
 		auto n2 = element2->OuterNormalVector(interface);
@@ -124,47 +122,17 @@ public:
 		return -interf->Integrate(functionToIntegrate);
 	}
 
-	/*function<double(double, double)> MeanGradX(Element* element, BasisFunction2D* func)
-	{
-		function<double(double, double)> meanGradX = [func](double x, double y) {
-			return 0.5 * func->EvalGradX(x, y);
-		};
-	}
-
-	function<double(double, double)> Jump(Element* element, BasisFunction2D* func)
-	{
-		function<double(double, double)> meanGradX = [func](double x, double y) {
-			return 0.5 * func->EvalGradX(x, y);
-		};
-	}*/
-
-	/*double PenalizationTerm(ElementInterface* interface, Element* element1, int localFunctionNumber1, Element* element2, int localFunctionNumber2)
-	{
-		if (!interface->IsBetween(element1, element2))
-			return 0;
-
-		BasisFunction2D* func1 = this->_localFunctions[localFunctionNumber1];
-		BasisFunction2D* func2 = this->_localFunctions[localFunctionNumber2];
-
-
-
-		return this->_penalizationCoefficient * Jump(element1, func1, interface) * Jump(element2, func2, interface);
-	}*/
-
-	double PenalizationTerm(ElementInterface* interface, Element* element1, int localFunctionNumber1, Element* element2, int localFunctionNumber2)
+	double PenalizationTerm(ElementInterface* interface, Element* element1, BasisFunction2D* func1, Element* element2, BasisFunction2D* func2)
 	{
 		Square* square1 = static_cast<Square*>(element1);
 		Square* square2 = static_cast<Square*>(element2);
-		return this->PenalizationTerm(interface, square1, localFunctionNumber1, square2, localFunctionNumber2);
+		return this->PenalizationTerm(interface, square1, func1, square2, func2);
 	}
 
-	double PenalizationTerm(ElementInterface* interface, Square* element1, int localFunctionNumber1, Square* element2, int localFunctionNumber2)
+	double PenalizationTerm(ElementInterface* interface, Square* element1, BasisFunction2D* func1, Square* element2, BasisFunction2D* func2)
 	{
 		//if (!interface->IsBetween(element1, element2))
 		//	return 0;
-
-		BasisFunction2D* func1 = this->_localFunctions[localFunctionNumber1];
-		BasisFunction2D* func2 = this->_localFunctions[localFunctionNumber2];
 
 		auto n1 = element1->OuterNormalVector(interface);
 		auto n2 = element2->OuterNormalVector(interface);
@@ -197,15 +165,14 @@ public:
 		return this->_penalizationCoefficient * integralJump1ScalarJump2;
 	}
 
-	double RightHandSide(Element* element, int localFunctionNumber)
+	double RightHandSide(Element* element, BasisFunction2D* func)
 	{
 		Square* square = static_cast<Square*>(element);
-		return this->RightHandSide(square, localFunctionNumber);
+		return this->RightHandSide(square, func);
 	}
 
-	double RightHandSide(Square* element, int localFunctionNumber)
+	double RightHandSide(Square* element, BasisFunction2D* func)
 	{
-		BasisFunction2D* func = this->_localFunctions[localFunctionNumber];
 		function<double(double, double)> sourceTimesBasisFunction = [this, func](double x, double y) {
 			return this->_sourceFunction(x, y) * func->Eval(x, y);
 		};

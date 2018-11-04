@@ -11,13 +11,14 @@ using namespace std;
 class Poisson1D
 {
 private:
+	string _solution;
 	std::function<double(double)> _sourceFunction;
 public:
-	Poisson1D(function<double(double)> sourceFunction)
+	Poisson1D(string solution, function<double(double)> sourceFunction)
 	{
 		cout << "----------------------------------------" << endl;
 		cout << "----------------------------------------" << endl;
-
+		this->_solution = solution;
 		this->_sourceFunction = sourceFunction;
 	}
 
@@ -30,14 +31,12 @@ public:
 		int nUnknowns = grid->NElements() * basis->NumberOfLocalFunctionsInElement(0);
 		//cout << "Unknowns: " << nUnknowns << endl;
 
-
-
 		//string terms = "volumic";
 		//string terms = "coupling";
 		//string terms = "penalization";
 		string terms = "";
 
-		string fileName = "Poisson1D_n" + to_string(grid->NElements()) + "_DG_SIPG_" + basis->Name() + "_pen" + to_string(penalizationCoefficient);
+		string fileName = "Poisson1D" + this->_solution + "_n" + to_string(grid->NElements()) + "_DG_SIPG_" + basis->Name() + "_pen" + to_string(penalizationCoefficient);
 		string matrixFilePath = outputDirectory + "/" + fileName + "_A" + terms + ".dat";
 		FileMatrix* fileMatrix = new FileMatrix(nUnknowns, nUnknowns, matrixFilePath);
 

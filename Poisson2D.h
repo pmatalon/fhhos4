@@ -11,10 +11,12 @@ using namespace std;
 class Poisson2D
 {
 private:
+	string _solution;
 	function<double(double, double)> _sourceFunction;
 public:
-	Poisson2D(function<double(double, double)> sourceFunction)
+	Poisson2D(string solution, function<double(double, double)> sourceFunction)
 	{
+		this->_solution = solution;
 		this->_sourceFunction = sourceFunction;
 	}
 
@@ -27,30 +29,17 @@ public:
 		BigNumber nUnknowns = static_cast<int>(grid->Elements.size()) * basis->NumberOfLocalFunctionsInElement(0);
 		cout << "Unknowns: " << nUnknowns << endl;
 
-		string terms = "volumic";
+		//string terms = "volumic";
 		//string terms = "coupling";
 		//string terms = "penalization";
-		//string terms = "";
+		string terms = "";
 
-		string fileName = "Poisson2D_n" + to_string(grid->N) + "_DG_SIPG_" + basis->Name() + "_pen" + to_string(penalizationCoefficient);
+		string fileName = "Poisson2D" + this->_solution + "_n" + to_string(grid->N) + "_DG_SIPG_" + basis->Name() + "_pen" + to_string(penalizationCoefficient);
 		string matrixFilePath = outputDirectory + "/" + fileName + "_A" + terms + ".dat";
 		FileMatrix* fileMatrix = new FileMatrix(nUnknowns, nUnknowns, matrixFilePath);
 
 		string rhsFilePath = outputDirectory + "/" + fileName + "_b.dat";
 		FileVector* fileRHS = new FileVector(rhsFilePath);
-
-		/*function<double(double)> testFunc1D = [](double x) {
-			return x;
-		};
-
-		function<double(double, double)> testFunc2D = [](double x, double y) {
-			return x * y;
-		};
-
-		double intTest1D = Utils::Integral(testFunc1D, 1, 4);
-		cout << "Integral test 1D = " << intTest1D << endl;
-		double intTest2D = Utils::Integral(testFunc2D, 1, 2, 1, 1);
-		cout << "Integral test 2D = " << intTest2D << endl;*/
 
 		//--------------------------------------------//
 		// Iteration on the elements: diagonal blocks //
@@ -61,14 +50,16 @@ public:
 			Element* element = grid->Elements[k];
 			vector<ElementInterface*> elementInterfaces = element->Interfaces;
 
-			for (int localFunction1 = 0; localFunction1 < basis->NumberOfLocalFunctionsInElement(element); localFunction1++)
+			for (int localFunctionNumber1 = 0; localFunctionNumber1 < basis->NumberOfLocalFunctionsInElement(element); localFunctionNumber1++)
 			{
-				BigNumber basisFunction1 = basis->GlobalFunctionNumber(element, localFunction1);
+				BasisFunction2D* localFunction1 = basis->GetLocalBasisFunction(element, localFunctionNumber1);
+				BigNumber basisFunction1 = basis->GlobalFunctionNumber(element, localFunctionNumber1);
 
 				// Current element (block diagonal)
-				for (int localFunction2 = 0; localFunction2 < basis->NumberOfLocalFunctionsInElement(element); localFunction2++)
+				for (int localFunctionNumber2 = 0; localFunctionNumber2 < basis->NumberOfLocalFunctionsInElement(element); localFunctionNumber2++)
 				{
-					BigNumber basisFunction2 = basis->GlobalFunctionNumber(element, localFunction2);
+					BasisFunction2D* localFunction2 = basis->GetLocalBasisFunction(element, localFunctionNumber2);
+					BigNumber basisFunction2 = basis->GlobalFunctionNumber(element, localFunctionNumber2);
 
 					double volumicTerm = basis->VolumicTerm(element, localFunction1, localFunction2);
 
@@ -106,12 +97,14 @@ public:
 			if (interface->IsDomainBoundary)
 				continue;
 
-			for (int localFunction1 = 0; localFunction1 < basis->NumberOfLocalFunctionsInElement(interface->Element1); localFunction1++)
+			for (int localFunctionNumber1 = 0; localFunctionNumber1 < basis->NumberOfLocalFunctionsInElement(interface->Element1); localFunctionNumber1++)
 			{
-				BigNumber basisFunction1 = basis->GlobalFunctionNumber(interface->Element1, localFunction1);
-				for (int localFunction2 = 0; localFunction2 < basis->NumberOfLocalFunctionsInElement(interface->Element2); localFunction2++)
+				BasisFunction2D* localFunction1 = basis->GetLocalBasisFunction(interface->Element1, localFunctionNumber1);
+				BigNumber basisFunction1 = basis->GlobalFunctionNumber(interface->Element1, localFunctionNumber1);
+				for (int localFunctionNumber2 = 0; localFunctionNumber2 < basis->NumberOfLocalFunctionsInElement(interface->Element2); localFunctionNumber2++)
 				{
-					BigNumber basisFunction2 = basis->GlobalFunctionNumber(interface->Element2, localFunction2);
+					BasisFunction2D* localFunction2 = basis->GetLocalBasisFunction(interface->Element2, localFunctionNumber2);
+					BigNumber basisFunction2 = basis->GlobalFunctionNumber(interface->Element2, localFunctionNumber2);
 					double coupling = basis->CouplingTerm(interface, interface->Element1, localFunction1, interface->Element2, localFunction2);
 					double penalization = basis->PenalizationTerm(interface, interface->Element1, localFunction1, interface->Element2, localFunction2);
 					

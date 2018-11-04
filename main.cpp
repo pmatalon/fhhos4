@@ -13,12 +13,13 @@
 using namespace std;
 
 
-void print_usage(int d, int n, string b, int p, int z, string o) {
+void print_usage(string s, int d, int n, string b, int p, int z, string o) {
 	cout << "--------------------------------------------------------" << endl;
 	cout << "Arguments:" << endl;
-	cout << "-d {1,2}:\t	space dimension (default: 1)\t--> " << d << endl;
+	cout << "-s {sine|poly}\t	solution (default: sine)\t--> " << s << endl;
+	cout << "-d {1|2}:\t	space dimension (default: 1)\t--> " << d << endl;
 	cout << "-n NUM:\t		number of subdivisions (default: 5)\t--> " << n << endl;
-	cout << "-b {monomials,reversemonomials,legendre}:	polynomial basis (default: monomials)\t--> " << b << endl;
+	cout << "-b {monomials|reversemonomials|legendre}:	polynomial basis (default: monomials)\t--> " << b << endl;
 	cout << "-p NUM:\t		max polynomial degree (default: 2)\t--> " << p << endl;
 	cout << "-z NUM:\t		penalization coefficient (default: 100)\t--> " << z << endl;
 	cout << "-o PATH:\t		output directory to export the system (default: ./)\t--> " << o << endl;
@@ -32,6 +33,7 @@ int main(int argc, char* argv[])
 	std::cout << v.transpose() << std::endl;
     printf("hello from DGHHO!\n");*/
 
+	string solution = "sine";
 	int dimension = 1;
 	BigNumber n = 5;
 	string basisCode = "monomials";
@@ -40,10 +42,12 @@ int main(int argc, char* argv[])
 	string outputDirectory = "./";
 
 	int option = 0;
-	while ((option = getopt(argc, argv, "d:n:b:p:z:o:")) != -1) 
+	while ((option = getopt(argc, argv, "s:d:n:b:p:z:o:")) != -1) 
 	{
 		switch (option) 
 		{
+			case 's': solution = optarg;
+				break;
 			case 'd': dimension = atoi(optarg);
 				break;
 			case 'n': n = stoul(optarg, nullptr, 0);
@@ -56,29 +60,35 @@ int main(int argc, char* argv[])
 				break;
 			case 'o': outputDirectory = optarg;
 				break;
-			default: print_usage(dimension, n, basisCode, polyDegree, penalizationCoefficient, outputDirectory);
+			default: print_usage(solution, dimension, n, basisCode, polyDegree, penalizationCoefficient, outputDirectory);
 				exit(EXIT_FAILURE);
 		}
 	}
-	print_usage(dimension, n, basisCode, polyDegree, penalizationCoefficient, outputDirectory);
+	print_usage(solution, dimension, n, basisCode, polyDegree, penalizationCoefficient, outputDirectory);
 
 	if (dimension == 1)
 	{
 		CartesianGrid1D* grid = new CartesianGrid1D(n);
 
-		//std::function<double(double)> sourceFunction = [](double x) { return sin(4 * M_PI * x); };
-		std::function<double(double)> sourceFunction = [](double x) { return 2; };
-		Poisson1D* problem = new Poisson1D(sourceFunction);
+		std::function<double(double)> sourceFunction = [](double x) { return sin(4 * M_PI * x); };
+		if (solution.compare("poly") == 0)
+			sourceFunction = [](double x) { return 2; };
+
+		Poisson1D* problem = new Poisson1D(solution, sourceFunction);
 
 		FunctionalBasisWithNumbers* basis;
 		if (basisCode.compare("monomials") == 0)
 			basis = new MonomialBasis1D(polyDegree, grid, penalizationCoefficient, sourceFunction);
+		else if (basisCode.compare("globalmonomials") == 0)
+			basis = new MonomialGlobalBasis1D(polyDegree, grid, penalizationCoefficient, sourceFunction);
 		else if (basisCode.compare("reversemonomials") == 0)
 			basis = new ReverseMonomialBasis1D(polyDegree, grid, penalizationCoefficient, sourceFunction);
 		/*else if (basisCode.compare("oldmonomials") == 0)
 			basis = new MonomialBasis1DOLD(polyDegree, grid, penalizationCoefficient, sourceFunction);*/
 		else if (basisCode.compare("legendre") == 0)
 			basis = new LegendreBasis1D(polyDegree, grid, penalizationCoefficient, sourceFunction);
+		else if (basisCode.compare("globallegendre") == 0)
+			basis = new GlobalLegendreBasis1D(polyDegree, grid, penalizationCoefficient, sourceFunction);
 		else
 		{
 			cout << "Basis not managed!";
@@ -94,9 +104,10 @@ int main(int argc, char* argv[])
 	{
 		CartesianGrid2D* grid = new CartesianGrid2D(n);
 
-		//std::function<double(double, double)> sourceFunction = [](double x, double y) { return 32 * pow(M_PI,2) * sin(4 * M_PI * x)*sin(4 * M_PI * y); };
-		std::function<double(double, double)> sourceFunction = [](double x, double y) { return 2 * y*(1 - y) + 2 * x*(1 - x); };
-		Poisson2D* problem = new Poisson2D(sourceFunction);
+		std::function<double(double, double)> sourceFunction = [](double x, double y) { return 32 * pow(M_PI,2) * sin(4 * M_PI * x)*sin(4 * M_PI * y); };
+		if (solution.compare("poly") == 0)
+			sourceFunction = [](double x, double y) { return 2 * y*(1 - y) + 2 * x*(1 - x); };
+		Poisson2D* problem = new Poisson2D(solution, sourceFunction);
 
 		FunctionalBasisWithObjects* basis;
 		basis = new MonomialBasis2D(polyDegree, grid, penalizationCoefficient, sourceFunction);
