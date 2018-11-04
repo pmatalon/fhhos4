@@ -5,7 +5,6 @@
 //#include <Eigen/Dense>
 #include <functional>
 #include <getopt.h>
-//#include "MonomialBasis1DOLD.h"
 #include "MonomialBasis1D.h"
 #include "ReverseMonomialBasis1D.h"
 #include "LegendreBasis1D.h"
@@ -83,8 +82,6 @@ int main(int argc, char* argv[])
 			basis = new MonomialGlobalBasis1D(polyDegree, grid, penalizationCoefficient, sourceFunction);
 		else if (basisCode.compare("reversemonomials") == 0)
 			basis = new ReverseMonomialBasis1D(polyDegree, grid, penalizationCoefficient, sourceFunction);
-		/*else if (basisCode.compare("oldmonomials") == 0)
-			basis = new MonomialBasis1DOLD(polyDegree, grid, penalizationCoefficient, sourceFunction);*/
 		else if (basisCode.compare("legendre") == 0)
 			basis = new LegendreBasis1D(polyDegree, grid, penalizationCoefficient, sourceFunction);
 		else if (basisCode.compare("globallegendre") == 0)
@@ -110,7 +107,15 @@ int main(int argc, char* argv[])
 		Poisson2D* problem = new Poisson2D(solution, sourceFunction);
 
 		FunctionalBasisWithObjects* basis;
-		basis = new MonomialBasis2D(polyDegree, grid, penalizationCoefficient, sourceFunction);
+		if (basisCode.compare("monomials") == 0)
+			basis = new MonomialBasis2D(polyDegree, grid, penalizationCoefficient, sourceFunction);
+		else if (basisCode.compare("globalmonomials") == 0)
+			basis = new MonomialGlobalBasis2D(polyDegree, grid, penalizationCoefficient, sourceFunction);
+		else
+		{
+			cout << "Basis not managed!";
+			exit(EXIT_FAILURE);
+		}
 
 		problem->DiscretizeDG(grid, basis, penalizationCoefficient, outputDirectory);
 		delete problem;

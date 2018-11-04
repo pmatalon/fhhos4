@@ -2,7 +2,7 @@
 #include <functional>
 #include "FunctionalBasisWithNumbers.h"
 #include "CartesianGrid1D.h"
-#include "BasisFunction1D.h"
+#include "IBasisFunction1D.h"
 #include "Element.h"
 #include "FileMatrix.h"
 #include "FileVector.h"
@@ -47,7 +47,7 @@ public:
 		{
 			for (int localFunctionNumber1 = 0; localFunctionNumber1 < basis->NumberOfLocalFunctionsInElement(element); localFunctionNumber1++)
 			{
-				BasisFunction1D* localFunction1 = basis->GetLocalBasisFunction(element, localFunctionNumber1);
+				IBasisFunction1D* localFunction1 = basis->GetLocalBasisFunction(element, localFunctionNumber1);
 				BigNumber basisFunction1 = basis->GlobalFunctionNumber(element, localFunctionNumber1);
 
 
@@ -58,7 +58,7 @@ public:
 					int interface = grid->GetInterface(element, neighbour);
 					for (int localFunctionNumber2 = 0; localFunctionNumber2 < basis->NumberOfLocalFunctionsInElement(neighbour); localFunctionNumber2++)
 					{
-						BasisFunction1D* localFunction2 = basis->GetLocalBasisFunction(element, localFunctionNumber2);
+						IBasisFunction1D* localFunction2 = basis->GetLocalBasisFunction(element, localFunctionNumber2);
 
 						double couplingTerm = basis->CouplingTerm(interface, element, localFunction1, neighbour, localFunction2);
 						double penalization = basis->PenalizationTerm(interface, element, localFunction1, neighbour, localFunction2);
@@ -78,7 +78,7 @@ public:
 				// Current element (block diagonal)
 				for (int localFunctionNumber2 = 0; localFunctionNumber2 < basis->NumberOfLocalFunctionsInElement(element); localFunctionNumber2++)
 				{
-					BasisFunction1D* localFunction2 = basis->GetLocalBasisFunction(element, localFunctionNumber2);
+					IBasisFunction1D* localFunction2 = basis->GetLocalBasisFunction(element, localFunctionNumber2);
 
 					double volumicTerm = basis->VolumicTerm(element, localFunction1, localFunction2);
 
@@ -107,7 +107,7 @@ public:
 					int interface = grid->GetInterface(element, neighbour);
 					for (int localFunctionNumber2 = 0; localFunctionNumber2 < basis->NumberOfLocalFunctionsInElement(neighbour); localFunctionNumber2++)
 					{
-						BasisFunction1D* localFunction2 = basis->GetLocalBasisFunction(element, localFunctionNumber2);
+						IBasisFunction1D* localFunction2 = basis->GetLocalBasisFunction(element, localFunctionNumber2);
 
 						double couplingTerm = basis->CouplingTerm(interface, element, localFunction1, neighbour, localFunction2);
 						double penalization = basis->PenalizationTerm(interface, element, localFunction1, neighbour, localFunction2);

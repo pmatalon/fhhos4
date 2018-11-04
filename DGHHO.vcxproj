@@ -86,10 +86,9 @@
   </PropertyGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="MonomialBasis1DOLD.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="BasisFunction2D.h" />
+    <ClInclude Include="IBasisFunction2D.h" />
     <ClInclude Include="CartesianGrid1D.h" />
     <ClInclude Include="CartesianGrid2D.h" />
     <ClInclude Include="Element.h" />
@@ -98,18 +97,19 @@
     <ClInclude Include="FileMatrix.h" />
     <ClInclude Include="FileVector.h" />
     <ClInclude Include="FunctionalBasis2D.h" />
+    <ClInclude Include="FunctionalGlobalBasis2D.h" />
     <ClInclude Include="FunctionalBasisWithNumbers.h" />
     <ClInclude Include="FunctionalBasisWithObjects.h" />
     <ClInclude Include="FunctionalGlobalBasis1D.h" />
-    <ClInclude Include="gauss_legendre.h" />
+    <ClInclude Include="GaussLegendre.h" />
     <ClInclude Include="FunctionalBasis1D.h" />
     <ClInclude Include="LegendreBasis1D.h" />
-    <ClInclude Include="MonomialBasis1DOLD.h" />
     <ClInclude Include="MonomialBasis2D.h" />
     <ClInclude Include="MonomialBasis1D.h" />
     <ClInclude Include="Poisson1D.h" />
     <ClInclude Include="Poisson2D.h" />
-    <ClInclude Include="BasisFunction1D.h" />
+    <ClInclude Include="IBasisFunction1D.h" />
+    <ClInclude Include="IPolynomialFunction.h" />
     <ClInclude Include="ReverseMonomialBasis1D.h" />
     <ClInclude Include="Square.h" />
     <ClInclude Include="Utils.h" />

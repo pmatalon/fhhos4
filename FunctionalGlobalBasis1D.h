@@ -4,8 +4,9 @@
 #include <math.h>
 #include "FunctionalBasisWithNumbers.h"
 #include "CartesianGrid1D.h"
-#include "BasisFunction1D.h"
-#include "Utils.h"
+#include "IBasisFunction1D.h"
+#include "IPolynomialFunction.h"
+//#include "Utils.h"
 using namespace std;
 
 class FunctionalGlobalBasis1D : public FunctionalBasisWithNumbers
@@ -15,7 +16,7 @@ protected:
 	int _penalizationCoefficient;
 	function<double(double)> _sourceFunction;
 
-	map<int, BasisFunction1D*> _localFunctions;
+	map<int, IBasisFunction1D*> _localFunctions;
 
 public:
 	FunctionalGlobalBasis1D(CartesianGrid1D* grid, int penalizationCoefficient, function<double(double)> sourceFunction)
@@ -30,7 +31,7 @@ public:
 		return static_cast<int>(this->_localFunctions.size());
 	}
 	
-	BasisFunction1D* GetLocalBasisFunction(BigNumber element, int localFunctionNumber)
+	IBasisFunction1D* GetLocalBasisFunction(BigNumber element, int localFunctionNumber)
 	{
 		return this->_localFunctions[localFunctionNumber];
 	}
@@ -40,16 +41,21 @@ public:
 		return element * NumberOfLocalFunctionsInElement(0) + localFunctionNumber + 1; // +1 so that the numbers start at 1
 	}
 
-	double VolumicTerm(BigNumber element, BasisFunction1D* func1, BasisFunction1D* func2)
+	double VolumicTerm(BigNumber element, IBasisFunction1D* func1, IBasisFunction1D* func2)
 	{
 		function<double(double)> functionToIntegrate = [func1, func2](double x) {
 			return func1->EvalDerivative(x)*func2->EvalDerivative(x);
 		};
 
-		return Utils::Integral(functionToIntegrate, this->_grid->XLeft(element), this->_grid->XRight(element));
+		IPolynomialFunction* poly1 = dynamic_cast<IPolynomialFunction*>(func1);
+		IPolynomialFunction* poly2 = dynamic_cast<IPolynomialFunction*>(func2);
+
+		GaussLegendre* gs = new GaussLegendre(poly1->GetDegree() + poly2->GetDegree());
+		return gs->Quadrature(functionToIntegrate, this->_grid->XLeft(element), this->_grid->XRight(element));
+		//return Utils::Integral(functionToIntegrate, this->_grid->XLeft(element), this->_grid->XRight(element));
 	}
 
-	double CouplingTerm(BigNumber interface, BigNumber element1, BasisFunction1D* func1, BigNumber element2, BasisFunction1D* func2)
+	double CouplingTerm(BigNumber interface, BigNumber element1, IBasisFunction1D* func1, BigNumber element2, IBasisFunction1D* func2)
 	{
 		if (element2 > element1 + 1 || element1 > element2 + 1)
 			return 0;
@@ -57,7 +63,7 @@ public:
 		return MeanGrad(element1, func1, interface) * Jump(element2, func2, interface) + MeanGrad(element2, func2, interface) * Jump(element1, func1, interface);
 	}
 
-	double PenalizationTerm(BigNumber point, BigNumber element1, BasisFunction1D* func1, BigNumber element2, BasisFunction1D* func2)
+	double PenalizationTerm(BigNumber point, BigNumber element1, IBasisFunction1D* func1, BigNumber element2, IBasisFunction1D* func2)
 	{
 		if (element2 > element1 + 1 || element1 > element2 + 1)
 			return 0;
@@ -65,22 +71,25 @@ public:
 		return this->_penalizationCoefficient * Jump(element1, func1, point) * Jump(element2, func2, point);
 	}
 
-	double RightHandSide(BigNumber element, BasisFunction1D* func)
+	double RightHandSide(BigNumber element, IBasisFunction1D* func)
 	{
 		function<double(double)> sourceTimesBasisFunction = [this, func](double x) {
 			return this->_sourceFunction(x) * func->Eval(x);
 		};
-		return Utils::Integral(sourceTimesBasisFunction, this->_grid->XLeft(element), this->_grid->XRight(element));
+
+		GaussLegendre* gs = new GaussLegendre();
+		return gs->Quadrature(sourceTimesBasisFunction, this->_grid->XLeft(element), this->_grid->XRight(element));
+		//return Utils::Integral(sourceTimesBasisFunction, this->_grid->XLeft(element), this->_grid->XRight(element));
 	}
 
-	double MeanGrad(BigNumber element, BasisFunction1D* func, BigNumber interface)
+	double MeanGrad(BigNumber element, IBasisFunction1D* func, BigNumber interface)
 	{
 		if (this->_grid->IsBoundaryLeft(interface) || this->_grid->IsBoundaryRight(interface))
 			return func->EvalDerivative(this->_grid->X(interface));
 		return 0.5 * (func->EvalDerivative(this->_grid->X(interface)));
 	}
 
-	double Jump(BigNumber element, BasisFunction1D* func, BigNumber interface)
+	double Jump(BigNumber element, IBasisFunction1D* func, BigNumber interface)
 	{
 		int factor = this->_grid->IsLeftInterface(element, interface) ? 1 : -1;
 		return factor * (func->Eval(this->_grid->X(interface)));

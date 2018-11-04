@@ -1,10 +1,11 @@
 #pragma once
 #include "FunctionalBasis1D.h"
-#include "BasisFunction1D.h"
+#include "IBasisFunction1D.h"
+#include "IPolynomialFunction.h"
 #include <math.h>
 using namespace std;
 
-class Legendre1D : public BasisFunction1D
+class Legendre1D : public IBasisFunction1D, public IPolynomialFunction
 {
 public:
 	int Degree;
@@ -19,6 +20,11 @@ public:
 	{
 		this->Degree = degree;
 		this->Normalized = normalized;
+	}
+
+	int GetDegree()
+	{
+		return this->Degree;
 	}
 
 	double Eval(double x)

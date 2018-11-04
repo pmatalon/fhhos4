@@ -1,11 +1,12 @@
 #pragma once
 #include "FunctionalBasis1D.h"
 #include "FunctionalGlobalBasis1D.h"
-#include "BasisFunction1D.h"
+#include "IBasisFunction1D.h"
+#include "IPolynomialFunction.h"
 #include <math.h>
 using namespace std;
 
-class Monomial1D : public BasisFunction1D
+class Monomial1D : public IBasisFunction1D, public IPolynomialFunction
 {
 public:
 	int Degree;
@@ -13,6 +14,11 @@ public:
 	Monomial1D(int degree)
 	{
 		this->Degree = degree;
+	}
+
+	int GetDegree()
+	{
+		return this->Degree;
 	}
 
 	double Eval(double x)

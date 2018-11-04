@@ -1,44 +1,53 @@
 #pragma once
 #include <functional>
 #include <vector>
+#include "GaussLegendre.h"
 
 class Utils
 {
 public:
 	// Integral on [-1, 1]
-	static double IntegralOnReferenceInterval(std::function<double(double)> func)
+	/*static double IntegralOnReferenceInterval(std::function<double(double)> func)
 	{
 		return GaussLegendre(7, func);
-	}
+	}*/
 
 	// Integral on [x1, x2]
-	static double Integral(std::function<double(double)> func, double x1, double x2)
+	/*static double Integral(std::function<double(double)> func, double x1, double x2)
 	{
 		return GaussLegendre(7, func, x1, x2);
+	}*/
+
+	// Integral on [-1, 1] x [-1, 1]
+	static double IntegralOnReferenceInterval(std::function<double(double, double)> func)
+	{
+		GaussLegendre* gs = new GaussLegendre();
+		return gs->Quadrature(func);
 	}
 
 	// Integral on [x1, x2] x [y1, y2]
 	static double Integral(std::function<double(double, double)> func, double x1, double x2, double y1, double y2)
 	{
-		int nPoints = 7;
+		//int nPoints = 7;
+		GaussLegendre* gs = new GaussLegendre();
 		if (x1 == x2)
 		{
 			std::function<double(double)> func1D = [func, x1](double y) {
 				return func(x1, y);
 			};
-			return GaussLegendre(nPoints, func1D, y1, y2);
+			return gs->Quadrature(func1D, y1, y2);
 		}
 		if (y1 == y2)
 		{
 			std::function<double(double)> func1D = [func, y1](double x) {
 				return func(x, y1);
 			};
-			return GaussLegendre(nPoints, func1D, x1, x2);
+			return gs->Quadrature(func1D, x1, x2);
 		}
-		return GaussLegendre(nPoints, func, x1, x2, y1, y2);
+		return gs->Quadrature(func, x1, x2, y1, y2);
 	}
 
-private:
+/*private:
 	// Gauss-Legendre quadrature on [-1, 1]
 	static double GaussLegendre(int nPoints, std::function<double(double)> func)
 	{
@@ -64,6 +73,21 @@ private:
 	}
 
 	// Gauss-Legendre quadrature on [-1, 1]^2
+	static double GaussLegendre(int nPoints, std::function<double(double, double)> func)
+	{
+		vector<double> points = GetGaussLegendrePoints(nPoints);
+		vector<double> weights = GetGaussLegendreWeights(nPoints);
+
+		double sum = 0;
+		for (int i = 0; i < nPoints; i++)
+		{
+			for (int j = 0; j < nPoints; j++)
+				sum += func(points[i], points[j]) * weights[i] * weights[j];
+		}
+		return sum;
+	}
+
+	// Gauss-Legendre quadrature on [x1, x2] x [y1, y2]
 	static double GaussLegendre(int nPoints, std::function<double(double, double)> func, double x1, double x2, double y1, double y2)
 	{
 		vector<double> points = GetGaussLegendrePoints(nPoints);
@@ -155,5 +179,5 @@ private:
 			weights[6] = 0.1294849661688697;
 		}
 		return weights;
-	}
+	}*/
 };

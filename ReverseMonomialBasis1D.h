@@ -1,10 +1,11 @@
 #pragma once
 #include "FunctionalBasis1D.h"
-#include "BasisFunction1D.h"
+#include "IBasisFunction1D.h"
+#include "IPolynomialFunction.h"
 
 using namespace std;
 
-class ReverseMonomial1D : public BasisFunction1D
+class ReverseMonomial1D : public IBasisFunction1D, public IPolynomialFunction
 {
 public:
 	int Degree;
@@ -12,6 +13,11 @@ public:
 	ReverseMonomial1D(int degree)
 	{
 		this->Degree = degree;
+	}
+
+	int GetDegree()
+	{
+		return this->Degree;
 	}
 
 	double Eval(double x)

@@ -2,9 +2,6 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="MonomialBasis1DOLD.cpp">
-      <Filter>FunctionalBasis</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Poisson1D.h" />
@@ -21,9 +18,6 @@
     <ClInclude Include="ElementInterface.h">
       <Filter>Mesh</Filter>
     </ClInclude>
-    <ClInclude Include="gauss_legendre.h">
-      <Filter>Utils</Filter>
-    </ClInclude>
     <ClInclude Include="Square.h">
       <Filter>Mesh</Filter>
     </ClInclude>
@@ -32,12 +26,6 @@
     </ClInclude>
     <ClInclude Include="CartesianGrid2D.h">
       <Filter>Mesh</Filter>
-    </ClInclude>
-    <ClInclude Include="BasisFunction1D.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
-    <ClInclude Include="BasisFunction2D.h">
-      <Filter>FunctionalBasis</Filter>
     </ClInclude>
     <ClInclude Include="FileMatrix.h">
       <Filter>Utils</Filter>
@@ -48,9 +36,6 @@
     <ClInclude Include="FunctionalBasis1D.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
-    <ClInclude Include="FunctionalBasis2D.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
     <ClInclude Include="FunctionalBasisWithNumbers.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
@@ -58,9 +43,6 @@
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
     <ClInclude Include="MonomialBasis1D.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
-    <ClInclude Include="MonomialBasis1DOLD.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
     <ClInclude Include="MonomialBasis2D.h">
@@ -73,6 +55,24 @@
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
     <ClInclude Include="FunctionalGlobalBasis1D.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="FunctionalGlobalBasis2D.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="FunctionalBasis2D.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="GaussLegendre.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="IPolynomialFunction.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="IBasisFunction1D.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="IBasisFunction2D.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
   </ItemGroup>

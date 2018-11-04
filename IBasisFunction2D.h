@@ -1,5 +1,5 @@
 #pragma once
-class BasisFunction2D
+class IBasisFunction2D
 {
 public:
 	virtual double Eval(double x, double y) = 0;

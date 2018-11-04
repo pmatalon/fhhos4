@@ -52,13 +52,13 @@ public:
 
 			for (int localFunctionNumber1 = 0; localFunctionNumber1 < basis->NumberOfLocalFunctionsInElement(element); localFunctionNumber1++)
 			{
-				BasisFunction2D* localFunction1 = basis->GetLocalBasisFunction(element, localFunctionNumber1);
+				IBasisFunction2D* localFunction1 = basis->GetLocalBasisFunction(element, localFunctionNumber1);
 				BigNumber basisFunction1 = basis->GlobalFunctionNumber(element, localFunctionNumber1);
 
 				// Current element (block diagonal)
 				for (int localFunctionNumber2 = 0; localFunctionNumber2 < basis->NumberOfLocalFunctionsInElement(element); localFunctionNumber2++)
 				{
-					BasisFunction2D* localFunction2 = basis->GetLocalBasisFunction(element, localFunctionNumber2);
+					IBasisFunction2D* localFunction2 = basis->GetLocalBasisFunction(element, localFunctionNumber2);
 					BigNumber basisFunction2 = basis->GlobalFunctionNumber(element, localFunctionNumber2);
 
 					double volumicTerm = basis->VolumicTerm(element, localFunction1, localFunction2);
@@ -99,11 +99,11 @@ public:
 
 			for (int localFunctionNumber1 = 0; localFunctionNumber1 < basis->NumberOfLocalFunctionsInElement(interface->Element1); localFunctionNumber1++)
 			{
-				BasisFunction2D* localFunction1 = basis->GetLocalBasisFunction(interface->Element1, localFunctionNumber1);
+				IBasisFunction2D* localFunction1 = basis->GetLocalBasisFunction(interface->Element1, localFunctionNumber1);
 				BigNumber basisFunction1 = basis->GlobalFunctionNumber(interface->Element1, localFunctionNumber1);
 				for (int localFunctionNumber2 = 0; localFunctionNumber2 < basis->NumberOfLocalFunctionsInElement(interface->Element2); localFunctionNumber2++)
 				{
-					BasisFunction2D* localFunction2 = basis->GetLocalBasisFunction(interface->Element2, localFunctionNumber2);
+					IBasisFunction2D* localFunction2 = basis->GetLocalBasisFunction(interface->Element2, localFunctionNumber2);
 					BigNumber basisFunction2 = basis->GlobalFunctionNumber(interface->Element2, localFunctionNumber2);
 					double coupling = basis->CouplingTerm(interface, interface->Element1, localFunction1, interface->Element2, localFunction2);
 					double penalization = basis->PenalizationTerm(interface, interface->Element1, localFunction1, interface->Element2, localFunction2);
