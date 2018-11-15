@@ -2,11 +2,12 @@
 #include "FunctionalBasis2D.h"
 #include "FunctionalGlobalBasis2D.h"
 #include "IBasisFunction2D.h"
+#include "IPolynomialFunction.h"
 #include <math.h>
 
 using namespace std;
 
-class Monomial2D : public IBasisFunction2D
+class Monomial2D : public IBasisFunction2D, public IPolynomialFunction
 {
 public:
 	int DegreeX;
@@ -16,6 +17,11 @@ public:
 	{
 		this->DegreeX = degreeX;
 		this->DegreeY = degreeY;
+	}
+
+	int GetDegree()
+	{
+		return this->DegreeX + this->DegreeY;
 	}
 
 	double Eval(double x, double y)
@@ -44,16 +50,19 @@ private:
 	int _maxPolynomialDegree;
 
 public:
-	MonomialBasis2D(int maxPolynomialDegree, CartesianGrid2D* grid, int penalizationCoefficient, function<double(double, double)> sourceFunction)
-		:FunctionalBasis2D(grid, penalizationCoefficient, sourceFunction)
+	MonomialBasis2D(int maxPolynomialDegree, int penalizationCoefficient, function<double(double, double)> sourceFunction)
+		:FunctionalBasis2D(penalizationCoefficient, sourceFunction)
 	{
 		this->_maxPolynomialDegree = maxPolynomialDegree;
 
 		int functionNumber = 0;
-		for (int i = 0; i <= this->_maxPolynomialDegree; i++)
+		for (int degree = 0; degree <= this->_maxPolynomialDegree; degree++)
 		{
-			for (int j = 0; i + j <= this->_maxPolynomialDegree; j++)
+			for (int j = 0; j <= degree; j++)
+			{
+				int i = degree - j;
 				this->_localFunctions[functionNumber++] = new Monomial2D(i, j);
+			}
 		}
 	}
 
@@ -76,10 +85,13 @@ public:
 		this->_maxPolynomialDegree = maxPolynomialDegree;
 
 		int functionNumber = 0;
-		for (int i = 0; i <= this->_maxPolynomialDegree; i++)
+		for (int degree = 0; degree <= this->_maxPolynomialDegree; degree++)
 		{
-			for (int j = 0; i + j <= this->_maxPolynomialDegree; j++)
+			for (int j = 0; j <= degree; j++)
+			{
+				int i = degree - j;
 				this->_localFunctions[functionNumber++] = new Monomial2D(i, j);
+			}
 		}
 	}
 

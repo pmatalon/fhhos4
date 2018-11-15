@@ -88,6 +88,8 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="CartesianGrid1DNew.h" />
+    <ClInclude Include="Element1DInterface.h" />
     <ClInclude Include="IBasisFunction2D.h" />
     <ClInclude Include="CartesianGrid1D.h" />
     <ClInclude Include="CartesianGrid2D.h" />
@@ -103,7 +105,9 @@
     <ClInclude Include="FunctionalGlobalBasis1D.h" />
     <ClInclude Include="GaussLegendre.h" />
     <ClInclude Include="FunctionalBasis1D.h" />
+    <ClInclude Include="Interval.h" />
     <ClInclude Include="LegendreBasis1D.h" />
+    <ClInclude Include="IMesh.h" />
     <ClInclude Include="MonomialBasis2D.h" />
     <ClInclude Include="MonomialBasis1D.h" />
     <ClInclude Include="Poisson1D.h" />

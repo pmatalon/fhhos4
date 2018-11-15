@@ -101,14 +101,14 @@ int main(int argc, char* argv[])
 	{
 		CartesianGrid2D* grid = new CartesianGrid2D(n);
 
-		std::function<double(double, double)> sourceFunction = [](double x, double y) { return 32 * pow(M_PI,2) * sin(4 * M_PI * x)*sin(4 * M_PI * y); };
+		std::function<double(double, double)> sourceFunction = [](double x, double y) { return 2 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y); };
 		if (solution.compare("poly") == 0)
 			sourceFunction = [](double x, double y) { return 2 * y*(1 - y) + 2 * x*(1 - x); };
-		Poisson2D* problem = new Poisson2D(solution, sourceFunction);
+		Poisson2D<IBasisFunction2D>* problem = new Poisson2D<IBasisFunction2D>(solution, sourceFunction);
 
-		FunctionalBasisWithObjects* basis;
+		FunctionalBasisWithObjects<IBasisFunction2D>* basis;
 		if (basisCode.compare("monomials") == 0)
-			basis = new MonomialBasis2D(polyDegree, grid, penalizationCoefficient, sourceFunction);
+			basis = new MonomialBasis2D(polyDegree, penalizationCoefficient, sourceFunction);
 		else if (basisCode.compare("globalmonomials") == 0)
 			basis = new MonomialGlobalBasis2D(polyDegree, grid, penalizationCoefficient, sourceFunction);
 		else

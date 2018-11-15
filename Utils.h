@@ -28,7 +28,6 @@ public:
 	// Integral on [x1, x2] x [y1, y2]
 	static double Integral(std::function<double(double, double)> func, double x1, double x2, double y1, double y2)
 	{
-		//int nPoints = 7;
 		GaussLegendre* gs = new GaussLegendre();
 		if (x1 == x2)
 		{

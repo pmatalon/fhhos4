@@ -72,6 +72,7 @@ public:
 							fileMatrix->Add(basisFunction1, basisFunction2, penalization);
 						else
 							fileMatrix->Add(basisFunction1, basisFunction2, couplingTerm + penalization);
+
 					}
 				}
 
@@ -98,6 +99,9 @@ public:
 						fileMatrix->Add(basisFunction1, basisFunction2, penalizationRight + penalizationLeft);
 					else
 						fileMatrix->Add(basisFunction1, basisFunction2, volumicTerm + couplingTermLeft + couplingTermRight + penalizationRight + penalizationLeft);
+
+
+					cout << "v = " << volumicTerm << " couplingTermLeft=" << couplingTermLeft << " couplingTermRight=" << couplingTermRight << " penalizationRight=" << penalizationRight << " penalizationRight=" << penalizationRight;
 				}
 
 				if (!grid->IsLastElement(element))

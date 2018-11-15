@@ -21,7 +21,7 @@ public:
 	{
 		if (value == 0)
 			return;
-		fprintf(this->_file, "%llu %llu %.17g \n", i, j, value);
+		fprintf(this->_file, "%llu %llu %.17e \n", i, j, value);
 	}
 	~FileMatrix()
 	{

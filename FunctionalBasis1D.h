@@ -5,7 +5,6 @@
 #include "FunctionalBasisWithNumbers.h"
 #include "CartesianGrid1D.h"
 #include "IBasisFunction1D.h"
-//#include "Utils.h"
 #include "GaussLegendre.h"
 #include "IPolynomialFunction.h"
 using namespace std;
@@ -56,7 +55,6 @@ public:
 
 		GaussLegendre* gs = new GaussLegendre(poly1->GetDegree() + poly2->GetDegree());
 		return 2 / (b - a) * gs->Quadrature(functionToIntegrate);
-		//return 2/(b - a) * Utils::IntegralOnReferenceInterval(functionToIntegrate);
 	}
 
 	double CouplingTerm(BigNumber interface, BigNumber element1, IBasisFunction1D* func1, BigNumber element2, IBasisFunction1D* func2)
@@ -86,7 +84,6 @@ public:
 
 		GaussLegendre* gs = new GaussLegendre();
 		return (b - a) / 2 * gs->Quadrature(sourceTimesBasisFunction);
-		//return (b - a) / 2 * Utils::IntegralOnReferenceInterval(sourceTimesBasisFunction);
 	}
 
 	double MeanDerivative(BigNumber element, IBasisFunction1D* func, BigNumber interface)

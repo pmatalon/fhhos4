@@ -12,6 +12,7 @@ public:
 	{
 		this->Element1 = element1;
 		this->Element2 = element2;
+		this->IsDomainBoundary = false;
 	}
 	ElementInterface(Element* element1)
 		:ElementInterface(element1, NULL)

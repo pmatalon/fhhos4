@@ -75,6 +75,18 @@
     <ClInclude Include="IBasisFunction2D.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
+    <ClInclude Include="IMesh.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="CartesianGrid1DNew.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="Interval.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="Element1DInterface.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

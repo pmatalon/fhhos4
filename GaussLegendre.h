@@ -27,6 +27,8 @@ public:
 		this->points.reserve(nPoints);
 		this->weights.reserve(nPoints);
 
+		// https://pomax.github.io/bezierinfo/legendre-gauss.html
+
 		if (nPoints == 2)
 		{
 			points[0] = -0.5773502691896257;
@@ -214,6 +216,21 @@ public:
 	// Gauss-Legendre quadrature on [x1, x2]x[y1, y2]
 	double Quadrature(std::function<double(double, double)> func, double x1, double x2, double y1, double y2)
 	{
+		if (x1 == x2)
+		{
+			std::function<double(double)> func1D = [func, x1](double y) {
+				return func(x1, y);
+			};
+			return Quadrature(func1D, y1, y2);
+		}
+		if (y1 == y2)
+		{
+			std::function<double(double)> func1D = [func, y1](double x) {
+				return func(x, y1);
+			};
+			return Quadrature(func1D, x1, x2);
+		}
+
 		double sum = 0;
 		for (int i = 0; i < this->nPoints; i++)
 		{

@@ -14,7 +14,7 @@ public:
 	}
 	void Add(double value)
 	{
-		fprintf(this->_file, "%.17g \n", value);
+		fprintf(this->_file, "%.17e \n", value);
 	}
 	~FileVector()
 	{
