@@ -22,6 +22,8 @@ public:
 		this->Normalized = normalized;
 	}
 
+	RefInterval ReferenceInterval() { return RefInterval::MinusOne_One(); }
+
 	int GetDegree()
 	{
 		return this->Degree;

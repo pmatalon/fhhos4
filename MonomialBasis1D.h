@@ -16,6 +16,8 @@ public:
 		this->Degree = degree;
 	}
 
+	RefInterval ReferenceInterval() { return RefInterval::MinusOne_One(); }
+
 	int GetDegree()
 	{
 		return this->Degree;
@@ -53,19 +55,6 @@ public:
 	{
 		return "monomials_p" + std::to_string(this->_maxPolynomialDegree);
 	}
-
-	/*double VolumicTerm(BigNumber element, int localFunctionNumber1, int localFunctionNumber2)
-	{
-		Monomial1D* func1 = (Monomial1D*)this->_localFunctions[localFunctionNumber1];
-		Monomial1D* func2 = (Monomial1D*)this->_localFunctions[localFunctionNumber2];
-
-		int i = func1->Degree;
-		int j = func2->Degree;
-
-		if (i == 0 || j == 0)
-			return 0;
-		return (double)(i * j) / (double)(i + j - 1) * (pow(this->_grid->XRight(element), i + j - 1) - pow(this->_grid->XLeft(element), i + j - 1));
-	}*/
 };
 
 

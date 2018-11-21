@@ -87,6 +87,9 @@
     <ClInclude Include="Element1DInterface.h">
       <Filter>Mesh</Filter>
     </ClInclude>
+    <ClInclude Include="BernsteinBasis1D.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

@@ -88,6 +88,7 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="BernsteinBasis1D.h" />
     <ClInclude Include="CartesianGrid1DNew.h" />
     <ClInclude Include="Element1DInterface.h" />
     <ClInclude Include="IBasisFunction2D.h" />

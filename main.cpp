@@ -8,6 +8,7 @@
 #include "MonomialBasis1D.h"
 #include "ReverseMonomialBasis1D.h"
 #include "LegendreBasis1D.h"
+#include "BernsteinBasis1D.h"
 #include "MonomialBasis2D.h"
 using namespace std;
 
@@ -18,7 +19,7 @@ void print_usage(string s, int d, int n, string b, int p, int z, string o) {
 	cout << "-s {sine|poly}\t	solution (default: sine)\t--> " << s << endl;
 	cout << "-d {1|2}:\t	space dimension (default: 1)\t--> " << d << endl;
 	cout << "-n NUM:\t		number of subdivisions (default: 5)\t--> " << n << endl;
-	cout << "-b {monomials|reversemonomials|legendre}:	polynomial basis (default: monomials)\t--> " << b << endl;
+	cout << "-b {monomials|legendre|bernstein}:	polynomial basis (default: monomials)\t--> " << b << endl;
 	cout << "-p NUM:\t		max polynomial degree (default: 2)\t--> " << p << endl;
 	cout << "-z NUM:\t		penalization coefficient (default: 100)\t--> " << z << endl;
 	cout << "-o PATH:\t		output directory to export the system (default: ./)\t--> " << o << endl;
@@ -72,20 +73,23 @@ int main(int argc, char* argv[])
 		std::function<double(double)> sourceFunction = [](double x) { return sin(4 * M_PI * x); };
 		if (solution.compare("poly") == 0)
 			sourceFunction = [](double x) { return 2; };
+			//sourceFunction = [](double x) { return (-1)*(-6 * x*pow(x - 1, 3) - 3 * pow(x, 3) * (2 * x - 2) - 18 * pow(x, 2) * pow(x - 1, 2)); };
 
 		Poisson1D* problem = new Poisson1D(solution, sourceFunction);
 
 		FunctionalBasisWithNumbers* basis;
 		if (basisCode.compare("monomials") == 0)
 			basis = new MonomialBasis1D(polyDegree, grid, penalizationCoefficient, sourceFunction);
-		else if (basisCode.compare("globalmonomials") == 0)
+		/*else if (basisCode.compare("globalmonomials") == 0)
 			basis = new MonomialGlobalBasis1D(polyDegree, grid, penalizationCoefficient, sourceFunction);
 		else if (basisCode.compare("reversemonomials") == 0)
-			basis = new ReverseMonomialBasis1D(polyDegree, grid, penalizationCoefficient, sourceFunction);
+			basis = new ReverseMonomialBasis1D(polyDegree, grid, penalizationCoefficient, sourceFunction);*/
 		else if (basisCode.compare("legendre") == 0)
 			basis = new LegendreBasis1D(polyDegree, grid, penalizationCoefficient, sourceFunction);
-		else if (basisCode.compare("globallegendre") == 0)
-			basis = new GlobalLegendreBasis1D(polyDegree, grid, penalizationCoefficient, sourceFunction);
+		else if (basisCode.compare("bernstein") == 0)
+			basis = new BernsteinBasis1D(polyDegree, grid, penalizationCoefficient, sourceFunction);
+		/*else if (basisCode.compare("globallegendre") == 0)
+			basis = new GlobalLegendreBasis1D(polyDegree, grid, penalizationCoefficient, sourceFunction);*/
 		else
 		{
 			cout << "Basis not managed!";
