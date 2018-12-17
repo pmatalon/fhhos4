@@ -40,6 +40,11 @@ public:
 		return value;
 	}
 
+	string ToString()
+	{
+		return "binomial(" + std::to_string(this->_degree) + ", " + std::to_string(this->_i) + ") * X^" + std::to_string(this->_i) + " * (1-X)^" + std::to_string(this->_degree - this->_i);
+	}
+
 private:
 	double Bernstein(double x)
 	{
@@ -69,13 +74,18 @@ private:
 	int _maxPolynomialDegree;
 
 public:
-	BernsteinBasis1D(int maxPolynomialDegree, CartesianGrid1D* grid, int penalizationCoefficient, function<double(double)> sourceFunction)
-		:FunctionalBasis1D(grid, penalizationCoefficient, sourceFunction)
+	BernsteinBasis1D(int maxPolynomialDegree, CartesianGrid1D* grid, function<double(double)> sourceFunction)
+		:FunctionalBasis1D(grid, sourceFunction)
 	{
 		this->_maxPolynomialDegree = maxPolynomialDegree;
 
 		for (int i = 0; i <= maxPolynomialDegree; i++)
 			this->_localFunctions[i] = new Bernstein1D(maxPolynomialDegree, i);
+	}
+
+	int GetDegree()
+	{
+		return this->_maxPolynomialDegree;
 	}
 
 	string Name()

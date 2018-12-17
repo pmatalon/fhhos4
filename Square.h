@@ -75,8 +75,4 @@ public:
 			return new double[2]{ -1, 0 };
 		return NULL;
 	}
-
-	inline ~Square()
-	{
-	}
 };

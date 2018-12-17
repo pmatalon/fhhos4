@@ -45,7 +45,6 @@ public:
 		return value;
 	}
 
-private:
 	static double Legendre(int n, double x)
 	{
 		if (n == 0)
@@ -79,6 +78,15 @@ private:
 		//return inverseNorm*DLegendre(n - 2, x) + (2 * n - 1)*Legendre(n - 1, x);
 		return ((2 * n - 1)*Legendre(n - 1, x) + (2 * n - 1)*x*DLegendre(n - 1, x) - (n-1) * DLegendre(n - 2, x)) / n;
 	}
+
+	string ToString()
+	{
+		if (this->Degree == 0)
+			return "1";
+		if (this->Degree == 1)
+			return "X";
+		return "Legendre(" + std::to_string(this->Degree) + ", X)";
+	}
 };
 
 class LegendreBasis1D : public FunctionalBasis1D
@@ -87,13 +95,18 @@ private:
 	int _maxPolynomialDegree;
 
 public:
-	LegendreBasis1D(int maxPolynomialDegree, CartesianGrid1D* grid, int penalizationCoefficient, function<double(double)> sourceFunction)
-		:FunctionalBasis1D(grid, penalizationCoefficient, sourceFunction)
+	LegendreBasis1D(int maxPolynomialDegree, CartesianGrid1D* grid, function<double(double)> sourceFunction)
+		:FunctionalBasis1D(grid, sourceFunction)
 	{
 		this->_maxPolynomialDegree = maxPolynomialDegree;
 
 		for (int i = 0; i <= maxPolynomialDegree; i++)
 			this->_localFunctions[i] = new Legendre1D(i);
+	}
+
+	int GetDegree()
+	{
+		return this->_maxPolynomialDegree;
 	}
 
 	string Name()

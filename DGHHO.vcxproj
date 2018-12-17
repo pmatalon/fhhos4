@@ -109,6 +109,7 @@
     <ClInclude Include="Interval.h" />
     <ClInclude Include="LegendreBasis1D.h" />
     <ClInclude Include="IMesh.h" />
+    <ClInclude Include="LegendreBasis2D.h" />
     <ClInclude Include="MonomialBasis2D.h" />
     <ClInclude Include="MonomialBasis1D.h" />
     <ClInclude Include="Poisson1D.h" />

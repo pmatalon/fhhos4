@@ -42,6 +42,27 @@ public:
 			return 0;
 		return this->DegreeY*pow(y, this->DegreeY - 1)*pow(x, this->DegreeX);
 	}
+
+	string ToString()
+	{
+		if (this->DegreeX == 0 && this->DegreeY == 0)
+			return "1";
+		if (this->DegreeX == 1 && this->DegreeY == 0)
+			return "X";
+		if (this->DegreeX == 0 && this->DegreeY == 1)
+			return "Y";
+		if (this->DegreeX == 1 && this->DegreeY == 1)
+			return "XY";
+		if (this->DegreeX == 0)
+			return "Y^" + std::to_string(this->DegreeY);
+		if (this->DegreeY == 0)
+			return "X^" + std::to_string(this->DegreeX);
+		if (this->DegreeX == 1)
+			return "XY^" + std::to_string(this->DegreeY);
+		if (this->DegreeY == 1)
+			return "X^" + std::to_string(this->DegreeX) + "Y";
+		return "X^" + std::to_string(this->DegreeX) + "Y^" + std::to_string(this->DegreeY);
+	}
 };
 
 class MonomialBasis2D : public FunctionalBasis2D
@@ -64,6 +85,11 @@ public:
 				this->_localFunctions[functionNumber++] = new Monomial2D(i, j);
 			}
 		}
+	}
+
+	int GetDegree()
+	{
+		return this->_maxPolynomialDegree;
 	}
 
 	std::string Name()
@@ -93,6 +119,11 @@ public:
 				this->_localFunctions[functionNumber++] = new Monomial2D(i, j);
 			}
 		}
+	}
+
+	int GetDegree()
+	{
+		return this->_maxPolynomialDegree;
 	}
 
 	std::string Name()

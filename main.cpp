@@ -10,6 +10,7 @@
 #include "LegendreBasis1D.h"
 #include "BernsteinBasis1D.h"
 #include "MonomialBasis2D.h"
+#include "LegendreBasis2D.h"
 using namespace std;
 
 
@@ -23,6 +24,7 @@ void print_usage(string s, int d, int n, string b, int p, int z, string o) {
 	cout << "-p NUM:\t		max polynomial degree (default: 2)\t--> " << p << endl;
 	cout << "-z NUM:\t		penalization coefficient (default: 100)\t--> " << z << endl;
 	cout << "-o PATH:\t		output directory to export the system (default: ./)\t--> " << o << endl;
+	cout << "-e:\t\t		extract all components of the matrix in separate files" << endl;
 	cout << "--------------------------------------------------------" << endl;
 }
 
@@ -40,9 +42,10 @@ int main(int argc, char* argv[])
 	int polyDegree = 2;
 	int penalizationCoefficient = 100;
 	string outputDirectory = "./";
+	bool extractMatrixComponents = false;
 
 	int option = 0;
-	while ((option = getopt(argc, argv, "s:d:n:b:p:z:o:")) != -1) 
+	while ((option = getopt(argc, argv, "s:d:n:b:p:z:o:e")) != -1) 
 	{
 		switch (option) 
 		{
@@ -59,6 +62,8 @@ int main(int argc, char* argv[])
 			case 'z': penalizationCoefficient = atoi(optarg);
 				break;
 			case 'o': outputDirectory = optarg;
+				break;
+			case 'e': extractMatrixComponents = true;
 				break;
 			default: print_usage(solution, dimension, n, basisCode, polyDegree, penalizationCoefficient, outputDirectory);
 				exit(EXIT_FAILURE);
@@ -79,15 +84,15 @@ int main(int argc, char* argv[])
 
 		FunctionalBasisWithNumbers* basis;
 		if (basisCode.compare("monomials") == 0)
-			basis = new MonomialBasis1D(polyDegree, grid, penalizationCoefficient, sourceFunction);
+			basis = new MonomialBasis1D(polyDegree, grid, sourceFunction);
 		/*else if (basisCode.compare("globalmonomials") == 0)
 			basis = new MonomialGlobalBasis1D(polyDegree, grid, penalizationCoefficient, sourceFunction);
 		else if (basisCode.compare("reversemonomials") == 0)
 			basis = new ReverseMonomialBasis1D(polyDegree, grid, penalizationCoefficient, sourceFunction);*/
 		else if (basisCode.compare("legendre") == 0)
-			basis = new LegendreBasis1D(polyDegree, grid, penalizationCoefficient, sourceFunction);
+			basis = new LegendreBasis1D(polyDegree, grid, sourceFunction);
 		else if (basisCode.compare("bernstein") == 0)
-			basis = new BernsteinBasis1D(polyDegree, grid, penalizationCoefficient, sourceFunction);
+			basis = new BernsteinBasis1D(polyDegree, grid, sourceFunction);
 		/*else if (basisCode.compare("globallegendre") == 0)
 			basis = new GlobalLegendreBasis1D(polyDegree, grid, penalizationCoefficient, sourceFunction);*/
 		else
@@ -96,7 +101,7 @@ int main(int argc, char* argv[])
 			exit(EXIT_FAILURE);
 		}
 
-		problem->DiscretizeDG(grid, basis, penalizationCoefficient, outputDirectory);
+		problem->DiscretizeDG(grid, basis, penalizationCoefficient, outputDirectory, extractMatrixComponents);
 		delete problem;
 		delete basis;
 		delete grid;
@@ -115,13 +120,15 @@ int main(int argc, char* argv[])
 			basis = new MonomialBasis2D(polyDegree, penalizationCoefficient, sourceFunction);
 		else if (basisCode.compare("globalmonomials") == 0)
 			basis = new MonomialGlobalBasis2D(polyDegree, grid, penalizationCoefficient, sourceFunction);
+		else if (basisCode.compare("legendre") == 0)
+			basis = new LegendreBasis2D(polyDegree, penalizationCoefficient, sourceFunction);
 		else
 		{
 			cout << "Basis not managed!";
 			exit(EXIT_FAILURE);
 		}
 
-		problem->DiscretizeDG(grid, basis, penalizationCoefficient, outputDirectory);
+		problem->DiscretizeDG(grid, basis, penalizationCoefficient, outputDirectory, extractMatrixComponents);
 		delete problem;
 		delete basis;
 		delete grid;

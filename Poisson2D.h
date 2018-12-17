@@ -6,6 +6,7 @@
 #include "ElementInterface.h"
 #include "FileMatrix.h"
 #include "FileVector.h"
+#include "MonomialBasis2D.h"
 using namespace std;
 
 #pragma once
@@ -22,24 +23,40 @@ public:
 		this->_sourceFunction = sourceFunction;
 	}
 
-	void DiscretizeDG(IMesh* grid, FunctionalBasisWithObjects<IBasisFunction>* basis, int penalizationCoefficient, string outputDirectory)
+	void DiscretizeDG(IMesh* grid, FunctionalBasisWithObjects<IBasisFunction>* basis, int penalizationCoefficient, string outputDirectory, bool extractMatrixComponents)
 	{
+		bool autoPenalization = penalizationCoefficient == -1;
+		if (autoPenalization)
+			penalizationCoefficient = 4 * pow(basis->GetDegree() + 1, 2) * grid->N; // Ralph-Hartmann
+
 		cout << "Discretization: Discontinuous Galerkin SIPG" << endl;
 		cout << "\tPenalization coefficient: " << penalizationCoefficient << endl;
 		cout << "\tBasis of polynomials: " << basis->Name() << endl;
 		
 		cout << "Local functions: " << basis->NumberOfLocalFunctionsInElement(0) << endl;
+		for (int localFunctionNumber = 0; localFunctionNumber < basis->NumberOfLocalFunctionsInElement(NULL); localFunctionNumber++)
+		{
+			IBasisFunction* localFunction = basis->GetLocalBasisFunction(NULL, localFunctionNumber);
+			cout << "\t " << localFunction->ToString() << endl;
+		}
 		BigNumber nUnknowns = static_cast<int>(grid->Elements.size()) * basis->NumberOfLocalFunctionsInElement(0);
 		cout << "Unknowns: " << nUnknowns << endl;
 
-		//string terms = "volumic";
-		//string terms = "coupling";
-		//string terms = "penalization";
-		string terms = "";
-
-		string fileName = "Poisson" + to_string(grid->Dim) + "D" + this->_solution + "_n" + to_string(grid->N) + "_DG_SIPG_" + basis->Name() + "_pen" + to_string(penalizationCoefficient);
-		string matrixFilePath = outputDirectory + "/" + fileName + "_A" + terms + ".dat";
-		FileMatrix* fileMatrix = new FileMatrix(nUnknowns, nUnknowns, matrixFilePath);
+		string fileName = "Poisson" + to_string(grid->Dim) + "D" + this->_solution + "_n" + to_string(grid->N) + "_DG_SIPG_" + basis->Name() + "_pen" + (autoPenalization ? "-1" : to_string(penalizationCoefficient));
+		string matrixFilePath			= outputDirectory + "/" + fileName + "_A.dat";
+		string matrixVolumicFilePath	= outputDirectory + "/" + fileName + "_A_volumic.dat";
+		string matrixCouplingFilePath	= outputDirectory + "/" + fileName + "_A_coupling.dat";
+		string matrixPenFilePath		= outputDirectory + "/" + fileName + "_A_pen.dat";
+		FileMatrix* fileMatrix			= new FileMatrix(nUnknowns, nUnknowns, matrixFilePath);
+		FileMatrix* fileMatrixVolumic = NULL;
+		FileMatrix* fileMatrixCoupling = NULL;
+		FileMatrix* fileMatrixPen = NULL;
+		if (extractMatrixComponents)
+		{
+			fileMatrixVolumic	= new FileMatrix(nUnknowns, nUnknowns, matrixVolumicFilePath);
+			fileMatrixCoupling	= new FileMatrix(nUnknowns, nUnknowns, matrixCouplingFilePath);
+			fileMatrixPen		= new FileMatrix(nUnknowns, nUnknowns, matrixPenFilePath);
+		}
 
 		string rhsFilePath = outputDirectory + "/" + fileName + "_b.dat";
 		FileVector* fileRHS = new FileVector(rhsFilePath);
@@ -67,24 +84,27 @@ public:
 
 					double volumicTerm = basis->VolumicTerm(element, localFunction1, localFunction2);
 
+					//cout << "\t func1 = " << dynamic_cast<Monomial2D*>(localFunction1)->ToString() << " func2 = " << dynamic_cast<Monomial2D*>(localFunction2)->ToString() << endl;
+					cout << "\t\t Volumic = " << volumicTerm << endl;
+
 					double coupling = 0;
 					double penalization = 0;
 					for (ElementInterface* elemInterface : elementInterfaces)
 					{
 						coupling += basis->CouplingTerm(elemInterface, element, localFunction1, element, localFunction2);
 						penalization += basis->PenalizationTerm(elemInterface, element, localFunction1, element, localFunction2);
+						cout << "\t\t " << elemInterface->ToString() << ":\t c=" << coupling << "\tp=" << penalization << endl;
 					}
 
-					//cout << "func" << localFunctionNumber1 << " func" << localFunctionNumber2 << ": volumic=" << volumicTerm << endl;
-
-					if (terms.compare("volumic") == 0)
-						fileMatrix->Add(basisFunction1, basisFunction2, volumicTerm);
-					else if (terms.compare("coupling") == 0)
-						fileMatrix->Add(basisFunction1, basisFunction2, coupling);
-					else if (terms.compare("penalization") == 0)
-						fileMatrix->Add(basisFunction1, basisFunction2, penalization);
-					else
-						fileMatrix->Add(basisFunction1, basisFunction2, volumicTerm + coupling + penalization);
+					cout << "\t\t TOTAL = " << volumicTerm + coupling + penalization << endl;
+					
+					if (extractMatrixComponents)
+					{
+						fileMatrixVolumic->Add(basisFunction1, basisFunction2, volumicTerm);
+						fileMatrixCoupling->Add(basisFunction1, basisFunction2, coupling);
+						fileMatrixPen->Add(basisFunction1, basisFunction2, penalization);
+					}
+					fileMatrix->Add(basisFunction1, basisFunction2, volumicTerm + coupling + penalization);
 				}
 
 				double rhs = basis->RightHandSide(element, localFunction1);
@@ -102,6 +122,8 @@ public:
 			if (interface->IsDomainBoundary)
 				continue;
 
+			cout << interface->ToString() << endl;
+
 			for (int localFunctionNumber1 = 0; localFunctionNumber1 < basis->NumberOfLocalFunctionsInElement(interface->Element1); localFunctionNumber1++)
 			{
 				IBasisFunction* localFunction1 = basis->GetLocalBasisFunction(interface->Element1, localFunctionNumber1);
@@ -113,36 +135,31 @@ public:
 					double coupling = basis->CouplingTerm(interface, interface->Element1, localFunction1, interface->Element2, localFunction2);
 					double penalization = basis->PenalizationTerm(interface, interface->Element1, localFunction1, interface->Element2, localFunction2);
 					
-					if (terms.compare("volumic") == 0)
-					{ }
-					else if (terms.compare("coupling") == 0)
+					if (extractMatrixComponents)
 					{
-						fileMatrix->Add(basisFunction1, basisFunction2, coupling);
-						fileMatrix->Add(basisFunction2, basisFunction1, coupling);
+						fileMatrixCoupling->Add(basisFunction1, basisFunction2, coupling);
+						fileMatrixCoupling->Add(basisFunction2, basisFunction1, coupling);
+
+						fileMatrixPen->Add(basisFunction1, basisFunction2, penalization);
+						fileMatrixPen->Add(basisFunction2, basisFunction1, penalization);
 					}
-					else if (terms.compare("penalization") == 0)
-					{
-						fileMatrix->Add(basisFunction1, basisFunction2, penalization);
-						fileMatrix->Add(basisFunction2, basisFunction1, penalization);
-					}
-					else
-					{
-						fileMatrix->Add(basisFunction1, basisFunction2, coupling + penalization);
-						fileMatrix->Add(basisFunction2, basisFunction1, coupling + penalization);
-					}
+					fileMatrix->Add(basisFunction1, basisFunction2, coupling + penalization);
+					fileMatrix->Add(basisFunction2, basisFunction1, coupling + penalization);
 				}
 			}
 		}
 
+		if (extractMatrixComponents)
+		{
+			delete fileMatrixVolumic;
+			delete fileMatrixCoupling;
+			delete fileMatrixPen;
+		}
 		delete fileMatrix;
 		delete fileRHS;
 
 		cout << "Matrix exported to \t" << matrixFilePath << endl;
 		cout << "RHS exported to \t" << rhsFilePath << endl;
-	}
-
-	~Poisson2D()
-	{
 	}
 };
 

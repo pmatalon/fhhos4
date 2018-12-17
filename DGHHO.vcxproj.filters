@@ -90,6 +90,9 @@
     <ClInclude Include="BernsteinBasis1D.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
+    <ClInclude Include="LegendreBasis2D.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

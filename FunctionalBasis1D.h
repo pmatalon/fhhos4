@@ -14,16 +14,14 @@ class FunctionalBasis1D : public FunctionalBasisWithNumbers
 {
 protected:
 	CartesianGrid1D* _grid;
-	int _penalizationCoefficient;
 	function<double(double)> _sourceFunction;
 
 	map<int, IBasisFunction1D*> _localFunctions;
 
 public:
-	FunctionalBasis1D(CartesianGrid1D* grid, int penalizationCoefficient, function<double(double)> sourceFunction)
+	FunctionalBasis1D(CartesianGrid1D* grid, function<double(double)> sourceFunction)
 	{
 		this->_grid = grid;
-		this->_penalizationCoefficient = penalizationCoefficient;
 		this->_sourceFunction = sourceFunction;
 	}
 
@@ -71,6 +69,35 @@ public:
 		}
 	}
 
+	double MassTerm(BigNumber element, IBasisFunction1D* func1, IBasisFunction1D* func2)
+	{
+		double a = this->_grid->XLeft(element);
+		double b = this->_grid->XRight(element);
+
+		IPolynomialFunction* poly1 = dynamic_cast<IPolynomialFunction*>(func1);
+		IPolynomialFunction* poly2 = dynamic_cast<IPolynomialFunction*>(func2);
+		GaussLegendre gs(poly1->GetDegree() + poly2->GetDegree());
+
+		if (func1->ReferenceInterval().Left == -1 && func1->ReferenceInterval().Right == 1)
+		{
+			// defined on [-1, 1]
+			function<double(double)> functionToIntegrate = [func1, func2](double t) {
+				return func1->Eval(t)*func2->Eval(t);
+			};
+
+			return 2 / (b - a) * gs.Quadrature(functionToIntegrate);
+		}
+		else
+		{
+			function<double(double)> functionToIntegrate = [func1, func2](double u) {
+				//double u = 0.5 * t + 0.5;
+				return func1->Eval(u)*func2->Eval(u);
+			};
+
+			return 1 / (b - a) * Utils::Integral(poly1->GetDegree() + poly2->GetDegree(), functionToIntegrate, 0, 1);
+		}
+	}
+
 	double CouplingTerm(BigNumber interface, BigNumber element1, IBasisFunction1D* func1, BigNumber element2, IBasisFunction1D* func2)
 	{
 		if (element2 > element1 + 1 || element1 > element2 + 1)
@@ -79,12 +106,12 @@ public:
 		return MeanDerivative(element1, func1, interface) * Jump(element2, func2, interface) + MeanDerivative(element2, func2, interface) * Jump(element1, func1, interface);
 	}
 
-	double PenalizationTerm(BigNumber point, BigNumber element1, IBasisFunction1D* func1, BigNumber element2, IBasisFunction1D* func2)
+	double PenalizationTerm(BigNumber point, BigNumber element1, IBasisFunction1D* func1, BigNumber element2, IBasisFunction1D* func2, double penalizationCoefficient)
 	{
 		if (element2 > element1 + 1 || element1 > element2 + 1)
 			return 0;
 
-		return this->_penalizationCoefficient * Jump(element1, func1, point) * Jump(element2, func2, point);
+		return penalizationCoefficient * Jump(element1, func1, point) * Jump(element2, func2, point);
 	}
 
 	double RightHandSide(BigNumber element, IBasisFunction1D* func)

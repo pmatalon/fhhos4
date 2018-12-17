@@ -42,17 +42,18 @@ public:
 		//------------//
 
 		this->Interfaces.reserve(n * (n + 3));
+		BigNumber numberInterface = 0;
 
 		for (BigNumber j = 0; j < n; ++j)
 		{
 			// South boundary
-			Element2DInterface* southBoundary = new Element2DInterface(this->Elements[j]);
+			Element2DInterface* southBoundary = new Element2DInterface(numberInterface++, this->Elements[j]);
 			this->Interfaces.push_back(southBoundary);
 			//this->BoundaryInterfaces.push_back(southBoundary);
 			dynamic_cast<Square*>(this->Elements[j])->SetSouthInterface(southBoundary);
 
 			// North boundary
-			Element2DInterface* northBoundary = new Element2DInterface(this->Elements[(n-1)*n + j]);
+			Element2DInterface* northBoundary = new Element2DInterface(numberInterface++, this->Elements[(n-1)*n + j]);
 			this->Interfaces.push_back(northBoundary);
 			//this->BoundaryInterfaces.push_back(northBoundary);
 			dynamic_cast<Square*>(this->Elements[(n - 1)*n + j])->SetNorthInterface(northBoundary);
@@ -61,13 +62,13 @@ public:
 		for (BigNumber i = 0; i < n; ++i)
 		{
 			// West boundary
-			Element2DInterface* westBoundary = new Element2DInterface(this->Elements[i*n]);
+			Element2DInterface* westBoundary = new Element2DInterface(numberInterface++, this->Elements[i*n]);
 			this->Interfaces.push_back(westBoundary);
 			//this->BoundaryInterfaces.push_back(westBoundary);
 			dynamic_cast<Square*>(this->Elements[i*n])->SetWestInterface(westBoundary);
 
 			// East boundary
-			Element2DInterface* eastBoundary = new Element2DInterface(this->Elements[i*n + n-1]);
+			Element2DInterface* eastBoundary = new Element2DInterface(numberInterface++, this->Elements[i*n + n-1]);
 			this->Interfaces.push_back(eastBoundary);
 			//this->BoundaryInterfaces.push_back(eastBoundary);
 			dynamic_cast<Square*>(this->Elements[i*n + n - 1])->SetEastInterface(eastBoundary);
@@ -82,7 +83,7 @@ public:
 				{
 					// East
 					Square* eastNeighbour = dynamic_cast<Square*>(this->Elements[i*n + j + 1]);
-					Element2DInterface* interface = new Element2DInterface(element, eastNeighbour);
+					Element2DInterface* interface = new Element2DInterface(numberInterface++, element, eastNeighbour);
 					this->Interfaces.push_back(interface);
 					element->SetEastInterface(interface);
 					eastNeighbour->SetWestInterface(interface);
@@ -91,7 +92,7 @@ public:
 				{
 					// North
 					Square* northNeighbour = dynamic_cast<Square*>(this->Elements[(i+1)*n + j]);
-					Element2DInterface* interface = new Element2DInterface(element, northNeighbour);
+					Element2DInterface* interface = new Element2DInterface(numberInterface++, element, northNeighbour);
 					this->Interfaces.push_back(interface);
 					element->SetNorthInterface(interface);
 					northNeighbour->SetSouthInterface(interface);

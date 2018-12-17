@@ -1,3 +1,4 @@
+#include <cstdio>
 #pragma once
 class RefInterval
 {
@@ -56,4 +57,5 @@ public:
 	virtual double EvalDerivative(double x) = 0;
 
 	virtual RefInterval ReferenceInterval() = 0;
+	virtual std::string ToString() = 0;
 };

@@ -3,19 +3,21 @@
 class ElementInterface
 {
 public:
+	BigNumber Number;
 	bool IsDomainBoundary;
 	Element* Element1;
 	Element* Element2;
 
 public:
-	ElementInterface(Element* element1, Element* element2)
+	ElementInterface(BigNumber number, Element* element1, Element* element2)
 	{
+		this->Number = number;
 		this->Element1 = element1;
 		this->Element2 = element2;
 		this->IsDomainBoundary = false;
 	}
-	ElementInterface(Element* element1)
-		:ElementInterface(element1, NULL)
+	ElementInterface(BigNumber number, Element* element1)
+		:ElementInterface(number, element1, NULL)
 	{
 		this->IsDomainBoundary = true;
 	}
@@ -31,14 +33,8 @@ public:
 		return true;
 	}
 
-	/*double* OuterNormalVector(Element* element)
+	virtual string ToString()
 	{
-		Square* square = static_cast<Square*>(element);
-		return this->OuterNormalVector(square);
+		return "Interface " + this->Number;
 	}
-
-	double* OuterNormalVector(Square* element)
-	{
-		if (this->)
-	}*/
 };
