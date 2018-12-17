@@ -65,10 +65,9 @@ public:
 		// Iteration on the elements: diagonal blocks //
 		//--------------------------------------------//
 
-		for (BigNumber k = 0; k < grid->Elements.size(); k++)
+		for (Element* element : grid->Elements)
 		{
-			Element* element = grid->Elements[k];
-			cout << "Element " << k << endl;
+			cout << "Element " << element->Number << endl;
 			vector<ElementInterface*> elementInterfaces = element->Interfaces;
 
 			for (int localFunctionNumber1 = 0; localFunctionNumber1 < basis->NumberOfLocalFunctionsInElement(element); localFunctionNumber1++)
@@ -116,9 +115,9 @@ public:
 		// Iteration on the interfaces: off-diagonal blocks //
 		//--------------------------------------------------//
 
-		for (BigNumber k = 0; k < grid->Interfaces.size(); k++)
+		for (ElementInterface* interface : grid->Interfaces)
 		{
-			auto interface = grid->Interfaces[k];
+			//auto interface = grid->Interfaces[k];
 			if (interface->IsDomainBoundary)
 				continue;
 

@@ -80,7 +80,7 @@ public:
 				return func1->Eval(t)*func2->Eval(t);
 			};
 
-			return 2 / (b - a) * gs.Quadrature(functionToIntegrate);
+			return (b - a) / 2 * gs.Quadrature(functionToIntegrate);
 		}
 		else
 		{
@@ -89,7 +89,7 @@ public:
 				return func1->Eval(u)*func2->Eval(u);
 			};
 
-			return 1 / (b - a) * Utils::Integral(func1->GetDegree() + func2->GetDegree(), functionToIntegrate, 0, 1);
+			return (b - a) * Utils::Integral(func1->GetDegree() + func2->GetDegree(), functionToIntegrate, 0, 1);
 		}
 	}
 

@@ -77,13 +77,18 @@ private:
 	int _maxPolynomialDegree;
 
 public:
-	MonomialGlobalBasis1D(int maxPolynomialDegree, CartesianGrid1D* grid, int penalizationCoefficient, function<double(double)> sourceFunction)
-		:FunctionalGlobalBasis1D(grid, penalizationCoefficient, sourceFunction)
+	MonomialGlobalBasis1D(int maxPolynomialDegree, CartesianGrid1D* grid, function<double(double)> sourceFunction)
+		:FunctionalGlobalBasis1D(grid, sourceFunction)
 	{
 		this->_maxPolynomialDegree = maxPolynomialDegree;
 
 		for (int i = 0; i <= maxPolynomialDegree; i++)
 			this->_localFunctions[i] = new Monomial1D(i);
+	}
+
+	int GetDegree()
+	{
+		return this->_maxPolynomialDegree;
 	}
 
 	string Name()

@@ -85,9 +85,9 @@ int main(int argc, char* argv[])
 		FunctionalBasisWithNumbers* basis;
 		if (basisCode.compare("monomials") == 0)
 			basis = new MonomialBasis1D(polyDegree, grid, sourceFunction);
-		/*else if (basisCode.compare("globalmonomials") == 0)
-			basis = new MonomialGlobalBasis1D(polyDegree, grid, penalizationCoefficient, sourceFunction);
-		else if (basisCode.compare("reversemonomials") == 0)
+		else if (basisCode.compare("globalmonomials") == 0)
+			basis = new MonomialGlobalBasis1D(polyDegree, grid, sourceFunction);
+		/*else if (basisCode.compare("reversemonomials") == 0)
 			basis = new ReverseMonomialBasis1D(polyDegree, grid, penalizationCoefficient, sourceFunction);*/
 		else if (basisCode.compare("legendre") == 0)
 			basis = new LegendreBasis1D(polyDegree, grid, sourceFunction);
