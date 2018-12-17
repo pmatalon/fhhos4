@@ -64,11 +64,17 @@ public:
 
 	double CouplingTerm(ElementInterface* interface, Element* element1, IBasisFunction2D* phi1, Element* element2, IBasisFunction2D* phi2)
 	{
+		Square* square1 = static_cast<Square*>(element1);
+		Square* square2 = static_cast<Square*>(element2);
+		return this->CouplingTerm(interface, square1, phi1, square2, phi2);
+	}
+
+	double CouplingTerm(ElementInterface* interface, Square* element1, IBasisFunction2D* phi1, Square* element2, IBasisFunction2D* phi2)
+	{
 		if (!interface->IsBetween(element1, element2))
 			return 0;
 
-		Square* square = (Square*)element1;
-		double h = square->Width;
+		double h = element1->Width;
 
 		auto n1 = element1->OuterNormalVector(interface);
 		auto n2 = element2->OuterNormalVector(interface);
@@ -82,37 +88,39 @@ public:
 
 		Element2DInterface* interf = (Element2DInterface*)interface;
 
-		function<double(double, double)> functionToIntegrate = [meanFactor, n1, n2, phi1, phi2, h, element1, element2](double t, double u) {
+		/*function<double(double, double)> functionToIntegrate = [meanFactor, n1, n2, phi1, phi2, h, element1, element2](double t, double u) {
 			double meanGradPhi1_scal_jumpPhi2 = meanFactor * (phi1->EvalGradX(t, u) * n2[0] + phi1->EvalGradY(t, u) * n2[1]) * phi2->Eval(t, u);
 			double meanGradPhi2_scal_jumpPhi1 = meanFactor * (phi2->EvalGradX(t, u) * n1[0] + phi2->EvalGradY(t, u) * n1[1]) * phi1->Eval(t, u);
-			/*if (element1->Number == 1 && element2->Number == 1 && poly1->GetDegree() == 1 && poly2->GetDegree() == 1)
-			{
-				cout << phi2->Eval(t, u) << endl;
-			}*/
 			return 2/h*(meanGradPhi1_scal_jumpPhi2 + meanGradPhi2_scal_jumpPhi1);
-		};
+		};*/
 
 
 		GaussLegendre gs(phi1->GetDegree() + phi2->GetDegree() + 1);
-		std::function<double(double)> func1D;
+		std::function<double(double)> functionToIntegrate;
 		if (interf->IsVertical())
 		{
-			double t = interface == square->EastInterface ? 1 : -1;
-			func1D = [functionToIntegrate, t](double u) {
-				return functionToIntegrate(t, u);
+			double t1 = interface == element1->EastInterface ? 1 : -1;
+			double t2 = interface == element2->EastInterface ? 1 : -1;
+			functionToIntegrate = [meanFactor, n1, n2, phi1, phi2, h, t1, t2](double u) {
+				double meanGradPhi1_scal_jumpPhi2 = meanFactor * (phi1->EvalGradX(t1, u) * n2[0] + phi1->EvalGradY(t1, u) * n2[1]) * phi2->Eval(t2, u);
+				double meanGradPhi2_scal_jumpPhi1 = meanFactor * (phi2->EvalGradX(t2, u) * n1[0] + phi2->EvalGradY(t2, u) * n1[1]) * phi1->Eval(t1, u);
+				return 2 / h * (meanGradPhi1_scal_jumpPhi2 + meanGradPhi2_scal_jumpPhi1);
 			};
 		}
 		else if (interf->IsHorizontal())
 		{
-			double u = interface == square->NorthInterface ? 1 : -1;
-			func1D = [functionToIntegrate, u](double t) {
-				return functionToIntegrate(t, u);
+			double u1 = interface == element1->NorthInterface ? 1 : -1;
+			double u2 = interface == element2->NorthInterface ? 1 : -1;
+			functionToIntegrate = [meanFactor, n1, n2, phi1, phi2, h, u1, u2](double t) {
+				double meanGradPhi1_scal_jumpPhi2 = meanFactor * (phi1->EvalGradX(t, u1) * n2[0] + phi1->EvalGradY(t, u1) * n2[1]) * phi2->Eval(t, u2);
+				double meanGradPhi2_scal_jumpPhi1 = meanFactor * (phi2->EvalGradX(t, u2) * n1[0] + phi2->EvalGradY(t, u2) * n1[1]) * phi1->Eval(t, u1);
+				return 2 / h * (meanGradPhi1_scal_jumpPhi2 + meanGradPhi2_scal_jumpPhi1);
 			};
 		}
 		else
 			return 0;
 
-		return -h / 2 * gs.Quadrature(func1D);
+		return -h / 2 * gs.Quadrature(functionToIntegrate);
 		//return -pow(h, 2) / 4 * gs.Quadrature(func1D);
 		//return -2/h* gs.Quadrature(func1D);
 		//return -gs.Quadrature(func1D);
@@ -136,38 +144,46 @@ public:
 		assert(n1[0] != 0 || n1[1] != 0);
 		assert(n2[0] != 0 || n2[1] != 0);
 		assert((n1[0] == n2[0] && n1[1] == n2[1]) || (n1[0] == -n2[0] && n1[1] == -n2[1]));
-		
-		function<double(double, double)> functionToIntegrate = [phi1, phi2, n1, n2, h](double t, double u) {
+
+		Element2DInterface* interf = (Element2DInterface*)interface;
+
+		/*function<double(double, double)> functionToIntegrate = [phi1, phi2, n1, n2, interf, element1, element2](double t, double u) {
 			return (n1[0] * n2[0] + n1[1] * n2[1]) * phi1->Eval(t, u) * phi2->Eval(t, u);
-		};
+		};*/
 
 		double integralJump1ScalarJump2 = 0;
 
-		Element2DInterface* interf = (Element2DInterface*)interface;
 		
 		GaussLegendre gs(phi1->GetDegree() + phi2->GetDegree() + 2);
-		std::function<double(double)> func1D;
+		//std::function<double(double)> func1D;
+		function<double(double)> functionToIntegrate;
 
 		assert(interf->IsVertical() || interf->IsHorizontal());
 
 		if (interf->IsVertical())
 		{
-			double t = interface == element1->EastInterface ? 1 : -1;
-			func1D = [functionToIntegrate, t](double u) {
+			double t1 = interface == element1->EastInterface ? 1 : -1;
+			double t2 = interface == element2->EastInterface ? 1 : -1;
+			/*func1D = [functionToIntegrate, t](double u) {
 				return functionToIntegrate(t, u);
+			};*/
+
+			functionToIntegrate = [phi1, phi2, n1, n2, t1, t2](double u) {
+				return (n1[0] * n2[0] + n1[1] * n2[1]) * phi1->Eval(t1, u) * phi2->Eval(t2, u);
 			};
 		}
 		else if (interf->IsHorizontal())
 		{
-			double u = interface == element1->NorthInterface ? 1 : -1;
-			func1D = [functionToIntegrate, u](double t) {
-				return functionToIntegrate(t, u);
+			double u1 = interface == element1->NorthInterface ? 1 : -1;
+			double u2 = interface == element2->NorthInterface ? 1 : -1;
+			functionToIntegrate = [phi1, phi2, n1, n2, u1, u2](double t) {
+				return (n1[0] * n2[0] + n1[1] * n2[1]) * phi1->Eval(t, u1) * phi2->Eval(t, u2);
 			};
 		}
 		else
 			return 0;
 
-		integralJump1ScalarJump2 = h / 2 * gs.Quadrature(func1D);
+		integralJump1ScalarJump2 = h / 2 * gs.Quadrature(functionToIntegrate);
 		//integralJump1ScalarJump2 = pow(h, 2) / 4 * gs.Quadrature(func1D);
 		//integralJump1ScalarJump2 = 2 / h * gs.Quadrature(func1D);
 		//integralJump1ScalarJump2 = gs.Quadrature(func1D);
