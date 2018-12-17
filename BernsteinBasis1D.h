@@ -1,12 +1,11 @@
 #pragma once
 #include "FunctionalBasis1D.h"
 #include "IBasisFunction1D.h"
-#include "IPolynomialFunction.h"
 #include "Utils.h"
 #include <math.h>
 using namespace std;
 
-class Bernstein1D : public IBasisFunction1D, public IPolynomialFunction
+class Bernstein1D : public IBasisFunction1D
 {
 private:
 	int _degree;

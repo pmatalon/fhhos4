@@ -66,9 +66,6 @@
     <ClInclude Include="GaussLegendre.h">
       <Filter>Utils</Filter>
     </ClInclude>
-    <ClInclude Include="IPolynomialFunction.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
     <ClInclude Include="IBasisFunction1D.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>

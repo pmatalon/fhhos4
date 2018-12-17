@@ -6,7 +6,6 @@
 #include "CartesianGrid1D.h"
 #include "IBasisFunction1D.h"
 #include "GaussLegendre.h"
-#include "IPolynomialFunction.h"
 #include "Utils.h"
 using namespace std;
 
@@ -45,9 +44,7 @@ public:
 		double a = this->_grid->XLeft(element);
 		double b = this->_grid->XRight(element);
 
-		IPolynomialFunction* poly1 = dynamic_cast<IPolynomialFunction*>(func1);
-		IPolynomialFunction* poly2 = dynamic_cast<IPolynomialFunction*>(func2);
-		GaussLegendre gs(poly1->GetDegree() + poly2->GetDegree());
+		GaussLegendre gs(func1->GetDegree() + func2->GetDegree());
 
 		if (func1->ReferenceInterval().Left == -1 && func1->ReferenceInterval().Right == 1)
 		{
@@ -65,7 +62,7 @@ public:
 				return func1->EvalDerivative(u)*func2->EvalDerivative(u);
 			};
 
-			return 1 / (b - a) * Utils::Integral(poly1->GetDegree() + poly2->GetDegree(), functionToIntegrate, 0, 1);
+			return 1 / (b - a) * Utils::Integral(func1->GetDegree() + func2->GetDegree(), functionToIntegrate, 0, 1);
 		}
 	}
 
@@ -74,9 +71,7 @@ public:
 		double a = this->_grid->XLeft(element);
 		double b = this->_grid->XRight(element);
 
-		IPolynomialFunction* poly1 = dynamic_cast<IPolynomialFunction*>(func1);
-		IPolynomialFunction* poly2 = dynamic_cast<IPolynomialFunction*>(func2);
-		GaussLegendre gs(poly1->GetDegree() + poly2->GetDegree());
+		GaussLegendre gs(func1->GetDegree() + func2->GetDegree());
 
 		if (func1->ReferenceInterval().Left == -1 && func1->ReferenceInterval().Right == 1)
 		{
@@ -94,7 +89,7 @@ public:
 				return func1->Eval(u)*func2->Eval(u);
 			};
 
-			return 1 / (b - a) * Utils::Integral(poly1->GetDegree() + poly2->GetDegree(), functionToIntegrate, 0, 1);
+			return 1 / (b - a) * Utils::Integral(func1->GetDegree() + func2->GetDegree(), functionToIntegrate, 0, 1);
 		}
 	}
 

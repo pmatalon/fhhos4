@@ -55,10 +55,7 @@ public:
 			return func1->EvalGradX(x, y)*func2->EvalGradX(x, y) + func1->EvalGradY(x, y)*func2->EvalGradY(x, y);
 		};
 
-		IPolynomialFunction* poly1 = dynamic_cast<IPolynomialFunction*>(func1);
-		IPolynomialFunction* poly2 = dynamic_cast<IPolynomialFunction*>(func2);
-
-		GaussLegendre* gs = new GaussLegendre(poly1->GetDegree() + poly2->GetDegree());
+		GaussLegendre* gs = new GaussLegendre(func1->GetDegree() + func2->GetDegree());
 		double h = element->Width;
 		return /*4 / pow(h, 2) **/ gs->Quadrature(functionToIntegrate, element->X, element->X + element->Width, element->Y, element->Y + element->Width);
 
@@ -126,10 +123,8 @@ public:
 		};
 
 		Element2DInterface* interf = (Element2DInterface*)interface;
-		IPolynomialFunction* poly1 = dynamic_cast<IPolynomialFunction*>(func1);
-		IPolynomialFunction* poly2 = dynamic_cast<IPolynomialFunction*>(func2);
 
-		GaussLegendre* gs = new GaussLegendre(poly1->GetDegree() + poly2->GetDegree() + 1);
+		GaussLegendre* gs = new GaussLegendre(func1->GetDegree() + func2->GetDegree() + 1);
 		double res = -gs->Quadrature(functionToIntegrate, interf->X1, interf->X2, interf->Y1, interf->Y2);
 		//double res = -interf->Integrate(functionToIntegrate);
 		return res;
@@ -174,10 +169,7 @@ public:
 		
 		Element2DInterface* interf = (Element2DInterface*)interface;
 
-		IPolynomialFunction* poly1 = dynamic_cast<IPolynomialFunction*>(func1);
-		IPolynomialFunction* poly2 = dynamic_cast<IPolynomialFunction*>(func2);
-
-		GaussLegendre* gs = new GaussLegendre(poly1->GetDegree() + poly2->GetDegree() + 2);
+		GaussLegendre* gs = new GaussLegendre(func1->GetDegree() + func2->GetDegree() + 2);
 		double integralJump1ScalarJump2 = gs->Quadrature(functionToIntegrate, interf->X1, interf->X2, interf->Y1, interf->Y2);
 		//double integralJump1ScalarJump2 = interf->Integrate(functionToIntegrate);
 

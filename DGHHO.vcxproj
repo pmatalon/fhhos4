@@ -115,7 +115,6 @@
     <ClInclude Include="Poisson1D.h" />
     <ClInclude Include="Poisson2D.h" />
     <ClInclude Include="IBasisFunction1D.h" />
-    <ClInclude Include="IPolynomialFunction.h" />
     <ClInclude Include="ReverseMonomialBasis1D.h" />
     <ClInclude Include="Square.h" />
     <ClInclude Include="Utils.h" />

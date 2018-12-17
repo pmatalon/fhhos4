@@ -5,7 +5,6 @@
 #include "FunctionalBasisWithNumbers.h"
 #include "CartesianGrid1D.h"
 #include "IBasisFunction1D.h"
-#include "IPolynomialFunction.h"
 //#include "Utils.h"
 using namespace std;
 
@@ -47,10 +46,7 @@ public:
 			return func1->EvalDerivative(x)*func2->EvalDerivative(x);
 		};
 
-		IPolynomialFunction* poly1 = dynamic_cast<IPolynomialFunction*>(func1);
-		IPolynomialFunction* poly2 = dynamic_cast<IPolynomialFunction*>(func2);
-
-		GaussLegendre* gs = new GaussLegendre(poly1->GetDegree() + poly2->GetDegree());
+		GaussLegendre* gs = new GaussLegendre(func1->GetDegree() + func2->GetDegree());
 		return gs->Quadrature(functionToIntegrate, this->_grid->XLeft(element), this->_grid->XRight(element));
 		//return Utils::Integral(functionToIntegrate, this->_grid->XLeft(element), this->_grid->XRight(element));
 	}

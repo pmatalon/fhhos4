@@ -2,11 +2,10 @@
 #include "FunctionalBasis1D.h"
 #include "FunctionalGlobalBasis1D.h"
 #include "IBasisFunction1D.h"
-#include "IPolynomialFunction.h"
 #include <math.h>
 using namespace std;
 
-class Monomial1D : public IBasisFunction1D, public IPolynomialFunction
+class Monomial1D : public IBasisFunction1D
 {
 public:
 	int Degree;

@@ -56,6 +56,7 @@ public:
 	virtual double Eval(double x) = 0;
 	virtual double EvalDerivative(double x) = 0;
 
+	virtual int GetDegree() = 0;
 	virtual RefInterval ReferenceInterval() = 0;
 	virtual std::string ToString() = 0;
 };

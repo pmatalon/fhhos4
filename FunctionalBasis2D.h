@@ -8,7 +8,6 @@
 #include "Utils.h"
 #include "Element.h"
 #include "ElementInterface.h"
-#include "IPolynomialFunction.h"
 #include <cstdio>
 using namespace std;
 
@@ -56,10 +55,7 @@ public:
 			return func1->EvalGradX(t, u)*func2->EvalGradX(t, u) + func1->EvalGradY(t, u)*func2->EvalGradY(t, u);
 		};
 
-		IPolynomialFunction* poly1 = dynamic_cast<IPolynomialFunction*>(func1);
-		IPolynomialFunction* poly2 = dynamic_cast<IPolynomialFunction*>(func2);
-
-		GaussLegendre gs(poly1->GetDegree() + poly2->GetDegree());
+		GaussLegendre gs(func1->GetDegree() + func2->GetDegree());
 		//return 4 / pow(h, 2) * gs.Quadrature(functionToIntegrate);
 		//return pow(h, 2) / 4 * gs.Quadrature(functionToIntegrate);
 		return gs.Quadrature(functionToIntegrate);
@@ -79,10 +75,8 @@ public:
 		double meanFactor = interface->IsDomainBoundary ? 1 : 0.5;
 
 		Element2DInterface* interf = (Element2DInterface*)interface;
-		IPolynomialFunction* poly1 = dynamic_cast<IPolynomialFunction*>(func1);
-		IPolynomialFunction* poly2 = dynamic_cast<IPolynomialFunction*>(func2);
 
-		function<double(double, double)> functionToIntegrate = [meanFactor, n1, n2, func1, func2, h, element1, element2, poly1, poly2](double t, double u) {
+		function<double(double, double)> functionToIntegrate = [meanFactor, n1, n2, func1, func2, h, element1, element2](double t, double u) {
 			double meanGradFunc1_scal_jumpFunc2 = meanFactor * (func1->EvalGradX(t, u) * n2[0] + func1->EvalGradY(t, u) * n2[1]) * func2->Eval(t, u);
 			double meanGradFunc2_scal_jumpFunc1 = meanFactor * (func2->EvalGradX(t, u) * n1[0] + func2->EvalGradY(t, u) * n1[1]) * func1->Eval(t, u);
 			/*if (element1->Number == 1 && element2->Number == 1 && poly1->GetDegree() == 1 && poly2->GetDegree() == 1)
@@ -95,7 +89,7 @@ public:
 
 		Square* square = (Square*)element1;
 
-		GaussLegendre gs(poly1->GetDegree() + poly2->GetDegree() + 1);
+		GaussLegendre gs(func1->GetDegree() + func2->GetDegree() + 1);
 		std::function<double(double)> func1D;
 		if (interf->IsVertical())
 		{
@@ -142,12 +136,10 @@ public:
 		double integralJump1ScalarJump2 = 0;
 
 		Element2DInterface* interf = (Element2DInterface*)interface;
-		IPolynomialFunction* poly1 = dynamic_cast<IPolynomialFunction*>(func1);
-		IPolynomialFunction* poly2 = dynamic_cast<IPolynomialFunction*>(func2);
 
 		Square* square = (Square*)element1;
 
-		GaussLegendre gs(poly1->GetDegree() + poly2->GetDegree() + 2);
+		GaussLegendre gs(func1->GetDegree() + func2->GetDegree() + 2);
 		std::function<double(double)> func1D;
 		if (interf->IsVertical())
 		{

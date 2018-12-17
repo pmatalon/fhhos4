@@ -1,12 +1,11 @@
 #pragma once
 #include "FunctionalBasis2D.h"
 #include "IBasisFunction2D.h"
-#include "IPolynomialFunction.h"
 #include <math.h>
 #include "LegendreBasis1D.h"
 using namespace std;
 
-class Legendre2D : public IBasisFunction2D, public IPolynomialFunction
+class Legendre2D : public IBasisFunction2D
 {
 public:
 	int DegreeX;
