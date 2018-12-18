@@ -104,7 +104,7 @@ public:
 			functionToIntegrate = [meanFactor, n1, n2, phi1, phi2, h, t1, t2](double u) {
 				double meanGradPhi1_scal_jumpPhi2 = meanFactor * (phi1->EvalGradX(t1, u) * n2[0] + phi1->EvalGradY(t1, u) * n2[1]) * phi2->Eval(t2, u);
 				double meanGradPhi2_scal_jumpPhi1 = meanFactor * (phi2->EvalGradX(t2, u) * n1[0] + phi2->EvalGradY(t2, u) * n1[1]) * phi1->Eval(t1, u);
-				return 2 / h * (meanGradPhi1_scal_jumpPhi2 + meanGradPhi2_scal_jumpPhi1);
+				return meanGradPhi1_scal_jumpPhi2 + meanGradPhi2_scal_jumpPhi1;
 			};
 		}
 		else if (interf->IsHorizontal())
@@ -114,13 +114,13 @@ public:
 			functionToIntegrate = [meanFactor, n1, n2, phi1, phi2, h, u1, u2](double t) {
 				double meanGradPhi1_scal_jumpPhi2 = meanFactor * (phi1->EvalGradX(t, u1) * n2[0] + phi1->EvalGradY(t, u1) * n2[1]) * phi2->Eval(t, u2);
 				double meanGradPhi2_scal_jumpPhi1 = meanFactor * (phi2->EvalGradX(t, u2) * n1[0] + phi2->EvalGradY(t, u2) * n1[1]) * phi1->Eval(t, u1);
-				return 2 / h * (meanGradPhi1_scal_jumpPhi2 + meanGradPhi2_scal_jumpPhi1);
+				return meanGradPhi1_scal_jumpPhi2 + meanGradPhi2_scal_jumpPhi1;
 			};
 		}
 		else
 			return 0;
 
-		return -h / 2 * gs.Quadrature(functionToIntegrate);
+		return -gs.Quadrature(functionToIntegrate);
 		//return -pow(h, 2) / 4 * gs.Quadrature(func1D);
 		//return -2/h* gs.Quadrature(func1D);
 		//return -gs.Quadrature(func1D);
