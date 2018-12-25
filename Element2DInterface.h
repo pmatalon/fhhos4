@@ -16,10 +16,10 @@ public:
 	Element2DInterface(BigNumber number, Element* element1) : ElementInterface(number, element1)
 	{	}
 
-	double Integrate(std::function<double(double, double)> func)
+	/*double Integrate(std::function<double(double, double)> func)
 	{
 		return Utils::Integral(func, this->X1, this->X2, this->Y1, this->Y2);
-	}
+	}*/
 
 	bool IsVertical() {	return this->X1 == this->X2; }
 	bool IsHorizontal()	{ return this->Y1 == this->Y2; }

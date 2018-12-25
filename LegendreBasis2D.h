@@ -70,7 +70,7 @@ public:
 	}
 };
 
-class LegendreBasis2D : public FunctionalBasis2D
+/*class LegendreBasis2D : public FunctionalBasis2D
 {
 private:
 	int _maxPolynomialDegree;
@@ -101,4 +101,4 @@ public:
 	{
 		return "legendre_p" + std::to_string(this->_maxPolynomialDegree);
 	}
-};
+};*/

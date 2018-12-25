@@ -80,11 +80,16 @@ public:
 
 	string ToString()
 	{
+		return this->ToString("X");
+	}
+
+	string ToString(string var)
+	{
 		if (this->Degree == 0)
 			return "1";
 		if (this->Degree == 1)
-			return "X";
-		return "Legendre(" + std::to_string(this->Degree) + ", X)";
+			return var;
+		return "Legendre(" + std::to_string(this->Degree) + ", " + var + ")";
 	}
 };
 

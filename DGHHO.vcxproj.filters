@@ -90,6 +90,12 @@
     <ClInclude Include="LegendreBasis2D.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
+    <ClInclude Include="BernsteinBasis2D.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="TensorPolynomial2D.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

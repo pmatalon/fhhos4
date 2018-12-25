@@ -36,11 +36,16 @@ public:
 
 	string ToString()
 	{
+		return this->ToString("X");
+	}
+
+	string ToString(string var)
+	{
 		if (this->Degree == 0)
 			return "1";
 		if (this->Degree == 1)
-			return "X";
-		return "X^" + std::to_string(this->Degree);
+			return var;
+		return var + "^" + std::to_string(this->Degree);
 	}
 };
 

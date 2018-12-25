@@ -89,6 +89,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BernsteinBasis1D.h" />
+    <ClInclude Include="BernsteinBasis2D.h" />
     <ClInclude Include="CartesianGrid1DNew.h" />
     <ClInclude Include="Element1DInterface.h" />
     <ClInclude Include="IBasisFunction2D.h" />
@@ -117,6 +118,7 @@
     <ClInclude Include="IBasisFunction1D.h" />
     <ClInclude Include="ReverseMonomialBasis1D.h" />
     <ClInclude Include="Square.h" />
+    <ClInclude Include="TensorPolynomial2D.h" />
     <ClInclude Include="Utils.h" />
   </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">

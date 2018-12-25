@@ -3,8 +3,8 @@
 class RefInterval
 {
 public:
-	static RefInterval &MinusOne_One() { static RefInterval interval(-1, 1); return interval; }
-	static RefInterval &Zero_One() { static RefInterval interval(0, 1); return interval; }
+	static RefInterval &MinusOne_One()	{ static RefInterval interval(-1, 1); return interval; }
+	static RefInterval &Zero_One()		{ static RefInterval interval( 0, 1); return interval; }
 	double Left;
 	double Right;
 private:
@@ -15,7 +15,7 @@ private:
 	}
 };
 
-class Transformation
+/*class Transformation
 {
 public:
 	virtual double F() = 0;
@@ -46,7 +46,7 @@ public:
 	{
 		return 2 / (this->_b - this->_a);
 	}
-};
+};*/
 
 
 
@@ -59,4 +59,5 @@ public:
 	virtual int GetDegree() = 0;
 	virtual RefInterval ReferenceInterval() = 0;
 	virtual std::string ToString() = 0;
+	virtual std::string ToString(std::string var) = 0;
 };

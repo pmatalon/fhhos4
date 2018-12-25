@@ -44,8 +44,7 @@ public:
 		double a = this->_grid->XLeft(element);
 		double b = this->_grid->XRight(element);
 
-		GaussLegendre gs(func1->GetDegree() + func2->GetDegree());
-
+		int nQuadPoints = func1->GetDegree() + func2->GetDegree();
 		if (func1->ReferenceInterval().Left == -1 && func1->ReferenceInterval().Right == 1)
 		{
 			// defined on [-1, 1]
@@ -53,6 +52,7 @@ public:
 				return func1->EvalDerivative(t)*func2->EvalDerivative(t);
 			};
 
+			GaussLegendre gs(nQuadPoints);
 			return 2 / (b - a) * gs.Quadrature(functionToIntegrate);
 		}
 		else
@@ -62,7 +62,7 @@ public:
 				return func1->EvalDerivative(u)*func2->EvalDerivative(u);
 			};
 
-			return 1 / (b - a) * Utils::Integral(func1->GetDegree() + func2->GetDegree(), functionToIntegrate, 0, 1);
+			return 1 / (b - a) * Utils::Integral(nQuadPoints, functionToIntegrate, 0, 1);
 		}
 	}
 

@@ -6,11 +6,12 @@
 #include <functional>
 #include <getopt.h>
 #include "MonomialBasis1D.h"
-#include "ReverseMonomialBasis1D.h"
+//#include "ReverseMonomialBasis1D.h"
 #include "LegendreBasis1D.h"
 #include "BernsteinBasis1D.h"
 #include "MonomialBasis2D.h"
 #include "LegendreBasis2D.h"
+#include "TensorPolynomial2D.h"
 using namespace std;
 
 
@@ -93,8 +94,6 @@ int main(int argc, char* argv[])
 			basis = new LegendreBasis1D(polyDegree, grid, sourceFunction);
 		else if (basisCode.compare("bernstein") == 0)
 			basis = new BernsteinBasis1D(polyDegree, grid, sourceFunction);
-		/*else if (basisCode.compare("globallegendre") == 0)
-			basis = new GlobalLegendreBasis1D(polyDegree, grid, penalizationCoefficient, sourceFunction);*/
 		else
 		{
 			cout << "Basis not managed!";
@@ -117,11 +116,13 @@ int main(int argc, char* argv[])
 
 		FunctionalBasisWithObjects<IBasisFunction2D>* basis;
 		if (basisCode.compare("monomials") == 0)
-			basis = new MonomialBasis2D(polyDegree, penalizationCoefficient, sourceFunction);
-		else if (basisCode.compare("globalmonomials") == 0)
-			basis = new MonomialGlobalBasis2D(polyDegree, grid, penalizationCoefficient, sourceFunction);
+			basis = new MonomialBasis2D(polyDegree, sourceFunction);
+		/*else if (basisCode.compare("globalmonomials") == 0)
+			basis = new MonomialGlobalBasis2D(polyDegree, grid, sourceFunction);*/
 		else if (basisCode.compare("legendre") == 0)
-			basis = new LegendreBasis2D(polyDegree, penalizationCoefficient, sourceFunction);
+			basis = new LegendreBasis2D(polyDegree, sourceFunction);
+		else if (basisCode.compare("bernstein") == 0)
+			basis = new BernsteinBasis2D(polyDegree, sourceFunction);
 		else
 		{
 			cout << "Basis not managed!";

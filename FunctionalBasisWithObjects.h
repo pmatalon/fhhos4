@@ -22,7 +22,7 @@ public:
 
 	virtual double CouplingTerm(ElementInterface* interface, Element* element1, IBasisFunction* func1, Element* element2, IBasisFunction* func2) = 0;
 
-	virtual double PenalizationTerm(ElementInterface* interface, Element* element1, IBasisFunction* func1, Element* element2, IBasisFunction* func2) = 0;
+	virtual double PenalizationTerm(ElementInterface* interface, Element* element1, IBasisFunction* func1, Element* element2, IBasisFunction* func2, double penalizationCoefficient) = 0;
 
 	virtual double RightHandSide(Element* element, IBasisFunction* func) = 0;
 

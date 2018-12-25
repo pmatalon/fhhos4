@@ -1,6 +1,5 @@
 #include <iostream>
 #include <functional>
-//#include "CartesianGrid2D.h"
 #include "IMesh.h"
 #include "FunctionalBasisWithObjects.h"
 #include "ElementInterface.h"
@@ -67,7 +66,7 @@ public:
 
 		for (Element* element : grid->Elements)
 		{
-			cout << "Element " << element->Number << endl;
+			//cout << "Element " << element->Number << endl;
 			vector<ElementInterface*> elementInterfaces = element->Interfaces;
 
 			for (int localFunctionNumber1 = 0; localFunctionNumber1 < basis->NumberOfLocalFunctionsInElement(element); localFunctionNumber1++)
@@ -82,20 +81,17 @@ public:
 					BigNumber basisFunction2 = basis->GlobalFunctionNumber(element, localFunctionNumber2);
 
 					double volumicTerm = basis->VolumicTerm(element, localFunction1, localFunction2);
-
-					//cout << "\t func1 = " << dynamic_cast<Monomial2D*>(localFunction1)->ToString() << " func2 = " << dynamic_cast<Monomial2D*>(localFunction2)->ToString() << endl;
-					cout << "\t\t Volumic = " << volumicTerm << endl;
-
+					
 					double coupling = 0;
 					double penalization = 0;
 					for (ElementInterface* elemInterface : elementInterfaces)
 					{
 						coupling += basis->CouplingTerm(elemInterface, element, localFunction1, element, localFunction2);
-						penalization += basis->PenalizationTerm(elemInterface, element, localFunction1, element, localFunction2);
+						penalization += basis->PenalizationTerm(elemInterface, element, localFunction1, element, localFunction2, penalizationCoefficient);
 						cout << "\t\t " << elemInterface->ToString() << ":\t c=" << coupling << "\tp=" << penalization << endl;
 					}
 
-					cout << "\t\t TOTAL = " << volumicTerm + coupling + penalization << endl;
+					//cout << "\t\t TOTAL = " << volumicTerm + coupling + penalization << endl;
 					
 					if (extractMatrixComponents)
 					{
@@ -117,11 +113,8 @@ public:
 
 		for (ElementInterface* interface : grid->Interfaces)
 		{
-			//auto interface = grid->Interfaces[k];
 			if (interface->IsDomainBoundary)
 				continue;
-
-			cout << interface->ToString() << endl;
 
 			for (int localFunctionNumber1 = 0; localFunctionNumber1 < basis->NumberOfLocalFunctionsInElement(interface->Element1); localFunctionNumber1++)
 			{
@@ -132,7 +125,7 @@ public:
 					IBasisFunction* localFunction2 = basis->GetLocalBasisFunction(interface->Element2, localFunctionNumber2);
 					BigNumber basisFunction2 = basis->GlobalFunctionNumber(interface->Element2, localFunctionNumber2);
 					double coupling = basis->CouplingTerm(interface, interface->Element1, localFunction1, interface->Element2, localFunction2);
-					double penalization = basis->PenalizationTerm(interface, interface->Element1, localFunction1, interface->Element2, localFunction2);
+					double penalization = basis->PenalizationTerm(interface, interface->Element1, localFunction1, interface->Element2, localFunction2, penalizationCoefficient);
 					
 					if (extractMatrixComponents)
 					{

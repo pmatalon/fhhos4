@@ -18,6 +18,8 @@ public:
 		this->DegreeY = degreeY;
 	}
 
+	RefInterval ReferenceInterval() { return RefInterval::MinusOne_One(); }
+
 	int GetDegree()
 	{
 		return this->DegreeX + this->DegreeY;
@@ -64,7 +66,7 @@ public:
 	}
 };
 
-class MonomialBasis2D : public FunctionalBasis2D
+/*class MonomialBasis2D : public FunctionalBasis2D
 {
 private:
 	int _maxPolynomialDegree;
@@ -95,7 +97,7 @@ public:
 	{
 		return "monomials_p" + std::to_string(this->_maxPolynomialDegree);
 	}
-};
+};*/
 
 
 class MonomialGlobalBasis2D : public FunctionalGlobalBasis2D

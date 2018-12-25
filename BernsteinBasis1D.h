@@ -41,7 +41,26 @@ public:
 
 	string ToString()
 	{
-		return "binomial(" + std::to_string(this->_degree) + ", " + std::to_string(this->_i) + ") * X^" + std::to_string(this->_i) + " * (1-X)^" + std::to_string(this->_degree - this->_i);
+		return this->ToString("X");
+	}
+
+	string ToString(string var)
+	{
+		string binomial = "";
+		if (this->_binomial != 1)
+			binomial = to_string(this->_binomial) + " * ";
+		string firstTerm = "";
+		if (this->_i != 0)
+			firstTerm = var + "^" + to_string(this->_i);
+		string secondTerm = "";
+		if (this->_degree - this->_i != 0)
+			secondTerm = "(1-" + var + ")^" + to_string(this->_degree - this->_i);
+		if (firstTerm.empty())
+			return binomial + secondTerm;
+		if (secondTerm.empty())
+			return binomial + firstTerm;
+		return binomial + firstTerm + " * " + secondTerm;
+		//return binomial + var + "^" + to_string(this->_i) + " * (1-" + var + ")^" + to_string(this->_degree - this->_i);
 	}
 
 private:

@@ -216,7 +216,7 @@ public:
 	// Gauss-Legendre quadrature on [x1, x2]x[y1, y2]
 	double Quadrature(std::function<double(double, double)> func, double x1, double x2, double y1, double y2)
 	{
-		if (x1 == x2)
+		/*if (x1 == x2)
 		{
 			std::function<double(double)> func1D = [func, x1](double y) {
 				return func(x1, y);
@@ -229,7 +229,7 @@ public:
 				return func(x, y1);
 			};
 			return Quadrature(func1D, x1, x2);
-		}
+		}*/
 
 		double sum = 0;
 		for (int i = 0; i < this->nPoints; i++)
