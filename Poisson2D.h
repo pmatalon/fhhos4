@@ -5,6 +5,8 @@
 #include "ElementInterface.h"
 #include "FileMatrix.h"
 #include "FileVector.h"
+#include "IPoisson_DGTerms.h"
+#include "Poisson2D_DGTerms_LocalBasis.h"
 using namespace std;
 
 #pragma once
@@ -21,7 +23,7 @@ public:
 		this->_sourceFunction = sourceFunction;
 	}
 
-	void DiscretizeDG(IMesh* grid, FunctionalBasisWithObjects<IBasisFunction>* basis, int penalizationCoefficient, string outputDirectory, bool extractMatrixComponents)
+	void DiscretizeDG(IMesh* grid, FunctionalBasisWithObjects<IBasisFunction>* basis, IPoisson_DGTerms<IBasisFunction>* dg, int penalizationCoefficient, string outputDirectory, bool extractMatrixComponents)
 	{
 		bool autoPenalization = penalizationCoefficient == -1;
 		if (autoPenalization)
@@ -29,7 +31,7 @@ public:
 
 		cout << "Discretization: Discontinuous Galerkin SIPG" << endl;
 		cout << "\tPenalization coefficient: " << penalizationCoefficient << endl;
-		cout << "\tBasis of polynomials: " << basis->Name() << endl;
+		cout << "\tBasis of polynomials: " << (dg->IsGlobalBasis() ? "global" : "") + basis->Name() << endl;
 		
 		cout << "Local functions: " << basis->NumberOfLocalFunctionsInElement(0) << endl;
 		for (int localFunctionNumber = 0; localFunctionNumber < basis->NumberOfLocalFunctionsInElement(NULL); localFunctionNumber++)
@@ -40,7 +42,7 @@ public:
 		BigNumber nUnknowns = static_cast<int>(grid->Elements.size()) * basis->NumberOfLocalFunctionsInElement(0);
 		cout << "Unknowns: " << nUnknowns << endl;
 
-		string fileName = "Poisson" + to_string(grid->Dim) + "D" + this->_solution + "_n" + to_string(grid->N) + "_DG_SIPG_" + basis->Name() + "_pen" + (autoPenalization ? "-1" : to_string(penalizationCoefficient));
+		string fileName = "Poisson" + to_string(grid->Dim) + "D" + this->_solution + "_n" + to_string(grid->N) + "_DG_SIPG_" + (dg->IsGlobalBasis() ? "global" : "") + basis->Name() + "_pen" + (autoPenalization ? "-1" : to_string(penalizationCoefficient));
 		string matrixFilePath			= outputDirectory + "/" + fileName + "_A.dat";
 		string matrixVolumicFilePath	= outputDirectory + "/" + fileName + "_A_volumic.dat";
 		string matrixCouplingFilePath	= outputDirectory + "/" + fileName + "_A_coupling.dat";
@@ -79,14 +81,14 @@ public:
 					IBasisFunction* localFunction2 = basis->GetLocalBasisFunction(element, localFunctionNumber2);
 					BigNumber basisFunction2 = basis->GlobalFunctionNumber(element, localFunctionNumber2);
 
-					double volumicTerm = basis->VolumicTerm(element, localFunction1, localFunction2);
+					double volumicTerm = dg->VolumicTerm(element, localFunction1, localFunction2);
 					
 					double coupling = 0;
 					double penalization = 0;
 					for (ElementInterface* elemInterface : elementInterfaces)
 					{
-						coupling += basis->CouplingTerm(elemInterface, element, localFunction1, element, localFunction2);
-						penalization += basis->PenalizationTerm(elemInterface, element, localFunction1, element, localFunction2, penalizationCoefficient);
+						coupling += dg->CouplingTerm(elemInterface, element, localFunction1, element, localFunction2);
+						penalization += dg->PenalizationTerm(elemInterface, element, localFunction1, element, localFunction2, penalizationCoefficient);
 						//cout << "\t\t " << elemInterface->ToString() << ":\t c=" << coupling << "\tp=" << penalization << endl;
 					}
 
@@ -101,7 +103,7 @@ public:
 					fileMatrix->Add(basisFunction1, basisFunction2, volumicTerm + coupling + penalization);
 				}
 
-				double rhs = basis->RightHandSide(element, localFunction1);
+				double rhs = dg->RightHandSide(element, localFunction1);
 				fileRHS->Add(rhs);
 			}
 		}
@@ -123,8 +125,8 @@ public:
 				{
 					IBasisFunction* localFunction2 = basis->GetLocalBasisFunction(interface->Element2, localFunctionNumber2);
 					BigNumber basisFunction2 = basis->GlobalFunctionNumber(interface->Element2, localFunctionNumber2);
-					double coupling = basis->CouplingTerm(interface, interface->Element1, localFunction1, interface->Element2, localFunction2);
-					double penalization = basis->PenalizationTerm(interface, interface->Element1, localFunction1, interface->Element2, localFunction2, penalizationCoefficient);
+					double coupling = dg->CouplingTerm(interface, interface->Element1, localFunction1, interface->Element2, localFunction2);
+					double penalization = dg->PenalizationTerm(interface, interface->Element1, localFunction1, interface->Element2, localFunction2, penalizationCoefficient);
 					
 					if (extractMatrixComponents)
 					{

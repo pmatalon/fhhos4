@@ -1,5 +1,4 @@
 #pragma once
-#include "FunctionalBasis1D.h"
 #include "IBasisFunction1D.h"
 #include "Utils.h"
 #include <math.h>
@@ -86,14 +85,14 @@ private:
 	}
 };
 
-class Bernstein2Basis1D : public FunctionalBasis1D
+class Bernstein2Basis1D : public FunctionalBasisWithNumbers
 {
 private:
 	int _maxPolynomialDegree;
 
 public:
-	Bernstein2Basis1D(int maxPolynomialDegree, CartesianGrid1D* grid, function<double(double)> sourceFunction)
-		:FunctionalBasis1D(grid, sourceFunction)
+	Bernstein2Basis1D(int maxPolynomialDegree)
+		:FunctionalBasisWithNumbers()
 	{
 		this->_maxPolynomialDegree = maxPolynomialDegree;
 

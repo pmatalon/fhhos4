@@ -1,5 +1,4 @@
 #pragma once
-#include "FunctionalBasis1D.h"
 #include "IBasisFunction1D.h"
 #include <math.h>
 using namespace std;
@@ -96,14 +95,14 @@ public:
 	}
 };
 
-class LegendreBasis1D : public FunctionalBasis1D
+class LegendreBasis1D : public FunctionalBasisWithNumbers
 {
 private:
 	int _maxPolynomialDegree;
 
 public:
-	LegendreBasis1D(int maxPolynomialDegree, CartesianGrid1D* grid, function<double(double)> sourceFunction)
-		:FunctionalBasis1D(grid, sourceFunction)
+	LegendreBasis1D(int maxPolynomialDegree)
+		:FunctionalBasisWithNumbers()
 	{
 		this->_maxPolynomialDegree = maxPolynomialDegree;
 
@@ -121,24 +120,3 @@ public:
 		return Legendre1D::Code() + "_p" + std::to_string(this->_maxPolynomialDegree);
 	}
 };
-
-/*class GlobalLegendreBasis1D : public FunctionalGlobalBasis1D
-{
-private:
-	int _maxPolynomialDegree;
-
-public:
-	GlobalLegendreBasis1D(int maxPolynomialDegree, CartesianGrid1D* grid, function<double(double)> sourceFunction)
-		:FunctionalGlobalBasis1D(grid, sourceFunction)
-	{
-		this->_maxPolynomialDegree = maxPolynomialDegree;
-
-		for (int i = 0; i <= maxPolynomialDegree; i++)
-			this->_localFunctions[i] = new Legendre1D(i);
-	}
-
-	string Name()
-	{
-		return "globallegendre_p" + std::to_string(this->_maxPolynomialDegree);
-	}
-};*/

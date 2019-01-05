@@ -1,6 +1,4 @@
 #pragma once
-#include "FunctionalBasis2D.h"
-#include "FunctionalGlobalBasis2D.h"
 #include "IBasisFunction2D.h"
 #include <math.h>
 #include "MonomialBasis1D.h"
@@ -57,15 +55,15 @@ public:
 	}
 };
 
-class TensorPolynomialBasis2D : public FunctionalBasis2D
+class TensorPolynomialBasis2D : public FunctionalBasisWithObjects<IBasisFunction2D>
 {
 private:
 	int _maxPolynomialDegree;
 	string _basisCode;
 
 public:
-	TensorPolynomialBasis2D(string basisCode, int maxPolynomialDegree, function<double(double, double)> sourceFunction)
-		:FunctionalBasis2D(sourceFunction)
+	TensorPolynomialBasis2D(string basisCode, int maxPolynomialDegree)
+		:FunctionalBasisWithObjects<IBasisFunction2D>()
 	{
 		this->_maxPolynomialDegree = maxPolynomialDegree;
 		this->_basisCode = basisCode;
@@ -95,63 +93,27 @@ public:
 	}
 };
 
-class MonomialGlobalBasis2D : public FunctionalGlobalBasis2D
-{
-private:
-	int _maxPolynomialDegree;
-
-public:
-	MonomialGlobalBasis2D(int maxPolynomialDegree, function<double(double, double)> sourceFunction)
-		:FunctionalGlobalBasis2D(sourceFunction)
-	{
-		this->_maxPolynomialDegree = maxPolynomialDegree;
-
-		int functionNumber = 0;
-		for (int degree = 0; degree <= this->_maxPolynomialDegree; degree++)
-		{
-			for (int j = 0; j <= degree; j++)
-			{
-				int i = degree - j;
-				IBasisFunction1D* polyX = BasisFunctionFactory::Create(Monomial1D::Code(), maxPolynomialDegree, i);
-				IBasisFunction1D* polyY = BasisFunctionFactory::Create(Monomial1D::Code(), maxPolynomialDegree, j);
-				this->_localFunctions[functionNumber++] = new TensorPolynomial2D(polyX, polyY);
-			}
-		}
-	}
-
-	int GetDegree()
-	{
-		return this->_maxPolynomialDegree;
-	}
-
-	std::string Name()
-	{
-		return "globalmonomials_p" + std::to_string(this->_maxPolynomialDegree);
-	}
-};
-
-
 class MonomialBasis2D : public TensorPolynomialBasis2D
 {
 public:
-	MonomialBasis2D(int maxPolynomialDegree, function<double(double, double)> sourceFunction)
-		:TensorPolynomialBasis2D(Monomial1D::Code(), maxPolynomialDegree, sourceFunction) {}
+	MonomialBasis2D(int maxPolynomialDegree)
+		:TensorPolynomialBasis2D(Monomial1D::Code(), maxPolynomialDegree) {}
 };
 class LegendreBasis2D : public TensorPolynomialBasis2D
 {
 public:
-	LegendreBasis2D(int maxPolynomialDegree, function<double(double, double)> sourceFunction)
-		:TensorPolynomialBasis2D(Legendre1D::Code(), maxPolynomialDegree, sourceFunction) {}
+	LegendreBasis2D(int maxPolynomialDegree)
+		:TensorPolynomialBasis2D(Legendre1D::Code(), maxPolynomialDegree) {}
 };
 class BernsteinBasis2D : public TensorPolynomialBasis2D
 {
 public:
-	BernsteinBasis2D(int maxPolynomialDegree, function<double(double, double)> sourceFunction)
-		:TensorPolynomialBasis2D(Bernstein1D::Code(), maxPolynomialDegree, sourceFunction) {}
+	BernsteinBasis2D(int maxPolynomialDegree)
+		:TensorPolynomialBasis2D(Bernstein1D::Code(), maxPolynomialDegree) {}
 };
 class Bernstein2Basis2D : public TensorPolynomialBasis2D
 {
 public:
-	Bernstein2Basis2D(int maxPolynomialDegree, function<double(double, double)> sourceFunction)
-		:TensorPolynomialBasis2D(Bernstein2_1D::Code(), maxPolynomialDegree, sourceFunction) {}
+	Bernstein2Basis2D(int maxPolynomialDegree)
+		:TensorPolynomialBasis2D(Bernstein2_1D::Code(), maxPolynomialDegree) {}
 };

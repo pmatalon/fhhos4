@@ -33,9 +33,6 @@
     <ClInclude Include="FileVector.h">
       <Filter>Utils</Filter>
     </ClInclude>
-    <ClInclude Include="FunctionalBasis1D.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
     <ClInclude Include="FunctionalBasisWithNumbers.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
@@ -46,15 +43,6 @@
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
     <ClInclude Include="LegendreBasis1D.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
-    <ClInclude Include="FunctionalGlobalBasis1D.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
-    <ClInclude Include="FunctionalGlobalBasis2D.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
-    <ClInclude Include="FunctionalBasis2D.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
     <ClInclude Include="GaussLegendre.h">
@@ -90,6 +78,12 @@
     <ClInclude Include="BasisFunctionFactory.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
+    <ClInclude Include="IPoisson_DGTerms.h" />
+    <ClInclude Include="Poisson2D_DGTerms_LocalBasis.h" />
+    <ClInclude Include="Poisson2D_DGTerms_GlobalBasis.h" />
+    <ClInclude Include="IPoisson1D_DGTerms.h" />
+    <ClInclude Include="Poisson1D_DGTerms_LocalBasis.h" />
+    <ClInclude Include="Poisson1D_DGTerms_GlobalBasis.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

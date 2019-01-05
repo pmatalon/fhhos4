@@ -1,26 +1,27 @@
 #pragma once
 #include <functional>
 #include <math.h>
-#include "FunctionalBasisWithObjects.h"
+#include "IPoisson_DGTerms.h"
+#include "IBasisFunction1D.h"
 #include "IBasisFunction2D.h"
 #include "Utils.h"
 #include "Element.h"
 #include "ElementInterface.h"
 #include "Square.h"
-#include <cstdio>
-#include <assert.h>
 using namespace std;
 
-class FunctionalBasis2D : public FunctionalBasisWithObjects<IBasisFunction2D>
+class Poisson2D_DGTerms_LocalBasis : public IPoisson_DGTerms<IBasisFunction2D>
 {
 protected:
 	function<double(double, double)> _sourceFunction;
 
 public:
-	FunctionalBasis2D(function<double(double, double)> sourceFunction)
+	Poisson2D_DGTerms_LocalBasis(function<double(double, double)> sourceFunction)
 	{
 		this->_sourceFunction = sourceFunction;
 	}
+
+	bool IsGlobalBasis() { return false; }
 
 	double VolumicTerm(Element* element, IBasisFunction2D* phi1, IBasisFunction2D* phi2)
 	{
@@ -60,7 +61,7 @@ public:
 		double meanFactor = interface->IsDomainBoundary ? 1 : 0.5;
 
 		Element2DInterface* interf = (Element2DInterface*)interface;
-		
+
 		std::function<double(double)> functionToIntegrate;
 		if (interf->IsVertical())
 		{

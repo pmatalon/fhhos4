@@ -10,6 +10,10 @@
 #include "BernsteinBasis1D.h"
 #include "TensorPolynomial2D.h"
 #include "CartesianGrid2D.h"
+#include "Poisson1D_DGTerms_LocalBasis.h"
+#include "Poisson1D_DGTerms_GlobalBasis.h"
+#include "Poisson2D_DGTerms_LocalBasis.h"
+#include "Poisson2D_DGTerms_GlobalBasis.h"
 using namespace std;
 
 
@@ -81,26 +85,29 @@ int main(int argc, char* argv[])
 
 		Poisson1D* problem = new Poisson1D(solution, sourceFunction);
 
+		IPoisson1D_DGTerms* dg = new Poisson1D_DGTerms_LocalBasis(grid, sourceFunction);
+
 		FunctionalBasisWithNumbers* basis;
 		if (basisCode.compare("monomials") == 0)
-			basis = new MonomialBasis1D(polyDegree, grid, sourceFunction);
+			basis = new MonomialBasis1D(polyDegree);
 		else if (basisCode.compare("globalmonomials") == 0)
-			basis = new MonomialGlobalBasis1D(polyDegree, grid, sourceFunction);
-		/*else if (basisCode.compare("reversemonomials") == 0)
-			basis = new ReverseMonomialBasis1D(polyDegree, grid, penalizationCoefficient, sourceFunction);*/
+		{
+			basis = new MonomialBasis1D(polyDegree);
+			dg = new Poisson1D_DGTerms_GlobalBasis(grid, sourceFunction);
+		}
 		else if (basisCode.compare("legendre") == 0)
-			basis = new LegendreBasis1D(polyDegree, grid, sourceFunction);
+			basis = new LegendreBasis1D(polyDegree);
 		else if (basisCode.compare("bernstein") == 0)
-			basis = new BernsteinBasis1D(polyDegree, grid, sourceFunction);
+			basis = new BernsteinBasis1D(polyDegree);
 		else if (basisCode.compare("bernstein2") == 0)
-			basis = new Bernstein2Basis1D(polyDegree, grid, sourceFunction);
+			basis = new Bernstein2Basis1D(polyDegree);
 		else
 		{
 			cout << "Basis not managed!";
 			exit(EXIT_FAILURE);
 		}
 
-		problem->DiscretizeDG(grid, basis, penalizationCoefficient, outputDirectory, extractMatrixComponents);
+		problem->DiscretizeDG(grid, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents);
 		delete problem;
 		delete basis;
 		delete grid;
@@ -114,24 +121,29 @@ int main(int argc, char* argv[])
 			sourceFunction = [](double x, double y) { return 2 * y*(1 - y) + 2 * x*(1 - x); };
 		Poisson2D<IBasisFunction2D>* problem = new Poisson2D<IBasisFunction2D>(solution, sourceFunction);
 
+		IPoisson_DGTerms<IBasisFunction2D>* dg = new Poisson2D_DGTerms_LocalBasis(sourceFunction);
+
 		FunctionalBasisWithObjects<IBasisFunction2D>* basis;
 		if (basisCode.compare("monomials") == 0)
-			basis = new MonomialBasis2D(polyDegree, sourceFunction);
+			basis = new MonomialBasis2D(polyDegree);
 		else if (basisCode.compare("globalmonomials") == 0)
-			basis = new MonomialGlobalBasis2D(polyDegree, sourceFunction);
+		{
+			basis = new MonomialBasis2D(polyDegree);
+			dg = new Poisson2D_DGTerms_GlobalBasis(sourceFunction);
+		}
 		else if (basisCode.compare("legendre") == 0)
-			basis = new LegendreBasis2D(polyDegree, sourceFunction);
+			basis = new LegendreBasis2D(polyDegree);
 		else if (basisCode.compare("bernstein") == 0)
-			basis = new BernsteinBasis2D(polyDegree, sourceFunction);
+			basis = new BernsteinBasis2D(polyDegree);
 		else if (basisCode.compare("bernstein2") == 0)
-			basis = new Bernstein2Basis2D(polyDegree, sourceFunction);
+			basis = new Bernstein2Basis2D(polyDegree);
 		else
 		{
 			cout << "Basis not managed!";
 			exit(EXIT_FAILURE);
 		}
 
-		problem->DiscretizeDG(grid, basis, penalizationCoefficient, outputDirectory, extractMatrixComponents);
+		problem->DiscretizeDG(grid, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents);
 		delete problem;
 		delete basis;
 		delete grid;

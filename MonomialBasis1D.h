@@ -1,6 +1,4 @@
 #pragma once
-#include "FunctionalBasis1D.h"
-#include "FunctionalGlobalBasis1D.h"
 #include "IBasisFunction1D.h"
 #include <math.h>
 using namespace std;
@@ -51,14 +49,14 @@ public:
 	}
 };
 
-class MonomialBasis1D : public FunctionalBasis1D
+class MonomialBasis1D : public FunctionalBasisWithNumbers
 {
 private:
 	int _maxPolynomialDegree;
 
 public:
-	MonomialBasis1D(int maxPolynomialDegree, CartesianGrid1D* grid, function<double(double)> sourceFunction)
-		:FunctionalBasis1D(grid, sourceFunction)
+	MonomialBasis1D(int maxPolynomialDegree)
+		:FunctionalBasisWithNumbers()
 	{
 		this->_maxPolynomialDegree = maxPolynomialDegree;
 
@@ -73,33 +71,6 @@ public:
 
 	string Name()
 	{
-		return "monomials_p" + std::to_string(this->_maxPolynomialDegree);
-	}
-};
-
-
-class MonomialGlobalBasis1D : public FunctionalGlobalBasis1D
-{
-private:
-	int _maxPolynomialDegree;
-
-public:
-	MonomialGlobalBasis1D(int maxPolynomialDegree, CartesianGrid1D* grid, function<double(double)> sourceFunction)
-		:FunctionalGlobalBasis1D(grid, sourceFunction)
-	{
-		this->_maxPolynomialDegree = maxPolynomialDegree;
-
-		for (int i = 0; i <= maxPolynomialDegree; i++)
-			this->_localFunctions[i] = new Monomial1D(i);
-	}
-
-	int GetDegree()
-	{
-		return this->_maxPolynomialDegree;
-	}
-
-	string Name()
-	{
-		return "globalmonomials_p" + std::to_string(this->_maxPolynomialDegree);
+		return Monomial1D::Code() + "_p" + std::to_string(this->_maxPolynomialDegree);
 	}
 };

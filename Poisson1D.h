@@ -1,6 +1,7 @@
 #pragma once
 #include <functional>
 #include "FunctionalBasisWithNumbers.h"
+#include "IPoisson1D_DGTerms.h"
 #include "CartesianGrid1D.h"
 #include "IBasisFunction1D.h"
 #include "Element.h"
@@ -23,7 +24,7 @@ public:
 		this->_sourceFunction = sourceFunction;
 	}
 
-	void DiscretizeDG(CartesianGrid1D* grid, FunctionalBasisWithNumbers* basis, int penalizationCoefficient, string outputDirectory, bool extractMatrixComponents)
+	void DiscretizeDG(CartesianGrid1D* grid, FunctionalBasisWithNumbers* basis, IPoisson1D_DGTerms* dg, int penalizationCoefficient, string outputDirectory, bool extractMatrixComponents)
 	{
 		bool autoPenalization = penalizationCoefficient == -1;
 		if (autoPenalization)
@@ -31,7 +32,7 @@ public:
 
 		cout << "Discretization: Discontinuous Galerkin SIPG" << endl;
 		cout << "\tPenalization coefficient: " << penalizationCoefficient << endl;
-		cout << "\tBasis of polynomials: " << basis->Name() << endl;
+		cout << "\tBasis of polynomials: " << (dg->IsGlobalBasis() ? "global" : "") + basis->Name() << endl;
 
 		cout << "Local functions: " << basis->NumberOfLocalFunctionsInElement(0) << endl;
 		for (int localFunctionNumber = 0; localFunctionNumber < basis->NumberOfLocalFunctionsInElement(0); localFunctionNumber++)
@@ -42,7 +43,7 @@ public:
 		int nUnknowns = grid->NElements() * basis->NumberOfLocalFunctionsInElement(0);
 		//cout << "Unknowns: " << nUnknowns << endl;
 
-		string fileName = "Poisson1D" + this->_solution + "_n" + to_string(grid->NElements()) + "_DG_SIPG_" + basis->Name() + "_pen" + (autoPenalization ? "-1" : to_string(penalizationCoefficient));
+		string fileName = "Poisson1D" + this->_solution + "_n" + to_string(grid->NElements()) + "_DG_SIPG_" + (dg->IsGlobalBasis() ? "global" : "") + basis->Name() + "_pen" + (autoPenalization ? "-1" : to_string(penalizationCoefficient));
 		string matrixFilePath = outputDirectory + "/" + fileName + "_A.dat";
 		string matrixVolumicFilePath = outputDirectory + "/" + fileName + "_A_volumic.dat";
 		string matrixCouplingFilePath = outputDirectory + "/" + fileName + "_A_coupling.dat";
@@ -78,18 +79,18 @@ public:
 					int neighbour = element - 1;
 					int interface = grid->GetInterface(element, neighbour);
 
-					cout << "Interface " << interface << " between element " << element << " and " << neighbour << endl;
+					//cout << "Interface " << interface << " between element " << element << " and " << neighbour << endl;
 
 					for (int localFunctionNumber2 = 0; localFunctionNumber2 < basis->NumberOfLocalFunctionsInElement(neighbour); localFunctionNumber2++)
 					{
 						IBasisFunction1D* localFunction2 = basis->GetLocalBasisFunction(element, localFunctionNumber2);
 						BigNumber basisFunction2 = basis->GlobalFunctionNumber(neighbour, localFunctionNumber2);
 						
-						double couplingTerm = basis->CouplingTerm(interface, element, localFunction1, neighbour, localFunction2);
-						double penalization = basis->PenalizationTerm(interface, element, localFunction1, neighbour, localFunction2, penalizationCoefficient);
+						double couplingTerm = dg->CouplingTerm(interface, element, localFunction1, neighbour, localFunction2);
+						double penalization = dg->PenalizationTerm(interface, element, localFunction1, neighbour, localFunction2, penalizationCoefficient);
 
-						cout << "\t func1 = " << localFunction1->ToString() << " func2 = " << localFunction2->ToString() << endl;
-						cout << "\t\t Interface " << interface << ":\t c=" << couplingTerm << "\tp=" << penalization << endl;
+						//cout << "\t func1 = " << localFunction1->ToString() << " func2 = " << localFunction2->ToString() << endl;
+						//cout << "\t\t Interface " << interface << ":\t c=" << couplingTerm << "\tp=" << penalization << endl;
 
 						if (extractMatrixComponents)
 						{
@@ -101,24 +102,24 @@ public:
 				}
 
 				// Current element (block diagonal)
-				cout << "Element " << element << endl;
+				//cout << "Element " << element << endl;
 				for (int localFunctionNumber2 = 0; localFunctionNumber2 < basis->NumberOfLocalFunctionsInElement(element); localFunctionNumber2++)
 				{
 					IBasisFunction1D* localFunction2 = basis->GetLocalBasisFunction(element, localFunctionNumber2);
 					int basisFunction2 = basis->GlobalFunctionNumber(element, localFunctionNumber2);
 
-					double volumicTerm = basis->VolumicTerm(element, localFunction1, localFunction2);
+					double volumicTerm = dg->VolumicTerm(element, localFunction1, localFunction2);
 
-					double couplingTermLeft = basis->CouplingTerm(grid->LeftInterface(element), element, localFunction1, element, localFunction2);
-					double penalizationLeft = basis->PenalizationTerm(grid->LeftInterface(element), element, localFunction1, element, localFunction2, penalizationCoefficient);
+					double couplingTermLeft = dg->CouplingTerm(grid->LeftInterface(element), element, localFunction1, element, localFunction2);
+					double penalizationLeft = dg->PenalizationTerm(grid->LeftInterface(element), element, localFunction1, element, localFunction2, penalizationCoefficient);
 
-					double couplingTermRight = basis->CouplingTerm(grid->RightInterface(element), element, localFunction1, element, localFunction2);
-					double penalizationRight = basis->PenalizationTerm(grid->RightInterface(element), element, localFunction1, element, localFunction2, penalizationCoefficient);
+					double couplingTermRight = dg->CouplingTerm(grid->RightInterface(element), element, localFunction1, element, localFunction2);
+					double penalizationRight = dg->PenalizationTerm(grid->RightInterface(element), element, localFunction1, element, localFunction2, penalizationCoefficient);
 
-					cout << "\t func1 = " << localFunction1->ToString() << " func2 = " << localFunction2->ToString() << endl;
-					cout << "\t\t Volumic = " << volumicTerm << endl;
-					cout << "\t\t Interface left:\t c=" << couplingTermLeft << "\tp=" << penalizationLeft << endl;
-					cout << "\t\t Interface right:\t c=" << couplingTermRight << "\tp=" << penalizationRight << endl;
+					//cout << "\t func1 = " << localFunction1->ToString() << " func2 = " << localFunction2->ToString() << endl;
+					//cout << "\t\t Volumic = " << volumicTerm << endl;
+					//cout << "\t\t Interface left:\t c=" << couplingTermLeft << "\tp=" << penalizationLeft << endl;
+					//cout << "\t\t Interface right:\t c=" << couplingTermRight << "\tp=" << penalizationRight << endl;
 
 					if (extractMatrixComponents)
 					{
@@ -126,7 +127,7 @@ public:
 						fileMatrixCoupling->Add(basisFunction1, basisFunction2, couplingTermLeft + couplingTermRight);
 						fileMatrixPen->Add(basisFunction1, basisFunction2, penalizationRight + penalizationLeft);
 
-						double massTerm = basis->MassTerm(element, localFunction1, localFunction2);
+						double massTerm = dg->MassTerm(element, localFunction1, localFunction2);
 						fileMassMatrix->Add(basisFunction1, basisFunction2, massTerm);
 					}
 					fileMatrix->Add(basisFunction1, basisFunction2, volumicTerm + couplingTermLeft + couplingTermRight + penalizationRight + penalizationLeft);
@@ -141,18 +142,18 @@ public:
 					int neighbour = element + 1;
 					int interface = grid->GetInterface(element, neighbour);
 
-					cout << "Interface " << interface << " between element " << element << " and " << neighbour << endl;
+					//cout << "Interface " << interface << " between element " << element << " and " << neighbour << endl;
 
 					for (int localFunctionNumber2 = 0; localFunctionNumber2 < basis->NumberOfLocalFunctionsInElement(neighbour); localFunctionNumber2++)
 					{
 						IBasisFunction1D* localFunction2 = basis->GetLocalBasisFunction(element, localFunctionNumber2);
 						int basisFunction2 = basis->GlobalFunctionNumber(neighbour, localFunctionNumber2);
 
-						double couplingTerm = basis->CouplingTerm(interface, element, localFunction1, neighbour, localFunction2);
-						double penalization = basis->PenalizationTerm(interface, element, localFunction1, neighbour, localFunction2, penalizationCoefficient);
+						double couplingTerm = dg->CouplingTerm(interface, element, localFunction1, neighbour, localFunction2);
+						double penalization = dg->PenalizationTerm(interface, element, localFunction1, neighbour, localFunction2, penalizationCoefficient);
 
-						cout << "\t func1 = " << localFunction1->ToString() << " func2 = " << localFunction2->ToString() << endl;
-						cout << "\t\t Interface " << interface << ":\t c=" << couplingTerm << "\tp=" << penalization << endl;
+						//cout << "\t func1 = " << localFunction1->ToString() << " func2 = " << localFunction2->ToString() << endl;
+						//cout << "\t\t Interface " << interface << ":\t c=" << couplingTerm << "\tp=" << penalization << endl;
 
 						if (extractMatrixComponents)
 						{
@@ -163,7 +164,7 @@ public:
 					}
 				}
 
-				double rhs = basis->RightHandSide(element, localFunction1);
+				double rhs = dg->RightHandSide(element, localFunction1);
 				fileRHS->Add(rhs);
 			}
 		}

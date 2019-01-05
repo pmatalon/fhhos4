@@ -1,25 +1,27 @@
 #pragma once
 #include <functional>
 #include <math.h>
-#include "FunctionalBasisWithObjects.h"
-#include "CartesianGrid2D.h"
+#include "IPoisson_DGTerms.h"
+#include "IBasisFunction1D.h"
 #include "IBasisFunction2D.h"
 #include "Utils.h"
 #include "Element.h"
 #include "ElementInterface.h"
-#include "GaussLegendre.h"
+#include "Square.h"
 using namespace std;
 
-class FunctionalGlobalBasis2D : public FunctionalBasisWithObjects<IBasisFunction2D>
+class Poisson2D_DGTerms_GlobalBasis : public IPoisson_DGTerms<IBasisFunction2D>
 {
 protected:
 	function<double(double, double)> _sourceFunction;
 
 public:
-	FunctionalGlobalBasis2D(function<double(double, double)> sourceFunction)
+	Poisson2D_DGTerms_GlobalBasis(function<double(double, double)> sourceFunction)
 	{
 		this->_sourceFunction = sourceFunction;
 	}
+
+	bool IsGlobalBasis() { return true; }
 
 	double VolumicTerm(Element* element, IBasisFunction2D* func1, IBasisFunction2D* func2)
 	{
@@ -34,9 +36,8 @@ public:
 		};
 
 		GaussLegendre* gs = new GaussLegendre(func1->GetDegree() + func2->GetDegree());
-		double h = element->Width;
-		return /*4 / pow(h, 2) **/ gs->Quadrature(functionToIntegrate, element->X, element->X + element->Width, element->Y, element->Y + element->Width);
-
+		//double h = element->Width;
+		return gs->Quadrature(functionToIntegrate, element->X, element->X + element->Width, element->Y, element->Y + element->Width);
 	}
 
 	double CouplingTerm(ElementInterface* interface, Element* element1, IBasisFunction2D* func1, Element* element2, IBasisFunction2D* func2)
@@ -84,17 +85,6 @@ public:
 		};
 
 		function<double(double, double)> functionToIntegrate = [meanGradFunc1X, meanGradFunc1Y, meanGradFunc2X, meanGradFunc2Y, jumpFunc1X, jumpFunc1Y, jumpFunc2X, jumpFunc2Y](double x, double y) {
-			/*double meanGradF1X = meanGradFunc1X(x, y);
-			double meanGradF1Y = meanGradFunc1Y(x, y);
-			double meanGradF2X = meanGradFunc2X(x, y);
-			double meanGradF2Y = meanGradFunc2Y(x, y);
-			double jumpF1X = jumpFunc1X(x, y);
-			double jumpF1Y = jumpFunc1Y(x, y);
-			double jumpF2X = jumpFunc2X(x, y);
-			double jumpF2Y = jumpFunc2Y(x, y);
-
-			double meanGradFunc1_scal_jumpFunc2 = meanGradF1X*jumpF2X + meanGradF1Y*jumpF2Y;
-			double meanGradFunc2_scal_jumpFunc1 = meanGradF2X*jumpF1X + meanGradF2Y*jumpF1Y;*/
 			double meanGradFunc1_scal_jumpFunc2 = meanGradFunc1X(x, y)*jumpFunc2X(x, y) + meanGradFunc1Y(x, y)*jumpFunc2Y(x, y);
 			double meanGradFunc2_scal_jumpFunc1 = meanGradFunc2X(x, y)*jumpFunc1X(x, y) + meanGradFunc2Y(x, y)*jumpFunc1Y(x, y);
 			return meanGradFunc1_scal_jumpFunc2 + meanGradFunc2_scal_jumpFunc1;
@@ -144,7 +134,7 @@ public:
 		function<double(double, double)> functionToIntegrate = [jumpFunc1X, jumpFunc1Y, jumpFunc2X, jumpFunc2Y](double x, double y) {
 			return jumpFunc1X(x, y)*jumpFunc2X(x, y) + jumpFunc1Y(x, y)*jumpFunc2Y(x, y);
 		};
-		
+
 		Element2DInterface* interf = (Element2DInterface*)interface;
 
 		GaussLegendre* gs = new GaussLegendre(func1->GetDegree() + func2->GetDegree() + 2);

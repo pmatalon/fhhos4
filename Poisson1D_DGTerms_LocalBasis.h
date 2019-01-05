@@ -1,25 +1,26 @@
 #pragma once
 #include <functional>
 #include <math.h>
-#include "FunctionalBasisWithNumbers.h"
-#include "CartesianGrid1D.h"
-#include "IBasisFunction1D.h"
-#include "GaussLegendre.h"
+#include "IPoisson1D_DGTerms.h"
 #include "Utils.h"
+#include "Element.h"
+#include "CartesianGrid1D.h"
 using namespace std;
 
-class FunctionalBasis1D : public FunctionalBasisWithNumbers
+class Poisson1D_DGTerms_LocalBasis : public IPoisson1D_DGTerms
 {
 protected:
 	CartesianGrid1D* _grid;
 	function<double(double)> _sourceFunction;
 
 public:
-	FunctionalBasis1D(CartesianGrid1D* grid, function<double(double)> sourceFunction)
+	Poisson1D_DGTerms_LocalBasis(CartesianGrid1D* grid, function<double(double)> sourceFunction)
 	{
 		this->_grid = grid;
 		this->_sourceFunction = sourceFunction;
 	}
+
+	bool IsGlobalBasis() { return false; }
 
 	double VolumicTerm(BigNumber element, IBasisFunction1D* func1, IBasisFunction1D* func2)
 	{
