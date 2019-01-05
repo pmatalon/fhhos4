@@ -3,25 +3,26 @@
 #include "IBasisFunction1D.h"
 #include "Utils.h"
 #include <math.h>
+#include <assert.h>
 using namespace std;
 
-class Bernstein1D : public IBasisFunction1D
+class Bernstein2_1D : public IBasisFunction1D
 {
 private:
 	int _degree;
 	int _i;
 	double _binomial;
 public:
-	static string Code() { return "bernstein"; };
+	static string Code() { return "bernstein2"; };
 
-	Bernstein1D(int degree, int i)
+	Bernstein2_1D(int degree, int i)
 	{
 		this->_degree = degree;
 		this->_i = i;
 		this->_binomial = Utils::Binomial(degree, i);
 	}
 
-	RefInterval ReferenceInterval() { return RefInterval::Zero_One(); }
+	RefInterval ReferenceInterval() { return RefInterval::MinusOne_One(); }
 
 	int GetDegree()
 	{
@@ -30,12 +31,12 @@ public:
 
 	double Eval(double x)
 	{
-		return Bernstein(x);
+		return Bernstein2(x);
 	}
 
 	double EvalDerivative(double x)
 	{
-		return DBernstein(x);
+		return DBernstein2(x);
 	}
 
 	string ToString()
@@ -63,41 +64,41 @@ public:
 	}
 
 private:
-	double Bernstein(double x)
+	double Bernstein2(double x)
 	{
 		int n = this->_degree;
 		int i = this->_i;
-		return this->_binomial * pow(x, i) * pow(1 - x, n - i);
+		return this->_binomial * pow(0.5*x + 0.5, i) * pow(0.5 - 0.5*x, n - i);
 	}
 
-	double DBernstein(double x)
+	double DBernstein2(double x)
 	{
 		int n = this->_degree;
 		int i = this->_i;
 		if (n == 0)
 			return 0;
 		if (i == 0)
-			return -this->_binomial * n * pow(1 - x, n - 1);
+			return -this->_binomial * 0.5 * n * pow(0.5 - 0.5*x, n - 1);
 		else if (n - i == 0)
-			return this->_binomial * i * pow(x, i - 1);
+			return this->_binomial * 0.5 * i * pow(0.5*x + 0.5, i - 1);
 		else
-			return this->_binomial * (i*pow(x, i - 1)*pow(1 - x, n - i) - (n-i)*pow(x, i)*pow(1 - x, n - i - 1));
+			return this->_binomial * (i*0.5*pow(0.5*x + 0.5, i - 1)*pow(0.5 - 0.5*x, n - i) - (n - i)*0.5*pow(0.5*x + 0.5, i)*pow(0.5 - 0.5*x, n - i - 1));
 	}
 };
 
-class BernsteinBasis1D : public FunctionalBasis1D
+class Bernstein2Basis1D : public FunctionalBasis1D
 {
 private:
 	int _maxPolynomialDegree;
 
 public:
-	BernsteinBasis1D(int maxPolynomialDegree, CartesianGrid1D* grid, function<double(double)> sourceFunction)
+	Bernstein2Basis1D(int maxPolynomialDegree, CartesianGrid1D* grid, function<double(double)> sourceFunction)
 		:FunctionalBasis1D(grid, sourceFunction)
 	{
 		this->_maxPolynomialDegree = maxPolynomialDegree;
 
 		for (int i = 0; i <= maxPolynomialDegree; i++)
-			this->_localFunctions[i] = new Bernstein1D(maxPolynomialDegree, i);
+			this->_localFunctions[i] = new Bernstein2_1D(maxPolynomialDegree, i);
 	}
 
 	int GetDegree()
@@ -107,6 +108,6 @@ public:
 
 	string Name()
 	{
-		return Bernstein1D::Code() + "_p" + std::to_string(this->_maxPolynomialDegree);
+		return "bernstein2_p" + std::to_string(this->_maxPolynomialDegree);
 	}
 };

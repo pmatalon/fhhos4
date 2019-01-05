@@ -1,5 +1,4 @@
 #pragma once
-#include <map>
 #include <functional>
 #include <math.h>
 #include "FunctionalBasisWithObjects.h"
@@ -14,33 +13,12 @@ using namespace std;
 class FunctionalGlobalBasis2D : public FunctionalBasisWithObjects<IBasisFunction2D>
 {
 protected:
-	CartesianGrid2D* _grid;
-	int _penalizationCoefficient;
 	function<double(double, double)> _sourceFunction;
 
-	map<int, IBasisFunction2D*> _localFunctions;
-
 public:
-	FunctionalGlobalBasis2D(CartesianGrid2D* grid, int penalizationCoefficient, function<double(double, double)> sourceFunction)
+	FunctionalGlobalBasis2D(function<double(double, double)> sourceFunction)
 	{
-		this->_grid = grid;
-		this->_penalizationCoefficient = penalizationCoefficient;
 		this->_sourceFunction = sourceFunction;
-	}
-
-	int NumberOfLocalFunctionsInElement(Element* element)
-	{
-		return static_cast<int>(this->_localFunctions.size());
-	}
-
-	IBasisFunction2D* GetLocalBasisFunction(Element* element, int localFunctionNumber)
-	{
-		return this->_localFunctions[localFunctionNumber];
-	}
-
-	BigNumber GlobalFunctionNumber(Element* element, int localFunctionNumber)
-	{
-		return element->Number * static_cast<int>(this->_localFunctions.size()) + localFunctionNumber + 1; // +1 so that the numbers start at 1
 	}
 
 	double VolumicTerm(Element* element, IBasisFunction2D* func1, IBasisFunction2D* func2)
@@ -130,14 +108,14 @@ public:
 		return res;
 	}
 
-	double PenalizationTerm(ElementInterface* interface, Element* element1, IBasisFunction2D* func1, Element* element2, IBasisFunction2D* func2)
+	double PenalizationTerm(ElementInterface* interface, Element* element1, IBasisFunction2D* func1, Element* element2, IBasisFunction2D* func2, double penalizationCoefficient)
 	{
 		Square* square1 = static_cast<Square*>(element1);
 		Square* square2 = static_cast<Square*>(element2);
-		return this->PenalizationTerm(interface, square1, func1, square2, func2);
+		return this->PenalizationTerm(interface, square1, func1, square2, func2, penalizationCoefficient);
 	}
 
-	double PenalizationTerm(ElementInterface* interface, Square* element1, IBasisFunction2D* func1, Square* element2, IBasisFunction2D* func2)
+	double PenalizationTerm(ElementInterface* interface, Square* element1, IBasisFunction2D* func1, Square* element2, IBasisFunction2D* func2, double penalizationCoefficient)
 	{
 		//if (!interface->IsBetween(element1, element2))
 		//	return 0;
@@ -173,7 +151,7 @@ public:
 		double integralJump1ScalarJump2 = gs->Quadrature(functionToIntegrate, interf->X1, interf->X2, interf->Y1, interf->Y2);
 		//double integralJump1ScalarJump2 = interf->Integrate(functionToIntegrate);
 
-		return this->_penalizationCoefficient * integralJump1ScalarJump2;
+		return penalizationCoefficient * integralJump1ScalarJump2;
 	}
 
 	double RightHandSide(Element* element, IBasisFunction2D* func)

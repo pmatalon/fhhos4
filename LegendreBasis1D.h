@@ -10,9 +10,12 @@ public:
 	int Degree;
 	bool Normalized;
 
+	static string Code() { return "legendre"; };
+
 	Legendre1D(int degree)
 	{
 		this->Degree = degree;
+		this->Normalized = false;
 	}
 
 	Legendre1D(int degree, bool normalized)
@@ -115,11 +118,11 @@ public:
 
 	string Name()
 	{
-		return "legendre_p" + std::to_string(this->_maxPolynomialDegree);
+		return Legendre1D::Code() + "_p" + std::to_string(this->_maxPolynomialDegree);
 	}
 };
 
-class GlobalLegendreBasis1D : public FunctionalGlobalBasis1D
+/*class GlobalLegendreBasis1D : public FunctionalGlobalBasis1D
 {
 private:
 	int _maxPolynomialDegree;
@@ -138,4 +141,4 @@ public:
 	{
 		return "globallegendre_p" + std::to_string(this->_maxPolynomialDegree);
 	}
-};
+};*/

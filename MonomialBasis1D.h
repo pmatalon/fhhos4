@@ -10,6 +10,8 @@ class Monomial1D : public IBasisFunction1D
 public:
 	int Degree;
 
+	static string Code() { return "monomials"; };
+
 	Monomial1D(int degree)
 	{
 		this->Degree = degree;

@@ -1,22 +1,34 @@
 #pragma once
 #include <string>
+#include <map>
 #include "Element.h"
 #include "ElementInterface.h"
-//#include "IBasisFunction2D.h"
 
 template <class IBasisFunction>
 class FunctionalBasisWithObjects
 {
+protected:
+	map<int, IBasisFunction*> _localFunctions;
+
 public:
 	virtual std::string Name() = 0;
 
 	virtual int GetDegree() = 0;
 
-	virtual int NumberOfLocalFunctionsInElement(Element* element) = 0;
+	int NumberOfLocalFunctionsInElement(Element* element)
+	{
+		return static_cast<int>(this->_localFunctions.size());
+	}
 
-	virtual IBasisFunction* GetLocalBasisFunction(Element* element, int localFunctionNumber) = 0;
+	IBasisFunction* GetLocalBasisFunction(Element* element, int localFunctionNumber)
+	{
+		return this->_localFunctions[localFunctionNumber];
+	}
 
-	virtual BigNumber GlobalFunctionNumber(Element* element, int localFunctionNumber) = 0;
+	BigNumber GlobalFunctionNumber(Element* element, int localFunctionNumber)
+	{
+		return element->Number * static_cast<int>(this->_localFunctions.size()) + localFunctionNumber + 1; // +1 so that the numbers start at 1
+	}
 
 	virtual double VolumicTerm(Element* element, IBasisFunction* func1, IBasisFunction* func2) = 0;
 

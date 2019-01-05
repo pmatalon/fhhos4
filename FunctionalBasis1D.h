@@ -1,5 +1,4 @@
 #pragma once
-#include <map>
 #include <functional>
 #include <math.h>
 #include "FunctionalBasisWithNumbers.h"
@@ -15,28 +14,11 @@ protected:
 	CartesianGrid1D* _grid;
 	function<double(double)> _sourceFunction;
 
-	map<int, IBasisFunction1D*> _localFunctions;
-
 public:
 	FunctionalBasis1D(CartesianGrid1D* grid, function<double(double)> sourceFunction)
 	{
 		this->_grid = grid;
 		this->_sourceFunction = sourceFunction;
-	}
-
-	int NumberOfLocalFunctionsInElement(BigNumber element)
-	{
-		return static_cast<int>(this->_localFunctions.size());
-	}
-
-	IBasisFunction1D* GetLocalBasisFunction(BigNumber element, int localFunctionNumber)
-	{
-		return this->_localFunctions[localFunctionNumber];
-	}
-
-	BigNumber GlobalFunctionNumber(BigNumber element, int localFunctionNumber)
-	{
-		return element * NumberOfLocalFunctionsInElement(0) + localFunctionNumber + 1; // +1 so that the numbers start at 1
 	}
 
 	double VolumicTerm(BigNumber element, IBasisFunction1D* func1, IBasisFunction1D* func2)

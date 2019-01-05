@@ -5,7 +5,6 @@
 #include "ElementInterface.h"
 #include "FileMatrix.h"
 #include "FileVector.h"
-#include "MonomialBasis2D.h"
 using namespace std;
 
 #pragma once
@@ -88,7 +87,7 @@ public:
 					{
 						coupling += basis->CouplingTerm(elemInterface, element, localFunction1, element, localFunction2);
 						penalization += basis->PenalizationTerm(elemInterface, element, localFunction1, element, localFunction2, penalizationCoefficient);
-						cout << "\t\t " << elemInterface->ToString() << ":\t c=" << coupling << "\tp=" << penalization << endl;
+						//cout << "\t\t " << elemInterface->ToString() << ":\t c=" << coupling << "\tp=" << penalization << endl;
 					}
 
 					//cout << "\t\t TOTAL = " << volumicTerm + coupling + penalization << endl;

@@ -1,13 +1,12 @@
 #pragma once
-#include <map>
 #include <functional>
 #include <math.h>
 #include "FunctionalBasisWithObjects.h"
-#include "CartesianGrid2D.h"
 #include "IBasisFunction2D.h"
 #include "Utils.h"
 #include "Element.h"
 #include "ElementInterface.h"
+#include "Square.h"
 #include <cstdio>
 #include <assert.h>
 using namespace std;
@@ -17,27 +16,10 @@ class FunctionalBasis2D : public FunctionalBasisWithObjects<IBasisFunction2D>
 protected:
 	function<double(double, double)> _sourceFunction;
 
-	map<int, IBasisFunction2D*> _localFunctions;
-
 public:
 	FunctionalBasis2D(function<double(double, double)> sourceFunction)
 	{
 		this->_sourceFunction = sourceFunction;
-	}
-
-	int NumberOfLocalFunctionsInElement(Element* element)
-	{
-		return static_cast<int>(this->_localFunctions.size());
-	}
-
-	IBasisFunction2D* GetLocalBasisFunction(Element* element, int localFunctionNumber)
-	{
-		return this->_localFunctions[localFunctionNumber];
-	}
-
-	BigNumber GlobalFunctionNumber(Element* element, int localFunctionNumber)
-	{
-		return element->Number * static_cast<int>(this->_localFunctions.size()) + localFunctionNumber + 1; // +1 so that the numbers start at 1
 	}
 
 	double VolumicTerm(Element* element, IBasisFunction2D* phi1, IBasisFunction2D* phi2)
@@ -68,6 +50,8 @@ public:
 		if (!interface->IsBetween(element1, element2))
 			return 0;
 
+		RefInterval refInterval = phi1->ReferenceInterval();
+
 		//double h = element1->Width;
 
 		auto n1 = element1->OuterNormalVector(interface);
@@ -80,8 +64,8 @@ public:
 		std::function<double(double)> functionToIntegrate;
 		if (interf->IsVertical())
 		{
-			double t1 = interface == element1->EastInterface ? phi1->ReferenceInterval().Right : phi1->ReferenceInterval().Left;
-			double t2 = interface == element2->EastInterface ? phi2->ReferenceInterval().Right : phi2->ReferenceInterval().Left;
+			double t1 = interface == element1->EastInterface ? refInterval.Right : refInterval.Left;
+			double t2 = interface == element2->EastInterface ? refInterval.Right : refInterval.Left;
 
 			functionToIntegrate = [meanFactor, n1, n2, phi1, phi2, t1, t2](double u) {
 				double meanGradPhi1_scal_jumpPhi2 = meanFactor * (phi1->EvalGradX(t1, u) * n2[0] + phi1->EvalGradY(t1, u) * n2[1]) * phi2->Eval(t2, u);
@@ -91,8 +75,8 @@ public:
 		}
 		else if (interf->IsHorizontal())
 		{
-			double u1 = interface == element1->NorthInterface ? phi1->ReferenceInterval().Right : phi1->ReferenceInterval().Left;
-			double u2 = interface == element2->NorthInterface ? phi2->ReferenceInterval().Right : phi2->ReferenceInterval().Left;
+			double u1 = interface == element1->NorthInterface ? refInterval.Right : refInterval.Left;
+			double u2 = interface == element2->NorthInterface ? refInterval.Right : refInterval.Left;
 
 			functionToIntegrate = [meanFactor, n1, n2, phi1, phi2, u1, u2](double t) {
 				double meanGradPhi1_scal_jumpPhi2 = meanFactor * (phi1->EvalGradX(t, u1) * n2[0] + phi1->EvalGradY(t, u1) * n2[1]) * phi2->Eval(t, u2);
@@ -104,7 +88,7 @@ public:
 			return 0;
 
 		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree() + 1;
-		return -Utils::Integral(nQuadPoints, functionToIntegrate, phi1->ReferenceInterval());
+		return -Utils::Integral(nQuadPoints, functionToIntegrate, refInterval);
 	}
 
 	double PenalizationTerm(ElementInterface* interface, Element* element1, IBasisFunction2D* phi1, Element* element2, IBasisFunction2D* phi2, double penalizationCoefficient)
@@ -126,14 +110,16 @@ public:
 		//assert(n2[0] != 0 || n2[1] != 0);
 		//assert((n1[0] == n2[0] && n1[1] == n2[1]) || (n1[0] == -n2[0] && n1[1] == -n2[1]));
 
+		RefInterval refInterval = phi1->ReferenceInterval();
+
 		Element2DInterface* interf = (Element2DInterface*)interface;
 
 		function<double(double)> functionToIntegrate;
 
 		if (interf->IsVertical())
 		{
-			double t1 = interface == element1->EastInterface ? phi1->ReferenceInterval().Right : phi1->ReferenceInterval().Left;
-			double t2 = interface == element2->EastInterface ? phi2->ReferenceInterval().Right : phi2->ReferenceInterval().Left;
+			double t1 = interface == element1->EastInterface ? refInterval.Right : refInterval.Left;
+			double t2 = interface == element2->EastInterface ? refInterval.Right : refInterval.Left;
 
 			functionToIntegrate = [phi1, phi2, n1, n2, t1, t2](double u) {
 				return (n1[0] * n2[0] + n1[1] * n2[1]) * phi1->Eval(t1, u) * phi2->Eval(t2, u);
@@ -141,8 +127,8 @@ public:
 		}
 		else if (interf->IsHorizontal())
 		{
-			double u1 = interface == element1->NorthInterface ? phi1->ReferenceInterval().Right : phi1->ReferenceInterval().Left;
-			double u2 = interface == element2->NorthInterface ? phi2->ReferenceInterval().Right : phi2->ReferenceInterval().Left;
+			double u1 = interface == element1->NorthInterface ? refInterval.Right : refInterval.Left;
+			double u2 = interface == element2->NorthInterface ? refInterval.Right : refInterval.Left;
 
 			functionToIntegrate = [phi1, phi2, n1, n2, u1, u2](double t) {
 				return (n1[0] * n2[0] + n1[1] * n2[1]) * phi1->Eval(t, u1) * phi2->Eval(t, u2);
@@ -152,8 +138,8 @@ public:
 			return 0;
 
 		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree() + 2;
-		double jacobian = phi1->ReferenceInterval().Left == -1 && phi1->ReferenceInterval().Right == 1 ? h / 2 : h;
-		double integralJump1ScalarJump2 = jacobian * Utils::Integral(nQuadPoints, functionToIntegrate, phi1->ReferenceInterval());
+		double jacobian = refInterval.Left == -1 && refInterval.Right == 1 ? (h / 2) : h;
+		double integralJump1ScalarJump2 = jacobian * Utils::Integral(nQuadPoints, functionToIntegrate, refInterval);
 		return penalizationCoefficient * integralJump1ScalarJump2;
 	}
 

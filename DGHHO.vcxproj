@@ -77,7 +77,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ProjectPublicIncludePath>
     </ProjectPublicIncludePath>
-    <IncludePath>C:\Users\pierr\Documents\Source\Repos\DGHHO\DGHHO\eigen-eigen-b3f3d4950030;$(IncludePath)</IncludePath>
+    <IncludePath>C:\Users\pierr\Documents\Source\Repos\dghho\eigen-eigen-b3f3d4950030;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ProjectPublicIncludePath>
@@ -88,8 +88,9 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="BasisFunctionFactory.h" />
+    <ClInclude Include="Bernstein2Basis1D.h" />
     <ClInclude Include="BernsteinBasis1D.h" />
-    <ClInclude Include="BernsteinBasis2D.h" />
     <ClInclude Include="CartesianGrid1DNew.h" />
     <ClInclude Include="Element1DInterface.h" />
     <ClInclude Include="IBasisFunction2D.h" />
@@ -110,20 +111,17 @@
     <ClInclude Include="Interval.h" />
     <ClInclude Include="LegendreBasis1D.h" />
     <ClInclude Include="IMesh.h" />
-    <ClInclude Include="LegendreBasis2D.h" />
-    <ClInclude Include="MonomialBasis2D.h" />
     <ClInclude Include="MonomialBasis1D.h" />
     <ClInclude Include="Poisson1D.h" />
     <ClInclude Include="Poisson2D.h" />
     <ClInclude Include="IBasisFunction1D.h" />
-    <ClInclude Include="ReverseMonomialBasis1D.h" />
     <ClInclude Include="Square.h" />
     <ClInclude Include="TensorPolynomial2D.h" />
     <ClInclude Include="Utils.h" />
   </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>/mnt/c/Users/pierr/Documents/Source/Repos/DGHHO/DGHHO/eigen-eigen-b3f3d4950030;$(ProjectPublicIncludePath);%(ClCompile.AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>/mnt/c/Users/pierr/Documents/Source/Repos/dghho/eigen-eigen-b3f3d4950030;$(ProjectPublicIncludePath);%(ClCompile.AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

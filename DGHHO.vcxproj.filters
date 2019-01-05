@@ -45,12 +45,6 @@
     <ClInclude Include="MonomialBasis1D.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
-    <ClInclude Include="MonomialBasis2D.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
-    <ClInclude Include="ReverseMonomialBasis1D.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
     <ClInclude Include="LegendreBasis1D.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
@@ -87,13 +81,13 @@
     <ClInclude Include="BernsteinBasis1D.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
-    <ClInclude Include="LegendreBasis2D.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
-    <ClInclude Include="BernsteinBasis2D.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
     <ClInclude Include="TensorPolynomial2D.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="Bernstein2Basis1D.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="BasisFunctionFactory.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
   </ItemGroup>

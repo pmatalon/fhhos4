@@ -63,7 +63,7 @@ public:
 		return Integral(func, xInterval.Left, xInterval.Right, yInterval.Left, yInterval.Right);
 	}
 
-	static int Binomial(int  n, int p)
+	static int Binomial(int n, int p)
 	{
 		if (p != 0 && n != p)
 			return Binomial(n - 1, p) + Binomial(n - 1, p - 1);

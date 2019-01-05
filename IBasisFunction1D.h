@@ -15,41 +15,6 @@ private:
 	}
 };
 
-/*class Transformation
-{
-public:
-	virtual double F() = 0;
-	virtual double JacobianF() = 0;
-};
-
-class Transform_X_to_T_in_MinusOne_One : public Transformation
-{
-private:
-	double _a;
-	double _b;
-public:
-	Transform_X_to_T_in_MinusOne_One(double a, double b)
-	{
-		this->_a = a;
-		this->_b = b;
-	}
-
-	double T2X(double t)
-	{
-		return (this->_b - this->_a) / 2 * t + (this->_a + this->_b) / 2;
-	}
-	double T2XPrime()
-	{
-		return (this->_b - this->_a) / 2;
-	}
-	double X2TPrime()
-	{
-		return 2 / (this->_b - this->_a);
-	}
-};*/
-
-
-
 class IBasisFunction1D
 {
 public:
