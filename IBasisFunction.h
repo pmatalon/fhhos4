@@ -48,6 +48,7 @@ public:
 	virtual double EvalGradX(double x, double y, double z) = 0;
 	virtual double EvalGradY(double x, double y, double z) = 0;
 	virtual double EvalGradZ(double x, double y, double z) = 0;
+	virtual double* Grad(double x, double y, double z) = 0;
 
 	virtual int GetDegree() = 0;
 	virtual RefInterval ReferenceInterval() = 0;

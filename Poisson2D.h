@@ -6,7 +6,6 @@
 #include "FileMatrix.h"
 #include "FileVector.h"
 #include "IPoisson_DGTerms.h"
-#include "Poisson2D_DGTerms_LocalBasis.h"
 using namespace std;
 
 #pragma once
@@ -15,19 +14,17 @@ class Poisson2D
 {
 private:
 	string _solution;
-	function<double(double, double)> _sourceFunction;
 public:
-	Poisson2D(string solution, function<double(double, double)> sourceFunction)
+	Poisson2D(string solution)
 	{
 		this->_solution = solution;
-		this->_sourceFunction = sourceFunction;
 	}
 
 	void DiscretizeDG(IMesh* grid, FunctionalBasisWithObjects<IBasisFunction>* basis, IPoisson_DGTerms<IBasisFunction>* dg, int penalizationCoefficient, string outputDirectory, bool extractMatrixComponents)
 	{
 		bool autoPenalization = penalizationCoefficient == -1;
 		if (autoPenalization)
-			penalizationCoefficient = 4 * pow(basis->GetDegree() + 1, 2) * grid->N; // Ralph-Hartmann
+			penalizationCoefficient = pow(grid->Dim, 2) * pow(basis->GetDegree() + 1, 2) * grid->N; // Ralph-Hartmann
 
 		cout << "Discretization: Discontinuous Galerkin SIPG" << endl;
 		cout << "\tPenalization coefficient: " << penalizationCoefficient << endl;

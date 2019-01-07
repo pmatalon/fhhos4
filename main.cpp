@@ -7,10 +7,12 @@
 #include <getopt.h>
 #include "FunctionalBasis.h"
 #include "CartesianGrid2D.h"
+#include "CartesianGrid3D.h"
 #include "Poisson1D_DGTerms_LocalBasis.h"
 #include "Poisson1D_DGTerms_GlobalBasis.h"
 #include "Poisson2D_DGTerms_LocalBasis.h"
 #include "Poisson2D_DGTerms_GlobalBasis.h"
+#include "Poisson3D_DGTerms_LocalBasis.h"
 using namespace std;
 
 
@@ -18,7 +20,7 @@ void print_usage(string s, int d, int n, string b, int p, int z, string o) {
 	cout << "--------------------------------------------------------" << endl;
 	cout << "Arguments:" << endl;
 	cout << "-s {sine|poly}\t	solution (default: sine)\t--> " << s << endl;
-	cout << "-d {1|2}:\t	space dimension (default: 1)\t--> " << d << endl;
+	cout << "-d {1|2|3}:\t	space dimension (default: 1)\t--> " << d << endl;
 	cout << "-n NUM:\t		number of subdivisions (default: 5)\t--> " << n << endl;
 	cout << "-b {monomials|legendre|bernstein}:	polynomial basis (default: monomials)\t--> " << b << endl;
 	cout << "-p NUM:\t		max polynomial degree (default: 2)\t--> " << p << endl;
@@ -116,7 +118,7 @@ int main(int argc, char* argv[])
 		std::function<double(double, double)> sourceFunction = [](double x, double y) { return 2 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y); };
 		if (solution.compare("poly") == 0)
 			sourceFunction = [](double x, double y) { return 2 * y*(1 - y) + 2 * x*(1 - x); };
-		Poisson2D<IBasisFunction2D>* problem = new Poisson2D<IBasisFunction2D>(solution, sourceFunction);
+		Poisson2D<IBasisFunction2D>* problem = new Poisson2D<IBasisFunction2D>(solution);
 
 		IPoisson_DGTerms<IBasisFunction2D>* dg = new Poisson2D_DGTerms_LocalBasis(sourceFunction);
 
@@ -139,6 +141,25 @@ int main(int argc, char* argv[])
 			cout << "Basis not managed!";
 			exit(EXIT_FAILURE);
 		}*/
+
+		problem->DiscretizeDG(grid, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents);
+		delete problem;
+		delete basis;
+		delete grid;
+	}
+	else if (dimension == 3)
+	{
+		CartesianGrid3D* grid = new CartesianGrid3D(n);
+
+		std::function<double(double, double, double)> sourceFunction = [](double x, double y, double z) { return 3 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y)*sin(4 * M_PI * z); };
+		if (solution.compare("poly") == 0)
+			sourceFunction = [](double x, double y, double z) { return 2 * (y*(1 - y)*z*(1 - z) + x * (1 - x)*z*(1 - z) + x * (1 - x)*y*(1 - y)); };
+
+		Poisson2D<IBasisFunction3D>* problem = new Poisson2D<IBasisFunction3D>(solution);
+
+		IPoisson_DGTerms<IBasisFunction3D>* dg = new Poisson3D_DGTerms_LocalBasis(sourceFunction);
+
+		FunctionalBasisWithObjects<IBasisFunction3D>* basis = new FunctionalBasis3D(basisCode, polyDegree);
 
 		problem->DiscretizeDG(grid, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents);
 		delete problem;

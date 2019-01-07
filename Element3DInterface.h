@@ -2,24 +2,20 @@
 #include "ElementInterface.h"
 #include "Utils.h"
 
-class Element2DInterface : public ElementInterface
+class Element3DInterface : public ElementInterface
 {
 public:
-	double X1;
-	double Y1;
-	double X2;
-	double Y2;
+	bool IsInXOYPlan = false;
+	bool IsInYOZPlan = false;
+	bool IsInXOZPlan = false;
 
-	Element2DInterface(BigNumber number, Element* element1, Element* element2) : ElementInterface(number, element1, element2)
+	Element3DInterface(BigNumber number, Element* element1, Element* element2) : ElementInterface(number, element1, element2)
 	{	}
 
-	Element2DInterface(BigNumber number, Element* element1) : ElementInterface(number, element1)
+	Element3DInterface(BigNumber number, Element* element1) : ElementInterface(number, element1)
 	{	}
 
-	bool IsVertical() {	return this->X1 == this->X2; }
-	bool IsHorizontal()	{ return this->Y1 == this->Y2; }
-
-	string ToString() override
+	/*string ToString() override
 	{
 		string s = "Interface " + std::to_string(this->Number);
 		if (this->IsVertical())
@@ -31,5 +27,5 @@ public:
 		else
 			s += " between element " + std::to_string(this->Element1->Number) + " and element " + std::to_string(this->Element2->Number);
 		return s;
-	}
+	}*/
 };

@@ -37,4 +37,6 @@ public:
 	{
 		return "Interface " + this->Number;
 	}
+
+	virtual ~ElementInterface() {}
 };

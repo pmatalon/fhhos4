@@ -6,6 +6,10 @@
 class Utils
 {
 public:
+	//-------------//
+	// Integral 1D //
+	//-------------//
+
 	static double Integral(int nPoints, std::function<double(double)> func, double x1, double x2)
 	{
 		GaussLegendre gs(nPoints);
@@ -30,13 +34,9 @@ public:
 		return Integral(func, interval.Left, interval.Right);
 	}
 
-
-	// Integral on [-1, 1] x [-1, 1]
-	/*static double IntegralOnReferenceInterval(std::function<double(double, double)> func)
-	{
-		GaussLegendre gs;
-		return gs.Quadrature(func);
-	}*/
+	//-------------//
+	// Integral 2D //
+	//-------------//
 
 	// Integral on [x1, x2] x [y1, y2]
 	static double Integral(int nPoints, std::function<double(double, double)> func, double x1, double x2, double y1, double y2)
@@ -63,11 +63,49 @@ public:
 		return Integral(func, xInterval.Left, xInterval.Right, yInterval.Left, yInterval.Right);
 	}
 
+	//-------------//
+	// Integral 3D //
+	//-------------//
+
+	// Integral on [x1, x2] x [y1, y2]
+	static double Integral(int nPoints, std::function<double(double, double, double)> func, double x1, double x2, double y1, double y2, double z1, double z2)
+	{
+		GaussLegendre gs(nPoints);
+		if (x1 == -1 && x2 == 1 && y1 == -1 && y2 == 1 && z1 == -1 && z2 == 1)
+			return gs.Quadrature(func);
+		else
+			return gs.Quadrature(func, x1, x2, y1, y2, z1, z2);
+	}
+
+	static double Integral(std::function<double(double, double, double)> func, double x1, double x2, double y1, double y2, double z1, double z2)
+	{
+		return Integral(GaussLegendre::MAX_POINTS, func, x1, x2, y1, y2, z1, z2);
+	}
+
+	static double Integral(int nPoints, std::function<double(double, double, double)> func, RefInterval xInterval, RefInterval yInterval, RefInterval zInterval)
+	{
+		return Integral(nPoints, func, xInterval.Left, xInterval.Right, yInterval.Left, yInterval.Right, zInterval.Left, zInterval.Right);
+	}
+
+	static double Integral(std::function<double(double, double, double)> func, RefInterval xInterval, RefInterval yInterval, RefInterval zInterval)
+	{
+		return Integral(func, xInterval.Left, xInterval.Right, yInterval.Left, yInterval.Right, zInterval.Left, zInterval.Right);
+	}
+
+	//----------------------//
+	// Binomial coefficient //
+	//----------------------//
+
 	static int Binomial(int n, int p)
 	{
 		if (p != 0 && n != p)
 			return Binomial(n - 1, p) + Binomial(n - 1, p - 1);
 		return 1;
+	}
+
+	static double InnerProduct3D(double* vector1, double* vector2)
+	{
+		return vector1[0] * vector2[0] + vector1[1] * vector2[1] + vector1[2] * vector2[2];
 	}
 
 };

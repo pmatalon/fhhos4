@@ -1,7 +1,7 @@
+#pragma once
 #include "Element.h"
 #include "Element2DInterface.h"
 
-#pragma once
 class Square : public Element
 {
 public:

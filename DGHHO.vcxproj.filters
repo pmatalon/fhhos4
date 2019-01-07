@@ -54,9 +54,6 @@
     <ClInclude Include="Element1DInterface.h">
       <Filter>Mesh</Filter>
     </ClInclude>
-    <ClInclude Include="TensorPolynomial2D.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
     <ClInclude Include="BasisFunctionFactory.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
@@ -84,6 +81,19 @@
     <ClInclude Include="IBasisFunction.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
+    <ClInclude Include="TensorPolynomial.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="CartesianGrid3D.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="Cube.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="Element3DInterface.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson3D_DGTerms_LocalBasis.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

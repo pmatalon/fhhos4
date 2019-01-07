@@ -51,9 +51,7 @@ public:
 			return 0;
 
 		RefInterval refInterval = phi1->ReferenceInterval();
-
-		//double h = element1->Width;
-
+		
 		auto n1 = element1->OuterNormalVector(interface);
 		auto n2 = element2->OuterNormalVector(interface);
 

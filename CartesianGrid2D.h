@@ -10,18 +10,8 @@ using namespace std;
 class CartesianGrid2D : public IMesh
 {
 public:
-	//BigNumber N;
-	//vector<Square*> Elements;
-	//vector<Element2DInterface*> Interfaces;
-	//vector<Element2DInterface*> BoundaryInterfaces;
-private:
-public:
 	CartesianGrid2D(BigNumber n) : IMesh(2, n)
 	{
-		//this->N = n;
-
-		// [0,1]^2 descretized in 0, 1/n, 2/n, n/n
-
 		//----------//
 		// Elements //
 		//----------//
@@ -101,7 +91,7 @@ public:
 		}
 	}
 
-	~CartesianGrid2D()
+	~CartesianGrid2D() override
 	{
 		for (size_t i = 0; i < this->Elements.size(); ++i)
 			delete this->Elements[i];

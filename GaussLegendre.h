@@ -216,21 +216,6 @@ public:
 	// Gauss-Legendre quadrature on [x1, x2]x[y1, y2]
 	double Quadrature(std::function<double(double, double)> func, double x1, double x2, double y1, double y2)
 	{
-		/*if (x1 == x2)
-		{
-			std::function<double(double)> func1D = [func, x1](double y) {
-				return func(x1, y);
-			};
-			return Quadrature(func1D, y1, y2);
-		}
-		if (y1 == y2)
-		{
-			std::function<double(double)> func1D = [func, y1](double x) {
-				return func(x, y1);
-			};
-			return Quadrature(func1D, x1, x2);
-		}*/
-
 		double sum = 0;
 		for (int i = 0; i < this->nPoints; i++)
 		{
@@ -238,5 +223,39 @@ public:
 				sum += func((x2 - x1) / 2 * this->points[i] + (x1 + x2) / 2, (y2 - y1) / 2 * this->points[j] + (y1 + y2) / 2) * this->weights[i] * this->weights[j];
 		}
 		return (x2 - x1) / 2 * (y2 - y1) / 2 * sum;
+	}
+
+	/*----------*/
+	/*    3D    */
+	/*----------*/
+
+	// Gauss-Legendre quadrature on [-1, 1]^3
+	double Quadrature(std::function<double(double, double, double)> func)
+	{
+		double sum = 0;
+		for (int i = 0; i < this->nPoints; i++)
+		{
+			for (int j = 0; j < this->nPoints; j++)
+			{
+				for (int k = 0; k < this->nPoints; k++)
+					sum += func(this->points[i], this->points[j], this->points[k]) * this->weights[i] * this->weights[j] * this->weights[k];
+			}
+		}
+		return sum;
+	}
+
+	// Gauss-Legendre quadrature on [x1, x2]x[y1, y2]x[z1, z2]
+	double Quadrature(std::function<double(double, double, double)> func, double x1, double x2, double y1, double y2, double z1, double z2)
+	{
+		double sum = 0;
+		for (int i = 0; i < this->nPoints; i++)
+		{
+			for (int j = 0; j < this->nPoints; j++)
+			{
+				for (int k = 0; k < this->nPoints; k++)
+					sum += func((x2 - x1) / 2 * this->points[i] + (x1 + x2) / 2, (y2 - y1) / 2 * this->points[j] + (y1 + y2) / 2, (z2 - z1) / 2 * this->points[k] + (z1 + z2) / 2) * this->weights[i] * this->weights[j] * this->weights[k];
+			}
+		}
+		return (x2 - x1) / 2 * (y2 - y1) / 2 * (z2 - z1) / 2 * sum;
 	}
 };

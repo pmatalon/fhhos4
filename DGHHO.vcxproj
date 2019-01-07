@@ -92,7 +92,10 @@
     <ClInclude Include="Bernstein2_1D.h" />
     <ClInclude Include="Bernstein1D.h" />
     <ClInclude Include="CartesianGrid1DNew.h" />
+    <ClInclude Include="CartesianGrid3D.h" />
+    <ClInclude Include="Cube.h" />
     <ClInclude Include="Element1DInterface.h" />
+    <ClInclude Include="Element3DInterface.h" />
     <ClInclude Include="FunctionalBasis.h" />
     <ClInclude Include="CartesianGrid1D.h" />
     <ClInclude Include="CartesianGrid2D.h" />
@@ -117,8 +120,9 @@
     <ClInclude Include="IBasisFunction.h" />
     <ClInclude Include="Poisson2D_DGTerms_GlobalBasis.h" />
     <ClInclude Include="Poisson2D_DGTerms_LocalBasis.h" />
+    <ClInclude Include="Poisson3D_DGTerms_LocalBasis.h" />
     <ClInclude Include="Square.h" />
-    <ClInclude Include="TensorPolynomial2D.h" />
+    <ClInclude Include="TensorPolynomial.h" />
     <ClInclude Include="Utils.h" />
   </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">

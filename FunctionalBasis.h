@@ -3,11 +3,11 @@
 #include "FunctionalBasisWithObjects.h"
 #include "BasisFunctionFactory.h"
 #include "IBasisFunction.h"
-#include "TensorPolynomial2D.h"
-//#include "MonomialBasis1D.h"
-//#include "BernsteinBasis1D.h"
-//#include "Bernstein2Basis1D.h"
-//#include "LegendreBasis1D.h"
+#include "TensorPolynomial.h"
+
+//----------//
+//    1D    //
+//----------//
 
 class FunctionalBasis1D : public FunctionalBasisWithNumbers
 {
@@ -37,6 +37,10 @@ public:
 	}
 };
 
+//----------//
+//    2D    //
+//----------//
+
 class FunctionalBasis2D : public FunctionalBasisWithObjects<IBasisFunction2D>
 {
 private:
@@ -60,6 +64,52 @@ public:
 				IBasisFunction1D* polyX = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, i);
 				IBasisFunction1D* polyY = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, j);
 				this->_localFunctions[functionNumber++] = new TensorPolynomial2D(polyX, polyY);
+			}
+		}
+	}
+
+	int GetDegree()
+	{
+		return this->_maxPolynomialDegree;
+	}
+
+	std::string Name()
+	{
+		return this->_basisCode + "_p" + std::to_string(this->_maxPolynomialDegree);
+	}
+};
+
+//----------//
+//    3D    //
+//----------//
+
+class FunctionalBasis3D : public FunctionalBasisWithObjects<IBasisFunction3D>
+{
+private:
+	int _maxPolynomialDegree;
+	string _basisCode;
+
+public:
+	FunctionalBasis3D(string basisCode, int maxPolynomialDegree)
+		:FunctionalBasisWithObjects<IBasisFunction3D>()
+	{
+		this->_maxPolynomialDegree = maxPolynomialDegree;
+		this->_basisCode = basisCode;
+
+		int functionNumber = 0;
+		for (int degree = 0; degree <= maxPolynomialDegree; degree++)
+		{
+			for (int degZ = 0; degZ <= degree; degZ++)
+			{
+				for (int degY = 0; degY <= degree - degZ; degY++)
+				{
+					int degX = degree - degZ - degY;
+
+					IBasisFunction1D* polyX = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, degX);
+					IBasisFunction1D* polyY = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, degY);
+					IBasisFunction1D* polyZ = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, degZ);
+					this->_localFunctions[functionNumber++] = new TensorPolynomial3D(polyX, polyY, polyZ);
+				}
 			}
 		}
 	}

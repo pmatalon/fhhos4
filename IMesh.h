@@ -17,4 +17,6 @@ public:
 		this->Dim = dim;
 		this->N = n;
 	}
+
+	virtual ~IMesh() {}
 };
