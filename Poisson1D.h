@@ -3,7 +3,7 @@
 #include "FunctionalBasisWithNumbers.h"
 #include "IPoisson1D_DGTerms.h"
 #include "CartesianGrid1D.h"
-#include "IBasisFunction1D.h"
+//#include "IBasisFunction.h"
 #include "Element.h"
 #include "FileMatrix.h"
 #include "FileVector.h"

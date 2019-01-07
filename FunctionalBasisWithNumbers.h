@@ -2,7 +2,7 @@
 #include <string>
 #include <map>
 #include "Element.h"
-#include "IBasisFunction1D.h"
+#include "IBasisFunction.h"
 class FunctionalBasisWithNumbers
 {
 protected:

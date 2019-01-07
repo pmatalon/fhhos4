@@ -2,8 +2,7 @@
 #include <functional>
 #include <math.h>
 #include "IPoisson_DGTerms.h"
-#include "IBasisFunction1D.h"
-#include "IBasisFunction2D.h"
+#include "IBasisFunction.h"
 #include "Utils.h"
 #include "Element.h"
 #include "ElementInterface.h"

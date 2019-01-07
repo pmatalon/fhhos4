@@ -1,5 +1,6 @@
 #pragma once
-#include "IBasisFunction1D.h"
+#include "IBasisFunction.h"
+#include <string>
 #include <math.h>
 using namespace std;
 
@@ -92,31 +93,5 @@ public:
 		if (this->Degree == 1)
 			return var;
 		return "Legendre(" + std::to_string(this->Degree) + ", " + var + ")";
-	}
-};
-
-class LegendreBasis1D : public FunctionalBasisWithNumbers
-{
-private:
-	int _maxPolynomialDegree;
-
-public:
-	LegendreBasis1D(int maxPolynomialDegree)
-		:FunctionalBasisWithNumbers()
-	{
-		this->_maxPolynomialDegree = maxPolynomialDegree;
-
-		for (int i = 0; i <= maxPolynomialDegree; i++)
-			this->_localFunctions[i] = new Legendre1D(i);
-	}
-
-	int GetDegree()
-	{
-		return this->_maxPolynomialDegree;
-	}
-
-	string Name()
-	{
-		return Legendre1D::Code() + "_p" + std::to_string(this->_maxPolynomialDegree);
 	}
 };

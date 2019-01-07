@@ -1,6 +1,6 @@
 #pragma once
 #include "Element.h"
-#include "IBasisFunction1D.h"
+#include "IBasisFunction.h"
 
 class IPoisson1D_DGTerms
 {

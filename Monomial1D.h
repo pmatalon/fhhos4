@@ -1,5 +1,6 @@
 #pragma once
-#include "IBasisFunction1D.h"
+#include "IBasisFunction.h"
+#include <string>
 #include <math.h>
 using namespace std;
 
@@ -46,31 +47,5 @@ public:
 		if (this->Degree == 1)
 			return var;
 		return var + "^" + std::to_string(this->Degree);
-	}
-};
-
-class MonomialBasis1D : public FunctionalBasisWithNumbers
-{
-private:
-	int _maxPolynomialDegree;
-
-public:
-	MonomialBasis1D(int maxPolynomialDegree)
-		:FunctionalBasisWithNumbers()
-	{
-		this->_maxPolynomialDegree = maxPolynomialDegree;
-
-		for (int i = 0; i <= maxPolynomialDegree; i++)
-			this->_localFunctions[i] = new Monomial1D(i);
-	}
-
-	int GetDegree()
-	{
-		return this->_maxPolynomialDegree;
-	}
-
-	string Name()
-	{
-		return Monomial1D::Code() + "_p" + std::to_string(this->_maxPolynomialDegree);
 	}
 };

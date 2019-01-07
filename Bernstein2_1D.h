@@ -1,6 +1,7 @@
 #pragma once
-#include "IBasisFunction1D.h"
+#include "IBasisFunction.h"
 #include "Utils.h"
+#include <string>
 #include <math.h>
 #include <assert.h>
 using namespace std;
@@ -82,31 +83,5 @@ private:
 			return this->_binomial * 0.5 * i * pow(0.5*x + 0.5, i - 1);
 		else
 			return this->_binomial * (i*0.5*pow(0.5*x + 0.5, i - 1)*pow(0.5 - 0.5*x, n - i) - (n - i)*0.5*pow(0.5*x + 0.5, i)*pow(0.5 - 0.5*x, n - i - 1));
-	}
-};
-
-class Bernstein2Basis1D : public FunctionalBasisWithNumbers
-{
-private:
-	int _maxPolynomialDegree;
-
-public:
-	Bernstein2Basis1D(int maxPolynomialDegree)
-		:FunctionalBasisWithNumbers()
-	{
-		this->_maxPolynomialDegree = maxPolynomialDegree;
-
-		for (int i = 0; i <= maxPolynomialDegree; i++)
-			this->_localFunctions[i] = new Bernstein2_1D(maxPolynomialDegree, i);
-	}
-
-	int GetDegree()
-	{
-		return this->_maxPolynomialDegree;
-	}
-
-	string Name()
-	{
-		return "bernstein2_p" + std::to_string(this->_maxPolynomialDegree);
 	}
 };

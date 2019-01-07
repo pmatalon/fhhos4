@@ -5,10 +5,7 @@
 //#include <Eigen/Dense>
 #include <functional>
 #include <getopt.h>
-#include "MonomialBasis1D.h"
-#include "LegendreBasis1D.h"
-#include "BernsteinBasis1D.h"
-#include "TensorPolynomial2D.h"
+#include "FunctionalBasis.h"
 #include "CartesianGrid2D.h"
 #include "Poisson1D_DGTerms_LocalBasis.h"
 #include "Poisson1D_DGTerms_GlobalBasis.h"
@@ -87,8 +84,8 @@ int main(int argc, char* argv[])
 
 		IPoisson1D_DGTerms* dg = new Poisson1D_DGTerms_LocalBasis(grid, sourceFunction);
 
-		FunctionalBasisWithNumbers* basis;
-		if (basisCode.compare("monomials") == 0)
+		FunctionalBasisWithNumbers* basis = new FunctionalBasis1D(basisCode, polyDegree);
+		/*if (basisCode.compare("monomials") == 0)
 			basis = new MonomialBasis1D(polyDegree);
 		else if (basisCode.compare("globalmonomials") == 0)
 		{
@@ -105,7 +102,7 @@ int main(int argc, char* argv[])
 		{
 			cout << "Basis not managed!";
 			exit(EXIT_FAILURE);
-		}
+		}*/
 
 		problem->DiscretizeDG(grid, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents);
 		delete problem;
@@ -123,8 +120,8 @@ int main(int argc, char* argv[])
 
 		IPoisson_DGTerms<IBasisFunction2D>* dg = new Poisson2D_DGTerms_LocalBasis(sourceFunction);
 
-		FunctionalBasisWithObjects<IBasisFunction2D>* basis;
-		if (basisCode.compare("monomials") == 0)
+		FunctionalBasisWithObjects<IBasisFunction2D>* basis = new FunctionalBasis2D(basisCode, polyDegree);
+		/*if (basisCode.compare("monomials") == 0)
 			basis = new MonomialBasis2D(polyDegree);
 		else if (basisCode.compare("globalmonomials") == 0)
 		{
@@ -141,7 +138,7 @@ int main(int argc, char* argv[])
 		{
 			cout << "Basis not managed!";
 			exit(EXIT_FAILURE);
-		}
+		}*/
 
 		problem->DiscretizeDG(grid, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents);
 		delete problem;

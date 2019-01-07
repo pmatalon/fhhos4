@@ -39,20 +39,8 @@
     <ClInclude Include="FunctionalBasisWithObjects.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
-    <ClInclude Include="MonomialBasis1D.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
-    <ClInclude Include="LegendreBasis1D.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
     <ClInclude Include="GaussLegendre.h">
       <Filter>Utils</Filter>
-    </ClInclude>
-    <ClInclude Include="IBasisFunction1D.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
-    <ClInclude Include="IBasisFunction2D.h">
-      <Filter>FunctionalBasis</Filter>
     </ClInclude>
     <ClInclude Include="IMesh.h">
       <Filter>Mesh</Filter>
@@ -66,13 +54,7 @@
     <ClInclude Include="Element1DInterface.h">
       <Filter>Mesh</Filter>
     </ClInclude>
-    <ClInclude Include="BernsteinBasis1D.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
     <ClInclude Include="TensorPolynomial2D.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
-    <ClInclude Include="Bernstein2Basis1D.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
     <ClInclude Include="BasisFunctionFactory.h">
@@ -84,6 +66,24 @@
     <ClInclude Include="IPoisson1D_DGTerms.h" />
     <ClInclude Include="Poisson1D_DGTerms_LocalBasis.h" />
     <ClInclude Include="Poisson1D_DGTerms_GlobalBasis.h" />
+    <ClInclude Include="FunctionalBasis.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="Bernstein2_1D.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="Monomial1D.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="Legendre1D.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="Bernstein1D.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="IBasisFunction.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
