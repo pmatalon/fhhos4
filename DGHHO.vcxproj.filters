@@ -94,6 +94,10 @@
     <ClInclude Include="RefInterval.h">
       <Filter>Utils</Filter>
     </ClInclude>
+    <ClInclude Include="Problem.h" />
+    <ClInclude Include="L2.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

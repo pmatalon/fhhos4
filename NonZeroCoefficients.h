@@ -16,7 +16,7 @@ public:
 		if (value != 0)
 			this->coefficients.push_back(Eigen::Triplet<double>(i, j, value));
 	}
-	void Fill(Eigen::SparseMatrix<double>& m)
+	void Fill(Eigen::SparseMatrix<double> &m)
 	{
 		m.setFromTriplets(this->coefficients.begin(), this->coefficients.end());
 	}

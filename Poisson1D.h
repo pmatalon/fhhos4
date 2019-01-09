@@ -2,6 +2,7 @@
 #include <functional>
 #include <Eigen/Sparse>
 #include <unsupported/Eigen/SparseExtra>
+#include "Problem.h"
 #include "FunctionalBasisWithNumbers.h"
 #include "IPoisson1D_DGTerms.h"
 #include "CartesianGrid1D.h"
@@ -10,15 +11,13 @@
 #include "NonZeroCoefficients.h"
 using namespace std;
 
-class Poisson1D
+class Poisson1D : public Problem
 {
 private:
-	string _solutionName;
 	std::function<double(double)> _sourceFunction;
 public:
-	Poisson1D(string solutionName, function<double(double)> sourceFunction)
+	Poisson1D(string solutionName, function<double(double)> sourceFunction) : Problem(solutionName)
 	{
-		this->_solutionName = solutionName;
 		this->_sourceFunction = sourceFunction;
 	}
 
@@ -56,7 +55,7 @@ public:
 		NonZeroCoefficients couplingCoeffs(nnzApproximate);
 		NonZeroCoefficients penCoeffs(nnzApproximate);
 
-		Eigen::VectorXd b(nUnknowns);
+		this->b = Eigen::VectorXd(nUnknowns);
 
 		for (int element = 0; element < mesh->NElements(); element++) // interval [element/n, (element+1)/n]
 		{
@@ -156,14 +155,14 @@ public:
 				}
 
 				double rhs = dg->RightHandSide(element, localFunction1);
-				b(basisFunction1) = rhs;
+				this->b(basisFunction1) = rhs;
 			}
 		}
 
-		Eigen::SparseMatrix<double> A(nUnknowns, nUnknowns);
-		matrixCoeffs.Fill(A);
-		Eigen::saveMarket(A, matrixFilePath);
-		Eigen::saveMarketVector(b, rhsFilePath);
+		this->A = Eigen::SparseMatrix<double>(nUnknowns, nUnknowns);
+		matrixCoeffs.Fill(this->A);
+		Eigen::saveMarket(this->A, matrixFilePath);
+		Eigen::saveMarketVector(this->b, rhsFilePath);
 
 		if (extractMatrixComponents)
 		{

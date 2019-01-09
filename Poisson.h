@@ -2,23 +2,24 @@
 #include <iostream>
 #include <Eigen/Sparse>
 #include <unsupported/Eigen/SparseExtra>
+#include "Problem.h"
 #include "IMesh.h"
 #include "FunctionalBasisWithObjects.h"
 #include "ElementInterface.h"
 #include "IPoisson_DGTerms.h"
 #include "NonZeroCoefficients.h"
+#include "L2.h"
 using namespace std;
 
 template <class IBasisFunction>
-class Poisson
+class Poisson : public Problem
 {
 private:
-	string _solutionName;
+
 public:
-	Poisson(string solutionName)
-	{
-		this->_solutionName = solutionName;
-	}
+
+	Poisson(string solutionName) : Problem(solutionName)
+	{	}
 
 	void DiscretizeDG(IMesh* mesh, FunctionalBasisWithObjects<IBasisFunction>* basis, IPoisson_DGTerms<IBasisFunction>* dg, int penalizationCoefficient, string outputDirectory, bool extractMatrixComponents)
 	{
@@ -46,7 +47,7 @@ public:
 		string matrixPenFilePath		= outputDirectory + "/" + fileName + "_A_pen.dat";
 		string rhsFilePath				= outputDirectory + "/" + fileName + "_b.dat";
 
-		Eigen::VectorXd b(nUnknowns);
+		this->b = Eigen::VectorXd(nUnknowns);
 
 		BigNumber nnzApproximate = extractMatrixComponents ? mesh->Elements.size() * basis->NumberOfLocalFunctionsInElement(NULL) * (2 * mesh->Dim + 1) : 0;
 		NonZeroCoefficients matrixCoeffs(nnzApproximate);
@@ -97,7 +98,7 @@ public:
 				}
 
 				double rhs = dg->RightHandSide(element, localFunction1);
-				b(basisFunction1) = rhs;
+				this->b(basisFunction1) = rhs;
 			}
 		}
 
@@ -135,10 +136,10 @@ public:
 			}
 		}
 
-		Eigen::SparseMatrix<double> A(nUnknowns, nUnknowns);
-		matrixCoeffs.Fill(A);
-		Eigen::saveMarket(A, matrixFilePath);
-		Eigen::saveMarketVector(b, rhsFilePath);
+		this->A = Eigen::SparseMatrix<double>(nUnknowns, nUnknowns);
+		matrixCoeffs.Fill(this->A);
+		Eigen::saveMarket(this->A, matrixFilePath);
+		Eigen::saveMarketVector(this->b, rhsFilePath);
 
 		if (extractMatrixComponents)
 		{

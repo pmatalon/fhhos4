@@ -4,6 +4,7 @@
 #include "BasisFunctionFactory.h"
 #include "IBasisFunction.h"
 #include "TensorPolynomial.h"
+#include <Eigen/Sparse>
 
 //----------//
 //    1D    //
@@ -77,6 +78,20 @@ public:
 	{
 		return this->_basisCode + "_p" + std::to_string(this->_maxPolynomialDegree);
 	}
+
+	function<double(double, double)> GetApproximateFunction(const Eigen::VectorXd &solution, BigNumber startIndex)
+	{
+		function<double(double, double)> approximate = [this, solution, startIndex](double t, double u) {
+			double result = 0;
+			for (int i = 0; i < this->_localFunctions.size(); i++)
+			{
+				auto phi = this->_localFunctions[i];
+				result += solution(startIndex + i) * phi->Eval(t, u);
+			}
+			return result;
+		};
+		return approximate;
+	}
 };
 
 //----------//
@@ -122,6 +137,20 @@ public:
 	std::string Name()
 	{
 		return this->_basisCode + "_p" + std::to_string(this->_maxPolynomialDegree);
+	}
+
+	function<double(double, double, double)> GetApproximateFunction(const Eigen::VectorXd &solution, BigNumber startIndex)
+	{
+		function<double(double, double, double)> approximate = [this, solution, startIndex](double t, double u, double v) {
+			double result = 0;
+			for (int i = 0; i < this->_localFunctions.size(); i++)
+			{
+				auto phi = this->_localFunctions[i];
+				result += solution(startIndex + i) * phi->Eval(t, u, v);
+			}
+			return result;
+		};
+		return approximate;
 	}
 };
 
