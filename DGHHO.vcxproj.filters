@@ -5,7 +5,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Poisson1D.h" />
-    <ClInclude Include="Poisson2D.h" />
     <ClInclude Include="Utils.h">
       <Filter>Utils</Filter>
     </ClInclude>
@@ -26,12 +25,6 @@
     </ClInclude>
     <ClInclude Include="CartesianGrid2D.h">
       <Filter>Mesh</Filter>
-    </ClInclude>
-    <ClInclude Include="FileMatrix.h">
-      <Filter>Utils</Filter>
-    </ClInclude>
-    <ClInclude Include="FileVector.h">
-      <Filter>Utils</Filter>
     </ClInclude>
     <ClInclude Include="FunctionalBasisWithNumbers.h">
       <Filter>FunctionalBasis</Filter>
@@ -94,6 +87,13 @@
       <Filter>Mesh</Filter>
     </ClInclude>
     <ClInclude Include="Poisson3D_DGTerms_LocalBasis.h" />
+    <ClInclude Include="Poisson.h" />
+    <ClInclude Include="NonZeroCoefficients.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="RefInterval.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

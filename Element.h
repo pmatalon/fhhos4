@@ -1,9 +1,8 @@
-//#include "ElementInterface.h"
 #include <vector>
-
+#include "Utils.h"
 class ElementInterface;
 
-typedef unsigned int BigNumber;
+//typedef unsigned int BigNumber;
 
 #pragma once
 class Element 

@@ -2,6 +2,9 @@
 #include <functional>
 #include <vector>
 #include "GaussLegendre.h"
+#include "RefInterval.h"
+
+typedef unsigned int BigNumber;
 
 class Utils
 {
@@ -101,11 +104,6 @@ public:
 		if (p != 0 && n != p)
 			return Binomial(n - 1, p) + Binomial(n - 1, p - 1);
 		return 1;
-	}
-
-	static double InnerProduct3D(double* vector1, double* vector2)
-	{
-		return vector1[0] * vector2[0] + vector1[1] * vector2[1] + vector1[2] * vector2[2];
 	}
 
 };

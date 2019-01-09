@@ -31,7 +31,7 @@ public:
 	double VolumicTerm(Square* element, IBasisFunction2D* phi1, IBasisFunction2D* phi2)
 	{
 		function<double(double, double)> functionToIntegrate = [phi1, phi2](double t, double u) {
-			return phi1->EvalGradX(t, u)*phi2->EvalGradX(t, u) + phi1->EvalGradY(t, u)*phi2->EvalGradY(t, u);
+			return InnerProduct(phi1->Grad(t, u), phi2->Grad(t, u));
 		};
 
 		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree();
@@ -65,9 +65,9 @@ public:
 			double t1 = interface == element1->EastInterface ? refInterval.Right : refInterval.Left;
 			double t2 = interface == element2->EastInterface ? refInterval.Right : refInterval.Left;
 
-			functionToIntegrate = [meanFactor, n1, n2, phi1, phi2, t1, t2](double u) {
-				double meanGradPhi1_scal_jumpPhi2 = meanFactor * (phi1->EvalGradX(t1, u) * n2[0] + phi1->EvalGradY(t1, u) * n2[1]) * phi2->Eval(t2, u);
-				double meanGradPhi2_scal_jumpPhi1 = meanFactor * (phi2->EvalGradX(t2, u) * n1[0] + phi2->EvalGradY(t2, u) * n1[1]) * phi1->Eval(t1, u);
+			functionToIntegrate = [n1, n2, phi1, phi2, t1, t2](double u) {
+				double meanGradPhi1_scal_jumpPhi2 = InnerProduct(phi1->Grad(t1, u), n2) * phi2->Eval(t2, u);
+				double meanGradPhi2_scal_jumpPhi1 = InnerProduct(phi2->Grad(t2, u), n1) * phi1->Eval(t1, u);
 				return meanGradPhi1_scal_jumpPhi2 + meanGradPhi2_scal_jumpPhi1;
 			};
 		}
@@ -76,9 +76,9 @@ public:
 			double u1 = interface == element1->NorthInterface ? refInterval.Right : refInterval.Left;
 			double u2 = interface == element2->NorthInterface ? refInterval.Right : refInterval.Left;
 
-			functionToIntegrate = [meanFactor, n1, n2, phi1, phi2, u1, u2](double t) {
-				double meanGradPhi1_scal_jumpPhi2 = meanFactor * (phi1->EvalGradX(t, u1) * n2[0] + phi1->EvalGradY(t, u1) * n2[1]) * phi2->Eval(t, u2);
-				double meanGradPhi2_scal_jumpPhi1 = meanFactor * (phi2->EvalGradX(t, u2) * n1[0] + phi2->EvalGradY(t, u2) * n1[1]) * phi1->Eval(t, u1);
+			functionToIntegrate = [n1, n2, phi1, phi2, u1, u2](double t) {
+				double meanGradPhi1_scal_jumpPhi2 = InnerProduct(phi1->Grad(t, u1), n2) * phi2->Eval(t, u2);
+				double meanGradPhi2_scal_jumpPhi1 = InnerProduct(phi2->Grad(t, u2), n1) * phi1->Eval(t, u1);
 				return meanGradPhi1_scal_jumpPhi2 + meanGradPhi2_scal_jumpPhi1;
 			};
 		}
@@ -86,7 +86,7 @@ public:
 			return 0;
 
 		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree() + 1;
-		return -Utils::Integral(nQuadPoints, functionToIntegrate, refInterval);
+		return -meanFactor * Utils::Integral(nQuadPoints, functionToIntegrate, refInterval);
 	}
 
 	double PenalizationTerm(ElementInterface* interface, Element* element1, IBasisFunction2D* phi1, Element* element2, IBasisFunction2D* phi2, double penalizationCoefficient)
@@ -98,15 +98,9 @@ public:
 
 	double PenalizationTerm(ElementInterface* interface, Square* element1, IBasisFunction2D* phi1, Square* element2, IBasisFunction2D* phi2, double penalizationCoefficient)
 	{
-		//if (!interface->IsBetween(element1, element2))
-		//	return 0;
 		double h = element1->Width;
 		auto n1 = element1->OuterNormalVector(interface);
 		auto n2 = element2->OuterNormalVector(interface);
-
-		//assert(n1[0] != 0 || n1[1] != 0);
-		//assert(n2[0] != 0 || n2[1] != 0);
-		//assert((n1[0] == n2[0] && n1[1] == n2[1]) || (n1[0] == -n2[0] && n1[1] == -n2[1]));
 
 		RefInterval refInterval = phi1->ReferenceInterval();
 
@@ -120,7 +114,7 @@ public:
 			double t2 = interface == element2->EastInterface ? refInterval.Right : refInterval.Left;
 
 			functionToIntegrate = [phi1, phi2, n1, n2, t1, t2](double u) {
-				return (n1[0] * n2[0] + n1[1] * n2[1]) * phi1->Eval(t1, u) * phi2->Eval(t2, u);
+				return InnerProduct(n1, n2) * phi1->Eval(t1, u) * phi2->Eval(t2, u);
 			};
 		}
 		else if (interf->IsHorizontal())
@@ -129,14 +123,14 @@ public:
 			double u2 = interface == element2->NorthInterface ? refInterval.Right : refInterval.Left;
 
 			functionToIntegrate = [phi1, phi2, n1, n2, u1, u2](double t) {
-				return (n1[0] * n2[0] + n1[1] * n2[1]) * phi1->Eval(t, u1) * phi2->Eval(t, u2);
+				return InnerProduct(n1, n2) * phi1->Eval(t, u1) * phi2->Eval(t, u2);
 			};
 		}
 		else
 			return 0;
 
 		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree() + 2;
-		double jacobian = refInterval.Left == -1 && refInterval.Right == 1 ? (h / 2) : h;
+		double jacobian = h / refInterval.Length;
 		double integralJump1ScalarJump2 = jacobian * Utils::Integral(nQuadPoints, functionToIntegrate, refInterval);
 		return penalizationCoefficient * integralJump1ScalarJump2;
 	}
@@ -154,23 +148,29 @@ public:
 		double y1 = element->Y;
 		double y2 = element->Y + element->Width;
 
+		RefInterval refInterval = phi->ReferenceInterval();
+
 		function<double(double, double)> sourceTimesBasisFunction = NULL;
-		double jacobian = 0;
-		if (phi->ReferenceInterval().Left == -1 && phi->ReferenceInterval().Right == 1)
+		if (refInterval.Left == -1 && refInterval.Right == 1)
 		{
 			sourceTimesBasisFunction = [this, phi, x1, x2, y1, y2](double t, double u) {
 				return this->_sourceFunction((x2 - x1) / 2 * t + (x2 + x1) / 2, (y2 - y1) / 2 * u + (y2 + y1) / 2) * phi->Eval(t, u);
 			};
-			jacobian = (x2 - x1) * (y2 - y1) / 4;
 		}
 		else
 		{
 			sourceTimesBasisFunction = [this, phi, x1, x2, y1, y2](double t, double u) {
 				return this->_sourceFunction((x2 - x1) * t + x1, (y2 - y1) * u + y1) * phi->Eval(t, u);
 			};
-			jacobian = (x2 - x1) * (y2 - y1);
 		}
 
-		return jacobian * Utils::Integral(sourceTimesBasisFunction, phi->ReferenceInterval(), phi->ReferenceInterval());
+		double jacobian = (x2 - x1) * (y2 - y1) / pow(refInterval.Length, 2);
+		return jacobian * Utils::Integral(sourceTimesBasisFunction, refInterval, refInterval);
+	}
+
+private:
+	static double InnerProduct(double* vector1, double* vector2)
+	{
+		return vector1[0] * vector2[0] + vector1[1] * vector2[1];
 	}
 };

@@ -102,8 +102,6 @@
     <ClInclude Include="Element.h" />
     <ClInclude Include="Element2DInterface.h" />
     <ClInclude Include="ElementInterface.h" />
-    <ClInclude Include="FileMatrix.h" />
-    <ClInclude Include="FileVector.h" />
     <ClInclude Include="FunctionalBasisWithNumbers.h" />
     <ClInclude Include="FunctionalBasisWithObjects.h" />
     <ClInclude Include="GaussLegendre.h" />
@@ -113,14 +111,16 @@
     <ClInclude Include="Legendre1D.h" />
     <ClInclude Include="IMesh.h" />
     <ClInclude Include="Monomial1D.h" />
+    <ClInclude Include="NonZeroCoefficients.h" />
     <ClInclude Include="Poisson1D.h" />
     <ClInclude Include="Poisson1D_DGTerms_GlobalBasis.h" />
     <ClInclude Include="Poisson1D_DGTerms_LocalBasis.h" />
-    <ClInclude Include="Poisson2D.h" />
+    <ClInclude Include="Poisson.h" />
     <ClInclude Include="IBasisFunction.h" />
     <ClInclude Include="Poisson2D_DGTerms_GlobalBasis.h" />
     <ClInclude Include="Poisson2D_DGTerms_LocalBasis.h" />
     <ClInclude Include="Poisson3D_DGTerms_LocalBasis.h" />
+    <ClInclude Include="RefInterval.h" />
     <ClInclude Include="Square.h" />
     <ClInclude Include="TensorPolynomial.h" />
     <ClInclude Include="Utils.h" />

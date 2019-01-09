@@ -1,7 +1,7 @@
 #include <cstdio>
 #include <iostream>
 #include "Poisson1D.h"
-#include "Poisson2D.h"
+#include "Poisson.h"
 //#include <Eigen/Dense>
 #include <functional>
 #include <getopt.h>
@@ -118,7 +118,7 @@ int main(int argc, char* argv[])
 		std::function<double(double, double)> sourceFunction = [](double x, double y) { return 2 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y); };
 		if (solution.compare("poly") == 0)
 			sourceFunction = [](double x, double y) { return 2 * y*(1 - y) + 2 * x*(1 - x); };
-		Poisson2D<IBasisFunction2D>* problem = new Poisson2D<IBasisFunction2D>(solution);
+		Poisson<IBasisFunction2D>* problem = new Poisson<IBasisFunction2D>(solution);
 
 		IPoisson_DGTerms<IBasisFunction2D>* dg = new Poisson2D_DGTerms_LocalBasis(sourceFunction);
 
@@ -155,7 +155,7 @@ int main(int argc, char* argv[])
 		if (solution.compare("poly") == 0)
 			sourceFunction = [](double x, double y, double z) { return 2 * (y*(1 - y)*z*(1 - z) + x * (1 - x)*z*(1 - z) + x * (1 - x)*y*(1 - y)); };
 
-		Poisson2D<IBasisFunction3D>* problem = new Poisson2D<IBasisFunction3D>(solution);
+		Poisson<IBasisFunction3D>* problem = new Poisson<IBasisFunction3D>(solution);
 
 		IPoisson_DGTerms<IBasisFunction3D>* dg = new Poisson3D_DGTerms_LocalBasis(sourceFunction);
 

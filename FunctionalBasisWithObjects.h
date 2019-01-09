@@ -27,7 +27,7 @@ public:
 
 	BigNumber GlobalFunctionNumber(Element* element, int localFunctionNumber)
 	{
-		return element->Number * static_cast<int>(this->_localFunctions.size()) + localFunctionNumber + 1; // +1 so that the numbers start at 1
+		return element->Number * static_cast<int>(this->_localFunctions.size()) + localFunctionNumber; // the numbers start at 0
 	}
 
 	virtual ~FunctionalBasisWithObjects() {}

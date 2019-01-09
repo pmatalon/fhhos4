@@ -25,7 +25,7 @@ public:
 
 	BigNumber GlobalFunctionNumber(BigNumber element, int localFunctionNumber)
 	{
-		return element * NumberOfLocalFunctionsInElement(0) + localFunctionNumber + 1; // +1 so that the numbers start at 1
+		return element * NumberOfLocalFunctionsInElement(0) + localFunctionNumber; // the numbers start at 0
 	}
 
 	virtual ~FunctionalBasisWithNumbers() {}

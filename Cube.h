@@ -76,9 +76,9 @@ public:
 		if (interface == this->BottomInterface)
 			return new double[3]{ 0, 0, -1 };
 		if (interface == this->FrontInterface)
-			return new double[3]{ 0, 1, 0 };
-		if (interface == this->BackInterface)
 			return new double[3]{ 0, -1, 0 };
+		if (interface == this->BackInterface)
+			return new double[3]{ 0, 1, 0 };
 		if (interface == this->LeftInterface)
 			return new double[3]{ -1, 0, 0 };
 		if (interface == this->RightInterface)

@@ -1,34 +1,32 @@
 #pragma once
 #include <functional>
+#include <Eigen/Sparse>
+#include <unsupported/Eigen/SparseExtra>
 #include "FunctionalBasisWithNumbers.h"
 #include "IPoisson1D_DGTerms.h"
 #include "CartesianGrid1D.h"
-//#include "IBasisFunction.h"
 #include "Element.h"
-#include "FileMatrix.h"
-#include "FileVector.h"
 #include <math.h>
+#include "NonZeroCoefficients.h"
 using namespace std;
 
 class Poisson1D
 {
 private:
-	string _solution;
+	string _solutionName;
 	std::function<double(double)> _sourceFunction;
 public:
-	Poisson1D(string solution, function<double(double)> sourceFunction)
+	Poisson1D(string solutionName, function<double(double)> sourceFunction)
 	{
-		cout << "----------------------------------------" << endl;
-		cout << "----------------------------------------" << endl;
-		this->_solution = solution;
+		this->_solutionName = solutionName;
 		this->_sourceFunction = sourceFunction;
 	}
 
-	void DiscretizeDG(CartesianGrid1D* grid, FunctionalBasisWithNumbers* basis, IPoisson1D_DGTerms* dg, int penalizationCoefficient, string outputDirectory, bool extractMatrixComponents)
+	void DiscretizeDG(CartesianGrid1D* mesh, FunctionalBasisWithNumbers* basis, IPoisson1D_DGTerms* dg, int penalizationCoefficient, string outputDirectory, bool extractMatrixComponents)
 	{
 		bool autoPenalization = penalizationCoefficient == -1;
 		if (autoPenalization)
-			penalizationCoefficient = pow(basis->GetDegree() + 1, 2) * grid->NElements(); // Ralph-Hartmann
+			penalizationCoefficient = pow(basis->GetDegree() + 1, 2) * mesh->NElements(); // Ralph-Hartmann
 
 		cout << "Discretization: Discontinuous Galerkin SIPG" << endl;
 		cout << "\tPenalization coefficient: " << penalizationCoefficient << endl;
@@ -40,44 +38,38 @@ public:
 			IBasisFunction1D* localFunction = basis->GetLocalBasisFunction(0, localFunctionNumber);
 			cout << "\t " << localFunction->ToString() << endl;
 		}
-		int nUnknowns = grid->NElements() * basis->NumberOfLocalFunctionsInElement(0);
-		//cout << "Unknowns: " << nUnknowns << endl;
+		int nUnknowns = mesh->NElements() * basis->NumberOfLocalFunctionsInElement(0);
+		cout << "Unknowns: " << nUnknowns << endl;
 
-		string fileName = "Poisson1D" + this->_solution + "_n" + to_string(grid->NElements()) + "_DG_SIPG_" + (dg->IsGlobalBasis() ? "global" : "") + basis->Name() + "_pen" + (autoPenalization ? "-1" : to_string(penalizationCoefficient));
-		string matrixFilePath = outputDirectory + "/" + fileName + "_A.dat";
-		string matrixVolumicFilePath = outputDirectory + "/" + fileName + "_A_volumic.dat";
-		string matrixCouplingFilePath = outputDirectory + "/" + fileName + "_A_coupling.dat";
-		string matrixPenFilePath = outputDirectory + "/" + fileName + "_A_pen.dat";
-		string massMatrixFilePath = outputDirectory + "/" + fileName + "_Mass.dat";
-		FileMatrix* fileMatrix = new FileMatrix(nUnknowns, nUnknowns, matrixFilePath);
-		FileMatrix* fileMatrixVolumic = NULL;
-		FileMatrix* fileMatrixCoupling = NULL;
-		FileMatrix* fileMatrixPen = NULL;
-		FileMatrix* fileMassMatrix = NULL;
-		if (extractMatrixComponents)
-		{
-			fileMatrixVolumic = new FileMatrix(nUnknowns, nUnknowns, matrixVolumicFilePath);
-			fileMatrixCoupling = new FileMatrix(nUnknowns, nUnknowns, matrixCouplingFilePath);
-			fileMatrixPen = new FileMatrix(nUnknowns, nUnknowns, matrixPenFilePath);
-			fileMassMatrix = new FileMatrix(nUnknowns, nUnknowns, massMatrixFilePath);
-		}
+		string fileName = "Poisson1D" + this->_solutionName + "_n" + to_string(mesh->NElements()) + "_DG_SIPG_" + (dg->IsGlobalBasis() ? "global" : "") + basis->Name() + "_pen" + (autoPenalization ? "-1" : to_string(penalizationCoefficient));
+		string matrixFilePath			= outputDirectory + "/" + fileName + "_A.dat";
+		string matrixVolumicFilePath	= outputDirectory + "/" + fileName + "_A_volumic.dat";
+		string matrixCouplingFilePath	= outputDirectory + "/" + fileName + "_A_coupling.dat";
+		string matrixPenFilePath		= outputDirectory + "/" + fileName + "_A_pen.dat";
+		string massMatrixFilePath		= outputDirectory + "/" + fileName + "_Mass.dat";
+		string rhsFilePath				= outputDirectory + "/" + fileName + "_b.dat";
 
-		string rhsFilePath = outputDirectory + "/" + fileName + "_b.dat";
-		FileVector* fileRHS = new FileVector(rhsFilePath);
+		BigNumber nnzApproximate = extractMatrixComponents ? mesh->NElements() * basis->NumberOfLocalFunctionsInElement(0) * 3 : 0;
+		NonZeroCoefficients matrixCoeffs(nnzApproximate);
+		NonZeroCoefficients massMatrixCoeffs(nnzApproximate);
+		NonZeroCoefficients volumicCoeffs(nnzApproximate);
+		NonZeroCoefficients couplingCoeffs(nnzApproximate);
+		NonZeroCoefficients penCoeffs(nnzApproximate);
 
-		for (int element = 0; element < grid->NElements(); element++) // interval [element/n, (element+1)/n]
+		Eigen::VectorXd b(nUnknowns);
+
+		for (int element = 0; element < mesh->NElements(); element++) // interval [element/n, (element+1)/n]
 		{
 			for (int localFunctionNumber1 = 0; localFunctionNumber1 < basis->NumberOfLocalFunctionsInElement(element); localFunctionNumber1++)
 			{
 				IBasisFunction1D* localFunction1 = basis->GetLocalBasisFunction(element, localFunctionNumber1);
 				BigNumber basisFunction1 = basis->GlobalFunctionNumber(element, localFunctionNumber1);
 
-
-				if (!grid->IsFirstElement(element))
+				if (!mesh->IsFirstElement(element))
 				{
 					// Left neighbour
 					int neighbour = element - 1;
-					int interface = grid->GetInterface(element, neighbour);
+					int interface = mesh->GetInterface(element, neighbour);
 
 					//cout << "Interface " << interface << " between element " << element << " and " << neighbour << endl;
 
@@ -94,10 +86,10 @@ public:
 
 						if (extractMatrixComponents)
 						{
-							fileMatrixCoupling->Add(basisFunction1, basisFunction2, couplingTerm);
-							fileMatrixPen->Add(basisFunction1, basisFunction2, penalization);
+							couplingCoeffs.Add(basisFunction1, basisFunction2, couplingTerm);
+							penCoeffs.Add(basisFunction1, basisFunction2, penalization);
 						}
-						fileMatrix->Add(basisFunction1, basisFunction2, couplingTerm + penalization);
+						matrixCoeffs.Add(basisFunction1, basisFunction2, couplingTerm + penalization);
 					}
 				}
 
@@ -110,11 +102,11 @@ public:
 
 					double volumicTerm = dg->VolumicTerm(element, localFunction1, localFunction2);
 
-					double couplingTermLeft = dg->CouplingTerm(grid->LeftInterface(element), element, localFunction1, element, localFunction2);
-					double penalizationLeft = dg->PenalizationTerm(grid->LeftInterface(element), element, localFunction1, element, localFunction2, penalizationCoefficient);
+					double couplingTermLeft = dg->CouplingTerm(mesh->LeftInterface(element), element, localFunction1, element, localFunction2);
+					double penalizationLeft = dg->PenalizationTerm(mesh->LeftInterface(element), element, localFunction1, element, localFunction2, penalizationCoefficient);
 
-					double couplingTermRight = dg->CouplingTerm(grid->RightInterface(element), element, localFunction1, element, localFunction2);
-					double penalizationRight = dg->PenalizationTerm(grid->RightInterface(element), element, localFunction1, element, localFunction2, penalizationCoefficient);
+					double couplingTermRight = dg->CouplingTerm(mesh->RightInterface(element), element, localFunction1, element, localFunction2);
+					double penalizationRight = dg->PenalizationTerm(mesh->RightInterface(element), element, localFunction1, element, localFunction2, penalizationCoefficient);
 
 					//cout << "\t func1 = " << localFunction1->ToString() << " func2 = " << localFunction2->ToString() << endl;
 					//cout << "\t\t Volumic = " << volumicTerm << endl;
@@ -123,24 +115,23 @@ public:
 
 					if (extractMatrixComponents)
 					{
-						fileMatrixVolumic->Add(basisFunction1, basisFunction2, volumicTerm);
-						fileMatrixCoupling->Add(basisFunction1, basisFunction2, couplingTermLeft + couplingTermRight);
-						fileMatrixPen->Add(basisFunction1, basisFunction2, penalizationRight + penalizationLeft);
+						volumicCoeffs.Add(basisFunction1, basisFunction2, volumicTerm);
+						couplingCoeffs.Add(basisFunction1, basisFunction2, couplingTermLeft + couplingTermRight);
+						penCoeffs.Add(basisFunction1, basisFunction2, penalizationRight + penalizationLeft);
 
 						double massTerm = dg->MassTerm(element, localFunction1, localFunction2);
-						fileMassMatrix->Add(basisFunction1, basisFunction2, massTerm);
+						massMatrixCoeffs.Add(basisFunction1, basisFunction2, massTerm);
 					}
-					fileMatrix->Add(basisFunction1, basisFunction2, volumicTerm + couplingTermLeft + couplingTermRight + penalizationRight + penalizationLeft);
-
+					matrixCoeffs.Add(basisFunction1, basisFunction2, volumicTerm + couplingTermLeft + couplingTermRight + penalizationRight + penalizationLeft);
 
 					//cout << "v = " << volumicTerm << " couplingTermLeft=" << couplingTermLeft << " couplingTermRight=" << couplingTermRight << " penalizationRight=" << penalizationRight << " penalizationRight=" << penalizationRight;
 				}
 
-				if (!grid->IsLastElement(element))
+				if (!mesh->IsLastElement(element))
 				{
 					// Right neighbour
 					int neighbour = element + 1;
-					int interface = grid->GetInterface(element, neighbour);
+					int interface = mesh->GetInterface(element, neighbour);
 
 					//cout << "Interface " << interface << " between element " << element << " and " << neighbour << endl;
 
@@ -157,27 +148,41 @@ public:
 
 						if (extractMatrixComponents)
 						{
-							fileMatrixCoupling->Add(basisFunction1, basisFunction2, couplingTerm);
-							fileMatrixPen->Add(basisFunction1, basisFunction2, penalization);
+							couplingCoeffs.Add(basisFunction1, basisFunction2, couplingTerm);
+							penCoeffs.Add(basisFunction1, basisFunction2, penalization);
 						}
-						fileMatrix->Add(basisFunction1, basisFunction2, couplingTerm + penalization);
+						matrixCoeffs.Add(basisFunction1, basisFunction2, couplingTerm + penalization);
 					}
 				}
 
 				double rhs = dg->RightHandSide(element, localFunction1);
-				fileRHS->Add(rhs);
+				b(basisFunction1) = rhs;
 			}
 		}
 
+		Eigen::SparseMatrix<double> A(nUnknowns, nUnknowns);
+		matrixCoeffs.Fill(A);
+		Eigen::saveMarket(A, matrixFilePath);
+		Eigen::saveMarketVector(b, rhsFilePath);
+
 		if (extractMatrixComponents)
 		{
-			delete fileMatrixVolumic;
-			delete fileMatrixCoupling;
-			delete fileMatrixPen;
-			delete fileMassMatrix;
+			Eigen::SparseMatrix<double> M(nUnknowns, nUnknowns);
+			massMatrixCoeffs.Fill(M);
+			Eigen::saveMarket(M, massMatrixFilePath);
+
+			Eigen::SparseMatrix<double> V(nUnknowns, nUnknowns);
+			volumicCoeffs.Fill(V);
+			Eigen::saveMarket(V, matrixVolumicFilePath);
+
+			Eigen::SparseMatrix<double> C(nUnknowns, nUnknowns);
+			couplingCoeffs.Fill(C);
+			Eigen::saveMarket(C, matrixCouplingFilePath);
+
+			Eigen::SparseMatrix<double> P(nUnknowns, nUnknowns);
+			penCoeffs.Fill(P);
+			Eigen::saveMarket(P, matrixPenFilePath);
 		}
-		delete fileMatrix;
-		delete fileRHS;
 
 		cout << "Matrix exported to " << matrixFilePath << endl;
 		cout << "RHS exported to " << rhsFilePath << endl;

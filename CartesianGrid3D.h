@@ -46,13 +46,13 @@ public:
 				Element3DInterface* bottomBoundary = new Element3DInterface(numberInterface++, this->Elements[index(ix, iy, 0)]);
 				this->Interfaces.push_back(bottomBoundary);
 				//this->BoundaryInterfaces.push_back(southBoundary);
-				dynamic_cast<Cube*>(this->Elements[iy*n + ix])->SetBottomInterface(bottomBoundary);
+				dynamic_cast<Cube*>(this->Elements[index(ix, iy, 0)])->SetBottomInterface(bottomBoundary);
 
 				// Top boundary
 				Element3DInterface* topBoundary = new Element3DInterface(numberInterface++, this->Elements[index(ix, iy, n-1)]);
 				this->Interfaces.push_back(topBoundary);
 				//this->BoundaryInterfaces.push_back(topBoundary);
-				dynamic_cast<Cube*>(this->Elements[(n - 1)*n*n + iy * n + ix])->SetTopInterface(topBoundary);
+				dynamic_cast<Cube*>(this->Elements[index(ix, iy, n - 1)])->SetTopInterface(topBoundary);
 			}
 		}
 

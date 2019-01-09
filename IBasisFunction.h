@@ -2,21 +2,6 @@
 #include <string>
 using namespace std;
 
-class RefInterval
-{
-public:
-	static RefInterval &MinusOne_One()	{ static RefInterval interval(-1, 1); return interval; }
-	static RefInterval &Zero_One()		{ static RefInterval interval( 0, 1); return interval; }
-	double Left;
-	double Right;
-private:
-	RefInterval(double left, double right)
-	{
-		this->Left = left;
-		this->Right = right;
-	}
-};
-
 class IBasisFunction1D
 {
 public:
@@ -35,6 +20,7 @@ public:
 	virtual double Eval(double x, double y) = 0;
 	virtual double EvalGradX(double x, double y) = 0;
 	virtual double EvalGradY(double x, double y) = 0;
+	virtual double* Grad(double x, double y) = 0;
 
 	virtual int GetDegree() = 0;
 	virtual RefInterval ReferenceInterval() = 0;
