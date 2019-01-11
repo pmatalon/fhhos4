@@ -1,30 +1,31 @@
 #pragma once
 #include <functional>
 #include <math.h>
-#include "IBasisFunction.h"
-#include "IPoisson_DGTerms.h"
+#include "IPoisson1D_DGTerms.h"
 #include "Utils.h"
 #include "Element.h"
+#include "CartesianGrid1D.h"
 using namespace std;
 
-class Poisson1D_DGTerms_LocalBasis : public IPoisson_DGTerms<IBasisFunction1D>
+class Poisson1D_DGTerms_LocalBasisOLD : public IPoisson1D_DGTerms
 {
 protected:
+	CartesianGrid1DOLD* _grid;
 	function<double(double)> _sourceFunction;
 
 public:
-	Poisson1D_DGTerms_LocalBasis(function<double(double)> sourceFunction)
+	Poisson1D_DGTerms_LocalBasisOLD(CartesianGrid1DOLD* grid, function<double(double)> sourceFunction)
 	{
+		this->_grid = grid;
 		this->_sourceFunction = sourceFunction;
 	}
 
 	bool IsGlobalBasis() { return false; }
 
-	double VolumicTerm(Element* element, IBasisFunction1D* func1, IBasisFunction1D* func2)
+	double VolumicTerm(BigNumber element, IBasisFunction1D* func1, IBasisFunction1D* func2)
 	{
-		Interval* interval = static_cast<Interval*>(element);
-		double a = interval->A;
-		double b = interval->B;
+		double a = this->_grid->XLeft(element);
+		double b = this->_grid->XRight(element);
 
 		int nQuadPoints = func1->GetDegree() + func2->GetDegree();
 		if (func1->ReferenceInterval().Left == -1 && func1->ReferenceInterval().Right == 1)
@@ -48,11 +49,10 @@ public:
 		}
 	}
 
-	double MassTerm(Element* element, IBasisFunction1D* func1, IBasisFunction1D* func2)
+	double MassTerm(BigNumber element, IBasisFunction1D* func1, IBasisFunction1D* func2)
 	{
-		Interval* interval = static_cast<Interval*>(element);
-		double a = interval->A;
-		double b = interval->B;
+		double a = this->_grid->XLeft(element);
+		double b = this->_grid->XRight(element);
 
 		GaussLegendre gs(func1->GetDegree() + func2->GetDegree());
 
@@ -76,31 +76,26 @@ public:
 		}
 	}
 
-	double CouplingTerm(ElementInterface* interface, Element* element1, IBasisFunction1D* func1, Element* element2, IBasisFunction1D* func2)
+	double CouplingTerm(BigNumber interface, BigNumber element1, IBasisFunction1D* func1, BigNumber element2, IBasisFunction1D* func2)
 	{
-		/*if (element2 > element1 + 1 || element1 > element2 + 1)
-			return 0;*/
-		Interval* interval1 = static_cast<Interval*>(element1);
-		Interval* interval2 = static_cast<Interval*>(element2);
+		if (element2 > element1 + 1 || element1 > element2 + 1)
+			return 0;
 
-		return MeanDerivative(interval1, func1, interface) * Jump(interval2, func2, interface) + MeanDerivative(interval2, func2, interface) * Jump(interval1, func1, interface);
+		return MeanDerivative(element1, func1, interface) * Jump(element2, func2, interface) + MeanDerivative(element2, func2, interface) * Jump(element1, func1, interface);
 	}
 
-	double PenalizationTerm(ElementInterface* point, Element* element1, IBasisFunction1D* func1, Element* element2, IBasisFunction1D* func2, double penalizationCoefficient)
+	double PenalizationTerm(BigNumber point, BigNumber element1, IBasisFunction1D* func1, BigNumber element2, IBasisFunction1D* func2, double penalizationCoefficient)
 	{
-		/*if (element2 > element1 + 1 || element1 > element2 + 1)
-			return 0;*/
-		Interval* interval1 = static_cast<Interval*>(element1);
-		Interval* interval2 = static_cast<Interval*>(element2);
+		if (element2 > element1 + 1 || element1 > element2 + 1)
+			return 0;
 
-		return penalizationCoefficient * Jump(interval1, func1, point) * Jump(interval2, func2, point);
+		return penalizationCoefficient * Jump(element1, func1, point) * Jump(element2, func2, point);
 	}
 
-	double RightHandSide(Element* element, IBasisFunction1D* func)
+	double RightHandSide(BigNumber element, IBasisFunction1D* func)
 	{
-		Interval* interval = static_cast<Interval*>(element);
-		double a = interval->A;
-		double b = interval->B;
+		double a = this->_grid->XLeft(element);
+		double b = this->_grid->XRight(element);
 
 		if (func->ReferenceInterval().Left == -1 && func->ReferenceInterval().Right == 1)
 		{
@@ -122,11 +117,11 @@ public:
 		}
 	}
 
-	double MeanDerivative(Interval* element, IBasisFunction1D* func, ElementInterface* interface)
+	double MeanDerivative(BigNumber element, IBasisFunction1D* func, BigNumber interface)
 	{
-		double t = interface == element->Left ? func->ReferenceInterval().Left : func->ReferenceInterval().Right; // t in [-1, 1]
-		double a = element->A;
-		double b = element->B;
+		double t = this->_grid->IsLeftInterface(element, interface) ? func->ReferenceInterval().Left : func->ReferenceInterval().Right; // t in [-1, 1]
+		double a = this->_grid->XLeft(element);
+		double b = this->_grid->XRight(element);
 
 		double jacobian = 0;
 		if (func->ReferenceInterval().Left == -1 && func->ReferenceInterval().Right == 1)
@@ -134,14 +129,15 @@ public:
 		else
 			jacobian = 1 / (b - a);
 
-		double meanFactor = interface->IsDomainBoundary ? 1 : 0.5;
-		return meanFactor * jacobian * func->EvalDerivative(t);
+		if (this->_grid->IsBoundaryLeft(interface) || this->_grid->IsBoundaryRight(interface))
+			return jacobian * func->EvalDerivative(t);
+		return 0.5 * jacobian * func->EvalDerivative(t);
 	}
 
-	double Jump(Interval* element, IBasisFunction1D* func, ElementInterface* interface)
+	double Jump(BigNumber element, IBasisFunction1D* func, BigNumber interface)
 	{
-		double t = interface == element->Left ? func->ReferenceInterval().Left : func->ReferenceInterval().Right; // t in [-1, 1]
-		int factor = interface == element->Left ? 1 : -1;
+		double t = this->_grid->IsLeftInterface(element, interface) ? func->ReferenceInterval().Left : func->ReferenceInterval().Right; // t in [-1, 1]
+		int factor = this->_grid->IsLeftInterface(element, interface) ? 1 : -1;
 		return factor * (func->Eval(t));
 	}
 };

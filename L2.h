@@ -11,6 +11,11 @@ using namespace std;
 class L2
 {
 public:
+
+	//--------//
+	//   2D   //
+	//--------//
+
 	static double Error(IMesh* mesh, FunctionalBasis2D* basis, Eigen::VectorXd solution, function<double(double, double)> exactSolution)
 	{
 		double absoluteError = 0;
@@ -51,6 +56,10 @@ public:
 		normExactSolution = sqrt(normExactSolution);
 		return absoluteError / normExactSolution;
 	}
+
+	//--------//
+	//   3D   //
+	//--------//
 
 	static double Error(IMesh* mesh, FunctionalBasis3D* basis, Eigen::VectorXd solution, function<double(double, double, double)> exactSolution)
 	{

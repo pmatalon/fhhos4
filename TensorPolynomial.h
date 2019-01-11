@@ -92,17 +92,17 @@ public:
 
 	double EvalGradX(double x, double y, double z)
 	{
-		return this->_funcX->EvalDerivative(x) * this->_funcY->Eval(y) * this->_funcY->Eval(z);
+		return this->_funcX->EvalDerivative(x) * this->_funcY->Eval(y) * this->_funcZ->Eval(z);
 	}
 
 	double EvalGradY(double x, double y, double z)
 	{
-		return this->_funcX->Eval(x) * this->_funcY->EvalDerivative(y) * this->_funcY->Eval(z);
+		return this->_funcX->Eval(x) * this->_funcY->EvalDerivative(y) * this->_funcZ->Eval(z);
 	}
 
 	double EvalGradZ(double x, double y, double z)
 	{
-		return this->_funcX->Eval(x) * this->_funcY->Eval(y) * this->_funcY->EvalDerivative(z);
+		return this->_funcX->Eval(x) * this->_funcY->Eval(y) * this->_funcZ->EvalDerivative(z);
 	}
 
 	double* Grad(double x, double y, double z)

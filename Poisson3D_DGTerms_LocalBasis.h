@@ -31,6 +31,7 @@ public:
 	double VolumicTerm(Cube* element, IBasisFunction3D* phi1, IBasisFunction3D* phi2)
 	{
 		double h = element->Width;
+		assert(h >= 0);
 		RefInterval refInterval = phi1->ReferenceInterval();
 
 		function<double(double, double, double)> functionToIntegrate = [phi1, phi2](double t, double u, double v) {
@@ -157,7 +158,7 @@ public:
 			};
 		}
 		else
-			return 0;
+			assert(false);
 
 		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree() + 2;
 		double jacobian = pow(h / refInterval.Length, 2);

@@ -5,7 +5,7 @@
 #include "Problem.h"
 #include "FunctionalBasisWithNumbers.h"
 #include "IPoisson1D_DGTerms.h"
-#include "CartesianGrid1D.h"
+#include "CartesianGrid1DOLD.h"
 #include "Element.h"
 #include <math.h>
 #include "NonZeroCoefficients.h"
@@ -21,11 +21,11 @@ public:
 		this->_sourceFunction = sourceFunction;
 	}
 
-	void DiscretizeDG(CartesianGrid1D* mesh, FunctionalBasisWithNumbers* basis, IPoisson1D_DGTerms* dg, int penalizationCoefficient, string outputDirectory, bool extractMatrixComponents)
+	void DiscretizeDG(CartesianGrid1DOLD* mesh, FunctionalBasisWithNumbers* basis, IPoisson1D_DGTerms* dg, int penalizationCoefficient, string outputDirectory, bool extractMatrixComponents)
 	{
 		bool autoPenalization = penalizationCoefficient == -1;
 		if (autoPenalization)
-			penalizationCoefficient = pow(basis->GetDegree() + 1, 2) * mesh->NElements(); // Ralph-Hartmann
+			penalizationCoefficient = pow(basis->GetDegree() + 1, 2) * mesh->N; // Ralph-Hartmann
 
 		cout << "Discretization: Discontinuous Galerkin SIPG" << endl;
 		cout << "\tPenalization coefficient: " << penalizationCoefficient << endl;

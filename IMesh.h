@@ -18,5 +18,14 @@ public:
 		this->N = n;
 	}
 
-	virtual ~IMesh() {}
+	virtual ~IMesh() 
+	{
+		for (size_t i = 0; i < this->Elements.size(); ++i)
+			delete this->Elements[i];
+		this->Elements.clear();
+
+		for (size_t i = 0; i < this->Interfaces.size(); ++i)
+			delete this->Interfaces[i];
+		this->Interfaces.clear();
+	}
 };

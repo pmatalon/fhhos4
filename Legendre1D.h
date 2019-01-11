@@ -2,6 +2,7 @@
 #include "IBasisFunction.h"
 #include <string>
 #include <math.h>
+#include <assert.h>
 using namespace std;
 
 class Legendre1D : public IBasisFunction1D
@@ -33,6 +34,7 @@ public:
 
 	double Eval(double x)
 	{
+		assert(x >= -1 && x <= 1);
 		double value = Legendre(this->Degree, x);
 		if (this->Normalized)
 			return sqrt(this->Degree + 0.5) * value;
@@ -41,6 +43,7 @@ public:
 
 	double EvalDerivative(double x)
 	{
+		assert(x >= -1 && x <= 1);
 		double value = DLegendre(this->Degree, x);
 		if (this->Normalized)
 			return sqrt(this->Degree + 0.5) * value;

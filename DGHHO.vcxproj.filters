@@ -4,7 +4,6 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Poisson1D.h" />
     <ClInclude Include="Utils.h">
       <Filter>Utils</Filter>
     </ClInclude>
@@ -18,9 +17,6 @@
       <Filter>Mesh</Filter>
     </ClInclude>
     <ClInclude Include="Square.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
-    <ClInclude Include="CartesianGrid1D.h">
       <Filter>Mesh</Filter>
     </ClInclude>
     <ClInclude Include="CartesianGrid2D.h">
@@ -38,9 +34,6 @@
     <ClInclude Include="IMesh.h">
       <Filter>Mesh</Filter>
     </ClInclude>
-    <ClInclude Include="CartesianGrid1DNew.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
     <ClInclude Include="Interval.h">
       <Filter>Mesh</Filter>
     </ClInclude>
@@ -50,12 +43,6 @@
     <ClInclude Include="BasisFunctionFactory.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
-    <ClInclude Include="IPoisson_DGTerms.h" />
-    <ClInclude Include="Poisson2D_DGTerms_LocalBasis.h" />
-    <ClInclude Include="Poisson2D_DGTerms_GlobalBasis.h" />
-    <ClInclude Include="IPoisson1D_DGTerms.h" />
-    <ClInclude Include="Poisson1D_DGTerms_LocalBasis.h" />
-    <ClInclude Include="Poisson1D_DGTerms_GlobalBasis.h" />
     <ClInclude Include="FunctionalBasis.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
@@ -86,8 +73,6 @@
     <ClInclude Include="Element3DInterface.h">
       <Filter>Mesh</Filter>
     </ClInclude>
-    <ClInclude Include="Poisson3D_DGTerms_LocalBasis.h" />
-    <ClInclude Include="Poisson.h" />
     <ClInclude Include="NonZeroCoefficients.h">
       <Filter>Utils</Filter>
     </ClInclude>
@@ -97,6 +82,48 @@
     <ClInclude Include="Problem.h" />
     <ClInclude Include="L2.h">
       <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson1D_DGTerms_GlobalBasis.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson2D_DGTerms_GlobalBasis.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson2D_DGTerms_LocalBasis.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson3D_DGTerms_LocalBasis.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="IPoisson_DGTerms.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="IPoisson1D_DGTerms.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson2D_HHOTerms.h">
+      <Filter>HHO</Filter>
+    </ClInclude>
+    <ClInclude Include="PoissonHHO.h">
+      <Filter>HHO</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson1D.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson1D_DGTerms_LocalBasisOLD.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson1D_DGTerms_LocalBasis.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="CartesianGrid1DOLD.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="CartesianGrid1D.h">
+      <Filter>Mesh</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -108,6 +135,12 @@
     </Filter>
     <Filter Include="FunctionalBasis">
       <UniqueIdentifier>{6da564fc-5853-4076-bdfa-41507d49f132}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DG">
+      <UniqueIdentifier>{7cd70dab-3d97-4983-bc8d-6c981af51b1d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="HHO">
+      <UniqueIdentifier>{5baa2ae8-8ff4-4937-bd5a-17cf25a395a1}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

@@ -2,12 +2,12 @@
 #include <iostream>
 #include "Poisson1D.h"
 #include "Poisson.h"
-//#include <Eigen/Dense>
 #include <functional>
 #include <getopt.h>
 #include "FunctionalBasis.h"
 #include "CartesianGrid2D.h"
 #include "CartesianGrid3D.h"
+#include "Poisson1D_DGTerms_LocalBasisOLD.h"
 #include "Poisson1D_DGTerms_LocalBasis.h"
 #include "Poisson1D_DGTerms_GlobalBasis.h"
 #include "Poisson2D_DGTerms_LocalBasis.h"
@@ -32,11 +32,6 @@ void print_usage(string s, int d, int n, string b, int p, int z, string o) {
 
 int main(int argc, char* argv[])
 {
-	/*Eigen::VectorXd v(4);
-	v << 1, 2, 3, 128;
-	std::cout << v.transpose() << std::endl;
-    printf("hello from DGHHO!\n");*/
-
 	string solution = "sine";
 	int dimension = 1;
 	BigNumber n = 5;
@@ -75,24 +70,28 @@ int main(int argc, char* argv[])
 
 	if (dimension == 1)
 	{
-		CartesianGrid1D* grid = new CartesianGrid1D(n);
+		CartesianGrid1D* mesh = new CartesianGrid1D(n);
 
 		std::function<double(double)> sourceFunction = [](double x) { return sin(4 * M_PI * x); };
 		if (solution.compare("poly") == 0)
 			sourceFunction = [](double x) { return 2; };
 			//sourceFunction = [](double x) { return (-1)*(-6 * x*pow(x - 1, 3) - 3 * pow(x, 3) * (2 * x - 2) - 18 * pow(x, 2) * pow(x - 1, 2)); };
 
-		Poisson1D* problem = new Poisson1D(solution, sourceFunction);
+		//Poisson1D* problem = new Poisson1D(solution, sourceFunction);
+		Poisson<IBasisFunction1D>* problem = new Poisson<IBasisFunction1D>(solution);
 
-		IPoisson1D_DGTerms* dg = new Poisson1D_DGTerms_LocalBasis(grid, sourceFunction);
+		//IPoisson1D_DGTerms* dg = new Poisson1D_DGTerms_LocalBasisOLD(mesh, sourceFunction);
+		IPoisson_DGTerms<IBasisFunction1D>* dg = new Poisson1D_DGTerms_LocalBasis(sourceFunction);
 
-		FunctionalBasisWithNumbers* basis = new FunctionalBasis1D(basisCode, polyDegree);
+		//FunctionalBasisWithNumbers* basis = new FunctionalBasis1DOLD(basisCode, polyDegree);
+		FunctionalBasis1D* basis = new FunctionalBasis1D(basisCode, polyDegree);
+
 		/*if (basisCode.compare("monomials") == 0)
 			basis = new MonomialBasis1D(polyDegree);
 		else if (basisCode.compare("globalmonomials") == 0)
 		{
 			basis = new MonomialBasis1D(polyDegree);
-			dg = new Poisson1D_DGTerms_GlobalBasis(grid, sourceFunction);
+			dg = new Poisson1D_DGTerms_GlobalBasis(mesh, sourceFunction);
 		}
 		else if (basisCode.compare("legendre") == 0)
 			basis = new LegendreBasis1D(polyDegree);
@@ -106,14 +105,14 @@ int main(int argc, char* argv[])
 			exit(EXIT_FAILURE);
 		}*/
 
-		problem->DiscretizeDG(grid, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents);
+		problem->DiscretizeDG(mesh, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents);
 		delete problem;
 		delete basis;
-		delete grid;
+		delete mesh;
 	}
 	else if (dimension == 2)
 	{
-		CartesianGrid2D* grid = new CartesianGrid2D(n);
+		CartesianGrid2D* mesh = new CartesianGrid2D(n);
 
 		std::function<double(double, double)> exactSolution = [](double x, double y) { return sin(4 * M_PI * x)*sin(4 * M_PI * y); };
 		std::function<double(double, double)> sourceFunction = [](double x, double y) { return 2 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y); };
@@ -127,38 +126,20 @@ int main(int argc, char* argv[])
 		IPoisson_DGTerms<IBasisFunction2D>* dg = new Poisson2D_DGTerms_LocalBasis(sourceFunction);
 
 		FunctionalBasis2D* basis = new FunctionalBasis2D(basisCode, polyDegree);
-		/*if (basisCode.compare("monomials") == 0)
-			basis = new MonomialBasis2D(polyDegree);
-		else if (basisCode.compare("globalmonomials") == 0)
-		{
-			basis = new MonomialBasis2D(polyDegree);
-			dg = new Poisson2D_DGTerms_GlobalBasis(sourceFunction);
-		}
-		else if (basisCode.compare("legendre") == 0)
-			basis = new LegendreBasis2D(polyDegree);
-		else if (basisCode.compare("bernstein") == 0)
-			basis = new BernsteinBasis2D(polyDegree);
-		else if (basisCode.compare("bernstein2") == 0)
-			basis = new Bernstein2Basis2D(polyDegree);
-		else
-		{
-			cout << "Basis not managed!";
-			exit(EXIT_FAILURE);
-		}*/
 
-		problem->DiscretizeDG(grid, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents);
+		problem->DiscretizeDG(mesh, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents);
 
 		problem->Solve();
-		double error = L2::Error(grid, basis, problem->Solution, exactSolution);
+		double error = L2::Error(mesh, basis, problem->Solution, exactSolution);
 		cout << "L2 Error = " << error << endl;
 
 		delete problem;
 		delete basis;
-		delete grid;
+		delete mesh;
 	}
 	else if (dimension == 3)
 	{
-		CartesianGrid3D* grid = new CartesianGrid3D(n);
+		CartesianGrid3D* mesh = new CartesianGrid3D(n);
 
 		std::function<double(double, double, double)> exactSolution = [](double x, double y, double z) { return sin(4 * M_PI * x)*sin(4 * M_PI * y)*sin(4 * M_PI * z); };
 		std::function<double(double, double, double)> sourceFunction = [](double x, double y, double z) { return 3 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y)*sin(4 * M_PI * z); };
@@ -174,16 +155,16 @@ int main(int argc, char* argv[])
 
 		FunctionalBasis3D* basis = new FunctionalBasis3D(basisCode, polyDegree);
 
-		problem->DiscretizeDG(grid, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents);
+		problem->DiscretizeDG(mesh, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents);
 
 		problem->Solve();
-		double error = L2::Error(grid, basis, problem->Solution, exactSolution);
+		double error = L2::Error(mesh, basis, problem->Solution, exactSolution);
 		cout << "L2 Error = " << error << endl;
 
 		delete problem;
 		delete basis;
-		delete grid;
+		delete mesh;
 	}
 	cout << "-------------------------- DONE ------------------------" << endl;
-    return 0;
+    return EXIT_SUCCESS;
 }

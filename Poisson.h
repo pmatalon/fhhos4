@@ -31,7 +31,7 @@ public:
 		cout << "\tPenalization coefficient: " << penalizationCoefficient << endl;
 		cout << "\tBasis of polynomials: " << (dg->IsGlobalBasis() ? "global" : "") + basis->Name() << endl;
 		
-		cout << "Local functions: " << basis->NumberOfLocalFunctionsInElement(0) << endl;
+		cout << "Local functions: " << basis->NumberOfLocalFunctionsInElement(NULL) << endl;
 		for (int localFunctionNumber = 0; localFunctionNumber < basis->NumberOfLocalFunctionsInElement(NULL); localFunctionNumber++)
 		{
 			IBasisFunction* localFunction = basis->GetLocalBasisFunction(NULL, localFunctionNumber);
@@ -75,15 +75,20 @@ public:
 					IBasisFunction* localFunction2 = basis->GetLocalBasisFunction(element, localFunctionNumber2);
 					BigNumber basisFunction2 = basis->GlobalFunctionNumber(element, localFunctionNumber2);
 
+					cout << "\t phi1 = " << localFunction1->ToString() << " phi2 = " << localFunction2->ToString() << endl;
+
 					double volumicTerm = dg->VolumicTerm(element, localFunction1, localFunction2);
+					cout << "\t\t volumic = " << volumicTerm << endl;
 					
 					double coupling = 0;
 					double penalization = 0;
 					for (ElementInterface* elemInterface : elementInterfaces)
 					{
-						coupling += dg->CouplingTerm(elemInterface, element, localFunction1, element, localFunction2);
-						penalization += dg->PenalizationTerm(elemInterface, element, localFunction1, element, localFunction2, penalizationCoefficient);
-						//cout << "\t\t " << elemInterface->ToString() << ":\t c=" << coupling << "\tp=" << penalization << endl;
+						double c = dg->CouplingTerm(elemInterface, element, localFunction1, element, localFunction2);
+						double p = dg->PenalizationTerm(elemInterface, element, localFunction1, element, localFunction2, penalizationCoefficient);
+						coupling += c;
+						penalization += p;
+						//cout << "\t\t " << elemInterface->ToString() << ":\t c=" << c << "\tp=" << p << endl;
 					}
 
 					//cout << "\t\t TOTAL = " << volumicTerm + coupling + penalization << endl;

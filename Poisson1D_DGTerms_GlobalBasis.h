@@ -10,11 +10,11 @@ using namespace std;
 class Poisson1D_DGTerms_GlobalBasis : public IPoisson1D_DGTerms
 {
 protected:
-	CartesianGrid1D* _grid;
+	CartesianGrid1DOLD* _grid;
 	function<double(double)> _sourceFunction;
 
 public:
-	Poisson1D_DGTerms_GlobalBasis(CartesianGrid1D* grid, function<double(double)> sourceFunction)
+	Poisson1D_DGTerms_GlobalBasis(CartesianGrid1DOLD* grid, function<double(double)> sourceFunction)
 	{
 		this->_grid = grid;
 		this->_sourceFunction = sourceFunction;

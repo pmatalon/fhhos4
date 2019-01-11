@@ -1,91 +1,50 @@
 #pragma once
+#include "IMesh.h"
+#include "Interval.h"
 
-class CartesianGrid1D
+class CartesianGrid1D : public IMesh
 {
 private:
-	BigNumber _n;
-	double* _x;
 public:
-	CartesianGrid1D(BigNumber n)
+	CartesianGrid1D(BigNumber n) : IMesh(1, n)
 	{
-		this->_n = n;
+		this->Elements.reserve(n);
+		this->Interfaces.reserve(n + 1);
+		double h = (double)1 / n;
 
-		// [0,1] descretized in 0, 1/n, 2/n, n/n (=> n+1 points)
-		this->_x = new double[n + 1];
 		for (BigNumber k = 0; k < n + 1; k++)
-			this->_x[k] = (double)k / n;
-	}
+		{
+			Element1DInterface* point = new Element1DInterface(k, k * h);
+			this->Interfaces.push_back(point);
+		}
 
-	inline ~CartesianGrid1D()
-	{
-		delete[] this->_x;
-	}
+		for (BigNumber k = 0; k < n; k++)
+		{
+			Element1DInterface* leftPoint = dynamic_cast<Element1DInterface*>(this->Interfaces[k]);
+			Element1DInterface* rightPoint = dynamic_cast<Element1DInterface*>(this->Interfaces[k+1]);
+			Interval* element = new Interval(k, leftPoint, rightPoint);
+			this->Elements.push_back(element);
+		}
 
-	inline int NElements()
-	{
-		return this->_n;
-	}
+		for (BigNumber k = 0; k < n + 1; k++)
+		{
+			Element1DInterface* point = dynamic_cast<Element1DInterface*>(this->Interfaces[k]);
 
-	inline double X(BigNumber point)
-	{
-		return this->_x[point];
+			if (k == 0)
+			{
+				point->IsDomainBoundary = true;
+				point->Element1 = this->Elements[k];
+			}
+			else if (k == n)
+			{
+				point->IsDomainBoundary = true;
+				point->Element2 = this->Elements[k - 1];
+			}
+			else
+			{
+				point->Element1 = this->Elements[k - 1];
+				point->Element2 = this->Elements[k];
+			}
+		}
 	}
-
-	inline double XRight(BigNumber element)
-	{
-		return this->_x[element + 1];
-	}
-
-	inline double XLeft(BigNumber element)
-	{
-		return this->_x[element];
-	}
-
-	inline int GetInterface(BigNumber element1, BigNumber element2)
-	{
-		if (element1 == element2 + 1)
-			return element1;
-		if (element1 == element2 - 1)
-			return element2;
-		return -1;
-	}
-
-	inline int LeftInterface(BigNumber element)
-	{
-		return element;
-	}
-
-	inline int RightInterface(BigNumber element)
-	{
-		return element + 1;
-	}
-
-	inline bool IsLeftInterface(BigNumber element, BigNumber point)
-	{
-		return point == element;
-	}
-
-	inline bool IsRightInterface(BigNumber element, BigNumber point)
-	{
-		return point == element + 1;
-	}
-
-	inline bool IsBoundaryLeft(BigNumber point)
-	{
-		return point == 0;
-	}
-	inline bool IsBoundaryRight(BigNumber point)
-	{
-		return point == this->_n;
-	}
-
-	inline bool IsFirstElement(BigNumber element)
-	{
-		return element == 0;
-	}
-	inline bool IsLastElement(BigNumber element)
-	{
-		return element == this->_n - 1;
-	}
-
 };

@@ -223,7 +223,7 @@ public:
 			for (int j = 0; j < this->nPoints; j++)
 				sum += func((x2 - x1) / 2 * this->points[i] + (x1 + x2) / 2, (y2 - y1) / 2 * this->points[j] + (y1 + y2) / 2) * this->weights[i] * this->weights[j];
 		}
-		return (x2 - x1) / 2 * (y2 - y1) / 2 * sum;
+		return (x2 - x1) * (y2 - y1) / 4 * sum;
 	}
 
 	/*----------*/
@@ -257,6 +257,6 @@ public:
 					sum += func((x2 - x1) / 2 * this->points[i] + (x1 + x2) / 2, (y2 - y1) / 2 * this->points[j] + (y1 + y2) / 2, (z2 - z1) / 2 * this->points[k] + (z1 + z2) / 2) * this->weights[i] * this->weights[j] * this->weights[k];
 			}
 		}
-		return (x2 - x1) / 2 * (y2 - y1) / 2 * (z2 - z1) / 2 * sum;
+		return (x2 - x1) * (y2 - y1) * (z2 - z1) / 8 * sum;
 	}
 };

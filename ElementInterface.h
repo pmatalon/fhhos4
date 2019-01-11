@@ -14,7 +14,7 @@ public:
 		this->Number = number;
 		this->Element1 = element1;
 		this->Element2 = element2;
-		this->IsDomainBoundary = false;
+		this->IsDomainBoundary = element2 == NULL;
 	}
 	ElementInterface(BigNumber number, Element* element1)
 		:ElementInterface(number, element1, NULL)

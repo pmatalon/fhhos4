@@ -30,11 +30,13 @@ public:
 
 	double Eval(double x)
 	{
+		assert(x >= 0 && x <= 1);
 		return Bernstein(x);
 	}
 
 	double EvalDerivative(double x)
 	{
+		assert(x >= 0 && x <= 1);
 		return DBernstein(x);
 	}
 
