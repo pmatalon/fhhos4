@@ -7,6 +7,10 @@ class IBasisFunction1D
 public:
 	virtual double Eval(double x) = 0;
 	virtual double EvalDerivative(double x) = 0;
+	double* Grad(double x)
+	{
+		return new double[1]{ EvalDerivative(x) };
+	}
 
 	virtual int GetDegree() = 0;
 	virtual RefInterval ReferenceInterval() = 0;

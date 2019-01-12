@@ -40,6 +40,8 @@ public:
 
 	double CouplingTerm(ElementInterface* interface, Element* element1, IBasisFunction2D* phi1, Element* element2, IBasisFunction2D* phi2)
 	{
+		assert(interface->IsBetween(element1, element2));
+
 		Square* square1 = static_cast<Square*>(element1);
 		Square* square2 = static_cast<Square*>(element2);
 		return this->CouplingTerm(interface, square1, phi1, square2, phi2);
@@ -47,9 +49,6 @@ public:
 
 	double CouplingTerm(ElementInterface* interface, Square* element1, IBasisFunction2D* phi1, Square* element2, IBasisFunction2D* phi2)
 	{
-		if (!interface->IsBetween(element1, element2))
-			return 0;
-
 		RefInterval refInterval = phi1->ReferenceInterval();
 		
 		auto n1 = element1->OuterNormalVector(interface);
@@ -91,6 +90,8 @@ public:
 
 	double PenalizationTerm(ElementInterface* interface, Element* element1, IBasisFunction2D* phi1, Element* element2, IBasisFunction2D* phi2, double penalizationCoefficient)
 	{
+		assert(interface->IsBetween(element1, element2));
+
 		Square* square1 = static_cast<Square*>(element1);
 		Square* square2 = static_cast<Square*>(element2);
 		return this->PenalizationTerm(interface, square1, phi1, square2, phi2, penalizationCoefficient);

@@ -64,6 +64,20 @@ public:
 	{
 		return this->_basisCode + "_p" + std::to_string(this->_maxPolynomialDegree);
 	}
+
+	function<double(double)> GetApproximateFunction(const Eigen::VectorXd &solution, BigNumber startIndex)
+	{
+		function<double(double)> approximate = [this, solution, startIndex](double t) {
+			double result = 0;
+			for (auto i = 0; i < this->_localFunctions.size(); i++)
+			{
+				auto phi = this->_localFunctions[i];
+				result += solution(startIndex + i) * phi->Eval(t);
+			}
+			return result;
+		};
+		return approximate;
+	}
 };
 
 //----------//
@@ -111,7 +125,7 @@ public:
 	{
 		function<double(double, double)> approximate = [this, solution, startIndex](double t, double u) {
 			double result = 0;
-			for (int i = 0; i < this->_localFunctions.size(); i++)
+			for (auto i = 0; i < this->_localFunctions.size(); i++)
 			{
 				auto phi = this->_localFunctions[i];
 				result += solution(startIndex + i) * phi->Eval(t, u);
@@ -171,7 +185,7 @@ public:
 	{
 		function<double(double, double, double)> approximate = [this, solution, startIndex](double t, double u, double v) {
 			double result = 0;
-			for (int i = 0; i < this->_localFunctions.size(); i++)
+			for (auto i = 0; i < this->_localFunctions.size(); i++)
 			{
 				auto phi = this->_localFunctions[i];
 				result += solution(startIndex + i) * phi->Eval(t, u, v);

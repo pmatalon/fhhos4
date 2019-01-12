@@ -4,6 +4,7 @@
 #include <Eigen/Sparse>
 #include "IMesh.h"
 #include "FunctionalBasis.h"
+#include "Interval.h"
 #include "Square.h"
 #include "Cube.h"
 using namespace std;
@@ -11,6 +12,49 @@ using namespace std;
 class L2
 {
 public:
+
+	//--------//
+	//   1D   //
+	//--------//
+
+	static double Error(IMesh* mesh, FunctionalBasis1D* basis, Eigen::VectorXd solution, function<double(double)> exactSolution)
+	{
+		double absoluteError = 0;
+		double normExactSolution = 0;
+		for (Element* element : mesh->Elements)
+		{
+			Interval* interval = static_cast<Interval*>(element);
+
+			double x1 = interval->A;
+			double x2 = interval->B;
+
+			RefInterval refInterval = basis->GetLocalBasisFunction(interval, 0)->ReferenceInterval();
+
+			auto approximate = basis->GetApproximateFunction(solution, element->Number * basis->NumberOfLocalFunctionsInElement(element));
+
+			function<double(double)> errorFunction = NULL;
+			if (refInterval.Left == -1 && refInterval.Right == 1)
+			{
+				errorFunction = [exactSolution, approximate, x1, x2](double t) {
+					return pow(exactSolution((x2 - x1) / 2 * t + (x2 + x1) / 2) - approximate(t), 2);
+				};
+			}
+			else
+			{
+				errorFunction = [exactSolution, approximate, x1, x2](double t) {
+					return pow(exactSolution((x2 - x1) * t + x1) - approximate(t), 2);
+				};
+			}
+
+			double jacobian = (x2 - x1) / refInterval.Length;
+			absoluteError += jacobian * Utils::Integral(errorFunction, refInterval);
+
+			normExactSolution += Utils::Integral([exactSolution](double x) { return pow(exactSolution(x), 2); }, x1, x2);
+		}
+		absoluteError = sqrt(absoluteError);
+		normExactSolution = sqrt(normExactSolution);
+		return absoluteError / normExactSolution;
+	}
 
 	//--------//
 	//   2D   //

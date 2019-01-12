@@ -75,10 +75,10 @@ public:
 					IBasisFunction* localFunction2 = basis->GetLocalBasisFunction(element, localFunctionNumber2);
 					BigNumber basisFunction2 = basis->GlobalFunctionNumber(element, localFunctionNumber2);
 
-					cout << "\t phi1 = " << localFunction1->ToString() << " phi2 = " << localFunction2->ToString() << endl;
+					//cout << "\t phi1 = " << localFunction1->ToString() << " phi2 = " << localFunction2->ToString() << endl;
 
 					double volumicTerm = dg->VolumicTerm(element, localFunction1, localFunction2);
-					cout << "\t\t volumic = " << volumicTerm << endl;
+					//cout << "\t\t volumic = " << volumicTerm << endl;
 					
 					double coupling = 0;
 					double penalization = 0;

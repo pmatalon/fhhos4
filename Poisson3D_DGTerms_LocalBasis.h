@@ -45,6 +45,8 @@ public:
 
 	double CouplingTerm(ElementInterface* interface, Element* element1, IBasisFunction3D* phi1, Element* element2, IBasisFunction3D* phi2)
 	{
+		assert(interface->IsBetween(element1, element2));
+
 		Cube* cube1 = static_cast<Cube*>(element1);
 		Cube* cube2 = static_cast<Cube*>(element2);
 		return this->CouplingTerm(interface, cube1, phi1, cube2, phi2);
@@ -52,8 +54,6 @@ public:
 
 	double CouplingTerm(ElementInterface* interface, Cube* element1, IBasisFunction3D* phi1, Cube* element2, IBasisFunction3D* phi2)
 	{
-		assert(interface->IsBetween(element1, element2));
-
 		RefInterval refInterval = phi1->ReferenceInterval();
 
 		double h = element1->Width;
@@ -109,6 +109,8 @@ public:
 
 	double PenalizationTerm(ElementInterface* interface, Element* element1, IBasisFunction3D* phi1, Element* element2, IBasisFunction3D* phi2, double penalizationCoefficient)
 	{
+		assert(interface->IsBetween(element1, element2));
+
 		Cube* cube1 = static_cast<Cube*>(element1);
 		Cube* cube2 = static_cast<Cube*>(element2);
 		return this->PenalizationTerm(interface, cube1, phi1, cube2, phi2, penalizationCoefficient);
@@ -116,8 +118,6 @@ public:
 
 	double PenalizationTerm(ElementInterface* interface, Cube* element1, IBasisFunction3D* phi1, Cube* element2, IBasisFunction3D* phi2, double penalizationCoefficient)
 	{
-		assert(interface->IsBetween(element1, element2));
-		
 		double h = element1->Width;
 		auto n1 = element1->OuterNormalVector(interface);
 		auto n2 = element2->OuterNormalVector(interface);

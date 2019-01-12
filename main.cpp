@@ -68,14 +68,20 @@ int main(int argc, char* argv[])
 	}
 	print_usage(solution, dimension, n, basisCode, polyDegree, penalizationCoefficient, outputDirectory);
 
+	IMesh* mesh;
+
 	if (dimension == 1)
 	{
-		CartesianGrid1D* mesh = new CartesianGrid1D(n);
+		mesh = new CartesianGrid1D(n);
 
+		std::function<double(double)> exactSolution = [](double x) { return sin(4 * M_PI * x) / (16 * pow(M_PI, 2)); };
 		std::function<double(double)> sourceFunction = [](double x) { return sin(4 * M_PI * x); };
 		if (solution.compare("poly") == 0)
+		{
+			std::function<double(double)> exactSolution = [](double x) { return x * (1 - x); };
 			sourceFunction = [](double x) { return 2; };
 			//sourceFunction = [](double x) { return (-1)*(-6 * x*pow(x - 1, 3) - 3 * pow(x, 3) * (2 * x - 2) - 18 * pow(x, 2) * pow(x - 1, 2)); };
+		}
 
 		//Poisson1D* problem = new Poisson1D(solution, sourceFunction);
 		Poisson<IBasisFunction1D>* problem = new Poisson<IBasisFunction1D>(solution);
@@ -106,13 +112,17 @@ int main(int argc, char* argv[])
 		}*/
 
 		problem->DiscretizeDG(mesh, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents);
+
+		problem->Solve();
+		double error = L2::Error(mesh, basis, problem->Solution, exactSolution);
+		cout << "L2 Error = " << error << endl;
+
 		delete problem;
 		delete basis;
-		delete mesh;
 	}
 	else if (dimension == 2)
 	{
-		CartesianGrid2D* mesh = new CartesianGrid2D(n);
+		mesh = new CartesianGrid2D(n);
 
 		std::function<double(double, double)> exactSolution = [](double x, double y) { return sin(4 * M_PI * x)*sin(4 * M_PI * y); };
 		std::function<double(double, double)> sourceFunction = [](double x, double y) { return 2 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y); };
@@ -135,11 +145,10 @@ int main(int argc, char* argv[])
 
 		delete problem;
 		delete basis;
-		delete mesh;
 	}
 	else if (dimension == 3)
 	{
-		CartesianGrid3D* mesh = new CartesianGrid3D(n);
+		mesh = new CartesianGrid3D(n);
 
 		std::function<double(double, double, double)> exactSolution = [](double x, double y, double z) { return sin(4 * M_PI * x)*sin(4 * M_PI * y)*sin(4 * M_PI * z); };
 		std::function<double(double, double, double)> sourceFunction = [](double x, double y, double z) { return 3 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y)*sin(4 * M_PI * z); };
@@ -163,8 +172,14 @@ int main(int argc, char* argv[])
 
 		delete problem;
 		delete basis;
-		delete mesh;
 	}
+	else
+	{
+		cout << "Dimension " << dimension << ", are you kidding?!";
+		exit(EXIT_FAILURE);
+	}
+	delete mesh;
+
 	cout << "-------------------------- DONE ------------------------" << endl;
     return EXIT_SUCCESS;
 }

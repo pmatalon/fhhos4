@@ -20,128 +20,103 @@ public:
 
 	bool IsGlobalBasis() { return false; }
 
-	double VolumicTerm(Element* element, IBasisFunction1D* func1, IBasisFunction1D* func2)
+	double VolumicTerm(Element* element, IBasisFunction1D* phi1, IBasisFunction1D* phi2)
 	{
 		Interval* interval = static_cast<Interval*>(element);
-		double a = interval->A;
-		double b = interval->B;
+		double h = interval->B - interval->A;
 
-		int nQuadPoints = func1->GetDegree() + func2->GetDegree();
-		if (func1->ReferenceInterval().Left == -1 && func1->ReferenceInterval().Right == 1)
-		{
-			// defined on [-1, 1]
-			function<double(double)> functionToIntegrate = [func1, func2](double t) {
-				return func1->EvalDerivative(t)*func2->EvalDerivative(t);
-			};
+		RefInterval refInterval = phi1->ReferenceInterval();
 
-			GaussLegendre gs(nQuadPoints);
-			return 2 / (b - a) * gs.Quadrature(functionToIntegrate);
-		}
-		else
-		{
-			function<double(double)> functionToIntegrate = [func1, func2](double u) {
-				//double u = 0.5 * t + 0.5;
-				return func1->EvalDerivative(u)*func2->EvalDerivative(u);
-			};
+		function<double(double)> functionToIntegrate = [phi1, phi2](double t) {
+			return InnerProduct(phi1->Grad(t), phi2->Grad(t));
+		};
 
-			return 1 / (b - a) * Utils::Integral(nQuadPoints, functionToIntegrate, 0, 1);
-		}
+		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree();
+		double factor = refInterval.Length / h;
+		return factor * Utils::Integral(nQuadPoints, functionToIntegrate, refInterval);
 	}
 
-	double MassTerm(Element* element, IBasisFunction1D* func1, IBasisFunction1D* func2)
+	double MassTerm(Element* element, IBasisFunction1D* phi1, IBasisFunction1D* phi2)
 	{
 		Interval* interval = static_cast<Interval*>(element);
-		double a = interval->A;
-		double b = interval->B;
+		double h = interval->B - interval->A;
 
-		GaussLegendre gs(func1->GetDegree() + func2->GetDegree());
+		RefInterval refInterval = phi1->ReferenceInterval();
 
-		if (func1->ReferenceInterval().Left == -1 && func1->ReferenceInterval().Right == 1)
-		{
-			// defined on [-1, 1]
-			function<double(double)> functionToIntegrate = [func1, func2](double t) {
-				return func1->Eval(t)*func2->Eval(t);
-			};
+		function<double(double)> functionToIntegrate = [phi1, phi2](double t) {
+			return phi1->Eval(t)*phi2->Eval(t);
+		};
 
-			return (b - a) / 2 * gs.Quadrature(functionToIntegrate);
-		}
-		else
-		{
-			function<double(double)> functionToIntegrate = [func1, func2](double u) {
-				//double u = 0.5 * t + 0.5;
-				return func1->Eval(u)*func2->Eval(u);
-			};
-
-			return (b - a) * Utils::Integral(func1->GetDegree() + func2->GetDegree(), functionToIntegrate, 0, 1);
-		}
+		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree() + 2;
+		double factor = h / refInterval.Length;
+		return factor * Utils::Integral(nQuadPoints, functionToIntegrate, refInterval);
 	}
 
-	double CouplingTerm(ElementInterface* interface, Element* element1, IBasisFunction1D* func1, Element* element2, IBasisFunction1D* func2)
+	double CouplingTerm(ElementInterface* interface, Element* element1, IBasisFunction1D* phi1, Element* element2, IBasisFunction1D* phi2)
 	{
-		/*if (element2 > element1 + 1 || element1 > element2 + 1)
-			return 0;*/
+		assert(interface->IsBetween(element1, element2));
 		Interval* interval1 = static_cast<Interval*>(element1);
 		Interval* interval2 = static_cast<Interval*>(element2);
 
-		return MeanDerivative(interval1, func1, interface) * Jump(interval2, func2, interface) + MeanDerivative(interval2, func2, interface) * Jump(interval1, func1, interface);
+		return MeanDerivative(interval1, phi1, interface) * Jump(interval2, phi2, interface) + MeanDerivative(interval2, phi2, interface) * Jump(interval1, phi1, interface);
 	}
 
-	double PenalizationTerm(ElementInterface* point, Element* element1, IBasisFunction1D* func1, Element* element2, IBasisFunction1D* func2, double penalizationCoefficient)
+	double PenalizationTerm(ElementInterface* point, Element* element1, IBasisFunction1D* phi1, Element* element2, IBasisFunction1D* phi2, double penalizationCoefficient)
 	{
-		/*if (element2 > element1 + 1 || element1 > element2 + 1)
-			return 0;*/
+		assert(point->IsBetween(element1, element2));
 		Interval* interval1 = static_cast<Interval*>(element1);
 		Interval* interval2 = static_cast<Interval*>(element2);
 
-		return penalizationCoefficient * Jump(interval1, func1, point) * Jump(interval2, func2, point);
+		return penalizationCoefficient * Jump(interval1, phi1, point) * Jump(interval2, phi2, point);
 	}
 
-	double RightHandSide(Element* element, IBasisFunction1D* func)
+	double RightHandSide(Element* element, IBasisFunction1D* phi)
 	{
 		Interval* interval = static_cast<Interval*>(element);
 		double a = interval->A;
 		double b = interval->B;
 
-		if (func->ReferenceInterval().Left == -1 && func->ReferenceInterval().Right == 1)
+		RefInterval refInterval = phi->ReferenceInterval();
+
+		function<double(double)> sourceTimesBasisFunction = NULL;
+		if (refInterval.Left == -1 && refInterval.Right == 1)
 		{
-			GaussLegendre gs;
-
-			function<double(double)> sourceTimesBasisFunction = [this, func, a, b](double t) {
-				return this->_sourceFunction((b - a) / 2 * t + (a + b) / 2) * func->Eval(t);
+			sourceTimesBasisFunction = [this, phi, a, b](double t) {
+				return this->_sourceFunction((b - a) / 2 * t + (a + b) / 2) * phi->Eval(t);
 			};
-
-			return (b - a) / 2 * gs.Quadrature(sourceTimesBasisFunction);
 		}
 		else
 		{
-			function<double(double)> sourceTimesBasisFunction = [this, func, a, b](double u) {
-				return this->_sourceFunction((b - a) * u + a) * func->Eval(u);
+			sourceTimesBasisFunction = [this, phi, a, b](double u) {
+				return this->_sourceFunction((b - a) * u + a) * phi->Eval(u);
 			};
-
-			return  (b - a) * Utils::Integral(sourceTimesBasisFunction, 0, 1);
 		}
+
+		double factor = (b - a) / refInterval.Length;
+		return  factor * Utils::Integral(sourceTimesBasisFunction, refInterval);
 	}
 
-	double MeanDerivative(Interval* element, IBasisFunction1D* func, ElementInterface* interface)
+	double MeanDerivative(Interval* element, IBasisFunction1D* phi, ElementInterface* interface)
 	{
-		double t = interface == element->Left ? func->ReferenceInterval().Left : func->ReferenceInterval().Right; // t in [-1, 1]
-		double a = element->A;
-		double b = element->B;
-
-		double jacobian = 0;
-		if (func->ReferenceInterval().Left == -1 && func->ReferenceInterval().Right == 1)
-			jacobian = 2 / (b - a);
-		else
-			jacobian = 1 / (b - a);
+		RefInterval refInterval = phi->ReferenceInterval();
+		double t = interface == element->Left ? refInterval.Left : refInterval.Right; // t in [-1, 1]
+		double h = element->B - element->A;
 
 		double meanFactor = interface->IsDomainBoundary ? 1 : 0.5;
-		return meanFactor * jacobian * func->EvalDerivative(t);
+		double jacobian = refInterval.Length / h;
+		return meanFactor * jacobian * phi->EvalDerivative(t);
 	}
 
-	double Jump(Interval* element, IBasisFunction1D* func, ElementInterface* interface)
+	double Jump(Interval* element, IBasisFunction1D* phi, ElementInterface* interface)
 	{
-		double t = interface == element->Left ? func->ReferenceInterval().Left : func->ReferenceInterval().Right; // t in [-1, 1]
+		double t = interface == element->Left ? phi->ReferenceInterval().Left : phi->ReferenceInterval().Right; // t in [-1, 1]
 		int factor = interface == element->Left ? 1 : -1;
-		return factor * (func->Eval(t));
+		return factor * (phi->Eval(t));
+	}
+
+private:
+	static double InnerProduct(double* vector1, double* vector2)
+	{
+		return vector1[0] * vector2[0];
 	}
 };
