@@ -1,7 +1,7 @@
 #pragma once
 #include <functional>
 #include <math.h>
-#include "IPoisson1D_DGTerms.h"
+#include "IPoisson1D_DGTerms_OLD.h"
 #include "Utils.h"
 #include "Element.h"
 #include "CartesianGrid1D.h"

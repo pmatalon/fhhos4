@@ -101,11 +101,11 @@ public:
 
 					double volumicTerm = dg->VolumicTerm(element, localFunction1, localFunction2);
 
-					double couplingTermLeft = dg->CouplingTerm(mesh->LeftInterface(element), element, localFunction1, element, localFunction2);
-					double penalizationLeft = dg->PenalizationTerm(mesh->LeftInterface(element), element, localFunction1, element, localFunction2, penalizationCoefficient);
+					double couplingTermLeft = dg->CouplingTerm(mesh->LeftFace(element), element, localFunction1, element, localFunction2);
+					double penalizationLeft = dg->PenalizationTerm(mesh->LeftFace(element), element, localFunction1, element, localFunction2, penalizationCoefficient);
 
-					double couplingTermRight = dg->CouplingTerm(mesh->RightInterface(element), element, localFunction1, element, localFunction2);
-					double penalizationRight = dg->PenalizationTerm(mesh->RightInterface(element), element, localFunction1, element, localFunction2, penalizationCoefficient);
+					double couplingTermRight = dg->CouplingTerm(mesh->RightFace(element), element, localFunction1, element, localFunction2);
+					double penalizationRight = dg->PenalizationTerm(mesh->RightFace(element), element, localFunction1, element, localFunction2, penalizationCoefficient);
 
 					//cout << "\t func1 = " << localFunction1->ToString() << " func2 = " << localFunction2->ToString() << endl;
 					//cout << "\t\t Volumic = " << volumicTerm << endl;

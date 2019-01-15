@@ -1,6 +1,6 @@
 #pragma once
 #include "Element.h"
-#include "Element2DInterface.h"
+#include "Face2D.h"
 
 class Square : public Element
 {
@@ -9,10 +9,10 @@ public:
 	double Y;
 	double Width;
 
-	Element2DInterface* NorthInterface;
-	Element2DInterface* SouthInterface;
-	Element2DInterface* EastInterface;
-	Element2DInterface* WestInterface;
+	Face2D* NorthFace;
+	Face2D* SouthFace;
+	Face2D* EastFace;
+	Face2D* WestFace;
 private:
 	Square* _neighbours;
 public:
@@ -28,55 +28,55 @@ public:
 		return StandardElementCode::Square;
 	}
 
-	void SetNorthInterface(Element2DInterface* interface)
+	void SetNorthInterface(Face2D* face)
 	{
-		this->Interfaces.push_back(interface);
-		this->NorthInterface = interface;
-		interface->X1 = this->X;
-		interface->Y1 = this->Y + this->Width;
-		interface->X2 = this->X + this->Width;
-		interface->Y2 = this->Y + this->Width;
+		this->Faces.push_back(face);
+		this->NorthFace = face;
+		face->X1 = this->X;
+		face->Y1 = this->Y + this->Width;
+		face->X2 = this->X + this->Width;
+		face->Y2 = this->Y + this->Width;
 	}
 
-	void SetSouthInterface(Element2DInterface* interface)
+	void SetSouthInterface(Face2D* face)
 	{
-		this->Interfaces.push_back(interface);
-		this->SouthInterface = interface;
-		interface->X1 = this->X;
-		interface->Y1 = this->Y;
-		interface->X2 = this->X + this->Width;
-		interface->Y2 = this->Y;
+		this->Faces.push_back(face);
+		this->SouthFace = face;
+		face->X1 = this->X;
+		face->Y1 = this->Y;
+		face->X2 = this->X + this->Width;
+		face->Y2 = this->Y;
 	}
 
-	void SetEastInterface(Element2DInterface* interface)
+	void SetEastInterface(Face2D* face)
 	{
-		this->Interfaces.push_back(interface);
-		this->EastInterface = interface;
-		interface->X1 = this->X + this->Width;
-		interface->Y1 = this->Y;
-		interface->X2 = this->X + this->Width;
-		interface->Y2 = this->Y + this->Width;
+		this->Faces.push_back(face);
+		this->EastFace = face;
+		face->X1 = this->X + this->Width;
+		face->Y1 = this->Y;
+		face->X2 = this->X + this->Width;
+		face->Y2 = this->Y + this->Width;
 	}
 
-	void SetWestInterface(Element2DInterface* interface)
+	void SetWestInterface(Face2D* face)
 	{
-		this->Interfaces.push_back(interface);
-		this->WestInterface = interface;
-		interface->X1 = this->X;
-		interface->Y1 = this->Y;
-		interface->X2 = this->X;
-		interface->Y2 = this->Y + this->Width;
+		this->Faces.push_back(face);
+		this->WestFace = face;
+		face->X1 = this->X;
+		face->Y1 = this->Y;
+		face->X2 = this->X;
+		face->Y2 = this->Y + this->Width;
 	}
 
-	double* OuterNormalVector(ElementInterface* interface)
+	double* OuterNormalVector(Face* face)
 	{
-		if (interface == this->NorthInterface)
+		if (face == this->NorthFace)
 			return new double[2]{ 0, 1 };
-		if (interface == this->SouthInterface)
+		if (face == this->SouthFace)
 			return new double[2]{ 0, -1 };
-		if (interface == this->EastInterface)
+		if (face == this->EastFace)
 			return new double[2]{ 1, 0 };
-		if (interface == this->WestInterface)
+		if (face == this->WestFace)
 			return new double[2]{ -1, 0 };
 		return NULL;
 	}

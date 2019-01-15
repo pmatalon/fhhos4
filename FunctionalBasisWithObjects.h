@@ -3,7 +3,7 @@
 #include <vector>
 #include <map>
 #include "Element.h"
-#include "ElementInterface.h"
+#include "Face.h"
 
 template <class IBasisFunction>
 class FunctionalBasisWithObjects

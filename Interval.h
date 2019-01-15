@@ -1,6 +1,6 @@
 #pragma once
 #include "Element.h"
-#include "Element1DInterface.h"
+#include "Face1D.h"
 
 class Interval : public Element
 {
@@ -8,15 +8,15 @@ public:
 	double A;
 	double B;
 
-	Element1DInterface* Left;
-	Element1DInterface* Right;
+	Face1D* Left;
+	Face1D* Right;
 
-	Interval(BigNumber number, Element1DInterface* left, Element1DInterface* right) : Element(number)
+	Interval(BigNumber number, Face1D* left, Face1D* right) : Element(number)
 	{
 		this->A = left->X;
 		this->B = right->X;
-		this->Interfaces.push_back(left);
-		this->Interfaces.push_back(right);
+		this->Faces.push_back(left);
+		this->Faces.push_back(right);
 		this->Left = left;
 		this->Right = right;
 	}
@@ -26,7 +26,7 @@ public:
 		return StandardElementCode::Interval;
 	}
 
-	double* OuterNormalVector(ElementInterface* interface)
+	double* OuterNormalVector(Face* interface)
 	{
 		if (interface == this->Left)
 			return new double[1]{ -1 };

@@ -10,7 +10,7 @@ public:
 	int Dim;
 	BigNumber N;
 	vector<Element*> Elements;
-	vector<ElementInterface*> Interfaces;
+	vector<Face*> Faces;
 
 	IMesh(int dim, BigNumber n)
 	{
@@ -24,8 +24,8 @@ public:
 			delete this->Elements[i];
 		this->Elements.clear();
 
-		for (size_t i = 0; i < this->Interfaces.size(); ++i)
-			delete this->Interfaces[i];
-		this->Interfaces.clear();
+		for (size_t i = 0; i < this->Faces.size(); ++i)
+			delete this->Faces[i];
+		this->Faces.clear();
 	}
 };

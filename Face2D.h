@@ -1,21 +1,25 @@
 #pragma once
-#include "ElementInterface.h"
+#include "Face.h"
 #include "Utils.h"
 
-class Element3DInterface : public ElementInterface
+class Face2D : public Face
 {
 public:
-	bool IsInXOYPlan = false;
-	bool IsInYOZPlan = false;
-	bool IsInXOZPlan = false;
+	double X1;
+	double Y1;
+	double X2;
+	double Y2;
 
-	Element3DInterface(BigNumber number, Element* element1, Element* element2) : ElementInterface(number, element1, element2)
+	Face2D(BigNumber number, Element* element1, Element* element2) : Face(number, element1, element2)
 	{	}
 
-	Element3DInterface(BigNumber number, Element* element1) : ElementInterface(number, element1)
+	Face2D(BigNumber number, Element* element1) : Face(number, element1)
 	{	}
 
-	/*string ToString() override
+	bool IsVertical() {	return this->X1 == this->X2; }
+	bool IsHorizontal()	{ return this->Y1 == this->Y2; }
+
+	string ToString() override
 	{
 		string s = "Interface " + std::to_string(this->Number);
 		if (this->IsVertical())
@@ -27,5 +31,5 @@ public:
 		else
 			s += " between element " + std::to_string(this->Element1->Number) + " and element " + std::to_string(this->Element2->Number);
 		return s;
-	}*/
+	}
 };

@@ -1,6 +1,6 @@
 #pragma once
 #include "Element.h"
-#include "Element3DInterface.h"
+#include "Face3D.h"
 
 class Cube : public Element
 {
@@ -10,12 +10,12 @@ public:
 	double Z;
 	double Width;
 
-	Element3DInterface* TopInterface;
-	Element3DInterface* BottomInterface;
-	Element3DInterface* FrontInterface;
-	Element3DInterface* BackInterface;
-	Element3DInterface* LeftInterface;
-	Element3DInterface* RightInterface;
+	Face3D* TopFace;
+	Face3D* BottomFace;
+	Face3D* FrontFace;
+	Face3D* BackFace;
+	Face3D* LeftFace;
+	Face3D* RightFace;
 private:
 	Cube* _neighbours;
 public:
@@ -32,61 +32,61 @@ public:
 		return StandardElementCode::Cube;
 	}
 
-	void SetTopInterface(Element3DInterface* interface)
+	void SetTopInterface(Face3D* interface)
 	{
-		this->Interfaces.push_back(interface);
-		this->TopInterface = interface;
+		this->Faces.push_back(interface);
+		this->TopFace = interface;
 		interface->IsInXOYPlan = true;
 	}
 
-	void SetBottomInterface(Element3DInterface* interface)
+	void SetBottomInterface(Face3D* interface)
 	{
-		this->Interfaces.push_back(interface);
-		this->BottomInterface = interface;
+		this->Faces.push_back(interface);
+		this->BottomFace = interface;
 		interface->IsInXOYPlan = true;
 	}
 
-	void SetFrontInterface(Element3DInterface* interface)
+	void SetFrontInterface(Face3D* interface)
 	{
-		this->Interfaces.push_back(interface);
-		this->FrontInterface = interface;
+		this->Faces.push_back(interface);
+		this->FrontFace = interface;
 		interface->IsInXOZPlan = true;
 	}
 
-	void SetBackInterface(Element3DInterface* interface)
+	void SetBackInterface(Face3D* interface)
 	{
-		this->Interfaces.push_back(interface);
-		this->BackInterface = interface;
+		this->Faces.push_back(interface);
+		this->BackFace = interface;
 		interface->IsInXOZPlan = true;
 	}
 
-	void SetLeftInterface(Element3DInterface* interface)
+	void SetLeftInterface(Face3D* interface)
 	{
-		this->Interfaces.push_back(interface);
-		this->LeftInterface = interface;
+		this->Faces.push_back(interface);
+		this->LeftFace = interface;
 		interface->IsInYOZPlan = true;
 	}
 
-	void SetRightInterface(Element3DInterface* interface)
+	void SetRightInterface(Face3D* interface)
 	{
-		this->Interfaces.push_back(interface);
-		this->RightInterface = interface;
+		this->Faces.push_back(interface);
+		this->RightFace = interface;
 		interface->IsInYOZPlan = true;
 	}
 
-	double* OuterNormalVector(ElementInterface* interface)
+	double* OuterNormalVector(Face* interface)
 	{
-		if (interface == this->TopInterface)
+		if (interface == this->TopFace)
 			return new double[3]{ 0, 0, 1 };
-		if (interface == this->BottomInterface)
+		if (interface == this->BottomFace)
 			return new double[3]{ 0, 0, -1 };
-		if (interface == this->FrontInterface)
+		if (interface == this->FrontFace)
 			return new double[3]{ 0, -1, 0 };
-		if (interface == this->BackInterface)
+		if (interface == this->BackFace)
 			return new double[3]{ 0, 1, 0 };
-		if (interface == this->LeftInterface)
+		if (interface == this->LeftFace)
 			return new double[3]{ -1, 0, 0 };
-		if (interface == this->RightInterface)
+		if (interface == this->RightFace)
 			return new double[3]{ 1, 0, 0 };
 		return NULL;
 	}

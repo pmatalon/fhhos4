@@ -1,6 +1,6 @@
 #include "Element.h"
 #pragma once
-class ElementInterface
+class Face
 {
 public:
 	BigNumber Number;
@@ -9,15 +9,15 @@ public:
 	Element* Element2;
 
 public:
-	ElementInterface(BigNumber number, Element* element1, Element* element2)
+	Face(BigNumber number, Element* element1, Element* element2)
 	{
 		this->Number = number;
 		this->Element1 = element1;
 		this->Element2 = element2;
 		this->IsDomainBoundary = element2 == NULL;
 	}
-	ElementInterface(BigNumber number, Element* element1)
-		:ElementInterface(number, element1, NULL)
+	Face(BigNumber number, Element* element1)
+		:Face(number, element1, NULL)
 	{
 		this->IsDomainBoundary = true;
 	}
@@ -38,5 +38,5 @@ public:
 		return "Interface " + this->Number;
 	}
 
-	virtual ~ElementInterface() {}
+	virtual ~Face() {}
 };

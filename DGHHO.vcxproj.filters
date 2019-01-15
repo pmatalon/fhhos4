@@ -10,20 +10,11 @@
     <ClInclude Include="Element.h">
       <Filter>Mesh</Filter>
     </ClInclude>
-    <ClInclude Include="Element2DInterface.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
-    <ClInclude Include="ElementInterface.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
     <ClInclude Include="Square.h">
       <Filter>Mesh</Filter>
     </ClInclude>
     <ClInclude Include="CartesianGrid2D.h">
       <Filter>Mesh</Filter>
-    </ClInclude>
-    <ClInclude Include="FunctionalBasisWithNumbers.h">
-      <Filter>FunctionalBasis</Filter>
     </ClInclude>
     <ClInclude Include="FunctionalBasisWithObjects.h">
       <Filter>FunctionalBasis</Filter>
@@ -35,9 +26,6 @@
       <Filter>Mesh</Filter>
     </ClInclude>
     <ClInclude Include="Interval.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
-    <ClInclude Include="Element1DInterface.h">
       <Filter>Mesh</Filter>
     </ClInclude>
     <ClInclude Include="BasisFunctionFactory.h">
@@ -70,9 +58,6 @@
     <ClInclude Include="Cube.h">
       <Filter>Mesh</Filter>
     </ClInclude>
-    <ClInclude Include="Element3DInterface.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
     <ClInclude Include="NonZeroCoefficients.h">
       <Filter>Utils</Filter>
     </ClInclude>
@@ -95,9 +80,6 @@
     <ClInclude Include="IPoisson_DGTerms.h">
       <Filter>DG</Filter>
     </ClInclude>
-    <ClInclude Include="IPoisson1D_DGTerms.h">
-      <Filter>DG</Filter>
-    </ClInclude>
     <ClInclude Include="Poisson2D_HHOTerms.h">
       <Filter>HHO</Filter>
     </ClInclude>
@@ -105,9 +87,6 @@
       <Filter>HHO</Filter>
     </ClInclude>
     <ClInclude Include="Poisson.h">
-      <Filter>DG</Filter>
-    </ClInclude>
-    <ClInclude Include="Poisson1D.h">
       <Filter>DG</Filter>
     </ClInclude>
     <ClInclude Include="Poisson1D_DGTerms_LocalBasisOLD.h">
@@ -143,22 +122,43 @@
     <ClInclude Include="Poisson_DG_Square.h">
       <Filter>DG</Filter>
     </ClInclude>
-    <ClInclude Include="Poisson_DG_ReferenceInterface.h">
-      <Filter>DG</Filter>
-    </ClInclude>
-    <ClInclude Include="Poisson_DG_ReferenceInterface2D.h">
-      <Filter>DG</Filter>
-    </ClInclude>
-    <ClInclude Include="Poisson_DG_Interface.h">
-      <Filter>DG</Filter>
-    </ClInclude>
-    <ClInclude Include="Poisson_DG_Interface2D.h">
-      <Filter>DG</Filter>
-    </ClInclude>
     <ClInclude Include="Poisson_DG_ReferenceCube.h">
       <Filter>DG</Filter>
     </ClInclude>
     <ClInclude Include="Poisson_DG_Cube.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson1D_OLD.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="IPoisson1D_DGTerms_OLD.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="FunctionalBasisWithNumbers_OLD.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="Face.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="Face2D.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="Face3D.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="Face1D.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson_DG_Face.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson_DG_ReferenceFace.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson_DG_ReferenceFace2D.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson_DG_Face2D.h">
       <Filter>DG</Filter>
     </ClInclude>
   </ItemGroup>

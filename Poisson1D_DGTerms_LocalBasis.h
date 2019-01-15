@@ -58,16 +58,16 @@ public:
 		return factor * Utils::Integral(nQuadPoints, functionToIntegrate, refInterval);
 	}
 
-	double CouplingTerm(ElementInterface* interface, Element* element1, IBasisFunction1D* phi1, Element* element2, IBasisFunction1D* phi2)
+	double CouplingTerm(Face* face, Element* element1, IBasisFunction1D* phi1, Element* element2, IBasisFunction1D* phi2)
 	{
-		assert(interface->IsBetween(element1, element2));
+		assert(face->IsBetween(element1, element2));
 		Interval* interval1 = static_cast<Interval*>(element1);
 		Interval* interval2 = static_cast<Interval*>(element2);
 
-		return MeanDerivative(interval1, phi1, interface) * Jump(interval2, phi2, interface) + MeanDerivative(interval2, phi2, interface) * Jump(interval1, phi1, interface);
+		return MeanDerivative(interval1, phi1, face) * Jump(interval2, phi2, face) + MeanDerivative(interval2, phi2, face) * Jump(interval1, phi1, face);
 	}
 
-	double PenalizationTerm(ElementInterface* point, Element* element1, IBasisFunction1D* phi1, Element* element2, IBasisFunction1D* phi2, double penalizationCoefficient)
+	double PenalizationTerm(Face* point, Element* element1, IBasisFunction1D* phi1, Element* element2, IBasisFunction1D* phi2, double penalizationCoefficient)
 	{
 		assert(point->IsBetween(element1, element2));
 		Interval* interval1 = static_cast<Interval*>(element1);
@@ -102,7 +102,7 @@ public:
 		return  factor * Utils::Integral(sourceTimesBasisFunction, refInterval);
 	}
 
-	double MeanDerivative(Interval* element, IBasisFunction1D* phi, ElementInterface* interface)
+	double MeanDerivative(Interval* element, IBasisFunction1D* phi, Face* interface)
 	{
 		DefInterval refInterval = phi->DefinitionInterval();
 		double t = interface == element->Left ? refInterval.Left : refInterval.Right; // t in [-1, 1]
@@ -113,10 +113,10 @@ public:
 		return meanFactor * jacobian * phi->EvalDerivative(t);
 	}
 
-	double Jump(Interval* element, IBasisFunction1D* phi, ElementInterface* interface)
+	double Jump(Interval* element, IBasisFunction1D* phi, Face* point)
 	{
-		double t = interface == element->Left ? phi->DefinitionInterval().Left : phi->DefinitionInterval().Right; // t in [-1, 1]
-		int factor = interface == element->Left ? 1 : -1;
+		double t = point == element->Left ? phi->DefinitionInterval().Left : phi->DefinitionInterval().Right; // t in [-1, 1]
+		int factor = point == element->Left ? 1 : -1;
 		return factor * (phi->Eval(t));
 	}
 

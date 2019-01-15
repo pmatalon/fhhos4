@@ -51,12 +51,12 @@ public:
 		return -1;
 	}
 
-	inline int LeftInterface(BigNumber element)
+	inline int LeftFace(BigNumber element)
 	{
 		return element;
 	}
 
-	inline int RightInterface(BigNumber element)
+	inline int RightFace(BigNumber element)
 	{
 		return element + 1;
 	}

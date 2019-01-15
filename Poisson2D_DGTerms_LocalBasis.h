@@ -5,7 +5,7 @@
 #include "IBasisFunction.h"
 #include "Utils.h"
 #include "Element.h"
-#include "ElementInterface.h"
+#include "Face.h"
 #include "Poisson_DG_ReferenceSquare.h"
 #include "Poisson_DG_Square.h"
 #include "Square.h"
@@ -43,31 +43,31 @@ public:
 		return Utils::Integral(nQuadPoints, functionToIntegrate, phi1->DefinitionInterval(), phi1->DefinitionInterval());
 	}*/
 
-	double CouplingTerm(ElementInterface* interface, Element* element1, IBasisFunction2D* phi1, Element* element2, IBasisFunction2D* phi2)
+	double CouplingTerm(Face* face, Element* element1, IBasisFunction2D* phi1, Element* element2, IBasisFunction2D* phi2)
 	{
-		assert(interface->IsBetween(element1, element2));
+		assert(face->IsBetween(element1, element2));
 
 		Square* square1 = static_cast<Square*>(element1);
 		Square* square2 = static_cast<Square*>(element2);
-		return this->CouplingTerm(interface, square1, phi1, square2, phi2);
+		return this->CouplingTerm(face, square1, phi1, square2, phi2);
 	}
 
-	double CouplingTerm(ElementInterface* interface, Square* element1, IBasisFunction2D* phi1, Square* element2, IBasisFunction2D* phi2)
+	double CouplingTerm(Face* face, Square* element1, IBasisFunction2D* phi1, Square* element2, IBasisFunction2D* phi2)
 	{
 		DefInterval refInterval = phi1->DefinitionInterval();
 		
-		auto n1 = element1->OuterNormalVector(interface);
-		auto n2 = element2->OuterNormalVector(interface);
+		auto n1 = element1->OuterNormalVector(face);
+		auto n2 = element2->OuterNormalVector(face);
 
-		double meanFactor = interface->IsDomainBoundary ? 1 : 0.5;
+		double meanFactor = face->IsDomainBoundary ? 1 : 0.5;
 
-		Element2DInterface* interf = (Element2DInterface*)interface;
+		Face2D* face2D = (Face2D*)face;
 
 		std::function<double(double)> functionToIntegrate;
-		if (interf->IsVertical())
+		if (face2D->IsVertical())
 		{
-			double t1 = interface == element1->EastInterface ? refInterval.Right : refInterval.Left;
-			double t2 = interface == element2->EastInterface ? refInterval.Right : refInterval.Left;
+			double t1 = face == element1->EastFace ? refInterval.Right : refInterval.Left;
+			double t2 = face == element2->EastFace ? refInterval.Right : refInterval.Left;
 
 			functionToIntegrate = [n1, n2, phi1, phi2, t1, t2](double u) {
 				double meanGradPhi1_scal_jumpPhi2 = InnerProduct(phi1->Grad(t1, u), n2) * phi2->Eval(t2, u);
@@ -75,10 +75,10 @@ public:
 				return meanGradPhi1_scal_jumpPhi2 + meanGradPhi2_scal_jumpPhi1;
 			};
 		}
-		else if (interf->IsHorizontal())
+		else if (face2D->IsHorizontal())
 		{
-			double u1 = interface == element1->NorthInterface ? refInterval.Right : refInterval.Left;
-			double u2 = interface == element2->NorthInterface ? refInterval.Right : refInterval.Left;
+			double u1 = face == element1->NorthFace ? refInterval.Right : refInterval.Left;
+			double u2 = face == element2->NorthFace ? refInterval.Right : refInterval.Left;
 
 			functionToIntegrate = [n1, n2, phi1, phi2, u1, u2](double t) {
 				double meanGradPhi1_scal_jumpPhi2 = InnerProduct(phi1->Grad(t, u1), n2) * phi2->Eval(t, u2);
@@ -93,40 +93,40 @@ public:
 		return -meanFactor * Utils::Integral(nQuadPoints, functionToIntegrate, refInterval);
 	}
 
-	double PenalizationTerm(ElementInterface* interface, Element* element1, IBasisFunction2D* phi1, Element* element2, IBasisFunction2D* phi2, double penalizationCoefficient)
+	double PenalizationTerm(Face* face, Element* element1, IBasisFunction2D* phi1, Element* element2, IBasisFunction2D* phi2, double penalizationCoefficient)
 	{
-		assert(interface->IsBetween(element1, element2));
+		assert(face->IsBetween(element1, element2));
 
 		Square* square1 = static_cast<Square*>(element1);
 		Square* square2 = static_cast<Square*>(element2);
-		return this->PenalizationTerm(interface, square1, phi1, square2, phi2, penalizationCoefficient);
+		return this->PenalizationTerm(face, square1, phi1, square2, phi2, penalizationCoefficient);
 	}
 
-	double PenalizationTerm(ElementInterface* interface, Square* element1, IBasisFunction2D* phi1, Square* element2, IBasisFunction2D* phi2, double penalizationCoefficient)
+	double PenalizationTerm(Face* face, Square* element1, IBasisFunction2D* phi1, Square* element2, IBasisFunction2D* phi2, double penalizationCoefficient)
 	{
 		double h = element1->Width;
-		auto n1 = element1->OuterNormalVector(interface);
-		auto n2 = element2->OuterNormalVector(interface);
+		auto n1 = element1->OuterNormalVector(face);
+		auto n2 = element2->OuterNormalVector(face);
 
 		DefInterval refInterval = phi1->DefinitionInterval();
 
-		Element2DInterface* interf = (Element2DInterface*)interface;
+		Face2D* face2D = (Face2D*)face;
 
 		function<double(double)> functionToIntegrate;
 
-		if (interf->IsVertical())
+		if (face2D->IsVertical())
 		{
-			double t1 = interface == element1->EastInterface ? refInterval.Right : refInterval.Left;
-			double t2 = interface == element2->EastInterface ? refInterval.Right : refInterval.Left;
+			double t1 = face == element1->EastFace ? refInterval.Right : refInterval.Left;
+			double t2 = face == element2->EastFace ? refInterval.Right : refInterval.Left;
 
 			functionToIntegrate = [phi1, phi2, n1, n2, t1, t2](double u) {
 				return InnerProduct(n1, n2) * phi1->Eval(t1, u) * phi2->Eval(t2, u);
 			};
 		}
-		else if (interf->IsHorizontal())
+		else if (face2D->IsHorizontal())
 		{
-			double u1 = interface == element1->NorthInterface ? refInterval.Right : refInterval.Left;
-			double u2 = interface == element2->NorthInterface ? refInterval.Right : refInterval.Left;
+			double u1 = face == element1->NorthFace ? refInterval.Right : refInterval.Left;
+			double u2 = face == element2->NorthFace ? refInterval.Right : refInterval.Left;
 
 			functionToIntegrate = [phi1, phi2, n1, n2, u1, u2](double t) {
 				return InnerProduct(n1, n2) * phi1->Eval(t, u1) * phi2->Eval(t, u2);

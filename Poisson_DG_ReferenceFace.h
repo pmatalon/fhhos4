@@ -3,12 +3,12 @@
 #include "IBasisFunction.h"
 #include "Element.h"
 
-class Poisson_DG_ReferenceInterface
+class Poisson_DG_ReferenceFace
 {
 protected:
 	Eigen::MatrixXd _couplingTerms;
 public:
-	Poisson_DG_ReferenceInterface(int nBasisFunctions) :
+	Poisson_DG_ReferenceFace(int nBasisFunctions) :
 		_couplingTerms(nBasisFunctions, nBasisFunctions)
 	{}
 

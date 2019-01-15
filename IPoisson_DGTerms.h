@@ -2,7 +2,7 @@
 #include <map>
 #include "FunctionalBasisWithObjects.h"
 #include "Element.h"
-#include "ElementInterface.h"
+#include "Face.h"
 #include "Poisson_DG_ReferenceElement.h"
 #include "Poisson_DG_Element.h"
 #include "Poisson_DG_Interval.h"
@@ -26,9 +26,9 @@ public:
 		return result;
 	}
 
-	virtual double CouplingTerm(ElementInterface* interface, Element* element1, IBasisFunction* func1, Element* element2, IBasisFunction* func2) = 0;
+	virtual double CouplingTerm(Face* interface, Element* element1, IBasisFunction* func1, Element* element2, IBasisFunction* func2) = 0;
 
-	virtual double PenalizationTerm(ElementInterface* interface, Element* element1, IBasisFunction* func1, Element* element2, IBasisFunction* func2, double penalizationCoefficient) = 0;
+	virtual double PenalizationTerm(Face* interface, Element* element1, IBasisFunction* func1, Element* element2, IBasisFunction* func2, double penalizationCoefficient) = 0;
 
 	virtual double RightHandSide(Element* element, IBasisFunction* func) = 0;
 

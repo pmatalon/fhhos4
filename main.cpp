@@ -1,6 +1,5 @@
 #include <cstdio>
 #include <iostream>
-#include "Poisson1D.h"
 #include "Poisson.h"
 #include <functional>
 #include <getopt.h>

@@ -5,7 +5,7 @@
 #include "Problem.h"
 #include "IMesh.h"
 #include "FunctionalBasisWithObjects.h"
-#include "ElementInterface.h"
+#include "Face.h"
 #include "IPoisson_DGTerms.h"
 #include "NonZeroCoefficients.h"
 #include "L2.h"
@@ -62,7 +62,7 @@ public:
 		for (Element* element : mesh->Elements)
 		{
 			//cout << "Element " << element->Number << endl;
-			vector<ElementInterface*> elementInterfaces = element->Interfaces;
+			vector<Face*> elementInterfaces = element->Faces;
 
 			for (int localFunctionNumber1 = 0; localFunctionNumber1 < basis->NumberOfLocalFunctionsInElement(element); localFunctionNumber1++)
 			{
@@ -82,7 +82,7 @@ public:
 					
 					double coupling = 0;
 					double penalization = 0;
-					for (ElementInterface* elemInterface : elementInterfaces)
+					for (Face* elemInterface : elementInterfaces)
 					{
 						double c = dg->CouplingTerm(elemInterface, element, localFunction1, element, localFunction2);
 						double p = dg->PenalizationTerm(elemInterface, element, localFunction1, element, localFunction2, penalizationCoefficient);
@@ -111,21 +111,21 @@ public:
 		// Iteration on the interfaces: off-diagonal blocks //
 		//--------------------------------------------------//
 
-		for (ElementInterface* interface : mesh->Interfaces)
+		for (Face* face : mesh->Faces)
 		{
-			if (interface->IsDomainBoundary)
+			if (face->IsDomainBoundary)
 				continue;
 
-			for (int localFunctionNumber1 = 0; localFunctionNumber1 < basis->NumberOfLocalFunctionsInElement(interface->Element1); localFunctionNumber1++)
+			for (int localFunctionNumber1 = 0; localFunctionNumber1 < basis->NumberOfLocalFunctionsInElement(face->Element1); localFunctionNumber1++)
 			{
-				IBasisFunction* localFunction1 = basis->GetLocalBasisFunction(interface->Element1, localFunctionNumber1);
-				BigNumber basisFunction1 = basis->GlobalFunctionNumber(interface->Element1, localFunctionNumber1);
-				for (int localFunctionNumber2 = 0; localFunctionNumber2 < basis->NumberOfLocalFunctionsInElement(interface->Element2); localFunctionNumber2++)
+				IBasisFunction* localFunction1 = basis->GetLocalBasisFunction(face->Element1, localFunctionNumber1);
+				BigNumber basisFunction1 = basis->GlobalFunctionNumber(face->Element1, localFunctionNumber1);
+				for (int localFunctionNumber2 = 0; localFunctionNumber2 < basis->NumberOfLocalFunctionsInElement(face->Element2); localFunctionNumber2++)
 				{
-					IBasisFunction* localFunction2 = basis->GetLocalBasisFunction(interface->Element2, localFunctionNumber2);
-					BigNumber basisFunction2 = basis->GlobalFunctionNumber(interface->Element2, localFunctionNumber2);
-					double coupling = dg->CouplingTerm(interface, interface->Element1, localFunction1, interface->Element2, localFunction2);
-					double penalization = dg->PenalizationTerm(interface, interface->Element1, localFunction1, interface->Element2, localFunction2, penalizationCoefficient);
+					IBasisFunction* localFunction2 = basis->GetLocalBasisFunction(face->Element2, localFunctionNumber2);
+					BigNumber basisFunction2 = basis->GlobalFunctionNumber(face->Element2, localFunctionNumber2);
+					double coupling = dg->CouplingTerm(face, face->Element1, localFunction1, face->Element2, localFunction2);
+					double penalization = dg->PenalizationTerm(face, face->Element1, localFunction1, face->Element2, localFunction2, penalizationCoefficient);
 					
 					if (extractMatrixComponents)
 					{

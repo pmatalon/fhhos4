@@ -1,10 +1,10 @@
 #pragma once
 #include <functional>
 #include <math.h>
-#include "IPoisson1D_DGTerms.h"
+#include "IPoisson1D_DGTerms_OLD.h"
 #include "Utils.h"
 #include "Element.h"
-#include "CartesianGrid1D.h"
+#include "CartesianGrid1DOLD.h"
 using namespace std;
 
 class Poisson1D_DGTerms_LocalBasisOLD : public IPoisson1D_DGTerms

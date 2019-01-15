@@ -1,7 +1,7 @@
 #pragma once
 #include <vector>
 #include "Utils.h"
-class ElementInterface;
+class Face;
 
 enum class StandardElementCode
 {
@@ -15,7 +15,7 @@ class Element
 {
 public:
 	BigNumber Number;
-	std::vector<ElementInterface*> Interfaces;
+	std::vector<Face*> Faces;
 
 	Element(BigNumber number)
 	{
@@ -24,7 +24,7 @@ public:
 
 	virtual StandardElementCode StdElementCode() = 0;
 
-	virtual double* OuterNormalVector(ElementInterface* interface) = 0;
+	virtual double* OuterNormalVector(Face* interface) = 0;
 
 	virtual ~Element() {}
 };
