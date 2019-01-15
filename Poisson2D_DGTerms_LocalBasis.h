@@ -6,6 +6,8 @@
 #include "Utils.h"
 #include "Element.h"
 #include "ElementInterface.h"
+#include "Poisson_DG_ReferenceSquare.h"
+#include "Poisson_DG_Square.h"
 #include "Square.h"
 using namespace std;
 
@@ -15,28 +17,31 @@ protected:
 	function<double(double, double)> _sourceFunction;
 
 public:
-	Poisson2D_DGTerms_LocalBasis(function<double(double, double)> sourceFunction)
+	Poisson2D_DGTerms_LocalBasis(function<double(double, double)> sourceFunction, FunctionalBasis2D* basis)
 	{
 		this->_sourceFunction = sourceFunction;
+		Poisson_DG_ReferenceElement* refSquare = new Poisson_DG_ReferenceSquare(basis->NumberOfLocalFunctionsInElement(NULL));
+		this->ComputeVolumicTerms(basis, refSquare);
+		this->ReferenceElements.insert(std::make_pair(StandardElementCode::Square, refSquare));
 	}
 
 	bool IsGlobalBasis() { return false; }
 
-	double VolumicTerm(Element* element, IBasisFunction2D* phi1, IBasisFunction2D* phi2)
+	/*double VolumicTerm(Element* element, IBasisFunction2D* phi1, IBasisFunction2D* phi2)
 	{
 		Square* square = static_cast<Square*>(element);
 		return this->VolumicTerm(square, phi1, phi2);
-	}
+	}*/
 
-	double VolumicTerm(Square* element, IBasisFunction2D* phi1, IBasisFunction2D* phi2)
+	/*double VolumicTerm(Square* element, IBasisFunction2D* phi1, IBasisFunction2D* phi2)
 	{
 		function<double(double, double)> functionToIntegrate = [phi1, phi2](double t, double u) {
 			return InnerProduct(phi1->Grad(t, u), phi2->Grad(t, u));
 		};
 
 		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree();
-		return Utils::Integral(nQuadPoints, functionToIntegrate, phi1->ReferenceInterval(), phi1->ReferenceInterval());
-	}
+		return Utils::Integral(nQuadPoints, functionToIntegrate, phi1->DefinitionInterval(), phi1->DefinitionInterval());
+	}*/
 
 	double CouplingTerm(ElementInterface* interface, Element* element1, IBasisFunction2D* phi1, Element* element2, IBasisFunction2D* phi2)
 	{
@@ -49,7 +54,7 @@ public:
 
 	double CouplingTerm(ElementInterface* interface, Square* element1, IBasisFunction2D* phi1, Square* element2, IBasisFunction2D* phi2)
 	{
-		RefInterval refInterval = phi1->ReferenceInterval();
+		DefInterval refInterval = phi1->DefinitionInterval();
 		
 		auto n1 = element1->OuterNormalVector(interface);
 		auto n2 = element2->OuterNormalVector(interface);
@@ -82,7 +87,7 @@ public:
 			};
 		}
 		else
-			return 0;
+			assert(false);
 
 		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree() + 1;
 		return -meanFactor * Utils::Integral(nQuadPoints, functionToIntegrate, refInterval);
@@ -103,7 +108,7 @@ public:
 		auto n1 = element1->OuterNormalVector(interface);
 		auto n2 = element2->OuterNormalVector(interface);
 
-		RefInterval refInterval = phi1->ReferenceInterval();
+		DefInterval refInterval = phi1->DefinitionInterval();
 
 		Element2DInterface* interf = (Element2DInterface*)interface;
 
@@ -128,7 +133,7 @@ public:
 			};
 		}
 		else
-			return 0;
+			assert(false);
 
 		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree() + 2;
 		double jacobian = h / refInterval.Length;
@@ -149,7 +154,7 @@ public:
 		double y1 = element->Y;
 		double y2 = element->Y + element->Width;
 
-		RefInterval refInterval = phi->ReferenceInterval();
+		DefInterval refInterval = phi->DefinitionInterval();
 
 		function<double(double, double)> sourceTimesBasisFunction = NULL;
 		if (refInterval.Left == -1 && refInterval.Right == 1)

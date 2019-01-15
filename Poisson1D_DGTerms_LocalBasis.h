@@ -5,6 +5,8 @@
 #include "IPoisson_DGTerms.h"
 #include "Utils.h"
 #include "Element.h"
+#include "Poisson_DG_ReferenceInterval.h"
+#include "Poisson_DG_Interval.h"
 using namespace std;
 
 class Poisson1D_DGTerms_LocalBasis : public IPoisson_DGTerms<IBasisFunction1D>
@@ -13,19 +15,22 @@ protected:
 	function<double(double)> _sourceFunction;
 
 public:
-	Poisson1D_DGTerms_LocalBasis(function<double(double)> sourceFunction)
+	Poisson1D_DGTerms_LocalBasis(function<double(double)> sourceFunction, FunctionalBasis1D* basis)
 	{
 		this->_sourceFunction = sourceFunction;
+		Poisson_DG_ReferenceElement* refInterval = new Poisson_DG_ReferenceInterval(basis->NumberOfLocalFunctionsInElement(NULL));
+		this->ComputeVolumicTerms(basis, refInterval);
+		this->ReferenceElements.insert(std::make_pair(StandardElementCode::Interval, refInterval));
 	}
 
 	bool IsGlobalBasis() { return false; }
 
-	double VolumicTerm(Element* element, IBasisFunction1D* phi1, IBasisFunction1D* phi2)
+	/*double VolumicTerm(Element* element, IBasisFunction1D* phi1, IBasisFunction1D* phi2)
 	{
 		Interval* interval = static_cast<Interval*>(element);
 		double h = interval->B - interval->A;
 
-		RefInterval refInterval = phi1->ReferenceInterval();
+		DefInterval refInterval = phi1->DefinitionInterval();
 
 		function<double(double)> functionToIntegrate = [phi1, phi2](double t) {
 			return InnerProduct(phi1->Grad(t), phi2->Grad(t));
@@ -33,15 +38,16 @@ public:
 
 		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree();
 		double factor = refInterval.Length / h;
-		return factor * Utils::Integral(nQuadPoints, functionToIntegrate, refInterval);
-	}
+		double result = factor * Utils::Integral(nQuadPoints, functionToIntegrate, refInterval);
+		return result;
+	}*/
 
 	double MassTerm(Element* element, IBasisFunction1D* phi1, IBasisFunction1D* phi2)
 	{
 		Interval* interval = static_cast<Interval*>(element);
 		double h = interval->B - interval->A;
 
-		RefInterval refInterval = phi1->ReferenceInterval();
+		DefInterval refInterval = phi1->DefinitionInterval();
 
 		function<double(double)> functionToIntegrate = [phi1, phi2](double t) {
 			return phi1->Eval(t)*phi2->Eval(t);
@@ -76,7 +82,7 @@ public:
 		double a = interval->A;
 		double b = interval->B;
 
-		RefInterval refInterval = phi->ReferenceInterval();
+		DefInterval refInterval = phi->DefinitionInterval();
 
 		function<double(double)> sourceTimesBasisFunction = NULL;
 		if (refInterval.Left == -1 && refInterval.Right == 1)
@@ -98,7 +104,7 @@ public:
 
 	double MeanDerivative(Interval* element, IBasisFunction1D* phi, ElementInterface* interface)
 	{
-		RefInterval refInterval = phi->ReferenceInterval();
+		DefInterval refInterval = phi->DefinitionInterval();
 		double t = interface == element->Left ? refInterval.Left : refInterval.Right; // t in [-1, 1]
 		double h = element->B - element->A;
 
@@ -109,7 +115,7 @@ public:
 
 	double Jump(Interval* element, IBasisFunction1D* phi, ElementInterface* interface)
 	{
-		double t = interface == element->Left ? phi->ReferenceInterval().Left : phi->ReferenceInterval().Right; // t in [-1, 1]
+		double t = interface == element->Left ? phi->DefinitionInterval().Left : phi->DefinitionInterval().Right; // t in [-1, 1]
 		int factor = interface == element->Left ? 1 : -1;
 		return factor * (phi->Eval(t));
 	}

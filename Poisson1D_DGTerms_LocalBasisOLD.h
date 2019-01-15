@@ -28,7 +28,7 @@ public:
 		double b = this->_grid->XRight(element);
 
 		int nQuadPoints = func1->GetDegree() + func2->GetDegree();
-		if (func1->ReferenceInterval().Left == -1 && func1->ReferenceInterval().Right == 1)
+		if (func1->DefinitionInterval().Left == -1 && func1->DefinitionInterval().Right == 1)
 		{
 			// defined on [-1, 1]
 			function<double(double)> functionToIntegrate = [func1, func2](double t) {
@@ -56,7 +56,7 @@ public:
 
 		GaussLegendre gs(func1->GetDegree() + func2->GetDegree());
 
-		if (func1->ReferenceInterval().Left == -1 && func1->ReferenceInterval().Right == 1)
+		if (func1->DefinitionInterval().Left == -1 && func1->DefinitionInterval().Right == 1)
 		{
 			// defined on [-1, 1]
 			function<double(double)> functionToIntegrate = [func1, func2](double t) {
@@ -97,7 +97,7 @@ public:
 		double a = this->_grid->XLeft(element);
 		double b = this->_grid->XRight(element);
 
-		if (func->ReferenceInterval().Left == -1 && func->ReferenceInterval().Right == 1)
+		if (func->DefinitionInterval().Left == -1 && func->DefinitionInterval().Right == 1)
 		{
 			GaussLegendre gs;
 
@@ -119,12 +119,12 @@ public:
 
 	double MeanDerivative(BigNumber element, IBasisFunction1D* func, BigNumber interface)
 	{
-		double t = this->_grid->IsLeftInterface(element, interface) ? func->ReferenceInterval().Left : func->ReferenceInterval().Right; // t in [-1, 1]
+		double t = this->_grid->IsLeftInterface(element, interface) ? func->DefinitionInterval().Left : func->DefinitionInterval().Right; // t in [-1, 1]
 		double a = this->_grid->XLeft(element);
 		double b = this->_grid->XRight(element);
 
 		double jacobian = 0;
-		if (func->ReferenceInterval().Left == -1 && func->ReferenceInterval().Right == 1)
+		if (func->DefinitionInterval().Left == -1 && func->DefinitionInterval().Right == 1)
 			jacobian = 2 / (b - a);
 		else
 			jacobian = 1 / (b - a);
@@ -136,7 +136,7 @@ public:
 
 	double Jump(BigNumber element, IBasisFunction1D* func, BigNumber interface)
 	{
-		double t = this->_grid->IsLeftInterface(element, interface) ? func->ReferenceInterval().Left : func->ReferenceInterval().Right; // t in [-1, 1]
+		double t = this->_grid->IsLeftInterface(element, interface) ? func->DefinitionInterval().Left : func->DefinitionInterval().Right; // t in [-1, 1]
 		int factor = this->_grid->IsLeftInterface(element, interface) ? 1 : -1;
 		return factor * (func->Eval(t));
 	}

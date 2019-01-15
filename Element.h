@@ -1,8 +1,16 @@
+#pragma once
 #include <vector>
 #include "Utils.h"
 class ElementInterface;
 
-#pragma once
+enum class StandardElementCode
+{
+	None,
+	Interval,
+	Square,
+	Cube
+};
+
 class Element 
 {
 public:
@@ -13,6 +21,8 @@ public:
 	{
 		this->Number = number;
 	}
+
+	virtual StandardElementCode StdElementCode() = 0;
 
 	virtual double* OuterNormalVector(ElementInterface* interface) = 0;
 

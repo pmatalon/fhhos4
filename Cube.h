@@ -27,6 +27,11 @@ public:
 		this->Width = width;
 	}
 
+	StandardElementCode StdElementCode()
+	{
+		return StandardElementCode::Cube;
+	}
+
 	void SetTopInterface(Element3DInterface* interface)
 	{
 		this->Interfaces.push_back(interface);

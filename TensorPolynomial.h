@@ -14,13 +14,14 @@ private:
 	IBasisFunction1D* _funcY;
 public:
 
-	TensorPolynomial2D(IBasisFunction1D* funcX, IBasisFunction1D* funcY)
+	TensorPolynomial2D(int localNumber, IBasisFunction1D* funcX, IBasisFunction1D* funcY)
 	{
+		this->LocalNumber = localNumber;
 		this->_funcX = funcX;
 		this->_funcY = funcY;
 	}
 
-	RefInterval ReferenceInterval() { return this->_funcX->ReferenceInterval(); }
+	DefInterval DefinitionInterval() { return this->_funcX->DefinitionInterval(); }
 
 	int GetDegree()
 	{
@@ -71,14 +72,15 @@ private:
 	IBasisFunction1D* _funcZ;
 public:
 
-	TensorPolynomial3D(IBasisFunction1D* funcX, IBasisFunction1D* funcY, IBasisFunction1D* funcZ)
+	TensorPolynomial3D(int localNumber, IBasisFunction1D* funcX, IBasisFunction1D* funcY, IBasisFunction1D* funcZ)
 	{
+		this->LocalNumber = localNumber;
 		this->_funcX = funcX;
 		this->_funcY = funcY;
 		this->_funcZ = funcZ;
 	}
 
-	RefInterval ReferenceInterval() { return this->_funcX->ReferenceInterval(); }
+	DefInterval DefinitionInterval() { return this->_funcX->DefinitionInterval(); }
 
 	int GetDegree()
 	{

@@ -28,7 +28,7 @@ public:
 			double x1 = interval->A;
 			double x2 = interval->B;
 
-			RefInterval refInterval = basis->GetLocalBasisFunction(interval, 0)->ReferenceInterval();
+			DefInterval refInterval = basis->GetLocalBasisFunction(interval, 0)->DefinitionInterval();
 
 			auto approximate = basis->GetApproximateFunction(solution, element->Number * basis->NumberOfLocalFunctionsInElement(element));
 
@@ -73,7 +73,7 @@ public:
 			double y1 = square->Y;
 			double y2 = square->Y + square->Width;
 
-			RefInterval refInterval = basis->GetLocalBasisFunction(square, 0)->ReferenceInterval();
+			DefInterval refInterval = basis->GetLocalBasisFunction(square, 0)->DefinitionInterval();
 
 			auto approximate = basis->GetApproximateFunction(solution, element->Number * basis->NumberOfLocalFunctionsInElement(element));
 
@@ -120,7 +120,7 @@ public:
 			double z1 = cube->Z;
 			double z2 = cube->Z + cube->Width;
 
-			RefInterval refInterval = basis->GetLocalBasisFunction(cube, 0)->ReferenceInterval();
+			DefInterval refInterval = basis->GetLocalBasisFunction(cube, 0)->DefinitionInterval();
 
 			auto approximate = basis->GetApproximateFunction(solution, element->Number * basis->NumberOfLocalFunctionsInElement(element));
 

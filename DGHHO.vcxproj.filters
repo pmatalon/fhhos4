@@ -76,9 +76,6 @@
     <ClInclude Include="NonZeroCoefficients.h">
       <Filter>Utils</Filter>
     </ClInclude>
-    <ClInclude Include="RefInterval.h">
-      <Filter>Utils</Filter>
-    </ClInclude>
     <ClInclude Include="Problem.h" />
     <ClInclude Include="L2.h">
       <Filter>Utils</Filter>
@@ -124,6 +121,45 @@
     </ClInclude>
     <ClInclude Include="CartesianGrid1D.h">
       <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson_DG_ReferenceElement.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson_DG_ReferenceInterval.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="DefInterval.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson_DG_Element.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson_DG_Interval.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson_DG_ReferenceSquare.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson_DG_Square.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson_DG_ReferenceInterface.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson_DG_ReferenceInterface2D.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson_DG_Interface.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson_DG_Interface2D.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson_DG_ReferenceCube.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson_DG_Cube.h">
+      <Filter>DG</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

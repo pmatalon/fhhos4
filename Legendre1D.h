@@ -15,17 +15,19 @@ public:
 
 	Legendre1D(int degree)
 	{
+		this->LocalNumber = degree;
 		this->Degree = degree;
 		this->Normalized = false;
 	}
 
 	Legendre1D(int degree, bool normalized)
 	{
+		this->LocalNumber = degree;
 		this->Degree = degree;
 		this->Normalized = normalized;
 	}
 
-	RefInterval ReferenceInterval() { return RefInterval::MinusOne_One(); }
+	DefInterval DefinitionInterval() { return DefInterval::MinusOne_One(); }
 
 	int GetDegree()
 	{

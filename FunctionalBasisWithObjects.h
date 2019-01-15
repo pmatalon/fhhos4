@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <vector>
 #include <map>
 #include "Element.h"
 #include "ElementInterface.h"
@@ -9,6 +10,7 @@ class FunctionalBasisWithObjects
 {
 protected:
 	map<int, IBasisFunction*> _localFunctions;
+	//vector<IBasisFunction*> _localFunctions;
 
 public:
 	virtual std::string Name() = 0;

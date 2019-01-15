@@ -23,6 +23,11 @@ public:
 		this->Width = width;
 	}
 
+	StandardElementCode StdElementCode()
+	{
+		return StandardElementCode::Square;
+	}
+
 	void SetNorthInterface(Element2DInterface* interface)
 	{
 		this->Interfaces.push_back(interface);

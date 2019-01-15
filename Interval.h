@@ -21,18 +21,10 @@ public:
 		this->Right = right;
 	}
 
-	/*void SetLeft(Element1DInterface* interface)
+	StandardElementCode StdElementCode()
 	{
-		this->Left = interface;
-		interface->X = this->A;
+		return StandardElementCode::Interval;
 	}
-
-	void SetRight(Element1DInterface* interface)
-	{
-		this->Interfaces.push_back(interface);
-		this->Right = interface;
-		interface->X = this->B;
-	}*/
 
 	double* OuterNormalVector(ElementInterface* interface)
 	{

@@ -69,7 +69,7 @@ public:
 	{
 		function<double(double)> approximate = [this, solution, startIndex](double t) {
 			double result = 0;
-			for (auto i = 0; i < this->_localFunctions.size(); i++)
+			for (unsigned int i = 0; i < this->_localFunctions.size(); i++)
 			{
 				auto phi = this->_localFunctions[i];
 				result += solution(startIndex + i) * phi->Eval(t);
@@ -91,22 +91,41 @@ private:
 	string _basisCode;
 
 public:
-	FunctionalBasis2D(string basisCode, int maxPolynomialDegree)
+	FunctionalBasis2D(string basisCode, int maxPolynomialDegree, bool fullTensorization)
 		:FunctionalBasisWithObjects<IBasisFunction2D>()
 	{
 		this->_maxPolynomialDegree = maxPolynomialDegree;
 		this->_basisCode = basisCode;
 
 		int functionNumber = 0;
-		for (int degree = 0; degree <= maxPolynomialDegree; degree++)
-		{
-			for (int j = 0; j <= degree; j++)
-			{
-				int i = degree - j;
 
-				IBasisFunction1D* polyX = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, i);
+		//if (BasisFunctionFactory::IsHierarchicalBasis(basisCode))
+		if (fullTensorization)
+		{
+			for (int j = 0; j <= maxPolynomialDegree; j++)
+			{
 				IBasisFunction1D* polyY = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, j);
-				this->_localFunctions[functionNumber++] = new TensorPolynomial2D(polyX, polyY);
+				for (int i = 0; i <= maxPolynomialDegree; i++)
+				{
+					IBasisFunction1D* polyX = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, i);
+					this->_localFunctions[functionNumber] = new TensorPolynomial2D(functionNumber, polyX, polyY);
+					functionNumber++;
+				}
+			}
+		}
+		else
+		{
+			for (int degree = 0; degree <= maxPolynomialDegree; degree++)
+			{
+				for (int j = 0; j <= degree; j++)
+				{
+					int i = degree - j;
+
+					IBasisFunction1D* polyX = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, i);
+					IBasisFunction1D* polyY = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, j);
+					this->_localFunctions[functionNumber] = new TensorPolynomial2D(functionNumber, polyX, polyY);
+					functionNumber++;
+				}
 			}
 		}
 	}
@@ -125,7 +144,7 @@ public:
 	{
 		function<double(double, double)> approximate = [this, solution, startIndex](double t, double u) {
 			double result = 0;
-			for (auto i = 0; i < this->_localFunctions.size(); i++)
+			for (unsigned int i = 0; i < this->_localFunctions.size(); i++)
 			{
 				auto phi = this->_localFunctions[i];
 				result += solution(startIndex + i) * phi->Eval(t, u);
@@ -147,25 +166,47 @@ private:
 	string _basisCode;
 
 public:
-	FunctionalBasis3D(string basisCode, int maxPolynomialDegree)
+	FunctionalBasis3D(string basisCode, int maxPolynomialDegree, bool fullTensorization)
 		:FunctionalBasisWithObjects<IBasisFunction3D>()
 	{
 		this->_maxPolynomialDegree = maxPolynomialDegree;
 		this->_basisCode = basisCode;
 
 		int functionNumber = 0;
-		for (int degree = 0; degree <= maxPolynomialDegree; degree++)
-		{
-			for (int degZ = 0; degZ <= degree; degZ++)
-			{
-				for (int degY = 0; degY <= degree - degZ; degY++)
-				{
-					int degX = degree - degZ - degY;
 
-					IBasisFunction1D* polyX = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, degX);
-					IBasisFunction1D* polyY = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, degY);
-					IBasisFunction1D* polyZ = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, degZ);
-					this->_localFunctions[functionNumber++] = new TensorPolynomial3D(polyX, polyY, polyZ);
+		if (fullTensorization)
+		{
+			for (int k = 0; k <= maxPolynomialDegree; k++)
+			{
+				IBasisFunction1D* polyZ = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, k);
+				for (int j = 0; j <= maxPolynomialDegree; j++)
+				{
+					IBasisFunction1D* polyY = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, j);
+					for (int i = 0; i <= maxPolynomialDegree; i++)
+					{
+						IBasisFunction1D* polyX = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, i);
+						this->_localFunctions[functionNumber] = new TensorPolynomial3D(functionNumber, polyX, polyY, polyZ);
+						functionNumber++;
+					}
+				}
+			}
+		}
+		else
+		{
+			for (int degree = 0; degree <= maxPolynomialDegree; degree++)
+			{
+				for (int degZ = 0; degZ <= degree; degZ++)
+				{
+					for (int degY = 0; degY <= degree - degZ; degY++)
+					{
+						int degX = degree - degZ - degY;
+
+						IBasisFunction1D* polyX = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, degX);
+						IBasisFunction1D* polyY = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, degY);
+						IBasisFunction1D* polyZ = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, degZ);
+						this->_localFunctions[functionNumber] = new TensorPolynomial3D(functionNumber, polyX, polyY, polyZ);
+						functionNumber++;
+					}
 				}
 			}
 		}
@@ -185,7 +226,7 @@ public:
 	{
 		function<double(double, double, double)> approximate = [this, solution, startIndex](double t, double u, double v) {
 			double result = 0;
-			for (auto i = 0; i < this->_localFunctions.size(); i++)
+			for (unsigned int i = 0; i < this->_localFunctions.size(); i++)
 			{
 				auto phi = this->_localFunctions[i];
 				result += solution(startIndex + i) * phi->Eval(t, u, v);

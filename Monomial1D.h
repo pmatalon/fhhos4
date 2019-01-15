@@ -13,10 +13,11 @@ public:
 
 	Monomial1D(int degree)
 	{
+		this->LocalNumber = degree;
 		this->Degree = degree;
 	}
 
-	RefInterval ReferenceInterval() { return RefInterval::MinusOne_One(); }
+	DefInterval DefinitionInterval() { return DefInterval::MinusOne_One(); }
 
 	int GetDegree()
 	{

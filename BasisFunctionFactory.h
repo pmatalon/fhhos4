@@ -9,7 +9,7 @@ using namespace std;
 class BasisFunctionFactory
 {
 public:
-	static IBasisFunction1D* Create(std::string basisCode, int maxPolynomialDegree, int i)
+	static IBasisFunction1D* Create(string basisCode, int maxPolynomialDegree, int i)
 	{
 		if (basisCode.compare(Monomial1D::Code()) == 0)
 			return new Monomial1D(i);
@@ -23,5 +23,10 @@ public:
 		cout << "Basis '" << basisCode << "' not managed!";
 		exit(EXIT_FAILURE);
 		return NULL;
+	}
+
+	static bool IsHierarchicalBasis(string basisCode)
+	{
+		return basisCode.compare(Monomial1D::Code()) == 0 || basisCode.compare(Legendre1D::Code()) == 0;
 	}
 };

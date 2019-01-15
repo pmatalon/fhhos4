@@ -16,15 +16,16 @@
 using namespace std;
 
 
-void print_usage(string s, int d, int n, string b, int p, int z, string o) {
+void print_usage(string s, int d, int n, string b, int p, bool f, int z, string o) {
 	cout << "--------------------------------------------------------" << endl;
 	cout << "Arguments:" << endl;
-	cout << "-s {sine|poly}\t	solution (default: sine)\t--> " << s << endl;
-	cout << "-d {1|2|3}:\t	space dimension (default: 1)\t--> " << d << endl;
-	cout << "-n NUM:\t		number of subdivisions (default: 5)\t--> " << n << endl;
+	cout << "-s {sine|poly}:\t\tsolution (default: sine)\t--> " << s << endl;
+	cout << "-d {1|2|3}:\t\t	space dimension (default: 1)\t--> " << d << endl;
+	cout << "-n NUM:\t\t		number of subdivisions (default: 5)\t--> " << n << endl;
 	cout << "-b {monomials|legendre|bernstein}:	polynomial basis (default: monomials)\t--> " << b << endl;
-	cout << "-p NUM:\t		max polynomial degree (default: 2)\t--> " << p << endl;
-	cout << "-z NUM:\t		penalization coefficient (default: 100)\t--> " << z << endl;
+	cout << "-p NUM:\t\t		max polynomial degree (default: 2)\t--> " << p << endl;
+	cout << "-f:\t\t		full tensorization of the polynomials when d=2 or 3 (default: false)\t--> " << f << endl;
+	cout << "-z NUM:\t\t\t	penalization coefficient (default: 100)\t--> " << z << endl;
 	cout << "-o PATH:\t		output directory to export the system (default: ./)\t--> " << o << endl;
 	cout << "-e:\t\t		extract all components of the matrix in separate files" << endl;
 	cout << "--------------------------------------------------------" << endl;
@@ -37,12 +38,13 @@ int main(int argc, char* argv[])
 	BigNumber n = 5;
 	string basisCode = "monomials";
 	int polyDegree = 2;
+	bool fullTensorization = false;
 	int penalizationCoefficient = 100;
 	string outputDirectory = "./";
 	bool extractMatrixComponents = false;
 
 	int option = 0;
-	while ((option = getopt(argc, argv, "s:d:n:b:p:z:o:e")) != -1) 
+	while ((option = getopt(argc, argv, "s:d:n:b:p:z:o:ef")) != -1) 
 	{
 		switch (option) 
 		{
@@ -56,17 +58,19 @@ int main(int argc, char* argv[])
 				break;
 			case 'p': polyDegree = atoi(optarg);
 				break;
+			case 'f': fullTensorization = true;
+				break;
 			case 'z': penalizationCoefficient = atoi(optarg);
 				break;
 			case 'o': outputDirectory = optarg;
 				break;
 			case 'e': extractMatrixComponents = true;
 				break;
-			default: print_usage(solution, dimension, n, basisCode, polyDegree, penalizationCoefficient, outputDirectory);
+			default: print_usage(solution, dimension, n, basisCode, polyDegree, fullTensorization, penalizationCoefficient, outputDirectory);
 				exit(EXIT_FAILURE);
 		}
 	}
-	print_usage(solution, dimension, n, basisCode, polyDegree, penalizationCoefficient, outputDirectory);
+	print_usage(solution, dimension, n, basisCode, polyDegree, fullTensorization, penalizationCoefficient, outputDirectory);
 
 	IMesh* mesh;
 
@@ -86,11 +90,11 @@ int main(int argc, char* argv[])
 		//Poisson1D* problem = new Poisson1D(solution, sourceFunction);
 		Poisson<IBasisFunction1D>* problem = new Poisson<IBasisFunction1D>(solution);
 
-		//IPoisson1D_DGTerms* dg = new Poisson1D_DGTerms_LocalBasisOLD(mesh, sourceFunction);
-		IPoisson_DGTerms<IBasisFunction1D>* dg = new Poisson1D_DGTerms_LocalBasis(sourceFunction);
-
 		//FunctionalBasisWithNumbers* basis = new FunctionalBasis1DOLD(basisCode, polyDegree);
 		FunctionalBasis1D* basis = new FunctionalBasis1D(basisCode, polyDegree);
+
+		//IPoisson1D_DGTerms* dg = new Poisson1D_DGTerms_LocalBasisOLD(mesh, sourceFunction);
+		IPoisson_DGTerms<IBasisFunction1D>* dg = new Poisson1D_DGTerms_LocalBasis(sourceFunction, basis);
 
 		/*if (basisCode.compare("monomials") == 0)
 			basis = new MonomialBasis1D(polyDegree);
@@ -133,9 +137,9 @@ int main(int argc, char* argv[])
 		}
 		Poisson<IBasisFunction2D>* problem = new Poisson<IBasisFunction2D>(solution);
 
-		IPoisson_DGTerms<IBasisFunction2D>* dg = new Poisson2D_DGTerms_LocalBasis(sourceFunction);
+		FunctionalBasis2D* basis = new FunctionalBasis2D(basisCode, polyDegree, fullTensorization);
 
-		FunctionalBasis2D* basis = new FunctionalBasis2D(basisCode, polyDegree);
+		IPoisson_DGTerms<IBasisFunction2D>* dg = new Poisson2D_DGTerms_LocalBasis(sourceFunction, basis);
 
 		problem->DiscretizeDG(mesh, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents);
 
@@ -160,9 +164,9 @@ int main(int argc, char* argv[])
 
 		Poisson<IBasisFunction3D>* problem = new Poisson<IBasisFunction3D>(solution);
 
-		IPoisson_DGTerms<IBasisFunction3D>* dg = new Poisson3D_DGTerms_LocalBasis(sourceFunction);
+		FunctionalBasis3D* basis = new FunctionalBasis3D(basisCode, polyDegree, fullTensorization);
 
-		FunctionalBasis3D* basis = new FunctionalBasis3D(basisCode, polyDegree);
+		IPoisson_DGTerms<IBasisFunction3D>* dg = new Poisson3D_DGTerms_LocalBasis(sourceFunction, basis);
 
 		problem->DiscretizeDG(mesh, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents);
 

@@ -7,6 +7,7 @@
 #include "Element.h"
 #include "ElementInterface.h"
 #include "Cube.h"
+#include "Poisson_DG_ReferenceCube.h"
 using namespace std;
 
 class Poisson3D_DGTerms_LocalBasis : public IPoisson_DGTerms<IBasisFunction3D>
@@ -15,24 +16,27 @@ protected:
 	function<double(double, double, double)> _sourceFunction;
 
 public:
-	Poisson3D_DGTerms_LocalBasis(function<double(double, double, double)> sourceFunction)
+	Poisson3D_DGTerms_LocalBasis(function<double(double, double, double)> sourceFunction, FunctionalBasis3D* basis)
 	{
 		this->_sourceFunction = sourceFunction;
+		Poisson_DG_ReferenceElement* refCube = new Poisson_DG_ReferenceCube(basis->NumberOfLocalFunctionsInElement(NULL));
+		this->ComputeVolumicTerms(basis, refCube);
+		this->ReferenceElements.insert(std::make_pair(StandardElementCode::Cube, refCube));
 	}
 
 	bool IsGlobalBasis() { return false; }
 
-	double VolumicTerm(Element* element, IBasisFunction3D* phi1, IBasisFunction3D* phi2)
+	/*double VolumicTerm(Element* element, IBasisFunction3D* phi1, IBasisFunction3D* phi2)
 	{
 		Cube* cube = static_cast<Cube*>(element);
 		return this->VolumicTerm(cube, phi1, phi2);
-	}
+	}*/
 
-	double VolumicTerm(Cube* element, IBasisFunction3D* phi1, IBasisFunction3D* phi2)
+	/*double VolumicTerm(Cube* element, IBasisFunction3D* phi1, IBasisFunction3D* phi2)
 	{
 		double h = element->Width;
 		assert(h >= 0);
-		RefInterval refInterval = phi1->ReferenceInterval();
+		DefInterval refInterval = phi1->DefinitionInterval();
 
 		function<double(double, double, double)> functionToIntegrate = [phi1, phi2](double t, double u, double v) {
 			return InnerProduct(phi1->Grad(t, u, v), phi2->Grad(t, u, v));
@@ -41,7 +45,7 @@ public:
 		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree();
 		double factor = h / refInterval.Length;
 		return factor * Utils::Integral(nQuadPoints, functionToIntegrate, refInterval, refInterval, refInterval);
-	}
+	}*/
 
 	double CouplingTerm(ElementInterface* interface, Element* element1, IBasisFunction3D* phi1, Element* element2, IBasisFunction3D* phi2)
 	{
@@ -54,7 +58,7 @@ public:
 
 	double CouplingTerm(ElementInterface* interface, Cube* element1, IBasisFunction3D* phi1, Cube* element2, IBasisFunction3D* phi2)
 	{
-		RefInterval refInterval = phi1->ReferenceInterval();
+		DefInterval refInterval = phi1->DefinitionInterval();
 
 		double h = element1->Width;
 
@@ -124,7 +128,7 @@ public:
 
 		assert(InnerProduct(n1, n2) == 1 || InnerProduct(n1, n2) == -1);
 
-		RefInterval refInterval = phi1->ReferenceInterval();
+		DefInterval refInterval = phi1->DefinitionInterval();
 
 		Element3DInterface* interf = (Element3DInterface*)interface;
 
@@ -181,7 +185,7 @@ public:
 		double z1 = element->Z;
 		double z2 = element->Z + element->Width;
 
-		RefInterval refInterval = phi->ReferenceInterval();
+		DefInterval refInterval = phi->DefinitionInterval();
 
 		function<double(double, double, double)> sourceTimesBasisFunction = NULL;
 		if (refInterval.Left == -1 && refInterval.Right == 1)

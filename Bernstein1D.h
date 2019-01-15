@@ -16,12 +16,13 @@ public:
 
 	Bernstein1D(int degree, int i)
 	{
+		this->LocalNumber = i;
 		this->_degree = degree;
 		this->_i = i;
 		this->_binomial = Utils::Binomial(degree, i);
 	}
 
-	RefInterval ReferenceInterval() { return RefInterval::Zero_One(); }
+	DefInterval DefinitionInterval() { return DefInterval::Zero_One(); }
 
 	int GetDegree()
 	{
