@@ -19,7 +19,7 @@ public:
 		};
 
 		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree();
-		double result = Utils::Integral(nQuadPoints, functionToIntegrate, phi1->DefinitionInterval(), phi1->DefinitionInterval());
+		double result = Utils::Integral(nQuadPoints, functionToIntegrate, -1,1, -1,1);
 
 		this->_volumicTerms(phi1->LocalNumber, phi2->LocalNumber) = result;
 	}

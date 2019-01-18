@@ -47,15 +47,13 @@ public:
 		Interval* interval = static_cast<Interval*>(element);
 		double h = interval->B - interval->A;
 
-		DefInterval refInterval = phi1->DefinitionInterval();
-
 		function<double(double)> functionToIntegrate = [phi1, phi2](double t) {
 			return phi1->Eval(t)*phi2->Eval(t);
 		};
 
 		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree() + 2;
-		double factor = h / refInterval.Length;
-		return factor * Utils::Integral(nQuadPoints, functionToIntegrate, refInterval);
+		double factor = h / 2;
+		return factor * Utils::Integral(nQuadPoints, functionToIntegrate, -1,1);
 	}
 
 	double CouplingTerm(Face* face, Element* element1, IBasisFunction1D* phi1, Element* element2, IBasisFunction1D* phi2)
@@ -82,41 +80,27 @@ public:
 		double a = interval->A;
 		double b = interval->B;
 
-		DefInterval refInterval = phi->DefinitionInterval();
+		function<double(double)> sourceTimesBasisFunction = [this, phi, a, b](double t) {
+			return this->_sourceFunction((b - a) / 2 * t + (a + b) / 2) * phi->Eval(t);
+		};
 
-		function<double(double)> sourceTimesBasisFunction = NULL;
-		if (refInterval.Left == -1 && refInterval.Right == 1)
-		{
-			sourceTimesBasisFunction = [this, phi, a, b](double t) {
-				return this->_sourceFunction((b - a) / 2 * t + (a + b) / 2) * phi->Eval(t);
-			};
-		}
-		else
-		{
-			assert(false);
-			sourceTimesBasisFunction = [this, phi, a, b](double u) {
-				return this->_sourceFunction((b - a) * u + a) * phi->Eval(u);
-			};
-		}
-
-		double factor = (b - a) / refInterval.Length;
-		return  factor * Utils::Integral(sourceTimesBasisFunction, refInterval);
+		double factor = (b - a) / 2;
+		return  factor * Utils::Integral(sourceTimesBasisFunction, -1,1);
 	}
 
 	double MeanDerivative(Interval* element, IBasisFunction1D* phi, Face* interface)
 	{
-		DefInterval refInterval = phi->DefinitionInterval();
-		double t = interface == element->Left ? refInterval.Left : refInterval.Right; // t in [-1, 1]
+		double t = interface == element->Left ? -1 : 1; // t in [-1, 1]
 		double h = element->B - element->A;
 
 		double meanFactor = interface->IsDomainBoundary ? 1 : 0.5;
-		double jacobian = refInterval.Length / h;
+		double jacobian = 2 / h;
 		return meanFactor * jacobian * phi->EvalDerivative(t);
 	}
 
 	double Jump(Interval* element, IBasisFunction1D* phi, Face* point)
 	{
-		double t = point == element->Left ? phi->DefinitionInterval().Left : phi->DefinitionInterval().Right; // t in [-1, 1]
+		double t = point == element->Left ? -1 : 1; // t in [-1, 1]
 		int factor = point == element->Left ? 1 : -1;
 		return factor * (phi->Eval(t));
 	}

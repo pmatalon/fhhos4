@@ -18,9 +18,8 @@ public:
 			return InnerProduct(phi1->Grad(t, u, v), phi2->Grad(t, u, v));
 		};
 
-		DefInterval refInterval = phi1->DefinitionInterval();
 		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree();
-		double result = Utils::Integral(nQuadPoints, functionToIntegrate, refInterval, refInterval, refInterval);
+		double result = Utils::Integral(nQuadPoints, functionToIntegrate, -1,1, -1,1, -1,1);
 
 		this->_volumicTerms(phi1->LocalNumber, phi2->LocalNumber) = result;
 	}

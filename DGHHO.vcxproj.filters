@@ -105,9 +105,6 @@
     <ClInclude Include="Poisson_DG_ReferenceInterval.h">
       <Filter>DG</Filter>
     </ClInclude>
-    <ClInclude Include="DefInterval.h">
-      <Filter>Utils</Filter>
-    </ClInclude>
     <ClInclude Include="Poisson_DG_Element.h">
       <Filter>DG</Filter>
     </ClInclude>

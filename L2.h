@@ -28,27 +28,14 @@ public:
 			double x1 = interval->A;
 			double x2 = interval->B;
 
-			DefInterval refInterval = basis->GetLocalBasisFunction(interval, 0)->DefinitionInterval();
-
 			auto approximate = basis->GetApproximateFunction(solution, element->Number * basis->NumberOfLocalFunctionsInElement(element));
 
-			function<double(double)> errorFunction = NULL;
-			if (refInterval.Left == -1 && refInterval.Right == 1)
-			{
-				errorFunction = [exactSolution, approximate, x1, x2](double t) {
-					return pow(exactSolution((x2 - x1) / 2 * t + (x2 + x1) / 2) - approximate(t), 2);
-				};
-			}
-			else
-			{
-				assert(false);
-				errorFunction = [exactSolution, approximate, x1, x2](double t) {
-					return pow(exactSolution((x2 - x1) * t + x1) - approximate(t), 2);
-				};
-			}
+			function<double(double)> errorFunction = [exactSolution, approximate, x1, x2](double t) {
+				return pow(exactSolution((x2 - x1) / 2 * t + (x2 + x1) / 2) - approximate(t), 2);
+			};
 
-			double jacobian = (x2 - x1) / refInterval.Length;
-			absoluteError += jacobian * Utils::Integral(errorFunction, refInterval);
+			double jacobian = (x2 - x1) / 2;
+			absoluteError += jacobian * Utils::Integral(errorFunction, -1,1);
 
 			normExactSolution += Utils::Integral([exactSolution](double x) { return pow(exactSolution(x), 2); }, x1, x2);
 		}
@@ -74,27 +61,14 @@ public:
 			double y1 = square->Y;
 			double y2 = square->Y + square->Width;
 
-			DefInterval refInterval = basis->GetLocalBasisFunction(square, 0)->DefinitionInterval();
-
 			auto approximate = basis->GetApproximateFunction(solution, element->Number * basis->NumberOfLocalFunctionsInElement(element));
 
-			function<double(double, double)> errorFunction = NULL;
-			if (refInterval.Left == -1 && refInterval.Right == 1)
-			{
-				errorFunction = [exactSolution, approximate, x1, x2, y1, y2](double t, double u) {
-					return pow(exactSolution((x2 - x1) / 2 * t + (x2 + x1) / 2, (y2 - y1) / 2 * u + (y2 + y1) / 2) - approximate(t, u), 2);
-				};
-			}
-			else
-			{
-				assert(false);
-				errorFunction = [exactSolution, approximate, x1, x2, y1, y2](double t, double u) {
-					return pow(exactSolution((x2 - x1) * t + x1, (y2 - y1) * u + y1) - approximate(t, u), 2);
-				};
-			}
-
-			double jacobian = (x2 - x1) * (y2 - y1) / pow(refInterval.Length, 2);
-			absoluteError += jacobian * Utils::Integral(errorFunction, refInterval, refInterval);
+			function<double(double, double)> errorFunction = [exactSolution, approximate, x1, x2, y1, y2](double t, double u) {
+				return pow(exactSolution((x2 - x1) / 2 * t + (x2 + x1) / 2, (y2 - y1) / 2 * u + (y2 + y1) / 2) - approximate(t, u), 2);
+			};
+			
+			double jacobian = (x2 - x1) * (y2 - y1) / 4;
+			absoluteError += jacobian * Utils::Integral(errorFunction, -1,1, -1,1);
 
 			normExactSolution += Utils::Integral([exactSolution](double x, double y) { return pow(exactSolution(x, y), 2); }, x1, x2, y1, y2);
 		}
@@ -122,27 +96,14 @@ public:
 			double z1 = cube->Z;
 			double z2 = cube->Z + cube->Width;
 
-			DefInterval refInterval = basis->GetLocalBasisFunction(cube, 0)->DefinitionInterval();
-
 			auto approximate = basis->GetApproximateFunction(solution, element->Number * basis->NumberOfLocalFunctionsInElement(element));
 
-			function<double(double, double, double)> errorFunction = NULL;
-			if (refInterval.Left == -1 && refInterval.Right == 1)
-			{
-				errorFunction = [exactSolution, approximate, x1, x2, y1, y2, z1, z2](double t, double u, double v) {
-					return pow(exactSolution((x2 - x1) / 2 * t + (x2 + x1) / 2, (y2 - y1) / 2 * u + (y2 + y1) / 2, (z2 - z1) / 2 * v + (z2 + z1) / 2) - approximate(t, u, v), 2);
-				};
-			}
-			else
-			{
-				assert(false);
-				errorFunction = [exactSolution, approximate, x1, x2, y1, y2, z1, z2](double t, double u, double v) {
-					return pow(exactSolution((x2 - x1) * t + x1, (y2 - y1) * u + y1, (z2 - z1) * v + z1) - approximate(t, u, v), 2);
-				};
-			}
+			function<double(double, double, double)> errorFunction = [exactSolution, approximate, x1, x2, y1, y2, z1, z2](double t, double u, double v) {
+				return pow(exactSolution((x2 - x1) / 2 * t + (x2 + x1) / 2, (y2 - y1) / 2 * u + (y2 + y1) / 2, (z2 - z1) / 2 * v + (z2 + z1) / 2) - approximate(t, u, v), 2);
+			};
 
-			double jacobian = (x2 - x1) * (y2 - y1) * (z2 - z1) / pow(refInterval.Length, 3);
-			absoluteError += jacobian * Utils::Integral(errorFunction, refInterval, refInterval, refInterval);
+			double jacobian = (x2 - x1) * (y2 - y1) * (z2 - z1) / 8;
+			absoluteError += jacobian * Utils::Integral(errorFunction, -1,1, -1,1, -1,1);
 
 			normExactSolution += Utils::Integral([exactSolution](double x, double y, double z) { return pow(exactSolution(x, y, z), 2); }, x1, x2, y1, y2, z1, z2);
 		}

@@ -1,6 +1,5 @@
 #pragma once
 #include "IBasisFunction.h"
-#include "DefInterval.h"
 #include "Utils.h"
 #include "Bernstein1D.h"
 #include <math.h>
@@ -30,8 +29,6 @@ public:
 
 		this->_binomial = Utils::Factorial(this->_degree) / (Utils::Factorial(this->_degX) * Utils::Factorial(this->_degY) * Utils::Factorial(this->_degZ) * Utils::Factorial(this->_degMixed));
 	}
-
-	DefInterval DefinitionInterval() { return  DefInterval::MinusOne_One(); }
 
 	int GetDegree()
 	{

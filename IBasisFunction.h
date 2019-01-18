@@ -7,7 +7,7 @@ class BasisFunction
 public:
 	int LocalNumber = -1;
 	virtual int GetDegree() = 0;
-	virtual DefInterval DefinitionInterval() = 0;
+	//virtual DefInterval DefinitionInterval() = 0;
 	virtual string ToString() = 0;
 };
 

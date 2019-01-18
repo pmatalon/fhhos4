@@ -28,25 +28,13 @@ public:
 		double b = this->_grid->XRight(element);
 
 		int nQuadPoints = func1->GetDegree() + func2->GetDegree();
-		if (func1->DefinitionInterval().Left == -1 && func1->DefinitionInterval().Right == 1)
-		{
-			// defined on [-1, 1]
-			function<double(double)> functionToIntegrate = [func1, func2](double t) {
-				return func1->EvalDerivative(t)*func2->EvalDerivative(t);
-			};
+		// defined on [-1, 1]
+		function<double(double)> functionToIntegrate = [func1, func2](double t) {
+			return func1->EvalDerivative(t)*func2->EvalDerivative(t);
+		};
 
-			GaussLegendre gs(nQuadPoints);
-			return 2 / (b - a) * gs.Quadrature(functionToIntegrate);
-		}
-		else
-		{
-			function<double(double)> functionToIntegrate = [func1, func2](double u) {
-				//double u = 0.5 * t + 0.5;
-				return func1->EvalDerivative(u)*func2->EvalDerivative(u);
-			};
-
-			return 1 / (b - a) * Utils::Integral(nQuadPoints, functionToIntegrate, 0, 1);
-		}
+		GaussLegendre gs(nQuadPoints);
+		return 2 / (b - a) * gs.Quadrature(functionToIntegrate);
 	}
 
 	double MassTerm(BigNumber element, IBasisFunction1D* func1, IBasisFunction1D* func2)
@@ -56,24 +44,12 @@ public:
 
 		GaussLegendre gs(func1->GetDegree() + func2->GetDegree());
 
-		if (func1->DefinitionInterval().Left == -1 && func1->DefinitionInterval().Right == 1)
-		{
-			// defined on [-1, 1]
-			function<double(double)> functionToIntegrate = [func1, func2](double t) {
-				return func1->Eval(t)*func2->Eval(t);
-			};
+		// defined on [-1, 1]
+		function<double(double)> functionToIntegrate = [func1, func2](double t) {
+			return func1->Eval(t)*func2->Eval(t);
+		};
 
-			return (b - a) / 2 * gs.Quadrature(functionToIntegrate);
-		}
-		else
-		{
-			function<double(double)> functionToIntegrate = [func1, func2](double u) {
-				//double u = 0.5 * t + 0.5;
-				return func1->Eval(u)*func2->Eval(u);
-			};
-
-			return (b - a) * Utils::Integral(func1->GetDegree() + func2->GetDegree(), functionToIntegrate, 0, 1);
-		}
+		return (b - a) / 2 * gs.Quadrature(functionToIntegrate);
 	}
 
 	double CouplingTerm(BigNumber interface, BigNumber element1, IBasisFunction1D* func1, BigNumber element2, IBasisFunction1D* func2)
@@ -97,37 +73,22 @@ public:
 		double a = this->_grid->XLeft(element);
 		double b = this->_grid->XRight(element);
 
-		if (func->DefinitionInterval().Left == -1 && func->DefinitionInterval().Right == 1)
-		{
-			GaussLegendre gs;
+		GaussLegendre gs;
 
-			function<double(double)> sourceTimesBasisFunction = [this, func, a, b](double t) {
-				return this->_sourceFunction((b - a) / 2 * t + (a + b) / 2) * func->Eval(t);
-			};
+		function<double(double)> sourceTimesBasisFunction = [this, func, a, b](double t) {
+			return this->_sourceFunction((b - a) / 2 * t + (a + b) / 2) * func->Eval(t);
+		};
 
-			return (b - a) / 2 * gs.Quadrature(sourceTimesBasisFunction);
-		}
-		else
-		{
-			function<double(double)> sourceTimesBasisFunction = [this, func, a, b](double u) {
-				return this->_sourceFunction((b - a) * u + a) * func->Eval(u);
-			};
-
-			return  (b - a) * Utils::Integral(sourceTimesBasisFunction, 0, 1);
-		}
+		return (b - a) / 2 * gs.Quadrature(sourceTimesBasisFunction);
 	}
 
 	double MeanDerivative(BigNumber element, IBasisFunction1D* func, BigNumber interface)
 	{
-		double t = this->_grid->IsLeftInterface(element, interface) ? func->DefinitionInterval().Left : func->DefinitionInterval().Right; // t in [-1, 1]
+		double t = this->_grid->IsLeftInterface(element, interface) ? -1 : 1; // t in [-1, 1]
 		double a = this->_grid->XLeft(element);
 		double b = this->_grid->XRight(element);
 
-		double jacobian = 0;
-		if (func->DefinitionInterval().Left == -1 && func->DefinitionInterval().Right == 1)
-			jacobian = 2 / (b - a);
-		else
-			jacobian = 1 / (b - a);
+		double jacobian = 2 / (b - a);
 
 		if (this->_grid->IsBoundaryLeft(interface) || this->_grid->IsBoundaryRight(interface))
 			return jacobian * func->EvalDerivative(t);
@@ -136,7 +97,7 @@ public:
 
 	double Jump(BigNumber element, IBasisFunction1D* func, BigNumber interface)
 	{
-		double t = this->_grid->IsLeftInterface(element, interface) ? func->DefinitionInterval().Left : func->DefinitionInterval().Right; // t in [-1, 1]
+		double t = this->_grid->IsLeftInterface(element, interface) ? -1 : 1; // t in [-1, 1]
 		int factor = this->_grid->IsLeftInterface(element, interface) ? 1 : -1;
 		return factor * (func->Eval(t));
 	}

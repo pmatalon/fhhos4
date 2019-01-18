@@ -16,8 +16,7 @@ public:
 	double VolumicTerm(BasisFunction* phi1, BasisFunction* phi2, Poisson_DG_ReferenceElement* referenceElement)
 	{
 		double h = this->_cube->Width;
-		DefInterval refInterval = phi1->DefinitionInterval();
-		double factor = h / refInterval.Length;
+		double factor = h / 2;
 		return factor * referenceElement->VolumicTerm(phi1, phi2);
 	}
 };

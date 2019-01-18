@@ -21,8 +21,6 @@ public:
 		this->_funcY = funcY;
 	}
 
-	DefInterval DefinitionInterval() { return this->_funcX->DefinitionInterval(); }
-
 	int GetDegree()
 	{
 		return this->_funcX->GetDegree() + this->_funcY->GetDegree();
@@ -74,8 +72,6 @@ public:
 		this->_funcY = funcY;
 		this->_funcZ = funcZ;
 	}
-
-	DefInterval DefinitionInterval() { return this->_funcX->DefinitionInterval(); }
 
 	int GetDegree()
 	{

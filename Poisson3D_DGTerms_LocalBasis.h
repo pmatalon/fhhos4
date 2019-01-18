@@ -58,8 +58,6 @@ public:
 
 	double CouplingTerm(Face* face, Cube* element1, IBasisFunction3D* phi1, Cube* element2, IBasisFunction3D* phi2)
 	{
-		DefInterval refInterval = phi1->DefinitionInterval();
-
 		double h = element1->Width;
 
 		auto n1 = element1->OuterNormalVector(face);
@@ -72,8 +70,8 @@ public:
 		std::function<double(double, double)> functionToIntegrate;
 		if (face3D->IsInXOYPlan)
 		{
-			double v1 = face == element1->TopFace ? refInterval.Right : refInterval.Left;
-			double v2 = face == element2->TopFace ? refInterval.Right : refInterval.Left;
+			double v1 = face == element1->TopFace ? 1 : -1;
+			double v2 = face == element2->TopFace ? 1 : -1;
 
 			functionToIntegrate = [n1, n2, phi1, phi2, v1, v2](double t, double u) {
 				double meanGradPhi1_scal_jumpPhi2 = InnerProduct(phi1->Grad(t, u, v1), n2) * phi2->Eval(t, u, v2);
@@ -83,8 +81,8 @@ public:
 		}
 		else if (face3D->IsInXOZPlan)
 		{
-			double u1 = face == element1->BackFace ? refInterval.Right : refInterval.Left;
-			double u2 = face == element2->BackFace ? refInterval.Right : refInterval.Left;
+			double u1 = face == element1->BackFace ? 1 : -1;
+			double u2 = face == element2->BackFace ? 1 : -1;
 
 			functionToIntegrate = [n1, n2, phi1, phi2, u1, u2](double t, double v) {
 				double meanGradPhi1_scal_jumpPhi2 = InnerProduct(phi1->Grad(t, u1, v), n2) * phi2->Eval(t, u2, v);
@@ -94,8 +92,8 @@ public:
 		}
 		else if (face3D->IsInYOZPlan)
 		{
-			double t1 = face == element1->RightFace ? refInterval.Right : refInterval.Left;
-			double t2 = face == element2->RightFace ? refInterval.Right : refInterval.Left;
+			double t1 = face == element1->RightFace ? 1 : -1;
+			double t2 = face == element2->RightFace ? 1 : -1;
 
 			functionToIntegrate = [n1, n2, phi1, phi2, t1, t2](double u, double v) {
 				double meanGradPhi1_scal_jumpPhi2 = InnerProduct(phi1->Grad(t1, u, v), n2) * phi2->Eval(t2, u, v);
@@ -107,8 +105,8 @@ public:
 			return 0;
 
 		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree() + 1;
-		double factor = h / refInterval.Length;
-		return -meanFactor * factor * Utils::Integral(nQuadPoints, functionToIntegrate, refInterval, refInterval);
+		double factor = h / 2;
+		return -meanFactor * factor * Utils::Integral(nQuadPoints, functionToIntegrate, -1,1, -1,1);
 	}
 
 	double PenalizationTerm(Face* face, Element* element1, IBasisFunction3D* phi1, Element* element2, IBasisFunction3D* phi2, double penalizationCoefficient)
@@ -128,16 +126,14 @@ public:
 
 		assert(InnerProduct(n1, n2) == 1 || InnerProduct(n1, n2) == -1);
 
-		DefInterval refInterval = phi1->DefinitionInterval();
-
 		Face3D* face3D = (Face3D*)face;
 
 		function<double(double, double)> functionToIntegrate;
 
 		if (face3D->IsInXOYPlan)
 		{
-			double v1 = face == element1->TopFace ? refInterval.Right : refInterval.Left;
-			double v2 = face == element2->TopFace ? refInterval.Right : refInterval.Left;
+			double v1 = face == element1->TopFace ? 1 : -1;
+			double v2 = face == element2->TopFace ? 1 : -1;
 
 			functionToIntegrate = [phi1, phi2, n1, n2, v1, v2](double t, double u) {
 				return InnerProduct(n1, n2) * phi1->Eval(t, u, v1) * phi2->Eval(t, u, v2);
@@ -145,8 +141,8 @@ public:
 		}
 		else if (face3D->IsInXOZPlan)
 		{
-			double u1 = face == element1->BackFace ? refInterval.Right : refInterval.Left;
-			double u2 = face == element2->BackFace ? refInterval.Right : refInterval.Left;
+			double u1 = face == element1->BackFace ? 1 : -1;
+			double u2 = face == element2->BackFace ? 1 : -1;
 
 			functionToIntegrate = [phi1, phi2, n1, n2, u1, u2](double t, double v) {
 				return InnerProduct(n1, n2) * phi1->Eval(t, u1, v) * phi2->Eval(t, u2, v);
@@ -154,8 +150,8 @@ public:
 		}
 		else if (face3D->IsInYOZPlan)
 		{
-			double t1 = face == element1->RightFace ? refInterval.Right : refInterval.Left;
-			double t2 = face == element2->RightFace ? refInterval.Right : refInterval.Left;
+			double t1 = face == element1->RightFace ? 1 : -1;
+			double t2 = face == element2->RightFace ? 1 : -1;
 
 			functionToIntegrate = [phi1, phi2, n1, n2, t1, t2](double u, double v) {
 				return InnerProduct(n1, n2) * phi1->Eval(t1, u, v) * phi2->Eval(t2, u, v);
@@ -165,8 +161,8 @@ public:
 			assert(false);
 
 		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree() + 2;
-		double jacobian = pow(h / refInterval.Length, 2);
-		double integralJump1ScalarJump2 = jacobian * Utils::Integral(nQuadPoints, functionToIntegrate, refInterval, refInterval);
+		double jacobian = pow(h, 2) / 4;
+		double integralJump1ScalarJump2 = jacobian * Utils::Integral(nQuadPoints, functionToIntegrate, -1,1, -1,1);
 		return penalizationCoefficient * integralJump1ScalarJump2;
 	}
 
@@ -185,24 +181,12 @@ public:
 		double z1 = element->Z;
 		double z2 = element->Z + element->Width;
 
-		DefInterval refInterval = phi->DefinitionInterval();
+		function<double(double, double, double)> sourceTimesBasisFunction = [this, phi, x1, x2, y1, y2, z1, z2](double t, double u, double v) {
+			return this->_sourceFunction((x2 - x1) / 2 * t + (x2 + x1) / 2, (y2 - y1) / 2 * u + (y2 + y1) / 2, (z2 - z1) / 2 * v + (z2 + z1) / 2) * phi->Eval(t, u, v);
+		};
 
-		function<double(double, double, double)> sourceTimesBasisFunction = NULL;
-		if (refInterval.Left == -1 && refInterval.Right == 1)
-		{
-			sourceTimesBasisFunction = [this, phi, x1, x2, y1, y2, z1, z2](double t, double u, double v) {
-				return this->_sourceFunction((x2 - x1) / 2 * t + (x2 + x1) / 2, (y2 - y1) / 2 * u + (y2 + y1) / 2, (z2 - z1) / 2 * v + (z2 + z1) / 2) * phi->Eval(t, u, v);
-			};
-		}
-		else
-		{
-			sourceTimesBasisFunction = [this, phi, x1, x2, y1, y2, z1, z2](double t, double u, double v) {
-				return this->_sourceFunction((x2 - x1) * t + x1, (y2 - y1) * u + y1, (z2 - z1) * v + z1) * phi->Eval(t, u, v);
-			};
-		}
-
-		double jacobian = (x2 - x1) * (y2 - y1) * (z2 - z1) / pow(refInterval.Length, 3);
-		return jacobian * Utils::Integral(sourceTimesBasisFunction, refInterval, refInterval, refInterval);
+		double jacobian = (x2 - x1) * (y2 - y1) * (z2 - z1) / 8;
+		return jacobian * Utils::Integral(sourceTimesBasisFunction, -1,1, -1,1, -1,1);
 	}
 
 private:

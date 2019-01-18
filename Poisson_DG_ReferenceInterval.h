@@ -15,15 +15,12 @@ public:
 		IBasisFunction1D* phi1 = dynamic_cast<IBasisFunction1D*>(p_phi1);
 		IBasisFunction1D* phi2 = dynamic_cast<IBasisFunction1D*>(p_phi2);
 
-		DefInterval refInterval = phi1->DefinitionInterval();
-
 		function<double(double)> functionToIntegrate = [phi1, phi2](double t) {
 			return InnerProduct(phi1->Grad(t), phi2->Grad(t));
 		};
 		// Sans doute probleme ici pour Bernstein
 		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree();
-		double factor = refInterval.Length / 2;
-		double result = factor * Utils::Integral(nQuadPoints, functionToIntegrate, refInterval);
+		double result = Utils::Integral(nQuadPoints, functionToIntegrate, -1,1);
 
 		this->_volumicTerms(phi1->LocalNumber, phi2->LocalNumber) = result;
 	}

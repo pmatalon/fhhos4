@@ -27,8 +27,6 @@ public:
 		this->Normalized = normalized;
 	}
 
-	DefInterval DefinitionInterval() { return DefInterval::MinusOne_One(); }
-
 	int GetDegree()
 	{
 		return this->Degree;

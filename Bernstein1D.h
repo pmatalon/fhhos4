@@ -23,8 +23,6 @@ public:
 		this->_binomial = Utils::Binomial(degree, i);
 	}
 
-	DefInterval DefinitionInterval() { return DefInterval::MinusOne_One(); }
-
 	int GetDegree()
 	{
 		return this->_degree;

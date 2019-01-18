@@ -2,7 +2,6 @@
 #include <functional>
 #include <vector>
 #include "GaussLegendre.h"
-#include "DefInterval.h"
 
 typedef unsigned int BigNumber;
 
@@ -27,7 +26,7 @@ public:
 		return Integral(GaussLegendre::MAX_POINTS, func, x1, x2);
 	}
 
-	static double Integral(int nPoints, std::function<double(double)> func, DefInterval interval)
+	/*static double Integral(int nPoints, std::function<double(double)> func, DefInterval interval)
 	{
 		return Integral(nPoints, func, interval.Left, interval.Right);
 	}
@@ -35,7 +34,7 @@ public:
 	static double Integral(std::function<double(double)> func, DefInterval interval)
 	{
 		return Integral(func, interval.Left, interval.Right);
-	}
+	}*/
 
 	//-------------//
 	// Integral 2D //
@@ -56,7 +55,7 @@ public:
 		return Integral(GaussLegendre::MAX_POINTS, func, x1, x2, y1, y2);
 	}
 
-	static double Integral(int nPoints, std::function<double(double, double)> func, DefInterval xInterval, DefInterval yInterval)
+	/*static double Integral(int nPoints, std::function<double(double, double)> func, DefInterval xInterval, DefInterval yInterval)
 	{
 		return Integral(nPoints, func, xInterval.Left, xInterval.Right, yInterval.Left, yInterval.Right);
 	}
@@ -64,7 +63,7 @@ public:
 	static double Integral(std::function<double(double, double)> func, DefInterval xInterval, DefInterval yInterval)
 	{
 		return Integral(func, xInterval.Left, xInterval.Right, yInterval.Left, yInterval.Right);
-	}
+	}*/
 
 	//-------------//
 	// Integral 3D //
@@ -85,7 +84,7 @@ public:
 		return Integral(GaussLegendre::MAX_POINTS, func, x1, x2, y1, y2, z1, z2);
 	}
 
-	static double Integral(int nPoints, std::function<double(double, double, double)> func, DefInterval xInterval, DefInterval yInterval, DefInterval zInterval)
+	/*static double Integral(int nPoints, std::function<double(double, double, double)> func, DefInterval xInterval, DefInterval yInterval, DefInterval zInterval)
 	{
 		return Integral(nPoints, func, xInterval.Left, xInterval.Right, yInterval.Left, yInterval.Right, zInterval.Left, zInterval.Right);
 	}
@@ -93,7 +92,7 @@ public:
 	static double Integral(std::function<double(double, double, double)> func, DefInterval xInterval, DefInterval yInterval, DefInterval zInterval)
 	{
 		return Integral(func, xInterval.Left, xInterval.Right, yInterval.Left, yInterval.Right, zInterval.Left, zInterval.Right);
-	}
+	}*/
 
 	//----------------------//
 	// Binomial coefficient //

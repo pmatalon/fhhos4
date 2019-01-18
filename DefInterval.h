@@ -1,4 +1,4 @@
-#pragma once
+/*#pragma once
 class DefInterval
 {
 public:
@@ -14,4 +14,4 @@ private:
 		this->Right = right;
 		this->Length = right - left;
 	}
-};
+};*/

@@ -17,8 +17,6 @@ public:
 		this->Degree = degree;
 	}
 
-	DefInterval DefinitionInterval() { return DefInterval::MinusOne_One(); }
-
 	int GetDegree()
 	{
 		return this->Degree;
