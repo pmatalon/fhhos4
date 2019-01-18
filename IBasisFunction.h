@@ -30,7 +30,10 @@ public:
 	virtual double Eval(double x, double y) = 0;
 	virtual double EvalGradX(double x, double y) = 0;
 	virtual double EvalGradY(double x, double y) = 0;
-	virtual double* Grad(double x, double y) = 0;
+	double* Grad(double x, double y)
+	{
+		return new double[2]{ EvalGradX(x, y), EvalGradY(x, y) };
+	}
 };
 
 class IBasisFunction3D : public BasisFunction
@@ -40,5 +43,8 @@ public:
 	virtual double EvalGradX(double x, double y, double z) = 0;
 	virtual double EvalGradY(double x, double y, double z) = 0;
 	virtual double EvalGradZ(double x, double y, double z) = 0;
-	virtual double* Grad(double x, double y, double z) = 0;
+	double* Grad(double x, double y, double z)
+	{
+		return new double[3]{ EvalGradX(x, y, z), EvalGradY(x, y, z), EvalGradZ(x, y, z) };
+	}
 };

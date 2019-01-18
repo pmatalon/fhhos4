@@ -3,7 +3,6 @@
 #include "Monomial1D.h"
 #include "Legendre1D.h"
 #include "Bernstein1D.h"
-#include "Bernstein2_1D.h"
 using namespace std;
 
 class BasisFunctionFactory
@@ -17,8 +16,6 @@ public:
 			return new Legendre1D(i, false);
 		if (basisCode.compare(Bernstein1D::Code()) == 0)
 			return new Bernstein1D(maxPolynomialDegree, i);
-		if (basisCode.compare(Bernstein2_1D::Code()) == 0)
-			return new Bernstein2_1D(maxPolynomialDegree, i);
 
 		cout << "Basis '" << basisCode << "' not managed!";
 		exit(EXIT_FAILURE);

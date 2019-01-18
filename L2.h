@@ -41,6 +41,7 @@ public:
 			}
 			else
 			{
+				assert(false);
 				errorFunction = [exactSolution, approximate, x1, x2](double t) {
 					return pow(exactSolution((x2 - x1) * t + x1) - approximate(t), 2);
 				};
@@ -86,6 +87,7 @@ public:
 			}
 			else
 			{
+				assert(false);
 				errorFunction = [exactSolution, approximate, x1, x2, y1, y2](double t, double u) {
 					return pow(exactSolution((x2 - x1) * t + x1, (y2 - y1) * u + y1) - approximate(t, u), 2);
 				};
@@ -133,6 +135,7 @@ public:
 			}
 			else
 			{
+				assert(false);
 				errorFunction = [exactSolution, approximate, x1, x2, y1, y2, z1, z2](double t, double u, double v) {
 					return pow(exactSolution((x2 - x1) * t + x1, (y2 - y1) * u + y1, (z2 - z1) * v + z1) - approximate(t, u, v), 2);
 				};

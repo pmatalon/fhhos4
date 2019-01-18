@@ -93,6 +93,7 @@ public:
 		}
 		else
 		{
+			assert(false);
 			sourceTimesBasisFunction = [this, phi, a, b](double u) {
 				return this->_sourceFunction((b - a) * u + a) * phi->Eval(u);
 			};

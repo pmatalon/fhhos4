@@ -4,6 +4,8 @@
 #include "BasisFunctionFactory.h"
 #include "IBasisFunction.h"
 #include "TensorPolynomial.h"
+#include "Bernstein2D.h"
+#include "Bernstein3D.h"
 #include <Eigen/Sparse>
 
 //----------//
@@ -89,6 +91,7 @@ class FunctionalBasis2D : public FunctionalBasisWithObjects<IBasisFunction2D>
 private:
 	int _maxPolynomialDegree;
 	string _basisCode;
+	bool _fullTensorization;
 
 public:
 	FunctionalBasis2D(string basisCode, int maxPolynomialDegree, bool fullTensorization)
@@ -96,10 +99,10 @@ public:
 	{
 		this->_maxPolynomialDegree = maxPolynomialDegree;
 		this->_basisCode = basisCode;
+		this->_fullTensorization = fullTensorization;
 
 		int functionNumber = 0;
 
-		//if (BasisFunctionFactory::IsHierarchicalBasis(basisCode))
 		if (fullTensorization)
 		{
 			for (int j = 0; j <= maxPolynomialDegree; j++)
@@ -115,16 +118,30 @@ public:
 		}
 		else
 		{
-			for (int degree = 0; degree <= maxPolynomialDegree; degree++)
+			if (basisCode.compare(Bernstein2D::Code()) == 0)
 			{
-				for (int j = 0; j <= degree; j++)
+				for (int j = 0; j <= maxPolynomialDegree; j++)
 				{
-					int i = degree - j;
+					for (int i = 0; i <= maxPolynomialDegree - j; i++)
+					{
+						this->_localFunctions[functionNumber] = new Bernstein2D(functionNumber, maxPolynomialDegree, i, j);
+						functionNumber++;
+					}
+				}
+			}
+			else
+			{
+				for (int degree = 0; degree <= maxPolynomialDegree; degree++)
+				{
+					for (int j = 0; j <= degree; j++)
+					{
+						int i = degree - j;
 
-					IBasisFunction1D* polyX = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, i);
-					IBasisFunction1D* polyY = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, j);
-					this->_localFunctions[functionNumber] = new TensorPolynomial2D(functionNumber, polyX, polyY);
-					functionNumber++;
+						IBasisFunction1D* polyX = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, i);
+						IBasisFunction1D* polyY = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, j);
+						this->_localFunctions[functionNumber] = new TensorPolynomial2D(functionNumber, polyX, polyY);
+						functionNumber++;
+					}
 				}
 			}
 		}
@@ -137,7 +154,10 @@ public:
 
 	std::string Name()
 	{
-		return this->_basisCode + "_p" + std::to_string(this->_maxPolynomialDegree);
+		string name = this->_basisCode + "_p" + std::to_string(this->_maxPolynomialDegree);
+		if (this->_fullTensorization)
+			name += "_ft";
+		return name;
 	}
 
 	function<double(double, double)> GetApproximateFunction(const Eigen::VectorXd &solution, BigNumber startIndex)
@@ -164,6 +184,7 @@ class FunctionalBasis3D : public FunctionalBasisWithObjects<IBasisFunction3D>
 private:
 	int _maxPolynomialDegree;
 	string _basisCode;
+	bool _fullTensorization;
 
 public:
 	FunctionalBasis3D(string basisCode, int maxPolynomialDegree, bool fullTensorization)
@@ -171,6 +192,7 @@ public:
 	{
 		this->_maxPolynomialDegree = maxPolynomialDegree;
 		this->_basisCode = basisCode;
+		this->_fullTensorization = fullTensorization;
 
 		int functionNumber = 0;
 
@@ -193,19 +215,36 @@ public:
 		}
 		else
 		{
-			for (int degree = 0; degree <= maxPolynomialDegree; degree++)
+			if (basisCode.compare(Bernstein3D::Code()) == 0)
 			{
-				for (int degZ = 0; degZ <= degree; degZ++)
+				for (int degZ = 0; degZ <= maxPolynomialDegree; degZ++)
 				{
-					for (int degY = 0; degY <= degree - degZ; degY++)
+					for (int degY = 0; degY <= maxPolynomialDegree - degZ; degY++)
 					{
-						int degX = degree - degZ - degY;
+						for (int degX = 0; degX <= maxPolynomialDegree - degY - degZ; degX++)
+						{
+							this->_localFunctions[functionNumber] = new Bernstein3D(functionNumber, maxPolynomialDegree, degX, degY, degZ);
+							functionNumber++;
+						}
+					}
+				}
+			}
+			else
+			{
+				for (int degree = 0; degree <= maxPolynomialDegree; degree++)
+				{
+					for (int degZ = 0; degZ <= degree; degZ++)
+					{
+						for (int degY = 0; degY <= degree - degZ; degY++)
+						{
+							int degX = degree - degZ - degY;
 
-						IBasisFunction1D* polyX = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, degX);
-						IBasisFunction1D* polyY = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, degY);
-						IBasisFunction1D* polyZ = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, degZ);
-						this->_localFunctions[functionNumber] = new TensorPolynomial3D(functionNumber, polyX, polyY, polyZ);
-						functionNumber++;
+							IBasisFunction1D* polyX = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, degX);
+							IBasisFunction1D* polyY = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, degY);
+							IBasisFunction1D* polyZ = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, degZ);
+							this->_localFunctions[functionNumber] = new TensorPolynomial3D(functionNumber, polyX, polyY, polyZ);
+							functionNumber++;
+						}
 					}
 				}
 			}
@@ -219,7 +258,10 @@ public:
 
 	std::string Name()
 	{
-		return this->_basisCode + "_p" + std::to_string(this->_maxPolynomialDegree);
+		string name = this->_basisCode + "_p" + std::to_string(this->_maxPolynomialDegree);
+		if (this->_fullTensorization)
+			name += "_ft";
+		return name;
 	}
 
 	function<double(double, double, double)> GetApproximateFunction(const Eigen::VectorXd &solution, BigNumber startIndex)

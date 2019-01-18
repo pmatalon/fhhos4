@@ -43,11 +43,6 @@ public:
 		return this->_funcX->Eval(x) * this->_funcY->EvalDerivative(y);
 	}
 
-	double* Grad(double x, double y)
-	{
-		return new double[2]{ EvalGradX(x, y), EvalGradY(x, y) };
-	}
-
 	string ToString()
 	{
 		string polyX = this->_funcX->ToString("X");
@@ -105,11 +100,6 @@ public:
 	double EvalGradZ(double x, double y, double z)
 	{
 		return this->_funcX->Eval(x) * this->_funcY->Eval(y) * this->_funcZ->EvalDerivative(z);
-	}
-
-	double* Grad(double x, double y, double z)
-	{
-		return new double[3]{ EvalGradX(x, y, z), EvalGradY(x, y, z), EvalGradZ(x, y, z) };
 	}
 
 	string ToString()

@@ -85,12 +85,16 @@
     <IncludePath>C:\Users\pierr\Documents\Source\Repos\DGHHO\DGHHO\eigen-eigen-b3f3d4950030;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\asm-generic;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\c++\5;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\c++\5\backward;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\c++\5\bits;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\c++\5\debug;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\c++\5\ext;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\linux;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\x86_64-linux-gnu\asm;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\x86_64-linux-gnu\bits;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\x86_64-linux-gnu\c++\5\bits;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\x86_64-linux-gnu\c++\5;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\x86_64-linux-gnu\sys;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\x86_64-linux-gnu\gnu;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\lib\gcc\x86_64-linux-gnu\5\include;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\lib\gcc\x86_64-linux-gnu\5\include-fixed;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemGroup>
+    <ClCompile Include="Bernstein2D.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BasisFunctionFactory.h" />
+    <ClInclude Include="Bernstein2D.h" />
     <ClInclude Include="Bernstein2_1D.h" />
+    <ClInclude Include="Bernstein1D_OLD.h" />
     <ClInclude Include="Bernstein1D.h" />
+    <ClInclude Include="Bernstein3D.h" />
     <ClInclude Include="CartesianGrid1D.h" />
     <ClInclude Include="CartesianGrid3D.h" />
     <ClInclude Include="Cube.h" />

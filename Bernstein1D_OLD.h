@@ -6,7 +6,7 @@
 #include <assert.h>
 using namespace std;
 
-class Bernstein1D : public IBasisFunction1D
+class Bernstein1D_OLD : public IBasisFunction1D
 {
 private:
 	int _degree;
@@ -15,7 +15,7 @@ private:
 public:
 	static string Code() { return "bernstein"; };
 
-	Bernstein1D(int degree, int i)
+	Bernstein1D_OLD(int degree, int i)
 	{
 		this->LocalNumber = i;
 		this->_degree = degree;
@@ -23,7 +23,7 @@ public:
 		this->_binomial = Utils::Binomial(degree, i);
 	}
 
-	DefInterval DefinitionInterval() { return DefInterval::MinusOne_One(); }
+	DefInterval DefinitionInterval() { return DefInterval::Zero_One(); }
 
 	int GetDegree()
 	{
@@ -32,15 +32,14 @@ public:
 
 	double Eval(double x)
 	{
-		assert(x >= -1 && x <= 1);
-		// Bernstein on [-1,1]: change of variable
-		return Bernstein(0.5*x + 0.5);
+		assert(x >= 0 && x <= 1);
+		return Bernstein(x);
 	}
 
 	double EvalDerivative(double x)
 	{
-		assert(x >= -1 && x <= 1);
-		return 0.5 * DBernstein(0.5*x + 0.5);
+		assert(x >= 0 && x <= 1);
+		return DBernstein(x);
 	}
 
 	string ToString()
@@ -64,13 +63,12 @@ public:
 		if (secondTerm.empty())
 			return binomial + firstTerm;
 		return binomial + firstTerm + " * " + secondTerm;
+		//return binomial + var + "^" + to_string(this->_i) + " * (1-" + var + ")^" + to_string(this->_degree - this->_i);
 	}
 
 private:
-	// Bernstein polynomial on [0,1]
 	double Bernstein(double x)
 	{
-		assert(x >= 0 && x <= 1);
 		int n = this->_degree;
 		int i = this->_i;
 		return this->_binomial * pow(x, i) * pow(1 - x, n - i);
@@ -78,7 +76,6 @@ private:
 
 	double DBernstein(double x)
 	{
-		assert(x >= 0 && x <= 1);
 		int n = this->_degree;
 		int i = this->_i;
 		if (n == 0)
@@ -88,6 +85,6 @@ private:
 		else if (n - i == 0)
 			return this->_binomial * i * pow(x, i - 1);
 		else
-			return this->_binomial * (i*pow(x, i - 1)*pow(1 - x, n - i) - (n - i)*pow(x, i)*pow(1 - x, n - i - 1));
+			return this->_binomial * (i*pow(x, i - 1)*pow(1 - x, n - i) - (n-i)*pow(x, i)*pow(1 - x, n - i - 1));
 	}
 };
