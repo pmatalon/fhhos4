@@ -10,14 +10,14 @@
 #include "Square.h"
 using namespace std;
 
-class Poisson2D_DGTerms_LocalBasis : public IPoisson_DGTerms<IBasisFunction2D>
+class Poisson2D_DGTerms_LocalBasis : public IPoisson_DGTerms
 {
 protected:
 	//function<double(double, double)> _sourceFunction;
 
 public:
 	Poisson2D_DGTerms_LocalBasis(function<double(double, double)> sourceFunction, FunctionalBasis2D* basis)
-		: IPoisson_DGTerms<IBasisFunction2D>(new SourceFunction2D(sourceFunction))
+		: IPoisson_DGTerms(new SourceFunction2D(sourceFunction))
 	{
 		//this->_sourceFunction = sourceFunction;
 		Poisson_DG_ReferenceElement* refSquare = new Poisson_DG_ReferenceSquare(basis->NumberOfLocalFunctionsInElement(NULL));

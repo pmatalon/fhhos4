@@ -9,14 +9,14 @@
 #include "Square.h"
 using namespace std;
 
-class Poisson2D_DGTerms_GlobalBasis : public IPoisson_DGTerms<IBasisFunction2D>
+class Poisson2D_DGTerms_GlobalBasis : public IPoisson_DGTerms
 {
 protected:
 	function<double(double, double)> _sourceFunction;
 
 public:
 	Poisson2D_DGTerms_GlobalBasis(function<double(double, double)> sourceFunction)
-		: IPoisson_DGTerms<IBasisFunction2D>(new SourceFunction2D(sourceFunction))
+		: IPoisson_DGTerms(new SourceFunction2D(sourceFunction))
 	{
 		this->_sourceFunction = sourceFunction;
 	}

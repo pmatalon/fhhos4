@@ -72,6 +72,8 @@ int main(int argc, char* argv[])
 	print_usage(solution, dimension, n, basisCode, polyDegree, fullTensorization, penalizationCoefficient, outputDirectory);
 
 	IMesh* mesh;
+	Poisson* problem;
+	IPoisson_DGTerms* dg;
 
 	if (dimension == 1)
 	{
@@ -87,13 +89,13 @@ int main(int argc, char* argv[])
 		}
 
 		//Poisson1D* problem = new Poisson1D(solution, sourceFunction);
-		Poisson<IBasisFunction1D>* problem = new Poisson<IBasisFunction1D>(solution);
+		problem = new Poisson(solution);
 
 		//FunctionalBasisWithNumbers* basis = new FunctionalBasis1DOLD(basisCode, polyDegree);
 		FunctionalBasis1D* basis = new FunctionalBasis1D(basisCode, polyDegree);
 
 		//IPoisson1D_DGTerms* dg = new Poisson1D_DGTerms_LocalBasisOLD(mesh, sourceFunction);
-		IPoisson_DGTerms<IBasisFunction1D>* dg = new Poisson1D_DGTerms_LocalBasis(sourceFunction, basis);
+		dg = new Poisson1D_DGTerms_LocalBasis(sourceFunction, basis);
 
 		/*if (basisCode.compare("monomials") == 0)
 			basis = new MonomialBasis1D(polyDegree);
@@ -120,7 +122,6 @@ int main(int argc, char* argv[])
 		double error = L2::Error(mesh, basis, problem->Solution, exactSolution);
 		cout << "L2 Error = " << error << endl;
 
-		delete problem;
 		delete basis;
 	}
 	else if (dimension == 2)
@@ -134,11 +135,11 @@ int main(int argc, char* argv[])
 			exactSolution = [](double x, double y) { return x*(1 - x) * y*(1 - y); };
 			sourceFunction = [](double x, double y) { return 2 * y*(1 - y) + 2 * x*(1 - x); };
 		}
-		Poisson<IBasisFunction2D>* problem = new Poisson<IBasisFunction2D>(solution);
+		problem = new Poisson(solution);
 
 		FunctionalBasis2D* basis = new FunctionalBasis2D(basisCode, polyDegree, fullTensorization);
 
-		IPoisson_DGTerms<IBasisFunction2D>* dg = new Poisson2D_DGTerms_LocalBasis(sourceFunction, basis);
+		dg = new Poisson2D_DGTerms_LocalBasis(sourceFunction, basis);
 
 		problem->DiscretizeDG(mesh, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents);
 
@@ -146,7 +147,6 @@ int main(int argc, char* argv[])
 		double error = L2::Error(mesh, basis, problem->Solution, exactSolution);
 		cout << "L2 Error = " << error << endl;
 
-		delete problem;
 		delete basis;
 	}
 	else if (dimension == 3)
@@ -161,11 +161,11 @@ int main(int argc, char* argv[])
 			sourceFunction = [](double x, double y, double z) { return 2 * (y*(1 - y)*z*(1 - z) + x * (1 - x)*z*(1 - z) + x * (1 - x)*y*(1 - y)); };
 		}
 
-		Poisson<IBasisFunction3D>* problem = new Poisson<IBasisFunction3D>(solution);
+		problem = new Poisson(solution);
 
 		FunctionalBasis3D* basis = new FunctionalBasis3D(basisCode, polyDegree, fullTensorization);
 
-		IPoisson_DGTerms<IBasisFunction3D>* dg = new Poisson3D_DGTerms_LocalBasis(sourceFunction, basis);
+		dg = new Poisson3D_DGTerms_LocalBasis(sourceFunction, basis);
 
 		problem->DiscretizeDG(mesh, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents);
 
@@ -173,7 +173,6 @@ int main(int argc, char* argv[])
 		double error = L2::Error(mesh, basis, problem->Solution, exactSolution);
 		cout << "L2 Error = " << error << endl;
 
-		delete problem;
 		delete basis;
 	}
 	else
@@ -181,6 +180,8 @@ int main(int argc, char* argv[])
 		cout << "Dimension " << dimension << ", are you kidding?!";
 		exit(EXIT_FAILURE);
 	}
+	delete dg;
+	delete problem;
 	delete mesh;
 
 	cout << "-------------------------- DONE ------------------------" << endl;

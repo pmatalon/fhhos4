@@ -7,7 +7,6 @@
 #include "Poisson_DG_Element.h"
 #include "Poisson_DG_Face.h"
 
-template <class IBasisFunction>
 class IPoisson_DGTerms
 {
 private:
@@ -54,16 +53,12 @@ public:
 
 protected:
 
-	void ComputeVolumicTerms(FunctionalBasisWithObjects<IBasisFunction>* basis, Poisson_DG_ReferenceElement* element)
+	void ComputeVolumicTerms(FunctionalBasisWithObjects* basis, Poisson_DG_ReferenceElement* element)
 	{
-		for (int localFunctionNumber1 = 0; localFunctionNumber1 < basis->NumberOfLocalFunctionsInElement(NULL); localFunctionNumber1++)
+		for (BasisFunction* phi1 : basis->LocalFunctions)
 		{
-			BasisFunction* phi1 = basis->GetLocalBasisFunction(NULL, localFunctionNumber1);
-			for (int localFunctionNumber2 = 0; localFunctionNumber2 < basis->NumberOfLocalFunctionsInElement(NULL); localFunctionNumber2++)
-			{
-				BasisFunction* phi2 = basis->GetLocalBasisFunction(NULL, localFunctionNumber2);
+			for (BasisFunction* phi2 : basis->LocalFunctions)
 				element->ComputeVolumicTerm(phi1, phi2);
-			}
 		}
 	}
 };

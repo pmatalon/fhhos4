@@ -11,7 +11,6 @@
 #include "L2.h"
 using namespace std;
 
-template <class IBasisFunction>
 class Poisson : public Problem
 {
 private:
@@ -21,7 +20,7 @@ public:
 	Poisson(string solutionName) : Problem(solutionName)
 	{	}
 
-	void DiscretizeDG(IMesh* mesh, FunctionalBasisWithObjects<IBasisFunction>* basis, IPoisson_DGTerms<IBasisFunction>* dg, int penalizationCoefficient, string outputDirectory, bool extractMatrixComponents)
+	void DiscretizeDG(IMesh* mesh, FunctionalBasisWithObjects* basis, IPoisson_DGTerms* dg, int penalizationCoefficient, string outputDirectory, bool extractMatrixComponents)
 	{
 		bool autoPenalization = penalizationCoefficient == -1;
 		if (autoPenalization)
@@ -32,11 +31,8 @@ public:
 		cout << "\tBasis of polynomials: " << (dg->IsGlobalBasis() ? "global" : "") + basis->Name() << endl;
 		
 		cout << "Local functions: " << basis->NumberOfLocalFunctionsInElement(NULL) << endl;
-		for (int localFunctionNumber = 0; localFunctionNumber < basis->NumberOfLocalFunctionsInElement(NULL); localFunctionNumber++)
-		{
-			IBasisFunction* localFunction = basis->GetLocalBasisFunction(NULL, localFunctionNumber);
-			cout << "\t " << localFunction->ToString() << endl;
-		}
+		for (BasisFunction* phi : basis->LocalFunctions)
+			cout << "\t " << phi->ToString() << endl;
 		BigNumber nUnknowns = static_cast<int>(mesh->Elements.size()) * basis->NumberOfLocalFunctionsInElement(NULL);
 		cout << "Unknowns: " << nUnknowns << endl;
 
@@ -63,16 +59,14 @@ public:
 		{
 			//cout << "Element " << element->Number << endl;
 
-			for (int localFunctionNumber1 = 0; localFunctionNumber1 < basis->NumberOfLocalFunctionsInElement(element); localFunctionNumber1++)
+			for (BasisFunction* phi1 : basis->LocalFunctions)
 			{
-				IBasisFunction* phi1 = basis->GetLocalBasisFunction(element, localFunctionNumber1);
-				BigNumber basisFunction1 = basis->GlobalFunctionNumber(element, localFunctionNumber1);
+				BigNumber basisFunction1 = basis->GlobalFunctionNumber(element, phi1);
 
 				// Current element (block diagonal)
-				for (int localFunctionNumber2 = 0; localFunctionNumber2 < basis->NumberOfLocalFunctionsInElement(element); localFunctionNumber2++)
+				for (BasisFunction* phi2 : basis->LocalFunctions)
 				{
-					IBasisFunction* phi2 = basis->GetLocalBasisFunction(element, localFunctionNumber2);
-					BigNumber basisFunction2 = basis->GlobalFunctionNumber(element, localFunctionNumber2);
+					BigNumber basisFunction2 = basis->GlobalFunctionNumber(element, phi2);
 
 					//cout << "\t phi" << phi1->LocalNumber << " = " << phi1->ToString() << " phi" << phi2->LocalNumber << " = " << phi2->ToString() << endl;
 
@@ -115,14 +109,12 @@ public:
 			if (face->IsDomainBoundary)
 				continue;
 
-			for (int localFunctionNumber1 = 0; localFunctionNumber1 < basis->NumberOfLocalFunctionsInElement(face->Element1); localFunctionNumber1++)
+			for (BasisFunction* phi1 : basis->LocalFunctions)
 			{
-				IBasisFunction* phi1 = basis->GetLocalBasisFunction(face->Element1, localFunctionNumber1);
-				BigNumber basisFunction1 = basis->GlobalFunctionNumber(face->Element1, localFunctionNumber1);
-				for (int localFunctionNumber2 = 0; localFunctionNumber2 < basis->NumberOfLocalFunctionsInElement(face->Element2); localFunctionNumber2++)
+				BigNumber basisFunction1 = basis->GlobalFunctionNumber(face->Element1, phi1);
+				for (BasisFunction* phi2 : basis->LocalFunctions)
 				{
-					IBasisFunction* phi2 = basis->GetLocalBasisFunction(face->Element2, localFunctionNumber2);
-					BigNumber basisFunction2 = basis->GlobalFunctionNumber(face->Element2, localFunctionNumber2);
+					BigNumber basisFunction2 = basis->GlobalFunctionNumber(face->Element2, phi2);
 					double coupling = dg->CouplingTerm(face, face->Element1, phi1, face->Element2, phi2);
 					double penalization = dg->PenalizationTerm(face, face->Element1, phi1, face->Element2, phi2, penalizationCoefficient);
 					

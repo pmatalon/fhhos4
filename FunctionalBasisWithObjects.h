@@ -4,32 +4,24 @@
 #include <map>
 #include "Element.h"
 #include "Face.h"
+#include "IBasisFunction.h"
 
-template <class IBasisFunction>
 class FunctionalBasisWithObjects
 {
-protected:
-	map<int, IBasisFunction*> _localFunctions;
-	//vector<IBasisFunction*> _localFunctions;
-
 public:
+	vector<BasisFunction*> LocalFunctions;
 	virtual std::string Name() = 0;
 
 	virtual int GetDegree() = 0;
 
 	int NumberOfLocalFunctionsInElement(Element* element)
 	{
-		return static_cast<int>(this->_localFunctions.size());
+		return static_cast<int>(this->LocalFunctions.size());
 	}
 
-	IBasisFunction* GetLocalBasisFunction(Element* element, int localFunctionNumber)
+	BigNumber GlobalFunctionNumber(Element* element, BasisFunction* phi)
 	{
-		return this->_localFunctions[localFunctionNumber];
-	}
-
-	BigNumber GlobalFunctionNumber(Element* element, int localFunctionNumber)
-	{
-		return element->Number * static_cast<int>(this->_localFunctions.size()) + localFunctionNumber; // the numbers start at 0
+		return element->Number * static_cast<int>(this->LocalFunctions.size()) + phi->LocalNumber; // the numbers start at 0
 	}
 
 	virtual ~FunctionalBasisWithObjects() {}

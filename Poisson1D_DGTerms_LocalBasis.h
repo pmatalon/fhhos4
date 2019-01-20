@@ -8,14 +8,14 @@
 #include "Poisson_DG_ReferenceInterval.h"
 using namespace std;
 
-class Poisson1D_DGTerms_LocalBasis : public IPoisson_DGTerms<IBasisFunction1D>
+class Poisson1D_DGTerms_LocalBasis : public IPoisson_DGTerms
 {
 protected:
 	//function<double(double)> _sourceFunction;
 
 public:
 	Poisson1D_DGTerms_LocalBasis(function<double(double)> sourceFunction, FunctionalBasis1D* basis) 
-		: IPoisson_DGTerms<IBasisFunction1D>(new SourceFunction1D(sourceFunction))
+		: IPoisson_DGTerms(new SourceFunction1D(sourceFunction))
 	{
 		//this->_sourceFunction = sourceFunction;
 		Poisson_DG_ReferenceElement* refInterval = new Poisson_DG_ReferenceInterval(basis->NumberOfLocalFunctionsInElement(NULL));

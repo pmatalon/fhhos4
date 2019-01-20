@@ -10,14 +10,14 @@
 #include "Poisson_DG_ReferenceCube.h"
 using namespace std;
 
-class Poisson3D_DGTerms_LocalBasis : public IPoisson_DGTerms<IBasisFunction3D>
+class Poisson3D_DGTerms_LocalBasis : public IPoisson_DGTerms
 {
 protected:
 	//function<double(double, double, double)> _sourceFunction;
 
 public:
 	Poisson3D_DGTerms_LocalBasis(function<double(double, double, double)> sourceFunction, FunctionalBasis3D* basis)
-		: IPoisson_DGTerms<IBasisFunction3D>(new SourceFunction3D(sourceFunction))
+		: IPoisson_DGTerms(new SourceFunction3D(sourceFunction))
 	{
 		//this->_sourceFunction = sourceFunction;
 		Poisson_DG_ReferenceElement* refCube = new Poisson_DG_ReferenceCube(basis->NumberOfLocalFunctionsInElement(NULL));

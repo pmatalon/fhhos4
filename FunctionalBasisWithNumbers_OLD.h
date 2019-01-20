@@ -6,7 +6,7 @@
 class FunctionalBasisWithNumbers
 {
 protected:
-	std::map<int, IBasisFunction1D*> _localFunctions;
+	std::map<int, IBasisFunction1D*> LocalFunctions;
 
 public:
 	virtual std::string Name() = 0;
@@ -15,12 +15,12 @@ public:
 
 	int NumberOfLocalFunctionsInElement(BigNumber element)
 	{
-		return static_cast<int>(this->_localFunctions.size());
+		return static_cast<int>(this->LocalFunctions.size());
 	}
 
 	IBasisFunction1D* GetLocalBasisFunction(BigNumber element, int localFunctionNumber)
 	{
-		return this->_localFunctions[localFunctionNumber];
+		return this->LocalFunctions[localFunctionNumber];
 	}
 
 	BigNumber GlobalFunctionNumber(BigNumber element, int localFunctionNumber)
