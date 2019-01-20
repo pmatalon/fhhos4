@@ -1,4 +1,4 @@
-#pragma once
+/*#pragma once
 #include "Poisson_DG_Element.h"
 #include "Interval.h"
 #include "IBasisFunction.h"
@@ -19,11 +19,4 @@ public:
 		double factor = 2 / h;
 		return factor * referenceElement->VolumicTerm(phi1, phi2);
 	}
-
-	/*double RightHandSide(BasisFunction* phi)
-	{
-		double h = this->_interval->B - this->_interval->A;
-		DefInterval refInterval = phi->DefinitionInterval();
-		double factor = h / refInterval.Length;
-	}*/
-};
+};*/

@@ -13,8 +13,7 @@ public:
 
 	double VolumicTerm(BasisFunction* phi1, BasisFunction* phi2)
 	{
-		double result = _volumicTerms(phi1->LocalNumber, phi2->LocalNumber);
-		return result;
+		return this->_volumicTerms(phi1->LocalNumber, phi2->LocalNumber);
 	}
 
 	virtual void ComputeVolumicTerm(BasisFunction* phi1, BasisFunction* phi2) = 0;

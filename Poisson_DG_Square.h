@@ -1,4 +1,4 @@
-#pragma once
+/*#pragma once
 #include "Poisson_DG_Element.h"
 #include "Square.h"
 #include "IBasisFunction.h"
@@ -17,4 +17,4 @@ public:
 	{
 		return referenceElement->VolumicTerm(phi1, phi2);
 	}
-};
+};*/

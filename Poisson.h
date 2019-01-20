@@ -59,33 +59,33 @@ public:
 		// Iteration on the elements: diagonal blocks //
 		//--------------------------------------------//
 
-		for (Element* element : mesh->Elements)
+		for (auto element : mesh->Elements)
 		{
 			//cout << "Element " << element->Number << endl;
 			vector<Face*> elementInterfaces = element->Faces;
 
 			for (int localFunctionNumber1 = 0; localFunctionNumber1 < basis->NumberOfLocalFunctionsInElement(element); localFunctionNumber1++)
 			{
-				IBasisFunction* localFunction1 = basis->GetLocalBasisFunction(element, localFunctionNumber1);
+				IBasisFunction* phi1 = basis->GetLocalBasisFunction(element, localFunctionNumber1);
 				BigNumber basisFunction1 = basis->GlobalFunctionNumber(element, localFunctionNumber1);
 
 				// Current element (block diagonal)
 				for (int localFunctionNumber2 = 0; localFunctionNumber2 < basis->NumberOfLocalFunctionsInElement(element); localFunctionNumber2++)
 				{
-					IBasisFunction* localFunction2 = basis->GetLocalBasisFunction(element, localFunctionNumber2);
+					IBasisFunction* phi2 = basis->GetLocalBasisFunction(element, localFunctionNumber2);
 					BigNumber basisFunction2 = basis->GlobalFunctionNumber(element, localFunctionNumber2);
 
-					//cout << "\t phi1 = " << localFunction1->ToString() << " phi2 = " << localFunction2->ToString() << endl;
+					//cout << "\t phi" << phi1->LocalNumber << " = " << phi1->ToString() << " phi" << phi2->LocalNumber << " = " << phi2->ToString() << endl;
 
-					double volumicTerm = dg->VolumicTerm(element, localFunction1, localFunction2);
+					double volumicTerm = dg->VolumicTerm(element, phi1, phi2);
 					//cout << "\t\t volumic = " << volumicTerm << endl;
 					
 					double coupling = 0;
 					double penalization = 0;
 					for (Face* elemInterface : elementInterfaces)
 					{
-						double c = dg->CouplingTerm(elemInterface, element, localFunction1, element, localFunction2);
-						double p = dg->PenalizationTerm(elemInterface, element, localFunction1, element, localFunction2, penalizationCoefficient);
+						double c = dg->CouplingTerm(elemInterface, element, phi1, element, phi2);
+						double p = dg->PenalizationTerm(elemInterface, element, phi1, element, phi2, penalizationCoefficient);
 						coupling += c;
 						penalization += p;
 						//cout << "\t\t " << elemInterface->ToString() << ":\t c=" << c << "\tp=" << p << endl;
@@ -102,7 +102,7 @@ public:
 					matrixCoeffs.Add(basisFunction1, basisFunction2, volumicTerm + coupling + penalization);
 				}
 
-				double rhs = dg->RightHandSide(element, localFunction1);
+				double rhs = dg->RightHandSide(element, phi1);
 				this->b(basisFunction1) = rhs;
 			}
 		}
@@ -111,21 +111,21 @@ public:
 		// Iteration on the interfaces: off-diagonal blocks //
 		//--------------------------------------------------//
 
-		for (Face* face : mesh->Faces)
+		for (auto face : mesh->Faces)
 		{
 			if (face->IsDomainBoundary)
 				continue;
 
 			for (int localFunctionNumber1 = 0; localFunctionNumber1 < basis->NumberOfLocalFunctionsInElement(face->Element1); localFunctionNumber1++)
 			{
-				IBasisFunction* localFunction1 = basis->GetLocalBasisFunction(face->Element1, localFunctionNumber1);
+				IBasisFunction* phi1 = basis->GetLocalBasisFunction(face->Element1, localFunctionNumber1);
 				BigNumber basisFunction1 = basis->GlobalFunctionNumber(face->Element1, localFunctionNumber1);
 				for (int localFunctionNumber2 = 0; localFunctionNumber2 < basis->NumberOfLocalFunctionsInElement(face->Element2); localFunctionNumber2++)
 				{
-					IBasisFunction* localFunction2 = basis->GetLocalBasisFunction(face->Element2, localFunctionNumber2);
+					IBasisFunction* phi2 = basis->GetLocalBasisFunction(face->Element2, localFunctionNumber2);
 					BigNumber basisFunction2 = basis->GlobalFunctionNumber(face->Element2, localFunctionNumber2);
-					double coupling = dg->CouplingTerm(face, face->Element1, localFunction1, face->Element2, localFunction2);
-					double penalization = dg->PenalizationTerm(face, face->Element1, localFunction1, face->Element2, localFunction2, penalizationCoefficient);
+					double coupling = dg->CouplingTerm(face, face->Element1, phi1, face->Element2, phi2);
+					double penalization = dg->PenalizationTerm(face, face->Element1, phi1, face->Element2, phi2, penalizationCoefficient);
 					
 					if (extractMatrixComponents)
 					{

@@ -85,7 +85,6 @@
     <IncludePath>C:\Users\pierr\Documents\Source\Repos\DGHHO\DGHHO\eigen-eigen-b3f3d4950030;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\asm-generic;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\c++\5;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\c++\5\backward;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\c++\5\bits;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\c++\5\debug;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\c++\5\ext;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\linux;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\x86_64-linux-gnu\asm;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\x86_64-linux-gnu\bits;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\x86_64-linux-gnu\c++\5\bits;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\x86_64-linux-gnu\c++\5;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\x86_64-linux-gnu\sys;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\x86_64-linux-gnu\gnu;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\lib\gcc\x86_64-linux-gnu\5\include;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\lib\gcc\x86_64-linux-gnu\5\include-fixed;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemGroup>
-    <ClCompile Include="Bernstein2D.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -98,15 +97,11 @@
     <ClInclude Include="CartesianGrid1D.h" />
     <ClInclude Include="CartesianGrid3D.h" />
     <ClInclude Include="Cube.h" />
-    <ClInclude Include="Poisson_DG_Cube.h" />
+    <ClInclude Include="Point.h" />
     <ClInclude Include="Poisson_DG_Element.h" />
     <ClInclude Include="Poisson_DG_Face.h" />
-    <ClInclude Include="Poisson_DG_Face2D.h" />
-    <ClInclude Include="Poisson_DG_Interval.h" />
     <ClInclude Include="Poisson_DG_ReferenceCube.h" />
     <ClInclude Include="Poisson_DG_ReferenceElement.h" />
-    <ClInclude Include="Poisson_DG_ReferenceFace.h" />
-    <ClInclude Include="Poisson_DG_ReferenceFace2D.h" />
     <ClInclude Include="Poisson_DG_ReferenceInterval.h" />
     <ClInclude Include="Face1D.h" />
     <ClInclude Include="Face3D.h" />
@@ -139,7 +134,6 @@
     <ClInclude Include="Poisson3D_DGTerms_LocalBasis.h" />
     <ClInclude Include="PoissonHHO.h" />
     <ClInclude Include="Poisson_DG_ReferenceSquare.h" />
-    <ClInclude Include="Poisson_DG_Square.h" />
     <ClInclude Include="Problem.h" />
     <ClInclude Include="Square.h" />
     <ClInclude Include="TensorPolynomial.h" />

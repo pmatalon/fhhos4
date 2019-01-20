@@ -1,4 +1,4 @@
-#pragma once
+/*#pragma once
 #include "Poisson_DG_Element.h"
 #include "Cube.h"
 #include "IBasisFunction.h"
@@ -19,4 +19,4 @@ public:
 		double factor = h / 2;
 		return factor * referenceElement->VolumicTerm(phi1, phi2);
 	}
-};
+};*/

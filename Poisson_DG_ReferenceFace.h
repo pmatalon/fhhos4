@@ -1,4 +1,4 @@
-#pragma once
+/*#pragma once
 #include <Eigen/Dense>
 #include "IBasisFunction.h"
 #include "Element.h"
@@ -19,4 +19,4 @@ public:
 	}
 
 	virtual void ComputeCouplingTerm(Element* element1, BasisFunction* phi1, Element* element2, BasisFunction* phi2) = 0;
-};
+};*/

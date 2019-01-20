@@ -1,4 +1,4 @@
-#pragma once
+/*#pragma once
 #include "Poisson_DG_Face.h"
 #include "Face2D.h"
 #include "IBasisFunction.h"
@@ -14,8 +14,8 @@ public:
 		this->_interface = interface;
 	}
 
-	double VolumicTerm(Element* element1, BasisFunction* phi1, Element* element2, BasisFunction* phi2, Poisson_DG_ReferenceFace* referenceInterface)
+	double CouplingTerm(Element* element1, BasisFunction* phi1, Element* element2, BasisFunction* phi2, Poisson_DG_ReferenceFace* referenceInterface)
 	{
 		return referenceInterface->CouplingTerm(element1, phi1, element2, phi2);
 	}
-};
+};*/

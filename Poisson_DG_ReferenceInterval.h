@@ -18,7 +18,7 @@ public:
 		function<double(double)> functionToIntegrate = [phi1, phi2](double t) {
 			return InnerProduct(phi1->Grad(t), phi2->Grad(t));
 		};
-		// Sans doute probleme ici pour Bernstein
+		
 		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree();
 		double result = Utils::Integral(nQuadPoints, functionToIntegrate, -1,1);
 

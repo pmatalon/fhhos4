@@ -2,10 +2,9 @@
 #include "Element.h"
 #include "IBasisFunction.h"
 
-class Poisson_DG_ReferenceFace;
-
 class Poisson_DG_Face
 {
 public:
-	virtual double CouplingTerm(Element* element1, BasisFunction* phi1, Element* element2, BasisFunction* phi2, Poisson_DG_ReferenceFace* referenceInterface) = 0;
+	virtual double CouplingTerm(Poisson_DG_Element* element1, BasisFunction* phi1, Poisson_DG_Element* element2, BasisFunction* phi2) = 0;
+	virtual double PenalizationTerm(Poisson_DG_Element* element1, BasisFunction* phi1, Poisson_DG_Element* element2, BasisFunction* phi2, double penalizationCoefficient) = 0;
 };

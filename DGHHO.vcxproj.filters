@@ -2,7 +2,6 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="Bernstein2D.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Utils.h">
@@ -108,19 +107,10 @@
     <ClInclude Include="Poisson_DG_Element.h">
       <Filter>DG</Filter>
     </ClInclude>
-    <ClInclude Include="Poisson_DG_Interval.h">
-      <Filter>DG</Filter>
-    </ClInclude>
     <ClInclude Include="Poisson_DG_ReferenceSquare.h">
       <Filter>DG</Filter>
     </ClInclude>
-    <ClInclude Include="Poisson_DG_Square.h">
-      <Filter>DG</Filter>
-    </ClInclude>
     <ClInclude Include="Poisson_DG_ReferenceCube.h">
-      <Filter>DG</Filter>
-    </ClInclude>
-    <ClInclude Include="Poisson_DG_Cube.h">
       <Filter>DG</Filter>
     </ClInclude>
     <ClInclude Include="Poisson1D_OLD.h">
@@ -147,15 +137,6 @@
     <ClInclude Include="Poisson_DG_Face.h">
       <Filter>DG</Filter>
     </ClInclude>
-    <ClInclude Include="Poisson_DG_ReferenceFace.h">
-      <Filter>DG</Filter>
-    </ClInclude>
-    <ClInclude Include="Poisson_DG_ReferenceFace2D.h">
-      <Filter>DG</Filter>
-    </ClInclude>
-    <ClInclude Include="Poisson_DG_Face2D.h">
-      <Filter>DG</Filter>
-    </ClInclude>
     <ClInclude Include="Bernstein1D_OLD.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
@@ -167,6 +148,9 @@
     </ClInclude>
     <ClInclude Include="Bernstein3D.h">
       <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="Point.h">
+      <Filter>Mesh</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

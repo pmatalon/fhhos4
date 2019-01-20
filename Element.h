@@ -24,7 +24,7 @@ public:
 
 	virtual StandardElementCode StdElementCode() = 0;
 
-	virtual double* OuterNormalVector(Face* interface) = 0;
+	virtual double* OuterNormalVector(Face* face) = 0;
 
 	virtual ~Element() {}
 };

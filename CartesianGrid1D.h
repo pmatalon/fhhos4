@@ -1,6 +1,7 @@
 #pragma once
 #include "IMesh.h"
 #include "Interval.h"
+#include "Face1D.h"
 
 class CartesianGrid1D : public IMesh
 {
@@ -20,15 +21,15 @@ public:
 
 		for (BigNumber k = 0; k < n; k++)
 		{
-			Face1D* leftPoint = dynamic_cast<Face1D*>(this->Faces[k]);
-			Face1D* rightPoint = dynamic_cast<Face1D*>(this->Faces[k+1]);
-			Interval* element = new Interval(k, leftPoint, rightPoint);
+			Face1D* leftPoint = static_cast<Face1D*>(this->Faces[k]);
+			Face1D* rightPoint = static_cast<Face1D*>(this->Faces[k+1]);
+			Interval* element = new Interval(k, leftPoint->X, rightPoint->X, leftPoint, rightPoint);
 			this->Elements.push_back(element);
 		}
 
 		for (BigNumber k = 0; k < n + 1; k++)
 		{
-			Face1D* point = dynamic_cast<Face1D*>(this->Faces[k]);
+			Face* point = this->Faces[k];
 
 			if (k == 0)
 			{

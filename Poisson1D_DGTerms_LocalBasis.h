@@ -6,7 +6,6 @@
 #include "Utils.h"
 #include "Element.h"
 #include "Poisson_DG_ReferenceInterval.h"
-#include "Poisson_DG_Interval.h"
 using namespace std;
 
 class Poisson1D_DGTerms_LocalBasis : public IPoisson_DGTerms<IBasisFunction1D>
@@ -33,7 +32,7 @@ public:
 		DefInterval refInterval = phi1->DefinitionInterval();
 
 		function<double(double)> functionToIntegrate = [phi1, phi2](double t) {
-			return InnerProduct(phi1->Grad(t), phi2->Grad(t));
+			return InnerProduct(phi1->GradPhiOnFace(t), phi2->GradPhiOnFace(t));
 		};
 
 		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree();
@@ -56,23 +55,23 @@ public:
 		return factor * Utils::Integral(nQuadPoints, functionToIntegrate, -1,1);
 	}
 
-	double CouplingTerm(Face* face, Element* element1, IBasisFunction1D* phi1, Element* element2, IBasisFunction1D* phi2)
+	/*double CouplingTerm(Face* face, Element* element1, IBasisFunction1D* phi1, Element* element2, IBasisFunction1D* phi2)
 	{
 		assert(face->IsBetween(element1, element2));
 		Interval* interval1 = static_cast<Interval*>(element1);
 		Interval* interval2 = static_cast<Interval*>(element2);
 
 		return MeanDerivative(interval1, phi1, face) * Jump(interval2, phi2, face) + MeanDerivative(interval2, phi2, face) * Jump(interval1, phi1, face);
-	}
+	}*/
 
-	double PenalizationTerm(Face* point, Element* element1, IBasisFunction1D* phi1, Element* element2, IBasisFunction1D* phi2, double penalizationCoefficient)
+	/*double PenalizationTerm(Face* point, Element* element1, IBasisFunction1D* phi1, Element* element2, IBasisFunction1D* phi2, double penalizationCoefficient) override
 	{
 		assert(point->IsBetween(element1, element2));
 		Interval* interval1 = static_cast<Interval*>(element1);
 		Interval* interval2 = static_cast<Interval*>(element2);
 
 		return penalizationCoefficient * Jump(interval1, phi1, point) * Jump(interval2, phi2, point);
-	}
+	}*/
 
 	double RightHandSide(Element* element, IBasisFunction1D* phi)
 	{
@@ -88,7 +87,7 @@ public:
 		return  factor * Utils::Integral(sourceTimesBasisFunction, -1,1);
 	}
 
-	double MeanDerivative(Interval* element, IBasisFunction1D* phi, Face* interface)
+	/*double MeanDerivative(Interval* element, IBasisFunction1D* phi, Face* interface)
 	{
 		double t = interface == element->Left ? -1 : 1; // t in [-1, 1]
 		double h = element->B - element->A;
@@ -103,7 +102,7 @@ public:
 		double t = point == element->Left ? -1 : 1; // t in [-1, 1]
 		int factor = point == element->Left ? 1 : -1;
 		return factor * (phi->Eval(t));
-	}
+	}*/
 
 private:
 	static double InnerProduct(double* vector1, double* vector2)

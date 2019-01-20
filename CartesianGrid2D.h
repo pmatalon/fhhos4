@@ -37,13 +37,13 @@ public:
 		for (BigNumber j = 0; j < n; ++j)
 		{
 			// South boundary
-			Face2D* southBoundary = new Face2D(numberInterface++, this->Elements[j]);
+			Face2D* southBoundary = new Face2D(numberInterface++, h, this->Elements[j]);
 			this->Faces.push_back(southBoundary);
 			//this->BoundaryInterfaces.push_back(southBoundary);
 			dynamic_cast<Square*>(this->Elements[j])->SetSouthInterface(southBoundary);
 
 			// North boundary
-			Face2D* northBoundary = new Face2D(numberInterface++, this->Elements[(n-1)*n + j]);
+			Face2D* northBoundary = new Face2D(numberInterface++, h, this->Elements[(n-1)*n + j]);
 			this->Faces.push_back(northBoundary);
 			//this->BoundaryInterfaces.push_back(northBoundary);
 			dynamic_cast<Square*>(this->Elements[(n - 1)*n + j])->SetNorthInterface(northBoundary);
@@ -52,13 +52,13 @@ public:
 		for (BigNumber i = 0; i < n; ++i)
 		{
 			// West boundary
-			Face2D* westBoundary = new Face2D(numberInterface++, this->Elements[i*n]);
+			Face2D* westBoundary = new Face2D(numberInterface++, h, this->Elements[i*n]);
 			this->Faces.push_back(westBoundary);
 			//this->BoundaryInterfaces.push_back(westBoundary);
 			dynamic_cast<Square*>(this->Elements[i*n])->SetWestInterface(westBoundary);
 
 			// East boundary
-			Face2D* eastBoundary = new Face2D(numberInterface++, this->Elements[i*n + n-1]);
+			Face2D* eastBoundary = new Face2D(numberInterface++, h, this->Elements[i*n + n-1]);
 			this->Faces.push_back(eastBoundary);
 			//this->BoundaryInterfaces.push_back(eastBoundary);
 			dynamic_cast<Square*>(this->Elements[i*n + n - 1])->SetEastInterface(eastBoundary);
@@ -73,7 +73,7 @@ public:
 				{
 					// East
 					Square* eastNeighbour = dynamic_cast<Square*>(this->Elements[i*n + j + 1]);
-					Face2D* interface = new Face2D(numberInterface++, element, eastNeighbour);
+					Face2D* interface = new Face2D(numberInterface++, h, element, eastNeighbour);
 					this->Faces.push_back(interface);
 					element->SetEastInterface(interface);
 					eastNeighbour->SetWestInterface(interface);
@@ -82,7 +82,7 @@ public:
 				{
 					// North
 					Square* northNeighbour = dynamic_cast<Square*>(this->Elements[(i+1)*n + j]);
-					Face2D* interface = new Face2D(numberInterface++, element, northNeighbour);
+					Face2D* interface = new Face2D(numberInterface++, h, element, northNeighbour);
 					this->Faces.push_back(interface);
 					element->SetNorthInterface(interface);
 					northNeighbour->SetSouthInterface(interface);

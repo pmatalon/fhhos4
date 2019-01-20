@@ -7,7 +7,6 @@
 #include "Element.h"
 #include "Face.h"
 #include "Poisson_DG_ReferenceSquare.h"
-#include "Poisson_DG_Square.h"
 #include "Square.h"
 using namespace std;
 
@@ -36,14 +35,14 @@ public:
 	/*double VolumicTerm(Square* element, IBasisFunction2D* phi1, IBasisFunction2D* phi2)
 	{
 		function<double(double, double)> functionToIntegrate = [phi1, phi2](double t, double u) {
-			return InnerProduct(phi1->Grad(t, u), phi2->Grad(t, u));
+			return InnerProduct(phi1->GradPhiOnFace(t, u), phi2->GradPhiOnFace(t, u));
 		};
 
 		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree();
 		return Utils::Integral(nQuadPoints, functionToIntegrate, phi1->DefinitionInterval(), phi1->DefinitionInterval());
 	}*/
 
-	double CouplingTerm(Face* face, Element* element1, IBasisFunction2D* phi1, Element* element2, IBasisFunction2D* phi2)
+	/*double CouplingTerm(Face* face, Element* element1, IBasisFunction2D* phi1, Element* element2, IBasisFunction2D* phi2)
 	{
 		assert(face->IsBetween(element1, element2));
 
@@ -68,8 +67,8 @@ public:
 			double t2 = face == element2->EastFace ? 1 : -1;
 
 			functionToIntegrate = [n1, n2, phi1, phi2, t1, t2](double u) {
-				double meanGradPhi1_scal_jumpPhi2 = InnerProduct(phi1->Grad(t1, u), n2) * phi2->Eval(t2, u);
-				double meanGradPhi2_scal_jumpPhi1 = InnerProduct(phi2->Grad(t2, u), n1) * phi1->Eval(t1, u);
+				double meanGradPhi1_scal_jumpPhi2 = InnerProduct(phi1->GradPhiOnFace(t1, u), n2) * phi2->EvalPhiOnFace(t2, u);
+				double meanGradPhi2_scal_jumpPhi1 = InnerProduct(phi2->GradPhiOnFace(t2, u), n1) * phi1->EvalPhiOnFace(t1, u);
 				return meanGradPhi1_scal_jumpPhi2 + meanGradPhi2_scal_jumpPhi1;
 			};
 		}
@@ -79,8 +78,8 @@ public:
 			double u2 = face == element2->NorthFace ? 1 : -1;
 
 			functionToIntegrate = [n1, n2, phi1, phi2, u1, u2](double t) {
-				double meanGradPhi1_scal_jumpPhi2 = InnerProduct(phi1->Grad(t, u1), n2) * phi2->Eval(t, u2);
-				double meanGradPhi2_scal_jumpPhi1 = InnerProduct(phi2->Grad(t, u2), n1) * phi1->Eval(t, u1);
+				double meanGradPhi1_scal_jumpPhi2 = InnerProduct(phi1->GradPhiOnFace(t, u1), n2) * phi2->EvalPhiOnFace(t, u2);
+				double meanGradPhi2_scal_jumpPhi1 = InnerProduct(phi2->GradPhiOnFace(t, u2), n1) * phi1->EvalPhiOnFace(t, u1);
 				return meanGradPhi1_scal_jumpPhi2 + meanGradPhi2_scal_jumpPhi1;
 			};
 		}
@@ -89,9 +88,9 @@ public:
 
 		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree() + 1;
 		return -meanFactor * Utils::Integral(nQuadPoints, functionToIntegrate, -1,1);
-	}
+	}*/
 
-	double PenalizationTerm(Face* face, Element* element1, IBasisFunction2D* phi1, Element* element2, IBasisFunction2D* phi2, double penalizationCoefficient)
+	/*double PenalizationTerm(Face* face, Element* element1, IBasisFunction2D* phi1, Element* element2, IBasisFunction2D* phi2, double penalizationCoefficient) override
 	{
 		assert(face->IsBetween(element1, element2));
 
@@ -135,7 +134,7 @@ public:
 		double jacobian = h / 2;
 		double integralJump1ScalarJump2 = jacobian * Utils::Integral(nQuadPoints, functionToIntegrate, -1,1);
 		return penalizationCoefficient * integralJump1ScalarJump2;
-	}
+	}*/
 
 	double RightHandSide(Element* element, IBasisFunction2D* phi)
 	{
