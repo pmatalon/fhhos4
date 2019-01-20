@@ -152,6 +152,9 @@
     <ClInclude Include="Point.h">
       <Filter>Mesh</Filter>
     </ClInclude>
+    <ClInclude Include="SourceFunction.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

@@ -135,6 +135,7 @@
     <ClInclude Include="PoissonHHO.h" />
     <ClInclude Include="Poisson_DG_ReferenceSquare.h" />
     <ClInclude Include="Problem.h" />
+    <ClInclude Include="SourceFunction.h" />
     <ClInclude Include="Square.h" />
     <ClInclude Include="TensorPolynomial.h" />
     <ClInclude Include="Utils.h" />

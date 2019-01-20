@@ -13,12 +13,13 @@ using namespace std;
 class Poisson2D_DGTerms_LocalBasis : public IPoisson_DGTerms<IBasisFunction2D>
 {
 protected:
-	function<double(double, double)> _sourceFunction;
+	//function<double(double, double)> _sourceFunction;
 
 public:
 	Poisson2D_DGTerms_LocalBasis(function<double(double, double)> sourceFunction, FunctionalBasis2D* basis)
+		: IPoisson_DGTerms<IBasisFunction2D>(new SourceFunction2D(sourceFunction))
 	{
-		this->_sourceFunction = sourceFunction;
+		//this->_sourceFunction = sourceFunction;
 		Poisson_DG_ReferenceElement* refSquare = new Poisson_DG_ReferenceSquare(basis->NumberOfLocalFunctionsInElement(NULL));
 		this->ComputeVolumicTerms(basis, refSquare);
 		this->ReferenceElements.insert(std::make_pair(StandardElementCode::Square, refSquare));
@@ -136,7 +137,7 @@ public:
 		return penalizationCoefficient * integralJump1ScalarJump2;
 	}*/
 
-	double RightHandSide(Element* element, IBasisFunction2D* phi)
+	/*double RightHandSide(Element* element, IBasisFunction2D* phi)
 	{
 		Square* square = static_cast<Square*>(element);
 		return this->RightHandSide(square, phi);
@@ -155,7 +156,7 @@ public:
 
 		double jacobian = (x2 - x1) * (y2 - y1) / 4;
 		return jacobian * Utils::Integral(sourceTimesBasisFunction, -1,1, -1,1);
-	}
+	}*/
 
 private:
 	static double InnerProduct(double* vector1, double* vector2)

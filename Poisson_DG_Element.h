@@ -1,5 +1,5 @@
 #pragma once
-#include "Point.h"
+#include "SourceFunction.h"
 
 class Poisson_DG_ReferenceElement;
 
@@ -12,6 +12,7 @@ public:
 	virtual function<double(Point)> EvalPhiOnFace(Face* face, BasisFunction* p_phi) = 0;
 	virtual function<double*(Point)> GradPhiOnFace(Face* face, BasisFunction* p_phi) = 0;
 
-	//virtual double RightHandSide(BasisFunction* phi1, Poisson_DG_ReferenceElement* referenceElement) = 0;
+	virtual double SourceTerm(BasisFunction* phi, SourceFunction* f) = 0;
+
 	virtual ~Poisson_DG_Element() {}
 };

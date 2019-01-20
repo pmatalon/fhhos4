@@ -11,12 +11,13 @@ using namespace std;
 class Poisson1D_DGTerms_LocalBasis : public IPoisson_DGTerms<IBasisFunction1D>
 {
 protected:
-	function<double(double)> _sourceFunction;
+	//function<double(double)> _sourceFunction;
 
 public:
-	Poisson1D_DGTerms_LocalBasis(function<double(double)> sourceFunction, FunctionalBasis1D* basis)
+	Poisson1D_DGTerms_LocalBasis(function<double(double)> sourceFunction, FunctionalBasis1D* basis) 
+		: IPoisson_DGTerms<IBasisFunction1D>(new SourceFunction1D(sourceFunction))
 	{
-		this->_sourceFunction = sourceFunction;
+		//this->_sourceFunction = sourceFunction;
 		Poisson_DG_ReferenceElement* refInterval = new Poisson_DG_ReferenceInterval(basis->NumberOfLocalFunctionsInElement(NULL));
 		this->ComputeVolumicTerms(basis, refInterval);
 		this->ReferenceElements.insert(std::make_pair(StandardElementCode::Interval, refInterval));
@@ -73,7 +74,7 @@ public:
 		return penalizationCoefficient * Jump(interval1, phi1, point) * Jump(interval2, phi2, point);
 	}*/
 
-	double RightHandSide(Element* element, IBasisFunction1D* phi)
+	/*double RightHandSide(Element* element, IBasisFunction1D* phi)
 	{
 		Interval* interval = static_cast<Interval*>(element);
 		double a = interval->A;
@@ -85,7 +86,7 @@ public:
 
 		double factor = (b - a) / 2;
 		return  factor * Utils::Integral(sourceTimesBasisFunction, -1,1);
-	}
+	}*/
 
 	/*double MeanDerivative(Interval* element, IBasisFunction1D* phi, Face* interface)
 	{

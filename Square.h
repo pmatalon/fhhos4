@@ -3,6 +3,7 @@
 #include "Face2D.h"
 #include "Poisson_DG_Element.h"
 #include "Poisson_DG_ReferenceElement.h"
+#include "SourceFunction.h"
 #include <assert.h>
 
 class Square : public Element, public Poisson_DG_Element
@@ -91,6 +92,24 @@ public:
 	double VolumicTerm(BasisFunction* phi1, BasisFunction* phi2, Poisson_DG_ReferenceElement* referenceElement)
 	{
 		return referenceElement->VolumicTerm(phi1, phi2);
+	}
+
+	double SourceTerm(BasisFunction* phi, SourceFunction* f)
+	{
+		double x1 = this->X;
+		double x2 = this->X + this->Width;
+		double y1 = this->Y;
+		double y2 = this->Y + this->Width;
+
+		function<double(double, double)> sourceTimesBasisFunction = [f, phi, x1, x2, y1, y2](double t, double u) {
+			Point p;
+			p.X = (x2 - x1) / 2 * t + (x2 + x1) / 2;
+			p.Y = (y2 - y1) / 2 * u + (y2 + y1) / 2;
+			return f->Eval(p) * phi->Eval(Point(t, u));
+		};
+
+		double jacobian = (x2 - x1) * (y2 - y1) / 4;
+		return jacobian * Utils::Integral(sourceTimesBasisFunction, -1,1, -1,1);
 	}
 
 	function<double(Point)> EvalPhiOnFace(Face* face, BasisFunction* p_phi)

@@ -46,6 +46,18 @@ public:
 		double factor = 2 / h;
 		return factor * referenceElement->VolumicTerm(phi1, phi2);
 	}
+	
+	double SourceTerm(BasisFunction* phi, SourceFunction* f)
+	{
+		double a = this->A;
+		double b = this->B;
+
+		function<double(double)> sourceTimesBasisFunction = [f, phi, a, b](double t) {
+			return f->Eval(Point((b - a) / 2 * t + (a + b) / 2)) * phi->Eval(Point(t));
+		};
+
+		return  (b - a) / 2 * Utils::Integral(sourceTimesBasisFunction, -1, 1);
+	}
 
 	function<double(Point)> EvalPhiOnFace(Face* face, BasisFunction* p_phi)
 	{

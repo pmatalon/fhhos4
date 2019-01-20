@@ -96,6 +96,27 @@ public:
 		return factor * referenceElement->VolumicTerm(phi1, phi2);
 	}
 
+	double SourceTerm(BasisFunction* phi, SourceFunction* f)
+	{
+		double x1 = this->X;
+		double x2 = this->X + this->Width;
+		double y1 = this->Y;
+		double y2 = this->Y + this->Width;
+		double z1 = this->Z;
+		double z2 = this->Z + this->Width;
+
+		function<double(double, double, double)> sourceTimesBasisFunction = [f, phi, x1, x2, y1, y2, z1, z2](double t, double u, double v) {
+			Point p;
+			p.X = (x2 - x1) / 2 * t + (x2 + x1) / 2;
+			p.Y = (y2 - y1) / 2 * u + (y2 + y1) / 2;
+			p.Z = (z2 - z1) / 2 * v + (z2 + z1) / 2;
+			return f->Eval(p) * phi->Eval(Point(t, u, v));
+		};
+
+		double jacobian = (x2 - x1) * (y2 - y1) * (z2 - z1) / 8;
+		return jacobian * Utils::Integral(sourceTimesBasisFunction, -1,1, -1,1, -1,1);
+	}
+
 	function<double(Point)> EvalPhiOnFace(Face* face, BasisFunction* p_phi)
 	{
 		IBasisFunction3D* phi = dynamic_cast<IBasisFunction3D*>(p_phi);

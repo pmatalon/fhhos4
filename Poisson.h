@@ -62,7 +62,6 @@ public:
 		for (auto element : mesh->Elements)
 		{
 			//cout << "Element " << element->Number << endl;
-			vector<Face*> elementInterfaces = element->Faces;
 
 			for (int localFunctionNumber1 = 0; localFunctionNumber1 < basis->NumberOfLocalFunctionsInElement(element); localFunctionNumber1++)
 			{
@@ -82,13 +81,13 @@ public:
 					
 					double coupling = 0;
 					double penalization = 0;
-					for (Face* elemInterface : elementInterfaces)
+					for (Face* face : element->Faces)
 					{
-						double c = dg->CouplingTerm(elemInterface, element, phi1, element, phi2);
-						double p = dg->PenalizationTerm(elemInterface, element, phi1, element, phi2, penalizationCoefficient);
+						double c = dg->CouplingTerm(face, element, phi1, element, phi2);
+						double p = dg->PenalizationTerm(face, element, phi1, element, phi2, penalizationCoefficient);
 						coupling += c;
 						penalization += p;
-						//cout << "\t\t " << elemInterface->ToString() << ":\t c=" << c << "\tp=" << p << endl;
+						//cout << "\t\t " << face->ToString() << ":\t c=" << c << "\tp=" << p << endl;
 					}
 
 					//cout << "\t\t TOTAL = " << volumicTerm + coupling + penalization << endl;
@@ -107,9 +106,9 @@ public:
 			}
 		}
 
-		//--------------------------------------------------//
-		// Iteration on the interfaces: off-diagonal blocks //
-		//--------------------------------------------------//
+		//---------------------------------------------//
+		// Iteration on the faces: off-diagonal blocks //
+		//---------------------------------------------//
 
 		for (auto face : mesh->Faces)
 		{

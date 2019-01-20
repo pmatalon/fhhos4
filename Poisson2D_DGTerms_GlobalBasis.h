@@ -16,6 +16,7 @@ protected:
 
 public:
 	Poisson2D_DGTerms_GlobalBasis(function<double(double, double)> sourceFunction)
+		: IPoisson_DGTerms<IBasisFunction2D>(new SourceFunction2D(sourceFunction))
 	{
 		this->_sourceFunction = sourceFunction;
 	}

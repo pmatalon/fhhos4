@@ -10,8 +10,15 @@
 template <class IBasisFunction>
 class IPoisson_DGTerms
 {
+private:
+	SourceFunction* _sourceFunction;
 public:
 	std::map<StandardElementCode, Poisson_DG_ReferenceElement*> ReferenceElements;
+
+	IPoisson_DGTerms(SourceFunction* sourceFunction)
+	{
+		this->_sourceFunction = sourceFunction;
+	}
 
 	virtual bool IsGlobalBasis() = 0;
 
@@ -39,7 +46,11 @@ public:
 		return dgFace->PenalizationTerm(dgElement1, phi1, dgElement2, phi2, penalizationCoefficient);
 	}
 
-	virtual double RightHandSide(Element* element, IBasisFunction* func) = 0;
+	virtual double RightHandSide(Element* element, BasisFunction* phi)
+	{
+		Poisson_DG_Element* dgElement = dynamic_cast<Poisson_DG_Element*>(element);
+		return dgElement->SourceTerm(phi, this->_sourceFunction);
+	}
 
 protected:
 
@@ -55,15 +66,4 @@ protected:
 			}
 		}
 	}
-
-	/*Poisson_DG_Element* Create(Element* element)
-	{
-		if (typeid(*element) == typeid(Interval))
-			return new Poisson_DG_Interval(static_cast<Interval*>(element));
-		if (typeid(*element) == typeid(Square))
-			return new Poisson_DG_Square(static_cast<Square*>(element));
-		if (typeid(*element) == typeid(Cube))
-			return new Poisson_DG_Cube(static_cast<Cube*>(element));
-		return NULL;
-	}*/
 };
