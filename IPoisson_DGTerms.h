@@ -29,6 +29,14 @@ public:
 		return dgElement->VolumicTerm(phi1, phi2, referenceElement);
 	}
 
+	virtual double MassTerm(Element* element, BasisFunction* phi1, BasisFunction* phi2)
+	{
+		Poisson_DG_ReferenceElement* referenceElement = this->ReferenceElements[element->StdElementCode()];
+		Poisson_DG_Element* dgElement = dynamic_cast<Poisson_DG_Element*>(element);
+
+		return dgElement->MassTerm(phi1, phi2, referenceElement);
+	}
+
 	virtual double CouplingTerm(Face* face, Element* element1, BasisFunction* phi1, Element* element2, BasisFunction* phi2)
 	{
 		Poisson_DG_Face* dgFace = dynamic_cast<Poisson_DG_Face*>(face);
@@ -53,12 +61,15 @@ public:
 
 protected:
 
-	void ComputeVolumicTerms(FunctionalBasisWithObjects* basis, Poisson_DG_ReferenceElement* element)
+	void ComputeReferenceTerms(FunctionalBasisWithObjects* basis, Poisson_DG_ReferenceElement* element)
 	{
 		for (BasisFunction* phi1 : basis->LocalFunctions)
 		{
 			for (BasisFunction* phi2 : basis->LocalFunctions)
+			{
 				element->ComputeVolumicTerm(phi1, phi2);
+				element->ComputeMassTerm(phi1, phi2);
+			}
 		}
 	}
 };

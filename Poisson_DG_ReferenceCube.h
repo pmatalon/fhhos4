@@ -24,6 +24,21 @@ public:
 		this->_volumicTerms(phi1->LocalNumber, phi2->LocalNumber) = result;
 	}
 
+	void ComputeMassTerm(BasisFunction* p_phi1, BasisFunction* p_phi2)
+	{
+		IBasisFunction3D* phi1 = dynamic_cast<IBasisFunction3D*>(p_phi1);
+		IBasisFunction3D* phi2 = dynamic_cast<IBasisFunction3D*>(p_phi2);
+
+		function<double(double, double, double)> functionToIntegrate = [phi1, phi2](double t, double u, double v) {
+			return phi1->Eval(t, u, v)*phi2->Eval(t, u, v);
+		};
+
+		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree() + 2;
+		double result = Utils::Integral(nQuadPoints, functionToIntegrate, -1,1, -1,1, -1,1);
+
+		this->_volumicTerms(phi1->LocalNumber, phi2->LocalNumber) = result;
+	}
+
 private:
 	static double InnerProduct(double* vector1, double* vector2)
 	{

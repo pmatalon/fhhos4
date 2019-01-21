@@ -41,12 +41,14 @@ public:
 		string matrixVolumicFilePath	= outputDirectory + "/" + fileName + "_A_volumic.dat";
 		string matrixCouplingFilePath	= outputDirectory + "/" + fileName + "_A_coupling.dat";
 		string matrixPenFilePath		= outputDirectory + "/" + fileName + "_A_pen.dat";
+		string massMatrixFilePath		= outputDirectory + "/" + fileName + "_Mass.dat";
 		string rhsFilePath				= outputDirectory + "/" + fileName + "_b.dat";
 
 		this->b = Eigen::VectorXd(nUnknowns);
 
 		BigNumber nnzApproximate = extractMatrixComponents ? mesh->Elements.size() * basis->NumberOfLocalFunctionsInElement(NULL) * (2 * mesh->Dim + 1) : 0;
 		NonZeroCoefficients matrixCoeffs(nnzApproximate);
+		NonZeroCoefficients massMatrixCoeffs(nnzApproximate);
 		NonZeroCoefficients volumicCoeffs(nnzApproximate);
 		NonZeroCoefficients couplingCoeffs(nnzApproximate);
 		NonZeroCoefficients penCoeffs(nnzApproximate);
@@ -72,6 +74,7 @@ public:
 
 					double volumicTerm = dg->VolumicTerm(element, phi1, phi2);
 					//cout << "\t\t volumic = " << volumicTerm << endl;
+					double massTerm = dg->MassTerm(element, phi1, phi2);
 					
 					double coupling = 0;
 					double penalization = 0;
@@ -93,6 +96,7 @@ public:
 						penCoeffs.Add(basisFunction1, basisFunction2, penalization);
 					}
 					matrixCoeffs.Add(basisFunction1, basisFunction2, volumicTerm + coupling + penalization);
+					massMatrixCoeffs.Add(basisFunction1, basisFunction2, massTerm);
 				}
 
 				double rhs = dg->RightHandSide(element, phi1);
@@ -135,6 +139,11 @@ public:
 		this->A = Eigen::SparseMatrix<double>(nUnknowns, nUnknowns);
 		matrixCoeffs.Fill(this->A);
 		Eigen::saveMarket(this->A, matrixFilePath);
+
+		Eigen::SparseMatrix<double> M(nUnknowns, nUnknowns);
+		massMatrixCoeffs.Fill(M);
+		Eigen::saveMarket(M, massMatrixFilePath);
+
 		Eigen::saveMarketVector(this->b, rhsFilePath);
 
 		if (extractMatrixComponents)

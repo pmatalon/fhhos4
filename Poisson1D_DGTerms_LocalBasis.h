@@ -19,7 +19,7 @@ public:
 	{
 		//this->_sourceFunction = sourceFunction;
 		Poisson_DG_ReferenceElement* refInterval = new Poisson_DG_ReferenceInterval(basis->NumberOfLocalFunctionsInElement(NULL));
-		this->ComputeVolumicTerms(basis, refInterval);
+		this->ComputeReferenceTerms(basis, refInterval);
 		this->ReferenceElements.insert(std::make_pair(StandardElementCode::Interval, refInterval));
 	}
 
@@ -42,7 +42,7 @@ public:
 		return result;
 	}*/
 
-	double MassTerm(Element* element, IBasisFunction1D* phi1, IBasisFunction1D* phi2)
+	/*double MassTerm(Element* element, IBasisFunction1D* phi1, IBasisFunction1D* phi2)
 	{
 		Interval* interval = static_cast<Interval*>(element);
 		double h = interval->B - interval->A;
@@ -54,7 +54,7 @@ public:
 		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree() + 2;
 		double factor = h / 2;
 		return factor * Utils::Integral(nQuadPoints, functionToIntegrate, -1,1);
-	}
+	}*/
 
 	/*double CouplingTerm(Face* face, Element* element1, IBasisFunction1D* phi1, Element* element2, IBasisFunction1D* phi2)
 	{
@@ -105,9 +105,9 @@ public:
 		return factor * (phi->Eval(t));
 	}*/
 
-private:
+/*private:
 	static double InnerProduct(double* vector1, double* vector2)
 	{
 		return vector1[0] * vector2[0];
-	}
+	}*/
 };

@@ -92,8 +92,13 @@ public:
 	double VolumicTerm(BasisFunction* phi1, BasisFunction* phi2, Poisson_DG_ReferenceElement* referenceElement)
 	{
 		double h = this->Width;
-		double factor = h / 2;
-		return factor * referenceElement->VolumicTerm(phi1, phi2);
+		return h / 2 * referenceElement->VolumicTerm(phi1, phi2);
+	}
+
+	double MassTerm(BasisFunction* phi1, BasisFunction* phi2, Poisson_DG_ReferenceElement* referenceElement)
+	{
+		double h = this->Width;
+		return pow(h, 3) / 8 * referenceElement->MassTerm(phi1, phi2);
 	}
 
 	double SourceTerm(BasisFunction* phi, SourceFunction* f)

@@ -21,7 +21,7 @@ public:
 	{
 		//this->_sourceFunction = sourceFunction;
 		Poisson_DG_ReferenceElement* refSquare = new Poisson_DG_ReferenceSquare(basis->NumberOfLocalFunctionsInElement(NULL));
-		this->ComputeVolumicTerms(basis, refSquare);
+		this->ComputeReferenceTerms(basis, refSquare);
 		this->ReferenceElements.insert(std::make_pair(StandardElementCode::Square, refSquare));
 	}
 
@@ -158,9 +158,9 @@ public:
 		return jacobian * Utils::Integral(sourceTimesBasisFunction, -1,1, -1,1);
 	}*/
 
-private:
+/*private:
 	static double InnerProduct(double* vector1, double* vector2)
 	{
 		return vector1[0] * vector2[0] + vector1[1] * vector2[1];
-	}
+	}*/
 };
