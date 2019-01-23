@@ -18,8 +18,10 @@ public:
 	Face2D* EastFace;
 	Face2D* WestFace;
 private:
-	Square* _neighbours;
+	//Square* _neighbours;
 public:
+	//static Square* ReferenceSquare;
+
 	Square(int number, double x, double y, double width) : Element(number)
 	{
 		this->X = x;
@@ -92,6 +94,8 @@ public:
 	double VolumicTerm(BasisFunction* phi1, BasisFunction* phi2, Poisson_DG_ReferenceElement* referenceElement)
 	{
 		return referenceElement->VolumicTerm(phi1, phi2);
+		//if (this == ReferenceSquare)
+			//return 
 	}
 
 	double MassTerm(BasisFunction* phi1, BasisFunction* phi2, Poisson_DG_ReferenceElement* referenceElement)
@@ -171,3 +175,5 @@ public:
 		return gradOnFace;
 	}
 };
+
+//Square* Square::ReferenceSquare = new Square(-1, -1, -1, 2);

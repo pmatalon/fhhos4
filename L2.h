@@ -85,6 +85,7 @@ public:
 	{
 		double absoluteError = 0;
 		double normExactSolution = 0;
+		//double normSolution = 0;
 		for (Element* element : mesh->Elements)
 		{
 			Cube* cube = static_cast<Cube*>(element);
@@ -105,10 +106,13 @@ public:
 			double jacobian = (x2 - x1) * (y2 - y1) * (z2 - z1) / 8;
 			absoluteError += jacobian * Utils::Integral(errorFunction, -1,1, -1,1, -1,1);
 
+			//normSolution += jacobian * Utils::Integral(approximate, -1, 1, -1, 1, -1, 1);
+
 			normExactSolution += Utils::Integral([exactSolution](double x, double y, double z) { return pow(exactSolution(x, y, z), 2); }, x1, x2, y1, y2, z1, z2);
 		}
 		absoluteError = sqrt(absoluteError);
 		normExactSolution = sqrt(normExactSolution);
+		//normSolution = sqrt(normSolution);
 		return absoluteError / normExactSolution;
 	}
 };

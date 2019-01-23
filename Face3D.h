@@ -43,9 +43,8 @@ public:
 		};
 
 		int nQuadPoints = p_phi1->GetDegree() + p_phi2->GetDegree() + 1;
-		double h = (dynamic_cast<Cube*>(element1))->Width;
-		double factor = h / 2;
-		return -meanFactor * factor * Utils::Integral(nQuadPoints, functionToIntegrate, -1,1, -1,1);
+		double h = this->Width;
+		return -meanFactor * h / 2 * Utils::Integral(nQuadPoints, functionToIntegrate, -1,1, -1,1);
 	}
 
 	double PenalizationTerm(Poisson_DG_Element* element1, BasisFunction* p_phi1, Poisson_DG_Element* element2, BasisFunction* p_phi2, double penalizationCoefficient)

@@ -3,6 +3,7 @@
 #include "Poisson.h"
 #include <functional>
 #include <getopt.h>
+#include <Eigen/Core>
 #include "FunctionalBasis.h"
 #include "CartesianGrid2D.h"
 #include "CartesianGrid3D.h"
@@ -25,13 +26,16 @@ void print_usage(string s, int d, int n, string b, int p, bool f, int z, string 
 	cout << "-p NUM:\t\t		max polynomial degree (default: 2)\t--> " << p << endl;
 	cout << "-f:\t\t		full tensorization of the polynomials when d=2 or 3 (default: false)\t--> " << f << endl;
 	cout << "-z NUM:\t\t\t	penalization coefficient (default: 100)\t--> " << z << endl;
-	cout << "-o PATH:\t		output directory to export the system (default: ./)\t--> " << o << endl;
 	cout << "-e:\t\t		extract all components of the matrix in separate files" << endl;
+	cout << "-m:\t\t		extract mass matrix" << endl;
+	cout << "-o PATH:\t		output directory to export the system (default: ./)\t--> " << o << endl;
 	cout << "--------------------------------------------------------" << endl;
 }
 
 int main(int argc, char* argv[])
 {
+	Eigen::initParallel();
+
 	string solution = "sine";
 	int dimension = 1;
 	BigNumber n = 5;
@@ -41,9 +45,10 @@ int main(int argc, char* argv[])
 	int penalizationCoefficient = 100;
 	string outputDirectory = "./";
 	bool extractMatrixComponents = false;
+	bool extractMassMatrix = false;
 
 	int option = 0;
-	while ((option = getopt(argc, argv, "s:d:n:b:p:z:o:ef")) != -1) 
+	while ((option = getopt(argc, argv, "s:d:n:b:p:z:o:emf")) != -1) 
 	{
 		switch (option) 
 		{
@@ -64,6 +69,8 @@ int main(int argc, char* argv[])
 			case 'o': outputDirectory = optarg;
 				break;
 			case 'e': extractMatrixComponents = true;
+				break;
+			case 'm': extractMassMatrix = true;
 				break;
 			default: print_usage(solution, dimension, n, basisCode, polyDegree, fullTensorization, penalizationCoefficient, outputDirectory);
 				exit(EXIT_FAILURE);
@@ -116,7 +123,7 @@ int main(int argc, char* argv[])
 			exit(EXIT_FAILURE);
 		}*/
 
-		problem->DiscretizeDG(mesh, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents);
+		problem->DiscretizeDG(mesh, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents, extractMassMatrix);
 
 		problem->Solve();
 		double error = L2::Error(mesh, basis, problem->Solution, exactSolution);
@@ -141,7 +148,7 @@ int main(int argc, char* argv[])
 
 		dg = new Poisson2D_DGTerms_LocalBasis(sourceFunction, basis);
 
-		problem->DiscretizeDG(mesh, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents);
+		problem->DiscretizeDG(mesh, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents, extractMassMatrix);
 
 		problem->Solve();
 		double error = L2::Error(mesh, basis, problem->Solution, exactSolution);
@@ -167,7 +174,7 @@ int main(int argc, char* argv[])
 
 		dg = new Poisson3D_DGTerms_LocalBasis(sourceFunction, basis);
 
-		problem->DiscretizeDG(mesh, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents);
+		problem->DiscretizeDG(mesh, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents, extractMassMatrix);
 
 		problem->Solve();
 		double error = L2::Error(mesh, basis, problem->Solution, exactSolution);

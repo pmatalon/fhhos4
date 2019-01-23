@@ -20,7 +20,7 @@ public:
 	Poisson(string solutionName) : Problem(solutionName)
 	{	}
 
-	void DiscretizeDG(IMesh* mesh, FunctionalBasisWithObjects* basis, IPoisson_DGTerms* dg, int penalizationCoefficient, string outputDirectory, bool extractMatrixComponents)
+	void DiscretizeDG(IMesh* mesh, FunctionalBasisWithObjects* basis, IPoisson_DGTerms* dg, int penalizationCoefficient, string outputDirectory, bool extractMatrixComponents, bool extractMassMatrix)
 	{
 		bool autoPenalization = penalizationCoefficient == -1;
 		if (autoPenalization)
@@ -46,12 +46,14 @@ public:
 
 		this->b = Eigen::VectorXd(nUnknowns);
 
-		BigNumber nnzApproximate = extractMatrixComponents ? mesh->Elements.size() * basis->NumberOfLocalFunctionsInElement(NULL) * (2 * mesh->Dim + 1) : 0;
+		BigNumber nnzApproximate = mesh->Elements.size() * basis->NumberOfLocalFunctionsInElement(NULL) * (2 * mesh->Dim + 1);
 		NonZeroCoefficients matrixCoeffs(nnzApproximate);
-		NonZeroCoefficients massMatrixCoeffs(nnzApproximate);
-		NonZeroCoefficients volumicCoeffs(nnzApproximate);
-		NonZeroCoefficients couplingCoeffs(nnzApproximate);
-		NonZeroCoefficients penCoeffs(nnzApproximate);
+		NonZeroCoefficients massMatrixCoeffs(extractMassMatrix ? nnzApproximate : 0);
+		NonZeroCoefficients volumicCoeffs(extractMatrixComponents ? nnzApproximate : 0);
+		NonZeroCoefficients couplingCoeffs(extractMatrixComponents ? nnzApproximate : 0);
+		NonZeroCoefficients penCoeffs(extractMatrixComponents ? nnzApproximate : 0);
+
+		cout << "Assembly..." << endl;
 
 		//--------------------------------------------//
 		// Iteration on the elements: diagonal blocks //
@@ -96,7 +98,8 @@ public:
 						penCoeffs.Add(basisFunction1, basisFunction2, penalization);
 					}
 					matrixCoeffs.Add(basisFunction1, basisFunction2, volumicTerm + coupling + penalization);
-					massMatrixCoeffs.Add(basisFunction1, basisFunction2, massTerm);
+					if (extractMassMatrix)
+						massMatrixCoeffs.Add(basisFunction1, basisFunction2, massTerm);
 				}
 
 				double rhs = dg->RightHandSide(element, phi1);
@@ -139,30 +142,37 @@ public:
 		this->A = Eigen::SparseMatrix<double>(nUnknowns, nUnknowns);
 		matrixCoeffs.Fill(this->A);
 		Eigen::saveMarket(this->A, matrixFilePath);
-
-		Eigen::SparseMatrix<double> M(nUnknowns, nUnknowns);
-		massMatrixCoeffs.Fill(M);
-		Eigen::saveMarket(M, massMatrixFilePath);
+		cout << "Matrix exported to \t" << matrixFilePath << endl;
 
 		Eigen::saveMarketVector(this->b, rhsFilePath);
+		cout << "RHS exported to \t" << rhsFilePath << endl;
+
+		if (extractMassMatrix)
+		{
+			Eigen::SparseMatrix<double> M(nUnknowns, nUnknowns);
+			massMatrixCoeffs.Fill(M);
+			Eigen::saveMarket(M, massMatrixFilePath);
+			cout << "Mass matrix exported to \t" << massMatrixFilePath << endl;
+		}
 
 		if (extractMatrixComponents)
 		{
 			Eigen::SparseMatrix<double> V(nUnknowns, nUnknowns);
 			volumicCoeffs.Fill(V);
 			Eigen::saveMarket(V, matrixVolumicFilePath);
+			cout << "Volumic part exported to \t" << matrixVolumicFilePath << endl;
 
 			Eigen::SparseMatrix<double> C(nUnknowns, nUnknowns);
 			couplingCoeffs.Fill(C);
 			Eigen::saveMarket(C, matrixCouplingFilePath);
+			cout << "Coupling part exported to \t" << matrixCouplingFilePath << endl;
 
 			Eigen::SparseMatrix<double> P(nUnknowns, nUnknowns);
 			penCoeffs.Fill(P);
 			Eigen::saveMarket(P, matrixPenFilePath);
+			cout << "Penalization part exported to \t" << matrixPenFilePath << endl;
 		}
 
-		cout << "Matrix exported to \t" << matrixFilePath << endl;
-		cout << "RHS exported to \t" << rhsFilePath << endl;
 	}
 };
 

@@ -59,6 +59,8 @@ public:
 		return dgElement->SourceTerm(phi, this->_sourceFunction);
 	}
 
+	virtual ~IPoisson_DGTerms() {}
+
 protected:
 
 	void ComputeReferenceTerms(FunctionalBasisWithObjects* basis, Poisson_DG_ReferenceElement* element)

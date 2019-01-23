@@ -36,7 +36,7 @@ public:
 		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree() + 2;
 		double result = Utils::Integral(nQuadPoints, functionToIntegrate, -1,1, -1,1);
 
-		this->_volumicTerms(phi1->LocalNumber, phi2->LocalNumber) = result;
+		this->_massTerms(phi1->LocalNumber, phi2->LocalNumber) = result;
 	}
 
 private:
