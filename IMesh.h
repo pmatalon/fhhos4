@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include "Element.h"
+#include "Face.h"
 
 using namespace std;
 

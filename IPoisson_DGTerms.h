@@ -1,8 +1,8 @@
 #pragma once
 #include <map>
-#include "FunctionalBasisWithObjects.h"
 #include "Element.h"
 #include "Face.h"
+#include "FunctionalBasis.h"
 #include "Poisson_DG_ReferenceElement.h"
 #include "Poisson_DG_Element.h"
 #include "Poisson_DG_Face.h"
@@ -63,7 +63,7 @@ public:
 
 protected:
 
-	void ComputeReferenceTerms(FunctionalBasisWithObjects* basis, Poisson_DG_ReferenceElement* element)
+	void ComputeReferenceTerms(FunctionalBasis* basis, Poisson_DG_ReferenceElement* element)
 	{
 		for (BasisFunction* phi1 : basis->LocalFunctions)
 		{

@@ -16,9 +16,6 @@
     <ClInclude Include="CartesianGrid2D.h">
       <Filter>Mesh</Filter>
     </ClInclude>
-    <ClInclude Include="FunctionalBasisWithObjects.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
     <ClInclude Include="GaussLegendre.h">
       <Filter>Utils</Filter>
     </ClInclude>
@@ -32,9 +29,6 @@
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
     <ClInclude Include="FunctionalBasis.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
-    <ClInclude Include="Bernstein2_1D.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
     <ClInclude Include="Monomial1D.h">
@@ -62,9 +56,6 @@
     <ClInclude Include="L2.h">
       <Filter>Utils</Filter>
     </ClInclude>
-    <ClInclude Include="Poisson1D_DGTerms_GlobalBasis.h">
-      <Filter>DG</Filter>
-    </ClInclude>
     <ClInclude Include="Poisson2D_DGTerms_GlobalBasis.h">
       <Filter>DG</Filter>
     </ClInclude>
@@ -86,14 +77,8 @@
     <ClInclude Include="Poisson.h">
       <Filter>DG</Filter>
     </ClInclude>
-    <ClInclude Include="Poisson1D_DGTerms_LocalBasisOLD.h">
-      <Filter>DG</Filter>
-    </ClInclude>
     <ClInclude Include="Poisson1D_DGTerms_LocalBasis.h">
       <Filter>DG</Filter>
-    </ClInclude>
-    <ClInclude Include="CartesianGrid1DOLD.h">
-      <Filter>Mesh</Filter>
     </ClInclude>
     <ClInclude Include="CartesianGrid1D.h">
       <Filter>Mesh</Filter>
@@ -113,15 +98,6 @@
     <ClInclude Include="Poisson_DG_ReferenceCube.h">
       <Filter>DG</Filter>
     </ClInclude>
-    <ClInclude Include="Poisson1D_OLD.h">
-      <Filter>DG</Filter>
-    </ClInclude>
-    <ClInclude Include="IPoisson1D_DGTerms_OLD.h">
-      <Filter>DG</Filter>
-    </ClInclude>
-    <ClInclude Include="FunctionalBasisWithNumbers_OLD.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
     <ClInclude Include="Face.h">
       <Filter>Mesh</Filter>
     </ClInclude>
@@ -136,9 +112,6 @@
     </ClInclude>
     <ClInclude Include="Poisson_DG_Face.h">
       <Filter>DG</Filter>
-    </ClInclude>
-    <ClInclude Include="Bernstein1D_OLD.h">
-      <Filter>FunctionalBasis</Filter>
     </ClInclude>
     <ClInclude Include="Bernstein1D.h">
       <Filter>FunctionalBasis</Filter>

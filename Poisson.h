@@ -4,7 +4,6 @@
 #include <unsupported/Eigen/SparseExtra>
 #include "Problem.h"
 #include "IMesh.h"
-#include "FunctionalBasisWithObjects.h"
 #include "Face.h"
 #include "IPoisson_DGTerms.h"
 #include "NonZeroCoefficients.h"
@@ -20,7 +19,7 @@ public:
 	Poisson(string solutionName) : Problem(solutionName)
 	{	}
 
-	void DiscretizeDG(IMesh* mesh, FunctionalBasisWithObjects* basis, IPoisson_DGTerms* dg, int penalizationCoefficient, string outputDirectory, bool extractMatrixComponents, bool extractMassMatrix)
+	void DiscretizeDG(IMesh* mesh, FunctionalBasis* basis, IPoisson_DGTerms* dg, int penalizationCoefficient, string outputDirectory, bool extractMatrixComponents, bool extractMassMatrix)
 	{
 		bool autoPenalization = penalizationCoefficient == -1;
 		if (autoPenalization)

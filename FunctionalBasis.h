@@ -1,6 +1,4 @@
 #pragma once
-#include "FunctionalBasisWithNumbers_OLD.h"
-#include "FunctionalBasisWithObjects.h"
 #include "BasisFunctionFactory.h"
 #include "IBasisFunction.h"
 #include "TensorPolynomial.h"
@@ -8,39 +6,32 @@
 #include "Bernstein3D.h"
 #include <Eigen/Sparse>
 
+class FunctionalBasis
+{
+public:
+	vector<BasisFunction*> LocalFunctions;
+	virtual std::string Name() = 0;
+
+	virtual int GetDegree() = 0;
+
+	int NumberOfLocalFunctionsInElement(Element* element)
+	{
+		return static_cast<int>(this->LocalFunctions.size());
+	}
+
+	BigNumber GlobalFunctionNumber(Element* element, BasisFunction* phi)
+	{
+		return element->Number * static_cast<int>(this->LocalFunctions.size()) + phi->LocalNumber; // the numbers start at 0
+	}
+
+	virtual ~FunctionalBasis() {}
+};
+
 //----------//
 //    1D    //
 //----------//
 
-/*class FunctionalBasis1DOLD : public FunctionalBasisWithNumbers
-{
-private:
-	int _maxPolynomialDegree;
-	string _basisCode;
-
-public:
-	FunctionalBasis1DOLD(string basisCode, int maxPolynomialDegree)
-		:FunctionalBasisWithNumbers()
-	{
-		this->_maxPolynomialDegree = maxPolynomialDegree;
-		this->_basisCode = basisCode;
-
-		for (int i = 0; i <= maxPolynomialDegree; i++)
-			this->LocalFunctions[i] = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, i);
-	}
-
-	int GetDegree()
-	{
-		return this->_maxPolynomialDegree;
-	}
-
-	string Name()
-	{
-		return this->_basisCode + "_p" + std::to_string(this->_maxPolynomialDegree);
-	}
-};*/
-
-class FunctionalBasis1D : public FunctionalBasisWithObjects
+class FunctionalBasis1D : public FunctionalBasis
 {
 private:
 	int _maxPolynomialDegree;
@@ -48,7 +39,7 @@ private:
 
 public:
 	FunctionalBasis1D(string basisCode, int maxPolynomialDegree)
-		:FunctionalBasisWithObjects()
+		:FunctionalBasis()
 	{
 		this->_maxPolynomialDegree = maxPolynomialDegree;
 		this->_basisCode = basisCode;
@@ -86,7 +77,7 @@ public:
 //    2D    //
 //----------//
 
-class FunctionalBasis2D : public FunctionalBasisWithObjects
+class FunctionalBasis2D : public FunctionalBasis
 {
 private:
 	int _maxPolynomialDegree;
@@ -95,7 +86,7 @@ private:
 
 public:
 	FunctionalBasis2D(string basisCode, int maxPolynomialDegree, bool fullTensorization)
-		:FunctionalBasisWithObjects()
+		:FunctionalBasis()
 	{
 		this->_maxPolynomialDegree = maxPolynomialDegree;
 		this->_basisCode = basisCode;
@@ -179,7 +170,7 @@ public:
 //    3D    //
 //----------//
 
-class FunctionalBasis3D : public FunctionalBasisWithObjects
+class FunctionalBasis3D : public FunctionalBasis
 {
 private:
 	int _maxPolynomialDegree;
@@ -188,7 +179,7 @@ private:
 
 public:
 	FunctionalBasis3D(string basisCode, int maxPolynomialDegree, bool fullTensorization)
-		:FunctionalBasisWithObjects()
+		:FunctionalBasis()
 	{
 		this->_maxPolynomialDegree = maxPolynomialDegree;
 		this->_basisCode = basisCode;

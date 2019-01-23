@@ -10,7 +10,7 @@ class PoissonHHO : Problem
 	PoissonHHO(string solutionName) : Problem(solutionName)
 	{	}
 
-	void Discretize(IMesh* mesh, FunctionalBasisWithObjects<IBasisFunction>* basis, IPoisson_HHOTerms<IBasisFunction>* hho)
+	void Discretize(IMesh* mesh, FunctionalBasis<IBasisFunction>* basis, IPoisson_HHOTerms<IBasisFunction>* hho)
 	{
 
 	}

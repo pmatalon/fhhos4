@@ -5,11 +5,10 @@
 #include <getopt.h>
 #include <Eigen/Core>
 #include "FunctionalBasis.h"
+#include "CartesianGrid1D.h"
 #include "CartesianGrid2D.h"
 #include "CartesianGrid3D.h"
-#include "Poisson1D_DGTerms_LocalBasisOLD.h"
 #include "Poisson1D_DGTerms_LocalBasis.h"
-#include "Poisson1D_DGTerms_GlobalBasis.h"
 #include "Poisson2D_DGTerms_LocalBasis.h"
 #include "Poisson2D_DGTerms_GlobalBasis.h"
 #include "Poisson3D_DGTerms_LocalBasis.h"

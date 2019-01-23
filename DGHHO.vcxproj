@@ -92,8 +92,6 @@
   <ItemGroup>
     <ClInclude Include="BasisFunctionFactory.h" />
     <ClInclude Include="Bernstein2D.h" />
-    <ClInclude Include="Bernstein2_1D.h" />
-    <ClInclude Include="Bernstein1D_OLD.h" />
     <ClInclude Include="Bernstein1D.h" />
     <ClInclude Include="Bernstein3D.h" />
     <ClInclude Include="CartesianGrid1D.h" />
@@ -108,25 +106,18 @@
     <ClInclude Include="Face1D.h" />
     <ClInclude Include="Face3D.h" />
     <ClInclude Include="FunctionalBasis.h" />
-    <ClInclude Include="CartesianGrid1DOLD.h" />
     <ClInclude Include="CartesianGrid2D.h" />
     <ClInclude Include="Element.h" />
     <ClInclude Include="Face2D.h" />
     <ClInclude Include="Face.h" />
-    <ClInclude Include="FunctionalBasisWithNumbers_OLD.h" />
-    <ClInclude Include="FunctionalBasisWithObjects.h" />
     <ClInclude Include="GaussLegendre.h" />
     <ClInclude Include="Interval.h" />
-    <ClInclude Include="IPoisson1D_DGTerms_OLD.h" />
     <ClInclude Include="IPoisson_DGTerms.h" />
     <ClInclude Include="L2.h" />
     <ClInclude Include="Legendre1D.h" />
     <ClInclude Include="IMesh.h" />
     <ClInclude Include="Monomial1D.h" />
     <ClInclude Include="NonZeroCoefficients.h" />
-    <ClInclude Include="Poisson1D_OLD.h" />
-    <ClInclude Include="Poisson1D_DGTerms_GlobalBasis.h" />
-    <ClInclude Include="Poisson1D_DGTerms_LocalBasisOLD.h" />
     <ClInclude Include="Poisson.h" />
     <ClInclude Include="IBasisFunction.h" />
     <ClInclude Include="Poisson1D_DGTerms_LocalBasis.h" />
