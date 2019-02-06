@@ -140,6 +140,9 @@ public:
 
 		this->A = Eigen::SparseMatrix<double>(nUnknowns, nUnknowns);
 		matrixCoeffs.Fill(this->A);
+		cout << "nnz(A) = " << this->A.nonZeros() << endl;
+
+		cout << "Export..." << endl;
 		Eigen::saveMarket(this->A, matrixFilePath);
 		cout << "Matrix exported to \t" << matrixFilePath << endl;
 
