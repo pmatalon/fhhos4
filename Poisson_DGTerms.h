@@ -7,14 +7,14 @@
 #include "Poisson_DG_Element.h"
 #include "Poisson_DG_Face.h"
 
-class IPoisson_DGTerms
+class Poisson_DGTerms
 {
 private:
 	SourceFunction* _sourceFunction;
 public:
 	std::map<StandardElementCode, Poisson_DG_ReferenceElement*> ReferenceElements;
 
-	IPoisson_DGTerms(SourceFunction* sourceFunction)
+	Poisson_DGTerms(SourceFunction* sourceFunction)
 	{
 		this->_sourceFunction = sourceFunction;
 	}
@@ -59,7 +59,7 @@ public:
 		return dgElement->SourceTerm(phi, this->_sourceFunction);
 	}
 
-	virtual ~IPoisson_DGTerms() {}
+	virtual ~Poisson_DGTerms() {}
 
 protected:
 

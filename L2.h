@@ -1,6 +1,6 @@
 #pragma once
 #include "Utils.h"
-#include "IBasisFunction.h"
+#include "BasisFunction.h"
 #include <Eigen/Sparse>
 #include "IMesh.h"
 #include "FunctionalBasis.h"

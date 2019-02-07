@@ -1,23 +1,18 @@
 #pragma once
-#include <functional>
 #include <math.h>
-#include "IBasisFunction.h"
-#include "IPoisson_DGTerms.h"
+#include "BasisFunction.h"
+#include "Poisson_DGTerms.h"
 #include "Utils.h"
 #include "Element.h"
 #include "Poisson_DG_ReferenceInterval.h"
 using namespace std;
 
-class Poisson1D_DGTerms_LocalBasis : public IPoisson_DGTerms
+class Poisson1D_DGTerms_LocalBasis : public Poisson_DGTerms
 {
-protected:
-	//function<double(double)> _sourceFunction;
-
 public:
-	Poisson1D_DGTerms_LocalBasis(function<double(double)> sourceFunction, FunctionalBasis1D* basis) 
-		: IPoisson_DGTerms(new SourceFunction1D(sourceFunction))
+	Poisson1D_DGTerms_LocalBasis(SourceFunction* sourceFunction, FunctionalBasis1D* basis) 
+		: Poisson_DGTerms(sourceFunction)
 	{
-		//this->_sourceFunction = sourceFunction;
 		Poisson_DG_ReferenceElement* refInterval = new Poisson_DG_ReferenceInterval(basis->NumberOfLocalFunctionsInElement(NULL));
 		this->ComputeReferenceTerms(basis, refInterval);
 		this->ReferenceElements.insert(std::make_pair(StandardElementCode::Interval, refInterval));

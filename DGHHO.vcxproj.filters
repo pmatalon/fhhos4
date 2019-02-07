@@ -37,9 +37,6 @@
     <ClInclude Include="Legendre1D.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
-    <ClInclude Include="IBasisFunction.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
     <ClInclude Include="TensorPolynomial.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
@@ -65,17 +62,11 @@
     <ClInclude Include="Poisson3D_DGTerms_LocalBasis.h">
       <Filter>DG</Filter>
     </ClInclude>
-    <ClInclude Include="IPoisson_DGTerms.h">
-      <Filter>DG</Filter>
-    </ClInclude>
     <ClInclude Include="Poisson2D_HHOTerms.h">
       <Filter>HHO</Filter>
     </ClInclude>
     <ClInclude Include="PoissonHHO.h">
       <Filter>HHO</Filter>
-    </ClInclude>
-    <ClInclude Include="Poisson.h">
-      <Filter>DG</Filter>
     </ClInclude>
     <ClInclude Include="Poisson1D_DGTerms_LocalBasis.h">
       <Filter>DG</Filter>
@@ -127,6 +118,15 @@
     </ClInclude>
     <ClInclude Include="SourceFunction.h">
       <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson_DG.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="BasisFunction.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson_DGTerms.h">
+      <Filter>DG</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

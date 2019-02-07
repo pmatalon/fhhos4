@@ -6,6 +6,7 @@ class SourceFunction
 {
 public:
 	virtual double Eval(Point p) = 0;
+	virtual ~SourceFunction() {}
 };
 
 class SourceFunction1D : public SourceFunction

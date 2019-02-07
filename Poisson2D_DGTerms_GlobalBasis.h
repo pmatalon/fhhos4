@@ -1,22 +1,22 @@
 #pragma once
 #include <functional>
 #include <math.h>
-#include "IPoisson_DGTerms.h"
-#include "IBasisFunction.h"
+#include "Poisson_DGTerms.h"
+#include "BasisFunction.h"
 #include "Utils.h"
 #include "Element.h"
 #include "Face.h"
 #include "Square.h"
 using namespace std;
 
-class Poisson2D_DGTerms_GlobalBasis : public IPoisson_DGTerms
+class Poisson2D_DGTerms_GlobalBasis : public Poisson_DGTerms
 {
 protected:
 	function<double(double, double)> _sourceFunction;
 
 public:
 	Poisson2D_DGTerms_GlobalBasis(function<double(double, double)> sourceFunction)
-		: IPoisson_DGTerms(new SourceFunction2D(sourceFunction))
+		: Poisson_DGTerms(new SourceFunction2D(sourceFunction))
 	{
 		this->_sourceFunction = sourceFunction;
 	}

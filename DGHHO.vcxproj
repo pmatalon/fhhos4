@@ -112,14 +112,14 @@
     <ClInclude Include="Face.h" />
     <ClInclude Include="GaussLegendre.h" />
     <ClInclude Include="Interval.h" />
-    <ClInclude Include="IPoisson_DGTerms.h" />
+    <ClInclude Include="Poisson_DGTerms.h" />
     <ClInclude Include="L2.h" />
     <ClInclude Include="Legendre1D.h" />
     <ClInclude Include="IMesh.h" />
     <ClInclude Include="Monomial1D.h" />
     <ClInclude Include="NonZeroCoefficients.h" />
-    <ClInclude Include="Poisson.h" />
-    <ClInclude Include="IBasisFunction.h" />
+    <ClInclude Include="Poisson_DG.h" />
+    <ClInclude Include="BasisFunction.h" />
     <ClInclude Include="Poisson1D_DGTerms_LocalBasis.h" />
     <ClInclude Include="Poisson2D_DGTerms_GlobalBasis.h" />
     <ClInclude Include="Poisson2D_DGTerms_LocalBasis.h" />

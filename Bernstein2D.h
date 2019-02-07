@@ -1,5 +1,5 @@
 #pragma once
-#include "IBasisFunction.h"
+#include "BasisFunction.h"
 #include "Utils.h"
 #include <math.h>
 

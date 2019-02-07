@@ -1,6 +1,6 @@
 #pragma once
 #include "BasisFunctionFactory.h"
-#include "IBasisFunction.h"
+#include "BasisFunction.h"
 #include "TensorPolynomial.h"
 #include "Bernstein2D.h"
 #include "Bernstein3D.h"

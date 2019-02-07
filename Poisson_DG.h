@@ -5,21 +5,21 @@
 #include "Problem.h"
 #include "IMesh.h"
 #include "Face.h"
-#include "IPoisson_DGTerms.h"
+#include "Poisson_DGTerms.h"
 #include "NonZeroCoefficients.h"
 #include "L2.h"
 using namespace std;
 
-class Poisson : public Problem
+class Poisson_DG : public Problem
 {
 private:
 
 public:
 
-	Poisson(string solutionName) : Problem(solutionName)
+	Poisson_DG(string solutionName) : Problem(solutionName)
 	{	}
 
-	void DiscretizeDG(IMesh* mesh, FunctionalBasis* basis, IPoisson_DGTerms* dg, int penalizationCoefficient, string outputDirectory, bool extractMatrixComponents, bool extractMassMatrix)
+	void Assemble(IMesh* mesh, FunctionalBasis* basis, Poisson_DGTerms* dg, int penalizationCoefficient, string outputDirectory, bool extractMatrixComponents, bool extractMassMatrix)
 	{
 		bool autoPenalization = penalizationCoefficient == -1;
 		if (autoPenalization)

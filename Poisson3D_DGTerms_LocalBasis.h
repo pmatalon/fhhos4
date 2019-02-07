@@ -1,8 +1,7 @@
 #pragma once
-#include <functional>
 #include <math.h>
-#include "IPoisson_DGTerms.h"
-#include "IBasisFunction.h"
+#include "Poisson_DGTerms.h"
+#include "BasisFunction.h"
 #include "Utils.h"
 #include "Element.h"
 #include "Face.h"
@@ -10,16 +9,12 @@
 #include "Poisson_DG_ReferenceCube.h"
 using namespace std;
 
-class Poisson3D_DGTerms_LocalBasis : public IPoisson_DGTerms
+class Poisson3D_DGTerms_LocalBasis : public Poisson_DGTerms
 {
-protected:
-	//function<double(double, double, double)> _sourceFunction;
-
 public:
-	Poisson3D_DGTerms_LocalBasis(function<double(double, double, double)> sourceFunction, FunctionalBasis3D* basis)
-		: IPoisson_DGTerms(new SourceFunction3D(sourceFunction))
+	Poisson3D_DGTerms_LocalBasis(SourceFunction* sourceFunction, FunctionalBasis3D* basis)
+		: Poisson_DGTerms(sourceFunction)
 	{
-		//this->_sourceFunction = sourceFunction;
 		Poisson_DG_ReferenceElement* refCube = new Poisson_DG_ReferenceCube(basis->NumberOfLocalFunctionsInElement(NULL));
 		this->ComputeReferenceTerms(basis, refCube);
 		this->ReferenceElements.insert(std::make_pair(StandardElementCode::Cube, refCube));
