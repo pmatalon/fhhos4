@@ -9,19 +9,19 @@
 #include "Square.h"
 using namespace std;
 
-class Poisson2D_DGTerms_GlobalBasis : public Poisson_DGTerms
+class Poisson2D_DGTerms_GlobalBasis : public Poisson_DGTerms<2>
 {
 protected:
 	function<double(double, double)> _sourceFunction;
 
 public:
-	Poisson2D_DGTerms_GlobalBasis(function<double(double, double)> sourceFunction)
-		: Poisson_DGTerms(new SourceFunction2D(sourceFunction))
+	Poisson2D_DGTerms_GlobalBasis(function<double(double, double)> sourceFunction, FunctionalBasis<2>* basis)
+		: Poisson_DGTerms<2>(new SourceFunction2D(sourceFunction), basis)
 	{
 		this->_sourceFunction = sourceFunction;
 	}
 
-	bool IsGlobalBasis() { return true; }
+	bool IsGlobalBasis() override { return true; }
 
 	double VolumicTerm(Element* element, IBasisFunction2D* func1, IBasisFunction2D* func2)
 	{

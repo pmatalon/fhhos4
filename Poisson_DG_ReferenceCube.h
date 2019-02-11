@@ -2,14 +2,14 @@
 #include "Element.h"
 #include "Poisson_DG_ReferenceElement.h"
 
-class Poisson_DG_ReferenceCube : public Poisson_DG_ReferenceElement
+class Poisson_DG_ReferenceCube : public Poisson_DG_ReferenceElement<3>
 {
 public:
 	Poisson_DG_ReferenceCube(int nBasisFunctions) :
 		Poisson_DG_ReferenceElement(nBasisFunctions)
 	{}
 
-	void ComputeVolumicTerm(BasisFunction* p_phi1, BasisFunction* p_phi2)
+	void ComputeVolumicTerm(BasisFunction<3>* p_phi1, BasisFunction<3>* p_phi2)
 	{
 		IBasisFunction3D* phi1 = static_cast<IBasisFunction3D*>(p_phi1);
 		IBasisFunction3D* phi2 = static_cast<IBasisFunction3D*>(p_phi2);
@@ -24,7 +24,7 @@ public:
 		this->_volumicTerms(phi1->LocalNumber, phi2->LocalNumber) = result;
 	}
 
-	void ComputeMassTerm(BasisFunction* p_phi1, BasisFunction* p_phi2)
+	void ComputeMassTerm(BasisFunction<3>* p_phi1, BasisFunction<3>* p_phi2)
 	{
 		IBasisFunction3D* phi1 = static_cast<IBasisFunction3D*>(p_phi1);
 		IBasisFunction3D* phi2 = static_cast<IBasisFunction3D*>(p_phi2);

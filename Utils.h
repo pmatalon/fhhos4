@@ -2,6 +2,7 @@
 #include <functional>
 #include <vector>
 #include "GaussLegendre.h"
+#include "Point.h"
 
 typedef unsigned int BigNumber;
 
@@ -24,6 +25,14 @@ public:
 	static double Integral(std::function<double(double)> func, double x1, double x2)
 	{
 		return Integral(GaussLegendre::MAX_POINTS, func, x1, x2);
+	}
+
+	static double Integral(std::function<double(Point)> func, double x1, double x2)
+	{
+		function<double(double)> funcToIntegrate = [func](double x) {
+			return func(x);
+		};
+		return Integral(funcToIntegrate, x1, x2);
 	}
 
 	/*static double Integral(int nPoints, std::function<double(double)> func, DefInterval interval)
@@ -55,6 +64,15 @@ public:
 		return Integral(GaussLegendre::MAX_POINTS, func, x1, x2, y1, y2);
 	}
 
+	static double Integral(std::function<double(Point)> func, double x1, double x2, double y1, double y2)
+	{
+		function<double(double, double)> funcToIntegrate = [func](double x, double y) {
+			Point p(x, y);
+			return func(p);
+		};
+		return Integral(funcToIntegrate, x1, x2, y1, y2);
+	}
+
 	/*static double Integral(int nPoints, std::function<double(double, double)> func, DefInterval xInterval, DefInterval yInterval)
 	{
 		return Integral(nPoints, func, xInterval.Left, xInterval.Right, yInterval.Left, yInterval.Right);
@@ -82,6 +100,15 @@ public:
 	static double Integral(std::function<double(double, double, double)> func, double x1, double x2, double y1, double y2, double z1, double z2)
 	{
 		return Integral(GaussLegendre::MAX_POINTS, func, x1, x2, y1, y2, z1, z2);
+	}
+
+	static double Integral(std::function<double(Point)> func, double x1, double x2, double y1, double y2, double z1, double z2)
+	{
+		function<double(double, double, double)> funcToIntegrate = [func](double x, double y, double z) {
+			Point p(x, y, z);
+			return func(p);
+		};
+		return Integral(funcToIntegrate, x1, x2, y1, y2, z1, z2);
 	}
 
 	/*static double Integral(int nPoints, std::function<double(double, double, double)> func, DefInterval xInterval, DefInterval yInterval, DefInterval zInterval)

@@ -4,23 +4,22 @@
 #include "BasisFunction.h"
 #include "Utils.h"
 #include "Element.h"
-#include "Face.h"
 #include "Cube.h"
 #include "Poisson_DG_ReferenceCube.h"
 using namespace std;
 
-class Poisson3D_DGTerms_LocalBasis : public Poisson_DGTerms
+class Poisson3D_DGTerms_LocalBasis : public Poisson_DGTerms<3>
 {
 public:
-	Poisson3D_DGTerms_LocalBasis(SourceFunction* sourceFunction, FunctionalBasis3D* basis)
-		: Poisson_DGTerms(sourceFunction)
+	Poisson3D_DGTerms_LocalBasis(SourceFunction* sourceFunction, FunctionalBasis<3>* basis)
+		: Poisson_DGTerms<3>(sourceFunction, basis)
 	{
-		Poisson_DG_ReferenceElement* refCube = new Poisson_DG_ReferenceCube(basis->NumberOfLocalFunctionsInElement(NULL));
+		/*Poisson_DG_ReferenceElement<3>* refCube = new Poisson_DG_ReferenceCube(basis->NumberOfLocalFunctionsInElement(NULL));
 		this->ComputeReferenceTerms(basis, refCube);
-		this->ReferenceElements.insert(std::make_pair(StandardElementCode::Cube, refCube));
+		this->ReferenceElements.insert(std::make_pair(StandardElementCode::Cube, refCube));*/
 	}
 
-	bool IsGlobalBasis() { return false; }
+	//bool IsGlobalBasis() { return false; }
 
 	/*double VolumicTerm(Element* element, IBasisFunction3D* phi1, IBasisFunction3D* phi2)
 	{

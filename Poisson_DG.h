@@ -10,6 +10,7 @@
 #include "L2.h"
 using namespace std;
 
+template <short Dim>
 class Poisson_DG : public Problem
 {
 private:
@@ -19,7 +20,7 @@ public:
 	Poisson_DG(string solutionName) : Problem(solutionName)
 	{	}
 
-	void Assemble(IMesh* mesh, FunctionalBasis* basis, Poisson_DGTerms* dg, int penalizationCoefficient, string outputDirectory, bool extractMatrixComponents, bool extractMassMatrix)
+	void Assemble(IMesh* mesh, FunctionalBasis<Dim>* basis, Poisson_DGTerms<Dim>* dg, int penalizationCoefficient, string outputDirectory, bool extractMatrixComponents, bool extractMassMatrix)
 	{
 		bool autoPenalization = penalizationCoefficient == -1;
 		if (autoPenalization)
@@ -30,7 +31,7 @@ public:
 		cout << "\tBasis of polynomials: " << (dg->IsGlobalBasis() ? "global" : "") + basis->Name() << endl;
 		
 		cout << "Local functions: " << basis->NumberOfLocalFunctionsInElement(NULL) << endl;
-		for (BasisFunction* phi : basis->LocalFunctions)
+		for (BasisFunction<Dim>* phi : basis->LocalFunctions)
 			cout << "\t " << phi->ToString() << endl;
 		BigNumber nUnknowns = static_cast<int>(mesh->Elements.size()) * basis->NumberOfLocalFunctionsInElement(NULL);
 		cout << "Unknowns: " << nUnknowns << endl;
@@ -62,12 +63,12 @@ public:
 		{
 			//cout << "Element " << element->Number << endl;
 
-			for (BasisFunction* phi1 : basis->LocalFunctions)
+			for (BasisFunction<Dim>* phi1 : basis->LocalFunctions)
 			{
 				BigNumber basisFunction1 = basis->GlobalFunctionNumber(element, phi1);
 
 				// Current element (block diagonal)
-				for (BasisFunction* phi2 : basis->LocalFunctions)
+				for (BasisFunction<Dim>* phi2 : basis->LocalFunctions)
 				{
 					BigNumber basisFunction2 = basis->GlobalFunctionNumber(element, phi2);
 
@@ -115,10 +116,10 @@ public:
 			if (face->IsDomainBoundary)
 				continue;
 
-			for (BasisFunction* phi1 : basis->LocalFunctions)
+			for (BasisFunction<Dim>* phi1 : basis->LocalFunctions)
 			{
 				BigNumber basisFunction1 = basis->GlobalFunctionNumber(face->Element1, phi1);
-				for (BasisFunction* phi2 : basis->LocalFunctions)
+				for (BasisFunction<Dim>* phi2 : basis->LocalFunctions)
 				{
 					BigNumber basisFunction2 = basis->GlobalFunctionNumber(face->Element2, phi2);
 					double coupling = dg->CouplingTerm(face, face->Element1, phi1, face->Element2, phi2);

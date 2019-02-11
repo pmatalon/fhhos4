@@ -3,7 +3,7 @@
 #include "Utils.h"
 #include "Poisson_DG_Face.h"
 
-class Face2D : public Face, public Poisson_DG_Face
+class Face2D : public Face, public Poisson_DG_Face<2>
 {
 public:
 	double Length;
@@ -43,7 +43,7 @@ public:
 	//                 Poisson_DG_Element implementation                //
 	//------------------------------------------------------------------//
 
-	double CouplingTerm(Poisson_DG_Element* element1, BasisFunction* p_phi1, Poisson_DG_Element* element2, BasisFunction* p_phi2)
+	double CouplingTerm(Poisson_DG_Element<2>* element1, BasisFunction<2>* p_phi1, Poisson_DG_Element<2>* element2, BasisFunction<2>* p_phi2)
 	{
 		auto n1 = element1->OuterNormalVector(this);
 		auto n2 = element2->OuterNormalVector(this);
@@ -67,7 +67,7 @@ public:
 		return -meanFactor * Utils::Integral(nQuadPoints, functionToIntegrate, -1, 1);
 	}
 
-	double PenalizationTerm(Poisson_DG_Element* element1, BasisFunction* p_phi1, Poisson_DG_Element* element2, BasisFunction* p_phi2, double penalizationCoefficient)
+	double PenalizationTerm(Poisson_DG_Element<2>* element1, BasisFunction<2>* p_phi1, Poisson_DG_Element<2>* element2, BasisFunction<2>* p_phi2, double penalizationCoefficient)
 	{
 		auto n1 = element1->OuterNormalVector(this);
 		auto n2 = element2->OuterNormalVector(this);

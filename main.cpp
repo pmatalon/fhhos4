@@ -77,91 +77,125 @@ int main(int argc, char* argv[])
 	}
 	print_usage(solution, dimension, n, basisCode, polyDegree, fullTensorization, penalizationCoefficient, outputDirectory);
 
+	//static const short Dim = dimension;
+
 	IMesh* mesh;
-	Poisson_DG* problem;
-	Poisson_DGTerms* dg;
+	//Poisson_DG* problem;
+	//Poisson_DGTerms* dg;
 	SourceFunction* sourceFunction;
 
 	if (dimension == 1)
 	{
 		mesh = new CartesianGrid1D(n);
 
-		std::function<double(double)> exactSolution = [](double x) { return sin(4 * M_PI * x) / (16 * pow(M_PI, 2)); };
-		//std::function<double(double)> sourceFunction = [](double x) { return sin(4 * M_PI * x); };
+		std::function<double(Point)> exactSolution = [](Point p) 
+		{
+			double x = p.X;
+			return sin(4 * M_PI * x) / (16 * pow(M_PI, 2)); 
+		};
 		sourceFunction = new SourceFunction1D([](double x) { return sin(4 * M_PI * x); });
 		if (solution.compare("poly") == 0)
 		{
-			std::function<double(double)> exactSolution = [](double x) { return x * (1 - x); };
-			//sourceFunction = [](double x) { return 2; };
+			std::function<double(Point)> exactSolution = [](Point p) 
+			{ 
+				double x = p.X;
+				return x * (1 - x); 
+			};
 			sourceFunction = new SourceFunction1D([](double x) { return 2; });
 			//sourceFunction = [](double x) { return (-1)*(-6 * x*pow(x - 1, 3) - 3 * pow(x, 3) * (2 * x - 2) - 18 * pow(x, 2) * pow(x - 1, 2)); };
 		}
 
-		problem = new Poisson_DG(solution);
-		FunctionalBasis1D* basis = new FunctionalBasis1D(basisCode, polyDegree);
-		dg = new Poisson1D_DGTerms_LocalBasis(sourceFunction, basis);
+		Poisson_DG<1>* problem = new Poisson_DG<1>(solution);
+		//FunctionalBasis1D* basis = new FunctionalBasis1D(basisCode, polyDegree);
+		FunctionalBasis<1>* basis = new FunctionalBasis<1>(basisCode, polyDegree);
+		Poisson_DGTerms<1>* dg = new Poisson1D_DGTerms_LocalBasis(sourceFunction, basis);
 
 		problem->Assemble(mesh, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents, extractMassMatrix);
 
 		problem->Solve();
-		double error = L2::Error(mesh, basis, problem->Solution, exactSolution);
+		//double error = L2::Error(mesh, basis, problem->Solution, exactSolution);
+		double error = L2::Error<1>(mesh, basis, problem->Solution, exactSolution);
 		cout << "L2 Error = " << error << endl;
 
+		delete dg;
+		delete problem;
 		delete basis;
 	}
 	else if (dimension == 2)
 	{
 		mesh = new CartesianGrid2D(n);
 
-		std::function<double(double, double)> exactSolution = [](double x, double y) { return sin(4 * M_PI * x)*sin(4 * M_PI * y); };
-		//std::function<double(double, double)> sourceFunction = [](double x, double y) { return 2 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y); };
+		std::function<double(Point)> exactSolution = [](Point p) 
+		{
+			double x = p.X;
+			double y = p.Y;
+			return sin(4 * M_PI * x)*sin(4 * M_PI * y); 
+		};
 		sourceFunction = new SourceFunction2D([](double x, double y) { return 2 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y); });
 		if (solution.compare("poly") == 0)
 		{
-			exactSolution = [](double x, double y) { return x*(1 - x) * y*(1 - y); };
-			//sourceFunction = [](double x, double y) { return 2 * y*(1 - y) + 2 * x*(1 - x); };
+			exactSolution = [](Point p)
+			{
+				double x = p.X;
+				double y = p.Y; 
+				return x*(1 - x) * y*(1 - y); 
+			};
 			sourceFunction = new SourceFunction2D([](double x, double y) { return 2 * y*(1 - y) + 2 * x*(1 - x); });
 		}
-		problem = new Poisson_DG(solution);
+		Poisson_DG<2>* problem = new Poisson_DG<2>(solution);
 
-		FunctionalBasis2D* basis = new FunctionalBasis2D(basisCode, polyDegree, fullTensorization);
+		FunctionalBasis<2>* basis = new FunctionalBasis<2>(basisCode, polyDegree, fullTensorization);
 
-		dg = new Poisson2D_DGTerms_LocalBasis(sourceFunction, basis);
+		Poisson_DGTerms<2>* dg = new Poisson2D_DGTerms_LocalBasis(sourceFunction, basis);
 
 		problem->Assemble(mesh, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents, extractMassMatrix);
 
 		problem->Solve();
-		double error = L2::Error(mesh, basis, problem->Solution, exactSolution);
+		double error = L2::Error<2>(mesh, basis, problem->Solution, exactSolution);
 		cout << "L2 Error = " << error << endl;
 
+		delete dg;
+		delete problem;
 		delete basis;
 	}
 	else if (dimension == 3)
 	{
 		mesh = new CartesianGrid3D(n);
 
-		std::function<double(double, double, double)> exactSolution = [](double x, double y, double z) { return sin(4 * M_PI * x)*sin(4 * M_PI * y)*sin(4 * M_PI * z); };
-		//std::function<double(double, double, double)> sourceFunction = [](double x, double y, double z) { return 3 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y)*sin(4 * M_PI * z); };
-		sourceFunction = new SourceFunction3D([](double x, double y, double z) { return 3 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y)*sin(4 * M_PI * z); });
+		std::function<double(Point)> exactSolution = [](Point p) 
+		{ 
+			double x = p.X;
+			double y = p.Y;
+			double z = p.Z;
+			return sin(4 * M_PI * x)*sin(4 * M_PI * y)*sin(4 * M_PI * z);
+		};
+		sourceFunction = new SourceFunction3D([](double x, double y, double z) {  return 3 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y)*sin(4 * M_PI * z); });
 		if (solution.compare("poly") == 0)
 		{
-			exactSolution = [](double x, double y, double z) { return x * (1 - x)*y*(1 - y)*z*(1 - z); };
-			//sourceFunction = [](double x, double y, double z) { return 2 * (y*(1 - y)*z*(1 - z) + x * (1 - x)*z*(1 - z) + x * (1 - x)*y*(1 - y)); };
+			exactSolution = [](Point p)
+			{
+				double x = p.X;
+				double y = p.Y;
+				double z = p.Z; 
+				return x * (1 - x)*y*(1 - y)*z*(1 - z);
+			};
 			sourceFunction = new SourceFunction3D([](double x, double y, double z) { return 2 * (y*(1 - y)*z*(1 - z) + x * (1 - x)*z*(1 - z) + x * (1 - x)*y*(1 - y)); });
 		}
 
-		problem = new Poisson_DG(solution);
+		Poisson_DG<3>* problem = new Poisson_DG<3>(solution);
 
-		FunctionalBasis3D* basis = new FunctionalBasis3D(basisCode, polyDegree, fullTensorization);
+		FunctionalBasis<3>* basis = new FunctionalBasis<3>(basisCode, polyDegree, fullTensorization);
 
-		dg = new Poisson3D_DGTerms_LocalBasis(sourceFunction, basis);
+		Poisson_DGTerms<3>* dg = new Poisson3D_DGTerms_LocalBasis(sourceFunction, basis);
 
 		problem->Assemble(mesh, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents, extractMassMatrix);
 
 		problem->Solve();
-		double error = L2::Error(mesh, basis, problem->Solution, exactSolution);
+		double error = L2::Error<3>(mesh, basis, problem->Solution, exactSolution);
 		cout << "L2 Error = " << error << endl;
 
+		delete dg;
+		delete problem;
 		delete basis;
 	}
 	else
@@ -171,8 +205,8 @@ int main(int argc, char* argv[])
 	}
 
 	delete sourceFunction;
-	delete dg;
-	delete problem;
+	//delete dg;
+	//delete problem;
 	delete mesh;
 
 	cout << "-------------------------- DONE ------------------------" << endl;

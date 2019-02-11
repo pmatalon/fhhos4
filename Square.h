@@ -6,7 +6,7 @@
 #include "SourceFunction.h"
 #include <assert.h>
 
-class Square : public Element, public Poisson_DG_Element
+class Square : public Element, public Poisson_DG_Element<2>
 {
 public:
 	double X;
@@ -87,24 +87,51 @@ public:
 		return NULL;
 	}
 
+	double Integral(function<double(Point)> func)
+	{
+		double x1 = this->X;
+		double x2 = this->X + this->Width;
+		double y1 = this->Y;
+		double y2 = this->Y + this->Width;
+
+		return Utils::Integral(func, x1, x2, y1, y2);
+	}
+
+	double L2ErrorPow2(function<double(Point)> approximate, function<double(Point)> exactSolution)
+	{
+		double x1 = this->X;
+		double x2 = this->X + this->Width;
+		double y1 = this->Y;
+		double y2 = this->Y + this->Width;
+
+		function<double(double, double)> errorFunction = [exactSolution, approximate, x1, x2, y1, y2](double t, double u) {
+			Point p;
+			p.X = (x2 - x1) / 2 * t + (x2 + x1) / 2;
+			p.Y = (y2 - y1) / 2 * u + (y2 + y1) / 2;
+			return pow(exactSolution(p) - approximate(Point(t, u)), 2);
+		};
+
+		return (x2 - x1) * (y2 - y1) / 4 * Utils::Integral(errorFunction, -1, 1, -1, 1);
+	}
+
 	//------------------------------------------------------------------//
 	//                 Poisson_DG_Element implementation                //
 	//------------------------------------------------------------------//
 
-	double VolumicTerm(BasisFunction* phi1, BasisFunction* phi2, Poisson_DG_ReferenceElement* referenceElement)
+	double VolumicTerm(BasisFunction<2>* phi1, BasisFunction<2>* phi2, Poisson_DG_ReferenceElement<2>* referenceElement)
 	{
 		return referenceElement->VolumicTerm(phi1, phi2);
 		//if (this == ReferenceSquare)
 			//return 
 	}
 
-	double MassTerm(BasisFunction* phi1, BasisFunction* phi2, Poisson_DG_ReferenceElement* referenceElement)
+	double MassTerm(BasisFunction<2>* phi1, BasisFunction<2>* phi2, Poisson_DG_ReferenceElement<2>* referenceElement)
 	{
 		double h = this->Width;
 		return pow(h, 2) / 4 * referenceElement->MassTerm(phi1, phi2);
 	}
 
-	double SourceTerm(BasisFunction* phi, SourceFunction* f)
+	double SourceTerm(BasisFunction<2>* phi, SourceFunction* f)
 	{
 		double x1 = this->X;
 		double x2 = this->X + this->Width;
@@ -122,7 +149,7 @@ public:
 		return jacobian * Utils::Integral(sourceTimesBasisFunction, -1,1, -1,1);
 	}
 
-	function<double(Point)> EvalPhiOnFace(Face* face, BasisFunction* p_phi)
+	function<double(Point)> EvalPhiOnFace(Face* face, BasisFunction<2>* p_phi)
 	{
 		IBasisFunction2D* phi = dynamic_cast<IBasisFunction2D*>(p_phi);
 
@@ -149,7 +176,7 @@ public:
 	}
 
 
-	function<double*(Point)> GradPhiOnFace(Face* face, BasisFunction* p_phi)
+	function<double*(Point)> GradPhiOnFace(Face* face, BasisFunction<2>* p_phi)
 	{
 		IBasisFunction2D* phi = dynamic_cast<IBasisFunction2D*>(p_phi);
 

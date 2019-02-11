@@ -7,18 +7,18 @@
 #include "Poisson_DG_ReferenceInterval.h"
 using namespace std;
 
-class Poisson1D_DGTerms_LocalBasis : public Poisson_DGTerms
+class Poisson1D_DGTerms_LocalBasis : public Poisson_DGTerms<1>
 {
 public:
-	Poisson1D_DGTerms_LocalBasis(SourceFunction* sourceFunction, FunctionalBasis1D* basis) 
-		: Poisson_DGTerms(sourceFunction)
+	Poisson1D_DGTerms_LocalBasis(SourceFunction* sourceFunction, FunctionalBasis<1>* basis) 
+		: Poisson_DGTerms<1>(sourceFunction, basis)
 	{
-		Poisson_DG_ReferenceElement* refInterval = new Poisson_DG_ReferenceInterval(basis->NumberOfLocalFunctionsInElement(NULL));
+		/*Poisson_DG_ReferenceElement<1>* refInterval = new Poisson_DG_ReferenceInterval(basis->NumberOfLocalFunctionsInElement(NULL));
 		this->ComputeReferenceTerms(basis, refInterval);
-		this->ReferenceElements.insert(std::make_pair(StandardElementCode::Interval, refInterval));
+		this->ReferenceElements.insert(std::make_pair(StandardElementCode::Interval, refInterval));*/
 	}
 
-	bool IsGlobalBasis() { return false; }
+	//bool IsGlobalBasis() { return false; }
 
 	/*double VolumicTerm(Element* element, IBasisFunction1D* phi1, IBasisFunction1D* phi2)
 	{

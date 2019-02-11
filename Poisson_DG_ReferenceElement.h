@@ -2,6 +2,7 @@
 #include <Eigen/Dense>
 #include "BasisFunction.h"
 
+template <short Dim>
 class Poisson_DG_ReferenceElement
 {
 protected:
@@ -12,15 +13,15 @@ public:
 		_volumicTerms(nBasisFunctions, nBasisFunctions), _massTerms(nBasisFunctions, nBasisFunctions)
 	{}
 
-	double VolumicTerm(BasisFunction* phi1, BasisFunction* phi2)
+	double VolumicTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{
 		return this->_volumicTerms(phi1->LocalNumber, phi2->LocalNumber);
 	}
-	double MassTerm(BasisFunction* phi1, BasisFunction* phi2)
+	double MassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{
 		return this->_massTerms(phi1->LocalNumber, phi2->LocalNumber);
 	}
 
-	virtual void ComputeVolumicTerm(BasisFunction* phi1, BasisFunction* phi2) = 0;
-	virtual void ComputeMassTerm(BasisFunction* phi1, BasisFunction* phi2) = 0;
+	virtual void ComputeVolumicTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) = 0;
+	virtual void ComputeMassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) = 0;
 };

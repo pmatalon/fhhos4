@@ -3,6 +3,7 @@
 #include "Point.h"
 using namespace std;
 
+template <short Dim>
 class BasisFunction
 {
 public:
@@ -12,7 +13,7 @@ public:
 	virtual string ToString() = 0;
 };
 
-class IBasisFunction1D : public BasisFunction
+class IBasisFunction1D : public BasisFunction<1>
 {
 public:
 	virtual double Eval(double x) = 0;
@@ -31,7 +32,7 @@ public:
 	virtual string ToString(string var) = 0;
 };
 
-class IBasisFunction2D : public BasisFunction
+class IBasisFunction2D : public BasisFunction<2>
 {
 public:
 	virtual double Eval(double x, double y) = 0;
@@ -47,7 +48,7 @@ public:
 	}
 };
 
-class IBasisFunction3D : public BasisFunction
+class IBasisFunction3D : public BasisFunction<3>
 {
 public:
 	virtual double Eval(double x, double y, double z) = 0;

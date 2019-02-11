@@ -3,7 +3,7 @@
 #include "Poisson_DG_Face.h"
 #include "Interval.h"
 
-class Face1D : public Face, public Poisson_DG_Face
+class Face1D : public Face, public Poisson_DG_Face<1>
 {
 public:
 	double X;
@@ -28,7 +28,7 @@ public:
 	//                 Poisson_DG_Element implementation                //
 	//------------------------------------------------------------------//
 
-	double CouplingTerm(Poisson_DG_Element* element1, BasisFunction* p_phi1, Poisson_DG_Element* element2, BasisFunction* p_phi2)
+	double CouplingTerm(Poisson_DG_Element<1>* element1, BasisFunction<1>* p_phi1, Poisson_DG_Element<1>* element2, BasisFunction<1>* p_phi2)
 	{
 		IBasisFunction1D* phi1 = static_cast<IBasisFunction1D*>(p_phi1);
 		IBasisFunction1D* phi2 = static_cast<IBasisFunction1D*>(p_phi2);
@@ -39,7 +39,7 @@ public:
 		return MeanDerivative(interval1, phi1) * Jump(interval2, phi2) + MeanDerivative(interval2, phi2) * Jump(interval1, phi1);
 	}
 
-	double PenalizationTerm(Poisson_DG_Element* element1, BasisFunction* p_phi1, Poisson_DG_Element* element2, BasisFunction* p_phi2, double penalizationCoefficient)
+	double PenalizationTerm(Poisson_DG_Element<1>* element1, BasisFunction<1>* p_phi1, Poisson_DG_Element<1>* element2, BasisFunction<1>* p_phi2, double penalizationCoefficient)
 	{
 		IBasisFunction1D* phi1 = static_cast<IBasisFunction1D*>(p_phi1);
 		IBasisFunction1D* phi2 = static_cast<IBasisFunction1D*>(p_phi2);

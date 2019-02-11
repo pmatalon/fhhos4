@@ -3,7 +3,7 @@
 #include "Poisson_DG_Element.h"
 #include "Poisson_DG_ReferenceElement.h"
 
-class Interval : public Element, public Poisson_DG_Element
+class Interval : public Element, public Poisson_DG_Element<1>
 {
 public:
 	double A;
@@ -35,24 +35,45 @@ public:
 			return new double[1]{ 1 };
 		return NULL;
 	}
+
+	double Integral(function<double(Point)> func)
+	{
+		function<double(double)> funcToIntegrate = [func](double x) {
+			return func(x);
+		};
+
+		return Utils::Integral(funcToIntegrate, this->A, this->B);
+	}
+
+	double L2ErrorPow2(function<double(Point)> approximate, function<double(Point)> exactSolution)
+	{
+		double a = this->A;
+		double b = this->B;
+
+		function<double(double)> errorFunction = [exactSolution, approximate, a, b](double t) {
+			return pow(exactSolution((b - a) / 2 * t + (b + a) / 2) - approximate(t), 2);
+		};
+
+		return (b - a) / 2 * Utils::Integral(errorFunction, -1, 1);
+	}
 	
 	//------------------------------------------------------------------//
 	//                 Poisson_DG_Element implementation                //
 	//------------------------------------------------------------------//
 
-	double VolumicTerm(BasisFunction* phi1, BasisFunction* phi2, Poisson_DG_ReferenceElement* referenceElement)
+	double VolumicTerm(BasisFunction<1>* phi1, BasisFunction<1>* phi2, Poisson_DG_ReferenceElement<1>* referenceElement)
 	{
 		double h = this->B - this->A;
 		return 2 / h * referenceElement->VolumicTerm(phi1, phi2);
 	}
 
-	double MassTerm(BasisFunction* phi1, BasisFunction* phi2, Poisson_DG_ReferenceElement* referenceElement)
+	double MassTerm(BasisFunction<1>* phi1, BasisFunction<1>* phi2, Poisson_DG_ReferenceElement<1>* referenceElement)
 	{
 		double h = this->B - this->A;
 		return h / 2 * referenceElement->MassTerm(phi1, phi2);
 	}
 	
-	double SourceTerm(BasisFunction* phi, SourceFunction* f)
+	double SourceTerm(BasisFunction<1>* phi, SourceFunction* f)
 	{
 		double a = this->A;
 		double b = this->B;
@@ -64,7 +85,7 @@ public:
 		return  (b - a) / 2 * Utils::Integral(sourceTimesBasisFunction, -1, 1);
 	}
 
-	function<double(Point)> EvalPhiOnFace(Face* face, BasisFunction* p_phi)
+	function<double(Point)> EvalPhiOnFace(Face* face, BasisFunction<1>* p_phi)
 	{
 		IBasisFunction1D* phi = dynamic_cast<IBasisFunction1D*>(p_phi);
 
@@ -76,7 +97,7 @@ public:
 	}
 
 
-	function<double*(Point)> GradPhiOnFace(Face* face, BasisFunction* p_phi)
+	function<double*(Point)> GradPhiOnFace(Face* face, BasisFunction<1>* p_phi)
 	{
 		IBasisFunction1D* phi = dynamic_cast<IBasisFunction1D*>(p_phi);
 

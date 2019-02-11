@@ -20,6 +20,6 @@ public:
 	{
 		this->X = x;
 		this->Y = y;
-		this->Z = y;
+		this->Z = z;
 	}
 };

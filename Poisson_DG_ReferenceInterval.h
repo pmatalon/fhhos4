@@ -2,15 +2,15 @@
 #include "Element.h"
 #include "Poisson_DG_ReferenceElement.h"
 
-class Poisson_DG_ReferenceInterval : public Poisson_DG_ReferenceElement
+class Poisson_DG_ReferenceInterval : public Poisson_DG_ReferenceElement<1>
 {
 public:
 	// [-1, 1]
 	Poisson_DG_ReferenceInterval(int nBasisFunctions) : 
-		Poisson_DG_ReferenceElement(nBasisFunctions)
+		Poisson_DG_ReferenceElement<1>(nBasisFunctions)
 	{}
 
-	void ComputeVolumicTerm(BasisFunction* p_phi1, BasisFunction* p_phi2)
+	void ComputeVolumicTerm(BasisFunction<1>* p_phi1, BasisFunction<1>* p_phi2)
 	{
 		IBasisFunction1D* phi1 = dynamic_cast<IBasisFunction1D*>(p_phi1);
 		IBasisFunction1D* phi2 = dynamic_cast<IBasisFunction1D*>(p_phi2);
@@ -25,7 +25,7 @@ public:
 		this->_volumicTerms(phi1->LocalNumber, phi2->LocalNumber) = result;
 	}
 
-	void ComputeMassTerm(BasisFunction* p_phi1, BasisFunction* p_phi2)
+	void ComputeMassTerm(BasisFunction<1>* p_phi1, BasisFunction<1>* p_phi2)
 	{
 		IBasisFunction1D* phi1 = dynamic_cast<IBasisFunction1D*>(p_phi1);
 		IBasisFunction1D* phi2 = dynamic_cast<IBasisFunction1D*>(p_phi2);

@@ -4,23 +4,22 @@
 #include "BasisFunction.h"
 #include "Utils.h"
 #include "Element.h"
-#include "Face.h"
 #include "Poisson_DG_ReferenceSquare.h"
 #include "Square.h"
 using namespace std;
 
-class Poisson2D_DGTerms_LocalBasis : public Poisson_DGTerms
+class Poisson2D_DGTerms_LocalBasis : public Poisson_DGTerms<2>
 {
 public:
-	Poisson2D_DGTerms_LocalBasis(SourceFunction* sourceFunction, FunctionalBasis2D* basis)
-		: Poisson_DGTerms(sourceFunction)
+	Poisson2D_DGTerms_LocalBasis(SourceFunction* sourceFunction, FunctionalBasis<2>* basis)
+		: Poisson_DGTerms<2>(sourceFunction, basis)
 	{
-		Poisson_DG_ReferenceElement* refSquare = new Poisson_DG_ReferenceSquare(basis->NumberOfLocalFunctionsInElement(NULL));
+		/*Poisson_DG_ReferenceElement<2>* refSquare = new Poisson_DG_ReferenceSquare(basis->NumberOfLocalFunctionsInElement(NULL));
 		this->ComputeReferenceTerms(basis, refSquare);
-		this->ReferenceElements.insert(std::make_pair(StandardElementCode::Square, refSquare));
+		this->ReferenceElements.insert(std::make_pair(StandardElementCode::Square, refSquare));*/
 	}
 
-	bool IsGlobalBasis() { return false; }
+	//bool IsGlobalBasis() { return false; }
 
 	/*double VolumicTerm(Element* element, IBasisFunction2D* phi1, IBasisFunction2D* phi2)
 	{
