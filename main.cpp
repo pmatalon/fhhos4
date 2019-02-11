@@ -8,10 +8,7 @@
 #include "CartesianGrid1D.h"
 #include "CartesianGrid2D.h"
 #include "CartesianGrid3D.h"
-#include "Poisson1D_DGTerms_LocalBasis.h"
-#include "Poisson2D_DGTerms_LocalBasis.h"
 #include "Poisson2D_DGTerms_GlobalBasis.h"
-#include "Poisson3D_DGTerms_LocalBasis.h"
 using namespace std;
 
 
@@ -108,7 +105,7 @@ int main(int argc, char* argv[])
 		Poisson_DG<1>* problem = new Poisson_DG<1>(solution);
 		//FunctionalBasis1D* basis = new FunctionalBasis1D(basisCode, polyDegree);
 		FunctionalBasis<1>* basis = new FunctionalBasis<1>(basisCode, polyDegree);
-		Poisson_DGTerms<1>* dg = new Poisson1D_DGTerms_LocalBasis(sourceFunction, basis);
+		Poisson_DGTerms<1>* dg = new Poisson_DGTerms<1>(sourceFunction, basis);
 
 		problem->Assemble(mesh, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents, extractMassMatrix);
 
@@ -146,7 +143,7 @@ int main(int argc, char* argv[])
 
 		FunctionalBasis<2>* basis = new FunctionalBasis<2>(basisCode, polyDegree, fullTensorization);
 
-		Poisson_DGTerms<2>* dg = new Poisson2D_DGTerms_LocalBasis(sourceFunction, basis);
+		Poisson_DGTerms<2>* dg = new Poisson_DGTerms<2>(sourceFunction, basis);
 
 		problem->Assemble(mesh, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents, extractMassMatrix);
 
@@ -186,7 +183,7 @@ int main(int argc, char* argv[])
 
 		FunctionalBasis<3>* basis = new FunctionalBasis<3>(basisCode, polyDegree, fullTensorization);
 
-		Poisson_DGTerms<3>* dg = new Poisson3D_DGTerms_LocalBasis(sourceFunction, basis);
+		Poisson_DGTerms<3>* dg = new Poisson_DGTerms<3>(sourceFunction, basis);
 
 		problem->Assemble(mesh, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents, extractMassMatrix);
 

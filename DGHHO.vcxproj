@@ -120,11 +120,8 @@
     <ClInclude Include="NonZeroCoefficients.h" />
     <ClInclude Include="Poisson_DG.h" />
     <ClInclude Include="BasisFunction.h" />
-    <ClInclude Include="Poisson1D_DGTerms_LocalBasis.h" />
     <ClInclude Include="Poisson2D_DGTerms_GlobalBasis.h" />
-    <ClInclude Include="Poisson2D_DGTerms_LocalBasis.h" />
     <ClInclude Include="Poisson2D_HHOTerms.h" />
-    <ClInclude Include="Poisson3D_DGTerms_LocalBasis.h" />
     <ClInclude Include="PoissonHHO.h" />
     <ClInclude Include="Poisson_DG_ReferenceSquare.h" />
     <ClInclude Include="Problem.h" />

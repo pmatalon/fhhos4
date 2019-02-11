@@ -56,20 +56,11 @@
     <ClInclude Include="Poisson2D_DGTerms_GlobalBasis.h">
       <Filter>DG</Filter>
     </ClInclude>
-    <ClInclude Include="Poisson2D_DGTerms_LocalBasis.h">
-      <Filter>DG</Filter>
-    </ClInclude>
-    <ClInclude Include="Poisson3D_DGTerms_LocalBasis.h">
-      <Filter>DG</Filter>
-    </ClInclude>
     <ClInclude Include="Poisson2D_HHOTerms.h">
       <Filter>HHO</Filter>
     </ClInclude>
     <ClInclude Include="PoissonHHO.h">
       <Filter>HHO</Filter>
-    </ClInclude>
-    <ClInclude Include="Poisson1D_DGTerms_LocalBasis.h">
-      <Filter>DG</Filter>
     </ClInclude>
     <ClInclude Include="CartesianGrid1D.h">
       <Filter>Mesh</Filter>
