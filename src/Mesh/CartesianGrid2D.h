@@ -2,15 +2,15 @@
 #include <vector>
 #include "Element.h"
 #include "Square.h"
-#include "Face2D.h"
-#include "IMesh.h"
+#include "IntervalFace.h"
+#include "Mesh.h"
 
 using namespace std;
 
-class CartesianGrid2D : public IMesh
+class CartesianGrid2D : public Mesh
 {
 public:
-	CartesianGrid2D(BigNumber n) : IMesh(2, n)
+	CartesianGrid2D(BigNumber n) : Mesh(n)
 	{
 		//----------//
 		// Elements //
@@ -37,13 +37,13 @@ public:
 		for (BigNumber j = 0; j < n; ++j)
 		{
 			// South boundary
-			Face2D* southBoundary = new Face2D(numberInterface++, h, this->Elements[j]);
+			IntervalFace* southBoundary = new IntervalFace(numberInterface++, h, this->Elements[j]);
 			this->Faces.push_back(southBoundary);
 			//this->BoundaryInterfaces.push_back(southBoundary);
 			dynamic_cast<Square*>(this->Elements[j])->SetSouthInterface(southBoundary);
 
 			// North boundary
-			Face2D* northBoundary = new Face2D(numberInterface++, h, this->Elements[(n-1)*n + j]);
+			IntervalFace* northBoundary = new IntervalFace(numberInterface++, h, this->Elements[(n-1)*n + j]);
 			this->Faces.push_back(northBoundary);
 			//this->BoundaryInterfaces.push_back(northBoundary);
 			dynamic_cast<Square*>(this->Elements[(n - 1)*n + j])->SetNorthInterface(northBoundary);
@@ -52,13 +52,13 @@ public:
 		for (BigNumber i = 0; i < n; ++i)
 		{
 			// West boundary
-			Face2D* westBoundary = new Face2D(numberInterface++, h, this->Elements[i*n]);
+			IntervalFace* westBoundary = new IntervalFace(numberInterface++, h, this->Elements[i*n]);
 			this->Faces.push_back(westBoundary);
 			//this->BoundaryInterfaces.push_back(westBoundary);
 			dynamic_cast<Square*>(this->Elements[i*n])->SetWestInterface(westBoundary);
 
 			// East boundary
-			Face2D* eastBoundary = new Face2D(numberInterface++, h, this->Elements[i*n + n-1]);
+			IntervalFace* eastBoundary = new IntervalFace(numberInterface++, h, this->Elements[i*n + n-1]);
 			this->Faces.push_back(eastBoundary);
 			//this->BoundaryInterfaces.push_back(eastBoundary);
 			dynamic_cast<Square*>(this->Elements[i*n + n - 1])->SetEastInterface(eastBoundary);
@@ -73,7 +73,7 @@ public:
 				{
 					// East
 					Square* eastNeighbour = dynamic_cast<Square*>(this->Elements[i*n + j + 1]);
-					Face2D* interface = new Face2D(numberInterface++, h, element, eastNeighbour);
+					IntervalFace* interface = new IntervalFace(numberInterface++, h, element, eastNeighbour);
 					this->Faces.push_back(interface);
 					element->SetEastInterface(interface);
 					eastNeighbour->SetWestInterface(interface);
@@ -82,7 +82,7 @@ public:
 				{
 					// North
 					Square* northNeighbour = dynamic_cast<Square*>(this->Elements[(i+1)*n + j]);
-					Face2D* interface = new Face2D(numberInterface++, h, element, northNeighbour);
+					IntervalFace* interface = new IntervalFace(numberInterface++, h, element, northNeighbour);
 					this->Faces.push_back(interface);
 					element->SetNorthInterface(interface);
 					northNeighbour->SetSouthInterface(interface);

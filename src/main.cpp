@@ -74,7 +74,7 @@ int main(int argc, char* argv[])
 	}
 	print_usage(solution, dimension, n, basisCode, polyDegree, fullTensorization, penalizationCoefficient, outputDirectory);
 
-	IMesh* mesh;
+	Mesh* mesh;
 	SourceFunction* sourceFunction;
 
 	if (dimension == 1)

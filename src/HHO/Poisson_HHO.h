@@ -20,7 +20,7 @@ public:
 	Poisson_HHO(string solutionName) : Problem(solutionName)
 	{	}
 
-	void Assemble(IMesh* mesh, FunctionalBasis<Dim>* elementBasis, FunctionalBasis<Dim-1>* faceBasis)
+	void Assemble(Mesh* mesh, FunctionalBasis<Dim>* elementBasis, FunctionalBasis<Dim-1>* faceBasis)
 	{
 
 		cout << "Discretization: Hybrid High Order" << endl;
@@ -34,7 +34,7 @@ public:
 		BigNumber nUnknowns = nElementUnknowns + nFaceUnknowns;
 		cout << "Unknowns: " << nUnknowns << endl;
 
-		string fileName = "Poisson" + to_string(mesh->Dim) + "D" + this->_solutionName + "_n" + to_string(mesh->N) + "_HHO_" + (dg->IsGlobalBasis() ? "global" : "") + basis->Name());
+		string fileName = "Poisson" + to_string(Dim) + "D" + this->_solutionName + "_n" + to_string(mesh->N) + "_HHO_" + (dg->IsGlobalBasis() ? "global" : "") + basis->Name());
 		string matrixFilePath = outputDirectory + "/" + fileName + "_A.dat";
 		/*string matrixVolumicFilePath = outputDirectory + "/" + fileName + "_A_volumic.dat";
 		string matrixCouplingFilePath = outputDirectory + "/" + fileName + "_A_coupling.dat";
@@ -44,7 +44,7 @@ public:
 
 		this->b = Eigen::VectorXd(nUnknowns);
 
-		BigNumber nnzApproximate = mesh->Elements.size() * basis->NumberOfLocalFunctionsInElement(NULL) * (2 * mesh->Dim + 1);
+		BigNumber nnzApproximate = mesh->Elements.size() * basis->NumberOfLocalFunctionsInElement(NULL) * (2 * Dim + 1);
 		NonZeroCoefficients matrixCoeffs(nnzApproximate);
 		/*NonZeroCoefficients massMatrixCoeffs(extractMassMatrix ? nnzApproximate : 0);
 		NonZeroCoefficients volumicCoeffs(extractMatrixComponents ? nnzApproximate : 0);

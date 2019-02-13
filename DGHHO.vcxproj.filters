@@ -65,15 +65,6 @@
     <ClInclude Include="src/Mesh/Face.h">
       <Filter>Mesh</Filter>
     </ClInclude>
-    <ClInclude Include="src/Mesh/Face1D.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
-    <ClInclude Include="src/Mesh/Face2D.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
-    <ClInclude Include="src/Mesh/Face3D.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
     <ClInclude Include="src/FunctionalBasis/FunctionalBasis.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
@@ -82,9 +73,6 @@
     </ClInclude>
     <ClInclude Include="src/Utils/L2.h">
       <Filter>Utils</Filter>
-    </ClInclude>
-    <ClInclude Include="src/Mesh/IMesh.h">
-      <Filter>Mesh</Filter>
     </ClInclude>
     <ClInclude Include="src/Mesh/Interval.h">
       <Filter>Mesh</Filter>
@@ -121,6 +109,18 @@
     </ClInclude>
     <ClInclude Include="src/Utils/Utils.h">
       <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\PointFace.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\IntervalFace.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\SquareFace.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\Mesh.h">
+      <Filter>Mesh</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

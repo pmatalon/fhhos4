@@ -5,21 +5,19 @@
 
 using namespace std;
 
-class IMesh
+class Mesh
 {
 public:
-	int Dim;
 	BigNumber N;
 	vector<Element*> Elements;
 	vector<Face*> Faces;
 
-	IMesh(int dim, BigNumber n)
+	Mesh(BigNumber n)
 	{
-		this->Dim = dim;
 		this->N = n;
 	}
 
-	virtual ~IMesh() 
+	virtual ~Mesh() 
 	{
 		for (size_t i = 0; i < this->Elements.size(); ++i)
 			delete this->Elements[i];

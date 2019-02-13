@@ -1,13 +1,13 @@
 #pragma once
-#include "IMesh.h"
+#include "Mesh.h"
 #include "Interval.h"
-#include "Face1D.h"
+#include "PointFace.h"
 
-class CartesianGrid1D : public IMesh
+class CartesianGrid1D : public Mesh
 {
 private:
 public:
-	CartesianGrid1D(BigNumber n) : IMesh(1, n)
+	CartesianGrid1D(BigNumber n) : Mesh(n)
 	{
 		this->Elements.reserve(n);
 		this->Faces.reserve(n + 1);
@@ -15,14 +15,14 @@ public:
 
 		for (BigNumber k = 0; k < n + 1; k++)
 		{
-			Face1D* point = new Face1D(k, k * h);
+			PointFace* point = new PointFace(k, k * h);
 			this->Faces.push_back(point);
 		}
 
 		for (BigNumber k = 0; k < n; k++)
 		{
-			Face1D* leftPoint = static_cast<Face1D*>(this->Faces[k]);
-			Face1D* rightPoint = static_cast<Face1D*>(this->Faces[k+1]);
+			PointFace* leftPoint = static_cast<PointFace*>(this->Faces[k]);
+			PointFace* rightPoint = static_cast<PointFace*>(this->Faces[k+1]);
 			Interval* element = new Interval(k, leftPoint->X, rightPoint->X, leftPoint, rightPoint);
 			this->Elements.push_back(element);
 		}

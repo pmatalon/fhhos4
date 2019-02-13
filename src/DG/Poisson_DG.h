@@ -3,7 +3,7 @@
 #include <Eigen/Sparse>
 #include <unsupported/Eigen/SparseExtra>
 #include "../Problem.h"
-#include "../Mesh/IMesh.h"
+#include "../Mesh/Mesh.h"
 #include "../Mesh/Face.h"
 #include "../DG/Poisson_DGTerms.h"
 #include "../Utils/NonZeroCoefficients.h"
@@ -20,11 +20,11 @@ public:
 	Poisson_DG(string solutionName) : Problem(solutionName)
 	{	}
 
-	void Assemble(IMesh* mesh, FunctionalBasis<Dim>* basis, Poisson_DGTerms<Dim>* dg, int penalizationCoefficient, string outputDirectory, bool extractMatrixComponents, bool extractMassMatrix)
+	void Assemble(Mesh* mesh, FunctionalBasis<Dim>* basis, Poisson_DGTerms<Dim>* dg, int penalizationCoefficient, string outputDirectory, bool extractMatrixComponents, bool extractMassMatrix)
 	{
 		bool autoPenalization = penalizationCoefficient == -1;
 		if (autoPenalization)
-			penalizationCoefficient = pow(mesh->Dim, 2) * pow(basis->GetDegree() + 1, 2) * mesh->N; // Ralph-Hartmann
+			penalizationCoefficient = pow(Dim, 2) * pow(basis->GetDegree() + 1, 2) * mesh->N; // Ralph-Hartmann
 
 		cout << "Discretization: Discontinuous Galerkin SIPG" << endl;
 		cout << "\tPenalization coefficient: " << penalizationCoefficient << endl;
@@ -36,7 +36,7 @@ public:
 		BigNumber nUnknowns = static_cast<int>(mesh->Elements.size()) * basis->NumberOfLocalFunctionsInElement(NULL);
 		cout << "Unknowns: " << nUnknowns << endl;
 
-		string fileName = "Poisson" + to_string(mesh->Dim) + "D" + this->_solutionName + "_n" + to_string(mesh->N) + "_DG_SIPG_" + (dg->IsGlobalBasis() ? "global" : "") + basis->Name() + "_pen" + (autoPenalization ? "-1" : to_string(penalizationCoefficient));
+		string fileName = "Poisson" + to_string(Dim) + "D" + this->_solutionName + "_n" + to_string(mesh->N) + "_DG_SIPG_" + (dg->IsGlobalBasis() ? "global" : "") + basis->Name() + "_pen" + (autoPenalization ? "-1" : to_string(penalizationCoefficient));
 		string matrixFilePath			= outputDirectory + "/" + fileName + "_A.dat";
 		string matrixVolumicFilePath	= outputDirectory + "/" + fileName + "_A_volumic.dat";
 		string matrixCouplingFilePath	= outputDirectory + "/" + fileName + "_A_coupling.dat";
@@ -46,7 +46,7 @@ public:
 
 		this->b = Eigen::VectorXd(nUnknowns);
 
-		BigNumber nnzApproximate = mesh->Elements.size() * basis->NumberOfLocalFunctionsInElement(NULL) * (2 * mesh->Dim + 1);
+		BigNumber nnzApproximate = mesh->Elements.size() * basis->NumberOfLocalFunctionsInElement(NULL) * (2 * Dim + 1);
 		NonZeroCoefficients matrixCoeffs(nnzApproximate);
 		NonZeroCoefficients massMatrixCoeffs(extractMassMatrix ? nnzApproximate : 0);
 		NonZeroCoefficients volumicCoeffs(extractMatrixComponents ? nnzApproximate : 0);

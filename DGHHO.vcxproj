@@ -80,6 +80,7 @@
     <IncludePath>C:\Users\pierr\Documents\Source\Repos\dghho\eigen-eigen-b3f3d4950030;$(IncludePath)</IncludePath>
     <LibraryPath>
     </LibraryPath>
+    <SourcePath>$(ProjectDir)Mesh;$(ProjectDir)DG;$(ProjectDir)FunctionalBasis;$(ProjectDir)HHO;$(ProjectDir)Utils;$(SourcePath)</SourcePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ProjectPublicIncludePath>
@@ -99,14 +100,14 @@
     <ClInclude Include="src/FunctionalBasis/Monomial1D.h" />
     <ClInclude Include="src/FunctionalBasis/FunctionalBasis.h" />
     <ClInclude Include="src/FunctionalBasis/TensorPolynomial.h" />
-    <ClInclude Include="src/Mesh/IMesh.h" />
+    <ClInclude Include="src\Mesh\Mesh.h" />
     <ClInclude Include="src/Mesh/CartesianGrid1D.h" />
     <ClInclude Include="src/Mesh/CartesianGrid2D.h" />
     <ClInclude Include="src/Mesh/CartesianGrid3D.h" />
     <ClInclude Include="src/Mesh/Element.h" />
-    <ClInclude Include="src/Mesh/Face1D.h" />
-    <ClInclude Include="src/Mesh/Face2D.h" />
-    <ClInclude Include="src/Mesh/Face3D.h" />
+    <ClInclude Include="src\Mesh\PointFace.h" />
+    <ClInclude Include="src\Mesh\IntervalFace.h" />
+    <ClInclude Include="src\Mesh\SquareFace.h" />
     <ClInclude Include="src/Mesh/Face.h" />
     <ClInclude Include="src/Mesh/Cube.h" />
     <ClInclude Include="src/Mesh/Square.h" />

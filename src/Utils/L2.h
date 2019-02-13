@@ -3,7 +3,7 @@
 #include "Utils.h"
 #include "../FunctionalBasis/BasisFunction.h"
 #include <Eigen/Sparse>
-#include "../Mesh/IMesh.h"
+#include "../Mesh/Mesh.h"
 #include "../FunctionalBasis/FunctionalBasis.h"
 #include "../Mesh/Interval.h"
 #include "../Mesh/Square.h"
@@ -14,7 +14,7 @@ class L2
 {
 public:
 	template <short Dim>
-	static double Error(IMesh* mesh, FunctionalBasis<Dim>* basis, Eigen::VectorXd solution, function<double(Point)> exactSolution)
+	static double Error(Mesh* mesh, FunctionalBasis<Dim>* basis, Eigen::VectorXd solution, function<double(Point)> exactSolution)
 	{
 		double absoluteError = 0;
 		double normExactSolution = 0;
@@ -46,7 +46,7 @@ public:
 	//   1D   //
 	//--------//
 
-	/*static double Error(IMesh* mesh, FunctionalBasis1D* basis, Eigen::VectorXd solution, function<double(double)> exactSolution)
+	/*static double Error(Mesh* mesh, FunctionalBasis1D* basis, Eigen::VectorXd solution, function<double(double)> exactSolution)
 	{
 		double absoluteError = 0;
 		double normExactSolution = 0;
@@ -77,7 +77,7 @@ public:
 	//   2D   //
 	//--------//
 
-	/*static double Error(IMesh* mesh, FunctionalBasis2D* basis, Eigen::VectorXd solution, function<double(double, double)> exactSolution)
+	/*static double Error(Mesh* mesh, FunctionalBasis2D* basis, Eigen::VectorXd solution, function<double(double, double)> exactSolution)
 	{
 		double absoluteError = 0;
 		double normExactSolution = 0;
@@ -110,7 +110,7 @@ public:
 	//   3D   //
 	//--------//
 
-	/*static double Error3D(IMesh* mesh, FunctionalBasis3D* basis, Eigen::VectorXd solution, function<double(Point)> exactSolution)
+	/*static double Error3D(Mesh* mesh, FunctionalBasis3D* basis, Eigen::VectorXd solution, function<double(Point)> exactSolution)
 	{
 		double absoluteError = 0;
 		double normExactSolution = 0;
@@ -153,7 +153,7 @@ public:
 		return absoluteError / normExactSolution;
 	}
 
-	static double Error3D(IMesh* mesh, FunctionalBasis3D* basis, Eigen::VectorXd solution, function<double(double, double, double)> exactSolution)
+	static double Error3D(Mesh* mesh, FunctionalBasis3D* basis, Eigen::VectorXd solution, function<double(double, double, double)> exactSolution)
 	{
 		double absoluteError = 0;
 		double normExactSolution = 0;

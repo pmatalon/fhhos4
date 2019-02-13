@@ -1,6 +1,6 @@
 #pragma once
 #include "Element.h"
-#include "Face2D.h"
+#include "IntervalFace.h"
 #include "../DG/Poisson_DG_Element.h"
 #include "../DG/Poisson_DG_ReferenceElement.h"
 #include "../Utils/SourceFunction.h"
@@ -13,14 +13,10 @@ public:
 	double Y;
 	double Width;
 
-	Face2D* NorthFace;
-	Face2D* SouthFace;
-	Face2D* EastFace;
-	Face2D* WestFace;
-private:
-	//Square* _neighbours;
-public:
-	//static Square* ReferenceSquare;
+	Face* NorthFace;
+	Face* SouthFace;
+	Face* EastFace;
+	Face* WestFace;
 
 	Square(int number, double x, double y, double width) : Element(number)
 	{
@@ -34,44 +30,44 @@ public:
 		return StandardElementCode::Square;
 	}
 
-	void SetNorthInterface(Face2D* face)
+	void SetNorthInterface(IntervalFace* face)
 	{
 		this->Faces.push_back(face);
 		this->NorthFace = face;
-		face->X1 = this->X;
+		/*face->X1 = this->X;
 		face->Y1 = this->Y + this->Width;
 		face->X2 = this->X + this->Width;
-		face->Y2 = this->Y + this->Width;
+		face->Y2 = this->Y + this->Width;*/
 	}
 
-	void SetSouthInterface(Face2D* face)
+	void SetSouthInterface(IntervalFace* face)
 	{
 		this->Faces.push_back(face);
 		this->SouthFace = face;
-		face->X1 = this->X;
+		/*face->X1 = this->X;
 		face->Y1 = this->Y;
 		face->X2 = this->X + this->Width;
-		face->Y2 = this->Y;
+		face->Y2 = this->Y;*/
 	}
 
-	void SetEastInterface(Face2D* face)
+	void SetEastInterface(IntervalFace* face)
 	{
 		this->Faces.push_back(face);
 		this->EastFace = face;
-		face->X1 = this->X + this->Width;
+		/*face->X1 = this->X + this->Width;
 		face->Y1 = this->Y;
 		face->X2 = this->X + this->Width;
-		face->Y2 = this->Y + this->Width;
+		face->Y2 = this->Y + this->Width;*/
 	}
 
-	void SetWestInterface(Face2D* face)
+	void SetWestInterface(IntervalFace* face)
 	{
 		this->Faces.push_back(face);
 		this->WestFace = face;
-		face->X1 = this->X;
+		/*face->X1 = this->X;
 		face->Y1 = this->Y;
 		face->X2 = this->X;
-		face->Y2 = this->Y + this->Width;
+		face->Y2 = this->Y + this->Width;*/
 	}
 
 	double* OuterNormalVector(Face* face)
@@ -121,8 +117,6 @@ public:
 	double VolumicTerm(BasisFunction<2>* phi1, BasisFunction<2>* phi2, Poisson_DG_ReferenceElement<2>* referenceElement)
 	{
 		return referenceElement->VolumicTerm(phi1, phi2);
-		//if (this == ReferenceSquare)
-			//return 
 	}
 
 	double MassTerm(BasisFunction<2>* phi1, BasisFunction<2>* phi2, Poisson_DG_ReferenceElement<2>* referenceElement)

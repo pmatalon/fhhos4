@@ -90,7 +90,7 @@ public:
 			return meanGradFunc1_scal_jumpFunc2 + meanGradFunc2_scal_jumpFunc1;
 		};
 
-		Face2D* interf = (Face2D*)interface;
+		IntervalFace* interf = (IntervalFace*)interface;
 
 		GaussLegendre* gs = new GaussLegendre(func1->GetDegree() + func2->GetDegree() + 1);
 		double res = -gs->Quadrature(functionToIntegrate, interf->X1, interf->X2, interf->Y1, interf->Y2);
@@ -135,7 +135,7 @@ public:
 			return jumpFunc1X(x, y)*jumpFunc2X(x, y) + jumpFunc1Y(x, y)*jumpFunc2Y(x, y);
 		};
 
-		Face2D* interf = (Face2D*)interface;
+		IntervalFace* interf = (IntervalFace*)interface;
 
 		GaussLegendre* gs = new GaussLegendre(func1->GetDegree() + func2->GetDegree() + 2);
 		double integralJump1ScalarJump2 = gs->Quadrature(functionToIntegrate, interf->X1, interf->X2, interf->Y1, interf->Y2);
