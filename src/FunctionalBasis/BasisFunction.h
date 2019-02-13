@@ -1,6 +1,6 @@
 #pragma once
 #include <string>
-#include "Point.h"
+#include "../Mesh/Point.h"
 using namespace std;
 
 template <short Dim>

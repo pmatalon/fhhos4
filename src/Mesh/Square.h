@@ -1,9 +1,9 @@
 #pragma once
 #include "Element.h"
 #include "Face2D.h"
-#include "Poisson_DG_Element.h"
-#include "Poisson_DG_ReferenceElement.h"
-#include "SourceFunction.h"
+#include "../DG/Poisson_DG_Element.h"
+#include "../DG/Poisson_DG_ReferenceElement.h"
+#include "../Utils/SourceFunction.h"
 #include <assert.h>
 
 class Square : public Element, public Poisson_DG_Element<2>

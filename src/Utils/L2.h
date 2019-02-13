@@ -1,13 +1,13 @@
 #pragma once
 #include <cstdio>
 #include "Utils.h"
-#include "BasisFunction.h"
+#include "../FunctionalBasis/BasisFunction.h"
 #include <Eigen/Sparse>
-#include "IMesh.h"
-#include "FunctionalBasis.h"
-#include "Interval.h"
-#include "Square.h"
-#include "Cube.h"
+#include "../Mesh/IMesh.h"
+#include "../FunctionalBasis/FunctionalBasis.h"
+#include "../Mesh/Interval.h"
+#include "../Mesh/Square.h"
+#include "../Mesh/Cube.h"
 using namespace std;
 
 class L2

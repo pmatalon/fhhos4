@@ -2,7 +2,7 @@
 #include <functional>
 #include <vector>
 #include "GaussLegendre.h"
-#include "Point.h"
+#include "../Mesh/Point.h"
 
 typedef unsigned int BigNumber;
 

@@ -1,6 +1,6 @@
 #pragma once
 #include <Eigen/Dense>
-#include "BasisFunction.h"
+#include "../FunctionalBasis/BasisFunction.h"
 
 template <short Dim>
 class Poisson_DG_ReferenceElement

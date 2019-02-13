@@ -2,12 +2,12 @@
 #include <iostream>
 #include <Eigen/Sparse>
 #include <unsupported/Eigen/SparseExtra>
-#include "Problem.h"
-#include "IMesh.h"
-#include "Face.h"
-#include "Poisson_DGTerms.h"
-#include "NonZeroCoefficients.h"
-#include "L2.h"
+#include "../Problem.h"
+#include "../Mesh/IMesh.h"
+#include "../Mesh/Face.h"
+#include "../DG/Poisson_DGTerms.h"
+#include "../Utils/NonZeroCoefficients.h"
+#include "../Utils/L2.h"
 using namespace std;
 
 template <short Dim>

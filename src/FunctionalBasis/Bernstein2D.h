@@ -1,6 +1,6 @@
 #pragma once
 #include "BasisFunction.h"
-#include "Utils.h"
+#include "../Utils/Utils.h"
 #include <math.h>
 
 class Bernstein2D : public IBasisFunction2D

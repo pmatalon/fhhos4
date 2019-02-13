@@ -1,7 +1,7 @@
 #pragma once
 #include "Element.h"
-#include "Poisson_DG_Element.h"
-#include "Poisson_DG_ReferenceElement.h"
+#include "../DG/Poisson_DG_Element.h"
+#include "../DG/Poisson_DG_ReferenceElement.h"
 
 class Interval : public Element, public Poisson_DG_Element<1>
 {

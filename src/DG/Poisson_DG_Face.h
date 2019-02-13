@@ -1,6 +1,6 @@
 #pragma once
-#include "Element.h"
-#include "BasisFunction.h"
+#include "../Mesh/Element.h"
+#include "../FunctionalBasis/BasisFunction.h"
 
 template <short Dim>
 class Poisson_DG_Face

@@ -1,126 +1,126 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="main.cpp" />
+    <ClCompile Include="src/main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Utils.h">
+    <ClInclude Include="src/Problem.h" />
+    <ClInclude Include="src/DG/Poisson_DG.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="src/DG/Poisson_DG_Element.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="src/DG/Poisson_DG_Face.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="src/DG/Poisson_DG_ReferenceCube.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="src/DG/Poisson_DG_ReferenceElement.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="src/DG/Poisson_DG_ReferenceInterval.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="src/DG/Poisson_DG_ReferenceSquare.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="src/DG/Poisson_DGTerms.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="src/DG/Poisson2D_DGTerms_GlobalBasis.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="src/FunctionalBasis/BasisFunction.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="src/FunctionalBasis/BasisFunctionFactory.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="src/FunctionalBasis/Bernstein1D.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="src/FunctionalBasis/Bernstein2D.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="src/FunctionalBasis/Bernstein3D.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="src/Mesh/CartesianGrid1D.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="src/Mesh/CartesianGrid2D.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="src/Mesh/CartesianGrid3D.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="src/Mesh/Cube.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="src/Mesh/Element.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="src/Mesh/Face.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="src/Mesh/Face1D.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="src/Mesh/Face2D.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="src/Mesh/Face3D.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="src/FunctionalBasis/FunctionalBasis.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="src/Utils/GaussLegendre.h">
       <Filter>Utils</Filter>
     </ClInclude>
-    <ClInclude Include="Element.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
-    <ClInclude Include="Square.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
-    <ClInclude Include="CartesianGrid2D.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
-    <ClInclude Include="GaussLegendre.h">
+    <ClInclude Include="src/Utils/L2.h">
       <Filter>Utils</Filter>
     </ClInclude>
-    <ClInclude Include="IMesh.h">
+    <ClInclude Include="src/Mesh/IMesh.h">
       <Filter>Mesh</Filter>
     </ClInclude>
-    <ClInclude Include="Interval.h">
+    <ClInclude Include="src/Mesh/Interval.h">
       <Filter>Mesh</Filter>
     </ClInclude>
-    <ClInclude Include="BasisFunctionFactory.h">
+    <ClInclude Include="src/FunctionalBasis/Legendre1D.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
-    <ClInclude Include="FunctionalBasis.h">
+    <ClInclude Include="src/FunctionalBasis/Monomial1D.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
-    <ClInclude Include="Monomial1D.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
-    <ClInclude Include="Legendre1D.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
-    <ClInclude Include="TensorPolynomial.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
-    <ClInclude Include="CartesianGrid3D.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
-    <ClInclude Include="Cube.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
-    <ClInclude Include="NonZeroCoefficients.h">
+    <ClInclude Include="src/Utils/NonZeroCoefficients.h">
       <Filter>Utils</Filter>
     </ClInclude>
-    <ClInclude Include="Problem.h" />
-    <ClInclude Include="L2.h">
-      <Filter>Utils</Filter>
-    </ClInclude>
-    <ClInclude Include="Poisson2D_DGTerms_GlobalBasis.h">
-      <Filter>DG</Filter>
-    </ClInclude>
-    <ClInclude Include="CartesianGrid1D.h">
+    <ClInclude Include="src/Mesh/Point.h">
       <Filter>Mesh</Filter>
     </ClInclude>
-    <ClInclude Include="Poisson_DG_ReferenceElement.h">
-      <Filter>DG</Filter>
-    </ClInclude>
-    <ClInclude Include="Poisson_DG_ReferenceInterval.h">
-      <Filter>DG</Filter>
-    </ClInclude>
-    <ClInclude Include="Poisson_DG_Element.h">
-      <Filter>DG</Filter>
-    </ClInclude>
-    <ClInclude Include="Poisson_DG_ReferenceSquare.h">
-      <Filter>DG</Filter>
-    </ClInclude>
-    <ClInclude Include="Poisson_DG_ReferenceCube.h">
-      <Filter>DG</Filter>
-    </ClInclude>
-    <ClInclude Include="Face.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
-    <ClInclude Include="Face2D.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
-    <ClInclude Include="Face3D.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
-    <ClInclude Include="Face1D.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
-    <ClInclude Include="Poisson_DG_Face.h">
-      <Filter>DG</Filter>
-    </ClInclude>
-    <ClInclude Include="Bernstein1D.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
-    <ClInclude Include="Bernstein2D.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
-    <ClInclude Include="Bernstein3D.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
-    <ClInclude Include="Point.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
-    <ClInclude Include="SourceFunction.h">
-      <Filter>Utils</Filter>
-    </ClInclude>
-    <ClInclude Include="Poisson_DG.h">
-      <Filter>DG</Filter>
-    </ClInclude>
-    <ClInclude Include="BasisFunction.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
-    <ClInclude Include="Poisson_DGTerms.h">
-      <Filter>DG</Filter>
-    </ClInclude>
-    <ClInclude Include="Poisson_HHO.h">
+    <ClInclude Include="src/HHO/Poisson_HHO.h">
       <Filter>HHO</Filter>
     </ClInclude>
-    <ClInclude Include="Poisson_HHO_Element.h">
+    <ClInclude Include="src/HHO/Poisson_HHO_Element.h">
       <Filter>HHO</Filter>
     </ClInclude>
-    <ClInclude Include="Poisson_HHO_Face.h">
+    <ClInclude Include="src/HHO/Poisson_HHO_Face.h">
       <Filter>HHO</Filter>
+    </ClInclude>
+    <ClInclude Include="src/FunctionalBasis/TensorPolynomial.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="src/Mesh/Square.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="src/Utils/SourceFunction.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="src/Utils/Utils.h">
+      <Filter>Utils</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -139,5 +139,8 @@
     <Filter Include="HHO">
       <UniqueIdentifier>{5baa2ae8-8ff4-4937-bd5a-17cf25a395a1}</UniqueIdentifier>
     </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="CMakeLists.txt" />
   </ItemGroup>
 </Project>

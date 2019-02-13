@@ -87,49 +87,52 @@
     <IncludePath>C:\Users\pierr\Documents\Source\Repos\DGHHO\DGHHO\eigen-eigen-b3f3d4950030;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\asm-generic;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\c++\5;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\c++\5\backward;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\c++\5\bits;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\c++\5\debug;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\c++\5\ext;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\linux;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\x86_64-linux-gnu\asm;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\x86_64-linux-gnu\bits;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\x86_64-linux-gnu\c++\5\bits;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\x86_64-linux-gnu\c++\5;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\x86_64-linux-gnu\sys;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include\x86_64-linux-gnu\gnu;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\lib\gcc\x86_64-linux-gnu\5\include;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\lib\gcc\x86_64-linux-gnu\5\include-fixed;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp" />
+    <ClCompile Include="src/main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="BasisFunctionFactory.h" />
-    <ClInclude Include="Bernstein2D.h" />
-    <ClInclude Include="Bernstein1D.h" />
-    <ClInclude Include="Bernstein3D.h" />
-    <ClInclude Include="CartesianGrid1D.h" />
-    <ClInclude Include="CartesianGrid3D.h" />
-    <ClInclude Include="Cube.h" />
-    <ClInclude Include="Point.h" />
-    <ClInclude Include="Poisson_DG_Element.h" />
-    <ClInclude Include="Poisson_DG_Face.h" />
-    <ClInclude Include="Poisson_DG_ReferenceCube.h" />
-    <ClInclude Include="Poisson_DG_ReferenceElement.h" />
-    <ClInclude Include="Poisson_DG_ReferenceInterval.h" />
-    <ClInclude Include="Face1D.h" />
-    <ClInclude Include="Face3D.h" />
-    <ClInclude Include="FunctionalBasis.h" />
-    <ClInclude Include="CartesianGrid2D.h" />
-    <ClInclude Include="Element.h" />
-    <ClInclude Include="Face2D.h" />
-    <ClInclude Include="Face.h" />
-    <ClInclude Include="GaussLegendre.h" />
-    <ClInclude Include="Interval.h" />
-    <ClInclude Include="Poisson_DGTerms.h" />
-    <ClInclude Include="L2.h" />
-    <ClInclude Include="Legendre1D.h" />
-    <ClInclude Include="IMesh.h" />
-    <ClInclude Include="Monomial1D.h" />
-    <ClInclude Include="NonZeroCoefficients.h" />
-    <ClInclude Include="Poisson_DG.h" />
-    <ClInclude Include="BasisFunction.h" />
-    <ClInclude Include="Poisson2D_DGTerms_GlobalBasis.h" />
-    <ClInclude Include="Poisson_HHO.h" />
-    <ClInclude Include="Poisson_DG_ReferenceSquare.h" />
-    <ClInclude Include="Poisson_HHO_Element.h" />
-    <ClInclude Include="Poisson_HHO_Face.h" />
-    <ClInclude Include="Problem.h" />
-    <ClInclude Include="SourceFunction.h" />
-    <ClInclude Include="Square.h" />
-    <ClInclude Include="TensorPolynomial.h" />
-    <ClInclude Include="Utils.h" />
+    <ClInclude Include="src/FunctionalBasis/BasisFunctionFactory.h" />
+    <ClInclude Include="src/FunctionalBasis/BasisFunction.h" />
+    <ClInclude Include="src/FunctionalBasis/Bernstein1D.h" />
+    <ClInclude Include="src/FunctionalBasis/Bernstein2D.h" />
+    <ClInclude Include="src/FunctionalBasis/Bernstein3D.h" />
+    <ClInclude Include="src/FunctionalBasis/Legendre1D.h" />
+    <ClInclude Include="src/FunctionalBasis/Monomial1D.h" />
+    <ClInclude Include="src/FunctionalBasis/FunctionalBasis.h" />
+    <ClInclude Include="src/FunctionalBasis/TensorPolynomial.h" />
+    <ClInclude Include="src/Mesh/IMesh.h" />
+    <ClInclude Include="src/Mesh/CartesianGrid1D.h" />
+    <ClInclude Include="src/Mesh/CartesianGrid2D.h" />
+    <ClInclude Include="src/Mesh/CartesianGrid3D.h" />
+    <ClInclude Include="src/Mesh/Element.h" />
+    <ClInclude Include="src/Mesh/Face1D.h" />
+    <ClInclude Include="src/Mesh/Face2D.h" />
+    <ClInclude Include="src/Mesh/Face3D.h" />
+    <ClInclude Include="src/Mesh/Face.h" />
+    <ClInclude Include="src/Mesh/Cube.h" />
+    <ClInclude Include="src/Mesh/Square.h" />
+    <ClInclude Include="src/Mesh/Interval.h" />
+    <ClInclude Include="src/Mesh/Point.h" />
+    <ClInclude Include="src/DG/Poisson_DG.h" />
+    <ClInclude Include="src/DG/Poisson_DG_Element.h" />
+    <ClInclude Include="src/DG/Poisson_DG_Face.h" />
+    <ClInclude Include="src/DG/Poisson_DG_ReferenceCube.h" />
+    <ClInclude Include="src/DG/Poisson_DG_ReferenceSquare.h" />
+    <ClInclude Include="src/DG/Poisson_DG_ReferenceElement.h" />
+    <ClInclude Include="src/DG/Poisson_DG_ReferenceInterval.h" />
+    <ClInclude Include="src/DG/Poisson_DGTerms.h" />
+    <ClInclude Include="src/DG/Poisson2D_DGTerms_GlobalBasis.h" />
+    <ClInclude Include="src/HHO/Poisson_HHO.h" />
+    <ClInclude Include="src/HHO/Poisson_HHO_Element.h" />
+    <ClInclude Include="src/HHO/Poisson_HHO_Face.h" />
+    <ClInclude Include="src/Utils/GaussLegendre.h" />
+    <ClInclude Include="src/Utils/L2.h" />
+    <ClInclude Include="src/Utils/NonZeroCoefficients.h" />
+    <ClInclude Include="src/Utils/SourceFunction.h" />
+    <ClInclude Include="src/Utils/Utils.h" />
+    <ClInclude Include="src/Problem.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="CMakeLists.txt" />
   </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>

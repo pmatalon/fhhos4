@@ -1,7 +1,7 @@
 #pragma once
 #include "Face.h"
-#include "Utils.h"
-#include "Poisson_DG_Face.h"
+#include "../Utils/Utils.h"
+#include "../DG/Poisson_DG_Face.h"
 
 class Face2D : public Face, public Poisson_DG_Face<2>
 {

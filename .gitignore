@@ -261,3 +261,9 @@ __pycache__/
 *.pyc
 /eigen-eigen-b3f3d4950030.zip
 /Eigen
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile

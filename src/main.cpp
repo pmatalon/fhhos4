@@ -1,14 +1,14 @@
 #include <cstdio>
 #include <iostream>
-#include "Poisson_DG.h"
+#include "DG/Poisson_DG.h"
 #include <functional>
 #include <getopt.h>
 #include <Eigen/Core>
-#include "FunctionalBasis.h"
-#include "CartesianGrid1D.h"
-#include "CartesianGrid2D.h"
-#include "CartesianGrid3D.h"
-#include "Poisson2D_DGTerms_GlobalBasis.h"
+#include "FunctionalBasis/FunctionalBasis.h"
+#include "Mesh/CartesianGrid1D.h"
+#include "Mesh/CartesianGrid2D.h"
+#include "Mesh/CartesianGrid3D.h"
+//#include "DG/Poisson2D_DGTerms_GlobalBasis.h"
 using namespace std;
 
 

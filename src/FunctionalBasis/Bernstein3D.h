@@ -1,6 +1,6 @@
 #pragma once
 #include "BasisFunction.h"
-#include "Utils.h"
+#include "../Utils/Utils.h"
 #include "Bernstein1D.h"
 #include <math.h>
 

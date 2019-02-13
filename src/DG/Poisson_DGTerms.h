@@ -1,8 +1,8 @@
 #pragma once
 #include <map>
-#include "Element.h"
-#include "Face.h"
-#include "FunctionalBasis.h"
+#include "../Mesh/Element.h"
+#include "../Mesh/Face.h"
+#include "../FunctionalBasis/FunctionalBasis.h"
 #include "Poisson_DG_ReferenceElement.h"
 #include "Poisson_DG_ReferenceInterval.h"
 #include "Poisson_DG_ReferenceSquare.h"
