@@ -56,12 +56,6 @@
     <ClInclude Include="Poisson2D_DGTerms_GlobalBasis.h">
       <Filter>DG</Filter>
     </ClInclude>
-    <ClInclude Include="Poisson2D_HHOTerms.h">
-      <Filter>HHO</Filter>
-    </ClInclude>
-    <ClInclude Include="PoissonHHO.h">
-      <Filter>HHO</Filter>
-    </ClInclude>
     <ClInclude Include="CartesianGrid1D.h">
       <Filter>Mesh</Filter>
     </ClInclude>
@@ -118,6 +112,15 @@
     </ClInclude>
     <ClInclude Include="Poisson_DGTerms.h">
       <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson_HHO.h">
+      <Filter>HHO</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson_HHO_Element.h">
+      <Filter>HHO</Filter>
+    </ClInclude>
+    <ClInclude Include="Poisson_HHO_Face.h">
+      <Filter>HHO</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -74,11 +74,7 @@ int main(int argc, char* argv[])
 	}
 	print_usage(solution, dimension, n, basisCode, polyDegree, fullTensorization, penalizationCoefficient, outputDirectory);
 
-	//static const short Dim = dimension;
-
 	IMesh* mesh;
-	//Poisson_DG* problem;
-	//Poisson_DGTerms* dg;
 	SourceFunction* sourceFunction;
 
 	if (dimension == 1)
@@ -103,14 +99,12 @@ int main(int argc, char* argv[])
 		}
 
 		Poisson_DG<1>* problem = new Poisson_DG<1>(solution);
-		//FunctionalBasis1D* basis = new FunctionalBasis1D(basisCode, polyDegree);
 		FunctionalBasis<1>* basis = new FunctionalBasis<1>(basisCode, polyDegree);
 		Poisson_DGTerms<1>* dg = new Poisson_DGTerms<1>(sourceFunction, basis);
 
 		problem->Assemble(mesh, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents, extractMassMatrix);
 
 		problem->Solve();
-		//double error = L2::Error(mesh, basis, problem->Solution, exactSolution);
 		double error = L2::Error<1>(mesh, basis, problem->Solution, exactSolution);
 		cout << "L2 Error = " << error << endl;
 
@@ -139,10 +133,9 @@ int main(int argc, char* argv[])
 			};
 			sourceFunction = new SourceFunction2D([](double x, double y) { return 2 * y*(1 - y) + 2 * x*(1 - x); });
 		}
+
 		Poisson_DG<2>* problem = new Poisson_DG<2>(solution);
-
 		FunctionalBasis<2>* basis = new FunctionalBasis<2>(basisCode, polyDegree, fullTensorization);
-
 		Poisson_DGTerms<2>* dg = new Poisson_DGTerms<2>(sourceFunction, basis);
 
 		problem->Assemble(mesh, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents, extractMassMatrix);
@@ -180,9 +173,7 @@ int main(int argc, char* argv[])
 		}
 
 		Poisson_DG<3>* problem = new Poisson_DG<3>(solution);
-
 		FunctionalBasis<3>* basis = new FunctionalBasis<3>(basisCode, polyDegree, fullTensorization);
-
 		Poisson_DGTerms<3>* dg = new Poisson_DGTerms<3>(sourceFunction, basis);
 
 		problem->Assemble(mesh, basis, dg, penalizationCoefficient, outputDirectory, extractMatrixComponents, extractMassMatrix);
@@ -202,8 +193,6 @@ int main(int argc, char* argv[])
 	}
 
 	delete sourceFunction;
-	//delete dg;
-	//delete problem;
 	delete mesh;
 
 	cout << "-------------------------- DONE ------------------------" << endl;

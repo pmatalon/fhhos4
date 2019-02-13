@@ -121,9 +121,10 @@
     <ClInclude Include="Poisson_DG.h" />
     <ClInclude Include="BasisFunction.h" />
     <ClInclude Include="Poisson2D_DGTerms_GlobalBasis.h" />
-    <ClInclude Include="Poisson2D_HHOTerms.h" />
-    <ClInclude Include="PoissonHHO.h" />
+    <ClInclude Include="Poisson_HHO.h" />
     <ClInclude Include="Poisson_DG_ReferenceSquare.h" />
+    <ClInclude Include="Poisson_HHO_Element.h" />
+    <ClInclude Include="Poisson_HHO_Face.h" />
     <ClInclude Include="Problem.h" />
     <ClInclude Include="SourceFunction.h" />
     <ClInclude Include="Square.h" />
