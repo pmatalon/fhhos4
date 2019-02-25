@@ -8,6 +8,7 @@
 #include "../DG/Poisson_DGTerms.h"
 #include "../Utils/NonZeroCoefficients.h"
 #include "../Utils/L2.h"
+#include "../Utils/Action.h"
 using namespace std;
 
 template <short Dim>
@@ -20,7 +21,7 @@ public:
 	Poisson_DG(string solutionName) : Problem(solutionName)
 	{	}
 
-	void Assemble(Mesh* mesh, FunctionalBasis<Dim>* basis, Poisson_DGTerms<Dim>* dg, int penalizationCoefficient, string outputDirectory, bool extractMatrixComponents, bool extractMassMatrix)
+	void Assemble(Mesh* mesh, FunctionalBasis<Dim>* basis, Poisson_DGTerms<Dim>* dg, int penalizationCoefficient, string outputDirectory, Action action)
 	{
 		bool autoPenalization = penalizationCoefficient == -1;
 		if (autoPenalization)
@@ -48,10 +49,10 @@ public:
 
 		BigNumber nnzApproximate = mesh->Elements.size() * basis->NumberOfLocalFunctionsInElement(NULL) * (2 * Dim + 1);
 		NonZeroCoefficients matrixCoeffs(nnzApproximate);
-		NonZeroCoefficients massMatrixCoeffs(extractMassMatrix ? nnzApproximate : 0);
-		NonZeroCoefficients volumicCoeffs(extractMatrixComponents ? nnzApproximate : 0);
-		NonZeroCoefficients couplingCoeffs(extractMatrixComponents ? nnzApproximate : 0);
-		NonZeroCoefficients penCoeffs(extractMatrixComponents ? nnzApproximate : 0);
+		NonZeroCoefficients massMatrixCoeffs((action & Action::ExtractMassMatrix) == Action::ExtractMassMatrix ? nnzApproximate : 0);
+		NonZeroCoefficients volumicCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
+		NonZeroCoefficients couplingCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
+		NonZeroCoefficients penCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
 
 		cout << "Assembly..." << endl;
 
@@ -76,7 +77,6 @@ public:
 
 					double volumicTerm = dg->VolumicTerm(element, phi1, phi2);
 					//cout << "\t\t volumic = " << volumicTerm << endl;
-					double massTerm = dg->MassTerm(element, phi1, phi2);
 					
 					double coupling = 0;
 					double penalization = 0;
@@ -91,15 +91,18 @@ public:
 
 					//cout << "\t\t TOTAL = " << volumicTerm + coupling + penalization << endl;
 					
-					if (extractMatrixComponents)
+					if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
 					{
 						volumicCoeffs.Add(basisFunction1, basisFunction2, volumicTerm);
 						couplingCoeffs.Add(basisFunction1, basisFunction2, coupling);
 						penCoeffs.Add(basisFunction1, basisFunction2, penalization);
 					}
 					matrixCoeffs.Add(basisFunction1, basisFunction2, volumicTerm + coupling + penalization);
-					if (extractMassMatrix)
+					if ((action & Action::ExtractMassMatrix) == Action::ExtractMassMatrix)
+					{
+						double massTerm = dg->MassTerm(element, phi1, phi2);
 						massMatrixCoeffs.Add(basisFunction1, basisFunction2, massTerm);
+					}
 				}
 
 				double rhs = dg->RightHandSide(element, phi1);
@@ -116,16 +119,22 @@ public:
 			if (face->IsDomainBoundary)
 				continue;
 
+			cout << "Face " << face->Number << endl;
+
 			for (BasisFunction<Dim>* phi1 : basis->LocalFunctions)
 			{
 				BigNumber basisFunction1 = basis->GlobalFunctionNumber(face->Element1, phi1);
 				for (BasisFunction<Dim>* phi2 : basis->LocalFunctions)
 				{
+					//cout << "\t phi" << phi1->LocalNumber << " = " << phi1->ToString() << " phi" << phi2->LocalNumber << " = " << phi2->ToString() << endl;
+
 					BigNumber basisFunction2 = basis->GlobalFunctionNumber(face->Element2, phi2);
 					double coupling = dg->CouplingTerm(face, face->Element1, phi1, face->Element2, phi2);
 					double penalization = dg->PenalizationTerm(face, face->Element1, phi1, face->Element2, phi2, penalizationCoefficient);
+
+					//cout << "\t\t\t c=" << coupling << "\tp=" << penalization << endl;
 					
-					if (extractMatrixComponents)
+					if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
 					{
 						couplingCoeffs.Add(basisFunction1, basisFunction2, coupling);
 						couplingCoeffs.Add(basisFunction2, basisFunction1, coupling);
@@ -143,14 +152,17 @@ public:
 		matrixCoeffs.Fill(this->A);
 		cout << "nnz(A) = " << this->A.nonZeros() << endl;
 
-		cout << "Export..." << endl;
-		Eigen::saveMarket(this->A, matrixFilePath);
-		cout << "Matrix exported to \t" << matrixFilePath << endl;
+		if ((action & Action::ExtractSystem) == Action::ExtractSystem)
+		{
+			cout << "Export..." << endl;
+			Eigen::saveMarket(this->A, matrixFilePath);
+			cout << "Matrix exported to \t" << matrixFilePath << endl;
 
-		Eigen::saveMarketVector(this->b, rhsFilePath);
-		cout << "RHS exported to \t" << rhsFilePath << endl;
+			Eigen::saveMarketVector(this->b, rhsFilePath);
+			cout << "RHS exported to \t" << rhsFilePath << endl;
+		}
 
-		if (extractMassMatrix)
+		if ((action & Action::ExtractMassMatrix) == Action::ExtractMassMatrix)
 		{
 			Eigen::SparseMatrix<double> M(nUnknowns, nUnknowns);
 			massMatrixCoeffs.Fill(M);
@@ -158,7 +170,7 @@ public:
 			cout << "Mass matrix exported to \t" << massMatrixFilePath << endl;
 		}
 
-		if (extractMatrixComponents)
+		if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
 		{
 			Eigen::SparseMatrix<double> V(nUnknowns, nUnknowns);
 			volumicCoeffs.Fill(V);

@@ -15,10 +15,12 @@ class Poisson_DGTerms
 {
 private:
 	SourceFunction* _sourceFunction;
+	DiffusionPartition _diffusionPartition;
 public:
 	std::map<StandardElementCode, Poisson_DG_ReferenceElement<Dim>*> ReferenceElements;
 
-	Poisson_DGTerms(SourceFunction* sourceFunction, FunctionalBasis<Dim>* basis)
+	Poisson_DGTerms(SourceFunction* sourceFunction, FunctionalBasis<Dim>* basis, DiffusionPartition diffusionPartition)
+		: _diffusionPartition(diffusionPartition)
 	{
 		this->_sourceFunction = sourceFunction;
 
@@ -49,7 +51,7 @@ public:
 		Poisson_DG_ReferenceElement<Dim>* referenceElement = this->ReferenceElements[element->StdElementCode()];
 		Poisson_DG_Element<Dim>* dgElement = dynamic_cast<Poisson_DG_Element<Dim>*>(element);
 
-		return dgElement->VolumicTerm(phi1, phi2, referenceElement);
+		return dgElement->VolumicTerm(phi1, phi2, referenceElement, this->_diffusionPartition);
 	}
 
 	virtual double MassTerm(Element* element, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
@@ -65,7 +67,7 @@ public:
 		Poisson_DG_Face<Dim>* dgFace = dynamic_cast<Poisson_DG_Face<Dim>*>(face);
 		Poisson_DG_Element<Dim>* dgElement1 = dynamic_cast<Poisson_DG_Element<Dim>*>(element1);
 		Poisson_DG_Element<Dim>* dgElement2 = dynamic_cast<Poisson_DG_Element<Dim>*>(element2);
-		return dgFace->CouplingTerm(dgElement1, phi1, dgElement2, phi2);
+		return dgFace->CouplingTerm(dgElement1, phi1, dgElement2, phi2, this->_diffusionPartition);
 	}
 
 	virtual double PenalizationTerm(Face* face, Element* element1, BasisFunction<Dim>* phi1, Element* element2, BasisFunction<Dim>* phi2, double penalizationCoefficient)
@@ -73,7 +75,7 @@ public:
 		Poisson_DG_Face<Dim>* dgFace = dynamic_cast<Poisson_DG_Face<Dim>*>(face);
 		Poisson_DG_Element<Dim>* dgElement1 = dynamic_cast<Poisson_DG_Element<Dim>*>(element1);
 		Poisson_DG_Element<Dim>* dgElement2 = dynamic_cast<Poisson_DG_Element<Dim>*>(element2);
-		return dgFace->PenalizationTerm(dgElement1, phi1, dgElement2, phi2, penalizationCoefficient);
+		return dgFace->PenalizationTerm(dgElement1, phi1, dgElement2, phi2, penalizationCoefficient, this->_diffusionPartition);
 	}
 
 	virtual double RightHandSide(Element* element, BasisFunction<Dim>* phi)

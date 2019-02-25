@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include "../Utils/Utils.h"
+#include "../Utils/DiffusionPartition.h"
 class Face;
 
 enum class StandardElementCode
@@ -28,6 +29,7 @@ public:
 
 	virtual double Integral(function<double(Point)> func) = 0;
 	virtual double L2ErrorPow2(function<double(Point)> approximate, function<double(Point)> exactSolution) = 0;
+	virtual double DiffusionCoefficient(DiffusionPartition diffusionPartition) = 0;
 
 	virtual ~Element() {}
 };

@@ -36,6 +36,11 @@ public:
 		return NULL;
 	}
 
+	double DiffusionCoefficient(DiffusionPartition diffusionPartition)
+	{
+		return diffusionPartition.Coefficient(Point((this->A+this->B)/2));
+	}
+
 	double Integral(function<double(Point)> func)
 	{
 		function<double(double)> funcToIntegrate = [func](double x) {
@@ -61,10 +66,11 @@ public:
 	//                 Poisson_DG_Element implementation                //
 	//------------------------------------------------------------------//
 
-	double VolumicTerm(BasisFunction<1>* phi1, BasisFunction<1>* phi2, Poisson_DG_ReferenceElement<1>* referenceElement)
+	double VolumicTerm(BasisFunction<1>* phi1, BasisFunction<1>* phi2, Poisson_DG_ReferenceElement<1>* referenceElement, DiffusionPartition diffusionPartition)
 	{
 		double h = this->B - this->A;
-		return 2 / h * referenceElement->VolumicTerm(phi1, phi2);
+		double kappa = this->DiffusionCoefficient(diffusionPartition);
+		return 2 / h * kappa * referenceElement->VolumicTerm(phi1, phi2);
 	}
 
 	double MassTerm(BasisFunction<1>* phi1, BasisFunction<1>* phi2, Poisson_DG_ReferenceElement<1>* referenceElement)
