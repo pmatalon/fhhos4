@@ -7,7 +7,7 @@
 
 using namespace std;
 
-class CartesianGrid2D : public Mesh
+class CartesianGrid2D : public Mesh<2>
 {
 public:
 	CartesianGrid2D(BigNumber n) : Mesh(n)

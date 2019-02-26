@@ -3,7 +3,7 @@
 #include "../DG/Poisson_DG_Face.h"
 #include "Interval.h"
 
-class PointFace : public Face, public Poisson_DG_Face<1>
+class PointFace : public Face<1>, public Poisson_DG_Face<1>
 {
 public:
 	double X;

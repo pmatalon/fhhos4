@@ -5,12 +5,13 @@
 
 using namespace std;
 
+template <short Dim>
 class Mesh
 {
 public:
 	BigNumber N;
-	vector<Element*> Elements;
-	vector<Face*> Faces;
+	vector<Element<Dim>*> Elements;
+	vector<Face<Dim>*> Faces;
 
 	Mesh(BigNumber n)
 	{

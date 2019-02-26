@@ -21,7 +21,7 @@ public:
 	Poisson_DG(string solutionName) : Problem(solutionName)
 	{	}
 
-	void Assemble(Mesh* mesh, FunctionalBasis<Dim>* basis, Poisson_DGTerms<Dim>* dg, int penalizationCoefficient, string outputDirectory, Action action)
+	void Assemble(Mesh<Dim>* mesh, FunctionalBasis<Dim>* basis, Poisson_DGTerms<Dim>* dg, int penalizationCoefficient, string outputDirectory, Action action)
 	{
 		bool autoPenalization = penalizationCoefficient == -1;
 		if (autoPenalization)
@@ -80,7 +80,7 @@ public:
 					
 					double coupling = 0;
 					double penalization = 0;
-					for (Face* face : element->Faces)
+					for (Face<Dim>* face : element->Faces)
 					{
 						double c = dg->CouplingTerm(face, element, phi1, element, phi2);
 						double p = dg->PenalizationTerm(face, element, phi1, element, phi2, penalizationCoefficient);

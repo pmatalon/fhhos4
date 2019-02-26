@@ -4,6 +4,7 @@
 #include <getopt.h>
 #include <Eigen/Core>
 #include "DG/Poisson_DG.h"
+#include "HHO/Poisson_HHO.h"
 #include "FunctionalBasis/FunctionalBasis.h"
 #include "Mesh/CartesianGrid1D.h"
 #include "Mesh/CartesianGrid2D.h"
@@ -94,8 +95,6 @@ int main(int argc, char* argv[])
 		else if (a[i] == 's')
 			action |= Action::SolveSystem;
 	}
-
-	Mesh* mesh;
 	SourceFunction* sourceFunction;
 
 	function<bool(Point)> isInPart1 = [](Point p) { return p.X < 0.5; };
@@ -107,7 +106,7 @@ int main(int argc, char* argv[])
 
 	if (dimension == 1)
 	{
-		mesh = new CartesianGrid1D(n);
+		Mesh<1>* mesh = new CartesianGrid1D(n);
 
 		function<double(Point)> exactSolution = [](Point p)
 		{
@@ -166,6 +165,7 @@ int main(int argc, char* argv[])
 		delete dg;
 		delete problem;
 		delete basis;
+		delete mesh;
 	}
 
 	//------------//
@@ -174,7 +174,7 @@ int main(int argc, char* argv[])
 
 	else if (dimension == 2)
 	{
-		mesh = new CartesianGrid2D(n);
+		Mesh<2>* mesh = new CartesianGrid2D(n);
 
 		function<double(Point)> exactSolution = [](Point p) 
 		{
@@ -229,6 +229,7 @@ int main(int argc, char* argv[])
 		delete dg;
 		delete problem;
 		delete basis;
+		delete mesh;
 	}
 
 	//------------//
@@ -237,7 +238,7 @@ int main(int argc, char* argv[])
 
 	else if (dimension == 3)
 	{
-		mesh = new CartesianGrid3D(n);
+		Mesh<3>* mesh = new CartesianGrid3D(n);
 
 		function<double(Point)> exactSolution = [](Point p) 
 		{ 
@@ -275,6 +276,7 @@ int main(int argc, char* argv[])
 		delete dg;
 		delete problem;
 		delete basis;
+		delete mesh;
 	}
 	else
 	{
@@ -283,7 +285,6 @@ int main(int argc, char* argv[])
 	}
 
 	delete sourceFunction;
-	delete mesh;
 
 	cout << "-------------------------- DONE ------------------------" << endl;
     return EXIT_SUCCESS;

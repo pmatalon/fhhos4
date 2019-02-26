@@ -46,7 +46,7 @@ public:
 
 	virtual bool IsGlobalBasis() { return false; }
 
-	virtual double VolumicTerm(Element* element, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
+	virtual double VolumicTerm(Element<Dim>* element, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{
 		Poisson_DG_ReferenceElement<Dim>* referenceElement = this->ReferenceElements[element->StdElementCode()];
 		Poisson_DG_Element<Dim>* dgElement = dynamic_cast<Poisson_DG_Element<Dim>*>(element);
@@ -54,7 +54,7 @@ public:
 		return dgElement->VolumicTerm(phi1, phi2, referenceElement, this->_diffusionPartition);
 	}
 
-	virtual double MassTerm(Element* element, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
+	virtual double MassTerm(Element<Dim>* element, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{
 		Poisson_DG_ReferenceElement<Dim>* referenceElement = this->ReferenceElements[element->StdElementCode()];
 		Poisson_DG_Element<Dim>* dgElement = dynamic_cast<Poisson_DG_Element<Dim>*>(element);
@@ -62,7 +62,7 @@ public:
 		return dgElement->MassTerm(phi1, phi2, referenceElement);
 	}
 
-	virtual double CouplingTerm(Face* face, Element* element1, BasisFunction<Dim>* phi1, Element* element2, BasisFunction<Dim>* phi2)
+	virtual double CouplingTerm(Face<Dim>* face, Element<Dim>* element1, BasisFunction<Dim>* phi1, Element<Dim>* element2, BasisFunction<Dim>* phi2)
 	{
 		Poisson_DG_Face<Dim>* dgFace = dynamic_cast<Poisson_DG_Face<Dim>*>(face);
 		Poisson_DG_Element<Dim>* dgElement1 = dynamic_cast<Poisson_DG_Element<Dim>*>(element1);
@@ -70,7 +70,7 @@ public:
 		return dgFace->CouplingTerm(dgElement1, phi1, dgElement2, phi2, this->_diffusionPartition);
 	}
 
-	virtual double PenalizationTerm(Face* face, Element* element1, BasisFunction<Dim>* phi1, Element* element2, BasisFunction<Dim>* phi2, double penalizationCoefficient)
+	virtual double PenalizationTerm(Face<Dim>* face, Element<Dim>* element1, BasisFunction<Dim>* phi1, Element<Dim>* element2, BasisFunction<Dim>* phi2, double penalizationCoefficient)
 	{
 		Poisson_DG_Face<Dim>* dgFace = dynamic_cast<Poisson_DG_Face<Dim>*>(face);
 		Poisson_DG_Element<Dim>* dgElement1 = dynamic_cast<Poisson_DG_Element<Dim>*>(element1);
@@ -78,7 +78,7 @@ public:
 		return dgFace->PenalizationTerm(dgElement1, phi1, dgElement2, phi2, penalizationCoefficient, this->_diffusionPartition);
 	}
 
-	virtual double RightHandSide(Element* element, BasisFunction<Dim>* phi)
+	virtual double RightHandSide(Element<Dim>* element, BasisFunction<Dim>* phi)
 	{
 		Poisson_DG_Element<Dim>* dgElement = dynamic_cast<Poisson_DG_Element<Dim>*>(element);
 		return dgElement->SourceTerm(phi, this->_sourceFunction);

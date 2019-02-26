@@ -1,28 +1,30 @@
 #include "Element.h"
 #pragma once
+
+template <short Dim>
 class Face
 {
 public:
 	BigNumber Number;
 	bool IsDomainBoundary;
-	Element* Element1;
-	Element* Element2;
+	Element<Dim>* Element1;
+	Element<Dim>* Element2;
 
 public:
-	Face(BigNumber number, Element* element1, Element* element2)
+	Face(BigNumber number, Element<Dim>* element1, Element<Dim>* element2)
 	{
 		this->Number = number;
 		this->Element1 = element1;
 		this->Element2 = element2;
 		this->IsDomainBoundary = element2 == NULL;
 	}
-	Face(BigNumber number, Element* element1)
+	Face(BigNumber number, Element<Dim>* element1)
 		:Face(number, element1, NULL)
 	{
 		this->IsDomainBoundary = true;
 	}
 
-	bool IsBetween(Element* element1, Element* element2)
+	bool IsBetween(Element<Dim>* element1, Element<Dim>* element2)
 	{
 		if (element1 == element2 && (element1 == this->Element1 || element1 == this->Element2))
 			return true;

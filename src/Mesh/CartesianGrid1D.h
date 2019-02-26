@@ -3,7 +3,7 @@
 #include "Interval.h"
 #include "PointFace.h"
 
-class CartesianGrid1D : public Mesh
+class CartesianGrid1D : public Mesh<1>
 {
 private:
 public:
@@ -29,7 +29,7 @@ public:
 
 		for (BigNumber k = 0; k < n + 1; k++)
 		{
-			Face* point = this->Faces[k];
+			Face<1>* point = this->Faces[k];
 
 			if (k == 0)
 			{

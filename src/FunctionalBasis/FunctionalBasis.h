@@ -174,12 +174,12 @@ public:
 		return this->_maxPolynomialDegree;
 	}
 
-	int NumberOfLocalFunctionsInElement(Element* element)
+	int NumberOfLocalFunctionsInElement(Element<Dim>* element)
 	{
 		return static_cast<int>(this->LocalFunctions.size());
 	}
 
-	BigNumber GlobalFunctionNumber(Element* element, BasisFunction<Dim>* phi)
+	BigNumber GlobalFunctionNumber(Element<Dim>* element, BasisFunction<Dim>* phi)
 	{
 		return element->Number * static_cast<int>(this->LocalFunctions.size()) + phi->LocalNumber; // the numbers start at 0
 	}

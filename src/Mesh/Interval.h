@@ -3,16 +3,16 @@
 #include "../DG/Poisson_DG_Element.h"
 #include "../DG/Poisson_DG_ReferenceElement.h"
 
-class Interval : public Element, public Poisson_DG_Element<1>
+class Interval : public Element<1>, public Poisson_DG_Element<1>
 {
 public:
 	double A;
 	double B;
 
-	Face* Left;
-	Face* Right;
+	Face<1>* Left;
+	Face<1>* Right;
 
-	Interval(BigNumber number, double a, double b, Face* left, Face* right) : Element(number)
+	Interval(BigNumber number, double a, double b, Face<1>* left, Face<1>* right) : Element(number)
 	{
 		this->A = a;
 		this->B = b;
@@ -27,7 +27,7 @@ public:
 		return StandardElementCode::Interval;
 	}
 
-	double* OuterNormalVector(Face* interface)
+	double* OuterNormalVector(Face<1>* interface)
 	{
 		if (interface == this->Left)
 			return new double[1]{ -1 };
@@ -91,7 +91,7 @@ public:
 		return  (b - a) / 2 * Utils::Integral(sourceTimesBasisFunction, -1, 1);
 	}
 
-	function<double(Point)> EvalPhiOnFace(Face* face, BasisFunction<1>* p_phi)
+	function<double(Point)> EvalPhiOnFace(Face<1>* face, BasisFunction<1>* p_phi)
 	{
 		IBasisFunction1D* phi = dynamic_cast<IBasisFunction1D*>(p_phi);
 
@@ -103,7 +103,7 @@ public:
 	}
 
 
-	function<double*(Point)> GradPhiOnFace(Face* face, BasisFunction<1>* p_phi)
+	function<double*(Point)> GradPhiOnFace(Face<1>* face, BasisFunction<1>* p_phi)
 	{
 		IBasisFunction1D* phi = dynamic_cast<IBasisFunction1D*>(p_phi);
 

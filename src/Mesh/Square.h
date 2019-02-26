@@ -3,20 +3,21 @@
 #include "IntervalFace.h"
 #include "../DG/Poisson_DG_Element.h"
 #include "../DG/Poisson_DG_ReferenceElement.h"
+#include "../HHO/Poisson_HHO_Element.h"
 #include "../Utils/SourceFunction.h"
 #include <assert.h>
 
-class Square : public Element, public Poisson_DG_Element<2>
+class Square : public Element<2>, public Poisson_DG_Element<2>, public Poisson_HHO_Element<2>
 {
 public:
 	double X;
 	double Y;
 	double Width;
 
-	Face* NorthFace;
-	Face* SouthFace;
-	Face* EastFace;
-	Face* WestFace;
+	Face<2>* NorthFace;
+	Face<2>* SouthFace;
+	Face<2>* EastFace;
+	Face<2>* WestFace;
 
 	Square(int number, double x, double y, double width) : Element(number)
 	{
@@ -34,43 +35,27 @@ public:
 	{
 		this->Faces.push_back(face);
 		this->NorthFace = face;
-		/*face->X1 = this->X;
-		face->Y1 = this->Y + this->Width;
-		face->X2 = this->X + this->Width;
-		face->Y2 = this->Y + this->Width;*/
 	}
 
 	void SetSouthInterface(IntervalFace* face)
 	{
 		this->Faces.push_back(face);
 		this->SouthFace = face;
-		/*face->X1 = this->X;
-		face->Y1 = this->Y;
-		face->X2 = this->X + this->Width;
-		face->Y2 = this->Y;*/
 	}
 
 	void SetEastInterface(IntervalFace* face)
 	{
 		this->Faces.push_back(face);
 		this->EastFace = face;
-		/*face->X1 = this->X + this->Width;
-		face->Y1 = this->Y;
-		face->X2 = this->X + this->Width;
-		face->Y2 = this->Y + this->Width;*/
 	}
 
 	void SetWestInterface(IntervalFace* face)
 	{
 		this->Faces.push_back(face);
 		this->WestFace = face;
-		/*face->X1 = this->X;
-		face->Y1 = this->Y;
-		face->X2 = this->X;
-		face->Y2 = this->Y + this->Width;*/
 	}
 
-	double* OuterNormalVector(Face* face)
+	double* OuterNormalVector(Face<2>* face)
 	{
 		if (face == this->NorthFace)
 			return new double[2]{ 0, 1 };
@@ -149,9 +134,9 @@ public:
 		return jacobian * Utils::Integral(sourceTimesBasisFunction, -1,1, -1,1);
 	}
 
-	function<double(Point)> EvalPhiOnFace(Face* face, BasisFunction<2>* p_phi)
+	function<double(Point)> EvalPhiOnFace(Face<2>* face, BasisFunction<2>* p_phi)
 	{
-		IBasisFunction2D* phi = dynamic_cast<IBasisFunction2D*>(p_phi);
+		IBasisFunction2D* phi = static_cast<IBasisFunction2D*>(p_phi);
 
 		function<double(Point)> evalOnFace = NULL;
 		if (face == this->EastFace || face == this->WestFace)
@@ -176,9 +161,9 @@ public:
 	}
 
 
-	function<double*(Point)> GradPhiOnFace(Face* face, BasisFunction<2>* p_phi)
+	function<double*(Point)> GradPhiOnFace(Face<2>* face, BasisFunction<2>* p_phi)
 	{
-		IBasisFunction2D* phi = dynamic_cast<IBasisFunction2D*>(p_phi);
+		IBasisFunction2D* phi = static_cast<IBasisFunction2D*>(p_phi);
 
 		function<double*(Point)> gradOnFace = NULL;
 		if (face == this->EastFace || face == this->WestFace)
@@ -200,6 +185,46 @@ public:
 		else
 			assert(false);
 		return gradOnFace;
+	}
+
+	//-------------------------------------------------------------------//
+	//                 Poisson_HHO_Element implementation                //
+	//-------------------------------------------------------------------//
+
+	double IntegralGradGrad(BasisFunction<2>* p_phi1, BasisFunction<2>* p_phi2)
+	{
+		IBasisFunction2D* phi1 = static_cast<IBasisFunction2D*>(p_phi1);
+		IBasisFunction2D* phi2 = static_cast<IBasisFunction2D*>(p_phi2);
+
+		function<double(double, double)> functionToIntegrate = [phi1, phi2](double t, double u) {
+			return InnerProduct(phi1->Grad(t, u), phi2->Grad(t, u));
+		};
+
+		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree();
+		return Utils::Integral(nQuadPoints, functionToIntegrate, -1, 1, -1, 1);
+	}
+
+	double S(BasisFunction<2>* phiReconstruct1, BasisFunction<2>* phiReconstruct2)
+	{
+		return this->IntegralGradGrad(phiReconstruct1, phiReconstruct2);
+	}
+
+	double Bt(BasisFunction<2>* phiReconstruct, BasisFunction<2>* phiElement)
+	{
+		double integralGradGrad = this->IntegralGradGrad(phiReconstruct, phiElement);
+		double sumFaces = 0;
+		return integralGradGrad + sumFaces;
+	}
+
+	double Bf(BasisFunction<2>* phiReconstruct, BasisFunction<1>* phiFace)
+	{
+		return 0;
+	}
+
+private:
+	static double InnerProduct(double* vector1, double* vector2)
+	{
+		return vector1[0] * vector2[0] + vector1[1] * vector2[1];
 	}
 };
 

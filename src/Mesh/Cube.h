@@ -2,7 +2,7 @@
 #include "Element.h"
 
 
-class Cube : public Element, public Poisson_DG_Element<3>
+class Cube : public Element<3>, public Poisson_DG_Element<3>
 {
 public:
 	double X;
@@ -10,12 +10,12 @@ public:
 	double Z;
 	double Width;
 
-	Face* TopFace;
-	Face* BottomFace;
-	Face* FrontFace;
-	Face* BackFace;
-	Face* LeftFace;
-	Face* RightFace;
+	Face<3>* TopFace;
+	Face<3>* BottomFace;
+	Face<3>* FrontFace;
+	Face<3>* BackFace;
+	Face<3>* LeftFace;
+	Face<3>* RightFace;
 private:
 	Cube* _neighbours;
 public:
@@ -32,43 +32,43 @@ public:
 		return StandardElementCode::Cube;
 	}
 
-	void SetTopInterface(Face* interface)
+	void SetTopInterface(Face<3>* interface)
 	{
 		this->Faces.push_back(interface);
 		this->TopFace = interface;
 	}
 
-	void SetBottomInterface(Face* interface)
+	void SetBottomInterface(Face<3>* interface)
 	{
 		this->Faces.push_back(interface);
 		this->BottomFace = interface;
 	}
 
-	void SetFrontInterface(Face* interface)
+	void SetFrontInterface(Face<3>* interface)
 	{
 		this->Faces.push_back(interface);
 		this->FrontFace = interface;
 	}
 
-	void SetBackInterface(Face* interface)
+	void SetBackInterface(Face<3>* interface)
 	{
 		this->Faces.push_back(interface);
 		this->BackFace = interface;
 	}
 
-	void SetLeftInterface(Face* interface)
+	void SetLeftInterface(Face<3>* interface)
 	{
 		this->Faces.push_back(interface);
 		this->LeftFace = interface;
 	}
 
-	void SetRightInterface(Face* interface)
+	void SetRightInterface(Face<3>* interface)
 	{
 		this->Faces.push_back(interface);
 		this->RightFace = interface;
 	}
 
-	double* OuterNormalVector(Face* interface)
+	double* OuterNormalVector(Face<3>* interface)
 	{
 		if (interface == this->TopFace)
 			return new double[3]{ 0, 0, 1 };
@@ -160,7 +160,7 @@ public:
 		return jacobian * Utils::Integral(sourceTimesBasisFunction, -1,1, -1,1, -1,1);
 	}
 
-	function<double(Point)> EvalPhiOnFace(Face* face, BasisFunction<3>* p_phi)
+	function<double(Point)> EvalPhiOnFace(Face<3>* face, BasisFunction<3>* p_phi)
 	{
 		IBasisFunction3D* phi = dynamic_cast<IBasisFunction3D*>(p_phi);
 
@@ -198,7 +198,7 @@ public:
 	}
 
 
-	function<double*(Point)> GradPhiOnFace(Face* face, BasisFunction<3>* p_phi)
+	function<double*(Point)> GradPhiOnFace(Face<3>* face, BasisFunction<3>* p_phi)
 	{
 		IBasisFunction3D* phi = dynamic_cast<IBasisFunction3D*>(p_phi);
 

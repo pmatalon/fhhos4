@@ -3,17 +3,17 @@
 #include "../Utils/Utils.h"
 #include "../DG/Poisson_DG_Face.h"
 
-class IntervalFace : public Face, public Poisson_DG_Face<2>
+class IntervalFace : public Face<2>, public Poisson_DG_Face<2>
 {
 public:
 	double Length;
 
-	IntervalFace(BigNumber number, double length, Element* element1, Element* element2) : Face(number, element1, element2)
+	IntervalFace(BigNumber number, double length, Element<2>* element1, Element<2>* element2) : Face(number, element1, element2)
 	{	
 		this->Length = length;
 	}
 
-	IntervalFace(BigNumber number, double length, Element* element1) : Face(number, element1)
+	IntervalFace(BigNumber number, double length, Element<2>* element1) : Face(number, element1)
 	{	
 		this->Length = length;
 	}

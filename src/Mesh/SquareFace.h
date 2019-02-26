@@ -3,17 +3,17 @@
 #include "../Utils/Utils.h"
 #include "Cube.h"
 
-class SquareFace : public Face, public Poisson_DG_Face<3>
+class SquareFace : public Face<3>, public Poisson_DG_Face<3>
 {
 public:
 	double Width = 0;
 
-	SquareFace(BigNumber number, double width, Element* element1, Element* element2) : Face(number, element1, element2)
+	SquareFace(BigNumber number, double width, Element<3>* element1, Element<3>* element2) : Face(number, element1, element2)
 	{
 		this->Width = width;
 	}
 
-	SquareFace(BigNumber number, double width, Element* element1) : Face(number, element1)
+	SquareFace(BigNumber number, double width, Element<3>* element1) : Face(number, element1)
 	{
 		this->Width = width;
 	}
