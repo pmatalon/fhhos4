@@ -23,6 +23,9 @@ void print_usage(string s, int d, double k, int n, string b, int p, bool f, int 
 	cout << "\t\t\t 'sine' = sine solution" << endl;
 	cout << "\t\t\t 'poly' = polynomial solution of global degree 2*d" << endl;
 	cout << "-n NUM:\t\t		number of subdivisions in each spatial dimension (default: 5)\t--> " << n << endl;
+	cout << "-t {dg|hho}:\t\t	discretization method (default: dg)" << endl;
+	cout << "\t\t\t 'dg'  = Discontinuous Galerkin (Symmetric Interior Penalty)" << endl;
+	cout << "\t\t\t 'hho' = Hybrid High Order" << endl;
 	cout << "-b {monomials|legendre|bernstein}:	polynomial basis (default: monomials)\t--> " << b << endl;
 	cout << "-p NUM:\t\t		max polynomial degree (default: 2)\t--> " << p << endl;
 	cout << "-f:\t\t		full tensorization of the polynomials when d=2 or 3 (space Q) (default: false)\t--> " << f << endl;
@@ -45,6 +48,7 @@ int main(int argc, char* argv[])
 	double kappa1 = 1;
 	double kappa2 = 1;
 	BigNumber n = 5;
+	string discretization = "dg";
 	string basisCode = "monomials";
 	int polyDegree = 2;
 	bool fullTensorization = false;
@@ -53,7 +57,7 @@ int main(int argc, char* argv[])
 	string outputDirectory = "./";
 
 	int option = 0;
-	while ((option = getopt(argc, argv, "d:k:s:n:b:p:z:a:o:f")) != -1) 
+	while ((option = getopt(argc, argv, "d:k:s:n:t:b:p:z:a:o:f")) != -1) 
 	{
 		switch (option) 
 		{
@@ -64,7 +68,15 @@ int main(int argc, char* argv[])
 			case 'k': kappa1 = atof(optarg);
 				break;
 			case 'n': n = stoul(optarg, nullptr, 0);
-				break; 
+				break;
+			case 't': discretization = optarg;
+				if (discretization.compare("dg") != 0 && discretization.compare("hho"))
+				{
+					print_usage(solution, dimension, kappa1, n, basisCode, polyDegree, fullTensorization, penalizationCoefficient, a, outputDirectory);
+					cout << "Unknown discretization: " << discretization;
+					exit(EXIT_FAILURE);
+				}
+				break;
 			case 'b': basisCode = optarg;
 				break;
 			case 'p': polyDegree = atoi(optarg);
@@ -213,22 +225,46 @@ int main(int argc, char* argv[])
 			});
 		}
 
-		Poisson_DG<2>* problem = new Poisson_DG<2>(solution);
-		FunctionalBasis<2>* basis = new FunctionalBasis<2>(basisCode, polyDegree, fullTensorization);
-		Poisson_DGTerms<2>* dg = new Poisson_DGTerms<2>(sourceFunction, basis, diffusionPartition);
-
-		problem->Assemble(mesh, basis, dg, penalizationCoefficient, outputDirectory, action);
-
-		if ((action & Action::SolveSystem) == Action::SolveSystem)
+		if (discretization.compare("dg") == 0)
 		{
-			problem->Solve();
-			double error = L2::Error<2>(mesh, basis, problem->Solution, exactSolution);
-			cout << "L2 Error = " << error << endl;
-		}
+			Poisson_DG<2>* problem = new Poisson_DG<2>(solution);
+			FunctionalBasis<2>* basis = new FunctionalBasis<2>(basisCode, polyDegree, fullTensorization);
+			Poisson_DGTerms<2>* dg = new Poisson_DGTerms<2>(sourceFunction, basis, diffusionPartition);
 
-		delete dg;
-		delete problem;
-		delete basis;
+			problem->Assemble(mesh, basis, dg, penalizationCoefficient, outputDirectory, action);
+
+			if ((action & Action::SolveSystem) == Action::SolveSystem)
+			{
+				problem->Solve();
+				double error = L2::Error<2>(mesh, basis, problem->Solution, exactSolution);
+				cout << "L2 Error = " << error << endl;
+			}
+
+			delete dg;
+			delete problem;
+			delete basis;
+		}
+		else if (discretization.compare("hho") == 0)
+		{
+			Poisson_HHO<2>* problem = new Poisson_HHO<2>(solution);
+			FunctionalBasis<2>* reconstructionBasis = new FunctionalBasis<2>(basisCode, polyDegree, fullTensorization);
+			FunctionalBasis<2>* elementBasis = new FunctionalBasis<2>(basisCode, polyDegree-1, fullTensorization);
+			FunctionalBasis<1>* faceBasis = new FunctionalBasis<1>(basisCode, polyDegree-1, fullTensorization);
+
+			problem->Assemble(mesh, reconstructionBasis, elementBasis, faceBasis, outputDirectory, action);
+
+			if ((action & Action::SolveSystem) == Action::SolveSystem)
+			{
+				problem->Solve();
+				double error = L2::Error<2>(mesh, reconstructionBasis, problem->Solution, exactSolution);
+				cout << "L2 Error = " << error << endl;
+			}
+
+			delete problem;
+			delete reconstructionBasis;
+			delete elementBasis;
+			delete faceBasis;
+		}
 		delete mesh;
 	}
 

@@ -21,28 +21,27 @@ public:
 	Poisson_HHO(string solutionName) : Problem(solutionName)
 	{	}
 
-	void Assemble(Mesh<Dim>* mesh, FunctionalBasis<Dim>* elementBasis, FunctionalBasis<Dim-1>* faceBasis, string outputDirectory, Action action)
+	void Assemble(Mesh<Dim>* mesh, FunctionalBasis<Dim>* reconstructionBasis, FunctionalBasis<Dim>* elementBasis, FunctionalBasis<Dim-1>* faceBasis, string outputDirectory, Action action)
 	{
-
+		cout << "Problem: Poisson " << Dim << "D" << endl;
 		cout << "Discretization: Hybrid High Order" << endl;
-		//cout << "\tBasis of polynomials: " << (dg->IsGlobalBasis() ? "global" : "") + basis->Name() << endl;
+		cout << "\tReconstruction basis: " << reconstructionBasis->Name() << " of degree " << reconstructionBasis->GetDegree() << endl;
+		cout << "\tElement basis: " << elementBasis->Name() << " of degree " << elementBasis->GetDegree() << endl;
+		cout << "\tFace basis: " << faceBasis->Name() << " of degree " << faceBasis->GetDegree() << endl;
 
-		/*cout << "Local functions: " << basis->NumberOfLocalFunctionsInElement(NULL) << endl;
-		for (BasisFunction<Dim>* phi : basis->LocalFunctions)
-			cout << "\t " << phi->ToString() << endl;*/
 		BigNumber nElementUnknowns = static_cast<int>(mesh->Elements.size()) * elementBasis->NumberOfLocalFunctionsInElement(NULL);
 		BigNumber nFaceUnknowns = static_cast<int>(mesh->Faces.size()) * faceBasis->NumberOfLocalFunctionsInElement(NULL);
 		BigNumber nUnknowns = nElementUnknowns + nFaceUnknowns;
 		cout << "Unknowns: " << nUnknowns << endl;
 
-		string fileName = "Poisson" + to_string(Dim) + "D" + this->_solutionName + "_n" + to_string(mesh->N) + "_HHO_" + faceBasis->Name();
+		string fileName = "Poisson" + to_string(Dim) + "D" + this->_solutionName + "_n" + to_string(mesh->N) + "_HHO_" + reconstructionBasis->Name();
 		string matrixFilePath = outputDirectory + "/" + fileName + "_A.dat";
 		string rhsFilePath = outputDirectory + "/" + fileName + "_b.dat";
 
 		this->b = Eigen::VectorXd(nUnknowns);
 
 		BigNumber nnzApproximate = mesh->Elements.size() * faceBasis->NumberOfLocalFunctionsInElement(NULL) * (2 * Dim + 1);
-		NonZeroCoefficients matrixCoeffs(nnzApproximate);
+		NonZeroCoefficients consistenceCoeffs(nnzApproximate);
 
 		cout << "Assembly..." << endl;
 
@@ -54,8 +53,9 @@ public:
 		{
 			//cout << "Element " << element->Number << endl;
 			Poisson_HHO_Element<Dim>* hhoElement = dynamic_cast<Poisson_HHO_Element<Dim>*>(element);
+			Reconstructor<Dim> reconstructor(hhoElement, reconstructionBasis, elementBasis, faceBasis);
 
-			for (BasisFunction<Dim>* phi1 : faceBasis->LocalFunctions)
+			/*for (BasisFunction<Dim>* phi1 : faceBasis->LocalFunctions)
 			{
 				BigNumber basisFunction1 = faceBasis->GlobalFunctionNumber(element, phi1);
 
@@ -69,12 +69,12 @@ public:
 					double interiorTerm = hhoElement->InteriorTerm(phi1, phi2);
 					//cout << "\t\t interiorTerm = " << interiorTerm << endl;
 
-					matrixCoeffs.Add(basisFunction1, basisFunction2, interiorTerm);
+					consistenceCoeffs.Add(basisFunction1, basisFunction2, interiorTerm);
 				}
 
 				double rhs = hhoElement->SourceTerm(phi1);
 				this->b(basisFunction1) = rhs;
-			}
+			}*/
 		}
 
 		//---------------------------------------------//
@@ -86,31 +86,20 @@ public:
 			if (face->IsDomainBoundary)
 				continue;
 
-			for (BasisFunction<Dim>* phi1 : faceBasis->LocalFunctions)
+			/*for (BasisFunction<Dim>* phi1 : faceBasis->LocalFunctions)
 			{
 				BigNumber basisFunction1 = faceBasis->GlobalFunctionNumber(face->Element1, phi1);
 				for (BasisFunction<Dim>* phi2 : faceBasis->LocalFunctions)
 				{
 					BigNumber basisFunction2 = faceBasis->GlobalFunctionNumber(face->Element2, phi2);
-					/*double coupling = dg->CouplingTerm(face, face->Element1, phi1, face->Element2, phi2);
-					double penalization = dg->PenalizationTerm(face, face->Element1, phi1, face->Element2, phi2, penalizationCoefficient);
-
-					if (extractMatrixComponents)
-					{
-						couplingCoeffs.Add(basisFunction1, basisFunction2, coupling);
-						couplingCoeffs.Add(basisFunction2, basisFunction1, coupling);
-
-						penCoeffs.Add(basisFunction1, basisFunction2, penalization);
-						penCoeffs.Add(basisFunction2, basisFunction1, penalization);
-					}
-					matrixCoeffs.Add(basisFunction1, basisFunction2, coupling + penalization);
-					matrixCoeffs.Add(basisFunction2, basisFunction1, coupling + penalization);*/
 				}
-			}
+			}*/
 		}
 
-		this->A = Eigen::SparseMatrix<double>(nUnknowns, nUnknowns);
-		matrixCoeffs.Fill(this->A);
+		Eigen::SparseMatrix<double> Acons = Eigen::SparseMatrix<double>(nUnknowns, nUnknowns);
+		consistenceCoeffs.Fill(this->A);
+		Eigen::SparseMatrix<double> Astab = Eigen::SparseMatrix<double>(nUnknowns, nUnknowns);
+		this->A = Acons + Astab;
 		cout << "nnz(A) = " << this->A.nonZeros() << endl;
 
 		cout << "Export..." << endl;
@@ -119,7 +108,6 @@ public:
 
 		Eigen::saveMarketVector(this->b, rhsFilePath);
 		cout << "RHS exported to \t" << rhsFilePath << endl;
-
 	}
 };
 

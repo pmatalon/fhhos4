@@ -20,7 +20,7 @@ public:
 		Bt(reconstructionBasis->LocalFunctions.size(), elementBasis->LocalFunctions.size()),
 		Bf(reconstructionBasis->LocalFunctions.size(), faceBasis->LocalFunctions.size())
 	{
-		this->element = element;
+		this->_element = element;
 		this->_reconstructionBasis = reconstructionBasis;
 		this->_elementBasis = elementBasis;
 		this->_faceBasis = faceBasis;

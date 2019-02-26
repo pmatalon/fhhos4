@@ -6,6 +6,7 @@
 #include "../HHO/Poisson_HHO_Element.h"
 #include "../Utils/SourceFunction.h"
 #include <assert.h>
+using namespace std;
 
 class Square : public Element<2>, public Poisson_DG_Element<2>, public Poisson_HHO_Element<2>
 {
@@ -212,20 +213,50 @@ public:
 	double Bt(BasisFunction<2>* phiReconstruct, BasisFunction<2>* phiElement)
 	{
 		double integralGradGrad = this->IntegralGradGrad(phiReconstruct, phiElement);
+		
 		double sumFaces = 0;
-		return integralGradGrad + sumFaces;
+		for (auto face : this->Faces)
+		{
+			auto phi = this->EvalPhiOnFace(face, phiElement);
+			auto gradPhi = this->GradPhiOnFace(face, phiReconstruct);
+			auto normal = this->OuterNormalVector(face);
+
+			std::function<double(double)> functionToIntegrate = [phi, gradPhi, normal](double u) {
+				Point p(u);
+				return InnerProduct(gradPhi(p), normal) * phi(p);
+			};
+
+			int nQuadPoints = phiReconstruct->GetDegree() + phiElement->GetDegree() + 1;
+			sumFaces += Utils::Integral(nQuadPoints, functionToIntegrate, -1, 1);
+		}
+		
+		return integralGradGrad - sumFaces;
 	}
 
 	double Bf(BasisFunction<2>* phiReconstruct, BasisFunction<1>* phiFace)
 	{
-		return 0;
+		double sumFaces = 0;
+		for (auto face : this->Faces)
+		{
+			auto gradPhi = this->GradPhiOnFace(face, phiReconstruct);
+			auto normal = this->OuterNormalVector(face);
+
+			std::function<double(double)> functionToIntegrate = [phiFace, gradPhi, normal](double u) {
+				Point p(u);
+				return InnerProduct(gradPhi(p), normal) * phiFace->Eval(p);
+			};
+
+			int nQuadPoints = phiReconstruct->GetDegree() + phiFace->GetDegree() + 1;
+			sumFaces += Utils::Integral(nQuadPoints, functionToIntegrate, -1, 1);
+		}
+		return sumFaces;
 	}
 
-private:
+/*private:
 	static double InnerProduct(double* vector1, double* vector2)
 	{
 		return vector1[0] * vector2[0] + vector1[1] * vector2[1];
-	}
+	}*/
 };
 
 //Square* Square::ReferenceSquare = new Square(-1, -1, -1, 2);

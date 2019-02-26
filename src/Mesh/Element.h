@@ -38,4 +38,13 @@ public:
 	virtual double DiffusionCoefficient(DiffusionPartition diffusionPartition) = 0;
 
 	virtual ~Element() {}
+
+protected:
+	static double InnerProduct(double* vector1, double* vector2)
+	{
+		double innerProduct = 0;
+		for (int i=0; i<Dim; i++)
+			innerProduct += vector1[i] * vector2[i];
+		return innerProduct;
+	}
 };

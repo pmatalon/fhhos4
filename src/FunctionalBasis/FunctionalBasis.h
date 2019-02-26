@@ -23,6 +23,7 @@ public:
 
 	FunctionalBasis(string basisCode, int maxPolynomialDegree, bool fullTensorization)
 	{
+		maxPolynomialDegree = max(0, maxPolynomialDegree);
 		this->_maxPolynomialDegree = maxPolynomialDegree;
 		this->_basisCode = basisCode;
 		this->_fullTensorization = fullTensorization;

@@ -23,13 +23,15 @@ public:
 
 	void Assemble(Mesh<Dim>* mesh, FunctionalBasis<Dim>* basis, Poisson_DGTerms<Dim>* dg, int penalizationCoefficient, string outputDirectory, Action action)
 	{
+		cout << "Problem: Poisson " << Dim << "D" << endl;
+
 		bool autoPenalization = penalizationCoefficient == -1;
 		if (autoPenalization)
 			penalizationCoefficient = pow(Dim, 2) * pow(basis->GetDegree() + 1, 2) * mesh->N; // Ralph-Hartmann
 
 		cout << "Discretization: Discontinuous Galerkin SIPG" << endl;
 		cout << "\tPenalization coefficient: " << penalizationCoefficient << endl;
-		cout << "\tBasis of polynomials: " << (dg->IsGlobalBasis() ? "global" : "") + basis->Name() << endl;
+		cout << "\tBasis of polynomials: " << (dg->IsGlobalBasis() ? "global" : "") + basis->Name() << " of degree " << basis->GetDegree() << endl;
 		
 		cout << "Local functions: " << basis->NumberOfLocalFunctionsInElement(NULL) << endl;
 		for (BasisFunction<Dim>* phi : basis->LocalFunctions)
