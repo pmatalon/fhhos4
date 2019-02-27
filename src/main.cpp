@@ -41,10 +41,17 @@ void print_usage() {
 	cout << "--------------------------------------------------------" << endl;
 }
 
+void argument_error(string msg)
+{
+	print_usage();
+	cout << "Argument error: " << msg << endl;
+	exit(EXIT_FAILURE);
+}
+
 int main(int argc, char* argv[])
 {
 	cout << "-------------------------- START ------------------------" << endl;
-	cout << "Option -h for help and arguments." << endl;
+	cout << "Option -h for help." << endl;
 	cout << "---------------------------------------------------------" << endl;
 	Eigen::initParallel();
 
@@ -69,22 +76,24 @@ int main(int argc, char* argv[])
 			case 'h': print_usage(); exit(EXIT_SUCCESS);
 				break;
 			case 'd': dimension = atoi(optarg);
+				if (dimension < 1 || dimension > 3)
+					argument_error("dimension " + to_string(dimension) + "! Are you kidding?! Stop wasting my time.");
 				break;
 			case 's': solution = optarg;
+				if (solution.compare("sine") != 0 && solution.compare("poly") != 0 && solution.compare("hetero") != 0)
+					argument_error("unknown analytical solution '" + solution + "'. Check -s argument.");
 				break;
 			case 'k': kappa1 = atof(optarg);
 				break;
 			case 'n': n = stoul(optarg, nullptr, 0);
 				break;
 			case 't': discretization = optarg;
-				if (discretization.compare("dg") != 0 && discretization.compare("hho"))
-				{
-					print_usage();
-					cout << "Unknown discretization: " << discretization;
-					exit(EXIT_FAILURE);
-				}
+				if (discretization.compare("dg") != 0 && discretization.compare("hho") != 0)
+					argument_error("unknown discretization '" + discretization + "'. Check -t argument.");
 				break;
 			case 'b': basisCode = optarg;
+				if (basisCode.compare("monomials") != 0 && basisCode.compare("legendre") != 0 && basisCode.compare("bernstein") != 0)
+					argument_error("unknown polynomial basis '" + basisCode + "'. Check -b argument.");
 				break;
 			case 'p': polyDegree = atoi(optarg);
 				break;
@@ -101,6 +110,9 @@ int main(int argc, char* argv[])
 		}
 	}
 
+	if (dimension != 1 && solution.compare("hetero") == 0)
+		argument_error("-s hetero is only supported in 1D.");
+
 	Action action = Action::None;
 	for (int i = 0; i < a.length(); i++)
 	{
@@ -112,6 +124,8 @@ int main(int argc, char* argv[])
 			action |= Action::ExtractMassMatrix;
 		else if (a[i] == 's')
 			action |= Action::SolveSystem;
+		else
+			argument_error("unknown action '" + to_string(a[i]) + "'. Check -a argument.");
 	}
 
 	function<double(Point)> exactSolution = NULL;
@@ -202,7 +216,7 @@ int main(int argc, char* argv[])
 		}
 		else if (solution.compare("poly") == 0)
 		{
-			exactSolution = [&diffusionPartition](Point p)
+			exactSolution = [](Point p)
 			{
 				double x = p.X;
 				double y = p.Y; 
@@ -301,11 +315,6 @@ int main(int argc, char* argv[])
 		delete problem;
 		delete basis;
 		delete mesh;
-	}
-	else
-	{
-		cout << "Dimension " << dimension << ", are you kidding?!";
-		exit(EXIT_FAILURE);
 	}
 
 	delete sourceFunction;
