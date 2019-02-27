@@ -15,15 +15,29 @@ template <short Dim>
 class Poisson_DG : public Problem
 {
 private:
-
+	DiffusionPartition _diffusionPartition;
 public:
 
-	Poisson_DG(string solutionName) : Problem(solutionName)
+	Poisson_DG(string solutionName, DiffusionPartition diffusionPartition) 
+		: _diffusionPartition(diffusionPartition), Problem(solutionName)
 	{	}
 
 	void Assemble(Mesh<Dim>* mesh, FunctionalBasis<Dim>* basis, Poisson_DGTerms<Dim>* dg, int penalizationCoefficient, string outputDirectory, Action action)
 	{
-		cout << "Problem: Poisson " << Dim << "D" << endl;
+		cout << "Problem: Poisson " << Dim << "D";
+		if (this->_diffusionPartition.Kappa1 != this->_diffusionPartition.Kappa2)
+			cout << ", heterogeneous diffusion coefficient (k1=" << this->_diffusionPartition.Kappa1 << ", k2=" << this->_diffusionPartition.Kappa2 << ")";
+		cout << endl;
+		cout << "Analytical solution: " ;
+		if (this->_solutionName.compare("sine") == 0)
+			cout << "sine function";
+		else if (this->_solutionName.compare("sine") == 0)
+			cout << "polynomial function";
+		else if (this->_solutionName.compare("hetero") == 0)
+			cout << "heterogeneous-specific piecewise polynomial function";
+		else
+			cout << "unknown";
+		cout << endl;
 		cout << "Subdivisions in each cartesian direction: " << mesh->N << endl;
 		cout << "Discretization: Discontinuous Galerkin SIPG" << endl;
 		cout << "\tPolynomial space: " << (basis->FullTensorization ? "Q" : "P") << endl;
