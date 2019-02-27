@@ -27,10 +27,15 @@ public:
 		this->Number = number;
 	}
 
+	Element<Dim>* ElementOnTheOtherSideOf(Face<Dim>* face)
+	{
+		return face->GetNeighbour(this);
+	}
+
 	virtual StandardElementCode StdElementCode() = 0;
 
 	virtual double* OuterNormalVector(Face<Dim>* face) = 0;
-
+	
 	virtual double Integral(function<double(Point)> func) = 0;
 	virtual function<double(Point)> EvalPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* phi) = 0;
 	virtual function<double*(Point)> GradPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* phi) = 0;

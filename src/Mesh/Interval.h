@@ -38,7 +38,7 @@ public:
 
 	double DiffusionCoefficient(DiffusionPartition diffusionPartition)
 	{
-		return diffusionPartition.Coefficient(Point((this->A+this->B)/2));
+		return diffusionPartition.Coefficient(Point((this->A + this->B) / 2));
 	}
 
 	double Integral(function<double(Point)> func)

@@ -11,6 +11,7 @@ class Poisson_DG_Element
 public:
 	virtual double* OuterNormalVector(Face<Dim>* face) = 0;
 	virtual double DiffusionCoefficient(DiffusionPartition diffusionPartition) = 0;
+	//virtual Element<Dim>* ElementOnTheOtherSideOf(Face<Dim>* face) = 0;
 
 	virtual function<double(Point)> EvalPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* phi) = 0;
 	virtual function<double*(Point)> GradPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* phi) = 0;

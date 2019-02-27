@@ -65,9 +65,9 @@ public:
 	virtual double CouplingTerm(Face<Dim>* face, Element<Dim>* element1, BasisFunction<Dim>* phi1, Element<Dim>* element2, BasisFunction<Dim>* phi2)
 	{
 		Poisson_DG_Face<Dim>* dgFace = dynamic_cast<Poisson_DG_Face<Dim>*>(face);
-		Poisson_DG_Element<Dim>* dgElement1 = dynamic_cast<Poisson_DG_Element<Dim>*>(element1);
-		Poisson_DG_Element<Dim>* dgElement2 = dynamic_cast<Poisson_DG_Element<Dim>*>(element2);
-		return dgFace->CouplingTerm(dgElement1, phi1, dgElement2, phi2, this->_diffusionPartition);
+		//Poisson_DG_Element<Dim>* dgElement1 = dynamic_cast<Poisson_DG_Element<Dim>*>(element1);
+		//Poisson_DG_Element<Dim>* dgElement2 = dynamic_cast<Poisson_DG_Element<Dim>*>(element2);
+		return dgFace->CouplingTerm(element1, phi1, element2, phi2, this->_diffusionPartition);
 	}
 
 	virtual double PenalizationTerm(Face<Dim>* face, Element<Dim>* element1, BasisFunction<Dim>* phi1, Element<Dim>* element2, BasisFunction<Dim>* phi2, double penalizationCoefficient)

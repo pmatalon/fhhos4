@@ -24,14 +24,15 @@ public:
 	void Assemble(Mesh<Dim>* mesh, FunctionalBasis<Dim>* basis, Poisson_DGTerms<Dim>* dg, int penalizationCoefficient, string outputDirectory, Action action)
 	{
 		cout << "Problem: Poisson " << Dim << "D" << endl;
+		cout << "Subdivisions in each cartesian direction: " << mesh->N << endl;
+		cout << "Discretization: Discontinuous Galerkin SIPG" << endl;
+		cout << "\tPolynomial space: " << (basis->FullTensorization ? "Q" : "P") << endl;
+		cout << "\tPolynomial basis: " << (dg->IsGlobalBasis() ? "global" : "") + basis->Name() << endl;
 
 		bool autoPenalization = penalizationCoefficient == -1;
 		if (autoPenalization)
 			penalizationCoefficient = pow(Dim, 2) * pow(basis->GetDegree() + 1, 2) * mesh->N; // Ralph-Hartmann
-
-		cout << "Discretization: Discontinuous Galerkin SIPG" << endl;
-		cout << "\tPenalization coefficient: " << penalizationCoefficient << endl;
-		cout << "\tBasis of polynomials: " << (dg->IsGlobalBasis() ? "global" : "") + basis->Name() << " of degree " << basis->GetDegree() << endl;
+		cout << "\tPenalization coefficient: " << penalizationCoefficient << (autoPenalization ? " (automatic)" : "") << endl;
 		
 		cout << "Local functions: " << basis->NumberOfLocalFunctionsInElement(NULL) << endl;
 		for (BasisFunction<Dim>* phi : basis->LocalFunctions)
@@ -121,7 +122,7 @@ public:
 			if (face->IsDomainBoundary)
 				continue;
 
-			cout << "Face " << face->Number << endl;
+			//cout << "Face " << face->Number << endl;
 
 			for (BasisFunction<Dim>* phi1 : basis->LocalFunctions)
 			{

@@ -35,9 +35,18 @@ public:
 		return true;
 	}
 
+	Element<Dim>* GetNeighbour(Element<Dim>* element)
+	{
+		if (element == this->Element1)
+			return this->Element2;
+		else if (element == this->Element2)
+			return this->Element1;
+		return NULL;
+	}
+
 	virtual string ToString()
 	{
-		return "Interface " + this->Number;
+		return "Interface " + to_string(this->Number);
 	}
 
 	virtual ~Face() {}

@@ -22,7 +22,7 @@ public:
 	//                 Poisson_DG_Element implementation                //
 	//------------------------------------------------------------------//
 
-	double CouplingTerm(Poisson_DG_Element<3>* element1, BasisFunction<3>* p_phi1, Poisson_DG_Element<3>* element2, BasisFunction<3>* p_phi2, DiffusionPartition diffusionPartition)
+	double CouplingTerm(Element<3>* element1, BasisFunction<3>* p_phi1, Element<3>* element2, BasisFunction<3>* p_phi2, DiffusionPartition diffusionPartition)
 	{
 		auto n1 = element1->OuterNormalVector(this);
 		auto n2 = element2->OuterNormalVector(this);
@@ -34,8 +34,12 @@ public:
 		double weight2 = 1;
 		if (!this->IsDomainBoundary)
 		{
-			weight1 = k2 / (k1 + k2);
-			weight2 = k1 / (k1 + k2);
+			Element<3>* elementOnTheOtherSide1 = element1->ElementOnTheOtherSideOf(this);
+			Element<3>* elementOnTheOtherSide2 = element2->ElementOnTheOtherSideOf(this);
+			double l1 = k1;
+			double l2 = elementOnTheOtherSide1->DiffusionCoefficient(diffusionPartition);
+			weight1 = elementOnTheOtherSide1->DiffusionCoefficient(diffusionPartition) / (l1 + l2);
+			weight2 = elementOnTheOtherSide2->DiffusionCoefficient(diffusionPartition) / (l1 + l2);
 		}
 
 		auto phi1 = element1->EvalPhiOnFace(this, p_phi1);
@@ -61,9 +65,6 @@ public:
 		auto n1 = element1->OuterNormalVector(this);
 		auto n2 = element2->OuterNormalVector(this);
 
-		double k1 = element1->DiffusionCoefficient(diffusionPartition);
-		double k2 = element2->DiffusionCoefficient(diffusionPartition);
-
 		auto phi1 = element1->EvalPhiOnFace(this, p_phi1);
 		auto phi2 = element2->EvalPhiOnFace(this, p_phi2);
 
@@ -75,7 +76,16 @@ public:
 		int nQuadPoints = p_phi1->GetDegree() + p_phi2->GetDegree() + 2;
 		double h = this->Width;
 		double integralJump1ScalarJump2 = pow(h, 2) / 4 * Utils::Integral(nQuadPoints, functionToIntegrate, -1, 1, -1, 1);
-		return 2 * k1*k2 / (k1 + k2) * penalizationCoefficient * integralJump1ScalarJump2;
+
+		double diffusionDependantCoefficient = element1->DiffusionCoefficient(diffusionPartition);
+		if (!this->IsDomainBoundary)
+		{
+			double k1 = this->Element1->DiffusionCoefficient(diffusionPartition);
+			double k2 = this->Element2->DiffusionCoefficient(diffusionPartition);
+			diffusionDependantCoefficient = 2 * k1*k2 / (k1 + k2);
+		}
+
+		return diffusionDependantCoefficient * penalizationCoefficient * integralJump1ScalarJump2;
 	}
 
 private:

@@ -14,21 +14,21 @@
 using namespace std;
 
 
-void print_usage(string s, int d, double k, int n, string b, int p, bool f, int z, string a, string o) {
+void print_usage(string s, int d, double k, string b, int p, int z, string a, string o) {
 	cout << "--------------------------------------------------------" << endl;
 	cout << "Arguments:" << endl;
-	cout << "-d {1|2|3}:\t\t	space dimension (default: 1)\t--> " << d << endl;
-	cout << "-k NUM:\t\t	diffusion coefficient k1 in the first part of the domain partition, while k2=1 in the second part (default: 1)\t--> " << k << endl;
+	cout << "-d {1|2|3}:\t\t		space dimension (default: 1)\t--> " << d << endl;
+	cout << "-k NUM:\t\t\t			diffusion coefficient k1 in the first part of the domain partition, while k2=1 in the second part (default: 1)\t--> " << k << endl;
 	cout << "-s {sine|poly}:\t\t	analytical solution (default: sine)\t--> " << s << endl;
-	cout << "\t\t\t 'sine' = sine solution" << endl;
-	cout << "\t\t\t 'poly' = polynomial solution of global degree 2*d" << endl;
-	cout << "-n NUM:\t\t		number of subdivisions in each spatial dimension (default: 5)\t--> " << n << endl;
+	cout << "\t\t\t\t\t					'sine' = sine solution" << endl;
+	cout << "\t\t\t\t\t					'poly' = polynomial solution of global degree 2*d" << endl;
+	cout << "-n NUM:\t\t		number of subdivisions in each cartesian dimension (default: 5)" << endl;
 	cout << "-t {dg|hho}:\t\t	discretization method (default: dg)" << endl;
 	cout << "\t\t\t 'dg'  = Discontinuous Galerkin (Symmetric Interior Penalty)" << endl;
 	cout << "\t\t\t 'hho' = Hybrid High Order" << endl;
 	cout << "-b {monomials|legendre|bernstein}:	polynomial basis (default: monomials)\t--> " << b << endl;
 	cout << "-p NUM:\t\t		max polynomial degree (default: 2)\t--> " << p << endl;
-	cout << "-f:\t\t		full tensorization of the polynomials when d=2 or 3 (space Q) (default: false)\t--> " << f << endl;
+	cout << "-f:\t\t		full tensorization of the polynomials when d=2 or 3 (space Q) (default: false)" << endl;
 	cout << "-z NUM:\t\t\t	penalization coefficient (default: -1 = automatic)\t--> " << z << endl;
 	cout << "-a {e|c|m|s}+\t\t	action (default: es): " << endl;
 	cout <<	"\t\t\t 'e' = extract system" << endl;
@@ -72,7 +72,7 @@ int main(int argc, char* argv[])
 			case 't': discretization = optarg;
 				if (discretization.compare("dg") != 0 && discretization.compare("hho"))
 				{
-					print_usage(solution, dimension, kappa1, n, basisCode, polyDegree, fullTensorization, penalizationCoefficient, a, outputDirectory);
+					print_usage(solution, dimension, kappa1, basisCode, polyDegree, penalizationCoefficient, a, outputDirectory);
 					cout << "Unknown discretization: " << discretization;
 					exit(EXIT_FAILURE);
 				}
@@ -89,11 +89,11 @@ int main(int argc, char* argv[])
 				break;
 			case 'o': outputDirectory = optarg;
 				break;
-			default: print_usage(solution, dimension, kappa1, n, basisCode, polyDegree, fullTensorization, penalizationCoefficient, a, outputDirectory);
+			default: print_usage(solution, dimension, kappa1, basisCode, polyDegree, penalizationCoefficient, a, outputDirectory);
 				exit(EXIT_FAILURE);
 		}
 	}
-	print_usage(solution, dimension, kappa1, n, basisCode, polyDegree, fullTensorization, penalizationCoefficient, a, outputDirectory);
+	print_usage(solution, dimension, kappa1, basisCode, polyDegree, penalizationCoefficient, a, outputDirectory);
 
 	Action action = Action::None;
 	for (int i = 0; i < a.length(); i++)
@@ -152,13 +152,7 @@ int main(int argc, char* argv[])
 				else
 					return 4 * a2 * pow(x - 1, 2) + 2 * b2 * (x - 1);
 			};
-			sourceFunction = new SourceFunction1D([&diffusionPartition](double x) {
-				/*double alpha = diffusionPartition.Kappa1;
-				if (diffusionPartition.IsInPart1(x))
-					return 4.0 / alpha;
-				else*/
-					return 4.0;
-			});
+			sourceFunction = new SourceFunction1D([&diffusionPartition](double x) { return 4; });
 		//}
 
 		Poisson_DG<1>* problem = new Poisson_DG<1>(solution);
@@ -197,16 +191,16 @@ int main(int argc, char* argv[])
 		sourceFunction = new SourceFunction2D([&diffusionPartition](double x, double y) { return diffusionPartition.Coefficient(x) * 2 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y); });
 		if (solution.compare("poly") == 0)
 		{
-			exactSolution = [](Point p)
+			exactSolution = [&diffusionPartition](Point p)
 			{
 				double x = p.X;
 				double y = p.Y; 
-				return x*(1 - x) * y*(1 - y); 
+				return x*(1 - x) * y*(1 - y);
 			};
-			sourceFunction = new SourceFunction2D([&diffusionPartition](double x, double y) { return diffusionPartition.Coefficient(x) * 2 * y*(1 - y) + 2 * x*(1 - x); });
+			sourceFunction = new SourceFunction2D([&diffusionPartition](double x, double y) { return diffusionPartition.Coefficient(x) * 2 * (y*(1 - y) + x*(1 - x)); });
 		}
 
-		if (diffusionPartition.Kappa1 != diffusionPartition.Kappa2)
+		/*if (diffusionPartition.Kappa1 != diffusionPartition.Kappa2)
 		{
 			exactSolution = [&diffusionPartition](Point p)
 			{
@@ -223,7 +217,7 @@ int main(int argc, char* argv[])
 				else
 					return -diffusionPartition.Coefficient(x)*2 * diffusionPartition.Kappa1 * (y * (1 - y) - (x - 0.5)*(x - 1));
 			});
-		}
+		}*/
 
 		if (discretization.compare("dg") == 0)
 		{
@@ -293,7 +287,7 @@ int main(int argc, char* argv[])
 				double z = p.Z; 
 				return x * (1 - x)*y*(1 - y)*z*(1 - z);
 			};
-			sourceFunction = new SourceFunction3D([&diffusionPartition](double x, double y, double z) { return diffusionPartition.Coefficient(x) * 2 * (y*(1 - y)*z*(1 - z) + x * (1 - x)*z*(1 - z) + x * (1 - x)*y*(1 - y)); });
+			sourceFunction = new SourceFunction3D([&diffusionPartition](double x, double y, double z) { return diffusionPartition.Coefficient(x) * 2 * ((y*(1 - y)*z*(1 - z) + x * (1 - x)*z*(1 - z) + x * (1 - x)*y*(1 - y))); });
 		}
 
 		Poisson_DG<3>* problem = new Poisson_DG<3>(solution);

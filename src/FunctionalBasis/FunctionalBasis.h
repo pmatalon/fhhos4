@@ -12,9 +12,9 @@ class FunctionalBasis
 protected:
 	int _maxPolynomialDegree;
 	string _basisCode;
-	bool _fullTensorization;
 
 public:
+	bool FullTensorization;
 	vector<BasisFunction<Dim>*> LocalFunctions;
 
 	FunctionalBasis(string basisCode, int maxPolynomialDegree) 
@@ -26,14 +26,14 @@ public:
 		maxPolynomialDegree = max(0, maxPolynomialDegree);
 		this->_maxPolynomialDegree = maxPolynomialDegree;
 		this->_basisCode = basisCode;
-		this->_fullTensorization = fullTensorization;
+		this->FullTensorization = fullTensorization;
 
 		//----------//
 		//    1D    //
 		//----------//
 		if (Dim == 1)
 		{
-			this->_fullTensorization = false;
+			this->FullTensorization = false;
 			for (int i = 0; i <= maxPolynomialDegree; i++)
 			{
 				BasisFunction<Dim>* poly = dynamic_cast<BasisFunction<Dim>*>(BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, i));
@@ -165,7 +165,7 @@ public:
 	string Name()
 	{
 		string name = this->_basisCode + "_p" + std::to_string(this->_maxPolynomialDegree);
-		if (this->_fullTensorization)
+		if (this->FullTensorization)
 			name += "_ft";
 		return name;
 	}
