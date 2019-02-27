@@ -54,7 +54,14 @@ public:
 		BigNumber nUnknowns = static_cast<int>(mesh->Elements.size()) * basis->NumberOfLocalFunctionsInElement(NULL);
 		cout << "Unknowns: " << nUnknowns << endl;
 
-		string fileName = "Poisson" + to_string(Dim) + "D" + this->_solutionName + "_n" + to_string(mesh->N) + "_DG_SIPG_" + (dg->IsGlobalBasis() ? "global" : "") + basis->Name() + "_pen" + (autoPenalization ? "-1" : to_string(penalizationCoefficient));
+		string kappaString = "";
+		if (this->_diffusionPartition.Kappa1 != 1)
+		{
+			char res[16];
+			sprintf(res, "_kappa%g", this->_diffusionPartition.Kappa1);
+			kappaString = res;
+		}
+		string fileName = "Poisson" + to_string(Dim) + "D" + this->_solutionName + kappaString + "_n" + to_string(mesh->N) + "_DG_SIPG_" + (dg->IsGlobalBasis() ? "global" : "") + basis->Name() + "_pen" + (autoPenalization ? "-1" : to_string(penalizationCoefficient));
 		string matrixFilePath			= outputDirectory + "/" + fileName + "_A.dat";
 		string matrixVolumicFilePath	= outputDirectory + "/" + fileName + "_A_volumic.dat";
 		string matrixCouplingFilePath	= outputDirectory + "/" + fileName + "_A_coupling.dat";
