@@ -22,6 +22,11 @@ public:
 		this->Right = right;
 	}
 
+	double GetDiameter()
+	{
+		return this->B - this->A;
+	}
+
 	StandardElementCode StdElementCode()
 	{
 		return StandardElementCode::Interval;

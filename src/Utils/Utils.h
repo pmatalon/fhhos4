@@ -3,6 +3,7 @@
 #include <vector>
 #include "GaussLegendre.h"
 #include "../Mesh/Point.h"
+#include "../FunctionalBasis/BasisFunction.h"
 
 typedef unsigned int BigNumber;
 
@@ -35,15 +36,14 @@ public:
 		return Integral(funcToIntegrate, x1, x2);
 	}
 
-	/*static double Integral(int nPoints, std::function<double(double)> func, DefInterval interval)
+	static double Integral(BasisFunction<1>* phi, double x1, double x2)
 	{
-		return Integral(nPoints, func, interval.Left, interval.Right);
+		function<double(double)> func = [phi](double x) {
+			return phi->Eval(x);
+		};
+		int nPoints = (int)ceil(((double)phi->GetDegree() + 1)/2);
+		return Utils::Integral(nPoints, func, x1, x2);
 	}
-
-	static double Integral(std::function<double(double)> func, DefInterval interval)
-	{
-		return Integral(func, interval.Left, interval.Right);
-	}*/
 
 	//-------------//
 	// Integral 2D //
@@ -73,15 +73,14 @@ public:
 		return Integral(funcToIntegrate, x1, x2, y1, y2);
 	}
 
-	/*static double Integral(int nPoints, std::function<double(double, double)> func, DefInterval xInterval, DefInterval yInterval)
+	static double Integral(BasisFunction<2>* phi, double x1, double x2, double y1, double y2)
 	{
-		return Integral(nPoints, func, xInterval.Left, xInterval.Right, yInterval.Left, yInterval.Right);
+		function<double(double, double)> func = [phi](double x, double y) {
+			return phi->Eval(Point(x, y));
+		};
+		int nPoints = (int)ceil(((double)phi->GetDegree() + 1) / 2);
+		return Utils::Integral(nPoints, func, x1, x2, y1, y2);
 	}
-
-	static double Integral(std::function<double(double, double)> func, DefInterval xInterval, DefInterval yInterval)
-	{
-		return Integral(func, xInterval.Left, xInterval.Right, yInterval.Left, yInterval.Right);
-	}*/
 
 	//-------------//
 	// Integral 3D //
@@ -111,15 +110,14 @@ public:
 		return Integral(funcToIntegrate, x1, x2, y1, y2, z1, z2);
 	}
 
-	/*static double Integral(int nPoints, std::function<double(double, double, double)> func, DefInterval xInterval, DefInterval yInterval, DefInterval zInterval)
+	static double Integral(BasisFunction<3>* phi, double x1, double x2, double y1, double y2, double z1, double z2)
 	{
-		return Integral(nPoints, func, xInterval.Left, xInterval.Right, yInterval.Left, yInterval.Right, zInterval.Left, zInterval.Right);
+		function<double(double, double, double)> func = [phi](double x, double y, double z) {
+			return phi->Eval(Point(x, y, z));
+		};
+		int nPoints = (int)ceil(((double)phi->GetDegree() + 1) / 2);
+		return Utils::Integral(nPoints, func, x1, x2, y1, y2, z1, z2);
 	}
-
-	static double Integral(std::function<double(double, double, double)> func, DefInterval xInterval, DefInterval yInterval, DefInterval zInterval)
-	{
-		return Integral(func, xInterval.Left, xInterval.Right, yInterval.Left, yInterval.Right, zInterval.Left, zInterval.Right);
-	}*/
 
 	//----------------------//
 	// Binomial coefficient //

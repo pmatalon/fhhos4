@@ -16,8 +16,7 @@ public:
 	Face<3>* BackFace;
 	Face<3>* LeftFace;
 	Face<3>* RightFace;
-private:
-	Cube* _neighbours;
+
 public:
 	Cube(int number, double x, double y, double z, double width) : Element(number)
 	{
@@ -25,6 +24,11 @@ public:
 		this->Y = y;
 		this->Z = z;
 		this->Width = width;
+	}
+
+	double GetDiameter()
+	{
+		return this->Width;
 	}
 
 	StandardElementCode StdElementCode()

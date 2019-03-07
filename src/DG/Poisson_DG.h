@@ -18,11 +18,11 @@ private:
 	DiffusionPartition _diffusionPartition;
 public:
 
-	Poisson_DG(string solutionName, DiffusionPartition diffusionPartition) 
-		: _diffusionPartition(diffusionPartition), Problem(solutionName)
+	Poisson_DG(string solutionName, DiffusionPartition diffusionPartition, string outputDirectory)
+		: Problem(solutionName, outputDirectory), _diffusionPartition(diffusionPartition)
 	{	}
 
-	void Assemble(Mesh<Dim>* mesh, FunctionalBasis<Dim>* basis, Poisson_DGTerms<Dim>* dg, int penalizationCoefficient, string outputDirectory, Action action)
+	void Assemble(Mesh<Dim>* mesh, FunctionalBasis<Dim>* basis, Poisson_DGTerms<Dim>* dg, int penalizationCoefficient, Action action)
 	{
 		cout << "Problem: Poisson " << Dim << "D";
 		if (this->_diffusionPartition.Kappa1 != this->_diffusionPartition.Kappa2)
@@ -61,13 +61,13 @@ public:
 			sprintf(res, "_kappa%g", this->_diffusionPartition.Kappa1);
 			kappaString = res;
 		}
-		string fileName = "Poisson" + to_string(Dim) + "D" + this->_solutionName + kappaString + "_n" + to_string(mesh->N) + "_DG_SIPG_" + (dg->IsGlobalBasis() ? "global" : "") + basis->Name() + "_pen" + (autoPenalization ? "-1" : to_string(penalizationCoefficient));
-		string matrixFilePath			= outputDirectory + "/" + fileName + "_A.dat";
-		string matrixVolumicFilePath	= outputDirectory + "/" + fileName + "_A_volumic.dat";
-		string matrixCouplingFilePath	= outputDirectory + "/" + fileName + "_A_coupling.dat";
-		string matrixPenFilePath		= outputDirectory + "/" + fileName + "_A_pen.dat";
-		string massMatrixFilePath		= outputDirectory + "/" + fileName + "_Mass.dat";
-		string rhsFilePath				= outputDirectory + "/" + fileName + "_b.dat";
+		this->_fileName = "Poisson" + to_string(Dim) + "D" + this->_solutionName + kappaString + "_n" + to_string(mesh->N) + "_DG_SIPG_" + (dg->IsGlobalBasis() ? "global" : "") + basis->Name() + "_pen" + (autoPenalization ? "-1" : to_string(penalizationCoefficient));
+		string matrixFilePath			= this->_outputDirectory + "/" + this->_fileName + "_A.dat";
+		string matrixVolumicFilePath	= this->_outputDirectory + "/" + this->_fileName + "_A_volumic.dat";
+		string matrixCouplingFilePath	= this->_outputDirectory + "/" + this->_fileName + "_A_coupling.dat";
+		string matrixPenFilePath		= this->_outputDirectory + "/" + this->_fileName + "_A_pen.dat";
+		string massMatrixFilePath		= this->_outputDirectory + "/" + this->_fileName + "_Mass.dat";
+		string rhsFilePath				= this->_outputDirectory + "/" + this->_fileName + "_b.dat";
 
 		this->b = Eigen::VectorXd(nUnknowns);
 

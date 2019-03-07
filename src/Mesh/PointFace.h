@@ -14,6 +14,14 @@ public:
 		this->IsDomainBoundary = false;
 	}
 
+	double GetDiameter()
+	{
+		if (this->Element1 != NULL)
+			return this->Element1->GetDiameter();
+		else
+			return this->Element2->GetDiameter();
+	}
+
 	//------------------------------------------------------------------//
 	//                 Poisson_DG_Element implementation                //
 	//------------------------------------------------------------------//

@@ -2,8 +2,9 @@
 #include "Face.h"
 #include "../Utils/Utils.h"
 #include "../DG/Poisson_DG_Face.h"
+#include "../HHO/Poisson_HHO_Face.h"
 
-class IntervalFace : public Face<2>, public Poisson_DG_Face<2>
+class IntervalFace : public Face<2>, public Poisson_DG_Face<2>, public Poisson_HHO_Face<2>
 {
 public:
 	double Length;
@@ -16,6 +17,11 @@ public:
 	IntervalFace(BigNumber number, double length, Element<2>* element1) : Face(number, element1)
 	{	
 		this->Length = length;
+	}
+
+	double GetDiameter()
+	{
+		return this->Length;
 	}
 
 	//------------------------------------------------------------------//
@@ -85,6 +91,39 @@ public:
 		}
 
 		return diffusionDependantCoefficient * penalizationCoefficient * integralJump1ScalarJump2;
+	}
+
+	double MassTerm(BasisFunction<1>* p_phi1, BasisFunction<1>* p_phi2) override
+	{
+		double h = this->Length;
+
+		IBasisFunction1D* phi1 = static_cast<IBasisFunction1D*>(p_phi1);
+		IBasisFunction1D* phi2 = static_cast<IBasisFunction1D*>(p_phi2);
+
+		function<double(double)> functionToIntegrate = [phi1, phi2](double t) {
+			return phi1->Eval(t) * phi2->Eval(t);
+		};
+
+		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree() + 2;
+		return h / 2 * Utils::Integral(nQuadPoints, functionToIntegrate, -1, 1);
+	}
+
+	double MassTerm(BasisFunction<1>* facePhi, Element<2>* element, BasisFunction<2>* reconstructPhi) override
+	{
+		double h = this->Length;
+		auto reconstructPhiOnFace = element->EvalPhiOnFace(this, reconstructPhi);
+
+		function<double(double)> functionToIntegrate = [facePhi, reconstructPhiOnFace](double t) {
+			return facePhi->Eval(t) * reconstructPhiOnFace(t);
+		};
+
+		int nQuadPoints = facePhi->GetDegree() + reconstructPhi->GetDegree() + 2;
+		return h / 2 * Utils::Integral(nQuadPoints, functionToIntegrate, -1, 1);
+	}
+
+	Eigen::MatrixXd MassMatrix(FunctionalBasis<1>* basis)
+	{
+		return Face<2>::MassMatrix(basis);
 	}
 
 private:

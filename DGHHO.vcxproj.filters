@@ -128,7 +128,9 @@
     <ClInclude Include="src\Utils\Action.h">
       <Filter>Utils</Filter>
     </ClInclude>
-    <ClInclude Include="src\HHO\Reconstructor.h" />
+    <ClInclude Include="src\HHO\Reconstructor.h">
+      <Filter>HHO</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
