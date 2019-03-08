@@ -44,6 +44,49 @@ public:
 		return NULL;
 	}
 
+	virtual double MassTerm(BasisFunction<Dim - 1>* phi1, BasisFunction<Dim - 1>* phi2)
+	{
+		return 0;
+	}
+
+	virtual double MassTerm(BasisFunction<Dim - 1>* facePhi, Element<Dim>* element, BasisFunction<Dim>* reconstructPhi)
+	{
+		return 0;
+	}
+
+	virtual double GetDiameter() = 0;
+
+	virtual Eigen::MatrixXd MassMatrix(FunctionalBasis<Dim-1>* basis)
+	{
+		Eigen::MatrixXd M(basis->LocalFunctions.size(), basis->LocalFunctions.size());
+		for (BasisFunction<Dim-1>* phi1 : basis->LocalFunctions)
+		{
+			for (BasisFunction<Dim-1>* phi2 : basis->LocalFunctions)
+			{
+				if (phi2->LocalNumber > phi1->LocalNumber)
+					break;
+				double term = this->MassTerm(phi1, phi2);
+				M(phi1->LocalNumber, phi2->LocalNumber) = term;
+				M(phi2->LocalNumber, phi1->LocalNumber) = term;
+			}
+		}
+		return M;
+	}
+
+	Eigen::MatrixXd MassMatrix(FunctionalBasis<Dim-1>* basis, Element<Dim>* element, FunctionalBasis<Dim>* reconstructBasis)
+	{
+		Eigen::MatrixXd M(basis->LocalFunctions.size(), reconstructBasis->LocalFunctions.size());
+		for (BasisFunction<Dim-1>* phi1 : basis->LocalFunctions)
+		{
+			for (BasisFunction<Dim>* phi2 : reconstructBasis->LocalFunctions)
+			{
+				double term = this->MassTerm(phi1, element, phi2);
+				M(phi1->LocalNumber, phi2->LocalNumber) = term;
+			}
+		}
+		return M;
+	}
+
 	virtual string ToString()
 	{
 		return "Interface " + to_string(this->Number);

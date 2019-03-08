@@ -5,6 +5,8 @@
 #include "Bernstein2D.h"
 #include "Bernstein3D.h"
 #include <Eigen/Sparse>
+template <short Dim>
+class Element;
 
 template <short Dim>
 class FunctionalBasis
@@ -195,6 +197,11 @@ public:
 	int NumberOfLocalFunctionsInElement(Element<Dim>* element)
 	{
 		return static_cast<int>(this->LocalFunctions.size());
+	}
+
+	int Size()
+	{
+		return NumberOfLocalFunctionsInElement(NULL);
 	}
 
 	BigNumber GlobalFunctionNumber(Element<Dim>* element, BasisFunction<Dim>* phi)

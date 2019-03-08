@@ -6,7 +6,8 @@ enum class Action : unsigned
 	ExtractSystem				= 1 << 1,
 	ExtractComponentMatrices	= 1 << 2,
 	ExtractMassMatrix			= 1 << 3,
-	SolveSystem					= 1 << 4
+	SolveSystem					= 1 << 4,
+	ExtractSolution				= 1 << 5
 };
 
 Action operator &(Action lhs, Action rhs)

@@ -18,6 +18,11 @@ public:
 		this->Width = width;
 	}
 
+	double GetDiameter()
+	{
+		return this->Width;
+	}
+
 	//------------------------------------------------------------------//
 	//                 Poisson_DG_Element implementation                //
 	//------------------------------------------------------------------//

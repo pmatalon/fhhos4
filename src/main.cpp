@@ -33,10 +33,11 @@ void print_usage() {
 	cout << "-f:\t\t		full tensorization of the polynomials when d=2 or 3 (space Q) (default: false)" << endl;
 	cout << "-z NUM:\t\t\t	penalization coefficient (default: -1 = automatic)" << endl;
 	cout << "-a {e|c|m|s}+\t\t	action (default: es): " << endl;
-	cout <<	"\t\t\t 'e' = extract system" << endl;
-	cout << "\t\t\t 'c' = extract all components of the matrix in separate files" << endl;
-	cout << "\t\t\t 'm' = extract mass matrix" << endl;
+	cout <<	"\t\t\t 'e' = export system" << endl;
+	cout << "\t\t\t 'c' = export all components of the matrix in separate files" << endl;
+	cout << "\t\t\t 'm' = export mass matrix" << endl;
 	cout << "\t\t\t 's' = solve system" << endl;
+	cout << "\t\t\t 'v' = export solution vector (requires 's')" << endl;
 	cout << "-o PATH:\t		output directory to export files (default: ./)" << endl;
 	cout << "--------------------------------------------------------" << endl;
 }
@@ -124,6 +125,8 @@ int main(int argc, char* argv[])
 			action |= Action::ExtractMassMatrix;
 		else if (a[i] == 's')
 			action |= Action::SolveSystem;
+		else if (a[i] == 'v')
+			action |= Action::ExtractSolution;
 		else
 			argument_error("unknown action '" + to_string(a[i]) + "'. Check -a argument.");
 	}
@@ -178,15 +181,17 @@ int main(int argc, char* argv[])
 			sourceFunction = new SourceFunction1D([&diffusionPartition](double x) { return 4; });
 		}
 
-		Poisson_DG<1>* problem = new Poisson_DG<1>(solution, diffusionPartition);
+		Poisson_DG<1>* problem = new Poisson_DG<1>(solution, diffusionPartition, outputDirectory);
 		FunctionalBasis<1>* basis = new FunctionalBasis<1>(basisCode, polyDegree);
 		Poisson_DGTerms<1>* dg = new Poisson_DGTerms<1>(sourceFunction, basis, diffusionPartition);
 
-		problem->Assemble(mesh, basis, dg, penalizationCoefficient, outputDirectory, action);
+		problem->Assemble(mesh, basis, dg, penalizationCoefficient, action);
 
 		if ((action & Action::SolveSystem) == Action::SolveSystem)
 		{
 			problem->Solve();
+			if ((action & Action::ExtractSolution) == Action::ExtractSolution)
+				problem->ExtractSolution();
 			double error = L2::Error<1>(mesh, basis, problem->Solution, exactSolution);
 			cout << "L2 Error = " << error << endl;
 		}
@@ -227,15 +232,17 @@ int main(int argc, char* argv[])
 
 		if (discretization.compare("dg") == 0)
 		{
-			Poisson_DG<2>* problem = new Poisson_DG<2>(solution, diffusionPartition);
+			Poisson_DG<2>* problem = new Poisson_DG<2>(solution, diffusionPartition, outputDirectory);
 			FunctionalBasis<2>* basis = new FunctionalBasis<2>(basisCode, polyDegree, fullTensorization);
 			Poisson_DGTerms<2>* dg = new Poisson_DGTerms<2>(sourceFunction, basis, diffusionPartition);
 
-			problem->Assemble(mesh, basis, dg, penalizationCoefficient, outputDirectory, action);
+			problem->Assemble(mesh, basis, dg, penalizationCoefficient, action);
 
 			if ((action & Action::SolveSystem) == Action::SolveSystem)
 			{
 				problem->Solve();
+				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
+					problem->ExtractSolution();
 				double error = L2::Error<2>(mesh, basis, problem->Solution, exactSolution);
 				cout << "L2 Error = " << error << endl;
 			}
@@ -246,23 +253,27 @@ int main(int argc, char* argv[])
 		}
 		else if (discretization.compare("hho") == 0)
 		{
-			Poisson_HHO<2>* problem = new Poisson_HHO<2>(solution);
 			FunctionalBasis<2>* reconstructionBasis = new FunctionalBasis<2>(basisCode, polyDegree, fullTensorization);
-			FunctionalBasis<2>* elementBasis = new FunctionalBasis<2>(basisCode, polyDegree-1, fullTensorization);
-			FunctionalBasis<1>* faceBasis = new FunctionalBasis<1>(basisCode, polyDegree-1, fullTensorization);
+			FunctionalBasis<2>* cellBasis = new FunctionalBasis<2>(basisCode, polyDegree - 1, fullTensorization);
+			FunctionalBasis<1>* faceBasis = new FunctionalBasis<1>(basisCode, polyDegree - 1, fullTensorization);
 
-			problem->Assemble(mesh, reconstructionBasis, elementBasis, faceBasis, outputDirectory, action);
+			Poisson_HHO<2>* problem = new Poisson_HHO<2>(mesh, solution, sourceFunction, reconstructionBasis, cellBasis, faceBasis, outputDirectory);
+
+			problem->Assemble(penalizationCoefficient, action);
 
 			if ((action & Action::SolveSystem) == Action::SolveSystem)
 			{
 				problem->Solve();
-				double error = L2::Error<2>(mesh, reconstructionBasis, problem->Solution, exactSolution);
+				problem->ReconstructSolution();
+				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
+					problem->ExtractSolution();
+				double error = L2::Error<2>(mesh, reconstructionBasis, problem->ReconstructedSolution, exactSolution);
 				cout << "L2 Error = " << error << endl;
 			}
 
 			delete problem;
 			delete reconstructionBasis;
-			delete elementBasis;
+			delete cellBasis;
 			delete faceBasis;
 		}
 		delete mesh;
@@ -298,15 +309,17 @@ int main(int argc, char* argv[])
 			sourceFunction = new SourceFunction3D([&diffusionPartition](double x, double y, double z) { return diffusionPartition.Coefficient(x) * 2 * ((y*(1 - y)*z*(1 - z) + x * (1 - x)*z*(1 - z) + x * (1 - x)*y*(1 - y))); });
 		}
 
-		Poisson_DG<3>* problem = new Poisson_DG<3>(solution, diffusionPartition);
+		Poisson_DG<3>* problem = new Poisson_DG<3>(solution, diffusionPartition, outputDirectory);
 		FunctionalBasis<3>* basis = new FunctionalBasis<3>(basisCode, polyDegree, fullTensorization);
 		Poisson_DGTerms<3>* dg = new Poisson_DGTerms<3>(sourceFunction, basis, diffusionPartition);
 
-		problem->Assemble(mesh, basis, dg, penalizationCoefficient, outputDirectory, action);
+		problem->Assemble(mesh, basis, dg, penalizationCoefficient, action);
 
 		if ((action & Action::SolveSystem) == Action::SolveSystem)
 		{
-			problem->Solve();
+			problem->Solve(); 
+			if ((action & Action::ExtractSolution) == Action::ExtractSolution)
+				problem->ExtractSolution();
 			double error = L2::Error<3>(mesh, basis, problem->Solution, exactSolution);
 			cout << "L2 Error = " << error << endl;
 		}
