@@ -22,7 +22,7 @@ public:
 			return;
 		Done(i, j) = 1;
 
-		if (abs(value) > 1e-16)
+		if (abs(value) != 0)
 			this->coefficients.push_back(Eigen::Triplet<double>(i, j, value));
 	}
 	void Fill(Eigen::SparseMatrix<double> &m)

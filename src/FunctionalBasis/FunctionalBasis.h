@@ -77,7 +77,7 @@ public:
 						}
 					}
 				}
-				else if (basisCode.compare(HemkerJac1D::Code()) == 0)
+				else if (basisCode.compare(Hemker1D::Code()) == 0)
 				{
 					for (int degree = 0; degree <= maxPolynomialDegree; degree++)
 					{
