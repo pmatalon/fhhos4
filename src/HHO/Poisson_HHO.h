@@ -20,11 +20,15 @@ private:
 	FunctionalBasis<Dim>* _reconstructionBasis;
 	FunctionalBasis<Dim>* _cellBasis;
 	FunctionalBasis<Dim - 1>* _faceBasis;
+	bool _staticCondensation = false;
+
+	Eigen::SparseMatrix<double> _globalMatrix;
+	Eigen::VectorXd _globalRHS;
 
 public:
 	Eigen::VectorXd ReconstructedSolution;
 
-	Poisson_HHO(Mesh<Dim>* mesh, string solutionName, SourceFunction* sourceFunction, FunctionalBasis<Dim>* reconstructionBasis, FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim - 1>* faceBasis, string outputDirectory)
+	Poisson_HHO(Mesh<Dim>* mesh, string solutionName, SourceFunction* sourceFunction, FunctionalBasis<Dim>* reconstructionBasis, FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim - 1>* faceBasis, bool staticCondensation, string outputDirectory)
 		: Problem(solutionName, outputDirectory)
 	{	
 		this->_mesh = mesh;
@@ -32,6 +36,7 @@ public:
 		this->_reconstructionBasis = reconstructionBasis;
 		this->_cellBasis = cellBasis;
 		this->_faceBasis = faceBasis;
+		this->_staticCondensation = staticCondensation;
 	}
 
 	void Assemble(int penalizationCoefficient, Action action)
@@ -41,34 +46,42 @@ public:
 		FunctionalBasis<Dim>* cellBasis = this->_cellBasis;
 		FunctionalBasis<Dim - 1>* faceBasis = this->_faceBasis;
 
+		auto nElements = mesh->Elements.size();
+		auto nFaces = mesh->Faces.size();
+
+		auto nLocalFaceUnknowns = faceBasis->Size();
+		auto nLocalCellUnknowns = cellBasis->Size();
+
+		BigNumber nTotalCellUnknowns = nElements * nLocalCellUnknowns;
+		BigNumber nTotalFaceUnknowns = nFaces * nLocalFaceUnknowns;
+		BigNumber nTotalHybridUnknowns = nTotalCellUnknowns + nTotalFaceUnknowns;
 
 		cout << "Problem: Poisson " << Dim << "D" << endl;
 		cout << "Subdivisions in each cartesian direction: " << mesh->N << endl;
-		cout << "\tElements: " << mesh->Elements.size() << endl;
-		cout << "\tFaces: " << mesh->Faces.size() << endl;
+		cout << "\tElements: " << nElements << endl;
+		cout << "\tFaces: " << nFaces << endl;
 		cout << "Discretization: Hybrid High Order" << endl;
 		cout << "\tReconstruction basis: " << reconstructionBasis->Name() << endl;
 		cout << "\tCell basis: " << cellBasis->Name() << endl;
 		cout << "\tFace basis: " << faceBasis->Name() << endl;
-
-		BigNumber nTotalCellUnknowns = static_cast<int>(mesh->Elements.size()) * cellBasis->NumberOfLocalFunctionsInElement(NULL);
-		BigNumber nTotalFaceUnknowns = static_cast<int>(mesh->Faces.size()) * faceBasis->NumberOfLocalFunctionsInElement(NULL);
-		BigNumber nTotalHybridUnknowns = nTotalCellUnknowns + nTotalFaceUnknowns;
-		cout << "Cell unknowns: " << nTotalCellUnknowns << " (" << cellBasis->NumberOfLocalFunctionsInElement(NULL) << " per cell)" << endl;
-		cout << "Face unknowns: " << nTotalFaceUnknowns << " (" << faceBasis->NumberOfLocalFunctionsInElement(NULL) << " per face)" << endl;
+		cout << "Cell unknowns: " << nTotalCellUnknowns << " (" << cellBasis->Size() << " per cell)" << endl;
+		cout << "Face unknowns: " << nTotalFaceUnknowns << " (" << faceBasis->Size() << " per face)" << endl;
 		cout << "Total unknowns: " << nTotalHybridUnknowns << endl;
+		cout << "System size: " << (this->_staticCondensation ? nTotalFaceUnknowns : nTotalHybridUnknowns) << " (" << (this->_staticCondensation ? "statically condensed" : "no static condensation") << ")" << endl;
 
 		bool autoPenalization = true;
 
-		this->_fileName = "Poisson" + to_string(Dim) + "D" + this->_solutionName + "_n" + to_string(mesh->N) + "_HHO_" + reconstructionBasis->Name() + "_pen" + (autoPenalization ? "-1" : to_string(penalizationCoefficient));
+		this->_fileName = "Poisson" + to_string(Dim) + "D" + this->_solutionName + "_n" + to_string(mesh->N) + "_HHO_" + reconstructionBasis->Name() + "_pen" + (autoPenalization ? "-1" : to_string(penalizationCoefficient)) + (_staticCondensation ? "_staticcond" : "");
 		string matrixFilePath = this->_outputDirectory + "/" + this->_fileName + "_A.dat";
+		string reconstructionMatrixFilePath = this->_outputDirectory + "/" + this->_fileName + "_Reconstruct.dat";
 		string rhsFilePath = this->_outputDirectory + "/" + this->_fileName + "_b.dat";
 
-		this->b = Eigen::VectorXd(nTotalHybridUnknowns);
+		this->_globalRHS = Eigen::VectorXd(nTotalHybridUnknowns);
 
-		BigNumber nnzApproximate = mesh->Elements.size() * faceBasis->NumberOfLocalFunctionsInElement(NULL) * (2 * Dim + 1);
+		BigNumber nnzApproximate = mesh->Elements.size() * nTotalHybridUnknowns * (2 * Dim + 1);
 		NonZeroCoefficients consistencyCoeffs(nTotalHybridUnknowns, nTotalHybridUnknowns, nnzApproximate);
 		NonZeroCoefficients stabilizationCoeffs(nTotalHybridUnknowns, nTotalHybridUnknowns, nnzApproximate);
+		NonZeroCoefficients reconstructionCoeffs(nnzApproximate);
 
 		cout << "Assembly..." << endl;
 		
@@ -77,9 +90,6 @@ public:
 			//cout << "Element " << element->Number << endl;
 			Poisson_HHO_Element<Dim>* hhoElement = dynamic_cast<Poisson_HHO_Element<Dim>*>(element);
 			hhoElement->InitReconstructor(reconstructionBasis, cellBasis, faceBasis);
-
-			// Cell unknowns / Cell unknowns
-			int nLocalCellUnknowns = cellBasis->NumberOfLocalFunctionsInElement(element);
 
 			for (BasisFunction<Dim>* cellPhi1 : cellBasis->LocalFunctions)
 			{
@@ -143,14 +153,32 @@ public:
 			for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions)
 			{
 				BigNumber i = DOFNumber(element, cellPhi);
-				this->b(i) = hhoElement->SourceTerm(cellPhi, this->_sourceFunction);
+				this->_globalRHS(i) = hhoElement->SourceTerm(cellPhi, this->_sourceFunction);
 			}
 			for (auto face : element->Faces)
 			{
 				for (BasisFunction<Dim - 1>* facePhi : faceBasis->LocalFunctions)
 				{
 					BigNumber i = DOFNumber(face, facePhi);
-					this->b(i) = 0;
+					this->_globalRHS(i) = 0;
+				}
+			}
+
+			for (BasisFunction<Dim>* reconstructPhi : reconstructionBasis->LocalFunctions)
+			{
+				BigNumber i = element->Number * reconstructionBasis->Size() + reconstructPhi->LocalNumber;
+				for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions)
+				{
+					BigNumber j = DOFNumber(element, cellPhi);
+					reconstructionCoeffs.Add(i, j, hhoElement->ReconstructionTerm(reconstructPhi, cellPhi));
+				}
+				for (auto face : element->Faces)
+				{
+					for (BasisFunction<Dim - 1>* facePhi : faceBasis->LocalFunctions)
+					{
+						BigNumber j = DOFNumber(face, facePhi);
+						reconstructionCoeffs.Add(i, j, hhoElement->ReconstructionTerm(reconstructPhi, face, facePhi));
+					}
 				}
 			}
 
@@ -161,12 +189,9 @@ public:
 			if (face->IsDomainBoundary)
 				continue;
 
-			for (BasisFunction<Dim>* phi1 : basis->LocalFunctions)
+			for (BasisFunction<Dim>* facePhi1 : _faceBasis->LocalFunctions)
 			{
-				BigNumber basisFunction1 = basis->GlobalFunctionNumber(face->Element1, phi1);
-				for (BasisFunction<Dim>* phi2 : basis->LocalFunctions)
-				{
-				}
+				
 			}
 		}*/
 
@@ -176,42 +201,97 @@ public:
 		Eigen::SparseMatrix<double> Astab = Eigen::SparseMatrix<double>(nTotalHybridUnknowns, nTotalHybridUnknowns);
 		stabilizationCoeffs.Fill(Astab);
 
-		this->A = Acons + Astab;
+		this->_globalMatrix = Acons + Astab;
+		if (this->_staticCondensation)
+		{
+			Eigen::SparseMatrix<double> Att = this->_globalMatrix.topLeftCorner(nTotalCellUnknowns, nTotalCellUnknowns);
+			Eigen::SparseMatrix<double> Aff = this->_globalMatrix.bottomRightCorner(nTotalFaceUnknowns, nTotalFaceUnknowns);
+			Eigen::SparseMatrix<double> Atf = this->_globalMatrix.topRightCorner(nTotalCellUnknowns, nTotalFaceUnknowns);
+
+			Eigen::SparseLU<Eigen::SparseMatrix<double>> inverseAtt;
+			inverseAtt.compute(Att);
+			this->A = Aff - Atf.transpose() * inverseAtt.solve(Atf);
+
+			Eigen::VectorXd bt = this->_globalRHS.head(nTotalCellUnknowns);
+			Eigen::VectorXd bf = this->_globalRHS.tail(nTotalFaceUnknowns);
+			this->b = bf - Atf.transpose() * inverseAtt.solve(bt);
+		}
+		else
+		{
+			this->A = this->_globalMatrix;
+			this->b = this->_globalRHS;
+		}
+
 		cout << "nnz(A) = " << this->A.nonZeros() << endl;
 
-		cout << "Export..." << endl;
-		Eigen::saveMarket(this->A, matrixFilePath);
-		cout << "Matrix exported to \t" << matrixFilePath << endl;
+		Eigen::SparseMatrix<double> reconstructionMatrix = Eigen::SparseMatrix<double>(nElements * reconstructionBasis->Size(), nTotalHybridUnknowns);
+		reconstructionCoeffs.Fill(reconstructionMatrix);
 
-		Eigen::saveMarketVector(this->b, rhsFilePath);
-		cout << "RHS exported to \t" << rhsFilePath << endl;
+		if ((action & Action::ExtractSystem) == Action::ExtractSystem)
+		{
+			cout << "Export..." << endl;
+			Eigen::saveMarket(this->A, matrixFilePath);
+			cout << "Matrix exported to \t" << matrixFilePath << endl;
+
+			Eigen::saveMarketVector(this->b, rhsFilePath);
+			cout << "RHS exported to \t" << rhsFilePath << endl;
+
+			Eigen::saveMarket(reconstructionMatrix, reconstructionMatrixFilePath);
+			cout << "Reconstruction matrix exported to \t" << reconstructionMatrixFilePath << endl;
+		}
 	}
 
 	void ReconstructSolution()
 	{
-		int nLocalReconstructUnknowns = this->_reconstructionBasis->NumberOfLocalFunctionsInElement(NULL);
-		Eigen::VectorXd globalReconstructedSolution(this->_mesh->Elements.size() * nLocalReconstructUnknowns);
+		auto nElements = this->_mesh->Elements.size();
+		auto nFaces = this->_mesh->Faces.size();
 
-		BigNumber nTotalCellUnknowns = static_cast<int>(this->_mesh->Elements.size()) * this->_cellBasis->NumberOfLocalFunctionsInElement(NULL);
+		auto nLocalFaceUnknowns = this->_faceBasis->Size();
+		auto nLocalCellUnknowns = this->_cellBasis->Size();
+
+		BigNumber nTotalCellUnknowns = nElements * nLocalCellUnknowns;
+		BigNumber nTotalFaceUnknowns = nFaces * nLocalFaceUnknowns;
+		BigNumber nTotalHybridUnknowns = nTotalCellUnknowns + nTotalFaceUnknowns;
+
+		auto nLocalReconstructUnknowns = this->_reconstructionBasis->Size();
+		Eigen::VectorXd globalReconstructedSolution(nElements * nLocalReconstructUnknowns);
+
+		Eigen::VectorXd globalHybridSolution;
+
+		if (this->_staticCondensation)
+		{
+			Eigen::VectorXd facesSolution = this->Solution;
+
+			Eigen::SparseMatrix<double> Att = this->_globalMatrix.topLeftCorner(nTotalCellUnknowns, nTotalCellUnknowns);
+			Eigen::SparseMatrix<double> Atf = this->_globalMatrix.topRightCorner(nTotalCellUnknowns, nTotalFaceUnknowns);
+			Eigen::VectorXd bt = this->_globalRHS.head(nTotalCellUnknowns);
+
+			Eigen::SparseLU<Eigen::SparseMatrix<double>> inverseAtt;
+			inverseAtt.compute(Att);
+
+
+			globalHybridSolution = Eigen::VectorXd(nTotalHybridUnknowns);
+			globalHybridSolution.tail(nTotalFaceUnknowns) = facesSolution;
+			globalHybridSolution.head(nTotalCellUnknowns) = inverseAtt.solve(bt - Atf * facesSolution);
+		}
+		else
+			globalHybridSolution = this->Solution;
 
 		for (auto element : this->_mesh->Elements)
 		{
 			Poisson_HHO_Element<Dim>* hhoElement = dynamic_cast<Poisson_HHO_Element<Dim>*>(element);
 
-			int nLocalCellUnknowns = this->_cellBasis->NumberOfLocalFunctionsInElement(element);
-			int nLocalFaceUnknowns = this->_faceBasis->NumberOfLocalFunctionsInElement(NULL);
-
 			Eigen::VectorXd localHybridSolution(nLocalCellUnknowns + nLocalFaceUnknowns * element->Faces.size());
-			localHybridSolution.head(nLocalCellUnknowns) = this->Solution.segment(element->Number * nLocalCellUnknowns, nLocalCellUnknowns);
+			localHybridSolution.head(nLocalCellUnknowns) = globalHybridSolution.segment(FirstDOFGlobalNumber(element), nLocalCellUnknowns);
 			for (auto face : element->Faces)
 			{
-				localHybridSolution.segment(nLocalCellUnknowns, nLocalFaceUnknowns) = this->Solution.segment(nTotalCellUnknowns + face->Number * nLocalFaceUnknowns, nLocalFaceUnknowns);
+				localHybridSolution.segment(hhoElement->FirstDOFLocalNumber(face), nLocalFaceUnknowns) = globalHybridSolution.segment(FirstDOFGlobalNumber(face), nLocalFaceUnknowns);
 			}
 
 			Eigen::VectorXd localReconstructedSolution = hhoElement->Reconstruct(localHybridSolution);
-
 			globalReconstructedSolution.segment(element->Number * nLocalReconstructUnknowns, nLocalReconstructUnknowns) = localReconstructedSolution;
 		}
+
 		this->ReconstructedSolution = globalReconstructedSolution;
 	}
 
@@ -223,12 +303,20 @@ public:
 private:
 	BigNumber DOFNumber(Element<Dim>* element, BasisFunction<Dim>* cellPhi)
 	{
-		return element->Number * this->_cellBasis->Size() + cellPhi->LocalNumber;
+		return FirstDOFGlobalNumber(element) + cellPhi->LocalNumber;
 	}
 	BigNumber DOFNumber(Face<Dim>* face, BasisFunction<Dim-1>* facePhi)
 	{
+		return FirstDOFGlobalNumber(face) + facePhi->LocalNumber;
+	}
+	BigNumber FirstDOFGlobalNumber(Element<Dim>* element)
+	{
+		return element->Number * this->_cellBasis->Size();
+	}
+	BigNumber FirstDOFGlobalNumber(Face<Dim>* face)
+	{
 		BigNumber nTotalCellUnknowns = static_cast<int>(this->_mesh->Elements.size()) * this->_cellBasis->Size();
-		return nTotalCellUnknowns + face->Number * this->_faceBasis->Size() + facePhi->LocalNumber;
+		return nTotalCellUnknowns + face->Number * this->_faceBasis->Size();
 	}
 };
 

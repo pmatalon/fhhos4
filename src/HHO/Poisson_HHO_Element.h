@@ -19,6 +19,7 @@ public:
 	virtual Eigen::VectorXd Reconstruct(Eigen::VectorXd hybridVector) = 0;
 
 	virtual int LocalNumberOf(Face<Dim>* face) = 0;
+	virtual int FirstDOFLocalNumber(Face<Dim>* face) = 0;
 
 	virtual double ConsistencyTerm(BasisFunction<Dim>* cellPhi1, BasisFunction<Dim>* cellPhi2) = 0;
 	virtual double ConsistencyTerm(Face<Dim>* face, BasisFunction<Dim>* cellPhi, BasisFunction<Dim-1>* facePhi) = 0;
@@ -27,6 +28,9 @@ public:
 	virtual double StabilizationTerm(BasisFunction<Dim>* cellPhi1, BasisFunction<Dim>* cellPhi2) = 0;
 	virtual double StabilizationTerm(Face<Dim>* face, BasisFunction<Dim>* cellPhi, BasisFunction<Dim - 1>* facePhi) = 0;
 	virtual double StabilizationTerm(Face<Dim>* face1, BasisFunction<Dim - 1>* facePhi1, Face<Dim>* face2, BasisFunction<Dim - 1>* facePhi2) = 0;
+
+	virtual double ReconstructionTerm(BasisFunction<Dim>* reconstrucPhi, BasisFunction<Dim>* cellPhi) = 0;
+	virtual double ReconstructionTerm(BasisFunction<Dim>* reconstrucPhi, Face<Dim>* face, BasisFunction<Dim-1>* facePhi) = 0;
 
 	virtual double MassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) = 0;
 	virtual Eigen::MatrixXd MassMatrix(FunctionalBasis<Dim>* basis) = 0;

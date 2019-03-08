@@ -30,8 +30,9 @@ void print_usage() {
 	cout << "\t\t\t 'hho' = Hybrid High Order" << endl;
 	cout << "-b {monomials|legendre|bernstein}:	polynomial basis (default: monomials)" << endl;
 	cout << "-p NUM:\t\t		max polynomial degree (default: 2)" << endl;
-	cout << "-f:\t\t		full tensorization of the polynomials when d=2 or 3 (space Q) (default: false)" << endl;
+	cout << "-f:\t\t		full tensorization of the polynomials when d=2 or 3 (space Q) (default: false = space P)" << endl;
 	cout << "-z NUM:\t\t\t	penalization coefficient (default: -1 = automatic)" << endl;
+	cout << "-c:\t\t		static condensation (HHO only) (default: no static condensation)" << endl;
 	cout << "-a {e|c|m|s}+\t\t	action (default: es): " << endl;
 	cout <<	"\t\t\t 'e' = export system" << endl;
 	cout << "\t\t\t 'c' = export all components of the matrix in separate files" << endl;
@@ -66,11 +67,12 @@ int main(int argc, char* argv[])
 	int polyDegree = 2;
 	bool fullTensorization = false;
 	int penalizationCoefficient = -1;
+	bool staticCondensation = false;
 	string a = "es";
-	string outputDirectory = "./";
+	string outputDirectory = ".";
 
 	int option = 0;
-	while ((option = getopt(argc, argv, "d:k:s:n:t:b:p:z:a:o:hf")) != -1) 
+	while ((option = getopt(argc, argv, "d:k:s:n:t:b:p:z:a:o:hfc")) != -1) 
 	{
 		switch (option) 
 		{
@@ -101,6 +103,8 @@ int main(int argc, char* argv[])
 			case 'f': fullTensorization = true;
 				break;
 			case 'z': penalizationCoefficient = atoi(optarg);
+				break;
+			case 'c': staticCondensation = true;
 				break;
 			case 'a': a = optarg;
 				break;
@@ -257,7 +261,7 @@ int main(int argc, char* argv[])
 			FunctionalBasis<2>* cellBasis = new FunctionalBasis<2>(basisCode, polyDegree - 1, fullTensorization);
 			FunctionalBasis<1>* faceBasis = new FunctionalBasis<1>(basisCode, polyDegree - 1, fullTensorization);
 
-			Poisson_HHO<2>* problem = new Poisson_HHO<2>(mesh, solution, sourceFunction, reconstructionBasis, cellBasis, faceBasis, outputDirectory);
+			Poisson_HHO<2>* problem = new Poisson_HHO<2>(mesh, solution, sourceFunction, reconstructionBasis, cellBasis, faceBasis, staticCondensation, outputDirectory);
 
 			problem->Assemble(penalizationCoefficient, action);
 

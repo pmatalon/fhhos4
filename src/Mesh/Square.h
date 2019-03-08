@@ -325,6 +325,11 @@ public:
 		return Element::LocalNumberOf(face);
 	}
 
+	int FirstDOFLocalNumber(Face<2>* face)
+	{
+		return this->HHOReconstructor->FirstDOFNumber(face);
+	}
+
 	double ConsistencyTerm(BasisFunction<2>* cellPhi1, BasisFunction<2>* cellPhi2)
 	{
 		return this->HHOReconstructor->ConsistencyTerm(cellPhi1, cellPhi2);
@@ -349,5 +354,14 @@ public:
 	double StabilizationTerm(Face<2>* face1, BasisFunction<1>* facePhi1, Face<2>* face2, BasisFunction<1>* facePhi2)
 	{
 		return this->HHOReconstructor->StabilizationTerm(face1, facePhi1, face2, facePhi2);
+	}
+
+	virtual double ReconstructionTerm(BasisFunction<2>* reconstrucPhi, BasisFunction<2>* cellPhi)
+	{
+		return this->HHOReconstructor->ReconstructionTerm(reconstrucPhi, cellPhi);
+	}
+	virtual double ReconstructionTerm(BasisFunction<2>* reconstrucPhi, Face<2>* face, BasisFunction<1>* facePhi)
+	{
+		return this->HHOReconstructor->ReconstructionTerm(reconstrucPhi, face, facePhi);
 	}
 };

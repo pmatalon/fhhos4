@@ -104,6 +104,15 @@ public:
 		return this->Astab(DOFNumber(face1, facePhi1), DOFNumber(face2, facePhi2));
 	}
 
+	double ReconstructionTerm(BasisFunction<Dim>* reconstructPhi, BasisFunction<Dim>* cellPhi2)
+	{
+		return this->P(reconstructPhi->LocalNumber, DOFNumber(cellPhi2));
+	}
+	double ReconstructionTerm(BasisFunction<Dim>* reconstructPhi, Face<Dim>* face, BasisFunction<Dim - 1>* facePhi)
+	{
+		return this->P(reconstructPhi->LocalNumber, DOFNumber(face, facePhi));
+	}
+
 private:
 
 	//------------------------------------------------------------------------------------//
@@ -256,7 +265,7 @@ private:
 			Eigen::MatrixXd ProjFT = Mf.inverse() * Nft;
 			Eigen::MatrixXd Df = ProjF * this->P;
 			for (int i = 0; i < Df.rows(); i++)
-				Df(i, this->_cellBasis->Size() + element->LocalNumberOf(face) * this->_faceBasis->Size() + i) -= 1;
+				Df(i, FirstDOFNumber(face) + i) -= 1;
 
 			Eigen::MatrixXd DiffTF = Df - ProjFT * Dt;
 			double h = face->GetDiameter();
@@ -264,13 +273,17 @@ private:
 			//cout << "------------- Astab -------------" << endl << Astab << endl;
 		}
 	}
-
 	int DOFNumber(BasisFunction<Dim>* cellPhi)
 	{
 		return cellPhi->LocalNumber;
 	}
 	int DOFNumber(Face<Dim>* face, BasisFunction<Dim - 1>* facePhi)
 	{
-		return this->_cellBasis->Size() + this->_element->LocalNumberOf(face) * this->_faceBasis->Size() + facePhi->LocalNumber;
+		return FirstDOFNumber(face) + facePhi->LocalNumber;
+	}
+public:
+	int FirstDOFNumber(Face<Dim>* face)
+	{
+		return this->_cellBasis->Size() + this->_element->LocalNumberOf(face) * this->_faceBasis->Size();
 	}
 };
