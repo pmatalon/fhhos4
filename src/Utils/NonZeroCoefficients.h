@@ -18,9 +18,12 @@ public:
 	}
 	void Add(BigNumber i, BigNumber j, double value)
 	{
-		if (Done.rows() > 0 && Done(i, j) == 1)
-			return;
-		Done(i, j) = 1;
+		if (Done.rows() > 0)
+		{
+			if (Done(i, j) == 1)
+				return;
+			Done(i, j) = 1;
+		}
 
 		if (abs(value) != 0)
 			this->coefficients.push_back(Eigen::Triplet<double>(i, j, value));
