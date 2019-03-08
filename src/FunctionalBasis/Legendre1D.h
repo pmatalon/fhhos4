@@ -17,7 +17,7 @@ public:
 	{
 		this->LocalNumber = degree;
 		this->Degree = degree;
-		this->Normalized = false;
+		this->Normalized = true;
 	}
 
 	Legendre1D(int degree, bool normalized)

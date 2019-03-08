@@ -25,7 +25,7 @@ public:
 			Done(i, j) = 1;
 		}
 
-		if (value != 0)
+		if (abs(value) > 1e-16)
 			this->coefficients.push_back(Eigen::Triplet<double>(i, j, value));
 	}
 	void Fill(Eigen::SparseMatrix<double> &m)
