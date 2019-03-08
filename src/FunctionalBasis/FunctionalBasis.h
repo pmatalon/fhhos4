@@ -75,6 +75,23 @@ public:
 						}
 					}
 				}
+				else if (basisCode.compare(HemkerJac1D::Code()) == 0)
+				{
+					for (int degree = 0; degree <= maxPolynomialDegree; degree++)
+					{
+						for (int j = 0; j <= degree; j++)
+						{
+							int i = degree - j;
+
+							IBasisFunction1D* polyX = BasisFunctionFactory::Create(basisCode, i, i);
+							IBasisFunction1D* polyY = BasisFunctionFactory::Create(basisCode, j, j);
+
+							BasisFunction<Dim>* poly2D = dynamic_cast<BasisFunction<Dim>*>(new TensorPolynomial2D(functionNumber, polyX, polyY));
+							this->LocalFunctions.push_back(poly2D);
+							functionNumber++;
+						}
+					}
+				}
 				else
 				{
 					for (int degree = 0; degree <= maxPolynomialDegree; degree++)

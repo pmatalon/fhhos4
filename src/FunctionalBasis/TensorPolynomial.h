@@ -46,10 +46,10 @@ public:
 		string polyX = this->_funcX->ToString("X");
 		string polyY = this->_funcY->ToString("Y");
 		if (polyX.compare("1") == 0)
-			return polyY;
+			return to_string(this->LocalNumber) + "\tdegree " + to_string(this->GetDegree()) + "\t" + polyY;
 		if (polyY.compare("1") == 0)
-			return polyX;
-		return polyX + " * " + polyY;
+			return to_string(this->LocalNumber) + "\tdegree " + to_string(this->GetDegree()) + "\t" + polyX;
+		return to_string(this->LocalNumber) + "\tdegree " + to_string(this->GetDegree()) + "\t" + polyX + " * " + polyY;
 	}
 };
 

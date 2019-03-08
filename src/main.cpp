@@ -92,7 +92,7 @@ int main(int argc, char* argv[])
 					argument_error("unknown discretization '" + discretization + "'. Check -t argument.");
 				break;
 			case 'b': basisCode = optarg;
-				if (basisCode.compare("monomials") != 0 && basisCode.compare("legendre") != 0 && basisCode.compare("bernstein") != 0)
+				if (basisCode.compare("monomials") != 0 && basisCode.compare("legendre") != 0 && basisCode.compare("bernstein") != 0 && basisCode.compare("hemker") != 0)
 					argument_error("unknown polynomial basis '" + basisCode + "'. Check -b argument.");
 				break;
 			case 'p': polyDegree = atoi(optarg);
