@@ -100,6 +100,7 @@
     <ClInclude Include="src/FunctionalBasis/Monomial1D.h" />
     <ClInclude Include="src/FunctionalBasis/FunctionalBasis.h" />
     <ClInclude Include="src/FunctionalBasis/TensorPolynomial.h" />
+    <ClInclude Include="src\FunctionalBasis\Hemker1D.h" />
     <ClInclude Include="src\HHO\Reconstructor.h" />
     <ClInclude Include="src\Mesh\Mesh.h" />
     <ClInclude Include="src/Mesh/CartesianGrid1D.h" />

@@ -131,6 +131,7 @@
     <ClInclude Include="src\HHO\Reconstructor.h">
       <Filter>HHO</Filter>
     </ClInclude>
+    <ClInclude Include="src\FunctionalBasis\Hemker1D.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
