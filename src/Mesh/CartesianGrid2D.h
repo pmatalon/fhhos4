@@ -27,9 +27,9 @@ public:
 			}
 		}
 
-		//------------//
+		//-------//
 		// Faces //
-		//------------//
+		//-------//
 
 		this->Faces.reserve(n * (n + 3));
 		BigNumber numberInterface = 0;
@@ -39,13 +39,13 @@ public:
 			// South boundary
 			IntervalFace* southBoundary = new IntervalFace(numberInterface++, h, this->Elements[j]);
 			this->Faces.push_back(southBoundary);
-			//this->BoundaryInterfaces.push_back(southBoundary);
+			this->BoundaryFaces.push_back(southBoundary);
 			dynamic_cast<Square*>(this->Elements[j])->SetSouthInterface(southBoundary);
 
 			// North boundary
 			IntervalFace* northBoundary = new IntervalFace(numberInterface++, h, this->Elements[(n-1)*n + j]);
 			this->Faces.push_back(northBoundary);
-			//this->BoundaryInterfaces.push_back(northBoundary);
+			this->BoundaryFaces.push_back(northBoundary);
 			dynamic_cast<Square*>(this->Elements[(n - 1)*n + j])->SetNorthInterface(northBoundary);
 		}
 
@@ -54,13 +54,13 @@ public:
 			// West boundary
 			IntervalFace* westBoundary = new IntervalFace(numberInterface++, h, this->Elements[i*n]);
 			this->Faces.push_back(westBoundary);
-			//this->BoundaryInterfaces.push_back(westBoundary);
+			this->BoundaryFaces.push_back(westBoundary);
 			dynamic_cast<Square*>(this->Elements[i*n])->SetWestInterface(westBoundary);
 
 			// East boundary
 			IntervalFace* eastBoundary = new IntervalFace(numberInterface++, h, this->Elements[i*n + n-1]);
 			this->Faces.push_back(eastBoundary);
-			//this->BoundaryInterfaces.push_back(eastBoundary);
+			this->BoundaryFaces.push_back(eastBoundary);
 			dynamic_cast<Square*>(this->Elements[i*n + n - 1])->SetEastInterface(eastBoundary);
 		}
 
@@ -75,6 +75,7 @@ public:
 					Square* eastNeighbour = dynamic_cast<Square*>(this->Elements[i*n + j + 1]);
 					IntervalFace* interface = new IntervalFace(numberInterface++, h, element, eastNeighbour);
 					this->Faces.push_back(interface);
+					this->InteriorFaces.push_back(interface);
 					element->SetEastInterface(interface);
 					eastNeighbour->SetWestInterface(interface);
 				}
@@ -84,11 +85,20 @@ public:
 					Square* northNeighbour = dynamic_cast<Square*>(this->Elements[(i+1)*n + j]);
 					IntervalFace* interface = new IntervalFace(numberInterface++, h, element, northNeighbour);
 					this->Faces.push_back(interface);
+					this->InteriorFaces.push_back(interface);
 					element->SetNorthInterface(interface);
 					northNeighbour->SetSouthInterface(interface);
 				}
 			}
 		}
+
+		// Global numbering (interior first, then boundary)
+		numberInterface = 0;
+		for (auto face : this->InteriorFaces)
+			face->Number = numberInterface++;
+		for (auto face : this->BoundaryFaces)
+			face->Number = numberInterface++;
+
 	}
 
 	~CartesianGrid2D() override

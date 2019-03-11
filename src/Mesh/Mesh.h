@@ -12,6 +12,8 @@ public:
 	BigNumber N;
 	vector<Element<Dim>*> Elements;
 	vector<Face<Dim>*> Faces;
+	vector<Face<Dim>*> BoundaryFaces;
+	vector<Face<Dim>*> InteriorFaces;
 
 	Mesh(BigNumber n)
 	{
