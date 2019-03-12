@@ -42,7 +42,6 @@ public:
 
 	void SetNorthInterface(IntervalFace* face)
 	{
-		//this->Faces.push_back(face);
 		this->AddFace(face);
 		this->NorthFace = face;
 	}

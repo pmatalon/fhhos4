@@ -92,17 +92,6 @@ public:
 			}
 		}
 
-		// Global numbering (interior first, then boundary)
-		numberInterface = 0;
-		for (auto face : this->InteriorFaces)
-			face->Number = numberInterface++;
-		for (auto face : this->BoundaryFaces)
-			face->Number = numberInterface++;
-
-	}
-
-	~CartesianGrid2D() override
-	{
 	}
 
 };

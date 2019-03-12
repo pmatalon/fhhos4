@@ -111,6 +111,13 @@ public:
 		NonZeroCoefficients stabilizationCoeffs(hho.nTotalHybridUnknowns, hho.nTotalHybridUnknowns, nnzApproximate);
 		NonZeroCoefficients reconstructionCoeffs(nnzApproximate);
 
+		// Global numbering of the faces (interior first, then boundary)
+		BigNumber faceNumber = 0;
+		for (auto face : mesh->InteriorFaces)
+			face->Number = faceNumber++;
+		for (auto face : mesh->BoundaryFaces)
+			face->Number = faceNumber++;
+
 		cout << "Assembly..." << endl;
 		
 		for (auto element : mesh->Elements)

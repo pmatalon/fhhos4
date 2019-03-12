@@ -31,9 +31,9 @@ public:
 			}
 		}
 
-		//------------//
+		//-------//
 		// Faces //
-		//------------//
+		//-------//
 
 		this->Faces.reserve(2*n*n * (n + 1));
 		BigNumber numberInterface = 0;
@@ -45,13 +45,13 @@ public:
 				// Bottom boundary
 				SquareFace* bottomBoundary = new SquareFace(numberInterface++, h, this->Elements[index(ix, iy, 0)]);
 				this->Faces.push_back(bottomBoundary);
-				//this->BoundaryInterfaces.push_back(southBoundary);
+				this->BoundaryFaces.push_back(bottomBoundary);
 				dynamic_cast<Cube*>(this->Elements[index(ix, iy, 0)])->SetBottomInterface(bottomBoundary);
 
 				// Top boundary
 				SquareFace* topBoundary = new SquareFace(numberInterface++, h, this->Elements[index(ix, iy, n-1)]);
 				this->Faces.push_back(topBoundary);
-				//this->BoundaryInterfaces.push_back(topBoundary);
+				this->BoundaryFaces.push_back(topBoundary);
 				dynamic_cast<Cube*>(this->Elements[index(ix, iy, n - 1)])->SetTopInterface(topBoundary);
 			}
 		}
@@ -63,13 +63,13 @@ public:
 				// Front boundary
 				SquareFace* frontBoundary = new SquareFace(numberInterface++, h, this->Elements[index(ix, 0, iz)]);
 				this->Faces.push_back(frontBoundary);
-				//this->BoundaryInterfaces.push_back(frontBoundary);
+				this->BoundaryFaces.push_back(frontBoundary);
 				dynamic_cast<Cube*>(this->Elements[index(ix, 0, iz)])->SetFrontInterface(frontBoundary);
 
 				// Back boundary
 				SquareFace* backBoundary = new SquareFace(numberInterface++, h, this->Elements[index(ix, n-1, iz)]);
 				this->Faces.push_back(backBoundary);
-				//this->BoundaryInterfaces.push_back(backBoundary);
+				this->BoundaryFaces.push_back(backBoundary);
 				dynamic_cast<Cube*>(this->Elements[index(ix, n - 1, iz)])->SetBackInterface(backBoundary);
 			}
 		}
@@ -81,13 +81,13 @@ public:
 				// Left boundary
 				SquareFace* leftBoundary = new SquareFace(numberInterface++, h, this->Elements[index(0, iy, iz)]);
 				this->Faces.push_back(leftBoundary);
-				//this->BoundaryInterfaces.push_back(leftBoundary);
+				this->BoundaryFaces.push_back(leftBoundary);
 				dynamic_cast<Cube*>(this->Elements[index(0, iy, iz)])->SetLeftInterface(leftBoundary);
 
 				// Right boundary
 				SquareFace* rightBoundary = new SquareFace(numberInterface++, h, this->Elements[index(n-1, iy, iz)]);
 				this->Faces.push_back(rightBoundary);
-				//this->BoundaryInterfaces.push_back(rightBoundary);
+				this->BoundaryFaces.push_back(rightBoundary);
 				dynamic_cast<Cube*>(this->Elements[index(n - 1, iy, iz)])->SetRightInterface(rightBoundary);
 			}
 		}
@@ -105,6 +105,7 @@ public:
 						Cube* rightNeighbour = dynamic_cast<Cube*>(this->Elements[index(ix+1, iy, iz)]);
 						SquareFace* interface = new SquareFace(numberInterface++, h, element, rightNeighbour);
 						this->Faces.push_back(interface);
+						this->InteriorFaces.push_back(interface);
 						element->SetRightInterface(interface);
 						rightNeighbour->SetLeftInterface(interface);
 					}
@@ -114,6 +115,7 @@ public:
 						Cube* backNeighbour = dynamic_cast<Cube*>(this->Elements[index(ix, iy+1, iz)]);
 						SquareFace* interface = new SquareFace(numberInterface++, h, element, backNeighbour);
 						this->Faces.push_back(interface);
+						this->InteriorFaces.push_back(interface);
 						element->SetBackInterface(interface);
 						backNeighbour->SetFrontInterface(interface);
 					}
@@ -123,17 +125,16 @@ public:
 						Cube* topNeighbour = dynamic_cast<Cube*>(this->Elements[index(ix, iy, iz+1)]);
 						SquareFace* interface = new SquareFace(numberInterface++, h, element, topNeighbour);
 						this->Faces.push_back(interface);
+						this->InteriorFaces.push_back(interface);
 						element->SetTopInterface(interface);
 						topNeighbour->SetBottomInterface(interface);
 					}
 				}
 			}
 		}
+
 	}
-	
-	~CartesianGrid3D() override
-	{
-	}
+
 private:
 	BigNumber index(BigNumber ix, BigNumber iy, BigNumber iz)
 	{

@@ -3,7 +3,7 @@
 #include "../Utils/Utils.h"
 #include "Cube.h"
 
-class SquareFace : public Face<3>, public Poisson_DG_Face<3>
+class SquareFace : public Face<3>, public Poisson_DG_Face<3>, public Poisson_HHO_Face<3>
 {
 public:
 	double Width = 0;
@@ -91,6 +91,40 @@ public:
 		}
 
 		return diffusionDependantCoefficient * penalizationCoefficient * integralJump1ScalarJump2;
+	}
+
+	double MassTerm(BasisFunction<2>* p_phi1, BasisFunction<2>* p_phi2) override
+	{
+		double h = this->Width;
+
+		IBasisFunction2D* phi1 = static_cast<IBasisFunction2D*>(p_phi1);
+		IBasisFunction2D* phi2 = static_cast<IBasisFunction2D*>(p_phi2);
+
+		function<double(double, double)> functionToIntegrate = [phi1, phi2](double t, double u) {
+			return phi1->Eval(t, u) * phi2->Eval(t, u);
+		};
+
+		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree() + 2;
+		return pow(h, 2) / 4 * Utils::Integral(nQuadPoints, functionToIntegrate, -1, 1, -1, 1);
+	}
+
+	double MassTerm(BasisFunction<2>* facePhi, Element<3>* element, BasisFunction<3>* reconstructPhi) override
+	{
+		double h = this->Width;
+		auto reconstructPhiOnFace = element->EvalPhiOnFace(this, reconstructPhi);
+
+		function<double(double, double)> functionToIntegrate = [facePhi, reconstructPhiOnFace](double t, double u) {
+			Point p(t, u);
+			return facePhi->Eval(p) * reconstructPhiOnFace(p);
+		};
+
+		int nQuadPoints = facePhi->GetDegree() + reconstructPhi->GetDegree() + 2;
+		return pow(h, 2) / 4 * Utils::Integral(nQuadPoints, functionToIntegrate, -1, 1, -1, 1);
+	}
+
+	Eigen::MatrixXd MassMatrix(FunctionalBasis<2>* basis)
+	{
+		return Face<3>::MassMatrix(basis);
 	}
 
 private:

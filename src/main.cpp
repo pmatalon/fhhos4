@@ -313,24 +313,52 @@ int main(int argc, char* argv[])
 			sourceFunction = new SourceFunction3D([&diffusionPartition](double x, double y, double z) { return diffusionPartition.Coefficient(x) * 2 * ((y*(1 - y)*z*(1 - z) + x * (1 - x)*z*(1 - z) + x * (1 - x)*y*(1 - y))); });
 		}
 
-		Poisson_DG<3>* problem = new Poisson_DG<3>(solution, diffusionPartition, outputDirectory);
-		FunctionalBasis<3>* basis = new FunctionalBasis<3>(basisCode, polyDegree, fullTensorization);
-		Poisson_DGTerms<3>* dg = new Poisson_DGTerms<3>(sourceFunction, basis, diffusionPartition);
-
-		problem->Assemble(mesh, basis, dg, penalizationCoefficient, action);
-
-		if ((action & Action::SolveSystem) == Action::SolveSystem)
+		if (discretization.compare("dg") == 0)
 		{
-			problem->Solve(); 
-			if ((action & Action::ExtractSolution) == Action::ExtractSolution)
-				problem->ExtractSolution();
-			double error = L2::Error<3>(mesh, basis, problem->Solution, exactSolution);
-			cout << "L2 Error = " << error << endl;
-		}
+			Poisson_DG<3>* problem = new Poisson_DG<3>(solution, diffusionPartition, outputDirectory);
+			FunctionalBasis<3>* basis = new FunctionalBasis<3>(basisCode, polyDegree, fullTensorization);
+			Poisson_DGTerms<3>* dg = new Poisson_DGTerms<3>(sourceFunction, basis, diffusionPartition);
 
-		delete dg;
-		delete problem;
-		delete basis;
+			problem->Assemble(mesh, basis, dg, penalizationCoefficient, action);
+
+			if ((action & Action::SolveSystem) == Action::SolveSystem)
+			{
+				problem->Solve();
+				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
+					problem->ExtractSolution();
+				double error = L2::Error<3>(mesh, basis, problem->Solution, exactSolution);
+				cout << "L2 Error = " << error << endl;
+			}
+
+			delete dg;
+			delete problem;
+			delete basis;
+		}
+		else if (discretization.compare("hho") == 0)
+		{
+			FunctionalBasis<3>* reconstructionBasis = new FunctionalBasis<3>(basisCode, polyDegree, fullTensorization);
+			FunctionalBasis<3>* cellBasis = new FunctionalBasis<3>(basisCode, polyDegree - 1, fullTensorization);
+			FunctionalBasis<2>* faceBasis = new FunctionalBasis<2>(basisCode, polyDegree - 1, fullTensorization);
+
+			Poisson_HHO<3>* problem = new Poisson_HHO<3>(mesh, solution, sourceFunction, reconstructionBasis, cellBasis, faceBasis, staticCondensation, outputDirectory);
+
+			problem->Assemble(penalizationCoefficient, action);
+
+			if ((action & Action::SolveSystem) == Action::SolveSystem)
+			{
+				problem->Solve();
+				problem->ReconstructSolution();
+				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
+					problem->ExtractSolution();
+				double error = L2::Error<3>(mesh, reconstructionBasis, problem->ReconstructedSolution, exactSolution);
+				cout << "L2 Error = " << error << endl;
+			}
+
+			delete problem;
+			delete reconstructionBasis;
+			delete cellBasis;
+			delete faceBasis;
+		}
 		delete mesh;
 	}
 
