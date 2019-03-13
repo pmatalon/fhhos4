@@ -1,0 +1,4 @@
+set(TPL_ENABLE_AGMG TRUE CACHE BOOL "Whether AGMG is enabled" FORCE)
+set(TPL_AGMG_LIB_PATH "/Users/mycek/Documents/CODES/AGMG_3.3.4-aca_lib" CACHE PATH "Path to AGMG library" FORCE)
+set(TPL_BLAS_LIB_PATH "/opt/local/lib" CACHE PATH "Path to BLAS library" FORCE)
+set(TPL_LAPACK_LIB_PATH "/opt/local/lib/lapack" CACHE PATH "Path to Lapack library" FORCE)

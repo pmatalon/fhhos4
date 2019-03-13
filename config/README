@@ -1,0 +1,14 @@
+# Use CMake as follows:
+#######################
+
+# 1. cd to the root directory (dghho) where the CMakeList.txt is located
+cd <path to project>
+
+# 2. Create a build directory and cd to it
+mkdir build && cd build
+
+# 3. Call cmake using 
+cmake -DCMAKE_CXX_COMPILER=<your C++ compiler> -DCMAKE_C_COMPILER=<your C compiler> -C ../config/<your custom cachefile> ..
+
+# 4. Call make
+make
