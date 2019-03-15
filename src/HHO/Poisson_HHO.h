@@ -107,8 +107,8 @@ public:
 		this->_globalRHS = Eigen::VectorXd(hho.nTotalHybridUnknowns);
 
 		BigNumber nnzApproximate = mesh->Elements.size() * hho.nTotalHybridUnknowns * (2 * Dim + 1);
-		NonZeroCoefficients consistencyCoeffs(hho.nTotalHybridUnknowns, hho.nTotalHybridUnknowns, nnzApproximate);
-		NonZeroCoefficients stabilizationCoeffs(hho.nTotalHybridUnknowns, hho.nTotalHybridUnknowns, nnzApproximate);
+		NonZeroCoefficients consistencyCoeffs(nnzApproximate);
+		NonZeroCoefficients stabilizationCoeffs(nnzApproximate);
 		NonZeroCoefficients reconstructionCoeffs(nnzApproximate);
 
 		// Global numbering of the faces (interior first, then boundary)
