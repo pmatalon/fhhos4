@@ -102,6 +102,7 @@
     <ClInclude Include="src/FunctionalBasis/TensorPolynomial.h" />
     <ClInclude Include="src\FunctionalBasis\Hemker1D.h" />
     <ClInclude Include="src\HHO\Reconstructor.h" />
+    <ClInclude Include="src\Mesh\CartesianElement.h" />
     <ClInclude Include="src\Mesh\Mesh.h" />
     <ClInclude Include="src/Mesh/CartesianGrid1D.h" />
     <ClInclude Include="src/Mesh/CartesianGrid2D.h" />
@@ -135,6 +136,8 @@
     <ClInclude Include="src/Utils/Utils.h" />
     <ClInclude Include="src/Problem.h" />
     <ClInclude Include="src\Utils\Action.h" />
+    <ClInclude Include="src\Utils\agmg.h" />
+    <ClInclude Include="src\Utils\ParallelLoop.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="CMakeLists.txt" />

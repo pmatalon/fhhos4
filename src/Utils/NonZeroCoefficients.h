@@ -36,8 +36,6 @@ public:
 
 	void Add(NonZeroCoefficients &chunk)
 	{
-		auto i = this->coefficients.end();
-		auto j = chunk.coefficients.begin();
 		this->coefficients.insert(this->coefficients.end(), chunk.coefficients.begin(), chunk.coefficients.end());
 	}
 

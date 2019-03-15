@@ -1,17 +1,14 @@
 #pragma once
 #include <iostream>
-#include <thread>
-#include <future>
-#include <math.h>
 #include <Eigen/Sparse>
 #include <unsupported/Eigen/SparseExtra>
 #include "../Problem.h"
 #include "../Mesh/Mesh.h"
-#include "../Mesh/Face.h"
 #include "../DG/Poisson_DGTerms.h"
 #include "../Utils/NonZeroCoefficients.h"
 #include "../Utils/L2.h"
 #include "../Utils/Action.h"
+#include "../Utils/ParallelLoop.h"
 using namespace std;
 
 template <short Dim>
@@ -74,45 +71,35 @@ public:
 
 		this->b = Eigen::VectorXd(nUnknowns);
 
+		cout << "--------------------------------------------------------" << endl;
 		cout << "Assembly..." << endl;
-		
-		auto nThreads = std::thread::hardware_concurrency();
-		if (nThreads == 0)
-			nThreads = 1;
 
 		//--------------------------------------------//
 		// Iteration on the elements: diagonal blocks //
 		//--------------------------------------------//
 
-		if (nThreads > mesh->Elements.size())
-			nThreads = mesh->Elements.size();
+		ParallelLoop parallelLoop(mesh->Elements.size());
 
-		cout << nThreads << " threads" << endl;
-
-		vector<std::future<void>> threadFutures;
-		BigNumber chunkSize = (BigNumber)ceil(mesh->Elements.size() / (double)nThreads);
-
-		vector<NonZeroCoefficients> chunksMatrixCoeffs(nThreads);
-		vector<NonZeroCoefficients> chunksMassMatrixCoeffs(nThreads);
-		vector<NonZeroCoefficients> chunksVolumicCoeffs(nThreads);
-		vector<NonZeroCoefficients> chunksCouplingCoeffs(nThreads);
-		vector<NonZeroCoefficients> chunksPenCoeffs(nThreads);
+		vector<NonZeroCoefficients> chunksMatrixCoeffs(parallelLoop.NThreads);
+		vector<NonZeroCoefficients> chunksMassMatrixCoeffs(parallelLoop.NThreads);
+		vector<NonZeroCoefficients> chunksVolumicCoeffs(parallelLoop.NThreads);
+		vector<NonZeroCoefficients> chunksCouplingCoeffs(parallelLoop.NThreads);
+		vector<NonZeroCoefficients> chunksPenCoeffs(parallelLoop.NThreads);
 		
-		for (int threadNumber = 0; threadNumber < nThreads; threadNumber++)
+		for (int threadNumber = 0; threadNumber < parallelLoop.NThreads; threadNumber++)
 		{
-			BigNumber chunkStart = threadNumber * chunkSize;
-			BigNumber chunkEnd = min(chunkStart + chunkSize, static_cast<unsigned int>(mesh->Elements.size()));
+			ParallelChunk* chunk = parallelLoop.Chunks[threadNumber];
 
-			threadFutures.push_back(std::async([this, mesh, dg, basis, action, penalizationCoefficient, chunkStart, chunkEnd, threadNumber, &chunksMatrixCoeffs, &chunksMassMatrixCoeffs, &chunksVolumicCoeffs, &chunksCouplingCoeffs, &chunksPenCoeffs]()
+			chunk->ThreadFuture = std::async([this, mesh, dg, basis, action, penalizationCoefficient, chunk, &chunksMatrixCoeffs, &chunksMassMatrixCoeffs, &chunksVolumicCoeffs, &chunksCouplingCoeffs, &chunksPenCoeffs]()
 			{
-				BigNumber nnzApproximate = (chunkEnd - chunkStart) * basis->Size() * (2 * Dim + 1);
+				BigNumber nnzApproximate = chunk->Size() * basis->Size() * (2 * Dim + 1);
 				NonZeroCoefficients matrixCoeffs(nnzApproximate);
 				NonZeroCoefficients massMatrixCoeffs((action & Action::ExtractMassMatrix) == Action::ExtractMassMatrix ? nnzApproximate : 0);
 				NonZeroCoefficients volumicCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
 				NonZeroCoefficients couplingCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
 				NonZeroCoefficients penCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
 
-				for (BigNumber iElem = chunkStart; iElem < chunkEnd; iElem++)
+				for (BigNumber iElem = chunk->Start; iElem < chunk->End; iElem++)
 				{
 					auto element = mesh->Elements[iElem];
 					//cout << "Element " << element->Number << endl;
@@ -163,13 +150,13 @@ public:
 					}
 				}
 
-				chunksMatrixCoeffs[threadNumber] = matrixCoeffs;
-				chunksMassMatrixCoeffs[threadNumber] = massMatrixCoeffs;
-				chunksVolumicCoeffs[threadNumber] = volumicCoeffs;
-				chunksCouplingCoeffs[threadNumber] = couplingCoeffs;
-				chunksPenCoeffs[threadNumber] = penCoeffs;
+				chunksMatrixCoeffs[chunk->ThreadNumber] = matrixCoeffs;
+				chunksMassMatrixCoeffs[chunk->ThreadNumber] = massMatrixCoeffs;
+				chunksVolumicCoeffs[chunk->ThreadNumber] = volumicCoeffs;
+				chunksCouplingCoeffs[chunk->ThreadNumber] = couplingCoeffs;
+				chunksPenCoeffs[chunk->ThreadNumber] = penCoeffs;
 			}
-			));
+			);
 		}
 
 		BigNumber nnzApproximate = mesh->Elements.size() * basis->Size() * (2 * Dim + 1);
@@ -179,10 +166,9 @@ public:
 		NonZeroCoefficients couplingCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
 		NonZeroCoefficients penCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
 
-		for (int threadNumber = 0; threadNumber < nThreads; threadNumber++)
-			threadFutures[threadNumber].wait();
+		parallelLoop.Wait();
 
-		for (int threadNumber = 0; threadNumber < nThreads; threadNumber++)
+		for (int threadNumber = 0; threadNumber < parallelLoop.NThreads; threadNumber++)
 		{
 			matrixCoeffs.Add(chunksMatrixCoeffs[threadNumber]);
 			massMatrixCoeffs.Add(chunksMassMatrixCoeffs[threadNumber]);
@@ -191,43 +177,88 @@ public:
 			penCoeffs.Add(chunksPenCoeffs[threadNumber]);
 		}
 
+		chunksMatrixCoeffs.clear();
+		chunksMassMatrixCoeffs.clear();
+		chunksVolumicCoeffs.clear();
+		chunksCouplingCoeffs.clear();
+		chunksPenCoeffs.clear();
+
 		//---------------------------------------------//
 		// Iteration on the faces: off-diagonal blocks //
 		//---------------------------------------------//
 
-		for (auto face : mesh->Faces)
+		ParallelLoop parallelLoopFaces(mesh->Faces.size());
+
+		chunksMatrixCoeffs = vector<NonZeroCoefficients>(parallelLoopFaces.NThreads);
+		chunksCouplingCoeffs = vector<NonZeroCoefficients>(parallelLoopFaces.NThreads);
+		chunksPenCoeffs = vector<NonZeroCoefficients>(parallelLoopFaces.NThreads);
+
+
+		for (int threadNumber = 0; threadNumber < parallelLoopFaces.NThreads; threadNumber++)
 		{
-			if (face->IsDomainBoundary)
-				continue;
+			ParallelChunk* chunk = parallelLoopFaces.Chunks[threadNumber];
 
-			//cout << "Face " << face->Number << endl;
-
-			for (BasisFunction<Dim>* phi1 : basis->LocalFunctions)
+			chunk->ThreadFuture = std::async([this, mesh, dg, basis, action, penalizationCoefficient, chunk, &chunksMatrixCoeffs, &chunksCouplingCoeffs, &chunksPenCoeffs]()
 			{
-				BigNumber basisFunction1 = basis->GlobalFunctionNumber(face->Element1, phi1);
-				for (BasisFunction<Dim>* phi2 : basis->LocalFunctions)
+				BigNumber nnzApproximate = chunk->Size() * basis->Size() * (2 * Dim + 1);
+				NonZeroCoefficients matrixCoeffs(nnzApproximate);
+				NonZeroCoefficients couplingCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
+				NonZeroCoefficients penCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
+
+				for (BigNumber iElem = chunk->Start; iElem < chunk->End; iElem++)
 				{
-					//cout << "\t phi" << phi1->LocalNumber << " = " << phi1->ToString() << " phi" << phi2->LocalNumber << " = " << phi2->ToString() << endl;
+					auto face = mesh->Faces[iElem];
+					if (face->IsDomainBoundary)
+						continue;
 
-					BigNumber basisFunction2 = basis->GlobalFunctionNumber(face->Element2, phi2);
-					double coupling = dg->CouplingTerm(face, face->Element1, phi1, face->Element2, phi2);
-					double penalization = dg->PenalizationTerm(face, face->Element1, phi1, face->Element2, phi2, penalizationCoefficient);
+					//cout << "Face " << face->Number << endl;
 
-					//cout << "\t\t\t c=" << coupling << "\tp=" << penalization << endl;
-					
-					if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
+					for (BasisFunction<Dim>* phi1 : basis->LocalFunctions)
 					{
-						couplingCoeffs.Add(basisFunction1, basisFunction2, coupling);
-						couplingCoeffs.Add(basisFunction2, basisFunction1, coupling);
+						BigNumber basisFunction1 = basis->GlobalFunctionNumber(face->Element1, phi1);
+						for (BasisFunction<Dim>* phi2 : basis->LocalFunctions)
+						{
+							//cout << "\t phi" << phi1->LocalNumber << " = " << phi1->ToString() << " phi" << phi2->LocalNumber << " = " << phi2->ToString() << endl;
 
-						penCoeffs.Add(basisFunction1, basisFunction2, penalization);
-						penCoeffs.Add(basisFunction2, basisFunction1, penalization);
+							BigNumber basisFunction2 = basis->GlobalFunctionNumber(face->Element2, phi2);
+							double coupling = dg->CouplingTerm(face, face->Element1, phi1, face->Element2, phi2);
+							double penalization = dg->PenalizationTerm(face, face->Element1, phi1, face->Element2, phi2, penalizationCoefficient);
+
+							//cout << "\t\t\t c=" << coupling << "\tp=" << penalization << endl;
+
+							if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
+							{
+								couplingCoeffs.Add(basisFunction1, basisFunction2, coupling);
+								couplingCoeffs.Add(basisFunction2, basisFunction1, coupling);
+
+								penCoeffs.Add(basisFunction1, basisFunction2, penalization);
+								penCoeffs.Add(basisFunction2, basisFunction1, penalization);
+							}
+							matrixCoeffs.Add(basisFunction1, basisFunction2, coupling + penalization);
+							matrixCoeffs.Add(basisFunction2, basisFunction1, coupling + penalization);
+						}
 					}
-					matrixCoeffs.Add(basisFunction1, basisFunction2, coupling + penalization);
-					matrixCoeffs.Add(basisFunction2, basisFunction1, coupling + penalization);
 				}
+
+				chunksMatrixCoeffs[chunk->ThreadNumber] = matrixCoeffs;
+				chunksCouplingCoeffs[chunk->ThreadNumber] = couplingCoeffs;
+				chunksPenCoeffs[chunk->ThreadNumber] = penCoeffs;
 			}
+			);
 		}
+
+		parallelLoopFaces.Wait();
+
+		for (int threadNumber = 0; threadNumber < parallelLoopFaces.NThreads; threadNumber++)
+		{
+			matrixCoeffs.Add(chunksMatrixCoeffs[threadNumber]);
+			couplingCoeffs.Add(chunksCouplingCoeffs[threadNumber]);
+			penCoeffs.Add(chunksPenCoeffs[threadNumber]);
+		}
+
+		//---------------//
+		// Matrix export //
+		//---------------//
 
 		this->A = Eigen::SparseMatrix<double>(nUnknowns, nUnknowns);
 		matrixCoeffs.Fill(this->A);

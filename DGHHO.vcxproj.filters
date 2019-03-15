@@ -134,6 +134,15 @@
     <ClInclude Include="src\FunctionalBasis\Hemker1D.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
+    <ClInclude Include="src\Mesh\CartesianElement.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Utils\agmg.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Utils\ParallelLoop.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
