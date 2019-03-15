@@ -6,16 +6,21 @@ class NonZeroCoefficients
 {
 private:
 	vector<Eigen::Triplet<double>> coefficients;
-	Eigen::MatrixXf Done;
+	//Eigen::MatrixXf Done;
 public:
+	int test = 0;
 	NonZeroCoefficients(BigNumber nnzApproximate)
 	{
 		this->coefficients.reserve(nnzApproximate);
 	}
-	NonZeroCoefficients(BigNumber nRows, BigNumber nCols, BigNumber nnzApproximate) : Done(nRows, nCols)
+
+	NonZeroCoefficients() {}
+
+	//Reserve()
+	/*NonZeroCoefficients(BigNumber nRows, BigNumber nCols, BigNumber nnzApproximate) : Done(nRows, nCols)
 	{
 		this->coefficients.reserve(nnzApproximate);
-	}
+	}*/
 	void Add(BigNumber i, BigNumber j, double value)
 	{
 		/*if (Done.rows() > 0)
@@ -28,6 +33,14 @@ public:
 		if (abs(value) > 1e-16)
 			this->coefficients.push_back(Eigen::Triplet<double>(i, j, value));
 	}
+
+	void Add(NonZeroCoefficients &chunk)
+	{
+		auto i = this->coefficients.end();
+		auto j = chunk.coefficients.begin();
+		this->coefficients.insert(this->coefficients.end(), chunk.coefficients.begin(), chunk.coefficients.end());
+	}
+
 	void Fill(Eigen::SparseMatrix<double> &m)
 	{
 		m.setFromTriplets(this->coefficients.begin(), this->coefficients.end());

@@ -1,5 +1,8 @@
 #pragma once
 #include <iostream>
+#include <thread>
+#include <future>
+#include <math.h>
 #include <Eigen/Sparse>
 #include <unsupported/Eigen/SparseExtra>
 #include "../Problem.h"
@@ -71,67 +74,121 @@ public:
 
 		this->b = Eigen::VectorXd(nUnknowns);
 
-		BigNumber nnzApproximate = mesh->Elements.size() * basis->NumberOfLocalFunctionsInElement(NULL) * (2 * Dim + 1);
+		cout << "Assembly..." << endl;
+		
+		auto nThreads = std::thread::hardware_concurrency();
+		if (nThreads == 0)
+			nThreads = 1;
+
+		//--------------------------------------------//
+		// Iteration on the elements: diagonal blocks //
+		//--------------------------------------------//
+
+		if (nThreads > mesh->Elements.size())
+			nThreads = mesh->Elements.size();
+
+		cout << nThreads << " threads" << endl;
+
+		vector<std::future<void>> threadFutures;
+		BigNumber chunkSize = (BigNumber)ceil(mesh->Elements.size() / (double)nThreads);
+
+		vector<NonZeroCoefficients> chunksMatrixCoeffs(nThreads);
+		vector<NonZeroCoefficients> chunksMassMatrixCoeffs(nThreads);
+		vector<NonZeroCoefficients> chunksVolumicCoeffs(nThreads);
+		vector<NonZeroCoefficients> chunksCouplingCoeffs(nThreads);
+		vector<NonZeroCoefficients> chunksPenCoeffs(nThreads);
+		
+		for (int threadNumber = 0; threadNumber < nThreads; threadNumber++)
+		{
+			BigNumber chunkStart = threadNumber * chunkSize;
+			BigNumber chunkEnd = min(chunkStart + chunkSize, static_cast<unsigned int>(mesh->Elements.size()));
+
+			threadFutures.push_back(std::async([this, mesh, dg, basis, action, penalizationCoefficient, chunkStart, chunkEnd, threadNumber, &chunksMatrixCoeffs, &chunksMassMatrixCoeffs, &chunksVolumicCoeffs, &chunksCouplingCoeffs, &chunksPenCoeffs]()
+			{
+				BigNumber nnzApproximate = (chunkEnd - chunkStart) * basis->Size() * (2 * Dim + 1);
+				NonZeroCoefficients matrixCoeffs(nnzApproximate);
+				NonZeroCoefficients massMatrixCoeffs((action & Action::ExtractMassMatrix) == Action::ExtractMassMatrix ? nnzApproximate : 0);
+				NonZeroCoefficients volumicCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
+				NonZeroCoefficients couplingCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
+				NonZeroCoefficients penCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
+
+				for (BigNumber iElem = chunkStart; iElem < chunkEnd; iElem++)
+				{
+					auto element = mesh->Elements[iElem];
+					//cout << "Element " << element->Number << endl;
+
+					for (BasisFunction<Dim>* phi1 : basis->LocalFunctions)
+					{
+						BigNumber basisFunction1 = basis->GlobalFunctionNumber(element, phi1);
+
+						// Current element (block diagonal)
+						for (BasisFunction<Dim>* phi2 : basis->LocalFunctions)
+						{
+							BigNumber basisFunction2 = basis->GlobalFunctionNumber(element, phi2);
+
+							//cout << "\t phi" << phi1->LocalNumber << " = " << phi1->ToString() << " phi" << phi2->LocalNumber << " = " << phi2->ToString() << endl;
+
+							double volumicTerm = dg->VolumicTerm(element, phi1, phi2);
+							//cout << "\t\t volumic = " << volumicTerm << endl;
+
+							double coupling = 0;
+							double penalization = 0;
+							for (Face<Dim>* face : element->Faces)
+							{
+								double c = dg->CouplingTerm(face, element, phi1, element, phi2);
+								double p = dg->PenalizationTerm(face, element, phi1, element, phi2, penalizationCoefficient);
+								coupling += c;
+								penalization += p;
+								//cout << "\t\t " << face->ToString() << ":\t c=" << c << "\tp=" << p << endl;
+							}
+
+							//cout << "\t\t TOTAL = " << volumicTerm + coupling + penalization << endl;
+
+							if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
+							{
+								volumicCoeffs.Add(basisFunction1, basisFunction2, volumicTerm);
+								couplingCoeffs.Add(basisFunction1, basisFunction2, coupling);
+								penCoeffs.Add(basisFunction1, basisFunction2, penalization);
+							}
+							matrixCoeffs.Add(basisFunction1, basisFunction2, volumicTerm + coupling + penalization);
+							if ((action & Action::ExtractMassMatrix) == Action::ExtractMassMatrix)
+							{
+								double massTerm = dg->MassTerm(element, phi1, phi2);
+								massMatrixCoeffs.Add(basisFunction1, basisFunction2, massTerm);
+							}
+						}
+
+						double rhs = dg->RightHandSide(element, phi1);
+						this->b(basisFunction1) = rhs;
+					}
+				}
+
+				chunksMatrixCoeffs[threadNumber] = matrixCoeffs;
+				chunksMassMatrixCoeffs[threadNumber] = massMatrixCoeffs;
+				chunksVolumicCoeffs[threadNumber] = volumicCoeffs;
+				chunksCouplingCoeffs[threadNumber] = couplingCoeffs;
+				chunksPenCoeffs[threadNumber] = penCoeffs;
+			}
+			));
+		}
+
+		BigNumber nnzApproximate = mesh->Elements.size() * basis->Size() * (2 * Dim + 1);
 		NonZeroCoefficients matrixCoeffs(nnzApproximate);
 		NonZeroCoefficients massMatrixCoeffs((action & Action::ExtractMassMatrix) == Action::ExtractMassMatrix ? nnzApproximate : 0);
 		NonZeroCoefficients volumicCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
 		NonZeroCoefficients couplingCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
 		NonZeroCoefficients penCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
 
-		cout << "Assembly..." << endl;
+		for (int threadNumber = 0; threadNumber < nThreads; threadNumber++)
+			threadFutures[threadNumber].wait();
 
-		//--------------------------------------------//
-		// Iteration on the elements: diagonal blocks //
-		//--------------------------------------------//
-
-		for (auto element : mesh->Elements)
+		for (int threadNumber = 0; threadNumber < nThreads; threadNumber++)
 		{
-			//cout << "Element " << element->Number << endl;
-
-			for (BasisFunction<Dim>* phi1 : basis->LocalFunctions)
-			{
-				BigNumber basisFunction1 = basis->GlobalFunctionNumber(element, phi1);
-
-				// Current element (block diagonal)
-				for (BasisFunction<Dim>* phi2 : basis->LocalFunctions)
-				{
-					BigNumber basisFunction2 = basis->GlobalFunctionNumber(element, phi2);
-
-					//cout << "\t phi" << phi1->LocalNumber << " = " << phi1->ToString() << " phi" << phi2->LocalNumber << " = " << phi2->ToString() << endl;
-
-					double volumicTerm = dg->VolumicTerm(element, phi1, phi2);
-					//cout << "\t\t volumic = " << volumicTerm << endl;
-					
-					double coupling = 0;
-					double penalization = 0;
-					for (Face<Dim>* face : element->Faces)
-					{
-						double c = dg->CouplingTerm(face, element, phi1, element, phi2);
-						double p = dg->PenalizationTerm(face, element, phi1, element, phi2, penalizationCoefficient);
-						coupling += c;
-						penalization += p;
-						//cout << "\t\t " << face->ToString() << ":\t c=" << c << "\tp=" << p << endl;
-					}
-
-					//cout << "\t\t TOTAL = " << volumicTerm + coupling + penalization << endl;
-					
-					if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
-					{
-						volumicCoeffs.Add(basisFunction1, basisFunction2, volumicTerm);
-						couplingCoeffs.Add(basisFunction1, basisFunction2, coupling);
-						penCoeffs.Add(basisFunction1, basisFunction2, penalization);
-					}
-					matrixCoeffs.Add(basisFunction1, basisFunction2, volumicTerm + coupling + penalization);
-					if ((action & Action::ExtractMassMatrix) == Action::ExtractMassMatrix)
-					{
-						double massTerm = dg->MassTerm(element, phi1, phi2);
-						massMatrixCoeffs.Add(basisFunction1, basisFunction2, massTerm);
-					}
-				}
-
-				double rhs = dg->RightHandSide(element, phi1);
-				this->b(basisFunction1) = rhs;
-			}
+			matrixCoeffs.Add(chunksMatrixCoeffs[threadNumber]);
+			massMatrixCoeffs.Add(chunksMassMatrixCoeffs[threadNumber]);
+			volumicCoeffs.Add(chunksVolumicCoeffs[threadNumber]);
+			couplingCoeffs.Add(chunksCouplingCoeffs[threadNumber]);
+			penCoeffs.Add(chunksPenCoeffs[threadNumber]);
 		}
 
 		//---------------------------------------------//
