@@ -34,11 +34,13 @@ public:
 			if (k == 0)
 			{
 				point->IsDomainBoundary = true;
+				this->BoundaryFaces.push_back(point);
 				point->Element1 = this->Elements[k];
 			}
 			else if (k == n)
 			{
 				point->IsDomainBoundary = true;
+				this->BoundaryFaces.push_back(point);
 				point->Element2 = this->Elements[k - 1];
 			}
 			else

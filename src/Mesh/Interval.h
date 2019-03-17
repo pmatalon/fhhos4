@@ -1,9 +1,9 @@
 #pragma once
-#include "Element.h"
+#include "CartesianElement.h"
 #include "../DG/Poisson_DG_Element.h"
 #include "../DG/Poisson_DG_ReferenceElement.h"
 
-class Interval : public Element<1>, public Poisson_DG_Element<1>
+class Interval : public CartesianElement<1>, public Poisson_DG_Element<1>
 {
 public:
 	double A;
@@ -12,19 +12,14 @@ public:
 	Face<1>* Left;
 	Face<1>* Right;
 
-	Interval(BigNumber number, double a, double b, Face<1>* left, Face<1>* right) : Element(number)
+	Interval(BigNumber number, double a, double b, Face<1>* left, Face<1>* right) : CartesianElement(number, b-a)
 	{
 		this->A = a;
 		this->B = b;
-		this->Faces.push_back(left);
-		this->Faces.push_back(right);
+		this->AddFace(left);
+		this->AddFace(right);
 		this->Left = left;
 		this->Right = right;
-	}
-
-	double GetDiameter()
-	{
-		return this->B - this->A;
 	}
 
 	StandardElementCode StdElementCode()
@@ -55,16 +50,16 @@ public:
 		return Utils::Integral(funcToIntegrate, this->A, this->B);
 	}
 
-	double L2ErrorPow2(function<double(Point)> approximate, function<double(Point)> exactSolution)
+	Point ConvertToDomain(Point referenceElementPoint) override
 	{
 		double a = this->A;
 		double b = this->B;
 
-		function<double(double)> errorFunction = [exactSolution, approximate, a, b](double t) {
-			return pow(exactSolution((b - a) / 2 * t + (b + a) / 2) - approximate(t), 2);
-		};
+		double t = referenceElementPoint.X;
 
-		return (b - a) / 2 * Utils::Integral(errorFunction, -1, 1);
+		Point p;
+		p.X = (b - a) / 2 * t + (b + a) / 2;
+		return p;
 	}
 	
 	//------------------------------------------------------------------//
@@ -86,19 +81,12 @@ public:
 	
 	double SourceTerm(BasisFunction<1>* phi, SourceFunction* f)
 	{
-		double a = this->A;
-		double b = this->B;
-
-		function<double(double)> sourceTimesBasisFunction = [f, phi, a, b](double t) {
-			return f->Eval(Point((b - a) / 2 * t + (a + b) / 2)) * phi->Eval(Point(t));
-		};
-
-		return  (b - a) / 2 * Utils::Integral(sourceTimesBasisFunction, -1, 1);
+		return CartesianElement::SourceTerm(phi, f);
 	}
 
 	function<double(Point)> EvalPhiOnFace(Face<1>* face, BasisFunction<1>* p_phi)
 	{
-		IBasisFunction1D* phi = dynamic_cast<IBasisFunction1D*>(p_phi);
+		IBasisFunction1D* phi = static_cast<IBasisFunction1D*>(p_phi);
 
 		double tFixed = face == this->Left ? -1 : 1;
 		function<double(Point)> evalOnFace = [phi, tFixed](Point point0D) {
@@ -110,7 +98,7 @@ public:
 
 	function<double*(Point)> GradPhiOnFace(Face<1>* face, BasisFunction<1>* p_phi)
 	{
-		IBasisFunction1D* phi = dynamic_cast<IBasisFunction1D*>(p_phi);
+		IBasisFunction1D* phi = static_cast<IBasisFunction1D*>(p_phi);
 
 		double tFixed = face == this->Left ? -1 : 1;
 		function<double*(Point)> gradOnFace = [phi, tFixed](Point point0D) {

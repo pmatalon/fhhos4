@@ -1,5 +1,5 @@
 #pragma once
-#include "Element.h"
+#include "CartesianElement.h"
 #include "IntervalFace.h"
 #include "../DG/Poisson_DG_Element.h"
 #include "../DG/Poisson_DG_ReferenceElement.h"
@@ -9,7 +9,7 @@
 #include <assert.h>
 using namespace std;
 
-class Square : public Element<2>, public Poisson_DG_Element<2>, public Poisson_HHO_Element<2>
+class Square : public CartesianElement<2>, public Poisson_DG_Element<2>, public Poisson_HHO_Element<2>
 {
 public:
 	double X;
@@ -23,16 +23,11 @@ public:
 
 	Reconstructor<2>* HHOReconstructor = NULL;
 
-	Square(int number, double x, double y, double width) : Element(number)
+	Square(int number, double x, double y, double width) : CartesianElement(number, width)
 	{
 		this->X = x;
 		this->Y = y;
 		this->Width = width;
-	}
-
-	double GetDiameter()
-	{
-		return this->Width;
 	}
 
 	StandardElementCode StdElementCode()
@@ -92,31 +87,20 @@ public:
 		return Utils::Integral(func, x1, x2, y1, y2);
 	}
 
-	double Integral(BasisFunction<2>* phi)
+	Point ConvertToDomain(Point referenceElementPoint) override
 	{
 		double x1 = this->X;
 		double x2 = this->X + this->Width;
 		double y1 = this->Y;
 		double y2 = this->Y + this->Width;
 
-		return (x2 - x1) * (y2 - y1) / 4 * Utils::Integral(phi, -1, 1, -1, 1);
-	}
+		double t = referenceElementPoint.X;
+		double u = referenceElementPoint.Y;
 
-	double L2ErrorPow2(function<double(Point)> approximate, function<double(Point)> exactSolution)
-	{
-		double x1 = this->X;
-		double x2 = this->X + this->Width;
-		double y1 = this->Y;
-		double y2 = this->Y + this->Width;
-
-		function<double(double, double)> errorFunction = [exactSolution, approximate, x1, x2, y1, y2](double t, double u) {
-			Point p;
-			p.X = (x2 - x1) / 2 * t + (x2 + x1) / 2;
-			p.Y = (y2 - y1) / 2 * u + (y2 + y1) / 2;
-			return pow(exactSolution(p) - approximate(Point(t, u)), 2);
-		};
-
-		return (x2 - x1) * (y2 - y1) / 4 * Utils::Integral(errorFunction, -1, 1, -1, 1);
+		Point p;
+		p.X = (x2 - x1) / 2 * t + (x2 + x1) / 2;
+		p.Y = (y2 - y1) / 2 * u + (y2 + y1) / 2;
+		return p;
 	}
 
 	//------------------------------------------------------------------//
@@ -137,17 +121,7 @@ public:
 
 	double MassTerm(BasisFunction<2>* p_phi1, BasisFunction<2>* p_phi2) override
 	{
-		double h = this->Width;
-
-		IBasisFunction2D* phi1 = static_cast<IBasisFunction2D*>(p_phi1);
-		IBasisFunction2D* phi2 = static_cast<IBasisFunction2D*>(p_phi2);
-
-		function<double(double, double)> functionToIntegrate = [phi1, phi2](double t, double u) {
-			return phi1->Eval(t, u)*phi2->Eval(t, u);
-		};
-
-		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree() + 2;
-		return pow(h, 2) / 4 * Utils::Integral(nQuadPoints, functionToIntegrate, -1, 1, -1, 1);
+		return CartesianElement::MassTerm(p_phi1, p_phi2);
 	}
 
 	Eigen::MatrixXd MassMatrix(FunctionalBasis<2>* basis)
@@ -162,20 +136,7 @@ public:
 
 	double SourceTerm(BasisFunction<2>* phi, SourceFunction* f)
 	{
-		double x1 = this->X;
-		double x2 = this->X + this->Width;
-		double y1 = this->Y;
-		double y2 = this->Y + this->Width;
-
-		function<double(double, double)> sourceTimesBasisFunction = [f, phi, x1, x2, y1, y2](double t, double u) {
-			Point p;
-			p.X = (x2 - x1) / 2 * t + (x2 + x1) / 2;
-			p.Y = (y2 - y1) / 2 * u + (y2 + y1) / 2;
-			return f->Eval(p) * phi->Eval(Point(t, u));
-		};
-
-		double jacobian = (x2 - x1) * (y2 - y1) / 4;
-		return jacobian * Utils::Integral(sourceTimesBasisFunction, -1,1, -1,1);
+		return CartesianElement::SourceTerm(phi, f);
 	}
 
 	function<double(Point)> EvalPhiOnFace(Face<2>* face, BasisFunction<2>* p_phi)
@@ -234,23 +195,7 @@ public:
 	//-------------------------------------------------------------------//
 	//                 Poisson_HHO_Element implementation                //
 	//-------------------------------------------------------------------//
-
-	double IntegralGradGrad(BasisFunction<2>* p_phi1, BasisFunction<2>* p_phi2)
-	{
-		if (p_phi1->GetDegree() == 0 || p_phi1->GetDegree() == 0)
-			return 0;
-
-		IBasisFunction2D* phi1 = static_cast<IBasisFunction2D*>(p_phi1);
-		IBasisFunction2D* phi2 = static_cast<IBasisFunction2D*>(p_phi2);
-
-		function<double(double, double)> functionToIntegrate = [phi1, phi2](double t, double u) {
-			return InnerProduct(phi1->Grad(t, u), phi2->Grad(t, u));
-		};
-
-		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree();
-		return Utils::Integral(nQuadPoints, functionToIntegrate, -1, 1, -1, 1);
-	}
-
+	
 	void InitReconstructor(FunctionalBasis<2>* reconstructionBasis, FunctionalBasis<2>* elementBasis, FunctionalBasis<1>* faceBasis)
 	{
 		this->HHOReconstructor = new Reconstructor<2>(this, reconstructionBasis, elementBasis, faceBasis);
@@ -268,18 +213,15 @@ public:
 
 	double Lt(BasisFunction<2>* phi)
 	{
-		return this->Integral(phi);
+		return CartesianElement::Integral(phi);
 	}
 
 	double Bt(BasisFunction<2>* reconstructPhi, BasisFunction<2>* cellPhi)
 	{
 		if (reconstructPhi->GetDegree() == 0)
 			return 0;
-
-		//cout << "reconstructPhi=" << reconstructPhi->ToString() << ", cellPhi=" << cellPhi->ToString() << endl;
-
+		
 		double integralGradGrad = this->IntegralGradGrad(reconstructPhi, cellPhi);
-		//cout << "\tintegralGradGrad=" << integralGradGrad << endl;
 		
 		double sumFaces = 0;
 		for (auto face : this->Faces)
@@ -295,7 +237,6 @@ public:
 
 			int nQuadPoints = reconstructPhi->GetDegree() + cellPhi->GetDegree() + 1;
 			double integralFace = Utils::Integral(nQuadPoints, functionToIntegrate, -1, 1);
-			//cout << "\tintegralFace=" << integralFace << endl;
 			sumFaces += integralFace;
 		}
 		

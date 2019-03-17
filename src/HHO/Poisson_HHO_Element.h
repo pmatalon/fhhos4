@@ -7,7 +7,7 @@ template <short Dim>
 class Poisson_HHO_Element
 {
 public:
-	virtual double* OuterNormalVector(Face<Dim>* face) = 0;
+	//virtual double* OuterNormalVector(Face<Dim>* face) = 0;
 	//virtual function<double(Point)> EvalPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* p_phi) = 0;
 
 	virtual double St(BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2) = 0;

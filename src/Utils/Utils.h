@@ -28,12 +28,17 @@ public:
 		return Integral(GaussLegendre::MAX_POINTS, func, x1, x2);
 	}
 
-	static double Integral(std::function<double(Point)> func, double x1, double x2)
+	static double Integral(int nPoints, std::function<double(Point)> func, double x1, double x2)
 	{
 		function<double(double)> funcToIntegrate = [func](double x) {
 			return func(x);
 		};
-		return Integral(funcToIntegrate, x1, x2);
+		return Integral(nPoints, funcToIntegrate, x1, x2);
+	}
+
+	static double Integral(std::function<double(Point)> func, double x1, double x2)
+	{
+		return Integral(GaussLegendre::MAX_POINTS, func, x1, x2);
 	}
 
 	static double Integral(BasisFunction<1>* phi, double x1, double x2)
@@ -43,6 +48,11 @@ public:
 		};
 		int nPoints = (int)ceil(((double)phi->GetDegree() + 1)/2);
 		return Utils::Integral(nPoints, func, x1, x2);
+	}
+
+	static double Integral(BasisFunction<1>* phi)
+	{
+		return Utils::Integral(phi, -1, 1);
 	}
 
 	//-------------//
@@ -64,13 +74,18 @@ public:
 		return Integral(GaussLegendre::MAX_POINTS, func, x1, x2, y1, y2);
 	}
 
-	static double Integral(std::function<double(Point)> func, double x1, double x2, double y1, double y2)
+	static double Integral(int nPoints, std::function<double(Point)> func, double x1, double x2, double y1, double y2)
 	{
 		function<double(double, double)> funcToIntegrate = [func](double x, double y) {
 			Point p(x, y);
 			return func(p);
 		};
-		return Integral(funcToIntegrate, x1, x2, y1, y2);
+		return Integral(nPoints, funcToIntegrate, x1, x2, y1, y2);
+	}
+
+	static double Integral(std::function<double(Point)> func, double x1, double x2, double y1, double y2)
+	{
+		return Integral(GaussLegendre::MAX_POINTS, func, x1, x2, y1, y2);
 	}
 
 	static double Integral(BasisFunction<2>* phi, double x1, double x2, double y1, double y2)
@@ -80,6 +95,11 @@ public:
 		};
 		int nPoints = (int)ceil(((double)phi->GetDegree() + 1) / 2);
 		return Utils::Integral(nPoints, func, x1, x2, y1, y2);
+	}
+
+	static double Integral(BasisFunction<2>* phi)
+	{
+		return Utils::Integral(phi, -1, 1, -1, 1);
 	}
 
 	//-------------//
@@ -101,13 +121,18 @@ public:
 		return Integral(GaussLegendre::MAX_POINTS, func, x1, x2, y1, y2, z1, z2);
 	}
 
-	static double Integral(std::function<double(Point)> func, double x1, double x2, double y1, double y2, double z1, double z2)
+	static double Integral(int nPoints, std::function<double(Point)> func, double x1, double x2, double y1, double y2, double z1, double z2)
 	{
 		function<double(double, double, double)> funcToIntegrate = [func](double x, double y, double z) {
 			Point p(x, y, z);
 			return func(p);
 		};
-		return Integral(funcToIntegrate, x1, x2, y1, y2, z1, z2);
+		return Integral(nPoints, funcToIntegrate, x1, x2, y1, y2, z1, z2);
+	}
+
+	static double Integral(std::function<double(Point)> func, double x1, double x2, double y1, double y2, double z1, double z2)
+	{
+		return Integral(GaussLegendre::MAX_POINTS, func, x1, x2, y1, y2, z1, z2);
 	}
 
 	static double Integral(BasisFunction<3>* phi, double x1, double x2, double y1, double y2, double z1, double z2)
@@ -117,6 +142,57 @@ public:
 		};
 		int nPoints = (int)ceil(((double)phi->GetDegree() + 1) / 2);
 		return Utils::Integral(nPoints, func, x1, x2, y1, y2, z1, z2);
+	}
+
+	static double Integral(BasisFunction<3>* phi)
+	{
+		return Utils::Integral(phi, -1, 1, -1, 1, -1, 1);
+	}
+
+	template <short Dim>
+	static double Integral(int nPoints, std::function<double(Point)> func)
+	{
+		if (Dim == 1)
+		{
+			/*function<double(double, double)> funcToIntegrate = [func](double x) {
+				Point p(x);
+				return func(p);
+			};*/
+			return Integral(nPoints, func, -1, 1);
+		}
+		else if (Dim == 2)
+		{
+			/*function<double(double, double)> funcToIntegrate = [func](double x, double y) {
+				Point p(x, y);
+				return func(p);
+			};*/
+			return Integral(nPoints, func, -1, 1, -1, 1);
+		}
+		else if (Dim == 3)
+		{
+			/*function<double(double, double, double)> funcToIntegrate = [func](double x, double y, double z) {
+				Point p(x, y, z);
+				return func(p);
+			};*/
+			return Integral(nPoints, func, -1, 1, -1, 1, -1, 1);
+		}
+		else
+		{
+			cout << "Unmanaged dimension in Integral." << endl;
+			exit(EXIT_FAILURE);
+		}
+	}
+
+	template <short Dim>
+	static double Integral(std::function<double(Point)> func)
+	{
+		return Integral<Dim>(GaussLegendre::MAX_POINTS, func);
+	}
+
+	template <short Dim>
+	static double Integral(BasisFunction<Dim>* phi)
+	{
+		return Integral<Dim>(phi);
 	}
 
 	//----------------------//
