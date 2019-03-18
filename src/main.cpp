@@ -185,9 +185,9 @@ int main(int argc, char* argv[])
 			sourceFunction = new SourceFunction1D([&diffusionPartition](double x) { return 4; });
 		}
 
-		Poisson_DG<1>* problem = new Poisson_DG<1>(solution, diffusionPartition, outputDirectory);
+		Poisson_DG<1>* problem = new Poisson_DG<1>(solution, sourceFunction, diffusionPartition, outputDirectory);
 		FunctionalBasis<1>* basis = new FunctionalBasis<1>(basisCode, polyDegree);
-		Poisson_DGTerms<1>* dg = new Poisson_DGTerms<1>(sourceFunction, basis, diffusionPartition);
+		Poisson_DGTerms<1>* dg = new Poisson_DGTerms<1>(basis, diffusionPartition);
 
 		problem->Assemble(mesh, basis, dg, penalizationCoefficient, action);
 
@@ -236,9 +236,9 @@ int main(int argc, char* argv[])
 
 		if (discretization.compare("dg") == 0)
 		{
-			Poisson_DG<2>* problem = new Poisson_DG<2>(solution, diffusionPartition, outputDirectory);
+			Poisson_DG<2>* problem = new Poisson_DG<2>(solution, sourceFunction, diffusionPartition, outputDirectory);
 			FunctionalBasis<2>* basis = new FunctionalBasis<2>(basisCode, polyDegree, fullTensorization);
-			Poisson_DGTerms<2>* dg = new Poisson_DGTerms<2>(sourceFunction, basis, diffusionPartition);
+			Poisson_DGTerms<2>* dg = new Poisson_DGTerms<2>(basis, diffusionPartition);
 
 			problem->Assemble(mesh, basis, dg, penalizationCoefficient, action);
 
@@ -315,9 +315,9 @@ int main(int argc, char* argv[])
 
 		if (discretization.compare("dg") == 0)
 		{
-			Poisson_DG<3>* problem = new Poisson_DG<3>(solution, diffusionPartition, outputDirectory);
+			Poisson_DG<3>* problem = new Poisson_DG<3>(solution, sourceFunction, diffusionPartition, outputDirectory);
 			FunctionalBasis<3>* basis = new FunctionalBasis<3>(basisCode, polyDegree, fullTensorization);
-			Poisson_DGTerms<3>* dg = new Poisson_DGTerms<3>(sourceFunction, basis, diffusionPartition);
+			Poisson_DGTerms<3>* dg = new Poisson_DGTerms<3>(basis, diffusionPartition);
 
 			problem->Assemble(mesh, basis, dg, penalizationCoefficient, action);
 

@@ -3,7 +3,7 @@
 #include "CartesianShape.h"
 
 template <short Dim>
-class CartesianElement : public Element<Dim>, public CartesianShape<Dim>
+class CartesianElement : virtual public Element<Dim>, public CartesianShape<Dim>
 {
 public:
 
@@ -42,7 +42,7 @@ public:
 		return CartesianShape<Dim>::ConvertToDomain(referenceElementPoint);
 	}
 
-	virtual double SourceTerm(BasisFunction<Dim>* phi, SourceFunction* f)
+	double SourceTerm(BasisFunction<Dim>* phi, SourceFunction* f)
 	{
 		function<double(Point)> sourceTimesBasisFunction = [this, f, phi](Point refElementPoint) {
 			Point domainPoint = this->ConvertToDomain(refElementPoint);
@@ -53,7 +53,7 @@ public:
 		return pow(h / 2, Dim) *  Utils::Integral<Dim>(sourceTimesBasisFunction);
 	}
 
-	virtual double L2ErrorPow2(function<double(Point)> approximate, function<double(Point)> exactSolution)
+	double L2ErrorPow2(function<double(Point)> approximate, function<double(Point)> exactSolution)
 	{
 		function<double(Point)> errorFunction = [this, exactSolution, approximate](Point refElementPoint) {
 			Point domainPoint = this->ConvertToDomain(refElementPoint);

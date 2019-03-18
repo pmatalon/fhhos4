@@ -3,26 +3,49 @@
 #include "../Utils/Utils.h"
 #include "Cube.h"
 
-class SquareFace : public Face<3>, public CartesianShape<2>, public Poisson_DG_Face<3>, public Poisson_HHO_Face<3>
+class SquareFace : virtual public Face<3>, public CartesianShape<2>, public Poisson_DG_Face<3>, public Poisson_HHO_Face<3>
 {
 public:
 
-	SquareFace(BigNumber number, double width, Element<3>* element1, Element<3>* element2) : Face(number, element1, element2), CartesianShape(Point(), width)
+	SquareFace(BigNumber number, double width, Element<3>* element1, Element<3>* element2) : Face(number, element1, element2), CartesianShape(Point(), width), Poisson_DG_Face(number, element1, element2)
 	{
 	}
 
-	SquareFace(BigNumber number, double width, Element<3>* element1) : Face(number, element1), CartesianShape(Point(), width)
+	SquareFace(BigNumber number, double width, Element<3>* element1) : Face(number, element1), CartesianShape(Point(), width), Poisson_DG_Face(number, element1, NULL)
 	{
 	}
+
+	//----------------------------------------------------//
+	//                 Face implementation                //
+	//----------------------------------------------------//
 
 	double GetDiameter()
 	{
 		return CartesianShape::Width;
 	}
+	
+	double MassTerm(BasisFunction<2>* phi1, BasisFunction<2>* phi2) override
+	{
+		return CartesianShape::MassTerm(phi1, phi2);
+	}
 
-	//------------------------------------------------------------------//
-	//                 Poisson_DG_Element implementation                //
-	//------------------------------------------------------------------//
+	double MassTerm(BasisFunction<2>* facePhi, Element<3>* element, BasisFunction<3>* reconstructPhi) override
+	{
+		double h = this->Width;
+		auto reconstructPhiOnFace = element->EvalPhiOnFace(this, reconstructPhi);
+
+		function<double(double, double)> functionToIntegrate = [facePhi, reconstructPhiOnFace](double t, double u) {
+			Point p(t, u);
+			return facePhi->Eval(p) * reconstructPhiOnFace(p);
+		};
+
+		int nQuadPoints = facePhi->GetDegree() + reconstructPhi->GetDegree() + 2;
+		return pow(h, 2) / 4 * Utils::Integral(nQuadPoints, functionToIntegrate, -1, 1, -1, 1);
+	}
+
+	//---------------------------------------------------------------//
+	//                 Poisson_DG_Face implementation                //
+	//---------------------------------------------------------------//
 
 	double CouplingTerm(Element<3>* element1, BasisFunction<3>* p_phi1, Element<3>* element2, BasisFunction<3>* p_phi2, DiffusionPartition diffusionPartition)
 	{
@@ -62,7 +85,7 @@ public:
 		return -h / 2 * Utils::Integral(nQuadPoints, functionToIntegrate, -1,1, -1,1);
 	}
 
-	double PenalizationTerm(Poisson_DG_Element<3>* element1, BasisFunction<3>* p_phi1, Poisson_DG_Element<3>* element2, BasisFunction<3>* p_phi2, double penalizationCoefficient, DiffusionPartition diffusionPartition)
+	double PenalizationTerm(Element<3>* element1, BasisFunction<3>* p_phi1, Element<3>* element2, BasisFunction<3>* p_phi2, double penalizationCoefficient, DiffusionPartition diffusionPartition)
 	{
 		auto n1 = element1->OuterNormalVector(this);
 		auto n2 = element2->OuterNormalVector(this);
@@ -88,30 +111,6 @@ public:
 		}
 
 		return diffusionDependantCoefficient * penalizationCoefficient * integralJump1ScalarJump2;
-	}
-
-	double MassTerm(BasisFunction<2>* phi1, BasisFunction<2>* phi2) override
-	{
-		return CartesianShape::MassTerm(phi1, phi2);
-	}
-
-	double MassTerm(BasisFunction<2>* facePhi, Element<3>* element, BasisFunction<3>* reconstructPhi) override
-	{
-		double h = this->Width;
-		auto reconstructPhiOnFace = element->EvalPhiOnFace(this, reconstructPhi);
-
-		function<double(double, double)> functionToIntegrate = [facePhi, reconstructPhiOnFace](double t, double u) {
-			Point p(t, u);
-			return facePhi->Eval(p) * reconstructPhiOnFace(p);
-		};
-
-		int nQuadPoints = facePhi->GetDegree() + reconstructPhi->GetDegree() + 2;
-		return pow(h, 2) / 4 * Utils::Integral(nQuadPoints, functionToIntegrate, -1, 1, -1, 1);
-	}
-
-	Eigen::MatrixXd MassMatrix(FunctionalBasis<2>* basis)
-	{
-		return Face<3>::MassMatrix(basis);
 	}
 
 private:

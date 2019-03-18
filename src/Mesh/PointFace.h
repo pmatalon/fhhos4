@@ -3,16 +3,20 @@
 #include "../DG/Poisson_DG_Face.h"
 #include "Interval.h"
 
-class PointFace : public Face<1>, public Poisson_DG_Face<1>
+class PointFace : virtual public Face<1>, public Poisson_DG_Face<1>
 {
 public:
 	double X;
 
-	PointFace(BigNumber number, double x) : Face(number, NULL, NULL)
+	PointFace(BigNumber number, double x) : Face(number, NULL, NULL), Poisson_DG_Face(number, NULL, NULL)
 	{
 		this->X = x;
 		this->IsDomainBoundary = false;
 	}
+
+	//----------------------------------------------------//
+	//                 Face implementation                //
+	//----------------------------------------------------//
 
 	double GetDiameter()
 	{
@@ -22,17 +26,27 @@ public:
 			return this->Element2->GetDiameter();
 	}
 
-	//------------------------------------------------------------------//
-	//                 Poisson_DG_Element implementation                //
-	//------------------------------------------------------------------//
+	double MassTerm(BasisFunction<0>* phi1, BasisFunction<0>* phi2)
+	{
+		return 0;
+	}
+
+	virtual double MassTerm(BasisFunction<0>* facePhi, Element<1>* element, BasisFunction<1>* reconstructPhi)
+	{
+		return 0;
+	}
+
+	//---------------------------------------------------------------//
+	//                 Poisson_DG_Face implementation                //
+	//---------------------------------------------------------------//
 
 	double CouplingTerm(Element<1>* element1, BasisFunction<1>* p_phi1, Element<1>* element2, BasisFunction<1>* p_phi2, DiffusionPartition diffusionPartition)
 	{
 		IBasisFunction1D* phi1 = static_cast<IBasisFunction1D*>(p_phi1);
 		IBasisFunction1D* phi2 = static_cast<IBasisFunction1D*>(p_phi2);
 
-		Interval* interval1 = static_cast<Interval*>(element1);
-		Interval* interval2 = static_cast<Interval*>(element2);
+		Interval* interval1 = dynamic_cast<Interval*>(element1);
+		Interval* interval2 = dynamic_cast<Interval*>(element2);
 
 		double k1 = element1->DiffusionCoefficient(diffusionPartition);
 		double k2 = element2->DiffusionCoefficient(diffusionPartition);
@@ -52,13 +66,13 @@ public:
 		return weight1 * k1 * MeanDerivative(interval1, phi1) * Jump(interval2, phi2) + weight2 * k2 * MeanDerivative(interval2, phi2) * Jump(interval1, phi1);
 	}
 
-	double PenalizationTerm(Poisson_DG_Element<1>* element1, BasisFunction<1>* p_phi1, Poisson_DG_Element<1>* element2, BasisFunction<1>* p_phi2, double penalizationCoefficient, DiffusionPartition diffusionPartition)
+	double PenalizationTerm(Element<1>* element1, BasisFunction<1>* p_phi1, Element<1>* element2, BasisFunction<1>* p_phi2, double penalizationCoefficient, DiffusionPartition diffusionPartition)
 	{
 		IBasisFunction1D* phi1 = static_cast<IBasisFunction1D*>(p_phi1);
 		IBasisFunction1D* phi2 = static_cast<IBasisFunction1D*>(p_phi2);
 
-		Interval* interval1 = static_cast<Interval*>(element1);
-		Interval* interval2 = static_cast<Interval*>(element2);
+		Interval* interval1 = dynamic_cast<Interval*>(element1);
+		Interval* interval2 = dynamic_cast<Interval*>(element2);
 
 		double diffusionDependantCoefficient = element1->DiffusionCoefficient(diffusionPartition);
 		if (!this->IsDomainBoundary)

@@ -9,13 +9,17 @@ public:
 	Face<1>* Left;
 	Face<1>* Right;
 
-	Interval(BigNumber number, double a, double b, Face<1>* left, Face<1>* right) : CartesianElement(number, Point(a), b-a)
+	Interval(BigNumber number, double a, double b, Face<1>* left, Face<1>* right) : Element(number), CartesianElement(number, Point(a), b-a), Poisson_DG_Element(number)
 	{
 		this->AddFace(left);
 		this->AddFace(right);
 		this->Left = left;
 		this->Right = right;
 	}
+
+	//-------------------------------------------------------//
+	//                 Element implementation                //
+	//-------------------------------------------------------//
 
 	StandardElementCode StdElementCode()
 	{
@@ -31,11 +35,6 @@ public:
 		return NULL;
 	}
 
-	double DiffusionCoefficient(DiffusionPartition diffusionPartition)
-	{
-		return CartesianElement::DiffusionCoefficient(diffusionPartition);
-	}
-
 	double IntegralGlobalFunction(function<double(Point)> func)
 	{
 		function<double(double)> funcToIntegrate = [func](double x) {
@@ -43,6 +42,28 @@ public:
 		};
 
 		return Utils::Integral(funcToIntegrate, this->Origin.X, this->Origin.X + this->Width);
+	}
+
+	function<double(Point)> EvalPhiOnFace(Face<1>* face, BasisFunction<1>* p_phi)
+	{
+		IBasisFunction1D* phi = static_cast<IBasisFunction1D*>(p_phi);
+
+		double tFixed = face == this->Left ? -1 : 1;
+		function<double(Point)> evalOnFace = [phi, tFixed](Point point0D) {
+			return phi->Eval(tFixed);
+		};
+		return evalOnFace;
+	}
+
+	function<double*(Point)> GradPhiOnFace(Face<1>* face, BasisFunction<1>* p_phi)
+	{
+		IBasisFunction1D* phi = static_cast<IBasisFunction1D*>(p_phi);
+
+		double tFixed = face == this->Left ? -1 : 1;
+		function<double*(Point)> gradOnFace = [phi, tFixed](Point point0D) {
+			return phi->Grad(tFixed);
+		};
+		return gradOnFace;
 	}
 	
 	//------------------------------------------------------------------//
@@ -65,28 +86,5 @@ public:
 	double SourceTerm(BasisFunction<1>* phi, SourceFunction* f)
 	{
 		return CartesianElement::SourceTerm(phi, f);
-	}
-
-	function<double(Point)> EvalPhiOnFace(Face<1>* face, BasisFunction<1>* p_phi)
-	{
-		IBasisFunction1D* phi = static_cast<IBasisFunction1D*>(p_phi);
-
-		double tFixed = face == this->Left ? -1 : 1;
-		function<double(Point)> evalOnFace = [phi, tFixed](Point point0D) {
-			return phi->Eval(tFixed);
-		};
-		return evalOnFace;
-	}
-
-
-	function<double*(Point)> GradPhiOnFace(Face<1>* face, BasisFunction<1>* p_phi)
-	{
-		IBasisFunction1D* phi = static_cast<IBasisFunction1D*>(p_phi);
-
-		double tFixed = face == this->Left ? -1 : 1;
-		function<double*(Point)> gradOnFace = [phi, tFixed](Point point0D) {
-			return phi->Grad(tFixed);
-		};
-		return gradOnFace;
 	}
 };

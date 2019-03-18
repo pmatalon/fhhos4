@@ -16,11 +16,14 @@ class Poisson_DG : public Problem
 {
 private:
 	DiffusionPartition _diffusionPartition;
+	SourceFunction* _sourceFunction;
 public:
 
-	Poisson_DG(string solutionName, DiffusionPartition diffusionPartition, string outputDirectory)
+	Poisson_DG(string solutionName, SourceFunction* sourceFunction, DiffusionPartition diffusionPartition, string outputDirectory)
 		: Problem(solutionName, outputDirectory), _diffusionPartition(diffusionPartition)
-	{	}
+	{
+		this->_sourceFunction = sourceFunction;
+	}
 
 	void Assemble(Mesh<Dim>* mesh, FunctionalBasis<Dim>* basis, Poisson_DGTerms<Dim>* dg, int penalizationCoefficient, Action action)
 	{
@@ -101,7 +104,7 @@ public:
 
 				for (BigNumber iElem = chunk->Start; iElem < chunk->End; iElem++)
 				{
-					auto element = mesh->Elements[iElem];
+					Poisson_DG_Element<Dim>* element = dynamic_cast<Poisson_DG_Element<Dim>*>(mesh->Elements[iElem]);
 					//cout << "Element " << element->Number << endl;
 
 					for (BasisFunction<Dim>* phi1 : basis->LocalFunctions)
@@ -120,10 +123,12 @@ public:
 
 							double coupling = 0;
 							double penalization = 0;
-							for (Face<Dim>* face : element->Faces)
+							for (Face<Dim>* f : element->Faces)
 							{
-								double c = dg->CouplingTerm(face, element, phi1, element, phi2);
-								double p = dg->PenalizationTerm(face, element, phi1, element, phi2, penalizationCoefficient);
+								Poisson_DG_Face<Dim>* face = dynamic_cast<Poisson_DG_Face<Dim>*>(f);
+
+								double c = face->CouplingTerm(element, phi1, element, phi2, this->_diffusionPartition);
+								double p = face->PenalizationTerm(element, phi1, element, phi2, penalizationCoefficient, this->_diffusionPartition);
 								coupling += c;
 								penalization += p;
 								//cout << "\t\t " << face->ToString() << ":\t c=" << c << "\tp=" << p << endl;
@@ -145,7 +150,7 @@ public:
 							}
 						}
 
-						double rhs = dg->RightHandSide(element, phi1);
+						double rhs = element->SourceTerm(phi1, this->_sourceFunction);
 						this->b(basisFunction1) = rhs;
 					}
 				}
@@ -207,7 +212,7 @@ public:
 
 				for (BigNumber iElem = chunk->Start; iElem < chunk->End; iElem++)
 				{
-					auto face = mesh->Faces[iElem];
+					Poisson_DG_Face<Dim>* face = dynamic_cast<Poisson_DG_Face<Dim>*>(mesh->Faces[iElem]);
 					if (face->IsDomainBoundary)
 						continue;
 
@@ -221,8 +226,8 @@ public:
 							//cout << "\t phi" << phi1->LocalNumber << " = " << phi1->ToString() << " phi" << phi2->LocalNumber << " = " << phi2->ToString() << endl;
 
 							BigNumber basisFunction2 = basis->GlobalFunctionNumber(face->Element2, phi2);
-							double coupling = dg->CouplingTerm(face, face->Element1, phi1, face->Element2, phi2);
-							double penalization = dg->PenalizationTerm(face, face->Element1, phi1, face->Element2, phi2, penalizationCoefficient);
+							double coupling = face->CouplingTerm(face->Element1, phi1, face->Element2, phi2, this->_diffusionPartition);
+							double penalization = face->PenalizationTerm(face->Element1, phi1, face->Element2, phi2, penalizationCoefficient, this->_diffusionPartition);
 
 							//cout << "\t\t\t c=" << coupling << "\tp=" << penalization << endl;
 

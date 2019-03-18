@@ -6,5 +6,5 @@ template <short Dim>
 class Poisson_HHO_Face
 {
 public:
-	virtual Eigen::MatrixXd MassMatrix(FunctionalBasis<Dim - 1>* faceBasis) = 0;
+	//virtual Eigen::MatrixXd MassMatrix(FunctionalBasis<Dim - 1>* faceBasis) = 0;
 };

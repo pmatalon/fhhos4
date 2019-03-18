@@ -21,8 +21,8 @@ public:
 
 		for (BigNumber k = 0; k < n; k++)
 		{
-			PointFace* leftPoint = static_cast<PointFace*>(this->Faces[k]);
-			PointFace* rightPoint = static_cast<PointFace*>(this->Faces[k+1]);
+			PointFace* leftPoint = dynamic_cast<PointFace*>(this->Faces[k]);
+			PointFace* rightPoint = dynamic_cast<PointFace*>(this->Faces[k+1]);
 			Interval* element = new Interval(k, leftPoint->X, rightPoint->X, leftPoint, rightPoint);
 			this->Elements.push_back(element);
 		}

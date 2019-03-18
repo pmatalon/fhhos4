@@ -4,26 +4,48 @@
 #include "../DG/Poisson_DG_Face.h"
 #include "../HHO/Poisson_HHO_Face.h"
 
-class IntervalFace : public Face<2>, public CartesianShape<1>, public Poisson_DG_Face<2>, public Poisson_HHO_Face<2>
+class IntervalFace : virtual public Face<2>, public CartesianShape<1>, public Poisson_DG_Face<2>, public Poisson_HHO_Face<2>
 {
 public:
 
-	IntervalFace(BigNumber number, double length, Element<2>* element1, Element<2>* element2) : Face(number, element1, element2), CartesianShape(Point(), length)
+	IntervalFace(BigNumber number, double length, Element<2>* element1, Element<2>* element2) : Face(number, element1, element2), CartesianShape(Point(), length), Poisson_DG_Face(number, element1, element2)
 	{
 	}
 
-	IntervalFace(BigNumber number, double length, Element<2>* element1) : Face(number, element1), CartesianShape(Point(), length)
+	IntervalFace(BigNumber number, double length, Element<2>* element1) : Face(number, element1), CartesianShape(Point(), length), Poisson_DG_Face(number, element1, NULL)
 	{
 	}
+
+	//----------------------------------------------------//
+	//                 Face implementation                //
+	//----------------------------------------------------//
 
 	double GetDiameter()
 	{
 		return CartesianShape::Width;
 	}
 
-	//------------------------------------------------------------------//
-	//                 Poisson_DG_Element implementation                //
-	//------------------------------------------------------------------//
+	double MassTerm(BasisFunction<1>* phi1, BasisFunction<1>* phi2) override
+	{
+		return CartesianShape::MassTerm(phi1, phi2);
+	}
+
+	double MassTerm(BasisFunction<1>* facePhi, Element<2>* element, BasisFunction<2>* reconstructPhi) override
+	{
+		double h = this->Width;
+		auto reconstructPhiOnFace = element->EvalPhiOnFace(this, reconstructPhi);
+
+		function<double(double)> functionToIntegrate = [facePhi, reconstructPhiOnFace](double t) {
+			return facePhi->Eval(t) * reconstructPhiOnFace(t);
+		};
+
+		int nQuadPoints = facePhi->GetDegree() + reconstructPhi->GetDegree() + 2;
+		return h / 2 * Utils::Integral(nQuadPoints, functionToIntegrate, -1, 1);
+	}
+
+	//---------------------------------------------------------------//
+	//                 Poisson_DG_Face implementation                //
+	//---------------------------------------------------------------//
 
 	double CouplingTerm(Element<2>* element1, BasisFunction<2>* p_phi1, Element<2>* element2, BasisFunction<2>* p_phi2, DiffusionPartition diffusionPartition)
 	{
@@ -62,7 +84,7 @@ public:
 		return -Utils::Integral(nQuadPoints, functionToIntegrate, -1, 1);
 	}
 
-	double PenalizationTerm(Poisson_DG_Element<2>* element1, BasisFunction<2>* p_phi1, Poisson_DG_Element<2>* element2, BasisFunction<2>* p_phi2, double penalizationCoefficient, DiffusionPartition diffusionPartition)
+	double PenalizationTerm(Element<2>* element1, BasisFunction<2>* p_phi1, Element<2>* element2, BasisFunction<2>* p_phi2, double penalizationCoefficient, DiffusionPartition diffusionPartition)
 	{
 		auto n1 = element1->OuterNormalVector(this);
 		auto n2 = element2->OuterNormalVector(this);
@@ -88,29 +110,6 @@ public:
 		}
 
 		return diffusionDependantCoefficient * penalizationCoefficient * integralJump1ScalarJump2;
-	}
-
-	double MassTerm(BasisFunction<1>* phi1, BasisFunction<1>* phi2) override
-	{
-		return CartesianShape::MassTerm(phi1, phi2);
-	}
-
-	double MassTerm(BasisFunction<1>* facePhi, Element<2>* element, BasisFunction<2>* reconstructPhi) override
-	{
-		double h = this->Width;
-		auto reconstructPhiOnFace = element->EvalPhiOnFace(this, reconstructPhi);
-
-		function<double(double)> functionToIntegrate = [facePhi, reconstructPhiOnFace](double t) {
-			return facePhi->Eval(t) * reconstructPhiOnFace(t);
-		};
-
-		int nQuadPoints = facePhi->GetDegree() + reconstructPhi->GetDegree() + 2;
-		return h / 2 * Utils::Integral(nQuadPoints, functionToIntegrate, -1, 1);
-	}
-
-	Eigen::MatrixXd MassMatrix(FunctionalBasis<1>* basis)
-	{
-		return Face<2>::MassMatrix(basis);
 	}
 
 private:

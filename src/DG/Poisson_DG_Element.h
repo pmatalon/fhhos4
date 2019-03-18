@@ -6,15 +6,10 @@ template <short Dim>
 class Poisson_DG_ReferenceElement;
 
 template <short Dim>
-class Poisson_DG_Element
+class Poisson_DG_Element : virtual public Element<Dim>
 {
 public:
-	virtual double* OuterNormalVector(Face<Dim>* face) = 0;
-	virtual double DiffusionCoefficient(DiffusionPartition diffusionPartition) = 0;
-	//virtual Element<Dim>* ElementOnTheOtherSideOf(Face<Dim>* face) = 0;
-
-	virtual function<double(Point)> EvalPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* phi) = 0;
-	virtual function<double*(Point)> GradPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* phi) = 0;
+	Poisson_DG_Element(BigNumber number) : Element<Dim>(number) {}
 
 	virtual double VolumicTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2, Poisson_DG_ReferenceElement<Dim>* referenceElement, DiffusionPartition diffusionPartition) = 0;
 	virtual double MassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2, Poisson_DG_ReferenceElement<Dim>* referenceElement) = 0;

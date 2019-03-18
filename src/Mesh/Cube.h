@@ -15,13 +15,8 @@ public:
 	Reconstructor<3>* HHOReconstructor = NULL;
 
 public:
-	Cube(int number, double x, double y, double z, double width) : CartesianElement(number, Point(x,y,z), width)
+	Cube(int number, double x, double y, double z, double width) : Element(number), CartesianElement(number, Point(x,y,z), width), Poisson_DG_Element(number), Poisson_HHO_Element(number)
 	{ }
-
-	StandardElementCode StdElementCode()
-	{
-		return StandardElementCode::Cube;
-	}
 
 	void SetTopInterface(Face<3>* face)
 	{
@@ -59,6 +54,15 @@ public:
 		this->RightFace = face;
 	}
 
+	//-------------------------------------------------------//
+	//                 Element implementation                //
+	//-------------------------------------------------------//
+
+	StandardElementCode StdElementCode()
+	{
+		return StandardElementCode::Cube;
+	}
+
 	double* OuterNormalVector(Face<3>* face)
 	{
 		if (face == this->TopFace)
@@ -76,11 +80,6 @@ public:
 		return NULL;
 	}
 
-	double DiffusionCoefficient(DiffusionPartition diffusionPartition)
-	{
-		return CartesianElement::DiffusionCoefficient(diffusionPartition);
-	}
-
 	double IntegralGlobalFunction(function<double(Point)> func)
 	{
 		double x1 = this->Origin.X;
@@ -91,43 +90,6 @@ public:
 		double z2 = this->Origin.Z + this->Width;
 
 		return Utils::Integral(func, x1, x2, y1, y2, z1, z2);
-	}
-
-	//------------------------------------------------------------------//
-	//                 Poisson_DG_Element implementation                //
-	//------------------------------------------------------------------//
-
-	double VolumicTerm(BasisFunction<3>* phi1, BasisFunction<3>* phi2, Poisson_DG_ReferenceElement<3>* referenceElement, DiffusionPartition diffusionPartition)
-	{
-		double h = this->Width;
-		double kappa = CartesianElement::DiffusionCoefficient(diffusionPartition);
-		return h / 2 * kappa * referenceElement->VolumicTerm(phi1, phi2);
-	}
-
-	double MassTerm(BasisFunction<3>* phi1, BasisFunction<3>* phi2, Poisson_DG_ReferenceElement<3>* referenceElement)
-	{
-		double h = this->Width;
-		return pow(h, 3) / 8 * referenceElement->MassTerm(phi1, phi2);
-	}
-
-	double MassTerm(BasisFunction<3>* phi1, BasisFunction<3>* phi2) override
-	{
-		return CartesianElement::MassTerm(phi1, phi2);
-	}
-	
-	Eigen::MatrixXd MassMatrix(FunctionalBasis<3>* basis)
-	{
-		return Element::MassMatrix(basis);
-	}
-
-	Eigen::MatrixXd MassMatrix(FunctionalBasis<3>* basis1, FunctionalBasis<3>* basis2)
-	{
-		return Element::MassMatrix(basis1, basis2);
-	}
-
-	double SourceTerm(BasisFunction<3>* phi, SourceFunction* f)
-	{
-		return CartesianElement::SourceTerm(phi, f);
 	}
 
 	function<double(Point)> EvalPhiOnFace(Face<3>* face, BasisFunction<3>* p_phi)
@@ -167,7 +129,6 @@ public:
 		return evalOnFace;
 	}
 
-
 	function<double*(Point)> GradPhiOnFace(Face<3>* face, BasisFunction<3>* p_phi)
 	{
 		IBasisFunction3D* phi = static_cast<IBasisFunction3D*>(p_phi);
@@ -203,6 +164,28 @@ public:
 		else
 			assert(false);
 		return gradOnFace;
+	}
+
+	//------------------------------------------------------------------//
+	//                 Poisson_DG_Element implementation                //
+	//------------------------------------------------------------------//
+
+	double VolumicTerm(BasisFunction<3>* phi1, BasisFunction<3>* phi2, Poisson_DG_ReferenceElement<3>* referenceElement, DiffusionPartition diffusionPartition)
+	{
+		double h = this->Width;
+		double kappa = CartesianElement::DiffusionCoefficient(diffusionPartition);
+		return h / 2 * kappa * referenceElement->VolumicTerm(phi1, phi2);
+	}
+
+	double MassTerm(BasisFunction<3>* phi1, BasisFunction<3>* phi2, Poisson_DG_ReferenceElement<3>* referenceElement)
+	{
+		double h = this->Width;
+		return pow(h, 3) / 8 * referenceElement->MassTerm(phi1, phi2);
+	}
+
+	double SourceTerm(BasisFunction<3>* phi, SourceFunction* f)
+	{
+		return CartesianElement::SourceTerm(phi, f);
 	}
 
 	//-------------------------------------------------------------------//
@@ -274,11 +257,6 @@ public:
 		double h = this->Width;
 		int nQuadPoints = reconstructPhi->GetDegree() + facePhi->GetDegree() + 1;
 		return h / 2 * Utils::Integral(nQuadPoints, functionToIntegrate, -1, 1, -1, 1);
-	}
-
-	int LocalNumberOf(Face<3>* face)
-	{
-		return Element::LocalNumberOf(face);
 	}
 
 	int FirstDOFLocalNumber(Face<3>* face)

@@ -44,15 +44,9 @@ public:
 		return NULL;
 	}
 
-	virtual double MassTerm(BasisFunction<Dim - 1>* phi1, BasisFunction<Dim - 1>* phi2)
-	{
-		return 0;
-	}
+	virtual double MassTerm(BasisFunction<Dim - 1>* phi1, BasisFunction<Dim - 1>* phi2) = 0;
 
-	virtual double MassTerm(BasisFunction<Dim - 1>* facePhi, Element<Dim>* element, BasisFunction<Dim>* reconstructPhi)
-	{
-		return 0;
-	}
+	virtual double MassTerm(BasisFunction<Dim - 1>* facePhi, Element<Dim>* element, BasisFunction<Dim>* reconstructPhi) = 0;
 
 	virtual double GetDiameter() = 0;
 

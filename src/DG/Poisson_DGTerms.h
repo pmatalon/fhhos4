@@ -14,16 +14,13 @@ template <short Dim>
 class Poisson_DGTerms
 {
 private:
-	SourceFunction* _sourceFunction;
 	DiffusionPartition _diffusionPartition;
 public:
 	std::map<StandardElementCode, Poisson_DG_ReferenceElement<Dim>*> ReferenceElements;
 
-	Poisson_DGTerms(SourceFunction* sourceFunction, FunctionalBasis<Dim>* basis, DiffusionPartition diffusionPartition)
+	Poisson_DGTerms(FunctionalBasis<Dim>* basis, DiffusionPartition diffusionPartition)
 		: _diffusionPartition(diffusionPartition)
 	{
-		this->_sourceFunction = sourceFunction;
-
 		if (Dim == 1)
 		{
 			Poisson_DG_ReferenceElement<Dim>* refInterval = dynamic_cast<Poisson_DG_ReferenceElement<Dim>*>(new Poisson_DG_ReferenceInterval(basis->NumberOfLocalFunctionsInElement(NULL)));
@@ -46,42 +43,16 @@ public:
 
 	virtual bool IsGlobalBasis() { return false; }
 
-	virtual double VolumicTerm(Element<Dim>* element, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
+	virtual double VolumicTerm(Poisson_DG_Element<Dim>* element, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{
 		Poisson_DG_ReferenceElement<Dim>* referenceElement = this->ReferenceElements[element->StdElementCode()];
-		Poisson_DG_Element<Dim>* dgElement = dynamic_cast<Poisson_DG_Element<Dim>*>(element);
-
-		return dgElement->VolumicTerm(phi1, phi2, referenceElement, this->_diffusionPartition);
+		return element->VolumicTerm(phi1, phi2, referenceElement, this->_diffusionPartition);
 	}
 
-	virtual double MassTerm(Element<Dim>* element, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
+	virtual double MassTerm(Poisson_DG_Element<Dim>* element, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{
 		Poisson_DG_ReferenceElement<Dim>* referenceElement = this->ReferenceElements[element->StdElementCode()];
-		Poisson_DG_Element<Dim>* dgElement = dynamic_cast<Poisson_DG_Element<Dim>*>(element);
-
-		return dgElement->MassTerm(phi1, phi2, referenceElement);
-	}
-
-	virtual double CouplingTerm(Face<Dim>* face, Element<Dim>* element1, BasisFunction<Dim>* phi1, Element<Dim>* element2, BasisFunction<Dim>* phi2)
-	{
-		Poisson_DG_Face<Dim>* dgFace = dynamic_cast<Poisson_DG_Face<Dim>*>(face);
-		//Poisson_DG_Element<Dim>* dgElement1 = dynamic_cast<Poisson_DG_Element<Dim>*>(element1);
-		//Poisson_DG_Element<Dim>* dgElement2 = dynamic_cast<Poisson_DG_Element<Dim>*>(element2);
-		return dgFace->CouplingTerm(element1, phi1, element2, phi2, this->_diffusionPartition);
-	}
-
-	virtual double PenalizationTerm(Face<Dim>* face, Element<Dim>* element1, BasisFunction<Dim>* phi1, Element<Dim>* element2, BasisFunction<Dim>* phi2, double penalizationCoefficient)
-	{
-		Poisson_DG_Face<Dim>* dgFace = dynamic_cast<Poisson_DG_Face<Dim>*>(face);
-		Poisson_DG_Element<Dim>* dgElement1 = dynamic_cast<Poisson_DG_Element<Dim>*>(element1);
-		Poisson_DG_Element<Dim>* dgElement2 = dynamic_cast<Poisson_DG_Element<Dim>*>(element2);
-		return dgFace->PenalizationTerm(dgElement1, phi1, dgElement2, phi2, penalizationCoefficient, this->_diffusionPartition);
-	}
-
-	virtual double RightHandSide(Element<Dim>* element, BasisFunction<Dim>* phi)
-	{
-		Poisson_DG_Element<Dim>* dgElement = dynamic_cast<Poisson_DG_Element<Dim>*>(element);
-		return dgElement->SourceTerm(phi, this->_sourceFunction);
+		return element->MassTerm(phi1, phi2, referenceElement);
 	}
 
 	virtual ~Poisson_DGTerms() {}

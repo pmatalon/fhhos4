@@ -21,9 +21,9 @@ public:
 	Eigen::MatrixXd Astab;
 
 	Reconstructor(Poisson_HHO_Element<Dim>* element, FunctionalBasis<Dim>* reconstructionBasis, FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim - 1>* faceBasis) :
-		P(reconstructionBasis->Size(), cellBasis->Size() + (dynamic_cast<Element<Dim>*>(element))->Faces.size() * faceBasis->Size()),
-		Acons(cellBasis->Size() + (dynamic_cast<Element<Dim>*>(element))->Faces.size() * faceBasis->Size(), cellBasis->Size() + (dynamic_cast<Element<Dim>*>(element))->Faces.size() * faceBasis->Size()),
-		Astab(cellBasis->Size() + (dynamic_cast<Element<Dim>*>(element))->Faces.size() * faceBasis->Size(), cellBasis->Size() + (dynamic_cast<Element<Dim>*>(element))->Faces.size() * faceBasis->Size())
+		P(reconstructionBasis->Size(), cellBasis->Size() + element->Faces.size() * faceBasis->Size()),
+		Acons(cellBasis->Size() + element->Faces.size() * faceBasis->Size(), cellBasis->Size() + element->Faces.size() * faceBasis->Size()),
+		Astab(cellBasis->Size() + element->Faces.size() * faceBasis->Size(), cellBasis->Size() + element->Faces.size() * faceBasis->Size())
 	{
 		this->_element = element;
 		this->_reconstructionBasis = reconstructionBasis;
@@ -51,8 +51,7 @@ public:
 
 	Eigen::VectorXd Interpolate(Eigen::VectorXd vector)
 	{
-		Element<Dim>* element = dynamic_cast<Element<Dim>*>(this->_element);
-		Eigen::VectorXd hybridVector(this->_cellBasis->Size() + element->Faces.size() * this->_faceBasis->Size());
+		Eigen::VectorXd hybridVector(this->_cellBasis->Size() + this->_element->Faces.size() * this->_faceBasis->Size());
 		
 		Eigen::MatrixXd Mt = this->_element->MassMatrix(this->_cellBasis);
 		//cout << "------------- Mt -------------" << endl << Mt << endl;
@@ -63,11 +62,11 @@ public:
 		hybridVector.head(this->_cellBasis->Size()) = ProjT * vector;
 
 		int index = this->_cellBasis->Size();
-		for (auto face : element->Faces)
+		for (auto face : this->_element->Faces)
 		{
 			Eigen::MatrixXd Mf = face->MassMatrix(this->_faceBasis);
 			//cout << "------------- Mf -------------" << endl << Mf << endl;
-			Eigen::MatrixXd Nf = face->MassMatrix(this->_faceBasis, element, this->_reconstructionBasis);
+			Eigen::MatrixXd Nf = face->MassMatrix(this->_faceBasis, this->_element, this->_reconstructionBasis);
 			//cout << "------------- Nf -------------" << endl << Nf << endl;
 			Eigen::MatrixXd ProjF = Mf.inverse() * Nf;
 
@@ -189,8 +188,7 @@ private:
 
 	Eigen::MatrixXd AssembleRHSMatrix()
 	{
-		Element<Dim>* element = dynamic_cast<Element<Dim>*>(this->_element);
-		auto nFaceUnknowns = element->Faces.size() * this->_faceBasis->Size();
+		auto nFaceUnknowns = this->_element->Faces.size() * this->_faceBasis->Size();
 		auto nColumns = this->_cellBasis->Size() + nFaceUnknowns;
 		Eigen::MatrixXd rhsMatrix(this->_reconstructionBasis->Size() + 1, nColumns);
 		//cout << rhsMatrix << endl << "----------------- rhsMatrix ----------------" << endl;
@@ -200,7 +198,7 @@ private:
 		//cout << rhsMatrix << endl << "----------------- after AssembleBt ----------------" << endl;
 		
 		// Top-right corner
-		for (auto face : element->Faces)
+		for (auto face : this->_element->Faces)
 			this->AssembleBf(rhsMatrix, face);
 		//cout << rhsMatrix << endl << "----------------- after AssembleBf ----------------" << endl;
 
@@ -239,8 +237,6 @@ private:
 
 	void AssembleStabilizationMatrix()
 	{
-		Element<Dim>* element = dynamic_cast<Element<Dim>*>(this->_element);
-
 		Eigen::MatrixXd Mt = this->_element->MassMatrix(this->_cellBasis);
 		//cout << "------------- Mt -------------" << endl << Mt << endl;
 		Eigen::MatrixXd Nt = this->_element->MassMatrix(this->_cellBasis, this->_reconstructionBasis);
@@ -253,13 +249,13 @@ private:
 			Dt(i, i) -= 1;
 		//cout << "------------- Dt -------------" << endl << Dt << endl;
 
-		for (auto face : element->Faces)
+		for (auto face : this->_element->Faces)
 		{
 			Eigen::MatrixXd Mf = face->MassMatrix(this->_faceBasis);
 			//cout << "------------- Mf -------------" << endl << Mf << endl;
-			Eigen::MatrixXd Nf = face->MassMatrix(this->_faceBasis, element, this->_reconstructionBasis);
+			Eigen::MatrixXd Nf = face->MassMatrix(this->_faceBasis, this->_element, this->_reconstructionBasis);
 			//cout << "------------- Nf -------------" << endl << Nf << endl;
-			Eigen::MatrixXd Nft = face->MassMatrix(this->_faceBasis, element, this->_cellBasis);
+			Eigen::MatrixXd Nft = face->MassMatrix(this->_faceBasis, this->_element, this->_cellBasis);
 			//cout << "------------- Nft -------------" << endl << Nft << endl;
 			Eigen::MatrixXd ProjF = Mf.inverse() * Nf;
 			Eigen::MatrixXd ProjFT = Mf.inverse() * Nft;
