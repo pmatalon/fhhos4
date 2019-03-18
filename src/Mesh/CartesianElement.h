@@ -1,61 +1,46 @@
 #pragma once
 #include "Element.h"
+#include "CartesianShape.h"
 
 template <short Dim>
-class CartesianElement : public Element<Dim>
+class CartesianElement : public Element<Dim>, public CartesianShape<Dim>
 {
 public:
-	double Width;
 
-	CartesianElement(int number, double width) : Element<Dim>(number)
+	CartesianElement(int number, Point origin, double width) : Element<Dim>(number), CartesianShape<Dim>(origin, width)
 	{
-		this->Width = width;
 	}
 
 	double GetDiameter() override
 	{
-		return this->Width;
+		return CartesianShape<Dim>::Width;
 	}
 
-	/*double Integral(function<double(Point)> func) override
+	double DiffusionCoefficient(DiffusionPartition diffusionPartition) override
 	{
-
-	}*/
+		Point origin = CartesianShape<Dim>::Origin;
+		return diffusionPartition.Coefficient(origin);
+	}
 
 	double Integral(BasisFunction<Dim>* phi)
 	{
-		double h = this->Width;
-		return pow(h/2, Dim) * Utils::Integral(phi);
+		return CartesianShape<Dim>::Integral(phi);
 	}
 
-	double MassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) override
+	double MassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{
-		double h = this->Width;
-
-		function<double(Point)> functionToIntegrate = [phi1, phi2](Point p) {
-			return phi1->Eval(p)*phi2->Eval(p);
-		};
-
-		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree() + 2;
-		return pow(h / 2, Dim) * Utils::Integral<Dim>(nQuadPoints, functionToIntegrate);
+		return CartesianShape<Dim>::MassTerm(phi1, phi2);
 	}
 
 	double IntegralGradGrad(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{
-		if (phi1->GetDegree() == 0 || phi1->GetDegree() == 0)
-			return 0;
-
-		double h = this->Width;
-
-		function<double(Point)> functionToIntegrate = [phi1, phi2](Point p) {
-			return Element<Dim>::InnerProduct(phi1->Grad(p), phi2->Grad(p));
-		};
-
-		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree();
-		return pow(h / 2, Dim-2) * Utils::Integral<Dim>(nQuadPoints, functionToIntegrate);
+		return CartesianShape<Dim>::IntegralGradGrad(phi1, phi2);
 	}
 
-	virtual Point ConvertToDomain(Point referenceElementPoint) = 0;
+	Point ConvertToDomain(Point referenceElementPoint)
+	{
+		return CartesianShape<Dim>::ConvertToDomain(referenceElementPoint);
+	}
 
 	virtual double SourceTerm(BasisFunction<Dim>* phi, SourceFunction* f)
 	{

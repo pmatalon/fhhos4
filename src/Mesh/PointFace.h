@@ -67,14 +67,14 @@ public:
 			double k2 = this->Element2->DiffusionCoefficient(diffusionPartition);
 			diffusionDependantCoefficient = 2 * k1*k2 / (k1 + k2);
 		}
-		//double h = interval1->B - interval1->A;
+
 		return diffusionDependantCoefficient * penalizationCoefficient * Jump(interval1, phi1) * Jump(interval2, phi2);
 	}
 
 	double MeanDerivative(Interval* element, IBasisFunction1D* phi)
 	{
 		double t = this == element->Left ? -1 : 1; // t in [-1, 1]
-		double h = element->B - element->A;
+		double h = element->Width;
 		return 2 / h * phi->EvalDerivative(t);
 	}
 

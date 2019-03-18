@@ -1,5 +1,5 @@
 #pragma once
-#include "CartesianElement.h"
+#include "CartesianShape.h"
 #include "IntervalFace.h"
 #include "../DG/Poisson_DG_Element.h"
 #include "../DG/Poisson_DG_ReferenceElement.h"
@@ -12,10 +12,6 @@ using namespace std;
 class Square : public CartesianElement<2>, public Poisson_DG_Element<2>, public Poisson_HHO_Element<2>
 {
 public:
-	double X;
-	double Y;
-	double Width;
-
 	Face<2>* NorthFace;
 	Face<2>* SouthFace;
 	Face<2>* EastFace;
@@ -23,11 +19,13 @@ public:
 
 	Reconstructor<2>* HHOReconstructor = NULL;
 
-	Square(int number, double x, double y, double width) : CartesianElement(number, width)
+	Square(int number, double x, double y, double width) : CartesianElement(number, Point(x, y), width)
 	{
-		this->X = x;
-		this->Y = y;
-		this->Width = width;
+	}
+
+	double GetDiameter()
+	{
+		return CartesianShape::Width;
 	}
 
 	StandardElementCode StdElementCode()
@@ -74,33 +72,22 @@ public:
 
 	double DiffusionCoefficient(DiffusionPartition diffusionPartition)
 	{
-		return diffusionPartition.Coefficient(Point(this->X, this->Y));
+		return CartesianElement::DiffusionCoefficient(diffusionPartition);
 	}
 
-	double Integral(function<double(Point)> func)
+	double IntegralGlobalFunction(function<double(Point)> func) override
 	{
-		double x1 = this->X;
-		double x2 = this->X + this->Width;
-		double y1 = this->Y;
-		double y2 = this->Y + this->Width;
+		double x1 = this->Origin.X;
+		double x2 = this->Origin.X + this->Width;
+		double y1 = this->Origin.Y;
+		double y2 = this->Origin.Y + this->Width;
 
 		return Utils::Integral(func, x1, x2, y1, y2);
 	}
 
-	Point ConvertToDomain(Point referenceElementPoint) override
+	double L2ErrorPow2(function<double(Point)> approximate, function<double(Point)> exactSolution) override
 	{
-		double x1 = this->X;
-		double x2 = this->X + this->Width;
-		double y1 = this->Y;
-		double y2 = this->Y + this->Width;
-
-		double t = referenceElementPoint.X;
-		double u = referenceElementPoint.Y;
-
-		Point p;
-		p.X = (x2 - x1) / 2 * t + (x2 + x1) / 2;
-		p.Y = (y2 - y1) / 2 * u + (y2 + y1) / 2;
-		return p;
+		return CartesianElement::L2ErrorPow2(approximate, exactSolution);
 	}
 
 	//------------------------------------------------------------------//
@@ -109,7 +96,7 @@ public:
 
 	double VolumicTerm(BasisFunction<2>* phi1, BasisFunction<2>* phi2, Poisson_DG_ReferenceElement<2>* referenceElement, DiffusionPartition diffusionPartition)
 	{
-		double kappa = this->DiffusionCoefficient(diffusionPartition);
+		double kappa = CartesianElement::DiffusionCoefficient(diffusionPartition);
 		return kappa * referenceElement->VolumicTerm(phi1, phi2);
 	}
 
@@ -119,9 +106,9 @@ public:
 		return pow(h, 2) / 4 * referenceElement->MassTerm(phi1, phi2);
 	}
 
-	double MassTerm(BasisFunction<2>* p_phi1, BasisFunction<2>* p_phi2) override
+	double MassTerm(BasisFunction<2>* phi1, BasisFunction<2>* phi2) override
 	{
-		return CartesianElement::MassTerm(p_phi1, p_phi2);
+		return CartesianShape::MassTerm(phi1, phi2);
 	}
 
 	Eigen::MatrixXd MassMatrix(FunctionalBasis<2>* basis)
@@ -213,7 +200,7 @@ public:
 
 	double Lt(BasisFunction<2>* phi)
 	{
-		return CartesianElement::Integral(phi);
+		return CartesianShape::Integral(phi);
 	}
 
 	double Bt(BasisFunction<2>* reconstructPhi, BasisFunction<2>* cellPhi)

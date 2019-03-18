@@ -3,24 +3,21 @@
 #include "../Utils/Utils.h"
 #include "Cube.h"
 
-class SquareFace : public Face<3>, public Poisson_DG_Face<3>, public Poisson_HHO_Face<3>
+class SquareFace : public Face<3>, public CartesianShape<2>, public Poisson_DG_Face<3>, public Poisson_HHO_Face<3>
 {
 public:
-	double Width = 0;
 
-	SquareFace(BigNumber number, double width, Element<3>* element1, Element<3>* element2) : Face(number, element1, element2)
+	SquareFace(BigNumber number, double width, Element<3>* element1, Element<3>* element2) : Face(number, element1, element2), CartesianShape(Point(), width)
 	{
-		this->Width = width;
 	}
 
-	SquareFace(BigNumber number, double width, Element<3>* element1) : Face(number, element1)
+	SquareFace(BigNumber number, double width, Element<3>* element1) : Face(number, element1), CartesianShape(Point(), width)
 	{
-		this->Width = width;
 	}
 
 	double GetDiameter()
 	{
-		return this->Width;
+		return CartesianShape::Width;
 	}
 
 	//------------------------------------------------------------------//
@@ -93,19 +90,9 @@ public:
 		return diffusionDependantCoefficient * penalizationCoefficient * integralJump1ScalarJump2;
 	}
 
-	double MassTerm(BasisFunction<2>* p_phi1, BasisFunction<2>* p_phi2) override
+	double MassTerm(BasisFunction<2>* phi1, BasisFunction<2>* phi2) override
 	{
-		double h = this->Width;
-
-		IBasisFunction2D* phi1 = static_cast<IBasisFunction2D*>(p_phi1);
-		IBasisFunction2D* phi2 = static_cast<IBasisFunction2D*>(p_phi2);
-
-		function<double(double, double)> functionToIntegrate = [phi1, phi2](double t, double u) {
-			return phi1->Eval(t, u) * phi2->Eval(t, u);
-		};
-
-		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree() + 2;
-		return pow(h, 2) / 4 * Utils::Integral(nQuadPoints, functionToIntegrate, -1, 1, -1, 1);
+		return CartesianShape::MassTerm(phi1, phi2);
 	}
 
 	double MassTerm(BasisFunction<2>* facePhi, Element<3>* element, BasisFunction<3>* reconstructPhi) override

@@ -143,6 +143,12 @@
     <ClInclude Include="src\Utils\ParallelLoop.h">
       <Filter>Utils</Filter>
     </ClInclude>
+    <ClInclude Include="src\Mesh\CartesianShape.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\ReferenceCartesianShape.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

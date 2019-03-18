@@ -6,16 +6,11 @@
 class Interval : public CartesianElement<1>, public Poisson_DG_Element<1>
 {
 public:
-	double A;
-	double B;
-
 	Face<1>* Left;
 	Face<1>* Right;
 
-	Interval(BigNumber number, double a, double b, Face<1>* left, Face<1>* right) : CartesianElement(number, b-a)
+	Interval(BigNumber number, double a, double b, Face<1>* left, Face<1>* right) : CartesianElement(number, Point(a), b-a)
 	{
-		this->A = a;
-		this->B = b;
 		this->AddFace(left);
 		this->AddFace(right);
 		this->Left = left;
@@ -38,28 +33,16 @@ public:
 
 	double DiffusionCoefficient(DiffusionPartition diffusionPartition)
 	{
-		return diffusionPartition.Coefficient(Point((this->A + this->B) / 2));
+		return CartesianElement::DiffusionCoefficient(diffusionPartition);
 	}
 
-	double Integral(function<double(Point)> func)
+	double IntegralGlobalFunction(function<double(Point)> func)
 	{
 		function<double(double)> funcToIntegrate = [func](double x) {
 			return func(x);
 		};
 
-		return Utils::Integral(funcToIntegrate, this->A, this->B);
-	}
-
-	Point ConvertToDomain(Point referenceElementPoint) override
-	{
-		double a = this->A;
-		double b = this->B;
-
-		double t = referenceElementPoint.X;
-
-		Point p;
-		p.X = (b - a) / 2 * t + (b + a) / 2;
-		return p;
+		return Utils::Integral(funcToIntegrate, this->Origin.X, this->Origin.X + this->Width);
 	}
 	
 	//------------------------------------------------------------------//
@@ -68,14 +51,14 @@ public:
 
 	double VolumicTerm(BasisFunction<1>* phi1, BasisFunction<1>* phi2, Poisson_DG_ReferenceElement<1>* referenceElement, DiffusionPartition diffusionPartition)
 	{
-		double h = this->B - this->A;
-		double kappa = this->DiffusionCoefficient(diffusionPartition);
+		double h = CartesianShape::Width;
+		double kappa = CartesianElement::DiffusionCoefficient(diffusionPartition);
 		return 2 / h * kappa * referenceElement->VolumicTerm(phi1, phi2);
 	}
 
 	double MassTerm(BasisFunction<1>* phi1, BasisFunction<1>* phi2, Poisson_DG_ReferenceElement<1>* referenceElement)
 	{
-		double h = this->B - this->A;
+		double h = CartesianShape::Width;
 		return h / 2 * referenceElement->MassTerm(phi1, phi2);
 	}
 	

@@ -76,13 +76,13 @@ public:
 
 		delete ia, ja, a, f, x;
 #else
-		Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
+		/*Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
 		solver.analyzePattern(this->A);
-		solver.factorize(this->A);
+		solver.factorize(this->A);*/
 
-		/*Eigen::ConjugateGradient<Eigen::SparseMatrix<double>, Eigen::Lower | Eigen::Upper, Eigen::DiagonalPreconditioner<double>> solver;
+		Eigen::ConjugateGradient<Eigen::SparseMatrix<double>, Eigen::Lower | Eigen::Upper, Eigen::DiagonalPreconditioner<double>> solver;
 		solver.setTolerance(1.e-10);
-		solver.compute(this->A);*/
+		solver.compute(this->A);
 
 		this->Solution = solver.solve(this->b);
 #endif

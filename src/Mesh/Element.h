@@ -42,7 +42,7 @@ public:
 
 	virtual double* OuterNormalVector(Face<Dim>* face) = 0;
 	
-	virtual double Integral(function<double(Point)> func) = 0;
+	virtual double IntegralGlobalFunction(function<double(Point)> globalFunction) = 0;
 
 	virtual double MassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{
@@ -100,7 +100,7 @@ protected:
 		int faceLocalNumber = this->_facesLocalNumbering.size();
 		this->_facesLocalNumbering.insert(std::pair<Face<Dim>*, int>(face, faceLocalNumber));
 	}
-
+public:
 	static double InnerProduct(double* vector1, double* vector2)
 	{
 		double innerProduct = 0;
