@@ -113,7 +113,7 @@ public:
 	}
 
 private:
-	static double InnerProduct(double* vector1, double* vector2)
+	static double InnerProduct(vector<double> vector1, vector<double> vector2)
 	{
 		return vector1[0] * vector2[0] + vector1[1] * vector2[1];
 	}

@@ -26,13 +26,13 @@ public:
 		return StandardElementCode::Interval;
 	}
 
-	double* OuterNormalVector(Face<1>* interface)
+	vector<double> OuterNormalVector(Face<1>* interface)
 	{
 		if (interface == this->Left)
-			return new double[1]{ -1 };
+			return vector<double>{ -1 };
 		else if(interface == this->Right)
-			return new double[1]{ 1 };
-		return NULL;
+			return vector<double>{ 1 };
+		assert(false);
 	}
 
 	double IntegralGlobalFunction(function<double(Point)> func)
@@ -55,12 +55,12 @@ public:
 		return evalOnFace;
 	}
 
-	function<double*(Point)> GradPhiOnFace(Face<1>* face, BasisFunction<1>* p_phi)
+	function<vector<double>(Point)> GradPhiOnFace(Face<1>* face, BasisFunction<1>* p_phi)
 	{
 		IBasisFunction1D* phi = static_cast<IBasisFunction1D*>(p_phi);
 
 		double tFixed = face == this->Left ? -1 : 1;
-		function<double*(Point)> gradOnFace = [phi, tFixed](Point point0D) {
+		function<vector<double>(Point)> gradOnFace = [phi, tFixed](Point point0D) {
 			return phi->Grad(tFixed);
 		};
 		return gradOnFace;

@@ -56,17 +56,17 @@ public:
 		return StandardElementCode::Square;
 	}
 
-	double* OuterNormalVector(Face<2>* face)
+	vector<double> OuterNormalVector(Face<2>* face)
 	{
 		if (face == this->NorthFace)
-			return new double[2]{ 0, 1 };
+			return vector<double>{ 0, 1 };
 		if (face == this->SouthFace)
-			return new double[2]{ 0, -1 };
+			return vector<double>{ 0, -1 };
 		if (face == this->EastFace)
-			return new double[2]{ 1, 0 };
+			return vector<double>{ 1, 0 };
 		if (face == this->WestFace)
-			return new double[2]{ -1, 0 };
-		return NULL;
+			return vector<double>{ -1, 0 };
+		assert(false);
 	}
 
 	double IntegralGlobalFunction(function<double(Point)> func) override
@@ -105,11 +105,11 @@ public:
 		return evalOnFace;
 	}
 
-	function<double*(Point)> GradPhiOnFace(Face<2>* face, BasisFunction<2>* p_phi)
+	function<vector<double>(Point)> GradPhiOnFace(Face<2>* face, BasisFunction<2>* p_phi)
 	{
 		IBasisFunction2D* phi = static_cast<IBasisFunction2D*>(p_phi);
 
-		function<double*(Point)> gradOnFace = NULL;
+		function<vector<double>(Point)> gradOnFace = NULL;
 		if (face == this->EastFace || face == this->WestFace)
 		{
 			double tFixed = face == this->EastFace ? 1 : -1;

@@ -40,7 +40,7 @@ public:
 
 	virtual double GetDiameter() = 0;
 
-	virtual double* OuterNormalVector(Face<Dim>* face) = 0;
+	virtual vector<double> OuterNormalVector(Face<Dim>* face) = 0;
 	
 	virtual double IntegralGlobalFunction(function<double(Point)> globalFunction) = 0;
 
@@ -86,7 +86,7 @@ public:
 	}
 
 	virtual function<double(Point)> EvalPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* phi) = 0;
-	virtual function<double*(Point)> GradPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* phi) = 0;
+	virtual function<vector<double>(Point)> GradPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* phi) = 0;
 	virtual double L2ErrorPow2(function<double(Point)> approximate, function<double(Point)> exactSolution) = 0;
 	virtual double DiffusionCoefficient(DiffusionPartition diffusionPartition) = 0;
 
@@ -101,7 +101,7 @@ protected:
 		this->_facesLocalNumbering.insert(std::pair<Face<Dim>*, int>(face, faceLocalNumber));
 	}
 public:
-	static double InnerProduct(double* vector1, double* vector2)
+	static double InnerProduct(vector<double> vector1, vector<double> vector2)
 	{
 		double innerProduct = 0;
 		for (int i=0; i<Dim; i++)

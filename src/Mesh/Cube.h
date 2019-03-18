@@ -63,21 +63,21 @@ public:
 		return StandardElementCode::Cube;
 	}
 
-	double* OuterNormalVector(Face<3>* face)
+	vector<double> OuterNormalVector(Face<3>* face)
 	{
 		if (face == this->TopFace)
-			return new double[3]{ 0, 0, 1 };
+			return vector<double>{ 0, 0, 1 };
 		if (face == this->BottomFace)
-			return new double[3]{ 0, 0, -1 };
+			return vector<double>{ 0, 0, -1 };
 		if (face == this->FrontFace)
-			return new double[3]{ 0, -1, 0 };
+			return vector<double>{ 0, -1, 0 };
 		if (face == this->BackFace)
-			return new double[3]{ 0, 1, 0 };
+			return vector<double>{ 0, 1, 0 };
 		if (face == this->LeftFace)
-			return new double[3]{ -1, 0, 0 };
+			return vector<double>{ -1, 0, 0 };
 		if (face == this->RightFace)
-			return new double[3]{ 1, 0, 0 };
-		return NULL;
+			return vector<double>{ 1, 0, 0 };
+		assert(false);
 	}
 
 	double IntegralGlobalFunction(function<double(Point)> func)
@@ -129,11 +129,11 @@ public:
 		return evalOnFace;
 	}
 
-	function<double*(Point)> GradPhiOnFace(Face<3>* face, BasisFunction<3>* p_phi)
+	function<vector<double>(Point)> GradPhiOnFace(Face<3>* face, BasisFunction<3>* p_phi)
 	{
 		IBasisFunction3D* phi = static_cast<IBasisFunction3D*>(p_phi);
 
-		function<double*(Point)> gradOnFace = NULL;
+		function<vector<double>(Point)> gradOnFace = NULL;
 		if (face == this->TopFace || face == this->BottomFace) // XOY plan
 		{
 			double vFixed = face == this->TopFace ? 1 : -1;
