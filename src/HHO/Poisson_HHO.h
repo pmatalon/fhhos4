@@ -120,11 +120,11 @@ public:
 
 		cout << "Assembly..." << endl;
 		
-		for (auto element : mesh->Elements)
+		for (auto e : mesh->Elements)
 		{
 			//cout << "Element " << element->Number << endl;
-			Poisson_HHO_Element<Dim>* hhoElement = dynamic_cast<Poisson_HHO_Element<Dim>*>(element);
-			hhoElement->InitReconstructor(reconstructionBasis, cellBasis, faceBasis);
+			Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
+			element->InitReconstructor(reconstructionBasis, cellBasis, faceBasis);
 
 			for (BasisFunction<Dim>* cellPhi1 : cellBasis->LocalFunctions)
 			{
@@ -132,10 +132,10 @@ public:
 				for (BasisFunction<Dim>* cellPhi2 : cellBasis->LocalFunctions)
 				{
 					BigNumber j = DOFNumber(element, cellPhi2);
-					double consistencyTerm = hhoElement->ConsistencyTerm(cellPhi1, cellPhi2);
+					double consistencyTerm = element->ConsistencyTerm(cellPhi1, cellPhi2);
 					consistencyCoeffs.Add(i, j, consistencyTerm);
 
-					double stabilizationTerm = hhoElement->StabilizationTerm(cellPhi1, cellPhi2);
+					double stabilizationTerm = element->StabilizationTerm(cellPhi1, cellPhi2);
 					stabilizationCoeffs.Add(i, j, stabilizationTerm);
 				}
 			}
@@ -153,11 +153,11 @@ public:
 					{
 						BigNumber j = DOFNumber(face, facePhi);
 
-						double consistencyTerm = hhoElement->ConsistencyTerm(face, cellPhi, facePhi);
+						double consistencyTerm = element->ConsistencyTerm(face, cellPhi, facePhi);
 						consistencyCoeffs.Add(i, j, consistencyTerm);
 						consistencyCoeffs.Add(j, i, consistencyTerm);
 
-						double stabilizationTerm = hhoElement->StabilizationTerm(face, cellPhi, facePhi);
+						double stabilizationTerm = element->StabilizationTerm(face, cellPhi, facePhi);
 						stabilizationCoeffs.Add(i, j, stabilizationTerm);
 						stabilizationCoeffs.Add(j, i, stabilizationTerm);
 					}
@@ -182,11 +182,11 @@ public:
 						{
 							BigNumber j = DOFNumber(face2, facePhi2);
 
-							double consistencyTerm = hhoElement->ConsistencyTerm(face1, facePhi1, face2, facePhi2);
+							double consistencyTerm = element->ConsistencyTerm(face1, facePhi1, face2, facePhi2);
 							consistencyCoeffs.Add(i, j, consistencyTerm);
 							//consistencyCoeffs.Add(j, i, consistencyTerm);
 
-							double stabilizationTerm = hhoElement->StabilizationTerm(face1, facePhi1, face2, facePhi2);
+							double stabilizationTerm = element->StabilizationTerm(face1, facePhi1, face2, facePhi2);
 							stabilizationCoeffs.Add(i, j, stabilizationTerm);
 						}
 					}
@@ -197,7 +197,7 @@ public:
 			for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions)
 			{
 				BigNumber i = DOFNumber(element, cellPhi);
-				this->_globalRHS(i) = hhoElement->SourceTerm(cellPhi, this->_sourceFunction);
+				this->_globalRHS(i) = element->SourceTerm(cellPhi, this->_sourceFunction);
 			}
 			for (auto face : element->Faces)
 			{
@@ -218,14 +218,14 @@ public:
 				for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions)
 				{
 					BigNumber j = DOFNumber(element, cellPhi);
-					reconstructionCoeffs.Add(i, j, hhoElement->ReconstructionTerm(reconstructPhi, cellPhi));
+					reconstructionCoeffs.Add(i, j, element->ReconstructionTerm(reconstructPhi, cellPhi));
 				}
 				for (auto face : element->Faces)
 				{
 					for (BasisFunction<Dim - 1>* facePhi : faceBasis->LocalFunctions)
 					{
 						BigNumber j = DOFNumber(face, facePhi);
-						reconstructionCoeffs.Add(i, j, hhoElement->ReconstructionTerm(reconstructPhi, face, facePhi));
+						reconstructionCoeffs.Add(i, j, element->ReconstructionTerm(reconstructPhi, face, facePhi));
 					}
 				}
 			}
@@ -305,21 +305,21 @@ public:
 		else
 			globalHybridSolution = this->Solution;
 
-		for (auto element : this->_mesh->Elements)
+		for (auto e : this->_mesh->Elements)
 		{
-			Poisson_HHO_Element<Dim>* hhoElement = dynamic_cast<Poisson_HHO_Element<Dim>*>(element);
+			Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
 
 			Eigen::VectorXd localHybridSolution(hho.nLocalCellUnknowns + hho.nLocalFaceUnknowns * element->Faces.size());
 			localHybridSolution.head(hho.nLocalCellUnknowns) = globalHybridSolution.segment(FirstDOFGlobalNumber(element), hho.nLocalCellUnknowns);
 			for (auto face : element->Faces)
 			{
 				if (face->IsDomainBoundary)
-					localHybridSolution.segment(hhoElement->FirstDOFLocalNumber(face), hho.nLocalFaceUnknowns) = Eigen::VectorXd::Zero(hho.nLocalFaceUnknowns);
+					localHybridSolution.segment(element->FirstDOFLocalNumber(face), hho.nLocalFaceUnknowns) = Eigen::VectorXd::Zero(hho.nLocalFaceUnknowns);
 				else
-					localHybridSolution.segment(hhoElement->FirstDOFLocalNumber(face), hho.nLocalFaceUnknowns) = globalHybridSolution.segment(FirstDOFGlobalNumber(face), hho.nLocalFaceUnknowns);
+					localHybridSolution.segment(element->FirstDOFLocalNumber(face), hho.nLocalFaceUnknowns) = globalHybridSolution.segment(FirstDOFGlobalNumber(face), hho.nLocalFaceUnknowns);
 			}
 
-			Eigen::VectorXd localReconstructedSolution = hhoElement->Reconstruct(localHybridSolution);
+			Eigen::VectorXd localReconstructedSolution = element->Reconstruct(localHybridSolution);
 			globalReconstructedSolution.segment(element->Number * hho.nLocalReconstructUnknowns, hho.nLocalReconstructUnknowns) = localReconstructedSolution;
 		}
 

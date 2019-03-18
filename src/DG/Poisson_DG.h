@@ -210,7 +210,7 @@ public:
 				NonZeroCoefficients couplingCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
 				NonZeroCoefficients penCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
 
-				for (BigNumber iElem = chunk->Start; iElem < chunk->End; iElem++)
+				for (BigNumber iElem = chunk->Start; iElem < chunk->End; ++iElem)
 				{
 					Poisson_DG_Face<Dim>* face = dynamic_cast<Poisson_DG_Face<Dim>*>(mesh->Faces[iElem]);
 					if (face->IsDomainBoundary)
