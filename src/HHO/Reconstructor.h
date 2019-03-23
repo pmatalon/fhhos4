@@ -237,6 +237,8 @@ private:
 
 	void AssembleStabilizationMatrix()
 	{
+		this->Astab = Eigen::MatrixXd::Zero(this->Astab.rows(), this->Astab.cols());
+
 		Eigen::MatrixXd Mt = this->_element->MassMatrix(this->_cellBasis);
 		//cout << "------------- Mt -------------" << endl << Mt << endl;
 		Eigen::MatrixXd Nt = this->_element->MassMatrix(this->_cellBasis, this->_reconstructionBasis);
