@@ -100,9 +100,11 @@ public:
 		bool autoPenalization = true;
 
 		this->_fileName = "Poisson" + to_string(Dim) + "D" + this->_solutionName + "_n" + to_string(mesh->N) + "_HHO_" + reconstructionBasis->Name() + "_pen" + (autoPenalization ? "-1" : to_string(penalizationCoefficient)) + (_staticCondensation ? "_staticcond" : "");
-		string matrixFilePath = this->_outputDirectory + "/" + this->_fileName + "_A.dat";
-		string reconstructionMatrixFilePath = this->_outputDirectory + "/" + this->_fileName + "_Reconstruct.dat";
-		string rhsFilePath = this->_outputDirectory + "/" + this->_fileName + "_b.dat";
+		string matrixFilePath				= this->_outputDirectory + "/" + this->_fileName + "_A.dat";
+		string consistencyFilePath			= this->_outputDirectory + "/" + this->_fileName + "_A_cons.dat";
+		string stabilizationFilePath		= this->_outputDirectory + "/" + this->_fileName + "_A_stab.dat";
+		string reconstructionMatrixFilePath	= this->_outputDirectory + "/" + this->_fileName + "_Reconstruct.dat";
+		string rhsFilePath					= this->_outputDirectory + "/" + this->_fileName + "_b.dat";
 
 		this->_globalRHS = Eigen::VectorXd(hho.nTotalHybridUnknowns);
 
@@ -272,6 +274,15 @@ public:
 
 			Eigen::saveMarketVector(this->b, rhsFilePath);
 			cout << "RHS exported to \t" << rhsFilePath << endl;
+		}
+
+		if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
+		{
+			Eigen::saveMarket(Acons, consistencyFilePath);
+			cout << "Consistency part exported to \t" << consistencyFilePath << endl;
+
+			Eigen::saveMarket(Astab, stabilizationFilePath);
+			cout << "Stabilization part exported to \t" << stabilizationFilePath << endl;
 
 			Eigen::saveMarket(reconstructionMatrix, reconstructionMatrixFilePath);
 			cout << "Reconstruction matrix exported to \t" << reconstructionMatrixFilePath << endl;
