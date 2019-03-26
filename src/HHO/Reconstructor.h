@@ -33,7 +33,7 @@ public:
 		this->AssembleReconstructionAndConsistencyMatrices();
 		this->AssembleStabilizationMatrix();
 
-		for (int i = 0; i < reconstructionBasis->Size(); i++)
+		/*for (int i = 0; i < reconstructionBasis->Size(); i++)
 		{
 			Eigen::VectorXd vector(reconstructionBasis->Size());
 			vector.setZero(reconstructionBasis->Size());
@@ -41,7 +41,7 @@ public:
 			//cout << "------------- vector -------------" << endl << vector << endl;
 			Eigen::VectorXd result = Reconstruct(Interpolate(vector));
 			//cout << "------------- result -------------" << endl << result << endl;
-		}
+		}*/
 	}
 
 	Eigen::VectorXd Reconstruct(Eigen::VectorXd hybridVector)

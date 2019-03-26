@@ -89,7 +89,7 @@ public:
 		vector<NonZeroCoefficients> chunksCouplingCoeffs(parallelLoop.NThreads);
 		vector<NonZeroCoefficients> chunksPenCoeffs(parallelLoop.NThreads);
 		
-		for (int threadNumber = 0; threadNumber < parallelLoop.NThreads; threadNumber++)
+		for (unsigned int threadNumber = 0; threadNumber < parallelLoop.NThreads; threadNumber++)
 		{
 			ParallelChunk* chunk = parallelLoop.Chunks[threadNumber];
 
@@ -173,7 +173,7 @@ public:
 
 		parallelLoop.Wait();
 
-		for (int threadNumber = 0; threadNumber < parallelLoop.NThreads; threadNumber++)
+		for (unsigned int threadNumber = 0; threadNumber < parallelLoop.NThreads; threadNumber++)
 		{
 			matrixCoeffs.Add(chunksMatrixCoeffs[threadNumber]);
 			massMatrixCoeffs.Add(chunksMassMatrixCoeffs[threadNumber]);
@@ -199,7 +199,7 @@ public:
 		chunksPenCoeffs = vector<NonZeroCoefficients>(parallelLoopFaces.NThreads);
 
 
-		for (int threadNumber = 0; threadNumber < parallelLoopFaces.NThreads; threadNumber++)
+		for (unsigned int threadNumber = 0; threadNumber < parallelLoopFaces.NThreads; threadNumber++)
 		{
 			ParallelChunk* chunk = parallelLoopFaces.Chunks[threadNumber];
 
@@ -254,7 +254,7 @@ public:
 
 		parallelLoopFaces.Wait();
 
-		for (int threadNumber = 0; threadNumber < parallelLoopFaces.NThreads; threadNumber++)
+		for (unsigned int threadNumber = 0; threadNumber < parallelLoopFaces.NThreads; threadNumber++)
 		{
 			matrixCoeffs.Add(chunksMatrixCoeffs[threadNumber]);
 			couplingCoeffs.Add(chunksCouplingCoeffs[threadNumber]);

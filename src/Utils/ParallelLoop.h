@@ -5,7 +5,6 @@
 #include <math.h>
 #include "Utils.h"
 
-//template <class T>
 class ParallelChunk
 {
 public:
@@ -18,7 +17,7 @@ public:
 	{
 		this->ThreadNumber = threadNumber;
 		this->Start = threadNumber * chunkMaxSize;
-		this->End = min(this->Start + chunkMaxSize, static_cast<unsigned int>(loopSize));
+		this->End = min(this->Start + chunkMaxSize, static_cast<long unsigned int>(loopSize));
 	}
 };
 
@@ -41,13 +40,13 @@ public:
 		Chunks.reserve(NThreads);
 		ChunkMaxSize = (BigNumber)ceil(loopSize / (double)NThreads);
 
-		for (int threadNumber = 0; threadNumber < NThreads; threadNumber++)
+		for (unsigned int threadNumber = 0; threadNumber < NThreads; threadNumber++)
 			Chunks[threadNumber] = new ParallelChunk(threadNumber, ChunkMaxSize, loopSize);
 	}
 
 	void Wait()
 	{
-		for (int threadNumber = 0; threadNumber < NThreads; threadNumber++)
+		for (unsigned int threadNumber = 0; threadNumber < NThreads; threadNumber++)
 			this->Chunks[threadNumber]->ThreadFuture.wait();
 	}
 

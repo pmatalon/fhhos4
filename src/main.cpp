@@ -119,7 +119,7 @@ int main(int argc, char* argv[])
 		argument_error("-s hetero is only supported in 1D.");
 
 	Action action = Action::None;
-	for (int i = 0; i < a.length(); i++)
+	for (size_t i = 0; i < a.length(); i++)
 	{
 		if (a[i] == 'e')
 			action |= Action::ExtractSystem;

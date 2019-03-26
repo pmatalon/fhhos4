@@ -5,7 +5,7 @@
 #include "../Mesh/Point.h"
 #include "../FunctionalBasis/BasisFunction.h"
 
-typedef unsigned int BigNumber;
+typedef long unsigned int BigNumber;
 
 class Utils
 {
