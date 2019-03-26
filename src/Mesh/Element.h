@@ -97,7 +97,7 @@ protected:
 	{
 		this->Faces.push_back(face);
 
-		int faceLocalNumber = this->_facesLocalNumbering.size();
+		int faceLocalNumber = static_cast<int>(this->_facesLocalNumbering.size());
 		this->_facesLocalNumbering.insert(std::pair<Face<Dim>*, int>(face, faceLocalNumber));
 	}
 public:

@@ -7,7 +7,7 @@ class CartesianElement : virtual public Element<Dim>, public CartesianShape<Dim>
 {
 public:
 
-	CartesianElement(int number, Point origin, double width) : Element<Dim>(number), CartesianShape<Dim>(origin, width)
+	CartesianElement(BigNumber number, Point origin, double width) : Element<Dim>(number), CartesianShape<Dim>(origin, width)
 	{
 	}
 
