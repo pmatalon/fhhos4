@@ -2,7 +2,7 @@
 #include "../Mesh/Element.h"
 #include "../FunctionalBasis/BasisFunction.h"
 
-template <short Dim>
+template <int Dim>
 class Poisson_DG_Face : virtual public Face<Dim>
 {
 public:

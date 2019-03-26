@@ -2,10 +2,10 @@
 #include "../Utils/SourceFunction.h"
 #include "../Utils/DiffusionPartition.h"
 
-template <short Dim>
+template <int Dim>
 class Poisson_DG_ReferenceElement;
 
-template <short Dim>
+template <int Dim>
 class Poisson_DG_Element : virtual public Element<Dim>
 {
 public:

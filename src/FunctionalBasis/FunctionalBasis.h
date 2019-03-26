@@ -5,10 +5,10 @@
 #include "Bernstein2D.h"
 #include "Bernstein3D.h"
 #include <Eigen/Sparse>
-template <short Dim>
+template <int Dim>
 class Element;
 
-template <short Dim>
+template <int Dim>
 class FunctionalBasis
 {
 protected:

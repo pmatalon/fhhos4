@@ -3,7 +3,7 @@
 #include "../Mesh/Point.h"
 using namespace std;
 
-template <short Dim>
+template <int Dim>
 class BasisFunction
 {
 public:

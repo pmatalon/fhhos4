@@ -3,7 +3,7 @@
 #include "../FunctionalBasis/FunctionalBasis.h"
 #include "../Mesh/Face.h"
 
-template <short Dim>
+template <int Dim>
 class Poisson_HHO_Element : virtual public Element<Dim>
 {
 public:

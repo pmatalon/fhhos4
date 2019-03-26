@@ -2,7 +2,7 @@
 #include <Eigen/Sparse>
 #include "../FunctionalBasis/FunctionalBasis.h"
 
-template <short Dim>
+template <int Dim>
 class Poisson_HHO_Face
 {
 public:

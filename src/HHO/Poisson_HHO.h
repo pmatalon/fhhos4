@@ -12,7 +12,7 @@
 using namespace std;
 
 
-template <short Dim>
+template <int Dim>
 struct HHO
 {
 	BigNumber nElements;
@@ -47,7 +47,7 @@ struct HHO
 	}
 };
 
-template <short Dim>
+template <int Dim>
 class Poisson_HHO : public Problem
 {
 private:

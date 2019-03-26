@@ -1,7 +1,7 @@
 #include "Element.h"
 #pragma once
 
-template <short Dim>
+template <int Dim>
 class Face
 {
 public:

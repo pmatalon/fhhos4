@@ -8,7 +8,7 @@ using namespace std;
 class L2
 {
 public:
-	template <short Dim>
+	template <int Dim>
 	static double Error(Mesh<Dim>* mesh, FunctionalBasis<Dim>* basis, Eigen::VectorXd solution, function<double(Point)> exactSolution)
 	{
 		double absoluteError = 0;

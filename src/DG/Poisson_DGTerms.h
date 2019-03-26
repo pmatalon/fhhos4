@@ -10,7 +10,7 @@
 #include "Poisson_DG_Element.h"
 #include "Poisson_DG_Face.h"
 
-template <short Dim>
+template <int Dim>
 class Poisson_DGTerms
 {
 private:

@@ -2,7 +2,7 @@
 #include <Eigen/Dense>
 #include "../FunctionalBasis/BasisFunction.h"
 
-template <short Dim>
+template <int Dim>
 class Poisson_DG_ReferenceElement
 {
 protected:

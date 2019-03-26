@@ -5,7 +5,7 @@
 #include "../Utils/DiffusionPartition.h"
 #include "../FunctionalBasis/FunctionalBasis.h"
 
-template <short Dim>
+template <int Dim>
 class Face;
 
 enum class StandardElementCode
@@ -16,7 +16,7 @@ enum class StandardElementCode
 	Cube
 };
 
-template <short Dim>
+template <int Dim>
 class Element 
 {
 private:

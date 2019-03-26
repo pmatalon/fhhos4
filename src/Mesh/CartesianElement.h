@@ -2,7 +2,7 @@
 #include "Element.h"
 #include "CartesianShape.h"
 
-template <short Dim>
+template <int Dim>
 class CartesianElement : virtual public Element<Dim>, public CartesianShape<Dim>
 {
 public:

@@ -5,7 +5,7 @@
 
 using namespace std;
 
-template <short Dim>
+template <int Dim>
 class Mesh
 {
 public:

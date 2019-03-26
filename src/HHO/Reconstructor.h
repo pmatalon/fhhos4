@@ -2,7 +2,7 @@
 #include <Eigen/Sparse>
 #include "Poisson_HHO_Element.h"
 
-template <short Dim>
+template <int Dim>
 class Reconstructor
 {
 private:

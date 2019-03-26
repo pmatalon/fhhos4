@@ -2,7 +2,7 @@
 #include <Eigen/Dense>
 #include "../FunctionalBasis/FunctionalBasis.h"
 
-template <short Dim>
+template <int Dim>
 class ReferenceCartesianShape
 {
 private:

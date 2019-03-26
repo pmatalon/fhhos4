@@ -149,7 +149,7 @@ public:
 		return Utils::Integral(phi, -1, 1, -1, 1, -1, 1);
 	}
 
-	template <short Dim>
+	template <int Dim>
 	static double Integral(int nPoints, std::function<double(Point)> func)
 	{
 		if (Dim == 1)
@@ -183,13 +183,13 @@ public:
 		}
 	}
 
-	template <short Dim>
+	template <int Dim>
 	static double Integral(std::function<double(Point)> func)
 	{
 		return Integral<Dim>(GaussLegendre::MAX_POINTS, func);
 	}
 
-	template <short Dim>
+	template <int Dim>
 	static double Integral(BasisFunction<Dim>* phi)
 	{
 		return Integral<Dim>(phi);

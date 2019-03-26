@@ -1,6 +1,6 @@
 #pragma once
 
-template <short Dim>
+template <int Dim>
 class CartesianShape
 {
 public:

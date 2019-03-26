@@ -11,7 +11,7 @@
 #include "../Utils/ParallelLoop.h"
 using namespace std;
 
-template <short Dim>
+template <int Dim>
 class Poisson_DG : public Problem
 {
 private:
