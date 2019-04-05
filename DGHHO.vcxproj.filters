@@ -149,6 +149,27 @@
     <ClInclude Include="src\Mesh\ReferenceCartesianShape.h">
       <Filter>Mesh</Filter>
     </ClInclude>
+    <ClInclude Include="src\Solver\Multigrid.h">
+      <Filter>Solver</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\Level.h">
+      <Filter>Solver</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\Smoother.h">
+      <Filter>Solver</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\IterativeSolver.h">
+      <Filter>Solver</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\BlockSOR.h">
+      <Filter>Solver</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\MultigridForHHO.h">
+      <Filter>Solver</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\GeometricMultigrid.h">
+      <Filter>Solver</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
@@ -165,6 +186,9 @@
     </Filter>
     <Filter Include="HHO">
       <UniqueIdentifier>{5baa2ae8-8ff4-4937-bd5a-17cf25a395a1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Solver">
+      <UniqueIdentifier>{8e3314b3-0755-4923-b019-a6fc48fdcffd}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
