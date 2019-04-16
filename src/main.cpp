@@ -263,7 +263,7 @@ int main(int argc, char* argv[])
 
 			Poisson_HHO<2>* problem = new Poisson_HHO<2>(mesh, solution, sourceFunction, reconstructionBasis, cellBasis, faceBasis, staticCondensation, outputDirectory);
 
-			problem->Assemble(penalizationCoefficient, action);
+			problem->Assemble(action);
 
 			if ((action & Action::SolveSystem) == Action::SolveSystem)
 			{
@@ -342,7 +342,7 @@ int main(int argc, char* argv[])
 
 			Poisson_HHO<3>* problem = new Poisson_HHO<3>(mesh, solution, sourceFunction, reconstructionBasis, cellBasis, faceBasis, staticCondensation, outputDirectory);
 
-			problem->Assemble(penalizationCoefficient, action);
+			problem->Assemble(action);
 
 			if ((action & Action::SolveSystem) == Action::SolveSystem)
 			{

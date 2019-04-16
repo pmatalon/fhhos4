@@ -81,6 +81,8 @@ public:
 		return M;
 	}
 
+	virtual vector<Point> GetNodalPoints(FunctionalBasis<Dim-1>* basis) = 0;
+
 	virtual string ToString()
 	{
 		return "Interface " + to_string(this->Number);

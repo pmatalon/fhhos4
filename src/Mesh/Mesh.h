@@ -15,6 +15,8 @@ public:
 	vector<Face<Dim>*> BoundaryFaces;
 	vector<Face<Dim>*> InteriorFaces;
 
+	Mesh<Dim>* CoarserMesh = NULL;
+
 	Mesh(BigNumber n)
 	{
 		this->N = n;

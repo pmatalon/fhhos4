@@ -94,4 +94,43 @@ public:
 
 	}
 
+	void BuildCoarserMesh()
+	{
+		BigNumber n = this->N;
+		if (n % 2 != 0)
+		{
+			cout << "Error: impossible to build coarser mesh." << endl;
+		}
+		else
+		{
+			CartesianGrid2D* coarserMesh = new CartesianGrid2D(n / 2);
+
+			for (BigNumber i = 0; i < n; ++i)
+			{
+				for (BigNumber j = 0; j < n; ++j)
+				{
+					Square* fineElement = dynamic_cast<Square*>(this->Elements[i*n + j]);
+					auto coarseElement = coarserMesh->Elements[(i / 2) * coarserMesh->N + j / 2];
+					//cout << "fineElement=" << fineElement->Number << " --> coarse=" << coarseElement->Number << endl;
+					coarseElement->FinerElements.push_back(fineElement);
+					fineElement->CoarserElement = coarseElement;
+					if (i % 2 == 0 && !fineElement->NorthFace->IsDomainBoundary)
+							coarseElement->FinerFacesRemoved.push_back(fineElement->NorthFace);
+					if (j % 2 == 0 && !fineElement->EastFace->IsDomainBoundary)
+						coarseElement->FinerFacesRemoved.push_back(fineElement->EastFace);
+				}
+			}
+
+			/*for (auto e : coarserMesh->Elements)
+			{
+				cout << "coarseElement " << e->Number << " removed faces: " ;
+				for (auto f : e->FinerFacesRemoved)
+					cout << f->Number << " ";
+				cout << endl;
+			}*/
+
+			this->CoarserMesh = coarserMesh;
+		}
+	}
+
 };

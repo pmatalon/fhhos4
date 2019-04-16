@@ -1,16 +1,20 @@
 #pragma once
 #include <Eigen/Sparse>
 #include "Poisson_HHO_Element.h"
+#include "Poisson_HHO_Face.h"
 
 template <int Dim>
 class Reconstructor
 {
 private:
 	Poisson_HHO_Element<Dim>* _element;
-	FunctionalBasis<Dim>* _reconstructionBasis;
-	FunctionalBasis<Dim>* _cellBasis;
-	FunctionalBasis<Dim - 1>* _faceBasis;
+
+	Eigen::MatrixXd _projFromReconstruct;
 public:
+	FunctionalBasis<Dim>* ReconstructionBasis;
+	FunctionalBasis<Dim>* CellBasis;
+	FunctionalBasis<Dim - 1>* FaceBasis;
+
 	// Reconstruction operator as a matrix
 	Eigen::MatrixXd P;
 
@@ -26,9 +30,19 @@ public:
 		Astab(cellBasis->Size() + element->Faces.size() * faceBasis->Size(), cellBasis->Size() + element->Faces.size() * faceBasis->Size())
 	{
 		this->_element = element;
-		this->_reconstructionBasis = reconstructionBasis;
-		this->_cellBasis = cellBasis;
-		this->_faceBasis = faceBasis;
+		this->ReconstructionBasis = reconstructionBasis;
+		this->CellBasis = cellBasis;
+		this->FaceBasis = faceBasis;
+
+		Eigen::MatrixXd Mt = this->_element->MassMatrix(cellBasis);
+		Eigen::MatrixXd Nt = this->_element->MassMatrix(cellBasis, reconstructionBasis);
+		this->_projFromReconstruct = Mt.inverse() * Nt;
+
+		for (auto f : this->_element->Faces)
+		{
+			Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+			face->InitHHO(reconstructionBasis, cellBasis, faceBasis);
+		}
 
 		this->AssembleReconstructionAndConsistencyMatrices();
 		this->AssembleStabilizationMatrix();
@@ -44,6 +58,11 @@ public:
 		}*/
 	}
 
+	Eigen::MatrixXd ReconstructionMatrix()
+	{
+		return this->P;
+	}
+
 	Eigen::VectorXd Reconstruct(Eigen::VectorXd hybridVector)
 	{
 		return this->P * hybridVector;
@@ -51,28 +70,20 @@ public:
 
 	Eigen::VectorXd Interpolate(Eigen::VectorXd vector)
 	{
-		Eigen::VectorXd hybridVector(this->_cellBasis->Size() + this->_element->Faces.size() * this->_faceBasis->Size());
-		
-		Eigen::MatrixXd Mt = this->_element->MassMatrix(this->_cellBasis);
-		//cout << "------------- Mt -------------" << endl << Mt << endl;
-		Eigen::MatrixXd Nt = this->_element->MassMatrix(this->_cellBasis, this->_reconstructionBasis);
-		//cout << "------------- Nt -------------" << endl << Nt << endl;
-		Eigen::MatrixXd ProjT = Mt.inverse() * Nt;
+		Eigen::VectorXd hybridVector(this->CellBasis->Size() + this->_element->Faces.size() * this->FaceBasis->Size());
+		Eigen::MatrixXd ProjT = _projFromReconstruct;
 
-		hybridVector.head(this->_cellBasis->Size()) = ProjT * vector;
+		hybridVector.head(this->CellBasis->Size()) = ProjT * vector;
 
-		int index = this->_cellBasis->Size();
-		for (auto face : this->_element->Faces)
+		int index = this->CellBasis->Size();
+		for (auto f : this->_element->Faces)
 		{
-			Eigen::MatrixXd Mf = face->MassMatrix(this->_faceBasis);
-			//cout << "------------- Mf -------------" << endl << Mf << endl;
-			Eigen::MatrixXd Nf = face->MassMatrix(this->_faceBasis, this->_element, this->_reconstructionBasis);
-			//cout << "------------- Nf -------------" << endl << Nf << endl;
-			Eigen::MatrixXd ProjF = Mf.inverse() * Nf;
+			Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+			Eigen::MatrixXd ProjF = face->GetProjFromReconstruct(this->_element);
 
-			hybridVector.segment(index, this->_faceBasis->Size()) = ProjF * vector;
+			hybridVector.segment(index, this->FaceBasis->Size()) = ProjF * vector;
 			//cout << "------------- hybridVector -------------" << endl << hybridVector << endl;
-			index += this->_faceBasis->Size();
+			index += this->FaceBasis->Size();
 		}
 		return hybridVector;
 	}
@@ -132,7 +143,7 @@ private:
 
 			// We don't keep the last element of the column, which is the Lagrange multiplier
 			//cout << "----------------- col " << j << " without Lagrange ----------------" << endl;
-			auto colWithoutLagrangeMultiplier = col.head(this->_reconstructionBasis->Size());
+			auto colWithoutLagrangeMultiplier = col.head(this->ReconstructionBasis->Size());
 			//cout << colWithoutLagrangeMultiplier << endl << endl;
 			//cout << "----------------- P(" << j << ") ----------------" << endl;
 			//cout << this->P.col(j) << endl << endl;
@@ -143,12 +154,12 @@ private:
 		}
 		//cout << this->P << endl << endl;
 
-		this->Acons = this->P.transpose() * matrixToInvert.topLeftCorner(this->_reconstructionBasis->Size(), this->_reconstructionBasis->Size()) * this->P;
+		this->Acons = this->P.transpose() * matrixToInvert.topLeftCorner(this->ReconstructionBasis->Size(), this->ReconstructionBasis->Size()) * this->P;
 	}
 
 	Eigen::MatrixXd AssembleMatrixToInvert()
 	{
-		Eigen::MatrixXd matrixToInvert(this->_reconstructionBasis->Size() + 1, this->_reconstructionBasis->Size() + 1);
+		Eigen::MatrixXd matrixToInvert(this->ReconstructionBasis->Size() + 1, this->ReconstructionBasis->Size() + 1);
 		//cout << matrixToInvert << endl << "----------------- matrixToInvert ----------------" << endl;
 		this->AssembleSt(matrixToInvert);
 		//cout << matrixToInvert << endl << "---------------- after AssembleSt -----------------" << endl;
@@ -161,17 +172,17 @@ private:
 
 	void AssembleSt(Eigen::MatrixXd &matrixToInvert)
 	{
-		for (BasisFunction<Dim>* phi1 : this->_reconstructionBasis->LocalFunctions)
+		for (BasisFunction<Dim>* phi1 : this->ReconstructionBasis->LocalFunctions)
 		{
-			for (BasisFunction<Dim>* phi2 : this->_reconstructionBasis->LocalFunctions)
+			for (BasisFunction<Dim>* phi2 : this->ReconstructionBasis->LocalFunctions)
 				matrixToInvert(phi1->LocalNumber, phi2->LocalNumber) = this->_element->St(phi1, phi2);
 		}
 	}
 
 	void AssembleLt(Eigen::MatrixXd &matrixToInvert)
 	{
-		int last = this->_reconstructionBasis->NumberOfLocalFunctionsInElement(NULL);
-		for (BasisFunction<Dim>* phi : this->_reconstructionBasis->LocalFunctions)
+		int last = this->ReconstructionBasis->NumberOfLocalFunctionsInElement(NULL);
+		for (BasisFunction<Dim>* phi : this->ReconstructionBasis->LocalFunctions)
 		{
 			double Lt = this->_element->Lt(phi);
 			matrixToInvert(last, phi->LocalNumber) = Lt;
@@ -181,16 +192,16 @@ private:
 
 	void AssembleMt(Eigen::MatrixXd &rhsMatrix)
 	{
-		int last = this->_reconstructionBasis->NumberOfLocalFunctionsInElement(NULL);
-		for (BasisFunction<Dim>* phi : this->_cellBasis->LocalFunctions)
+		int last = this->ReconstructionBasis->NumberOfLocalFunctionsInElement(NULL);
+		for (BasisFunction<Dim>* phi : this->CellBasis->LocalFunctions)
 			rhsMatrix(last, phi->LocalNumber) = this->_element->Lt(phi);
 	}
 
 	Eigen::MatrixXd AssembleRHSMatrix()
 	{
-		auto nFaceUnknowns = this->_element->Faces.size() * this->_faceBasis->Size();
-		auto nColumns = this->_cellBasis->Size() + nFaceUnknowns;
-		Eigen::MatrixXd rhsMatrix(this->_reconstructionBasis->Size() + 1, nColumns);
+		auto nFaceUnknowns = this->_element->Faces.size() * this->FaceBasis->Size();
+		auto nColumns = this->CellBasis->Size() + nFaceUnknowns;
+		Eigen::MatrixXd rhsMatrix(this->ReconstructionBasis->Size() + 1, nColumns);
 		//cout << rhsMatrix << endl << "----------------- rhsMatrix ----------------" << endl;
 		
 		// Top-left corner
@@ -215,18 +226,18 @@ private:
 
 	void AssembleBt(Eigen::MatrixXd &rhsMatrix)
 	{
-		for (BasisFunction<Dim>* reconstructPhi : this->_reconstructionBasis->LocalFunctions)
+		for (BasisFunction<Dim>* reconstructPhi : this->ReconstructionBasis->LocalFunctions)
 		{
-			for (BasisFunction<Dim>* cellPhi : this->_cellBasis->LocalFunctions)
+			for (BasisFunction<Dim>* cellPhi : this->CellBasis->LocalFunctions)
 				rhsMatrix(reconstructPhi->LocalNumber, DOFNumber(cellPhi)) = this->_element->Bt(reconstructPhi, cellPhi);
 		}
 	}
 
 	void AssembleBf(Eigen::MatrixXd &rhsMatrix, Face<Dim>* face)
 	{
-		for (BasisFunction<Dim>* reconstructPhi : this->_reconstructionBasis->LocalFunctions)
+		for (BasisFunction<Dim>* reconstructPhi : this->ReconstructionBasis->LocalFunctions)
 		{
-			for (BasisFunction<Dim-1>* facePhi : this->_faceBasis->LocalFunctions)
+			for (BasisFunction<Dim-1>* facePhi : this->FaceBasis->LocalFunctions)
 				rhsMatrix(reconstructPhi->LocalNumber, DOFNumber(face, facePhi)) = this->_element->Bf(reconstructPhi, facePhi, face);
 		}
 	}
@@ -239,11 +250,7 @@ private:
 	{
 		this->Astab = Eigen::MatrixXd::Zero(this->Astab.rows(), this->Astab.cols());
 
-		Eigen::MatrixXd Mt = this->_element->MassMatrix(this->_cellBasis);
-		//cout << "------------- Mt -------------" << endl << Mt << endl;
-		Eigen::MatrixXd Nt = this->_element->MassMatrix(this->_cellBasis, this->_reconstructionBasis);
-		//cout << "------------- Nt -------------" << endl << Nt << endl;
-		Eigen::MatrixXd ProjT = Mt.inverse() * Nt;
+		Eigen::MatrixXd ProjT = _projFromReconstruct;
 		//cout << "------------- ProjT -------------" << endl << ProjT << endl;
 		Eigen::MatrixXd Dt = ProjT * this->P;
 		//cout << "------------- Dt -------------" << endl << Dt << endl;
@@ -251,16 +258,13 @@ private:
 			Dt(i, i) -= 1;
 		//cout << "------------- Dt -------------" << endl << Dt << endl;
 
-		for (auto face : this->_element->Faces)
+		for (auto f : this->_element->Faces)
 		{
-			Eigen::MatrixXd Mf = face->MassMatrix(this->_faceBasis);
-			//cout << "------------- Mf -------------" << endl << Mf << endl;
-			Eigen::MatrixXd Nf = face->MassMatrix(this->_faceBasis, this->_element, this->_reconstructionBasis);
-			//cout << "------------- Nf -------------" << endl << Nf << endl;
-			Eigen::MatrixXd Nft = face->MassMatrix(this->_faceBasis, this->_element, this->_cellBasis);
-			//cout << "------------- Nft -------------" << endl << Nft << endl;
-			Eigen::MatrixXd ProjF = Mf.inverse() * Nf;
-			Eigen::MatrixXd ProjFT = Mf.inverse() * Nft;
+			Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+			Eigen::MatrixXd Mf = face->GetMassMatrix();
+			Eigen::MatrixXd ProjF = face->GetProjFromReconstruct(this->_element);
+			Eigen::MatrixXd ProjFT = face->GetProjFromCell(this->_element);
+
 			Eigen::MatrixXd Df = ProjF * this->P;
 			for (int i = 0; i < Df.rows(); i++)
 				Df(i, FirstDOFNumber(face) + i) -= 1;
@@ -282,6 +286,6 @@ private:
 public:
 	int FirstDOFNumber(Face<Dim>* face)
 	{
-		return this->_cellBasis->Size() + this->_element->LocalNumberOf(face) * this->_faceBasis->Size();
+		return this->CellBasis->Size() + this->_element->LocalNumberOf(face) * this->FaceBasis->Size();
 	}
 };

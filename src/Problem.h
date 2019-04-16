@@ -2,7 +2,6 @@
 #include <string>
 #include <Eigen/Sparse>
 #include "Utils/agmg.h"
-#include "Solver/MultigridForHHO.h"
 using namespace std;
 
 #ifdef TPL_ENABLE_AGMG
@@ -26,7 +25,7 @@ public:
 		this->_outputDirectory = outputDirectory;
 	}
 
-	void Solve()
+	virtual void Solve()
 	{
 		cout << "Solving..." << endl;
 #ifdef TPL_ENABLE_AGMG

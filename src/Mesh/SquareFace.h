@@ -7,11 +7,19 @@ class SquareFace : virtual public Face<3>, public CartesianShape<2>, public Pois
 {
 public:
 
-	SquareFace(BigNumber number, double width, Element<3>* element1, Element<3>* element2) : Face(number, element1, element2), CartesianShape(Point(), width), Poisson_DG_Face(number, element1, element2)
+	SquareFace(BigNumber number, double width, Element<3>* element1, Element<3>* element2) : 
+		Face(number, element1, element2), 
+		CartesianShape(Point(), width), 
+		Poisson_DG_Face(number, element1, element2),
+		Poisson_HHO_Face(number, element1, element2)
 	{
 	}
 
-	SquareFace(BigNumber number, double width, Element<3>* element1) : Face(number, element1), CartesianShape(Point(), width), Poisson_DG_Face(number, element1, NULL)
+	SquareFace(BigNumber number, double width, Element<3>* element1) : 
+		Face(number, element1), 
+		CartesianShape(Point(), width), 
+		Poisson_DG_Face(number, element1, NULL),
+		Poisson_HHO_Face(number, element1, NULL)
 	{
 	}
 
@@ -41,6 +49,11 @@ public:
 
 		int nQuadPoints = facePhi->GetDegree() + reconstructPhi->GetDegree() + 2;
 		return pow(h, 2) / 4 * Utils::Integral(nQuadPoints, functionToIntegrate, -1, 1, -1, 1);
+	}
+
+	vector<Point> GetNodalPoints(FunctionalBasis<2>* basis)
+	{
+		return CartesianShape<2>::GetNodalPoints(basis);
 	}
 
 	//---------------------------------------------------------------//

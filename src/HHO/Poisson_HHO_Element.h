@@ -4,9 +4,14 @@
 #include "../Mesh/Face.h"
 
 template <int Dim>
+class Reconstructor;
+
+template <int Dim>
 class Poisson_HHO_Element : virtual public Element<Dim>
 {
 public:
+	//Reconstructor<Dim>* HHOReconstructor = NULL;
+
 	Poisson_HHO_Element(BigNumber number) : Element<Dim>(number) {}
 
 	virtual double St(BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2) = 0;
@@ -15,7 +20,9 @@ public:
 	virtual double Bf(BasisFunction<Dim>* reconstructPhi, BasisFunction<Dim-1>* facePhi, Face<Dim>* face) = 0;
 	
 	virtual void InitReconstructor(FunctionalBasis<Dim>* reconstructionBasis, FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim - 1>* faceBasis) = 0;
+	virtual Reconstructor<Dim>* HHO() = 0;
 	virtual Eigen::VectorXd Reconstruct(Eigen::VectorXd hybridVector) = 0;
+	//virtual Eigen::MatrixXd ReconstructionMatrix() = 0;
 
 	virtual int FirstDOFLocalNumber(Face<Dim>* face) = 0;
 

@@ -197,6 +197,11 @@ public:
 		this->HHOReconstructor = new Reconstructor<3>(this, reconstructionBasis, elementBasis, faceBasis);
 	}
 
+	Reconstructor<3>* HHO()
+	{
+		return this->HHOReconstructor;
+	}
+
 	Eigen::VectorXd Reconstruct(Eigen::VectorXd hybridVector)
 	{
 		return this->HHOReconstructor->Reconstruct(hybridVector);

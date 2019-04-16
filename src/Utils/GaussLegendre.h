@@ -529,6 +529,11 @@ public:
 		}
 	}
 
+	double Point(int i)
+	{
+		return points[i];
+	}
+
 	/*----------*/
 	/*    1D    */
 	/*----------*/

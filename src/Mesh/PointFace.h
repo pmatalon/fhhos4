@@ -36,6 +36,11 @@ public:
 		return 0;
 	}
 
+	vector<Point> GetNodalPoints(FunctionalBasis<0>* basis)
+	{
+		return vector<Point> {Point(0)};
+	}
+
 	//---------------------------------------------------------------//
 	//                 Poisson_DG_Face implementation                //
 	//---------------------------------------------------------------//

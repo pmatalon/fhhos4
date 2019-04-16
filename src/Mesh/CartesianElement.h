@@ -42,6 +42,11 @@ public:
 		return CartesianShape<Dim>::ConvertToDomain(referenceElementPoint);
 	}
 
+	vector<Point> GetNodalPoints(FunctionalBasis<Dim>* basis)
+	{
+		return CartesianShape<Dim>::GetNodalPoints(basis);
+	}
+
 	double SourceTerm(BasisFunction<Dim>* phi, SourceFunction* f)
 	{
 		function<double(Point)> sourceTimesBasisFunction = [this, f, phi](Point refElementPoint) {

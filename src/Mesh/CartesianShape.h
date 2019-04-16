@@ -72,4 +72,47 @@ public:
 		return p;
 	}
 
+	vector<Point> GetNodalPoints(FunctionalBasis<Dim>* basis)
+	{
+		vector<Point> points(basis->Size());
+		if (Dim == 1)
+		{
+			GaussLegendre gauss(basis->Size());
+			for (int i = 0; i < basis->Size(); ++i)
+				points.push_back(gauss.Point(i));
+		}
+		else if (Dim == 2)
+		{
+			if (basis->FullTensorization)
+			{
+				GaussLegendre gauss(basis->GetDegree() + 1);
+				for (int i = 0; i < basis->GetDegree() + 1; ++i)
+					for (int j = 0; j < basis->GetDegree() + 1; ++j)
+						points.push_back(Point(gauss.Point(i), gauss.Point(j)));
+			}
+			else
+			{
+				cout << "Error: Must use the Q space to generate nodal points!" << endl;
+				exit(EXIT_FAILURE);
+			}
+		}
+		else if (Dim == 3)
+		{
+			if (basis->FullTensorization)
+			{
+				GaussLegendre gauss(basis->GetDegree() + 1);
+				for (int i = 0; i < basis->GetDegree() + 1; ++i)
+					for (int j = 0; j < basis->GetDegree() + 1; ++j)
+						for (int k = 0; k < basis->GetDegree() + 1; ++k)
+							points.push_back(Point(gauss.Point(i), gauss.Point(j), gauss.Point(k)));
+			}
+			else
+			{
+				cout << "Error: Must use the Q space to generate nodal points!" << endl;
+				exit(EXIT_FAILURE);
+			}
+		}
+		return points;
+	}
+
 };

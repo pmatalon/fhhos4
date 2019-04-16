@@ -1,5 +1,5 @@
 #pragma once
-#include "CartesianShape.h"
+#include "CartesianElement.h"
 #include "IntervalFace.h"
 #include "../DG/Poisson_DG_Element.h"
 #include "../DG/Poisson_DG_ReferenceElement.h"
@@ -159,6 +159,11 @@ public:
 	void InitReconstructor(FunctionalBasis<2>* reconstructionBasis, FunctionalBasis<2>* elementBasis, FunctionalBasis<1>* faceBasis)
 	{
 		this->HHOReconstructor = new Reconstructor<2>(this, reconstructionBasis, elementBasis, faceBasis);
+	}
+
+	Reconstructor<2>* HHO()
+	{
+		return this->HHOReconstructor;
 	}
 
 	Eigen::VectorXd Reconstruct(Eigen::VectorXd hybridVector)

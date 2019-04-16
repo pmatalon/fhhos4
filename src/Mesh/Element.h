@@ -25,6 +25,10 @@ public:
 	BigNumber Number;
 	std::vector<Face<Dim>*> Faces;
 
+	std::vector<Element<Dim>*> FinerElements;
+	Element<Dim>* CoarserElement;
+	std::vector<Face<Dim>*> FinerFacesRemoved;
+
 
 	Element(BigNumber number)
 	{
@@ -89,6 +93,7 @@ public:
 	virtual function<vector<double>(Point)> GradPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* phi) = 0;
 	virtual double L2ErrorPow2(function<double(Point)> approximate, function<double(Point)> exactSolution) = 0;
 	virtual double DiffusionCoefficient(DiffusionPartition diffusionPartition) = 0;
+	virtual vector<Point> GetNodalPoints(FunctionalBasis<Dim>* basis) = 0;
 
 	virtual ~Element() {}
 

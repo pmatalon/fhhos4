@@ -8,11 +8,19 @@ class IntervalFace : virtual public Face<2>, public CartesianShape<1>, public Po
 {
 public:
 
-	IntervalFace(BigNumber number, double length, Element<2>* element1, Element<2>* element2) : Face(number, element1, element2), CartesianShape(Point(), length), Poisson_DG_Face(number, element1, element2)
+	IntervalFace(BigNumber number, double length, Element<2>* element1, Element<2>* element2) : 
+		Face(number, element1, element2), 
+		CartesianShape(Point(), length), 
+		Poisson_DG_Face(number, element1, element2),
+		Poisson_HHO_Face(number, element1, element2)
 	{
 	}
 
-	IntervalFace(BigNumber number, double length, Element<2>* element1) : Face(number, element1), CartesianShape(Point(), length), Poisson_DG_Face(number, element1, NULL)
+	IntervalFace(BigNumber number, double length, Element<2>* element1) : 
+		Face(number, element1), 
+		CartesianShape(Point(), length), 
+		Poisson_DG_Face(number, element1, NULL),
+		Poisson_HHO_Face(number, element1, NULL)
 	{
 	}
 
@@ -41,6 +49,11 @@ public:
 
 		int nQuadPoints = facePhi->GetDegree() + reconstructPhi->GetDegree() + 2;
 		return h / 2 * Utils::Integral(nQuadPoints, functionToIntegrate, -1, 1);
+	}
+
+	vector<Point> GetNodalPoints(FunctionalBasis<1>* basis)
+	{
+		return CartesianShape<1>::GetNodalPoints(basis);
 	}
 
 	//---------------------------------------------------------------//

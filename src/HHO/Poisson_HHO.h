@@ -9,6 +9,8 @@
 #include "Reconstructor.h"
 #include "../Utils/NonZeroCoefficients.h"
 #include "../Utils/L2.h"
+#include "../Solver/MultigridForHHO.h"
+#include "../Mesh/CartesianGrid2D.h"
 using namespace std;
 
 
@@ -76,7 +78,7 @@ public:
 		this->_staticCondensation = staticCondensation;
 	}
 
-	void Assemble(int penalizationCoefficient, Action action)
+	void Assemble(Action action)
 	{
 		Mesh<Dim>* mesh = this->_mesh;
 		FunctionalBasis<Dim>* reconstructionBasis = this->_reconstructionBasis;
@@ -99,7 +101,7 @@ public:
 
 		bool autoPenalization = true;
 
-		this->_fileName = "Poisson" + to_string(Dim) + "D" + this->_solutionName + "_n" + to_string(mesh->N) + "_HHO_" + reconstructionBasis->Name() + "_pen" + (autoPenalization ? "-1" : to_string(penalizationCoefficient)) + (_staticCondensation ? "_staticcond" : "");
+		this->_fileName = "Poisson" + to_string(Dim) + "D" + this->_solutionName + "_n" + to_string(mesh->N) + "_HHO_" + reconstructionBasis->Name() + "_pen-1" + (_staticCondensation ? "_staticcond" : "");
 		string matrixFilePath				= this->_outputDirectory + "/" + this->_fileName + "_A.dat";
 		string consistencyFilePath			= this->_outputDirectory + "/" + this->_fileName + "_A_cons.dat";
 		string stabilizationFilePath		= this->_outputDirectory + "/" + this->_fileName + "_A_stab.dat";
@@ -341,6 +343,15 @@ public:
 	{
 		Problem::ExtractSolution(this->ReconstructedSolution);
 	}
+
+	/*void Solve() override
+	{
+		vector<Mesh<Dim>*> meshSequence(2);
+		dynamic_cast<CartesianGrid2D*>(this->_mesh)->BuildCoarserMesh();
+		meshSequence.push_back(this->_mesh);
+		meshSequence.push_back(this->_mesh->CoarserMesh);
+		MultigridForHHO<Dim> mg(meshSequence);
+	}*/
 
 private:
 	BigNumber DOFNumber(Element<Dim>* element, BasisFunction<Dim>* cellPhi)

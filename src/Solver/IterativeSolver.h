@@ -37,5 +37,6 @@ protected:
 	{
 		if (IterationCount > MaxIterations)
 			return true;
+		return false;
 	}
 };

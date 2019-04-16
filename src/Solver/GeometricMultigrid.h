@@ -24,10 +24,21 @@ private:
 public:
 	GeometricMultigrid(vector<Mesh<Dim>*> meshSequence) : Multigrid()
 	{
+		this->_meshSequence = meshSequence;
+	}
+
+	/*void Setup(const Eigen::SparseMatrix<double>& A) override
+	{
+		this->SetupLevelHierarchy();
+		Multigrid::Setup(A);
+	}*/
+private:
+	void SetupLevelHierarchy() override
+	{
 		Level* finerLevel = NULL;
-		for (unsigned int i = 0; i < meshSequence.size(); i++)
+		for (int i = 0; i < _meshSequence.size(); i++)
 		{
-			Level* level = CreateLevel(i, meshSequence[i]);
+			GeometricLevel<Dim>* level = this->CreateGeometricLevel(i, _meshSequence[i]);
 			if (i == 0)
 				this->_fineLevel = level;
 			else
@@ -41,5 +52,10 @@ public:
 	}
 
 protected:
-	virtual GeometricLevel<Dim> CreateGeometricLevel(int number, Mesh<Dim> mesh) = 0;
+	/*Level* CreateLevel(int number) override
+	{
+		return CreateGeometricLevel(number, _meshSequence[number]);
+	}*/
+
+	virtual GeometricLevel<Dim>* CreateGeometricLevel(int number, Mesh<Dim>* mesh) = 0;
 };

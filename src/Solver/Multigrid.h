@@ -12,14 +12,16 @@ public:
 	Multigrid() : IterativeSolver()
 	{ }
 
-//protected:
-	//virtual Level* CreateLevel(int number) = 0;
-
-private:
 	void Setup(const Eigen::SparseMatrix<double>& A) override
 	{
+		this->SetupLevelHierarchy();
 		this->_fineLevel->Setup(A);
 	}
+
+protected:
+	//virtual Level* CreateLevel(int number) = 0;
+	virtual void SetupLevelHierarchy() = 0;
+private:
 
 	Eigen::VectorXd ExecuteOneIteration(const Eigen::VectorXd& b, Eigen::VectorXd& x) override
 	{
