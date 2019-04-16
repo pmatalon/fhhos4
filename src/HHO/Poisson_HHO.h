@@ -341,14 +341,14 @@ public:
 		Problem::ExtractSolution(this->ReconstructedSolution);
 	}
 
-	void Solve() override
+	/*void Solve() override
 	{
 		vector<Mesh<Dim>*> meshSequence(2);
 		dynamic_cast<CartesianGrid2D*>(this->_mesh)->BuildCoarserMesh();
 		meshSequence.push_back(this->_mesh);
 		meshSequence.push_back(this->_mesh->CoarserMesh);
 		MultigridForHHO<Dim> mg(meshSequence);
-	}
+	}*/
 
 private:
 	BigNumber DOFNumber(Element<Dim>* element, BasisFunction<Dim>* cellPhi)
