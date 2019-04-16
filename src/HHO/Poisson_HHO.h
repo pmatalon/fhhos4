@@ -6,7 +6,6 @@
 #include "../Mesh/Mesh.h"
 #include "../Mesh/Face.h"
 #include "Poisson_HHO_Element.h"
-#include "Reconstructor.h"
 #include "../Utils/NonZeroCoefficients.h"
 #include "../Utils/L2.h"
 #include "../Solver/MultigridForHHO.h"
@@ -99,8 +98,6 @@ public:
 		cout << "Total unknowns: " << hho.nTotalHybridUnknowns << endl;
 		cout << "System size: " << (this->_staticCondensation ? hho.nTotalFaceUnknowns : hho.nTotalHybridUnknowns) << " (" << (this->_staticCondensation ? "statically condensed" : "no static condensation") << ")" << endl;
 
-		bool autoPenalization = true;
-
 		this->_fileName = "Poisson" + to_string(Dim) + "D" + this->_solutionName + "_n" + to_string(mesh->N) + "_HHO_" + reconstructionBasis->Name() + "_pen-1" + (_staticCondensation ? "_staticcond" : "");
 		string matrixFilePath				= this->_outputDirectory + "/" + this->_fileName + "_A.dat";
 		string consistencyFilePath			= this->_outputDirectory + "/" + this->_fileName + "_A_cons.dat";
@@ -128,7 +125,7 @@ public:
 		{
 			//cout << "Element " << element->Number << endl;
 			Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
-			element->InitReconstructor(reconstructionBasis, cellBasis, faceBasis);
+			element->InitHHO(reconstructionBasis, cellBasis, faceBasis);
 
 			for (BasisFunction<Dim>* cellPhi1 : cellBasis->LocalFunctions)
 			{
@@ -327,9 +324,9 @@ public:
 			for (auto face : element->Faces)
 			{
 				if (face->IsDomainBoundary)
-					localHybridSolution.segment(element->FirstDOFLocalNumber(face), hho.nLocalFaceUnknowns) = Eigen::VectorXd::Zero(hho.nLocalFaceUnknowns);
+					localHybridSolution.segment(element->FirstDOFNumber(face), hho.nLocalFaceUnknowns) = Eigen::VectorXd::Zero(hho.nLocalFaceUnknowns);
 				else
-					localHybridSolution.segment(element->FirstDOFLocalNumber(face), hho.nLocalFaceUnknowns) = globalHybridSolution.segment(FirstDOFGlobalNumber(face), hho.nLocalFaceUnknowns);
+					localHybridSolution.segment(element->FirstDOFNumber(face), hho.nLocalFaceUnknowns) = globalHybridSolution.segment(FirstDOFGlobalNumber(face), hho.nLocalFaceUnknowns);
 			}
 
 			Eigen::VectorXd localReconstructedSolution = element->Reconstruct(localHybridSolution);
@@ -344,14 +341,14 @@ public:
 		Problem::ExtractSolution(this->ReconstructedSolution);
 	}
 
-	/*void Solve() override
+	void Solve() override
 	{
 		vector<Mesh<Dim>*> meshSequence(2);
 		dynamic_cast<CartesianGrid2D*>(this->_mesh)->BuildCoarserMesh();
 		meshSequence.push_back(this->_mesh);
 		meshSequence.push_back(this->_mesh->CoarserMesh);
 		MultigridForHHO<Dim> mg(meshSequence);
-	}*/
+	}
 
 private:
 	BigNumber DOFNumber(Element<Dim>* element, BasisFunction<Dim>* cellPhi)

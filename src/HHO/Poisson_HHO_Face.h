@@ -3,6 +3,9 @@
 #include "../FunctionalBasis/FunctionalBasis.h"
 
 template <int Dim>
+class Poisson_HHO_Element;
+
+template <int Dim>
 class Poisson_HHO_Face : virtual public Face<Dim>
 {
 private:

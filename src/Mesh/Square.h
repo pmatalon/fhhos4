@@ -5,7 +5,6 @@
 #include "../DG/Poisson_DG_ReferenceElement.h"
 #include "../HHO/Poisson_HHO_Element.h"
 #include "../Utils/SourceFunction.h"
-#include "../HHO/Reconstructor.h"
 #include <assert.h>
 using namespace std;
 
@@ -16,8 +15,6 @@ public:
 	Face<2>* SouthFace;
 	Face<2>* EastFace;
 	Face<2>* WestFace;
-
-	Reconstructor<2>* HHOReconstructor = NULL;
 
 	Square(int number, double x, double y, double width) : Element(number), CartesianElement(number, Point(x, y), width), Poisson_DG_Element(number), Poisson_HHO_Element(number)
 	{
@@ -156,21 +153,6 @@ public:
 	//                 Poisson_HHO_Element implementation                //
 	//-------------------------------------------------------------------//
 	
-	void InitReconstructor(FunctionalBasis<2>* reconstructionBasis, FunctionalBasis<2>* elementBasis, FunctionalBasis<1>* faceBasis)
-	{
-		this->HHOReconstructor = new Reconstructor<2>(this, reconstructionBasis, elementBasis, faceBasis);
-	}
-
-	Reconstructor<2>* HHO()
-	{
-		return this->HHOReconstructor;
-	}
-
-	Eigen::VectorXd Reconstruct(Eigen::VectorXd hybridVector)
-	{
-		return this->HHOReconstructor->Reconstruct(hybridVector);
-	}
-
 	double St(BasisFunction<2>* reconstructPhi1, BasisFunction<2>* reconstructPhi2)
 	{
 		return this->IntegralGradGrad(reconstructPhi1, reconstructPhi2);
@@ -223,45 +205,5 @@ public:
 
 		int nQuadPoints = reconstructPhi->GetDegree() + facePhi->GetDegree() + 1;
 		return Utils::Integral(nQuadPoints, functionToIntegrate, -1, 1);
-	}
-
-	int FirstDOFLocalNumber(Face<2>* face)
-	{
-		return this->HHOReconstructor->FirstDOFNumber(face);
-	}
-
-	double ConsistencyTerm(BasisFunction<2>* cellPhi1, BasisFunction<2>* cellPhi2)
-	{
-		return this->HHOReconstructor->ConsistencyTerm(cellPhi1, cellPhi2);
-	}
-	double ConsistencyTerm(Face<2>* face, BasisFunction<2>* cellPhi, BasisFunction<1>* facePhi)
-	{
-		return this->HHOReconstructor->ConsistencyTerm(face, cellPhi, facePhi);
-	}
-	double ConsistencyTerm(Face<2>* face1, BasisFunction<1>* facePhi1, Face<2>* face2, BasisFunction<1>* facePhi2)
-	{
-		return this->HHOReconstructor->ConsistencyTerm(face1, facePhi1, face2, facePhi2);
-	}
-
-	double StabilizationTerm(BasisFunction<2>* cellPhi1, BasisFunction<2>* cellPhi2)
-	{
-		return this->HHOReconstructor->StabilizationTerm(cellPhi1, cellPhi2);
-	}
-	double StabilizationTerm(Face<2>* face, BasisFunction<2>* cellPhi, BasisFunction<1>* facePhi)
-	{
-		return this->HHOReconstructor->StabilizationTerm(face, cellPhi, facePhi);
-	}
-	double StabilizationTerm(Face<2>* face1, BasisFunction<1>* facePhi1, Face<2>* face2, BasisFunction<1>* facePhi2)
-	{
-		return this->HHOReconstructor->StabilizationTerm(face1, facePhi1, face2, facePhi2);
-	}
-
-	virtual double ReconstructionTerm(BasisFunction<2>* reconstrucPhi, BasisFunction<2>* cellPhi)
-	{
-		return this->HHOReconstructor->ReconstructionTerm(reconstrucPhi, cellPhi);
-	}
-	virtual double ReconstructionTerm(BasisFunction<2>* reconstrucPhi, Face<2>* face, BasisFunction<1>* facePhi)
-	{
-		return this->HHOReconstructor->ReconstructionTerm(reconstrucPhi, face, facePhi);
 	}
 };

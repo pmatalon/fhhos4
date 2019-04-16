@@ -33,8 +33,11 @@ public:
 
 	virtual void Setup(const Eigen::SparseMatrix<double>& A)
 	{
-		SetupRestriction();
-		SetupProlongation();
+		if (!this->IsCoarsestLevel())
+		{
+			SetupRestriction();
+			SetupProlongation();
+		}
 
 		SetupOperator(A);
 
@@ -43,7 +46,8 @@ public:
 			this->CoarserLevel->Setup(this->OperatorMatrix);
 		//---------------------------//
 
-		SetupSmoothers();
+		if (!this->IsCoarsestLevel())
+			SetupSmoothers();
 	}
 
 	virtual Eigen::VectorXd Restrict(Eigen::VectorXd& vectorOnThisLevel) = 0;

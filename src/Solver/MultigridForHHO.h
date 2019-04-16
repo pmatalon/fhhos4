@@ -49,10 +49,10 @@ private:
 		{
 			Poisson_HHO_Element<Dim>* coarseElement = dynamic_cast<Poisson_HHO_Element<Dim>*>(ce);
 			Poisson_HHO_Element<Dim>* oneFinerElement = dynamic_cast<Poisson_HHO_Element<Dim>*>(ce->FinerElements[0]);
-			coarseElement->InitReconstructor(oneFinerElement->HHO()->ReconstructionBasis, oneFinerElement->HHO()->CellBasis, oneFinerElement->HHO()->FaceBasis); // TODO: make a light init (no nead to assemble the stabilization matrix for example)
-			auto reconstructMatrix = coarseElement->HHO()->ReconstructionMatrix();
-			auto reconstructionBasis = coarseElement->HHO()->ReconstructionBasis;
-			auto faceBasis = coarseElement->HHO()->FaceBasis;
+			coarseElement->InitHHO(oneFinerElement->ReconstructionBasis, oneFinerElement->CellBasis, oneFinerElement->FaceBasis); // TODO: make a light init (no nead to assemble the stabilization matrix for example)
+			auto reconstructMatrix = coarseElement->ReconstructionMatrix();
+			auto reconstructionBasis = coarseElement->ReconstructionBasis;
+			auto faceBasis = coarseElement->FaceBasis;
 
 			for (auto f : coarseElement->FinerFacesRemoved)
 			{
@@ -75,7 +75,7 @@ private:
 
 				reconstructedPolynomialRestrictedOnFace = modalToNodal_reconstruct * reconstructMatrix;*/
 				Poisson_HHO_Face<Dim>* fineFace = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
-				Eigen::MatrixXd ProjF = fineFace->GetProjFromReconstruct(this->_element);
+				Eigen::MatrixXd ProjF = fineFace->GetProjFromCoarserReconstruct();
 			}
 		}
 	}
