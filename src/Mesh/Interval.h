@@ -44,27 +44,6 @@ public:
 		return Utils::Integral(funcToIntegrate, this->Origin.X, this->Origin.X + this->Width);
 	}
 
-	function<double(Point)> EvalPhiOnFace(Face<1>* face, BasisFunction<1>* p_phi)
-	{
-		IBasisFunction1D* phi = static_cast<IBasisFunction1D*>(p_phi);
-
-		double tFixed = face == this->Left ? -1 : 1;
-		function<double(Point)> evalOnFace = [phi, tFixed](Point point0D) {
-			return phi->Eval(tFixed);
-		};
-		return evalOnFace;
-	}
-
-	function<vector<double>(Point)> GradPhiOnFace(Face<1>* face, BasisFunction<1>* p_phi)
-	{
-		IBasisFunction1D* phi = static_cast<IBasisFunction1D*>(p_phi);
-
-		double tFixed = face == this->Left ? -1 : 1;
-		function<vector<double>(Point)> gradOnFace = [phi, tFixed](Point point0D) {
-			return phi->Grad(tFixed);
-		};
-		return gradOnFace;
-	}
 	
 	//------------------------------------------------------------------//
 	//                 Poisson_DG_Element implementation                //

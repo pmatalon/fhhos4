@@ -17,7 +17,7 @@ public:
 	{
 		this->LocalNumber = degree;
 		this->Degree = degree;
-		this->Normalized = true;
+		this->Normalized = false;
 	}
 
 	Legendre1D(int degree, bool normalized)
@@ -34,7 +34,7 @@ public:
 
 	double Eval(double x)
 	{
-		assert(x >= -1 && x <= 1);
+		this->TestIsInReferenceInterval(x);
 		double value = Legendre(this->Degree, x);
 		if (this->Normalized)
 			return sqrt(this->Degree + 0.5) * value;
@@ -43,7 +43,7 @@ public:
 
 	double EvalDerivative(double x)
 	{
-		assert(x >= -1 && x <= 1);
+		this->TestIsInReferenceInterval(x);
 		double value = DLegendre(this->Degree, x);
 		if (this->Normalized)
 			return sqrt(this->Degree + 0.5) * value;

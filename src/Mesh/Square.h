@@ -16,7 +16,19 @@ public:
 	Face<2>* EastFace;
 	Face<2>* WestFace;
 
-	Square(int number, double x, double y, double width) : Element(number), CartesianElement(number, Point(x, y), width), Poisson_DG_Element(number), Poisson_HHO_Element(number)
+	Point BottomLeftCorner;
+	Point TopLeftCorner;
+	Point TopRightCorner;
+	Point BottomRightCorner;
+
+	Square(int number, double x, double y, double width) : 
+		Element(number), 
+		CartesianElement(number, Point(x, y), width), 
+		Poisson_DG_Element(number), Poisson_HHO_Element(number),
+		BottomLeftCorner(x, y),
+		TopLeftCorner(x, y + width),
+		TopRightCorner(x + width, y + width),
+		BottomRightCorner(x + width, y)
 	{
 	}
 
@@ -74,58 +86,6 @@ public:
 		double y2 = this->Origin.Y + this->Width;
 
 		return Utils::Integral(func, x1, x2, y1, y2);
-	}
-
-	function<double(Point)> EvalPhiOnFace(Face<2>* face, BasisFunction<2>* p_phi)
-	{
-		IBasisFunction2D* phi = static_cast<IBasisFunction2D*>(p_phi);
-
-		function<double(Point)> evalOnFace = NULL;
-		if (face == this->EastFace || face == this->WestFace)
-		{
-			double tFixed = face == this->EastFace ? 1 : -1;
-			evalOnFace = [phi, tFixed](Point point1D) {
-				double u = point1D.X;
-				return phi->Eval(tFixed, u);
-			};
-		}
-		else if (face == this->SouthFace || face == this->NorthFace)
-		{
-			double uFixed = face == this->NorthFace ? 1 : -1;
-			evalOnFace = [phi, uFixed](Point point1D) {
-				double t = point1D.X;
-				return phi->Eval(t, uFixed);
-			};
-		}
-		else
-			assert(false);
-		return evalOnFace;
-	}
-
-	function<vector<double>(Point)> GradPhiOnFace(Face<2>* face, BasisFunction<2>* p_phi)
-	{
-		IBasisFunction2D* phi = static_cast<IBasisFunction2D*>(p_phi);
-
-		function<vector<double>(Point)> gradOnFace = NULL;
-		if (face == this->EastFace || face == this->WestFace)
-		{
-			double tFixed = face == this->EastFace ? 1 : -1;
-			gradOnFace = [phi, tFixed](Point point1D) {
-				double u = point1D.X;
-				return phi->Grad(tFixed, u);
-			};
-		}
-		else if (face == this->SouthFace || face == this->NorthFace)
-		{
-			double uFixed = face == this->NorthFace ? 1 : -1;
-			gradOnFace = [phi, uFixed](Point point1D) {
-				double t = point1D.X;
-				return phi->Grad(t, uFixed);
-			};
-		}
-		else
-			assert(false);
-		return gradOnFace;
 	}
 
 	//------------------------------------------------------------------//

@@ -42,6 +42,11 @@ public:
 		return CartesianShape<Dim>::ConvertToDomain(referenceElementPoint);
 	}
 
+	Point ConvertToReference(Point domainPoint)
+	{
+		return CartesianShape<Dim>::ConvertToReference(domainPoint);
+	}
+
 	vector<Point> GetNodalPoints(FunctionalBasis<Dim>* basis)
 	{
 		return CartesianShape<Dim>::GetNodalPoints(basis);

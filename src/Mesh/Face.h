@@ -50,6 +50,8 @@ public:
 
 	virtual double GetDiameter() = 0;
 
+	virtual Point ConvertToDomain(Point refPoint) = 0;
+
 	virtual Eigen::MatrixXd MassMatrix(FunctionalBasis<Dim-1>* basis)
 	{
 		Eigen::MatrixXd M(basis->LocalFunctions.size(), basis->LocalFunctions.size());

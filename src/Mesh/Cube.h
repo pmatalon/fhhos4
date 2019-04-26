@@ -13,7 +13,11 @@ public:
 	Face<3>* RightFace;
 
 public:
-	Cube(int number, double x, double y, double z, double width) : Element(number), CartesianElement(number, Point(x,y,z), width), Poisson_DG_Element(number), Poisson_HHO_Element(number)
+	Cube(int number, double x, double y, double z, double width) : 
+		Element(number), 
+		CartesianElement(number, Point(x,y,z), width), 
+		Poisson_DG_Element(number), 
+		Poisson_HHO_Element(number)
 	{ }
 
 	void SetTopInterface(Face<3>* face)
@@ -90,7 +94,7 @@ public:
 		return Utils::Integral(func, x1, x2, y1, y2, z1, z2);
 	}
 
-	function<double(Point)> EvalPhiOnFace(Face<3>* face, BasisFunction<3>* p_phi)
+	function<double(Point)> EvalPhiOnFace(Face<3>* face, BasisFunction<3>* p_phi) override
 	{
 		IBasisFunction3D* phi = static_cast<IBasisFunction3D*>(p_phi);
 
@@ -127,7 +131,7 @@ public:
 		return evalOnFace;
 	}
 
-	function<vector<double>(Point)> GradPhiOnFace(Face<3>* face, BasisFunction<3>* p_phi)
+	function<vector<double>(Point)> GradPhiOnFace(Face<3>* face, BasisFunction<3>* p_phi) override
 	{
 		IBasisFunction3D* phi = static_cast<IBasisFunction3D*>(p_phi);
 

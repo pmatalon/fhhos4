@@ -3,7 +3,7 @@
 #include "../Utils/Utils.h"
 #include "Cube.h"
 
-class SquareFace : virtual public Face<3>, public CartesianShape<2>, public Poisson_DG_Face<3>, public Poisson_HHO_Face<3>
+class SquareFace : virtual public Face<3>, public CartesianShape<3,2>, public Poisson_DG_Face<3>, public Poisson_HHO_Face<3>
 {
 public:
 
@@ -51,9 +51,19 @@ public:
 		return pow(h, 2) / 4 * Utils::Integral(nQuadPoints, functionToIntegrate, -1, 1, -1, 1);
 	}
 
+	Point ConvertToReference(Point domainPoint)
+	{
+		return CartesianShape<3,2>::ConvertToReference(domainPoint);
+	}
+
+	Point ConvertToDomain(Point referenceElementPoint)
+	{
+		return CartesianShape<3,2>::ConvertToDomain(referenceElementPoint);
+	}
+
 	vector<Point> GetNodalPoints(FunctionalBasis<2>* basis)
 	{
-		return CartesianShape<2>::GetNodalPoints(basis);
+		return CartesianShape<3,2>::GetNodalPoints(basis);
 	}
 
 	//---------------------------------------------------------------//

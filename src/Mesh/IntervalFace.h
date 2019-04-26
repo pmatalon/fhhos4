@@ -4,21 +4,21 @@
 #include "../DG/Poisson_DG_Face.h"
 #include "../HHO/Poisson_HHO_Face.h"
 
-class IntervalFace : virtual public Face<2>, public CartesianShape<1>, public Poisson_DG_Face<2>, public Poisson_HHO_Face<2>
+class IntervalFace : virtual public Face<2>, public CartesianShape<2,1>, public Poisson_DG_Face<2>, public Poisson_HHO_Face<2>
 {
 public:
 
-	IntervalFace(BigNumber number, double length, Element<2>* element1, Element<2>* element2) : 
+	IntervalFace(BigNumber number, Point origin, double length, Element<2>* element1, Element<2>* element2, CartesianShapeOrientation orientation) : 
 		Face(number, element1, element2), 
-		CartesianShape(Point(), length), 
+		CartesianShape(origin, length, orientation),
 		Poisson_DG_Face(number, element1, element2),
 		Poisson_HHO_Face(number, element1, element2)
 	{
 	}
 
-	IntervalFace(BigNumber number, double length, Element<2>* element1) : 
+	IntervalFace(BigNumber number, Point origin, double length, Element<2>* element1, CartesianShapeOrientation orientation) :
 		Face(number, element1), 
-		CartesianShape(Point(), length), 
+		CartesianShape(origin, length, orientation),
 		Poisson_DG_Face(number, element1, NULL),
 		Poisson_HHO_Face(number, element1, NULL)
 	{
@@ -51,9 +51,19 @@ public:
 		return h / 2 * Utils::Integral(nQuadPoints, functionToIntegrate, -1, 1);
 	}
 
+	Point ConvertToReference(Point domainPoint)
+	{
+		return CartesianShape<2,1>::ConvertToReference(domainPoint);
+	}
+
+	Point ConvertToDomain(Point referenceElementPoint)
+	{
+		return CartesianShape<2,1>::ConvertToDomain(referenceElementPoint);
+	}
+
 	vector<Point> GetNodalPoints(FunctionalBasis<1>* basis)
 	{
-		return CartesianShape<1>::GetNodalPoints(basis);
+		return CartesianShape<2,1>::GetNodalPoints(basis);
 	}
 
 	//---------------------------------------------------------------//

@@ -30,14 +30,14 @@ public:
 
 	double Eval(double x)
 	{
-		assert(x >= -1 && x <= 1);
+		this->TestIsInReferenceInterval(x);
 		// Bernstein on [-1,1]: change of variable
 		return Bernstein(0.5*x + 0.5);
 	}
 
 	double EvalDerivative(double x)
 	{
-		assert(x >= -1 && x <= 1);
+		this->TestIsInReferenceInterval(x);
 		return 0.5 * DBernstein(0.5*x + 0.5);
 	}
 
@@ -68,7 +68,6 @@ private:
 	// Bernstein polynomial on [0,1]
 	double Bernstein(double x)
 	{
-		assert(x >= 0 && x <= 1);
 		int n = this->_degree;
 		int i = this->_i;
 		return this->_binomial * pow(x, i) * pow(1 - x, n - i);
@@ -76,7 +75,6 @@ private:
 
 	double DBernstein(double x)
 	{
-		assert(x >= 0 && x <= 1);
 		int n = this->_degree;
 		int i = this->_i;
 		if (n == 0)

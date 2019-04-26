@@ -33,6 +33,11 @@ public:
 		return Eval(p.X);
 	}
 
+	void TestIsInReferenceInterval(double x)
+	{
+		assert(x >= -1.0000000000001 && x <= 1.0000000000001);
+	}
+
 	virtual string ToString() = 0;
 	virtual string ToString(string var) = 0;
 };

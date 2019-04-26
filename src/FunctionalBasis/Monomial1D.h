@@ -24,13 +24,13 @@ public:
 
 	double Eval(double x)
 	{
-		assert(x >= -1 && x <= 1);
+		this->TestIsInReferenceInterval(x);
 		return pow(x, this->Degree);
 	}
 
 	double EvalDerivative(double x)
 	{
-		assert(x >= -1 && x <= 1);
+		this->TestIsInReferenceInterval(x);
 		if (this->Degree == 0)
 			return 0;
 		return this->Degree*pow(x, this->Degree - 1);

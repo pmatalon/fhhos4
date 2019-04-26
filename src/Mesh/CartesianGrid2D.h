@@ -37,13 +37,15 @@ public:
 		for (BigNumber j = 0; j < n; ++j)
 		{
 			// South boundary
-			IntervalFace* southBoundary = new IntervalFace(numberInterface++, h, this->Elements[j]);
+			Square* square = dynamic_cast<Square*>(this->Elements[j]);
+			IntervalFace* southBoundary = new IntervalFace(numberInterface++, square->BottomLeftCorner, h, square, CartesianShapeOrientation::Horizontal);
 			this->Faces.push_back(southBoundary);
 			this->BoundaryFaces.push_back(southBoundary);
 			dynamic_cast<Square*>(this->Elements[j])->SetSouthInterface(southBoundary);
 
 			// North boundary
-			IntervalFace* northBoundary = new IntervalFace(numberInterface++, h, this->Elements[(n-1)*n + j]);
+			square = dynamic_cast<Square*>(this->Elements[(n - 1)*n + j]);
+			IntervalFace* northBoundary = new IntervalFace(numberInterface++, square->TopLeftCorner, h, square, CartesianShapeOrientation::Horizontal);
 			this->Faces.push_back(northBoundary);
 			this->BoundaryFaces.push_back(northBoundary);
 			dynamic_cast<Square*>(this->Elements[(n - 1)*n + j])->SetNorthInterface(northBoundary);
@@ -52,13 +54,15 @@ public:
 		for (BigNumber i = 0; i < n; ++i)
 		{
 			// West boundary
-			IntervalFace* westBoundary = new IntervalFace(numberInterface++, h, this->Elements[i*n]);
+			Square* square = dynamic_cast<Square*>(this->Elements[i*n]);
+			IntervalFace* westBoundary = new IntervalFace(numberInterface++, square->BottomLeftCorner, h, square, CartesianShapeOrientation::Vertical);
 			this->Faces.push_back(westBoundary);
 			this->BoundaryFaces.push_back(westBoundary);
 			dynamic_cast<Square*>(this->Elements[i*n])->SetWestInterface(westBoundary);
 
 			// East boundary
-			IntervalFace* eastBoundary = new IntervalFace(numberInterface++, h, this->Elements[i*n + n-1]);
+			square = dynamic_cast<Square*>(this->Elements[i*n + n - 1]);
+			IntervalFace* eastBoundary = new IntervalFace(numberInterface++, square->BottomRightCorner, h, square, CartesianShapeOrientation::Vertical);
 			this->Faces.push_back(eastBoundary);
 			this->BoundaryFaces.push_back(eastBoundary);
 			dynamic_cast<Square*>(this->Elements[i*n + n - 1])->SetEastInterface(eastBoundary);
@@ -73,7 +77,7 @@ public:
 				{
 					// East
 					Square* eastNeighbour = dynamic_cast<Square*>(this->Elements[i*n + j + 1]);
-					IntervalFace* interface = new IntervalFace(numberInterface++, h, element, eastNeighbour);
+					IntervalFace* interface = new IntervalFace(numberInterface++, eastNeighbour->BottomLeftCorner, h, element, eastNeighbour, CartesianShapeOrientation::Vertical);
 					this->Faces.push_back(interface);
 					this->InteriorFaces.push_back(interface);
 					element->SetEastInterface(interface);
@@ -83,7 +87,7 @@ public:
 				{
 					// North
 					Square* northNeighbour = dynamic_cast<Square*>(this->Elements[(i+1)*n + j]);
-					IntervalFace* interface = new IntervalFace(numberInterface++, h, element, northNeighbour);
+					IntervalFace* interface = new IntervalFace(numberInterface++, northNeighbour->BottomLeftCorner, h, element, northNeighbour, CartesianShapeOrientation::Horizontal);
 					this->Faces.push_back(interface);
 					this->InteriorFaces.push_back(interface);
 					element->SetNorthInterface(interface);

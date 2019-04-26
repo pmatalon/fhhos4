@@ -91,7 +91,6 @@ private:
 	// Bernstein polynomial on [0,1]
 	double BivariateBernstein(double x, double y)
 	{
-		assert(x >= 0 && x <= 1 && y >= 0 && y <= 1);
 		return this->_binomial * pow(x, this->_degX) * pow(y, this->_degY) * pow(1 - x - y, this->_degMixed);
 	}
 

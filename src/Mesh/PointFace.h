@@ -36,6 +36,16 @@ public:
 		return 0;
 	}
 
+	Point ConvertToReference(Point domainPoint)
+	{
+		return Point(0);
+	}
+
+	Point ConvertToDomain(Point referenceElementPoint)
+	{
+		return Point(0);
+	}
+
 	vector<Point> GetNodalPoints(FunctionalBasis<0>* basis)
 	{
 		return vector<Point> {Point(0)};

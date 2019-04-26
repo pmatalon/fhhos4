@@ -44,6 +44,9 @@ public:
 
 	virtual double GetDiameter() = 0;
 
+	virtual Point ConvertToDomain(Point refPoint) = 0;
+	virtual Point ConvertToReference(Point domainPoint) = 0;
+
 	virtual vector<double> OuterNormalVector(Face<Dim>* face) = 0;
 	
 	virtual double IntegralGlobalFunction(function<double(Point)> globalFunction) = 0;
@@ -89,8 +92,26 @@ public:
 		return this->_facesLocalNumbering[face];
 	}
 
-	virtual function<double(Point)> EvalPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* phi) = 0;
-	virtual function<vector<double>(Point)> GradPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* phi) = 0;
+	virtual function<double(Point)> EvalPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* phi)
+	{
+		function<double(Point)> evalOnFace = [this, face, phi](Point refPoint1D) {
+			Point domainPoint2D = face->ConvertToDomain(refPoint1D);
+			Point refPoint2D = this->ConvertToReference(domainPoint2D);
+			return phi->Eval(refPoint2D);
+		};
+		return evalOnFace;
+	}
+
+	virtual function<vector<double>(Point)> GradPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* phi)
+	{
+		function<vector<double>(Point)> gradOnFace = [this, face, phi](Point refPoint1D) {
+			Point domainPoint2D = face->ConvertToDomain(refPoint1D);
+			Point refPoint2D = this->ConvertToReference(domainPoint2D);
+			return phi->Grad(refPoint2D);
+		};
+		return gradOnFace;
+	}
+
 	virtual double L2ErrorPow2(function<double(Point)> approximate, function<double(Point)> exactSolution) = 0;
 	virtual double DiffusionCoefficient(DiffusionPartition diffusionPartition) = 0;
 	virtual vector<Point> GetNodalPoints(FunctionalBasis<Dim>* basis) = 0;

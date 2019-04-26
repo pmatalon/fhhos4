@@ -105,7 +105,6 @@ private:
 	// Bernstein polynomial on [0,1]
 	double TrivariateBernstein(double x, double y, double z)
 	{
-		assert(x >= 0 && x <= 1 && y >= 0 && y <= 1 && z >= 0 && z <= 1);
 		return this->_binomial * pow(x, this->_degX) * pow(y, this->_degY) * pow(z, this->_degZ) * pow(1 - x - y - z, this->_degMixed);
 	}
 
