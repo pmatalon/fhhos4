@@ -14,6 +14,8 @@ public:
 		_solver(solver)
 	{
 		_solver->MaxIterations = nSmoothingIterations;
+		_solver->PrintIterationResults = false;
+		_solver->ComputeExactSolution = false;
 	}
 
 	void Setup(const Eigen::SparseMatrix<double>& A)

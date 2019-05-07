@@ -9,6 +9,7 @@ template <int Dim>
 class Poisson_HHO_Element : virtual public Element<Dim>
 {
 private:
+	Eigen::MatrixXd _massCell;
 	Eigen::MatrixXd _projFromReconstruct;
 public:
 	FunctionalBasis<Dim>* ReconstructionBasis;
@@ -23,6 +24,8 @@ public:
 
 	// Stabilization contribution
 	Eigen::MatrixXd Astab;
+
+	//Eigen::MatrixXd SolveCellUnknows;
 
 
 	Poisson_HHO_Element(BigNumber number) : Element<Dim>(number) {}
@@ -40,19 +43,9 @@ public:
 		this->CellBasis = cellBasis;
 		this->FaceBasis = faceBasis;
 
-		Eigen::MatrixXd Mt = this->MassMatrix(cellBasis);
+		this->_massCell = this->MassMatrix(cellBasis);
 		Eigen::MatrixXd Nt = this->MassMatrix(cellBasis, reconstructionBasis);
-		this->_projFromReconstruct = Mt.inverse() * Nt;
-
-		for (auto f : this->Faces)
-		{
-			Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
-			face->InitHHO(reconstructionBasis, cellBasis, faceBasis);
-		}
-
-		//P(reconstructionBasis->Size(), cellBasis->Size() + this->Faces.size() * faceBasis->Size()),
-		//Acons(cellBasis->Size() + element->Faces.size() * faceBasis->Size(), cellBasis->Size() + element->Faces.size() * faceBasis->Size()),
-		//Astab(cellBasis->Size() + element->Faces.size() * faceBasis->Size(), cellBasis->Size() + element->Faces.size() * faceBasis->Size())
+		this->_projFromReconstruct = _massCell.inverse() * Nt;
 
 		this->AssembleReconstructionAndConsistencyMatrices();
 		this->AssembleStabilizationMatrix();
@@ -66,8 +59,88 @@ public:
 			Eigen::VectorXd result = Reconstruct(Interpolate(vector));
 			//cout << "------------- result -------------" << endl << result << endl;
 		}*/
+
+		/*int nCellUnknowns = cellBasis->Size();
+		int nTotalFaceUnknowns = this->Faces.size() * faceBasis->Size();
+
+		auto A = Acons + Astab;
+		auto Att = A.topLeftCorner(nCellUnknowns, nCellUnknowns);
+		auto Aff = A.bottomRightCorner(nTotalFaceUnknowns, nTotalFaceUnknowns);
+		auto Atf = A.topRightCorner(nCellUnknowns, nTotalFaceUnknowns);
+
+		this->SolveCellUnknowns = - Att.inverse() * Atf;*/
 	}
-	
+
+	Eigen::MatrixXd GetMassMatrix()
+	{
+		return this->_massCell;
+	}
+
+	Eigen::MatrixXd ComputeInterpolationMatrixFromFaces()
+	{
+		Eigen::MatrixXd I(this->CellBasis->Size(), this->Faces.size() * this->FaceBasis->Size());
+
+		Eigen::MatrixXd M_cell = this->_massCell;
+		Eigen::MatrixXd invM_cell = M_cell.inverse();
+		
+		for (auto f : this->Faces)
+		{
+			Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+
+			double weight = 1;// face->GetDiameter() / this->FrontierMeasure();
+			Eigen::MatrixXd M_face = face->GetMassMatrix();
+			Eigen::MatrixXd Pi_face = face->GetProjFromCell(this);
+			I.block(0, this->LocalNumberOf(face) * this->FaceBasis->Size(), this->CellBasis->Size(), this->FaceBasis->Size()) = weight * invM_cell * Pi_face.transpose() * M_face;
+		}
+
+		return I;
+	}
+
+	Eigen::MatrixXd ComputeProjectorMatrixFromCellOntoFaces()
+	{
+		Eigen::MatrixXd Pi = Eigen::MatrixXd::Zero(this->Faces.size() * this->FaceBasis->Size(), this->CellBasis->Size());
+
+		for (auto f : this->Faces)
+		{
+			Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+
+			Eigen::MatrixXd Pi_face = face->GetProjFromCell(this);
+			Pi.block(this->LocalNumberOf(face)*this->FaceBasis->Size(), 0, this->FaceBasis->Size(), this->CellBasis->Size()) = Pi_face;
+		}
+
+		return Pi;
+	}
+
+	Eigen::MatrixXd ComputeCanonicalInjectionMatrixCoarseToFine()
+	{
+		Eigen::MatrixXd J(this->CellBasis->Size() * this->FinerElements.size(), this->CellBasis->Size());
+
+		for (auto e : this->FinerElements)
+		{
+			Poisson_HHO_Element<Dim>* fineElement = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
+			vector<Point> nodalPoints = fineElement->GetNodalPoints(this->CellBasis);
+
+			Eigen::MatrixXd V(this->CellBasis->Size(), this->CellBasis->Size()); // Vandermonde matrix
+			Eigen::MatrixXd rhsMatrix(this->CellBasis->Size(), this->CellBasis->Size());
+			for (int i = 0; i < this->CellBasis->Size(); i++)
+			{
+				Point fineRefPoint = nodalPoints[i];
+				Point domainPoint = fineElement->ConvertToDomain(fineRefPoint);
+				Point coarseRefPoint = this->ConvertToReference(domainPoint);
+
+				for (BasisFunction<Dim>* cellPhi : this->CellBasis->LocalFunctions)
+				{
+					V(i, cellPhi->LocalNumber) = cellPhi->Eval(fineRefPoint);
+					rhsMatrix(i, cellPhi->LocalNumber) = cellPhi->Eval(coarseRefPoint);
+				}
+			}
+			Eigen::ColPivHouseholderQR<Eigen::MatrixXd> solver = V.colPivHouseholderQr();
+			J.block(this->LocalNumberOf(fineElement)*this->CellBasis->Size(), 0, this->CellBasis->Size(), this->CellBasis->Size()) = solver.solve(rhsMatrix);
+		}
+
+		return J;
+	}
+
 	Eigen::VectorXd Reconstruct(Eigen::VectorXd hybridVector)
 	{
 		return this->P* hybridVector;
@@ -78,12 +151,18 @@ public:
 		return this->P;
 	}
 
-	Eigen::VectorXd Interpolate(Eigen::VectorXd vector)
+	/*Eigen::VectorXd SolveCellUnknowns(Eigen::VectorXd faceUnknownsVector)
+	{
+		Eigen::VectorXd cellUnknownsVector = this->SolveCellUnknowns * faceUnknownsVector;
+		return cellUnknownsVector;
+	}*/
+
+	Eigen::VectorXd Interpolate(Eigen::VectorXd reconstructVector)
 	{
 		Eigen::VectorXd hybridVector(this->CellBasis->Size() + this->Faces.size() * this->FaceBasis->Size());
 		Eigen::MatrixXd ProjT = _projFromReconstruct;
 
-		hybridVector.head(this->CellBasis->Size()) = ProjT * vector;
+		hybridVector.head(this->CellBasis->Size()) = ProjT * reconstructVector;
 
 		int index = this->CellBasis->Size();
 		for (auto f : this->Faces)
@@ -91,7 +170,7 @@ public:
 			Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
 			Eigen::MatrixXd ProjF = face->GetProjFromReconstruct(this);
 
-			hybridVector.segment(index, this->FaceBasis->Size()) = ProjF * vector;
+			hybridVector.segment(index, this->FaceBasis->Size()) = ProjF * reconstructVector;
 			//cout << "------------- hybridVector -------------" << endl << hybridVector << endl;
 			index += this->FaceBasis->Size();
 		}

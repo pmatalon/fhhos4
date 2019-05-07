@@ -87,6 +87,16 @@ public:
 		return M;
 	}
 
+	int LocalNumberOf(Element<Dim>* finerElement)
+	{
+		for (int i = 0; i < this->FinerElements.size(); i++)
+		{
+			if (this->FinerElements[i] == finerElement)
+				return i;
+		}
+		assert(false);
+	}
+
 	int LocalNumberOf(Face<Dim>* face)
 	{
 		return this->_facesLocalNumbering[face];
@@ -110,6 +120,13 @@ public:
 			return phi->Grad(refPoint2D);
 		};
 		return gradOnFace;
+	}
+
+	double FrontierMeasure()
+	{
+		double measure = 0;
+		for (auto f : this->Faces)
+			measure += f->GetDiameter();
 	}
 
 	virtual double L2ErrorPow2(function<double(Point)> approximate, function<double(Point)> exactSolution) = 0;

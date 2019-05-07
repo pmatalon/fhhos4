@@ -39,6 +39,15 @@ public:
 		this->coefficients.insert(this->coefficients.end(), chunk.coefficients.begin(), chunk.coefficients.end());
 	}
 
+	void Add(BigNumber iStart, BigNumber jStart, const Eigen::MatrixXd &m)
+	{
+		for (int i = 0; i < m.rows(); ++i)
+		{
+			for (int j = 0; j < m.cols(); ++j)
+				Add(iStart + i, jStart + j, m(i, j));
+		}
+	}
+
 	void Fill(Eigen::SparseMatrix<double> &m)
 	{
 		m.setFromTriplets(this->coefficients.begin(), this->coefficients.end());

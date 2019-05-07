@@ -11,6 +11,7 @@
 #include "Mesh/CartesianGrid3D.h"
 #include "Utils/Action.h"
 #include "Utils/DiffusionPartition.h"
+#include "Solver/MultigridForHHO.h"
 using namespace std;
 
 
@@ -118,7 +119,7 @@ int main(int argc, char* argv[])
 	if (dimension != 1 && solution.compare("hetero") == 0)
 		argument_error("-s hetero is only supported in 1D.");
 
-	Action action = Action::None;
+	Action action = Action::LogAssembly;
 	for (size_t i = 0; i < a.length(); i++)
 	{
 		if (a[i] == 'e')
@@ -265,9 +266,27 @@ int main(int argc, char* argv[])
 
 			problem->Assemble(action);
 
+			/*for (auto f : mesh->Faces)
+			{
+				IntervalFace* face = dynamic_cast<IntervalFace*>(f);
+				cout << *face << endl;
+			}*/
+
 			if ((action & Action::SolveSystem) == Action::SolveSystem)
 			{
+				if (staticCondensation && mesh->N > 2)
+				{
+					/*MultigridForHHO<2> solver(problem, 2);
+					//GaussSeidel solver;
+					solver.Setup(problem->A);
+					solver.Solve(problem->b);*/
+				}
+
 				problem->Solve();
+				
+				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
+					problem->ExtractTraceSystemSolution();
+
 				problem->ReconstructSolution();
 				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
 					problem->ExtractSolution();

@@ -11,6 +11,11 @@ class Poisson_HHO_Face : virtual public Face<Dim>
 private:
 	Eigen::MatrixXd _massMatrix;
 
+	Eigen::MatrixXd _elem1_massCellFace;
+	Eigen::MatrixXd _elem1_massReconstructFace;
+	Eigen::MatrixXd _elem2_massCellFace;
+	Eigen::MatrixXd _elem2_massReconstructFace;
+
 	// Project a (k+1)-polynomial on the face
 	Eigen::MatrixXd _elem1_projFromReconstruct;
 	Eigen::MatrixXd _elem2_projFromReconstruct;
@@ -30,21 +35,21 @@ public:
 		Eigen::MatrixXd invMf = this->_massMatrix.inverse();
 
 		//cout << "------------- Mf -------------" << endl << Mf << endl;
-		Eigen::MatrixXd Nf1 = this->MassMatrix(faceBasis, this->Element1, reconstructionBasis);
+		this->_elem1_massReconstructFace = this->MassMatrix(faceBasis, this->Element1, reconstructionBasis);
 		//cout << "------------- Nf -------------" << endl << Nf << endl;
-		Eigen::MatrixXd Nft1 = this->MassMatrix(faceBasis, this->Element1, cellBasis);
+		this->_elem1_massCellFace = this->MassMatrix(faceBasis, this->Element1, cellBasis);
 		//cout << "------------- Nft -------------" << endl << Nft << endl;
-		this->_elem1_projFromReconstruct = invMf * Nf1;
-		this->_elem1_projFromCell = invMf * Nft1;
+		this->_elem1_projFromReconstruct = invMf * _elem1_massReconstructFace;
+		this->_elem1_projFromCell = invMf * _elem1_massCellFace;
 
 		if (this->Element2 != NULL)
 		{
-			Eigen::MatrixXd Nf2 = this->MassMatrix(faceBasis, this->Element2, reconstructionBasis);
+			this->_elem2_massReconstructFace = this->MassMatrix(faceBasis, this->Element2, reconstructionBasis);
 			//cout << "------------- Nf -------------" << endl << Nf << endl;
-			Eigen::MatrixXd Nft2 = this->MassMatrix(faceBasis, this->Element2, cellBasis);
+			this->_elem2_massCellFace = this->MassMatrix(faceBasis, this->Element2, cellBasis);
 			//cout << "------------- Nft -------------" << endl << Nft << endl;
-			this->_elem2_projFromReconstruct = invMf * Nf2;
-			this->_elem2_projFromCell = invMf * Nft2;
+			this->_elem2_projFromReconstruct = invMf * _elem2_massReconstructFace;
+			this->_elem2_projFromCell = invMf * _elem2_massCellFace;
 		}
 	}
 
@@ -53,20 +58,40 @@ public:
 		return this->_massMatrix;
 	}
 
+	Eigen::MatrixXd GetMassCellFace(Element<Dim>* element)
+	{
+		if (element == this->Element1)
+			return _elem1_massCellFace;
+		else if (element == this->Element2)
+			return _elem2_massCellFace;
+		assert(false);
+	}
+
+	Eigen::MatrixXd GetMassReconstructFace(Element<Dim>* element)
+	{
+		if (element == this->Element1)
+			return _elem1_massReconstructFace;
+		else if (element == this->Element2)
+			return _elem2_massReconstructFace;
+		assert(false);
+	}
+
 	Eigen::MatrixXd GetProjFromReconstruct(Element<Dim>* element)
 	{
 		if (element == this->Element1)
 			return _elem1_projFromReconstruct;
-		else
+		else if (element == this->Element2)
 			return _elem2_projFromReconstruct;
+		assert(false);
 	}
 
 	Eigen::MatrixXd GetProjFromCell(Element<Dim>* element)
 	{
 		if (element == this->Element1)
 			return _elem1_projFromCell;
-		else
+		else if (element == this->Element2)
 			return _elem2_projFromCell;
+		assert(false);
 	}
 
 	Eigen::MatrixXd GetProjFromCoarserReconstruct()

@@ -135,6 +135,12 @@ public:
 		return diffusionDependantCoefficient * penalizationCoefficient * integralJump1ScalarJump2;
 	}
 
+	friend ostream& operator<<(ostream& os, const IntervalFace& face)
+	{
+		os << face.Number << "\t(" << face.CartesianShape::Origin.X << ", " << face.CartesianShape::Origin.Y << ")\t" << (face.CartesianShape::Orientation == CartesianShapeOrientation::Horizontal ? "horizontal" : "vertical");
+		return os;
+	}
+
 private:
 	static double InnerProduct(vector<double> vector1, vector<double> vector2)
 	{

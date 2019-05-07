@@ -8,13 +8,11 @@
 #include "Poisson_HHO_Element.h"
 #include "../Utils/NonZeroCoefficients.h"
 #include "../Utils/L2.h"
-#include "../Solver/MultigridForHHO.h"
-#include "../Mesh/CartesianGrid2D.h"
 using namespace std;
 
 
 template <int Dim>
-struct HHO
+struct HHOInfo
 {
 	BigNumber nElements;
 	BigNumber nFaces;
@@ -30,7 +28,7 @@ struct HHO
 	BigNumber nTotalHybridUnknowns;
 	BigNumber nTotalHybridCoeffs;
 
-	HHO(Mesh<Dim>* mesh, FunctionalBasis<Dim>* reconstructionBasis, FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim - 1>* faceBasis)
+	HHOInfo(Mesh<Dim>* mesh, FunctionalBasis<Dim>* reconstructionBasis, FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim - 1>* faceBasis)
 	{
 		nElements = mesh->Elements.size();
 		nFaces = mesh->Faces.size();
@@ -52,22 +50,22 @@ template <int Dim>
 class Poisson_HHO : public Problem
 {
 private:
-	Mesh<Dim>* _mesh;
 	SourceFunction* _sourceFunction;
 	FunctionalBasis<Dim>* _reconstructionBasis;
 	FunctionalBasis<Dim>* _cellBasis;
 	FunctionalBasis<Dim - 1>* _faceBasis;
 	bool _staticCondensation = false;
-	HHO<Dim> _hho;
 
 	Eigen::SparseMatrix<double> _globalMatrix;
 	Eigen::VectorXd _globalRHS;
 
 public:
+	Mesh<Dim>* _mesh;
+	HHOInfo<Dim> HHO;
 	Eigen::VectorXd ReconstructedSolution;
 
 	Poisson_HHO(Mesh<Dim>* mesh, string solutionName, SourceFunction* sourceFunction, FunctionalBasis<Dim>* reconstructionBasis, FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim - 1>* faceBasis, bool staticCondensation, string outputDirectory)
-		: Problem(solutionName, outputDirectory), _hho(mesh, reconstructionBasis, cellBasis, faceBasis)
+		: Problem(solutionName, outputDirectory), HHO(mesh, reconstructionBasis, cellBasis, faceBasis)
 	{	
 		this->_mesh = mesh;
 		this->_sourceFunction = sourceFunction;
@@ -77,27 +75,34 @@ public:
 		this->_staticCondensation = staticCondensation;
 	}
 
+	Poisson_HHO<Dim>* GetProblemOnCoarserMesh()
+	{
+		return new Poisson_HHO<Dim>(_mesh->CoarserMesh, _solutionName, _sourceFunction, _reconstructionBasis, _cellBasis, _faceBasis, _staticCondensation, "");
+	}
+
 	void Assemble(Action action)
 	{
 		Mesh<Dim>* mesh = this->_mesh;
 		FunctionalBasis<Dim>* reconstructionBasis = this->_reconstructionBasis;
 		FunctionalBasis<Dim>* cellBasis = this->_cellBasis;
 		FunctionalBasis<Dim - 1>* faceBasis = this->_faceBasis;
-		HHO<Dim> hho = this->_hho;
+		HHOInfo<Dim> hho = this->HHO;
 
-		cout << "Problem: Poisson " << Dim << "D" << endl;
-		cout << "Subdivisions in each cartesian direction: " << mesh->N << endl;
-		cout << "\tElements: " << hho.nElements << endl;
-		cout << "\tFaces: " << hho.nFaces << " (" << hho.nInteriorFaces << " interior + " << hho.nBoundaryFaces << " boundary)" << endl;
-		cout << "Discretization: Hybrid High Order" << endl;
-		cout << "\tReconstruction basis: " << reconstructionBasis->Name() << endl;
-		cout << "\tCell basis: " << cellBasis->Name() << endl;
-		cout << "\tFace basis: " << faceBasis->Name() << endl;
-		cout << "Cell unknowns: " << hho.nTotalCellUnknowns << " (" << cellBasis->Size() << " per cell)" << endl;
-		cout << "Face unknowns: " << hho.nTotalFaceUnknowns << " (" << faceBasis->Size() << " per interior face)" << endl;
-		cout << "Total unknowns: " << hho.nTotalHybridUnknowns << endl;
-		cout << "System size: " << (this->_staticCondensation ? hho.nTotalFaceUnknowns : hho.nTotalHybridUnknowns) << " (" << (this->_staticCondensation ? "statically condensed" : "no static condensation") << ")" << endl;
-
+		if ((action & Action::LogAssembly) == Action::LogAssembly)
+		{
+			cout << "Problem: Poisson " << Dim << "D" << endl;
+			cout << "Subdivisions in each cartesian direction: " << mesh->N << endl;
+			cout << "\tElements: " << hho.nElements << endl;
+			cout << "\tFaces: " << hho.nFaces << " (" << hho.nInteriorFaces << " interior + " << hho.nBoundaryFaces << " boundary)" << endl;
+			cout << "Discretization: Hybrid High Order" << endl;
+			cout << "\tReconstruction basis: " << reconstructionBasis->Name() << endl;
+			cout << "\tCell basis: " << cellBasis->Name() << endl;
+			cout << "\tFace basis: " << faceBasis->Name() << endl;
+			cout << "Cell unknowns: " << hho.nTotalCellUnknowns << " (" << cellBasis->Size() << " per cell)" << endl;
+			cout << "Face unknowns: " << hho.nTotalFaceUnknowns << " (" << faceBasis->Size() << " per interior face)" << endl;
+			cout << "Total unknowns: " << hho.nTotalHybridUnknowns << endl;
+			cout << "System size: " << (this->_staticCondensation ? hho.nTotalFaceUnknowns : hho.nTotalHybridUnknowns) << " (" << (this->_staticCondensation ? "statically condensed" : "no static condensation") << ")" << endl;
+		}
 		this->_fileName = "Poisson" + to_string(Dim) + "D" + this->_solutionName + "_n" + to_string(mesh->N) + "_HHO_" + reconstructionBasis->Name() + "_pen-1" + (_staticCondensation ? "_staticcond" : "");
 		string matrixFilePath				= this->_outputDirectory + "/" + this->_fileName + "_A.dat";
 		string consistencyFilePath			= this->_outputDirectory + "/" + this->_fileName + "_A_cons.dat";
@@ -112,21 +117,16 @@ public:
 		NonZeroCoefficients stabilizationCoeffs(nnzApproximate);
 		NonZeroCoefficients reconstructionCoeffs(nnzApproximate);
 
-		// Global numbering of the faces (interior first, then boundary)
-		BigNumber faceNumber = 0;
-		for (auto face : mesh->InteriorFaces)
-			face->Number = faceNumber++;
-		for (auto face : mesh->BoundaryFaces)
-			face->Number = faceNumber++;
-
-		cout << "Assembly..." << endl;
+		if ((action & Action::LogAssembly) == Action::LogAssembly)
+			cout << "Assembly..." << endl;
+		this->InitHHO();
 		
 		for (auto e : mesh->Elements)
 		{
 			//cout << "Element " << element->Number << endl;
 			Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
-			element->InitHHO(reconstructionBasis, cellBasis, faceBasis);
 
+			// Cell unknowns / Cell unknowns
 			for (BasisFunction<Dim>* cellPhi1 : cellBasis->LocalFunctions)
 			{
 				BigNumber i = DOFNumber(element, cellPhi1);
@@ -212,21 +212,24 @@ public:
 				}
 			}
 
-			// Global reconstruction matrix (for export)
-			for (BasisFunction<Dim>* reconstructPhi : reconstructionBasis->LocalFunctions)
+			if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
 			{
-				BigNumber i = element->Number * reconstructionBasis->Size() + reconstructPhi->LocalNumber;
-				for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions)
+				// Global reconstruction matrix (for export)
+				for (BasisFunction<Dim>* reconstructPhi : reconstructionBasis->LocalFunctions)
 				{
-					BigNumber j = DOFNumber(element, cellPhi);
-					reconstructionCoeffs.Add(i, j, element->ReconstructionTerm(reconstructPhi, cellPhi));
-				}
-				for (auto face : element->Faces)
-				{
-					for (BasisFunction<Dim - 1>* facePhi : faceBasis->LocalFunctions)
+					BigNumber i = element->Number * reconstructionBasis->Size() + reconstructPhi->LocalNumber;
+					for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions)
 					{
-						BigNumber j = DOFNumber(face, facePhi);
-						reconstructionCoeffs.Add(i, j, element->ReconstructionTerm(reconstructPhi, face, facePhi));
+						BigNumber j = DOFNumber(element, cellPhi);
+						reconstructionCoeffs.Add(i, j, element->ReconstructionTerm(reconstructPhi, cellPhi));
+					}
+					for (auto face : element->Faces)
+					{
+						for (BasisFunction<Dim - 1>* facePhi : faceBasis->LocalFunctions)
+						{
+							BigNumber j = DOFNumber(face, facePhi);
+							reconstructionCoeffs.Add(i, j, element->ReconstructionTerm(reconstructPhi, face, facePhi));
+						}
 					}
 				}
 			}
@@ -260,7 +263,8 @@ public:
 			this->b = this->_globalRHS;
 		}
 
-		cout << "nnz(A) = " << this->A.nonZeros() << endl;
+		if ((action & Action::LogAssembly) == Action::LogAssembly)
+			cout << "nnz(A) = " << this->A.nonZeros() << endl;
 
 		Eigen::SparseMatrix<double> reconstructionMatrix = Eigen::SparseMatrix<double>(hho.nElements * reconstructionBasis->Size(), hho.nTotalHybridCoeffs);
 		reconstructionCoeffs.Fill(reconstructionMatrix);
@@ -288,9 +292,31 @@ public:
 		}
 	}
 
+	void InitHHO()
+	{
+		// Global numbering of the faces (interior first, then boundary)
+		BigNumber faceNumber = 0;
+		for (auto face : this->_mesh->InteriorFaces)
+			face->Number = faceNumber++;
+		for (auto face : this->_mesh->BoundaryFaces)
+			face->Number = faceNumber++;
+
+		for (auto f : this->_mesh->Faces)
+		{
+			Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+			face->InitHHO(this->_reconstructionBasis, this->_cellBasis, this->_faceBasis);
+		}
+
+		for (auto e : this->_mesh->Elements)
+		{
+			Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
+			element->InitHHO(this->_reconstructionBasis, this->_cellBasis, this->_faceBasis);
+		}
+	}
+
 	void ReconstructSolution()
 	{
-		HHO<Dim> hho = this->_hho;
+		HHOInfo<Dim> hho = this->HHO;
 
 		Eigen::VectorXd globalReconstructedSolution(hho.nElements * hho.nLocalReconstructUnknowns);
 
@@ -336,6 +362,14 @@ public:
 		this->ReconstructedSolution = globalReconstructedSolution;
 	}
 
+	void ExtractTraceSystemSolution()
+	{
+		if (this->_staticCondensation)
+		{
+			Problem::ExtractSolution(this->Solution, "Faces");
+		}
+	}
+
 	void ExtractSolution() override
 	{
 		Problem::ExtractSolution(this->ReconstructedSolution);
@@ -365,7 +399,7 @@ private:
 	}
 	BigNumber FirstDOFGlobalNumber(Face<Dim>* face)
 	{
-		return this->_hho.nTotalCellUnknowns + face->Number * this->_faceBasis->Size();
+		return this->HHO.nTotalCellUnknowns + face->Number * this->_faceBasis->Size();
 	}
 };
 

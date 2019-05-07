@@ -31,9 +31,15 @@ public:
 
 	void Setup(const Eigen::SparseMatrix<double>& A) override
 	{
+		IterativeSolver::Setup(A);
+
 		D = Eigen::SparseMatrix<double>(A.rows(), A.cols());
 		L = Eigen::SparseMatrix<double>(A.rows(), A.cols());
 		U = Eigen::SparseMatrix<double>(A.rows(), A.cols());
+
+		NonZeroCoefficients D_coeffs(A.nonZeros());
+		NonZeroCoefficients L_coeffs(A.nonZeros());
+		NonZeroCoefficients U_coeffs(A.nonZeros());
 
 		for (unsigned int i = 0; i < A.rows() / _blockSize; ++i)
 		{
@@ -42,14 +48,18 @@ public:
 				unsigned int k = i * _blockSize;
 				unsigned int l = j * _blockSize;
 				auto block = A.block(k, l, _blockSize, _blockSize);
-				/*if (i == j)
-					D.block(k, l, _blockSize, _blockSize) = block;
+				if (i == j)
+					D_coeffs.Add(k, l, block);
 				else if (i < j)
-					U.block(k, l, _blockSize, _blockSize) = block;
+					U_coeffs.Add(k, l, block);
 				else
-					L.block(k, l,_ blockSize, _blockSize) = block;*/
+					L_coeffs.Add(k, l, block);
 			}
 		}
+
+		D_coeffs.Fill(D);
+		U_coeffs.Fill(U);
+		L_coeffs.Fill(L);
 
 		Eigen::SparseMatrix<double> M = _direction == Direction::Forward ? (D + _omega * L) : (D + _omega * U);
 		_solver.analyzePattern(M);
@@ -88,4 +98,14 @@ public: GaussSeidel() : SOR(1) {}
 class ReverseGaussSeidel : public ReverseSOR
 {
 public: ReverseGaussSeidel() : ReverseSOR(1) {}
+};
+
+class BlockGaussSeidel : public BlockSOR
+{
+public: BlockGaussSeidel(int blockSize) : BlockSOR(blockSize, 1, Direction::Forward) {}
+};
+
+class ReverseBlockGaussSeidel : public BlockSOR
+{
+public: ReverseBlockGaussSeidel(int blockSize) : BlockSOR(blockSize, 1, Direction::Backward) {}
 };

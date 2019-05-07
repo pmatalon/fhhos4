@@ -69,12 +69,12 @@ public:
 		return M;
 	}
 
-	Eigen::MatrixXd MassMatrix(FunctionalBasis<Dim-1>* basis, Element<Dim>* element, FunctionalBasis<Dim>* reconstructBasis)
+	Eigen::MatrixXd MassMatrix(FunctionalBasis<Dim-1>* basis, Element<Dim>* element, FunctionalBasis<Dim>* cellBasis)
 	{
-		Eigen::MatrixXd M(basis->LocalFunctions.size(), reconstructBasis->LocalFunctions.size());
+		Eigen::MatrixXd M(basis->LocalFunctions.size(), cellBasis->LocalFunctions.size());
 		for (BasisFunction<Dim-1>* phi1 : basis->LocalFunctions)
 		{
-			for (BasisFunction<Dim>* phi2 : reconstructBasis->LocalFunctions)
+			for (BasisFunction<Dim>* phi2 : cellBasis->LocalFunctions)
 			{
 				double term = this->MassTerm(phi1, element, phi2);
 				M(phi1->LocalNumber, phi2->LocalNumber) = term;

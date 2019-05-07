@@ -155,43 +155,50 @@ public:
 
 	vector<Point> GetNodalPoints(FunctionalBasis<ShapeDim>* basis)
 	{
-		vector<Point> points(basis->Size());
+		vector<Point> points;
 		if (ShapeDim == 1)
 		{
+			points.reserve(basis->Size());
 			GaussLegendre gauss(basis->Size());
 			for (int i = 0; i < basis->Size(); ++i)
 				points.push_back(gauss.Point(i));
 		}
 		else if (ShapeDim == 2)
 		{
-			if (basis->FullTensorization)
+			if (basis->GetDegree() == 1)
 			{
-				GaussLegendre gauss(basis->GetDegree() + 1);
-				for (int i = 0; i < basis->GetDegree() + 1; ++i)
-					for (int j = 0; j < basis->GetDegree() + 1; ++j)
-						points.push_back(Point(gauss.Point(i), gauss.Point(j)));
+				points.push_back(Point(-1, 1)); // top-left corner
+				points.push_back(Point(1, 1)); // top-right corner
+				points.push_back(Point(0, -1)); // bottom-middle
+			}
+			if (basis->GetDegree() == 2)
+			{
+				points.push_back(Point(-1, 1)); // top-left corner
+				points.push_back(Point(1, 1)); // top-right corner
+				points.push_back(Point(1, -1)); // bottom-right corner
+				points.push_back(Point(-1, -1)); // bottom-left corner
+				points.push_back(Point(-1, 0)); // center-left
+				points.push_back(Point(1, 0)); // center-right
 			}
 			else
 			{
-				cout << "Error: Must use the Q space to generate nodal points!" << endl;
-				exit(EXIT_FAILURE);
+				int nPoint1D = ceil(sqrt(basis->Size()));
+				points.reserve(pow(nPoint1D, 2));
+				GaussLegendre gauss(nPoint1D);
+				for (int i = 0; i < nPoint1D; ++i)
+					for (int j = 0; j < nPoint1D; ++j)
+						points.push_back(Point(gauss.Point(i), gauss.Point(j)));
 			}
 		}
 		else if (ShapeDim == 3)
 		{
-			if (basis->FullTensorization)
-			{
-				GaussLegendre gauss(basis->GetDegree() + 1);
-				for (int i = 0; i < basis->GetDegree() + 1; ++i)
-					for (int j = 0; j < basis->GetDegree() + 1; ++j)
-						for (int k = 0; k < basis->GetDegree() + 1; ++k)
-							points.push_back(Point(gauss.Point(i), gauss.Point(j), gauss.Point(k)));
-			}
-			else
-			{
-				cout << "Error: Must use the Q space to generate nodal points!" << endl;
-				exit(EXIT_FAILURE);
-			}
+			int nPoint1D = ceil(cbrt(basis->Size()));
+			points.reserve(pow(nPoint1D, 3));
+			GaussLegendre gauss(nPoint1D);
+			for (int i = 0; i < nPoint1D; ++i)
+				for (int j = 0; j < nPoint1D; ++j)
+					for (int k = 0; k < nPoint1D; ++k)
+						points.push_back(Point(gauss.Point(i), gauss.Point(j), gauss.Point(k)));
 		}
 		return points;
 	}
