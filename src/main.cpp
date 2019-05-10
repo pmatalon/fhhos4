@@ -136,10 +136,10 @@ int main(int argc, char* argv[])
 			argument_error("unknown action '" + to_string(a[i]) + "'. Check -a argument.");
 	}
 
-	function<double(Point)> exactSolution = NULL;
+	function<double(DomPoint)> exactSolution = NULL;
 	SourceFunction* sourceFunction;
 
-	function<bool(Point)> isInPart1 = [](Point p) { return p.X < 0.5; };
+	function<bool(DomPoint)> isInPart1 = [](DomPoint p) { return p.X < 0.5; };
 	DiffusionPartition diffusionPartition(isInPart1, kappa1, kappa2);
 
 	//------------//
@@ -151,7 +151,7 @@ int main(int argc, char* argv[])
 		Mesh<1>* mesh = new CartesianGrid1D(n);
 		if (solution.compare("sine") == 0)
 		{
-			exactSolution = [](Point p)
+			exactSolution = [](DomPoint p)
 			{
 				double x = p.X;
 				return sin(4 * M_PI * x) / (16 * pow(M_PI, 2));
@@ -160,7 +160,7 @@ int main(int argc, char* argv[])
 		}
 		else if (solution.compare("poly") == 0)
 		{
-			exactSolution = [](Point p) 
+			exactSolution = [](DomPoint p) 
 			{ 
 				double x = p.X;
 				return x * (1 - x); 
@@ -170,7 +170,7 @@ int main(int argc, char* argv[])
 		}
 		else if (solution.compare("hetero") == 0)
 		{
-			exactSolution = [&diffusionPartition](Point p)
+			exactSolution = [&diffusionPartition](DomPoint p)
 			{
 				double x = p.X;
 				double alpha = diffusionPartition.Kappa1;
@@ -222,7 +222,7 @@ int main(int argc, char* argv[])
 		Mesh<2>* mesh = new CartesianGrid2D(n);
 		if (solution.compare("sine") == 0)
 		{
-			exactSolution = [](Point p)
+			exactSolution = [](DomPoint p)
 			{
 				double x = p.X;
 				double y = p.Y;
@@ -232,7 +232,7 @@ int main(int argc, char* argv[])
 		}
 		else if (solution.compare("poly") == 0)
 		{
-			exactSolution = [](Point p)
+			exactSolution = [](DomPoint p)
 			{
 				double x = p.X;
 				double y = p.Y; 
@@ -321,7 +321,7 @@ int main(int argc, char* argv[])
 		Mesh<3>* mesh = new CartesianGrid3D(n);
 		if (solution.compare("sine") == 0)
 		{
-			exactSolution = [](Point p)
+			exactSolution = [](DomPoint p)
 			{
 				double x = p.X;
 				double y = p.Y;
@@ -332,7 +332,7 @@ int main(int argc, char* argv[])
 		}
 		else if (solution.compare("poly") == 0)
 		{
-			exactSolution = [](Point p)
+			exactSolution = [](DomPoint p)
 			{
 				double x = p.X;
 				double y = p.Y;

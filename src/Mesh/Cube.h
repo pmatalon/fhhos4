@@ -15,7 +15,7 @@ public:
 public:
 	Cube(int number, double x, double y, double z, double width) : 
 		Element(number), 
-		CartesianElement(number, Point(x,y,z), width), 
+		CartesianElement(number, DomPoint(x,y,z), width), 
 		Poisson_DG_Element(number), 
 		Poisson_HHO_Element(number)
 	{ }
@@ -82,7 +82,7 @@ public:
 		assert(false);
 	}
 
-	double IntegralGlobalFunction(function<double(Point)> func)
+	double IntegralGlobalFunction(function<double(DomPoint)> func)
 	{
 		double x1 = this->Origin.X;
 		double x2 = this->Origin.X + this->Width;
@@ -98,11 +98,11 @@ public:
 	{
 		IBasisFunction3D* phi = static_cast<IBasisFunction3D*>(p_phi);
 
-		function<double(Point)> evalOnFace = NULL;
+		function<double(RefPoint)> evalOnFace = NULL;
 		if (face == this->TopFace || face == this->BottomFace) // XOY plan
 		{
 			double vFixed = face == this->TopFace ? 1 : -1;
-			evalOnFace = [phi, vFixed](Point point2D) {
+			evalOnFace = [phi, vFixed](RefPoint point2D) {
 				double t = point2D.X;
 				double u = point2D.Y;
 				return phi->Eval(t, u, vFixed);
@@ -111,7 +111,7 @@ public:
 		else if (face == this->BackFace || face == this->FrontFace) // XOZ plan
 		{
 			double uFixed = face == this->BackFace ? 1 : -1;
-			evalOnFace = [phi, uFixed](Point point2D) {
+			evalOnFace = [phi, uFixed](RefPoint point2D) {
 				double t = point2D.X;
 				double v = point2D.Y;
 				return phi->Eval(t, uFixed, v);
@@ -120,7 +120,7 @@ public:
 		else if (face == this->RightFace || face == this->LeftFace) // YOZ plan
 		{
 			double tFixed = face == this->RightFace ? 1 : -1;
-			evalOnFace = [phi, tFixed](Point point2D) {
+			evalOnFace = [phi, tFixed](RefPoint point2D) {
 				double u = point2D.X;
 				double v = point2D.Y;
 				return phi->Eval(tFixed, u, v);
@@ -131,15 +131,15 @@ public:
 		return evalOnFace;
 	}
 
-	function<vector<double>(Point)> GradPhiOnFace(Face<3>* face, BasisFunction<3>* p_phi) override
+	function<vector<double>(RefPoint)> GradPhiOnFace(Face<3>* face, BasisFunction<3>* p_phi) override
 	{
 		IBasisFunction3D* phi = static_cast<IBasisFunction3D*>(p_phi);
 
-		function<vector<double>(Point)> gradOnFace = NULL;
+		function<vector<double>(RefPoint)> gradOnFace = NULL;
 		if (face == this->TopFace || face == this->BottomFace) // XOY plan
 		{
 			double vFixed = face == this->TopFace ? 1 : -1;
-			gradOnFace = [phi, vFixed](Point point2D) {
+			gradOnFace = [phi, vFixed](RefPoint point2D) {
 				double t = point2D.X;
 				double u = point2D.Y;
 				return phi->Grad(t, u, vFixed);
@@ -148,7 +148,7 @@ public:
 		else if (face == this->BackFace || face == this->FrontFace) // XOZ plan
 		{
 			double uFixed = face == this->BackFace ? 1 : -1;
-			gradOnFace = [phi, uFixed](Point point2D) {
+			gradOnFace = [phi, uFixed](RefPoint point2D) {
 				double t = point2D.X;
 				double v = point2D.Y;
 				return phi->Grad(t, uFixed, v);
@@ -157,7 +157,7 @@ public:
 		else if (face == this->RightFace || face == this->LeftFace) // YOZ plan
 		{
 			double tFixed = face == this->RightFace ? 1 : -1;
-			gradOnFace = [phi, tFixed](Point point2D) {
+			gradOnFace = [phi, tFixed](RefPoint point2D) {
 				double u = point2D.X;
 				double v = point2D.Y;
 				return phi->Grad(tFixed, u, v);
@@ -221,7 +221,7 @@ public:
 			auto normal = this->OuterNormalVector(face);
 
 			std::function<double(double, double)> functionToIntegrate = [phi, gradPhi, normal](double u, double v) {
-				Point p(u, v);
+				RefPoint p(u, v);
 				return InnerProduct(gradPhi(p), normal) * phi(p);
 			};
 
@@ -242,7 +242,7 @@ public:
 		auto normal = this->OuterNormalVector(face);
 
 		std::function<double(double, double)> functionToIntegrate = [facePhi, gradPhi, normal](double u, double v) {
-			Point p(u, v);
+			RefPoint p(u, v);
 			return InnerProduct(gradPhi(p), normal) * facePhi->Eval(p);
 		};
 

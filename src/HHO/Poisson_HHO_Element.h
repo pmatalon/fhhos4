@@ -83,15 +83,15 @@ public:
 		for (auto e : this->FinerElements)
 		{
 			Poisson_HHO_Element<Dim>* fineElement = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
-			vector<Point> nodalPoints = fineElement->GetNodalPoints(this->CellBasis);
+			vector<RefPoint> nodalPoints = fineElement->GetNodalPoints(this->CellBasis);
 
 			Eigen::MatrixXd V(this->CellBasis->Size(), this->CellBasis->Size()); // Vandermonde matrix
 			Eigen::MatrixXd rhsMatrix(this->CellBasis->Size(), this->CellBasis->Size());
 			for (int i = 0; i < this->CellBasis->Size(); i++)
 			{
-				Point fineRefPoint = nodalPoints[i];
-				Point domainPoint = fineElement->ConvertToDomain(fineRefPoint);
-				Point coarseRefPoint = this->ConvertToReference(domainPoint);
+				RefPoint fineRefPoint = nodalPoints[i];
+				DomPoint domainPoint = fineElement->ConvertToDomain(fineRefPoint);
+				RefPoint coarseRefPoint = this->ConvertToReference(domainPoint);
 
 				for (BasisFunction<Dim>* cellPhi : this->CellBasis->LocalFunctions)
 				{

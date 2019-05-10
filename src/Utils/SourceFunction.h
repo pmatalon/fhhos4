@@ -5,7 +5,7 @@
 class SourceFunction
 {
 public:
-	virtual double Eval(Point p) = 0;
+	virtual double Eval(DomPoint p) = 0;
 	virtual ~SourceFunction() {}
 };
 
@@ -18,7 +18,7 @@ public:
 	{
 		this->_f = f;
 	}
-	double Eval(Point p)
+	double Eval(DomPoint p)
 	{
 		return this->_f(p.X);
 	}
@@ -33,7 +33,7 @@ public:
 	{
 		this->_f = f;
 	}
-	double Eval(Point p)
+	double Eval(DomPoint p)
 	{
 		return this->_f(p.X, p.Y);
 	}
@@ -48,7 +48,7 @@ public:
 	{
 		this->_f = f;
 	}
-	double Eval(Point p)
+	double Eval(DomPoint p)
 	{
 		return this->_f(p.X, p.Y, p.Z);
 	}

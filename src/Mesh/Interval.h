@@ -9,7 +9,7 @@ public:
 	Face<1>* Left;
 	Face<1>* Right;
 
-	Interval(BigNumber number, double a, double b, Face<1>* left, Face<1>* right) : Element(number), CartesianElement(number, Point(a), b-a), Poisson_DG_Element(number)
+	Interval(BigNumber number, double a, double b, Face<1>* left, Face<1>* right) : Element(number), CartesianElement(number, DomPoint(a), b-a), Poisson_DG_Element(number)
 	{
 		this->AddFace(left);
 		this->AddFace(right);
@@ -35,7 +35,7 @@ public:
 		assert(false);
 	}
 
-	double IntegralGlobalFunction(function<double(Point)> func)
+	double IntegralGlobalFunction(function<double(DomPoint)> func)
 	{
 		function<double(double)> funcToIntegrate = [func](double x) {
 			return func(x);

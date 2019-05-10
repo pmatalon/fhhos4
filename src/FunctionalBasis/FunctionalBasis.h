@@ -209,9 +209,9 @@ public:
 		return element->Number * static_cast<int>(this->LocalFunctions.size()) + phi->LocalNumber; // the numbers start at 0
 	}
 
-	function<double(Point)> GetApproximateFunction(const Eigen::VectorXd &solution, BigNumber startIndex)
+	function<double(RefPoint)> GetApproximateFunction(const Eigen::VectorXd &solution, BigNumber startIndex)
 	{
-		function<double(Point)> approximate = [this, solution, startIndex](Point p) {
+		function<double(RefPoint)> approximate = [this, solution, startIndex](RefPoint p) {
 			double result = 0;
 			for (unsigned int i = 0; i < this->LocalFunctions.size(); i++)
 			{

@@ -9,7 +9,7 @@ class L2
 {
 public:
 	template <int Dim>
-	static double Error(Mesh<Dim>* mesh, FunctionalBasis<Dim>* basis, Eigen::VectorXd solution, function<double(Point)> exactSolution)
+	static double Error(Mesh<Dim>* mesh, FunctionalBasis<Dim>* basis, Eigen::VectorXd solution, function<double(DomPoint)> exactSolution)
 	{
 		double absoluteError = 0;
 		double normExactSolution = 0;
@@ -17,7 +17,7 @@ public:
 		{
 			auto approximate = basis->GetApproximateFunction(solution, element->Number * basis->NumberOfLocalFunctionsInElement(element));
 			absoluteError += element->L2ErrorPow2(approximate, exactSolution);
-			normExactSolution += element->IntegralGlobalFunction([exactSolution](Point p) { return pow(exactSolution(p), 2); });
+			normExactSolution += element->IntegralGlobalFunction([exactSolution](DomPoint p) { return pow(exactSolution(p), 2); });
 		}
 		absoluteError = sqrt(absoluteError);
 		normExactSolution = sqrt(normExactSolution);

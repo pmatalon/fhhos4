@@ -16,14 +16,14 @@ public:
 	Face<2>* EastFace;
 	Face<2>* WestFace;
 
-	Point BottomLeftCorner;
-	Point TopLeftCorner;
-	Point TopRightCorner;
-	Point BottomRightCorner;
+	DomPoint BottomLeftCorner;
+	DomPoint TopLeftCorner;
+	DomPoint TopRightCorner;
+	DomPoint BottomRightCorner;
 
 	Square(int number, double x, double y, double width) : 
 		Element(number), 
-		CartesianElement(number, Point(x, y), width), 
+		CartesianElement(number, DomPoint(x, y), width), 
 		Poisson_DG_Element(number), Poisson_HHO_Element(number),
 		BottomLeftCorner(x, y),
 		TopLeftCorner(x, y + width),
@@ -78,7 +78,7 @@ public:
 		assert(false);
 	}
 
-	double IntegralGlobalFunction(function<double(Point)> func) override
+	double IntegralGlobalFunction(function<double(DomPoint)> func) override
 	{
 		double x1 = this->Origin.X;
 		double x2 = this->Origin.X + this->Width;
@@ -138,7 +138,7 @@ public:
 			auto normal = this->OuterNormalVector(face);
 
 			std::function<double(double)> functionToIntegrate = [phi, gradPhi, normal](double u) {
-				Point p(u);
+				RefPoint p(u);
 				return InnerProduct(gradPhi(p), normal) * phi(p);
 			};
 
@@ -159,7 +159,7 @@ public:
 		auto normal = this->OuterNormalVector(face);
 
 		std::function<double(double)> functionToIntegrate = [facePhi, gradPhi, normal](double u) {
-			Point p(u);
+			RefPoint p(u);
 			return InnerProduct(gradPhi(p), normal) * facePhi->Eval(p);
 		};
 

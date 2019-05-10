@@ -91,7 +91,7 @@ public:
 	static double Integral(BasisFunction<2>* phi, double x1, double x2, double y1, double y2)
 	{
 		function<double(double, double)> func = [phi](double x, double y) {
-			return phi->Eval(Point(x, y));
+			return phi->Eval(RefPoint(x, y));
 		};
 		int nPoints = (int)ceil(((double)phi->GetDegree() + 1) / 2);
 		return Utils::Integral(nPoints, func, x1, x2, y1, y2);
@@ -138,7 +138,7 @@ public:
 	static double Integral(BasisFunction<3>* phi, double x1, double x2, double y1, double y2, double z1, double z2)
 	{
 		function<double(double, double, double)> func = [phi](double x, double y, double z) {
-			return phi->Eval(Point(x, y, z));
+			return phi->Eval(RefPoint(x, y, z));
 		};
 		int nPoints = (int)ceil(((double)phi->GetDegree() + 1) / 2);
 		return Utils::Integral(nPoints, func, x1, x2, y1, y2, z1, z2);
@@ -150,32 +150,14 @@ public:
 	}
 
 	template <int Dim>
-	static double Integral(int nPoints, std::function<double(Point)> func)
+	static double Integral(int nPoints, std::function<double(RefPoint)> func)
 	{
 		if (Dim == 1)
-		{
-			/*function<double(double, double)> funcToIntegrate = [func](double x) {
-				Point p(x);
-				return func(p);
-			};*/
 			return Integral(nPoints, func, -1, 1);
-		}
 		else if (Dim == 2)
-		{
-			/*function<double(double, double)> funcToIntegrate = [func](double x, double y) {
-				Point p(x, y);
-				return func(p);
-			};*/
 			return Integral(nPoints, func, -1, 1, -1, 1);
-		}
 		else if (Dim == 3)
-		{
-			/*function<double(double, double, double)> funcToIntegrate = [func](double x, double y, double z) {
-				Point p(x, y, z);
-				return func(p);
-			};*/
 			return Integral(nPoints, func, -1, 1, -1, 1, -1, 1);
-		}
 		else
 		{
 			cout << "Unmanaged dimension in Integral." << endl;
@@ -184,16 +166,16 @@ public:
 	}
 
 	template <int Dim>
-	static double Integral(std::function<double(Point)> func)
+	static double Integral(std::function<double(RefPoint)> func)
 	{
 		return Integral<Dim>(GaussLegendre::MAX_POINTS, func);
 	}
 
-	template <int Dim>
+	/*template <int Dim>
 	static double Integral(BasisFunction<Dim>* phi)
 	{
 		return Integral<Dim>(phi);
-	}
+	}*/
 
 	//----------------------//
 	// Binomial coefficient //

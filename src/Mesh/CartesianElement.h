@@ -7,7 +7,7 @@ class CartesianElement : virtual public Element<Dim>, public CartesianShape<Dim>
 {
 public:
 
-	CartesianElement(BigNumber number, Point origin, double width) : Element<Dim>(number), CartesianShape<Dim>(origin, width)
+	CartesianElement(BigNumber number, DomPoint origin, double width) : Element<Dim>(number), CartesianShape<Dim>(origin, width)
 	{
 	}
 
@@ -23,7 +23,7 @@ public:
 
 	double DiffusionCoefficient(DiffusionPartition diffusionPartition) override
 	{
-		Point origin = CartesianShape<Dim>::Origin;
+		DomPoint origin = CartesianShape<Dim>::Origin;
 		return diffusionPartition.Coefficient(origin);
 	}
 
@@ -42,25 +42,25 @@ public:
 		return CartesianShape<Dim>::IntegralGradGrad(phi1, phi2);
 	}
 
-	Point ConvertToDomain(Point referenceElementPoint)
+	DomPoint ConvertToDomain(RefPoint referenceElementPoint)
 	{
 		return CartesianShape<Dim>::ConvertToDomain(referenceElementPoint);
 	}
 
-	Point ConvertToReference(Point domainPoint)
+	RefPoint ConvertToReference(DomPoint domainPoint)
 	{
 		return CartesianShape<Dim>::ConvertToReference(domainPoint);
 	}
 
-	vector<Point> GetNodalPoints(FunctionalBasis<Dim>* basis)
+	vector<RefPoint> GetNodalPoints(FunctionalBasis<Dim>* basis)
 	{
 		return CartesianShape<Dim>::GetNodalPoints(basis);
 	}
 
 	double SourceTerm(BasisFunction<Dim>* phi, SourceFunction* f)
 	{
-		function<double(Point)> sourceTimesBasisFunction = [this, f, phi](Point refElementPoint) {
-			Point domainPoint = this->ConvertToDomain(refElementPoint);
+		function<double(Point)> sourceTimesBasisFunction = [this, f, phi](RefPoint refElementPoint) {
+			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
 			return f->Eval(domainPoint) * phi->Eval(refElementPoint);
 		};
 
@@ -68,10 +68,10 @@ public:
 		return pow(h / 2, Dim) *  Utils::Integral<Dim>(sourceTimesBasisFunction);
 	}
 
-	double L2ErrorPow2(function<double(Point)> approximate, function<double(Point)> exactSolution)
+	double L2ErrorPow2(function<double(RefPoint)> approximate, function<double(DomPoint)> exactSolution)
 	{
-		function<double(Point)> errorFunction = [this, exactSolution, approximate](Point refElementPoint) {
-			Point domainPoint = this->ConvertToDomain(refElementPoint);
+		function<double(RefPoint)> errorFunction = [this, exactSolution, approximate](RefPoint refElementPoint) {
+			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
 			return pow(exactSolution(domainPoint) - approximate(refElementPoint), 2);
 		};
 

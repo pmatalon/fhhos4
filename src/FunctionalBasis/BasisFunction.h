@@ -8,8 +8,8 @@ class BasisFunction
 {
 public:
 	int LocalNumber = -1;
-	virtual double Eval(Point p) = 0;
-	virtual vector<double> Grad(Point p) = 0;
+	virtual double Eval(RefPoint p) = 0;
+	virtual vector<double> Grad(RefPoint p) = 0;
 	virtual int GetDegree() = 0;
 	virtual string ToString() = 0;
 };
@@ -20,7 +20,7 @@ public:
 	virtual double Eval(double x) = 0;
 	virtual double EvalDerivative(double x) = 0;
 
-	vector<double> Grad(Point p) override
+	vector<double> Grad(RefPoint p) override
 	{
 		return this->Grad(p.X);
 	}
@@ -28,7 +28,7 @@ public:
 	{
 		return vector<double>{ EvalDerivative(x) };
 	}
-	double Eval(Point p) override
+	double Eval(RefPoint p) override
 	{
 		return Eval(p.X);
 	}
@@ -48,7 +48,7 @@ public:
 	virtual double Eval(double x, double y) = 0;
 	virtual double EvalGradX(double x, double y) = 0;
 	virtual double EvalGradY(double x, double y) = 0;
-	double Eval(Point p) override
+	double Eval(RefPoint p) override
 	{
 		return Eval(p.X, p.Y);
 	}
@@ -56,7 +56,7 @@ public:
 	{
 		return vector<double>{ EvalGradX(x, y), EvalGradY(x, y) };
 	}
-	vector<double> Grad(Point p) override
+	vector<double> Grad(RefPoint p) override
 	{
 		return this->Grad(p.X, p.Y);
 	}
@@ -69,7 +69,7 @@ public:
 	virtual double EvalGradX(double x, double y, double z) = 0;
 	virtual double EvalGradY(double x, double y, double z) = 0;
 	virtual double EvalGradZ(double x, double y, double z) = 0;
-	double Eval(Point p) override
+	double Eval(RefPoint p) override
 	{
 		return Eval(p.X, p.Y, p.Z);
 	}
@@ -77,7 +77,7 @@ public:
 	{
 		return vector<double>{ EvalGradX(x, y, z), EvalGradY(x, y, z), EvalGradZ(x, y, z) };
 	}
-	vector<double> Grad(Point p) override
+	vector<double> Grad(RefPoint p) override
 	{
 		return this->Grad(p.X, p.Y, p.Z);
 	}

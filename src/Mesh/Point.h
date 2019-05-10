@@ -23,3 +23,6 @@ public:
 		this->Z = z;
 	}
 };
+
+typedef Point RefPoint; // Reference point: X, Y, Z are in the reference interval [-1, 1]
+typedef Point DomPoint; // Domain point

@@ -14,15 +14,15 @@ template <int DomainDim, int ShapeDim = DomainDim>
 class CartesianShape
 {
 public:
-	Point Origin;
+	DomPoint Origin;
 	double Width;
 	CartesianShapeOrientation Orientation;
 
-	CartesianShape(Point origin, double width) : 
+	CartesianShape(DomPoint origin, double width) : 
 		CartesianShape(origin, width, CartesianShapeOrientation::None)
 	{}
 
-	CartesianShape(Point origin, double width, CartesianShapeOrientation orientation)
+	CartesianShape(DomPoint origin, double width, CartesianShapeOrientation orientation)
 	{
 		this->Origin = origin;
 		this->Width = width;
@@ -44,7 +44,7 @@ public:
 	{
 		double h = this->Width;
 
-		function<double(Point)> functionToIntegrate = [phi1, phi2](Point p) {
+		function<double(RefPoint)> functionToIntegrate = [phi1, phi2](RefPoint p) {
 			return phi1->Eval(p)*phi2->Eval(p);
 		};
 
@@ -59,7 +59,7 @@ public:
 
 		double h = this->Width;
 
-		function<double(Point)> functionToIntegrate = [phi1, phi2](Point p) {
+		function<double(RefPoint)> functionToIntegrate = [phi1, phi2](RefPoint p) {
 			return Element<ShapeDim>::InnerProduct(phi1->Grad(p), phi2->Grad(p));
 		};
 
@@ -67,9 +67,9 @@ public:
 		return pow(h / 2, ShapeDim-2) * Utils::Integral<ShapeDim>(nQuadPoints, functionToIntegrate);
 	}
 
-	Point ConvertToDomain(Point referenceElementPoint)
+	DomPoint ConvertToDomain(RefPoint referenceElementPoint)
 	{
-		Point p;
+		DomPoint p;
 		if (ShapeDim == DomainDim)
 		{
 			double x1 = this->Origin.X;
@@ -112,9 +112,9 @@ public:
 		return p;
 	}
 
-	Point ConvertToReference(Point domainPoint)
+	RefPoint ConvertToReference(DomPoint domainPoint)
 	{
-		Point refPoint;
+		RefPoint refPoint;
 		if (ShapeDim == DomainDim)
 		{
 			double x1 = this->Origin.X;
@@ -151,65 +151,65 @@ public:
 		return refPoint;
 	}
 
-	vector<Point> GetNodalPoints(FunctionalBasis<ShapeDim>* basis)
+	vector<RefPoint> GetNodalPoints(FunctionalBasis<ShapeDim>* basis)
 	{
-		vector<Point> points;
+		vector<RefPoint> points;
 		points.reserve(basis->Size());
 		if (ShapeDim == 1)
 		{
 			if (basis->GetDegree() == 0)
-				points.push_back(Point(0));
+				points.push_back(RefPoint(0));
 			else
 			{
 				double h = 2 / ((double)basis->Size() - 1);
 				for (int i = 0; i < basis->Size(); ++i)
-					points.push_back(Point(-1 + i * h));
+					points.push_back(RefPoint(-1 + i * h));
 			}
 		}
 		else if (ShapeDim == 2)
 		{
 			if (basis->GetDegree() == 0)
-				points.push_back(Point(0, 0));
+				points.push_back(RefPoint(0, 0));
 			else if (basis->FullTensorization)
 			{
 				cout << "Warning: these interpolation points have never been tested." << endl;
 				double h = 2 / (double)basis->GetDegree();
 				for (int i = 0; i < basis->GetDegree() + 1; ++i)
 					for (int j = 0; j < basis->GetDegree() + 1; ++j)
-						points.push_back(Point(-1 + i * h, -1 + j * h));
+						points.push_back(RefPoint(-1 + i * h, -1 + j * h));
 			}
 			else
 			{
 				if (basis->GetDegree() == 1)
 				{
-					points.push_back(Point(-1, 1)); // top-left corner
-					points.push_back(Point(1, 1)); // top-right corner
-					points.push_back(Point(0, -1)); // bottom-middle
+					points.push_back(RefPoint(-1, 1)); // top-left corner
+					points.push_back(RefPoint(1, 1)); // top-right corner
+					points.push_back(RefPoint(0, -1)); // bottom-middle
 				}
 				else if (basis->GetDegree() == 2)
 				{
-					points.push_back(Point(-1, 1)); // top-left corner
-					points.push_back(Point(1, 1)); // top-right corner
-					points.push_back(Point(1, -1)); // bottom-right corner
-					points.push_back(Point(-1, -1)); // bottom-left corner
+					points.push_back(RefPoint(-1, 1)); // top-left corner
+					points.push_back(RefPoint(1, 1)); // top-right corner
+					points.push_back(RefPoint(1, -1)); // bottom-right corner
+					points.push_back(RefPoint(-1, -1)); // bottom-left corner
 
-					points.push_back(Point(-1, 0)); // center-left
-					points.push_back(Point(1, 0)); // center-right
+					points.push_back(RefPoint(-1, 0)); // center-left
+					points.push_back(RefPoint(1, 0)); // center-right
 				}
 				else if (basis->GetDegree() == 3)
 				{
-					points.push_back(Point(-1, 1)); // top-left corner
-					points.push_back(Point(1, 1)); // top-right corner
-					points.push_back(Point(1, -1)); // bottom-right corner
-					points.push_back(Point(-1, -1)); // bottom-left corner
+					points.push_back(RefPoint(-1, 1)); // top-left corner
+					points.push_back(RefPoint(1, 1)); // top-right corner
+					points.push_back(RefPoint(1, -1)); // bottom-right corner
+					points.push_back(RefPoint(-1, -1)); // bottom-left corner
 
-					points.push_back(Point(-1, 0)); // center-left
-					points.push_back(Point(1, 0)); // center-right
-					points.push_back(Point(0, 1)); // top-middle
-					points.push_back(Point(0, -1)); // bottom-middle
+					points.push_back(RefPoint(-1, 0)); // center-left
+					points.push_back(RefPoint(1, 0)); // center-right
+					points.push_back(RefPoint(0, 1)); // top-middle
+					points.push_back(RefPoint(0, -1)); // bottom-middle
 
-					points.push_back(Point(-0.5, 0));
-					points.push_back(Point(0.5, 0));
+					points.push_back(RefPoint(-0.5, 0));
+					points.push_back(RefPoint(0.5, 0));
 				}
 				else
 				{
@@ -219,7 +219,7 @@ public:
 					GaussLegendre gauss(nPoint1D);
 					for (int i = 0; i < nPoint1D; ++i)
 						for (int j = 0; j < nPoint1D; ++j)
-							points.push_back(Point(gauss.Point(i), gauss.Point(j)));
+							points.push_back(RefPoint(gauss.Point(i), gauss.Point(j)));
 				}
 			}
 		}
@@ -232,7 +232,7 @@ public:
 			for (int i = 0; i < nPoint1D; ++i)
 				for (int j = 0; j < nPoint1D; ++j)
 					for (int k = 0; k < nPoint1D; ++k)
-						points.push_back(Point(gauss.Point(i), gauss.Point(j), gauss.Point(k)));
+						points.push_back(RefPoint(gauss.Point(i), gauss.Point(j), gauss.Point(k)));
 		}
 		return points;
 	}

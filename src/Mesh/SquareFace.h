@@ -9,7 +9,7 @@ public:
 
 	SquareFace(BigNumber number, double width, Element<3>* element1, Element<3>* element2) : 
 		Face(number, element1, element2), 
-		CartesianShape(Point(), width), 
+		CartesianShape(DomPoint(), width), 
 		Poisson_DG_Face(number, element1, element2),
 		Poisson_HHO_Face(number, element1, element2)
 	{
@@ -17,7 +17,7 @@ public:
 
 	SquareFace(BigNumber number, double width, Element<3>* element1) : 
 		Face(number, element1), 
-		CartesianShape(Point(), width), 
+		CartesianShape(DomPoint(), width), 
 		Poisson_DG_Face(number, element1, NULL),
 		Poisson_HHO_Face(number, element1, NULL)
 	{
@@ -48,7 +48,7 @@ public:
 		auto reconstructPhiOnFace = element->EvalPhiOnFace(this, reconstructPhi);
 
 		function<double(double, double)> functionToIntegrate = [facePhi, reconstructPhiOnFace](double t, double u) {
-			Point p(t, u);
+			RefPoint p(t, u);
 			return facePhi->Eval(p) * reconstructPhiOnFace(p);
 		};
 
@@ -56,17 +56,17 @@ public:
 		return pow(h, 2) / 4 * Utils::Integral(nQuadPoints, functionToIntegrate, -1, 1, -1, 1);
 	}
 
-	Point ConvertToReference(Point domainPoint)
+	RefPoint ConvertToReference(DomPoint domainPoint)
 	{
 		return CartesianShape<3,2>::ConvertToReference(domainPoint);
 	}
 
-	Point ConvertToDomain(Point referenceElementPoint)
+	DomPoint ConvertToDomain(RefPoint referenceElementPoint)
 	{
 		return CartesianShape<3,2>::ConvertToDomain(referenceElementPoint);
 	}
 
-	vector<Point> GetNodalPoints(FunctionalBasis<2>* basis)
+	vector<RefPoint> GetNodalPoints(FunctionalBasis<2>* basis)
 	{
 		return CartesianShape<3,2>::GetNodalPoints(basis);
 	}
@@ -102,7 +102,7 @@ public:
 		auto gradPhi2 = element2->GradPhiOnFace(this, p_phi2);
 
 		std::function<double(double, double)> functionToIntegrate = [n1, n2, phi1, phi2, gradPhi1, gradPhi2, weight1, weight2, k1, k2](double u, double v) {
-			Point p(u, v);
+			RefPoint p(u, v);
 			double meanGradPhi1_scal_jumpPhi2 = weight1 * k1 * InnerProduct(gradPhi1(p), n2) * phi2(p);
 			double meanGradPhi2_scal_jumpPhi1 = weight2 * k2 * InnerProduct(gradPhi2(p), n1) * phi1(p);
 			return meanGradPhi1_scal_jumpPhi2 + meanGradPhi2_scal_jumpPhi1;
@@ -122,7 +122,7 @@ public:
 		auto phi2 = element2->EvalPhiOnFace(this, p_phi2);
 
 		std::function<double(double, double)> functionToIntegrate = [phi1, phi2, n1, n2](double s, double t) {
-			Point p(s, t);
+			RefPoint p(s, t);
 			return InnerProduct(n1, n2) * phi1(p) * phi2(p);
 		};
 

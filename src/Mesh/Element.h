@@ -45,12 +45,12 @@ public:
 	virtual double GetDiameter() = 0;
 	virtual double Measure() = 0;
 
-	virtual Point ConvertToDomain(Point refPoint) = 0;
-	virtual Point ConvertToReference(Point domainPoint) = 0;
+	virtual DomPoint ConvertToDomain(RefPoint refPoint) = 0;
+	virtual RefPoint ConvertToReference(DomPoint domainPoint) = 0;
 
 	virtual vector<double> OuterNormalVector(Face<Dim>* face) = 0;
 	
-	virtual double IntegralGlobalFunction(function<double(Point)> globalFunction) = 0;
+	virtual double IntegralGlobalFunction(function<double(DomPoint)> globalFunction) = 0;
 
 	virtual double MassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{
@@ -105,9 +105,9 @@ public:
 
 	virtual function<double(Point)> EvalPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* phi)
 	{
-		function<double(Point)> evalOnFace = [this, face, phi](Point refPoint1D) {
-			Point domainPoint2D = face->ConvertToDomain(refPoint1D);
-			Point refPoint2D = this->ConvertToReference(domainPoint2D);
+		function<double(Point)> evalOnFace = [this, face, phi](RefPoint refPoint1D) {
+			DomPoint domainPoint2D = face->ConvertToDomain(refPoint1D);
+			RefPoint refPoint2D = this->ConvertToReference(domainPoint2D);
 			return phi->Eval(refPoint2D);
 		};
 		return evalOnFace;
@@ -115,9 +115,9 @@ public:
 
 	virtual function<vector<double>(Point)> GradPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* phi)
 	{
-		function<vector<double>(Point)> gradOnFace = [this, face, phi](Point refPoint1D) {
-			Point domainPoint2D = face->ConvertToDomain(refPoint1D);
-			Point refPoint2D = this->ConvertToReference(domainPoint2D);
+		function<vector<double>(Point)> gradOnFace = [this, face, phi](RefPoint refPoint1D) {
+			DomPoint domainPoint2D = face->ConvertToDomain(refPoint1D);
+			RefPoint refPoint2D = this->ConvertToReference(domainPoint2D);
 			return phi->Grad(refPoint2D);
 		};
 		return gradOnFace;
@@ -130,9 +130,9 @@ public:
 			measure += f->Measure();
 	}
 
-	virtual double L2ErrorPow2(function<double(Point)> approximate, function<double(Point)> exactSolution) = 0;
+	virtual double L2ErrorPow2(function<double(RefPoint)> approximate, function<double(DomPoint)> exactSolution) = 0;
 	virtual double DiffusionCoefficient(DiffusionPartition diffusionPartition) = 0;
-	virtual vector<Point> GetNodalPoints(FunctionalBasis<Dim>* basis) = 0;
+	virtual vector<RefPoint> GetNodalPoints(FunctionalBasis<Dim>* basis) = 0;
 
 	virtual ~Element() {}
 

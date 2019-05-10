@@ -41,19 +41,19 @@ public:
 		return 0;
 	}
 
-	Point ConvertToReference(Point domainPoint)
+	RefPoint ConvertToReference(DomPoint domainPoint)
 	{
-		return Point(0);
+		return RefPoint(0);
 	}
 
-	Point ConvertToDomain(Point referenceElementPoint)
+	DomPoint ConvertToDomain(RefPoint referenceElementPoint)
 	{
-		return Point(0);
+		return DomPoint(0);
 	}
 
-	vector<Point> GetNodalPoints(FunctionalBasis<0>* basis)
+	vector<RefPoint> GetNodalPoints(FunctionalBasis<0>* basis)
 	{
-		return vector<Point> {Point(0)};
+		return vector<RefPoint> {RefPoint(0)};
 	}
 
 	//---------------------------------------------------------------//

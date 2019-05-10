@@ -51,7 +51,7 @@ public:
 	virtual double GetDiameter() = 0;
 	virtual double Measure() = 0;
 
-	virtual Point ConvertToDomain(Point refPoint) = 0;
+	virtual DomPoint ConvertToDomain(RefPoint refPoint) = 0;
 
 	virtual Eigen::MatrixXd MassMatrix(FunctionalBasis<Dim-1>* basis)
 	{
@@ -84,7 +84,7 @@ public:
 		return M;
 	}
 
-	virtual vector<Point> GetNodalPoints(FunctionalBasis<Dim-1>* basis) = 0;
+	virtual vector<RefPoint> GetNodalPoints(FunctionalBasis<Dim-1>* basis) = 0;
 
 	virtual string ToString()
 	{
