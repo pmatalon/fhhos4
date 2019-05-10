@@ -26,6 +26,11 @@ public:
 			return this->Element2->GetDiameter();
 	}
 
+	double Measure()
+	{
+		return 0;
+	}
+
 	double MassTerm(BasisFunction<0>* phi1, BasisFunction<0>* phi2)
 	{
 		return 0;

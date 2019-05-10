@@ -49,6 +49,7 @@ public:
 	virtual double MassTerm(BasisFunction<Dim - 1>* facePhi, Element<Dim>* element, BasisFunction<Dim>* reconstructPhi) = 0;
 
 	virtual double GetDiameter() = 0;
+	virtual double Measure() = 0;
 
 	virtual Point ConvertToDomain(Point refPoint) = 0;
 

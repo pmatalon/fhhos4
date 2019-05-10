@@ -137,7 +137,6 @@
     <ClInclude Include="src/Utils/Utils.h" />
     <ClInclude Include="src/Problem.h" />
     <ClInclude Include="src\Solver\BlockSOR.h" />
-    <ClInclude Include="src\Solver\GeometricMultigrid.h" />
     <ClInclude Include="src\Solver\IterationResult.h" />
     <ClInclude Include="src\Solver\Level.h" />
     <ClInclude Include="src\Solver\Multigrid.h" />

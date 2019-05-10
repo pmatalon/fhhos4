@@ -1,8 +1,8 @@
 #pragma once
 #include <Eigen/Sparse>
 #include <vector>
-#include "GeometricMultigrid.h"
 #include "BlockSOR.h"
+#include "Multigrid.h"
 #include "../Mesh/Mesh.h"
 #include "../HHO/Poisson_HHO_Element.h"
 using namespace std;
@@ -23,14 +23,31 @@ public:
 
 	void Setup()
 	{
-		this->OperatorMatrix = this->_problem->A;
+		/*this->OperatorMatrix = this->_problem->A;
 		if (!this->IsCoarsestLevel())
 		{
 			SetupProlongation();
 			SetupRestriction();
 			SetupSmoothers();
+		}*/
+
+		// Galerkin operator
+		if (!this->IsCoarsestLevel())
+		{
+			SetupProlongation();
+			SetupRestriction();
+		}
+		
+		if (this->IsFinestLevel())
+			this->OperatorMatrix = this->_problem->A;
+		else
+		{
+			LevelForHHO<Dim>* finerLevel = dynamic_cast<LevelForHHO<Dim>*>(FinerLevel);
+			this->OperatorMatrix = finerLevel->R * finerLevel->OperatorMatrix * finerLevel->P;
 		}
 
+		if (!this->IsCoarsestLevel())
+			SetupSmoothers();
 	}
 
 	Eigen::VectorXd Restrict(Eigen::VectorXd& vectorOnThisLevel) override
@@ -54,94 +71,22 @@ private:
 
 	void SetupProlongation()
 	{
-		//P = Eigen::SparseMatrix<double>(this->OperatorMatrix.rows(), this->CoarserLevel->OperatorMatrix.rows());
-
 		Poisson_HHO<Dim>* finePb = this->_problem;
 		Poisson_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
-		Mesh<Dim>* coarseMesh = coarsePb->_mesh;
-
-		//NonZeroCoefficients I_c_coeffs(coarsePb->HHO.nTotalCellUnknowns * coarsePb->HHO.nTotalFaceUnknowns); // Global interpolator from coarse faces onto coarse interiors
-		NonZeroCoefficients J_f_c_coeffs(coarsePb->HHO.nTotalCellUnknowns * finePb->HHO.nTotalCellUnknowns); // Straight injector from coarse interior functions to fine interior functions
-		//NonZeroCoefficients Pi_f_coeffs(finePb->HHO.nTotalCellUnknowns * finePb->HHO.nTotalFaceUnknowns); // Global projector from fine interiors onto fine faces
-
-		int nCoarseFaceUnknowns = coarsePb->HHO.nLocalFaceUnknowns;
-		int nCoarseCellUnknowns = coarsePb->HHO.nLocalCellUnknowns;
-
-		int nFineFaceUnknowns = finePb->HHO.nLocalFaceUnknowns;
-		int nFineCellUnknowns = finePb->HHO.nLocalCellUnknowns;
-
-		for (auto ce : coarseMesh->Elements)
-		{
-			Poisson_HHO_Element<Dim>* coarseElement = dynamic_cast<Poisson_HHO_Element<Dim>*>(ce);
-
-			// I_c contribution
-			/*Eigen::MatrixXd local_I_c = coarseElement->ComputeInterpolationMatrixFromFaces();
-			for (auto face : coarseElement->Faces)
-			{
-				if (face->IsDomainBoundary)
-					continue;
-
-				BigNumber elemGlobalNumber = coarseElement->Number;
-				BigNumber faceGlobalNumber = face->Number;
-				BigNumber faceLocalNumber = coarseElement->LocalNumberOf(face);
-
-				I_c_coeffs.Add(elemGlobalNumber*nCoarseCellUnknowns, faceGlobalNumber*nCoarseFaceUnknowns, local_I_c.block(0, faceLocalNumber*nCoarseFaceUnknowns, nCoarseCellUnknowns, nCoarseFaceUnknowns));
-			}*/
-			
-			// J_f_c contribution
-			Eigen::MatrixXd local_J_f_c = coarseElement->ComputeCanonicalInjectionMatrixCoarseToFine();
-			for (auto fineElement : coarseElement->FinerElements)
-			{
-				BigNumber coarseElemGlobalNumber = coarseElement->Number;
-				BigNumber fineElemGlobalNumber = fineElement->Number;
-				BigNumber fineElemLocalNumber = coarseElement->LocalNumberOf(fineElement);
-
-				J_f_c_coeffs.Add(fineElemGlobalNumber*nFineCellUnknowns, coarseElemGlobalNumber*nCoarseCellUnknowns, local_J_f_c.block(fineElemLocalNumber*nFineCellUnknowns, 0, nFineCellUnknowns, nCoarseCellUnknowns));
-			}
-
-			// Pi_f contribution
-			/*for (auto fe : coarseElement->FinerElements)
-			{
-				Poisson_HHO_Element<Dim>* fineElement = dynamic_cast<Poisson_HHO_Element<Dim>*>(fe);
-
-				Eigen::MatrixXd local_Pi_f = fineElement->ComputeProjectorMatrixFromCellOntoFaces();
-				for (auto face : fineElement->Faces)
-				{
-					if (face->IsDomainBoundary)
-						continue;
-
-					BigNumber elemGlobalNumber = fineElement->Number;
-					BigNumber faceGlobalNumber = face->Number;
-					BigNumber faceLocalNumber = fineElement->LocalNumberOf(face);
-
-					Pi_f_coeffs.Add(faceGlobalNumber*nFineFaceUnknowns, elemGlobalNumber*nFineCellUnknowns, local_Pi_f.block(faceLocalNumber, 0, nFineFaceUnknowns, nFineCellUnknowns));
-				}
-			}*/
-		}
-
-		//Eigen::SparseMatrix<double> I_c(coarsePb->HHO.nTotalCellUnknowns, coarsePb->HHO.nTotalFaceUnknowns);
-		Eigen::SparseMatrix<double> J_f_c(finePb->HHO.nTotalCellUnknowns, coarsePb->HHO.nTotalCellUnknowns);
-		//Eigen::SparseMatrix<double> Pi_f(finePb->HHO.nTotalFaceUnknowns, finePb->HHO.nTotalCellUnknowns);
-
-		//I_c_coeffs.Fill(I_c);
-		J_f_c_coeffs.Fill(J_f_c);
-		//Pi_f_coeffs.Fill(Pi_f);
 
 		auto I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
+		auto J_f_c = GetGlobalCanonicalInjectionMatrixCoarseToFine();
 		auto Pi_c = GetGlobalProjectorMatrixFromCellsToFaces(coarsePb);
 		auto Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
 
-
-		//cout << "------------------ " << " mult" << endl << (globalIc*globalPic) << endl;
-
 		finePb->ExportMatrix(I_c, "I_c");
 		finePb->ExportMatrix(J_f_c, "J_f_c");
-		finePb->ExportMatrix(Pi_f, "Pi_f");
+		this->_problem->ExportMatrix(Pi_f, "Pi_f");
 
 		finePb->ExportMatrix(Pi_c, "Pi_c");
 
-		// Prolongation
 		P = Pi_f * J_f_c * I_c;
+
 		finePb->ExportMatrix(P, "P");
 	}
 
@@ -179,7 +124,7 @@ private:
 
 				Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
 
-				double weight = 1;// face->GetDiameter() / element->FrontierMeasure();
+				double weight = element->Measure() / element->FrontierMeasure();
 				Eigen::MatrixXd M_face = face->GetMassMatrix();
 
 				BigNumber faceGlobalNumber = face->Number;
@@ -203,20 +148,27 @@ private:
 		{
 			Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
 
-			// I_c contribution
-			Eigen::MatrixXd local_I = element->ComputeInterpolationMatrixFromFaces();
+			Eigen::MatrixXd M_cell = element->GetMassMatrix();
+			Eigen::MatrixXd invM_cell = M_cell.inverse();
 
-			//cout << "------------------ Element " << coarseElement->Number << " local_I_c" << endl << local_I_c << endl;
-			for (auto face : element->Faces)
+			//Eigen::MatrixXd local_I = element->ComputeInterpolationMatrixFromFaces();
+			for (auto f : element->Faces)
 			{
-				if (face->IsDomainBoundary)
+				if (f->IsDomainBoundary)
 					continue;
+
+				Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
 
 				BigNumber elemGlobalNumber = element->Number;
 				BigNumber faceGlobalNumber = face->Number;
 				BigNumber faceLocalNumber = element->LocalNumberOf(face);
 
-				I_coeffs.Add(elemGlobalNumber*nCellUnknowns, faceGlobalNumber*nFaceUnknowns, local_I.block(0, faceLocalNumber*nFaceUnknowns, nCellUnknowns, nFaceUnknowns));
+				Eigen::MatrixXd M_face = face->GetMassMatrix();
+				Eigen::MatrixXd Pi_face = face->GetProjFromCell(element);
+
+				double weight = element->Measure() / element->FrontierMeasure();
+				//I_coeffs.Add(elemGlobalNumber*nCellUnknowns, faceGlobalNumber*nFaceUnknowns, local_I.block(0, faceLocalNumber*nFaceUnknowns, nCellUnknowns, nFaceUnknowns));
+				I_coeffs.Add(elemGlobalNumber*nCellUnknowns, faceGlobalNumber*nFaceUnknowns, weight * invM_cell * Pi_face.transpose() * M_face);
 			}
 		}
 		Eigen::SparseMatrix<double> I(problem->HHO.nTotalCellUnknowns, problem->HHO.nTotalFaceUnknowns);
@@ -234,40 +186,82 @@ private:
 		{
 			Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
 
-			Eigen::MatrixXd local_Pi = element->ComputeProjectorMatrixFromCellOntoFaces();
-			for (auto face : element->Faces)
+			//Eigen::MatrixXd local_Pi = element->ComputeProjectorMatrixFromCellOntoFaces();
+			for (auto f : element->Faces)
 			{
-				if (face->IsDomainBoundary)
+				if (f->IsDomainBoundary)
 					continue;
+
+				Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
 
 				BigNumber elemGlobalNumber = element->Number;
 				BigNumber faceGlobalNumber = face->Number;
 				BigNumber faceLocalNumber = element->LocalNumberOf(face);
 
-				Pi_coeffs.Add(faceGlobalNumber*nFaceUnknowns, elemGlobalNumber*nCellUnknowns, local_Pi.block(faceLocalNumber*nFaceUnknowns, 0, nFaceUnknowns, nCellUnknowns));
+				double weight = element->Measure() / element->FrontierMeasure();
+				Pi_coeffs.Add(faceGlobalNumber*nFaceUnknowns, elemGlobalNumber*nCellUnknowns, weight*face->GetProjFromCell(element));// local_Pi.block(faceLocalNumber*nFaceUnknowns, 0, nFaceUnknowns, nCellUnknowns));
 			}
 		}
-		/*cout << "*****************************************************" << endl;
-		for (auto face : problem->_mesh->Faces)
+		/*for (auto f : problem->_mesh->Faces)
 		{
-			if (face->IsDomainBoundary)
+			if (f->IsDomainBoundary)
 				continue;
 
-			Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(face->Element2);
-			Eigen::MatrixXd local_Pi = element->ComputeProjectorMatrixFromCellOntoFaces();
+			Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
 
-			cout << "Face " << face->Number << " takes value from element " << element->Number << endl;
+			Poisson_HHO_Element<Dim>* element1 = dynamic_cast<Poisson_HHO_Element<Dim>*>(face->Element1);
+			Poisson_HHO_Element<Dim>* element2 = dynamic_cast<Poisson_HHO_Element<Dim>*>(face->Element2);
+			//Eigen::MatrixXd local_Pi = element->ComputeProjectorMatrixFromCellOntoFaces();
 
-			BigNumber elemGlobalNumber = element->Number;
+			//cout << "Face " << face->Number << " takes value from element " << element->Number << endl;
+
 			BigNumber faceGlobalNumber = face->Number;
-			BigNumber faceLocalNumber = element->LocalNumberOf(face);
+			BigNumber elem1GlobalNumber = element1->Number;
+			BigNumber faceLocalNumber1 = element1->LocalNumberOf(face);
+			BigNumber elem2GlobalNumber = element2->Number;
+			BigNumber faceLocalNumber2 = element2->LocalNumberOf(face);
 
-			Pi_coeffs.Add(faceGlobalNumber*nFaceUnknowns, elemGlobalNumber*nCellUnknowns, local_Pi.block(faceLocalNumber*nFaceUnknowns, 0, nFaceUnknowns, nCellUnknowns));
+			Pi_coeffs.Add(faceGlobalNumber*nFaceUnknowns, elem1GlobalNumber*nCellUnknowns, 0.5 * face->GetProjFromCell(element1));//local_Pi.block(faceLocalNumber*nFaceUnknowns, 0, nFaceUnknowns, nCellUnknowns));
+			Pi_coeffs.Add(faceGlobalNumber*nFaceUnknowns, elem2GlobalNumber*nCellUnknowns, 0.5 * face->GetProjFromCell(element2));
 		}*/
 
 		Eigen::SparseMatrix<double> Pi(problem->HHO.nTotalFaceUnknowns, problem->HHO.nTotalCellUnknowns);
 		Pi_coeffs.Fill(Pi);
 		return Pi;
+	}
+
+	Eigen::SparseMatrix<double> GetGlobalCanonicalInjectionMatrixCoarseToFine()
+	{
+		Poisson_HHO<Dim>* finePb = this->_problem;
+		Poisson_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
+		Mesh<Dim>* coarseMesh = coarsePb->_mesh;
+
+		NonZeroCoefficients J_f_c_coeffs(coarsePb->HHO.nTotalCellUnknowns * finePb->HHO.nTotalCellUnknowns); // Straight injector from coarse interior functions to fine interior functions
+
+		int nCoarseFaceUnknowns = coarsePb->HHO.nLocalFaceUnknowns;
+		int nCoarseCellUnknowns = coarsePb->HHO.nLocalCellUnknowns;
+
+		int nFineFaceUnknowns = finePb->HHO.nLocalFaceUnknowns;
+		int nFineCellUnknowns = finePb->HHO.nLocalCellUnknowns;
+
+		for (auto ce : coarseMesh->Elements)
+		{
+			Poisson_HHO_Element<Dim>* coarseElement = dynamic_cast<Poisson_HHO_Element<Dim>*>(ce);
+
+			Eigen::MatrixXd local_J_f_c = coarseElement->ComputeCanonicalInjectionMatrixCoarseToFine();
+			for (auto fineElement : coarseElement->FinerElements)
+			{
+				BigNumber coarseElemGlobalNumber = coarseElement->Number;
+				BigNumber fineElemGlobalNumber = fineElement->Number;
+				BigNumber fineElemLocalNumber = coarseElement->LocalNumberOf(fineElement);
+
+				J_f_c_coeffs.Add(fineElemGlobalNumber*nFineCellUnknowns, coarseElemGlobalNumber*nCoarseCellUnknowns, local_J_f_c.block(fineElemLocalNumber*nFineCellUnknowns, 0, nFineCellUnknowns, nCoarseCellUnknowns));
+			}
+		}
+
+		Eigen::SparseMatrix<double> J_f_c(finePb->HHO.nTotalCellUnknowns, coarsePb->HHO.nTotalCellUnknowns);
+		J_f_c_coeffs.Fill(J_f_c);
+		return J_f_c;
 	}
 };
 
@@ -276,56 +270,93 @@ class MultigridForHHO : public Multigrid
 {
 private:
 	Poisson_HHO<Dim>* _problem;
+	bool _automaticNumberOfLevels;
 	int _nLevels;
 public:
-	MultigridForHHO(Poisson_HHO<Dim>* problem, int nLevels) : Multigrid()
+	int MatrixMaxSizeForCoarsestLevel = 10;
+
+	MultigridForHHO(Poisson_HHO<Dim>* problem) : MultigridForHHO(problem, true, 10)
+	{}
+	MultigridForHHO(Poisson_HHO<Dim>* problem, int nLevels) : MultigridForHHO(problem, false, nLevels)
+	{}
+
+	MultigridForHHO(Poisson_HHO<Dim>* problem, bool automaticNumberOfLevels, int nLevelsOrCoarsestMatrixSize) : Multigrid()
 	{
-		_problem = problem;
-		_nLevels = nLevels;
+		this->_problem = problem;
+		this->_automaticNumberOfLevels = automaticNumberOfLevels;
+		
+		if (automaticNumberOfLevels)
+		{
+			this->_nLevels = 0;
+			this->MatrixMaxSizeForCoarsestLevel = nLevelsOrCoarsestMatrixSize;
+		}
+		else
+		{
+			this->_nLevels = nLevelsOrCoarsestMatrixSize;
+			this->MatrixMaxSizeForCoarsestLevel = 0;
+		}
+
+		this->_fineLevel = new LevelForHHO<Dim>(0, problem);
+	}
+	
+	virtual void Serialize(ostream& os) const override
+	{
+		os << "MultigridForHHO" << endl;
+		os << "\t" << "Levels: ";
+		if (_automaticNumberOfLevels)
+			os << _nLevels << " (automatic)" << endl;
+		else
+			os << _nLevels << endl;
+		os << "\t" << "Pre-smoothing:\t\t" << _fineLevel->PreSmoother << endl;
+		os << "\t" << "Post-smoothing:\t" << _fineLevel->PostSmoother;
 	}
 
 	void Setup(const Eigen::SparseMatrix<double>& A) override
 	{
 		IterativeSolver::Setup(A);
 
-		LevelForHHO<Dim>* finerLevel = NULL;
+		cout << "Setup..." << endl;
+
+		LevelForHHO<Dim>* finerLevel = dynamic_cast<LevelForHHO<Dim>*>(this->_fineLevel);
 		Poisson_HHO<Dim>* problem = _problem;
-		for (int levelNumber = 0; levelNumber < _nLevels; levelNumber++)
+		if (!_automaticNumberOfLevels)
 		{
-			LevelForHHO<Dim>* level = new LevelForHHO<Dim>(levelNumber, problem);
-			if (levelNumber == 0)
-				this->_fineLevel = level;
-			else
-			{
-				finerLevel->CoarserLevel = level;
-				level->FinerLevel = finerLevel;
-			}
-
-			finerLevel = level;
-
-			if (levelNumber < _nLevels - 1)
+			for (int levelNumber = 1; levelNumber < _nLevels; levelNumber++)
 			{
 				dynamic_cast<CartesianGrid2D*>(problem->_mesh)->BuildCoarserMesh();
 				problem = problem->GetProblemOnCoarserMesh();
 				problem->Assemble(Action::None);
-				/*for (auto f : problem->_mesh->Faces)
-				{
-					IntervalFace* face = dynamic_cast<IntervalFace*>(f);
-					cout << *face << endl;
-				}*/
-			}
-		}
+				LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(levelNumber, problem);
 
-		LevelForHHO<Dim>* level = dynamic_cast<LevelForHHO<Dim>*>(this->_fineLevel);
-		while (level != NULL)
+				finerLevel->CoarserLevel = coarseLevel;
+				coarseLevel->FinerLevel = finerLevel;
+
+				finerLevel->Setup();
+
+				finerLevel = coarseLevel;
+			}
+			finerLevel->Setup();
+		}
+		else
 		{
-			level->Setup();
-			level = dynamic_cast<LevelForHHO<Dim>*>(level->CoarserLevel);
+			int levelNumber = 0;
+			while (problem->A.rows() > MatrixMaxSizeForCoarsestLevel)
+			{
+				levelNumber++;
+				dynamic_cast<CartesianGrid2D*>(problem->_mesh)->BuildCoarserMesh();
+				problem = problem->GetProblemOnCoarserMesh();
+				problem->Assemble(Action::None);
+				LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(levelNumber, problem);
+
+				finerLevel->CoarserLevel = coarseLevel;
+				coarseLevel->FinerLevel = finerLevel;
+
+				finerLevel->Setup();
+
+				finerLevel = coarseLevel;
+			}
+			finerLevel->Setup();
+			_nLevels = levelNumber + 1;
 		}
 	}
-
-	/*GeometricLevel<Dim>* CreateGeometricLevel(int number, Mesh<Dim>* mesh)
-	{
-		return new LevelForHHO<Dim>(number, mesh);
-	}*/
 };

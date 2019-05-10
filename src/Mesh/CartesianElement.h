@@ -16,6 +16,11 @@ public:
 		return CartesianShape<Dim>::Width;
 	}
 
+	double Measure()
+	{
+		return CartesianShape<Dim>::Measure();
+	}
+
 	double DiffusionCoefficient(DiffusionPartition diffusionPartition) override
 	{
 		Point origin = CartesianShape<Dim>::Origin;

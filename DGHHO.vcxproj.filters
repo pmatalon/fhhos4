@@ -164,9 +164,6 @@
     <ClInclude Include="src\Solver\MultigridForHHO.h">
       <Filter>Solver</Filter>
     </ClInclude>
-    <ClInclude Include="src\Solver\GeometricMultigrid.h">
-      <Filter>Solver</Filter>
-    </ClInclude>
     <ClInclude Include="src\Solver\IterationResult.h">
       <Filter>Solver</Filter>
     </ClInclude>

@@ -29,6 +29,11 @@ public:
 		this->Orientation = orientation;
 	}
 
+	double Measure()
+	{
+		return pow(this->Width, ShapeDim);
+	}
+
 	double Integral(BasisFunction<ShapeDim>* phi)
 	{
 		double h = this->Width;
@@ -133,18 +138,11 @@ public:
 		else if (ShapeDim == 1 && DomainDim == 2)
 		{
 			double x1 = this->Origin.X;
-			//double y1 = this->Origin.Y;
-
 			double x2 = x1 + this->Width;
-			//double y2 = y1;
 			if (this->Orientation == CartesianShapeOrientation::Vertical)
-			{
 				x2 = x1;
-				//y2 = y1 + this->Width;
-			}
 
 			double x = domainPoint.X;
-			//double y = domainPoint.Y;
 
 			refPoint.X = 2 / (x2 - x1) * x - (x2 + x1) / (x2 - x1);
 		}
@@ -156,42 +154,78 @@ public:
 	vector<Point> GetNodalPoints(FunctionalBasis<ShapeDim>* basis)
 	{
 		vector<Point> points;
+		points.reserve(basis->Size());
 		if (ShapeDim == 1)
 		{
-			points.reserve(basis->Size());
-			GaussLegendre gauss(basis->Size());
-			for (int i = 0; i < basis->Size(); ++i)
-				points.push_back(gauss.Point(i));
+			if (basis->GetDegree() == 0)
+				points.push_back(Point(0));
+			else
+			{
+				double h = 2 / ((double)basis->Size() - 1);
+				for (int i = 0; i < basis->Size(); ++i)
+					points.push_back(Point(-1 + i * h));
+			}
 		}
 		else if (ShapeDim == 2)
 		{
-			if (basis->GetDegree() == 1)
+			if (basis->GetDegree() == 0)
+				points.push_back(Point(0, 0));
+			else if (basis->FullTensorization)
 			{
-				points.push_back(Point(-1, 1)); // top-left corner
-				points.push_back(Point(1, 1)); // top-right corner
-				points.push_back(Point(0, -1)); // bottom-middle
-			}
-			if (basis->GetDegree() == 2)
-			{
-				points.push_back(Point(-1, 1)); // top-left corner
-				points.push_back(Point(1, 1)); // top-right corner
-				points.push_back(Point(1, -1)); // bottom-right corner
-				points.push_back(Point(-1, -1)); // bottom-left corner
-				points.push_back(Point(-1, 0)); // center-left
-				points.push_back(Point(1, 0)); // center-right
+				cout << "Warning: these interpolation points have never been tested." << endl;
+				double h = 2 / (double)basis->GetDegree();
+				for (int i = 0; i < basis->GetDegree() + 1; ++i)
+					for (int j = 0; j < basis->GetDegree() + 1; ++j)
+						points.push_back(Point(-1 + i * h, -1 + j * h));
 			}
 			else
 			{
-				int nPoint1D = ceil(sqrt(basis->Size()));
-				points.reserve(pow(nPoint1D, 2));
-				GaussLegendre gauss(nPoint1D);
-				for (int i = 0; i < nPoint1D; ++i)
-					for (int j = 0; j < nPoint1D; ++j)
-						points.push_back(Point(gauss.Point(i), gauss.Point(j)));
+				if (basis->GetDegree() == 1)
+				{
+					points.push_back(Point(-1, 1)); // top-left corner
+					points.push_back(Point(1, 1)); // top-right corner
+					points.push_back(Point(0, -1)); // bottom-middle
+				}
+				else if (basis->GetDegree() == 2)
+				{
+					points.push_back(Point(-1, 1)); // top-left corner
+					points.push_back(Point(1, 1)); // top-right corner
+					points.push_back(Point(1, -1)); // bottom-right corner
+					points.push_back(Point(-1, -1)); // bottom-left corner
+
+					points.push_back(Point(-1, 0)); // center-left
+					points.push_back(Point(1, 0)); // center-right
+				}
+				else if (basis->GetDegree() == 3)
+				{
+					points.push_back(Point(-1, 1)); // top-left corner
+					points.push_back(Point(1, 1)); // top-right corner
+					points.push_back(Point(1, -1)); // bottom-right corner
+					points.push_back(Point(-1, -1)); // bottom-left corner
+
+					points.push_back(Point(-1, 0)); // center-left
+					points.push_back(Point(1, 0)); // center-right
+					points.push_back(Point(0, 1)); // top-middle
+					points.push_back(Point(0, -1)); // bottom-middle
+
+					points.push_back(Point(-0.5, 0));
+					points.push_back(Point(0.5, 0));
+				}
+				else
+				{
+					cout << "Warning: interpolation points to be implemented!" << endl;
+					int nPoint1D = ceil(sqrt(basis->Size()));
+					points.reserve(pow(nPoint1D, 2));
+					GaussLegendre gauss(nPoint1D);
+					for (int i = 0; i < nPoint1D; ++i)
+						for (int j = 0; j < nPoint1D; ++j)
+							points.push_back(Point(gauss.Point(i), gauss.Point(j)));
+				}
 			}
 		}
 		else if (ShapeDim == 3)
 		{
+			cout << "Warning: interpolation points to be implemented!" << endl;
 			int nPoint1D = ceil(cbrt(basis->Size()));
 			points.reserve(pow(nPoint1D, 3));
 			GaussLegendre gauss(nPoint1D);

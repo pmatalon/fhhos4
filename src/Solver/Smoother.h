@@ -10,6 +10,7 @@ private:
 	int _nSmoothingIterations;
 
 public:
+
 	Smoother(IterativeSolver* solver, int nSmoothingIterations) :
 		_solver(solver)
 	{
@@ -26,6 +27,12 @@ public:
 	Eigen::VectorXd Smooth(Eigen::VectorXd& x, const Eigen::VectorXd& b)
 	{
 		return _solver->Solve(b, x);
+	}
+
+	friend ostream& operator<<(ostream& os, const Smoother& s)
+	{
+		os << s._solver->MaxIterations << " sweep(s) of " << *(s._solver);
+		return os;
 	}
 
 };

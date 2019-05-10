@@ -186,24 +186,30 @@ int main(int argc, char* argv[])
 			sourceFunction = new SourceFunction1D([&diffusionPartition](double x) { return 4; });
 		}
 
-		Poisson_DG<1>* problem = new Poisson_DG<1>(solution, sourceFunction, diffusionPartition, outputDirectory);
-		FunctionalBasis<1>* basis = new FunctionalBasis<1>(basisCode, polyDegree);
-		Poisson_DGTerms<1>* dg = new Poisson_DGTerms<1>(basis, diffusionPartition);
-
-		problem->Assemble(mesh, basis, dg, penalizationCoefficient, action);
-
-		if ((action & Action::SolveSystem) == Action::SolveSystem)
+		if (discretization.compare("dg") == 0)
 		{
-			problem->Solve();
-			if ((action & Action::ExtractSolution) == Action::ExtractSolution)
-				problem->ExtractSolution();
-			double error = L2::Error<1>(mesh, basis, problem->Solution, exactSolution);
-			cout << "L2 Error = " << error << endl;
-		}
+			Poisson_DG<1>* problem = new Poisson_DG<1>(solution, sourceFunction, diffusionPartition, outputDirectory);
+			FunctionalBasis<1>* basis = new FunctionalBasis<1>(basisCode, polyDegree);
+			Poisson_DGTerms<1>* dg = new Poisson_DGTerms<1>(basis, diffusionPartition);
 
-		delete dg;
-		delete problem;
-		delete basis;
+			problem->Assemble(mesh, basis, dg, penalizationCoefficient, action);
+
+			if ((action & Action::SolveSystem) == Action::SolveSystem)
+			{
+				problem->Solve();
+				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
+					problem->ExtractSolution();
+				double error = L2::Error<1>(mesh, basis, problem->Solution, exactSolution);
+				cout << "L2 Error = " << error << endl;
+			}
+
+			delete dg;
+			delete problem;
+			delete basis;
+		}
+		else
+			argument_error("HHO in 1D not implemented.");
+
 		delete mesh;
 	}
 
@@ -264,6 +270,7 @@ int main(int argc, char* argv[])
 
 			Poisson_HHO<2>* problem = new Poisson_HHO<2>(mesh, solution, sourceFunction, reconstructionBasis, cellBasis, faceBasis, staticCondensation, outputDirectory);
 
+			cout << "----------------------- Assembly -------------------------" << endl;
 			problem->Assemble(action);
 
 			/*for (auto f : mesh->Faces)
@@ -274,12 +281,15 @@ int main(int argc, char* argv[])
 
 			if ((action & Action::SolveSystem) == Action::SolveSystem)
 			{
+				cout << "------------------- Linear system resolution ------------------" << endl;
 				if (staticCondensation && mesh->N > 2)
 				{
-					/*MultigridForHHO<2> solver(problem, 2);
-					//GaussSeidel solver;
+					MultigridForHHO<2> solver(problem, 2);
+					cout << "Solver: " << solver << endl;
+					//BlockGaussSeidel solver(problem->HHO.nLocalFaceUnknowns);
 					solver.Setup(problem->A);
-					solver.Solve(problem->b);*/
+					solver.Tolerance = 1e-5;
+					solver.Solve(problem->b);
 				}
 
 				problem->Solve();

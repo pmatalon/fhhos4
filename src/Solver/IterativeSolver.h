@@ -21,6 +21,14 @@ public:
 	{
 	}
 
+	virtual void Serialize(ostream& os) const = 0;
+
+	friend ostream& operator<<(ostream& os, const IterativeSolver& s)
+	{
+		s.Serialize(os);
+		return os;
+	}
+
 	virtual void Setup(const Eigen::SparseMatrix<double>& A)
 	{
 		this->A = A;

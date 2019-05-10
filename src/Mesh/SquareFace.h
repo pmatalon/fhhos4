@@ -31,6 +31,11 @@ public:
 	{
 		return CartesianShape::Width;
 	}
+
+	double Measure()
+	{
+		return CartesianShape::Measure();
+	}
 	
 	double MassTerm(BasisFunction<2>* phi1, BasisFunction<2>* phi2) override
 	{

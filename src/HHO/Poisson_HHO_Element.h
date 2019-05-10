@@ -76,41 +76,6 @@ public:
 		return this->_massCell;
 	}
 
-	Eigen::MatrixXd ComputeInterpolationMatrixFromFaces()
-	{
-		Eigen::MatrixXd I(this->CellBasis->Size(), this->Faces.size() * this->FaceBasis->Size());
-
-		Eigen::MatrixXd M_cell = this->_massCell;
-		Eigen::MatrixXd invM_cell = M_cell.inverse();
-		
-		for (auto f : this->Faces)
-		{
-			Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
-
-			double weight = 1;// face->GetDiameter() / this->FrontierMeasure();
-			Eigen::MatrixXd M_face = face->GetMassMatrix();
-			Eigen::MatrixXd Pi_face = face->GetProjFromCell(this);
-			I.block(0, this->LocalNumberOf(face) * this->FaceBasis->Size(), this->CellBasis->Size(), this->FaceBasis->Size()) = weight * invM_cell * Pi_face.transpose() * M_face;
-		}
-
-		return I;
-	}
-
-	Eigen::MatrixXd ComputeProjectorMatrixFromCellOntoFaces()
-	{
-		Eigen::MatrixXd Pi = Eigen::MatrixXd::Zero(this->Faces.size() * this->FaceBasis->Size(), this->CellBasis->Size());
-
-		for (auto f : this->Faces)
-		{
-			Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
-
-			Eigen::MatrixXd Pi_face = face->GetProjFromCell(this);
-			Pi.block(this->LocalNumberOf(face)*this->FaceBasis->Size(), 0, this->FaceBasis->Size(), this->CellBasis->Size()) = Pi_face;
-		}
-
-		return Pi;
-	}
-
 	Eigen::MatrixXd ComputeCanonicalInjectionMatrixCoarseToFine()
 	{
 		Eigen::MatrixXd J(this->CellBasis->Size() * this->FinerElements.size(), this->CellBasis->Size());

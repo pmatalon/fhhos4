@@ -11,7 +11,7 @@ enum class Direction : unsigned
 
 class BlockSOR : public IterativeSolver
 {
-private:
+protected:
 	int _blockSize;
 	double _omega;
 	Direction _direction;
@@ -27,6 +27,11 @@ public:
 		this->_blockSize = blockSize;
 		this->_omega = omega;
 		this->_direction = direction;
+	}
+
+	virtual void Serialize(ostream& os) const override
+	{
+		os << "Block-SOR (blockSize=" << _blockSize << ", omega=" << _omega << ", direction=" << (_direction == Direction::Forward ? "forward" : "backward") << ")";
 	}
 
 	void Setup(const Eigen::SparseMatrix<double>& A) override
@@ -82,30 +87,66 @@ private:
 
 class SOR : public BlockSOR
 {
-public: SOR(double omega) : BlockSOR(1, omega, Direction::Forward) {}
+public: 
+	SOR(double omega) : BlockSOR(1, omega, Direction::Forward) {}
+
+	virtual void Serialize(ostream& os) const override
+	{
+		os << "SOR (omega=" << _omega << ")";
+	}
 };
 
 class ReverseSOR : public BlockSOR
 {
-public: ReverseSOR(double omega) : BlockSOR(1, omega, Direction::Backward) {}
+public: 
+	ReverseSOR(double omega) : BlockSOR(1, omega, Direction::Backward) {}
+
+	virtual void Serialize(ostream& os) const override
+	{
+		os << "Reverse SOR (omega=" << _omega << ")";
+	}
 };
 
 class GaussSeidel : public SOR
 {
-public: GaussSeidel() : SOR(1) {}
+public: 
+	GaussSeidel() : SOR(1) {}
+
+	virtual void Serialize(ostream& os) const override
+	{
+		os << "GaussSeidel";
+	}
 };
 
 class ReverseGaussSeidel : public ReverseSOR
 {
-public: ReverseGaussSeidel() : ReverseSOR(1) {}
+public: 
+	ReverseGaussSeidel() : ReverseSOR(1) {}
+
+	virtual void Serialize(ostream& os) const override
+	{
+		os << "Reverse GaussSeidel";
+	}
 };
 
 class BlockGaussSeidel : public BlockSOR
 {
-public: BlockGaussSeidel(int blockSize) : BlockSOR(blockSize, 1, Direction::Forward) {}
+public: 
+	BlockGaussSeidel(int blockSize) : BlockSOR(blockSize, 1, Direction::Forward) {}
+
+	virtual void Serialize(ostream& os) const override
+	{
+		os << "block-GaussSeidel (blockSize=" << _blockSize << ")";
+	}
 };
 
 class ReverseBlockGaussSeidel : public BlockSOR
 {
-public: ReverseBlockGaussSeidel(int blockSize) : BlockSOR(blockSize, 1, Direction::Backward) {}
+public: 
+	ReverseBlockGaussSeidel(int blockSize) : BlockSOR(blockSize, 1, Direction::Backward) {}
+
+	virtual void Serialize(ostream& os) const override
+	{
+		os << "Reverse block-GaussSeidel (blockSize=" << _blockSize << ")";
+	}
 };

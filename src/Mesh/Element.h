@@ -43,6 +43,7 @@ public:
 	virtual StandardElementCode StdElementCode() = 0;
 
 	virtual double GetDiameter() = 0;
+	virtual double Measure() = 0;
 
 	virtual Point ConvertToDomain(Point refPoint) = 0;
 	virtual Point ConvertToReference(Point domainPoint) = 0;
@@ -126,7 +127,7 @@ public:
 	{
 		double measure = 0;
 		for (auto f : this->Faces)
-			measure += f->GetDiameter();
+			measure += f->Measure();
 	}
 
 	virtual double L2ErrorPow2(function<double(Point)> approximate, function<double(Point)> exactSolution) = 0;
