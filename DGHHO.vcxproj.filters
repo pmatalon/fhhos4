@@ -14,24 +14,6 @@
     <ClInclude Include="src/DG/Poisson_DG_Face.h">
       <Filter>DG</Filter>
     </ClInclude>
-    <ClInclude Include="src/DG/Poisson_DG_ReferenceCube.h">
-      <Filter>DG</Filter>
-    </ClInclude>
-    <ClInclude Include="src/DG/Poisson_DG_ReferenceElement.h">
-      <Filter>DG</Filter>
-    </ClInclude>
-    <ClInclude Include="src/DG/Poisson_DG_ReferenceInterval.h">
-      <Filter>DG</Filter>
-    </ClInclude>
-    <ClInclude Include="src/DG/Poisson_DG_ReferenceSquare.h">
-      <Filter>DG</Filter>
-    </ClInclude>
-    <ClInclude Include="src/DG/Poisson_DGTerms.h">
-      <Filter>DG</Filter>
-    </ClInclude>
-    <ClInclude Include="src/DG/Poisson2D_DGTerms_GlobalBasis.h">
-      <Filter>DG</Filter>
-    </ClInclude>
     <ClInclude Include="src/FunctionalBasis/BasisFunction.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>

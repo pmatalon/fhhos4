@@ -120,12 +120,6 @@
     <ClInclude Include="src/DG/Poisson_DG.h" />
     <ClInclude Include="src/DG/Poisson_DG_Element.h" />
     <ClInclude Include="src/DG/Poisson_DG_Face.h" />
-    <ClInclude Include="src/DG/Poisson_DG_ReferenceCube.h" />
-    <ClInclude Include="src/DG/Poisson_DG_ReferenceSquare.h" />
-    <ClInclude Include="src/DG/Poisson_DG_ReferenceElement.h" />
-    <ClInclude Include="src/DG/Poisson_DG_ReferenceInterval.h" />
-    <ClInclude Include="src/DG/Poisson_DGTerms.h" />
-    <ClInclude Include="src/DG/Poisson2D_DGTerms_GlobalBasis.h" />
     <ClInclude Include="src/HHO/Poisson_HHO.h" />
     <ClInclude Include="src/HHO/Poisson_HHO_Element.h" />
     <ClInclude Include="src/HHO/Poisson_HHO_Face.h" />

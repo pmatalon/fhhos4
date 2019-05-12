@@ -8,13 +8,6 @@
 template <int Dim>
 class Face;
 
-enum class StandardElementCode
-{
-	None,
-	Interval,
-	Square,
-	Cube
-};
 
 template <int Dim>
 class Element 
@@ -39,8 +32,6 @@ public:
 	{
 		return face->GetNeighbour(this);
 	}
-
-	virtual StandardElementCode StdElementCode() = 0;
 
 	virtual double GetDiameter() = 0;
 	virtual double Measure() = 0;

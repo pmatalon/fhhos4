@@ -9,6 +9,7 @@
 #include "Mesh/CartesianGrid1D.h"
 #include "Mesh/CartesianGrid2D.h"
 #include "Mesh/CartesianGrid3D.h"
+#include "Mesh/CartesianShape.h"
 #include "Utils/Action.h"
 #include "Utils/DiffusionPartition.h"
 #include "Solver/MultigridForHHO.h"
@@ -190,9 +191,8 @@ int main(int argc, char* argv[])
 		{
 			Poisson_DG<1>* problem = new Poisson_DG<1>(solution, sourceFunction, diffusionPartition, outputDirectory);
 			FunctionalBasis<1>* basis = new FunctionalBasis<1>(basisCode, polyDegree);
-			Poisson_DGTerms<1>* dg = new Poisson_DGTerms<1>(basis, diffusionPartition);
 
-			problem->Assemble(mesh, basis, dg, penalizationCoefficient, action);
+			problem->Assemble(mesh, basis, penalizationCoefficient, action);
 
 			if ((action & Action::SolveSystem) == Action::SolveSystem)
 			{
@@ -203,7 +203,6 @@ int main(int argc, char* argv[])
 				cout << "L2 Error = " << error << endl;
 			}
 
-			delete dg;
 			delete problem;
 			delete basis;
 		}
@@ -245,9 +244,8 @@ int main(int argc, char* argv[])
 		{
 			Poisson_DG<2>* problem = new Poisson_DG<2>(solution, sourceFunction, diffusionPartition, outputDirectory);
 			FunctionalBasis<2>* basis = new FunctionalBasis<2>(basisCode, polyDegree, fullTensorization);
-			Poisson_DGTerms<2>* dg = new Poisson_DGTerms<2>(basis, diffusionPartition);
 
-			problem->Assemble(mesh, basis, dg, penalizationCoefficient, action);
+			problem->Assemble(mesh, basis, penalizationCoefficient, action);
 
 			if ((action & Action::SolveSystem) == Action::SolveSystem)
 			{
@@ -258,7 +256,6 @@ int main(int argc, char* argv[])
 				cout << "L2 Error = " << error << endl;
 			}
 
-			delete dg;
 			delete problem;
 			delete basis;
 		}
@@ -346,9 +343,8 @@ int main(int argc, char* argv[])
 		{
 			Poisson_DG<3>* problem = new Poisson_DG<3>(solution, sourceFunction, diffusionPartition, outputDirectory);
 			FunctionalBasis<3>* basis = new FunctionalBasis<3>(basisCode, polyDegree, fullTensorization);
-			Poisson_DGTerms<3>* dg = new Poisson_DGTerms<3>(basis, diffusionPartition);
 
-			problem->Assemble(mesh, basis, dg, penalizationCoefficient, action);
+			problem->Assemble(mesh, basis, penalizationCoefficient, action);
 
 			if ((action & Action::SolveSystem) == Action::SolveSystem)
 			{
@@ -359,7 +355,6 @@ int main(int argc, char* argv[])
 				cout << "L2 Error = " << error << endl;
 			}
 
-			delete dg;
 			delete problem;
 			delete basis;
 		}

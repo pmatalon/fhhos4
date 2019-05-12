@@ -60,11 +60,6 @@ public:
 	//                 Element implementation                //
 	//-------------------------------------------------------//
 
-	StandardElementCode StdElementCode()
-	{
-		return StandardElementCode::Cube;
-	}
-
 	vector<double> OuterNormalVector(Face<3>* face)
 	{
 		if (face == this->TopFace)
@@ -172,17 +167,17 @@ public:
 	//                 Poisson_DG_Element implementation                //
 	//------------------------------------------------------------------//
 
-	double VolumicTerm(BasisFunction<3>* phi1, BasisFunction<3>* phi2, Poisson_DG_ReferenceElement<3>* referenceElement, DiffusionPartition diffusionPartition)
+	double VolumicTerm(BasisFunction<3>* phi1, BasisFunction<3>* phi2, DiffusionPartition diffusionPartition)
 	{
 		double h = this->Width;
 		double kappa = CartesianElement::DiffusionCoefficient(diffusionPartition);
-		return h / 2 * kappa * referenceElement->VolumicTerm(phi1, phi2);
+		return h / 2 * kappa * CartesianElement::ReferenceShape.StiffnessTerm(phi1, phi2);
 	}
 
-	double MassTerm(BasisFunction<3>* phi1, BasisFunction<3>* phi2, Poisson_DG_ReferenceElement<3>* referenceElement)
+	double MassTerm(BasisFunction<3>* phi1, BasisFunction<3>* phi2)
 	{
 		double h = this->Width;
-		return pow(h, 3) / 8 * referenceElement->MassTerm(phi1, phi2);
+		return pow(h, 3) / 8 * CartesianElement::ReferenceShape.MassTerm(phi1, phi2);
 	}
 
 	double SourceTerm(BasisFunction<3>* phi, SourceFunction* f)

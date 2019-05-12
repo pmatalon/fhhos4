@@ -1,7 +1,6 @@
 #pragma once
 #include "CartesianElement.h"
 #include "../DG/Poisson_DG_Element.h"
-#include "../DG/Poisson_DG_ReferenceElement.h"
 
 class Interval : public CartesianElement<1>, public Poisson_DG_Element<1>
 {
@@ -20,11 +19,6 @@ public:
 	//-------------------------------------------------------//
 	//                 Element implementation                //
 	//-------------------------------------------------------//
-
-	StandardElementCode StdElementCode()
-	{
-		return StandardElementCode::Interval;
-	}
 
 	vector<double> OuterNormalVector(Face<1>* interface)
 	{
@@ -49,17 +43,17 @@ public:
 	//                 Poisson_DG_Element implementation                //
 	//------------------------------------------------------------------//
 
-	double VolumicTerm(BasisFunction<1>* phi1, BasisFunction<1>* phi2, Poisson_DG_ReferenceElement<1>* referenceElement, DiffusionPartition diffusionPartition)
+	double VolumicTerm(BasisFunction<1>* phi1, BasisFunction<1>* phi2, DiffusionPartition diffusionPartition)
 	{
 		double h = CartesianShape::Width;
 		double kappa = CartesianElement::DiffusionCoefficient(diffusionPartition);
-		return 2 / h * kappa * referenceElement->VolumicTerm(phi1, phi2);
+		return 2 / h * kappa * CartesianElement::ReferenceShape.StiffnessTerm(phi1, phi2);
 	}
 
-	double MassTerm(BasisFunction<1>* phi1, BasisFunction<1>* phi2, Poisson_DG_ReferenceElement<1>* referenceElement)
+	double MassTerm(BasisFunction<1>* phi1, BasisFunction<1>* phi2)
 	{
 		double h = CartesianShape::Width;
-		return h / 2 * referenceElement->MassTerm(phi1, phi2);
+		return h / 2 * CartesianElement::ReferenceShape.MassTerm(phi1, phi2);
 	}
 	
 	double SourceTerm(BasisFunction<1>* phi, SourceFunction* f)

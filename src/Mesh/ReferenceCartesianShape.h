@@ -6,36 +6,49 @@ template <int Dim>
 class ReferenceCartesianShape
 {
 private:
-	static ReferenceCartesianShape* _instance;
-
 	Eigen::MatrixXd _stiffnessMatrix;
 	Eigen::MatrixXd _massMatrix;
 public:
-	static ReferenceCartesianShape* Get()
+	ReferenceCartesianShape()
 	{
-		return _instance;
 	}
 
 	double MassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{
 		return this->_massMatrix(phi1->LocalNumber, phi2->LocalNumber);
 	}
+
 	double StiffnessTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{
 		return this->_stiffnessMatrix(phi1->LocalNumber, phi2->LocalNumber);
-	}
-
-
-private:
-
-	ReferenceCartesianShape()
-	{
 	}
 
 	double Integral(BasisFunction<Dim>* phi)
 	{
 		return Utils::Integral(phi);
 	}
+
+	void ComputeMassMatrix(FunctionalBasis<Dim>* basis)
+	{
+		_massMatrix = Eigen::MatrixXd(basis->Size(), basis->Size());
+		for (BasisFunction<Dim>* phi1 : basis->LocalFunctions)
+		{
+			for (BasisFunction<Dim>* phi2 : basis->LocalFunctions)
+				this->_massMatrix(phi1->LocalNumber, phi2->LocalNumber) = ComputeMassTerm(phi1, phi2);
+		}
+	}
+
+	void ComputeStiffnessMatrix(FunctionalBasis<Dim>* basis)
+	{
+		_stiffnessMatrix = Eigen::MatrixXd(basis->Size(), basis->Size());
+		for (BasisFunction<Dim>* phi1 : basis->LocalFunctions)
+		{
+			for (BasisFunction<Dim>* phi2 : basis->LocalFunctions)
+				this->_stiffnessMatrix(phi1->LocalNumber, phi2->LocalNumber) = ComputeIntegralGradGrad(phi1, phi2);
+		}
+	}
+
+private:
 
 	double ComputeMassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{

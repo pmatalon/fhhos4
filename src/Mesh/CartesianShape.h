@@ -1,4 +1,5 @@
 #pragma once
+#include "ReferenceCartesianShape.h"
 
 enum class CartesianShapeOrientation : unsigned
 {
@@ -17,6 +18,8 @@ public:
 	DomPoint Origin;
 	double Width;
 	CartesianShapeOrientation Orientation;
+
+	static ReferenceCartesianShape<ShapeDim> ReferenceShape;
 
 	CartesianShape(DomPoint origin, double width) : 
 		CartesianShape(origin, width, CartesianShapeOrientation::None)
@@ -37,7 +40,7 @@ public:
 	double Integral(BasisFunction<ShapeDim>* phi)
 	{
 		double h = this->Width;
-		return pow(h/2, ShapeDim) * Utils::Integral(phi);
+		return pow(h / 2, ShapeDim) * ReferenceShape.Integral(phi);
 	}
 
 	double MassTerm(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
@@ -238,3 +241,6 @@ public:
 	}
 
 };
+
+template <int DomainDim, int ShapeDim>
+ReferenceCartesianShape<ShapeDim> CartesianShape<DomainDim, ShapeDim>::ReferenceShape = ReferenceCartesianShape<ShapeDim>();

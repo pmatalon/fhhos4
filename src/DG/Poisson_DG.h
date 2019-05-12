@@ -4,11 +4,13 @@
 #include <unsupported/Eigen/SparseExtra>
 #include "../Problem.h"
 #include "../Mesh/Mesh.h"
-#include "../DG/Poisson_DGTerms.h"
+#include "../Mesh/CartesianShape.h"
 #include "../Utils/NonZeroCoefficients.h"
 #include "../Utils/L2.h"
 #include "../Utils/Action.h"
 #include "../Utils/ParallelLoop.h"
+#include "Poisson_DG_Element.h"
+#include "Poisson_DG_Face.h"
 using namespace std;
 
 template <int Dim>
@@ -25,7 +27,7 @@ public:
 		this->_sourceFunction = sourceFunction;
 	}
 
-	void Assemble(Mesh<Dim>* mesh, FunctionalBasis<Dim>* basis, Poisson_DGTerms<Dim>* dg, int penalizationCoefficient, Action action)
+	void Assemble(Mesh<Dim>* mesh, FunctionalBasis<Dim>* basis, int penalizationCoefficient, Action action)
 	{
 		cout << "Problem: Poisson " << Dim << "D";
 		if (this->_diffusionPartition.Kappa1 != this->_diffusionPartition.Kappa2)
@@ -44,7 +46,7 @@ public:
 		cout << "Subdivisions in each cartesian direction: " << mesh->N << endl;
 		cout << "Discretization: Discontinuous Galerkin SIPG" << endl;
 		cout << "\tPolynomial space: " << (basis->FullTensorization ? "Q" : "P") << endl;
-		cout << "\tPolynomial basis: " << (dg->IsGlobalBasis() ? "global" : "") + basis->Name() << endl;
+		cout << "\tPolynomial basis: " << basis->Name() << endl;
 
 		bool autoPenalization = penalizationCoefficient == -1;
 		if (autoPenalization)
@@ -64,7 +66,7 @@ public:
 			sprintf(res, "_kappa%g", this->_diffusionPartition.Kappa1);
 			kappaString = res;
 		}
-		this->_fileName = "Poisson" + to_string(Dim) + "D" + this->_solutionName + kappaString + "_n" + to_string(mesh->N) + "_DG_SIPG_" + (dg->IsGlobalBasis() ? "global" : "") + basis->Name() + "_pen" + (autoPenalization ? "-1" : to_string(penalizationCoefficient));
+		this->_fileName = "Poisson" + to_string(Dim) + "D" + this->_solutionName + kappaString + "_n" + to_string(mesh->N) + "_DG_SIPG_" + basis->Name() + "_pen" + (autoPenalization ? "-1" : to_string(penalizationCoefficient));
 		string matrixFilePath			= this->_outputDirectory + "/" + this->_fileName + "_A.dat";
 		string matrixVolumicFilePath	= this->_outputDirectory + "/" + this->_fileName + "_A_volumic.dat";
 		string matrixCouplingFilePath	= this->_outputDirectory + "/" + this->_fileName + "_A_coupling.dat";
@@ -76,6 +78,9 @@ public:
 
 		cout << "--------------------------------------------------------" << endl;
 		cout << "Assembly..." << endl;
+
+		CartesianShape<Dim, Dim>::ReferenceShape.ComputeMassMatrix(basis);
+		CartesianShape<Dim, Dim>::ReferenceShape.ComputeStiffnessMatrix(basis);
 
 		//--------------------------------------------//
 		// Iteration on the elements: diagonal blocks //
@@ -93,7 +98,7 @@ public:
 		{
 			ParallelChunk* chunk = parallelLoop.Chunks[threadNumber];
 
-			chunk->ThreadFuture = std::async([this, mesh, dg, basis, action, penalizationCoefficient, chunk, &chunksMatrixCoeffs, &chunksMassMatrixCoeffs, &chunksVolumicCoeffs, &chunksCouplingCoeffs, &chunksPenCoeffs]()
+			chunk->ThreadFuture = std::async([this, mesh, basis, action, penalizationCoefficient, chunk, &chunksMatrixCoeffs, &chunksMassMatrixCoeffs, &chunksVolumicCoeffs, &chunksCouplingCoeffs, &chunksPenCoeffs]()
 			{
 				BigNumber nnzApproximate = chunk->Size() * basis->Size() * (2 * Dim + 1);
 				NonZeroCoefficients matrixCoeffs(nnzApproximate);
@@ -118,7 +123,7 @@ public:
 
 							//cout << "\t phi" << phi1->LocalNumber << " = " << phi1->ToString() << " phi" << phi2->LocalNumber << " = " << phi2->ToString() << endl;
 
-							double volumicTerm = dg->VolumicTerm(element, phi1, phi2);
+							double volumicTerm = element->VolumicTerm(phi1, phi2, this->_diffusionPartition);
 							//cout << "\t\t volumic = " << volumicTerm << endl;
 
 							double coupling = 0;
@@ -145,7 +150,7 @@ public:
 							matrixCoeffs.Add(basisFunction1, basisFunction2, volumicTerm + coupling + penalization);
 							if ((action & Action::ExtractMassMatrix) == Action::ExtractMassMatrix)
 							{
-								double massTerm = dg->MassTerm(element, phi1, phi2);
+								double massTerm = element->MassTerm(phi1, phi2);
 								massMatrixCoeffs.Add(basisFunction1, basisFunction2, massTerm);
 							}
 						}
@@ -203,7 +208,7 @@ public:
 		{
 			ParallelChunk* chunk = parallelLoopFaces.Chunks[threadNumber];
 
-			chunk->ThreadFuture = std::async([this, mesh, dg, basis, action, penalizationCoefficient, chunk, &chunksMatrixCoeffs, &chunksCouplingCoeffs, &chunksPenCoeffs]()
+			chunk->ThreadFuture = std::async([this, mesh, basis, action, penalizationCoefficient, chunk, &chunksMatrixCoeffs, &chunksCouplingCoeffs, &chunksPenCoeffs]()
 			{
 				BigNumber nnzApproximate = chunk->Size() * basis->Size() * (2 * Dim + 1);
 				NonZeroCoefficients matrixCoeffs(nnzApproximate);
