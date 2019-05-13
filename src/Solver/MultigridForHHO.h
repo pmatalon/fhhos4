@@ -125,7 +125,7 @@ private:
 				Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
 
 				double weight = element->Measure() / element->FrontierMeasure();
-				Eigen::MatrixXd M_face = face->GetMassMatrix();
+				Eigen::MatrixXd M_face = face->FaceMassMatrix();
 
 				BigNumber faceGlobalNumber = face->Number;
 				BigNumber faceLocalNumber = element->LocalNumberOf(face);
@@ -148,7 +148,7 @@ private:
 		{
 			Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
 
-			Eigen::MatrixXd M_cell = element->GetMassMatrix();
+			Eigen::MatrixXd M_cell = element->CellMassMatrix();
 			Eigen::MatrixXd invM_cell = M_cell.inverse();
 
 			//Eigen::MatrixXd local_I = element->ComputeInterpolationMatrixFromFaces();
@@ -163,7 +163,7 @@ private:
 				BigNumber faceGlobalNumber = face->Number;
 				BigNumber faceLocalNumber = element->LocalNumberOf(face);
 
-				Eigen::MatrixXd M_face = face->GetMassMatrix();
+				Eigen::MatrixXd M_face = face->FaceMassMatrix();
 				Eigen::MatrixXd Pi_face = face->GetProjFromCell(element);
 
 				double weight = element->Measure() / element->FrontierMeasure();

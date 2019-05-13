@@ -39,20 +39,40 @@ public:
 
 	double Integral(BasisFunction<ShapeDim>* phi)
 	{
-		double h = this->Width;
-		return pow(h / 2, ShapeDim) * ReferenceShape.Integral(phi);
+		return Rescale(ReferenceShape.ComputeIntegral(phi), 0);
 	}
+
+	double ComputeIntegral(function<double(RefPoint)> func, int numberOfDerivatives)
+	{
+		double integralOnReferenceShape = ReferenceShape.ComputeIntegral(func);
+		return Rescale(integralOnReferenceShape, numberOfDerivatives);
+	}
+
+	double ComputeIntegral(function<double(RefPoint)> func, int numberOfDerivatives, int polynomialDegree)
+	{
+		double integralOnReferenceShape = ReferenceShape.ComputeIntegral(func, polynomialDegree);
+		return Rescale(integralOnReferenceShape, numberOfDerivatives);
+	}
+
+	Eigen::MatrixXd ComputeAndReturnFaceMassMatrix(FunctionalBasis<ShapeDim>* basis)
+	{
+		return RescaleMass(ReferenceShape.StoredFaceMassMatrix());
+	}
+
+	Eigen::MatrixXd ComputeAndReturnCellMassMatrix(FunctionalBasis<ShapeDim>* basis)
+	{
+		return RescaleMass(ReferenceShape.StoredCellMassMatrix());
+	}
+
+	Eigen::MatrixXd ComputeAndReturnCellReconstructMassMatrix(FunctionalBasis<ShapeDim>* cellBasis, FunctionalBasis<ShapeDim>* reconstructBasis)
+	{
+		return RescaleMass(ReferenceShape.StoredCellReconstructMassMatrix());
+	}
+
 
 	double MassTerm(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
 	{
-		double h = this->Width;
-
-		function<double(RefPoint)> functionToIntegrate = [phi1, phi2](RefPoint p) {
-			return phi1->Eval(p)*phi2->Eval(p);
-		};
-
-		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree() + 2;
-		return pow(h / 2, ShapeDim) * Utils::Integral<ShapeDim>(nQuadPoints, functionToIntegrate);
+		return RescaleMass(ReferenceShape.MassTerm(phi1, phi2));
 	}
 
 	double IntegralGradGrad(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
@@ -60,14 +80,55 @@ public:
 		if (phi1->GetDegree() == 0 || phi1->GetDegree() == 0)
 			return 0;
 
+		return RescaleStiffness(ReferenceShape.StiffnessTerm(phi1, phi2));
+	}
+
+	double IntegralGradGradReconstruct(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
+	{
+		if (phi1->GetDegree() == 0 || phi1->GetDegree() == 0)
+			return 0;
+
+		return RescaleStiffness(ReferenceShape.ReconstructStiffnessTerm(phi1, phi2));
+	}
+
+	double ComputeIntegralGradGrad(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
+	{
+		if (phi1->GetDegree() == 0 || phi1->GetDegree() == 0)
+			return 0;
+
+		return RescaleStiffness(ReferenceShape.ComputeIntegralGradGrad(phi1, phi2));
+	}
+
+	Eigen::MatrixXd Rescale(const Eigen::MatrixXd& matrixOnReferenceElement, int numberOfDerivatives)
+	{
 		double h = this->Width;
+		return pow(h / 2, ShapeDim - numberOfDerivatives) * matrixOnReferenceElement;
+	}
 
-		function<double(RefPoint)> functionToIntegrate = [phi1, phi2](RefPoint p) {
-			return Element<ShapeDim>::InnerProduct(phi1->Grad(p), phi2->Grad(p));
-		};
+	double Rescale(double termOnReferenceElement, int numberOfDerivatives)
+	{
+		double h = this->Width;
+		return pow(h / 2, ShapeDim - numberOfDerivatives) * termOnReferenceElement;
+	}
 
-		int nQuadPoints = phi1->GetDegree() + phi2->GetDegree();
-		return pow(h / 2, ShapeDim-2) * Utils::Integral<ShapeDim>(nQuadPoints, functionToIntegrate);
+	Eigen::MatrixXd RescaleMass(const Eigen::MatrixXd& massMatrixOnReferenceElement)
+	{
+		return Rescale(massMatrixOnReferenceElement, 0);
+	}
+
+	double RescaleMass(double massTermOnReferenceElement)
+	{
+		return Rescale(massTermOnReferenceElement, 0);
+	}
+
+	Eigen::MatrixXd RescaleStiffness(const Eigen::MatrixXd& stiffnessMatrixOnReferenceElement)
+	{
+		return Rescale(stiffnessMatrixOnReferenceElement, 2);
+	}
+
+	double RescaleStiffness(double stiffnessTermOnReferenceElement)
+	{
+		return Rescale(stiffnessTermOnReferenceElement, 2);
 	}
 
 	DomPoint ConvertToDomain(RefPoint referenceElementPoint)

@@ -45,15 +45,13 @@ public:
 
 	double VolumicTerm(BasisFunction<1>* phi1, BasisFunction<1>* phi2, DiffusionPartition diffusionPartition)
 	{
-		double h = CartesianShape::Width;
 		double kappa = CartesianElement::DiffusionCoefficient(diffusionPartition);
-		return 2 / h * kappa * CartesianElement::ReferenceShape.StiffnessTerm(phi1, phi2);
+		return kappa * CartesianElement::IntegralGradGrad(phi1, phi2);
 	}
 
 	double MassTerm(BasisFunction<1>* phi1, BasisFunction<1>* phi2)
 	{
-		double h = CartesianShape::Width;
-		return h / 2 * CartesianElement::ReferenceShape.MassTerm(phi1, phi2);
+		return CartesianElement::MassTerm(phi1, phi2);
 	}
 	
 	double SourceTerm(BasisFunction<1>* phi, SourceFunction* f)

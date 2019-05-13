@@ -9,7 +9,7 @@ template <int Dim>
 class Poisson_HHO_Face : virtual public Face<Dim>
 {
 private:
-	Eigen::MatrixXd _massMatrix;
+	Eigen::MatrixXd _faceMassMatrix;
 
 	Eigen::MatrixXd _elem1_massCellFace;
 	Eigen::MatrixXd _elem1_massReconstructFace;
@@ -28,11 +28,11 @@ public:
 
 	void InitHHO(FunctionalBasis<Dim>* reconstructionBasis, FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim - 1>* faceBasis)
 	{
-		if (this->_massMatrix.rows() > 0)
+		if (this->_faceMassMatrix.rows() > 0)
 			return;
 
-		this->_massMatrix = this->MassMatrix(faceBasis);
-		Eigen::MatrixXd invMf = this->_massMatrix.inverse();
+		this->_faceMassMatrix = this->ComputeAndReturnFaceMassMatrix(faceBasis);
+		Eigen::MatrixXd invMf = this->_faceMassMatrix.inverse();
 
 		//cout << "------------- Mf -------------" << endl << Mf << endl;
 		this->_elem1_massReconstructFace = this->MassMatrix(faceBasis, this->Element1, reconstructionBasis);
@@ -53,10 +53,12 @@ public:
 		}
 	}
 
-	Eigen::MatrixXd GetMassMatrix()
+	Eigen::MatrixXd FaceMassMatrix()
 	{
-		return this->_massMatrix;
+		return this->_faceMassMatrix;
 	}
+
+	virtual Eigen::MatrixXd ComputeAndReturnFaceMassMatrix(FunctionalBasis<Dim-1>* basis) = 0;
 
 	Eigen::MatrixXd GetMassCellFace(Element<Dim>* element)
 	{
@@ -99,4 +101,7 @@ public:
 		Poisson_HHO_Element<Dim>* fineElement = dynamic_cast<Poisson_HHO_Element<Dim>*>(this->Element1);
 
 	}
+
+	virtual double ComputeIntegral(function<double(RefPoint)> func, int numberOfDerivatives) = 0;
+	virtual double ComputeIntegral(function<double(RefPoint)> func, int numberOfDerivatives, int polynomialDegree) = 0;
 };

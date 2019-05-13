@@ -31,11 +31,6 @@ public:
 		return 0;
 	}
 
-	double MassTerm(BasisFunction<0>* phi1, BasisFunction<0>* phi2)
-	{
-		return 0;
-	}
-
 	virtual double MassTerm(BasisFunction<0>* facePhi, Element<1>* element, BasisFunction<1>* reconstructPhi)
 	{
 		return 0;

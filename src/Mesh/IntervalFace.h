@@ -38,11 +38,6 @@ public:
 		return CartesianShape::Measure();
 	}
 
-	double MassTerm(BasisFunction<1>* phi1, BasisFunction<1>* phi2) override
-	{
-		return CartesianShape::MassTerm(phi1, phi2);
-	}
-
 	double MassTerm(BasisFunction<1>* facePhi, Element<2>* element, BasisFunction<2>* reconstructPhi) override
 	{
 		double h = this->Width;
@@ -58,17 +53,17 @@ public:
 
 	RefPoint ConvertToReference(DomPoint domainPoint)
 	{
-		return CartesianShape<2,1>::ConvertToReference(domainPoint);
+		return CartesianShape::ConvertToReference(domainPoint);
 	}
 
 	DomPoint ConvertToDomain(RefPoint referenceElementPoint)
 	{
-		return CartesianShape<2,1>::ConvertToDomain(referenceElementPoint);
+		return CartesianShape::ConvertToDomain(referenceElementPoint);
 	}
 
 	vector<RefPoint> GetNodalPoints(FunctionalBasis<1>* basis)
 	{
-		return CartesianShape<2,1>::GetNodalPoints(basis);
+		return CartesianShape::GetNodalPoints(basis);
 	}
 
 	//---------------------------------------------------------------//
@@ -144,6 +139,24 @@ public:
 	{
 		os << face.Number << "\t(" << face.CartesianShape::Origin.X << ", " << face.CartesianShape::Origin.Y << ")\t" << (face.CartesianShape::Orientation == CartesianShapeOrientation::Horizontal ? "horizontal" : "vertical");
 		return os;
+	}
+
+	//----------------------------------------------------------------//
+	//                 Poisson_HHO_Face implementation                //
+	//----------------------------------------------------------------//
+
+	Eigen::MatrixXd ComputeAndReturnFaceMassMatrix(FunctionalBasis<1>* basis)
+	{
+		return CartesianShape::ComputeAndReturnFaceMassMatrix(basis);
+	}
+
+	double ComputeIntegral(function<double(RefPoint)> func, int numberOfDerivatives)
+	{
+		return CartesianShape::ComputeIntegral(func, numberOfDerivatives);
+	}
+	double ComputeIntegral(function<double(RefPoint)> func, int numberOfDerivatives, int polynomialDegree)
+	{
+		return CartesianShape::ComputeIntegral(func, numberOfDerivatives, polynomialDegree);
 	}
 
 private:

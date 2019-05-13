@@ -79,8 +79,8 @@ public:
 		cout << "--------------------------------------------------------" << endl;
 		cout << "Assembly..." << endl;
 
-		CartesianShape<Dim, Dim>::ReferenceShape.ComputeMassMatrix(basis);
-		CartesianShape<Dim, Dim>::ReferenceShape.ComputeStiffnessMatrix(basis);
+		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreMassMatrix(basis);
+		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreStiffnessMatrix(basis);
 
 		//--------------------------------------------//
 		// Iteration on the elements: diagonal blocks //

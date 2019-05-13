@@ -43,41 +43,6 @@ public:
 	
 	virtual double IntegralGlobalFunction(function<double(DomPoint)> globalFunction) = 0;
 
-	virtual double MassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
-	{
-		return 0;
-	}
-
-	Eigen::MatrixXd MassMatrix(FunctionalBasis<Dim>* basis)
-	{
-		Eigen::MatrixXd M(basis->LocalFunctions.size(), basis->LocalFunctions.size());
-		for (BasisFunction<Dim>* phi1 : basis->LocalFunctions)
-		{
-			for (BasisFunction<Dim>* phi2 : basis->LocalFunctions)
-			{
-				if (phi2->LocalNumber > phi1->LocalNumber)
-					break;
-				double term = this->MassTerm(phi1, phi2);
-				M(phi1->LocalNumber, phi2->LocalNumber) = term;
-				M(phi2->LocalNumber, phi1->LocalNumber) = term;
-			}
-		}
-		return M;
-	}
-
-	Eigen::MatrixXd MassMatrix(FunctionalBasis<Dim>* basis1, FunctionalBasis<Dim>* basis2)
-	{
-		Eigen::MatrixXd M(basis1->LocalFunctions.size(), basis2->LocalFunctions.size());
-		for (BasisFunction<Dim>* phi1 : basis1->LocalFunctions)
-		{
-			for (BasisFunction<Dim>* phi2 : basis2->LocalFunctions)
-			{
-				double term = this->MassTerm(phi1, phi2);
-				M(phi1->LocalNumber, phi2->LocalNumber) = term;
-			}
-		}
-		return M;
-	}
 
 	int LocalNumberOf(Element<Dim>* finerElement)
 	{

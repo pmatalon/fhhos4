@@ -169,15 +169,13 @@ public:
 
 	double VolumicTerm(BasisFunction<3>* phi1, BasisFunction<3>* phi2, DiffusionPartition diffusionPartition)
 	{
-		double h = this->Width;
 		double kappa = CartesianElement::DiffusionCoefficient(diffusionPartition);
-		return h / 2 * kappa * CartesianElement::ReferenceShape.StiffnessTerm(phi1, phi2);
+		return kappa * CartesianElement::IntegralGradGrad(phi1, phi2);
 	}
 
 	double MassTerm(BasisFunction<3>* phi1, BasisFunction<3>* phi2)
 	{
-		double h = this->Width;
-		return pow(h, 3) / 8 * CartesianElement::ReferenceShape.MassTerm(phi1, phi2);
+		return CartesianElement::MassTerm(phi1, phi2);
 	}
 
 	double SourceTerm(BasisFunction<3>* phi, SourceFunction* f)
@@ -189,60 +187,28 @@ public:
 	//                 Poisson_HHO_Element implementation                //
 	//-------------------------------------------------------------------//
 
+	Eigen::MatrixXd ComputeAndReturnCellMassMatrix(FunctionalBasis<3>* basis)
+	{
+		return CartesianElement::CartesianShape::ComputeAndReturnCellMassMatrix(basis);
+	}
+
+	Eigen::MatrixXd ComputeAndReturnCellReconstructMassMatrix(FunctionalBasis<3>* cellBasis, FunctionalBasis<3>* reconstructBasis)
+	{
+		return CartesianElement::CartesianShape::ComputeAndReturnCellReconstructMassMatrix(cellBasis, reconstructBasis);
+	}
+
+	double ComputeIntegralGradGrad(BasisFunction<3>* phi1, BasisFunction<3>* phi2)
+	{
+		return CartesianElement::ComputeIntegralGradGrad(phi1, phi2);
+	}
+
 	double St(BasisFunction<3>* reconstructPhi1, BasisFunction<3>* reconstructPhi2)
 	{
-		return this->IntegralGradGrad(reconstructPhi1, reconstructPhi2);
+		return CartesianElement::CartesianShape::IntegralGradGradReconstruct(reconstructPhi1, reconstructPhi2);
 	}
 
 	double Lt(BasisFunction<3>* phi)
 	{
 		return CartesianElement::Integral(phi);
-	}
-
-	double Bt(BasisFunction<3>* reconstructPhi, BasisFunction<3>* cellPhi)
-	{
-		if (reconstructPhi->GetDegree() == 0)
-			return 0;
-
-
-		double integralGradGrad = this->IntegralGradGrad(reconstructPhi, cellPhi);
-		double h = this->Width;
-
-		double sumFaces = 0;
-		for (auto face : this->Faces)
-		{
-			auto phi = this->EvalPhiOnFace(face, cellPhi);
-			auto gradPhi = this->GradPhiOnFace(face, reconstructPhi);
-			auto normal = this->OuterNormalVector(face);
-
-			std::function<double(double, double)> functionToIntegrate = [phi, gradPhi, normal](double u, double v) {
-				RefPoint p(u, v);
-				return InnerProduct(gradPhi(p), normal) * phi(p);
-			};
-
-			int nQuadPoints = reconstructPhi->GetDegree() + cellPhi->GetDegree() + 1;
-			double integralFace = h/2 * Utils::Integral(nQuadPoints, functionToIntegrate, -1, 1, -1, 1);
-			sumFaces += integralFace;
-		}
-
-		return integralGradGrad - sumFaces;
-	}
-
-	double Bf(BasisFunction<3>* reconstructPhi, BasisFunction<2>* facePhi, Face<3>* face)
-	{
-		if (reconstructPhi->GetDegree() == 0)
-			return 0;
-
-		auto gradPhi = this->GradPhiOnFace(face, reconstructPhi);
-		auto normal = this->OuterNormalVector(face);
-
-		std::function<double(double, double)> functionToIntegrate = [facePhi, gradPhi, normal](double u, double v) {
-			RefPoint p(u, v);
-			return InnerProduct(gradPhi(p), normal) * facePhi->Eval(p);
-		};
-
-		double h = this->Width;
-		int nQuadPoints = reconstructPhi->GetDegree() + facePhi->GetDegree() + 1;
-		return h / 2 * Utils::Integral(nQuadPoints, functionToIntegrate, -1, 1, -1, 1);
 	}
 };

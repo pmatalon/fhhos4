@@ -42,6 +42,11 @@ public:
 		return CartesianShape<Dim>::IntegralGradGrad(phi1, phi2);
 	}
 
+	double ComputeIntegralGradGrad(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
+	{
+		return CartesianShape<Dim>::ComputeIntegralGradGrad(phi1, phi2);
+	}
+
 	DomPoint ConvertToDomain(RefPoint referenceElementPoint)
 	{
 		return CartesianShape<Dim>::ConvertToDomain(referenceElementPoint);
@@ -59,13 +64,12 @@ public:
 
 	double SourceTerm(BasisFunction<Dim>* phi, SourceFunction* f)
 	{
-		function<double(Point)> sourceTimesBasisFunction = [this, f, phi](RefPoint refElementPoint) {
+		function<double(RefPoint)> sourceTimesBasisFunction = [this, f, phi](RefPoint refElementPoint) {
 			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
 			return f->Eval(domainPoint) * phi->Eval(refElementPoint);
 		};
 
-		double h = this->Width;
-		return pow(h / 2, Dim) *  Utils::Integral<Dim>(sourceTimesBasisFunction);
+		CartesianShape<Dim>::ComputeIntegral(sourceTimesBasisFunction, 0);
 	}
 
 	double L2ErrorPow2(function<double(RefPoint)> approximate, function<double(DomPoint)> exactSolution)
@@ -75,7 +79,6 @@ public:
 			return pow(exactSolution(domainPoint) - approximate(refElementPoint), 2);
 		};
 
-		double h = this->Width;
-		return pow(h / 2, Dim) *  Utils::Integral<Dim>(errorFunction);
+		CartesianShape<Dim>::ComputeIntegral(errorFunction, 0);
 	}
 };

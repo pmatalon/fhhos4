@@ -9,7 +9,7 @@ template <int Dim>
 class Poisson_HHO_Element : virtual public Element<Dim>
 {
 private:
-	Eigen::MatrixXd _massCell;
+	Eigen::MatrixXd _cellMassMatrix;
 	Eigen::MatrixXd _projFromReconstruct;
 public:
 	FunctionalBasis<Dim>* ReconstructionBasis;
@@ -34,8 +34,9 @@ public:
 
 	virtual double St(BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2) = 0;
 	virtual double Lt(BasisFunction<Dim>* phi) = 0;
-	virtual double Bt(BasisFunction<Dim>* reconstructPhi, BasisFunction<Dim>* cellPhi) = 0;
-	virtual double Bf(BasisFunction<Dim>* reconstructPhi, BasisFunction<Dim-1>* facePhi, Face<Dim>* face) = 0;
+	//virtual double Bt(BasisFunction<Dim>* reconstructPhi, BasisFunction<Dim>* cellPhi) = 0;
+	//virtual double Bf(BasisFunction<Dim>* reconstructPhi, BasisFunction<Dim-1>* facePhi, Face<Dim>* face) = 0;
+	virtual double ComputeIntegralGradGrad(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) = 0;
 	
 	void InitHHO(FunctionalBasis<Dim>* reconstructionBasis, FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim - 1> * faceBasis)
 	{
@@ -43,9 +44,9 @@ public:
 		this->CellBasis = cellBasis;
 		this->FaceBasis = faceBasis;
 
-		this->_massCell = this->MassMatrix(cellBasis);
-		Eigen::MatrixXd Nt = this->MassMatrix(cellBasis, reconstructionBasis);
-		this->_projFromReconstruct = _massCell.inverse() * Nt;
+		this->_cellMassMatrix = this->ComputeAndReturnCellMassMatrix(cellBasis);
+		Eigen::MatrixXd Nt = this->ComputeAndReturnCellReconstructMassMatrix(cellBasis, reconstructionBasis);
+		this->_projFromReconstruct = _cellMassMatrix.inverse() * Nt;
 
 		this->AssembleReconstructionAndConsistencyMatrices();
 		this->AssembleStabilizationMatrix();
@@ -71,11 +72,14 @@ public:
 		this->SolveCellUnknowns = - Att.inverse() * Atf;*/
 	}
 
-	Eigen::MatrixXd GetMassMatrix()
+	Eigen::MatrixXd CellMassMatrix()
 	{
-		return this->_massCell;
+		return this->_cellMassMatrix;
 	}
 
+	virtual Eigen::MatrixXd ComputeAndReturnCellMassMatrix(FunctionalBasis<Dim>* basis) = 0;
+	virtual Eigen::MatrixXd ComputeAndReturnCellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) = 0;
+	
 	Eigen::MatrixXd ComputeCanonicalInjectionMatrixCoarseToFine()
 	{
 		Eigen::MatrixXd J(this->CellBasis->Size() * this->FinerElements.size(), this->CellBasis->Size());
@@ -292,13 +296,59 @@ private:
 		}
 	}
 
-	void AssembleBf(Eigen::MatrixXd & rhsMatrix, Face<Dim> * face)
+	void AssembleBf(Eigen::MatrixXd & rhsMatrix, Face<Dim> * f)
 	{
+		Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
 		for (BasisFunction<Dim>* reconstructPhi : this->ReconstructionBasis->LocalFunctions)
 		{
 			for (BasisFunction<Dim - 1> * facePhi : this->FaceBasis->LocalFunctions)
 				rhsMatrix(reconstructPhi->LocalNumber, DOFNumber(face, facePhi)) = this->Bf(reconstructPhi, facePhi, face);
 		}
+	}
+
+	double Bt(BasisFunction<Dim>* reconstructPhi, BasisFunction<Dim>* cellPhi)
+	{
+		if (reconstructPhi->GetDegree() == 0)
+			return 0;
+
+		double integralGradGrad = this->ComputeIntegralGradGrad(reconstructPhi, cellPhi);
+
+		double sumFaces = 0;
+		for (auto f : this->Faces)
+		{
+			Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+
+			auto phi = this->EvalPhiOnFace(face, cellPhi);
+			auto gradPhi = this->GradPhiOnFace(face, reconstructPhi);
+			auto normal = this->OuterNormalVector(face);
+
+			std::function<double(RefPoint)> functionToIntegrate = [phi, gradPhi, normal](RefPoint p) {
+				return Utils::InnerProduct<Dim>(gradPhi(p), normal) * phi(p);
+			};
+
+			int polynomialDegree = reconstructPhi->GetDegree() - 1 + cellPhi->GetDegree();
+			double integralFace = face->ComputeIntegral(functionToIntegrate, 1, polynomialDegree);
+
+			sumFaces += integralFace;
+		}
+
+		return integralGradGrad - sumFaces;
+	}
+
+	double Bf(BasisFunction<Dim>* reconstructPhi, BasisFunction<Dim-1>* facePhi, Poisson_HHO_Face<Dim>* face)
+	{
+		if (reconstructPhi->GetDegree() == 0)
+			return 0;
+
+		auto gradPhi = this->GradPhiOnFace(face, reconstructPhi);
+		auto normal = this->OuterNormalVector(face);
+
+		std::function<double(RefPoint)> functionToIntegrate = [facePhi, gradPhi, normal](RefPoint p) {
+			return Utils::InnerProduct<Dim>(gradPhi(p), normal) * facePhi->Eval(p);
+		};
+
+		int polynomialDegree = reconstructPhi->GetDegree() - 1 + facePhi->GetDegree();
+		return face->ComputeIntegral(functionToIntegrate, 1, polynomialDegree);
 	}
 
 	//---------------------------------------------//
@@ -321,7 +371,7 @@ private:
 		for (auto f : this->Faces)
 		{
 			Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
-			Eigen::MatrixXd Mf = face->GetMassMatrix();
+			Eigen::MatrixXd Mf = face->FaceMassMatrix();
 			Eigen::MatrixXd ProjF = face->GetProjFromReconstruct(this);
 			Eigen::MatrixXd ProjFT = face->GetProjFromCell(this);
 

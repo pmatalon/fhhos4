@@ -119,6 +119,14 @@ public:
 
 		if ((action & Action::LogAssembly) == Action::LogAssembly)
 			cout << "Assembly..." << endl;
+
+		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreCellMassMatrix(cellBasis);
+		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreReconstructMassMatrix(reconstructionBasis);
+		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreCellStiffnessMatrix(cellBasis);
+		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreReconstructStiffnessMatrix(reconstructionBasis);
+		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreCellReconstructMassMatrix(cellBasis, reconstructionBasis);
+		CartesianShape<Dim, Dim-1>::ReferenceShape.ComputeAndStoreFaceMassMatrix(faceBasis);
+
 		this->InitHHO();
 		
 		for (auto e : mesh->Elements)
