@@ -37,6 +37,39 @@ public:
 		return pow(this->Width, ShapeDim);
 	}
 
+	double IntegralGlobalFunction(function<double(DomPoint)> func)
+	{
+		if (ShapeDim == 1)
+		{
+			double x1 = this->Origin.X;
+			double x2 = this->Origin.X + this->Width;
+
+			return Utils::Integral(func, x1, x2);
+		}
+		else if (ShapeDim == 2)
+		{
+			double x1 = this->Origin.X;
+			double x2 = this->Origin.X + this->Width;
+			double y1 = this->Origin.Y;
+			double y2 = this->Origin.Y + this->Width;
+
+			return Utils::Integral(func, x1, x2, y1, y2);
+		}
+		else if (ShapeDim == 3)
+		{
+			double x1 = this->Origin.X;
+			double x2 = this->Origin.X + this->Width;
+			double y1 = this->Origin.Y;
+			double y2 = this->Origin.Y + this->Width;
+			double z1 = this->Origin.Z;
+			double z2 = this->Origin.Z + this->Width;
+
+			return Utils::Integral(func, x1, x2, y1, y2, z1, z2);
+		}
+		else
+			assert(false);
+	}
+
 	double Integral(BasisFunction<ShapeDim>* phi)
 	{
 		return Rescale(ReferenceShape.ComputeIntegral(phi), 0);
@@ -99,6 +132,7 @@ public:
 		return RescaleStiffness(ReferenceShape.ComputeIntegralGradGrad(phi1, phi2));
 	}
 
+private:
 	Eigen::MatrixXd Rescale(const Eigen::MatrixXd& matrixOnReferenceElement, int numberOfDerivatives)
 	{
 		double h = this->Width;
@@ -131,6 +165,7 @@ public:
 		return Rescale(stiffnessTermOnReferenceElement, 2);
 	}
 
+public:
 	DomPoint ConvertToDomain(RefPoint referenceElementPoint)
 	{
 		DomPoint p;

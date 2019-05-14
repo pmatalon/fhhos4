@@ -213,6 +213,10 @@ public:
 		return f;
 	}
 
+	//---------------//
+	// Inner product //
+	//---------------//
+
 	template <int Dim>
 	static double InnerProduct(vector<double> vector1, vector<double> vector2)
 	{

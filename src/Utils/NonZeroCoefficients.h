@@ -21,7 +21,7 @@ public:
 	{
 		this->coefficients.reserve(nnzApproximate);
 	}*/
-	void Add(BigNumber i, BigNumber j, double value)
+	inline void Add(BigNumber i, BigNumber j, double value)
 	{
 		/*if (Done.rows() > 0)
 		{
@@ -34,12 +34,12 @@ public:
 			this->coefficients.push_back(Eigen::Triplet<double>(i, j, value));
 	}
 
-	void Add(NonZeroCoefficients &chunk)
+	inline void Add(NonZeroCoefficients &chunk)
 	{
 		this->coefficients.insert(this->coefficients.end(), chunk.coefficients.begin(), chunk.coefficients.end());
 	}
 
-	void Add(BigNumber iStart, BigNumber jStart, const Eigen::MatrixXd &m)
+	inline void Add(BigNumber iStart, BigNumber jStart, const Eigen::MatrixXd &m)
 	{
 		for (int i = 0; i < m.rows(); ++i)
 		{
@@ -48,7 +48,7 @@ public:
 		}
 	}
 
-	void Fill(Eigen::SparseMatrix<double> &m)
+	inline void Fill(Eigen::SparseMatrix<double> &m)
 	{
 		m.setFromTriplets(this->coefficients.begin(), this->coefficients.end());
 	}

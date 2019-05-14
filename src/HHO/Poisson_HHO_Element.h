@@ -34,8 +34,6 @@ public:
 
 	virtual double St(BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2) = 0;
 	virtual double Lt(BasisFunction<Dim>* phi) = 0;
-	//virtual double Bt(BasisFunction<Dim>* reconstructPhi, BasisFunction<Dim>* cellPhi) = 0;
-	//virtual double Bf(BasisFunction<Dim>* reconstructPhi, BasisFunction<Dim-1>* facePhi, Face<Dim>* face) = 0;
 	virtual double ComputeIntegralGradGrad(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) = 0;
 	
 	void InitHHO(FunctionalBasis<Dim>* reconstructionBasis, FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim - 1> * faceBasis)
@@ -265,24 +263,19 @@ private:
 		auto nFaceUnknowns = this->Faces.size() * this->FaceBasis->Size();
 		auto nColumns = this->CellBasis->Size() + nFaceUnknowns;
 		Eigen::MatrixXd rhsMatrix(this->ReconstructionBasis->Size() + 1, nColumns);
-		//cout << rhsMatrix << endl << "----------------- rhsMatrix ----------------" << endl;
 
 		// Top-left corner
 		this->AssembleBt(rhsMatrix);
-		//cout << rhsMatrix << endl << "----------------- after AssembleBt ----------------" << endl;
 
 		// Top-right corner
 		for (auto face : this->Faces)
 			this->AssembleBf(rhsMatrix, face);
-		//cout << rhsMatrix << endl << "----------------- after AssembleBf ----------------" << endl;
 
 		// Bottom-left corner
 		this->AssembleMt(rhsMatrix);
-		//cout << rhsMatrix << endl << "----------------- after AssembleMt ----------------" << endl;
 
 		// Bottom-right corner
 		rhsMatrix.bottomRightCorner(1, nFaceUnknowns) << Eigen::ArrayXXd::Zero(1, nFaceUnknowns);
-		//cout << rhsMatrix << endl << "---------------------------------" << endl;
 
 		return rhsMatrix;
 	}
@@ -357,16 +350,12 @@ private:
 
 	void AssembleStabilizationMatrix()
 	{
-		//this->Astab = Eigen::MatrixXd::Zero(this->Astab.rows(), this->Astab.cols());
 		this->Astab = Eigen::MatrixXd::Zero(CellBasis->Size() + this->Faces.size() * FaceBasis->Size(), CellBasis->Size() + this->Faces.size() * FaceBasis->Size());
 
 		Eigen::MatrixXd ProjT = _projFromReconstruct;
-		//cout << "------------- ProjT -------------" << endl << ProjT << endl;
 		Eigen::MatrixXd Dt = ProjT * this->P;
-		//cout << "------------- Dt -------------" << endl << Dt << endl;
 		for (int i = 0; i < Dt.rows(); i++)
 			Dt(i, i) -= 1;
-		//cout << "------------- Dt -------------" << endl << Dt << endl;
 
 		for (auto f : this->Faces)
 		{
@@ -382,7 +371,6 @@ private:
 			Eigen::MatrixXd DiffTF = Df - ProjFT * Dt;
 			double h = face->GetDiameter();
 			this->Astab += DiffTF.transpose() * Mf * DiffTF / h;
-			//cout << "------------- Astab -------------" << endl << Astab << endl;
 		}
 	}
 	int DOFNumber(BasisFunction<Dim> * cellPhi)

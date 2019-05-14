@@ -192,10 +192,12 @@ int main(int argc, char* argv[])
 			Poisson_DG<1>* problem = new Poisson_DG<1>(solution, sourceFunction, diffusionPartition, outputDirectory);
 			FunctionalBasis<1>* basis = new FunctionalBasis<1>(basisCode, polyDegree);
 
+			cout << "----------------------- Assembly -------------------------" << endl;
 			problem->Assemble(mesh, basis, penalizationCoefficient, action);
 
 			if ((action & Action::SolveSystem) == Action::SolveSystem)
 			{
+				cout << "------------------- Linear system resolution ------------------" << endl;
 				problem->Solve();
 				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
 					problem->ExtractSolution();
@@ -245,6 +247,7 @@ int main(int argc, char* argv[])
 			Poisson_DG<2>* problem = new Poisson_DG<2>(solution, sourceFunction, diffusionPartition, outputDirectory);
 			FunctionalBasis<2>* basis = new FunctionalBasis<2>(basisCode, polyDegree, fullTensorization);
 
+			cout << "----------------------- Assembly -------------------------" << endl;
 			problem->Assemble(mesh, basis, penalizationCoefficient, action);
 
 			if ((action & Action::SolveSystem) == Action::SolveSystem)
@@ -286,10 +289,11 @@ int main(int argc, char* argv[])
 					//BlockGaussSeidel solver(problem->HHO.nLocalFaceUnknowns);
 					solver.Setup(problem->A);
 					solver.Tolerance = 1e-5;
-					solver.Solve(problem->b);
-				}
+					problem->Solution = solver.Solve(problem->b);
 
-				problem->Solve();
+				}
+				else
+					problem->Solve();
 				
 				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
 					problem->ExtractTraceSystemSolution();
@@ -341,6 +345,7 @@ int main(int argc, char* argv[])
 
 		if (discretization.compare("dg") == 0)
 		{
+			cout << "----------------------- Assembly -------------------------" << endl;
 			Poisson_DG<3>* problem = new Poisson_DG<3>(solution, sourceFunction, diffusionPartition, outputDirectory);
 			FunctionalBasis<3>* basis = new FunctionalBasis<3>(basisCode, polyDegree, fullTensorization);
 
@@ -348,6 +353,7 @@ int main(int argc, char* argv[])
 
 			if ((action & Action::SolveSystem) == Action::SolveSystem)
 			{
+				cout << "------------------- Linear system resolution ------------------" << endl;
 				problem->Solve();
 				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
 					problem->ExtractSolution();
@@ -366,10 +372,12 @@ int main(int argc, char* argv[])
 
 			Poisson_HHO<3>* problem = new Poisson_HHO<3>(mesh, solution, sourceFunction, reconstructionBasis, cellBasis, faceBasis, staticCondensation, outputDirectory);
 
+			cout << "----------------------- Assembly -------------------------" << endl;
 			problem->Assemble(action);
 
 			if ((action & Action::SolveSystem) == Action::SolveSystem)
 			{
+				cout << "------------------- Linear system resolution ------------------" << endl;
 				problem->Solve();
 				problem->ReconstructSolution();
 				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
