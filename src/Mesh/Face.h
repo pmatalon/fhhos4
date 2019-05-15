@@ -11,6 +11,7 @@ public:
 	Element<Dim>* Element2;
 
 public:
+	Face() { assert(false); }
 	Face(BigNumber number, Element<Dim>* element1, Element<Dim>* element2)
 	{
 		this->Number = number;
@@ -44,29 +45,12 @@ public:
 		return NULL;
 	}
 
-	virtual double MassTerm(BasisFunction<Dim - 1>* facePhi, Element<Dim>* element, BasisFunction<Dim>* reconstructPhi) = 0;
-
 	virtual double GetDiameter() = 0;
 	virtual double Measure() = 0;
-
 	virtual DomPoint ConvertToDomain(RefPoint refPoint) = 0;
+	virtual double ComputeIntegral(function<double(RefPoint)> func, int numberOfDerivatives) = 0;
+	virtual double ComputeIntegral(function<double(RefPoint)> func, int numberOfDerivatives, int polynomialDegree) = 0;
 	
-	Eigen::MatrixXd MassMatrix(FunctionalBasis<Dim-1>* basis, Element<Dim>* element, FunctionalBasis<Dim>* cellBasis)
-	{
-		Eigen::MatrixXd M(basis->LocalFunctions.size(), cellBasis->LocalFunctions.size());
-		for (BasisFunction<Dim-1>* phi1 : basis->LocalFunctions)
-		{
-			for (BasisFunction<Dim>* phi2 : cellBasis->LocalFunctions)
-			{
-				double term = this->MassTerm(phi1, element, phi2);
-				M(phi1->LocalNumber, phi2->LocalNumber) = term;
-			}
-		}
-		return M;
-	}
-
-	virtual vector<RefPoint> GetNodalPoints(FunctionalBasis<Dim-1>* basis) = 0;
-
 	virtual string ToString()
 	{
 		return "Interface " + to_string(this->Number);

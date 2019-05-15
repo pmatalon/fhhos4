@@ -60,6 +60,32 @@ public:
 
 	virtual Eigen::MatrixXd ComputeAndReturnFaceMassMatrix(FunctionalBasis<Dim-1>* basis) = 0;
 
+	Eigen::MatrixXd MassMatrix(FunctionalBasis<Dim - 1>* basis, Element<Dim>* element, FunctionalBasis<Dim>* cellBasis)
+	{
+		Eigen::MatrixXd M(basis->LocalFunctions.size(), cellBasis->LocalFunctions.size());
+		for (BasisFunction<Dim - 1>* phi1 : basis->LocalFunctions)
+		{
+			for (BasisFunction<Dim>* phi2 : cellBasis->LocalFunctions)
+			{
+				double term = this->ComputeMassTerm(phi1, element, phi2);
+				M(phi1->LocalNumber, phi2->LocalNumber) = term;
+			}
+		}
+		return M;
+	}
+
+	double ComputeMassTerm(BasisFunction<Dim - 1>* facePhi, Element<Dim>* element, BasisFunction<Dim>* reconstructPhi)
+	{
+		auto reconstructPhiOnFace = element->EvalPhiOnFace(this, reconstructPhi);
+
+		function<double(RefPoint)> functionToIntegrate = [facePhi, reconstructPhiOnFace](RefPoint p) {
+			return facePhi->Eval(p) * reconstructPhiOnFace(p);
+		};
+
+		int polynomialDegree = facePhi->GetDegree() + reconstructPhi->GetDegree();
+		return this->ComputeIntegral(functionToIntegrate, 0, polynomialDegree);
+	}
+
 	Eigen::MatrixXd GetMassCellFace(Element<Dim>* element)
 	{
 		if (element == this->Element1)
@@ -95,13 +121,4 @@ public:
 			return _elem2_projFromCell;
 		assert(false);
 	}
-
-	Eigen::MatrixXd GetProjFromCoarserReconstruct()
-	{
-		Poisson_HHO_Element<Dim>* fineElement = dynamic_cast<Poisson_HHO_Element<Dim>*>(this->Element1);
-
-	}
-
-	virtual double ComputeIntegral(function<double(RefPoint)> func, int numberOfDerivatives) = 0;
-	virtual double ComputeIntegral(function<double(RefPoint)> func, int numberOfDerivatives, int polynomialDegree) = 0;
 };

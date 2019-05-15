@@ -51,11 +51,21 @@ public:
 		return vector<RefPoint> {RefPoint(0)};
 	}
 
+	double ComputeIntegral(function<double(RefPoint)> func, int numberOfDerivatives, int polynomialDegree)
+	{
+		assert(false);
+	}
+
+	double ComputeIntegral(function<double(RefPoint)> func, int numberOfDerivatives)
+	{
+		assert(false);
+	}
+
 	//---------------------------------------------------------------//
 	//                 Poisson_DG_Face implementation                //
 	//---------------------------------------------------------------//
 
-	double CouplingTerm(Element<1>* element1, BasisFunction<1>* p_phi1, Element<1>* element2, BasisFunction<1>* p_phi2, DiffusionPartition diffusionPartition)
+	double CouplingTerm(Element<1>* element1, BasisFunction<1>* p_phi1, Element<1>* element2, BasisFunction<1>* p_phi2, DiffusionPartition diffusionPartition) override
 	{
 		IBasisFunction1D* phi1 = static_cast<IBasisFunction1D*>(p_phi1);
 		IBasisFunction1D* phi2 = static_cast<IBasisFunction1D*>(p_phi2);
@@ -81,7 +91,7 @@ public:
 		return weight1 * k1 * MeanDerivative(interval1, phi1) * Jump(interval2, phi2) + weight2 * k2 * MeanDerivative(interval2, phi2) * Jump(interval1, phi1);
 	}
 
-	double PenalizationTerm(Element<1>* element1, BasisFunction<1>* p_phi1, Element<1>* element2, BasisFunction<1>* p_phi2, double penalizationCoefficient, DiffusionPartition diffusionPartition)
+	double PenalizationTerm(Element<1>* element1, BasisFunction<1>* p_phi1, Element<1>* element2, BasisFunction<1>* p_phi2, double penalizationCoefficient, DiffusionPartition diffusionPartition) override
 	{
 		IBasisFunction1D* phi1 = static_cast<IBasisFunction1D*>(p_phi1);
 		IBasisFunction1D* phi2 = static_cast<IBasisFunction1D*>(p_phi2);

@@ -149,6 +149,9 @@
     <ClInclude Include="src\Solver\IterationResult.h">
       <Filter>Solver</Filter>
     </ClInclude>
+    <ClInclude Include="src\Mesh\CartesianFace.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
