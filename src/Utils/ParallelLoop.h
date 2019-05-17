@@ -4,6 +4,7 @@
 #include <future>
 #include <math.h>
 #include "Utils.h"
+using namespace std;
 
 class ParallelChunk
 {
@@ -12,7 +13,7 @@ public:
 	BigNumber Start;
 	BigNumber End;
 	BigNumber Size() { return End - Start; }
-	std::future<void> ThreadFuture;
+	future<void> ThreadFuture;
 	ParallelChunk(int threadNumber, BigNumber chunkMaxSize, BigNumber loopSize)
 	{
 		this->ThreadNumber = threadNumber;
@@ -48,6 +49,26 @@ public:
 	{
 		for (unsigned int threadNumber = 0; threadNumber < NThreads; threadNumber++)
 			this->Chunks[threadNumber]->ThreadFuture.wait();
+	}
+
+	template <class T>
+	static void Execute(vector<T> list, function<void(T)> functionToExecute)
+	{
+		ParallelLoop parallelLoop(list.size());
+
+		for (unsigned int threadNumber = 0; threadNumber < parallelLoop.NThreads; threadNumber++)
+		{
+			ParallelChunk* chunk = parallelLoop.Chunks[threadNumber];
+			chunk->ThreadFuture = std::async([chunk, list, functionToExecute]()
+				{
+					for (BigNumber i = chunk->Start; i < chunk->End; ++i)
+					{
+						functionToExecute(list[i]);
+					}
+				}
+			);
+		}
+		parallelLoop.Wait();
 	}
 
 	~ParallelLoop()

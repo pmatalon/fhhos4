@@ -110,139 +110,192 @@ public:
 		string reconstructionMatrixFilePath	= this->_outputDirectory + "/" + this->_fileName + "_Reconstruct.dat";
 		string rhsFilePath					= this->_outputDirectory + "/" + this->_fileName + "_b.dat";
 
-		this->_globalRHS = Eigen::VectorXd(hho.nTotalHybridUnknowns);
-
-		BigNumber nnzApproximate = mesh->Elements.size() * hho.nTotalHybridUnknowns * (2 * Dim + 1);
-		NonZeroCoefficients consistencyCoeffs(nnzApproximate);
-		NonZeroCoefficients stabilizationCoeffs(nnzApproximate);
-		NonZeroCoefficients reconstructionCoeffs(nnzApproximate);
-
 		if ((action & Action::LogAssembly) == Action::LogAssembly)
 			cout << "Assembly..." << endl;
 
+		this->_globalRHS = Eigen::VectorXd(hho.nTotalHybridUnknowns);
+
+		// Compute some useful integrals on reference element and store them
 		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreCellMassMatrix(cellBasis);
 		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreReconstructMassMatrix(reconstructionBasis);
 		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreCellStiffnessMatrix(cellBasis);
 		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreReconstructStiffnessMatrix(reconstructionBasis);
 		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreCellReconstructMassMatrix(cellBasis, reconstructionBasis);
-		CartesianShape<Dim, Dim-1>::ReferenceShape.ComputeAndStoreFaceMassMatrix(faceBasis);
+		CartesianShape<Dim, Dim - 1>::ReferenceShape.ComputeAndStoreFaceMassMatrix(faceBasis);
 
 		this->InitHHO();
+
+		//-------------------------------//
+		// Parallel loop on the elements //
+		//-------------------------------//
+
+		ParallelLoop parallelLoop(mesh->Elements.size());
+
+		vector<NonZeroCoefficients> chunksConsistencyCoeffs(parallelLoop.NThreads);
+		vector<NonZeroCoefficients> chunksStabilizationCoeffs(parallelLoop.NThreads);
+		vector<NonZeroCoefficients> chunksReconstructionCoeffs(parallelLoop.NThreads);
 		
-		for (auto e : mesh->Elements)
+		for (unsigned int threadNumber = 0; threadNumber < parallelLoop.NThreads; threadNumber++)
 		{
-			//cout << "Element " << element->Number << endl;
-			Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
+			ParallelChunk* chunk = parallelLoop.Chunks[threadNumber];
 
-			// Cell unknowns / Cell unknowns
-			for (BasisFunction<Dim>* cellPhi1 : cellBasis->LocalFunctions)
-			{
-				BigNumber i = DOFNumber(element, cellPhi1);
-				for (BasisFunction<Dim>* cellPhi2 : cellBasis->LocalFunctions)
+			chunk->ThreadFuture = std::async([this, &hho, mesh, cellBasis, faceBasis, reconstructionBasis, action, chunk, &chunksConsistencyCoeffs, &chunksStabilizationCoeffs, &chunksReconstructionCoeffs]()
 				{
-					BigNumber j = DOFNumber(element, cellPhi2);
-					double consistencyTerm = element->ConsistencyTerm(cellPhi1, cellPhi2);
-					consistencyCoeffs.Add(i, j, consistencyTerm);
+					BigNumber nnzApproximate = chunk->Size() * (pow(hho.nLocalCellUnknowns, 2) + 4 * pow(hho.nLocalFaceUnknowns, 2) + hho.nLocalCellUnknowns * 4 * hho.nLocalFaceUnknowns);
+					NonZeroCoefficients consistencyCoeffs(nnzApproximate);
+					NonZeroCoefficients stabilizationCoeffs(nnzApproximate);
+					NonZeroCoefficients reconstructionCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
 
-					double stabilizationTerm = element->StabilizationTerm(cellPhi1, cellPhi2);
-					stabilizationCoeffs.Add(i, j, stabilizationTerm);
-				}
-			}
-
-			// Cell unknowns / Face unknowns
-			for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions)
-			{
-				BigNumber i = DOFNumber(element, cellPhi);
-				for (auto face : element->Faces)
-				{
-					if (face->IsDomainBoundary)
-						continue;
-
-					for (BasisFunction<Dim-1>* facePhi : faceBasis->LocalFunctions)
+					for (BigNumber iElem = chunk->Start; iElem < chunk->End; iElem++)
 					{
-						BigNumber j = DOFNumber(face, facePhi);
+						//--------------//
+						//   Assembly   //
+						//--------------//
 
-						double consistencyTerm = element->ConsistencyTerm(face, cellPhi, facePhi);
-						consistencyCoeffs.Add(i, j, consistencyTerm);
-						consistencyCoeffs.Add(j, i, consistencyTerm);
+						//cout << "Element " << element->Number << endl;
+						Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(mesh->Elements[iElem]);
 
-						double stabilizationTerm = element->StabilizationTerm(face, cellPhi, facePhi);
-						stabilizationCoeffs.Add(i, j, stabilizationTerm);
-						stabilizationCoeffs.Add(j, i, stabilizationTerm);
-					}
-				}
-			}
-
-			// Face unknowns / Face unknowns
-			for (auto face1 : element->Faces)
-			{
-				if (face1->IsDomainBoundary)
-					continue;
-
-				for (BasisFunction<Dim - 1>* facePhi1 : faceBasis->LocalFunctions)
-				{
-					BigNumber i = DOFNumber(face1, facePhi1);
-					for (auto face2 : element->Faces)
-					{
-						if (face2->IsDomainBoundary)
-							continue;
-
-						for (BasisFunction<Dim - 1>* facePhi2 : faceBasis->LocalFunctions)
+						// Cell unknowns / Cell unknowns
+						for (BasisFunction<Dim>* cellPhi1 : cellBasis->LocalFunctions)
 						{
-							BigNumber j = DOFNumber(face2, facePhi2);
+							BigNumber i = DOFNumber(element, cellPhi1);
+							for (BasisFunction<Dim>* cellPhi2 : cellBasis->LocalFunctions)
+							{
+								BigNumber j = DOFNumber(element, cellPhi2);
+								double consistencyTerm = element->ConsistencyTerm(cellPhi1, cellPhi2);
+								consistencyCoeffs.Add(i, j, consistencyTerm);
 
-							double consistencyTerm = element->ConsistencyTerm(face1, facePhi1, face2, facePhi2);
-							consistencyCoeffs.Add(i, j, consistencyTerm);
-							//consistencyCoeffs.Add(j, i, consistencyTerm);
+								double stabilizationTerm = element->StabilizationTerm(cellPhi1, cellPhi2);
+								stabilizationCoeffs.Add(i, j, stabilizationTerm);
+							}
+						}
 
-							double stabilizationTerm = element->StabilizationTerm(face1, facePhi1, face2, facePhi2);
-							stabilizationCoeffs.Add(i, j, stabilizationTerm);
+						// Cell unknowns / Face unknowns
+						for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions)
+						{
+							BigNumber i = DOFNumber(element, cellPhi);
+							for (auto face : element->Faces)
+							{
+								if (face->IsDomainBoundary)
+									continue;
+
+								for (BasisFunction<Dim - 1>* facePhi : faceBasis->LocalFunctions)
+								{
+									BigNumber j = DOFNumber(face, facePhi);
+
+									double consistencyTerm = element->ConsistencyTerm(face, cellPhi, facePhi);
+									consistencyCoeffs.Add(i, j, consistencyTerm);
+									consistencyCoeffs.Add(j, i, consistencyTerm);
+
+									double stabilizationTerm = element->StabilizationTerm(face, cellPhi, facePhi);
+									stabilizationCoeffs.Add(i, j, stabilizationTerm);
+									stabilizationCoeffs.Add(j, i, stabilizationTerm);
+								}
+							}
+						}
+
+						// Face unknowns / Face unknowns
+						for (auto face1 : element->Faces)
+						{
+							if (face1->IsDomainBoundary)
+								continue;
+
+							for (BasisFunction<Dim - 1>* facePhi1 : faceBasis->LocalFunctions)
+							{
+								BigNumber i = DOFNumber(face1, facePhi1);
+								for (auto face2 : element->Faces)
+								{
+									if (face2->IsDomainBoundary)
+										continue;
+
+									for (BasisFunction<Dim - 1>* facePhi2 : faceBasis->LocalFunctions)
+									{
+										BigNumber j = DOFNumber(face2, facePhi2);
+
+										double consistencyTerm = element->ConsistencyTerm(face1, facePhi1, face2, facePhi2);
+										consistencyCoeffs.Add(i, j, consistencyTerm);
+										//consistencyCoeffs.Add(j, i, consistencyTerm);
+
+										double stabilizationTerm = element->StabilizationTerm(face1, facePhi1, face2, facePhi2);
+										stabilizationCoeffs.Add(i, j, stabilizationTerm);
+									}
+								}
+							}
+						}
+
+						// Right-hand side
+						for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions)
+						{
+							BigNumber i = DOFNumber(element, cellPhi);
+							this->_globalRHS(i) = element->SourceTerm(cellPhi, this->_sourceFunction);
+						}
+						for (auto face : element->Faces)
+						{
+							if (face->IsDomainBoundary)
+								continue;
+
+							for (BasisFunction<Dim - 1>* facePhi : faceBasis->LocalFunctions)
+							{
+								BigNumber i = DOFNumber(face, facePhi);
+								this->_globalRHS(i) = 0;
+							}
+						}
+
+						if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
+						{
+							// Global reconstruction matrix (for export)
+							for (BasisFunction<Dim>* reconstructPhi : reconstructionBasis->LocalFunctions)
+							{
+								BigNumber i = element->Number * reconstructionBasis->Size() + reconstructPhi->LocalNumber;
+								for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions)
+								{
+									BigNumber j = DOFNumber(element, cellPhi);
+									reconstructionCoeffs.Add(i, j, element->ReconstructionTerm(reconstructPhi, cellPhi));
+								}
+								for (auto face : element->Faces)
+								{
+									for (BasisFunction<Dim - 1>* facePhi : faceBasis->LocalFunctions)
+									{
+										BigNumber j = DOFNumber(face, facePhi);
+										reconstructionCoeffs.Add(i, j, element->ReconstructionTerm(reconstructPhi, face, facePhi));
+									}
+								}
+							}
 						}
 					}
+
+					chunksConsistencyCoeffs[chunk->ThreadNumber] = consistencyCoeffs;
+					chunksStabilizationCoeffs[chunk->ThreadNumber] = stabilizationCoeffs;
+					chunksReconstructionCoeffs[chunk->ThreadNumber] = reconstructionCoeffs;
 				}
-			}
-
-			// Right-hand side
-			for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions)
-			{
-				BigNumber i = DOFNumber(element, cellPhi);
-				this->_globalRHS(i) = element->SourceTerm(cellPhi, this->_sourceFunction);
-			}
-			for (auto face : element->Faces)
-			{
-				if (face->IsDomainBoundary)
-					continue;
-
-				for (BasisFunction<Dim - 1>* facePhi : faceBasis->LocalFunctions)
-				{
-					BigNumber i = DOFNumber(face, facePhi);
-					this->_globalRHS(i) = 0;
-				}
-			}
-
-			if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
-			{
-				// Global reconstruction matrix (for export)
-				for (BasisFunction<Dim>* reconstructPhi : reconstructionBasis->LocalFunctions)
-				{
-					BigNumber i = element->Number * reconstructionBasis->Size() + reconstructPhi->LocalNumber;
-					for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions)
-					{
-						BigNumber j = DOFNumber(element, cellPhi);
-						reconstructionCoeffs.Add(i, j, element->ReconstructionTerm(reconstructPhi, cellPhi));
-					}
-					for (auto face : element->Faces)
-					{
-						for (BasisFunction<Dim - 1>* facePhi : faceBasis->LocalFunctions)
-						{
-							BigNumber j = DOFNumber(face, facePhi);
-							reconstructionCoeffs.Add(i, j, element->ReconstructionTerm(reconstructPhi, face, facePhi));
-						}
-					}
-				}
-			}
-
+			);
 		}
+
+		//------------------------------------//
+		// Aggregation of the parallel chunks //
+		//------------------------------------//
+
+		BigNumber nnzApproximate = mesh->Elements.size() * (pow(hho.nLocalCellUnknowns, 2) + 4 * pow(hho.nLocalFaceUnknowns, 2) + hho.nLocalCellUnknowns * 4 * hho.nLocalFaceUnknowns);
+		NonZeroCoefficients consistencyCoeffs(nnzApproximate);
+		NonZeroCoefficients stabilizationCoeffs(nnzApproximate);
+		NonZeroCoefficients reconstructionCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
+
+		parallelLoop.Wait();
+
+		for (unsigned int threadNumber = 0; threadNumber < parallelLoop.NThreads; threadNumber++)
+		{
+			consistencyCoeffs.Add(chunksConsistencyCoeffs[threadNumber]);
+			stabilizationCoeffs.Add(chunksStabilizationCoeffs[threadNumber]);
+			reconstructionCoeffs.Add(chunksReconstructionCoeffs[threadNumber]);
+		}
+
+		chunksConsistencyCoeffs.clear();
+		chunksStabilizationCoeffs.clear();
+		chunksReconstructionCoeffs.clear();
+
+		//--------------------------//
+		// Creation of the matrices //
+		//--------------------------//
 
 		Eigen::SparseMatrix<double> Acons = Eigen::SparseMatrix<double>(hho.nTotalHybridUnknowns, hho.nTotalHybridUnknowns);
 		consistencyCoeffs.Fill(Acons);
@@ -277,6 +330,10 @@ public:
 		Eigen::SparseMatrix<double> reconstructionMatrix = Eigen::SparseMatrix<double>(hho.nElements * reconstructionBasis->Size(), hho.nTotalHybridCoeffs);
 		reconstructionCoeffs.Fill(reconstructionMatrix);
 
+		//------------------//
+		//      Export      //
+		//------------------//
+
 		if ((action & Action::ExtractSystem) == Action::ExtractSystem)
 		{
 			cout << "Export..." << endl;
@@ -309,17 +366,21 @@ public:
 		for (auto face : this->_mesh->BoundaryFaces)
 			face->Number = faceNumber++;
 
-		for (auto f : this->_mesh->Faces)
-		{
-			Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
-			face->InitHHO(this->_reconstructionBasis, this->_cellBasis, this->_faceBasis);
-		}
+		// Init faces //
+		ParallelLoop::Execute<Face<Dim>*>(this->_mesh->Faces, [this](Face<Dim>* f)
+			{
+				Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+				face->InitHHO(this->_reconstructionBasis, this->_cellBasis, this->_faceBasis);
+			}
+		);
 
-		for (auto e : this->_mesh->Elements)
-		{
-			Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
-			element->InitHHO(this->_reconstructionBasis, this->_cellBasis, this->_faceBasis);
-		}
+		// Init Elements //
+		ParallelLoop::Execute<Element<Dim>*>(this->_mesh->Elements, [this](Element<Dim>* e)
+			{
+				Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
+				element->InitHHO(this->_reconstructionBasis, this->_cellBasis, this->_faceBasis);
+			}
+		);
 	}
 
 	void ReconstructSolution()

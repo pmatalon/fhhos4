@@ -361,7 +361,7 @@ public:
 			}
 			finerLevel->Setup();
 			_nLevels = levelNumber + 1;
-			cout << "\t" << _nLevels << " levels built." << endl;
+			cout << "\t--> " << _nLevels << " levels built." << endl;
 		}
 	}
 };
