@@ -87,6 +87,27 @@ public:
 		return Rescale(integralOnReferenceShape, numberOfDerivatives);
 	}
 
+	//--------//
+	//   DG   //
+	//--------//
+
+	double MassTerm(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
+	{
+		return RescaleMass(ReferenceShape.MassTerm(phi1, phi2));
+	}
+
+	double StiffnessTerm(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
+	{
+		if (phi1->GetDegree() == 0 || phi1->GetDegree() == 0)
+			return 0;
+
+		return RescaleStiffness(ReferenceShape.StiffnessTerm(phi1, phi2));
+	}
+
+	//---------//
+	//   HHO   //
+	//---------//
+
 	Eigen::MatrixXd ComputeAndReturnFaceMassMatrix(FunctionalBasis<ShapeDim>* basis)
 	{
 		return RescaleMass(ReferenceShape.StoredFaceMassMatrix());
@@ -100,20 +121,6 @@ public:
 	Eigen::MatrixXd ComputeAndReturnCellReconstructMassMatrix(FunctionalBasis<ShapeDim>* cellBasis, FunctionalBasis<ShapeDim>* reconstructBasis)
 	{
 		return RescaleMass(ReferenceShape.StoredCellReconstructMassMatrix());
-	}
-
-
-	double MassTerm(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
-	{
-		return RescaleMass(ReferenceShape.MassTerm(phi1, phi2));
-	}
-
-	double IntegralGradGrad(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
-	{
-		if (phi1->GetDegree() == 0 || phi1->GetDegree() == 0)
-			return 0;
-
-		return RescaleStiffness(ReferenceShape.StiffnessTerm(phi1, phi2));
 	}
 
 	double IntegralGradGradReconstruct(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)

@@ -27,14 +27,7 @@ public:
 
 	//Eigen::MatrixXd SolveCellUnknows;
 
-
 	Poisson_HHO_Element(BigNumber number) : Element<Dim>(number) {}
-
-	virtual double SourceTerm(BasisFunction<Dim>* cellPhi, SourceFunction* f) = 0;
-
-	virtual double St(BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2) = 0;
-	virtual double Lt(BasisFunction<Dim>* phi) = 0;
-	virtual double ComputeIntegralGradGrad(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) = 0;
 	
 	void InitHHO(FunctionalBasis<Dim>* reconstructionBasis, FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim - 1> * faceBasis)
 	{
@@ -74,9 +67,6 @@ public:
 	{
 		return this->_cellMassMatrix;
 	}
-
-	virtual Eigen::MatrixXd ComputeAndReturnCellMassMatrix(FunctionalBasis<Dim>* basis) = 0;
-	virtual Eigen::MatrixXd ComputeAndReturnCellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) = 0;
 	
 	Eigen::MatrixXd ComputeCanonicalInjectionMatrixCoarseToFine()
 	{
@@ -178,6 +168,14 @@ public:
 	{
 		return this->P(reconstructPhi->LocalNumber, DOFNumber(face, facePhi));
 	}
+
+
+	virtual double SourceTerm(BasisFunction<Dim>* cellPhi, SourceFunction* f) = 0;
+	virtual double St(BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2) = 0;
+	//virtual double Lt(BasisFunction<Dim>* phi) = 0;
+	virtual double ComputeIntegralGradGrad(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) = 0;
+	virtual Eigen::MatrixXd ComputeAndReturnCellMassMatrix(FunctionalBasis<Dim>* basis) = 0;
+	virtual Eigen::MatrixXd ComputeAndReturnCellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) = 0;
 
 
 	virtual ~Poisson_HHO_Element() {}
@@ -342,6 +340,11 @@ private:
 
 		int polynomialDegree = reconstructPhi->GetDegree() - 1 + facePhi->GetDegree();
 		return face->ComputeIntegral(functionToIntegrate, 1, polynomialDegree);
+	}
+
+	double Lt(BasisFunction<Dim>* phi)
+	{
+		return this->Integral(phi);
 	}
 
 	//---------------------------------------------//

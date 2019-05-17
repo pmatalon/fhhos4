@@ -89,9 +89,9 @@ public:
 		return CartesianShape<Dim>::MassTerm(phi1, phi2);
 	}
 
-	double IntegralGradGrad(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
+	double StiffnessTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{
-		return CartesianShape<Dim>::IntegralGradGrad(phi1, phi2);
+		return CartesianShape<Dim>::StiffnessTerm(phi1, phi2);
 	}
 
 	//-------------------------------------------------------------------//
@@ -111,10 +111,5 @@ public:
 	double St(BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2)
 	{
 		return CartesianShape<Dim>::IntegralGradGradReconstruct(reconstructPhi1, reconstructPhi2);
-	}
-
-	double Lt(BasisFunction<Dim>* phi)
-	{
-		return Integral(phi);
 	}
 };

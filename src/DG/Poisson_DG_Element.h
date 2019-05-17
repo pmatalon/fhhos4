@@ -12,11 +12,10 @@ public:
 	virtual double VolumicTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2, DiffusionPartition diffusionPartition)
 	{
 		double kappa = this->DiffusionCoefficient(diffusionPartition);
-		return kappa * IntegralGradGrad(phi1, phi2);
+		return kappa * this->StiffnessTerm(phi1, phi2);
 	}
 
-	virtual double IntegralGradGrad(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) = 0;
-
+	virtual double StiffnessTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) = 0;
 	virtual double MassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) = 0;
 	virtual double SourceTerm(BasisFunction<Dim>* phi, SourceFunction* f) = 0;
 

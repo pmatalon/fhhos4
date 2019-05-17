@@ -17,25 +17,9 @@ private:
 	Eigen::MatrixXd _reconstructStiffnessMatrix;
 	Eigen::MatrixXd _faceMassMatrix;
 	Eigen::MatrixXd _cellReconstructMassMatrix;
+
 public:
-	ReferenceCartesianShape()
-	{
-	}
-
-	double MassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
-	{
-		return this->_massMatrix(phi1->LocalNumber, phi2->LocalNumber);
-	}
-
-	double StiffnessTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
-	{
-		return this->_stiffnessMatrix(phi1->LocalNumber, phi2->LocalNumber);
-	}
-
-	double ReconstructStiffnessTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
-	{
-		return this->_reconstructStiffnessMatrix(phi1->LocalNumber, phi2->LocalNumber);
-	}
+	ReferenceCartesianShape() {}
 
 	double ComputeIntegral(BasisFunction<Dim>* phi)
 	{
@@ -52,46 +36,33 @@ public:
 		return Utils::Integral<Dim>(func);
 	}
 
+	//--------//
+	//   DG   //
+	//--------//
+
+	double MassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
+	{
+		return this->_massMatrix(phi1->LocalNumber, phi2->LocalNumber);
+	}
+	double StiffnessTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
+	{
+		return this->_stiffnessMatrix(phi1->LocalNumber, phi2->LocalNumber);
+	}
+
 	void ComputeAndStoreMassMatrix(FunctionalBasis<Dim>* basis)
 	{
 		if (_massMatrix.rows() == 0)
 			_massMatrix = ComputeAndReturnMassMatrix(basis);
-	}
-	void ComputeAndStoreCellMassMatrix(FunctionalBasis<Dim>* basis)
-	{
-		if (_cellMassMatrix.rows() == 0)
-			_cellMassMatrix = ComputeAndReturnMassMatrix(basis);
-	}
-	void ComputeAndStoreFaceMassMatrix(FunctionalBasis<Dim>* basis)
-	{
-		if (_faceMassMatrix.rows() == 0)
-			_faceMassMatrix = ComputeAndReturnMassMatrix(basis);
-	}
-	void ComputeAndStoreReconstructMassMatrix(FunctionalBasis<Dim>* basis)
-	{
-		if (_reconstructMassMatrix.rows() == 0)
-			_reconstructMassMatrix = ComputeAndReturnMassMatrix(basis);
 	}
 	void ComputeAndStoreStiffnessMatrix(FunctionalBasis<Dim>* basis)
 	{
 		if (_stiffnessMatrix.rows() == 0)
 			_stiffnessMatrix = ComputeAndReturnStiffnessMatrix(basis);
 	}
-	void ComputeAndStoreCellStiffnessMatrix(FunctionalBasis<Dim>* basis)
-	{
-		if (_cellStiffnessMatrix.rows() == 0)
-			_cellStiffnessMatrix = ComputeAndReturnStiffnessMatrix(basis);
-	}
-	void ComputeAndStoreReconstructStiffnessMatrix(FunctionalBasis<Dim>* basis)
-	{
-		if (_reconstructStiffnessMatrix.rows() == 0)
-			_reconstructStiffnessMatrix = ComputeAndReturnStiffnessMatrix(basis);
-	}
-	void ComputeAndStoreCellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis)
-	{
-		if (_cellReconstructMassMatrix.rows() == 0)
-			_cellReconstructMassMatrix = ComputeAndReturnMassMatrix(cellBasis, reconstructBasis);
-	}
+
+	//---------//
+	//   HHO   //
+	//---------//
 
 	Eigen::MatrixXd StoredCellMassMatrix()
 	{
@@ -108,6 +79,42 @@ public:
 	Eigen::MatrixXd StoredCellReconstructMassMatrix()
 	{
 		return _cellReconstructMassMatrix;
+	}
+
+	double ReconstructStiffnessTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
+	{
+		return this->_reconstructStiffnessMatrix(phi1->LocalNumber, phi2->LocalNumber);
+	}
+
+	void ComputeAndStoreCellMassMatrix(FunctionalBasis<Dim>* basis)
+	{
+		if (_cellMassMatrix.rows() == 0)
+			_cellMassMatrix = ComputeAndReturnMassMatrix(basis);
+	}
+	void ComputeAndStoreFaceMassMatrix(FunctionalBasis<Dim>* basis)
+	{
+		if (_faceMassMatrix.rows() == 0)
+			_faceMassMatrix = ComputeAndReturnMassMatrix(basis);
+	}
+	void ComputeAndStoreReconstructMassMatrix(FunctionalBasis<Dim>* basis)
+	{
+		if (_reconstructMassMatrix.rows() == 0)
+			_reconstructMassMatrix = ComputeAndReturnMassMatrix(basis);
+	}
+	void ComputeAndStoreCellStiffnessMatrix(FunctionalBasis<Dim>* basis)
+	{
+		if (_cellStiffnessMatrix.rows() == 0)
+			_cellStiffnessMatrix = ComputeAndReturnStiffnessMatrix(basis);
+	}
+	void ComputeAndStoreReconstructStiffnessMatrix(FunctionalBasis<Dim>* basis)
+	{
+		if (_reconstructStiffnessMatrix.rows() == 0)
+			_reconstructStiffnessMatrix = ComputeAndReturnStiffnessMatrix(basis);
+	}
+	void ComputeAndStoreCellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis)
+	{
+		if (_cellReconstructMassMatrix.rows() == 0)
+			_cellReconstructMassMatrix = ComputeAndReturnMassMatrix(cellBasis, reconstructBasis);
 	}
 
 private:

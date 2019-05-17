@@ -22,7 +22,6 @@ public:
 	Element<Dim>* CoarserElement;
 	std::vector<Face<Dim>*> FinerFacesRemoved;
 
-
 	Element(BigNumber number)
 	{
 		this->Number = number;
@@ -32,17 +31,6 @@ public:
 	{
 		return face->GetNeighbour(this);
 	}
-
-	virtual double GetDiameter() = 0;
-	virtual double Measure() = 0;
-
-	virtual DomPoint ConvertToDomain(RefPoint refPoint) = 0;
-	virtual RefPoint ConvertToReference(DomPoint domainPoint) = 0;
-
-	virtual vector<double> OuterNormalVector(Face<Dim>* face) = 0;
-	
-	virtual double IntegralGlobalFunction(function<double(DomPoint)> globalFunction) = 0;
-
 
 	int LocalNumberOf(Element<Dim>* finerElement)
 	{
@@ -86,6 +74,13 @@ public:
 			measure += f->Measure();
 	}
 
+	virtual double GetDiameter() = 0;
+	virtual double Measure() = 0;
+	virtual DomPoint ConvertToDomain(RefPoint refPoint) = 0;
+	virtual RefPoint ConvertToReference(DomPoint domainPoint) = 0;
+	virtual vector<double> OuterNormalVector(Face<Dim>* face) = 0;
+	virtual double Integral(BasisFunction<Dim>* phi) = 0;
+	virtual double IntegralGlobalFunction(function<double(DomPoint)> globalFunction) = 0;
 	virtual double L2ErrorPow2(function<double(RefPoint)> approximate, function<double(DomPoint)> exactSolution) = 0;
 	virtual double DiffusionCoefficient(DiffusionPartition diffusionPartition) = 0;
 	virtual vector<RefPoint> GetNodalPoints(FunctionalBasis<Dim>* basis) = 0;

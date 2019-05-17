@@ -284,7 +284,7 @@ int main(int argc, char* argv[])
 				cout << "------------------- Linear system resolution ------------------" << endl;
 				if (staticCondensation && mesh->N > 2)
 				{
-					MultigridForHHO<2> solver(problem, 2);
+					MultigridForHHO<2> solver(problem);
 					cout << "Solver: " << solver << endl;
 					//BlockGaussSeidel solver(problem->HHO.nLocalFaceUnknowns);
 					solver.Setup(problem->A);

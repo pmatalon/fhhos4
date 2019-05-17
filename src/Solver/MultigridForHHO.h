@@ -23,6 +23,7 @@ public:
 
 	void Setup()
 	{
+		cout << "\tSetup level " << this->Number << "..." << endl;
 		/*this->OperatorMatrix = this->_problem->A;
 		if (!this->IsCoarsestLevel())
 		{
@@ -48,6 +49,8 @@ public:
 
 		if (!this->IsCoarsestLevel())
 			SetupSmoothers();
+
+		cout << "\tLevel " << this->Number << ": size(A)=" << this->OperatorMatrix.rows() << ", nnz(A)=" << this->OperatorMatrix.nonZeros() << endl;
 	}
 
 	Eigen::VectorXd Restrict(Eigen::VectorXd& vectorOnThisLevel) override
@@ -76,14 +79,13 @@ private:
 
 		auto I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
 		auto J_f_c = GetGlobalCanonicalInjectionMatrixCoarseToFine();
-		auto Pi_c = GetGlobalProjectorMatrixFromCellsToFaces(coarsePb);
+		auto Pi_c = GetGlobalProjectorMatrixFromCellsToFaces(coarsePb); // to be removed later
 		auto Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
 
 		finePb->ExportMatrix(I_c, "I_c");
 		finePb->ExportMatrix(J_f_c, "J_f_c");
-		this->_problem->ExportMatrix(Pi_f, "Pi_f");
-
-		finePb->ExportMatrix(Pi_c, "Pi_c");
+		finePb->ExportMatrix(Pi_c, "Pi_c"); // to be removed later
+		finePb->ExportMatrix(Pi_f, "Pi_f");
 
 		P = Pi_f * J_f_c * I_c;
 
@@ -303,7 +305,9 @@ public:
 	{
 		os << "MultigridForHHO" << endl;
 		os << "\t" << "Levels: ";
-		if (_automaticNumberOfLevels)
+		if (_automaticNumberOfLevels && _nLevels == 0)
+			os << " automatic coarsening until matrix size <= " << MatrixMaxSizeForCoarsestLevel << endl;
+		else if (_automaticNumberOfLevels && _nLevels > 0)
 			os << _nLevels << " (automatic)" << endl;
 		else
 			os << _nLevels << endl;
@@ -357,6 +361,7 @@ public:
 			}
 			finerLevel->Setup();
 			_nLevels = levelNumber + 1;
+			cout << "\t" << _nLevels << " levels built." << endl;
 		}
 	}
 };
