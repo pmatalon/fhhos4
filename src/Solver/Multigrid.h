@@ -39,7 +39,7 @@ private:
 			//level->ExportVector(x, "mg_initialGuess");
 
 			// Pre-smoothing //
-			x = level->PreSmoother.Smooth(x, b);
+			x = level->PreSmoother->Smooth(x, b);
 
 			//level->ExportVector(x, "mg_afterPreSmoothing");
 
@@ -59,7 +59,7 @@ private:
 			x = x + level->Prolong(ec);
 
 			// Post-smoothing //
-			x = level->PostSmoother.Smooth(x, b);
+			x = level->PostSmoother->Smooth(x, b);
 			//level->ExportVector(x, "mg_afterPostSmoothing");
 		}
 

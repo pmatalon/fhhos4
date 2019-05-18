@@ -1,11 +1,12 @@
 #pragma once
 #include <Eigen/Sparse>
 #include "IterativeSolver.h"
+#include "BlockSOR.h"
 using namespace std;
 
 class Smoother
 {
-private:
+protected:
 	IterativeSolver* _solver;
 	int _nSmoothingIterations;
 
@@ -35,9 +36,21 @@ public:
 		return os;
 	}
 
-	~Smoother()
+	virtual ~Smoother()
 	{
-		//delete _solver;
+		delete _solver;
 	}
 
+};
+
+class BlockGaussSeidelSmoother : public Smoother
+{
+public:
+	BlockGaussSeidelSmoother(int blockSize, int nSmoothingIterations) : Smoother(new BlockGaussSeidel(blockSize), nSmoothingIterations) {}
+};
+
+class ReverseBlockGaussSeidelSmoother : public Smoother
+{
+public:
+	ReverseBlockGaussSeidelSmoother(int blockSize, int nSmoothingIterations) : Smoother(new ReverseBlockGaussSeidel(blockSize), nSmoothingIterations) {}
 };

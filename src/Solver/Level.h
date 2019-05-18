@@ -10,15 +10,17 @@ public:
 
 	Eigen::SparseMatrix<double> OperatorMatrix;
 
-	Smoother PreSmoother;
-	Smoother PostSmoother;
+	Smoother* PreSmoother;
+	Smoother* PostSmoother;
 
 	Level* FinerLevel = NULL;
 	Level* CoarserLevel = NULL;
 
-	Level(int number, Smoother preSmoother, Smoother postSmoother) : PreSmoother(preSmoother), PostSmoother(postSmoother)
+	Level(int number, Smoother* preSmoother, Smoother* postSmoother)
 	{
 		this->Number = number;
+		this->PreSmoother = preSmoother;
+		this->PostSmoother = postSmoother;
 	}
 
 	bool IsFinestLevel()
@@ -57,6 +59,8 @@ public:
 
 	virtual ~Level()
 	{
+		delete PreSmoother;
+		delete PostSmoother;
 		if (CoarserLevel)
 			delete CoarserLevel;
 	}
@@ -68,7 +72,7 @@ protected:
 
 	void SetupSmoothers()
 	{
-		this->PreSmoother.Setup(this->OperatorMatrix);
-		this->PostSmoother.Setup(this->OperatorMatrix);
+		this->PreSmoother->Setup(this->OperatorMatrix);
+		this->PostSmoother->Setup(this->OperatorMatrix);
 	}
 };

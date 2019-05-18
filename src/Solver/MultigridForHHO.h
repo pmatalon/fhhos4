@@ -16,7 +16,7 @@ private:
 	Poisson_HHO<Dim>* _problem;
 public:
 	LevelForHHO(int number, Poisson_HHO<Dim>* problem)
-		: Level(number, Smoother(new BlockGaussSeidel(problem->HHO.nLocalFaceUnknowns), 1), Smoother(new ReverseBlockGaussSeidel(problem->HHO.nLocalFaceUnknowns), 1))
+		: Level(number, new BlockGaussSeidelSmoother(problem->HHO.nLocalFaceUnknowns, 1), new ReverseBlockGaussSeidelSmoother(problem->HHO.nLocalFaceUnknowns, 1))
 	{
 		this->_problem = problem;
 	}
@@ -330,8 +330,8 @@ public:
 			os << _nLevels << " (automatic)" << endl;
 		else
 			os << _nLevels << endl;
-		os << "\t" << "Pre-smoothing:\t\t" << _fineLevel->PreSmoother << endl;
-		os << "\t" << "Post-smoothing:\t" << _fineLevel->PostSmoother;
+		os << "\t" << "Pre-smoothing:\t\t" << *(_fineLevel->PreSmoother) << endl;
+		os << "\t" << "Post-smoothing:\t" << *(_fineLevel->PostSmoother);
 	}
 
 	void Setup(const Eigen::SparseMatrix<double>& A) override
