@@ -35,4 +35,9 @@ public:
 		return os;
 	}
 
+	~Smoother()
+	{
+		//delete _solver;
+	}
+
 };

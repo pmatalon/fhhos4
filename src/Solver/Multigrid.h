@@ -65,6 +65,11 @@ private:
 
 		return x;
 	}
+public:
+	virtual ~Multigrid()
+	{
+		delete _fineLevel;
+	}
 
 protected:
 	virtual Eigen::VectorXd SolveCoarsestLevel(Eigen::SparseMatrix<double>& A, const Eigen::VectorXd& b)

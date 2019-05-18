@@ -223,88 +223,9 @@ public:
 		return approximate;
 	}
 
-	virtual ~FunctionalBasis() {}
+	virtual ~FunctionalBasis() 
+	{
+		for (auto phi : LocalFunctions)
+			delete phi;
+	}
 };
-
-//----------//
-//    1D    //
-//----------//
-
-/*class FunctionalBasis1D : public FunctionalBasis<1>
-{
-
-public:
-	FunctionalBasis1D(string basisCode, int maxPolynomialDegree)
-		:FunctionalBasis<1>(basisCode, maxPolynomialDegree, false)
-	{
-	}
-
-	function<double(double)> GetApproximateFunction(const Eigen::VectorXd &solution, BigNumber startIndex)
-	{
-		function<double(double)> approximate = [this, solution, startIndex](double t) {
-			double result = 0;
-			for (unsigned int i = 0; i < this->LocalFunctions.size(); i++)
-			{
-				IBasisFunction1D* phi = static_cast<IBasisFunction1D*>(this->LocalFunctions[i]);
-				result += solution(startIndex + i) * phi->Eval(t);
-			}
-			return result;
-		};
-		return approximate;
-	}
-};*/
-
-//----------//
-//    2D    //
-//----------//
-
-/*class FunctionalBasis2D : public FunctionalBasis<2>
-{
-
-public:
-	FunctionalBasis2D(string basisCode, int maxPolynomialDegree, bool fullTensorization)
-		:FunctionalBasis<2>(basisCode, maxPolynomialDegree, fullTensorization)
-	{
-	}
-
-	function<double(double, double)> GetApproximateFunction(const Eigen::VectorXd &solution, BigNumber startIndex)
-	{
-		function<double(double, double)> approximate = [this, solution, startIndex](double t, double u) {
-			double result = 0;
-			for (unsigned int i = 0; i < this->LocalFunctions.size(); i++)
-			{
-				IBasisFunction2D* phi = static_cast<IBasisFunction2D*>(this->LocalFunctions[i]);
-				result += solution(startIndex + i) * phi->Eval(t, u);
-			}
-			return result;
-		};
-		return approximate;
-	}
-};*/
-
-//----------//
-//    3D    //
-//----------//
-
-/*class FunctionalBasis3D : public FunctionalBasis<3>
-{
-public:
-	FunctionalBasis3D(string basisCode, int maxPolynomialDegree, bool fullTensorization)
-		:FunctionalBasis<3>(basisCode, maxPolynomialDegree, fullTensorization)
-	{
-	}
-
-	function<double(double, double, double)> GetApproximateFunction(const Eigen::VectorXd &solution, BigNumber startIndex)
-	{
-		function<double(double, double, double)> approximate = [this, solution, startIndex](double t, double u, double v) {
-			double result = 0;
-			for (unsigned int i = 0; i < this->LocalFunctions.size(); i++)
-			{
-				IBasisFunction3D* phi = static_cast<IBasisFunction3D*>(this->LocalFunctions[i]);
-				result += solution(startIndex + i) * phi->Eval(t, u, v);
-			}
-			return result;
-		};
-		return approximate;
-	}
-};*/

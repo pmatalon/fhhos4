@@ -277,6 +277,13 @@ private:
 		J_f_c_coeffs.Fill(J_f_c);
 		return J_f_c;
 	}
+
+public:
+	~LevelForHHO()
+	{
+		if (!this->IsFinestLevel())
+			delete _problem;
+	}
 };
 
 template <int Dim>
@@ -376,4 +383,7 @@ public:
 			cout << "\t--> " << _nLevels << " levels built." << endl;
 		}
 	}
+
+	//~MultigridForHHO()
+	//{}
 };

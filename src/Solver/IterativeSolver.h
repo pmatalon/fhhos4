@@ -67,6 +67,8 @@ public:
 		return x;
 	}
 
+	virtual ~IterativeSolver() {}
+
 protected:
 	IterationResult SaveIterationResult(Eigen::VectorXd& x, const Eigen::VectorXd& b)
 	{

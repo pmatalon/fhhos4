@@ -31,5 +31,8 @@ public:
 		for (size_t i = 0; i < this->Faces.size(); ++i)
 			delete this->Faces[i];
 		this->Faces.clear();
+
+		if (CoarserMesh)
+			delete CoarserMesh;
 	}
 };

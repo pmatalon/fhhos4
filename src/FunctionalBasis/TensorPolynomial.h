@@ -51,6 +51,12 @@ public:
 			return to_string(this->LocalNumber) + "\tdegree " + to_string(this->GetDegree()) + "\t" + polyX;
 		return to_string(this->LocalNumber) + "\tdegree " + to_string(this->GetDegree()) + "\t" + polyX + " * " + polyY;
 	}
+
+	~TensorPolynomial2D()
+	{
+		delete _funcX;
+		delete _funcY;
+	}
 };
 
 //----------//
@@ -116,5 +122,12 @@ public:
 		if (polyZ.compare("1") == 0)
 			return polyX + " * " + polyY;
 		return polyX + " * " + polyY + " * " + polyZ;
+	}
+
+	~TensorPolynomial3D()
+	{
+		delete _funcX;
+		delete _funcY;
+		delete _funcZ;
 	}
 };

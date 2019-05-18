@@ -127,8 +127,11 @@ public:
 
 	~ParallelLoop()
 	{
-		for (auto chunk : this->Chunks)
+		for (unsigned int threadNumber = 0; threadNumber < NThreads; threadNumber++)
+		{
+			ParallelChunk* chunk = Chunks[threadNumber];
 			delete chunk;
+		}
 	}
 
 };

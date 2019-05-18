@@ -12,6 +12,7 @@ public:
 	virtual vector<double> Grad(RefPoint p) = 0;
 	virtual int GetDegree() = 0;
 	virtual string ToString() = 0;
+	virtual ~BasisFunction() {}
 };
 
 class IBasisFunction1D : public BasisFunction<1>

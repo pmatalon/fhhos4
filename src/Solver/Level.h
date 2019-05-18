@@ -55,6 +55,12 @@ public:
 
 	virtual void ExportVector(Eigen::VectorXd& v, string suffix) = 0;
 
+	virtual ~Level()
+	{
+		if (CoarserLevel)
+			delete CoarserLevel;
+	}
+
 protected:
 	/*virtual void SetupRestriction() = 0;
 	virtual void SetupProlongation() = 0;
