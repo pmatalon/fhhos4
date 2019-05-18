@@ -13,7 +13,9 @@ public:
 	BigNumber Start;
 	BigNumber End;
 	BigNumber Size() { return End - Start; }
-	future<void> ThreadFuture;
+	std::future<void> ThreadFuture;
+	NonZeroCoefficients Coeffs;
+
 	ParallelChunk(int threadNumber, BigNumber chunkMaxSize, BigNumber loopSize)
 	{
 		this->ThreadNumber = threadNumber;
@@ -22,17 +24,23 @@ public:
 	}
 };
 
+template <class T>
 class ParallelLoop
 {
 public:
+	vector<T> List;
 	unsigned int NThreads;
 	BigNumber ChunkMaxSize;
 
 	vector<ParallelChunk*> Chunks;
 
-	ParallelLoop(BigNumber loopSize)
+	ParallelLoop(vector<T> list) :ParallelLoop(list, std::thread::hardware_concurrency()) {}
+	
+	ParallelLoop(vector<T> list, unsigned int nThreads)
 	{
-		NThreads = std::thread::hardware_concurrency();
+		List = list;
+		BigNumber loopSize = list.size();
+		NThreads = nThreads;
 		if (NThreads == 0)
 			NThreads = 1;
 		if (NThreads > loopSize)
@@ -51,24 +59,70 @@ public:
 			this->Chunks[threadNumber]->ThreadFuture.wait();
 	}
 
-	template <class T>
-	static void Execute(vector<T> list, function<void(T)> functionToExecute)
+	void Execute(function<void(T)> functionToExecute)
 	{
-		ParallelLoop parallelLoop(list.size());
-
-		for (unsigned int threadNumber = 0; threadNumber < parallelLoop.NThreads; threadNumber++)
+		for (unsigned int threadNumber = 0; threadNumber < NThreads; threadNumber++)
 		{
-			ParallelChunk* chunk = parallelLoop.Chunks[threadNumber];
-			chunk->ThreadFuture = std::async([chunk, list, functionToExecute]()
+			ParallelChunk* chunk = Chunks[threadNumber];
+			chunk->ThreadFuture = std::async(std::launch::async, [chunk, this, functionToExecute]()
 				{
 					for (BigNumber i = chunk->Start; i < chunk->End; ++i)
 					{
-						functionToExecute(list[i]);
+						functionToExecute(this->List[i]);
 					}
 				}
 			);
 		}
-		parallelLoop.Wait();
+		Wait();
+	}
+
+	void Execute(function<void(T, ParallelChunk*)> functionToExecute)
+	{
+		//cout << "-----------------------------------------------------" << endl;
+		for (unsigned int threadNumber = 0; threadNumber < NThreads; threadNumber++)
+		{
+			ParallelChunk* chunk = Chunks[threadNumber];
+			//cout << "[" << threadNumber << "] launch async" << endl;
+			chunk->ThreadFuture = std::async(std::launch::async, [chunk, this, functionToExecute]()
+				{
+					//cout << "[" << chunk->ThreadNumber << "] begin execute" << endl;
+					for (BigNumber i = chunk->Start; i < chunk->End; ++i)
+					{
+						functionToExecute(this->List[i], chunk);
+					}
+
+					//cout << "[" << chunk->ThreadNumber << "] end execute" << endl;
+				}
+			);
+			//cout << "[" << threadNumber << "] end launch async" << endl;
+		}
+		Wait();
+	}
+
+	void ReserveChunkCoeffsSize(BigNumber nnzForOneLoopIterate)
+	{
+		for (unsigned int threadNumber = 0; threadNumber < NThreads; threadNumber++)
+		{
+			ParallelChunk* chunk = Chunks[threadNumber];
+			chunk->Coeffs = NonZeroCoefficients(chunk->Size() * nnzForOneLoopIterate);
+		}
+	}
+
+	inline void Fill(Eigen::SparseMatrix<double> &m)
+	{
+		NonZeroCoefficients global;
+		for (unsigned int threadNumber = 0; threadNumber < NThreads; threadNumber++)
+		{
+			ParallelChunk* chunk = Chunks[threadNumber];
+			global.Add(chunk->Coeffs);
+		}
+		global.Fill(m);
+	}
+
+	static void Execute(vector<T> list, function<void(T)> functionToExecute)
+	{
+		ParallelLoop parallelLoop(list);
+		parallelLoop.Execute(functionToExecute);
 	}
 
 	~ParallelLoop()

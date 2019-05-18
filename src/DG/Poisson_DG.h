@@ -86,7 +86,7 @@ public:
 		// Iteration on the elements: diagonal blocks //
 		//--------------------------------------------//
 
-		ParallelLoop parallelLoop(mesh->Elements.size());
+		ParallelLoop<Element<Dim>*> parallelLoop(mesh->Elements);
 
 		vector<NonZeroCoefficients> chunksMatrixCoeffs(parallelLoop.NThreads);
 		vector<NonZeroCoefficients> chunksMassMatrixCoeffs(parallelLoop.NThreads);
@@ -197,7 +197,7 @@ public:
 		// Iteration on the faces: off-diagonal blocks //
 		//---------------------------------------------//
 
-		ParallelLoop parallelLoopFaces(mesh->Faces.size());
+		ParallelLoop<Face<Dim>*> parallelLoopFaces(mesh->Faces);
 
 		chunksMatrixCoeffs = vector<NonZeroCoefficients>(parallelLoopFaces.NThreads);
 		chunksCouplingCoeffs = vector<NonZeroCoefficients>(parallelLoopFaces.NThreads);

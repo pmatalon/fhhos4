@@ -77,7 +77,7 @@ public:
 
 	Poisson_HHO<Dim>* GetProblemOnCoarserMesh()
 	{
-		return new Poisson_HHO<Dim>(_mesh->CoarserMesh, _solutionName, _sourceFunction, _reconstructionBasis, _cellBasis, _faceBasis, _staticCondensation, "");
+		return new Poisson_HHO<Dim>(_mesh->CoarserMesh, _solutionName, _sourceFunction, _reconstructionBasis, _cellBasis, _faceBasis, _staticCondensation, _outputDirectory);
 	}
 
 	void Assemble(Action action)
@@ -129,7 +129,7 @@ public:
 		// Parallel loop on the elements //
 		//-------------------------------//
 
-		ParallelLoop parallelLoop(mesh->Elements.size());
+		ParallelLoop<Element<Dim>*> parallelLoop(mesh->Elements);
 
 		vector<NonZeroCoefficients> chunksConsistencyCoeffs(parallelLoop.NThreads);
 		vector<NonZeroCoefficients> chunksStabilizationCoeffs(parallelLoop.NThreads);
@@ -367,7 +367,7 @@ public:
 			face->Number = faceNumber++;
 
 		// Init faces //
-		ParallelLoop::Execute<Face<Dim>*>(this->_mesh->Faces, [this](Face<Dim>* f)
+		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->Faces, [this](Face<Dim>* f)
 			{
 				Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
 				face->InitHHO(this->_reconstructionBasis, this->_cellBasis, this->_faceBasis);
@@ -375,7 +375,7 @@ public:
 		);
 
 		// Init Elements //
-		ParallelLoop::Execute<Element<Dim>*>(this->_mesh->Elements, [this](Element<Dim>* e)
+		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this](Element<Dim>* e)
 			{
 				Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
 				element->InitHHO(this->_reconstructionBasis, this->_cellBasis, this->_faceBasis);

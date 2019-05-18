@@ -79,13 +79,13 @@ private:
 
 		auto I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
 		auto J_f_c = GetGlobalCanonicalInjectionMatrixCoarseToFine();
-		auto Pi_c = GetGlobalProjectorMatrixFromCellsToFaces(coarsePb); // to be removed later
+		//auto Pi_c = GetGlobalProjectorMatrixFromCellsToFaces(coarsePb); // to be removed later
 		auto Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
 
-		finePb->ExportMatrix(I_c, "I_c");
+		/*finePb->ExportMatrix(I_c, "I_c");
 		finePb->ExportMatrix(J_f_c, "J_f_c");
 		finePb->ExportMatrix(Pi_c, "Pi_c"); // to be removed later
-		finePb->ExportMatrix(Pi_f, "Pi_f");
+		finePb->ExportMatrix(Pi_f, "Pi_f");*/
 
 		P = Pi_f * J_f_c * I_c;
 
@@ -100,14 +100,14 @@ private:
 		Eigen::SparseMatrix<double> M_c = GetGlobalMassMatrix(coarsePb); // Coarse mass matrix
 		Eigen::SparseMatrix<double> M_f = GetGlobalMassMatrix(finePb); // Fine mass matrix
 
-		Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
-		solver.analyzePattern(M_c);
-		solver.factorize(M_c);
-		Eigen::SparseMatrix<double> I(M_c.rows(), M_c.cols());
-		I.setIdentity();
-		auto invM_c = solver.solve(I);
+		finePb->ExportMatrix(M_c, "level_" + to_string(this->Number) + "_M_c_qui_marche_pas");
 
-		R = invM_c * P.transpose() * M_f;
+		Eigen::SparseLU<Eigen::SparseMatrix<double>> solverM_c;
+		solverM_c.analyzePattern(M_c);
+		solverM_c.factorize(M_c);
+
+		//R = invM_c * P.transpose() * M_f;
+		R = solverM_c.solve(P.transpose() * M_f);
 
 		finePb->ExportMatrix(R, "R");
 	}
@@ -115,96 +115,108 @@ private:
 	Eigen::SparseMatrix<double> GetGlobalMassMatrix(Poisson_HHO<Dim>* problem)
 	{
 		int faceLocalUnknowns = problem->HHO.nLocalFaceUnknowns;
-		NonZeroCoefficients M_coeffs(problem->HHO.nElements * problem->HHO.nLocalFaceUnknowns * problem->HHO.nLocalFaceUnknowns);
-		for (auto e : problem->_mesh->Elements)
-		{
-			Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
-			for (auto f : element->Faces)
+
+		ParallelLoop<Element<Dim>*> parallelLoop(problem->_mesh->Elements);
+		parallelLoop.ReserveChunkCoeffsSize(4 * faceLocalUnknowns * faceLocalUnknowns);
+		parallelLoop.Execute([this, faceLocalUnknowns](Element<Dim>* e, ParallelChunk* chunk)
 			{
-				if (f->IsDomainBoundary)
-					continue;
+				Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
+				for (auto f : element->Faces)
+				{
+					if (f->IsDomainBoundary)
+						continue;
 
-				Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+					Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
 
-				double weight = element->Measure() / element->FrontierMeasure();
-				Eigen::MatrixXd M_face = face->FaceMassMatrix();
+					double weight = element->Measure() / element->FrontierMeasure();
+					Eigen::MatrixXd M_face = face->FaceMassMatrix();
 
-				BigNumber faceGlobalNumber = face->Number;
-				BigNumber faceLocalNumber = element->LocalNumberOf(face);
+					BigNumber faceGlobalNumber = face->Number;
+					BigNumber faceLocalNumber = element->LocalNumberOf(face);
 
-				M_coeffs.Add(faceGlobalNumber*faceLocalUnknowns, faceGlobalNumber*faceLocalUnknowns, weight * M_face);
-			}
-		}
+					chunk->Coeffs.Add(faceGlobalNumber*faceLocalUnknowns, faceGlobalNumber*faceLocalUnknowns, weight * M_face);
+				}
+			});
 		Eigen::SparseMatrix<double> M(problem->HHO.nTotalFaceUnknowns, problem->HHO.nTotalFaceUnknowns);
-		M_coeffs.Fill(M);
+		parallelLoop.Fill(M);
+
 		return M;
 	}
 
 	Eigen::SparseMatrix<double> GetGlobalInterpolationMatrixFromFacesToCells(Poisson_HHO<Dim>* problem)
 	{
-		NonZeroCoefficients I_coeffs(problem->HHO.nTotalCellUnknowns * problem->HHO.nTotalFaceUnknowns);
 		int nCellUnknowns = problem->HHO.nLocalCellUnknowns;
 		int nFaceUnknowns = problem->HHO.nLocalFaceUnknowns;
 
-		for (auto e : problem->_mesh->Elements)
-		{
-			Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
+		ParallelLoop<Element<Dim>*> parallelLoop(problem->_mesh->Elements);
+		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nFaceUnknowns);
 
-			Eigen::MatrixXd M_cell = element->CellMassMatrix();
-			Eigen::MatrixXd invM_cell = M_cell.inverse();
-
-			//Eigen::MatrixXd local_I = element->ComputeInterpolationMatrixFromFaces();
-			for (auto f : element->Faces)
+		parallelLoop.Execute([this, nCellUnknowns, nFaceUnknowns](Element<Dim>* e, ParallelChunk* chunk)
 			{
-				if (f->IsDomainBoundary)
-					continue;
+				Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
 
-				Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+				Eigen::MatrixXd M_cell = element->CellMassMatrix();
+				Eigen::MatrixXd invM_cell = M_cell.inverse();
 
-				BigNumber elemGlobalNumber = element->Number;
-				BigNumber faceGlobalNumber = face->Number;
-				BigNumber faceLocalNumber = element->LocalNumberOf(face);
+				for (auto f : element->Faces)
+				{
+					if (f->IsDomainBoundary)
+						continue;
 
-				Eigen::MatrixXd M_face = face->FaceMassMatrix();
-				Eigen::MatrixXd Pi_face = face->GetProjFromCell(element);
+					Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
 
-				double weight = element->Measure() / element->FrontierMeasure();
-				//I_coeffs.Add(elemGlobalNumber*nCellUnknowns, faceGlobalNumber*nFaceUnknowns, local_I.block(0, faceLocalNumber*nFaceUnknowns, nCellUnknowns, nFaceUnknowns));
-				I_coeffs.Add(elemGlobalNumber*nCellUnknowns, faceGlobalNumber*nFaceUnknowns, weight * invM_cell * Pi_face.transpose() * M_face);
-			}
-		}
+					BigNumber elemGlobalNumber = element->Number;
+					BigNumber faceGlobalNumber = face->Number;
+					BigNumber faceLocalNumber = element->LocalNumberOf(face);
+
+					Eigen::MatrixXd M_face = face->FaceMassMatrix();
+					Eigen::MatrixXd Pi_face = face->GetProjFromCell(element);
+
+					double weight = element->Measure() / element->FrontierMeasure();
+					chunk->Coeffs.Add(elemGlobalNumber*nCellUnknowns, faceGlobalNumber*nFaceUnknowns, weight * invM_cell * Pi_face.transpose() * M_face);
+				}
+			});
 		Eigen::SparseMatrix<double> I(problem->HHO.nTotalCellUnknowns, problem->HHO.nTotalFaceUnknowns);
-		I_coeffs.Fill(I);
+		parallelLoop.Fill(I);
+
 		return I;
 	}
 
 	Eigen::SparseMatrix<double> GetGlobalProjectorMatrixFromCellsToFaces(Poisson_HHO<Dim>* problem)
 	{
-		NonZeroCoefficients Pi_coeffs(problem->HHO.nTotalCellUnknowns * problem->HHO.nTotalFaceUnknowns);
 		int nCellUnknowns = problem->HHO.nLocalCellUnknowns;
 		int nFaceUnknowns = problem->HHO.nLocalFaceUnknowns;
 
-		for (auto e : problem->_mesh->Elements)
-		{
-			Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
+		ParallelLoop<Element<Dim>*> parallelLoop(problem->_mesh->Elements);
+		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nFaceUnknowns);
 
-			//Eigen::MatrixXd local_Pi = element->ComputeProjectorMatrixFromCellOntoFaces();
-			for (auto f : element->Faces)
+		parallelLoop.Execute([this, nCellUnknowns, nFaceUnknowns](Element<Dim>* e, ParallelChunk* chunk)
 			{
-				if (f->IsDomainBoundary)
-					continue;
+				Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
 
-				Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+				for (auto f : element->Faces)
+				{
+					if (f->IsDomainBoundary)
+						continue;
 
-				BigNumber elemGlobalNumber = element->Number;
-				BigNumber faceGlobalNumber = face->Number;
-				BigNumber faceLocalNumber = element->LocalNumberOf(face);
+					Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
 
-				double weight = element->Measure() / element->FrontierMeasure();
-				Pi_coeffs.Add(faceGlobalNumber*nFaceUnknowns, elemGlobalNumber*nCellUnknowns, weight*face->GetProjFromCell(element));// local_Pi.block(faceLocalNumber*nFaceUnknowns, 0, nFaceUnknowns, nCellUnknowns));
-			}
-		}
-		/*for (auto f : problem->_mesh->Faces)
+					BigNumber elemGlobalNumber = element->Number;
+					BigNumber faceGlobalNumber = face->Number;
+					BigNumber faceLocalNumber = element->LocalNumberOf(face);
+
+					double weight = element->Measure() / element->FrontierMeasure();
+					chunk->Coeffs.Add(faceGlobalNumber*nFaceUnknowns, elemGlobalNumber*nCellUnknowns, weight*face->GetProjFromCell(element));
+				}
+			});
+
+		Eigen::SparseMatrix<double> Pi(problem->HHO.nTotalFaceUnknowns, problem->HHO.nTotalCellUnknowns);
+		parallelLoop.Fill(Pi);
+
+		/*NonZeroCoefficients Pi_coeffs(problem->HHO.nTotalCellUnknowns * problem->HHO.nTotalFaceUnknowns);
+		int nCellUnknowns = problem->HHO.nLocalCellUnknowns;
+		int nFaceUnknowns = problem->HHO.nLocalFaceUnknowns;
+		for (auto f : problem->_mesh->Faces)
 		{
 			if (f->IsDomainBoundary)
 				continue;
@@ -225,10 +237,10 @@ private:
 
 			Pi_coeffs.Add(faceGlobalNumber*nFaceUnknowns, elem1GlobalNumber*nCellUnknowns, 0.5 * face->GetProjFromCell(element1));//local_Pi.block(faceLocalNumber*nFaceUnknowns, 0, nFaceUnknowns, nCellUnknowns));
 			Pi_coeffs.Add(faceGlobalNumber*nFaceUnknowns, elem2GlobalNumber*nCellUnknowns, 0.5 * face->GetProjFromCell(element2));
-		}*/
+		}
 
 		Eigen::SparseMatrix<double> Pi(problem->HHO.nTotalFaceUnknowns, problem->HHO.nTotalCellUnknowns);
-		Pi_coeffs.Fill(Pi);
+		Pi_coeffs.Fill(Pi);*/
 		return Pi;
 	}
 

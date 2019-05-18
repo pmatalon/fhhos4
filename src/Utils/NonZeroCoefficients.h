@@ -8,11 +8,12 @@ private:
 	vector<Eigen::Triplet<double>> coefficients;
 	//Eigen::MatrixXf Done;
 public:
-	int test = 0;
 	NonZeroCoefficients(BigNumber nnzApproximate)
 	{
 		this->coefficients.reserve(nnzApproximate);
 	}
+
+
 
 	NonZeroCoefficients() {}
 
@@ -51,5 +52,12 @@ public:
 	inline void Fill(Eigen::SparseMatrix<double> &m)
 	{
 		m.setFromTriplets(this->coefficients.begin(), this->coefficients.end());
+	}
+
+	friend ostream& operator<<(ostream& os, const NonZeroCoefficients& nnzCoeffs)
+	{
+		for (Eigen::Triplet<double> t : nnzCoeffs.coefficients)
+			os << t.row() << "\t" << t.col() << "\t" << t.value() << endl;
+		return os;
 	}
 };
