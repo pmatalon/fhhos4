@@ -46,19 +46,18 @@ public:
 		NonZeroCoefficients L_coeffs(A.nonZeros());
 		NonZeroCoefficients U_coeffs(A.nonZeros());
 
-		for (unsigned int i = 0; i < A.rows() / _blockSize; ++i)
+		for (int k = 0; k < A.outerSize(); ++k)
 		{
-			for (unsigned int j = 0; j < A.rows() / _blockSize; ++j)
+			for (Eigen::SparseMatrix<double>::InnerIterator it(A, k); it; ++it)
 			{
-				unsigned int k = i * _blockSize;
-				unsigned int l = j * _blockSize;
-				auto block = A.block(k, l, _blockSize, _blockSize);
-				if (i == j)
-					D_coeffs.Add(k, l, block);
-				else if (i < j)
-					U_coeffs.Add(k, l, block);
+				auto iBlock = it.row() / _blockSize;
+				auto jBlock = it.col() / _blockSize;
+				if (iBlock == jBlock)
+					D_coeffs.Add(it.row(), it.col(), it.value());
+				else if (iBlock < jBlock)
+					U_coeffs.Add(it.row(), it.col(), it.value());
 				else
-					L_coeffs.Add(k, l, block);
+					L_coeffs.Add(it.row(), it.col(), it.value());
 			}
 		}
 
