@@ -23,7 +23,7 @@ public:
 
 	void Setup()
 	{
-		cout << "\tSetup level " << this->Number << "..." << endl;
+		cout << "\tSetup level " << this->Number << endl;
 		/*this->OperatorMatrix = this->_problem->A;
 		if (!this->IsCoarsestLevel())
 		{
@@ -35,22 +35,34 @@ public:
 		// Galerkin operator
 		if (!this->IsCoarsestLevel())
 		{
+			cout << "\t\tProlongation:      "; cout.flush();
 			SetupProlongation();
+			cout << Utils::MatrixInfo(this->P, "P") << endl;
+
+			cout << "\t\tRestriction:       "; cout.flush();
 			SetupRestriction();
+			cout << Utils::MatrixInfo(this->R, "R") << endl;
 		}
 		
 		if (this->IsFinestLevel())
+		{
+			cout << "\t\tFine grid operator: "; cout.flush();
 			this->OperatorMatrix = this->_problem->A;
+			cout << Utils::MatrixInfo(this->OperatorMatrix, "A") << endl;
+		}
 		else
 		{
 			LevelForHHO<Dim>* finerLevel = dynamic_cast<LevelForHHO<Dim>*>(FinerLevel);
-			this->OperatorMatrix = finerLevel->R * finerLevel->OperatorMatrix * finerLevel->P;
+			cout << "\t\tGalerkin operator: "; cout.flush();
+			this->OperatorMatrix = (finerLevel->R * finerLevel->OperatorMatrix * finerLevel->P).pruned();
+			cout << Utils::MatrixInfo(this->OperatorMatrix, "A") << endl;
 		}
 
 		if (!this->IsCoarsestLevel())
+		{
+			cout << "\t\tSmoothers..." << endl;
 			SetupSmoothers();
-
-		cout << "\tLevel " << this->Number << ": size(A)=" << this->OperatorMatrix.rows() << ", nnz(A)=" << this->OperatorMatrix.nonZeros() << endl;
+		}		
 	}
 
 	Eigen::VectorXd Restrict(Eigen::VectorXd& vectorOnThisLevel) override
@@ -87,7 +99,7 @@ private:
 		finePb->ExportMatrix(Pi_c, "Pi_c"); // to be removed later
 		finePb->ExportMatrix(Pi_f, "Pi_f");*/
 
-		P = Pi_f * J_f_c * I_c;
+		P = (Pi_f * J_f_c * I_c).pruned();
 
 		finePb->ExportMatrix(P, "P");
 	}
@@ -250,31 +262,32 @@ private:
 		Poisson_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
 		Mesh<Dim>* coarseMesh = coarsePb->_mesh;
 
-		NonZeroCoefficients J_f_c_coeffs(coarsePb->HHO.nTotalCellUnknowns * finePb->HHO.nTotalCellUnknowns); // Straight injector from coarse interior functions to fine interior functions
-
 		int nCoarseFaceUnknowns = coarsePb->HHO.nLocalFaceUnknowns;
 		int nCoarseCellUnknowns = coarsePb->HHO.nLocalCellUnknowns;
 
 		int nFineFaceUnknowns = finePb->HHO.nLocalFaceUnknowns;
 		int nFineCellUnknowns = finePb->HHO.nLocalCellUnknowns;
 
-		for (auto ce : coarseMesh->Elements)
-		{
-			Poisson_HHO_Element<Dim>* coarseElement = dynamic_cast<Poisson_HHO_Element<Dim>*>(ce);
+		ParallelLoop<Element<Dim>*> parallelLoop(coarseMesh->Elements);
+		parallelLoop.ReserveChunkCoeffsSize(nFineCellUnknowns * 4 * nCoarseCellUnknowns);
 
-			Eigen::MatrixXd local_J_f_c = coarseElement->ComputeCanonicalInjectionMatrixCoarseToFine();
-			for (auto fineElement : coarseElement->FinerElements)
+		parallelLoop.Execute([this, nCoarseFaceUnknowns, nCoarseCellUnknowns, nFineFaceUnknowns, nFineCellUnknowns](Element<Dim>* ce, ParallelChunk* chunk)
 			{
-				BigNumber coarseElemGlobalNumber = coarseElement->Number;
-				BigNumber fineElemGlobalNumber = fineElement->Number;
-				BigNumber fineElemLocalNumber = coarseElement->LocalNumberOf(fineElement);
+				Poisson_HHO_Element<Dim>* coarseElement = dynamic_cast<Poisson_HHO_Element<Dim>*>(ce);
 
-				J_f_c_coeffs.Add(fineElemGlobalNumber*nFineCellUnknowns, coarseElemGlobalNumber*nCoarseCellUnknowns, local_J_f_c.block(fineElemLocalNumber*nFineCellUnknowns, 0, nFineCellUnknowns, nCoarseCellUnknowns));
-			}
-		}
+				Eigen::MatrixXd local_J_f_c = coarseElement->ComputeCanonicalInjectionMatrixCoarseToFine();
+				for (auto fineElement : coarseElement->FinerElements)
+				{
+					BigNumber coarseElemGlobalNumber = coarseElement->Number;
+					BigNumber fineElemGlobalNumber = fineElement->Number;
+					BigNumber fineElemLocalNumber = coarseElement->LocalNumberOf(fineElement);
+
+					chunk->Coeffs.Add(fineElemGlobalNumber*nFineCellUnknowns, coarseElemGlobalNumber*nCoarseCellUnknowns, local_J_f_c.block(fineElemLocalNumber*nFineCellUnknowns, 0, nFineCellUnknowns, nCoarseCellUnknowns));
+				}
+			});
 
 		Eigen::SparseMatrix<double> J_f_c(finePb->HHO.nTotalCellUnknowns, coarsePb->HHO.nTotalCellUnknowns);
-		J_f_c_coeffs.Fill(J_f_c);
+		parallelLoop.Fill(J_f_c);
 		return J_f_c;
 	}
 
@@ -294,9 +307,9 @@ private:
 	bool _automaticNumberOfLevels;
 	int _nLevels;
 public:
-	int MatrixMaxSizeForCoarsestLevel = 10;
+	int MatrixMaxSizeForCoarsestLevel = 100;
 
-	MultigridForHHO(Poisson_HHO<Dim>* problem) : MultigridForHHO(problem, true, 10)
+	MultigridForHHO(Poisson_HHO<Dim>* problem) : MultigridForHHO(problem, true, 100)
 	{}
 	MultigridForHHO(Poisson_HHO<Dim>* problem, int nLevels) : MultigridForHHO(problem, false, nLevels)
 	{}
@@ -323,15 +336,15 @@ public:
 	virtual void Serialize(ostream& os) const override
 	{
 		os << "MultigridForHHO" << endl;
-		os << "\t" << "Levels: ";
+		os << "\t" << "Levels:         ";
 		if (_automaticNumberOfLevels && _nLevels == 0)
 			os << " automatic coarsening until matrix size <= " << MatrixMaxSizeForCoarsestLevel << endl;
 		else if (_automaticNumberOfLevels && _nLevels > 0)
 			os << _nLevels << " (automatic)" << endl;
 		else
 			os << _nLevels << endl;
-		os << "\t" << "Pre-smoothing:\t\t" << *(_fineLevel->PreSmoother) << endl;
-		os << "\t" << "Post-smoothing:\t" << *(_fineLevel->PostSmoother);
+		os << "\t" << "Pre-smoothing:  " << *(_fineLevel->PreSmoother) << endl;
+		os << "\t" << "Post-smoothing: " << *(_fineLevel->PostSmoother);
 	}
 
 	void Setup(const Eigen::SparseMatrix<double>& A) override

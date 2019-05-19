@@ -74,9 +74,15 @@ public:
 protected:
 	virtual Eigen::VectorXd SolveCoarsestLevel(Eigen::SparseMatrix<double>& A, const Eigen::VectorXd& b)
 	{
+		//cout << "----------------- A coarse -------------------" << A << endl;
 		Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
-		solver.analyzePattern(A);
-		solver.factorize(A);
+		solver.compute(A);
+		Eigen::ComputationInfo info = solver.info();
+		if (info != Eigen::ComputationInfo::Success)
+		{
+			cout << "Error: SparseLU failed to execute on the coarsest level with the code " << info << ": " << solver.lastErrorMessage() << endl;
+			exit(EXIT_FAILURE);
+		}
 		Eigen::VectorXd x = solver.solve(b);
 		return x;
 	}

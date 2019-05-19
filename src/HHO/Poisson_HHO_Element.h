@@ -172,7 +172,6 @@ public:
 
 	virtual double SourceTerm(BasisFunction<Dim>* cellPhi, SourceFunction* f) = 0;
 	virtual double St(BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2) = 0;
-	//virtual double Lt(BasisFunction<Dim>* phi) = 0;
 	virtual double ComputeIntegralGradGrad(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) = 0;
 	virtual Eigen::MatrixXd ComputeAndReturnCellMassMatrix(FunctionalBasis<Dim>* basis) = 0;
 	virtual Eigen::MatrixXd ComputeAndReturnCellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) = 0;

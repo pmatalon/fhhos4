@@ -93,15 +93,15 @@ public:
 			cout << "Problem: Poisson " << Dim << "D" << endl;
 			cout << "Subdivisions in each cartesian direction: " << mesh->N << endl;
 			cout << "\tElements: " << hho.nElements << endl;
-			cout << "\tFaces: " << hho.nFaces << " (" << hho.nInteriorFaces << " interior + " << hho.nBoundaryFaces << " boundary)" << endl;
+			cout << "\tFaces:    " << hho.nFaces << " (" << hho.nInteriorFaces << " interior + " << hho.nBoundaryFaces << " boundary)" << endl;
 			cout << "Discretization: Hybrid High Order" << endl;
 			cout << "\tReconstruction basis: " << reconstructionBasis->Name() << endl;
-			cout << "\tCell basis: " << cellBasis->Name() << endl;
-			cout << "\tFace basis: " << faceBasis->Name() << endl;
-			cout << "Cell unknowns: " << hho.nTotalCellUnknowns << " (" << cellBasis->Size() << " per cell)" << endl;
-			cout << "Face unknowns: " << hho.nTotalFaceUnknowns << " (" << faceBasis->Size() << " per interior face)" << endl;
+			cout << "\tCell basis:           " << cellBasis->Name() << endl;
+			cout << "\tFace basis:           " << faceBasis->Name() << endl;
+			cout << "Cell unknowns:  " << hho.nTotalCellUnknowns << " (" << cellBasis->Size() << " per cell)" << endl;
+			cout << "Face unknowns:  " << hho.nTotalFaceUnknowns << " (" << faceBasis->Size() << " per interior face)" << endl;
 			cout << "Total unknowns: " << hho.nTotalHybridUnknowns << endl;
-			cout << "System size: " << (this->_staticCondensation ? hho.nTotalFaceUnknowns : hho.nTotalHybridUnknowns) << " (" << (this->_staticCondensation ? "statically condensed" : "no static condensation") << ")" << endl;
+			cout << "System size:    " << (this->_staticCondensation ? hho.nTotalFaceUnknowns : hho.nTotalHybridUnknowns) << " (" << (this->_staticCondensation ? "statically condensed" : "no static condensation") << ")" << endl;
 		}
 		this->_fileName = "Poisson" + to_string(Dim) + "D" + this->_solutionName + "_n" + to_string(mesh->N) + "_HHO_" + reconstructionBasis->Name() + "_pen-1" + (_staticCondensation ? "_staticcond" : "");
 		string matrixFilePath				= this->_outputDirectory + "/" + this->_fileName + "_A.dat";
@@ -111,7 +111,7 @@ public:
 		string rhsFilePath					= this->_outputDirectory + "/" + this->_fileName + "_b.dat";
 
 		if ((action & Action::LogAssembly) == Action::LogAssembly)
-			cout << "Assembly..." << endl;
+			cout << endl << "Assembly..." << endl;
 
 		this->_globalRHS = Eigen::VectorXd(hho.nTotalHybridUnknowns);
 
@@ -306,6 +306,9 @@ public:
 		this->_globalMatrix = Acons + Astab;
 		if (this->_staticCondensation)
 		{
+			if ((action & Action::LogAssembly) == Action::LogAssembly)
+				cout << "Static condensation..." << endl;
+
 			Eigen::SparseMatrix<double> Att = this->_globalMatrix.topLeftCorner(hho.nTotalCellUnknowns, hho.nTotalCellUnknowns);
 			Eigen::SparseMatrix<double> Aff = this->_globalMatrix.bottomRightCorner(hho.nTotalFaceUnknowns, hho.nTotalFaceUnknowns);
 			Eigen::SparseMatrix<double> Atf = this->_globalMatrix.topRightCorner(hho.nTotalCellUnknowns, hho.nTotalFaceUnknowns);
@@ -336,24 +339,24 @@ public:
 
 		if ((action & Action::ExtractSystem) == Action::ExtractSystem)
 		{
-			cout << "Export..." << endl;
+			cout << "Export:" << endl;
 			Eigen::saveMarket(this->A, matrixFilePath);
-			cout << "Matrix exported to \t" << matrixFilePath << endl;
+			cout << "Matrix exported to                " << matrixFilePath << endl;
 
 			Eigen::saveMarketVector(this->b, rhsFilePath);
-			cout << "RHS exported to \t" << rhsFilePath << endl;
+			cout << "RHS exported to                   " << rhsFilePath << endl;
 		}
 
 		if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
 		{
 			Eigen::saveMarket(Acons, consistencyFilePath);
-			cout << "Consistency part exported to \t" << consistencyFilePath << endl;
+			cout << "Consistency part exported to      " << consistencyFilePath << endl;
 
 			Eigen::saveMarket(Astab, stabilizationFilePath);
-			cout << "Stabilization part exported to \t" << stabilizationFilePath << endl;
+			cout << "Stabilization part exported to    " << stabilizationFilePath << endl;
 
 			Eigen::saveMarket(reconstructionMatrix, reconstructionMatrixFilePath);
-			cout << "Reconstruction matrix exported to \t" << reconstructionMatrixFilePath << endl;
+			cout << "Reconstruction matrix exported to " << reconstructionMatrixFilePath << endl;
 		}
 	}
 

@@ -226,4 +226,12 @@ public:
 		return innerProduct;
 	}
 
+	static string MatrixInfo(const Eigen::SparseMatrix<double>& M, string name)
+	{
+		double density = (double)M.nonZeros() / (M.rows() * M.cols()) * 100;
+		//double roundedDensity = (int)(density * 10.0) / 10.0;
+		int roundedDensity = ceil(density);
+		return "size(" + name + ")=" + to_string(M.rows()) + "x" + to_string(M.cols()) + ", \tnnz(" + name + ")=" + to_string(M.nonZeros()) + ", \tdensity(" + name + ")=" + to_string(roundedDensity) + "%";
+	}
+
 };
