@@ -16,6 +16,11 @@ file(
 
 add_executable(dghho ${source_files})
 
+# Include pthread
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+target_link_libraries(dghho Threads::Threads)
+
 # Link to Third Party Libraries (TPL)
 # AGMG (requires Blas and Lapack)
 if(${TPL_ENABLE_AGMG})
