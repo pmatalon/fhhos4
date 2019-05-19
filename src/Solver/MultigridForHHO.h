@@ -35,11 +35,11 @@ public:
 		// Galerkin operator
 		if (!this->IsCoarsestLevel())
 		{
-			cout << "\t\tProlongation:      "; cout.flush();
+			cout << "\t\tProlongation      : "; cout.flush();
 			SetupProlongation();
 			cout << Utils::MatrixInfo(this->P, "P") << endl;
 
-			cout << "\t\tRestriction:       "; cout.flush();
+			cout << "\t\tRestriction       : "; cout.flush();
 			SetupRestriction();
 			cout << Utils::MatrixInfo(this->R, "R") << endl;
 		}
@@ -53,7 +53,7 @@ public:
 		else
 		{
 			LevelForHHO<Dim>* finerLevel = dynamic_cast<LevelForHHO<Dim>*>(FinerLevel);
-			cout << "\t\tGalerkin operator: "; cout.flush();
+			cout << "\t\tGalerkin operator : "; cout.flush();
 			this->OperatorMatrix = (finerLevel->R * finerLevel->OperatorMatrix * finerLevel->P).pruned();
 			cout << Utils::MatrixInfo(this->OperatorMatrix, "A") << endl;
 		}
@@ -306,27 +306,28 @@ private:
 	Poisson_HHO<Dim>* _problem;
 	bool _automaticNumberOfLevels;
 	int _nLevels;
+	//const int DefaultMatrixMaxSizeForCoarsestLevel = 100;
 public:
-	int MatrixMaxSizeForCoarsestLevel = 100;
+	int MatrixMaxSizeForCoarsestLevel;
 
-	MultigridForHHO(Poisson_HHO<Dim>* problem) : MultigridForHHO(problem, true, 100)
+	MultigridForHHO(Poisson_HHO<Dim>* problem) : MultigridForHHO(problem, 0)
 	{}
-	MultigridForHHO(Poisson_HHO<Dim>* problem, int nLevels) : MultigridForHHO(problem, false, nLevels)
-	{}
+	//MultigridForHHO(Poisson_HHO<Dim>* problem, int nLevels) : MultigridForHHO(problem, nLevels <= 0, nLevels > 0 ? nLevels : DefaultMatrixMaxSizeForCoarsestLevel)
+	//{}
 
-	MultigridForHHO(Poisson_HHO<Dim>* problem, bool automaticNumberOfLevels, int nLevelsOrCoarsestMatrixSize) : Multigrid()
+	MultigridForHHO(Poisson_HHO<Dim>* problem, int nLevels) : Multigrid()
 	{
 		this->_problem = problem;
-		this->_automaticNumberOfLevels = automaticNumberOfLevels;
+		this->_automaticNumberOfLevels = nLevels <= 0;
 		
-		if (automaticNumberOfLevels)
+		if (this->_automaticNumberOfLevels)
 		{
 			this->_nLevels = 0;
-			this->MatrixMaxSizeForCoarsestLevel = nLevelsOrCoarsestMatrixSize;
+			this->MatrixMaxSizeForCoarsestLevel = 100;
 		}
 		else
 		{
-			this->_nLevels = nLevelsOrCoarsestMatrixSize;
+			this->_nLevels = nLevels;
 			this->MatrixMaxSizeForCoarsestLevel = 0;
 		}
 
@@ -336,14 +337,14 @@ public:
 	virtual void Serialize(ostream& os) const override
 	{
 		os << "MultigridForHHO" << endl;
-		os << "\t" << "Levels:         ";
+		os << "\t" << "Levels        : ";
 		if (_automaticNumberOfLevels && _nLevels == 0)
-			os << " automatic coarsening until matrix size <= " << MatrixMaxSizeForCoarsestLevel << endl;
+			os << "automatic coarsening until matrix size <= " << MatrixMaxSizeForCoarsestLevel << endl;
 		else if (_automaticNumberOfLevels && _nLevels > 0)
 			os << _nLevels << " (automatic)" << endl;
 		else
 			os << _nLevels << endl;
-		os << "\t" << "Pre-smoothing:  " << *(_fineLevel->PreSmoother) << endl;
+		os << "\t" << "Pre-smoothing : " << *(_fineLevel->PreSmoother) << endl;
 		os << "\t" << "Post-smoothing: " << *(_fineLevel->PostSmoother);
 	}
 

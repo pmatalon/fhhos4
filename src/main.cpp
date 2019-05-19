@@ -19,29 +19,37 @@ using namespace std;
 void print_usage() {
 	cout << "--------------------------------------------------------" << endl;
 	cout << "Arguments:" << endl;
-	cout << "-h:\t\t		help --> print usage" << endl;
-	cout << "-d {1|2|3}:\t\t		space dimension (default: 1)" << endl;
-	cout << "-k NUM:\t\t\t			diffusion coefficient k1 in the first part of the domain partition, while k2=1 in the second part (default: 1)" << endl;
-	cout << "-s {sine|poly|hetero}:\t\t	analytical solution (default: sine)" << endl;
-	cout << "\t\t\t\t\t					'sine'   = sine solution" << endl;
-	cout << "\t\t\t\t\t					'poly'   = polynomial solution of global degree 2*d" << endl;
-	cout << "\t\t\t\t\t					'hetero' = (1D only) heterogeneous diffusion-specific analytical solution" << endl;
-	cout << "-n NUM:\t\t		number of subdivisions in each cartesian dimension (default: 5)" << endl;
-	cout << "-t {dg|hho}:\t\t	discretization method (default: dg)" << endl;
-	cout << "\t\t\t 'dg'  = Discontinuous Galerkin (Symmetric Interior Penalty)" << endl;
-	cout << "\t\t\t 'hho' = Hybrid High Order" << endl;
-	cout << "-b {monomials|legendre|bernstein}:	polynomial basis (default: monomials)" << endl;
-	cout << "-p NUM:\t\t		max polynomial degree (default: 2)" << endl;
-	cout << "-f:\t\t		full tensorization of the polynomials when d=2 or 3 (space Q) (default: false = space P)" << endl;
-	cout << "-z NUM:\t\t\t	penalization coefficient (default: -1 = automatic)" << endl;
-	cout << "-c:\t\t		static condensation (HHO only) (default: no static condensation)" << endl;
-	cout << "-a {e|c|m|s}+\t\t	action (default: es): " << endl;
-	cout <<	"\t\t\t 'e' = export system" << endl;
-	cout << "\t\t\t 'c' = export all components of the matrix in separate files" << endl;
-	cout << "\t\t\t 'm' = export mass matrix" << endl;
-	cout << "\t\t\t 's' = solve system" << endl;
-	cout << "\t\t\t 'v' = export solution vector (requires 's')" << endl;
-	cout << "-o PATH:\t		output directory to export files (default: ./)" << endl;
+	cout << "-h                   : help --> print usage" << endl;
+	cout << "-d {1|2|3}           : space dimension (default: 1)" << endl;
+	cout << "-k NUM               : diffusion coefficient k1 in the first part of the domain partition," << endl;
+	cout << "                       while k2=1 in the second part (default: 1)" << endl;
+	cout << "                       (DG only)" << endl;
+	cout << "-s {sine|poly|hetero}: analytical solution (default: 'sine')" << endl;
+	cout << "                                 'sine'   = sine solution" << endl;
+	cout << "                                 'poly'   = polynomial solution of global degree 2*d" << endl;
+	cout << "                                 'hetero' = (1D only) heterogeneous diffusion-specific analytical solution" << endl;
+	cout << "-n NUM               : number of subdivisions in each cartesian dimension (default: 5)" << endl;
+	cout << "-t {dg|hho}          : discretization method (default: 'dg')" << endl;
+	cout << "                                 'dg'  = Discontinuous Galerkin (Symmetric Interior Penalty)" << endl;
+	cout << "                                 'hho' = Hybrid High Order" << endl;
+	cout << "-b BASIS             : polynomial basis (default: monomials)" << endl;
+	cout << "                                 'monomials'" << endl;
+	cout << "                                 'legendre'" << endl;
+	cout << "                                 'bernstein'" << endl;
+	cout << "-p NUM               : max polynomial degree (default: 2)" << endl;
+	cout << "-f                   : full tensorization of the polynomials when d=2 or 3 (i.e. space Q) (default: space P)" << endl;
+	cout << "-z NUM               : penalization coefficient (default: -1 = automatic)" << endl;
+	cout << "-c                   : static condensation (HHO only) (default: no static condensation)" << endl;
+	cout << "-a {e|c|m|s|v}+      : action (default: 'es'): " << endl;
+	cout <<	"                                 'e' = export system" << endl;
+	cout << "                                 'c' = export all components of the matrix in separate files" << endl;
+	cout << "                                 'm' = export mass matrix" << endl;
+	cout << "                                 's' = solve system" << endl;
+	cout << "                                 'v' = export solution vector (requires 's')" << endl;
+	cout << "-l NUM               : number of multigrid levels (HHO 2D with static cond. only) (default: 0)" << endl;
+	cout << "                                  0     - automatic coarsening until the matrix dimension reaches 100 or less" << endl;
+	cout << "                                  other - fixed number of levels" << endl;
+	cout << "-o PATH              : output directory to export files (default: ./)" << endl;
 	cout << "--------------------------------------------------------" << endl;
 }
 
@@ -71,10 +79,11 @@ int main(int argc, char* argv[])
 	int penalizationCoefficient = -1;
 	bool staticCondensation = false;
 	string a = "es";
+	int nMultigridLevels = 0;
 	string outputDirectory = ".";
 
 	int option = 0;
-	while ((option = getopt(argc, argv, "d:k:s:n:t:b:p:z:a:o:hfc")) != -1) 
+	while ((option = getopt(argc, argv, "d:k:s:n:t:b:p:z:a:l:o:hfc")) != -1) 
 	{
 		switch (option) 
 		{
@@ -109,6 +118,8 @@ int main(int argc, char* argv[])
 			case 'c': staticCondensation = true;
 				break;
 			case 'a': a = optarg;
+				break;
+			case 'l': nMultigridLevels = atoi(optarg);
 				break;
 			case 'o': outputDirectory = optarg;
 				break;
@@ -284,7 +295,7 @@ int main(int argc, char* argv[])
 				cout << "------------------- Linear system resolution ------------------" << endl;
 				if (staticCondensation && mesh->N > 2)
 				{
-					MultigridForHHO<2> solver(problem);
+					MultigridForHHO<2> solver(problem, nMultigridLevels);
 					cout << "Solver: " << solver << endl;
 					//BlockGaussSeidel solver(problem->HHO.nLocalFaceUnknowns);
 					solver.Setup(problem->A);
