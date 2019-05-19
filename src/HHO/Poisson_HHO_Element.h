@@ -25,7 +25,7 @@ public:
 	// Stabilization contribution
 	Eigen::MatrixXd Astab;
 
-	//Eigen::MatrixXd SolveCellUnknows;
+	Eigen::MatrixXd invAtt;
 
 	Poisson_HHO_Element(BigNumber number) : Element<Dim>(number) {}
 	
@@ -52,15 +52,14 @@ public:
 			//cout << "------------- result -------------" << endl << result << endl;
 		}*/
 
-		/*int nCellUnknowns = cellBasis->Size();
+		int nCellUnknowns = cellBasis->Size();
 		int nTotalFaceUnknowns = this->Faces.size() * faceBasis->Size();
 
 		auto A = Acons + Astab;
 		auto Att = A.topLeftCorner(nCellUnknowns, nCellUnknowns);
-		auto Aff = A.bottomRightCorner(nTotalFaceUnknowns, nTotalFaceUnknowns);
-		auto Atf = A.topRightCorner(nCellUnknowns, nTotalFaceUnknowns);
-
-		this->SolveCellUnknowns = - Att.inverse() * Atf;*/
+		//auto Aff = A.bottomRightCorner(nTotalFaceUnknowns, nTotalFaceUnknowns);
+		//auto Atf = A.topRightCorner(nCellUnknowns, nTotalFaceUnknowns);
+		this->invAtt = Att.inverse();
 	}
 
 	Eigen::MatrixXd CellMassMatrix()

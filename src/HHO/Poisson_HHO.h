@@ -93,15 +93,15 @@ public:
 			cout << "Problem: Poisson " << Dim << "D" << endl;
 			cout << "Subdivisions in each cartesian direction: " << mesh->N << endl;
 			cout << "\tElements: " << hho.nElements << endl;
-			cout << "\tFaces:    " << hho.nFaces << " (" << hho.nInteriorFaces << " interior + " << hho.nBoundaryFaces << " boundary)" << endl;
+			cout << "\tFaces   : " << hho.nFaces << " (" << hho.nInteriorFaces << " interior + " << hho.nBoundaryFaces << " boundary)" << endl;
 			cout << "Discretization: Hybrid High Order" << endl;
 			cout << "\tReconstruction basis: " << reconstructionBasis->Name() << endl;
-			cout << "\tCell basis:           " << cellBasis->Name() << endl;
-			cout << "\tFace basis:           " << faceBasis->Name() << endl;
-			cout << "Cell unknowns:  " << hho.nTotalCellUnknowns << " (" << cellBasis->Size() << " per cell)" << endl;
-			cout << "Face unknowns:  " << hho.nTotalFaceUnknowns << " (" << faceBasis->Size() << " per interior face)" << endl;
+			cout << "\tCell basis          : " << cellBasis->Name() << endl;
+			cout << "\tFace basis          : " << faceBasis->Name() << endl;
+			cout << "Cell unknowns : " << hho.nTotalCellUnknowns << " (" << cellBasis->Size() << " per cell)" << endl;
+			cout << "Face unknowns : " << hho.nTotalFaceUnknowns << " (" << faceBasis->Size() << " per interior face)" << endl;
 			cout << "Total unknowns: " << hho.nTotalHybridUnknowns << endl;
-			cout << "System size:    " << (this->_staticCondensation ? hho.nTotalFaceUnknowns : hho.nTotalHybridUnknowns) << " (" << (this->_staticCondensation ? "statically condensed" : "no static condensation") << ")" << endl;
+			cout << "System size   : " << (this->_staticCondensation ? hho.nTotalFaceUnknowns : hho.nTotalHybridUnknowns) << " (" << (this->_staticCondensation ? "statically condensed" : "no static condensation") << ")" << endl;
 		}
 		this->_fileName = "Poisson" + to_string(Dim) + "D" + this->_solutionName + "_n" + to_string(mesh->N) + "_HHO_" + reconstructionBasis->Name() + "_pen-1" + (_staticCondensation ? "_staticcond" : "");
 		string matrixFilePath				= this->_outputDirectory + "/" + this->_fileName + "_A.dat";
@@ -309,17 +309,26 @@ public:
 			if ((action & Action::LogAssembly) == Action::LogAssembly)
 				cout << "Static condensation..." << endl;
 
-			Eigen::SparseMatrix<double> Att = this->_globalMatrix.topLeftCorner(hho.nTotalCellUnknowns, hho.nTotalCellUnknowns);
+			//Eigen::SparseMatrix<double> Att = this->_globalMatrix.topLeftCorner(hho.nTotalCellUnknowns, hho.nTotalCellUnknowns);
 			Eigen::SparseMatrix<double> Aff = this->_globalMatrix.bottomRightCorner(hho.nTotalFaceUnknowns, hho.nTotalFaceUnknowns);
 			Eigen::SparseMatrix<double> Atf = this->_globalMatrix.topRightCorner(hho.nTotalCellUnknowns, hho.nTotalFaceUnknowns);
 
-			Eigen::SparseLU<Eigen::SparseMatrix<double>> inverseAtt;
-			inverseAtt.compute(Att);
-			this->A = Aff - Atf.transpose() * inverseAtt.solve(Atf);
+			ParallelLoop<Element<Dim>*> parallelLoop(mesh->Elements);
+			parallelLoop.ReserveChunkCoeffsSize(hho.nLocalCellUnknowns * hho.nLocalCellUnknowns);
+			parallelLoop.Execute([this](Element<Dim>* e, ParallelChunk* chunk)
+				{
+					Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
+					int nCellUnknowns = this->HHO.nLocalCellUnknowns;
+					chunk->Coeffs.Add(element->Number * nCellUnknowns, element->Number * nCellUnknowns, element->invAtt);
+				});
+			Eigen::SparseMatrix<double> inverseAtt = Eigen::SparseMatrix<double>(hho.nTotalCellUnknowns, hho.nTotalCellUnknowns);
+			parallelLoop.Fill(inverseAtt);
+
+			this->A = Aff - Atf.transpose() * inverseAtt * Atf;
 
 			Eigen::VectorXd bt = this->_globalRHS.head(hho.nTotalCellUnknowns);
 			Eigen::VectorXd bf = this->_globalRHS.tail(hho.nTotalFaceUnknowns);
-			this->b = bf - Atf.transpose() * inverseAtt.solve(bt);
+			this->b = bf - Atf.transpose() * inverseAtt * bt;
 		}
 		else
 		{
