@@ -53,10 +53,10 @@ public:
 			{
 				for (int j = 0; j <= maxPolynomialDegree; j++)
 				{
-					IBasisFunction1D* polyY = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, j);
 					for (int i = 0; i <= maxPolynomialDegree; i++)
 					{
 						IBasisFunction1D* polyX = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, i);
+						IBasisFunction1D* polyY = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, j);
 						BasisFunction<Dim>* poly2D = dynamic_cast<BasisFunction<Dim>*>(new TensorPolynomial2D(functionNumber, polyX, polyY));
 						this->LocalFunctions.push_back(poly2D);
 						functionNumber++;
@@ -124,13 +124,13 @@ public:
 			{
 				for (int k = 0; k <= maxPolynomialDegree; k++)
 				{
-					IBasisFunction1D* polyZ = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, k);
 					for (int j = 0; j <= maxPolynomialDegree; j++)
 					{
-						IBasisFunction1D* polyY = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, j);
 						for (int i = 0; i <= maxPolynomialDegree; i++)
 						{
 							IBasisFunction1D* polyX = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, i);
+							IBasisFunction1D* polyY = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, j);
+							IBasisFunction1D* polyZ = BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, k);
 
 							BasisFunction<Dim>* poly3D = dynamic_cast<BasisFunction<Dim>*>(new TensorPolynomial3D(functionNumber, polyX, polyY, polyZ));
 							this->LocalFunctions.push_back(poly3D);

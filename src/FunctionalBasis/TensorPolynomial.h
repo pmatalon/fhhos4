@@ -54,8 +54,10 @@ public:
 
 	~TensorPolynomial2D()
 	{
-		delete _funcX;
-		delete _funcY;
+		if (_funcX)
+			delete _funcX;
+		if (_funcY)
+			delete _funcY;
 	}
 };
 
