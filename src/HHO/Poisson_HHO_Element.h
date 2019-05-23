@@ -35,8 +35,8 @@ public:
 		this->CellBasis = cellBasis;
 		this->FaceBasis = faceBasis;
 
-		this->_cellMassMatrix = this->ComputeAndReturnCellMassMatrix(cellBasis);
-		Eigen::MatrixXd Nt = this->ComputeAndReturnCellReconstructMassMatrix(cellBasis, reconstructionBasis);
+		this->_cellMassMatrix = this->CellMassMatrix(cellBasis);
+		Eigen::MatrixXd Nt = this->CellReconstructMassMatrix(cellBasis, reconstructionBasis);
 		this->_projFromReconstruct = _cellMassMatrix.inverse() * Nt;
 
 		this->AssembleReconstructionAndConsistencyMatrices();
@@ -67,31 +67,31 @@ public:
 		return this->_cellMassMatrix;
 	}
 	
-	Eigen::MatrixXd ComputeCanonicalInjectionMatrixCoarseToFine()
+	Eigen::MatrixXd ComputeCanonicalInjectionMatrixCoarseToFine(FunctionalBasis<Dim>* cellBasis)
 	{
-		Eigen::MatrixXd J(this->CellBasis->Size() * this->FinerElements.size(), this->CellBasis->Size());
+		Eigen::MatrixXd J(cellBasis->Size() * this->FinerElements.size(), cellBasis->Size());
 
 		for (auto e : this->FinerElements)
 		{
 			Poisson_HHO_Element<Dim>* fineElement = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
-			vector<RefPoint> nodalPoints = fineElement->GetNodalPoints(this->CellBasis);
+			vector<RefPoint> nodalPoints = fineElement->GetNodalPoints(cellBasis);
 
-			Eigen::MatrixXd V(this->CellBasis->Size(), this->CellBasis->Size()); // Vandermonde matrix
-			Eigen::MatrixXd rhsMatrix(this->CellBasis->Size(), this->CellBasis->Size());
-			for (int i = 0; i < this->CellBasis->Size(); i++)
+			Eigen::MatrixXd V(cellBasis->Size(), cellBasis->Size()); // Vandermonde matrix
+			Eigen::MatrixXd rhsMatrix(cellBasis->Size(), cellBasis->Size());
+			for (int i = 0; i < cellBasis->Size(); i++)
 			{
 				RefPoint fineRefPoint = nodalPoints[i];
 				DomPoint domainPoint = fineElement->ConvertToDomain(fineRefPoint);
 				RefPoint coarseRefPoint = this->ConvertToReference(domainPoint);
 
-				for (BasisFunction<Dim>* cellPhi : this->CellBasis->LocalFunctions)
+				for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions)
 				{
 					V(i, cellPhi->LocalNumber) = cellPhi->Eval(fineRefPoint);
 					rhsMatrix(i, cellPhi->LocalNumber) = cellPhi->Eval(coarseRefPoint);
 				}
 			}
 			Eigen::ColPivHouseholderQR<Eigen::MatrixXd> solver = V.colPivHouseholderQr();
-			J.block(this->LocalNumberOf(fineElement)*this->CellBasis->Size(), 0, this->CellBasis->Size(), this->CellBasis->Size()) = solver.solve(rhsMatrix);
+			J.block(this->LocalNumberOf(fineElement)*cellBasis->Size(), 0, cellBasis->Size(), cellBasis->Size()) = solver.solve(rhsMatrix);
 		}
 
 		return J;
@@ -172,8 +172,8 @@ public:
 	virtual double SourceTerm(BasisFunction<Dim>* cellPhi, SourceFunction* f) = 0;
 	virtual double St(BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2) = 0;
 	virtual double ComputeIntegralGradGrad(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) = 0;
-	virtual Eigen::MatrixXd ComputeAndReturnCellMassMatrix(FunctionalBasis<Dim>* basis) = 0;
-	virtual Eigen::MatrixXd ComputeAndReturnCellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) = 0;
+	virtual Eigen::MatrixXd CellMassMatrix(FunctionalBasis<Dim>* basis) = 0;
+	virtual Eigen::MatrixXd CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) = 0;
 
 
 	virtual ~Poisson_HHO_Element() {}

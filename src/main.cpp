@@ -299,7 +299,7 @@ int main(int argc, char* argv[])
 					cout << "Solver: " << solver << endl;
 					//BlockGaussSeidel solver(problem->HHO.nLocalFaceUnknowns);
 					solver.Setup(problem->A);
-					solver.Tolerance = 1e-5;
+					solver.Tolerance = 1e-8;
 					cout << endl;
 					problem->Solution = solver.Solve(problem->b);
 

@@ -50,9 +50,9 @@ public:
 	//                 Poisson_HHO_Face implementation                //
 	//----------------------------------------------------------------//
 
-	Eigen::MatrixXd ComputeAndReturnFaceMassMatrix(FunctionalBasis<Dim-1>* basis)
+	Eigen::MatrixXd FaceMassMatrix(FunctionalBasis<Dim-1>* basis)
 	{
-		return CartesianShape<Dim, Dim - 1>::ComputeAndReturnFaceMassMatrix(basis);
+		return CartesianShape<Dim, Dim - 1>::FaceMassMatrix(basis);
 	}
 
 };

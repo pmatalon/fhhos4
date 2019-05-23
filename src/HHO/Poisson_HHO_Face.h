@@ -10,6 +10,7 @@ class Poisson_HHO_Face : virtual public Face<Dim>
 {
 private:
 	Eigen::MatrixXd _faceMassMatrix;
+	Eigen::MatrixXd _invFaceMassMatrix;
 
 	Eigen::MatrixXd _elem1_massCellFace;
 	Eigen::MatrixXd _elem1_massReconstructFace;
@@ -24,6 +25,8 @@ private:
 	Eigen::MatrixXd _elem1_projFromCell;
 	Eigen::MatrixXd _elem2_projFromCell;
 public:
+	FunctionalBasis<Dim - 1>* FaceBasis;
+
 	Poisson_HHO_Face(BigNumber number, Element<Dim>* element1, Element<Dim>* element2) : Face<Dim>(number, element1, element2) {}
 
 	void InitHHO(FunctionalBasis<Dim>* reconstructionBasis, FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim - 1>* faceBasis)
@@ -31,25 +34,22 @@ public:
 		if (this->_faceMassMatrix.rows() > 0)
 			return;
 
-		this->_faceMassMatrix = this->ComputeAndReturnFaceMassMatrix(faceBasis);
-		Eigen::MatrixXd invMf = this->_faceMassMatrix.inverse();
+		this->FaceBasis = faceBasis;
 
-		//cout << "------------- Mf -------------" << endl << Mf << endl;
+		this->_faceMassMatrix = this->FaceMassMatrix(faceBasis);
+		this->_invFaceMassMatrix = this->_faceMassMatrix.inverse();
+
 		this->_elem1_massReconstructFace = this->MassMatrix(faceBasis, this->Element1, reconstructionBasis);
-		//cout << "------------- Nf -------------" << endl << Nf << endl;
 		this->_elem1_massCellFace = this->MassMatrix(faceBasis, this->Element1, cellBasis);
-		//cout << "------------- Nft -------------" << endl << Nft << endl;
-		this->_elem1_projFromReconstruct = invMf * _elem1_massReconstructFace;
-		this->_elem1_projFromCell = invMf * _elem1_massCellFace;
+		this->_elem1_projFromReconstruct = this->_invFaceMassMatrix * _elem1_massReconstructFace;
+		this->_elem1_projFromCell = this->_invFaceMassMatrix * _elem1_massCellFace;
 
 		if (this->Element2 != NULL)
 		{
 			this->_elem2_massReconstructFace = this->MassMatrix(faceBasis, this->Element2, reconstructionBasis);
-			//cout << "------------- Nf -------------" << endl << Nf << endl;
 			this->_elem2_massCellFace = this->MassMatrix(faceBasis, this->Element2, cellBasis);
-			//cout << "------------- Nft -------------" << endl << Nft << endl;
-			this->_elem2_projFromReconstruct = invMf * _elem2_massReconstructFace;
-			this->_elem2_projFromCell = invMf * _elem2_massCellFace;
+			this->_elem2_projFromReconstruct = this->_invFaceMassMatrix * _elem2_massReconstructFace;
+			this->_elem2_projFromCell = this->_invFaceMassMatrix * _elem2_massCellFace;
 		}
 	}
 
@@ -58,7 +58,12 @@ public:
 		return this->_faceMassMatrix;
 	}
 
-	virtual Eigen::MatrixXd ComputeAndReturnFaceMassMatrix(FunctionalBasis<Dim-1>* basis) = 0;
+	Eigen::MatrixXd InvFaceMassMatrix()
+	{
+		return this->_invFaceMassMatrix;
+	}
+
+	virtual Eigen::MatrixXd FaceMassMatrix(FunctionalBasis<Dim-1>* basis) = 0;
 
 	Eigen::MatrixXd MassMatrix(FunctionalBasis<Dim - 1>* basis, Element<Dim>* element, FunctionalBasis<Dim>* cellBasis)
 	{
@@ -120,5 +125,12 @@ public:
 		else if (element == this->Element2)
 			return _elem2_projFromCell;
 		assert(false);
+	}
+
+	Eigen::MatrixXd GetProjFromCell(Element<Dim>* element, FunctionalBasis<Dim>* cellInterpolationBasis)
+	{
+		Eigen::MatrixXd massFaceCell = this->MassMatrix(this->FaceBasis, element, cellInterpolationBasis);
+		Eigen::MatrixXd projFromCell = this->_invFaceMassMatrix * massFaceCell;
+		return projFromCell;
 	}
 };

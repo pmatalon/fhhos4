@@ -108,19 +108,19 @@ public:
 	//   HHO   //
 	//---------//
 
-	Eigen::MatrixXd ComputeAndReturnFaceMassMatrix(FunctionalBasis<ShapeDim>* basis)
+	Eigen::MatrixXd FaceMassMatrix(FunctionalBasis<ShapeDim>* basis)
 	{
-		return RescaleMass(ReferenceShape.StoredFaceMassMatrix());
+		return RescaleMass(ReferenceShape.FaceMassMatrix(basis));
 	}
 
-	Eigen::MatrixXd ComputeAndReturnCellMassMatrix(FunctionalBasis<ShapeDim>* basis)
+	Eigen::MatrixXd CellMassMatrix(FunctionalBasis<ShapeDim>* basis)
 	{
-		return RescaleMass(ReferenceShape.StoredCellMassMatrix());
+		return RescaleMass(ReferenceShape.CellMassMatrix(basis));
 	}
 
-	Eigen::MatrixXd ComputeAndReturnCellReconstructMassMatrix(FunctionalBasis<ShapeDim>* cellBasis, FunctionalBasis<ShapeDim>* reconstructBasis)
+	Eigen::MatrixXd CellReconstructMassMatrix(FunctionalBasis<ShapeDim>* cellBasis, FunctionalBasis<ShapeDim>* reconstructBasis)
 	{
-		return RescaleMass(ReferenceShape.StoredCellReconstructMassMatrix());
+		return RescaleMass(ReferenceShape.CellReconstructMassMatrix(cellBasis, reconstructBasis));
 	}
 
 	double IntegralGradGradReconstruct(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
@@ -278,7 +278,6 @@ public:
 				points.push_back(RefPoint(0, 0));
 			else if (basis->FullTensorization)
 			{
-				cout << "Warning: these interpolation points have never been tested." << endl;
 				double h = 2 / (double)basis->GetDegree();
 				for (int i = 0; i < basis->GetDegree() + 1; ++i)
 					for (int j = 0; j < basis->GetDegree() + 1; ++j)

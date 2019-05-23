@@ -61,42 +61,50 @@ public:
 
 	void Execute(function<void(T)> functionToExecute)
 	{
-		for (unsigned int threadNumber = 0; threadNumber < NThreads; threadNumber++)
+		if (NThreads == 1)
 		{
-			ParallelChunk* chunk = Chunks[threadNumber];
-			chunk->ThreadFuture = std::async(std::launch::async, [chunk, this, functionToExecute]()
-				{
-					for (BigNumber i = chunk->Start; i < chunk->End; ++i)
-					{
-						functionToExecute(this->List[i]);
-					}
-				}
-			);
+			ParallelChunk* chunk = Chunks[0];
+			for (BigNumber i = chunk->Start; i < chunk->End; ++i)
+				functionToExecute(this->List[i]);
 		}
-		Wait();
+		else
+		{
+			for (unsigned int threadNumber = 0; threadNumber < NThreads; threadNumber++)
+			{
+				ParallelChunk* chunk = Chunks[threadNumber];
+				chunk->ThreadFuture = std::async(std::launch::async, [chunk, this, functionToExecute]()
+					{
+						for (BigNumber i = chunk->Start; i < chunk->End; ++i)
+							functionToExecute(this->List[i]);
+					}
+				);
+			}
+			Wait();
+		}
 	}
 
 	void Execute(function<void(T, ParallelChunk*)> functionToExecute)
 	{
-		//cout << "-----------------------------------------------------" << endl;
-		for (unsigned int threadNumber = 0; threadNumber < NThreads; threadNumber++)
+		if (NThreads == 1)
 		{
-			ParallelChunk* chunk = Chunks[threadNumber];
-			//cout << "[" << threadNumber << "] launch async" << endl;
-			chunk->ThreadFuture = std::async(std::launch::async, [chunk, this, functionToExecute]()
-				{
-					//cout << "[" << chunk->ThreadNumber << "] begin execute" << endl;
-					for (BigNumber i = chunk->Start; i < chunk->End; ++i)
-					{
-						functionToExecute(this->List[i], chunk);
-					}
-
-					//cout << "[" << chunk->ThreadNumber << "] end execute" << endl;
-				}
-			);
-			//cout << "[" << threadNumber << "] end launch async" << endl;
+			ParallelChunk* chunk = Chunks[0];
+			for (BigNumber i = chunk->Start; i < chunk->End; ++i)
+				functionToExecute(this->List[i], chunk);
 		}
-		Wait();
+		else
+		{
+			for (unsigned int threadNumber = 0; threadNumber < NThreads; threadNumber++)
+			{
+				ParallelChunk* chunk = Chunks[threadNumber];
+				chunk->ThreadFuture = std::async(std::launch::async, [chunk, this, functionToExecute]()
+					{
+						for (BigNumber i = chunk->Start; i < chunk->End; ++i)
+							functionToExecute(this->List[i], chunk);
+					}
+				);
+			}
+			Wait();
+		}
 	}
 
 	void ReserveChunkCoeffsSize(BigNumber nnzForOneLoopIterate)

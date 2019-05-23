@@ -98,14 +98,14 @@ public:
 	//                 Poisson_HHO_Element implementation                //
 	//-------------------------------------------------------------------//
 
-	Eigen::MatrixXd ComputeAndReturnCellMassMatrix(FunctionalBasis<Dim>* basis)
+	Eigen::MatrixXd CellMassMatrix(FunctionalBasis<Dim>* basis)
 	{
-		return CartesianShape<Dim>::ComputeAndReturnCellMassMatrix(basis);
+		return CartesianShape<Dim>::CellMassMatrix(basis);
 	}
 
-	Eigen::MatrixXd ComputeAndReturnCellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis)
+	Eigen::MatrixXd CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis)
 	{
-		return CartesianShape<Dim>::ComputeAndReturnCellReconstructMassMatrix(cellBasis, reconstructBasis);
+		return CartesianShape<Dim>::CellReconstructMassMatrix(cellBasis, reconstructBasis);
 	}
 
 	double St(BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2)
