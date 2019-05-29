@@ -21,6 +21,12 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 target_link_libraries(dghho Threads::Threads)
 
+# c++ flags
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+
+# show compiler commands
+set(CMAKE_VERBOSE_MAKEFILE ON)
+
 # Link to Third Party Libraries (TPL)
 # AGMG (requires Blas and Lapack)
 if(${TPL_ENABLE_AGMG})
