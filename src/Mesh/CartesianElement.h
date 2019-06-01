@@ -67,7 +67,7 @@ public:
 			return f->Eval(domainPoint) * phi->Eval(refElementPoint);
 		};
 
-		CartesianShape<Dim>::ComputeIntegral(sourceTimesBasisFunction, 0);
+		return CartesianShape<Dim>::ComputeIntegral(sourceTimesBasisFunction, 0);
 	}
 
 	double L2ErrorPow2(function<double(RefPoint)> approximate, function<double(DomPoint)> exactSolution)
@@ -77,7 +77,7 @@ public:
 			return pow(exactSolution(domainPoint) - approximate(refElementPoint), 2);
 		};
 
-		CartesianShape<Dim>::ComputeIntegral(errorFunction, 0);
+		return CartesianShape<Dim>::ComputeIntegral(errorFunction, 0);
 	}
 
 	//------------------------------------------------------------------//
