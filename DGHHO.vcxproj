@@ -142,6 +142,7 @@
     <ClInclude Include="src\Solver\IterativeSolver.h" />
     <ClInclude Include="src\Utils\Action.h" />
     <ClInclude Include="src\Utils\agmg.h" />
+    <ClInclude Include="src\Utils\ElementParallelLoop.h" />
     <ClInclude Include="src\Utils\ParallelLoop.h" />
   </ItemGroup>
   <ItemGroup>

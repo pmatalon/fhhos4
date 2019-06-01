@@ -5,6 +5,7 @@
 #include "Multigrid.h"
 #include "../Mesh/Mesh.h"
 #include "../HHO/Poisson_HHO_Element.h"
+#include "../Utils/ElementParallelLoop.h"
 using namespace std;
 
 template <int Dim>
@@ -140,9 +141,9 @@ private:
 	{
 		int faceLocalUnknowns = problem->HHO.nLocalFaceUnknowns;
 
-		ParallelLoop<Element<Dim>*> parallelLoop(problem->_mesh->Elements);
+		ElementParallelLoop<Dim> parallelLoop(problem->_mesh->Elements);
 		parallelLoop.ReserveChunkCoeffsSize(4 * faceLocalUnknowns * faceLocalUnknowns);
-		parallelLoop.Execute([this, faceLocalUnknowns](Element<Dim>* e, ParallelChunk* chunk)
+		parallelLoop.Execute([this, faceLocalUnknowns](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
 			{
 				Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
 				for (auto f : element->Faces)
@@ -158,7 +159,7 @@ private:
 					BigNumber faceGlobalNumber = face->Number;
 					BigNumber faceLocalNumber = element->LocalNumberOf(face);
 
-					chunk->Coeffs.Add(faceGlobalNumber*faceLocalUnknowns, faceGlobalNumber*faceLocalUnknowns, weight * M_face);
+					chunk->Results.Coeffs.Add(faceGlobalNumber*faceLocalUnknowns, faceGlobalNumber*faceLocalUnknowns, weight * M_face);
 				}
 			});
 		Eigen::SparseMatrix<double> M(problem->HHO.nTotalFaceUnknowns, problem->HHO.nTotalFaceUnknowns);
@@ -171,9 +172,9 @@ private:
 	{
 		int faceLocalUnknowns = problem->HHO.nLocalFaceUnknowns;
 
-		ParallelLoop<Element<Dim>*> parallelLoop(problem->_mesh->Elements);
+		ElementParallelLoop<Dim> parallelLoop(problem->_mesh->Elements);
 		parallelLoop.ReserveChunkCoeffsSize(4 * faceLocalUnknowns * faceLocalUnknowns);
-		parallelLoop.Execute([this, faceLocalUnknowns](Element<Dim>* e, ParallelChunk* chunk)
+		parallelLoop.Execute([this, faceLocalUnknowns](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
 			{
 				Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
 				for (auto f : element->Faces)
@@ -189,7 +190,7 @@ private:
 					BigNumber faceGlobalNumber = face->Number;
 					BigNumber faceLocalNumber = element->LocalNumberOf(face);
 
-					chunk->Coeffs.Add(faceGlobalNumber*faceLocalUnknowns, faceGlobalNumber*faceLocalUnknowns, invM_face / weight);
+					chunk->Results.Coeffs.Add(faceGlobalNumber*faceLocalUnknowns, faceGlobalNumber*faceLocalUnknowns, invM_face / weight);
 				}
 			});
 		Eigen::SparseMatrix<double> M(problem->HHO.nTotalFaceUnknowns, problem->HHO.nTotalFaceUnknowns);
@@ -204,12 +205,12 @@ private:
 
 		ParallelLoop<Element<Dim>*> parallelLoop(problem->_mesh->Elements);
 		parallelLoop.ReserveChunkCoeffsSize(cellLocalUnknowns * cellLocalUnknowns);
-		parallelLoop.Execute([this, cellLocalUnknowns](Element<Dim>* e, ParallelChunk* chunk)
+		parallelLoop.Execute([this, cellLocalUnknowns](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
 			{
 				Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
 				Eigen::MatrixXd M_cell = element->CellMassMatrix();
 				Eigen::MatrixXd invM_cell = M_cell.inverse();
-				chunk->Coeffs.Add(element->Number*cellLocalUnknowns, element->Number*cellLocalUnknowns, invM_cell);
+				chunk->Results.Coeffs.Add(element->Number*cellLocalUnknowns, element->Number*cellLocalUnknowns, invM_cell);
 				
 			});
 		Eigen::SparseMatrix<double> M(problem->HHO.nTotalCellUnknowns, problem->HHO.nTotalCellUnknowns);
@@ -233,10 +234,10 @@ private:
 
 		FunctionalBasis<Dim>* cellInterpolationBasis = GetCellInterpolationBasis(problem);
 
-		ParallelLoop<Element<Dim>*> parallelLoop(problem->_mesh->Elements);
+		ElementParallelLoop<Dim> parallelLoop(problem->_mesh->Elements);
 		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nFaceUnknowns);
 
-		parallelLoop.Execute([this, nCellUnknowns, nFaceUnknowns, cellInterpolationBasis](Element<Dim>* e, ParallelChunk* chunk)
+		parallelLoop.Execute([this, nCellUnknowns, nFaceUnknowns, cellInterpolationBasis](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
 			{
 				Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
 
@@ -258,7 +259,7 @@ private:
 					Eigen::MatrixXd Pi_face = face->GetProjFromCell(element, cellInterpolationBasis);
 
 					double weight = Weight(element, face);
-					chunk->Coeffs.Add(elemGlobalNumber*cellInterpolationBasis->Size(), faceGlobalNumber*nFaceUnknowns, weight * invM_cell * Pi_face.transpose() * M_face);
+					chunk->Results.Coeffs.Add(elemGlobalNumber*cellInterpolationBasis->Size(), faceGlobalNumber*nFaceUnknowns, weight * invM_cell * Pi_face.transpose() * M_face);
 				}
 			});
 
@@ -276,10 +277,10 @@ private:
 		FunctionalBasis<Dim>* cellInterpolationBasis = GetCellInterpolationBasis(problem);
 		int nCellUnknowns = cellInterpolationBasis->Size();
 
-		ParallelLoop<Element<Dim>*> parallelLoop(problem->_mesh->Elements);
+		ElementParallelLoop<Dim> parallelLoop(problem->_mesh->Elements);
 		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nFaceUnknowns);
 
-		parallelLoop.Execute([this, nCellUnknowns, nFaceUnknowns, cellInterpolationBasis](Element<Dim>* e, ParallelChunk* chunk)
+		parallelLoop.Execute([this, nCellUnknowns, nFaceUnknowns, cellInterpolationBasis](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
 			{
 				Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
 
@@ -295,7 +296,7 @@ private:
 					BigNumber faceLocalNumber = element->LocalNumberOf(face);
 
 					double weight = Weight(element, face);
-					chunk->Coeffs.Add(faceGlobalNumber*nFaceUnknowns, elemGlobalNumber*nCellUnknowns, weight*face->GetProjFromCell(element, cellInterpolationBasis));
+					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, elemGlobalNumber*nCellUnknowns, weight*face->GetProjFromCell(element, cellInterpolationBasis));
 				}
 			});
 
@@ -342,10 +343,10 @@ private:
 		FunctionalBasis<Dim>* cellInterpolationBasis = GetCellInterpolationBasis(finePb);
 		int nCellUnknowns = cellInterpolationBasis->Size();
 
-		ParallelLoop<Element<Dim>*> parallelLoop(coarseMesh->Elements);
+		ElementParallelLoop<Dim> parallelLoop(coarseMesh->Elements);
 		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nCellUnknowns);
 
-		parallelLoop.Execute([this, cellInterpolationBasis, nCellUnknowns](Element<Dim>* ce, ParallelChunk* chunk)
+		parallelLoop.Execute([this, cellInterpolationBasis, nCellUnknowns](Element<Dim>* ce, ParallelChunk<CoeffsChunk>* chunk)
 			{
 				Poisson_HHO_Element<Dim>* coarseElement = dynamic_cast<Poisson_HHO_Element<Dim>*>(ce);
 
@@ -356,7 +357,7 @@ private:
 					BigNumber fineElemGlobalNumber = fineElement->Number;
 					BigNumber fineElemLocalNumber = coarseElement->LocalNumberOf(fineElement);
 
-					chunk->Coeffs.Add(fineElemGlobalNumber*nCellUnknowns, coarseElemGlobalNumber*nCellUnknowns, local_J_f_c.block(fineElemLocalNumber*nCellUnknowns, 0, nCellUnknowns, nCellUnknowns));
+					chunk->Results.Coeffs.Add(fineElemGlobalNumber*nCellUnknowns, coarseElemGlobalNumber*nCellUnknowns, local_J_f_c.block(fineElemLocalNumber*nCellUnknowns, 0, nCellUnknowns, nCellUnknowns));
 				}
 			});
 

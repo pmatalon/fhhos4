@@ -86,7 +86,7 @@ public:
 		// Iteration on the elements: diagonal blocks //
 		//--------------------------------------------//
 
-		ParallelLoop<Element<Dim>*> parallelLoop(mesh->Elements);
+		ParallelLoop<Element<Dim>*, EmptyResultChunk> parallelLoop(mesh->Elements);
 
 		vector<NonZeroCoefficients> chunksMatrixCoeffs(parallelLoop.NThreads);
 		vector<NonZeroCoefficients> chunksMassMatrixCoeffs(parallelLoop.NThreads);
@@ -96,7 +96,7 @@ public:
 		
 		for (unsigned int threadNumber = 0; threadNumber < parallelLoop.NThreads; threadNumber++)
 		{
-			ParallelChunk* chunk = parallelLoop.Chunks[threadNumber];
+			ParallelChunk<EmptyResultChunk>* chunk = parallelLoop.Chunks[threadNumber];
 
 			chunk->ThreadFuture = std::async([this, mesh, basis, action, penalizationCoefficient, chunk, &chunksMatrixCoeffs, &chunksMassMatrixCoeffs, &chunksVolumicCoeffs, &chunksCouplingCoeffs, &chunksPenCoeffs]()
 			{
@@ -197,7 +197,7 @@ public:
 		// Iteration on the faces: off-diagonal blocks //
 		//---------------------------------------------//
 
-		ParallelLoop<Face<Dim>*> parallelLoopFaces(mesh->Faces);
+		ParallelLoop<Face<Dim>*, EmptyResultChunk> parallelLoopFaces(mesh->Faces);
 
 		chunksMatrixCoeffs = vector<NonZeroCoefficients>(parallelLoopFaces.NThreads);
 		chunksCouplingCoeffs = vector<NonZeroCoefficients>(parallelLoopFaces.NThreads);
@@ -206,7 +206,7 @@ public:
 
 		for (unsigned int threadNumber = 0; threadNumber < parallelLoopFaces.NThreads; threadNumber++)
 		{
-			ParallelChunk* chunk = parallelLoopFaces.Chunks[threadNumber];
+			ParallelChunk<EmptyResultChunk>* chunk = parallelLoopFaces.Chunks[threadNumber];
 
 			chunk->ThreadFuture = std::async([this, mesh, basis, action, penalizationCoefficient, chunk, &chunksMatrixCoeffs, &chunksCouplingCoeffs, &chunksPenCoeffs]()
 			{

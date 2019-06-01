@@ -8,6 +8,7 @@
 #include "Poisson_HHO_Element.h"
 #include "../Utils/NonZeroCoefficients.h"
 #include "../Utils/L2.h"
+#include "../Utils/ElementParallelLoop.h"
 using namespace std;
 
 
@@ -129,7 +130,7 @@ public:
 		// Parallel loop on the elements //
 		//-------------------------------//
 
-		ParallelLoop<Element<Dim>*> parallelLoop(mesh->Elements);
+		ParallelLoop<Element<Dim>*, EmptyResultChunk> parallelLoop(mesh->Elements);
 
 		vector<NonZeroCoefficients> chunksConsistencyCoeffs(parallelLoop.NThreads);
 		vector<NonZeroCoefficients> chunksStabilizationCoeffs(parallelLoop.NThreads);
@@ -137,7 +138,7 @@ public:
 		
 		for (unsigned int threadNumber = 0; threadNumber < parallelLoop.NThreads; threadNumber++)
 		{
-			ParallelChunk* chunk = parallelLoop.Chunks[threadNumber];
+			ParallelChunk<EmptyResultChunk>* chunk = parallelLoop.Chunks[threadNumber];
 
 			chunk->ThreadFuture = std::async([this, &hho, mesh, cellBasis, faceBasis, reconstructionBasis, action, chunk, &chunksConsistencyCoeffs, &chunksStabilizationCoeffs, &chunksReconstructionCoeffs]()
 				{
@@ -313,16 +314,7 @@ public:
 			Eigen::SparseMatrix<double> Aff = this->_globalMatrix.bottomRightCorner(hho.nTotalFaceUnknowns, hho.nTotalFaceUnknowns);
 			Eigen::SparseMatrix<double> Atf = this->_globalMatrix.topRightCorner(hho.nTotalCellUnknowns, hho.nTotalFaceUnknowns);
 
-			ParallelLoop<Element<Dim>*> parallelLoop(mesh->Elements);
-			parallelLoop.ReserveChunkCoeffsSize(hho.nLocalCellUnknowns * hho.nLocalCellUnknowns);
-			parallelLoop.Execute([this](Element<Dim>* e, ParallelChunk* chunk)
-				{
-					Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
-					int nCellUnknowns = this->HHO.nLocalCellUnknowns;
-					chunk->Coeffs.Add(element->Number * nCellUnknowns, element->Number * nCellUnknowns, element->invAtt);
-				});
-			Eigen::SparseMatrix<double> inverseAtt = Eigen::SparseMatrix<double>(hho.nTotalCellUnknowns, hho.nTotalCellUnknowns);
-			parallelLoop.Fill(inverseAtt);
+			Eigen::SparseMatrix<double> inverseAtt = GetInverseAtt();
 
 			this->A = Aff - Atf.transpose() * inverseAtt * Atf;
 
@@ -405,40 +397,38 @@ public:
 
 		if (this->_staticCondensation)
 		{
+			cout << "Solving cell unknowns..." << endl;
 			Eigen::VectorXd facesSolution = this->Solution;
 
-			Eigen::SparseMatrix<double> Att = this->_globalMatrix.topLeftCorner(hho.nTotalCellUnknowns, hho.nTotalCellUnknowns);
 			Eigen::SparseMatrix<double> Atf = this->_globalMatrix.topRightCorner(hho.nTotalCellUnknowns, hho.nTotalFaceUnknowns);
 			Eigen::VectorXd bt = this->_globalRHS.head(hho.nTotalCellUnknowns);
-
-			Eigen::SparseLU<Eigen::SparseMatrix<double>> inverseAtt;
-			inverseAtt.compute(Att);
-
+			Eigen::SparseMatrix<double> inverseAtt = GetInverseAtt();
 
 			globalHybridSolution = Eigen::VectorXd(hho.nTotalHybridUnknowns);
 			globalHybridSolution.tail(hho.nTotalFaceUnknowns) = facesSolution;
-			globalHybridSolution.head(hho.nTotalCellUnknowns) = inverseAtt.solve(bt - Atf * facesSolution);
+			globalHybridSolution.head(hho.nTotalCellUnknowns) = inverseAtt * (bt - Atf * facesSolution);
 		}
 		else
 			globalHybridSolution = this->Solution;
 
-		for (auto e : this->_mesh->Elements)
-		{
-			Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
-
-			Eigen::VectorXd localHybridSolution(hho.nLocalCellUnknowns + hho.nLocalFaceUnknowns * element->Faces.size());
-			localHybridSolution.head(hho.nLocalCellUnknowns) = globalHybridSolution.segment(FirstDOFGlobalNumber(element), hho.nLocalCellUnknowns);
-			for (auto face : element->Faces)
+		cout << "Reconstruction of higher order approximation..." << endl;
+		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, hho, &globalHybridSolution, &globalReconstructedSolution](Element<Dim>* e)
 			{
-				if (face->IsDomainBoundary)
-					localHybridSolution.segment(element->FirstDOFNumber(face), hho.nLocalFaceUnknowns) = Eigen::VectorXd::Zero(hho.nLocalFaceUnknowns);
-				else
-					localHybridSolution.segment(element->FirstDOFNumber(face), hho.nLocalFaceUnknowns) = globalHybridSolution.segment(FirstDOFGlobalNumber(face), hho.nLocalFaceUnknowns);
-			}
+				Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
 
-			Eigen::VectorXd localReconstructedSolution = element->Reconstruct(localHybridSolution);
-			globalReconstructedSolution.segment(element->Number * hho.nLocalReconstructUnknowns, hho.nLocalReconstructUnknowns) = localReconstructedSolution;
-		}
+				Eigen::VectorXd localHybridSolution(hho.nLocalCellUnknowns + hho.nLocalFaceUnknowns * element->Faces.size());
+				localHybridSolution.head(hho.nLocalCellUnknowns) = globalHybridSolution.segment(FirstDOFGlobalNumber(element), hho.nLocalCellUnknowns);
+				for (auto face : element->Faces)
+				{
+					if (face->IsDomainBoundary)
+						localHybridSolution.segment(element->FirstDOFNumber(face), hho.nLocalFaceUnknowns) = Eigen::VectorXd::Zero(hho.nLocalFaceUnknowns);
+					else
+						localHybridSolution.segment(element->FirstDOFNumber(face), hho.nLocalFaceUnknowns) = globalHybridSolution.segment(FirstDOFGlobalNumber(face), hho.nLocalFaceUnknowns);
+				}
+
+				Eigen::VectorXd localReconstructedSolution = element->Reconstruct(localHybridSolution);
+				globalReconstructedSolution.segment(element->Number * hho.nLocalReconstructUnknowns, hho.nLocalReconstructUnknowns) = localReconstructedSolution;
+			});
 
 		this->ReconstructedSolution = globalReconstructedSolution;
 	}
@@ -464,6 +454,21 @@ public:
 		meshSequence.push_back(this->_mesh->CoarserMesh);
 		MultigridForHHO<Dim> mg(meshSequence);
 	}*/
+
+	Eigen::SparseMatrix<double> GetInverseAtt()
+	{
+		ElementParallelLoop<Dim> parallelLoop(_mesh->Elements);
+		parallelLoop.ReserveChunkCoeffsSize(this->HHO.nLocalCellUnknowns * this->HHO.nLocalCellUnknowns);
+		parallelLoop.Execute([this](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
+				int nCellUnknowns = this->HHO.nLocalCellUnknowns;
+				chunk->Results.Coeffs.Add(element->Number * nCellUnknowns, element->Number * nCellUnknowns, element->invAtt);
+			});
+		Eigen::SparseMatrix<double> inverseAtt = Eigen::SparseMatrix<double>(this->HHO.nTotalCellUnknowns, this->HHO.nTotalCellUnknowns);
+		parallelLoop.Fill(inverseAtt);
+		return inverseAtt;
+	}
 
 private:
 	BigNumber DOFNumber(Element<Dim>* element, BasisFunction<Dim>* cellPhi)
