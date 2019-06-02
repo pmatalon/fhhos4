@@ -122,11 +122,6 @@ private:
 
 		//finePb->ExportMatrix(M_f, "level_" + to_string(this->Number) + "_M_f");
 
-		/*Eigen::SparseLU<Eigen::SparseMatrix<double>> solverM_c;
-		solverM_c.analyzePattern(M_c);
-		solverM_c.factorize(M_c);*/
-
-		//R = solverM_c.solve(P.transpose() * M_f);
 		R = invM_c * P.transpose() * M_f;
 
 		finePb->ExportMatrix(R, "R");

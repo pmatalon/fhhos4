@@ -40,6 +40,16 @@ public:
 		return CartesianShape<Dim>::Integral(phi);
 	}
 
+	double ComputeIntegral(function<double(RefPoint)> func, int numberOfDerivatives)
+	{
+		return CartesianShape<Dim>::ComputeIntegral(func, numberOfDerivatives);
+	}
+
+	double ComputeIntegral(function<double(RefPoint)> func, int numberOfDerivatives, int polynomialDegree)
+	{
+		return CartesianShape<Dim>::ComputeIntegral(func, numberOfDerivatives, polynomialDegree);
+	}
+
 	double ComputeIntegralGradGrad(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{
 		return CartesianShape<Dim>::ComputeIntegralGradGrad(phi1, phi2);

@@ -21,7 +21,7 @@ public:
 		};
 
 		ParallelLoop<Element<Dim>*, ChunkResult> parallelLoop(mesh->Elements);
-		parallelLoop.Execute([basis, solution, exactSolution](Element<Dim>* element, ParallelChunk<ChunkResult>* chunk)
+		parallelLoop.Execute([basis, &solution, exactSolution](Element<Dim>* element, ParallelChunk<ChunkResult>* chunk)
 			{
 				auto approximate = basis->GetApproximateFunction(solution, element->Number * basis->NumberOfLocalFunctionsInElement(element));
 				chunk->Results.absoluteError += element->L2ErrorPow2(approximate, exactSolution);

@@ -192,7 +192,7 @@ private:
 public:
 	double ComputeMassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{
-		function<double(Point)> functionToIntegrate = [phi1, phi2](RefPoint p) {
+		function<double(RefPoint)> functionToIntegrate = [phi1, phi2](RefPoint p) {
 			return phi1->Eval(p)*phi2->Eval(p);
 		};
 
@@ -205,7 +205,7 @@ public:
 		if (phi1->GetDegree() == 0 || phi1->GetDegree() == 0)
 			return 0;
 
-		function<double(Point)> functionToIntegrate = [phi1, phi2](RefPoint p) {
+		function<double(RefPoint)> functionToIntegrate = [phi1, phi2](RefPoint p) {
 			return Element<Dim>::InnerProduct(phi1->Grad(p), phi2->Grad(p));
 		};
 

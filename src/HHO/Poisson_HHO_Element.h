@@ -74,24 +74,27 @@ public:
 		for (auto e : this->FinerElements)
 		{
 			Poisson_HHO_Element<Dim>* fineElement = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
-			vector<RefPoint> nodalPoints = fineElement->GetNodalPoints(cellBasis);
 
-			Eigen::MatrixXd V(cellBasis->Size(), cellBasis->Size()); // Vandermonde matrix
-			Eigen::MatrixXd rhsMatrix(cellBasis->Size(), cellBasis->Size());
-			for (int i = 0; i < cellBasis->Size(); i++)
+			Eigen::MatrixXd fineCoarseMass(cellBasis->Size(), cellBasis->Size());
+			for (BasisFunction<Dim>* finePhi : cellBasis->LocalFunctions)
 			{
-				RefPoint fineRefPoint = nodalPoints[i];
-				DomPoint domainPoint = fineElement->ConvertToDomain(fineRefPoint);
-				RefPoint coarseRefPoint = this->ConvertToReference(domainPoint);
-
-				for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions)
+				for (BasisFunction<Dim>* coarsePhi : cellBasis->LocalFunctions)
 				{
-					V(i, cellPhi->LocalNumber) = cellPhi->Eval(fineRefPoint);
-					rhsMatrix(i, cellPhi->LocalNumber) = cellPhi->Eval(coarseRefPoint);
+					function<double(RefPoint)> functionToIntegrate = [this, fineElement, finePhi, coarsePhi](RefPoint fineRefPoint) {
+						DomPoint domPoint = fineElement->ConvertToDomain(fineRefPoint);
+						RefPoint coarseRefPoint = this->ConvertToReference(domPoint);
+						return finePhi->Eval(fineRefPoint)*coarsePhi->Eval(coarseRefPoint);
+					};
+					
+					int polynomialDegree = finePhi->GetDegree() + coarsePhi->GetDegree();
+					double integral = fineElement->ComputeIntegral(functionToIntegrate, 0, polynomialDegree);
+					fineCoarseMass(finePhi->LocalNumber, coarsePhi->LocalNumber) = integral;
 				}
 			}
-			Eigen::ColPivHouseholderQR<Eigen::MatrixXd> solver = V.colPivHouseholderQr();
-			J.block(this->LocalNumberOf(fineElement)*cellBasis->Size(), 0, cellBasis->Size(), cellBasis->Size()) = solver.solve(rhsMatrix);
+			
+			Eigen::MatrixXd fineMass = fineElement->CellMassMatrix(cellBasis);
+
+			J.block(this->LocalNumberOf(fineElement)*cellBasis->Size(), 0, cellBasis->Size(), cellBasis->Size()) = fineMass.inverse() * fineCoarseMass;
 		}
 
 		return J;

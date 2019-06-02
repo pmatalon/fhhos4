@@ -81,6 +81,8 @@ public:
 	virtual vector<double> OuterNormalVector(Face<Dim>* face) = 0;
 	virtual double Integral(BasisFunction<Dim>* phi) = 0;
 	virtual double IntegralGlobalFunction(function<double(DomPoint)> globalFunction) = 0;
+	virtual double ComputeIntegral(function<double(RefPoint)> func, int numberOfDerivatives) = 0;
+	virtual double ComputeIntegral(function<double(RefPoint)> func, int numberOfDerivatives, int polynomialDegree) = 0;
 	virtual double L2ErrorPow2(function<double(RefPoint)> approximate, function<double(DomPoint)> exactSolution) = 0;
 	virtual double DiffusionCoefficient(DiffusionPartition diffusionPartition) = 0;
 	virtual vector<RefPoint> GetNodalPoints(FunctionalBasis<Dim>* basis) = 0;
