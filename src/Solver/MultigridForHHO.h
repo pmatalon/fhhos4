@@ -90,12 +90,13 @@ private:
 		Poisson_HHO<Dim>* finePb = this->_problem;
 		Poisson_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
 
-		//Eigen::SparseMatrix<double> Pi_c = GetGlobalProjectorMatrixFromCellsToFaces(coarsePb); // to be removed later
 		Eigen::SparseMatrix<double> I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
-		/*Eigen::SparseMatrix<double> invM_cells = GetInverseGlobalMassMatrix_Cells(coarsePb);
+		//Eigen::SparseMatrix<double> Pi_c = GetGlobalProjectorMatrixFromCellsToFaces(coarsePb); // to be removed later
+		//Eigen::SparseMatrix<double> invM_cells = GetInverseGlobalMassMatrix_Cells(coarsePb);
+		/*Eigen::SparseMatrix<double> invM_faces = GetInverseGlobalMassMatrix_Faces(coarsePb);
 		Eigen::SparseMatrix<double> M_faces = GetGlobalMassMatrix_Faces(coarsePb);
-		Eigen::SparseMatrix<double> I_c = invM_cells * Pi_c.transpose() * M_faces;*/
-		//Eigen::SparseMatrix<double> M_faces_f = GetGlobalMassMatrix_Faces(finePb); // to be removed later
+		Eigen::SparseMatrix<double> I_c = invM_faces * Pi_c.transpose() * M_faces;
+		//Eigen::SparseMatrix<double> M_faces_f = GetGlobalMassMatrix_Faces(finePb); // to be removed later */
 		//finePb->ExportMatrix(M_faces_f, "M_faces_f"); // to be removed later
 
 		Eigen::SparseMatrix<double> J_f_c = GetGlobalCanonicalInjectionMatrixCoarseToFine();
@@ -120,8 +121,6 @@ private:
 		Eigen::SparseMatrix<double> invM_c = GetInverseGlobalMassMatrix_Faces(coarsePb); // Coarse mass matrix
 		Eigen::SparseMatrix<double> M_f = GetGlobalMassMatrix_Faces(finePb); // Fine mass matrix
 
-		//finePb->ExportMatrix(M_f, "level_" + to_string(this->Number) + "_M_f");
-
 		R = invM_c * P.transpose() * M_f;
 
 		finePb->ExportMatrix(R, "R");
@@ -129,7 +128,7 @@ private:
 
 	inline double Weight(Element<Dim>* element, Face<Dim>* face)
 	{
-		return 0.5;//element->Measure() / element->FrontierMeasure();
+		return element->Measure() / (face->Element1->Measure() + face->Element2->Measure());
 	}
 
 	Eigen::SparseMatrix<double> GetGlobalMassMatrix_Faces(Poisson_HHO<Dim>* problem)
@@ -223,6 +222,11 @@ private:
 	}
 
 	Eigen::SparseMatrix<double> GetGlobalInterpolationMatrixFromFacesToCells(Poisson_HHO<Dim>* problem)
+	{
+		return GetAdjointToGlobalProjUsingCellInnerProduct(problem);
+	}
+
+	Eigen::SparseMatrix<double> GetAdjointToGlobalProjUsingCellInnerProduct(Poisson_HHO<Dim>* problem)
 	{
 		int nCellUnknowns = problem->HHO.nLocalCellUnknowns;
 		int nFaceUnknowns = problem->HHO.nLocalFaceUnknowns;
