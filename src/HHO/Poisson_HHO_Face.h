@@ -88,7 +88,7 @@ public:
 		};
 
 		int polynomialDegree = facePhi->GetDegree() + reconstructPhi->GetDegree();
-		return this->ComputeIntegral(functionToIntegrate, 0, polynomialDegree);
+		return this->ComputeIntegral(functionToIntegrate, polynomialDegree);
 	}
 
 	Eigen::MatrixXd GetMassCellFace(Element<Dim>* element)

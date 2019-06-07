@@ -226,6 +226,15 @@ public:
 		return innerProduct;
 	}
 
+	template <int Dim>
+	static vector<double> Multiply(vector<double> coefficients, vector<double> v)
+	{
+		vector<double> result(Dim);
+		for (int i = 0; i < Dim; i++)
+			result[i] = coefficients[i] * v[i];
+		return result;
+	}
+
 	static string MatrixInfo(const Eigen::SparseMatrix<double>& M, string name)
 	{
 		double density = (double)M.nonZeros() / (M.rows() * M.cols()) * 100;

@@ -41,7 +41,7 @@ public:
 		};
 
 		int polynomialDegree = p_phi1->GetDegree() + p_phi2->GetDegree() - 1;
-		double integralJump1ScalarJump2 = this->ComputeIntegral(functionToIntegrate, 1, polynomialDegree);
+		double integralJump1ScalarJump2 = this->ComputeIntegral(functionToIntegrate, polynomialDegree);
 	}
 
 	virtual double PenalizationTerm(Element<Dim>* element1, BasisFunction<Dim>* p_phi1, Element<Dim>* element2, BasisFunction<Dim>* p_phi2, double penalizationCoefficient, DiffusionPartition diffusionPartition)
@@ -57,7 +57,7 @@ public:
 		};
 
 		int polynomialDegree = p_phi1->GetDegree() + p_phi2->GetDegree();
-		double integralJump1ScalarJump2 = this->ComputeIntegral(functionToIntegrate, 0, polynomialDegree);
+		double integralJump1ScalarJump2 = this->ComputeIntegral(functionToIntegrate, polynomialDegree);
 
 		double diffusionDependantCoefficient = element1->DiffusionCoefficient(diffusionPartition);
 		if (!this->IsDomainBoundary)

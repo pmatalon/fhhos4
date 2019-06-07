@@ -48,8 +48,8 @@ public:
 	virtual double GetDiameter() = 0;
 	virtual double Measure() = 0;
 	virtual DomPoint ConvertToDomain(RefPoint refPoint) = 0;
-	virtual double ComputeIntegral(function<double(RefPoint)> func, int numberOfDerivatives) = 0;
-	virtual double ComputeIntegral(function<double(RefPoint)> func, int numberOfDerivatives, int polynomialDegree) = 0;
+	virtual double ComputeIntegral(function<double(RefPoint)> func) = 0;
+	virtual double ComputeIntegral(function<double(RefPoint)> func, int polynomialDegree) = 0;
 	
 	virtual string ToString()
 	{

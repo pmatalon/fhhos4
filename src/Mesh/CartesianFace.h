@@ -20,7 +20,7 @@ public:
 
 	double GetDiameter()
 	{
-		return CartesianShape<Dim, Dim - 1>::Width;
+		return max({ CartesianShape<Dim, Dim - 1>::WidthX, CartesianShape<Dim, Dim - 1>::WidthY, CartesianShape<Dim, Dim - 1>::WidthZ });
 	}
 
 	double Measure()
@@ -37,13 +37,13 @@ public:
 		return CartesianShape<Dim, Dim - 1>::ConvertToDomain(referenceElementPoint);
 	}
 
-	double ComputeIntegral(function<double(RefPoint)> func, int numberOfDerivatives)
+	double ComputeIntegral(function<double(RefPoint)> func)
 	{
-		return CartesianShape<Dim, Dim - 1>::ComputeIntegral(func, numberOfDerivatives);
+		return CartesianShape<Dim, Dim - 1>::ComputeIntegral(func);
 	}
-	double ComputeIntegral(function<double(RefPoint)> func, int numberOfDerivatives, int polynomialDegree)
+	double ComputeIntegral(function<double(RefPoint)> func, int polynomialDegree)
 	{
-		return CartesianShape<Dim, Dim - 1>::ComputeIntegral(func, numberOfDerivatives, polynomialDegree);
+		return CartesianShape<Dim, Dim - 1>::ComputeIntegral(func, polynomialDegree);
 	}
 
 	//----------------------------------------------------------------//

@@ -16,25 +16,104 @@ class CartesianShape
 {
 public:
 	DomPoint Origin;
-	double Width;
-	CartesianShapeOrientation Orientation;
+	double WidthX = 0;
+	double WidthY = 0;
+	double WidthZ = 0;
+	CartesianShapeOrientation Orientation = CartesianShapeOrientation::None;
 
 	static ReferenceCartesianShape<ShapeDim> ReferenceShape;
 
-	CartesianShape(DomPoint origin, double width) : 
-		CartesianShape(origin, width, CartesianShapeOrientation::None)
-	{}
+	CartesianShape(DomPoint origin, double width)
+	{
+		this->Origin = origin;
+		this->WidthX = ShapeDim >= 1 ? width : 0;
+		this->WidthY = ShapeDim >= 2 ? width : 0;
+		this->WidthZ = ShapeDim >= 3 ? width : 0;
+		this->Orientation = CartesianShapeOrientation::None;
+	}
+
+	CartesianShape(DomPoint origin, double widthX, double widthY)
+	{
+		assert(DomainDim == 2 && ShapeDim == 2);
+		this->Origin = origin;
+		this->WidthX = widthX;
+		this->WidthY = widthY;
+		this->Orientation = CartesianShapeOrientation::None;
+	}
+
+	CartesianShape(DomPoint origin, double widthX, double widthY, double widthZ)
+	{
+		assert(DomainDim == 3 && ShapeDim == 3);
+		this->Origin = origin;
+		this->WidthX = widthX;
+		this->WidthY = widthY;
+		this->WidthZ = widthZ;
+		this->Orientation = CartesianShapeOrientation::None;
+	}
 
 	CartesianShape(DomPoint origin, double width, CartesianShapeOrientation orientation)
 	{
+		assert(ShapeDim == DomainDim - 1);
 		this->Origin = origin;
-		this->Width = width;
+		if (DomainDim == 2)
+		{
+			if (orientation == CartesianShapeOrientation::Horizontal)
+				this->WidthX = width;
+			else if (orientation == CartesianShapeOrientation::Vertical)
+				this->WidthY = width;
+			else
+				assert(false);
+		}
+		else if (DomainDim == 3)
+		{
+			if (orientation == CartesianShapeOrientation::InXOY)
+			{
+				this->WidthX = width;
+				this->WidthY = width;
+			}
+			else if (orientation == CartesianShapeOrientation::InXOZ)
+			{
+				this->WidthX = width;
+				this->WidthZ = width;
+			}
+			else if (orientation == CartesianShapeOrientation::InYOZ)
+			{
+				this->WidthY = width;
+				this->WidthZ = width;
+			}
+			else
+				assert(false);
+		}
+		this->Orientation = orientation;
+	}
+
+	CartesianShape(DomPoint origin, double width1, double width2, CartesianShapeOrientation orientation)
+	{
+		assert(DomainDim == 3 && ShapeDim == DomainDim - 1);
+		this->Origin = origin;
+		if (orientation == CartesianShapeOrientation::InXOY)
+		{
+			this->WidthX = width1;
+			this->WidthY = width2;
+		}
+		else if (orientation == CartesianShapeOrientation::InXOZ)
+		{
+			this->WidthX = width1;
+			this->WidthZ = width2;
+		}
+		else if (orientation == CartesianShapeOrientation::InYOZ)
+		{
+			this->WidthY = width1;
+			this->WidthZ = width2;
+		}
+		else
+			assert(false);
 		this->Orientation = orientation;
 	}
 
 	double Measure()
 	{
-		return pow(this->Width, ShapeDim);
+		return (this->WidthX != 0 ? this->WidthX : 1) * (this->WidthY != 0 ? this->WidthY : 1) * (this->WidthZ != 0 ? this->WidthZ : 1);
 	}
 
 	double IntegralGlobalFunction(function<double(DomPoint)> func)
@@ -42,27 +121,27 @@ public:
 		if (ShapeDim == 1)
 		{
 			double x1 = this->Origin.X;
-			double x2 = this->Origin.X + this->Width;
+			double x2 = this->Origin.X + this->WidthX;
 
 			return Utils::Integral(func, x1, x2);
 		}
 		else if (ShapeDim == 2)
 		{
 			double x1 = this->Origin.X;
-			double x2 = this->Origin.X + this->Width;
+			double x2 = this->Origin.X + this->WidthX;
 			double y1 = this->Origin.Y;
-			double y2 = this->Origin.Y + this->Width;
+			double y2 = this->Origin.Y + this->WidthY;
 
 			return Utils::Integral(func, x1, x2, y1, y2);
 		}
 		else if (ShapeDim == 3)
 		{
 			double x1 = this->Origin.X;
-			double x2 = this->Origin.X + this->Width;
+			double x2 = this->Origin.X + this->WidthX;
 			double y1 = this->Origin.Y;
-			double y2 = this->Origin.Y + this->Width;
+			double y2 = this->Origin.Y + this->WidthY;
 			double z1 = this->Origin.Z;
-			double z2 = this->Origin.Z + this->Width;
+			double z2 = this->Origin.Z + this->WidthZ;
 
 			return Utils::Integral(func, x1, x2, y1, y2, z1, z2);
 		}
@@ -72,19 +151,19 @@ public:
 
 	double Integral(BasisFunction<ShapeDim>* phi)
 	{
-		return Rescale(ReferenceShape.ComputeIntegral(phi), 0);
+		return Rescale(ReferenceShape.ComputeIntegral(phi));
 	}
 
-	double ComputeIntegral(function<double(RefPoint)> func, int numberOfDerivatives)
+	double ComputeIntegral(function<double(RefPoint)> func)
 	{
 		double integralOnReferenceShape = ReferenceShape.ComputeIntegral(func);
-		return Rescale(integralOnReferenceShape, numberOfDerivatives);
+		return Rescale(integralOnReferenceShape);
 	}
 
-	double ComputeIntegral(function<double(RefPoint)> func, int numberOfDerivatives, int polynomialDegree)
+	double ComputeIntegral(function<double(RefPoint)> func, int polynomialDegree)
 	{
 		double integralOnReferenceShape = ReferenceShape.ComputeIntegral(func, polynomialDegree);
-		return Rescale(integralOnReferenceShape, numberOfDerivatives);
+		return Rescale(integralOnReferenceShape);
 	}
 
 	//--------//
@@ -140,36 +219,44 @@ public:
 	}
 
 private:
-	Eigen::MatrixXd Rescale(const Eigen::MatrixXd& matrixOnReferenceElement, int numberOfDerivatives)
+	Eigen::MatrixXd Rescale(const Eigen::MatrixXd& matrixOnReferenceElement)
 	{
-		double h = this->Width;
-		return pow(h / 2, ShapeDim - numberOfDerivatives) * matrixOnReferenceElement;
+		double rescalingCoeff = this->Measure() / pow(2, ShapeDim);
+		return rescalingCoeff * matrixOnReferenceElement;
 	}
 
-	double Rescale(double termOnReferenceElement, int numberOfDerivatives)
+	double Rescale(double termOnReferenceElement)
 	{
-		double h = this->Width;
-		return pow(h / 2, ShapeDim - numberOfDerivatives) * termOnReferenceElement;
+		double rescalingCoeff = this->Measure() / pow(2, ShapeDim);
+		return rescalingCoeff * termOnReferenceElement;
 	}
 
 	Eigen::MatrixXd RescaleMass(const Eigen::MatrixXd& massMatrixOnReferenceElement)
 	{
-		return Rescale(massMatrixOnReferenceElement, 0);
+		return Rescale(massMatrixOnReferenceElement);
 	}
 
 	double RescaleMass(double massTermOnReferenceElement)
 	{
-		return Rescale(massTermOnReferenceElement, 0);
+		return Rescale(massTermOnReferenceElement);
 	}
 
 	Eigen::MatrixXd RescaleStiffness(const Eigen::MatrixXd& stiffnessMatrixOnReferenceElement)
 	{
-		return Rescale(stiffnessMatrixOnReferenceElement, 2);
+		vector<double> gradTransfo = GradTransformation();
+		double product = 1;
+		for (int i = 0; i < ShapeDim; i++)
+			product *= gradTransfo[i];
+		return product * Rescale(stiffnessMatrixOnReferenceElement);
 	}
 
 	double RescaleStiffness(double stiffnessTermOnReferenceElement)
 	{
-		return Rescale(stiffnessTermOnReferenceElement, 2);
+		vector<double> gradTransfo = GradTransformation();
+		double product = 1;
+		for (int i = 0; i < ShapeDim; i++)
+			product *= gradTransfo[i];
+		return product * Rescale(stiffnessTermOnReferenceElement);
 	}
 
 public:
@@ -179,11 +266,11 @@ public:
 		if (ShapeDim == DomainDim)
 		{
 			double x1 = this->Origin.X;
-			double x2 = this->Origin.X + this->Width;
+			double x2 = this->Origin.X + this->WidthX;
 			double y1 = this->Origin.Y;
-			double y2 = this->Origin.Y + this->Width;
+			double y2 = this->Origin.Y + this->WidthY;
 			double z1 = this->Origin.Z;
-			double z2 = this->Origin.Z + this->Width;
+			double z2 = this->Origin.Z + this->WidthZ;
 
 			double t = referenceElementPoint.X;
 			double u = referenceElementPoint.Y;
@@ -201,17 +288,21 @@ public:
 			double x1 = this->Origin.X;
 			double y1 = this->Origin.Y;
 
-			double x2 = x1 + this->Width;
+			double x2 = x1 + this->WidthX;
 			double y2 = y1;
 			if (this->Orientation == CartesianShapeOrientation::Vertical)
 			{
 				x2 = x1;
-				y2 = y1 + this->Width;
+				y2 = y1 + this->WidthY;
 			}
 
 			double t = referenceElementPoint.X;
 			p.X = (x2 - x1) / 2 * t + (x2 + x1) / 2;
 			p.Y = (y2 - y1) / 2 * t + (y2 + y1) / 2;
+		}
+		else if (ShapeDim == 2 && DomainDim == 3)
+		{
+			assert(false && "ConvertToDomain: 3D case to be implemented!");
 		}
 		else
 			assert(false);
@@ -224,11 +315,11 @@ public:
 		if (ShapeDim == DomainDim)
 		{
 			double x1 = this->Origin.X;
-			double x2 = this->Origin.X + this->Width;
+			double x2 = this->Origin.X + this->WidthX;
 			double y1 = this->Origin.Y;
-			double y2 = this->Origin.Y + this->Width;
+			double y2 = this->Origin.Y + this->WidthY;
 			double z1 = this->Origin.Z;
-			double z2 = this->Origin.Z + this->Width;
+			double z2 = this->Origin.Z + this->WidthZ;
 
 			double x = domainPoint.X;
 			double y = domainPoint.Y;
@@ -243,18 +334,53 @@ public:
 		}
 		else if (ShapeDim == 1 && DomainDim == 2)
 		{
-			double x1 = this->Origin.X;
-			double x2 = x1 + this->Width;
+			/*double x1 = this->Origin.X;
+			double x2 = x1 + this->WidthX;
 			if (this->Orientation == CartesianShapeOrientation::Vertical)
 				x2 = x1;
 
 			double x = domainPoint.X;
 
-			refPoint.X = 2 / (x2 - x1) * x - (x2 + x1) / (x2 - x1);
+			refPoint.X = 2 / (x2 - x1) * x - (x2 + x1) / (x2 - x1);*/
+			assert(false);
+		}
+		else if (ShapeDim == 2 && DomainDim == 3)
+		{
+			assert(false && "ConvertToReference: 3D case to be implemented!");
 		}
 		else
 			assert(false);
 		return refPoint;
+	}
+
+	vector<double> GradTransformation()
+	{
+		vector<double> gradTransfo(ShapeDim);
+		if (ShapeDim == DomainDim)
+		{
+			if (ShapeDim >= 1)
+				gradTransfo[0] = 2 / this->WidthX;
+			if (ShapeDim >= 2)
+				gradTransfo[1] = 2 / this->WidthY;
+			if (ShapeDim == 3)
+				gradTransfo[2] = 2 / this->WidthZ;
+		}
+		else if (ShapeDim == 1 && DomainDim == 2)
+		{
+			if (this->Orientation == CartesianShapeOrientation::Horizontal)
+				gradTransfo[0] = 2 / this->WidthX;
+			else if (this->Orientation == CartesianShapeOrientation::Vertical)
+				gradTransfo[0] = 2 / this->WidthY;
+			else
+				assert(false);
+		}
+		else if (ShapeDim == 2 && DomainDim == 3)
+		{
+			assert(false && "GradTransformation: 3D case to be implemented!");
+		}
+		else
+			assert(false);
+		return gradTransfo;
 	}
 
 	vector<RefPoint> GetNodalPoints(FunctionalBasis<ShapeDim>* basis)

@@ -87,7 +87,7 @@ public:
 					};
 					
 					int polynomialDegree = finePhi->GetDegree() + coarsePhi->GetDegree();
-					double integral = fineElement->ComputeIntegral(functionToIntegrate, 0, polynomialDegree);
+					double integral = fineElement->ComputeIntegral(functionToIntegrate, polynomialDegree);
 					fineCoarseMass(finePhi->LocalNumber, coarsePhi->LocalNumber) = integral;
 				}
 			}
@@ -319,7 +319,7 @@ private:
 			};
 
 			int polynomialDegree = reconstructPhi->GetDegree() - 1 + cellPhi->GetDegree();
-			double integralFace = face->ComputeIntegral(functionToIntegrate, 1, polynomialDegree);
+			double integralFace = face->ComputeIntegral(functionToIntegrate, polynomialDegree);
 
 			sumFaces += integralFace;
 		}
@@ -340,7 +340,7 @@ private:
 		};
 
 		int polynomialDegree = reconstructPhi->GetDegree() - 1 + facePhi->GetDegree();
-		return face->ComputeIntegral(functionToIntegrate, 1, polynomialDegree);
+		return face->ComputeIntegral(functionToIntegrate, polynomialDegree);
 	}
 
 	double Lt(BasisFunction<Dim>* phi)

@@ -51,12 +51,12 @@ public:
 		return vector<RefPoint> {RefPoint(0)};
 	}
 
-	double ComputeIntegral(function<double(RefPoint)> func, int numberOfDerivatives, int polynomialDegree)
+	double ComputeIntegral(function<double(RefPoint)> func, int polynomialDegree)
 	{
 		assert(false);
 	}
 
-	double ComputeIntegral(function<double(RefPoint)> func, int numberOfDerivatives)
+	double ComputeIntegral(function<double(RefPoint)> func)
 	{
 		assert(false);
 	}
@@ -113,7 +113,7 @@ public:
 	double MeanDerivative(Interval* element, IBasisFunction1D* phi)
 	{
 		double t = this == element->Left ? -1 : 1; // t in [-1, 1]
-		double h = element->Width;
+		double h = element->WidthX;
 		return 2 / h * phi->EvalDerivative(t);
 	}
 

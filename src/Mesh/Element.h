@@ -47,9 +47,9 @@ public:
 		return this->_facesLocalNumbering[face];
 	}
 
-	virtual function<double(Point)> EvalPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* phi)
+	virtual function<double(RefPoint)> EvalPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* phi)
 	{
-		function<double(Point)> evalOnFace = [this, face, phi](RefPoint refPoint1D) {
+		function<double(RefPoint)> evalOnFace = [this, face, phi](RefPoint refPoint1D) {
 			DomPoint domainPoint2D = face->ConvertToDomain(refPoint1D);
 			RefPoint refPoint2D = this->ConvertToReference(domainPoint2D);
 			return phi->Eval(refPoint2D);
@@ -57,12 +57,14 @@ public:
 		return evalOnFace;
 	}
 
-	virtual function<vector<double>(Point)> GradPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* phi)
+	virtual function<vector<double>(RefPoint)> GradPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* phi)
 	{
-		function<vector<double>(Point)> gradOnFace = [this, face, phi](RefPoint refPoint1D) {
+		function<vector<double>(RefPoint)> gradOnFace = [this, face, phi](RefPoint refPoint1D) {
 			DomPoint domainPoint2D = face->ConvertToDomain(refPoint1D);
 			RefPoint refPoint2D = this->ConvertToReference(domainPoint2D);
-			return phi->Grad(refPoint2D);
+			vector<double> gradPhi = phi->Grad(refPoint2D);
+			vector<double> gradTransfo = this->GradTransformation();
+			return Utils::Multiply<Dim>(gradTransfo, gradPhi);
 		};
 		return gradOnFace;
 	}
@@ -78,11 +80,12 @@ public:
 	virtual double Measure() = 0;
 	virtual DomPoint ConvertToDomain(RefPoint refPoint) = 0;
 	virtual RefPoint ConvertToReference(DomPoint domainPoint) = 0;
+	virtual vector<double> GradTransformation() = 0;
 	virtual vector<double> OuterNormalVector(Face<Dim>* face) = 0;
 	virtual double Integral(BasisFunction<Dim>* phi) = 0;
 	virtual double IntegralGlobalFunction(function<double(DomPoint)> globalFunction) = 0;
-	virtual double ComputeIntegral(function<double(RefPoint)> func, int numberOfDerivatives) = 0;
-	virtual double ComputeIntegral(function<double(RefPoint)> func, int numberOfDerivatives, int polynomialDegree) = 0;
+	virtual double ComputeIntegral(function<double(RefPoint)> func) = 0;
+	virtual double ComputeIntegral(function<double(RefPoint)> func, int polynomialDegree) = 0;
 	virtual double L2ErrorPow2(function<double(RefPoint)> approximate, function<double(DomPoint)> exactSolution) = 0;
 	virtual double DiffusionCoefficient(DiffusionPartition diffusionPartition) = 0;
 	virtual vector<RefPoint> GetNodalPoints(FunctionalBasis<Dim>* basis) = 0;

@@ -16,7 +16,7 @@ public:
 
 	double GetDiameter() override
 	{
-		return CartesianShape<Dim>::Width;
+		return max({ CartesianShape<Dim>::WidthX, CartesianShape<Dim>::WidthY, CartesianShape<Dim>::WidthZ });
 	}
 
 	double Measure()
@@ -40,14 +40,14 @@ public:
 		return CartesianShape<Dim>::Integral(phi);
 	}
 
-	double ComputeIntegral(function<double(RefPoint)> func, int numberOfDerivatives)
+	double ComputeIntegral(function<double(RefPoint)> func)
 	{
-		return CartesianShape<Dim>::ComputeIntegral(func, numberOfDerivatives);
+		return CartesianShape<Dim>::ComputeIntegral(func);
 	}
 
-	double ComputeIntegral(function<double(RefPoint)> func, int numberOfDerivatives, int polynomialDegree)
+	double ComputeIntegral(function<double(RefPoint)> func, int polynomialDegree)
 	{
-		return CartesianShape<Dim>::ComputeIntegral(func, numberOfDerivatives, polynomialDegree);
+		return CartesianShape<Dim>::ComputeIntegral(func, polynomialDegree);
 	}
 
 	double ComputeIntegralGradGrad(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
@@ -63,6 +63,11 @@ public:
 	RefPoint ConvertToReference(DomPoint domainPoint)
 	{
 		return CartesianShape<Dim>::ConvertToReference(domainPoint);
+	}
+
+	vector<double> GradTransformation()
+	{
+		return CartesianShape<Dim>::GradTransformation();
 	}
 
 	vector<RefPoint> GetNodalPoints(FunctionalBasis<Dim>* basis)
