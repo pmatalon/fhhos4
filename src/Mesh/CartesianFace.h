@@ -25,7 +25,7 @@ public:
 
 	double Measure()
 	{
-		return CartesianShape<Dim, Dim - 1>::Measure();
+		return CartesianShape<Dim, Dim - 1>::Measure;
 	}
 
 	RefPoint ConvertToReference(DomPoint domainPoint)

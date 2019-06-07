@@ -20,41 +20,46 @@ public:
 	double WidthY = 0;
 	double WidthZ = 0;
 	CartesianShapeOrientation Orientation = CartesianShapeOrientation::None;
+	double Measure;
+	bool IsRegular; // true if all widths are equal
 
 	static ReferenceCartesianShape<ShapeDim> ReferenceShape;
 
+	//------------------//
+	//   Constructors   //
+	//------------------//
+
 	CartesianShape(DomPoint origin, double width)
 	{
-		this->Origin = origin;
 		this->WidthX = ShapeDim >= 1 ? width : 0;
 		this->WidthY = ShapeDim >= 2 ? width : 0;
 		this->WidthZ = ShapeDim >= 3 ? width : 0;
-		this->Orientation = CartesianShapeOrientation::None;
+		this->IsRegular = true;
+		Init(origin, CartesianShapeOrientation::None);
 	}
 
 	CartesianShape(DomPoint origin, double widthX, double widthY)
 	{
 		assert(DomainDim == 2 && ShapeDim == 2);
-		this->Origin = origin;
 		this->WidthX = widthX;
 		this->WidthY = widthY;
-		this->Orientation = CartesianShapeOrientation::None;
+		this->IsRegular = false;
+		Init(origin, CartesianShapeOrientation::None);
 	}
 
 	CartesianShape(DomPoint origin, double widthX, double widthY, double widthZ)
 	{
 		assert(DomainDim == 3 && ShapeDim == 3);
-		this->Origin = origin;
 		this->WidthX = widthX;
 		this->WidthY = widthY;
 		this->WidthZ = widthZ;
-		this->Orientation = CartesianShapeOrientation::None;
+		this->IsRegular = false;
+		Init(origin, CartesianShapeOrientation::None);
 	}
 
 	CartesianShape(DomPoint origin, double width, CartesianShapeOrientation orientation)
 	{
 		assert(ShapeDim == DomainDim - 1);
-		this->Origin = origin;
 		if (DomainDim == 2)
 		{
 			if (orientation == CartesianShapeOrientation::Horizontal)
@@ -84,13 +89,13 @@ public:
 			else
 				assert(false);
 		}
-		this->Orientation = orientation;
+		this->IsRegular = true;
+		Init(origin, orientation);
 	}
 
 	CartesianShape(DomPoint origin, double width1, double width2, CartesianShapeOrientation orientation)
 	{
 		assert(DomainDim == 3 && ShapeDim == DomainDim - 1);
-		this->Origin = origin;
 		if (orientation == CartesianShapeOrientation::InXOY)
 		{
 			this->WidthX = width1;
@@ -108,13 +113,20 @@ public:
 		}
 		else
 			assert(false);
-		this->Orientation = orientation;
+		this->IsRegular = false;
+		Init(origin, orientation);
 	}
 
-	double Measure()
+	inline void Init(DomPoint origin, CartesianShapeOrientation orientation)
 	{
-		return (this->WidthX != 0 ? this->WidthX : 1) * (this->WidthY != 0 ? this->WidthY : 1) * (this->WidthZ != 0 ? this->WidthZ : 1);
+		this->Origin = origin;
+		this->Orientation = orientation;
+		this->Measure = (this->WidthX != 0 ? this->WidthX : 1) * (this->WidthY != 0 ? this->WidthY : 1) * (this->WidthZ != 0 ? this->WidthZ : 1);
 	}
+
+	//---------------//
+	//   Integrals   //
+	//---------------//
 
 	double IntegralGlobalFunction(function<double(DomPoint)> func)
 	{
@@ -151,19 +163,36 @@ public:
 
 	double Integral(BasisFunction<ShapeDim>* phi)
 	{
-		return Rescale(ReferenceShape.ComputeIntegral(phi));
+		return RescalingCoeff() * ReferenceShape.ComputeIntegral(phi);
 	}
 
 	double ComputeIntegral(function<double(RefPoint)> func)
 	{
 		double integralOnReferenceShape = ReferenceShape.ComputeIntegral(func);
-		return Rescale(integralOnReferenceShape);
+		return RescalingCoeff() * integralOnReferenceShape;
 	}
 
 	double ComputeIntegral(function<double(RefPoint)> func, int polynomialDegree)
 	{
 		double integralOnReferenceShape = ReferenceShape.ComputeIntegral(func, polynomialDegree);
-		return Rescale(integralOnReferenceShape);
+		return RescalingCoeff() * integralOnReferenceShape;
+	}
+
+	double ComputeIntegralGradGrad(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
+	{
+		if (phi1->GetDegree() == 0 || phi1->GetDegree() == 0)
+			return 0;
+
+		vector<double> gradTransfo = GradTransformation();
+
+		function<double(RefPoint)> functionToIntegrate = [phi1, phi2, gradTransfo](RefPoint p) {
+			vector<double> gradPhi1 = Utils::Multiply<ShapeDim>(gradTransfo, phi1->Grad(p));
+			vector<double> gradPhi2 = Utils::Multiply<ShapeDim>(gradTransfo, phi2->Grad(p));
+			return Element<ShapeDim>::InnerProduct(gradPhi1, gradPhi2);
+		};
+
+		int polynomialDegree = max(0, phi1->GetDegree() + phi2->GetDegree() - 2);
+		return ComputeIntegral(functionToIntegrate, polynomialDegree);
 	}
 
 	//--------//
@@ -172,15 +201,18 @@ public:
 
 	double MassTerm(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
 	{
-		return RescaleMass(ReferenceShape.MassTerm(phi1, phi2));
+		return RescalingCoeff() * ReferenceShape.MassTerm(phi1, phi2);
 	}
 
 	double StiffnessTerm(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
 	{
-		if (phi1->GetDegree() == 0 || phi1->GetDegree() == 0)
-			return 0;
-
-		return RescaleStiffness(ReferenceShape.StiffnessTerm(phi1, phi2));
+		if (this->IsRegular)
+		{
+			vector<double> gradTransfo = GradTransformation();
+			return RescalingCoeff() * pow(gradTransfo[0], 2) * ReferenceShape.StiffnessTerm(phi1, phi2);
+		}
+		else
+			return ComputeIntegralGradGrad(phi1, phi2);
 	}
 
 	//---------//
@@ -189,74 +221,34 @@ public:
 
 	Eigen::MatrixXd FaceMassMatrix(FunctionalBasis<ShapeDim>* basis)
 	{
-		return RescaleMass(ReferenceShape.FaceMassMatrix(basis));
+		return RescalingCoeff() * ReferenceShape.FaceMassMatrix(basis);
 	}
 
 	Eigen::MatrixXd CellMassMatrix(FunctionalBasis<ShapeDim>* basis)
 	{
-		return RescaleMass(ReferenceShape.CellMassMatrix(basis));
+		return RescalingCoeff() * ReferenceShape.CellMassMatrix(basis);
 	}
 
 	Eigen::MatrixXd CellReconstructMassMatrix(FunctionalBasis<ShapeDim>* cellBasis, FunctionalBasis<ShapeDim>* reconstructBasis)
 	{
-		return RescaleMass(ReferenceShape.CellReconstructMassMatrix(cellBasis, reconstructBasis));
+		return RescalingCoeff() * ReferenceShape.CellReconstructMassMatrix(cellBasis, reconstructBasis);
 	}
 
 	double IntegralGradGradReconstruct(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
 	{
-		if (phi1->GetDegree() == 0 || phi1->GetDegree() == 0)
-			return 0;
-
-		return RescaleStiffness(ReferenceShape.ReconstructStiffnessTerm(phi1, phi2));
-	}
-
-	double ComputeIntegralGradGrad(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
-	{
-		if (phi1->GetDegree() == 0 || phi1->GetDegree() == 0)
-			return 0;
-
-		return RescaleStiffness(ReferenceShape.ComputeIntegralGradGrad(phi1, phi2));
+		if (this->IsRegular)
+		{
+			vector<double> gradTransfo = GradTransformation();
+			return RescalingCoeff() * pow(gradTransfo[0], 2) * ReferenceShape.ReconstructStiffnessTerm(phi1, phi2);
+		}
+		else
+			return ComputeIntegralGradGrad(phi1, phi2);
 	}
 
 private:
-	Eigen::MatrixXd Rescale(const Eigen::MatrixXd& matrixOnReferenceElement)
+	inline double RescalingCoeff()
 	{
-		double rescalingCoeff = this->Measure() / pow(2, ShapeDim);
-		return rescalingCoeff * matrixOnReferenceElement;
-	}
-
-	double Rescale(double termOnReferenceElement)
-	{
-		double rescalingCoeff = this->Measure() / pow(2, ShapeDim);
-		return rescalingCoeff * termOnReferenceElement;
-	}
-
-	Eigen::MatrixXd RescaleMass(const Eigen::MatrixXd& massMatrixOnReferenceElement)
-	{
-		return Rescale(massMatrixOnReferenceElement);
-	}
-
-	double RescaleMass(double massTermOnReferenceElement)
-	{
-		return Rescale(massTermOnReferenceElement);
-	}
-
-	Eigen::MatrixXd RescaleStiffness(const Eigen::MatrixXd& stiffnessMatrixOnReferenceElement)
-	{
-		vector<double> gradTransfo = GradTransformation();
-		double product = 1;
-		for (int i = 0; i < ShapeDim; i++)
-			product *= gradTransfo[i];
-		return product * Rescale(stiffnessMatrixOnReferenceElement);
-	}
-
-	double RescaleStiffness(double stiffnessTermOnReferenceElement)
-	{
-		vector<double> gradTransfo = GradTransformation();
-		double product = 1;
-		for (int i = 0; i < ShapeDim; i++)
-			product *= gradTransfo[i];
-		return product * Rescale(stiffnessTermOnReferenceElement);
+		return this->Measure / pow(2, ShapeDim);
 	}
 
 public:

@@ -21,7 +21,7 @@ public:
 
 	double Measure()
 	{
-		return CartesianShape<Dim>::Measure();
+		return CartesianShape<Dim>::Measure;
 	}
 
 	double DiffusionCoefficient(DiffusionPartition diffusionPartition) override
