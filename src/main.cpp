@@ -40,6 +40,10 @@ void print_usage() {
 	cout << "-f                   : full tensorization of the polynomials when d=2 or 3 (i.e. space Q) (default: space P)" << endl;
 	cout << "-z NUM               : penalization coefficient (default: -1 = automatic)" << endl;
 	cout << "-c                   : static condensation (HHO only) (default: no static condensation)" << endl;
+	cout << "-r NUM               : max number of threads used for parallelism (default: 0 = automatic)" << endl;
+	cout << "                                  0     - automatic (default)" << endl;
+	cout << "                                  1     - sequential execution" << endl;
+	cout << "                                  other - requested number of threads" << endl;
 	cout << "-a {e|c|m|s|v}+      : action (default: 'es'): " << endl;
 	cout <<	"                                 'e' = export system" << endl;
 	cout << "                                 'c' = export all components of the matrix in separate files" << endl;
@@ -83,7 +87,7 @@ int main(int argc, char* argv[])
 	string outputDirectory = ".";
 
 	int option = 0;
-	while ((option = getopt(argc, argv, "d:k:s:n:t:b:p:z:a:l:o:hfc")) != -1) 
+	while ((option = getopt(argc, argv, "d:k:s:n:t:b:p:z:a:l:o:r:hfc")) != -1) 
 	{
 		switch (option) 
 		{
@@ -120,6 +124,8 @@ int main(int argc, char* argv[])
 			case 'a': a = optarg;
 				break;
 			case 'l': nMultigridLevels = atoi(optarg);
+				break;
+			case 'r': BaseParallelLoop::SetDefaultNThreads(atoi(optarg));
 				break;
 			case 'o': outputDirectory = optarg;
 				break;

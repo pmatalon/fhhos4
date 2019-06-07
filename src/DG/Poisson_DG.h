@@ -57,7 +57,8 @@ public:
 		for (BasisFunction<Dim>* phi : basis->LocalFunctions)
 			cout << "\t " << phi->ToString() << endl;
 		BigNumber nUnknowns = static_cast<int>(mesh->Elements.size()) * basis->NumberOfLocalFunctionsInElement(NULL);
-		cout << "Unknowns: " << nUnknowns << endl;
+		cout << "Unknowns   : " << nUnknowns << endl;
+		cout << "Parallelism: " << (BaseParallelLoop::GetDefaultNThreads() == 1 ? "sequential execution" : to_string(BaseParallelLoop::GetDefaultNThreads()) + " threads") << endl;
 
 		string kappaString = "";
 		if (this->_diffusionPartition.Kappa1 != 1)

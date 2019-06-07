@@ -34,8 +34,33 @@ public:
 	}
 };
 
+class BaseParallelLoop
+{
+protected:
+	static unsigned int DefaultNThreads;
+
+public:
+	static void SetDefaultNThreads(unsigned int nThreads)
+	{
+		DefaultNThreads = nThreads;
+		if (DefaultNThreads == 0)
+		{
+			DefaultNThreads = std::thread::hardware_concurrency();
+			if (DefaultNThreads == 0)
+			{
+				cout << "Warning: std::thread::hardware_concurrency() returned 0. Falling down to sequential execution.";
+				DefaultNThreads = 1;
+			}
+		}
+	}
+	static unsigned int GetDefaultNThreads()
+	{
+		return DefaultNThreads;
+	}
+};
+
 template <class T, class ResultT = CoeffsChunk>//, typename enable_if<is_base_of<ParallelChunk, ChunkT>::value>::type = ParallelChunk >
-class ParallelLoop
+class ParallelLoop : public BaseParallelLoop
 {
 	//static_assert(std::is_base_of<ParallelChunk, ChunkT>::value, "ChunkT must inherit from ParallelChunk");
 
@@ -46,7 +71,7 @@ public:
 
 	vector<ParallelChunk<ResultT>*> Chunks;
 
-	ParallelLoop(vector<T> list) :ParallelLoop(list, std::thread::hardware_concurrency()) {}
+	ParallelLoop(vector<T> list) :ParallelLoop(list, BaseParallelLoop::DefaultNThreads) {}
 	
 	ParallelLoop(vector<T> list, unsigned int nThreads)
 	{
@@ -54,7 +79,7 @@ public:
 		BigNumber loopSize = list.size();
 		NThreads = nThreads;
 		if (NThreads == 0)
-			NThreads = 1;
+			NThreads = std::thread::hardware_concurrency();
 		if (NThreads > loopSize)
 			NThreads = loopSize;
 
@@ -165,3 +190,5 @@ void ParallelLoop<, CoeffsChunk>::Fill(Eigen::SparseMatrix<double> &m)
 	}
 	global.Fill(m);
 }*/
+
+unsigned int BaseParallelLoop::DefaultNThreads = std::thread::hardware_concurrency();
