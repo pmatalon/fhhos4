@@ -1,6 +1,6 @@
 #pragma once
-#include "Face.h"
-#include "../DG/Poisson_DG_Face.h"
+#include "../Face.h"
+#include "../../DG/Poisson_DG_Face.h"
 #include "Interval.h"
 
 class PointFace : virtual public Face<1>, public Poisson_DG_Face<1>

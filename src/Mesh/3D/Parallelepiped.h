@@ -1,6 +1,5 @@
 #pragma once
-#include "CartesianElement.h"
-
+#include "../CartesianElement.h"
 
 class Parallelepiped : public CartesianElement<3>
 {

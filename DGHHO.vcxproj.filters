@@ -29,18 +29,6 @@
     <ClInclude Include="src/FunctionalBasis/Bernstein3D.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
-    <ClInclude Include="src/Mesh/CartesianGrid1D.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
-    <ClInclude Include="src/Mesh/CartesianGrid2D.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
-    <ClInclude Include="src/Mesh/CartesianGrid3D.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
-    <ClInclude Include="src/Mesh/Cube.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
     <ClInclude Include="src/Mesh/Element.h">
       <Filter>Mesh</Filter>
     </ClInclude>
@@ -55,9 +43,6 @@
     </ClInclude>
     <ClInclude Include="src/Utils/L2.h">
       <Filter>Utils</Filter>
-    </ClInclude>
-    <ClInclude Include="src/Mesh/Interval.h">
-      <Filter>Mesh</Filter>
     </ClInclude>
     <ClInclude Include="src/FunctionalBasis/Legendre1D.h">
       <Filter>FunctionalBasis</Filter>
@@ -83,17 +68,11 @@
     <ClInclude Include="src/FunctionalBasis/TensorPolynomial.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
-    <ClInclude Include="src/Mesh/Square.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
     <ClInclude Include="src/Utils/SourceFunction.h">
       <Filter>Utils</Filter>
     </ClInclude>
     <ClInclude Include="src/Utils/Utils.h">
       <Filter>Utils</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\PointFace.h">
-      <Filter>Mesh</Filter>
     </ClInclude>
     <ClInclude Include="src\Mesh\Mesh.h">
       <Filter>Mesh</Filter>
@@ -149,17 +128,38 @@
     <ClInclude Include="src\Utils\ElementParallelLoop.h">
       <Filter>Utils</Filter>
     </ClInclude>
-    <ClInclude Include="src\Mesh\Rectangle.h">
-      <Filter>Mesh</Filter>
+    <ClInclude Include="src/Mesh/1D/CartesianGrid1D.h">
+      <Filter>Mesh\1D</Filter>
     </ClInclude>
-    <ClInclude Include="src\Mesh\Edge.h">
-      <Filter>Mesh</Filter>
+    <ClInclude Include="src/Mesh/1D/Interval.h">
+      <Filter>Mesh\1D</Filter>
     </ClInclude>
-    <ClInclude Include="src\Mesh\Parallelepiped.h">
-      <Filter>Mesh</Filter>
+    <ClInclude Include="src/Mesh/1D/PointFace.h">
+      <Filter>Mesh\1D</Filter>
     </ClInclude>
-    <ClInclude Include="src\Mesh\RectangularFace.h">
-      <Filter>Mesh</Filter>
+    <ClInclude Include="src/Mesh/2D/CartesianGrid2D.h">
+      <Filter>Mesh\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src/Mesh/2D/Edge.h">
+      <Filter>Mesh\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src/Mesh/2D/Rectangle.h">
+      <Filter>Mesh\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src/Mesh/3D/CartesianGrid3D.h">
+      <Filter>Mesh\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="src/Mesh/3D/Cube.h">
+      <Filter>Mesh\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="src/Mesh/3D/Parallelepiped.h">
+      <Filter>Mesh\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="src/Mesh/3D/RectangularFace.h">
+      <Filter>Mesh\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="src/Mesh/2D/Square.h">
+      <Filter>Mesh\2D</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -180,6 +180,15 @@
     </Filter>
     <Filter Include="Solver">
       <UniqueIdentifier>{8e3314b3-0755-4923-b019-a6fc48fdcffd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Mesh\1D">
+      <UniqueIdentifier>{c0ff87ea-0e06-4982-ab2d-557707270d25}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Mesh\2D">
+      <UniqueIdentifier>{3918712d-145e-4ded-97d0-fe4c46b54614}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Mesh\3D">
+      <UniqueIdentifier>{300cd2ef-6bb5-4fc7-88f5-e9bd50d91391}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

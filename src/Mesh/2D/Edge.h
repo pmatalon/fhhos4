@@ -1,8 +1,5 @@
 #pragma once
-#include "Face.h"
-#include "CartesianFace.h"
-#include "../Utils/Utils.h"
-#include "../DG/Poisson_DG_Face.h"
+#include "../CartesianFace.h"
 
 class Edge : public CartesianFace<2>
 {

@@ -1,7 +1,5 @@
 #pragma once
-#include "Face.h"
-#include "CartesianFace.h"
-#include "../Utils/Utils.h"
+#include "../CartesianFace.h"
 
 class RectangularFace : public CartesianFace<3>
 {

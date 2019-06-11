@@ -1,5 +1,5 @@
 #pragma once
-#include "CartesianElement.h"
+#include "../CartesianElement.h"
 
 class Interval : public CartesianElement<1>
 {
