@@ -218,7 +218,7 @@ public:
 	//---------------//
 
 	template <int Dim>
-	static double InnerProduct(vector<double> vector1, vector<double> vector2)
+	inline static double InnerProduct(vector<double> vector1, vector<double> vector2)
 	{
 		double innerProduct = 0;
 		for (int i = 0; i < Dim; i++)
@@ -227,7 +227,7 @@ public:
 	}
 
 	template <int Dim>
-	static vector<double> Multiply(vector<double> coefficients, vector<double> v)
+	inline static vector<double> Multiply(vector<double> coefficients, vector<double> v)
 	{
 		vector<double> result(Dim);
 		for (int i = 0; i < Dim; i++)

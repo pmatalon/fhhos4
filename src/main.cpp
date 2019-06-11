@@ -22,12 +22,12 @@ void print_usage() {
 	cout << "-h                   : help --> print usage" << endl;
 	cout << "-d {1|2|3}           : space dimension (default: 1)" << endl;
 	cout << "-k NUM               : diffusion coefficient k1 in the first part of the domain partition," << endl;
-	cout << "                       while k2=1 in the second part (default: 1)" << endl;
+	cout << "                       while k2=1 in the second part (default: 1 = homogeneous diffusion)" << endl;
 	cout << "                       (DG only)" << endl;
 	cout << "-s {sine|poly|hetero}: analytical solution (default: 'sine')" << endl;
 	cout << "                                 'sine'   = sine solution" << endl;
 	cout << "                                 'poly'   = polynomial solution of global degree 2*d" << endl;
-	cout << "                                 'hetero' = (1D only) heterogeneous diffusion-specific analytical solution" << endl;
+	cout << "                                 'hetero' = (DG 1D only) heterogeneous diffusion-specific analytical solution" << endl;
 	cout << "-n NUM               : number of subdivisions in each cartesian dimension (default: 5)" << endl;
 	cout << "-t {dg|hho}          : discretization method (default: 'dg')" << endl;
 	cout << "                                 'dg'  = Discontinuous Galerkin (Symmetric Interior Penalty)" << endl;
@@ -36,7 +36,8 @@ void print_usage() {
 	cout << "                                 'monomials'" << endl;
 	cout << "                                 'legendre'" << endl;
 	cout << "                                 'bernstein'" << endl;
-	cout << "-p NUM               : max polynomial degree (default: 2)" << endl;
+	cout << "                                 'hemker'" << endl;
+	cout << "-p NUM               : max polynomial degree of approximation (default: 2)" << endl;
 	cout << "-f                   : full tensorization of the polynomials when d=2 or 3 (i.e. space Q) (default: space P)" << endl;
 	cout << "-z NUM               : penalization coefficient (default: -1 = automatic)" << endl;
 	cout << "-c                   : static condensation (HHO only) (default: no static condensation)" << endl;
@@ -237,7 +238,13 @@ int main(int argc, char* argv[])
 
 	else if (dimension == 2)
 	{
-		Mesh<2>* mesh = new CartesianGrid2D(n);
+		Mesh<2>* mesh = new CartesianGrid2D(n, n);
+		//mesh->BuildCoarserMesh();
+
+		//cout << *mesh << endl << endl;
+
+		//cout << "Coarse mesh" << endl << *(mesh->CoarserMesh) << endl << endl;
+
 		if (solution.compare("sine") == 0)
 		{
 			exactSolution = [](DomPoint p)
@@ -289,12 +296,6 @@ int main(int argc, char* argv[])
 
 			cout << "----------------------- Assembly -------------------------" << endl;
 			problem->Assemble(action);
-
-			/*for (auto f : mesh->Faces)
-			{
-				IntervalFace* face = dynamic_cast<IntervalFace*>(f);
-				cout << *face << endl;
-			}*/
 
 			if ((action & Action::SolveSystem) == Action::SolveSystem)
 			{

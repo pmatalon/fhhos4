@@ -43,7 +43,7 @@ public:
 		assert(DomainDim == 2 && ShapeDim == 2);
 		this->WidthX = widthX;
 		this->WidthY = widthY;
-		this->IsRegular = false;
+		this->IsRegular = (widthX == widthY);
 		Init(origin, CartesianShapeOrientation::None);
 	}
 
@@ -53,7 +53,7 @@ public:
 		this->WidthX = widthX;
 		this->WidthY = widthY;
 		this->WidthZ = widthZ;
-		this->IsRegular = false;
+		this->IsRegular = (widthX == widthY && widthY == widthZ);
 		Init(origin, CartesianShapeOrientation::None);
 	}
 
@@ -122,6 +122,50 @@ public:
 		this->Origin = origin;
 		this->Orientation = orientation;
 		this->Measure = (this->WidthX != 0 ? this->WidthX : 1) * (this->WidthY != 0 ? this->WidthY : 1) * (this->WidthZ != 0 ? this->WidthZ : 1);
+	}
+
+	void Serialize(ostream& os) const
+	{
+		if (ShapeDim == 2)
+			os << (IsRegular ? "square" : "rectangle") << ", ";
+		else if (ShapeDim == 3)
+			os << (IsRegular ? "cube" : "parallelepipede") << ", ";
+		os << "origin = ";
+		Origin.Serialize(os, DomainDim);
+		if (ShapeDim == DomainDim)
+		{
+			if (IsRegular)
+				os << ", width = " << WidthX;
+			else
+			{
+				os << ", widthX = " << WidthX;
+				if (DomainDim >= 2)
+					os << ", widthY = " << WidthY;
+				else if (DomainDim >= 3)
+					os << ", widthZ = " << WidthZ;
+			}
+		}
+		else
+		{
+			if (DomainDim == 1)
+				os << ", width = " << WidthX;
+			else if (DomainDim == 2)
+			{
+				if (WidthX != 0)
+					os << ", widthX = " << WidthX;
+				else
+					os << ", widthY = " << WidthY;
+			}
+			else if (DomainDim == 3)
+			{
+				if (WidthX != 0)
+					os << ", widthX = " << WidthX;
+				else if (WidthY != 0)
+					os << ", widthY = " << WidthY;
+				else if (WidthZ != 0)
+					os << ", widthZ = " << WidthZ;
+			}
+		}
 	}
 
 	//---------------//

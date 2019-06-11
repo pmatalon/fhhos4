@@ -135,6 +135,12 @@ public:
 
 	}
 
+	void BuildCoarserMesh()
+	{
+		cout << "Error: BuildCoarserMesh not implemented!" << endl;
+		exit(EXIT_FAILURE);
+	}
+
 private:
 	BigNumber index(BigNumber ix, BigNumber iy, BigNumber iz)
 	{

@@ -18,6 +18,13 @@ public:
 	//                 Face implementation                //
 	//----------------------------------------------------//
 
+	void Serialize(ostream& os) const override
+	{
+		Face<Dim>::Serialize(os);
+		os << ": ";
+		CartesianShape<Dim, Dim - 1>::Serialize(os);
+	}
+
 	double GetDiameter()
 	{
 		return max({ CartesianShape<Dim, Dim - 1>::WidthX, CartesianShape<Dim, Dim - 1>::WidthY, CartesianShape<Dim, Dim - 1>::WidthZ });

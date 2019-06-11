@@ -17,10 +17,4 @@ public:
 		Face(number, element1), 
 		CartesianFace(number, origin, length, element1, NULL, orientation)
 	{ }
-
-	friend ostream& operator<<(ostream& os, const IntervalFace& face)
-	{
-		os << face.Number << "\t(" << face.CartesianShape::Origin.X << ", " << face.CartesianShape::Origin.Y << ")\t" << (face.CartesianShape::Orientation == CartesianShapeOrientation::Horizontal ? "horizontal" : "vertical");
-		return os;
-	}
 };

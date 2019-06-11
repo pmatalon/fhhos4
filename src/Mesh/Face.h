@@ -50,10 +50,25 @@ public:
 	virtual DomPoint ConvertToDomain(RefPoint refPoint) = 0;
 	virtual double ComputeIntegral(function<double(RefPoint)> func) = 0;
 	virtual double ComputeIntegral(function<double(RefPoint)> func, int polynomialDegree) = 0;
-	
-	virtual string ToString()
+
+	friend ostream& operator<<(ostream& os, const Face<Dim>& s)
 	{
-		return "Interface " + to_string(this->Number);
+		s.Serialize(os);
+		return os;
+	}
+
+	virtual void Serialize(ostream& os) const
+	{
+		if (Dim == 1)
+			os << "Interface ";
+		else if (Dim == 2)
+			os << "Edge ";
+		else if (Dim == 3)
+			os << "Face ";
+		os << this->Number << " of ";
+		os << "element(s) " << this->Element1->Number;
+		if (this->Element2)
+			os << ", " << this->Element2->Number;
 	}
 
 	virtual ~Face() {}

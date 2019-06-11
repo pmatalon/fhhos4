@@ -114,6 +114,9 @@ public:
 
 	function<vector<double>(RefPoint)> GradPhiOnFace(Face<3>* face, BasisFunction<3>* p_phi) override
 	{
+		cout << "Error: TODO use GradTransformation()." << endl;
+		exit(EXIT_FAILURE);
+
 		IBasisFunction3D* phi = static_cast<IBasisFunction3D*>(p_phi);
 
 		function<vector<double>(RefPoint)> gradOnFace = NULL;

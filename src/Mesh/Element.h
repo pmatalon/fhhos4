@@ -90,6 +90,29 @@ public:
 	virtual double DiffusionCoefficient(DiffusionPartition diffusionPartition) = 0;
 	virtual vector<RefPoint> GetNodalPoints(FunctionalBasis<Dim>* basis) = 0;
 
+	virtual void Serialize(ostream& os) const
+	{
+		os << "Element " << this->Number << ": ";
+		if (Dim == 1)
+			os << "interfaces ";
+		else if (Dim == 2)
+			os << "edges ";
+		else if (Dim == 3)
+			os << "faces ";
+		for (size_t i = 0; i < this->Faces.size(); ++i)
+		{
+			os << this->Faces[i]->Number;
+			if (i < this->Faces.size() - 1)
+				os << ", ";
+		}
+	}
+
+	friend ostream& operator<<(ostream& os, const Element<Dim>& s)
+	{
+		s.Serialize(os);
+		return os;
+	}
+
 	virtual ~Element() {}
 
 protected:

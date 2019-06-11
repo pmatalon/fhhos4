@@ -155,6 +155,9 @@
     <ClInclude Include="src\Utils\ElementParallelLoop.h">
       <Filter>Utils</Filter>
     </ClInclude>
+    <ClInclude Include="src\Mesh\Rectangle.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

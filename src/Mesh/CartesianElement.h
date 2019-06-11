@@ -14,6 +14,25 @@ public:
 		CartesianShape<Dim>(origin, width)
 	{}
 
+	CartesianElement(BigNumber number, DomPoint origin, double widthX, double widthY) :
+		Poisson_DG_Element<Dim>(number),
+		Poisson_HHO_Element<Dim>(number),
+		CartesianShape<Dim>(origin, widthX, widthY)
+	{}
+
+	CartesianElement(BigNumber number, DomPoint origin, double widthX, double widthY, double widthZ) :
+		Poisson_DG_Element<Dim>(number),
+		Poisson_HHO_Element<Dim>(number),
+		CartesianShape<Dim>(origin, widthX, widthY, widthZ)
+	{}
+
+	void Serialize(ostream& os) const override
+	{
+		Element<Dim>::Serialize(os);
+		os << ", ";
+		CartesianShape<Dim>::Serialize(os);
+	}
+
 	double GetDiameter() override
 	{
 		return max({ CartesianShape<Dim>::WidthX, CartesianShape<Dim>::WidthY, CartesianShape<Dim>::WidthZ });

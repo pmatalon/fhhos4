@@ -22,6 +22,18 @@ public:
 		this->Y = y;
 		this->Z = z;
 	}
+
+	void Serialize(ostream& os, int dim) const
+	{
+		os << "(";
+		if (dim == 1)
+			os << X;
+		else if (dim == 2)
+			os << X << ", " << Y;
+		else if (dim == 3)
+			os << X << ", " << Y << ", " << Z;
+		os << ")";
+	}
 };
 
 typedef Point RefPoint; // Reference point: X, Y, Z are in the reference interval [-1, 1]

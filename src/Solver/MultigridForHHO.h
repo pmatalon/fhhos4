@@ -431,7 +431,7 @@ public:
 		{
 			for (int levelNumber = 1; levelNumber < _nLevels; levelNumber++)
 			{
-				dynamic_cast<CartesianGrid2D*>(problem->_mesh)->BuildCoarserMesh();
+				problem->_mesh->BuildCoarserMesh();
 				problem = problem->GetProblemOnCoarserMesh();
 				problem->Assemble(Action::None);
 				LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(levelNumber, problem);
@@ -451,7 +451,7 @@ public:
 			while (problem->A.rows() > MatrixMaxSizeForCoarsestLevel)
 			{
 				levelNumber++;
-				dynamic_cast<CartesianGrid2D*>(problem->_mesh)->BuildCoarserMesh();
+				problem->_mesh->BuildCoarserMesh();
 				problem = problem->GetProblemOnCoarserMesh();
 				problem->Assemble(Action::None);
 				LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(levelNumber, problem);

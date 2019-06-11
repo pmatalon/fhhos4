@@ -113,6 +113,7 @@
     <ClInclude Include="src/Mesh/Element.h" />
     <ClInclude Include="src\Mesh\PointFace.h" />
     <ClInclude Include="src\Mesh\IntervalFace.h" />
+    <ClInclude Include="src\Mesh\Rectangle.h" />
     <ClInclude Include="src\Mesh\ReferenceCartesianShape.h" />
     <ClInclude Include="src\Mesh\SquareFace.h" />
     <ClInclude Include="src/Mesh/Face.h" />

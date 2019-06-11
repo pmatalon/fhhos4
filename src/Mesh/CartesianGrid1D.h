@@ -5,7 +5,6 @@
 
 class CartesianGrid1D : public Mesh<1>
 {
-private:
 public:
 	CartesianGrid1D(BigNumber n) : Mesh(n)
 	{
@@ -49,5 +48,11 @@ public:
 				point->Element2 = this->Elements[k];
 			}
 		}
+	}
+
+	void BuildCoarserMesh()
+	{
+		cout << "Error: BuildCoarserMesh not implemented!" << endl;
+		exit(EXIT_FAILURE);
 	}
 };
