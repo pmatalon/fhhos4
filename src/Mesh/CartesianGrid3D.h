@@ -43,16 +43,18 @@ public:
 			for (BigNumber ix = 0; ix < n; ++ix)
 			{
 				// Bottom boundary
-				SquareFace* bottomBoundary = new SquareFace(numberInterface++, h, this->Elements[index(ix, iy, 0)]);
+				Cube* cube = dynamic_cast<Cube*>(this->Elements[index(ix, iy, 0)]);
+				SquareFace* bottomBoundary = new SquareFace(numberInterface++, cube->BackLeftBottomCorner, h, cube, CartesianShapeOrientation::InXOY);
 				this->Faces.push_back(bottomBoundary);
 				this->BoundaryFaces.push_back(bottomBoundary);
-				dynamic_cast<Cube*>(this->Elements[index(ix, iy, 0)])->SetBottomInterface(bottomBoundary);
+				cube->SetBottomFace(bottomBoundary);
 
 				// Top boundary
-				SquareFace* topBoundary = new SquareFace(numberInterface++, h, this->Elements[index(ix, iy, n-1)]);
+				cube = dynamic_cast<Cube*>(this->Elements[index(ix, iy, n - 1)]);
+				SquareFace* topBoundary = new SquareFace(numberInterface++, cube->BackLeftTopCorner, h, this->Elements[index(ix, iy, n-1)], CartesianShapeOrientation::InXOY);
 				this->Faces.push_back(topBoundary);
 				this->BoundaryFaces.push_back(topBoundary);
-				dynamic_cast<Cube*>(this->Elements[index(ix, iy, n - 1)])->SetTopInterface(topBoundary);
+				cube->SetTopFace(topBoundary);
 			}
 		}
 
@@ -60,17 +62,19 @@ public:
 		{
 			for (BigNumber ix = 0; ix < n; ++ix)
 			{
-				// Front boundary
-				SquareFace* frontBoundary = new SquareFace(numberInterface++, h, this->Elements[index(ix, 0, iz)]);
-				this->Faces.push_back(frontBoundary);
-				this->BoundaryFaces.push_back(frontBoundary);
-				dynamic_cast<Cube*>(this->Elements[index(ix, 0, iz)])->SetFrontInterface(frontBoundary);
+				// Left boundary
+				Cube* cube = dynamic_cast<Cube*>(this->Elements[index(ix, 0, iz)]);
+				SquareFace* leftBoundary = new SquareFace(numberInterface++, cube->BackLeftBottomCorner, h, cube, CartesianShapeOrientation::InXOZ);
+				this->Faces.push_back(leftBoundary);
+				this->BoundaryFaces.push_back(leftBoundary);
+				cube->SetLeftFace(leftBoundary);
 
-				// Back boundary
-				SquareFace* backBoundary = new SquareFace(numberInterface++, h, this->Elements[index(ix, n-1, iz)]);
-				this->Faces.push_back(backBoundary);
-				this->BoundaryFaces.push_back(backBoundary);
-				dynamic_cast<Cube*>(this->Elements[index(ix, n - 1, iz)])->SetBackInterface(backBoundary);
+				// Right boundary
+				cube = dynamic_cast<Cube*>(this->Elements[index(ix, n - 1, iz)]);
+				SquareFace* rightBoundary = new SquareFace(numberInterface++, cube->BackRightBottomCorner, h, cube, CartesianShapeOrientation::InXOZ);
+				this->Faces.push_back(rightBoundary);
+				this->BoundaryFaces.push_back(rightBoundary);
+				cube->SetRightFace(rightBoundary);
 			}
 		}
 
@@ -78,17 +82,19 @@ public:
 		{
 			for (BigNumber iy = 0; iy < n; ++iy)
 			{
-				// Left boundary
-				SquareFace* leftBoundary = new SquareFace(numberInterface++, h, this->Elements[index(0, iy, iz)]);
-				this->Faces.push_back(leftBoundary);
-				this->BoundaryFaces.push_back(leftBoundary);
-				dynamic_cast<Cube*>(this->Elements[index(0, iy, iz)])->SetLeftInterface(leftBoundary);
+				// Back boundary
+				Cube* cube = dynamic_cast<Cube*>(this->Elements[index(0, iy, iz)]);
+				SquareFace* backBoundary = new SquareFace(numberInterface++, cube->BackLeftBottomCorner, h, cube, CartesianShapeOrientation::InYOZ);
+				this->Faces.push_back(backBoundary);
+				this->BoundaryFaces.push_back(backBoundary);
+				cube->SetBackFace(backBoundary);
 
-				// Right boundary
-				SquareFace* rightBoundary = new SquareFace(numberInterface++, h, this->Elements[index(n-1, iy, iz)]);
-				this->Faces.push_back(rightBoundary);
-				this->BoundaryFaces.push_back(rightBoundary);
-				dynamic_cast<Cube*>(this->Elements[index(n - 1, iy, iz)])->SetRightInterface(rightBoundary);
+				// Front boundary
+				cube = dynamic_cast<Cube*>(this->Elements[index(n - 1, iy, iz)]);
+				SquareFace* frontBoundary = new SquareFace(numberInterface++, cube->FrontLeftBottomCorner, h, cube, CartesianShapeOrientation::InYOZ);
+				this->Faces.push_back(frontBoundary);
+				this->BoundaryFaces.push_back(frontBoundary);
+				cube->SetFrontFace(frontBoundary);
 			}
 		}
 
@@ -101,33 +107,33 @@ public:
 					Cube* element = dynamic_cast<Cube*>(this->Elements[index(ix, iy, iz)]);
 					if (ix != n - 1)
 					{
-						// Right
-						Cube* rightNeighbour = dynamic_cast<Cube*>(this->Elements[index(ix+1, iy, iz)]);
-						SquareFace* interface = new SquareFace(numberInterface++, h, element, rightNeighbour);
+						// Front
+						Cube* frontNeighbour = dynamic_cast<Cube*>(this->Elements[index(ix+1, iy, iz)]);
+						SquareFace* interface = new SquareFace(numberInterface++, element->FrontLeftBottomCorner, h, element, frontNeighbour, CartesianShapeOrientation::InYOZ);
 						this->Faces.push_back(interface);
 						this->InteriorFaces.push_back(interface);
-						element->SetRightInterface(interface);
-						rightNeighbour->SetLeftInterface(interface);
+						element->SetFrontFace(interface);
+						frontNeighbour->SetBackFace(interface);
 					}
 					if (iy != n - 1)
 					{
-						// Back
-						Cube* backNeighbour = dynamic_cast<Cube*>(this->Elements[index(ix, iy+1, iz)]);
-						SquareFace* interface = new SquareFace(numberInterface++, h, element, backNeighbour);
+						// Right
+						Cube* rightNeighbour = dynamic_cast<Cube*>(this->Elements[index(ix, iy+1, iz)]);
+						SquareFace* interface = new SquareFace(numberInterface++, element->BackRightBottomCorner, h, element, rightNeighbour, CartesianShapeOrientation::InXOZ);
 						this->Faces.push_back(interface);
 						this->InteriorFaces.push_back(interface);
-						element->SetBackInterface(interface);
-						backNeighbour->SetFrontInterface(interface);
+						element->SetRightFace(interface);
+						rightNeighbour->SetLeftFace(interface);
 					}
 					if (iz != n - 1)
 					{
 						// Top
 						Cube* topNeighbour = dynamic_cast<Cube*>(this->Elements[index(ix, iy, iz+1)]);
-						SquareFace* interface = new SquareFace(numberInterface++, h, element, topNeighbour);
+						SquareFace* interface = new SquareFace(numberInterface++, element->BackLeftTopCorner, h, element, topNeighbour, CartesianShapeOrientation::InXOY);
 						this->Faces.push_back(interface);
 						this->InteriorFaces.push_back(interface);
-						element->SetTopInterface(interface);
-						topNeighbour->SetBottomInterface(interface);
+						element->SetTopFace(interface);
+						topNeighbour->SetBottomFace(interface);
 					}
 				}
 			}

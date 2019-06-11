@@ -8,13 +8,13 @@ class SquareFace : public CartesianFace<3>
 {
 public:
 
-	SquareFace(BigNumber number, double width, Element<3>* element1, Element<3>* element2) : 
+	SquareFace(BigNumber number, DomPoint origin, double width, Element<3>* element1, Element<3>* element2, CartesianShapeOrientation orientation) :
 		Face(number, element1, element2), 
-		CartesianFace(number, DomPoint(), width, element1, element2, CartesianShapeOrientation::None)
+		CartesianFace(number, origin, width, element1, element2, orientation)
 	{ }
 
-	SquareFace(BigNumber number, double width, Element<3>* element1) : 
+	SquareFace(BigNumber number, DomPoint origin, double width, Element<3>* element1, CartesianShapeOrientation orientation) :
 		Face(number, element1), 
-		CartesianFace(number, DomPoint(), width, element1, NULL, CartesianShapeOrientation::None)
+		CartesianFace(number, origin, width, element1, NULL, orientation)
 	{ }
 };

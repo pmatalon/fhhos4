@@ -160,9 +160,9 @@ public:
 			{
 				if (WidthX != 0)
 					os << ", widthX = " << WidthX;
-				else if (WidthY != 0)
+				if (WidthY != 0)
 					os << ", widthY = " << WidthY;
-				else if (WidthZ != 0)
+				if (WidthZ != 0)
 					os << ", widthZ = " << WidthZ;
 			}
 		}
@@ -338,7 +338,39 @@ public:
 		}
 		else if (ShapeDim == 2 && DomainDim == 3)
 		{
-			assert(false && "ConvertToDomain: 3D case to be implemented!");
+			double x1 = this->Origin.X;
+			double y1 = this->Origin.Y;
+			double z1 = this->Origin.Z;
+
+			double x2 = x1 + this->WidthX;
+			double y2 = y1 + this->WidthY;
+			double z2 = z1 + this->WidthZ;
+
+			double t = referenceElementPoint.X;
+			double u = referenceElementPoint.Y;
+
+			if (this->Orientation == CartesianShapeOrientation::InXOY)
+			{
+				p.X = (x2 - x1) / 2 * t + (x2 + x1) / 2;
+				p.Y = (y2 - y1) / 2 * u + (y2 + y1) / 2;
+				p.Z = z1;
+			}
+			else if (this->Orientation == CartesianShapeOrientation::InXOZ)
+			{
+				p.X = (x2 - x1) / 2 * t + (x2 + x1) / 2;
+				p.Y = y1;
+				p.Z = (z2 - z1) / 2 * u + (z2 + z1) / 2;
+			}
+			else if (this->Orientation == CartesianShapeOrientation::InYOZ)
+			{
+				p.X = x1;
+				p.Y = (y2 - y1) / 2 * t + (y2 + y1) / 2;
+				p.Z = (z2 - z1) / 2 * u + (z2 + z1) / 2;
+			}
+			else
+				assert(false);
+
+			//assert(false && "ConvertToDomain: 3D case to be implemented!");
 		}
 		else
 			assert(false);
