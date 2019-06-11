@@ -14,6 +14,14 @@ public:
 		CartesianShape<Dim, Dim - 1>(origin, width, orientation)
 	{}
 
+	CartesianFace(BigNumber number, DomPoint origin, double firstWidth, double secondWidth, Element<Dim>* element1, Element<Dim>* element2, CartesianShapeOrientation orientation) :
+		Poisson_DG_Face<Dim>(number, element1, element2),
+		Poisson_HHO_Face<Dim>(number, element1, element2),
+		CartesianShape<Dim, Dim - 1>(origin, firstWidth, secondWidth, orientation)
+	{
+		assert(Dim == 3);
+	}
+
 	//----------------------------------------------------//
 	//                 Face implementation                //
 	//----------------------------------------------------//

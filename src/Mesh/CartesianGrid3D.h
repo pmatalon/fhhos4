@@ -1,8 +1,8 @@
 #pragma once
 #include <vector>
 #include "Element.h"
-#include "Cube.h"
-#include "SquareFace.h"
+#include "Parallelepiped.h"
+#include "RectangularFace.h"
 #include "Mesh.h"
 
 using namespace std;
@@ -10,23 +10,33 @@ using namespace std;
 class CartesianGrid3D : public Mesh<3>
 {
 public:
-	CartesianGrid3D(BigNumber n) : Mesh(n)
+	BigNumber Ny;
+	BigNumber Nz;
+
+	CartesianGrid3D(BigNumber nx, BigNumber ny, BigNumber nz) : Mesh(nx)
 	{
+		// nx = ny = nz falls down to cubic elements
+
+		this->Ny = ny;
+		this->Nz = nz;
+
 		//----------//
 		// Elements //
 		//----------//
 
-		this->Elements.reserve(n * n * n);
-		double h = 1 / (double)n;
+		this->Elements.reserve(nx * ny * nz);
+		double hx = 1 / (double)nx;
+		double hy = 1 / (double)ny;
+		double hz = 1 / (double)nz;
 
-		for (BigNumber iz = 0; iz < n; ++iz)
+		for (BigNumber iz = 0; iz < nz; ++iz)
 		{
-			for (BigNumber iy = 0; iy < n; ++iy)
+			for (BigNumber iy = 0; iy < ny; ++iy)
 			{
-				for (BigNumber ix = 0; ix < n; ++ix)
+				for (BigNumber ix = 0; ix < nx; ++ix)
 				{
-					Cube* cube = new Cube(index(ix, iy, iz), (double)ix / n, (double)iy / n, (double)iz / n, h);
-					this->Elements.push_back(cube);
+					Parallelepiped* element = new Parallelepiped(index(ix, iy, iz), ix * hx, iy * hy, iz * hz, hx, hy, hz);
+					this->Elements.push_back(element);
 				}
 			}
 		}
@@ -35,101 +45,101 @@ public:
 		// Faces //
 		//-------//
 
-		this->Faces.reserve(2*n*n * (n + 1));
+		this->Faces.reserve(nx * (ny + 1) * (nz + 1) + ny * (nx + 1) * (nz + 1) + nz * (nx + 1) * (ny + 1));
 		BigNumber numberInterface = 0;
 
-		for (BigNumber iy = 0; iy < n; ++iy)
+		for (BigNumber iy = 0; iy < ny; ++iy)
 		{
-			for (BigNumber ix = 0; ix < n; ++ix)
+			for (BigNumber ix = 0; ix < nx; ++ix)
 			{
 				// Bottom boundary
-				Cube* cube = dynamic_cast<Cube*>(this->Elements[index(ix, iy, 0)]);
-				SquareFace* bottomBoundary = new SquareFace(numberInterface++, cube->BackLeftBottomCorner, h, cube, CartesianShapeOrientation::InXOY);
+				Parallelepiped* element = dynamic_cast<Parallelepiped*>(this->Elements[index(ix, iy, 0)]);
+				RectangularFace* bottomBoundary = new RectangularFace(numberInterface++, element->BackLeftBottomCorner, hx, hy, element, CartesianShapeOrientation::InXOY);
 				this->Faces.push_back(bottomBoundary);
 				this->BoundaryFaces.push_back(bottomBoundary);
-				cube->SetBottomFace(bottomBoundary);
+				element->SetBottomFace(bottomBoundary);
 
 				// Top boundary
-				cube = dynamic_cast<Cube*>(this->Elements[index(ix, iy, n - 1)]);
-				SquareFace* topBoundary = new SquareFace(numberInterface++, cube->BackLeftTopCorner, h, this->Elements[index(ix, iy, n-1)], CartesianShapeOrientation::InXOY);
+				element = dynamic_cast<Parallelepiped*>(this->Elements[index(ix, iy, nz - 1)]);
+				RectangularFace* topBoundary = new RectangularFace(numberInterface++, element->BackLeftTopCorner, hx, hy, element, CartesianShapeOrientation::InXOY);
 				this->Faces.push_back(topBoundary);
 				this->BoundaryFaces.push_back(topBoundary);
-				cube->SetTopFace(topBoundary);
+				element->SetTopFace(topBoundary);
 			}
 		}
 
-		for (BigNumber iz = 0; iz < n; ++iz)
+		for (BigNumber iz = 0; iz < nz; ++iz)
 		{
-			for (BigNumber ix = 0; ix < n; ++ix)
+			for (BigNumber ix = 0; ix < nx; ++ix)
 			{
 				// Left boundary
-				Cube* cube = dynamic_cast<Cube*>(this->Elements[index(ix, 0, iz)]);
-				SquareFace* leftBoundary = new SquareFace(numberInterface++, cube->BackLeftBottomCorner, h, cube, CartesianShapeOrientation::InXOZ);
+				Parallelepiped* element = dynamic_cast<Parallelepiped*>(this->Elements[index(ix, 0, iz)]);
+				RectangularFace* leftBoundary = new RectangularFace(numberInterface++, element->BackLeftBottomCorner, hx, hz, element, CartesianShapeOrientation::InXOZ);
 				this->Faces.push_back(leftBoundary);
 				this->BoundaryFaces.push_back(leftBoundary);
-				cube->SetLeftFace(leftBoundary);
+				element->SetLeftFace(leftBoundary);
 
 				// Right boundary
-				cube = dynamic_cast<Cube*>(this->Elements[index(ix, n - 1, iz)]);
-				SquareFace* rightBoundary = new SquareFace(numberInterface++, cube->BackRightBottomCorner, h, cube, CartesianShapeOrientation::InXOZ);
+				element = dynamic_cast<Parallelepiped*>(this->Elements[index(ix, ny - 1, iz)]);
+				RectangularFace* rightBoundary = new RectangularFace(numberInterface++, element->BackRightBottomCorner, hx, hz, element, CartesianShapeOrientation::InXOZ);
 				this->Faces.push_back(rightBoundary);
 				this->BoundaryFaces.push_back(rightBoundary);
-				cube->SetRightFace(rightBoundary);
+				element->SetRightFace(rightBoundary);
 			}
 		}
 
-		for (BigNumber iz = 0; iz < n; ++iz)
+		for (BigNumber iz = 0; iz < nz; ++iz)
 		{
-			for (BigNumber iy = 0; iy < n; ++iy)
+			for (BigNumber iy = 0; iy < ny; ++iy)
 			{
 				// Back boundary
-				Cube* cube = dynamic_cast<Cube*>(this->Elements[index(0, iy, iz)]);
-				SquareFace* backBoundary = new SquareFace(numberInterface++, cube->BackLeftBottomCorner, h, cube, CartesianShapeOrientation::InYOZ);
+				Parallelepiped* element = dynamic_cast<Parallelepiped*>(this->Elements[index(0, iy, iz)]);
+				RectangularFace* backBoundary = new RectangularFace(numberInterface++, element->BackLeftBottomCorner, hy, hz, element, CartesianShapeOrientation::InYOZ);
 				this->Faces.push_back(backBoundary);
 				this->BoundaryFaces.push_back(backBoundary);
-				cube->SetBackFace(backBoundary);
+				element->SetBackFace(backBoundary);
 
 				// Front boundary
-				cube = dynamic_cast<Cube*>(this->Elements[index(n - 1, iy, iz)]);
-				SquareFace* frontBoundary = new SquareFace(numberInterface++, cube->FrontLeftBottomCorner, h, cube, CartesianShapeOrientation::InYOZ);
+				element = dynamic_cast<Parallelepiped*>(this->Elements[index(nx - 1, iy, iz)]);
+				RectangularFace* frontBoundary = new RectangularFace(numberInterface++, element->FrontLeftBottomCorner, hy, hz, element, CartesianShapeOrientation::InYOZ);
 				this->Faces.push_back(frontBoundary);
 				this->BoundaryFaces.push_back(frontBoundary);
-				cube->SetFrontFace(frontBoundary);
+				element->SetFrontFace(frontBoundary);
 			}
 		}
 
-		for (BigNumber iz = 0; iz < n; ++iz)
+		for (BigNumber iz = 0; iz < nz; ++iz)
 		{
-			for (BigNumber iy = 0; iy < n; ++iy)
+			for (BigNumber iy = 0; iy < ny; ++iy)
 			{
-				for (BigNumber ix = 0; ix < n; ++ix)
+				for (BigNumber ix = 0; ix < nx; ++ix)
 				{
-					Cube* element = dynamic_cast<Cube*>(this->Elements[index(ix, iy, iz)]);
-					if (ix != n - 1)
+					Parallelepiped* element = dynamic_cast<Parallelepiped*>(this->Elements[index(ix, iy, iz)]);
+					if (ix != nx - 1)
 					{
 						// Front
-						Cube* frontNeighbour = dynamic_cast<Cube*>(this->Elements[index(ix+1, iy, iz)]);
-						SquareFace* interface = new SquareFace(numberInterface++, element->FrontLeftBottomCorner, h, element, frontNeighbour, CartesianShapeOrientation::InYOZ);
+						Parallelepiped* frontNeighbour = dynamic_cast<Parallelepiped*>(this->Elements[index(ix+1, iy, iz)]);
+						RectangularFace* interface = new RectangularFace(numberInterface++, element->FrontLeftBottomCorner, hy, hz, element, frontNeighbour, CartesianShapeOrientation::InYOZ);
 						this->Faces.push_back(interface);
 						this->InteriorFaces.push_back(interface);
 						element->SetFrontFace(interface);
 						frontNeighbour->SetBackFace(interface);
 					}
-					if (iy != n - 1)
+					if (iy != ny - 1)
 					{
 						// Right
-						Cube* rightNeighbour = dynamic_cast<Cube*>(this->Elements[index(ix, iy+1, iz)]);
-						SquareFace* interface = new SquareFace(numberInterface++, element->BackRightBottomCorner, h, element, rightNeighbour, CartesianShapeOrientation::InXOZ);
+						Parallelepiped* rightNeighbour = dynamic_cast<Parallelepiped*>(this->Elements[index(ix, iy+1, iz)]);
+						RectangularFace* interface = new RectangularFace(numberInterface++, element->BackRightBottomCorner, hx, hz, element, rightNeighbour, CartesianShapeOrientation::InXOZ);
 						this->Faces.push_back(interface);
 						this->InteriorFaces.push_back(interface);
 						element->SetRightFace(interface);
 						rightNeighbour->SetLeftFace(interface);
 					}
-					if (iz != n - 1)
+					if (iz != nz - 1)
 					{
 						// Top
-						Cube* topNeighbour = dynamic_cast<Cube*>(this->Elements[index(ix, iy, iz+1)]);
-						SquareFace* interface = new SquareFace(numberInterface++, element->BackLeftTopCorner, h, element, topNeighbour, CartesianShapeOrientation::InXOY);
+						Parallelepiped* topNeighbour = dynamic_cast<Parallelepiped*>(this->Elements[index(ix, iy, iz+1)]);
+						RectangularFace* interface = new RectangularFace(numberInterface++, element->BackLeftTopCorner, hx, hy, element, topNeighbour, CartesianShapeOrientation::InXOY);
 						this->Faces.push_back(interface);
 						this->InteriorFaces.push_back(interface);
 						element->SetTopFace(interface);
@@ -148,9 +158,10 @@ public:
 	}
 
 private:
-	BigNumber index(BigNumber ix, BigNumber iy, BigNumber iz)
+	inline BigNumber index(BigNumber ix, BigNumber iy, BigNumber iz)
 	{
-		BigNumber n = this->N;
-		return iz * n*n + iy * n + ix;
+		BigNumber nx = this->N;
+		BigNumber ny = this->Ny;
+		return iz * ny*nx + iy * nx + ix;
 	}
 };

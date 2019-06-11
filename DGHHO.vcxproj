@@ -111,11 +111,12 @@
     <ClInclude Include="src/Mesh/CartesianGrid2D.h" />
     <ClInclude Include="src/Mesh/CartesianGrid3D.h" />
     <ClInclude Include="src/Mesh/Element.h" />
+    <ClInclude Include="src\Mesh\Parallelepiped.h" />
     <ClInclude Include="src\Mesh\PointFace.h" />
     <ClInclude Include="src\Mesh\Edge.h" />
     <ClInclude Include="src\Mesh\Rectangle.h" />
     <ClInclude Include="src\Mesh\ReferenceCartesianShape.h" />
-    <ClInclude Include="src\Mesh\SquareFace.h" />
+    <ClInclude Include="src\Mesh\RectangularFace.h" />
     <ClInclude Include="src/Mesh/Face.h" />
     <ClInclude Include="src/Mesh/Cube.h" />
     <ClInclude Include="src/Mesh/Square.h" />

@@ -95,9 +95,6 @@
     <ClInclude Include="src\Mesh\PointFace.h">
       <Filter>Mesh</Filter>
     </ClInclude>
-    <ClInclude Include="src\Mesh\SquareFace.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
     <ClInclude Include="src\Mesh\Mesh.h">
       <Filter>Mesh</Filter>
     </ClInclude>
@@ -156,6 +153,12 @@
       <Filter>Mesh</Filter>
     </ClInclude>
     <ClInclude Include="src\Mesh\Edge.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\Parallelepiped.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\RectangularFace.h">
       <Filter>Mesh</Filter>
     </ClInclude>
   </ItemGroup>

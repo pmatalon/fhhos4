@@ -339,7 +339,7 @@ int main(int argc, char* argv[])
 
 	else if (dimension == 3)
 	{
-		Mesh<3>* mesh = new CartesianGrid3D(n);
+		Mesh<3>* mesh = new CartesianGrid3D(n, n, n);
 		if (solution.compare("sine") == 0)
 		{
 			exactSolution = [](DomPoint p)
