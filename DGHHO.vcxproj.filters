@@ -95,9 +95,6 @@
     <ClInclude Include="src\Mesh\PointFace.h">
       <Filter>Mesh</Filter>
     </ClInclude>
-    <ClInclude Include="src\Mesh\IntervalFace.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
     <ClInclude Include="src\Mesh\SquareFace.h">
       <Filter>Mesh</Filter>
     </ClInclude>
@@ -156,6 +153,9 @@
       <Filter>Utils</Filter>
     </ClInclude>
     <ClInclude Include="src\Mesh\Rectangle.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\Edge.h">
       <Filter>Mesh</Filter>
     </ClInclude>
   </ItemGroup>

@@ -2,7 +2,7 @@
 #include <vector>
 #include "Element.h"
 #include "Rectangle.h"
-#include "IntervalFace.h"
+#include "Edge.h"
 #include "Mesh.h"
 using namespace std;
 
@@ -44,14 +44,14 @@ public:
 		{
 			// South boundary
 			Rectangle* rectangle = dynamic_cast<Rectangle*>(this->Elements[j]);
-			IntervalFace* southBoundary = new IntervalFace(numberInterface++, rectangle->BottomLeftCorner, hx, rectangle, CartesianShapeOrientation::Horizontal);
+			Edge* southBoundary = new Edge(numberInterface++, rectangle->BottomLeftCorner, hx, rectangle, CartesianShapeOrientation::Horizontal);
 			this->Faces.push_back(southBoundary);
 			this->BoundaryFaces.push_back(southBoundary);
 			dynamic_cast<Rectangle*>(this->Elements[j])->SetSouthInterface(southBoundary);
 
 			// North boundary
 			rectangle = dynamic_cast<Rectangle*>(this->Elements[(ny - 1)*nx + j]);
-			IntervalFace* northBoundary = new IntervalFace(numberInterface++, rectangle->TopLeftCorner, hx, rectangle, CartesianShapeOrientation::Horizontal);
+			Edge* northBoundary = new Edge(numberInterface++, rectangle->TopLeftCorner, hx, rectangle, CartesianShapeOrientation::Horizontal);
 			this->Faces.push_back(northBoundary);
 			this->BoundaryFaces.push_back(northBoundary);
 			dynamic_cast<Rectangle*>(this->Elements[(ny - 1)*nx + j])->SetNorthInterface(northBoundary);
@@ -61,14 +61,14 @@ public:
 		{
 			// West boundary
 			Rectangle* rectangle = dynamic_cast<Rectangle*>(this->Elements[i*nx]);
-			IntervalFace* westBoundary = new IntervalFace(numberInterface++, rectangle->BottomLeftCorner, hy, rectangle, CartesianShapeOrientation::Vertical);
+			Edge* westBoundary = new Edge(numberInterface++, rectangle->BottomLeftCorner, hy, rectangle, CartesianShapeOrientation::Vertical);
 			this->Faces.push_back(westBoundary);
 			this->BoundaryFaces.push_back(westBoundary);
 			dynamic_cast<Rectangle*>(this->Elements[i*nx])->SetWestInterface(westBoundary);
 
 			// East boundary
 			rectangle = dynamic_cast<Rectangle*>(this->Elements[i*nx + nx - 1]);
-			IntervalFace* eastBoundary = new IntervalFace(numberInterface++, rectangle->BottomRightCorner, hy, rectangle, CartesianShapeOrientation::Vertical);
+			Edge* eastBoundary = new Edge(numberInterface++, rectangle->BottomRightCorner, hy, rectangle, CartesianShapeOrientation::Vertical);
 			this->Faces.push_back(eastBoundary);
 			this->BoundaryFaces.push_back(eastBoundary);
 			dynamic_cast<Rectangle*>(this->Elements[i*nx + nx - 1])->SetEastInterface(eastBoundary);
@@ -83,7 +83,7 @@ public:
 				{
 					// East
 					Rectangle* eastNeighbour = dynamic_cast<Rectangle*>(this->Elements[i*nx + j + 1]);
-					IntervalFace* interface = new IntervalFace(numberInterface++, eastNeighbour->BottomLeftCorner, hy, element, eastNeighbour, CartesianShapeOrientation::Vertical);
+					Edge* interface = new Edge(numberInterface++, eastNeighbour->BottomLeftCorner, hy, element, eastNeighbour, CartesianShapeOrientation::Vertical);
 					this->Faces.push_back(interface);
 					this->InteriorFaces.push_back(interface);
 					element->SetEastInterface(interface);
@@ -93,7 +93,7 @@ public:
 				{
 					// North
 					Rectangle* northNeighbour = dynamic_cast<Rectangle*>(this->Elements[(i + 1)*nx + j]);
-					IntervalFace* interface = new IntervalFace(numberInterface++, northNeighbour->BottomLeftCorner, hx, element, northNeighbour, CartesianShapeOrientation::Horizontal);
+					Edge* interface = new Edge(numberInterface++, northNeighbour->BottomLeftCorner, hx, element, northNeighbour, CartesianShapeOrientation::Horizontal);
 					this->Faces.push_back(interface);
 					this->InteriorFaces.push_back(interface);
 					element->SetNorthInterface(interface);

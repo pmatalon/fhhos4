@@ -1,6 +1,6 @@
 #pragma once
 #include "CartesianElement.h"
-#include "IntervalFace.h"
+#include "Edge.h"
 using namespace std;
 
 class Rectangle : public CartesianElement<2>
@@ -25,25 +25,25 @@ public:
 		BottomRightCorner(x + widthX, y)
 	{}
 
-	void SetNorthInterface(IntervalFace* face)
+	void SetNorthInterface(Edge* face)
 	{
 		this->AddFace(face);
 		this->NorthFace = face;
 	}
 
-	void SetSouthInterface(IntervalFace* face)
+	void SetSouthInterface(Edge* face)
 	{
 		this->AddFace(face);
 		this->SouthFace = face;
 	}
 
-	void SetEastInterface(IntervalFace* face)
+	void SetEastInterface(Edge* face)
 	{
 		this->AddFace(face);
 		this->EastFace = face;
 	}
 
-	void SetWestInterface(IntervalFace* face)
+	void SetWestInterface(Edge* face)
 	{
 		this->AddFace(face);
 		this->WestFace = face;
