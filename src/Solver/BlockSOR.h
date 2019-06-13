@@ -42,24 +42,38 @@ public:
 		L = Eigen::SparseMatrix<double>(A.rows(), A.cols());
 		U = Eigen::SparseMatrix<double>(A.rows(), A.cols());
 
+		struct ChunkResult
+		{
+			NonZeroCoefficients D_coeffs;
+			NonZeroCoefficients L_coeffs;
+			NonZeroCoefficients U_coeffs;
+		};
+		NumberParallelLoop<ChunkResult> parallelLoop(A.outerSize());
+		parallelLoop.Execute([this, &A](BigNumber k, ParallelChunk<ChunkResult>* chunk)
+			{
+				for (Eigen::SparseMatrix<double>::InnerIterator it(A, k); it; ++it)
+				{
+					auto iBlock = it.row() / this->_blockSize;
+					auto jBlock = it.col() / this->_blockSize;
+					if (iBlock == jBlock)
+						chunk->Results.D_coeffs.Add(it.row(), it.col(), it.value());
+					else if (iBlock < jBlock)
+						chunk->Results.U_coeffs.Add(it.row(), it.col(), it.value());
+					else
+						chunk->Results.L_coeffs.Add(it.row(), it.col(), it.value());
+				}
+			});
+
 		NonZeroCoefficients D_coeffs(A.nonZeros());
 		NonZeroCoefficients L_coeffs(A.nonZeros());
 		NonZeroCoefficients U_coeffs(A.nonZeros());
 
-		for (int k = 0; k < A.outerSize(); ++k)
-		{
-			for (Eigen::SparseMatrix<double>::InnerIterator it(A, k); it; ++it)
+		parallelLoop.AggregateChunkResults([&D_coeffs, &L_coeffs, &U_coeffs](ChunkResult chunkResult)
 			{
-				auto iBlock = it.row() / _blockSize;
-				auto jBlock = it.col() / _blockSize;
-				if (iBlock == jBlock)
-					D_coeffs.Add(it.row(), it.col(), it.value());
-				else if (iBlock < jBlock)
-					U_coeffs.Add(it.row(), it.col(), it.value());
-				else
-					L_coeffs.Add(it.row(), it.col(), it.value());
-			}
-		}
+				D_coeffs.Add(chunkResult.D_coeffs);
+				L_coeffs.Add(chunkResult.L_coeffs);
+				U_coeffs.Add(chunkResult.U_coeffs);
+			});
 
 		D_coeffs.Fill(D);
 		U_coeffs.Fill(U);

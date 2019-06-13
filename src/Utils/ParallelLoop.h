@@ -59,24 +59,17 @@ public:
 	}
 };
 
-template <class T, class ResultT = CoeffsChunk>//, typename enable_if<is_base_of<ParallelChunk, ChunkT>::value>::type = ParallelChunk >
-class ParallelLoop : public BaseParallelLoop
+template <class ResultT>
+class BaseChunksParallelLoop : public BaseParallelLoop
 {
-	//static_assert(std::is_base_of<ParallelChunk, ChunkT>::value, "ChunkT must inherit from ParallelChunk");
-
 public:
-	vector<T> List;
 	unsigned int NThreads;
 	BigNumber ChunkMaxSize;
 
 	vector<ParallelChunk<ResultT>*> Chunks;
 
-	ParallelLoop(vector<T> list) :ParallelLoop(list, BaseParallelLoop::DefaultNThreads) {}
-	
-	ParallelLoop(vector<T> list, unsigned int nThreads)
+	BaseChunksParallelLoop(BigNumber loopSize, unsigned int nThreads)
 	{
-		List = list;
-		BigNumber loopSize = list.size();
 		NThreads = nThreads;
 		if (NThreads == 0)
 			NThreads = std::thread::hardware_concurrency();
@@ -98,7 +91,7 @@ public:
 			functionInitChunkResults(results);
 		}
 	}
-	
+
 	void AggregateChunkResults(function<void(ResultT)> aggregate)
 	{
 		for (unsigned int threadNumber = 0; threadNumber < NThreads; threadNumber++)
@@ -114,19 +107,45 @@ public:
 			this->Chunks[threadNumber]->ThreadFuture.wait();
 	}
 
+	virtual ~BaseChunksParallelLoop()
+	{
+		for (unsigned int threadNumber = 0; threadNumber < NThreads; threadNumber++)
+		{
+			ParallelChunk<ResultT>* chunk = Chunks[threadNumber];
+			delete chunk;
+		}
+	}
+};
+
+template <class T, class ResultT = CoeffsChunk>//, typename enable_if<is_base_of<ParallelChunk, ChunkT>::value>::type = ParallelChunk >
+class ParallelLoop : public BaseChunksParallelLoop<ResultT>
+{
+	//static_assert(std::is_base_of<ParallelChunk, ChunkT>::value, "ChunkT must inherit from ParallelChunk");
+
+public:
+	vector<T> List;
+
+	ParallelLoop(vector<T> list) :ParallelLoop(list, BaseParallelLoop::DefaultNThreads) {}
+	
+	ParallelLoop(vector<T> list, unsigned int nThreads) :
+		BaseChunksParallelLoop<ResultT>(list.size(), nThreads)
+	{
+		List = list;
+	}
+
 	void Execute(function<void(T)> functionToExecute)
 	{
-		if (NThreads == 1)
+		if (this->NThreads == 1)
 		{
-			ParallelChunk<ResultT>* chunk = Chunks[0];
+			ParallelChunk<ResultT>* chunk = this->Chunks[0];
 			for (BigNumber i = chunk->Start; i < chunk->End; ++i)
 				functionToExecute(this->List[i]);
 		}
 		else
 		{
-			for (unsigned int threadNumber = 0; threadNumber < NThreads; threadNumber++)
+			for (unsigned int threadNumber = 0; threadNumber < this->NThreads; threadNumber++)
 			{
-				ParallelChunk<ResultT>* chunk = Chunks[threadNumber];
+				ParallelChunk<ResultT>* chunk = this->Chunks[threadNumber];
 				chunk->ThreadFuture = std::async(std::launch::async, [chunk, this, functionToExecute]()
 					{
 						for (BigNumber i = chunk->Start; i < chunk->End; ++i)
@@ -134,23 +153,23 @@ public:
 					}
 				);
 			}
-			Wait();
+			this->Wait();
 		}
 	}
 
 	void Execute(function<void(T, ParallelChunk<ResultT>*)> functionToExecute)
 	{
-		if (NThreads == 1)
+		if (this->NThreads == 1)
 		{
-			ParallelChunk<ResultT>* chunk = Chunks[0];
+			ParallelChunk<ResultT>* chunk = this->Chunks[0];
 			for (BigNumber i = chunk->Start; i < chunk->End; ++i)
 				functionToExecute(this->List[i], chunk);
 		}
 		else
 		{
-			for (unsigned int threadNumber = 0; threadNumber < NThreads; threadNumber++)
+			for (unsigned int threadNumber = 0; threadNumber < this->NThreads; threadNumber++)
 			{
-				ParallelChunk<ResultT>* chunk = Chunks[threadNumber];
+				ParallelChunk<ResultT>* chunk = this->Chunks[threadNumber];
 				chunk->ThreadFuture = std::async(std::launch::async, [chunk, this, functionToExecute]()
 					{
 						for (BigNumber i = chunk->Start; i < chunk->End; ++i)
@@ -158,7 +177,7 @@ public:
 					}
 				);
 			}
-			Wait();
+			this->Wait();
 		}
 	}
 
@@ -167,28 +186,71 @@ public:
 		ParallelLoop parallelLoop(list);
 		parallelLoop.Execute(functionToExecute);
 	}
+};
 
-	~ParallelLoop()
+template <class ResultT = CoeffsChunk>
+class NumberParallelLoop : public BaseChunksParallelLoop<ResultT>
+{
+public:
+	NumberParallelLoop(BigNumber endLoop) : NumberParallelLoop(endLoop, BaseParallelLoop::DefaultNThreads) {}
+
+	NumberParallelLoop(BigNumber endLoop, unsigned int nThreads) :
+		BaseChunksParallelLoop<ResultT>(endLoop, nThreads)
+	{}
+
+	void Execute(function<void(BigNumber)> functionToExecute)
 	{
-		for (unsigned int threadNumber = 0; threadNumber < NThreads; threadNumber++)
+		if (this->NThreads == 1)
 		{
-			ParallelChunk<ResultT>* chunk = Chunks[threadNumber];
-			delete chunk;
+			ParallelChunk<ResultT>* chunk = this->Chunks[0];
+			for (BigNumber i = chunk->Start; i < chunk->End; ++i)
+				functionToExecute(i);
+		}
+		else
+		{
+			for (unsigned int threadNumber = 0; threadNumber < this->NThreads; threadNumber++)
+			{
+				ParallelChunk<ResultT>* chunk = this->Chunks[threadNumber];
+				chunk->ThreadFuture = std::async(std::launch::async, [chunk, this, functionToExecute]()
+					{
+						for (BigNumber i = chunk->Start; i < chunk->End; ++i)
+							functionToExecute(i);
+					}
+				);
+			}
+			this->Wait();
 		}
 	}
 
-};
-
-/*template <>
-void ParallelLoop<, CoeffsChunk>::Fill(Eigen::SparseMatrix<double> &m)
-{
-	NonZeroCoefficients global;
-	for (unsigned int threadNumber = 0; threadNumber < NThreads; threadNumber++)
+	void Execute(function<void(BigNumber, ParallelChunk<ResultT>*)> functionToExecute)
 	{
-		ParallelChunk<CoeffsChunk>* chunk = Chunks[threadNumber];
-		global.Add(chunk->Results.Coeffs);
+		if (this->NThreads == 1)
+		{
+			ParallelChunk<ResultT>* chunk = this->Chunks[0];
+			for (BigNumber i = chunk->Start; i < chunk->End; ++i)
+				functionToExecute(i, chunk);
+		}
+		else
+		{
+			for (unsigned int threadNumber = 0; threadNumber < this->NThreads; threadNumber++)
+			{
+				ParallelChunk<ResultT>* chunk = this->Chunks[threadNumber];
+				chunk->ThreadFuture = std::async(std::launch::async, [chunk, this, functionToExecute]()
+					{
+						for (BigNumber i = chunk->Start; i < chunk->End; ++i)
+							functionToExecute(i, chunk);
+					}
+				);
+			}
+			this->Wait();
+		}
 	}
-	global.Fill(m);
-}*/
+
+	static void Execute(BigNumber endLoop, function<void(BigNumber)> functionToExecute)
+	{
+		NumberParallelLoop parallelLoop(endLoop);
+		parallelLoop.Execute(functionToExecute);
+	}
+};
 
 unsigned int BaseParallelLoop::DefaultNThreads = std::thread::hardware_concurrency();
