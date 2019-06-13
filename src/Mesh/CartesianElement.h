@@ -142,7 +142,7 @@ public:
 		return CartesianShape<Dim>::CellReconstructMassMatrix(cellBasis, reconstructBasis);
 	}
 
-	double St(BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2)
+	double IntegralGradGradReconstruct(BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2)
 	{
 		return CartesianShape<Dim>::IntegralGradGradReconstruct(reconstructPhi1, reconstructPhi2);
 	}

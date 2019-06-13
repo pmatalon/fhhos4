@@ -130,50 +130,49 @@ public:
 			Eigen::MatrixXd ProjF = face->GetProjFromReconstruct(this);
 
 			hybridVector.segment(index, this->FaceBasis->Size()) = ProjF * reconstructVector;
-			//cout << "------------- hybridVector -------------" << endl << hybridVector << endl;
 			index += this->FaceBasis->Size();
 		}
 		return hybridVector;
 	}
 
-	double ConsistencyTerm(BasisFunction<Dim>* cellPhi1, BasisFunction<Dim>* cellPhi2)
+	inline double ConsistencyTerm(BasisFunction<Dim>* cellPhi1, BasisFunction<Dim>* cellPhi2)
 	{
 		return this->Acons(DOFNumber(cellPhi1), DOFNumber(cellPhi2));
 	}
-	double ConsistencyTerm(Face<Dim>* face, BasisFunction<Dim>* cellPhi, BasisFunction<Dim - 1> * facePhi)
+	inline double ConsistencyTerm(Face<Dim>* face, BasisFunction<Dim>* cellPhi, BasisFunction<Dim - 1> * facePhi)
 	{
 		return this->Acons(DOFNumber(cellPhi), DOFNumber(face, facePhi));
 	}
-	double ConsistencyTerm(Face<Dim>* face1, BasisFunction<Dim - 1> * facePhi1, Face<Dim>* face2, BasisFunction<Dim - 1> * facePhi2)
+	inline double ConsistencyTerm(Face<Dim>* face1, BasisFunction<Dim - 1> * facePhi1, Face<Dim>* face2, BasisFunction<Dim - 1> * facePhi2)
 	{
 		return this->Acons(DOFNumber(face1, facePhi1), DOFNumber(face2, facePhi2));
 	}
 
-	double StabilizationTerm(BasisFunction<Dim>* cellPhi1, BasisFunction<Dim>* cellPhi2)
+	inline double StabilizationTerm(BasisFunction<Dim>* cellPhi1, BasisFunction<Dim>* cellPhi2)
 	{
 		return this->Astab(DOFNumber(cellPhi1), DOFNumber(cellPhi2));
 	}
-	double StabilizationTerm(Face<Dim>* face, BasisFunction<Dim>* cellPhi, BasisFunction<Dim - 1> * facePhi)
+	inline double StabilizationTerm(Face<Dim>* face, BasisFunction<Dim>* cellPhi, BasisFunction<Dim - 1> * facePhi)
 	{
 		return this->Astab(DOFNumber(cellPhi), DOFNumber(face, facePhi));
 	}
-	double StabilizationTerm(Face<Dim>* face1, BasisFunction<Dim - 1> * facePhi1, Face<Dim>* face2, BasisFunction<Dim - 1> * facePhi2)
+	inline double StabilizationTerm(Face<Dim>* face1, BasisFunction<Dim - 1> * facePhi1, Face<Dim>* face2, BasisFunction<Dim - 1> * facePhi2)
 	{
 		return this->Astab(DOFNumber(face1, facePhi1), DOFNumber(face2, facePhi2));
 	}
 
-	double ReconstructionTerm(BasisFunction<Dim>* reconstructPhi, BasisFunction<Dim>* cellPhi2)
+	inline double ReconstructionTerm(BasisFunction<Dim>* reconstructPhi, BasisFunction<Dim>* cellPhi2)
 	{
 		return this->P(reconstructPhi->LocalNumber, DOFNumber(cellPhi2));
 	}
-	double ReconstructionTerm(BasisFunction<Dim>* reconstructPhi, Face<Dim>* face, BasisFunction<Dim - 1> * facePhi)
+	inline double ReconstructionTerm(BasisFunction<Dim>* reconstructPhi, Face<Dim>* face, BasisFunction<Dim - 1> * facePhi)
 	{
 		return this->P(reconstructPhi->LocalNumber, DOFNumber(face, facePhi));
 	}
 
 
 	virtual double SourceTerm(BasisFunction<Dim>* cellPhi, SourceFunction* f) = 0;
-	virtual double St(BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2) = 0;
+	virtual double IntegralGradGradReconstruct(BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2) = 0;
 	virtual double ComputeIntegralGradGrad(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) = 0;
 	virtual Eigen::MatrixXd CellMassMatrix(FunctionalBasis<Dim>* basis) = 0;
 	virtual Eigen::MatrixXd CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) = 0;
@@ -191,70 +190,58 @@ private:
 	{
 		this->P = Eigen::MatrixXd(ReconstructionBasis->Size(), CellBasis->Size() + this->Faces.size() * FaceBasis->Size());
 
-		Eigen::MatrixXd matrixToInvert = this->AssembleMatrixToInvert();
+		Eigen::MatrixXd reconstructionMatrixToInvert = this->AssembleReconstructionMatrixToInvert();
 		Eigen::MatrixXd rhsMatrix = this->AssembleRHSMatrix();
 
-		Eigen::ColPivHouseholderQR<Eigen::MatrixXd> solver = matrixToInvert.colPivHouseholderQr();
+		Eigen::ColPivHouseholderQR<Eigen::MatrixXd> solver = reconstructionMatrixToInvert.colPivHouseholderQr();
 		for (int j = 0; j < rhsMatrix.cols(); j++)
 		{
-			//cout << "----------------- col " << j << " ----------------" << endl;
 			Eigen::VectorXd col = solver.solve(rhsMatrix.col(j));
-			//cout << col << endl << endl;
 
 			// We don't keep the last element of the column, which is the Lagrange multiplier
-			//cout << "----------------- col " << j << " without Lagrange ----------------" << endl;
 			auto colWithoutLagrangeMultiplier = col.head(this->ReconstructionBasis->Size());
-			//cout << colWithoutLagrangeMultiplier << endl << endl;
-			//cout << "----------------- P(" << j << ") ----------------" << endl;
-			//cout << this->P.col(j) << endl << endl;
 			this->P.col(j) = colWithoutLagrangeMultiplier;
-
-			//cout << "----------------- P ----------------" << endl;
-			//cout << this->P << endl << endl;
 		}
-		//cout << this->P << endl << endl;
 
-		this->Acons = this->P.transpose() * matrixToInvert.topLeftCorner(this->ReconstructionBasis->Size(), this->ReconstructionBasis->Size()) * this->P;
+		Eigen::MatrixXd laplacianMatrix = reconstructionMatrixToInvert.topLeftCorner(this->ReconstructionBasis->Size(), this->ReconstructionBasis->Size()); // Grad-Grad part (block S)
+
+		this->Acons = this->P.transpose() * laplacianMatrix * this->P;
 	}
 
-	Eigen::MatrixXd AssembleMatrixToInvert()
+	Eigen::MatrixXd AssembleReconstructionMatrixToInvert()
 	{
 		Eigen::MatrixXd matrixToInvert(this->ReconstructionBasis->Size() + 1, this->ReconstructionBasis->Size() + 1);
-		//cout << matrixToInvert << endl << "----------------- matrixToInvert ----------------" << endl;
-		this->AssembleSt(matrixToInvert);
-		//cout << matrixToInvert << endl << "---------------- after AssembleSt -----------------" << endl;
-		this->AssembleLt(matrixToInvert);
-		//cout << matrixToInvert << endl << "---------------- after AssembleLt -----------------" << endl;
+		this->AssembleGradientReconstructionMatrix(matrixToInvert); // Block S
+		this->AssembleMeanValueCondition(matrixToInvert); // Blocks L and L_transpose
 		matrixToInvert.bottomRightCorner<1, 1>() << 0;
-		//cout << matrixToInvert << endl << "---------------- after 0 -----------------" << endl;
 		return matrixToInvert;
 	}
 
-	void AssembleSt(Eigen::MatrixXd & matrixToInvert)
+	void AssembleGradientReconstructionMatrix(Eigen::MatrixXd & reconstructionMatrixToInvert)
 	{
 		for (BasisFunction<Dim>* phi1 : this->ReconstructionBasis->LocalFunctions)
 		{
 			for (BasisFunction<Dim>* phi2 : this->ReconstructionBasis->LocalFunctions)
-				matrixToInvert(phi1->LocalNumber, phi2->LocalNumber) = this->St(phi1, phi2);
+				reconstructionMatrixToInvert(phi1->LocalNumber, phi2->LocalNumber) = this->IntegralGradGradReconstruct(phi1, phi2);
 		}
 	}
 
-	void AssembleLt(Eigen::MatrixXd & matrixToInvert)
+	void AssembleMeanValueCondition(Eigen::MatrixXd & reconstructionMatrixToInvert)
 	{
 		int last = this->ReconstructionBasis->NumberOfLocalFunctionsInElement(NULL);
 		for (BasisFunction<Dim>* phi : this->ReconstructionBasis->LocalFunctions)
 		{
-			double Lt = this->Lt(phi);
-			matrixToInvert(last, phi->LocalNumber) = Lt;
-			matrixToInvert(phi->LocalNumber, last) = Lt;
+			double meanValue = this->Integral(phi);
+			reconstructionMatrixToInvert(last, phi->LocalNumber) = meanValue;
+			reconstructionMatrixToInvert(phi->LocalNumber, last) = meanValue;
 		}
 	}
 
-	void AssembleMt(Eigen::MatrixXd & rhsMatrix)
+	void AssembleMeanValueConditionRHS(Eigen::MatrixXd & rhsMatrix)
 	{
 		int last = this->ReconstructionBasis->NumberOfLocalFunctionsInElement(NULL);
 		for (BasisFunction<Dim>* phi : this->CellBasis->LocalFunctions)
-			rhsMatrix(last, phi->LocalNumber) = this->Lt(phi);
+			rhsMatrix(last, phi->LocalNumber) = this->Integral(phi);
 	}
 
 	Eigen::MatrixXd AssembleRHSMatrix()
@@ -263,42 +250,42 @@ private:
 		auto nColumns = this->CellBasis->Size() + nFaceUnknowns;
 		Eigen::MatrixXd rhsMatrix(this->ReconstructionBasis->Size() + 1, nColumns);
 
-		// Top-left corner
-		this->AssembleBt(rhsMatrix);
+		// Top-left corner (Block Bt)
+		this->AssembleIntegrationByPartsRHS_cell(rhsMatrix);
 
-		// Top-right corner
+		// Top-right corner (Block B_frontier)
 		for (auto face : this->Faces)
-			this->AssembleBf(rhsMatrix, face);
+			this->AssembleIntegrationByPartsRHS_face(rhsMatrix, face);
 
-		// Bottom-left corner
-		this->AssembleMt(rhsMatrix);
+		// Bottom-left corner (Block Lt)
+		this->AssembleMeanValueConditionRHS(rhsMatrix);
 
-		// Bottom-right corner
+		// Bottom-right corner (0)
 		rhsMatrix.bottomRightCorner(1, nFaceUnknowns) << Eigen::ArrayXXd::Zero(1, nFaceUnknowns);
 
 		return rhsMatrix;
 	}
 
-	void AssembleBt(Eigen::MatrixXd & rhsMatrix)
+	void AssembleIntegrationByPartsRHS_cell(Eigen::MatrixXd & rhsMatrix)
 	{
 		for (BasisFunction<Dim>* reconstructPhi : this->ReconstructionBasis->LocalFunctions)
 		{
 			for (BasisFunction<Dim>* cellPhi : this->CellBasis->LocalFunctions)
-				rhsMatrix(reconstructPhi->LocalNumber, DOFNumber(cellPhi)) = this->Bt(reconstructPhi, cellPhi);
+				rhsMatrix(reconstructPhi->LocalNumber, DOFNumber(cellPhi)) = this->IntegrationByPartsRHS_cell(reconstructPhi, cellPhi);
 		}
 	}
 
-	void AssembleBf(Eigen::MatrixXd & rhsMatrix, Face<Dim> * f)
+	void AssembleIntegrationByPartsRHS_face(Eigen::MatrixXd & rhsMatrix, Face<Dim> * f)
 	{
 		Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
 		for (BasisFunction<Dim>* reconstructPhi : this->ReconstructionBasis->LocalFunctions)
 		{
 			for (BasisFunction<Dim - 1> * facePhi : this->FaceBasis->LocalFunctions)
-				rhsMatrix(reconstructPhi->LocalNumber, DOFNumber(face, facePhi)) = this->Bf(reconstructPhi, facePhi, face);
+				rhsMatrix(reconstructPhi->LocalNumber, DOFNumber(face, facePhi)) = this->IntegrationByPartsRHS_face(face, reconstructPhi, facePhi);
 		}
 	}
 
-	double Bt(BasisFunction<Dim>* reconstructPhi, BasisFunction<Dim>* cellPhi)
+	double IntegrationByPartsRHS_cell(BasisFunction<Dim>* reconstructPhi, BasisFunction<Dim>* cellPhi)
 	{
 		if (reconstructPhi->GetDegree() == 0)
 			return 0;
@@ -327,7 +314,7 @@ private:
 		return integralGradGrad - sumFaces;
 	}
 
-	double Bf(BasisFunction<Dim>* reconstructPhi, BasisFunction<Dim-1>* facePhi, Poisson_HHO_Face<Dim>* face)
+	double IntegrationByPartsRHS_face(Poisson_HHO_Face<Dim>* face, BasisFunction<Dim>* reconstructPhi, BasisFunction<Dim-1>* facePhi)
 	{
 		if (reconstructPhi->GetDegree() == 0)
 			return 0;
@@ -341,11 +328,6 @@ private:
 
 		int polynomialDegree = reconstructPhi->GetDegree() - 1 + facePhi->GetDegree();
 		return face->ComputeIntegral(functionToIntegrate, polynomialDegree);
-	}
-
-	double Lt(BasisFunction<Dim>* phi)
-	{
-		return this->Integral(phi);
 	}
 
 	//---------------------------------------------//
