@@ -7,8 +7,8 @@ class Level
 {
 public:
 	int Number;
-
 	Eigen::SparseMatrix<double> OperatorMatrix;
+	bool UseGalerkinOperator = true;
 
 	Smoother* PreSmoother;
 	Smoother* PostSmoother;
@@ -16,6 +16,11 @@ public:
 	Level* FinerLevel = NULL;
 	Level* CoarserLevel = NULL;
 
+protected:
+	Eigen::SparseMatrix<double> R;
+	Eigen::SparseMatrix<double> P;
+
+public:
 	Level(int number, Smoother* preSmoother, Smoother* postSmoother)
 	{
 		this->Number = number;
@@ -33,27 +38,59 @@ public:
 		return this->CoarserLevel == NULL;
 	}
 
-	/*virtual void Setup(const Eigen::SparseMatrix<double>& finerLevelOperatorMatrix)
+	void Setup()
 	{
-		if (!this->IsCoarsestLevel())
+		cout << "\tSetup level " << this->Number << endl;
+
+		if (this->IsFinestLevel())
 		{
-			SetupRestriction();
-			SetupProlongation();
+			cout << "\t\tFine grid operator: "; cout.flush();
+			cout << Utils::MatrixInfo(this->OperatorMatrix, "A") << endl;
+		}
+		else
+		{
+			if (this->UseGalerkinOperator)
+			{
+				cout << "\t\tGalerkin operator : "; cout.flush();
+				this->OperatorMatrix = (FinerLevel->R * FinerLevel->OperatorMatrix * FinerLevel->P).pruned();
+			}
+			else
+			{
+				cout << "\t\tDiscretized operator: "; cout.flush();
+				SetupDiscretizedOperator();
+			}
+			cout << Utils::MatrixInfo(this->OperatorMatrix, "A") << endl;
 		}
 
-		SetupOperator(finerLevelOperatorMatrix);
-
-		//---- Can be done async ----//
 		if (!this->IsCoarsestLevel())
-			this->CoarserLevel->Setup(this->OperatorMatrix);
-		//---------------------------//
+		{
+			cout << "\t\tProlongation      : "; cout.flush();
+			SetupProlongation();
+			cout << Utils::MatrixInfo(this->P, "P") << endl;
+
+			cout << "\t\tRestriction       : "; cout.flush();
+			SetupRestriction();
+			cout << Utils::MatrixInfo(this->R, "R") << endl;
+		}
 
 		if (!this->IsCoarsestLevel())
+		{
+			cout << "\t\tSmoothers..." << endl;
 			SetupSmoothers();
-	}*/
+		}
+	}
 
-	virtual Eigen::VectorXd Restrict(Eigen::VectorXd& vectorOnThisLevel) = 0;
-	virtual Eigen::VectorXd Prolong(Eigen::VectorXd& vectorOnTheCoarserLevel) = 0;
+	Eigen::VectorXd Restrict(Eigen::VectorXd& vectorOnThisLevel)
+	{
+		Eigen::VectorXd coarseVector = R * vectorOnThisLevel;
+		return coarseVector;
+	}
+
+	Eigen::VectorXd Prolong(Eigen::VectorXd& vectorOnTheCoarserLevel)
+	{
+		Eigen::VectorXd vectorOnThisLevel = P * vectorOnTheCoarserLevel;
+		return vectorOnThisLevel;
+	}
 
 	virtual void ExportVector(Eigen::VectorXd& v, string suffix) = 0;
 
@@ -66,9 +103,9 @@ public:
 	}
 
 protected:
-	/*virtual void SetupRestriction() = 0;
+	virtual void SetupDiscretizedOperator() {}
+	virtual void SetupRestriction() = 0;
 	virtual void SetupProlongation() = 0;
-	virtual void SetupOperator(const Eigen::SparseMatrix<double>& A) = 0;*/
 
 	void SetupSmoothers()
 	{

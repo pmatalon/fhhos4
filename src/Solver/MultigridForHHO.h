@@ -12,70 +12,13 @@ template <int Dim>
 class LevelForHHO : public Level
 {
 private:
-	Eigen::SparseMatrix<double> R;
-	Eigen::SparseMatrix<double> P;
 	Poisson_HHO<Dim>* _problem;
 public:
 	LevelForHHO(int number, Poisson_HHO<Dim>* problem)
 		: Level(number, new BlockGaussSeidelSmoother(problem->HHO.nLocalFaceUnknowns, 1), new ReverseBlockGaussSeidelSmoother(problem->HHO.nLocalFaceUnknowns, 1))
 	{
+		this->UseGalerkinOperator = true;
 		this->_problem = problem;
-	}
-
-	void Setup()
-	{
-		cout << "\tSetup level " << this->Number << endl;
-		/*this->OperatorMatrix = this->_problem->A;
-		if (!this->IsCoarsestLevel())
-		{
-			SetupProlongation();
-			SetupRestriction();
-			SetupSmoothers();
-		}*/
-
-		// Galerkin operator
-		if (!this->IsCoarsestLevel())
-		{
-			cout << "\t\tProlongation      : "; cout.flush();
-			SetupProlongation();
-			cout << Utils::MatrixInfo(this->P, "P") << endl;
-
-			cout << "\t\tRestriction       : "; cout.flush();
-			SetupRestriction();
-			cout << Utils::MatrixInfo(this->R, "R") << endl;
-		}
-		
-		if (this->IsFinestLevel())
-		{
-			cout << "\t\tFine grid operator: "; cout.flush();
-			this->OperatorMatrix = this->_problem->A;
-			cout << Utils::MatrixInfo(this->OperatorMatrix, "A") << endl;
-		}
-		else
-		{
-			LevelForHHO<Dim>* finerLevel = dynamic_cast<LevelForHHO<Dim>*>(FinerLevel);
-			cout << "\t\tGalerkin operator : "; cout.flush();
-			this->OperatorMatrix = (finerLevel->R * finerLevel->OperatorMatrix * finerLevel->P).pruned();
-			cout << Utils::MatrixInfo(this->OperatorMatrix, "A") << endl;
-		}
-
-		if (!this->IsCoarsestLevel())
-		{
-			cout << "\t\tSmoothers..." << endl;
-			SetupSmoothers();
-		}		
-	}
-
-	Eigen::VectorXd Restrict(Eigen::VectorXd& vectorOnThisLevel) override
-	{
-		Eigen::VectorXd coarseVector = R * vectorOnThisLevel;
-		return coarseVector;
-	}
-	
-	Eigen::VectorXd Prolong(Eigen::VectorXd& vectorOnTheCoarserLevel)  override
-	{
-		Eigen::VectorXd vectorOnThisLevel = P * vectorOnTheCoarserLevel;
-		return vectorOnThisLevel;
 	}
 
 	void ExportVector(Eigen::VectorXd& v, string suffix)
@@ -84,8 +27,12 @@ public:
 	}
 
 private:
+	void SetupDiscretizedOperator() override 
+	{
+		this->OperatorMatrix = this->_problem->A;
+	}
 
-	void SetupProlongation()
+	void SetupProlongation() override
 	{
 		Poisson_HHO<Dim>* finePb = this->_problem;
 		Poisson_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
@@ -113,7 +60,7 @@ private:
 		finePb->ExportMatrix(P, "P");
 	}
 
-	void SetupRestriction()
+	void SetupRestriction() override
 	{
 		Poisson_HHO<Dim>* finePb = this->_problem;
 		Poisson_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
@@ -405,7 +352,7 @@ public:
 		this->_fineLevel = new LevelForHHO<Dim>(0, problem);
 	}
 	
-	virtual void Serialize(ostream& os) const override
+	void Serialize(ostream& os) const override
 	{
 		os << "MultigridForHHO" << endl;
 		os << "\t" << "Levels        : ";
@@ -426,6 +373,7 @@ public:
 		cout << "Setup..." << endl;
 
 		LevelForHHO<Dim>* finerLevel = dynamic_cast<LevelForHHO<Dim>*>(this->_fineLevel);
+		finerLevel->OperatorMatrix = A;
 		Poisson_HHO<Dim>* problem = _problem;
 		if (!_automaticNumberOfLevels)
 		{
