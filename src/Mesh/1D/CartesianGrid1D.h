@@ -1,7 +1,7 @@
 #pragma once
 #include "../Mesh.h"
 #include "Interval.h"
-#include "PointFace.h"
+#include "InterfacePoint.h"
 
 class CartesianGrid1D : public Mesh<1>
 {
@@ -14,14 +14,14 @@ public:
 
 		for (BigNumber k = 0; k < n + 1; k++)
 		{
-			PointFace* point = new PointFace(k, k * h);
+			InterfacePoint* point = new InterfacePoint(k, k * h);
 			this->Faces.push_back(point);
 		}
 
 		for (BigNumber k = 0; k < n; k++)
 		{
-			PointFace* leftPoint = dynamic_cast<PointFace*>(this->Faces[k]);
-			PointFace* rightPoint = dynamic_cast<PointFace*>(this->Faces[k+1]);
+			InterfacePoint* leftPoint = dynamic_cast<InterfacePoint*>(this->Faces[k]);
+			InterfacePoint* rightPoint = dynamic_cast<InterfacePoint*>(this->Faces[k+1]);
 			Interval* element = new Interval(k, leftPoint->X, rightPoint->X, leftPoint, rightPoint);
 			this->Elements.push_back(element);
 		}

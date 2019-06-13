@@ -134,9 +134,6 @@
     <ClInclude Include="src/Mesh/1D/Interval.h">
       <Filter>Mesh\1D</Filter>
     </ClInclude>
-    <ClInclude Include="src/Mesh/1D/PointFace.h">
-      <Filter>Mesh\1D</Filter>
-    </ClInclude>
     <ClInclude Include="src/Mesh/2D/CartesianGrid2D.h">
       <Filter>Mesh\2D</Filter>
     </ClInclude>
@@ -160,6 +157,9 @@
     </ClInclude>
     <ClInclude Include="src/Mesh/2D/Square.h">
       <Filter>Mesh\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\1D\InterfacePoint.h">
+      <Filter>Mesh\1D</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

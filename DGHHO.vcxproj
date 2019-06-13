@@ -112,7 +112,7 @@
     <ClInclude Include="src/Mesh/3D/CartesianGrid3D.h" />
     <ClInclude Include="src/Mesh/Element.h" />
     <ClInclude Include="src/Mesh/3D/Parallelepiped.h" />
-    <ClInclude Include="src/Mesh/1D/PointFace.h" />
+    <ClInclude Include="src\Mesh\1D\InterfacePoint.h" />
     <ClInclude Include="src/Mesh/2D/Edge.h" />
     <ClInclude Include="src/Mesh/2D/Rectangle.h" />
     <ClInclude Include="src\Mesh\ReferenceCartesianShape.h" />

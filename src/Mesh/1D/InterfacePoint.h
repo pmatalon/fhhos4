@@ -3,12 +3,12 @@
 #include "../../DG/Poisson_DG_Face.h"
 #include "Interval.h"
 
-class PointFace : virtual public Face<1>, public Poisson_DG_Face<1>
+class InterfacePoint : virtual public Face<1>, public Poisson_DG_Face<1>
 {
 public:
 	double X;
 
-	PointFace(BigNumber number, double x) : Face(number, NULL, NULL), Poisson_DG_Face(number, NULL, NULL)
+	InterfacePoint(BigNumber number, double x) : Face(number, NULL, NULL), Poisson_DG_Face(number, NULL, NULL)
 	{
 		this->X = x;
 		this->IsDomainBoundary = false;
