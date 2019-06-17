@@ -82,26 +82,20 @@ private:
 	{
 		int faceLocalUnknowns = problem->HHO.nLocalFaceUnknowns;
 
-		ElementParallelLoop<Dim> parallelLoop(problem->_mesh->Elements);
-		parallelLoop.ReserveChunkCoeffsSize(4 * faceLocalUnknowns * faceLocalUnknowns);
-		parallelLoop.Execute([this, faceLocalUnknowns](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+		FaceParallelLoop<Dim> parallelLoop(problem->_mesh->Faces);
+		parallelLoop.ReserveChunkCoeffsSize(faceLocalUnknowns * faceLocalUnknowns);
+		parallelLoop.Execute([this, faceLocalUnknowns](Face<Dim>* f, ParallelChunk<CoeffsChunk>* chunk)
 			{
-				Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
-				for (auto f : element->Faces)
-				{
-					if (f->IsDomainBoundary)
-						continue;
+				if (f->IsDomainBoundary)
+					return;
 
-					Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+				Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
 
-					double weight = Weight(element, face);
-					Eigen::MatrixXd M_face = face->FaceMassMatrix();
+				Eigen::MatrixXd M_face = face->FaceMassMatrix();
 
-					BigNumber faceGlobalNumber = face->Number;
-					BigNumber faceLocalNumber = element->LocalNumberOf(face);
+				BigNumber faceGlobalNumber = face->Number;
 
-					chunk->Results.Coeffs.Add(faceGlobalNumber*faceLocalUnknowns, faceGlobalNumber*faceLocalUnknowns, weight * M_face);
-				}
+				chunk->Results.Coeffs.Add(faceGlobalNumber*faceLocalUnknowns, faceGlobalNumber*faceLocalUnknowns, M_face);
 			});
 		Eigen::SparseMatrix<double> M(problem->HHO.nTotalFaceUnknowns, problem->HHO.nTotalFaceUnknowns);
 		parallelLoop.Fill(M);
@@ -113,26 +107,20 @@ private:
 	{
 		int faceLocalUnknowns = problem->HHO.nLocalFaceUnknowns;
 
-		ElementParallelLoop<Dim> parallelLoop(problem->_mesh->Elements);
-		parallelLoop.ReserveChunkCoeffsSize(4 * faceLocalUnknowns * faceLocalUnknowns);
-		parallelLoop.Execute([this, faceLocalUnknowns](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+		FaceParallelLoop<Dim> parallelLoop(problem->_mesh->Faces);
+		parallelLoop.ReserveChunkCoeffsSize(faceLocalUnknowns * faceLocalUnknowns);
+		parallelLoop.Execute([this, faceLocalUnknowns](Face<Dim>* f, ParallelChunk<CoeffsChunk>* chunk)
 			{
-				Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
-				for (auto f : element->Faces)
-				{
-					if (f->IsDomainBoundary)
-						continue;
+				if (f->IsDomainBoundary)
+					return;
 
-					Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+				Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
 
-					double weight = Weight(element, face);
-					Eigen::MatrixXd invM_face = face->InvFaceMassMatrix();
+				Eigen::MatrixXd invM_face = face->InvFaceMassMatrix();
 
-					BigNumber faceGlobalNumber = face->Number;
-					BigNumber faceLocalNumber = element->LocalNumberOf(face);
+				BigNumber faceGlobalNumber = face->Number;
 
-					chunk->Results.Coeffs.Add(faceGlobalNumber*faceLocalUnknowns, faceGlobalNumber*faceLocalUnknowns, invM_face / weight);
-				}
+				chunk->Results.Coeffs.Add(faceGlobalNumber*faceLocalUnknowns, faceGlobalNumber*faceLocalUnknowns, invM_face);
 			});
 		Eigen::SparseMatrix<double> M(problem->HHO.nTotalFaceUnknowns, problem->HHO.nTotalFaceUnknowns);
 		parallelLoop.Fill(M);
@@ -162,8 +150,12 @@ private:
 	FunctionalBasis<Dim>* GetCellInterpolationBasis(Poisson_HHO<Dim>* problem)
 	{
 		int faceDegreePSpace = dynamic_cast<Poisson_HHO_Element<Dim>*>(problem->_mesh->Elements[0])->FaceBasis->GetDegree();
-		int cellDegreeQSpace = (int)floor(2 * sqrt(faceDegreePSpace + 1) - 1);
-		FunctionalBasis<Dim>* cellInterpolationBasis = new FunctionalBasis<Dim>("monomials", cellDegreeQSpace, true);
+
+		//int cellDegreeQSpace = (int)floor(2 * sqrt(faceDegreePSpace + 1) - 1);
+		//FunctionalBasis<Dim>* cellInterpolationBasis = new FunctionalBasis<Dim>("monomials", cellDegreeQSpace, true);
+		int cellDegreePSpace = faceDegreePSpace + 1;
+		FunctionalBasis<Dim>* cellInterpolationBasis = new FunctionalBasis<Dim>("monomials", cellDegreePSpace, false);
+
 		return cellInterpolationBasis;
 	}
 
