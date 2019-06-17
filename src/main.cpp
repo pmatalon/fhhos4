@@ -209,11 +209,13 @@ int main(int argc, char* argv[])
 			Poisson_DG<1>* problem = new Poisson_DG<1>(solution, sourceFunction, diffusionPartition, outputDirectory);
 			FunctionalBasis<1>* basis = new FunctionalBasis<1>(basisCode, polyDegree);
 
+			cout << endl;
 			cout << "----------------------- Assembly -------------------------" << endl;
 			problem->Assemble(mesh, basis, penalizationCoefficient, action);
 
 			if ((action & Action::SolveSystem) == Action::SolveSystem)
 			{
+				cout << endl;
 				cout << "------------------- Linear system resolution ------------------" << endl;
 				problem->Solve();
 				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
@@ -270,6 +272,7 @@ int main(int argc, char* argv[])
 			Poisson_DG<2>* problem = new Poisson_DG<2>(solution, sourceFunction, diffusionPartition, outputDirectory);
 			FunctionalBasis<2>* basis = new FunctionalBasis<2>(basisCode, polyDegree, fullTensorization);
 
+			cout << endl;
 			cout << "----------------------- Assembly -------------------------" << endl;
 			problem->Assemble(mesh, basis, penalizationCoefficient, action);
 
@@ -293,11 +296,13 @@ int main(int argc, char* argv[])
 
 			Poisson_HHO<2>* problem = new Poisson_HHO<2>(mesh, solution, sourceFunction, reconstructionBasis, cellBasis, faceBasis, staticCondensation, outputDirectory);
 
+			cout << endl;
 			cout << "----------------------- Assembly -------------------------" << endl;
 			problem->Assemble(action);
 
 			if ((action & Action::SolveSystem) == Action::SolveSystem)
 			{
+				cout << endl;
 				cout << "------------------- Linear system resolution ------------------" << endl;
 				if (staticCondensation && mesh->N > 2)
 				{
@@ -364,6 +369,7 @@ int main(int argc, char* argv[])
 
 		if (discretization.compare("dg") == 0)
 		{
+			cout << endl;
 			cout << "----------------------- Assembly -------------------------" << endl;
 			Poisson_DG<3>* problem = new Poisson_DG<3>(solution, sourceFunction, diffusionPartition, outputDirectory);
 			FunctionalBasis<3>* basis = new FunctionalBasis<3>(basisCode, polyDegree, fullTensorization);
@@ -391,11 +397,13 @@ int main(int argc, char* argv[])
 
 			Poisson_HHO<3>* problem = new Poisson_HHO<3>(mesh, solution, sourceFunction, reconstructionBasis, cellBasis, faceBasis, staticCondensation, outputDirectory);
 
+			cout << endl;
 			cout << "----------------------- Assembly -------------------------" << endl;
 			problem->Assemble(action);
 
 			if ((action & Action::SolveSystem) == Action::SolveSystem)
 			{
+				cout << endl;
 				cout << "------------------- Linear system resolution ------------------" << endl;
 				problem->Solve();
 				problem->ReconstructSolution();

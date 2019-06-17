@@ -146,6 +146,19 @@ public:
 		return hybridVector;
 	}
 
+	inline double MatrixTerm(BasisFunction<Dim>* cellPhi1, BasisFunction<Dim>* cellPhi2)
+	{
+		return this->A(DOFNumber(cellPhi1), DOFNumber(cellPhi2));
+	}
+	inline double MatrixTerm(Face<Dim>* face, BasisFunction<Dim>* cellPhi, BasisFunction<Dim - 1> * facePhi)
+	{
+		return this->A(DOFNumber(cellPhi), DOFNumber(face, facePhi));
+	}
+	inline double MatrixTerm(Face<Dim>* face1, BasisFunction<Dim - 1> * facePhi1, Face<Dim>* face2, BasisFunction<Dim - 1> * facePhi2)
+	{
+		return this->A(DOFNumber(face1, facePhi1), DOFNumber(face2, facePhi2));
+	}
+
 	inline double ConsistencyTerm(BasisFunction<Dim>* cellPhi1, BasisFunction<Dim>* cellPhi2)
 	{
 		return this->Acons(DOFNumber(cellPhi1), DOFNumber(cellPhi2));

@@ -133,19 +133,21 @@ public:
 
 		ParallelLoop<Element<Dim>*, EmptyResultChunk> parallelLoop(mesh->Elements);
 
-		vector<NonZeroCoefficients> chunksConsistencyCoeffs(parallelLoop.NThreads);
-		vector<NonZeroCoefficients> chunksStabilizationCoeffs(parallelLoop.NThreads);
-		vector<NonZeroCoefficients> chunksReconstructionCoeffs(parallelLoop.NThreads);
+		vector<NonZeroCoefficients> chunksMatrixCoeffs(parallelLoop.NThreads);
+		vector<NonZeroCoefficients> chunksConsistencyCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? parallelLoop.NThreads : 0);
+		vector<NonZeroCoefficients> chunksStabilizationCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? parallelLoop.NThreads : 0);
+		vector<NonZeroCoefficients> chunksReconstructionCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? parallelLoop.NThreads : 0);
 		
 		for (unsigned int threadNumber = 0; threadNumber < parallelLoop.NThreads; threadNumber++)
 		{
 			ParallelChunk<EmptyResultChunk>* chunk = parallelLoop.Chunks[threadNumber];
 
-			chunk->ThreadFuture = std::async([this, &hho, mesh, cellBasis, faceBasis, reconstructionBasis, action, chunk, &chunksConsistencyCoeffs, &chunksStabilizationCoeffs, &chunksReconstructionCoeffs]()
+			chunk->ThreadFuture = std::async([this, &hho, mesh, cellBasis, faceBasis, reconstructionBasis, action, chunk, &chunksMatrixCoeffs, &chunksConsistencyCoeffs, &chunksStabilizationCoeffs, &chunksReconstructionCoeffs]()
 				{
 					BigNumber nnzApproximate = chunk->Size() * (pow(hho.nLocalCellUnknowns, 2) + 4 * pow(hho.nLocalFaceUnknowns, 2) + hho.nLocalCellUnknowns * 4 * hho.nLocalFaceUnknowns);
-					NonZeroCoefficients consistencyCoeffs(nnzApproximate);
-					NonZeroCoefficients stabilizationCoeffs(nnzApproximate);
+					NonZeroCoefficients matrixCoeffs(nnzApproximate);
+					NonZeroCoefficients consistencyCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
+					NonZeroCoefficients stabilizationCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
 					NonZeroCoefficients reconstructionCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
 
 					for (BigNumber iElem = chunk->Start; iElem < chunk->End; iElem++)
@@ -164,11 +166,17 @@ public:
 							for (BasisFunction<Dim>* cellPhi2 : cellBasis->LocalFunctions)
 							{
 								BigNumber j = DOFNumber(element, cellPhi2);
-								double consistencyTerm = element->ConsistencyTerm(cellPhi1, cellPhi2);
-								consistencyCoeffs.Add(i, j, consistencyTerm);
 
-								double stabilizationTerm = element->StabilizationTerm(cellPhi1, cellPhi2);
-								stabilizationCoeffs.Add(i, j, stabilizationTerm);
+								double matrixTerm = element->MatrixTerm(cellPhi1, cellPhi2);
+								matrixCoeffs.Add(i, j, matrixTerm);
+								if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
+								{
+									double consistencyTerm = element->ConsistencyTerm(cellPhi1, cellPhi2);
+									consistencyCoeffs.Add(i, j, consistencyTerm);
+
+									double stabilizationTerm = element->StabilizationTerm(cellPhi1, cellPhi2);
+									stabilizationCoeffs.Add(i, j, stabilizationTerm);
+								}
 							}
 						}
 
@@ -185,13 +193,19 @@ public:
 								{
 									BigNumber j = DOFNumber(face, facePhi);
 
-									double consistencyTerm = element->ConsistencyTerm(face, cellPhi, facePhi);
-									consistencyCoeffs.Add(i, j, consistencyTerm);
-									consistencyCoeffs.Add(j, i, consistencyTerm);
+									double matrixTerm = element->MatrixTerm(face, cellPhi, facePhi);
+									matrixCoeffs.Add(i, j, matrixTerm);
+									matrixCoeffs.Add(j, i, matrixTerm);
+									if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
+									{
+										double consistencyTerm = element->ConsistencyTerm(face, cellPhi, facePhi);
+										consistencyCoeffs.Add(i, j, consistencyTerm);
+										consistencyCoeffs.Add(j, i, consistencyTerm);
 
-									double stabilizationTerm = element->StabilizationTerm(face, cellPhi, facePhi);
-									stabilizationCoeffs.Add(i, j, stabilizationTerm);
-									stabilizationCoeffs.Add(j, i, stabilizationTerm);
+										double stabilizationTerm = element->StabilizationTerm(face, cellPhi, facePhi);
+										stabilizationCoeffs.Add(i, j, stabilizationTerm);
+										stabilizationCoeffs.Add(j, i, stabilizationTerm);
+									}
 								}
 							}
 						}
@@ -214,12 +228,16 @@ public:
 									{
 										BigNumber j = DOFNumber(face2, facePhi2);
 
-										double consistencyTerm = element->ConsistencyTerm(face1, facePhi1, face2, facePhi2);
-										consistencyCoeffs.Add(i, j, consistencyTerm);
-										//consistencyCoeffs.Add(j, i, consistencyTerm);
+										double matrixTerm = element->MatrixTerm(face1, facePhi1, face2, facePhi2);
+										matrixCoeffs.Add(i, j, matrixTerm);
+										if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
+										{
+											double consistencyTerm = element->ConsistencyTerm(face1, facePhi1, face2, facePhi2);
+											consistencyCoeffs.Add(i, j, consistencyTerm);
 
-										double stabilizationTerm = element->StabilizationTerm(face1, facePhi1, face2, facePhi2);
-										stabilizationCoeffs.Add(i, j, stabilizationTerm);
+											double stabilizationTerm = element->StabilizationTerm(face1, facePhi1, face2, facePhi2);
+											stabilizationCoeffs.Add(i, j, stabilizationTerm);
+										}
 									}
 								}
 							}
@@ -266,9 +284,13 @@ public:
 						}
 					}
 
-					chunksConsistencyCoeffs[chunk->ThreadNumber] = consistencyCoeffs;
-					chunksStabilizationCoeffs[chunk->ThreadNumber] = stabilizationCoeffs;
-					chunksReconstructionCoeffs[chunk->ThreadNumber] = reconstructionCoeffs;
+					chunksMatrixCoeffs[chunk->ThreadNumber] = matrixCoeffs;
+					if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
+					{
+						chunksConsistencyCoeffs[chunk->ThreadNumber] = consistencyCoeffs;
+						chunksStabilizationCoeffs[chunk->ThreadNumber] = stabilizationCoeffs;
+						chunksReconstructionCoeffs[chunk->ThreadNumber] = reconstructionCoeffs;
+					}
 				}
 			);
 		}
@@ -278,34 +300,40 @@ public:
 		//------------------------------------//
 
 		BigNumber nnzApproximate = mesh->Elements.size() * (pow(hho.nLocalCellUnknowns, 2) + 4 * pow(hho.nLocalFaceUnknowns, 2) + hho.nLocalCellUnknowns * 4 * hho.nLocalFaceUnknowns);
-		NonZeroCoefficients consistencyCoeffs(nnzApproximate);
-		NonZeroCoefficients stabilizationCoeffs(nnzApproximate);
+		NonZeroCoefficients matrixCoeffs(nnzApproximate);
+		NonZeroCoefficients consistencyCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
+		NonZeroCoefficients stabilizationCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
 		NonZeroCoefficients reconstructionCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
 
 		parallelLoop.Wait();
 
 		for (unsigned int threadNumber = 0; threadNumber < parallelLoop.NThreads; threadNumber++)
 		{
-			consistencyCoeffs.Add(chunksConsistencyCoeffs[threadNumber]);
-			stabilizationCoeffs.Add(chunksStabilizationCoeffs[threadNumber]);
-			reconstructionCoeffs.Add(chunksReconstructionCoeffs[threadNumber]);
+			matrixCoeffs.Add(chunksMatrixCoeffs[threadNumber]);
+			if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
+			{
+				consistencyCoeffs.Add(chunksConsistencyCoeffs[threadNumber]);
+				stabilizationCoeffs.Add(chunksStabilizationCoeffs[threadNumber]);
+				reconstructionCoeffs.Add(chunksReconstructionCoeffs[threadNumber]);
+			}
 		}
 
-		chunksConsistencyCoeffs.clear();
-		chunksStabilizationCoeffs.clear();
-		chunksReconstructionCoeffs.clear();
+		chunksMatrixCoeffs.clear();
+		if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
+		{
+			chunksConsistencyCoeffs.clear();
+			chunksStabilizationCoeffs.clear();
+			chunksReconstructionCoeffs.clear();
+		}
 
 		//--------------------------//
 		// Creation of the matrices //
 		//--------------------------//
 
-		Eigen::SparseMatrix<double> Acons = Eigen::SparseMatrix<double>(hho.nTotalHybridUnknowns, hho.nTotalHybridUnknowns);
-		consistencyCoeffs.Fill(Acons);
+		Eigen::SparseMatrix<double> globalMatrix = Eigen::SparseMatrix<double>(hho.nTotalHybridUnknowns, hho.nTotalHybridUnknowns);
+		matrixCoeffs.Fill(globalMatrix);
 
-		Eigen::SparseMatrix<double> Astab = Eigen::SparseMatrix<double>(hho.nTotalHybridUnknowns, hho.nTotalHybridUnknowns);
-		stabilizationCoeffs.Fill(Astab);
-
-		this->_globalMatrix = Acons + Astab;
+		this->_globalMatrix = globalMatrix;
 		if (this->_staticCondensation)
 		{
 			if ((action & Action::LogAssembly) == Action::LogAssembly)
@@ -330,10 +358,7 @@ public:
 		}
 
 		if ((action & Action::LogAssembly) == Action::LogAssembly)
-			cout << "nnz(A) = " << this->A.nonZeros() << endl;
-
-		Eigen::SparseMatrix<double> reconstructionMatrix = Eigen::SparseMatrix<double>(hho.nElements * reconstructionBasis->Size(), hho.nTotalHybridCoeffs);
-		reconstructionCoeffs.Fill(reconstructionMatrix);
+			cout << Utils::MatrixInfo(this->A, "A") << endl;
 
 		//------------------//
 		//      Export      //
@@ -351,6 +376,15 @@ public:
 
 		if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
 		{
+			Eigen::SparseMatrix<double> Acons = Eigen::SparseMatrix<double>(hho.nTotalHybridUnknowns, hho.nTotalHybridUnknowns);
+			consistencyCoeffs.Fill(Acons);
+
+			Eigen::SparseMatrix<double> Astab = Eigen::SparseMatrix<double>(hho.nTotalHybridUnknowns, hho.nTotalHybridUnknowns);
+			stabilizationCoeffs.Fill(Astab);
+
+			Eigen::SparseMatrix<double> reconstructionMatrix = Eigen::SparseMatrix<double>(hho.nElements * reconstructionBasis->Size(), hho.nTotalHybridCoeffs);
+			reconstructionCoeffs.Fill(reconstructionMatrix);
+
 			Eigen::saveMarket(Acons, consistencyFilePath);
 			cout << "Consistency part exported to      " << consistencyFilePath << endl;
 
