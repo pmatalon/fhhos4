@@ -152,7 +152,6 @@ private:
 				Eigen::MatrixXd M_cell = element->CellMassMatrix();
 				Eigen::MatrixXd invM_cell = M_cell.inverse();
 				chunk->Results.Coeffs.Add(element->Number*cellLocalUnknowns, element->Number*cellLocalUnknowns, invM_cell);
-				
 			});
 		Eigen::SparseMatrix<double> M(problem->HHO.nTotalCellUnknowns, problem->HHO.nTotalCellUnknowns);
 		parallelLoop.Fill(M);
@@ -170,8 +169,11 @@ private:
 
 	Eigen::SparseMatrix<double> GetGlobalInterpolationMatrixFromFacesToCells(Poisson_HHO<Dim>* problem)
 	{
-		return GetAdjointToGlobalProjUsingCellInnerProduct(problem);
+		//return GetAdjointToGlobalProjUsingCellInnerProduct(problem);
+		return GetReconstructionMatrix(problem);
 	}
+
+
 
 	Eigen::SparseMatrix<double> GetAdjointToGlobalProjUsingCellInnerProduct(Poisson_HHO<Dim>* problem)
 	{
@@ -214,6 +216,41 @@ private:
 		delete cellInterpolationBasis;
 
 		return I;
+	}
+
+	Eigen::SparseMatrix<double> GetReconstructionMatrix(Poisson_HHO<Dim>* problem)
+	{
+		int nCellUnknowns = problem->HHO.nLocalCellUnknowns;
+		int nFaceUnknowns = problem->HHO.nLocalFaceUnknowns;
+
+		FunctionalBasis<Dim>* cellInterpolationBasis = GetCellInterpolationBasis(problem);
+
+		ElementParallelLoop<Dim> parallelLoop(problem->_mesh->Elements);
+		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nFaceUnknowns);
+
+		parallelLoop.Execute([this, nFaceUnknowns, cellInterpolationBasis](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
+				for (auto f : element->Faces)
+				{
+					if (f->IsDomainBoundary)
+						continue;
+
+					Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+
+					BigNumber elemGlobalNumber = element->Number;
+					BigNumber faceGlobalNumber = face->Number;
+					BigNumber faceLocalNumber = element->LocalNumberOf(face);
+					Eigen::MatrixXd reconstructMatrix = element->ReconstructionFromFacesMatrix();
+					chunk->Results.Coeffs.Add(elemGlobalNumber * cellInterpolationBasis->Size(), faceGlobalNumber * nFaceUnknowns, reconstructMatrix.col(faceLocalNumber));
+				}
+			});
+
+		Eigen::SparseMatrix<double> M(problem->HHO.nElements * cellInterpolationBasis->Size(), problem->HHO.nTotalFaceUnknowns);
+		parallelLoop.Fill(M);
+		delete cellInterpolationBasis;
+
+		return M;
 	}
 
 	Eigen::SparseMatrix<double> GetGlobalProjectorMatrixFromCellsToFaces(Poisson_HHO<Dim>* problem)

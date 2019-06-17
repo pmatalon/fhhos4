@@ -25,6 +25,9 @@ public:
 	// Stabilization contribution
 	Eigen::MatrixXd Astab;
 
+	// Local operator matrix (= Acons + Astab)
+	Eigen::MatrixXd A;
+
 	Eigen::MatrixXd invAtt;
 
 	Poisson_HHO_Element(BigNumber number) : Element<Dim>(number) {}
@@ -55,11 +58,12 @@ public:
 		int nCellUnknowns = cellBasis->Size();
 		int nTotalFaceUnknowns = this->Faces.size() * faceBasis->Size();
 
-		auto A = Acons + Astab;
+		this->A = Acons + Astab;
 		auto Att = A.topLeftCorner(nCellUnknowns, nCellUnknowns);
 		//auto Aff = A.bottomRightCorner(nTotalFaceUnknowns, nTotalFaceUnknowns);
-		//auto Atf = A.topRightCorner(nCellUnknowns, nTotalFaceUnknowns);
+		auto Atf = A.topRightCorner(nCellUnknowns, nTotalFaceUnknowns);
 		this->invAtt = Att.inverse();
+		
 	}
 
 	Eigen::MatrixXd CellMassMatrix()
@@ -102,7 +106,7 @@ public:
 
 	Eigen::VectorXd Reconstruct(Eigen::VectorXd hybridVector)
 	{
-		return this->P* hybridVector;
+		return this->P * hybridVector;
 	}
 	
 	Eigen::MatrixXd ReconstructionMatrix()
@@ -110,11 +114,18 @@ public:
 		return this->P;
 	}
 
-	/*Eigen::VectorXd SolveCellUnknowns(Eigen::VectorXd faceUnknownsVector)
+	Eigen::MatrixXd ReconstructionFromFacesMatrix()
 	{
-		Eigen::VectorXd cellUnknownsVector = this->SolveCellUnknowns * faceUnknownsVector;
-		return cellUnknownsVector;
-	}*/
+		int nCellUnknowns = CellBasis->Size();
+		int nTotalFaceUnknowns = this->Faces.size() * FaceBasis->Size();
+
+		auto Atf = this->A.topRightCorner(nCellUnknowns, nTotalFaceUnknowns);
+		Eigen::MatrixXd solveCellUnknowns = -this->invAtt * Atf;
+		Eigen::MatrixXd createHybridVectorFromFacesMatrix(nCellUnknowns + nTotalFaceUnknowns, nTotalFaceUnknowns);
+		createHybridVectorFromFacesMatrix.topRows(nCellUnknowns) = solveCellUnknowns;
+		createHybridVectorFromFacesMatrix.bottomRows(nTotalFaceUnknowns) = Eigen::MatrixXd::Identity(nTotalFaceUnknowns, nTotalFaceUnknowns);
+		return this->P * createHybridVectorFromFacesMatrix;
+	}
 
 	Eigen::VectorXd Interpolate(Eigen::VectorXd reconstructVector)
 	{
