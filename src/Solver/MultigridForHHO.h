@@ -234,7 +234,7 @@ private:
 					BigNumber faceGlobalNumber = face->Number;
 					BigNumber faceLocalNumber = element->LocalNumberOf(face);
 					Eigen::MatrixXd reconstructMatrix = element->ReconstructionFromFacesMatrix();
-					chunk->Results.Coeffs.Add(elemGlobalNumber * cellInterpolationBasis->Size(), faceGlobalNumber * nFaceUnknowns, reconstructMatrix.col(faceLocalNumber));
+					chunk->Results.Coeffs.Add(elemGlobalNumber * cellInterpolationBasis->Size(), faceGlobalNumber * nFaceUnknowns, reconstructMatrix.block(0, faceLocalNumber*nFaceUnknowns, cellInterpolationBasis->Size(), nFaceUnknowns));
 				}
 			});
 

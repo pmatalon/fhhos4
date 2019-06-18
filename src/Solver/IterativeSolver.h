@@ -33,10 +33,7 @@ public:
 	{
 		this->A = A;
 		if (this->ComputeExactSolution)
-		{
-			this->_directSolver.analyzePattern(this->A);
-			this->_directSolver.factorize(this->A);
-		}
+			this->_directSolver.compute(this->A);
 	}
 
 	Eigen::VectorXd Solve(const Eigen::VectorXd& b)

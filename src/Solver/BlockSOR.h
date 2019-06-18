@@ -80,8 +80,14 @@ public:
 		L_coeffs.Fill(L);
 
 		Eigen::SparseMatrix<double> M = _direction == Direction::Forward ? (D + _omega * L) : (D + _omega * U);
-		_solver.analyzePattern(M);
-		_solver.factorize(M);
+		_solver.compute(M);
+		Eigen::ComputationInfo info = _solver.info();
+		if (info != Eigen::ComputationInfo::Success)
+		{
+			cout << "Error: SparseLU failed to execute in the setup of BlockSOR with the code " << info << ": " << _solver.lastErrorMessage() << endl;
+			//cout << A << endl;
+			exit(EXIT_FAILURE);
+		}
 	}
 
 private:
