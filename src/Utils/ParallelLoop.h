@@ -73,8 +73,10 @@ public:
 		NThreads = nThreads;
 		if (NThreads == 0)
 			NThreads = std::thread::hardware_concurrency();
-		if (NThreads > loopSize)
-			NThreads = loopSize;
+
+		// Each thread must have at least 2 elements to process
+		while (loopSize / NThreads < 2 && NThreads > 1)
+			NThreads--;
 
 		Chunks.reserve(NThreads);
 		ChunkMaxSize = (BigNumber)ceil(loopSize / (double)NThreads);
