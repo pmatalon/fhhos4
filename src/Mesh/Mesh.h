@@ -2,27 +2,40 @@
 #include <vector>
 #include "Element.h"
 #include "Face.h"
-
 using namespace std;
+
+enum class CoarseningStrategy : unsigned
+{
+	AgglomerationAndMergeColinearFaces = 0,
+	AgglomerationAndKeepFineFaces = 1
+};
 
 template <int Dim>
 class Mesh
 {
 public:
-	BigNumber N;
 	vector<Element<Dim>*> Elements;
 	vector<Face<Dim>*> Faces;
 	vector<Face<Dim>*> BoundaryFaces;
 	vector<Face<Dim>*> InteriorFaces;
 
-	Mesh<Dim>* CoarserMesh = NULL;
+	Mesh<Dim>* CoarseMesh = NULL;
 
-	Mesh(BigNumber n)
+	Mesh() {}
+
+	virtual string Description() = 0;
+	virtual string FileNamePart() = 0;
+	virtual double H() = 0;
+	virtual void CoarsenMesh(CoarseningStrategy strategy) = 0;
+
+	void AddFace(Face<Dim>* f)
 	{
-		this->N = n;
+		this->Faces.push_back(f);
+		if (f->IsDomainBoundary)
+			this->BoundaryFaces.push_back(f);
+		else
+			this->InteriorFaces.push_back(f);
 	}
-
-	virtual void BuildCoarserMesh() = 0;
 
 	virtual void Serialize(ostream& os) const
 	{
@@ -48,7 +61,7 @@ public:
 			delete this->Faces[i];
 		this->Faces.clear();
 
-		if (CoarserMesh)
-			delete CoarserMesh;
+		if (CoarseMesh)
+			delete CoarseMesh;
 	}
 };

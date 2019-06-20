@@ -6,8 +6,11 @@
 class CartesianGrid1D : public Mesh<1>
 {
 public:
-	CartesianGrid1D(BigNumber n) : Mesh(n)
+	BigNumber N;
+
+	CartesianGrid1D(BigNumber n) : Mesh()
 	{
+		this->N = n;
 		this->Elements.reserve(n);
 		this->Faces.reserve(n + 1);
 		double h = (double)1 / n;
@@ -50,9 +53,24 @@ public:
 		}
 	}
 
-	void BuildCoarserMesh()
+	string Description()
 	{
-		cout << "Error: BuildCoarserMesh not implemented!" << endl;
+		return "Subdivisions in each cartesian direction: " + to_string(this->N);
+	}
+
+	string FileNamePart()
+	{
+		return "n" + to_string(this->N);
+	}
+
+	double H()
+	{
+		return (double)1 / this->N;
+	}
+
+	void CoarsenMesh(CoarseningStrategy strategy)
+	{
+		cout << "Error: CoarsenMesh not implemented!" << endl;
 		exit(EXIT_FAILURE);
 	}
 };

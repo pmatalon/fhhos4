@@ -43,14 +43,14 @@ public:
 		else
 			cout << "unknown";
 		cout << endl;
-		cout << "Subdivisions in each cartesian direction: " << mesh->N << endl;
+		cout << mesh->Description() << endl;
 		cout << "Discretization: Discontinuous Galerkin SIPG" << endl;
 		cout << "\tPolynomial space: " << (basis->FullTensorization ? "Q" : "P") << endl;
 		cout << "\tPolynomial basis: " << basis->Name() << endl;
 
 		bool autoPenalization = penalizationCoefficient == -1;
 		if (autoPenalization)
-			penalizationCoefficient = pow(Dim, 2) * pow(basis->GetDegree() + 1, 2) * mesh->N; // Ralph-Hartmann
+			penalizationCoefficient = pow(Dim, 2) * pow(basis->GetDegree() + 1, 2) / mesh->H(); // Ralph-Hartmann
 		cout << "\tPenalization coefficient: " << penalizationCoefficient << (autoPenalization ? " (automatic)" : "") << endl;
 		
 		cout << "Local functions: " << basis->NumberOfLocalFunctionsInElement(NULL) << endl;
@@ -67,7 +67,7 @@ public:
 			sprintf(res, "_kappa%g", this->_diffusionPartition.Kappa1);
 			kappaString = res;
 		}
-		this->_fileName = "Poisson" + to_string(Dim) + "D" + this->_solutionName + kappaString + "_n" + to_string(mesh->N) + "_DG_SIPG_" + basis->Name() + "_pen" + (autoPenalization ? "-1" : to_string(penalizationCoefficient));
+		this->_fileName = "Poisson" + to_string(Dim) + "D" + this->_solutionName + kappaString + "_" + mesh->FileNamePart() + "_DG_SIPG_" + basis->Name() + "_pen" + (autoPenalization ? "-1" : to_string(penalizationCoefficient));
 		string matrixFilePath			= this->_outputDirectory + "/" + this->_fileName + "_A.dat";
 		string matrixVolumicFilePath	= this->_outputDirectory + "/" + this->_fileName + "_A_volumic.dat";
 		string matrixCouplingFilePath	= this->_outputDirectory + "/" + this->_fileName + "_A_coupling.dat";

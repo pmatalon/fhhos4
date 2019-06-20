@@ -22,6 +22,16 @@ public:
 		assert(Dim == 3);
 	}
 
+private:
+	CartesianFace(BigNumber number, Element<Dim>* element1, Element<Dim>* element2, CartesianShape<Dim, Dim - 1>* shape) :
+		Poisson_DG_Face<Dim>(number, element1, element2),
+		Poisson_HHO_Face<Dim>(number, element1, element2),
+		CartesianShape<Dim, Dim - 1>(*shape),
+		Face<Dim>(number, element1,  element2)
+	{}
+
+public:
+
 	//----------------------------------------------------//
 	//                 Face implementation                //
 	//----------------------------------------------------//
@@ -59,6 +69,13 @@ public:
 	double ComputeIntegral(function<double(RefPoint)> func, int polynomialDegree)
 	{
 		return CartesianShape<Dim, Dim - 1>::ComputeIntegral(func, polynomialDegree);
+	}
+
+	Face<Dim>* CreateSameGeometricFace(BigNumber number, Element<Dim>* element1)
+	{
+		Face<Dim>* copy = new CartesianFace<Dim>(number, element1, NULL, this);
+		copy->IsDomainBoundary = this->IsDomainBoundary;
+		return copy;
 	}
 
 	//----------------------------------------------------------------//

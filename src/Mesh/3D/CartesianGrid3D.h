@@ -9,13 +9,14 @@ using namespace std;
 class CartesianGrid3D : public Mesh<3>
 {
 public:
+	BigNumber Nx;
 	BigNumber Ny;
 	BigNumber Nz;
 
-	CartesianGrid3D(BigNumber nx, BigNumber ny, BigNumber nz) : Mesh(nx)
+	CartesianGrid3D(BigNumber nx, BigNumber ny, BigNumber nz) : Mesh()
 	{
 		// nx = ny = nz falls down to cubic elements
-
+		this->Nx = nx;
 		this->Ny = ny;
 		this->Nz = nz;
 
@@ -150,16 +151,31 @@ public:
 
 	}
 
-	void BuildCoarserMesh()
+	string Description()
 	{
-		cout << "Error: BuildCoarserMesh not implemented!" << endl;
+		return "Subdivisions in each cartesian direction: " + to_string(this->Nx) + " x " + to_string(this->Ny) + " x " + to_string(this->Nz);
+	}
+
+	string FileNamePart()
+	{
+		return "n" + to_string(this->Nx);
+	}
+
+	double H()
+	{
+		return 1 / (double)this->Nx;
+	}
+
+	void CoarsenMesh(CoarseningStrategy strategy)
+	{
+		cout << "Error: CoarsenMesh not implemented!" << endl;
 		exit(EXIT_FAILURE);
 	}
 
 private:
 	inline BigNumber index(BigNumber ix, BigNumber iy, BigNumber iz)
 	{
-		BigNumber nx = this->N;
+		BigNumber nx = this->Nx;
 		BigNumber ny = this->Ny;
 		return iz * ny*nx + iy * nx + ix;
 	}

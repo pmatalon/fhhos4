@@ -61,6 +61,11 @@ public:
 		assert(false);
 	}
 
+	Face<1>* CreateSameGeometricFace(BigNumber number, Element<1>* element1)
+	{
+		return new InterfacePoint(number, this->X);
+	}
+
 	//---------------------------------------------------------------//
 	//                 Poisson_DG_Face implementation                //
 	//---------------------------------------------------------------//

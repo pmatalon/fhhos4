@@ -240,11 +240,9 @@ int main(int argc, char* argv[])
 	else if (dimension == 2)
 	{
 		Mesh<2>* mesh = new CartesianGrid2D(n, n);
-		//mesh->BuildCoarserMesh();
-
+		//mesh->CoarsenMesh(CoarseningStrategy::AgglomerationAndKeepFineFaces);
 		//cout << *mesh << endl << endl;
-
-		//cout << "Coarse mesh" << endl << *(mesh->CoarserMesh) << endl << endl;
+		//cout << "Coarse mesh" << endl << *(mesh->CoarseMesh) << endl << endl;
 
 		if (solution.compare("sine") == 0)
 		{
@@ -304,12 +302,12 @@ int main(int argc, char* argv[])
 			{
 				cout << endl;
 				cout << "------------------- Linear system resolution ------------------" << endl;
-				if (staticCondensation && mesh->N > 2)
+				if (staticCondensation && mesh->Elements.size() > 4)
 				{
 					MultigridForHHO<2> solver(problem, nMultigridLevels);
 					cout << "Solver: " << solver << endl;
 					//BlockGaussSeidel solver(problem->HHO.nLocalFaceUnknowns);
-					solver.ComputeExactSolution = mesh->N <= 32;
+					solver.ComputeExactSolution = mesh->Elements.size() <= 32 * 32;
 					solver.Setup(problem->A);
 					solver.Tolerance = 1e-8;
 					cout << endl;

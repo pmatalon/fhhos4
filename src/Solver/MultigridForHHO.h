@@ -278,34 +278,6 @@ private:
 		Eigen::SparseMatrix<double> Pi(problem->HHO.nTotalFaceUnknowns, problem->HHO.nElements * nCellUnknowns);
 		parallelLoop.Fill(Pi);
 
-		/*NonZeroCoefficients Pi_coeffs(problem->HHO.nTotalCellUnknowns * problem->HHO.nTotalFaceUnknowns);
-		int nCellUnknowns = problem->HHO.nLocalCellUnknowns;
-		int nFaceUnknowns = problem->HHO.nLocalFaceUnknowns;
-		for (auto f : problem->_mesh->Faces)
-		{
-			if (f->IsDomainBoundary)
-				continue;
-
-			Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
-
-			Poisson_HHO_Element<Dim>* element1 = dynamic_cast<Poisson_HHO_Element<Dim>*>(face->Element1);
-			Poisson_HHO_Element<Dim>* element2 = dynamic_cast<Poisson_HHO_Element<Dim>*>(face->Element2);
-			//Eigen::MatrixXd local_Pi = element->ComputeProjectorMatrixFromCellOntoFaces();
-
-			//cout << "Face " << face->Number << " takes value from element " << element->Number << endl;
-
-			BigNumber faceGlobalNumber = face->Number;
-			BigNumber elem1GlobalNumber = element1->Number;
-			BigNumber faceLocalNumber1 = element1->LocalNumberOf(face);
-			BigNumber elem2GlobalNumber = element2->Number;
-			BigNumber faceLocalNumber2 = element2->LocalNumberOf(face);
-
-			Pi_coeffs.Add(faceGlobalNumber*nFaceUnknowns, elem1GlobalNumber*nCellUnknowns, 0.5 * face->GetProjFromCell(element1));//local_Pi.block(faceLocalNumber*nFaceUnknowns, 0, nFaceUnknowns, nCellUnknowns));
-			Pi_coeffs.Add(faceGlobalNumber*nFaceUnknowns, elem2GlobalNumber*nCellUnknowns, 0.5 * face->GetProjFromCell(element2));
-		}
-
-		Eigen::SparseMatrix<double> Pi(problem->HHO.nTotalFaceUnknowns, problem->HHO.nTotalCellUnknowns);
-		Pi_coeffs.Fill(Pi);*/
 		return Pi;
 	}
 
@@ -401,6 +373,8 @@ public:
 
 		cout << "Setup..." << endl;
 
+		CoarseningStrategy coarseningStrategy = CoarseningStrategy::AgglomerationAndMergeColinearFaces;
+
 		LevelForHHO<Dim>* finerLevel = dynamic_cast<LevelForHHO<Dim>*>(this->_fineLevel);
 		finerLevel->OperatorMatrix = A;
 		Poisson_HHO<Dim>* problem = _problem;
@@ -408,7 +382,7 @@ public:
 		{
 			for (int levelNumber = 1; levelNumber < _nLevels; levelNumber++)
 			{
-				problem->_mesh->BuildCoarserMesh();
+				problem->_mesh->CoarsenMesh(coarseningStrategy);
 				problem = problem->GetProblemOnCoarserMesh();
 				problem->Assemble(Action::None);
 				LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(levelNumber, problem);
@@ -428,7 +402,7 @@ public:
 			while (problem->A.rows() > MatrixMaxSizeForCoarsestLevel)
 			{
 				levelNumber++;
-				problem->_mesh->BuildCoarserMesh();
+				problem->_mesh->CoarsenMesh(coarseningStrategy);
 				problem = problem->GetProblemOnCoarserMesh();
 				problem->Assemble(Action::None);
 				LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(levelNumber, problem);

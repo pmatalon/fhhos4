@@ -50,6 +50,7 @@ public:
 	virtual DomPoint ConvertToDomain(RefPoint refPoint) = 0;
 	virtual double ComputeIntegral(function<double(RefPoint)> func) = 0;
 	virtual double ComputeIntegral(function<double(RefPoint)> func, int polynomialDegree) = 0;
+	virtual Face<Dim>* CreateSameGeometricFace(BigNumber number, Element<Dim>* element1) = 0;
 
 	friend ostream& operator<<(ostream& os, const Face<Dim>& s)
 	{

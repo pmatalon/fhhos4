@@ -78,7 +78,7 @@ public:
 
 	Poisson_HHO<Dim>* GetProblemOnCoarserMesh()
 	{
-		return new Poisson_HHO<Dim>(_mesh->CoarserMesh, _solutionName, _sourceFunction, _reconstructionBasis, _cellBasis, _faceBasis, _staticCondensation, _outputDirectory);
+		return new Poisson_HHO<Dim>(_mesh->CoarseMesh, _solutionName, _sourceFunction, _reconstructionBasis, _cellBasis, _faceBasis, _staticCondensation, _outputDirectory);
 	}
 
 	void Assemble(Action action)
@@ -92,7 +92,7 @@ public:
 		if ((action & Action::LogAssembly) == Action::LogAssembly)
 		{
 			cout << "Problem: Poisson " << Dim << "D" << endl;
-			cout << "Subdivisions in each cartesian direction: " << mesh->N << endl;
+			cout << mesh->Description() << endl;
 			cout << "\tElements: " << hho.nElements << endl;
 			cout << "\tFaces   : " << hho.nFaces << " (" << hho.nInteriorFaces << " interior + " << hho.nBoundaryFaces << " boundary)" << endl;
 			cout << "Discretization: Hybrid High Order" << endl;
@@ -105,7 +105,7 @@ public:
 			cout << "System size   : " << (this->_staticCondensation ? hho.nTotalFaceUnknowns : hho.nTotalHybridUnknowns) << " (" << (this->_staticCondensation ? "statically condensed" : "no static condensation") << ")" << endl;
 			cout << "Parallelism   : " << (BaseParallelLoop::GetDefaultNThreads() == 1 ? "sequential execution" : to_string(BaseParallelLoop::GetDefaultNThreads()) + " threads") << endl;
 		}
-		this->_fileName = "Poisson" + to_string(Dim) + "D" + this->_solutionName + "_n" + to_string(mesh->N) + "_HHO_" + reconstructionBasis->Name() + "_pen-1" + (_staticCondensation ? "_staticcond" : "");
+		this->_fileName = "Poisson" + to_string(Dim) + "D" + this->_solutionName + "_" + mesh->FileNamePart() + "_HHO_" + reconstructionBasis->Name() + "_pen-1" + (_staticCondensation ? "_staticcond" : "");
 		string matrixFilePath				= this->_outputDirectory + "/" + this->_fileName + "_A.dat";
 		string consistencyFilePath			= this->_outputDirectory + "/" + this->_fileName + "_A_cons.dat";
 		string stabilizationFilePath		= this->_outputDirectory + "/" + this->_fileName + "_A_stab.dat";
@@ -480,15 +480,6 @@ public:
 	{
 		Problem::ExtractSolution(this->ReconstructedSolution);
 	}
-
-	/*void Solve() override
-	{
-		vector<Mesh<Dim>*> meshSequence(2);
-		dynamic_cast<CartesianGrid2D*>(this->_mesh)->BuildCoarserMesh();
-		meshSequence.push_back(this->_mesh);
-		meshSequence.push_back(this->_mesh->CoarserMesh);
-		MultigridForHHO<Dim> mg(meshSequence);
-	}*/
 
 	Eigen::SparseMatrix<double> GetInverseAtt()
 	{
