@@ -374,6 +374,7 @@ public:
 		cout << "Setup..." << endl;
 
 		CoarseningStrategy coarseningStrategy = CoarseningStrategy::AgglomerationAndMergeColinearFaces;
+		//CoarseningStrategy coarseningStrategy = CoarseningStrategy::AgglomerationAndKeepFineFaces;
 
 		LevelForHHO<Dim>* finerLevel = dynamic_cast<LevelForHHO<Dim>*>(this->_fineLevel);
 		finerLevel->OperatorMatrix = A;
@@ -382,9 +383,11 @@ public:
 		{
 			for (int levelNumber = 1; levelNumber < _nLevels; levelNumber++)
 			{
+				//cout << "fine mesh" << endl << *(problem->_mesh) << endl << endl;
 				problem->_mesh->CoarsenMesh(coarseningStrategy);
 				problem = problem->GetProblemOnCoarserMesh();
 				problem->Assemble(Action::None);
+				//cout << "coarse mesh" << endl << *(problem->_mesh) << endl << endl;
 				LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(levelNumber, problem);
 
 				finerLevel->CoarserLevel = coarseLevel;

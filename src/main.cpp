@@ -9,6 +9,7 @@
 #include "Mesh/1D/CartesianGrid1D.h"
 #include "Mesh/2D/CartesianGrid2D.h"
 #include "Mesh/3D/CartesianGrid3D.h"
+#include "Mesh/2D/CartesianPolygonalMesh2D.h"
 #include "Utils/Action.h"
 #include "Utils/DiffusionPartition.h"
 #include "Solver/MultigridForHHO.h"
@@ -240,7 +241,9 @@ int main(int argc, char* argv[])
 	else if (dimension == 2)
 	{
 		Mesh<2>* mesh = new CartesianGrid2D(n, n);
+		//Mesh<2>* mesh = new CartesianPolygonalMesh2D(n, n);
 		//mesh->CoarsenMesh(CoarseningStrategy::AgglomerationAndKeepFineFaces);
+		//mesh = mesh->CoarseMesh;
 		//cout << *mesh << endl << endl;
 		//cout << "Coarse mesh" << endl << *(mesh->CoarseMesh) << endl << endl;
 

@@ -103,6 +103,7 @@
     <ClInclude Include="src/FunctionalBasis/FunctionalBasis.h" />
     <ClInclude Include="src/FunctionalBasis/TensorPolynomial.h" />
     <ClInclude Include="src\FunctionalBasis\Hemker1D.h" />
+    <ClInclude Include="src\Mesh\2D\CartesianPolygonalMesh2D.h" />
     <ClInclude Include="src\Mesh\2D\RectangularPolygon.h" />
     <ClInclude Include="src\Mesh\CartesianElement.h" />
     <ClInclude Include="src\Mesh\CartesianFace.h" />
@@ -116,7 +117,6 @@
     <ClInclude Include="src\Mesh\1D\InterfacePoint.h" />
     <ClInclude Include="src/Mesh/2D/Edge.h" />
     <ClInclude Include="src/Mesh/2D/Rectangle.h" />
-    <ClInclude Include="src\Mesh\CartesianPolyhedralMesh.h" />
     <ClInclude Include="src\Mesh\ReferenceCartesianShape.h" />
     <ClInclude Include="src/Mesh/3D/RectangularFace.h" />
     <ClInclude Include="src/Mesh/Face.h" />

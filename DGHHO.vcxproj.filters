@@ -164,8 +164,8 @@
     <ClInclude Include="src\Mesh\2D\RectangularPolygon.h">
       <Filter>Mesh\2D</Filter>
     </ClInclude>
-    <ClInclude Include="src\Mesh\CartesianPolyhedralMesh.h">
-      <Filter>Mesh</Filter>
+    <ClInclude Include="src\Mesh\2D\CartesianPolygonalMesh2D.h">
+      <Filter>Mesh\2D</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

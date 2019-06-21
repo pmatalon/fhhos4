@@ -66,8 +66,10 @@ public:
 			os << "Edge ";
 		else if (Dim == 3)
 			os << "Face ";
-		os << this->Number << " of ";
-		os << "element(s) " << this->Element1->Number;
+		os << this->Number << " of element";
+		if (!this->IsDomainBoundary)
+			os << "s";
+		os << " " << this->Element1->Number;
 		if (this->Element2)
 			os << ", " << this->Element2->Number;
 	}

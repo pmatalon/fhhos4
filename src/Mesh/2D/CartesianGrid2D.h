@@ -2,9 +2,9 @@
 #include <vector>
 #include "Rectangle.h"
 #include "RectangularPolygon.h"
+#include "CartesianPolygonalMesh2D.h"
 #include "Edge.h"
 #include "../Mesh.h"
-#include "../CartesianPolyhedralMesh.h"
 using namespace std;
 
 class CartesianGrid2D : public Mesh<2>
@@ -183,7 +183,9 @@ public:
 		}
 		else
 		{
-			CartesianPolyhedralMesh<2>* coarseMesh = new CartesianPolyhedralMesh<2>();
+			CartesianPolygonalMesh2D* coarseMesh = new CartesianPolygonalMesh2D();
+			coarseMesh->Nx = nx / 2;
+			coarseMesh->Ny = ny / 2;
 
 			// Elements //
 			BigNumber faceNumber = 0;
