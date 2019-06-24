@@ -45,10 +45,10 @@ void print_usage() {
 	cout << "                                  0     - automatic (default)" << endl;
 	cout << "                                  1     - sequential execution" << endl;
 	cout << "                                  other - requested number of threads" << endl;
-	cout << "-a {e|c|m|s|v}+      : action (default: 'es'): " << endl;
+	cout << "-a {e|c|f|s|v}+      : action (default: 'es'): " << endl;
 	cout <<	"                                 'e' = export system" << endl;
 	cout << "                                 'c' = export all components of the matrix in separate files" << endl;
-	cout << "                                 'm' = export mass matrix" << endl;
+	cout << "                                 'f' = export faces for Matlab" << endl;
 	cout << "                                 's' = solve system" << endl;
 	cout << "                                 'v' = export solution vector (requires 's')" << endl;
 	cout << "-l NUM               : number of multigrid levels (HHO 2D with static cond. only) (default: 0)" << endl;
@@ -145,8 +145,8 @@ int main(int argc, char* argv[])
 			action |= Action::ExtractSystem;
 		else if (a[i] == 'c')
 			action |= Action::ExtractComponentMatrices;
-		else if (a[i] == 'm')
-			action |= Action::ExtractMassMatrix;
+		else if (a[i] == 'f')
+			action |= Action::ExportFaces;
 		else if (a[i] == 's')
 			action |= Action::SolveSystem;
 		else if (a[i] == 'v')
@@ -300,6 +300,9 @@ int main(int argc, char* argv[])
 			cout << endl;
 			cout << "----------------------- Assembly -------------------------" << endl;
 			problem->Assemble(action);
+
+			if ((action & Action::ExportFaces) == Action::ExportFaces)
+				mesh->ExportFacesToMatlab(outputDirectory);
 
 			if ((action & Action::SolveSystem) == Action::SolveSystem)
 			{

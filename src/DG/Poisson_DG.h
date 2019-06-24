@@ -103,7 +103,7 @@ public:
 			{
 				BigNumber nnzApproximate = chunk->Size() * basis->Size() * (2 * Dim + 1);
 				NonZeroCoefficients matrixCoeffs(nnzApproximate);
-				NonZeroCoefficients massMatrixCoeffs((action & Action::ExtractMassMatrix) == Action::ExtractMassMatrix ? nnzApproximate : 0);
+				NonZeroCoefficients massMatrixCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
 				NonZeroCoefficients volumicCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
 				NonZeroCoefficients couplingCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
 				NonZeroCoefficients penCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
@@ -149,7 +149,7 @@ public:
 								penCoeffs.Add(basisFunction1, basisFunction2, penalization);
 							}
 							matrixCoeffs.Add(basisFunction1, basisFunction2, volumicTerm + coupling + penalization);
-							if ((action & Action::ExtractMassMatrix) == Action::ExtractMassMatrix)
+							if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
 							{
 								double massTerm = element->MassTerm(phi1, phi2);
 								massMatrixCoeffs.Add(basisFunction1, basisFunction2, massTerm);
@@ -172,7 +172,7 @@ public:
 
 		BigNumber nnzApproximate = mesh->Elements.size() * basis->Size() * (2 * Dim + 1);
 		NonZeroCoefficients matrixCoeffs(nnzApproximate);
-		NonZeroCoefficients massMatrixCoeffs((action & Action::ExtractMassMatrix) == Action::ExtractMassMatrix ? nnzApproximate : 0);
+		NonZeroCoefficients massMatrixCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
 		NonZeroCoefficients volumicCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
 		NonZeroCoefficients couplingCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
 		NonZeroCoefficients penCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
@@ -285,16 +285,13 @@ public:
 			cout << "RHS exported to \t" << rhsFilePath << endl;
 		}
 
-		if ((action & Action::ExtractMassMatrix) == Action::ExtractMassMatrix)
+		if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
 		{
 			Eigen::SparseMatrix<double> M(nUnknowns, nUnknowns);
 			massMatrixCoeffs.Fill(M);
 			Eigen::saveMarket(M, massMatrixFilePath);
 			cout << "Mass matrix exported to \t" << massMatrixFilePath << endl;
-		}
 
-		if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
-		{
 			Eigen::SparseMatrix<double> V(nUnknowns, nUnknowns);
 			volumicCoeffs.Fill(V);
 			Eigen::saveMarket(V, matrixVolumicFilePath);

@@ -78,6 +78,11 @@ public:
 		return copy;
 	}
 
+	void ExportFaceToMatlab(FILE* file)
+	{
+		fprintf(file, "%llu %.17g %.17g %.17g %d %d\n", this->Number, this->Origin.X, this->Origin.Y, this->Origin.Z, this->Orientation, this->IsDomainBoundary);
+	}
+
 	//----------------------------------------------------------------//
 	//                 Poisson_HHO_Face implementation                //
 	//----------------------------------------------------------------//

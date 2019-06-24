@@ -88,15 +88,20 @@ public:
 #endif
 	}
 
+	string GetFilePath(string suffix)
+	{
+		return this->_outputDirectory + "/" + this->_fileName + "_" + suffix + ".dat";
+	}
+
 	void ExportMatrix(const Eigen::SparseMatrix<double>& M, string suffix)
 	{
-		string filePath = this->_outputDirectory + "/" + this->_fileName + "_" + suffix + ".dat";
+		string filePath = GetFilePath(suffix);
 		Eigen::saveMarket(M, filePath);
 	}
 
 	void ExportVector(const Eigen::VectorXd& M, string suffix)
 	{
-		string filePath = this->_outputDirectory + "/" + this->_fileName + "_" + suffix + ".dat";
+		string filePath = GetFilePath(suffix);
 		Eigen::saveMarketVector(M, filePath);
 	}
 
@@ -116,7 +121,7 @@ protected:
 
 	void ExtractSolution(Eigen::VectorXd solution, string suffix)
 	{
-		string solutionFilePath = this->_outputDirectory + "/" + this->_fileName + "_solution" + suffix + ".dat";
+		string solutionFilePath = GetFilePath("solution" + suffix);
 		Eigen::saveMarketVector(solution, solutionFilePath);
 		cout << "Solution exported to \t" << solutionFilePath << endl;
 	}

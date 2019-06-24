@@ -37,6 +37,17 @@ public:
 			this->InteriorFaces.push_back(f);
 	}
 
+	void ExportFacesToMatlab(string outputDirectory)
+	{
+		string filePath = outputDirectory + "/faces" + to_string(Dim) + "D_" + FileNamePart() + ".dat";
+		FILE* file = fopen(filePath.c_str(), "w");
+		fprintf(file, "Number OriginX OriginY OriginZ Orientation Boundary\n");
+		for (Face<Dim>* f : this->Faces)
+			f->ExportFaceToMatlab(file);
+		fclose(file);
+		cout << "Faces exported to \t" << filePath << endl;
+	}
+
 	virtual void Serialize(ostream& os) const
 	{
 		for (auto element : this->Elements)

@@ -66,6 +66,11 @@ public:
 		return new InterfacePoint(number, this->X);
 	}
 
+	void ExportFaceToMatlab(FILE* file)
+	{
+		fprintf(file, "%llu %.17g 0 0 0 %d\n", this->Number, this->X, this->IsDomainBoundary);
+	}
+
 	//---------------------------------------------------------------//
 	//                 Poisson_DG_Face implementation                //
 	//---------------------------------------------------------------//
