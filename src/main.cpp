@@ -318,7 +318,6 @@ int main(int argc, char* argv[])
 					solver.Tolerance = 1e-8;
 					cout << endl;
 					problem->Solution = solver.Solve(problem->b);
-
 				}
 				else
 					problem->Solve();
@@ -326,7 +325,7 @@ int main(int argc, char* argv[])
 				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
 					problem->ExtractTraceSystemSolution();
 
-				problem->ReconstructSolution();
+				problem->ReconstructHigherOrderApproximation();
 				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
 					problem->ExtractSolution();
 				double error = L2::Error<2>(mesh, reconstructionBasis, problem->ReconstructedSolution, exactSolution);
@@ -409,10 +408,26 @@ int main(int argc, char* argv[])
 			{
 				cout << endl;
 				cout << "------------------- Linear system resolution ------------------" << endl;
-				problem->Solve();
-				problem->ReconstructSolution();
+				if (staticCondensation)
+				{
+					MultigridForHHO<3> solver(problem, nMultigridLevels);
+					cout << "Solver: " << solver << endl;
+					solver.ComputeExactSolution = mesh->Elements.size() <= 8 * 8;
+					solver.Setup(problem->A);
+					solver.Tolerance = 1e-8;
+					cout << endl;
+					problem->Solution = solver.Solve(problem->b);
+				}
+				else
+					problem->Solve();
+
+				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
+					problem->ExtractTraceSystemSolution();
+
+				problem->ReconstructHigherOrderApproximation();
 				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
 					problem->ExtractSolution();
+
 				double error = L2::Error<3>(mesh, reconstructionBasis, problem->ReconstructedSolution, exactSolution);
 				cout << "L2 Error = " << error << endl;
 			}

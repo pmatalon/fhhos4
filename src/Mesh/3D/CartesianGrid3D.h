@@ -168,8 +168,49 @@ public:
 
 	void CoarsenMesh(CoarseningStrategy strategy)
 	{
-		cout << "Error: CoarsenMesh not implemented!" << endl;
-		exit(EXIT_FAILURE);
+		if (strategy == CoarseningStrategy::AgglomerationAndMergeColinearFaces)
+			CoarsenByAgglomerationAndMergeColinearFaces();
+		else
+			assert(false && "Coarsening strategy not implemented!");
+	}
+
+	void CoarsenByAgglomerationAndMergeColinearFaces()
+	{
+		BigNumber nx = this->Nx;
+		BigNumber ny = this->Ny;
+		BigNumber nz = this->Nz;
+
+		if (nx % 2 != 0 || ny % 2 != 0 || nz % 2 != 0)
+		{
+			cout << "Error: impossible to build coarse mesh. Nx, Ny and Nz must be even: Nx = " << nx << ", Ny = " << ny << ", Nz = " << nz << "." << endl;
+		}
+		else
+		{
+			CartesianGrid3D* coarseMesh = new CartesianGrid3D(nx / 2, ny / 2, nz / 2);
+
+			for (BigNumber iz = 0; iz < nz; ++iz)
+			{
+				for (BigNumber iy = 0; iy < ny; ++iy)
+				{
+					for (BigNumber ix = 0; ix < nx; ++ix)
+					{
+						Parallelepiped* fineElement = dynamic_cast<Parallelepiped*>(this->Elements[index(ix, iy, iz)]);
+						auto coarseElement = coarseMesh->Elements[coarseMesh->index(ix / 2, iy / 2, iz / 2)];
+
+						coarseElement->FinerElements.push_back(fineElement);
+						fineElement->CoarserElement = coarseElement;
+						if (iz % 2 == 0 && !fineElement->TopFace->IsDomainBoundary)
+							coarseElement->FinerFacesRemoved.push_back(fineElement->TopFace);
+						if (iy % 2 == 0 && !fineElement->RightFace->IsDomainBoundary)
+							coarseElement->FinerFacesRemoved.push_back(fineElement->RightFace);
+						if (ix % 2 == 0 && !fineElement->FrontFace->IsDomainBoundary)
+							coarseElement->FinerFacesRemoved.push_back(fineElement->FrontFace);
+					}
+				}
+			}
+
+			this->CoarseMesh = coarseMesh;
+		}
 	}
 
 private:

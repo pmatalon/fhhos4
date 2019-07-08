@@ -422,7 +422,7 @@ public:
 		);
 	}
 
-	void ReconstructSolution()
+	void ReconstructHigherOrderApproximation()
 	{
 		HHOInfo<Dim> hho = this->HHO;
 
