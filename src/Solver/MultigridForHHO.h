@@ -68,7 +68,7 @@ private:
 		Eigen::SparseMatrix<double> invM_c = GetInverseGlobalMassMatrix_Faces(coarsePb); // Coarse mass matrix
 		Eigen::SparseMatrix<double> M_f = GetGlobalMassMatrix_Faces(finePb); // Fine mass matrix
 
-		R = invM_c * P.transpose() * M_f;
+		R = /*(coarsePb->_mesh->SqueletonMeasure() / finePb->_mesh->SqueletonMeasure()) **/ invM_c * P.transpose() * M_f;
 
 		finePb->ExportMatrix(R, "R");
 	}
@@ -100,7 +100,9 @@ private:
 		Eigen::SparseMatrix<double> M(problem->HHO.nTotalFaceUnknowns, problem->HHO.nTotalFaceUnknowns);
 		parallelLoop.Fill(M);
 
-		return M;
+		double squeletonMeasure = problem->_mesh->SqueletonMeasure();
+
+		return M / squeletonMeasure;
 	}
 
 	Eigen::SparseMatrix<double> GetInverseGlobalMassMatrix_Faces(Poisson_HHO<Dim>* problem)
@@ -125,7 +127,9 @@ private:
 		Eigen::SparseMatrix<double> M(problem->HHO.nTotalFaceUnknowns, problem->HHO.nTotalFaceUnknowns);
 		parallelLoop.Fill(M);
 
-		return M;
+		double squeletonMeasure = problem->_mesh->SqueletonMeasure();
+
+		return M * squeletonMeasure;
 	}
 
 	Eigen::SparseMatrix<double> GetInverseGlobalMassMatrix_Cells(Poisson_HHO<Dim>* problem)
@@ -149,12 +153,13 @@ private:
 
 	FunctionalBasis<Dim>* GetCellInterpolationBasis(Poisson_HHO<Dim>* problem)
 	{
-		int faceDegreePSpace = dynamic_cast<Poisson_HHO_Element<Dim>*>(problem->_mesh->Elements[0])->FaceBasis->GetDegree();
+		auto faceBasis = dynamic_cast<Poisson_HHO_Element<Dim>*>(problem->_mesh->Elements[0])->FaceBasis;
+		int faceDegreePSpace = faceBasis->GetDegree();
 
 		//int cellDegreeQSpace = (int)floor(2 * sqrt(faceDegreePSpace + 1) - 1);
 		//FunctionalBasis<Dim>* cellInterpolationBasis = new FunctionalBasis<Dim>("monomials", cellDegreeQSpace, true);
 		int cellDegreePSpace = faceDegreePSpace + 1;
-		FunctionalBasis<Dim>* cellInterpolationBasis = new FunctionalBasis<Dim>("monomials", cellDegreePSpace, false);
+		FunctionalBasis<Dim>* cellInterpolationBasis = new FunctionalBasis<Dim>(faceBasis->BasisCode(), cellDegreePSpace, false);
 
 		return cellInterpolationBasis;
 	}
@@ -167,7 +172,7 @@ private:
 
 
 
-	Eigen::SparseMatrix<double> GetAdjointToGlobalProjUsingCellInnerProduct(Poisson_HHO<Dim>* problem)
+	/*Eigen::SparseMatrix<double> GetAdjointToGlobalProjUsingCellInnerProduct(Poisson_HHO<Dim>* problem)
 	{
 		int nCellUnknowns = problem->HHO.nLocalCellUnknowns;
 		int nFaceUnknowns = problem->HHO.nLocalFaceUnknowns;
@@ -208,7 +213,7 @@ private:
 		delete cellInterpolationBasis;
 
 		return I;
-	}
+	}*/
 
 	Eigen::SparseMatrix<double> GetReconstructionMatrix(Poisson_HHO<Dim>* problem)
 	{

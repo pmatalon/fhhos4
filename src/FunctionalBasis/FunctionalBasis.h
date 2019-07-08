@@ -181,6 +181,11 @@ public:
 		}
 	}
 
+	string BasisCode()
+	{
+		return this->_basisCode;
+	}
+
 	string Name()
 	{
 		string name = this->_basisCode + "_p" + std::to_string(this->_maxPolynomialDegree);

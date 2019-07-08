@@ -37,6 +37,14 @@ public:
 			this->InteriorFaces.push_back(f);
 	}
 
+	double SqueletonMeasure()
+	{
+		double measure = 0;
+		for (Face<Dim>* face : this->Faces)
+			measure += face->Measure();
+		return measure;
+	}
+
 	void ExportFacesToMatlab(string outputDirectory)
 	{
 		string filePath = outputDirectory + "/faces" + to_string(Dim) + "D_" + FileNamePart() + ".dat";

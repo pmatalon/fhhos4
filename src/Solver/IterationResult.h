@@ -18,7 +18,8 @@ struct IterationResult
 		this->x = x;
 		this->r = r;
 		this->ResidualNorm = r.norm();
-		this->NormalizedResidualNorm = ResidualNorm / b.norm();
+		double b_norm = b.norm();
+		this->NormalizedResidualNorm = b_norm > 0 ? ResidualNorm / b.norm() : ResidualNorm;
 	}
 
 	void ComputeError(const Eigen::VectorXd& exactSolution)
