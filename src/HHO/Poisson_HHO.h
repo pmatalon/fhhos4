@@ -116,6 +116,7 @@ public:
 			cout << endl << "Assembly..." << endl;
 
 		this->_globalRHS = Eigen::VectorXd(hho.nTotalHybridUnknowns);
+		this->_globalRHS.tail(hho.nTotalFaceUnknowns) = Eigen::VectorXd::Zero(hho.nTotalFaceUnknowns);
 
 		// Compute some useful integrals on reference element and store them
 		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreCellMassMatrix(cellBasis);
@@ -159,23 +160,26 @@ public:
 						//cout << "Element " << element->Number << endl;
 						Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(mesh->Elements[iElem]);
 
-						// Cell unknowns / Cell unknowns
-						for (BasisFunction<Dim>* cellPhi1 : cellBasis->LocalFunctions)
+						if (!this->_staticCondensation)
 						{
-							BigNumber i = DOFNumber(element, cellPhi1);
-							for (BasisFunction<Dim>* cellPhi2 : cellBasis->LocalFunctions)
+							// Cell unknowns / Cell unknowns
+							for (BasisFunction<Dim>* cellPhi1 : cellBasis->LocalFunctions)
 							{
-								BigNumber j = DOFNumber(element, cellPhi2);
-
-								double matrixTerm = element->MatrixTerm(cellPhi1, cellPhi2);
-								matrixCoeffs.Add(i, j, matrixTerm);
-								if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
+								BigNumber i = DOFNumber(element, cellPhi1);
+								for (BasisFunction<Dim>* cellPhi2 : cellBasis->LocalFunctions)
 								{
-									double consistencyTerm = element->ConsistencyTerm(cellPhi1, cellPhi2);
-									consistencyCoeffs.Add(i, j, consistencyTerm);
+									BigNumber j = DOFNumber(element, cellPhi2);
 
-									double stabilizationTerm = element->StabilizationTerm(cellPhi1, cellPhi2);
-									stabilizationCoeffs.Add(i, j, stabilizationTerm);
+									double matrixTerm = element->MatrixTerm(cellPhi1, cellPhi2);
+									matrixCoeffs.Add(i, j, matrixTerm);
+									if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
+									{
+										double consistencyTerm = element->ConsistencyTerm(cellPhi1, cellPhi2);
+										consistencyCoeffs.Add(i, j, consistencyTerm);
+
+										double stabilizationTerm = element->StabilizationTerm(cellPhi1, cellPhi2);
+										stabilizationCoeffs.Add(i, j, stabilizationTerm);
+									}
 								}
 							}
 						}
@@ -248,17 +252,6 @@ public:
 						{
 							BigNumber i = DOFNumber(element, cellPhi);
 							this->_globalRHS(i) = element->SourceTerm(cellPhi, this->_sourceFunction);
-						}
-						for (auto face : element->Faces)
-						{
-							if (face->IsDomainBoundary)
-								continue;
-
-							for (BasisFunction<Dim - 1>* facePhi : faceBasis->LocalFunctions)
-							{
-								BigNumber i = DOFNumber(face, facePhi);
-								this->_globalRHS(i) = 0;
-							}
 						}
 
 						if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
