@@ -2,20 +2,32 @@
 #include <Eigen/Sparse>
 #include "IterativeSolver.h"
 #include "Level.h"
+#include "EigenSparseLU.h"
 using namespace std;
 
 class Multigrid : public IterativeSolver
 {
 protected:
-	Level* _fineLevel;
-public:
-	Multigrid() : IterativeSolver()
-	{ }
+	Level* _fineLevel = NULL;
+	Solver* _coarseSolver = NULL;
 
-	/*void Setup(const Eigen::SparseMatrix<double>& A) override
+public:
+	Multigrid() : IterativeSolver() { }
+
+protected:
+	void SetupCoarseSolver()
 	{
-		//this->_fineLevel->Setup(A);
-	}*/
+		cout << "\t\tSetup coarse solver..." << endl;
+
+		if (this->_coarseSolver == NULL)
+			this->_coarseSolver = new EigenSparseLU();
+
+		Level* level = this->_fineLevel;
+		while (level->CoarserLevel != NULL)
+			level = level->CoarserLevel;
+
+		this->_coarseSolver->Setup(level->OperatorMatrix);
+	}
 
 private:
 
@@ -31,7 +43,7 @@ private:
 		Eigen::VectorXd x;
 
 		if (level->IsCoarsestLevel())
-			x = SolveCoarsestLevel(A, b);
+			x = _coarseSolver->Solve(b);
 		else
 		{
 			x = initialGuess;
@@ -65,25 +77,11 @@ private:
 
 		return x;
 	}
+
 public:
 	virtual ~Multigrid()
 	{
 		delete _fineLevel;
-	}
-
-protected:
-	virtual Eigen::VectorXd SolveCoarsestLevel(Eigen::SparseMatrix<double>& A, const Eigen::VectorXd& b)
-	{
-		Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
-		solver.compute(A);
-		Eigen::ComputationInfo info = solver.info();
-		if (info != Eigen::ComputationInfo::Success)
-		{
-			cout << "----------------- A coarse -------------------" << A << endl;
-			cout << "Error: SparseLU failed to execute on the coarsest level with the code " << info << ": " << solver.lastErrorMessage() << endl;
-			exit(EXIT_FAILURE);
-		}
-		Eigen::VectorXd x = solver.solve(b);
-		return x;
+		delete _coarseSolver;
 	}
 };

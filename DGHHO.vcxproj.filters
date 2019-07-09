@@ -89,9 +89,6 @@
     <ClInclude Include="src\Mesh\CartesianElement.h">
       <Filter>Mesh</Filter>
     </ClInclude>
-    <ClInclude Include="src\Utils\agmg.h">
-      <Filter>Utils</Filter>
-    </ClInclude>
     <ClInclude Include="src\Utils\ParallelLoop.h">
       <Filter>Utils</Filter>
     </ClInclude>
@@ -166,6 +163,21 @@
     </ClInclude>
     <ClInclude Include="src\Mesh\2D\CartesianPolygonalMesh2D.h">
       <Filter>Mesh\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\Solver.h">
+      <Filter>Solver</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\EigenSparseLU.h">
+      <Filter>Solver</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\EigenCG.h">
+      <Filter>Solver</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\AGMG.h">
+      <Filter>Solver</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\enable_AGMG.h">
+      <Filter>Solver</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

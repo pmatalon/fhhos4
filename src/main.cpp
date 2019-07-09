@@ -13,6 +13,8 @@
 #include "Utils/Action.h"
 #include "Utils/DiffusionPartition.h"
 #include "Solver/MultigridForHHO.h"
+#include "Solver/EigenCG.h"
+#include "Solver/AGMG.h"
 using namespace std;
 
 
@@ -51,6 +53,10 @@ void print_usage() {
 	cout << "                                 'f' = export faces for Matlab" << endl;
 	cout << "                                 's' = solve system" << endl;
 	cout << "                                 'v' = export solution vector (requires 's')" << endl;
+	cout << "-v SOLVER            : linear solver (default: 'lu'): " << endl;
+	cout << "                                 'lu'   = LU factorization (Eigen library)" << endl;
+	cout << "                                 'mg'   = Custom multigrid for HHO with static condensation" << endl;
+	cout << "                                 'agmg' = Yvan Notay's AGMG solver" << endl;
 	cout << "-l NUM               : number of multigrid levels (HHO 2D with static cond. only) (default: 0)" << endl;
 	cout << "                                  0     - automatic coarsening until the matrix dimension reaches 100 or less" << endl;
 	cout << "                                  other - fixed number of levels" << endl;
@@ -64,6 +70,49 @@ void argument_error(string msg)
 	cout << "Argument error: " << msg << endl;
 	exit(EXIT_FAILURE);
 }
+
+Solver* create_solver(int dim, string solverCode, Problem* problem, double tolerance, bool staticCondensation, int nMultigridLevels)
+{
+	Solver* solver = NULL;
+	if (solverCode.compare("mg") == 0)
+	{
+		if (staticCondensation)
+		{
+			if (dim == 2)
+			{
+				Poisson_HHO<2>* hhoProblem = dynamic_cast<Poisson_HHO<2>*>(problem);
+				MultigridForHHO<2>* mg = new MultigridForHHO<2>(hhoProblem, nMultigridLevels);
+				mg->ComputeExactSolution = hhoProblem->_mesh->Elements.size() <= 32 * 32;
+				solver = mg;
+			}
+			else if (dim == 3)
+			{
+				Poisson_HHO<3>* hhoProblem = dynamic_cast<Poisson_HHO<3>*>(problem);
+				MultigridForHHO<3>* mg = new MultigridForHHO<3>(hhoProblem, nMultigridLevels);
+				mg->ComputeExactSolution = hhoProblem->_mesh->Elements.size() <= 8 * 8;
+			}
+			else
+				argument_error("Multigrid only applicable on dimensions 2 and 3.");
+		}
+		else
+			argument_error("Multigrid only applicable on HHO discretization with static condensation.");
+	}
+	else if (solverCode.compare("lu") == 0)
+		solver = new EigenSparseLU();
+	else if (solverCode.compare("cg") == 0)
+		solver = new EigenCG(tolerance);
+	else if (solverCode.compare("agmg") == 0)
+		solver = new AGMG(tolerance);
+	else
+		argument_error("Unknown solver or not applicable!");
+
+	IterativeSolver* iterativeSolver = dynamic_cast<IterativeSolver*>(solver);
+	if (iterativeSolver != nullptr)
+		iterativeSolver->Tolerance = tolerance;
+
+	return solver;
+}
+
 
 int main(int argc, char* argv[])
 {
@@ -86,9 +135,11 @@ int main(int argc, char* argv[])
 	string a = "es";
 	int nMultigridLevels = 0;
 	string outputDirectory = ".";
+	string solverCode = "lu";
+	double solverTolerance = 1e-8;
 
 	int option = 0;
-	while ((option = getopt(argc, argv, "d:k:s:n:t:b:p:z:a:l:o:r:hfc")) != -1) 
+	while ((option = getopt(argc, argv, "d:k:s:n:t:b:p:z:a:l:o:r:v:hfc")) != -1) 
 	{
 		switch (option) 
 		{
@@ -123,6 +174,8 @@ int main(int argc, char* argv[])
 			case 'c': staticCondensation = true;
 				break;
 			case 'a': a = optarg;
+				break;
+			case 'v': solverCode = optarg;
 				break;
 			case 'l': nMultigridLevels = atoi(optarg);
 				break;
@@ -218,7 +271,11 @@ int main(int argc, char* argv[])
 			{
 				cout << endl;
 				cout << "------------------- Linear system resolution ------------------" << endl;
-				problem->Solve();
+				Solver* solver = create_solver(dimension, solverCode, problem, solverTolerance, staticCondensation, nMultigridLevels);
+				cout << "Solver: " << *solver << endl << endl;
+				solver->Setup(problem->A);
+				problem->Solution = solver->Solve(problem->b);
+				delete solver;
 				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
 					problem->ExtractSolution();
 				double error = L2::Error<1>(mesh, basis, problem->Solution, exactSolution);
@@ -279,7 +336,11 @@ int main(int argc, char* argv[])
 
 			if ((action & Action::SolveSystem) == Action::SolveSystem)
 			{
-				problem->Solve();
+				Solver* solver = create_solver(dimension, solverCode, problem, solverTolerance, staticCondensation, nMultigridLevels);
+				cout << "Solver: " << *solver << endl << endl;
+				solver->Setup(problem->A);
+				problem->Solution = solver->Solve(problem->b);
+				delete solver;
 				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
 					problem->ExtractSolution();
 				double error = L2::Error<2>(mesh, basis, problem->Solution, exactSolution);
@@ -308,21 +369,14 @@ int main(int argc, char* argv[])
 			{
 				cout << endl;
 				cout << "------------------- Linear system resolution ------------------" << endl;
-				if (staticCondensation && mesh->Elements.size() > 4)
-				{
-					MultigridForHHO<2> solver(problem, nMultigridLevels);
-					cout << "Solver: " << solver << endl;
-					//BlockGaussSeidel solver(problem->HHO.nLocalFaceUnknowns);
-					solver.ComputeExactSolution = mesh->Elements.size() <= 32 * 32;
-					solver.Setup(problem->A);
-					solver.Tolerance = 1e-8;
-					cout << endl;
-					problem->Solution = solver.Solve(problem->b);
-				}
-				else
-					problem->Solve();
+
+				Solver* solver = create_solver(dimension, solverCode, problem, solverTolerance, staticCondensation, nMultigridLevels);
+				cout << "Solver: " << *solver << endl << endl;
+				solver->Setup(problem->A);
+				problem->Solution = solver->Solve(problem->b);
+				delete solver;
 				
-				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
+				if (staticCondensation && (action & Action::ExtractSolution) == Action::ExtractSolution)
 					problem->ExtractTraceSystemSolution();
 
 				problem->ReconstructHigherOrderApproximation();
@@ -382,7 +436,11 @@ int main(int argc, char* argv[])
 			if ((action & Action::SolveSystem) == Action::SolveSystem)
 			{
 				cout << "------------------- Linear system resolution ------------------" << endl;
-				problem->Solve();
+				Solver* solver = create_solver(dimension, solverCode, problem, solverTolerance, staticCondensation, nMultigridLevels);
+				cout << "Solver: " << *solver << endl << endl;
+				solver->Setup(problem->A);
+				problem->Solution = solver->Solve(problem->b);
+				delete solver;
 				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
 					problem->ExtractSolution();
 				double error = L2::Error<3>(mesh, basis, problem->Solution, exactSolution);
@@ -408,18 +466,11 @@ int main(int argc, char* argv[])
 			{
 				cout << endl;
 				cout << "------------------- Linear system resolution ------------------" << endl;
-				if (staticCondensation)
-				{
-					MultigridForHHO<3> solver(problem, nMultigridLevels);
-					cout << "Solver: " << solver << endl;
-					solver.ComputeExactSolution = mesh->Elements.size() <= 8 * 8;
-					solver.Setup(problem->A);
-					solver.Tolerance = 1e-8;
-					cout << endl;
-					problem->Solution = solver.Solve(problem->b);
-				}
-				else
-					problem->Solve();
+				Solver* solver = create_solver(dimension, solverCode, problem, solverTolerance, staticCondensation, nMultigridLevels);
+				cout << "Solver: " << *solver << endl << endl;
+				solver->Setup(problem->A);
+				problem->Solution = solver->Solve(problem->b);
+				delete solver;
 
 				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
 					problem->ExtractTraceSystemSolution();

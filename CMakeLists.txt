@@ -54,14 +54,14 @@ if(${TPL_ENABLE_AGMG})
 	target_link_libraries(dghho "-lgfortran" "-lm" ${TPL_AGMG_LIB} ${TPL_LAPACK_LIB} ${TPL_BLAS_LIB})
 
 	file(WRITE 
-		src/Utils/agmg.h 
+		src/Solver/enable_AGMG.h 
 		"#define TPL_ENABLE_AGMG"
 	)
 
 	message(STATUS "AGMG enabled")
 else()
 	file(WRITE 
-		src/Utils/agmg.h 
+		src/Solver/enable_AGMG.h 
 		"#undef TPL_ENABLE_AGMG"
 	)
 	message(STATUS "AGMG disabled")

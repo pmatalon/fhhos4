@@ -1,6 +1,7 @@
 #pragma once
 #include <Eigen/Sparse>
 #include "IterativeSolver.h"
+#include "EigenSparseLU.h"
 using namespace std;
 
 enum class Direction : unsigned
@@ -19,7 +20,7 @@ protected:
 	Eigen::SparseMatrix<double> D;
 	Eigen::SparseMatrix<double> L;
 	Eigen::SparseMatrix<double> U;
-	Eigen::SparseLU<Eigen::SparseMatrix<double>> _solver;
+	EigenSparseLU _solver;
 public:
 
 	BlockSOR(int blockSize, double omega, Direction direction)
@@ -80,14 +81,7 @@ public:
 		L_coeffs.Fill(L);
 
 		Eigen::SparseMatrix<double> M = _direction == Direction::Forward ? (D + _omega * L) : (D + _omega * U);
-		_solver.compute(M);
-		Eigen::ComputationInfo info = _solver.info();
-		if (info != Eigen::ComputationInfo::Success)
-		{
-			cout << "Error: SparseLU failed to execute in the setup of BlockSOR with the code " << info << ": " << _solver.lastErrorMessage() << endl;
-			//cout << A << endl;
-			exit(EXIT_FAILURE);
-		}
+		_solver.Setup(M);
 	}
 
 private:
@@ -99,7 +93,7 @@ private:
 		else
 			rhs = (-_omega * L + (1 - _omega)*D)*x + _omega * b;
 
-		x = _solver.solve(rhs);
+		x = _solver.Solve(rhs);
 		return x;
 	}
 };

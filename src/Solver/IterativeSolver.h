@@ -1,9 +1,10 @@
 #pragma once
 #include <Eigen/Sparse>
+#include "Solver.h"
 #include "IterationResult.h"
 using namespace std;
 
-class IterativeSolver
+class IterativeSolver : public Solver
 {
 private:
 	Eigen::SparseLU<Eigen::SparseMatrix<double>> _directSolver;
@@ -17,26 +18,16 @@ public:
 
 	Eigen::SparseMatrix<double> A;
 
-	IterativeSolver()
-	{
-	}
+	IterativeSolver() : Solver() {}
 
-	virtual void Serialize(ostream& os) const = 0;
-
-	friend ostream& operator<<(ostream& os, const IterativeSolver& s)
-	{
-		s.Serialize(os);
-		return os;
-	}
-
-	virtual void Setup(const Eigen::SparseMatrix<double>& A)
+	virtual void Setup(const Eigen::SparseMatrix<double>& A) override
 	{
 		this->A = A;
 		if (this->ComputeExactSolution)
 			this->_directSolver.compute(this->A);
 	}
 
-	Eigen::VectorXd Solve(const Eigen::VectorXd& b)
+	Eigen::VectorXd Solve(const Eigen::VectorXd& b) override
 	{
 		Eigen::VectorXd zero = Eigen::VectorXd::Zero(b.rows());
 		return Solve(b, zero);

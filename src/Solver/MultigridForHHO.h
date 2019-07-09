@@ -403,6 +403,7 @@ public:
 				finerLevel = coarseLevel;
 			}
 			finerLevel->Setup();
+			this->SetupCoarseSolver();
 		}
 		else
 		{
@@ -424,6 +425,7 @@ public:
 			}
 			finerLevel->Setup();
 			_nLevels = levelNumber + 1;
+			this->SetupCoarseSolver();
 			cout << "\t--> " << _nLevels << " levels built." << endl;
 		}
 	}
