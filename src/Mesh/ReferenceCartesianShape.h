@@ -202,7 +202,7 @@ public:
 
 	double ComputeIntegralGradGrad(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{
-		if (phi1->GetDegree() == 0 || phi1->GetDegree() == 0)
+		if (phi1->GetDegree() == 0 || phi2->GetDegree() == 0)
 			return 0;
 
 		function<double(RefPoint)> functionToIntegrate = [phi1, phi2](RefPoint p) {
