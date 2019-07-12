@@ -1,20 +1,8 @@
 #include <cstdio>
 #include <iostream>
-#include <functional>
 #include <getopt.h>
 #include <Eigen/Core>
-#include "DG/Poisson_DG.h"
-#include "HHO/Poisson_HHO.h"
-#include "FunctionalBasis/FunctionalBasis.h"
-#include "Mesh/1D/CartesianGrid1D.h"
-#include "Mesh/2D/CartesianGrid2D.h"
-#include "Mesh/3D/CartesianGrid3D.h"
-#include "Mesh/2D/CartesianPolygonalMesh2D.h"
-#include "Utils/Action.h"
-#include "Utils/DiffusionPartition.h"
-#include "Solver/MultigridForHHO.h"
-#include "Solver/EigenCG.h"
-#include "Solver/AGMG.h"
+#include "Program.h"
 using namespace std;
 
 
@@ -70,49 +58,6 @@ void argument_error(string msg)
 	cout << "Argument error: " << msg << endl;
 	exit(EXIT_FAILURE);
 }
-
-Solver* create_solver(int dim, string solverCode, Problem* problem, double tolerance, bool staticCondensation, int nMultigridLevels)
-{
-	Solver* solver = NULL;
-	if (solverCode.compare("mg") == 0)
-	{
-		if (staticCondensation)
-		{
-			if (dim == 2)
-			{
-				Poisson_HHO<2>* hhoProblem = dynamic_cast<Poisson_HHO<2>*>(problem);
-				MultigridForHHO<2>* mg = new MultigridForHHO<2>(hhoProblem, nMultigridLevels);
-				mg->ComputeExactSolution = hhoProblem->_mesh->Elements.size() <= 32 * 32;
-				solver = mg;
-			}
-			else if (dim == 3)
-			{
-				Poisson_HHO<3>* hhoProblem = dynamic_cast<Poisson_HHO<3>*>(problem);
-				MultigridForHHO<3>* mg = new MultigridForHHO<3>(hhoProblem, nMultigridLevels);
-				mg->ComputeExactSolution = hhoProblem->_mesh->Elements.size() <= 8 * 8;
-			}
-			else
-				argument_error("Multigrid only applicable on dimensions 2 and 3.");
-		}
-		else
-			argument_error("Multigrid only applicable on HHO discretization with static condensation.");
-	}
-	else if (solverCode.compare("lu") == 0)
-		solver = new EigenSparseLU();
-	else if (solverCode.compare("cg") == 0)
-		solver = new EigenCG(tolerance);
-	else if (solverCode.compare("agmg") == 0)
-		solver = new AGMG(tolerance);
-	else
-		argument_error("Unknown solver or not applicable!");
-
-	IterativeSolver* iterativeSolver = dynamic_cast<IterativeSolver*>(solver);
-	if (iterativeSolver != nullptr)
-		iterativeSolver->Tolerance = tolerance;
-
-	return solver;
-}
-
 
 int main(int argc, char* argv[])
 {
@@ -191,6 +136,15 @@ int main(int argc, char* argv[])
 	if (dimension != 1 && solution.compare("hetero") == 0)
 		argument_error("-s hetero is only supported in 1D.");
 
+	if (dimension == 1 && discretization.compare("hho") == 0)
+		argument_error("HHO in 1D not implemented.");
+
+	if (solverCode.compare("mg") == 0 && discretization.compare("dg") == 0)
+		argument_error("Multigrid only applicable on HHO discretization.");
+
+	if (solverCode.compare("mg") == 0 && discretization.compare("hho") == 0 && !staticCondensation)
+		argument_error("Multigrid only applicable if the static condensation is enabled.");
+
 	Action action = Action::LogAssembly;
 	for (size_t i = 0; i < a.length(); i++)
 	{
@@ -208,290 +162,18 @@ int main(int argc, char* argv[])
 			argument_error("unknown action '" + to_string(a[i]) + "'. Check -a argument.");
 	}
 
-	function<double(DomPoint)> exactSolution = NULL;
-	SourceFunction* sourceFunction;
-
-	function<bool(DomPoint)> isInPart1 = [](DomPoint p) { return p.X < 0.5; };
-	DiffusionPartition diffusionPartition(isInPart1, kappa1, kappa2);
-
-	//------------//
-	//     1D     //
-	//------------//
-
+	Program* program = nullptr;
 	if (dimension == 1)
-	{
-		Mesh<1>* mesh = new CartesianGrid1D(n);
-		if (solution.compare("sine") == 0)
-		{
-			exactSolution = [](DomPoint p)
-			{
-				double x = p.X;
-				return sin(4 * M_PI * x) / (16 * pow(M_PI, 2));
-			};
-			sourceFunction = new SourceFunction1D([&diffusionPartition](double x) { return diffusionPartition.Coefficient(x) * sin(4 * M_PI * x); });
-		}
-		else if (solution.compare("poly") == 0)
-		{
-			exactSolution = [](DomPoint p) 
-			{ 
-				double x = p.X;
-				return x * (1 - x); 
-			};
-			sourceFunction = new SourceFunction1D([&diffusionPartition](double x) { return diffusionPartition.Coefficient(x) * 2; });
-			//sourceFunction = [](double x) { return (-1)*(-6 * x*pow(x - 1, 3) - 3 * pow(x, 3) * (2 * x - 2) - 18 * pow(x, 2) * pow(x - 1, 2)); };
-		}
-		else if (solution.compare("hetero") == 0)
-		{
-			exactSolution = [&diffusionPartition](DomPoint p)
-			{
-				double x = p.X;
-				double alpha = diffusionPartition.Kappa1;
-				double a1 = -1 / (2 * alpha);
-				double a2 = -0.5;
-				double b1 = (1 + 3 * alpha)/(2 * alpha*(1 + alpha));
-				double b2 = -(alpha + 3) / (2 * (1 + alpha));
-				if (diffusionPartition.IsInPart1(p))
-					return 4 * a1 *pow(x, 2) + 2 * b1 * x;
-				else
-					return 4 * a2 * pow(x - 1, 2) + 2 * b2 * (x - 1);
-			};
-			sourceFunction = new SourceFunction1D([&diffusionPartition](double x) { return 4; });
-		}
-
-		if (discretization.compare("dg") == 0)
-		{
-			Poisson_DG<1>* problem = new Poisson_DG<1>(solution, sourceFunction, diffusionPartition, outputDirectory);
-			FunctionalBasis<1>* basis = new FunctionalBasis<1>(basisCode, polyDegree);
-
-			cout << endl;
-			cout << "----------------------- Assembly -------------------------" << endl;
-			problem->Assemble(mesh, basis, penalizationCoefficient, action);
-
-			if ((action & Action::SolveSystem) == Action::SolveSystem)
-			{
-				cout << endl;
-				cout << "------------------- Linear system resolution ------------------" << endl;
-				Solver* solver = create_solver(dimension, solverCode, problem, solverTolerance, staticCondensation, nMultigridLevels);
-				cout << "Solver: " << *solver << endl << endl;
-				solver->Setup(problem->A);
-				problem->Solution = solver->Solve(problem->b);
-				delete solver;
-				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
-					problem->ExtractSolution();
-				double error = L2::Error<1>(mesh, basis, problem->Solution, exactSolution);
-				cout << "L2 Error = " << error << endl;
-			}
-
-			delete problem;
-			delete basis;
-		}
-		else
-			argument_error("HHO in 1D not implemented.");
-
-		delete mesh;
-	}
-
-	//------------//
-	//     2D     //
-	//------------//
-
+		program = new ProgramDim<1>();
 	else if (dimension == 2)
-	{
-		Mesh<2>* mesh = new CartesianGrid2D(n, n);
-		//Mesh<2>* mesh = new CartesianPolygonalMesh2D(n, n);
-		//mesh->CoarsenMesh(CoarseningStrategy::AgglomerationAndKeepFineFaces);
-		//mesh = mesh->CoarseMesh;
-		//cout << *mesh << endl << endl;
-		//cout << "Coarse mesh" << endl << *(mesh->CoarseMesh) << endl << endl;
-
-		if (solution.compare("sine") == 0)
-		{
-			exactSolution = [](DomPoint p)
-			{
-				double x = p.X;
-				double y = p.Y;
-				return sin(4 * M_PI * x)*sin(4 * M_PI * y);
-			};
-			sourceFunction = new SourceFunction2D([&diffusionPartition](double x, double y) { return diffusionPartition.Coefficient(x) * 2 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y); });
-		}
-		else if (solution.compare("poly") == 0)
-		{
-			exactSolution = [](DomPoint p)
-			{
-				double x = p.X;
-				double y = p.Y; 
-				return x*(1 - x) * y*(1 - y);
-			};
-			sourceFunction = new SourceFunction2D([&diffusionPartition](double x, double y) { return diffusionPartition.Coefficient(x) * 2 * (y*(1 - y) + x*(1 - x)); });
-		}
-
-		if (discretization.compare("dg") == 0)
-		{
-			Poisson_DG<2>* problem = new Poisson_DG<2>(solution, sourceFunction, diffusionPartition, outputDirectory);
-			FunctionalBasis<2>* basis = new FunctionalBasis<2>(basisCode, polyDegree, fullTensorization);
-
-			cout << endl;
-			cout << "----------------------- Assembly -------------------------" << endl;
-			problem->Assemble(mesh, basis, penalizationCoefficient, action);
-
-			if ((action & Action::SolveSystem) == Action::SolveSystem)
-			{
-				Solver* solver = create_solver(dimension, solverCode, problem, solverTolerance, staticCondensation, nMultigridLevels);
-				cout << "Solver: " << *solver << endl << endl;
-				solver->Setup(problem->A);
-				problem->Solution = solver->Solve(problem->b);
-				delete solver;
-				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
-					problem->ExtractSolution();
-				double error = L2::Error<2>(mesh, basis, problem->Solution, exactSolution);
-				cout << "L2 Error = " << error << endl;
-			}
-
-			delete problem;
-			delete basis;
-		}
-		else if (discretization.compare("hho") == 0)
-		{
-			FunctionalBasis<2>* reconstructionBasis = new FunctionalBasis<2>(basisCode, polyDegree, fullTensorization);
-			FunctionalBasis<2>* cellBasis = new FunctionalBasis<2>(basisCode, polyDegree - 1, fullTensorization);
-			FunctionalBasis<1>* faceBasis = new FunctionalBasis<1>(basisCode, polyDegree - 1, fullTensorization);
-
-			Poisson_HHO<2>* problem = new Poisson_HHO<2>(mesh, solution, sourceFunction, reconstructionBasis, cellBasis, faceBasis, staticCondensation, outputDirectory);
-
-			cout << endl;
-			cout << "----------------------- Assembly -------------------------" << endl;
-			problem->Assemble(action);
-
-			if ((action & Action::ExportFaces) == Action::ExportFaces)
-				mesh->ExportFacesToMatlab(outputDirectory);
-
-			if ((action & Action::SolveSystem) == Action::SolveSystem)
-			{
-				cout << endl;
-				cout << "------------------- Linear system resolution ------------------" << endl;
-
-				Solver* solver = create_solver(dimension, solverCode, problem, solverTolerance, staticCondensation, nMultigridLevels);
-				cout << "Solver: " << *solver << endl << endl;
-				solver->Setup(problem->A);
-				problem->Solution = solver->Solve(problem->b);
-				delete solver;
-				
-				if (staticCondensation && (action & Action::ExtractSolution) == Action::ExtractSolution)
-					problem->ExtractTraceSystemSolution();
-
-				problem->ReconstructHigherOrderApproximation();
-				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
-					problem->ExtractSolution();
-				double error = L2::Error<2>(mesh, reconstructionBasis, problem->ReconstructedSolution, exactSolution);
-				cout << "L2 Error = " << error << endl;
-			}
-
-			delete problem;
-			delete reconstructionBasis;
-			delete cellBasis;
-			delete faceBasis;
-		}
-		delete mesh;
-	}
-
-	//------------//
-	//     3D     //
-	//------------//
-
+		program = new ProgramDim<2>();
 	else if (dimension == 3)
-	{
-		Mesh<3>* mesh = new CartesianGrid3D(n, n, n);
-		if (solution.compare("sine") == 0)
-		{
-			exactSolution = [](DomPoint p)
-			{
-				double x = p.X;
-				double y = p.Y;
-				double z = p.Z;
-				return sin(4 * M_PI * x)*sin(4 * M_PI * y)*sin(4 * M_PI * z);
-			};
-			sourceFunction = new SourceFunction3D([&diffusionPartition](double x, double y, double z) {  return diffusionPartition.Coefficient(x) * 3 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y)*sin(4 * M_PI * z); });
-		}
-		else if (solution.compare("poly") == 0)
-		{
-			exactSolution = [](DomPoint p)
-			{
-				double x = p.X;
-				double y = p.Y;
-				double z = p.Z; 
-				return x * (1 - x)*y*(1 - y)*z*(1 - z);
-			};
-			sourceFunction = new SourceFunction3D([&diffusionPartition](double x, double y, double z) { return diffusionPartition.Coefficient(x) * 2 * ((y*(1 - y)*z*(1 - z) + x * (1 - x)*z*(1 - z) + x * (1 - x)*y*(1 - y))); });
-		}
+		program = new ProgramDim<3>();
 
-		if (discretization.compare("dg") == 0)
-		{
-			cout << endl;
-			cout << "----------------------- Assembly -------------------------" << endl;
-			Poisson_DG<3>* problem = new Poisson_DG<3>(solution, sourceFunction, diffusionPartition, outputDirectory);
-			FunctionalBasis<3>* basis = new FunctionalBasis<3>(basisCode, polyDegree, fullTensorization);
+	program->Start(solution, kappa1, kappa2, n, discretization, basisCode, polyDegree, fullTensorization, 
+		penalizationCoefficient, staticCondensation, action, nMultigridLevels, outputDirectory, solverCode, solverTolerance);
 
-			problem->Assemble(mesh, basis, penalizationCoefficient, action);
-
-			if ((action & Action::SolveSystem) == Action::SolveSystem)
-			{
-				cout << "------------------- Linear system resolution ------------------" << endl;
-				Solver* solver = create_solver(dimension, solverCode, problem, solverTolerance, staticCondensation, nMultigridLevels);
-				cout << "Solver: " << *solver << endl << endl;
-				solver->Setup(problem->A);
-				problem->Solution = solver->Solve(problem->b);
-				delete solver;
-				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
-					problem->ExtractSolution();
-				double error = L2::Error<3>(mesh, basis, problem->Solution, exactSolution);
-				cout << "L2 Error = " << error << endl;
-			}
-
-			delete problem;
-			delete basis;
-		}
-		else if (discretization.compare("hho") == 0)
-		{
-			FunctionalBasis<3>* reconstructionBasis = new FunctionalBasis<3>(basisCode, polyDegree, fullTensorization);
-			FunctionalBasis<3>* cellBasis = new FunctionalBasis<3>(basisCode, polyDegree - 1, fullTensorization);
-			FunctionalBasis<2>* faceBasis = new FunctionalBasis<2>(basisCode, polyDegree - 1, fullTensorization);
-
-			Poisson_HHO<3>* problem = new Poisson_HHO<3>(mesh, solution, sourceFunction, reconstructionBasis, cellBasis, faceBasis, staticCondensation, outputDirectory);
-
-			cout << endl;
-			cout << "----------------------- Assembly -------------------------" << endl;
-			problem->Assemble(action);
-
-			if ((action & Action::SolveSystem) == Action::SolveSystem)
-			{
-				cout << endl;
-				cout << "------------------- Linear system resolution ------------------" << endl;
-				Solver* solver = create_solver(dimension, solverCode, problem, solverTolerance, staticCondensation, nMultigridLevels);
-				cout << "Solver: " << *solver << endl << endl;
-				solver->Setup(problem->A);
-				problem->Solution = solver->Solve(problem->b);
-				delete solver;
-
-				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
-					problem->ExtractTraceSystemSolution();
-
-				problem->ReconstructHigherOrderApproximation();
-				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
-					problem->ExtractSolution();
-
-				double error = L2::Error<3>(mesh, reconstructionBasis, problem->ReconstructedSolution, exactSolution);
-				cout << "L2 Error = " << error << endl;
-			}
-
-			delete problem;
-			delete reconstructionBasis;
-			delete cellBasis;
-			delete faceBasis;
-		}
-		delete mesh;
-	}
-
-	delete sourceFunction;
+	delete program;
 
 	cout << "----------------- SUCCESSFUL TERMINATION ----------------" << endl;
     return EXIT_SUCCESS;

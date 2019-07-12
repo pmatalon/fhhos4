@@ -137,6 +137,7 @@
     <ClInclude Include="src/Utils/SourceFunction.h" />
     <ClInclude Include="src/Utils/Utils.h" />
     <ClInclude Include="src/Problem.h" />
+    <ClInclude Include="src\Program.h" />
     <ClInclude Include="src\Solver\AGMG.h" />
     <ClInclude Include="src\Solver\BlockSOR.h" />
     <ClInclude Include="src\Solver\EigenCG.h" />
