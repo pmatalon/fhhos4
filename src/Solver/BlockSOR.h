@@ -7,7 +7,7 @@ using namespace std;
 enum class Direction : unsigned
 {
 	Forward = 0,
-	Backward = 1 << 1
+	Backward = 1
 };
 
 class BlockSOR : public IterativeSolver
@@ -17,10 +17,7 @@ protected:
 	double _omega;
 	Direction _direction;
 
-	Eigen::SparseMatrix<double> D;
-	Eigen::SparseMatrix<double> L;
-	Eigen::SparseMatrix<double> U;
-	EigenSparseLU _solver;
+	vector<Eigen::MatrixXd> invD;
 public:
 
 	BlockSOR(int blockSize, double omega, Direction direction)
@@ -35,66 +32,75 @@ public:
 		os << "Block-SOR (blockSize=" << _blockSize << ", omega=" << _omega << ", direction=" << (_direction == Direction::Forward ? "forward" : "backward") << ")";
 	}
 
+	//------------------------------------------------//
+	// Big assumption: the matrix must be symmetric!  //
+	//------------------------------------------------//
+
 	void Setup(const Eigen::SparseMatrix<double>& A) override
 	{
+		//Eigen::SparseMatrix<double, Eigen::RowMajor> A = colMajorA;
 		IterativeSolver::Setup(A);
 
-		D = Eigen::SparseMatrix<double>(A.rows(), A.cols());
-		L = Eigen::SparseMatrix<double>(A.rows(), A.cols());
-		U = Eigen::SparseMatrix<double>(A.rows(), A.cols());
+		auto nb = A.rows() / _blockSize;
+		this->invD = vector<Eigen::MatrixXd>(nb);
 
-		struct ChunkResult
-		{
-			NonZeroCoefficients D_coeffs;
-			NonZeroCoefficients L_coeffs;
-			NonZeroCoefficients U_coeffs;
-		};
-		NumberParallelLoop<ChunkResult> parallelLoop(A.outerSize());
-		parallelLoop.Execute([this, &A](BigNumber k, ParallelChunk<ChunkResult>* chunk)
+		NumberParallelLoop<EmptyResultChunk> parallelLoop(nb);
+		parallelLoop.Execute([this](BigNumber i, ParallelChunk<EmptyResultChunk>* chunk)
 			{
-				for (Eigen::SparseMatrix<double>::InnerIterator it(A, k); it; ++it)
-				{
-					auto iBlock = it.row() / this->_blockSize;
-					auto jBlock = it.col() / this->_blockSize;
-					if (iBlock == jBlock)
-						chunk->Results.D_coeffs.Add(it.row(), it.col(), it.value());
-					else if (iBlock < jBlock)
-						chunk->Results.U_coeffs.Add(it.row(), it.col(), it.value());
-					else
-						chunk->Results.L_coeffs.Add(it.row(), it.col(), it.value());
-				}
+				Eigen::MatrixXd Di = this->A.block(i * _blockSize, i * _blockSize, _blockSize, _blockSize);
+				this->invD[i] = Di.inverse();
 			});
-
-		NonZeroCoefficients D_coeffs(A.nonZeros());
-		NonZeroCoefficients L_coeffs(A.nonZeros());
-		NonZeroCoefficients U_coeffs(A.nonZeros());
-
-		parallelLoop.AggregateChunkResults([&D_coeffs, &L_coeffs, &U_coeffs](ChunkResult chunkResult)
-			{
-				D_coeffs.Add(chunkResult.D_coeffs);
-				L_coeffs.Add(chunkResult.L_coeffs);
-				U_coeffs.Add(chunkResult.U_coeffs);
-			});
-
-		D_coeffs.Fill(D);
-		U_coeffs.Fill(U);
-		L_coeffs.Fill(L);
-
-		Eigen::SparseMatrix<double> M = _direction == Direction::Forward ? (D + _omega * L) : (D + _omega * U);
-		_solver.Setup(M);
 	}
 
 private:
 	Eigen::VectorXd ExecuteOneIteration(const Eigen::VectorXd& b, Eigen::VectorXd& x) override
 	{
-		Eigen::VectorXd rhs;
+		auto nb = A.rows() / _blockSize;
 		if (_direction == Direction::Forward)
-			rhs = (-_omega * U + (1 - _omega)*D)*x + _omega * b;
+		{
+			for (BigNumber i = 0; i < nb; ++i)
+				ProcessBlockRow(i, b, x);
+		}
 		else
-			rhs = (-_omega * L + (1 - _omega)*D)*x + _omega * b;
-
-		x = _solver.Solve(rhs);
+		{
+			for (BigNumber i = 0; i < nb; ++i)
+				ProcessBlockRow(nb - i - 1, b, x);
+		}
 		return x;
+	}
+
+	inline void ProcessBlockRow(BigNumber currentBlockRow, const Eigen::VectorXd& b, Eigen::VectorXd& x)
+	{
+		// BlockRow i: [ --- Li --- | Di | --- Ui --- ]
+
+		/*
+		auto nb = A.rows() / _blockSize;
+		// x_new                                               x_new                                  x_old                                               x_old
+		x.segment(i * _blockSize, _blockSize) = -_omega * Li * x.head(i * _blockSize) - _omega * Ui * x.tail((nb - i - 1) * _blockSize) + (1 - _omega)*Di*x.segment(i * _blockSize, _blockSize) + _omega * bi;
+		x.segment(i * _blockSize, _blockSize) = this->invD.block(i * _blockSize, 0, _blockSize, _blockSize) * x.segment(i * _blockSize, _blockSize);*/
+
+
+		Eigen::VectorXd tmp_x = _omega * b.segment(currentBlockRow * _blockSize, _blockSize);
+		
+		for (int k = 0; k < _blockSize; k++)
+		{
+			BigNumber iBlock = currentBlockRow;
+			BigNumber i = iBlock * _blockSize + k;
+			// Iteration over the non-zeros of the i-th row. But...
+			// ColumnMajor --> the following line iterates over the non-zeros of the i-th COLUMN, which equals the i-th row because the matrix is symmetric.
+			for (Eigen::SparseMatrix<double>::InnerIterator it(A, i); it; ++it)
+			{
+				auto j = it.row(); // ColumnMajor --> we actually took the column instead of the row, so the column number is actually given by the row number.
+				auto jBlock = j / this->_blockSize;
+				auto a_ij = it.value();
+				if (iBlock == jBlock) // Di
+					tmp_x(k) += (1 - _omega) * a_ij * x(j);
+				else // Li and Ui
+					tmp_x(k) += -_omega * a_ij * x(j);
+			}
+		}
+
+		x.segment(currentBlockRow * _blockSize, _blockSize) = this->invD[currentBlockRow] * tmp_x;
 	}
 };
 

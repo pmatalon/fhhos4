@@ -160,7 +160,7 @@ public:
 				cout << endl;
 				cout << "------------------- Linear system resolution ------------------" << endl;
 
-				Solver* solver = CreateSolver(solverCode, problem, solverTolerance, staticCondensation, nMultigridLevels);
+				Solver* solver = CreateSolver(solverCode, problem, solverTolerance, staticCondensation, nMultigridLevels, basis->Size());
 				cout << "Solver: " << *solver << endl << endl;
 				solver->Setup(problem->A);
 				problem->Solution = solver->Solve(problem->b);
@@ -194,7 +194,7 @@ public:
 				cout << endl;
 				cout << "------------------- Linear system resolution ------------------" << endl;
 
-				Solver* solver = CreateSolver(solverCode, problem, solverTolerance, staticCondensation, nMultigridLevels);
+				Solver* solver = CreateSolver(solverCode, problem, solverTolerance, staticCondensation, nMultigridLevels, faceBasis->Size());
 				cout << "Solver: " << *solver << endl << endl;
 				solver->Setup(problem->A);
 				problem->Solution = solver->Solve(problem->b);
@@ -222,7 +222,7 @@ public:
 private:
 	Mesh<Dim>* BuildMesh(int n) { return nullptr;  }
 
-	Solver* CreateSolver(string solverCode, Problem* problem, double tolerance, bool staticCondensation, int nMultigridLevels)
+	Solver* CreateSolver(string solverCode, Problem* problem, double tolerance, bool staticCondensation, int nMultigridLevels, int blockSize)
 	{
 		Solver* solver = NULL;
 		if (solverCode.compare("mg") == 0)
@@ -241,6 +241,8 @@ private:
 			solver = new EigenSparseLU();
 		else if (solverCode.compare("cg") == 0)
 			solver = new EigenCG(tolerance);
+		else if (solverCode.compare("bgs") == 0)
+			solver = new BlockGaussSeidel(blockSize);
 		else if (solverCode.compare("agmg") == 0)
 			solver = new AGMG(tolerance);
 		else

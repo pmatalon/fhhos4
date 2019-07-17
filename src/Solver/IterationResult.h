@@ -25,7 +25,8 @@ struct IterationResult
 	void ComputeError(const Eigen::VectorXd& exactSolution)
 	{
 		this->e = exactSolution - x;
-		this->RelativeErrorNorm = e.norm() / exactSolution.norm();
+		double exactSolNorm = exactSolution.norm();
+		this->RelativeErrorNorm = exactSolNorm > 0 ? e.norm() / exactSolution.norm() : e.norm();
 	}
 
 	friend ostream& operator<<(ostream& os, const IterationResult& result)

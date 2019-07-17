@@ -27,7 +27,7 @@ void print_usage() {
 	cout << "                                 'legendre'" << endl;
 	cout << "                                 'bernstein'" << endl;
 	cout << "                                 'hemker'" << endl;
-	cout << "-p NUM               : max polynomial degree of approximation (default: 2)" << endl;
+	cout << "-p NUM               : polynomial degree of approximation (default: 2)" << endl;
 	cout << "-f                   : full tensorization of the polynomials when d=2 or 3 (i.e. space Q) (default: space P)" << endl;
 	cout << "-z NUM               : penalization coefficient (default: -1 = automatic)" << endl;
 	cout << "-c                   : static condensation (HHO only) (default: no static condensation)" << endl;
@@ -43,6 +43,8 @@ void print_usage() {
 	cout << "                                 'v' = export solution vector (requires 's')" << endl;
 	cout << "-v SOLVER            : linear solver (default: 'lu'): " << endl;
 	cout << "                                 'lu'   = LU factorization (Eigen library)" << endl;
+	cout << "                                 'cg'   = Conjugate gradient with Jacobi preconditioner (Eigen library)" << endl;
+	cout << "                                 'bgs'  = Block Gauss-Seidel: the block size is set to the number of DOFs per cell (DG) or face (HHO)" << endl;
 	cout << "                                 'mg'   = Custom multigrid for HHO with static condensation" << endl;
 	cout << "                                 'agmg' = Yvan Notay's AGMG solver" << endl;
 	cout << "-l NUM               : number of multigrid levels (HHO 2D with static cond. only) (default: 0)" << endl;

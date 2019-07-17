@@ -410,10 +410,12 @@ public:
 			int levelNumber = 0;
 			while (problem->A.rows() > MatrixMaxSizeForCoarsestLevel)
 			{
-				levelNumber++;
 				problem->_mesh->CoarsenMesh(coarseningStrategy);
 				problem = problem->GetProblemOnCoarserMesh();
 				problem->Assemble(Action::None);
+				if (problem->A.rows() == 0)
+					break;
+				levelNumber++;
 				LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(levelNumber, problem);
 
 				finerLevel->CoarserLevel = coarseLevel;

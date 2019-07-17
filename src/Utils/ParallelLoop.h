@@ -85,22 +85,16 @@ public:
 			Chunks[threadNumber] = new ParallelChunk<ResultT>(threadNumber, ChunkMaxSize, loopSize);
 	}
 
-	void InitChunkResults(function<void(ResultT)> functionInitChunkResults)
+	void InitChunkResults(function<void(ResultT&)> functionInitChunkResults)
 	{
 		for (unsigned int threadNumber = 0; threadNumber < NThreads; threadNumber++)
-		{
-			ResultT results = Chunks[threadNumber]->Results;
-			functionInitChunkResults(results);
-		}
+			functionInitChunkResults(Chunks[threadNumber]->Results);
 	}
 
-	void AggregateChunkResults(function<void(ResultT)> aggregate)
+	void AggregateChunkResults(function<void(ResultT&)> aggregate)
 	{
 		for (unsigned int threadNumber = 0; threadNumber < NThreads; threadNumber++)
-		{
-			ResultT results = Chunks[threadNumber]->Results;
-			aggregate(results);
-		}
+			aggregate(Chunks[threadNumber]->Results);
 	}
 
 	void Wait()

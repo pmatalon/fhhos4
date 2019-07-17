@@ -179,6 +179,7 @@
     <ClInclude Include="src\Solver\enable_AGMG.h">
       <Filter>Solver</Filter>
     </ClInclude>
+    <ClInclude Include="src\Program.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

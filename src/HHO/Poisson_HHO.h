@@ -95,7 +95,7 @@ public:
 			cout << mesh->Description() << endl;
 			cout << "\tElements: " << hho.nElements << endl;
 			cout << "\tFaces   : " << hho.nFaces << " (" << hho.nInteriorFaces << " interior + " << hho.nBoundaryFaces << " boundary)" << endl;
-			cout << "Discretization: Hybrid High Order" << endl;
+			cout << "Discretization: Hybrid High Order (k = " << faceBasis->GetDegree() << ")" << endl;
 			cout << "\tReconstruction basis: " << reconstructionBasis->Name() << endl;
 			cout << "\tCell basis          : " << cellBasis->Name() << endl;
 			cout << "\tFace basis          : " << faceBasis->Name() << endl;
