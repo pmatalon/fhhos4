@@ -17,7 +17,7 @@ public:
 	LevelForHHO(int number, Poisson_HHO<Dim>* problem)
 		: Level(number, new BlockGaussSeidelSmoother(problem->HHO.nLocalFaceUnknowns, 1), new ReverseBlockGaussSeidelSmoother(problem->HHO.nLocalFaceUnknowns, 1))
 	{
-		this->UseGalerkinOperator = true;
+		this->UseGalerkinOperator = false;
 		this->_problem = problem;
 	}
 
@@ -95,14 +95,12 @@ private:
 
 				BigNumber faceGlobalNumber = face->Number;
 
-				chunk->Results.Coeffs.Add(faceGlobalNumber*faceLocalUnknowns, faceGlobalNumber*faceLocalUnknowns, M_face);
+				chunk->Results.Coeffs.Add(faceGlobalNumber*faceLocalUnknowns, faceGlobalNumber*faceLocalUnknowns, M_face / face->Measure());
 			});
 		Eigen::SparseMatrix<double> M(problem->HHO.nTotalFaceUnknowns, problem->HHO.nTotalFaceUnknowns);
 		parallelLoop.Fill(M);
 
-		double squeletonMeasure = problem->_mesh->SqueletonMeasure();
-
-		return M / squeletonMeasure;
+		return M;
 	}
 
 	Eigen::SparseMatrix<double> GetInverseGlobalMassMatrix_Faces(Poisson_HHO<Dim>* problem)
@@ -122,14 +120,12 @@ private:
 
 				BigNumber faceGlobalNumber = face->Number;
 
-				chunk->Results.Coeffs.Add(faceGlobalNumber*faceLocalUnknowns, faceGlobalNumber*faceLocalUnknowns, invM_face);
+				chunk->Results.Coeffs.Add(faceGlobalNumber*faceLocalUnknowns, faceGlobalNumber*faceLocalUnknowns, invM_face * face->Measure());
 			});
 		Eigen::SparseMatrix<double> M(problem->HHO.nTotalFaceUnknowns, problem->HHO.nTotalFaceUnknowns);
 		parallelLoop.Fill(M);
 
-		double squeletonMeasure = problem->_mesh->SqueletonMeasure();
-
-		return M * squeletonMeasure;
+		return M;
 	}
 
 	Eigen::SparseMatrix<double> GetInverseGlobalMassMatrix_Cells(Poisson_HHO<Dim>* problem)
