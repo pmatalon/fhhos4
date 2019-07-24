@@ -21,7 +21,7 @@ class Program
 public:
 	Program() {}
 	virtual void Start(string solution, double kappa1, double kappa2, BigNumber n, string discretization, string basisCode, int polyDegree, bool fullTensorization, 
-		int penalizationCoefficient, bool staticCondensation, Action action, int nMultigridLevels, string outputDirectory, string solverCode, double solverTolerance) = 0;
+		int penalizationCoefficient, bool staticCondensation, Action action, int nMultigridLevels, bool useGalerkinOperator, string outputDirectory, string solverCode, double solverTolerance) = 0;
 };
 
 template <int Dim>
@@ -31,7 +31,7 @@ public:
 	ProgramDim() : Program() {}
 
 	void Start(string solution, double kappa1, double kappa2, BigNumber n, string discretization, string basisCode, int polyDegree, bool fullTensorization, 
-		int penalizationCoefficient, bool staticCondensation, Action action, int nMultigridLevels, string outputDirectory, string solverCode, double solverTolerance)
+		int penalizationCoefficient, bool staticCondensation, Action action, int nMultigridLevels, bool useGalerkinOperator, string outputDirectory, string solverCode, double solverTolerance)
 	{
 		//----------//
 		//   Mesh   //
@@ -160,7 +160,7 @@ public:
 				cout << endl;
 				cout << "------------------- Linear system resolution ------------------" << endl;
 
-				Solver* solver = CreateSolver(solverCode, problem, solverTolerance, staticCondensation, nMultigridLevels, basis->Size());
+				Solver* solver = CreateSolver(solverCode, problem, solverTolerance, staticCondensation, nMultigridLevels, useGalerkinOperator, basis->Size());
 				cout << "Solver: " << *solver << endl << endl;
 				solver->Setup(problem->A);
 				problem->Solution = solver->Solve(problem->b);
@@ -194,7 +194,7 @@ public:
 				cout << endl;
 				cout << "------------------- Linear system resolution ------------------" << endl;
 
-				Solver* solver = CreateSolver(solverCode, problem, solverTolerance, staticCondensation, nMultigridLevels, faceBasis->Size());
+				Solver* solver = CreateSolver(solverCode, problem, solverTolerance, staticCondensation, nMultigridLevels, useGalerkinOperator, faceBasis->Size());
 				cout << "Solver: " << *solver << endl << endl;
 				solver->Setup(problem->A);
 				problem->Solution = solver->Solve(problem->b);
@@ -222,7 +222,7 @@ public:
 private:
 	Mesh<Dim>* BuildMesh(int n) { return nullptr;  }
 
-	Solver* CreateSolver(string solverCode, Problem* problem, double tolerance, bool staticCondensation, int nMultigridLevels, int blockSize)
+	Solver* CreateSolver(string solverCode, Problem* problem, double tolerance, bool staticCondensation, int nMultigridLevels, bool useGalerkinOperator, int blockSize)
 	{
 		Solver* solver = NULL;
 		if (solverCode.compare("mg") == 0)
@@ -231,6 +231,7 @@ private:
 			{
 				Poisson_HHO<Dim>* hhoProblem = dynamic_cast<Poisson_HHO<Dim>*>(problem);
 				MultigridForHHO<Dim>* mg = new MultigridForHHO<Dim>(hhoProblem, nMultigridLevels);
+				mg->UseGalerkinOperator = useGalerkinOperator;
 				mg->ComputeExactSolution = hhoProblem->_mesh->Elements.size() <= (Dim == 2 ? 32 * 32 : 8 * 8);
 				solver = mg;
 			}

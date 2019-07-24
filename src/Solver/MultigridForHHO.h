@@ -14,10 +14,10 @@ class LevelForHHO : public Level
 private:
 	Poisson_HHO<Dim>* _problem;
 public:
-	LevelForHHO(int number, Poisson_HHO<Dim>* problem)
+	LevelForHHO(int number, Poisson_HHO<Dim>* problem, bool useGalerkinOperator)
 		: Level(number, new BlockGaussSeidelSmoother(problem->HHO.nLocalFaceUnknowns, 1), new ReverseBlockGaussSeidelSmoother(problem->HHO.nLocalFaceUnknowns, 1))
 	{
-		this->UseGalerkinOperator = false;
+		this->UseGalerkinOperator = useGalerkinOperator;
 		this->_problem = problem;
 	}
 
@@ -331,6 +331,7 @@ private:
 	int _nLevels;
 public:
 	int MatrixMaxSizeForCoarsestLevel;
+	bool UseGalerkinOperator;
 
 	MultigridForHHO(Poisson_HHO<Dim>* problem) : MultigridForHHO(problem, 0)
 	{}
@@ -351,7 +352,7 @@ public:
 			this->MatrixMaxSizeForCoarsestLevel = 0;
 		}
 
-		this->_fineLevel = new LevelForHHO<Dim>(0, problem);
+		this->_fineLevel = new LevelForHHO<Dim>(0, problem, false);
 	}
 	
 	void Serialize(ostream& os) const override
@@ -389,7 +390,7 @@ public:
 				problem = problem->GetProblemOnCoarserMesh();
 				problem->Assemble(Action::None);
 				//cout << "coarse mesh" << endl << *(problem->_mesh) << endl << endl;
-				LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(levelNumber, problem);
+				LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(levelNumber, problem, UseGalerkinOperator);
 
 				finerLevel->CoarserLevel = coarseLevel;
 				coarseLevel->FinerLevel = finerLevel;
@@ -412,7 +413,7 @@ public:
 				if (problem->A.rows() == 0)
 					break;
 				levelNumber++;
-				LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(levelNumber, problem);
+				LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(levelNumber, problem, UseGalerkinOperator);
 
 				finerLevel->CoarserLevel = coarseLevel;
 				coarseLevel->FinerLevel = finerLevel;

@@ -50,6 +50,9 @@ void print_usage() {
 	cout << "-l NUM               : number of multigrid levels (HHO 2D with static cond. only) (default: 0)" << endl;
 	cout << "                                  0     - automatic coarsening until the matrix dimension reaches 100 or less" << endl;
 	cout << "                                  other - fixed number of levels" << endl;
+	cout << "-g {0|1}             : coarse grid operator for the multigrid" << endl;
+	cout << "                                  0     - discretized operator" << endl;
+	cout << "                                  1     - Galerkin operator (default)" << endl;
 	cout << "-o PATH              : output directory to export files (default: ./)" << endl;
 	cout << "--------------------------------------------------------" << endl;
 }
@@ -81,12 +84,13 @@ int main(int argc, char* argv[])
 	bool staticCondensation = false;
 	string a = "es";
 	int nMultigridLevels = 0;
+	bool useGalerkinOperator = true;
 	string outputDirectory = ".";
 	string solverCode = "lu";
 	double solverTolerance = 1e-8;
 
 	int option = 0;
-	while ((option = getopt(argc, argv, "d:k:s:n:t:b:p:z:a:l:o:r:v:hfc")) != -1) 
+	while ((option = getopt(argc, argv, "d:k:s:n:t:b:p:z:a:l:o:r:v:g:hfc")) != -1) 
 	{
 		switch (option) 
 		{
@@ -125,6 +129,8 @@ int main(int argc, char* argv[])
 			case 'v': solverCode = optarg;
 				break;
 			case 'l': nMultigridLevels = atoi(optarg);
+				break;
+			case 'g': useGalerkinOperator = atoi(optarg);
 				break;
 			case 'r': BaseParallelLoop::SetDefaultNThreads(atoi(optarg));
 				break;
@@ -173,7 +179,7 @@ int main(int argc, char* argv[])
 		program = new ProgramDim<3>();
 
 	program->Start(solution, kappa1, kappa2, n, discretization, basisCode, polyDegree, fullTensorization, 
-		penalizationCoefficient, staticCondensation, action, nMultigridLevels, outputDirectory, solverCode, solverTolerance);
+		penalizationCoefficient, staticCondensation, action, nMultigridLevels, useGalerkinOperator, outputDirectory, solverCode, solverTolerance);
 
 	delete program;
 
