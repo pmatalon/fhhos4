@@ -20,17 +20,15 @@ class ParallelChunk
 {
 public:
 	int ThreadNumber;
-	BigNumber Start;
-	BigNumber End;
+	BigNumber Start; // starts at 0
+	BigNumber End; // not included in the chunk
 	BigNumber Size() { return End - Start; }
 	std::future<void> ThreadFuture;
 	ResultT Results;
 
-	ParallelChunk(int threadNumber, BigNumber chunkMaxSize, BigNumber loopSize)
+	ParallelChunk(int threadNumber)
 	{
 		this->ThreadNumber = threadNumber;
-		this->Start = threadNumber * chunkMaxSize;
-		this->End = min(this->Start + chunkMaxSize, static_cast<long unsigned int>(loopSize));
 	}
 };
 
@@ -64,7 +62,7 @@ class BaseChunksParallelLoop : public BaseParallelLoop
 {
 public:
 	unsigned int NThreads;
-	BigNumber ChunkMaxSize;
+	BigNumber ChunkMinSize;
 
 	vector<ParallelChunk<ResultT>*> Chunks;
 
@@ -79,10 +77,18 @@ public:
 			NThreads--;
 
 		Chunks.reserve(NThreads);
-		ChunkMaxSize = (BigNumber)ceil(loopSize / (double)NThreads);
+		ChunkMinSize = loopSize / NThreads;
+		int rest = loopSize - NThreads * ChunkMinSize;
 
+		BigNumber start = 0;
 		for (unsigned int threadNumber = 0; threadNumber < NThreads; threadNumber++)
-			Chunks[threadNumber] = new ParallelChunk<ResultT>(threadNumber, ChunkMaxSize, loopSize);
+		{
+			Chunks[threadNumber] = new ParallelChunk<ResultT>(threadNumber);
+			Chunks[threadNumber]->Start = start;
+			Chunks[threadNumber]->End = start + ChunkMinSize + (threadNumber < rest ? 1 : 0);
+			start += Chunks[threadNumber]->Size();
+		}
+		assert(start == loopSize);
 	}
 
 	void InitChunkResults(function<void(ResultT&)> functionInitChunkResults)
