@@ -42,6 +42,8 @@ public:
 	{
 		cout << "\tSetup level " << this->Number << endl;
 
+		OnStartSetup();
+
 		if (this->IsFinestLevel())
 		{
 			cout << "\t\tFine grid operator: "; cout.flush();
@@ -103,6 +105,7 @@ public:
 	}
 
 protected:
+	virtual void OnStartSetup() {}
 	virtual void SetupDiscretizedOperator() {}
 	virtual void SetupRestriction() = 0;
 	virtual void SetupProlongation() = 0;

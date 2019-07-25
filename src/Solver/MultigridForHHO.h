@@ -32,15 +32,24 @@ private:
 		this->OperatorMatrix = this->_problem->A;
 	}
 
+	void OnStartSetup() override
+	{
+		cout << "\t\tMesh              : " << this->_problem->_mesh->Elements.size() << " elements" << endl;
+		if (!IsCoarsestLevel())
+		{
+			Poisson_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
+
+			if (this->UseGalerkinOperator)
+				coarsePb->InitHHO();
+			else
+				coarsePb->Assemble(Action::None);
+		}
+	}
+
 	void SetupProlongation() override
 	{
 		Poisson_HHO<Dim>* finePb = this->_problem;
 		Poisson_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
-
-		if (this->UseGalerkinOperator)
-			coarsePb->InitHHO();
-		else
-			coarsePb->Assemble(Action::None);
 
 		Eigen::SparseMatrix<double> I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
 		//Eigen::SparseMatrix<double> Pi_c = GetGlobalProjectorMatrixFromCellsToFaces(coarsePb); // to be removed later
@@ -377,7 +386,10 @@ public:
 				//cout << "fine mesh" << endl << *(problem->_mesh) << endl << endl;
 				problem->_mesh->CoarsenMesh(coarseningStrategy);
 				if (problem->_mesh->CoarseMesh->InteriorFaces.size() == 0)
+				{
+					cout << "Warning: impossible to coarsen the mesh any more.";
 					break;
+				}
 				problem = problem->GetProblemOnCoarserMesh();
 				//cout << "coarse mesh" << endl << *(problem->_mesh) << endl << endl;
 				LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(levelNumber, problem, UseGalerkinOperator);
@@ -395,10 +407,12 @@ public:
 		else
 		{
 			int levelNumber = 0;
-			while (problem->A.rows() > MatrixMaxSizeForCoarsestLevel)
+			while (problem->HHO.nTotalFaceUnknowns > MatrixMaxSizeForCoarsestLevel)
 			{
 				problem->_mesh->CoarsenMesh(coarseningStrategy);
-				if (problem->_mesh->CoarseMesh->InteriorFaces.size() == 0)
+				auto nCoarseInteriorFaces = problem->_mesh->CoarseMesh->InteriorFaces.size();
+				auto nCoarseUnknowns = nCoarseInteriorFaces * problem->HHO.nLocalFaceUnknowns;
+				if (nCoarseInteriorFaces == 0)
 					break;
 				problem = problem->GetProblemOnCoarserMesh();
 				levelNumber++;
