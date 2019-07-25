@@ -37,6 +37,11 @@ private:
 		Poisson_HHO<Dim>* finePb = this->_problem;
 		Poisson_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
 
+		if (this->UseGalerkinOperator)
+			coarsePb->InitHHO();
+		else
+			coarsePb->Assemble(Action::None);
+
 		Eigen::SparseMatrix<double> I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
 		//Eigen::SparseMatrix<double> Pi_c = GetGlobalProjectorMatrixFromCellsToFaces(coarsePb); // to be removed later
 		//Eigen::SparseMatrix<double> invM_cells = GetInverseGlobalMassMatrix_Cells(coarsePb);
@@ -82,20 +87,12 @@ private:
 	{
 		int faceLocalUnknowns = problem->HHO.nLocalFaceUnknowns;
 
-		FaceParallelLoop<Dim> parallelLoop(problem->_mesh->Faces);
+		FaceParallelLoop<Dim> parallelLoop(problem->_mesh->InteriorFaces);
 		parallelLoop.ReserveChunkCoeffsSize(faceLocalUnknowns * faceLocalUnknowns);
 		parallelLoop.Execute([this, faceLocalUnknowns](Face<Dim>* f, ParallelChunk<CoeffsChunk>* chunk)
 			{
-				if (f->IsDomainBoundary)
-					return;
-
 				Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
-
-				Eigen::MatrixXd M_face = face->FaceMassMatrix();
-
-				BigNumber faceGlobalNumber = face->Number;
-
-				chunk->Results.Coeffs.Add(faceGlobalNumber*faceLocalUnknowns, faceGlobalNumber*faceLocalUnknowns, M_face / face->Measure());
+				chunk->Results.Coeffs.Add(face->Number*faceLocalUnknowns, face->Number*faceLocalUnknowns, face->FaceMassMatrix() / face->Measure());
 			});
 		Eigen::SparseMatrix<double> M(problem->HHO.nTotalFaceUnknowns, problem->HHO.nTotalFaceUnknowns);
 		parallelLoop.Fill(M);
@@ -107,20 +104,12 @@ private:
 	{
 		int faceLocalUnknowns = problem->HHO.nLocalFaceUnknowns;
 
-		FaceParallelLoop<Dim> parallelLoop(problem->_mesh->Faces);
+		FaceParallelLoop<Dim> parallelLoop(problem->_mesh->InteriorFaces);
 		parallelLoop.ReserveChunkCoeffsSize(faceLocalUnknowns * faceLocalUnknowns);
 		parallelLoop.Execute([this, faceLocalUnknowns](Face<Dim>* f, ParallelChunk<CoeffsChunk>* chunk)
 			{
-				if (f->IsDomainBoundary)
-					return;
-
 				Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
-
-				Eigen::MatrixXd invM_face = face->InvFaceMassMatrix();
-
-				BigNumber faceGlobalNumber = face->Number;
-
-				chunk->Results.Coeffs.Add(faceGlobalNumber*faceLocalUnknowns, faceGlobalNumber*faceLocalUnknowns, invM_face * face->Measure());
+				chunk->Results.Coeffs.Add(face->Number*faceLocalUnknowns, face->Number*faceLocalUnknowns, face->InvFaceMassMatrix() * face->Measure());
 			});
 		Eigen::SparseMatrix<double> M(problem->HHO.nTotalFaceUnknowns, problem->HHO.nTotalFaceUnknowns);
 		parallelLoop.Fill(M);
@@ -149,7 +138,7 @@ private:
 
 	FunctionalBasis<Dim>* GetCellInterpolationBasis(Poisson_HHO<Dim>* problem)
 	{
-		auto faceBasis = dynamic_cast<Poisson_HHO_Element<Dim>*>(problem->_mesh->Elements[0])->FaceBasis;
+		FunctionalBasis<Dim-1>* faceBasis = dynamic_cast<Poisson_HHO_Element<Dim>*>(problem->_mesh->Elements[0])->FaceBasis;
 		int faceDegreePSpace = faceBasis->GetDegree();
 
 		//int cellDegreeQSpace = (int)floor(2 * sqrt(faceDegreePSpace + 1) - 1);
@@ -387,8 +376,9 @@ public:
 			{
 				//cout << "fine mesh" << endl << *(problem->_mesh) << endl << endl;
 				problem->_mesh->CoarsenMesh(coarseningStrategy);
+				if (problem->_mesh->CoarseMesh->InteriorFaces.size() == 0)
+					break;
 				problem = problem->GetProblemOnCoarserMesh();
-				problem->Assemble(Action::None);
 				//cout << "coarse mesh" << endl << *(problem->_mesh) << endl << endl;
 				LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(levelNumber, problem, UseGalerkinOperator);
 
@@ -408,10 +398,9 @@ public:
 			while (problem->A.rows() > MatrixMaxSizeForCoarsestLevel)
 			{
 				problem->_mesh->CoarsenMesh(coarseningStrategy);
-				problem = problem->GetProblemOnCoarserMesh();
-				problem->Assemble(Action::None);
-				if (problem->A.rows() == 0)
+				if (problem->_mesh->CoarseMesh->InteriorFaces.size() == 0)
 					break;
+				problem = problem->GetProblemOnCoarserMesh();
 				levelNumber++;
 				LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(levelNumber, problem, UseGalerkinOperator);
 
