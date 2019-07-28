@@ -17,7 +17,8 @@ protected:
 	double _omega;
 	Direction _direction;
 
-	vector<Eigen::MatrixXd> invD;
+	vector<Eigen::FullPivLU<Eigen::MatrixXd>> invD;
+	Eigen::SparseMatrix<double, Eigen::RowMajor> _rowMajorA;
 public:
 
 	BlockSOR(int blockSize, double omega, Direction direction)
@@ -36,19 +37,19 @@ public:
 	// Big assumption: the matrix must be symmetric!  //
 	//------------------------------------------------//
 
-	void Setup(const Eigen::SparseMatrix<double>& A) override
+	void Setup(const SparseMatrix& colMajorA) override
 	{
-		//Eigen::SparseMatrix<double, Eigen::RowMajor> A = colMajorA;
-		IterativeSolver::Setup(A);
+		this->_rowMajorA = colMajorA;
+		IterativeSolver::Setup(colMajorA);
 
 		auto nb = A.rows() / _blockSize;
-		this->invD = vector<Eigen::MatrixXd>(nb);
+		this->invD = vector<Eigen::FullPivLU<Eigen::MatrixXd>>(nb);
 
 		NumberParallelLoop<EmptyResultChunk> parallelLoop(nb);
 		parallelLoop.Execute([this](BigNumber i, ParallelChunk<EmptyResultChunk>* chunk)
 			{
 				Eigen::MatrixXd Di = this->A.block(i * _blockSize, i * _blockSize, _blockSize, _blockSize);
-				this->invD[i] = Di.inverse();
+				this->invD[i].compute(Di);
 			});
 	}
 
@@ -79,18 +80,16 @@ private:
 		x.segment(i * _blockSize, _blockSize) = -_omega * Li * x.head(i * _blockSize) - _omega * Ui * x.tail((nb - i - 1) * _blockSize) + (1 - _omega)*Di*x.segment(i * _blockSize, _blockSize) + _omega * bi;
 		x.segment(i * _blockSize, _blockSize) = this->invD.block(i * _blockSize, 0, _blockSize, _blockSize) * x.segment(i * _blockSize, _blockSize);*/
 
-
 		Eigen::VectorXd tmp_x = _omega * b.segment(currentBlockRow * _blockSize, _blockSize);
-		
+
 		for (int k = 0; k < _blockSize; k++)
 		{
 			BigNumber iBlock = currentBlockRow;
 			BigNumber i = iBlock * _blockSize + k;
-			// Iteration over the non-zeros of the i-th row. But...
-			// ColumnMajor --> the following line iterates over the non-zeros of the i-th COLUMN, which equals the i-th row because the matrix is symmetric.
-			for (Eigen::SparseMatrix<double>::InnerIterator it(A, i); it; ++it)
+			// RowMajor --> the following line iterates over the non-zeros of the i-th row.
+			for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(_rowMajorA, i); it; ++it)
 			{
-				auto j = it.row(); // ColumnMajor --> we actually took the column instead of the row, so the column number is actually given by the row number.
+				auto j = it.col();
 				auto jBlock = j / this->_blockSize;
 				auto a_ij = it.value();
 				if (iBlock == jBlock) // Di
@@ -100,7 +99,7 @@ private:
 			}
 		}
 
-		x.segment(currentBlockRow * _blockSize, _blockSize) = this->invD[currentBlockRow] * tmp_x;
+		x.segment(currentBlockRow * _blockSize, _blockSize) = this->invD[currentBlockRow].solve(tmp_x);
 	}
 };
 
