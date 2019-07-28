@@ -7,7 +7,7 @@ class Level
 {
 public:
 	int Number;
-	Eigen::SparseMatrix<double> OperatorMatrix;
+	SparseMatrix OperatorMatrix;
 	bool UseGalerkinOperator = true;
 
 	Smoother* PreSmoother;
@@ -17,8 +17,8 @@ public:
 	Level* CoarserLevel = NULL;
 
 protected:
-	Eigen::SparseMatrix<double> R;
-	Eigen::SparseMatrix<double> P;
+	SparseMatrix R;
+	SparseMatrix P;
 
 public:
 	Level(int number, Smoother* preSmoother, Smoother* postSmoother)

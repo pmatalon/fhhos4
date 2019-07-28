@@ -20,7 +20,7 @@ public:
 		_solver->ComputeExactSolution = false;
 	}
 
-	void Setup(const Eigen::SparseMatrix<double>& A)
+	void Setup(const SparseMatrix& A)
 	{
 		_solver->Setup(A);
 	}

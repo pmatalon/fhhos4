@@ -11,7 +11,7 @@ extern "C" void dagmg_(int*, double*, int*, int*, double*, double*, int*, int*, 
 class AGMG : public Solver
 {
 private:
-	Eigen::SparseMatrix<double> A;
+	SparseMatrix A;
 
 public:
 	double Tolerance;
@@ -30,7 +30,7 @@ public:
 		os << "AGMG";
 	}
 
-	void Setup(const Eigen::SparseMatrix<double>& A) override
+	void Setup(const SparseMatrix& A) override
 	{
 		this->A = A;
 	}

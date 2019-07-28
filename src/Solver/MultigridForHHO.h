@@ -51,22 +51,12 @@ private:
 		Poisson_HHO<Dim>* finePb = this->_problem;
 		Poisson_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
 
-		Eigen::SparseMatrix<double> I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
-		//Eigen::SparseMatrix<double> Pi_c = GetGlobalProjectorMatrixFromCellsToFaces(coarsePb); // to be removed later
-		//Eigen::SparseMatrix<double> invM_cells = GetInverseGlobalMassMatrix_Cells(coarsePb);
-		/*Eigen::SparseMatrix<double> invM_faces = GetInverseGlobalMassMatrix_Faces(coarsePb);
-		Eigen::SparseMatrix<double> M_faces = GetGlobalMassMatrix_Faces(coarsePb);
-		Eigen::SparseMatrix<double> I_c = invM_faces * Pi_c.transpose() * M_faces;
-		//Eigen::SparseMatrix<double> M_faces_f = GetGlobalMassMatrix_Faces(finePb); // to be removed later */
-		//finePb->ExportMatrix(M_faces_f, "M_faces_f"); // to be removed later
-
-		Eigen::SparseMatrix<double> J_f_c = GetGlobalCanonicalInjectionMatrixCoarseToFine();
-		Eigen::SparseMatrix<double> Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
+		SparseMatrix I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
+		SparseMatrix J_f_c = GetGlobalCanonicalInjectionMatrixCoarseToFine();
+		SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
 		
-		//cout << "----------------- Pi_f (" << Pi_f.rows() << ", " << Pi_f.cols() << ") ----------------" << endl << Pi_f << endl;
 		finePb->ExportMatrix(I_c, "I_c");
 		finePb->ExportMatrix(J_f_c, "J_f_c");
-		//finePb->ExportMatrix(Pi_c, "Pi_c"); // to be removed later
 		finePb->ExportMatrix(Pi_f, "Pi_f");
 
 		P = (Pi_f * J_f_c * I_c).pruned();
@@ -79,10 +69,13 @@ private:
 		Poisson_HHO<Dim>* finePb = this->_problem;
 		Poisson_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
 
-		Eigen::SparseMatrix<double> invM_c = GetInverseGlobalMassMatrix_Faces(coarsePb); // Coarse mass matrix
-		Eigen::SparseMatrix<double> M_f = GetGlobalMassMatrix_Faces(finePb); // Fine mass matrix
+		SparseMatrix invM_c = GetInverseGlobalMassMatrix_Faces(coarsePb); // Coarse mass matrix
+		SparseMatrix M_f = GetGlobalMassMatrix_Faces(finePb); // Fine mass matrix
 
-		R = /*(coarsePb->_mesh->SqueletonMeasure() / finePb->_mesh->SqueletonMeasure()) **/ invM_c * P.transpose() * M_f;
+		//finePb->ExportMatrix(invM_c, "invM_c");
+		//finePb->ExportMatrix(M_f, "M_f");
+
+		R = invM_c * P.transpose() * M_f;
 
 		finePb->ExportMatrix(R, "R");
 	}
@@ -92,7 +85,7 @@ private:
 		return element->Measure() / (face->Element1->Measure() + face->Element2->Measure());
 	}
 
-	Eigen::SparseMatrix<double> GetGlobalMassMatrix_Faces(Poisson_HHO<Dim>* problem)
+	SparseMatrix GetGlobalMassMatrix_Faces(Poisson_HHO<Dim>* problem)
 	{
 		int faceLocalUnknowns = problem->HHO.nLocalFaceUnknowns;
 
@@ -103,13 +96,13 @@ private:
 				Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
 				chunk->Results.Coeffs.Add(face->Number*faceLocalUnknowns, face->Number*faceLocalUnknowns, face->FaceMassMatrix() / face->Measure());
 			});
-		Eigen::SparseMatrix<double> M(problem->HHO.nTotalFaceUnknowns, problem->HHO.nTotalFaceUnknowns);
+		SparseMatrix M(problem->HHO.nTotalFaceUnknowns, problem->HHO.nTotalFaceUnknowns);
 		parallelLoop.Fill(M);
 
 		return M;
 	}
 
-	Eigen::SparseMatrix<double> GetInverseGlobalMassMatrix_Faces(Poisson_HHO<Dim>* problem)
+	SparseMatrix GetInverseGlobalMassMatrix_Faces(Poisson_HHO<Dim>* problem)
 	{
 		int faceLocalUnknowns = problem->HHO.nLocalFaceUnknowns;
 
@@ -120,13 +113,13 @@ private:
 				Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
 				chunk->Results.Coeffs.Add(face->Number*faceLocalUnknowns, face->Number*faceLocalUnknowns, face->InvFaceMassMatrix() * face->Measure());
 			});
-		Eigen::SparseMatrix<double> M(problem->HHO.nTotalFaceUnknowns, problem->HHO.nTotalFaceUnknowns);
+		SparseMatrix M(problem->HHO.nTotalFaceUnknowns, problem->HHO.nTotalFaceUnknowns);
 		parallelLoop.Fill(M);
 
 		return M;
 	}
 
-	Eigen::SparseMatrix<double> GetInverseGlobalMassMatrix_Cells(Poisson_HHO<Dim>* problem)
+	SparseMatrix GetInverseGlobalMassMatrix_Cells(Poisson_HHO<Dim>* problem)
 	{
 		int cellLocalUnknowns = problem->HHO.nLocalCellUnknowns;
 
@@ -139,7 +132,7 @@ private:
 				Eigen::MatrixXd invM_cell = M_cell.inverse();
 				chunk->Results.Coeffs.Add(element->Number*cellLocalUnknowns, element->Number*cellLocalUnknowns, invM_cell);
 			});
-		Eigen::SparseMatrix<double> M(problem->HHO.nTotalCellUnknowns, problem->HHO.nTotalCellUnknowns);
+		SparseMatrix M(problem->HHO.nTotalCellUnknowns, problem->HHO.nTotalCellUnknowns);
 		parallelLoop.Fill(M);
 
 		return M;
@@ -158,7 +151,7 @@ private:
 		return cellInterpolationBasis;
 	}
 
-	Eigen::SparseMatrix<double> GetGlobalInterpolationMatrixFromFacesToCells(Poisson_HHO<Dim>* problem)
+	SparseMatrix GetGlobalInterpolationMatrixFromFacesToCells(Poisson_HHO<Dim>* problem)
 	{
 		//return GetAdjointToGlobalProjUsingCellInnerProduct(problem);
 		return GetReconstructionMatrix(problem);
@@ -166,7 +159,7 @@ private:
 
 
 
-	/*Eigen::SparseMatrix<double> GetAdjointToGlobalProjUsingCellInnerProduct(Poisson_HHO<Dim>* problem)
+	/*SparseMatrix GetAdjointToGlobalProjUsingCellInnerProduct(Poisson_HHO<Dim>* problem)
 	{
 		int nCellUnknowns = problem->HHO.nLocalCellUnknowns;
 		int nFaceUnknowns = problem->HHO.nLocalFaceUnknowns;
@@ -202,14 +195,14 @@ private:
 				}
 			});
 
-		Eigen::SparseMatrix<double> I(problem->HHO.nElements * cellInterpolationBasis->Size(), problem->HHO.nTotalFaceUnknowns);
+		SparseMatrix I(problem->HHO.nElements * cellInterpolationBasis->Size(), problem->HHO.nTotalFaceUnknowns);
 		parallelLoop.Fill(I);
 		delete cellInterpolationBasis;
 
 		return I;
 	}*/
 
-	Eigen::SparseMatrix<double> GetReconstructionMatrix(Poisson_HHO<Dim>* problem)
+	SparseMatrix GetReconstructionMatrix(Poisson_HHO<Dim>* problem)
 	{
 		int nCellUnknowns = problem->HHO.nLocalCellUnknowns;
 		int nFaceUnknowns = problem->HHO.nLocalFaceUnknowns;
@@ -237,14 +230,14 @@ private:
 				}
 			});
 
-		Eigen::SparseMatrix<double> M(problem->HHO.nElements * cellInterpolationBasis->Size(), problem->HHO.nTotalFaceUnknowns);
+		SparseMatrix M(problem->HHO.nElements * cellInterpolationBasis->Size(), problem->HHO.nTotalFaceUnknowns);
 		parallelLoop.Fill(M);
 		delete cellInterpolationBasis;
 
 		return M;
 	}
 
-	Eigen::SparseMatrix<double> GetGlobalProjectorMatrixFromCellsToFaces(Poisson_HHO<Dim>* problem)
+	SparseMatrix GetGlobalProjectorMatrixFromCellsToFaces(Poisson_HHO<Dim>* problem)
 	{
 		int nFaceUnknowns = problem->HHO.nLocalFaceUnknowns;
 
@@ -274,13 +267,13 @@ private:
 				}
 			});
 
-		Eigen::SparseMatrix<double> Pi(problem->HHO.nTotalFaceUnknowns, problem->HHO.nElements * nCellUnknowns);
+		SparseMatrix Pi(problem->HHO.nTotalFaceUnknowns, problem->HHO.nElements * nCellUnknowns);
 		parallelLoop.Fill(Pi);
 
 		return Pi;
 	}
 
-	Eigen::SparseMatrix<double> GetGlobalCanonicalInjectionMatrixCoarseToFine()
+	SparseMatrix GetGlobalCanonicalInjectionMatrixCoarseToFine()
 	{
 		Poisson_HHO<Dim>* finePb = this->_problem;
 		Poisson_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
@@ -307,7 +300,7 @@ private:
 				}
 			});
 
-		Eigen::SparseMatrix<double> J_f_c(finePb->HHO.nElements * nCellUnknowns, coarsePb->HHO.nElements * nCellUnknowns);
+		SparseMatrix J_f_c(finePb->HHO.nElements * nCellUnknowns, coarsePb->HHO.nElements * nCellUnknowns);
 		parallelLoop.Fill(J_f_c);
 		return J_f_c;
 	}
@@ -367,7 +360,7 @@ public:
 		os << "\t" << "Post-smoothing: " << *(_fineLevel->PostSmoother);
 	}
 
-	void Setup(const Eigen::SparseMatrix<double>& A) override
+	void Setup(const SparseMatrix& A) override
 	{
 		IterativeSolver::Setup(A);
 

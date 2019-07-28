@@ -6,7 +6,7 @@ using namespace std;
 class EigenCG : public Solver
 {
 private:
-	Eigen::ConjugateGradient<Eigen::SparseMatrix<double>, Eigen::Lower | Eigen::Upper, Eigen::DiagonalPreconditioner<double>> _solver;
+	Eigen::ConjugateGradient<SparseMatrix, Eigen::Lower | Eigen::Upper, Eigen::DiagonalPreconditioner<double>> _solver;
 
 public:
 	double Tolerance;
@@ -21,7 +21,7 @@ public:
 		os << "Conjugate Gradient (Eigen library)";
 	}
 
-	void Setup(const Eigen::SparseMatrix<double>& A) override
+	void Setup(const SparseMatrix& A) override
 	{
 		_solver.compute(A);
 		Eigen::ComputationInfo info = _solver.info();

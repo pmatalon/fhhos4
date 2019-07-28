@@ -1,11 +1,13 @@
 #pragma once
 #include <functional>
 #include <vector>
+#include <Eigen/Sparse>
 #include "GaussLegendre.h"
 #include "../Mesh/Point.h"
 #include "../FunctionalBasis/BasisFunction.h"
 
 typedef long unsigned int BigNumber;
+typedef Eigen::SparseMatrix<double, Eigen::ColMajor> SparseMatrix;
 
 class Utils
 {
@@ -235,7 +237,7 @@ public:
 		return result;
 	}
 
-	static string MatrixInfo(const Eigen::SparseMatrix<double>& M, string name)
+	static string MatrixInfo(const SparseMatrix& M, string name)
 	{
 		double density = (double)M.nonZeros() / (M.rows() * M.cols()) * 100;
 		//double roundedDensity = (int)(density * 10.0) / 10.0;

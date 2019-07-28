@@ -271,7 +271,7 @@ public:
 		// Matrix export //
 		//---------------//
 
-		this->A = Eigen::SparseMatrix<double>(nUnknowns, nUnknowns);
+		this->A = SparseMatrix(nUnknowns, nUnknowns);
 		matrixCoeffs.Fill(this->A);
 		cout << "nnz(A) = " << this->A.nonZeros() << endl;
 
@@ -287,22 +287,22 @@ public:
 
 		if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
 		{
-			Eigen::SparseMatrix<double> M(nUnknowns, nUnknowns);
+			SparseMatrix M(nUnknowns, nUnknowns);
 			massMatrixCoeffs.Fill(M);
 			Eigen::saveMarket(M, massMatrixFilePath);
 			cout << "Mass matrix exported to \t" << massMatrixFilePath << endl;
 
-			Eigen::SparseMatrix<double> V(nUnknowns, nUnknowns);
+			SparseMatrix V(nUnknowns, nUnknowns);
 			volumicCoeffs.Fill(V);
 			Eigen::saveMarket(V, matrixVolumicFilePath);
 			cout << "Volumic part exported to \t" << matrixVolumicFilePath << endl;
 
-			Eigen::SparseMatrix<double> C(nUnknowns, nUnknowns);
+			SparseMatrix C(nUnknowns, nUnknowns);
 			couplingCoeffs.Fill(C);
 			Eigen::saveMarket(C, matrixCouplingFilePath);
 			cout << "Coupling part exported to \t" << matrixCouplingFilePath << endl;
 
-			Eigen::SparseMatrix<double> P(nUnknowns, nUnknowns);
+			SparseMatrix P(nUnknowns, nUnknowns);
 			penCoeffs.Fill(P);
 			Eigen::saveMarket(P, matrixPenFilePath);
 			cout << "Penalization part exported to \t" << matrixPenFilePath << endl;

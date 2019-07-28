@@ -15,7 +15,7 @@ public:
 		return os;
 	}
 
-	virtual void Setup(const Eigen::SparseMatrix<double>& A) = 0;
+	virtual void Setup(const SparseMatrix& A) = 0;
 
 	virtual Eigen::VectorXd Solve(const Eigen::VectorXd& b) = 0;
 

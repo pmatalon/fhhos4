@@ -7,7 +7,7 @@ using namespace std;
 class IterativeSolver : public Solver
 {
 private:
-	Eigen::SparseLU<Eigen::SparseMatrix<double>> _directSolver;
+	Eigen::SparseLU<SparseMatrix> _directSolver;
 	Eigen::VectorXd _exactSolution;
 public:
 	double Tolerance = 1e-3;
@@ -16,11 +16,11 @@ public:
 	bool PrintIterationResults = true;
 	bool ComputeExactSolution = true;
 
-	Eigen::SparseMatrix<double> A;
+	SparseMatrix A;
 
 	IterativeSolver() : Solver() {}
 
-	virtual void Setup(const Eigen::SparseMatrix<double>& A) override
+	virtual void Setup(const SparseMatrix& A) override
 	{
 		this->A = A;
 		if (this->ComputeExactSolution)

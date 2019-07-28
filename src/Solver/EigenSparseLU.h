@@ -6,7 +6,7 @@ using namespace std;
 class EigenSparseLU : public Solver
 {
 private:
-	Eigen::SparseLU<Eigen::SparseMatrix<double>> _solver;
+	Eigen::SparseLU<SparseMatrix> _solver;
 
 public:
 	EigenSparseLU() : Solver() {}
@@ -16,7 +16,7 @@ public:
 		os << "Sparse LU factorization (Eigen library)";
 	}
 
-	void Setup(const Eigen::SparseMatrix<double>& A) override
+	void Setup(const SparseMatrix& A) override
 	{
 		_solver.compute(A);
 		Eigen::ComputationInfo info = _solver.info();

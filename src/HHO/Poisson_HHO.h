@@ -57,7 +57,7 @@ private:
 	FunctionalBasis<Dim - 1>* _faceBasis;
 	bool _staticCondensation = false;
 
-	Eigen::SparseMatrix<double> _globalMatrix;
+	SparseMatrix _globalMatrix;
 	Eigen::VectorXd _globalRHS;
 
 public:
@@ -323,7 +323,7 @@ public:
 		// Creation of the matrices //
 		//--------------------------//
 
-		Eigen::SparseMatrix<double> globalMatrix = Eigen::SparseMatrix<double>(hho.nTotalHybridUnknowns, hho.nTotalHybridUnknowns);
+		SparseMatrix globalMatrix = SparseMatrix(hho.nTotalHybridUnknowns, hho.nTotalHybridUnknowns);
 		matrixCoeffs.Fill(globalMatrix);
 
 		this->_globalMatrix = globalMatrix;
@@ -332,11 +332,11 @@ public:
 			if ((action & Action::LogAssembly) == Action::LogAssembly)
 				cout << "Static condensation..." << endl;
 
-			//Eigen::SparseMatrix<double> Att = this->_globalMatrix.topLeftCorner(hho.nTotalCellUnknowns, hho.nTotalCellUnknowns);
-			Eigen::SparseMatrix<double> Aff = this->_globalMatrix.bottomRightCorner(hho.nTotalFaceUnknowns, hho.nTotalFaceUnknowns);
-			Eigen::SparseMatrix<double> Atf = this->_globalMatrix.topRightCorner(hho.nTotalCellUnknowns, hho.nTotalFaceUnknowns);
+			//SparseMatrix Att = this->_globalMatrix.topLeftCorner(hho.nTotalCellUnknowns, hho.nTotalCellUnknowns);
+			SparseMatrix Aff = this->_globalMatrix.bottomRightCorner(hho.nTotalFaceUnknowns, hho.nTotalFaceUnknowns);
+			SparseMatrix Atf = this->_globalMatrix.topRightCorner(hho.nTotalCellUnknowns, hho.nTotalFaceUnknowns);
 
-			Eigen::SparseMatrix<double> inverseAtt = GetInverseAtt();
+			SparseMatrix inverseAtt = GetInverseAtt();
 
 			this->A = Aff - Atf.transpose() * inverseAtt * Atf;
 
@@ -369,13 +369,13 @@ public:
 
 		if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
 		{
-			Eigen::SparseMatrix<double> Acons = Eigen::SparseMatrix<double>(hho.nTotalHybridUnknowns, hho.nTotalHybridUnknowns);
+			SparseMatrix Acons = SparseMatrix(hho.nTotalHybridUnknowns, hho.nTotalHybridUnknowns);
 			consistencyCoeffs.Fill(Acons);
 
-			Eigen::SparseMatrix<double> Astab = Eigen::SparseMatrix<double>(hho.nTotalHybridUnknowns, hho.nTotalHybridUnknowns);
+			SparseMatrix Astab = SparseMatrix(hho.nTotalHybridUnknowns, hho.nTotalHybridUnknowns);
 			stabilizationCoeffs.Fill(Astab);
 
-			Eigen::SparseMatrix<double> reconstructionMatrix = Eigen::SparseMatrix<double>(hho.nElements * reconstructionBasis->Size(), hho.nTotalHybridCoeffs);
+			SparseMatrix reconstructionMatrix = SparseMatrix(hho.nElements * reconstructionBasis->Size(), hho.nTotalHybridCoeffs);
 			reconstructionCoeffs.Fill(reconstructionMatrix);
 
 			Eigen::saveMarket(Acons, consistencyFilePath);
@@ -428,9 +428,9 @@ public:
 			cout << "Solving cell unknowns..." << endl;
 			Eigen::VectorXd facesSolution = this->Solution;
 
-			Eigen::SparseMatrix<double> Atf = this->_globalMatrix.topRightCorner(hho.nTotalCellUnknowns, hho.nTotalFaceUnknowns);
+			SparseMatrix Atf = this->_globalMatrix.topRightCorner(hho.nTotalCellUnknowns, hho.nTotalFaceUnknowns);
 			Eigen::VectorXd bt = this->_globalRHS.head(hho.nTotalCellUnknowns);
-			Eigen::SparseMatrix<double> inverseAtt = GetInverseAtt();
+			SparseMatrix inverseAtt = GetInverseAtt();
 
 			globalHybridSolution = Eigen::VectorXd(hho.nTotalHybridUnknowns);
 			globalHybridSolution.tail(hho.nTotalFaceUnknowns) = facesSolution;
@@ -474,7 +474,7 @@ public:
 		Problem::ExtractSolution(this->ReconstructedSolution);
 	}
 
-	Eigen::SparseMatrix<double> GetInverseAtt()
+	SparseMatrix GetInverseAtt()
 	{
 		ElementParallelLoop<Dim> parallelLoop(_mesh->Elements);
 		parallelLoop.ReserveChunkCoeffsSize(this->HHO.nLocalCellUnknowns * this->HHO.nLocalCellUnknowns);
@@ -484,7 +484,7 @@ public:
 				int nCellUnknowns = this->HHO.nLocalCellUnknowns;
 				chunk->Results.Coeffs.Add(element->Number * nCellUnknowns, element->Number * nCellUnknowns, element->invAtt);
 			});
-		Eigen::SparseMatrix<double> inverseAtt = Eigen::SparseMatrix<double>(this->HHO.nTotalCellUnknowns, this->HHO.nTotalCellUnknowns);
+		SparseMatrix inverseAtt = SparseMatrix(this->HHO.nTotalCellUnknowns, this->HHO.nTotalCellUnknowns);
 		parallelLoop.Fill(inverseAtt);
 		return inverseAtt;
 	}

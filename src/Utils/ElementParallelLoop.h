@@ -19,7 +19,7 @@ public:
 		}
 	}
 
-	void Fill(Eigen::SparseMatrix<double> &m)
+	void Fill(SparseMatrix &m)
 	{
 		NonZeroCoefficients global;
 		for (unsigned int threadNumber = 0; threadNumber < this->NThreads; threadNumber++)

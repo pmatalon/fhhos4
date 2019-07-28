@@ -49,7 +49,7 @@ public:
 		}
 	}
 
-	inline void Fill(Eigen::SparseMatrix<double> &m)
+	inline void Fill(SparseMatrix &m)
 	{
 		m.setFromTriplets(this->coefficients.begin(), this->coefficients.end());
 	}

@@ -121,13 +121,20 @@ public:
 
 		auto Atf = this->A.topRightCorner(nCellUnknowns, nTotalFaceUnknowns);
 		Eigen::MatrixXd solveCellUnknowns = -this->invAtt * Atf;
+		/*auto Att_cons = this->Acons.topLeftCorner(nCellUnknowns, nCellUnknowns);
+		cout << "----------------- Att_cons (" << Att_cons.rows() << ", " << Att_cons.cols() << ") ----------------" << endl << Att_cons << endl;
+		auto Atf_cons = this->Acons.topRightCorner(nCellUnknowns, nTotalFaceUnknowns);
+		cout << "----------------- Atf_cons (" << Atf_cons.rows() << ", " << Atf_cons.cols() << ") ----------------" << endl << Atf_cons << endl;
+		Eigen::MatrixXd solveCellUnknowns = - Att_cons.inverse() * Atf_cons;
+		cout << "----------------- solveCellUnknowns (" << solveCellUnknowns.rows() << ", " << solveCellUnknowns.cols() << ") ----------------" << endl << solveCellUnknowns << endl;*/
+
 		Eigen::MatrixXd createHybridVectorFromFacesMatrix(nCellUnknowns + nTotalFaceUnknowns, nTotalFaceUnknowns);
 		createHybridVectorFromFacesMatrix.topRows(nCellUnknowns) = solveCellUnknowns;
 		createHybridVectorFromFacesMatrix.bottomRows(nTotalFaceUnknowns) = Eigen::MatrixXd::Identity(nTotalFaceUnknowns, nTotalFaceUnknowns);
 		return this->P * createHybridVectorFromFacesMatrix;
 	}
 
-	Eigen::VectorXd Interpolate(Eigen::VectorXd reconstructVector)
+	/*Eigen::VectorXd Interpolate(Eigen::VectorXd reconstructVector)
 	{
 		Eigen::VectorXd hybridVector(this->CellBasis->Size() + this->Faces.size() * this->FaceBasis->Size());
 		Eigen::MatrixXd ProjT = _projFromReconstruct;
@@ -144,7 +151,7 @@ public:
 			index += this->FaceBasis->Size();
 		}
 		return hybridVector;
-	}
+	}*/
 
 	inline double MatrixTerm(BasisFunction<Dim>* cellPhi1, BasisFunction<Dim>* cellPhi2)
 	{

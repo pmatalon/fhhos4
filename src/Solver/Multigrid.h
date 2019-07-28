@@ -39,7 +39,7 @@ private:
 
 	Eigen::VectorXd MultigridCycle(Level* level, const Eigen::VectorXd& b, Eigen::VectorXd& initialGuess)
 	{
-		Eigen::SparseMatrix<double> A = level->OperatorMatrix;
+		SparseMatrix A = level->OperatorMatrix;
 		Eigen::VectorXd x;
 
 		if (level->IsCoarsestLevel())
