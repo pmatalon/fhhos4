@@ -54,7 +54,7 @@ public:
 			if (this->UseGalerkinOperator)
 			{
 				cout << "\t\tGalerkin operator : "; cout.flush();
-				this->OperatorMatrix = (FinerLevel->R * FinerLevel->OperatorMatrix * FinerLevel->P).pruned();
+				this->OperatorMatrix = FinerLevel->R * FinerLevel->OperatorMatrix * FinerLevel->P;
 			}
 			else
 			{

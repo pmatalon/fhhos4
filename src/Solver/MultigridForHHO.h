@@ -59,7 +59,7 @@ private:
 		finePb->ExportMatrix(J_f_c, "J_f_c");
 		finePb->ExportMatrix(Pi_f, "Pi_f");
 
-		P = (Pi_f * J_f_c * I_c).pruned();
+		P = Pi_f * J_f_c * I_c;
 
 		finePb->ExportMatrix(P, "P");
 	}

@@ -37,10 +37,11 @@ public:
 	// Big assumption: the matrix must be symmetric!  //
 	//------------------------------------------------//
 
-	void Setup(const SparseMatrix& colMajorA) override
+	void Setup(const SparseMatrix& A) override
 	{
-		this->_rowMajorA = colMajorA;
-		IterativeSolver::Setup(colMajorA);
+		IterativeSolver::Setup(A);
+		if (!A.IsRowMajor)
+			this->_rowMajorA = A;
 
 		auto nb = A.rows() / _blockSize;
 		this->invD = vector<Eigen::FullPivLU<Eigen::MatrixXd>>(nb);
@@ -87,7 +88,7 @@ private:
 			BigNumber iBlock = currentBlockRow;
 			BigNumber i = iBlock * _blockSize + k;
 			// RowMajor --> the following line iterates over the non-zeros of the i-th row.
-			for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(_rowMajorA, i); it; ++it)
+			for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(A.IsRowMajor ? A : _rowMajorA, i); it; ++it)
 			{
 				auto j = it.col();
 				auto jBlock = j / this->_blockSize;

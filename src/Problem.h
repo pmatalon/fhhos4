@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <Eigen/Sparse>
+#include "Utils/Utils.h"
 using namespace std;
 
 class Problem
@@ -10,7 +11,7 @@ protected:
 	string _outputDirectory;
 	string _fileName;
 public:
-	Eigen::SparseMatrix<double> A;
+	SparseMatrix A;
 	Eigen::VectorXd b;
 	Eigen::VectorXd Solution;
 
@@ -25,7 +26,7 @@ public:
 		return this->_outputDirectory + "/" + this->_fileName + "_" + suffix + ".dat";
 	}
 
-	void ExportMatrix(const Eigen::SparseMatrix<double>& M, string suffix)
+	void ExportMatrix(const SparseMatrix& M, string suffix)
 	{
 		string filePath = GetFilePath(suffix);
 		Eigen::saveMarket(M, filePath);

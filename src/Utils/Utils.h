@@ -7,7 +7,7 @@
 #include "../FunctionalBasis/BasisFunction.h"
 
 typedef long unsigned int BigNumber;
-typedef Eigen::SparseMatrix<double, Eigen::ColMajor> SparseMatrix;
+using SparseMatrix = Eigen::SparseMatrix<double, Eigen::RowMajor>;
 
 class Utils
 {
