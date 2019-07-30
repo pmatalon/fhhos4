@@ -69,13 +69,14 @@ private:
 		Poisson_HHO<Dim>* finePb = this->_problem;
 		Poisson_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
 
-		SparseMatrix invM_c = GetInverseGlobalMassMatrix_Faces(coarsePb); // Coarse mass matrix
-		SparseMatrix M_f = GetGlobalMassMatrix_Faces(finePb); // Fine mass matrix
+		//SparseMatrix invM_c = GetInverseGlobalMassMatrix_Faces(coarsePb); // Coarse mass matrix
+		//SparseMatrix M_f = GetGlobalMassMatrix_Faces(finePb); // Fine mass matrix
 
 		//finePb->ExportMatrix(invM_c, "invM_c");
 		//finePb->ExportMatrix(M_f, "M_f");
 
-		R = invM_c * P.transpose() * M_f;
+		//R = invM_c * P.transpose() * M_f;
+		R = /*(coarsePb->_mesh->SqueletonMeasure() / finePb->_mesh->SqueletonMeasure()) **/ P.transpose();
 
 		finePb->ExportMatrix(R, "R");
 	}
