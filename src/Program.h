@@ -12,6 +12,7 @@
 #include "Utils/Action.h"
 #include "Utils/DiffusionPartition.h"
 #include "Solver/MultigridForHHO.h"
+#include "Solver/BlockJacobi.h"
 #include "Solver/EigenCG.h"
 #include "Solver/AGMG.h"
 using namespace std;
@@ -244,6 +245,8 @@ private:
 			solver = new EigenCG(tolerance);
 		else if (solverCode.compare("bgs") == 0)
 			solver = new BlockGaussSeidel(blockSize);
+		else if (solverCode.compare("bj") == 0)
+			solver = new BlockJacobi(blockSize);
 		else if (solverCode.compare("agmg") == 0)
 			solver = new AGMG(tolerance);
 		else

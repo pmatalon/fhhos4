@@ -180,6 +180,9 @@
       <Filter>Solver</Filter>
     </ClInclude>
     <ClInclude Include="src\Program.h" />
+    <ClInclude Include="src\Solver\BlockJacobi.h">
+      <Filter>Solver</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

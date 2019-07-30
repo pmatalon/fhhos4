@@ -44,6 +44,7 @@ void print_usage() {
 	cout << "-v SOLVER            : linear solver (default: 'lu'): " << endl;
 	cout << "                                 'lu'   = LU factorization (Eigen library)" << endl;
 	cout << "                                 'cg'   = Conjugate gradient with Jacobi preconditioner (Eigen library)" << endl;
+	cout << "                                 'bj'   = Block Jacobi: the block size is set to the number of DOFs per cell (DG) or face (HHO)" << endl;
 	cout << "                                 'bgs'  = Block Gauss-Seidel: the block size is set to the number of DOFs per cell (DG) or face (HHO)" << endl;
 	cout << "                                 'mg'   = Custom multigrid for HHO with static condensation" << endl;
 	cout << "                                 'agmg' = Yvan Notay's AGMG solver" << endl;

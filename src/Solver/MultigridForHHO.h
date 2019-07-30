@@ -1,10 +1,7 @@
 #pragma once
-#include <Eigen/Sparse>
-#include <vector>
-#include "BlockSOR.h"
 #include "Multigrid.h"
 #include "../Mesh/Mesh.h"
-#include "../HHO/Poisson_HHO_Element.h"
+#include "../HHO/Poisson_HHO.h"
 #include "../Utils/ElementParallelLoop.h"
 using namespace std;
 

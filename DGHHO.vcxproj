@@ -139,6 +139,7 @@
     <ClInclude Include="src/Problem.h" />
     <ClInclude Include="src\Program.h" />
     <ClInclude Include="src\Solver\AGMG.h" />
+    <ClInclude Include="src\Solver\BlockJacobi.h" />
     <ClInclude Include="src\Solver\BlockSOR.h" />
     <ClInclude Include="src\Solver\EigenCG.h" />
     <ClInclude Include="src\Solver\EigenSparseLU.h" />

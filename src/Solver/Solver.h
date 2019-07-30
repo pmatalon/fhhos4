@@ -1,5 +1,5 @@
 #pragma once
-#include <Eigen/Sparse>
+#include "../Utils/Utils.h"
 using namespace std;
 
 class Solver

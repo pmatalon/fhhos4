@@ -1,7 +1,6 @@
 #pragma once
-#include <Eigen/Sparse>
-#include "IterativeSolver.h"
 #include "BlockSOR.h"
+#include "BlockJacobi.h"
 using namespace std;
 
 class Smoother
@@ -41,6 +40,12 @@ public:
 		delete _solver;
 	}
 
+};
+
+class BlockJacobiSmoother : public Smoother
+{
+public:
+	BlockJacobiSmoother(int blockSize, int nSmoothingIterations) : Smoother(new BlockJacobi(blockSize), nSmoothingIterations) {}
 };
 
 class BlockGaussSeidelSmoother : public Smoother
