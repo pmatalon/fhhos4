@@ -1,8 +1,6 @@
 #pragma once
-#include <Eigen/Sparse>
 #include "IterativeSolver.h"
 #include "Level.h"
-#include "EigenSparseLU.h"
 using namespace std;
 
 class Multigrid : public IterativeSolver
@@ -10,9 +8,23 @@ class Multigrid : public IterativeSolver
 protected:
 	Level* _fineLevel = NULL;
 	Solver* _coarseSolver = NULL;
-
+private:
+	NonZeroCoefficients _cycleSchema;
 public:
+	int WLoops = 1; // 1 --> V-cycle, >1 --> W-cycle 
+
 	Multigrid() : IterativeSolver() { }
+
+	int NumberOfLevels()
+	{
+		int nLevels = 1;
+		Level* level = this->_fineLevel;
+		while (level = level->CoarserLevel)
+		{
+			nLevels++;
+		}
+		return nLevels;
+	}
 
 protected:
 	void SetupCoarseSolver()
@@ -64,8 +76,13 @@ private:
 			Eigen::VectorXd rc = level->Restrict(r);
 
 			// Residual equation Ae=r solved on the coarse grid //
-			Eigen::VectorXd zero = Eigen::VectorXd::Zero(rc.rows());
-			Eigen::VectorXd ec = MultigridCycle(level->CoarserLevel, rc, zero);
+			Eigen::VectorXd ec = Eigen::VectorXd::Zero(rc.rows());
+			for (int i = 0; i < this->WLoops; ++i)
+			{
+				ec = MultigridCycle(level->CoarserLevel, rc, ec);
+				if (level->CoarserLevel->IsCoarsestLevel())
+					break;
+			}
 
 			// Coarse-grid correction //
 			x = x + level->Prolong(ec);
@@ -76,6 +93,66 @@ private:
 		}
 
 		return x;
+	}
+
+public:
+	void PrintCycleSchema()
+	{
+		StoreCycleSchema(this->_fineLevel);
+		int nLevels = this->NumberOfLevels();
+		SparseMatrix schema2(nLevels, 50);
+		_cycleSchema.Fill(schema2);
+		Eigen::MatrixXd schema = schema2;
+		for (int row = 0; row < schema.rows(); row++)
+		{
+			for (int col = 0; col < schema.cols(); col++)
+			{
+				if (schema(row, col) == 0)
+					cout << "  ";
+				else
+					cout << " o";
+			}
+			cout << endl;
+		}
+		cout << endl;
+	}
+
+private:
+	inline void PrintLevel(Level* level)
+	{
+		for (int i = 0; i < level->Number; i++)
+			cout << "   ";
+		cout << "o" << endl;
+	}
+	inline void StoreLevelInSchema(Level* level)
+	{
+		static int col = 0;
+		_cycleSchema.Add(level->Number, col++, 1);
+	}
+	void StoreCycleSchema(Level* level)
+	{
+		static Level* currentLevel = nullptr;
+		if (currentLevel != level)
+		{
+			StoreLevelInSchema(level);
+			currentLevel = level;
+		}
+
+		if (!level->IsCoarsestLevel())
+		{
+			for (int i = 0; i < this->WLoops; ++i)
+			{
+				StoreCycleSchema(level->CoarserLevel);
+				if (level->CoarserLevel->IsCoarsestLevel())
+					break;
+			}
+
+			if (currentLevel != level)
+			{
+				StoreLevelInSchema(level);
+				currentLevel = level;
+			}
+		}
 	}
 
 public:

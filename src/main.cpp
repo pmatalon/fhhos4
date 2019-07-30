@@ -7,9 +7,12 @@ using namespace std;
 
 
 void print_usage() {
-	cout << "--------------------------------------------------------" << endl;
+	cout << "-------------------------------------------------------------------------------------" << endl;
 	cout << "Arguments:" << endl;
 	cout << "-h                   : help --> print usage" << endl;
+	cout << endl;
+	cout << "------------------------- Problem definition -------------------------" << endl;
+	cout << endl;
 	cout << "-d {1|2|3}           : space dimension (default: 1)" << endl;
 	cout << "-k NUM               : diffusion coefficient k1 in the first part of the domain partition," << endl;
 	cout << "                       while k2=1 in the second part (default: 1 = homogeneous diffusion)" << endl;
@@ -18,6 +21,9 @@ void print_usage() {
 	cout << "                                 'sine'   = sine solution" << endl;
 	cout << "                                 'poly'   = polynomial solution of global degree 2*d" << endl;
 	cout << "                                 'hetero' = (DG 1D only) heterogeneous diffusion-specific analytical solution" << endl;
+	cout << endl;
+	cout << "------------------------- Discretization -------------------------" << endl;
+	cout << endl;
 	cout << "-n NUM               : number of subdivisions in each cartesian dimension (default: 5)" << endl;
 	cout << "-t {dg|hho}          : discretization method (default: 'dg')" << endl;
 	cout << "                                 'dg'  = Discontinuous Galerkin (Symmetric Interior Penalty)" << endl;
@@ -31,16 +37,9 @@ void print_usage() {
 	cout << "-f                   : full tensorization of the polynomials when d=2 or 3 (i.e. space Q) (default: space P)" << endl;
 	cout << "-z NUM               : penalization coefficient (default: -1 = automatic)" << endl;
 	cout << "-c                   : static condensation (HHO only) (default: no static condensation)" << endl;
-	cout << "-r NUM               : max number of threads used for parallelism (default: 0 = automatic)" << endl;
-	cout << "                                  0     - automatic (default)" << endl;
-	cout << "                                  1     - sequential execution" << endl;
-	cout << "                                  other - requested number of threads" << endl;
-	cout << "-a {e|c|f|s|v}+      : action (default: 'es'): " << endl;
-	cout <<	"                                 'e' = export system" << endl;
-	cout << "                                 'c' = export all components of the matrix in separate files" << endl;
-	cout << "                                 'f' = export faces for Matlab" << endl;
-	cout << "                                 's' = solve system" << endl;
-	cout << "                                 'v' = export solution vector (requires 's')" << endl;
+	cout << endl;
+	cout << "------------------------- Linear solvers -------------------------" << endl;
+	cout << endl;
 	cout << "-v SOLVER            : linear solver (default: 'lu'): " << endl;
 	cout << "                                 'lu'   = LU factorization (Eigen library)" << endl;
 	cout << "                                 'cg'   = Conjugate gradient with Jacobi preconditioner (Eigen library)" << endl;
@@ -51,9 +50,25 @@ void print_usage() {
 	cout << "-l NUM               : number of multigrid levels (HHO 2D with static cond. only) (default: 0)" << endl;
 	cout << "                                  0     - automatic coarsening until the matrix dimension reaches 100 or less" << endl;
 	cout << "                                  other - fixed number of levels" << endl;
+	cout << "-w NUM               : number of loops in the W-cycle of the multigrid" << endl;
+	cout << "                                  1     - V-cycle (default)" << endl;
+	cout << "                                 >1     - W-cycle" << endl;
 	cout << "-g {0|1}             : coarse grid operator for the multigrid" << endl;
 	cout << "                                  0     - discretized operator" << endl;
 	cout << "                                  1     - Galerkin operator (default)" << endl;
+	cout << endl;
+	cout << "------------------------- Misc -------------------------" << endl;
+	cout << endl;
+	cout << "-r NUM               : max number of threads used for parallelism (default: 0 = automatic)" << endl;
+	cout << "                                  0     - automatic (default)" << endl;
+	cout << "                                  1     - sequential execution" << endl;
+	cout << "                                  other - requested number of threads" << endl;
+	cout << "-a {e|c|f|s|v}+      : action (default: 'es'): " << endl;
+	cout << "                                 'e' = export system" << endl;
+	cout << "                                 'c' = export all components of the matrix in separate files" << endl;
+	cout << "                                 'f' = export faces for Matlab" << endl;
+	cout << "                                 's' = solve system" << endl;
+	cout << "                                 'v' = export solution vector (requires 's')" << endl;
 	cout << "-o PATH              : output directory to export files (default: ./)" << endl;
 	cout << "--------------------------------------------------------" << endl;
 }
@@ -85,13 +100,14 @@ int main(int argc, char* argv[])
 	bool staticCondensation = false;
 	string a = "es";
 	int nMultigridLevels = 0;
+	int wLoops = 1;
 	bool useGalerkinOperator = true;
 	string outputDirectory = ".";
 	string solverCode = "lu";
 	double solverTolerance = 1e-8;
 
 	int option = 0;
-	while ((option = getopt(argc, argv, "d:k:s:n:t:b:p:z:a:l:o:r:v:g:hfc")) != -1) 
+	while ((option = getopt(argc, argv, "d:k:s:n:t:b:p:z:a:l:o:r:v:w:g:hfc")) != -1) 
 	{
 		switch (option) 
 		{
@@ -130,6 +146,10 @@ int main(int argc, char* argv[])
 			case 'v': solverCode = optarg;
 				break;
 			case 'l': nMultigridLevels = atoi(optarg);
+				break;
+			case 'w': wLoops = atoi(optarg);
+				if (wLoops < 1)
+					argument_error("the number of loops in the W-cycle must be >= 1. Check -w argument.");
 				break;
 			case 'g': useGalerkinOperator = atoi(optarg);
 				break;
@@ -180,7 +200,7 @@ int main(int argc, char* argv[])
 		program = new ProgramDim<3>();
 
 	program->Start(solution, kappa1, kappa2, n, discretization, basisCode, polyDegree, fullTensorization, 
-		penalizationCoefficient, staticCondensation, action, nMultigridLevels, useGalerkinOperator, outputDirectory, solverCode, solverTolerance);
+		penalizationCoefficient, staticCondensation, action, nMultigridLevels, wLoops, useGalerkinOperator, outputDirectory, solverCode, solverTolerance);
 
 	delete program;
 

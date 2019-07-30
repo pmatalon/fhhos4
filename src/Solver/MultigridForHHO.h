@@ -347,6 +347,11 @@ public:
 	void Serialize(ostream& os) const override
 	{
 		os << "MultigridForHHO" << endl;
+		os << "\t" << "Cycle         : ";
+		if (this->WLoops == 1)
+			os << "V-cycle" << endl;
+		else
+			os << "W-cycle (" << this->WLoops << " loops)" << endl;
 		os << "\t" << "Levels        : ";
 		if (_automaticNumberOfLevels && _nLevels == 0)
 			os << "automatic coarsening until matrix size <= " << MatrixMaxSizeForCoarsestLevel << endl;
@@ -421,6 +426,9 @@ public:
 			this->SetupCoarseSolver();
 			cout << "\t--> " << _nLevels << " levels built." << endl;
 		}
+		
+		if (this->WLoops > 1)
+			PrintCycleSchema();
 	}
 
 	//~MultigridForHHO()
