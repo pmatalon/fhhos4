@@ -20,9 +20,7 @@ public:
 		int nLevels = 1;
 		Level* level = this->_fineLevel;
 		while (level = level->CoarserLevel)
-		{
 			nLevels++;
-		}
 		return nLevels;
 	}
 

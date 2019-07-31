@@ -9,7 +9,6 @@ class Legendre1D : public IBasisFunction1D
 {
 public:
 	int Degree;
-	bool Normalized;
 
 	static string Code() { return "legendre"; };
 
@@ -17,14 +16,6 @@ public:
 	{
 		this->LocalNumber = degree;
 		this->Degree = degree;
-		this->Normalized = false;
-	}
-
-	Legendre1D(int degree, bool normalized)
-	{
-		this->LocalNumber = degree;
-		this->Degree = degree;
-		this->Normalized = normalized;
 	}
 
 	int GetDegree()
@@ -32,22 +23,16 @@ public:
 		return this->Degree;
 	}
 
-	double Eval(double x)
+	virtual double Eval(double x) override
 	{
 		this->TestIsInReferenceInterval(x);
-		double value = Legendre(this->Degree, x);
-		if (this->Normalized)
-			return sqrt(this->Degree + 0.5) * value;
-		return value;
+		return Legendre(this->Degree, x);
 	}
 
-	double EvalDerivative(double x)
+	virtual double EvalDerivative(double x) override
 	{
 		this->TestIsInReferenceInterval(x);
-		double value = DLegendre(this->Degree, x);
-		if (this->Normalized)
-			return sqrt(this->Degree + 0.5) * value;
-		return value;
+		return DLegendre(this->Degree, x);
 	}
 
 	static double Legendre(int n, double x)
@@ -96,5 +81,28 @@ public:
 		if (this->Degree == 1)
 			return var;
 		return "Legendre(" + std::to_string(this->Degree) + ", " + var + ")";
+	}
+};
+
+class NormalizedLegendre1D : public Legendre1D
+{
+private:
+	double _inverseNorm;
+public:
+	static string Code() { return "nlegendre"; };
+
+	NormalizedLegendre1D(int degree) : Legendre1D(degree)
+	{
+		_inverseNorm = sqrt(this->Degree + 0.5);
+	}
+
+	virtual double Eval(double x) override
+	{
+		return _inverseNorm * Legendre1D::Eval(x);
+	}
+
+	virtual double EvalDerivative(double x) override
+	{
+		return _inverseNorm * Legendre1D::EvalDerivative(x);
 	}
 };
