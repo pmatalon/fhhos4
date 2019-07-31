@@ -14,10 +14,10 @@ void print_usage() {
 	cout << "------------------------- Problem definition -------------------------" << endl;
 	cout << endl;
 	cout << "-d {1|2|3}           : space dimension (default: 1)" << endl;
-	cout << "-k NUM               : diffusion coefficient k1 in the first part of the domain partition," << endl;
-	cout << "                       while k2=1 in the second part (default: 1 = homogeneous diffusion)" << endl;
+	cout << "-kappa NUM           : diffusion coefficient kappa1 in the first part of the domain partition," << endl;
+	cout << "                       while kappa2=1 in the second part (default: 1 = homogeneous diffusion)" << endl;
 	cout << "                       (DG only)" << endl;
-	cout << "-s {sine|poly|hetero}: analytical solution (default: 'sine')" << endl;
+	cout << "-s CODE              : analytical solution (default: 'sine')" << endl;
 	cout << "                                 'sine'   = sine solution" << endl;
 	cout << "                                 'poly'   = polynomial solution of global degree 2*d" << endl;
 	cout << "                                 'hetero' = (DG 1D only) heterogeneous diffusion-specific analytical solution" << endl;
@@ -48,8 +48,8 @@ void print_usage() {
 	cout << "                                 'bgs'  = Block Gauss-Seidel: the block size is set to the number of DOFs per cell (DG) or face (HHO)" << endl;
 	cout << "                                 'mg'   = Custom multigrid for HHO with static condensation" << endl;
 	cout << "                                 'agmg' = Yvan Notay's AGMG solver" << endl;
-	cout << "-l NUM               : number of multigrid levels (HHO 2D with static cond. only) (default: 0)" << endl;
-	cout << "                                  0     - automatic coarsening until the matrix dimension reaches 100 or less" << endl;
+	cout << "-l NUM               : number of multigrid levels (HHO with static cond. only):" << endl;
+	cout << "                                  0     - (default) automatic coarsening until the matrix dimension reaches 100 or less" << endl;
 	cout << "                                  other - fixed number of levels" << endl;
 	cout << "-w NUM               : number of loops in the W-cycle of the multigrid" << endl;
 	cout << "                                  1     - V-cycle (default)" << endl;
@@ -57,10 +57,18 @@ void print_usage() {
 	cout << "-g {0|1}             : coarse grid operator for the multigrid" << endl;
 	cout << "                                  0     - discretized operator" << endl;
 	cout << "                                  1     - Galerkin operator (default)" << endl;
+	cout << "-presmoother CODE    : pre-smoother:" << endl;
+	cout << "                                 'j'    = Jacobi" << endl;
+	cout << "                                 'gs'   = Gauss-Seidel" << endl;
+	cout << "                                 'rgs'  = Reverse Gauss-Seidel" << endl;
+	cout << "                                 'bj'   = Block Jacobi: the block size is set to the number of DOFs per face" << endl;
+	cout << "                                 'bgs'  = Block Gauss-Seidel: the block size is set to the number of DOFs per face" << endl;
+	cout << "                                 'rbgs' = Reverse Block Gauss-Seidel" << endl;
+	cout << "-postsmoother CODE   : post-smoother. See list above." << endl;
 	cout << endl;
-	cout << "------------------------- Misc -------------------------" << endl;
+	cout << "------------------------- Miscellaneous -------------------------" << endl;
 	cout << endl;
-	cout << "-r NUM               : max number of threads used for parallelism (default: 0 = automatic)" << endl;
+	cout << "-threads NUM         : max number of threads used for parallelism" << endl;
 	cout << "                                  0     - automatic (default)" << endl;
 	cout << "                                  1     - sequential execution" << endl;
 	cout << "                                  other - requested number of threads" << endl;
@@ -109,58 +117,98 @@ int main(int argc, char* argv[])
 	string solverCode = "lu";
 	double solverTolerance = 1e-8;
 
+	enum {
+		OPT_Kappa = 1000,
+		OPT_PreSmoother,
+		OPT_PostSmoother,
+		OPT_Threads
+	};
+
+	static struct option long_opts[] = {
+		 { "help", no_argument, NULL, 'h' },
+		 { "kappa", required_argument, NULL, OPT_Kappa },
+		 { "presmoother", required_argument, NULL, OPT_PreSmoother },
+		 { "postsmoother", required_argument, NULL, OPT_PostSmoother },
+		 { "threads", required_argument, NULL, OPT_Threads },
+		 { NULL, 0, NULL, 0 }
+	};
+
+	int long_index = 0;
 	int option = 0;
-	while ((option = getopt(argc, argv, "d:k:s:n:t:b:p:z:a:l:o:r:v:w:g:m:hfc")) != -1) 
+	while ((option = getopt_long_only(argc, argv, "d:s:n:t:b:p:z:a:l:o:v:w:g:hfc", long_opts, &long_index)) != -1)
 	{
 		switch (option) 
 		{
-			case 'h': print_usage(); exit(EXIT_SUCCESS);
+			case 'h': 
+				print_usage(); 
+				exit(EXIT_SUCCESS);
 				break;
-			case 'd': dimension = atoi(optarg);
+			case 'd': 
+				dimension = atoi(optarg);
 				if (dimension < 1 || dimension > 3)
 					argument_error("dimension " + to_string(dimension) + "! Are you kidding?! Stop wasting my time.");
 				break;
-			case 's': solution = optarg;
+			case 's': 
+				solution = optarg;
 				if (solution.compare("sine") != 0 && solution.compare("poly") != 0 && solution.compare("hetero") != 0)
 					argument_error("unknown analytical solution '" + solution + "'. Check -s argument.");
 				break;
-			case 'k': kappa1 = atof(optarg);
+			case OPT_Kappa: 
+				kappa1 = atof(optarg);
 				break;
-			case 'n': n = stoul(optarg, nullptr, 0);
+			case 'n': 
+				n = stoul(optarg, nullptr, 0);
 				break;
-			case 't': discretization = optarg;
+			case 't': 
+				discretization = optarg;
 				if (discretization.compare("dg") != 0 && discretization.compare("hho") != 0)
 					argument_error("unknown discretization '" + discretization + "'. Check -t argument.");
 				break;
-			case 'b': basisCode = optarg;
+			case 'b': 
+				basisCode = optarg;
 				if (basisCode.compare("monomials") != 0 && basisCode.compare("legendre") != 0 && basisCode.compare("nlegendre") != 0 && basisCode.compare("bernstein") != 0 && basisCode.compare("hemker") != 0)
 					argument_error("unknown polynomial basis '" + basisCode + "'. Check -b argument.");
 				break;
-			case 'p': polyDegree = atoi(optarg);
+			case 'p': 
+				polyDegree = atoi(optarg);
 				break;
-			case 'f': fullTensorization = true;
+			case 'f': 
+				fullTensorization = true;
 				break;
-			case 'z': penalizationCoefficient = atoi(optarg);
+			case 'z': 
+				penalizationCoefficient = atoi(optarg);
 				break;
-			case 'c': staticCondensation = true;
+			case 'c': 
+				staticCondensation = true;
 				break;
-			case 'a': a = optarg;
+			case 'a': 
+				a = optarg;
 				break;
-			case 'v': solverCode = optarg;
+			case 'v': 
+				solverCode = optarg;
 				break;
-			case 'l': nMultigridLevels = atoi(optarg);
+			case 'l': 
+				nMultigridLevels = atoi(optarg);
 				break;
-			case 'w': wLoops = atoi(optarg);
+			case 'w': 
+				wLoops = atoi(optarg);
 				if (wLoops < 1)
 					argument_error("the number of loops in the W-cycle must be >= 1. Check -w argument.");
 				break;
-			case 'g': useGalerkinOperator = atoi(optarg);
+			case 'g': 
+				useGalerkinOperator = atoi(optarg);
 				break;
-			case 'm': preSmootherCode = optarg;
+			case OPT_PreSmoother:
+				preSmootherCode = optarg;
 				break;
-			case 'r': BaseParallelLoop::SetDefaultNThreads(atoi(optarg));
+			case OPT_PostSmoother:
+				postSmootherCode = optarg;
 				break;
-			case 'o': outputDirectory = optarg;
+			case OPT_Threads:
+				BaseParallelLoop::SetDefaultNThreads(atoi(optarg));
+				break;
+			case 'o': 
+				outputDirectory = optarg;
 				break;
 			default: print_usage();
 				exit(EXIT_FAILURE);
@@ -172,6 +220,9 @@ int main(int argc, char* argv[])
 
 	if (dimension == 1 && discretization.compare("hho") == 0)
 		argument_error("HHO in 1D not implemented.");
+
+	if (discretization.compare("hho") == 0 && polyDegree == 0)
+		argument_error("HHO does not exist with p=0. Linear approximation at least (p >= 1).");
 
 	if (solverCode.compare("mg") == 0 && discretization.compare("dg") == 0)
 		argument_error("Multigrid only applicable on HHO discretization.");
