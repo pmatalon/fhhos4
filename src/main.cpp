@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <iostream>
 #include <getopt.h>
+#include <regex>
 #include <Eigen/Core>
 #include "Program.h"
 using namespace std;
@@ -48,23 +49,23 @@ void print_usage() {
 	cout << "                                 'bgs'  = Block Gauss-Seidel: the block size is set to the number of DOFs per cell (DG) or face (HHO)" << endl;
 	cout << "                                 'mg'   = Custom multigrid for HHO with static condensation" << endl;
 	cout << "                                 'agmg' = Yvan Notay's AGMG solver" << endl;
+	cout << "-cycle [V|W],NUM,NUM : multigrid cycle: V,1,0 or W,1,1 for example" << endl;
+	cout << "-w NUM               : number of loops in the W-cycle" << endl;
+	cout << "                                  1     - V-cycle (default)" << endl;
+	cout << "                                 >1     - W-cycle" << endl;
 	cout << "-l NUM               : number of multigrid levels (HHO with static cond. only):" << endl;
 	cout << "                                  0     - (default) automatic coarsening until the matrix dimension reaches 100 or less" << endl;
 	cout << "                                  other - fixed number of levels" << endl;
-	cout << "-w NUM               : number of loops in the W-cycle of the multigrid" << endl;
-	cout << "                                  1     - V-cycle (default)" << endl;
-	cout << "                                 >1     - W-cycle" << endl;
 	cout << "-g {0|1}             : coarse grid operator for the multigrid" << endl;
 	cout << "                                  0     - discretized operator" << endl;
 	cout << "                                  1     - Galerkin operator (default)" << endl;
-	cout << "-presmoother CODE    : pre-smoother:" << endl;
+	cout << "-smoothers CODE,CODE : pre-smoother,post-smoother:" << endl;
 	cout << "                                 'j'    = Jacobi" << endl;
 	cout << "                                 'gs'   = Gauss-Seidel" << endl;
 	cout << "                                 'rgs'  = Reverse Gauss-Seidel" << endl;
 	cout << "                                 'bj'   = Block Jacobi: the block size is set to the number of DOFs per face" << endl;
 	cout << "                                 'bgs'  = Block Gauss-Seidel: the block size is set to the number of DOFs per face" << endl;
 	cout << "                                 'rbgs' = Reverse Block Gauss-Seidel" << endl;
-	cout << "-postsmoother CODE   : post-smoother. See list above." << endl;
 	cout << endl;
 	cout << "------------------------- Miscellaneous -------------------------" << endl;
 	cout << endl;
@@ -113,22 +114,24 @@ int main(int argc, char* argv[])
 	bool useGalerkinOperator = true;
 	string preSmootherCode = "bgs";
 	string postSmootherCode = "rbgs";
+	int nPreSmoothingIterations = 1;
+	int nPostSmoothingIterations = 1;
 	string outputDirectory = ".";
 	string solverCode = "lu";
 	double solverTolerance = 1e-8;
 
 	enum {
 		OPT_Kappa = 1000,
-		OPT_PreSmoother,
-		OPT_PostSmoother,
+		OPT_MGCycle,
+		OPT_Smoothers,
 		OPT_Threads
 	};
 
 	static struct option long_opts[] = {
 		 { "help", no_argument, NULL, 'h' },
 		 { "kappa", required_argument, NULL, OPT_Kappa },
-		 { "presmoother", required_argument, NULL, OPT_PreSmoother },
-		 { "postsmoother", required_argument, NULL, OPT_PostSmoother },
+		 { "cycle", required_argument, NULL, OPT_MGCycle },
+		 { "smoothers", required_argument, NULL, OPT_Smoothers },
 		 { "threads", required_argument, NULL, OPT_Threads },
 		 { NULL, 0, NULL, 0 }
 	};
@@ -187,6 +190,26 @@ int main(int argc, char* argv[])
 			case 'v': 
 				solverCode = optarg;
 				break;
+			case OPT_MGCycle:
+			{
+				string s(optarg);
+				regex pattern("^([vwVW]),([[:digit:]]+),([[:digit:]]+)$");
+				smatch matches;
+
+				if (std::regex_search(s, matches, pattern))
+				{
+					char cycleLetter = matches.str(1)[0];
+					if (cycleLetter == 'v' || cycleLetter == 'V')
+						wLoops = 1;
+					else if (cycleLetter == 'w' || cycleLetter == 'W')
+						wLoops = 2;
+					nPreSmoothingIterations = stoi(matches.str(2));
+					nPostSmoothingIterations = stoi(matches.str(3));
+				}
+				else
+					argument_error("syntax error in the multigrid cycle. Check -mg-cycle argument.");
+				break;
+			}
 			case 'l': 
 				nMultigridLevels = atoi(optarg);
 				break;
@@ -198,12 +221,14 @@ int main(int argc, char* argv[])
 			case 'g': 
 				useGalerkinOperator = atoi(optarg);
 				break;
-			case OPT_PreSmoother:
-				preSmootherCode = optarg;
+			case OPT_Smoothers:
+			{
+				string s(optarg);
+				auto pos = s.find(",");
+				preSmootherCode = s.substr(0, s.find(","));
+				postSmootherCode = s.substr(pos + 1);
 				break;
-			case OPT_PostSmoother:
-				postSmootherCode = optarg;
-				break;
+			}
 			case OPT_Threads:
 				BaseParallelLoop::SetDefaultNThreads(atoi(optarg));
 				break;
@@ -256,7 +281,8 @@ int main(int argc, char* argv[])
 		program = new ProgramDim<3>();
 
 	program->Start(solution, kappa1, kappa2, n, discretization, basisCode, polyDegree, fullTensorization, penalizationCoefficient, staticCondensation, action, 
-		nMultigridLevels, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, outputDirectory, solverCode, solverTolerance);
+		nMultigridLevels, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations,
+		outputDirectory, solverCode, solverTolerance);
 
 	delete program;
 

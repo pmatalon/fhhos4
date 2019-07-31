@@ -23,7 +23,8 @@ public:
 	Program() {}
 	virtual void Start(string solution, double kappa1, double kappa2, BigNumber n, string discretization, string basisCode, int polyDegree, bool fullTensorization, 
 		int penalizationCoefficient, bool staticCondensation, Action action, 
-		int nMultigridLevels, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, string outputDirectory, string solverCode, double solverTolerance) = 0;
+		int nMultigridLevels, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations, 
+		string outputDirectory, string solverCode, double solverTolerance) = 0;
 };
 
 template <int Dim>
@@ -34,7 +35,8 @@ public:
 
 	void Start(string solution, double kappa1, double kappa2, BigNumber n, string discretization, string basisCode, int polyDegree, bool fullTensorization, 
 		int penalizationCoefficient, bool staticCondensation, Action action, 
-		int nMultigridLevels, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, string outputDirectory, string solverCode, double solverTolerance)
+		int nMultigridLevels, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations, 
+		string outputDirectory, string solverCode, double solverTolerance)
 	{
 		//----------//
 		//   Mesh   //
@@ -163,7 +165,7 @@ public:
 				cout << endl;
 				cout << "------------------- Linear system resolution ------------------" << endl;
 
-				Solver* solver = CreateSolver(solverCode, problem, solverTolerance, staticCondensation, nMultigridLevels, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, basis->Size());
+				Solver* solver = CreateSolver(solverCode, problem, solverTolerance, staticCondensation, nMultigridLevels, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, basis->Size());
 				cout << "Solver: " << *solver << endl << endl;
 				solver->Setup(problem->A);
 				problem->Solution = solver->Solve(problem->b);
@@ -197,7 +199,7 @@ public:
 				cout << endl;
 				cout << "------------------- Linear system resolution ------------------" << endl;
 
-				Solver* solver = CreateSolver(solverCode, problem, solverTolerance, staticCondensation, nMultigridLevels, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, faceBasis->Size());
+				Solver* solver = CreateSolver(solverCode, problem, solverTolerance, staticCondensation, nMultigridLevels, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, faceBasis->Size());
 				cout << "Solver: " << *solver << endl << endl;
 				solver->Setup(problem->A);
 				problem->Solution = solver->Solve(problem->b);
@@ -226,7 +228,7 @@ private:
 	Mesh<Dim>* BuildMesh(int n) { return nullptr;  }
 
 	Solver* CreateSolver(string solverCode, Problem* problem, double tolerance, bool staticCondensation, 
-		int nMultigridLevels, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int blockSize)
+		int nMultigridLevels, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations, int blockSize)
 	{
 		Solver* solver = NULL;
 		if (solverCode.compare("mg") == 0)
@@ -239,6 +241,8 @@ private:
 				mg->UseGalerkinOperator = useGalerkinOperator;
 				mg->PreSmootherCode = preSmootherCode;
 				mg->PostSmootherCode = postSmootherCode;
+				mg->PreSmoothingIterations = nPreSmoothingIterations;
+				mg->PostSmoothingIterations = nPostSmoothingIterations;
 				mg->ComputeExactSolution = hhoProblem->_mesh->Elements.size() <= (Dim == 2 ? 32 * 32 : 8 * 8);
 				solver = mg;
 			}
