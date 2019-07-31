@@ -131,6 +131,8 @@ class GaussSeidel : public SOR
 public: 
 	GaussSeidel() : SOR(1) {}
 
+	static string Code() { return "gs"; };
+
 	virtual void Serialize(ostream& os) const override
 	{
 		os << "GaussSeidel";
@@ -141,6 +143,8 @@ class ReverseGaussSeidel : public ReverseSOR
 {
 public: 
 	ReverseGaussSeidel() : ReverseSOR(1) {}
+
+	static string Code() { return "rgs"; };
 
 	virtual void Serialize(ostream& os) const override
 	{
@@ -153,6 +157,8 @@ class BlockGaussSeidel : public BlockSOR
 public: 
 	BlockGaussSeidel(int blockSize) : BlockSOR(blockSize, 1, Direction::Forward) {}
 
+	static string Code() { return "bgs"; };
+
 	virtual void Serialize(ostream& os) const override
 	{
 		os << "block-GaussSeidel (blockSize=" << _blockSize << ")";
@@ -163,6 +169,8 @@ class ReverseBlockGaussSeidel : public BlockSOR
 {
 public: 
 	ReverseBlockGaussSeidel(int blockSize) : BlockSOR(blockSize, 1, Direction::Backward) {}
+
+	static string Code() { return "rbgs"; };
 
 	virtual void Serialize(ostream& os) const override
 	{

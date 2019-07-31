@@ -103,12 +103,14 @@ int main(int argc, char* argv[])
 	int nMultigridLevels = 0;
 	int wLoops = 1;
 	bool useGalerkinOperator = true;
+	string preSmootherCode = "bgs";
+	string postSmootherCode = "rbgs";
 	string outputDirectory = ".";
 	string solverCode = "lu";
 	double solverTolerance = 1e-8;
 
 	int option = 0;
-	while ((option = getopt(argc, argv, "d:k:s:n:t:b:p:z:a:l:o:r:v:w:g:hfc")) != -1) 
+	while ((option = getopt(argc, argv, "d:k:s:n:t:b:p:z:a:l:o:r:v:w:g:m:hfc")) != -1) 
 	{
 		switch (option) 
 		{
@@ -153,6 +155,8 @@ int main(int argc, char* argv[])
 					argument_error("the number of loops in the W-cycle must be >= 1. Check -w argument.");
 				break;
 			case 'g': useGalerkinOperator = atoi(optarg);
+				break;
+			case 'm': preSmootherCode = optarg;
 				break;
 			case 'r': BaseParallelLoop::SetDefaultNThreads(atoi(optarg));
 				break;
@@ -200,8 +204,8 @@ int main(int argc, char* argv[])
 	else if (dimension == 3)
 		program = new ProgramDim<3>();
 
-	program->Start(solution, kappa1, kappa2, n, discretization, basisCode, polyDegree, fullTensorization, 
-		penalizationCoefficient, staticCondensation, action, nMultigridLevels, wLoops, useGalerkinOperator, outputDirectory, solverCode, solverTolerance);
+	program->Start(solution, kappa1, kappa2, n, discretization, basisCode, polyDegree, fullTensorization, penalizationCoefficient, staticCondensation, action, 
+		nMultigridLevels, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, outputDirectory, solverCode, solverTolerance);
 
 	delete program;
 

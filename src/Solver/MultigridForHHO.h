@@ -1,5 +1,6 @@
 #pragma once
 #include "Multigrid.h"
+#include "SmootherFactory.h"
 #include "../Mesh/Mesh.h"
 #include "../HHO/Poisson_HHO.h"
 #include "../Utils/ElementParallelLoop.h"
@@ -12,7 +13,7 @@ private:
 	Poisson_HHO<Dim>* _problem;
 public:
 	LevelForHHO(int number, Poisson_HHO<Dim>* problem, bool useGalerkinOperator)
-		: Level(number, new BlockGaussSeidelSmoother(problem->HHO.nLocalFaceUnknowns, 1), new ReverseBlockGaussSeidelSmoother(problem->HHO.nLocalFaceUnknowns, 1))
+		: Level(number)
 	{
 		this->UseGalerkinOperator = useGalerkinOperator;
 		this->_problem = problem;
@@ -321,6 +322,10 @@ private:
 public:
 	int MatrixMaxSizeForCoarsestLevel;
 	bool UseGalerkinOperator;
+	string PreSmootherCode = "bgs";
+	string PostSmootherCode = "rbgs";
+	int PreSmoothingIterations = 1;
+	int PostSmoothingIterations = 1;
 
 	MultigridForHHO(Poisson_HHO<Dim>* problem) : MultigridForHHO(problem, 0)
 	{}
@@ -359,8 +364,12 @@ public:
 			os << _nLevels << " (automatic)" << endl;
 		else
 			os << _nLevels << endl;
-		os << "\t" << "Pre-smoothing : " << *(_fineLevel->PreSmoother) << endl;
-		os << "\t" << "Post-smoothing: " << *(_fineLevel->PostSmoother);
+		Smoother* preSmoother = SmootherFactory::Create(PreSmootherCode, PreSmoothingIterations, _problem->HHO.nLocalFaceUnknowns);
+		Smoother* postSmoother = SmootherFactory::Create(PostSmootherCode, PostSmoothingIterations, _problem->HHO.nLocalFaceUnknowns);
+		os << "\t" << "Pre-smoothing : " << *preSmoother << endl;
+		os << "\t" << "Post-smoothing: " << *postSmoother;
+		delete preSmoother;
+		delete postSmoother;
 	}
 
 	void Setup(const SparseMatrix& A) override
@@ -374,6 +383,8 @@ public:
 
 		LevelForHHO<Dim>* finerLevel = dynamic_cast<LevelForHHO<Dim>*>(this->_fineLevel);
 		finerLevel->OperatorMatrix = A;
+		finerLevel->PreSmoother = SmootherFactory::Create(PreSmootherCode, PreSmoothingIterations, _problem->HHO.nLocalFaceUnknowns);
+		finerLevel->PostSmoother = SmootherFactory::Create(PostSmootherCode, PostSmoothingIterations, _problem->HHO.nLocalFaceUnknowns);
 		Poisson_HHO<Dim>* problem = _problem;
 		if (!_automaticNumberOfLevels)
 		{
@@ -389,6 +400,8 @@ public:
 				problem = problem->GetProblemOnCoarserMesh();
 				//cout << "coarse mesh" << endl << *(problem->_mesh) << endl << endl;
 				LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(levelNumber, problem, UseGalerkinOperator);
+				coarseLevel->PreSmoother = SmootherFactory::Create(PreSmootherCode, PreSmoothingIterations, problem->HHO.nLocalFaceUnknowns);
+				coarseLevel->PostSmoother = SmootherFactory::Create(PostSmootherCode, PostSmoothingIterations, problem->HHO.nLocalFaceUnknowns);
 
 				finerLevel->CoarserLevel = coarseLevel;
 				coarseLevel->FinerLevel = finerLevel;
@@ -413,6 +426,8 @@ public:
 				problem = problem->GetProblemOnCoarserMesh();
 				levelNumber++;
 				LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(levelNumber, problem, UseGalerkinOperator);
+				coarseLevel->PreSmoother = SmootherFactory::Create(PreSmootherCode, PreSmoothingIterations, problem->HHO.nLocalFaceUnknowns);
+				coarseLevel->PostSmoother = SmootherFactory::Create(PostSmootherCode, PostSmoothingIterations, problem->HHO.nLocalFaceUnknowns);
 
 				finerLevel->CoarserLevel = coarseLevel;
 				coarseLevel->FinerLevel = finerLevel;

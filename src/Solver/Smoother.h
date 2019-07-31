@@ -42,10 +42,28 @@ public:
 
 };
 
+class JacobiSmoother : public Smoother
+{
+public:
+	JacobiSmoother(int nSmoothingIterations) : Smoother(new Jacobi(), nSmoothingIterations) {}
+};
+
 class BlockJacobiSmoother : public Smoother
 {
 public:
 	BlockJacobiSmoother(int blockSize, int nSmoothingIterations) : Smoother(new BlockJacobi(blockSize), nSmoothingIterations) {}
+};
+
+class GaussSeidelSmoother : public Smoother
+{
+public:
+	GaussSeidelSmoother(int nSmoothingIterations) : Smoother(new GaussSeidel(), nSmoothingIterations) {}
+};
+
+class ReverseGaussSeidelSmoother : public Smoother
+{
+public:
+	ReverseGaussSeidelSmoother(int nSmoothingIterations) : Smoother(new ReverseGaussSeidel(), nSmoothingIterations) {}
 };
 
 class BlockGaussSeidelSmoother : public Smoother

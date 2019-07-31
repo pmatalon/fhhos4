@@ -10,32 +10,30 @@ public:
 	SparseMatrix OperatorMatrix;
 	bool UseGalerkinOperator = true;
 
-	Smoother* PreSmoother;
-	Smoother* PostSmoother;
+	Smoother* PreSmoother = nullptr;
+	Smoother* PostSmoother = nullptr;
 
-	Level* FinerLevel = NULL;
-	Level* CoarserLevel = NULL;
+	Level* FinerLevel = nullptr;
+	Level* CoarserLevel = nullptr;
 
 protected:
 	SparseMatrix R;
 	SparseMatrix P;
 
 public:
-	Level(int number, Smoother* preSmoother, Smoother* postSmoother)
+	Level(int number)
 	{
 		this->Number = number;
-		this->PreSmoother = preSmoother;
-		this->PostSmoother = postSmoother;
 	}
 
 	bool IsFinestLevel()
 	{
-		return this->FinerLevel == NULL;
+		return this->FinerLevel == nullptr;
 	}
 
 	bool IsCoarsestLevel()
 	{
-		return this->CoarserLevel == NULL;
+		return this->CoarserLevel == nullptr;
 	}
 
 	void Setup()

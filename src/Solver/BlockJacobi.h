@@ -93,6 +93,8 @@ class DampedJacobi : public BlockDampedJacobi
 public: 
 	DampedJacobi(double omega) : BlockDampedJacobi(1, omega) {}
 
+	static string Code() { return "dj"; };
+
 	virtual void Serialize(ostream& os) const override
 	{
 		os << "Damped Jacobi (omega=" << _omega << ")";
@@ -104,6 +106,8 @@ class BlockJacobi : public BlockDampedJacobi
 public:
 	BlockJacobi(int blockSize) : BlockDampedJacobi(blockSize, 1) {}
 
+	static string Code() { return "bj"; };
+
 	virtual void Serialize(ostream& os) const override
 	{
 		os << "Block Jacobi (blockSize=" << _blockSize << ")";
@@ -114,6 +118,8 @@ class Jacobi : public BlockJacobi
 {
 public: 
 	Jacobi() : BlockJacobi(1) {}
+
+	static string Code() { return "j"; };
 
 	virtual void Serialize(ostream& os) const override
 	{
