@@ -56,6 +56,7 @@ private:
 	FunctionalBasis<Dim>* _cellBasis;
 	FunctionalBasis<Dim - 1>* _faceBasis;
 	bool _staticCondensation = false;
+	DiffusionPartition _diffusionPartition;
 
 	SparseMatrix _globalMatrix;
 	Eigen::VectorXd _globalRHS;
@@ -65,8 +66,8 @@ public:
 	HHOInfo<Dim> HHO;
 	Eigen::VectorXd ReconstructedSolution;
 
-	Poisson_HHO(Mesh<Dim>* mesh, string solutionName, SourceFunction* sourceFunction, FunctionalBasis<Dim>* reconstructionBasis, FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim - 1>* faceBasis, bool staticCondensation, string outputDirectory)
-		: Problem(solutionName, outputDirectory), HHO(mesh, reconstructionBasis, cellBasis, faceBasis)
+	Poisson_HHO(Mesh<Dim>* mesh, string solutionName, SourceFunction* sourceFunction, FunctionalBasis<Dim>* reconstructionBasis, FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim - 1>* faceBasis, bool staticCondensation, DiffusionPartition diffusionPartition, string outputDirectory)
+		: Problem(solutionName, outputDirectory), HHO(mesh, reconstructionBasis, cellBasis, faceBasis), _diffusionPartition(diffusionPartition)
 	{	
 		this->_mesh = mesh;
 		this->_sourceFunction = sourceFunction;
@@ -78,7 +79,7 @@ public:
 
 	Poisson_HHO<Dim>* GetProblemOnCoarserMesh()
 	{
-		return new Poisson_HHO<Dim>(_mesh->CoarseMesh, _solutionName, _sourceFunction, _reconstructionBasis, _cellBasis, _faceBasis, _staticCondensation, _outputDirectory);
+		return new Poisson_HHO<Dim>(_mesh->CoarseMesh, _solutionName, _sourceFunction, _reconstructionBasis, _cellBasis, _faceBasis, _staticCondensation, _diffusionPartition, _outputDirectory);
 	}
 
 	void Assemble(Action action)
@@ -91,7 +92,10 @@ public:
 
 		if ((action & Action::LogAssembly) == Action::LogAssembly)
 		{
-			cout << "Problem: Poisson " << Dim << "D" << endl;
+			cout << "Problem: Poisson " << Dim << "D";
+			if (this->_diffusionPartition.Kappa1 != this->_diffusionPartition.Kappa2)
+				cout << ", heterogeneous diffusion coefficient (k1=" << this->_diffusionPartition.Kappa1 << ", k2=" << this->_diffusionPartition.Kappa2 << ")";
+			cout << endl;
 			cout << mesh->Description() << endl;
 			cout << "\tElements: " << hho.nElements << endl;
 			cout << "\tFaces   : " << hho.nFaces << " (" << hho.nInteriorFaces << " interior + " << hho.nBoundaryFaces << " boundary)" << endl;
@@ -105,7 +109,15 @@ public:
 			cout << "System size   : " << (this->_staticCondensation ? hho.nTotalFaceUnknowns : hho.nTotalHybridUnknowns) << " (" << (this->_staticCondensation ? "statically condensed" : "no static condensation") << ")" << endl;
 			cout << "Parallelism   : " << (BaseParallelLoop::GetDefaultNThreads() == 1 ? "sequential execution" : to_string(BaseParallelLoop::GetDefaultNThreads()) + " threads") << endl;
 		}
-		this->_fileName = "Poisson" + to_string(Dim) + "D" + this->_solutionName + "_" + mesh->FileNamePart() + "_HHO_" + reconstructionBasis->Name() + "_pen-1" + (_staticCondensation ? "_staticcond" : "");
+
+		string kappaString = "";
+		if (this->_diffusionPartition.Kappa1 != 1)
+		{
+			char res[16];
+			sprintf(res, "_kappa%g", this->_diffusionPartition.Kappa1);
+			kappaString = res;
+		}
+		this->_fileName = "Poisson" + to_string(Dim) + "D" + this->_solutionName + kappaString + "_" + mesh->FileNamePart() + "_HHO_" + reconstructionBasis->Name() + "_pen-1" + (_staticCondensation ? "_staticcond" : "");
 		string matrixFilePath				= this->_outputDirectory + "/" + this->_fileName + "_A.dat";
 		string consistencyFilePath			= this->_outputDirectory + "/" + this->_fileName + "_A_cons.dat";
 		string stabilizationFilePath		= this->_outputDirectory + "/" + this->_fileName + "_A_stab.dat";
@@ -410,7 +422,7 @@ public:
 		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this](Element<Dim>* e)
 			{
 				Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
-				element->InitHHO(this->_reconstructionBasis, this->_cellBasis, this->_faceBasis);
+				element->InitHHO(this->_reconstructionBasis, this->_cellBasis, this->_faceBasis, this->_diffusionPartition);
 			}
 		);
 	}

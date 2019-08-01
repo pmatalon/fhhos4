@@ -185,7 +185,7 @@ public:
 			FunctionalBasis<Dim>* cellBasis = new FunctionalBasis<Dim>(basisCode, polyDegree - 1, fullTensorization);
 			FunctionalBasis<Dim-1>* faceBasis = new FunctionalBasis<Dim-1>(basisCode, polyDegree - 1, fullTensorization);
 
-			Poisson_HHO<Dim>* problem = new Poisson_HHO<Dim>(mesh, solution, sourceFunction, reconstructionBasis, cellBasis, faceBasis, staticCondensation, outputDirectory);
+			Poisson_HHO<Dim>* problem = new Poisson_HHO<Dim>(mesh, solution, sourceFunction, reconstructionBasis, cellBasis, faceBasis, staticCondensation, diffusionPartition, outputDirectory);
 
 			cout << endl;
 			cout << "----------------------- Assembly -------------------------" << endl;

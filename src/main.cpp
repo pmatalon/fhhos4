@@ -16,12 +16,14 @@ void print_usage() {
 	cout << endl;
 	cout << "-d {1|2|3}           : space dimension (default: 1)" << endl;
 	cout << "-kappa NUM           : diffusion coefficient kappa1 in the first part of the domain partition," << endl;
-	cout << "                       while kappa2=1 in the second part (default: 1 = homogeneous diffusion)" << endl;
-	cout << "                       (DG only)" << endl;
+	cout << "                       while kappa2=1 in the second part" << endl;
+	cout << "                       Ex:        1       = homogeneous diffusion (default)" << endl;
+	cout << "                                  0.9     = little heterogeneity" << endl;
+	cout << "                                  0.1     = big heterogeneity" << endl;
 	cout << "-s CODE              : analytical solution (default: 'sine')" << endl;
 	cout << "                                 'sine'   = sine solution" << endl;
 	cout << "                                 'poly'   = polynomial solution of global degree 2*d" << endl;
-	cout << "                                 'hetero' = (DG 1D only) heterogeneous diffusion-specific analytical solution" << endl;
+	cout << "                                 'hetero' = (1D only) heterogeneous diffusion-specific analytical solution" << endl;
 	cout << endl;
 	cout << "------------------------- Discretization -------------------------" << endl;
 	cout << endl;
