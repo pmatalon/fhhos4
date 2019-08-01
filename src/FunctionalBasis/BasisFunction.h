@@ -15,6 +15,31 @@ public:
 	virtual ~BasisFunction() {}
 };
 
+class BasisFunction0D : public BasisFunction<0>
+{
+public:
+	BasisFunction0D()
+	{
+		this->LocalNumber = 0;
+	}
+	double Eval(RefPoint p) override
+	{
+		return 1;
+	}
+	virtual vector<double> Grad(RefPoint p) override
+	{
+		return vector<double> { 0 };
+	}
+	virtual int GetDegree() override
+	{
+		return 0;
+	}
+	virtual string ToString() override
+	{
+		return "1";
+	}
+};
+
 class IBasisFunction1D : public BasisFunction<1>
 {
 public:

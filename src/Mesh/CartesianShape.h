@@ -319,6 +319,10 @@ public:
 			if (ShapeDim == 3)
 				p.Z = (z2 - z1) / 2 * v + (z2 + z1) / 2;
 		}
+		else if (ShapeDim == 0 && DomainDim == 1)
+		{
+			p = this->Origin;
+		}
 		else if (ShapeDim == 1 && DomainDim == 2)
 		{
 			double x1 = this->Origin.X;
@@ -369,8 +373,6 @@ public:
 			}
 			else
 				assert(false);
-
-			//assert(false && "ConvertToDomain: 3D case to be implemented!");
 		}
 		else
 			assert(false);

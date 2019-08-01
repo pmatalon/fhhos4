@@ -31,6 +31,16 @@ public:
 		this->FullTensorization = fullTensorization;
 
 		//----------//
+		//    0D    //
+		//----------//
+		if (Dim == 0)
+		{
+			this->_maxPolynomialDegree = 0;
+			this->FullTensorization = false;
+			BasisFunction<Dim>* poly = dynamic_cast<BasisFunction<Dim>*>(new BasisFunction0D());
+			this->LocalFunctions.push_back(poly);
+		}
+		//----------//
 		//    1D    //
 		//----------//
 		if (Dim == 1)

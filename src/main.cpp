@@ -207,7 +207,7 @@ int main(int argc, char* argv[])
 					nPostSmoothingIterations = stoi(matches.str(3));
 				}
 				else
-					argument_error("syntax error in the multigrid cycle. Check -mg-cycle argument.");
+					argument_error("syntax error in the multigrid cycle. Check -cycle argument.");
 				break;
 			}
 			case 'l': 
@@ -243,8 +243,8 @@ int main(int argc, char* argv[])
 	if (dimension != 1 && solution.compare("hetero") == 0)
 		argument_error("-s hetero is only supported in 1D.");
 
-	if (dimension == 1 && discretization.compare("hho") == 0)
-		argument_error("HHO in 1D not implemented.");
+	if (dimension == 1 && discretization.compare("hho") == 0 && polyDegree != 1)
+		argument_error("HHO in 1D only exists for p = 1.");
 
 	if (discretization.compare("hho") == 0 && polyDegree == 0)
 		argument_error("HHO does not exist with p=0. Linear approximation at least (p >= 1).");

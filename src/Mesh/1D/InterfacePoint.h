@@ -1,14 +1,15 @@
 #pragma once
-#include "../Face.h"
-#include "../../DG/Poisson_DG_Face.h"
 #include "Interval.h"
+#include "../CartesianFace.h"
 
-class InterfacePoint : virtual public Face<1>, public Poisson_DG_Face<1>
+class InterfacePoint : public CartesianFace<1>
 {
 public:
 	double X;
 
-	InterfacePoint(BigNumber number, double x) : Face(number, NULL, NULL), Poisson_DG_Face(number, NULL, NULL)
+	InterfacePoint(BigNumber number, double x) : 
+		Face(number, NULL, NULL), 
+		CartesianFace<1>(number, x, 0, NULL, NULL, CartesianShapeOrientation::None)
 	{
 		this->X = x;
 		this->IsDomainBoundary = false;
@@ -18,7 +19,7 @@ public:
 	//                 Face implementation                //
 	//----------------------------------------------------//
 
-	double GetDiameter()
+	double GetDiameter() override
 	{
 		if (this->Element1 != NULL)
 			return this->Element1->GetDiameter();
@@ -26,39 +27,9 @@ public:
 			return this->Element2->GetDiameter();
 	}
 
-	double Measure()
+	double Measure() override
 	{
 		return 0;
-	}
-
-	virtual double MassTerm(BasisFunction<0>* facePhi, Element<1>* element, BasisFunction<1>* reconstructPhi)
-	{
-		return 0;
-	}
-
-	RefPoint ConvertToReference(DomPoint domainPoint)
-	{
-		return RefPoint(0);
-	}
-
-	DomPoint ConvertToDomain(RefPoint referenceElementPoint)
-	{
-		return DomPoint(0);
-	}
-
-	vector<RefPoint> GetNodalPoints(FunctionalBasis<0>* basis)
-	{
-		return vector<RefPoint> {RefPoint(0)};
-	}
-
-	double ComputeIntegral(function<double(RefPoint)> func, int polynomialDegree)
-	{
-		assert(false);
-	}
-
-	double ComputeIntegral(function<double(RefPoint)> func)
-	{
-		assert(false);
 	}
 
 	Face<1>* CreateSameGeometricFace(BigNumber number, Element<1>* element1)

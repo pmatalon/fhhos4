@@ -43,10 +43,11 @@ public:
 			{
 				point->IsDomainBoundary = true;
 				this->BoundaryFaces.push_back(point);
-				point->Element2 = this->Elements[k - 1];
+				point->Element1 = this->Elements[k - 1];
 			}
 			else
 			{
+				this->InteriorFaces.push_back(point);
 				point->Element1 = this->Elements[k - 1];
 				point->Element2 = this->Elements[k];
 			}

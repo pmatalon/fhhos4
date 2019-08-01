@@ -154,7 +154,9 @@ public:
 	template <int Dim>
 	static double Integral(int nPoints, std::function<double(RefPoint)> func)
 	{
-		if (Dim == 1)
+		if (Dim == 0)
+			return func(0);
+		else if (Dim == 1)
 			return Integral(nPoints, func, -1, 1);
 		else if (Dim == 2)
 			return Integral(nPoints, func, -1, 1, -1, 1);
@@ -171,7 +173,9 @@ public:
 	static double Integral(std::function<double(RefPoint)> func, int polynomialDegree)
 	{
 		int nPoints = NumberOfRequiredQuadraturePoint(polynomialDegree);
-		if (Dim == 1)
+		if (Dim == 0)
+			return func(0);
+		else if (Dim == 1)
 			return Integral(nPoints, func, -1, 1);
 		else if (Dim == 2)
 			return Integral(nPoints, func, -1, 1, -1, 1);
