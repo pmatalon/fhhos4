@@ -338,7 +338,7 @@ public:
 		if (this->_automaticNumberOfLevels)
 		{
 			this->_nLevels = 0;
-			this->MatrixMaxSizeForCoarsestLevel = 100;
+			this->MatrixMaxSizeForCoarsestLevel = 1000;
 		}
 		else
 		{

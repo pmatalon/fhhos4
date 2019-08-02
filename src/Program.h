@@ -172,8 +172,11 @@ public:
 				delete solver;
 				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
 					problem->ExtractSolution();
-				double error = L2::Error<Dim>(mesh, basis, problem->Solution, exactSolution);
-				cout << "L2 Error = " << error << endl;
+				if ((action & Action::ComputeL2Error) == Action::ComputeL2Error)
+				{
+					double error = L2::Error<Dim>(mesh, basis, problem->Solution, exactSolution);
+					cout << "L2 Error = " << error << endl;
+				}
 			}
 
 			delete problem;
@@ -211,8 +214,11 @@ public:
 				problem->ReconstructHigherOrderApproximation();
 				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
 					problem->ExtractSolution();
-				double error = L2::Error<Dim>(mesh, reconstructionBasis, problem->ReconstructedSolution, exactSolution);
-				cout << "L2 Error = " << error << endl;
+				if ((action & Action::ComputeL2Error) == Action::ComputeL2Error)
+				{
+					double error = L2::Error<Dim>(mesh, reconstructionBasis, problem->ReconstructedSolution, exactSolution);
+					cout << "L2 Error = " << error << endl;
+				}
 			}
 
 			delete problem;

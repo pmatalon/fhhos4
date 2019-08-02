@@ -75,28 +75,29 @@ void print_usage() {
 	cout << "                                  0     - automatic (default)" << endl;
 	cout << "                                  1     - sequential execution" << endl;
 	cout << "                                  other - requested number of threads" << endl;
-	cout << "-a {e|c|f|s|v}+      : action (default: 'es'): " << endl;
+	cout << "-a {e|c|f|s|v|r}+    : action (default: 'esr'): " << endl;
 	cout << "                                 'e' = export system" << endl;
 	cout << "                                 'c' = export all components of the matrix in separate files" << endl;
 	cout << "                                 'f' = export faces for Matlab" << endl;
 	cout << "                                 's' = solve system" << endl;
 	cout << "                                 'v' = export solution vector (requires 's')" << endl;
+	cout << "                                 'r' = compute L2 error against the analytical solution" << endl;
 	cout << "-o PATH              : output directory to export files (default: ./)" << endl;
 	cout << "--------------------------------------------------------" << endl;
 }
 
 void argument_error(string msg)
 {
-	print_usage();
 	cout << "Argument error: " << msg << endl;
+	cout << "------------------------- FAILURE -------------------------" << endl;
 	exit(EXIT_FAILURE);
 }
 
 int main(int argc, char* argv[])
 {
-	cout << "-------------------------- START ------------------------" << endl;
+	cout << "-------------------------- START --------------------------" << endl;
 	cout << "Option -h for help." << endl;
-	cout << "---------------------------------------------------------" << endl;
+	cout << "-----------------------------------------------------------" << endl;
 	Eigen::initParallel();
 
 	int dimension = 1;
@@ -110,7 +111,7 @@ int main(int argc, char* argv[])
 	bool fullTensorization = false;
 	int penalizationCoefficient = -1;
 	bool staticCondensation = false;
-	string a = "es";
+	string a = "esr";
 	int nMultigridLevels = 0;
 	int wLoops = 1;
 	bool useGalerkinOperator = true;
@@ -270,8 +271,13 @@ int main(int argc, char* argv[])
 			action |= Action::SolveSystem;
 		else if (a[i] == 'v')
 			action |= Action::ExtractSolution;
+		else if (a[i] == 'r')
+			action |= Action::ComputeL2Error;
 		else
-			argument_error("unknown action '" + to_string(a[i]) + "'. Check -a argument.");
+		{
+			string character(1, a[i]);
+			argument_error("unknown action '" + character + "'. Check -a argument.");
+		}
 	}
 
 	Program* program = nullptr;

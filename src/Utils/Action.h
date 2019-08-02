@@ -9,6 +9,7 @@ enum class Action : unsigned
 	SolveSystem					= 1 << 4,
 	ExtractSolution				= 1 << 5,
 	LogAssembly					= 1 << 6,
+	ComputeL2Error              = 1 << 7
 };
 
 Action operator &(Action lhs, Action rhs)
