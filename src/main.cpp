@@ -58,6 +58,7 @@ void print_usage() {
 	cout << "-l NUM               : number of multigrid levels (HHO with static cond. only):" << endl;
 	cout << "                                  0     - (default) automatic coarsening until the matrix dimension reaches 100 or less" << endl;
 	cout << "                                  other - fixed number of levels" << endl;
+	cout << "-coarse-size NUM     : matrix size limit below which the automatic coarsening stops and a direct solver is used (default: 1000)" << endl;
 	cout << "-g {0|1}             : coarse grid operator for the multigrid" << endl;
 	cout << "                                  0     - discretized operator" << endl;
 	cout << "                                  1     - Galerkin operator (default)" << endl;
@@ -113,6 +114,7 @@ int main(int argc, char* argv[])
 	bool staticCondensation = false;
 	string a = "esr";
 	int nMultigridLevels = 0;
+	int matrixMaxSizeForCoarsestLevel = 1000;
 	int wLoops = 1;
 	bool useGalerkinOperator = true;
 	string preSmootherCode = "bgs";
@@ -126,6 +128,7 @@ int main(int argc, char* argv[])
 	enum {
 		OPT_Kappa = 1000,
 		OPT_MGCycle,
+		OPT_CoarseMatrixSize,
 		OPT_Smoothers,
 		OPT_Threads
 	};
@@ -134,6 +137,7 @@ int main(int argc, char* argv[])
 		 { "help", no_argument, NULL, 'h' },
 		 { "kappa", required_argument, NULL, OPT_Kappa },
 		 { "cycle", required_argument, NULL, OPT_MGCycle },
+		 { "coarse-size", required_argument, NULL, OPT_CoarseMatrixSize },
 		 { "smoothers", required_argument, NULL, OPT_Smoothers },
 		 { "threads", required_argument, NULL, OPT_Threads },
 		 { NULL, 0, NULL, 0 }
@@ -216,6 +220,9 @@ int main(int argc, char* argv[])
 			case 'l': 
 				nMultigridLevels = atoi(optarg);
 				break;
+			case OPT_CoarseMatrixSize:
+				matrixMaxSizeForCoarsestLevel = atoi(optarg);
+				break;
 			case 'w': 
 				wLoops = atoi(optarg);
 				if (wLoops < 1)
@@ -289,7 +296,7 @@ int main(int argc, char* argv[])
 		program = new ProgramDim<3>();
 
 	program->Start(solution, kappa1, kappa2, n, discretization, basisCode, polyDegree, fullTensorization, penalizationCoefficient, staticCondensation, action, 
-		nMultigridLevels, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations,
+		nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations,
 		outputDirectory, solverCode, solverTolerance);
 
 	delete program;

@@ -23,7 +23,7 @@ public:
 	Program() {}
 	virtual void Start(string solution, double kappa1, double kappa2, BigNumber n, string discretization, string basisCode, int polyDegree, bool fullTensorization, 
 		int penalizationCoefficient, bool staticCondensation, Action action, 
-		int nMultigridLevels, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations, 
+		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations,
 		string outputDirectory, string solverCode, double solverTolerance) = 0;
 };
 
@@ -35,7 +35,7 @@ public:
 
 	void Start(string solution, double kappa1, double kappa2, BigNumber n, string discretization, string basisCode, int polyDegree, bool fullTensorization, 
 		int penalizationCoefficient, bool staticCondensation, Action action, 
-		int nMultigridLevels, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations, 
+		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations,
 		string outputDirectory, string solverCode, double solverTolerance)
 	{
 		//----------//
@@ -165,7 +165,7 @@ public:
 				cout << endl;
 				cout << "------------------- Linear system resolution ------------------" << endl;
 
-				Solver* solver = CreateSolver(solverCode, problem, solverTolerance, staticCondensation, nMultigridLevels, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, basis->Size());
+				Solver* solver = CreateSolver(solverCode, problem, solverTolerance, staticCondensation, nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, basis->Size());
 				cout << "Solver: " << *solver << endl << endl;
 				solver->Setup(problem->A);
 				problem->Solution = solver->Solve(problem->b);
@@ -202,7 +202,7 @@ public:
 				cout << endl;
 				cout << "------------------- Linear system resolution ------------------" << endl;
 
-				Solver* solver = CreateSolver(solverCode, problem, solverTolerance, staticCondensation, nMultigridLevels, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, faceBasis->Size());
+				Solver* solver = CreateSolver(solverCode, problem, solverTolerance, staticCondensation, nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, faceBasis->Size());
 				cout << "Solver: " << *solver << endl << endl;
 				solver->Setup(problem->A);
 				problem->Solution = solver->Solve(problem->b);
@@ -234,7 +234,7 @@ private:
 	Mesh<Dim>* BuildMesh(int n) { return nullptr;  }
 
 	Solver* CreateSolver(string solverCode, Problem* problem, double tolerance, bool staticCondensation, 
-		int nMultigridLevels, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations, int blockSize)
+		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations, int blockSize)
 	{
 		Solver* solver = NULL;
 		if (solverCode.compare("mg") == 0)
@@ -243,6 +243,7 @@ private:
 			{
 				Poisson_HHO<Dim>* hhoProblem = dynamic_cast<Poisson_HHO<Dim>*>(problem);
 				MultigridForHHO<Dim>* mg = new MultigridForHHO<Dim>(hhoProblem, nMultigridLevels);
+				mg->MatrixMaxSizeForCoarsestLevel = matrixMaxSizeForCoarsestLevel;
 				mg->WLoops = wLoops;
 				mg->UseGalerkinOperator = useGalerkinOperator;
 				mg->PreSmootherCode = preSmootherCode;
