@@ -10,6 +10,7 @@ public:
 	Element<Dim>* Element1;
 	Element<Dim>* Element2;
 
+	bool IsRemovedOnCoarserGrid = false;
 public:
 	Face() { assert(false); }
 	Face(BigNumber number, Element<Dim>* element1, Element<Dim>* element2)

@@ -154,9 +154,15 @@ public:
 					coarseElement->FinerElements.push_back(fineElement);
 					fineElement->CoarserElement = coarseElement;
 					if (i % 2 == 0 && !fineElement->NorthFace->IsDomainBoundary)
+					{
+						fineElement->NorthFace->IsRemovedOnCoarserGrid = true;
 						coarseElement->FinerFacesRemoved.push_back(fineElement->NorthFace);
+					}
 					if (j % 2 == 0 && !fineElement->EastFace->IsDomainBoundary)
+					{
+						fineElement->EastFace->IsRemovedOnCoarserGrid = true;
 						coarseElement->FinerFacesRemoved.push_back(fineElement->EastFace);
+					}
 				}
 			}
 
@@ -261,6 +267,10 @@ public:
 					}
 
 					// Finer faces removed
+					bottomLeftElement->NorthFace->IsRemovedOnCoarserGrid = true;
+					topLeftElement->EastFace->IsRemovedOnCoarserGrid = true;
+					topRightElement->SouthFace->IsRemovedOnCoarserGrid = true;
+					bottomRightElement->WestFace->IsRemovedOnCoarserGrid = true;
 					coarseElement->FinerFacesRemoved.push_back(bottomLeftElement->NorthFace);
 					coarseElement->FinerFacesRemoved.push_back(topLeftElement->EastFace);
 					coarseElement->FinerFacesRemoved.push_back(topRightElement->SouthFace);

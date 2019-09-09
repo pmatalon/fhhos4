@@ -242,13 +242,25 @@ public:
 
 					// Finer faces removed
 					for (Face<2>* f : bottomLeftElement->NorthFaces)
+					{
+						f->IsRemovedOnCoarserGrid = true;
 						coarseElement->FinerFacesRemoved.push_back(f);
+					}
 					for (Face<2>* f : topLeftElement->EastFaces)
+					{
+						f->IsRemovedOnCoarserGrid = true;
 						coarseElement->FinerFacesRemoved.push_back(f);
+					}
 					for (Face<2>* f : topRightElement->SouthFaces)
+					{
+						f->IsRemovedOnCoarserGrid = true;
 						coarseElement->FinerFacesRemoved.push_back(f);
+					}
 					for (Face<2>* f : bottomRightElement->WestFaces)
+					{
+						f->IsRemovedOnCoarserGrid = true;
 						coarseElement->FinerFacesRemoved.push_back(f);
+					}
 				}
 			}
 

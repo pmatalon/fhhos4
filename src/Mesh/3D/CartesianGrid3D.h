@@ -200,11 +200,20 @@ public:
 						coarseElement->FinerElements.push_back(fineElement);
 						fineElement->CoarserElement = coarseElement;
 						if (iz % 2 == 0 && !fineElement->TopFace->IsDomainBoundary)
+						{
+							fineElement->TopFace->IsRemovedOnCoarserGrid = true;
 							coarseElement->FinerFacesRemoved.push_back(fineElement->TopFace);
+						}
 						if (iy % 2 == 0 && !fineElement->RightFace->IsDomainBoundary)
+						{
+							fineElement->RightFace->IsRemovedOnCoarserGrid = true;
 							coarseElement->FinerFacesRemoved.push_back(fineElement->RightFace);
+						}
 						if (ix % 2 == 0 && !fineElement->FrontFace->IsDomainBoundary)
+						{
+							fineElement->FrontFace->IsRemovedOnCoarserGrid = true;
 							coarseElement->FinerFacesRemoved.push_back(fineElement->FrontFace);
+						}
 					}
 				}
 			}
