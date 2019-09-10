@@ -81,7 +81,7 @@ private:
 
 	inline double Weight(Element<Dim>* element, Face<Dim>* face)
 	{
-		return element->Measure() / (face->Element1->Measure() + face->Element2->Measure());
+		return element->Kappa / (face->Element1->Kappa + face->Element2->Kappa);
 	}
 
 	SparseMatrix GetGlobalMassMatrix_Faces(Poisson_HHO<Dim>* problem)
