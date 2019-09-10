@@ -83,6 +83,8 @@ public:
 		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreMassMatrix(basis);
 		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreStiffnessMatrix(basis);
 
+		mesh->SetDiffusionCoefficient(_diffusionPartition);
+
 		//--------------------------------------------//
 		// Iteration on the elements: diagonal blocks //
 		//--------------------------------------------//
@@ -124,7 +126,7 @@ public:
 
 							//cout << "\t phi" << phi1->LocalNumber << " = " << phi1->ToString() << " phi" << phi2->LocalNumber << " = " << phi2->ToString() << endl;
 
-							double volumicTerm = element->VolumicTerm(phi1, phi2, this->_diffusionPartition);
+							double volumicTerm = element->VolumicTerm(phi1, phi2);
 							//cout << "\t\t volumic = " << volumicTerm << endl;
 
 							double coupling = 0;
@@ -133,8 +135,8 @@ public:
 							{
 								Poisson_DG_Face<Dim>* face = dynamic_cast<Poisson_DG_Face<Dim>*>(f);
 
-								double c = face->CouplingTerm(element, phi1, element, phi2, this->_diffusionPartition);
-								double p = face->PenalizationTerm(element, phi1, element, phi2, penalizationCoefficient, this->_diffusionPartition);
+								double c = face->CouplingTerm(element, phi1, element, phi2);
+								double p = face->PenalizationTerm(element, phi1, element, phi2, penalizationCoefficient);
 								coupling += c;
 								penalization += p;
 								//cout << "\t\t " << face->ToString() << ":\t c=" << c << "\tp=" << p << endl;
@@ -232,8 +234,8 @@ public:
 							//cout << "\t phi" << phi1->LocalNumber << " = " << phi1->ToString() << " phi" << phi2->LocalNumber << " = " << phi2->ToString() << endl;
 
 							BigNumber basisFunction2 = basis->GlobalFunctionNumber(face->Element2, phi2);
-							double coupling = face->CouplingTerm(face->Element1, phi1, face->Element2, phi2, this->_diffusionPartition);
-							double penalization = face->PenalizationTerm(face->Element1, phi1, face->Element2, phi2, penalizationCoefficient, this->_diffusionPartition);
+							double coupling = face->CouplingTerm(face->Element1, phi1, face->Element2, phi2);
+							double penalization = face->PenalizationTerm(face->Element1, phi1, face->Element2, phi2, penalizationCoefficient);
 
 							//cout << "\t\t\t c=" << coupling << "\tp=" << penalization << endl;
 

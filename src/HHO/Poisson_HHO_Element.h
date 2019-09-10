@@ -15,7 +15,6 @@ public:
 	FunctionalBasis<Dim>* ReconstructionBasis;
 	FunctionalBasis<Dim>* CellBasis;
 	FunctionalBasis<Dim - 1>* FaceBasis;
-	double Kappa; // constant diffusion coefficient
 
 	// Reconstruction operator as a matrix
 	Eigen::MatrixXd P;
@@ -33,12 +32,11 @@ public:
 
 	Poisson_HHO_Element(BigNumber number) : Element<Dim>(number) {}
 	
-	void InitHHO(FunctionalBasis<Dim>* reconstructionBasis, FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim - 1> * faceBasis, DiffusionPartition diffusionPartition)
+	void InitHHO(FunctionalBasis<Dim>* reconstructionBasis, FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim - 1> * faceBasis)
 	{
 		this->ReconstructionBasis = reconstructionBasis;
 		this->CellBasis = cellBasis;
 		this->FaceBasis = faceBasis;
-		this->Kappa = this->DiffusionCoefficient(diffusionPartition);
 
 		this->_cellMassMatrix = this->CellMassMatrix(cellBasis);
 		Eigen::MatrixXd Nt = this->CellReconstructMassMatrix(cellBasis, reconstructionBasis);
@@ -249,7 +247,7 @@ private:
 		for (BasisFunction<Dim>* phi1 : this->ReconstructionBasis->LocalFunctions)
 		{
 			for (BasisFunction<Dim>* phi2 : this->ReconstructionBasis->LocalFunctions)
-				reconstructionMatrixToInvert(phi1->LocalNumber, phi2->LocalNumber) = Kappa * this->IntegralGradGradReconstruct(phi1, phi2);
+				reconstructionMatrixToInvert(phi1->LocalNumber, phi2->LocalNumber) = this->Kappa * this->IntegralGradGradReconstruct(phi1, phi2);
 		}
 	}
 
@@ -317,7 +315,7 @@ private:
 		if (reconstructPhi->GetDegree() == 0)
 			return 0;
 
-		double integralGradGrad = Kappa * this->ComputeIntegralGradGrad(reconstructPhi, cellPhi);
+		double integralGradGrad = this->Kappa * this->ComputeIntegralGradGrad(reconstructPhi, cellPhi);
 
 		double sumFaces = 0;
 		for (auto f : this->Faces)
@@ -333,7 +331,7 @@ private:
 			};
 
 			int polynomialDegree = reconstructPhi->GetDegree() - 1 + cellPhi->GetDegree();
-			double integralFace = Kappa * face->ComputeIntegral(functionToIntegrate, polynomialDegree);
+			double integralFace = this->Kappa * face->ComputeIntegral(functionToIntegrate, polynomialDegree);
 
 			sumFaces += integralFace;
 		}
@@ -354,7 +352,7 @@ private:
 		};
 
 		int polynomialDegree = reconstructPhi->GetDegree() - 1 + facePhi->GetDegree();
-		return Kappa * face->ComputeIntegral(functionToIntegrate, polynomialDegree);
+		return this->Kappa * face->ComputeIntegral(functionToIntegrate, polynomialDegree);
 	}
 
 	//---------------------------------------------//
@@ -383,7 +381,7 @@ private:
 
 			Eigen::MatrixXd DiffTF = Df - ProjFT * Dt;
 			double h = face->GetDiameter();
-			this->Astab += DiffTF.transpose() * Mf * DiffTF * Kappa / h;
+			this->Astab += DiffTF.transpose() * Mf * DiffTF * this->Kappa / h;
 		}
 	}
 	int DOFNumber(BasisFunction<Dim> * cellPhi)

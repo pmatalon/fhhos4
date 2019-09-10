@@ -43,11 +43,17 @@ public:
 		return CartesianShape<Dim>::Measure;
 	}
 
-	double DiffusionCoefficient(DiffusionPartition diffusionPartition) override
+	void SetDiffusionCoefficient(DiffusionPartition diffusionPartition) override
+	{
+		DomPoint origin = CartesianShape<Dim>::Origin;
+		this->Kappa = diffusionPartition.Coefficient(origin);
+	}
+
+	/*double DiffusionCoefficient(DiffusionPartition diffusionPartition) override
 	{
 		DomPoint origin = CartesianShape<Dim>::Origin;
 		return diffusionPartition.Coefficient(origin);
-	}
+	}*/
 
 	double IntegralGlobalFunction(function<double(DomPoint)> func)
 	{

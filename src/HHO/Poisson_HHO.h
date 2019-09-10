@@ -138,6 +138,7 @@ public:
 		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreCellReconstructMassMatrix(cellBasis, reconstructionBasis);
 		CartesianShape<Dim, Dim - 1>::ReferenceShape.ComputeAndStoreFaceMassMatrix(faceBasis);
 
+		mesh->SetDiffusionCoefficient(_diffusionPartition);
 		this->InitHHO();
 
 		//-------------------------------//
@@ -422,7 +423,7 @@ public:
 		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this](Element<Dim>* e)
 			{
 				Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
-				element->InitHHO(this->_reconstructionBasis, this->_cellBasis, this->_faceBasis, this->_diffusionPartition);
+				element->InitHHO(this->_reconstructionBasis, this->_cellBasis, this->_faceBasis);
 			}
 		);
 	}

@@ -5,6 +5,7 @@
 #include <math.h>
 #include <type_traits>
 #include "Utils.h"
+#include "NonZeroCoefficients.h"
 using namespace std;
 
 struct EmptyResultChunk

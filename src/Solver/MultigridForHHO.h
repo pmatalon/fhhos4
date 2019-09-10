@@ -74,7 +74,7 @@ private:
 		//finePb->ExportMatrix(M_f, "M_f");
 
 		//R = invM_c * P.transpose() * M_f;
-		R = /*(coarsePb->_mesh->SqueletonMeasure() / finePb->_mesh->SqueletonMeasure()) **/ P.transpose();
+		R = /*(coarsePb->_mesh->SkeletonMeasure() / finePb->_mesh->SkeletonMeasure()) **/ P.transpose();
 
 		finePb->ExportMatrix(R, "R");
 	}

@@ -9,10 +9,9 @@ class Poisson_DG_Element : virtual public Element<Dim>
 public:
 	Poisson_DG_Element(BigNumber number) : Element<Dim>(number) {}
 
-	virtual double VolumicTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2, DiffusionPartition diffusionPartition)
+	virtual double VolumicTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{
-		double kappa = this->DiffusionCoefficient(diffusionPartition);
-		return kappa * this->StiffnessTerm(phi1, phi2);
+		return this->Kappa * this->StiffnessTerm(phi1, phi2);
 	}
 
 	virtual double StiffnessTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) = 0;

@@ -2,6 +2,7 @@
 #include <vector>
 #include "Element.h"
 #include "Face.h"
+#include "../Utils/ParallelLoop.h"
 using namespace std;
 
 enum class CoarseningStrategy : unsigned
@@ -37,12 +38,24 @@ public:
 			this->InteriorFaces.push_back(f);
 	}
 
-	double SqueletonMeasure()
+	double SkeletonMeasure()
 	{
 		double measure = 0;
 		for (Face<Dim>* face : this->Faces)
 			measure += face->Measure();
 		return measure;
+	}
+
+	void SetDiffusionCoefficient(DiffusionPartition diffusionPartition)
+	{
+		if (diffusionPartition.Kappa1 == diffusionPartition.Kappa2)
+			return;
+
+		ParallelLoop<Element<Dim>*, EmptyResultChunk> parallelLoop(this->Elements);
+		parallelLoop.Execute([&diffusionPartition](Element<Dim>* e, ParallelChunk<EmptyResultChunk>* chunk)
+			{
+				e->SetDiffusionCoefficient(diffusionPartition);
+			});
 	}
 
 	void ExportFacesToMatlab(string outputDirectory)
