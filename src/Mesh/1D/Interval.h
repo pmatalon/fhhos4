@@ -21,12 +21,15 @@ public:
 	//                 Element implementation                //
 	//-------------------------------------------------------//
 
-	vector<double> OuterNormalVector(Face<1>* interface)
+	DimVector<1> OuterNormalVector(Face<1>* interface)
 	{
+		DimVector<1> n;
 		if (interface == this->Left)
-			return vector<double>{ -1 };
-		else if(interface == this->Right)
-			return vector<double>{ 1 };
-		assert(false);
+			n << -1;
+		else if (interface == this->Right)
+			n << 1;
+		else
+			assert(false);
+		return n;
 	}
 };

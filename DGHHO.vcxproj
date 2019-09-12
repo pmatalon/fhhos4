@@ -155,6 +155,7 @@
     <ClInclude Include="src\Utils\Action.h" />
     <ClInclude Include="src\Utils\ElementParallelLoop.h" />
     <ClInclude Include="src\Utils\ParallelLoop.h" />
+    <ClInclude Include="src\Utils\Types.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="CMakeLists.txt" />

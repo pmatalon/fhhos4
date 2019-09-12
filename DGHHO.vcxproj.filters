@@ -186,6 +186,9 @@
     <ClInclude Include="src\Solver\SmootherFactory.h">
       <Filter>Solver</Filter>
     </ClInclude>
+    <ClInclude Include="src\Utils\Types.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

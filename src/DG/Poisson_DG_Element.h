@@ -1,7 +1,6 @@
 #pragma once
 #include "../Mesh/Element.h"
 #include "../Utils/SourceFunction.h"
-#include "../Utils/DiffusionPartition.h"
 
 template <int Dim>
 class Poisson_DG_Element : virtual public Element<Dim>

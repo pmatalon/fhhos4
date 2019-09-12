@@ -84,7 +84,7 @@ public:
 		return CartesianShape<Dim>::ConvertToReference(domainPoint);
 	}
 
-	vector<double> GradTransformation()
+	DimVector<Dim> GradTransformation()
 	{
 		return CartesianShape<Dim>::GradTransformation();
 	}

@@ -35,8 +35,8 @@ public:
 		auto gradPhi2 = element2->GradPhiOnFace(this, p_phi2);
 
 		std::function<double(RefPoint)> functionToIntegrate = [n1, n2, phi1, phi2, gradPhi1, gradPhi2, weight1, weight2, k1, k2](RefPoint p) {
-			double meanGradPhi1_scal_jumpPhi2 = weight1 * k1 * Utils::InnerProduct<Dim>(gradPhi1(p), n2) * phi2(p);
-			double meanGradPhi2_scal_jumpPhi1 = weight2 * k2 * Utils::InnerProduct<Dim>(gradPhi2(p), n1) * phi1(p);
+			double meanGradPhi1_scal_jumpPhi2 = weight1 * k1 * gradPhi1(p).dot(n2) * phi2(p);
+			double meanGradPhi2_scal_jumpPhi1 = weight2 * k2 * gradPhi2(p).dot(n1) * phi1(p);
 			return meanGradPhi1_scal_jumpPhi2 + meanGradPhi2_scal_jumpPhi1;
 		};
 
@@ -53,7 +53,7 @@ public:
 		auto phi2 = element2->EvalPhiOnFace(this, p_phi2);
 
 		std::function<double(RefPoint)> functionToIntegrate = [phi1, phi2, n1, n2](RefPoint p) {
-			return Utils::InnerProduct<Dim>(n1, n2) * phi1(p) * phi2(p);
+			return n1.dot(n2) * phi1(p) * phi2(p);
 		};
 
 		int polynomialDegree = p_phi1->GetDegree() + p_phi2->GetDegree();

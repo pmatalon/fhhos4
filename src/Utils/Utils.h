@@ -2,12 +2,10 @@
 #include <functional>
 #include <vector>
 #include <Eigen/Sparse>
+#include "Types.h"
 #include "GaussLegendre.h"
 #include "../Mesh/Point.h"
 #include "../FunctionalBasis/BasisFunction.h"
-
-typedef long unsigned int BigNumber;
-using SparseMatrix = Eigen::SparseMatrix<double, Eigen::RowMajor>;
 
 class Utils
 {
@@ -217,28 +215,6 @@ public:
 		for (int i = 2; i <= n; i++)
 			f *= i;
 		return f;
-	}
-
-	//---------------//
-	// Inner product //
-	//---------------//
-
-	template <int Dim>
-	inline static double InnerProduct(vector<double> vector1, vector<double> vector2)
-	{
-		double innerProduct = 0;
-		for (int i = 0; i < Dim; i++)
-			innerProduct += vector1[i] * vector2[i];
-		return innerProduct;
-	}
-
-	template <int Dim>
-	inline static vector<double> Multiply(vector<double> coefficients, vector<double> v)
-	{
-		vector<double> result(Dim);
-		for (int i = 0; i < Dim; i++)
-			result[i] = coefficients[i] * v[i];
-		return result;
 	}
 
 	static string MatrixInfo(const SparseMatrix& M, string name)

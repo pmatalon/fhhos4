@@ -227,12 +227,12 @@ public:
 		if (phi1->GetDegree() == 0 || phi2->GetDegree() == 0)
 			return 0;
 
-		vector<double> gradTransfo = GradTransformation();
+		DimVector<ShapeDim> gradTransfo = GradTransformation();
 
 		function<double(RefPoint)> functionToIntegrate = [phi1, phi2, gradTransfo](RefPoint p) {
-			vector<double> gradPhi1 = Utils::Multiply<ShapeDim>(gradTransfo, phi1->Grad(p));
-			vector<double> gradPhi2 = Utils::Multiply<ShapeDim>(gradTransfo, phi2->Grad(p));
-			return Element<ShapeDim>::InnerProduct(gradPhi1, gradPhi2);
+			DimVector<ShapeDim> gradPhi1 = gradTransfo.cwiseProduct(phi1->Grad(p));
+			DimVector<ShapeDim> gradPhi2 = gradTransfo.cwiseProduct(phi2->Grad(p));
+			return gradPhi1.dot(gradPhi2);
 		};
 
 		int polynomialDegree = max(0, phi1->GetDegree() + phi2->GetDegree() - 2);
@@ -252,7 +252,7 @@ public:
 	{
 		if (this->IsRegular)
 		{
-			vector<double> gradTransfo = GradTransformation();
+			DimVector<ShapeDim> gradTransfo = GradTransformation();
 			return RescalingCoeff() * pow(gradTransfo[0], 2) * ReferenceShape.StiffnessTerm(phi1, phi2);
 		}
 		else
@@ -282,7 +282,7 @@ public:
 	{
 		if (this->IsRegular)
 		{
-			vector<double> gradTransfo = GradTransformation();
+			DimVector<ShapeDim> gradTransfo = GradTransformation();
 			return RescalingCoeff() * pow(gradTransfo[0], 2) * ReferenceShape.ReconstructStiffnessTerm(phi1, phi2);
 		}
 		else
@@ -423,9 +423,9 @@ public:
 		return refPoint;
 	}
 
-	vector<double> GradTransformation()
+	DimVector<ShapeDim> GradTransformation()
 	{
-		vector<double> gradTransfo(ShapeDim);
+		DimVector<ShapeDim> gradTransfo(ShapeDim);
 		if (ShapeDim == DomainDim)
 		{
 			if (ShapeDim >= 1)

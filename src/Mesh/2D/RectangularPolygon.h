@@ -72,17 +72,20 @@ public:
 	//                 Element implementation                //
 	//-------------------------------------------------------//
 
-	vector<double> OuterNormalVector(Face<2>* face)
+	DimVector<2> OuterNormalVector(Face<2>* face)
 	{
+		DimVector<2> n;
 		if (isIn(this->NorthFaces, face))
-			return vector<double>{ 0, 1 };
-		if (isIn(this->SouthFaces, face))
-			return vector<double>{ 0, -1 };
-		if (isIn(this->EastFaces, face))
-			return vector<double>{ 1, 0 };
-		if (isIn(this->WestFaces, face))
-			return vector<double>{ -1, 0 };
-		assert(false);
+			n << 0, 1;
+		else if (isIn(this->SouthFaces, face))
+			n << 0, -1;
+		else if (isIn(this->EastFaces, face))
+			n << 1, 0;
+		else if (isIn(this->WestFaces, face))
+			n << -1, 0;
+		else
+			assert(false);
+		return n;
 	}
 
 private:

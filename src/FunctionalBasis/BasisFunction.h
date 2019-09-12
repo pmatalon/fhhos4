@@ -1,6 +1,6 @@
 #pragma once
 #include <string>
-#include "../Mesh/Point.h"
+#include "../Utils/Types.h"
 using namespace std;
 
 template <int Dim>
@@ -9,7 +9,7 @@ class BasisFunction
 public:
 	int LocalNumber = -1;
 	virtual double Eval(RefPoint p) = 0;
-	virtual vector<double> Grad(RefPoint p) = 0;
+	virtual DimVector<Dim> Grad(RefPoint p) = 0;
 	virtual int GetDegree() = 0;
 	virtual string ToString() = 0;
 	virtual ~BasisFunction() {}
@@ -26,9 +26,9 @@ public:
 	{
 		return 1;
 	}
-	virtual vector<double> Grad(RefPoint p) override
+	virtual DimVector<0> Grad(RefPoint p) override
 	{
-		return vector<double> { 0 };
+		return DimVector<0>();
 	}
 	virtual int GetDegree() override
 	{
@@ -46,13 +46,15 @@ public:
 	virtual double Eval(double x) = 0;
 	virtual double EvalDerivative(double x) = 0;
 
-	vector<double> Grad(RefPoint p) override
+	DimVector<1> Grad(RefPoint p) override
 	{
 		return this->Grad(p.X);
 	}
-	vector<double> Grad(double x)
+	DimVector<1> Grad(double x)
 	{
-		return vector<double>{ EvalDerivative(x) };
+		DimVector<1> g;
+		g << EvalDerivative(x);
+		return g;
 	}
 	double Eval(RefPoint p) override
 	{
@@ -78,11 +80,13 @@ public:
 	{
 		return Eval(p.X, p.Y);
 	}
-	vector<double> Grad(double x, double y)
+	DimVector<2> Grad(double x, double y)
 	{
-		return vector<double>{ EvalGradX(x, y), EvalGradY(x, y) };
+		DimVector<2> g;
+		g << EvalGradX(x, y), EvalGradY(x, y);
+		return g;
 	}
-	vector<double> Grad(RefPoint p) override
+	DimVector<2> Grad(RefPoint p) override
 	{
 		return this->Grad(p.X, p.Y);
 	}
@@ -99,11 +103,13 @@ public:
 	{
 		return Eval(p.X, p.Y, p.Z);
 	}
-	vector<double> Grad(double x, double y, double z)
+	DimVector<3> Grad(double x, double y, double z)
 	{
-		return vector<double>{ EvalGradX(x, y, z), EvalGradY(x, y, z), EvalGradZ(x, y, z) };
+		DimVector<3> g;
+		g << EvalGradX(x, y, z), EvalGradY(x, y, z), EvalGradZ(x, y, z);
+		return g;
 	}
-	vector<double> Grad(RefPoint p) override
+	DimVector<3> Grad(RefPoint p) override
 	{
 		return this->Grad(p.X, p.Y, p.Z);
 	}

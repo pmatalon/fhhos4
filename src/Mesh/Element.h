@@ -59,14 +59,15 @@ public:
 		return evalOnFace;
 	}
 
-	virtual function<vector<double>(RefPoint)> GradPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* phi)
+	virtual function<DimVector<Dim>(RefPoint)> GradPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* phi)
 	{
-		function<vector<double>(RefPoint)> gradOnFace = [this, face, phi](RefPoint refPoint1D) {
+		function<DimVector<Dim>(RefPoint)> gradOnFace = [this, face, phi](RefPoint refPoint1D) {
 			DomPoint domainPoint2D = face->ConvertToDomain(refPoint1D);
 			RefPoint refPoint2D = this->ConvertToReference(domainPoint2D);
-			vector<double> gradPhi = phi->Grad(refPoint2D);
-			vector<double> gradTransfo = this->GradTransformation();
-			return Utils::Multiply<Dim>(gradTransfo, gradPhi);
+			DimVector<Dim> gradPhi = phi->Grad(refPoint2D);
+			DimVector<Dim> gradTransfo = this->GradTransformation();
+			DimVector<Dim> result = gradTransfo.cwiseProduct(gradPhi);
+			return result;
 		};
 		return gradOnFace;
 	}
@@ -82,8 +83,8 @@ public:
 	virtual double Measure() = 0;
 	virtual DomPoint ConvertToDomain(RefPoint refPoint) = 0;
 	virtual RefPoint ConvertToReference(DomPoint domainPoint) = 0;
-	virtual vector<double> GradTransformation() = 0;
-	virtual vector<double> OuterNormalVector(Face<Dim>* face) = 0;
+	virtual DimVector<Dim> GradTransformation() = 0;
+	virtual DimVector<Dim> OuterNormalVector(Face<Dim>* face) = 0;
 	virtual double Integral(BasisFunction<Dim>* phi) = 0;
 	virtual double IntegralGlobalFunction(function<double(DomPoint)> globalFunction) = 0;
 	virtual double ComputeIntegral(function<double(RefPoint)> func) = 0;
@@ -124,13 +125,5 @@ protected:
 
 		int faceLocalNumber = static_cast<int>(this->_facesLocalNumbering.size());
 		this->_facesLocalNumbering.insert(std::pair<Face<Dim>*, int>(face, faceLocalNumber));
-	}
-public:
-	static double InnerProduct(vector<double> vector1, vector<double> vector2)
-	{
-		double innerProduct = 0;
-		for (int i=0; i<Dim; i++)
-			innerProduct += vector1[i] * vector2[i];
-		return innerProduct;
 	}
 };

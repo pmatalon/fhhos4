@@ -53,17 +53,20 @@ public:
 	//                 Element implementation                //
 	//-------------------------------------------------------//
 
-	vector<double> OuterNormalVector(Face<2>* face)
+	DimVector<2> OuterNormalVector(Face<2>* face)
 	{
+		DimVector<2> n;
 		if (face == this->NorthFace)
-			return vector<double>{ 0, 1 };
-		if (face == this->SouthFace)
-			return vector<double>{ 0, -1 };
-		if (face == this->EastFace)
-			return vector<double>{ 1, 0 };
-		if (face == this->WestFace)
-			return vector<double>{ -1, 0 };
-		assert(false);
+			n << 0, 1;
+		else if (face == this->SouthFace)
+			n << 0, -1;
+		else if (face == this->EastFace)
+			n << 1, 0;
+		else if (face == this->WestFace)
+			n << -1, 0;
+		else
+			assert(false);
+		return n;
 	}
 
 };

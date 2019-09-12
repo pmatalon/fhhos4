@@ -69,21 +69,24 @@ public:
 	//                 Element implementation                //
 	//-------------------------------------------------------//
 
-	vector<double> OuterNormalVector(Face<3>* face)
+	DimVector<3> OuterNormalVector(Face<3>* face)
 	{
+		DimVector<3> n;
 		if (face == this->TopFace)
-			return vector<double>{ 0, 0, 1 };
-		if (face == this->BottomFace)
-			return vector<double>{ 0, 0, -1 };
-		if (face == this->FrontFace)
-			return vector<double>{ 1, 0, 0 };
-		if (face == this->BackFace)
-			return vector<double>{ -1, 0, 0 };
-		if (face == this->LeftFace)
-			return vector<double>{ 0, -1, 0 };
-		if (face == this->RightFace)
-			return vector<double>{ 0, 1, 0 };
-		assert(false);
+			n << 0, 0, 1;
+		else if (face == this->BottomFace)
+			n << 0, 0, -1;
+		else if (face == this->FrontFace)
+			n << 1, 0, 0;
+		else if (face == this->BackFace)
+			n << -1, 0, 0;
+		else if (face == this->LeftFace)
+			n << 0, -1, 0;
+		else if (face == this->RightFace)
+			n << 0, 1, 0;
+		else
+			assert(false);
+		return n;
 	}
 
 };

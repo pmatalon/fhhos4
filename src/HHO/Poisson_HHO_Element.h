@@ -327,7 +327,7 @@ private:
 			auto normal = this->OuterNormalVector(face);
 
 			std::function<double(RefPoint)> functionToIntegrate = [phi, gradPhi, normal](RefPoint p) {
-				return Utils::InnerProduct<Dim>(gradPhi(p), normal) * phi(p);
+				return gradPhi(p).dot(normal) * phi(p);
 			};
 
 			int polynomialDegree = reconstructPhi->GetDegree() - 1 + cellPhi->GetDegree();
@@ -348,7 +348,7 @@ private:
 		auto normal = this->OuterNormalVector(face);
 
 		std::function<double(RefPoint)> functionToIntegrate = [facePhi, gradPhi, normal](RefPoint p) {
-			return Utils::InnerProduct<Dim>(gradPhi(p), normal) * facePhi->Eval(p);
+			return gradPhi(p).dot(normal) * facePhi->Eval(p);
 		};
 
 		int polynomialDegree = reconstructPhi->GetDegree() - 1 + facePhi->GetDegree();

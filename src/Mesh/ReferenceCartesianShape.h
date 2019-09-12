@@ -206,7 +206,7 @@ public:
 			return 0;
 
 		function<double(RefPoint)> functionToIntegrate = [phi1, phi2](RefPoint p) {
-			return Element<Dim>::InnerProduct(phi1->Grad(p), phi2->Grad(p));
+			return phi1->Grad(p).dot(phi2->Grad(p));
 		};
 
 		int polynomialDegree = max(0, phi1->GetDegree() + phi2->GetDegree() - 2);
