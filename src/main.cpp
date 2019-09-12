@@ -20,6 +20,9 @@ void print_usage() {
 	cout << "                       Ex:        1       = homogeneous diffusion (default)" << endl;
 	cout << "                                  0.9     = little heterogeneity" << endl;
 	cout << "                                  0.1     = big heterogeneity" << endl;
+	cout << "-partition CODE      : domain partition describing the heterogeneity pattern in case of heterogeneous diffusion" << endl;
+	cout << "                                 'halves'   = the domain is split in two vertical halves (default)" << endl;
+	cout << "                                 'chiasmus' = chiasmus shape" << endl;
 	cout << "-s CODE              : analytical solution (default: 'sine')" << endl;
 	cout << "                                 'sine'   = sine solution" << endl;
 	cout << "                                 'poly'   = polynomial solution of global degree 2*d" << endl;
@@ -105,6 +108,7 @@ int main(int argc, char* argv[])
 	string solution = "sine";
 	double kappa1 = 1;
 	double kappa2 = 1;
+	string partition = "halves";
 	BigNumber n = 5;
 	string discretization = "dg";
 	string basisCode = "monomials";
@@ -127,6 +131,7 @@ int main(int argc, char* argv[])
 
 	enum {
 		OPT_Kappa = 1000,
+		OPT_Partition,
 		OPT_MGCycle,
 		OPT_CoarseMatrixSize,
 		OPT_Smoothers,
@@ -136,6 +141,7 @@ int main(int argc, char* argv[])
 	static struct option long_opts[] = {
 		 { "help", no_argument, NULL, 'h' },
 		 { "kappa", required_argument, NULL, OPT_Kappa },
+		 { "partition", required_argument, NULL, OPT_Partition },
 		 { "cycle", required_argument, NULL, OPT_MGCycle },
 		 { "coarse-size", required_argument, NULL, OPT_CoarseMatrixSize },
 		 { "smoothers", required_argument, NULL, OPT_Smoothers },
@@ -165,6 +171,11 @@ int main(int argc, char* argv[])
 				break;
 			case OPT_Kappa: 
 				kappa1 = atof(optarg);
+				break;
+			case OPT_Partition:
+				partition = optarg;
+				if (partition.compare("halves") != 0 && partition.compare("chiasmus") != 0)
+					argument_error("unknown partition '" + partition + "'. Check -partition argument.");
 				break;
 			case 'n': 
 				n = stoul(optarg, nullptr, 0);
@@ -295,7 +306,7 @@ int main(int argc, char* argv[])
 	else if (dimension == 3)
 		program = new ProgramDim<3>();
 
-	program->Start(solution, kappa1, kappa2, n, discretization, basisCode, polyDegree, fullTensorization, penalizationCoefficient, staticCondensation, action, 
+	program->Start(solution, kappa1, kappa2, partition, n, discretization, basisCode, polyDegree, fullTensorization, penalizationCoefficient, staticCondensation, action, 
 		nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations,
 		outputDirectory, solverCode, solverTolerance);
 

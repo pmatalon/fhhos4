@@ -22,4 +22,9 @@ public:
 		double kappa = this->IsInPart1(p) ? this->Kappa1 : this->Kappa2;
 		return kappa;
 	}
+
+	bool IsHomogeneous()
+	{
+		return this->Kappa1 == this->Kappa2;
+	}
 };

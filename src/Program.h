@@ -21,7 +21,7 @@ class Program
 {
 public:
 	Program() {}
-	virtual void Start(string solution, double kappa1, double kappa2, BigNumber n, string discretization, string basisCode, int polyDegree, bool fullTensorization, 
+	virtual void Start(string solution, double kappa1, double kappa2, string partition, BigNumber n, string discretization, string basisCode, int polyDegree, bool fullTensorization,
 		int penalizationCoefficient, bool staticCondensation, Action action, 
 		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations,
 		string outputDirectory, string solverCode, double solverTolerance) = 0;
@@ -33,7 +33,7 @@ class ProgramDim : public Program
 public:
 	ProgramDim() : Program() {}
 
-	void Start(string solution, double kappa1, double kappa2, BigNumber n, string discretization, string basisCode, int polyDegree, bool fullTensorization, 
+	void Start(string solution, double kappa1, double kappa2, string partition, BigNumber n, string discretization, string basisCode, int polyDegree, bool fullTensorization,
 		int penalizationCoefficient, bool staticCondensation, Action action, 
 		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations,
 		string outputDirectory, string solverCode, double solverTolerance)
@@ -56,29 +56,38 @@ public:
 		function<double(DomPoint)> exactSolution = NULL;
 		SourceFunction* sourceFunction;
 
-		function<bool(DomPoint)> isInPart1 = [](DomPoint p) { return p.X < 0.5; };
+		function<bool(DomPoint)> isInPart1 = NULL;
+		if (partition.compare("halves") == 0 || Dim == 1)
+			isInPart1 = [](DomPoint p) { return p.X < 0.5; };
+		else if (partition.compare("chiasmus") == 0)
+			isInPart1 = [](DomPoint p) { return (p.X < 0.5 && p.Y >= 0.5) || (p.X >= 0.5 && p.Y < 0.5); };
 		DiffusionPartition diffusionPartition(isInPart1, kappa1, kappa2);
 
 		if (Dim == 1)
 		{
 			if (solution.compare("sine") == 0)
 			{
-				exactSolution = [](DomPoint p)
+				if (diffusionPartition.IsHomogeneous())
 				{
-					double x = p.X;
-					return sin(4 * M_PI * x) / (16 * pow(M_PI, 2));
-				};
-				sourceFunction = new SourceFunction1D([&diffusionPartition](double x) { return diffusionPartition.Coefficient(x) * sin(4 * M_PI * x); });
+					exactSolution = [](DomPoint p)
+					{
+						double x = p.X;
+						return sin(4 * M_PI * x) / (16 * pow(M_PI, 2));
+					};
+				}
+				sourceFunction = new SourceFunction1D([](double x) { return sin(4 * M_PI * x); });
 			}
 			else if (solution.compare("poly") == 0)
 			{
-				exactSolution = [](DomPoint p)
+				if (diffusionPartition.IsHomogeneous())
 				{
-					double x = p.X;
-					return x * (1 - x);
-				};
-				sourceFunction = new SourceFunction1D([&diffusionPartition](double x) { return diffusionPartition.Coefficient(x) * 2; });
-				//sourceFunction = [](double x) { return (-1)*(-6 * x*pow(x - 1, 3) - 3 * pow(x, 3) * (2 * x - 2) - 18 * pow(x, 2) * pow(x - 1, 2)); };
+					exactSolution = [](DomPoint p)
+					{
+						double x = p.X;
+						return x * (1 - x);
+					};
+				}
+				sourceFunction = new SourceFunction1D([](double x) { return 2; });
 			}
 			else if (solution.compare("hetero") == 0)
 			{
@@ -102,48 +111,60 @@ public:
 		{
 			if (solution.compare("sine") == 0)
 			{
-				exactSolution = [](DomPoint p)
+				if (diffusionPartition.IsHomogeneous())
 				{
-					double x = p.X;
-					double y = p.Y;
-					return sin(4 * M_PI * x)*sin(4 * M_PI * y);
-				};
-				sourceFunction = new SourceFunction2D([&diffusionPartition](double x, double y) { return diffusionPartition.Coefficient(x) * 2 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y); });
+					exactSolution = [](DomPoint p)
+					{
+						double x = p.X;
+						double y = p.Y;
+						return sin(4 * M_PI * x)*sin(4 * M_PI * y);
+					};
+				}
+				sourceFunction = new SourceFunction2D([](double x, double y) { return 2 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y); });
 			}
 			else if (solution.compare("poly") == 0)
 			{
-				exactSolution = [](DomPoint p)
+				if (diffusionPartition.IsHomogeneous())
 				{
-					double x = p.X;
-					double y = p.Y;
-					return x * (1 - x) * y*(1 - y);
-				};
-				sourceFunction = new SourceFunction2D([&diffusionPartition](double x, double y) { return diffusionPartition.Coefficient(x) * 2 * (y*(1 - y) + x * (1 - x)); });
+					exactSolution = [](DomPoint p)
+					{
+						double x = p.X;
+						double y = p.Y;
+						return x * (1 - x) * y*(1 - y);
+					};
+				}
+				sourceFunction = new SourceFunction2D([](double x, double y) { return 2 * (y*(1 - y) + x * (1 - x)); });
 			}
 		}
 		else if (Dim == 3)
 		{
 			if (solution.compare("sine") == 0)
 			{
-				exactSolution = [](DomPoint p)
+				if (diffusionPartition.IsHomogeneous())
 				{
-					double x = p.X;
-					double y = p.Y;
-					double z = p.Z;
-					return sin(4 * M_PI * x)*sin(4 * M_PI * y)*sin(4 * M_PI * z);
-				};
-				sourceFunction = new SourceFunction3D([&diffusionPartition](double x, double y, double z) {  return diffusionPartition.Coefficient(x) * 3 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y)*sin(4 * M_PI * z); });
+					exactSolution = [](DomPoint p)
+					{
+						double x = p.X;
+						double y = p.Y;
+						double z = p.Z;
+						return sin(4 * M_PI * x)*sin(4 * M_PI * y)*sin(4 * M_PI * z);
+					};
+				}
+				sourceFunction = new SourceFunction3D([](double x, double y, double z) {  return 3 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y)*sin(4 * M_PI * z); });
 			}
 			else if (solution.compare("poly") == 0)
 			{
-				exactSolution = [](DomPoint p)
+				if (diffusionPartition.IsHomogeneous())
 				{
-					double x = p.X;
-					double y = p.Y;
-					double z = p.Z;
-					return x * (1 - x)*y*(1 - y)*z*(1 - z);
-				};
-				sourceFunction = new SourceFunction3D([&diffusionPartition](double x, double y, double z) { return diffusionPartition.Coefficient(x) * 2 * ((y*(1 - y)*z*(1 - z) + x * (1 - x)*z*(1 - z) + x * (1 - x)*y*(1 - y))); });
+					exactSolution = [](DomPoint p)
+					{
+						double x = p.X;
+						double y = p.Y;
+						double z = p.Z;
+						return x * (1 - x)*y*(1 - y)*z*(1 - z);
+					};
+				}
+				sourceFunction = new SourceFunction3D([](double x, double y, double z) { return 2 * ((y*(1 - y)*z*(1 - z) + x * (1 - x)*z*(1 - z) + x * (1 - x)*y*(1 - y))); });
 			}
 		}
 
@@ -172,7 +193,7 @@ public:
 				delete solver;
 				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
 					problem->ExtractSolution();
-				if ((action & Action::ComputeL2Error) == Action::ComputeL2Error)
+				if ((action & Action::ComputeL2Error) == Action::ComputeL2Error && exactSolution != NULL)
 				{
 					double error = L2::Error<Dim>(mesh, basis, problem->Solution, exactSolution);
 					cout << "L2 Error = " << error << endl;
