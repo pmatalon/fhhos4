@@ -19,6 +19,7 @@ public:
 	std::vector<Face<Dim>*> Faces;
 
 	double Kappa = 1; // constant diffusion coefficient
+	Tensor<Dim>* DiffTensor = nullptr;
 
 	std::vector<Element<Dim>*> FinerElements;
 	Element<Dim>* CoarserElement;
@@ -90,7 +91,8 @@ public:
 	virtual double ComputeIntegral(function<double(RefPoint)> func) = 0;
 	virtual double ComputeIntegral(function<double(RefPoint)> func, int polynomialDegree) = 0;
 	virtual double L2ErrorPow2(function<double(RefPoint)> approximate, function<double(DomPoint)> exactSolution) = 0;
-	virtual void SetDiffusionCoefficient(DiffusionPartition diffusionPartition) = 0;
+	virtual void SetDiffusionCoefficient(DiffusionPartition<Dim>* diffusionPartition) = 0;
+	virtual void SetDiffusionTensor(DiffusionPartition<Dim>* diffusionPartition) = 0;
 	virtual vector<RefPoint> GetNodalPoints(FunctionalBasis<Dim>* basis) = 0;
 
 	virtual void Serialize(ostream& os) const

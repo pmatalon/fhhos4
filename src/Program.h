@@ -4,7 +4,6 @@
 #include <functional>
 #include "DG/Poisson_DG.h"
 #include "HHO/Poisson_HHO.h"
-#include "FunctionalBasis/FunctionalBasis.h"
 #include "Mesh/1D/CartesianGrid1D.h"
 #include "Mesh/2D/CartesianGrid2D.h"
 #include "Mesh/3D/CartesianGrid3D.h"
@@ -15,13 +14,14 @@
 #include "Solver/BlockJacobi.h"
 #include "Solver/EigenCG.h"
 #include "Solver/AGMG.h"
+#include "Utils/L2.h"
 using namespace std;
 
 class Program
 {
 public:
 	Program() {}
-	virtual void Start(string solution, double kappa1, double kappa2, string partition, BigNumber n, string discretization, string basisCode, int polyDegree, bool fullTensorization,
+	virtual void Start(string solution, double kappa1, double kappa2, double anisotropyRatio, string partition, BigNumber n, string discretization, string basisCode, int polyDegree, bool fullTensorization,
 		int penalizationCoefficient, bool staticCondensation, Action action, 
 		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations,
 		string outputDirectory, string solverCode, double solverTolerance) = 0;
@@ -33,7 +33,7 @@ class ProgramDim : public Program
 public:
 	ProgramDim() : Program() {}
 
-	void Start(string solution, double kappa1, double kappa2, string partition, BigNumber n, string discretization, string basisCode, int polyDegree, bool fullTensorization,
+	void Start(string solution, double kappa1, double kappa2, double anisotropyRatio, string partition, BigNumber n, string discretization, string basisCode, int polyDegree, bool fullTensorization,
 		int penalizationCoefficient, bool staticCondensation, Action action, 
 		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations,
 		string outputDirectory, string solverCode, double solverTolerance)
@@ -49,6 +49,31 @@ public:
 		//cout << *mesh << endl << endl;
 		//cout << "Coarse mesh" << endl << *(mesh->CoarseMesh) << endl << endl;
 
+		//--------------------------------------------//
+		//   Diffusion heterogeneity and anisotropy   //
+		//--------------------------------------------//
+
+		double rotationAngleInDegrees = 0;
+		if (discretization.compare("dg") == 0)
+		{
+			rotationAngleInDegrees = 0;
+			anisotropyRatio = 1;
+		}
+		double rotationAngleInRandians = rotationAngleInDegrees * M_PI / 180;
+		DimVector<Dim> anisotropyCoefficients1 = kappa1 * DimVector<Dim>::Ones(Dim);
+		DimVector<Dim> anisotropyCoefficients2 = kappa2 * DimVector<Dim>::Ones(Dim);
+		if (Dim > 1)
+		{
+			anisotropyCoefficients1[0] = anisotropyRatio * anisotropyCoefficients1[1];
+			anisotropyCoefficients2[0] = anisotropyRatio * anisotropyCoefficients2[1];
+		}
+		Tensor<Dim> diffTensor1(anisotropyCoefficients1, rotationAngleInRandians);
+		Tensor<Dim> diffTensor2(anisotropyCoefficients2, rotationAngleInRandians);
+
+		DiffusionPartition<Dim> diffusionPartition(partition, &diffTensor1, &diffTensor2);
+		
+		mesh->SetDiffusionCoefficient(&diffusionPartition);
+
 		//---------------------------------------------//
 		//   Analytical solution and source function   //
 		//---------------------------------------------//
@@ -56,18 +81,11 @@ public:
 		function<double(DomPoint)> exactSolution = NULL;
 		SourceFunction* sourceFunction;
 
-		function<bool(DomPoint)> isInPart1 = NULL;
-		if (partition.compare("halves") == 0 || Dim == 1)
-			isInPart1 = [](DomPoint p) { return p.X < 0.5; };
-		else if (partition.compare("chiasmus") == 0)
-			isInPart1 = [](DomPoint p) { return (p.X < 0.5 && p.Y >= 0.5) || (p.X >= 0.5 && p.Y < 0.5); };
-		DiffusionPartition diffusionPartition(isInPart1, kappa1, kappa2);
-
 		if (Dim == 1)
 		{
 			if (solution.compare("sine") == 0)
 			{
-				if (diffusionPartition.IsHomogeneous())
+				if (diffusionPartition.IsHomogeneous)
 				{
 					exactSolution = [](DomPoint p)
 					{
@@ -79,7 +97,7 @@ public:
 			}
 			else if (solution.compare("poly") == 0)
 			{
-				if (diffusionPartition.IsHomogeneous())
+				if (diffusionPartition.IsHomogeneous)
 				{
 					exactSolution = [](DomPoint p)
 					{
@@ -111,20 +129,22 @@ public:
 		{
 			if (solution.compare("sine") == 0)
 			{
-				if (diffusionPartition.IsHomogeneous())
+				if (diffusionPartition.IsHomogeneous && rotationAngleInDegrees == 0)
 				{
-					exactSolution = [](DomPoint p)
+					exactSolution = [anisotropyCoefficients1](DomPoint p)
 					{
 						double x = p.X;
 						double y = p.Y;
-						return sin(4 * M_PI * x)*sin(4 * M_PI * y);
+						double a = anisotropyCoefficients1[0];
+						double b = anisotropyCoefficients1[1];
+						return 2 / (a + b) * sin(4 * M_PI * x)*sin(4 * M_PI * y);
 					};
 				}
 				sourceFunction = new SourceFunction2D([](double x, double y) { return 2 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y); });
 			}
 			else if (solution.compare("poly") == 0)
 			{
-				if (diffusionPartition.IsHomogeneous())
+				if (diffusionPartition.IsHomogeneous && diffusionPartition.IsIsotropic)
 				{
 					exactSolution = [](DomPoint p)
 					{
@@ -140,7 +160,7 @@ public:
 		{
 			if (solution.compare("sine") == 0)
 			{
-				if (diffusionPartition.IsHomogeneous())
+				if (diffusionPartition.IsHomogeneous && diffusionPartition.IsIsotropic)
 				{
 					exactSolution = [](DomPoint p)
 					{
@@ -154,7 +174,7 @@ public:
 			}
 			else if (solution.compare("poly") == 0)
 			{
-				if (diffusionPartition.IsHomogeneous())
+				if (diffusionPartition.IsHomogeneous && diffusionPartition.IsIsotropic)
 				{
 					exactSolution = [](DomPoint p)
 					{
@@ -174,7 +194,7 @@ public:
 
 		if (discretization.compare("dg") == 0)
 		{
-			Poisson_DG<Dim>* problem = new Poisson_DG<Dim>(solution, sourceFunction, diffusionPartition, outputDirectory);
+			Poisson_DG<Dim>* problem = new Poisson_DG<Dim>(solution, sourceFunction, &diffusionPartition, outputDirectory);
 			FunctionalBasis<Dim>* basis = new FunctionalBasis<Dim>(basisCode, polyDegree, fullTensorization);
 
 			cout << endl;
@@ -196,7 +216,7 @@ public:
 				if ((action & Action::ComputeL2Error) == Action::ComputeL2Error && exactSolution != NULL)
 				{
 					double error = L2::Error<Dim>(mesh, basis, problem->Solution, exactSolution);
-					cout << "L2 Error = " << error << endl;
+					cout << "L2 Error = " << std::scientific << error << endl;
 				}
 			}
 
@@ -209,7 +229,7 @@ public:
 			FunctionalBasis<Dim>* cellBasis = new FunctionalBasis<Dim>(basisCode, polyDegree - 1, fullTensorization);
 			FunctionalBasis<Dim-1>* faceBasis = new FunctionalBasis<Dim-1>(basisCode, polyDegree - 1, fullTensorization);
 
-			Poisson_HHO<Dim>* problem = new Poisson_HHO<Dim>(mesh, solution, sourceFunction, reconstructionBasis, cellBasis, faceBasis, staticCondensation, diffusionPartition, outputDirectory);
+			Poisson_HHO<Dim>* problem = new Poisson_HHO<Dim>(mesh, solution, sourceFunction, reconstructionBasis, cellBasis, faceBasis, staticCondensation, &diffusionPartition, outputDirectory);
 
 			cout << endl;
 			cout << "----------------------- Assembly -------------------------" << endl;
@@ -235,10 +255,10 @@ public:
 				problem->ReconstructHigherOrderApproximation();
 				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
 					problem->ExtractSolution();
-				if ((action & Action::ComputeL2Error) == Action::ComputeL2Error)
+				if ((action & Action::ComputeL2Error) == Action::ComputeL2Error && exactSolution != NULL)
 				{
 					double error = L2::Error<Dim>(mesh, reconstructionBasis, problem->ReconstructedSolution, exactSolution);
-					cout << "L2 Error = " << error << endl;
+					cout << "L2 Error = " << std::scientific << error << endl;
 				}
 			}
 

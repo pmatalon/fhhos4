@@ -239,6 +239,23 @@ public:
 		return ComputeIntegral(functionToIntegrate, polynomialDegree);
 	}
 
+	double ComputeIntegralKGradGrad(Tensor<ShapeDim>* K, BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
+	{
+		if (phi1->GetDegree() == 0 || phi2->GetDegree() == 0)
+			return 0;
+
+		DimVector<ShapeDim> gradTransfo = GradTransformation();
+
+		function<double(RefPoint)> functionToIntegrate = [K, phi1, phi2, gradTransfo](RefPoint p) {
+			DimVector<ShapeDim> gradPhi1 = gradTransfo.cwiseProduct(phi1->Grad(p));
+			DimVector<ShapeDim> gradPhi2 = gradTransfo.cwiseProduct(phi2->Grad(p));
+			return (K * gradPhi1).dot(gradPhi2);
+		};
+
+		int polynomialDegree = max(0, phi1->GetDegree() + phi2->GetDegree() - 2);
+		return ComputeIntegral(functionToIntegrate, polynomialDegree);
+	}
+
 	//--------//
 	//   DG   //
 	//--------//
@@ -278,15 +295,15 @@ public:
 		return RescalingCoeff() * ReferenceShape.CellReconstructMassMatrix(cellBasis, reconstructBasis);
 	}
 
-	double IntegralGradGradReconstruct(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
+	double IntegralKGradGradReconstruct(Tensor<ShapeDim>* K, BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
 	{
 		if (this->IsRegular)
 		{
 			DimVector<ShapeDim> gradTransfo = GradTransformation();
-			return RescalingCoeff() * pow(gradTransfo[0], 2) * ReferenceShape.ReconstructStiffnessTerm(phi1, phi2);
+			return RescalingCoeff() * pow(gradTransfo[0], 2) * ReferenceShape.ReconstructKStiffnessTerm(K, phi1, phi2);
 		}
 		else
-			return ComputeIntegralGradGrad(phi1, phi2);
+			return ComputeIntegralKGradGrad(K, phi1, phi2);
 	}
 
 private:

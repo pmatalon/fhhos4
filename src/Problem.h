@@ -1,6 +1,6 @@
 #pragma once
 #include <string>
-#include <Eigen/Sparse>
+#include <unsupported/Eigen/SparseExtra>
 #include "Utils/Utils.h"
 using namespace std;
 

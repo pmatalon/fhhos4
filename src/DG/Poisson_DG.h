@@ -1,12 +1,7 @@
 #pragma once
-#include <iostream>
-#include <Eigen/Sparse>
-#include <unsupported/Eigen/SparseExtra>
 #include "../Problem.h"
 #include "../Mesh/Mesh.h"
 #include "../Mesh/CartesianShape.h"
-#include "../Utils/NonZeroCoefficients.h"
-#include "../Utils/L2.h"
 #include "../Utils/Action.h"
 #include "../Utils/ParallelLoop.h"
 #include "Poisson_DG_Element.h"
@@ -17,26 +12,27 @@ template <int Dim>
 class Poisson_DG : public Problem
 {
 private:
-	DiffusionPartition _diffusionPartition;
+	DiffusionPartition<Dim>* _diffusionPartition;
 	SourceFunction* _sourceFunction;
 public:
 
-	Poisson_DG(string solutionName, SourceFunction* sourceFunction, DiffusionPartition diffusionPartition, string outputDirectory)
-		: Problem(solutionName, outputDirectory), _diffusionPartition(diffusionPartition)
+	Poisson_DG(string solutionName, SourceFunction* sourceFunction, DiffusionPartition<Dim>* diffusionPartition, string outputDirectory)
+		: Problem(solutionName, outputDirectory)
 	{
 		this->_sourceFunction = sourceFunction;
+		this->_diffusionPartition = diffusionPartition;
 	}
 
 	void Assemble(Mesh<Dim>* mesh, FunctionalBasis<Dim>* basis, int penalizationCoefficient, Action action)
 	{
 		cout << "Problem: Poisson " << Dim << "D";
-		if (this->_diffusionPartition.Kappa1 != this->_diffusionPartition.Kappa2)
-			cout << ", heterogeneous diffusion coefficient (k1=" << this->_diffusionPartition.Kappa1 << ", k2=" << this->_diffusionPartition.Kappa2 << ")";
+		if (!this->_diffusionPartition->IsHomogeneous)
+			cout << ", heterogeneous diffusion coefficient (k1=" << this->_diffusionPartition->Kappa1 << ", k2=" << this->_diffusionPartition->Kappa2 << ")";
 		cout << endl;
 		cout << "Analytical solution: " ;
 		if (this->_solutionName.compare("sine") == 0)
 			cout << "sine function";
-		else if (this->_solutionName.compare("sine") == 0)
+		else if (this->_solutionName.compare("poly") == 0)
 			cout << "polynomial function";
 		else if (this->_solutionName.compare("hetero") == 0)
 			cout << "heterogeneous-specific piecewise polynomial function";
@@ -61,10 +57,10 @@ public:
 		cout << "Parallelism: " << (BaseParallelLoop::GetDefaultNThreads() == 1 ? "sequential execution" : to_string(BaseParallelLoop::GetDefaultNThreads()) + " threads") << endl;
 
 		string kappaString = "";
-		if (this->_diffusionPartition.Kappa1 != 1)
+		if (!this->_diffusionPartition->IsHomogeneous)
 		{
 			char res[16];
-			sprintf(res, "_kappa%g", this->_diffusionPartition.Kappa1);
+			sprintf(res, "_kappa%g", this->_diffusionPartition->HeterogeneityRatio);
 			kappaString = res;
 		}
 		this->_fileName = "Poisson" + to_string(Dim) + "D" + this->_solutionName + kappaString + "_" + mesh->FileNamePart() + "_DG_SIPG_" + basis->Name() + "_pen" + (autoPenalization ? "-1" : to_string(penalizationCoefficient));
@@ -82,9 +78,7 @@ public:
 
 		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreMassMatrix(basis);
 		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreStiffnessMatrix(basis);
-
-		mesh->SetDiffusionCoefficient(_diffusionPartition);
-
+		
 		//--------------------------------------------//
 		// Iteration on the elements: diagonal blocks //
 		//--------------------------------------------//

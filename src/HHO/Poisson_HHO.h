@@ -1,13 +1,7 @@
 #pragma once
-#include <iostream>
-#include <Eigen/Sparse>
-#include <unsupported/Eigen/SparseExtra>
 #include "../Problem.h"
 #include "../Mesh/Mesh.h"
-#include "../Mesh/Face.h"
 #include "Poisson_HHO_Element.h"
-#include "../Utils/NonZeroCoefficients.h"
-#include "../Utils/L2.h"
 #include "../Utils/ElementParallelLoop.h"
 using namespace std;
 
@@ -56,7 +50,7 @@ private:
 	FunctionalBasis<Dim>* _cellBasis;
 	FunctionalBasis<Dim - 1>* _faceBasis;
 	bool _staticCondensation = false;
-	DiffusionPartition _diffusionPartition;
+	DiffusionPartition<Dim>* _diffusionPartition;
 
 	SparseMatrix _globalMatrix;
 	Eigen::VectorXd _globalRHS;
@@ -66,8 +60,8 @@ public:
 	HHOInfo<Dim> HHO;
 	Eigen::VectorXd ReconstructedSolution;
 
-	Poisson_HHO(Mesh<Dim>* mesh, string solutionName, SourceFunction* sourceFunction, FunctionalBasis<Dim>* reconstructionBasis, FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim - 1>* faceBasis, bool staticCondensation, DiffusionPartition diffusionPartition, string outputDirectory)
-		: Problem(solutionName, outputDirectory), HHO(mesh, reconstructionBasis, cellBasis, faceBasis), _diffusionPartition(diffusionPartition)
+	Poisson_HHO(Mesh<Dim>* mesh, string solutionName, SourceFunction* sourceFunction, FunctionalBasis<Dim>* reconstructionBasis, FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim - 1>* faceBasis, bool staticCondensation, DiffusionPartition<Dim>* diffusionPartition, string outputDirectory)
+		: Problem(solutionName, outputDirectory), HHO(mesh, reconstructionBasis, cellBasis, faceBasis)
 	{	
 		this->_mesh = mesh;
 		this->_sourceFunction = sourceFunction;
@@ -75,6 +69,7 @@ public:
 		this->_cellBasis = cellBasis;
 		this->_faceBasis = faceBasis;
 		this->_staticCondensation = staticCondensation;
+		this->_diffusionPartition = diffusionPartition;
 	}
 
 	Poisson_HHO<Dim>* GetProblemOnCoarserMesh()
@@ -93,16 +88,45 @@ public:
 		if ((action & Action::LogAssembly) == Action::LogAssembly)
 		{
 			cout << "Problem: Poisson " << Dim << "D";
-			if (this->_diffusionPartition.Kappa1 != this->_diffusionPartition.Kappa2)
-				cout << ", heterogeneous diffusion coefficient (k1=" << this->_diffusionPartition.Kappa1 << ", k2=" << this->_diffusionPartition.Kappa2 << ")";
+			if (this->_diffusionPartition->IsHomogeneous && this->_diffusionPartition->IsIsotropic)
+				cout << " (homogeneous and isotropic)" << endl;
+			else
+			{
+				cout << endl;
+				if (this->_diffusionPartition->IsHomogeneous)
+				{
+					cout << "    Homogeneous coefficient" << endl;
+					cout << "    Anisotropic: ratio = " << this->_diffusionPartition->K1->AnisotropyRatio << endl;
+				}
+				else
+				{
+					cout << "    Heterogeneous coefficient: partition = " << this->_diffusionPartition->Partition << endl;
+					cout << "                               ratio     = " << scientific << this->_diffusionPartition->HeterogeneityRatio << fixed << endl;
+					if (this->_diffusionPartition->IsIsotropic)
+						cout << "    Isotropic" << endl;
+					else
+						cout << "    Anisotropic: ratio = " << this->_diffusionPartition->K1->AnisotropyRatio << endl;
+				}
+			}
+
+			cout << "Analytical solution: ";
+			if (this->_solutionName.compare("sine") == 0)
+				cout << "sine function";
+			else if (this->_solutionName.compare("poly") == 0)
+				cout << "polynomial function";
+			else if (this->_solutionName.compare("hetero") == 0)
+				cout << "heterogeneous-specific piecewise polynomial function";
+			else
+				cout << "unknown";
 			cout << endl;
+
 			cout << mesh->Description() << endl;
-			cout << "\tElements: " << hho.nElements << endl;
-			cout << "\tFaces   : " << hho.nFaces << " (" << hho.nInteriorFaces << " interior + " << hho.nBoundaryFaces << " boundary)" << endl;
+			cout << "    Elements: " << hho.nElements << endl;
+			cout << "    Faces   : " << hho.nFaces << " (" << hho.nInteriorFaces << " interior + " << hho.nBoundaryFaces << " boundary)" << endl;
 			cout << "Discretization: Hybrid High Order (k = " << faceBasis->GetDegree() << ")" << endl;
-			cout << "\tReconstruction basis: " << reconstructionBasis->Name() << endl;
-			cout << "\tCell basis          : " << cellBasis->Name() << endl;
-			cout << "\tFace basis          : " << faceBasis->Name() << endl;
+			cout << "    Reconstruction basis: " << reconstructionBasis->Name() << endl;
+			cout << "    Cell basis          : " << cellBasis->Name() << endl;
+			cout << "    Face basis          : " << faceBasis->Name() << endl;
 			cout << "Cell unknowns : " << hho.nTotalCellUnknowns << " (" << cellBasis->Size() << " per cell)" << endl;
 			cout << "Face unknowns : " << hho.nTotalFaceUnknowns << " (" << faceBasis->Size() << " per interior face)" << endl;
 			cout << "Total unknowns: " << hho.nTotalHybridUnknowns << endl;
@@ -111,10 +135,10 @@ public:
 		}
 
 		string kappaString = "";
-		if (this->_diffusionPartition.Kappa1 != 1)
+		if (!this->_diffusionPartition->IsHomogeneous)
 		{
 			char res[16];
-			sprintf(res, "_kappa%g", this->_diffusionPartition.Kappa1);
+			sprintf(res, "_kappa%g", this->_diffusionPartition->HeterogeneityRatio);
 			kappaString = res;
 		}
 		this->_fileName = "Poisson" + to_string(Dim) + "D" + this->_solutionName + kappaString + "_" + mesh->FileNamePart() + "_HHO_" + reconstructionBasis->Name() + "_pen-1" + (_staticCondensation ? "_staticcond" : "");
@@ -134,11 +158,11 @@ public:
 		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreCellMassMatrix(cellBasis);
 		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreReconstructMassMatrix(reconstructionBasis);
 		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreCellStiffnessMatrix(cellBasis);
-		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreReconstructStiffnessMatrix(reconstructionBasis);
+		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreReconstructK1StiffnessMatrix(_diffusionPartition->K1, reconstructionBasis);
+		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreReconstructK2StiffnessMatrix(_diffusionPartition->K2, reconstructionBasis);
 		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreCellReconstructMassMatrix(cellBasis, reconstructionBasis);
 		CartesianShape<Dim, Dim - 1>::ReferenceShape.ComputeAndStoreFaceMassMatrix(faceBasis);
 
-		mesh->SetDiffusionCoefficient(_diffusionPartition);
 		this->InitHHO();
 
 		//-------------------------------//

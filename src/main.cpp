@@ -10,62 +10,63 @@ using namespace std;
 void print_usage() {
 	cout << "-------------------------------------------------------------------------------------" << endl;
 	cout << "Arguments:" << endl;
-	cout << "-h                   : help --> print usage" << endl;
+	cout << "-h                    : help --> print usage" << endl;
 	cout << endl;
 	cout << "------------------------- Problem definition -------------------------" << endl;
 	cout << endl;
-	cout << "-d {1|2|3}           : space dimension (default: 1)" << endl;
-	cout << "-kappa NUM           : diffusion coefficient kappa1 in the first part of the domain partition," << endl;
-	cout << "                       while kappa2=1 in the second part" << endl;
-	cout << "                       Ex:        1       = homogeneous diffusion (default)" << endl;
+	cout << "-d {1|2|3}            : space dimension (default: 1)" << endl;
+	cout << "-kappa NUM            : diffusion coefficient kappa1 in the first part of the domain partition," << endl;
+	cout << "                        while kappa2=1 in the second part" << endl;
+	cout << "                        Ex:       1       = homogeneous diffusion (default)" << endl;
 	cout << "                                  0.9     = little heterogeneity" << endl;
-	cout << "                                  0.1     = big heterogeneity" << endl;
-	cout << "-partition CODE      : domain partition describing the heterogeneity pattern in case of heterogeneous diffusion" << endl;
+	cout << "                                  0.1     = bigger heterogeneity" << endl;
+	cout << "-anisotropy-ratio NUM : diffusion coefficient kappa1 in the first part of the domain partition," << endl;
+	cout << "-partition CODE       : domain partition describing the heterogeneity pattern in case of heterogeneous diffusion" << endl;
 	cout << "                                 'halves'   = the domain is split in two vertical halves (default)" << endl;
 	cout << "                                 'chiasmus' = chiasmus shape" << endl;
-	cout << "-s CODE              : analytical solution (default: 'sine')" << endl;
+	cout << "-s CODE               : analytical solution (default: 'sine')" << endl;
 	cout << "                                 'sine'   = sine solution" << endl;
 	cout << "                                 'poly'   = polynomial solution of global degree 2*d" << endl;
 	cout << "                                 'hetero' = (1D only) heterogeneous diffusion-specific analytical solution" << endl;
 	cout << endl;
 	cout << "------------------------- Discretization -------------------------" << endl;
 	cout << endl;
-	cout << "-n NUM               : number of subdivisions in each cartesian dimension (default: 5)" << endl;
-	cout << "-t {dg|hho}          : discretization method (default: 'dg')" << endl;
+	cout << "-n NUM                : number of subdivisions in each cartesian dimension (default: 5)" << endl;
+	cout << "-t {dg|hho}           : discretization method (default: 'dg')" << endl;
 	cout << "                                 'dg'  = Discontinuous Galerkin (Symmetric Interior Penalty)" << endl;
 	cout << "                                 'hho' = Hybrid High Order" << endl;
-	cout << "-b BASIS             : polynomial basis (default: monomials)" << endl;
+	cout << "-b BASIS              : polynomial basis (default: monomials)" << endl;
 	cout << "                                 'monomials'" << endl;
 	cout << "                                 'legendre'" << endl;
 	cout << "                                 'nlegendre' (normalized Legendre)" << endl;
 	cout << "                                 'bernstein'" << endl;
 	cout << "                                 'hemker'" << endl;
-	cout << "-p NUM               : polynomial degree of approximation (default: 2)" << endl;
-	cout << "-f                   : full tensorization of the polynomials when d=2 or 3 (i.e. space Q) (default: space P)" << endl;
-	cout << "-z NUM               : penalization coefficient (default: -1 = automatic)" << endl;
-	cout << "-c                   : static condensation (HHO only) (default: no static condensation)" << endl;
+	cout << "-p NUM                : polynomial degree of approximation (default: 2)" << endl;
+	cout << "-f                    : full tensorization of the polynomials when d=2 or 3 (i.e. space Q) (default: space P)" << endl;
+	cout << "-z NUM                : penalization coefficient (default: -1 = automatic)" << endl;
+	cout << "-c                    : static condensation (HHO only) (default: no static condensation)" << endl;
 	cout << endl;
 	cout << "------------------------- Linear solvers -------------------------" << endl;
 	cout << endl;
-	cout << "-v SOLVER            : linear solver (default: 'lu'): " << endl;
+	cout << "-v SOLVER             : linear solver (default: 'lu'): " << endl;
 	cout << "                                 'lu'   = LU factorization (Eigen library)" << endl;
 	cout << "                                 'cg'   = Conjugate gradient with Jacobi preconditioner (Eigen library)" << endl;
 	cout << "                                 'bj'   = Block Jacobi: the block size is set to the number of DOFs per cell (DG) or face (HHO)" << endl;
 	cout << "                                 'bgs'  = Block Gauss-Seidel: the block size is set to the number of DOFs per cell (DG) or face (HHO)" << endl;
 	cout << "                                 'mg'   = Custom multigrid for HHO with static condensation" << endl;
 	cout << "                                 'agmg' = Yvan Notay's AGMG solver" << endl;
-	cout << "-cycle [V|W],NUM,NUM : multigrid cycle: V,1,0 or W,1,1 for example" << endl;
-	cout << "-w NUM               : number of loops in the W-cycle" << endl;
+	cout << "-cycle [V|W],NUM,NUM  : multigrid cycle: V,1,0 or W,1,1 for example" << endl;
+	cout << "-w NUM                : number of loops in the W-cycle" << endl;
 	cout << "                                  1     - V-cycle (default)" << endl;
 	cout << "                                 >1     - W-cycle" << endl;
-	cout << "-l NUM               : number of multigrid levels (HHO with static cond. only):" << endl;
+	cout << "-l NUM                : number of multigrid levels (HHO with static cond. only):" << endl;
 	cout << "                                  0     - (default) automatic coarsening until the matrix dimension reaches 100 or less" << endl;
 	cout << "                                  other - fixed number of levels" << endl;
-	cout << "-coarse-size NUM     : matrix size limit below which the automatic coarsening stops and a direct solver is used (default: 1000)" << endl;
-	cout << "-g {0|1}             : coarse grid operator for the multigrid" << endl;
+	cout << "-coarse-size NUM      : matrix size limit below which the automatic coarsening stops and a direct solver is used (default: 1000)" << endl;
+	cout << "-g {0|1}              : coarse grid operator for the multigrid" << endl;
 	cout << "                                  0     - discretized operator" << endl;
 	cout << "                                  1     - Galerkin operator (default)" << endl;
-	cout << "-smoothers CODE,CODE : pre-smoother,post-smoother:" << endl;
+	cout << "-smoothers CODE,CODE  : pre-smoother,post-smoother: gs,rgs for example" << endl;
 	cout << "                                 'j'    = Jacobi" << endl;
 	cout << "                                 'gs'   = Gauss-Seidel" << endl;
 	cout << "                                 'rgs'  = Reverse Gauss-Seidel" << endl;
@@ -75,18 +76,18 @@ void print_usage() {
 	cout << endl;
 	cout << "------------------------- Miscellaneous -------------------------" << endl;
 	cout << endl;
-	cout << "-threads NUM         : max number of threads used for parallelism" << endl;
+	cout << "-threads NUM          : max number of threads used for parallelism" << endl;
 	cout << "                                  0     - automatic (default)" << endl;
 	cout << "                                  1     - sequential execution" << endl;
 	cout << "                                  other - requested number of threads" << endl;
-	cout << "-a {e|c|f|s|v|r}+    : action (default: 'esr'): " << endl;
+	cout << "-a {e|c|f|s|v|r}+     : action (default: 'esr'): " << endl;
 	cout << "                                 'e' = export system" << endl;
 	cout << "                                 'c' = export all components of the matrix in separate files" << endl;
 	cout << "                                 'f' = export faces for Matlab" << endl;
 	cout << "                                 's' = solve system" << endl;
 	cout << "                                 'v' = export solution vector (requires 's')" << endl;
 	cout << "                                 'r' = compute L2 error against the analytical solution" << endl;
-	cout << "-o PATH              : output directory to export files (default: ./)" << endl;
+	cout << "-o PATH               : output directory to export files (default: ./)" << endl;
 	cout << "--------------------------------------------------------" << endl;
 }
 
@@ -108,6 +109,7 @@ int main(int argc, char* argv[])
 	string solution = "sine";
 	double kappa1 = 1;
 	double kappa2 = 1;
+	double anisotropyRatio = 1;
 	string partition = "halves";
 	BigNumber n = 5;
 	string discretization = "dg";
@@ -131,6 +133,7 @@ int main(int argc, char* argv[])
 
 	enum {
 		OPT_Kappa = 1000,
+		OPT_AnisotropyRatio,
 		OPT_Partition,
 		OPT_MGCycle,
 		OPT_CoarseMatrixSize,
@@ -141,6 +144,7 @@ int main(int argc, char* argv[])
 	static struct option long_opts[] = {
 		 { "help", no_argument, NULL, 'h' },
 		 { "kappa", required_argument, NULL, OPT_Kappa },
+		 { "anisotropy-ratio", required_argument, NULL, OPT_AnisotropyRatio },
 		 { "partition", required_argument, NULL, OPT_Partition },
 		 { "cycle", required_argument, NULL, OPT_MGCycle },
 		 { "coarse-size", required_argument, NULL, OPT_CoarseMatrixSize },
@@ -171,6 +175,9 @@ int main(int argc, char* argv[])
 				break;
 			case OPT_Kappa: 
 				kappa1 = atof(optarg);
+				break;
+			case OPT_AnisotropyRatio:
+				anisotropyRatio = atof(optarg);
 				break;
 			case OPT_Partition:
 				partition = optarg;
@@ -306,7 +313,7 @@ int main(int argc, char* argv[])
 	else if (dimension == 3)
 		program = new ProgramDim<3>();
 
-	program->Start(solution, kappa1, kappa2, partition, n, discretization, basisCode, polyDegree, fullTensorization, penalizationCoefficient, staticCondensation, action, 
+	program->Start(solution, kappa1, kappa2, anisotropyRatio, partition, n, discretization, basisCode, polyDegree, fullTensorization, penalizationCoefficient, staticCondensation, action,
 		nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations,
 		outputDirectory, solverCode, solverTolerance);
 

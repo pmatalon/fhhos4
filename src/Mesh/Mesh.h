@@ -20,6 +20,8 @@ public:
 	vector<Face<Dim>*> BoundaryFaces;
 	vector<Face<Dim>*> InteriorFaces;
 
+	DiffusionPartition<Dim>* _diffusionPartition = nullptr;
+
 	Mesh<Dim>* CoarseMesh = NULL;
 
 	Mesh() {}
@@ -46,15 +48,15 @@ public:
 		return measure;
 	}
 
-	void SetDiffusionCoefficient(DiffusionPartition diffusionPartition)
+	void SetDiffusionCoefficient(DiffusionPartition<Dim>* diffusionPartition)
 	{
-		if (diffusionPartition.Kappa1 == diffusionPartition.Kappa2)
-			return;
+		this->_diffusionPartition = diffusionPartition;
 
 		ParallelLoop<Element<Dim>*, EmptyResultChunk> parallelLoop(this->Elements);
 		parallelLoop.Execute([&diffusionPartition](Element<Dim>* e, ParallelChunk<EmptyResultChunk>* chunk)
 			{
-				e->SetDiffusionCoefficient(diffusionPartition);
+				e->SetDiffusionCoefficient(diffusionPartition); // For DG
+				e->SetDiffusionTensor(diffusionPartition);
 			});
 	}
 

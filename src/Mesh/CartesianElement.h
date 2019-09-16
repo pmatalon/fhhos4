@@ -43,10 +43,17 @@ public:
 		return CartesianShape<Dim>::Measure;
 	}
 
-	void SetDiffusionCoefficient(DiffusionPartition diffusionPartition) override
+	// For DG
+	void SetDiffusionCoefficient(DiffusionPartition<Dim>* diffusionPartition) override
 	{
 		DomPoint origin = CartesianShape<Dim>::Origin;
-		this->Kappa = diffusionPartition.Coefficient(origin);
+		this->Kappa = diffusionPartition->Coefficient(origin);
+	}
+
+	void SetDiffusionTensor(DiffusionPartition<Dim>* diffusionPartition) override
+	{
+		DomPoint origin = CartesianShape<Dim>::Origin;
+		this->DiffTensor = diffusionPartition->DiffTensor(origin);
 	}
 
 	double IntegralGlobalFunction(function<double(DomPoint)> func)
@@ -72,6 +79,11 @@ public:
 	double ComputeIntegralGradGrad(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{
 		return CartesianShape<Dim>::ComputeIntegralGradGrad(phi1, phi2);
+	}
+
+	double ComputeIntegralKGradGrad(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
+	{
+		return CartesianShape<Dim>::ComputeIntegralKGradGrad(K, phi1, phi2);
 	}
 
 	DomPoint ConvertToDomain(RefPoint referenceElementPoint)
@@ -142,8 +154,8 @@ public:
 		return CartesianShape<Dim>::CellReconstructMassMatrix(cellBasis, reconstructBasis);
 	}
 
-	double IntegralGradGradReconstruct(BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2)
+	double IntegralKGradGradReconstruct(Tensor<Dim>* K, BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2)
 	{
-		return CartesianShape<Dim>::IntegralGradGradReconstruct(reconstructPhi1, reconstructPhi2);
+		return CartesianShape<Dim>::IntegralKGradGradReconstruct(K, reconstructPhi1, reconstructPhi2);
 	}
 };

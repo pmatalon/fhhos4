@@ -197,8 +197,8 @@ public:
 
 
 	virtual double SourceTerm(BasisFunction<Dim>* cellPhi, SourceFunction* f) = 0;
-	virtual double IntegralGradGradReconstruct(BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2) = 0;
-	virtual double ComputeIntegralGradGrad(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) = 0;
+	virtual double IntegralKGradGradReconstruct(Tensor<Dim>* K, BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2) = 0;
+	virtual double ComputeIntegralKGradGrad(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) = 0;
 	virtual Eigen::MatrixXd CellMassMatrix(FunctionalBasis<Dim>* basis) = 0;
 	virtual Eigen::MatrixXd CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) = 0;
 
@@ -247,7 +247,7 @@ private:
 		for (BasisFunction<Dim>* phi1 : this->ReconstructionBasis->LocalFunctions)
 		{
 			for (BasisFunction<Dim>* phi2 : this->ReconstructionBasis->LocalFunctions)
-				reconstructionMatrixToInvert(phi1->LocalNumber, phi2->LocalNumber) = this->Kappa * this->IntegralGradGradReconstruct(phi1, phi2);
+				reconstructionMatrixToInvert(phi1->LocalNumber, phi2->LocalNumber) = this->IntegralKGradGradReconstruct(this->DiffTensor, phi1, phi2);
 		}
 	}
 
@@ -315,7 +315,7 @@ private:
 		if (reconstructPhi->GetDegree() == 0)
 			return 0;
 
-		double integralGradGrad = this->Kappa * this->ComputeIntegralGradGrad(reconstructPhi, cellPhi);
+		double integralGradGrad = this->ComputeIntegralKGradGrad(this->DiffTensor, reconstructPhi, cellPhi);
 
 		double sumFaces = 0;
 		for (auto f : this->Faces)
@@ -326,12 +326,12 @@ private:
 			auto gradPhi = this->GradPhiOnFace(face, reconstructPhi);
 			auto normal = this->OuterNormalVector(face);
 
-			std::function<double(RefPoint)> functionToIntegrate = [phi, gradPhi, normal](RefPoint p) {
-				return gradPhi(p).dot(normal) * phi(p);
+			std::function<double(RefPoint)> functionToIntegrate = [this, phi, gradPhi, normal](RefPoint p) {
+				return (this->DiffTensor * gradPhi(p)).dot(normal) * phi(p);
 			};
 
 			int polynomialDegree = reconstructPhi->GetDegree() - 1 + cellPhi->GetDegree();
-			double integralFace = this->Kappa * face->ComputeIntegral(functionToIntegrate, polynomialDegree);
+			double integralFace = face->ComputeIntegral(functionToIntegrate, polynomialDegree);
 
 			sumFaces += integralFace;
 		}
@@ -347,12 +347,12 @@ private:
 		auto gradPhi = this->GradPhiOnFace(face, reconstructPhi);
 		auto normal = this->OuterNormalVector(face);
 
-		std::function<double(RefPoint)> functionToIntegrate = [facePhi, gradPhi, normal](RefPoint p) {
-			return gradPhi(p).dot(normal) * facePhi->Eval(p);
+		std::function<double(RefPoint)> functionToIntegrate = [this, facePhi, gradPhi, normal](RefPoint p) {
+			return (this->DiffTensor * gradPhi(p)).dot(normal) * facePhi->Eval(p);
 		};
 
 		int polynomialDegree = reconstructPhi->GetDegree() - 1 + facePhi->GetDegree();
-		return this->Kappa * face->ComputeIntegral(functionToIntegrate, polynomialDegree);
+		return face->ComputeIntegral(functionToIntegrate, polynomialDegree);
 	}
 
 	//---------------------------------------------//
@@ -371,6 +371,7 @@ private:
 		for (auto f : this->Faces)
 		{
 			Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+			auto normal = this->OuterNormalVector(face);
 			Eigen::MatrixXd Mf = face->FaceMassMatrix();
 			Eigen::MatrixXd ProjF = face->GetProjFromReconstruct(this);
 			Eigen::MatrixXd ProjFT = face->GetProjFromCell(this);
@@ -381,7 +382,7 @@ private:
 
 			Eigen::MatrixXd DiffTF = Df - ProjFT * Dt;
 			double h = face->GetDiameter();
-			this->Astab += DiffTF.transpose() * Mf * DiffTF * this->Kappa / h;
+			this->Astab += DiffTF.transpose() * Mf * DiffTF * (this->DiffTensor * normal).dot(normal) / h;
 		}
 	}
 	int DOFNumber(BasisFunction<Dim> * cellPhi)

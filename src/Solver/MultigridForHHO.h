@@ -81,7 +81,16 @@ private:
 
 	inline double Weight(Element<Dim>* element, Face<Dim>* face)
 	{
-		return element->Kappa / (face->Element1->Kappa + face->Element2->Kappa);
+		auto n = element->OuterNormalVector(face);
+		double k = (element->DiffTensor * n).dot(n);
+
+		auto n1 = face->Element1->OuterNormalVector(face);
+		double k1 = (face->Element1->DiffTensor * n1).dot(n1);
+
+		auto n2 = face->Element2->OuterNormalVector(face);
+		double k2 = (face->Element2->DiffTensor * n2).dot(n2);
+
+		return k / (k1 + k2);
 	}
 
 	SparseMatrix GetGlobalMassMatrix_Faces(Poisson_HHO<Dim>* problem)

@@ -18,7 +18,11 @@ private:
 	FunctionalBasis<Dim>* _reconstructMassMatrixBasis;
 
 	Eigen::MatrixXd _cellStiffnessMatrix;
-	Eigen::MatrixXd _reconstructStiffnessMatrix;
+
+	Eigen::MatrixXd _reconstructK1StiffnessMatrix;
+	Tensor<Dim>* _K1;
+	Eigen::MatrixXd _reconstructK2StiffnessMatrix;
+	Tensor<Dim>* _K2;
 
 	Eigen::MatrixXd _faceMassMatrix;
 	FunctionalBasis<Dim>* _faceMassMatrixBasis;
@@ -98,9 +102,13 @@ public:
 		return ComputeAndReturnMassMatrix(cellBasis, reconstructBasis);
 	}
 
-	double ReconstructStiffnessTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
+	double ReconstructKStiffnessTerm(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{
-		return this->_reconstructStiffnessMatrix(phi1->LocalNumber, phi2->LocalNumber);
+		if (K == _K1)
+			return this->_reconstructK1StiffnessMatrix(phi1->LocalNumber, phi2->LocalNumber);
+		else if (K == _K2)
+			return this->_reconstructK2StiffnessMatrix(phi1->LocalNumber, phi2->LocalNumber);
+		assert(false);
 	}
 
 	void ComputeAndStoreCellMassMatrix(FunctionalBasis<Dim>* basis)
@@ -132,10 +140,21 @@ public:
 		if (_cellStiffnessMatrix.rows() == 0)
 			_cellStiffnessMatrix = ComputeAndReturnStiffnessMatrix(basis);
 	}
-	void ComputeAndStoreReconstructStiffnessMatrix(FunctionalBasis<Dim>* basis)
+	void ComputeAndStoreReconstructK1StiffnessMatrix(Tensor<Dim>* K, FunctionalBasis<Dim>* basis)
 	{
-		if (_reconstructStiffnessMatrix.rows() == 0)
-			_reconstructStiffnessMatrix = ComputeAndReturnStiffnessMatrix(basis);
+		if (_reconstructK1StiffnessMatrix.rows() == 0)
+		{
+			_reconstructK1StiffnessMatrix = ComputeAndReturnKStiffnessMatrix(K, basis);
+			_K1 = K;
+		}
+	}
+	void ComputeAndStoreReconstructK2StiffnessMatrix(Tensor<Dim>* K, FunctionalBasis<Dim>* basis)
+	{
+		if (_reconstructK2StiffnessMatrix.rows() == 0)
+		{
+			_reconstructK2StiffnessMatrix = ComputeAndReturnKStiffnessMatrix(K, basis);
+			_K2 = K;
+		}
 	}
 	void ComputeAndStoreCellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis)
 	{
@@ -189,6 +208,17 @@ private:
 		}
 		return stiffnessMatrix;
 	}
+
+	Eigen::MatrixXd ComputeAndReturnKStiffnessMatrix(Tensor<Dim>* K, FunctionalBasis<Dim>* basis)
+	{
+		Eigen::MatrixXd stiffnessMatrix = Eigen::MatrixXd(basis->Size(), basis->Size());
+		for (BasisFunction<Dim>* phi1 : basis->LocalFunctions)
+		{
+			for (BasisFunction<Dim>* phi2 : basis->LocalFunctions)
+				stiffnessMatrix(phi1->LocalNumber, phi2->LocalNumber) = ComputeIntegralKGradGrad(K, phi1, phi2);
+		}
+		return stiffnessMatrix;
+	}
 public:
 	double ComputeMassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{
@@ -207,6 +237,19 @@ public:
 
 		function<double(RefPoint)> functionToIntegrate = [phi1, phi2](RefPoint p) {
 			return phi1->Grad(p).dot(phi2->Grad(p));
+		};
+
+		int polynomialDegree = max(0, phi1->GetDegree() + phi2->GetDegree() - 2);
+		return Utils::Integral<Dim>(functionToIntegrate, polynomialDegree);
+	}
+
+	double ComputeIntegralKGradGrad(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
+	{
+		if (phi1->GetDegree() == 0 || phi2->GetDegree() == 0)
+			return 0;
+
+		function<double(RefPoint)> functionToIntegrate = [K, phi1, phi2](RefPoint p) {
+			return (K * phi1->Grad(p)).dot(phi2->Grad(p));
 		};
 
 		int polynomialDegree = max(0, phi1->GetDegree() + phi2->GetDegree() - 2);
