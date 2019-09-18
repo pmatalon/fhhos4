@@ -60,8 +60,8 @@ public:
 	HHOInfo<Dim> HHO;
 	Eigen::VectorXd ReconstructedSolution;
 
-	Poisson_HHO(Mesh<Dim>* mesh, string solutionName, SourceFunction* sourceFunction, FunctionalBasis<Dim>* reconstructionBasis, FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim - 1>* faceBasis, bool staticCondensation, DiffusionPartition<Dim>* diffusionPartition, string outputDirectory)
-		: Problem(solutionName, outputDirectory), HHO(mesh, reconstructionBasis, cellBasis, faceBasis)
+	Poisson_HHO(Mesh<Dim>* mesh, string rhsCode, SourceFunction* sourceFunction, FunctionalBasis<Dim>* reconstructionBasis, FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim - 1>* faceBasis, bool staticCondensation, DiffusionPartition<Dim>* diffusionPartition, string outputDirectory)
+		: Problem(rhsCode, outputDirectory), HHO(mesh, reconstructionBasis, cellBasis, faceBasis)
 	{	
 		this->_mesh = mesh;
 		this->_sourceFunction = sourceFunction;
@@ -74,7 +74,7 @@ public:
 
 	Poisson_HHO<Dim>* GetProblemOnCoarserMesh()
 	{
-		return new Poisson_HHO<Dim>(_mesh->CoarseMesh, _solutionName, _sourceFunction, _reconstructionBasis, _cellBasis, _faceBasis, _staticCondensation, _diffusionPartition, _outputDirectory);
+		return new Poisson_HHO<Dim>(_mesh->CoarseMesh, _rhsCode, _sourceFunction, _reconstructionBasis, _cellBasis, _faceBasis, _staticCondensation, _diffusionPartition, _outputDirectory);
 	}
 
 	void Assemble(Action action)
@@ -110,11 +110,11 @@ public:
 			}
 
 			cout << "Analytical solution: ";
-			if (this->_solutionName.compare("sine") == 0)
+			if (this->_rhsCode.compare("sine") == 0)
 				cout << "sine function";
-			else if (this->_solutionName.compare("poly") == 0)
+			else if (this->_rhsCode.compare("poly") == 0)
 				cout << "polynomial function";
-			else if (this->_solutionName.compare("hetero") == 0)
+			else if (this->_rhsCode.compare("hetero") == 0)
 				cout << "heterogeneous-specific piecewise polynomial function";
 			else
 				cout << "unknown";
@@ -134,19 +134,19 @@ public:
 			cout << "Parallelism   : " << (BaseParallelLoop::GetDefaultNThreads() == 1 ? "sequential execution" : to_string(BaseParallelLoop::GetDefaultNThreads()) + " threads") << endl;
 		}
 
-		string kappaString = "";
+		string heterogeneityString = "";
 		if (!this->_diffusionPartition->IsHomogeneous)
 		{
 			char res[16];
-			sprintf(res, "_kappa%g", this->_diffusionPartition->HeterogeneityRatio);
-			kappaString = res;
+			sprintf(res, "_heterog%g", this->_diffusionPartition->HeterogeneityRatio);
+			heterogeneityString = res;
 		}
-		this->_fileName = "Poisson" + to_string(Dim) + "D" + this->_solutionName + kappaString + "_" + mesh->FileNamePart() + "_HHO_" + reconstructionBasis->Name() + "_pen-1" + (_staticCondensation ? "_staticcond" : "");
-		string matrixFilePath				= this->_outputDirectory + "/" + this->_fileName + "_A.dat";
-		string consistencyFilePath			= this->_outputDirectory + "/" + this->_fileName + "_A_cons.dat";
-		string stabilizationFilePath		= this->_outputDirectory + "/" + this->_fileName + "_A_stab.dat";
-		string reconstructionMatrixFilePath	= this->_outputDirectory + "/" + this->_fileName + "_Reconstruct.dat";
-		string rhsFilePath					= this->_outputDirectory + "/" + this->_fileName + "_b.dat";
+		this->_fileName = "Poisson" + to_string(Dim) + "D" + this->_rhsCode + heterogeneityString + "_" + mesh->FileNamePart() + "_HHO_" + reconstructionBasis->Name() + (_staticCondensation ? "" : "_nostaticcond");
+		string matrixFilePath				= this->GetFilePath("A");
+		string consistencyFilePath			= this->GetFilePath("A_cons");
+		string stabilizationFilePath		= this->GetFilePath("A_stab");
+		string reconstructionMatrixFilePath	= this->GetFilePath("Reconstruct");
+		string rhsFilePath					= this->GetFilePath("b");
 
 		if ((action & Action::LogAssembly) == Action::LogAssembly)
 			cout << endl << "Assembly..." << endl;

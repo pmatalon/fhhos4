@@ -21,7 +21,7 @@ class Program
 {
 public:
 	Program() {}
-	virtual void Start(string solution, double kappa1, double kappa2, double anisotropyRatio, string partition, BigNumber n, string discretization, string basisCode, int polyDegree, bool fullTensorization,
+	virtual void Start(string rhsCode, double kappa1, double kappa2, double anisotropyRatio, string partition, BigNumber n, string discretization, string basisCode, int polyDegree, bool usePolynomialSpaceQ,
 		int penalizationCoefficient, bool staticCondensation, Action action, 
 		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations,
 		string outputDirectory, string solverCode, double solverTolerance) = 0;
@@ -33,7 +33,7 @@ class ProgramDim : public Program
 public:
 	ProgramDim() : Program() {}
 
-	void Start(string solution, double kappa1, double kappa2, double anisotropyRatio, string partition, BigNumber n, string discretization, string basisCode, int polyDegree, bool fullTensorization,
+	void Start(string rhsCode, double kappa1, double kappa2, double anisotropyRatio, string partition, BigNumber n, string discretization, string basisCode, int polyDegree, bool usePolynomialSpaceQ,
 		int penalizationCoefficient, bool staticCondensation, Action action, 
 		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations,
 		string outputDirectory, string solverCode, double solverTolerance)
@@ -83,7 +83,7 @@ public:
 
 		if (Dim == 1)
 		{
-			if (solution.compare("sine") == 0)
+			if (rhsCode.compare("sine") == 0)
 			{
 				if (diffusionPartition.IsHomogeneous)
 				{
@@ -95,7 +95,7 @@ public:
 				}
 				sourceFunction = new SourceFunction1D([](double x) { return sin(4 * M_PI * x); });
 			}
-			else if (solution.compare("poly") == 0)
+			else if (rhsCode.compare("poly") == 0)
 			{
 				if (diffusionPartition.IsHomogeneous)
 				{
@@ -107,7 +107,7 @@ public:
 				}
 				sourceFunction = new SourceFunction1D([](double x) { return 2; });
 			}
-			else if (solution.compare("hetero") == 0)
+			else if (rhsCode.compare("heterog") == 0)
 			{
 				exactSolution = [&diffusionPartition](DomPoint p)
 				{
@@ -127,7 +127,7 @@ public:
 		}
 		else if (Dim == 2)
 		{
-			if (solution.compare("sine") == 0)
+			if (rhsCode.compare("sine") == 0)
 			{
 				if (diffusionPartition.IsHomogeneous && rotationAngleInDegrees == 0)
 				{
@@ -142,7 +142,7 @@ public:
 				}
 				sourceFunction = new SourceFunction2D([](double x, double y) { return 2 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y); });
 			}
-			else if (solution.compare("poly") == 0)
+			else if (rhsCode.compare("poly") == 0)
 			{
 				if (diffusionPartition.IsHomogeneous && diffusionPartition.IsIsotropic)
 				{
@@ -158,7 +158,7 @@ public:
 		}
 		else if (Dim == 3)
 		{
-			if (solution.compare("sine") == 0)
+			if (rhsCode.compare("sine") == 0)
 			{
 				if (diffusionPartition.IsHomogeneous && diffusionPartition.IsIsotropic)
 				{
@@ -172,7 +172,7 @@ public:
 				}
 				sourceFunction = new SourceFunction3D([](double x, double y, double z) {  return 3 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y)*sin(4 * M_PI * z); });
 			}
-			else if (solution.compare("poly") == 0)
+			else if (rhsCode.compare("poly") == 0)
 			{
 				if (diffusionPartition.IsHomogeneous && diffusionPartition.IsIsotropic)
 				{
@@ -194,8 +194,8 @@ public:
 
 		if (discretization.compare("dg") == 0)
 		{
-			Poisson_DG<Dim>* problem = new Poisson_DG<Dim>(solution, sourceFunction, &diffusionPartition, outputDirectory);
-			FunctionalBasis<Dim>* basis = new FunctionalBasis<Dim>(basisCode, polyDegree, fullTensorization);
+			Poisson_DG<Dim>* problem = new Poisson_DG<Dim>(rhsCode, sourceFunction, &diffusionPartition, outputDirectory);
+			FunctionalBasis<Dim>* basis = new FunctionalBasis<Dim>(basisCode, polyDegree, usePolynomialSpaceQ);
 
 			cout << endl;
 			cout << "----------------------- Assembly -------------------------" << endl;
@@ -225,11 +225,11 @@ public:
 		}
 		else if (discretization.compare("hho") == 0)
 		{
-			FunctionalBasis<Dim>* reconstructionBasis = new FunctionalBasis<Dim>(basisCode, polyDegree, fullTensorization);
-			FunctionalBasis<Dim>* cellBasis = new FunctionalBasis<Dim>(basisCode, polyDegree - 1, fullTensorization);
-			FunctionalBasis<Dim-1>* faceBasis = new FunctionalBasis<Dim-1>(basisCode, polyDegree - 1, fullTensorization);
+			FunctionalBasis<Dim>* reconstructionBasis = new FunctionalBasis<Dim>(basisCode, polyDegree, usePolynomialSpaceQ);
+			FunctionalBasis<Dim>* cellBasis = new FunctionalBasis<Dim>(basisCode, polyDegree - 1, usePolynomialSpaceQ);
+			FunctionalBasis<Dim-1>* faceBasis = new FunctionalBasis<Dim-1>(basisCode, polyDegree - 1, usePolynomialSpaceQ);
 
-			Poisson_HHO<Dim>* problem = new Poisson_HHO<Dim>(mesh, solution, sourceFunction, reconstructionBasis, cellBasis, faceBasis, staticCondensation, &diffusionPartition, outputDirectory);
+			Poisson_HHO<Dim>* problem = new Poisson_HHO<Dim>(mesh, rhsCode, sourceFunction, reconstructionBasis, cellBasis, faceBasis, staticCondensation, &diffusionPartition, outputDirectory);
 
 			cout << endl;
 			cout << "----------------------- Assembly -------------------------" << endl;

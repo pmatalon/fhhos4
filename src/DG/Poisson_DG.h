@@ -16,8 +16,8 @@ private:
 	SourceFunction* _sourceFunction;
 public:
 
-	Poisson_DG(string solutionName, SourceFunction* sourceFunction, DiffusionPartition<Dim>* diffusionPartition, string outputDirectory)
-		: Problem(solutionName, outputDirectory)
+	Poisson_DG(string rhsCode, SourceFunction* sourceFunction, DiffusionPartition<Dim>* diffusionPartition, string outputDirectory)
+		: Problem(rhsCode, outputDirectory)
 	{
 		this->_sourceFunction = sourceFunction;
 		this->_diffusionPartition = diffusionPartition;
@@ -30,18 +30,18 @@ public:
 			cout << ", heterogeneous diffusion coefficient (k1=" << this->_diffusionPartition->Kappa1 << ", k2=" << this->_diffusionPartition->Kappa2 << ")";
 		cout << endl;
 		cout << "Analytical solution: " ;
-		if (this->_solutionName.compare("sine") == 0)
+		if (this->_rhsCode.compare("sine") == 0)
 			cout << "sine function";
-		else if (this->_solutionName.compare("poly") == 0)
+		else if (this->_rhsCode.compare("poly") == 0)
 			cout << "polynomial function";
-		else if (this->_solutionName.compare("hetero") == 0)
+		else if (this->_rhsCode.compare("hetero") == 0)
 			cout << "heterogeneous-specific piecewise polynomial function";
 		else
 			cout << "unknown";
 		cout << endl;
 		cout << mesh->Description() << endl;
 		cout << "Discretization: Discontinuous Galerkin SIPG" << endl;
-		cout << "\tPolynomial space: " << (basis->FullTensorization ? "Q" : "P") << endl;
+		cout << "\tPolynomial space: " << (basis->UsePolynomialSpaceQ ? "Q" : "P") << endl;
 		cout << "\tPolynomial basis: " << basis->Name() << endl;
 
 		bool autoPenalization = penalizationCoefficient == -1;
@@ -56,20 +56,20 @@ public:
 		cout << "Unknowns   : " << nUnknowns << endl;
 		cout << "Parallelism: " << (BaseParallelLoop::GetDefaultNThreads() == 1 ? "sequential execution" : to_string(BaseParallelLoop::GetDefaultNThreads()) + " threads") << endl;
 
-		string kappaString = "";
+		string heterogeneityString = "";
 		if (!this->_diffusionPartition->IsHomogeneous)
 		{
 			char res[16];
-			sprintf(res, "_kappa%g", this->_diffusionPartition->HeterogeneityRatio);
-			kappaString = res;
+			sprintf(res, "_heterog%g", this->_diffusionPartition->HeterogeneityRatio);
+			heterogeneityString = res;
 		}
-		this->_fileName = "Poisson" + to_string(Dim) + "D" + this->_solutionName + kappaString + "_" + mesh->FileNamePart() + "_DG_SIPG_" + basis->Name() + "_pen" + (autoPenalization ? "-1" : to_string(penalizationCoefficient));
-		string matrixFilePath			= this->_outputDirectory + "/" + this->_fileName + "_A.dat";
-		string matrixVolumicFilePath	= this->_outputDirectory + "/" + this->_fileName + "_A_volumic.dat";
-		string matrixCouplingFilePath	= this->_outputDirectory + "/" + this->_fileName + "_A_coupling.dat";
-		string matrixPenFilePath		= this->_outputDirectory + "/" + this->_fileName + "_A_pen.dat";
-		string massMatrixFilePath		= this->_outputDirectory + "/" + this->_fileName + "_Mass.dat";
-		string rhsFilePath				= this->_outputDirectory + "/" + this->_fileName + "_b.dat";
+		this->_fileName = "Poisson" + to_string(Dim) + "D" + this->_rhsCode + heterogeneityString + "_" + mesh->FileNamePart() + "_DG_SIPG_" + basis->Name() + "_pen" + (autoPenalization ? "-1" : to_string(penalizationCoefficient));
+		string matrixFilePath			= this->GetFilePath("A");
+		string matrixVolumicFilePath	= this->GetFilePath("A_volumic");
+		string matrixCouplingFilePath	= this->GetFilePath("A_coupling");
+		string matrixPenFilePath		= this->GetFilePath("A_pen");
+		string massMatrixFilePath		= this->GetFilePath("Mass");
+		string rhsFilePath				= this->GetFilePath("b");
 
 		this->b = Eigen::VectorXd(nUnknowns);
 

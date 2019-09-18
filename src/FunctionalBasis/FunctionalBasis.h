@@ -16,19 +16,19 @@ protected:
 	string _basisCode;
 
 public:
-	bool FullTensorization;
+	bool UsePolynomialSpaceQ;
 	vector<BasisFunction<Dim>*> LocalFunctions;
 
 	FunctionalBasis(string basisCode, int maxPolynomialDegree) 
 		: FunctionalBasis(basisCode, maxPolynomialDegree, false)
 	{}
 
-	FunctionalBasis(string basisCode, int maxPolynomialDegree, bool fullTensorization)
+	FunctionalBasis(string basisCode, int maxPolynomialDegree, bool usePolynomialSpaceQ)
 	{
 		maxPolynomialDegree = max(0, maxPolynomialDegree);
 		this->_maxPolynomialDegree = maxPolynomialDegree;
 		this->_basisCode = basisCode;
-		this->FullTensorization = fullTensorization;
+		this->UsePolynomialSpaceQ = usePolynomialSpaceQ;
 
 		//----------//
 		//    0D    //
@@ -36,7 +36,7 @@ public:
 		if (Dim == 0)
 		{
 			this->_maxPolynomialDegree = 0;
-			this->FullTensorization = false;
+			this->UsePolynomialSpaceQ = false;
 			BasisFunction<Dim>* poly = dynamic_cast<BasisFunction<Dim>*>(new BasisFunction0D());
 			this->LocalFunctions.push_back(poly);
 		}
@@ -45,7 +45,7 @@ public:
 		//----------//
 		if (Dim == 1)
 		{
-			this->FullTensorization = false;
+			this->UsePolynomialSpaceQ = false;
 			for (int i = 0; i <= maxPolynomialDegree; i++)
 			{
 				BasisFunction<Dim>* poly = dynamic_cast<BasisFunction<Dim>*>(BasisFunctionFactory::Create(basisCode, maxPolynomialDegree, i));
@@ -59,7 +59,7 @@ public:
 		{
 			int functionNumber = 0;
 
-			if (fullTensorization)
+			if (usePolynomialSpaceQ)
 			{
 				for (int j = 0; j <= maxPolynomialDegree; j++)
 				{
@@ -130,7 +130,7 @@ public:
 		{
 			int functionNumber = 0;
 
-			if (fullTensorization)
+			if (usePolynomialSpaceQ)
 			{
 				for (int k = 0; k <= maxPolynomialDegree; k++)
 				{
@@ -199,8 +199,8 @@ public:
 	string Name()
 	{
 		string name = this->_basisCode + "_p" + std::to_string(this->_maxPolynomialDegree);
-		if (this->FullTensorization)
-			name += "_ft";
+		if (this->UsePolynomialSpaceQ)
+			name += "_Q";
 		return name;
 	}
 

@@ -8,7 +8,7 @@
 
 #### Launch program
 
->	./bin/dghho -d 2 -t hho -c -s poly -a s -n 8 -b monomials -p 1
+>	./bin/dghho -d 2 -discr hho -s sine -a s -n 8 -p 1
 
 #### Help
 

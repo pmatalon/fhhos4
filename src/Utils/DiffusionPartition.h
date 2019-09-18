@@ -34,7 +34,7 @@ public:
 		this->Kappa2 = k2->LargestEigenValue; // still used in DG
 		this->IsHomogeneous = *K1 == *K2;
 		this->IsIsotropic = K1->IsIsotropic && K2->IsIsotropic;
-		this->HeterogeneityRatio = (K1->LargestEigenValue > K2->LargestEigenValue) ? (K1->LargestEigenValue / K2->LargestEigenValue) : (K2->LargestEigenValue / K1->LargestEigenValue);
+		this->HeterogeneityRatio = K1->LargestEigenValue / K2->LargestEigenValue;
 	}
 
 	// Still used in DG

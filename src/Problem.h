@@ -7,7 +7,7 @@ using namespace std;
 class Problem
 {
 protected:
-	string _solutionName;
+	string _rhsCode;
 	string _outputDirectory;
 	string _fileName;
 public:
@@ -15,9 +15,9 @@ public:
 	Eigen::VectorXd b;
 	Eigen::VectorXd Solution;
 
-	Problem(string solutionName, string outputDirectory)
+	Problem(string rhsCode, string outputDirectory)
 	{
-		this->_solutionName = solutionName;
+		this->_rhsCode = rhsCode;
 		this->_outputDirectory = outputDirectory;
 	}
 

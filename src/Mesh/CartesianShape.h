@@ -489,7 +489,7 @@ public:
 		{
 			if (basis->GetDegree() == 0)
 				points.push_back(RefPoint(0, 0));
-			else if (basis->FullTensorization)
+			else if (basis->UsePolynomialSpaceQ)
 			{
 				double h = 2 / (double)basis->GetDegree();
 				for (int i = 0; i < basis->GetDegree() + 1; ++i)
