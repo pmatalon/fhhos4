@@ -53,13 +53,13 @@ private:
 		SparseMatrix J_f_c = GetGlobalCanonicalInjectionMatrixCoarseToFine();
 		SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
 		
-		finePb->ExportMatrix(I_c, "I_c");
+		/*finePb->ExportMatrix(I_c, "I_c");
 		finePb->ExportMatrix(J_f_c, "J_f_c");
-		finePb->ExportMatrix(Pi_f, "Pi_f");
+		finePb->ExportMatrix(Pi_f, "Pi_f");*/
 
 		P = Pi_f * J_f_c * I_c;
 
-		finePb->ExportMatrix(P, "P");
+		//finePb->ExportMatrix(P, "P");
 	}
 
 	void SetupRestriction() override
@@ -74,9 +74,9 @@ private:
 		//finePb->ExportMatrix(M_f, "M_f");
 
 		//R = invM_c * P.transpose() * M_f;
-		R = /*(coarsePb->_mesh->SkeletonMeasure() / finePb->_mesh->SkeletonMeasure()) **/ P.transpose();
+		R = P.transpose();
 
-		finePb->ExportMatrix(R, "R");
+		//finePb->ExportMatrix(R, "R");
 	}
 
 	inline double Weight(Element<Dim>* element, Face<Dim>* face)
@@ -110,7 +110,7 @@ private:
 		return M;
 	}
 
-	SparseMatrix GetInverseGlobalMassMatrix_Faces(Poisson_HHO<Dim>* problem)
+	/*SparseMatrix GetInverseGlobalMassMatrix_Faces(Poisson_HHO<Dim>* problem)
 	{
 		int faceLocalUnknowns = problem->HHO.nLocalFaceUnknowns;
 
@@ -144,7 +144,7 @@ private:
 		parallelLoop.Fill(M);
 
 		return M;
-	}
+	}*/
 
 	FunctionalBasis<Dim>* GetCellInterpolationBasis(Poisson_HHO<Dim>* problem)
 	{
