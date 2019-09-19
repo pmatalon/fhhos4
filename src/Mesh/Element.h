@@ -73,27 +73,28 @@ public:
 		return gradOnFace;
 	}
 
-	double FrontierMeasure()
+	double FrontierMeasure() const
 	{
 		double measure = 0;
 		for (auto f : this->Faces)
 			measure += f->Measure();
+		return measure;
 	}
 
 	virtual double GetDiameter() = 0;
 	virtual double Measure() = 0;
-	virtual DomPoint ConvertToDomain(RefPoint refPoint) = 0;
-	virtual RefPoint ConvertToReference(DomPoint domainPoint) = 0;
-	virtual DimVector<Dim> GradTransformation() = 0;
+	virtual DomPoint ConvertToDomain(RefPoint refPoint) const = 0;
+	virtual RefPoint ConvertToReference(DomPoint domainPoint) const = 0;
+	virtual DimVector<Dim> GradTransformation() const = 0;
 	virtual DimVector<Dim> OuterNormalVector(Face<Dim>* face) = 0;
-	virtual double Integral(BasisFunction<Dim>* phi) = 0;
-	virtual double IntegralGlobalFunction(function<double(DomPoint)> globalFunction) = 0;
-	virtual double ComputeIntegral(function<double(RefPoint)> func) = 0;
-	virtual double ComputeIntegral(function<double(RefPoint)> func, int polynomialDegree) = 0;
-	virtual double L2ErrorPow2(function<double(RefPoint)> approximate, function<double(DomPoint)> exactSolution) = 0;
+	virtual double Integral(BasisFunction<Dim>* phi) const = 0;
+	virtual double IntegralGlobalFunction(function<double(DomPoint)> globalFunction) const = 0;
+	virtual double ComputeIntegral(function<double(RefPoint)> func) const = 0;
+	virtual double ComputeIntegral(function<double(RefPoint)> func, int polynomialDegree) const = 0;
+	virtual double L2ErrorPow2(function<double(RefPoint)> approximate, function<double(DomPoint)> exactSolution) const = 0;
 	virtual void SetDiffusionCoefficient(DiffusionPartition<Dim>* diffusionPartition) = 0;
 	virtual void SetDiffusionTensor(DiffusionPartition<Dim>* diffusionPartition) = 0;
-	virtual vector<RefPoint> GetNodalPoints(FunctionalBasis<Dim>* basis) = 0;
+	virtual vector<RefPoint> GetNodalPoints(FunctionalBasis<Dim>* basis) const = 0;
 
 	virtual void Serialize(ostream& os) const
 	{

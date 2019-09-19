@@ -198,7 +198,7 @@ public:
 
 	virtual double SourceTerm(BasisFunction<Dim>* cellPhi, SourceFunction* f) = 0;
 	virtual double IntegralKGradGradReconstruct(Tensor<Dim>* K, BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2) = 0;
-	virtual double ComputeIntegralKGradGrad(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) = 0;
+	virtual double ComputeIntegralKGradGrad(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const = 0;
 	virtual Eigen::MatrixXd CellMassMatrix(FunctionalBasis<Dim>* basis) = 0;
 	virtual Eigen::MatrixXd CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) = 0;
 

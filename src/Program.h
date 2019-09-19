@@ -9,6 +9,7 @@
 #include "Mesh/3D/CartesianGrid3D.h"
 #include "Mesh/2D/CartesianPolygonalMesh2D.h"
 #include "Utils/Action.h"
+#include "Utils/Timer.h"
 #include "Utils/DiffusionPartition.h"
 #include "Solver/MultigridForHHO.h"
 #include "Solver/BlockJacobi.h"
@@ -38,6 +39,9 @@ public:
 		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations,
 		string outputDirectory, string solverCode, double solverTolerance)
 	{
+		Timer totalTimer;
+		totalTimer.Start();
+
 		//----------//
 		//   Mesh   //
 		//----------//
@@ -194,46 +198,50 @@ public:
 
 		if (discretization.compare("dg") == 0)
 		{
-			Poisson_DG<Dim>* problem = new Poisson_DG<Dim>(rhsCode, sourceFunction, &diffusionPartition, outputDirectory);
-			FunctionalBasis<Dim>* basis = new FunctionalBasis<Dim>(basisCode, polyDegree, usePolynomialSpaceQ);
+			Poisson_DG<Dim> problem(rhsCode, sourceFunction, &diffusionPartition, outputDirectory);
+			FunctionalBasis<Dim> basis(basisCode, polyDegree, usePolynomialSpaceQ);
 
 			cout << endl;
 			cout << "----------------------- Assembly -------------------------" << endl;
-			problem->Assemble(mesh, basis, penalizationCoefficient, action);
+			problem.Assemble(mesh, &basis, penalizationCoefficient, action);
 
 			if ((action & Action::SolveSystem) == Action::SolveSystem)
 			{
 				cout << endl;
 				cout << "------------------- Linear system resolution ------------------" << endl;
 
-				Solver* solver = CreateSolver(solverCode, problem, solverTolerance, staticCondensation, nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, basis->Size());
+				Timer solverTimer;
+				solverTimer.Start();
+
+				Solver* solver = CreateSolver(solverCode, &problem, solverTolerance, staticCondensation, nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, basis.Size());
 				cout << "Solver: " << *solver << endl << endl;
-				solver->Setup(problem->A);
-				problem->Solution = solver->Solve(problem->b);
+				solver->Setup(problem.A);
+				problem.Solution = solver->Solve(problem.b);
 				delete solver;
+
+				solverTimer.Stop();
+				cout << "Solving time: CPU = " << solverTimer.CPU() << ", elapsed = " << solverTimer.Elapsed() << endl << endl;
+
 				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
-					problem->ExtractSolution();
+					problem.ExtractSolution();
 				if ((action & Action::ComputeL2Error) == Action::ComputeL2Error && exactSolution != NULL)
 				{
-					double error = L2::Error<Dim>(mesh, basis, problem->Solution, exactSolution);
+					double error = L2::Error<Dim>(mesh, basis, problem.Solution, exactSolution);
 					cout << "L2 Error = " << std::scientific << error << endl;
 				}
 			}
-
-			delete problem;
-			delete basis;
 		}
 		else if (discretization.compare("hho") == 0)
 		{
-			FunctionalBasis<Dim>* reconstructionBasis = new FunctionalBasis<Dim>(basisCode, polyDegree, usePolynomialSpaceQ);
-			FunctionalBasis<Dim>* cellBasis = new FunctionalBasis<Dim>(basisCode, polyDegree - 1, usePolynomialSpaceQ);
-			FunctionalBasis<Dim-1>* faceBasis = new FunctionalBasis<Dim-1>(basisCode, polyDegree - 1, usePolynomialSpaceQ);
+			FunctionalBasis<Dim> reconstructionBasis(basisCode, polyDegree, usePolynomialSpaceQ);
+			FunctionalBasis<Dim> cellBasis(basisCode, polyDegree - 1, usePolynomialSpaceQ);
+			FunctionalBasis<Dim-1> faceBasis(basisCode, polyDegree - 1, usePolynomialSpaceQ);
 
-			Poisson_HHO<Dim>* problem = new Poisson_HHO<Dim>(mesh, rhsCode, sourceFunction, reconstructionBasis, cellBasis, faceBasis, staticCondensation, &diffusionPartition, outputDirectory);
+			Poisson_HHO<Dim> problem(mesh, rhsCode, sourceFunction, &reconstructionBasis, &cellBasis, &faceBasis, staticCondensation, &diffusionPartition, outputDirectory);
 
 			cout << endl;
 			cout << "----------------------- Assembly -------------------------" << endl;
-			problem->Assemble(action);
+			problem.Assemble(action);
 
 			if ((action & Action::ExportFaces) == Action::ExportFaces)
 				mesh->ExportFacesToMatlab(outputDirectory);
@@ -243,36 +251,40 @@ public:
 				cout << endl;
 				cout << "------------------- Linear system resolution ------------------" << endl;
 
-				Solver* solver = CreateSolver(solverCode, problem, solverTolerance, staticCondensation, nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, faceBasis->Size());
+				Timer solverTimer;
+				solverTimer.Start();
+
+				Solver* solver = CreateSolver(solverCode, &problem, solverTolerance, staticCondensation, nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, faceBasis.Size());
 				cout << "Solver: " << *solver << endl << endl;
-				solver->Setup(problem->A);
-				problem->Solution = solver->Solve(problem->b);
+				solver->Setup(problem.A);
+				problem.Solution = solver->Solve(problem.b);
 				delete solver;
 
-				if (staticCondensation && (action & Action::ExtractSolution) == Action::ExtractSolution)
-					problem->ExtractTraceSystemSolution();
+				solverTimer.Stop();
+				cout << "Solving time: CPU = " << solverTimer.CPU() << ", elapsed = " << solverTimer.Elapsed() << endl << endl;
 
-				problem->ReconstructHigherOrderApproximation();
+				if (staticCondensation && (action & Action::ExtractSolution) == Action::ExtractSolution)
+					problem.ExtractTraceSystemSolution();
+
+				problem.ReconstructHigherOrderApproximation();
 				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
-					problem->ExtractSolution();
+					problem.ExtractSolution();
 				if ((action & Action::ComputeL2Error) == Action::ComputeL2Error && exactSolution != NULL)
 				{
-					double error = L2::Error<Dim>(mesh, reconstructionBasis, problem->ReconstructedSolution, exactSolution);
+					double error = L2::Error<Dim>(mesh, reconstructionBasis, problem.ReconstructedSolution, exactSolution);
 					cout << "L2 Error = " << std::scientific << error << endl;
 				}
 			}
-
-			delete problem;
-			delete reconstructionBasis;
-			delete cellBasis;
-			delete faceBasis;
 		}
 		delete mesh;
 		delete sourceFunction;
+
+		totalTimer.Stop();
+		cout << endl << "Total time: CPU = " << totalTimer.CPU() << ", elapsed = " << totalTimer.Elapsed() << endl;
 	}
 
 private:
-	Mesh<Dim>* BuildMesh(int n) { return nullptr;  }
+	Mesh<Dim>* BuildMesh(int n) { return nullptr; }
 
 	Solver* CreateSolver(string solverCode, Problem* problem, double tolerance, bool staticCondensation, 
 		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations, int blockSize)

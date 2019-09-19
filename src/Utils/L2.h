@@ -10,7 +10,7 @@ class L2
 {
 public:
 	template <int Dim>
-	static double Error(Mesh<Dim>* mesh, FunctionalBasis<Dim>* basis, const Eigen::VectorXd& solution, function<double(DomPoint)> exactSolution)
+	static double Error(Mesh<Dim>* mesh, const FunctionalBasis<Dim>& basis, const Eigen::VectorXd& solution, function<double(DomPoint)> exactSolution)
 	{
 		cout << endl << "Computing L2 error..." << endl;
 		
@@ -21,9 +21,9 @@ public:
 		};
 
 		ParallelLoop<Element<Dim>*, ChunkResult> parallelLoop(mesh->Elements);
-		parallelLoop.Execute([basis, &solution, exactSolution](Element<Dim>* element, ParallelChunk<ChunkResult>* chunk)
+		parallelLoop.Execute([&basis, &solution, exactSolution](Element<Dim>* element, ParallelChunk<ChunkResult>* chunk)
 			{
-				auto approximate = basis->GetApproximateFunction(solution, element->Number * basis->NumberOfLocalFunctionsInElement(element));
+				auto approximate = basis.GetApproximateFunction(solution, element->Number * basis.NumberOfLocalFunctionsInElement(element));
 				chunk->Results.absoluteError += element->L2ErrorPow2(approximate, exactSolution);
 				chunk->Results.normExactSolution += element->IntegralGlobalFunction([exactSolution](DomPoint p) { return pow(exactSolution(p), 2); });
 			});

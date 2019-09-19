@@ -172,7 +172,7 @@ public:
 	//   Integrals   //
 	//---------------//
 
-	double IntegralGlobalFunction(function<double(DomPoint)> func)
+	double IntegralGlobalFunction(function<double(DomPoint)> func) const
 	{
 		if (ShapeDim == 1)
 		{
@@ -205,24 +205,24 @@ public:
 			assert(false);
 	}
 
-	double Integral(BasisFunction<ShapeDim>* phi)
+	double Integral(BasisFunction<ShapeDim>* phi) const
 	{
 		return RescalingCoeff() * ReferenceShape.ComputeIntegral(phi);
 	}
 
-	double ComputeIntegral(function<double(RefPoint)> func)
+	double ComputeIntegral(function<double(RefPoint)> func) const
 	{
 		double integralOnReferenceShape = ReferenceShape.ComputeIntegral(func);
 		return RescalingCoeff() * integralOnReferenceShape;
 	}
 
-	double ComputeIntegral(function<double(RefPoint)> func, int polynomialDegree)
+	double ComputeIntegral(function<double(RefPoint)> func, int polynomialDegree) const
 	{
 		double integralOnReferenceShape = ReferenceShape.ComputeIntegral(func, polynomialDegree);
 		return RescalingCoeff() * integralOnReferenceShape;
 	}
 
-	double ComputeIntegralGradGrad(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
+	double ComputeIntegralGradGrad(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2) const
 	{
 		if (phi1->GetDegree() == 0 || phi2->GetDegree() == 0)
 			return 0;
@@ -239,7 +239,7 @@ public:
 		return ComputeIntegral(functionToIntegrate, polynomialDegree);
 	}
 
-	double ComputeIntegralKGradGrad(Tensor<ShapeDim>* K, BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
+	double ComputeIntegralKGradGrad(Tensor<ShapeDim>* K, BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2) const
 	{
 		if (phi1->GetDegree() == 0 || phi2->GetDegree() == 0)
 			return 0;
@@ -307,13 +307,13 @@ public:
 	}
 
 private:
-	inline double RescalingCoeff()
+	inline double RescalingCoeff() const
 	{
 		return this->Measure / pow(2, ShapeDim);
 	}
 
 public:
-	DomPoint ConvertToDomain(RefPoint referenceElementPoint)
+	DomPoint ConvertToDomain(RefPoint referenceElementPoint) const
 	{
 		DomPoint p;
 		if (ShapeDim == DomainDim)
@@ -396,7 +396,7 @@ public:
 		return p;
 	}
 
-	RefPoint ConvertToReference(DomPoint domainPoint)
+	RefPoint ConvertToReference(DomPoint domainPoint) const
 	{
 		RefPoint refPoint;
 		if (ShapeDim == DomainDim)
@@ -440,7 +440,7 @@ public:
 		return refPoint;
 	}
 
-	DimVector<ShapeDim> GradTransformation()
+	DimVector<ShapeDim> GradTransformation() const
 	{
 		DimVector<ShapeDim> gradTransfo(ShapeDim);
 		if (ShapeDim == DomainDim)
@@ -470,7 +470,7 @@ public:
 		return gradTransfo;
 	}
 
-	vector<RefPoint> GetNodalPoints(FunctionalBasis<ShapeDim>* basis)
+	vector<RefPoint> GetNodalPoints(FunctionalBasis<ShapeDim>* basis) const
 	{
 		vector<RefPoint> points;
 		points.reserve(basis->Size());

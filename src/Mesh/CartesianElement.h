@@ -56,52 +56,52 @@ public:
 		this->DiffTensor = diffusionPartition->DiffTensor(origin);
 	}
 
-	double IntegralGlobalFunction(function<double(DomPoint)> func)
+	double IntegralGlobalFunction(function<double(DomPoint)> func) const
 	{
 		return CartesianShape<Dim>::IntegralGlobalFunction(func);
 	}
 
-	double Integral(BasisFunction<Dim>* phi)
+	double Integral(BasisFunction<Dim>* phi) const
 	{
 		return CartesianShape<Dim>::Integral(phi);
 	}
 
-	double ComputeIntegral(function<double(RefPoint)> func)
+	double ComputeIntegral(function<double(RefPoint)> func) const
 	{
 		return CartesianShape<Dim>::ComputeIntegral(func);
 	}
 
-	double ComputeIntegral(function<double(RefPoint)> func, int polynomialDegree)
+	double ComputeIntegral(function<double(RefPoint)> func, int polynomialDegree) const
 	{
 		return CartesianShape<Dim>::ComputeIntegral(func, polynomialDegree);
 	}
 
-	double ComputeIntegralGradGrad(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
+	double ComputeIntegralGradGrad(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
 	{
 		return CartesianShape<Dim>::ComputeIntegralGradGrad(phi1, phi2);
 	}
 
-	double ComputeIntegralKGradGrad(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
+	double ComputeIntegralKGradGrad(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
 	{
 		return CartesianShape<Dim>::ComputeIntegralKGradGrad(K, phi1, phi2);
 	}
 
-	DomPoint ConvertToDomain(RefPoint referenceElementPoint)
+	DomPoint ConvertToDomain(RefPoint referenceElementPoint) const
 	{
 		return CartesianShape<Dim>::ConvertToDomain(referenceElementPoint);
 	}
 
-	RefPoint ConvertToReference(DomPoint domainPoint)
+	RefPoint ConvertToReference(DomPoint domainPoint) const
 	{
 		return CartesianShape<Dim>::ConvertToReference(domainPoint);
 	}
 
-	DimVector<Dim> GradTransformation()
+	DimVector<Dim> GradTransformation() const
 	{
 		return CartesianShape<Dim>::GradTransformation();
 	}
 
-	vector<RefPoint> GetNodalPoints(FunctionalBasis<Dim>* basis)
+	vector<RefPoint> GetNodalPoints(FunctionalBasis<Dim>* basis) const
 	{
 		return CartesianShape<Dim>::GetNodalPoints(basis);
 	}
@@ -116,7 +116,7 @@ public:
 		return CartesianShape<Dim>::ComputeIntegral(sourceTimesBasisFunction, 0);
 	}
 
-	double L2ErrorPow2(function<double(RefPoint)> approximate, function<double(DomPoint)> exactSolution)
+	double L2ErrorPow2(function<double(RefPoint)> approximate, function<double(DomPoint)> exactSolution) const
 	{
 		function<double(RefPoint)> errorFunction = [this, exactSolution, approximate](RefPoint refElementPoint) {
 			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);

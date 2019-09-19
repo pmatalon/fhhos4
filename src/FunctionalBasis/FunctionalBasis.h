@@ -191,12 +191,12 @@ public:
 		}
 	}
 
-	string BasisCode()
+	string BasisCode() const
 	{
 		return this->_basisCode;
 	}
 
-	string Name()
+	string Name() const
 	{
 		string name = this->_basisCode + "_p" + std::to_string(this->_maxPolynomialDegree);
 		if (this->UsePolynomialSpaceQ)
@@ -204,27 +204,27 @@ public:
 		return name;
 	}
 
-	int GetDegree()
+	int GetDegree() const
 	{
 		return this->_maxPolynomialDegree;
 	}
 
-	int NumberOfLocalFunctionsInElement(Element<Dim>* element)
+	int NumberOfLocalFunctionsInElement(Element<Dim>* element) const
 	{
 		return static_cast<int>(this->LocalFunctions.size());
 	}
 
-	int Size()
+	int Size() const
 	{
 		return NumberOfLocalFunctionsInElement(NULL);
 	}
 
-	BigNumber GlobalFunctionNumber(Element<Dim>* element, BasisFunction<Dim>* phi)
+	BigNumber GlobalFunctionNumber(Element<Dim>* element, BasisFunction<Dim>* phi) const
 	{
 		return element->Number * static_cast<int>(this->LocalFunctions.size()) + phi->LocalNumber; // the numbers start at 0
 	}
 
-	function<double(RefPoint)> GetApproximateFunction(const Eigen::VectorXd &solution, BigNumber startIndex)
+	function<double(RefPoint)> GetApproximateFunction(const Eigen::VectorXd &solution, BigNumber startIndex) const
 	{
 		function<double(RefPoint)> approximate = [this, solution, startIndex](RefPoint p) {
 			double result = 0;
