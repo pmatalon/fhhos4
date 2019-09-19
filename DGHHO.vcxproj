@@ -156,6 +156,7 @@
     <ClInclude Include="src\Utils\ElementParallelLoop.h" />
     <ClInclude Include="src\Utils\ParallelLoop.h" />
     <ClInclude Include="src\Utils\Tensor.h" />
+    <ClInclude Include="src\Utils\Timer.h" />
     <ClInclude Include="src\Utils\Types.h" />
   </ItemGroup>
   <ItemGroup>
