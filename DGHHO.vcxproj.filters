@@ -195,6 +195,12 @@
     <ClInclude Include="src\Utils\Timer.h">
       <Filter>Utils</Filter>
     </ClInclude>
+    <ClInclude Include="src\Solver\ConjugateGradient.h">
+      <Filter>Solver</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\Preconditioner.h">
+      <Filter>Solver</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

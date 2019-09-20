@@ -6,7 +6,7 @@ using namespace std;
 
 class IterativeSolver : public Solver
 {
-private:
+protected:
 	Eigen::SparseLU<SparseMatrix> _directSolver;
 	Eigen::VectorXd _exactSolution;
 public:
@@ -29,16 +29,25 @@ public:
 
 	Eigen::VectorXd Solve(const Eigen::VectorXd& b) override
 	{
-		Eigen::VectorXd zero = Eigen::VectorXd::Zero(b.rows());
-		return Solve(b, zero);
+		return Solve(b, "0");
+	}
+
+	Eigen::VectorXd Solve(const Eigen::VectorXd& b, string initialGuessCode)
+	{
+		Eigen::VectorXd initialGuess;
+		if (initialGuessCode.compare("0") == 0)
+			initialGuess = Eigen::VectorXd::Zero(b.rows());
+		else if (initialGuessCode.compare("1") == 0)
+			initialGuess = Eigen::VectorXd::Ones(b.rows());
+		else
+			assert(false);
+		return Solve(b, initialGuess);
 	}
 
 	virtual Eigen::VectorXd Solve(const Eigen::VectorXd& b, Eigen::VectorXd& initialGuess)
 	{
 		if (this->ComputeExactSolution)
-		{
 			this->_exactSolution = this->_directSolver.solve(b);
-		}
 
 		Eigen::VectorXd x = initialGuess;
 		this->IterationCount = 0;
@@ -52,15 +61,18 @@ public:
 			result = SaveIterationResult(x, b);
 		}
 
+		if (this->PrintIterationResults)
+			cout << endl;
+
 		return x;
 	}
 
 	virtual ~IterativeSolver() {}
 
 protected:
-	IterationResult SaveIterationResult(Eigen::VectorXd& x, const Eigen::VectorXd& b)
+	IterationResult SaveIterationResult(Eigen::VectorXd& x, const Eigen::VectorXd& b, const Eigen::VectorXd& r)
 	{
-		IterationResult result(this->IterationCount, x, b - A * x, b);
+		IterationResult result(this->IterationCount, x, r, b);
 		if (this->ComputeExactSolution)
 			result.ComputeError(this->_exactSolution);
 		if (this->PrintIterationResults)
@@ -68,7 +80,12 @@ protected:
 		return result;
 	}
 
-	virtual Eigen::VectorXd ExecuteOneIteration(const Eigen::VectorXd& b, Eigen::VectorXd& x) = 0;
+	IterationResult SaveIterationResult(Eigen::VectorXd& x, const Eigen::VectorXd& b)
+	{
+		return SaveIterationResult(x, b, b - A * x);
+	}
+
+	virtual Eigen::VectorXd ExecuteOneIteration(const Eigen::VectorXd& b, Eigen::VectorXd& x) {};
 
 	bool StoppingCriteriaReached(const IterationResult& result)
 	{

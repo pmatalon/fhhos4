@@ -1,24 +1,20 @@
 #pragma once
 #include <Eigen/Sparse>
-#include "Solver.h"
+#include "IterativeSolver.h"
 using namespace std;
 
-class EigenCG : public Solver
+class EigenCG : public IterativeSolver
 {
 private:
 	Eigen::ConjugateGradient<SparseMatrix, Eigen::Lower | Eigen::Upper, Eigen::DiagonalPreconditioner<double>> _solver;
 
 public:
-	double Tolerance;
 
-	EigenCG(double tolerance) : Solver() 
-	{
-		this->Tolerance = tolerance;
-	}
+	EigenCG() : IterativeSolver() {}
 
 	void Serialize(ostream& os) const override
 	{
-		os << "Conjugate Gradient (Eigen library)";
+		os << "Conjugate Gradient (Eigen library), diagonal preconditioner";
 	}
 
 	void Setup(const SparseMatrix& A) override
@@ -34,9 +30,10 @@ public:
 		_solver.setTolerance(this->Tolerance);
 	}
 
-	Eigen::VectorXd Solve(const Eigen::VectorXd& b) override
+	Eigen::VectorXd Solve(const Eigen::VectorXd& b, Eigen::VectorXd& initialGuess) override
 	{
-		Eigen::VectorXd x = _solver.solve(b);
+		Eigen::VectorXd x = _solver.solveWithGuess(b, initialGuess);
+		this->IterationCount = _solver.iterations();
 		return x;
 	}
 };

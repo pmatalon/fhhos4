@@ -11,6 +11,7 @@
 #include "Utils/Action.h"
 #include "Utils/Timer.h"
 #include "Utils/DiffusionPartition.h"
+#include "Solver/ConjugateGradient.h"
 #include "Solver/MultigridForHHO.h"
 #include "Solver/BlockJacobi.h"
 #include "Solver/EigenCG.h"
@@ -25,7 +26,7 @@ public:
 	virtual void Start(string rhsCode, double kappa1, double kappa2, double anisotropyRatio, string partition, BigNumber n, string discretization, string basisCode, int polyDegree, bool usePolynomialSpaceQ,
 		int penalizationCoefficient, bool staticCondensation, Action action, 
 		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations,
-		string outputDirectory, string solverCode, double solverTolerance) = 0;
+		string initialGuessCode, string outputDirectory, string solverCode, double solverTolerance) = 0;
 };
 
 template <int Dim>
@@ -37,7 +38,7 @@ public:
 	void Start(string rhsCode, double kappa1, double kappa2, double anisotropyRatio, string partition, BigNumber n, string discretization, string basisCode, int polyDegree, bool usePolynomialSpaceQ,
 		int penalizationCoefficient, bool staticCondensation, Action action, 
 		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations,
-		string outputDirectory, string solverCode, double solverTolerance)
+		string initialGuessCode, string outputDirectory, string solverCode, double solverTolerance)
 	{
 		Timer totalTimer;
 		totalTimer.Start();
@@ -210,17 +211,9 @@ public:
 				cout << endl;
 				cout << "------------------- Linear system resolution ------------------" << endl;
 
-				Timer solverTimer;
-				solverTimer.Start();
-
 				Solver* solver = CreateSolver(solverCode, &problem, solverTolerance, staticCondensation, nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, basis.Size());
-				cout << "Solver: " << *solver << endl << endl;
-				solver->Setup(problem.A);
-				problem.Solution = solver->Solve(problem.b);
-				delete solver;
+				problem.Solution = Solve(solver, problem.A, problem.b, initialGuessCode);
 
-				solverTimer.Stop();
-				cout << "Solving time: CPU = " << solverTimer.CPU() << ", elapsed = " << solverTimer.Elapsed() << endl << endl;
 
 				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
 					problem.ExtractSolution();
@@ -251,28 +244,22 @@ public:
 				cout << endl;
 				cout << "------------------- Linear system resolution ------------------" << endl;
 
-				Timer solverTimer;
-				solverTimer.Start();
-
 				Solver* solver = CreateSolver(solverCode, &problem, solverTolerance, staticCondensation, nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, faceBasis.Size());
-				cout << "Solver: " << *solver << endl << endl;
-				solver->Setup(problem.A);
-				problem.Solution = solver->Solve(problem.b);
-				delete solver;
-
-				solverTimer.Stop();
-				cout << "Solving time: CPU = " << solverTimer.CPU() << ", elapsed = " << solverTimer.Elapsed() << endl << endl;
+				problem.Solution = Solve(solver, problem.A, problem.b, initialGuessCode);
 
 				if (staticCondensation && (action & Action::ExtractSolution) == Action::ExtractSolution)
 					problem.ExtractTraceSystemSolution();
 
-				problem.ReconstructHigherOrderApproximation();
-				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
-					problem.ExtractSolution();
-				if ((action & Action::ComputeL2Error) == Action::ComputeL2Error && exactSolution != NULL)
+				if ((action & Action::ExtractSolution) == Action::ExtractSolution || ((action & Action::ComputeL2Error) == Action::ComputeL2Error && exactSolution != NULL))
 				{
-					double error = L2::Error<Dim>(mesh, reconstructionBasis, problem.ReconstructedSolution, exactSolution);
-					cout << "L2 Error = " << std::scientific << error << endl;
+					problem.ReconstructHigherOrderApproximation();
+					if ((action & Action::ExtractSolution) == Action::ExtractSolution)
+						problem.ExtractSolution();
+					if ((action & Action::ComputeL2Error) == Action::ComputeL2Error && exactSolution != NULL)
+					{
+						double error = L2::Error<Dim>(mesh, reconstructionBasis, problem.ReconstructedSolution, exactSolution);
+						cout << "L2 Error = " << std::scientific << error << endl;
+					}
 				}
 			}
 		}
@@ -290,7 +277,7 @@ private:
 		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations, int blockSize)
 	{
 		Solver* solver = NULL;
-		if (solverCode.compare("mg") == 0)
+		if (solverCode.compare("mg") == 0 || solverCode.compare("pcgmg") == 0)
 		{
 			if (staticCondensation)
 			{
@@ -303,8 +290,15 @@ private:
 				mg->PostSmootherCode = postSmootherCode;
 				mg->PreSmoothingIterations = nPreSmoothingIterations;
 				mg->PostSmoothingIterations = nPostSmoothingIterations;
-				mg->ComputeExactSolution = hhoProblem->_mesh->Elements.size() <= (Dim == 2 ? 32 * 32 : 8 * 8);
-				solver = mg;
+
+				if (solverCode.compare("mg") == 0)
+					solver = mg;
+				else if (solverCode.compare("pcgmg") == 0)
+				{
+					ConjugateGradient* cg = new ConjugateGradient();
+					cg->Precond = Preconditioner(mg);
+					solver = cg;
+				}
 			}
 			else
 				assert(false && "Multigrid only applicable on HHO discretization with static condensation.");
@@ -312,7 +306,9 @@ private:
 		else if (solverCode.compare("lu") == 0)
 			solver = new EigenSparseLU();
 		else if (solverCode.compare("cg") == 0)
-			solver = new EigenCG(tolerance);
+			solver = new ConjugateGradient();
+		else if (solverCode.compare("eigencg") == 0)
+			solver = new EigenCG();
 		else if (solverCode.compare("bgs") == 0)
 			solver = new BlockGaussSeidel(blockSize);
 		else if (solverCode.compare("bj") == 0)
@@ -327,6 +323,32 @@ private:
 			iterativeSolver->Tolerance = tolerance;
 
 		return solver;
+	}
+
+	Eigen::VectorXd Solve(Solver* solver, const SparseMatrix& A, const Eigen::VectorXd& b, string initialGuessCode)
+	{
+		Timer solverTimer;
+		solverTimer.Start();
+
+		cout << "Solver: " << *solver << endl << endl;
+		solver->Setup(A);
+
+		Eigen::VectorXd x;
+		IterativeSolver* iterativeSolver = dynamic_cast<IterativeSolver*>(solver);
+		if (iterativeSolver != nullptr)
+		{
+			iterativeSolver->ComputeExactSolution = A.rows() <= 2000;
+			x = iterativeSolver->Solve(b, initialGuessCode);
+			cout << iterativeSolver->IterationCount << " iterations." << endl;
+		}
+		else
+			x = solver->Solve(b);
+
+		delete solver;
+
+		solverTimer.Stop();
+		cout << "Solving time: CPU = " << solverTimer.CPU() << ", elapsed = " << solverTimer.Elapsed() << endl << endl;
+		return x;
 	}
 };
 

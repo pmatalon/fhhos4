@@ -80,12 +80,14 @@ void print_usage() {
 	cout << endl;
 	cout << "-s SOLVER" << endl;
 	cout << "      Linear solver (default: lu)." << endl;
-	cout << "              lu   - LU factorization (Eigen library)" << endl;
-	cout << "              cg   - Conjugate gradient with Jacobi preconditioner (Eigen library)" << endl;
-	cout << "              bj   - Block Jacobi: the block size is set to the number of DOFs per cell (DG) or face (HHO)" << endl;
-	cout << "              bgs  - Block Gauss-Seidel: the block size is set to the number of DOFs per cell (DG) or face (HHO)" << endl;
-	cout << "              mg   - Custom multigrid for HHO with static condensation" << endl;
-	cout << "              agmg - Yvan Notay's AGMG solver" << endl;
+	cout << "              lu       - LU factorization (Eigen library)" << endl;
+	cout << "              cg       - Conjugate Gradient, no preconditioner" << endl;
+	cout << "              eigencg  - Conjugate Gradient (Eigen library) with diagonal preconditioner" << endl;
+	cout << "              bj       - Block Jacobi: the block size is set to the number of DOFs per cell (DG) or face (HHO)" << endl;
+	cout << "              bgs      - Block Gauss-Seidel: the block size is set to the number of DOFs per cell (DG) or face (HHO)" << endl;
+	cout << "              mg       - Custom multigrid for HHO" << endl;
+	cout << "              pcgmg    - Conjugate Gradient, preconditioned with the custom multigrid for HHO" << endl;
+	cout << "              agmg     - Yvan Notay's AGMG solver" << endl;
 	cout << endl;
 	cout << "-cycle [V|W],NUM,NUM" << endl;
 	cout << "      Multigrid cycle." << endl;
@@ -117,6 +119,11 @@ void print_usage() {
 	cout << "              bj   - Block Jacobi: the block size is set to the number of DOFs per face" << endl;
 	cout << "              bgs  - Block Gauss-Seidel: the block size is set to the number of DOFs per face" << endl;
 	cout << "              rbgs - Reverse Block Gauss-Seidel" << endl;
+	cout << endl;
+	cout << "-initial-guess CODE" << endl;
+	cout << "      Initial guess for the iterative solvers." << endl;
+	cout << "              0     - zero vector (default)" << endl;
+	cout << "              1     - all ones vector" << endl;
 	cout << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << "                             Miscellaneous                            " << endl;
@@ -185,6 +192,7 @@ int main(int argc, char* argv[])
 	string outputDirectory = ".";
 	string solverCode = "lu";
 	double solverTolerance = 1e-8;
+	string initialGuessCode = "0";
 
 	enum {
 		OPT_RightHandSide = 1000,
@@ -198,6 +206,7 @@ int main(int argc, char* argv[])
 		OPT_MGCycle,
 		OPT_CoarseMatrixSize,
 		OPT_Smoothers,
+		OPT_InitialGuess,
 		OPT_Threads
 	};
 
@@ -214,6 +223,7 @@ int main(int argc, char* argv[])
 		 { "cycle", required_argument, NULL, OPT_MGCycle },
 		 { "coarse-size", required_argument, NULL, OPT_CoarseMatrixSize },
 		 { "smoothers", required_argument, NULL, OPT_Smoothers },
+		 { "initial-guess", required_argument, NULL, OPT_InitialGuess },
 		 { "threads", required_argument, NULL, OPT_Threads },
 		 { NULL, 0, NULL, 0 }
 	};
@@ -328,6 +338,10 @@ int main(int argc, char* argv[])
 				postSmootherCode = s.substr(pos + 1);
 				break;
 			}
+			case OPT_InitialGuess:
+				initialGuessCode = optarg;
+				if (initialGuessCode.compare("0") != 0 && initialGuessCode.compare("1") != 0)
+					argument_error("unknown initial guess '" + initialGuessCode + "'. Check -initial-guess argument.");
 			case OPT_Threads:
 				BaseParallelLoop::SetDefaultNThreads(atoi(optarg));
 				break;
@@ -386,7 +400,7 @@ int main(int argc, char* argv[])
 
 	program->Start(rhsCode, kappa1, kappa2, anisotropyRatio, partition, n, discretization, basisCode, polyDegree, usePolynomialSpaceQ, penalizationCoefficient, staticCondensation, action,
 		nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations,
-		outputDirectory, solverCode, solverTolerance);
+		initialGuessCode, outputDirectory, solverCode, solverTolerance);
 
 	delete program;
 

@@ -141,6 +141,7 @@
     <ClInclude Include="src\Solver\AGMG.h" />
     <ClInclude Include="src\Solver\BlockJacobi.h" />
     <ClInclude Include="src\Solver\BlockSOR.h" />
+    <ClInclude Include="src\Solver\ConjugateGradient.h" />
     <ClInclude Include="src\Solver\EigenCG.h" />
     <ClInclude Include="src\Solver\EigenSparseLU.h" />
     <ClInclude Include="src\Solver\enable_AGMG.h" />
@@ -148,6 +149,7 @@
     <ClInclude Include="src\Solver\Level.h" />
     <ClInclude Include="src\Solver\Multigrid.h" />
     <ClInclude Include="src\Solver\MultigridForHHO.h" />
+    <ClInclude Include="src\Solver\Preconditioner.h" />
     <ClInclude Include="src\Solver\Smoother.h" />
     <ClInclude Include="src\Solver\IterativeSolver.h" />
     <ClInclude Include="src\Solver\SmootherFactory.h" />
