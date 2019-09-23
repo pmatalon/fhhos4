@@ -23,8 +23,6 @@ public:
 	virtual void Setup(const SparseMatrix& A) override
 	{
 		this->A = A;
-		if (this->ComputeExactSolution)
-			this->_directSolver.compute(this->A);
 	}
 
 	Eigen::VectorXd Solve(const Eigen::VectorXd& b) override
