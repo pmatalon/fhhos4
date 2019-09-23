@@ -25,7 +25,7 @@ public:
 	friend ostream& operator<<(ostream& os, const Preconditioner& p)
 	{
 		if (p._solver)
-			os << p._solver;
+			os << *(p._solver);
 		else
 			os << "none";
 		return os;

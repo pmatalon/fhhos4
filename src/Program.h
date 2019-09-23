@@ -204,7 +204,13 @@ public:
 
 			cout << endl;
 			cout << "----------------------- Assembly -------------------------" << endl;
+			Timer assemblyTimer;
+			assemblyTimer.Start();
+
 			problem.Assemble(mesh, &basis, penalizationCoefficient, action);
+			
+			assemblyTimer.Stop();
+			cout << endl << "Assembly time: CPU = " << assemblyTimer.CPU() << ", elapsed = " << assemblyTimer.Elapsed() << endl;
 
 			if ((action & Action::SolveSystem) == Action::SolveSystem)
 			{
@@ -213,7 +219,6 @@ public:
 
 				Solver* solver = CreateSolver(solverCode, &problem, solverTolerance, staticCondensation, nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, basis.Size());
 				problem.Solution = Solve(solver, problem.A, problem.b, initialGuessCode);
-
 
 				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
 					problem.ExtractSolution();
@@ -234,7 +239,13 @@ public:
 
 			cout << endl;
 			cout << "----------------------- Assembly -------------------------" << endl;
+			Timer assemblyTimer;
+			assemblyTimer.Start();
+
 			problem.Assemble(action);
+
+			assemblyTimer.Stop();
+			cout << endl << "Assembly time: CPU = " << assemblyTimer.CPU() << ", elapsed = " << assemblyTimer.Elapsed() << endl;
 
 			if ((action & Action::ExportFaces) == Action::ExportFaces)
 				mesh->ExportFacesToMatlab(outputDirectory);
