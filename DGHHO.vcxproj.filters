@@ -201,6 +201,9 @@
     <ClInclude Include="src\Solver\Preconditioner.h">
       <Filter>Solver</Filter>
     </ClInclude>
+    <ClInclude Include="src\HHO\HHOParameters.h">
+      <Filter>HHO</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

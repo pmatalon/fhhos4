@@ -52,6 +52,11 @@ void print_usage() {
 	cout << "               dg     - Discontinuous Galerkin (Symmetric Interior Penalty)" << endl;
 	cout << "               hho    - Hybrid High Order" << endl;
 	cout << endl;
+	cout << "-stab CODE" << endl;
+	cout << "      Stabilization term (only used in HHO)." << endl;
+	cout << "               hho    - HHO stabilization term" << endl;
+	cout << "               hdg    - HDG stabilization term" << endl;
+	cout << endl;
 	cout << "-b CODE" << endl;
 	cout << "      Polynomial basis (default: legendre)." << endl;
 	cout << "               monomials" << endl;
@@ -86,7 +91,9 @@ void print_usage() {
 	cout << "              bj       - Block Jacobi: the block size is set to the number of DOFs per cell (DG) or face (HHO)" << endl;
 	cout << "              bgs      - Block Gauss-Seidel: the block size is set to the number of DOFs per cell (DG) or face (HHO)" << endl;
 	cout << "              mg       - Custom multigrid for HHO" << endl;
-	cout << "              pcgmg    - Conjugate Gradient, preconditioned with the custom multigrid for HHO" << endl;
+	cout << "              mg2      - Custom multigrid for HHO (identity for faces present on both grids)" << endl;
+	cout << "              pcgmg    - Conjugate Gradient, preconditioned with the custom multigrid for HHO 'mg'" << endl;
+	cout << "              pcgmg2   - Conjugate Gradient, preconditioned with the custom multigrid for HHO 'mg2'" << endl;
 	cout << "              agmg     - Yvan Notay's AGMG solver" << endl;
 	cout << endl;
 	cout << "-cycle [V|W],NUM,NUM" << endl;
@@ -180,6 +187,7 @@ int main(int argc, char* argv[])
 	string partition = "chiasmus";
 	BigNumber n = 16;
 	string discretization = "hho";
+	string stabilization = "hho";
 	string basisCode = "legendre";
 	int polyDegree = 1;
 	bool usePolynomialSpaceQ = false;
@@ -206,6 +214,7 @@ int main(int argc, char* argv[])
 		OPT_Anisotropy,
 		OPT_Partition,
 		OPT_Discretization,
+		OPT_Stabilization,
 		OPT_NoStaticCondensation,
 		OPT_Penalization,
 		OPT_PolySpace,
@@ -224,6 +233,7 @@ int main(int argc, char* argv[])
 		 { "aniso", required_argument, NULL, OPT_Anisotropy },
 		 { "partition", required_argument, NULL, OPT_Partition },
 		 { "discr", required_argument, NULL, OPT_Discretization },
+		 { "stab", required_argument, NULL, OPT_Stabilization },
 		 { "no-static-cond", required_argument, NULL, OPT_NoStaticCondensation },
 		 { "pen", required_argument, NULL, OPT_Penalization },
 		 { "poly-space", required_argument, NULL, OPT_PolySpace },
@@ -274,6 +284,11 @@ int main(int argc, char* argv[])
 				discretization = optarg;
 				if (discretization.compare("dg") != 0 && discretization.compare("hho") != 0)
 					argument_error("unknown discretization '" + discretization + "'. Check -discr argument.");
+				break;
+			case OPT_Stabilization:
+				stabilization = optarg;
+				if (stabilization.compare("hdg") != 0 && stabilization.compare("hho") != 0)
+					argument_error("unknown stabilization code '" + stabilization + "'. Check -stab argument.");
 				break;
 			case 'b': 
 				basisCode = optarg;
@@ -415,7 +430,7 @@ int main(int argc, char* argv[])
 	else if (dimension == 3)
 		program = new ProgramDim<3>();
 
-	program->Start(rhsCode, kappa1, kappa2, anisotropyRatio, partition, n, discretization, basisCode, polyDegree, usePolynomialSpaceQ, penalizationCoefficient, staticCondensation, action,
+	program->Start(rhsCode, kappa1, kappa2, anisotropyRatio, partition, n, discretization, stabilization, basisCode, polyDegree, usePolynomialSpaceQ, penalizationCoefficient, staticCondensation, action,
 		nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations,
 		coarseningStgy, initialGuessCode, outputDirectory, solverCode, solverTolerance);
 

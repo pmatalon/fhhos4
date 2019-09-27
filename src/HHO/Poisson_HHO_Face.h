@@ -25,29 +25,29 @@ private:
 	Eigen::MatrixXd _elem1_projFromCell;
 	Eigen::MatrixXd _elem2_projFromCell;
 public:
-	FunctionalBasis<Dim - 1>* FaceBasis;
+	HHOParameters<Dim>* HHO;
 
 	Poisson_HHO_Face(BigNumber number, Element<Dim>* element1, Element<Dim>* element2) : Face<Dim>(number, element1, element2) {}
 
-	void InitHHO(FunctionalBasis<Dim>* reconstructionBasis, FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim - 1>* faceBasis)
+	void InitHHO(HHOParameters<Dim>* hho)
 	{
 		if (this->_faceMassMatrix.rows() > 0)
 			return;
 
-		this->FaceBasis = faceBasis;
+		this->HHO = hho;
 
-		this->_faceMassMatrix = this->FaceMassMatrix(faceBasis);
+		this->_faceMassMatrix = this->FaceMassMatrix(HHO->FaceBasis);
 		this->_invFaceMassMatrix = this->_faceMassMatrix.inverse();
 
-		this->_elem1_massReconstructFace = this->MassMatrix(faceBasis, this->Element1, reconstructionBasis);
-		this->_elem1_massCellFace = this->MassMatrix(faceBasis, this->Element1, cellBasis);
+		this->_elem1_massReconstructFace = this->MassMatrix(HHO->FaceBasis, this->Element1, HHO->ReconstructionBasis);
+		this->_elem1_massCellFace = this->MassMatrix(HHO->FaceBasis, this->Element1, HHO->CellBasis);
 		this->_elem1_projFromReconstruct = this->_invFaceMassMatrix * _elem1_massReconstructFace;
 		this->_elem1_projFromCell = this->_invFaceMassMatrix * _elem1_massCellFace;
 
 		if (this->Element2 != NULL)
 		{
-			this->_elem2_massReconstructFace = this->MassMatrix(faceBasis, this->Element2, reconstructionBasis);
-			this->_elem2_massCellFace = this->MassMatrix(faceBasis, this->Element2, cellBasis);
+			this->_elem2_massReconstructFace = this->MassMatrix(HHO->FaceBasis, this->Element2, HHO->ReconstructionBasis);
+			this->_elem2_massCellFace = this->MassMatrix(HHO->FaceBasis, this->Element2, HHO->CellBasis);
 			this->_elem2_projFromReconstruct = this->_invFaceMassMatrix * _elem2_massReconstructFace;
 			this->_elem2_projFromCell = this->_invFaceMassMatrix * _elem2_massCellFace;
 		}
@@ -129,7 +129,7 @@ public:
 
 	Eigen::MatrixXd GetProjFromCell(Element<Dim>* element, FunctionalBasis<Dim>* cellInterpolationBasis)
 	{
-		Eigen::MatrixXd massFaceCell = this->MassMatrix(this->FaceBasis, element, cellInterpolationBasis);
+		Eigen::MatrixXd massFaceCell = this->MassMatrix(HHO->FaceBasis, element, cellInterpolationBasis);
 		Eigen::MatrixXd projFromCell = this->_invFaceMassMatrix * massFaceCell;
 		return projFromCell;
 	}

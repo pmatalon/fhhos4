@@ -5,50 +5,11 @@
 #include "../Utils/ElementParallelLoop.h"
 using namespace std;
 
-
-template <int Dim>
-struct HHOInfo
-{
-	BigNumber nElements;
-	BigNumber nFaces;
-	BigNumber nInteriorFaces;
-	BigNumber nBoundaryFaces;
-
-	int nLocalFaceUnknowns;
-	int nLocalCellUnknowns;
-	int nLocalReconstructUnknowns;
-
-	BigNumber nTotalCellUnknowns;
-	BigNumber nTotalFaceUnknowns;
-	BigNumber nTotalHybridUnknowns;
-	BigNumber nTotalHybridCoeffs;
-
-	HHOInfo(Mesh<Dim>* mesh, FunctionalBasis<Dim>* reconstructionBasis, FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim - 1>* faceBasis)
-	{
-		nElements = mesh->Elements.size();
-		nFaces = mesh->Faces.size();
-		nInteriorFaces = mesh->InteriorFaces.size();
-		nBoundaryFaces = mesh->BoundaryFaces.size();
-
-		nLocalFaceUnknowns = faceBasis->Size();
-		nLocalCellUnknowns = cellBasis->Size();
-		nLocalReconstructUnknowns = reconstructionBasis->Size();
-
-		nTotalCellUnknowns = nElements * nLocalCellUnknowns;
-		nTotalFaceUnknowns = nInteriorFaces * nLocalFaceUnknowns;
-		nTotalHybridUnknowns = nTotalCellUnknowns + nTotalFaceUnknowns;
-		nTotalHybridCoeffs = nTotalCellUnknowns + nFaces * nLocalFaceUnknowns;;
-	}
-};
-
 template <int Dim>
 class Poisson_HHO : public Problem
 {
 private:
 	SourceFunction* _sourceFunction;
-	FunctionalBasis<Dim>* _reconstructionBasis;
-	FunctionalBasis<Dim>* _cellBasis;
-	FunctionalBasis<Dim - 1>* _faceBasis;
 	bool _staticCondensation = false;
 	DiffusionPartition<Dim>* _diffusionPartition;
 
@@ -57,17 +18,15 @@ private:
 
 public:
 	Mesh<Dim>* _mesh;
-	HHOInfo<Dim> HHO;
+	HHOParameters<Dim>* HHO;
 	Eigen::VectorXd ReconstructedSolution;
 
-	Poisson_HHO(Mesh<Dim>* mesh, string rhsCode, SourceFunction* sourceFunction, FunctionalBasis<Dim>* reconstructionBasis, FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim - 1>* faceBasis, bool staticCondensation, DiffusionPartition<Dim>* diffusionPartition, string outputDirectory)
-		: Problem(rhsCode, outputDirectory), HHO(mesh, reconstructionBasis, cellBasis, faceBasis)
+	Poisson_HHO(Mesh<Dim>* mesh, string rhsCode, SourceFunction* sourceFunction, HHOParameters<Dim>* hho, bool staticCondensation, DiffusionPartition<Dim>* diffusionPartition, string outputDirectory)
+		: Problem(rhsCode, outputDirectory)
 	{	
 		this->_mesh = mesh;
 		this->_sourceFunction = sourceFunction;
-		this->_reconstructionBasis = reconstructionBasis;
-		this->_cellBasis = cellBasis;
-		this->_faceBasis = faceBasis;
+		this->HHO = hho;
 		this->_staticCondensation = staticCondensation;
 		this->_diffusionPartition = diffusionPartition;
 
@@ -78,7 +37,7 @@ public:
 			sprintf(res, "_heterog%g", this->_diffusionPartition->HeterogeneityRatio);
 			heterogeneityString = res;
 		}
-		this->_fileName = "Poisson" + to_string(Dim) + "D" + this->_rhsCode + heterogeneityString + "_" + mesh->FileNamePart() + "_HHO_" + reconstructionBasis->Name() + (_staticCondensation ? "" : "_nostaticcond");
+		this->_fileName = "Poisson" + to_string(Dim) + "D" + this->_rhsCode + heterogeneityString + "_" + mesh->FileNamePart() + "_HHO_" + HHO->ReconstructionBasis->Name() + (_staticCondensation ? "" : "_nostaticcond");
 
 		// Re-numbering of the faces (interior first, then boundary)
 		BigNumber faceNumber = 0;
@@ -90,7 +49,8 @@ public:
 
 	Poisson_HHO<Dim>* GetProblemOnCoarserMesh()
 	{
-		return new Poisson_HHO<Dim>(_mesh->CoarseMesh, _rhsCode, _sourceFunction, _reconstructionBasis, _cellBasis, _faceBasis, _staticCondensation, _diffusionPartition, _outputDirectory);
+		HHOParameters<Dim>* coarseHHO = new HHOParameters<Dim>(_mesh->CoarseMesh, HHO->Stabilization, HHO->ReconstructionBasis, HHO->CellBasis, HHO->FaceBasis);
+		return new Poisson_HHO<Dim>(_mesh->CoarseMesh, _rhsCode, _sourceFunction, coarseHHO, _staticCondensation, _diffusionPartition, _outputDirectory);
 	}
 
 	void ExportFaces()
@@ -106,10 +66,9 @@ public:
 	void Assemble(Action action)
 	{
 		Mesh<Dim>* mesh = this->_mesh;
-		FunctionalBasis<Dim>* reconstructionBasis = this->_reconstructionBasis;
-		FunctionalBasis<Dim>* cellBasis = this->_cellBasis;
-		FunctionalBasis<Dim - 1>* faceBasis = this->_faceBasis;
-		HHOInfo<Dim> hho = this->HHO;
+		FunctionalBasis<Dim>* reconstructionBasis = HHO->ReconstructionBasis;
+		FunctionalBasis<Dim>* cellBasis = HHO->CellBasis;
+		FunctionalBasis<Dim - 1>* faceBasis = HHO->FaceBasis;
 
 		if ((action & Action::LogAssembly) == Action::LogAssembly)
 		{
@@ -147,16 +106,16 @@ public:
 			cout << endl;
 
 			cout << mesh->Description() << endl;
-			cout << "    Elements: " << hho.nElements << endl;
-			cout << "    Faces   : " << hho.nFaces << " (" << hho.nInteriorFaces << " interior + " << hho.nBoundaryFaces << " boundary)" << endl;
+			cout << "    Elements: " << HHO->nElements << endl;
+			cout << "    Faces   : " << HHO->nFaces << " (" << HHO->nInteriorFaces << " interior + " << HHO->nBoundaryFaces << " boundary)" << endl;
 			cout << "Discretization: Hybrid High Order (k = " << faceBasis->GetDegree() << ")" << endl;
 			cout << "    Reconstruction basis: " << reconstructionBasis->Name() << endl;
 			cout << "    Cell basis          : " << cellBasis->Name() << endl;
 			cout << "    Face basis          : " << faceBasis->Name() << endl;
-			cout << "Cell unknowns : " << hho.nTotalCellUnknowns << " (" << cellBasis->Size() << " per cell)" << endl;
-			cout << "Face unknowns : " << hho.nTotalFaceUnknowns << " (" << faceBasis->Size() << " per interior face)" << endl;
-			cout << "Total unknowns: " << hho.nTotalHybridUnknowns << endl;
-			cout << "System size   : " << (this->_staticCondensation ? hho.nTotalFaceUnknowns : hho.nTotalHybridUnknowns) << " (" << (this->_staticCondensation ? "statically condensed" : "no static condensation") << ")" << endl;
+			cout << "Cell unknowns : " << HHO->nTotalCellUnknowns << " (" << cellBasis->Size() << " per cell)" << endl;
+			cout << "Face unknowns : " << HHO->nTotalFaceUnknowns << " (" << faceBasis->Size() << " per interior face)" << endl;
+			cout << "Total unknowns: " << HHO->nTotalHybridUnknowns << endl;
+			cout << "System size   : " << (this->_staticCondensation ? HHO->nTotalFaceUnknowns : HHO->nTotalHybridUnknowns) << " (" << (this->_staticCondensation ? "statically condensed" : "no static condensation") << ")" << endl;
 			cout << "Parallelism   : " << (BaseParallelLoop::GetDefaultNThreads() == 1 ? "sequential execution" : to_string(BaseParallelLoop::GetDefaultNThreads()) + " threads") << endl;
 		}
 
@@ -169,8 +128,8 @@ public:
 		if ((action & Action::LogAssembly) == Action::LogAssembly)
 			cout << endl << "Assembly..." << endl;
 
-		this->_globalRHS = Eigen::VectorXd(hho.nTotalHybridUnknowns);
-		this->_globalRHS.tail(hho.nTotalFaceUnknowns) = Eigen::VectorXd::Zero(hho.nTotalFaceUnknowns);
+		this->_globalRHS = Eigen::VectorXd(HHO->nTotalHybridUnknowns);
+		this->_globalRHS.tail(HHO->nTotalFaceUnknowns) = Eigen::VectorXd::Zero(HHO->nTotalFaceUnknowns);
 
 		// Compute some useful integrals on reference element and store them
 		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreCellMassMatrix(cellBasis);
@@ -198,9 +157,9 @@ public:
 		{
 			ParallelChunk<EmptyResultChunk>* chunk = parallelLoop.Chunks[threadNumber];
 
-			chunk->ThreadFuture = std::async([this, &hho, mesh, cellBasis, faceBasis, reconstructionBasis, action, chunk, &chunksMatrixCoeffs, &chunksConsistencyCoeffs, &chunksStabilizationCoeffs, &chunksReconstructionCoeffs]()
+			chunk->ThreadFuture = std::async([this, mesh, cellBasis, faceBasis, reconstructionBasis, action, chunk, &chunksMatrixCoeffs, &chunksConsistencyCoeffs, &chunksStabilizationCoeffs, &chunksReconstructionCoeffs]()
 				{
-					BigNumber nnzApproximate = chunk->Size() * (pow(hho.nLocalCellUnknowns, 2) + 4 * pow(hho.nLocalFaceUnknowns, 2) + hho.nLocalCellUnknowns * 4 * hho.nLocalFaceUnknowns);
+					BigNumber nnzApproximate = chunk->Size() * (pow(HHO->nCellUnknowns, 2) + 4 * pow(HHO->nFaceUnknowns, 2) + HHO->nCellUnknowns * 4 * HHO->nFaceUnknowns);
 					NonZeroCoefficients matrixCoeffs(nnzApproximate);
 					NonZeroCoefficients consistencyCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
 					NonZeroCoefficients stabilizationCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
@@ -347,7 +306,7 @@ public:
 		// Aggregation of the parallel chunks //
 		//------------------------------------//
 
-		BigNumber nnzApproximate = mesh->Elements.size() * (pow(hho.nLocalCellUnknowns, 2) + 4 * pow(hho.nLocalFaceUnknowns, 2) + hho.nLocalCellUnknowns * 4 * hho.nLocalFaceUnknowns);
+		BigNumber nnzApproximate = mesh->Elements.size() * (pow(HHO->nCellUnknowns, 2) + 4 * pow(HHO->nFaceUnknowns, 2) + HHO->nCellUnknowns * 4 * HHO->nFaceUnknowns);
 		NonZeroCoefficients matrixCoeffs(nnzApproximate);
 		NonZeroCoefficients consistencyCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
 		NonZeroCoefficients stabilizationCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
@@ -378,7 +337,7 @@ public:
 		// Creation of the matrices //
 		//--------------------------//
 
-		SparseMatrix globalMatrix = SparseMatrix(hho.nTotalHybridUnknowns, hho.nTotalHybridUnknowns);
+		SparseMatrix globalMatrix = SparseMatrix(HHO->nTotalHybridUnknowns, HHO->nTotalHybridUnknowns);
 		matrixCoeffs.Fill(globalMatrix);
 
 		this->_globalMatrix = globalMatrix;
@@ -387,16 +346,16 @@ public:
 			if ((action & Action::LogAssembly) == Action::LogAssembly)
 				cout << "Static condensation..." << endl;
 
-			//SparseMatrix Att = this->_globalMatrix.topLeftCorner(hho.nTotalCellUnknowns, hho.nTotalCellUnknowns);
-			SparseMatrix Aff = this->_globalMatrix.bottomRightCorner(hho.nTotalFaceUnknowns, hho.nTotalFaceUnknowns);
-			SparseMatrix Atf = this->_globalMatrix.topRightCorner(hho.nTotalCellUnknowns, hho.nTotalFaceUnknowns);
+			//SparseMatrix Att = this->_globalMatrix.topLeftCorner(HHO->nTotalCellUnknowns, HHO->nTotalCellUnknowns);
+			SparseMatrix Aff = this->_globalMatrix.bottomRightCorner(HHO->nTotalFaceUnknowns, HHO->nTotalFaceUnknowns);
+			SparseMatrix Atf = this->_globalMatrix.topRightCorner(HHO->nTotalCellUnknowns, HHO->nTotalFaceUnknowns);
 
 			SparseMatrix inverseAtt = GetInverseAtt();
 
 			this->A = Aff - Atf.transpose() * inverseAtt * Atf;
 
-			Eigen::VectorXd bt = this->_globalRHS.head(hho.nTotalCellUnknowns);
-			Eigen::VectorXd bf = this->_globalRHS.tail(hho.nTotalFaceUnknowns);
+			Eigen::VectorXd bt = this->_globalRHS.head(HHO->nTotalCellUnknowns);
+			Eigen::VectorXd bf = this->_globalRHS.tail(HHO->nTotalFaceUnknowns);
 			this->b = bf - Atf.transpose() * inverseAtt * bt;
 		}
 		else
@@ -424,13 +383,13 @@ public:
 
 		if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
 		{
-			SparseMatrix Acons = SparseMatrix(hho.nTotalHybridUnknowns, hho.nTotalHybridUnknowns);
+			SparseMatrix Acons = SparseMatrix(HHO->nTotalHybridUnknowns, HHO->nTotalHybridUnknowns);
 			consistencyCoeffs.Fill(Acons);
 
-			SparseMatrix Astab = SparseMatrix(hho.nTotalHybridUnknowns, hho.nTotalHybridUnknowns);
+			SparseMatrix Astab = SparseMatrix(HHO->nTotalHybridUnknowns, HHO->nTotalHybridUnknowns);
 			stabilizationCoeffs.Fill(Astab);
 
-			SparseMatrix reconstructionMatrix = SparseMatrix(hho.nElements * reconstructionBasis->Size(), hho.nTotalHybridCoeffs);
+			SparseMatrix reconstructionMatrix = SparseMatrix(HHO->nElements * reconstructionBasis->Size(), HHO->nTotalHybridCoeffs);
 			reconstructionCoeffs.Fill(reconstructionMatrix);
 
 			Eigen::saveMarket(Acons, consistencyFilePath);
@@ -450,7 +409,7 @@ public:
 		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->Faces, [this](Face<Dim>* f)
 			{
 				Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
-				face->InitHHO(this->_reconstructionBasis, this->_cellBasis, this->_faceBasis);
+				face->InitHHO(HHO);
 			}
 		);
 
@@ -458,16 +417,14 @@ public:
 		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this](Element<Dim>* e)
 			{
 				Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
-				element->InitHHO(this->_reconstructionBasis, this->_cellBasis, this->_faceBasis);
+				element->InitHHO(HHO);
 			}
 		);
 	}
 
 	void ReconstructHigherOrderApproximation()
 	{
-		HHOInfo<Dim> hho = this->HHO;
-
-		Eigen::VectorXd globalReconstructedSolution(hho.nElements * hho.nLocalReconstructUnknowns);
+		Eigen::VectorXd globalReconstructedSolution(HHO->nElements * HHO->nReconstructUnknowns);
 
 		Eigen::VectorXd globalHybridSolution;
 
@@ -476,34 +433,35 @@ public:
 			cout << "Solving cell unknowns..." << endl;
 			Eigen::VectorXd facesSolution = this->Solution;
 
-			SparseMatrix Atf = this->_globalMatrix.topRightCorner(hho.nTotalCellUnknowns, hho.nTotalFaceUnknowns);
-			Eigen::VectorXd bt = this->_globalRHS.head(hho.nTotalCellUnknowns);
+			SparseMatrix Atf = this->_globalMatrix.topRightCorner(HHO->nTotalCellUnknowns, HHO->nTotalFaceUnknowns);
+			Eigen::VectorXd bt = this->_globalRHS.head(HHO->nTotalCellUnknowns);
 			SparseMatrix inverseAtt = GetInverseAtt();
 
-			globalHybridSolution = Eigen::VectorXd(hho.nTotalHybridUnknowns);
-			globalHybridSolution.tail(hho.nTotalFaceUnknowns) = facesSolution;
-			globalHybridSolution.head(hho.nTotalCellUnknowns) = inverseAtt * (bt - Atf * facesSolution);
+			globalHybridSolution = Eigen::VectorXd(HHO->nTotalHybridUnknowns);
+			globalHybridSolution.tail(HHO->nTotalFaceUnknowns) = facesSolution;
+			globalHybridSolution.head(HHO->nTotalCellUnknowns) = inverseAtt * (bt - Atf * facesSolution);
 		}
 		else
 			globalHybridSolution = this->Solution;
 
 		cout << "Reconstruction of higher order approximation..." << endl;
-		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, hho, &globalHybridSolution, &globalReconstructedSolution](Element<Dim>* e)
+		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, &globalHybridSolution, &globalReconstructedSolution](Element<Dim>* e)
 			{
+				HHOParameters<Dim>* HHO = this->HHO;
 				Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
 
-				Eigen::VectorXd localHybridSolution(hho.nLocalCellUnknowns + hho.nLocalFaceUnknowns * element->Faces.size());
-				localHybridSolution.head(hho.nLocalCellUnknowns) = globalHybridSolution.segment(FirstDOFGlobalNumber(element), hho.nLocalCellUnknowns);
+				Eigen::VectorXd localHybridSolution(HHO->nCellUnknowns + HHO->nFaceUnknowns * element->Faces.size());
+				localHybridSolution.head(HHO->nCellUnknowns) = globalHybridSolution.segment(FirstDOFGlobalNumber(element), HHO->nCellUnknowns);
 				for (auto face : element->Faces)
 				{
 					if (face->IsDomainBoundary)
-						localHybridSolution.segment(element->FirstDOFNumber(face), hho.nLocalFaceUnknowns) = Eigen::VectorXd::Zero(hho.nLocalFaceUnknowns);
+						localHybridSolution.segment(element->FirstDOFNumber(face), HHO->nFaceUnknowns) = Eigen::VectorXd::Zero(HHO->nFaceUnknowns);
 					else
-						localHybridSolution.segment(element->FirstDOFNumber(face), hho.nLocalFaceUnknowns) = globalHybridSolution.segment(FirstDOFGlobalNumber(face), hho.nLocalFaceUnknowns);
+						localHybridSolution.segment(element->FirstDOFNumber(face), HHO->nFaceUnknowns) = globalHybridSolution.segment(FirstDOFGlobalNumber(face), HHO->nFaceUnknowns);
 				}
 
 				Eigen::VectorXd localReconstructedSolution = element->Reconstruct(localHybridSolution);
-				globalReconstructedSolution.segment(element->Number * hho.nLocalReconstructUnknowns, hho.nLocalReconstructUnknowns) = localReconstructedSolution;
+				globalReconstructedSolution.segment(element->Number * HHO->nReconstructUnknowns, HHO->nReconstructUnknowns) = localReconstructedSolution;
 			});
 
 		this->ReconstructedSolution = globalReconstructedSolution;
@@ -525,14 +483,13 @@ public:
 	SparseMatrix GetInverseAtt()
 	{
 		ElementParallelLoop<Dim> parallelLoop(_mesh->Elements);
-		parallelLoop.ReserveChunkCoeffsSize(this->HHO.nLocalCellUnknowns * this->HHO.nLocalCellUnknowns);
+		parallelLoop.ReserveChunkCoeffsSize(HHO->nCellUnknowns * HHO->nCellUnknowns);
 		parallelLoop.Execute([this](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
 			{
 				Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
-				int nCellUnknowns = this->HHO.nLocalCellUnknowns;
-				chunk->Results.Coeffs.Add(element->Number * nCellUnknowns, element->Number * nCellUnknowns, element->invAtt);
+				chunk->Results.Coeffs.Add(element->Number * HHO->nCellUnknowns, element->Number * HHO->nCellUnknowns, element->invAtt);
 			});
-		SparseMatrix inverseAtt = SparseMatrix(this->HHO.nTotalCellUnknowns, this->HHO.nTotalCellUnknowns);
+		SparseMatrix inverseAtt = SparseMatrix(HHO->nTotalCellUnknowns, HHO->nTotalCellUnknowns);
 		parallelLoop.Fill(inverseAtt);
 		return inverseAtt;
 	}
@@ -548,11 +505,11 @@ private:
 	}
 	BigNumber FirstDOFGlobalNumber(Element<Dim>* element)
 	{
-		return element->Number * this->_cellBasis->Size();
+		return element->Number * HHO->CellBasis->Size();
 	}
 	BigNumber FirstDOFGlobalNumber(Face<Dim>* face)
 	{
-		return this->HHO.nTotalCellUnknowns + face->Number * this->_faceBasis->Size();
+		return this->HHO->nTotalCellUnknowns + face->Number * HHO->FaceBasis->Size();
 	}
 };
 

@@ -23,7 +23,7 @@ class Program
 {
 public:
 	Program() {}
-	virtual void Start(string rhsCode, double kappa1, double kappa2, double anisotropyRatio, string partition, BigNumber n, string discretization, string basisCode, int polyDegree, bool usePolynomialSpaceQ,
+	virtual void Start(string rhsCode, double kappa1, double kappa2, double anisotropyRatio, string partition, BigNumber n, string discretization, string stabilization, string basisCode, int polyDegree, bool usePolynomialSpaceQ,
 		int penalizationCoefficient, bool staticCondensation, Action action, 
 		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations,
 		CoarseningStrategy coarseningStgy, string initialGuessCode, string outputDirectory, string solverCode, double solverTolerance) = 0;
@@ -35,7 +35,7 @@ class ProgramDim : public Program
 public:
 	ProgramDim() : Program() {}
 
-	void Start(string rhsCode, double kappa1, double kappa2, double anisotropyRatio, string partition, BigNumber n, string discretization, string basisCode, int polyDegree, bool usePolynomialSpaceQ,
+	void Start(string rhsCode, double kappa1, double kappa2, double anisotropyRatio, string partition, BigNumber n, string discretization, string stabilization, string basisCode, int polyDegree, bool usePolynomialSpaceQ,
 		int penalizationCoefficient, bool staticCondensation, Action action, 
 		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations,
 		CoarseningStrategy coarseningStgy, string initialGuessCode, string outputDirectory, string solverCode, double solverTolerance)
@@ -235,7 +235,9 @@ public:
 			FunctionalBasis<Dim> cellBasis(basisCode, polyDegree - 1, usePolynomialSpaceQ);
 			FunctionalBasis<Dim-1> faceBasis(basisCode, polyDegree - 1, usePolynomialSpaceQ);
 
-			Poisson_HHO<Dim> problem(mesh, rhsCode, sourceFunction, &reconstructionBasis, &cellBasis, &faceBasis, staticCondensation, &diffusionPartition, outputDirectory);
+			HHOParameters<Dim> hho(mesh, stabilization, &reconstructionBasis, &cellBasis, &faceBasis);
+
+			Poisson_HHO<Dim> problem(mesh, rhsCode, sourceFunction, &hho, staticCondensation, &diffusionPartition, outputDirectory);
 
 			cout << endl;
 			cout << "----------------------- Assembly -------------------------" << endl;

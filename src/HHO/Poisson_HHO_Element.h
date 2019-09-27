@@ -2,6 +2,7 @@
 #include <Eigen/Sparse>
 #include "../Mesh/Element.h"
 #include "../Utils/SourceFunction.h"
+#include "HHOParameters.h"
 #include "Poisson_HHO_Face.h"
 
 template <int Dim>
@@ -11,9 +12,7 @@ private:
 	Eigen::MatrixXd _cellMassMatrix;
 	Eigen::MatrixXd _projFromReconstruct;
 public:
-	FunctionalBasis<Dim>* ReconstructionBasis;
-	FunctionalBasis<Dim>* CellBasis;
-	FunctionalBasis<Dim - 1>* FaceBasis;
+	HHOParameters<Dim>* HHO;
 
 	// Reconstruction operator as a matrix
 	Eigen::MatrixXd P;
@@ -31,24 +30,21 @@ public:
 
 	Poisson_HHO_Element(BigNumber number) : Element<Dim>(number) {}
 	
-	void InitHHO(FunctionalBasis<Dim>* reconstructionBasis, FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim - 1> * faceBasis)
+	void InitHHO(HHOParameters<Dim>* hho)
 	{
-		this->ReconstructionBasis = reconstructionBasis;
-		this->CellBasis = cellBasis;
-		this->FaceBasis = faceBasis;
+		this->HHO = hho;
 
-		this->_cellMassMatrix = this->CellMassMatrix(cellBasis);
-		Eigen::MatrixXd Nt = this->CellReconstructMassMatrix(cellBasis, reconstructionBasis);
+		this->_cellMassMatrix = this->CellMassMatrix(hho->CellBasis);
+		Eigen::MatrixXd Nt = this->CellReconstructMassMatrix(hho->CellBasis, hho->ReconstructionBasis);
 		this->_projFromReconstruct = _cellMassMatrix.inverse() * Nt;
 
 		this->AssembleReconstructionAndConsistencyMatrices();
 		this->AssembleStabilizationMatrix();
 
-		int nCellUnknowns = cellBasis->Size();
-		int nTotalFaceUnknowns = this->Faces.size() * faceBasis->Size();
+		int nTotalFaceUnknowns = this->Faces.size() * hho->nFaceUnknowns;
 
 		this->A = Acons + Astab;
-		auto Att = A.topLeftCorner(nCellUnknowns, nCellUnknowns);
+		auto Att = A.topLeftCorner(hho->nCellUnknowns, hho->nCellUnknowns);
 		//auto Aff = A.bottomRightCorner(nTotalFaceUnknowns, nTotalFaceUnknowns);
 		//auto Atf = A.topRightCorner(nCellUnknowns, nTotalFaceUnknowns);
 		this->invAtt = Att.inverse();
@@ -104,14 +100,13 @@ public:
 
 	Eigen::MatrixXd ReconstructionFromFacesMatrix()
 	{
-		int nCellUnknowns = CellBasis->Size();
-		int nTotalFaceUnknowns = this->Faces.size() * FaceBasis->Size();
+		int nTotalFaceUnknowns = this->Faces.size() * HHO->nFaceUnknowns;
 
-		auto Atf = this->A.topRightCorner(nCellUnknowns, nTotalFaceUnknowns);
+		auto Atf = this->A.topRightCorner(HHO->nCellUnknowns, nTotalFaceUnknowns);
 		Eigen::MatrixXd solveCellUnknowns = -this->invAtt * Atf;
 
-		Eigen::MatrixXd createHybridVectorFromFacesMatrix(nCellUnknowns + nTotalFaceUnknowns, nTotalFaceUnknowns);
-		createHybridVectorFromFacesMatrix.topRows(nCellUnknowns) = solveCellUnknowns;
+		Eigen::MatrixXd createHybridVectorFromFacesMatrix(HHO->nCellUnknowns + nTotalFaceUnknowns, nTotalFaceUnknowns);
+		createHybridVectorFromFacesMatrix.topRows(HHO->nCellUnknowns) = solveCellUnknowns;
 		createHybridVectorFromFacesMatrix.bottomRows(nTotalFaceUnknowns) = Eigen::MatrixXd::Identity(nTotalFaceUnknowns, nTotalFaceUnknowns);
 		return this->P * createHybridVectorFromFacesMatrix;
 	}
@@ -182,7 +177,7 @@ private:
 
 	void AssembleReconstructionAndConsistencyMatrices()
 	{
-		this->P = Eigen::MatrixXd(ReconstructionBasis->Size(), CellBasis->Size() + this->Faces.size() * FaceBasis->Size());
+		this->P = Eigen::MatrixXd(HHO->nReconstructUnknowns, HHO->nCellUnknowns + this->Faces.size() * HHO->nFaceUnknowns);
 
 		Eigen::MatrixXd reconstructionMatrixToInvert = this->AssembleReconstructionMatrixToInvert();
 		Eigen::MatrixXd rhsMatrix = this->AssembleRHSMatrix();
@@ -193,18 +188,18 @@ private:
 			Eigen::VectorXd col = solver.solve(rhsMatrix.col(j));
 
 			// We don't keep the last element of the column, which is the Lagrange multiplier
-			auto colWithoutLagrangeMultiplier = col.head(this->ReconstructionBasis->Size());
+			auto colWithoutLagrangeMultiplier = col.head(HHO->nReconstructUnknowns);
 			this->P.col(j) = colWithoutLagrangeMultiplier;
 		}
 
-		Eigen::MatrixXd laplacianMatrix = reconstructionMatrixToInvert.topLeftCorner(this->ReconstructionBasis->Size(), this->ReconstructionBasis->Size()); // Grad-Grad part (block S)
+		Eigen::MatrixXd laplacianMatrix = reconstructionMatrixToInvert.topLeftCorner(HHO->nReconstructUnknowns, HHO->nReconstructUnknowns); // Grad-Grad part (block S)
 
 		this->Acons = this->P.transpose() * laplacianMatrix * this->P;
 	}
 
 	Eigen::MatrixXd AssembleReconstructionMatrixToInvert()
 	{
-		Eigen::MatrixXd matrixToInvert(this->ReconstructionBasis->Size() + 1, this->ReconstructionBasis->Size() + 1);
+		Eigen::MatrixXd matrixToInvert(HHO->nReconstructUnknowns + 1, HHO->nReconstructUnknowns + 1);
 		this->AssembleGradientReconstructionMatrix(matrixToInvert); // Block S
 		this->AssembleMeanValueCondition(matrixToInvert); // Blocks L and L_transpose
 		matrixToInvert.bottomRightCorner<1, 1>() << 0;
@@ -213,17 +208,17 @@ private:
 
 	void AssembleGradientReconstructionMatrix(Eigen::MatrixXd & reconstructionMatrixToInvert)
 	{
-		for (BasisFunction<Dim>* phi1 : this->ReconstructionBasis->LocalFunctions)
+		for (BasisFunction<Dim>* phi1 : HHO->ReconstructionBasis->LocalFunctions)
 		{
-			for (BasisFunction<Dim>* phi2 : this->ReconstructionBasis->LocalFunctions)
+			for (BasisFunction<Dim>* phi2 : HHO->ReconstructionBasis->LocalFunctions)
 				reconstructionMatrixToInvert(phi1->LocalNumber, phi2->LocalNumber) = this->IntegralKGradGradReconstruct(this->DiffTensor, phi1, phi2);
 		}
 	}
 
 	void AssembleMeanValueCondition(Eigen::MatrixXd & reconstructionMatrixToInvert)
 	{
-		int last = this->ReconstructionBasis->NumberOfLocalFunctionsInElement(NULL);
-		for (BasisFunction<Dim>* phi : this->ReconstructionBasis->LocalFunctions)
+		int last = HHO->ReconstructionBasis->NumberOfLocalFunctionsInElement(NULL);
+		for (BasisFunction<Dim>* phi : HHO->ReconstructionBasis->LocalFunctions)
 		{
 			double meanValue = this->Integral(phi);
 			reconstructionMatrixToInvert(last, phi->LocalNumber) = meanValue;
@@ -233,16 +228,16 @@ private:
 
 	void AssembleMeanValueConditionRHS(Eigen::MatrixXd & rhsMatrix)
 	{
-		int last = this->ReconstructionBasis->NumberOfLocalFunctionsInElement(NULL);
-		for (BasisFunction<Dim>* phi : this->CellBasis->LocalFunctions)
+		int last = HHO->ReconstructionBasis->NumberOfLocalFunctionsInElement(NULL);
+		for (BasisFunction<Dim>* phi : HHO->CellBasis->LocalFunctions)
 			rhsMatrix(last, phi->LocalNumber) = this->Integral(phi);
 	}
 
 	Eigen::MatrixXd AssembleRHSMatrix()
 	{
-		auto nFaceUnknowns = this->Faces.size() * this->FaceBasis->Size();
-		auto nColumns = this->CellBasis->Size() + nFaceUnknowns;
-		Eigen::MatrixXd rhsMatrix(this->ReconstructionBasis->Size() + 1, nColumns);
+		auto nTotalFaceUnknowns = this->Faces.size() * HHO->nFaceUnknowns;
+		auto nColumns = HHO->nCellUnknowns + nTotalFaceUnknowns;
+		Eigen::MatrixXd rhsMatrix(HHO->nReconstructUnknowns + 1, nColumns);
 
 		// Top-left corner (Block Bt)
 		this->AssembleIntegrationByPartsRHS_cell(rhsMatrix);
@@ -255,16 +250,16 @@ private:
 		this->AssembleMeanValueConditionRHS(rhsMatrix);
 
 		// Bottom-right corner (0)
-		rhsMatrix.bottomRightCorner(1, nFaceUnknowns) << Eigen::ArrayXXd::Zero(1, nFaceUnknowns);
+		rhsMatrix.bottomRightCorner(1, nTotalFaceUnknowns) << Eigen::ArrayXXd::Zero(1, nTotalFaceUnknowns);
 
 		return rhsMatrix;
 	}
 
 	void AssembleIntegrationByPartsRHS_cell(Eigen::MatrixXd & rhsMatrix)
 	{
-		for (BasisFunction<Dim>* reconstructPhi : this->ReconstructionBasis->LocalFunctions)
+		for (BasisFunction<Dim>* reconstructPhi : HHO->ReconstructionBasis->LocalFunctions)
 		{
-			for (BasisFunction<Dim>* cellPhi : this->CellBasis->LocalFunctions)
+			for (BasisFunction<Dim>* cellPhi : HHO->CellBasis->LocalFunctions)
 				rhsMatrix(reconstructPhi->LocalNumber, DOFNumber(cellPhi)) = this->IntegrationByPartsRHS_cell(reconstructPhi, cellPhi);
 		}
 	}
@@ -272,9 +267,9 @@ private:
 	void AssembleIntegrationByPartsRHS_face(Eigen::MatrixXd & rhsMatrix, Face<Dim> * f)
 	{
 		Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
-		for (BasisFunction<Dim>* reconstructPhi : this->ReconstructionBasis->LocalFunctions)
+		for (BasisFunction<Dim>* reconstructPhi : HHO->ReconstructionBasis->LocalFunctions)
 		{
-			for (BasisFunction<Dim - 1> * facePhi : this->FaceBasis->LocalFunctions)
+			for (BasisFunction<Dim - 1> * facePhi : HHO->FaceBasis->LocalFunctions)
 				rhsMatrix(reconstructPhi->LocalNumber, DOFNumber(face, facePhi)) = this->IntegrationByPartsRHS_face(face, reconstructPhi, facePhi);
 		}
 	}
@@ -330,29 +325,58 @@ private:
 
 	void AssembleStabilizationMatrix()
 	{
-		this->Astab = Eigen::MatrixXd::Zero(CellBasis->Size() + this->Faces.size() * FaceBasis->Size(), CellBasis->Size() + this->Faces.size() * FaceBasis->Size());
+		int nHybridUnknowns = HHO->nCellUnknowns + this->Faces.size() * HHO->nFaceUnknowns;
 
-		Eigen::MatrixXd ProjT = _projFromReconstruct;
-		Eigen::MatrixXd Dt = ProjT * this->P;
-		for (int i = 0; i < Dt.rows(); i++)
-			Dt(i, i) -= 1;
+		this->Astab = Eigen::MatrixXd::Zero(nHybridUnknowns, nHybridUnknowns);
 
-		for (auto f : this->Faces)
+		if (HHO->Stabilization.compare("hho") == 0)
 		{
-			Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
-			auto normal = this->OuterNormalVector(face);
-			Eigen::MatrixXd Mf = face->FaceMassMatrix();
-			Eigen::MatrixXd ProjF = face->GetProjFromReconstruct(this);
-			Eigen::MatrixXd ProjFT = face->GetProjFromCell(this);
+			Eigen::MatrixXd ProjT = _projFromReconstruct;
+			Eigen::MatrixXd Dt = ProjT * this->P;
+			for (int i = 0; i < Dt.rows(); i++)
+				Dt(i, i) -= 1;
 
-			Eigen::MatrixXd Df = ProjF * this->P;
-			for (int i = 0; i < Df.rows(); i++)
-				Df(i, FirstDOFNumber(face) + i) -= 1;
+			for (auto f : this->Faces)
+			{
+				Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+				auto normal = this->OuterNormalVector(face);
+				Eigen::MatrixXd Mf = face->FaceMassMatrix();
+				Eigen::MatrixXd ProjF = face->GetProjFromReconstruct(this);
+				Eigen::MatrixXd ProjFT = face->GetProjFromCell(this);
 
-			Eigen::MatrixXd DiffTF = Df - ProjFT * Dt;
-			double h = face->GetDiameter();
-			this->Astab += DiffTF.transpose() * Mf * DiffTF * (this->DiffTensor * normal).dot(normal) / h;
+				Eigen::MatrixXd Df = ProjF * this->P;
+				for (int i = 0; i < Df.rows(); i++)
+					Df(i, FirstDOFNumber(face) + i) -= 1;
+
+				Eigen::MatrixXd DiffTF = Df - ProjFT * Dt;
+				double h = face->GetDiameter();
+				this->Astab += DiffTF.transpose() * Mf * DiffTF * (this->DiffTensor * normal).dot(normal) / h;
+			}
 		}
+		else if (HHO->Stabilization.compare("hdg") == 0)
+		{
+			for (auto f : this->Faces)
+			{
+				Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+				auto normal = this->OuterNormalVector(face);
+				Eigen::MatrixXd Mf = face->FaceMassMatrix();
+				Eigen::MatrixXd ProjFT = face->GetProjFromCell(this);
+
+				Eigen::MatrixXd Fpart = Eigen::MatrixXd::Zero(HHO->nFaceUnknowns, nHybridUnknowns);
+				Fpart.middleCols(FirstDOFNumber(face), HHO->nFaceUnknowns) = Eigen::MatrixXd::Identity(HHO->nFaceUnknowns, HHO->nFaceUnknowns);
+
+				//cout << "------------- Fpart -------------" << endl << Fpart << endl;
+
+				Eigen::MatrixXd Tpart = Eigen::MatrixXd::Zero(HHO->nCellUnknowns, nHybridUnknowns);
+				Tpart.middleCols(0, HHO->nCellUnknowns) = Eigen::MatrixXd::Identity(HHO->nCellUnknowns, HHO->nCellUnknowns);
+
+				Eigen::MatrixXd DiffTF = Fpart - ProjFT * Tpart;
+				double h = face->GetDiameter();
+				this->Astab += DiffTF.transpose() * Mf * DiffTF * (this->DiffTensor * normal).dot(normal) / h;
+			}
+		}
+		else
+			assert(false);
 	}
 	int DOFNumber(BasisFunction<Dim> * cellPhi)
 	{
@@ -366,6 +390,6 @@ private:
 public:
 	int FirstDOFNumber(Face<Dim> * face)
 	{
-		return this->CellBasis->Size() + this->LocalNumberOf(face) * this->FaceBasis->Size();
+		return HHO->nCellUnknowns + this->LocalNumberOf(face) * HHO->nFaceUnknowns;
 	}
 };
