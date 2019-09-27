@@ -18,9 +18,9 @@ public:
 
 	GaussLegendre(int nPoints)
 	{
-		if (nPoints < 2)
-			nPoints = 2;
-		else if (nPoints > MAX_POINTS)
+		assert(nPoints > 0);
+
+		if (nPoints > MAX_POINTS)
 		{
 			cout << "Warning: " << nPoints << " Gauss points are required to compute the exact integral (only " << MAX_POINTS << " are implemented)." << endl;
 			nPoints = MAX_POINTS;
@@ -33,7 +33,13 @@ public:
 
 		// https://pomax.github.io/bezierinfo/legendre-gauss.html
 
-		if (nPoints == 2)
+		if (nPoints == 1)
+		{
+			points[0] = 0;
+
+			weights[0] = 2.0000000000000000;
+		}
+		else if (nPoints == 2)
 		{
 			points[0] = -0.5773502691896257;
 			points[1] = 0.5773502691896257;
