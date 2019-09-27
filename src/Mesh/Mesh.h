@@ -7,8 +7,8 @@ using namespace std;
 
 enum class CoarseningStrategy : unsigned
 {
-	AgglomerationAndMergeColinearFaces = 0,
-	AgglomerationAndKeepFineFaces = 1
+	Standard = 0,
+	Agglomeration = 1
 };
 
 template <int Dim>
@@ -60,11 +60,15 @@ public:
 			});
 	}
 
-	void ExportFacesToMatlab(string outputDirectory)
+	void ExportFacesToMatlab(string outputDirectory, bool dummy)
 	{
 		string filePath = outputDirectory + "/faces" + to_string(Dim) + "D_" + FileNamePart() + ".dat";
+		ExportFacesToMatlab(filePath);
+	}
+	void ExportFacesToMatlab(string filePath)
+	{
 		FILE* file = fopen(filePath.c_str(), "w");
-		fprintf(file, "Number OriginX OriginY OriginZ Orientation Boundary\n");
+		fprintf(file, "Number OriginX OriginY OriginZ WidthX WidthY WidthZ Orientation Boundary\n");
 		for (Face<Dim>* f : this->Faces)
 			f->ExportFaceToMatlab(file);
 		fclose(file);

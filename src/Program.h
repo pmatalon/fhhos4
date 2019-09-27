@@ -26,7 +26,7 @@ public:
 	virtual void Start(string rhsCode, double kappa1, double kappa2, double anisotropyRatio, string partition, BigNumber n, string discretization, string basisCode, int polyDegree, bool usePolynomialSpaceQ,
 		int penalizationCoefficient, bool staticCondensation, Action action, 
 		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations,
-		string initialGuessCode, string outputDirectory, string solverCode, double solverTolerance) = 0;
+		CoarseningStrategy coarseningStgy, string initialGuessCode, string outputDirectory, string solverCode, double solverTolerance) = 0;
 };
 
 template <int Dim>
@@ -38,7 +38,7 @@ public:
 	void Start(string rhsCode, double kappa1, double kappa2, double anisotropyRatio, string partition, BigNumber n, string discretization, string basisCode, int polyDegree, bool usePolynomialSpaceQ,
 		int penalizationCoefficient, bool staticCondensation, Action action, 
 		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations,
-		string initialGuessCode, string outputDirectory, string solverCode, double solverTolerance)
+		CoarseningStrategy coarseningStgy, string initialGuessCode, string outputDirectory, string solverCode, double solverTolerance)
 	{
 		Timer totalTimer;
 		totalTimer.Start();
@@ -49,7 +49,7 @@ public:
 
 		Mesh<Dim>* mesh = BuildMesh(n);
 
-		//mesh->CoarsenMesh(CoarseningStrategy::AgglomerationAndKeepFineFaces);
+		//mesh->CoarsenMesh(CoarseningStrategy::Agglomeration);
 		//mesh = mesh->CoarseMesh;
 		//cout << *mesh << endl << endl;
 		//cout << "Coarse mesh" << endl << *(mesh->CoarseMesh) << endl << endl;
@@ -217,7 +217,7 @@ public:
 				cout << endl;
 				cout << "------------------- Linear system resolution ------------------" << endl;
 
-				Solver* solver = CreateSolver(solverCode, &problem, solverTolerance, staticCondensation, nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, basis.Size());
+				Solver* solver = CreateSolver(solverCode, &problem, solverTolerance, staticCondensation, nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, coarseningStgy, basis.Size());
 				problem.Solution = Solve(solver, problem.A, problem.b, initialGuessCode);
 
 				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
@@ -248,14 +248,14 @@ public:
 			cout << endl << "Assembly time: CPU = " << assemblyTimer.CPU() << ", elapsed = " << assemblyTimer.Elapsed() << endl;
 
 			if ((action & Action::ExportFaces) == Action::ExportFaces)
-				mesh->ExportFacesToMatlab(outputDirectory);
+				mesh->ExportFacesToMatlab(outputDirectory, true);
 
 			if ((action & Action::SolveSystem) == Action::SolveSystem)
 			{
 				cout << endl;
 				cout << "------------------- Linear system resolution ------------------" << endl;
 
-				Solver* solver = CreateSolver(solverCode, &problem, solverTolerance, staticCondensation, nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, faceBasis.Size());
+				Solver* solver = CreateSolver(solverCode, &problem, solverTolerance, staticCondensation, nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, coarseningStgy, faceBasis.Size());
 				problem.Solution = Solve(solver, problem.A, problem.b, initialGuessCode);
 
 				if (staticCondensation && (action & Action::ExtractSolution) == Action::ExtractSolution)
@@ -285,15 +285,16 @@ private:
 	Mesh<Dim>* BuildMesh(int n) { return nullptr; }
 
 	Solver* CreateSolver(string solverCode, Problem* problem, double tolerance, bool staticCondensation, 
-		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations, int blockSize)
+		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations, CoarseningStrategy coarseningStgy, int blockSize)
 	{
 		Solver* solver = NULL;
-		if (solverCode.compare("mg") == 0 || solverCode.compare("pcgmg") == 0)
+		if (solverCode.compare("mg") == 0 || solverCode.compare("pcgmg") == 0 || solverCode.compare("mg2") == 0 || solverCode.compare("pcgmg2") == 0)
 		{
 			if (staticCondensation)
 			{
 				Poisson_HHO<Dim>* hhoProblem = dynamic_cast<Poisson_HHO<Dim>*>(problem);
-				MultigridForHHO<Dim>* mg = new MultigridForHHO<Dim>(hhoProblem, nMultigridLevels);
+				int algoNumber = solverCode.compare("mg") == 0 || solverCode.compare("pcgmg") == 0 ? 1 : 2;
+				MultigridForHHO<Dim>* mg = new MultigridForHHO<Dim>(hhoProblem, algoNumber, nMultigridLevels);
 				mg->MatrixMaxSizeForCoarsestLevel = matrixMaxSizeForCoarsestLevel;
 				mg->WLoops = wLoops;
 				mg->UseGalerkinOperator = useGalerkinOperator;
@@ -301,10 +302,11 @@ private:
 				mg->PostSmootherCode = postSmootherCode;
 				mg->PreSmoothingIterations = nPreSmoothingIterations;
 				mg->PostSmoothingIterations = nPostSmoothingIterations;
+				mg->CoarseningStgy = coarseningStgy;
 
-				if (solverCode.compare("mg") == 0)
+				if (solverCode.compare("mg") == 0 || solverCode.compare("mg2") == 0)
 					solver = mg;
-				else if (solverCode.compare("pcgmg") == 0)
+				else if (solverCode.compare("pcgmg") == 0 || solverCode.compare("pcgmg2") == 0)
 				{
 					ConjugateGradient* cg = new ConjugateGradient();
 					cg->Precond = Preconditioner(mg);
@@ -342,18 +344,21 @@ private:
 		solverTimer.Start();
 
 		cout << "Solver: " << *solver << endl << endl;
-		solver->Setup(A);
 
 		Eigen::VectorXd x;
 		IterativeSolver* iterativeSolver = dynamic_cast<IterativeSolver*>(solver);
 		if (iterativeSolver != nullptr)
 		{
 			iterativeSolver->ComputeExactSolution = A.rows() <= 2000;
+			solver->Setup(A);
 			x = iterativeSolver->Solve(b, initialGuessCode);
 			cout << iterativeSolver->IterationCount << " iterations." << endl;
 		}
 		else
+		{
+			solver->Setup(A);
 			x = solver->Solve(b);
+		}
 
 		delete solver;
 

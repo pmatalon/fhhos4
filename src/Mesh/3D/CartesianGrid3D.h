@@ -168,7 +168,7 @@ public:
 
 	void CoarsenMesh(CoarseningStrategy strategy)
 	{
-		if (strategy == CoarseningStrategy::AgglomerationAndMergeColinearFaces)
+		if (strategy == CoarseningStrategy::Standard)
 			CoarsenByAgglomerationAndMergeColinearFaces();
 		else
 			assert(false && "Coarsening strategy not implemented!");
@@ -196,7 +196,7 @@ public:
 					for (BigNumber ix = 0; ix < nx; ++ix)
 					{
 						Parallelepiped* fineElement = dynamic_cast<Parallelepiped*>(this->Elements[index(ix, iy, iz)]);
-						auto coarseElement = coarseMesh->Elements[coarseMesh->index(ix / 2, iy / 2, iz / 2)];
+						Parallelepiped* coarseElement = dynamic_cast<Parallelepiped*>(coarseMesh->Elements[coarseMesh->index(ix / 2, iy / 2, iz / 2)]);
 
 						coarseElement->FinerElements.push_back(fineElement);
 						fineElement->CoarserElement = coarseElement;
@@ -204,17 +204,28 @@ public:
 						{
 							fineElement->TopFace->IsRemovedOnCoarserGrid = true;
 							coarseElement->FinerFacesRemoved.push_back(fineElement->TopFace);
+							coarseElement->BottomFace->FinerFaces.push_back(fineElement->BottomFace);
 						}
+						if (iz == nz - 1)
+							coarseElement->TopFace->FinerFaces.push_back(fineElement->TopFace);
+
 						if (iy % 2 == 0 && !fineElement->RightFace->IsDomainBoundary)
 						{
 							fineElement->RightFace->IsRemovedOnCoarserGrid = true;
 							coarseElement->FinerFacesRemoved.push_back(fineElement->RightFace);
+							coarseElement->LeftFace->FinerFaces.push_back(fineElement->LeftFace);
 						}
+						if (iy == ny - 1)
+							coarseElement->RightFace->FinerFaces.push_back(fineElement->RightFace);
+
 						if (ix % 2 == 0 && !fineElement->FrontFace->IsDomainBoundary)
 						{
 							fineElement->FrontFace->IsRemovedOnCoarserGrid = true;
 							coarseElement->FinerFacesRemoved.push_back(fineElement->FrontFace);
+							coarseElement->BackFace->FinerFaces.push_back(fineElement->BackFace);
 						}
+						if (ix == nx - 1)
+							coarseElement->FrontFace->FinerFaces.push_back(fineElement->FrontFace);
 					}
 				}
 			}

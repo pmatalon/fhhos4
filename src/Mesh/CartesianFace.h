@@ -41,6 +41,9 @@ public:
 		Face<Dim>::Serialize(os);
 		os << ": ";
 		CartesianShape<Dim, Dim - 1>::Serialize(os);
+		/*os << ", finer faces = ";
+		for (Face<Dim> * finerFace : this->FinerFaces)
+			os << finerFace->Number << ",";*/
 	}
 
 	double GetDiameter()
@@ -80,7 +83,7 @@ public:
 
 	void ExportFaceToMatlab(FILE* file)
 	{
-		fprintf(file, "%llu %.17g %.17g %.17g %d %d\n", this->Number, this->Origin.X, this->Origin.Y, this->Origin.Z, this->Orientation, this->IsDomainBoundary);
+		fprintf(file, "%llu %.17g %.17g %.17g %.17g %.17g %.17g %d %d\n", this->Number, this->Origin.X, this->Origin.Y, this->Origin.Z, this->WidthX, this->WidthY, this->WidthZ, this->Orientation, this->IsDomainBoundary);
 	}
 
 	//----------------------------------------------------------------//

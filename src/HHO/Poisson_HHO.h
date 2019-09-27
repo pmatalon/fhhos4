@@ -70,11 +70,37 @@ public:
 		this->_faceBasis = faceBasis;
 		this->_staticCondensation = staticCondensation;
 		this->_diffusionPartition = diffusionPartition;
+
+		string heterogeneityString = "";
+		if (!this->_diffusionPartition->IsHomogeneous)
+		{
+			char res[16];
+			sprintf(res, "_heterog%g", this->_diffusionPartition->HeterogeneityRatio);
+			heterogeneityString = res;
+		}
+		this->_fileName = "Poisson" + to_string(Dim) + "D" + this->_rhsCode + heterogeneityString + "_" + mesh->FileNamePart() + "_HHO_" + reconstructionBasis->Name() + (_staticCondensation ? "" : "_nostaticcond");
+
+		// Re-numbering of the faces (interior first, then boundary)
+		BigNumber faceNumber = 0;
+		for (auto face : this->_mesh->InteriorFaces)
+			face->Number = faceNumber++;
+		for (auto face : this->_mesh->BoundaryFaces)
+			face->Number = faceNumber++;
 	}
 
 	Poisson_HHO<Dim>* GetProblemOnCoarserMesh()
 	{
 		return new Poisson_HHO<Dim>(_mesh->CoarseMesh, _rhsCode, _sourceFunction, _reconstructionBasis, _cellBasis, _faceBasis, _staticCondensation, _diffusionPartition, _outputDirectory);
+	}
+
+	void ExportFaces()
+	{
+		return ExportFaces("");
+	}
+	void ExportFaces(string suffix)
+	{
+		string filePath = GetFilePath("faces" + suffix);
+		this->_mesh->ExportFacesToMatlab(filePath);
 	}
 
 	void Assemble(Action action)
@@ -134,14 +160,6 @@ public:
 			cout << "Parallelism   : " << (BaseParallelLoop::GetDefaultNThreads() == 1 ? "sequential execution" : to_string(BaseParallelLoop::GetDefaultNThreads()) + " threads") << endl;
 		}
 
-		string heterogeneityString = "";
-		if (!this->_diffusionPartition->IsHomogeneous)
-		{
-			char res[16];
-			sprintf(res, "_heterog%g", this->_diffusionPartition->HeterogeneityRatio);
-			heterogeneityString = res;
-		}
-		this->_fileName = "Poisson" + to_string(Dim) + "D" + this->_rhsCode + heterogeneityString + "_" + mesh->FileNamePart() + "_HHO_" + reconstructionBasis->Name() + (_staticCondensation ? "" : "_nostaticcond");
 		string matrixFilePath				= this->GetFilePath("A");
 		string consistencyFilePath			= this->GetFilePath("A_cons");
 		string stabilizationFilePath		= this->GetFilePath("A_stab");
@@ -428,13 +446,6 @@ public:
 
 	void InitHHO()
 	{
-		// Global numbering of the faces (interior first, then boundary)
-		BigNumber faceNumber = 0;
-		for (auto face : this->_mesh->InteriorFaces)
-			face->Number = faceNumber++;
-		for (auto face : this->_mesh->BoundaryFaces)
-			face->Number = faceNumber++;
-
 		// Init faces //
 		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->Faces, [this](Face<Dim>* f)
 			{

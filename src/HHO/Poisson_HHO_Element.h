@@ -1,9 +1,8 @@
 #pragma once
 #include <Eigen/Sparse>
+#include "../Mesh/Element.h"
 #include "../Utils/SourceFunction.h"
-#include "../FunctionalBasis/FunctionalBasis.h"
 #include "Poisson_HHO_Face.h"
-#include "../Mesh/Face.h"
 
 template <int Dim>
 class Poisson_HHO_Element : virtual public Element<Dim>
@@ -45,25 +44,14 @@ public:
 		this->AssembleReconstructionAndConsistencyMatrices();
 		this->AssembleStabilizationMatrix();
 
-		/*for (int i = 0; i < reconstructionBasis->Size(); i++)
-		{
-			Eigen::VectorXd vector(reconstructionBasis->Size());
-			vector.setZero(reconstructionBasis->Size());
-			vector(i) = 1;
-			//cout << "------------- vector -------------" << endl << vector << endl;
-			Eigen::VectorXd result = Reconstruct(Interpolate(vector));
-			//cout << "------------- result -------------" << endl << result << endl;
-		}*/
-
 		int nCellUnknowns = cellBasis->Size();
 		int nTotalFaceUnknowns = this->Faces.size() * faceBasis->Size();
 
 		this->A = Acons + Astab;
 		auto Att = A.topLeftCorner(nCellUnknowns, nCellUnknowns);
 		//auto Aff = A.bottomRightCorner(nTotalFaceUnknowns, nTotalFaceUnknowns);
-		auto Atf = A.topRightCorner(nCellUnknowns, nTotalFaceUnknowns);
+		//auto Atf = A.topRightCorner(nCellUnknowns, nTotalFaceUnknowns);
 		this->invAtt = Att.inverse();
-		
 	}
 
 	Eigen::MatrixXd CellMassMatrix()
@@ -127,25 +115,6 @@ public:
 		createHybridVectorFromFacesMatrix.bottomRows(nTotalFaceUnknowns) = Eigen::MatrixXd::Identity(nTotalFaceUnknowns, nTotalFaceUnknowns);
 		return this->P * createHybridVectorFromFacesMatrix;
 	}
-
-	/*Eigen::VectorXd Interpolate(Eigen::VectorXd reconstructVector)
-	{
-		Eigen::VectorXd hybridVector(this->CellBasis->Size() + this->Faces.size() * this->FaceBasis->Size());
-		Eigen::MatrixXd ProjT = _projFromReconstruct;
-
-		hybridVector.head(this->CellBasis->Size()) = ProjT * reconstructVector;
-
-		int index = this->CellBasis->Size();
-		for (auto f : this->Faces)
-		{
-			Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
-			Eigen::MatrixXd ProjF = face->GetProjFromReconstruct(this);
-
-			hybridVector.segment(index, this->FaceBasis->Size()) = ProjF * reconstructVector;
-			index += this->FaceBasis->Size();
-		}
-		return hybridVector;
-	}*/
 
 	inline double MatrixTerm(BasisFunction<Dim>* cellPhi1, BasisFunction<Dim>* cellPhi2)
 	{

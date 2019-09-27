@@ -7,7 +7,6 @@ class NonZeroCoefficients
 {
 private:
 	vector<Eigen::Triplet<double>> coefficients;
-	//Eigen::MatrixXf Done;
 public:
 	NonZeroCoefficients(BigNumber nnzApproximate)
 	{
@@ -25,13 +24,6 @@ public:
 	}*/
 	inline void Add(BigNumber i, BigNumber j, double value)
 	{
-		/*if (Done.rows() > 0)
-		{
-			if (Done(i, j) == 1)
-				return;
-			Done(i, j) = 1;
-		}*/
-
 		if (abs(value) > 1e-16)
 			this->coefficients.push_back(Eigen::Triplet<double>(i, j, value));
 	}
@@ -47,6 +39,17 @@ public:
 		{
 			for (int j = 0; j < m.cols(); ++j)
 				Add(iStart + i, jStart + j, m(i, j));
+		}
+	}
+
+	inline void CopyRows(BigNumber iStart, int nRows, const Eigen::SparseMatrix<double, Eigen::RowMajor> &m)
+	{
+		for (int i = 0; i < nRows; ++i)
+		{
+			for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(m, iStart + i); it; ++it)
+			{
+				Add(it.row(), it.col(), it.value());
+			}
 		}
 	}
 

@@ -1,5 +1,6 @@
-#include "Element.h"
 #pragma once
+#include "Element.h"
+using namespace std;
 
 template <int Dim>
 class Face
@@ -10,7 +11,9 @@ public:
 	Element<Dim>* Element1;
 	Element<Dim>* Element2;
 
-	bool IsRemovedOnCoarserGrid = false;
+	bool IsRemovedOnCoarserGrid = false; 
+	vector<Face<Dim>*> FinerFaces;
+
 public:
 	Face() { assert(false); }
 	Face(BigNumber number, Element<Dim>* element1, Element<Dim>* element2)
@@ -46,9 +49,20 @@ public:
 		return NULL;
 	}
 
+	int LocalNumberOf(Face<Dim>* finerFace)
+	{
+		for (int i = 0; i < this->FinerFaces.size(); i++)
+		{
+			if (this->FinerFaces[i] == finerFace)
+				return i;
+		}
+		assert(false);
+	}
+
 	virtual double GetDiameter() = 0;
 	virtual double Measure() = 0;
 	virtual DomPoint ConvertToDomain(RefPoint refPoint) = 0;
+	virtual RefPoint ConvertToReference(DomPoint domainPoint) = 0;
 	virtual double ComputeIntegral(function<double(RefPoint)> func) = 0;
 	virtual double ComputeIntegral(function<double(RefPoint)> func, int polynomialDegree) = 0;
 	virtual Face<Dim>* CreateSameGeometricFace(BigNumber number, Element<Dim>* element1) = 0;

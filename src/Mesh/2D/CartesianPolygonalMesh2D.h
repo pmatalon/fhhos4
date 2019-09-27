@@ -121,9 +121,9 @@ public:
 
 	virtual void CoarsenMesh(CoarseningStrategy strategy)
 	{
-		/*if (strategy == CoarseningStrategy::AgglomerationAndMergeColinearFaces)
+		/*if (strategy == CoarseningStrategy::Standard)
 			CoarsenByAgglomerationAndMergeColinearFaces();
-		else*/ if (strategy == CoarseningStrategy::AgglomerationAndKeepFineFaces)
+		else*/ if (strategy == CoarseningStrategy::Agglomeration)
 			CoarsenByAgglomerationAndKeepFineFaces();
 		else
 			assert(false && "Coarsening strategy not implemented!");
@@ -176,12 +176,14 @@ public:
 						for (Face<2>* f : bottomLeftElement->WestFaces)
 						{
 							Face<2>* newFace = f->CreateSameGeometricFace(faceNumber++, coarseElement);
+							newFace->FinerFaces.push_back(f);
 							coarseElement->AddWestFace(newFace);
 							coarseMesh->AddFace(newFace);
 						}
 						for (Face<2>* f : topLeftElement->WestFaces)
 						{
 							Face<2>* newFace = f->CreateSameGeometricFace(faceNumber++, coarseElement);
+							newFace->FinerFaces.push_back(f);
 							coarseElement->AddWestFace(newFace);
 							coarseMesh->AddFace(newFace);
 						}
@@ -196,12 +198,14 @@ public:
 					for (Face<2>* f : topLeftElement->NorthFaces)
 					{
 						Face<2>* newFace = f->CreateSameGeometricFace(faceNumber++, coarseElement);
+						newFace->FinerFaces.push_back(f);
 						coarseElement->AddNorthFace(newFace);
 						coarseMesh->AddFace(newFace);
 					}
 					for (Face<2>* f : topRightElement->NorthFaces)
 					{
 						Face<2>* newFace = f->CreateSameGeometricFace(faceNumber++, coarseElement);
+						newFace->FinerFaces.push_back(f);
 						coarseElement->AddNorthFace(newFace);
 						coarseMesh->AddFace(newFace);
 					}
@@ -210,12 +214,14 @@ public:
 					for (Face<2>* f : topRightElement->EastFaces)
 					{
 						Face<2>* newFace = f->CreateSameGeometricFace(faceNumber++, coarseElement);
+						newFace->FinerFaces.push_back(f);
 						coarseElement->AddEastFace(newFace);
 						coarseMesh->AddFace(newFace);
 					}
 					for (Face<2>* f : bottomRightElement->EastFaces)
 					{
 						Face<2>* newFace = f->CreateSameGeometricFace(faceNumber++, coarseElement);
+						newFace->FinerFaces.push_back(f);
 						coarseElement->AddEastFace(newFace);
 						coarseMesh->AddFace(newFace);
 					}
@@ -226,12 +232,14 @@ public:
 						for (Face<2>* f : bottomRightElement->SouthFaces)
 						{
 							Face<2>* newFace = f->CreateSameGeometricFace(faceNumber++, coarseElement);
+							newFace->FinerFaces.push_back(f);
 							coarseElement->AddSouthFace(newFace);
 							coarseMesh->AddFace(newFace);
 						}
 						for (Face<2>* f : bottomLeftElement->SouthFaces)
 						{
 							Face<2>* newFace = f->CreateSameGeometricFace(faceNumber++, coarseElement);
+							newFace->FinerFaces.push_back(f);
 							coarseElement->AddSouthFace(newFace);
 							coarseMesh->AddFace(newFace);
 						}

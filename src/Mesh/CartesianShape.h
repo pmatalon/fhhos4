@@ -421,15 +421,22 @@ public:
 		}
 		else if (ShapeDim == 1 && DomainDim == 2)
 		{
-			/*double x1 = this->Origin.X;
-			double x2 = x1 + this->WidthX;
-			if (this->Orientation == CartesianShapeOrientation::Vertical)
-				x2 = x1;
-
-			double x = domainPoint.X;
-
-			refPoint.X = 2 / (x2 - x1) * x - (x2 + x1) / (x2 - x1);*/
-			assert(false);
+			if (this->Orientation == CartesianShapeOrientation::Horizontal)
+			{
+				double x1 = this->Origin.X;
+				double x2 = x1 + this->WidthX;
+				double x = domainPoint.X;
+				refPoint.X = 2 / (x2 - x1) * x - (x2 + x1) / (x2 - x1);
+			}
+			else if (this->Orientation == CartesianShapeOrientation::Vertical)
+			{
+				double y1 = this->Origin.Y;
+				double y2 = y1 + this->WidthY;
+				double y = domainPoint.Y;
+				refPoint.X = 2 / (y2 - y1) * y - (y2 + y1) / (y2 - y1);
+			}
+			else
+				assert(false);
 		}
 		else if (ShapeDim == 2 && DomainDim == 3)
 		{

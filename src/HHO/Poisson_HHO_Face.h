@@ -133,4 +133,37 @@ public:
 		Eigen::MatrixXd projFromCell = this->_invFaceMassMatrix * massFaceCell;
 		return projFromCell;
 	}
+
+	Eigen::MatrixXd ComputeCanonicalInjectionMatrixCoarseToFine(FunctionalBasis<Dim-1>* faceBasis)
+	{
+		Eigen::MatrixXd J(faceBasis->Size() * this->FinerFaces.size(), faceBasis->Size());
+
+		for (auto f : this->FinerFaces)
+		{
+			Poisson_HHO_Face<Dim>* fineFace = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+
+			Eigen::MatrixXd fineCoarseMass(faceBasis->Size(), faceBasis->Size());
+			for (BasisFunction<Dim-1>* finePhi : faceBasis->LocalFunctions)
+			{
+				for (BasisFunction<Dim-1>* coarsePhi : faceBasis->LocalFunctions)
+				{
+					function<double(RefPoint)> functionToIntegrate = [this, fineFace, finePhi, coarsePhi](RefPoint fineRefPoint) {
+						DomPoint domPoint = fineFace->ConvertToDomain(fineRefPoint);
+						RefPoint coarseRefPoint = this->ConvertToReference(domPoint);
+						return finePhi->Eval(fineRefPoint)*coarsePhi->Eval(coarseRefPoint);
+					};
+
+					int polynomialDegree = finePhi->GetDegree() + coarsePhi->GetDegree();
+					double integral = fineFace->ComputeIntegral(functionToIntegrate, polynomialDegree);
+					fineCoarseMass(finePhi->LocalNumber, coarsePhi->LocalNumber) = integral;
+				}
+			}
+
+			Eigen::MatrixXd invFineMass = fineFace->InvFaceMassMatrix();
+
+			J.block(this->LocalNumberOf(fineFace)*faceBasis->Size(), 0, faceBasis->Size(), faceBasis->Size()) = invFineMass * fineCoarseMass;
+		}
+
+		return J;
+	}
 };

@@ -14,7 +14,7 @@ public:
 	int MaxIterations = 200;
 	int IterationCount = 0;
 	bool PrintIterationResults = true;
-	bool ComputeExactSolution = true;
+	bool ComputeExactSolution = false;
 
 	SparseMatrix A;
 
@@ -23,6 +23,8 @@ public:
 	virtual void Setup(const SparseMatrix& A) override
 	{
 		this->A = A;
+		if (this->ComputeExactSolution)
+			this->_directSolver.compute(A);
 	}
 
 	Eigen::VectorXd Solve(const Eigen::VectorXd& b) override
