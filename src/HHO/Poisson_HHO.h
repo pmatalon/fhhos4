@@ -1,43 +1,29 @@
 #pragma once
-#include "../Problem.h"
-#include "../Mesh/Mesh.h"
+#include "../PoissonProblem.h"
 #include "Poisson_HHO_Element.h"
 #include "../Utils/ElementParallelLoop.h"
 using namespace std;
 
 template <int Dim>
-class Poisson_HHO : public Problem
+class Poisson_HHO : public PoissonProblem<Dim>
 {
 private:
-	SourceFunction* _sourceFunction;
 	bool _staticCondensation = false;
-	DiffusionPartition<Dim>* _diffusionPartition;
 
 	SparseMatrix _globalMatrix;
 	Eigen::VectorXd _globalRHS;
 
 public:
-	Mesh<Dim>* _mesh;
 	HHOParameters<Dim>* HHO;
 	Eigen::VectorXd ReconstructedSolution;
 
 	Poisson_HHO(Mesh<Dim>* mesh, string rhsCode, SourceFunction* sourceFunction, HHOParameters<Dim>* hho, bool staticCondensation, DiffusionPartition<Dim>* diffusionPartition, string outputDirectory)
-		: Problem(rhsCode, outputDirectory)
+		: PoissonProblem<Dim>(mesh, diffusionPartition, rhsCode, sourceFunction, outputDirectory)
 	{	
-		this->_mesh = mesh;
-		this->_sourceFunction = sourceFunction;
 		this->HHO = hho;
 		this->_staticCondensation = staticCondensation;
-		this->_diffusionPartition = diffusionPartition;
 
-		string heterogeneityString = "";
-		if (!this->_diffusionPartition->IsHomogeneous)
-		{
-			char res[16];
-			sprintf(res, "_heterog%g", this->_diffusionPartition->HeterogeneityRatio);
-			heterogeneityString = res;
-		}
-		this->_fileName = "Poisson" + to_string(Dim) + "D" + this->_rhsCode + heterogeneityString + "_" + mesh->FileNamePart() + "_HHO_" + HHO->ReconstructionBasis->Name() + (_staticCondensation ? "" : "_nostaticcond");
+		this->_fileName = this->_fileName + "_HHO_" + HHO->ReconstructionBasis->Name() + (_staticCondensation ? "" : "_nostaticcond");
 
 		// Re-numbering of the faces (interior first, then boundary)
 		BigNumber faceNumber = 0;
@@ -49,8 +35,8 @@ public:
 
 	Poisson_HHO<Dim>* GetProblemOnCoarserMesh()
 	{
-		HHOParameters<Dim>* coarseHHO = new HHOParameters<Dim>(_mesh->CoarseMesh, HHO->Stabilization, HHO->ReconstructionBasis, HHO->CellBasis, HHO->FaceBasis);
-		return new Poisson_HHO<Dim>(_mesh->CoarseMesh, _rhsCode, _sourceFunction, coarseHHO, _staticCondensation, _diffusionPartition, _outputDirectory);
+		HHOParameters<Dim>* coarseHHO = new HHOParameters<Dim>(this->_mesh->CoarseMesh, HHO->Stabilization, HHO->ReconstructionBasis, HHO->CellBasis, HHO->FaceBasis);
+		return new Poisson_HHO<Dim>(this->_mesh->CoarseMesh, this->_rhsCode, this->_sourceFunction, coarseHHO, _staticCondensation, this->_diffusionPartition, this->_outputDirectory);
 	}
 
 	void ExportFaces()
@@ -59,8 +45,23 @@ public:
 	}
 	void ExportFaces(string suffix)
 	{
-		string filePath = GetFilePath("faces" + suffix);
+		string filePath = this->GetFilePath("faces" + suffix);
 		this->_mesh->ExportFacesToMatlab(filePath);
+	}
+
+	void PrintDiscretization()
+	{
+		cout << this->_mesh->Description() << endl;
+		cout << "    Elements: " << HHO->nElements << endl;
+		cout << "    Faces   : " << HHO->nFaces << " (" << HHO->nInteriorFaces << " interior + " << HHO->nBoundaryFaces << " boundary)" << endl;
+		cout << "Discretization: Hybrid High Order (k = " << HHO->FaceBasis->GetDegree() << ")" << endl;
+		cout << "    Reconstruction basis: " << HHO->ReconstructionBasis->Name() << endl;
+		cout << "    Cell basis          : " << HHO->CellBasis->Name() << endl;
+		cout << "    Face basis          : " << HHO->FaceBasis->Name() << endl;
+		cout << "Cell unknowns : " << HHO->nTotalCellUnknowns << " (" << HHO->CellBasis->Size() << " per cell)" << endl;
+		cout << "Face unknowns : " << HHO->nTotalFaceUnknowns << " (" << HHO->FaceBasis->Size() << " per interior face)" << endl;
+		cout << "Total unknowns: " << HHO->nTotalHybridUnknowns << endl;
+		cout << "System size   : " << (this->_staticCondensation ? HHO->nTotalFaceUnknowns : HHO->nTotalHybridUnknowns) << " (" << (this->_staticCondensation ? "statically condensed" : "no static condensation") << ")" << endl;
 	}
 
 	void Assemble(Action action)
@@ -72,50 +73,8 @@ public:
 
 		if ((action & Action::LogAssembly) == Action::LogAssembly)
 		{
-			cout << "Problem: Poisson " << Dim << "D";
-			if (this->_diffusionPartition->IsHomogeneous && this->_diffusionPartition->IsIsotropic)
-				cout << " (homogeneous and isotropic)" << endl;
-			else
-			{
-				cout << endl;
-				if (this->_diffusionPartition->IsHomogeneous)
-				{
-					cout << "    Homogeneous coefficient" << endl;
-					cout << "    Anisotropic: ratio = " << this->_diffusionPartition->K1->AnisotropyRatio << endl;
-				}
-				else
-				{
-					cout << "    Heterogeneous coefficient: partition = " << this->_diffusionPartition->Partition << endl;
-					cout << "                               ratio     = " << scientific << this->_diffusionPartition->HeterogeneityRatio << fixed << endl;
-					if (this->_diffusionPartition->IsIsotropic)
-						cout << "    Isotropic" << endl;
-					else
-						cout << "    Anisotropic: ratio = " << this->_diffusionPartition->K1->AnisotropyRatio << endl;
-				}
-			}
-
-			cout << "Analytical solution: ";
-			if (this->_rhsCode.compare("sine") == 0)
-				cout << "sine function";
-			else if (this->_rhsCode.compare("poly") == 0)
-				cout << "polynomial function";
-			else if (this->_rhsCode.compare("hetero") == 0)
-				cout << "heterogeneous-specific piecewise polynomial function";
-			else
-				cout << "unknown";
-			cout << endl;
-
-			cout << mesh->Description() << endl;
-			cout << "    Elements: " << HHO->nElements << endl;
-			cout << "    Faces   : " << HHO->nFaces << " (" << HHO->nInteriorFaces << " interior + " << HHO->nBoundaryFaces << " boundary)" << endl;
-			cout << "Discretization: Hybrid High Order (k = " << faceBasis->GetDegree() << ")" << endl;
-			cout << "    Reconstruction basis: " << reconstructionBasis->Name() << endl;
-			cout << "    Cell basis          : " << cellBasis->Name() << endl;
-			cout << "    Face basis          : " << faceBasis->Name() << endl;
-			cout << "Cell unknowns : " << HHO->nTotalCellUnknowns << " (" << cellBasis->Size() << " per cell)" << endl;
-			cout << "Face unknowns : " << HHO->nTotalFaceUnknowns << " (" << faceBasis->Size() << " per interior face)" << endl;
-			cout << "Total unknowns: " << HHO->nTotalHybridUnknowns << endl;
-			cout << "System size   : " << (this->_staticCondensation ? HHO->nTotalFaceUnknowns : HHO->nTotalHybridUnknowns) << " (" << (this->_staticCondensation ? "statically condensed" : "no static condensation") << ")" << endl;
+			this->PrintPhysicalProblem();
+			this->PrintDiscretization();
 			cout << "Parallelism   : " << (BaseParallelLoop::GetDefaultNThreads() == 1 ? "sequential execution" : to_string(BaseParallelLoop::GetDefaultNThreads()) + " threads") << endl;
 		}
 
@@ -135,8 +94,8 @@ public:
 		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreCellMassMatrix(cellBasis);
 		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreReconstructMassMatrix(reconstructionBasis);
 		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreCellStiffnessMatrix(cellBasis);
-		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreReconstructK1StiffnessMatrix(_diffusionPartition->K1, reconstructionBasis);
-		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreReconstructK2StiffnessMatrix(_diffusionPartition->K2, reconstructionBasis);
+		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreReconstructK1StiffnessMatrix(this->_diffusionPartition->K1, reconstructionBasis);
+		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreReconstructK2StiffnessMatrix(this->_diffusionPartition->K2, reconstructionBasis);
 		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreCellReconstructMassMatrix(cellBasis, reconstructionBasis);
 		CartesianShape<Dim, Dim - 1>::ReferenceShape.ComputeAndStoreFaceMassMatrix(faceBasis);
 
@@ -471,18 +430,18 @@ public:
 	{
 		if (this->_staticCondensation)
 		{
-			Problem::ExtractSolution(this->Solution, "Faces");
+			Problem<Dim>::ExtractSolution(this->Solution, "Faces");
 		}
 	}
 
 	void ExtractSolution() override
 	{
-		Problem::ExtractSolution(this->ReconstructedSolution);
+		Problem<Dim>::ExtractSolution(this->ReconstructedSolution);
 	}
 
 	SparseMatrix GetInverseAtt()
 	{
-		ElementParallelLoop<Dim> parallelLoop(_mesh->Elements);
+		ElementParallelLoop<Dim> parallelLoop(this->_mesh->Elements);
 		parallelLoop.ReserveChunkCoeffsSize(HHO->nCellUnknowns * HHO->nCellUnknowns);
 		parallelLoop.Execute([this](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
 			{

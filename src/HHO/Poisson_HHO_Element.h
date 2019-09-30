@@ -365,8 +365,6 @@ private:
 				Eigen::MatrixXd Fpart = Eigen::MatrixXd::Zero(HHO->nFaceUnknowns, nHybridUnknowns);
 				Fpart.middleCols(FirstDOFNumber(face), HHO->nFaceUnknowns) = Eigen::MatrixXd::Identity(HHO->nFaceUnknowns, HHO->nFaceUnknowns);
 
-				//cout << "------------- Fpart -------------" << endl << Fpart << endl;
-
 				Eigen::MatrixXd Tpart = Eigen::MatrixXd::Zero(HHO->nCellUnknowns, nHybridUnknowns);
 				Tpart.middleCols(0, HHO->nCellUnknowns) = Eigen::MatrixXd::Identity(HHO->nCellUnknowns, HHO->nCellUnknowns);
 

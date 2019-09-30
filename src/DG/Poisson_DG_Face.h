@@ -40,7 +40,7 @@ public:
 			return meanGradPhi1_scal_jumpPhi2 + meanGradPhi2_scal_jumpPhi1;
 		};
 
-		int polynomialDegree = p_phi1->GetDegree() + p_phi2->GetDegree() - 1;
+		int polynomialDegree = max(p_phi1->GetDegree() + p_phi2->GetDegree() - 1, 0);
 		double integralJump1ScalarJump2 = this->ComputeIntegral(functionToIntegrate, polynomialDegree);
 	}
 

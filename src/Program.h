@@ -199,15 +199,15 @@ public:
 
 		if (discretization.compare("dg") == 0)
 		{
-			Poisson_DG<Dim> problem(rhsCode, sourceFunction, &diffusionPartition, outputDirectory);
 			FunctionalBasis<Dim> basis(basisCode, polyDegree, usePolynomialSpaceQ);
+			Poisson_DG<Dim> problem(mesh, rhsCode, sourceFunction, &diffusionPartition, outputDirectory, &basis, penalizationCoefficient);
 
 			cout << endl;
 			cout << "----------------------- Assembly -------------------------" << endl;
 			Timer assemblyTimer;
 			assemblyTimer.Start();
 
-			problem.Assemble(mesh, &basis, penalizationCoefficient, action);
+			problem.Assemble(action);
 			
 			assemblyTimer.Stop();
 			cout << endl << "Assembly time: CPU = " << assemblyTimer.CPU() << ", elapsed = " << assemblyTimer.Elapsed() << endl;
@@ -286,7 +286,7 @@ public:
 private:
 	Mesh<Dim>* BuildMesh(int n) { return nullptr; }
 
-	Solver* CreateSolver(string solverCode, Problem* problem, double tolerance, bool staticCondensation, 
+	Solver* CreateSolver(string solverCode, Problem<Dim>* problem, double tolerance, bool staticCondensation, 
 		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations, CoarseningStrategy coarseningStgy, int blockSize)
 	{
 		Solver* solver = NULL;

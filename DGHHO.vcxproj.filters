@@ -204,6 +204,7 @@
     <ClInclude Include="src\HHO\HHOParameters.h">
       <Filter>HHO</Filter>
     </ClInclude>
+    <ClInclude Include="src\PoissonProblem.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

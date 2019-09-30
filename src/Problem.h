@@ -1,23 +1,25 @@
 #pragma once
 #include <string>
 #include <unsupported/Eigen/SparseExtra>
+#include "Mesh/Mesh.h"
 #include "Utils/Utils.h"
 using namespace std;
 
+template <int Dim>
 class Problem
 {
 protected:
-	string _rhsCode;
 	string _outputDirectory;
 	string _fileName;
 public:
+	Mesh<Dim>* _mesh;
 	SparseMatrix A;
 	Eigen::VectorXd b;
 	Eigen::VectorXd Solution;
 
-	Problem(string rhsCode, string outputDirectory)
+	Problem(Mesh<Dim>* mesh, string outputDirectory)
 	{
-		this->_rhsCode = rhsCode;
+		this->_mesh = mesh;
 		this->_outputDirectory = outputDirectory;
 	}
 
@@ -25,6 +27,8 @@ public:
 	{
 		return this->_outputDirectory + "/" + this->_fileName + "_" + suffix + ".dat";
 	}
+
+	virtual void PrintPhysicalProblem() = 0;
 
 	void ExportMatrix(const SparseMatrix& M, string suffix)
 	{
