@@ -3,7 +3,7 @@
 #include <map>
 #include "Vertex.h"
 #include "../Utils/Utils.h"
-#include "../Utils/DiffusionPartition.h"
+#include "../Problem/DiffusionPartition.h"
 #include "../FunctionalBasis/FunctionalBasis.h"
 
 template <int Dim>

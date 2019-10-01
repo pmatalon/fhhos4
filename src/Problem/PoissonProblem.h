@@ -1,7 +1,7 @@
 #pragma once
 #include "Problem.h"
-#include "Utils/DiffusionPartition.h"
-#include "Utils/SourceFunction.h"
+#include "DiffusionPartition.h"
+#include "SourceFunction.h"
 using namespace std;
 
 template <int Dim>

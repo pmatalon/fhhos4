@@ -10,7 +10,6 @@
 #include "Mesh/2D/CartesianPolygonalMesh2D.h"
 #include "Utils/Action.h"
 #include "Utils/Timer.h"
-#include "Utils/DiffusionPartition.h"
 #include "Solver/ConjugateGradient.h"
 #include "Solver/MultigridForHHO.h"
 #include "Solver/BlockJacobi.h"

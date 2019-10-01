@@ -1,7 +1,7 @@
 #pragma once
 #include <Eigen/Sparse>
 #include "../Mesh/Element.h"
-#include "../Utils/SourceFunction.h"
+#include "../Problem/SourceFunction.h"
 #include "HHOParameters.h"
 #include "Poisson_HHO_Face.h"
 

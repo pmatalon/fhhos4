@@ -1,5 +1,5 @@
 #pragma once
-#include "../PoissonProblem.h"
+#include "../Problem/PoissonProblem.h"
 #include "../Mesh/CartesianShape.h"
 #include "../Utils/Action.h"
 #include "../Utils/ParallelLoop.h"

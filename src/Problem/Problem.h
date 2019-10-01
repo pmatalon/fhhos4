@@ -1,8 +1,8 @@
 #pragma once
 #include <string>
 #include <unsupported/Eigen/SparseExtra>
-#include "Mesh/Mesh.h"
-#include "Utils/Utils.h"
+#include "../Mesh/Mesh.h"
+#include "../Utils/Utils.h"
 using namespace std;
 
 template <int Dim>
