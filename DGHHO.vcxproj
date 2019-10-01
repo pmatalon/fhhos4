@@ -121,8 +121,6 @@
     <ClInclude Include="src\Mesh\ReferenceCartesianShape.h" />
     <ClInclude Include="src/Mesh/3D/RectangularFace.h" />
     <ClInclude Include="src/Mesh/Face.h" />
-    <ClInclude Include="src/Mesh/3D/Cube.h" />
-    <ClInclude Include="src/Mesh/2D/Square.h" />
     <ClInclude Include="src/Mesh/1D/Interval.h" />
     <ClInclude Include="src/Mesh/Point.h" />
     <ClInclude Include="src/DG/Poisson_DG.h" />
@@ -138,6 +136,7 @@
     <ClInclude Include="src/Utils/SourceFunction.h" />
     <ClInclude Include="src/Utils/Utils.h" />
     <ClInclude Include="src/Problem.h" />
+    <ClInclude Include="src\Mesh\Vertex.h" />
     <ClInclude Include="src\PoissonProblem.h" />
     <ClInclude Include="src\Program.h" />
     <ClInclude Include="src\Solver\AGMG.h" />

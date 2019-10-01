@@ -12,22 +12,31 @@ public:
 	Face<3>* RightFace;
 
 public:
-	DomPoint BackLeftBottomCorner;
-	DomPoint FrontLeftBottomCorner;
-	DomPoint BackRightBottomCorner;
-	DomPoint BackLeftTopCorner;
+	Vertex* BackLeftBottomCorner;
+	Vertex* FrontLeftBottomCorner;
+	Vertex* BackRightBottomCorner;
+	Vertex* BackLeftTopCorner;
+	Vertex* FrontLeftTopCorner;
+	Vertex* BackRightTopCorner;
+	Vertex* FrontRightBottomCorner;
+	Vertex* FrontRightTopCorner;
 
-	Parallelepiped(int number, double x, double y, double z, double widthX, double widthY, double widthZ) :
+	Parallelepiped(int number, Vertex* backLeftBottomCorner, Vertex* frontLeftBottomCorner, Vertex* backRightBottomCorner, Vertex* backLeftTopCorner, Vertex* frontLeftTopCorner, Vertex* backRightTopCorner, Vertex* frontRightBottomCorner, Vertex* frontRightTopCorner) :
 		Element(number), 
-		CartesianElement(number, DomPoint(x,y,z), widthX, widthY, widthZ),
+		CartesianElement(number, backLeftBottomCorner, frontLeftBottomCorner->X - backLeftBottomCorner->X, backRightBottomCorner->Y - backLeftBottomCorner->Y, backLeftTopCorner->Z - backLeftBottomCorner->Z)
 		// back  : x <-- x,    front: x <-- x + width
 		// left  : y <-- y,	   right: y <-- y + width
 		// bottom: z <-- z,    top  : z <-- z + width
-		BackLeftBottomCorner(x, y, z),
-		FrontLeftBottomCorner(x + widthX, y, z),
-		BackRightBottomCorner(x, y + widthY, z),
-		BackLeftTopCorner(x, y, z + widthZ)
-	{ }
+	{
+		BackLeftBottomCorner = backLeftBottomCorner;
+		FrontLeftBottomCorner = frontLeftBottomCorner;
+		BackRightBottomCorner = backRightBottomCorner;
+		BackLeftTopCorner = backLeftTopCorner;
+		FrontLeftTopCorner = frontLeftTopCorner;
+		BackRightTopCorner = backRightTopCorner;
+		FrontRightBottomCorner = frontRightBottomCorner;
+		FrontRightTopCorner = frontRightTopCorner;
+	}
 
 	void SetTopFace(Face<3>* face)
 	{

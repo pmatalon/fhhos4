@@ -12,19 +12,20 @@ public:
 	vector<Face<2>*> EastFaces;
 	vector<Face<2>*> WestFaces;
 
-	DomPoint BottomLeftCorner;
-	DomPoint TopLeftCorner;
-	DomPoint TopRightCorner;
-	DomPoint BottomRightCorner;
+	Vertex* BottomLeftCorner;
+	Vertex* TopLeftCorner;
+	Vertex* TopRightCorner;
+	Vertex* BottomRightCorner;
 
-	RectangularPolygon(int number, DomPoint bottomLeftCorner, double widthX, double widthY) :
+	RectangularPolygon(int number, Vertex* bottomLeftCorner, Vertex* topLeftCorner, Vertex* topRightCorner, Vertex* bottomRightCorner) :
 		Element(number), 
-		CartesianElement(number, bottomLeftCorner, widthX, widthY),
-		BottomLeftCorner(bottomLeftCorner),
-		TopLeftCorner(bottomLeftCorner.X, bottomLeftCorner.Y + widthY),
-		TopRightCorner(bottomLeftCorner.X + widthX, bottomLeftCorner.Y + widthY),
-		BottomRightCorner(bottomLeftCorner.X + widthX, bottomLeftCorner.Y)
-	{}
+		CartesianElement(number, bottomLeftCorner, bottomRightCorner->X - bottomLeftCorner->X, topLeftCorner->Y - bottomLeftCorner->Y)
+	{
+		BottomLeftCorner = bottomLeftCorner;
+		TopLeftCorner = topLeftCorner;
+		TopRightCorner = topRightCorner;
+		BottomRightCorner = bottomRightCorner;
+	}
 
 	void AddNorthFace(Face<2>* face)
 	{

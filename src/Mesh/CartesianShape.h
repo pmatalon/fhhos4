@@ -15,7 +15,7 @@ template <int DomainDim, int ShapeDim = DomainDim>
 class CartesianShape
 {
 public:
-	DomPoint Origin;
+	DomPoint* Origin;
 	double WidthX = 0;
 	double WidthY = 0;
 	double WidthZ = 0;
@@ -29,8 +29,9 @@ public:
 	//   Constructors   //
 	//------------------//
 
-	CartesianShape(DomPoint origin, double width)
+	CartesianShape(DomPoint* origin, double width)
 	{
+		assert(width > 0);
 		this->WidthX = ShapeDim >= 1 ? width : 0;
 		this->WidthY = ShapeDim >= 2 ? width : 0;
 		this->WidthZ = ShapeDim >= 3 ? width : 0;
@@ -38,18 +39,20 @@ public:
 		Init(origin, CartesianShapeOrientation::None);
 	}
 
-	CartesianShape(DomPoint origin, double widthX, double widthY)
+	CartesianShape(DomPoint* origin, double widthX, double widthY)
 	{
 		assert(DomainDim == 2 && ShapeDim == 2);
+		assert(widthX > 0 && widthY > 0);
 		this->WidthX = widthX;
 		this->WidthY = widthY;
 		this->IsRegular = (widthX == widthY);
 		Init(origin, CartesianShapeOrientation::None);
 	}
 
-	CartesianShape(DomPoint origin, double widthX, double widthY, double widthZ)
+	CartesianShape(DomPoint* origin, double widthX, double widthY, double widthZ)
 	{
 		assert(DomainDim == 3 && ShapeDim == 3);
+		assert(widthX > 0 && widthY > 0 && widthZ > 0);
 		this->WidthX = widthX;
 		this->WidthY = widthY;
 		this->WidthZ = widthZ;
@@ -57,9 +60,10 @@ public:
 		Init(origin, CartesianShapeOrientation::None);
 	}
 
-	CartesianShape(DomPoint origin, double width, CartesianShapeOrientation orientation)
+	CartesianShape(DomPoint* origin, double width, CartesianShapeOrientation orientation)
 	{
 		assert(ShapeDim == DomainDim - 1);
+		assert(ShapeDim == 0 || width > 0);
 		if (DomainDim == 2)
 		{
 			if (orientation == CartesianShapeOrientation::Horizontal)
@@ -93,9 +97,10 @@ public:
 		Init(origin, orientation);
 	}
 
-	CartesianShape(DomPoint origin, double width1, double width2, CartesianShapeOrientation orientation)
+	CartesianShape(DomPoint* origin, double width1, double width2, CartesianShapeOrientation orientation)
 	{
 		assert(DomainDim == 3 && ShapeDim == DomainDim - 1);
+		assert(width1 > 0 && width2 > 0);
 		if (orientation == CartesianShapeOrientation::InXOY)
 		{
 			this->WidthX = width1;
@@ -117,7 +122,7 @@ public:
 		Init(origin, orientation);
 	}
 
-	inline void Init(DomPoint origin, CartesianShapeOrientation orientation)
+	inline void Init(DomPoint* origin, CartesianShapeOrientation orientation)
 	{
 		this->Origin = origin;
 		this->Orientation = orientation;
@@ -131,7 +136,7 @@ public:
 		else if (ShapeDim == 3)
 			os << (IsRegular ? "cube" : "parallelepipede") << ", ";
 		os << "origin = ";
-		Origin.Serialize(os, DomainDim);
+		Origin->Serialize(os, DomainDim);
 		if (ShapeDim == DomainDim)
 		{
 			if (IsRegular)
@@ -176,28 +181,28 @@ public:
 	{
 		if (ShapeDim == 1)
 		{
-			double x1 = this->Origin.X;
-			double x2 = this->Origin.X + this->WidthX;
+			double x1 = this->Origin->X;
+			double x2 = this->Origin->X + this->WidthX;
 
 			return Utils::Integral(func, x1, x2);
 		}
 		else if (ShapeDim == 2)
 		{
-			double x1 = this->Origin.X;
-			double x2 = this->Origin.X + this->WidthX;
-			double y1 = this->Origin.Y;
-			double y2 = this->Origin.Y + this->WidthY;
+			double x1 = this->Origin->X;
+			double x2 = this->Origin->X + this->WidthX;
+			double y1 = this->Origin->Y;
+			double y2 = this->Origin->Y + this->WidthY;
 
 			return Utils::Integral(func, x1, x2, y1, y2);
 		}
 		else if (ShapeDim == 3)
 		{
-			double x1 = this->Origin.X;
-			double x2 = this->Origin.X + this->WidthX;
-			double y1 = this->Origin.Y;
-			double y2 = this->Origin.Y + this->WidthY;
-			double z1 = this->Origin.Z;
-			double z2 = this->Origin.Z + this->WidthZ;
+			double x1 = this->Origin->X;
+			double x2 = this->Origin->X + this->WidthX;
+			double y1 = this->Origin->Y;
+			double y2 = this->Origin->Y + this->WidthY;
+			double z1 = this->Origin->Z;
+			double z2 = this->Origin->Z + this->WidthZ;
 
 			return Utils::Integral(func, x1, x2, y1, y2, z1, z2);
 		}
@@ -318,12 +323,12 @@ public:
 		DomPoint p;
 		if (ShapeDim == DomainDim)
 		{
-			double x1 = this->Origin.X;
-			double x2 = this->Origin.X + this->WidthX;
-			double y1 = this->Origin.Y;
-			double y2 = this->Origin.Y + this->WidthY;
-			double z1 = this->Origin.Z;
-			double z2 = this->Origin.Z + this->WidthZ;
+			double x1 = this->Origin->X;
+			double x2 = this->Origin->X + this->WidthX;
+			double y1 = this->Origin->Y;
+			double y2 = this->Origin->Y + this->WidthY;
+			double z1 = this->Origin->Z;
+			double z2 = this->Origin->Z + this->WidthZ;
 
 			double t = referenceElementPoint.X;
 			double u = referenceElementPoint.Y;
@@ -338,12 +343,12 @@ public:
 		}
 		else if (ShapeDim == 0 && DomainDim == 1)
 		{
-			p = this->Origin;
+			p = *(this->Origin);
 		}
 		else if (ShapeDim == 1 && DomainDim == 2)
 		{
-			double x1 = this->Origin.X;
-			double y1 = this->Origin.Y;
+			double x1 = this->Origin->X;
+			double y1 = this->Origin->Y;
 
 			double x2 = x1 + this->WidthX;
 			double y2 = y1;
@@ -359,9 +364,9 @@ public:
 		}
 		else if (ShapeDim == 2 && DomainDim == 3)
 		{
-			double x1 = this->Origin.X;
-			double y1 = this->Origin.Y;
-			double z1 = this->Origin.Z;
+			double x1 = this->Origin->X;
+			double y1 = this->Origin->Y;
+			double z1 = this->Origin->Z;
 
 			double x2 = x1 + this->WidthX;
 			double y2 = y1 + this->WidthY;
@@ -401,12 +406,12 @@ public:
 		RefPoint refPoint;
 		if (ShapeDim == DomainDim)
 		{
-			double x1 = this->Origin.X;
-			double x2 = this->Origin.X + this->WidthX;
-			double y1 = this->Origin.Y;
-			double y2 = this->Origin.Y + this->WidthY;
-			double z1 = this->Origin.Z;
-			double z2 = this->Origin.Z + this->WidthZ;
+			double x1 = this->Origin->X;
+			double x2 = this->Origin->X + this->WidthX;
+			double y1 = this->Origin->Y;
+			double y2 = this->Origin->Y + this->WidthY;
+			double z1 = this->Origin->Z;
+			double z2 = this->Origin->Z + this->WidthZ;
 
 			double x = domainPoint.X;
 			double y = domainPoint.Y;
@@ -423,14 +428,14 @@ public:
 		{
 			if (this->Orientation == CartesianShapeOrientation::Horizontal)
 			{
-				double x1 = this->Origin.X;
+				double x1 = this->Origin->X;
 				double x2 = x1 + this->WidthX;
 				double x = domainPoint.X;
 				refPoint.X = 2 / (x2 - x1) * x - (x2 + x1) / (x2 - x1);
 			}
 			else if (this->Orientation == CartesianShapeOrientation::Vertical)
 			{
-				double y1 = this->Origin.Y;
+				double y1 = this->Origin->Y;
 				double y2 = y1 + this->WidthY;
 				double y = domainPoint.Y;
 				refPoint.X = 2 / (y2 - y1) * y - (y2 + y1) / (y2 - y1);

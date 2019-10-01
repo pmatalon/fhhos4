@@ -8,19 +8,19 @@ class CartesianElement : public Poisson_DG_Element<Dim>, public Poisson_HHO_Elem
 {
 public:
 
-	CartesianElement(BigNumber number, DomPoint origin, double width) :
+	CartesianElement(BigNumber number, DomPoint* origin, double width) :
 		Poisson_DG_Element<Dim>(number),
 		Poisson_HHO_Element<Dim>(number), 
 		CartesianShape<Dim>(origin, width)
 	{}
 
-	CartesianElement(BigNumber number, DomPoint origin, double widthX, double widthY) :
+	CartesianElement(BigNumber number, DomPoint* origin, double widthX, double widthY) :
 		Poisson_DG_Element<Dim>(number),
 		Poisson_HHO_Element<Dim>(number),
 		CartesianShape<Dim>(origin, widthX, widthY)
 	{}
 
-	CartesianElement(BigNumber number, DomPoint origin, double widthX, double widthY, double widthZ) :
+	CartesianElement(BigNumber number, DomPoint* origin, double widthX, double widthY, double widthZ) :
 		Poisson_DG_Element<Dim>(number),
 		Poisson_HHO_Element<Dim>(number),
 		CartesianShape<Dim>(origin, widthX, widthY, widthZ)
@@ -46,14 +46,14 @@ public:
 	// For DG
 	void SetDiffusionCoefficient(DiffusionPartition<Dim>* diffusionPartition) override
 	{
-		DomPoint origin = CartesianShape<Dim>::Origin;
-		this->Kappa = diffusionPartition->Coefficient(origin);
+		DomPoint* origin = CartesianShape<Dim>::Origin;
+		this->Kappa = diffusionPartition->Coefficient(*origin);
 	}
 
 	void SetDiffusionTensor(DiffusionPartition<Dim>* diffusionPartition) override
 	{
-		DomPoint origin = CartesianShape<Dim>::Origin;
-		this->DiffTensor = diffusionPartition->DiffTensor(origin);
+		DomPoint* origin = CartesianShape<Dim>::Origin;
+		this->DiffTensor = diffusionPartition->DiffTensor(*origin);
 	}
 
 	double IntegralGlobalFunction(function<double(DomPoint)> func) const

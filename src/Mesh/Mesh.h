@@ -15,6 +15,7 @@ template <int Dim>
 class Mesh
 {
 public:
+	vector<Vertex*> Vertices;
 	vector<Element<Dim>*> Elements;
 	vector<Face<Dim>*> Faces;
 	vector<Face<Dim>*> BoundaryFaces;
@@ -101,5 +102,9 @@ public:
 
 		if (CoarseMesh)
 			delete CoarseMesh;
+
+		for (size_t i = 0; i < this->Vertices.size(); ++i)
+			delete this->Vertices[i];
+		this->Vertices.clear();
 	}
 };

@@ -17,15 +17,19 @@ public:
 
 		for (BigNumber k = 0; k < n + 1; k++)
 		{
-			InterfacePoint* point = new InterfacePoint(k, k * h);
+			Vertex* vertex = new Vertex(k, k * h);
+			this->Vertices.push_back(vertex);
+			InterfacePoint* point = new InterfacePoint(k, vertex);
 			this->Faces.push_back(point);
 		}
 
 		for (BigNumber k = 0; k < n; k++)
 		{
-			InterfacePoint* leftPoint = dynamic_cast<InterfacePoint*>(this->Faces[k]);
-			InterfacePoint* rightPoint = dynamic_cast<InterfacePoint*>(this->Faces[k+1]);
-			Interval* element = new Interval(k, leftPoint->X, rightPoint->X, leftPoint, rightPoint);
+			InterfacePoint* leftFace = dynamic_cast<InterfacePoint*>(this->Faces[k]);
+			InterfacePoint* rightFace = dynamic_cast<InterfacePoint*>(this->Faces[k+1]);
+			Interval* element = new Interval(k, leftFace->V, rightFace->V);
+			element->SetLeftInterface(leftFace);
+			element->SetRightInterface(rightFace);
 			this->Elements.push_back(element);
 		}
 

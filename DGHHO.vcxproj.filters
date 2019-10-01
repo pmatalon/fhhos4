@@ -143,17 +143,11 @@
     <ClInclude Include="src/Mesh/3D/CartesianGrid3D.h">
       <Filter>Mesh\3D</Filter>
     </ClInclude>
-    <ClInclude Include="src/Mesh/3D/Cube.h">
-      <Filter>Mesh\3D</Filter>
-    </ClInclude>
     <ClInclude Include="src/Mesh/3D/Parallelepiped.h">
       <Filter>Mesh\3D</Filter>
     </ClInclude>
     <ClInclude Include="src/Mesh/3D/RectangularFace.h">
       <Filter>Mesh\3D</Filter>
-    </ClInclude>
-    <ClInclude Include="src/Mesh/2D/Square.h">
-      <Filter>Mesh\2D</Filter>
     </ClInclude>
     <ClInclude Include="src\Mesh\1D\InterfacePoint.h">
       <Filter>Mesh\1D</Filter>
@@ -205,6 +199,9 @@
       <Filter>HHO</Filter>
     </ClInclude>
     <ClInclude Include="src\PoissonProblem.h" />
+    <ClInclude Include="src\Mesh\Vertex.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

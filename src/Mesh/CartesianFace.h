@@ -1,4 +1,5 @@
 #pragma once
+#include "Vertex.h"
 #include "Face.h"
 #include "CartesianShape.h"
 #include "../HHO/Poisson_HHO_Face.h"
@@ -8,13 +9,13 @@ class CartesianFace : public Poisson_DG_Face<Dim>, public Poisson_HHO_Face<Dim>,
 {
 public:
 
-	CartesianFace(BigNumber number, DomPoint origin, double width, Element<Dim>* element1, Element<Dim>* element2, CartesianShapeOrientation orientation) :
+	CartesianFace(BigNumber number, Vertex* origin, double width, Element<Dim>* element1, Element<Dim>* element2, CartesianShapeOrientation orientation) :
 		Poisson_DG_Face<Dim>(number, element1, element2),
 		Poisson_HHO_Face<Dim>(number, element1, element2), 
 		CartesianShape<Dim, Dim - 1>(origin, width, orientation)
 	{}
 
-	CartesianFace(BigNumber number, DomPoint origin, double firstWidth, double secondWidth, Element<Dim>* element1, Element<Dim>* element2, CartesianShapeOrientation orientation) :
+	CartesianFace(BigNumber number, Vertex* origin, double firstWidth, double secondWidth, Element<Dim>* element1, Element<Dim>* element2, CartesianShapeOrientation orientation) :
 		Poisson_DG_Face<Dim>(number, element1, element2),
 		Poisson_HHO_Face<Dim>(number, element1, element2),
 		CartesianShape<Dim, Dim - 1>(origin, firstWidth, secondWidth, orientation)
@@ -83,7 +84,7 @@ public:
 
 	void ExportFaceToMatlab(FILE* file)
 	{
-		fprintf(file, "%llu %.17g %.17g %.17g %.17g %.17g %.17g %d %d\n", this->Number, this->Origin.X, this->Origin.Y, this->Origin.Z, this->WidthX, this->WidthY, this->WidthZ, this->Orientation, this->IsDomainBoundary);
+		fprintf(file, "%llu %.17g %.17g %.17g %.17g %.17g %.17g %d %d\n", this->Number, this->Origin->X, this->Origin->Y, this->Origin->Z, this->WidthX, this->WidthY, this->WidthZ, this->Orientation, this->IsDomainBoundary);
 	}
 
 	//----------------------------------------------------------------//

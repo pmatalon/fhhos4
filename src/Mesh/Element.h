@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <map>
+#include "Vertex.h"
 #include "../Utils/Utils.h"
 #include "../Utils/DiffusionPartition.h"
 #include "../FunctionalBasis/FunctionalBasis.h"

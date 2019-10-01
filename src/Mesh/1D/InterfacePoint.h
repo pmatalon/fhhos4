@@ -5,13 +5,13 @@
 class InterfacePoint : public CartesianFace<1>
 {
 public:
-	double X;
+	Vertex* V;
 
-	InterfacePoint(BigNumber number, double x) : 
+	InterfacePoint(BigNumber number, Vertex* v) : 
 		Face(number, NULL, NULL), 
-		CartesianFace<1>(number, x, 0, NULL, NULL, CartesianShapeOrientation::None)
+		CartesianFace<1>(number, v, 0, NULL, NULL, CartesianShapeOrientation::None)
 	{
-		this->X = x;
+		this->V = v;
 		this->IsDomainBoundary = false;
 	}
 
@@ -34,12 +34,12 @@ public:
 
 	Face<1>* CreateSameGeometricFace(BigNumber number, Element<1>* element1)
 	{
-		return new InterfacePoint(number, this->X);
+		return new InterfacePoint(number, this->V);
 	}
 
 	void ExportFaceToMatlab(FILE* file)
 	{
-		fprintf(file, "%llu %.17g 0 0 0 %d\n", this->Number, this->X, this->IsDomainBoundary);
+		fprintf(file, "%llu %.17g 0 0 0 %d\n", this->Number, this->V->X, this->IsDomainBoundary);
 	}
 
 	//---------------------------------------------------------------//

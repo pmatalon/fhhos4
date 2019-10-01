@@ -7,14 +7,21 @@ public:
 	Face<1>* Left;
 	Face<1>* Right;
 
-	Interval(BigNumber number, double a, double b, Face<1>* left, Face<1>* right) : 
+	Interval(BigNumber number, Vertex* left, Vertex* right) :
 		Element(number),
-		CartesianElement(number, DomPoint(a), b-a)
+		CartesianElement(number, left, right->X - left->X)
+	{ }
+	
+	void SetLeftInterface(Face<1>* face)
 	{
-		this->AddFace(left);
-		this->AddFace(right);
-		this->Left = left;
-		this->Right = right;
+		this->AddFace(face);
+		this->Left = face;
+	}
+
+	void SetRightInterface(Face<1>* face)
+	{
+		this->AddFace(face);
+		this->Right = face;
 	}
 
 	//-------------------------------------------------------//

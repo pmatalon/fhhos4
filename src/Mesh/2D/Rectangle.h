@@ -11,19 +11,20 @@ public:
 	Face<2>* EastFace;
 	Face<2>* WestFace;
 
-	DomPoint BottomLeftCorner;
-	DomPoint TopLeftCorner;
-	DomPoint TopRightCorner;
-	DomPoint BottomRightCorner;
+	Vertex* BottomLeftCorner;
+	Vertex* TopLeftCorner;
+	Vertex* TopRightCorner;
+	Vertex* BottomRightCorner;
 
-	Rectangle(int number, double x, double y, double widthX, double widthY) :
+	Rectangle(int number, Vertex* bottomLeftCorner, Vertex* topLeftCorner, Vertex* topRightCorner, Vertex* bottomRightCorner) :
 		Element(number), 
-		CartesianElement(number, DomPoint(x, y), widthX, widthY), 
-		BottomLeftCorner(x, y),
-		TopLeftCorner(x, y + widthY),
-		TopRightCorner(x + widthX, y + widthY),
-		BottomRightCorner(x + widthX, y)
-	{}
+		CartesianElement(number, bottomLeftCorner, bottomRightCorner->X - bottomLeftCorner->X, topLeftCorner->Y - bottomLeftCorner->Y)
+	{
+		BottomLeftCorner = bottomLeftCorner;
+		TopLeftCorner = topLeftCorner;
+		TopRightCorner = topRightCorner;
+		BottomRightCorner = bottomRightCorner;
+	}
 
 	void SetNorthInterface(Edge* face)
 	{
