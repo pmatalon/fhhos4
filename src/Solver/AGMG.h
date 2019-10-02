@@ -35,7 +35,7 @@ public:
 		this->A = A;
 	}
 
-	Eigen::VectorXd Solve(const Eigen::VectorXd& b) override
+	Vector Solve(const Vector& b) override
 	{
 #ifdef TPL_ENABLE_AGMG
 		int ijob = 0, nrest = 1;
@@ -79,7 +79,7 @@ public:
 		dagmg_(&nun, a, ja, ia, f, x, &ijob, &iprint, &nrest, &iter, &tol);
 
 		// copy into solution
-		Eigen::VectorXd solution = Eigen::VectorXd(nun);
+		Vector solution = Vector(nun);
 		for (int i = 0; i < nun; i++)
 			solution[i] = x[i];
 

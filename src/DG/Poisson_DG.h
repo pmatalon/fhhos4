@@ -63,7 +63,7 @@ public:
 		string rhsFilePath				= this->GetFilePath("b");
 
 		BigNumber nUnknowns = static_cast<int>(mesh->Elements.size()) * basis->NumberOfLocalFunctionsInElement(NULL);
-		this->b = Eigen::VectorXd(nUnknowns);
+		this->b = Vector(nUnknowns);
 
 		cout << "--------------------------------------------------------" << endl;
 		cout << "Assembly..." << endl;

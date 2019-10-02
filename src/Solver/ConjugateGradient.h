@@ -24,7 +24,7 @@ public:
 	}
 
 private:
-	Eigen::VectorXd Solve(const Eigen::VectorXd& b, Eigen::VectorXd& initialGuess) override
+	Vector Solve(const Vector& b, Vector& initialGuess) override
 	{
 		this->SolvingComputationalWork = 0;
 
@@ -33,15 +33,15 @@ private:
 
 		IterationResult result = CreateFirstIterationResult(b, initialGuess);
 
-		Eigen::VectorXd x = initialGuess;
-		Eigen::VectorXd r = b - A * x;
+		Vector x = initialGuess;
+		Vector r = b - A * x;
 		result.AddCost(2 * A.nonZeros());
 		result.SetResidual(r);
 
 		double beta = 0;
-		Eigen::VectorXd z = Precond.Solve(r);
+		Vector z = Precond.Solve(r);
 		result.AddCost(Precond.SolvingComputationalWork());
-		Eigen::VectorXd d = z;
+		Vector d = z;
 		this->IterationCount = 0;
 
 		while (!StoppingCriteriaReached(result))
@@ -54,8 +54,8 @@ private:
 			double alpha = r.dot(z)/(d.dot(A*d));
 			x = x + alpha * d;
 
-			Eigen::VectorXd old_r = r;
-			Eigen::VectorXd old_z = z;
+			Vector old_r = r;
+			Vector old_z = z;
 
 			r = r - alpha * A * d;
 			result.AddCost(2 * A.nonZeros());

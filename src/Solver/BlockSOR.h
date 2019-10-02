@@ -17,7 +17,7 @@ protected:
 	double _omega;
 	Direction _direction;
 
-	vector<Eigen::FullPivLU<Eigen::MatrixXd>> invD;
+	vector<Eigen::FullPivLU<DenseMatrix>> invD;
 	Eigen::SparseMatrix<double, Eigen::RowMajor> _rowMajorA;
 public:
 
@@ -44,12 +44,12 @@ public:
 			this->_rowMajorA = A;
 
 		auto nb = A.rows() / _blockSize;
-		this->invD = vector<Eigen::FullPivLU<Eigen::MatrixXd>>(nb);
+		this->invD = vector<Eigen::FullPivLU<DenseMatrix>>(nb);
 
 		NumberParallelLoop<EmptyResultChunk> parallelLoop(nb);
 		parallelLoop.Execute([this](BigNumber i, ParallelChunk<EmptyResultChunk>* chunk)
 			{
-				Eigen::MatrixXd Di = this->A.block(i * _blockSize, i * _blockSize, _blockSize, _blockSize);
+				DenseMatrix Di = this->A.block(i * _blockSize, i * _blockSize, _blockSize, _blockSize);
 				this->invD[i].compute(Di);
 			});
 
@@ -57,7 +57,7 @@ public:
 	}
 
 private:
-	IterationResult ExecuteOneIteration(const Eigen::VectorXd& b, Eigen::VectorXd& x, const IterationResult& oldResult) override
+	IterationResult ExecuteOneIteration(const Vector& b, Vector& x, const IterationResult& oldResult) override
 	{
 		IterationResult result(oldResult);
 
@@ -78,7 +78,7 @@ private:
 		return result;
 	}
 
-	inline void ProcessBlockRow(BigNumber currentBlockRow, const Eigen::VectorXd& b, Eigen::VectorXd& x)
+	inline void ProcessBlockRow(BigNumber currentBlockRow, const Vector& b, Vector& x)
 	{
 		// BlockRow i: [ --- Li --- | Di | --- Ui --- ]
 
@@ -88,7 +88,7 @@ private:
 		x.segment(i * _blockSize, _blockSize) = -_omega * Li * x.head(i * _blockSize) - _omega * Ui * x.tail((nb - i - 1) * _blockSize) + (1 - _omega)*Di*x.segment(i * _blockSize, _blockSize) + _omega * bi;
 		x.segment(i * _blockSize, _blockSize) = this->invD.block(i * _blockSize, 0, _blockSize, _blockSize) * x.segment(i * _blockSize, _blockSize);*/
 
-		Eigen::VectorXd tmp_x = _omega * b.segment(currentBlockRow * _blockSize, _blockSize);
+		Vector tmp_x = _omega * b.segment(currentBlockRow * _blockSize, _blockSize);
 
 		for (int k = 0; k < _blockSize; k++)
 		{

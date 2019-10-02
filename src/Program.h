@@ -339,14 +339,14 @@ private:
 		return solver;
 	}
 
-	Eigen::VectorXd Solve(Solver* solver, const SparseMatrix& A, const Eigen::VectorXd& b, string initialGuessCode)
+	Vector Solve(Solver* solver, const SparseMatrix& A, const Vector& b, string initialGuessCode)
 	{
 		Timer solverTimer;
 		solverTimer.Start();
 
 		cout << "Solver: " << *solver << endl << endl;
 
-		Eigen::VectorXd x;
+		Vector x;
 		IterativeSolver* iterativeSolver = dynamic_cast<IterativeSolver*>(solver);
 		if (iterativeSolver != nullptr)
 		{

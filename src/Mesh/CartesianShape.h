@@ -285,17 +285,17 @@ public:
 	//   HHO   //
 	//---------//
 
-	Eigen::MatrixXd FaceMassMatrix(FunctionalBasis<ShapeDim>* basis)
+	DenseMatrix FaceMassMatrix(FunctionalBasis<ShapeDim>* basis)
 	{
 		return RescalingCoeff() * ReferenceShape.FaceMassMatrix(basis);
 	}
 
-	Eigen::MatrixXd CellMassMatrix(FunctionalBasis<ShapeDim>* basis)
+	DenseMatrix CellMassMatrix(FunctionalBasis<ShapeDim>* basis)
 	{
 		return RescalingCoeff() * ReferenceShape.CellMassMatrix(basis);
 	}
 
-	Eigen::MatrixXd CellReconstructMassMatrix(FunctionalBasis<ShapeDim>* cellBasis, FunctionalBasis<ShapeDim>* reconstructBasis)
+	DenseMatrix CellReconstructMassMatrix(FunctionalBasis<ShapeDim>* cellBasis, FunctionalBasis<ShapeDim>* reconstructBasis)
 	{
 		return RescalingCoeff() * ReferenceShape.CellReconstructMassMatrix(cellBasis, reconstructBasis);
 	}

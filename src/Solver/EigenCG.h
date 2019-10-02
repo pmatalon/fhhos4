@@ -30,9 +30,9 @@ public:
 		_solver.setTolerance(this->Tolerance);
 	}
 
-	Eigen::VectorXd Solve(const Eigen::VectorXd& b, Eigen::VectorXd& initialGuess) override
+	Vector Solve(const Vector& b, Vector& initialGuess) override
 	{
-		Eigen::VectorXd x = _solver.solveWithGuess(b, initialGuess);
+		Vector x = _solver.solveWithGuess(b, initialGuess);
 		this->IterationCount = _solver.iterations();
 		return x;
 	}

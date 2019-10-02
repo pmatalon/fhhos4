@@ -20,7 +20,7 @@ public:
 
 	virtual void Setup(const SparseMatrix& A) = 0;
 
-	virtual Eigen::VectorXd Solve(const Eigen::VectorXd& b) = 0;
+	virtual Vector Solve(const Vector& b) = 0;
 
 	virtual ~Solver() {}
 };

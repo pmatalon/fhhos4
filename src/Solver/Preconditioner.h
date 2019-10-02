@@ -37,7 +37,7 @@ public:
 			_solver->Setup(A);
 	}
 
-	Eigen::VectorXd Solve(const Eigen::VectorXd& b)
+	Vector Solve(const Vector& b)
 	{
 		if (_solver)
 			return _solver->Solve(b);

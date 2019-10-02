@@ -20,6 +20,7 @@ public:
 	vector<Face<Dim>*> Faces;
 	vector<Face<Dim>*> BoundaryFaces;
 	vector<Face<Dim>*> InteriorFaces;
+	vector<Face<Dim>*> DirichletFaces;
 
 	DiffusionPartition<Dim>* _diffusionPartition = nullptr;
 

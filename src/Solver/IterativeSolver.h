@@ -8,7 +8,7 @@ class IterativeSolver : public Solver
 {
 protected:
 	Eigen::SparseLU<SparseMatrix> _directSolver;
-	Eigen::VectorXd _exactSolution;
+	Vector _exactSolution;
 public:
 	double Tolerance = 1e-3;
 	int MaxIterations = 200;
@@ -27,24 +27,24 @@ public:
 			this->_directSolver.compute(A);
 	}
 
-	Eigen::VectorXd Solve(const Eigen::VectorXd& b) override
+	Vector Solve(const Vector& b) override
 	{
 		return Solve(b, "0");
 	}
 
-	Eigen::VectorXd Solve(const Eigen::VectorXd& b, string initialGuessCode)
+	Vector Solve(const Vector& b, string initialGuessCode)
 	{
-		Eigen::VectorXd initialGuess;
+		Vector initialGuess;
 		if (initialGuessCode.compare("0") == 0)
-			initialGuess = Eigen::VectorXd::Zero(b.rows());
+			initialGuess = Vector::Zero(b.rows());
 		else if (initialGuessCode.compare("1") == 0)
-			initialGuess = Eigen::VectorXd::Ones(b.rows());
+			initialGuess = Vector::Ones(b.rows());
 		else
 			assert(false);
 		return Solve(b, initialGuess);
 	}
 
-	virtual Eigen::VectorXd Solve(const Eigen::VectorXd& b, Eigen::VectorXd& initialGuess)
+	virtual Vector Solve(const Vector& b, Vector& initialGuess)
 	{
 		this->SolvingComputationalWork = 0;
 
@@ -85,7 +85,7 @@ public:
 	virtual ~IterativeSolver() {}
 
 protected:
-	IterationResult CreateFirstIterationResult(const Eigen::VectorXd& b, const Eigen::VectorXd& x)
+	IterationResult CreateFirstIterationResult(const Vector& b, const Vector& x)
 	{
 		IterationResult result;
 		result.SetB(b);
@@ -94,20 +94,8 @@ protected:
 		result.SetX(x);
 		return result;
 	}
-	/*IterationResult SaveIterationResult(Eigen::VectorXd& x, const Eigen::VectorXd& b, const Eigen::VectorXd& r)
-	{
-		IterationResult result = CreateNewIterationResult(x, b, r);
-		if (this->PrintIterationResults)
-			cout << result << endl;
-		return result;
-	}
 
-	IterationResult SaveIterationResult(Eigen::VectorXd& x, const Eigen::VectorXd& b)
-	{
-		return SaveIterationResult(x, b, b - A * x);
-	}*/
-
-	virtual IterationResult ExecuteOneIteration(const Eigen::VectorXd& b, Eigen::VectorXd& x, const IterationResult& oldResult) {};
+	virtual IterationResult ExecuteOneIteration(const Vector& b, Vector& x, const IterationResult& oldResult) {};
 
 	bool StoppingCriteriaReached(const IterationResult& result)
 	{

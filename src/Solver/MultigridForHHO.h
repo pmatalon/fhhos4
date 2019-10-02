@@ -22,7 +22,7 @@ public:
 		//problem->ExportFaces("L" + to_string(number));
 	}
 
-	void ExportVector(Eigen::VectorXd& v, string suffix)
+	void ExportVector(Vector& v, string suffix)
 	{
 		this->_problem->ExportVector(v, suffix);
 	}
@@ -148,7 +148,7 @@ private:
 					BigNumber elemGlobalNumber = element->Number;
 					BigNumber faceGlobalNumber = face->Number;
 					BigNumber faceLocalNumber = element->LocalNumberOf(face);
-					Eigen::MatrixXd reconstructMatrix = element->ReconstructionFromFacesMatrix();
+					DenseMatrix reconstructMatrix = element->ReconstructionFromFacesMatrix();
 					chunk->Results.Coeffs.Add(elemGlobalNumber * cellInterpolationBasis->Size(), faceGlobalNumber * nFaceUnknowns, reconstructMatrix.block(0, faceLocalNumber*nFaceUnknowns, cellInterpolationBasis->Size(), nFaceUnknowns));
 				}
 			});
@@ -212,7 +212,7 @@ private:
 			{
 				Poisson_HHO_Element<Dim>* coarseElement = dynamic_cast<Poisson_HHO_Element<Dim>*>(ce);
 
-				Eigen::MatrixXd local_J_f_c = coarseElement->ComputeCanonicalInjectionMatrixCoarseToFine(cellInterpolationBasis);
+				DenseMatrix local_J_f_c = coarseElement->ComputeCanonicalInjectionMatrixCoarseToFine(cellInterpolationBasis);
 				for (auto fineElement : coarseElement->FinerElements)
 				{
 					BigNumber coarseElemGlobalNumber = coarseElement->Number;
@@ -244,7 +244,7 @@ private:
 			{
 				Poisson_HHO_Face<Dim>* coarseFace = dynamic_cast<Poisson_HHO_Face<Dim>*>(cf);
 
-				Eigen::MatrixXd local_J_f_c = coarseFace->ComputeCanonicalInjectionMatrixCoarseToFine(faceBasis);
+				DenseMatrix local_J_f_c = coarseFace->ComputeCanonicalInjectionMatrixCoarseToFine(faceBasis);
 				for (auto fineFace : coarseFace->FinerFaces)
 				{
 					BigNumber coarseFaceGlobalNumber = coarseFace->Number;

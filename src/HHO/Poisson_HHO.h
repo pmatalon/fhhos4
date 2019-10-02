@@ -11,11 +11,11 @@ private:
 	bool _staticCondensation = false;
 
 	SparseMatrix _globalMatrix;
-	Eigen::VectorXd _globalRHS;
+	Vector _globalRHS;
 
 public:
 	HHOParameters<Dim>* HHO;
-	Eigen::VectorXd ReconstructedSolution;
+	Vector ReconstructedSolution;
 
 	Poisson_HHO(Mesh<Dim>* mesh, string rhsCode, SourceFunction* sourceFunction, HHOParameters<Dim>* hho, bool staticCondensation, DiffusionPartition<Dim>* diffusionPartition, string outputDirectory)
 		: PoissonProblem<Dim>(mesh, diffusionPartition, rhsCode, sourceFunction, outputDirectory)
@@ -87,8 +87,8 @@ public:
 		if ((action & Action::LogAssembly) == Action::LogAssembly)
 			cout << endl << "Assembly..." << endl;
 
-		this->_globalRHS = Eigen::VectorXd(HHO->nTotalHybridUnknowns);
-		this->_globalRHS.tail(HHO->nTotalFaceUnknowns) = Eigen::VectorXd::Zero(HHO->nTotalFaceUnknowns);
+		this->_globalRHS = Vector(HHO->nTotalHybridUnknowns);
+		this->_globalRHS.tail(HHO->nTotalFaceUnknowns) = Vector::Zero(HHO->nTotalFaceUnknowns);
 
 		// Compute some useful integrals on reference element and store them
 		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreCellMassMatrix(cellBasis);
@@ -313,8 +313,8 @@ public:
 
 			this->A = Aff - Atf.transpose() * inverseAtt * Atf;
 
-			Eigen::VectorXd bt = this->_globalRHS.head(HHO->nTotalCellUnknowns);
-			Eigen::VectorXd bf = this->_globalRHS.tail(HHO->nTotalFaceUnknowns);
+			Vector bt = this->_globalRHS.head(HHO->nTotalCellUnknowns);
+			Vector bf = this->_globalRHS.tail(HHO->nTotalFaceUnknowns);
 			this->b = bf - Atf.transpose() * inverseAtt * bt;
 		}
 		else
@@ -383,20 +383,20 @@ public:
 
 	void ReconstructHigherOrderApproximation()
 	{
-		Eigen::VectorXd globalReconstructedSolution(HHO->nElements * HHO->nReconstructUnknowns);
+		Vector globalReconstructedSolution(HHO->nElements * HHO->nReconstructUnknowns);
 
-		Eigen::VectorXd globalHybridSolution;
+		Vector globalHybridSolution;
 
 		if (this->_staticCondensation)
 		{
 			cout << "Solving cell unknowns..." << endl;
-			Eigen::VectorXd facesSolution = this->Solution;
+			Vector facesSolution = this->Solution;
 
 			SparseMatrix Atf = this->_globalMatrix.topRightCorner(HHO->nTotalCellUnknowns, HHO->nTotalFaceUnknowns);
-			Eigen::VectorXd bt = this->_globalRHS.head(HHO->nTotalCellUnknowns);
+			Vector bt = this->_globalRHS.head(HHO->nTotalCellUnknowns);
 			SparseMatrix inverseAtt = GetInverseAtt();
 
-			globalHybridSolution = Eigen::VectorXd(HHO->nTotalHybridUnknowns);
+			globalHybridSolution = Vector(HHO->nTotalHybridUnknowns);
 			globalHybridSolution.tail(HHO->nTotalFaceUnknowns) = facesSolution;
 			globalHybridSolution.head(HHO->nTotalCellUnknowns) = inverseAtt * (bt - Atf * facesSolution);
 		}
@@ -409,17 +409,17 @@ public:
 				HHOParameters<Dim>* HHO = this->HHO;
 				Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
 
-				Eigen::VectorXd localHybridSolution(HHO->nCellUnknowns + HHO->nFaceUnknowns * element->Faces.size());
+				Vector localHybridSolution(HHO->nCellUnknowns + HHO->nFaceUnknowns * element->Faces.size());
 				localHybridSolution.head(HHO->nCellUnknowns) = globalHybridSolution.segment(FirstDOFGlobalNumber(element), HHO->nCellUnknowns);
 				for (auto face : element->Faces)
 				{
 					if (face->IsDomainBoundary)
-						localHybridSolution.segment(element->FirstDOFNumber(face), HHO->nFaceUnknowns) = Eigen::VectorXd::Zero(HHO->nFaceUnknowns);
+						localHybridSolution.segment(element->FirstDOFNumber(face), HHO->nFaceUnknowns) = Vector::Zero(HHO->nFaceUnknowns);
 					else
 						localHybridSolution.segment(element->FirstDOFNumber(face), HHO->nFaceUnknowns) = globalHybridSolution.segment(FirstDOFGlobalNumber(face), HHO->nFaceUnknowns);
 				}
 
-				Eigen::VectorXd localReconstructedSolution = element->Reconstruct(localHybridSolution);
+				Vector localReconstructedSolution = element->Reconstruct(localHybridSolution);
 				globalReconstructedSolution.segment(element->Number * HHO->nReconstructUnknowns, HHO->nReconstructUnknowns) = localReconstructedSolution;
 			});
 

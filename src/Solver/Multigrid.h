@@ -41,7 +41,7 @@ protected:
 
 private:
 
-	IterationResult ExecuteOneIteration(const Eigen::VectorXd& b, Eigen::VectorXd& x, const IterationResult& oldResult) override
+	IterationResult ExecuteOneIteration(const Vector& b, Vector& x, const IterationResult& oldResult) override
 	{
 		IterationResult result(oldResult);
 		x = MultigridCycle(this->_fineLevel, b, x, result);
@@ -49,10 +49,10 @@ private:
 		return result;
 	}
 
-	Eigen::VectorXd MultigridCycle(Level* level, const Eigen::VectorXd& b, Eigen::VectorXd& initialGuess, IterationResult& result)
+	Vector MultigridCycle(Level* level, const Vector& b, Vector& initialGuess, IterationResult& result)
 	{
 		SparseMatrix A = level->OperatorMatrix;
-		Eigen::VectorXd x;
+		Vector x;
 
 		if (level->IsCoarsestLevel())
 		{
@@ -72,17 +72,17 @@ private:
 			//level->ExportVector(x, "mg_afterPreSmoothing");
 
 			// Residual computation //
-			Eigen::VectorXd r = b - A * x;
+			Vector r = b - A * x;
 			result.AddCost(2 * A.nonZeros());
 
 			//cout << "res = " << (r.norm() / b.norm()) << endl;
 			
 			// Restriction of the residual on the coarse grid //
-			Eigen::VectorXd rc = level->Restrict(r);
+			Vector rc = level->Restrict(r);
 			result.AddCost(level->RestrictCost());
 
 			// Residual equation Ae=r solved on the coarse grid //
-			Eigen::VectorXd ec = Eigen::VectorXd::Zero(rc.rows());
+			Vector ec = Vector::Zero(rc.rows());
 			for (int i = 0; i < this->WLoops; ++i)
 			{
 				ec = MultigridCycle(level->CoarserLevel, rc, ec, result);
@@ -110,7 +110,7 @@ public:
 		int nLevels = this->NumberOfLevels();
 		SparseMatrix schema2(nLevels, 50);
 		_cycleSchema.Fill(schema2);
-		Eigen::MatrixXd schema = schema2;
+		DenseMatrix schema = schema2;
 		for (int row = 0; row < schema.rows(); row++)
 		{
 			for (int col = 0; col < schema.cols(); col++)

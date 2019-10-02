@@ -7,27 +7,27 @@ class ReferenceCartesianShape
 {
 private:
 	// For DG
-	Eigen::MatrixXd _stiffnessMatrix;
-	Eigen::MatrixXd _massMatrix;
+	DenseMatrix _stiffnessMatrix;
+	DenseMatrix _massMatrix;
 
 	// For HHO
-	Eigen::MatrixXd _cellMassMatrix;
+	DenseMatrix _cellMassMatrix;
 	FunctionalBasis<Dim>* _cellMassMatrixBasis;
 
-	Eigen::MatrixXd _reconstructMassMatrix;
+	DenseMatrix _reconstructMassMatrix;
 	FunctionalBasis<Dim>* _reconstructMassMatrixBasis;
 
-	Eigen::MatrixXd _cellStiffnessMatrix;
+	DenseMatrix _cellStiffnessMatrix;
 
-	Eigen::MatrixXd _reconstructK1StiffnessMatrix;
+	DenseMatrix _reconstructK1StiffnessMatrix;
 	Tensor<Dim>* _K1;
-	Eigen::MatrixXd _reconstructK2StiffnessMatrix;
+	DenseMatrix _reconstructK2StiffnessMatrix;
 	Tensor<Dim>* _K2;
 
-	Eigen::MatrixXd _faceMassMatrix;
+	DenseMatrix _faceMassMatrix;
 	FunctionalBasis<Dim>* _faceMassMatrixBasis;
 
-	Eigen::MatrixXd _cellReconstructMassMatrix;
+	DenseMatrix _cellReconstructMassMatrix;
 	FunctionalBasis<Dim>* _cellReconstructMassMatrixCellBasis;
 	FunctionalBasis<Dim>* _cellReconstructMassMatrixReconstructBasis;
 
@@ -77,25 +77,25 @@ public:
 	//   HHO   //
 	//---------//
 
-	Eigen::MatrixXd CellMassMatrix(FunctionalBasis<Dim>* basis)
+	DenseMatrix CellMassMatrix(FunctionalBasis<Dim>* basis)
 	{
 		if (basis == _cellMassMatrixBasis)
 			return _cellMassMatrix;
 		return ComputeAndReturnMassMatrix(basis);
 	}
-	Eigen::MatrixXd ReconstructMassMatrix(FunctionalBasis<Dim>* basis)
+	DenseMatrix ReconstructMassMatrix(FunctionalBasis<Dim>* basis)
 	{
 		if (basis == _reconstructMassMatrixBasis)
 			return _reconstructMassMatrix;
 		return ComputeAndReturnMassMatrix(basis);
 	}
-	Eigen::MatrixXd FaceMassMatrix(FunctionalBasis<Dim>* basis)
+	DenseMatrix FaceMassMatrix(FunctionalBasis<Dim>* basis)
 	{
 		if (basis == _faceMassMatrixBasis)
 			return _faceMassMatrix;
 		return ComputeAndReturnMassMatrix(basis);
 	}
-	Eigen::MatrixXd CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis)
+	DenseMatrix CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis)
 	{
 		if (cellBasis == _cellReconstructMassMatrixCellBasis && reconstructBasis == _cellReconstructMassMatrixReconstructBasis)
 			return _cellReconstructMassMatrix;
@@ -167,9 +167,9 @@ public:
 	}
 
 private:
-	Eigen::MatrixXd ComputeAndReturnMassMatrix(FunctionalBasis<Dim>* basis)
+	DenseMatrix ComputeAndReturnMassMatrix(FunctionalBasis<Dim>* basis)
 	{
-		Eigen::MatrixXd M = Eigen::MatrixXd(basis->Size(), basis->Size());
+		DenseMatrix M = DenseMatrix(basis->Size(), basis->Size());
 		for (BasisFunction<Dim>* phi1 : basis->LocalFunctions)
 		{
 			for (BasisFunction<Dim>* phi2 : basis->LocalFunctions)
@@ -184,9 +184,9 @@ private:
 		return M;
 	}
 
-	Eigen::MatrixXd ComputeAndReturnMassMatrix(FunctionalBasis<Dim>* basis1, FunctionalBasis<Dim>* basis2)
+	DenseMatrix ComputeAndReturnMassMatrix(FunctionalBasis<Dim>* basis1, FunctionalBasis<Dim>* basis2)
 	{
-		Eigen::MatrixXd M(basis1->LocalFunctions.size(), basis2->LocalFunctions.size());
+		DenseMatrix M(basis1->LocalFunctions.size(), basis2->LocalFunctions.size());
 		for (BasisFunction<Dim>* phi1 : basis1->LocalFunctions)
 		{
 			for (BasisFunction<Dim>* phi2 : basis2->LocalFunctions)
@@ -198,9 +198,9 @@ private:
 		return M;
 	}
 
-	Eigen::MatrixXd ComputeAndReturnStiffnessMatrix(FunctionalBasis<Dim>* basis)
+	DenseMatrix ComputeAndReturnStiffnessMatrix(FunctionalBasis<Dim>* basis)
 	{
-		Eigen::MatrixXd stiffnessMatrix = Eigen::MatrixXd(basis->Size(), basis->Size());
+		DenseMatrix stiffnessMatrix = DenseMatrix(basis->Size(), basis->Size());
 		for (BasisFunction<Dim>* phi1 : basis->LocalFunctions)
 		{
 			for (BasisFunction<Dim>* phi2 : basis->LocalFunctions)
@@ -209,9 +209,9 @@ private:
 		return stiffnessMatrix;
 	}
 
-	Eigen::MatrixXd ComputeAndReturnKStiffnessMatrix(Tensor<Dim>* K, FunctionalBasis<Dim>* basis)
+	DenseMatrix ComputeAndReturnKStiffnessMatrix(Tensor<Dim>* K, FunctionalBasis<Dim>* basis)
 	{
-		Eigen::MatrixXd stiffnessMatrix = Eigen::MatrixXd(basis->Size(), basis->Size());
+		DenseMatrix stiffnessMatrix = DenseMatrix(basis->Size(), basis->Size());
 		for (BasisFunction<Dim>* phi1 : basis->LocalFunctions)
 		{
 			for (BasisFunction<Dim>* phi2 : basis->LocalFunctions)

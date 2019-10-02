@@ -33,7 +33,7 @@ public:
 		this->coefficients.insert(this->coefficients.end(), chunk.coefficients.begin(), chunk.coefficients.end());
 	}
 
-	inline void Add(BigNumber iStart, BigNumber jStart, const Eigen::MatrixXd &m)
+	inline void Add(BigNumber iStart, BigNumber jStart, const DenseMatrix &m)
 	{
 		for (int i = 0; i < m.rows(); ++i)
 		{

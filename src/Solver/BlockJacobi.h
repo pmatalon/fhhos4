@@ -9,7 +9,7 @@ protected:
 	int _blockSize;
 	double _omega;
 
-	vector<Eigen::FullPivLU<Eigen::MatrixXd>> invD;
+	vector<Eigen::FullPivLU<DenseMatrix>> invD;
 	Eigen::SparseMatrix<double, Eigen::RowMajor> _rowMajorA;
 public:
 
@@ -35,12 +35,12 @@ public:
 			this->_rowMajorA = A;
 
 		auto nb = A.rows() / _blockSize;
-		this->invD = vector<Eigen::FullPivLU<Eigen::MatrixXd>>(nb);
+		this->invD = vector<Eigen::FullPivLU<DenseMatrix>>(nb);
 
 		NumberParallelLoop<EmptyResultChunk> parallelLoop(nb);
 		parallelLoop.Execute([this](BigNumber i, ParallelChunk<EmptyResultChunk>* chunk)
 			{
-				Eigen::MatrixXd Di = this->A.block(i * _blockSize, i * _blockSize, _blockSize, _blockSize);
+				DenseMatrix Di = this->A.block(i * _blockSize, i * _blockSize, _blockSize, _blockSize);
 				this->invD[i].compute(Di);
 			});
 
@@ -48,13 +48,13 @@ public:
 	}
 
 private:
-	IterationResult ExecuteOneIteration(const Eigen::VectorXd& b, Eigen::VectorXd& xOld, const IterationResult& oldResult) override
+	IterationResult ExecuteOneIteration(const Vector& b, Vector& xOld, const IterationResult& oldResult) override
 	{
 		IterationResult result(oldResult);
 
 		auto nb = A.rows() / _blockSize;
 
-		Eigen::VectorXd xNew(xOld.rows());
+		Vector xNew(xOld.rows());
 
 		NumberParallelLoop<EmptyResultChunk> parallelLoop(nb);
 		parallelLoop.Execute([this, b, xOld, &xNew](BigNumber i, ParallelChunk<EmptyResultChunk>* chunk)
@@ -67,11 +67,11 @@ private:
 		return result;
 	}
 
-	inline void ProcessBlockRow(BigNumber currentBlockRow, const Eigen::VectorXd& b, const Eigen::VectorXd& xOld, Eigen::VectorXd& xNew)
+	inline void ProcessBlockRow(BigNumber currentBlockRow, const Vector& b, const Vector& xOld, Vector& xNew)
 	{
 		// BlockRow i: [ --- Li --- | Di | --- Ui --- ]
 
-		Eigen::VectorXd tmp_x = _omega * b.segment(currentBlockRow * _blockSize, _blockSize);
+		Vector tmp_x = _omega * b.segment(currentBlockRow * _blockSize, _blockSize);
 
 		for (int k = 0; k < _blockSize; k++)
 		{

@@ -29,10 +29,10 @@ public:
 		}
 	}
 
-	Eigen::VectorXd Solve(const Eigen::VectorXd& b) override
+	Vector Solve(const Vector& b) override
 	{
 		this->SolvingComputationalWork = 0;
-		Eigen::VectorXd x = _solver.solve(b);
+		Vector x = _solver.solve(b);
 		this->SolvingComputationalWork = b.rows() * b.rows(); // back substitution
 		return x;
 	}

@@ -9,24 +9,24 @@ template <int Dim>
 class Poisson_HHO_Element : virtual public Element<Dim>
 {
 private:
-	Eigen::MatrixXd _cellMassMatrix;
-	Eigen::MatrixXd _projFromReconstruct;
+	DenseMatrix _cellMassMatrix;
+	DenseMatrix _projFromReconstruct;
 public:
 	HHOParameters<Dim>* HHO;
 
 	// Reconstruction operator as a matrix
-	Eigen::MatrixXd P;
+	DenseMatrix P;
 
 	// Consistency contribution
-	Eigen::MatrixXd Acons;
+	DenseMatrix Acons;
 
 	// Stabilization contribution
-	Eigen::MatrixXd Astab;
+	DenseMatrix Astab;
 
 	// Local operator matrix (= Acons + Astab)
-	Eigen::MatrixXd A;
+	DenseMatrix A;
 
-	Eigen::MatrixXd invAtt;
+	DenseMatrix invAtt;
 
 	Poisson_HHO_Element(BigNumber number) : Element<Dim>(number) {}
 	
@@ -35,7 +35,7 @@ public:
 		this->HHO = hho;
 
 		this->_cellMassMatrix = this->CellMassMatrix(hho->CellBasis);
-		Eigen::MatrixXd Nt = this->CellReconstructMassMatrix(hho->CellBasis, hho->ReconstructionBasis);
+		DenseMatrix Nt = this->CellReconstructMassMatrix(hho->CellBasis, hho->ReconstructionBasis);
 		this->_projFromReconstruct = _cellMassMatrix.inverse() * Nt;
 
 		this->AssembleReconstructionAndConsistencyMatrices();
@@ -50,20 +50,20 @@ public:
 		this->invAtt = Att.inverse();
 	}
 
-	Eigen::MatrixXd CellMassMatrix()
+	DenseMatrix CellMassMatrix()
 	{
 		return this->_cellMassMatrix;
 	}
 	
-	Eigen::MatrixXd ComputeCanonicalInjectionMatrixCoarseToFine(FunctionalBasis<Dim>* cellBasis)
+	DenseMatrix ComputeCanonicalInjectionMatrixCoarseToFine(FunctionalBasis<Dim>* cellBasis)
 	{
-		Eigen::MatrixXd J(cellBasis->Size() * this->FinerElements.size(), cellBasis->Size());
+		DenseMatrix J(cellBasis->Size() * this->FinerElements.size(), cellBasis->Size());
 
 		for (auto e : this->FinerElements)
 		{
 			Poisson_HHO_Element<Dim>* fineElement = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
 
-			Eigen::MatrixXd fineCoarseMass(cellBasis->Size(), cellBasis->Size());
+			DenseMatrix fineCoarseMass(cellBasis->Size(), cellBasis->Size());
 			for (BasisFunction<Dim>* finePhi : cellBasis->LocalFunctions)
 			{
 				for (BasisFunction<Dim>* coarsePhi : cellBasis->LocalFunctions)
@@ -80,7 +80,7 @@ public:
 				}
 			}
 			
-			Eigen::MatrixXd fineMass = fineElement->CellMassMatrix(cellBasis);
+			DenseMatrix fineMass = fineElement->CellMassMatrix(cellBasis);
 
 			J.block(this->LocalNumberOf(fineElement)*cellBasis->Size(), 0, cellBasis->Size(), cellBasis->Size()) = fineMass.inverse() * fineCoarseMass;
 		}
@@ -88,26 +88,26 @@ public:
 		return J;
 	}
 
-	Eigen::VectorXd Reconstruct(Eigen::VectorXd hybridVector)
+	Vector Reconstruct(Vector hybridVector)
 	{
 		return this->P * hybridVector;
 	}
 	
-	Eigen::MatrixXd ReconstructionMatrix()
+	DenseMatrix ReconstructionMatrix()
 	{
 		return this->P;
 	}
 
-	Eigen::MatrixXd ReconstructionFromFacesMatrix()
+	DenseMatrix ReconstructionFromFacesMatrix()
 	{
 		int nTotalFaceUnknowns = this->Faces.size() * HHO->nFaceUnknowns;
 
 		auto Atf = this->A.topRightCorner(HHO->nCellUnknowns, nTotalFaceUnknowns);
-		Eigen::MatrixXd solveCellUnknowns = -this->invAtt * Atf;
+		DenseMatrix solveCellUnknowns = -this->invAtt * Atf;
 
-		Eigen::MatrixXd createHybridVectorFromFacesMatrix(HHO->nCellUnknowns + nTotalFaceUnknowns, nTotalFaceUnknowns);
+		DenseMatrix createHybridVectorFromFacesMatrix(HHO->nCellUnknowns + nTotalFaceUnknowns, nTotalFaceUnknowns);
 		createHybridVectorFromFacesMatrix.topRows(HHO->nCellUnknowns) = solveCellUnknowns;
-		createHybridVectorFromFacesMatrix.bottomRows(nTotalFaceUnknowns) = Eigen::MatrixXd::Identity(nTotalFaceUnknowns, nTotalFaceUnknowns);
+		createHybridVectorFromFacesMatrix.bottomRows(nTotalFaceUnknowns) = DenseMatrix::Identity(nTotalFaceUnknowns, nTotalFaceUnknowns);
 		return this->P * createHybridVectorFromFacesMatrix;
 	}
 
@@ -163,8 +163,8 @@ public:
 	virtual double SourceTerm(BasisFunction<Dim>* cellPhi, SourceFunction* f) = 0;
 	virtual double IntegralKGradGradReconstruct(Tensor<Dim>* K, BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2) = 0;
 	virtual double ComputeIntegralKGradGrad(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const = 0;
-	virtual Eigen::MatrixXd CellMassMatrix(FunctionalBasis<Dim>* basis) = 0;
-	virtual Eigen::MatrixXd CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) = 0;
+	virtual DenseMatrix CellMassMatrix(FunctionalBasis<Dim>* basis) = 0;
+	virtual DenseMatrix CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) = 0;
 
 
 	virtual ~Poisson_HHO_Element() {}
@@ -177,36 +177,36 @@ private:
 
 	void AssembleReconstructionAndConsistencyMatrices()
 	{
-		this->P = Eigen::MatrixXd(HHO->nReconstructUnknowns, HHO->nCellUnknowns + this->Faces.size() * HHO->nFaceUnknowns);
+		this->P = DenseMatrix(HHO->nReconstructUnknowns, HHO->nCellUnknowns + this->Faces.size() * HHO->nFaceUnknowns);
 
-		Eigen::MatrixXd reconstructionMatrixToInvert = this->AssembleReconstructionMatrixToInvert();
-		Eigen::MatrixXd rhsMatrix = this->AssembleRHSMatrix();
+		DenseMatrix reconstructionMatrixToInvert = this->AssembleReconstructionMatrixToInvert();
+		DenseMatrix rhsMatrix = this->AssembleRHSMatrix();
 
-		Eigen::ColPivHouseholderQR<Eigen::MatrixXd> solver = reconstructionMatrixToInvert.colPivHouseholderQr();
+		Eigen::ColPivHouseholderQR<DenseMatrix> solver = reconstructionMatrixToInvert.colPivHouseholderQr();
 		for (int j = 0; j < rhsMatrix.cols(); j++)
 		{
-			Eigen::VectorXd col = solver.solve(rhsMatrix.col(j));
+			Vector col = solver.solve(rhsMatrix.col(j));
 
 			// We don't keep the last element of the column, which is the Lagrange multiplier
 			auto colWithoutLagrangeMultiplier = col.head(HHO->nReconstructUnknowns);
 			this->P.col(j) = colWithoutLagrangeMultiplier;
 		}
 
-		Eigen::MatrixXd laplacianMatrix = reconstructionMatrixToInvert.topLeftCorner(HHO->nReconstructUnknowns, HHO->nReconstructUnknowns); // Grad-Grad part (block S)
+		DenseMatrix laplacianMatrix = reconstructionMatrixToInvert.topLeftCorner(HHO->nReconstructUnknowns, HHO->nReconstructUnknowns); // Grad-Grad part (block S)
 
 		this->Acons = this->P.transpose() * laplacianMatrix * this->P;
 	}
 
-	Eigen::MatrixXd AssembleReconstructionMatrixToInvert()
+	DenseMatrix AssembleReconstructionMatrixToInvert()
 	{
-		Eigen::MatrixXd matrixToInvert(HHO->nReconstructUnknowns + 1, HHO->nReconstructUnknowns + 1);
+		DenseMatrix matrixToInvert(HHO->nReconstructUnknowns + 1, HHO->nReconstructUnknowns + 1);
 		this->AssembleGradientReconstructionMatrix(matrixToInvert); // Block S
 		this->AssembleMeanValueCondition(matrixToInvert); // Blocks L and L_transpose
 		matrixToInvert.bottomRightCorner<1, 1>() << 0;
 		return matrixToInvert;
 	}
 
-	void AssembleGradientReconstructionMatrix(Eigen::MatrixXd & reconstructionMatrixToInvert)
+	void AssembleGradientReconstructionMatrix(DenseMatrix & reconstructionMatrixToInvert)
 	{
 		for (BasisFunction<Dim>* phi1 : HHO->ReconstructionBasis->LocalFunctions)
 		{
@@ -215,7 +215,7 @@ private:
 		}
 	}
 
-	void AssembleMeanValueCondition(Eigen::MatrixXd & reconstructionMatrixToInvert)
+	void AssembleMeanValueCondition(DenseMatrix & reconstructionMatrixToInvert)
 	{
 		int last = HHO->ReconstructionBasis->NumberOfLocalFunctionsInElement(NULL);
 		for (BasisFunction<Dim>* phi : HHO->ReconstructionBasis->LocalFunctions)
@@ -226,18 +226,18 @@ private:
 		}
 	}
 
-	void AssembleMeanValueConditionRHS(Eigen::MatrixXd & rhsMatrix)
+	void AssembleMeanValueConditionRHS(DenseMatrix & rhsMatrix)
 	{
 		int last = HHO->ReconstructionBasis->NumberOfLocalFunctionsInElement(NULL);
 		for (BasisFunction<Dim>* phi : HHO->CellBasis->LocalFunctions)
 			rhsMatrix(last, phi->LocalNumber) = this->Integral(phi);
 	}
 
-	Eigen::MatrixXd AssembleRHSMatrix()
+	DenseMatrix AssembleRHSMatrix()
 	{
 		auto nTotalFaceUnknowns = this->Faces.size() * HHO->nFaceUnknowns;
 		auto nColumns = HHO->nCellUnknowns + nTotalFaceUnknowns;
-		Eigen::MatrixXd rhsMatrix(HHO->nReconstructUnknowns + 1, nColumns);
+		DenseMatrix rhsMatrix(HHO->nReconstructUnknowns + 1, nColumns);
 
 		// Top-left corner (Block Bt)
 		this->AssembleIntegrationByPartsRHS_cell(rhsMatrix);
@@ -255,7 +255,7 @@ private:
 		return rhsMatrix;
 	}
 
-	void AssembleIntegrationByPartsRHS_cell(Eigen::MatrixXd & rhsMatrix)
+	void AssembleIntegrationByPartsRHS_cell(DenseMatrix & rhsMatrix)
 	{
 		for (BasisFunction<Dim>* reconstructPhi : HHO->ReconstructionBasis->LocalFunctions)
 		{
@@ -264,7 +264,7 @@ private:
 		}
 	}
 
-	void AssembleIntegrationByPartsRHS_face(Eigen::MatrixXd & rhsMatrix, Face<Dim> * f)
+	void AssembleIntegrationByPartsRHS_face(DenseMatrix & rhsMatrix, Face<Dim> * f)
 	{
 		Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
 		for (BasisFunction<Dim>* reconstructPhi : HHO->ReconstructionBasis->LocalFunctions)
@@ -327,12 +327,12 @@ private:
 	{
 		int nHybridUnknowns = HHO->nCellUnknowns + this->Faces.size() * HHO->nFaceUnknowns;
 
-		this->Astab = Eigen::MatrixXd::Zero(nHybridUnknowns, nHybridUnknowns);
+		this->Astab = DenseMatrix::Zero(nHybridUnknowns, nHybridUnknowns);
 
 		if (HHO->Stabilization.compare("hho") == 0)
 		{
-			Eigen::MatrixXd ProjT = _projFromReconstruct;
-			Eigen::MatrixXd Dt = ProjT * this->P;
+			DenseMatrix ProjT = _projFromReconstruct;
+			DenseMatrix Dt = ProjT * this->P;
 			for (int i = 0; i < Dt.rows(); i++)
 				Dt(i, i) -= 1;
 
@@ -340,15 +340,15 @@ private:
 			{
 				Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
 				auto normal = this->OuterNormalVector(face);
-				Eigen::MatrixXd Mf = face->FaceMassMatrix();
-				Eigen::MatrixXd ProjF = face->GetProjFromReconstruct(this);
-				Eigen::MatrixXd ProjFT = face->GetProjFromCell(this);
+				DenseMatrix Mf = face->FaceMassMatrix();
+				DenseMatrix ProjF = face->GetProjFromReconstruct(this);
+				DenseMatrix ProjFT = face->GetProjFromCell(this);
 
-				Eigen::MatrixXd Df = ProjF * this->P;
+				DenseMatrix Df = ProjF * this->P;
 				for (int i = 0; i < Df.rows(); i++)
 					Df(i, FirstDOFNumber(face) + i) -= 1;
 
-				Eigen::MatrixXd DiffTF = Df - ProjFT * Dt;
+				DenseMatrix DiffTF = Df - ProjFT * Dt;
 				double h = face->GetDiameter();
 				this->Astab += DiffTF.transpose() * Mf * DiffTF * (this->DiffTensor * normal).dot(normal) / h;
 			}
@@ -359,16 +359,16 @@ private:
 			{
 				Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
 				auto normal = this->OuterNormalVector(face);
-				Eigen::MatrixXd Mf = face->FaceMassMatrix();
-				Eigen::MatrixXd ProjFT = face->GetProjFromCell(this);
+				DenseMatrix Mf = face->FaceMassMatrix();
+				DenseMatrix ProjFT = face->GetProjFromCell(this);
 
-				Eigen::MatrixXd Fpart = Eigen::MatrixXd::Zero(HHO->nFaceUnknowns, nHybridUnknowns);
-				Fpart.middleCols(FirstDOFNumber(face), HHO->nFaceUnknowns) = Eigen::MatrixXd::Identity(HHO->nFaceUnknowns, HHO->nFaceUnknowns);
+				DenseMatrix Fpart = DenseMatrix::Zero(HHO->nFaceUnknowns, nHybridUnknowns);
+				Fpart.middleCols(FirstDOFNumber(face), HHO->nFaceUnknowns) = DenseMatrix::Identity(HHO->nFaceUnknowns, HHO->nFaceUnknowns);
 
-				Eigen::MatrixXd Tpart = Eigen::MatrixXd::Zero(HHO->nCellUnknowns, nHybridUnknowns);
-				Tpart.middleCols(0, HHO->nCellUnknowns) = Eigen::MatrixXd::Identity(HHO->nCellUnknowns, HHO->nCellUnknowns);
+				DenseMatrix Tpart = DenseMatrix::Zero(HHO->nCellUnknowns, nHybridUnknowns);
+				Tpart.middleCols(0, HHO->nCellUnknowns) = DenseMatrix::Identity(HHO->nCellUnknowns, HHO->nCellUnknowns);
 
-				Eigen::MatrixXd DiffTF = Fpart - ProjFT * Tpart;
+				DenseMatrix DiffTF = Fpart - ProjFT * Tpart;
 				double h = face->GetDiameter();
 				this->Astab += DiffTF.transpose() * Mf * DiffTF * (this->DiffTensor * normal).dot(normal) / h;
 			}

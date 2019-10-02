@@ -24,7 +24,7 @@ public:
 		_solver->Setup(A);
 	}
 
-	Eigen::VectorXd Smooth(Eigen::VectorXd& x, const Eigen::VectorXd& b)
+	Vector Smooth(Vector& x, const Vector& b)
 	{
 		return _solver->Solve(b, x);
 	}

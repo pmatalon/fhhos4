@@ -82,9 +82,9 @@ public:
 		}
 	}
 
-	Eigen::VectorXd Restrict(Eigen::VectorXd& vectorOnThisLevel)
+	Vector Restrict(Vector& vectorOnThisLevel)
 	{
-		Eigen::VectorXd coarseVector = R * vectorOnThisLevel;
+		Vector coarseVector = R * vectorOnThisLevel;
 		return coarseVector;
 	}
 
@@ -93,9 +93,9 @@ public:
 		return 2 * R.nonZeros();
 	}
 
-	Eigen::VectorXd Prolong(Eigen::VectorXd& vectorOnTheCoarserLevel)
+	Vector Prolong(Vector& vectorOnTheCoarserLevel)
 	{
-		Eigen::VectorXd vectorOnThisLevel = P * vectorOnTheCoarserLevel;
+		Vector vectorOnThisLevel = P * vectorOnTheCoarserLevel;
 		return vectorOnThisLevel;
 	}
 
@@ -104,7 +104,7 @@ public:
 		return 2 * P.nonZeros();
 	}
 
-	virtual void ExportVector(Eigen::VectorXd& v, string suffix) = 0;
+	virtual void ExportVector(Vector& v, string suffix) = 0;
 
 	virtual ~Level()
 	{

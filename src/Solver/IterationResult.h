@@ -7,12 +7,12 @@ class IterationResult
 private:
 	double _bNorm;
 	bool _computeError = false;
-	Eigen::VectorXd _exactSolution;
+	Vector _exactSolution;
 	BigNumber _iterationComputationalWork = 0;
 	BigNumber _solvingComputationalWork = 0;
-	Eigen::VectorXd x;
-	Eigen::VectorXd r;
-	Eigen::VectorXd e;
+	Vector x;
+	Vector r;
+	Vector e;
 public:
 	int IterationNumber = 0;
 	double ResidualNorm = -1;
@@ -36,30 +36,30 @@ public:
 		return _solvingComputationalWork;
 	}
 
-	void SetB(const Eigen::VectorXd& b)
+	void SetB(const Vector& b)
 	{
 		this->_bNorm = b.norm();
 	}
 
-	Eigen::VectorXd X() const
+	Vector X() const
 	{
 		return this->x;
 	}
 
-	void SetX(const Eigen::VectorXd& x)
+	void SetX(const Vector& x)
 	{
 		this->x = x;
 		if (_computeError)
 			ComputeError();
 	}
 
-	void SetExactSolution(const Eigen::VectorXd exactSolution)
+	void SetExactSolution(const Vector exactSolution)
 	{
 		this->_exactSolution = exactSolution;
 		this->_computeError = true;
 	}
 
-	void SetResidual(const Eigen::VectorXd& r)
+	void SetResidual(const Vector& r)
 	{
 		this->r = r;
 		this->ResidualNorm = r.norm();

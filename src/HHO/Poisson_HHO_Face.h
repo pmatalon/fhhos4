@@ -9,21 +9,21 @@ template <int Dim>
 class Poisson_HHO_Face : virtual public Face<Dim>
 {
 private:
-	Eigen::MatrixXd _faceMassMatrix;
-	Eigen::MatrixXd _invFaceMassMatrix;
+	DenseMatrix _faceMassMatrix;
+	DenseMatrix _invFaceMassMatrix;
 
-	Eigen::MatrixXd _elem1_massCellFace;
-	Eigen::MatrixXd _elem1_massReconstructFace;
-	Eigen::MatrixXd _elem2_massCellFace;
-	Eigen::MatrixXd _elem2_massReconstructFace;
+	DenseMatrix _elem1_massCellFace;
+	DenseMatrix _elem1_massReconstructFace;
+	DenseMatrix _elem2_massCellFace;
+	DenseMatrix _elem2_massReconstructFace;
 
 	// Project a (k+1)-polynomial on the face
-	Eigen::MatrixXd _elem1_projFromReconstruct;
-	Eigen::MatrixXd _elem2_projFromReconstruct;
+	DenseMatrix _elem1_projFromReconstruct;
+	DenseMatrix _elem2_projFromReconstruct;
 
 	// Project a k-polynomial on the face
-	Eigen::MatrixXd _elem1_projFromCell;
-	Eigen::MatrixXd _elem2_projFromCell;
+	DenseMatrix _elem1_projFromCell;
+	DenseMatrix _elem2_projFromCell;
 public:
 	HHOParameters<Dim>* HHO;
 
@@ -53,21 +53,21 @@ public:
 		}
 	}
 
-	Eigen::MatrixXd FaceMassMatrix()
+	DenseMatrix FaceMassMatrix()
 	{
 		return this->_faceMassMatrix;
 	}
 
-	Eigen::MatrixXd InvFaceMassMatrix()
+	DenseMatrix InvFaceMassMatrix()
 	{
 		return this->_invFaceMassMatrix;
 	}
 
-	virtual Eigen::MatrixXd FaceMassMatrix(FunctionalBasis<Dim-1>* basis) = 0;
+	virtual DenseMatrix FaceMassMatrix(FunctionalBasis<Dim-1>* basis) = 0;
 
-	Eigen::MatrixXd MassMatrix(FunctionalBasis<Dim - 1>* basis, Element<Dim>* element, FunctionalBasis<Dim>* cellBasis)
+	DenseMatrix MassMatrix(FunctionalBasis<Dim - 1>* basis, Element<Dim>* element, FunctionalBasis<Dim>* cellBasis)
 	{
-		Eigen::MatrixXd M(basis->LocalFunctions.size(), cellBasis->LocalFunctions.size());
+		DenseMatrix M(basis->LocalFunctions.size(), cellBasis->LocalFunctions.size());
 		for (BasisFunction<Dim - 1>* phi1 : basis->LocalFunctions)
 		{
 			for (BasisFunction<Dim>* phi2 : cellBasis->LocalFunctions)
@@ -91,7 +91,7 @@ public:
 		return this->ComputeIntegral(functionToIntegrate, polynomialDegree);
 	}
 
-	Eigen::MatrixXd GetMassCellFace(Element<Dim>* element)
+	DenseMatrix GetMassCellFace(Element<Dim>* element)
 	{
 		if (element == this->Element1)
 			return _elem1_massCellFace;
@@ -100,7 +100,7 @@ public:
 		assert(false);
 	}
 
-	Eigen::MatrixXd GetMassReconstructFace(Element<Dim>* element)
+	DenseMatrix GetMassReconstructFace(Element<Dim>* element)
 	{
 		if (element == this->Element1)
 			return _elem1_massReconstructFace;
@@ -109,7 +109,7 @@ public:
 		assert(false);
 	}
 
-	Eigen::MatrixXd GetProjFromReconstruct(Element<Dim>* element)
+	DenseMatrix GetProjFromReconstruct(Element<Dim>* element)
 	{
 		if (element == this->Element1)
 			return _elem1_projFromReconstruct;
@@ -118,7 +118,7 @@ public:
 		assert(false);
 	}
 
-	Eigen::MatrixXd GetProjFromCell(Element<Dim>* element)
+	DenseMatrix GetProjFromCell(Element<Dim>* element)
 	{
 		if (element == this->Element1)
 			return _elem1_projFromCell;
@@ -127,22 +127,22 @@ public:
 		assert(false);
 	}
 
-	Eigen::MatrixXd GetProjFromCell(Element<Dim>* element, FunctionalBasis<Dim>* cellInterpolationBasis)
+	DenseMatrix GetProjFromCell(Element<Dim>* element, FunctionalBasis<Dim>* cellInterpolationBasis)
 	{
-		Eigen::MatrixXd massFaceCell = this->MassMatrix(HHO->FaceBasis, element, cellInterpolationBasis);
-		Eigen::MatrixXd projFromCell = this->_invFaceMassMatrix * massFaceCell;
+		DenseMatrix massFaceCell = this->MassMatrix(HHO->FaceBasis, element, cellInterpolationBasis);
+		DenseMatrix projFromCell = this->_invFaceMassMatrix * massFaceCell;
 		return projFromCell;
 	}
 
-	Eigen::MatrixXd ComputeCanonicalInjectionMatrixCoarseToFine(FunctionalBasis<Dim-1>* faceBasis)
+	DenseMatrix ComputeCanonicalInjectionMatrixCoarseToFine(FunctionalBasis<Dim-1>* faceBasis)
 	{
-		Eigen::MatrixXd J(faceBasis->Size() * this->FinerFaces.size(), faceBasis->Size());
+		DenseMatrix J(faceBasis->Size() * this->FinerFaces.size(), faceBasis->Size());
 
 		for (auto f : this->FinerFaces)
 		{
 			Poisson_HHO_Face<Dim>* fineFace = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
 
-			Eigen::MatrixXd fineCoarseMass(faceBasis->Size(), faceBasis->Size());
+			DenseMatrix fineCoarseMass(faceBasis->Size(), faceBasis->Size());
 			for (BasisFunction<Dim-1>* finePhi : faceBasis->LocalFunctions)
 			{
 				for (BasisFunction<Dim-1>* coarsePhi : faceBasis->LocalFunctions)
@@ -159,7 +159,7 @@ public:
 				}
 			}
 
-			Eigen::MatrixXd invFineMass = fineFace->InvFaceMassMatrix();
+			DenseMatrix invFineMass = fineFace->InvFaceMassMatrix();
 
 			J.block(this->LocalNumberOf(fineFace)*faceBasis->Size(), 0, faceBasis->Size(), faceBasis->Size()) = invFineMass * fineCoarseMass;
 		}

@@ -14,8 +14,8 @@ protected:
 public:
 	Mesh<Dim>* _mesh;
 	SparseMatrix A;
-	Eigen::VectorXd b;
-	Eigen::VectorXd Solution;
+	Vector b;
+	Vector Solution;
 
 	Problem(Mesh<Dim>* mesh, string outputDirectory)
 	{
@@ -36,7 +36,7 @@ public:
 		Eigen::saveMarket(M, filePath);
 	}
 
-	void ExportVector(const Eigen::VectorXd& M, string suffix)
+	void ExportVector(const Vector& M, string suffix)
 	{
 		string filePath = GetFilePath(suffix);
 		Eigen::saveMarketVector(M, filePath);
@@ -51,12 +51,12 @@ public:
 	{	}
 
 protected:
-	void ExtractSolution(Eigen::VectorXd solution)
+	void ExtractSolution(Vector solution)
 	{
 		this->ExtractSolution(solution, "");
 	}
 
-	void ExtractSolution(Eigen::VectorXd solution, string suffix)
+	void ExtractSolution(Vector solution, string suffix)
 	{
 		string solutionFilePath = GetFilePath("solution" + suffix);
 		Eigen::saveMarketVector(solution, solutionFilePath);
