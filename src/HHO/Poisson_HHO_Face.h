@@ -1,5 +1,4 @@
 #pragma once
-#include <Eigen/Sparse>
 #include "../FunctionalBasis/FunctionalBasis.h"
 
 template <int Dim>

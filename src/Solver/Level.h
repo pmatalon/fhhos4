@@ -1,5 +1,4 @@
 #pragma once
-#include <Eigen/Sparse>
 #include "Smoother.h"
 using namespace std;
 

@@ -1,5 +1,4 @@
 #pragma once
-#include <Eigen/Sparse>
 #include "IterativeSolver.h"
 using namespace std;
 

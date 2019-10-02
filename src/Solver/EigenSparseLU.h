@@ -1,5 +1,4 @@
 #pragma once
-#include <Eigen/Sparse>
 #include "Solver.h"
 using namespace std;
 

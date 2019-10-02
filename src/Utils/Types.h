@@ -1,5 +1,6 @@
 #pragma once
 #include <Eigen/Sparse>
+#include <Eigen/Dense>
 
 typedef long unsigned int BigNumber;
 

@@ -1,7 +1,4 @@
 #pragma once
-#include <cstdio>
-#include <iostream>
-#include <functional>
 #include "DG/Poisson_DG.h"
 #include "HHO/Poisson_HHO.h"
 #include "Mesh/1D/CartesianGrid1D.h"

@@ -4,7 +4,6 @@
 #include "TensorPolynomial.h"
 #include "Bernstein2D.h"
 #include "Bernstein3D.h"
-#include <Eigen/Sparse>
 template <int Dim>
 class Element;
 

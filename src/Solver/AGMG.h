@@ -1,5 +1,4 @@
 #pragma once
-#include <Eigen/Sparse>
 #include "Solver.h"
 #include "enable_AGMG.h"
 using namespace std;

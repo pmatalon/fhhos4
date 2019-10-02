@@ -1,5 +1,4 @@
 #pragma once
-#include <Eigen/Sparse>
 #include "../Mesh/Element.h"
 #include "../Problem/SourceFunction.h"
 #include "HHOParameters.h"

@@ -1,7 +1,6 @@
 #pragma once
 #include <functional>
 #include <vector>
-#include <Eigen/Sparse>
 #include "Types.h"
 #include "GaussLegendre.h"
 #include "../Mesh/Point.h"

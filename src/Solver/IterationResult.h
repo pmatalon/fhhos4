@@ -1,5 +1,4 @@
 #pragma once
-#include <Eigen/Sparse>
 using namespace std;
 
 class IterationResult
