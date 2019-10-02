@@ -43,4 +43,14 @@ public:
 			return _solver->Solve(b);
 		return b;
 	}
+	
+	BigNumber SetupComputationalWork()
+	{
+		return _solver->SetupComputationalWork;
+	}
+
+	BigNumber SolvingComputationalWork()
+	{
+		return _solver->SolvingComputationalWork;
+	}
 };

@@ -52,11 +52,15 @@ public:
 				Eigen::MatrixXd Di = this->A.block(i * _blockSize, i * _blockSize, _blockSize, _blockSize);
 				this->invD[i].compute(Di);
 			});
+
+		this->SetupComputationalWork = 2.0 / 3.0*pow(_blockSize, 3);
 	}
 
 private:
-	Eigen::VectorXd ExecuteOneIteration(const Eigen::VectorXd& b, Eigen::VectorXd& x) override
+	IterationResult ExecuteOneIteration(const Eigen::VectorXd& b, Eigen::VectorXd& x, const IterationResult& oldResult) override
 	{
+		IterationResult result(oldResult);
+
 		auto nb = A.rows() / _blockSize;
 		if (_direction == Direction::Forward)
 		{
@@ -68,7 +72,10 @@ private:
 			for (BigNumber i = 0; i < nb; ++i)
 				ProcessBlockRow(nb - i - 1, b, x);
 		}
-		return x;
+
+		result.SetX(x);
+		result.AddCost(2 * A.nonZeros() + nb * pow(_blockSize, 2));
+		return result;
 	}
 
 	inline void ProcessBlockRow(BigNumber currentBlockRow, const Eigen::VectorXd& b, Eigen::VectorXd& x)

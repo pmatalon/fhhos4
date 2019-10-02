@@ -35,6 +35,11 @@ public:
 		return os;
 	}
 
+	BigNumber SolvingComputationalWork()
+	{
+		return _solver->SolvingComputationalWork;
+	}
+
 	virtual ~Smoother()
 	{
 		delete _solver;

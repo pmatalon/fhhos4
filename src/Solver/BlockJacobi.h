@@ -43,11 +43,15 @@ public:
 				Eigen::MatrixXd Di = this->A.block(i * _blockSize, i * _blockSize, _blockSize, _blockSize);
 				this->invD[i].compute(Di);
 			});
+
+		this->SetupComputationalWork = 2.0 / 3.0*pow(_blockSize, 3);
 	}
 
 private:
-	Eigen::VectorXd ExecuteOneIteration(const Eigen::VectorXd& b, Eigen::VectorXd& xOld) override
+	IterationResult ExecuteOneIteration(const Eigen::VectorXd& b, Eigen::VectorXd& xOld, const IterationResult& oldResult) override
 	{
+		IterationResult result(oldResult);
+
 		auto nb = A.rows() / _blockSize;
 
 		Eigen::VectorXd xNew(xOld.rows());
@@ -57,8 +61,10 @@ private:
 			{
 				ProcessBlockRow(i, b, xOld, xNew);
 			});
-			
-		return xNew;
+
+		result.SetX(xNew);
+		result.AddCost(2 * A.nonZeros() + nb * pow(_blockSize, 2));
+		return result;
 	}
 
 	inline void ProcessBlockRow(BigNumber currentBlockRow, const Eigen::VectorXd& b, const Eigen::VectorXd& xOld, Eigen::VectorXd& xNew)

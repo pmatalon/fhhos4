@@ -41,19 +41,24 @@ protected:
 
 private:
 
-	Eigen::VectorXd ExecuteOneIteration(const Eigen::VectorXd& b, Eigen::VectorXd& x) override
+	IterationResult ExecuteOneIteration(const Eigen::VectorXd& b, Eigen::VectorXd& x, const IterationResult& oldResult) override
 	{
-		x = MultigridCycle(this->_fineLevel, b, x);
-		return x;
+		IterationResult result(oldResult);
+		x = MultigridCycle(this->_fineLevel, b, x, result);
+		result.SetX(x);
+		return result;
 	}
 
-	Eigen::VectorXd MultigridCycle(Level* level, const Eigen::VectorXd& b, Eigen::VectorXd& initialGuess)
+	Eigen::VectorXd MultigridCycle(Level* level, const Eigen::VectorXd& b, Eigen::VectorXd& initialGuess, IterationResult& result)
 	{
 		SparseMatrix A = level->OperatorMatrix;
 		Eigen::VectorXd x;
 
 		if (level->IsCoarsestLevel())
+		{
 			x = _coarseSolver->Solve(b);
+			result.AddCost(_coarseSolver->SolvingComputationalWork);
+		}
 		else
 		{
 			x = initialGuess;
@@ -62,31 +67,36 @@ private:
 
 			// Pre-smoothing //
 			x = level->PreSmoother->Smooth(x, b);
+			result.AddCost(level->PreSmoother->SolvingComputationalWork());
 
 			//level->ExportVector(x, "mg_afterPreSmoothing");
 
 			// Residual computation //
 			Eigen::VectorXd r = b - A * x;
+			result.AddCost(2 * A.nonZeros());
 
 			//cout << "res = " << (r.norm() / b.norm()) << endl;
 			
 			// Restriction of the residual on the coarse grid //
 			Eigen::VectorXd rc = level->Restrict(r);
+			result.AddCost(level->RestrictCost());
 
 			// Residual equation Ae=r solved on the coarse grid //
 			Eigen::VectorXd ec = Eigen::VectorXd::Zero(rc.rows());
 			for (int i = 0; i < this->WLoops; ++i)
 			{
-				ec = MultigridCycle(level->CoarserLevel, rc, ec);
+				ec = MultigridCycle(level->CoarserLevel, rc, ec, result);
 				if (level->CoarserLevel->IsCoarsestLevel())
 					break;
 			}
 
 			// Coarse-grid correction //
 			x = x + level->Prolong(ec);
+			result.AddCost(level->ProlongCost());
 
 			// Post-smoothing //
 			x = level->PostSmoother->Smooth(x, b);
+			result.AddCost(level->PostSmoother->SolvingComputationalWork());
 			//level->ExportVector(x, "mg_afterPostSmoothing");
 		}
 

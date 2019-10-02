@@ -46,35 +46,57 @@ public:
 
 	virtual Eigen::VectorXd Solve(const Eigen::VectorXd& b, Eigen::VectorXd& initialGuess)
 	{
+		this->SolvingComputationalWork = 0;
+
 		if (this->ComputeExactSolution)
 			this->_exactSolution = this->_directSolver.solve(b);
 
-		Eigen::VectorXd x = initialGuess;
 		this->IterationCount = 0;
 
-		IterationResult result = SaveIterationResult(x, b);
+		IterationResult result = CreateFirstIterationResult(b, initialGuess);
+		result.SetResidual(b - A * initialGuess);
+		result.AddCost(2 * A.nonZeros());
+		if (this->PrintIterationResults)
+			cout << result << endl;
+
 		while (!StoppingCriteriaReached(result))
 		{
-			x = ExecuteOneIteration(b, x);
+			auto x = result.X();
+			result = ExecuteOneIteration(b, x, result);
 			this->IterationCount++;
 
-			result = SaveIterationResult(x, b);
+			if (!result.IsResidualSet())
+			{
+				result.SetResidual(b - A * result.X());
+				result.AddCost(2 * A.nonZeros());
+			}
+			if (this->PrintIterationResults)
+				cout << result << endl;
 		}
 
 		if (this->PrintIterationResults)
 			cout << endl;
 
-		return x;
+		this->SolvingComputationalWork = result.SolvingComputationalWork();
+
+		return result.X();
 	}
 
 	virtual ~IterativeSolver() {}
 
 protected:
-	IterationResult SaveIterationResult(Eigen::VectorXd& x, const Eigen::VectorXd& b, const Eigen::VectorXd& r)
+	IterationResult CreateFirstIterationResult(const Eigen::VectorXd& b, const Eigen::VectorXd& x)
 	{
-		IterationResult result(this->IterationCount, x, r, b);
+		IterationResult result;
+		result.SetB(b);
 		if (this->ComputeExactSolution)
-			result.ComputeError(this->_exactSolution);
+			result.SetExactSolution(this->_exactSolution);
+		result.SetX(x);
+		return result;
+	}
+	/*IterationResult SaveIterationResult(Eigen::VectorXd& x, const Eigen::VectorXd& b, const Eigen::VectorXd& r)
+	{
+		IterationResult result = CreateNewIterationResult(x, b, r);
 		if (this->PrintIterationResults)
 			cout << result << endl;
 		return result;
@@ -83,9 +105,9 @@ protected:
 	IterationResult SaveIterationResult(Eigen::VectorXd& x, const Eigen::VectorXd& b)
 	{
 		return SaveIterationResult(x, b, b - A * x);
-	}
+	}*/
 
-	virtual Eigen::VectorXd ExecuteOneIteration(const Eigen::VectorXd& b, Eigen::VectorXd& x) {};
+	virtual IterationResult ExecuteOneIteration(const Eigen::VectorXd& b, Eigen::VectorXd& x, const IterationResult& oldResult) {};
 
 	bool StoppingCriteriaReached(const IterationResult& result)
 	{

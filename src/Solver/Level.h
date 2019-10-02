@@ -16,6 +16,8 @@ public:
 	Level* FinerLevel = nullptr;
 	Level* CoarserLevel = nullptr;
 
+	BigNumber SetupComputationalWork = 0;
+
 protected:
 	SparseMatrix R;
 	SparseMatrix P;
@@ -86,10 +88,20 @@ public:
 		return coarseVector;
 	}
 
+	double RestrictCost()
+	{
+		return 2 * R.nonZeros();
+	}
+
 	Eigen::VectorXd Prolong(Eigen::VectorXd& vectorOnTheCoarserLevel)
 	{
 		Eigen::VectorXd vectorOnThisLevel = P * vectorOnTheCoarserLevel;
 		return vectorOnThisLevel;
+	}
+
+	double ProlongCost()
+	{
+		return 2 * P.nonZeros();
 	}
 
 	virtual void ExportVector(Eigen::VectorXd& v, string suffix) = 0;

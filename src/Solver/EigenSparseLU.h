@@ -19,6 +19,7 @@ public:
 	void Setup(const SparseMatrix& A) override
 	{
 		_solver.compute(A);
+		this->SetupComputationalWork = 2.0 / 3.0 * pow(A.rows(), 3); // LU factorization
 		Eigen::ComputationInfo info = _solver.info();
 		if (info != Eigen::ComputationInfo::Success)
 		{
@@ -30,7 +31,9 @@ public:
 
 	Eigen::VectorXd Solve(const Eigen::VectorXd& b) override
 	{
+		this->SolvingComputationalWork = 0;
 		Eigen::VectorXd x = _solver.solve(b);
+		this->SolvingComputationalWork = b.rows() * b.rows(); // back substitution
 		return x;
 	}
 };

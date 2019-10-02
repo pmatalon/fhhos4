@@ -5,6 +5,9 @@ using namespace std;
 class Solver
 {
 public:
+	BigNumber SetupComputationalWork = 0;
+	BigNumber SolvingComputationalWork = 0;
+
 	Solver() { }
 
 	virtual void Serialize(ostream& os) const = 0;
