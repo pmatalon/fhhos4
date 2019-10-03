@@ -44,6 +44,9 @@ private:
 		Vector d = z;
 		this->IterationCount = 0;
 
+		if (this->PrintIterationResults)
+			cout << result << endl;
+
 		while (!StoppingCriteriaReached(result))
 		{
 			result = IterationResult(result);
