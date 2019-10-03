@@ -46,7 +46,7 @@ private:
 
 		while (!StoppingCriteriaReached(result))
 		{
-			IterationResult result(result);
+			result = IterationResult(result);
 
 			if (this->IterationCount > 0)
 				d = z + beta * d;
