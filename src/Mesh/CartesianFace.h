@@ -57,6 +57,11 @@ public:
 		return CartesianShape<Dim, Dim - 1>::Measure;
 	}
 
+	DomPoint Center()
+	{
+		return CartesianShape<Dim, Dim - 1>::Center;
+	}
+
 	RefPoint ConvertToReference(DomPoint domainPoint)
 	{
 		return CartesianShape<Dim, Dim - 1>::ConvertToReference(domainPoint);

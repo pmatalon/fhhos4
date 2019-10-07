@@ -21,8 +21,10 @@ public:
 	vector<Face<Dim>*> BoundaryFaces;
 	vector<Face<Dim>*> InteriorFaces;
 	vector<Face<Dim>*> DirichletFaces;
+	vector<Face<Dim>*> NeumannFaces;
 
 	DiffusionPartition<Dim>* _diffusionPartition = nullptr;
+	BoundaryConditions* _boundaryConditions = nullptr;
 
 	Mesh<Dim>* CoarseMesh = NULL;
 
@@ -60,6 +62,25 @@ public:
 				e->SetDiffusionCoefficient(diffusionPartition); // For DG
 				e->SetDiffusionTensor(diffusionPartition);
 			});
+	}
+
+	void SetBoundaryConditions(BoundaryConditions* bc)
+	{
+		this->_boundaryConditions = bc;
+
+		ParallelLoop<Face<Dim>*, EmptyResultChunk> parallelLoop(this->BoundaryFaces);
+		parallelLoop.Execute([bc](Face<Dim>* f, ParallelChunk<EmptyResultChunk>* chunk)
+			{
+				f->SetBoundaryConditions(bc);
+			});
+
+		for (auto f : this->BoundaryFaces)
+		{
+			if (f->HasDirichletBC())
+				this->DirichletFaces.push_back(f);
+			else if (f->HasNeumannBC())
+				this->NeumannFaces.push_back(f);
+		}
 	}
 
 	void ExportFacesToMatlab(string outputDirectory, bool dummy)

@@ -162,6 +162,7 @@ public:
 		else
 			assert(false && "Coarsening strategy not implemented!");
 		this->CoarseMesh->SetDiffusionCoefficient(this->_diffusionPartition);
+		this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
 	}
 
 	void CoarsenByAgglomerationAndMergeColinearFaces()

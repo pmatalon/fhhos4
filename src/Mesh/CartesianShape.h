@@ -21,6 +21,7 @@ public:
 	double WidthZ = 0;
 	CartesianShapeOrientation Orientation = CartesianShapeOrientation::None;
 	double Measure;
+	DomPoint Center;
 	bool IsRegular; // true if all widths are equal
 
 	static ReferenceCartesianShape<ShapeDim> ReferenceShape;
@@ -127,6 +128,24 @@ public:
 		this->Origin = origin;
 		this->Orientation = orientation;
 		this->Measure = (this->WidthX != 0 ? this->WidthX : 1) * (this->WidthY != 0 ? this->WidthY : 1) * (this->WidthZ != 0 ? this->WidthZ : 1);
+		if (ShapeDim == 1)
+			this->Center = DomPoint(0);
+		else if (ShapeDim == 2)
+		{
+			if (this->Orientation == CartesianShapeOrientation::Horizontal)
+				this->Center = DomPoint(Origin->X + WidthX / 2, Origin->Y);
+			else
+				this->Center = DomPoint(Origin->X, Origin->Y + WidthY / 2);
+		}
+		else if (ShapeDim == 3)
+		{
+			if (this->Orientation == CartesianShapeOrientation::InXOY)
+				this->Center = DomPoint(Origin->X + WidthX / 2, Origin->Y + WidthY / 2, Origin->Z);
+			else if (this->Orientation == CartesianShapeOrientation::InXOZ)
+				this->Center = DomPoint(Origin->X + WidthX / 2, Origin->Y, Origin->Z + WidthZ / 2);
+			else if (this->Orientation == CartesianShapeOrientation::InYOZ)
+				this->Center = DomPoint(Origin->X, Origin->Y + WidthY / 2, Origin->Z + WidthZ / 2);
+		}
 	}
 
 	void Serialize(ostream& os) const

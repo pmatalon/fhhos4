@@ -12,6 +12,8 @@ struct HHOParameters
 	BigNumber nFaces;
 	BigNumber nInteriorFaces;
 	BigNumber nBoundaryFaces;
+	BigNumber nDirichletFaces;
+	BigNumber nNeumannFaces;
 
 	int nFaceUnknowns;
 	int nCellUnknowns;
@@ -21,6 +23,9 @@ struct HHOParameters
 	BigNumber nTotalFaceUnknowns;
 	BigNumber nTotalHybridUnknowns;
 	BigNumber nTotalHybridCoeffs;
+
+	BigNumber nDirichletUnknowns;
+	BigNumber nNeumannUnknowns;
 
 	string Stabilization;
 
@@ -34,15 +39,20 @@ struct HHOParameters
 		nFaces = mesh->Faces.size();
 		nInteriorFaces = mesh->InteriorFaces.size();
 		nBoundaryFaces = mesh->BoundaryFaces.size();
+		nDirichletFaces = mesh->DirichletFaces.size();
+		nNeumannFaces = mesh->NeumannFaces.size();
 
 		nFaceUnknowns = faceBasis->Size();
 		nCellUnknowns = cellBasis->Size();
 		nReconstructUnknowns = reconstructionBasis->Size();
 
 		nTotalCellUnknowns = nElements * nCellUnknowns;
-		nTotalFaceUnknowns = nInteriorFaces * nFaceUnknowns;
+		nTotalFaceUnknowns = (nInteriorFaces + nNeumannFaces) * nFaceUnknowns;
 		nTotalHybridUnknowns = nTotalCellUnknowns + nTotalFaceUnknowns;
 		nTotalHybridCoeffs = nTotalCellUnknowns + nFaces * nFaceUnknowns;
+
+		nDirichletUnknowns = nDirichletFaces * nFaceUnknowns;
+		nNeumannUnknowns = nNeumannFaces * nFaceUnknowns;
 
 		Stabilization = stabilization;
 	}

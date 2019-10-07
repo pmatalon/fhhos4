@@ -135,6 +135,7 @@
     <ClInclude Include="src/Utils/Utils.h" />
     <ClInclude Include="src/Problem/DiffusionPartition.h" />
     <ClInclude Include="src/Problem/Problem.h" />
+    <ClInclude Include="src\Problem\BoundaryConditions.h" />
     <ClInclude Include="src\Problem\Tensor.h" />
     <ClInclude Include="src/Problem/PoissonProblem.h" />
     <ClInclude Include="src/Problem/SourceFunction.h" />

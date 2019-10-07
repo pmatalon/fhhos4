@@ -15,7 +15,7 @@ public:
 	Mesh<Dim>* _mesh;
 	SparseMatrix A;
 	Vector b;
-	Vector Solution;
+	Vector SystemSolution;
 
 	Problem(Mesh<Dim>* mesh, string outputDirectory)
 	{
@@ -44,7 +44,7 @@ public:
 
 	virtual void ExtractSolution()
 	{
-		this->ExtractSolution(this->Solution);
+		this->ExtractSolution(this->SystemSolution);
 	}
 
 	virtual ~Problem()

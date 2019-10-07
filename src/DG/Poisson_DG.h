@@ -16,7 +16,7 @@ private:
 	int _penalizationCoefficient;
 public:
 	Poisson_DG(Mesh<Dim>* mesh, string rhsCode, SourceFunction* sourceFunction, DiffusionPartition<Dim>* diffusionPartition, string outputDirectory, FunctionalBasis<Dim>* basis, int penalizationCoefficient)
-		: PoissonProblem<Dim>(mesh, diffusionPartition, rhsCode, sourceFunction, outputDirectory)
+		: PoissonProblem<Dim>(mesh, diffusionPartition, rhsCode, sourceFunction, nullptr, outputDirectory)
 	{ 
 		this->_basis = basis;
 		this->_autoPenalization = penalizationCoefficient == -1;

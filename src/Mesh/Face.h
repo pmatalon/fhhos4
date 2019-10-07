@@ -1,10 +1,14 @@
 #pragma once
 #include "Element.h"
+#include "../Problem/BoundaryConditions.h"
 using namespace std;
 
 template <int Dim>
 class Face
 {
+private:
+	BoundaryConditionType _boundaryConditionType;
+	function<double(DomPoint)> _boundaryConditionFunction = [](DomPoint p) { return 0; };
 public:
 	BigNumber Number;
 	bool IsDomainBoundary;
@@ -22,11 +26,38 @@ public:
 		this->Element1 = element1;
 		this->Element2 = element2;
 		this->IsDomainBoundary = element2 == NULL;
+		this->_boundaryConditionType = BoundaryConditionType::NotOnBoundary;
 	}
 	Face(BigNumber number, Element<Dim>* element1)
 		:Face(number, element1, NULL)
 	{
 		this->IsDomainBoundary = true;
+		this->_boundaryConditionType = BoundaryConditionType::Dirichlet;
+	}
+
+	void SetBoundaryConditions(BoundaryConditions* bc)
+	{
+		assert(IsDomainBoundary);
+		if (bc->GetBoundaryConditionType(this->Center()) == BoundaryConditionType::Dirichlet)
+		{
+			this->_boundaryConditionType = BoundaryConditionType::Dirichlet;
+			this->_boundaryConditionFunction = bc->DirichletFunction;
+		}
+		else
+		{
+			this->_boundaryConditionType = BoundaryConditionType::Neumann;
+			this->_boundaryConditionFunction = bc->NeumannFunction;
+		}
+	}	
+
+	bool HasDirichletBC()
+	{
+		return IsDomainBoundary && _boundaryConditionType == BoundaryConditionType::Dirichlet;
+	}
+
+	bool HasNeumannBC()
+	{
+		return IsDomainBoundary && _boundaryConditionType == BoundaryConditionType::Neumann;
 	}
 
 	bool IsBetween(Element<Dim>* element1, Element<Dim>* element2)
@@ -61,6 +92,7 @@ public:
 
 	virtual double GetDiameter() = 0;
 	virtual double Measure() = 0;
+	virtual DomPoint Center() = 0;
 	virtual DomPoint ConvertToDomain(RefPoint refPoint) = 0;
 	virtual RefPoint ConvertToReference(DomPoint domainPoint) = 0;
 	virtual double ComputeIntegral(function<double(RefPoint)> func) = 0;

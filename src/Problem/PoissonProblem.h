@@ -11,14 +11,16 @@ protected:
 	DiffusionPartition<Dim>* _diffusionPartition;
 	string _rhsCode;
 	SourceFunction* _sourceFunction;
+	BoundaryConditions* _boundaryConditions;
 public:
 
-	PoissonProblem(Mesh<Dim>* mesh, DiffusionPartition<Dim>* diffusionPartition, string rhsCode, SourceFunction* sourceFunction, string outputDirectory)
+	PoissonProblem(Mesh<Dim>* mesh, DiffusionPartition<Dim>* diffusionPartition, string rhsCode, SourceFunction* sourceFunction, BoundaryConditions* bc, string outputDirectory)
 		: Problem<Dim>(mesh, outputDirectory)
 	{
 		this->_diffusionPartition = diffusionPartition;
 		this->_rhsCode = rhsCode; 
 		this->_sourceFunction = sourceFunction;
+		this->_boundaryConditions = bc;
 
 		string heterogeneityString = "";
 		if (!this->_diffusionPartition->IsHomogeneous)

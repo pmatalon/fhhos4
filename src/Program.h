@@ -189,6 +189,37 @@ public:
 			}
 		}
 
+		//-------------------------//
+		//   Boundary conditions   //
+		//-------------------------//
+
+		/*exactSolution = [](DomPoint p)
+		{
+			double x = p.X;
+			double y = p.Y;
+			return pow(x, 3);
+			//return 1;
+		};
+		sourceFunction = new SourceFunction2D([](double x, double y) { 
+			return -6 * x; 
+			});*/
+
+		function<BoundaryConditionType(DomPoint)> getBoundaryConditionType = [](DomPoint p)
+		{
+			return BoundaryConditionType::Dirichlet;
+		};
+		function<double(DomPoint)> dirichletBC = [exactSolution](DomPoint p)
+		{
+			if (exactSolution != nullptr)
+				return exactSolution(p);
+			return 0.0; 
+		};
+		function<double(DomPoint)> neumannBC = [](DomPoint p) { return 0; };
+
+		BoundaryConditions bc(getBoundaryConditionType, dirichletBC, neumannBC);
+
+		mesh->SetBoundaryConditions(&bc);
+
 		//--------------------------------//
 		//   Discretization and solving   //
 		//--------------------------------//
@@ -214,13 +245,13 @@ public:
 				cout << "------------------- Linear system resolution ------------------" << endl;
 
 				Solver* solver = CreateSolver(solverCode, &problem, solverTolerance, staticCondensation, nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, coarseningStgy, basis.Size());
-				problem.Solution = Solve(solver, problem.A, problem.b, initialGuessCode);
+				problem.SystemSolution = Solve(solver, problem.A, problem.b, initialGuessCode);
 
 				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
 					problem.ExtractSolution();
 				if ((action & Action::ComputeL2Error) == Action::ComputeL2Error && exactSolution != NULL)
 				{
-					double error = L2::Error<Dim>(mesh, basis, problem.Solution, exactSolution);
+					double error = L2::Error<Dim>(mesh, basis, problem.SystemSolution, exactSolution);
 					cout << "L2 Error = " << std::scientific << error << endl;
 				}
 			}
@@ -233,7 +264,7 @@ public:
 
 			HHOParameters<Dim> hho(mesh, stabilization, &reconstructionBasis, &cellBasis, &faceBasis);
 
-			Poisson_HHO<Dim> problem(mesh, rhsCode, sourceFunction, &hho, staticCondensation, &diffusionPartition, outputDirectory);
+			Poisson_HHO<Dim> problem(mesh, rhsCode, sourceFunction, &hho, staticCondensation, &diffusionPartition, &bc, outputDirectory);
 
 			cout << endl;
 			cout << "----------------------- Assembly -------------------------" << endl;
@@ -254,7 +285,7 @@ public:
 				cout << "------------------- Linear system resolution ------------------" << endl;
 
 				Solver* solver = CreateSolver(solverCode, &problem, solverTolerance, staticCondensation, nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, coarseningStgy, faceBasis.Size());
-				problem.Solution = Solve(solver, problem.A, problem.b, initialGuessCode);
+				problem.SystemSolution = Solve(solver, problem.A, problem.b, initialGuessCode);
 
 				if (staticCondensation && (action & Action::ExtractSolution) == Action::ExtractSolution)
 					problem.ExtractTraceSystemSolution();

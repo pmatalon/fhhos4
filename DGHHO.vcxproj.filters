@@ -206,6 +206,9 @@
     <ClInclude Include="src/Problem/SourceFunction.h">
       <Filter>Problem</Filter>
     </ClInclude>
+    <ClInclude Include="src\Problem\BoundaryConditions.h">
+      <Filter>Problem</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

@@ -10,33 +10,35 @@ class Poisson_HHO : public PoissonProblem<Dim>
 private:
 	bool _staticCondensation = false;
 
-	SparseMatrix _globalMatrix;
+	SparseMatrix _globalSystemMatrix;
 	Vector _globalRHS;
-
+	Vector _dirichletCond;
 public:
 	HHOParameters<Dim>* HHO;
 	Vector ReconstructedSolution;
 
-	Poisson_HHO(Mesh<Dim>* mesh, string rhsCode, SourceFunction* sourceFunction, HHOParameters<Dim>* hho, bool staticCondensation, DiffusionPartition<Dim>* diffusionPartition, string outputDirectory)
-		: PoissonProblem<Dim>(mesh, diffusionPartition, rhsCode, sourceFunction, outputDirectory)
+	Poisson_HHO(Mesh<Dim>* mesh, string rhsCode, SourceFunction* sourceFunction, HHOParameters<Dim>* hho, bool staticCondensation, DiffusionPartition<Dim>* diffusionPartition, BoundaryConditions* bc, string outputDirectory)
+		: PoissonProblem<Dim>(mesh, diffusionPartition, rhsCode, sourceFunction, bc, outputDirectory)
 	{	
 		this->HHO = hho;
 		this->_staticCondensation = staticCondensation;
 
 		this->_fileName = this->_fileName + "_HHO_" + HHO->ReconstructionBasis->Name() + (_staticCondensation ? "" : "_nostaticcond");
 
-		// Re-numbering of the faces (interior first, then boundary)
+		// Re-numbering of the faces: interior first, then Neumann, and Dirichlet at the end (because they will be eliminated from the system)
 		BigNumber faceNumber = 0;
 		for (auto face : this->_mesh->InteriorFaces)
 			face->Number = faceNumber++;
-		for (auto face : this->_mesh->BoundaryFaces)
+		for (auto face : this->_mesh->NeumannFaces)
+			face->Number = faceNumber++;
+		for (auto face : this->_mesh->DirichletFaces)
 			face->Number = faceNumber++;
 	}
 
 	Poisson_HHO<Dim>* GetProblemOnCoarserMesh()
 	{
 		HHOParameters<Dim>* coarseHHO = new HHOParameters<Dim>(this->_mesh->CoarseMesh, HHO->Stabilization, HHO->ReconstructionBasis, HHO->CellBasis, HHO->FaceBasis);
-		return new Poisson_HHO<Dim>(this->_mesh->CoarseMesh, this->_rhsCode, this->_sourceFunction, coarseHHO, _staticCondensation, this->_diffusionPartition, this->_outputDirectory);
+		return new Poisson_HHO<Dim>(this->_mesh->CoarseMesh, this->_rhsCode, this->_sourceFunction, coarseHHO, _staticCondensation, this->_diffusionPartition, this->_boundaryConditions, this->_outputDirectory);
 	}
 
 	void ExportFaces()
@@ -135,7 +137,10 @@ public:
 
 						if (!this->_staticCondensation)
 						{
-							// Cell unknowns / Cell unknowns
+							//-------------//
+							// Cell / Cell //
+							//-------------//
+
 							for (BasisFunction<Dim>* cellPhi1 : cellBasis->LocalFunctions)
 							{
 								BigNumber i = DOFNumber(element, cellPhi1);
@@ -157,15 +162,15 @@ public:
 							}
 						}
 
-						// Cell unknowns / Face unknowns
+						//-------------//
+						// Cell / Face //
+						//-------------//
+
 						for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions)
 						{
 							BigNumber i = DOFNumber(element, cellPhi);
 							for (auto face : element->Faces)
 							{
-								if (face->IsDomainBoundary)
-									continue;
-
 								for (BasisFunction<Dim - 1>* facePhi : faceBasis->LocalFunctions)
 								{
 									BigNumber j = DOFNumber(face, facePhi);
@@ -173,7 +178,7 @@ public:
 									double matrixTerm = element->MatrixTerm(face, cellPhi, facePhi);
 									matrixCoeffs.Add(i, j, matrixTerm);
 									matrixCoeffs.Add(j, i, matrixTerm);
-									if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
+									if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices && !face->HasDirichletBC())
 									{
 										double consistencyTerm = element->ConsistencyTerm(face, cellPhi, facePhi);
 										consistencyCoeffs.Add(i, j, consistencyTerm);
@@ -187,27 +192,24 @@ public:
 							}
 						}
 
-						// Face unknowns / Face unknowns
+						//-------------//
+						// Face / Face //
+						//-------------//
+
 						for (auto face1 : element->Faces)
 						{
-							if (face1->IsDomainBoundary)
-								continue;
-
 							for (BasisFunction<Dim - 1>* facePhi1 : faceBasis->LocalFunctions)
 							{
 								BigNumber i = DOFNumber(face1, facePhi1);
 								for (auto face2 : element->Faces)
 								{
-									if (face2->IsDomainBoundary)
-										continue;
-
 									for (BasisFunction<Dim - 1>* facePhi2 : faceBasis->LocalFunctions)
 									{
 										BigNumber j = DOFNumber(face2, facePhi2);
 
 										double matrixTerm = element->MatrixTerm(face1, facePhi1, face2, facePhi2);
 										matrixCoeffs.Add(i, j, matrixTerm);
-										if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
+										if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices && !face1->HasDirichletBC() && !face2->HasDirichletBC())
 										{
 											double consistencyTerm = element->ConsistencyTerm(face1, facePhi1, face2, facePhi2);
 											consistencyCoeffs.Add(i, j, consistencyTerm);
@@ -220,16 +222,22 @@ public:
 							}
 						}
 
-						// Right-hand side
+						//-----------------//
+						// Right-hand side //
+						//-----------------//
+
 						for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions)
 						{
 							BigNumber i = DOFNumber(element, cellPhi);
 							this->_globalRHS(i) = element->SourceTerm(cellPhi, this->_sourceFunction);
 						}
 
+						//-------------------------------------------//
+						// Global reconstruction matrix (for export) //
+						//-------------------------------------------//
+
 						if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
 						{
-							// Global reconstruction matrix (for export)
 							for (BasisFunction<Dim>* reconstructPhi : reconstructionBasis->LocalFunctions)
 							{
 								BigNumber i = element->Number * reconstructionBasis->Size() + reconstructPhi->LocalNumber;
@@ -292,22 +300,49 @@ public:
 			chunksReconstructionCoeffs.clear();
 		}
 
-		//--------------------------//
-		// Creation of the matrices //
-		//--------------------------//
 
-		SparseMatrix globalMatrix = SparseMatrix(HHO->nTotalHybridUnknowns, HHO->nTotalHybridUnknowns);
-		matrixCoeffs.Fill(globalMatrix);
+		SparseMatrix extendedMatrix = SparseMatrix(HHO->nTotalHybridCoeffs, HHO->nTotalHybridCoeffs);
+		matrixCoeffs.Fill(extendedMatrix);
 
-		this->_globalMatrix = globalMatrix;
+		// Extended matrix where the Dirichlet "unknowns" are eliminated
+		this->_globalSystemMatrix = extendedMatrix.topLeftCorner(HHO->nTotalHybridUnknowns, HHO->nTotalHybridUnknowns);
+
+		//---------------------------------//
+		// Boundary conditions enforcement //
+		//---------------------------------//
+
+		// Neumann
+		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->NeumannFaces, [this, faceBasis](Face<Dim>* f)
+			{
+				Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+				BigNumber i = FirstDOFGlobalNumber(f);
+				this->_globalRHS.segment(i, HHO->nFaceUnknowns) = face->ProjectOnBasis(faceBasis, this->_boundaryConditions->NeumannFunction);
+			}
+		);
+
+		// Dirichlet
+		this->_dirichletCond = Vector(HHO->nDirichletUnknowns);
+		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->DirichletFaces, [this, faceBasis](Face<Dim>* f)
+			{
+				Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+				BigNumber i = FirstDOFGlobalNumber(f) - HHO->nTotalHybridUnknowns;
+				this->_dirichletCond.segment(i, HHO->nFaceUnknowns) = face->InvFaceMassMatrix()*face->ProjectOnBasis(faceBasis, this->_boundaryConditions->DirichletFunction);
+			}
+		);
+		//cout << this->_dirichletCond << endl;
+		this->_globalRHS -= extendedMatrix.topRightCorner(HHO->nTotalHybridUnknowns, HHO->nDirichletUnknowns) * this->_dirichletCond;
+
+		//---------------------//
+		// Static condensation //
+		//---------------------//
+
 		if (this->_staticCondensation)
 		{
 			if ((action & Action::LogAssembly) == Action::LogAssembly)
 				cout << "Static condensation..." << endl;
 
-			//SparseMatrix Att = this->_globalMatrix.topLeftCorner(HHO->nTotalCellUnknowns, HHO->nTotalCellUnknowns);
-			SparseMatrix Aff = this->_globalMatrix.bottomRightCorner(HHO->nTotalFaceUnknowns, HHO->nTotalFaceUnknowns);
-			SparseMatrix Atf = this->_globalMatrix.topRightCorner(HHO->nTotalCellUnknowns, HHO->nTotalFaceUnknowns);
+			SparseMatrix Aff = this->_globalSystemMatrix.bottomRightCorner(HHO->nTotalFaceUnknowns, HHO->nTotalFaceUnknowns);
+			SparseMatrix Atf = this->_globalSystemMatrix.topRightCorner(HHO->nTotalCellUnknowns, HHO->nTotalFaceUnknowns);
 
 			SparseMatrix inverseAtt = GetInverseAtt();
 
@@ -319,7 +354,7 @@ public:
 		}
 		else
 		{
-			this->A = this->_globalMatrix;
+			this->A = this->_globalSystemMatrix;
 			this->b = this->_globalRHS;
 		}
 
@@ -384,24 +419,25 @@ public:
 	void ReconstructHigherOrderApproximation()
 	{
 		Vector globalReconstructedSolution(HHO->nElements * HHO->nReconstructUnknowns);
-
-		Vector globalHybridSolution;
+		Vector globalHybridSolution(HHO->nTotalHybridCoeffs);
 
 		if (this->_staticCondensation)
 		{
 			cout << "Solving cell unknowns..." << endl;
-			Vector facesSolution = this->Solution;
+			Vector facesSolution = this->SystemSolution;
 
-			SparseMatrix Atf = this->_globalMatrix.topRightCorner(HHO->nTotalCellUnknowns, HHO->nTotalFaceUnknowns);
+			SparseMatrix Atf = this->_globalSystemMatrix.topRightCorner(HHO->nTotalCellUnknowns, HHO->nTotalFaceUnknowns);
 			Vector bt = this->_globalRHS.head(HHO->nTotalCellUnknowns);
 			SparseMatrix inverseAtt = GetInverseAtt();
 
-			globalHybridSolution = Vector(HHO->nTotalHybridUnknowns);
-			globalHybridSolution.tail(HHO->nTotalFaceUnknowns) = facesSolution;
 			globalHybridSolution.head(HHO->nTotalCellUnknowns) = inverseAtt * (bt - Atf * facesSolution);
+			globalHybridSolution.segment(HHO->nTotalCellUnknowns, HHO->nTotalFaceUnknowns) = facesSolution;
 		}
 		else
-			globalHybridSolution = this->Solution;
+			globalHybridSolution.head(HHO->nTotalHybridUnknowns) = this->SystemSolution;
+
+		// Dirichlet boundary conditions
+		globalHybridSolution.tail(HHO->nDirichletUnknowns) = this->_dirichletCond;
 
 		cout << "Reconstruction of higher order approximation..." << endl;
 		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, &globalHybridSolution, &globalReconstructedSolution](Element<Dim>* e)
@@ -413,10 +449,7 @@ public:
 				localHybridSolution.head(HHO->nCellUnknowns) = globalHybridSolution.segment(FirstDOFGlobalNumber(element), HHO->nCellUnknowns);
 				for (auto face : element->Faces)
 				{
-					if (face->IsDomainBoundary)
-						localHybridSolution.segment(element->FirstDOFNumber(face), HHO->nFaceUnknowns) = Vector::Zero(HHO->nFaceUnknowns);
-					else
-						localHybridSolution.segment(element->FirstDOFNumber(face), HHO->nFaceUnknowns) = globalHybridSolution.segment(FirstDOFGlobalNumber(face), HHO->nFaceUnknowns);
+					localHybridSolution.segment(element->FirstDOFNumber(face), HHO->nFaceUnknowns) = globalHybridSolution.segment(FirstDOFGlobalNumber(face), HHO->nFaceUnknowns);
 				}
 
 				Vector localReconstructedSolution = element->Reconstruct(localHybridSolution);
@@ -430,7 +463,7 @@ public:
 	{
 		if (this->_staticCondensation)
 		{
-			Problem<Dim>::ExtractSolution(this->Solution, "Faces");
+			Problem<Dim>::ExtractSolution(this->SystemSolution, "Faces");
 		}
 	}
 

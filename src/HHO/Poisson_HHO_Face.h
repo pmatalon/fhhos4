@@ -133,6 +133,26 @@ public:
 		return projFromCell;
 	}
 
+	double ProjectOnBasisFunction(BasisFunction<Dim - 1>* phi, function<double(DomPoint)> f)
+	{
+		function<double(RefPoint)> functionToIntegrate = [this, f, phi](RefPoint refElementPoint) {
+			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
+			return f(domainPoint) * phi->Eval(refElementPoint);
+		};
+
+		return this->ComputeIntegral(functionToIntegrate);
+	}
+
+	Vector ProjectOnBasis(FunctionalBasis<Dim - 1>* faceBasis, function<double(DomPoint)> f)
+	{
+		Vector projection(faceBasis->Size());
+		for (BasisFunction<Dim - 1>* phi : faceBasis->LocalFunctions)
+		{
+			projection(phi->LocalNumber) = ProjectOnBasisFunction(phi, f);
+		}
+		return projection;
+	}
+
 	DenseMatrix ComputeCanonicalInjectionMatrixCoarseToFine(FunctionalBasis<Dim-1>* faceBasis)
 	{
 		DenseMatrix J(faceBasis->Size() * this->FinerFaces.size(), faceBasis->Size());
