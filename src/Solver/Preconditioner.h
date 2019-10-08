@@ -46,11 +46,15 @@ public:
 	
 	BigNumber SetupComputationalWork()
 	{
-		return _solver->SetupComputationalWork;
+		if (_solver)
+			return _solver->SetupComputationalWork;
+		return 0;
 	}
 
 	BigNumber SolvingComputationalWork()
 	{
-		return _solver->SolvingComputationalWork;
+		if (_solver)
+			return _solver->SolvingComputationalWork;
+		return 0;
 	}
 };
