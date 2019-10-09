@@ -1,6 +1,7 @@
 #pragma once
 #include <functional>
 #include <vector>
+#include "Types.h"
 using namespace std;
 
 class GaussLegendre
@@ -623,4 +624,37 @@ public:
 		}
 		return (x2 - x1) * (y2 - y1) * (z2 - z1) / 8 * sum;
 	}
+
+	template <int Dim>
+	double QuadratureDim(std::function<double(RefPoint)> func)
+	{
+		double sum = 0;
+		if (Dim == 1)
+		{
+			for (int i = 0; i < this->nPoints; i++)
+				sum += func(RefPoint(this->points[i])) * this->weights[i];
+		}
+		else if (Dim == 2)
+		{
+			for (int i = 0; i < this->nPoints; i++)
+			{
+				for (int j = 0; j < this->nPoints; j++)
+					sum += func(RefPoint(this->points[i], this->points[j])) * this->weights[i] * this->weights[j];
+			}
+		}
+		else if (Dim == 3)
+		{
+			for (int i = 0; i < this->nPoints; i++)
+			{
+				for (int j = 0; j < this->nPoints; j++)
+				{
+					for (int k = 0; k < this->nPoints; k++)
+						sum += func(RefPoint(this->points[i], this->points[j], this->points[k])) * this->weights[i] * this->weights[j] * this->weights[k];
+				}
+			}
+		}
+		return sum;
+	}
+
+	
 };

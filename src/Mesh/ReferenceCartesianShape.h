@@ -38,12 +38,12 @@ public:
 		return Utils::Integral(phi);
 	}
 
-	double ComputeIntegral(function<double(RefPoint)> func, int polynomialDegree)
+	double ComputeIntegral(RefFunction func, int polynomialDegree)
 	{
 		return Utils::Integral<Dim>(func, polynomialDegree);
 	}
 
-	double ComputeIntegral(function<double(RefPoint)> func)
+	double ComputeIntegral(RefFunction func)
 	{
 		return Utils::Integral<Dim>(func);
 	}
@@ -221,7 +221,7 @@ private:
 public:
 	double ComputeMassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{
-		function<double(RefPoint)> functionToIntegrate = [phi1, phi2](RefPoint p) {
+		RefFunction functionToIntegrate = [phi1, phi2](RefPoint p) {
 			return phi1->Eval(p)*phi2->Eval(p);
 		};
 
@@ -234,7 +234,7 @@ public:
 		if (phi1->GetDegree() == 0 || phi2->GetDegree() == 0)
 			return 0;
 
-		function<double(RefPoint)> functionToIntegrate = [phi1, phi2](RefPoint p) {
+		RefFunction functionToIntegrate = [phi1, phi2](RefPoint p) {
 			return phi1->Grad(p).dot(phi2->Grad(p));
 		};
 
@@ -247,7 +247,7 @@ public:
 		if (phi1->GetDegree() == 0 || phi2->GetDegree() == 0)
 			return 0;
 
-		function<double(RefPoint)> functionToIntegrate = [K, phi1, phi2](RefPoint p) {
+		RefFunction functionToIntegrate = [K, phi1, phi2](RefPoint p) {
 			return (K * phi1->Grad(p)).dot(phi2->Grad(p));
 		};
 

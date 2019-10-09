@@ -10,7 +10,7 @@ class L2
 {
 public:
 	template <int Dim>
-	static double Error(Mesh<Dim>* mesh, const FunctionalBasis<Dim>& basis, const Vector& solution, function<double(DomPoint)> exactSolution)
+	static double Error(Mesh<Dim>* mesh, const FunctionalBasis<Dim>& basis, const Vector& solution, DomFunction exactSolution)
 	{
 		cout << endl << "Computing L2 error..." << endl;
 		

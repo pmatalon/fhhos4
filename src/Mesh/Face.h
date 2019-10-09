@@ -8,7 +8,7 @@ class Face
 {
 private:
 	BoundaryConditionType _boundaryConditionType;
-	function<double(DomPoint)> _boundaryConditionFunction = [](DomPoint p) { return 0; };
+	DomFunction _boundaryConditionFunction = [](DomPoint p) { return 0; };
 public:
 	BigNumber Number;
 	bool IsDomainBoundary;
@@ -95,8 +95,8 @@ public:
 	virtual DomPoint Center() = 0;
 	virtual DomPoint ConvertToDomain(RefPoint refPoint) = 0;
 	virtual RefPoint ConvertToReference(DomPoint domainPoint) = 0;
-	virtual double ComputeIntegral(function<double(RefPoint)> func) = 0;
-	virtual double ComputeIntegral(function<double(RefPoint)> func, int polynomialDegree) = 0;
+	virtual double ComputeIntegral(RefFunction func) = 0;
+	virtual double ComputeIntegral(RefFunction func, int polynomialDegree) = 0;
 	virtual Face<Dim>* CreateSameGeometricFace(BigNumber number, Element<Dim>* element1) = 0;
 	virtual void ExportFaceToMatlab(FILE* file) = 0;
 

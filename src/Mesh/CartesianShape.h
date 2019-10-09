@@ -196,7 +196,7 @@ public:
 	//   Integrals   //
 	//---------------//
 
-	double IntegralGlobalFunction(function<double(DomPoint)> func) const
+	double IntegralGlobalFunction(DomFunction func) const
 	{
 		if (ShapeDim == 1)
 		{
@@ -234,13 +234,13 @@ public:
 		return RescalingCoeff() * ReferenceShape.ComputeIntegral(phi);
 	}
 
-	double ComputeIntegral(function<double(RefPoint)> func) const
+	double ComputeIntegral(RefFunction func) const
 	{
 		double integralOnReferenceShape = ReferenceShape.ComputeIntegral(func);
 		return RescalingCoeff() * integralOnReferenceShape;
 	}
 
-	double ComputeIntegral(function<double(RefPoint)> func, int polynomialDegree) const
+	double ComputeIntegral(RefFunction func, int polynomialDegree) const
 	{
 		double integralOnReferenceShape = ReferenceShape.ComputeIntegral(func, polynomialDegree);
 		return RescalingCoeff() * integralOnReferenceShape;
@@ -253,7 +253,7 @@ public:
 
 		DimVector<ShapeDim> gradTransfo = GradTransformation();
 
-		function<double(RefPoint)> functionToIntegrate = [phi1, phi2, gradTransfo](RefPoint p) {
+		RefFunction functionToIntegrate = [phi1, phi2, gradTransfo](RefPoint p) {
 			DimVector<ShapeDim> gradPhi1 = gradTransfo.cwiseProduct(phi1->Grad(p));
 			DimVector<ShapeDim> gradPhi2 = gradTransfo.cwiseProduct(phi2->Grad(p));
 			return gradPhi1.dot(gradPhi2);
@@ -270,7 +270,7 @@ public:
 
 		DimVector<ShapeDim> gradTransfo = GradTransformation();
 
-		function<double(RefPoint)> functionToIntegrate = [K, phi1, phi2, gradTransfo](RefPoint p) {
+		RefFunction functionToIntegrate = [K, phi1, phi2, gradTransfo](RefPoint p) {
 			DimVector<ShapeDim> gradPhi1 = gradTransfo.cwiseProduct(phi1->Grad(p));
 			DimVector<ShapeDim> gradPhi2 = gradTransfo.cwiseProduct(phi2->Grad(p));
 			return (K * gradPhi1).dot(gradPhi2);

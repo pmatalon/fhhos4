@@ -82,7 +82,7 @@ public:
 	{
 		auto reconstructPhiOnFace = element->EvalPhiOnFace(this, reconstructPhi);
 
-		function<double(RefPoint)> functionToIntegrate = [facePhi, reconstructPhiOnFace](RefPoint p) {
+		RefFunction functionToIntegrate = [facePhi, reconstructPhiOnFace](RefPoint p) {
 			return facePhi->Eval(p) * reconstructPhiOnFace(p);
 		};
 
@@ -133,9 +133,9 @@ public:
 		return projFromCell;
 	}
 
-	double ProjectOnBasisFunction(BasisFunction<Dim - 1>* phi, function<double(DomPoint)> f)
+	double ProjectOnBasisFunction(BasisFunction<Dim - 1>* phi, DomFunction f)
 	{
-		function<double(RefPoint)> functionToIntegrate = [this, f, phi](RefPoint refElementPoint) {
+		RefFunction functionToIntegrate = [this, f, phi](RefPoint refElementPoint) {
 			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
 			return f(domainPoint) * phi->Eval(refElementPoint);
 		};
@@ -143,7 +143,7 @@ public:
 		return this->ComputeIntegral(functionToIntegrate);
 	}
 
-	Vector ProjectOnBasis(FunctionalBasis<Dim - 1>* faceBasis, function<double(DomPoint)> f)
+	Vector ProjectOnBasis(FunctionalBasis<Dim - 1>* faceBasis, DomFunction f)
 	{
 		Vector projection(faceBasis->Size());
 		for (BasisFunction<Dim - 1>* phi : faceBasis->LocalFunctions)
@@ -166,7 +166,7 @@ public:
 			{
 				for (BasisFunction<Dim-1>* coarsePhi : faceBasis->LocalFunctions)
 				{
-					function<double(RefPoint)> functionToIntegrate = [this, fineFace, finePhi, coarsePhi](RefPoint fineRefPoint) {
+					RefFunction functionToIntegrate = [this, fineFace, finePhi, coarsePhi](RefPoint fineRefPoint) {
 						DomPoint domPoint = fineFace->ConvertToDomain(fineRefPoint);
 						RefPoint coarseRefPoint = this->ConvertToReference(domPoint);
 						return finePhi->Eval(fineRefPoint)*coarsePhi->Eval(coarseRefPoint);

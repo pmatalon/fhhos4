@@ -79,7 +79,7 @@ public:
 		//   Analytical solution and source function   //
 		//---------------------------------------------//
 
-		function<double(DomPoint)> exactSolution = NULL;
+		DomFunction exactSolution = NULL;
 		SourceFunction* sourceFunction;
 
 		if (Dim == 1)
@@ -253,13 +253,13 @@ public:
 		{
 			return BoundaryConditionType::Dirichlet;
 		};
-		function<double(DomPoint)> dirichletBC = [exactSolution](DomPoint p)
+		DomFunction dirichletBC = [exactSolution](DomPoint p)
 		{
 			if (exactSolution != nullptr)
 				return exactSolution(p);
 			return 0.0; 
 		};
-		function<double(DomPoint)> neumannBC = [](DomPoint p) { return 0; };
+		DomFunction neumannBC = [](DomPoint p) { return 0; };
 
 		BoundaryConditions bc(getBoundaryConditionType, dirichletBC, neumannBC);
 

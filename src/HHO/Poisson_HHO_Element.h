@@ -67,7 +67,7 @@ public:
 			{
 				for (BasisFunction<Dim>* coarsePhi : cellBasis->LocalFunctions)
 				{
-					function<double(RefPoint)> functionToIntegrate = [this, fineElement, finePhi, coarsePhi](RefPoint fineRefPoint) {
+					RefFunction functionToIntegrate = [this, fineElement, finePhi, coarsePhi](RefPoint fineRefPoint) {
 						DomPoint domPoint = fineElement->ConvertToDomain(fineRefPoint);
 						RefPoint coarseRefPoint = this->ConvertToReference(domPoint);
 						return finePhi->Eval(fineRefPoint)*coarsePhi->Eval(coarseRefPoint);
@@ -289,7 +289,7 @@ private:
 			auto gradPhi = this->GradPhiOnFace(face, reconstructPhi);
 			auto normal = this->OuterNormalVector(face);
 
-			std::function<double(RefPoint)> functionToIntegrate = [this, phi, gradPhi, normal](RefPoint p) {
+			RefFunction functionToIntegrate = [this, phi, gradPhi, normal](RefPoint p) {
 				return (this->DiffTensor * gradPhi(p)).dot(normal) * phi(p);
 			};
 
@@ -310,7 +310,7 @@ private:
 		auto gradPhi = this->GradPhiOnFace(face, reconstructPhi);
 		auto normal = this->OuterNormalVector(face);
 
-		std::function<double(RefPoint)> functionToIntegrate = [this, facePhi, gradPhi, normal](RefPoint p) {
+		RefFunction functionToIntegrate = [this, facePhi, gradPhi, normal](RefPoint p) {
 			return (this->DiffTensor * gradPhi(p)).dot(normal) * facePhi->Eval(p);
 		};
 

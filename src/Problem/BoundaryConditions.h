@@ -1,6 +1,5 @@
 #pragma once
-#include <functional>
-#include "../Mesh/Point.h"
+#include "../Utils/Utils.h"
 using namespace std;
 
 enum class BoundaryConditionType : unsigned
@@ -14,11 +13,11 @@ class BoundaryConditions
 {
 public:
 	function<BoundaryConditionType(DomPoint)> GetBoundaryConditionType;
-	function<double(DomPoint)> DirichletFunction;
-	function<double(DomPoint)> NeumannFunction;
+	DomFunction DirichletFunction;
+	DomFunction NeumannFunction;
 	bool HomogeneousDirichlet = false;
 
-	BoundaryConditions(function<BoundaryConditionType(DomPoint)> getBoundaryConditionType, function<double(DomPoint)> dirichletFunction, function<double(DomPoint)> neumannFunction)
+	BoundaryConditions(function<BoundaryConditionType(DomPoint)> getBoundaryConditionType, DomFunction dirichletFunction, DomFunction neumannFunction)
 	{
 		this->GetBoundaryConditionType = getBoundaryConditionType;
 		this->DirichletFunction = dirichletFunction;

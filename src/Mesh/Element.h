@@ -51,9 +51,9 @@ public:
 		return this->_facesLocalNumbering[face];
 	}
 
-	virtual function<double(RefPoint)> EvalPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* phi)
+	virtual RefFunction EvalPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* phi)
 	{
-		function<double(RefPoint)> evalOnFace = [this, face, phi](RefPoint refPoint1D) {
+		RefFunction evalOnFace = [this, face, phi](RefPoint refPoint1D) {
 			DomPoint domainPoint2D = face->ConvertToDomain(refPoint1D);
 			RefPoint refPoint2D = this->ConvertToReference(domainPoint2D);
 			return phi->Eval(refPoint2D);
@@ -89,10 +89,10 @@ public:
 	virtual DimVector<Dim> GradTransformation() const = 0;
 	virtual DimVector<Dim> OuterNormalVector(Face<Dim>* face) = 0;
 	virtual double Integral(BasisFunction<Dim>* phi) const = 0;
-	virtual double IntegralGlobalFunction(function<double(DomPoint)> globalFunction) const = 0;
-	virtual double ComputeIntegral(function<double(RefPoint)> func) const = 0;
-	virtual double ComputeIntegral(function<double(RefPoint)> func, int polynomialDegree) const = 0;
-	virtual double L2ErrorPow2(function<double(RefPoint)> approximate, function<double(DomPoint)> exactSolution) const = 0;
+	virtual double IntegralGlobalFunction(DomFunction globalFunction) const = 0;
+	virtual double ComputeIntegral(RefFunction func) const = 0;
+	virtual double ComputeIntegral(RefFunction func, int polynomialDegree) const = 0;
+	virtual double L2ErrorPow2(RefFunction approximate, DomFunction exactSolution) const = 0;
 	virtual void SetDiffusionCoefficient(DiffusionPartition<Dim>* diffusionPartition) = 0;
 	virtual void SetDiffusionTensor(DiffusionPartition<Dim>* diffusionPartition) = 0;
 	virtual vector<RefPoint> GetNodalPoints(FunctionalBasis<Dim>* basis) const = 0;

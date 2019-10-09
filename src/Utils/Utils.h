@@ -5,6 +5,10 @@
 #include "GaussLegendre.h"
 #include "../Mesh/Point.h"
 #include "../FunctionalBasis/BasisFunction.h"
+using namespace std;
+
+using RefFunction = function<double(RefPoint)>;
+using DomFunction = function<double(DomPoint)>;
 
 class Utils
 {
@@ -16,10 +20,7 @@ public:
 	static double Integral(int nPoints, std::function<double(double)> func, double x1, double x2)
 	{
 		GaussLegendre gs(nPoints);
-		if (x1 == -1 && x2 == 1)
-			return gs.Quadrature(func);
-		else
-			return gs.Quadrature(func, x1, x2);
+		return gs.Quadrature(func, x1, x2);
 	}
 	
 	static double Integral(std::function<double(double)> func, double x1, double x2)
@@ -27,31 +28,17 @@ public:
 		return Integral(GaussLegendre::MAX_POINTS, func, x1, x2);
 	}
 
-	static double Integral(int nPoints, std::function<double(Point)> func, double x1, double x2)
+	static double Integral(int nPoints, DomFunction func, double x1, double x2)
 	{
 		function<double(double)> funcToIntegrate = [func](double x) {
-			return func(x);
+			return func(DomPoint(x));
 		};
 		return Integral(nPoints, funcToIntegrate, x1, x2);
 	}
 
-	static double Integral(std::function<double(Point)> func, double x1, double x2)
+	static double Integral(DomFunction func, double x1, double x2)
 	{
 		return Integral(GaussLegendre::MAX_POINTS, func, x1, x2);
-	}
-
-	static double Integral(BasisFunction<1>* phi, double x1, double x2)
-	{
-		function<double(double)> func = [phi](double x) {
-			return phi->Eval(x);
-		};
-		int nPoints = NumberOfRequiredQuadraturePoint(phi->GetDegree());
-		return Utils::Integral(nPoints, func, x1, x2);
-	}
-
-	static double Integral(BasisFunction<1>* phi)
-	{
-		return Utils::Integral(phi, -1, 1);
 	}
 
 	//-------------//
@@ -62,10 +49,7 @@ public:
 	static double Integral(int nPoints, std::function<double(double, double)> func, double x1, double x2, double y1, double y2)
 	{
 		GaussLegendre gs(nPoints);
-		if (x1 == -1 && x2 == 1 && y1 == -1 && y2 == 1)
-			return gs.Quadrature(func);
-		else
-			return gs.Quadrature(func, x1, x2, y1, y2);
+		return gs.Quadrature(func, x1, x2, y1, y2);
 	}
 
 	static double Integral(std::function<double(double, double)> func, double x1, double x2, double y1, double y2)
@@ -73,32 +57,17 @@ public:
 		return Integral(GaussLegendre::MAX_POINTS, func, x1, x2, y1, y2);
 	}
 
-	static double Integral(int nPoints, std::function<double(Point)> func, double x1, double x2, double y1, double y2)
+	static double Integral(int nPoints, DomFunction func, double x1, double x2, double y1, double y2)
 	{
 		function<double(double, double)> funcToIntegrate = [func](double x, double y) {
-			Point p(x, y);
-			return func(p);
+			return func(DomPoint(x, y));
 		};
 		return Integral(nPoints, funcToIntegrate, x1, x2, y1, y2);
 	}
 
-	static double Integral(std::function<double(Point)> func, double x1, double x2, double y1, double y2)
+	static double Integral(DomFunction func, double x1, double x2, double y1, double y2)
 	{
 		return Integral(GaussLegendre::MAX_POINTS, func, x1, x2, y1, y2);
-	}
-
-	static double Integral(BasisFunction<2>* phi, double x1, double x2, double y1, double y2)
-	{
-		function<double(double, double)> func = [phi](double x, double y) {
-			return phi->Eval(RefPoint(x, y));
-		};
-		int nPoints = NumberOfRequiredQuadraturePoint(phi->GetDegree());
-		return Utils::Integral(nPoints, func, x1, x2, y1, y2);
-	}
-
-	static double Integral(BasisFunction<2>* phi)
-	{
-		return Utils::Integral(phi, -1, 1, -1, 1);
 	}
 
 	//-------------//
@@ -109,10 +78,7 @@ public:
 	static double Integral(int nPoints, std::function<double(double, double, double)> func, double x1, double x2, double y1, double y2, double z1, double z2)
 	{
 		GaussLegendre gs(nPoints);
-		if (x1 == -1 && x2 == 1 && y1 == -1 && y2 == 1 && z1 == -1 && z2 == 1)
-			return gs.Quadrature(func);
-		else
-			return gs.Quadrature(func, x1, x2, y1, y2, z1, z2);
+		return gs.Quadrature(func, x1, x2, y1, y2, z1, z2);
 	}
 
 	static double Integral(std::function<double(double, double, double)> func, double x1, double x2, double y1, double y2, double z1, double z2)
@@ -120,75 +86,52 @@ public:
 		return Integral(GaussLegendre::MAX_POINTS, func, x1, x2, y1, y2, z1, z2);
 	}
 
-	static double Integral(int nPoints, std::function<double(Point)> func, double x1, double x2, double y1, double y2, double z1, double z2)
+	static double Integral(int nPoints, DomFunction func, double x1, double x2, double y1, double y2, double z1, double z2)
 	{
 		function<double(double, double, double)> funcToIntegrate = [func](double x, double y, double z) {
-			Point p(x, y, z);
-			return func(p);
+			return func(DomPoint(x, y, z));
 		};
 		return Integral(nPoints, funcToIntegrate, x1, x2, y1, y2, z1, z2);
 	}
 
-	static double Integral(std::function<double(Point)> func, double x1, double x2, double y1, double y2, double z1, double z2)
+	static double Integral(DomFunction func, double x1, double x2, double y1, double y2, double z1, double z2)
 	{
 		return Integral(GaussLegendre::MAX_POINTS, func, x1, x2, y1, y2, z1, z2);
 	}
 
-	static double Integral(BasisFunction<3>* phi, double x1, double x2, double y1, double y2, double z1, double z2)
-	{
-		function<double(double, double, double)> func = [phi](double x, double y, double z) {
-			return phi->Eval(RefPoint(x, y, z));
-		};
-		int nPoints = NumberOfRequiredQuadraturePoint(phi->GetDegree());
-		return Utils::Integral(nPoints, func, x1, x2, y1, y2, z1, z2);
-	}
-
-	static double Integral(BasisFunction<3>* phi)
-	{
-		return Utils::Integral(phi, -1, 1, -1, 1, -1, 1);
-	}
 
 	template <int Dim>
-	static double Integral(int nPoints, std::function<double(RefPoint)> func)
+	static double Integral(int nPoints, RefFunction func)
 	{
 		if (Dim == 0)
 			return func(0);
-		else if (Dim == 1)
-			return Integral(nPoints, func, -1, 1);
-		else if (Dim == 2)
-			return Integral(nPoints, func, -1, 1, -1, 1);
-		else if (Dim == 3)
-			return Integral(nPoints, func, -1, 1, -1, 1, -1, 1);
-		else
-		{
-			cout << "Unmanaged dimension in Integral." << endl;
-			exit(EXIT_FAILURE);
-		}
+		GaussLegendre gs(nPoints);
+		return gs.QuadratureDim<Dim>(func);
 	}
 
 	template <int Dim>
-	static double Integral(std::function<double(RefPoint)> func, int polynomialDegree)
-	{
-		int nPoints = NumberOfRequiredQuadraturePoint(polynomialDegree);
-		if (Dim == 0)
-			return func(0);
-		else if (Dim == 1)
-			return Integral(nPoints, func, -1, 1);
-		else if (Dim == 2)
-			return Integral(nPoints, func, -1, 1, -1, 1);
-		else if (Dim == 3)
-			return Integral(nPoints, func, -1, 1, -1, 1, -1, 1);
-		else
-		{
-			cout << "Unmanaged dimension in Integral." << endl;
-			exit(EXIT_FAILURE);
-		}
-	}
-
-	template <int Dim>
-	static double Integral(std::function<double(RefPoint)> func)
+	static double Integral(RefFunction func)
 	{
 		return Integral<Dim>(GaussLegendre::MAX_POINTS, func);
+	}
+
+	template <int Dim>
+	static double Integral(BasisFunction<Dim>* phi)
+	{
+		RefFunction func = [phi](RefPoint p) {
+			return phi->Eval(p);
+		};
+		int nPoints = NumberOfRequiredQuadraturePoint(phi->GetDegree());
+		return Utils::Integral<Dim>(nPoints, func);
+	}
+
+	template <int Dim>
+	static double Integral(RefFunction func, int polynomialDegree)
+	{
+		if (Dim == 0)
+			return func(0);
+		int nPoints = NumberOfRequiredQuadraturePoint(polynomialDegree);
+		return Integral<Dim>(nPoints, func);
 	}
 
 	static int NumberOfRequiredQuadraturePoint(int polynomialDegree)

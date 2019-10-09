@@ -71,11 +71,11 @@ public:
 		return CartesianShape<Dim, Dim - 1>::ConvertToDomain(referenceElementPoint);
 	}
 
-	double ComputeIntegral(function<double(RefPoint)> func)
+	double ComputeIntegral(RefFunction func)
 	{
 		return CartesianShape<Dim, Dim - 1>::ComputeIntegral(func);
 	}
-	double ComputeIntegral(function<double(RefPoint)> func, int polynomialDegree)
+	double ComputeIntegral(RefFunction func, int polynomialDegree)
 	{
 		return CartesianShape<Dim, Dim - 1>::ComputeIntegral(func, polynomialDegree);
 	}

@@ -223,9 +223,9 @@ public:
 		return element->Number * static_cast<int>(this->LocalFunctions.size()) + phi->LocalNumber; // the numbers start at 0
 	}
 
-	function<double(RefPoint)> GetApproximateFunction(const Vector &solution, BigNumber startIndex) const
+	RefFunction GetApproximateFunction(const Vector &solution, BigNumber startIndex) const
 	{
-		function<double(RefPoint)> approximate = [this, solution, startIndex](RefPoint p) {
+		RefFunction approximate = [this, solution, startIndex](RefPoint p) {
 			double result = 0;
 			for (unsigned int i = 0; i < this->LocalFunctions.size(); i++)
 			{

@@ -56,7 +56,7 @@ public:
 		this->DiffTensor = diffusionPartition->DiffTensor(*origin);
 	}
 
-	double IntegralGlobalFunction(function<double(DomPoint)> func) const
+	double IntegralGlobalFunction(DomFunction func) const
 	{
 		return CartesianShape<Dim>::IntegralGlobalFunction(func);
 	}
@@ -66,12 +66,12 @@ public:
 		return CartesianShape<Dim>::Integral(phi);
 	}
 
-	double ComputeIntegral(function<double(RefPoint)> func) const
+	double ComputeIntegral(RefFunction func) const
 	{
 		return CartesianShape<Dim>::ComputeIntegral(func);
 	}
 
-	double ComputeIntegral(function<double(RefPoint)> func, int polynomialDegree) const
+	double ComputeIntegral(RefFunction func, int polynomialDegree) const
 	{
 		return CartesianShape<Dim>::ComputeIntegral(func, polynomialDegree);
 	}
@@ -108,7 +108,7 @@ public:
 
 	double SourceTerm(BasisFunction<Dim>* phi, SourceFunction* f)
 	{
-		function<double(RefPoint)> sourceTimesBasisFunction = [this, f, phi](RefPoint refElementPoint) {
+		RefFunction sourceTimesBasisFunction = [this, f, phi](RefPoint refElementPoint) {
 			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
 			return f->Eval(domainPoint) * phi->Eval(refElementPoint);
 		};
@@ -116,9 +116,9 @@ public:
 		return CartesianShape<Dim>::ComputeIntegral(sourceTimesBasisFunction);
 	}
 
-	double L2ErrorPow2(function<double(RefPoint)> approximate, function<double(DomPoint)> exactSolution) const
+	double L2ErrorPow2(RefFunction approximate, DomFunction exactSolution) const
 	{
-		function<double(RefPoint)> errorFunction = [this, exactSolution, approximate](RefPoint refElementPoint) {
+		RefFunction errorFunction = [this, exactSolution, approximate](RefPoint refElementPoint) {
 			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
 			return pow(exactSolution(domainPoint) - approximate(refElementPoint), 2);
 		};
