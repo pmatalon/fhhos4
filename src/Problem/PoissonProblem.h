@@ -23,9 +23,9 @@ public:
 		this->_boundaryConditions = bc;
 
 		string heterogeneityString = "";
-		if (!this->_diffusionPartition->IsHomogeneous)
+		if (rhsCode.compare("kellogg") != 0 && !this->_diffusionPartition->IsHomogeneous)
 		{
-			char res[16];
+			char res[32];
 			sprintf(res, "_heterog%g", this->_diffusionPartition->HeterogeneityRatio);
 			heterogeneityString = res;
 		}

@@ -13,6 +13,10 @@ public:
 	double AnisotropyRatio;
 	double RotationAngle;
 
+	Tensor(DimVector<Dim> anisotropyCoefficients)
+		: Tensor(anisotropyCoefficients, 0)
+	{ }
+
 	Tensor(DimVector<Dim> anisotropyCoefficients, double rotationAngle)
 	{
 		//this->TensorMatrix = Utils::CreateTensor(anisotropyCoefficients, rotationAngle);

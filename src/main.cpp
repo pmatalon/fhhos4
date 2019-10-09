@@ -36,6 +36,7 @@ void print_usage() {
 	cout << "               sine    - the source function and the analytical solution are a sine functions" << endl;
 	cout << "               poly    - the source function is constant, the analytical solution is a polynomial of total degree 2*d" << endl;
 	cout << "               heterog - (1D only) heterogeneous diffusion-specific analytical solution" << endl;
+	cout << "               kellogg - (2D only) heterogeneous diffusion-specific analytical solution (known benchmark)" << endl;
 	cout << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << "                             Discretization                           " << endl;
@@ -260,7 +261,7 @@ int main(int argc, char* argv[])
 				break;
 			case OPT_RightHandSide:
 				rhsCode = optarg;
-				if (rhsCode.compare("sine") != 0 && rhsCode.compare("poly") != 0 && rhsCode.compare("heterog") != 0)
+				if (rhsCode.compare("sine") != 0 && rhsCode.compare("poly") != 0 && rhsCode.compare("heterog") != 0 && rhsCode.compare("kellogg") != 0)
 					argument_error("unknown right-hand side code '" + rhsCode + "'. Check -rhs argument.");
 				break;
 			case OPT_Heterogeneity: 
@@ -384,6 +385,23 @@ int main(int argc, char* argv[])
 
 	if (dimension != 1 && rhsCode.compare("heterog") == 0)
 		argument_error("-rhs heterog is only supported in 1D.");
+
+	if (rhsCode.compare("kellogg") == 0)
+	{
+		if (dimension != 2)
+			argument_error("-rhs kellogg is only supported in 2D.");
+		if (kappa1 != 1)
+			cout << "Warning: -heterog argument is ignored due to -rhs kellogg" << endl;
+		if (anisotropyRatio != 1)
+			cout << "Warning: -haniso argument is ignored due to -rhs kellogg" << endl;
+		if (rhsCode.compare("chiasmus") != 0)
+			cout << "Warning: -partition argument is ignored due to -rhs kellogg" << endl;
+
+		partition = "chiasmus";
+		anisotropyRatio = 1;
+		kappa1 = 1;
+		kappa2 = 161.4476387975881;
+	}
 
 	if (dimension == 1 && discretization.compare("hho") == 0 && polyDegree != 1)
 		argument_error("HHO in 1D only exists for p = 1.");

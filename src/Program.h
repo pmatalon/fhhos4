@@ -72,7 +72,7 @@ public:
 		Tensor<Dim> diffTensor2(anisotropyCoefficients2, rotationAngleInRandians);
 
 		DiffusionPartition<Dim> diffusionPartition(partition, &diffTensor1, &diffTensor2);
-		
+
 		mesh->SetDiffusionCoefficient(&diffusionPartition);
 
 		//---------------------------------------------//
@@ -156,6 +156,51 @@ public:
 				}
 				sourceFunction = new SourceFunction2D([](double x, double y) { return 2 * (y*(1 - y) + x * (1 - x)); });
 			}
+			else if (rhsCode.compare("kellogg") == 0)
+			{
+				if (diffusionPartition.IsIsotropic)
+				{
+					exactSolution = [](DomPoint p)
+					{
+						// Conversion from [0,1]x[0,1] to [-1,1]x[-1,1]
+						double x = 2 * p.X - 1;
+						double y = 2 * p.Y - 1;
+
+						// Conversion to polar coordinates (r, t)
+						double r = sqrt(x*x + y * y);
+						double t = 0;
+						if (x > 0 && y >= 0)
+							t = atan(y / x);
+						else if (x > 0 && y < 0)
+							t = atan(y / x) + 2 * M_PI;
+						else if (x < 0)
+							t = atan(y / x) + M_PI;
+						else if (x == 0 && y > 0)
+							t = M_PI / 2;
+						else if (x == 0 && y < 0)
+							t = 3 * M_PI / 2;
+						else
+							assert(false);
+
+						// Function in polar coordinates
+						double eps = 0.1;
+						double nu = M_PI / 4;
+						double ksi = -14.9225565104455152;
+
+						if (t >= 0 && t <= M_PI / 2)
+							return pow(r, eps) * cos((M_PI / 2 - ksi)*eps) * cos((t - M_PI / 2 + nu)*eps);
+						if (t >= M_PI / 2 && t <= M_PI)
+							return pow(r, eps) * cos(nu*eps) * cos((t - M_PI + ksi)*eps);
+						if (t >= M_PI && t <= 3 * M_PI / 2)
+							return pow(r, eps) * cos(ksi*eps) * cos((t - M_PI - nu)*eps);
+						if (t >= 3 * M_PI / 2 && t <= 2 * M_PI)
+							return pow(r, eps) * cos((M_PI / 2 - nu)*eps) * cos((t - 3 * M_PI / 2 - ksi)*eps);
+
+						assert(false);
+					};
+				}
+				sourceFunction = new SourceFunction2D([](double x, double y) { return 0; });
+			}
 		}
 		else if (Dim == 3)
 		{
@@ -223,7 +268,7 @@ public:
 		//--------------------------------//
 		//   Discretization and solving   //
 		//--------------------------------//
-
+		
 		if (discretization.compare("dg") == 0)
 		{
 			FunctionalBasis<Dim> basis(basisCode, polyDegree, usePolynomialSpaceQ);
@@ -263,7 +308,7 @@ public:
 			FunctionalBasis<Dim-1> faceBasis(basisCode, polyDegree - 1, usePolynomialSpaceQ);
 
 			HHOParameters<Dim> hho(mesh, stabilization, &reconstructionBasis, &cellBasis, &faceBasis);
-
+			
 			Poisson_HHO<Dim> problem(mesh, rhsCode, sourceFunction, &hho, staticCondensation, &diffusionPartition, &bc, outputDirectory);
 
 			cout << endl;
