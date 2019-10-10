@@ -19,8 +19,8 @@ public:
 
 	static double Integral(int nPoints, std::function<double(double)> func, double x1, double x2)
 	{
-		GaussLegendre gs(nPoints);
-		return gs.Quadrature(func, x1, x2);
+		GaussLegendre* gs = GaussLegendre::Get(nPoints);
+		return gs->Quadrature(func, x1, x2);
 	}
 	
 	static double Integral(std::function<double(double)> func, double x1, double x2)
@@ -48,8 +48,8 @@ public:
 	// Integral on [x1, x2] x [y1, y2]
 	static double Integral(int nPoints, std::function<double(double, double)> func, double x1, double x2, double y1, double y2)
 	{
-		GaussLegendre gs(nPoints);
-		return gs.Quadrature(func, x1, x2, y1, y2);
+		GaussLegendre* gs = GaussLegendre::Get(nPoints);
+		return gs->Quadrature(func, x1, x2, y1, y2);
 	}
 
 	static double Integral(std::function<double(double, double)> func, double x1, double x2, double y1, double y2)
@@ -77,8 +77,8 @@ public:
 	// Integral on [x1, x2] x [y1, y2]
 	static double Integral(int nPoints, std::function<double(double, double, double)> func, double x1, double x2, double y1, double y2, double z1, double z2)
 	{
-		GaussLegendre gs(nPoints);
-		return gs.Quadrature(func, x1, x2, y1, y2, z1, z2);
+		GaussLegendre* gs = GaussLegendre::Get(nPoints);
+		return gs->Quadrature(func, x1, x2, y1, y2, z1, z2);
 	}
 
 	static double Integral(std::function<double(double, double, double)> func, double x1, double x2, double y1, double y2, double z1, double z2)
@@ -105,8 +105,8 @@ public:
 	{
 		if (Dim == 0)
 			return func(0);
-		GaussLegendre gs(nPoints);
-		return gs.QuadratureDim<Dim>(func);
+		GaussLegendre* gs = GaussLegendre::Get(nPoints);
+		return gs->QuadratureDim<Dim>(func);
 	}
 
 	template <int Dim>

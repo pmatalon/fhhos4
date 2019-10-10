@@ -565,10 +565,10 @@ public:
 					cout << "Warning: interpolation points to be implemented!" << endl;
 					int nPoint1D = ceil(sqrt(basis->Size()));
 					points.reserve(pow(nPoint1D, 2));
-					GaussLegendre gauss(nPoint1D);
+					GaussLegendre* gauss = GaussLegendre::Get(nPoint1D);
 					for (int i = 0; i < nPoint1D; ++i)
 						for (int j = 0; j < nPoint1D; ++j)
-							points.push_back(RefPoint(gauss.Point(i), gauss.Point(j)));
+							points.push_back(RefPoint(gauss->Point(i), gauss->Point(j)));
 				}
 			}
 		}
@@ -577,11 +577,11 @@ public:
 			cout << "Warning: interpolation points to be implemented!" << endl;
 			int nPoint1D = ceil(cbrt(basis->Size()));
 			points.reserve(pow(nPoint1D, 3));
-			GaussLegendre gauss(nPoint1D);
+			GaussLegendre* gauss = GaussLegendre::Get(nPoint1D);
 			for (int i = 0; i < nPoint1D; ++i)
 				for (int j = 0; j < nPoint1D; ++j)
 					for (int k = 0; k < nPoint1D; ++k)
-						points.push_back(RefPoint(gauss.Point(i), gauss.Point(j), gauss.Point(k)));
+						points.push_back(RefPoint(gauss->Point(i), gauss->Point(j), gauss->Point(k)));
 		}
 		return points;
 	}

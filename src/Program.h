@@ -39,6 +39,8 @@ public:
 		Timer totalTimer;
 		totalTimer.Start();
 
+		GaussLegendre::Init();
+
 		//----------//
 		//   Mesh   //
 		//----------//
@@ -350,6 +352,7 @@ public:
 		}
 		delete mesh;
 		delete sourceFunction;
+		GaussLegendre::Free();
 
 		totalTimer.Stop();
 		cout << endl << "Total time: CPU = " << totalTimer.CPU() << ", elapsed = " << totalTimer.Elapsed() << endl;
