@@ -394,7 +394,7 @@ int main(int argc, char* argv[])
 			cout << "Warning: -heterog argument is ignored due to -rhs kellogg" << endl;
 		if (anisotropyRatio != 1)
 			cout << "Warning: -haniso argument is ignored due to -rhs kellogg" << endl;
-		if (rhsCode.compare("chiasmus") != 0)
+		if (partition.compare("chiasmus") != 0)
 			cout << "Warning: -partition argument is ignored due to -rhs kellogg" << endl;
 
 		partition = "chiasmus";
