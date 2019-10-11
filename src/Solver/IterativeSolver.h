@@ -98,6 +98,8 @@ protected:
 
 	bool StoppingCriteriaReached(const IterationResult& result)
 	{
+		if (MaxIterations == 0)
+			return true;
 		if (IterationCount == 0)
 			return false;
 		if (IterationCount >= MaxIterations)
