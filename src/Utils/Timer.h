@@ -69,14 +69,14 @@ public:
 		_elapsed_stop = chrono::high_resolution_clock::now();
 	}
 
-	Duration CPU()
+	Duration CPU() const
 	{
 		double span = (double)(_cpu_stop - _cpu_start);
 		Duration d((int)((double)span / CLOCKS_PER_SEC * 1000));
 		return d;
 	}
 
-	Duration Elapsed()
+	Duration Elapsed() const
 	{
 		double durationInMilliseconds = chrono::duration_cast<chrono::duration<double, std::milli>>(_elapsed_stop - _elapsed_start).count();
 		Duration d(durationInMilliseconds);

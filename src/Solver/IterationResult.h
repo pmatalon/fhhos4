@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utils/Timer.h"
 using namespace std;
 
 class IterationResult
@@ -9,6 +10,7 @@ private:
 	Vector _exactSolution;
 	BigNumber _iterationComputationalWork = 0;
 	BigNumber _solvingComputationalWork = 0;
+	Timer _solvingTimer;
 	Vector x;
 	Vector r;
 	Vector e;
@@ -19,9 +21,12 @@ public:
 	double RelativeErrorNorm = -1;
 
 	IterationResult()
-	{}
+	{
+		this->_solvingTimer.Start();
+	}
 
 	IterationResult(const IterationResult& oldResult)
+		: _solvingTimer(oldResult._solvingTimer)
 	{
 		this->IterationNumber = oldResult.IterationNumber + 1;
 		this->_solvingComputationalWork = oldResult._solvingComputationalWork;
@@ -50,6 +55,7 @@ public:
 		this->x = x;
 		if (_computeError)
 			ComputeError();
+		this->_solvingTimer.Stop();
 	}
 
 	void SetExactSolution(const Vector exactSolution)
@@ -91,6 +97,7 @@ public:
 			if (result.RelativeErrorNorm != -1)
 				os << "\tRelative err";
 			os << "\tComput. work";
+			os << "\tCPU time";
 		}
 		else
 		{
@@ -98,6 +105,7 @@ public:
 			if (result.RelativeErrorNorm != -1)
 				os << "\t" << result.RelativeErrorNorm;
 			os << "\t" << result._solvingComputationalWork;
+			os << "\t\t" << result._solvingTimer.CPU().InMilliseconds;
 		}
 		return os;
 	}
