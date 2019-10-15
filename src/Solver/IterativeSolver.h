@@ -3,6 +3,12 @@
 #include "IterationResult.h"
 using namespace std;
 
+enum class StoppingCriteria : unsigned
+{
+	NormalizedResidual = 0,
+	MaxIterations = 1
+};
+
 class IterativeSolver : public Solver
 {
 protected:
@@ -14,6 +20,7 @@ public:
 	int IterationCount = 0;
 	bool PrintIterationResults = true;
 	bool ComputeExactSolution = false;
+	StoppingCriteria StoppingCrit = StoppingCriteria::NormalizedResidual;
 
 	SparseMatrix A;
 
@@ -53,8 +60,17 @@ public:
 		this->IterationCount = 0;
 
 		IterationResult result = CreateFirstIterationResult(b, initialGuess);
-		result.SetResidual(b - A * initialGuess);
-		result.AddCost(2 * A.nonZeros());
+		if (MaxIterations == 0)
+		{
+			result.SetX(initialGuess);
+			return initialGuess;
+		}
+
+		if (StoppingCrit == StoppingCriteria::NormalizedResidual)
+		{
+			result.SetResidual(b - A * initialGuess);
+			result.AddCost(2 * A.nonZeros());
+		}
 		if (this->PrintIterationResults)
 			cout << result << endl;
 
@@ -104,7 +120,7 @@ protected:
 			return false;
 		if (IterationCount >= MaxIterations)
 			return true;
-		if (result.NormalizedResidualNorm < this->Tolerance)
+		if (StoppingCrit == StoppingCriteria::NormalizedResidual && result.NormalizedResidualNorm < this->Tolerance)
 			return true;
 		return false;
 	}

@@ -57,7 +57,7 @@ private:
 		if (level->IsCoarsestLevel())
 		{
 			x = _coarseSolver->Solve(b);
-			result.AddCost(_coarseSolver->SolvingComputationalWork);
+			//result.AddCost(_coarseSolver->SolvingComputationalWork);
 		}
 		else
 		{

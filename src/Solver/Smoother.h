@@ -14,6 +14,7 @@ public:
 	Smoother(IterativeSolver* solver, int nSmoothingIterations) :
 		_solver(solver)
 	{
+		_solver->StoppingCrit = StoppingCriteria::MaxIterations;
 		_solver->MaxIterations = nSmoothingIterations;
 		_solver->PrintIterationResults = false;
 		_solver->ComputeExactSolution = false;
