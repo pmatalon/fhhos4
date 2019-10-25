@@ -42,6 +42,7 @@ public:
 
 		int polynomialDegree = max(p_phi1->GetDegree() + p_phi2->GetDegree() - 1, 0);
 		double integralJump1ScalarJump2 = this->ComputeIntegral(functionToIntegrate, polynomialDegree);
+		return -integralJump1ScalarJump2;
 	}
 
 	virtual double PenalizationTerm(Element<Dim>* element1, BasisFunction<Dim>* p_phi1, Element<Dim>* element2, BasisFunction<Dim>* p_phi2, double penalizationCoefficient)
