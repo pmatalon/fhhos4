@@ -15,7 +15,6 @@ public:
 
 	virtual double StiffnessTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) = 0;
 	virtual double MassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) = 0;
-	virtual double SourceTerm(BasisFunction<Dim>* phi, SourceFunction* f) = 0;
 
 	virtual ~Poisson_DG_Element() {}
 };

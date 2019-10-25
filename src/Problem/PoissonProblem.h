@@ -61,8 +61,12 @@ public:
 			cout << "sine function";
 		else if (this->_rhsCode.compare("poly") == 0)
 			cout << "polynomial function";
+		else if (this->_rhsCode.compare("one") == 0)
+			cout << "constant 1";
 		else if (this->_rhsCode.compare("hetero") == 0)
 			cout << "heterogeneous-specific piecewise polynomial function";
+		else if (this->_rhsCode.compare("kellogg") == 0)
+			cout << "Kellogg";
 		else
 			cout << "unknown";
 		cout << endl;

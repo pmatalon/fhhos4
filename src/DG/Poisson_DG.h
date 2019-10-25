@@ -1,6 +1,7 @@
 #pragma once
 #include "../Problem/PoissonProblem.h"
 #include "../Mesh/CartesianShape.h"
+#include "../Mesh/2D/Triangle.h"
 #include "../Utils/Action.h"
 #include "../Utils/ParallelLoop.h"
 #include "Poisson_DG_Element.h"
@@ -30,7 +31,7 @@ public:
 
 	void PrintDiscretization()
 	{
-		cout << this->_mesh->Description() << endl;
+		cout << "Mesh: " << this->_mesh->Description() << endl;
 		cout << "Discretization: Discontinuous Galerkin SIPG" << endl;
 		cout << "\tPolynomial space: " << (_basis->UsePolynomialSpaceQ ? "Q" : "P") << endl;
 		cout << "\tPolynomial basis: " << _basis->Name() << endl;
@@ -70,6 +71,8 @@ public:
 
 		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreMassMatrix(basis);
 		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreStiffnessMatrix(basis);
+		if (Dim == 2)
+			Triangle::RefTriangle.ComputeAndStoreMassMatrix((FunctionalBasis<2>*)basis);
 		
 		//--------------------------------------------//
 		// Iteration on the elements: diagonal blocks //

@@ -7,7 +7,6 @@ template <int Dim>
 class CartesianElement : public Poisson_DG_Element<Dim>, public Poisson_HHO_Element<Dim>, public CartesianShape<Dim>
 {
 public:
-
 	CartesianElement(BigNumber number, DomPoint* origin, double width) :
 		Poisson_DG_Element<Dim>(number),
 		Poisson_HHO_Element<Dim>(number), 
@@ -33,97 +32,67 @@ public:
 		CartesianShape<Dim>::Serialize(os);
 	}
 
-	double GetDiameter() override
+	inline double GetDiameter() override
 	{
 		return max({ CartesianShape<Dim>::WidthX, CartesianShape<Dim>::WidthY, CartesianShape<Dim>::WidthZ });
 	}
-
-	double Measure()
+	inline double Measure()
 	{
 		return CartesianShape<Dim>::Measure;
 	}
-
-	// For DG
-	void SetDiffusionCoefficient(DiffusionPartition<Dim>* diffusionPartition) override
+	inline DomPoint Center()
 	{
-		DomPoint* origin = CartesianShape<Dim>::Origin;
-		this->Kappa = diffusionPartition->Coefficient(*origin);
+		return CartesianShape<Dim>::Center;
 	}
-
-	void SetDiffusionTensor(DiffusionPartition<Dim>* diffusionPartition) override
-	{
-		DomPoint* origin = CartesianShape<Dim>::Origin;
-		this->DiffTensor = diffusionPartition->DiffTensor(*origin);
-	}
-
-	double IntegralGlobalFunction(DomFunction func) const
+	
+	inline double IntegralGlobalFunction(DomFunction func) const override
 	{
 		return CartesianShape<Dim>::IntegralGlobalFunction(func);
 	}
 
-	double Integral(BasisFunction<Dim>* phi) const
+	inline double Integral(BasisFunction<Dim>* phi) const
 	{
 		return CartesianShape<Dim>::Integral(phi);
 	}
 
-	double ComputeIntegral(RefFunction func) const
+	inline double ComputeIntegral(RefFunction func) const
 	{
 		return CartesianShape<Dim>::ComputeIntegral(func);
 	}
 
-	double ComputeIntegral(RefFunction func, int polynomialDegree) const
+	inline double ComputeIntegral(RefFunction func, int polynomialDegree) const
 	{
 		return CartesianShape<Dim>::ComputeIntegral(func, polynomialDegree);
 	}
 
-	double ComputeIntegralGradGrad(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
+	inline double ComputeIntegralGradGrad(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
 	{
 		return CartesianShape<Dim>::ComputeIntegralGradGrad(phi1, phi2);
 	}
 
-	double ComputeIntegralKGradGrad(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
+	inline double ComputeIntegralKGradGrad(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
 	{
 		return CartesianShape<Dim>::ComputeIntegralKGradGrad(K, phi1, phi2);
 	}
 
-	DomPoint ConvertToDomain(RefPoint referenceElementPoint) const
+	inline DomPoint ConvertToDomain(RefPoint referenceElementPoint) const
 	{
 		return CartesianShape<Dim>::ConvertToDomain(referenceElementPoint);
 	}
 
-	RefPoint ConvertToReference(DomPoint domainPoint) const
+	inline RefPoint ConvertToReference(DomPoint domainPoint) const
 	{
 		return CartesianShape<Dim>::ConvertToReference(domainPoint);
 	}
 
-	DimVector<Dim> GradTransformation() const
+	inline DimMatrix<Dim> InverseJacobian() const
 	{
-		return CartesianShape<Dim>::GradTransformation();
+		return CartesianShape<Dim>::InverseJacobian();
 	}
 
-	vector<RefPoint> GetNodalPoints(FunctionalBasis<Dim>* basis) const
+	inline vector<RefPoint> GetNodalPoints(FunctionalBasis<Dim>* basis) const
 	{
 		return CartesianShape<Dim>::GetNodalPoints(basis);
-	}
-
-	double SourceTerm(BasisFunction<Dim>* phi, SourceFunction* f)
-	{
-		RefFunction sourceTimesBasisFunction = [this, f, phi](RefPoint refElementPoint) {
-			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
-			return f->Eval(domainPoint) * phi->Eval(refElementPoint);
-		};
-
-		return CartesianShape<Dim>::ComputeIntegral(sourceTimesBasisFunction);
-	}
-
-	double L2ErrorPow2(RefFunction approximate, DomFunction exactSolution) const
-	{
-		RefFunction errorFunction = [this, exactSolution, approximate](RefPoint refElementPoint) {
-			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
-			return pow(exactSolution(domainPoint) - approximate(refElementPoint), 2);
-		};
-
-		return CartesianShape<Dim>::ComputeIntegral(errorFunction);
 	}
 
 	//------------------------------------------------------------------//

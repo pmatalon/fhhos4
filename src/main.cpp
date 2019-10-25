@@ -35,6 +35,7 @@ void print_usage() {
 	cout << "      It also determines the analytical solution in the homogeneous isotropic case." << endl;
 	cout << "               sine    - the source function and the analytical solution are a sine functions" << endl;
 	cout << "               poly    - the source function is constant, the analytical solution is a polynomial of total degree 2*d" << endl;
+	cout << "               one     - the source function is 0, the analytical solution is 1" << endl;
 	cout << "               heterog - (1D only) heterogeneous diffusion-specific analytical solution" << endl;
 	cout << "               kellogg - (2D only) heterogeneous diffusion-specific analytical solution (known benchmark)" << endl;
 	cout << endl;
@@ -45,6 +46,10 @@ void print_usage() {
 	cout << "-n NUM" << endl;
 	cout << "      Number of subdivisions in each cartesian dimension (default: 16)." << endl;
 	cout << endl;
+	cout << "-mesh CODE" << endl;
+	cout << "      Type of mesh:" << endl;
+	cout << "               cart   - Uniform Cartesian mesh (default)" << endl;
+	cout << "               tri    - Trianglular mesh" << endl;
 	cout << "-discr CODE" << endl;
 	cout << "      Discretization method (default: hho)." << endl;
 	cout << "               dg     - Discontinuous Galerkin (Symmetric Interior Penalty)" << endl;
@@ -184,6 +189,7 @@ int main(int argc, char* argv[])
 	double anisotropyRatio = 1;
 	string partition = "chiasmus";
 	BigNumber n = 16;
+	string meshCode = "cart";
 	string discretization = "hho";
 	string stabilization = "hho";
 	string basisCode = "legendre";
@@ -212,6 +218,7 @@ int main(int argc, char* argv[])
 		OPT_Anisotropy,
 		OPT_Partition,
 		OPT_Discretization,
+		OPT_Mesh,
 		OPT_Stabilization,
 		OPT_NoStaticCondensation,
 		OPT_Penalization,
@@ -231,6 +238,7 @@ int main(int argc, char* argv[])
 		 { "aniso", required_argument, NULL, OPT_Anisotropy },
 		 { "partition", required_argument, NULL, OPT_Partition },
 		 { "discr", required_argument, NULL, OPT_Discretization },
+		 { "mesh", required_argument, NULL, OPT_Mesh },
 		 { "stab", required_argument, NULL, OPT_Stabilization },
 		 { "no-static-cond", required_argument, NULL, OPT_NoStaticCondensation },
 		 { "pen", required_argument, NULL, OPT_Penalization },
@@ -261,7 +269,7 @@ int main(int argc, char* argv[])
 				break;
 			case OPT_RightHandSide:
 				rhsCode = optarg;
-				if (rhsCode.compare("sine") != 0 && rhsCode.compare("poly") != 0 && rhsCode.compare("heterog") != 0 && rhsCode.compare("kellogg") != 0)
+				if (rhsCode.compare("sine") != 0 && rhsCode.compare("poly") != 0 && rhsCode.compare("one") != 0 && rhsCode.compare("heterog") != 0 && rhsCode.compare("kellogg") != 0)
 					argument_error("unknown right-hand side code '" + rhsCode + "'. Check -rhs argument.");
 				break;
 			case OPT_Heterogeneity: 
@@ -282,6 +290,11 @@ int main(int argc, char* argv[])
 				discretization = optarg;
 				if (discretization.compare("dg") != 0 && discretization.compare("hho") != 0)
 					argument_error("unknown discretization '" + discretization + "'. Check -discr argument.");
+				break;
+			case OPT_Mesh:
+				meshCode = optarg;
+				if (meshCode.compare("cart") != 0 && meshCode.compare("tri") != 0)
+					argument_error("unknown mesh code '" + meshCode + "'. Check -mesh argument.");
 				break;
 			case OPT_Stabilization:
 				stabilization = optarg;
@@ -403,11 +416,17 @@ int main(int argc, char* argv[])
 		kappa2 = 161.4476387975881;
 	}
 
+	if (dimension > 1 && discretization.compare("dg") == 0 && polyDegree == 0)
+		argument_error("In 2D/3D, DG is not a convergent scheme for p = 0.");
+
 	if (dimension == 1 && discretization.compare("hho") == 0 && polyDegree != 1)
 		argument_error("HHO in 1D only exists for p = 1.");
 
 	if (discretization.compare("hho") == 0 && polyDegree == 0)
 		argument_error("HHO does not exist with p = 0. Linear approximation at least (p >= 1).");
+
+	if (meshCode.compare("tri") == 0 && dimension != 2)
+		argument_error("The triangular mesh in only available in 2D.");
 
 	if (solverCode.compare("mg") == 0 && discretization.compare("dg") == 0)
 		argument_error("Multigrid only applicable on HHO discretization.");
@@ -445,7 +464,8 @@ int main(int argc, char* argv[])
 	else if (dimension == 3)
 		program = new ProgramDim<3>();
 
-	program->Start(rhsCode, kappa1, kappa2, anisotropyRatio, partition, n, discretization, stabilization, basisCode, polyDegree, usePolynomialSpaceQ, penalizationCoefficient, staticCondensation, action,
+	program->Start(rhsCode, kappa1, kappa2, anisotropyRatio, partition, 
+		n, discretization, meshCode, stabilization, basisCode, polyDegree, usePolynomialSpaceQ, penalizationCoefficient, staticCondensation, action,
 		nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations,
 		coarseningStgy, initialGuessCode, outputDirectory, solverCode, solverTolerance);
 

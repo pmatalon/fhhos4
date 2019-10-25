@@ -180,7 +180,7 @@ public:
 
 	string Description()
 	{
-		return "Subdivisions in each cartesian direction: " + to_string(this->Nx) + " x " + to_string(this->Ny) + " x " + to_string(this->Nz);
+		return "Cartesian " + to_string(this->Nx) + " x " + to_string(this->Ny) + " x " + to_string(this->Nz);
 	}
 
 	string FileNamePart()

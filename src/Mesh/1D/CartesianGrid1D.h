@@ -60,7 +60,7 @@ public:
 
 	string Description()
 	{
-		return "Subdivisions in each cartesian direction: " + to_string(this->N);
+		return "Uniform, " + to_string(this->N) + " subdivisions";
 	}
 
 	string FileNamePart()

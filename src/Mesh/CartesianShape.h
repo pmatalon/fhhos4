@@ -129,13 +129,25 @@ public:
 		this->Orientation = orientation;
 		this->Measure = (this->WidthX != 0 ? this->WidthX : 1) * (this->WidthY != 0 ? this->WidthY : 1) * (this->WidthZ != 0 ? this->WidthZ : 1);
 		if (ShapeDim == 1)
-			this->Center = DomPoint(0);
-		else if (ShapeDim == 2)
 		{
-			if (this->Orientation == CartesianShapeOrientation::Horizontal)
+			if (DomainDim == 1)
+				this->Center = DomPoint(Origin->X + WidthX / 2);
+			else if (this->Orientation == CartesianShapeOrientation::Horizontal)
 				this->Center = DomPoint(Origin->X + WidthX / 2, Origin->Y);
 			else
 				this->Center = DomPoint(Origin->X, Origin->Y + WidthY / 2);
+		}
+		else if (ShapeDim == 2)
+		{
+			if (DomainDim == 2)
+			{
+				if (this->Orientation == CartesianShapeOrientation::Horizontal)
+					this->Center = DomPoint(Origin->X + WidthX / 2, Origin->Y);
+				else
+					this->Center = DomPoint(Origin->X, Origin->Y + WidthY / 2);
+			}
+			else
+				assert(false && "not implemented yet");
 		}
 		else if (ShapeDim == 3)
 		{
@@ -231,19 +243,19 @@ public:
 
 	double Integral(BasisFunction<ShapeDim>* phi) const
 	{
-		return RescalingCoeff() * ReferenceShape.ComputeIntegral(phi);
+		return DetJacobian() * ReferenceShape.ComputeIntegral(phi);
 	}
 
 	double ComputeIntegral(RefFunction func) const
 	{
 		double integralOnReferenceShape = ReferenceShape.ComputeIntegral(func);
-		return RescalingCoeff() * integralOnReferenceShape;
+		return DetJacobian() * integralOnReferenceShape;
 	}
 
 	double ComputeIntegral(RefFunction func, int polynomialDegree) const
 	{
 		double integralOnReferenceShape = ReferenceShape.ComputeIntegral(func, polynomialDegree);
-		return RescalingCoeff() * integralOnReferenceShape;
+		return DetJacobian() * integralOnReferenceShape;
 	}
 
 	double ComputeIntegralGradGrad(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2) const
@@ -251,11 +263,11 @@ public:
 		if (phi1->GetDegree() == 0 || phi2->GetDegree() == 0)
 			return 0;
 
-		DimVector<ShapeDim> gradTransfo = GradTransformation();
+		DimMatrix<ShapeDim> invJ = InverseJacobian();
 
-		RefFunction functionToIntegrate = [phi1, phi2, gradTransfo](RefPoint p) {
-			DimVector<ShapeDim> gradPhi1 = gradTransfo.cwiseProduct(phi1->Grad(p));
-			DimVector<ShapeDim> gradPhi2 = gradTransfo.cwiseProduct(phi2->Grad(p));
+		RefFunction functionToIntegrate = [phi1, phi2, invJ](RefPoint p) {
+			DimVector<ShapeDim> gradPhi1 = invJ * phi1->Grad(p);
+			DimVector<ShapeDim> gradPhi2 = invJ * phi2->Grad(p);
 			return gradPhi1.dot(gradPhi2);
 		};
 
@@ -268,11 +280,11 @@ public:
 		if (phi1->GetDegree() == 0 || phi2->GetDegree() == 0)
 			return 0;
 
-		DimVector<ShapeDim> gradTransfo = GradTransformation();
+		DimMatrix<ShapeDim> invJ = InverseJacobian();
 
-		RefFunction functionToIntegrate = [K, phi1, phi2, gradTransfo](RefPoint p) {
-			DimVector<ShapeDim> gradPhi1 = gradTransfo.cwiseProduct(phi1->Grad(p));
-			DimVector<ShapeDim> gradPhi2 = gradTransfo.cwiseProduct(phi2->Grad(p));
+		RefFunction functionToIntegrate = [K, phi1, phi2, invJ](RefPoint p) {
+			DimVector<ShapeDim> gradPhi1 = invJ * phi1->Grad(p);
+			DimVector<ShapeDim> gradPhi2 = invJ * phi2->Grad(p);
 			return (K * gradPhi1).dot(gradPhi2);
 		};
 
@@ -286,15 +298,15 @@ public:
 
 	double MassTerm(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
 	{
-		return RescalingCoeff() * ReferenceShape.MassTerm(phi1, phi2);
+		return DetJacobian() * ReferenceShape.MassTerm(phi1, phi2);
 	}
 
 	double StiffnessTerm(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
 	{
 		if (this->IsRegular)
 		{
-			DimVector<ShapeDim> gradTransfo = GradTransformation();
-			return RescalingCoeff() * pow(gradTransfo[0], 2) * ReferenceShape.StiffnessTerm(phi1, phi2);
+			DimMatrix<ShapeDim> invJ = InverseJacobian();
+			return DetJacobian() * pow(invJ(0, 0), 2) * ReferenceShape.StiffnessTerm(phi1, phi2);
 		}
 		else
 			return ComputeIntegralGradGrad(phi1, phi2);
@@ -306,34 +318,34 @@ public:
 
 	DenseMatrix FaceMassMatrix(FunctionalBasis<ShapeDim>* basis)
 	{
-		return RescalingCoeff() * ReferenceShape.FaceMassMatrix(basis);
+		return DetJacobian() * ReferenceShape.FaceMassMatrix(basis);
 	}
 
 	DenseMatrix CellMassMatrix(FunctionalBasis<ShapeDim>* basis)
 	{
-		return RescalingCoeff() * ReferenceShape.CellMassMatrix(basis);
+		return DetJacobian() * ReferenceShape.CellMassMatrix(basis);
 	}
 
 	DenseMatrix CellReconstructMassMatrix(FunctionalBasis<ShapeDim>* cellBasis, FunctionalBasis<ShapeDim>* reconstructBasis)
 	{
-		return RescalingCoeff() * ReferenceShape.CellReconstructMassMatrix(cellBasis, reconstructBasis);
+		return DetJacobian() * ReferenceShape.CellReconstructMassMatrix(cellBasis, reconstructBasis);
 	}
 
 	double IntegralKGradGradReconstruct(Tensor<ShapeDim>* K, BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
 	{
 		if (this->IsRegular)
 		{
-			DimVector<ShapeDim> gradTransfo = GradTransformation();
-			return RescalingCoeff() * pow(gradTransfo[0], 2) * ReferenceShape.ReconstructKStiffnessTerm(K, phi1, phi2);
+			DimMatrix<ShapeDim> invJ = InverseJacobian();
+			return DetJacobian() * pow(invJ(0, 0), 2) * ReferenceShape.ReconstructKStiffnessTerm(K, phi1, phi2);
 		}
 		else
 			return ComputeIntegralKGradGrad(K, phi1, phi2);
 	}
 
 private:
-	inline double RescalingCoeff() const
+	inline double DetJacobian() const
 	{
-		return this->Measure / pow(2, ShapeDim);
+		return this->Measure / ReferenceShape.Measure();
 	}
 
 public:
@@ -471,34 +483,34 @@ public:
 		return refPoint;
 	}
 
-	DimVector<ShapeDim> GradTransformation() const
+	DimMatrix<ShapeDim> InverseJacobian() const
 	{
-		DimVector<ShapeDim> gradTransfo(ShapeDim);
+		DimMatrix<ShapeDim> invJ = DimMatrix<ShapeDim>::Zero();
 		if (ShapeDim == DomainDim)
 		{
 			if (ShapeDim >= 1)
-				gradTransfo[0] = 2 / this->WidthX;
+				invJ(0, 0) = 2 / this->WidthX;
 			if (ShapeDim >= 2)
-				gradTransfo[1] = 2 / this->WidthY;
+				invJ(1, 1) = 2 / this->WidthY;
 			if (ShapeDim == 3)
-				gradTransfo[2] = 2 / this->WidthZ;
+				invJ(2, 2) = 2 / this->WidthZ;
 		}
 		else if (ShapeDim == 1 && DomainDim == 2)
 		{
 			if (this->Orientation == CartesianShapeOrientation::Horizontal)
-				gradTransfo[0] = 2 / this->WidthX;
+				invJ(0, 0) = 2 / this->WidthX;
 			else if (this->Orientation == CartesianShapeOrientation::Vertical)
-				gradTransfo[0] = 2 / this->WidthY;
+				invJ(0, 0) = 2 / this->WidthY;
 			else
 				assert(false);
 		}
 		else if (ShapeDim == 2 && DomainDim == 3)
 		{
-			assert(false && "GradTransformation: 3D case to be implemented!");
+			assert(false && "InverseJacobian: 3D case to be implemented!");
 		}
 		else
 			assert(false);
-		return gradTransfo;
+		return invJ;
 	}
 
 	vector<RefPoint> GetNodalPoints(FunctionalBasis<ShapeDim>* basis) const

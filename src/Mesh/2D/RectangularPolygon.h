@@ -1,7 +1,7 @@
 #pragma once
 #include <algorithm>
 #include "../CartesianElement.h"
-#include "Edge.h"
+#include "CartesianEdge.h"
 using namespace std;
 
 class RectangularPolygon : public CartesianElement<2>

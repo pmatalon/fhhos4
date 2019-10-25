@@ -5,6 +5,7 @@
 #include "Mesh/2D/CartesianGrid2D.h"
 #include "Mesh/3D/CartesianGrid3D.h"
 #include "Mesh/2D/CartesianPolygonalMesh2D.h"
+#include "Mesh/2D/TriangularMesh.h"
 #include "Utils/Action.h"
 #include "Utils/Timer.h"
 #include "Solver/ConjugateGradient.h"
@@ -19,7 +20,8 @@ class Program
 {
 public:
 	Program() {}
-	virtual void Start(string rhsCode, double kappa1, double kappa2, double anisotropyRatio, string partition, BigNumber n, string discretization, string stabilization, string basisCode, int polyDegree, bool usePolynomialSpaceQ,
+	virtual void Start(string rhsCode, double kappa1, double kappa2, double anisotropyRatio, string partition, 
+		BigNumber n, string discretization, string meshCode, string stabilization, string basisCode, int polyDegree, bool usePolynomialSpaceQ,
 		int penalizationCoefficient, bool staticCondensation, Action action, 
 		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations,
 		CoarseningStrategy coarseningStgy, string initialGuessCode, string outputDirectory, string solverCode, double solverTolerance) = 0;
@@ -31,7 +33,8 @@ class ProgramDim : public Program
 public:
 	ProgramDim() : Program() {}
 
-	void Start(string rhsCode, double kappa1, double kappa2, double anisotropyRatio, string partition, BigNumber n, string discretization, string stabilization, string basisCode, int polyDegree, bool usePolynomialSpaceQ,
+	void Start(string rhsCode, double kappa1, double kappa2, double anisotropyRatio, string partition, 
+		BigNumber n, string discretization, string meshCode, string stabilization, string basisCode, int polyDegree, bool usePolynomialSpaceQ,
 		int penalizationCoefficient, bool staticCondensation, Action action, 
 		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations,
 		CoarseningStrategy coarseningStgy, string initialGuessCode, string outputDirectory, string solverCode, double solverTolerance)
@@ -45,12 +48,10 @@ public:
 		//   Mesh   //
 		//----------//
 
-		Mesh<Dim>* mesh = BuildMesh(n);
+		Mesh<Dim>* mesh = BuildMesh(n, meshCode);
 
-		//mesh->CoarsenMesh(CoarseningStrategy::Agglomeration);
-		//mesh = mesh->CoarseMesh;
-		//cout << *mesh << endl << endl;
-		//cout << "Coarse mesh" << endl << *(mesh->CoarseMesh) << endl << endl;
+		//if (n == 2)
+			//cout << *mesh << endl << endl;
 
 		//--------------------------------------------//
 		//   Diffusion heterogeneity and anisotropy   //
@@ -157,6 +158,14 @@ public:
 					};
 				}
 				sourceFunction = new SourceFunction2D([](double x, double y) { return 2 * (y*(1 - y) + x * (1 - x)); });
+			}
+			else if (rhsCode.compare("one") == 0)
+			{
+				if (diffusionPartition.IsHomogeneous && diffusionPartition.IsIsotropic)
+				{
+					exactSolution = [](DomPoint p) { return 1; };
+				}
+				sourceFunction = new SourceFunction2D([](double x, double y) { return 0; });
 			}
 			else if (rhsCode.compare("kellogg") == 0)
 			{
@@ -359,7 +368,7 @@ public:
 	}
 
 private:
-	Mesh<Dim>* BuildMesh(int n) { return nullptr; }
+	Mesh<Dim>* BuildMesh(int n, string meshCode) { return nullptr; }
 
 	Solver* CreateSolver(string solverCode, Problem<Dim>* problem, double tolerance, bool staticCondensation, 
 		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations, CoarseningStrategy coarseningStgy, int blockSize)
@@ -446,20 +455,24 @@ private:
 };
 
 template <>
-Mesh<1>* ProgramDim<1>::BuildMesh(int n)
+Mesh<1>* ProgramDim<1>::BuildMesh(int n, string meshCode)
 {
 	return new CartesianGrid1D(n);
 }
 
 template <>
-Mesh<2>* ProgramDim<2>::BuildMesh(int n)
+Mesh<2>* ProgramDim<2>::BuildMesh(int n, string meshCode)
 {
-	return new CartesianGrid2D(n, n);
-	//mesh = new CartesianPolygonalMesh2D(n, n);
+	if (meshCode.compare("cart") == 0)
+		return new CartesianGrid2D(n, n);
+		//return new CartesianPolygonalMesh2D(n, n);
+	else if(meshCode.compare("tri") == 0)
+		return new TriangularMesh(n, n);
+	assert(false);
 }
 
 template <>
-Mesh<3>* ProgramDim<3>::BuildMesh(int n)
+Mesh<3>* ProgramDim<3>::BuildMesh(int n, string meshCode)
 {
 	return new CartesianGrid3D(n, n, n);
 }

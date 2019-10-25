@@ -2,6 +2,7 @@
 #include "../Problem/PoissonProblem.h"
 #include "Poisson_HHO_Element.h"
 #include "../Utils/ElementParallelLoop.h"
+#include "../Mesh/2D/Triangle.h"
 using namespace std;
 
 template <int Dim>
@@ -53,7 +54,7 @@ public:
 
 	void PrintDiscretization()
 	{
-		cout << this->_mesh->Description() << endl;
+		cout << "Mesh: " << this->_mesh->Description() << endl;
 		cout << "    Elements: " << HHO->nElements << endl;
 		cout << "    Faces   : " << HHO->nFaces << " (" << HHO->nInteriorFaces << " interior + " << HHO->nBoundaryFaces << " boundary)" << endl;
 		cout << "Discretization: Hybrid High Order (k = " << HHO->FaceBasis->GetDegree() << ")" << endl;
@@ -93,6 +94,7 @@ public:
 		this->_globalRHS.tail(HHO->nTotalFaceUnknowns) = Vector::Zero(HHO->nTotalFaceUnknowns);
 
 		// Compute some useful integrals on reference element and store them
+		// - Cartesian element
 		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreCellMassMatrix(cellBasis);
 		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreReconstructMassMatrix(reconstructionBasis);
 		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreCellStiffnessMatrix(cellBasis);
@@ -100,6 +102,16 @@ public:
 		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreReconstructK2StiffnessMatrix(this->_diffusionPartition->K2, reconstructionBasis);
 		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreCellReconstructMassMatrix(cellBasis, reconstructionBasis);
 		CartesianShape<Dim, Dim - 1>::ReferenceShape.ComputeAndStoreFaceMassMatrix(faceBasis);
+		if (Dim == 2)
+		{
+			// - Triangle
+			Triangle::RefTriangle.ComputeAndStoreCellMassMatrix((FunctionalBasis<2>*)cellBasis);
+			Triangle::RefTriangle.ComputeAndStoreReconstructMassMatrix((FunctionalBasis<2>*)reconstructionBasis);
+			//Triangle::RefTriangle.ComputeAndStoreCellStiffnessMatrix((FunctionalBasis<2>*)cellBasis);
+			//Triangle::RefTriangle.ComputeAndStoreReconstructK1StiffnessMatrix(this->_diffusionPartition->K1, reconstructionBasis);
+			//Triangle::RefTriangle.ComputeAndStoreReconstructK2StiffnessMatrix(this->_diffusionPartition->K2, reconstructionBasis);
+			Triangle::RefTriangle.ComputeAndStoreCellReconstructMassMatrix((FunctionalBasis<2>*)cellBasis, (FunctionalBasis<2>*)reconstructionBasis);
+		}
 
 		this->InitHHO();
 

@@ -3,6 +3,7 @@
 #include <map>
 #include "Vertex.h"
 #include "../Utils/Utils.h"
+#include "../Problem/SourceFunction.h"
 #include "../Problem/DiffusionPartition.h"
 #include "../FunctionalBasis/FunctionalBasis.h"
 
@@ -19,7 +20,7 @@ public:
 	BigNumber Number;
 	std::vector<Face<Dim>*> Faces;
 
-	double Kappa = 1; // constant diffusion coefficient
+	double Kappa = 1; // constant diffusion coefficient (used in DG)
 	Tensor<Dim>* DiffTensor = nullptr;
 
 	std::vector<Element<Dim>*> FinerElements;
@@ -46,9 +47,19 @@ public:
 		assert(false);
 	}
 
-	int LocalNumberOf(Face<Dim>* face)
+	inline int LocalNumberOf(Face<Dim>* face)
 	{
 		return this->_facesLocalNumbering[face];
+	}
+
+	bool IsOnBoundary()
+	{
+		for (Face<Dim>* f : Faces)
+		{
+			if (f->IsDomainBoundary)
+				return true;
+		}
+		return false;
 	}
 
 	virtual RefFunction EvalPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* phi)
@@ -67,8 +78,8 @@ public:
 			DomPoint domainPoint2D = face->ConvertToDomain(refPoint1D);
 			RefPoint refPoint2D = this->ConvertToReference(domainPoint2D);
 			DimVector<Dim> gradPhi = phi->Grad(refPoint2D);
-			DimVector<Dim> gradTransfo = this->GradTransformation();
-			DimVector<Dim> result = gradTransfo.cwiseProduct(gradPhi);
+			DimMatrix<Dim> invJ = this->InverseJacobian();
+			DimVector<Dim> result = invJ * gradPhi;
 			return result;
 		};
 		return gradOnFace;
@@ -82,19 +93,56 @@ public:
 		return measure;
 	}
 
+	double L2ErrorPow2(RefFunction approximate, DomFunction exactSolution) const
+	{
+		RefFunction errorFunction = [this, exactSolution, approximate](RefPoint refElementPoint) {
+			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
+			return pow(exactSolution(domainPoint) - approximate(refElementPoint), 2);
+		};
+
+		return ComputeIntegral(errorFunction);
+	}
+
+	double SourceTerm(BasisFunction<Dim>* phi, SourceFunction* f)
+	{
+		RefFunction sourceTimesBasisFunction = [this, f, phi](RefPoint refElementPoint) {
+			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
+			return f->Eval(domainPoint) * phi->Eval(refElementPoint);
+		};
+
+		return ComputeIntegral(sourceTimesBasisFunction);
+	}
+
+	virtual double IntegralGlobalFunction(DomFunction globalFunction) const
+	{
+		RefFunction refFunction = [this, globalFunction](RefPoint refElementPoint) {
+			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
+			return globalFunction(domainPoint);
+		};
+
+		return ComputeIntegral(refFunction);
+	}
+
+	// For DG
+	void SetDiffusionCoefficient(DiffusionPartition<Dim>* diffusionPartition)
+	{
+		this->Kappa = diffusionPartition->Coefficient(Center());
+	}
+	void SetDiffusionTensor(DiffusionPartition<Dim>* diffusionPartition)
+	{
+		this->DiffTensor = diffusionPartition->DiffTensor(Center());
+	}
+
 	virtual double GetDiameter() = 0;
 	virtual double Measure() = 0;
+	virtual DomPoint Center() = 0;
 	virtual DomPoint ConvertToDomain(RefPoint refPoint) const = 0;
 	virtual RefPoint ConvertToReference(DomPoint domainPoint) const = 0;
-	virtual DimVector<Dim> GradTransformation() const = 0;
+	virtual DimMatrix<Dim> InverseJacobian() const = 0;
 	virtual DimVector<Dim> OuterNormalVector(Face<Dim>* face) = 0;
 	virtual double Integral(BasisFunction<Dim>* phi) const = 0;
-	virtual double IntegralGlobalFunction(DomFunction globalFunction) const = 0;
 	virtual double ComputeIntegral(RefFunction func) const = 0;
 	virtual double ComputeIntegral(RefFunction func, int polynomialDegree) const = 0;
-	virtual double L2ErrorPow2(RefFunction approximate, DomFunction exactSolution) const = 0;
-	virtual void SetDiffusionCoefficient(DiffusionPartition<Dim>* diffusionPartition) = 0;
-	virtual void SetDiffusionTensor(DiffusionPartition<Dim>* diffusionPartition) = 0;
 	virtual vector<RefPoint> GetNodalPoints(FunctionalBasis<Dim>* basis) const = 0;
 
 	virtual void Serialize(ostream& os) const
@@ -122,7 +170,6 @@ public:
 
 	virtual ~Element() {}
 
-protected:
 	void AddFace(Face<Dim>* face)
 	{
 		this->Faces.push_back(face);

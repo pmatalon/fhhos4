@@ -1,19 +1,16 @@
 #pragma once
 #include <vector>
-#include "Rectangle.h"
-#include "RectangularPolygon.h"
-#include "CartesianPolygonalMesh2D.h"
-#include "CartesianEdge.h"
+#include "Triangle.h"
 #include "../Mesh.h"
 using namespace std;
 
-class CartesianGrid2D : public Mesh<2>
+class TriangularMesh : public Mesh<2>
 {
 public:
 	BigNumber Nx;
 	BigNumber Ny;
 
-	CartesianGrid2D(BigNumber nx, BigNumber ny) : Mesh()
+	TriangularMesh(BigNumber nx, BigNumber ny) : Mesh()
 	{
 		// nx = ny falls down to square elements
 		this->Nx = nx;
@@ -51,8 +48,10 @@ public:
 				Vertex* topLeftCorner     = Vertices[indexV(ix,     iy + 1)];
 				Vertex* topRightCorner    = Vertices[indexV(ix + 1, iy + 1)];
 				Vertex* bottomRightCorner = Vertices[indexV(ix + 1, iy    )];
-				Rectangle* rectangle = new Rectangle(number, bottomLeftCorner, topLeftCorner, topRightCorner, bottomRightCorner);
-				this->Elements.push_back(rectangle);
+				Triangle* triangle = new Triangle(number, bottomLeftCorner, bottomRightCorner, topLeftCorner);
+				this->Elements.push_back(triangle);
+				Triangle* triangle2 = new Triangle(number + 1, topLeftCorner, bottomRightCorner, topRightCorner);
+				this->Elements.push_back(triangle2);
 			}
 		}
 
@@ -66,61 +65,69 @@ public:
 		for (BigNumber ix = 0; ix < nx; ++ix)
 		{
 			// South boundary
-			Rectangle* rectangle = dynamic_cast<Rectangle*>(this->Elements[index(ix, 0)]);
-			CartesianEdge* southBoundary = new CartesianEdge(numberInterface++, rectangle->BottomLeftCorner, rectangle->BottomRightCorner, rectangle, CartesianShapeOrientation::Horizontal);
+			Triangle* triangle = dynamic_cast<Triangle*>(this->Elements[index(ix, 0)]);
+			Edge* southBoundary = new Edge(numberInterface++, triangle->V1, triangle->V2, triangle);
 			this->Faces.push_back(southBoundary);
 			this->BoundaryFaces.push_back(southBoundary);
-			rectangle->SetSouthInterface(southBoundary);
+			triangle->AddFace(southBoundary);
 
 			// North boundary
-			rectangle = dynamic_cast<Rectangle*>(this->Elements[index(ix, ny - 1)]);
-			CartesianEdge* northBoundary = new CartesianEdge(numberInterface++, rectangle->TopLeftCorner, rectangle->TopRightCorner, rectangle, CartesianShapeOrientation::Horizontal);
+			triangle = dynamic_cast<Triangle*>(this->Elements[index(ix, ny - 1) + 1]);
+			Edge* northBoundary = new Edge(numberInterface++, triangle->V1, triangle->V3, triangle);
 			this->Faces.push_back(northBoundary);
 			this->BoundaryFaces.push_back(northBoundary);
-			rectangle->SetNorthInterface(northBoundary);
+			triangle->AddFace(northBoundary);
 		}
 
 		for (BigNumber iy = 0; iy < ny; ++iy)
 		{
 			// West boundary
-			Rectangle* rectangle = dynamic_cast<Rectangle*>(this->Elements[index(0, iy)]);
-			CartesianEdge* westBoundary = new CartesianEdge(numberInterface++, rectangle->BottomLeftCorner, rectangle->TopLeftCorner, rectangle, CartesianShapeOrientation::Vertical);
+			Triangle* triangle = dynamic_cast<Triangle*>(this->Elements[index(0, iy)]);
+			Edge* westBoundary = new Edge(numberInterface++, triangle->V3, triangle->V1, triangle);
 			this->Faces.push_back(westBoundary);
 			this->BoundaryFaces.push_back(westBoundary);
-			rectangle->SetWestInterface(westBoundary);
+			triangle->AddFace(westBoundary);
 
 			// East boundary
-			rectangle = dynamic_cast<Rectangle*>(this->Elements[index(nx-1, iy)]);
-			CartesianEdge* eastBoundary = new CartesianEdge(numberInterface++, rectangle->BottomRightCorner, rectangle->TopRightCorner, rectangle, CartesianShapeOrientation::Vertical);
+			triangle = dynamic_cast<Triangle*>(this->Elements[index(nx-1, iy)+1]);
+			Edge* eastBoundary = new Edge(numberInterface++, triangle->V2, triangle->V3, triangle);
 			this->Faces.push_back(eastBoundary);
 			this->BoundaryFaces.push_back(eastBoundary);
-			rectangle->SetEastInterface(eastBoundary);
+			triangle->AddFace(eastBoundary);
 		}
 
 		for (BigNumber iy = 0; iy < ny; iy++)
 		{
 			for (BigNumber ix = 0; ix < nx; ix++)
 			{
-				Rectangle* element = dynamic_cast<Rectangle*>(this->Elements[index(ix, iy)]);
+				Triangle* element1 = dynamic_cast<Triangle*>(this->Elements[index(ix, iy)]);
+				Triangle* element2 = dynamic_cast<Triangle*>(this->Elements[index(ix, iy)+1]);
+
+				Edge* interface = new Edge(numberInterface++, element1->V3, element1->V2, element1, element2);
+				this->Faces.push_back(interface);
+				this->InteriorFaces.push_back(interface);
+				element1->AddFace(interface);
+				element2->AddFace(interface);
+
 				if (ix != nx - 1)
 				{
 					// East
-					Rectangle* eastNeighbour = dynamic_cast<Rectangle*>(this->Elements[index(ix + 1, iy)]);
-					CartesianEdge* interface = new CartesianEdge(numberInterface++, eastNeighbour->BottomLeftCorner, eastNeighbour->TopLeftCorner, element, eastNeighbour, CartesianShapeOrientation::Vertical);
+					Triangle* eastNeighbour = dynamic_cast<Triangle*>(this->Elements[index(ix + 1, iy)]);
+					interface = new Edge(numberInterface++, eastNeighbour->V3, eastNeighbour->V1, element2, eastNeighbour);
 					this->Faces.push_back(interface);
 					this->InteriorFaces.push_back(interface);
-					element->SetEastInterface(interface);
-					eastNeighbour->SetWestInterface(interface);
+					element2->AddFace(interface);
+					eastNeighbour->AddFace(interface);
 				}
 				if (iy != ny - 1)
 				{
 					// North
-					Rectangle* northNeighbour = dynamic_cast<Rectangle*>(this->Elements[index(ix, iy + 1)]);
-					CartesianEdge* interface = new CartesianEdge(numberInterface++, northNeighbour->BottomLeftCorner, northNeighbour->BottomRightCorner, element, northNeighbour, CartesianShapeOrientation::Horizontal);
+					Triangle* northNeighbour = dynamic_cast<Triangle*>(this->Elements[index(ix, iy + 1)]);
+					interface = new Edge(numberInterface++, northNeighbour->V1, northNeighbour->V2, element2, northNeighbour);
 					this->Faces.push_back(interface);
 					this->InteriorFaces.push_back(interface);
-					element->SetNorthInterface(interface);
-					northNeighbour->SetSouthInterface(interface);
+					element2->AddFace(interface);
+					northNeighbour->AddFace(interface);
 				}
 			}
 		}
@@ -134,13 +141,13 @@ private:
 	}
 	inline BigNumber index(BigNumber x, BigNumber y)
 	{
-		return y * Nx + x;
+		return (y * Nx + x) * 2;
 	}
 
 public:
 	string Description()
 	{
-		return "Cartesian " + to_string(this->Nx) + " x " + to_string(this->Ny);
+		return "Triangular " + to_string(this->Nx) + " x " + to_string(this->Ny);
 	}
 
 	string FileNamePart()
@@ -150,22 +157,22 @@ public:
 
 	double H()
 	{
-		return 1 / (double)this->Nx;
+		return sqrt(2) / (double)this->Nx;
 	}
 
 	void CoarsenMesh(CoarseningStrategy strategy)
 	{
-		if (strategy == CoarseningStrategy::Standard)
-			CoarsenByAgglomerationAndMergeColinearFaces();
-		else if (strategy == CoarseningStrategy::Agglomeration)
-			CoarsenByAgglomerationAndKeepFineFaces();
-		else
+		//if (strategy == CoarseningStrategy::Standard)
+			//CoarsenByAgglomerationAndMergeColinearFaces();
+		//else if (strategy == CoarseningStrategy::Agglomeration)
+			//CoarsenByAgglomerationAndKeepFineFaces();
+		//else
 			assert(false && "Coarsening strategy not implemented!");
 		this->CoarseMesh->SetDiffusionCoefficient(this->_diffusionPartition);
 		this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
 	}
 
-	void CoarsenByAgglomerationAndMergeColinearFaces()
+	/*void CoarsenByAgglomerationAndMergeColinearFaces()
 	{
 		BigNumber nx = this->Nx;
 		BigNumber ny = this->Ny;
@@ -176,14 +183,14 @@ public:
 		}
 		else
 		{
-			CartesianGrid2D* coarseMesh = new CartesianGrid2D(nx / 2, ny / 2);
+			TriangularMesh* coarseMesh = new TriangularMesh(nx / 2, ny / 2);
 
 			for (BigNumber i = 0; i < ny; ++i)
 			{
 				for (BigNumber j = 0; j < nx; ++j)
 				{
-					Rectangle* fineElement = dynamic_cast<Rectangle*>(this->Elements[i*nx + j]);
-					Rectangle* coarseElement = dynamic_cast<Rectangle*>(coarseMesh->Elements[(i / 2) * coarseMesh->Nx + j / 2]);
+					Triangle* fineElement = dynamic_cast<Triangle*>(this->Elements[i*nx + j]);
+					Triangle* coarseElement = dynamic_cast<Triangle*>(coarseMesh->Elements[(i / 2) * coarseMesh->Nx + j / 2]);
 
 					coarseElement->FinerElements.push_back(fineElement);
 					fineElement->CoarserElement = coarseElement;
@@ -207,19 +214,11 @@ public:
 				}
 			}
 
-			/*for (auto e : coarseMesh->Elements)
-			{
-				cout << "coarseElement " << e->Number << " removed faces: " ;
-				for (auto f : e->FinerFacesRemoved)
-					cout << f->Number << " ";
-				cout << endl;
-			}*/
-
 			this->CoarseMesh = coarseMesh;
 		}
-	}
+	}*/
 
-	void CoarsenByAgglomerationAndKeepFineFaces()
+	/*void CoarsenByAgglomerationAndKeepFineFaces()
 	{
 		BigNumber nx = this->Nx;
 		BigNumber ny = this->Ny;
@@ -240,10 +239,10 @@ public:
 			{
 				for (BigNumber j = 0; j < nx/2; ++j)
 				{
-					Rectangle* bottomLeftElement = dynamic_cast<Rectangle*>(this->Elements[2 * i * nx + 2 * j]);
-					Rectangle* bottomRightElement = dynamic_cast<Rectangle*>(this->Elements[2 * i * nx + 2 * j + 1]);
-					Rectangle* topLeftElement = dynamic_cast<Rectangle*>(this->Elements[(2 * i + 1) * nx + 2 * j]);
-					Rectangle* topRightElement = dynamic_cast<Rectangle*>(this->Elements[(2 * i + 1) * nx + 2 * j + 1]);
+					Triangle* bottomLeftElement = dynamic_cast<Triangle*>(this->Elements[2 * i * nx + 2 * j]);
+					Triangle* bottomRightElement = dynamic_cast<Triangle*>(this->Elements[2 * i * nx + 2 * j + 1]);
+					Triangle* topLeftElement = dynamic_cast<Triangle*>(this->Elements[(2 * i + 1) * nx + 2 * j]);
+					Triangle* topRightElement = dynamic_cast<Triangle*>(this->Elements[(2 * i + 1) * nx + 2 * j + 1]);
 
 					// Coarse element
 					RectangularPolygon* coarseElement = new RectangularPolygon(i*nx/2 + j, bottomLeftElement->BottomLeftCorner, topLeftElement->TopLeftCorner, topRightElement->TopRightCorner, bottomRightElement->BottomRightCorner);
@@ -329,5 +328,5 @@ public:
 
 			this->CoarseMesh = coarseMesh;
 		}
-	}
+	}*/
 };

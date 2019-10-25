@@ -65,14 +65,14 @@ public:
 		{
 			// South boundary
 			RectangularPolygon* rectangle = dynamic_cast<RectangularPolygon*>(this->Elements[index(ix, 0)]);
-			Edge* southBoundary = new Edge(numberInterface++, rectangle->BottomLeftCorner, rectangle->BottomRightCorner, rectangle, CartesianShapeOrientation::Horizontal);
+			CartesianEdge* southBoundary = new CartesianEdge(numberInterface++, rectangle->BottomLeftCorner, rectangle->BottomRightCorner, rectangle, CartesianShapeOrientation::Horizontal);
 			this->Faces.push_back(southBoundary);
 			this->BoundaryFaces.push_back(southBoundary);
 			rectangle->AddSouthFace(southBoundary);
 
 			// North boundary
 			rectangle = dynamic_cast<RectangularPolygon*>(this->Elements[index(ix, ny - 1)]);
-			Edge* northBoundary = new Edge(numberInterface++, rectangle->TopLeftCorner, rectangle->TopRightCorner, rectangle, CartesianShapeOrientation::Horizontal);
+			CartesianEdge* northBoundary = new CartesianEdge(numberInterface++, rectangle->TopLeftCorner, rectangle->TopRightCorner, rectangle, CartesianShapeOrientation::Horizontal);
 			this->Faces.push_back(northBoundary);
 			this->BoundaryFaces.push_back(northBoundary);
 			rectangle->AddNorthFace(northBoundary);
@@ -82,14 +82,14 @@ public:
 		{
 			// West boundary
 			RectangularPolygon* rectangle = dynamic_cast<RectangularPolygon*>(this->Elements[index(0, iy)]);
-			Edge* westBoundary = new Edge(numberInterface++, rectangle->BottomLeftCorner, rectangle->TopLeftCorner, rectangle, CartesianShapeOrientation::Vertical);
+			CartesianEdge* westBoundary = new CartesianEdge(numberInterface++, rectangle->BottomLeftCorner, rectangle->TopLeftCorner, rectangle, CartesianShapeOrientation::Vertical);
 			this->Faces.push_back(westBoundary);
 			this->BoundaryFaces.push_back(westBoundary);
 			rectangle->AddWestFace(westBoundary);
 
 			// East boundary
 			rectangle = dynamic_cast<RectangularPolygon*>(this->Elements[index(nx - 1, iy)]);
-			Edge* eastBoundary = new Edge(numberInterface++, rectangle->BottomRightCorner, rectangle->TopRightCorner, rectangle, CartesianShapeOrientation::Vertical);
+			CartesianEdge* eastBoundary = new CartesianEdge(numberInterface++, rectangle->BottomRightCorner, rectangle->TopRightCorner, rectangle, CartesianShapeOrientation::Vertical);
 			this->Faces.push_back(eastBoundary);
 			this->BoundaryFaces.push_back(eastBoundary);
 			rectangle->AddEastFace(eastBoundary);
@@ -104,7 +104,7 @@ public:
 				{
 					// East
 					RectangularPolygon* eastNeighbour = dynamic_cast<RectangularPolygon*>(this->Elements[index(ix + 1, iy)]);
-					Edge* interface = new Edge(numberInterface++, eastNeighbour->BottomLeftCorner, eastNeighbour->TopLeftCorner, element, eastNeighbour, CartesianShapeOrientation::Vertical);
+					CartesianEdge* interface = new CartesianEdge(numberInterface++, eastNeighbour->BottomLeftCorner, eastNeighbour->TopLeftCorner, element, eastNeighbour, CartesianShapeOrientation::Vertical);
 					this->Faces.push_back(interface);
 					this->InteriorFaces.push_back(interface);
 					element->AddEastFace(interface);
@@ -114,7 +114,7 @@ public:
 				{
 					// North
 					RectangularPolygon* northNeighbour = dynamic_cast<RectangularPolygon*>(this->Elements[index(ix, iy + 1)]);
-					Edge* interface = new Edge(numberInterface++, northNeighbour->BottomLeftCorner, northNeighbour->BottomRightCorner, element, northNeighbour, CartesianShapeOrientation::Horizontal);
+					CartesianEdge* interface = new CartesianEdge(numberInterface++, northNeighbour->BottomLeftCorner, northNeighbour->BottomRightCorner, element, northNeighbour, CartesianShapeOrientation::Horizontal);
 					this->Faces.push_back(interface);
 					this->InteriorFaces.push_back(interface);
 					element->AddNorthFace(interface);
@@ -137,7 +137,7 @@ private:
 public:
 	string Description()
 	{
-		return "CartesianPolygonalMesh: Subdivisions in each cartesian direction: " + to_string(this->Nx) + " x " + to_string(this->Ny);
+		return "CartesianPolygonalMesh: " + to_string(this->Nx) + " x " + to_string(this->Ny);
 	}
 
 	string FileNamePart()
