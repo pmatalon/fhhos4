@@ -182,10 +182,10 @@ public:
 		Triangle lower(number, &bottomLeft, &bottomRight, &topLeft);
 		Triangle upper(number, &topLeft, &bottomRight, &topRight);
 
-		double lowerIntegral = lower.IntegralGlobalFunction(domX, 1);
+		/*double lowerIntegral = lower.Integral(domX, 1);
 		assert(abs(lowerIntegral - 1.0 / 6) < 1e-14);
-		double upperIntegral = upper.IntegralGlobalFunction(domX, 1);
-		assert(abs(upperIntegral - 1.0 / 3) < 1e-14);
+		double upperIntegral = upper.Integral(domX, 1);
+		assert(abs(upperIntegral - 1.0 / 3) < 1e-14);*/
 	}
 
 private:

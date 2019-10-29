@@ -47,5 +47,23 @@ bool operator!=(Point const& p1, Point const& p2)
 	return p1.X != p2.X || p1.Y != p2.Y || p1.Z != p2.Z;
 }
 
-typedef Point RefPoint; // Reference point: X, Y, Z are in the reference interval [-1, 1]
-typedef Point DomPoint; // Domain point
+
+// Reference point: X, Y, Z are in the reference interval [-1, 1]
+class RefPoint : public Point 
+{
+public:
+	RefPoint() : Point() {}
+	RefPoint(double x) : Point(x) {}
+	RefPoint(double x, double y) : Point(x, y) {}
+	RefPoint(double x, double y, double z) : Point(x, y, z) {}
+};
+
+// Domain point
+class DomPoint : public Point
+{
+public:
+	DomPoint() : Point() {}
+	DomPoint(double x) : Point(x) {}
+	DomPoint(double x, double y) : Point(x, y) {}
+	DomPoint(double x, double y, double z) : Point(x, y, z) {}
+};

@@ -113,7 +113,7 @@ public:
 		return ComputeIntegral(sourceTimesBasisFunction);
 	}
 
-	virtual double IntegralGlobalFunction(DomFunction globalFunction) const
+	virtual double Integral(DomFunction globalFunction) const
 	{
 		RefFunction refFunction = [this, globalFunction](RefPoint refElementPoint) {
 			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
@@ -122,7 +122,7 @@ public:
 
 		return ComputeIntegral(refFunction);
 	}
-	virtual double IntegralGlobalFunction(DomFunction globalFunction, int polynomialDegree) const
+	virtual double Integral(DomFunction globalFunction, int polynomialDegree) const
 	{
 		RefFunction refFunction = [this, globalFunction](RefPoint refElementPoint) {
 			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);

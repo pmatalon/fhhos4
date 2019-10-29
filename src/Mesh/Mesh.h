@@ -138,7 +138,7 @@ public:
 				double integral = e->ComputeIntegral(refOne, degree);
 				assert(abs(integral - e->Measure()) < 1e-14);
 			}
-			double integral = e->IntegralGlobalFunction(domOne);
+			double integral = e->Integral(domOne);
 			assert(abs(integral - e->Measure()) < 1e-14);
 		}
 

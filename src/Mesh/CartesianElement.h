@@ -45,9 +45,9 @@ public:
 		return CartesianShape<Dim>::Center;
 	}
 	
-	inline double IntegralGlobalFunction(DomFunction func) const override
+	inline double Integral(DomFunction func) const override
 	{
-		return CartesianShape<Dim>::IntegralGlobalFunction(func);
+		return CartesianShape<Dim>::Integral(func);
 	}
 
 	inline double Integral(BasisFunction<Dim>* phi) const

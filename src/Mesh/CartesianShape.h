@@ -208,7 +208,7 @@ public:
 	//   Integrals   //
 	//---------------//
 
-	double IntegralGlobalFunction(DomFunction func) const
+	double Integral(DomFunction func) const
 	{
 		if (ShapeDim == 1)
 		{
