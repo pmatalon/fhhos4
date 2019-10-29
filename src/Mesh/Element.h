@@ -32,6 +32,28 @@ public:
 		this->Number = number;
 	}
 
+	//-----------------------//
+	//   Virtual functions   //
+	//-----------------------//
+
+	// Geometric information
+	virtual double Diameter() = 0;
+	virtual double Measure() = 0;
+	virtual DomPoint Center() = 0;
+	virtual DimVector<Dim> OuterNormalVector(Face<Dim>* face) = 0;
+
+	// Transformation to reference element
+	virtual DomPoint ConvertToDomain(RefPoint refPoint) const = 0;
+	virtual RefPoint ConvertToReference(DomPoint domainPoint) const = 0;
+	virtual DimMatrix<Dim> InverseJacobianTranspose() const = 0;
+
+	// Integral
+	virtual double Integral(BasisFunction<Dim>* phi) const = 0;
+	virtual double Integral(RefFunction func) const = 0;
+	virtual double Integral(RefFunction func, int polynomialDegree) const = 0;
+
+	//--------------------------------------------------------------------------------//
+
 	Element<Dim>* ElementOnTheOtherSideOf(Face<Dim>* face)
 	{
 		return face->GetNeighbour(this);
@@ -141,18 +163,6 @@ public:
 	{
 		this->DiffTensor = diffusionPartition->DiffTensor(Center());
 	}
-
-	virtual double GetDiameter() = 0;
-	virtual double Measure() = 0;
-	virtual DomPoint Center() = 0;
-	virtual DomPoint ConvertToDomain(RefPoint refPoint) const = 0;
-	virtual RefPoint ConvertToReference(DomPoint domainPoint) const = 0;
-	virtual DimMatrix<Dim> InverseJacobianTranspose() const = 0;
-	virtual DimVector<Dim> OuterNormalVector(Face<Dim>* face) = 0;
-	virtual double Integral(BasisFunction<Dim>* phi) const = 0;
-	virtual double Integral(RefFunction func) const = 0;
-	virtual double Integral(RefFunction func, int polynomialDegree) const = 0;
-	virtual vector<RefPoint> GetNodalPoints(FunctionalBasis<Dim>* basis) const = 0;
 
 	virtual void Serialize(ostream& os) const
 	{

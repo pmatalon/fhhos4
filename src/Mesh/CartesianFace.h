@@ -47,7 +47,7 @@ public:
 			os << finerFace->Number << ",";*/
 	}
 
-	double GetDiameter()
+	double Diameter()
 	{
 		return max({ CartesianShape<Dim, Dim - 1>::WidthX, CartesianShape<Dim, Dim - 1>::WidthY, CartesianShape<Dim, Dim - 1>::WidthZ });
 	}

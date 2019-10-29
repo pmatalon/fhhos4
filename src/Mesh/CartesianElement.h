@@ -32,7 +32,7 @@ public:
 		CartesianShape<Dim>::Serialize(os);
 	}
 
-	inline double GetDiameter() override
+	inline double Diameter() override
 	{
 		return max({ CartesianShape<Dim>::WidthX, CartesianShape<Dim>::WidthY, CartesianShape<Dim>::WidthZ });
 	}
@@ -88,11 +88,6 @@ public:
 	inline DimMatrix<Dim> InverseJacobianTranspose() const
 	{
 		return CartesianShape<Dim>::InverseJacobianTranspose();
-	}
-
-	inline vector<RefPoint> GetNodalPoints(FunctionalBasis<Dim>* basis) const
-	{
-		return CartesianShape<Dim>::GetNodalPoints(basis);
 	}
 
 	//------------------------------------------------------------------//

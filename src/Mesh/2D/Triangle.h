@@ -70,7 +70,7 @@ public:
 	//                 Element implementation                //
 	//-------------------------------------------------------//
 
-	inline double GetDiameter()
+	inline double Diameter()
 	{
 		return _diameter;
 	}
@@ -171,11 +171,6 @@ public:
 	double Integral(RefFunction func, int polynomialDegree) const
 	{
 		return DetJacobian() * RefTriangle.Integral(func, polynomialDegree);
-	}
-
-	vector<RefPoint> GetNodalPoints(FunctionalBasis<2>* basis) const
-	{
-		assert(false);
 	}
 
 	//-------------------------------------------------------------------//

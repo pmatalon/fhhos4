@@ -347,7 +347,7 @@ private:
 					Df(i, FirstDOFNumber(face) + i) -= 1;
 
 				DenseMatrix DiffTF = Df - ProjFT * Dt;
-				double h = face->GetDiameter();
+				double h = face->Diameter();
 				this->Astab += DiffTF.transpose() * Mf * DiffTF * (this->DiffTensor * normal).dot(normal) / h;
 			}
 		}
@@ -367,7 +367,7 @@ private:
 				Tpart.middleCols(0, HHO->nCellUnknowns) = DenseMatrix::Identity(HHO->nCellUnknowns, HHO->nCellUnknowns);
 
 				DenseMatrix DiffTF = Fpart - ProjFT * Tpart;
-				double h = face->GetDiameter();
+				double h = face->Diameter();
 				this->Astab += DiffTF.transpose() * Mf * DiffTF * (this->DiffTensor * normal).dot(normal) / h;
 			}
 		}

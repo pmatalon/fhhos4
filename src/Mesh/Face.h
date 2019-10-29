@@ -90,7 +90,7 @@ public:
 		assert(false);
 	}
 
-	virtual double GetDiameter() = 0;
+	virtual double Diameter() = 0;
 	virtual double Measure() = 0;
 	virtual DomPoint Center() = 0;
 	virtual DomPoint ConvertToDomain(RefPoint refPoint) = 0;

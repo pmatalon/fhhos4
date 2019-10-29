@@ -19,12 +19,12 @@ public:
 	//                 Face implementation                //
 	//----------------------------------------------------//
 
-	double GetDiameter() override
+	double Diameter() override
 	{
 		if (this->Element1 != NULL)
-			return this->Element1->GetDiameter();
+			return this->Element1->Diameter();
 		else
-			return this->Element2->GetDiameter();
+			return this->Element2->Diameter();
 	}
 
 	double Measure() override

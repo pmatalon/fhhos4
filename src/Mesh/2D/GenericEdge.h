@@ -46,7 +46,7 @@ public:
 		_center = DomPoint((Vertex1->X + Vertex2->X) / 2, (Vertex1->Y + Vertex2->Y) / 2);
 	}
 
-	inline double GetDiameter()
+	inline double Diameter()
 	{
 		return _width;
 	}
