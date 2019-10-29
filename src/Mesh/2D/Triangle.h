@@ -1,7 +1,7 @@
 #pragma once
 #include "../../DG/Poisson_DG_Element.h"
 #include "../../HHO/Poisson_HHO_Element.h"
-#include "GenericEdge.h"
+#include "Edge.h"
 #include "../ReferenceTriangle.h"
 using namespace std;
 

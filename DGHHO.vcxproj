@@ -106,7 +106,7 @@
     <ClInclude Include="src\FunctionalBasis\Hemker1D.h" />
     <ClInclude Include="src\HHO\HHOParameters.h" />
     <ClInclude Include="src\Mesh\2D\CartesianPolygonalMesh2D.h" />
-    <ClInclude Include="src\Mesh\2D\GenericEdge.h" />
+    <ClInclude Include="src\Mesh\2D\Edge.h" />
     <ClInclude Include="src\Mesh\2D\RectangularPolygon.h" />
     <ClInclude Include="src\Mesh\2D\Triangle.h" />
     <ClInclude Include="src\Mesh\2D\TriangularMesh.h" />

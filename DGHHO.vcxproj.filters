@@ -221,9 +221,6 @@
     <ClInclude Include="src\Mesh\2D\CartesianEdge.h">
       <Filter>Mesh\2D</Filter>
     </ClInclude>
-    <ClInclude Include="src\Mesh\2D\GenericEdge.h">
-      <Filter>Mesh\2D</Filter>
-    </ClInclude>
     <ClInclude Include="src\Mesh\ReferenceTriangle.h">
       <Filter>Mesh</Filter>
     </ClInclude>
@@ -232,6 +229,9 @@
     </ClInclude>
     <ClInclude Include="src\Mesh\ReferenceElement.h">
       <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\2D\Edge.h">
+      <Filter>Mesh\2D</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
