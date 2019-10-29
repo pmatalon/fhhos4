@@ -25,15 +25,11 @@ public:
 
 	double ComputeIntegral(RefFunction func) const override
 	{
-		//return _measure * func(RefPoint(0, 0)); // TODO remove this!!!
-		// TODO: change 1000
-		Dunavant dunavant(1000);
+		Dunavant dunavant;
 		return _measure * dunavant.Quadrature(func);
 	}
 	double ComputeIntegral(RefFunction func, int polynomialDegree) const override
 	{
-		if (polynomialDegree == 0)
-			return _measure * func(RefPoint(0, 0));
 		Dunavant dunavant(polynomialDegree);
 		return _measure * dunavant.Quadrature(func);
 	}
