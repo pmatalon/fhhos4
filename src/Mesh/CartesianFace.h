@@ -61,20 +61,20 @@ public:
 		return CartesianShape<Dim, Dim - 1>::Center;
 	}
 
-	RefPoint ConvertToReference(DomPoint domainPoint)
+	inline RefPoint ConvertToReference(DomPoint domainPoint)
 	{
 		return CartesianShape<Dim, Dim - 1>::ConvertToReference(domainPoint);
 	}
-	DomPoint ConvertToDomain(RefPoint referenceElementPoint)
+	inline DomPoint ConvertToDomain(RefPoint referenceElementPoint)
 	{
 		return CartesianShape<Dim, Dim - 1>::ConvertToDomain(referenceElementPoint);
 	}
 
-	double Integral(RefFunction func) const
+	inline double Integral(RefFunction func) const
 	{
 		return CartesianShape<Dim, Dim - 1>::Integral(func);
 	}
-	double Integral(RefFunction func, int polynomialDegree) const
+	inline double Integral(RefFunction func, int polynomialDegree) const
 	{
 		return CartesianShape<Dim, Dim - 1>::Integral(func, polynomialDegree);
 	}
@@ -86,7 +86,7 @@ public:
 		return copy;
 	}
 
-	void ExportFaceToMatlab(FILE* file)
+	inline void ExportFaceToMatlab(FILE* file)
 	{
 		fprintf(file, "%llu %.17g %.17g %.17g %.17g %.17g %.17g %d %d\n", this->Number, this->Origin->X, this->Origin->Y, this->Origin->Z, this->WidthX, this->WidthY, this->WidthZ, this->Orientation, this->IsDomainBoundary);
 	}
@@ -95,7 +95,7 @@ public:
 	//                 Poisson_HHO_Face implementation                //
 	//----------------------------------------------------------------//
 
-	DenseMatrix FaceMassMatrix(FunctionalBasis<Dim-1>* basis)
+	inline DenseMatrix FaceMassMatrix(FunctionalBasis<Dim-1>* basis)
 	{
 		return CartesianShape<Dim, Dim - 1>::FaceMassMatrix(basis);
 	}

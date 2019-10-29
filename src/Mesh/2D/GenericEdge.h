@@ -83,16 +83,14 @@ public:
 		return p;
 	}
 
-	double Integral(RefFunction func) const
+	inline double Integral(RefFunction func) const
 	{
-		double integralOnReferenceShape = ReferenceEdge().Integral(func);
-		return DetJacobian() * integralOnReferenceShape;
+		return DetJacobian() * ReferenceEdge().Integral(func);
 	}
 
-	double Integral(RefFunction func, int polynomialDegree) const
+	inline double Integral(RefFunction func, int polynomialDegree) const
 	{
-		double integralOnReferenceShape = ReferenceEdge().Integral(func, polynomialDegree);
-		return DetJacobian() * integralOnReferenceShape;
+		return DetJacobian() * ReferenceEdge().Integral(func, polynomialDegree);
 	}
 
 	Face<2>* CreateSameGeometricFace(BigNumber number, Element<2>* element1)
@@ -104,27 +102,27 @@ public:
 
 	void ExportFaceToMatlab(FILE* file)
 	{
+		assert(false);
 		//fprintf(file, "%llu %.17g %.17g %.17g %.17g %.17g %.17g %d %d\n", this->Number, this->Origin->X, this->Origin->Y, this->Origin->Z, this->WidthX, this->WidthY, this->WidthZ, this->Orientation, this->IsDomainBoundary);
-	}
-
-private:
-	inline static ReferenceCartesianShape<1> ReferenceEdge()
-	{
-		return CartesianShape<2, 1>::ReferenceShape;
 	}
 
 	inline double DetJacobian() const
 	{
-		return _width / 2;
+		return _width / ReferenceEdge().Measure();
 	}
 
 	//----------------------------------------------------------------//
 	//                 Poisson_HHO_Face implementation                //
 	//----------------------------------------------------------------//
 
-public:
-	DenseMatrix FaceMassMatrix(FunctionalBasis<1>* basis)
+	inline DenseMatrix FaceMassMatrix(FunctionalBasis<1>* basis)
 	{
-		return DetJacobian() * CartesianShape<2, 1>::ReferenceShape.FaceMassMatrix(basis);
+		return DetJacobian() * ReferenceEdge().FaceMassMatrix(basis);
+	}
+
+private:
+	inline static ReferenceCartesianShape<1> ReferenceEdge()
+	{
+		return CartesianShape<2, 1>::ReferenceShape;
 	}
 };
