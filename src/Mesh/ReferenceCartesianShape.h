@@ -24,15 +24,15 @@ public:
 		return pow(2, Dim);
 	}
 
-	double ComputeIntegral(BasisFunction<Dim>* phi) const override
+	double Integral(BasisFunction<Dim>* phi) const override
 	{
 		return Utils::Integral(phi);
 	}
-	double ComputeIntegral(RefFunction func, int polynomialDegree) const override
+	double Integral(RefFunction func, int polynomialDegree) const override
 	{
 		return Utils::Integral<Dim>(func, polynomialDegree);
 	}
-	double ComputeIntegral(RefFunction func) const override
+	double Integral(RefFunction func) const override
 	{
 		return Utils::Integral<Dim>(func);
 	}
@@ -122,7 +122,7 @@ public:
 		};
 
 		int polynomialDegree = max(0, phi1->GetDegree() + phi2->GetDegree() - 2);
-		return ComputeIntegral(functionToIntegrate, polynomialDegree);
+		return Integral(functionToIntegrate, polynomialDegree);
 	}
 
 	double ComputeIntegralKGradGrad(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
@@ -135,6 +135,6 @@ public:
 		};
 
 		int polynomialDegree = max(0, phi1->GetDegree() + phi2->GetDegree() - 2);
-		return ComputeIntegral(functionToIntegrate, polynomialDegree);
+		return Integral(functionToIntegrate, polynomialDegree);
 	}
 };

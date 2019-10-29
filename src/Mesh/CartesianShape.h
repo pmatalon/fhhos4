@@ -243,18 +243,18 @@ public:
 
 	double Integral(BasisFunction<ShapeDim>* phi) const
 	{
-		return DetJacobian() * ReferenceShape.ComputeIntegral(phi);
+		return DetJacobian() * ReferenceShape.Integral(phi);
 	}
 
-	double ComputeIntegral(RefFunction func) const
+	double Integral(RefFunction func) const
 	{
-		double integralOnReferenceShape = ReferenceShape.ComputeIntegral(func);
+		double integralOnReferenceShape = ReferenceShape.Integral(func);
 		return DetJacobian() * integralOnReferenceShape;
 	}
 
-	double ComputeIntegral(RefFunction func, int polynomialDegree) const
+	double Integral(RefFunction func, int polynomialDegree) const
 	{
-		double integralOnReferenceShape = ReferenceShape.ComputeIntegral(func, polynomialDegree);
+		double integralOnReferenceShape = ReferenceShape.Integral(func, polynomialDegree);
 		return DetJacobian() * integralOnReferenceShape;
 	}
 
@@ -272,7 +272,7 @@ public:
 		};
 
 		int polynomialDegree = max(0, phi1->GetDegree() + phi2->GetDegree() - 2);
-		return ComputeIntegral(functionToIntegrate, polynomialDegree);
+		return Integral(functionToIntegrate, polynomialDegree);
 	}
 
 	double ComputeIntegralKGradGrad(Tensor<ShapeDim>* K, BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2) const
@@ -289,7 +289,7 @@ public:
 		};
 
 		int polynomialDegree = max(0, phi1->GetDegree() + phi2->GetDegree() - 2);
-		return ComputeIntegral(functionToIntegrate, polynomialDegree);
+		return Integral(functionToIntegrate, polynomialDegree);
 	}
 
 	//--------//

@@ -71,13 +71,13 @@ public:
 		return CartesianShape<Dim, Dim - 1>::ConvertToDomain(referenceElementPoint);
 	}
 
-	double ComputeIntegral(RefFunction func) const
+	double Integral(RefFunction func) const
 	{
-		return CartesianShape<Dim, Dim - 1>::ComputeIntegral(func);
+		return CartesianShape<Dim, Dim - 1>::Integral(func);
 	}
-	double ComputeIntegral(RefFunction func, int polynomialDegree) const
+	double Integral(RefFunction func, int polynomialDegree) const
 	{
-		return CartesianShape<Dim, Dim - 1>::ComputeIntegral(func, polynomialDegree);
+		return CartesianShape<Dim, Dim - 1>::Integral(func, polynomialDegree);
 	}
 
 	Face<Dim>* CreateSameGeometricFace(BigNumber number, Element<Dim>* element1)

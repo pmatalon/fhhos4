@@ -83,15 +83,15 @@ public:
 		return p;
 	}
 
-	double ComputeIntegral(RefFunction func) const
+	double Integral(RefFunction func) const
 	{
-		double integralOnReferenceShape = ReferenceEdge().ComputeIntegral(func);
+		double integralOnReferenceShape = ReferenceEdge().Integral(func);
 		return DetJacobian() * integralOnReferenceShape;
 	}
 
-	double ComputeIntegral(RefFunction func, int polynomialDegree) const
+	double Integral(RefFunction func, int polynomialDegree) const
 	{
-		double integralOnReferenceShape = ReferenceEdge().ComputeIntegral(func, polynomialDegree);
+		double integralOnReferenceShape = ReferenceEdge().Integral(func, polynomialDegree);
 		return DetJacobian() * integralOnReferenceShape;
 	}
 

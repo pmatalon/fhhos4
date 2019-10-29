@@ -55,14 +55,14 @@ public:
 		return CartesianShape<Dim>::Integral(phi);
 	}
 
-	inline double ComputeIntegral(RefFunction func) const
+	inline double Integral(RefFunction func) const
 	{
-		return CartesianShape<Dim>::ComputeIntegral(func);
+		return CartesianShape<Dim>::Integral(func);
 	}
 
-	inline double ComputeIntegral(RefFunction func, int polynomialDegree) const
+	inline double Integral(RefFunction func, int polynomialDegree) const
 	{
-		return CartesianShape<Dim>::ComputeIntegral(func, polynomialDegree);
+		return CartesianShape<Dim>::Integral(func, polynomialDegree);
 	}
 
 	inline double ComputeIntegralGradGrad(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const

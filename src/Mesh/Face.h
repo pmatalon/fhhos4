@@ -95,8 +95,8 @@ public:
 	virtual DomPoint Center() = 0;
 	virtual DomPoint ConvertToDomain(RefPoint refPoint) = 0;
 	virtual RefPoint ConvertToReference(DomPoint domainPoint) = 0;
-	virtual double ComputeIntegral(RefFunction func) const = 0;
-	virtual double ComputeIntegral(RefFunction func, int polynomialDegree) const = 0;
+	virtual double Integral(RefFunction func) const = 0;
+	virtual double Integral(RefFunction func, int polynomialDegree) const = 0;
 	virtual Face<Dim>* CreateSameGeometricFace(BigNumber number, Element<Dim>* element1) = 0;
 	virtual void ExportFaceToMatlab(FILE* file) = 0;
 

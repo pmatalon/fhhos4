@@ -41,7 +41,7 @@ public:
 		};
 
 		int polynomialDegree = max(p_phi1->GetDegree() + p_phi2->GetDegree() - 1, 0);
-		double integralJump1ScalarJump2 = this->ComputeIntegral(functionToIntegrate, polynomialDegree);
+		double integralJump1ScalarJump2 = this->Integral(functionToIntegrate, polynomialDegree);
 		return -integralJump1ScalarJump2;
 	}
 
@@ -58,7 +58,7 @@ public:
 		};
 
 		int polynomialDegree = p_phi1->GetDegree() + p_phi2->GetDegree();
-		double integralJump1ScalarJump2 = this->ComputeIntegral(functionToIntegrate, polynomialDegree);
+		double integralJump1ScalarJump2 = this->Integral(functionToIntegrate, polynomialDegree);
 
 		double diffusionDependantCoefficient = element1->Kappa;
 		if (!this->IsDomainBoundary)

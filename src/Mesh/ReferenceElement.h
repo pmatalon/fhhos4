@@ -26,15 +26,15 @@ protected:
 public:
 	ReferenceElement() {}
 
-	virtual double ComputeIntegral(RefFunction func) const = 0;
-	virtual double ComputeIntegral(RefFunction func, int polynomialDegree) const = 0;
+	virtual double Integral(RefFunction func) const = 0;
+	virtual double Integral(RefFunction func, int polynomialDegree) const = 0;
 
-	virtual double ComputeIntegral(BasisFunction<Dim>* phi) const
+	virtual double Integral(BasisFunction<Dim>* phi) const
 	{
 		RefFunction func = [phi](RefPoint p) {
 			return phi->Eval(p);
 		};
-		return ComputeIntegral(func, phi->GetDegree());
+		return Integral(func, phi->GetDegree());
 	}
 
 	//--------//
@@ -157,7 +157,7 @@ public:
 		};
 
 		int polynomialDegree = phi1->GetDegree() + phi2->GetDegree();
-		return ComputeIntegral(functionToIntegrate, polynomialDegree);
+		return Integral(functionToIntegrate, polynomialDegree);
 	}
 
 };

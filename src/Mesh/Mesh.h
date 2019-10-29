@@ -135,7 +135,7 @@ public:
 
 			for (int degree = 0; degree < 5; degree++)
 			{
-				double integral = e->ComputeIntegral(refOne, degree);
+				double integral = e->Integral(refOne, degree);
 				assert(abs(integral - e->Measure()) < 1e-14);
 			}
 			double integral = e->Integral(domOne);

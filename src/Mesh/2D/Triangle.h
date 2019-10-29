@@ -162,15 +162,15 @@ public:
 
 	double Integral(BasisFunction<2>* phi) const
 	{
-		return DetJacobian() * RefTriangle.ComputeIntegral(phi);
+		return DetJacobian() * RefTriangle.Integral(phi);
 	}
-	double ComputeIntegral(RefFunction func) const
+	double Integral(RefFunction func) const
 	{
-		return DetJacobian() * RefTriangle.ComputeIntegral(func);
+		return DetJacobian() * RefTriangle.Integral(func);
 	}
-	double ComputeIntegral(RefFunction func, int polynomialDegree) const
+	double Integral(RefFunction func, int polynomialDegree) const
 	{
-		return DetJacobian() * RefTriangle.ComputeIntegral(func, polynomialDegree);
+		return DetJacobian() * RefTriangle.Integral(func, polynomialDegree);
 	}
 
 	vector<RefPoint> GetNodalPoints(FunctionalBasis<2>* basis) const
@@ -228,7 +228,7 @@ public:
 		};
 
 		int polynomialDegree = max(0, phi1->GetDegree() + phi2->GetDegree() - 2);
-		return ComputeIntegral(functionToIntegrate, polynomialDegree);
+		return Integral(functionToIntegrate, polynomialDegree);
 	}
 
 };

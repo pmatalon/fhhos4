@@ -23,19 +23,19 @@ public:
 		return _measure;
 	}
 
-	double ComputeIntegral(RefFunction func) const override
+	double Integral(RefFunction func) const override
 	{
 		Dunavant dunavant;
 		return _measure * dunavant.Quadrature(func);
 	}
-	double ComputeIntegral(RefFunction func, int polynomialDegree) const override
+	double Integral(RefFunction func, int polynomialDegree) const override
 	{
 		Dunavant dunavant(polynomialDegree);
 		return _measure * dunavant.Quadrature(func);
 	}
-	double ComputeIntegral(BasisFunction<2>* phi) const
+	double Integral(BasisFunction<2>* phi) const
 	{
-		return ReferenceElement<2>::ComputeIntegral(phi);
+		return ReferenceElement<2>::Integral(phi);
 	}
 
 };

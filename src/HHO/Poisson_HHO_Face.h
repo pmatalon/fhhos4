@@ -87,7 +87,7 @@ public:
 		};
 
 		int polynomialDegree = facePhi->GetDegree() + reconstructPhi->GetDegree();
-		return this->ComputeIntegral(functionToIntegrate, polynomialDegree);
+		return this->Integral(functionToIntegrate, polynomialDegree);
 	}
 
 	DenseMatrix GetMassCellFace(Element<Dim>* element)
@@ -140,7 +140,7 @@ public:
 			return f(domainPoint) * phi->Eval(refElementPoint);
 		};
 
-		return this->ComputeIntegral(functionToIntegrate);
+		return this->Integral(functionToIntegrate);
 	}
 
 	Vector ProjectOnBasis(FunctionalBasis<Dim - 1>* faceBasis, DomFunction f)
@@ -173,7 +173,7 @@ public:
 					};
 
 					int polynomialDegree = finePhi->GetDegree() + coarsePhi->GetDegree();
-					double integral = fineFace->ComputeIntegral(functionToIntegrate, polynomialDegree);
+					double integral = fineFace->Integral(functionToIntegrate, polynomialDegree);
 					fineCoarseMass(finePhi->LocalNumber, coarsePhi->LocalNumber) = integral;
 				}
 			}

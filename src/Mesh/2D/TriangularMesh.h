@@ -169,7 +169,7 @@ public:
 		ReferenceTriangle refTriangle;
 		for (int degree = 1; degree < 5; degree++)
 		{
-			double integral = refTriangle.ComputeIntegral(refX, degree);
+			double integral = refTriangle.Integral(refX, degree);
 			assert(abs(integral - 1.0 / 6.0) < 1e-15);
 		}
 

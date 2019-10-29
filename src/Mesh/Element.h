@@ -100,7 +100,7 @@ public:
 			return pow(exactSolution(domainPoint) - approximate(refElementPoint), 2);
 		};
 
-		return ComputeIntegral(errorFunction);
+		return Integral(errorFunction);
 	}
 
 	double SourceTerm(BasisFunction<Dim>* phi, SourceFunction* f)
@@ -110,7 +110,7 @@ public:
 			return f->Eval(domainPoint) * phi->Eval(refElementPoint);
 		};
 
-		return ComputeIntegral(sourceTimesBasisFunction);
+		return Integral(sourceTimesBasisFunction);
 	}
 
 	virtual double Integral(DomFunction globalFunction) const
@@ -120,7 +120,7 @@ public:
 			return globalFunction(domainPoint);
 		};
 
-		return ComputeIntegral(refFunction);
+		return Integral(refFunction);
 	}
 	virtual double Integral(DomFunction globalFunction, int polynomialDegree) const
 	{
@@ -129,7 +129,7 @@ public:
 			return globalFunction(domainPoint);
 		};
 
-		return ComputeIntegral(refFunction, polynomialDegree);
+		return Integral(refFunction, polynomialDegree);
 	}
 
 	// For DG
@@ -150,8 +150,8 @@ public:
 	virtual DimMatrix<Dim> InverseJacobianTranspose() const = 0;
 	virtual DimVector<Dim> OuterNormalVector(Face<Dim>* face) = 0;
 	virtual double Integral(BasisFunction<Dim>* phi) const = 0;
-	virtual double ComputeIntegral(RefFunction func) const = 0;
-	virtual double ComputeIntegral(RefFunction func, int polynomialDegree) const = 0;
+	virtual double Integral(RefFunction func) const = 0;
+	virtual double Integral(RefFunction func, int polynomialDegree) const = 0;
 	virtual vector<RefPoint> GetNodalPoints(FunctionalBasis<Dim>* basis) const = 0;
 
 	virtual void Serialize(ostream& os) const
