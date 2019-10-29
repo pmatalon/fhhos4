@@ -50,8 +50,10 @@ public:
 
 		Mesh<Dim>* mesh = BuildMesh(n, meshCode);
 
-		//if (n == 2)
-			//cout << *mesh << endl << endl;
+		if (n <= 4)
+			mesh->SanityCheck();
+		if (n <= 2)
+			cout << *mesh << endl << endl;
 
 		//--------------------------------------------//
 		//   Diffusion heterogeneity and anisotropy   //
@@ -164,6 +166,14 @@ public:
 				if (diffusionPartition.IsHomogeneous && diffusionPartition.IsIsotropic)
 				{
 					exactSolution = [](DomPoint p) { return 1; };
+				}
+				sourceFunction = new SourceFunction2D([](double x, double y) { return 0; });
+			}
+			else if (rhsCode.compare("x") == 0)
+			{
+				if (diffusionPartition.IsHomogeneous && diffusionPartition.IsIsotropic)
+				{
+					exactSolution = [](DomPoint p) { return p.X; };
 				}
 				sourceFunction = new SourceFunction2D([](double x, double y) { return 0; });
 			}

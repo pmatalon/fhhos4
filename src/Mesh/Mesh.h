@@ -112,6 +112,43 @@ public:
 		return os;
 	}
 
+	virtual void SanityCheck()
+	{
+		RefFunction refOne = [](RefPoint p) { return 1; };
+		DomFunction domOne = [](DomPoint p) { return 1; };
+
+		for (auto e : this->Elements)
+		{
+			for (auto f : e->Faces)
+			{
+				auto n = e->OuterNormalVector(f);
+
+				auto neighbour = f->GetNeighbour(e);
+				if (neighbour != nullptr)
+				{
+					auto n2 = neighbour->OuterNormalVector(f);
+					assert(abs(n.dot(n2) + 1) < 1e-15);
+				}
+				else
+					assert(e->IsOnBoundary());
+			}
+
+			for (int degree = 0; degree < 5; degree++)
+			{
+				double integral = e->ComputeIntegral(refOne, degree);
+				assert(abs(integral - e->Measure()) < 1e-14);
+			}
+			double integral = e->IntegralGlobalFunction(domOne);
+			assert(abs(integral - e->Measure()) < 1e-14);
+		}
+
+		for (auto f : this->BoundaryFaces)
+			assert(f->IsDomainBoundary);
+
+		for (auto f : this->InteriorFaces)
+			assert(!f->IsDomainBoundary);
+	}
+
 	virtual ~Mesh() 
 	{
 		for (size_t i = 0; i < this->Elements.size(); ++i)

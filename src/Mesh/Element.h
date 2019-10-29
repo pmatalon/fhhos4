@@ -78,7 +78,7 @@ public:
 			DomPoint domainPoint2D = face->ConvertToDomain(refPoint1D);
 			RefPoint refPoint2D = this->ConvertToReference(domainPoint2D);
 			DimVector<Dim> gradPhi = phi->Grad(refPoint2D);
-			DimMatrix<Dim> invJ = this->InverseJacobian();
+			DimMatrix<Dim> invJ = this->InverseJacobianTranspose();
 			DimVector<Dim> result = invJ * gradPhi;
 			return result;
 		};
@@ -122,6 +122,15 @@ public:
 
 		return ComputeIntegral(refFunction);
 	}
+	virtual double IntegralGlobalFunction(DomFunction globalFunction, int polynomialDegree) const
+	{
+		RefFunction refFunction = [this, globalFunction](RefPoint refElementPoint) {
+			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
+			return globalFunction(domainPoint);
+		};
+
+		return ComputeIntegral(refFunction, polynomialDegree);
+	}
 
 	// For DG
 	void SetDiffusionCoefficient(DiffusionPartition<Dim>* diffusionPartition)
@@ -138,7 +147,7 @@ public:
 	virtual DomPoint Center() = 0;
 	virtual DomPoint ConvertToDomain(RefPoint refPoint) const = 0;
 	virtual RefPoint ConvertToReference(DomPoint domainPoint) const = 0;
-	virtual DimMatrix<Dim> InverseJacobian() const = 0;
+	virtual DimMatrix<Dim> InverseJacobianTranspose() const = 0;
 	virtual DimVector<Dim> OuterNormalVector(Face<Dim>* face) = 0;
 	virtual double Integral(BasisFunction<Dim>* phi) const = 0;
 	virtual double ComputeIntegral(RefFunction func) const = 0;

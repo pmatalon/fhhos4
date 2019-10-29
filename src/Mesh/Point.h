@@ -38,5 +38,14 @@ public:
 	}
 };
 
+bool operator==(Point const& p1, Point const& p2)
+{
+	return p1.X == p2.X && p1.Y == p2.Y && p1.Z == p2.Z;
+}
+bool operator!=(Point const& p1, Point const& p2)
+{
+	return p1.X != p2.X || p1.Y != p2.Y || p1.Z != p2.Z;
+}
+
 typedef Point RefPoint; // Reference point: X, Y, Z are in the reference interval [-1, 1]
 typedef Point DomPoint; // Domain point

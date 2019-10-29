@@ -263,7 +263,7 @@ public:
 		if (phi1->GetDegree() == 0 || phi2->GetDegree() == 0)
 			return 0;
 
-		DimMatrix<ShapeDim> invJ = InverseJacobian();
+		DimMatrix<ShapeDim> invJ = InverseJacobianTranspose();
 
 		RefFunction functionToIntegrate = [phi1, phi2, invJ](RefPoint p) {
 			DimVector<ShapeDim> gradPhi1 = invJ * phi1->Grad(p);
@@ -280,7 +280,7 @@ public:
 		if (phi1->GetDegree() == 0 || phi2->GetDegree() == 0)
 			return 0;
 
-		DimMatrix<ShapeDim> invJ = InverseJacobian();
+		DimMatrix<ShapeDim> invJ = InverseJacobianTranspose();
 
 		RefFunction functionToIntegrate = [K, phi1, phi2, invJ](RefPoint p) {
 			DimVector<ShapeDim> gradPhi1 = invJ * phi1->Grad(p);
@@ -305,7 +305,7 @@ public:
 	{
 		if (this->IsRegular)
 		{
-			DimMatrix<ShapeDim> invJ = InverseJacobian();
+			DimMatrix<ShapeDim> invJ = InverseJacobianTranspose();
 			return DetJacobian() * pow(invJ(0, 0), 2) * ReferenceShape.StiffnessTerm(phi1, phi2);
 		}
 		else
@@ -335,7 +335,7 @@ public:
 	{
 		if (this->IsRegular)
 		{
-			DimMatrix<ShapeDim> invJ = InverseJacobian();
+			DimMatrix<ShapeDim> invJ = InverseJacobianTranspose();
 			return DetJacobian() * pow(invJ(0, 0), 2) * ReferenceShape.ReconstructKStiffnessTerm(K, phi1, phi2);
 		}
 		else
@@ -483,7 +483,7 @@ public:
 		return refPoint;
 	}
 
-	DimMatrix<ShapeDim> InverseJacobian() const
+	DimMatrix<ShapeDim> InverseJacobianTranspose() const
 	{
 		DimMatrix<ShapeDim> invJ = DimMatrix<ShapeDim>::Zero();
 		if (ShapeDim == DomainDim)
@@ -506,7 +506,7 @@ public:
 		}
 		else if (ShapeDim == 2 && DomainDim == 3)
 		{
-			assert(false && "InverseJacobian: 3D case to be implemented!");
+			assert(false && "InverseJacobianTranspose: 3D case to be implemented!");
 		}
 		else
 			assert(false);

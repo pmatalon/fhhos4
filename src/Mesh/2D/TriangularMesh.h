@@ -100,38 +100,92 @@ public:
 		{
 			for (BigNumber ix = 0; ix < nx; ix++)
 			{
-				Triangle* element1 = dynamic_cast<Triangle*>(this->Elements[index(ix, iy)]);
-				Triangle* element2 = dynamic_cast<Triangle*>(this->Elements[index(ix, iy)+1]);
+				Triangle* lowerTriangle = dynamic_cast<Triangle*>(this->Elements[index(ix, iy)]);
+				Triangle* upperTriangle = dynamic_cast<Triangle*>(this->Elements[index(ix, iy)+1]);
 
-				Edge* interface = new Edge(numberInterface++, element1->V3, element1->V2, element1, element2);
+				Edge* interface = new Edge(numberInterface++, lowerTriangle->V3, lowerTriangle->V2, lowerTriangle, upperTriangle);
 				this->Faces.push_back(interface);
 				this->InteriorFaces.push_back(interface);
-				element1->AddFace(interface);
-				element2->AddFace(interface);
+				lowerTriangle->AddFace(interface);
+				upperTriangle->AddFace(interface);
 
 				if (ix != nx - 1)
 				{
 					// East
 					Triangle* eastNeighbour = dynamic_cast<Triangle*>(this->Elements[index(ix + 1, iy)]);
-					interface = new Edge(numberInterface++, eastNeighbour->V3, eastNeighbour->V1, element2, eastNeighbour);
+					interface = new Edge(numberInterface++, eastNeighbour->V3, eastNeighbour->V1, upperTriangle, eastNeighbour);
 					this->Faces.push_back(interface);
 					this->InteriorFaces.push_back(interface);
-					element2->AddFace(interface);
+					upperTriangle->AddFace(interface);
 					eastNeighbour->AddFace(interface);
 				}
 				if (iy != ny - 1)
 				{
 					// North
 					Triangle* northNeighbour = dynamic_cast<Triangle*>(this->Elements[index(ix, iy + 1)]);
-					interface = new Edge(numberInterface++, northNeighbour->V1, northNeighbour->V2, element2, northNeighbour);
+					interface = new Edge(numberInterface++, northNeighbour->V1, northNeighbour->V2, upperTriangle, northNeighbour);
 					this->Faces.push_back(interface);
 					this->InteriorFaces.push_back(interface);
-					element2->AddFace(interface);
+					upperTriangle->AddFace(interface);
 					northNeighbour->AddFace(interface);
 				}
 			}
 		}
 
+	}
+
+	void SanityCheck() override
+	{
+		Mesh::SanityCheck();
+		RefFunction refX = [](RefPoint p) { return p.X; };
+		DomFunction domX = [](DomPoint p) { return p.X; };
+
+		for (auto e : this->Elements)
+		{
+			Triangle* t = dynamic_cast<Triangle*>(e);
+			assert(t->Faces.size() == 3);
+
+			assert(t->DetJacobian() == 1/t->InverseJacobianTranspose().determinant());
+
+			for (auto f : t->Faces)
+			{
+				auto n = t->OuterNormalVector(f);
+				Edge* edge = dynamic_cast<Edge*>(f);
+				assert(n.dot(Vect(edge->Vertex1, edge->Vertex2)) == 0);
+			}
+			
+			assert(t->ConvertToDomain(t->ConvertToReference(*(t->V1))) == *(t->V1));
+			assert(t->ConvertToDomain(t->ConvertToReference(*(t->V2))) == *(t->V2));
+			assert(t->ConvertToDomain(t->ConvertToReference(*(t->V3))) == *(t->V3));
+
+			RefPoint ref1 = t->ConvertToReference(*(t->V1));
+			assert(ref1 == RefPoint(0, 0) || ref1 == RefPoint(1, 0) || ref1 == RefPoint(0, 1));
+			RefPoint ref2 = t->ConvertToReference(*(t->V2));
+			assert((ref2 == RefPoint(0, 0) || ref2 == RefPoint(1, 0) || ref2 == RefPoint(0, 1)) && ref2 != ref1);
+			RefPoint ref3 = t->ConvertToReference(*(t->V3));
+			assert((ref3 == RefPoint(0, 0) || ref3 == RefPoint(1, 0) || ref3 == RefPoint(0, 1)) && ref3 != ref1 && ref3 != ref2);
+		}
+
+		ReferenceTriangle refTriangle;
+		for (int degree = 1; degree < 5; degree++)
+		{
+			double integral = refTriangle.ComputeIntegral(refX, degree);
+			assert(abs(integral - 1.0 / 6.0) < 1e-15);
+		}
+
+		BigNumber number = 0;
+		Vertex bottomLeft(number,  0, 0);
+		Vertex bottomRight(number, 1, 0);
+		Vertex topRight(number,    1, 1);
+		Vertex topLeft(number,     0, 1);
+
+		Triangle lower(number, &bottomLeft, &bottomRight, &topLeft);
+		Triangle upper(number, &topLeft, &bottomRight, &topRight);
+
+		double lowerIntegral = lower.IntegralGlobalFunction(domX, 1);
+		assert(abs(lowerIntegral - 1.0 / 6) < 1e-14);
+		double upperIntegral = upper.IntegralGlobalFunction(domX, 1);
+		assert(abs(upperIntegral - 1.0 / 3) < 1e-14);
 	}
 
 private:

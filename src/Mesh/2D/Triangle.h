@@ -12,7 +12,7 @@ private:
 	double _measure;
 	DomPoint _center;
 
-	DimMatrix<2> _invJacobian;
+	DimMatrix<2> _inverseJacobianTranspose;
 	double _detJacobian;
 
 public:
@@ -45,14 +45,13 @@ public:
 		_center = DomPoint((V1->X + V2->X + V3->X) / 3, (V1->Y + V2->Y + V3->Y) / 3);
 
 		_detJacobian = _measure / RefTriangle.Measure();
-		//double detJacobian2 = (V2->X - V1->X)*(V3->Y - V1->Y) - (V2->Y - V1->Y)*(V3->X - V1->X);
 
-		_invJacobian(0, 0) =  (V3->Y - V1->Y) / ((V3->Y - V1->Y)*(V2->X - V1->X) - (V3->X - V1->X)*(V2->Y - V1->Y));
-		_invJacobian(0, 1) = -(V3->X - V1->X) / ((V3->Y - V1->Y)*(V2->X - V1->X) - (V3->X - V1->X)*(V2->Y - V1->Y));
-		_invJacobian(1, 0) =  (V2->Y - V1->Y) / ((V2->Y - V1->Y)*(V3->X - V1->X) - (V2->X - V1->X)*(V3->Y - V1->Y));
-		_invJacobian(1, 1) = -(V2->X - V1->X) / ((V2->Y - V1->Y)*(V3->X - V1->X) - (V2->X - V1->X)*(V3->Y - V1->Y));
-		//double detJacobian3 = 1/_invJacobian.determinant();
-		//int i = 0;
+		DimMatrix<2> inverseJacobian;
+		inverseJacobian(0, 0) =  (V3->Y - V1->Y) / ((V3->Y - V1->Y)*(V2->X - V1->X) - (V3->X - V1->X)*(V2->Y - V1->Y));
+		inverseJacobian(0, 1) = -(V3->X - V1->X) / ((V3->Y - V1->Y)*(V2->X - V1->X) - (V3->X - V1->X)*(V2->Y - V1->Y));
+		inverseJacobian(1, 0) =  (V2->Y - V1->Y) / ((V2->Y - V1->Y)*(V3->X - V1->X) - (V2->X - V1->X)*(V3->Y - V1->Y));
+		inverseJacobian(1, 1) = -(V2->X - V1->X) / ((V2->Y - V1->Y)*(V3->X - V1->X) - (V2->X - V1->X)*(V3->Y - V1->Y));
+		_inverseJacobianTranspose = inverseJacobian.transpose();
 	}
 
 	void Serialize(ostream& os) const override
@@ -121,23 +120,17 @@ public:
 		else
 			assert(false);
 
-		double nAC = n(0) * (C->X - A->X) + n(1) * (C->Y - A->Y);
-		if (nAC > 0)
+		DimVector<2> AC = Vect(A, C);
+		//double nAC = n(0) * (C->X - A->X) + n(1) * (C->Y - A->Y);
+		//if (nAC > 0)
+		if (n.dot(AC) > 0)
 			n = -1 * n;
 		n = n.normalized();
-
-		//cout << "Element " << this->Number << ", edge " << *edge << endl;
-		//cout << "  n = " << n << endl;
-
 		return n;
 	}
 
 	DomPoint ConvertToDomain(RefPoint refPoint) const
 	{
-		/*BarycentricPoint bary = RefTriangle.ConvertToBarycentric(refPoint);
-		TriangleStruct phyTriangle(*V1, *V2, *V3);
-		DomPoint p = phyTriangle.ToCartesian(bary);
-		return p;*/
 		double t = refPoint.X;
 		double u = refPoint.Y;
 
@@ -149,35 +142,22 @@ public:
 
 	RefPoint ConvertToReference(DomPoint domainPoint) const
 	{
-		/*BarycentricPoint bary = ConvertToBarycentric(domainPoint);
-		RefPoint p = RefTriangle.ConvertToRef(bary);
-		return p;*/
 		double x = domainPoint.X;
 		double y = domainPoint.Y;
 
-		RefPoint p;
-		p.X = ((V3->Y - V1->Y)*(x - V1->X) - (V3->X - V1->X)*(y - V1->Y)) / ((V3->Y - V1->Y)*(V2->X - V1->X) - (V3->X - V1->X)*(V2->Y - V1->Y));
-		p.Y = ((V2->Y - V1->Y)*(x - V1->X) - (V2->X - V1->X)*(y - V1->Y)) / ((V2->Y - V1->Y)*(V3->X - V1->X) - (V2->X - V1->X)*(V3->Y - V1->Y));
+		double t = ((V3->Y - V1->Y)*(x - V1->X) - (V3->X - V1->X)*(y - V1->Y)) / ((V3->Y - V1->Y)*(V2->X - V1->X) - (V3->X - V1->X)*(V2->Y - V1->Y));
+		double u = ((V2->Y - V1->Y)*(x - V1->X) - (V2->X - V1->X)*(y - V1->Y)) / ((V2->Y - V1->Y)*(V3->X - V1->X) - (V2->X - V1->X)*(V3->Y - V1->Y));
+		RefPoint p(t, u);
 		return p;
 	}
-
-private:
-	/*BarycentricPoint ConvertToBarycentric(DomPoint p) const
-	{
-		TriangleStruct phyTriangle(*V1, *V2, *V3);
-		BarycentricPoint bary = phyTriangle.ToBarycentric(p);
-		return bary;
-	}*/
 
 	inline double DetJacobian() const
 	{
 		return _detJacobian;
 	}
-
-public:
-	inline DimMatrix<2> InverseJacobian() const
+	inline DimMatrix<2> InverseJacobianTranspose() const
 	{
-		return _invJacobian;
+		return _inverseJacobianTranspose;
 	}
 
 	double Integral(BasisFunction<2>* phi) const
@@ -239,7 +219,7 @@ public:
 		if (phi1->GetDegree() == 0 || phi2->GetDegree() == 0)
 			return 0;
 
-		DimMatrix<2> invJ = InverseJacobian();
+		DimMatrix<2> invJ = InverseJacobianTranspose();
 
 		RefFunction functionToIntegrate = [K, phi1, phi2, invJ](RefPoint p) {
 			DimVector<2> gradPhi1 = invJ * phi1->Grad(p);

@@ -85,9 +85,9 @@ public:
 		return CartesianShape<Dim>::ConvertToReference(domainPoint);
 	}
 
-	inline DimMatrix<Dim> InverseJacobian() const
+	inline DimMatrix<Dim> InverseJacobianTranspose() const
 	{
-		return CartesianShape<Dim>::InverseJacobian();
+		return CartesianShape<Dim>::InverseJacobianTranspose();
 	}
 
 	inline vector<RefPoint> GetNodalPoints(FunctionalBasis<Dim>* basis) const
