@@ -129,6 +129,15 @@ public:
 		return n;
 	}
 
+	inline double DetJacobian() const
+	{
+		return _detJacobian;
+	}
+	inline DimMatrix<2> InverseJacobianTranspose() const
+	{
+		return _inverseJacobianTranspose;
+	}
+
 	DomPoint ConvertToDomain(RefPoint refPoint) const
 	{
 		double t = refPoint.X;
@@ -149,15 +158,6 @@ public:
 		double u = ((V2->Y - V1->Y)*(x - V1->X) - (V2->X - V1->X)*(y - V1->Y)) / ((V2->Y - V1->Y)*(V3->X - V1->X) - (V2->X - V1->X)*(V3->Y - V1->Y));
 		RefPoint p(t, u);
 		return p;
-	}
-
-	inline double DetJacobian() const
-	{
-		return _detJacobian;
-	}
-	inline DimMatrix<2> InverseJacobianTranspose() const
-	{
-		return _inverseJacobianTranspose;
 	}
 
 	double Integral(BasisFunction<2>* phi) const

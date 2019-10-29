@@ -204,151 +204,45 @@ public:
 		}
 	}
 
-	//---------------//
-	//   Integrals   //
-	//---------------//
+	//-------------------------------------//
+	// Transformation to reference element //
+	//-------------------------------------//
 
-	double Integral(DomFunction func) const
-	{
-		if (ShapeDim == 1)
-		{
-			double x1 = this->Origin->X;
-			double x2 = this->Origin->X + this->WidthX;
-
-			return Utils::Integral(func, x1, x2);
-		}
-		else if (ShapeDim == 2)
-		{
-			double x1 = this->Origin->X;
-			double x2 = this->Origin->X + this->WidthX;
-			double y1 = this->Origin->Y;
-			double y2 = this->Origin->Y + this->WidthY;
-
-			return Utils::Integral(func, x1, x2, y1, y2);
-		}
-		else if (ShapeDim == 3)
-		{
-			double x1 = this->Origin->X;
-			double x2 = this->Origin->X + this->WidthX;
-			double y1 = this->Origin->Y;
-			double y2 = this->Origin->Y + this->WidthY;
-			double z1 = this->Origin->Z;
-			double z2 = this->Origin->Z + this->WidthZ;
-
-			return Utils::Integral(func, x1, x2, y1, y2, z1, z2);
-		}
-		else
-			assert(false);
-	}
-
-	double Integral(BasisFunction<ShapeDim>* phi) const
-	{
-		return DetJacobian() * ReferenceShape.Integral(phi);
-	}
-
-	double Integral(RefFunction func) const
-	{
-		double integralOnReferenceShape = ReferenceShape.Integral(func);
-		return DetJacobian() * integralOnReferenceShape;
-	}
-
-	double Integral(RefFunction func, int polynomialDegree) const
-	{
-		double integralOnReferenceShape = ReferenceShape.Integral(func, polynomialDegree);
-		return DetJacobian() * integralOnReferenceShape;
-	}
-
-	double ComputeIntegralGradGrad(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2) const
-	{
-		if (phi1->GetDegree() == 0 || phi2->GetDegree() == 0)
-			return 0;
-
-		DimMatrix<ShapeDim> invJ = InverseJacobianTranspose();
-
-		RefFunction functionToIntegrate = [phi1, phi2, invJ](RefPoint p) {
-			DimVector<ShapeDim> gradPhi1 = invJ * phi1->Grad(p);
-			DimVector<ShapeDim> gradPhi2 = invJ * phi2->Grad(p);
-			return gradPhi1.dot(gradPhi2);
-		};
-
-		int polynomialDegree = max(0, phi1->GetDegree() + phi2->GetDegree() - 2);
-		return Integral(functionToIntegrate, polynomialDegree);
-	}
-
-	double ComputeIntegralKGradGrad(Tensor<ShapeDim>* K, BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2) const
-	{
-		if (phi1->GetDegree() == 0 || phi2->GetDegree() == 0)
-			return 0;
-
-		DimMatrix<ShapeDim> invJ = InverseJacobianTranspose();
-
-		RefFunction functionToIntegrate = [K, phi1, phi2, invJ](RefPoint p) {
-			DimVector<ShapeDim> gradPhi1 = invJ * phi1->Grad(p);
-			DimVector<ShapeDim> gradPhi2 = invJ * phi2->Grad(p);
-			return (K * gradPhi1).dot(gradPhi2);
-		};
-
-		int polynomialDegree = max(0, phi1->GetDegree() + phi2->GetDegree() - 2);
-		return Integral(functionToIntegrate, polynomialDegree);
-	}
-
-	//--------//
-	//   DG   //
-	//--------//
-
-	double MassTerm(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
-	{
-		return DetJacobian() * ReferenceShape.MassTerm(phi1, phi2);
-	}
-
-	double StiffnessTerm(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
-	{
-		if (this->IsRegular)
-		{
-			DimMatrix<ShapeDim> invJ = InverseJacobianTranspose();
-			return DetJacobian() * pow(invJ(0, 0), 2) * ReferenceShape.StiffnessTerm(phi1, phi2);
-		}
-		else
-			return ComputeIntegralGradGrad(phi1, phi2);
-	}
-
-	//---------//
-	//   HHO   //
-	//---------//
-
-	DenseMatrix FaceMassMatrix(FunctionalBasis<ShapeDim>* basis)
-	{
-		return DetJacobian() * ReferenceShape.FaceMassMatrix(basis);
-	}
-
-	DenseMatrix CellMassMatrix(FunctionalBasis<ShapeDim>* basis)
-	{
-		return DetJacobian() * ReferenceShape.CellMassMatrix(basis);
-	}
-
-	DenseMatrix CellReconstructMassMatrix(FunctionalBasis<ShapeDim>* cellBasis, FunctionalBasis<ShapeDim>* reconstructBasis)
-	{
-		return DetJacobian() * ReferenceShape.CellReconstructMassMatrix(cellBasis, reconstructBasis);
-	}
-
-	double IntegralKGradGradReconstruct(Tensor<ShapeDim>* K, BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
-	{
-		if (this->IsRegular)
-		{
-			DimMatrix<ShapeDim> invJ = InverseJacobianTranspose();
-			return DetJacobian() * pow(invJ(0, 0), 2) * ReferenceShape.ReconstructKStiffnessTerm(K, phi1, phi2);
-		}
-		else
-			return ComputeIntegralKGradGrad(K, phi1, phi2);
-	}
-
-private:
 	inline double DetJacobian() const
 	{
 		return this->Measure / ReferenceShape.Measure();
 	}
 
-public:
+	DimMatrix<ShapeDim> InverseJacobianTranspose() const
+	{
+		DimMatrix<ShapeDim> invJ = DimMatrix<ShapeDim>::Zero();
+		if (ShapeDim == DomainDim)
+		{
+			if (ShapeDim >= 1)
+				invJ(0, 0) = 2 / this->WidthX;
+			if (ShapeDim >= 2)
+				invJ(1, 1) = 2 / this->WidthY;
+			if (ShapeDim == 3)
+				invJ(2, 2) = 2 / this->WidthZ;
+		}
+		else if (ShapeDim == 1 && DomainDim == 2)
+		{
+			if (this->Orientation == CartesianShapeOrientation::Horizontal)
+				invJ(0, 0) = 2 / this->WidthX;
+			else if (this->Orientation == CartesianShapeOrientation::Vertical)
+				invJ(0, 0) = 2 / this->WidthY;
+			else
+				assert(false);
+		}
+		else if (ShapeDim == 2 && DomainDim == 3)
+		{
+			assert(false && "InverseJacobianTranspose: 3D case to be implemented!");
+		}
+		else
+			assert(false);
+		return invJ;
+	}
+
 	DomPoint ConvertToDomain(RefPoint referenceElementPoint) const
 	{
 		DomPoint p;
@@ -483,34 +377,138 @@ public:
 		return refPoint;
 	}
 
-	DimMatrix<ShapeDim> InverseJacobianTranspose() const
+	//-------------------------------------//
+	//              Integrals              //
+	//-------------------------------------//
+
+	double Integral(DomFunction func) const
 	{
-		DimMatrix<ShapeDim> invJ = DimMatrix<ShapeDim>::Zero();
-		if (ShapeDim == DomainDim)
+		if (ShapeDim == 1)
 		{
-			if (ShapeDim >= 1)
-				invJ(0, 0) = 2 / this->WidthX;
-			if (ShapeDim >= 2)
-				invJ(1, 1) = 2 / this->WidthY;
-			if (ShapeDim == 3)
-				invJ(2, 2) = 2 / this->WidthZ;
+			double x1 = this->Origin->X;
+			double x2 = this->Origin->X + this->WidthX;
+
+			return Utils::Integral(func, x1, x2);
 		}
-		else if (ShapeDim == 1 && DomainDim == 2)
+		else if (ShapeDim == 2)
 		{
-			if (this->Orientation == CartesianShapeOrientation::Horizontal)
-				invJ(0, 0) = 2 / this->WidthX;
-			else if (this->Orientation == CartesianShapeOrientation::Vertical)
-				invJ(0, 0) = 2 / this->WidthY;
-			else
-				assert(false);
+			double x1 = this->Origin->X;
+			double x2 = this->Origin->X + this->WidthX;
+			double y1 = this->Origin->Y;
+			double y2 = this->Origin->Y + this->WidthY;
+
+			return Utils::Integral(func, x1, x2, y1, y2);
 		}
-		else if (ShapeDim == 2 && DomainDim == 3)
+		else if (ShapeDim == 3)
 		{
-			assert(false && "InverseJacobianTranspose: 3D case to be implemented!");
+			double x1 = this->Origin->X;
+			double x2 = this->Origin->X + this->WidthX;
+			double y1 = this->Origin->Y;
+			double y2 = this->Origin->Y + this->WidthY;
+			double z1 = this->Origin->Z;
+			double z2 = this->Origin->Z + this->WidthZ;
+
+			return Utils::Integral(func, x1, x2, y1, y2, z1, z2);
 		}
 		else
 			assert(false);
-		return invJ;
+	}
+
+	double Integral(BasisFunction<ShapeDim>* phi) const
+	{
+		return DetJacobian() * ReferenceShape.Integral(phi);
+	}
+	double Integral(RefFunction func) const
+	{
+		return DetJacobian() * ReferenceShape.Integral(func);
+	}
+	double Integral(RefFunction func, int polynomialDegree) const
+	{
+		return DetJacobian() * ReferenceShape.Integral(func, polynomialDegree);
+	}
+
+	double ComputeIntegralGradGrad(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2) const
+	{
+		if (phi1->GetDegree() == 0 || phi2->GetDegree() == 0)
+			return 0;
+
+		DimMatrix<ShapeDim> invJ = InverseJacobianTranspose();
+
+		RefFunction functionToIntegrate = [phi1, phi2, invJ](RefPoint p) {
+			DimVector<ShapeDim> gradPhi1 = invJ * phi1->Grad(p);
+			DimVector<ShapeDim> gradPhi2 = invJ * phi2->Grad(p);
+			return gradPhi1.dot(gradPhi2);
+		};
+
+		int polynomialDegree = max(0, phi1->GetDegree() + phi2->GetDegree() - 2);
+		return Integral(functionToIntegrate, polynomialDegree);
+	}
+
+	double ComputeIntegralKGradGrad(Tensor<ShapeDim>* K, BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2) const
+	{
+		if (phi1->GetDegree() == 0 || phi2->GetDegree() == 0)
+			return 0;
+
+		DimMatrix<ShapeDim> invJ = InverseJacobianTranspose();
+
+		RefFunction functionToIntegrate = [K, phi1, phi2, invJ](RefPoint p) {
+			DimVector<ShapeDim> gradPhi1 = invJ * phi1->Grad(p);
+			DimVector<ShapeDim> gradPhi2 = invJ * phi2->Grad(p);
+			return (K * gradPhi1).dot(gradPhi2);
+		};
+
+		int polynomialDegree = max(0, phi1->GetDegree() + phi2->GetDegree() - 2);
+		return Integral(functionToIntegrate, polynomialDegree);
+	}
+
+	//----------------------------//
+	//             DG             //
+	//----------------------------//
+
+	double MassTerm(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
+	{
+		return DetJacobian() * ReferenceShape.MassTerm(phi1, phi2);
+	}
+
+	double StiffnessTerm(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
+	{
+		if (this->IsRegular)
+		{
+			DimMatrix<ShapeDim> invJ = InverseJacobianTranspose();
+			return DetJacobian() * pow(invJ(0, 0), 2) * ReferenceShape.StiffnessTerm(phi1, phi2);
+		}
+		else
+			return ComputeIntegralGradGrad(phi1, phi2);
+	}
+
+	//-----------------------------//
+	//             HHO             //
+	//-----------------------------//
+
+	DenseMatrix FaceMassMatrix(FunctionalBasis<ShapeDim>* basis)
+	{
+		return DetJacobian() * ReferenceShape.FaceMassMatrix(basis);
+	}
+
+	DenseMatrix CellMassMatrix(FunctionalBasis<ShapeDim>* basis)
+	{
+		return DetJacobian() * ReferenceShape.CellMassMatrix(basis);
+	}
+
+	DenseMatrix CellReconstructMassMatrix(FunctionalBasis<ShapeDim>* cellBasis, FunctionalBasis<ShapeDim>* reconstructBasis)
+	{
+		return DetJacobian() * ReferenceShape.CellReconstructMassMatrix(cellBasis, reconstructBasis);
+	}
+
+	double IntegralKGradGradReconstruct(Tensor<ShapeDim>* K, BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
+	{
+		if (this->IsRegular)
+		{
+			DimMatrix<ShapeDim> invJ = InverseJacobianTranspose();
+			return DetJacobian() * pow(invJ(0, 0), 2) * ReferenceShape.ReconstructKStiffnessTerm(K, phi1, phi2);
+		}
+		else
+			return ComputeIntegralKGradGrad(K, phi1, phi2);
 	}
 };
 

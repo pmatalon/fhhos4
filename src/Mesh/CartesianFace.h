@@ -47,17 +47,16 @@ public:
 			os << finerFace->Number << ",";*/
 	}
 
-	double Diameter()
+	// Geometric information
+	inline double Diameter()
 	{
 		return max({ CartesianShape<Dim, Dim - 1>::WidthX, CartesianShape<Dim, Dim - 1>::WidthY, CartesianShape<Dim, Dim - 1>::WidthZ });
 	}
-
-	double Measure()
+	inline double Measure()
 	{
 		return CartesianShape<Dim, Dim - 1>::Measure;
 	}
-
-	DomPoint Center()
+	inline DomPoint Center()
 	{
 		return CartesianShape<Dim, Dim - 1>::Center;
 	}

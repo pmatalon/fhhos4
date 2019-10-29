@@ -52,7 +52,17 @@ public:
 	virtual double Integral(RefFunction func) const = 0;
 	virtual double Integral(RefFunction func, int polynomialDegree) const = 0;
 
-	//--------------------------------------------------------------------------------//
+	//---------------------------//
+	//   Geometric information   //
+	//---------------------------//
+
+	void AddFace(Face<Dim>* face)
+	{
+		this->Faces.push_back(face);
+
+		int faceLocalNumber = static_cast<int>(this->_facesLocalNumbering.size());
+		this->_facesLocalNumbering.insert(std::pair<Face<Dim>*, int>(face, faceLocalNumber));
+	}
 
 	Element<Dim>* ElementOnTheOtherSideOf(Face<Dim>* face)
 	{
@@ -84,6 +94,38 @@ public:
 		return false;
 	}
 
+	double FrontierMeasure() const
+	{
+		double measure = 0;
+		for (auto f : this->Faces)
+			measure += f->Measure();
+		return measure;
+	}
+
+	//-------------------//
+	//     Integrals     //
+	//-------------------//
+
+	virtual double Integral(DomFunction globalFunction) const
+	{
+		RefFunction refFunction = [this, globalFunction](RefPoint refElementPoint) {
+			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
+			return globalFunction(domainPoint);
+		};
+
+		return Integral(refFunction);
+	}
+
+	virtual double Integral(DomFunction globalFunction, int polynomialDegree) const
+	{
+		RefFunction refFunction = [this, globalFunction](RefPoint refElementPoint) {
+			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
+			return globalFunction(domainPoint);
+		};
+
+		return Integral(refFunction, polynomialDegree);
+	}
+
 	virtual RefFunction EvalPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* phi)
 	{
 		RefFunction evalOnFace = [this, face, phi](RefPoint refPoint1D) {
@@ -107,14 +149,6 @@ public:
 		return gradOnFace;
 	}
 
-	double FrontierMeasure() const
-	{
-		double measure = 0;
-		for (auto f : this->Faces)
-			measure += f->Measure();
-		return measure;
-	}
-
 	double L2ErrorPow2(RefFunction approximate, DomFunction exactSolution) const
 	{
 		RefFunction errorFunction = [this, exactSolution, approximate](RefPoint refElementPoint) {
@@ -135,24 +169,9 @@ public:
 		return Integral(sourceTimesBasisFunction);
 	}
 
-	virtual double Integral(DomFunction globalFunction) const
-	{
-		RefFunction refFunction = [this, globalFunction](RefPoint refElementPoint) {
-			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
-			return globalFunction(domainPoint);
-		};
-
-		return Integral(refFunction);
-	}
-	virtual double Integral(DomFunction globalFunction, int polynomialDegree) const
-	{
-		RefFunction refFunction = [this, globalFunction](RefPoint refElementPoint) {
-			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
-			return globalFunction(domainPoint);
-		};
-
-		return Integral(refFunction, polynomialDegree);
-	}
+	//--------------//
+	//     Misc     //
+	//--------------//
 
 	// For DG
 	void SetDiffusionCoefficient(DiffusionPartition<Dim>* diffusionPartition)
@@ -188,12 +207,4 @@ public:
 	}
 
 	virtual ~Element() {}
-
-	void AddFace(Face<Dim>* face)
-	{
-		this->Faces.push_back(face);
-
-		int faceLocalNumber = static_cast<int>(this->_facesLocalNumbering.size());
-		this->_facesLocalNumbering.insert(std::pair<Face<Dim>*, int>(face, faceLocalNumber));
-	}
 };

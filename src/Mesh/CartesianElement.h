@@ -32,6 +32,11 @@ public:
 		CartesianShape<Dim>::Serialize(os);
 	}
 
+	//------------------------------------------------------------------//
+	//                      Element implementation                      //
+	//------------------------------------------------------------------//
+
+	// Geometric information
 	inline double Diameter() override
 	{
 		return max({ CartesianShape<Dim>::WidthX, CartesianShape<Dim>::WidthY, CartesianShape<Dim>::WidthZ });
@@ -44,62 +49,49 @@ public:
 	{
 		return CartesianShape<Dim>::Center;
 	}
-	
-	inline double Integral(DomFunction func) const override
-	{
-		return CartesianShape<Dim>::Integral(func);
-	}
 
-	inline double Integral(BasisFunction<Dim>* phi) const
-	{
-		return CartesianShape<Dim>::Integral(phi);
-	}
-
-	inline double Integral(RefFunction func) const
-	{
-		return CartesianShape<Dim>::Integral(func);
-	}
-
-	inline double Integral(RefFunction func, int polynomialDegree) const
-	{
-		return CartesianShape<Dim>::Integral(func, polynomialDegree);
-	}
-
-	inline double ComputeIntegralGradGrad(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
-	{
-		return CartesianShape<Dim>::ComputeIntegralGradGrad(phi1, phi2);
-	}
-
-	inline double ComputeIntegralKGradGrad(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
-	{
-		return CartesianShape<Dim>::ComputeIntegralKGradGrad(K, phi1, phi2);
-	}
-
+	// Transformation to reference element
 	inline DomPoint ConvertToDomain(RefPoint referenceElementPoint) const
 	{
 		return CartesianShape<Dim>::ConvertToDomain(referenceElementPoint);
 	}
-
 	inline RefPoint ConvertToReference(DomPoint domainPoint) const
 	{
 		return CartesianShape<Dim>::ConvertToReference(domainPoint);
 	}
-
 	inline DimMatrix<Dim> InverseJacobianTranspose() const
 	{
 		return CartesianShape<Dim>::InverseJacobianTranspose();
+	}
+	
+	// Integral
+	inline double Integral(DomFunction func) const override
+	{
+		return CartesianShape<Dim>::Integral(func);
+	}
+	inline double Integral(BasisFunction<Dim>* phi) const
+	{
+		return CartesianShape<Dim>::Integral(phi);
+	}
+	inline double Integral(RefFunction func) const
+	{
+		return CartesianShape<Dim>::Integral(func);
+	}
+	inline double Integral(RefFunction func, int polynomialDegree) const
+	{
+		return CartesianShape<Dim>::Integral(func, polynomialDegree);
 	}
 
 	//------------------------------------------------------------------//
 	//                 Poisson_DG_Element implementation                //
 	//------------------------------------------------------------------//
 	
-	double MassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
+	inline double MassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{
 		return CartesianShape<Dim>::MassTerm(phi1, phi2);
 	}
 
-	double StiffnessTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
+	inline double StiffnessTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{
 		return CartesianShape<Dim>::StiffnessTerm(phi1, phi2);
 	}
@@ -108,18 +100,23 @@ public:
 	//                 Poisson_HHO_Element implementation                //
 	//-------------------------------------------------------------------//
 
-	DenseMatrix CellMassMatrix(FunctionalBasis<Dim>* basis)
+	inline DenseMatrix CellMassMatrix(FunctionalBasis<Dim>* basis)
 	{
 		return CartesianShape<Dim>::CellMassMatrix(basis);
 	}
 
-	DenseMatrix CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis)
+	inline DenseMatrix CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis)
 	{
 		return CartesianShape<Dim>::CellReconstructMassMatrix(cellBasis, reconstructBasis);
 	}
 
-	double IntegralKGradGradReconstruct(Tensor<Dim>* K, BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2)
+	inline double IntegralKGradGradReconstruct(Tensor<Dim>* K, BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2)
 	{
 		return CartesianShape<Dim>::IntegralKGradGradReconstruct(K, reconstructPhi1, reconstructPhi2);
+	}
+
+	inline double ComputeIntegralKGradGrad(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
+	{
+		return CartesianShape<Dim>::ComputeIntegralKGradGrad(K, phi1, phi2);
 	}
 };

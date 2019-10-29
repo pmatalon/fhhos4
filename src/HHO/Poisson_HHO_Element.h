@@ -28,6 +28,17 @@ public:
 	DenseMatrix invAtt;
 
 	Poisson_HHO_Element(BigNumber number) : Element<Dim>(number) {}
+
+	//-----------------------//
+	//   Virtual functions   //
+	//-----------------------//
+
+	virtual double IntegralKGradGradReconstruct(Tensor<Dim>* K, BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2) = 0;
+	virtual double ComputeIntegralKGradGrad(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const = 0;
+	virtual DenseMatrix CellMassMatrix(FunctionalBasis<Dim>* basis) = 0;
+	virtual DenseMatrix CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) = 0;
+
+	//--------------------------------------------------------------------------------//
 	
 	void InitHHO(HHOParameters<Dim>* hho)
 	{
@@ -158,19 +169,12 @@ public:
 		return this->P(reconstructPhi->LocalNumber, DOFNumber(face, facePhi));
 	}
 
-
-	virtual double IntegralKGradGradReconstruct(Tensor<Dim>* K, BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2) = 0;
-	virtual double ComputeIntegralKGradGrad(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const = 0;
-	virtual DenseMatrix CellMassMatrix(FunctionalBasis<Dim>* basis) = 0;
-	virtual DenseMatrix CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) = 0;
-
-
 	virtual ~Poisson_HHO_Element() {}
 
 private:
 
 	//------------------------------------------------------------------------------------//
-	//--------------- Reconstruction operator and consistency contribution ---------------//
+	//                Reconstruction operator and consistency contribution                //
 	//------------------------------------------------------------------------------------//
 
 	void AssembleReconstructionAndConsistencyMatrices()
@@ -318,7 +322,7 @@ private:
 	}
 
 	//---------------------------------------------//
-	//--------------- Stabilization ---------------//
+	//                Stabilization                //
 	//---------------------------------------------//
 
 	void AssembleStabilizationMatrix()

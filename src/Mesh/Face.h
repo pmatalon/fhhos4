@@ -35,30 +35,30 @@ public:
 		this->_boundaryConditionType = BoundaryConditionType::Dirichlet;
 	}
 
-	void SetBoundaryConditions(BoundaryConditions* bc)
-	{
-		assert(IsDomainBoundary);
-		if (bc->GetBoundaryConditionType(this->Center()) == BoundaryConditionType::Dirichlet)
-		{
-			this->_boundaryConditionType = BoundaryConditionType::Dirichlet;
-			this->_boundaryConditionFunction = bc->DirichletFunction;
-		}
-		else
-		{
-			this->_boundaryConditionType = BoundaryConditionType::Neumann;
-			this->_boundaryConditionFunction = bc->NeumannFunction;
-		}
-	}	
+	//-----------------------//
+	//   Virtual functions   //
+	//-----------------------//
 
-	bool HasDirichletBC()
-	{
-		return IsDomainBoundary && _boundaryConditionType == BoundaryConditionType::Dirichlet;
-	}
+	// Geometric information
+	virtual double Diameter() = 0;
+	virtual double Measure() = 0;
+	virtual DomPoint Center() = 0;
+	virtual Face<Dim>* CreateSameGeometricFace(BigNumber number, Element<Dim>* element1) = 0;
 
-	bool HasNeumannBC()
-	{
-		return IsDomainBoundary && _boundaryConditionType == BoundaryConditionType::Neumann;
-	}
+	// Transformation to reference element
+	virtual DomPoint ConvertToDomain(RefPoint refPoint) = 0;
+	virtual RefPoint ConvertToReference(DomPoint domainPoint) = 0;
+
+	// Integral
+	virtual double Integral(RefFunction func) const = 0;
+	virtual double Integral(RefFunction func, int polynomialDegree) const = 0;
+
+	// Misc
+	virtual void ExportFaceToMatlab(FILE* file) = 0;
+
+	//---------------------------//
+	//   Geometric information   //
+	//---------------------------//
 
 	bool IsBetween(Element<Dim>* element1, Element<Dim>* element2)
 	{
@@ -90,15 +90,38 @@ public:
 		assert(false);
 	}
 
-	virtual double Diameter() = 0;
-	virtual double Measure() = 0;
-	virtual DomPoint Center() = 0;
-	virtual DomPoint ConvertToDomain(RefPoint refPoint) = 0;
-	virtual RefPoint ConvertToReference(DomPoint domainPoint) = 0;
-	virtual double Integral(RefFunction func) const = 0;
-	virtual double Integral(RefFunction func, int polynomialDegree) const = 0;
-	virtual Face<Dim>* CreateSameGeometricFace(BigNumber number, Element<Dim>* element1) = 0;
-	virtual void ExportFaceToMatlab(FILE* file) = 0;
+	//-----------------------------//
+	//     Problem information     //
+	//-----------------------------//
+
+	void SetBoundaryConditions(BoundaryConditions* bc)
+	{
+		assert(IsDomainBoundary);
+		if (bc->GetBoundaryConditionType(this->Center()) == BoundaryConditionType::Dirichlet)
+		{
+			this->_boundaryConditionType = BoundaryConditionType::Dirichlet;
+			this->_boundaryConditionFunction = bc->DirichletFunction;
+		}
+		else
+		{
+			this->_boundaryConditionType = BoundaryConditionType::Neumann;
+			this->_boundaryConditionFunction = bc->NeumannFunction;
+		}
+	}
+
+	inline bool HasDirichletBC()
+	{
+		return IsDomainBoundary && _boundaryConditionType == BoundaryConditionType::Dirichlet;
+	}
+
+	inline bool HasNeumannBC()
+	{
+		return IsDomainBoundary && _boundaryConditionType == BoundaryConditionType::Neumann;
+	}
+
+	//--------------//
+	//     Misc     //
+	//--------------//
 
 	friend ostream& operator<<(ostream& os, const Face<Dim>& s)
 	{
