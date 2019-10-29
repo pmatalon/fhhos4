@@ -1,5 +1,6 @@
 #pragma once
 #include "ReferenceElement.h"
+#include "../Utils/GaussLegendre.h"
 
 template <int Dim>
 class ReferenceCartesianShape : public ReferenceElement<Dim>
@@ -26,15 +27,28 @@ public:
 
 	double Integral(BasisFunction<Dim>* phi) const override
 	{
-		return Utils::Integral(phi);
+		RefFunction func = [phi](RefPoint p) {
+			return phi->Eval(p);
+		};
+		return Integral(func, phi->GetDegree());
 	}
 	double Integral(RefFunction func, int polynomialDegree) const override
 	{
-		return Utils::Integral<Dim>(func, polynomialDegree);
+		if (Dim == 0)
+			return func(0);
+		int nPoints = GaussLegendre::NumberOfRequiredQuadraturePoint(polynomialDegree);
+		return Integral(nPoints, func);
 	}
 	double Integral(RefFunction func) const override
 	{
-		return Utils::Integral<Dim>(func);
+		return Integral(GaussLegendre::MAX_POINTS, func);
+	}
+	double Integral(int nPoints, RefFunction func) const
+	{
+		if (Dim == 0)
+			return func(0);
+		GaussLegendre* gs = GaussLegendre::Get(nPoints);
+		return gs->QuadratureDim<Dim>(func);
 	}
 
 	//--------//

@@ -538,6 +538,12 @@ public:
 		}
 	}
 
+	static int NumberOfRequiredQuadraturePoint(int polynomialDegree)
+	{
+		int nPoints = (int)ceil(((double)polynomialDegree + 1) / 2);
+		return nPoints;
+	}
+
 	double Point(int i)
 	{
 		return points[i];

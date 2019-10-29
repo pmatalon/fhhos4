@@ -388,7 +388,7 @@ public:
 			double x1 = this->Origin->X;
 			double x2 = this->Origin->X + this->WidthX;
 
-			return Utils::Integral(func, x1, x2);
+			return Integral(func, x1, x2);
 		}
 		else if (ShapeDim == 2)
 		{
@@ -397,7 +397,7 @@ public:
 			double y1 = this->Origin->Y;
 			double y2 = this->Origin->Y + this->WidthY;
 
-			return Utils::Integral(func, x1, x2, y1, y2);
+			return Integral(func, x1, x2, y1, y2);
 		}
 		else if (ShapeDim == 3)
 		{
@@ -408,21 +408,21 @@ public:
 			double z1 = this->Origin->Z;
 			double z2 = this->Origin->Z + this->WidthZ;
 
-			return Utils::Integral(func, x1, x2, y1, y2, z1, z2);
+			return Integral(func, x1, x2, y1, y2, z1, z2);
 		}
 		else
 			assert(false);
 	}
 
-	double Integral(BasisFunction<ShapeDim>* phi) const
+	inline double Integral(BasisFunction<ShapeDim>* phi) const
 	{
 		return DetJacobian() * ReferenceShape.Integral(phi);
 	}
-	double Integral(RefFunction func) const
+	inline double Integral(RefFunction func) const
 	{
 		return DetJacobian() * ReferenceShape.Integral(func);
 	}
-	double Integral(RefFunction func, int polynomialDegree) const
+	inline double Integral(RefFunction func, int polynomialDegree) const
 	{
 		return DetJacobian() * ReferenceShape.Integral(func, polynomialDegree);
 	}
@@ -465,7 +465,7 @@ public:
 	//             DG             //
 	//----------------------------//
 
-	double MassTerm(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
+	inline double MassTerm(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
 	{
 		return DetJacobian() * ReferenceShape.MassTerm(phi1, phi2);
 	}
@@ -485,17 +485,17 @@ public:
 	//             HHO             //
 	//-----------------------------//
 
-	DenseMatrix FaceMassMatrix(FunctionalBasis<ShapeDim>* basis)
+	inline DenseMatrix FaceMassMatrix(FunctionalBasis<ShapeDim>* basis)
 	{
 		return DetJacobian() * ReferenceShape.FaceMassMatrix(basis);
 	}
 
-	DenseMatrix CellMassMatrix(FunctionalBasis<ShapeDim>* basis)
+	inline DenseMatrix CellMassMatrix(FunctionalBasis<ShapeDim>* basis)
 	{
 		return DetJacobian() * ReferenceShape.CellMassMatrix(basis);
 	}
 
-	DenseMatrix CellReconstructMassMatrix(FunctionalBasis<ShapeDim>* cellBasis, FunctionalBasis<ShapeDim>* reconstructBasis)
+	inline DenseMatrix CellReconstructMassMatrix(FunctionalBasis<ShapeDim>* cellBasis, FunctionalBasis<ShapeDim>* reconstructBasis)
 	{
 		return DetJacobian() * ReferenceShape.CellReconstructMassMatrix(cellBasis, reconstructBasis);
 	}
@@ -509,6 +509,94 @@ public:
 		}
 		else
 			return ComputeIntegralKGradGrad(K, phi1, phi2);
+	}
+
+private:
+
+	//-------------//
+	// Integral 1D //
+	//-------------//
+
+	static double Integral(int nPoints, std::function<double(double)> func, double x1, double x2)
+	{
+		GaussLegendre* gs = GaussLegendre::Get(nPoints);
+		return gs->Quadrature(func, x1, x2);
+	}
+
+	inline static double Integral(std::function<double(double)> func, double x1, double x2)
+	{
+		return Integral(GaussLegendre::MAX_POINTS, func, x1, x2);
+	}
+
+	static double Integral(int nPoints, DomFunction func, double x1, double x2)
+	{
+		function<double(double)> funcToIntegrate = [func](double x) {
+			return func(DomPoint(x));
+		};
+		return Integral(nPoints, funcToIntegrate, x1, x2);
+	}
+
+	inline static double Integral(DomFunction func, double x1, double x2)
+	{
+		return Integral(GaussLegendre::MAX_POINTS, func, x1, x2);
+	}
+
+	//-------------//
+	// Integral 2D //
+	//-------------//
+
+	// Integral on [x1, x2] x [y1, y2]
+	static double Integral(int nPoints, std::function<double(double, double)> func, double x1, double x2, double y1, double y2)
+	{
+		GaussLegendre* gs = GaussLegendre::Get(nPoints);
+		return gs->Quadrature(func, x1, x2, y1, y2);
+	}
+
+	inline static double Integral(std::function<double(double, double)> func, double x1, double x2, double y1, double y2)
+	{
+		return Integral(GaussLegendre::MAX_POINTS, func, x1, x2, y1, y2);
+	}
+
+	static double Integral(int nPoints, DomFunction func, double x1, double x2, double y1, double y2)
+	{
+		function<double(double, double)> funcToIntegrate = [func](double x, double y) {
+			return func(DomPoint(x, y));
+		};
+		return Integral(nPoints, funcToIntegrate, x1, x2, y1, y2);
+	}
+
+	inline static double Integral(DomFunction func, double x1, double x2, double y1, double y2)
+	{
+		return Integral(GaussLegendre::MAX_POINTS, func, x1, x2, y1, y2);
+	}
+
+	//-------------//
+	// Integral 3D //
+	//-------------//
+
+	// Integral on [x1, x2] x [y1, y2] x [z1, z2]
+	static double Integral(int nPoints, std::function<double(double, double, double)> func, double x1, double x2, double y1, double y2, double z1, double z2)
+	{
+		GaussLegendre* gs = GaussLegendre::Get(nPoints);
+		return gs->Quadrature(func, x1, x2, y1, y2, z1, z2);
+	}
+
+	inline static double Integral(std::function<double(double, double, double)> func, double x1, double x2, double y1, double y2, double z1, double z2)
+	{
+		return Integral(GaussLegendre::MAX_POINTS, func, x1, x2, y1, y2, z1, z2);
+	}
+
+	static double Integral(int nPoints, DomFunction func, double x1, double x2, double y1, double y2, double z1, double z2)
+	{
+		function<double(double, double, double)> funcToIntegrate = [func](double x, double y, double z) {
+			return func(DomPoint(x, y, z));
+		};
+		return Integral(nPoints, funcToIntegrate, x1, x2, y1, y2, z1, z2);
+	}
+
+	inline static double Integral(DomFunction func, double x1, double x2, double y1, double y2, double z1, double z2)
+	{
+		return Integral(GaussLegendre::MAX_POINTS, func, x1, x2, y1, y2, z1, z2);
 	}
 };
 
