@@ -11,7 +11,6 @@ private:
 	TriangleShape _shape;
 
 public:
-
 	Triangle(int number, Vertex* v1, Vertex* v2, Vertex* v3) :
 		Element(number),
 		Poisson_DG_Element<2>(number),

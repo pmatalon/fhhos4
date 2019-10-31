@@ -6,7 +6,6 @@ using namespace std;
 
 class TriangleShape : public GeometricShapeWithReferenceShape<2>
 {
-public:
 private:
 	double _diameter;
 	double _measure;

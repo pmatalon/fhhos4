@@ -259,17 +259,6 @@ public:
 		//   Boundary conditions   //
 		//-------------------------//
 
-		/*exactSolution = [](DomPoint p)
-		{
-			double x = p.X;
-			double y = p.Y;
-			return pow(x, 3);
-			//return 1;
-		};
-		sourceFunction = new SourceFunction2D([](double x, double y) { 
-			return -6 * x; 
-			});*/
-
 		function<BoundaryConditionType(DomPoint)> getBoundaryConditionType = [](DomPoint p)
 		{
 			return BoundaryConditionType::Dirichlet;
@@ -285,6 +274,10 @@ public:
 		BoundaryConditions bc(getBoundaryConditionType, dirichletBC, neumannBC);
 
 		mesh->SetBoundaryConditions(&bc);
+
+		//mesh->CoarsenMesh(CoarseningStrategy::Standard);
+		//cout << *mesh << endl << endl;
+		//cout << "Coarse mesh" << endl << *(mesh->CoarseMesh) << endl << endl;
 
 		//--------------------------------//
 		//   Discretization and solving   //

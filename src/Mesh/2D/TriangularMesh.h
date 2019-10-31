@@ -4,6 +4,48 @@
 #include "../Mesh.h"
 using namespace std;
 
+class LowerTriangle : public Triangle
+{
+public:
+	LowerTriangle(int number, Vertex* v1, Vertex* v2, Vertex* v3) : Triangle(number, v1, v2, v3), Element(number) {}
+
+	Edge* GetEdge(Vertex* v1, Vertex* v2)
+	{
+		for (Face<2>* f : this->Faces)
+		{
+			Edge* e = dynamic_cast<Edge*>(f);
+			if ((e->Vertex1() == v1 && e->Vertex2() == v2) || (e->Vertex1() == v2 && e->Vertex2() == v1))
+				return e;
+		}
+		assert(false);
+	}
+
+	Edge* SouthEdge() { return GetEdge(this->V1(), this->V2());	}
+	Edge* ObliqueEdge() { return GetEdge(this->V2(), this->V3()); }
+	Edge* WestEdge() { return GetEdge(this->V3(), this->V1()); }
+};
+
+class UpperTriangle : public Triangle
+{
+public:
+	UpperTriangle(int number, Vertex* v1, Vertex* v2, Vertex* v3) : Triangle(number, v1, v2, v3), Element(number) {}
+
+	Edge* GetEdge(Vertex* v1, Vertex* v2)
+	{
+		for (Face<2>* f : this->Faces)
+		{
+			Edge* e = dynamic_cast<Edge*>(f);
+			if ((e->Vertex1() == v1 && e->Vertex2() == v2) || (e->Vertex1() == v2 && e->Vertex2() == v1))
+				return e;
+		}
+		assert(false);
+	}
+
+	Edge* ObliqueEdge() { return GetEdge(this->V1(), this->V2()); }
+	Edge* EastEdge() { return GetEdge(this->V2(), this->V3()); }
+	Edge* NorthEdge() { return GetEdge(this->V3(), this->V1()); }
+};
+
 class TriangularMesh : public Mesh<2>
 {
 public:
@@ -48,10 +90,10 @@ public:
 				Vertex* topLeftCorner     = Vertices[indexV(ix,     iy + 1)];
 				Vertex* topRightCorner    = Vertices[indexV(ix + 1, iy + 1)];
 				Vertex* bottomRightCorner = Vertices[indexV(ix + 1, iy    )];
-				Triangle* triangle = new Triangle(number, bottomLeftCorner, bottomRightCorner, topLeftCorner);
-				this->Elements.push_back(triangle);
-				Triangle* triangle2 = new Triangle(number + 1, topLeftCorner, bottomRightCorner, topRightCorner);
-				this->Elements.push_back(triangle2);
+				Triangle* lowerTriangle = new LowerTriangle(number, bottomLeftCorner, bottomRightCorner, topLeftCorner);
+				this->Elements.push_back(lowerTriangle);
+				Triangle* upperTriangle = new UpperTriangle(number + 1, topLeftCorner, bottomRightCorner, topRightCorner);
+				this->Elements.push_back(upperTriangle);
 			}
 		}
 
@@ -65,35 +107,35 @@ public:
 		for (BigNumber ix = 0; ix < nx; ++ix)
 		{
 			// South boundary
-			Triangle* triangle = dynamic_cast<Triangle*>(this->Elements[index(ix, 0)]);
-			Edge* southBoundary = new Edge(numberInterface++, triangle->V1(), triangle->V2(), triangle);
+			Triangle* lowerTriangle = dynamic_cast<Triangle*>(this->Elements[index(ix, 0)]);
+			Edge* southBoundary = new Edge(numberInterface++, lowerTriangle->V1(), lowerTriangle->V2(), lowerTriangle);
 			this->Faces.push_back(southBoundary);
 			this->BoundaryFaces.push_back(southBoundary);
-			triangle->AddFace(southBoundary);
+			lowerTriangle->AddFace(southBoundary);
 
 			// North boundary
-			triangle = dynamic_cast<Triangle*>(this->Elements[index(ix, ny - 1) + 1]);
-			Edge* northBoundary = new Edge(numberInterface++, triangle->V1(), triangle->V3(), triangle);
+			Triangle* upperTriangle = dynamic_cast<Triangle*>(this->Elements[index(ix, ny - 1) + 1]);
+			Edge* northBoundary = new Edge(numberInterface++, upperTriangle->V1(), upperTriangle->V3(), upperTriangle);
 			this->Faces.push_back(northBoundary);
 			this->BoundaryFaces.push_back(northBoundary);
-			triangle->AddFace(northBoundary);
+			upperTriangle->AddFace(northBoundary);
 		}
 
 		for (BigNumber iy = 0; iy < ny; ++iy)
 		{
 			// West boundary
-			Triangle* triangle = dynamic_cast<Triangle*>(this->Elements[index(0, iy)]);
-			Edge* westBoundary = new Edge(numberInterface++, triangle->V3(), triangle->V1(), triangle);
+			Triangle* lowerTriangle = dynamic_cast<Triangle*>(this->Elements[index(0, iy)]);
+			Edge* westBoundary = new Edge(numberInterface++, lowerTriangle->V3(), lowerTriangle->V1(), lowerTriangle);
 			this->Faces.push_back(westBoundary);
 			this->BoundaryFaces.push_back(westBoundary);
-			triangle->AddFace(westBoundary);
+			lowerTriangle->AddFace(westBoundary);
 
 			// East boundary
-			triangle = dynamic_cast<Triangle*>(this->Elements[index(nx-1, iy)+1]);
-			Edge* eastBoundary = new Edge(numberInterface++, triangle->V2(), triangle->V3(), triangle);
+			Triangle* upperTriangle = dynamic_cast<Triangle*>(this->Elements[index(nx-1, iy)+1]);
+			Edge* eastBoundary = new Edge(numberInterface++, upperTriangle->V2(), upperTriangle->V3(), upperTriangle);
 			this->Faces.push_back(eastBoundary);
 			this->BoundaryFaces.push_back(eastBoundary);
-			triangle->AddFace(eastBoundary);
+			upperTriangle->AddFace(eastBoundary);
 		}
 
 		for (BigNumber iy = 0; iy < ny; iy++)
@@ -216,17 +258,17 @@ public:
 
 	void CoarsenMesh(CoarseningStrategy strategy)
 	{
-		//if (strategy == CoarseningStrategy::Standard)
-			//CoarsenByAgglomerationAndMergeColinearFaces();
+		if (strategy == CoarseningStrategy::Standard)
+			CoarsenByAgglomerationAndMergeColinearFaces();
 		//else if (strategy == CoarseningStrategy::Agglomeration)
 			//CoarsenByAgglomerationAndKeepFineFaces();
-		//else
+		else
 			assert(false && "Coarsening strategy not implemented!");
 		this->CoarseMesh->SetDiffusionCoefficient(this->_diffusionPartition);
 		this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
 	}
 
-	/*void CoarsenByAgglomerationAndMergeColinearFaces()
+	void CoarsenByAgglomerationAndMergeColinearFaces()
 	{
 		BigNumber nx = this->Nx;
 		BigNumber ny = this->Ny;
@@ -243,34 +285,94 @@ public:
 			{
 				for (BigNumber j = 0; j < nx; ++j)
 				{
-					Triangle* fineElement = dynamic_cast<Triangle*>(this->Elements[i*nx + j]);
-					Triangle* coarseElement = dynamic_cast<Triangle*>(coarseMesh->Elements[(i / 2) * coarseMesh->Nx + j / 2]);
+					LowerTriangle* fineLower = dynamic_cast<LowerTriangle*>(this->Elements[index(i, j)]);
+					UpperTriangle* fineUpper = dynamic_cast<UpperTriangle*>(this->Elements[index(i, j)+1]);
 
-					coarseElement->FinerElements.push_back(fineElement);
-					fineElement->CoarserElement = coarseElement;
-					if (i % 2 == 0 && !fineElement->NorthFace->IsDomainBoundary)
-					{
-						fineElement->NorthFace->IsRemovedOnCoarserGrid = true;
-						coarseElement->FinerFacesRemoved.push_back(fineElement->NorthFace);
-						coarseElement->SouthFace->FinerFaces.push_back(fineElement->SouthFace);
-					}
-					if (i == ny - 1)
-						coarseElement->NorthFace->FinerFaces.push_back(fineElement->NorthFace);
+					LowerTriangle* coarseLower = dynamic_cast<LowerTriangle*>(coarseMesh->Elements[coarseMesh->index(i / 2, j / 2)]);
+					UpperTriangle* coarseUpper = dynamic_cast<UpperTriangle*>(coarseMesh->Elements[coarseMesh->index(i / 2, j / 2)+1]);
 
-					if (j % 2 == 0 && !fineElement->EastFace->IsDomainBoundary)
+					if (j % 2 == 0) // on an even row
 					{
-						fineElement->EastFace->IsRemovedOnCoarserGrid = true;
-						coarseElement->FinerFacesRemoved.push_back(fineElement->EastFace);
-						coarseElement->WestFace->FinerFaces.push_back(fineElement->WestFace);
+						coarseLower->FinerElements.push_back(fineLower);
+						fineLower->CoarserElement = coarseLower;
+						//Edge* coarseSouthEdge = coarseLower->SouthEdge();
+						//cout << "south edge = " << *coarseSouthEdge << endl;
+						coarseLower->SouthEdge()->FinerFaces.push_back(fineLower->SouthEdge());
+
+						if (i % 2 == 0) // on an even column
+						{
+							coarseLower->FinerElements.push_back(fineUpper);
+							fineUpper->CoarserElement = coarseLower;
+							
+							fineUpper->ObliqueEdge()->IsRemovedOnCoarserGrid = true;
+							fineUpper->EastEdge()->IsRemovedOnCoarserGrid = true;
+							fineUpper->NorthEdge()->IsRemovedOnCoarserGrid = true;
+
+							coarseLower->WestEdge()->FinerFaces.push_back(fineLower->WestEdge());
+						}
+						else
+						{
+							coarseUpper->FinerElements.push_back(fineUpper);
+							fineUpper->CoarserElement = coarseUpper;
+
+							coarseLower->ObliqueEdge()->FinerFaces.push_back(fineLower->ObliqueEdge());
+						}
 					}
-					if (j == nx - 1)
-						coarseElement->EastFace->FinerFaces.push_back(fineElement->EastFace);
+					else // on an odd row
+					{
+						coarseUpper->FinerElements.push_back(fineUpper);
+						fineUpper->CoarserElement = coarseUpper;
+						if (i % 2 == 0) // on an even col
+						{
+							coarseLower->FinerElements.push_back(fineLower);
+							fineLower->CoarserElement = coarseLower;
+
+							coarseLower->WestEdge()->FinerFaces.push_back(fineLower->WestEdge());
+							coarseLower->ObliqueEdge()->FinerFaces.push_back(fineLower->ObliqueEdge());
+						}
+						else // on an odd col
+						{
+							coarseUpper->FinerElements.push_back(fineLower);
+							fineLower->CoarserElement = coarseUpper;
+
+							fineLower->SouthEdge()->IsRemovedOnCoarserGrid = true;
+							fineLower->ObliqueEdge()->IsRemovedOnCoarserGrid = true;
+							fineLower->WestEdge()->IsRemovedOnCoarserGrid = true;
+						}
+					}
+					if (j == nx - 1) // last row
+						coarseUpper->NorthEdge()->FinerFaces.push_back(fineUpper->NorthEdge());
+					if (i == ny - 1) // last col
+						coarseUpper->EastEdge()->FinerFaces.push_back(fineUpper->EastEdge());
 				}
 			}
 
 			this->CoarseMesh = coarseMesh;
+
+			/*for (Element<2>* elem : coarseMesh->Elements)
+			{
+				cout << "Coarse elem " << elem->Number << ", fine elem: ";
+				for (Element<2>* fineElem : elem->FinerElements)
+					cout << fineElem->Number << " ";
+				cout << endl;
+			}
+			cout << endl;
+			for (Face<2>* f : this->Faces)
+			{
+				Edge* e = dynamic_cast<Edge*>(f);
+				cout << "Fine " << *e << ", IsRemovedOnCoarserGrid = " << e->IsRemovedOnCoarserGrid << endl;
+			}
+			cout << endl;
+			for (Face<2>* f : coarseMesh->Faces)
+			{
+				Edge* e = dynamic_cast<Edge*>(f);
+				cout << "Coarse " << *e << ", FinerFaces = ";
+				for (Face<2>* fineF : e->FinerFaces)
+					cout << fineF->Number << " ";
+				cout << endl;
+			}*/
 		}
-	}*/
+	}
 
 	/*void CoarsenByAgglomerationAndKeepFineFaces()
 	{
