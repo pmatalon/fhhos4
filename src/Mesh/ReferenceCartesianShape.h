@@ -1,9 +1,9 @@
 #pragma once
-#include "ReferenceElement.h"
+#include "ReferenceShape.h"
 #include "../Utils/GaussLegendre.h"
 
 template <int Dim>
-class ReferenceCartesianShape : public ReferenceElement<Dim>
+class ReferenceCartesianShape : public ReferenceShape<Dim>
 {
 private:
 	// For DG
@@ -18,20 +18,21 @@ private:
 	Tensor<Dim>* _K2;
 
 public:
-	ReferenceCartesianShape() : ReferenceElement<Dim>() {}
+	ReferenceCartesianShape() : ReferenceShape<Dim>() {}
 
-	inline double Measure()
+	virtual double Diameter() const override
+	{
+		return 2;
+	}
+	inline double Measure() const override
 	{
 		return pow(2, Dim);
 	}
-
-	double Integral(BasisFunction<Dim>* phi) const override
+	virtual DomPoint Center() const override
 	{
-		RefFunction func = [phi](RefPoint p) {
-			return phi->Eval(p);
-		};
-		return Integral(func, phi->GetDegree());
+		return DomPoint(0);
 	}
+
 	double Integral(RefFunction func, int polynomialDegree) const override
 	{
 		if (Dim == 0)

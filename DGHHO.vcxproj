@@ -109,10 +109,13 @@
     <ClInclude Include="src\Mesh\2D\Edge.h" />
     <ClInclude Include="src\Mesh\2D\RectangularPolygon.h" />
     <ClInclude Include="src\Mesh\2D\Triangle.h" />
+    <ClInclude Include="src\Mesh\2D\TriangleShape.h" />
     <ClInclude Include="src\Mesh\2D\TriangularMesh.h" />
     <ClInclude Include="src\Mesh\CartesianElement.h" />
     <ClInclude Include="src\Mesh\CartesianFace.h" />
     <ClInclude Include="src\Mesh\CartesianShape.h" />
+    <ClInclude Include="src\Mesh\GeometricShape.h" />
+    <ClInclude Include="src\Mesh\GeometricShapeWithReferenceShape.h" />
     <ClInclude Include="src\Mesh\Mesh.h" />
     <ClInclude Include="src/Mesh/1D/CartesianGrid1D.h" />
     <ClInclude Include="src/Mesh/2D/CartesianGrid2D.h" />
@@ -139,7 +142,7 @@
     <ClInclude Include="src/Utils/Utils.h" />
     <ClInclude Include="src/Problem/DiffusionPartition.h" />
     <ClInclude Include="src/Problem/Problem.h" />
-    <ClInclude Include="src\Mesh\ReferenceElement.h" />
+    <ClInclude Include="src\Mesh\ReferenceShape.h" />
     <ClInclude Include="src\Mesh\ReferenceTriangle.h" />
     <ClInclude Include="src\Problem\BoundaryConditions.h" />
     <ClInclude Include="src\Problem\Tensor.h" />

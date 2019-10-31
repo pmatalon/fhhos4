@@ -66,14 +66,14 @@ public:
 		{
 			// South boundary
 			Triangle* triangle = dynamic_cast<Triangle*>(this->Elements[index(ix, 0)]);
-			Edge* southBoundary = new Edge(numberInterface++, triangle->V1, triangle->V2, triangle);
+			Edge* southBoundary = new Edge(numberInterface++, triangle->V1(), triangle->V2(), triangle);
 			this->Faces.push_back(southBoundary);
 			this->BoundaryFaces.push_back(southBoundary);
 			triangle->AddFace(southBoundary);
 
 			// North boundary
 			triangle = dynamic_cast<Triangle*>(this->Elements[index(ix, ny - 1) + 1]);
-			Edge* northBoundary = new Edge(numberInterface++, triangle->V1, triangle->V3, triangle);
+			Edge* northBoundary = new Edge(numberInterface++, triangle->V1(), triangle->V3(), triangle);
 			this->Faces.push_back(northBoundary);
 			this->BoundaryFaces.push_back(northBoundary);
 			triangle->AddFace(northBoundary);
@@ -83,14 +83,14 @@ public:
 		{
 			// West boundary
 			Triangle* triangle = dynamic_cast<Triangle*>(this->Elements[index(0, iy)]);
-			Edge* westBoundary = new Edge(numberInterface++, triangle->V3, triangle->V1, triangle);
+			Edge* westBoundary = new Edge(numberInterface++, triangle->V3(), triangle->V1(), triangle);
 			this->Faces.push_back(westBoundary);
 			this->BoundaryFaces.push_back(westBoundary);
 			triangle->AddFace(westBoundary);
 
 			// East boundary
 			triangle = dynamic_cast<Triangle*>(this->Elements[index(nx-1, iy)+1]);
-			Edge* eastBoundary = new Edge(numberInterface++, triangle->V2, triangle->V3, triangle);
+			Edge* eastBoundary = new Edge(numberInterface++, triangle->V2(), triangle->V3(), triangle);
 			this->Faces.push_back(eastBoundary);
 			this->BoundaryFaces.push_back(eastBoundary);
 			triangle->AddFace(eastBoundary);
@@ -103,7 +103,7 @@ public:
 				Triangle* lowerTriangle = dynamic_cast<Triangle*>(this->Elements[index(ix, iy)]);
 				Triangle* upperTriangle = dynamic_cast<Triangle*>(this->Elements[index(ix, iy)+1]);
 
-				Edge* interface = new Edge(numberInterface++, lowerTriangle->V3, lowerTriangle->V2, lowerTriangle, upperTriangle);
+				Edge* interface = new Edge(numberInterface++, lowerTriangle->V3(), lowerTriangle->V2(), lowerTriangle, upperTriangle);
 				this->Faces.push_back(interface);
 				this->InteriorFaces.push_back(interface);
 				lowerTriangle->AddFace(interface);
@@ -113,7 +113,7 @@ public:
 				{
 					// East
 					Triangle* eastNeighbour = dynamic_cast<Triangle*>(this->Elements[index(ix + 1, iy)]);
-					interface = new Edge(numberInterface++, eastNeighbour->V3, eastNeighbour->V1, upperTriangle, eastNeighbour);
+					interface = new Edge(numberInterface++, eastNeighbour->V3(), eastNeighbour->V1(), upperTriangle, eastNeighbour);
 					this->Faces.push_back(interface);
 					this->InteriorFaces.push_back(interface);
 					upperTriangle->AddFace(interface);
@@ -123,7 +123,7 @@ public:
 				{
 					// North
 					Triangle* northNeighbour = dynamic_cast<Triangle*>(this->Elements[index(ix, iy + 1)]);
-					interface = new Edge(numberInterface++, northNeighbour->V1, northNeighbour->V2, upperTriangle, northNeighbour);
+					interface = new Edge(numberInterface++, northNeighbour->V1(), northNeighbour->V2(), upperTriangle, northNeighbour);
 					this->Faces.push_back(interface);
 					this->InteriorFaces.push_back(interface);
 					upperTriangle->AddFace(interface);
@@ -145,24 +145,24 @@ public:
 			Triangle* t = dynamic_cast<Triangle*>(e);
 			assert(t->Faces.size() == 3);
 
-			assert(t->DetJacobian() == 1/t->InverseJacobianTranspose().determinant());
+			assert(t->Shape()->DetJacobian() == 1/t->Shape()->InverseJacobianTranspose().determinant());
 
 			for (auto f : t->Faces)
 			{
 				auto n = t->OuterNormalVector(f);
 				Edge* edge = dynamic_cast<Edge*>(f);
-				assert(n.dot(Vect(edge->Vertex1, edge->Vertex2)) == 0);
+				assert(n.dot(Vect(edge->Vertex1(), edge->Vertex2())) == 0);
 			}
 			
-			assert(t->ConvertToDomain(t->ConvertToReference(*(t->V1))) == *(t->V1));
-			assert(t->ConvertToDomain(t->ConvertToReference(*(t->V2))) == *(t->V2));
-			assert(t->ConvertToDomain(t->ConvertToReference(*(t->V3))) == *(t->V3));
+			assert(t->ConvertToDomain(t->ConvertToReference(*(t->V1()))) == *(t->V1()));
+			assert(t->ConvertToDomain(t->ConvertToReference(*(t->V2()))) == *(t->V2()));
+			assert(t->ConvertToDomain(t->ConvertToReference(*(t->V3()))) == *(t->V3()));
 
-			RefPoint ref1 = t->ConvertToReference(*(t->V1));
+			RefPoint ref1 = t->ConvertToReference(*(t->V1()));
 			assert(ref1 == RefPoint(0, 0) || ref1 == RefPoint(1, 0) || ref1 == RefPoint(0, 1));
-			RefPoint ref2 = t->ConvertToReference(*(t->V2));
+			RefPoint ref2 = t->ConvertToReference(*(t->V2()));
 			assert((ref2 == RefPoint(0, 0) || ref2 == RefPoint(1, 0) || ref2 == RefPoint(0, 1)) && ref2 != ref1);
-			RefPoint ref3 = t->ConvertToReference(*(t->V3));
+			RefPoint ref3 = t->ConvertToReference(*(t->V3()));
 			assert((ref3 == RefPoint(0, 0) || ref3 == RefPoint(1, 0) || ref3 == RefPoint(0, 1)) && ref3 != ref1 && ref3 != ref2);
 		}
 

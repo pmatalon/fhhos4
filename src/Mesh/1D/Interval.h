@@ -11,6 +11,11 @@ public:
 		Element(number),
 		CartesianElement(number, left, right->X - left->X)
 	{ }
+
+	inline double Width()
+	{
+		return this->_shape.WidthX;
+	}
 	
 	void SetLeftInterface(Face<1>* face)
 	{

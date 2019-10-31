@@ -19,7 +19,7 @@ public:
 	//                 Face implementation                //
 	//----------------------------------------------------//
 
-	double Diameter() override
+	double Diameter() const override
 	{
 		if (this->Element1 != NULL)
 			return this->Element1->Diameter();
@@ -27,7 +27,7 @@ public:
 			return this->Element2->Diameter();
 	}
 
-	double Measure() override
+	double Measure() const override
 	{
 		return 0;
 	}
@@ -94,7 +94,7 @@ public:
 	double MeanDerivative(Interval* element, IBasisFunction1D* phi)
 	{
 		double t = this == element->Left ? -1 : 1; // t in [-1, 1]
-		double h = element->WidthX;
+		double h = element->Width();
 		return 2 / h * phi->EvalDerivative(t);
 	}
 

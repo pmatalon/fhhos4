@@ -12,19 +12,21 @@ enum class CartesianShapeOrientation : unsigned
 };
 
 template <int DomainDim, int ShapeDim = DomainDim>
-class CartesianShape
+class CartesianShape : public GeometricShapeWithReferenceShape<ShapeDim>
 {
+private:
+	double _diameter;
+	double _measure;
+	DomPoint _center;
 public:
 	DomPoint* Origin;
 	double WidthX = 0;
 	double WidthY = 0;
 	double WidthZ = 0;
 	CartesianShapeOrientation Orientation = CartesianShapeOrientation::None;
-	double Measure;
-	DomPoint Center;
 	bool IsRegular; // true if all widths are equal
 
-	static ReferenceCartesianShape<ShapeDim> ReferenceShape;
+	static ReferenceCartesianShape<ShapeDim> RefCartShape;
 
 	//------------------//
 	//   Constructors   //
@@ -127,24 +129,25 @@ public:
 	{
 		this->Origin = origin;
 		this->Orientation = orientation;
-		this->Measure = (this->WidthX != 0 ? this->WidthX : 1) * (this->WidthY != 0 ? this->WidthY : 1) * (this->WidthZ != 0 ? this->WidthZ : 1);
+		this->_diameter = max({ WidthX, WidthY, WidthZ });
+		this->_measure = (this->WidthX != 0 ? this->WidthX : 1) * (this->WidthY != 0 ? this->WidthY : 1) * (this->WidthZ != 0 ? this->WidthZ : 1);
 		if (ShapeDim == 1)
 		{
 			if (DomainDim == 1)
-				this->Center = DomPoint(Origin->X + WidthX / 2);
+				this->_center = DomPoint(Origin->X + WidthX / 2);
 			else if (this->Orientation == CartesianShapeOrientation::Horizontal)
-				this->Center = DomPoint(Origin->X + WidthX / 2, Origin->Y);
+				this->_center = DomPoint(Origin->X + WidthX / 2, Origin->Y);
 			else
-				this->Center = DomPoint(Origin->X, Origin->Y + WidthY / 2);
+				this->_center = DomPoint(Origin->X, Origin->Y + WidthY / 2);
 		}
 		else if (ShapeDim == 2)
 		{
 			if (DomainDim == 2)
 			{
 				if (this->Orientation == CartesianShapeOrientation::Horizontal)
-					this->Center = DomPoint(Origin->X + WidthX / 2, Origin->Y);
+					this->_center = DomPoint(Origin->X + WidthX / 2, Origin->Y);
 				else
-					this->Center = DomPoint(Origin->X, Origin->Y + WidthY / 2);
+					this->_center = DomPoint(Origin->X, Origin->Y + WidthY / 2);
 			}
 			else
 				assert(false && "not implemented yet");
@@ -152,12 +155,39 @@ public:
 		else if (ShapeDim == 3)
 		{
 			if (this->Orientation == CartesianShapeOrientation::InXOY)
-				this->Center = DomPoint(Origin->X + WidthX / 2, Origin->Y + WidthY / 2, Origin->Z);
+				this->_center = DomPoint(Origin->X + WidthX / 2, Origin->Y + WidthY / 2, Origin->Z);
 			else if (this->Orientation == CartesianShapeOrientation::InXOZ)
-				this->Center = DomPoint(Origin->X + WidthX / 2, Origin->Y, Origin->Z + WidthZ / 2);
+				this->_center = DomPoint(Origin->X + WidthX / 2, Origin->Y, Origin->Z + WidthZ / 2);
 			else if (this->Orientation == CartesianShapeOrientation::InYOZ)
-				this->Center = DomPoint(Origin->X, Origin->Y + WidthY / 2, Origin->Z + WidthZ / 2);
+				this->_center = DomPoint(Origin->X, Origin->Y + WidthY / 2, Origin->Z + WidthZ / 2);
 		}
+	}
+
+	//-------------------------------------//
+	//       Geometric information         //
+	//-------------------------------------//
+
+	ReferenceShape<ShapeDim>* RefShape() const
+	{
+		return &RefCartShape;
+	}
+
+	static ReferenceCartesianShape<ShapeDim>* InitReferenceShape()
+	{
+		return &RefCartShape;
+	}
+
+	double Diameter() const override
+	{
+		return _diameter;
+	}
+	double Measure() const override
+	{
+		return _measure;
+	}
+	DomPoint Center() const override
+	{
+		return _center;
 	}
 
 	void Serialize(ostream& os) const
@@ -208,12 +238,12 @@ public:
 	// Transformation to reference element //
 	//-------------------------------------//
 
-	inline double DetJacobian() const
+	inline double DetJacobian() const override
 	{
-		return this->Measure / ReferenceShape.Measure();
+		return _measure / RefCartShape.Measure();
 	}
 
-	DimMatrix<ShapeDim> InverseJacobianTranspose() const
+	DimMatrix<ShapeDim> InverseJacobianTranspose() const override
 	{
 		DimMatrix<ShapeDim> invJ = DimMatrix<ShapeDim>::Zero();
 		if (ShapeDim == DomainDim)
@@ -414,101 +444,34 @@ public:
 			assert(false);
 	}
 
-	inline double Integral(BasisFunction<ShapeDim>* phi) const
-	{
-		return DetJacobian() * ReferenceShape.Integral(phi);
-	}
-	inline double Integral(RefFunction func) const
-	{
-		return DetJacobian() * ReferenceShape.Integral(func);
-	}
-	inline double Integral(RefFunction func, int polynomialDegree) const
-	{
-		return DetJacobian() * ReferenceShape.Integral(func, polynomialDegree);
-	}
-
-	double ComputeIntegralGradGrad(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2) const
-	{
-		if (phi1->GetDegree() == 0 || phi2->GetDegree() == 0)
-			return 0;
-
-		DimMatrix<ShapeDim> invJ = InverseJacobianTranspose();
-
-		RefFunction functionToIntegrate = [phi1, phi2, invJ](RefPoint p) {
-			DimVector<ShapeDim> gradPhi1 = invJ * phi1->Grad(p);
-			DimVector<ShapeDim> gradPhi2 = invJ * phi2->Grad(p);
-			return gradPhi1.dot(gradPhi2);
-		};
-
-		int polynomialDegree = max(0, phi1->GetDegree() + phi2->GetDegree() - 2);
-		return Integral(functionToIntegrate, polynomialDegree);
-	}
-
-	double ComputeIntegralKGradGrad(Tensor<ShapeDim>* K, BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2) const
-	{
-		if (phi1->GetDegree() == 0 || phi2->GetDegree() == 0)
-			return 0;
-
-		DimMatrix<ShapeDim> invJ = InverseJacobianTranspose();
-
-		RefFunction functionToIntegrate = [K, phi1, phi2, invJ](RefPoint p) {
-			DimVector<ShapeDim> gradPhi1 = invJ * phi1->Grad(p);
-			DimVector<ShapeDim> gradPhi2 = invJ * phi2->Grad(p);
-			return (K * gradPhi1).dot(gradPhi2);
-		};
-
-		int polynomialDegree = max(0, phi1->GetDegree() + phi2->GetDegree() - 2);
-		return Integral(functionToIntegrate, polynomialDegree);
-	}
-
 	//----------------------------//
 	//             DG             //
 	//----------------------------//
-
-	inline double MassTerm(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
-	{
-		return DetJacobian() * ReferenceShape.MassTerm(phi1, phi2);
-	}
 
 	double StiffnessTerm(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
 	{
 		if (this->IsRegular)
 		{
 			DimMatrix<ShapeDim> invJ = InverseJacobianTranspose();
-			return DetJacobian() * pow(invJ(0, 0), 2) * ReferenceShape.StiffnessTerm(phi1, phi2);
+			return DetJacobian() * pow(invJ(0, 0), 2) * RefCartShape.StiffnessTerm(phi1, phi2);
 		}
 		else
-			return ComputeIntegralGradGrad(phi1, phi2);
+			return GeometricShapeWithReferenceShape<ShapeDim>::ComputeIntegralGradGrad(phi1, phi2);
 	}
 
 	//-----------------------------//
 	//             HHO             //
 	//-----------------------------//
-
-	inline DenseMatrix FaceMassMatrix(FunctionalBasis<ShapeDim>* basis)
-	{
-		return DetJacobian() * ReferenceShape.FaceMassMatrix(basis);
-	}
-
-	inline DenseMatrix CellMassMatrix(FunctionalBasis<ShapeDim>* basis)
-	{
-		return DetJacobian() * ReferenceShape.CellMassMatrix(basis);
-	}
-
-	inline DenseMatrix CellReconstructMassMatrix(FunctionalBasis<ShapeDim>* cellBasis, FunctionalBasis<ShapeDim>* reconstructBasis)
-	{
-		return DetJacobian() * ReferenceShape.CellReconstructMassMatrix(cellBasis, reconstructBasis);
-	}
-
+	
 	double IntegralKGradGradReconstruct(Tensor<ShapeDim>* K, BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
 	{
 		if (this->IsRegular)
 		{
 			DimMatrix<ShapeDim> invJ = InverseJacobianTranspose();
-			return DetJacobian() * pow(invJ(0, 0), 2) * ReferenceShape.ReconstructKStiffnessTerm(K, phi1, phi2);
+			return DetJacobian() * pow(invJ(0, 0), 2) * RefCartShape.ReconstructKStiffnessTerm(K, phi1, phi2);
 		}
 		else
-			return ComputeIntegralKGradGrad(K, phi1, phi2);
+			return GeometricShapeWithReferenceShape<ShapeDim>::ComputeIntegralKGradGrad(K, phi1, phi2);
 	}
 
 private:
@@ -601,4 +564,4 @@ private:
 };
 
 template <int DomainDim, int ShapeDim>
-ReferenceCartesianShape<ShapeDim> CartesianShape<DomainDim, ShapeDim>::ReferenceShape = ReferenceCartesianShape<ShapeDim>();
+ReferenceCartesianShape<ShapeDim> CartesianShape<DomainDim, ShapeDim>::RefCartShape = ReferenceCartesianShape<ShapeDim>();

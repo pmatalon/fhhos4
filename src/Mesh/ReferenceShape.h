@@ -1,9 +1,8 @@
 #pragma once
-#include <Eigen/Dense>
-#include "../FunctionalBasis/FunctionalBasis.h"
+#include "GeometricShape.h"
 
 template <int Dim>
-class ReferenceElement
+class ReferenceShape : public GeometricShape<Dim>
 {
 protected:
 	// For DG
@@ -24,17 +23,23 @@ protected:
 	FunctionalBasis<Dim>* _faceMassMatrixBasis;
 
 public:
-	ReferenceElement() {}
+	ReferenceShape() {}
 
 	virtual double Integral(RefFunction func) const = 0;
 	virtual double Integral(RefFunction func, int polynomialDegree) const = 0;
 
-	virtual double Integral(BasisFunction<Dim>* phi) const
+	double Integral(DomFunction globalFunction) const override
 	{
-		RefFunction func = [phi](RefPoint p) {
-			return phi->Eval(p);
-		};
-		return Integral(func, phi->GetDegree());
+		assert(false);
+	}
+	double Integral(DomFunction globalFunction, int polynomialDegree) const override
+	{
+		assert(false);
+	}
+
+	virtual void Serialize(ostream& os) const
+	{
+		assert(false);
 	}
 
 	//--------//

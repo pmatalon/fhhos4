@@ -69,10 +69,10 @@ public:
 		cout << "--------------------------------------------------------" << endl;
 		cout << "Assembly..." << endl;
 
-		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreMassMatrix(basis);
-		CartesianShape<Dim, Dim>::ReferenceShape.ComputeAndStoreStiffnessMatrix(basis);
+		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreMassMatrix(basis);
+		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreStiffnessMatrix(basis);
 		if (Dim == 2)
-			Triangle::RefTriangle.ComputeAndStoreMassMatrix((FunctionalBasis<2>*)basis);
+			TriangleShape::InitReferenceShape()->ComputeAndStoreMassMatrix((FunctionalBasis<2>*)basis);
 		
 		//--------------------------------------------//
 		// Iteration on the elements: diagonal blocks //

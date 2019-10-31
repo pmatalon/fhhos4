@@ -2,10 +2,9 @@
 #include <vector>
 #include <map>
 #include "Vertex.h"
-#include "../Utils/Utils.h"
+#include "GeometricShapeWithReferenceShape.h"
 #include "../Problem/SourceFunction.h"
 #include "../Problem/DiffusionPartition.h"
-#include "../FunctionalBasis/FunctionalBasis.h"
 
 template <int Dim>
 class Face;
@@ -36,25 +35,41 @@ public:
 	//   Virtual functions   //
 	//-----------------------//
 
-	// Geometric information
-	virtual double Diameter() = 0;
-	virtual double Measure() = 0;
-	virtual DomPoint Center() = 0;
-	virtual DimVector<Dim> OuterNormalVector(Face<Dim>* face) = 0;
-
-	// Transformation to reference element
-	virtual DomPoint ConvertToDomain(RefPoint refPoint) const = 0;
-	virtual RefPoint ConvertToReference(DomPoint domainPoint) const = 0;
-	virtual DimMatrix<Dim> InverseJacobianTranspose() const = 0;
-
-	// Integral
-	virtual double Integral(BasisFunction<Dim>* phi) const = 0;
-	virtual double Integral(RefFunction func) const = 0;
-	virtual double Integral(RefFunction func, int polynomialDegree) const = 0;
+	virtual const GeometricShapeWithReferenceShape<Dim>* Shape() const = 0;
 
 	//---------------------------//
 	//   Geometric information   //
 	//---------------------------//
+
+	// Geometric information
+	virtual double Diameter() const
+	{
+		return Shape()->Diameter();
+	}
+	virtual double Measure() const
+	{
+		return Shape()->Measure();
+	}
+	virtual DomPoint Center() const
+	{
+		return Shape()->Center();
+	}
+	virtual DimVector<Dim> OuterNormalVector(Face<Dim>* face) = 0;
+
+	// Transformation to reference element
+	virtual DomPoint ConvertToDomain(RefPoint refPoint) const
+	{
+		return Shape()->ConvertToDomain(refPoint);
+	}
+	virtual RefPoint ConvertToReference(DomPoint domainPoint) const
+	{
+		return Shape()->ConvertToReference(domainPoint);
+	}
+	virtual DimMatrix<Dim> InverseJacobianTranspose() const
+	{
+		return Shape()->InverseJacobianTranspose();
+	}
+
 
 	void AddFace(Face<Dim>* face)
 	{
@@ -106,24 +121,25 @@ public:
 	//     Integrals     //
 	//-------------------//
 
+	virtual double Integral(BasisFunction<Dim>* phi) const
+	{
+		return Shape()->Integral(phi);
+	}
+	virtual double Integral(RefFunction func) const
+	{
+		return Shape()->Integral(func);
+	}
+	virtual double Integral(RefFunction func, int polynomialDegree) const
+	{
+		return Shape()->Integral(func, polynomialDegree);
+	}
 	virtual double Integral(DomFunction globalFunction) const
 	{
-		RefFunction refFunction = [this, globalFunction](RefPoint refElementPoint) {
-			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
-			return globalFunction(domainPoint);
-		};
-
-		return Integral(refFunction);
+		return Shape()->Integral(globalFunction);
 	}
-
 	virtual double Integral(DomFunction globalFunction, int polynomialDegree) const
 	{
-		RefFunction refFunction = [this, globalFunction](RefPoint refElementPoint) {
-			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
-			return globalFunction(domainPoint);
-		};
-
-		return Integral(refFunction, polynomialDegree);
+		return Shape()->Integral(globalFunction, polynomialDegree);
 	}
 
 	virtual RefFunction EvalPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* phi)
@@ -198,6 +214,8 @@ public:
 			if (i < this->Faces.size() - 1)
 				os << ", ";
 		}
+		os << ", ";
+		Shape()->Serialize(os);
 	}
 
 	friend ostream& operator<<(ostream& os, const Element<Dim>& s)

@@ -39,19 +39,42 @@ public:
 	//   Virtual functions   //
 	//-----------------------//
 
+	virtual const GeometricShapeWithReferenceShape<Dim-1>* Shape() const = 0;
+
 	// Geometric information
-	virtual double Diameter() = 0;
-	virtual double Measure() = 0;
-	virtual DomPoint Center() = 0;
+	virtual double Diameter() const
+	{
+		return Shape()->Diameter();
+	}
+	virtual double Measure() const
+	{
+		return Shape()->Measure();
+	}
+	virtual DomPoint Center() const
+	{
+		return Shape()->Center();
+	}
 	virtual Face<Dim>* CreateSameGeometricFace(BigNumber number, Element<Dim>* element1) = 0;
 
 	// Transformation to reference element
-	virtual DomPoint ConvertToDomain(RefPoint refPoint) = 0;
-	virtual RefPoint ConvertToReference(DomPoint domainPoint) = 0;
+	virtual DomPoint ConvertToDomain(RefPoint refPoint) const
+	{
+		return Shape()->ConvertToDomain(refPoint);
+	}
+	virtual RefPoint ConvertToReference(DomPoint domainPoint) const
+	{
+		return Shape()->ConvertToReference(domainPoint);
+	}
 
 	// Integral
-	virtual double Integral(RefFunction func) const = 0;
-	virtual double Integral(RefFunction func, int polynomialDegree) const = 0;
+	virtual double Integral(RefFunction func) const
+	{
+		return Shape()->Integral(func);
+	}
+	virtual double Integral(RefFunction func, int polynomialDegree) const
+	{
+		return Shape()->Integral(func, polynomialDegree);
+	}
 
 	// Misc
 	virtual void ExportFaceToMatlab(FILE* file) = 0;
@@ -143,6 +166,9 @@ public:
 		os << " " << this->Element1->Number;
 		if (this->Element2)
 			os << ", " << this->Element2->Number;
+
+		os << ": ";
+		Shape()->Serialize(os);
 	}
 
 	virtual ~Face() {}
