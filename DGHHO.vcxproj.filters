@@ -242,6 +242,15 @@
     <ClInclude Include="src\Mesh\ReferenceShape.h">
       <Filter>Mesh</Filter>
     </ClInclude>
+    <ClInclude Include="src\Mesh\2D\QuadrilateralMesh.h">
+      <Filter>Mesh\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\2D\Quadrilateral.h">
+      <Filter>Mesh\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\2D\QuadrilateralShape.h">
+      <Filter>Mesh\2D</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

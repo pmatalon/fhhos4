@@ -51,6 +51,7 @@ void print_usage() {
 	cout << "      Type of mesh:" << endl;
 	cout << "               cart   - Uniform Cartesian mesh (default)" << endl;
 	cout << "               tri    - Trianglular mesh" << endl;
+	cout << "               quad   - Quadrilateral mesh" << endl;
 	cout << "-discr CODE" << endl;
 	cout << "      Discretization method (default: hho)." << endl;
 	cout << "               dg     - Discontinuous Galerkin (Symmetric Interior Penalty)" << endl;
@@ -299,7 +300,7 @@ int main(int argc, char* argv[])
 				break;
 			case OPT_Mesh:
 				meshCode = optarg;
-				if (meshCode.compare("cart") != 0 && meshCode.compare("tri") != 0)
+				if (meshCode.compare("cart") != 0 && meshCode.compare("tri") != 0 && meshCode.compare("quad") != 0)
 					argument_error("unknown mesh code '" + meshCode + "'. Check -mesh argument.");
 				break;
 			case OPT_Stabilization:
@@ -397,8 +398,12 @@ int main(int argc, char* argv[])
 			case 'o': 
 				outputDirectory = optarg;
 				break;
-			default: print_usage();
+			default:
+			{
+				string character(1, option);
+				argument_error("unknown option '" + character + "'.");
 				exit(EXIT_FAILURE);
+			}
 		}
 	}
 
@@ -433,6 +438,9 @@ int main(int argc, char* argv[])
 
 	if (meshCode.compare("tri") == 0 && dimension != 2)
 		argument_error("The triangular mesh in only available in 2D.");
+
+	if (meshCode.compare("quad") == 0 && dimension != 2)
+		argument_error("The quadrilateral mesh in only available in 2D.");
 
 	if (solverCode.compare("mg") == 0 && discretization.compare("dg") == 0)
 		argument_error("Multigrid only applicable on HHO discretization.");

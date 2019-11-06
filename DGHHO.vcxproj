@@ -107,6 +107,9 @@
     <ClInclude Include="src\HHO\HHOParameters.h" />
     <ClInclude Include="src\Mesh\2D\CartesianPolygonalMesh2D.h" />
     <ClInclude Include="src\Mesh\2D\Edge.h" />
+    <ClInclude Include="src\Mesh\2D\Quadrilateral.h" />
+    <ClInclude Include="src\Mesh\2D\QuadrilateralShape.h" />
+    <ClInclude Include="src\Mesh\2D\QuadrilateralMesh.h" />
     <ClInclude Include="src\Mesh\2D\RectangularPolygon.h" />
     <ClInclude Include="src\Mesh\2D\Triangle.h" />
     <ClInclude Include="src\Mesh\2D\TriangleShape.h" />

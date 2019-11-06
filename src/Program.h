@@ -6,6 +6,7 @@
 #include "Mesh/3D/CartesianGrid3D.h"
 #include "Mesh/2D/CartesianPolygonalMesh2D.h"
 #include "Mesh/2D/TriangularMesh.h"
+#include "Mesh/2D/QuadrilateralMesh.h"
 #include "Utils/Action.h"
 #include "Utils/Timer.h"
 #include "Solver/ConjugateGradient.h"
@@ -471,6 +472,8 @@ Mesh<2>* ProgramDim<2>::BuildMesh(int n, string meshCode)
 		//return new CartesianPolygonalMesh2D(n, n);
 	else if(meshCode.compare("tri") == 0)
 		return new TriangularMesh(n, n);
+	else if (meshCode.compare("quad") == 0)
+		return new QuadrilateralMesh(n, n);
 	assert(false);
 }
 
