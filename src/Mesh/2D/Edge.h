@@ -3,7 +3,7 @@
 #include "../../HHO/Poisson_HHO_Face.h"
 #include "../CartesianShape.h"
 
-class EdgeShape : public GeometricShapeWithReferenceShape<1>
+class EdgeShape : public GeometricShapeWithConstantJacobian<1>
 {
 private:
 	double _width;
@@ -12,7 +12,7 @@ public:
 	Vertex* Vertex1;
 	Vertex* Vertex2;
 
-	EdgeShape(Vertex* v1, Vertex* v2) : GeometricShapeWithReferenceShape<1>()
+	EdgeShape(Vertex* v1, Vertex* v2) : GeometricShapeWithConstantJacobian<1>()
 	{
 		Vertex1 = v1;
 		Vertex2 = v2;

@@ -1,10 +1,10 @@
 #pragma once
 #include "../Vertex.h"
 #include "../ReferenceTriangle.h"
-#include "../GeometricShapeWithReferenceShape.h"
+#include "../GeometricShapeWithConstantJacobian.h"
 using namespace std;
 
-class TriangleShape : public GeometricShapeWithReferenceShape<2>
+class TriangleShape : public GeometricShapeWithConstantJacobian<2>
 {
 private:
 	double _diameter;

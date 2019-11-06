@@ -1,5 +1,6 @@
 #pragma once
 #include "ReferenceCartesianShape.h"
+#include "GeometricShapeWithConstantJacobian.h"
 
 enum class CartesianShapeOrientation : unsigned
 {
@@ -12,7 +13,7 @@ enum class CartesianShapeOrientation : unsigned
 };
 
 template <int DomainDim, int ShapeDim = DomainDim>
-class CartesianShape : public GeometricShapeWithReferenceShape<ShapeDim>
+class CartesianShape : public GeometricShapeWithConstantJacobian<ShapeDim>
 {
 private:
 	double _diameter;

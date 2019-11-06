@@ -65,12 +65,13 @@ public:
 	{
 		return Shape()->ConvertToReference(domainPoint);
 	}
-	virtual DimMatrix<Dim> InverseJacobianTranspose() const
+private:
+	inline DimMatrix<Dim> InverseJacobianTranspose(RefPoint p) const
 	{
-		return Shape()->InverseJacobianTranspose();
+		return Shape()->InverseJacobianTranspose(p);
 	}
 
-
+public:
 	void AddFace(Face<Dim>* face)
 	{
 		this->Faces.push_back(face);
@@ -158,7 +159,7 @@ public:
 			DomPoint domainPoint2D = face->ConvertToDomain(refPoint1D);
 			RefPoint refPoint2D = this->ConvertToReference(domainPoint2D);
 			DimVector<Dim> gradPhi = phi->Grad(refPoint2D);
-			DimMatrix<Dim> invJ = this->InverseJacobianTranspose();
+			DimMatrix<Dim> invJ = this->InverseJacobianTranspose(refPoint2D);
 			DimVector<Dim> result = invJ * gradPhi;
 			return result;
 		};

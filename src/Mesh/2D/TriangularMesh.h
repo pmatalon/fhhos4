@@ -187,7 +187,7 @@ public:
 			Triangle* t = dynamic_cast<Triangle*>(e);
 			assert(t->Faces.size() == 3);
 
-			assert(t->Shape()->DetJacobian() == 1/t->Shape()->InverseJacobianTranspose().determinant());
+			//assert(t->Shape()->DetJacobian() == 1/t->Shape()->InverseJacobianTranspose().determinant());
 
 			for (auto f : t->Faces)
 			{

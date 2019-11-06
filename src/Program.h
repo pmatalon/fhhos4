@@ -473,7 +473,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(int n, string meshCode)
 	else if(meshCode.compare("tri") == 0)
 		return new TriangularMesh(n, n);
 	else if (meshCode.compare("quad") == 0)
-		return new QuadrilateralMesh(n, n);
+		return new QuadrilateralMesh(n, n, 0.5);
 	assert(false);
 }
 

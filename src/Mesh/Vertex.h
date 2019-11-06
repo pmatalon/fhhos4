@@ -21,7 +21,7 @@ public:
 	}
 };
 
-DimVector<2> operator-(Vertex const& A, Vertex const& B)
+DimVector<2> operator-(Point const& A, Point const& B)
 {
 	DimVector<2> v;
 	v << A.X - B.X, A.Y - B.Y;

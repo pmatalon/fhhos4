@@ -61,7 +61,7 @@ public:
 
 		_diameter = max(diag13, diag24);
 
-		_measure = 0.25 * sqrt(diag13*diag13 * diag24*diag24 - pow(edge12*edge12 + edge34*edge34 - edge23*edge23 - edge41*edge41, 2));
+		_measure = 0.25 * sqrt(4*diag13*diag13 * diag24*diag24 - pow(edge12*edge12 + edge34*edge34 - edge23*edge23 - edge41*edge41, 2));
 
 		_center = DomPoint((V1->X + V2->X + V3->X + V4->X) / 4, (V1->Y + V2->Y + V3->Y + V4->Y) / 4);
 	}
@@ -89,23 +89,14 @@ public:
 		return _center;
 	}
 
-	double DetJacobian() const
-	{
-		assert(false);
-	}
-	DimMatrix<2> InverseJacobianTranspose() const
-	{
-		assert(false);
-	}
-	int RefFaceNumber(const GeometricShape<1>* face) const
-	{
-		assert(false);
-	}
-
-	double DetJacobian(RefPoint p) const
+	double DetJacobian(RefPoint p) const override
 	{
 		DimMatrix<2> jacobianMatrix = JacobianMatrix(p);
 		return jacobianMatrix.determinant();
+	}
+	int DetJacobianDegree() const override
+	{
+		return 2;
 	}
 	DimMatrix<2> InverseJacobianTranspose(RefPoint p) const
 	{
@@ -116,37 +107,34 @@ public:
 	{
 		double t = p.X;
 		double u = p.Y;
+
 		DimMatrix<2> jacobianMatrix;
-		jacobianMatrix(0, 0) = 0.25 * (V1->X *(u-1) + V2->X * (1-u)  + V3->X*(u+1) + V4->X*(-u-1)); // sum { x_i * d(Khi_i)/dt }
-		jacobianMatrix(0, 1) = 0.25 * (V1->X *(t-1) + V2->X * (-t-1) + V3->X*(t+1) + V4->X*(1-t)); // sum { x_i * d(Khi_i)/du }
-		jacobianMatrix(1, 0) = 0.25 * (V1->Y *(u-1) + V2->Y * (1-u)  + V3->Y*(u+1) + V4->Y*(-u-1)); // sum { y_i * d(Khi_i)/dt }
-		jacobianMatrix(1, 1) = 0.25 * (V1->Y *(t-1) + V2->Y * (-t-1) + V3->Y*(t+1) + V4->Y*(1-t)); // sum { y_i * d(Khi_i)/du }
+		jacobianMatrix(0, 0) = a1 + a3 * u;
+		jacobianMatrix(0, 1) = a2 + a3 * t;
+		jacobianMatrix(1, 0) = b1 + b3 * u;
+		jacobianMatrix(1, 1) = b2 + b3 * t;
+
 		return jacobianMatrix;
 	}
 
-
-
-	// Formulas in the book by Elman et al. "Finite Elements and Fast Iterative Solvers"
+	// Formulas in Silva et al. "Exact and efficient interpolation using finite elements shape functions" (2009)
 	DomPoint ConvertToDomain(RefPoint refPoint) const
 	{
 		double t = refPoint.X;
 		double u = refPoint.Y;
 
 		DomPoint p;
-		p.X = V1->X * Khi1(t, u) + V2->X * Khi2(t, u) + V3->X * Khi3(t, u) + V4->X * Khi4(t, u);
-		p.Y = V1->Y * Khi1(t, u) + V2->Y * Khi2(t, u) + V3->Y * Khi3(t, u) + V4->Y * Khi4(t, u);
+		p.X = a0 + a1*t + a2*u + a3*t*u;
+		p.Y = b0 + b1*t + b2*u + b3*t*u;
 		return p;
 	}
 
 	RefPoint ConvertToReference(DomPoint domainPoint) const
 	{
-		//assert(false);
-		// x = a0 + a1*t + a2*u + a3*t*u
-		// y = b0 + b1*t + b2*u + b3*t*u
 		double t, u;
 
-		double x0 = -(a0 - domainPoint.X);
-		double y0 = -(b0 - domainPoint.Y);
+		double x0 = domainPoint.X - a0;
+		double y0 = domainPoint.Y - b0;
 
 		if (a3 == 0 && b3 == 0)
 		{
@@ -187,24 +175,6 @@ public:
 				assert(false);
 		}
 		return RefPoint(t, u);
-	}
-
-private:
-	inline static double Khi1(double t, double u)
-	{
-		return (t - 1)*(u - 1) / 4;
-	}
-	inline static double Khi2(double t, double u)
-	{
-		return -(t + 1)*(u - 1) / 4;
-	}
-	inline static double Khi3(double t, double u)
-	{
-		return (t + 1)*(u + 1) / 4;
-	}
-	inline static double Khi4(double t, double u)
-	{
-		return -(t - 1)*(u + 1) / 4;
 	}
 
 public:

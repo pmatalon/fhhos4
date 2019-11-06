@@ -118,6 +118,7 @@
     <ClInclude Include="src\Mesh\CartesianFace.h" />
     <ClInclude Include="src\Mesh\CartesianShape.h" />
     <ClInclude Include="src\Mesh\GeometricShape.h" />
+    <ClInclude Include="src\Mesh\GeometricShapeWithConstantJacobian.h" />
     <ClInclude Include="src\Mesh\GeometricShapeWithReferenceShape.h" />
     <ClInclude Include="src\Mesh\Mesh.h" />
     <ClInclude Include="src/Mesh/1D/CartesianGrid1D.h" />

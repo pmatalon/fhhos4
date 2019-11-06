@@ -17,8 +17,10 @@ public:
 	// Transformation to reference element
 	virtual DomPoint ConvertToDomain(RefPoint refPoint) const = 0;
 	virtual RefPoint ConvertToReference(DomPoint domainPoint) const = 0;
-	virtual DimMatrix<Dim> InverseJacobianTranspose() const = 0;
-	virtual double DetJacobian() const = 0;
+
+	virtual DimMatrix<Dim> InverseJacobianTranspose(RefPoint p) const = 0;
+	virtual double DetJacobian(RefPoint p) const = 0;
+	virtual int DetJacobianDegree() const = 0;
 
 	//-------------------//
 	//     Integrals     //
@@ -29,14 +31,20 @@ public:
 		return GeometricShape<Dim>::Integral(phi);
 	}
 
-	double Integral(RefFunction func) const override
+	virtual double Integral(RefFunction f) const override
 	{
-		return DetJacobian() * RefShape()->Integral(func);
+		RefFunction func = [this, f](RefPoint p) {
+			return DetJacobian(p) * f(p);
+		};
+		return RefShape()->Integral(func);
 	}
 
-	double Integral(RefFunction func, int polynomialDegree) const override
+	virtual double Integral(RefFunction f, int polynomialDegree) const override
 	{
-		return DetJacobian() * RefShape()->Integral(func, polynomialDegree);
+		RefFunction func = [this, f](RefPoint p) {
+			return DetJacobian(p) * f(p);
+		};
+		return RefShape()->Integral(func, polynomialDegree + DetJacobianDegree());
 	}
 
 	virtual double Integral(DomFunction globalFunction) const
@@ -63,14 +71,13 @@ public:
 	//     Specific integrals     //
 	//----------------------------//
 
-	double ComputeIntegralGradGrad(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
+	virtual double ComputeIntegralGradGrad(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
 	{
 		if (phi1->GetDegree() == 0 || phi2->GetDegree() == 0)
 			return 0;
 
-		DimMatrix<Dim> invJ = InverseJacobianTranspose();
-
-		RefFunction functionToIntegrate = [phi1, phi2, invJ](RefPoint p) {
+		RefFunction functionToIntegrate = [this, phi1, phi2](RefPoint p) {
+			DimMatrix<Dim> invJ = InverseJacobianTranspose(p);
 			DimVector<Dim> gradPhi1 = invJ * phi1->Grad(p);
 			DimVector<Dim> gradPhi2 = invJ * phi2->Grad(p);
 			return gradPhi1.dot(gradPhi2);
@@ -80,14 +87,13 @@ public:
 		return Integral(functionToIntegrate, polynomialDegree);
 	}
 
-	double ComputeIntegralKGradGrad(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
+	virtual double ComputeIntegralKGradGrad(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
 	{
 		if (phi1->GetDegree() == 0 || phi2->GetDegree() == 0)
 			return 0;
 
-		DimMatrix<Dim> invJ = InverseJacobianTranspose();
-
-		RefFunction functionToIntegrate = [K, phi1, phi2, invJ](RefPoint p) {
+		RefFunction functionToIntegrate = [this, K, phi1, phi2](RefPoint p) {
+			DimMatrix<Dim> invJ = InverseJacobianTranspose(p);
 			DimVector<Dim> gradPhi1 = invJ * phi1->Grad(p);
 			DimVector<Dim> gradPhi2 = invJ * phi2->Grad(p);
 			return (K * gradPhi1).dot(gradPhi2);
@@ -101,27 +107,27 @@ public:
 	//             DG             //
 	//----------------------------//
 
-	inline double MassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
+	virtual double MassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{
-		return DetJacobian() * RefShape()->MassTerm(phi1, phi2);
+		return this->ComputeMassTerm(phi1, phi2);
 	}
 
 	//-----------------------------//
 	//             HHO             //
 	//-----------------------------//
 
-	inline DenseMatrix FaceMassMatrix(FunctionalBasis<Dim>* basis)
+	virtual DenseMatrix FaceMassMatrix(FunctionalBasis<Dim>* basis)
 	{
-		return DetJacobian() * RefShape()->FaceMassMatrix(basis);
+		return this->ComputeAndReturnMassMatrix(basis);
 	}
 
-	inline DenseMatrix CellMassMatrix(FunctionalBasis<Dim>* basis)
+	virtual DenseMatrix CellMassMatrix(FunctionalBasis<Dim>* basis)
 	{
-		return DetJacobian() * RefShape()->CellMassMatrix(basis);
+		return this->ComputeAndReturnMassMatrix(basis);
 	}
 
-	inline DenseMatrix CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis)
+	virtual DenseMatrix CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis)
 	{
-		return DetJacobian() * RefShape()->CellReconstructMassMatrix(cellBasis, reconstructBasis);
+		return this->ComputeAndReturnMassMatrix(cellBasis, reconstructBasis);
 	}
 };

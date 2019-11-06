@@ -65,25 +65,25 @@ public:
 	{
 		if (basis == _cellMassMatrixBasis)
 			return _cellMassMatrix;
-		return ComputeAndReturnMassMatrix(basis);
+		return this->ComputeAndReturnMassMatrix(basis);
 	}
 	DenseMatrix CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis)
 	{
 		if (cellBasis == _cellReconstructMassMatrixCellBasis && reconstructBasis == _cellReconstructMassMatrixReconstructBasis)
 			return _cellReconstructMassMatrix;
-		return ComputeAndReturnMassMatrix(cellBasis, reconstructBasis);
+		return this->ComputeAndReturnMassMatrix(cellBasis, reconstructBasis);
 	}
 	DenseMatrix ReconstructMassMatrix(FunctionalBasis<Dim>* basis)
 	{
 		if (basis == _reconstructMassMatrixBasis)
 			return _reconstructMassMatrix;
-		return ComputeAndReturnMassMatrix(basis);
+		return this->ComputeAndReturnMassMatrix(basis);
 	}
 	DenseMatrix FaceMassMatrix(FunctionalBasis<Dim>* basis)
 	{
 		if (basis == _faceMassMatrixBasis)
 			return _faceMassMatrix;
-		return ComputeAndReturnMassMatrix(basis);
+		return this->ComputeAndReturnMassMatrix(basis);
 	}
 
 
@@ -91,7 +91,7 @@ public:
 	{
 		if (_cellMassMatrix.rows() == 0)
 		{
-			_cellMassMatrix = ComputeAndReturnMassMatrix(basis);
+			_cellMassMatrix = this->ComputeAndReturnMassMatrix(basis);
 			_cellMassMatrixBasis = basis;
 		}
 	}
@@ -99,7 +99,7 @@ public:
 	{
 		if (_reconstructMassMatrix.rows() == 0)
 		{
-			_reconstructMassMatrix = ComputeAndReturnMassMatrix(basis);
+			_reconstructMassMatrix = this->ComputeAndReturnMassMatrix(basis);
 			_reconstructMassMatrixBasis = basis;
 		}
 	}
@@ -107,7 +107,7 @@ public:
 	{
 		if (_cellReconstructMassMatrix.rows() == 0)
 		{
-			_cellReconstructMassMatrix = ComputeAndReturnMassMatrix(cellBasis, reconstructBasis);
+			_cellReconstructMassMatrix = this->ComputeAndReturnMassMatrix(cellBasis, reconstructBasis);
 			_cellReconstructMassMatrixCellBasis = cellBasis;
 			_cellReconstructMassMatrixReconstructBasis = reconstructBasis;
 		}
@@ -116,53 +116,9 @@ public:
 	{
 		if (_faceMassMatrix.rows() == 0)
 		{
-			_faceMassMatrix = ComputeAndReturnMassMatrix(basis);
+			_faceMassMatrix = this->ComputeAndReturnMassMatrix(basis);
 			_faceMassMatrixBasis = basis;
 		}
-	}
-
-
-protected:
-	DenseMatrix ComputeAndReturnMassMatrix(FunctionalBasis<Dim>* basis)
-	{
-		DenseMatrix M = DenseMatrix(basis->Size(), basis->Size());
-		for (BasisFunction<Dim>* phi1 : basis->LocalFunctions)
-		{
-			for (BasisFunction<Dim>* phi2 : basis->LocalFunctions)
-			{
-				if (phi2->LocalNumber > phi1->LocalNumber)
-					break;
-				double term = ComputeMassTerm(phi1, phi2);
-				M(phi1->LocalNumber, phi2->LocalNumber) = term;
-				M(phi2->LocalNumber, phi1->LocalNumber) = term;
-			}
-		}
-		return M;
-	}
-
-	DenseMatrix ComputeAndReturnMassMatrix(FunctionalBasis<Dim>* basis1, FunctionalBasis<Dim>* basis2)
-	{
-		DenseMatrix M(basis1->LocalFunctions.size(), basis2->LocalFunctions.size());
-		for (BasisFunction<Dim>* phi1 : basis1->LocalFunctions)
-		{
-			for (BasisFunction<Dim>* phi2 : basis2->LocalFunctions)
-			{
-				double term = ComputeMassTerm(phi1, phi2);
-				M(phi1->LocalNumber, phi2->LocalNumber) = term;
-			}
-		}
-		return M;
-	}
-
-public:
-	double ComputeMassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
-	{
-		RefFunction functionToIntegrate = [phi1, phi2](RefPoint p) {
-			return phi1->Eval(p)*phi2->Eval(p);
-		};
-
-		int polynomialDegree = phi1->GetDegree() + phi2->GetDegree();
-		return Integral(functionToIntegrate, polynomialDegree);
 	}
 
 };

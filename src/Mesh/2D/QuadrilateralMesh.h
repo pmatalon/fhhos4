@@ -9,7 +9,7 @@ public:
 	BigNumber Nx;
 	BigNumber Ny;
 
-	QuadrilateralMesh(BigNumber nx, BigNumber ny) : Mesh()
+	QuadrilateralMesh(BigNumber nx, BigNumber ny, double xShiftAsFraction) : Mesh()
 	{
 		// nx = ny falls down to square elements
 		this->Nx = nx;
@@ -17,6 +17,9 @@ public:
 
 		double hx = 1.0 / nx;
 		double hy = 1.0 / ny;
+
+		assert(xShiftAsFraction >= 0 && xShiftAsFraction < 1);
+		double xShift = xShiftAsFraction * hx;
 
 		//----------//
 		// Vertices //
@@ -28,7 +31,11 @@ public:
 			for (BigNumber ix = 0; ix < nx + 1; ++ix)
 			{
 				BigNumber number = indexV(ix, iy);
-				Vertex* vertex = new Vertex(number, ix * hx, iy * hy);
+				double x = ix * hx;
+				double y = iy * hy;
+				if (ix != 0 && ix != nx && iy % 2 == 1)
+					x += xShift;
+				Vertex* vertex = new Vertex(number, x, y);
 				this->Vertices.push_back(vertex);
 			}
 		}
@@ -47,7 +54,7 @@ public:
 				Vertex* topLeftCorner     = Vertices[indexV(ix,     iy + 1)];
 				Vertex* topRightCorner    = Vertices[indexV(ix + 1, iy + 1)];
 				Vertex* bottomRightCorner = Vertices[indexV(ix + 1, iy    )];
-				Quadrilateral* quad = new Quadrilateral(number, bottomLeftCorner, topLeftCorner, topRightCorner, bottomRightCorner);
+				Quadrilateral* quad = new Quadrilateral(number, bottomLeftCorner, bottomRightCorner, topRightCorner, topLeftCorner);
 				this->Elements.push_back(quad);
 			}
 		}

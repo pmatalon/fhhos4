@@ -56,36 +56,10 @@ public:
 		n << A->Y - B->Y, B->X - A->X;
 
 		// Condition 2: n.AC < 0
-		Vertex* C = nullptr;
-		/*if (edge->Vertex1() == _shape.V1)
-		{
-			if (edge->Vertex2() == _shape.V2)
-				C = _shape.V3;
-			else
-				C = _shape.V2;
-		}
-		else if (edge->Vertex1() == _shape.V2)
-		{
-			if (edge->Vertex2() == _shape.V1)
-				C = _shape.V3;
-			else
-				C = _shape.V1;
-		}
-		else if (edge->Vertex1() == _shape.V3)
-		{
-			if (edge->Vertex2() == _shape.V1)
-				C = _shape.V2;
-			else
-				C = _shape.V1;
-		}
-		else
-			assert(false);*/
-
-		DimVector<2> AC = Vect(A, C);
-		//double nAC = n(0) * (C->X - A->X) + n(1) * (C->Y - A->Y);
-		//if (nAC > 0)
+		DimVector<2> AC = this->Center() - *A;
 		if (n.dot(AC) > 0)
 			n = -1 * n;
+
 		n = n.normalized();
 		return n;
 	}

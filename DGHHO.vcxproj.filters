@@ -251,6 +251,9 @@
     <ClInclude Include="src\Mesh\2D\QuadrilateralShape.h">
       <Filter>Mesh\2D</Filter>
     </ClInclude>
+    <ClInclude Include="src\Mesh\GeometricShapeWithConstantJacobian.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
