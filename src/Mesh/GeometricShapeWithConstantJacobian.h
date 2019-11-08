@@ -108,4 +108,18 @@ public:
 	{
 		return DetJacobian() * this->RefShape()->CellReconstructMassMatrix(cellBasis, reconstructBasis);
 	}
+
+	//---------------------------------------------------------------------//
+	// This is f***ing useless, it should be automatic due to inheritance! //
+	// But without that it doesn't compile for some reason :-(             //
+	//---------------------------------------------------------------------//
+
+	virtual double Integral(DomFunction globalFunction) const
+	{
+		return GeometricShapeWithReferenceShape<Dim>::Integral(globalFunction);
+	}
+	virtual double Integral(DomFunction globalFunction, int polynomialDegree) const
+	{
+		return GeometricShapeWithReferenceShape<Dim>::Integral(globalFunction, polynomialDegree);
+	}
 };

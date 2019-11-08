@@ -63,7 +63,7 @@ public:
 
 	void TestIsInReferenceInterval(double x)
 	{
-		assert(x >= -1.0000000000001 && x <= 1.0000000000001);
+		assert(abs(x) < 1.1);
 	}
 
 	virtual string ToString() = 0;

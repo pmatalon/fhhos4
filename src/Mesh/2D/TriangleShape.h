@@ -114,6 +114,20 @@ public:
 		os << "--";
 		V3->Serialize(os, 2);
 	}
+
+	//---------------------------------------------------------------------//
+	// This is f***ing useless, it should be automatic due to inheritance! //
+	// But without that it doesn't compile for some reason :-(             //
+	//---------------------------------------------------------------------//
+
+	virtual double Integral(DomFunction globalFunction) const
+	{
+		return GeometricShapeWithConstantJacobian<2>::Integral(globalFunction);
+	}
+	virtual double Integral(DomFunction globalFunction, int polynomialDegree) const
+	{
+		return GeometricShapeWithConstantJacobian<2>::Integral(globalFunction, polynomialDegree);
+	}
 };
 
 ReferenceTriangle TriangleShape::RefTriangle = ReferenceTriangle();

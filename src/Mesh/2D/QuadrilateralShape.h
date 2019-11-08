@@ -196,7 +196,7 @@ public:
 	//                            Unit tests                             //
 	//-------------------------------------------------------------------//
 
-	static void UnitTests()
+	static void Test()
 	{
 		int number = 0;
 		Vertex lowerLeft(number, -1, -1);

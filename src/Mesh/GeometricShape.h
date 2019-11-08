@@ -27,6 +27,8 @@ public:
 
 	//--------------------------------------------------------------------------------//
 
+	virtual ~GeometricShape() {}
+
 	virtual double Integral(BasisFunction<Dim>* phi) const
 	{
 		RefFunction func = [phi](RefPoint p) {
@@ -75,5 +77,26 @@ protected:
 
 		int polynomialDegree = phi1->GetDegree() + phi2->GetDegree();
 		return Integral(functionToIntegrate, polynomialDegree);
+	}
+
+	//-------------------------------------------------------------------//
+	//                            Unit tests                             //
+	//-------------------------------------------------------------------//
+
+public:
+	virtual void UnitTests() const
+	{
+		RefFunction refOne = [](RefPoint p) { return 1; };
+		DomFunction domOne = [](DomPoint p) { return 1; };
+
+		double measure = Measure();
+
+		for (int degree = 0; degree < 5; degree++)
+		{
+			double integral = Integral(refOne, degree);
+			assert(abs(integral - measure) < 1e-14);
+		}
+		double integral = Integral(domOne);
+		assert(abs(integral - measure) < 1e-14);
 	}
 };

@@ -88,7 +88,7 @@ public:
 		string filePath = outputDirectory + "/faces" + to_string(Dim) + "D_" + FileNamePart() + ".dat";
 		ExportFacesToMatlab(filePath);
 	}
-	void ExportFacesToMatlab(string filePath)
+	virtual void ExportFacesToMatlab(string filePath)
 	{
 		FILE* file = fopen(filePath.c_str(), "w");
 		fprintf(file, "Number OriginX OriginY OriginZ WidthX WidthY WidthZ Orientation Boundary\n");
@@ -114,11 +114,10 @@ public:
 
 	virtual void SanityCheck()
 	{
-		RefFunction refOne = [](RefPoint p) { return 1; };
-		DomFunction domOne = [](DomPoint p) { return 1; };
-
 		for (auto e : this->Elements)
 		{
+			e->UnitTests();
+
 			for (auto f : e->Faces)
 			{
 				auto n = e->OuterNormalVector(f);
@@ -132,14 +131,6 @@ public:
 				else
 					assert(e->IsOnBoundary());
 			}
-
-			for (int degree = 0; degree < 5; degree++)
-			{
-				double integral = e->Integral(refOne, degree);
-				assert(abs(integral - e->Measure()) < 1e-14);
-			}
-			double integral = e->Integral(domOne);
-			assert(abs(integral - e->Measure()) < 1e-14);
 		}
 
 		for (auto f : this->BoundaryFaces)

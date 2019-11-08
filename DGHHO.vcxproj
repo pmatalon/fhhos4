@@ -107,7 +107,11 @@
     <ClInclude Include="src\HHO\HHOParameters.h" />
     <ClInclude Include="src\Mesh\2D\CartesianPolygonalMesh2D.h" />
     <ClInclude Include="src\Mesh\2D\Edge.h" />
+    <ClInclude Include="src\Mesh\2D\Polygon.h" />
+    <ClInclude Include="src\Mesh\2D\PolygonalMesh.h" />
+    <ClInclude Include="src\Mesh\2D\PolygonalShape.h" />
     <ClInclude Include="src\Mesh\2D\Quadrilateral.h" />
+    <ClInclude Include="src\Mesh\2D\QuadrilateralAsPolygonalMesh.h" />
     <ClInclude Include="src\Mesh\2D\QuadrilateralShape.h" />
     <ClInclude Include="src\Mesh\2D\QuadrilateralMesh.h" />
     <ClInclude Include="src\Mesh\2D\RectangularPolygon.h" />
@@ -174,6 +178,7 @@
     <ClInclude Include="src\Utils\Dunavant\Dunavant.h" />
     <ClInclude Include="src\Utils\Dunavant\triangle_dunavant_rule.hpp" />
     <ClInclude Include="src\Utils\ElementParallelLoop.h" />
+    <ClInclude Include="src\Utils\Geometry.h" />
     <ClInclude Include="src\Utils\ParallelLoop.h" />
     <ClInclude Include="src\Utils\Timer.h" />
     <ClInclude Include="src\Utils\Types.h" />

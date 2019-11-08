@@ -562,7 +562,23 @@ private:
 	{
 		return Integral(GaussLegendre::MAX_POINTS, func, x1, x2, y1, y2, z1, z2);
 	}
+
+	//---------------------------------------------------------------------//
+	// This is f***ing useless, it should be automatic due to inheritance! //
+	// But without that it doesn't compile for some reason :-(             //
+	//---------------------------------------------------------------------//
+public:
+	double Integral(RefFunction func) const override
+	{
+		return GeometricShapeWithConstantJacobian<ShapeDim>::Integral(func);
+	}
+	double Integral(RefFunction func, int polynomialDegree) const override
+	{
+		return GeometricShapeWithConstantJacobian<ShapeDim>::Integral(func, polynomialDegree);
+	}
 };
 
 template <int DomainDim, int ShapeDim>
 ReferenceCartesianShape<ShapeDim> CartesianShape<DomainDim, ShapeDim>::RefCartShape = ReferenceCartesianShape<ShapeDim>();
+
+using RectangleShape = CartesianShape<2>;

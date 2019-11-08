@@ -254,6 +254,21 @@
     <ClInclude Include="src\Mesh\GeometricShapeWithConstantJacobian.h">
       <Filter>Mesh</Filter>
     </ClInclude>
+    <ClInclude Include="src\Mesh\2D\PolygonalShape.h">
+      <Filter>Mesh\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\2D\PolygonalMesh.h">
+      <Filter>Mesh\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\2D\Polygon.h">
+      <Filter>Mesh\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\2D\QuadrilateralAsPolygonalMesh.h">
+      <Filter>Mesh\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Utils\Geometry.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

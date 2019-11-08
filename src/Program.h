@@ -7,6 +7,7 @@
 #include "Mesh/2D/CartesianPolygonalMesh2D.h"
 #include "Mesh/2D/TriangularMesh.h"
 #include "Mesh/2D/QuadrilateralMesh.h"
+#include "Mesh/2D/QuadrilateralAsPolygonalMesh.h"
 #include "Utils/Action.h"
 #include "Utils/Timer.h"
 #include "Solver/ConjugateGradient.h"
@@ -52,9 +53,15 @@ public:
 		Mesh<Dim>* mesh = BuildMesh(n, meshCode);
 
 		if (n <= 4)
+		{
+			// Unit tests
+			QuadrilateralShape::Test();
+			PolygonalShape::Test();
+
 			mesh->SanityCheck();
-		if (n <= 2)
-			cout << *mesh << endl << endl;
+			if (n <= 2)
+				cout << *mesh << endl << endl;
+		}
 
 		//--------------------------------------------//
 		//   Diffusion heterogeneity and anisotropy   //
@@ -474,6 +481,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(int n, string meshCode)
 		return new TriangularMesh(n, n);
 	else if (meshCode.compare("quad") == 0)
 		return new QuadrilateralMesh(n, n, 0.5);
+		//return new QuadrilateralAsPolygonalMesh(n, n, 0.5);
 	assert(false);
 }
 
