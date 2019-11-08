@@ -366,6 +366,7 @@ public:
 					{
 						double error = L2::Error<Dim>(mesh, reconstructionBasis, problem.ReconstructedSolution, exactSolution);
 						cout << "L2 Error = " << std::scientific << error << endl;
+						problem.AssertSchemeConvergence(error);
 					}
 				}
 			}

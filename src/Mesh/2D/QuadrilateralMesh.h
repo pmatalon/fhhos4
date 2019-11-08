@@ -8,10 +8,12 @@ class QuadrilateralMesh : public Mesh<2>
 public:
 	BigNumber Nx;
 	BigNumber Ny;
+	double XShift;
 
 	QuadrilateralMesh(BigNumber nx, BigNumber ny, double xShiftAsFraction) : Mesh()
 	{
-		// nx = ny falls down to square elements
+		this->XShift = xShiftAsFraction;
+
 		this->Nx = nx;
 		this->Ny = ny;
 
@@ -153,7 +155,8 @@ public:
 
 	double H()
 	{
-		return 1.0 / this->Nx;
+		Quadrilateral* q = dynamic_cast<Quadrilateral*>(this->Elements[1]);
+		return q->Diameter();
 	}
 
 	void CoarsenMesh(CoarseningStrategy strategy)

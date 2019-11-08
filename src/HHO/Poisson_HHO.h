@@ -42,6 +42,43 @@ public:
 		return new Poisson_HHO<Dim>(this->_mesh->CoarseMesh, this->_rhsCode, this->_sourceFunction, coarseHHO, _staticCondensation, this->_diffusionPartition, this->_boundaryConditions, this->_outputDirectory);
 	}
 
+	void AssertSchemeConvergence(double l2Error)
+	{
+		if (Dim == 1)
+			return;
+
+		double h = this->_mesh->H();
+		int k = this->HHO->FaceBasis->GetDegree();
+
+		double constant = ConvergenceHiddenConstant(k);
+		double upperBound;
+		if ((this->_rhsCode.compare("sine") == 0 || this->_rhsCode.compare("poly") == 0) && this->_diffusionPartition->IsHomogeneous) // solution is H^{r+2} with r in <= k
+		{
+			double r = k;
+			if (k == 0)
+				upperBound = constant * pow(h, 2);
+			else
+				upperBound = constant * pow(h, r + 2);
+		}
+		else if (this->_rhsCode.compare("kellogg") == 0) // solution is H^{1+eps}
+		{
+			double eps = 0.1;
+			upperBound = constant * pow(h, 2 * eps); // source: Di Pietro's mail, but he's not totally sure...
+		}
+		else
+			return;
+
+		cout << "UpperBound = " << upperBound << endl;
+		assert(l2Error < upperBound);
+	}
+private:
+	double ConvergenceHiddenConstant(int k)
+	{
+		// Depends on the domain. Very rough numerical estimate for [0, 1]^Dim:
+		return pow(10, Dim);
+	}
+
+public:
 	void ExportFaces()
 	{
 		return ExportFaces("");

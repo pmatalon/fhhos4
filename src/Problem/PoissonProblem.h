@@ -73,4 +73,6 @@ public:
 			cout << "unknown";
 		cout << endl;
 	}
+
+	virtual void AssertSchemeConvergence(double l2Error) {}
 };
