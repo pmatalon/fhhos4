@@ -151,7 +151,14 @@ public:
 					this->_center = DomPoint(Origin->X, Origin->Y + WidthY / 2);
 			}
 			else
-				assert(false && "not implemented yet");
+			{
+				if (this->Orientation == CartesianShapeOrientation::InXOY)
+					this->_center = DomPoint(Origin->X + WidthX / 2, Origin->Y + WidthY / 2, Origin->Z);
+				else if (this->Orientation == CartesianShapeOrientation::InXOZ)
+					this->_center = DomPoint(Origin->X + WidthX / 2, Origin->Y, Origin->Z + WidthZ / 2);
+				else if (this->Orientation == CartesianShapeOrientation::InYOZ)
+					this->_center = DomPoint(Origin->X, Origin->Y + WidthY / 2, Origin->Z + WidthZ / 2);
+			}
 		}
 		else if (ShapeDim == 3)
 		{
