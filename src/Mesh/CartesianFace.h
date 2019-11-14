@@ -58,13 +58,10 @@ public:
 		fprintf(file, "%llu %.17g %.17g %.17g %.17g %.17g %.17g %d %d\n", this->Number, _shape->Origin->X, _shape->Origin->Y, _shape->Origin->Z, _shape->WidthX, _shape->WidthY, _shape->WidthZ, _shape->Orientation, this->IsDomainBoundary);
 	}
 
-	//----------------------------------------------------------------//
-	//                 Poisson_HHO_Face implementation                //
-	//----------------------------------------------------------------//
-
-	inline DenseMatrix FaceMassMatrix(FunctionalBasis<Dim-1>* basis)
+	virtual ~CartesianFace()
 	{
-		return _shape->FaceMassMatrix(basis);
+		if (_shape)
+			delete _shape;
 	}
 
 };

@@ -120,7 +120,6 @@ public:
 		return _shape;
 	}
 
-
 	Face<2>* CreateSameGeometricFace(BigNumber number, Element<2>* element1)
 	{
 		Face<2>* copy = new Edge(number, _shape->Vertex1, _shape->Vertex2, element1);
@@ -134,12 +133,9 @@ public:
 		//fprintf(file, "%llu %.17g %.17g %.17g %.17g %.17g %.17g %d %d\n", this->Number, this->Origin->X, this->Origin->Y, this->Origin->Z, this->WidthX, this->WidthY, this->WidthZ, this->Orientation, this->IsDomainBoundary);
 	}
 
-	//----------------------------------------------------------------//
-	//                 Poisson_HHO_Face implementation                //
-	//----------------------------------------------------------------//
-
-	inline DenseMatrix FaceMassMatrix(FunctionalBasis<1>* basis)
+	virtual ~Edge()
 	{
-		return _shape->FaceMassMatrix(basis);
+		if (_shape)
+			delete _shape;
 	}
 };

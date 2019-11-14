@@ -64,41 +64,11 @@ public:
 		n = n.normalized();
 		return n;
 	}
-
-	//-------------------------------------------------------------------//
-	//                  Poisson_DG_Element implementation                //
-	//-------------------------------------------------------------------//
-
-	double MassTerm(BasisFunction<2>* phi1, BasisFunction<2>* phi2)
+	
+	virtual ~Quadrilateral()
 	{
-		return _shape->MassTerm(phi1, phi2);
-	}
-
-	double StiffnessTerm(BasisFunction<2>* phi1, BasisFunction<2>* phi2)
-	{
-		Tensor<2>* K = Tensor<2>::Isotropic();
-		double integral = Shape()->ComputeIntegralKGradGrad(K, phi1, phi2);
-		delete K;
-		return integral;
-	}
-
-	//-------------------------------------------------------------------//
-	//                 Poisson_HHO_Element implementation                //
-	//-------------------------------------------------------------------//
-
-	DenseMatrix CellMassMatrix(FunctionalBasis<2>* basis)
-	{
-		return _shape->CellMassMatrix(basis);
-	}
-
-	DenseMatrix CellReconstructMassMatrix(FunctionalBasis<2>* cellBasis, FunctionalBasis<2>* reconstructBasis)
-	{
-		return _shape->CellReconstructMassMatrix(cellBasis, reconstructBasis);
-	}
-
-	double IntegralKGradGradReconstruct(Tensor<2>* K, BasisFunction<2>* reconstructPhi1, BasisFunction<2>* reconstructPhi2)
-	{
-		return Shape()->ComputeIntegralKGradGrad(K, reconstructPhi1, reconstructPhi2);
+		if (_shape)
+			delete _shape;
 	}
 
 };

@@ -62,7 +62,10 @@ public:
 		return this->_invFaceMassMatrix;
 	}
 
-	virtual DenseMatrix FaceMassMatrix(FunctionalBasis<Dim-1>* basis) = 0;
+	DenseMatrix FaceMassMatrix(FunctionalBasis<Dim-1>* basis)
+	{
+		return this->Shape()->FaceMassMatrix(basis);
+	}
 
 	DenseMatrix MassMatrix(FunctionalBasis<Dim - 1>* basis, Element<Dim>* element, FunctionalBasis<Dim>* cellBasis)
 	{

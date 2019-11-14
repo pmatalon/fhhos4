@@ -40,36 +40,9 @@ public:
 		return _shape;
 	}
 
-	//------------------------------------------------------------------//
-	//                 Poisson_DG_Element implementation                //
-	//------------------------------------------------------------------//
-	
-	inline double MassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
+	virtual ~CartesianElement()
 	{
-		return _shape->MassTerm(phi1, phi2);
-	}
-
-	inline double StiffnessTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
-	{
-		return _shape->StiffnessTerm(phi1, phi2);
-	}
-
-	//-------------------------------------------------------------------//
-	//                 Poisson_HHO_Element implementation                //
-	//-------------------------------------------------------------------//
-
-	inline DenseMatrix CellMassMatrix(FunctionalBasis<Dim>* basis)
-	{
-		return _shape->CellMassMatrix(basis);
-	}
-
-	inline DenseMatrix CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis)
-	{
-		return _shape->CellReconstructMassMatrix(cellBasis, reconstructBasis);
-	}
-
-	inline double IntegralKGradGradReconstruct(Tensor<Dim>* K, BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2)
-	{
-		return _shape->IntegralKGradGradReconstruct(K, reconstructPhi1, reconstructPhi2);
+		if (_shape)
+			delete _shape;
 	}
 };

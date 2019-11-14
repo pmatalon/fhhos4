@@ -456,7 +456,7 @@ public:
 	//             DG             //
 	//----------------------------//
 
-	double StiffnessTerm(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
+	double StiffnessTerm(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2) override
 	{
 		if (this->IsRegular)
 		{
@@ -471,7 +471,7 @@ public:
 	//             HHO             //
 	//-----------------------------//
 	
-	double IntegralKGradGradReconstruct(Tensor<ShapeDim>* K, BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2)
+	double IntegralKGradGradReconstruct(Tensor<ShapeDim>* K, BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2) override
 	{
 		if (this->IsRegular)
 		{

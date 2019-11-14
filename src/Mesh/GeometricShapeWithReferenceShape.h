@@ -112,6 +112,11 @@ public:
 		return this->ComputeMassTerm(phi1, phi2);
 	}
 
+	virtual double StiffnessTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
+	{
+		return this->ComputeIntegralGradGrad(phi1, phi2);
+	}
+
 	//-----------------------------//
 	//             HHO             //
 	//-----------------------------//
@@ -129,5 +134,10 @@ public:
 	virtual DenseMatrix CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis)
 	{
 		return this->ComputeAndReturnMassMatrix(cellBasis, reconstructBasis);
+	}
+
+	virtual double IntegralKGradGradReconstruct(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
+	{
+		return this->ComputeIntegralKGradGrad(K, phi1, phi2);
 	}
 };

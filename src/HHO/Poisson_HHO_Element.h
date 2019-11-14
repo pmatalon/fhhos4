@@ -29,14 +29,25 @@ public:
 
 	Poisson_HHO_Element(BigNumber number) : Element<Dim>(number) {}
 
-	//-----------------------//
-	//   Virtual functions   //
-	//-----------------------//
+	//----------------------------//
+	//   HHO-specific integrals   //
+	//----------------------------//
 
-	virtual double IntegralKGradGradReconstruct(Tensor<Dim>* K, BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2) = 0;
-	//virtual double ComputeIntegralKGradGrad(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const = 0;
-	virtual DenseMatrix CellMassMatrix(FunctionalBasis<Dim>* basis) = 0;
-	virtual DenseMatrix CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) = 0;
+private:
+	double IntegralKGradGradReconstruct(Tensor<Dim>* K, BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2)
+	{
+		return this->Shape()->IntegralKGradGradReconstruct(K, reconstructPhi1, reconstructPhi2);
+	}
+
+	DenseMatrix CellMassMatrix(FunctionalBasis<Dim>* basis)
+	{
+		return this->Shape()->CellMassMatrix(basis);
+	}
+
+	DenseMatrix CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis)
+	{
+		return this->Shape()->CellReconstructMassMatrix(cellBasis, reconstructBasis);
+	}
 
 	double ComputeIntegralKGradGrad(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
 	{
@@ -44,7 +55,7 @@ public:
 	}
 
 	//--------------------------------------------------------------------------------//
-	
+public:
 	void InitHHO(HHOParameters<Dim>* hho)
 	{
 		this->HHO = hho;
