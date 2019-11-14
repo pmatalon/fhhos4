@@ -35,7 +35,7 @@ public:
 	//   Virtual functions   //
 	//-----------------------//
 
-	virtual const GeometricShapeWithReferenceShape<Dim>* Shape() const = 0;
+	virtual GeometricShapeWithReferenceShape<Dim>* Shape() const = 0;
 
 	//---------------------------//
 	//   Geometric information   //

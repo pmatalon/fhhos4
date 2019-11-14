@@ -8,40 +8,41 @@ using namespace std;
 class Quadrilateral : public Poisson_DG_Element<2>, public Poisson_HHO_Element<2>
 {
 private:
-	QuadrilateralShape _shape;
+	QuadrilateralShape* _shape;
 
 public:
 	Quadrilateral(int number, Vertex* v1, Vertex* v2, Vertex* v3, Vertex* v4) :
 		Element(number),
 		Poisson_DG_Element<2>(number),
-		Poisson_HHO_Element<2>(number),
-		_shape(v1, v2, v3, v4)
-	{}
+		Poisson_HHO_Element<2>(number)
+	{
+		_shape = new QuadrilateralShape(v1, v2, v3, v4);
+	}
 
 	inline Vertex* V1()
 	{
-		return _shape.V1;
+		return _shape->V1;
 	}
 	inline Vertex* V2()
 	{
-		return _shape.V2;
+		return _shape->V2;
 	}
 	inline Vertex* V3()
 	{
-		return _shape.V3;
+		return _shape->V3;
 	}
 	inline Vertex* V4()
 	{
-		return _shape.V4;
+		return _shape->V4;
 	}
 
 	//-------------------------------------------------------//
 	//                 Element implementation                //
 	//-------------------------------------------------------//
 
-	const GeometricShapeWithReferenceShape<2>* Shape() const
+	GeometricShapeWithReferenceShape<2>* Shape() const
 	{
-		return &_shape;
+		return _shape;
 	}
 
 	DimVector<2> OuterNormalVector(Face<2>* face)
@@ -70,7 +71,7 @@ public:
 
 	double MassTerm(BasisFunction<2>* phi1, BasisFunction<2>* phi2)
 	{
-		return _shape.MassTerm(phi1, phi2);
+		return _shape->MassTerm(phi1, phi2);
 	}
 
 	double StiffnessTerm(BasisFunction<2>* phi1, BasisFunction<2>* phi2)
@@ -87,12 +88,12 @@ public:
 
 	DenseMatrix CellMassMatrix(FunctionalBasis<2>* basis)
 	{
-		return _shape.CellMassMatrix(basis);
+		return _shape->CellMassMatrix(basis);
 	}
 
 	DenseMatrix CellReconstructMassMatrix(FunctionalBasis<2>* cellBasis, FunctionalBasis<2>* reconstructBasis)
 	{
-		return _shape.CellReconstructMassMatrix(cellBasis, reconstructBasis);
+		return _shape->CellReconstructMassMatrix(cellBasis, reconstructBasis);
 	}
 
 	double IntegralKGradGradReconstruct(Tensor<2>* K, BasisFunction<2>* reconstructPhi1, BasisFunction<2>* reconstructPhi2)

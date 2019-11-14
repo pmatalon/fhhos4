@@ -39,7 +39,13 @@ public:
 	//   Virtual functions   //
 	//-----------------------//
 
-	virtual const GeometricShapeWithReferenceShape<Dim-1>* Shape() const = 0;
+	virtual GeometricShapeWithReferenceShape<Dim-1>* Shape() const = 0;
+
+	virtual void ExportFaceToMatlab(FILE* file) = 0;
+
+	//---------------------------//
+	//   Geometric information   //
+	//---------------------------//
 
 	// Geometric information
 	virtual double Diameter() const
@@ -76,12 +82,9 @@ public:
 		return Shape()->Integral(func, polynomialDegree);
 	}
 
-	// Misc
-	virtual void ExportFaceToMatlab(FILE* file) = 0;
-
-	//---------------------------//
-	//   Geometric information   //
-	//---------------------------//
+	//---------------------------------------//
+	//   Relations to other faces/elements   //
+	//---------------------------------------//
 
 	bool IsBetween(Element<Dim>* element1, Element<Dim>* element2)
 	{

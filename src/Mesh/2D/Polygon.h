@@ -7,28 +7,29 @@ using namespace std;
 class Polygon : public Poisson_DG_Element<2>, public Poisson_HHO_Element<2>
 {
 private:
-	PolygonalShape _shape;
+	PolygonalShape* _shape;
 
 public:
 	Polygon(int number, vector<Vertex*> vertices) :
 		Element(number),
 		Poisson_DG_Element<2>(number),
-		Poisson_HHO_Element<2>(number),
-		_shape(vertices)
-	{}
+		Poisson_HHO_Element<2>(number)
+	{
+		_shape = new PolygonalShape(vertices);
+	}
 
 	inline vector<Vertex*> Vertices()
 	{
-		return _shape.Vertices;
+		return _shape->Vertices;
 	}
 
 	//-------------------------------------------------------//
 	//                 Element implementation                //
 	//-------------------------------------------------------//
 
-	const GeometricShapeWithReferenceShape<2>* Shape() const
+	GeometricShapeWithReferenceShape<2>* Shape() const
 	{
-		return &_shape;
+		return _shape;
 	}
 
 	DimVector<2> OuterNormalVector(Face<2>* face)
@@ -51,13 +52,19 @@ public:
 		return n;
 	}
 
+	virtual ~Polygon()
+	{
+		if (_shape)
+			delete _shape;
+	}
+
 	//-------------------------------------------------------------------//
 	//                  Poisson_DG_Element implementation                //
 	//-------------------------------------------------------------------//
 
 	double MassTerm(BasisFunction<2>* phi1, BasisFunction<2>* phi2)
 	{
-		return _shape.MassTerm(phi1, phi2);
+		return _shape->MassTerm(phi1, phi2);
 	}
 
 	double StiffnessTerm(BasisFunction<2>* phi1, BasisFunction<2>* phi2)
@@ -74,12 +81,12 @@ public:
 
 	DenseMatrix CellMassMatrix(FunctionalBasis<2>* basis)
 	{
-		return _shape.CellMassMatrix(basis);
+		return _shape->CellMassMatrix(basis);
 	}
 
 	DenseMatrix CellReconstructMassMatrix(FunctionalBasis<2>* cellBasis, FunctionalBasis<2>* reconstructBasis)
 	{
-		return _shape.CellReconstructMassMatrix(cellBasis, reconstructBasis);
+		return _shape->CellReconstructMassMatrix(cellBasis, reconstructBasis);
 	}
 
 	double IntegralKGradGradReconstruct(Tensor<2>* K, BasisFunction<2>* reconstructPhi1, BasisFunction<2>* reconstructPhi2)

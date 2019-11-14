@@ -8,36 +8,37 @@ using namespace std;
 class Triangle : public Poisson_DG_Element<2>, public Poisson_HHO_Element<2>
 {
 private:
-	TriangleShape _shape;
+	TriangleShape* _shape;
 
 public:
 	Triangle(int number, Vertex* v1, Vertex* v2, Vertex* v3) :
 		Element(number),
 		Poisson_DG_Element<2>(number),
-		Poisson_HHO_Element<2>(number),
-		_shape(v1, v2, v3)
-	{}
+		Poisson_HHO_Element<2>(number)
+	{
+		_shape = new TriangleShape(v1, v2, v3);
+	}
 
 	inline Vertex* V1()
 	{
-		return _shape.V1;
+		return _shape->V1;
 	}
 	inline Vertex* V2()
 	{
-		return _shape.V2;
+		return _shape->V2;
 	}
 	inline Vertex* V3()
 	{
-		return _shape.V3;
+		return _shape->V3;
 	}
 
 	//-------------------------------------------------------//
 	//                 Element implementation                //
 	//-------------------------------------------------------//
 
-	const GeometricShapeWithReferenceShape<2>* Shape() const
+	GeometricShapeWithReferenceShape<2>* Shape() const
 	{
-		return &_shape;
+		return _shape;
 	}
 
 	DimVector<2> OuterNormalVector(Face<2>* face)
@@ -53,35 +54,39 @@ public:
 
 		// Condition 2: n.AC < 0
 		Vertex* C = nullptr;
-		if (edge->Vertex1() == _shape.V1)
+		if (edge->Vertex1() == _shape->V1)
 		{
-			if (edge->Vertex2() == _shape.V2)
-				C = _shape.V3;
+			if (edge->Vertex2() == _shape->V2)
+				C = _shape->V3;
 			else
-				C = _shape.V2;
+				C = _shape->V2;
 		}
-		else if (edge->Vertex1() == _shape.V2)
+		else if (edge->Vertex1() == _shape->V2)
 		{
-			if (edge->Vertex2() == _shape.V1)
-				C = _shape.V3;
+			if (edge->Vertex2() == _shape->V1)
+				C = _shape->V3;
 			else
-				C = _shape.V1;
+				C = _shape->V1;
 		}
-		else if (edge->Vertex1() == _shape.V3)
+		else if (edge->Vertex1() == _shape->V3)
 		{
-			if (edge->Vertex2() == _shape.V1)
-				C = _shape.V2;
+			if (edge->Vertex2() == _shape->V1)
+				C = _shape->V2;
 			else
-				C = _shape.V1;
+				C = _shape->V1;
 		}
 		else
 			assert(false);
-
+		
 		DimVector<2> AC = Vect(A, C);
 		//double nAC = n(0) * (C->X - A->X) + n(1) * (C->Y - A->Y);
 		//if (nAC > 0)
 		if (n.dot(AC) > 0)
 			n = -1 * n;
+		/*DimVector<2> AC = this->Center() - *A;
+		if (n.dot(AC) > 0)
+			n = -1 * n;*/
+
 		n = n.normalized();
 		return n;
 	}
@@ -92,7 +97,7 @@ public:
 
 	double MassTerm(BasisFunction<2>* phi1, BasisFunction<2>* phi2)
 	{
-		return _shape.MassTerm(phi1, phi2);
+		return _shape->MassTerm(phi1, phi2);
 	}
 
 	double StiffnessTerm(BasisFunction<2>* phi1, BasisFunction<2>* phi2)
@@ -109,12 +114,12 @@ public:
 
 	DenseMatrix CellMassMatrix(FunctionalBasis<2>* basis)
 	{
-		return _shape.CellMassMatrix(basis);
+		return _shape->CellMassMatrix(basis);
 	}
 
 	DenseMatrix CellReconstructMassMatrix(FunctionalBasis<2>* cellBasis, FunctionalBasis<2>* reconstructBasis)
 	{
-		return _shape.CellReconstructMassMatrix(cellBasis, reconstructBasis);
+		return _shape->CellReconstructMassMatrix(cellBasis, reconstructBasis);
 	}
 
 	double IntegralKGradGradReconstruct(Tensor<2>* K, BasisFunction<2>* reconstructPhi1, BasisFunction<2>* reconstructPhi2)

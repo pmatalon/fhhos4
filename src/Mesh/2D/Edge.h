@@ -87,15 +87,15 @@ public:
 class Edge : public Poisson_DG_Face<2>, public Poisson_HHO_Face<2>
 {
 private:
-	EdgeShape _shape;
+	EdgeShape* _shape;
 public:
 
 	Edge(BigNumber number, Vertex* v1, Vertex* v2, Element<2>* element1, Element<2>* element2) : 
 		Poisson_DG_Face(number, element1, element2),
 		Poisson_HHO_Face(number, element1, element2),
-		_shape(v1, v2),
 		Face(number, element1, element2)
 	{
+		_shape = new EdgeShape(v1, v2);
 	}
 
 	Edge(BigNumber number, Vertex* v1, Vertex* v2, Element<2>* element1) :
@@ -104,26 +104,26 @@ public:
 
 	inline Vertex* Vertex1() const
 	{
-		return _shape.Vertex1;
+		return _shape->Vertex1;
 	}
 	inline Vertex* Vertex2() const
 	{
-		return _shape.Vertex2;
+		return _shape->Vertex2;
 	}
 
 	//----------------------------------------------------//
 	//                 Face implementation                //
 	//----------------------------------------------------//
 
-	const GeometricShapeWithReferenceShape<1>* Shape() const override
+	GeometricShapeWithReferenceShape<1>* Shape() const override
 	{
-		return &_shape;
+		return _shape;
 	}
 
 
 	Face<2>* CreateSameGeometricFace(BigNumber number, Element<2>* element1)
 	{
-		Face<2>* copy = new Edge(number, _shape.Vertex1, _shape.Vertex2, element1);
+		Face<2>* copy = new Edge(number, _shape->Vertex1, _shape->Vertex2, element1);
 		copy->IsDomainBoundary = this->IsDomainBoundary;
 		return copy;
 	}
@@ -140,6 +140,6 @@ public:
 
 	inline DenseMatrix FaceMassMatrix(FunctionalBasis<1>* basis)
 	{
-		return _shape.FaceMassMatrix(basis);
+		return _shape->FaceMassMatrix(basis);
 	}
 };

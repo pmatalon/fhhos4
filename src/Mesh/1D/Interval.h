@@ -14,7 +14,7 @@ public:
 
 	inline double Width()
 	{
-		return this->_shape.WidthX;
+		return this->_shape->WidthX;
 	}
 	
 	void SetLeftInterface(Face<1>* face)
