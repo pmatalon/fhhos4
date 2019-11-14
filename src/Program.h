@@ -477,12 +477,14 @@ Mesh<2>* ProgramDim<2>::BuildMesh(int n, string meshCode)
 {
 	if (meshCode.compare("cart") == 0)
 		return new CartesianGrid2D(n, n);
-		//return new CartesianPolygonalMesh2D(n, n);
+	else if (meshCode.compare("cart-poly") == 0)
+		return new CartesianPolygonalMesh2D(n, n);
 	else if(meshCode.compare("tri") == 0)
 		return new TriangularMesh(n, n);
 	else if (meshCode.compare("quad") == 0)
 		return new QuadrilateralMesh(n, n, 0.5);
-		//return new QuadrilateralAsPolygonalMesh(n, n, 0.5);
+	else if (meshCode.compare("quad-poly") == 0)
+		return new QuadrilateralAsPolygonalMesh(n, n, 0.5);
 	assert(false);
 }
 

@@ -300,7 +300,11 @@ int main(int argc, char* argv[])
 				break;
 			case OPT_Mesh:
 				meshCode = optarg;
-				if (meshCode.compare("cart") != 0 && meshCode.compare("tri") != 0 && meshCode.compare("quad") != 0)
+				if (   meshCode.compare("cart") != 0
+					&& meshCode.compare("cart-poly") != 0
+					&& meshCode.compare("tri") != 0 
+					&& meshCode.compare("quad") != 0
+					&& meshCode.compare("quad-poly") != 0)
 					argument_error("unknown mesh code '" + meshCode + "'. Check -mesh argument.");
 				break;
 			case OPT_Stabilization:
