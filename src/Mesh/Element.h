@@ -84,6 +84,19 @@ public:
 	{
 		return face->GetNeighbour(this);
 	}
+	
+	Face<Dim>* InterfaceWith(Element<Dim>* other)
+	{
+		for (Face<Dim>* f1 : this->Faces)
+		{
+			for (Face<Dim>* f2 : other->Faces)
+			{
+				if (f1 == f2)
+					return f1;
+			}
+		}
+		return nullptr;
+	}
 
 	int LocalNumberOf(Element<Dim>* finerElement)
 	{

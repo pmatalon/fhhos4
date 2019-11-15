@@ -1,7 +1,7 @@
 #pragma once
 #include <vector>
 #include "Triangle.h"
-#include "../Mesh.h"
+#include "../PolyhedralMesh.h"
 using namespace std;
 
 class LowerTriangle : public Triangle
@@ -46,20 +46,20 @@ public:
 	Edge* NorthEdge() { return GetEdge(this->V3(), this->V1()); }
 };
 
-class TriangularMesh : public Mesh<2>
+class TriangularMesh : public PolyhedralMesh<2>
 {
 public:
 	BigNumber Nx;
 	BigNumber Ny;
 
-	TriangularMesh(BigNumber nx, BigNumber ny) : Mesh()
+	TriangularMesh(BigNumber nx, BigNumber ny) : PolyhedralMesh()
 	{
 		// nx = ny falls down to square elements
 		this->Nx = nx;
 		this->Ny = ny;
 
-		double hx = 1 / (double)nx;
-		double hy = 1 / (double)ny;
+		double hx = 1.0 / nx;
+		double hy = 1.0 / ny;
 
 		//----------//
 		// Vertices //
@@ -241,25 +241,25 @@ private:
 	}
 
 public:
-	string Description()
+	string Description() override
 	{
 		return "Triangular " + to_string(this->Nx) + " x " + to_string(this->Ny);
 	}
 
-	string FileNamePart()
+	string FileNamePart() override
 	{
 		return "n" + to_string(this->Nx);
 	}
 
-	double H()
+	double H() override
 	{
 		return sqrt(2) / (double)this->Nx;
 	}
 
-	void CoarsenMesh(CoarseningStrategy strategy)
+	void CoarsenMesh(CoarseningStrategy strategy) override
 	{
 		if (strategy == CoarseningStrategy::Standard)
-			CoarsenByAgglomerationAndMergeColinearFaces();
+			Standard();
 		//else if (strategy == CoarseningStrategy::Agglomeration)
 			//CoarsenByAgglomerationAndKeepFineFaces();
 		else
@@ -268,7 +268,7 @@ public:
 		this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
 	}
 
-	void CoarsenByAgglomerationAndMergeColinearFaces()
+	void Standard()
 	{
 		BigNumber nx = this->Nx;
 		BigNumber ny = this->Ny;

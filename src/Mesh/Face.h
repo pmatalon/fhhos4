@@ -17,6 +17,7 @@ public:
 
 	bool IsRemovedOnCoarserGrid = false; 
 	vector<Face<Dim>*> FinerFaces;
+	Face<Dim>* CoarseFace = nullptr;
 
 public:
 	Face() { assert(false); }

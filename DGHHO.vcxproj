@@ -108,7 +108,6 @@
     <ClInclude Include="src\Mesh\2D\CartesianPolygonalMesh2D.h" />
     <ClInclude Include="src\Mesh\2D\Edge.h" />
     <ClInclude Include="src\Mesh\2D\Polygon.h" />
-    <ClInclude Include="src\Mesh\2D\PolygonalMesh.h" />
     <ClInclude Include="src\Mesh\2D\PolygonalShape.h" />
     <ClInclude Include="src\Mesh\2D\Quadrilateral.h" />
     <ClInclude Include="src\Mesh\2D\QuadrilateralAsPolygonalMesh.h" />
@@ -133,6 +132,7 @@
     <ClInclude Include="src\Mesh\1D\InterfacePoint.h" />
     <ClInclude Include="src\Mesh\2D\CartesianEdge.h" />
     <ClInclude Include="src/Mesh/2D/Rectangle.h" />
+    <ClInclude Include="src\Mesh\PolyhedralMesh.h" />
     <ClInclude Include="src\Mesh\ReferenceCartesianShape.h" />
     <ClInclude Include="src/Mesh/3D/RectangularFace.h" />
     <ClInclude Include="src/Mesh/Face.h" />

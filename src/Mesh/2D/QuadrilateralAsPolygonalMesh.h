@@ -1,15 +1,15 @@
 #pragma once
 #include "Polygon.h"
-#include "../Mesh.h"
+#include "../PolyhedralMesh.h"
 using namespace std;
 
-class QuadrilateralAsPolygonalMesh : public Mesh<2>
+class QuadrilateralAsPolygonalMesh : public PolyhedralMesh<2>
 {
 public:
 	BigNumber Nx;
 	BigNumber Ny;
 
-	QuadrilateralAsPolygonalMesh(BigNumber nx, BigNumber ny, double xShiftAsFraction) : Mesh()
+	QuadrilateralAsPolygonalMesh(BigNumber nx, BigNumber ny, double xShiftAsFraction) : PolyhedralMesh()
 	{
 		// nx = ny falls down to square elements
 		this->Nx = nx;
@@ -142,31 +142,19 @@ private:
 	}
 
 public:
-	string Description()
+	string Description() override
 	{
 		return "Quadrilaterals as polygons " + to_string(this->Nx) + " x " + to_string(this->Ny);
 	}
 
-	string FileNamePart()
+	string FileNamePart() override
 	{
 		return "n" + to_string(this->Nx);
 	}
 
-	double H()
+	double H() override
 	{
-		return 1.0 / this->Nx;
-	}
-
-	void CoarsenMesh(CoarseningStrategy strategy)
-	{
-		/*if (strategy == CoarseningStrategy::Standard)
-			CoarsenByAgglomerationAndMergeColinearFaces();
-		//else if (strategy == CoarseningStrategy::Agglomeration)
-			//CoarsenByAgglomerationAndKeepFineFaces();
-		else*/
-			assert(false && "Coarsening strategy not implemented!");
-		this->CoarseMesh->SetDiffusionCoefficient(this->_diffusionPartition);
-		this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
+		return this->Elements[1]->Diameter();
 	}
 
 };

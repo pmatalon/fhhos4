@@ -1,24 +1,24 @@
 #pragma once
-#include "../Mesh.h"
+#include "../PolyhedralMesh.h"
 #include "RectangularPolygon.h"
 using namespace std;
 
-class CartesianPolygonalMesh2D : public Mesh<2>
+class CartesianPolygonalMesh2D : public PolyhedralMesh<2>
 {
 public:
 	BigNumber Nx;
 	BigNumber Ny;
 
-	CartesianPolygonalMesh2D() : Mesh() {}
+	CartesianPolygonalMesh2D() : PolyhedralMesh() {}
 
-	CartesianPolygonalMesh2D(BigNumber nx, BigNumber ny) : Mesh()
+	CartesianPolygonalMesh2D(BigNumber nx, BigNumber ny) : PolyhedralMesh()
 	{
 		// nx = ny falls down to square elements
 		this->Nx = nx;
 		this->Ny = ny;
 
-		double hx = 1 / (double)nx;
-		double hy = 1 / (double)ny;
+		double hx = 1.0 / nx;
+		double hy = 1.0 / ny;
 
 		//----------//
 		// Vertices //
@@ -135,22 +135,22 @@ private:
 	}
 
 public:
-	string Description()
+	string Description() override
 	{
 		return "CartesianPolygonalMesh: " + to_string(this->Nx) + " x " + to_string(this->Ny);
 	}
 
-	string FileNamePart()
+	string FileNamePart() override
 	{
 		return "n" + to_string(this->Nx);
 	}
 
-	double H()
+	double H() override
 	{
-		return 1 / (double)this->Nx;
+		return 1.0 / this->Nx;
 	}
 
-	virtual void CoarsenMesh(CoarseningStrategy strategy)
+	void CoarsenMesh(CoarseningStrategy strategy) override
 	{
 		/*if (strategy == CoarseningStrategy::Standard)
 			CoarsenByAgglomerationAndMergeColinearFaces();

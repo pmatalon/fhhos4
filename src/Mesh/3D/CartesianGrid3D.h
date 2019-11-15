@@ -190,20 +190,21 @@ public:
 
 	double H()
 	{
-		return 1 / (double)this->Nx;
+		return 1.0 / this->Nx;
 	}
 
 	void CoarsenMesh(CoarseningStrategy strategy)
 	{
 		if (strategy == CoarseningStrategy::Standard)
-			CoarsenByAgglomerationAndMergeColinearFaces();
+			StandardCoarsening();
 		else
 			assert(false && "Coarsening strategy not implemented!");
 		this->CoarseMesh->SetDiffusionCoefficient(this->_diffusionPartition);
 		this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
 	}
 
-	void CoarsenByAgglomerationAndMergeColinearFaces()
+private:
+	void StandardCoarsening()
 	{
 		BigNumber nx = this->Nx;
 		BigNumber ny = this->Ny;

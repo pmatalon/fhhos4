@@ -20,6 +20,7 @@ public:
 	PolygonalShape(vector<Vertex*> vertices) 
 		: _vertices(vertices)
 	{
+		assert(vertices.size() >= 3);
 		Init();
 	}
 

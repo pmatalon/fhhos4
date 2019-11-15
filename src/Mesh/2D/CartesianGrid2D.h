@@ -4,16 +4,16 @@
 #include "RectangularPolygon.h"
 #include "CartesianPolygonalMesh2D.h"
 #include "CartesianEdge.h"
-#include "../Mesh.h"
+#include "../PolyhedralMesh.h"
 using namespace std;
 
-class CartesianGrid2D : public Mesh<2>
+class CartesianGrid2D : public PolyhedralMesh<2>
 {
 public:
 	BigNumber Nx;
 	BigNumber Ny;
 
-	CartesianGrid2D(BigNumber nx, BigNumber ny) : Mesh()
+	CartesianGrid2D(BigNumber nx, BigNumber ny) : PolyhedralMesh()
 	{
 		// nx = ny falls down to square elements
 		this->Nx = nx;
@@ -138,25 +138,25 @@ private:
 	}
 
 public:
-	string Description()
+	string Description() override
 	{
 		return "Cartesian " + to_string(this->Nx) + " x " + to_string(this->Ny);
 	}
 
-	string FileNamePart()
+	string FileNamePart() override
 	{
 		return "n" + to_string(this->Nx);
 	}
 
-	double H()
+	double H() override
 	{
-		return 1 / (double)this->Nx;
+		return 1.0 / this->Nx;
 	}
 
-	void CoarsenMesh(CoarseningStrategy strategy)
+	void CoarsenMesh(CoarseningStrategy strategy) override
 	{
 		if (strategy == CoarseningStrategy::Standard)
-			CoarsenByAgglomerationAndMergeColinearFaces();
+			StandardCoarsening();
 		else if (strategy == CoarseningStrategy::Agglomeration)
 			CoarsenByAgglomerationAndKeepFineFaces();
 		else
@@ -165,7 +165,7 @@ public:
 		this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
 	}
 
-	void CoarsenByAgglomerationAndMergeColinearFaces()
+	void StandardCoarsening()
 	{
 		BigNumber nx = this->Nx;
 		BigNumber ny = this->Ny;
