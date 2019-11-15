@@ -20,7 +20,7 @@ public:
 
 	inline vector<Vertex*> Vertices()
 	{
-		return _shape->Vertices;
+		return _shape->Vertices();
 	}
 
 	//-------------------------------------------------------//

@@ -36,6 +36,8 @@ public:
 		BackRightTopCorner = backRightTopCorner;
 		FrontRightBottomCorner = frontRightBottomCorner;
 		FrontRightTopCorner = frontRightTopCorner;
+		this->_shape->SetVertices(vector<Vertex*> {backLeftBottomCorner, frontLeftBottomCorner, backRightBottomCorner, backLeftTopCorner,
+			frontLeftTopCorner, backRightTopCorner, frontRightBottomCorner, frontRightTopCorner});
 	}
 
 	void SetTopFace(Face<3>* face)

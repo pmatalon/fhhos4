@@ -7,7 +7,7 @@
 template <int Dim>
 class CartesianFace : public Poisson_DG_Face<Dim>, public Poisson_HHO_Face<Dim>
 {
-private:
+protected:
 	CartesianShape<Dim, Dim - 1>* _shape;
 public:
 

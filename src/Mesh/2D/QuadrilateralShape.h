@@ -71,6 +71,11 @@ public:
 		return &RefSquare;
 	}
 
+	inline vector<Vertex*> Vertices() const override
+	{
+		return vector<Vertex*> { V1, V2, V3, V4 };
+	}
+
 	static ReferenceCartesianShape<2>* InitReferenceShape()
 	{
 		return &RefSquare;

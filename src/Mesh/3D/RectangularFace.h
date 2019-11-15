@@ -8,12 +8,16 @@ public:
 	RectangularFace(BigNumber number, Vertex* origin, Vertex* v2, Vertex* v3, Element<3>* element1, Element<3>* element2, CartesianShapeOrientation orientation) :
 		Face(number, element1, element2), 
 		CartesianFace(number, origin, firstWidth(origin, v2, orientation), secondWidth(origin, v3, orientation), element1, element2, orientation)
-	{}
+	{
+		// TODO: add vertices to the shape
+	}
 
 	RectangularFace(BigNumber number, Vertex* origin, Vertex* v2, Vertex* v3, Element<3>* element1, CartesianShapeOrientation orientation) :
 		Face(number, element1), 
 		CartesianFace(number, origin, firstWidth(origin, v2, orientation), secondWidth(origin, v3, orientation), element1, NULL, orientation)
-	{}
+	{
+		// TODO: add vertices to the shape
+	}
 
 private:
 	static double firstWidth(Vertex* origin, Vertex* v2, CartesianShapeOrientation orientation)

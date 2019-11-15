@@ -30,6 +30,11 @@ public:
 		return &CartesianShape<2, 1>::RefCartShape;
 	}
 
+	inline vector<Vertex*> Vertices() const override
+	{
+		return vector<Vertex*> {Vertex1, Vertex2};
+	}
+
 	inline double Diameter() const override
 	{
 		return _width;

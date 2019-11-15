@@ -54,6 +54,11 @@ public:
 	{
 		return &RefTriangle;
 	}
+	
+	inline vector<Vertex*> Vertices() const override
+	{
+		return vector<Vertex*> { V1, V2, V3 };
+	}
 
 	static ReferenceTriangle* InitReferenceShape()
 	{

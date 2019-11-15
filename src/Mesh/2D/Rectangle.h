@@ -24,6 +24,7 @@ public:
 		TopLeftCorner = topLeftCorner;
 		TopRightCorner = topRightCorner;
 		BottomRightCorner = bottomRightCorner;
+		this->_shape->SetVertices(vector<Vertex*> {bottomLeftCorner, bottomRightCorner, topRightCorner, topLeftCorner});
 	}
 
 	void SetNorthInterface(CartesianEdge* face)

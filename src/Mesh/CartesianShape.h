@@ -16,6 +16,8 @@ template <int DomainDim, int ShapeDim = DomainDim>
 class CartesianShape : public GeometricShapeWithConstantJacobian<ShapeDim>
 {
 private:
+	vector<Vertex*> _vertices;
+
 	double _diameter;
 	double _measure;
 	DomPoint _center;
@@ -178,6 +180,18 @@ public:
 	ReferenceShape<ShapeDim>* RefShape() const
 	{
 		return &RefCartShape;
+	}
+
+	// Not a great solution, the vertices should pass by the constructor,
+	// but hey, a little "quick and dirty" can't do no harm bro...!
+	inline void SetVertices(vector<Vertex*> vertices)
+	{
+		_vertices = vector<Vertex*>(vertices);
+	}
+
+	inline vector<Vertex*> Vertices() const override
+	{
+		return _vertices;
 	}
 
 	static ReferenceCartesianShape<ShapeDim>* InitReferenceShape()

@@ -6,6 +6,8 @@ using namespace std;
 class PolygonalShape : public GeometricShapeWithReferenceShape<2>
 {
 private:
+	vector<Vertex*> _vertices;
+
 	double _diameter;
 	double _measure;
 	Vertex* _center;
@@ -14,10 +16,9 @@ private:
 	QuadrilateralShape* _boundingBox;
 
 public:
-	vector<Vertex*> Vertices;
 
 	PolygonalShape(vector<Vertex*> vertices) 
-		: Vertices(vertices)
+		: _vertices(vertices)
 	{
 		Init();
 	}
@@ -27,9 +28,9 @@ public:
 		_diameter = 0;
 		double sumX = 0;
 		double sumY = 0;
-		for (Vertex* v1 : Vertices)
+		for (Vertex* v1 : _vertices)
 		{
-			for (Vertex* v2 : Vertices)
+			for (Vertex* v2 : _vertices)
 			{
 				if (v1 != v2)
 				{
@@ -42,11 +43,11 @@ public:
 			sumY += v1->Y;
 		}
 		
-		_center = new Vertex(0, sumX / Vertices.size(), sumY / Vertices.size());
+		_center = new Vertex(0, sumX / _vertices.size(), sumY / _vertices.size());
 
-		_triangulation = Geometry::Triangulation(Vertices);
+		_triangulation = Geometry::Triangulation(_vertices);
 
-		_boundingBox = Geometry::CreateBoundingBox(Vertices);
+		_boundingBox = Geometry::CreateBoundingBox(_vertices);
 
 		_measure = 0;
 		for (TriangleShape* t : _triangulation)
@@ -56,6 +57,11 @@ public:
 	ReferenceShape<2>* RefShape() const
 	{
 		return &RectangleShape::RefCartShape;
+	}
+
+	inline vector<Vertex*> Vertices() const override
+	{
+		return _vertices;
 	}
 
 	inline double Diameter() const override
