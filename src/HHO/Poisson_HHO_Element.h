@@ -124,6 +124,14 @@ public:
 		return this->P;
 	}
 
+	DenseMatrix SolveCellUnknownsMatrix()
+	{
+		int nTotalFaceUnknowns = this->Faces.size() * HHO->nFaceUnknowns;
+		auto Atf = this->A.topRightCorner(HHO->nCellUnknowns, nTotalFaceUnknowns);
+		DenseMatrix solveCellUnknowns = -this->invAtt * Atf;
+		return solveCellUnknowns;
+	}
+
 	DenseMatrix ReconstructionFromFacesMatrix()
 	{
 		int nTotalFaceUnknowns = this->Faces.size() * HHO->nFaceUnknowns;
