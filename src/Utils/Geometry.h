@@ -56,4 +56,21 @@ public:
 		return boundingRectangle;
 	}
 
+	template <int Dim>
+	bool AreInDirectOrder(Vertex* A, Vertex* B, Vertex* C)
+	{
+		if (Dim == 2)
+		{
+			DimVector<2> AB = *B - *A;
+			DimVector<2> AC = *C - *A;
+			double angle = atan2(AC[1], AC[0]) - atan2(AB[1], AB[0]);
+			if (angle < 0) // to get angle in [0, 2*Pi]
+				angle += 2 * M_PI;
+
+			return angle < M_PI;
+		}
+		else
+			assert(false);
+	}
+
 };

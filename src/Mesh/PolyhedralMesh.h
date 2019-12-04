@@ -1,6 +1,7 @@
 #pragma once
 #include <set>
 #include <list>
+#include <algorithm>
 #include "Mesh.h"
 #include "2D/Polygon.h"
 using namespace std;
@@ -33,12 +34,12 @@ public:
 
 	virtual void CoarsenMesh(CoarseningStrategy strategy) override
 	{
-		if (strategy == CoarseningStrategy::Standard)
+		/*if (strategy == CoarseningStrategy::Standard)
 			CoarsenByAgglomerationAndMergeColinearFaces();
-		else if (strategy == CoarseningStrategy::Agglomeration)
+		else if (strategy == CoarseningStrategy::Agglomeration)*/
 			CoarsenByAgglomerationAndKeepFineFaces();
-		else
-			assert(false && "Coarsening strategy not implemented!");
+		/*else
+			assert(false && "Coarsening strategy not implemented!");*/
 		this->CoarseMesh->SetDiffusionCoefficient(this->_diffusionPartition);
 		this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
 	}
@@ -51,32 +52,49 @@ private:
 
 	void CoarsenByAgglomerationAndKeepFineFaces()
 	{
-		if (this->Elements.size() <= AgglomerateSize)
+		/*if (this->Elements.size() <= AgglomerateSize)
 		{
 			cout << "Error: impossible to build coarse mesh. Only " << this->Elements.size() << " element(s) left." << endl;
 		}
-		else
+		else*/
 		{
 			PolyhedralMesh<Dim>* coarseMesh = new PolyhedralMesh<Dim>();
 
-			// TODO: iterate on the interior vertices instead of the elements
-			list<Element<Dim>*> remainingElements;// (this->Elements);
-			while (!remainingElements.empty())
-			{
-				Element<Dim>* e = remainingElements.front();
-				remainingElements.pop_front();
-				if (!e->CoarserElement) // not already aggregated
-				{
-					vector<Element<Dim>*> elementsToAggregate;
-					elementsToAggregate.push_back(e);
-					for (Face<Dim>* f : e->Faces)
-					{
-						if (!f->IsDomainBoundary)
-						{
+			// Associate to each vertex the list of elements it connects
+			map<Vertex*, vector<Element<Dim>*>> vertexElements = BuildVertexElementMap();
 
-						}
+			// Sort the vertices by number of elements
+			sort(this->Vertices.begin(), this->Vertices.end(), [&vertexElements](Vertex* v1, Vertex* v2) { return vertexElements[v1].size() > vertexElements[v2].size(); });
+
+			for (Vertex* v : this->Vertices)
+			{
+				vector<Element<Dim>*> elementsAroundV = vertexElements[v];
+
+				if (elementsAroundV.empty()) // the vertex has been discarded (see below)
+					continue;
+
+				/*bool vIsOnBoundary = true;
+				for (Element<Dim>* e : elementsAroundV)
+				{
+					if (!e->IsOnBoundary())
+					{
+						vIsOnBoundary = false;
+						break;
 					}
-					coarseMesh->Agglomerate(elementsToAggregate);
+				}
+				if (vIsOnBoundary)
+					continue;*/
+
+				for (Element<Dim>* e : elementsAroundV)
+					assert(e->CoarserElement == nullptr);
+
+				coarseMesh->Agglomerate(elementsAroundV, v);
+
+				// All the vertices of the agglomerated elements are dicarded for future agglomeration
+				for (Element<Dim>* e : elementsAroundV)
+				{
+					for (Vertex* v2 : e->Shape()->Vertices())
+						vertexElements[v2].clear();
 				}
 			}
 
@@ -85,9 +103,56 @@ private:
 	}
 
 private:
-
-	Element<Dim>* Agglomerate(vector<Element<Dim>*> fineElements)
+	map<Vertex*, vector<Element<Dim>*>> BuildVertexElementMap()
 	{
+		// Init the map with an empty list of elements for each vertex
+		map<Vertex*, vector<Element<Dim>*>> vertexElements;
+		for (Vertex* v : this->Vertices)
+			vertexElements.insert({ v, vector<Element<Dim>*>() });
+		
+		// Add the elements to the list of their respective vertices
+		for (Element<Dim>* e : this->Elements)
+		{
+			for (Vertex* v : e->Shape()->Vertices())
+				vertexElements[v].push_back(e);
+		}
+
+		// TODO: sort the lists in direct order
+
+
+		return vertexElements;
+	}
+
+	/*set<pair<Vertex*, int>> SortByNumberOfElements(map<Vertex*, vector<Element<Dim>*>> vertexElements)
+	{
+		set<pair<Vertex*, int>> orderedList;
+
+		typename map<Vertex*, vector<Element<Dim>*>>::iterator it;
+		for (it = vertexElements.begin(); it != vertexElements.end(); it++)
+		{
+			Vertex* v = it->first;
+			vector<Element<Dim>*> vElements = it->second;
+
+			orderedList.insert(make_pair(v, vElements->size()));
+		}
+
+		return orderedList;
+	}*/
+
+	void SortInDirectOrder(vector<Element<Dim>*> elementsAroundV, Vertex* v)
+	{
+		assert(elementsAroundV.size() > 0);
+		Element<Dim>* firstElement = elementsAroundV[0];
+
+		// TODO
+	}
+
+	Element<Dim>* Agglomerate(vector<Element<Dim>*> fineElements, Vertex* removedVertex)
+	{
+		//-----------------------------------------------------------------------------------------------------------//
+		// Requirement: fineElements must be sorted in direct (= counter-clockwise) order around the removed vertex. //
+		//-----------------------------------------------------------------------------------------------------------//
+
 		// The interior faces of the future macro-element are flagged.
 		for (Element<2>* e1 : fineElements)
 		{
@@ -96,12 +161,14 @@ private:
 				if (e1 != e2)
 				{
 					Face<2>* interface = e1->InterfaceWith(e2);
-					interface->IsRemovedOnCoarserGrid = true;
+					if (interface != nullptr)
+						interface->IsRemovedOnCoarserGrid = true;
 				}
 			}
 		}
 
-		// Separation of the faces we keep and the faces we remove
+		// Separation of the faces we keep and the faces we remove,
+		// and the vertices of the macro-element are extracted from those of the faces we keep.
 		vector<Vertex*> macroElementVertices;
 		set<Face<Dim>*> keptFaces;
 		set<Face<Dim>*> removedFaces;
@@ -142,7 +209,8 @@ private:
 		{
 			if (!f->CoarseFace) // this face has not been already created by a previous aggregation
 			{
-				Face<Dim>* copy = f->CreateSameGeometricFace(0, macroElement);
+				BigNumber faceNumber = this->Faces.size();
+				Face<Dim>* copy = f->CreateSameGeometricFace(faceNumber, macroElement);
 				copy->IsDomainBoundary = f->IsDomainBoundary;
 				f->CoarseFace = copy;
 				copy->FinerFaces.push_back(f);
@@ -168,9 +236,10 @@ private:
 
 	Element<Dim>* CreatePolyhedron(vector<Vertex*> vertices)
 	{
+		BigNumber elementNumber = this->Elements.size();
 		if (Dim == 2)
 		{
-			Polygon* macroElement = new Polygon(0, vertices);
+			Polygon* macroElement = new Polygon(elementNumber, vertices);
 			return macroElement;
 		}
 		assert(false && "Not yet implemented");
