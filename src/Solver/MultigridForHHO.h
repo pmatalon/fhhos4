@@ -11,6 +11,7 @@ class LevelForHHO : public Level
 private:
 	Poisson_HHO<Dim>* _problem;
 	int _algoNumber = 1;
+	bool _exportMatrices = false;
 public:
 	LevelForHHO(int number, Poisson_HHO<Dim>* problem, bool useGalerkinOperator, int algoNumber)
 		: Level(number)
@@ -56,9 +57,14 @@ private:
 		SparseMatrix J_f_c = GetGlobalCanonicalInjectionMatrixCoarseToFineElements();
 		SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
 
-		/*finePb->ExportMatrix(I_c, "I_c");
-		finePb->ExportMatrix(J_f_c, "J_f_c");
-		finePb->ExportMatrix(Pi_f, "Pi_f");*/
+		if (_exportMatrices)
+		{
+			SparseMatrix SolveCellUnknowns = GetSolveCellUnknownsMatrix(coarsePb);
+			finePb->ExportMatrix(I_c, "I_c");
+			finePb->ExportMatrix(J_f_c, "J_f_c");
+			finePb->ExportMatrix(Pi_f, "Pi_f");
+			finePb->ExportMatrix(SolveCellUnknowns, "SolveCellUnknowns");
+		}
 
 		SparseMatrix P_algo1 = Pi_f * J_f_c * I_c;
 
@@ -84,13 +90,17 @@ private:
 			P = SparseMatrix(finePb->HHO->nInteriorFaces * nFaceUnknowns, coarsePb->HHO->nInteriorFaces * nFaceUnknowns);
 			parallelLoop.Fill(P);
 		}
-		//finePb->ExportMatrix(P, "P");
+
+		if (_exportMatrices)
+			finePb->ExportMatrix(P, "P");
 	}
 
 	void SetupRestriction() override
 	{
 		R = P.transpose();
-		//this->_problem->ExportMatrix(R, "R");
+
+		if (_exportMatrices)
+			this->_problem->ExportMatrix(R, "R");
 	}
 
 	inline double Weight(Element<Dim>* element, Face<Dim>* face)
@@ -149,6 +159,42 @@ private:
 					BigNumber faceGlobalNumber = face->Number;
 					BigNumber faceLocalNumber = element->LocalNumberOf(face);
 					DenseMatrix reconstructMatrix = element->ReconstructionFromFacesMatrix();
+					chunk->Results.Coeffs.Add(elemGlobalNumber * cellInterpolationBasis->Size(), faceGlobalNumber * nFaceUnknowns, reconstructMatrix.block(0, faceLocalNumber*nFaceUnknowns, cellInterpolationBasis->Size(), nFaceUnknowns));
+				}
+			});
+
+		SparseMatrix M(problem->HHO->nElements * cellInterpolationBasis->Size(), problem->HHO->nTotalFaceUnknowns);
+		parallelLoop.Fill(M);
+		delete cellInterpolationBasis;
+
+		return M;
+	}
+
+	SparseMatrix GetSolveCellUnknownsMatrix(Poisson_HHO<Dim>* problem)
+	{
+		int nCellUnknowns = problem->HHO->nCellUnknowns;
+		int nFaceUnknowns = problem->HHO->nFaceUnknowns;
+
+		FunctionalBasis<Dim - 1>* faceBasis = problem->HHO->FaceBasis;
+		FunctionalBasis<Dim>* cellInterpolationBasis = new FunctionalBasis<Dim>(faceBasis->BasisCode(), faceBasis->GetDegree(), false);
+
+		ElementParallelLoop<Dim> parallelLoop(problem->_mesh->Elements);
+		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nFaceUnknowns);
+
+		parallelLoop.Execute([this, nFaceUnknowns, cellInterpolationBasis](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
+				for (auto f : element->Faces)
+				{
+					if (f->IsDomainBoundary)
+						continue;
+
+					Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+
+					BigNumber elemGlobalNumber = element->Number;
+					BigNumber faceGlobalNumber = face->Number;
+					BigNumber faceLocalNumber = element->LocalNumberOf(face);
+					DenseMatrix reconstructMatrix = element->SolveCellUnknownsMatrix();
 					chunk->Results.Coeffs.Add(elemGlobalNumber * cellInterpolationBasis->Size(), faceGlobalNumber * nFaceUnknowns, reconstructMatrix.block(0, faceLocalNumber*nFaceUnknowns, cellInterpolationBasis->Size(), nFaceUnknowns));
 				}
 			});
