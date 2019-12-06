@@ -307,6 +307,9 @@ public:
 							fineUpper->ObliqueEdge()->IsRemovedOnCoarserGrid = true;
 							fineUpper->EastEdge()->IsRemovedOnCoarserGrid = true;
 							fineUpper->NorthEdge()->IsRemovedOnCoarserGrid = true;
+							coarseLower->FinerFacesRemoved.push_back(fineUpper->ObliqueEdge());
+							coarseLower->FinerFacesRemoved.push_back(fineUpper->EastEdge());
+							coarseLower->FinerFacesRemoved.push_back(fineUpper->NorthEdge());
 
 							coarseLower->WestEdge()->FinerFaces.push_back(fineLower->WestEdge());
 						}
@@ -338,6 +341,9 @@ public:
 							fineLower->SouthEdge()->IsRemovedOnCoarserGrid = true;
 							fineLower->ObliqueEdge()->IsRemovedOnCoarserGrid = true;
 							fineLower->WestEdge()->IsRemovedOnCoarserGrid = true;
+							coarseUpper->FinerFacesRemoved.push_back(fineLower->SouthEdge());
+							coarseUpper->FinerFacesRemoved.push_back(fineLower->ObliqueEdge());
+							coarseUpper->FinerFacesRemoved.push_back(fineLower->WestEdge());
 						}
 					}
 					if (j == nx - 1) // last row
@@ -371,118 +377,20 @@ public:
 					cout << fineF->Number << " ";
 				cout << endl;
 			}*/
+			SanityCheckStandardCoarsening();
 		}
 	}
 
-	/*void CoarsenByAgglomerationAndKeepFineFaces()
+	void SanityCheckStandardCoarsening()
 	{
-		BigNumber nx = this->Nx;
-		BigNumber ny = this->Ny;
-
-		if (nx % 2 != 0 || ny % 2 != 0)
+		for (Element<2>* ce : this->CoarseMesh->Elements)
 		{
-			cout << "Error: impossible to build coarse mesh. Nx and Ny must be even: Nx = " << nx << ", Ny = " << ny << "." << endl;
+			assert(ce->FinerElements.size() == 4);
+			assert(ce->FinerFacesRemoved.size() == 3);
 		}
-		else
-		{
-			CartesianPolygonalMesh2D* coarseMesh = new CartesianPolygonalMesh2D();
-			coarseMesh->Nx = nx / 2;
-			coarseMesh->Ny = ny / 2;
 
-			// Elements //
-			BigNumber faceNumber = 0;
-			for (BigNumber i = 0; i < ny/2; ++i)
-			{
-				for (BigNumber j = 0; j < nx/2; ++j)
-				{
-					Triangle* bottomLeftElement = dynamic_cast<Triangle*>(this->Elements[2 * i * nx + 2 * j]);
-					Triangle* bottomRightElement = dynamic_cast<Triangle*>(this->Elements[2 * i * nx + 2 * j + 1]);
-					Triangle* topLeftElement = dynamic_cast<Triangle*>(this->Elements[(2 * i + 1) * nx + 2 * j]);
-					Triangle* topRightElement = dynamic_cast<Triangle*>(this->Elements[(2 * i + 1) * nx + 2 * j + 1]);
+		for (Face<2>* cf : this->CoarseMesh->Faces)
+			assert(cf->FinerFaces.size() == 2);
+	}
 
-					// Coarse element
-					RectangularPolygon* coarseElement = new RectangularPolygon(i*nx/2 + j, bottomLeftElement->BottomLeftCorner, topLeftElement->TopLeftCorner, topRightElement->TopRightCorner, bottomRightElement->BottomRightCorner);
-					coarseMesh->Elements.push_back(coarseElement);
-
-					coarseElement->FinerElements.push_back(bottomLeftElement);
-					coarseElement->FinerElements.push_back(bottomRightElement);
-					coarseElement->FinerElements.push_back(topLeftElement);
-					coarseElement->FinerElements.push_back(topRightElement);
-
-					bottomLeftElement->CoarserElement = coarseElement;
-					bottomRightElement->CoarserElement = coarseElement;
-					topLeftElement->CoarserElement = coarseElement;
-					topRightElement->CoarserElement = coarseElement;
-
-					// West faces
-					if (j == 0)
-					{
-						Face<2>* bottomWestFace = bottomLeftElement->WestFace->CreateSameGeometricFace(faceNumber++, coarseElement);
-						bottomWestFace->FinerFaces.push_back(bottomLeftElement->WestFace);
-						Face<2>* topWestFace = topLeftElement->WestFace->CreateSameGeometricFace(faceNumber++, coarseElement);
-						topWestFace->FinerFaces.push_back(topLeftElement->WestFace);
-						coarseElement->AddWestFace(bottomWestFace);
-						coarseElement->AddWestFace(topWestFace);
-						coarseMesh->AddFace(bottomWestFace);
-						coarseMesh->AddFace(topWestFace);
-					}
-					else
-					{
-						RectangularPolygon* leftNeighbour = dynamic_cast<RectangularPolygon*>(coarseMesh->Elements[i * nx/2 + j - 1]);
-						coarseElement->SetWestFacesFromNeighbour(leftNeighbour);
-					}
-
-					// North faces
-					Face<2>* leftNorthFace = topLeftElement->NorthFace->CreateSameGeometricFace(faceNumber++, coarseElement);
-					leftNorthFace->FinerFaces.push_back(topLeftElement->NorthFace);
-					Face<2>* rightNorthFace = topRightElement->NorthFace->CreateSameGeometricFace(faceNumber++, coarseElement);
-					rightNorthFace->FinerFaces.push_back(topRightElement->NorthFace);
-					coarseElement->AddNorthFace(leftNorthFace);
-					coarseElement->AddNorthFace(rightNorthFace);
-					coarseMesh->AddFace(leftNorthFace);
-					coarseMesh->AddFace(rightNorthFace);
-
-					// East faces
-					Face<2>* topEastFace = topRightElement->EastFace->CreateSameGeometricFace(faceNumber++, coarseElement);
-					topEastFace->FinerFaces.push_back(topRightElement->EastFace);
-					Face<2>* bottomEastFace = bottomRightElement->EastFace->CreateSameGeometricFace(faceNumber++, coarseElement);
-					bottomEastFace->FinerFaces.push_back(bottomRightElement->EastFace);
-					coarseElement->AddEastFace(topEastFace);
-					coarseElement->AddEastFace(bottomEastFace);
-					coarseMesh->AddFace(topEastFace);
-					coarseMesh->AddFace(bottomEastFace);
-
-					// South faces
-					if (i == 0)
-					{
-						Face<2>* rightSouthFace = bottomRightElement->SouthFace->CreateSameGeometricFace(faceNumber++, coarseElement);
-						rightSouthFace->FinerFaces.push_back(bottomRightElement->SouthFace);
-						Face<2>* leftSouthFace = bottomLeftElement->SouthFace->CreateSameGeometricFace(faceNumber++, coarseElement);
-						leftSouthFace->FinerFaces.push_back(bottomLeftElement->SouthFace);
-						coarseElement->AddSouthFace(rightSouthFace);
-						coarseElement->AddSouthFace(leftSouthFace);
-						coarseMesh->AddFace(rightSouthFace);
-						coarseMesh->AddFace(leftSouthFace);
-					}
-					else
-					{
-						RectangularPolygon* bottomNeighbour = dynamic_cast<RectangularPolygon*>(coarseMesh->Elements[(i - 1) * nx/2 + j]);
-						coarseElement->SetSouthFacesFromNeighbour(bottomNeighbour);
-					}
-
-					// Finer faces removed
-					bottomLeftElement->NorthFace->IsRemovedOnCoarserGrid = true;
-					topLeftElement->EastFace->IsRemovedOnCoarserGrid = true;
-					topRightElement->SouthFace->IsRemovedOnCoarserGrid = true;
-					bottomRightElement->WestFace->IsRemovedOnCoarserGrid = true;
-					coarseElement->FinerFacesRemoved.push_back(bottomLeftElement->NorthFace);
-					coarseElement->FinerFacesRemoved.push_back(topLeftElement->EastFace);
-					coarseElement->FinerFacesRemoved.push_back(topRightElement->SouthFace);
-					coarseElement->FinerFacesRemoved.push_back(bottomRightElement->WestFace);
-				}
-			}
-
-			this->CoarseMesh = coarseMesh;
-		}
-	}*/
 };

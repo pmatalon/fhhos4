@@ -133,6 +133,30 @@ public:
 	{
 		return GeometricShapeWithConstantJacobian<2>::Integral(globalFunction, polynomialDegree);
 	}
+
+	//-------------------------------------------------------------------//
+	//                            Unit tests                             //
+	//-------------------------------------------------------------------//
+
+	static void Test()
+	{
+		int number = 0;
+		Vertex lowerLeft(number, -1, -1);
+		Vertex lowerRight(number, 1, -1);
+		Vertex upperLeft(number, -1, 1);
+
+		TriangleShape t(&lowerLeft, &lowerRight, &upperLeft);
+
+		t.UnitTests();
+
+		RefPoint llRef = t.ConvertToReference(lowerLeft);
+		assert(llRef == RefPoint(0, 0));
+		DomPoint llDom = t.ConvertToDomain(RefPoint(0, 0));
+		assert(lowerLeft == llDom);
+
+		RefPoint ulRef = t.ConvertToReference(upperLeft);
+		assert(ulRef == RefPoint(0, 1));
+	}
 };
 
 ReferenceTriangle TriangleShape::RefTriangle = ReferenceTriangle();

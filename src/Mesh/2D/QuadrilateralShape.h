@@ -210,6 +210,9 @@ public:
 		Vertex upperLeft(number, -1, 1);
 
 		QuadrilateralShape q(&lowerLeft, &lowerRight, &upperRight, &upperLeft);
+
+		q.UnitTests();
+
 		RefPoint llRef = q.ConvertToReference(lowerLeft);
 		assert(llRef == RefPoint(-1, -1));
 		DomPoint llDom = q.ConvertToDomain(RefPoint(-1, -1));

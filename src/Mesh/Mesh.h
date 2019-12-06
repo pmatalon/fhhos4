@@ -91,7 +91,7 @@ public:
 	virtual void ExportFacesToMatlab(string filePath)
 	{
 		FILE* file = fopen(filePath.c_str(), "w");
-		fprintf(file, "Number OriginX OriginY OriginZ WidthX WidthY WidthZ Orientation Boundary\n");
+		fprintf(file, "Number x1    y1    x2    y2 IsDomainBoundary\n");
 		for (Face<Dim>* f : this->Faces)
 			f->ExportFaceToMatlab(file);
 		fclose(file);
@@ -138,6 +138,41 @@ public:
 
 		for (auto f : this->InteriorFaces)
 			assert(!f->IsDomainBoundary);
+
+		if (CoarseMesh)
+		{
+			CoarseMesh->SanityCheck();
+
+			for (Element<Dim>* fe : this->Elements)
+			{
+				assert(fe->CoarserElement != nullptr);
+
+				bool feIsReferenced = false;
+				for (Element<Dim>* e : fe->CoarserElement->FinerElements)
+				{
+					if (e == fe)
+					{
+						feIsReferenced = true;
+						break;
+					}
+				}
+				assert(feIsReferenced);
+			}
+
+			for (Element<Dim>* ce : CoarseMesh->Elements)
+			{
+				assert(ce->FinerElements.size() > 0);
+				for (Face<Dim>* ff : ce->FinerFacesRemoved)
+					assert(ff->IsRemovedOnCoarserGrid);
+			}
+			
+			for (Face<Dim>* cf : CoarseMesh->Faces)
+			{
+				assert(cf->FinerFaces.size() > 0);
+				for (Face<Dim>* ff : cf->FinerFaces)
+					assert(!ff->IsRemovedOnCoarserGrid);
+			}
+		}
 	}
 
 	virtual ~Mesh() 

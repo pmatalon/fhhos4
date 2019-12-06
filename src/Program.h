@@ -55,6 +55,7 @@ public:
 		if (n <= 4)
 		{
 			// Unit tests
+			TriangleShape::Test();
 			QuadrilateralShape::Test();
 			PolygonalShape::Test();
 
@@ -284,6 +285,7 @@ public:
 		mesh->SetBoundaryConditions(&bc);
 
 		//mesh->CoarsenMesh(CoarseningStrategy::Standard);
+		//mesh->SanityCheck();
 		//cout << *mesh << endl << endl;
 		//cout << "Coarse mesh" << endl << *(mesh->CoarseMesh) << endl << endl;
 
