@@ -354,30 +354,7 @@ public:
 			}
 
 			this->CoarseMesh = coarseMesh;
-
-			/*for (Element<2>* elem : coarseMesh->Elements)
-			{
-				cout << "Coarse elem " << elem->Number << ", fine elem: ";
-				for (Element<2>* fineElem : elem->FinerElements)
-					cout << fineElem->Number << " ";
-				cout << endl;
-			}
-			cout << endl;
-			for (Face<2>* f : this->Faces)
-			{
-				Edge* e = dynamic_cast<Edge*>(f);
-				cout << "Fine " << *e << ", IsRemovedOnCoarserGrid = " << e->IsRemovedOnCoarserGrid << endl;
-			}
-			cout << endl;
-			for (Face<2>* f : coarseMesh->Faces)
-			{
-				Edge* e = dynamic_cast<Edge*>(f);
-				cout << "Coarse " << *e << ", FinerFaces = ";
-				for (Face<2>* fineF : e->FinerFaces)
-					cout << fineF->Number << " ";
-				cout << endl;
-			}*/
-			SanityCheckStandardCoarsening();
+			//SanityCheckStandardCoarsening();
 		}
 	}
 
