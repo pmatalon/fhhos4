@@ -55,7 +55,20 @@ public:
 
 	inline void ExportFaceToMatlab(FILE* file)
 	{
-		fprintf(file, "%llu %.17g %.17g %.17g %.17g %.17g %.17g %d %d\n", this->Number, _shape->Origin->X, _shape->Origin->Y, _shape->Origin->Z, _shape->WidthX, _shape->WidthY, _shape->WidthZ, _shape->Orientation, this->IsDomainBoundary);
+		if (Dim == 2)
+		{
+			DomPoint p2 = *(_shape->Origin);
+			if (_shape->Orientation == CartesianShapeOrientation::Horizontal)
+				p2.X += _shape->WidthX;
+			else if (_shape->Orientation == CartesianShapeOrientation::Vertical)
+				p2.Y += _shape->WidthY;
+			else
+				assert(false);
+			//             Number  x1    y1    x2    y2 IsDomainBoundary
+			fprintf(file, "%llu %.17g %.17g %.17g %.17g %d\n", this->Number, _shape->Origin->X, _shape->Origin->Y, p2.X, p2.Y, this->IsDomainBoundary);
+		}
+		else
+			assert(false);
 	}
 
 	virtual ~CartesianFace()
