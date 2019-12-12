@@ -20,12 +20,14 @@ public:
 			double normExactSolution = 0;
 		};
 
+		int degreeUsedForNonPolynomials = basis.GetDegree() + 2;
+
 		ParallelLoop<Element<Dim>*, ChunkResult> parallelLoop(mesh->Elements);
-		parallelLoop.Execute([&basis, &solution, exactSolution](Element<Dim>* element, ParallelChunk<ChunkResult>* chunk)
+		parallelLoop.Execute([&basis, &solution, exactSolution, &degreeUsedForNonPolynomials](Element<Dim>* element, ParallelChunk<ChunkResult>* chunk)
 			{
 				auto approximate = basis.GetApproximateFunction(solution, element->Number * basis.NumberOfLocalFunctionsInElement(element));
-				chunk->Results.absoluteError += element->L2ErrorPow2(approximate, exactSolution);
-				chunk->Results.normExactSolution += element->Integral([exactSolution](DomPoint p) { return pow(exactSolution(p), 2); });
+				chunk->Results.absoluteError += element->L2ErrorPow2(approximate, exactSolution, degreeUsedForNonPolynomials);
+				chunk->Results.normExactSolution += element->Integral([exactSolution](DomPoint p) { return pow(exactSolution(p), 2); }, degreeUsedForNonPolynomials);
 			});
 
 

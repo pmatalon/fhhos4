@@ -179,14 +179,14 @@ public:
 		return gradOnFace;
 	}
 
-	double L2ErrorPow2(RefFunction approximate, DomFunction exactSolution) const
+	double L2ErrorPow2(RefFunction approximate, DomFunction exactSolution, int degreeUsed) const
 	{
 		RefFunction errorFunction = [this, exactSolution, approximate](RefPoint refElementPoint) {
 			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
 			return pow(exactSolution(domainPoint) - approximate(refElementPoint), 2);
 		};
 
-		return Integral(errorFunction);
+		return Integral(errorFunction, degreeUsed);
 	}
 
 	double SourceTerm(BasisFunction<Dim>* phi, SourceFunction* f)
