@@ -77,7 +77,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ProjectPublicIncludePath>
     </ProjectPublicIncludePath>
-    <IncludePath>C:\Users\pierr\Documents\Source\Repos\dghho\eigen-eigen-b3f3d4950030;$(IncludePath)</IncludePath>
+    <IncludePath>C:\Users\pierr\Documents\Source\Repos\dghho\eigen-eigen-b3f3d4950030;C:\Users\pierr\Documents\Source\Repos\dghho\gmsh-4.4.1-Linux64-sdk\include;$(IncludePath)</IncludePath>
     <LibraryPath>
     </LibraryPath>
     <SourcePath>$(ProjectDir)Mesh;$(ProjectDir)DG;$(ProjectDir)FunctionalBasis;$(ProjectDir)HHO;$(ProjectDir)Utils;$(SourcePath)</SourcePath>
@@ -107,6 +107,7 @@
     <ClInclude Include="src\HHO\HHOParameters.h" />
     <ClInclude Include="src\Mesh\2D\CartesianPolygonalMesh2D.h" />
     <ClInclude Include="src\Mesh\2D\Edge.h" />
+    <ClInclude Include="src\Mesh\2D\GMSHTriangularMesh.h" />
     <ClInclude Include="src\Mesh\2D\Polygon.h" />
     <ClInclude Include="src\Mesh\2D\PolygonalShape.h" />
     <ClInclude Include="src\Mesh\2D\Quadrilateral.h" />
@@ -189,13 +190,18 @@
   </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>/mnt/c/Users/pierr/Documents/Source/Repos/dghho/eigen-eigen-b3f3d4950030;$(ProjectPublicIncludePath);%(ClCompile.AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>/mnt/c/Users/pierr/Documents/Source/Repos/dghho/eigen-eigen-b3f3d4950030;$(ProjectPublicIncludePath);%(ClCompile.AdditionalIncludeDirectories);/mnt/c/Users/pierr/Documents/Source/Repos/dghho/gmsh-4.4.1-Linux64-sdk/include</AdditionalIncludeDirectories>
       <AdditionalOptions>
       </AdditionalOptions>
       <Verbose>true</Verbose>
     </ClCompile>
     <Link>
       <AdditionalOptions>-fopenmp %(AdditionalOptions)</AdditionalOptions>
+      <LibraryDependencies>gmsh</LibraryDependencies>
+      <AdditionalLibraryDirectories>/mnt/c/Users/pierr/Documents/Source/Repos/dghho/gmsh-4.4.1-Linux64-sdk/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <ShowProgress>false</ShowProgress>
+      <VerboseOutput>false</VerboseOutput>
+      <Trace>false</Trace>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

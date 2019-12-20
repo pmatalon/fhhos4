@@ -8,6 +8,10 @@ set(TPL_ENABLE_AGMG FALSE CACHE BOOL "Whether AGMG is enabled")
 # Include Eigen
 include_directories(eigen-eigen-b3f3d4950030)
 
+# Include GMSH
+include_directories(${CMAKE_SOURCE_DIR}/gmsh-4.4.1-Linux64-sdk/include)
+link_directories(${CMAKE_SOURCE_DIR}/gmsh-4.4.1-Linux64-sdk/lib)
+
 file(
 	GLOB_RECURSE
 	source_files
@@ -20,6 +24,9 @@ add_executable(dghho ${source_files})
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 target_link_libraries(dghho Threads::Threads)
+
+# Include GMSH
+target_link_libraries(dghho "-lgmsh")
 
 # c++ flags
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
