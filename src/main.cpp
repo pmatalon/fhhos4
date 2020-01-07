@@ -304,6 +304,7 @@ int main(int argc, char* argv[])
 					&& meshCode.compare("cart-poly") != 0
 					&& meshCode.compare("tri") != 0
 					&& meshCode.compare("gmsh-tri") != 0
+					&& meshCode.compare("gmsh-cart") != 0
 					&& meshCode.compare("quad") != 0
 					&& meshCode.compare("quad-poly") != 0)
 					argument_error("unknown mesh code '" + meshCode + "'. Check -mesh argument.");

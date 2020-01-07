@@ -8,7 +8,7 @@
 #include "Mesh/2D/TriangularMesh.h"
 #include "Mesh/2D/QuadrilateralMesh.h"
 #include "Mesh/2D/QuadrilateralAsPolygonalMesh.h"
-#include "Mesh/2D/GMSHTriangularMesh.h"
+#include "Mesh/GMSHMesh.h"
 #include "Utils/Action.h"
 #include "Utils/Timer.h"
 #include "Solver/ConjugateGradient.h"
@@ -488,8 +488,8 @@ Mesh<2>* ProgramDim<2>::BuildMesh(int n, string meshCode)
 		return new QuadrilateralMesh(n, n, 0.5);
 	else if (meshCode.compare("quad-poly") == 0)
 		return new QuadrilateralAsPolygonalMesh(n, n, 0.5);
-	else if (meshCode.compare("gmsh-tri") == 0)
-		return new GMSHTriangularMesh();
+	else if (meshCode.compare("gmsh-cart") == 0)
+		return new GMSHMesh<2>("/mnt/c/Users/pierr/Documents/Source/Repos/dghho/data/meshes/square_cart_n2.msh");
 	assert(false);
 }
 
