@@ -211,6 +211,10 @@ public:
 	{
 		return _center;
 	}
+	inline bool Contains(DomPoint p) const override
+	{
+		assert(false && "Not implemented");
+	}
 
 	void Serialize(ostream& os) const
 	{

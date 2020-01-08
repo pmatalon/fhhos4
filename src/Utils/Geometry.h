@@ -73,4 +73,11 @@ public:
 			assert(false);
 	}
 
+	static bool IsInSegment(DomPoint A, DomPoint B, DomPoint P)
+	{
+		DimVector<2> AB = B - A;
+		DimVector<2> AP = P - A;
+		return AB.dot(AP) > 0 && AB.dot(AP) < AB.dot(AB);
+	}
+
 };

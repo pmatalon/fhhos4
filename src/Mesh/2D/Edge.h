@@ -2,6 +2,7 @@
 #include "../../DG/Poisson_DG_Face.h"
 #include "../../HHO/Poisson_HHO_Face.h"
 #include "../CartesianShape.h"
+#include "../../Utils/Geometry.h"
 
 class EdgeShape : public GeometricShapeWithConstantJacobian<1>
 {
@@ -46,6 +47,10 @@ public:
 	inline DomPoint Center() const override
 	{
 		return _center;
+	}
+	inline bool Contains(DomPoint p) const override
+	{
+		return Geometry::IsInSegment(*Vertex1, *Vertex2, p);
 	}
 
 	inline double DetJacobian() const override

@@ -16,6 +16,8 @@ public:
 
 	virtual vector<Vertex*> Vertices() const = 0;
 
+	virtual bool Contains(DomPoint p) const = 0;
+
 	// Transformation to reference element
 	virtual DomPoint ConvertToDomain(RefPoint refPoint) const = 0;
 	virtual RefPoint ConvertToReference(DomPoint domainPoint) const = 0;

@@ -133,9 +133,10 @@ void print_usage() {
 	cout << "              rbgs - Reverse Block Gauss-Seidel" << endl;
 	cout << endl;
 	cout << "-cs CODE" << endl;
-	cout << "      Coarsening strategy of the multigrid. Default: standard coarsening." << endl;
+	cout << "      Coarsening strategy of the multigrid." << endl;
 	cout << "              s    - standard coarsening (merge colinear faces on the coarse mesh)" << endl;
 	cout << "              a    - agglomeration coarsening (keep fine faces on the coarse mesh)" << endl;
+	cout << "              r    - fine meshes obtained by structured refinement of the coarse mesh" << endl;
 	cout << endl;
 	cout << "-initial-guess CODE" << endl;
 	cout << "      Initial guess for the iterative solvers." << endl;
@@ -388,10 +389,12 @@ int main(int argc, char* argv[])
 			case OPT_CoarseningStrategy:
 			{
 				string code = optarg;
-				if (code.compare("s") != 0 && code.compare("a") != 0)
+				if (code.compare("s") != 0 && code.compare("a") != 0 && code.compare("r") != 0)
 					argument_error("unknown coarsening strategy code '" + code + "'. Check -cs argument.");
 				if (code.compare("a") == 0)
 					coarseningStgy = CoarseningStrategy::Agglomeration;
+				if (code.compare("r") == 0)
+					coarseningStgy = CoarseningStrategy::StructuredRefinement;
 				break;
 			}
 			case OPT_InitialGuess:

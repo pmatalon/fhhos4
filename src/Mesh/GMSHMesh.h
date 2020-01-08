@@ -30,15 +30,33 @@ class GMSHMesh : public PolyhedralMesh<Dim>
 private:
 	map<size_t, BigNumber> _elementExternalNumbers;
 	map<size_t, BigNumber> _vertexExternalNumbers;
+	double _h = -1;
 public:
-	GMSHMesh(string mshFile) : PolyhedralMesh<Dim>()
+	GMSHMesh(string mshFile, int initialRefinements = 0) : PolyhedralMesh<Dim>()
 	{
+		if (!Utils::FileExists(mshFile))
+		{
+			cout << "File not found: " << mshFile;
+			exit(EXIT_FAILURE);
+		}
+
 		gmsh::initialize();
 		gmsh::open(mshFile);
 
-		for (int i=0; i<5; i++)
+		for (int i = 0; i < initialRefinements; i++)
 			gmsh::model::mesh::refine();
 
+		Build();
+	}
+
+private:
+	GMSHMesh() : PolyhedralMesh<Dim>()
+	{
+		Build();
+	}
+
+	void Build()
+	{
 		//----------//
 		// Vertices //
 		//----------//
@@ -92,7 +110,6 @@ public:
 
 					e = new Quadrilateral(elemNumber, GetVertex(nodeTag1), GetVertex(nodeTag2), GetVertex(nodeTag3), GetVertex(nodeTag4));
 					_elementExternalNumbers.insert({ elements[j], elemNumber });
-					elemNumber++;
 					elemNodeIndex += 4;
 				}
 				else if (elemType == GMSH_Triangle)
@@ -103,7 +120,6 @@ public:
 
 					e = new Triangle(elemNumber, GetVertex(nodeTag1), GetVertex(nodeTag2), GetVertex(nodeTag3));
 					_elementExternalNumbers.insert({ elements[j], elemNumber });
-					elemNumber++;
 					elemNodeIndex += 3;
 				}
 				else
@@ -114,7 +130,12 @@ public:
 					MeshVertex<Dim>* mv = (MeshVertex<Dim>*)v;
 					mv->Elements.push_back(e);
 				}
+
 				this->Elements.push_back(e);
+				elemNumber++;
+
+				if (e->Diameter() > this->_h)
+					this->_h = e->Diameter();
 			}
 		}
 
@@ -195,10 +216,17 @@ private:
 		return this->Vertices[internalNumber];
 	}
 
+	inline Element<Dim>* GetElement(BigNumber elementTag)
+	{
+		BigNumber internalNumber = _elementExternalNumbers.at(elementTag);
+		return this->Elements[internalNumber];
+	}
+
 public:
 	~GMSHMesh()
 	{
-		gmsh::finalize();
+		if (!this->CoarseMesh)
+			gmsh::finalize();
 	}
 
 	string Description() override
@@ -213,12 +241,127 @@ public:
 
 	double H() override
 	{
-		
+		return _h;
 	}
 
 	void CoarsenMesh(CoarseningStrategy strategy) override
 	{
-		assert(false);
+		if (strategy != CoarseningStrategy::StructuredRefinement)
+			assert(false);
+	}
+
+	void RefineMesh()
+	{
+		if (this->FineMesh)
+			assert(false && "Mesh already refined!");
+
+		string coarse_mesh_tmp_file = "./temporary_coarse.msh";
+		string fine_mesh_tmp_file = "./temporary_fine.msh";
+
+		// Save the current mesh in a temporary file, because the refinement will delete it
+		gmsh::write(coarse_mesh_tmp_file);
+
+		// Mesh refinement
+		gmsh::model::mesh::refine();
+
+		// Building our own mesh objects from the GMSH ones
+		GMSHMesh<Dim>* fineMesh = new GMSHMesh<Dim>();
+		this->FineMesh = fineMesh;
+		this->FineMesh->CoarseMesh = this;
+
+		// Save the fine mesh in a temporary file because we're going to reload the coarse one
+		gmsh::write(fine_mesh_tmp_file);
+
+		// Reloading the now coarse mesh to be able to link its objects with the finer ones
+		gmsh::open(coarse_mesh_tmp_file);
+
+		// Linking fine/coarse elements
+		for (Element<Dim>* fine : fineMesh->Elements)
+		{
+			Element<Dim>* coarse = LocateElementThatEmbeds(fine);
+			coarse->FinerElements.push_back(fine);
+			fine->CoarserElement = coarse;
+		}
+
+		// Remove coarse temporary file and reload the fine mesh
+		remove(coarse_mesh_tmp_file.c_str());
+		gmsh::open(fine_mesh_tmp_file);
+		remove(fine_mesh_tmp_file.c_str());
+
+		// Continue linking
+		for (Face<Dim>* fineFace : fineMesh->Faces)
+		{
+			if (fineFace->IsDomainBoundary)
+			{
+				fineFace->IsRemovedOnCoarserGrid = false;
+				for (Face<Dim>* coarseFace : fineFace->Element1->CoarserElement->Faces)
+				{
+					if (coarseFace->IsDomainBoundary && coarseFace->Contains(fineFace->Center()))
+					{
+						fineFace->CoarseFace = coarseFace;
+						coarseFace->FinerFaces.push_back(fineFace);
+						break;
+					}
+				}
+			}
+			else
+			{
+				Element<Dim>* coarseElement1 = fineFace->Element1->CoarserElement;
+				Element<Dim>* coarseElement2 = fineFace->Element2->CoarserElement;
+				fineFace->IsRemovedOnCoarserGrid = coarseElement1 == coarseElement2;
+				if (!fineFace->IsRemovedOnCoarserGrid)
+				{
+					// TODO: change InterfaceWith so it returns a vector of faces (local refinement)
+					Face<Dim>* coarseFace = coarseElement1->InterfaceWith(coarseElement2);
+					fineFace->CoarseFace = coarseFace;
+					coarseFace->FinerFaces.push_back(fineFace);
+				}
+				else
+					coarseElement1->FinerFacesRemoved.push_back(fineFace);
+			}
+		}
+	}
+
+	GMSHMesh<Dim>* RefineNTimes(int nRefinements)
+	{
+		GMSHMesh<Dim>* mesh = this;
+		for (int i = 0; i < nRefinements; i++)
+		{
+			mesh->RefineMesh();
+			mesh = static_cast<GMSHMesh<Dim>*>(mesh->FineMesh);
+		}
+		return mesh;
+	}
+
+	GMSHMesh<Dim>* RefineUntilNElements(BigNumber nElements)
+	{
+		GMSHMesh<Dim>* mesh = this;
+		while (mesh->Elements.size() < nElements)
+		{
+			mesh->RefineMesh();
+			mesh = static_cast<GMSHMesh<Dim>*>(mesh->FineMesh);
+		}
+		return mesh;
+	}
+
+private:
+	Element<Dim>* LocateElementThatEmbeds(Element<Dim>* finerElement)
+	{
+		size_t coarseElementTag;
+		int coarseElementType;
+		DomPoint fineCenter = finerElement->Center();
+		vector<size_t> coarseElementNodes;
+		double u, v, w;
+		bool strictResearch = true;
+
+		vector<std::string> names;
+		gmsh::model::list(names);
+
+		gmsh::model::mesh::getElementByCoordinates(fineCenter.X, fineCenter.Y, fineCenter.Z, coarseElementTag,
+			coarseElementType, coarseElementNodes, u, v, w, // useless parameters for us
+			Dim, strictResearch);
+
+		return GetElement(coarseElementTag);
 	}
 
 };

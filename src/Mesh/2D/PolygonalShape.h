@@ -77,6 +77,10 @@ public:
 	{
 		return *_center;
 	}
+	inline bool Contains(DomPoint p) const override
+	{
+		assert(false && "Not implemented");
+	}
 
 	double Integral(RefFunction boundingBoxDefinedFunction) const override
 	{

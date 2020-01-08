@@ -53,7 +53,7 @@ public:
 
 		Mesh<Dim>* mesh = BuildMesh(n, meshCode);
 
-		if (n <= 4)
+		if (n <= 16)
 		{
 			// Unit tests
 			TriangleShape::Test();
@@ -489,7 +489,11 @@ Mesh<2>* ProgramDim<2>::BuildMesh(int n, string meshCode)
 	else if (meshCode.compare("quad-poly") == 0)
 		return new QuadrilateralAsPolygonalMesh(n, n, 0.5);
 	else if (meshCode.compare("gmsh-cart") == 0)
-		return new GMSHMesh<2>("/mnt/c/Users/pierr/Documents/Source/Repos/dghho/data/meshes/square_cart_n2.msh");
+	{
+		GMSHMesh<2>* coarseMesh = new GMSHMesh<2>("/mnt/c/Users/pierr/Documents/Source/Repos/dghho/data/meshes/square_cart_n2.msh");
+		GMSHMesh<2>* fineMesh = coarseMesh->RefineUntilNElements(n*n);
+		return fineMesh;
+	}
 	assert(false);
 }
 

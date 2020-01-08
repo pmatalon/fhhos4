@@ -61,6 +61,10 @@ public:
 	{
 		return Shape()->Center();
 	}
+	virtual bool Contains(DomPoint p) const
+	{
+		return Shape()->Contains(p);
+	}
 	virtual Face<Dim>* CreateSameGeometricFace(BigNumber number, Element<Dim>* element1) = 0;
 
 	// Transformation to reference element

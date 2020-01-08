@@ -8,7 +8,8 @@ using namespace std;
 enum class CoarseningStrategy : unsigned
 {
 	Standard = 0,
-	Agglomeration = 1
+	Agglomeration,
+	StructuredRefinement
 };
 
 template <int Dim>
@@ -26,7 +27,8 @@ public:
 	DiffusionPartition<Dim>* _diffusionPartition = nullptr;
 	BoundaryConditions* _boundaryConditions = nullptr;
 
-	Mesh<Dim>* CoarseMesh = NULL;
+	Mesh<Dim>* CoarseMesh = nullptr;
+	Mesh<Dim>* FineMesh = nullptr;
 
 	Mesh() {}
 
@@ -62,6 +64,9 @@ public:
 				e->SetDiffusionCoefficient(diffusionPartition); // For DG
 				e->SetDiffusionTensor(diffusionPartition);
 			});
+
+		if (this->CoarseMesh)
+			this->CoarseMesh->SetDiffusionCoefficient(diffusionPartition);
 	}
 
 	void SetBoundaryConditions(BoundaryConditions* bc)
@@ -81,6 +86,9 @@ public:
 			else if (f->HasNeumannBC())
 				this->NeumannFaces.push_back(f);
 		}
+
+		if (this->CoarseMesh)
+			this->CoarseMesh->SetBoundaryConditions(bc);
 	}
 
 	void ExportFacesToMatlab(string outputDirectory, bool dummy)
@@ -139,6 +147,8 @@ public:
 		for (auto f : this->InteriorFaces)
 			assert(!f->IsDomainBoundary);
 
+		assert(this->BoundaryFaces.size() + this->InteriorFaces.size() == this->Faces.size());
+
 		if (CoarseMesh)
 		{
 			CoarseMesh->SanityCheck();
@@ -171,6 +181,27 @@ public:
 				assert(cf->FinerFaces.size() > 0);
 				for (Face<Dim>* ff : cf->FinerFaces)
 					assert(!ff->IsRemovedOnCoarserGrid);
+			}
+
+			for (Face<Dim>* ff : this->Faces)
+			{
+				if (ff->IsRemovedOnCoarserGrid)
+				{
+					Element<Dim>* ce1 = ff->Element1->CoarserElement;
+					Element<Dim>* ce2 = ff->Element2->CoarserElement;
+					assert(ce1 == ce2);
+
+					bool ffIsReferenced = false;
+					for (Face<Dim>* removedFace : ce1->FinerFacesRemoved)
+					{
+						if (ff == removedFace)
+						{
+							ffIsReferenced = true;
+							break;
+						}
+					}
+					assert(ffIsReferenced);
+				}
 			}
 		}
 	}

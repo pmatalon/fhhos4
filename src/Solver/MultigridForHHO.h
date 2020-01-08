@@ -423,6 +423,8 @@ public:
 			os << "standard" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::Agglomeration)
 			os << "agglomeration" << endl;
+		else if (CoarseningStgy == CoarseningStrategy::StructuredRefinement)
+			os << "structured refinement from coarse mesh" << endl;
 		Smoother* preSmoother = SmootherFactory::Create(PreSmootherCode, PreSmoothingIterations, _problem->HHO->nFaceUnknowns);
 		Smoother* postSmoother = SmootherFactory::Create(PostSmootherCode, PostSmoothingIterations, _problem->HHO->nFaceUnknowns);
 		os << "\t" << "Pre-smoothing      : " << *preSmoother << endl;

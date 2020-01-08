@@ -34,4 +34,10 @@ public:
 		return "size(" + name + ")=" + to_string(M.rows()) + "x" + to_string(M.cols()) + ", \tnnz(" + name + ")=" + to_string(M.nonZeros()) + ", \tdensity(" + name + ")=" + to_string(density) + "%";
 	}
 
+	static bool FileExists(string filename)
+	{
+		ifstream ifile(filename);
+		return ifile.good();
+	}
+
 };
