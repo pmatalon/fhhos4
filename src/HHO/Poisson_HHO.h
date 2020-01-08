@@ -535,6 +535,53 @@ public:
 		return inverseAtt;
 	}
 
+	Vector ProjectOnFaceDiscreteSpace(DomFunction func)
+	{
+		Vector vectorOfDoFs = Vector(HHO->nTotalFaceUnknowns);
+		auto faceBasis = HHO->FaceBasis;
+		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->Faces, [this, faceBasis, &vectorOfDoFs, func](Face<Dim>* f)
+			{
+				if (f->HasDirichletBC())
+					return;
+				Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+				BigNumber i = face->Number * faceBasis->Size();// FirstDOFGlobalNumber(f);
+
+				DenseMatrix m = face->InvFaceMassMatrix();
+				Vector v = face->ProjectOnBasis(faceBasis, func);
+
+				vectorOfDoFs.segment(i, HHO->nFaceUnknowns) = face->InvFaceMassMatrix()*face->ProjectOnBasis(faceBasis, func);
+			}
+		);
+		return vectorOfDoFs;
+	}
+
+	double IntegralFromFaceDoFs(Vector dofs, int polyDegree)
+	{
+		auto faceBasis = HHO->FaceBasis;
+
+		struct ChunkResult
+		{
+			double integral = 0;
+		};
+
+		ParallelLoop<Face<Dim>*, ChunkResult> parallelLoop(this->_mesh->Faces);
+		parallelLoop.Execute([this, dofs, faceBasis, &polyDegree](Face<Dim>* f, ParallelChunk<ChunkResult>* chunk)
+			{
+				if (f->HasDirichletBC())
+					return;
+				auto approximate = faceBasis->GetApproximateFunction(dofs, f->Number * faceBasis->Size());
+				chunk->Results.integral += f->Integral(approximate, polyDegree);
+			});
+
+		double integral = 0;
+
+		parallelLoop.AggregateChunkResults([&integral](ChunkResult chunkResult)
+			{
+				integral += chunkResult.integral;
+			});
+		return integral;
+	}
+
 private:
 	BigNumber DOFNumber(Element<Dim>* element, BasisFunction<Dim>* cellPhi)
 	{

@@ -97,10 +97,59 @@ private:
 
 	void SetupRestriction() override
 	{
-		R = P.transpose();
+		R = RestrictionScalingFactor() * P.transpose();
 
 		if (_exportMatrices)
 			this->_problem->ExportMatrix(R, "R");
+	}
+
+private:
+	double RestrictionScalingFactor()
+	{
+		double scalingFactor = 1;
+
+		//------------- Try 1 -------------//
+		/*SparseMatrix PT_P = P.transpose()*P;
+		double averageEigenvalue = (PT_P).diagonal().sum() / PT_P.cols();
+		double maxEigenvalue = (PT_P).diagonal().max()
+		cout << "averageEigenvalue = " << averageEigenvalue << endl;
+		scalingFactor = 1 / averageEigenvalue;*/
+
+		//------------- Try 2 -------------//
+		/*Poisson_HHO<Dim>* finePb = this->_problem;
+		Poisson_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
+		scalingFactor = coarsePb->_mesh->SkeletonMeasure() / finePb->_mesh->SkeletonMeasure();*/
+
+		//------------- Try 3 -------------//
+		// Actually rescales correctly, but that's not what we want //
+		/*Poisson_HHO<Dim>* finePb = this->_problem;
+		DomFunction constantOne = [](DomPoint p) { return 1; };
+		Vector constantOneDoFs = finePb->ProjectOnFaceDiscreteSpace(constantOne);
+
+		double skeletonMeasure = 0;
+		for (Face<Dim>* face : finePb->_mesh->Faces)
+		{
+			if (!face->HasDirichletBC())
+				skeletonMeasure += face->Measure();
+		}
+
+		Vector restrictAndProlongateConstantOne = P * P.transpose() * constantOneDoFs;
+		double integral = finePb->IntegralFromFaceDoFs(restrictAndProlongateConstantOne, 0);
+
+		scalingFactor = skeletonMeasure / integral;*/
+
+		//------------- Try 4 -------------//
+		/*Poisson_HHO<Dim>* finePb = this->_problem;
+		Poisson_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
+		DomFunction constantOne = [](DomPoint p) { return 1; };
+		Vector constantOneDoFs = coarsePb->ProjectOnFaceDiscreteSpace(constantOne);
+
+		double coarseProduct = constantOneDoFs.transpose() * coarsePb->A * constantOneDoFs;
+		double fineProduct = constantOneDoFs.transpose() * P.transpose() * finePb->A * P * constantOneDoFs;
+		scalingFactor = (coarseProduct / fineProduct);
+
+		cout << "scalingFactor = " << scalingFactor << endl;*/
+		return scalingFactor;
 	}
 
 	inline double Weight(Element<Dim>* element, Face<Dim>* face)
