@@ -44,14 +44,18 @@ void print_usage() {
 	cout << "                             Discretization                           " << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << endl;
-	cout << "-n NUM" << endl;
-	cout << "      Number of subdivisions in each cartesian dimension (default: 16)." << endl;
-	cout << endl;
 	cout << "-mesh CODE" << endl;
-	cout << "      Type of mesh:" << endl;
-	cout << "               cart   - Uniform Cartesian mesh (default)" << endl;
-	cout << "               tri    - Trianglular mesh" << endl;
-	cout << "               quad   - Quadrilateral mesh" << endl;
+	cout << "      Type of mesh. (Default: cart)" << endl;
+	cout << "               cart          - Unit square/cube discretized by a in-house uniform Cartesian mesh (default)" << endl;
+	cout << "               tri           - (2D only) Unit square/cube discretized by a in-house uniform trianglular mesh" << endl;
+	cout << "               quad          - (2D only) Unit square/cube discretized by a in-house uniform quadrilateral mesh" << endl;
+	cout << "               gmsh-cart     - (2D only) Unit square discretized by a uniform Cartesian mesh built by GMSH" << endl;
+	cout << "               gmsh-tri      - (2D only) Unit square discretized by a uniform triangular mesh built by GMSH" << endl;
+	cout << "               gmsh-uns-tri  - (2D only) Unit square discretized by an unstructured triangular mesh built by GMSH" << endl;
+	cout << endl;
+	cout << "-n NUM" << endl;
+	cout << "      Number of subdivisions in each cartesian dimension of the unit square/cube (default: 16)." << endl;
+	cout << endl;
 	cout << "-discr CODE" << endl;
 	cout << "      Discretization method (default: hho)." << endl;
 	cout << "               dg     - Discontinuous Galerkin (Symmetric Interior Penalty)" << endl;
@@ -173,7 +177,7 @@ void print_usage() {
 
 void argument_error(string msg)
 {
-	cout << "Argument error: " << msg << endl;
+	cout << Utils::BeginRed << "Argument error: " << msg << Utils::EndColor << endl;
 	cout << "------------------------- FAILURE -------------------------" << endl;
 	exit(EXIT_FAILURE);
 }
@@ -306,6 +310,7 @@ int main(int argc, char* argv[])
 					&& meshCode.compare("tri") != 0
 					&& meshCode.compare("gmsh-tri") != 0
 					&& meshCode.compare("gmsh-cart") != 0
+					&& meshCode.compare("gmsh-uns-tri") != 0
 					&& meshCode.compare("quad") != 0
 					&& meshCode.compare("quad-poly") != 0)
 					argument_error("unknown mesh code '" + meshCode + "'. Check -mesh argument.");
@@ -411,7 +416,6 @@ int main(int argc, char* argv[])
 			{
 				string character(1, option);
 				argument_error("unknown option '" + character + "'.");
-				exit(EXIT_FAILURE);
 			}
 		}
 	}
@@ -445,11 +449,21 @@ int main(int argc, char* argv[])
 	if (discretization.compare("hho") == 0 && polyDegree == 0)
 		argument_error("HHO does not exist with p = 0. Linear approximation at least (p >= 1).");
 
-	if (meshCode.compare("tri") == 0 && dimension != 2)
+#ifndef GMSH_ENABLED
+	if (meshCode.find("gmsh") != string::npos)
+		argument_error("GMSH is disabled. Recompile with the cmake option -DENABLE_GMSH=ON to use GMSH meshes, or choose another argument for -mesh.");
+#endif // GMSH_ENABLED
+
+	if ((meshCode.compare("tri") == 0 || meshCode.compare("gmsh-tri") == 0 || meshCode.compare("gmsh-uns-tri") == 0) && dimension != 2)
 		argument_error("The triangular mesh in only available in 2D.");
 
 	if (meshCode.compare("quad") == 0 && dimension != 2)
 		argument_error("The quadrilateral mesh in only available in 2D.");
+
+#ifndef AGMG_ENABLED
+	if (solverCode.compare("agmg") == 0)
+		argument_error("AGMG is disabled. Recompile with the cmake option -DENABLE_AGMG=ON, or choose another solver.");
+#endif // AGMG_ENABLED
 
 	if (solverCode.compare("mg") == 0 && discretization.compare("dg") == 0)
 		argument_error("Multigrid only applicable on HHO discretization.");

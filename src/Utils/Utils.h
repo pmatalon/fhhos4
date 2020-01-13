@@ -1,6 +1,5 @@
 #pragma once
 #include <functional>
-#include <vector>
 #include "Types.h"
 #include "../Mesh/Point.h"
 using namespace std;
@@ -40,4 +39,13 @@ public:
 		return ifile.good();
 	}
 
+	static string BeginRed;
+	static string BeginGreen;
+	static string BeginYellow;
+	static string EndColor;
+
 };
+string Utils::BeginRed    = "\033[1;31m";
+string Utils::BeginGreen  = "\033[1;32m";
+string Utils::BeginYellow = "\033[1;33m";
+string Utils::EndColor    = "\033[0m\n";

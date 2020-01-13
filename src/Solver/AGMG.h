@@ -1,9 +1,8 @@
 #pragma once
 #include "Solver.h"
-#include "enable_AGMG.h"
 using namespace std;
 
-#ifdef TPL_ENABLE_AGMG
+#ifdef AGMG_ENABLED
 extern "C" void dagmg_(int*, double*, int*, int*, double*, double*, int*, int*, int*, int*, double*);
 #endif
 
@@ -17,7 +16,7 @@ public:
 
 	AGMG(double tolerance) : Solver() 
 	{
-#ifdef TPL_ENABLE_AGMG
+#ifdef AGMG_ENABLED
 		this->Tolerance = tolerance;
 #else
 		assert(false && "AGMG is disabled. The source must be recompiled with the appropriate option to use AGMG.");
@@ -36,7 +35,7 @@ public:
 
 	Vector Solve(const Vector& b) override
 	{
-#ifdef TPL_ENABLE_AGMG
+#ifdef AGMG_ENABLED
 		int ijob = 0, nrest = 1;
 		int nun = this->A.cols();
 		int nnz = this->A.nonZeros();

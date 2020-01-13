@@ -163,9 +163,6 @@
     <ClInclude Include="src\Solver\AGMG.h">
       <Filter>Solver</Filter>
     </ClInclude>
-    <ClInclude Include="src\Solver\enable_AGMG.h">
-      <Filter>Solver</Filter>
-    </ClInclude>
     <ClInclude Include="src\Program.h" />
     <ClInclude Include="src\Solver\BlockJacobi.h">
       <Filter>Solver</Filter>
@@ -274,6 +271,12 @@
     </ClInclude>
     <ClInclude Include="src\Mesh\GMSHMesh.h">
       <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\2D\GMSHCartesianMesh.h">
+      <Filter>Mesh\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\2D\GMSHUnstructuredTriangularMesh.h">
+      <Filter>Mesh\2D</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

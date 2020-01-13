@@ -1,6 +1,6 @@
 #### Use CMake to build the makefile
 
->	cmake -G "Unix Makefiles"
+>	cmake -G "Unix Makefiles" -DENABLE_GMSH=ON -DENABLE_AGMG=OFF
 
 #### Compile
 
@@ -8,7 +8,7 @@
 
 #### Launch program
 
->	./bin/dghho -d 2 -discr hho -s sine -a s -n 8 -p 1
+>	./bin/dghho -d 2 -discr hho -a s -n 8 -p 1
 
 #### Help
 

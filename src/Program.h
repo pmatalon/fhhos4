@@ -8,14 +8,20 @@
 #include "Mesh/2D/TriangularMesh.h"
 #include "Mesh/2D/QuadrilateralMesh.h"
 #include "Mesh/2D/QuadrilateralAsPolygonalMesh.h"
-#include "Mesh/GMSHMesh.h"
+#ifdef GMSH_ENABLED
+#include "Mesh/2D/GMSHCartesianMesh.h"
+#include "Mesh/2D/GMSHTriangularMesh.h"
+#include "Mesh/2D/GMSHUnstructuredTriangularMesh.h"
+#endif
 #include "Utils/Action.h"
 #include "Utils/Timer.h"
 #include "Solver/ConjugateGradient.h"
 #include "Solver/MultigridForHHO.h"
 #include "Solver/BlockJacobi.h"
 #include "Solver/EigenCG.h"
+#ifdef AGMG_ENABLED
 #include "Solver/AGMG.h"
+#endif
 #include "Utils/L2.h"
 using namespace std;
 
@@ -50,6 +56,8 @@ public:
 		//----------//
 		//   Mesh   //
 		//----------//
+
+		Mesh<Dim>::MeshDirectory = "/mnt/c/Users/pierr/Documents/Source/Repos/dghho/data/meshes/";
 
 		Mesh<Dim>* mesh = BuildMesh(n, meshCode);
 
@@ -427,8 +435,10 @@ private:
 			solver = new BlockGaussSeidel(blockSize);
 		else if (solverCode.compare("bj") == 0)
 			solver = new BlockJacobi(blockSize);
+#ifdef AGMG_ENABLED
 		else if (solverCode.compare("agmg") == 0)
 			solver = new AGMG(tolerance);
+#endif // AGMG_ENABLED
 		else
 			assert(false && "Unknown solver or not applicable!");
 
@@ -488,12 +498,26 @@ Mesh<2>* ProgramDim<2>::BuildMesh(int n, string meshCode)
 		return new QuadrilateralMesh(n, n, 0.5);
 	else if (meshCode.compare("quad-poly") == 0)
 		return new QuadrilateralAsPolygonalMesh(n, n, 0.5);
+#ifdef GMSH_ENABLED
 	else if (meshCode.compare("gmsh-cart") == 0)
 	{
-		GMSHMesh<2>* coarseMesh = new GMSHMesh<2>("/mnt/c/Users/pierr/Documents/Source/Repos/dghho/data/meshes/square_cart_n2.msh");
+		GMSHMesh<2>* coarseMesh = new GMSHCartesianMesh();
 		GMSHMesh<2>* fineMesh = coarseMesh->RefineUntilNElements(n*n);
 		return fineMesh;
 	}
+	else if (meshCode.compare("gmsh-tri") == 0)
+	{
+		GMSHMesh<2>* coarseMesh = new GMSHTriangularMesh();
+		GMSHMesh<2>* fineMesh = coarseMesh->RefineUntilNElements(n*n*2);
+		return fineMesh;
+	}
+	else if (meshCode.compare("gmsh-uns-tri") == 0)
+	{
+		GMSHMesh<2>* coarseMesh = new GMSHUnstructuredTriangularMesh();
+		GMSHMesh<2>* fineMesh = coarseMesh->RefineUntilNElements(n*n*2);
+		return fineMesh;
+	}
+#endif // GMSH_ENABLED
 	assert(false);
 }
 

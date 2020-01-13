@@ -444,61 +444,53 @@ public:
 		finerLevel->PreSmoother = SmootherFactory::Create(PreSmootherCode, PreSmoothingIterations, _problem->HHO->nFaceUnknowns);
 		finerLevel->PostSmoother = SmootherFactory::Create(PostSmootherCode, PostSmoothingIterations, _problem->HHO->nFaceUnknowns);
 		Poisson_HHO<Dim>* problem = _problem;
-		if (!_automaticNumberOfLevels)
+
+		bool noCoarserMeshProvided = false;
+		bool coarsestPossibleMeshReached = false;
+
+		int levelNumber = 0;
+		while ((_automaticNumberOfLevels && problem->HHO->nTotalFaceUnknowns > MatrixMaxSizeForCoarsestLevel) || (levelNumber < _nLevels - 1))
 		{
-			for (int levelNumber = 1; levelNumber < _nLevels; levelNumber++)
+			// Can we coarsen the mesh?
+			if (this->CoarseningStgy == CoarseningStrategy::StructuredRefinement && problem->_mesh->CoarseMesh == nullptr)
 			{
-				//cout << "fine mesh" << endl << *(problem->_mesh) << endl << endl;
-				problem->_mesh->CoarsenMesh(this->CoarseningStgy);
-				if (problem->_mesh->CoarseMesh->InteriorFaces.size() == 0)
-				{
-					cout << "Warning: impossible to coarsen the mesh any more.";
-					break;
-				}
-				problem = problem->GetProblemOnCoarserMesh();
-				//cout << "coarse mesh" << endl << *(problem->_mesh) << endl << endl;
-				LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(levelNumber, problem, UseGalerkinOperator, _algoNumber);
-				coarseLevel->PreSmoother = SmootherFactory::Create(PreSmootherCode, PreSmoothingIterations, problem->HHO->nFaceUnknowns);
-				coarseLevel->PostSmoother = SmootherFactory::Create(PostSmootherCode, PostSmoothingIterations, problem->HHO->nFaceUnknowns);
-
-				finerLevel->CoarserLevel = coarseLevel;
-				coarseLevel->FinerLevel = finerLevel;
-
-				finerLevel->Setup();
-
-				finerLevel = coarseLevel;
+				noCoarserMeshProvided = true;
+				break;
 			}
-			finerLevel->Setup();
-			this->SetupCoarseSolver();
-		}
-		else
-		{
-			int levelNumber = 0;
-			while (problem->HHO->nTotalFaceUnknowns > MatrixMaxSizeForCoarsestLevel)
+			problem->_mesh->CoarsenMesh(this->CoarseningStgy);
+			if (problem->_mesh->CoarseMesh->InteriorFaces.size() == 0)
 			{
-				problem->_mesh->CoarsenMesh(this->CoarseningStgy);
-				auto nCoarseInteriorFaces = problem->_mesh->CoarseMesh->InteriorFaces.size();
-				auto nCoarseUnknowns = nCoarseInteriorFaces * problem->HHO->nFaceUnknowns;
-				if (nCoarseInteriorFaces == 0)
-					break;
-				problem = problem->GetProblemOnCoarserMesh();
-				levelNumber++;
-				LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(levelNumber, problem, UseGalerkinOperator, _algoNumber);
-				coarseLevel->PreSmoother = SmootherFactory::Create(PreSmootherCode, PreSmoothingIterations, problem->HHO->nFaceUnknowns);
-				coarseLevel->PostSmoother = SmootherFactory::Create(PostSmootherCode, PostSmoothingIterations, problem->HHO->nFaceUnknowns);
-
-				finerLevel->CoarserLevel = coarseLevel;
-				coarseLevel->FinerLevel = finerLevel;
-
-				finerLevel->Setup();
-
-				finerLevel = coarseLevel;
+				coarsestPossibleMeshReached = true;
+				break;
 			}
+
+			// Build coarse level
+			problem = problem->GetProblemOnCoarserMesh();
+			levelNumber++;
+			LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(levelNumber, problem, UseGalerkinOperator, _algoNumber);
+			coarseLevel->PreSmoother = SmootherFactory::Create(PreSmootherCode, PreSmoothingIterations, problem->HHO->nFaceUnknowns);
+			coarseLevel->PostSmoother = SmootherFactory::Create(PostSmootherCode, PostSmoothingIterations, problem->HHO->nFaceUnknowns);
+
+			// Link between levels
+			finerLevel->CoarserLevel = coarseLevel;
+			coarseLevel->FinerLevel = finerLevel;
+
+			// Setup fine level
 			finerLevel->Setup();
-			_nLevels = levelNumber + 1;
-			this->SetupCoarseSolver();
-			cout << "\t--> " << _nLevels << " levels built." << endl;
+
+			finerLevel = coarseLevel;
 		}
+
+		_nLevels = levelNumber + 1;
+		finerLevel->Setup();
+
+		if (coarsestPossibleMeshReached)
+			cout << Utils::BeginYellow << "Warning: impossible to coarsen the mesh any more." << Utils::EndColor;
+		if (noCoarserMeshProvided)
+			cout << Utils::BeginYellow << "Warning: cannot build coarser level because no coarser mesh has been provided." << Utils::EndColor;
+
+		this->SetupCoarseSolver();
+		cout << "\t--> " << _nLevels << " levels built." << endl;
 		
 		if (this->WLoops > 1)
 			PrintCycleSchema();

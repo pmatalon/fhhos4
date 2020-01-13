@@ -107,7 +107,9 @@
     <ClInclude Include="src\HHO\HHOParameters.h" />
     <ClInclude Include="src\Mesh\2D\CartesianPolygonalMesh2D.h" />
     <ClInclude Include="src\Mesh\2D\Edge.h" />
+    <ClInclude Include="src\Mesh\2D\GMSHCartesianMesh.h" />
     <ClInclude Include="src\Mesh\2D\GMSHTriangularMesh.h" />
+    <ClInclude Include="src\Mesh\2D\GMSHUnstructuredTriangularMesh.h" />
     <ClInclude Include="src\Mesh\2D\Polygon.h" />
     <ClInclude Include="src\Mesh\2D\PolygonalShape.h" />
     <ClInclude Include="src\Mesh\2D\Quadrilateral.h" />
@@ -166,7 +168,6 @@
     <ClInclude Include="src\Solver\ConjugateGradient.h" />
     <ClInclude Include="src\Solver\EigenCG.h" />
     <ClInclude Include="src\Solver\EigenSparseLU.h" />
-    <ClInclude Include="src\Solver\enable_AGMG.h" />
     <ClInclude Include="src\Solver\IterationResult.h" />
     <ClInclude Include="src\Solver\Level.h" />
     <ClInclude Include="src\Solver\Multigrid.h" />
@@ -195,6 +196,7 @@
       <AdditionalOptions>
       </AdditionalOptions>
       <Verbose>true</Verbose>
+      <PreprocessorDefinitions>GMSH_ENABLED</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <AdditionalOptions>-fopenmp %(AdditionalOptions)</AdditionalOptions>

@@ -30,6 +30,8 @@ public:
 	Mesh<Dim>* CoarseMesh = nullptr;
 	Mesh<Dim>* FineMesh = nullptr;
 
+	static string MeshDirectory;
+
 	Mesh() {}
 
 	virtual string Description() = 0;
@@ -224,3 +226,6 @@ public:
 		this->Vertices.clear();
 	}
 };
+
+template <int Dim>
+string Mesh<Dim>::MeshDirectory = "";

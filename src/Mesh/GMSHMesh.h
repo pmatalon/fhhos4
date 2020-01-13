@@ -27,6 +27,9 @@ public:
 template <int Dim>
 class GMSHMesh : public PolyhedralMesh<Dim>
 {
+protected:
+	string _description = "GMSH file";
+	string _fileNamePart = "gmsh-file";
 private:
 	map<size_t, BigNumber> _elementExternalNumbers;
 	map<size_t, BigNumber> _vertexExternalNumbers;
@@ -36,8 +39,13 @@ public:
 	{
 		if (!Utils::FileExists(mshFile))
 		{
-			cout << "File not found: " << mshFile;
-			exit(EXIT_FAILURE);
+			if (Utils::FileExists(Mesh<Dim>::MeshDirectory + mshFile))
+				mshFile = Mesh<Dim>::MeshDirectory + mshFile;
+			else
+			{
+				cout << Utils::BeginRed << "File not found: " << mshFile << Utils::EndColor;
+				exit(EXIT_FAILURE);
+			}
 		}
 
 		gmsh::initialize();
@@ -231,12 +239,12 @@ public:
 
 	string Description() override
 	{
-		return "GMSH";
+		return _description;
 	}
 
 	string FileNamePart() override
 	{
-		return "GMSH";
+		return _fileNamePart;
 	}
 
 	double H() override
@@ -247,7 +255,7 @@ public:
 	void CoarsenMesh(CoarseningStrategy strategy) override
 	{
 		if (strategy != CoarseningStrategy::StructuredRefinement)
-			assert(false);
+			assert(false && "Unmanaged coarsening strategy");
 	}
 
 	void RefineMesh()
@@ -266,6 +274,8 @@ public:
 
 		// Building our own mesh objects from the GMSH ones
 		GMSHMesh<Dim>* fineMesh = new GMSHMesh<Dim>();
+		fineMesh->_description = this->_description;
+		fineMesh->_fileNamePart = this->_fileNamePart;
 		this->FineMesh = fineMesh;
 		this->FineMesh->CoarseMesh = this;
 
