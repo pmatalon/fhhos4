@@ -48,7 +48,12 @@ public:
 			}
 		}
 
+		cout << mshFile << endl;
+
 		gmsh::initialize();
+		//gmsh::option::setNumber("General.Terminal", 1);
+		//gmsh::option::setNumber("General.Verbosity", 99);
+
 		gmsh::open(mshFile);
 
 		for (int i = 0; i < initialRefinements; i++)
@@ -75,6 +80,18 @@ private:
 		bool returnParametricCoord = false;
 		bool includeBoundary = true;
 		gmsh::model::mesh::getNodes(nodeTags, coord, parametricCoord, Dim, -1, includeBoundary, returnParametricCoord);
+
+		// If .geo file, the mesh hasn't been generated
+		if (nodeTags.empty())
+		{
+			gmsh::model::mesh::generate(Dim);
+			gmsh::model::mesh::getNodes(nodeTags, coord, parametricCoord, Dim, -1, includeBoundary, returnParametricCoord);
+			if (nodeTags.empty())
+			{
+				cout << Utils::BeginRed << "Error: the mesh generation failed. Try commenting the line SetFactory(\"OpenCASCADE\"); (if there is one)." << Utils::EndColor;
+				exit(EXIT_FAILURE);
+			}
+		}
 
 		this->Vertices.reserve(nodeTags.size());
 		BigNumber vertexNumber = 0;

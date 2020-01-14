@@ -248,7 +248,7 @@ public:
 
 	string FileNamePart() override
 	{
-		return "n" + to_string(this->Nx);
+		return "tri-n" + to_string(this->Nx);
 	}
 
 	double H() override

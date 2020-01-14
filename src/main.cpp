@@ -46,15 +46,19 @@ void print_usage() {
 	cout << endl;
 	cout << "-mesh CODE" << endl;
 	cout << "      Type of mesh. (Default: cart)" << endl;
-	cout << "               cart          - Unit square/cube discretized by a in-house uniform Cartesian mesh (default)" << endl;
-	cout << "               tri           - (2D only) Unit square/cube discretized by a in-house uniform trianglular mesh" << endl;
-	cout << "               quad          - (2D only) Unit square/cube discretized by a in-house uniform quadrilateral mesh" << endl;
+	cout << "               cart          - Unit square/cube discretized by an in-house uniform Cartesian mesh (default)" << endl;
+	cout << "               tri           - (2D only) Unit square/cube discretized by an in-house uniform trianglular mesh" << endl;
+	cout << "               quad          - (2D only) Unit square/cube discretized by an in-house uniform quadrilateral mesh" << endl;
 	cout << "               gmsh-cart     - (2D only) Unit square discretized by a uniform Cartesian mesh built by GMSH" << endl;
 	cout << "               gmsh-tri      - (2D only) Unit square discretized by a uniform triangular mesh built by GMSH" << endl;
 	cout << "               gmsh-uns-tri  - (2D only) Unit square discretized by an unstructured triangular mesh built by GMSH" << endl;
+	cout << "               gmsh          - (2D only) .msh or .geo GMSH file given in the argument -file" << endl;
 	cout << endl;
 	cout << "-n NUM" << endl;
 	cout << "      Number of subdivisions in each cartesian dimension of the unit square/cube (default: 16)." << endl;
+	cout << endl;
+	cout << "-file PATH" << endl;
+	cout << "      GMSH file (.msh or .geo)." << endl;
 	cout << endl;
 	cout << "-discr CODE" << endl;
 	cout << "      Discretization method (default: hho)." << endl;
@@ -197,6 +201,7 @@ int main(int argc, char* argv[])
 	string partition = "chiasmus";
 	BigNumber n = 16;
 	string meshCode = "cart";
+	string meshFilePath = "";
 	string discretization = "hho";
 	string stabilization = "hho";
 	string basisCode = "legendre";
@@ -226,6 +231,7 @@ int main(int argc, char* argv[])
 		OPT_Partition,
 		OPT_Discretization,
 		OPT_Mesh,
+		OPT_MeshFilePath,
 		OPT_Stabilization,
 		OPT_NoStaticCondensation,
 		OPT_Penalization,
@@ -246,6 +252,7 @@ int main(int argc, char* argv[])
 		 { "partition", required_argument, NULL, OPT_Partition },
 		 { "discr", required_argument, NULL, OPT_Discretization },
 		 { "mesh", required_argument, NULL, OPT_Mesh },
+		 { "file", required_argument, NULL, OPT_MeshFilePath },
 		 { "stab", required_argument, NULL, OPT_Stabilization },
 		 { "no-static-cond", required_argument, NULL, OPT_NoStaticCondensation },
 		 { "pen", required_argument, NULL, OPT_Penalization },
@@ -311,9 +318,13 @@ int main(int argc, char* argv[])
 					&& meshCode.compare("gmsh-tri") != 0
 					&& meshCode.compare("gmsh-cart") != 0
 					&& meshCode.compare("gmsh-uns-tri") != 0
+					&& meshCode.compare("gmsh") != 0
 					&& meshCode.compare("quad") != 0
 					&& meshCode.compare("quad-poly") != 0)
 					argument_error("unknown mesh code '" + meshCode + "'. Check -mesh argument.");
+				break;
+			case OPT_MeshFilePath:
+				meshFilePath = optarg;
 				break;
 			case OPT_Stabilization:
 				stabilization = optarg;
@@ -460,6 +471,9 @@ int main(int argc, char* argv[])
 	if (meshCode.compare("quad") == 0 && dimension != 2)
 		argument_error("The quadrilateral mesh in only available in 2D.");
 
+	if (meshCode.compare("gmsh") == 0 && meshFilePath.compare("") == 0)
+		argument_error("The GMSH file path is missing. Add the argument -file.");
+
 #ifndef AGMG_ENABLED
 	if (solverCode.compare("agmg") == 0)
 		argument_error("AGMG is disabled. Recompile with the cmake option -DENABLE_AGMG=ON, or choose another solver.");
@@ -502,7 +516,7 @@ int main(int argc, char* argv[])
 		program = new ProgramDim<3>();
 
 	program->Start(rhsCode, kappa1, kappa2, anisotropyRatio, partition, 
-		n, discretization, meshCode, stabilization, basisCode, polyDegree, usePolynomialSpaceQ, penalizationCoefficient, staticCondensation, action,
+		n, discretization, meshCode, meshFilePath, stabilization, basisCode, polyDegree, usePolynomialSpaceQ, penalizationCoefficient, staticCondensation, action,
 		nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations,
 		coarseningStgy, initialGuessCode, outputDirectory, solverCode, solverTolerance);
 

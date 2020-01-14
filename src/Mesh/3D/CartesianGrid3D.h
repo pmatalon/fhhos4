@@ -185,7 +185,7 @@ public:
 
 	string FileNamePart()
 	{
-		return "n" + to_string(this->Nx);
+		return "cart-n" + to_string(this->Nx);
 	}
 
 	double H()

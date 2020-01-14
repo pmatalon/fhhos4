@@ -259,8 +259,16 @@ paket-files/
 # Python Tools for Visual Studio (PTVS)
 __pycache__/
 *.pyc
+
+# Eigen
 /eigen-eigen-b3f3d4950030.zip
 /Eigen
+
+# GMSH
+/gmsh-4.4.1-Linux64-sdk/include/gmsh.h_cwrap
+/gmsh-4.4.1-Linux64-sdk/include/gmshc.h
+/gmsh-4.4.1-Linux64-sdk/share
+/gmsh-4.4.1-Linux64-sdk/README.txt
 
 # CMake
 CMakeFiles/

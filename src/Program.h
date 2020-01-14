@@ -30,7 +30,7 @@ class Program
 public:
 	Program() {}
 	virtual void Start(string rhsCode, double kappa1, double kappa2, double anisotropyRatio, string partition, 
-		BigNumber n, string discretization, string meshCode, string stabilization, string basisCode, int polyDegree, bool usePolynomialSpaceQ,
+		BigNumber n, string discretization, string meshCode, string meshFilePath, string stabilization, string basisCode, int polyDegree, bool usePolynomialSpaceQ,
 		int penalizationCoefficient, bool staticCondensation, Action action, 
 		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations,
 		CoarseningStrategy coarseningStgy, string initialGuessCode, string outputDirectory, string solverCode, double solverTolerance) = 0;
@@ -43,7 +43,7 @@ public:
 	ProgramDim() : Program() {}
 
 	void Start(string rhsCode, double kappa1, double kappa2, double anisotropyRatio, string partition, 
-		BigNumber n, string discretization, string meshCode, string stabilization, string basisCode, int polyDegree, bool usePolynomialSpaceQ,
+		BigNumber n, string discretization, string meshCode, string meshFilePath, string stabilization, string basisCode, int polyDegree, bool usePolynomialSpaceQ,
 		int penalizationCoefficient, bool staticCondensation, Action action, 
 		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations,
 		CoarseningStrategy coarseningStgy, string initialGuessCode, string outputDirectory, string solverCode, double solverTolerance)
@@ -59,7 +59,7 @@ public:
 
 		Mesh<Dim>::MeshDirectory = "/mnt/c/Users/pierr/Documents/Source/Repos/dghho/data/meshes/";
 
-		Mesh<Dim>* mesh = BuildMesh(n, meshCode);
+		Mesh<Dim>* mesh = BuildMesh(n, meshCode, meshFilePath);
 
 		if (n <= 16)
 		{
@@ -391,7 +391,7 @@ public:
 	}
 
 private:
-	Mesh<Dim>* BuildMesh(int n, string meshCode) { return nullptr; }
+	Mesh<Dim>* BuildMesh(int n, string meshCode, string meshFilePath) { return nullptr; }
 
 	Solver* CreateSolver(string solverCode, Problem<Dim>* problem, double tolerance, bool staticCondensation, 
 		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations, CoarseningStrategy coarseningStgy, int blockSize)
@@ -480,13 +480,13 @@ private:
 };
 
 template <>
-Mesh<1>* ProgramDim<1>::BuildMesh(int n, string meshCode)
+Mesh<1>* ProgramDim<1>::BuildMesh(int n, string meshCode, string meshFilePath)
 {
 	return new CartesianGrid1D(n);
 }
 
 template <>
-Mesh<2>* ProgramDim<2>::BuildMesh(int n, string meshCode)
+Mesh<2>* ProgramDim<2>::BuildMesh(int n, string meshCode, string meshFilePath)
 {
 	if (meshCode.compare("cart") == 0)
 		return new CartesianGrid2D(n, n);
@@ -517,12 +517,18 @@ Mesh<2>* ProgramDim<2>::BuildMesh(int n, string meshCode)
 		GMSHMesh<2>* fineMesh = coarseMesh->RefineUntilNElements(n*n*2);
 		return fineMesh;
 	}
+	else if (meshCode.compare("gmsh") == 0)
+	{
+		GMSHMesh<2>* coarseMesh = new GMSHMesh<2>(meshFilePath);
+		GMSHMesh<2>* fineMesh = coarseMesh->RefineUntilNElements(n*n*2);
+		return fineMesh;
+	}
 #endif // GMSH_ENABLED
 	assert(false);
 }
 
 template <>
-Mesh<3>* ProgramDim<3>::BuildMesh(int n, string meshCode)
+Mesh<3>* ProgramDim<3>::BuildMesh(int n, string meshCode, string meshFilePath)
 {
 	return new CartesianGrid3D(n, n, n);
 }
