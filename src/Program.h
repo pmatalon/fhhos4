@@ -322,7 +322,7 @@ public:
 				cout << endl;
 				cout << "------------------- Linear system resolution ------------------" << endl;
 
-				Solver* solver = CreateSolver(solverCode, &problem, solverTolerance, staticCondensation, nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, coarseningStgy, basis.Size());
+				Solver* solver = CreateSolver(solverCode, &problem, action, solverTolerance, staticCondensation, nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, coarseningStgy, basis.Size());
 				problem.SystemSolution = Solve(solver, problem.A, problem.b, initialGuessCode);
 
 				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
@@ -362,7 +362,7 @@ public:
 				cout << endl;
 				cout << "------------------- Linear system resolution ------------------" << endl;
 
-				Solver* solver = CreateSolver(solverCode, &problem, solverTolerance, staticCondensation, nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, coarseningStgy, faceBasis.Size());
+				Solver* solver = CreateSolver(solverCode, &problem, action, solverTolerance, staticCondensation, nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, coarseningStgy, faceBasis.Size());
 				problem.SystemSolution = Solve(solver, problem.A, problem.b, initialGuessCode);
 
 				if (staticCondensation && (action & Action::ExtractSolution) == Action::ExtractSolution)
@@ -393,7 +393,7 @@ public:
 private:
 	Mesh<Dim>* BuildMesh(int n, string meshCode, string meshFilePath) { return nullptr; }
 
-	Solver* CreateSolver(string solverCode, Problem<Dim>* problem, double tolerance, bool staticCondensation, 
+	Solver* CreateSolver(string solverCode, Problem<Dim>* problem, Action action, double tolerance, bool staticCondensation,
 		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations, CoarseningStrategy coarseningStgy, int blockSize)
 	{
 		Solver* solver = NULL;
@@ -412,6 +412,7 @@ private:
 				mg->PreSmoothingIterations = nPreSmoothingIterations;
 				mg->PostSmoothingIterations = nPostSmoothingIterations;
 				mg->CoarseningStgy = coarseningStgy;
+				mg->ExportMatrices = (action & Action::ExportMultigridMatrices) == Action::ExportMultigridMatrices;
 
 				if (solverCode.compare("mg") == 0 || solverCode.compare("mg2") == 0)
 					solver = mg;

@@ -11,8 +11,9 @@ class LevelForHHO : public Level
 private:
 	Poisson_HHO<Dim>* _problem;
 	int _algoNumber = 1;
-	bool _exportMatrices = false;
 public:
+	bool ExportMatrices = false;
+
 	LevelForHHO(int number, Poisson_HHO<Dim>* problem, bool useGalerkinOperator, int algoNumber)
 		: Level(number)
 	{
@@ -57,7 +58,7 @@ private:
 		SparseMatrix J_f_c = GetGlobalCanonicalInjectionMatrixCoarseToFineElements();
 		SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
 
-		if (_exportMatrices)
+		if (ExportMatrices)
 		{
 			SparseMatrix SolveCellUnknowns = GetSolveCellUnknownsMatrix(coarsePb);
 			finePb->ExportMatrix(I_c, "I_c");
@@ -91,7 +92,7 @@ private:
 			parallelLoop.Fill(P);
 		}
 
-		if (_exportMatrices)
+		if (ExportMatrices)
 			finePb->ExportMatrix(P, "P");
 	}
 
@@ -99,7 +100,7 @@ private:
 	{
 		R = RestrictionScalingFactor() * P.transpose();
 
-		if (_exportMatrices)
+		if (ExportMatrices)
 			this->_problem->ExportMatrix(R, "R");
 	}
 
@@ -379,6 +380,7 @@ public:
 	int PreSmoothingIterations = 1;
 	int PostSmoothingIterations = 1;
 	CoarseningStrategy CoarseningStgy = CoarseningStrategy::Standard;
+	bool ExportMatrices = false;
 
 	MultigridForHHO(Poisson_HHO<Dim>* problem, int algoNumber) : MultigridForHHO(problem, algoNumber, 0)
 	{}
@@ -443,6 +445,7 @@ public:
 		finerLevel->OperatorMatrix = A;
 		finerLevel->PreSmoother = SmootherFactory::Create(PreSmootherCode, PreSmoothingIterations, _problem->HHO->nFaceUnknowns);
 		finerLevel->PostSmoother = SmootherFactory::Create(PostSmootherCode, PostSmoothingIterations, _problem->HHO->nFaceUnknowns);
+		finerLevel->ExportMatrices = ExportMatrices;
 		Poisson_HHO<Dim>* problem = _problem;
 
 		bool noCoarserMeshProvided = false;
@@ -470,6 +473,7 @@ public:
 			LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(levelNumber, problem, UseGalerkinOperator, _algoNumber);
 			coarseLevel->PreSmoother = SmootherFactory::Create(PreSmootherCode, PreSmoothingIterations, problem->HHO->nFaceUnknowns);
 			coarseLevel->PostSmoother = SmootherFactory::Create(PostSmootherCode, PostSmoothingIterations, problem->HHO->nFaceUnknowns);
+			coarseLevel->ExportMatrices = ExportMatrices;
 
 			// Link between levels
 			finerLevel->CoarserLevel = coarseLevel;

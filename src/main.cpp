@@ -170,6 +170,7 @@ void print_usage() {
 	cout << "              c   - export all components of the matrix in separate files" << endl;
 	cout << "              f   - export faces for Matlab" << endl;
 	cout << "              s   - solve system" << endl;
+	cout << "              m   - export multigrid matrices" << endl;
 	cout << "              v   - export solution vector (requires 's')" << endl;
 	cout << "              r   - compute L2 error against the analytical solution if known" << endl;
 	cout << endl;
@@ -496,6 +497,8 @@ int main(int argc, char* argv[])
 			action |= Action::ExportFaces;
 		else if (a[i] == 's')
 			action |= Action::SolveSystem;
+		else if (a[i] == 'm')
+			action |= Action::ExportMultigridMatrices;
 		else if (a[i] == 'v')
 			action |= Action::ExtractSolution;
 		else if (a[i] == 'r')
