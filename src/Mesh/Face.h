@@ -65,6 +65,17 @@ public:
 	{
 		return Shape()->Contains(p);
 	}
+
+	bool HasVertex(Vertex* v)
+	{
+		for (Vertex* v2 : this->Shape()->Vertices())
+		{
+			if (v == v2)
+				return true;
+		}
+		return false;
+	}
+
 	virtual Face<Dim>* CreateSameGeometricFace(BigNumber number, Element<Dim>* element1) = 0;
 
 	// Transformation to reference element

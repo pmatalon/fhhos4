@@ -2,6 +2,7 @@
 #include <gmsh.h>
 #include "PolyhedralMesh.h"
 #include "2D/Quadrilateral.h"
+#include "3D/Tetrahedron.h"
 using namespace std;
 
 enum GMSHElementTypes
@@ -10,6 +11,12 @@ enum GMSHElementTypes
 	GMSH_Triangle = 2,
 	GMSH_Quadrilateral = 3,
 	GMSH_Tetrahedron = 4
+};
+
+enum GMSHFaceTypes
+{
+	GMSH_TriangleFace = 3,
+	GMSH_QuadrilateralFace = 4
 };
 
 template <int Dim>
@@ -48,8 +55,6 @@ public:
 			}
 		}
 
-		cout << mshFile << endl;
-
 		gmsh::initialize();
 		//gmsh::option::setNumber("General.Terminal", 1);
 		//gmsh::option::setNumber("General.Verbosity", 99);
@@ -67,6 +72,10 @@ private:
 	{
 		Build();
 	}
+
+	// Dim-specific functions
+	Element<Dim>* CreateElement(int elemType, size_t elementTag, const vector<size_t>& elementNodes, size_t& elemNodeIndex, BigNumber elemNumber) { return nullptr; }
+	void CreateFaces(int elemType, BigNumber& faceNumber) { }
 
 	void Build()
 	{
@@ -125,30 +134,7 @@ private:
 			size_t elemNodeIndex = 0;
 			for (size_t j = 0; j < elements.size(); j++)
 			{
-				Element<Dim>* e = nullptr;
-				if (elemType == GMSH_Quadrilateral)
-				{
-					size_t nodeTag1 = elementNodes[elemNodeIndex];
-					size_t nodeTag2 = elementNodes[elemNodeIndex + 1];
-					size_t nodeTag3 = elementNodes[elemNodeIndex + 2];
-					size_t nodeTag4 = elementNodes[elemNodeIndex + 3];
-
-					e = new Quadrilateral(elemNumber, GetVertex(nodeTag1), GetVertex(nodeTag2), GetVertex(nodeTag3), GetVertex(nodeTag4));
-					_elementExternalNumbers.insert({ elements[j], elemNumber });
-					elemNodeIndex += 4;
-				}
-				else if (elemType == GMSH_Triangle)
-				{
-					size_t nodeTag1 = elementNodes[elemNodeIndex];
-					size_t nodeTag2 = elementNodes[elemNodeIndex + 1];
-					size_t nodeTag3 = elementNodes[elemNodeIndex + 2];
-
-					e = new Triangle(elemNumber, GetVertex(nodeTag1), GetVertex(nodeTag2), GetVertex(nodeTag3));
-					_elementExternalNumbers.insert({ elements[j], elemNumber });
-					elemNodeIndex += 3;
-				}
-				else
-					assert(false && "GMSH element type not managed.");
+				Element<Dim>* e = CreateElement(elemType, elements[j], elementNodes, elemNodeIndex, elemNumber);
 
 				for (Vertex* v : e->Shape()->Vertices())
 				{
@@ -172,65 +158,7 @@ private:
 		for (int i = 0; i < elementTypes.size(); i++)
 		{
 			int elemType = elementTypes[i];
-
-			if (Dim == 2)
-			{
-				vector<size_t> edgeNodes;
-				bool onlyPrimaryNodes = true;
-				gmsh::model::mesh::getElementEdgeNodes(elemType, edgeNodes, -1, onlyPrimaryNodes);
-
-				for (size_t j = 0; j < edgeNodes.size(); j+=2)
-				{
-					MeshVertex<Dim>* v1 = (MeshVertex<Dim>*)GetVertex(edgeNodes[j]);
-					MeshVertex<Dim>* v2 = (MeshVertex<Dim>*)GetVertex(edgeNodes[j + 1]);
-
-					bool edgeAlreadyExists = false;
-					for (Face<Dim>* f : v1->Faces)
-					{
-						Edge* edge = dynamic_cast<Edge*>(f);
-						if (edge->Vertex1() == v2 || edge->Vertex2() == v2)
-						{
-							edgeAlreadyExists = true;
-							break;
-						}
-					}
-					if (edgeAlreadyExists)
-						continue;
-
-					vector<Element<Dim>*> neighbours;
-					for (Element<Dim>* e1 : v1->Elements)
-					{
-						for (Element<Dim>* e2 : v2->Elements)
-						{
-							if (e1 == e2)
-							{
-								neighbours.push_back(e1);
-								break;
-							}
-						}
-					}
-
-					Edge* edge;
-					if (neighbours.size() == 1)
-					{
-						edge = new Edge(faceNumber++, v1, v2, neighbours[0]);
-						neighbours[0]->AddFace(edge);
-						this->BoundaryFaces.push_back(edge);
-					}
-					else if (neighbours.size() == 2)
-					{
-						edge = new Edge(faceNumber++, v1, v2, neighbours[0], neighbours[1]);
-						neighbours[0]->AddFace(edge);
-						neighbours[1]->AddFace(edge);
-						this->InteriorFaces.push_back(edge);
-					}
-					else
-						assert(false);
-					this->Faces.push_back(edge);
-					v1->Faces.push_back(edge);
-					v2->Faces.push_back(edge);
-				}
-			}
+			CreateFaces(elemType, faceNumber);
 		}
 	}
 
@@ -279,6 +207,8 @@ public:
 	{
 		if (this->FineMesh)
 			assert(false && "Mesh already refined!");
+
+		cout << "Mesh refinement" << endl;
 
 		string coarse_mesh_tmp_file = "./temporary_coarse.msh";
 		string fine_mesh_tmp_file = "./temporary_fine.msh";
@@ -330,6 +260,8 @@ public:
 						break;
 					}
 				}
+				if (!fineFace->CoarseFace)
+					assert(false && "A coarse face should have been found.");
 			}
 			else
 			{
@@ -340,6 +272,7 @@ public:
 				{
 					// TODO: change InterfaceWith so it returns a vector of faces (local refinement)
 					Face<Dim>* coarseFace = coarseElement1->InterfaceWith(coarseElement2);
+					assert(coarseFace != nullptr);
 					fineFace->CoarseFace = coarseFace;
 					coarseFace->FinerFaces.push_back(fineFace);
 				}
@@ -392,3 +325,200 @@ private:
 	}
 
 };
+
+//-------------//
+// 2D elements //
+//-------------//
+
+template <>
+Element<2>* GMSHMesh<2>::CreateElement(int elemType, size_t elementTag, const vector<size_t>& elementNodes, size_t& elemNodeIndex, BigNumber elemNumber)
+{ 
+	Element<2>* e = nullptr;
+	if (elemType == GMSH_Quadrilateral)
+	{
+		size_t nodeTag1 = elementNodes[elemNodeIndex];
+		size_t nodeTag2 = elementNodes[elemNodeIndex + 1];
+		size_t nodeTag3 = elementNodes[elemNodeIndex + 2];
+		size_t nodeTag4 = elementNodes[elemNodeIndex + 3];
+
+		e = new Quadrilateral(elemNumber, GetVertex(nodeTag1), GetVertex(nodeTag2), GetVertex(nodeTag3), GetVertex(nodeTag4));
+		_elementExternalNumbers.insert({ elementTag, elemNumber });
+		elemNodeIndex += 4;
+	}
+	else if (elemType == GMSH_Triangle)
+	{
+		size_t nodeTag1 = elementNodes[elemNodeIndex];
+		size_t nodeTag2 = elementNodes[elemNodeIndex + 1];
+		size_t nodeTag3 = elementNodes[elemNodeIndex + 2];
+
+		e = new Triangle(elemNumber, GetVertex(nodeTag1), GetVertex(nodeTag2), GetVertex(nodeTag3));
+		_elementExternalNumbers.insert({ elementTag, elemNumber });
+		elemNodeIndex += 3;
+	}
+	else
+		assert(false && "GMSH element type not managed.");
+
+	return e;
+}
+
+//-------------//
+// 3D elements //
+//-------------//
+
+template <>
+Element<3>* GMSHMesh<3>::CreateElement(int elemType, size_t elementTag, const vector<size_t>& elementNodes, size_t& elemNodeIndex, BigNumber elemNumber)
+{
+	Element<3>* e = nullptr;
+	if (elemType == GMSH_Tetrahedron)
+	{
+		size_t nodeTag1 = elementNodes[elemNodeIndex];
+		size_t nodeTag2 = elementNodes[elemNodeIndex + 1];
+		size_t nodeTag3 = elementNodes[elemNodeIndex + 2];
+		size_t nodeTag4 = elementNodes[elemNodeIndex + 3];
+
+		e = new Tetrahedron(elemNumber, GetVertex(nodeTag1), GetVertex(nodeTag2), GetVertex(nodeTag3), GetVertex(nodeTag4));
+		_elementExternalNumbers.insert({ elementTag, elemNumber });
+		elemNodeIndex += 4;
+	}
+	else
+		assert(false && "GMSH element type not managed.");
+	return e;
+}
+
+//--------------//
+//   2D faces   //
+//--------------//
+
+template <>
+void GMSHMesh<2>::CreateFaces(int elemType, BigNumber& faceNumber)
+{
+	vector<size_t> edgeNodes;
+	bool onlyPrimaryNodes = true;
+	gmsh::model::mesh::getElementEdgeNodes(elemType, edgeNodes, -1, onlyPrimaryNodes);
+
+	for (size_t j = 0; j < edgeNodes.size(); j += 2)
+	{
+		MeshVertex<2>* v1 = (MeshVertex<2>*)GetVertex(edgeNodes[j]);
+		MeshVertex<2>* v2 = (MeshVertex<2>*)GetVertex(edgeNodes[j + 1]);
+
+		bool edgeAlreadyExists = false;
+		for (Face<2>* f : v1->Faces)
+		{
+			if (f->HasVertex(v2))
+			{
+				edgeAlreadyExists = true;
+				break;
+			}
+		}
+		if (edgeAlreadyExists)
+			continue;
+
+		vector<Element<2>*> neighbours;
+		for (Element<2>* e1 : v1->Elements)
+		{
+			for (Element<2>* e2 : v2->Elements)
+			{
+				if (e1 == e2)
+				{
+					neighbours.push_back(e1);
+					break;
+				}
+			}
+		}
+
+		Edge* edge;
+		if (neighbours.size() == 1)
+		{
+			edge = new Edge(faceNumber++, v1, v2, neighbours[0]);
+			neighbours[0]->AddFace(edge);
+			this->BoundaryFaces.push_back(edge);
+		}
+		else if (neighbours.size() == 2)
+		{
+			edge = new Edge(faceNumber++, v1, v2, neighbours[0], neighbours[1]);
+			neighbours[0]->AddFace(edge);
+			neighbours[1]->AddFace(edge);
+			this->InteriorFaces.push_back(edge);
+		}
+		else
+			assert(false);
+		this->Faces.push_back(edge);
+		v1->Faces.push_back(edge);
+		v2->Faces.push_back(edge);
+	}
+}
+
+//--------------//
+//   3D faces   //
+//--------------//
+
+template <>
+void GMSHMesh<3>::CreateFaces(int elemType, BigNumber& faceNumber)
+{
+	assert(elemType == GMSHElementTypes::GMSH_Tetrahedron);
+
+	int faceType = GMSHFaceTypes::GMSH_TriangleFace;
+	vector<size_t> faceNodes;
+	bool onlyPrimaryNodes = true;
+	gmsh::model::mesh::getElementFaceNodes(elemType, faceType, faceNodes, -1, onlyPrimaryNodes);
+
+	for (size_t j = 0; j < faceNodes.size(); j += 3)
+	{
+		MeshVertex<3>* v1 = (MeshVertex<3>*)GetVertex(faceNodes[j]);
+		MeshVertex<3>* v2 = (MeshVertex<3>*)GetVertex(faceNodes[j + 1]);
+		MeshVertex<3>* v3 = (MeshVertex<3>*)GetVertex(faceNodes[j + 2]);
+
+		bool faceAlreadyExists = false;
+		for (Face<3>* f : v1->Faces)
+		{
+			if (f->HasVertex(v2) && f->HasVertex(v3))
+			{
+				faceAlreadyExists = true;
+				break;
+			}
+		}
+		if (faceAlreadyExists)
+			continue;
+
+		vector<Element<3>*> neighbours;
+		for (Element<3>* f1 : v1->Elements)
+		{
+			for (Element<3>* f2 : v2->Elements)
+			{
+				if (f1 == f2)
+				{
+					for (Element<3>* f3 : v3->Elements)
+					{
+						if (f2 == f3)
+						{
+							neighbours.push_back(f1);
+							break;
+						}
+					}
+					break;
+				}
+			}
+		}
+
+		TriangularFace* face;
+		if (neighbours.size() == 1)
+		{
+			face = new TriangularFace(faceNumber++, v1, v2, v3, neighbours[0]);
+			neighbours[0]->AddFace(face);
+			this->BoundaryFaces.push_back(face);
+		}
+		else if (neighbours.size() == 2)
+		{
+			face = new TriangularFace(faceNumber++, v1, v2, v3, neighbours[0], neighbours[1]);
+			neighbours[0]->AddFace(face);
+			neighbours[1]->AddFace(face);
+			this->InteriorFaces.push_back(face);
+		}
+		else
+			assert(false);
+		this->Faces.push_back(face);
+		v1->Faces.push_back(face);
+		v2->Faces.push_back(face);
+		v3->Faces.push_back(face);
+	}
+}

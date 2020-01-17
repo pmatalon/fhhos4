@@ -80,4 +80,18 @@ public:
 		return AB.dot(AP) > 0 && AB.dot(AP) < AB.dot(AB);
 	}
 
+	static bool IsInTriangle(DomPoint A, DomPoint B, DomPoint C, DomPoint P, double triangleArea)
+	{
+		// From https://math.stackexchange.com/questions/4322/check-whether-a-point-is-within-a-3d-triangle
+
+		DimVector<3> PA = Vect<3>(P, A);
+		DimVector<3> PB = Vect<3>(P, B);
+		DimVector<3> PC = Vect<3>(P, C);
+		// Barycentric coordinates
+		double alpha = PB.cross(PC).norm() / (2 * triangleArea);
+		double beta = PC.cross(PA).norm() / (2 * triangleArea);
+		double gamma = 1 - alpha - beta;
+		return (alpha >= 0 && alpha <= 1) && (beta >= 0 && beta <= 1) && (gamma >= 0 && gamma <= 1);
+	}
+
 };

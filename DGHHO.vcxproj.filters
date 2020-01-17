@@ -5,6 +5,9 @@
     <ClCompile Include="src\Utils\Dunavant\triangle_dunavant_rule.cpp">
       <Filter>Utils\Dunavant</Filter>
     </ClCompile>
+    <ClCompile Include="src\Utils\Keast\tetrahedron_keast_rule.cpp">
+      <Filter>Utils\Keast</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src/DG/Poisson_DG.h">
@@ -278,6 +281,33 @@
     <ClInclude Include="src\Mesh\2D\GMSHUnstructuredTriangularMesh.h">
       <Filter>Mesh\2D</Filter>
     </ClInclude>
+    <ClInclude Include="src\Mesh\3D\Tetrahedron.h">
+      <Filter>Mesh\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\3D\TetrahedronShape.h">
+      <Filter>Mesh\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\3D\TriangularFace.h">
+      <Filter>Mesh\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\3D\ReferenceTetrahedron.h">
+      <Filter>Mesh\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\3D\TriangleIn3DShape.h">
+      <Filter>Mesh\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Utils\Keast\Keast.h">
+      <Filter>Utils\Keast</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Utils\Keast\tetrahedron_keast_rule.hpp">
+      <Filter>Utils\Keast</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\3D\GMSHTetrahedralMesh.h">
+      <Filter>Mesh\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\2D\GMSHQuadrilateralMesh.h">
+      <Filter>Mesh\2D</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
@@ -312,6 +342,9 @@
     </Filter>
     <Filter Include="Utils\Dunavant">
       <UniqueIdentifier>{9e267a7d-8baa-4693-8915-0a99d9065f34}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Utils\Keast">
+      <UniqueIdentifier>{ac5f4816-0e50-4bd5-afed-8f2aa7aa9f59}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

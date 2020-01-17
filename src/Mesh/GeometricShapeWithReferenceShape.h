@@ -19,8 +19,8 @@ public:
 	virtual bool Contains(DomPoint p) const = 0;
 
 	// Transformation to reference element
-	virtual DomPoint ConvertToDomain(RefPoint refPoint) const = 0;
-	virtual RefPoint ConvertToReference(DomPoint domainPoint) const = 0;
+	virtual DomPoint ConvertToDomain(RefPoint refPoint) const = 0; // Mapping
+	virtual RefPoint ConvertToReference(DomPoint domainPoint) const = 0; // Inverse mapping
 
 	virtual DimMatrix<Dim> InverseJacobianTranspose(RefPoint p) const = 0;
 	virtual double DetJacobian(RefPoint p) const = 0;

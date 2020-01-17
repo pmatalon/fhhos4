@@ -154,13 +154,13 @@ private:
 		//-----------------------------------------------------------------------------------------------------------//
 
 		// The interior faces of the future macro-element are flagged.
-		for (Element<2>* e1 : fineElements)
+		for (Element<Dim>* e1 : fineElements)
 		{
-			for (Element<2>* e2 : fineElements)
+			for (Element<Dim>* e2 : fineElements)
 			{
 				if (e1 != e2)
 				{
-					Face<2>* interface = e1->InterfaceWith(e2);
+					Face<Dim>* interface = e1->InterfaceWith(e2);
 					if (interface != nullptr)
 						interface->IsRemovedOnCoarserGrid = true;
 				}
@@ -234,14 +234,21 @@ private:
 		return macroElement;
 	}
 
-	Element<Dim>* CreatePolyhedron(vector<Vertex*> vertices)
-	{
-		BigNumber elementNumber = this->Elements.size();
-		if (Dim == 2)
-		{
-			Polygon* macroElement = new Polygon(elementNumber, vertices);
-			return macroElement;
-		}
-		assert(false && "Not yet implemented");
-	}
+	// Dim-specific function
+	Element<Dim>* CreatePolyhedron(vector<Vertex*> vertices) { return nullptr; }
 };
+
+
+template<>
+Element<2>* PolyhedralMesh<2>::CreatePolyhedron(vector<Vertex*> vertices)
+{
+	BigNumber elementNumber = this->Elements.size();
+	Polygon* macroElement = new Polygon(elementNumber, vertices);
+	return macroElement;
+}
+
+template<>
+Element<3>* PolyhedralMesh<3>::CreatePolyhedron(vector<Vertex*> vertices)
+{
+	assert(false && "Not yet implemented");
+}

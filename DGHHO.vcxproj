@@ -92,6 +92,7 @@
   <ItemGroup>
     <ClCompile Include="src/main.cpp" />
     <ClCompile Include="src\Utils\Dunavant\triangle_dunavant_rule.cpp" />
+    <ClCompile Include="src\Utils\Keast\tetrahedron_keast_rule.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src/FunctionalBasis/BasisFunctionFactory.h" />
@@ -108,6 +109,7 @@
     <ClInclude Include="src\Mesh\2D\CartesianPolygonalMesh2D.h" />
     <ClInclude Include="src\Mesh\2D\Edge.h" />
     <ClInclude Include="src\Mesh\2D\GMSHCartesianMesh.h" />
+    <ClInclude Include="src\Mesh\2D\GMSHQuadrilateralMesh.h" />
     <ClInclude Include="src\Mesh\2D\GMSHTriangularMesh.h" />
     <ClInclude Include="src\Mesh\2D\GMSHUnstructuredTriangularMesh.h" />
     <ClInclude Include="src\Mesh\2D\Polygon.h" />
@@ -120,6 +122,12 @@
     <ClInclude Include="src\Mesh\2D\Triangle.h" />
     <ClInclude Include="src\Mesh\2D\TriangleShape.h" />
     <ClInclude Include="src\Mesh\2D\TriangularMesh.h" />
+    <ClInclude Include="src\Mesh\3D\GMSHTetrahedralMesh.h" />
+    <ClInclude Include="src\Mesh\3D\ReferenceTetrahedron.h" />
+    <ClInclude Include="src\Mesh\3D\Tetrahedron.h" />
+    <ClInclude Include="src\Mesh\3D\TetrahedronShape.h" />
+    <ClInclude Include="src\Mesh\3D\TriangleIn3DShape.h" />
+    <ClInclude Include="src\Mesh\3D\TriangularFace.h" />
     <ClInclude Include="src\Mesh\CartesianElement.h" />
     <ClInclude Include="src\Mesh\CartesianFace.h" />
     <ClInclude Include="src\Mesh\CartesianShape.h" />
@@ -182,6 +190,8 @@
     <ClInclude Include="src\Utils\Dunavant\triangle_dunavant_rule.hpp" />
     <ClInclude Include="src\Utils\ElementParallelLoop.h" />
     <ClInclude Include="src\Utils\Geometry.h" />
+    <ClInclude Include="src\Utils\Keast\Keast.h" />
+    <ClInclude Include="src\Utils\Keast\tetrahedron_keast_rule.hpp" />
     <ClInclude Include="src\Utils\ParallelLoop.h" />
     <ClInclude Include="src\Utils\Timer.h" />
     <ClInclude Include="src\Utils\Types.h" />

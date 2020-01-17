@@ -12,6 +12,8 @@
 #include "Mesh/2D/GMSHCartesianMesh.h"
 #include "Mesh/2D/GMSHTriangularMesh.h"
 #include "Mesh/2D/GMSHUnstructuredTriangularMesh.h"
+#include "Mesh/2D/GMSHQuadrilateralMesh.h"
+#include "Mesh/3D/GMSHTetrahedralMesh.h"
 #endif
 #include "Utils/Action.h"
 #include "Utils/Timer.h"
@@ -67,6 +69,7 @@ public:
 			TriangleShape::Test();
 			QuadrilateralShape::Test();
 			PolygonalShape::Test();
+			TetrahedronShape::Test();
 
 			mesh->SanityCheck();
 			if (n <= 2)
@@ -518,6 +521,12 @@ Mesh<2>* ProgramDim<2>::BuildMesh(int n, string meshCode, string meshFilePath)
 		GMSHMesh<2>* fineMesh = coarseMesh->RefineUntilNElements(n*n*2);
 		return fineMesh;
 	}
+	else if (meshCode.compare("gmsh-quad") == 0)
+	{
+		GMSHMesh<2>* coarseMesh = new GMSHQuadrilateralMesh();
+		GMSHMesh<2>* fineMesh = coarseMesh->RefineUntilNElements(n*n);
+		return fineMesh;
+	}
 	else if (meshCode.compare("gmsh") == 0)
 	{
 		GMSHMesh<2>* coarseMesh = new GMSHMesh<2>(meshFilePath);
@@ -531,5 +540,21 @@ Mesh<2>* ProgramDim<2>::BuildMesh(int n, string meshCode, string meshFilePath)
 template <>
 Mesh<3>* ProgramDim<3>::BuildMesh(int n, string meshCode, string meshFilePath)
 {
-	return new CartesianGrid3D(n, n, n);
+	if (meshCode.compare("cart") == 0)
+		return new CartesianGrid3D(n, n, n);
+#ifdef GMSH_ENABLED
+	else if (meshCode.compare("gmsh-tetra") == 0)
+	{
+		GMSHMesh<3>* coarseMesh = new GMSHTetrahedralMesh();
+		GMSHMesh<3>* fineMesh = coarseMesh->RefineUntilNElements(n*n*n*2);
+		return fineMesh;
+	}
+	else if (meshCode.compare("gmsh") == 0)
+	{
+		GMSHMesh<3>* coarseMesh = new GMSHMesh<3>(meshFilePath);
+		GMSHMesh<3>* fineMesh = coarseMesh->RefineUntilNElements(n*n*n*2);
+		return fineMesh;
+	}
+#endif // GMSH_ENABLED
+	assert(false);
 }

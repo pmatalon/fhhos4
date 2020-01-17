@@ -78,14 +78,9 @@ public:
 		else
 			assert(false);
 		
-		DimVector<2> AC = Vect(A, C);
-		//double nAC = n(0) * (C->X - A->X) + n(1) * (C->Y - A->Y);
-		//if (nAC > 0)
+		DimVector<2> AC = Vect<2>(A, C);
 		if (n.dot(AC) > 0)
 			n = -1 * n;
-		/*DimVector<2> AC = this->Center() - *A;
-		if (n.dot(AC) > 0)
-			n = -1 * n;*/
 
 		n = n.normalized();
 		return n;
@@ -95,6 +90,16 @@ public:
 	{
 		if (_shape)
 			delete _shape;
+	}
+
+	//-------------------------------------------------------------------//
+	//                            Unit tests                             //
+	//-------------------------------------------------------------------//
+
+	void UnitTests() const override
+	{
+		Element<2>::UnitTests();
+		assert(this->Faces.size() == 3);
 	}
 
 };

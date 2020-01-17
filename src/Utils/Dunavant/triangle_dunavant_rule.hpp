@@ -1,3 +1,5 @@
+namespace triangle_dunavant_rule {
+
 int dunavant_degree ( int rule );
 int dunavant_order_num ( int rule );
 void dunavant_rule ( int rule, int order_num, double xy[], double w[] );
@@ -57,3 +59,4 @@ int s_len_trim ( char *s );
 void timestamp ( );
 double triangle_area ( double t[2*3] );
 
+}

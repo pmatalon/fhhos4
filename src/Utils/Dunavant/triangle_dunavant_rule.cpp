@@ -9,6 +9,7 @@
 using namespace std;
 
 # include "triangle_dunavant_rule.hpp"
+namespace triangle_dunavant_rule {
 
 //****************************************************************************80
 
@@ -3042,3 +3043,4 @@ double triangle_area ( double t[2*3] )
   return area;
 }
 
+}

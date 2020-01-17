@@ -316,9 +316,11 @@ int main(int argc, char* argv[])
 				if (   meshCode.compare("cart") != 0
 					&& meshCode.compare("cart-poly") != 0
 					&& meshCode.compare("tri") != 0
-					&& meshCode.compare("gmsh-tri") != 0
 					&& meshCode.compare("gmsh-cart") != 0
+					&& meshCode.compare("gmsh-tri") != 0
+					&& meshCode.compare("gmsh-quad") != 0
 					&& meshCode.compare("gmsh-uns-tri") != 0
+					&& meshCode.compare("gmsh-tetra") != 0
 					&& meshCode.compare("gmsh") != 0
 					&& meshCode.compare("quad") != 0
 					&& meshCode.compare("quad-poly") != 0)
@@ -469,8 +471,11 @@ int main(int argc, char* argv[])
 	if ((meshCode.compare("tri") == 0 || meshCode.compare("gmsh-tri") == 0 || meshCode.compare("gmsh-uns-tri") == 0) && dimension != 2)
 		argument_error("The triangular mesh in only available in 2D.");
 
-	if (meshCode.compare("quad") == 0 && dimension != 2)
+	if ((meshCode.compare("quad") == 0 || meshCode.compare("gmsh-quad") == 0) && dimension != 2)
 		argument_error("The quadrilateral mesh in only available in 2D.");
+
+	if (meshCode.compare("gmsh-tetra") == 0 && dimension != 3)
+		argument_error("The tetrahedral mesh in only available in 3D.");
 
 	if (meshCode.compare("gmsh") == 0 && meshFilePath.compare("") == 0)
 		argument_error("The GMSH file path is missing. Add the argument -file.");

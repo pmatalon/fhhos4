@@ -193,7 +193,7 @@ public:
 			{
 				auto n = t->OuterNormalVector(f);
 				Edge* edge = dynamic_cast<Edge*>(f);
-				assert(n.dot(Vect(edge->Vertex1(), edge->Vertex2())) == 0);
+				assert(n.dot(Vect<2>(edge->Vertex1(), edge->Vertex2())) == 0);
 			}
 			
 			assert(t->ConvertToDomain(t->ConvertToReference(*(t->V1()))) == *(t->V1()));

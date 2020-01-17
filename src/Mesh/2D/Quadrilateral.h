@@ -71,4 +71,14 @@ public:
 			delete _shape;
 	}
 
+	//-------------------------------------------------------------------//
+	//                            Unit tests                             //
+	//-------------------------------------------------------------------//
+
+	void UnitTests() const override
+	{
+		Element<2>::UnitTests();
+		assert(this->Faces.size() == 4);
+	}
+
 };

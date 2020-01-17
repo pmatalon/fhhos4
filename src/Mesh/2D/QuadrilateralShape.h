@@ -127,6 +127,7 @@ public:
 	}
 
 	// Formulas in Silva et al. "Exact and efficient interpolation using finite elements shape functions" (2009)
+	// where ksi = t, eta = u
 	DomPoint ConvertToDomain(RefPoint refPoint) const
 	{
 		double t = refPoint.X;
@@ -160,7 +161,8 @@ public:
 			if (discr > 0)
 			{
 				u = (-B + sqrt(discr)) / (2 * A);
-				if (u < -1 || u > 1)
+				//if (u < -1 || u > 1)
+				if (abs(u) > 1.0001)
 					u = (-B - sqrt(discr)) / (2 * A);
 			}
 			else if (discr == 0)
@@ -168,7 +170,7 @@ public:
 			else
 				assert(false);
 
-			if (a1 + a3 * u != 0)
+			if (abs(a1 + a3 * u) > 1e-16) // if (a1 + a3 * u != 0)
 				t = (x0 - a2 * u) / (a1 + a3 * u);
 			else if (a1 != 0 && a3 != 0)
 			{
@@ -183,6 +185,8 @@ public:
 			else
 				assert(false);
 		}
+		if (abs(t) > 1.1 || abs(u) > 1.1)
+			assert(false);
 		return RefPoint(t, u);
 	}
 

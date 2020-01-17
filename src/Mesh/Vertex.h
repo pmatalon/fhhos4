@@ -29,9 +29,21 @@ DimVector<2> operator-(Point const& A, Point const& B)
 	return v;
 }
 
-DimVector<2> Vect(Vertex* A, Vertex* B)
+template<int Dim>
+DimVector<Dim> Vect(Point A, Point B)
 {
-	DimVector<2> v;
-	v << B->X - A->X, B->Y - A->Y;
+	DimVector<Dim> v;
+	if (Dim == 1)
+		v << B.X - A.X;
+	else if (Dim == 2)
+		v << B.X - A.X, B.Y - A.Y;
+	else if (Dim == 3)
+		v << B.X - A.X, B.Y - A.Y, B.Z - A.Z;
 	return v;
+}
+
+template<int Dim>
+DimVector<Dim> Vect(Vertex* A, Vertex* B)
+{
+	return Vect<Dim>(*A, *B);
 }
