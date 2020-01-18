@@ -146,12 +146,7 @@ public:
 		else if (ShapeDim == 2)
 		{
 			if (DomainDim == 2)
-			{
-				if (this->Orientation == CartesianShapeOrientation::Horizontal)
-					this->_center = DomPoint(Origin->X + WidthX / 2, Origin->Y);
-				else
-					this->_center = DomPoint(Origin->X, Origin->Y + WidthY / 2);
-			}
+				this->_center = DomPoint(Origin->X + WidthX / 2, Origin->Y + WidthY / 2);
 			else
 			{
 				if (this->Orientation == CartesianShapeOrientation::InXOY)
@@ -164,12 +159,8 @@ public:
 		}
 		else if (ShapeDim == 3)
 		{
-			if (this->Orientation == CartesianShapeOrientation::InXOY)
-				this->_center = DomPoint(Origin->X + WidthX / 2, Origin->Y + WidthY / 2, Origin->Z);
-			else if (this->Orientation == CartesianShapeOrientation::InXOZ)
-				this->_center = DomPoint(Origin->X + WidthX / 2, Origin->Y, Origin->Z + WidthZ / 2);
-			else if (this->Orientation == CartesianShapeOrientation::InYOZ)
-				this->_center = DomPoint(Origin->X, Origin->Y + WidthY / 2, Origin->Z + WidthZ / 2);
+			assert(DomainDim == 3);
+			this->_center = DomPoint(Origin->X + WidthX / 2, Origin->Y + WidthY / 2, Origin->Z + WidthZ / 2);
 		}
 	}
 

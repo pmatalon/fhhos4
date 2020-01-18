@@ -217,6 +217,10 @@ private:
 		else
 		{
 			CartesianGrid3D* coarseMesh = new CartesianGrid3D(nx / 2, ny / 2, nz / 2);
+			coarseMesh->ComesFrom.CS = CoarseningStrategy::Standard;
+			coarseMesh->ComesFrom.nFineElementsByCoarseElement = 8;
+			coarseMesh->ComesFrom.nFineFacesAddedByCoarseElement = 12;
+			coarseMesh->ComesFrom.nFineFacesByKeptCoarseFace = 4;
 
 			for (BigNumber iz = 0; iz < nz; ++iz)
 			{

@@ -63,7 +63,7 @@ public:
 
 		Mesh<Dim>* mesh = BuildMesh(n, meshCode, meshFilePath);
 
-		if (n <= 16)
+		if ((action & Action::UnitTests) == Action::UnitTests)
 		{
 			// Unit tests
 			TriangleShape::Test();
@@ -296,10 +296,13 @@ public:
 
 		mesh->SetBoundaryConditions(&bc);
 
-		//mesh->CoarsenMesh(CoarseningStrategy::Standard);
-		//mesh->SanityCheck();
-		//cout << *mesh << endl << endl;
-		//cout << "Coarse mesh" << endl << *(mesh->CoarseMesh) << endl << endl;
+		if ((action & Action::UnitTests) == Action::UnitTests)
+		{
+			mesh->CoarsenMesh(coarseningStgy);
+			mesh->SanityCheck();
+			//cout << *mesh << endl << endl;
+			//cout << "Coarse mesh" << endl << *(mesh->CoarseMesh) << endl << endl;
+		}
 
 		//--------------------------------//
 		//   Discretization and solving   //

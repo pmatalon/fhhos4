@@ -7,9 +7,29 @@ using namespace std;
 
 enum class CoarseningStrategy : unsigned
 {
-	Standard = 0,
+	None,
+	Standard,
 	Agglomeration,
 	StructuredRefinement
+};
+
+struct CoarseningStrategyDetails
+{
+	CoarseningStrategy CS;
+	int nFineFacesAddedByCoarseElement = -1;
+	int nFineElementsByCoarseElement = -1;
+	int nFineFacesByKeptCoarseFace = -1;
+
+	CoarseningStrategyDetails(CoarseningStrategy cs)
+	{
+		CS = cs;
+	}
+	CoarseningStrategyDetails() : CoarseningStrategyDetails(CoarseningStrategy::None) {}
+
+	bool HasDetails()
+	{
+		return nFineElementsByCoarseElement != -1 && nFineFacesAddedByCoarseElement != -1 && nFineFacesByKeptCoarseFace != -1;
+	}
 };
 
 template <int Dim>
@@ -29,6 +49,7 @@ public:
 
 	Mesh<Dim>* CoarseMesh = nullptr;
 	Mesh<Dim>* FineMesh = nullptr;
+	CoarseningStrategyDetails ComesFrom;
 
 	static string MeshDirectory;
 
@@ -170,6 +191,7 @@ public:
 				bool feIsReferenced = false;
 				for (Element<Dim>* e : fe->CoarserElement->FinerElements)
 				{
+					assert(e->CoarserElement == fe->CoarserElement);
 					if (e == fe)
 					{
 						feIsReferenced = true;
@@ -185,7 +207,7 @@ public:
 				for (Face<Dim>* ff : ce->FinerFacesRemoved)
 					assert(ff->IsRemovedOnCoarserGrid);
 			}
-			
+
 			for (Face<Dim>* cf : CoarseMesh->Faces)
 			{
 				assert(cf->FinerFaces.size() > 0);
@@ -212,6 +234,28 @@ public:
 					}
 					assert(ffIsReferenced);
 				}
+			}
+
+			Mesh<Dim>* meshToGetInfo = nullptr;
+			if (this->ComesFrom.CS == CoarseningStrategy::StructuredRefinement)
+				meshToGetInfo = this;
+			else if (CoarseMesh->ComesFrom.CS == CoarseningStrategy::Standard || CoarseMesh->ComesFrom.CS == CoarseningStrategy::Agglomeration)
+				meshToGetInfo = CoarseMesh;
+
+			if (meshToGetInfo != nullptr && meshToGetInfo->ComesFrom.HasDetails())
+			{
+				int nFineFacesAddedByCoarseElement = meshToGetInfo->ComesFrom.nFineFacesAddedByCoarseElement;
+				int nFineElementsByCoarseElement = meshToGetInfo->ComesFrom.nFineElementsByCoarseElement;
+				int nFineFacesByKeptCoarseFace = meshToGetInfo->ComesFrom.nFineFacesByKeptCoarseFace;
+
+				for (Element<Dim>* ce : CoarseMesh->Elements)
+				{
+					assert(ce->FinerElements.size() == nFineElementsByCoarseElement);
+					assert(ce->FinerFacesRemoved.size() == nFineFacesAddedByCoarseElement);
+				}
+				BigNumber finerFacesAdded = nFineFacesAddedByCoarseElement * CoarseMesh->Elements.size();
+				assert(this->Elements.size() == nFineElementsByCoarseElement * CoarseMesh->Elements.size());
+				assert(this->Faces.size() == nFineFacesByKeptCoarseFace * CoarseMesh->Faces.size() + finerFacesAdded);
 			}
 		}
 	}

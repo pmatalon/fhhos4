@@ -280,6 +280,10 @@ public:
 		else
 		{
 			TriangularMesh* coarseMesh = new TriangularMesh(nx / 2, ny / 2);
+			coarseMesh->ComesFrom.CS = CoarseningStrategy::Standard;
+			coarseMesh->ComesFrom.nFineElementsByCoarseElement = 4;
+			coarseMesh->ComesFrom.nFineFacesAddedByCoarseElement = 3;
+			coarseMesh->ComesFrom.nFineFacesByKeptCoarseFace = 2;
 
 			for (BigNumber i = 0; i < ny; ++i)
 			{

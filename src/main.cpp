@@ -173,6 +173,7 @@ void print_usage() {
 	cout << "              m   - export multigrid matrices" << endl;
 	cout << "              v   - export solution vector (requires 's')" << endl;
 	cout << "              r   - compute L2 error against the analytical solution if known" << endl;
+	cout << "              t   - run unit tests" << endl;
 	cout << endl;
 	cout << "-o PATH" << endl;
 	cout << "      Output directory to export files (default: ./)." << endl;
@@ -519,6 +520,8 @@ int main(int argc, char* argv[])
 			action |= Action::ExtractSolution;
 		else if (a[i] == 'r')
 			action |= Action::ComputeL2Error;
+		else if (a[i] == 't')
+			action |= Action::UnitTests;
 		else
 		{
 			string character(1, a[i]);

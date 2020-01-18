@@ -204,7 +204,7 @@ public:
 			assert(false && "Unmanaged coarsening strategy");
 	}
 
-	void RefineMesh()
+	virtual void RefineMesh()
 	{
 		if (this->FineMesh)
 			assert(false && "Mesh already refined!");
@@ -222,8 +222,10 @@ public:
 
 		// Building our own mesh objects from the GMSH ones
 		GMSHMesh<Dim>* fineMesh = new GMSHMesh<Dim>();
+		fineMesh->ComesFrom.CS = CoarseningStrategy::StructuredRefinement;
 		fineMesh->_description = this->_description;
 		fineMesh->_fileNamePart = this->_fileNamePart;
+
 		this->FineMesh = fineMesh;
 		this->FineMesh->CoarseMesh = this;
 

@@ -177,6 +177,10 @@ public:
 			CartesianPolygonalMesh2D* coarseMesh = new CartesianPolygonalMesh2D();
 			coarseMesh->Nx = nx / 2;
 			coarseMesh->Ny = ny / 2;
+			coarseMesh->ComesFrom.CS = CoarseningStrategy::Agglomeration;
+			coarseMesh->ComesFrom.nFineElementsByCoarseElement = 4;
+			coarseMesh->ComesFrom.nFineFacesAddedByCoarseElement = 4;
+			coarseMesh->ComesFrom.nFineFacesByKeptCoarseFace = 1;
 
 			BigNumber faceNumber = 0;
 			for (BigNumber i = 0; i < ny / 2; ++i)

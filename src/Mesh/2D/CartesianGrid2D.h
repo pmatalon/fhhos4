@@ -177,6 +177,10 @@ public:
 		else
 		{
 			CartesianGrid2D* coarseMesh = new CartesianGrid2D(nx / 2, ny / 2);
+			coarseMesh->ComesFrom.CS = CoarseningStrategy::Standard;
+			coarseMesh->ComesFrom.nFineElementsByCoarseElement = 4;
+			coarseMesh->ComesFrom.nFineFacesAddedByCoarseElement = 4;
+			coarseMesh->ComesFrom.nFineFacesByKeptCoarseFace = 2;
 
 			for (BigNumber i = 0; i < ny; ++i)
 			{
@@ -233,6 +237,10 @@ public:
 			CartesianPolygonalMesh2D* coarseMesh = new CartesianPolygonalMesh2D();
 			coarseMesh->Nx = nx / 2;
 			coarseMesh->Ny = ny / 2;
+			coarseMesh->ComesFrom.CS = CoarseningStrategy::Agglomeration;
+			coarseMesh->ComesFrom.nFineElementsByCoarseElement = 4;
+			coarseMesh->ComesFrom.nFineFacesAddedByCoarseElement = 4;
+			coarseMesh->ComesFrom.nFineFacesByKeptCoarseFace = 1;
 
 			// Elements //
 			BigNumber faceNumber = 0;

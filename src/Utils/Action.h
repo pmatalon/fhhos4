@@ -10,7 +10,8 @@ enum class Action : unsigned
 	ExportMultigridMatrices     = 1 << 5,
 	ExtractSolution				= 1 << 6,
 	LogAssembly					= 1 << 7,
-	ComputeL2Error              = 1 << 8
+	ComputeL2Error              = 1 << 8,
+	UnitTests                   = 1 << 9
 };
 
 Action operator &(Action lhs, Action rhs)

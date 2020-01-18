@@ -11,4 +11,11 @@ public:
 		this->_fileNamePart = "gmsh-tri";
 	}
 
+	void RefineMesh() override
+	{
+		GMSHMesh::RefineMesh();
+		this->FineMesh->ComesFrom.nFineElementsByCoarseElement = 4;
+		this->FineMesh->ComesFrom.nFineFacesAddedByCoarseElement = 3;
+		this->FineMesh->ComesFrom.nFineFacesByKeptCoarseFace = 2;
+	}
 };
