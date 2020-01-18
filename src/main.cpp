@@ -219,7 +219,7 @@ int main(int argc, char* argv[])
 	string postSmootherCode = "rbgs";
 	int nPreSmoothingIterations = 1;
 	int nPostSmoothingIterations = 1;
-	CoarseningStrategy coarseningStgy = CoarseningStrategy::Standard;
+	string coarseningStgyCode = "default";
 	string outputDirectory = ".";
 	string solverCode = "lu";
 	double solverTolerance = 1e-8;
@@ -406,16 +406,10 @@ int main(int argc, char* argv[])
 				break;
 			}
 			case OPT_CoarseningStrategy:
-			{
-				string code = optarg;
-				if (code.compare("s") != 0 && code.compare("a") != 0 && code.compare("r") != 0)
-					argument_error("unknown coarsening strategy code '" + code + "'. Check -cs argument.");
-				if (code.compare("a") == 0)
-					coarseningStgy = CoarseningStrategy::Agglomeration;
-				if (code.compare("r") == 0)
-					coarseningStgy = CoarseningStrategy::StructuredRefinement;
+				coarseningStgyCode = optarg;
+				if (coarseningStgyCode.compare("s") != 0 && coarseningStgyCode.compare("a") != 0 && coarseningStgyCode.compare("r") != 0)
+					argument_error("unknown coarsening strategy code '" + coarseningStgyCode + "'. Check -cs argument.");
 				break;
-			}
 			case OPT_InitialGuess:
 				initialGuessCode = optarg;
 				if (initialGuessCode.compare("0") != 0 && initialGuessCode.compare("1") != 0)
@@ -490,6 +484,23 @@ int main(int argc, char* argv[])
 
 	if (solverCode.compare("mg") == 0 && discretization.compare("hho") == 0 && !staticCondensation)
 		argument_error("Multigrid only applicable if the static condensation is enabled.");
+
+
+	CoarseningStrategy coarseningStgy = CoarseningStrategy::Standard;
+	if (coarseningStgyCode.compare("default") == 0)
+	{
+		if (meshCode.find("gmsh") == 0)
+			coarseningStgy = CoarseningStrategy::StructuredRefinement;
+		else
+			coarseningStgy = CoarseningStrategy::Standard;
+	}
+	else if (coarseningStgyCode.compare("s") == 0)
+		coarseningStgy = CoarseningStrategy::Standard;
+	else if (coarseningStgyCode.compare("a") == 0)
+		coarseningStgy = CoarseningStrategy::Agglomeration;
+	else if (coarseningStgyCode.compare("r") == 0)
+		coarseningStgy = CoarseningStrategy::StructuredRefinement;
+
 
 	Action action = Action::LogAssembly;
 	for (size_t i = 0; i < a.length(); i++)
