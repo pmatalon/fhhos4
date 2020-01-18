@@ -55,7 +55,7 @@ public:
 	//                 Element implementation                //
 	//-------------------------------------------------------//
 
-	DimVector<2> OuterNormalVector(Face<2>* face)
+	DimVector<2> OuterNormalVector(Face<2>* face) const
 	{
 		DimVector<2> n;
 		if (face == this->NorthFace)

@@ -80,7 +80,7 @@ public:
 	//                 Element implementation                //
 	//-------------------------------------------------------//
 
-	DimVector<3> OuterNormalVector(Face<3>* face)
+	DimVector<3> OuterNormalVector(Face<3>* face) const
 	{
 		DimVector<3> n;
 		if (face == this->TopFace)

@@ -45,7 +45,7 @@ public:
 		return _shape;
 	}
 
-	DimVector<3> OuterNormalVector(Face<3>* f)
+	DimVector<3> OuterNormalVector(Face<3>* f) const
 	{
 		DimVector<3> n;
 		TriangularFace* face = dynamic_cast<TriangularFace*>(f);

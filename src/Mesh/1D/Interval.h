@@ -33,7 +33,7 @@ public:
 	//                 Element implementation                //
 	//-------------------------------------------------------//
 
-	DimVector<1> OuterNormalVector(Face<1>* interface)
+	DimVector<1> OuterNormalVector(Face<1>* interface) const
 	{
 		DimVector<1> n;
 		if (interface == this->Left)

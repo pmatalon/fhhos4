@@ -10,7 +10,8 @@ enum GMSHElementTypes
 	GMSH_Segment = 1,
 	GMSH_Triangle = 2,
 	GMSH_Quadrilateral = 3,
-	GMSH_Tetrahedron = 4
+	GMSH_Tetrahedron = 4,
+	GMSH_Hexahedron = 8
 };
 
 enum GMSHFaceTypes

@@ -54,7 +54,7 @@ public:
 	{
 		return Shape()->Center();
 	}
-	virtual DimVector<Dim> OuterNormalVector(Face<Dim>* face) = 0;
+	virtual DimVector<Dim> OuterNormalVector(Face<Dim>* face) const = 0;
 
 	// Transformation to reference element
 	virtual DomPoint ConvertToDomain(RefPoint refPoint) const
@@ -247,5 +247,26 @@ public:
 	virtual void UnitTests() const
 	{
 		Shape()->UnitTests();
+
+		// The following tests are valid if the element is convex
+		DomPoint C = this->Center();
+		for (Face<Dim>* f : this->Faces)
+		{
+			DimVector<Dim> n = this->OuterNormalVector(f);
+			for (Vertex* v : f->Shape()->Vertices())
+			{
+				DimVector<Dim> VC = Vect<Dim>(*v, C);
+				assert(VC.dot(n) < 0);
+
+				for (Vertex* v2 : f->Shape()->Vertices())
+				{
+					if (v2 != v)
+					{
+						DimVector<Dim> V1V2 = Vect<Dim>(v, v2);
+						assert(abs(V1V2.dot(n)) < 1e-15);
+					}
+				}
+			}
+		}
 	}
 };

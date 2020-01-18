@@ -73,7 +73,7 @@ public:
 	//                 Element implementation                //
 	//-------------------------------------------------------//
 
-	DimVector<2> OuterNormalVector(Face<2>* face)
+	DimVector<2> OuterNormalVector(Face<2>* face) const
 	{
 		DimVector<2> n;
 		if (isIn(this->NorthFaces, face))
@@ -90,7 +90,7 @@ public:
 	}
 
 private:
-	bool isIn(vector<Face<2>*> faces, Face<2>* f)
+	bool isIn(vector<Face<2>*> faces, Face<2>* f) const
 	{
 		auto it = find(faces.begin(), faces.end(), f);
 		if (it != faces.end())

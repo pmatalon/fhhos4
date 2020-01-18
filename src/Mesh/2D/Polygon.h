@@ -32,7 +32,7 @@ public:
 		return _shape;
 	}
 
-	DimVector<2> OuterNormalVector(Face<2>* face)
+	DimVector<2> OuterNormalVector(Face<2>* face) const
 	{
 		DimVector<2> n;
 		Edge* edge = dynamic_cast<Edge*>(face);

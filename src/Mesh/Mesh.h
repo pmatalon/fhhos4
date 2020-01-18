@@ -144,13 +144,21 @@ public:
 		}
 
 		for (auto f : this->BoundaryFaces)
+		{
 			assert(f->IsDomainBoundary);
+			assert(f->Element1);
+			assert(!f->Element2);
+		}
 
 		for (auto f : this->InteriorFaces)
+		{
 			assert(!f->IsDomainBoundary);
+			assert(f->Element1);
+			assert(f->Element2);
+		}
 
 		assert(this->BoundaryFaces.size() + this->InteriorFaces.size() == this->Faces.size());
-
+		
 		if (CoarseMesh)
 		{
 			CoarseMesh->SanityCheck();
