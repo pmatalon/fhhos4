@@ -39,7 +39,7 @@ public:
 
 	void ExportFaceToMatlab(FILE* file)
 	{
-		fprintf(file, "%llu %.17g 0 0 0 %d\n", this->Number, this->V->X, this->IsDomainBoundary);
+		fprintf(file, "%lu %.17g 0 0 0 %d\n", this->Number, this->V->X, this->IsDomainBoundary);
 	}
 
 	//---------------------------------------------------------------//

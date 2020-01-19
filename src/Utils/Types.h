@@ -2,7 +2,7 @@
 #include <Eigen/Sparse>
 #include <Eigen/Dense>
 
-typedef long unsigned int BigNumber;
+typedef std::size_t BigNumber;
 
 using SparseMatrix = Eigen::SparseMatrix<double, Eigen::RowMajor>;
 

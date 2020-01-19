@@ -140,7 +140,7 @@ public:
 	void ExportFaceToMatlab(FILE* file)
 	{
 		//             Number  x1    y1    x2    y2 IsDomainBoundary
-		fprintf(file, "%llu %.17g %.17g %.17g %.17g %d\n", this->Number, _shape->Vertex1->X, _shape->Vertex1->Y, _shape->Vertex2->X, _shape->Vertex2->Y, this->IsDomainBoundary);
+		fprintf(file, "%lu %.17g %.17g %.17g %.17g %d\n", this->Number, _shape->Vertex1->X, _shape->Vertex1->Y, _shape->Vertex2->X, _shape->Vertex2->Y, this->IsDomainBoundary);
 	}
 
 	virtual ~Edge()
