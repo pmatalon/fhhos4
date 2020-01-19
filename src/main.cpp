@@ -150,6 +150,8 @@ void print_usage() {
 	cout << "      Initial guess for the iterative solvers." << endl;
 	cout << "              0     - zero vector (default)" << endl;
 	cout << "              1     - all ones vector" << endl;
+	cout << "-tol NUM" << endl;
+	cout << "      Tolerance of the iterative solver (default: 1e-8)." << endl;
 	cout << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << "                             Miscellaneous                            " << endl;
@@ -243,6 +245,7 @@ int main(int argc, char* argv[])
 		OPT_Smoothers,
 		OPT_CoarseningStrategy,
 		OPT_InitialGuess,
+		OPT_Tolerance,
 		OPT_Threads
 	};
 
@@ -264,6 +267,7 @@ int main(int argc, char* argv[])
 		 { "smoothers", required_argument, NULL, OPT_Smoothers },
 		 { "cs", required_argument, NULL, OPT_CoarseningStrategy },
 		 { "initial-guess", required_argument, NULL, OPT_InitialGuess },
+		 { "tol", required_argument, NULL, OPT_Tolerance },
 		 { "threads", required_argument, NULL, OPT_Threads },
 		 { NULL, 0, NULL, 0 }
 	};
@@ -415,6 +419,9 @@ int main(int argc, char* argv[])
 				initialGuessCode = optarg;
 				if (initialGuessCode.compare("0") != 0 && initialGuessCode.compare("1") != 0)
 					argument_error("unknown initial guess '" + initialGuessCode + "'. Check -initial-guess argument.");
+			case OPT_Tolerance:
+				solverTolerance = atof(optarg);
+				break;
 			case OPT_Threads:
 				BaseParallelLoop::SetDefaultNThreads(atoi(optarg));
 				break;
