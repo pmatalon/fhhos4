@@ -225,7 +225,7 @@ public:
 
 	RefFunction GetApproximateFunction(const Vector &solution, BigNumber startIndex) const
 	{
-		RefFunction approximate = [this, solution, startIndex](RefPoint p) {
+		RefFunction approximate = [this, &solution, startIndex](RefPoint p) {
 			double result = 0;
 			for (unsigned int i = 0; i < this->LocalFunctions.size(); i++)
 			{
