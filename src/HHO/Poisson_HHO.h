@@ -18,6 +18,7 @@ private:
 public:
 	HHOParameters<Dim>* HHO;
 	Vector ReconstructedSolution;
+	Vector GlobalHybridSolution;
 
 	Poisson_HHO(Mesh<Dim>* mesh, string rhsCode, SourceFunction* sourceFunction, HHOParameters<Dim>* hho, bool staticCondensation, DiffusionPartition<Dim>* diffusionPartition, BoundaryConditions* bc, string outputDirectory)
 		: PoissonProblem<Dim>(mesh, diffusionPartition, rhsCode, sourceFunction, bc, outputDirectory)
@@ -95,6 +96,7 @@ public:
 		cout << "Mesh: " << this->_mesh->Description() << endl;
 		cout << "    Elements: " << HHO->nElements << endl;
 		cout << "    Faces   : " << HHO->nFaces << " (" << HHO->nInteriorFaces << " interior + " << HHO->nBoundaryFaces << " boundary)" << endl;
+		cout << "    h       : " << scientific << this->_mesh->H() << defaultfloat << endl;
 		cout << "Discretization: Hybrid High Order (k = " << HHO->FaceBasis->GetDegree() << ")" << endl;
 		cout << "    Reconstruction basis: " << HHO->ReconstructionBasis->Name() << endl;
 		cout << "    Cell basis          : " << HHO->CellBasis->Name() << endl;
@@ -476,7 +478,7 @@ public:
 	void ReconstructHigherOrderApproximation()
 	{
 		Vector globalReconstructedSolution(HHO->nElements * HHO->nReconstructUnknowns);
-		Vector globalHybridSolution(HHO->nTotalHybridCoeffs);
+		this->GlobalHybridSolution = Vector(HHO->nTotalHybridCoeffs);
 
 		if (this->_staticCondensation)
 		{
@@ -487,26 +489,28 @@ public:
 			Vector bt = this->_globalRHS.head(HHO->nTotalCellUnknowns);
 			SparseMatrix inverseAtt = GetInverseAtt();
 
-			globalHybridSolution.head(HHO->nTotalCellUnknowns) = inverseAtt * (bt - Atf * facesSolution);
-			globalHybridSolution.segment(HHO->nTotalCellUnknowns, HHO->nTotalFaceUnknowns) = facesSolution;
+			this->GlobalHybridSolution.head(HHO->nTotalCellUnknowns) = inverseAtt * (bt - Atf * facesSolution);
+			this->GlobalHybridSolution.segment(HHO->nTotalCellUnknowns, HHO->nTotalFaceUnknowns) = facesSolution;
 		}
 		else
-			globalHybridSolution.head(HHO->nTotalHybridUnknowns) = this->SystemSolution;
+			this->GlobalHybridSolution.head(HHO->nTotalHybridUnknowns) = this->SystemSolution;
 
 		// Dirichlet boundary conditions
-		globalHybridSolution.tail(HHO->nDirichletUnknowns) = this->_dirichletCond;
+		this->GlobalHybridSolution.tail(HHO->nDirichletUnknowns) = this->_dirichletCond;
+
+
 
 		cout << "Reconstruction of higher order approximation..." << endl;
-		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, &globalHybridSolution, &globalReconstructedSolution](Element<Dim>* e)
+		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, &globalReconstructedSolution](Element<Dim>* e)
 			{
 				HHOParameters<Dim>* HHO = this->HHO;
 				Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
 
 				Vector localHybridSolution(HHO->nCellUnknowns + HHO->nFaceUnknowns * element->Faces.size());
-				localHybridSolution.head(HHO->nCellUnknowns) = globalHybridSolution.segment(FirstDOFGlobalNumber(element), HHO->nCellUnknowns);
+				localHybridSolution.head(HHO->nCellUnknowns) = this->GlobalHybridSolution.segment(FirstDOFGlobalNumber(element), HHO->nCellUnknowns);
 				for (auto face : element->Faces)
 				{
-					localHybridSolution.segment(element->FirstDOFNumber(face), HHO->nFaceUnknowns) = globalHybridSolution.segment(FirstDOFGlobalNumber(face), HHO->nFaceUnknowns);
+					localHybridSolution.segment(element->FirstDOFNumber(face), HHO->nFaceUnknowns) = this->GlobalHybridSolution.segment(FirstDOFGlobalNumber(face), HHO->nFaceUnknowns);
 				}
 
 				Vector localReconstructedSolution = element->Reconstruct(localHybridSolution);
@@ -522,6 +526,11 @@ public:
 		{
 			Problem<Dim>::ExtractSolution(this->SystemSolution, "Faces");
 		}
+	}
+
+	void ExtractHybridSolution()
+	{
+		Problem<Dim>::ExtractSolution(this->GlobalHybridSolution, "Hybrid");
 	}
 
 	void ExtractSolution() override
