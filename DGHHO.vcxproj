@@ -108,7 +108,7 @@
     <ClInclude Include="src\HHO\HHOParameters.h" />
     <ClInclude Include="src\Mesh\2D\CartesianPolygonalMesh2D.h" />
     <ClInclude Include="src\Mesh\2D\Edge.h" />
-    <ClInclude Include="src\Mesh\2D\GMSHCartesianMesh.h" />
+    <ClInclude Include="src\Mesh\2D\GMSHCartesianMesh2D.h" />
     <ClInclude Include="src\Mesh\2D\GMSHQuadrilateralMesh.h" />
     <ClInclude Include="src\Mesh\2D\GMSHTriangularMesh.h" />
     <ClInclude Include="src\Mesh\2D\GMSHUnstructuredTriangularMesh.h" />
@@ -122,6 +122,7 @@
     <ClInclude Include="src\Mesh\2D\Triangle.h" />
     <ClInclude Include="src\Mesh\2D\TriangleShape.h" />
     <ClInclude Include="src\Mesh\2D\TriangularMesh.h" />
+    <ClInclude Include="src\Mesh\3D\GMSHCartesianMesh3D.h" />
     <ClInclude Include="src\Mesh\3D\GMSHTetrahedralMesh.h" />
     <ClInclude Include="src\Mesh\3D\ReferenceTetrahedron.h" />
     <ClInclude Include="src\Mesh\3D\Tetrahedron.h" />

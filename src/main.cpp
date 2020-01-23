@@ -49,7 +49,7 @@ void print_usage() {
 	cout << "               cart          - Unit square/cube discretized by an in-house uniform Cartesian mesh (default)" << endl;
 	cout << "               tri           - (2D only) Unit square/cube discretized by an in-house uniform trianglular mesh" << endl;
 	cout << "               quad          - (2D only) Unit square/cube discretized by an in-house uniform quadrilateral mesh" << endl;
-	cout << "               gmsh-cart     - (2D only) Unit square discretized by a uniform Cartesian mesh built by GMSH" << endl;
+	cout << "               gmsh-cart     - Unit square discretized by a uniform Cartesian mesh built by GMSH" << endl;
 	cout << "               gmsh-tri      - (2D only) Unit square discretized by a uniform triangular mesh built by GMSH" << endl;
 	cout << "               gmsh-uns-tri  - (2D only) Unit square discretized by an unstructured triangular mesh built by GMSH" << endl;
 	cout << "               gmsh          - (2D only) .msh or .geo GMSH file given in the argument -file" << endl;
@@ -150,8 +150,12 @@ void print_usage() {
 	cout << "      Initial guess for the iterative solvers." << endl;
 	cout << "              0     - zero vector (default)" << endl;
 	cout << "              1     - all ones vector" << endl;
+	cout << endl;
 	cout << "-tol NUM" << endl;
 	cout << "      Tolerance of the iterative solver (default: 1e-8)." << endl;
+	cout << endl;
+	cout << "-max-iter NUM" << endl;
+	cout << "      Maximum number of iterations for the iterative solver (default: 200)." << endl;
 	cout << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << "                             Miscellaneous                            " << endl;
@@ -227,6 +231,7 @@ int main(int argc, char* argv[])
 	string solverCode = "lu";
 	double solverTolerance = 1e-8;
 	string initialGuessCode = "0";
+	int maxIterations = 200;
 
 	enum {
 		OPT_RightHandSide = 1000,
@@ -246,6 +251,7 @@ int main(int argc, char* argv[])
 		OPT_CoarseningStrategy,
 		OPT_InitialGuess,
 		OPT_Tolerance,
+		OPT_MaxIterations,
 		OPT_Threads
 	};
 
@@ -268,6 +274,7 @@ int main(int argc, char* argv[])
 		 { "cs", required_argument, NULL, OPT_CoarseningStrategy },
 		 { "initial-guess", required_argument, NULL, OPT_InitialGuess },
 		 { "tol", required_argument, NULL, OPT_Tolerance },
+		 { "max-iter", required_argument, NULL, OPT_MaxIterations },
 		 { "threads", required_argument, NULL, OPT_Threads },
 		 { NULL, 0, NULL, 0 }
 	};
@@ -419,8 +426,14 @@ int main(int argc, char* argv[])
 				initialGuessCode = optarg;
 				if (initialGuessCode.compare("0") != 0 && initialGuessCode.compare("1") != 0)
 					argument_error("unknown initial guess '" + initialGuessCode + "'. Check -initial-guess argument.");
+				break;
 			case OPT_Tolerance:
 				solverTolerance = atof(optarg);
+				break;
+			case OPT_MaxIterations:
+				maxIterations = atoi(optarg);
+				if (maxIterations < 1)
+					argument_error("-max-iter argument must be > 0.");
 				break;
 			case OPT_Threads:
 				BaseParallelLoop::SetDefaultNThreads(atoi(optarg));
@@ -547,7 +560,7 @@ int main(int argc, char* argv[])
 	program->Start(rhsCode, kappa1, kappa2, anisotropyRatio, partition, 
 		n, discretization, meshCode, meshFilePath, stabilization, basisCode, polyDegree, usePolynomialSpaceQ, penalizationCoefficient, staticCondensation, action,
 		nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations,
-		coarseningStgy, initialGuessCode, outputDirectory, solverCode, solverTolerance);
+		coarseningStgy, initialGuessCode, outputDirectory, solverCode, solverTolerance, maxIterations);
 
 	delete program;
 

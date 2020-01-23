@@ -1,18 +1,21 @@
 // Gmsh project created on Fri Dec 13 13:50:13 2019
-SetFactory("OpenCASCADE");
+//SetFactory("OpenCASCADE");
+L = 1;
+N = 2;
+h = 1/N;
 
 // Corners
-Point(1) = {0, 0, 0, 1.0};
-Point(2) = {1, 0, 0, 1.0};
-Point(3) = {0, 1, 0, 1.0};
-Point(4) = {1, 1, 0, 1.0};
+Point(1) = {0, 0, 0, h};
+Point(2) = {L, 0, 0, h};
+Point(3) = {0, L, 0, h};
+Point(4) = {L, L, 0, h};
 // Center
-Point(5) = {0.5, 0.5, 0, 1.0};
+Point(5) = {L/2, L/2, 0, h};
 // Middle edges
-Point(6) = {0.5, 0, 0, 1.0};
-Point(7) = {0, 0.5, 0, 1.0};
-Point(8) = {1, 0.5, 0, 1.0};
-Point(9) = {0.5, 1, 0, 1.0};
+Point(6) = {L/2, 0, 0, h};
+Point(7) = {0, L/2, 0, h};
+Point(8) = {L, L/2, 0, h};
+Point(9) = {L/2, L, 0, h};
 
 // External lines
 Line(1) = {1, 6};

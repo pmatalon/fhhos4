@@ -9,11 +9,12 @@
 #include "Mesh/2D/QuadrilateralMesh.h"
 #include "Mesh/2D/QuadrilateralAsPolygonalMesh.h"
 #ifdef GMSH_ENABLED
-#include "Mesh/2D/GMSHCartesianMesh.h"
+#include "Mesh/2D/GMSHCartesianMesh2D.h"
 #include "Mesh/2D/GMSHTriangularMesh.h"
 #include "Mesh/2D/GMSHUnstructuredTriangularMesh.h"
 #include "Mesh/2D/GMSHQuadrilateralMesh.h"
 #include "Mesh/3D/GMSHTetrahedralMesh.h"
+#include "Mesh/3D/GMSHCartesianMesh3D.h"
 #endif
 #include "Utils/Action.h"
 #include "Utils/Timer.h"
@@ -35,7 +36,7 @@ public:
 		BigNumber n, string discretization, string meshCode, string meshFilePath, string stabilization, string basisCode, int polyDegree, bool usePolynomialSpaceQ,
 		int penalizationCoefficient, bool staticCondensation, Action action, 
 		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations,
-		CoarseningStrategy coarseningStgy, string initialGuessCode, string outputDirectory, string solverCode, double solverTolerance) = 0;
+		CoarseningStrategy coarseningStgy, string initialGuessCode, string outputDirectory, string solverCode, double solverTolerance, int maxIterations) = 0;
 };
 
 template <int Dim>
@@ -48,7 +49,7 @@ public:
 		BigNumber n, string discretization, string meshCode, string meshFilePath, string stabilization, string basisCode, int polyDegree, bool usePolynomialSpaceQ,
 		int penalizationCoefficient, bool staticCondensation, Action action, 
 		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations,
-		CoarseningStrategy coarseningStgy, string initialGuessCode, string outputDirectory, string solverCode, double solverTolerance)
+		CoarseningStrategy coarseningStgy, string initialGuessCode, string outputDirectory, string solverCode, double solverTolerance, int maxIterations)
 	{
 		Timer totalTimer;
 		totalTimer.Start();
@@ -328,7 +329,7 @@ public:
 				cout << endl;
 				cout << "------------------- Linear system resolution ------------------" << endl;
 
-				Solver* solver = CreateSolver(solverCode, &problem, action, solverTolerance, staticCondensation, nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, coarseningStgy, basis.Size());
+				Solver* solver = CreateSolver(solverCode, &problem, action, solverTolerance, maxIterations, staticCondensation, nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, coarseningStgy, basis.Size());
 				problem.SystemSolution = Solve(solver, problem.A, problem.b, initialGuessCode);
 
 				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
@@ -368,7 +369,7 @@ public:
 				cout << endl;
 				cout << "------------------- Linear system resolution ------------------" << endl;
 
-				Solver* solver = CreateSolver(solverCode, &problem, action, solverTolerance, staticCondensation, nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, coarseningStgy, faceBasis.Size());
+				Solver* solver = CreateSolver(solverCode, &problem, action, solverTolerance, maxIterations, staticCondensation, nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, coarseningStgy, faceBasis.Size());
 				problem.SystemSolution = Solve(solver, problem.A, problem.b, initialGuessCode);
 
 				if (staticCondensation && (action & Action::ExtractSolution) == Action::ExtractSolution)
@@ -378,7 +379,10 @@ public:
 				{
 					problem.ReconstructHigherOrderApproximation();
 					if ((action & Action::ExtractSolution) == Action::ExtractSolution)
+					{
+						problem.ExtractHybridSolution();
 						problem.ExtractSolution();
+					}
 					if ((action & Action::ComputeL2Error) == Action::ComputeL2Error && exactSolution != NULL)
 					{
 						double error = L2::Error<Dim>(mesh, reconstructionBasis, problem.ReconstructedSolution, exactSolution);
@@ -399,7 +403,7 @@ public:
 private:
 	Mesh<Dim>* BuildMesh(int n, string meshCode, string meshFilePath) { return nullptr; }
 
-	Solver* CreateSolver(string solverCode, Problem<Dim>* problem, Action action, double tolerance, bool staticCondensation,
+	Solver* CreateSolver(string solverCode, Problem<Dim>* problem, Action action, double tolerance, int maxIterations, bool staticCondensation,
 		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations, CoarseningStrategy coarseningStgy, int blockSize)
 	{
 		Solver* solver = NULL;
@@ -451,7 +455,10 @@ private:
 
 		IterativeSolver* iterativeSolver = dynamic_cast<IterativeSolver*>(solver);
 		if (iterativeSolver != nullptr)
+		{
 			iterativeSolver->Tolerance = tolerance;
+			iterativeSolver->MaxIterations = maxIterations;
+		}
 
 		return solver;
 	}
@@ -508,20 +515,20 @@ Mesh<2>* ProgramDim<2>::BuildMesh(int n, string meshCode, string meshFilePath)
 #ifdef GMSH_ENABLED
 	else if (meshCode.compare("gmsh-cart") == 0)
 	{
-		GMSHMesh<2>* coarseMesh = new GMSHCartesianMesh();
+		GMSHMesh<2>* coarseMesh = new GMSHCartesianMesh2D();
 		GMSHMesh<2>* fineMesh = coarseMesh->RefineUntilNElements(n*n);
 		return fineMesh;
 	}
 	else if (meshCode.compare("gmsh-tri") == 0)
 	{
 		GMSHMesh<2>* coarseMesh = new GMSHTriangularMesh();
-		GMSHMesh<2>* fineMesh = coarseMesh->RefineUntilNElements(n*n*2);
+		GMSHMesh<2>* fineMesh = coarseMesh->RefineUntilNElements(2*n*n);
 		return fineMesh;
 	}
 	else if (meshCode.compare("gmsh-uns-tri") == 0)
 	{
 		GMSHMesh<2>* coarseMesh = new GMSHUnstructuredTriangularMesh();
-		GMSHMesh<2>* fineMesh = coarseMesh->RefineUntilNElements(n*n*2);
+		GMSHMesh<2>* fineMesh = coarseMesh->RefineUntilNElements(2*n*n);
 		return fineMesh;
 	}
 	else if (meshCode.compare("gmsh-quad") == 0)
@@ -533,7 +540,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(int n, string meshCode, string meshFilePath)
 	else if (meshCode.compare("gmsh") == 0)
 	{
 		GMSHMesh<2>* coarseMesh = new GMSHMesh<2>(meshFilePath);
-		GMSHMesh<2>* fineMesh = coarseMesh->RefineUntilNElements(n*n*2);
+		GMSHMesh<2>* fineMesh = coarseMesh->RefineUntilNElements(2*n*n);
 		return fineMesh;
 	}
 #endif // GMSH_ENABLED
@@ -546,16 +553,22 @@ Mesh<3>* ProgramDim<3>::BuildMesh(int n, string meshCode, string meshFilePath)
 	if (meshCode.compare("cart") == 0)
 		return new CartesianGrid3D(n, n, n);
 #ifdef GMSH_ENABLED
+	else if (meshCode.compare("gmsh-cart") == 0)
+	{
+		GMSHMesh<3>* coarseMesh = new GMSHCartesianMesh3D();
+		GMSHMesh<3>* fineMesh = coarseMesh->RefineUntilNElements(n*n*n);
+		return fineMesh;
+	}
 	else if (meshCode.compare("gmsh-tetra") == 0)
 	{
 		GMSHMesh<3>* coarseMesh = new GMSHTetrahedralMesh();
-		GMSHMesh<3>* fineMesh = coarseMesh->RefineUntilNElements(n*n*n*2);
+		GMSHMesh<3>* fineMesh = coarseMesh->RefineUntilNElements(6*n*n*n);
 		return fineMesh;
 	}
 	else if (meshCode.compare("gmsh") == 0)
 	{
 		GMSHMesh<3>* coarseMesh = new GMSHMesh<3>(meshFilePath);
-		GMSHMesh<3>* fineMesh = coarseMesh->RefineUntilNElements(n*n*n*2);
+		GMSHMesh<3>* fineMesh = coarseMesh->RefineUntilNElements(6*n*n*n);
 		return fineMesh;
 	}
 #endif // GMSH_ENABLED

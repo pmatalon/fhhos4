@@ -11,7 +11,9 @@ enum GMSHElementTypes
 	GMSH_Triangle = 2,
 	GMSH_Quadrilateral = 3,
 	GMSH_Tetrahedron = 4,
-	GMSH_Hexahedron = 8
+	GMSH_Hexahedron = 5,
+	GMSH_Prism = 6,
+	GMSH_Pyramid = 7
 };
 
 enum GMSHFaceTypes
@@ -38,13 +40,15 @@ class GMSHMesh : public PolyhedralMesh<Dim>
 protected:
 	string _description = "GMSH file";
 	string _fileNamePart = "gmsh-file";
-private:
+
 	map<size_t, BigNumber> _elementExternalNumbers;
 	map<size_t, BigNumber> _vertexExternalNumbers;
 	double _h = -1;
 public:
-	GMSHMesh(string mshFile, int initialRefinements = 0) : PolyhedralMesh<Dim>()
+	GMSHMesh(string mshFile, string description, string fileNamePart) : PolyhedralMesh<Dim>()
 	{
+		_description = description;
+		_fileNamePart = fileNamePart;
 		if (!Utils::FileExists(mshFile))
 		{
 			if (Utils::FileExists(Mesh<Dim>::MeshDirectory + mshFile))
@@ -62,22 +66,25 @@ public:
 
 		gmsh::open(mshFile);
 
-		for (int i = 0; i < initialRefinements; i++)
-			gmsh::model::mesh::refine();
-
 		Build();
 	}
 
-private:
-	GMSHMesh() : PolyhedralMesh<Dim>()
+	GMSHMesh(string mshFile) : GMSHMesh(mshFile, "GMSH file", "gmsh-file")
+	{}
+
+protected:
+	GMSHMesh(string description, string fileNamePart) : PolyhedralMesh<Dim>()
 	{
+		_description = description;
+		_fileNamePart = fileNamePart;
 		Build();
 	}
 
 	// Dim-specific functions
-	Element<Dim>* CreateElement(int elemType, size_t elementTag, const vector<size_t>& elementNodes, size_t& elemNodeIndex, BigNumber elemNumber) { return nullptr; }
+	virtual Element<Dim>* CreateElement(int elemType, size_t elementTag, const vector<size_t>& elementNodes, size_t& elemNodeIndex, BigNumber elemNumber) { return nullptr; }
 	void CreateFaces(int elemType, BigNumber& faceNumber) { }
 
+private:
 	void Build()
 	{
 		//----------//
@@ -163,7 +170,7 @@ private:
 		}
 	}
 
-private:
+protected:
 	inline Vertex* GetVertex(BigNumber nodeTag)
 	{
 		BigNumber internalNumber = _vertexExternalNumbers.at(nodeTag);
@@ -221,10 +228,8 @@ public:
 		gmsh::model::mesh::refine();
 
 		// Building our own mesh objects from the GMSH ones
-		GMSHMesh<Dim>* fineMesh = new GMSHMesh<Dim>();
+		GMSHMesh<Dim>* fineMesh = CreateEmptyMesh();
 		fineMesh->ComesFrom.CS = CoarseningStrategy::StructuredRefinement;
-		fineMesh->_description = this->_description;
-		fineMesh->_fileNamePart = this->_fileNamePart;
 
 		this->FineMesh = fineMesh;
 		this->FineMesh->CoarseMesh = this;
@@ -283,6 +288,11 @@ public:
 					coarseElement1->FinerFacesRemoved.push_back(fineFace);
 			}
 		}
+	}
+
+	virtual GMSHMesh<Dim>* CreateEmptyMesh()
+	{
+		return new GMSHMesh<Dim>(this->_description, this->_fileNamePart);
 	}
 
 	GMSHMesh<Dim>* RefineNTimes(int nRefinements)
@@ -383,6 +393,30 @@ Element<3>* GMSHMesh<3>::CreateElement(int elemType, size_t elementTag, const ve
 		_elementExternalNumbers.insert({ elementTag, elemNumber });
 		elemNodeIndex += 4;
 	}
+	else if (elemType == GMSH_Hexahedron && this->FileNamePart().compare("gmsh-cart") == 0)
+	{
+		Vertex* v1 = GetVertex(elementNodes[elemNodeIndex]);     // (0, 1, 1)
+		Vertex* v2 = GetVertex(elementNodes[elemNodeIndex + 1]); // (0, 1, 0)
+		Vertex* v3 = GetVertex(elementNodes[elemNodeIndex + 2]); // (1, 1, 0)
+		Vertex* v4 = GetVertex(elementNodes[elemNodeIndex + 3]); // (1, 1, 1)
+		Vertex* v5 = GetVertex(elementNodes[elemNodeIndex + 4]); // (0, 0, 1)
+		Vertex* v6 = GetVertex(elementNodes[elemNodeIndex + 5]); // (0, 0, 0)
+		Vertex* v7 = GetVertex(elementNodes[elemNodeIndex + 6]); // (1, 0, 0)
+		Vertex* v8 = GetVertex(elementNodes[elemNodeIndex + 7]); // (1, 0, 1)
+
+		Vertex* backLeftBottomCorner = v6;
+		Vertex* frontLeftBottomCorner = v7;
+		Vertex* backRightBottomCorner = v2;
+		Vertex* backLeftTopCorner = v5;
+		Vertex* frontLeftTopCorner = v8;
+		Vertex* backRightTopCorner = v1;
+		Vertex* frontRightBottomCorner = v3;
+		Vertex* frontRightTopCorner = v4;
+
+		e = new Parallelepiped(elemNumber, backLeftBottomCorner, frontLeftBottomCorner, backRightBottomCorner, backLeftTopCorner, frontLeftTopCorner, backRightTopCorner, frontRightBottomCorner, frontRightTopCorner);
+		_elementExternalNumbers.insert({ elementTag, elemNumber });
+		elemNodeIndex += 8;
+	}
 	else
 		assert(false && "GMSH element type not managed.");
 	return e;
@@ -458,23 +492,62 @@ void GMSHMesh<2>::CreateFaces(int elemType, BigNumber& faceNumber)
 template <>
 void GMSHMesh<3>::CreateFaces(int elemType, BigNumber& faceNumber)
 {
-	assert(elemType == GMSHElementTypes::GMSH_Tetrahedron);
+	//assert(elemType == GMSHElementTypes::GMSH_Tetrahedron);
 
-	int faceType = GMSHFaceTypes::GMSH_TriangleFace;
+	int faceType = -1;
+	int nFaceVertices = -1;
+	if (elemType == GMSHElementTypes::GMSH_Tetrahedron)
+	{
+		faceType = GMSHFaceTypes::GMSH_TriangleFace;
+		nFaceVertices = 3;
+	}
+	else if (elemType == GMSHElementTypes::GMSH_Hexahedron)
+	{
+		faceType = GMSHFaceTypes::GMSH_QuadrilateralFace;
+		nFaceVertices = 4;
+	}
+	else
+		assert(false);
+
 	vector<size_t> faceNodes;
 	bool onlyPrimaryNodes = true;
 	gmsh::model::mesh::getElementFaceNodes(elemType, faceType, faceNodes, -1, onlyPrimaryNodes);
 
-	for (size_t j = 0; j < faceNodes.size(); j += 3)
+	for (size_t j = 0; j < faceNodes.size(); j += nFaceVertices)
 	{
-		MeshVertex<3>* v1 = (MeshVertex<3>*)GetVertex(faceNodes[j]);
+		vector<MeshVertex<3>*> vertices(nFaceVertices);
+		for (int k = 0; k < nFaceVertices; k++)
+		{
+			MeshVertex<3>* v = (MeshVertex<3>*)GetVertex(faceNodes[j+k]);
+			vertices[k] = v;
+		}
+		/*MeshVertex<3>* v1 = (MeshVertex<3>*)GetVertex(faceNodes[j]);
 		MeshVertex<3>* v2 = (MeshVertex<3>*)GetVertex(faceNodes[j + 1]);
-		MeshVertex<3>* v3 = (MeshVertex<3>*)GetVertex(faceNodes[j + 2]);
+		MeshVertex<3>* v3 = (MeshVertex<3>*)GetVertex(faceNodes[j + 2]);*/
 
-		bool faceAlreadyExists = false;
+		// Check if a face with those vertices already exists
+		/*bool faceAlreadyExists = false;
 		for (Face<3>* f : v1->Faces)
 		{
 			if (f->HasVertex(v2) && f->HasVertex(v3))
+			{
+				faceAlreadyExists = true;
+				break;
+			}
+		}*/
+		bool faceAlreadyExists = false;
+		for (Face<3>* f : vertices[0]->Faces)
+		{
+			bool thisFaceHasAllVertices = true;
+			for (int k = 1; k < nFaceVertices; k++)
+			{
+				if (!f->HasVertex(vertices[k]))
+				{
+					thisFaceHasAllVertices = false;
+					break;
+				}
+			}
+			if (thisFaceHasAllVertices)
 			{
 				faceAlreadyExists = true;
 				break;
@@ -483,8 +556,9 @@ void GMSHMesh<3>::CreateFaces(int elemType, BigNumber& faceNumber)
 		if (faceAlreadyExists)
 			continue;
 
+		// Find the neighbouring elements this future face is the interface of
 		vector<Element<3>*> neighbours;
-		for (Element<3>* f1 : v1->Elements)
+		/*for (Element<3>* f1 : v1->Elements)
 		{
 			for (Element<3>* f2 : v2->Elements)
 			{
@@ -501,27 +575,135 @@ void GMSHMesh<3>::CreateFaces(int elemType, BigNumber& faceNumber)
 					break;
 				}
 			}
+		}*/
+		for (Element<3>* e : vertices[0]->Elements)
+		{
+			bool eHasAllVertices = true;
+			for (int k = 1; k < nFaceVertices; k++)
+			{
+				bool eHasVertexk = false;
+				for (Element<3>* ek : vertices[k]->Elements)
+				{
+					if (ek == e)
+					{
+						eHasVertexk = true;
+						break;
+					}
+				}
+				if (!eHasVertexk)
+				{
+					eHasAllVertices = false;
+					break;
+				}
+			}
+			if (eHasAllVertices)
+				neighbours.push_back(e);
 		}
 
-		TriangularFace* face;
+
+		// Creation of the face
+		Face<3>* face;
+		if (faceType == GMSHFaceTypes::GMSH_TriangleFace)
+		{
+			if (neighbours.size() == 1)
+				face = new TriangularFace(faceNumber++, vertices[0], vertices[1], vertices[2], neighbours[0]);
+			else if (neighbours.size() == 2)
+				face = new TriangularFace(faceNumber++, vertices[0], vertices[1], vertices[2], neighbours[0], neighbours[1]);
+		}
+		else if (faceType == GMSHFaceTypes::GMSH_QuadrilateralFace && this->FileNamePart().compare("gmsh-cart") == 0)
+		{
+			Vertex* v1 = vertices[0]; // (0, 1, 1)
+			Vertex* v2 = vertices[1]; // (1, 1, 1)
+			Vertex* v3 = vertices[2]; // (1, 1, 0)
+			Vertex* v4 = vertices[3]; // (0, 1, 0)
+
+			CartesianShapeOrientation orientation = CartesianShapeOrientation::None;
+			Vertex* origin;
+			Vertex* vertex1;
+			Vertex* vertex2;
+
+			DimVector<3> v12 = Vect<3>(v1, v2);
+			DimVector<3> v13 = Vect<3>(v1, v3);
+			//DimVector<3> normal = Vect<3>(v2, v1).cross(Vect<3>(v3, v1));
+			DimVector<3> unitX; unitX << 1, 0, 0;
+			DimVector<3> unitY; unitY << 0, 1, 0;
+			DimVector<3> unitZ; unitZ << 0, 0, 1;
+			if (abs(v12.dot(unitX)) < 1e-14 && abs(v13.dot(unitX)) < 1e-14)
+			{
+				orientation = CartesianShapeOrientation::InYOZ;
+			}
+			else if (abs(v12.dot(unitY)) < 1e-14 && abs(v13.dot(unitY)) < 1e-14)
+			{
+				orientation = CartesianShapeOrientation::InXOZ;
+				origin = v4;
+				vertex1 = v3;
+				vertex2 = v1;
+			}
+			else if (abs(v12.dot(unitZ)) < 1e-14 && abs(v13.dot(unitZ)) < 1e-14)
+			{
+				orientation = CartesianShapeOrientation::InXOY;
+			}
+			else
+				assert(false);
+
+			DimVector<3> OV1; OV1 << v1->X, v1->Y, v1->Z;
+			DimVector<3> OV2; OV2 << v2->X, v2->Y, v2->Z;
+			DimVector<3> OV3; OV3 << v3->X, v3->Y, v3->Z;
+			DimVector<3> OV4; OV4 << v4->X, v4->Y, v4->Z;
+
+			double minNorm = min({OV1.norm(), OV2.norm(), OV3.norm(), OV4.norm()});
+			if (minNorm == OV1.norm())
+			{
+				origin = v1;
+				vertex1 = v4;
+				vertex2 = v2;
+			}
+			else if (minNorm == OV2.norm())
+			{
+				origin = v2;
+				vertex1 = v3;
+				vertex2 = v1;
+			}
+			else if (minNorm == OV3.norm())
+			{
+				origin = v3;
+				vertex1 = v2;
+				vertex2 = v4;
+			}
+			else if (minNorm == OV4.norm())
+			{
+				origin = v4;
+				vertex1 = v1;
+				vertex2 = v3;
+			}
+			else
+				assert(false);
+
+			if (neighbours.size() == 1)
+				face = new RectangularFace(faceNumber++, origin, vertex1, vertex2, neighbours[0], orientation);
+			else if (neighbours.size() == 2)
+				face = new RectangularFace(faceNumber++, origin, vertex1, vertex2, neighbours[0], neighbours[1], orientation);
+		}
+		else
+			assert(false);
+
+		
 		if (neighbours.size() == 1)
 		{
-			face = new TriangularFace(faceNumber++, v1, v2, v3, neighbours[0]);
 			neighbours[0]->AddFace(face);
 			this->BoundaryFaces.push_back(face);
 		}
 		else if (neighbours.size() == 2)
 		{
-			face = new TriangularFace(faceNumber++, v1, v2, v3, neighbours[0], neighbours[1]);
 			neighbours[0]->AddFace(face);
 			neighbours[1]->AddFace(face);
 			this->InteriorFaces.push_back(face);
 		}
 		else
 			assert(false);
+
 		this->Faces.push_back(face);
-		v1->Faces.push_back(face);
-		v2->Faces.push_back(face);
-		v3->Faces.push_back(face);
+		for (MeshVertex<3>* v : vertices)
+			v->Faces.push_back(face);
 	}
 }

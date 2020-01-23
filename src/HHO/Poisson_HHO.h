@@ -77,7 +77,8 @@ private:
 	double ConvergenceHiddenConstant(int k)
 	{
 		// Depends on the domain. Very rough numerical estimate for [0, 1]^Dim:
-		return pow(10, Dim);
+		//return pow(10, Dim);
+		return 100;
 	}
 
 public:

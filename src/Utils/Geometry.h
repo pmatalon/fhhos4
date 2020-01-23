@@ -90,8 +90,8 @@ public:
 		// Barycentric coordinates
 		double alpha = PB.cross(PC).norm() / (2 * triangleArea);
 		double beta = PC.cross(PA).norm() / (2 * triangleArea);
-		double gamma = 1 - alpha - beta;
-		return (alpha >= 0 && alpha <= 1) && (beta >= 0 && beta <= 1) && (gamma >= 0 && gamma <= 1);
+		double gamma = PA.cross(PB).norm() / (2 * triangleArea);
+		return (alpha >= 0 && alpha <= 1) && (beta >= 0 && beta <= 1) && (gamma >= 0 && gamma <= 1) && (abs(alpha + beta + gamma -1) < 1e-14);
 	}
 
 };

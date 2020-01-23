@@ -80,7 +80,7 @@ public:
 		// Elements //
 		//----------//
 
-		this->Elements.reserve(nx * ny);
+		this->Elements.reserve(2 * nx * ny);
 		for (BigNumber iy = 0; iy < ny; ++iy)
 		{
 			for (BigNumber ix = 0; ix < nx; ++ix)
@@ -101,7 +101,7 @@ public:
 		// Faces //
 		//-------//
 
-		this->Faces.reserve(nx * (ny + 1) + ny * (nx + 1));
+		this->Faces.reserve(nx * (ny + 1) + ny * (nx + 1) + nx * ny);
 		BigNumber numberInterface = 0;
 
 		for (BigNumber ix = 0; ix < nx; ++ix)

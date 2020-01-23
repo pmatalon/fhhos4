@@ -110,18 +110,21 @@ private:
 		double scalingFactor = 1;
 
 		//------------- Try 1 -------------//
+		// scalingFactor = 1 / (average eigenvalue of P^T*P)
 		/*SparseMatrix PT_P = P.transpose()*P;
 		double averageEigenvalue = (PT_P).diagonal().sum() / PT_P.cols();
-		double maxEigenvalue = (PT_P).diagonal().max()
+		//double maxEigenvalue = (PT_P).diagonal().max()
 		cout << "averageEigenvalue = " << averageEigenvalue << endl;
 		scalingFactor = 1 / averageEigenvalue;*/
 
 		//------------- Try 2 -------------//
+		// scalingFactor = coarseSkeletonMeasure / fineSkeletonMeasure;
 		/*Poisson_HHO<Dim>* finePb = this->_problem;
 		Poisson_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
 		scalingFactor = coarsePb->_mesh->SkeletonMeasure() / finePb->_mesh->SkeletonMeasure();*/
 
 		//------------- Try 3 -------------//
+		// Scaling conservation:
 		// Actually rescales correctly, but that's not what we want //
 		/*Poisson_HHO<Dim>* finePb = this->_problem;
 		DomFunction constantOne = [](DomPoint p) { return 1; };

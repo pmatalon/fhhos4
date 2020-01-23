@@ -40,6 +40,19 @@ public:
 
 	void Init()
 	{
+		double diag13 = (*V3 - *V1).norm();
+		double diag24 = (*V4 - *V2).norm();
+		double edge12 = (*V2 - *V1).norm();
+		double edge23 = (*V3 - *V2).norm();
+		double edge34 = (*V4 - *V3).norm();
+		double edge41 = (*V1 - *V4).norm();
+
+		_diameter = max(diag13, diag24);
+
+		_measure = 0.25 * sqrt(4 * diag13*diag13 * diag24*diag24 - pow(edge12*edge12 + edge34 * edge34 - edge23 * edge23 - edge41 * edge41, 2));
+
+		_center = DomPoint((V1->X + V2->X + V3->X + V4->X) / 4, (V1->Y + V2->Y + V3->Y + V4->Y) / 4);
+
 		// x = a0 + a1*t + a2*u + a3*t*u
 		// y = b0 + b1*t + b2*u + b3*t*u
 		a0 = 0.25 * ( V1->X + V2->X + V3->X + V4->X);
@@ -52,18 +65,11 @@ public:
 		b2 = 0.25 * (-V1->Y - V2->Y + V3->Y + V4->Y);
 		b3 = 0.25 * ( V1->Y - V2->Y + V3->Y - V4->Y);
 
-		double diag13 = (*V3 - *V1).norm();
-		double diag24 = (*V4 - *V2).norm();
-		double edge12 = (*V2 - *V1).norm();
-		double edge23 = (*V3 - *V2).norm();
-		double edge34 = (*V4 - *V3).norm();
-		double edge41 = (*V1 - *V4).norm();
-
-		_diameter = max(diag13, diag24);
-
-		_measure = 0.25 * sqrt(4*diag13*diag13 * diag24*diag24 - pow(edge12*edge12 + edge34*edge34 - edge23*edge23 - edge41*edge41, 2));
-
-		_center = DomPoint((V1->X + V2->X + V3->X + V4->X) / 4, (V1->Y + V2->Y + V3->Y + V4->Y) / 4);
+		// Sometimes a3 or b3 can be really small, but not zero. Then we set it to zero be tested in ConvertToReference()
+		if (abs(a3 / _measure) < 1e-10)
+			a3 = 0;
+		if (abs(b3 / _measure) < 1e-10)
+			b3 = 0;
 	}
 
 	ReferenceShape<2>* RefShape() const
