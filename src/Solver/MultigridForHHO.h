@@ -11,15 +11,17 @@ class LevelForHHO : public Level
 private:
 	Poisson_HHO<Dim>* _problem;
 	int _algoNumber = 1;
+	FunctionalBasis<Dim>* _cellInterpolationBasis;
 public:
 	bool ExportMatrices = false;
 
-	LevelForHHO(int number, Poisson_HHO<Dim>* problem, bool useGalerkinOperator, int algoNumber)
+	LevelForHHO(int number, Poisson_HHO<Dim>* problem, bool useGalerkinOperator, int algoNumber, FunctionalBasis<Dim>* cellInterpolationBasis)
 		: Level(number)
 	{
 		this->UseGalerkinOperator = useGalerkinOperator;
 		this->_problem = problem;
 		this->_algoNumber = algoNumber;
+		this->_cellInterpolationBasis = cellInterpolationBasis;
 
 		//problem->ExportFaces("L" + to_string(number));
 	}
@@ -170,35 +172,15 @@ private:
 		return k / (k1 + k2);
 	}
 
-	FunctionalBasis<Dim>* GetCellInterpolationBasis(Poisson_HHO<Dim>* problem)
-	{
-		FunctionalBasis<Dim-1>* faceBasis = problem->HHO->FaceBasis;
-		int faceDegreePSpace = faceBasis->GetDegree();
-
-		//int cellDegreeQSpace = (int)floor(2 * sqrt(faceDegreePSpace + 1) - 1);
-		//FunctionalBasis<Dim>* cellInterpolationBasis = new FunctionalBasis<Dim>("monomials", cellDegreeQSpace, true);
-		int cellDegreePSpace = faceDegreePSpace + 1;
-		FunctionalBasis<Dim>* cellInterpolationBasis = new FunctionalBasis<Dim>(faceBasis->BasisCode(), cellDegreePSpace, false);
-
-		return cellInterpolationBasis;
-	}
-
 	SparseMatrix GetGlobalInterpolationMatrixFromFacesToCells(Poisson_HHO<Dim>* problem)
 	{
-		return GetReconstructionMatrix(problem);
-	}
-
-	SparseMatrix GetReconstructionMatrix(Poisson_HHO<Dim>* problem)
-	{
-		int nCellUnknowns = problem->HHO->nCellUnknowns;
+		int nCellUnknowns = _cellInterpolationBasis->Size();
 		int nFaceUnknowns = problem->HHO->nFaceUnknowns;
-
-		FunctionalBasis<Dim>* cellInterpolationBasis = GetCellInterpolationBasis(problem);
 
 		ElementParallelLoop<Dim> parallelLoop(problem->_mesh->Elements);
 		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nFaceUnknowns);
 
-		parallelLoop.Execute([this, nFaceUnknowns, cellInterpolationBasis](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+		parallelLoop.Execute([this, nFaceUnknowns, nCellUnknowns](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
 			{
 				Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
 				for (auto f : element->Faces)
@@ -211,14 +193,21 @@ private:
 					BigNumber elemGlobalNumber = element->Number;
 					BigNumber faceGlobalNumber = face->Number;
 					BigNumber faceLocalNumber = element->LocalNumberOf(face);
-					DenseMatrix reconstructMatrix = element->ReconstructionFromFacesMatrix();
-					chunk->Results.Coeffs.Add(elemGlobalNumber * cellInterpolationBasis->Size(), faceGlobalNumber * nFaceUnknowns, reconstructMatrix.block(0, faceLocalNumber*nFaceUnknowns, cellInterpolationBasis->Size(), nFaceUnknowns));
+
+					DenseMatrix cellInterpMatrix;
+					if (_cellInterpolationBasis == _problem->HHO->ReconstructionBasis)
+						cellInterpMatrix = element->ReconstructionFromFacesMatrix();
+					else if (_cellInterpolationBasis == _problem->HHO->CellBasis)
+						cellInterpMatrix = element->SolveCellUnknownsMatrix();
+					else
+						assert(false);
+
+					chunk->Results.Coeffs.Add(elemGlobalNumber * nCellUnknowns, faceGlobalNumber * nFaceUnknowns, cellInterpMatrix.block(0, faceLocalNumber*nFaceUnknowns, nCellUnknowns, nFaceUnknowns));
 				}
 			});
 
-		SparseMatrix M(problem->HHO->nElements * cellInterpolationBasis->Size(), problem->HHO->nTotalFaceUnknowns);
+		SparseMatrix M(problem->HHO->nElements * nCellUnknowns, problem->HHO->nTotalFaceUnknowns);
 		parallelLoop.Fill(M);
-		delete cellInterpolationBasis;
 
 		return M;
 	}
@@ -229,12 +218,12 @@ private:
 		int nFaceUnknowns = problem->HHO->nFaceUnknowns;
 
 		FunctionalBasis<Dim - 1>* faceBasis = problem->HHO->FaceBasis;
-		FunctionalBasis<Dim>* cellInterpolationBasis = new FunctionalBasis<Dim>(faceBasis->BasisCode(), faceBasis->GetDegree(), false);
+		FunctionalBasis<Dim>* cellInterpolationBasis = _problem->HHO->CellBasis;
 
 		ElementParallelLoop<Dim> parallelLoop(problem->_mesh->Elements);
 		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nFaceUnknowns);
 
-		parallelLoop.Execute([this, nFaceUnknowns, cellInterpolationBasis](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+		parallelLoop.Execute([this, nFaceUnknowns, nCellUnknowns](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
 			{
 				Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
 				for (auto f : element->Faces)
@@ -248,13 +237,12 @@ private:
 					BigNumber faceGlobalNumber = face->Number;
 					BigNumber faceLocalNumber = element->LocalNumberOf(face);
 					DenseMatrix reconstructMatrix = element->SolveCellUnknownsMatrix();
-					chunk->Results.Coeffs.Add(elemGlobalNumber * cellInterpolationBasis->Size(), faceGlobalNumber * nFaceUnknowns, reconstructMatrix.block(0, faceLocalNumber*nFaceUnknowns, cellInterpolationBasis->Size(), nFaceUnknowns));
+					chunk->Results.Coeffs.Add(elemGlobalNumber * nCellUnknowns, faceGlobalNumber * nFaceUnknowns, reconstructMatrix.block(0, faceLocalNumber*nFaceUnknowns, nCellUnknowns, nFaceUnknowns));
 				}
 			});
 
-		SparseMatrix M(problem->HHO->nElements * cellInterpolationBasis->Size(), problem->HHO->nTotalFaceUnknowns);
+		SparseMatrix M(problem->HHO->nElements * nCellUnknowns, problem->HHO->nTotalFaceUnknowns);
 		parallelLoop.Fill(M);
-		delete cellInterpolationBasis;
 
 		return M;
 	}
@@ -262,14 +250,12 @@ private:
 	SparseMatrix GetGlobalProjectorMatrixFromCellsToFaces(Poisson_HHO<Dim>* problem)
 	{
 		int nFaceUnknowns = problem->HHO->nFaceUnknowns;
-
-		FunctionalBasis<Dim>* cellInterpolationBasis = GetCellInterpolationBasis(problem);
-		int nCellUnknowns = cellInterpolationBasis->Size();
+		int nCellUnknowns = _cellInterpolationBasis->Size();
 
 		ElementParallelLoop<Dim> parallelLoop(problem->_mesh->Elements);
 		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nFaceUnknowns);
 
-		parallelLoop.Execute([this, nCellUnknowns, nFaceUnknowns, cellInterpolationBasis](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+		parallelLoop.Execute([this, nCellUnknowns, nFaceUnknowns](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
 			{
 				Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
 
@@ -285,7 +271,7 @@ private:
 					BigNumber faceLocalNumber = element->LocalNumberOf(face);
 
 					double weight = Weight(element, face);
-					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, elemGlobalNumber*nCellUnknowns, weight*face->GetProjFromCell(element, cellInterpolationBasis));
+					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, elemGlobalNumber*nCellUnknowns, weight*face->GetProjFromCell(element, _cellInterpolationBasis));
 				}
 			});
 
@@ -301,17 +287,16 @@ private:
 		Poisson_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
 		Mesh<Dim>* coarseMesh = coarsePb->_mesh;
 
-		FunctionalBasis<Dim>* cellInterpolationBasis = GetCellInterpolationBasis(finePb);
-		int nCellUnknowns = cellInterpolationBasis->Size();
+		int nCellUnknowns = _cellInterpolationBasis->Size();
 
 		ElementParallelLoop<Dim> parallelLoop(coarseMesh->Elements);
 		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nCellUnknowns);
 
-		parallelLoop.Execute([this, cellInterpolationBasis, nCellUnknowns](Element<Dim>* ce, ParallelChunk<CoeffsChunk>* chunk)
+		parallelLoop.Execute([this, nCellUnknowns](Element<Dim>* ce, ParallelChunk<CoeffsChunk>* chunk)
 			{
 				Poisson_HHO_Element<Dim>* coarseElement = dynamic_cast<Poisson_HHO_Element<Dim>*>(ce);
 
-				DenseMatrix local_J_f_c = coarseElement->ComputeCanonicalInjectionMatrixCoarseToFine(cellInterpolationBasis);
+				DenseMatrix local_J_f_c = coarseElement->ComputeCanonicalInjectionMatrixCoarseToFine(_cellInterpolationBasis);
 				for (auto fineElement : coarseElement->FinerElements)
 				{
 					BigNumber coarseElemGlobalNumber = coarseElement->Number;
@@ -375,6 +360,7 @@ private:
 	bool _automaticNumberOfLevels;
 	int _nLevels;
 	int _algoNumber = 1;
+	FunctionalBasis<Dim>* _cellInterpolationBasis;
 public:
 	int MatrixMaxSizeForCoarsestLevel;
 	bool UseGalerkinOperator = false;
@@ -385,13 +371,14 @@ public:
 	CoarseningStrategy CoarseningStgy = CoarseningStrategy::Standard;
 	bool ExportMatrices = false;
 
-	MultigridForHHO(Poisson_HHO<Dim>* problem, int algoNumber) : MultigridForHHO(problem, algoNumber, 0)
+	MultigridForHHO(Poisson_HHO<Dim>* problem, int algoNumber, FunctionalBasis<Dim>* cellInterpolationBasis) : MultigridForHHO(problem, algoNumber, cellInterpolationBasis, 0)
 	{}
 
-	MultigridForHHO(Poisson_HHO<Dim>* problem, int algoNumber, int nLevels) : Multigrid()
+	MultigridForHHO(Poisson_HHO<Dim>* problem, int algoNumber, FunctionalBasis<Dim>* cellInterpolationBasis, int nLevels) : Multigrid()
 	{
 		this->_problem = problem;
 		this->_algoNumber = algoNumber;
+		this->_cellInterpolationBasis = cellInterpolationBasis;
 		this->_automaticNumberOfLevels = nLevels <= 0;
 		
 		if (this->_automaticNumberOfLevels)
@@ -405,7 +392,7 @@ public:
 			this->MatrixMaxSizeForCoarsestLevel = 0;
 		}
 
-		this->_fineLevel = new LevelForHHO<Dim>(0, problem, false, _algoNumber);
+		this->_fineLevel = new LevelForHHO<Dim>(0, problem, false, _algoNumber, _cellInterpolationBasis);
 	}
 	
 	void Serialize(ostream& os) const override
@@ -473,7 +460,7 @@ public:
 			// Build coarse level
 			problem = problem->GetProblemOnCoarserMesh();
 			levelNumber++;
-			LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(levelNumber, problem, UseGalerkinOperator, _algoNumber);
+			LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(levelNumber, problem, UseGalerkinOperator, _algoNumber, _cellInterpolationBasis);
 			coarseLevel->PreSmoother = SmootherFactory::Create(PreSmootherCode, PreSmoothingIterations, problem->HHO->nFaceUnknowns);
 			coarseLevel->PostSmoother = SmootherFactory::Create(PostSmootherCode, PostSmoothingIterations, problem->HHO->nFaceUnknowns);
 			coarseLevel->ExportMatrices = ExportMatrices;

@@ -109,6 +109,11 @@ void print_usage() {
 	cout << "              pcgmg2   - Conjugate Gradient, preconditioned with the custom multigrid for HHO 'mg2'" << endl;
 	cout << "              agmg     - Yvan Notay's AGMG solver" << endl;
 	cout << endl;
+	cout << "-cell-reconstruct-degree NUM" << endl;
+	cout << "      (Only if solver is 'mg' or 'mg2') In the polongation, degree of the polynomial reconstructed on the cells from the faces." << endl;
+	cout << "              0        - degree k  : recover cell unknowns by solving the local problem" << endl;
+	cout << "              1        - degree k+1: recover cell unknowns by solving the local problem and use the local reconstructor (default)" << endl;
+	cout << endl;
 	cout << "-cycle [V|W],NUM,NUM" << endl;
 	cout << "      Multigrid cycle." << endl;
 	cout << "      Examples: \"V,1,0\" or \"W,1,1\"." << endl;
@@ -221,6 +226,7 @@ int main(int argc, char* argv[])
 	int nMultigridLevels = 0;
 	int matrixMaxSizeForCoarsestLevel = 1000;
 	int wLoops = 1;
+	int multigridCellReconstructDegree = 1;
 	bool useGalerkinOperator = false;
 	string preSmootherCode = "bgs";
 	string postSmootherCode = "rbgs";
@@ -246,6 +252,7 @@ int main(int argc, char* argv[])
 		OPT_Penalization,
 		OPT_PolySpace,
 		OPT_MGCycle,
+		OPT_MGCellReconstructDegree,
 		OPT_CoarseMatrixSize,
 		OPT_Smoothers,
 		OPT_CoarseningStrategy,
@@ -269,6 +276,7 @@ int main(int argc, char* argv[])
 		 { "pen", required_argument, NULL, OPT_Penalization },
 		 { "poly-space", required_argument, NULL, OPT_PolySpace },
 		 { "cycle", required_argument, NULL, OPT_MGCycle },
+		 { "cell-reconstruct-degree", required_argument, NULL, OPT_MGCellReconstructDegree },
 		 { "coarse-size", required_argument, NULL, OPT_CoarseMatrixSize },
 		 { "smoothers", required_argument, NULL, OPT_Smoothers },
 		 { "cs", required_argument, NULL, OPT_CoarseningStrategy },
@@ -395,6 +403,11 @@ int main(int argc, char* argv[])
 					argument_error("syntax error in the multigrid cycle. Check -cycle argument.");
 				break;
 			}
+			case OPT_MGCellReconstructDegree:
+				multigridCellReconstructDegree = atoi(optarg);
+				if (multigridCellReconstructDegree != 0 && multigridCellReconstructDegree != 1)
+					argument_error("check -cell-reconstruct-degree argument. Expecting 0 or 1.");
+				break;
 			case 'l': 
 				nMultigridLevels = atoi(optarg);
 				break;
@@ -559,7 +572,7 @@ int main(int argc, char* argv[])
 
 	program->Start(rhsCode, kappa1, kappa2, anisotropyRatio, partition, 
 		n, discretization, meshCode, meshFilePath, stabilization, basisCode, polyDegree, usePolynomialSpaceQ, penalizationCoefficient, staticCondensation, action,
-		nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations,
+		nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, multigridCellReconstructDegree, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations,
 		coarseningStgy, initialGuessCode, outputDirectory, solverCode, solverTolerance, maxIterations);
 
 	delete program;
