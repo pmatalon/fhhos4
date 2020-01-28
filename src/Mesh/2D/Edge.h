@@ -79,11 +79,22 @@ public:
 	{
 		double x1 = Vertex1->X;
 		double x2 = Vertex2->X;
+		double y1 = Vertex1->Y;
+		double y2 = Vertex2->Y;
 
 		double x = domainPoint.X;
+		double y = domainPoint.Y;
 
-		RefPoint p(2 / (x2 - x1) * x - (x2 + x1) / (x2 - x1));
-		return p;
+		if (abs(x2 - x1) < abs(y2 - y1))
+		{
+			RefPoint p(2 / (y2 - y1) * y - (y2 + y1) / (y2 - y1));
+			return p;
+		}
+		else
+		{
+			RefPoint p(2 / (x2 - x1) * x - (x2 + x1) / (x2 - x1));
+			return p;
+		}
 	}
 
 	void Serialize(ostream& os) const override

@@ -71,7 +71,8 @@ public:
 			return;
 
 		cout << "UpperBound = " << upperBound << endl;
-		assert(l2Error < upperBound);
+		if (l2Error > upperBound)
+			cout << Utils::BeginRed << "The L2 error is bigger than the theoretical upper bound." << Utils::EndColor << endl;
 	}
 private:
 	double ConvergenceHiddenConstant(int k)

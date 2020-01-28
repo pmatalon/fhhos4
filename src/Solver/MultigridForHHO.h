@@ -78,6 +78,9 @@ private:
 			int nFaceUnknowns = finePb->HHO->nFaceUnknowns;
 			SparseMatrix J_faces = GetGlobalCanonicalInjectionMatrixCoarseToFineFaces();
 
+			if (ExportMatrices)
+				finePb->ExportMatrix(J_faces, "J_faces");
+
 			FaceParallelLoop<Dim> parallelLoop(finePb->_mesh->InteriorFaces);
 			parallelLoop.ReserveChunkCoeffsSize(nFaceUnknowns * 2 * nFaceUnknowns);
 
