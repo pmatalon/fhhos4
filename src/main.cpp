@@ -104,13 +104,20 @@ void print_usage() {
 	cout << "              bj       - Block Jacobi: the block size is set to the number of DOFs per cell (DG) or face (HHO)" << endl;
 	cout << "              bgs      - Block Gauss-Seidel: the block size is set to the number of DOFs per cell (DG) or face (HHO)" << endl;
 	cout << "              mg       - Custom multigrid for HHO" << endl;
-	cout << "              mg2      - Custom multigrid for HHO (identity for faces present on both grids)" << endl;
 	cout << "              pcgmg    - Conjugate Gradient, preconditioned with the custom multigrid for HHO 'mg'" << endl;
-	cout << "              pcgmg2   - Conjugate Gradient, preconditioned with the custom multigrid for HHO 'mg2'" << endl;
 	cout << "              agmg     - Yvan Notay's AGMG solver" << endl;
 	cout << endl;
+	cout << "-prolong NUM" << endl;
+	cout << "      (Only if solver is 'mg') How the prolongation operator is built." << endl;
+	cout << "              1        - Interpolation from coarse faces to coarse cells" << endl;
+	cout << "                         L2-projection on the fine faces" << endl;
+	cout << "              2        - Interpolation from coarse faces to coarse cells" << endl;
+	cout << "                         On faces present on both fine and coarse meshes, we keep the polynomials identical. Otherwise, L2-projection from the cell polynomials" << endl;
+	cout << "              3        - Interpolation from coarse faces to coarse cells" << endl;
+	cout << "                         Adjoint of the same interpolation on the fine mesh" << endl;
+	cout << endl;
 	cout << "-cell-reconstruct-degree NUM" << endl;
-	cout << "      (Only if solver is 'mg' or 'mg2') In the polongation, degree of the polynomial reconstructed on the cells from the faces." << endl;
+	cout << "      (Only if solver is 'mg') In the polongation, degree of the polynomial reconstructed on the cells from the faces." << endl;
 	cout << "              0        - degree k  : recover cell unknowns by solving the local problem" << endl;
 	cout << "              1        - degree k+1: recover cell unknowns by solving the local problem and use the local reconstructor (default)" << endl;
 	cout << endl;
@@ -224,6 +231,7 @@ int main(int argc, char* argv[])
 	bool staticCondensation = true;
 	string a = "sr";
 	int nMultigridLevels = 0;
+	int prolongationCode = 1;
 	int matrixMaxSizeForCoarsestLevel = 1000;
 	int wLoops = 1;
 	int multigridCellReconstructDegree = 1;
@@ -253,6 +261,7 @@ int main(int argc, char* argv[])
 		OPT_PolySpace,
 		OPT_MGCycle,
 		OPT_MGCellReconstructDegree,
+		OPT_ProlongationCode,
 		OPT_CoarseMatrixSize,
 		OPT_Smoothers,
 		OPT_CoarseningStrategy,
@@ -277,6 +286,7 @@ int main(int argc, char* argv[])
 		 { "poly-space", required_argument, NULL, OPT_PolySpace },
 		 { "cycle", required_argument, NULL, OPT_MGCycle },
 		 { "cell-reconstruct-degree", required_argument, NULL, OPT_MGCellReconstructDegree },
+		 { "prolong", required_argument, NULL, OPT_ProlongationCode },
 		 { "coarse-size", required_argument, NULL, OPT_CoarseMatrixSize },
 		 { "smoothers", required_argument, NULL, OPT_Smoothers },
 		 { "cs", required_argument, NULL, OPT_CoarseningStrategy },
@@ -407,6 +417,11 @@ int main(int argc, char* argv[])
 				multigridCellReconstructDegree = atoi(optarg);
 				if (multigridCellReconstructDegree != 0 && multigridCellReconstructDegree != 1)
 					argument_error("check -cell-reconstruct-degree argument. Expecting 0 or 1.");
+				break;
+			case OPT_ProlongationCode:
+				prolongationCode = atoi(optarg);
+				if (prolongationCode != 1 && prolongationCode != 2 && prolongationCode != 3)
+					argument_error("check -prolong argument. Expecting 1, 2 or 3.");
 				break;
 			case 'l': 
 				nMultigridLevels = atoi(optarg);
@@ -572,7 +587,7 @@ int main(int argc, char* argv[])
 
 	program->Start(rhsCode, kappa1, kappa2, anisotropyRatio, partition, 
 		n, discretization, meshCode, meshFilePath, stabilization, basisCode, polyDegree, usePolynomialSpaceQ, penalizationCoefficient, staticCondensation, action,
-		nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, multigridCellReconstructDegree, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations,
+		nMultigridLevels, prolongationCode, matrixMaxSizeForCoarsestLevel, wLoops, multigridCellReconstructDegree, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations,
 		coarseningStgy, initialGuessCode, outputDirectory, solverCode, solverTolerance, maxIterations);
 
 	delete program;

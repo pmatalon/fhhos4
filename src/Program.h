@@ -35,7 +35,7 @@ public:
 	virtual void Start(string rhsCode, double kappa1, double kappa2, double anisotropyRatio, string partition, 
 		BigNumber n, string discretization, string meshCode, string meshFilePath, string stabilization, string basisCode, int polyDegree, bool usePolynomialSpaceQ,
 		int penalizationCoefficient, bool staticCondensation, Action action, 
-		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, int multigridCellReconstructDegree, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations,
+		int nMultigridLevels, int prolongationCode, int matrixMaxSizeForCoarsestLevel, int wLoops, int multigridCellReconstructDegree, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations,
 		CoarseningStrategy coarseningStgy, string initialGuessCode, string outputDirectory, string solverCode, double solverTolerance, int maxIterations) = 0;
 };
 
@@ -48,7 +48,7 @@ public:
 	void Start(string rhsCode, double kappa1, double kappa2, double anisotropyRatio, string partition, 
 		BigNumber n, string discretization, string meshCode, string meshFilePath, string stabilization, string basisCode, int polyDegree, bool usePolynomialSpaceQ,
 		int penalizationCoefficient, bool staticCondensation, Action action, 
-		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, int multigridCellReconstructDegree, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations,
+		int nMultigridLevels, int prolongationCode, int matrixMaxSizeForCoarsestLevel, int wLoops, int multigridCellReconstructDegree, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations,
 		CoarseningStrategy coarseningStgy, string initialGuessCode, string outputDirectory, string solverCode, double solverTolerance, int maxIterations)
 	{
 		Timer totalTimer;
@@ -330,7 +330,7 @@ public:
 				cout << endl;
 				cout << "------------------- Linear system resolution ------------------" << endl;
 
-				Solver* solver = CreateSolver(solverCode, &problem, action, solverTolerance, maxIterations, staticCondensation, nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, multigridCellReconstructDegree, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, coarseningStgy, basis.Size());
+				Solver* solver = CreateSolver(solverCode, &problem, action, solverTolerance, maxIterations, staticCondensation, nMultigridLevels, prolongationCode, matrixMaxSizeForCoarsestLevel, wLoops, multigridCellReconstructDegree, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, coarseningStgy, basis.Size());
 				problem.SystemSolution = Solve(solver, problem.A, problem.b, initialGuessCode);
 
 				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
@@ -370,7 +370,7 @@ public:
 				cout << endl;
 				cout << "------------------- Linear system resolution ------------------" << endl;
 
-				Solver* solver = CreateSolver(solverCode, &problem, action, solverTolerance, maxIterations, staticCondensation, nMultigridLevels, matrixMaxSizeForCoarsestLevel, wLoops, multigridCellReconstructDegree, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, coarseningStgy, faceBasis.Size());
+				Solver* solver = CreateSolver(solverCode, &problem, action, solverTolerance, maxIterations, staticCondensation, nMultigridLevels, prolongationCode, matrixMaxSizeForCoarsestLevel, wLoops, multigridCellReconstructDegree, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, coarseningStgy, faceBasis.Size());
 				problem.SystemSolution = Solve(solver, problem.A, problem.b, initialGuessCode);
 
 				if (staticCondensation && (action & Action::ExtractSolution) == Action::ExtractSolution)
@@ -405,15 +405,14 @@ private:
 	Mesh<Dim>* BuildMesh(int n, string meshCode, string meshFilePath) { return nullptr; }
 
 	Solver* CreateSolver(string solverCode, Problem<Dim>* problem, Action action, double tolerance, int maxIterations, bool staticCondensation,
-		int nMultigridLevels, int matrixMaxSizeForCoarsestLevel, int wLoops, int multigridCellReconstructDegree, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations, CoarseningStrategy coarseningStgy, int blockSize)
+		int nMultigridLevels, int prolongationCode, int matrixMaxSizeForCoarsestLevel, int wLoops, int multigridCellReconstructDegree, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations, CoarseningStrategy coarseningStgy, int blockSize)
 	{
 		Solver* solver = NULL;
-		if (solverCode.compare("mg") == 0 || solverCode.compare("pcgmg") == 0 || solverCode.compare("mg2") == 0 || solverCode.compare("pcgmg2") == 0)
+		if (solverCode.compare("mg") == 0 || solverCode.compare("pcgmg") == 0)
 		{
 			if (staticCondensation)
 			{
 				Poisson_HHO<Dim>* hhoProblem = dynamic_cast<Poisson_HHO<Dim>*>(problem);
-				int algoNumber = solverCode.compare("mg") == 0 || solverCode.compare("pcgmg") == 0 ? 1 : 2;
 
 				FunctionalBasis<Dim>* cellInterpolationBasis;
 				if (multigridCellReconstructDegree == 1)
@@ -423,7 +422,7 @@ private:
 				else
 					assert(false);
 
-				MultigridForHHO<Dim>* mg = new MultigridForHHO<Dim>(hhoProblem, algoNumber, cellInterpolationBasis, nMultigridLevels);
+				MultigridForHHO<Dim>* mg = new MultigridForHHO<Dim>(hhoProblem, prolongationCode, cellInterpolationBasis, nMultigridLevels);
 				mg->MatrixMaxSizeForCoarsestLevel = matrixMaxSizeForCoarsestLevel;
 				mg->WLoops = wLoops;
 				mg->UseGalerkinOperator = useGalerkinOperator;
@@ -434,9 +433,9 @@ private:
 				mg->CoarseningStgy = coarseningStgy;
 				mg->ExportMatrices = (action & Action::ExportMultigridMatrices) == Action::ExportMultigridMatrices;
 
-				if (solverCode.compare("mg") == 0 || solverCode.compare("mg2") == 0)
+				if (solverCode.compare("mg") == 0)
 					solver = mg;
-				else if (solverCode.compare("pcgmg") == 0 || solverCode.compare("pcgmg2") == 0)
+				else if (solverCode.compare("pcgmg") == 0)
 				{
 					ConjugateGradient* cg = new ConjugateGradient();
 					cg->Precond = Preconditioner(mg);

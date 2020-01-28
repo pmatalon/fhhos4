@@ -10,17 +10,17 @@ class LevelForHHO : public Level
 {
 private:
 	Poisson_HHO<Dim>* _problem;
-	int _algoNumber = 1;
+	int _prolongationCode = 1;
 	FunctionalBasis<Dim>* _cellInterpolationBasis;
 public:
 	bool ExportMatrices = false;
 
-	LevelForHHO(int number, Poisson_HHO<Dim>* problem, bool useGalerkinOperator, int algoNumber, FunctionalBasis<Dim>* cellInterpolationBasis)
+	LevelForHHO(int number, Poisson_HHO<Dim>* problem, bool useGalerkinOperator, int prolongationCode, FunctionalBasis<Dim>* cellInterpolationBasis)
 		: Level(number)
 	{
 		this->UseGalerkinOperator = useGalerkinOperator;
 		this->_problem = problem;
-		this->_algoNumber = algoNumber;
+		this->_prolongationCode = prolongationCode;
 		this->_cellInterpolationBasis = cellInterpolationBasis;
 
 		//problem->ExportFaces("L" + to_string(number));
@@ -71,9 +71,9 @@ private:
 
 		SparseMatrix P_algo1 = Pi_f * J_f_c * I_c;
 
-		if (_algoNumber == 1)
+		if (_prolongationCode == 1)
 			P = P_algo1;
-		else
+		else if (_prolongationCode == 2)
 		{
 			int nFaceUnknowns = finePb->HHO->nFaceUnknowns;
 			SparseMatrix J_faces = GetGlobalCanonicalInjectionMatrixCoarseToFineFaces();
@@ -96,6 +96,16 @@ private:
 			P = SparseMatrix(finePb->HHO->nInteriorFaces * nFaceUnknowns, coarsePb->HHO->nInteriorFaces * nFaceUnknowns);
 			parallelLoop.Fill(P);
 		}
+		else if (_prolongationCode == 3)
+		{
+			SparseMatrix I_f = GetGlobalInterpolationMatrixFromFacesToCells(finePb);
+			if (ExportMatrices)
+				finePb->ExportMatrix(I_f, "I_f");
+
+			P = I_f.transpose() * J_f_c * I_c;
+		}
+		else
+			assert(false);
 
 		if (ExportMatrices)
 			finePb->ExportMatrix(P, "P");
@@ -362,7 +372,7 @@ private:
 	Poisson_HHO<Dim>* _problem;
 	bool _automaticNumberOfLevels;
 	int _nLevels;
-	int _algoNumber = 1;
+	int _prolongationCode = 1;
 	FunctionalBasis<Dim>* _cellInterpolationBasis;
 public:
 	int MatrixMaxSizeForCoarsestLevel;
@@ -374,13 +384,13 @@ public:
 	CoarseningStrategy CoarseningStgy = CoarseningStrategy::Standard;
 	bool ExportMatrices = false;
 
-	MultigridForHHO(Poisson_HHO<Dim>* problem, int algoNumber, FunctionalBasis<Dim>* cellInterpolationBasis) : MultigridForHHO(problem, algoNumber, cellInterpolationBasis, 0)
+	MultigridForHHO(Poisson_HHO<Dim>* problem, int prolongationCode, FunctionalBasis<Dim>* cellInterpolationBasis) : MultigridForHHO(problem, prolongationCode, cellInterpolationBasis, 0)
 	{}
 
-	MultigridForHHO(Poisson_HHO<Dim>* problem, int algoNumber, FunctionalBasis<Dim>* cellInterpolationBasis, int nLevels) : Multigrid()
+	MultigridForHHO(Poisson_HHO<Dim>* problem, int prolongationCode, FunctionalBasis<Dim>* cellInterpolationBasis, int nLevels) : Multigrid()
 	{
 		this->_problem = problem;
-		this->_algoNumber = algoNumber;
+		this->_prolongationCode = prolongationCode;
 		this->_cellInterpolationBasis = cellInterpolationBasis;
 		this->_automaticNumberOfLevels = nLevels <= 0;
 		
@@ -395,17 +405,27 @@ public:
 			this->MatrixMaxSizeForCoarsestLevel = 0;
 		}
 
-		this->_fineLevel = new LevelForHHO<Dim>(0, problem, false, _algoNumber, _cellInterpolationBasis);
+		this->_fineLevel = new LevelForHHO<Dim>(0, problem, false, _prolongationCode, _cellInterpolationBasis);
 	}
 	
 	void Serialize(ostream& os) const override
 	{
 		os << "MultigridForHHO" << endl;
+		os << "\t" << "Prolongation       : " << _prolongationCode << endl;
+
+		os << "\t" << "Cell interpolation : ";
+		if (_cellInterpolationBasis == _problem->HHO->CellBasis)
+			os << "k";
+		else if (_cellInterpolationBasis == _problem->HHO->ReconstructionBasis)
+			os << "k+1";
+		os << endl;
+
 		os << "\t" << "Cycle              : ";
 		if (this->WLoops == 1)
 			os << "V-cycle" << endl;
 		else
 			os << "W-cycle (" << this->WLoops << " loops)" << endl;
+
 		os << "\t" << "Levels             : ";
 		if (_automaticNumberOfLevels && _nLevels == 0)
 			os << "automatic coarsening until matrix size <= " << MatrixMaxSizeForCoarsestLevel << endl;
@@ -413,6 +433,7 @@ public:
 			os << _nLevels << " (automatic)" << endl;
 		else
 			os << _nLevels << endl;
+
 		os << "\t" << "Coarsening strategy: ";
 		if (CoarseningStgy == CoarseningStrategy::Standard)
 			os << "standard" << endl;
@@ -420,6 +441,7 @@ public:
 			os << "agglomeration" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::StructuredRefinement)
 			os << "structured refinement from coarse mesh" << endl;
+
 		Smoother* preSmoother = SmootherFactory::Create(PreSmootherCode, PreSmoothingIterations, _problem->HHO->nFaceUnknowns);
 		Smoother* postSmoother = SmootherFactory::Create(PostSmootherCode, PostSmoothingIterations, _problem->HHO->nFaceUnknowns);
 		os << "\t" << "Pre-smoothing      : " << *preSmoother << endl;
@@ -463,7 +485,7 @@ public:
 			// Build coarse level
 			problem = problem->GetProblemOnCoarserMesh();
 			levelNumber++;
-			LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(levelNumber, problem, UseGalerkinOperator, _algoNumber, _cellInterpolationBasis);
+			LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(levelNumber, problem, UseGalerkinOperator, _prolongationCode, _cellInterpolationBasis);
 			coarseLevel->PreSmoother = SmootherFactory::Create(PreSmootherCode, PreSmoothingIterations, problem->HHO->nFaceUnknowns);
 			coarseLevel->PostSmoother = SmootherFactory::Create(PostSmootherCode, PostSmoothingIterations, problem->HHO->nFaceUnknowns);
 			coarseLevel->ExportMatrices = ExportMatrices;
