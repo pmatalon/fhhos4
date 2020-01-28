@@ -311,6 +311,7 @@
     <ClInclude Include="src\Mesh\3D\GMSHCartesianMesh3D.h">
       <Filter>Mesh\3D</Filter>
     </ClInclude>
+    <ClInclude Include="src\ProgramArguments.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

@@ -1,4 +1,5 @@
 #pragma once
+#include "ProgramArguments.h"
 #include "DG/Poisson_DG.h"
 #include "HHO/Poisson_HHO.h"
 #include "Mesh/1D/CartesianGrid1D.h"
@@ -32,11 +33,7 @@ class Program
 {
 public:
 	Program() {}
-	virtual void Start(string rhsCode, double kappa1, double kappa2, double anisotropyRatio, string partition, 
-		BigNumber n, string discretization, string meshCode, string meshFilePath, string stabilization, string basisCode, int polyDegree, bool usePolynomialSpaceQ,
-		int penalizationCoefficient, bool staticCondensation, Action action, 
-		int nMultigridLevels, int prolongationCode, int matrixMaxSizeForCoarsestLevel, int wLoops, int multigridCellReconstructDegree, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations,
-		CoarseningStrategy coarseningStgy, string initialGuessCode, string outputDirectory, string solverCode, double solverTolerance, int maxIterations) = 0;
+	virtual void Start(ProgramArguments& args) = 0;
 };
 
 template <int Dim>
@@ -45,11 +42,7 @@ class ProgramDim : public Program
 public:
 	ProgramDim() : Program() {}
 
-	void Start(string rhsCode, double kappa1, double kappa2, double anisotropyRatio, string partition, 
-		BigNumber n, string discretization, string meshCode, string meshFilePath, string stabilization, string basisCode, int polyDegree, bool usePolynomialSpaceQ,
-		int penalizationCoefficient, bool staticCondensation, Action action, 
-		int nMultigridLevels, int prolongationCode, int matrixMaxSizeForCoarsestLevel, int wLoops, int multigridCellReconstructDegree, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations,
-		CoarseningStrategy coarseningStgy, string initialGuessCode, string outputDirectory, string solverCode, double solverTolerance, int maxIterations)
+	void Start(ProgramArguments& args)
 	{
 		Timer totalTimer;
 		totalTimer.Start();
@@ -62,9 +55,9 @@ public:
 
 		Mesh<Dim>::MeshDirectory = "/mnt/c/Users/pierr/Documents/Source/Repos/dghho/data/meshes/";
 
-		Mesh<Dim>* mesh = BuildMesh(n, meshCode, meshFilePath);
+		Mesh<Dim>* mesh = BuildMesh(args.Discretization.N, args.Discretization.MeshCode, args.Discretization.MeshFilePath);
 
-		if ((action & Action::UnitTests) == Action::UnitTests)
+		if ((args.Actions & Action::UnitTests) == Action::UnitTests)
 		{
 			// Unit tests
 			TriangleShape::Test();
@@ -74,7 +67,7 @@ public:
 			TriangleIn3DShape::Test();
 
 			mesh->SanityCheck();
-			if (n <= 2)
+			if (args.Discretization.N <= 2)
 				cout << *mesh << endl << endl;
 		}
 
@@ -83,23 +76,23 @@ public:
 		//--------------------------------------------//
 
 		double rotationAngleInDegrees = 0;
-		if (discretization.compare("dg") == 0)
+		if (args.Discretization.Method.compare("dg") == 0)
 		{
 			rotationAngleInDegrees = 0;
-			anisotropyRatio = 1;
+			args.Problem.AnisotropyRatio = 1;
 		}
 		double rotationAngleInRandians = rotationAngleInDegrees * M_PI / 180;
-		DimVector<Dim> anisotropyCoefficients1 = kappa1 * DimVector<Dim>::Ones(Dim);
-		DimVector<Dim> anisotropyCoefficients2 = kappa2 * DimVector<Dim>::Ones(Dim);
+		DimVector<Dim> anisotropyCoefficients1 = args.Problem.Kappa1 * DimVector<Dim>::Ones(Dim);
+		DimVector<Dim> anisotropyCoefficients2 = args.Problem.Kappa2 * DimVector<Dim>::Ones(Dim);
 		if (Dim > 1)
 		{
-			anisotropyCoefficients1[0] = anisotropyRatio * anisotropyCoefficients1[1];
-			anisotropyCoefficients2[0] = anisotropyRatio * anisotropyCoefficients2[1];
+			anisotropyCoefficients1[0] = args.Problem.AnisotropyRatio * anisotropyCoefficients1[1];
+			anisotropyCoefficients2[0] = args.Problem.AnisotropyRatio * anisotropyCoefficients2[1];
 		}
 		Tensor<Dim> diffTensor1(anisotropyCoefficients1, rotationAngleInRandians);
 		Tensor<Dim> diffTensor2(anisotropyCoefficients2, rotationAngleInRandians);
 
-		DiffusionPartition<Dim> diffusionPartition(partition, &diffTensor1, &diffTensor2);
+		DiffusionPartition<Dim> diffusionPartition(args.Problem.Partition, &diffTensor1, &diffTensor2);
 
 		mesh->SetDiffusionCoefficient(&diffusionPartition);
 
@@ -112,7 +105,7 @@ public:
 
 		if (Dim == 1)
 		{
-			if (rhsCode.compare("sine") == 0)
+			if (args.Problem.RHSCode.compare("sine") == 0)
 			{
 				if (diffusionPartition.IsHomogeneous)
 				{
@@ -124,7 +117,7 @@ public:
 				}
 				sourceFunction = new SourceFunction1D([](double x) { return sin(4 * M_PI * x); });
 			}
-			else if (rhsCode.compare("poly") == 0)
+			else if (args.Problem.RHSCode.compare("poly") == 0)
 			{
 				if (diffusionPartition.IsHomogeneous)
 				{
@@ -136,7 +129,7 @@ public:
 				}
 				sourceFunction = new SourceFunction1D([](double x) { return 2; });
 			}
-			else if (rhsCode.compare("heterog") == 0)
+			else if (args.Problem.RHSCode.compare("heterog") == 0)
 			{
 				exactSolution = [&diffusionPartition](DomPoint p)
 				{
@@ -156,7 +149,7 @@ public:
 		}
 		else if (Dim == 2)
 		{
-			if (rhsCode.compare("sine") == 0)
+			if (args.Problem.RHSCode.compare("sine") == 0)
 			{
 				if (diffusionPartition.IsHomogeneous && rotationAngleInDegrees == 0)
 				{
@@ -171,7 +164,7 @@ public:
 				}
 				sourceFunction = new SourceFunction2D([](double x, double y) { return 2 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y); });
 			}
-			else if (rhsCode.compare("poly") == 0)
+			else if (args.Problem.RHSCode.compare("poly") == 0)
 			{
 				if (diffusionPartition.IsHomogeneous && diffusionPartition.IsIsotropic)
 				{
@@ -184,7 +177,7 @@ public:
 				}
 				sourceFunction = new SourceFunction2D([](double x, double y) { return 2 * (y*(1 - y) + x * (1 - x)); });
 			}
-			else if (rhsCode.compare("one") == 0)
+			else if (args.Problem.RHSCode.compare("one") == 0)
 			{
 				if (diffusionPartition.IsHomogeneous && diffusionPartition.IsIsotropic)
 				{
@@ -192,7 +185,7 @@ public:
 				}
 				sourceFunction = new SourceFunction2D([](double x, double y) { return 0; });
 			}
-			else if (rhsCode.compare("x") == 0)
+			else if (args.Problem.RHSCode.compare("x") == 0)
 			{
 				if (diffusionPartition.IsHomogeneous && diffusionPartition.IsIsotropic)
 				{
@@ -200,7 +193,7 @@ public:
 				}
 				sourceFunction = new SourceFunction2D([](double x, double y) { return 0; });
 			}
-			else if (rhsCode.compare("kellogg") == 0)
+			else if (args.Problem.RHSCode.compare("kellogg") == 0)
 			{
 				if (diffusionPartition.IsIsotropic)
 				{
@@ -248,7 +241,7 @@ public:
 		}
 		else if (Dim == 3)
 		{
-			if (rhsCode.compare("sine") == 0)
+			if (args.Problem.RHSCode.compare("sine") == 0)
 			{
 				if (diffusionPartition.IsHomogeneous && diffusionPartition.IsIsotropic)
 				{
@@ -262,7 +255,7 @@ public:
 				}
 				sourceFunction = new SourceFunction3D([](double x, double y, double z) {  return 3 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y)*sin(4 * M_PI * z); });
 			}
-			else if (rhsCode.compare("poly") == 0)
+			else if (args.Problem.RHSCode.compare("poly") == 0)
 			{
 				if (diffusionPartition.IsHomogeneous && diffusionPartition.IsIsotropic)
 				{
@@ -298,9 +291,9 @@ public:
 
 		mesh->SetBoundaryConditions(&bc);
 
-		if ((action & Action::UnitTests) == Action::UnitTests)
+		if ((args.Actions & Action::UnitTests) == Action::UnitTests)
 		{
-			mesh->CoarsenMesh(coarseningStgy);
+			mesh->CoarsenMesh(args.Solver.MG.CoarseningStgy);
 			mesh->SanityCheck();
 			//cout << *mesh << endl << endl;
 			//cout << "Coarse mesh" << endl << *(mesh->CoarseMesh) << endl << endl;
@@ -310,81 +303,81 @@ public:
 		//   Discretization and solving   //
 		//--------------------------------//
 		
-		if (discretization.compare("dg") == 0)
+		if (args.Discretization.Method.compare("dg") == 0)
 		{
-			FunctionalBasis<Dim> basis(basisCode, polyDegree, usePolynomialSpaceQ);
-			Poisson_DG<Dim> problem(mesh, rhsCode, sourceFunction, &diffusionPartition, outputDirectory, &basis, penalizationCoefficient);
+			FunctionalBasis<Dim> basis(args.Discretization.BasisCode, args.Discretization.PolyDegree, args.Discretization.UsePolynomialSpaceQ);
+			Poisson_DG<Dim> problem(mesh, args.Problem.RHSCode, sourceFunction, &diffusionPartition, args.OutputDirectory, &basis, args.Discretization.PenalizationCoefficient);
 
 			cout << endl;
 			cout << "----------------------- Assembly -------------------------" << endl;
 			Timer assemblyTimer;
 			assemblyTimer.Start();
 
-			problem.Assemble(action);
+			problem.Assemble(args.Actions);
 			
 			assemblyTimer.Stop();
 			cout << endl << "Assembly time: CPU = " << assemblyTimer.CPU() << ", elapsed = " << assemblyTimer.Elapsed() << endl;
 
-			if ((action & Action::SolveSystem) == Action::SolveSystem)
+			if ((args.Actions & Action::SolveSystem) == Action::SolveSystem)
 			{
 				cout << endl;
 				cout << "------------------- Linear system resolution ------------------" << endl;
 
-				Solver* solver = CreateSolver(solverCode, &problem, action, solverTolerance, maxIterations, staticCondensation, nMultigridLevels, prolongationCode, matrixMaxSizeForCoarsestLevel, wLoops, multigridCellReconstructDegree, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, coarseningStgy, basis.Size());
-				problem.SystemSolution = Solve(solver, problem.A, problem.b, initialGuessCode);
+				Solver* solver = CreateSolver(args, &problem, basis.Size());
+				problem.SystemSolution = Solve(solver, problem.A, problem.b, args.Solver.InitialGuessCode);
 
-				if ((action & Action::ExtractSolution) == Action::ExtractSolution)
+				if ((args.Actions & Action::ExtractSolution) == Action::ExtractSolution)
 					problem.ExtractSolution();
-				if ((action & Action::ComputeL2Error) == Action::ComputeL2Error && exactSolution != NULL)
+				if ((args.Actions & Action::ComputeL2Error) == Action::ComputeL2Error && exactSolution != NULL)
 				{
 					double error = L2::Error<Dim>(mesh, basis, problem.SystemSolution, exactSolution);
 					cout << "L2 Error = " << std::scientific << error << endl;
 				}
 			}
 		}
-		else if (discretization.compare("hho") == 0)
+		else if (args.Discretization.Method.compare("hho") == 0)
 		{
-			FunctionalBasis<Dim> reconstructionBasis(basisCode, polyDegree, usePolynomialSpaceQ);
-			FunctionalBasis<Dim> cellBasis(basisCode, polyDegree - 1, usePolynomialSpaceQ);
-			FunctionalBasis<Dim-1> faceBasis(basisCode, polyDegree - 1, usePolynomialSpaceQ);
+			FunctionalBasis<Dim> reconstructionBasis(args.Discretization.BasisCode, args.Discretization.PolyDegree, args.Discretization.UsePolynomialSpaceQ);
+			FunctionalBasis<Dim> cellBasis(args.Discretization.BasisCode, args.Discretization.PolyDegree - 1, args.Discretization.UsePolynomialSpaceQ);
+			FunctionalBasis<Dim-1> faceBasis(args.Discretization.BasisCode, args.Discretization.PolyDegree - 1, args.Discretization.UsePolynomialSpaceQ);
 
-			HHOParameters<Dim> hho(mesh, stabilization, &reconstructionBasis, &cellBasis, &faceBasis);
+			HHOParameters<Dim> hho(mesh, args.Discretization.Stabilization, &reconstructionBasis, &cellBasis, &faceBasis);
 			
-			Poisson_HHO<Dim> problem(mesh, rhsCode, sourceFunction, &hho, staticCondensation, &diffusionPartition, &bc, outputDirectory);
+			Poisson_HHO<Dim> problem(mesh, args.Problem.RHSCode, sourceFunction, &hho, args.Discretization.StaticCondensation, &diffusionPartition, &bc, args.OutputDirectory);
 
 			cout << endl;
 			cout << "----------------------- Assembly -------------------------" << endl;
 			Timer assemblyTimer;
 			assemblyTimer.Start();
 
-			problem.Assemble(action);
+			problem.Assemble(args.Actions);
 
 			assemblyTimer.Stop();
 			cout << endl << "Assembly time: CPU = " << assemblyTimer.CPU() << ", elapsed = " << assemblyTimer.Elapsed() << endl;
 
-			if ((action & Action::ExportFaces) == Action::ExportFaces)
-				mesh->ExportFacesToMatlab(outputDirectory, true);
+			if ((args.Actions & Action::ExportFaces) == Action::ExportFaces)
+				mesh->ExportFacesToMatlab(args.OutputDirectory, true);
 
-			if ((action & Action::SolveSystem) == Action::SolveSystem)
+			if ((args.Actions & Action::SolveSystem) == Action::SolveSystem)
 			{
 				cout << endl;
 				cout << "------------------- Linear system resolution ------------------" << endl;
 
-				Solver* solver = CreateSolver(solverCode, &problem, action, solverTolerance, maxIterations, staticCondensation, nMultigridLevels, prolongationCode, matrixMaxSizeForCoarsestLevel, wLoops, multigridCellReconstructDegree, useGalerkinOperator, preSmootherCode, postSmootherCode, nPreSmoothingIterations, nPostSmoothingIterations, coarseningStgy, faceBasis.Size());
-				problem.SystemSolution = Solve(solver, problem.A, problem.b, initialGuessCode);
+				Solver* solver = CreateSolver(args, &problem, faceBasis.Size());
+				problem.SystemSolution = Solve(solver, problem.A, problem.b, args.Solver.InitialGuessCode);
 
-				if (staticCondensation && (action & Action::ExtractSolution) == Action::ExtractSolution)
+				if (args.Discretization.StaticCondensation && (args.Actions & Action::ExtractSolution) == Action::ExtractSolution)
 					problem.ExtractTraceSystemSolution();
 
-				if ((action & Action::ExtractSolution) == Action::ExtractSolution || ((action & Action::ComputeL2Error) == Action::ComputeL2Error && exactSolution != NULL))
+				if ((args.Actions & Action::ExtractSolution) == Action::ExtractSolution || ((args.Actions & Action::ComputeL2Error) == Action::ComputeL2Error && exactSolution != NULL))
 				{
 					problem.ReconstructHigherOrderApproximation();
-					if ((action & Action::ExtractSolution) == Action::ExtractSolution)
+					if ((args.Actions & Action::ExtractSolution) == Action::ExtractSolution)
 					{
 						problem.ExtractHybridSolution();
 						problem.ExtractSolution();
 					}
-					if ((action & Action::ComputeL2Error) == Action::ComputeL2Error && exactSolution != NULL)
+					if ((args.Actions & Action::ComputeL2Error) == Action::ComputeL2Error && exactSolution != NULL)
 					{
 						double error = L2::Error<Dim>(mesh, reconstructionBasis, problem.ReconstructedSolution, exactSolution);
 						cout << "L2 Error = " << std::scientific << error << endl;
@@ -404,38 +397,37 @@ public:
 private:
 	Mesh<Dim>* BuildMesh(int n, string meshCode, string meshFilePath) { return nullptr; }
 
-	Solver* CreateSolver(string solverCode, Problem<Dim>* problem, Action action, double tolerance, int maxIterations, bool staticCondensation,
-		int nMultigridLevels, int prolongationCode, int matrixMaxSizeForCoarsestLevel, int wLoops, int multigridCellReconstructDegree, bool useGalerkinOperator, string preSmootherCode, string postSmootherCode, int nPreSmoothingIterations, int nPostSmoothingIterations, CoarseningStrategy coarseningStgy, int blockSize)
+	Solver* CreateSolver(const ProgramArguments& args, Problem<Dim>* problem, int blockSize)
 	{
 		Solver* solver = NULL;
-		if (solverCode.compare("mg") == 0 || solverCode.compare("pcgmg") == 0)
+		if (args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("pcgmg") == 0)
 		{
-			if (staticCondensation)
+			if (args.Discretization.StaticCondensation)
 			{
 				Poisson_HHO<Dim>* hhoProblem = dynamic_cast<Poisson_HHO<Dim>*>(problem);
 
 				FunctionalBasis<Dim>* cellInterpolationBasis;
-				if (multigridCellReconstructDegree == 1)
+				if (args.Solver.MG.CellInterpolationCode == 1)
 					cellInterpolationBasis = hhoProblem->HHO->ReconstructionBasis;
-				else if (multigridCellReconstructDegree == 0)
+				else if (args.Solver.MG.CellInterpolationCode == 2)
 					cellInterpolationBasis = hhoProblem->HHO->CellBasis;
 				else
 					assert(false);
 
-				MultigridForHHO<Dim>* mg = new MultigridForHHO<Dim>(hhoProblem, prolongationCode, cellInterpolationBasis, nMultigridLevels);
-				mg->MatrixMaxSizeForCoarsestLevel = matrixMaxSizeForCoarsestLevel;
-				mg->WLoops = wLoops;
-				mg->UseGalerkinOperator = useGalerkinOperator;
-				mg->PreSmootherCode = preSmootherCode;
-				mg->PostSmootherCode = postSmootherCode;
-				mg->PreSmoothingIterations = nPreSmoothingIterations;
-				mg->PostSmoothingIterations = nPostSmoothingIterations;
-				mg->CoarseningStgy = coarseningStgy;
-				mg->ExportMatrices = (action & Action::ExportMultigridMatrices) == Action::ExportMultigridMatrices;
+				MultigridForHHO<Dim>* mg = new MultigridForHHO<Dim>(hhoProblem, args.Solver.MG.ProlongationCode, cellInterpolationBasis, args.Solver.MG.Levels);
+				mg->MatrixMaxSizeForCoarsestLevel = args.Solver.MG.MatrixMaxSizeForCoarsestLevel;
+				mg->WLoops = args.Solver.MG.WLoops;
+				mg->UseGalerkinOperator = args.Solver.MG.UseGalerkinOperator;
+				mg->PreSmootherCode = args.Solver.MG.PreSmootherCode;
+				mg->PostSmootherCode = args.Solver.MG.PostSmootherCode;
+				mg->PreSmoothingIterations = args.Solver.MG.PreSmoothingIterations;
+				mg->PostSmoothingIterations = args.Solver.MG.PostSmoothingIterations;
+				mg->CoarseningStgy = args.Solver.MG.CoarseningStgy;
+				mg->ExportMatrices = (args.Actions & Action::ExportMultigridMatrices) == Action::ExportMultigridMatrices;
 
-				if (solverCode.compare("mg") == 0)
+				if (args.Solver.SolverCode.compare("mg") == 0)
 					solver = mg;
-				else if (solverCode.compare("pcgmg") == 0)
+				else if (args.Solver.SolverCode.compare("pcgmg") == 0)
 				{
 					ConjugateGradient* cg = new ConjugateGradient();
 					cg->Precond = Preconditioner(mg);
@@ -445,18 +437,18 @@ private:
 			else
 				assert(false && "Multigrid only applicable on HHO discretization with static condensation.");
 		}
-		else if (solverCode.compare("lu") == 0)
+		else if (args.Solver.SolverCode.compare("lu") == 0)
 			solver = new EigenSparseLU();
-		else if (solverCode.compare("cg") == 0)
+		else if (args.Solver.SolverCode.compare("cg") == 0)
 			solver = new ConjugateGradient();
-		else if (solverCode.compare("eigencg") == 0)
+		else if (args.Solver.SolverCode.compare("eigencg") == 0)
 			solver = new EigenCG();
-		else if (solverCode.compare("bgs") == 0)
+		else if (args.Solver.SolverCode.compare("bgs") == 0)
 			solver = new BlockGaussSeidel(blockSize);
-		else if (solverCode.compare("bj") == 0)
+		else if (args.Solver.SolverCode.compare("bj") == 0)
 			solver = new BlockJacobi(blockSize);
 #ifdef AGMG_ENABLED
-		else if (solverCode.compare("agmg") == 0)
+		else if (args.Solver.solverCode.compare("agmg") == 0)
 			solver = new AGMG(tolerance);
 #endif // AGMG_ENABLED
 		else
@@ -465,8 +457,8 @@ private:
 		IterativeSolver* iterativeSolver = dynamic_cast<IterativeSolver*>(solver);
 		if (iterativeSolver != nullptr)
 		{
-			iterativeSolver->Tolerance = tolerance;
-			iterativeSolver->MaxIterations = maxIterations;
+			iterativeSolver->Tolerance = args.Solver.Tolerance;
+			iterativeSolver->MaxIterations = args.Solver.MaxIterations;
 		}
 
 		return solver;

@@ -171,6 +171,7 @@
     <ClInclude Include="src/Problem/SourceFunction.h" />
     <ClInclude Include="src\Mesh\Vertex.h" />
     <ClInclude Include="src\Program.h" />
+    <ClInclude Include="src\ProgramArguments.h" />
     <ClInclude Include="src\Solver\AGMG.h" />
     <ClInclude Include="src\Solver\BlockJacobi.h" />
     <ClInclude Include="src\Solver\BlockSOR.h" />

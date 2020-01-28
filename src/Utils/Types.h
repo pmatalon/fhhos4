@@ -15,3 +15,11 @@ using DimVector = Eigen::Matrix<double, Dim, 1>;
 
 template<int Dim>
 using DimMatrix = Eigen::Matrix<double, Dim, Dim>;
+
+enum class CoarseningStrategy : unsigned
+{
+	None,
+	Standard,
+	Agglomeration,
+	StructuredRefinement
+};

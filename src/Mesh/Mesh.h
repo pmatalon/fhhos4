@@ -5,14 +5,6 @@
 #include "../Utils/ParallelLoop.h"
 using namespace std;
 
-enum class CoarseningStrategy : unsigned
-{
-	None,
-	Standard,
-	Agglomeration,
-	StructuredRefinement
-};
-
 struct CoarseningStrategyDetails
 {
 	CoarseningStrategy CS;
