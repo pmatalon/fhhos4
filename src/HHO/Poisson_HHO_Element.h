@@ -83,6 +83,7 @@ public:
 	
 	DenseMatrix ComputeCanonicalInjectionMatrixCoarseToFine(FunctionalBasis<Dim>* cellBasis)
 	{
+		assert(this->FinerElements.size() > 0);
 		DenseMatrix J(cellBasis->Size() * this->FinerElements.size(), cellBasis->Size());
 
 		for (auto e : this->FinerElements)

@@ -47,7 +47,6 @@ public:
 
 	DimVector<3> OuterNormalVector(Face<3>* f) const
 	{
-		DimVector<3> n;
 		TriangularFace* face = dynamic_cast<TriangularFace*>(f);
 		Vertex* A = face->Vertex1();
 		Vertex* B = face->Vertex2();
@@ -57,7 +56,7 @@ public:
 		DimVector<3> AC = Vect<3>(A, C);
 
 		// Condition 1: n.AB = 0 and n.AC = 0
-		n = AB.cross(AC);
+		DimVector<3> n = AB.cross(AC);
 
 		for (Vertex* D : this->Shape()->Vertices())
 		{

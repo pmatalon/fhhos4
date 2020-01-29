@@ -97,6 +97,6 @@ public:
 			assert(abs(integral - measure) < 1e-14);
 		}
 		double integral = Integral(domOne);
-		assert(abs(integral - measure) < 1e-14);
+		assert(abs(integral - measure) < 1e-13);
 	}
 };

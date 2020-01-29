@@ -124,16 +124,7 @@ public:
 	// Inverse mapping
 	RefPoint ConvertToReference(DomPoint domainPoint) const
 	{
-		/*double x = domainPoint.X;
-		double y = domainPoint.Y;
-		double z = domainPoint.Z;*/
-
 		DimVector<3> tuv = _inverseMapping * Vect<3>(*V1, domainPoint);
-
-		/*double t = tuv(0);
-		double u = tuv(1);
-		double v = tuv(2);*/
-
 		RefPoint p(tuv(0), tuv(1), tuv(2));
 		return p;
 	}
@@ -181,13 +172,25 @@ public:
 
 		t.UnitTests();
 
-		RefPoint llRef = t.ConvertToReference(A);
-		assert(llRef == RefPoint(0, 0, 0));
-		DomPoint llDom = t.ConvertToDomain(RefPoint(0, 0, 0));
-		assert(A == llDom);
+		RefPoint ARef = t.ConvertToReference(A);
+		assert(ARef == RefPoint(0, 0, 0));
+		DomPoint ADom = t.ConvertToDomain(RefPoint(0, 0, 0));
+		assert(A == ADom);
 
-		RefPoint ulRef = t.ConvertToReference(B);
-		assert(ulRef == RefPoint(1, 0, 0));
+		RefPoint BRef = t.ConvertToReference(B);
+		assert(BRef == RefPoint(1, 0, 0));
+		DomPoint BDom = t.ConvertToDomain(RefPoint(1, 0, 0));
+		assert(B == BDom);
+
+		RefPoint CRef = t.ConvertToReference(C);
+		assert(CRef == RefPoint(0, 1, 0));
+		DomPoint CDom = t.ConvertToDomain(RefPoint(0, 1, 0));
+		assert(C == CDom);
+
+		RefPoint DRef = t.ConvertToReference(D);
+		assert(DRef == RefPoint(0, 0, 1));
+		DomPoint DDom = t.ConvertToDomain(RefPoint(0, 0, 1));
+		assert(D == DDom);
 
 		assert(abs(t.Measure() - pow(3, 3)/6.0) < 1e-14); // Tetra's volume is 1/6 of the cube's
 	}

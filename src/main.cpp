@@ -447,7 +447,7 @@ int main(int argc, char* argv[])
 			case OPT_CellInterpCode:
 			{
 				int cellInterp = atoi(optarg);
-				if (cellInterp != 0 && cellInterp != 1)
+				if (cellInterp != 1 && cellInterp != 2)
 					argument_error("check -cell-interp argument. Expecting 1 or 2.");
 				args.Solver.MG.CellInterpolationCode = cellInterp;
 				break;

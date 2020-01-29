@@ -27,6 +27,11 @@ public:
 			_weights.push_back(1);
 			return;
 		}
+		else if (degree > 8)
+		{
+			cout << "Warning: the Keast quadradure rules only compute exact integrals of polynomials up to degree 8." << endl;
+			degree = 8;
+		}
 
 		int maxRule = keast_rule_num();
 		int rule, degreeRule;

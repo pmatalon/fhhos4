@@ -552,18 +552,33 @@ template <>
 Mesh<3>* ProgramDim<3>::BuildMesh(int n, string meshCode, string meshFilePath)
 {
 	if (meshCode.compare("cart") == 0)
-		return new CartesianGrid3D(n, n, n);
+	{
+		CartesianGrid3D* fineMesh = new CartesianGrid3D(n, n, n);
+
+		assert(fineMesh->Elements.size() == n*n*n);
+		assert(fineMesh->Faces.size() == 3*n*n*(n+1));
+
+		return fineMesh;
+	}
 #ifdef GMSH_ENABLED
 	else if (meshCode.compare("gmsh-cart") == 0)
 	{
 		GMSHMesh<3>* coarseMesh = new GMSHCartesianMesh3D();
 		GMSHMesh<3>* fineMesh = coarseMesh->RefineUntilNElements(n*n*n);
+
+		assert(fineMesh->Elements.size() == n*n*n);
+		assert(fineMesh->Faces.size() == 3*n*n*(n+1));
+
 		return fineMesh;
 	}
 	else if (meshCode.compare("gmsh-tetra") == 0)
 	{
 		GMSHMesh<3>* coarseMesh = new GMSHTetrahedralMesh();
 		GMSHMesh<3>* fineMesh = coarseMesh->RefineUntilNElements(6*n*n*n);
+
+		assert(fineMesh->Elements.size() == 6*n*n*n);
+		assert(fineMesh->Faces.size() == 12*n*n*n + 6*n*n);
+
 		return fineMesh;
 	}
 	else if (meshCode.compare("gmsh") == 0)

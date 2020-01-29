@@ -148,6 +148,27 @@ public:
 
 	static void Test()
 	{
+		int number = 0;
+		Vertex lowerLeft(number, -1, -1, 0);
+		Vertex lowerRight(number, 1, -1, 1);
+		Vertex upperLeft(number, -1, 1, 5);
 
+		TriangleIn3DShape t(&lowerLeft, &lowerRight, &upperLeft);
+
+		t.UnitTests();
+
+		//RefPoint llRef = t.ConvertToReference(lowerLeft);
+		//assert(llRef == RefPoint(0, 0));
+		DomPoint llDom = t.ConvertToDomain(RefPoint(0, 0, 0));
+		assert(lowerLeft == llDom);
+
+		DomPoint lrDom = t.ConvertToDomain(RefPoint(1, 0, 0));
+		assert(lowerRight == lrDom);
+
+		DomPoint ulDom = t.ConvertToDomain(RefPoint(0, 1, 0));
+		assert(upperLeft == ulDom);
+
+		//RefPoint ulRef = t.ConvertToReference(upperLeft);
+		//assert(ulRef == RefPoint(0, 1));
 	}
 };
