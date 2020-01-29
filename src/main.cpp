@@ -150,6 +150,7 @@ void print_usage() {
 	cout << "              gs   - Gauss-Seidel" << endl;
 	cout << "              rgs  - Reverse Gauss-Seidel" << endl;
 	cout << "              bj   - Block Jacobi: the block size is set to the number of DOFs per face" << endl;
+	cout << "              bj23 - Block Jacobi with a damping factor of 2/3" << endl;
 	cout << "              bgs  - Block Gauss-Seidel: the block size is set to the number of DOFs per face" << endl;
 	cout << "              rbgs - Reverse Block Gauss-Seidel" << endl;
 	cout << endl;

@@ -44,6 +44,13 @@ public:
 	static string BeginYellow;
 	static string EndColor;
 
+	static void FatalError(string msg)
+	{
+		cout << Utils::BeginRed << "Error: " << msg << Utils::EndColor << endl;
+		cout << "------------------------- FAILURE -------------------------" << endl;
+		exit(EXIT_FAILURE);
+	}
+
 };
 string Utils::BeginRed    = "\033[1;31m";
 string Utils::BeginGreen  = "\033[1;32m";

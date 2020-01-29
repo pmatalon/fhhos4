@@ -107,6 +107,14 @@ public:
 	}
 };
 
+class BlockDampedJacobi23 : public BlockDampedJacobi
+{
+public:
+	BlockDampedJacobi23(int blockSize) : BlockDampedJacobi(blockSize, 2.0/3.0) {}
+
+	static string Code() { return "bj23"; };
+};
+
 class BlockJacobi : public BlockDampedJacobi
 {
 public:

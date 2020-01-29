@@ -20,8 +20,9 @@ public:
 			return new JacobiSmoother(nSmootherIterations);
 		if (smootherCode.compare(BlockJacobi::Code()) == 0)
 			return new BlockJacobiSmoother(blockSize, nSmootherIterations);
+		if (smootherCode.compare(BlockDampedJacobi23::Code()) == 0)
+			return new BlockDampedJacobi23Smoother(blockSize, nSmootherIterations);
 
-		cout << "Error: Unmanaged smoother code: '" + smootherCode + "'";
-		assert(false);
+		Utils::FatalError("Unmanaged smoother code: '" + smootherCode + "'");
 	}
 };

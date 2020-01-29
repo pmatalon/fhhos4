@@ -60,6 +60,12 @@ public:
 	BlockJacobiSmoother(int blockSize, int nSmoothingIterations) : Smoother(new BlockJacobi(blockSize), nSmoothingIterations) {}
 };
 
+class BlockDampedJacobi23Smoother : public Smoother
+{
+public:
+	BlockDampedJacobi23Smoother(int blockSize, int nSmoothingIterations) : Smoother(new BlockDampedJacobi23(blockSize), nSmoothingIterations) {}
+};
+
 class GaussSeidelSmoother : public Smoother
 {
 public:
