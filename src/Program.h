@@ -146,6 +146,8 @@ public:
 				};
 				sourceFunction = new SourceFunction1D([&diffusionPartition](double x) { return 4; });
 			}
+			else
+				Utils::FatalError("'" + args.Problem.RHSCode + "' is unknown or not implemented in 1D. Check -rhs argument.");
 		}
 		else if (Dim == 2)
 		{
@@ -176,6 +178,19 @@ public:
 					};
 				}
 				sourceFunction = new SourceFunction2D([](double x, double y) { return 2 * (y*(1 - y) + x * (1 - x)); });
+			}
+			else if (args.Problem.RHSCode.compare("exp") == 0)
+			{
+				if (diffusionPartition.IsHomogeneous && diffusionPartition.IsIsotropic)
+				{
+					exactSolution = [](DomPoint p)
+					{
+						double x = p.X;
+						double y = p.Y;
+						return exp(x*y*y);
+					};
+				}
+				sourceFunction = new SourceFunction2D([](double x, double y) { return (-pow(y,4) - 2*x*(1+2*x*y*y))*exp(x*y*y); });
 			}
 			else if (args.Problem.RHSCode.compare("one") == 0)
 			{
@@ -238,6 +253,8 @@ public:
 				}
 				sourceFunction = new SourceFunction2D([](double x, double y) { return 0; });
 			}
+			else
+				Utils::FatalError("'" + args.Problem.RHSCode + "' is unknown or not implemented in 2D. Check -rhs argument.");
 		}
 		else if (Dim == 3)
 		{
@@ -269,6 +286,22 @@ public:
 				}
 				sourceFunction = new SourceFunction3D([](double x, double y, double z) { return 2 * ((y*(1 - y)*z*(1 - z) + x * (1 - x)*z*(1 - z) + x * (1 - x)*y*(1 - y))); });
 			}
+			else if (args.Problem.RHSCode.compare("exp") == 0)
+			{
+				if (diffusionPartition.IsHomogeneous && diffusionPartition.IsIsotropic)
+				{
+					exactSolution = [](DomPoint p)
+					{
+						double x = p.X;
+						double y = p.Y;
+						double z = p.Z;
+						return exp(x*y*y*z*z*z);
+					};
+				}
+				sourceFunction = new SourceFunction3D([](double x, double y, double z) { return -(pow(y, 4)*pow(z, 6) + 2 * x*pow(z, 3) + 4 * x*x*y*y*pow(z, 6) + 6 * x*y*y*z + 9 * x*x*pow(y, 4)*pow(z, 4))*exp(x*y*y*z*z*z); });
+			}
+			else
+				Utils::FatalError("'" + args.Problem.RHSCode + "' is unknown or not implemented in 3D. Check -rhs argument.");
 		}
 
 		//-------------------------//

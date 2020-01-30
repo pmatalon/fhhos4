@@ -299,18 +299,8 @@ int main(int argc, char* argv[])
 				break;
 			}
 			case OPT_RightHandSide:
-			{
-				string rhsCode = optarg;
-				if (   rhsCode.compare("sine") != 0
-					&& rhsCode.compare("poly") != 0
-					&& rhsCode.compare("one") != 0
-					&& rhsCode.compare("x") != 0
-					&& rhsCode.compare("heterog") != 0
-					&& rhsCode.compare("kellogg") != 0)
-					argument_error("unknown right-hand side code '" + rhsCode + "'. Check -rhs argument.");
-				args.Problem.RHSCode = rhsCode;
+				args.Problem.RHSCode = optarg;
 				break;
-			}
 			case OPT_Heterogeneity: 
 				args.Problem.Kappa1 = atof(optarg);
 				break;
