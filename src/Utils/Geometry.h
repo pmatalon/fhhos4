@@ -80,7 +80,7 @@ public:
 		return AB.dot(AP) > 0 && AB.dot(AP) < AB.dot(AB);
 	}
 
-	static bool IsInTriangle(DomPoint A, DomPoint B, DomPoint C, DomPoint P, double triangleArea)
+	static bool IsInTriangle(DomPoint A, DomPoint B, DomPoint C, DomPoint P, double triangleArea, double triangleDiameter)
 	{
 		// From https://math.stackexchange.com/questions/4322/check-whether-a-point-is-within-a-3d-triangle
 
@@ -91,7 +91,7 @@ public:
 		double alpha = PB.cross(PC).norm() / (2 * triangleArea);
 		double beta = PC.cross(PA).norm() / (2 * triangleArea);
 		double gamma = PA.cross(PB).norm() / (2 * triangleArea);
-		return (alpha >= 0 && alpha <= 1) && (beta >= 0 && beta <= 1) && (gamma >= 0 && gamma <= 1) && (abs(alpha + beta + gamma -1) < 1e-14);
+		return (alpha >= 0 && alpha <= 1) && (beta >= 0 && beta <= 1) && (gamma >= 0 && gamma <= 1) && (abs(alpha + beta + gamma -1) < 1e-3 * triangleDiameter);
 	}
 
 };

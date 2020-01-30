@@ -256,6 +256,7 @@ public:
 		// Continue linking
 		for (Face<Dim>* fineFace : fineMesh->Faces)
 		{
+			// Boundary face
 			if (fineFace->IsDomainBoundary)
 			{
 				fineFace->IsRemovedOnCoarserGrid = false;
@@ -268,9 +269,34 @@ public:
 						break;
 					}
 				}
+				// If no coarse face has been found, it may be because the geometry is curved and the refinement yields a non-nested mesh.
+				// In that case, we take the closest one w.r.t. the centers
 				if (!fineFace->CoarseFace)
-					assert(false && "A coarse face should have been found.");
+				{
+					double smallestDistance = -1;
+					Face<Dim>* closestCoarseFace = nullptr;
+					for (Face<Dim>* coarseFace : fineFace->Element1->CoarserElement->Faces)
+					{
+						if (coarseFace->IsDomainBoundary)
+						{
+							double distance = Vect<3>(fineFace->Center(), coarseFace->Center()).norm();
+							if (!closestCoarseFace || distance < smallestDistance)
+							{
+								smallestDistance = distance;
+								closestCoarseFace = coarseFace;
+							}
+						}
+					}
+					if (closestCoarseFace)
+					{
+						fineFace->CoarseFace = closestCoarseFace;
+						closestCoarseFace->FinerFaces.push_back(fineFace);
+					}
+					else
+						assert(false && "A coarse face should have been found.");
+				}
 			}
+			// Interior face
 			else
 			{
 				Element<Dim>* coarseElement1 = fineFace->Element1->CoarserElement;
