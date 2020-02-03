@@ -403,6 +403,51 @@ private:
 		else
 			assert(false);
 	}
+
+	//-------------------------------------------------------------------------//
+	//  Find polynomial faces which reconstruct the k+1 polynomial on the cell //
+	//  and minimize the L2-norm                                               //
+	//-------------------------------------------------------------------------//
+
+public:
+	DenseMatrix FindFacesPolyWhichReconstructOnTheCell()
+	{
+		// Assembly of the Lagrangian matrix
+		int nBoundaryUnknowns = this->Faces.size() * HHO->nFaceUnknowns;
+		DenseMatrix boundaryMassMatrix = DenseMatrix::Zero(nBoundaryUnknowns, nBoundaryUnknowns);
+		for (Face<Dim>* face : this->Faces)
+		{
+			Poisson_HHO_Face<Dim>* f = dynamic_cast<Poisson_HHO_Face<Dim>*>(face);
+			int localNumber = this->LocalNumberOf(f);
+			boundaryMassMatrix.block(localNumber, localNumber, HHO->nFaceUnknowns, HHO->nFaceUnknowns) = f->FaceMassMatrix();
+		}
+
+		DenseMatrix C = ReconstructionFromFacesMatrix();
+
+		DenseMatrix lagrangianMatrix(nBoundaryUnknowns + C.rows(), nBoundaryUnknowns + C.rows());
+		lagrangianMatrix.topLeftCorner(nBoundaryUnknowns, nBoundaryUnknowns) = boundaryMassMatrix;
+		lagrangianMatrix.topRightCorner(C.cols(), C.rows()) = C.transpose();
+		lagrangianMatrix.bottomLeftCorner(C.rows(), C.cols()) = C;
+		lagrangianMatrix.bottomRightCorner(C.rows(), C.rows()) = DenseMatrix::Zero(C.rows(), C.rows());
+
+		// Assembly of the right-hand side
+		DenseMatrix rhs(HHO->nReconstructUnknowns + C.cols(), HHO->nReconstructUnknowns);
+		rhs.topRows(C.cols()) = DenseMatrix::Zero(C.cols(), HHO->nReconstructUnknowns);
+		rhs.bottomRows(HHO->nReconstructUnknowns) = DenseMatrix::Identity(HHO->nReconstructUnknowns, HHO->nReconstructUnknowns);
+
+		// Solving
+		Eigen::ColPivHouseholderQR<DenseMatrix> solver = lagrangianMatrix.colPivHouseholderQr();
+		DenseMatrix solutionWithLagrangeCoeffs = solver.solve(rhs);
+		DenseMatrix solution = solutionWithLagrangeCoeffs.topRows(nBoundaryUnknowns);
+
+		return solution;
+	}
+
+	//-----------------------------------------//
+	//                DOFNumber                //
+	//-----------------------------------------//
+
+private:
 	int DOFNumber(BasisFunction<Dim> * cellPhi)
 	{
 		return cellPhi->LocalNumber;
