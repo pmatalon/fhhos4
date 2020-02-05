@@ -56,34 +56,44 @@ private:
 		Poisson_HHO<Dim>* finePb = this->_problem;
 		Poisson_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
 
-		SparseMatrix I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
-		SparseMatrix J_f_c = GetGlobalCanonicalInjectionMatrixCoarseToFineElements();
-		SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
-
-		SparseMatrix Pi_c = GetGlobalProjectorMatrixFromCellsToFaces(coarsePb);
-
-		if (ExportMatrices)
-		{
-			SparseMatrix SolveCellUnknowns = GetSolveCellUnknownsMatrix(coarsePb);
-			finePb->ExportMatrix(I_c, "I_c");
-			finePb->ExportMatrix(J_f_c, "J_f_c");
-			finePb->ExportMatrix(Pi_f, "Pi_f");
-			finePb->ExportMatrix(SolveCellUnknowns, "SolveCellUnknowns");
-
-			finePb->ExportMatrix(Pi_c, "Pi_c");
-		}
-
-		SparseMatrix P_algo1 = Pi_f * J_f_c * I_c;
-
 		if (_prolongationCode == 1)
-			P = P_algo1;
+		{
+			SparseMatrix I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
+			SparseMatrix J_f_c = GetGlobalCanonicalInjectionMatrixCoarseToFineElements();
+			SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
+
+			if (ExportMatrices)
+			{
+				finePb->ExportMatrix(I_c, "I_c");
+				finePb->ExportMatrix(J_f_c, "J_f_c");
+				finePb->ExportMatrix(Pi_f, "Pi_f");
+
+				SparseMatrix SolveCellUnknowns = GetSolveCellUnknownsMatrix(coarsePb);
+				finePb->ExportMatrix(SolveCellUnknowns, "SolveCellUnknowns");
+			}
+
+			P = Pi_f * J_f_c * I_c;
+		}
 		else if (_prolongationCode == 2)
 		{
-			int nFaceUnknowns = finePb->HHO->nFaceUnknowns;
+			SparseMatrix I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
+			SparseMatrix J_f_c = GetGlobalCanonicalInjectionMatrixCoarseToFineElements();
+			SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
+
 			SparseMatrix J_faces = GetGlobalCanonicalInjectionMatrixCoarseToFineFaces();
 
 			if (ExportMatrices)
+			{
+				finePb->ExportMatrix(I_c, "I_c");
+				finePb->ExportMatrix(J_f_c, "J_f_c");
+				finePb->ExportMatrix(Pi_f, "Pi_f");
+
 				finePb->ExportMatrix(J_faces, "J_faces");
+			}
+
+			SparseMatrix P_algo1 = Pi_f * J_f_c * I_c;
+			
+			int nFaceUnknowns = finePb->HHO->nFaceUnknowns;
 
 			FaceParallelLoop<Dim> parallelLoop(finePb->_mesh->InteriorFaces);
 			parallelLoop.ReserveChunkCoeffsSize(nFaceUnknowns * 2 * nFaceUnknowns);
@@ -102,14 +112,63 @@ private:
 		}
 		else if (_prolongationCode == 3)
 		{
+			SparseMatrix I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
+			SparseMatrix J_f_c = GetGlobalCanonicalInjectionMatrixCoarseToFineElements();
 			SparseMatrix K_f = GetGlobalMatrixFindFacesWhichReconstructCells(finePb);
+
 			if (ExportMatrices)
+			{
+				finePb->ExportMatrix(I_c, "I_c");
+				finePb->ExportMatrix(J_f_c, "J_f_c");
 				finePb->ExportMatrix(K_f, "K_f");
+			}
 
 			P = K_f * J_f_c * I_c;
 		}
+		else if (_prolongationCode == 4)
+		{
+			int nFaceUnknowns = finePb->HHO->nFaceUnknowns;
+
+			ElementParallelLoop<Dim> parallelLoop(coarsePb->_mesh->Elements);
+
+			parallelLoop.Execute([this, finePb, nFaceUnknowns](Element<Dim>* ce, ParallelChunk<CoeffsChunk>* chunk)
+				{
+					Poisson_HHO_Element<Dim>* coarseElem = dynamic_cast<Poisson_HHO_Element<Dim>*>(ce);
+					DenseMatrix resolveCondensedFinerFacesFromCoarseBoundary = coarseElem->StaticallyCondenseInteriorFinerFaces(this->OperatorMatrix);
+
+					for (int i = 0; i < coarseElem->FinerFacesRemoved.size(); i++)
+					{
+						Face<Dim>* condensedFineFace = coarseElem->FinerFacesRemoved[i];
+						for (Face<Dim>* coarseFace : coarseElem->Faces)
+						{
+							if (coarseFace->IsDomainBoundary)
+								continue;
+
+							BigNumber coarseFaceLocalNumberInCoarseElem = coarseElem->LocalNumberOf(coarseFace);
+							chunk->Results.Coeffs.Add(condensedFineFace->Number*nFaceUnknowns, coarseFace->Number*nFaceUnknowns, resolveCondensedFinerFacesFromCoarseBoundary.block(i*nFaceUnknowns, coarseFaceLocalNumberInCoarseElem*nFaceUnknowns, nFaceUnknowns, nFaceUnknowns));
+						}
+					}
+
+					for (Face<Dim>* cf : coarseElem->Faces)
+					{
+						if (cf->IsDomainBoundary)
+							continue;
+
+						Poisson_HHO_Face<Dim>* coarseFace = dynamic_cast<Poisson_HHO_Face<Dim>*>(cf);
+						DenseMatrix local_J_f_c = coarseFace->ComputeCanonicalInjectionMatrixCoarseToFine(finePb->HHO->FaceBasis);
+						for (auto fineFace : coarseFace->FinerFaces)
+						{
+							BigNumber fineFaceLocalNumberInCoarseFace = coarseFace->LocalNumberOf(fineFace);
+							chunk->Results.Coeffs.Add(fineFace->Number*nFaceUnknowns, coarseFace->Number*nFaceUnknowns, local_J_f_c.block(fineFaceLocalNumberInCoarseFace*nFaceUnknowns, 0, nFaceUnknowns, nFaceUnknowns));
+						}
+					}
+				});
+
+			P = SparseMatrix(finePb->HHO->nInteriorFaces * nFaceUnknowns, coarsePb->HHO->nInteriorFaces * nFaceUnknowns);
+			parallelLoop.Fill(P);
+		}
 		else
-			assert(false);
+			Utils::FatalError("Unknown prolongationCode.");
 
 		if (ExportMatrices)
 			finePb->ExportMatrix(P, "P");

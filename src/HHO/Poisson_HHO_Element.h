@@ -443,6 +443,79 @@ public:
 		return solution;
 	}
 
+	//-------------------------------------------//
+	//  Used by the algorithm from Wildey et al. //
+	//-------------------------------------------//
+
+public:
+	DenseMatrix StaticallyCondenseInteriorFinerFaces(const SparseMatrix& fineA)
+	{
+		int nFaceUnknowns = HHO->nFaceUnknowns;
+
+		int nFineInteriorFaces = this->FinerFacesRemoved.size();
+		int nFineBoundaryFaces = 0;
+		for (Face<Dim>* cf : this->Faces)
+			nFineBoundaryFaces += cf->FinerFaces.size();
+
+		DenseMatrix Aii = DenseMatrix::Zero(nFineInteriorFaces*nFaceUnknowns, nFineInteriorFaces*nFaceUnknowns);
+		DenseMatrix Aib = DenseMatrix::Zero(nFineInteriorFaces*nFaceUnknowns, nFineBoundaryFaces*nFaceUnknowns);
+
+		for (int i = 0; i < this->FinerFacesRemoved.size(); i++)
+		{
+			// Aii
+			Poisson_HHO_Face<Dim>* fi = dynamic_cast<Poisson_HHO_Face<Dim>*>(this->FinerFacesRemoved[i]);
+			for (int j = 0; j < this->FinerFacesRemoved.size(); j++)
+			{
+				Poisson_HHO_Face<Dim>* fj = dynamic_cast<Poisson_HHO_Face<Dim>*>(this->FinerFacesRemoved[j]);
+				Aii.block(i*nFaceUnknowns, j*nFaceUnknowns, nFaceUnknowns, nFaceUnknowns) = fineA.block(fi->Number*nFaceUnknowns, fj->Number*nFaceUnknowns, nFaceUnknowns, nFaceUnknowns);
+			}
+			// Aib
+			BigNumber fineFaceLocalNumberInCoarseElem = 0;
+			for (Face<Dim>* cf : this->Faces)
+			{
+				if (cf->IsDomainBoundary)
+					continue;
+
+				for (int j = 0; j < cf->FinerFaces.size(); j++)
+				{
+					Poisson_HHO_Face<Dim>* fj = dynamic_cast<Poisson_HHO_Face<Dim>*>(cf->FinerFaces[j]);
+					Aib.block(i*nFaceUnknowns, fineFaceLocalNumberInCoarseElem*nFaceUnknowns, nFaceUnknowns, nFaceUnknowns) = fineA.block(fi->Number*nFaceUnknowns, fj->Number*nFaceUnknowns, nFaceUnknowns, nFaceUnknowns);
+					fineFaceLocalNumberInCoarseElem++;
+				}
+			}
+		}
+
+
+		int nCoarseFaces = 0;
+		for (Face<Dim>* cf : this->Faces)
+			nCoarseFaces++;
+
+		DenseMatrix J = DenseMatrix::Zero(nFineBoundaryFaces*nFaceUnknowns, nCoarseFaces*nFaceUnknowns);
+		BigNumber fineFaceLocalNumberInCoarseElem = 0;
+		for (auto cf : this->Faces)
+		{
+			if (cf->IsDomainBoundary)
+				continue;
+
+			Poisson_HHO_Face<Dim>* coarseFace = dynamic_cast<Poisson_HHO_Face<Dim>*>(cf);
+
+			DenseMatrix local_J_f_c = coarseFace->ComputeCanonicalInjectionMatrixCoarseToFine(HHO->FaceBasis);
+			for (auto fineFace : coarseFace->FinerFaces)
+			{
+				BigNumber fineFaceLocalNumberInCoarseFace = coarseFace->LocalNumberOf(fineFace);
+				BigNumber coarseFaceLocalNumberInCoarseElem = this->LocalNumberOf(coarseFace);
+
+				J.block(fineFaceLocalNumberInCoarseElem*nFaceUnknowns, coarseFaceLocalNumberInCoarseElem*nFaceUnknowns, nFaceUnknowns, nFaceUnknowns) = local_J_f_c.block(fineFaceLocalNumberInCoarseFace*nFaceUnknowns, 0, nFaceUnknowns, nFaceUnknowns);
+				fineFaceLocalNumberInCoarseElem++;
+			}
+		}
+
+		DenseMatrix resolveCondensedFinerFacesFromFineBoundary = -Aii.inverse()*Aib;
+		DenseMatrix resolveCondensedFinerFacesFromCoarseBoundary = resolveCondensedFinerFacesFromFineBoundary * J;
+
+		return resolveCondensedFinerFacesFromCoarseBoundary;
+	}
+
 	//-----------------------------------------//
 	//                DOFNumber                //
 	//-----------------------------------------//

@@ -46,19 +46,21 @@ void print_usage() {
 	cout << endl;
 	cout << "-mesh CODE" << endl;
 	cout << "      Type of mesh. (Default: cart)" << endl;
-	cout << "               cart          - Unit square/cube discretized by an in-house uniform Cartesian mesh (default)" << endl;
-	cout << "               tri           - (2D only) Unit square/cube discretized by an in-house uniform trianglular mesh" << endl;
-	cout << "               quad          - (2D only) Unit square/cube discretized by an in-house uniform quadrilateral mesh" << endl;
+	cout << "               cart          - Unit square/cube discretized by an in-house uniform Cartesian mesh" << endl;
+	cout << "               tri           - Unit square/cube discretized by an in-house uniform trianglular mesh (2D only)" << endl;
+	cout << "               quad          - Unit square/cube discretized by an in-house uniform quadrilateral mesh (2D only)" << endl;
 	cout << "               gmsh-cart     - Unit square discretized by a uniform Cartesian mesh built by GMSH" << endl;
-	cout << "               gmsh-tri      - (2D only) Unit square discretized by a uniform triangular mesh built by GMSH" << endl;
-	cout << "               gmsh-uns-tri  - (2D only) Unit square discretized by an unstructured triangular mesh built by GMSH" << endl;
-	cout << "               gmsh          - (2D only) .msh or .geo GMSH file given in the argument -file" << endl;
+	cout << "               gmsh-tri      - Unit square discretized by a uniform triangular mesh built by GMSH (2D only)" << endl;
+	cout << "               gmsh-uns-tri  - Unit square discretized by an unstructured triangular mesh built by GMSH (2D only)" << endl;
+	cout << "               gmsh-tetra    - Unit cube discretized by a uniform tetrahedral mesh built by GMSH (3D only)" << endl;
+	cout << "               gmsh          - .msh or .geo GMSH file given in the argument -file" << endl;
 	cout << endl;
 	cout << "-n NUM" << endl;
 	cout << "      Number of subdivisions in each cartesian dimension of the unit square/cube (default: 16)." << endl;
 	cout << endl;
 	cout << "-file PATH" << endl;
-	cout << "      GMSH file (.msh or .geo)." << endl;
+	cout << "      GMSH file (.geo or .msh) containing the geometry or the mesh. Requires option -mesh gmsh." << endl;
+	cout << "      To be used with the multigrid (whose levels will be built by successive refinements), the file must contain the COARSE mesh." << endl;
 	cout << endl;
 	cout << "-discr CODE" << endl;
 	cout << "      Discretization method (default: hho)." << endl;
@@ -162,12 +164,15 @@ void print_usage() {
 	cout << endl;
 	cout << "-prolong NUM" << endl;
 	cout << "      How the prolongation operator is built." << endl;
-	cout << "              1        - Interpolation from coarse faces to coarse cells" << endl;
-	cout << "                         L2-projection on the fine faces" << endl;
-	cout << "              2        - Interpolation from coarse faces to coarse cells" << endl;
-	cout << "                         On faces present on both fine and coarse meshes, we keep the polynomials identical. Otherwise, L2-projection from the cell polynomials" << endl;
-	cout << "              3        - Interpolation from coarse faces to coarse cells" << endl;
-	cout << "                         Adjoint of the same interpolation on the fine mesh" << endl;
+	cout << "              1        - Step 1: Interpolation from coarse faces to coarse cells (refer to -cell-interp argument)" << endl;
+	cout << "                         Step 2: L2-projection on the fine faces" << endl;
+	cout << "              2        - Step 1: Interpolation from coarse faces to coarse cells (refer to -cell-interp argument)" << endl;
+	cout << "                         Step 2: On faces present on both fine and coarse meshes, we keep the polynomials identical." << endl;
+	cout << "                                 On faces interior to coarse elements, L2-projection from the cell polynomials." << endl;
+	cout << "              3        - Step 1: Interpolation from coarse faces to coarse cells" << endl;
+	cout << "                         Step 2: Adjoint of the same interpolation on the fine mesh" << endl;
+	cout << "              4        - Algorithm from Wildey et al.: the coarse level is built by static condensation of the fine faces interior to coarse elements." << endl;
+	cout << "                         The prolongation solves those condensed unknowns." << endl;
 	cout << endl;
 	cout << "-cell-interp NUM" << endl;
 	cout << "      In the polongation, degree of the polynomial interpolated on the cells from the faces." << endl;
@@ -182,8 +187,8 @@ void print_usage() {
 	cout << "      Prints usage." << endl;
 	cout << endl;
 	cout << "-threads NUM" << endl;
-	cout << "      Max number of threads used for parallelism." << endl;
-	cout << "              0     - automatic (default)" << endl;
+	cout << "      Max number of threads used for parallelism (default: 0)." << endl;
+	cout << "              0     - automatic: usually number of cores x 2 (because of hyper-threading)" << endl;
 	cout << "              1     - sequential execution" << endl;
 	cout << "              other - requested number of threads" << endl;
 	cout << endl;
@@ -193,8 +198,8 @@ void print_usage() {
 	cout << "              c   - export all Components of the matrix in separate files" << endl;
 	cout << "              f   - export Faces for Matlab" << endl;
 	cout << "              s   - Solve system" << endl;
-	cout << "              m   - export Multigrid matrices" << endl;
 	cout << "              v   - export solution Vector (requires 's')" << endl;
+	cout << "              m   - export Multigrid matrices" << endl;
 	cout << "              r   - compute L2 eRRor against the analytical solution (if known)" << endl;
 	cout << "              t   - run unit Tests" << endl;
 	cout << endl;
@@ -446,8 +451,8 @@ int main(int argc, char* argv[])
 			case OPT_ProlongationCode:
 			{
 				int prolongationCode = atoi(optarg);
-				if (prolongationCode != 1 && prolongationCode != 2 && prolongationCode != 3)
-					argument_error("check -prolong argument. Expecting 1, 2 or 3.");
+				if (prolongationCode < 1 || prolongationCode > 4)
+					argument_error("check -prolong argument. Expecting 1, 2, 3 or 4.");
 				args.Solver.MG.ProlongationCode = prolongationCode;
 				break;
 			}
@@ -563,6 +568,9 @@ int main(int argc, char* argv[])
 
 	if (args.Solver.SolverCode.compare("mg") == 0 && args.Discretization.Method.compare("hho") == 0 && !args.Discretization.StaticCondensation)
 		argument_error("Multigrid only applicable if the static condensation is enabled.");
+
+	if (args.Solver.SolverCode.compare("mg") == 0 && args.Solver.MG.ProlongationCode == 4 && !args.Solver.MG.UseGalerkinOperator)
+		argument_error("To use the prolongationCode 4, you must also use the Galerkin operator. To do so, add option -g 1.");
 
 
 	args.Solver.MG.CoarseningStgy = CoarseningStrategy::Standard;
