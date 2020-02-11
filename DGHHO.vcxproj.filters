@@ -46,9 +46,6 @@
     <ClInclude Include="src/Utils/GaussLegendre.h">
       <Filter>Utils</Filter>
     </ClInclude>
-    <ClInclude Include="src/Utils/L2.h">
-      <Filter>Utils</Filter>
-    </ClInclude>
     <ClInclude Include="src/FunctionalBasis/Legendre1D.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>

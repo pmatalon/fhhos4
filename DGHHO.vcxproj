@@ -158,7 +158,6 @@
     <ClInclude Include="src/HHO/Poisson_HHO_Element.h" />
     <ClInclude Include="src/HHO/Poisson_HHO_Face.h" />
     <ClInclude Include="src/Utils/GaussLegendre.h" />
-    <ClInclude Include="src/Utils/L2.h" />
     <ClInclude Include="src/Utils/NonZeroCoefficients.h" />
     <ClInclude Include="src/Utils/Utils.h" />
     <ClInclude Include="src/Problem/DiffusionPartition.h" />

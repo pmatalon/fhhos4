@@ -11,18 +11,19 @@ using namespace std;
 template <int Dim>
 class Poisson_DG : public PoissonProblem<Dim>
 {
+public:
+	FunctionalBasis<Dim>* Basis;
 private:
-	FunctionalBasis<Dim>* _basis;
 	bool _autoPenalization;
 	int _penalizationCoefficient;
 public:
 	Poisson_DG(Mesh<Dim>* mesh, string rhsCode, SourceFunction* sourceFunction, DiffusionPartition<Dim>* diffusionPartition, string outputDirectory, FunctionalBasis<Dim>* basis, int penalizationCoefficient)
 		: PoissonProblem<Dim>(mesh, diffusionPartition, rhsCode, sourceFunction, nullptr, outputDirectory)
 	{ 
-		this->_basis = basis;
+		this->Basis = basis;
 		this->_autoPenalization = penalizationCoefficient == -1;
 		if (_autoPenalization)
-			this->_penalizationCoefficient = pow(Dim, 2) * pow(_basis->GetDegree() + 1, 2) / this->_mesh->H(); // Ralph-Hartmann
+			this->_penalizationCoefficient = pow(Dim, 2) * pow(Basis->GetDegree() + 1, 2) / this->_mesh->H(); // Ralph-Hartmann
 		else
 			this->_penalizationCoefficient = penalizationCoefficient;
 
@@ -33,20 +34,25 @@ public:
 	{
 		cout << "Mesh: " << this->_mesh->Description() << endl;
 		cout << "Discretization: Discontinuous Galerkin SIPG" << endl;
-		cout << "\tPolynomial space: " << (_basis->UsePolynomialSpaceQ ? "Q" : "P") << endl;
-		cout << "\tPolynomial basis: " << _basis->Name() << endl;
+		cout << "\tPolynomial space: " << (Basis->UsePolynomialSpaceQ ? "Q" : "P") << endl;
+		cout << "\tPolynomial basis: " << Basis->Name() << endl;
 		cout << "\tPenalization coefficient: " << _penalizationCoefficient << (_autoPenalization ? " (automatic)" : "") << endl;
-		cout << "Local functions: " << _basis->NumberOfLocalFunctionsInElement(NULL) << endl;
-		for (BasisFunction<Dim>* phi : _basis->LocalFunctions)
+		cout << "Local functions: " << Basis->NumberOfLocalFunctionsInElement(NULL) << endl;
+		for (BasisFunction<Dim>* phi : Basis->LocalFunctions)
 			cout << "\t " << phi->ToString() << endl;
-		BigNumber nUnknowns = static_cast<int>(this->_mesh->Elements.size()) * _basis->NumberOfLocalFunctionsInElement(NULL);
+		BigNumber nUnknowns = static_cast<int>(this->_mesh->Elements.size()) * Basis->NumberOfLocalFunctionsInElement(NULL);
 		cout << "Unknowns   : " << nUnknowns << endl;
 	}
 
-	void Assemble(Action action)
+	double L2Error(DomFunction exactSolution) override
+	{
+		return Problem<Dim>::L2Error(Basis, this->SystemSolution, exactSolution);
+	}
+
+	void Assemble(Action action) override
 	{
 		auto mesh = this->_mesh;
-		auto basis = this->_basis;
+		auto basis = this->Basis;
 		auto penalizationCoefficient = this->_penalizationCoefficient;
 
 		if ((action & Action::LogAssembly) == Action::LogAssembly)

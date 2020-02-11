@@ -44,6 +44,11 @@ public:
 		return new Poisson_HHO<Dim>(this->_mesh->CoarseMesh, this->_rhsCode, this->_sourceFunction, coarseHHO, _staticCondensation, this->_diffusionPartition, this->_boundaryConditions, this->_outputDirectory);
 	}
 
+	double L2Error(DomFunction exactSolution) override
+	{
+		return Problem<Dim>::L2Error(HHO->ReconstructionBasis, this->ReconstructedSolution, exactSolution);
+	}
+
 	void AssertSchemeConvergence(double l2Error)
 	{
 		if (Dim == 1)

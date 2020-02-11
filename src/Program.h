@@ -26,7 +26,6 @@
 #ifdef AGMG_ENABLED
 #include "Solver/AGMG.h"
 #endif
-#include "Utils/L2.h"
 using namespace std;
 
 class Program
@@ -332,95 +331,110 @@ public:
 			//cout << "Coarse mesh" << endl << *(mesh->CoarseMesh) << endl << endl;
 		}
 
-		//--------------------------------//
-		//   Discretization and solving   //
-		//--------------------------------//
+		//----------------------//
+		//       Assembly       //
+		//----------------------//
+
+		Problem<Dim>* problem = nullptr;
 		
 		if (args.Discretization.Method.compare("dg") == 0)
 		{
-			FunctionalBasis<Dim> basis(args.Discretization.BasisCode, args.Discretization.PolyDegree, args.Discretization.UsePolynomialSpaceQ);
-			Poisson_DG<Dim> problem(mesh, args.Problem.RHSCode, sourceFunction, &diffusionPartition, args.OutputDirectory, &basis, args.Discretization.PenalizationCoefficient);
-
-			cout << endl;
-			cout << "----------------------- Assembly -------------------------" << endl;
-			Timer assemblyTimer;
-			assemblyTimer.Start();
-
-			problem.Assemble(args.Actions);
-			
-			assemblyTimer.Stop();
-			cout << endl << "Assembly time: CPU = " << assemblyTimer.CPU() << ", elapsed = " << assemblyTimer.Elapsed() << endl;
-
-			if ((args.Actions & Action::SolveSystem) == Action::SolveSystem)
-			{
-				cout << endl;
-				cout << "------------------- Linear system resolution ------------------" << endl;
-
-				Solver* solver = CreateSolver(args, &problem, basis.Size());
-				problem.SystemSolution = Solve(solver, problem.A, problem.b, args.Solver.InitialGuessCode);
-
-				if ((args.Actions & Action::ExtractSolution) == Action::ExtractSolution)
-					problem.ExtractSolution();
-				if ((args.Actions & Action::ComputeL2Error) == Action::ComputeL2Error && exactSolution != NULL)
-				{
-					double error = L2::Error<Dim>(mesh, basis, problem.SystemSolution, exactSolution);
-					cout << "L2 Error = " << std::scientific << error << endl;
-				}
-			}
+			FunctionalBasis<Dim>* basis = new FunctionalBasis<Dim>(args.Discretization.BasisCode, args.Discretization.PolyDegree, args.Discretization.UsePolynomialSpaceQ);
+			problem = new Poisson_DG<Dim>(mesh, args.Problem.RHSCode, sourceFunction, &diffusionPartition, args.OutputDirectory, basis, args.Discretization.PenalizationCoefficient);
 		}
 		else if (args.Discretization.Method.compare("hho") == 0)
 		{
-			FunctionalBasis<Dim> reconstructionBasis(args.Discretization.BasisCode, args.Discretization.PolyDegree, args.Discretization.UsePolynomialSpaceQ);
-			FunctionalBasis<Dim> cellBasis(args.Discretization.BasisCode, args.Discretization.PolyDegree - 1, args.Discretization.UsePolynomialSpaceQ);
-			FunctionalBasis<Dim-1> faceBasis(args.Discretization.BasisCode, args.Discretization.PolyDegree - 1, args.Discretization.UsePolynomialSpaceQ);
+			FunctionalBasis<Dim>* reconstructionBasis = new FunctionalBasis<Dim>(args.Discretization.BasisCode, args.Discretization.PolyDegree, args.Discretization.UsePolynomialSpaceQ);
+			FunctionalBasis<Dim>* cellBasis = new FunctionalBasis<Dim>(args.Discretization.BasisCode, args.Discretization.PolyDegree - 1, args.Discretization.UsePolynomialSpaceQ);
+			FunctionalBasis<Dim - 1>* faceBasis = new FunctionalBasis<Dim - 1>(args.Discretization.BasisCode, args.Discretization.PolyDegree - 1, args.Discretization.UsePolynomialSpaceQ);
 
-			HHOParameters<Dim> hho(mesh, args.Discretization.Stabilization, &reconstructionBasis, &cellBasis, &faceBasis);
+			HHOParameters<Dim>* hho = new HHOParameters<Dim>(mesh, args.Discretization.Stabilization, reconstructionBasis, cellBasis, faceBasis);
+
+			problem = new Poisson_HHO<Dim>(mesh, args.Problem.RHSCode, sourceFunction, hho, args.Discretization.StaticCondensation, &diffusionPartition, &bc, args.OutputDirectory);
+		}
+		else
+			Utils::FatalError("Unknown discretization.");
+
+		cout << endl;
+		cout << "----------------------- Assembly -------------------------" << endl;
+		Timer assemblyTimer;
+		assemblyTimer.Start();
+
+		problem->Assemble(args.Actions);
 			
-			Poisson_HHO<Dim> problem(mesh, args.Problem.RHSCode, sourceFunction, &hho, args.Discretization.StaticCondensation, &diffusionPartition, &bc, args.OutputDirectory);
+		assemblyTimer.Stop();
+		cout << endl << "Assembly time: CPU = " << assemblyTimer.CPU() << ", elapsed = " << assemblyTimer.Elapsed() << endl;
 
+		//--------------------------------------//
+		//       Linear system resolution       //
+		//--------------------------------------//
+
+		if ((args.Actions & Action::SolveSystem) == Action::SolveSystem)
+		{
 			cout << endl;
-			cout << "----------------------- Assembly -------------------------" << endl;
-			Timer assemblyTimer;
-			assemblyTimer.Start();
+			cout << "------------------- Linear system resolution ------------------" << endl;
 
-			problem.Assemble(args.Actions);
-
-			assemblyTimer.Stop();
-			cout << endl << "Assembly time: CPU = " << assemblyTimer.CPU() << ", elapsed = " << assemblyTimer.Elapsed() << endl;
-
-			if ((args.Actions & Action::ExportFaces) == Action::ExportFaces)
-				mesh->ExportFacesToMatlab(args.OutputDirectory, true);
-
-			if ((args.Actions & Action::SolveSystem) == Action::SolveSystem)
+			int blockSizeForBlockSolver = 1;
+			if (args.Discretization.Method.compare("dg") == 0)
 			{
-				cout << endl;
-				cout << "------------------- Linear system resolution ------------------" << endl;
+				Poisson_DG<Dim>* dgPb = static_cast<Poisson_DG<Dim>*>(problem);
+				blockSizeForBlockSolver = dgPb->Basis->Size();
+			}
+			else if (args.Discretization.Method.compare("hho") == 0)
+			{
+				Poisson_HHO<Dim>* hhoPb = static_cast<Poisson_HHO<Dim>*>(problem);
+				blockSizeForBlockSolver = hhoPb->HHO->FaceBasis->Size();
+			}
 
-				Solver* solver = CreateSolver(args, &problem, faceBasis.Size());
-				problem.SystemSolution = Solve(solver, problem.A, problem.b, args.Solver.InitialGuessCode);
+			Solver* solver = CreateSolver(args, problem, blockSizeForBlockSolver);
+			problem->SystemSolution = Solve(solver, problem->A, problem->b, args.Solver.InitialGuessCode);
 
+			//-----------------------------//
+			//       Solution export       //
+			//-----------------------------//
+
+			if (args.Discretization.Method.compare("dg") == 0)
+			{
+				if ((args.Actions & Action::ExtractSolution) == Action::ExtractSolution)
+					problem->ExtractSolution();
+			}
+			else if (args.Discretization.Method.compare("hho") == 0)
+			{
+				Poisson_HHO<Dim>* hhoPb = static_cast<Poisson_HHO<Dim>*>(problem);
 				if (args.Discretization.StaticCondensation && (args.Actions & Action::ExtractSolution) == Action::ExtractSolution)
-					problem.ExtractTraceSystemSolution();
+					hhoPb->ExtractTraceSystemSolution();
 
 				if ((args.Actions & Action::ExtractSolution) == Action::ExtractSolution || ((args.Actions & Action::ComputeL2Error) == Action::ComputeL2Error && exactSolution != NULL))
 				{
-					problem.ReconstructHigherOrderApproximation();
+					hhoPb->ReconstructHigherOrderApproximation();
 					if ((args.Actions & Action::ExtractSolution) == Action::ExtractSolution)
 					{
-						problem.ExtractHybridSolution();
-						problem.ExtractSolution();
-					}
-					if ((args.Actions & Action::ComputeL2Error) == Action::ComputeL2Error && exactSolution != NULL)
-					{
-						double error = L2::Error<Dim>(mesh, reconstructionBasis, problem.ReconstructedSolution, exactSolution);
-						cout << "L2 Error = " << std::scientific << error << endl;
-						problem.AssertSchemeConvergence(error);
+						hhoPb->ExtractHybridSolution();
+						hhoPb->ExtractSolution();
 					}
 				}
 			}
+
+			//----------------------//
+			//       L2 error       //
+			//----------------------//
+
+			if ((args.Actions & Action::ComputeL2Error) == Action::ComputeL2Error && exactSolution != NULL)
+			{
+				double error = problem->L2Error(exactSolution);
+				cout << "L2 Error = " << std::scientific << error << endl;
+
+				if (args.Discretization.Method.compare("hho") == 0)
+				{
+					Poisson_HHO<Dim>* hhoPb = static_cast<Poisson_HHO<Dim>*>(problem);
+					hhoPb->AssertSchemeConvergence(error);
+				}
+			}
 		}
+		
 		delete mesh;
 		delete sourceFunction;
+		delete problem;
 		GaussLegendre::Free();
 
 		totalTimer.Stop();
