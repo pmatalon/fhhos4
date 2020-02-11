@@ -12,15 +12,17 @@ private:
 	double _measure;
 	DomPoint _center;
 
-	//DimMatrix<2> _inverseJacobianTranspose;
+	DimMatrix<2> _inverseMapping;
+	bool _doNotUseX = false;
+	bool _doNotUseY = false;
+	bool _doNotUseZ = false;
+
 	double _detJacobian;
 
 public:
 	Vertex* V1;
 	Vertex* V2;
 	Vertex* V3;
-
-	//static ReferenceTriangle RefTriangle;
 
 	TriangleIn3DShape(Vertex* v1, Vertex* v2, Vertex* v3)
 	{
@@ -42,13 +44,32 @@ public:
 		_center = DomPoint((V1->X + V2->X + V3->X) / 3, (V1->Y + V2->Y + V3->Y) / 3, (V1->Z + V2->Z + V3->Z) / 3);
 
 		_detJacobian = _measure / RefShape()->Measure();
-
-		/*DimMatrix<2> inverseJacobian;
-		inverseJacobian(0, 0) = (V3->Y - V1->Y) / ((V3->Y - V1->Y)*(V2->X - V1->X) - (V3->X - V1->X)*(V2->Y - V1->Y));
-		inverseJacobian(0, 1) = -(V3->X - V1->X) / ((V3->Y - V1->Y)*(V2->X - V1->X) - (V3->X - V1->X)*(V2->Y - V1->Y));
-		inverseJacobian(1, 0) = (V2->Y - V1->Y) / ((V2->Y - V1->Y)*(V3->X - V1->X) - (V2->X - V1->X)*(V3->Y - V1->Y));
-		inverseJacobian(1, 1) = -(V2->X - V1->X) / ((V2->Y - V1->Y)*(V3->X - V1->X) - (V2->X - V1->X)*(V3->Y - V1->Y));
-		_inverseJacobianTranspose = inverseJacobian.transpose();*/
+		
+		DimMatrix<2> mapping;
+		mapping <<
+			V2->X - V1->X, V3->X - V1->X,
+			V2->Y - V1->Y, V3->Y - V1->Y;
+		if (abs(mapping.determinant()) > 1e-12)
+			_doNotUseZ = true;
+		else
+		{
+			mapping <<
+				V2->X - V1->X, V3->X - V1->X,
+				V2->Z - V1->Z, V3->Z - V1->Z;
+			if (abs(mapping.determinant()) > 1e-12)
+				_doNotUseY = true;
+			else
+			{
+				mapping <<
+					V2->Y - V1->Y, V3->Y - V1->Y,
+					V2->Z - V1->Z, V3->Z - V1->Z;
+				if (abs(mapping.determinant()) > 1e-12)
+					_doNotUseX = true;
+				else
+					assert(false);
+			}
+		}
+		_inverseMapping = mapping.inverse();
 	}
 
 	ReferenceShape<2>* RefShape() const
@@ -89,7 +110,6 @@ public:
 	}
 	inline DimMatrix<2> InverseJacobianTranspose() const
 	{
-		//return _inverseJacobianTranspose;
 		assert(false);
 	}
 
@@ -107,14 +127,27 @@ public:
 
 	RefPoint ConvertToReference(DomPoint domainPoint) const
 	{
-		/*double x = domainPoint.X;
+		double x = domainPoint.X;
 		double y = domainPoint.Y;
+		double z = domainPoint.Z;
 
-		double t = ((V3->Y - V1->Y)*(x - V1->X) - (V3->X - V1->X)*(y - V1->Y)) / ((V3->Y - V1->Y)*(V2->X - V1->X) - (V3->X - V1->X)*(V2->Y - V1->Y));
-		double u = ((V2->Y - V1->Y)*(x - V1->X) - (V2->X - V1->X)*(y - V1->Y)) / ((V2->Y - V1->Y)*(V3->X - V1->X) - (V2->X - V1->X)*(V3->Y - V1->Y));
+		DimVector<2> v;
+		if (_doNotUseZ)
+			v << x - V1->X, y - V1->Y;
+		else if (_doNotUseY)
+			v << x - V1->X, z - V1->Z;
+		else if (_doNotUseX)
+			v << y - V1->Y, z - V1->Z;
+
+		DimVector<2> tu = _inverseMapping * v;
+		double t = tu(0);
+		double u = tu(1);
+
+		//if (abs(t) > 1.1 || abs(u) > 1.1 || t != t || u != u)
+			//assert(false);
+
 		RefPoint p(t, u);
-		return p;*/
-		assert(false);
+		return p;
 	}
 
 	void Serialize(ostream& os) const override
@@ -157,18 +190,27 @@ public:
 
 		t.UnitTests();
 
-		//RefPoint llRef = t.ConvertToReference(lowerLeft);
-		//assert(llRef == RefPoint(0, 0));
+		RefPoint llRef = t.ConvertToReference(lowerLeft);
+		assert(llRef == RefPoint(0, 0));
 		DomPoint llDom = t.ConvertToDomain(RefPoint(0, 0, 0));
 		assert(lowerLeft == llDom);
 
+		RefPoint lrRef = t.ConvertToReference(lowerRight);
+		assert(lrRef == RefPoint(1, 0));
 		DomPoint lrDom = t.ConvertToDomain(RefPoint(1, 0, 0));
 		assert(lowerRight == lrDom);
 
+		RefPoint ulRef = t.ConvertToReference(upperLeft);
+		assert(ulRef == RefPoint(0, 1));
 		DomPoint ulDom = t.ConvertToDomain(RefPoint(0, 1, 0));
 		assert(upperLeft == ulDom);
 
-		//RefPoint ulRef = t.ConvertToReference(upperLeft);
-		//assert(ulRef == RefPoint(0, 1));
+		//-----------------------------------------------------
+		Vertex v1(number, 4.5, 1.8, 0.21);
+		Vertex v2(number, 4, 1.7, 0);
+		Vertex v3(number, 4, 1.7, 1);
+		TriangleIn3DShape t2(&v1, &v2, &v3);
+		t2.ConvertToReference(DomPoint(4.2, 1.7, 0.1));
+
 	}
 };
