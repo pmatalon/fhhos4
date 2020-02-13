@@ -5,7 +5,7 @@ using namespace std;
 
 struct ProblemArguments
 {
-	int Dimension = 2;
+	int Dimension = -1;
 	string RHSCode = "sine";
 	double Kappa1 = 1;
 	double Kappa2 = 1;
@@ -17,7 +17,7 @@ struct DiscretizationArguments
 {
 	BigNumber N = 16;
 	string Method = "hho";
-	string MeshCode = "cart";
+	string MeshCode = "tri";
 	string MeshFilePath = "";
 	string Stabilization = "hho";
 	string BasisCode = "legendre";
@@ -45,7 +45,7 @@ struct MultigridArguments
 
 struct SolverArguments
 {
-	string SolverCode = "lu";
+	string SolverCode = "default";
 	string InitialGuessCode = "0";
 	double Tolerance = 1e-8;
 	int MaxIterations = 200;

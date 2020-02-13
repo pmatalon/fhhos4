@@ -12,7 +12,7 @@ void print_usage() {
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << endl;
 	cout << "-d NUM" << endl;
-	cout << "      Space dimension of the domain: 1, 2 or 3 (default: 2)." << endl;
+	cout << "      Space dimension of the domain: 1, 2 or 3 (derived from the mesh if not set)." << endl;
 	cout << endl;
 	cout << "-heterog NUM" << endl;
 	cout << "      Heterogeneity ratio. Constant diffusion coefficient in one part of the domain partition" << endl;
@@ -99,7 +99,8 @@ void print_usage() {
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << endl;
 	cout << "-s SOLVER" << endl;
-	cout << "      Linear solver (default: lu)." << endl;
+	cout << "      Linear solver." << endl;
+	cout << "              default  - 'lu' for small problems, 'eigencg' for bigger problems, 'mg' for HHO" << endl;
 	cout << "              lu       - LU factorization (Eigen library)" << endl;
 	cout << "              cg       - Conjugate Gradient, no preconditioner" << endl;
 	cout << "              eigencg  - Conjugate Gradient (Eigen library) with diagonal preconditioner" << endl;
@@ -512,6 +513,20 @@ int main(int argc, char* argv[])
 		}
 	}
 
+	if (args.Problem.Dimension == -1)
+	{
+		if (args.Discretization.MeshCode.compare("tri") == 0 || 
+			args.Discretization.MeshCode.compare("gmsh-tri") == 0 || 
+			args.Discretization.MeshCode.compare("gmsh-uns-tri") == 0 ||
+			args.Discretization.MeshCode.compare("quad") == 0 || 
+			args.Discretization.MeshCode.compare("gmsh-quad") == 0)
+			args.Problem.Dimension = 2;
+		else if (args.Discretization.MeshCode.compare("gmsh-tetra") == 0)
+			args.Problem.Dimension = 3;
+		else
+			argument_error("The dimension of the domain is missing. Please define it with option -d.");
+	}
+
 	if (args.Problem.Dimension != 1 && args.Problem.RHSCode.compare("heterog") == 0)
 		argument_error("-rhs heterog is only supported in 1D.");
 
@@ -572,6 +587,15 @@ int main(int argc, char* argv[])
 	if (args.Solver.SolverCode.compare("mg") == 0 && args.Solver.MG.ProlongationCode == 4 && !args.Solver.MG.UseGalerkinOperator)
 		argument_error("To use the prolongationCode 4, you must also use the Galerkin operator. To do so, add option -g 1.");
 
+	if (args.Solver.SolverCode.compare("default") == 0)
+	{
+		if (args.Discretization.Method.compare("hho") == 0 && args.Discretization.StaticCondensation && args.Problem.Dimension > 1)
+			args.Solver.SolverCode = "mg";
+		else if ((args.Problem.Dimension == 2 && args.Discretization.N < 64) || (args.Problem.Dimension == 3 && args.Discretization.N < 16))
+			args.Solver.SolverCode = "lu";
+		else
+			args.Solver.SolverCode = "eigencg";
+	}
 
 	args.Solver.MG.CoarseningStgy = CoarseningStrategy::Standard;
 	if (args.Solver.MG.CoarseningStgyCode.compare("default") == 0)
