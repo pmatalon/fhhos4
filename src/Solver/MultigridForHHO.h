@@ -59,39 +59,43 @@ private:
 		if (_prolongationCode == 1)
 		{
 			SparseMatrix I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
-			SparseMatrix J_f_c = GetGlobalCanonicalInjectionMatrixCoarseToFineElements();
-			SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
+			//SparseMatrix J_f_c = GetGlobalCanonicalInjectionMatrixCoarseToFineElements();
+			//SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
+			SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCoarseCellsToFineFaces();
 
 			if (ExportMatrices)
 			{
 				finePb->ExportMatrix(I_c, "I_c");
-				finePb->ExportMatrix(J_f_c, "J_f_c");
+				//finePb->ExportMatrix(J_f_c, "J_f_c");
 				finePb->ExportMatrix(Pi_f, "Pi_f");
 
 				SparseMatrix SolveCellUnknowns = GetSolveCellUnknownsMatrix(coarsePb);
 				finePb->ExportMatrix(SolveCellUnknowns, "SolveCellUnknowns");
 			}
 
-			P = Pi_f * J_f_c * I_c;
+			//P = Pi_f * J_f_c * I_c;
+			P = Pi_f * I_c;
 		}
 		else if (_prolongationCode == 2)
 		{
 			SparseMatrix I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
-			SparseMatrix J_f_c = GetGlobalCanonicalInjectionMatrixCoarseToFineElements();
-			SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
+			//SparseMatrix J_f_c = GetGlobalCanonicalInjectionMatrixCoarseToFineElements();
+			//SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
+			SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCoarseCellsToFineFaces();
 
 			SparseMatrix J_faces = GetGlobalCanonicalInjectionMatrixCoarseToFineFaces();
 
 			if (ExportMatrices)
 			{
 				finePb->ExportMatrix(I_c, "I_c");
-				finePb->ExportMatrix(J_f_c, "J_f_c");
+				//finePb->ExportMatrix(J_f_c, "J_f_c");
 				finePb->ExportMatrix(Pi_f, "Pi_f");
 
 				finePb->ExportMatrix(J_faces, "J_faces");
 			}
 
-			SparseMatrix P_algo1 = Pi_f * J_f_c * I_c;
+			//SparseMatrix P_algo1 = Pi_f * J_f_c * I_c;
+			SparseMatrix P_algo1 = Pi_f * I_c;
 			
 			int nFaceUnknowns = finePb->HHO->nFaceUnknowns;
 
@@ -347,7 +351,6 @@ private:
 
 					BigNumber elemGlobalNumber = element->Number;
 					BigNumber faceGlobalNumber = face->Number;
-					BigNumber faceLocalNumber = element->LocalNumberOf(face);
 
 					double weight = Weight(element, face);
 					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, elemGlobalNumber*nCellUnknowns, weight*face->GetProjFromCell(element, _cellInterpolationBasis));
@@ -355,6 +358,49 @@ private:
 			});
 
 		SparseMatrix Pi(problem->HHO->nTotalFaceUnknowns, problem->HHO->nElements * nCellUnknowns);
+		parallelLoop.Fill(Pi);
+
+		return Pi;
+	}
+
+	SparseMatrix GetGlobalProjectorMatrixFromCoarseCellsToFineFaces()
+	{
+		Poisson_HHO<Dim>* finePb = this->_problem;
+		Poisson_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
+
+		int nFaceUnknowns = finePb->HHO->nFaceUnknowns;
+		int nCellUnknowns = _cellInterpolationBasis->Size();
+
+		FaceParallelLoop<Dim> parallelLoop(finePb->_mesh->InteriorFaces);
+		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nFaceUnknowns);
+
+		parallelLoop.Execute([this, nCellUnknowns, nFaceUnknowns](Face<Dim>* f, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+				BigNumber faceGlobalNumber = face->Number;
+				if (face->IsRemovedOnCoarserGrid)
+				{
+					Element<Dim>* coarseElem = face->Element1->CoarserElement;
+					BigNumber coarseElemGlobalNumber = coarseElem->Number;
+
+					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, coarseElemGlobalNumber*nCellUnknowns, face->GetProjFromCell(coarseElem, _cellInterpolationBasis));
+				}
+				else
+				{
+					Element<Dim>* coarseElem1 = face->Element1->CoarserElement;
+					Element<Dim>* coarseElem2 = face->Element2->CoarserElement;
+					BigNumber coarseElem1GlobalNumber = coarseElem1->Number;
+					BigNumber coarseElem2GlobalNumber = coarseElem2->Number;
+
+					double weight1 = Weight(coarseElem1, face->CoarseFace); // Careful with using face->CoarseFace when the mesh isn't nested...
+					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, coarseElem1GlobalNumber*nCellUnknowns, weight1*face->GetProjFromCell(coarseElem1, _cellInterpolationBasis));
+
+					double weight2 = Weight(coarseElem2, face->CoarseFace);
+					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, coarseElem2GlobalNumber*nCellUnknowns, weight2*face->GetProjFromCell(coarseElem2, _cellInterpolationBasis));
+				}
+			});
+
+		SparseMatrix Pi(finePb->HHO->nTotalFaceUnknowns, coarsePb->HHO->nElements * nCellUnknowns);
 		parallelLoop.Fill(Pi);
 
 		return Pi;

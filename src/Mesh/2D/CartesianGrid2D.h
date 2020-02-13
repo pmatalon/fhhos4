@@ -196,18 +196,26 @@ public:
 						fineElement->NorthFace->IsRemovedOnCoarserGrid = true;
 						coarseElement->FinerFacesRemoved.push_back(fineElement->NorthFace);
 						coarseElement->SouthFace->FinerFaces.push_back(fineElement->SouthFace);
+						fineElement->SouthFace->CoarseFace = coarseElement->SouthFace;
 					}
 					if (i == ny - 1)
+					{
 						coarseElement->NorthFace->FinerFaces.push_back(fineElement->NorthFace);
+						fineElement->NorthFace->CoarseFace = coarseElement->NorthFace;
+					}
 
 					if (j % 2 == 0 && !fineElement->EastFace->IsDomainBoundary)
 					{
 						fineElement->EastFace->IsRemovedOnCoarserGrid = true;
 						coarseElement->FinerFacesRemoved.push_back(fineElement->EastFace);
 						coarseElement->WestFace->FinerFaces.push_back(fineElement->WestFace);
+						fineElement->WestFace->CoarseFace = coarseElement->WestFace;
 					}
 					if (j == nx - 1)
+					{
 						coarseElement->EastFace->FinerFaces.push_back(fineElement->EastFace);
+						fineElement->EastFace->CoarseFace = coarseElement->EastFace;
+					}
 				}
 			}
 

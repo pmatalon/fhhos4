@@ -238,27 +238,39 @@ private:
 							fineElement->TopFace->IsRemovedOnCoarserGrid = true;
 							coarseElement->FinerFacesRemoved.push_back(fineElement->TopFace);
 							coarseElement->BottomFace->FinerFaces.push_back(fineElement->BottomFace);
+							fineElement->BottomFace->CoarseFace = coarseElement->BottomFace;
 						}
 						if (iz == nz - 1)
+						{
 							coarseElement->TopFace->FinerFaces.push_back(fineElement->TopFace);
+							fineElement->TopFace->CoarseFace = coarseElement->TopFace;
+						}
 
 						if (iy % 2 == 0 && !fineElement->RightFace->IsDomainBoundary)
 						{
 							fineElement->RightFace->IsRemovedOnCoarserGrid = true;
 							coarseElement->FinerFacesRemoved.push_back(fineElement->RightFace);
 							coarseElement->LeftFace->FinerFaces.push_back(fineElement->LeftFace);
+							fineElement->LeftFace->CoarseFace = coarseElement->LeftFace;
 						}
 						if (iy == ny - 1)
+						{
 							coarseElement->RightFace->FinerFaces.push_back(fineElement->RightFace);
+							fineElement->RightFace->CoarseFace = coarseElement->RightFace;
+						}
 
 						if (ix % 2 == 0 && !fineElement->FrontFace->IsDomainBoundary)
 						{
 							fineElement->FrontFace->IsRemovedOnCoarserGrid = true;
 							coarseElement->FinerFacesRemoved.push_back(fineElement->FrontFace);
 							coarseElement->BackFace->FinerFaces.push_back(fineElement->BackFace);
+							fineElement->BackFace->CoarseFace = coarseElement->BackFace;
 						}
 						if (ix == nx - 1)
+						{
 							coarseElement->FrontFace->FinerFaces.push_back(fineElement->FrontFace);
+							fineElement->FrontFace->CoarseFace = coarseElement->FrontFace;
+						}
 					}
 				}
 			}

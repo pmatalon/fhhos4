@@ -302,6 +302,7 @@ public:
 						//Edge* coarseSouthEdge = coarseLower->SouthEdge();
 						//cout << "south edge = " << *coarseSouthEdge << endl;
 						coarseLower->SouthEdge()->FinerFaces.push_back(fineLower->SouthEdge());
+						fineLower->SouthEdge()->CoarseFace = coarseLower->SouthEdge();
 
 						if (i % 2 == 0) // on an even column
 						{
@@ -316,6 +317,7 @@ public:
 							coarseLower->FinerFacesRemoved.push_back(fineUpper->NorthEdge());
 
 							coarseLower->WestEdge()->FinerFaces.push_back(fineLower->WestEdge());
+							fineLower->WestEdge()->CoarseFace = coarseLower->WestEdge();
 						}
 						else
 						{
@@ -323,6 +325,7 @@ public:
 							fineUpper->CoarserElement = coarseUpper;
 
 							coarseLower->ObliqueEdge()->FinerFaces.push_back(fineLower->ObliqueEdge());
+							fineLower->ObliqueEdge()->CoarseFace = coarseLower->ObliqueEdge();
 						}
 					}
 					else // on an odd row
@@ -335,7 +338,9 @@ public:
 							fineLower->CoarserElement = coarseLower;
 
 							coarseLower->WestEdge()->FinerFaces.push_back(fineLower->WestEdge());
+							fineLower->WestEdge()->CoarseFace = coarseLower->WestEdge();
 							coarseLower->ObliqueEdge()->FinerFaces.push_back(fineLower->ObliqueEdge());
+							fineLower->ObliqueEdge()->CoarseFace = coarseLower->ObliqueEdge();
 						}
 						else // on an odd col
 						{
@@ -351,9 +356,15 @@ public:
 						}
 					}
 					if (j == nx - 1) // last row
+					{
 						coarseUpper->NorthEdge()->FinerFaces.push_back(fineUpper->NorthEdge());
+						fineUpper->NorthEdge()->CoarseFace = coarseUpper->NorthEdge();
+					}
 					if (i == ny - 1) // last col
+					{
 						coarseUpper->EastEdge()->FinerFaces.push_back(fineUpper->EastEdge());
+						fineUpper->EastEdge()->CoarseFace = coarseUpper->EastEdge();
+					}
 				}
 			}
 
