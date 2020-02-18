@@ -422,7 +422,7 @@ public:
 			if ((args.Actions & Action::ComputeL2Error) == Action::ComputeL2Error && exactSolution != NULL)
 			{
 				double error = problem->L2Error(exactSolution);
-				cout << "L2 Error = " << std::scientific << error << endl;
+				cout << endl << "L2 Error = " << std::scientific << error << endl;
 
 				if (args.Discretization.Method.compare("hho") == 0)
 				{

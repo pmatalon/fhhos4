@@ -71,8 +71,6 @@ public:
 protected:
 	virtual double L2Error(FunctionalBasis<Dim>* basis, const Vector& solution, DomFunction exactSolution)
 	{
-		cout << endl << "Computing L2 error..." << endl;
-
 		struct ChunkResult
 		{
 			double absoluteError = 0;
