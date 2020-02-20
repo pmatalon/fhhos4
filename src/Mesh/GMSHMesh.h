@@ -3,6 +3,7 @@
 #include "PolyhedralMesh.h"
 #include "2D/Quadrilateral.h"
 #include "3D/Tetrahedron.h"
+#include "2D/TriangularMesh.h"
 using namespace std;
 
 enum GMSHElementTypes
@@ -41,8 +42,8 @@ protected:
 	string _description = "GMSH file";
 	string _fileNamePart = "gmsh-file";
 
-	map<size_t, BigNumber> _elementExternalNumbers;
-	map<size_t, BigNumber> _vertexExternalNumbers;
+	map<size_t, Element<Dim>*> _elementExternalNumbers;
+	map<size_t, MeshVertex<Dim>*> _vertexExternalNumbers;
 	double _h = -1;
 public:
 	GMSHMesh(string mshFile, string description, string fileNamePart) : PolyhedralMesh<Dim>()
@@ -117,7 +118,7 @@ private:
 			if (_vertexExternalNumbers.find(nodeTags[i]) == _vertexExternalNumbers.end())
 			{
 				MeshVertex<Dim>* v = new MeshVertex<Dim>(vertexNumber, coord[3 * i], coord[3 * i + 1], coord[3 * i + 2]);
-				_vertexExternalNumbers.insert({ nodeTags[i], vertexNumber });
+				_vertexExternalNumbers.insert({ nodeTags[i], v });
 				this->Vertices.push_back(v);
 				vertexNumber++;
 			}
@@ -171,16 +172,14 @@ private:
 	}
 
 protected:
-	inline Vertex* GetVertex(BigNumber nodeTag)
+	inline MeshVertex<Dim>* GetVertex(BigNumber nodeTag)
 	{
-		BigNumber internalNumber = _vertexExternalNumbers.at(nodeTag);
-		return this->Vertices[internalNumber];
+		return _vertexExternalNumbers.at(nodeTag);
 	}
 
 	inline Element<Dim>* GetElement(BigNumber elementTag)
 	{
-		BigNumber internalNumber = _elementExternalNumbers.at(elementTag);
-		return this->Elements[internalNumber];
+		return _elementExternalNumbers.at(elementTag);
 	}
 
 public:
@@ -363,6 +362,105 @@ private:
 		return GetElement(coarseElementTag);
 	}
 
+protected:
+	void RenumberLike(Mesh<Dim>* myMesh)
+	{
+		// Renumbering the elements like myMesh
+		assert(this->Elements.size() == myMesh->Elements.size());
+		for (auto gmshElem : this->Elements)
+		{
+			bool matchFound = false;
+			for (auto myElem : myMesh->Elements)
+			{
+				if (myElem->HasSameVertices(gmshElem, true))
+				{
+					gmshElem->Number = myElem->Number;
+					matchFound = true;
+					break;
+				}
+			}
+			assert(matchFound);
+		}
+
+		// Renumbering the faces like myMesh
+		assert(this->Faces.size() == myMesh->Faces.size());
+		for (auto gmshFace : this->Faces)
+		{
+			bool matchFound = false;
+			for (auto myFace : myMesh->Faces)
+			{
+				if (myFace->HasSameVertices(gmshFace, true))
+				{
+					gmshFace->Number = myFace->Number;
+					matchFound = true;
+					break;
+				}
+			}
+			assert(matchFound);
+		}
+
+		// Reordering the faces in the lists so that we still get the same numbers as myMesh when HHO renumbers the faces
+		// in the order it finds them on the lists
+		/*vector<Face<Dim>*> facesCopy = this->Faces;
+		this->Faces.clear();
+		for (auto myFace : myMesh->Faces)
+		{
+			for (auto gmshFace : facesCopy)
+			{
+				if (gmshFace->Number == myFace->Number)
+				{
+					this->Faces.push_back(gmshFace);
+					break;
+				}
+			}
+		}
+		assert(facesCopy.size() == this->Faces.size());*/ // not mandatory to retrieve performance
+
+		Reorder(this->InteriorFaces, myMesh->InteriorFaces);
+		//std::srand(unsigned(std::time(0)));
+		//std::random_shuffle(this->InteriorFaces.begin(), this->InteriorFaces.end());
+
+		//Reorder(this->BoundaryFaces, myMesh->BoundaryFaces); // not mandatory to retrieve performance
+
+		if (this->CoarseMesh)
+		{
+			myMesh->CoarsenMesh(CoarseningStrategy::Standard);
+			static_cast<GMSHMesh<Dim>*>(this->CoarseMesh)->RenumberLike(myMesh->CoarseMesh);
+		}
+	}
+
+	void Reorder(vector<Face<Dim>*>& listToReorder, vector<Face<Dim>*> orderedList)
+	{
+		assert(listToReorder.size() == orderedList.size());
+		listToReorder.clear();
+		for (auto myFace : orderedList)
+		{
+			for (auto gmshFace : this->Faces)
+			{
+				if (gmshFace->Number == myFace->Number)
+				{
+					listToReorder.push_back(gmshFace);
+					break;
+				}
+			}
+		}
+	}
+
+public:
+	virtual void RenumberLikeMe()
+	{
+		if (this->_fileNamePart.compare("gmsh-tri") == 0)
+		{
+			BigNumber n = sqrt(this->Elements.size() / 2);
+			TriangularMesh* myMesh = new TriangularMesh(n, n);
+
+			RenumberLike(dynamic_cast<Mesh<Dim>*>(myMesh));
+			delete myMesh;
+		}
+		else
+			assert(false);
+	}
+
 };
 
 //-------------//
@@ -381,7 +479,7 @@ Element<2>* GMSHMesh<2>::CreateElement(int elemType, size_t elementTag, const ve
 		size_t nodeTag4 = elementNodes[elemNodeIndex + 3];
 
 		e = new Quadrilateral(elemNumber, GetVertex(nodeTag1), GetVertex(nodeTag2), GetVertex(nodeTag3), GetVertex(nodeTag4));
-		_elementExternalNumbers.insert({ elementTag, elemNumber });
+		_elementExternalNumbers.insert({ elementTag, e });
 		elemNodeIndex += 4;
 	}
 	else if (elemType == GMSH_Triangle)
@@ -391,7 +489,7 @@ Element<2>* GMSHMesh<2>::CreateElement(int elemType, size_t elementTag, const ve
 		size_t nodeTag3 = elementNodes[elemNodeIndex + 2];
 
 		e = new Triangle(elemNumber, GetVertex(nodeTag1), GetVertex(nodeTag2), GetVertex(nodeTag3));
-		_elementExternalNumbers.insert({ elementTag, elemNumber });
+		_elementExternalNumbers.insert({ elementTag, e });
 		elemNodeIndex += 3;
 	}
 	else
@@ -416,7 +514,7 @@ Element<3>* GMSHMesh<3>::CreateElement(int elemType, size_t elementTag, const ve
 		size_t nodeTag4 = elementNodes[elemNodeIndex + 3];
 
 		e = new Tetrahedron(elemNumber, GetVertex(nodeTag1), GetVertex(nodeTag2), GetVertex(nodeTag3), GetVertex(nodeTag4));
-		_elementExternalNumbers.insert({ elementTag, elemNumber });
+		_elementExternalNumbers.insert({ elementTag, e });
 		elemNodeIndex += 4;
 	}
 	else if (elemType == GMSH_Hexahedron && this->FileNamePart().compare("gmsh-cart") == 0)
@@ -440,7 +538,7 @@ Element<3>* GMSHMesh<3>::CreateElement(int elemType, size_t elementTag, const ve
 		Vertex* frontRightTopCorner = v4;
 
 		e = new Parallelepiped(elemNumber, backLeftBottomCorner, frontLeftBottomCorner, backRightBottomCorner, backLeftTopCorner, frontLeftTopCorner, backRightTopCorner, frontRightBottomCorner, frontRightTopCorner);
-		_elementExternalNumbers.insert({ elementTag, elemNumber });
+		_elementExternalNumbers.insert({ elementTag, e });
 		elemNodeIndex += 8;
 	}
 	else
@@ -518,8 +616,6 @@ void GMSHMesh<2>::CreateFaces(int elemType, BigNumber& faceNumber)
 template <>
 void GMSHMesh<3>::CreateFaces(int elemType, BigNumber& faceNumber)
 {
-	//assert(elemType == GMSHElementTypes::GMSH_Tetrahedron);
-
 	int faceType = -1;
 	int nFaceVertices = -1;
 	if (elemType == GMSHElementTypes::GMSH_Tetrahedron)
@@ -547,20 +643,8 @@ void GMSHMesh<3>::CreateFaces(int elemType, BigNumber& faceNumber)
 			MeshVertex<3>* v = (MeshVertex<3>*)GetVertex(faceNodes[j+k]);
 			vertices[k] = v;
 		}
-		/*MeshVertex<3>* v1 = (MeshVertex<3>*)GetVertex(faceNodes[j]);
-		MeshVertex<3>* v2 = (MeshVertex<3>*)GetVertex(faceNodes[j + 1]);
-		MeshVertex<3>* v3 = (MeshVertex<3>*)GetVertex(faceNodes[j + 2]);*/
 
 		// Check if a face with those vertices already exists
-		/*bool faceAlreadyExists = false;
-		for (Face<3>* f : v1->Faces)
-		{
-			if (f->HasVertex(v2) && f->HasVertex(v3))
-			{
-				faceAlreadyExists = true;
-				break;
-			}
-		}*/
 		bool faceAlreadyExists = false;
 		for (Face<3>* f : vertices[0]->Faces)
 		{
@@ -584,24 +668,6 @@ void GMSHMesh<3>::CreateFaces(int elemType, BigNumber& faceNumber)
 
 		// Find the neighbouring elements this future face is the interface of
 		vector<Element<3>*> neighbours;
-		/*for (Element<3>* f1 : v1->Elements)
-		{
-			for (Element<3>* f2 : v2->Elements)
-			{
-				if (f1 == f2)
-				{
-					for (Element<3>* f3 : v3->Elements)
-					{
-						if (f2 == f3)
-						{
-							neighbours.push_back(f1);
-							break;
-						}
-					}
-					break;
-				}
-			}
-		}*/
 		for (Element<3>* e : vertices[0]->Elements)
 		{
 			bool eHasAllVertices = true;

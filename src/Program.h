@@ -68,6 +68,12 @@ public:
 			mesh->SanityCheck();
 			if (args.Discretization.N <= 2)
 				cout << *mesh << endl << endl;
+
+			/*if (args.Discretization.MeshCode.compare("gmsh-tri") == 0)
+			{
+				GMSHMesh<Dim>* gmshMesh = dynamic_cast<GMSHMesh<Dim>*>(mesh);
+				gmshMesh->RenumberLikeMe();
+			}*/
 		}
 
 		//--------------------------------------------//
@@ -94,7 +100,7 @@ public:
 		DiffusionPartition<Dim> diffusionPartition(args.Problem.Partition, &diffTensor1, &diffTensor2);
 
 		mesh->SetDiffusionCoefficient(&diffusionPartition);
-
+		
 		//---------------------------------------------//
 		//   Analytical solution and source function   //
 		//---------------------------------------------//
@@ -351,6 +357,9 @@ public:
 			HHOParameters<Dim>* hho = new HHOParameters<Dim>(mesh, args.Discretization.Stabilization, reconstructionBasis, cellBasis, faceBasis);
 
 			problem = new Poisson_HHO<Dim>(mesh, args.Problem.RHSCode, sourceFunction, hho, args.Discretization.StaticCondensation, &diffusionPartition, &bc, args.OutputDirectory);
+
+			if ((args.Actions & Action::ExportFaces) == Action::ExportFaces)
+				mesh->ExportFacesToMatlab(args.OutputDirectory, true);
 		}
 		else
 			Utils::FatalError("Unknown discretization.");

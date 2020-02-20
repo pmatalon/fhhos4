@@ -26,6 +26,33 @@ public:
 	virtual double DetJacobian(RefPoint p) const = 0;
 	virtual int DetJacobianDegree() const = 0;
 
+	//--------------------//
+	//      Geometry      //
+	//--------------------//
+
+	bool HasVertex(Vertex* v, bool compareCoordinates = false)
+	{
+		for (Vertex* v2 : this->Vertices())
+		{
+			if (v == v2 || (compareCoordinates && *v == *v2))
+				return true;
+		}
+		return false;
+	}
+
+	bool HasSameVertices(GeometricShapeWithReferenceShape<Dim>* other, bool compareCoordinates = false)
+	{
+		if (this->Vertices().size() != other->Vertices().size())
+			return false;
+
+		for (Vertex* v : this->Vertices())
+		{
+			if (!other->HasVertex(v, compareCoordinates))
+				return false;
+		}
+		return true;
+	}
+
 	//-------------------//
 	//     Integrals     //
 	//-------------------//

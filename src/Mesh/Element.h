@@ -98,6 +98,16 @@ public:
 		return nullptr;
 	}
 
+	bool HasVertex(Vertex* v, bool compareCoordinates = false)
+	{
+		return this->Shape()->HasVertex(v, compareCoordinates);
+	}
+
+	bool HasSameVertices(Element<Dim>* other, bool compareCoordinates = false)
+	{
+		return this->Shape()->HasSameVertices(other->Shape(), compareCoordinates);
+	}
+
 	int LocalNumberOf(Element<Dim>* finerElement)
 	{
 		for (int i = 0; i < this->FinerElements.size(); i++)

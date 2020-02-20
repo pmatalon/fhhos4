@@ -412,7 +412,7 @@ public:
 
 			SparseMatrix inverseAtt = GetInverseAtt();
 
-			this->A = Aff - Atf.transpose() * inverseAtt * Atf;
+			this->A = (Aff - Atf.transpose() * inverseAtt * Atf).pruned();
 
 			Vector bt = this->_globalRHS.head(HHO->nTotalCellUnknowns);
 			Vector bf = this->_globalRHS.tail(HHO->nTotalFaceUnknowns);

@@ -66,14 +66,14 @@ public:
 		return Shape()->Contains(p);
 	}
 
-	bool HasVertex(Vertex* v)
+	bool HasVertex(Vertex* v, bool compareCoordinates = false)
 	{
-		for (Vertex* v2 : this->Shape()->Vertices())
-		{
-			if (v == v2)
-				return true;
-		}
-		return false;
+		return this->Shape()->HasVertex(v, compareCoordinates);
+	}
+
+	bool HasSameVertices(Face<Dim>* other, bool compareCoordinates = false)
+	{
+		return this->Shape()->HasSameVertices(other->Shape(), compareCoordinates);
 	}
 
 	virtual Face<Dim>* CreateSameGeometricFace(BigNumber number, Element<Dim>* element1) = 0;

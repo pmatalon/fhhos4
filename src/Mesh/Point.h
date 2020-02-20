@@ -4,6 +4,8 @@ using namespace std;
 class Point
 {
 public:
+	static double Tolerance;
+
 	double X = 0;
 	double Y = 0;
 	double Z = 0;
@@ -38,13 +40,15 @@ public:
 	}
 };
 
+double Point::Tolerance = 1e-10;
+
 bool operator==(Point const& p1, Point const& p2)
 {
-	return p1.X == p2.X && p1.Y == p2.Y && p1.Z == p2.Z;
+	return abs(p1.X - p2.X) <= Point::Tolerance && abs(p1.Y - p2.Y) <= Point::Tolerance && abs(p1.Z - p2.Z) <= Point::Tolerance;
 }
 bool operator!=(Point const& p1, Point const& p2)
 {
-	return p1.X != p2.X || p1.Y != p2.Y || p1.Z != p2.Z;
+	return !(p1 == p2);
 }
 
 

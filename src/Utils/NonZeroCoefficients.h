@@ -23,7 +23,7 @@ public:
 	}*/
 	inline void Add(BigNumber i, BigNumber j, double value)
 	{
-		if (abs(value) > 1e-16)
+		if (abs(value) > 1e-15)
 			this->coefficients.push_back(Eigen::Triplet<double>(i, j, value));
 	}
 

@@ -264,8 +264,11 @@ public:
 			//CoarsenByAgglomerationAndKeepFineFaces();
 		else
 			assert(false && "Coarsening strategy not implemented!");
-		this->CoarseMesh->SetDiffusionCoefficient(this->_diffusionPartition);
-		this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
+
+		if (this->_diffusionPartition)
+			this->CoarseMesh->SetDiffusionCoefficient(this->_diffusionPartition);
+		if (this->_boundaryConditions)
+			this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
 	}
 
 	void Standard()
