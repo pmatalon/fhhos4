@@ -29,7 +29,7 @@ public:
 
 	virtual void Serialize(ostream& os) const override
 	{
-		os << "Block-SOR (blockSize=" << _blockSize << ", omega=" << _omega << ", direction=" << (_direction == Direction::Forward ? "forward" : "backward") << ")";
+		os << "Block SOR (blockSize=" << _blockSize << ", omega=" << _omega << ", direction=" << (_direction == Direction::Forward ? "forward" : "backward") << ")";
 	}
 
 	//------------------------------------------------//
@@ -141,7 +141,7 @@ public:
 
 	virtual void Serialize(ostream& os) const override
 	{
-		os << "GaussSeidel";
+		os << "Gauss-Seidel";
 	}
 };
 
@@ -154,7 +154,7 @@ public:
 
 	virtual void Serialize(ostream& os) const override
 	{
-		os << "Reverse GaussSeidel";
+		os << "Reverse Gauss-Seidel";
 	}
 };
 
@@ -167,7 +167,7 @@ public:
 
 	virtual void Serialize(ostream& os) const override
 	{
-		os << "block-GaussSeidel (blockSize=" << _blockSize << ")";
+		os << "Block Gauss-Seidel (blockSize=" << _blockSize << ")";
 	}
 };
 
@@ -180,6 +180,6 @@ public:
 
 	virtual void Serialize(ostream& os) const override
 	{
-		os << "Reverse block-GaussSeidel (blockSize=" << _blockSize << ")";
+		os << "Reverse Block Gauss-Seidel (blockSize=" << _blockSize << ")";
 	}
 };

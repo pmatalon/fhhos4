@@ -53,7 +53,7 @@ private:
 
 	void OnStartSetup() override
 	{
-		cout << "\t\tMesh              : " << this->_problem->_mesh->Elements.size() << " elements" << endl;
+		cout << "\t\tMesh                : " << this->_problem->_mesh->Elements.size() << " elements" << endl;
 		if (!IsCoarsestLevel())
 		{
 			Poisson_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;

@@ -46,14 +46,14 @@ public:
 
 		if (this->IsFinestLevel())
 		{
-			cout << "\t\tFine grid operator: "; cout.flush();
+			cout << "\t\tFine grid operator  : "; cout.flush();
 			cout << Utils::MatrixInfo(this->OperatorMatrix, "A") << endl;
 		}
 		else
 		{
 			if (this->UseGalerkinOperator)
 			{
-				cout << "\t\tGalerkin operator : "; cout.flush();
+				cout << "\t\tGalerkin operator   : "; cout.flush();
 				this->OperatorMatrix = FinerLevel->R * FinerLevel->OperatorMatrix * FinerLevel->P;
 			}
 			else
@@ -66,19 +66,21 @@ public:
 
 		if (!this->IsCoarsestLevel())
 		{
-			cout << "\t\tProlongation      : "; cout.flush();
+			cout << "\t\tProlongation        : "; cout.flush();
 			SetupProlongation();
 			cout << Utils::MatrixInfo(this->P, "P") << endl;
 
-			cout << "\t\tRestriction       : "; cout.flush();
+			cout << "\t\tRestriction         : "; cout.flush();
 			SetupRestriction();
 			cout << Utils::MatrixInfo(this->R, "R") << endl;
-		}
 
-		if (!this->IsCoarsestLevel())
-		{
-			cout << "\t\tSmoothers..." << endl;
-			SetupSmoothers();
+			cout << "\t\tPreSmoothing        : "; cout.flush();
+			PreSmoother->Setup(this->OperatorMatrix);
+			cout << PreSmoother->Iterations() << " iteration" << (PreSmoother->Iterations() > 1 ? "s" : "") <<  endl;
+
+			cout << "\t\tPostSmoothing       : "; cout.flush();
+			PostSmoother->Setup(this->OperatorMatrix);
+			cout << PostSmoother->Iterations() << " iteration" << (PostSmoother->Iterations() > 1 ? "s" : "") << endl;
 		}
 	}
 
@@ -121,10 +123,4 @@ protected:
 	virtual void SetupDiscretizedOperator() {}
 	virtual void SetupRestriction() = 0;
 	virtual void SetupProlongation() = 0;
-
-	void SetupSmoothers()
-	{
-		this->PreSmoother->Setup(this->OperatorMatrix);
-		this->PostSmoother->Setup(this->OperatorMatrix);
-	}
 };

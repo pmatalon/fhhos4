@@ -20,6 +20,11 @@ public:
 		_solver->ComputeExactSolution = false;
 	}
 
+	int Iterations()
+	{
+		return _solver->MaxIterations;
+	}
+
 	void Setup(const SparseMatrix& A)
 	{
 		_solver->Setup(A);
@@ -32,7 +37,7 @@ public:
 
 	friend ostream& operator<<(ostream& os, const Smoother& s)
 	{
-		os << s._solver->MaxIterations << " sweep(s) of " << *(s._solver);
+		os << *(s._solver);
 		return os;
 	}
 

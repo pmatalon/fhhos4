@@ -39,6 +39,7 @@ struct MultigridArguments
 	string PostSmootherCode = "rbgs";
 	int PreSmoothingIterations = 1;
 	int PostSmoothingIterations = 1;
+	int CoarseLevelAdditionalSmoothing = 0;
 	string CoarseningStgyCode = "default";
 	CoarseningStrategy CoarseningStgy;
 };

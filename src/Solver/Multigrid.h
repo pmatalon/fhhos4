@@ -21,6 +21,7 @@ public:
 	string PostSmootherCode = "rbgs";
 	int PreSmoothingIterations = 1;
 	int PostSmoothingIterations = 1;
+	int CoarseLevelAdditionalSmoothing = 0;
 	int BlockSizeForBlockSmoothers = -1;
 	CoarseningStrategy CoarseningStgy = CoarseningStrategy::Standard;
 	bool ExportMatrices = false;
@@ -72,8 +73,10 @@ public:
 			// Build coarse level
 			levelNumber++;
 			Level* coarseLevel = CreateCoarseLevel(currentLevel);
-			coarseLevel->PreSmoother = SmootherFactory::Create(PreSmootherCode, PreSmoothingIterations, BlockSizeForBlockSmoothers);
-			coarseLevel->PostSmoother = SmootherFactory::Create(PostSmootherCode, PostSmoothingIterations, BlockSizeForBlockSmoothers);
+			int preSmoothingIterations = PreSmoothingIterations + coarseLevel->Number * CoarseLevelAdditionalSmoothing;
+			int postSmoothingIterations = PostSmoothingIterations + coarseLevel->Number * CoarseLevelAdditionalSmoothing;
+			coarseLevel->PreSmoother = SmootherFactory::Create(PreSmootherCode, preSmoothingIterations, BlockSizeForBlockSmoothers);
+			coarseLevel->PostSmoother = SmootherFactory::Create(PostSmootherCode, postSmoothingIterations, BlockSizeForBlockSmoothers);
 			coarseLevel->UseGalerkinOperator = UseGalerkinOperator;
 			coarseLevel->ExportMatrices = ExportMatrices;
 
@@ -196,9 +199,17 @@ public:
 
 		os << "\t" << "Cycle              : ";
 		if (this->WLoops == 1)
-			os << "V-cycle" << endl;
+			os << "V";
+		else if (this->WLoops == 2)
+			os << "W";
 		else
-			os << "W-cycle (" << this->WLoops << " loops)" << endl;
+			os << "W(" << this->WLoops << " loops)";
+		os << "(" << PreSmoothingIterations << ", " << PostSmoothingIterations;
+		if (CoarseLevelAdditionalSmoothing > 0)
+			os << ", +" << CoarseLevelAdditionalSmoothing;
+		else if (CoarseLevelAdditionalSmoothing < 0)
+			os << ", " << CoarseLevelAdditionalSmoothing;
+		os << ")" << endl;
 
 		os << "\t" << "Levels             : ";
 		if (_automaticNumberOfLevels && _nLevels == 0)

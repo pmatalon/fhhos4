@@ -478,6 +478,7 @@ private:
 				mg->PostSmootherCode = args.Solver.MG.PostSmootherCode;
 				mg->PreSmoothingIterations = args.Solver.MG.PreSmoothingIterations;
 				mg->PostSmoothingIterations = args.Solver.MG.PostSmoothingIterations;
+				mg->CoarseLevelAdditionalSmoothing = args.Solver.MG.CoarseLevelAdditionalSmoothing;
 				mg->CoarseningStgy = args.Solver.MG.CoarseningStgy;
 				mg->ExportMatrices = (args.Actions & Action::ExportMultigridMatrices) == Action::ExportMultigridMatrices;
 

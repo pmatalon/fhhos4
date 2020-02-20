@@ -125,9 +125,12 @@ void print_usage() {
 	cout << "                                 Multigrid                            " << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << endl;
-	cout << "-cycle [V|W],NUM,NUM" << endl;
+	cout << "-cycle (V|W),NUM,NUM[,+NUM]" << endl;
 	cout << "      Multigrid cycle." << endl;
 	cout << "      Examples: \"V,1,0\" or \"W,1,1\"." << endl;
+	cout << "      The third number defines the value of which the number of smoothing iterations is raised at each coarse level." << endl;
+	cout << "      Example: \"V,1,1,+1\" performs (1,1) smoothing steps at the finer level, then (2,2) on the next one, then (3,3), etc." << endl;
+	cout << "      Note that negative values are allowed (to lower the number of smoothing steps)." << endl;
 	cout << endl;
 	cout << "-w NUM" << endl;
 	cout << "      Number of loops in the multigrid cycle." << endl;
@@ -424,7 +427,7 @@ int main(int argc, char* argv[])
 			case OPT_MGCycle:
 			{
 				string s(optarg);
-				regex pattern("^([vwVW]),([[:digit:]]+),([[:digit:]]+)$");
+				regex pattern("^([vwVW]),([[:digit:]]+),([[:digit:]]+)(,([+-])?([[:digit:]]+))?$");
 				smatch matches;
 
 				if (std::regex_search(s, matches, pattern))
@@ -436,6 +439,12 @@ int main(int argc, char* argv[])
 						args.Solver.MG.WLoops = 2;
 					args.Solver.MG.PreSmoothingIterations = stoi(matches.str(2));
 					args.Solver.MG.PostSmoothingIterations = stoi(matches.str(3));
+					if (!matches.str(4).empty())
+					{
+						args.Solver.MG.CoarseLevelAdditionalSmoothing = stoi(matches.str(6));
+						if (matches.str(5)[0] == '-')
+							args.Solver.MG.CoarseLevelAdditionalSmoothing *= -1;
+					}
 				}
 				else
 					argument_error("syntax error in the multigrid cycle. Check -cycle argument.");
