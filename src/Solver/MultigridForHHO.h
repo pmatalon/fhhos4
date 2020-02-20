@@ -1,6 +1,5 @@
 #pragma once
 #include "Multigrid.h"
-#include "SmootherFactory.h"
 #include "../HHO/Poisson_HHO.h"
 #include "../Utils/ElementParallelLoop.h"
 using namespace std;
@@ -9,16 +8,14 @@ template <int Dim>
 class LevelForHHO : public Level
 {
 private:
-	Poisson_HHO<Dim>* _problem;
 	int _prolongationCode = 1;
 	FunctionalBasis<Dim>* _cellInterpolationBasis;
 public:
-	bool ExportMatrices = false;
+	Poisson_HHO<Dim>* _problem;
 
-	LevelForHHO(int number, Poisson_HHO<Dim>* problem, bool useGalerkinOperator, int prolongationCode, FunctionalBasis<Dim>* cellInterpolationBasis)
+	LevelForHHO(int number, Poisson_HHO<Dim>* problem, int prolongationCode, FunctionalBasis<Dim>* cellInterpolationBasis)
 		: Level(number)
 	{
-		this->UseGalerkinOperator = useGalerkinOperator;
 		this->_problem = problem;
 		this->_prolongationCode = prolongationCode;
 		this->_cellInterpolationBasis = cellInterpolationBasis;
@@ -26,7 +23,24 @@ public:
 		//problem->ExportFaces("L" + to_string(number));
 	}
 
-	void ExportVector(Vector& v, string suffix)
+	BigNumber NUnknowns() override
+	{
+		return _problem->HHO->nTotalFaceUnknowns;
+	}
+
+	void CoarsenMesh(CoarseningStrategy coarseningStgy, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override
+	{
+		if (coarseningStgy == CoarseningStrategy::StructuredRefinement && _problem->_mesh->CoarseMesh == nullptr)
+		{
+			noCoarserMeshProvided = true;
+			return;
+		}
+		_problem->_mesh->CoarsenMesh(coarseningStgy);
+		if (_problem->_mesh->CoarseMesh->InteriorFaces.size() == 0)
+			coarsestPossibleMeshReached = true;
+	}
+
+	void ExportVector(Vector& v, string suffix) override
 	{
 		this->_problem->ExportVector(v, suffix);
 	}
@@ -522,148 +536,42 @@ class MultigridForHHO : public Multigrid
 {
 private:
 	Poisson_HHO<Dim>* _problem;
-	bool _automaticNumberOfLevels;
-	int _nLevels;
 	int _prolongationCode = 1;
 	FunctionalBasis<Dim>* _cellInterpolationBasis;
 public:
-	int MatrixMaxSizeForCoarsestLevel;
-	bool UseGalerkinOperator = false;
-	string PreSmootherCode = "bgs";
-	string PostSmootherCode = "rbgs";
-	int PreSmoothingIterations = 1;
-	int PostSmoothingIterations = 1;
-	CoarseningStrategy CoarseningStgy = CoarseningStrategy::Standard;
-	bool ExportMatrices = false;
 
-	MultigridForHHO(Poisson_HHO<Dim>* problem, int prolongationCode, FunctionalBasis<Dim>* cellInterpolationBasis) : MultigridForHHO(problem, prolongationCode, cellInterpolationBasis, 0)
+	MultigridForHHO(Poisson_HHO<Dim>* problem, int prolongationCode, FunctionalBasis<Dim>* cellInterpolationBasis)
+		: MultigridForHHO(problem, prolongationCode, cellInterpolationBasis, 0)
 	{}
 
-	MultigridForHHO(Poisson_HHO<Dim>* problem, int prolongationCode, FunctionalBasis<Dim>* cellInterpolationBasis, int nLevels) : Multigrid()
+	MultigridForHHO(Poisson_HHO<Dim>* problem, int prolongationCode, FunctionalBasis<Dim>* cellInterpolationBasis, int nLevels)
+		: Multigrid(nLevels)
 	{
 		this->_problem = problem;
 		this->_prolongationCode = prolongationCode;
 		this->_cellInterpolationBasis = cellInterpolationBasis;
-		this->_automaticNumberOfLevels = nLevels <= 0;
-		
-		if (this->_automaticNumberOfLevels)
-		{
-			this->_nLevels = 0;
-			this->MatrixMaxSizeForCoarsestLevel = 1000;
-		}
-		else
-		{
-			this->_nLevels = nLevels;
-			this->MatrixMaxSizeForCoarsestLevel = 0;
-		}
-
-		this->_fineLevel = new LevelForHHO<Dim>(0, problem, false, _prolongationCode, _cellInterpolationBasis);
+		this->BlockSizeForBlockSmoothers = problem->HHO->nFaceUnknowns;
+		this->_fineLevel = new LevelForHHO<Dim>(0, problem, _prolongationCode, _cellInterpolationBasis);
 	}
-	
-	void Serialize(ostream& os) const override
+
+	void BeginSerialize(ostream& os) const override
 	{
 		os << "MultigridForHHO" << endl;
 		os << "\t" << "Prolongation       : " << _prolongationCode << endl;
-
 		os << "\t" << "Cell interpolation : ";
 		if (_cellInterpolationBasis == _problem->HHO->CellBasis)
 			os << "k";
 		else if (_cellInterpolationBasis == _problem->HHO->ReconstructionBasis)
 			os << "k+1";
 		os << endl;
-
-		os << "\t" << "Cycle              : ";
-		if (this->WLoops == 1)
-			os << "V-cycle" << endl;
-		else
-			os << "W-cycle (" << this->WLoops << " loops)" << endl;
-
-		os << "\t" << "Levels             : ";
-		if (_automaticNumberOfLevels && _nLevels == 0)
-			os << "automatic coarsening until matrix size <= " << MatrixMaxSizeForCoarsestLevel << endl;
-		else if (_automaticNumberOfLevels && _nLevels > 0)
-			os << _nLevels << " (automatic)" << endl;
-		else
-			os << _nLevels << endl;
-
-		os << "\t" << "Coarsening strategy: ";
-		if (CoarseningStgy == CoarseningStrategy::Standard)
-			os << "standard" << endl;
-		else if (CoarseningStgy == CoarseningStrategy::Agglomeration)
-			os << "agglomeration" << endl;
-		else if (CoarseningStgy == CoarseningStrategy::StructuredRefinement)
-			os << "structured refinement from coarse mesh" << endl;
-
-		Smoother* preSmoother = SmootherFactory::Create(PreSmootherCode, PreSmoothingIterations, _problem->HHO->nFaceUnknowns);
-		Smoother* postSmoother = SmootherFactory::Create(PostSmootherCode, PostSmoothingIterations, _problem->HHO->nFaceUnknowns);
-		os << "\t" << "Pre-smoothing      : " << *preSmoother << endl;
-		os << "\t" << "Post-smoothing     : " << *postSmoother;
-		delete preSmoother;
-		delete postSmoother;
 	}
-
-	void Setup(const SparseMatrix& A) override
+	
+protected:
+	Level* CreateCoarseLevel(Level* fineLevel) override
 	{
-		IterativeSolver::Setup(A);
-
-		cout << "Setup..." << endl;
-
-		LevelForHHO<Dim>* finerLevel = dynamic_cast<LevelForHHO<Dim>*>(this->_fineLevel);
-		finerLevel->OperatorMatrix = A;
-		finerLevel->PreSmoother = SmootherFactory::Create(PreSmootherCode, PreSmoothingIterations, _problem->HHO->nFaceUnknowns);
-		finerLevel->PostSmoother = SmootherFactory::Create(PostSmootherCode, PostSmoothingIterations, _problem->HHO->nFaceUnknowns);
-		finerLevel->ExportMatrices = ExportMatrices;
-		Poisson_HHO<Dim>* problem = _problem;
-
-		bool noCoarserMeshProvided = false;
-		bool coarsestPossibleMeshReached = false;
-
-		int levelNumber = 0;
-		while ((_automaticNumberOfLevels && problem->HHO->nTotalFaceUnknowns > MatrixMaxSizeForCoarsestLevel) || (levelNumber < _nLevels - 1))
-		{
-			// Can we coarsen the mesh?
-			if (this->CoarseningStgy == CoarseningStrategy::StructuredRefinement && problem->_mesh->CoarseMesh == nullptr)
-			{
-				noCoarserMeshProvided = true;
-				break;
-			}
-			problem->_mesh->CoarsenMesh(this->CoarseningStgy);
-			if (problem->_mesh->CoarseMesh->InteriorFaces.size() == 0)
-			{
-				coarsestPossibleMeshReached = true;
-				break;
-			}
-
-			// Build coarse level
-			problem = problem->GetProblemOnCoarserMesh();
-			levelNumber++;
-			LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(levelNumber, problem, UseGalerkinOperator, _prolongationCode, _cellInterpolationBasis);
-			coarseLevel->PreSmoother = SmootherFactory::Create(PreSmootherCode, PreSmoothingIterations, problem->HHO->nFaceUnknowns);
-			coarseLevel->PostSmoother = SmootherFactory::Create(PostSmootherCode, PostSmoothingIterations, problem->HHO->nFaceUnknowns);
-			coarseLevel->ExportMatrices = ExportMatrices;
-
-			// Link between levels
-			finerLevel->CoarserLevel = coarseLevel;
-			coarseLevel->FinerLevel = finerLevel;
-
-			// Setup fine level
-			finerLevel->Setup();
-
-			finerLevel = coarseLevel;
-		}
-
-		_nLevels = levelNumber + 1;
-		finerLevel->Setup();
-
-		if (coarsestPossibleMeshReached)
-			cout << Utils::BeginYellow << "Warning: impossible to coarsen the mesh any more." << Utils::EndColor;
-		if (noCoarserMeshProvided)
-			cout << Utils::BeginYellow << "Warning: cannot build coarser level because no coarser mesh has been provided." << Utils::EndColor;
-
-		this->SetupCoarseSolver();
-		cout << "\t--> " << _nLevels << " levels built." << endl;
-		
-		if (this->WLoops > 1)
-			PrintCycleSchema();
+		LevelForHHO<Dim>* hhoFineLevel = dynamic_cast<LevelForHHO<Dim>*>(fineLevel);
+		Poisson_HHO<Dim>* coarseProblem = hhoFineLevel->_problem->GetProblemOnCoarserMesh();
+		LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(fineLevel->Number + 1, coarseProblem, _prolongationCode, _cellInterpolationBasis);
+		return coarseLevel;
 	}
 };

@@ -1,39 +1,119 @@
 #pragma once
 #include "IterativeSolver.h"
+#include "SmootherFactory.h"
 #include "Level.h"
 using namespace std;
 
 class Multigrid : public IterativeSolver
 {
 protected:
-	Level* _fineLevel = NULL;
-	Solver* _coarseSolver = NULL;
+	Level* _fineLevel = nullptr;
+	Solver* _coarseSolver = nullptr;
 private:
+	bool _automaticNumberOfLevels;
+	int _nLevels;
 	NonZeroCoefficients _cycleSchema;
 public:
-	int WLoops = 1; // 1 --> V-cycle, >1 --> W-cycle 
+	int WLoops = 1; // 1 --> V-cycle, >= 2 --> W-cycle 
+	int MatrixMaxSizeForCoarsestLevel;
+	bool UseGalerkinOperator = false;
+	string PreSmootherCode = "bgs";
+	string PostSmootherCode = "rbgs";
+	int PreSmoothingIterations = 1;
+	int PostSmoothingIterations = 1;
+	int BlockSizeForBlockSmoothers = -1;
+	CoarseningStrategy CoarseningStgy = CoarseningStrategy::Standard;
+	bool ExportMatrices = false;
 
-	Multigrid() : IterativeSolver() { }
+	Multigrid(int nLevels) : IterativeSolver()
+	{
+		this->_automaticNumberOfLevels = nLevels <= 0;
+
+		if (this->_automaticNumberOfLevels)
+		{
+			this->_nLevels = 0;
+			this->MatrixMaxSizeForCoarsestLevel = 1000;
+		}
+		else
+		{
+			this->_nLevels = nLevels;
+			this->MatrixMaxSizeForCoarsestLevel = 0;
+		}
+	}
 
 	int NumberOfLevels()
 	{
-		int nLevels = 1;
-		Level* level = this->_fineLevel;
-		while (level = level->CoarserLevel)
-			nLevels++;
-		return nLevels;
+		return _nLevels;
+	}
+
+	void Setup(const SparseMatrix& A) override
+	{
+		IterativeSolver::Setup(A);
+
+		cout << "Setup..." << endl;
+
+		this->_fineLevel->OperatorMatrix = A;
+		this->_fineLevel->PreSmoother = SmootherFactory::Create(PreSmootherCode, PreSmoothingIterations, BlockSizeForBlockSmoothers);
+		this->_fineLevel->PostSmoother = SmootherFactory::Create(PostSmootherCode, PostSmoothingIterations, BlockSizeForBlockSmoothers);
+		this->_fineLevel->UseGalerkinOperator = false;
+		this->_fineLevel->ExportMatrices = ExportMatrices;
+
+		Level* currentLevel = this->_fineLevel;
+		bool noCoarserMeshProvided = false;
+		bool coarsestPossibleMeshReached = false;
+		int levelNumber = 0;
+		while ((_automaticNumberOfLevels && currentLevel->NUnknowns() > MatrixMaxSizeForCoarsestLevel) || (levelNumber < _nLevels - 1))
+		{
+			// Can we coarsen the mesh?
+			currentLevel->CoarsenMesh(this->CoarseningStgy, noCoarserMeshProvided, coarsestPossibleMeshReached);
+			if (noCoarserMeshProvided || coarsestPossibleMeshReached)
+				break;
+
+			// Build coarse level
+			levelNumber++;
+			Level* coarseLevel = CreateCoarseLevel(currentLevel);
+			coarseLevel->PreSmoother = SmootherFactory::Create(PreSmootherCode, PreSmoothingIterations, BlockSizeForBlockSmoothers);
+			coarseLevel->PostSmoother = SmootherFactory::Create(PostSmootherCode, PostSmoothingIterations, BlockSizeForBlockSmoothers);
+			coarseLevel->UseGalerkinOperator = UseGalerkinOperator;
+			coarseLevel->ExportMatrices = ExportMatrices;
+
+			// Link between levels
+			currentLevel->CoarserLevel = coarseLevel;
+			coarseLevel->FinerLevel = currentLevel;
+
+			// Setup fine level
+			currentLevel->Setup();
+
+			currentLevel = coarseLevel;
+		}
+
+		_nLevels = levelNumber + 1;
+		currentLevel->Setup();
+
+		if (coarsestPossibleMeshReached)
+			cout << Utils::BeginYellow << "Warning: impossible to coarsen the mesh any more." << Utils::EndColor;
+		if (noCoarserMeshProvided)
+			cout << Utils::BeginYellow << "Warning: cannot build coarser level because no coarser mesh has been provided." << Utils::EndColor;
+
+		this->SetupCoarseSolver();
+		cout << "\t--> " << _nLevels << " levels built." << endl;
+
+		if (this->WLoops > 1)
+			PrintCycleSchema();
 	}
 
 protected:
+	virtual Level* CreateCoarseLevel(Level* fineLevel) = 0;
+
 	void SetupCoarseSolver()
 	{
 		cout << "\t\tSetup coarse solver..." << endl;
 
-		if (this->_coarseSolver == NULL)
+		if (this->_coarseSolver == nullptr)
 			this->_coarseSolver = new EigenSparseLU();
 
 		Level* level = this->_fineLevel;
-		while (level->CoarserLevel != NULL)
+		while (level->CoarserLevel != nullptr)
 			level = level->CoarserLevel;
 
 		this->_coarseSolver->Setup(level->OperatorMatrix);
@@ -103,7 +183,47 @@ private:
 		return x;
 	}
 
+protected:
+	virtual void BeginSerialize(ostream& os) const
+	{
+		os << "Multigrid" << endl;
+	}
+
 public:
+	virtual void Serialize(ostream& os) const override
+	{
+		BeginSerialize(cout);
+
+		os << "\t" << "Cycle              : ";
+		if (this->WLoops == 1)
+			os << "V-cycle" << endl;
+		else
+			os << "W-cycle (" << this->WLoops << " loops)" << endl;
+
+		os << "\t" << "Levels             : ";
+		if (_automaticNumberOfLevels && _nLevels == 0)
+			os << "automatic coarsening until matrix size <= " << MatrixMaxSizeForCoarsestLevel << endl;
+		else if (_automaticNumberOfLevels && _nLevels > 0)
+			os << _nLevels << " (automatic)" << endl;
+		else
+			os << _nLevels << endl;
+
+		os << "\t" << "Coarsening strategy: ";
+		if (CoarseningStgy == CoarseningStrategy::Standard)
+			os << "standard" << endl;
+		else if (CoarseningStgy == CoarseningStrategy::Agglomeration)
+			os << "agglomeration" << endl;
+		else if (CoarseningStgy == CoarseningStrategy::StructuredRefinement)
+			os << "structured refinement from coarse mesh" << endl;
+
+		Smoother* preSmoother = SmootherFactory::Create(PreSmootherCode, PreSmoothingIterations, BlockSizeForBlockSmoothers);
+		Smoother* postSmoother = SmootherFactory::Create(PostSmootherCode, PostSmoothingIterations, BlockSizeForBlockSmoothers);
+		os << "\t" << "Pre-smoothing      : " << *preSmoother << endl;
+		os << "\t" << "Post-smoothing     : " << *postSmoother;
+		delete preSmoother;
+		delete postSmoother;
+	}
+
 	void PrintCycleSchema()
 	{
 		StoreCycleSchema(this->_fineLevel);

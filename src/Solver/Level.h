@@ -7,7 +7,7 @@ class Level
 public:
 	int Number;
 	SparseMatrix OperatorMatrix;
-	bool UseGalerkinOperator = true;
+	bool UseGalerkinOperator = false;
 
 	Smoother* PreSmoother = nullptr;
 	Smoother* PostSmoother = nullptr;
@@ -15,6 +15,7 @@ public:
 	Level* FinerLevel = nullptr;
 	Level* CoarserLevel = nullptr;
 
+	bool ExportMatrices = false;
 	BigNumber SetupComputationalWork = 0;
 
 protected:
@@ -103,6 +104,8 @@ public:
 		return 2 * P.nonZeros();
 	}
 
+	virtual BigNumber NUnknowns() = 0;
+	virtual void CoarsenMesh(CoarseningStrategy coarseningStgy, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) = 0;
 	virtual void ExportVector(Vector& v, string suffix) = 0;
 
 	virtual ~Level()
