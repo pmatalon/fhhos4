@@ -33,6 +33,7 @@ class Program
 public:
 	Program() {}
 	virtual void Start(ProgramArguments& args) = 0;
+	virtual ~Program() {}
 };
 
 template <int Dim>
@@ -54,7 +55,7 @@ public:
 
 		Mesh<Dim>::MeshDirectory = "/mnt/c/Users/pierr/Documents/Source/Repos/dghho/data/meshes/";
 
-		Mesh<Dim>* mesh = BuildMesh(args.Discretization.N, args.Discretization.MeshCode, args.Discretization.MeshFilePath);
+		Mesh<Dim>* mesh = BuildMesh(args.Discretization.N, args.Discretization.MeshCode, args.Discretization.MeshFilePath, args.Solver.MG.CoarseningStgy);
 
 		if ((args.Actions & Action::UnitTests) == Action::UnitTests)
 		{
@@ -440,9 +441,26 @@ public:
 				}
 			}
 		}
+
+		//--------------------------//
+		//       Deallocation       //
+		//--------------------------//
 		
 		delete mesh;
 		delete sourceFunction;
+		if (args.Discretization.Method.compare("dg") == 0)
+		{
+			Poisson_DG<Dim>* dgPb = static_cast<Poisson_DG<Dim>*>(problem);
+			delete dgPb->Basis;
+		}
+		else if (args.Discretization.Method.compare("hho") == 0)
+		{
+			Poisson_HHO<Dim>* hhoPb = static_cast<Poisson_HHO<Dim>*>(problem);
+			delete hhoPb->HHO->CellBasis;
+			delete hhoPb->HHO->FaceBasis;
+			delete hhoPb->HHO->ReconstructionBasis;
+			delete hhoPb->HHO;
+		}
 		delete problem;
 		GaussLegendre::Free();
 
@@ -451,7 +469,7 @@ public:
 	}
 
 private:
-	Mesh<Dim>* BuildMesh(int n, string meshCode, string meshFilePath) { return nullptr; }
+	Mesh<Dim>* BuildMesh(int n, string meshCode, string meshFilePath, CoarseningStrategy refinementStgy) { return nullptr; }
 
 	Solver* CreateSolver(const ProgramArguments& args, Problem<Dim>* problem, int blockSize)
 	{
@@ -552,13 +570,13 @@ private:
 };
 
 template <>
-Mesh<1>* ProgramDim<1>::BuildMesh(int n, string meshCode, string meshFilePath)
+Mesh<1>* ProgramDim<1>::BuildMesh(int n, string meshCode, string meshFilePath, CoarseningStrategy refinementStgy)
 {
 	return new CartesianGrid1D(n);
 }
 
 template <>
-Mesh<2>* ProgramDim<2>::BuildMesh(int n, string meshCode, string meshFilePath)
+Mesh<2>* ProgramDim<2>::BuildMesh(int n, string meshCode, string meshFilePath, CoarseningStrategy refinementStgy)
 {
 	if (meshCode.compare("cart") == 0)
 		return new CartesianGrid2D(n, n);
@@ -573,32 +591,32 @@ Mesh<2>* ProgramDim<2>::BuildMesh(int n, string meshCode, string meshFilePath)
 #ifdef GMSH_ENABLED
 	else if (meshCode.compare("gmsh-cart") == 0)
 	{
-		GMSHMesh<2>* coarseMesh = new GMSHCartesianMesh2D();
-		GMSHMesh<2>* fineMesh = coarseMesh->RefineUntilNElements(n*n);
+		Mesh<2>* coarseMesh = new GMSHCartesianMesh2D();
+		Mesh<2>* fineMesh = coarseMesh->RefineUntilNElements(n*n, refinementStgy);
 		return fineMesh;
 	}
 	else if (meshCode.compare("gmsh-tri") == 0)
 	{
-		GMSHMesh<2>* coarseMesh = new GMSHTriangularMesh();
-		GMSHMesh<2>* fineMesh = coarseMesh->RefineUntilNElements(2*n*n);
+		Mesh<2>* coarseMesh = new GMSHTriangularMesh();
+		Mesh<2>* fineMesh = coarseMesh->RefineUntilNElements(2*n*n, refinementStgy);
 		return fineMesh;
 	}
 	else if (meshCode.compare("gmsh-uns-tri") == 0)
 	{
-		GMSHMesh<2>* coarseMesh = new GMSHUnstructuredTriangularMesh();
-		GMSHMesh<2>* fineMesh = coarseMesh->RefineUntilNElements(2*n*n);
+		Mesh<2>* coarseMesh = new GMSHUnstructuredTriangularMesh();
+		Mesh<2>* fineMesh = coarseMesh->RefineUntilNElements(2*n*n, refinementStgy);
 		return fineMesh;
 	}
 	else if (meshCode.compare("gmsh-quad") == 0)
 	{
-		GMSHMesh<2>* coarseMesh = new GMSHQuadrilateralMesh();
-		GMSHMesh<2>* fineMesh = coarseMesh->RefineUntilNElements(n*n);
+		Mesh<2>* coarseMesh = new GMSHQuadrilateralMesh();
+		Mesh<2>* fineMesh = coarseMesh->RefineUntilNElements(n*n, refinementStgy);
 		return fineMesh;
 	}
 	else if (meshCode.compare("gmsh") == 0)
 	{
-		GMSHMesh<2>* coarseMesh = new GMSHMesh<2>(meshFilePath);
-		GMSHMesh<2>* fineMesh = coarseMesh->RefineUntilNElements(2*n*n);
+		Mesh<2>* coarseMesh = new GMSHMesh<2>(meshFilePath);
+		Mesh<2>* fineMesh = coarseMesh->RefineUntilNElements(2*n*n, refinementStgy);
 		return fineMesh;
 	}
 #endif // GMSH_ENABLED
@@ -606,7 +624,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(int n, string meshCode, string meshFilePath)
 }
 
 template <>
-Mesh<3>* ProgramDim<3>::BuildMesh(int n, string meshCode, string meshFilePath)
+Mesh<3>* ProgramDim<3>::BuildMesh(int n, string meshCode, string meshFilePath, CoarseningStrategy refinementStgy)
 {
 	if (meshCode.compare("cart") == 0)
 	{
@@ -620,8 +638,8 @@ Mesh<3>* ProgramDim<3>::BuildMesh(int n, string meshCode, string meshFilePath)
 #ifdef GMSH_ENABLED
 	else if (meshCode.compare("gmsh-cart") == 0)
 	{
-		GMSHMesh<3>* coarseMesh = new GMSHCartesianMesh3D();
-		GMSHMesh<3>* fineMesh = coarseMesh->RefineUntilNElements(n*n*n);
+		Mesh<3>* coarseMesh = new GMSHCartesianMesh3D();
+		Mesh<3>* fineMesh = coarseMesh->RefineUntilNElements(n*n*n, refinementStgy);
 
 		assert(fineMesh->Elements.size() == n*n*n);
 		assert(fineMesh->Faces.size() == 3*n*n*(n+1));
@@ -630,8 +648,8 @@ Mesh<3>* ProgramDim<3>::BuildMesh(int n, string meshCode, string meshFilePath)
 	}
 	else if (meshCode.compare("gmsh-tetra") == 0)
 	{
-		GMSHMesh<3>* coarseMesh = new GMSHTetrahedralMesh();
-		GMSHMesh<3>* fineMesh = coarseMesh->RefineUntilNElements(6*n*n*n);
+		Mesh<3>* coarseMesh = new GMSHTetrahedralMesh();
+		Mesh<3>* fineMesh = coarseMesh->RefineUntilNElements(6*n*n*n, refinementStgy);
 
 		assert(fineMesh->Elements.size() == 6*n*n*n);
 		assert(fineMesh->Faces.size() == 12*n*n*n + 6*n*n);
@@ -640,8 +658,8 @@ Mesh<3>* ProgramDim<3>::BuildMesh(int n, string meshCode, string meshFilePath)
 	}
 	else if (meshCode.compare("gmsh") == 0)
 	{
-		GMSHMesh<3>* coarseMesh = new GMSHMesh<3>(meshFilePath);
-		GMSHMesh<3>* fineMesh = coarseMesh->RefineUntilNElements(6*n*n*n);
+		Mesh<3>* coarseMesh = new GMSHMesh<3>(meshFilePath);
+		Mesh<3>* fineMesh = coarseMesh->RefineUntilNElements(6*n*n*n, refinementStgy);
 		return fineMesh;
 	}
 #endif // GMSH_ENABLED

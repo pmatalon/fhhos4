@@ -24,19 +24,7 @@ enum GMSHFaceTypes
 };
 
 template <int Dim>
-class MeshVertex : public Vertex
-{
-public:
-	vector<Element<Dim>*> Elements;
-	vector<Face<Dim>*> Faces;
-
-	MeshVertex(BigNumber number, double x) : Vertex(number, x) {}
-	MeshVertex(BigNumber number, double x, double y) : Vertex(number, x, y) {}
-	MeshVertex(BigNumber number, double x, double y, double z) : Vertex(number, x, y, z) {}
-};
-
-template <int Dim>
-class GMSHMesh : public PolyhedralMesh<Dim>
+class GMSHMesh : virtual public PolyhedralMesh<Dim>
 {
 protected:
 	string _description = "GMSH file";
@@ -45,6 +33,7 @@ protected:
 	map<size_t, Element<Dim>*> _elementExternalNumbers;
 	map<size_t, MeshVertex<Dim>*> _vertexExternalNumbers;
 	double _h = -1;
+	double _regularity = 1;
 public:
 	GMSHMesh(string mshFile, string description, string fileNamePart) : PolyhedralMesh<Dim>()
 	{
@@ -156,6 +145,9 @@ private:
 
 				if (e->Diameter() > this->_h)
 					this->_h = e->Diameter();
+
+				if (e->Regularity() < this->_regularity)
+					this->_regularity = e->Regularity();
 			}
 		}
 
@@ -183,7 +175,7 @@ protected:
 	}
 
 public:
-	~GMSHMesh()
+	virtual ~GMSHMesh()
 	{
 		if (!this->CoarseMesh)
 			gmsh::finalize();
@@ -204,18 +196,32 @@ public:
 		return _h;
 	}
 
-	void CoarsenMesh(CoarseningStrategy strategy) override
+	double Regularity() override
 	{
-		if (strategy != CoarseningStrategy::StructuredRefinement)
-			assert(false && "Unmanaged coarsening strategy");
+		return _regularity;
 	}
 
-	virtual void RefineMesh()
+	void CoarsenMesh(CoarseningStrategy strategy) override
+	{
+		if (strategy == CoarseningStrategy::SplittingRefinement || strategy == CoarseningStrategy::BeyRefinement)
+			return;
+		PolyhedralMesh<Dim>::CoarsenMesh(strategy);
+	}
+
+	virtual void RefineMesh(CoarseningStrategy strategy)
 	{
 		if (this->FineMesh)
 			assert(false && "Mesh already refined!");
 
-		cout << "Mesh refinement" << endl;
+		if (strategy == CoarseningStrategy::SplittingRefinement)
+			RefineMeshBySplitting();
+		else
+			Utils::FatalError("Unmanaged refinement strategy");
+	}
+
+	virtual void RefineMeshBySplitting()
+	{
+		cout << "Mesh refinement by splitting" << endl;
 
 		string coarse_mesh_tmp_file = "./temporary_coarse.msh";
 		string fine_mesh_tmp_file = "./temporary_fine.msh";
@@ -223,12 +229,12 @@ public:
 		// Save the current mesh in a temporary file, because the refinement will delete it
 		gmsh::write(coarse_mesh_tmp_file);
 
-		// Mesh refinement
+		// Mesh refinement by splitting
 		gmsh::model::mesh::refine();
 
 		// Building our own mesh objects from the GMSH ones
-		GMSHMesh<Dim>* fineMesh = CreateEmptyMesh();
-		fineMesh->ComesFrom.CS = CoarseningStrategy::StructuredRefinement;
+		GMSHMesh<Dim>* fineMesh = CreateEmptyGMSHMesh();
+		fineMesh->ComesFrom.CS = CoarseningStrategy::SplittingRefinement;
 
 		this->FineMesh = fineMesh;
 		this->FineMesh->CoarseMesh = this;
@@ -253,93 +259,12 @@ public:
 		remove(fine_mesh_tmp_file.c_str());
 
 		// Continue linking
-		for (Face<Dim>* fineFace : fineMesh->Faces)
-		{
-			// Boundary face
-			if (fineFace->IsDomainBoundary)
-			{
-				fineFace->IsRemovedOnCoarserGrid = false;
-				for (Face<Dim>* coarseFace : fineFace->Element1->CoarserElement->Faces)
-				{
-					if (coarseFace->IsDomainBoundary && coarseFace->Contains(fineFace->Center()))
-					{
-						fineFace->CoarseFace = coarseFace;
-						coarseFace->FinerFaces.push_back(fineFace);
-						break;
-					}
-				}
-				// If no coarse face has been found, it may be because the geometry is curved and the refinement yields a non-nested mesh.
-				// In that case, we take the closest one w.r.t. the centers
-				if (!fineFace->CoarseFace)
-				{
-					double smallestDistance = -1;
-					Face<Dim>* closestCoarseFace = nullptr;
-					for (Face<Dim>* coarseFace : fineFace->Element1->CoarserElement->Faces)
-					{
-						if (coarseFace->IsDomainBoundary)
-						{
-							double distance = Vect<3>(fineFace->Center(), coarseFace->Center()).norm();
-							if (!closestCoarseFace || distance < smallestDistance)
-							{
-								smallestDistance = distance;
-								closestCoarseFace = coarseFace;
-							}
-						}
-					}
-					if (closestCoarseFace)
-					{
-						fineFace->CoarseFace = closestCoarseFace;
-						closestCoarseFace->FinerFaces.push_back(fineFace);
-					}
-					else
-						assert(false && "A coarse face should have been found.");
-				}
-			}
-			// Interior face
-			else
-			{
-				Element<Dim>* coarseElement1 = fineFace->Element1->CoarserElement;
-				Element<Dim>* coarseElement2 = fineFace->Element2->CoarserElement;
-				fineFace->IsRemovedOnCoarserGrid = coarseElement1 == coarseElement2;
-				if (!fineFace->IsRemovedOnCoarserGrid)
-				{
-					// TODO: change InterfaceWith so it returns a vector of faces (local refinement)
-					Face<Dim>* coarseFace = coarseElement1->InterfaceWith(coarseElement2);
-					assert(coarseFace != nullptr);
-					fineFace->CoarseFace = coarseFace;
-					coarseFace->FinerFaces.push_back(fineFace);
-				}
-				else
-					coarseElement1->FinerFacesRemoved.push_back(fineFace);
-			}
-		}
+		fineMesh->LinkFacesToCoarseFaces();
 	}
 
-	virtual GMSHMesh<Dim>* CreateEmptyMesh()
+	virtual GMSHMesh<Dim>* CreateEmptyGMSHMesh()
 	{
 		return new GMSHMesh<Dim>(this->_description, this->_fileNamePart);
-	}
-
-	GMSHMesh<Dim>* RefineNTimes(int nRefinements)
-	{
-		GMSHMesh<Dim>* mesh = this;
-		for (int i = 0; i < nRefinements; i++)
-		{
-			mesh->RefineMesh();
-			mesh = static_cast<GMSHMesh<Dim>*>(mesh->FineMesh);
-		}
-		return mesh;
-	}
-
-	GMSHMesh<Dim>* RefineUntilNElements(BigNumber nElements)
-	{
-		GMSHMesh<Dim>* mesh = this;
-		while (mesh->Elements.size() < nElements)
-		{
-			mesh->RefineMesh();
-			mesh = static_cast<GMSHMesh<Dim>*>(mesh->FineMesh);
-		}
-		return mesh;
 	}
 
 private:
@@ -424,8 +349,8 @@ protected:
 
 		if (this->CoarseMesh)
 		{
-			myMesh->CoarsenMesh(CoarseningStrategy::Standard);
-			static_cast<GMSHMesh<Dim>*>(this->CoarseMesh)->RenumberLike(myMesh->CoarseMesh);
+			myMesh->CoarsenMesh(CoarseningStrategy::StandardCoarsening);
+			dynamic_cast<GMSHMesh<Dim>*>(this->CoarseMesh)->RenumberLike(myMesh->CoarseMesh);
 		}
 	}
 

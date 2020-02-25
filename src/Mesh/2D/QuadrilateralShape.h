@@ -10,6 +10,7 @@ private:
 	double _diameter;
 	double _measure;
 	DomPoint _center;
+	double _inRadius;
 
 	double a0;
 	double a1;
@@ -50,6 +51,8 @@ public:
 		_diameter = max(diag13, diag24);
 
 		_measure = 0.25 * sqrt(4 * diag13*diag13 * diag24*diag24 - pow(edge12*edge12 + edge34 * edge34 - edge23 * edge23 - edge41 * edge41, 2));
+
+		_inRadius = 2 * _measure / (edge12 + edge23 + edge34 + edge41);
 
 		_center = DomPoint((V1->X + V2->X + V3->X + V4->X) / 4, (V1->Y + V2->Y + V3->Y + V4->Y) / 4);
 
@@ -98,6 +101,10 @@ public:
 	inline DomPoint Center() const override
 	{
 		return _center;
+	}
+	inline double InRadius() const override
+	{
+		return _inRadius;
 	}
 	inline bool Contains(DomPoint p) const override
 	{

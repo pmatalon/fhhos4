@@ -48,6 +48,10 @@ public:
 	{
 		return _center;
 	}
+	inline double InRadius() const override
+	{
+		return 0;
+	}
 	inline bool Contains(DomPoint p) const override
 	{
 		return Geometry::IsInSegment(*Vertex1, *Vertex2, p);

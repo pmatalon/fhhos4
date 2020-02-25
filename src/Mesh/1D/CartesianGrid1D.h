@@ -73,9 +73,18 @@ public:
 		return (double)1 / this->N;
 	}
 
-	void CoarsenMesh(CoarseningStrategy strategy)
+	double Regularity() override
 	{
-		cout << "Error: CoarsenMesh not implemented!" << endl;
-		exit(EXIT_FAILURE);
+		assert(false);
+	}
+
+	void CoarsenMesh(CoarseningStrategy strategy) override
+	{
+		Utils::FatalError("Coarsening strategy not implemented!");
+	}
+
+	void RefineMesh(CoarseningStrategy strategy) override
+	{
+		Utils::FatalError("Refinement strategy not implemented!");
 	}
 };

@@ -11,6 +11,7 @@ private:
 	double _diameter;
 	double _measure;
 	DomPoint _center;
+	double _inRadius;
 
 	DimMatrix<2> _inverseMapping;
 	bool _doNotUseX = false;
@@ -42,6 +43,8 @@ public:
 		_measure = 0.5 * v12.cross(v13).norm();
 
 		_center = DomPoint((V1->X + V2->X + V3->X) / 3, (V1->Y + V2->Y + V3->Y) / 3, (V1->Z + V2->Z + V3->Z) / 3);
+
+		_inRadius = 2 * _measure / (v12.norm() + v13.norm() + v23.norm());
 
 		_detJacobian = _measure / RefShape()->Measure();
 		
@@ -98,6 +101,10 @@ public:
 	inline DomPoint Center() const override
 	{
 		return _center;
+	}
+	inline double InRadius() const override
+	{
+		return _inRadius;
 	}
 	inline bool Contains(DomPoint p) const override
 	{

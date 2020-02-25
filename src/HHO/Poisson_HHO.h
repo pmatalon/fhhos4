@@ -101,9 +101,10 @@ public:
 	void PrintDiscretization()
 	{
 		cout << "Mesh: " << this->_mesh->Description() << endl;
-		cout << "    Elements: " << HHO->nElements << endl;
-		cout << "    Faces   : " << HHO->nFaces << " (" << HHO->nInteriorFaces << " interior + " << HHO->nBoundaryFaces << " boundary)" << endl;
-		cout << "    h       : " << scientific << this->_mesh->H() << defaultfloat << endl;
+		cout << "    Elements  : " << HHO->nElements << endl;
+		cout << "    Faces     : " << HHO->nFaces << " (" << HHO->nInteriorFaces << " interior + " << HHO->nBoundaryFaces << " boundary)" << endl;
+		cout << "    h         : " << scientific << this->_mesh->H() << defaultfloat << endl;
+		cout << "    Regularity: " << this->_mesh->Regularity() << defaultfloat << endl;
 		cout << "Discretization: Hybrid High Order (k = " << HHO->FaceBasis->GetDegree() << ")" << endl;
 		cout << "    Reconstruction basis: " << HHO->ReconstructionBasis->Name() << endl;
 		cout << "    Cell basis          : " << HHO->CellBasis->Name() << endl;

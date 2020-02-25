@@ -24,5 +24,6 @@ public:
 			return new BlockDampedJacobi23Smoother(blockSize, nSmootherIterations);
 
 		Utils::FatalError("Unmanaged smoother code: '" + smootherCode + "'");
+		return nullptr;
 	}
 };

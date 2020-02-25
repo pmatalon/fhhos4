@@ -25,6 +25,26 @@ struct CoarseningStrategyDetails
 };
 
 template <int Dim>
+class MeshVertex : public Vertex
+{
+public:
+	vector<Element<Dim>*> Elements;
+	vector<Face<Dim>*> Faces;
+
+	MeshVertex(BigNumber number, double x) : Vertex(number, x) {}
+	MeshVertex(BigNumber number, double x, double y) : Vertex(number, x, y) {}
+	MeshVertex(BigNumber number, double x, double y, double z) : Vertex(number, x, y, z) {}
+	MeshVertex(BigNumber number, DomPoint p) : Vertex(number, p) {}
+	MeshVertex(const Vertex v) : Vertex(v) {}
+
+	~MeshVertex() override
+	{
+		Elements.clear();
+		Faces.clear();
+	}
+};
+
+template <int Dim>
 class Mesh
 {
 public:
@@ -50,7 +70,9 @@ public:
 	virtual string Description() = 0;
 	virtual string FileNamePart() = 0;
 	virtual double H() = 0;
+	virtual double Regularity() = 0;
 	virtual void CoarsenMesh(CoarseningStrategy strategy) = 0;
+	virtual void RefineMesh(CoarseningStrategy strategy) = 0;
 
 	void AddFace(Face<Dim>* f)
 	{
@@ -67,6 +89,25 @@ public:
 		for (Face<Dim>* face : this->Faces)
 			measure += face->Measure();
 		return measure;
+	}
+
+	Face<Dim>* ExistingFaceWithVertices(vector<MeshVertex<Dim>*> vertices)
+	{
+		for (Face<Dim>* f : vertices[0]->Faces)
+		{
+			bool thisFaceHasAllVertices = true;
+			for (int k = 1; k < vertices.size(); k++)
+			{
+				if (!f->HasVertex(vertices[k]))
+				{
+					thisFaceHasAllVertices = false;
+					break;
+				}
+			}
+			if (thisFaceHasAllVertices)
+				return f;
+		}
+		return nullptr;
 	}
 
 	void SetDiffusionCoefficient(DiffusionPartition<Dim>* diffusionPartition)
@@ -119,6 +160,71 @@ public:
 			f->ExportFaceToMatlab(file);
 		fclose(file);
 		cout << "Faces exported to \t" << filePath << endl;
+	}
+
+	void LinkFacesToCoarseFaces()
+	{
+		// Continue linking
+		for (Face<Dim>* fineFace : this->Faces)
+		{
+			// Boundary face
+			if (fineFace->IsDomainBoundary)
+			{
+				fineFace->IsRemovedOnCoarserGrid = false;
+				for (Face<Dim>* coarseFace : fineFace->Element1->CoarserElement->Faces)
+				{
+					if (coarseFace->IsDomainBoundary && coarseFace->Contains(fineFace->Center()))
+					{
+						fineFace->CoarseFace = coarseFace;
+						coarseFace->FinerFaces.push_back(fineFace);
+						break;
+					}
+				}
+				// If no coarse face has been found, it may be because the geometry is curved and the refinement yields a non-nested mesh.
+				// In that case, we take the closest one w.r.t. the centers
+				if (!fineFace->CoarseFace)
+				{
+					double smallestDistance = -1;
+					Face<Dim>* closestCoarseFace = nullptr;
+					for (Face<Dim>* coarseFace : fineFace->Element1->CoarserElement->Faces)
+					{
+						if (coarseFace->IsDomainBoundary)
+						{
+							double distance = Vect<Dim>(fineFace->Center(), coarseFace->Center()).norm();
+							if (!closestCoarseFace || distance < smallestDistance)
+							{
+								smallestDistance = distance;
+								closestCoarseFace = coarseFace;
+							}
+						}
+					}
+					if (closestCoarseFace)
+					{
+						fineFace->CoarseFace = closestCoarseFace;
+						closestCoarseFace->FinerFaces.push_back(fineFace);
+					}
+					else
+						assert(false && "A coarse face should have been found.");
+				}
+			}
+			// Interior face
+			else
+			{
+				Element<Dim>* coarseElement1 = fineFace->Element1->CoarserElement;
+				Element<Dim>* coarseElement2 = fineFace->Element2->CoarserElement;
+				fineFace->IsRemovedOnCoarserGrid = coarseElement1 == coarseElement2;
+				if (!fineFace->IsRemovedOnCoarserGrid)
+				{
+					// TODO: change InterfaceWith so it returns a vector of faces (local refinement)
+					Face<Dim>* coarseFace = coarseElement1->InterfaceWith(coarseElement2);
+					assert(coarseFace != nullptr);
+					fineFace->CoarseFace = coarseFace;
+					coarseFace->FinerFaces.push_back(fineFace);
+				}
+				else
+					coarseElement1->FinerFacesRemoved.push_back(fineFace);
+			}
+		}
 	}
 
 	virtual void Serialize(ostream& os) const
@@ -229,9 +335,9 @@ public:
 			}
 
 			Mesh<Dim>* meshToGetInfo = nullptr;
-			if (this->ComesFrom.CS == CoarseningStrategy::StructuredRefinement)
+			if (this->ComesFrom.CS == CoarseningStrategy::SplittingRefinement || this->ComesFrom.CS == CoarseningStrategy::BeyRefinement)
 				meshToGetInfo = this;
-			else if (CoarseMesh->ComesFrom.CS == CoarseningStrategy::Standard || CoarseMesh->ComesFrom.CS == CoarseningStrategy::Agglomeration)
+			else if (CoarseMesh->ComesFrom.CS == CoarseningStrategy::StandardCoarsening || CoarseMesh->ComesFrom.CS == CoarseningStrategy::AgglomerationCoarsening)
 				meshToGetInfo = CoarseMesh;
 
 			if (meshToGetInfo != nullptr && meshToGetInfo->ComesFrom.HasDetails())
@@ -250,6 +356,28 @@ public:
 				assert(this->Faces.size() == nFineFacesByKeptCoarseFace * CoarseMesh->Faces.size() + finerFacesAdded);
 			}
 		}
+	}
+
+	Mesh<Dim>* RefineNTimes(int nRefinements, CoarseningStrategy strategy)
+	{
+		Mesh<Dim>* mesh = this;
+		for (int i = 0; i < nRefinements; i++)
+		{
+			mesh->RefineMesh(strategy);
+			mesh = mesh->FineMesh;
+		}
+		return mesh;
+	}
+
+	Mesh<Dim>* RefineUntilNElements(BigNumber nElements, CoarseningStrategy strategy)
+	{
+		Mesh<Dim>* mesh = this;
+		while (mesh->Elements.size() < nElements)
+		{
+			mesh->RefineMesh(strategy);
+			mesh = mesh->FineMesh;
+		}
+		return mesh;
 	}
 
 	virtual ~Mesh() 

@@ -1,27 +1,62 @@
 #pragma once
 #include "../GMSHMesh.h"
+#include "TetrahedralMesh.h"
 using namespace std;
 
-class GMSHTetrahedralMesh : public GMSHMesh<3>
+class GMSHTetrahedralMesh : public GMSHMesh<3>, public TetrahedralMesh
 {
 public:
-	GMSHTetrahedralMesh() : GMSHMesh("cube4tetra.geo", "GMSH tetrahedral", "gmsh-tetra")
+	GMSHTetrahedralMesh() :
+		GMSHMesh("cube4tetra.geo", "GMSH tetrahedral", "gmsh-tetra")
 	{}
+
+	string Description() override
+	{
+		return GMSHMesh<3>::Description();
+	}
+
+	string FileNamePart() override
+	{
+		return GMSHMesh<3>::FileNamePart();
+	}
+
+	double H() override
+	{
+		return GMSHMesh<3>::H();
+	}
+
+	double Regularity() override
+	{
+		return GMSHMesh<3>::Regularity();
+	}
 private:
 	GMSHTetrahedralMesh(string description, string fileNamePart) : GMSHMesh(description, fileNamePart)
 	{}
 
 public:
-	void RefineMesh() override
+	void RefineMeshBySplitting() override
 	{
-		GMSHMesh::RefineMesh();
+		GMSHMesh::RefineMeshBySplitting();
 		this->FineMesh->ComesFrom.nFineElementsByCoarseElement = 8;
 		this->FineMesh->ComesFrom.nFineFacesAddedByCoarseElement = 8;
 		this->FineMesh->ComesFrom.nFineFacesByKeptCoarseFace = 4;
 	}
 
+	void RefineMesh(CoarseningStrategy strategy) override
+	{
+		if (this->FineMesh)
+			assert(false && "Mesh already refined!");
+
+		if (strategy == CoarseningStrategy::SplittingRefinement)
+			this->RefineMeshBySplitting();
+		else if (strategy == CoarseningStrategy::BeyRefinement)
+			TetrahedralMesh::RefineMeshByBeyMethod();
+		else
+			assert(false && "Unmanaged refinement strategy");
+	}
+
 protected:
-	virtual GMSHMesh<3>* CreateEmptyMesh() override
+	virtual GMSHMesh<3>* CreateEmptyGMSHMesh() override
 	{
 		return new GMSHTetrahedralMesh(this->_description, this->_fileNamePart);
 	}

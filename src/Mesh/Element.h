@@ -54,6 +54,14 @@ public:
 	{
 		return Shape()->Center();
 	}
+	virtual double InRadius() const
+	{
+		return Shape()->InRadius();
+	}
+	virtual double Regularity() const
+	{
+		return Shape()->Regularity();
+	}
 	virtual DimVector<Dim> OuterNormalVector(Face<Dim>* face) const = 0;
 
 	// Transformation to reference element

@@ -20,6 +20,12 @@ public:
 	{
 		this->Number = number;
 	}
+	Vertex(BigNumber number, DomPoint p) : DomPoint(p)
+	{
+		this->Number = number;
+	}
+
+	virtual ~Vertex() {}
 };
 
 DimVector<2> operator-(Point const& A, Point const& B)
@@ -46,4 +52,16 @@ template<int Dim>
 DimVector<Dim> Vect(Vertex* A, Vertex* B)
 {
 	return Vect<Dim>(*A, *B);
+}
+
+template<int Dim>
+DomPoint Middle(Vertex* A, Vertex* B)
+{
+	if (Dim == 1)
+		return DomPoint((A->X + B->X) / 2);
+	else if (Dim == 2)
+		return DomPoint((A->X + B->X) / 2, (A->Y + B->Y) / 2);
+	else if (Dim == 3)
+		return DomPoint((A->X + B->X) / 2, (A->Y + B->Y) / 2, (A->Z + B->Z) / 2);
+	assert(false);
 }

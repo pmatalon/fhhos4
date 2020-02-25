@@ -164,7 +164,8 @@ void print_usage() {
 	cout << "      Coarsening strategy of the multigrid." << endl;
 	cout << "              s   - standard coarsening (merge colinear faces on the coarse mesh)" << endl;
 	cout << "              a   - agglomeration coarsening (keep fine faces on the coarse mesh)" << endl;
-	cout << "              r   - fine meshes obtained by structured refinement of the coarse mesh" << endl;
+	cout << "              r   - fine meshes obtained by structured refinement of the coarse mesh using a splitting method" << endl;
+	cout << "              b   - fine meshes obtained by structured refinement of the coarse mesh using the Bey method" << endl;
 	cout << endl;
 	cout << "-prolong NUM" << endl;
 	cout << "      How the prolongation operator is built." << endl;
@@ -491,7 +492,7 @@ int main(int argc, char* argv[])
 			case OPT_CoarseningStrategy:
 			{
 				string coarseningStgyCode = optarg;
-				if (coarseningStgyCode.compare("s") != 0 && coarseningStgyCode.compare("a") != 0 && coarseningStgyCode.compare("r") != 0)
+				if (coarseningStgyCode.compare("s") != 0 && coarseningStgyCode.compare("a") != 0 && coarseningStgyCode.compare("r") != 0 && coarseningStgyCode.compare("b") != 0)
 					argument_error("unknown coarsening strategy code '" + coarseningStgyCode + "'. Check -cs argument.");
 				args.Solver.MG.CoarseningStgyCode = coarseningStgyCode;
 				break;
@@ -606,20 +607,27 @@ int main(int argc, char* argv[])
 			args.Solver.SolverCode = "eigencg";
 	}
 
-	args.Solver.MG.CoarseningStgy = CoarseningStrategy::Standard;
+	args.Solver.MG.CoarseningStgy = CoarseningStrategy::StandardCoarsening;
 	if (args.Solver.MG.CoarseningStgyCode.compare("default") == 0)
 	{
 		if (args.Discretization.MeshCode.find("gmsh") == 0)
-			args.Solver.MG.CoarseningStgy = CoarseningStrategy::StructuredRefinement;
+		{
+			if (args.Problem.Dimension == 2)
+				args.Solver.MG.CoarseningStgy = CoarseningStrategy::SplittingRefinement;
+			else if (args.Problem.Dimension == 3)
+				args.Solver.MG.CoarseningStgy = CoarseningStrategy::BeyRefinement;
+		}
 		else
-			args.Solver.MG.CoarseningStgy = CoarseningStrategy::Standard;
+			args.Solver.MG.CoarseningStgy = CoarseningStrategy::StandardCoarsening;
 	}
 	else if (args.Solver.MG.CoarseningStgyCode.compare("s") == 0)
-		args.Solver.MG.CoarseningStgy = CoarseningStrategy::Standard;
+		args.Solver.MG.CoarseningStgy = CoarseningStrategy::StandardCoarsening;
 	else if (args.Solver.MG.CoarseningStgyCode.compare("a") == 0)
-		args.Solver.MG.CoarseningStgy = CoarseningStrategy::Agglomeration;
+		args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarsening;
 	else if (args.Solver.MG.CoarseningStgyCode.compare("r") == 0)
-		args.Solver.MG.CoarseningStgy = CoarseningStrategy::StructuredRefinement;
+		args.Solver.MG.CoarseningStgy = CoarseningStrategy::SplittingRefinement;
+	else if (args.Solver.MG.CoarseningStgyCode.compare("b") == 0)
+		args.Solver.MG.CoarseningStgy = CoarseningStrategy::BeyRefinement;
 
 
 	args.Actions = Action::LogAssembly;

@@ -150,17 +150,27 @@ public:
 		return 1.0 / this->Nx;
 	}
 
+	double Regularity() override
+	{
+		return min((double)this->Nx, (double)this->Ny) / max((double)this->Nx, (double)this->Ny);
+	}
+
 	void CoarsenMesh(CoarseningStrategy strategy) override
 	{
 		/*if (strategy == CoarseningStrategy::Standard)
 			CoarsenByAgglomerationAndMergeColinearFaces();
-		else*/ if (strategy == CoarseningStrategy::Agglomeration)
+		else*/ if (strategy == CoarseningStrategy::AgglomerationCoarsening)
 			CoarsenByAgglomerationAndKeepFineFaces();
 		else
 			assert(false && "Coarsening strategy not implemented!");
 
 		this->CoarseMesh->SetDiffusionCoefficient(this->_diffusionPartition);
 		this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
+	}
+
+	void RefineMesh(CoarseningStrategy strategy) override
+	{
+		Utils::FatalError("Refinement strategy not implemented!");
 	}
 
 	void CoarsenByAgglomerationAndKeepFineFaces()
@@ -177,7 +187,7 @@ public:
 			CartesianPolygonalMesh2D* coarseMesh = new CartesianPolygonalMesh2D();
 			coarseMesh->Nx = nx / 2;
 			coarseMesh->Ny = ny / 2;
-			coarseMesh->ComesFrom.CS = CoarseningStrategy::Agglomeration;
+			coarseMesh->ComesFrom.CS = CoarseningStrategy::AgglomerationCoarsening;
 			coarseMesh->ComesFrom.nFineElementsByCoarseElement = 4;
 			coarseMesh->ComesFrom.nFineFacesAddedByCoarseElement = 4;
 			coarseMesh->ComesFrom.nFineFacesByKeptCoarseFace = 1;

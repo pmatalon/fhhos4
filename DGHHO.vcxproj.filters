@@ -309,6 +309,9 @@
       <Filter>Mesh\3D</Filter>
     </ClInclude>
     <ClInclude Include="src\ProgramArguments.h" />
+    <ClInclude Include="src\Mesh\3D\TetrahedralMesh.h">
+      <Filter>Mesh\3D</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

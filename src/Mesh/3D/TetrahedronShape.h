@@ -10,6 +10,7 @@ private:
 	double _diameter;
 	double _measure;
 	DomPoint _center;
+	double _inRadius;
 
 	DimMatrix<3> _inverseMapping;
 	DimMatrix<3> _inverseJacobianTranspose;
@@ -25,6 +26,7 @@ public:
 
 	TetrahedronShape(Vertex* v1, Vertex* v2, Vertex* v3, Vertex* v4)
 	{
+		assert(*v1 != *v2 && *v1 != *v3 && *v1 != *v4 && *v2 != *v3 && *v2 != *v4 && *v3 != *v4);
 		V1 = v1;
 		V2 = v2;
 		V3 = v3;
@@ -34,21 +36,29 @@ public:
 
 	void Init()
 	{
-		double lengthEdge12 = Vect<3>(V1, V2).norm();
-		double lengthEdge13 = Vect<3>(V1, V3).norm();
-		double lengthEdge14 = Vect<3>(V1, V4).norm();
-		double lengthEdge23 = Vect<3>(V2, V3).norm();
-		double lengthEdge24 = Vect<3>(V2, V4).norm();
-		double lengthEdge34 = Vect<3>(V3, V4).norm();
+		DimVector<3> v12 = Vect<3>(V1, V2);
+		DimVector<3> v13 = Vect<3>(V1, V3);
+		DimVector<3> v14 = Vect<3>(V1, V4);
+		DimVector<3> v23 = Vect<3>(V2, V3);
+		DimVector<3> v24 = Vect<3>(V2, V4);
+		DimVector<3> v34 = Vect<3>(V3, V4);
+		double lengthEdge12 = v12.norm();
+		double lengthEdge13 = v13.norm();
+		double lengthEdge14 = v14.norm();
+		double lengthEdge23 = v23.norm();
+		double lengthEdge24 = v24.norm();
+		double lengthEdge34 = v34.norm();
 		_diameter = max({ lengthEdge12, lengthEdge13, lengthEdge14, lengthEdge23, lengthEdge24, lengthEdge34 });
 
 		DimMatrix<3> m;
-		m.col(0) = Vect<3>(V1, V2);
-		m.col(1) = Vect<3>(V1, V3);
-		m.col(2) = Vect<3>(V1, V4);
+		m.col(0) = v12;
+		m.col(1) = v13;
+		m.col(2) = v14;
 		_measure = abs(m.determinant()) / 6;
 
 		_center = DomPoint((V1->X + V2->X + V3->X + V4->X) / 4, (V1->Y + V2->Y + V3->Y + V4->Y) / 4, (V1->Z + V2->Z + V3->Z + V4->Z) / 4);
+
+		_inRadius = 3 * _measure / (0.5*v12.cross(v13).norm() + 0.5*v13.cross(v14).norm() + 0.5*v14.cross(v12).norm() + 0.5*v23.cross(v24).norm());
 
 		_detJacobian = _measure / RefTetra.Measure();
 
@@ -92,6 +102,10 @@ public:
 	inline DomPoint Center() const override
 	{
 		return _center;
+	}
+	inline double InRadius() const override
+	{
+		return _inRadius;
 	}
 	inline bool Contains(DomPoint p) const override
 	{

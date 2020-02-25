@@ -19,7 +19,8 @@ using DimMatrix = Eigen::Matrix<double, Dim, Dim>;
 enum class CoarseningStrategy : unsigned
 {
 	None,
-	Standard,
-	Agglomeration,
-	StructuredRefinement
+	StandardCoarsening,
+	AgglomerationCoarsening,
+	SplittingRefinement,
+	BeyRefinement
 };

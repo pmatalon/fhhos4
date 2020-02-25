@@ -11,9 +11,9 @@ public:
 		this->_fileNamePart = "gmsh-uns-tri";
 	}
 
-	void RefineMesh() override
+	void RefineMeshBySplitting() override
 	{
-		GMSHMesh::RefineMesh();
+		GMSHMesh::RefineMeshBySplitting();
 		this->FineMesh->ComesFrom.nFineElementsByCoarseElement = 4;
 		this->FineMesh->ComesFrom.nFineFacesAddedByCoarseElement = 3;
 		this->FineMesh->ComesFrom.nFineFacesByKeptCoarseFace = 2;

@@ -18,6 +18,7 @@ public:
 	virtual double Diameter() const = 0;
 	virtual double Measure() const = 0;
 	virtual DomPoint Center() const = 0;
+	virtual double InRadius() const = 0;
 
 	// Integrals
 	virtual double Integral(RefFunction func) const = 0;
@@ -26,6 +27,11 @@ public:
 	virtual double Integral(DomFunction globalFunction, int polynomialDegree) const = 0;
 
 	//--------------------------------------------------------------------------------//
+
+	double Regularity() const
+	{
+		return 2 * InRadius() / Diameter();
+	}
 
 	virtual ~GeometricShape() {}
 

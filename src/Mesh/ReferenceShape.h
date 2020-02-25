@@ -25,6 +25,11 @@ protected:
 public:
 	ReferenceShape() {}
 
+	double InRadius() const override
+	{
+		assert(false);
+	}
+
 	virtual double Integral(RefFunction func) const = 0;
 	virtual double Integral(RefFunction func, int polynomialDegree) const = 0;
 

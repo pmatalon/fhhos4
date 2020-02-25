@@ -21,6 +21,7 @@ private:
 	double _diameter;
 	double _measure;
 	DomPoint _center;
+	double _inRadius = 0;
 public:
 	DomPoint* Origin;
 	double WidthX = 0;
@@ -146,7 +147,10 @@ public:
 		else if (ShapeDim == 2)
 		{
 			if (DomainDim == 2)
+			{
 				this->_center = DomPoint(Origin->X + WidthX / 2, Origin->Y + WidthY / 2);
+				_inRadius = min(WidthX, WidthY);
+			}
 			else
 			{
 				if (this->Orientation == CartesianShapeOrientation::InXOY)
@@ -161,6 +165,7 @@ public:
 		{
 			assert(DomainDim == 3);
 			this->_center = DomPoint(Origin->X + WidthX / 2, Origin->Y + WidthY / 2, Origin->Z + WidthZ / 2);
+			_inRadius = min({ WidthX, WidthY, WidthZ });
 		}
 	}
 
@@ -201,6 +206,10 @@ public:
 	DomPoint Center() const override
 	{
 		return _center;
+	}
+	double InRadius() const override
+	{
+		return _inRadius;
 	}
 	inline bool Contains(DomPoint p) const override
 	{

@@ -11,6 +11,7 @@ private:
 	double _diameter;
 	double _measure;
 	Vertex* _center;
+	double _inRadius;
 
 	vector<TriangleShape*> _triangulation;
 	QuadrilateralShape* _boundingBox;
@@ -53,6 +54,8 @@ public:
 		_measure = 0;
 		for (TriangleShape* t : _triangulation)
 			_measure += t->Measure();
+
+		_inRadius = 0;
 	}
 
 	ReferenceShape<2>* RefShape() const
@@ -76,6 +79,10 @@ public:
 	inline DomPoint Center() const override
 	{
 		return *_center;
+	}
+	inline double InRadius() const override
+	{
+		return _inRadius;
 	}
 	inline bool Contains(DomPoint p) const override
 	{

@@ -11,7 +11,7 @@ private:
 	TetrahedronShape* _shape;
 
 public:
-	Tetrahedron(int number, Vertex* v1, Vertex* v2, Vertex* v3, Vertex* v4) :
+	Tetrahedron(BigNumber number, Vertex* v1, Vertex* v2, Vertex* v3, Vertex* v4) :
 		Element(number),
 		Poisson_DG_Element<3>(number),
 		Poisson_HHO_Element<3>(number)

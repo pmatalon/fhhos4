@@ -256,19 +256,29 @@ public:
 		return sqrt(2) / (double)this->Nx;
 	}
 
+	double Regularity() override
+	{
+		return this->Elements[0]->Regularity();
+	}
+
 	void CoarsenMesh(CoarseningStrategy strategy) override
 	{
-		if (strategy == CoarseningStrategy::Standard)
+		if (strategy == CoarseningStrategy::StandardCoarsening)
 			Standard();
-		//else if (strategy == CoarseningStrategy::Agglomeration)
+		//else if (strategy == CoarseningStrategy::AgglomerationCoarsening)
 			//CoarsenByAgglomerationAndKeepFineFaces();
 		else
-			assert(false && "Coarsening strategy not implemented!");
+			Utils::FatalError("Coarsening strategy not implemented!");
 
 		if (this->_diffusionPartition)
 			this->CoarseMesh->SetDiffusionCoefficient(this->_diffusionPartition);
 		if (this->_boundaryConditions)
 			this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
+	}
+
+	void RefineMesh(CoarseningStrategy strategy) override
+	{
+		Utils::FatalError("Refinement strategy not implemented!");
 	}
 
 	void Standard()
@@ -283,7 +293,7 @@ public:
 		else
 		{
 			TriangularMesh* coarseMesh = new TriangularMesh(nx / 2, ny / 2);
-			coarseMesh->ComesFrom.CS = CoarseningStrategy::Standard;
+			coarseMesh->ComesFrom.CS = CoarseningStrategy::StandardCoarsening;
 			coarseMesh->ComesFrom.nFineElementsByCoarseElement = 4;
 			coarseMesh->ComesFrom.nFineFacesAddedByCoarseElement = 3;
 			coarseMesh->ComesFrom.nFineFacesByKeptCoarseFace = 2;

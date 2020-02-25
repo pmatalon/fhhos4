@@ -12,16 +12,16 @@ private:
 	{}
 
 public:
-	void RefineMesh() override
+	void RefineMeshBySplitting() override
 	{
-		GMSHMesh::RefineMesh();
+		GMSHMesh::RefineMeshBySplitting();
 		this->FineMesh->ComesFrom.nFineElementsByCoarseElement = 8;
 		this->FineMesh->ComesFrom.nFineFacesAddedByCoarseElement = 12;
 		this->FineMesh->ComesFrom.nFineFacesByKeptCoarseFace = 4;
 	}
 
 protected:
-	virtual GMSHMesh<3>* CreateEmptyMesh() override
+	virtual GMSHMesh<3>* CreateEmptyGMSHMesh() override
 	{
 		return new GMSHCartesianMesh3D(this->_description, this->_fileNamePart);
 	}

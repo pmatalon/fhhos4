@@ -10,6 +10,7 @@ private:
 	double _diameter;
 	double _measure;
 	DomPoint _center;
+	double _inRadius;
 
 	DimMatrix<2> _inverseJacobianTranspose;
 	double _detJacobian;
@@ -37,6 +38,8 @@ public:
 		_diameter = max(lengthEdge12, max(lengthEdge23, lengthEdge13));
 
 		_measure = 0.5 * abs(V1->X * (V2->Y - V3->Y) + V2->X * (V3->Y - V1->Y) + V3->X * (V1->Y - V2->Y));
+
+		_inRadius = 2 * _measure / (lengthEdge12 + lengthEdge23 + lengthEdge13);
 
 		_center = DomPoint((V1->X + V2->X + V3->X) / 3, (V1->Y + V2->Y + V3->Y) / 3);
 
@@ -76,6 +79,10 @@ public:
 	inline DomPoint Center() const override
 	{
 		return _center;
+	}
+	inline double InRadius() const override
+	{
+		return _inRadius;
 	}
 	inline bool Contains(DomPoint p) const override
 	{

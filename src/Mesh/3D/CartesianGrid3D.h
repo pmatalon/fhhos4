@@ -193,14 +193,24 @@ public:
 		return 1.0 / this->Nx;
 	}
 
+	double Regularity() override
+	{
+		return 1;
+	}
+
 	void CoarsenMesh(CoarseningStrategy strategy)
 	{
-		if (strategy == CoarseningStrategy::Standard)
+		if (strategy == CoarseningStrategy::StandardCoarsening)
 			StandardCoarsening();
 		else
-			assert(false && "Coarsening strategy not implemented!");
+			Utils::FatalError("Coarsening strategy not implemented!");
 		this->CoarseMesh->SetDiffusionCoefficient(this->_diffusionPartition);
 		this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
+	}
+
+	void RefineMesh(CoarseningStrategy strategy) override
+	{
+		Utils::FatalError("Refinement strategy not implemented!");
 	}
 
 private:
@@ -217,7 +227,7 @@ private:
 		else
 		{
 			CartesianGrid3D* coarseMesh = new CartesianGrid3D(nx / 2, ny / 2, nz / 2);
-			coarseMesh->ComesFrom.CS = CoarseningStrategy::Standard;
+			coarseMesh->ComesFrom.CS = CoarseningStrategy::StandardCoarsening;
 			coarseMesh->ComesFrom.nFineElementsByCoarseElement = 8;
 			coarseMesh->ComesFrom.nFineFacesAddedByCoarseElement = 12;
 			coarseMesh->ComesFrom.nFineFacesByKeptCoarseFace = 4;

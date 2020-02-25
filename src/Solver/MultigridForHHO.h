@@ -30,7 +30,7 @@ public:
 
 	void CoarsenMesh(CoarseningStrategy coarseningStgy, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override
 	{
-		if (coarseningStgy == CoarseningStrategy::StructuredRefinement && _problem->_mesh->CoarseMesh == nullptr)
+		if (coarseningStgy == CoarseningStrategy::SplittingRefinement && _problem->_mesh->CoarseMesh == nullptr)
 		{
 			noCoarserMeshProvided = true;
 			return;
@@ -53,7 +53,7 @@ private:
 
 	void OnStartSetup() override
 	{
-		cout << "\t\tMesh                : " << this->_problem->_mesh->Elements.size() << " elements" << endl;
+		cout << "\t\tMesh                : " << this->_problem->_mesh->Elements.size() << " elements, regularity = " << this->_problem->_mesh->Regularity() << endl;
 		if (!IsCoarsestLevel())
 		{
 			Poisson_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
@@ -312,8 +312,8 @@ private:
 		int nCellUnknowns = problem->HHO->nCellUnknowns;
 		int nFaceUnknowns = problem->HHO->nFaceUnknowns;
 
-		FunctionalBasis<Dim - 1>* faceBasis = problem->HHO->FaceBasis;
-		FunctionalBasis<Dim>* cellInterpolationBasis = _problem->HHO->CellBasis;
+		//FunctionalBasis<Dim - 1>* faceBasis = problem->HHO->FaceBasis;
+		//FunctionalBasis<Dim>* cellInterpolationBasis = _problem->HHO->CellBasis;
 
 		ElementParallelLoop<Dim> parallelLoop(problem->_mesh->Elements);
 		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nFaceUnknowns);

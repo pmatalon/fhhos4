@@ -157,4 +157,9 @@ public:
 		return this->Elements[1]->Diameter();
 	}
 
+	double Regularity() override
+	{
+		return this->Elements[1]->Regularity();
+	}
+
 };

@@ -110,7 +110,7 @@ protected:
 		return result;
 	}
 
-	virtual IterationResult ExecuteOneIteration(const Vector& b, Vector& x, const IterationResult& oldResult) {};
+	virtual IterationResult ExecuteOneIteration(const Vector& b, Vector& x, const IterationResult& oldResult) { assert(false); };
 
 	bool StoppingCriteriaReached(const IterationResult& result)
 	{

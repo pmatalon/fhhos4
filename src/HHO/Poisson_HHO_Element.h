@@ -67,7 +67,7 @@ public:
 		this->AssembleReconstructionAndConsistencyMatrices();
 		this->AssembleStabilizationMatrix();
 
-		int nTotalFaceUnknowns = this->Faces.size() * hho->nFaceUnknowns;
+		//int nTotalFaceUnknowns = this->Faces.size() * hho->nFaceUnknowns;
 
 		this->A = Acons + Astab;
 		auto Att = A.topLeftCorner(hho->nCellUnknowns, hho->nCellUnknowns);

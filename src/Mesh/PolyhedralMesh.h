@@ -32,16 +32,29 @@ public:
 		assert(false);
 	}
 
+	virtual double Regularity() override
+	{
+		assert(false);
+	}
+
 	virtual void CoarsenMesh(CoarseningStrategy strategy) override
 	{
+		if (strategy == CoarseningStrategy::SplittingRefinement || strategy == CoarseningStrategy::BeyRefinement)
+			return;
 		/*if (strategy == CoarseningStrategy::Standard)
 			CoarsenByAgglomerationAndMergeColinearFaces();
-		else if (strategy == CoarseningStrategy::Agglomeration)*/
+		else if (strategy == CoarseningStrategy::AgglomerationCoarsening)*/
 			CoarsenByAgglomerationAndKeepFineFaces();
 		/*else
 			assert(false && "Coarsening strategy not implemented!");*/
+		assert(false && "Coarsening strategy not implemented!");
 		this->CoarseMesh->SetDiffusionCoefficient(this->_diffusionPartition);
 		this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
+	}
+
+	virtual void RefineMesh(CoarseningStrategy strategy) override
+	{
+		Utils::FatalError("Refinement strategy not implemented!");
 	}
 
 private:

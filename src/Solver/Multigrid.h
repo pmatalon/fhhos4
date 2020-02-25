@@ -23,7 +23,7 @@ public:
 	int PostSmoothingIterations = 1;
 	int CoarseLevelAdditionalSmoothing = 0;
 	int BlockSizeForBlockSmoothers = -1;
-	CoarseningStrategy CoarseningStgy = CoarseningStrategy::Standard;
+	CoarseningStrategy CoarseningStgy = CoarseningStrategy::StandardCoarsening;
 	bool ExportMatrices = false;
 
 	Multigrid(int nLevels) : IterativeSolver()
@@ -220,12 +220,16 @@ public:
 			os << _nLevels << endl;
 
 		os << "\t" << "Coarsening strategy: ";
-		if (CoarseningStgy == CoarseningStrategy::Standard)
+		if (CoarseningStgy == CoarseningStrategy::StandardCoarsening)
 			os << "standard" << endl;
-		else if (CoarseningStgy == CoarseningStrategy::Agglomeration)
+		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarsening)
 			os << "agglomeration" << endl;
-		else if (CoarseningStgy == CoarseningStrategy::StructuredRefinement)
-			os << "structured refinement from coarse mesh" << endl;
+		else if (CoarseningStgy == CoarseningStrategy::SplittingRefinement)
+			os << "refinement by splitting from coarse mesh" << endl;
+		else if (CoarseningStgy == CoarseningStrategy::BeyRefinement)
+			os << "Bey's refinement from coarse mesh" << endl;
+		else
+			os << "unknown" << endl;
 
 		Smoother* preSmoother = SmootherFactory::Create(PreSmootherCode, PreSmoothingIterations, BlockSizeForBlockSmoothers);
 		Smoother* postSmoother = SmootherFactory::Create(PostSmootherCode, PostSmoothingIterations, BlockSizeForBlockSmoothers);
