@@ -109,7 +109,7 @@ public:
 	}
 	inline bool Contains(DomPoint p) const override
 	{
-		assert(false && "Not implemented");
+		return Geometry::IsInTetrahedron(*V1, *V2, *V3, *V4, p, _measure, _diameter);
 	}
 
 	inline double DetJacobian() const

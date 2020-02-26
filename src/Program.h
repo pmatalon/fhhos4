@@ -9,6 +9,7 @@
 #include "Mesh/2D/TriangularMesh.h"
 #include "Mesh/2D/QuadrilateralMesh.h"
 #include "Mesh/2D/QuadrilateralAsPolygonalMesh.h"
+#include "Mesh/3D/CartesianTetrahedralMesh.h"
 #ifdef GMSH_ENABLED
 #include "Mesh/2D/GMSHCartesianMesh2D.h"
 #include "Mesh/2D/GMSHTriangularMesh.h"
@@ -632,6 +633,15 @@ Mesh<3>* ProgramDim<3>::BuildMesh(int n, string meshCode, string meshFilePath, C
 
 		assert(fineMesh->Elements.size() == n*n*n);
 		assert(fineMesh->Faces.size() == 3*n*n*(n+1));
+
+		return fineMesh;
+	}
+	else if (meshCode.compare("tetra") == 0)
+	{
+		Mesh<3>* fineMesh = new CartesianTetrahedralMesh(n);
+
+		assert(fineMesh->Elements.size() == 6 * n*n*n);
+		assert(fineMesh->Faces.size() == 12 * n*n*n + 6 * n*n);
 
 		return fineMesh;
 	}

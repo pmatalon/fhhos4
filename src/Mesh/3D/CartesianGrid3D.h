@@ -204,8 +204,11 @@ public:
 			StandardCoarsening();
 		else
 			Utils::FatalError("Coarsening strategy not implemented!");
-		this->CoarseMesh->SetDiffusionCoefficient(this->_diffusionPartition);
-		this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
+		if (this->_diffusionPartition)
+		{
+			this->CoarseMesh->SetDiffusionCoefficient(this->_diffusionPartition);
+			this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
+		}
 	}
 
 	void RefineMesh(CoarseningStrategy strategy) override

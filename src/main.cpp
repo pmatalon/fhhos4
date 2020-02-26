@@ -47,12 +47,13 @@ void print_usage() {
 	cout << "-mesh CODE" << endl;
 	cout << "      Type of mesh. (Default: cart)" << endl;
 	cout << "               cart          - Unit square/cube discretized by an in-house uniform Cartesian mesh" << endl;
-	cout << "               tri           - Unit square/cube discretized by an in-house uniform trianglular mesh (2D only)" << endl;
-	cout << "               quad          - Unit square/cube discretized by an in-house uniform quadrilateral mesh (2D only)" << endl;
+	cout << "               tri           - Unit square discretized by an in-house uniform trianglular mesh" << endl;
+	cout << "               quad          - Unit square discretized by an in-house uniform quadrilateral mesh" << endl;
 	cout << "               gmsh-cart     - Unit square discretized by a uniform Cartesian mesh built by GMSH" << endl;
-	cout << "               gmsh-tri      - Unit square discretized by a uniform triangular mesh built by GMSH (2D only)" << endl;
-	cout << "               gmsh-uns-tri  - Unit square discretized by an unstructured triangular mesh built by GMSH (2D only)" << endl;
-	cout << "               gmsh-tetra    - Unit cube discretized by a uniform tetrahedral mesh built by GMSH (3D only)" << endl;
+	cout << "               gmsh-tri      - Unit square discretized by a uniform triangular mesh built by GMSH from successive refinements of a coarse mesh" << endl;
+	cout << "               gmsh-uns-tri  - Unit square discretized by an unstructured triangular mesh built by GMSH from successive refinements of a coarse mesh" << endl;
+	cout << "               tetra         - Unit cube discretized by a uniform tetrahedral mesh embedded in a Cartesian mesh" << endl;
+	cout << "               gmsh-tetra    - Unit cube discretized by a uniform tetrahedral mesh built by GMSH from successive refinements of a coarse mesh" << endl;
 	cout << "               gmsh          - .msh or .geo GMSH file given in the argument -file" << endl;
 	cout << endl;
 	cout << "-n NUM" << endl;
@@ -351,6 +352,7 @@ int main(int argc, char* argv[])
 					&& meshCode.compare("gmsh-tri") != 0
 					&& meshCode.compare("gmsh-quad") != 0
 					&& meshCode.compare("gmsh-uns-tri") != 0
+					&& meshCode.compare("tetra") != 0
 					&& meshCode.compare("gmsh-tetra") != 0
 					&& meshCode.compare("gmsh") != 0
 					&& meshCode.compare("quad") != 0
@@ -531,7 +533,8 @@ int main(int argc, char* argv[])
 			args.Discretization.MeshCode.compare("quad") == 0 || 
 			args.Discretization.MeshCode.compare("gmsh-quad") == 0)
 			args.Problem.Dimension = 2;
-		else if (args.Discretization.MeshCode.compare("gmsh-tetra") == 0)
+		else if (args.Discretization.MeshCode.compare("tetra") == 0 ||
+				 args.Discretization.MeshCode.compare("gmsh-tetra") == 0)
 			args.Problem.Dimension = 3;
 		else
 			argument_error("The dimension of the domain is missing. Please define it with option -d.");
@@ -577,7 +580,7 @@ int main(int argc, char* argv[])
 	if ((args.Discretization.MeshCode.compare("quad") == 0 || args.Discretization.MeshCode.compare("gmsh-quad") == 0) && args.Problem.Dimension != 2)
 		argument_error("The quadrilateral mesh in only available in 2D.");
 
-	if (args.Discretization.MeshCode.compare("gmsh-tetra") == 0 && args.Problem.Dimension != 3)
+	if ((args.Discretization.MeshCode.compare("gmsh-tetra") == 0 || args.Discretization.MeshCode.compare("tetra") == 0) && args.Problem.Dimension != 3)
 		argument_error("The tetrahedral mesh in only available in 3D.");
 
 	if (args.Discretization.MeshCode.compare("gmsh") == 0 && args.Discretization.MeshFilePath.compare("") == 0)

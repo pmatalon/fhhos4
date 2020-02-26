@@ -94,4 +94,22 @@ public:
 		return (alpha >= 0 && alpha <= 1) && (beta >= 0 && beta <= 1) && (gamma >= 0 && gamma <= 1) && (abs(alpha + beta + gamma -1) < 1e-3 * triangleDiameter);
 	}
 
+	static bool IsInTetrahedron(DomPoint A, DomPoint B, DomPoint C, DomPoint D, DomPoint P, double tetraVolume, double tetraDiameter)
+	{
+		double alpha = VolumeTetra(P, B, C, D) / tetraVolume;
+		double beta = VolumeTetra(A, P, C, D) / tetraVolume;
+		double gamma = VolumeTetra(A, B, P, D) / tetraVolume;
+		double delta = VolumeTetra(A, B, C, P) / tetraVolume;
+		return (alpha >= 0 && alpha <= 1) && (beta >= 0 && beta <= 1) && (gamma >= 0 && gamma <= 1) && (delta >= 0 && delta <= 1) && (abs(alpha + beta + gamma + delta - 1) < 1e-3 * tetraDiameter);
+	}
+
+	static double VolumeTetra(DomPoint A, DomPoint B, DomPoint C, DomPoint D)
+	{
+		DimMatrix<3> m;
+		m.col(0) = Vect<3>(A, B);
+		m.col(1) = Vect<3>(A, C);
+		m.col(2) = Vect<3>(A, D);
+		return abs(m.determinant()) / 6;
+	}
+
 };

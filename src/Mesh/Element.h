@@ -62,6 +62,10 @@ public:
 	{
 		return Shape()->Regularity();
 	}
+	virtual bool Contains(DomPoint p) const
+	{
+		return Shape()->Contains(p);
+	}
 	virtual DimVector<Dim> OuterNormalVector(Face<Dim>* face) const = 0;
 
 	// Transformation to reference element
