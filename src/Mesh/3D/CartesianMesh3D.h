@@ -203,17 +203,13 @@ public:
 		if (strategy == CoarseningStrategy::StandardCoarsening)
 			StandardCoarsening();
 		else
-			Utils::FatalError("Coarsening strategy not implemented!");
+			Mesh<3>::CoarsenMesh(strategy);
+
 		if (this->_diffusionPartition)
 		{
 			this->CoarseMesh->SetDiffusionCoefficient(this->_diffusionPartition);
 			this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
 		}
-	}
-
-	void RefineMesh(CoarseningStrategy strategy) override
-	{
-		Utils::FatalError("Refinement strategy not implemented!");
 	}
 
 private:

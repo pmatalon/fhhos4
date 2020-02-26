@@ -45,16 +45,10 @@ public:
 			CoarsenByAgglomerationAndMergeColinearFaces();
 		else if (strategy == CoarseningStrategy::AgglomerationCoarsening)*/
 			CoarsenByAgglomerationAndKeepFineFaces();
-		/*else
-			assert(false && "Coarsening strategy not implemented!");*/
-		assert(false && "Coarsening strategy not implemented!");
+
+		Mesh<Dim>::CoarsenMesh(strategy);
 		this->CoarseMesh->SetDiffusionCoefficient(this->_diffusionPartition);
 		this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
-	}
-
-	virtual void RefineMesh(CoarseningStrategy strategy) override
-	{
-		Utils::FatalError("Refinement strategy not implemented!");
 	}
 
 private:

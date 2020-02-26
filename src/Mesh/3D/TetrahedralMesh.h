@@ -33,7 +33,7 @@ public:
 		return _regularity;
 	}
 
-	virtual void RefineMesh(CoarseningStrategy strategy)
+	virtual void RefineMesh(CoarseningStrategy strategy) override
 	{
 		if (this->FineMesh)
 			assert(false && "Mesh already refined!");
@@ -41,7 +41,7 @@ public:
 		if (strategy == CoarseningStrategy::BeyRefinement)
 			RefineMeshByBeyMethod();
 		else
-			assert(false && "Unmanaged refinement strategy");
+			PolyhedralMesh<3>::RefineMesh(strategy);
 	}
 
 protected:

@@ -71,8 +71,15 @@ public:
 	virtual string FileNamePart() = 0;
 	virtual double H() = 0;
 	virtual double Regularity() = 0;
-	virtual void CoarsenMesh(CoarseningStrategy strategy) = 0;
-	virtual void RefineMesh(CoarseningStrategy strategy) = 0;
+
+	virtual void CoarsenMesh(CoarseningStrategy strategy)
+	{
+		Utils::FatalError("Unmanaged coarsening strategy");
+	}
+	virtual void RefineMesh(CoarseningStrategy strategy)
+	{
+		Utils::FatalError("Unmanaged refinement strategy");
+	}
 
 	void AddFace(Face<Dim>* f)
 	{

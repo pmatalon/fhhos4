@@ -52,7 +52,7 @@ public:
 		else if (strategy == CoarseningStrategy::BeyRefinement)
 			TetrahedralMesh::RefineMeshByBeyMethod();
 		else
-			assert(false && "Unmanaged refinement strategy");
+			GMSHMesh<3>::RefineMesh(strategy);
 	}
 
 protected:

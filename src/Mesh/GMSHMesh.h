@@ -216,7 +216,7 @@ public:
 		if (strategy == CoarseningStrategy::SplittingRefinement)
 			RefineMeshBySplitting();
 		else
-			Utils::FatalError("Unmanaged refinement strategy");
+			PolyhedralMesh<Dim>::RefineMesh(strategy);
 	}
 
 	virtual void RefineMeshBySplitting()
