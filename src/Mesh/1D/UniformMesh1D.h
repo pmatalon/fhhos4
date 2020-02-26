@@ -3,12 +3,12 @@
 #include "Interval.h"
 #include "InterfacePoint.h"
 
-class CartesianGrid1D : public Mesh<1>
+class UniformMesh1D : public Mesh<1>
 {
 public:
 	BigNumber N;
 
-	CartesianGrid1D(BigNumber n) : Mesh()
+	UniformMesh1D(BigNumber n) : Mesh()
 	{
 		this->N = n;
 		this->Elements.reserve(n);

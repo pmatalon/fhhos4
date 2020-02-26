@@ -121,20 +121,11 @@
     <ClInclude Include="src\Utils\ElementParallelLoop.h">
       <Filter>Utils</Filter>
     </ClInclude>
-    <ClInclude Include="src/Mesh/1D/CartesianGrid1D.h">
-      <Filter>Mesh\1D</Filter>
-    </ClInclude>
     <ClInclude Include="src/Mesh/1D/Interval.h">
       <Filter>Mesh\1D</Filter>
     </ClInclude>
-    <ClInclude Include="src/Mesh/2D/CartesianGrid2D.h">
-      <Filter>Mesh\2D</Filter>
-    </ClInclude>
     <ClInclude Include="src/Mesh/2D/Rectangle.h">
       <Filter>Mesh\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src/Mesh/3D/CartesianGrid3D.h">
-      <Filter>Mesh\3D</Filter>
     </ClInclude>
     <ClInclude Include="src/Mesh/3D/Parallelepiped.h">
       <Filter>Mesh\3D</Filter>
@@ -313,6 +304,15 @@
       <Filter>Mesh\3D</Filter>
     </ClInclude>
     <ClInclude Include="src\Mesh\3D\CartesianTetrahedralMesh.h">
+      <Filter>Mesh\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\1D\UniformMesh1D.h">
+      <Filter>Mesh\1D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\2D\CartesianMesh2D.h">
+      <Filter>Mesh\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\3D\CartesianMesh3D.h">
       <Filter>Mesh\3D</Filter>
     </ClInclude>
   </ItemGroup>

@@ -2,9 +2,9 @@
 #include "ProgramArguments.h"
 #include "DG/Poisson_DG.h"
 #include "HHO/Poisson_HHO.h"
-#include "Mesh/1D/CartesianGrid1D.h"
-#include "Mesh/2D/CartesianGrid2D.h"
-#include "Mesh/3D/CartesianGrid3D.h"
+#include "Mesh/1D/UniformMesh1D.h"
+#include "Mesh/2D/CartesianMesh2D.h"
+#include "Mesh/3D/CartesianMesh3D.h"
 #include "Mesh/2D/CartesianPolygonalMesh2D.h"
 #include "Mesh/2D/TriangularMesh.h"
 #include "Mesh/2D/QuadrilateralMesh.h"
@@ -573,14 +573,14 @@ private:
 template <>
 Mesh<1>* ProgramDim<1>::BuildMesh(int n, string meshCode, string meshFilePath, CoarseningStrategy refinementStgy)
 {
-	return new CartesianGrid1D(n);
+	return new UniformMesh1D(n);
 }
 
 template <>
 Mesh<2>* ProgramDim<2>::BuildMesh(int n, string meshCode, string meshFilePath, CoarseningStrategy refinementStgy)
 {
 	if (meshCode.compare("cart") == 0)
-		return new CartesianGrid2D(n, n);
+		return new CartesianMesh2D(n, n);
 	else if (meshCode.compare("cart-poly") == 0)
 		return new CartesianPolygonalMesh2D(n, n);
 	else if (meshCode.compare("tri") == 0)
@@ -629,7 +629,7 @@ Mesh<3>* ProgramDim<3>::BuildMesh(int n, string meshCode, string meshFilePath, C
 {
 	if (meshCode.compare("cart") == 0)
 	{
-		CartesianGrid3D* fineMesh = new CartesianGrid3D(n, n, n);
+		CartesianMesh3D* fineMesh = new CartesianMesh3D(n, n, n);
 
 		assert(fineMesh->Elements.size() == n*n*n);
 		assert(fineMesh->Faces.size() == 3*n*n*(n+1));

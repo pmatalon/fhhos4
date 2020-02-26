@@ -1,19 +1,19 @@
 #pragma once
 #include "TetrahedralMesh.h"
-#include "CartesianGrid3D.h"
+#include "CartesianMesh3D.h"
 using namespace std;
 
 class CartesianTetrahedralMesh : public TetrahedralMesh
 {
 private:
-	CartesianGrid3D* _cartMesh = nullptr;
+	CartesianMesh3D* _cartMesh = nullptr;
 	map<Parallelepiped*, vector<Tetrahedron*>> _tetrasInCube;
 
 public:
-	CartesianTetrahedralMesh(BigNumber n) : CartesianTetrahedralMesh(new CartesianGrid3D(n, n, n))
+	CartesianTetrahedralMesh(BigNumber n) : CartesianTetrahedralMesh(new CartesianMesh3D(n, n, n))
 	{}
 
-	CartesianTetrahedralMesh(CartesianGrid3D* cartMesh) : TetrahedralMesh()
+	CartesianTetrahedralMesh(CartesianMesh3D* cartMesh) : TetrahedralMesh()
 	{
 		_cartMesh = cartMesh;
 
@@ -99,7 +99,7 @@ public:
 			TetrahedralMesh::CoarsenMesh(strategy);
 
 		_cartMesh->CoarsenMesh(strategy);
-		CartesianTetrahedralMesh* coarseMesh = new CartesianTetrahedralMesh(dynamic_cast<CartesianGrid3D*>(_cartMesh->CoarseMesh));
+		CartesianTetrahedralMesh* coarseMesh = new CartesianTetrahedralMesh(dynamic_cast<CartesianMesh3D*>(_cartMesh->CoarseMesh));
 		this->CoarseMesh = coarseMesh;
 		coarseMesh->FineMesh = this;
 		coarseMesh->ComesFrom.CS = CoarseningStrategy::StandardCoarsening;

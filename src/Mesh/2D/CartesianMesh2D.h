@@ -7,13 +7,13 @@
 #include "../PolyhedralMesh.h"
 using namespace std;
 
-class CartesianGrid2D : public PolyhedralMesh<2>
+class CartesianMesh2D : public PolyhedralMesh<2>
 {
 public:
 	BigNumber Nx;
 	BigNumber Ny;
 
-	CartesianGrid2D(BigNumber nx, BigNumber ny) : PolyhedralMesh()
+	CartesianMesh2D(BigNumber nx, BigNumber ny) : PolyhedralMesh()
 	{
 		// nx = ny falls down to square elements
 		this->Nx = nx;
@@ -186,7 +186,7 @@ public:
 		}
 		else
 		{
-			CartesianGrid2D* coarseMesh = new CartesianGrid2D(nx / 2, ny / 2);
+			CartesianMesh2D* coarseMesh = new CartesianMesh2D(nx / 2, ny / 2);
 			coarseMesh->ComesFrom.CS = CoarseningStrategy::StandardCoarsening;
 			coarseMesh->ComesFrom.nFineElementsByCoarseElement = 4;
 			coarseMesh->ComesFrom.nFineFacesAddedByCoarseElement = 4;
