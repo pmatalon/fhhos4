@@ -65,6 +65,10 @@ public:
 	{
 		return Shape()->Contains(p);
 	}
+	virtual vector<Vertex*> Vertices() const
+	{
+		return Shape()->Vertices();
+	}
 
 	bool HasVertex(Vertex* v, bool compareCoordinates = false)
 	{

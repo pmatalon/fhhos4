@@ -20,7 +20,8 @@ public:
 		this->_prolongationCode = prolongationCode;
 		this->_cellInterpolationBasis = cellInterpolationBasis;
 
-		//problem->ExportFaces("L" + to_string(number));
+		if (ExportMatrices)
+			problem->ExportFaces("L" + to_string(number));
 	}
 
 	BigNumber NUnknowns() override
@@ -53,7 +54,11 @@ private:
 
 	void OnStartSetup() override
 	{
-		cout << "\t\tMesh                : " << this->_problem->_mesh->Elements.size() << " elements, regularity = " << this->_problem->_mesh->Regularity() << endl;
+		if (_prolongationCode == 5)
+			cout << "\t\tMesh                : " << this->_problem->_mesh->Faces.size() << " faces" << endl;
+		else
+			cout << "\t\tMesh                : " << this->_problem->_mesh->Elements.size() << " elements, regularity = " << this->_problem->_mesh->Regularity() << endl;
+
 		if (!IsCoarsestLevel())
 		{
 			Poisson_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
@@ -184,6 +189,11 @@ private:
 
 			P = SparseMatrix(finePb->HHO->nInteriorFaces * nFaceUnknowns, coarsePb->HHO->nInteriorFaces * nFaceUnknowns);
 			parallelLoop.Fill(P);
+		}
+		else if (_prolongationCode == 5)
+		{
+			SparseMatrix J_faces = GetGlobalCanonicalInjectionMatrixCoarseToFineFaces();
+			P = J_faces;
 		}
 		else
 			Utils::FatalError("Unknown prolongationCode.");

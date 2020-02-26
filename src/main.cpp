@@ -165,6 +165,7 @@ void print_usage() {
 	cout << "      Coarsening strategy of the multigrid." << endl;
 	cout << "              s   - standard coarsening (merge colinear faces on the coarse mesh)" << endl;
 	cout << "              a   - agglomeration coarsening (keep fine faces on the coarse mesh)" << endl;
+	cout << "              f   - face coarsening: the faces are coarsened and all kept on the coarse skeleton" << endl;
 	cout << "              r   - fine meshes obtained by structured refinement of the coarse mesh using a splitting method" << endl;
 	cout << "              b   - fine meshes obtained by structured refinement of the coarse mesh using the Bey method" << endl;
 	cout << endl;
@@ -179,6 +180,7 @@ void print_usage() {
 	cout << "                   Step 2: Adjoint of the same interpolation on the fine mesh" << endl;
 	cout << "              4  - Algorithm from Wildey et al.: the coarse level is built by static condensation of the fine faces interior to coarse elements." << endl;
 	cout << "                   The prolongation solves those condensed unknowns." << endl;
+	cout << "              5  - Canonical injection from coarse faces to fine faces (implemented to be used with option -cs f)." << endl;
 	cout << endl;
 	cout << "-cell-interp NUM" << endl;
 	cout << "      In the polongation, degree of the polynomial interpolated on the cells from the faces." << endl;
@@ -464,8 +466,8 @@ int main(int argc, char* argv[])
 			case OPT_ProlongationCode:
 			{
 				int prolongationCode = atoi(optarg);
-				if (prolongationCode < 1 || prolongationCode > 4)
-					argument_error("check -prolong argument. Expecting 1, 2, 3 or 4.");
+				if (prolongationCode < 1 || prolongationCode > 5)
+					argument_error("check -prolong argument. Expecting 1, 2, 3, 4 or 5.");
 				args.Solver.MG.ProlongationCode = prolongationCode;
 				break;
 			}
@@ -494,7 +496,11 @@ int main(int argc, char* argv[])
 			case OPT_CoarseningStrategy:
 			{
 				string coarseningStgyCode = optarg;
-				if (coarseningStgyCode.compare("s") != 0 && coarseningStgyCode.compare("a") != 0 && coarseningStgyCode.compare("r") != 0 && coarseningStgyCode.compare("b") != 0)
+				if (coarseningStgyCode.compare("s") != 0 && 
+					coarseningStgyCode.compare("a") != 0 &&
+					coarseningStgyCode.compare("f") != 0 &&
+					coarseningStgyCode.compare("r") != 0 && 
+					coarseningStgyCode.compare("b") != 0)
 					argument_error("unknown coarsening strategy code '" + coarseningStgyCode + "'. Check -cs argument.");
 				args.Solver.MG.CoarseningStgyCode = coarseningStgyCode;
 				break;
@@ -586,30 +592,37 @@ int main(int argc, char* argv[])
 	if (args.Discretization.MeshCode.compare("gmsh") == 0 && args.Discretization.MeshFilePath.compare("") == 0)
 		argument_error("The GMSH file path is missing. Add the argument -file.");
 
-#ifndef AGMG_ENABLED
-	if (args.Solver.SolverCode.compare("agmg") == 0)
-		argument_error("AGMG is disabled. Recompile with the cmake option -DENABLE_AGMG=ON, or choose another solver.");
-#endif // AGMG_ENABLED
-
-	if (args.Solver.SolverCode.compare("mg") == 0 && args.Discretization.Method.compare("dg") == 0)
-		argument_error("Multigrid only applicable on HHO discretization.");
-
-	if (args.Solver.SolverCode.compare("mg") == 0 && args.Discretization.Method.compare("hho") == 0 && !args.Discretization.StaticCondensation)
-		argument_error("Multigrid only applicable if the static condensation is enabled.");
-
-	if (args.Solver.SolverCode.compare("mg") == 0 && args.Solver.MG.ProlongationCode == 4 && !args.Solver.MG.UseGalerkinOperator)
-		argument_error("To use the prolongationCode 4, you must also use the Galerkin operator. To do so, add option -g 1.");
-
 	if (args.Solver.SolverCode.compare("default") == 0)
 	{
 		if (args.Discretization.Method.compare("hho") == 0 && args.Discretization.StaticCondensation && args.Problem.Dimension > 1)
+		{
 			args.Solver.SolverCode = "mg";
+			if ((args.Solver.MG.ProlongationCode == 4 || args.Solver.MG.ProlongationCode == 5) && !args.Solver.MG.UseGalerkinOperator)
+			{
+				Utils::Warning("The multigrid with prolongation code " + to_string(args.Solver.MG.ProlongationCode) + " requires the Galerkin operator. Option -g 0 ignored.");
+				args.Solver.MG.UseGalerkinOperator = true;
+			}
+		}
 		else if ((args.Problem.Dimension == 2 && args.Discretization.N < 64) || (args.Problem.Dimension == 3 && args.Discretization.N < 16))
 			args.Solver.SolverCode = "lu";
 		else
 			args.Solver.SolverCode = "eigencg";
 	}
 
+#ifndef AGMG_ENABLED
+	if (args.Solver.SolverCode.compare("agmg") == 0)
+		argument_error("AGMG is disabled. Recompile with the cmake option -DENABLE_AGMG=ON, or choose another solver.");
+#endif // AGMG_ENABLED
+
+	if ((args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("pcgmg") == 0) && args.Discretization.Method.compare("dg") == 0)
+		argument_error("Multigrid only applicable on HHO discretization.");
+
+	if ((args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("pcgmg") == 0) && args.Discretization.Method.compare("hho") == 0 && !args.Discretization.StaticCondensation)
+		argument_error("Multigrid only applicable if the static condensation is enabled.");
+
+	if ((args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("pcgmg") == 0) && args.Solver.MG.ProlongationCode == 4 && !args.Solver.MG.UseGalerkinOperator)
+		argument_error("To use the prolongationCode 4, you must also use the Galerkin operator. To do so, add option -g 1.");
+	
 	args.Solver.MG.CoarseningStgy = CoarseningStrategy::StandardCoarsening;
 	if (args.Solver.MG.CoarseningStgyCode.compare("default") == 0)
 	{
@@ -627,11 +640,15 @@ int main(int argc, char* argv[])
 		args.Solver.MG.CoarseningStgy = CoarseningStrategy::StandardCoarsening;
 	else if (args.Solver.MG.CoarseningStgyCode.compare("a") == 0)
 		args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarsening;
+	else if (args.Solver.MG.CoarseningStgyCode.compare("f") == 0)
+		args.Solver.MG.CoarseningStgy = CoarseningStrategy::FaceCoarsening;
 	else if (args.Solver.MG.CoarseningStgyCode.compare("r") == 0)
 		args.Solver.MG.CoarseningStgy = CoarseningStrategy::SplittingRefinement;
 	else if (args.Solver.MG.CoarseningStgyCode.compare("b") == 0)
 		args.Solver.MG.CoarseningStgy = CoarseningStrategy::BeyRefinement;
 
+	if ((args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("pcgmg") == 0) && args.Solver.MG.CoarseningStgy == CoarseningStrategy::FaceCoarsening && !args.Solver.MG.UseGalerkinOperator)
+		argument_error("To use the face coarsening, you must also use the Galerkin operator. To do so, add option -g 1.");
 
 	args.Actions = Action::LogAssembly;
 	for (size_t i = 0; i < args.ActionCodes.length(); i++)

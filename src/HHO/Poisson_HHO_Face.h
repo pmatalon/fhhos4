@@ -1,5 +1,6 @@
 #pragma once
 #include "../FunctionalBasis/FunctionalBasis.h"
+#include "HHOParameters.h"
 
 template <int Dim>
 class Poisson_HHO_Element;
@@ -38,12 +39,15 @@ public:
 		this->_faceMassMatrix = this->FaceMassMatrix(HHO->FaceBasis);
 		this->_invFaceMassMatrix = this->_faceMassMatrix.inverse();
 
-		this->_elem1_massReconstructFace = this->MassMatrix(HHO->FaceBasis, this->Element1, HHO->ReconstructionBasis);
-		this->_elem1_massCellFace = this->MassMatrix(HHO->FaceBasis, this->Element1, HHO->CellBasis);
-		this->_elem1_projFromReconstruct = this->_invFaceMassMatrix * _elem1_massReconstructFace;
-		this->_elem1_projFromCell = this->_invFaceMassMatrix * _elem1_massCellFace;
+		if (this->Element1 != nullptr)
+		{
+			this->_elem1_massReconstructFace = this->MassMatrix(HHO->FaceBasis, this->Element1, HHO->ReconstructionBasis);
+			this->_elem1_massCellFace = this->MassMatrix(HHO->FaceBasis, this->Element1, HHO->CellBasis);
+			this->_elem1_projFromReconstruct = this->_invFaceMassMatrix * _elem1_massReconstructFace;
+			this->_elem1_projFromCell = this->_invFaceMassMatrix * _elem1_massCellFace;
+		}
 
-		if (this->Element2 != NULL)
+		if (this->Element2 != nullptr)
 		{
 			this->_elem2_massReconstructFace = this->MassMatrix(HHO->FaceBasis, this->Element2, HHO->ReconstructionBasis);
 			this->_elem2_massCellFace = this->MassMatrix(HHO->FaceBasis, this->Element2, HHO->CellBasis);

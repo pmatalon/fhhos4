@@ -39,14 +39,19 @@ public:
 
 	virtual void CoarsenMesh(CoarseningStrategy strategy) override
 	{
+		if (this->CoarseMesh)
+			return;
 		if (strategy == CoarseningStrategy::SplittingRefinement || strategy == CoarseningStrategy::BeyRefinement)
 			return;
-		/*if (strategy == CoarseningStrategy::Standard)
+		if (strategy == CoarseningStrategy::StandardCoarsening)
 			CoarsenByAgglomerationAndMergeColinearFaces();
-		else if (strategy == CoarseningStrategy::AgglomerationCoarsening)*/
+		else if (strategy == CoarseningStrategy::AgglomerationCoarsening)
 			CoarsenByAgglomerationAndKeepFineFaces();
+		else if (strategy == CoarseningStrategy::FaceCoarsening)
+			FaceCoarsening();
+		else
+			Mesh<Dim>::CoarsenMesh(strategy);
 
-		Mesh<Dim>::CoarsenMesh(strategy);
 		this->CoarseMesh->SetDiffusionCoefficient(this->_diffusionPartition);
 		this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
 	}
@@ -55,6 +60,7 @@ private:
 
 	void CoarsenByAgglomerationAndMergeColinearFaces()
 	{
+		assert(false);
 	}
 
 	void CoarsenByAgglomerationAndKeepFineFaces()
@@ -241,8 +247,9 @@ private:
 		return macroElement;
 	}
 
-	// Dim-specific function
+	// Dim-specific functions
 	Element<Dim>* CreatePolyhedron(vector<Vertex*> vertices) { return nullptr; }
+	void FaceCoarsening() { assert(false); };
 };
 
 
@@ -258,4 +265,99 @@ template<>
 Element<3>* PolyhedralMesh<3>::CreatePolyhedron(vector<Vertex*> vertices)
 {
 	assert(false && "Not yet implemented");
+}
+
+template <>
+void PolyhedralMesh<2>::FaceCoarsening()
+{
+	PolyhedralMesh<2>* coarseSkeleton = new PolyhedralMesh<2>();
+	coarseSkeleton->ComesFrom.CS = CoarseningStrategy::FaceCoarsening;
+	this->CoarseMesh = coarseSkeleton;
+	coarseSkeleton->FineMesh = this;
+
+	// Copy all vertices
+	map<size_t, MeshVertex<2>*> verticesByNumber;
+	for (Vertex* v : this->Vertices)
+	{
+		MeshVertex<2>* coarseV = new MeshVertex<2>(*v);
+		coarseSkeleton->Vertices.push_back(coarseV);
+		verticesByNumber.insert({ coarseV->Number, coarseV });
+	}
+
+	BigNumber faceNumber = 0;
+
+	for (Face<2>* face1 : this->Faces)
+	{
+		if (face1->CoarseFace)
+			continue;
+
+		Edge* edge1 = dynamic_cast<Edge*>(face1);
+		CartesianEdge* cedge1 = dynamic_cast<CartesianEdge*>(face1);
+		for (Vertex* v : face1->Vertices())
+		{
+			MeshVertex<2>* vertex = static_cast<MeshVertex<2>*>(v);
+			if (!vertex)
+				Utils::FatalError("Face coarsening not implemented on this mesh");
+
+			for (Face<2>* face2 : vertex->Faces)
+			{
+				if (face1 == face2 || face2->CoarseFace)
+					continue;
+
+				Edge* edge2 = dynamic_cast<Edge*>(face2);
+				CartesianEdge* cedge2 = dynamic_cast<CartesianEdge*>(face2);
+
+				// Compute colinearity
+				Vertex* otherVertexInEdge1;
+				Vertex* otherVertexInEdge2;
+				if (edge1)
+				{
+					otherVertexInEdge1 = edge1->Vertex1() == v ? edge1->Vertex2() : edge1->Vertex1();
+					otherVertexInEdge2 = edge2->Vertex1() == v ? edge2->Vertex2() : edge2->Vertex1();
+				}
+				else
+				{
+					vector<Vertex*> verticesEdge1 = face1->Vertices();
+					vector<Vertex*> verticesEdge2 = face2->Vertices();
+					otherVertexInEdge1 = verticesEdge1[0] == v ? verticesEdge1[1] : verticesEdge1[0];
+					otherVertexInEdge2 = verticesEdge2[0] == v ? verticesEdge2[1] : verticesEdge2[0];
+				}
+
+				MeshVertex<2>* coarseV = verticesByNumber.at(v->Number);
+				MeshVertex<2>* coarseOtherVertexInEdge1 = verticesByNumber.at(otherVertexInEdge1->Number);
+				MeshVertex<2>* coarseOtherVertexInEdge2 = verticesByNumber.at(otherVertexInEdge2->Number);
+
+				DimVector<2> vector1 = Vect<2>(coarseV, coarseOtherVertexInEdge1);
+				DimVector<2> vector2 = Vect<2>(coarseV, coarseOtherVertexInEdge2);
+
+				double cosine = vector1.dot(vector2) / (vector1.norm()*vector2.norm());
+				if (cosine == -1) // the edges are colinear
+				{
+					Edge* mergedEdge = new Edge(faceNumber++, coarseOtherVertexInEdge1, coarseOtherVertexInEdge2);
+					
+					if (face1->IsDomainBoundary && face2->IsDomainBoundary)
+						mergedEdge->IsDomainBoundary = true;
+					else if (!face1->IsDomainBoundary && !face2->IsDomainBoundary)
+						mergedEdge->IsDomainBoundary = false;
+					else
+						assert(false && "Not sure what to do yet");
+
+					face1->CoarseFace = mergedEdge;
+					face2->CoarseFace = mergedEdge;
+					mergedEdge->FinerFaces.push_back(face1);
+					mergedEdge->FinerFaces.push_back(face2);
+
+					coarseSkeleton->AddFace(mergedEdge);
+
+					coarseOtherVertexInEdge1->Faces.push_back(mergedEdge);
+					coarseOtherVertexInEdge2->Faces.push_back(mergedEdge);
+
+					break;
+				}
+			}
+		}
+
+		if (!face1->CoarseFace)
+			Utils::Warning("Face " + to_string(face1->Number) + " has not been coarsened.");
+	}
 }

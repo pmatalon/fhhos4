@@ -272,15 +272,21 @@ public:
 		for (auto f : this->BoundaryFaces)
 		{
 			assert(f->IsDomainBoundary);
-			assert(f->Element1);
-			assert(!f->Element2);
+			if (this->ComesFrom.CS != CoarseningStrategy::FaceCoarsening)
+			{
+				assert(f->Element1);
+				assert(!f->Element2);
+			}
 		}
 
 		for (auto f : this->InteriorFaces)
 		{
 			assert(!f->IsDomainBoundary);
-			assert(f->Element1);
-			assert(f->Element2);
+			if (this->ComesFrom.CS != CoarseningStrategy::FaceCoarsening)
+			{
+				assert(f->Element1);
+				assert(f->Element2);
+			}
 		}
 
 		assert(this->BoundaryFaces.size() + this->InteriorFaces.size() == this->Faces.size());
@@ -289,28 +295,31 @@ public:
 		{
 			CoarseMesh->SanityCheck();
 
-			for (Element<Dim>* fe : this->Elements)
+			if (CoarseMesh->ComesFrom.CS != CoarseningStrategy::FaceCoarsening)
 			{
-				assert(fe->CoarserElement != nullptr);
-
-				bool feIsReferenced = false;
-				for (Element<Dim>* e : fe->CoarserElement->FinerElements)
+				for (Element<Dim>* fe : this->Elements)
 				{
-					assert(e->CoarserElement == fe->CoarserElement);
-					if (e == fe)
-					{
-						feIsReferenced = true;
-						break;
-					}
-				}
-				assert(feIsReferenced);
-			}
+					assert(fe->CoarserElement != nullptr);
 
-			for (Element<Dim>* ce : CoarseMesh->Elements)
-			{
-				assert(ce->FinerElements.size() > 0);
-				for (Face<Dim>* ff : ce->FinerFacesRemoved)
-					assert(ff->IsRemovedOnCoarserGrid);
+					bool feIsReferenced = false;
+					for (Element<Dim>* e : fe->CoarserElement->FinerElements)
+					{
+						assert(e->CoarserElement == fe->CoarserElement);
+						if (e == fe)
+						{
+							feIsReferenced = true;
+							break;
+						}
+					}
+					assert(feIsReferenced);
+				}
+
+				for (Element<Dim>* ce : CoarseMesh->Elements)
+				{
+					assert(ce->FinerElements.size() > 0);
+					for (Face<Dim>* ff : ce->FinerFacesRemoved)
+						assert(ff->IsRemovedOnCoarserGrid);
+				}
 			}
 
 			for (Face<Dim>* cf : CoarseMesh->Faces)

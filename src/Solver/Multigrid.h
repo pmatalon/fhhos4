@@ -228,6 +228,8 @@ public:
 			os << "refinement by splitting from coarse mesh" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::BeyRefinement)
 			os << "Bey's refinement from coarse mesh" << endl;
+		else if (CoarseningStgy == CoarseningStrategy::FaceCoarsening)
+			os << "face coarsening" << endl;
 		else
 			os << "unknown" << endl;
 

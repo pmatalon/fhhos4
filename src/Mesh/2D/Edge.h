@@ -127,6 +127,10 @@ public:
 		Edge(number, v1, v2, element1, nullptr)
 	{ }
 
+	Edge(BigNumber number, Vertex* v1, Vertex* v2) :
+		Edge(number, v1, v2, nullptr, nullptr)
+	{ }
+
 	inline Vertex* Vertex1() const
 	{
 		return _shape->Vertex1;
@@ -135,7 +139,7 @@ public:
 	{
 		return _shape->Vertex2;
 	}
-
+	
 	//----------------------------------------------------//
 	//                 Face implementation                //
 	//----------------------------------------------------//

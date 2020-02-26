@@ -1,4 +1,5 @@
 #pragma once
+#include <fstream>
 #include <functional>
 #include "Types.h"
 #include "../Mesh/Point.h"
@@ -49,6 +50,11 @@ public:
 		cout << Utils::BeginRed << "Error: " << msg << Utils::EndColor << endl;
 		cout << "------------------------- FAILURE -------------------------" << endl;
 		exit(EXIT_FAILURE);
+	}
+
+	static void Warning(string msg)
+	{
+		cout << Utils::BeginYellow << "Warning: " << msg << Utils::EndColor << endl;
 	}
 
 };
