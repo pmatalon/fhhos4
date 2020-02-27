@@ -21,7 +21,8 @@ public:
 	string PostSmootherCode = "rbgs";
 	int PreSmoothingIterations = 1;
 	int PostSmoothingIterations = 1;
-	int CoarseLevelAdditionalSmoothing = 0;
+	int CoarseLevelChangeSmoothingCoeff = 0;
+	char CoarseLevelChangeSmoothingOperator = '+';
 	int BlockSizeForBlockSmoothers = -1;
 	CoarseningStrategy CoarseningStgy = CoarseningStrategy::StandardCoarsening;
 	bool ExportMatrices = false;
@@ -73,10 +74,30 @@ public:
 			// Build coarse level
 			levelNumber++;
 			Level* coarseLevel = CreateCoarseLevel(currentLevel);
-			int preSmoothingIterations = PreSmoothingIterations + coarseLevel->Number * CoarseLevelAdditionalSmoothing;
-			int postSmoothingIterations = PostSmoothingIterations + coarseLevel->Number * CoarseLevelAdditionalSmoothing;
+
+			int preSmoothingIterations = currentLevel->PreSmoother->Iterations();
+			int postSmoothingIterations = currentLevel->PreSmoother->Iterations();
+			if (CoarseLevelChangeSmoothingOperator == '+')
+			{
+				preSmoothingIterations += CoarseLevelChangeSmoothingCoeff;
+				postSmoothingIterations += CoarseLevelChangeSmoothingCoeff;
+			}
+			else if (CoarseLevelChangeSmoothingOperator == '-')
+			{
+				preSmoothingIterations -= CoarseLevelChangeSmoothingCoeff;
+				postSmoothingIterations -= CoarseLevelChangeSmoothingCoeff;
+			}
+			else if (CoarseLevelChangeSmoothingOperator == '*')
+			{
+				preSmoothingIterations *= CoarseLevelChangeSmoothingCoeff;
+				postSmoothingIterations *= CoarseLevelChangeSmoothingCoeff;
+			}
+			else
+				assert(false);
+
 			coarseLevel->PreSmoother = SmootherFactory::Create(PreSmootherCode, preSmoothingIterations, BlockSizeForBlockSmoothers);
 			coarseLevel->PostSmoother = SmootherFactory::Create(PostSmootherCode, postSmoothingIterations, BlockSizeForBlockSmoothers);
+
 			coarseLevel->UseGalerkinOperator = UseGalerkinOperator;
 			coarseLevel->ExportMatrices = ExportMatrices;
 
@@ -204,11 +225,11 @@ public:
 			os << "W";
 		else
 			os << "W(" << this->WLoops << " loops)";
-		os << "(" << PreSmoothingIterations << ", " << PostSmoothingIterations;
-		if (CoarseLevelAdditionalSmoothing > 0)
-			os << ", +" << CoarseLevelAdditionalSmoothing;
-		else if (CoarseLevelAdditionalSmoothing < 0)
-			os << ", " << CoarseLevelAdditionalSmoothing;
+		os << "(" << PreSmoothingIterations << "," << PostSmoothingIterations;
+		if ((CoarseLevelChangeSmoothingOperator == '+' && CoarseLevelChangeSmoothingCoeff > 0) ||
+			(CoarseLevelChangeSmoothingOperator == '-' && CoarseLevelChangeSmoothingCoeff > 0) ||
+			(CoarseLevelChangeSmoothingOperator == '*' && CoarseLevelChangeSmoothingCoeff > 1))
+			os << "," << CoarseLevelChangeSmoothingOperator << CoarseLevelChangeSmoothingCoeff;
 		os << ")" << endl;
 
 		os << "\t" << "Levels             : ";

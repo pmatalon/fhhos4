@@ -126,12 +126,12 @@ void print_usage() {
 	cout << "                                 Multigrid                            " << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << endl;
-	cout << "-cycle (V|W),NUM,NUM[,+NUM]" << endl;
+	cout << "-cycle (V|W),NUM,NUM[,+-*NUM]" << endl;
 	cout << "      Multigrid cycle." << endl;
 	cout << "      Examples: \"V,1,0\" or \"W,1,1\"." << endl;
-	cout << "      The third number defines the value of which the number of smoothing iterations is raised at each coarse level." << endl;
+	cout << "      The third number defines the value of which the number of smoothing iterations is increased or decreased at each coarse level," << endl;
+	cout << "      according to the arithmetic operation ('+', '-' or '*') that preceeds it." << endl;
 	cout << "      Example: \"V,1,1,+1\" performs (1,1) smoothing steps at the finer level, then (2,2) on the next one, then (3,3), etc." << endl;
-	cout << "      Note that negative values are allowed (to lower the number of smoothing steps)." << endl;
 	cout << endl;
 	cout << "-w NUM" << endl;
 	cout << "      Number of loops in the multigrid cycle." << endl;
@@ -165,7 +165,7 @@ void print_usage() {
 	cout << "      Coarsening strategy of the multigrid." << endl;
 	cout << "              s   - standard coarsening (merge colinear faces on the coarse mesh)" << endl;
 	cout << "              a   - agglomeration coarsening (keep fine faces on the coarse mesh)" << endl;
-	cout << "              f   - face coarsening: the faces are coarsened and all kept on the coarse skeleton" << endl;
+	cout << "              f   - face coarsening: the faces are coarsened and all kept on the coarse skeleton. Requires -g 1." << endl;
 	cout << "              r   - fine meshes obtained by structured refinement of the coarse mesh using a splitting method" << endl;
 	cout << "              b   - fine meshes obtained by structured refinement of the coarse mesh using the Bey method" << endl;
 	cout << endl;
@@ -180,6 +180,7 @@ void print_usage() {
 	cout << "                   Step 2: Adjoint of the same interpolation on the fine mesh" << endl;
 	cout << "              4  - Algorithm from Wildey et al.: the coarse level is built by static condensation of the fine faces interior to coarse elements." << endl;
 	cout << "                   The prolongation solves those condensed unknowns." << endl;
+	cout << "                   To reproduce Wildey et al.'s algorithm, this option should be used with '-g 1 -cycle V,1,1,*2'." << endl;
 	cout << "              5  - Canonical injection from coarse faces to fine faces (implemented to be used with option -cs f)." << endl;
 	cout << endl;
 	cout << "-cell-interp NUM" << endl;
@@ -432,7 +433,7 @@ int main(int argc, char* argv[])
 			case OPT_MGCycle:
 			{
 				string s(optarg);
-				regex pattern("^([vwVW]),([[:digit:]]+),([[:digit:]]+)(,([+-])?([[:digit:]]+))?$");
+				regex pattern("^([vwVW]),([[:digit:]]+),([[:digit:]]+)(,([*+-])([[:digit:]]+))?$");
 				smatch matches;
 
 				if (std::regex_search(s, matches, pattern))
@@ -446,9 +447,8 @@ int main(int argc, char* argv[])
 					args.Solver.MG.PostSmoothingIterations = stoi(matches.str(3));
 					if (!matches.str(4).empty())
 					{
-						args.Solver.MG.CoarseLevelAdditionalSmoothing = stoi(matches.str(6));
-						if (matches.str(5)[0] == '-')
-							args.Solver.MG.CoarseLevelAdditionalSmoothing *= -1;
+						args.Solver.MG.CoarseLevelChangeSmoothingOperator = matches.str(5)[0];
+						args.Solver.MG.CoarseLevelChangeSmoothingCoeff = stoi(matches.str(6));
 					}
 				}
 				else

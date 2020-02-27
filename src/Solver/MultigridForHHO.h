@@ -568,12 +568,15 @@ public:
 	{
 		os << "MultigridForHHO" << endl;
 		os << "\t" << "Prolongation       : " << _prolongationCode << endl;
-		os << "\t" << "Cell interpolation : ";
-		if (_cellInterpolationBasis == _problem->HHO->CellBasis)
-			os << "k";
-		else if (_cellInterpolationBasis == _problem->HHO->ReconstructionBasis)
-			os << "k+1";
-		os << endl;
+		if (_prolongationCode != 5)
+		{
+			os << "\t" << "Cell interpolation : ";
+			if (_cellInterpolationBasis == _problem->HHO->CellBasis)
+				os << "k";
+			else if (_cellInterpolationBasis == _problem->HHO->ReconstructionBasis)
+				os << "k+1";
+			os << endl;
+		}
 	}
 	
 protected:
