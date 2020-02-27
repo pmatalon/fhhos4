@@ -45,6 +45,8 @@ public:
 			initialGuess = Vector::Zero(b.rows());
 		else if (initialGuessCode.compare("1") == 0)
 			initialGuess = Vector::Ones(b.rows());
+		else if (initialGuessCode.compare("rand") == 0)
+			initialGuess = Vector::Random(b.rows());
 		else
 			assert(false);
 		return Solve(b, initialGuess);

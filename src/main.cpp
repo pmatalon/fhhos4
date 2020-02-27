@@ -127,8 +127,9 @@ void print_usage() {
 	cout << endl;
 	cout << "-initial-guess CODE" << endl;
 	cout << "      Initial guess for the iterative solvers." << endl;
-	cout << "              0     - zero vector (default)" << endl;
-	cout << "              1     - all ones vector" << endl;
+	cout << "              0        - zero vector (default)" << endl;
+	cout << "              1        - all ones vector" << endl;
+	cout << "              rand     - random" << endl;
 	cout << endl;
 	cout << "-tol NUM" << endl;
 	cout << "      Tolerance of the iterative solver (default: 1e-8)." << endl;
@@ -443,7 +444,7 @@ int main(int argc, char* argv[])
 			case OPT_InitialGuess:
 			{
 				string initialGuessCode = optarg;
-				if (initialGuessCode.compare("0") != 0 && initialGuessCode.compare("1") != 0)
+				if (initialGuessCode.compare("0") != 0 && initialGuessCode.compare("1") != 0 && initialGuessCode.compare("rand") != 0)
 					argument_error("unknown initial guess '" + initialGuessCode + "'. Check -initial-guess argument.");
 				args.Solver.InitialGuessCode = initialGuessCode;
 				break;
