@@ -253,7 +253,7 @@ public:
 
 	double H() override
 	{
-		return sqrt(2) / (double)this->Nx;
+		return this->Elements[0]->Regularity();
 	}
 
 	double Regularity() override
@@ -298,17 +298,17 @@ public:
 			coarseMesh->ComesFrom.nFineFacesAddedByCoarseElement = 3;
 			coarseMesh->ComesFrom.nFineFacesByKeptCoarseFace = 2;
 
-			for (BigNumber i = 0; i < ny; ++i)
+			for (BigNumber row = 0; row < ny; ++row)
 			{
-				for (BigNumber j = 0; j < nx; ++j)
+				for (BigNumber col = 0; col < nx; ++col)
 				{
-					LowerTriangle* fineLower = dynamic_cast<LowerTriangle*>(this->Elements[index(i, j)]);
-					UpperTriangle* fineUpper = dynamic_cast<UpperTriangle*>(this->Elements[index(i, j)+1]);
+					LowerTriangle* fineLower = dynamic_cast<LowerTriangle*>(this->Elements[index(col, row)]);
+					UpperTriangle* fineUpper = dynamic_cast<UpperTriangle*>(this->Elements[index(col, row)+1]);
 
-					LowerTriangle* coarseLower = dynamic_cast<LowerTriangle*>(coarseMesh->Elements[coarseMesh->index(i / 2, j / 2)]);
-					UpperTriangle* coarseUpper = dynamic_cast<UpperTriangle*>(coarseMesh->Elements[coarseMesh->index(i / 2, j / 2)+1]);
+					LowerTriangle* coarseLower = dynamic_cast<LowerTriangle*>(coarseMesh->Elements[coarseMesh->index(col / 2, row / 2)]);
+					UpperTriangle* coarseUpper = dynamic_cast<UpperTriangle*>(coarseMesh->Elements[coarseMesh->index(col / 2, row / 2)+1]);
 
-					if (j % 2 == 0) // on an even row
+					if (row % 2 == 0) // on an even row
 					{
 						coarseLower->FinerElements.push_back(fineLower);
 						fineLower->CoarserElement = coarseLower;
@@ -317,7 +317,7 @@ public:
 						coarseLower->SouthEdge()->FinerFaces.push_back(fineLower->SouthEdge());
 						fineLower->SouthEdge()->CoarseFace = coarseLower->SouthEdge();
 
-						if (i % 2 == 0) // on an even column
+						if (col % 2 == 0) // on an even column
 						{
 							coarseLower->FinerElements.push_back(fineUpper);
 							fineUpper->CoarserElement = coarseLower;
@@ -345,7 +345,7 @@ public:
 					{
 						coarseUpper->FinerElements.push_back(fineUpper);
 						fineUpper->CoarserElement = coarseUpper;
-						if (i % 2 == 0) // on an even col
+						if (col % 2 == 0) // on an even col
 						{
 							coarseLower->FinerElements.push_back(fineLower);
 							fineLower->CoarserElement = coarseLower;
@@ -368,12 +368,12 @@ public:
 							coarseUpper->FinerFacesRemoved.push_back(fineLower->WestEdge());
 						}
 					}
-					if (j == nx - 1) // last row
+					if (row == ny - 1) // last row
 					{
 						coarseUpper->NorthEdge()->FinerFaces.push_back(fineUpper->NorthEdge());
 						fineUpper->NorthEdge()->CoarseFace = coarseUpper->NorthEdge();
 					}
-					if (i == ny - 1) // last col
+					if (col == nx - 1) // last col
 					{
 						coarseUpper->EastEdge()->FinerFaces.push_back(fineUpper->EastEdge());
 						fineUpper->EastEdge()->CoarseFace = coarseUpper->EastEdge();

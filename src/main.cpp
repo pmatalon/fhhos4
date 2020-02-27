@@ -48,7 +48,7 @@ void print_usage() {
 	cout << "      Type of mesh. (Default: cart)" << endl;
 	cout << "               cart          - Unit square/cube discretized by an in-house uniform Cartesian mesh" << endl;
 	cout << "               tri           - Unit square discretized by an in-house uniform trianglular mesh" << endl;
-	cout << "               quad          - Unit square discretized by an in-house uniform quadrilateral mesh" << endl;
+	cout << "               quad          - Unit square discretized by an in-house uniform quadrilateral mesh (use argument -stretch to configure)" << endl;
 	cout << "               gmsh-cart     - Unit square discretized by a uniform Cartesian mesh built by GMSH" << endl;
 	cout << "               gmsh-tri      - Unit square discretized by a uniform triangular mesh built by GMSH from successive refinements of a coarse mesh" << endl;
 	cout << "               gmsh-uns-tri  - Unit square discretized by an unstructured triangular mesh built by GMSH from successive refinements of a coarse mesh" << endl;
@@ -58,10 +58,24 @@ void print_usage() {
 	cout << endl;
 	cout << "-n NUM" << endl;
 	cout << "      Number of subdivisions in each cartesian dimension of the unit square/cube (default: 16)." << endl;
+	cout << "      If used with -ny or -nz, then used for -nx." << endl;
+	cout << endl;
+	cout << "-nx NUM" << endl;
+	cout << "      Number of subdivisions in the x dimension of the unit square/cube (default: 16)." << endl;
+	cout << endl;
+	cout << "-ny NUM" << endl;
+	cout << "      Number of subdivisions in the y dimension of the unit square/cube (default: same as -n or -nx). Used only for the meshes 'cart', 'tri', 'quad'." << endl;
+	cout << endl;
+	cout << "-nz NUM" << endl;
+	cout << "      Number of subdivisions in the z dimension of the unit square/cube (default: same as -n or -nx). Used only for the meshes 'cart', 'tri', 'quad'." << endl;
 	cout << endl;
 	cout << "-file PATH" << endl;
 	cout << "      GMSH file (.geo or .msh) containing the geometry or the mesh. Requires option -mesh gmsh." << endl;
 	cout << "      To be used with the multigrid (whose levels will be built by successive refinements), the file must contain the COARSE mesh." << endl;
+	cout << endl;
+	cout << "-stretch NUM" << endl;
+	cout << "      0 <= NUM < 1   stretching factor of the quadrilateral element used in the 'quad' mesh." << endl;
+	cout << "      0 yields square elements. Default is 0.5: the top right corner is moved to the right 0.5 times the element's width." << endl;
 	cout << endl;
 	cout << "-discr CODE" << endl;
 	cout << "      Discretization method (default: hho)." << endl;
@@ -241,9 +255,13 @@ int main(int argc, char* argv[])
 		OPT_Anisotropy,
 		OPT_Partition,
 		// Discretization
+		OPT_Nx,
+		OPT_Ny,
+		OPT_Nz,
 		OPT_Discretization,
 		OPT_Mesh,
 		OPT_MeshFilePath,
+		OPT_Stretch,
 		OPT_Stabilization,
 		OPT_NoStaticCondensation,
 		OPT_Penalization,
@@ -270,9 +288,12 @@ int main(int argc, char* argv[])
 		 { "aniso", required_argument, NULL, OPT_Anisotropy },
 		 { "partition", required_argument, NULL, OPT_Partition },
 		 // Discretization
+		 { "nx", required_argument, NULL, OPT_Nx },
+		 { "ny", required_argument, NULL, OPT_Ny },
 		 { "discr", required_argument, NULL, OPT_Discretization },
 		 { "mesh", required_argument, NULL, OPT_Mesh },
 		 { "file", required_argument, NULL, OPT_MeshFilePath },
+		 { "stretch", required_argument, NULL, OPT_Stretch },
 		 { "stab", required_argument, NULL, OPT_Stabilization },
 		 { "no-static-cond", required_argument, NULL, OPT_NoStaticCondensation },
 		 { "pen", required_argument, NULL, OPT_Penalization },
@@ -334,8 +355,15 @@ int main(int argc, char* argv[])
 			//   Discretization   //
 			//--------------------//
 
-			case 'n': 
+			case 'n':
+			case OPT_Nx:
 				args.Discretization.N = stoul(optarg, nullptr, 0);
+				break;
+			case OPT_Ny:
+				args.Discretization.Ny = stoul(optarg, nullptr, 0);
+				break;
+			case OPT_Nz:
+				args.Discretization.Nz = stoul(optarg, nullptr, 0);
 				break;
 			case OPT_Discretization:
 			{
@@ -366,6 +394,9 @@ int main(int argc, char* argv[])
 			}
 			case OPT_MeshFilePath:
 				args.Discretization.MeshFilePath = optarg;
+				break;
+			case OPT_Stretch:
+				args.Discretization.Stretch = atof(optarg);
 				break;
 			case OPT_Stabilization:
 			{

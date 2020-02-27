@@ -16,9 +16,12 @@ struct ProblemArguments
 struct DiscretizationArguments
 {
 	BigNumber N = 16;
+	BigNumber Ny = -1;
+	BigNumber Nz = -1;
 	string Method = "hho";
 	string MeshCode = "tri";
 	string MeshFilePath = "";
+	double Stretch = 0.5;
 	string Stabilization = "hho";
 	string BasisCode = "legendre";
 	int PolyDegree = 1;

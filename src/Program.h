@@ -56,7 +56,7 @@ public:
 
 		Mesh<Dim>::MeshDirectory = "/mnt/c/Users/pierr/Documents/Source/Repos/dghho/data/meshes/";
 
-		Mesh<Dim>* mesh = BuildMesh(args.Discretization.N, args.Discretization.MeshCode, args.Discretization.MeshFilePath, args.Solver.MG.CoarseningStgy);
+		Mesh<Dim>* mesh = BuildMesh(args);
 
 		if ((args.Actions & Action::UnitTests) == Action::UnitTests)
 		{
@@ -470,7 +470,7 @@ public:
 	}
 
 private:
-	Mesh<Dim>* BuildMesh(int n, string meshCode, string meshFilePath, CoarseningStrategy refinementStgy) { return nullptr; }
+	Mesh<Dim>* BuildMesh(ProgramArguments& args) { return nullptr; }
 
 	Solver* CreateSolver(const ProgramArguments& args, Problem<Dim>* problem, int blockSize)
 	{
@@ -572,53 +572,59 @@ private:
 };
 
 template <>
-Mesh<1>* ProgramDim<1>::BuildMesh(int n, string meshCode, string meshFilePath, CoarseningStrategy refinementStgy)
+Mesh<1>* ProgramDim<1>::BuildMesh(ProgramArguments& args)
 {
-	return new UniformMesh1D(n);
+	return new UniformMesh1D(args.Discretization.N);
 }
 
 template <>
-Mesh<2>* ProgramDim<2>::BuildMesh(int n, string meshCode, string meshFilePath, CoarseningStrategy refinementStgy)
+Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 {
+	BigNumber nx = args.Discretization.N;
+	BigNumber ny = args.Discretization.Ny == -1 ? args.Discretization.N : args.Discretization.Ny;
+	string meshCode = args.Discretization.MeshCode;
+	double stretch = args.Discretization.Stretch;
+	CoarseningStrategy refinementStgy = args.Solver.MG.CoarseningStgy;
+
 	if (meshCode.compare("cart") == 0)
-		return new CartesianMesh2D(n, n);
+		return new CartesianMesh2D(nx, ny);
 	else if (meshCode.compare("cart-poly") == 0)
-		return new CartesianPolygonalMesh2D(n, n);
+		return new CartesianPolygonalMesh2D(nx, ny);
 	else if (meshCode.compare("tri") == 0)
-		return new TriangularMesh(n, n);
+		return new TriangularMesh(nx, ny);
 	else if (meshCode.compare("quad") == 0)
-		return new QuadrilateralMesh(n, n, 0.5);
+		return new QuadrilateralMesh(nx, ny, stretch);
 	else if (meshCode.compare("quad-poly") == 0)
-		return new QuadrilateralAsPolygonalMesh(n, n, 0.5);
+		return new QuadrilateralAsPolygonalMesh(nx, ny, stretch);
 #ifdef GMSH_ENABLED
 	else if (meshCode.compare("gmsh-cart") == 0)
 	{
 		Mesh<2>* coarseMesh = new GMSHCartesianMesh2D();
-		Mesh<2>* fineMesh = coarseMesh->RefineUntilNElements(n*n, refinementStgy);
+		Mesh<2>* fineMesh = coarseMesh->RefineUntilNElements(nx*ny, refinementStgy);
 		return fineMesh;
 	}
 	else if (meshCode.compare("gmsh-tri") == 0)
 	{
 		Mesh<2>* coarseMesh = new GMSHTriangularMesh();
-		Mesh<2>* fineMesh = coarseMesh->RefineUntilNElements(2*n*n, refinementStgy);
+		Mesh<2>* fineMesh = coarseMesh->RefineUntilNElements(2*nx*ny, refinementStgy);
 		return fineMesh;
 	}
 	else if (meshCode.compare("gmsh-uns-tri") == 0)
 	{
 		Mesh<2>* coarseMesh = new GMSHUnstructuredTriangularMesh();
-		Mesh<2>* fineMesh = coarseMesh->RefineUntilNElements(2*n*n, refinementStgy);
+		Mesh<2>* fineMesh = coarseMesh->RefineUntilNElements(2*nx*ny, refinementStgy);
 		return fineMesh;
 	}
 	else if (meshCode.compare("gmsh-quad") == 0)
 	{
 		Mesh<2>* coarseMesh = new GMSHQuadrilateralMesh();
-		Mesh<2>* fineMesh = coarseMesh->RefineUntilNElements(n*n, refinementStgy);
+		Mesh<2>* fineMesh = coarseMesh->RefineUntilNElements(nx*ny, refinementStgy);
 		return fineMesh;
 	}
 	else if (meshCode.compare("gmsh") == 0)
 	{
-		Mesh<2>* coarseMesh = new GMSHMesh<2>(meshFilePath);
-		Mesh<2>* fineMesh = coarseMesh->RefineUntilNElements(2*n*n, refinementStgy);
+		Mesh<2>* coarseMesh = new GMSHMesh<2>(args.Discretization.MeshFilePath);
+		Mesh<2>* fineMesh = coarseMesh->RefineUntilNElements(2*nx*ny, refinementStgy);
 		return fineMesh;
 	}
 #endif // GMSH_ENABLED
@@ -626,13 +632,20 @@ Mesh<2>* ProgramDim<2>::BuildMesh(int n, string meshCode, string meshFilePath, C
 }
 
 template <>
-Mesh<3>* ProgramDim<3>::BuildMesh(int n, string meshCode, string meshFilePath, CoarseningStrategy refinementStgy)
+Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args)
 {
+	BigNumber n = args.Discretization.N;
+	BigNumber nx = args.Discretization.N;
+	BigNumber ny = args.Discretization.Ny;
+	BigNumber nz = args.Discretization.Ny;
+	string meshCode = args.Discretization.MeshCode;
+	CoarseningStrategy refinementStgy = args.Solver.MG.CoarseningStgy;
+
 	if (meshCode.compare("cart") == 0)
 	{
-		CartesianMesh3D* fineMesh = new CartesianMesh3D(n, n, n);
+		CartesianMesh3D* fineMesh = new CartesianMesh3D(nx, ny, nz);
 
-		assert(fineMesh->Elements.size() == n*n*n);
+		assert(fineMesh->Elements.size() == nx*ny*nz);
 		assert(fineMesh->Faces.size() == 3*n*n*(n+1));
 
 		return fineMesh;
@@ -641,7 +654,7 @@ Mesh<3>* ProgramDim<3>::BuildMesh(int n, string meshCode, string meshFilePath, C
 	{
 		Mesh<3>* fineMesh = new CartesianTetrahedralMesh(n);
 
-		assert(fineMesh->Elements.size() == 6 * n*n*n);
+		assert(fineMesh->Elements.size() == 6 * nx*ny*nz);
 		assert(fineMesh->Faces.size() == 12 * n*n*n + 6 * n*n);
 
 		return fineMesh;
@@ -669,7 +682,7 @@ Mesh<3>* ProgramDim<3>::BuildMesh(int n, string meshCode, string meshFilePath, C
 	}
 	else if (meshCode.compare("gmsh") == 0)
 	{
-		Mesh<3>* coarseMesh = new GMSHMesh<3>(meshFilePath);
+		Mesh<3>* coarseMesh = new GMSHMesh<3>(args.Discretization.MeshFilePath);
 		Mesh<3>* fineMesh = coarseMesh->RefineUntilNElements(6*n*n*n, refinementStgy);
 		return fineMesh;
 	}
