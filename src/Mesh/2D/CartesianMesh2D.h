@@ -293,8 +293,10 @@ public:
 				if (j == 0)
 				{
 					Face<2>* bottomWestFace = bottomLeftElement->WestFace->CreateSameGeometricFace(faceNumber++, coarseElement);
+					bottomLeftElement->WestFace->CoarseFace = bottomWestFace;
 					bottomWestFace->FinerFaces.push_back(bottomLeftElement->WestFace);
 					Face<2>* topWestFace = topLeftElement->WestFace->CreateSameGeometricFace(faceNumber++, coarseElement);
+					topLeftElement->WestFace->CoarseFace = topWestFace;
 					topWestFace->FinerFaces.push_back(topLeftElement->WestFace);
 					coarseElement->AddWestFace(bottomWestFace);
 					coarseElement->AddWestFace(topWestFace);
@@ -309,8 +311,10 @@ public:
 
 				// North faces
 				Face<2>* leftNorthFace = topLeftElement->NorthFace->CreateSameGeometricFace(faceNumber++, coarseElement);
+				topLeftElement->NorthFace->CoarseFace = leftNorthFace;
 				leftNorthFace->FinerFaces.push_back(topLeftElement->NorthFace);
 				Face<2>* rightNorthFace = topRightElement->NorthFace->CreateSameGeometricFace(faceNumber++, coarseElement);
+				topRightElement->NorthFace->CoarseFace = rightNorthFace;
 				rightNorthFace->FinerFaces.push_back(topRightElement->NorthFace);
 				coarseElement->AddNorthFace(leftNorthFace);
 				coarseElement->AddNorthFace(rightNorthFace);
@@ -319,8 +323,10 @@ public:
 
 				// East faces
 				Face<2>* topEastFace = topRightElement->EastFace->CreateSameGeometricFace(faceNumber++, coarseElement);
+				topRightElement->EastFace->CoarseFace = topEastFace;
 				topEastFace->FinerFaces.push_back(topRightElement->EastFace);
 				Face<2>* bottomEastFace = bottomRightElement->EastFace->CreateSameGeometricFace(faceNumber++, coarseElement);
+				bottomRightElement->EastFace->CoarseFace = bottomEastFace;
 				bottomEastFace->FinerFaces.push_back(bottomRightElement->EastFace);
 				coarseElement->AddEastFace(topEastFace);
 				coarseElement->AddEastFace(bottomEastFace);
@@ -331,8 +337,10 @@ public:
 				if (i == 0)
 				{
 					Face<2>* rightSouthFace = bottomRightElement->SouthFace->CreateSameGeometricFace(faceNumber++, coarseElement);
+					bottomRightElement->SouthFace->CoarseFace = rightSouthFace;
 					rightSouthFace->FinerFaces.push_back(bottomRightElement->SouthFace);
 					Face<2>* leftSouthFace = bottomLeftElement->SouthFace->CreateSameGeometricFace(faceNumber++, coarseElement);
+					bottomLeftElement->SouthFace->CoarseFace = leftSouthFace;
 					leftSouthFace->FinerFaces.push_back(bottomLeftElement->SouthFace);
 					coarseElement->AddSouthFace(rightSouthFace);
 					coarseElement->AddSouthFace(leftSouthFace);

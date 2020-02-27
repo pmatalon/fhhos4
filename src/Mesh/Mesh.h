@@ -326,7 +326,10 @@ public:
 			{
 				assert(cf->FinerFaces.size() > 0);
 				for (Face<Dim>* ff : cf->FinerFaces)
+				{
 					assert(!ff->IsRemovedOnCoarserGrid);
+					assert(ff->CoarseFace == cf);
+				}
 			}
 
 			for (Face<Dim>* ff : this->Faces)
