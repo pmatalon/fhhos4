@@ -162,7 +162,7 @@ public:
 	virtual void ExportFacesToMatlab(string filePath)
 	{
 		FILE* file = fopen(filePath.c_str(), "w");
-		fprintf(file, "Number x1    y1    x2    y2 IsDomainBoundary\n");
+		fprintf(file, "Number x1    y1    x2    y2 IsDomainBoundary IsRemovedOnCoarserGrid\n");
 		for (Face<Dim>* f : this->Faces)
 			f->ExportFaceToMatlab(file);
 		fclose(file);

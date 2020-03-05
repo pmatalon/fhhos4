@@ -64,8 +64,8 @@ public:
 				p2.Y += _shape->WidthY;
 			else
 				assert(false);
-			//             Number  x1    y1    x2    y2 IsDomainBoundary
-			fprintf(file, "%lu %.17g %.17g %.17g %.17g %d\n", this->Number, _shape->Origin->X, _shape->Origin->Y, p2.X, p2.Y, this->IsDomainBoundary);
+			//             Number  x1    y1    x2    y2 IsDomainBoundary IsRemovedOnCoarserGrid
+			fprintf(file, "%lu %.17g %.17g %.17g %.17g %d %d\n", this->Number, _shape->Origin->X, _shape->Origin->Y, p2.X, p2.Y, this->IsDomainBoundary, this->IsRemovedOnCoarserGrid);
 		}
 		else
 			assert(false);

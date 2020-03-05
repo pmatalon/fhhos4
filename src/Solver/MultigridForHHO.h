@@ -19,9 +19,6 @@ public:
 		this->_problem = problem;
 		this->_prolongationCode = prolongationCode;
 		this->_cellInterpolationBasis = cellInterpolationBasis;
-
-		if (ExportMatrices)
-			problem->ExportFaces("L" + to_string(number));
 	}
 
 	BigNumber NUnknowns() override
@@ -41,9 +38,31 @@ public:
 			coarsestPossibleMeshReached = true;
 	}
 
-	void ExportVector(Vector& v, string suffix) override
+	void ExportVector(Vector& v, string suffix, int levelNumber) override
 	{
-		this->_problem->ExportVector(v, suffix);
+		if (!this->IsFinestLevel())
+			this->FinerLevel->ExportVector(v, suffix, levelNumber);
+		else
+			this->_problem->ExportVector(v, "level" + to_string(levelNumber) + "_" + suffix);
+	}
+
+	void ExportMatrix(const SparseMatrix& M, string suffix, int levelNumber) override
+	{
+		if (!this->IsFinestLevel())
+			this->FinerLevel->ExportMatrix(M, suffix, levelNumber);
+		else
+			this->_problem->ExportMatrix(M, "level" + to_string(levelNumber) + "_" + suffix);
+	}
+
+	void ExportFaces(Mesh<Dim>* levelMesh, int levelNumber)
+	{
+		if (!this->IsFinestLevel())
+			dynamic_cast<LevelForHHO<Dim>*>(this->FinerLevel)->ExportFaces(levelMesh, levelNumber);
+		else
+		{
+			string filePath = this->_problem->GetFilePath("level" + to_string(levelNumber) + "_faces");
+			levelMesh->ExportFacesToMatlab(filePath);
+		}
 	}
 
 private:
@@ -58,6 +77,9 @@ private:
 			cout << "\t\tMesh                : " << this->_problem->_mesh->Faces.size() << " faces" << endl;
 		else
 			cout << "\t\tMesh                : " << this->_problem->_mesh->Elements.size() << " elements, regularity = " << this->_problem->_mesh->Regularity() << endl;
+
+		if (ExportMatrices)
+			this->ExportFaces(this->_problem->_mesh, this->Number);
 
 		if (!IsCoarsestLevel())
 		{
@@ -84,12 +106,12 @@ private:
 
 			if (ExportMatrices)
 			{
-				finePb->ExportMatrix(I_c, "I_c");
-				//finePb->ExportMatrix(J_f_c, "J_f_c");
-				finePb->ExportMatrix(Pi_f, "Pi_f");
+				Level::ExportMatrix(I_c, "I_c");
+				//Level::ExportMatrix(J_f_c, "J_f_c");
+				Level::ExportMatrix(Pi_f, "Pi_f");
 
 				SparseMatrix SolveCellUnknowns = GetSolveCellUnknownsMatrix(coarsePb);
-				finePb->ExportMatrix(SolveCellUnknowns, "SolveCellUnknowns");
+				Level::ExportMatrix(SolveCellUnknowns, "SolveCellUnknowns");
 			}
 
 			//P = Pi_f * J_f_c * I_c;
@@ -106,11 +128,13 @@ private:
 
 			if (ExportMatrices)
 			{
-				finePb->ExportMatrix(I_c, "I_c");
-				//finePb->ExportMatrix(J_f_c, "J_f_c");
-				finePb->ExportMatrix(Pi_f, "Pi_f");
+				Level::ExportMatrix(I_c, "I_c");
+				//Level::ExportMatrix(J_f_c, "J_f_c");
+				Level::ExportMatrix(Pi_f, "Pi_f");
+				Level::ExportMatrix(J_faces, "J_faces");
 
-				finePb->ExportMatrix(J_faces, "J_faces");
+				SparseMatrix SolveCellUnknowns = GetSolveCellUnknownsMatrix(coarsePb);
+				Level::ExportMatrix(SolveCellUnknowns, "SolveCellUnknowns");
 			}
 
 			//SparseMatrix P_algo1 = Pi_f * J_f_c * I_c;
@@ -141,15 +165,16 @@ private:
 
 			if (ExportMatrices)
 			{
-				finePb->ExportMatrix(I_c, "I_c");
-				finePb->ExportMatrix(J_f_c, "J_f_c");
-				finePb->ExportMatrix(K_f, "K_f");
+				Level::ExportMatrix(I_c, "I_c");
+				Level::ExportMatrix(J_f_c, "J_f_c");
+				Level::ExportMatrix(K_f, "K_f");
 			}
 
 			P = K_f * J_f_c * I_c;
 		}
 		else if (_prolongationCode == 4)
 		{
+			// Wildey et al. //
 			int nFaceUnknowns = finePb->HHO->nFaceUnknowns;
 
 			ElementParallelLoop<Dim> parallelLoop(coarsePb->_mesh->Elements);
@@ -199,7 +224,7 @@ private:
 			Utils::FatalError("Unknown prolongationCode.");
 
 		if (ExportMatrices)
-			finePb->ExportMatrix(P, "P");
+			Level::ExportMatrix(P, "P");
 	}
 
 	void SetupRestriction() override
@@ -207,7 +232,7 @@ private:
 		R = RestrictionScalingFactor() * P.transpose();
 
 		if (ExportMatrices)
-			this->_problem->ExportMatrix(R, "R");
+			Level::ExportMatrix(R, "R");
 	}
 
 private:

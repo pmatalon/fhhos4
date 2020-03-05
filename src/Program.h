@@ -359,9 +359,6 @@ public:
 			HHOParameters<Dim>* hho = new HHOParameters<Dim>(mesh, args.Discretization.Stabilization, reconstructionBasis, cellBasis, faceBasis);
 
 			problem = new Poisson_HHO<Dim>(mesh, args.Problem.RHSCode, sourceFunction, hho, args.Discretization.StaticCondensation, &diffusionPartition, &bc, args.OutputDirectory);
-
-			if ((args.Actions & Action::ExportFaces) == Action::ExportFaces)
-				mesh->ExportFacesToMatlab(args.OutputDirectory, true);
 		}
 		else
 			Utils::FatalError("Unknown discretization.");
@@ -424,6 +421,9 @@ public:
 						hhoPb->ExtractSolution();
 					}
 				}
+
+				if ((args.Actions & Action::ExportFaces) == Action::ExportFaces)
+					mesh->ExportFacesToMatlab(args.OutputDirectory, true);
 			}
 
 			//----------------------//
@@ -636,8 +636,8 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args)
 {
 	BigNumber n = args.Discretization.N;
 	BigNumber nx = args.Discretization.N;
-	BigNumber ny = args.Discretization.Ny;
-	BigNumber nz = args.Discretization.Ny;
+	BigNumber ny = args.Discretization.Ny == -1 ? args.Discretization.N : args.Discretization.Ny;
+	BigNumber nz = args.Discretization.Nz == -1 ? args.Discretization.N : args.Discretization.Nz;
 	string meshCode = args.Discretization.MeshCode;
 	CoarseningStrategy refinementStgy = args.Solver.MG.CoarseningStgy;
 
@@ -646,7 +646,8 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args)
 		CartesianMesh3D* fineMesh = new CartesianMesh3D(nx, ny, nz);
 
 		assert(fineMesh->Elements.size() == nx*ny*nz);
-		assert(fineMesh->Faces.size() == 3*n*n*(n+1));
+		if (nx == ny && ny == nz)
+			assert(fineMesh->Faces.size() == 3*n*n*(n+1));
 
 		return fineMesh;
 	}
@@ -655,13 +656,17 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args)
 		Mesh<3>* fineMesh = new CartesianTetrahedralMesh(n);
 
 		assert(fineMesh->Elements.size() == 6 * nx*ny*nz);
-		assert(fineMesh->Faces.size() == 12 * n*n*n + 6 * n*n);
+		if (nx == ny && ny == nz)
+			assert(fineMesh->Faces.size() == 12 * n*n*n + 6 * n*n);
 
 		return fineMesh;
 	}
 #ifdef GMSH_ENABLED
 	else if (meshCode.compare("gmsh-cart") == 0)
 	{
+		if (nx != ny || nx != nz)
+			Utils::FatalError("-ny, -ny not managed with this mesh");
+
 		Mesh<3>* coarseMesh = new GMSHCartesianMesh3D();
 		Mesh<3>* fineMesh = coarseMesh->RefineUntilNElements(n*n*n, refinementStgy);
 
@@ -672,6 +677,9 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args)
 	}
 	else if (meshCode.compare("gmsh-tetra") == 0)
 	{
+		if (nx != ny || nx != nz)
+			Utils::FatalError("-ny, -ny not managed with this mesh");
+
 		Mesh<3>* coarseMesh = new GMSHTetrahedralMesh();
 		Mesh<3>* fineMesh = coarseMesh->RefineUntilNElements(6*n*n*n, refinementStgy);
 
@@ -682,6 +690,9 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args)
 	}
 	else if (meshCode.compare("gmsh") == 0)
 	{
+		if (nx != ny || nx != nz)
+			Utils::FatalError("-ny, -ny not managed with this mesh");
+
 		Mesh<3>* coarseMesh = new GMSHMesh<3>(args.Discretization.MeshFilePath);
 		Mesh<3>* fineMesh = coarseMesh->RefineUntilNElements(6*n*n*n, refinementStgy);
 		return fineMesh;

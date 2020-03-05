@@ -88,15 +88,6 @@ private:
 	}
 
 public:
-	void ExportFaces()
-	{
-		return ExportFaces("");
-	}
-	void ExportFaces(string suffix)
-	{
-		string filePath = this->GetFilePath("faces" + suffix);
-		this->_mesh->ExportFacesToMatlab(filePath);
-	}
 
 	void PrintDiscretization()
 	{

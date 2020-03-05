@@ -108,7 +108,18 @@ public:
 
 	virtual BigNumber NUnknowns() = 0;
 	virtual void CoarsenMesh(CoarseningStrategy coarseningStgy, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) = 0;
-	virtual void ExportVector(Vector& v, string suffix) = 0;
+
+	virtual void ExportVector(Vector& v, string suffix, int levelNumber) = 0;
+	virtual void ExportMatrix(const SparseMatrix& M, string suffix, int levelNumber) = 0;
+
+	void ExportVector(Vector& v, string suffix)
+	{
+		this->ExportVector(v, suffix, this->Number);
+	}
+	void ExportMatrix(const SparseMatrix& M, string suffix)
+	{
+		this->ExportMatrix(M, suffix, this->Number);
+	}
 
 	virtual ~Level()
 	{
