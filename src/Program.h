@@ -497,6 +497,7 @@ private:
 				mg->PostSmootherCode = args.Solver.MG.PostSmootherCode;
 				mg->PreSmoothingIterations = args.Solver.MG.PreSmoothingIterations;
 				mg->PostSmoothingIterations = args.Solver.MG.PostSmoothingIterations;
+				mg->RelaxationParameter = args.Solver.RelaxationParameter;
 				mg->CoarseLevelChangeSmoothingCoeff = args.Solver.MG.CoarseLevelChangeSmoothingCoeff;
 				mg->CoarseLevelChangeSmoothingOperator = args.Solver.MG.CoarseLevelChangeSmoothingOperator;
 				mg->CoarseningStgy = args.Solver.MG.CoarseningStgy;
@@ -520,10 +521,20 @@ private:
 			solver = new ConjugateGradient();
 		else if (args.Solver.SolverCode.compare("eigencg") == 0)
 			solver = new EigenCG();
-		else if (args.Solver.SolverCode.compare("bgs") == 0)
-			solver = new BlockGaussSeidel(blockSize);
+		else if (args.Solver.SolverCode.compare("j") == 0)
+			solver = new BlockJacobi(1, args.Solver.RelaxationParameter);
+		else if (args.Solver.SolverCode.compare("sor") == 0 || args.Solver.SolverCode.compare("gs") == 0)
+			solver = new BlockSOR(1, args.Solver.RelaxationParameter, Direction::Forward);
+		else if (args.Solver.SolverCode.compare("rsor") == 0 || args.Solver.SolverCode.compare("rgs") == 0)
+			solver = new BlockSOR(1, args.Solver.RelaxationParameter, Direction::Backward);
+		else if (args.Solver.SolverCode.compare("bsor") == 0 || args.Solver.SolverCode.compare("bgs") == 0)
+			solver = new BlockSOR(blockSize, args.Solver.RelaxationParameter, Direction::Forward);
+		else if (args.Solver.SolverCode.compare("rbsor") == 0 || args.Solver.SolverCode.compare("rbgs") == 0)
+			solver = new BlockSOR(blockSize, args.Solver.RelaxationParameter, Direction::Backward);
 		else if (args.Solver.SolverCode.compare("bj") == 0)
-			solver = new BlockJacobi(blockSize);
+			solver = new BlockJacobi(blockSize, args.Solver.RelaxationParameter);
+		else if (args.Solver.SolverCode.compare("bj23") == 0)
+			solver = new BlockJacobi(blockSize, 2.0/3.0);
 #ifdef AGMG_ENABLED
 		else if (args.Solver.solverCode.compare("agmg") == 0)
 			solver = new AGMG(tolerance);

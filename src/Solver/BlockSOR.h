@@ -19,6 +19,7 @@ protected:
 	vector<Eigen::FullPivLU<DenseMatrix>> invD;
 	Eigen::SparseMatrix<double, Eigen::RowMajor> _rowMajorA;
 public:
+	BlockSOR(int blockSize, double omega) : BlockSOR(blockSize, omega, Direction::Forward) {}
 
 	BlockSOR(int blockSize, double omega, Direction direction)
 	{
@@ -29,7 +30,19 @@ public:
 
 	virtual void Serialize(ostream& os) const override
 	{
-		os << "Block SOR (blockSize=" << _blockSize << ", omega=" << _omega << ", direction=" << (_direction == Direction::Forward ? "forward" : "backward") << ")";
+		if (_blockSize != 1)
+			os << "Block ";
+		if (_omega == 1)
+			os << "Gauss-Seidel ";
+		else
+			os << "SOR ";
+
+		os << " (";
+		if (_blockSize != 1)
+			os << "blockSize=" << _blockSize << ", ";
+		if (_omega != 1)
+			os << "omega=" << _omega << ", ";
+		os << "direction=" << (_direction == Direction::Forward ? "forward" : "backward") << ")";
 	}
 
 	//------------------------------------------------//
@@ -107,79 +120,5 @@ private:
 		}
 
 		x.segment(currentBlockRow * _blockSize, _blockSize) = this->invD[currentBlockRow].solve(tmp_x);
-	}
-};
-
-class SOR : public BlockSOR
-{
-public: 
-	SOR(double omega) : BlockSOR(1, omega, Direction::Forward) {}
-
-	virtual void Serialize(ostream& os) const override
-	{
-		os << "SOR (omega=" << _omega << ")";
-	}
-};
-
-class ReverseSOR : public BlockSOR
-{
-public: 
-	ReverseSOR(double omega) : BlockSOR(1, omega, Direction::Backward) {}
-
-	virtual void Serialize(ostream& os) const override
-	{
-		os << "Reverse SOR (omega=" << _omega << ")";
-	}
-};
-
-class GaussSeidel : public SOR
-{
-public: 
-	GaussSeidel() : SOR(1) {}
-
-	static string Code() { return "gs"; };
-
-	virtual void Serialize(ostream& os) const override
-	{
-		os << "Gauss-Seidel";
-	}
-};
-
-class ReverseGaussSeidel : public ReverseSOR
-{
-public: 
-	ReverseGaussSeidel() : ReverseSOR(1) {}
-
-	static string Code() { return "rgs"; };
-
-	virtual void Serialize(ostream& os) const override
-	{
-		os << "Reverse Gauss-Seidel";
-	}
-};
-
-class BlockGaussSeidel : public BlockSOR
-{
-public: 
-	BlockGaussSeidel(int blockSize) : BlockSOR(blockSize, 1, Direction::Forward) {}
-
-	static string Code() { return "bgs"; };
-
-	virtual void Serialize(ostream& os) const override
-	{
-		os << "Block Gauss-Seidel (blockSize=" << _blockSize << ")";
-	}
-};
-
-class ReverseBlockGaussSeidel : public BlockSOR
-{
-public: 
-	ReverseBlockGaussSeidel(int blockSize) : BlockSOR(blockSize, 1, Direction::Backward) {}
-
-	static string Code() { return "rbgs"; };
-
-	virtual void Serialize(ostream& os) const override
-	{
-		os << "Reverse Block Gauss-Seidel (blockSize=" << _blockSize << ")";
 	}
 };

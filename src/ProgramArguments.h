@@ -54,6 +54,7 @@ struct SolverArguments
 	string InitialGuessCode = "0";
 	double Tolerance = 1e-8;
 	int MaxIterations = 200;
+	double RelaxationParameter = 1;
 	MultigridArguments MG;
 };
 

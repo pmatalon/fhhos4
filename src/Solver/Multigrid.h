@@ -24,6 +24,7 @@ public:
 	int CoarseLevelChangeSmoothingCoeff = 0;
 	char CoarseLevelChangeSmoothingOperator = '+';
 	int BlockSizeForBlockSmoothers = -1;
+	double RelaxationParameter = 1;
 	CoarseningStrategy CoarseningStgy = CoarseningStrategy::StandardCoarsening;
 	bool ExportMatrices = false;
 
@@ -55,8 +56,8 @@ public:
 		cout << "Setup..." << endl;
 
 		this->_fineLevel->OperatorMatrix = A;
-		this->_fineLevel->PreSmoother = this->_fineLevel->CreateSmoother(PreSmootherCode, PreSmoothingIterations, BlockSizeForBlockSmoothers);
-		this->_fineLevel->PostSmoother = this->_fineLevel->CreateSmoother(PostSmootherCode, PostSmoothingIterations, BlockSizeForBlockSmoothers);
+		this->_fineLevel->PreSmoother = this->_fineLevel->CreateSmoother(PreSmootherCode, PreSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
+		this->_fineLevel->PostSmoother = this->_fineLevel->CreateSmoother(PostSmootherCode, PostSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
 		this->_fineLevel->UseGalerkinOperator = false;
 		this->_fineLevel->ExportMatrices = ExportMatrices;
 
@@ -95,8 +96,8 @@ public:
 			else
 				assert(false);
 
-			coarseLevel->PreSmoother = coarseLevel->CreateSmoother(PreSmootherCode, preSmoothingIterations, BlockSizeForBlockSmoothers);
-			coarseLevel->PostSmoother = coarseLevel->CreateSmoother(PostSmootherCode, postSmoothingIterations, BlockSizeForBlockSmoothers);
+			coarseLevel->PreSmoother = coarseLevel->CreateSmoother(PreSmootherCode, preSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
+			coarseLevel->PostSmoother = coarseLevel->CreateSmoother(PostSmootherCode, postSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
 
 			coarseLevel->UseGalerkinOperator = UseGalerkinOperator;
 			coarseLevel->ExportMatrices = ExportMatrices;
@@ -266,8 +267,8 @@ public:
 		else
 			os << "unknown" << endl;
 
-		Smoother* preSmoother = this->_fineLevel->CreateSmoother(PreSmootherCode, PreSmoothingIterations, BlockSizeForBlockSmoothers);
-		Smoother* postSmoother = this->_fineLevel->CreateSmoother(PostSmootherCode, PostSmoothingIterations, BlockSizeForBlockSmoothers);
+		Smoother* preSmoother = this->_fineLevel->CreateSmoother(PreSmootherCode, PreSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
+		Smoother* postSmoother = this->_fineLevel->CreateSmoother(PostSmootherCode, PostSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
 		os << "\t" << "Pre-smoothing      : " << *preSmoother << endl;
 		os << "\t" << "Post-smoothing     : " << *postSmoother;
 		delete preSmoother;

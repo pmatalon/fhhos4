@@ -53,44 +53,14 @@ public:
 
 };
 
-class JacobiSmoother : public Smoother
-{
-public:
-	JacobiSmoother(int nSmoothingIterations) : Smoother(new Jacobi(), nSmoothingIterations) {}
-};
-
 class BlockJacobiSmoother : public Smoother
 {
 public:
-	BlockJacobiSmoother(int blockSize, int nSmoothingIterations) : Smoother(new BlockJacobi(blockSize), nSmoothingIterations) {}
+	BlockJacobiSmoother(int blockSize, double omega, int nSmoothingIterations) : Smoother(new BlockJacobi(blockSize, omega), nSmoothingIterations) {}
 };
 
-class BlockDampedJacobi23Smoother : public Smoother
+class BlockSORSmoother : public Smoother
 {
 public:
-	BlockDampedJacobi23Smoother(int blockSize, int nSmoothingIterations) : Smoother(new BlockDampedJacobi23(blockSize), nSmoothingIterations) {}
-};
-
-class GaussSeidelSmoother : public Smoother
-{
-public:
-	GaussSeidelSmoother(int nSmoothingIterations) : Smoother(new GaussSeidel(), nSmoothingIterations) {}
-};
-
-class ReverseGaussSeidelSmoother : public Smoother
-{
-public:
-	ReverseGaussSeidelSmoother(int nSmoothingIterations) : Smoother(new ReverseGaussSeidel(), nSmoothingIterations) {}
-};
-
-class BlockGaussSeidelSmoother : public Smoother
-{
-public:
-	BlockGaussSeidelSmoother(int blockSize, int nSmoothingIterations) : Smoother(new BlockGaussSeidel(blockSize), nSmoothingIterations) {}
-};
-
-class ReverseBlockGaussSeidelSmoother : public Smoother
-{
-public:
-	ReverseBlockGaussSeidelSmoother(int blockSize, int nSmoothingIterations) : Smoother(new ReverseBlockGaussSeidel(blockSize), nSmoothingIterations) {}
+	BlockSORSmoother(int blockSize, double omega, Direction direction, int nSmoothingIterations) : Smoother(new BlockSOR(blockSize, omega, direction), nSmoothingIterations) {}
 };

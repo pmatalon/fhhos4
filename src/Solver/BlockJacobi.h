@@ -3,7 +3,7 @@
 #include "../Utils/ParallelLoop.h"
 using namespace std;
 
-class BlockDampedJacobi : public IterativeSolver
+class BlockJacobi : public IterativeSolver
 {
 protected:
 	int _blockSize;
@@ -13,15 +13,41 @@ protected:
 	Eigen::SparseMatrix<double, Eigen::RowMajor> _rowMajorA;
 public:
 
-	BlockDampedJacobi(int blockSize, double omega)
+	BlockJacobi(int blockSize, double omega = 1)
 	{
+		assert(omega > 0 && omega < 2);
 		this->_blockSize = blockSize;
 		this->_omega = omega;
 	}
 
 	virtual void Serialize(ostream& os) const override
 	{
-		os << "Block-Damped Jacobi (blockSize=" << _blockSize << ", omega=" << _omega << ")";
+		if (_blockSize == 1)
+		{
+			os << "Jacobi";
+			if (_omega != 1)
+			{
+				os << " (omega=";
+				if (_omega == 2.0/3.0)
+					os << "2/3";
+				else
+					os << _omega;
+				os << ")";
+			}
+		}
+		else
+		{
+			os << "Block Jacobi (blockSize=" << _blockSize;
+			if (_omega != 1)
+			{
+				os << ", omega=";
+				if (_omega == 2.0 / 3.0)
+					os << "2/3";
+				else
+				os <<  _omega;
+			}
+			os << ")";
+		}
 	}
 
 	//------------------------------------------------//
@@ -67,6 +93,7 @@ private:
 		return result;
 	}
 
+protected:
 	inline void ProcessBlockRow(BigNumber currentBlockRow, const Vector& b, const Vector& xOld, Vector& xNew)
 	{
 		// BlockRow i: [ --- Li --- | Di | --- Ui --- ]
@@ -91,52 +118,5 @@ private:
 		}
 
 		xNew.segment(currentBlockRow * _blockSize, _blockSize) = this->invD[currentBlockRow].solve(tmp_x);
-	}
-};
-
-class DampedJacobi : public BlockDampedJacobi
-{
-public: 
-	DampedJacobi(double omega) : BlockDampedJacobi(1, omega) {}
-
-	static string Code() { return "dj"; };
-
-	virtual void Serialize(ostream& os) const override
-	{
-		os << "Damped Jacobi (omega=" << _omega << ")";
-	}
-};
-
-class BlockDampedJacobi23 : public BlockDampedJacobi
-{
-public:
-	BlockDampedJacobi23(int blockSize) : BlockDampedJacobi(blockSize, 2.0/3.0) {}
-
-	static string Code() { return "bj23"; };
-};
-
-class BlockJacobi : public BlockDampedJacobi
-{
-public:
-	BlockJacobi(int blockSize) : BlockDampedJacobi(blockSize, 1) {}
-
-	static string Code() { return "bj"; };
-
-	virtual void Serialize(ostream& os) const override
-	{
-		os << "Block Jacobi (blockSize=" << _blockSize << ")";
-	}
-};
-
-class Jacobi : public BlockJacobi
-{
-public: 
-	Jacobi() : BlockJacobi(1) {}
-
-	static string Code() { return "j"; };
-
-	virtual void Serialize(ostream& os) const override
-	{
-		os << "Jacobi";
 	}
 };

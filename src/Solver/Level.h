@@ -121,9 +121,9 @@ public:
 		this->ExportMatrix(M, suffix, this->Number);
 	}
 
-	virtual Smoother* CreateSmoother(string smootherCode, int nSmootherIterations, int blockSize)
+	virtual Smoother* CreateSmoother(string smootherCode, int nSmootherIterations, int blockSize, double omega)
 	{
-		return SmootherFactory::Create(smootherCode, nSmootherIterations, blockSize);
+		return SmootherFactory::Create(smootherCode, nSmootherIterations, blockSize, omega);
 	}
 
 	virtual ~Level()
