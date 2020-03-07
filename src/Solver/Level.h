@@ -121,6 +121,11 @@ public:
 		this->ExportMatrix(M, suffix, this->Number);
 	}
 
+	virtual Smoother* CreateSmoother(string smootherCode, int nSmootherIterations, int blockSize)
+	{
+		return SmootherFactory::Create(smootherCode, nSmootherIterations, blockSize);
+	}
+
 	virtual ~Level()
 	{
 		delete PreSmoother;
