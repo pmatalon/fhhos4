@@ -77,7 +77,7 @@ public:
 			Level* coarseLevel = CreateCoarseLevel(currentLevel);
 
 			int preSmoothingIterations = currentLevel->PreSmoother->Iterations();
-			int postSmoothingIterations = currentLevel->PreSmoother->Iterations();
+			int postSmoothingIterations = currentLevel->PostSmoother->Iterations();
 			if (CoarseLevelChangeSmoothingOperator == '+')
 			{
 				preSmoothingIterations += CoarseLevelChangeSmoothingCoeff;
@@ -212,9 +212,11 @@ private:
 			result.AddCost(level->ProlongCost());
 
 			// Post-smoothing //
+			//if (this->ExportMatrices && !level->IsCoarsestLevel() && level->CoarserLevel->IsCoarsestLevel())
 			x = level->PostSmoother->Smooth(x, b);
 			result.AddCost(level->PostSmoother->SolvingComputationalWork());
-			//level->ExportVector(x, "mg_afterPostSmoothing");
+			//if (this->ExportMatrices && this->IterationCount == 1)
+				//level->ExportVector(x, "sol_afterPostSmoothing");
 		}
 
 		return x;
