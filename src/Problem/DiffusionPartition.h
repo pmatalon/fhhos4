@@ -25,6 +25,8 @@ public:
 			this->IsInPart1 = [](DomPoint p) { return p.X < 0.5; };
 		else if (partition.compare("chiasmus") == 0)
 			this->IsInPart1 = [](DomPoint p) { return (p.X < 0.5 && p.Y >= 0.5) || (p.X >= 0.5 && p.Y < 0.5); };
+		else if (partition.compare("circle") == 0)
+			this->IsInPart1 = [](DomPoint p) { return pow(p.X - 0.5, 2) + pow(p.Y - 0.5, 2) <= pow(0.25, 2); };
 		else
 			assert(false);
 

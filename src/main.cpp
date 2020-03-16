@@ -27,8 +27,9 @@ void print_usage() {
 	cout << endl;
 	cout << "-partition CODE" << endl;
 	cout << "      Domain partition describing the heterogeneity pattern in case of heterogeneous diffusion." << endl;
-	cout << "               halves     - the domain is split in two vertical halves" << endl;
+	cout << "               halves     - the domain is split into two vertical halves" << endl;
 	cout << "               chiasmus   - chiasmus shape (default)" << endl;
+	cout << "               circle     - the domain is split into two parts by a circle of center (1/2, 1/2) and of radius 1/4" << endl;
 	cout << endl;
 	cout << "-rhs CODE" << endl;
 	cout << "      Right-hand side code determining the source function (default: sine)." << endl;
@@ -209,6 +210,11 @@ void print_usage() {
 	cout << "              1   - degree k+1: recover cell unknowns by solving the local problem and apply the local reconstructor (default)" << endl;
 	cout << "              2   - degree k  : recover cell unknowns by solving the local problem" << endl;
 	cout << endl;
+	cout << "-weight CODE" << endl;
+	cout << "      In the polongation, weighting factor of the projection to the fine faces." << endl;
+	cout << "              k   - proportional to the diffusion coefficient (default)" << endl;
+	cout << "              a   - simple average (1/2)" << endl;
+	cout << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << "                             Miscellaneous                            " << endl;
 	cout << "----------------------------------------------------------------------" << endl;
@@ -281,6 +287,7 @@ int main(int argc, char* argv[])
 		// Multigrid
 		OPT_MGCycle,
 		OPT_CellInterpCode,
+		OPT_Weight,
 		OPT_ProlongationCode,
 		OPT_CoarseMatrixSize,
 		OPT_Smoothers,
@@ -314,6 +321,7 @@ int main(int argc, char* argv[])
 		 // Multigrid
 		 { "cycle", required_argument, NULL, OPT_MGCycle },
 		 { "cell-interp", required_argument, NULL, OPT_CellInterpCode },
+		 { "weight", required_argument, NULL, OPT_Weight },
 		 { "prolong", required_argument, NULL, OPT_ProlongationCode },
 		 { "coarse-size", required_argument, NULL, OPT_CoarseMatrixSize },
 		 { "smoothers", required_argument, NULL, OPT_Smoothers },
@@ -354,7 +362,7 @@ int main(int argc, char* argv[])
 			case OPT_Partition:
 			{
 				string partition = optarg;
-				if (partition.compare("halves") != 0 && partition.compare("chiasmus") != 0)
+				if (partition.compare("halves") != 0 && partition.compare("chiasmus") != 0 && partition.compare("circle") != 0)
 					argument_error("unknown partition '" + partition + "'. Check -partition argument.");
 				args.Problem.Partition = partition;
 				break;
@@ -504,6 +512,14 @@ int main(int argc, char* argv[])
 				if (cellInterp != 1 && cellInterp != 2)
 					argument_error("check -cell-interp argument. Expecting 1 or 2.");
 				args.Solver.MG.CellInterpolationCode = cellInterp;
+				break;
+			}
+			case OPT_Weight:
+			{
+				string weightCode = optarg;
+				if (weightCode.compare("k") != 0 && weightCode.compare("a") != 0)
+					argument_error("unknown weight code '" + weightCode + "'. Check -weight argument.");
+				args.Solver.MG.WeightCode = weightCode;
 				break;
 			}
 			case OPT_ProlongationCode:

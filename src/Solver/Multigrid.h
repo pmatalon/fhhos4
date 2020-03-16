@@ -196,18 +196,18 @@ private:
 			}
 
 			// Coarse-grid correction //
-			/*if (this->ExportMatrices && this->IterationCount == 1)
+			/*if (this->ExportMatrices)
 			{
-				level->ExportVector(ec, "ce");
-				level->ExportVector(x, "sol");
+				level->ExportVector(ec, "it" + to_string(this->IterationCount) + "_ce");
+				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol");
 				auto cgc = level->Prolong(ec);
-				level->ExportVector(cgc, "cgc");
+				level->ExportVector(cgc, "it" + to_string(this->IterationCount) + "_cgc");
 			}*/
 
 			x = x + level->Prolong(ec);
 
-			/*if (this->ExportMatrices && this->IterationCount == 1)
-				level->ExportVector(x, "sol_cgc");*/
+			//if (this->ExportMatrices)
+				//level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_cgc");
 
 			result.AddCost(level->ProlongCost());
 
@@ -215,8 +215,8 @@ private:
 			//if (this->ExportMatrices && !level->IsCoarsestLevel() && level->CoarserLevel->IsCoarsestLevel())
 			x = level->PostSmoother->Smooth(x, b);
 			result.AddCost(level->PostSmoother->SolvingComputationalWork());
-			//if (this->ExportMatrices && this->IterationCount == 1)
-				//level->ExportVector(x, "sol_afterPostSmoothing");
+			//if (this->ExportMatrices)
+				//level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPostSmoothing");
 		}
 
 		return x;

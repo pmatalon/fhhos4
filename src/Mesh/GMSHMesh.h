@@ -54,6 +54,8 @@ public:
 		//gmsh::option::setNumber("General.Terminal", 1);
 		//gmsh::option::setNumber("General.Verbosity", 99);
 
+		cout << "Opening file " << mshFile << endl;
+
 		gmsh::open(mshFile);
 
 		Build();

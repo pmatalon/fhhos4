@@ -37,6 +37,7 @@ struct MultigridArguments
 	int MatrixMaxSizeForCoarsestLevel = 1000;
 	int WLoops = 1;
 	int CellInterpolationCode = 1;
+	string WeightCode = "k";
 	bool UseGalerkinOperator = false;
 	string PreSmootherCode = "bgs";
 	string PostSmootherCode = "rbgs";

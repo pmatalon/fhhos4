@@ -252,6 +252,11 @@ public:
 		}
 		os << ", ";
 		Shape()->Serialize(os);
+		if (this->DiffTensor->LargestEigenValue > 1)
+		{
+			os << ", k=";
+			os << this->DiffTensor->LargestEigenValue;
+		}
 	}
 
 	friend ostream& operator<<(ostream& os, const Element<Dim>& s)

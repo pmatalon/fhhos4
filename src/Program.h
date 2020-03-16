@@ -489,7 +489,7 @@ private:
 				else
 					assert(false);
 
-				MultigridForHHO<Dim>* mg = new MultigridForHHO<Dim>(hhoProblem, args.Solver.MG.ProlongationCode, cellInterpolationBasis, args.Solver.MG.Levels);
+				MultigridForHHO<Dim>* mg = new MultigridForHHO<Dim>(hhoProblem, args.Solver.MG.ProlongationCode, cellInterpolationBasis, args.Solver.MG.WeightCode, args.Solver.MG.Levels);
 				mg->MatrixMaxSizeForCoarsestLevel = args.Solver.MG.MatrixMaxSizeForCoarsestLevel;
 				mg->WLoops = args.Solver.MG.WLoops;
 				mg->UseGalerkinOperator = args.Solver.MG.UseGalerkinOperator;

@@ -10,15 +10,17 @@ class LevelForHHO : public Level
 private:
 	int _prolongationCode = 1;
 	FunctionalBasis<Dim>* _cellInterpolationBasis;
+	string _weightCode = "k";
 public:
 	Poisson_HHO<Dim>* _problem;
 
-	LevelForHHO(int number, Poisson_HHO<Dim>* problem, int prolongationCode, FunctionalBasis<Dim>* cellInterpolationBasis)
+	LevelForHHO(int number, Poisson_HHO<Dim>* problem, int prolongationCode, FunctionalBasis<Dim>* cellInterpolationBasis, string weightCode)
 		: Level(number)
 	{
 		this->_problem = problem;
 		this->_prolongationCode = prolongationCode;
 		this->_cellInterpolationBasis = cellInterpolationBasis;
+		this->_weightCode = weightCode;
 	}
 
 	BigNumber NUnknowns() override
@@ -70,6 +72,14 @@ private:
 	{
 		this->OperatorMatrix = this->_problem->A;
 	}
+
+	/*Smoother* CreateSmoother(string smootherCode, int nSmootherIterations, int blockSize, double omega) override
+	{
+		if (smootherCode.compare(MegaSmootherInternalSolver<Dim>::Code()) == 0)
+			return new MegaSmoother<Dim>(this->_problem->_mesh, blockSize, nSmootherIterations);
+		else
+			return Level::CreateSmoother(smootherCode, nSmootherIterations, blockSize, omega);
+	}*/
 
 	void OnStartSetup() override
 	{
@@ -289,16 +299,23 @@ private:
 
 	inline double Weight(Element<Dim>* element, Face<Dim>* face)
 	{
-		auto n = element->OuterNormalVector(face);
-		double k = (element->DiffTensor * n).dot(n);
+		if (_weightCode.compare("k") == 0)
+		{
+			auto n = element->OuterNormalVector(face);
+			double k = (element->DiffTensor * n).dot(n);
 
-		auto n1 = face->Element1->OuterNormalVector(face);
-		double k1 = (face->Element1->DiffTensor * n1).dot(n1);
+			auto n1 = face->Element1->OuterNormalVector(face);
+			double k1 = (face->Element1->DiffTensor * n1).dot(n1);
 
-		auto n2 = face->Element2->OuterNormalVector(face);
-		double k2 = (face->Element2->DiffTensor * n2).dot(n2);
+			auto n2 = face->Element2->OuterNormalVector(face);
+			double k2 = (face->Element2->DiffTensor * n2).dot(n2);
 
-		return k / (k1 + k2);
+			return k / (k1 + k2);
+		}
+		else if (_weightCode.compare("a") == 0)
+			return 0.5;
+		else
+			Utils::FatalError("Unknown weight code.");
 	}
 
 	SparseMatrix GetGlobalInterpolationMatrixFromFacesToCells(Poisson_HHO<Dim>* problem)
@@ -441,11 +458,15 @@ private:
 					BigNumber coarseElem1GlobalNumber = coarseElem1->Number;
 					BigNumber coarseElem2GlobalNumber = coarseElem2->Number;
 
-					double weight1 = Weight(coarseElem1, face->CoarseFace); // Careful with using face->CoarseFace when the mesh isn't nested...
+					//double weight1 = Weight(coarseElem1, face->CoarseFace); // Careful with using face->CoarseFace when the mesh isn't nested...
+					double weight1 = Weight(face->Element1, face);
 					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, coarseElem1GlobalNumber*nCellUnknowns, weight1*face->GetProjFromCell(coarseElem1, _cellInterpolationBasis));
 
-					double weight2 = Weight(coarseElem2, face->CoarseFace);
+					//double weight2 = Weight(coarseElem2, face->CoarseFace);
+					double weight2 = Weight(face->Element2, face);
 					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, coarseElem2GlobalNumber*nCellUnknowns, weight2*face->GetProjFromCell(coarseElem2, _cellInterpolationBasis));
+
+					assert(abs(weight1 + weight2 - 1) < 1e-12);
 				}
 			});
 
@@ -573,20 +594,22 @@ private:
 	Poisson_HHO<Dim>* _problem;
 	int _prolongationCode = 1;
 	FunctionalBasis<Dim>* _cellInterpolationBasis;
+	string _weightCode = "k";
 public:
 
-	MultigridForHHO(Poisson_HHO<Dim>* problem, int prolongationCode, FunctionalBasis<Dim>* cellInterpolationBasis)
-		: MultigridForHHO(problem, prolongationCode, cellInterpolationBasis, 0)
+	MultigridForHHO(Poisson_HHO<Dim>* problem, int prolongationCode, FunctionalBasis<Dim>* cellInterpolationBasis, string weightCode)
+		: MultigridForHHO(problem, prolongationCode, cellInterpolationBasis, weightCode, 0)
 	{}
 
-	MultigridForHHO(Poisson_HHO<Dim>* problem, int prolongationCode, FunctionalBasis<Dim>* cellInterpolationBasis, int nLevels)
+	MultigridForHHO(Poisson_HHO<Dim>* problem, int prolongationCode, FunctionalBasis<Dim>* cellInterpolationBasis, string weightCode, int nLevels)
 		: Multigrid(nLevels)
 	{
 		this->_problem = problem;
 		this->_prolongationCode = prolongationCode;
 		this->_cellInterpolationBasis = cellInterpolationBasis;
+		this->_weightCode = weightCode;
 		this->BlockSizeForBlockSmoothers = problem->HHO->nFaceUnknowns;
-		this->_fineLevel = new LevelForHHO<Dim>(0, problem, _prolongationCode, _cellInterpolationBasis);
+		this->_fineLevel = new LevelForHHO<Dim>(0, problem, _prolongationCode, _cellInterpolationBasis, _weightCode);
 	}
 
 	void BeginSerialize(ostream& os) const override
@@ -602,6 +625,12 @@ public:
 				os << "k+1";
 			os << endl;
 		}
+		os << "\t" << "Weighting          : ";
+		if (_weightCode.compare("k") == 0)
+			os << "proportional to the diffusion coefficient (code k)";
+		else if (_weightCode.compare("a") == 0)
+			os << "simple average (code a)";
+		os << endl;
 	}
 	
 protected:
@@ -609,7 +638,7 @@ protected:
 	{
 		LevelForHHO<Dim>* hhoFineLevel = dynamic_cast<LevelForHHO<Dim>*>(fineLevel);
 		Poisson_HHO<Dim>* coarseProblem = hhoFineLevel->_problem->GetProblemOnCoarserMesh();
-		LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(fineLevel->Number + 1, coarseProblem, _prolongationCode, _cellInterpolationBasis);
+		LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(fineLevel->Number + 1, coarseProblem, _prolongationCode, _cellInterpolationBasis, _weightCode);
 		return coarseLevel;
 	}
 };
