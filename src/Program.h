@@ -54,8 +54,6 @@ public:
 		//   Mesh   //
 		//----------//
 
-		Mesh<Dim>::MeshDirectory = "/mnt/c/Users/pierr/Documents/Source/Repos/dghho/data/meshes/";
-
 		Mesh<Dim>* mesh = BuildMesh(args);
 
 		if ((args.Actions & Action::UnitTests) == Action::UnitTests)

@@ -259,6 +259,10 @@ int main(int argc, char* argv[])
 	cout << "-----------------------------------------------------------" << endl;
 	Eigen::initParallel();
 
+	string meshDirectory = "/mnt/c/Users/pierr/Documents/Source/Repos/dghho/data/meshes/";
+	Mesh<2>::MeshDirectory = meshDirectory;
+	Mesh<3>::MeshDirectory = meshDirectory;
+
 	ProgramArguments args;
 
 	enum {
@@ -592,15 +596,17 @@ int main(int argc, char* argv[])
 
 	if (args.Problem.Dimension == -1)
 	{
-		if (args.Discretization.MeshCode.compare("tri") == 0 || 
-			args.Discretization.MeshCode.compare("gmsh-tri") == 0 || 
+		if (args.Discretization.MeshCode.compare("tri") == 0 ||
+			args.Discretization.MeshCode.compare("gmsh-tri") == 0 ||
 			args.Discretization.MeshCode.compare("gmsh-uns-tri") == 0 ||
-			args.Discretization.MeshCode.compare("quad") == 0 || 
+			args.Discretization.MeshCode.compare("quad") == 0 ||
 			args.Discretization.MeshCode.compare("gmsh-quad") == 0)
 			args.Problem.Dimension = 2;
 		else if (args.Discretization.MeshCode.compare("tetra") == 0 ||
-				 args.Discretization.MeshCode.compare("gmsh-tetra") == 0)
+			args.Discretization.MeshCode.compare("gmsh-tetra") == 0)
 			args.Problem.Dimension = 3;
+		else if (args.Discretization.MeshCode.compare("gmsh") == 0)
+			args.Problem.Dimension = GMSHMesh<2>::GetDimension(args.Discretization.MeshFilePath);
 		else
 			argument_error("The dimension of the domain is missing. Please define it with option -d.");
 	}

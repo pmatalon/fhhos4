@@ -39,16 +39,7 @@ public:
 	{
 		_description = description;
 		_fileNamePart = fileNamePart;
-		if (!Utils::FileExists(mshFile))
-		{
-			if (Utils::FileExists(Mesh<Dim>::MeshDirectory + mshFile))
-				mshFile = Mesh<Dim>::MeshDirectory + mshFile;
-			else
-			{
-				cout << Utils::BeginRed << "File not found: " << mshFile << Utils::EndColor;
-				exit(EXIT_FAILURE);
-			}
-		}
+		mshFile = SearchFile(mshFile);
 
 		gmsh::initialize();
 		//gmsh::option::setNumber("General.Terminal", 1);
@@ -64,6 +55,15 @@ public:
 	GMSHMesh(string mshFile) : GMSHMesh(mshFile, "GMSH file", "gmsh-file")
 	{}
 
+	static int GetDimension(string mshFile)
+	{
+		mshFile = SearchFile(mshFile);
+		gmsh::initialize();
+		gmsh::open(mshFile);
+		int d = gmsh::model::getDimension();
+		gmsh::finalize();
+		return d;
+	}
 protected:
 	GMSHMesh(string description, string fileNamePart) : PolyhedralMesh<Dim>()
 	{
@@ -77,6 +77,21 @@ protected:
 	void CreateFaces(int elemType, BigNumber& faceNumber) { }
 
 private:
+	static string SearchFile(string mshFile)
+	{
+		if (!Utils::FileExists(mshFile))
+		{
+			if (Utils::FileExists(Mesh<Dim>::MeshDirectory + mshFile))
+				mshFile = Mesh<Dim>::MeshDirectory + mshFile;
+			else
+			{
+				cout << Utils::BeginRed << "File not found: " << mshFile << Utils::EndColor;
+				exit(EXIT_FAILURE);
+			}
+		}
+		return mshFile;
+	}
+
 	void Build()
 	{
 		//----------//
