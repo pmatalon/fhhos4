@@ -125,6 +125,7 @@
     <ClInclude Include="src\Mesh\3D\Cube_CartesianTetrahedralMesh.h" />
     <ClInclude Include="src\Mesh\3D\Cube_GMSHCartesianMesh.h" />
     <ClInclude Include="src\Mesh\3D\Cube_GMSHTetrahedralMesh.h" />
+    <ClInclude Include="src\Mesh\3D\GMSHTetrahedralMesh.h" />
     <ClInclude Include="src\Mesh\3D\ReferenceTetrahedron.h" />
     <ClInclude Include="src\Mesh\3D\TetrahedralMesh.h" />
     <ClInclude Include="src\Mesh\3D\Tetrahedron.h" />

@@ -261,7 +261,7 @@ public:
 		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarsening)
 			os << "agglomeration" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::SplittingRefinement)
-			os << "refinement by splitting from coarse mesh" << endl;
+			os << "GMSH refinement by splitting from coarse mesh" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::BeyRefinement)
 			os << "Bey's refinement from coarse mesh" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::FaceCoarsening)

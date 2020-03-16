@@ -689,8 +689,10 @@ int main(int argc, char* argv[])
 		{
 			if (args.Problem.Dimension == 2)
 				args.Solver.MG.CoarseningStgy = CoarseningStrategy::SplittingRefinement;
-			else if (args.Problem.Dimension == 3)
+			else if (args.Discretization.MeshCode.compare("gmsh-tetra") == 0)
 				args.Solver.MG.CoarseningStgy = CoarseningStrategy::BeyRefinement;
+			else
+				args.Solver.MG.CoarseningStgy = CoarseningStrategy::SplittingRefinement;
 		}
 		else
 			args.Solver.MG.CoarseningStgy = CoarseningStrategy::StandardCoarsening;

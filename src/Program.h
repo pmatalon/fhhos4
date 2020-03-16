@@ -704,7 +704,11 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args)
 		if (nx != ny || nx != nz)
 			Utils::FatalError("-ny, -ny not managed with this mesh");
 
-		Mesh<3>* coarseMesh = new GMSHMesh<3>(args.Discretization.MeshFilePath);
+		Mesh<3>* coarseMesh;
+		if (refinementStgy == CoarseningStrategy::BeyRefinement)
+			coarseMesh = new GMSHTetrahedralMesh(args.Discretization.MeshFilePath);
+		else
+			coarseMesh = new GMSHMesh<3>(args.Discretization.MeshFilePath);
 		Mesh<3>* fineMesh = coarseMesh->RefineUntilNElements(6*n*n*n, refinementStgy);
 		return fineMesh;
 	}
