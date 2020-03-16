@@ -3,14 +3,14 @@
 #include "../PolyhedralMesh.h"
 using namespace std;
 
-class QuadrilateralMesh : public PolyhedralMesh<2>
+class Square_QuadrilateralMesh : public PolyhedralMesh<2>
 {
 public:
 	BigNumber Nx;
 	BigNumber Ny;
 	double XShift;
 
-	QuadrilateralMesh(BigNumber nx, BigNumber ny, double xShiftAsFraction) : PolyhedralMesh()
+	Square_QuadrilateralMesh(BigNumber nx, BigNumber ny, double xShiftAsFraction) : PolyhedralMesh()
 	{
 		this->XShift = xShiftAsFraction;
 

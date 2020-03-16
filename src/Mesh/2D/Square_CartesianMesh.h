@@ -2,18 +2,18 @@
 #include <vector>
 #include "Rectangle.h"
 #include "RectangularPolygon.h"
-#include "CartesianPolygonalMesh2D.h"
+#include "Square_CartesianPolygonalMesh.h"
 #include "CartesianEdge.h"
 #include "../PolyhedralMesh.h"
 using namespace std;
 
-class CartesianMesh2D : public PolyhedralMesh<2>
+class Square_CartesianMesh : public PolyhedralMesh<2>
 {
 public:
 	BigNumber Nx;
 	BigNumber Ny;
 
-	CartesianMesh2D(BigNumber nx, BigNumber ny) : PolyhedralMesh()
+	Square_CartesianMesh(BigNumber nx, BigNumber ny) : PolyhedralMesh()
 	{
 		// nx = ny falls down to square elements
 		this->Nx = nx;
@@ -199,7 +199,7 @@ public:
 			return;
 		}
 
-		CartesianMesh2D* coarseMesh = new CartesianMesh2D(nx / 2, ny / 2);
+		Square_CartesianMesh* coarseMesh = new Square_CartesianMesh(nx / 2, ny / 2);
 		coarseMesh->ComesFrom.CS = CoarseningStrategy::StandardCoarsening;
 		coarseMesh->ComesFrom.nFineElementsByCoarseElement = 4;
 		coarseMesh->ComesFrom.nFineFacesAddedByCoarseElement = 4;
@@ -256,7 +256,7 @@ public:
 			return;
 		}
 
-		CartesianPolygonalMesh2D* coarseMesh = new CartesianPolygonalMesh2D();
+		Square_CartesianPolygonalMesh* coarseMesh = new Square_CartesianPolygonalMesh();
 		coarseMesh->Nx = nx / 2;
 		coarseMesh->Ny = ny / 2;
 		coarseMesh->ComesFrom.CS = CoarseningStrategy::AgglomerationCoarsening;

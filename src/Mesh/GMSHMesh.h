@@ -3,7 +3,7 @@
 #include "PolyhedralMesh.h"
 #include "2D/Quadrilateral.h"
 #include "3D/Tetrahedron.h"
-#include "2D/TriangularMesh.h"
+#include "2D/Square_TriangularMesh.h"
 using namespace std;
 
 enum GMSHElementTypes
@@ -379,7 +379,7 @@ public:
 		if (this->_fileNamePart.compare("gmsh-tri") == 0)
 		{
 			BigNumber n = sqrt(this->Elements.size() / 2);
-			TriangularMesh* myMesh = new TriangularMesh(n, n);
+			Square_TriangularMesh* myMesh = new Square_TriangularMesh(n, n);
 
 			RenumberLike(dynamic_cast<Mesh<Dim>*>(myMesh));
 			delete myMesh;

@@ -1,19 +1,19 @@
 #pragma once
 #include "TetrahedralMesh.h"
-#include "CartesianMesh3D.h"
+#include "Cube_CartesianMesh.h"
 using namespace std;
 
-class CartesianTetrahedralMesh : public TetrahedralMesh
+class Cube_CartesianTetrahedralMesh : public TetrahedralMesh
 {
 private:
-	CartesianMesh3D* _cartMesh = nullptr;
+	Cube_CartesianMesh* _cartMesh = nullptr;
 	map<Parallelepiped*, vector<Tetrahedron*>> _tetrasInCube;
 
 public:
-	CartesianTetrahedralMesh(BigNumber n) : CartesianTetrahedralMesh(new CartesianMesh3D(n, n, n))
+	Cube_CartesianTetrahedralMesh(BigNumber n) : Cube_CartesianTetrahedralMesh(new Cube_CartesianMesh(n, n, n))
 	{}
 
-	CartesianTetrahedralMesh(CartesianMesh3D* cartMesh) : TetrahedralMesh()
+	Cube_CartesianTetrahedralMesh(Cube_CartesianMesh* cartMesh) : TetrahedralMesh()
 	{
 		_cartMesh = cartMesh;
 
@@ -99,7 +99,7 @@ public:
 			TetrahedralMesh::CoarsenMesh(strategy);
 
 		_cartMesh->CoarsenMesh(strategy);
-		CartesianTetrahedralMesh* coarseMesh = new CartesianTetrahedralMesh(dynamic_cast<CartesianMesh3D*>(_cartMesh->CoarseMesh));
+		Cube_CartesianTetrahedralMesh* coarseMesh = new Cube_CartesianTetrahedralMesh(dynamic_cast<Cube_CartesianMesh*>(_cartMesh->CoarseMesh));
 		this->CoarseMesh = coarseMesh;
 		coarseMesh->FineMesh = this;
 		coarseMesh->ComesFrom.CS = CoarseningStrategy::StandardCoarsening;
@@ -135,7 +135,7 @@ public:
 		this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
 	}
 
-	~CartesianTetrahedralMesh()
+	~Cube_CartesianTetrahedralMesh()
 	{
 		if (!this->FineMesh)
 			delete _cartMesh;

@@ -3,20 +3,20 @@
 #include "DG/Poisson_DG.h"
 #include "HHO/Poisson_HHO.h"
 #include "Mesh/1D/UniformMesh1D.h"
-#include "Mesh/2D/CartesianMesh2D.h"
-#include "Mesh/3D/CartesianMesh3D.h"
-#include "Mesh/2D/CartesianPolygonalMesh2D.h"
-#include "Mesh/2D/TriangularMesh.h"
-#include "Mesh/2D/QuadrilateralMesh.h"
-#include "Mesh/2D/QuadrilateralAsPolygonalMesh.h"
-#include "Mesh/3D/CartesianTetrahedralMesh.h"
+#include "Mesh/2D/Square_CartesianMesh.h"
+#include "Mesh/2D/Square_CartesianPolygonalMesh.h"
+#include "Mesh/2D/Square_TriangularMesh.h"
+#include "Mesh/2D/Square_QuadrilateralMesh.h"
+#include "Mesh/2D/Square_QuadrilateralAsPolygonalMesh.h"
+#include "Mesh/3D/Cube_CartesianMesh.h"
+#include "Mesh/3D/Cube_CartesianTetrahedralMesh.h"
 #ifdef GMSH_ENABLED
-#include "Mesh/2D/GMSHCartesianMesh2D.h"
-#include "Mesh/2D/GMSHTriangularMesh.h"
-#include "Mesh/2D/GMSHUnstructuredTriangularMesh.h"
-#include "Mesh/2D/GMSHQuadrilateralMesh.h"
-#include "Mesh/3D/GMSHTetrahedralMesh.h"
-#include "Mesh/3D/GMSHCartesianMesh3D.h"
+#include "Mesh/2D/Square_GMSHCartesianMesh.h"
+#include "Mesh/2D/Square_GMSHTriangularMesh.h"
+#include "Mesh/2D/Square_GMSHUnstructuredTriangularMesh.h"
+#include "Mesh/2D/Square_GMSHQuadrilateralMesh.h"
+#include "Mesh/3D/Cube_GMSHTetrahedralMesh.h"
+#include "Mesh/3D/Cube_GMSHCartesianMesh.h"
 #endif
 #include "Utils/Action.h"
 #include "Utils/Timer.h"
@@ -598,37 +598,37 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 	CoarseningStrategy refinementStgy = args.Solver.MG.CoarseningStgy;
 
 	if (meshCode.compare("cart") == 0)
-		return new CartesianMesh2D(nx, ny);
+		return new Square_CartesianMesh(nx, ny);
 	else if (meshCode.compare("cart-poly") == 0)
-		return new CartesianPolygonalMesh2D(nx, ny);
+		return new Square_CartesianPolygonalMesh(nx, ny);
 	else if (meshCode.compare("tri") == 0)
-		return new TriangularMesh(nx, ny);
+		return new Square_TriangularMesh(nx, ny);
 	else if (meshCode.compare("quad") == 0)
-		return new QuadrilateralMesh(nx, ny, stretch);
+		return new Square_QuadrilateralMesh(nx, ny, stretch);
 	else if (meshCode.compare("quad-poly") == 0)
-		return new QuadrilateralAsPolygonalMesh(nx, ny, stretch);
+		return new Square_QuadrilateralAsPolygonalMesh(nx, ny, stretch);
 #ifdef GMSH_ENABLED
 	else if (meshCode.compare("gmsh-cart") == 0)
 	{
-		Mesh<2>* coarseMesh = new GMSHCartesianMesh2D();
+		Mesh<2>* coarseMesh = new Square_GMSHCartesianMesh();
 		Mesh<2>* fineMesh = coarseMesh->RefineUntilNElements(nx*ny, refinementStgy);
 		return fineMesh;
 	}
 	else if (meshCode.compare("gmsh-tri") == 0)
 	{
-		Mesh<2>* coarseMesh = new GMSHTriangularMesh();
+		Mesh<2>* coarseMesh = new Square_GMSHTriangularMesh();
 		Mesh<2>* fineMesh = coarseMesh->RefineUntilNElements(2*nx*ny, refinementStgy);
 		return fineMesh;
 	}
 	else if (meshCode.compare("gmsh-uns-tri") == 0)
 	{
-		Mesh<2>* coarseMesh = new GMSHUnstructuredTriangularMesh();
+		Mesh<2>* coarseMesh = new Square_GMSHUnstructuredTriangularMesh();
 		Mesh<2>* fineMesh = coarseMesh->RefineUntilNElements(2*nx*ny, refinementStgy);
 		return fineMesh;
 	}
 	else if (meshCode.compare("gmsh-quad") == 0)
 	{
-		Mesh<2>* coarseMesh = new GMSHQuadrilateralMesh();
+		Mesh<2>* coarseMesh = new Square_GMSHQuadrilateralMesh();
 		Mesh<2>* fineMesh = coarseMesh->RefineUntilNElements(nx*ny, refinementStgy);
 		return fineMesh;
 	}
@@ -654,7 +654,7 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args)
 
 	if (meshCode.compare("cart") == 0)
 	{
-		CartesianMesh3D* fineMesh = new CartesianMesh3D(nx, ny, nz);
+		Cube_CartesianMesh* fineMesh = new Cube_CartesianMesh(nx, ny, nz);
 
 		assert(fineMesh->Elements.size() == nx*ny*nz);
 		if (nx == ny && ny == nz)
@@ -664,7 +664,7 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args)
 	}
 	else if (meshCode.compare("tetra") == 0)
 	{
-		Mesh<3>* fineMesh = new CartesianTetrahedralMesh(n);
+		Mesh<3>* fineMesh = new Cube_CartesianTetrahedralMesh(n);
 
 		assert(fineMesh->Elements.size() == 6 * nx*ny*nz);
 		if (nx == ny && ny == nz)
@@ -678,7 +678,7 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args)
 		if (nx != ny || nx != nz)
 			Utils::FatalError("-ny, -ny not managed with this mesh");
 
-		Mesh<3>* coarseMesh = new GMSHCartesianMesh3D();
+		Mesh<3>* coarseMesh = new Cube_GMSHCartesianMesh();
 		Mesh<3>* fineMesh = coarseMesh->RefineUntilNElements(n*n*n, refinementStgy);
 
 		assert(fineMesh->Elements.size() == n*n*n);
@@ -691,7 +691,7 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args)
 		if (nx != ny || nx != nz)
 			Utils::FatalError("-ny, -ny not managed with this mesh");
 
-		Mesh<3>* coarseMesh = new GMSHTetrahedralMesh();
+		Mesh<3>* coarseMesh = new Cube_GMSHTetrahedralMesh();
 		Mesh<3>* fineMesh = coarseMesh->RefineUntilNElements(6*n*n*n, refinementStgy);
 
 		assert(fineMesh->Elements.size() == 6*n*n*n);

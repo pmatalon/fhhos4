@@ -3,13 +3,13 @@
 #include "../PolyhedralMesh.h"
 using namespace std;
 
-class QuadrilateralAsPolygonalMesh : public PolyhedralMesh<2>
+class Square_QuadrilateralAsPolygonalMesh : public PolyhedralMesh<2>
 {
 public:
 	BigNumber Nx;
 	BigNumber Ny;
 
-	QuadrilateralAsPolygonalMesh(BigNumber nx, BigNumber ny, double xShiftAsFraction) : PolyhedralMesh()
+	Square_QuadrilateralAsPolygonalMesh(BigNumber nx, BigNumber ny, double xShiftAsFraction) : PolyhedralMesh()
 	{
 		// nx = ny falls down to square elements
 		this->Nx = nx;

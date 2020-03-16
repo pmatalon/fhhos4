@@ -2,10 +2,10 @@
 #include "../GMSHMesh.h"
 using namespace std;
 
-class GMSHTriangularMesh : public GMSHMesh<2>
+class Square_GMSHTriangularMesh : public GMSHMesh<2>
 {
 public:
-	GMSHTriangularMesh() : GMSHMesh("square4tri.geo")
+	Square_GMSHTriangularMesh() : GMSHMesh("square4tri.geo")
 	{
 		this->_description = "GMSH triangular";
 		this->_fileNamePart = "gmsh-tri";

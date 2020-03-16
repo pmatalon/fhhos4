@@ -139,9 +139,6 @@
     <ClInclude Include="src\Mesh\2D\RectangularPolygon.h">
       <Filter>Mesh\2D</Filter>
     </ClInclude>
-    <ClInclude Include="src\Mesh\2D\CartesianPolygonalMesh2D.h">
-      <Filter>Mesh\2D</Filter>
-    </ClInclude>
     <ClInclude Include="src\Solver\Solver.h">
       <Filter>Solver</Filter>
     </ClInclude>
@@ -203,9 +200,6 @@
     <ClInclude Include="src\Mesh\2D\Triangle.h">
       <Filter>Mesh\2D</Filter>
     </ClInclude>
-    <ClInclude Include="src\Mesh\2D\TriangularMesh.h">
-      <Filter>Mesh\2D</Filter>
-    </ClInclude>
     <ClInclude Include="src\Mesh\2D\CartesianEdge.h">
       <Filter>Mesh\2D</Filter>
     </ClInclude>
@@ -230,9 +224,6 @@
     <ClInclude Include="src\Mesh\ReferenceShape.h">
       <Filter>Mesh</Filter>
     </ClInclude>
-    <ClInclude Include="src\Mesh\2D\QuadrilateralMesh.h">
-      <Filter>Mesh\2D</Filter>
-    </ClInclude>
     <ClInclude Include="src\Mesh\2D\Quadrilateral.h">
       <Filter>Mesh\2D</Filter>
     </ClInclude>
@@ -248,23 +239,14 @@
     <ClInclude Include="src\Mesh\2D\Polygon.h">
       <Filter>Mesh\2D</Filter>
     </ClInclude>
-    <ClInclude Include="src\Mesh\2D\QuadrilateralAsPolygonalMesh.h">
-      <Filter>Mesh\2D</Filter>
-    </ClInclude>
     <ClInclude Include="src\Utils\Geometry.h">
       <Filter>Utils</Filter>
     </ClInclude>
     <ClInclude Include="src\Mesh\PolyhedralMesh.h">
       <Filter>Mesh</Filter>
     </ClInclude>
-    <ClInclude Include="src\Mesh\2D\GMSHTriangularMesh.h">
-      <Filter>Mesh\2D</Filter>
-    </ClInclude>
     <ClInclude Include="src\Mesh\GMSHMesh.h">
       <Filter>Mesh</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\2D\GMSHUnstructuredTriangularMesh.h">
-      <Filter>Mesh\2D</Filter>
     </ClInclude>
     <ClInclude Include="src\Mesh\3D\Tetrahedron.h">
       <Filter>Mesh\3D</Filter>
@@ -287,32 +269,50 @@
     <ClInclude Include="src\Utils\Keast\tetrahedron_keast_rule.hpp">
       <Filter>Utils\Keast</Filter>
     </ClInclude>
-    <ClInclude Include="src\Mesh\3D\GMSHTetrahedralMesh.h">
-      <Filter>Mesh\3D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\2D\GMSHQuadrilateralMesh.h">
-      <Filter>Mesh\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\2D\GMSHCartesianMesh2D.h">
-      <Filter>Mesh\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\3D\GMSHCartesianMesh3D.h">
-      <Filter>Mesh\3D</Filter>
-    </ClInclude>
     <ClInclude Include="src\ProgramArguments.h" />
     <ClInclude Include="src\Mesh\3D\TetrahedralMesh.h">
-      <Filter>Mesh\3D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\3D\CartesianTetrahedralMesh.h">
       <Filter>Mesh\3D</Filter>
     </ClInclude>
     <ClInclude Include="src\Mesh\1D\UniformMesh1D.h">
       <Filter>Mesh\1D</Filter>
     </ClInclude>
-    <ClInclude Include="src\Mesh\2D\CartesianMesh2D.h">
+    <ClInclude Include="src\Mesh\2D\Square_GMSHQuadrilateralMesh.h">
       <Filter>Mesh\2D</Filter>
     </ClInclude>
-    <ClInclude Include="src\Mesh\3D\CartesianMesh3D.h">
+    <ClInclude Include="src\Mesh\2D\Square_GMSHTriangularMesh.h">
+      <Filter>Mesh\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\2D\Square_GMSHUnstructuredTriangularMesh.h">
+      <Filter>Mesh\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\2D\Square_QuadrilateralAsPolygonalMesh.h">
+      <Filter>Mesh\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\2D\Square_QuadrilateralMesh.h">
+      <Filter>Mesh\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\2D\Square_TriangularMesh.h">
+      <Filter>Mesh\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\3D\Cube_CartesianTetrahedralMesh.h">
+      <Filter>Mesh\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\3D\Cube_GMSHTetrahedralMesh.h">
+      <Filter>Mesh\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\2D\Square_CartesianMesh.h">
+      <Filter>Mesh\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\2D\Square_CartesianPolygonalMesh.h">
+      <Filter>Mesh\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\2D\Square_GMSHCartesianMesh.h">
+      <Filter>Mesh\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\3D\Cube_CartesianMesh.h">
+      <Filter>Mesh\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\3D\Cube_GMSHCartesianMesh.h">
       <Filter>Mesh\3D</Filter>
     </ClInclude>
   </ItemGroup>

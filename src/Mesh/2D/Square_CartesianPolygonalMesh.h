@@ -3,15 +3,15 @@
 #include "RectangularPolygon.h"
 using namespace std;
 
-class CartesianPolygonalMesh2D : public PolyhedralMesh<2>
+class Square_CartesianPolygonalMesh : public PolyhedralMesh<2>
 {
 public:
 	BigNumber Nx;
 	BigNumber Ny;
 
-	CartesianPolygonalMesh2D() : PolyhedralMesh() {}
+	Square_CartesianPolygonalMesh() : PolyhedralMesh() {}
 
-	CartesianPolygonalMesh2D(BigNumber nx, BigNumber ny) : PolyhedralMesh()
+	Square_CartesianPolygonalMesh(BigNumber nx, BigNumber ny) : PolyhedralMesh()
 	{
 		// nx = ny falls down to square elements
 		this->Nx = nx;
@@ -177,7 +177,7 @@ public:
 			return;
 		}
 
-		CartesianPolygonalMesh2D* coarseMesh = new CartesianPolygonalMesh2D();
+		Square_CartesianPolygonalMesh* coarseMesh = new Square_CartesianPolygonalMesh();
 		coarseMesh->Nx = nx / 2;
 		coarseMesh->Ny = ny / 2;
 		coarseMesh->ComesFrom.CS = CoarseningStrategy::AgglomerationCoarsening;

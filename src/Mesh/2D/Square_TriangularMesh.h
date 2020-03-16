@@ -46,13 +46,13 @@ public:
 	Edge* NorthEdge() { return GetEdge(this->V3(), this->V1()); }
 };
 
-class TriangularMesh : public PolyhedralMesh<2>
+class Square_TriangularMesh : public PolyhedralMesh<2>
 {
 public:
 	BigNumber Nx;
 	BigNumber Ny;
 
-	TriangularMesh(BigNumber nx, BigNumber ny) : PolyhedralMesh()
+	Square_TriangularMesh(BigNumber nx, BigNumber ny) : PolyhedralMesh()
 	{
 		// nx = ny falls down to square elements
 		this->Nx = nx;
@@ -292,7 +292,7 @@ public:
 		}
 		else
 		{
-			TriangularMesh* coarseMesh = new TriangularMesh(nx / 2, ny / 2);
+			Square_TriangularMesh* coarseMesh = new Square_TriangularMesh(nx / 2, ny / 2);
 			coarseMesh->ComesFrom.CS = CoarseningStrategy::StandardCoarsening;
 			coarseMesh->ComesFrom.nFineElementsByCoarseElement = 4;
 			coarseMesh->ComesFrom.nFineFacesAddedByCoarseElement = 3;

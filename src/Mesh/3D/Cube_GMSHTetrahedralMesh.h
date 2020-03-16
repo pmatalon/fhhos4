@@ -3,10 +3,10 @@
 #include "TetrahedralMesh.h"
 using namespace std;
 
-class GMSHTetrahedralMesh : public GMSHMesh<3>, public TetrahedralMesh
+class Cube_GMSHTetrahedralMesh : public GMSHMesh<3>, public TetrahedralMesh
 {
 public:
-	GMSHTetrahedralMesh() :
+	Cube_GMSHTetrahedralMesh() :
 		GMSHMesh("cube4tetra.geo", "GMSH tetrahedral", "gmsh-tetra")
 	{}
 
@@ -30,7 +30,7 @@ public:
 		return GMSHMesh<3>::Regularity();
 	}
 private:
-	GMSHTetrahedralMesh(string description, string fileNamePart) : GMSHMesh(description, fileNamePart)
+	Cube_GMSHTetrahedralMesh(string description, string fileNamePart) : GMSHMesh(description, fileNamePart)
 	{}
 
 public:
@@ -58,6 +58,6 @@ public:
 protected:
 	virtual GMSHMesh<3>* CreateEmptyGMSHMesh() override
 	{
-		return new GMSHTetrahedralMesh(this->_description, this->_fileNamePart);
+		return new Cube_GMSHTetrahedralMesh(this->_description, this->_fileNamePart);
 	}
 };

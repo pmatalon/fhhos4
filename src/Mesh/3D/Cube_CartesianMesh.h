@@ -6,14 +6,14 @@
 
 using namespace std;
 
-class CartesianMesh3D : public Mesh<3>
+class Cube_CartesianMesh : public Mesh<3>
 {
 public:
 	BigNumber Nx;
 	BigNumber Ny;
 	BigNumber Nz;
 
-	CartesianMesh3D(BigNumber nx, BigNumber ny, BigNumber nz) : Mesh()
+	Cube_CartesianMesh(BigNumber nx, BigNumber ny, BigNumber nz) : Mesh()
 	{
 		// nx = ny = nz falls down to cubic elements
 		this->Nx = nx;
@@ -225,7 +225,7 @@ private:
 		}
 		else
 		{
-			CartesianMesh3D* coarseMesh = new CartesianMesh3D(nx / 2, ny / 2, nz / 2);
+			Cube_CartesianMesh* coarseMesh = new Cube_CartesianMesh(nx / 2, ny / 2, nz / 2);
 			coarseMesh->ComesFrom.CS = CoarseningStrategy::StandardCoarsening;
 			coarseMesh->ComesFrom.nFineElementsByCoarseElement = 8;
 			coarseMesh->ComesFrom.nFineFacesAddedByCoarseElement = 12;
