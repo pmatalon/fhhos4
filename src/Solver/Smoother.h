@@ -27,7 +27,8 @@ public:
 
 	void Setup(const SparseMatrix& A)
 	{
-		_solver->Setup(A);
+		if (_solver->MaxIterations > 0)
+			_solver->Setup(A);
 	}
 
 	Vector Smooth(Vector& x, const Vector& b)
