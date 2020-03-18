@@ -662,7 +662,14 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args)
 	}
 	else if (meshCode.compare("tetra") == 0)
 	{
-		Mesh<3>* fineMesh = new Cube_CartesianTetrahedralMesh(n);
+		Mesh<3>* fineMesh;
+		if (refinementStgy == CoarseningStrategy::StandardCoarsening)
+			fineMesh = new Cube_CartesianTetrahedralMesh(n);
+		else
+		{
+			Mesh<3>* coarseMesh = new Cube_CartesianTetrahedralMesh(1);
+			fineMesh = coarseMesh->RefineUntilNElements(6 * n*n*n, refinementStgy);
+		}
 
 		assert(fineMesh->Elements.size() == 6 * nx*ny*nz);
 		if (nx == ny && ny == nz)
