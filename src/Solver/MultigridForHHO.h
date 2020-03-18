@@ -316,6 +316,7 @@ private:
 			return 0.5;
 		else
 			Utils::FatalError("Unknown weight code.");
+		assert(false);
 	}
 
 	SparseMatrix GetGlobalInterpolationMatrixFromFacesToCells(Poisson_HHO<Dim>* problem)
