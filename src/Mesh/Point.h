@@ -52,6 +52,16 @@ bool operator!=(Point const& p1, Point const& p2)
 {
 	return !(p1 == p2);
 }
+bool operator<(Point const& p1, Point const& p2)
+{
+	if (p1.X < p2.X)
+		return true;
+	if (p1.X == p2.X && p1.Y < p2.Y)
+		return true;
+	if (p1.X == p2.X && p1.Y == p2.Y && p1.Z < p2.Z)
+		return true;
+	return false;
+}
 
 
 // Reference point: X, Y, Z are in the reference interval [-1, 1]
