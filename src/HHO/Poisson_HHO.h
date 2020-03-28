@@ -59,7 +59,7 @@ public:
 
 		double constant = ConvergenceHiddenConstant(k);
 		double upperBound;
-		if ((this->_rhsCode.compare("sine") == 0 || this->_rhsCode.compare("poly") == 0) && this->_diffusionPartition->IsHomogeneous) // solution is H^{r+2} with r in <= k
+		if ((this->_rhsCode.compare("sine") == 0 || this->_rhsCode.compare("poly") == 0 || this->_rhsCode.compare("zero") == 0) && this->_diffusionPartition->IsHomogeneous) // solution is H^{r+2} with r in <= k
 		{
 			double r = k;
 			if (k == 0)

@@ -36,6 +36,7 @@ void print_usage() {
 	cout << "      It also determines the analytical solution in the homogeneous isotropic case." << endl;
 	cout << "               sine    - the source function and the analytical solution are a sine functions" << endl;
 	cout << "               poly    - the source function is constant, the analytical solution is a polynomial of total degree 2*d" << endl;
+	cout << "               zero    - the source function and the analytical solution are 0" << endl;
 	cout << "               one     - the source function is 0, the analytical solution is 1" << endl;
 	cout << "               x       - the source function is 0, the analytical solution is x" << endl;
 	cout << "               heterog - (1D only) heterogeneous diffusion-specific analytical solution" << endl;

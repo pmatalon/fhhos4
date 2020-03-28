@@ -205,6 +205,14 @@ public:
 				}
 				sourceFunction = new SourceFunction2D([](double x, double y) { return 0; });
 			}
+			else if (args.Problem.RHSCode.compare("zero") == 0)
+			{
+				if (diffusionPartition.IsHomogeneous && diffusionPartition.IsIsotropic)
+				{
+					exactSolution = [](DomPoint p) { return 0; };
+				}
+				sourceFunction = new SourceFunction2D([](double x, double y) { return 0; });
+			}
 			else if (args.Problem.RHSCode.compare("x") == 0)
 			{
 				if (diffusionPartition.IsHomogeneous && diffusionPartition.IsIsotropic)

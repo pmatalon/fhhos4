@@ -97,6 +97,6 @@ protected:
 
 		absoluteError = sqrt(absoluteError);
 		normExactSolution = sqrt(normExactSolution);
-		return absoluteError / normExactSolution;
+		return normExactSolution != 0 ? absoluteError / normExactSolution : absoluteError;
 	}
 };
