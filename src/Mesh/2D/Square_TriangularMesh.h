@@ -253,7 +253,7 @@ public:
 
 	double H() override
 	{
-		return this->Elements[0]->Regularity();
+		return this->Elements[0]->Diameter();
 	}
 
 	double Regularity() override
