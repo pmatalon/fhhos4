@@ -82,6 +82,17 @@ public:
 			PostSmoother->Setup(this->OperatorMatrix);
 			cout << PostSmoother->Iterations() << " iteration" << (PostSmoother->Iterations() > 1 ? "s" : "") << endl;
 		}
+
+		if (ExportMatrices)
+		{
+			this->ExportMatrix(OperatorMatrix, "A");
+			
+			if (!this->IsCoarsestLevel())
+			{
+				this->ExportMatrix(P, "P");
+				this->ExportMatrix(R, "R");
+			}
+		}
 	}
 
 	Vector Restrict(Vector& vectorOnThisLevel)
@@ -109,10 +120,10 @@ public:
 	virtual BigNumber NUnknowns() = 0;
 	virtual void CoarsenMesh(CoarseningStrategy coarseningStgy, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) = 0;
 
-	virtual void ExportVector(Vector& v, string suffix, int levelNumber) = 0;
+	virtual void ExportVector(const Vector& v, string suffix, int levelNumber) = 0;
 	virtual void ExportMatrix(const SparseMatrix& M, string suffix, int levelNumber) = 0;
 
-	void ExportVector(Vector& v, string suffix)
+	void ExportVector(const Vector& v, string suffix)
 	{
 		this->ExportVector(v, suffix, this->Number);
 	}

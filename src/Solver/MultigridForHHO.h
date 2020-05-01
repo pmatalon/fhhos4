@@ -40,7 +40,7 @@ public:
 			coarsestPossibleMeshReached = true;
 	}
 
-	void ExportVector(Vector& v, string suffix, int levelNumber) override
+	void ExportVector(const Vector& v, string suffix, int levelNumber) override
 	{
 		if (!this->IsFinestLevel())
 			this->FinerLevel->ExportVector(v, suffix, levelNumber);
@@ -232,17 +232,11 @@ private:
 		}
 		else
 			Utils::FatalError("Unknown prolongationCode.");
-
-		if (ExportMatrices)
-			Level::ExportMatrix(P, "P");
 	}
 
 	void SetupRestriction() override
 	{
 		R = RestrictionScalingFactor() * P.transpose();
-
-		if (ExportMatrices)
-			Level::ExportMatrix(R, "R");
 	}
 
 private:
@@ -294,6 +288,13 @@ private:
 		scalingFactor = (coarseProduct / fineProduct);
 
 		cout << "scalingFactor = " << scalingFactor << endl;*/
+
+		//------------- Try 5 -------------//
+		// scalingFactor = h_coarse / h_fine;
+		/*Poisson_HHO<Dim>* finePb = this->_problem;
+		Poisson_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
+		scalingFactor = coarsePb->_mesh->H() / finePb->_mesh->H();*/
+
 		return scalingFactor;
 	}
 
@@ -632,6 +633,44 @@ public:
 		else if (_weightCode.compare("a") == 0)
 			os << "simple average (code a)";
 		os << endl;
+	}
+
+	Vector Solve(const Vector& b, string initialGuessCode) override
+	{
+		Vector initialGuess;
+		if (initialGuessCode.compare("smooth") == 0)
+		{
+			DomFunction coarseErrorFunction = [](DomPoint p)
+			{
+				double x = p.X;
+				double y = p.Y;
+				//return sin(4 * M_PI * x)*sin(4 * M_PI * y);
+				//return x * (1 - x) * y*(1 - y);
+				return sin(M_PI * x)*sin(M_PI * y);
+			};
+
+			Level* coarseLevel = this->_fineLevel;
+			while (coarseLevel->CoarserLevel)
+				coarseLevel = coarseLevel->CoarserLevel;
+
+			Poisson_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(coarseLevel)->_problem;
+
+			Vector coarseError = coarsePb->ProjectOnFaceDiscreteSpace(coarseErrorFunction);
+
+			Level* fineLevel = coarseLevel;
+			Vector prolongatedError = coarseError;
+			while (fineLevel->FinerLevel)
+			{
+				fineLevel = fineLevel->FinerLevel;
+				prolongatedError = fineLevel->Prolong(prolongatedError);
+			}
+
+			initialGuess = -prolongatedError;
+		}
+		else
+			return Multigrid::Solve(b, initialGuessCode);
+
+		return Multigrid::Solve(b, initialGuess);
 	}
 	
 protected:

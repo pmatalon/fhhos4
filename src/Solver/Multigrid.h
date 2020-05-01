@@ -159,6 +159,9 @@ private:
 		SparseMatrix A = level->OperatorMatrix;
 		Vector x;
 
+		if (this->ExportMatrices)
+			level->ExportVector(b, "it" + to_string(this->IterationCount) + "_b");
+
 		if (level->IsCoarsestLevel())
 		{
 			x = _coarseSolver->Solve(b);
@@ -168,25 +171,37 @@ private:
 		{
 			x = initialGuess;
 
-			//level->ExportVector(x, "mg_initialGuess");
+			if (this->ExportMatrices)
+				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_beforePreSmoothing");
 
+			//---------------//
 			// Pre-smoothing //
+			//---------------//
+
 			x = level->PreSmoother->Smooth(x, b);
 			result.AddCost(level->PreSmoother->SolvingComputationalWork());
 
-			//level->ExportVector(x, "mg_afterPreSmoothing");
+			if (this->ExportMatrices)
+				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPreSmoothing");
 
+			//----------------------//
 			// Residual computation //
+			//----------------------//
+
 			Vector r = b - A * x;
 			result.AddCost(2 * A.nonZeros());
-
-			//cout << "res = " << (r.norm() / b.norm()) << endl;
 			
+			//------------------------------------------------//
 			// Restriction of the residual on the coarse grid //
+			//------------------------------------------------//
+
 			Vector rc = level->Restrict(r);
 			result.AddCost(level->RestrictCost());
 
+			//--------------------------------------------------//
 			// Residual equation Ae=r solved on the coarse grid //
+			//--------------------------------------------------//
+
 			Vector ec = Vector::Zero(rc.rows());
 			for (int i = 0; i < this->WLoops; ++i)
 			{
@@ -195,28 +210,34 @@ private:
 					break;
 			}
 
+			//------------------------//
 			// Coarse-grid correction //
-			/*if (this->ExportMatrices)
+			//------------------------//
+
+			if (this->ExportMatrices)
 			{
 				level->ExportVector(ec, "it" + to_string(this->IterationCount) + "_ce");
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol");
 				auto cgc = level->Prolong(ec);
 				level->ExportVector(cgc, "it" + to_string(this->IterationCount) + "_cgc");
-			}*/
+			}
 
 			x = x + level->Prolong(ec);
-
-			//if (this->ExportMatrices)
-				//level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_cgc");
-
 			result.AddCost(level->ProlongCost());
 
+			if (this->ExportMatrices)
+				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_cgc");
+
+			//----------------//
 			// Post-smoothing //
+			//----------------//
+
 			//if (this->ExportMatrices && !level->IsCoarsestLevel() && level->CoarserLevel->IsCoarsestLevel())
 			x = level->PostSmoother->Smooth(x, b);
 			result.AddCost(level->PostSmoother->SolvingComputationalWork());
-			//if (this->ExportMatrices)
-				//level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPostSmoothing");
+
+			if (this->ExportMatrices)
+				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPostSmoothing");
 		}
 
 		return x;

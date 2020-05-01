@@ -38,7 +38,7 @@ public:
 		return Solve(b, "0");
 	}
 
-	Vector Solve(const Vector& b, string initialGuessCode)
+	virtual Vector Solve(const Vector& b, string initialGuessCode)
 	{
 		Vector initialGuess;
 		if (initialGuessCode.compare("0") == 0)
