@@ -121,11 +121,13 @@ void print_usage() {
 	cout << "              lu        - LU factorization (Eigen library)" << endl;
 	cout << "              cg        - Conjugate Gradient, no preconditioner" << endl;
 	cout << "              eigencg   - Conjugate Gradient (Eigen library) with diagonal preconditioner" << endl;
+	cout << "              fcg       - Flexible Conjugate Gradient (truncation-restart: FCG(1)), no preconditioner" << endl;
 	cout << "              [b]j      - [Block] Jacobi" << endl;
 	cout << "              [r][b]gs  - [Reverse order] [Block] Gauss-Seidel" << endl;
 	cout << "              [r][b]sor - [Reverse order] [Block] SOR (identical to gs, both can use argument -relax)" << endl;
 	cout << "              mg        - Custom multigrid for HHO" << endl;
-	cout << "              pcgmg     - Conjugate Gradient, preconditioned with the custom multigrid for HHO 'mg'" << endl;
+	cout << "              cgmg      - Conjugate Gradient, preconditioned with the custom multigrid for HHO 'mg'" << endl;
+	cout << "              fcgmg     - Flexible Conjugate Gradient FCG(1), preconditioned with the custom multigrid for HHO 'mg'" << endl;
 	cout << "              agmg      - Yvan Notay's AGMG solver" << endl;
 	cout << "      For the block solvers, the block size is set to the number of DOFs per cell (DG) or face (HHO)." << endl;
 	cout << "      Jacobi, Gauss-Seidel and SOR can use argument -relax to change the relaxation parameter." << endl;

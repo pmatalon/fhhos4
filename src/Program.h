@@ -21,6 +21,7 @@
 #include "Utils/Action.h"
 #include "Utils/Timer.h"
 #include "Solver/ConjugateGradient.h"
+#include "Solver/FlexibleConjugateGradient.h"
 #include "Solver/MultigridForHHO.h"
 #include "Solver/BlockJacobi.h"
 #include "Solver/EigenCG.h"
@@ -481,7 +482,7 @@ private:
 	Solver* CreateSolver(const ProgramArguments& args, Problem<Dim>* problem, int blockSize)
 	{
 		Solver* solver = NULL;
-		if (args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("pcgmg") == 0)
+		if (args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("cgmg") == 0 || args.Solver.SolverCode.compare("fcgmg") == 0)
 		{
 			if (args.Discretization.StaticCondensation)
 			{
@@ -511,11 +512,17 @@ private:
 
 				if (args.Solver.SolverCode.compare("mg") == 0)
 					solver = mg;
-				else if (args.Solver.SolverCode.compare("pcgmg") == 0)
+				else if (args.Solver.SolverCode.compare("cgmg") == 0)
 				{
 					ConjugateGradient* cg = new ConjugateGradient();
 					cg->Precond = Preconditioner(mg);
 					solver = cg;
+				}
+				else if (args.Solver.SolverCode.compare("fcgmg") == 0)
+				{
+					FlexibleConjugateGradient* fcg = new FlexibleConjugateGradient(1);
+					fcg->Precond = Preconditioner(mg);
+					solver = fcg;
 				}
 			}
 			else
@@ -527,6 +534,8 @@ private:
 			solver = new ConjugateGradient();
 		else if (args.Solver.SolverCode.compare("eigencg") == 0)
 			solver = new EigenCG();
+		else if (args.Solver.SolverCode.compare("fcg") == 0)
+			solver = new FlexibleConjugateGradient();
 		else if (args.Solver.SolverCode.compare("j") == 0)
 			solver = new BlockJacobi(1, args.Solver.RelaxationParameter);
 		else if (args.Solver.SolverCode.compare("sor") == 0 || args.Solver.SolverCode.compare("gs") == 0)

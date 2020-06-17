@@ -54,14 +54,16 @@ private:
 			if (this->IterationCount > 0)
 				d = z + beta * d;
 
-			double alpha = r.dot(z)/(d.dot(A*d));
+			Vector Ad = A * d;
+			result.AddCost(2 * A.nonZeros());
+
+			double alpha = r.dot(z)/(d.dot(Ad));
 			x = x + alpha * d;
 
 			Vector old_r = r;
 			Vector old_z = z;
 
-			r = r - alpha * A * d;
-			result.AddCost(2 * A.nonZeros());
+			r = r - alpha * Ad;
 
 			z = Precond.Solve(r);
 			result.AddCost(Precond.SolvingComputationalWork());

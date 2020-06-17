@@ -318,6 +318,9 @@
     <ClInclude Include="src\Mesh\3D\GMSHTetrahedralMesh.h">
       <Filter>Mesh\3D</Filter>
     </ClInclude>
+    <ClInclude Include="src\Solver\FlexibleConjugateGradient.h">
+      <Filter>Solver</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
