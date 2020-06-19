@@ -24,7 +24,7 @@ struct DiscretizationArguments
 	double Stretch = 0.5;
 	string Stabilization = "hho";
 	string BasisCode = "legendre";
-	int PolyDegree = 1;
+	int PolyDegree = 2;
 	bool UsePolynomialSpaceQ = false;
 	int PenalizationCoefficient = -1;
 	bool StaticCondensation = true;
@@ -35,6 +35,7 @@ struct MultigridArguments
 	int Levels = 0;
 	int ProlongationCode = 1;
 	int MatrixMaxSizeForCoarsestLevel = 1000;
+	char CycleLetter = 'V';
 	int WLoops = 1;
 	int CellInterpolationCode = 1;
 	string WeightCode = "k";

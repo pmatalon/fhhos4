@@ -127,7 +127,7 @@ void print_usage() {
 	cout << "              [r][b]sor - [Reverse order] [Block] SOR (identical to gs, both can use argument -relax)" << endl;
 	cout << "              mg        - Custom multigrid for HHO" << endl;
 	cout << "              cgmg      - Conjugate Gradient, preconditioned with the custom multigrid for HHO 'mg'" << endl;
-	cout << "              fcgmg     - Flexible Conjugate Gradient FCG(1), preconditioned with the custom multigrid for HHO 'mg'" << endl;
+	cout << "              fcgmg     - Flexible Conjugate Gradient FCG(1), preconditioned with the custom multigrid for HHO 'mg' (meant to be used with K-cycle)" << endl;
 	cout << "              agmg      - Yvan Notay's AGMG solver" << endl;
 	cout << "      For the block solvers, the block size is set to the number of DOFs per cell (DG) or face (HHO)." << endl;
 	cout << "      Jacobi, Gauss-Seidel and SOR can use argument -relax to change the relaxation parameter." << endl;
@@ -152,12 +152,14 @@ void print_usage() {
 	cout << "                                 Multigrid                            " << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << endl;
-	cout << "-cycle (V|W),NUM,NUM[,+-*NUM]" << endl;
+	cout << "-cycle (V|W|K),NUM,NUM[,+-*NUM]" << endl;
 	cout << "      Multigrid cycle." << endl;
-	cout << "      Examples: \"V,1,0\" or \"W,1,1\"." << endl;
+	cout << "      Examples: \"V,1,0\", \"W,1,1\", \"K,1,1\"." << endl;
 	cout << "      The third number defines the value of which the number of smoothing iterations is increased or decreased at each coarse level," << endl;
 	cout << "      according to the arithmetic operation ('+', '-' or '*') that preceeds it." << endl;
 	cout << "      Example: \"V,1,1,+1\" performs (1,1) smoothing steps at the finer level, then (2,2) on the next one, then (3,3), etc." << endl;
+	cout << "      The K-cycle is usually meant to be used as a preconditioner for a Flexible Conjugate Gradient." << endl;
+	cout << "      Example: \"-s fgcmg -cycle K,1,1\"." << endl;
 	cout << endl;
 	cout << "-w NUM" << endl;
 	cout << "      Number of loops in the multigrid cycle." << endl;
@@ -495,16 +497,27 @@ int main(int argc, char* argv[])
 			case OPT_MGCycle:
 			{
 				string s(optarg);
-				regex pattern("^([vwVW]),([[:digit:]]+),([[:digit:]]+)(,([*+-])([[:digit:]]+))?$");
+				regex pattern("^([vwkVWK]),([[:digit:]]+),([[:digit:]]+)(,([*+-])([[:digit:]]+))?$");
 				smatch matches;
 
 				if (std::regex_search(s, matches, pattern))
 				{
 					char cycleLetter = matches.str(1)[0];
 					if (cycleLetter == 'v' || cycleLetter == 'V')
+					{
+						args.Solver.MG.CycleLetter = 'V';
 						args.Solver.MG.WLoops = 1;
+					}
 					else if (cycleLetter == 'w' || cycleLetter == 'W')
+					{
+						args.Solver.MG.CycleLetter = 'W';
 						args.Solver.MG.WLoops = 2;
+					}
+					else if (cycleLetter == 'k' || cycleLetter == 'K')
+					{
+						args.Solver.MG.CycleLetter = 'K';
+						args.Solver.MG.WLoops = 1;
+					}
 					args.Solver.MG.PreSmoothingIterations = stoi(matches.str(2));
 					args.Solver.MG.PostSmoothingIterations = stoi(matches.str(3));
 					if (!matches.str(4).empty())

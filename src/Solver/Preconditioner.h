@@ -4,7 +4,7 @@ using namespace std;
 
 class Preconditioner
 {
-private:
+protected:
 	IterativeSolver* _solver = nullptr;
 public:
 	Preconditioner() {}
@@ -15,6 +15,11 @@ public:
 		_solver->ComputeExactSolution = false;
 		_solver->PrintIterationResults = false;
 		_solver->MaxIterations = 1;
+	}
+
+	IterativeSolver* GetSolver()
+	{
+		return _solver;
 	}
 
 	bool IsIdentity()

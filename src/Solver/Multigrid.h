@@ -12,8 +12,9 @@ protected:
 private:
 	bool _automaticNumberOfLevels;
 	int _nLevels;
-	NonZeroCoefficients _cycleSchema;
+	NonZeroCoefficients _cycleSchema; // used only for drawing the cycle in the console
 public:
+	char Cycle = 'V';
 	int WLoops = 1; // 1 --> V-cycle, >= 2 --> W-cycle 
 	int MatrixMaxSizeForCoarsestLevel;
 	bool UseGalerkinOperator = false;
@@ -27,6 +28,7 @@ public:
 	double RelaxationParameter = 1;
 	CoarseningStrategy CoarseningStgy = CoarseningStrategy::StandardCoarsening;
 	bool ExportMatrices = false;
+	bool DoNotCreateLevels = false;
 
 	Multigrid(int nLevels) : IterativeSolver()
 	{
@@ -44,6 +46,10 @@ public:
 		}
 	}
 
+protected:
+	Multigrid() {};
+
+public:
 	int NumberOfLevels()
 	{
 		return _nLevels;
@@ -52,6 +58,9 @@ public:
 	void Setup(const SparseMatrix& A) override
 	{
 		IterativeSolver::Setup(A);
+
+		if (DoNotCreateLevels)
+			return;
 
 		cout << "Setup..." << endl;
 
@@ -76,6 +85,7 @@ public:
 			levelNumber++;
 			Level* coarseLevel = CreateCoarseLevel(currentLevel);
 
+			// Smoothers on coarse level
 			int preSmoothingIterations = currentLevel->PreSmoother->Iterations();
 			int postSmoothingIterations = currentLevel->PostSmoother->Iterations();
 			if (CoarseLevelChangeSmoothingOperator == '+')
@@ -102,6 +112,26 @@ public:
 			coarseLevel->UseGalerkinOperator = UseGalerkinOperator;
 			coarseLevel->ExportMatrices = ExportMatrices;
 
+			// FCG if K-cycle
+			if (this->Cycle == 'K')
+			{
+				FlexibleConjugateGradient* fcg = new FlexibleConjugateGradient();
+				coarseLevel->FCG = fcg;
+
+				Multigrid* mg = new Multigrid();
+				mg->_fineLevel = coarseLevel;
+				mg->DoNotCreateLevels = true;
+				mg->Cycle = this->Cycle;
+				mg->WLoops = this->WLoops;
+				fcg->Precond = Preconditioner(mg);
+
+				fcg->ComputeExactSolution = false;
+				fcg->PrintIterationResults = false;
+				fcg->MaxIterations = 2;
+				fcg->StoppingCrit = StoppingCriteria::NormalizedResidual;
+				fcg->Tolerance = 0.25;
+			}
+
 			// Link between levels
 			currentLevel->CoarserLevel = coarseLevel;
 			coarseLevel->FinerLevel = currentLevel;
@@ -121,6 +151,13 @@ public:
 			cout << Utils::BeginYellow << "Warning: cannot build coarser level because no coarser mesh has been provided." << Utils::EndColor;
 
 		this->SetupCoarseSolver();
+
+		if (this->Cycle == 'K')
+		{
+			Multigrid* mg = static_cast<Multigrid*>(currentLevel->FCG->Precond.GetSolver());
+			mg->_coarseSolver = this->_coarseSolver;
+		}
+
 		cout << "\t--> " << _nLevels << " levels built." << endl;
 
 		if (this->WLoops > 1)
@@ -128,7 +165,10 @@ public:
 	}
 
 protected:
-	virtual Level* CreateCoarseLevel(Level* fineLevel) = 0;
+	virtual Level* CreateCoarseLevel(Level* fineLevel)
+	{
+		assert(false && "Not implemented. This method must be implemented in the subclass.");
+	}
 
 	void SetupCoarseSolver()
 	{
@@ -178,8 +218,7 @@ private:
 			// Pre-smoothing //
 			//---------------//
 
-			x = level->PreSmoother->Smooth(x, b);
-			result.AddCost(level->PreSmoother->SolvingComputationalWork());
+			x = level->PreSmoother->Smooth(x, b);                                    result.AddCost(level->PreSmoother->SolvingComputationalWork());
 
 			if (this->ExportMatrices)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPreSmoothing");
@@ -188,26 +227,31 @@ private:
 			// Residual computation //
 			//----------------------//
 
-			Vector r = b - A * x;
-			result.AddCost(2 * A.nonZeros());
+			Vector r = b - A * x;                                                    result.AddCost(2 * A.nonZeros());
 			
 			//------------------------------------------------//
 			// Restriction of the residual on the coarse grid //
 			//------------------------------------------------//
 
-			Vector rc = level->Restrict(r);
-			result.AddCost(level->RestrictCost());
+			Vector rc = level->Restrict(r);                                          result.AddCost(level->RestrictCost());
 
 			//--------------------------------------------------//
 			// Residual equation Ae=r solved on the coarse grid //
 			//--------------------------------------------------//
 
 			Vector ec = Vector::Zero(rc.rows());
-			for (int i = 0; i < this->WLoops; ++i)
+			if (this->Cycle == 'V' || this->Cycle == 'W')
 			{
-				ec = MultigridCycle(level->CoarserLevel, rc, ec, result);
-				if (level->CoarserLevel->IsCoarsestLevel())
-					break;
+				for (int i = 0; i < this->WLoops; ++i)
+				{
+					ec = MultigridCycle(level->CoarserLevel, rc, ec, result);
+					if (level->CoarserLevel->IsCoarsestLevel())
+						break;
+				}
+			}
+			else if (this->Cycle == 'K')
+			{
+				ec = level->CoarserLevel->FCG->Solve(rc, ec);                        result.AddCost(level->CoarserLevel->FCG->SolvingComputationalWork);
 			}
 
 			//------------------------//
@@ -222,8 +266,7 @@ private:
 				level->ExportVector(cgc, "it" + to_string(this->IterationCount) + "_cgc");
 			}
 
-			x = x + level->Prolong(ec);
-			result.AddCost(level->ProlongCost());
+			x = x + level->Prolong(ec);                                              result.AddCost(level->ProlongCost());
 
 			if (this->ExportMatrices)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_cgc");
@@ -232,9 +275,7 @@ private:
 			// Post-smoothing //
 			//----------------//
 
-			//if (this->ExportMatrices && !level->IsCoarsestLevel() && level->CoarserLevel->IsCoarsestLevel())
-			x = level->PostSmoother->Smooth(x, b);
-			result.AddCost(level->PostSmoother->SolvingComputationalWork());
+			x = level->PostSmoother->Smooth(x, b);                                   result.AddCost(level->PostSmoother->SolvingComputationalWork());
 
 			if (this->ExportMatrices)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPostSmoothing");

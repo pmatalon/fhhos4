@@ -498,6 +498,7 @@ private:
 
 				MultigridForHHO<Dim>* mg = new MultigridForHHO<Dim>(hhoProblem, args.Solver.MG.ProlongationCode, cellInterpolationBasis, args.Solver.MG.WeightCode, args.Solver.MG.Levels);
 				mg->MatrixMaxSizeForCoarsestLevel = args.Solver.MG.MatrixMaxSizeForCoarsestLevel;
+				mg->Cycle = args.Solver.MG.CycleLetter;
 				mg->WLoops = args.Solver.MG.WLoops;
 				mg->UseGalerkinOperator = args.Solver.MG.UseGalerkinOperator;
 				mg->PreSmootherCode = args.Solver.MG.PreSmootherCode;

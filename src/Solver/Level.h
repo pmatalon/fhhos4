@@ -1,5 +1,6 @@
 #pragma once
 #include "Smoother.h"
+#include "FlexibleConjugateGradient.h"
 using namespace std;
 
 class Level
@@ -17,6 +18,8 @@ public:
 
 	bool ExportMatrices = false;
 	BigNumber SetupComputationalWork = 0;
+
+	FlexibleConjugateGradient* FCG = nullptr; // used in K-cycle
 
 protected:
 	SparseMatrix R;
@@ -93,6 +96,9 @@ public:
 				this->ExportMatrix(R, "R");
 			}
 		}
+
+		if (FCG)
+			FCG->Setup(this->OperatorMatrix);
 	}
 
 	Vector Restrict(Vector& vectorOnThisLevel)
@@ -143,6 +149,8 @@ public:
 		delete PostSmoother;
 		if (CoarserLevel)
 			delete CoarserLevel;
+		if (FCG)
+			delete FCG;
 	}
 
 protected:
