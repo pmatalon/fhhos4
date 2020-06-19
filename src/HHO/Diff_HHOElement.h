@@ -2,10 +2,10 @@
 #include "../Mesh/Element.h"
 #include "../Problem/SourceFunction.h"
 #include "HHOParameters.h"
-#include "Poisson_HHO_Face.h"
+#include "Diff_HHOFace.h"
 
 template <int Dim>
-class Poisson_HHO_Element : virtual public Element<Dim>
+class Diff_HHOElement : virtual public Element<Dim>
 {
 private:
 	DenseMatrix _cellMassMatrix;
@@ -27,7 +27,7 @@ public:
 
 	DenseMatrix invAtt;
 
-	Poisson_HHO_Element(BigNumber number) : Element<Dim>(number) {}
+	Diff_HHOElement(BigNumber number) : Element<Dim>(number) {}
 
 	//----------------------------//
 	//   HHO-specific integrals   //
@@ -88,7 +88,7 @@ public:
 
 		for (auto e : this->FinerElements)
 		{
-			Poisson_HHO_Element<Dim>* fineElement = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
+			Diff_HHOElement<Dim>* fineElement = dynamic_cast<Diff_HHOElement<Dim>*>(e);
 
 			DenseMatrix fineCoarseMass(cellBasis->Size(), cellBasis->Size());
 			for (BasisFunction<Dim>* finePhi : cellBasis->LocalFunctions)
@@ -194,7 +194,7 @@ public:
 		return this->P(reconstructPhi->LocalNumber, DOFNumber(face, facePhi));
 	}
 
-	virtual ~Poisson_HHO_Element() {}
+	virtual ~Diff_HHOElement() {}
 
 private:
 
@@ -293,7 +293,7 @@ private:
 
 	void AssembleIntegrationByPartsRHS_face(DenseMatrix & rhsMatrix, Face<Dim> * f)
 	{
-		Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+		Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
 		for (BasisFunction<Dim>* reconstructPhi : HHO->ReconstructionBasis->LocalFunctions)
 		{
 			for (BasisFunction<Dim - 1> * facePhi : HHO->FaceBasis->LocalFunctions)
@@ -311,7 +311,7 @@ private:
 		double sumFaces = 0;
 		for (auto f : this->Faces)
 		{
-			Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+			Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
 
 			auto phi = this->EvalPhiOnFace(face, cellPhi);
 			auto gradPhi = this->GradPhiOnFace(face, reconstructPhi);
@@ -330,7 +330,7 @@ private:
 		return integralGradGrad - sumFaces;
 	}
 
-	double IntegrationByPartsRHS_face(Poisson_HHO_Face<Dim>* face, BasisFunction<Dim>* reconstructPhi, BasisFunction<Dim-1>* facePhi)
+	double IntegrationByPartsRHS_face(Diff_HHOFace<Dim>* face, BasisFunction<Dim>* reconstructPhi, BasisFunction<Dim-1>* facePhi)
 	{
 		if (reconstructPhi->GetDegree() == 0)
 			return 0;
@@ -365,7 +365,7 @@ private:
 
 			for (auto f : this->Faces)
 			{
-				Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+				Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
 				auto normal = this->OuterNormalVector(face);
 				DenseMatrix Mf = face->FaceMassMatrix();
 				DenseMatrix ProjF = face->GetProjFromReconstruct(this);
@@ -384,7 +384,7 @@ private:
 		{
 			for (auto f : this->Faces)
 			{
-				Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+				Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
 				auto normal = this->OuterNormalVector(face);
 				DenseMatrix Mf = face->FaceMassMatrix();
 				DenseMatrix ProjFT = face->GetProjFromCell(this);
@@ -417,7 +417,7 @@ public:
 		DenseMatrix boundaryMassMatrix = DenseMatrix::Zero(nBoundaryUnknowns, nBoundaryUnknowns);
 		for (Face<Dim>* face : this->Faces)
 		{
-			Poisson_HHO_Face<Dim>* f = dynamic_cast<Poisson_HHO_Face<Dim>*>(face);
+			Diff_HHOFace<Dim>* f = dynamic_cast<Diff_HHOFace<Dim>*>(face);
 			int localNumber = this->LocalNumberOf(f);
 			boundaryMassMatrix.block(localNumber, localNumber, HHO->nFaceUnknowns, HHO->nFaceUnknowns) = f->FaceMassMatrix();
 		}
@@ -463,10 +463,10 @@ public:
 		for (int i = 0; i < this->FinerFacesRemoved.size(); i++)
 		{
 			// Aii
-			Poisson_HHO_Face<Dim>* fi = dynamic_cast<Poisson_HHO_Face<Dim>*>(this->FinerFacesRemoved[i]);
+			Diff_HHOFace<Dim>* fi = dynamic_cast<Diff_HHOFace<Dim>*>(this->FinerFacesRemoved[i]);
 			for (int j = 0; j < this->FinerFacesRemoved.size(); j++)
 			{
-				Poisson_HHO_Face<Dim>* fj = dynamic_cast<Poisson_HHO_Face<Dim>*>(this->FinerFacesRemoved[j]);
+				Diff_HHOFace<Dim>* fj = dynamic_cast<Diff_HHOFace<Dim>*>(this->FinerFacesRemoved[j]);
 				Aii.block(i*nFaceUnknowns, j*nFaceUnknowns, nFaceUnknowns, nFaceUnknowns) = fineA.block(fi->Number*nFaceUnknowns, fj->Number*nFaceUnknowns, nFaceUnknowns, nFaceUnknowns);
 			}
 			// Aib
@@ -478,7 +478,7 @@ public:
 
 				for (int j = 0; j < cf->FinerFaces.size(); j++)
 				{
-					Poisson_HHO_Face<Dim>* fj = dynamic_cast<Poisson_HHO_Face<Dim>*>(cf->FinerFaces[j]);
+					Diff_HHOFace<Dim>* fj = dynamic_cast<Diff_HHOFace<Dim>*>(cf->FinerFaces[j]);
 					Aib.block(i*nFaceUnknowns, fineFaceLocalNumberInCoarseElem*nFaceUnknowns, nFaceUnknowns, nFaceUnknowns) = fineA.block(fi->Number*nFaceUnknowns, fj->Number*nFaceUnknowns, nFaceUnknowns, nFaceUnknowns);
 					fineFaceLocalNumberInCoarseElem++;
 				}
@@ -497,7 +497,7 @@ public:
 			if (cf->IsDomainBoundary)
 				continue;
 
-			Poisson_HHO_Face<Dim>* coarseFace = dynamic_cast<Poisson_HHO_Face<Dim>*>(cf);
+			Diff_HHOFace<Dim>* coarseFace = dynamic_cast<Diff_HHOFace<Dim>*>(cf);
 
 			DenseMatrix local_J_f_c = coarseFace->ComputeCanonicalInjectionMatrixCoarseToFine(HHO->FaceBasis);
 			for (auto fineFace : coarseFace->FinerFaces)

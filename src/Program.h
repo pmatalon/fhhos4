@@ -1,7 +1,7 @@
 #pragma once
 #include "ProgramArguments.h"
-#include "DG/Poisson_DG.h"
-#include "HHO/Poisson_HHO.h"
+#include "DG/Diffusion_DG.h"
+#include "HHO/Diffusion_HHO.h"
 #include "Mesh/1D/UniformMesh1D.h"
 #include "Mesh/2D/Square_CartesianMesh.h"
 #include "Mesh/2D/Square_CartesianPolygonalMesh.h"
@@ -355,7 +355,7 @@ public:
 		if (args.Discretization.Method.compare("dg") == 0)
 		{
 			FunctionalBasis<Dim>* basis = new FunctionalBasis<Dim>(args.Discretization.BasisCode, args.Discretization.PolyDegree, args.Discretization.UsePolynomialSpaceQ);
-			problem = new Poisson_DG<Dim>(mesh, args.Problem.RHSCode, sourceFunction, &diffusionPartition, args.OutputDirectory, basis, args.Discretization.PenalizationCoefficient);
+			problem = new Diffusion_DG<Dim>(mesh, args.Problem.RHSCode, sourceFunction, &diffusionPartition, args.OutputDirectory, basis, args.Discretization.PenalizationCoefficient);
 		}
 		else if (args.Discretization.Method.compare("hho") == 0)
 		{
@@ -365,7 +365,7 @@ public:
 
 			HHOParameters<Dim>* hho = new HHOParameters<Dim>(mesh, args.Discretization.Stabilization, reconstructionBasis, cellBasis, faceBasis);
 
-			problem = new Poisson_HHO<Dim>(mesh, args.Problem.RHSCode, sourceFunction, hho, args.Discretization.StaticCondensation, &diffusionPartition, &bc, args.OutputDirectory);
+			problem = new Diffusion_HHO<Dim>(mesh, args.Problem.RHSCode, sourceFunction, hho, args.Discretization.StaticCondensation, &diffusionPartition, &bc, args.OutputDirectory);
 		}
 		else
 			Utils::FatalError("Unknown discretization.");
@@ -380,24 +380,24 @@ public:
 		assemblyTimer.Stop();
 		cout << endl << "Assembly time: CPU = " << assemblyTimer.CPU() << ", elapsed = " << assemblyTimer.Elapsed() << endl;
 
-		//--------------------------------------//
-		//       Linear system resolution       //
-		//--------------------------------------//
+		//------------------------------------//
+		//       Linear system solution       //
+		//------------------------------------//
 
 		if ((args.Actions & Action::SolveSystem) == Action::SolveSystem)
 		{
 			cout << endl;
-			cout << "------------------- Linear system resolution ------------------" << endl;
+			cout << "------------------- Linear system solution ------------------" << endl;
 
 			int blockSizeForBlockSolver = 1;
 			if (args.Discretization.Method.compare("dg") == 0)
 			{
-				Poisson_DG<Dim>* dgPb = static_cast<Poisson_DG<Dim>*>(problem);
+				Diffusion_DG<Dim>* dgPb = static_cast<Diffusion_DG<Dim>*>(problem);
 				blockSizeForBlockSolver = dgPb->Basis->Size();
 			}
 			else if (args.Discretization.Method.compare("hho") == 0)
 			{
-				Poisson_HHO<Dim>* hhoPb = static_cast<Poisson_HHO<Dim>*>(problem);
+				Diffusion_HHO<Dim>* hhoPb = static_cast<Diffusion_HHO<Dim>*>(problem);
 				blockSizeForBlockSolver = hhoPb->HHO->FaceBasis->Size();
 			}
 
@@ -415,7 +415,7 @@ public:
 			}
 			else if (args.Discretization.Method.compare("hho") == 0)
 			{
-				Poisson_HHO<Dim>* hhoPb = static_cast<Poisson_HHO<Dim>*>(problem);
+				Diffusion_HHO<Dim>* hhoPb = static_cast<Diffusion_HHO<Dim>*>(problem);
 				if (args.Discretization.StaticCondensation && (args.Actions & Action::ExtractSolution) == Action::ExtractSolution)
 					hhoPb->ExtractTraceSystemSolution();
 
@@ -444,7 +444,7 @@ public:
 
 				if (args.Discretization.Method.compare("hho") == 0)
 				{
-					Poisson_HHO<Dim>* hhoPb = static_cast<Poisson_HHO<Dim>*>(problem);
+					Diffusion_HHO<Dim>* hhoPb = static_cast<Diffusion_HHO<Dim>*>(problem);
 					hhoPb->AssertSchemeConvergence(error);
 				}
 			}
@@ -458,12 +458,12 @@ public:
 		delete sourceFunction;
 		if (args.Discretization.Method.compare("dg") == 0)
 		{
-			Poisson_DG<Dim>* dgPb = static_cast<Poisson_DG<Dim>*>(problem);
+			Diffusion_DG<Dim>* dgPb = static_cast<Diffusion_DG<Dim>*>(problem);
 			delete dgPb->Basis;
 		}
 		else if (args.Discretization.Method.compare("hho") == 0)
 		{
-			Poisson_HHO<Dim>* hhoPb = static_cast<Poisson_HHO<Dim>*>(problem);
+			Diffusion_HHO<Dim>* hhoPb = static_cast<Diffusion_HHO<Dim>*>(problem);
 			delete hhoPb->HHO->CellBasis;
 			delete hhoPb->HHO->FaceBasis;
 			delete hhoPb->HHO->ReconstructionBasis;
@@ -486,7 +486,7 @@ private:
 		{
 			if (args.Discretization.StaticCondensation)
 			{
-				Poisson_HHO<Dim>* hhoProblem = dynamic_cast<Poisson_HHO<Dim>*>(problem);
+				Diffusion_HHO<Dim>* hhoProblem = dynamic_cast<Diffusion_HHO<Dim>*>(problem);
 
 				FunctionalBasis<Dim>* cellInterpolationBasis;
 				if (args.Solver.MG.CellInterpolationCode == 1)

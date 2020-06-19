@@ -82,7 +82,7 @@ void print_usage() {
 	cout << "-discr CODE" << endl;
 	cout << "      Discretization method (default: hho)." << endl;
 	cout << "               dg     - Discontinuous Galerkin (Symmetric Interior Penalty)" << endl;
-	cout << "               hho    - Hybrid High Order" << endl;
+	cout << "               hho    - Hybrid High-Order" << endl;
 	cout << endl;
 	cout << "-stab CODE" << endl;
 	cout << "      Stabilization term (only used in HHO)." << endl;

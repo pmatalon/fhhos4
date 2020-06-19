@@ -1,15 +1,15 @@
 #pragma once
-#include "../Problem/PoissonProblem.h"
+#include "../Problem/DiffusionProblem.h"
 #include "../Mesh/CartesianShape.h"
 #include "../Mesh/2D/Triangle.h"
 #include "../Utils/Action.h"
 #include "../Utils/ParallelLoop.h"
-#include "Poisson_DG_Element.h"
-#include "Poisson_DG_Face.h"
+#include "Diff_DGElement.h"
+#include "Diff_DGFace.h"
 using namespace std;
 
 template <int Dim>
-class Poisson_DG : public PoissonProblem<Dim>
+class Diffusion_DG : public DiffusionProblem<Dim>
 {
 public:
 	FunctionalBasis<Dim>* Basis;
@@ -17,8 +17,8 @@ private:
 	bool _autoPenalization;
 	int _penalizationCoefficient;
 public:
-	Poisson_DG(Mesh<Dim>* mesh, string rhsCode, SourceFunction* sourceFunction, DiffusionPartition<Dim>* diffusionPartition, string outputDirectory, FunctionalBasis<Dim>* basis, int penalizationCoefficient)
-		: PoissonProblem<Dim>(mesh, diffusionPartition, rhsCode, sourceFunction, nullptr, outputDirectory)
+	Diffusion_DG(Mesh<Dim>* mesh, string rhsCode, SourceFunction* sourceFunction, DiffusionPartition<Dim>* diffusionPartition, string outputDirectory, FunctionalBasis<Dim>* basis, int penalizationCoefficient)
+		: DiffusionProblem<Dim>(mesh, diffusionPartition, rhsCode, sourceFunction, nullptr, outputDirectory)
 	{ 
 		this->Basis = basis;
 		this->_autoPenalization = penalizationCoefficient == -1;
@@ -107,7 +107,7 @@ public:
 
 				for (BigNumber iElem = chunk->Start; iElem < chunk->End; iElem++)
 				{
-					Poisson_DG_Element<Dim>* element = dynamic_cast<Poisson_DG_Element<Dim>*>(mesh->Elements[iElem]);
+					Diff_DGElement<Dim>* element = dynamic_cast<Diff_DGElement<Dim>*>(mesh->Elements[iElem]);
 					//cout << "Element " << element->Number << endl;
 
 					for (BasisFunction<Dim>* phi1 : basis->LocalFunctions)
@@ -128,7 +128,7 @@ public:
 							double penalization = 0;
 							for (Face<Dim>* f : element->Faces)
 							{
-								Poisson_DG_Face<Dim>* face = dynamic_cast<Poisson_DG_Face<Dim>*>(f);
+								Diff_DGFace<Dim>* face = dynamic_cast<Diff_DGFace<Dim>*>(f);
 
 								double c = face->CouplingTerm(element, phi1, element, phi2);
 								double p = face->PenalizationTerm(element, phi1, element, phi2, penalizationCoefficient);
@@ -215,7 +215,7 @@ public:
 
 				for (BigNumber iElem = chunk->Start; iElem < chunk->End; ++iElem)
 				{
-					Poisson_DG_Face<Dim>* face = dynamic_cast<Poisson_DG_Face<Dim>*>(mesh->Faces[iElem]);
+					Diff_DGFace<Dim>* face = dynamic_cast<Diff_DGFace<Dim>*>(mesh->Faces[iElem]);
 					if (face->IsDomainBoundary)
 						continue;
 

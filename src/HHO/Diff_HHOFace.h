@@ -3,10 +3,10 @@
 #include "HHOParameters.h"
 
 template <int Dim>
-class Poisson_HHO_Element;
+class Diff_HHOElement;
 
 template <int Dim>
-class Poisson_HHO_Face : virtual public Face<Dim>
+class Diff_HHOFace : virtual public Face<Dim>
 {
 private:
 	DenseMatrix _faceMassMatrix;
@@ -27,7 +27,7 @@ private:
 public:
 	HHOParameters<Dim>* HHO;
 
-	Poisson_HHO_Face(BigNumber number, Element<Dim>* element1, Element<Dim>* element2) : Face<Dim>(number, element1, element2) {}
+	Diff_HHOFace(BigNumber number, Element<Dim>* element1, Element<Dim>* element2) : Face<Dim>(number, element1, element2) {}
 
 	void InitHHO(HHOParameters<Dim>* hho)
 	{
@@ -166,7 +166,7 @@ public:
 
 		for (auto f : this->FinerFaces)
 		{
-			Poisson_HHO_Face<Dim>* fineFace = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+			Diff_HHOFace<Dim>* fineFace = dynamic_cast<Diff_HHOFace<Dim>*>(f);
 
 			DenseMatrix fineCoarseMass(faceBasis->Size(), faceBasis->Size());
 			for (BasisFunction<Dim-1>* finePhi : faceBasis->LocalFunctions)

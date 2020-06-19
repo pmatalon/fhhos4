@@ -43,7 +43,7 @@ public:
 	}
 
 	//---------------------------------------------------------------//
-	//                 Poisson_DG_Face implementation                //
+	//                 Diff_DGFace implementation                //
 	//---------------------------------------------------------------//
 
 	double CouplingTerm(Element<1>* element1, BasisFunction<1>* p_phi1, Element<1>* element2, BasisFunction<1>* p_phi2) override

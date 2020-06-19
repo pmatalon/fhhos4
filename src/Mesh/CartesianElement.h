@@ -1,32 +1,32 @@
 #pragma once
 #include "Element.h"
 #include "CartesianShape.h"
-#include "../HHO/Poisson_HHO_Element.h"
+#include "../HHO/Diff_HHOElement.h"
 
 template <int Dim>
-class CartesianElement : public Poisson_DG_Element<Dim>, public Poisson_HHO_Element<Dim>
+class CartesianElement : public Diff_DGElement<Dim>, public Diff_HHOElement<Dim>
 {
 protected:
 	CartesianShape<Dim>* _shape;
 
 public:
 	CartesianElement(BigNumber number, DomPoint* origin, double width) :
-		Poisson_DG_Element<Dim>(number),
-		Poisson_HHO_Element<Dim>(number)
+		Diff_DGElement<Dim>(number),
+		Diff_HHOElement<Dim>(number)
 	{
 		_shape = new CartesianShape<Dim>(origin, width);
 	}
 
 	CartesianElement(BigNumber number, DomPoint* origin, double widthX, double widthY) :
-		Poisson_DG_Element<Dim>(number),
-		Poisson_HHO_Element<Dim>(number)
+		Diff_DGElement<Dim>(number),
+		Diff_HHOElement<Dim>(number)
 	{
 		_shape = new CartesianShape<Dim>(origin, widthX, widthY);
 	}
 
 	CartesianElement(BigNumber number, DomPoint* origin, double widthX, double widthY, double widthZ) :
-		Poisson_DG_Element<Dim>(number),
-		Poisson_HHO_Element<Dim>(number)
+		Diff_DGElement<Dim>(number),
+		Diff_HHOElement<Dim>(number)
 	{
 		_shape = new CartesianShape<Dim>(origin, widthX, widthY, widthZ);
 	}

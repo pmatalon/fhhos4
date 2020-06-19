@@ -1,11 +1,11 @@
 #pragma once
-#include "../../DG/Poisson_DG_Element.h"
-#include "../../HHO/Poisson_HHO_Element.h"
+#include "../../DG/Diff_DGElement.h"
+#include "../../HHO/Diff_HHOElement.h"
 #include "TetrahedronShape.h"
 #include "TriangularFace.h"
 using namespace std;
 
-class Tetrahedron : public Poisson_DG_Element<3>, public Poisson_HHO_Element<3>
+class Tetrahedron : public Diff_DGElement<3>, public Diff_HHOElement<3>
 {
 private:
 	TetrahedronShape* _shape;
@@ -13,8 +13,8 @@ private:
 public:
 	Tetrahedron(BigNumber number, Vertex* v1, Vertex* v2, Vertex* v3, Vertex* v4) :
 		Element(number),
-		Poisson_DG_Element<3>(number),
-		Poisson_HHO_Element<3>(number)
+		Diff_DGElement<3>(number),
+		Diff_HHOElement<3>(number)
 	{
 		_shape = new TetrahedronShape(v1, v2, v3, v4);
 	}

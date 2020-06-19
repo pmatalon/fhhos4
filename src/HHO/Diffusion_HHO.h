@@ -1,13 +1,13 @@
 #pragma once
-#include "../Problem/PoissonProblem.h"
-#include "Poisson_HHO_Element.h"
+#include "../Problem/DiffusionProblem.h"
+#include "Diff_HHOElement.h"
 #include "../Utils/ElementParallelLoop.h"
 #include "../Mesh/2D/Triangle.h"
 #include "../Mesh/3D/Tetrahedron.h"
 using namespace std;
 
 template <int Dim>
-class Poisson_HHO : public PoissonProblem<Dim>
+class Diffusion_HHO : public DiffusionProblem<Dim>
 {
 private:
 	bool _staticCondensation = false;
@@ -20,8 +20,8 @@ public:
 	Vector ReconstructedSolution;
 	Vector GlobalHybridSolution;
 
-	Poisson_HHO(Mesh<Dim>* mesh, string rhsCode, SourceFunction* sourceFunction, HHOParameters<Dim>* hho, bool staticCondensation, DiffusionPartition<Dim>* diffusionPartition, BoundaryConditions* bc, string outputDirectory)
-		: PoissonProblem<Dim>(mesh, diffusionPartition, rhsCode, sourceFunction, bc, outputDirectory)
+	Diffusion_HHO(Mesh<Dim>* mesh, string rhsCode, SourceFunction* sourceFunction, HHOParameters<Dim>* hho, bool staticCondensation, DiffusionPartition<Dim>* diffusionPartition, BoundaryConditions* bc, string outputDirectory)
+		: DiffusionProblem<Dim>(mesh, diffusionPartition, rhsCode, sourceFunction, bc, outputDirectory)
 	{	
 		this->HHO = hho;
 		this->_staticCondensation = staticCondensation;
@@ -38,10 +38,10 @@ public:
 			face->Number = faceNumber++;
 	}
 
-	Poisson_HHO<Dim>* GetProblemOnCoarserMesh()
+	Diffusion_HHO<Dim>* GetProblemOnCoarserMesh()
 	{
 		HHOParameters<Dim>* coarseHHO = new HHOParameters<Dim>(this->_mesh->CoarseMesh, HHO->Stabilization, HHO->ReconstructionBasis, HHO->CellBasis, HHO->FaceBasis);
-		return new Poisson_HHO<Dim>(this->_mesh->CoarseMesh, this->_rhsCode, this->_sourceFunction, coarseHHO, _staticCondensation, this->_diffusionPartition, this->_boundaryConditions, this->_outputDirectory);
+		return new Diffusion_HHO<Dim>(this->_mesh->CoarseMesh, this->_rhsCode, this->_sourceFunction, coarseHHO, _staticCondensation, this->_diffusionPartition, this->_boundaryConditions, this->_outputDirectory);
 	}
 
 	double L2Error(DomFunction exactSolution) override
@@ -96,7 +96,7 @@ public:
 		cout << "    Faces     : " << HHO->nFaces << " (" << HHO->nInteriorFaces << " interior + " << HHO->nBoundaryFaces << " boundary)" << endl;
 		cout << "    h         : " << scientific << this->_mesh->H() << defaultfloat << endl;
 		cout << "    Regularity: " << this->_mesh->Regularity() << defaultfloat << endl;
-		cout << "Discretization: Hybrid High Order (k = " << HHO->FaceBasis->GetDegree() << ")" << endl;
+		cout << "Discretization: Hybrid High-Order (k = " << HHO->FaceBasis->GetDegree() << ")" << endl;
 		cout << "    Reconstruction basis: " << HHO->ReconstructionBasis->Name() << endl;
 		cout << "    Cell basis          : " << HHO->CellBasis->Name() << endl;
 		cout << "    Face basis          : " << HHO->FaceBasis->Name() << endl;
@@ -191,7 +191,7 @@ public:
 						//--------------//
 
 						//cout << "Element " << element->Number << endl;
-						Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(mesh->Elements[iElem]);
+						Diff_HHOElement<Dim>* element = dynamic_cast<Diff_HHOElement<Dim>*>(mesh->Elements[iElem]);
 
 						if (!this->_staticCondensation)
 						{
@@ -372,7 +372,7 @@ public:
 		// Neumann
 		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->NeumannFaces, [this, faceBasis](Face<Dim>* f)
 			{
-				Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+				Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
 				BigNumber i = FirstDOFGlobalNumber(f);
 				this->_globalRHS.segment(i, HHO->nFaceUnknowns) = face->ProjectOnBasis(faceBasis, this->_boundaryConditions->NeumannFunction);
 			}
@@ -382,7 +382,7 @@ public:
 		this->_dirichletCond = Vector(HHO->nDirichletUnknowns);
 		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->DirichletFaces, [this, faceBasis](Face<Dim>* f)
 			{
-				Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+				Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
 				BigNumber i = FirstDOFGlobalNumber(f) - HHO->nTotalHybridUnknowns;
 				this->_dirichletCond.segment(i, HHO->nFaceUnknowns) = face->InvFaceMassMatrix()*face->ProjectOnBasis(faceBasis, this->_boundaryConditions->DirichletFunction);
 			}
@@ -460,7 +460,7 @@ public:
 		// Init faces //
 		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->Faces, [this](Face<Dim>* f)
 			{
-				Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+				Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
 				face->InitHHO(HHO);
 			}
 		);
@@ -468,7 +468,7 @@ public:
 		// Init Elements //
 		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this](Element<Dim>* e)
 			{
-				Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
+				Diff_HHOElement<Dim>* element = dynamic_cast<Diff_HHOElement<Dim>*>(e);
 				element->InitHHO(HHO);
 			}
 		);
@@ -503,7 +503,7 @@ public:
 		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, &globalReconstructedSolution](Element<Dim>* e)
 			{
 				HHOParameters<Dim>* HHO = this->HHO;
-				Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
+				Diff_HHOElement<Dim>* element = dynamic_cast<Diff_HHOElement<Dim>*>(e);
 
 				Vector localHybridSolution(HHO->nCellUnknowns + HHO->nFaceUnknowns * element->Faces.size());
 				localHybridSolution.head(HHO->nCellUnknowns) = this->GlobalHybridSolution.segment(FirstDOFGlobalNumber(element), HHO->nCellUnknowns);
@@ -543,7 +543,7 @@ public:
 		parallelLoop.ReserveChunkCoeffsSize(HHO->nCellUnknowns * HHO->nCellUnknowns);
 		parallelLoop.Execute([this](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
 			{
-				Poisson_HHO_Element<Dim>* element = dynamic_cast<Poisson_HHO_Element<Dim>*>(e);
+				Diff_HHOElement<Dim>* element = dynamic_cast<Diff_HHOElement<Dim>*>(e);
 				chunk->Results.Coeffs.Add(element->Number * HHO->nCellUnknowns, element->Number * HHO->nCellUnknowns, element->invAtt);
 			});
 		SparseMatrix inverseAtt = SparseMatrix(HHO->nTotalCellUnknowns, HHO->nTotalCellUnknowns);
@@ -559,7 +559,7 @@ public:
 			{
 				if (f->HasDirichletBC())
 					return;
-				Poisson_HHO_Face<Dim>* face = dynamic_cast<Poisson_HHO_Face<Dim>*>(f);
+				Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
 				BigNumber i = face->Number * faceBasis->Size();// FirstDOFGlobalNumber(f);
 
 				DenseMatrix m = face->InvFaceMassMatrix();

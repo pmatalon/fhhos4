@@ -10,15 +10,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src/DG/Poisson_DG.h">
-      <Filter>DG</Filter>
-    </ClInclude>
-    <ClInclude Include="src/DG/Poisson_DG_Element.h">
-      <Filter>DG</Filter>
-    </ClInclude>
-    <ClInclude Include="src/DG/Poisson_DG_Face.h">
-      <Filter>DG</Filter>
-    </ClInclude>
     <ClInclude Include="src/FunctionalBasis/BasisFunction.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
@@ -57,15 +48,6 @@
     </ClInclude>
     <ClInclude Include="src/Mesh/Point.h">
       <Filter>Mesh</Filter>
-    </ClInclude>
-    <ClInclude Include="src/HHO/Poisson_HHO.h">
-      <Filter>HHO</Filter>
-    </ClInclude>
-    <ClInclude Include="src/HHO/Poisson_HHO_Element.h">
-      <Filter>HHO</Filter>
-    </ClInclude>
-    <ClInclude Include="src/HHO/Poisson_HHO_Face.h">
-      <Filter>HHO</Filter>
     </ClInclude>
     <ClInclude Include="src/FunctionalBasis/TensorPolynomial.h">
       <Filter>FunctionalBasis</Filter>
@@ -175,9 +157,6 @@
     </ClInclude>
     <ClInclude Include="src\Mesh\Vertex.h">
       <Filter>Mesh</Filter>
-    </ClInclude>
-    <ClInclude Include="src/Problem/PoissonProblem.h">
-      <Filter>Problem</Filter>
     </ClInclude>
     <ClInclude Include="src\Problem\Tensor.h">
       <Filter>Problem</Filter>
@@ -320,6 +299,27 @@
     </ClInclude>
     <ClInclude Include="src\Solver\FlexibleConjugateGradient.h">
       <Filter>Solver</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Problem\DiffusionProblem.h">
+      <Filter>Problem</Filter>
+    </ClInclude>
+    <ClInclude Include="src\DG\Diffusion_DG.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="src\HHO\Diffusion_HHO.h">
+      <Filter>HHO</Filter>
+    </ClInclude>
+    <ClInclude Include="src\HHO\Diff_HHOElement.h">
+      <Filter>HHO</Filter>
+    </ClInclude>
+    <ClInclude Include="src\HHO\Diff_HHOFace.h">
+      <Filter>HHO</Filter>
+    </ClInclude>
+    <ClInclude Include="src\DG\Diff_DGElement.h">
+      <Filter>DG</Filter>
+    </ClInclude>
+    <ClInclude Include="src\DG\Diff_DGFace.h">
+      <Filter>DG</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

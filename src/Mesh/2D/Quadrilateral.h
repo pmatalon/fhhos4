@@ -1,11 +1,11 @@
 #pragma once
-#include "../../DG/Poisson_DG_Element.h"
-#include "../../HHO/Poisson_HHO_Element.h"
+#include "../../DG/Diff_DGElement.h"
+#include "../../HHO/Diff_HHOElement.h"
 #include "QuadrilateralShape.h"
 #include "Edge.h"
 using namespace std;
 
-class Quadrilateral : public Poisson_DG_Element<2>, public Poisson_HHO_Element<2>
+class Quadrilateral : public Diff_DGElement<2>, public Diff_HHOElement<2>
 {
 private:
 	QuadrilateralShape* _shape;
@@ -13,8 +13,8 @@ private:
 public:
 	Quadrilateral(int number, Vertex* v1, Vertex* v2, Vertex* v3, Vertex* v4) :
 		Element(number),
-		Poisson_DG_Element<2>(number),
-		Poisson_HHO_Element<2>(number)
+		Diff_DGElement<2>(number),
+		Diff_HHOElement<2>(number)
 	{
 		_shape = new QuadrilateralShape(v1, v2, v3, v4);
 	}

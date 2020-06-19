@@ -296,6 +296,8 @@ public:
 		BeginSerialize(cout);
 
 		os << "\t" << "Cycle              : ";
+		if (this->Cycle == 'K')
+			os << "K";
 		if (this->WLoops == 1)
 			os << "V";
 		else if (this->WLoops == 2)
@@ -337,6 +339,11 @@ public:
 		os << "\t" << "Post-smoothing     : " << *postSmoother;
 		delete preSmoother;
 		delete postSmoother;
+		if (PreSmootherCode.compare("bj") == 0 || PostSmootherCode.compare("bj") == 0)
+		{
+			os << endl;
+			Utils::Warning("Note that without relaxation parameter, the (block) Jacobi iteration is not a smoother. You can use 'bj23' (under-relaxation parameter = 2/3) instead.");
+		}
 	}
 
 	void PrintCycleSchema()

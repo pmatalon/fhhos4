@@ -1,10 +1,10 @@
 #pragma once
-#include "../../DG/Poisson_DG_Element.h"
-#include "../../HHO/Poisson_HHO_Element.h"
+#include "../../DG/Diff_DGElement.h"
+#include "../../HHO/Diff_HHOElement.h"
 #include "PolygonalShape.h"
 using namespace std;
 
-class Polygon : public Poisson_DG_Element<2>, public Poisson_HHO_Element<2>
+class Polygon : public Diff_DGElement<2>, public Diff_HHOElement<2>
 {
 private:
 	PolygonalShape* _shape;
@@ -12,8 +12,8 @@ private:
 public:
 	Polygon(int number, vector<Vertex*> vertices) :
 		Element(number),
-		Poisson_DG_Element<2>(number),
-		Poisson_HHO_Element<2>(number)
+		Diff_DGElement<2>(number),
+		Diff_HHOElement<2>(number)
 	{
 		_shape = new PolygonalShape(vertices);
 	}

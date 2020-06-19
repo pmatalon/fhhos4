@@ -154,12 +154,12 @@
     <ClInclude Include="src/Mesh/Face.h" />
     <ClInclude Include="src/Mesh/1D/Interval.h" />
     <ClInclude Include="src/Mesh/Point.h" />
-    <ClInclude Include="src/DG/Poisson_DG.h" />
-    <ClInclude Include="src/DG/Poisson_DG_Element.h" />
-    <ClInclude Include="src/DG/Poisson_DG_Face.h" />
-    <ClInclude Include="src/HHO/Poisson_HHO.h" />
-    <ClInclude Include="src/HHO/Poisson_HHO_Element.h" />
-    <ClInclude Include="src/HHO/Poisson_HHO_Face.h" />
+    <ClInclude Include="src\DG\Diffusion_DG.h" />
+    <ClInclude Include="src\DG\Diff_DGElement.h" />
+    <ClInclude Include="src\DG\Diff_DGFace.h" />
+    <ClInclude Include="src\HHO\Diffusion_HHO.h" />
+    <ClInclude Include="src\HHO\Diff_HHOElement.h" />
+    <ClInclude Include="src\HHO\Diff_HHOFace.h" />
     <ClInclude Include="src/Utils/GaussLegendre.h" />
     <ClInclude Include="src/Utils/NonZeroCoefficients.h" />
     <ClInclude Include="src/Utils/Utils.h" />
@@ -169,7 +169,7 @@
     <ClInclude Include="src\Mesh\ReferenceTriangle.h" />
     <ClInclude Include="src\Problem\BoundaryConditions.h" />
     <ClInclude Include="src\Problem\Tensor.h" />
-    <ClInclude Include="src/Problem/PoissonProblem.h" />
+    <ClInclude Include="src\Problem\DiffusionProblem.h" />
     <ClInclude Include="src/Problem/SourceFunction.h" />
     <ClInclude Include="src\Mesh\Vertex.h" />
     <ClInclude Include="src\Program.h" />

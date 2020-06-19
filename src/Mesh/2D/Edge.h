@@ -1,6 +1,6 @@
 #pragma once
-#include "../../DG/Poisson_DG_Face.h"
-#include "../../HHO/Poisson_HHO_Face.h"
+#include "../../DG/Diff_DGFace.h"
+#include "../../HHO/Diff_HHOFace.h"
 #include "../CartesianShape.h"
 #include "../../Utils/Geometry.h"
 
@@ -109,15 +109,15 @@ public:
 	}
 };
 
-class Edge : public Poisson_DG_Face<2>, public Poisson_HHO_Face<2>
+class Edge : public Diff_DGFace<2>, public Diff_HHOFace<2>
 {
 private:
 	EdgeShape* _shape;
 public:
 
 	Edge(BigNumber number, Vertex* v1, Vertex* v2, Element<2>* element1, Element<2>* element2) : 
-		Poisson_DG_Face(number, element1, element2),
-		Poisson_HHO_Face(number, element1, element2),
+		Diff_DGFace(number, element1, element2),
+		Diff_HHOFace(number, element1, element2),
 		Face(number, element1, element2)
 	{
 		_shape = new EdgeShape(v1, v2);

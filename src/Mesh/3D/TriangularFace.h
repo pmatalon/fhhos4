@@ -1,17 +1,17 @@
 #pragma once
-#include "../../DG/Poisson_DG_Face.h"
-#include "../../HHO/Poisson_HHO_Face.h"
+#include "../../DG/Diff_DGFace.h"
+#include "../../HHO/Diff_HHOFace.h"
 #include "TriangleIn3DShape.h"
 
-class TriangularFace : public Poisson_DG_Face<3>, public Poisson_HHO_Face<3>
+class TriangularFace : public Diff_DGFace<3>, public Diff_HHOFace<3>
 {
 private:
 	TriangleIn3DShape* _shape;
 public:
 
 	TriangularFace(BigNumber number, Vertex* v1, Vertex* v2, Vertex* v3, Element<3>* element1, Element<3>* element2) :
-		Poisson_DG_Face(number, element1, element2),
-		Poisson_HHO_Face(number, element1, element2),
+		Diff_DGFace(number, element1, element2),
+		Diff_HHOFace(number, element1, element2),
 		Face(number, element1, element2)
 	{
 		_shape = new TriangleIn3DShape(v1, v2, v3);

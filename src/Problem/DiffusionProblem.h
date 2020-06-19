@@ -5,7 +5,7 @@
 using namespace std;
 
 template <int Dim>
-class PoissonProblem : public Problem<Dim>
+class DiffusionProblem : public Problem<Dim>
 {
 protected:
 	DiffusionPartition<Dim>* _diffusionPartition;
@@ -14,7 +14,7 @@ protected:
 	BoundaryConditions* _boundaryConditions;
 public:
 
-	PoissonProblem(Mesh<Dim>* mesh, DiffusionPartition<Dim>* diffusionPartition, string rhsCode, SourceFunction* sourceFunction, BoundaryConditions* bc, string outputDirectory)
+	DiffusionProblem(Mesh<Dim>* mesh, DiffusionPartition<Dim>* diffusionPartition, string rhsCode, SourceFunction* sourceFunction, BoundaryConditions* bc, string outputDirectory)
 		: Problem<Dim>(mesh, outputDirectory)
 	{
 		this->_diffusionPartition = diffusionPartition;
@@ -34,7 +34,7 @@ public:
 
 	void PrintPhysicalProblem() override
 	{
-		cout << "Problem: Poisson " << Dim << "D";
+		cout << "Problem: Diffusion " << Dim << "D";
 		if (this->_diffusionPartition->IsHomogeneous && this->_diffusionPartition->IsIsotropic)
 			cout << " (homogeneous and isotropic)" << endl;
 		else
