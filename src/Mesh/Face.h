@@ -80,6 +80,50 @@ public:
 		return this->Shape()->HasSameVertices(other->Shape(), compareCoordinates);
 	}
 
+	bool IsIn(vector<Face<Dim>*> list)
+	{
+		for (Face<Dim>* f : list)
+		{
+			if (f == this)
+				return true;
+		}
+		return false;
+	}
+
+	static int NumberOfFacesContainingVertex(vector<Face<Dim>*> faces, Vertex* v)
+	{
+		int nFacesContainingV = 0;
+		for (Face<Dim>* f : faces)
+		{
+			if (f->HasVertex(v, true))
+			{
+				nFacesContainingV++;
+				if (nFacesContainingV >= 2)
+					break;
+			}
+		}
+		return nFacesContainingV;
+	}
+
+	static bool IsInFaces(vector<Face<Dim>*> faces, Vertex* v)
+	{
+		bool vertexIsInFaces = false;
+		for (Face<Dim>* f : faces)
+		{
+			if (f->HasVertex(v, true))
+			{
+				vertexIsInFaces = true;
+				break;
+			}
+		}
+		return vertexIsInFaces;
+	}
+
+	static bool IsInTwoFaces(vector<Face<Dim>*> faces, Vertex* v)
+	{
+		return NumberOfFacesContainingVertex(faces, v) >= 2;
+	}
+
 	virtual Face<Dim>* CreateSameGeometricFace(BigNumber number, Element<Dim>* element1) = 0;
 
 	// Transformation to reference element

@@ -39,6 +39,9 @@ public:
 		Init();
 	}
 
+	// Copy constructor
+	QuadrilateralShape(const QuadrilateralShape& shape) = default;
+
 	void Init()
 	{
 		double diag13 = (*V3 - *V1).norm();
@@ -75,6 +78,11 @@ public:
 			b3 = 0;
 	}
 
+	GeometricShapeWithReferenceShape<2>* CreateCopy() const
+	{
+		return new QuadrilateralShape(*this);
+	}
+
 	ReferenceShape<2>* RefShape() const
 	{
 		return &RefSquare;
@@ -83,6 +91,26 @@ public:
 	inline vector<Vertex*> Vertices() const override
 	{
 		return vector<Vertex*> { V1, V2, V3, V4 };
+	}
+
+	bool IsDegenerated() const override
+	{
+		assert(false && "To implement");
+	}
+
+	void ReshapeByMovingIntersection(Vertex* oldIntersect, Vertex* newIntersect) override
+	{
+		if (*V1 == *oldIntersect)
+			V1 = newIntersect;
+		else if (*V2 == *oldIntersect)
+			V2 = newIntersect;
+		else if (*V3 == *oldIntersect)
+			V3 = newIntersect;
+		else if (*V4 == *oldIntersect)
+			V4 = newIntersect;
+		else
+			assert(false && "This quadrilateral does not have this vertex.");
+		Init();
 	}
 
 	static ReferenceCartesianShape<2>* InitReferenceShape()
@@ -101,6 +129,10 @@ public:
 	inline DomPoint Center() const override
 	{
 		return _center;
+	}
+	inline bool IsConvex() const override
+	{
+		return true;
 	}
 	inline double InRadius() const override
 	{
@@ -199,7 +231,7 @@ public:
 				assert(false);
 		}
 		if (abs(t) > 1.1 || abs(u) > 1.1)
-			assert(false);
+			assert(false && "The point is not included in the quadrilateral");
 		return RefPoint(t, u);
 	}
 
@@ -241,6 +273,14 @@ public:
 
 		RefPoint urRef = q.ConvertToReference(upperRight);
 		assert(urRef == RefPoint(1, 1));
+
+
+		Vertex V1(number, 0, 0);
+		Vertex V2(number, 0.13, 0);
+		Vertex V3(number, 0.13, 0.05);
+		Vertex V4(number, 0, 0.05);
+		QuadrilateralShape q2(&V1, &V2, &V3, &V4);
+		DomPoint dom = q.ConvertToDomain(RefPoint(-0.069222, 0.534611));
 	}
 };
 

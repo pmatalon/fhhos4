@@ -23,7 +23,7 @@ public:
 	Tensor<Dim>* DiffTensor = nullptr;
 
 	std::vector<Element<Dim>*> FinerElements;
-	Element<Dim>* CoarserElement;
+	Element<Dim>* CoarserElement = nullptr;
 	std::vector<Face<Dim>*> FinerFacesRemoved;
 
 	Element(BigNumber number)
@@ -54,6 +54,10 @@ public:
 	{
 		return Shape()->Center();
 	}
+	virtual bool IsConvex() const
+	{
+		return Shape()->IsConvex();
+	}
 	virtual double InRadius() const
 	{
 		return Shape()->InRadius();
@@ -61,6 +65,10 @@ public:
 	virtual double Regularity() const
 	{
 		return Shape()->Regularity();
+	}
+	virtual vector<Vertex*> Vertices() const
+	{
+		return Shape()->Vertices();
 	}
 	virtual bool Contains(DomPoint p) const
 	{
@@ -92,12 +100,31 @@ public:
 		this->_facesLocalNumbering.insert(std::pair<Face<Dim>*, int>(face, faceLocalNumber));
 	}
 
+	void RemoveFace(Face<Dim>* f)
+	{
+		int i = 0;
+		for (i = 0; i < this->Faces.size(); i++)
+		{
+			if (this->Faces[i] == f)
+				break;
+		}
+		this->Faces.erase(this->Faces.begin() + i);
+	}
+
+	void InitFaceLocalNumbering()
+	{
+		this->_facesLocalNumbering.clear();
+		int faceLocalNumber = 0;
+		for (Face<Dim>* f : this->Faces)
+			this->_facesLocalNumbering.insert({ f, faceLocalNumber++ });
+	}
+
 	Element<Dim>* ElementOnTheOtherSideOf(Face<Dim>* face)
 	{
 		return face->GetNeighbour(this);
 	}
 	
-	Face<Dim>* InterfaceWith(Element<Dim>* other)
+	Face<Dim>* CommonFaceWith(Element<Dim>* other)
 	{
 		for (Face<Dim>* f1 : this->Faces)
 		{
@@ -110,6 +137,50 @@ public:
 		return nullptr;
 	}
 
+	vector<Face<Dim>*> InterfaceWith(Element<Dim>* other)
+	{
+		vector<Face<Dim>*> faces;
+		for (Face<Dim>* f1 : this->Faces)
+		{
+			for (Face<Dim>* f2 : other->Faces)
+			{
+				if (f1 == f2)
+					faces.push_back(f1);
+			}
+		}
+		return faces;
+	}
+
+	vector<Face<Dim>*> NonCommonFacesWith(Element<Dim>* other)
+	{
+		vector<Face<Dim>*> faces;
+		for (Face<Dim>* f1 : this->Faces)
+		{
+			bool otherAlsoHasIt = false;
+			for (Face<Dim>* f2 : other->Faces)
+			{
+				if (f1 == f2)
+				{
+					otherAlsoHasIt = true;
+					break;
+				}
+			}
+			if (!otherAlsoHasIt)
+				faces.push_back(f1);
+		}
+		return faces;
+	}
+
+	bool HasFace(Face<Dim>* face)
+	{
+		for (Face<Dim>* f : this->Faces)
+		{
+			if (f == face)
+				return true;
+		}
+		return false;
+	}
+
 	bool HasVertex(Vertex* v, bool compareCoordinates = false)
 	{
 		return this->Shape()->HasVertex(v, compareCoordinates);
@@ -120,6 +191,37 @@ public:
 		return this->Shape()->HasSameVertices(other->Shape(), compareCoordinates);
 	}
 
+	bool IsIn(vector<Element<Dim>*> list)
+	{
+		for (Element<Dim>* e : list)
+		{
+			if (e == this)
+				return true;
+		}
+		return false;
+	}
+
+	// Replace faces with their agglomeration //
+	void ReplaceFaces(vector<Face<Dim>*> faces, Face<Dim>* mergedFace)
+	{
+		vector<Face<Dim>*> currentFaces(this->Faces);
+		this->Faces.clear();
+		for (Face<Dim>* f : currentFaces)
+		{
+			if (!f->IsIn(faces))
+				this->Faces.push_back(f);
+		}
+		this->Faces.push_back(mergedFace);
+
+		RemoveIntersections(faces, mergedFace);
+	}
+
+protected:
+	virtual void RemoveIntersections(vector<Face<Dim>*> oldFaces, Face<Dim>* newFace)
+	{
+		assert(false);
+	}
+public:
 	int LocalNumberOf(Element<Dim>* finerElement)
 	{
 		for (int i = 0; i < this->FinerElements.size(); i++)
@@ -276,24 +378,30 @@ public:
 		Shape()->UnitTests();
 
 		// The following tests are valid if the element is convex
-		DomPoint C = this->Center();
-		for (Face<Dim>* f : this->Faces)
+		if (this->IsConvex())
 		{
-			DimVector<Dim> n = this->OuterNormalVector(f);
-			for (Vertex* v : f->Shape()->Vertices())
-			{
-				DimVector<Dim> VC = Vect<Dim>(*v, C);
-				assert(VC.dot(n) < 0);
+			DomPoint C = this->Center();
+			assert(this->Contains(C) && "The element does not contain its centroid."); // comment this line if Contains() is not implemented
 
-				for (Vertex* v2 : f->Shape()->Vertices())
+			for (Face<Dim>* f : this->Faces)
+			{
+				DimVector<Dim> n = this->OuterNormalVector(f);
+				for (Vertex* v : f->Shape()->Vertices())
 				{
-					if (v2 != v)
+					DimVector<Dim> VC = Vect<Dim>(*v, C);
+					assert(VC.dot(n) < 0);
+
+					for (Vertex* v2 : f->Shape()->Vertices())
 					{
-						DimVector<Dim> V1V2 = Vect<Dim>(v, v2);
-						assert(abs(V1V2.dot(n)) < 1e-15);
+						if (v2 != v)
+						{
+							DimVector<Dim> V1V2 = Vect<Dim>(v, v2);
+							assert(abs(V1V2.dot(n)) < 1e-15);
+						}
 					}
 				}
 			}
 		}
+
 	}
 };

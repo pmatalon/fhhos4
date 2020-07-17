@@ -33,6 +33,8 @@ public:
 		Init();
 	}
 
+	TriangleIn3DShape(const TriangleIn3DShape& shape) = default;
+
 	void Init()
 	{
 		DimVector<3> v12 = Vect<3>(V1, V2);
@@ -75,6 +77,11 @@ public:
 		_inverseMapping = mapping.inverse();
 	}
 
+	GeometricShapeWithReferenceShape<2>* CreateCopy() const
+	{
+		return new TriangleIn3DShape(*this);
+	}
+
 	ReferenceShape<2>* RefShape() const
 	{
 		return &TriangleShape::RefTriangle;
@@ -83,6 +90,11 @@ public:
 	inline vector<Vertex*> Vertices() const override
 	{
 		return vector<Vertex*> { V1, V2, V3 };
+	}
+
+	bool IsDegenerated() const override
+	{
+		assert(false && "To implement");
 	}
 
 	static ReferenceTriangle* InitReferenceShape()
@@ -101,6 +113,10 @@ public:
 	inline DomPoint Center() const override
 	{
 		return _center;
+	}
+	inline bool IsConvex() const override
+	{
+		return true;
 	}
 	inline double InRadius() const override
 	{

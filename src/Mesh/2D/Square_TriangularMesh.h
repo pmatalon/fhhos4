@@ -268,7 +268,7 @@ public:
 		//else if (strategy == CoarseningStrategy::AgglomerationCoarsening)
 			//CoarsenByAgglomerationAndKeepFineFaces();
 		else
-			Utils::FatalError("Coarsening strategy not implemented!");
+			PolyhedralMesh<2>::CoarsenMesh(strategy);
 
 		if (this->_diffusionPartition)
 			this->CoarseMesh->SetDiffusionCoefficient(this->_diffusionPartition);

@@ -20,10 +20,17 @@ public:
 		Init();
 	}
 
+	EdgeShape(const EdgeShape& shape) = default;
+
 	inline void Init()
 	{
 		_width = sqrt(pow(Vertex2->X - Vertex1->X, 2) + pow(Vertex2->Y - Vertex1->Y, 2));
 		_center = DomPoint((Vertex1->X + Vertex2->X) / 2, (Vertex1->Y + Vertex2->Y) / 2);
+	}
+	
+	GeometricShapeWithReferenceShape<1>* CreateCopy() const
+	{
+		return new EdgeShape(*this);
 	}
 
 	inline ReferenceShape<1>* RefShape() const override
@@ -34,6 +41,11 @@ public:
 	inline vector<Vertex*> Vertices() const override
 	{
 		return vector<Vertex*> {Vertex1, Vertex2};
+	}
+
+	bool IsDegenerated() const override
+	{
+		return *Vertex1 == *Vertex2;
 	}
 
 	inline double Diameter() const override
@@ -47,6 +59,10 @@ public:
 	inline DomPoint Center() const override
 	{
 		return _center;
+	}
+	inline bool IsConvex() const override
+	{
+		return true;
 	}
 	inline double InRadius() const override
 	{

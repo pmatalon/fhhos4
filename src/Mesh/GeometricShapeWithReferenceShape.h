@@ -2,6 +2,7 @@
 #include "ReferenceShape.h"
 #include "../Problem/Tensor.h"
 
+// Must be renamed in DomainShape
 template <int Dim>
 class GeometricShapeWithReferenceShape : public GeometricShape<Dim>
 {
@@ -12,11 +13,16 @@ public:
 	//   Virtual functions   //
 	//-----------------------//
 
+	// Geometry
 	virtual ReferenceShape<Dim>* RefShape() const = 0;
 
 	virtual vector<Vertex*> Vertices() const = 0;
 
+	virtual bool IsConvex() const = 0;
+
 	virtual bool Contains(DomPoint p) const = 0;
+
+	virtual bool IsDegenerated() const = 0;
 
 	// Transformation to reference element
 	virtual DomPoint ConvertToDomain(RefPoint refPoint) const = 0; // Mapping
@@ -25,6 +31,8 @@ public:
 	virtual DimMatrix<Dim> InverseJacobianTranspose(RefPoint p) const = 0;
 	virtual double DetJacobian(RefPoint p) const = 0;
 	virtual int DetJacobianDegree() const = 0;
+
+	virtual GeometricShapeWithReferenceShape<Dim>* CreateCopy() const = 0;
 
 	//--------------------//
 	//      Geometry      //
@@ -51,6 +59,51 @@ public:
 				return false;
 		}
 		return true;
+	}
+
+	bool Contains(GeometricShapeWithReferenceShape<Dim>* other)
+	{
+		if (!this->Contains(other->Center()))
+			return false;
+
+		for (auto v : other->Vertices())
+		{
+			if (!this->HasVertex(v, true) && !this->Contains(*v))
+				return false;
+		}
+
+		return true;
+	}
+
+	// For squares, triangles, etc, just one subshape: itself.
+	// For polyhedra: decomposition into simplices.
+	// For agglomerates: list of shapes forming the agglomerate.
+	virtual bool IsMadeOfSubShapes() const
+	{
+		return false;
+	}
+	virtual vector<GeometricShapeWithReferenceShape<Dim>*> SubShapes() const
+	{
+		assert(false);
+	}
+	virtual void ExportSubShapesToMatlab() const
+	{
+		assert(false);
+	}
+
+	virtual void ReshapeByMovingIntersection(Vertex* oldIntersect, Vertex* newIntersect)
+	{
+		assert(false && "To be implemented in subclasses");
+	}
+
+	bool IsIn(vector<GeometricShapeWithReferenceShape<Dim>*> list)
+	{
+		for (GeometricShapeWithReferenceShape<Dim>* s : list)
+		{
+			if (s == this)
+				return true;
+		}
+		return false;
 	}
 
 	//-------------------//

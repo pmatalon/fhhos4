@@ -132,6 +132,8 @@
     <ClInclude Include="src\Mesh\3D\TetrahedronShape.h" />
     <ClInclude Include="src\Mesh\3D\TriangleIn3DShape.h" />
     <ClInclude Include="src\Mesh\3D\TriangularFace.h" />
+    <ClInclude Include="src\Mesh\AgglomerateElement.h" />
+    <ClInclude Include="src\Mesh\AgglomerateShape.h" />
     <ClInclude Include="src\Mesh\CartesianElement.h" />
     <ClInclude Include="src\Mesh\CartesianFace.h" />
     <ClInclude Include="src\Mesh\CartesianShape.h" />
@@ -197,7 +199,9 @@
     <ClInclude Include="src\Utils\Geometry.h" />
     <ClInclude Include="src\Utils\Keast\Keast.h" />
     <ClInclude Include="src\Utils\Keast\tetrahedron_keast_rule.hpp" />
+    <ClInclude Include="src\Utils\MatlabScript.h" />
     <ClInclude Include="src\Utils\ParallelLoop.h" />
+    <ClInclude Include="src\Utils\RotatingList.h" />
     <ClInclude Include="src\Utils\Timer.h" />
     <ClInclude Include="src\Utils\Types.h" />
   </ItemGroup>

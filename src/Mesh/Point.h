@@ -82,4 +82,9 @@ public:
 	DomPoint(double x) : Point(x) {}
 	DomPoint(double x, double y) : Point(x, y) {}
 	DomPoint(double x, double y, double z) : Point(x, y, z) {}
+
+	static DomPoint Middle(DomPoint A, DomPoint B)
+	{
+		return DomPoint((A.X + B.X) / 2, (A.Y + B.Y) / 2, (A.Z + B.Z) / 2);
+	}
 };

@@ -40,6 +40,16 @@ public:
 		return ifile.good();
 	}
 
+	template <typename T>
+	static inline vector<T> Join(vector<T> A, vector<T> B)
+	{
+		vector<T> AB;
+		AB.reserve(A.size() + B.size()); // preallocate memory
+		AB.insert(AB.end(), A.begin(), A.end());
+		AB.insert(AB.end(), B.begin(), B.end());
+		return AB;
+	}
+
 	static string BeginRed;
 	static string BeginGreen;
 	static string BeginYellow;

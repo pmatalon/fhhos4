@@ -32,7 +32,7 @@ private:
 		Diff_HHOFace<Dim>(number, element1, element2),
 		Face<Dim>(number, element1,  element2)
 	{
-		_shape = shape;
+		_shape = new CartesianShape<Dim, Dim - 1>(*shape);
 	}
 
 public:
@@ -48,7 +48,7 @@ public:
 
 	Face<Dim>* CreateSameGeometricFace(BigNumber number, Element<Dim>* element1)
 	{
-		Face<Dim>* copy = new CartesianFace<Dim>(number, element1, NULL, _shape);
+		Face<Dim>* copy = new CartesianFace<Dim>(number, element1, nullptr, _shape);
 		copy->IsDomainBoundary = this->IsDomainBoundary;
 		return copy;
 	}
@@ -74,7 +74,10 @@ public:
 	virtual ~CartesianFace()
 	{
 		if (_shape)
+		{
 			delete _shape;
+			_shape = nullptr;
+		}
 	}
 
 };

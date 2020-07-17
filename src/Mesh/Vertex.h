@@ -25,6 +25,16 @@ public:
 		this->Number = number;
 	}
 
+	bool IsIn(vector<Vertex*> list)
+	{
+		for (Vertex* v : list)
+		{
+			if (v == this)
+				return true;
+		}
+		return false;
+	}
+
 	virtual ~Vertex() {}
 };
 
@@ -52,6 +62,12 @@ template<int Dim>
 DimVector<Dim> Vect(Vertex* A, Vertex* B)
 {
 	return Vect<Dim>(*A, *B);
+}
+
+template<int Dim>
+DimVector<Dim> Vect(Vertex* A, Point B)
+{
+	return Vect<Dim>(*A, B);
 }
 
 template<int Dim>

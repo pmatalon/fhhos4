@@ -340,10 +340,28 @@ public:
 
 		if ((args.Actions & Action::UnitTests) == Action::UnitTests)
 		{
-			mesh->CoarsenMesh(args.Solver.MG.CoarseningStgy);
-			mesh->SanityCheck();
-			//cout << *mesh << endl << endl;
-			//cout << "Coarse mesh" << endl << *(mesh->CoarseMesh) << endl << endl;
+			if (args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("cgmg") == 0 || args.Solver.SolverCode.compare("fcgmg") == 0)
+			{
+				mesh->ExportFacesToMatlab(args.OutputDirectory + "/fine.dat");
+
+				// 1st coarsening
+				mesh->CoarsenMesh(args.Solver.MG.CoarseningStgy);
+				mesh->CoarseMesh->ExportFacesToMatlab(args.OutputDirectory + "/coarse1.dat");
+				mesh->CoarseMesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_coarse1.m");
+				mesh->SanityCheck();
+				// 2nd coarsening
+				mesh->CoarseMesh->CoarsenMesh(args.Solver.MG.CoarseningStgy);
+				mesh->CoarseMesh->CoarseMesh->ExportFacesToMatlab(args.OutputDirectory + "/coarse2.dat");
+				mesh->CoarseMesh->CoarseMesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_coarse2.m");
+				mesh->SanityCheck();
+				// 3rd coarsening
+				mesh->CoarseMesh->CoarseMesh->CoarsenMesh(args.Solver.MG.CoarseningStgy);
+				mesh->CoarseMesh->CoarseMesh->CoarseMesh->ExportFacesToMatlab(args.OutputDirectory + "/coarse3.dat");
+				mesh->CoarseMesh->CoarseMesh->CoarseMesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_coarse3.m");
+				mesh->SanityCheck();
+				//cout << *mesh << endl << endl;
+				//cout << "Coarse mesh" << endl << *(mesh->CoarseMesh) << endl << endl;
+			}
 		}
 
 		//----------------------//
@@ -611,51 +629,56 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 	BigNumber ny = args.Discretization.Ny == -1 ? args.Discretization.N : args.Discretization.Ny;
 	string meshCode = args.Discretization.MeshCode;
 	double stretch = args.Discretization.Stretch;
-	CoarseningStrategy refinementStgy = args.Solver.MG.CoarseningStgy;
 
+	CoarseningStrategy refinementStgy = args.Solver.MG.CoarseningStgy;
+	if (args.Solver.MG.CoarseningStgy != CoarseningStrategy::BeyRefinement && args.Solver.MG.CoarseningStgy != CoarseningStrategy::SplittingRefinement)
+		refinementStgy = CoarseningStrategy::SplittingRefinement;
+
+	Mesh<2>* fineMesh = nullptr;
 	if (meshCode.compare("cart") == 0)
-		return new Square_CartesianMesh(nx, ny);
+		fineMesh = new Square_CartesianMesh(nx, ny);
 	else if (meshCode.compare("cart-poly") == 0)
-		return new Square_CartesianPolygonalMesh(nx, ny);
+		fineMesh = new Square_CartesianPolygonalMesh(nx, ny);
 	else if (meshCode.compare("tri") == 0)
-		return new Square_TriangularMesh(nx, ny);
+		fineMesh = new Square_TriangularMesh(nx, ny);
 	else if (meshCode.compare("quad") == 0)
-		return new Square_QuadrilateralMesh(nx, ny, stretch);
+		fineMesh = new Square_QuadrilateralMesh(nx, ny, stretch);
 	else if (meshCode.compare("quad-poly") == 0)
-		return new Square_QuadrilateralAsPolygonalMesh(nx, ny, stretch);
+		fineMesh = new Square_QuadrilateralAsPolygonalMesh(nx, ny, stretch);
 #ifdef GMSH_ENABLED
 	else if (meshCode.compare("gmsh-cart") == 0)
 	{
 		Mesh<2>* coarseMesh = new Square_GMSHCartesianMesh();
-		Mesh<2>* fineMesh = coarseMesh->RefineUntilNElements(nx*ny, refinementStgy);
-		return fineMesh;
+		fineMesh = coarseMesh->RefineUntilNElements(nx*ny, refinementStgy);
 	}
 	else if (meshCode.compare("gmsh-tri") == 0)
 	{
 		Mesh<2>* coarseMesh = new Square_GMSHTriangularMesh();
-		Mesh<2>* fineMesh = coarseMesh->RefineUntilNElements(2*nx*ny, refinementStgy);
-		return fineMesh;
+		fineMesh = coarseMesh->RefineUntilNElements(2*nx*ny, refinementStgy);
 	}
 	else if (meshCode.compare("gmsh-uns-tri") == 0)
 	{
 		Mesh<2>* coarseMesh = new Square_GMSHUnstructuredTriangularMesh();
-		Mesh<2>* fineMesh = coarseMesh->RefineUntilNElements(2*nx*ny, refinementStgy);
-		return fineMesh;
+		fineMesh = coarseMesh->RefineUntilNElements(2*nx*ny, refinementStgy);
 	}
 	else if (meshCode.compare("gmsh-quad") == 0)
 	{
 		Mesh<2>* coarseMesh = new Square_GMSHQuadrilateralMesh();
-		Mesh<2>* fineMesh = coarseMesh->RefineUntilNElements(nx*ny, refinementStgy);
-		return fineMesh;
+		fineMesh = coarseMesh->RefineUntilNElements(nx*ny, refinementStgy);
 	}
 	else if (meshCode.compare("gmsh") == 0)
 	{
 		Mesh<2>* coarseMesh = new GMSHMesh<2>(args.Discretization.MeshFilePath);
-		Mesh<2>* fineMesh = coarseMesh->RefineUntilNElements(2*nx*ny, refinementStgy);
-		return fineMesh;
+		fineMesh = coarseMesh->RefineUntilNElements(2*nx*ny, refinementStgy);
 	}
 #endif // GMSH_ENABLED
-	assert(false);
+	else
+		assert(false);
+	
+	if (args.Solver.MG.CoarseningStgy != CoarseningStrategy::BeyRefinement && args.Solver.MG.CoarseningStgy != CoarseningStrategy::SplittingRefinement && fineMesh->CoarseMesh)
+		fineMesh->DeleteCoarseMeshes();
+
+	return fineMesh;
 }
 
 template <>

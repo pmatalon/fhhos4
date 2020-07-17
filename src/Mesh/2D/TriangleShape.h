@@ -2,6 +2,7 @@
 #include "../Vertex.h"
 #include "../ReferenceTriangle.h"
 #include "../GeometricShapeWithConstantJacobian.h"
+#include "../../Utils/Geometry.h"
 using namespace std;
 
 class TriangleShape : public GeometricShapeWithConstantJacobian<2>
@@ -30,6 +31,8 @@ public:
 		Init();
 	}
 
+	TriangleShape(const TriangleShape& shape) = default;
+
 	void Init()
 	{
 		double lengthEdge12 = sqrt(pow(V2->X - V1->X, 2) + pow(V2->Y - V1->Y, 2));
@@ -53,6 +56,11 @@ public:
 		_inverseJacobianTranspose = inverseJacobian.transpose();
 	}
 
+	GeometricShapeWithReferenceShape<2>* CreateCopy() const
+	{
+		return new TriangleShape(*this);
+	}
+
 	ReferenceShape<2>* RefShape() const
 	{
 		return &RefTriangle;
@@ -61,6 +69,27 @@ public:
 	inline vector<Vertex*> Vertices() const override
 	{
 		return vector<Vertex*> { V1, V2, V3 };
+	}
+
+	bool IsDegenerated() const override
+	{
+		DimVector<2> V1V2 = Vect<2>(V1, V2);
+		DimVector<2> V1V3 = Vect<2>(V1, V3);
+		double cross = V1V2[0] * V1V3[1] - V1V2[1] * V1V3[0];
+		return abs(cross) < Point::Tolerance;
+	}
+
+	void ReshapeByMovingIntersection(Vertex* oldIntersect, Vertex* newIntersect) override
+	{
+		if (*V1 == *oldIntersect)
+			V1 = newIntersect;
+		else if (*V2 == *oldIntersect)
+			V2 = newIntersect;
+		else if (*V3 == *oldIntersect)
+			V3 = newIntersect;
+		else
+			assert(false && "This triangle does not have this vertex.");
+		Init();
 	}
 
 	static ReferenceTriangle* InitReferenceShape()
@@ -80,13 +109,17 @@ public:
 	{
 		return _center;
 	}
+	inline bool IsConvex() const override
+	{
+		return true;
+	}
 	inline double InRadius() const override
 	{
 		return _inRadius;
 	}
 	inline bool Contains(DomPoint p) const override
 	{
-		assert(false && "Not implemented");
+		return Geometry::IsInTriangle(*V1, *V2, *V3, p, _measure, _diameter);
 	}
 
 	inline double DetJacobian() const

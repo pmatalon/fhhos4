@@ -34,6 +34,8 @@ public:
 		Init();
 	}
 
+	TetrahedronShape(const TetrahedronShape& shape) = default;
+
 	void Init()
 	{
 		DimVector<3> v12 = Vect<3>(V1, V2);
@@ -76,6 +78,11 @@ public:
 		//assert(abs(_detJacobian - 1 / inverseJacobian.determinant()) < 1e-14);
 	}
 
+	GeometricShapeWithReferenceShape<3>* CreateCopy() const
+	{
+		return new TetrahedronShape(*this);
+	}
+
 	ReferenceShape<3>* RefShape() const
 	{
 		return &RefTetra;
@@ -84,6 +91,11 @@ public:
 	inline vector<Vertex*> Vertices() const override
 	{
 		return vector<Vertex*> { V1, V2, V3, V4 };
+	}
+
+	bool IsDegenerated() const override
+	{
+		assert(false && "To implement");
 	}
 
 	static ReferenceTetrahedron* InitReferenceShape()
@@ -102,6 +114,10 @@ public:
 	inline DomPoint Center() const override
 	{
 		return _center;
+	}
+	inline bool IsConvex() const override
+	{
+		return true;
 	}
 	inline double InRadius() const override
 	{

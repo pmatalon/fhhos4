@@ -36,6 +36,8 @@ public:
 	//   Constructors   //
 	//------------------//
 
+	CartesianShape(const CartesianShape &) = default; // Copy constructor
+
 	CartesianShape(DomPoint* origin, double width)
 	{
 		assert(width > 0);
@@ -173,6 +175,16 @@ public:
 	//       Geometric information         //
 	//-------------------------------------//
 
+	GeometricShapeWithReferenceShape<ShapeDim>* CreateCopy() const
+	{
+		return new CartesianShape<DomainDim,ShapeDim>(*this);
+	}
+
+	void ReshapeByMovingIntersection(Vertex* oldIntersect, Vertex* newIntersect) override
+	{
+		assert(false && "Cannot be reshaped. Must create a new shape (in 2D, a QuadrilateralShape)");
+	}
+
 	ReferenceShape<ShapeDim>* RefShape() const
 	{
 		return &RefCartShape;
@@ -188,6 +200,11 @@ public:
 	inline vector<Vertex*> Vertices() const override
 	{
 		return _vertices;
+	}
+
+	bool IsDegenerated() const override
+	{
+		assert(false && "To implement");
 	}
 
 	static ReferenceCartesianShape<ShapeDim>* InitReferenceShape()
@@ -207,13 +224,20 @@ public:
 	{
 		return _center;
 	}
+	inline bool IsConvex() const override
+	{
+		return true;
+	}
 	double InRadius() const override
 	{
 		return _inRadius;
 	}
 	inline bool Contains(DomPoint p) const override
 	{
-		assert(false && "Not implemented");
+		if (DomainDim == 2 && ShapeDim == 2)
+			return (Origin->X <= p.X && p.X <= Origin->X + WidthX) && (Origin->Y <= p.Y && p.Y <= Origin->Y + WidthY);
+		else
+			assert(false && "Not implemented");
 	}
 
 	void Serialize(ostream& os) const

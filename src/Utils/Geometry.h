@@ -1,32 +1,10 @@
 #pragma once
-#include "../Mesh/2D/TriangleShape.h"
 #include "../Mesh/2D/QuadrilateralShape.h"
 using namespace std;
 
 class Geometry
 {
 public:
-	static vector<TriangleShape*> Triangulation(vector<Vertex*> vertices)
-	{
-		vector<TriangleShape*> triangles;
-
-		double sumX = 0;
-		double sumY = 0;
-		for (Vertex* v : vertices)
-		{
-			sumX += v->X;
-			sumY += v->Y;
-		}
-
-		Vertex* center = new Vertex(0, sumX / vertices.size(), sumY / vertices.size());
-
-		for (int i = 0; i < vertices.size(); i++)
-		{
-			TriangleShape* subTriangle = new TriangleShape(vertices[i], vertices[(i + 1) % vertices.size()], center);
-			triangles.push_back(subTriangle);
-		}
-		return triangles;
-	}
 
 	static QuadrilateralShape* CreateBoundingBox(vector<Vertex*> vertices)
 	{
@@ -77,7 +55,8 @@ public:
 	{
 		DimVector<2> AB = B - A;
 		DimVector<2> AP = P - A;
-		return AB.dot(AP) > 0 && AB.dot(AP) < AB.dot(AB);
+		double AB_dot_AP = AB.dot(AP);
+		return AB_dot_AP > 0 && AB_dot_AP < AB.dot(AB) && abs(AB_dot_AP - AB.norm()*AP.norm()) < Point::Tolerance;
 	}
 
 	static bool IsInTriangle(DomPoint A, DomPoint B, DomPoint C, DomPoint P, double triangleArea, double triangleDiameter)
@@ -91,7 +70,10 @@ public:
 		double alpha = PB.cross(PC).norm() / (2 * triangleArea);
 		double beta = PC.cross(PA).norm() / (2 * triangleArea);
 		double gamma = PA.cross(PB).norm() / (2 * triangleArea);
-		return (alpha >= 0 && alpha <= 1) && (beta >= 0 && beta <= 1) && (gamma >= 0 && gamma <= 1) && (abs(alpha + beta + gamma -1) < 1e-3 * triangleDiameter);
+		return (alpha >= 0 && alpha <= 1) 
+			&& (beta >= 0 && beta <= 1) 
+			&& (gamma >= 0 && gamma <= 1) 
+			&& (abs(alpha + beta + gamma -1) < 1e-3 * triangleDiameter);
 	}
 
 	static bool IsInTetrahedron(DomPoint A, DomPoint B, DomPoint C, DomPoint D, DomPoint P, double tetraVolume, double tetraDiameter)
@@ -100,7 +82,11 @@ public:
 		double beta = VolumeTetra(A, P, C, D) / tetraVolume;
 		double gamma = VolumeTetra(A, B, P, D) / tetraVolume;
 		double delta = VolumeTetra(A, B, C, P) / tetraVolume;
-		return (alpha >= 0 && alpha <= 1) && (beta >= 0 && beta <= 1) && (gamma >= 0 && gamma <= 1) && (delta >= 0 && delta <= 1) && (abs(alpha + beta + gamma + delta - 1) < 1e-3 * tetraDiameter);
+		return (alpha >= 0 && alpha <= 1) 
+			&& (beta >= 0 && beta <= 1) 
+			&& (gamma >= 0 && gamma <= 1) 
+			&& (delta >= 0 && delta <= 1) 
+			&& (abs(alpha + beta + gamma + delta - 1) < 1e-3 * tetraDiameter);
 	}
 
 	static double VolumeTetra(DomPoint A, DomPoint B, DomPoint C, DomPoint D)

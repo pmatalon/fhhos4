@@ -60,6 +60,8 @@ public:
 	{
 		this->HHO = hho;
 
+		this->InitFaceLocalNumbering();
+
 		this->_cellMassMatrix = this->CellMassMatrix(hho->CellBasis);
 		DenseMatrix Nt = this->CellReconstructMassMatrix(hho->CellBasis, hho->ReconstructionBasis);
 		this->_projFromReconstruct = _cellMassMatrix.inverse() * Nt;

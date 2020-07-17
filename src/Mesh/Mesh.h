@@ -3,6 +3,7 @@
 #include "Element.h"
 #include "Face.h"
 #include "../Utils/ParallelLoop.h"
+#include "../Utils/MatlabScript.h"
 using namespace std;
 
 struct CoarseningStrategyDetails
@@ -83,11 +84,44 @@ public:
 
 	void AddFace(Face<Dim>* f)
 	{
+		if (f->Number == -1)
+			f->Number = this->Faces.size();
+
 		this->Faces.push_back(f);
 		if (f->IsDomainBoundary)
 			this->BoundaryFaces.push_back(f);
 		else
 			this->InteriorFaces.push_back(f);
+	}
+
+	void RemoveFace(Face<Dim>* f)
+	{
+		BigNumber iToRemove = f->Number;
+		assert(this->Faces[iToRemove] == f);
+		this->Faces.erase(this->Faces.begin() + f->Number);
+		for (int i = iToRemove; i < this->Faces.size(); i++)
+			this->Faces[i]->Number = i;
+
+		// TODO: optimize
+		BigNumber i = 0;
+		if (f->IsDomainBoundary)
+		{
+			for (i = 0; i < this->BoundaryFaces.size(); i++)
+			{
+				if (this->BoundaryFaces[i] == f)
+					break;
+			}
+			this->BoundaryFaces.erase(this->BoundaryFaces.begin() + i);
+		}
+		else
+		{
+			for (i = 0; i < this->InteriorFaces.size(); i++)
+			{
+				if (this->InteriorFaces[i] == f)
+					break;
+			}
+			this->InteriorFaces.erase(this->InteriorFaces.begin() + i);
+		}
 	}
 
 	double SkeletonMeasure()
@@ -134,6 +168,9 @@ public:
 
 	void SetBoundaryConditions(BoundaryConditions* bc)
 	{
+		if (!this->DirichletFaces.empty() || !this->NeumannFaces.empty())
+			return;
+
 		this->_boundaryConditions = bc;
 
 		ParallelLoop<Face<Dim>*, EmptyResultChunk> parallelLoop(this->BoundaryFaces);
@@ -141,7 +178,7 @@ public:
 			{
 				f->SetBoundaryConditions(bc);
 			});
-
+		
 		for (auto f : this->BoundaryFaces)
 		{
 			if (f->HasDirichletBC())
@@ -167,6 +204,12 @@ public:
 			f->ExportFaceToMatlab(file);
 		fclose(file);
 		cout << "Faces exported to \t" << filePath << endl;
+	}
+	void ExportElementCentersToMatlab(string filePath)
+	{
+		MatlabScript script(filePath);
+		for (auto e : this->Elements)
+			script.PlotText(e->Center(), to_string(e->Number), "r");
 	}
 
 	void LinkFacesToCoarseFaces()
@@ -222,8 +265,8 @@ public:
 				fineFace->IsRemovedOnCoarserGrid = coarseElement1 == coarseElement2;
 				if (!fineFace->IsRemovedOnCoarserGrid)
 				{
-					// TODO: change InterfaceWith so it returns a vector of faces (local refinement)
-					Face<Dim>* coarseFace = coarseElement1->InterfaceWith(coarseElement2);
+					// TODO: change CommonFaceWith so it returns a vector of faces (local refinement)
+					Face<Dim>* coarseFace = coarseElement1->CommonFaceWith(coarseElement2);
 					assert(coarseFace != nullptr);
 					fineFace->CoarseFace = coarseFace;
 					coarseFace->FinerFaces.push_back(fineFace);
@@ -251,9 +294,10 @@ public:
 	virtual void SanityCheck()
 	{
 		for (auto e : this->Elements)
-		{
 			e->UnitTests();
 
+		for (auto e : this->Elements)
+		{
 			for (auto f : e->Faces)
 			{
 				auto n = e->OuterNormalVector(f);
@@ -262,6 +306,29 @@ public:
 				if (neighbour != nullptr)
 				{
 					auto n2 = neighbour->OuterNormalVector(f);
+					if (abs(n.dot(n2) + 1) >= 1e-15)
+					{
+						// Analysis of the problem
+						cout << "Problem with normal vectors at " << *f << endl;
+						cout << "One of them is not pointing outwards." << endl;
+						double d = abs(n.dot(n2) + 1);
+						auto c = e->Center();
+						if (e->Shape()->IsMadeOfSubShapes())
+						{
+							cout << "Matlab script to plot the subshapes of element " << e->Number << ":" << endl;
+							e->Shape()->ExportSubShapesToMatlab();
+							cout << endl;
+						}
+						if (neighbour->Shape()->IsMadeOfSubShapes())
+						{
+							cout << "Matlab script to plot the subshapes of element " << neighbour->Number << ":" << endl;
+							neighbour->Shape()->ExportSubShapesToMatlab();
+							cout << endl;
+						}
+						n = e->OuterNormalVector(f);
+						n2 = neighbour->OuterNormalVector(f);
+						e->UnitTests();
+					}
 					assert(abs(n.dot(n2) + 1) < 1e-15);
 				}
 				else
@@ -397,6 +464,22 @@ public:
 			mesh = mesh->FineMesh;
 		}
 		return mesh;
+	}
+
+	void DeleteCoarseMeshes()
+	{
+		delete this->CoarseMesh;
+		this->CoarseMesh = nullptr;
+
+		for (Element<Dim>* e : this->Elements)
+			e->CoarserElement = nullptr;
+		for (Face<Dim>* f : this->Faces)
+		{
+			f->CoarseFace = nullptr;
+			f->IsRemovedOnCoarserGrid = false;
+		}
+
+		this->ComesFrom = CoarseningStrategyDetails(CoarseningStrategy::None);
 	}
 
 	virtual ~Mesh() 

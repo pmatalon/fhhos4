@@ -324,6 +324,8 @@ public:
 			os << "standard" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarsening)
 			os << "agglomeration" << endl;
+		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByMostCoplanarFaces)
+			os << "agglomeration by most coplanar faces" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::SplittingRefinement)
 			os << "GMSH refinement by splitting from coarse mesh" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::BeyRefinement)

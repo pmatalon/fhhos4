@@ -1,6 +1,7 @@
 #pragma once
 #include "../../Utils/Geometry.h"
 #include "../CartesianShape.h"
+#include "TriangleShape.h"
 using namespace std;
 
 class PolygonalShape : public GeometricShapeWithReferenceShape<2>
@@ -13,7 +14,7 @@ private:
 	Vertex* _center;
 	double _inRadius;
 
-	vector<TriangleShape*> _triangulation;
+	vector<GeometricShapeWithReferenceShape<2>*> _triangulation;
 	QuadrilateralShape* _boundingBox;
 
 public:
@@ -24,6 +25,8 @@ public:
 		assert(vertices.size() >= 3);
 		Init();
 	}
+
+	PolygonalShape(const PolygonalShape& shape) = default;
 
 	void Init()
 	{
@@ -47,15 +50,65 @@ public:
 		
 		_center = new Vertex(0, sumX / _vertices.size(), sumY / _vertices.size());
 
-		_triangulation = Geometry::Triangulation(_vertices);
+		_triangulation = Triangulation(_vertices);
 
 		_boundingBox = Geometry::CreateBoundingBox(_vertices);
 
 		_measure = 0;
-		for (TriangleShape* t : _triangulation)
+		for (GeometricShapeWithReferenceShape<2>* t : _triangulation)
 			_measure += t->Measure();
 
+		// TODO
 		_inRadius = 0;
+	}
+
+	static vector<GeometricShapeWithReferenceShape<2>*> Triangulation(vector<Vertex*> vertices)
+	{
+		// Requirement: the polygon defined by the vertices must be convex!
+
+		vector<GeometricShapeWithReferenceShape<2>*> triangles;
+
+		double sumX = 0;
+		double sumY = 0;
+		for (Vertex* v : vertices)
+		{
+			sumX += v->X;
+			sumY += v->Y;
+		}
+
+		Vertex* center = new Vertex(-1, sumX / vertices.size(), sumY / vertices.size());
+
+		if (vertices.size() == 3)
+		{
+			TriangleShape* triangle = new TriangleShape(vertices[0], vertices[1], vertices[2]);
+			triangles.push_back(triangle);
+		}
+		else
+		{
+			for (int i = 0; i < vertices.size(); i++)
+			{
+				TriangleShape* subTriangle = new TriangleShape(vertices[i], vertices[(i + 1) % vertices.size()], center);
+				triangles.push_back(subTriangle);
+			}
+		}
+		return triangles;
+	}
+
+	GeometricShapeWithReferenceShape<2>* CreateCopy() const
+	{
+		PolygonalShape* copy = new PolygonalShape(*this);
+		copy->_triangulation = Triangulation(copy->_vertices);
+		copy->_boundingBox = static_cast<QuadrilateralShape*>(this->_boundingBox->CreateCopy());
+		return copy;
+	}
+
+	bool IsMadeOfSubShapes() const override
+	{
+		return true;
+	}
+	vector<GeometricShapeWithReferenceShape<2>*> SubShapes() const override
+	{
+		return _triangulation;
 	}
 
 	ReferenceShape<2>* RefShape() const
@@ -66,6 +119,11 @@ public:
 	inline vector<Vertex*> Vertices() const override
 	{
 		return _vertices;
+	}
+
+	bool IsDegenerated() const override
+	{
+		assert(false && "To implement");
 	}
 
 	inline double Diameter() const override
@@ -80,13 +138,33 @@ public:
 	{
 		return *_center;
 	}
+	inline bool IsConvex() const override
+	{
+		if (_vertices.size() < 4)
+			return true;
+		// Not convex if a cord is outside the shape
+		for (int i = 0; i < _vertices.size(); i++)
+		{
+			for (int j = i + 1; j < _vertices.size(); j++)
+			{
+				if (!Contains(DomPoint::Middle(*_vertices[i], *_vertices[j])))
+					return false;
+			}
+		}
+		return true;
+	}
 	inline double InRadius() const override
 	{
 		return _inRadius;
 	}
 	inline bool Contains(DomPoint p) const override
 	{
-		assert(false && "Not implemented");
+		for (GeometricShapeWithReferenceShape<2>* t : _triangulation)
+		{
+			if (t->Contains(p))
+				return true;
+		}
+		return false;
 	}
 
 	double Integral(RefFunction boundingBoxDefinedFunction) const override
@@ -99,7 +177,7 @@ public:
 		};
 
 		double integral = 0;
-		for (TriangleShape* t : _triangulation)
+		for (GeometricShapeWithReferenceShape<2>* t : _triangulation)
 			integral += t->Integral(boundingBoxFunction);
 		return integral;
 	}
@@ -114,7 +192,7 @@ public:
 		};
 
 		double integral = 0;
-		for (TriangleShape* t : _triangulation)
+		for (GeometricShapeWithReferenceShape<2>* t : _triangulation)
 			integral += t->Integral(boundingBoxFunction, polynomialDegree);
 		return integral;
 	}
@@ -149,7 +227,7 @@ public:
 
 	~PolygonalShape()
 	{
-		for (TriangleShape* t : _triangulation)
+		for (GeometricShapeWithReferenceShape<2>* t : _triangulation)
 			delete t;
 		delete _center;
 		delete _boundingBox;

@@ -193,7 +193,11 @@ void print_usage() {
 	cout << "      Coarsening strategy of the multigrid." << endl;
 	cout << "              s   - standard coarsening (merge colinear faces on the coarse mesh)" << endl;
 	cout << "              a   - agglomeration coarsening (keep fine faces on the coarse mesh)" << endl;
-	cout << "              f   - face coarsening: the faces are coarsened and all kept on the coarse skeleton. Requires -g 1." << endl;
+	cout << "              l   - agglomeration coarsening by most colinear/coplanar faces" << endl;
+	cout << "              c   - (experimental) agglomeration coarsening by closest center" << endl;
+	cout << "              i   - (experimental) agglomeration coarsening by largest interface" << endl;
+	cout << "              p   - (experimental) agglomeration coarsening by seed points" << endl;
+	cout << "              f   - (experimental) face coarsening: the faces are coarsened and all kept on the coarse skeleton. Requires -g 1." << endl;
 	cout << "              r   - fine meshes obtained by structured refinement of the coarse mesh using a splitting method" << endl;
 	cout << "              b   - fine meshes obtained by structured refinement of the coarse mesh using the Bey method" << endl;
 	cout << endl;
@@ -579,12 +583,6 @@ int main(int argc, char* argv[])
 			case OPT_CoarseningStrategy:
 			{
 				string coarseningStgyCode = optarg;
-				if (coarseningStgyCode.compare("s") != 0 && 
-					coarseningStgyCode.compare("a") != 0 &&
-					coarseningStgyCode.compare("f") != 0 &&
-					coarseningStgyCode.compare("r") != 0 && 
-					coarseningStgyCode.compare("b") != 0)
-					argument_error("unknown coarsening strategy code '" + coarseningStgyCode + "'. Check -cs argument.");
 				args.Solver.MG.CoarseningStgyCode = coarseningStgyCode;
 				break;
 			}
@@ -727,12 +725,22 @@ int main(int argc, char* argv[])
 		args.Solver.MG.CoarseningStgy = CoarseningStrategy::StandardCoarsening;
 	else if (args.Solver.MG.CoarseningStgyCode.compare("a") == 0)
 		args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarsening;
+	else if (args.Solver.MG.CoarseningStgyCode.compare("l") == 0)
+		args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByMostCoplanarFaces;
+	else if (args.Solver.MG.CoarseningStgyCode.compare("c") == 0)
+		args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByClosestCenter;
+	else if (args.Solver.MG.CoarseningStgyCode.compare("i") == 0)
+		args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByLargestInterface;
+	else if (args.Solver.MG.CoarseningStgyCode.compare("p") == 0)
+		args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningBySeedPoints;
 	else if (args.Solver.MG.CoarseningStgyCode.compare("f") == 0)
 		args.Solver.MG.CoarseningStgy = CoarseningStrategy::FaceCoarsening;
 	else if (args.Solver.MG.CoarseningStgyCode.compare("r") == 0)
 		args.Solver.MG.CoarseningStgy = CoarseningStrategy::SplittingRefinement;
 	else if (args.Solver.MG.CoarseningStgyCode.compare("b") == 0)
 		args.Solver.MG.CoarseningStgy = CoarseningStrategy::BeyRefinement;
+	else
+		argument_error("unknown coarsening strategy code '" + args.Solver.MG.CoarseningStgyCode + "'. Check -cs argument.");
 
 	if ((args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("pcgmg") == 0) && args.Solver.MG.CoarseningStgy == CoarseningStrategy::FaceCoarsening && !args.Solver.MG.UseGalerkinOperator)
 		argument_error("To use the face coarsening, you must also use the Galerkin operator. To do so, add option -g 1.");
