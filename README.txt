@@ -1,6 +1,10 @@
+#### Install CGAL and its dependencies
+
+>   sudo apt-get install libcgal-dev
+
 #### Use CMake to build the makefile
 
->	cmake -G "Unix Makefiles" -DENABLE_GMSH=ON -DENABLE_AGMG=OFF
+>	cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DENABLE_GMSH=ON -DENABLE_AGMG=OFF
 
 #### Compile
 
@@ -8,7 +12,7 @@
 
 #### Launch program
 
->	./bin/dghho -d 2 -discr hho -a s -n 8 -p 1
+>	./bin/Release/dghho -d 2 -discr hho -mesh cart -n 8 -p 2
 
 #### Help
 

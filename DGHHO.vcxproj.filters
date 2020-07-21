@@ -373,7 +373,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <Text Include="CMakeLists.txt" />
     <Text Include="README.txt" />
+    <Text Include="CMakeLists.txt" />
   </ItemGroup>
 </Project>

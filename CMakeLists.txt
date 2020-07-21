@@ -1,9 +1,9 @@
-cmake_minimum_required (VERSION 2.8)
+cmake_minimum_required (VERSION 3.1)
 
 project(dghho)
 
 option(ENABLE_GMSH "Build with the GMSH interface" OFF)
-option(ENABLE_AGMG "Build with the AGMG" OFF)
+option(ENABLE_AGMG "Build with AGMG" OFF)
 
 set(EXECUTABLE_OUTPUT_PATH bin/${CMAKE_BUILD_TYPE})
 
@@ -19,6 +19,19 @@ file(
 add_executable(dghho ${source_files})
 #add_executable(dghho "${PROJECT_SOURCE_DIR}/src/main.cpp")
 
+# Include CGAL
+#add_definitions(-DCGAL_DIR="${CMAKE_SOURCE_DIR}/cgal")
+#include_directories("/usr/include/CGAL")
+#find_library(CGAL_LIB NAMES CGAL)
+#if(CGAL_LIB)
+#	message(STATUS "Found CGAL: ${CGAL_LIB}")
+#else()
+#	message(FATAL_ERROR "CGAL not found.")
+#endif()
+#target_link_libraries(dghho CGAL)
+find_package(CGAL REQUIRED COMPONENTS Core)
+target_link_libraries(dghho CGAL::CGAL CGAL::CGAL_Core)
+
 # Include Eigen
 include_directories(eigen-eigen-b3f3d4950030)
 
@@ -27,12 +40,10 @@ if (ENABLE_GMSH)
 	include_directories(${CMAKE_SOURCE_DIR}/gmsh-4.4.1-Linux64-sdk/include)
 	find_library(GMSH_LIB NAMES gmsh PATHS "${CMAKE_SOURCE_DIR}/gmsh-4.4.1-Linux64-sdk/lib")
 	if(GMSH_LIB)
-		#link_directories(${CMAKE_SOURCE_DIR}/gmsh-4.4.1-Linux64-sdk/lib)
-		#target_link_libraries(dghho "-lgmsh")
-		target_link_libraries(dghho "${GMSH_LIB}")
+		target_link_libraries(dghho "${GMSH_LIB}") # -lgmsh
 		add_definitions(-DGMSH_ENABLED)
 	else()
-		message(FATAL_ERROR "GMSH not found. Must be compiled and put in ${CMAKE_SOURCE_DIR}/gmsh-4.4.1-Linux64-sdk/lib")
+		message(FATAL_ERROR "GMSH not found. Must be compiled and put in a standard directory or in ${CMAKE_SOURCE_DIR}/gmsh-4.4.1-Linux64-sdk/lib")
 	endif()
 	message(STATUS "GMSH enabled")
 else()
@@ -45,7 +56,7 @@ find_package(Threads REQUIRED)
 target_link_libraries(dghho Threads::Threads)
 
 # c++ flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g") # uncomment this line and comment the one above to use Valgrind
 
 # Include AGMG (requires Blas and Lapack)

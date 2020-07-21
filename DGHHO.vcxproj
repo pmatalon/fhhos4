@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
-    <ProjectConfiguration Include="Debug|ARM">
+    <!--<ProjectConfiguration Include="Debug|ARM">
       <Configuration>Debug</Configuration>
       <Platform>ARM</Platform>
     </ProjectConfiguration>
@@ -24,7 +24,7 @@
     <ProjectConfiguration Include="Release|x86">
       <Configuration>Release</Configuration>
       <Platform>x86</Platform>
-    </ProjectConfiguration>
+    </ProjectConfiguration>-->
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
       <Platform>x64</Platform>
@@ -216,10 +216,11 @@
       </AdditionalOptions>
       <Verbose>true</Verbose>
       <PreprocessorDefinitions>GMSH_ENABLED</PreprocessorDefinitions>
+      <CppLanguageStandard>c++14</CppLanguageStandard>
     </ClCompile>
     <Link>
       <AdditionalOptions>-fopenmp %(AdditionalOptions)</AdditionalOptions>
-      <LibraryDependencies>gmsh</LibraryDependencies>
+      <LibraryDependencies>gmsh;gmp;gmpxx;mpfr;boost_thread;boost_system;boost_chrono;boost_date_time;boost_atomic</LibraryDependencies>
       <AdditionalLibraryDirectories>/mnt/c/Users/pierr/Documents/Source/Repos/dghho/gmsh-4.4.1-Linux64-sdk/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <ShowProgress>false</ShowProgress>
       <VerboseOutput>false</VerboseOutput>

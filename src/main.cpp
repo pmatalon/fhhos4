@@ -623,8 +623,10 @@ int main(int argc, char* argv[])
 		else if (args.Discretization.MeshCode.compare("tetra") == 0 ||
 			args.Discretization.MeshCode.compare("gmsh-tetra") == 0)
 			args.Problem.Dimension = 3;
+#ifdef GMSH_ENABLED
 		else if (args.Discretization.MeshCode.compare("gmsh") == 0)
 			args.Problem.Dimension = GMSHMesh<2>::GetDimension(args.Discretization.MeshFilePath);
+#endif
 		else
 			argument_error("The dimension of the domain is missing. Please define it with option -d.");
 	}
