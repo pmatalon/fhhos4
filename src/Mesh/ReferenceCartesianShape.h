@@ -33,6 +33,12 @@ public:
 		return DomPoint(0);
 	}
 
+	vector<RefPoint> QuadraturePoints() const
+	{
+		GaussLegendre* gs = GaussLegendre::Get(GaussLegendre::MAX_POINTS);
+		return gs->QuadraturePoints<Dim>();
+	}
+
 	double Integral(RefFunction func, int polynomialDegree) const override
 	{
 		if (Dim == 0)

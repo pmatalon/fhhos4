@@ -321,17 +321,19 @@ public:
 
 		os << "\t" << "Coarsening strategy: ";
 		if (CoarseningStgy == CoarseningStrategy::StandardCoarsening)
-			os << "standard" << endl;
+			os << "standard [-cs s]" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarsening)
-			os << "agglomeration" << endl;
+			os << "agglomeration [-cs a]" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByMostCoplanarFaces)
-			os << "agglomeration by most coplanar faces" << endl;
+			os << "agglomeration by most coplanar faces [-cs l]" << endl;
+		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface)
+			os << "agglomeration by largest interface [-cs i]" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::SplittingRefinement)
-			os << "GMSH refinement by splitting from coarse mesh" << endl;
+			os << "GMSH refinement by splitting from coarse mesh [-cs r]" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::BeyRefinement)
-			os << "Bey's refinement from coarse mesh" << endl;
+			os << "Bey's refinement from coarse mesh [-cs b]" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::FaceCoarsening)
-			os << "face coarsening" << endl;
+			os << "face coarsening [-cs f]" << endl;
 		else
 			os << "unknown" << endl;
 

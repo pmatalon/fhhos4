@@ -328,6 +328,7 @@ public:
 						n = e->OuterNormalVector(f);
 						n2 = neighbour->OuterNormalVector(f);
 						e->UnitTests();
+						assert(false && "Problem with normal vectors: one of them is not pointing outwards.");
 					}
 					assert(abs(n.dot(n2) + 1) < 1e-15);
 				}

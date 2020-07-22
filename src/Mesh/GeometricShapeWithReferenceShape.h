@@ -110,6 +110,15 @@ public:
 	//     Integrals     //
 	//-------------------//
 
+	vector<DomPoint> QuadraturePoints() const
+	{
+		vector<RefPoint> refPoints = RefShape()->QuadraturePoints();
+		vector<DomPoint> domPoints;
+		for (RefPoint refPoint : refPoints)
+			domPoints.push_back(this->ConvertToDomain(refPoint));
+		return domPoints;
+	}
+
 	double Integral(BasisFunction<Dim>* phi) const
 	{
 		return GeometricShape<Dim>::Integral(phi);

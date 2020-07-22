@@ -29,3 +29,14 @@ enum class CoarseningStrategy : unsigned
 	SplittingRefinement,
 	BeyRefinement
 };
+
+enum class Prolongation : unsigned
+{
+	CellInterp_Trace = 1,
+	CellInterp_Inject_Trace = 6,
+	CellInterp_L2proj_Trace = 7,
+	CellInterp_InjectAndTrace = 2,
+	CellInterp_Inject_Adjoint = 3,
+	Wildey = 4,
+	FaceInject = 5
+};

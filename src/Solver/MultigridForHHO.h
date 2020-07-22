@@ -8,13 +8,13 @@ template <int Dim>
 class LevelForHHO : public Level
 {
 private:
-	int _prolongationCode = 1;
+	Prolongation _prolongationCode = Prolongation::CellInterp_Trace;
 	FunctionalBasis<Dim>* _cellInterpolationBasis;
 	string _weightCode = "k";
 public:
 	Diffusion_HHO<Dim>* _problem;
 
-	LevelForHHO(int number, Diffusion_HHO<Dim>* problem, int prolongationCode, FunctionalBasis<Dim>* cellInterpolationBasis, string weightCode)
+	LevelForHHO(int number, Diffusion_HHO<Dim>* problem, Prolongation prolongationCode, FunctionalBasis<Dim>* cellInterpolationBasis, string weightCode)
 		: Level(number)
 	{
 		this->_problem = problem;
@@ -83,7 +83,7 @@ private:
 
 	void OnStartSetup() override
 	{
-		if (_prolongationCode == 5)
+		if (_prolongationCode == Prolongation::FaceInject)
 			cout << "\t\tMesh                : " << this->_problem->_mesh->Faces.size() << " faces" << endl;
 		else
 			cout << "\t\tMesh                : " << this->_problem->_mesh->Elements.size() << " elements, regularity = " << this->_problem->_mesh->Regularity() << endl;
@@ -107,31 +107,91 @@ private:
 		Diffusion_HHO<Dim>* finePb = this->_problem;
 		Diffusion_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
 
-		if (_prolongationCode == 1)
+		if (_prolongationCode == Prolongation::CellInterp_Trace)
 		{
+			//----------------------------------------------------------//
+			//                       Default method                     //
+			// Step 1: Interpolation from coarse faces to coarse cells. //
+			// Step 2: Trace on the fine faces.                         //
+			//----------------------------------------------------------//
+
 			SparseMatrix I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
-			//SparseMatrix J_f_c = GetGlobalCanonicalInjectionMatrixCoarseToFineElements();
-			//SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
 			SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCoarseCellsToFineFaces();
 
 			if (ExportMatrices)
 			{
 				Level::ExportMatrix(I_c, "I_c");
-				//Level::ExportMatrix(J_f_c, "J_f_c");
 				Level::ExportMatrix(Pi_f, "Pi_f");
 
 				SparseMatrix SolveCellUnknowns = GetSolveCellUnknownsMatrix(coarsePb);
 				Level::ExportMatrix(SolveCellUnknowns, "SolveCellUnknowns");
 			}
 
-			//P = Pi_f * J_f_c * I_c;
 			P = Pi_f * I_c;
 		}
-		else if (_prolongationCode == 2)
+		else if (_prolongationCode == Prolongation::CellInterp_Inject_Trace)
 		{
+			//----------------------------------------------------------//
+			//          Same method, other implementation               //
+			// Step 1: Interpolation from coarse faces to coarse cells. //
+			// Step 2: Canonical injection from coarse to fine cells.   //
+			// Step 3: Trace on the fine faces.                         //
+			//----------------------------------------------------------//
+
 			SparseMatrix I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
-			//SparseMatrix J_f_c = GetGlobalCanonicalInjectionMatrixCoarseToFineElements();
-			//SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
+			SparseMatrix J_f_c = GetGlobalCanonicalInjectionMatrixCoarseToFineElements();
+			SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
+
+			if (ExportMatrices)
+			{
+				Level::ExportMatrix(I_c, "I_c");
+				Level::ExportMatrix(J_f_c, "J_f_c");
+				Level::ExportMatrix(Pi_f, "Pi_f");
+
+				SparseMatrix SolveCellUnknowns = GetSolveCellUnknownsMatrix(coarsePb);
+				Level::ExportMatrix(SolveCellUnknowns, "SolveCellUnknowns");
+			}
+
+			P = Pi_f * J_f_c * I_c;
+		}
+		else if (_prolongationCode == Prolongation::CellInterp_L2proj_Trace)
+		{
+			//---------------------------------------------------------------------//
+			//                      Non-nested variant                             //
+			// Step 1: Interpolation from coarse faces to coarse cells.            //
+			// Step 2: Instead of the canonical injection which is now impossible, //
+			//         L2-projection onto the fine cells.                          //
+			// Step 3: Trace on the fine faces.                                    //
+			//---------------------------------------------------------------------//
+
+			ElementParallelLoop<Dim> parallelLoop(coarsePb->_mesh->Elements);
+			parallelLoop.Execute([](Element<Dim>* ce, ParallelChunk<CoeffsChunk>* chunk)
+				{
+					ce->SetOverlappingFineElements();
+				});
+
+			SparseMatrix I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
+			SparseMatrix J_f_c = GetGlobalL2ProjectionMatrixCoarseToFineElements();
+			SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
+
+			if (ExportMatrices)
+			{
+				Level::ExportMatrix(I_c, "I_c");
+				Level::ExportMatrix(J_f_c, "J_f_c");
+				Level::ExportMatrix(Pi_f, "Pi_f");
+			}
+
+			P = Pi_f * J_f_c * I_c;
+		}
+		else if (_prolongationCode == Prolongation::CellInterp_InjectAndTrace)
+		{
+			//---------------------------------------------------------------------------------------------//
+			// Step 1: Interpolation from coarse faces to coarse cells.                                    //
+			// Step 2: On faces present on both fine and coarse meshes, we keep the polynomials identical. //
+			//         On faces interior to coarse elements, trace of the cell polynomials.                //
+			//---------------------------------------------------------------------------------------------//
+
+			SparseMatrix I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
 			SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCoarseCellsToFineFaces();
 
 			SparseMatrix J_faces = GetGlobalCanonicalInjectionMatrixCoarseToFineFaces();
@@ -139,7 +199,6 @@ private:
 			if (ExportMatrices)
 			{
 				Level::ExportMatrix(I_c, "I_c");
-				//Level::ExportMatrix(J_f_c, "J_f_c");
 				Level::ExportMatrix(Pi_f, "Pi_f");
 				Level::ExportMatrix(J_faces, "J_faces");
 
@@ -147,7 +206,6 @@ private:
 				Level::ExportMatrix(SolveCellUnknowns, "SolveCellUnknowns");
 			}
 
-			//SparseMatrix P_algo1 = Pi_f * J_f_c * I_c;
 			SparseMatrix P_algo1 = Pi_f * I_c;
 			
 			int nFaceUnknowns = finePb->HHO->nFaceUnknowns;
@@ -167,8 +225,15 @@ private:
 			P = SparseMatrix(finePb->HHO->nInteriorFaces * nFaceUnknowns, coarsePb->HHO->nInteriorFaces * nFaceUnknowns);
 			parallelLoop.Fill(P);
 		}
-		else if (_prolongationCode == 3)
+		else if (_prolongationCode == Prolongation::CellInterp_Inject_Adjoint)
 		{
+			//-------------------------------------------------------------//
+			//                           Daniel's                          //
+			// Step 1: Interpolation from coarse faces to coarse cells.    //
+			// Step 2: Canonical injection from coarse to fine cells.      //
+			// Step 2: Adjoint of the same interpolation on the fine mesh. //
+			//-------------------------------------------------------------//
+
 			SparseMatrix I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
 			SparseMatrix J_f_c = GetGlobalCanonicalInjectionMatrixCoarseToFineElements();
 			SparseMatrix K_f = GetGlobalMatrixFindFacesWhichReconstructCells(finePb);
@@ -182,9 +247,14 @@ private:
 
 			P = K_f * J_f_c * I_c;
 		}
-		else if (_prolongationCode == 4)
+		else if (_prolongationCode == Prolongation::Wildey)
 		{
-			// Wildey et al. //
+			//-------------------------------------------------------------------------------------------------//
+			//                                           Wildey et al.                                         //
+			// The coarse level is built by static condensation of the fine faces interior to coarse elements. //
+			// The prolongation solves those condensed unknowns.                                               //
+			//-------------------------------------------------------------------------------------------------//
+
 			int nFaceUnknowns = finePb->HHO->nFaceUnknowns;
 
 			ElementParallelLoop<Dim> parallelLoop(coarsePb->_mesh->Elements);
@@ -225,8 +295,13 @@ private:
 			P = SparseMatrix(finePb->HHO->nInteriorFaces * nFaceUnknowns, coarsePb->HHO->nInteriorFaces * nFaceUnknowns);
 			parallelLoop.Fill(P);
 		}
-		else if (_prolongationCode == 5)
+		else if (_prolongationCode == Prolongation::FaceInject)
 		{
+			//----------------------------------------------------------------//
+			// Canonical injection from coarse faces to fine faces.           //
+			// Implemented to be used with the face coarsening (option -cs f) //
+			//----------------------------------------------------------------//
+
 			SparseMatrix J_faces = GetGlobalCanonicalInjectionMatrixCoarseToFineFaces();
 			P = J_faces;
 		}
@@ -549,6 +624,37 @@ private:
 		return J_f_c;
 	}
 
+	SparseMatrix GetGlobalL2ProjectionMatrixCoarseToFineElements()
+	{
+		Diffusion_HHO<Dim>* finePb = this->_problem;
+		Diffusion_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
+		Mesh<Dim>* coarseMesh = coarsePb->_mesh;
+
+		int nCellUnknowns = _cellInterpolationBasis->Size();
+
+		ElementParallelLoop<Dim> parallelLoop(coarseMesh->Elements);
+		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nCellUnknowns);
+
+		parallelLoop.Execute([this, nCellUnknowns](Element<Dim>* ce, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				Diff_HHOElement<Dim>* coarseElement = dynamic_cast<Diff_HHOElement<Dim>*>(ce);
+
+				DenseMatrix local_J_f_c = coarseElement->ComputeL2ProjectionMatrixCoarseToFine(_cellInterpolationBasis);
+				for (auto fineElement : coarseElement->OverlappingFineElements)
+				{
+					BigNumber coarseElemGlobalNumber = coarseElement->Number;
+					BigNumber fineElemGlobalNumber = fineElement->Number;
+					BigNumber fineElemLocalNumber = coarseElement->LocalNumberOfOverlapping(fineElement);
+
+					chunk->Results.Coeffs.Add(fineElemGlobalNumber*nCellUnknowns, coarseElemGlobalNumber*nCellUnknowns, local_J_f_c.block(fineElemLocalNumber*nCellUnknowns, 0, nCellUnknowns, nCellUnknowns));
+				}
+			});
+
+		SparseMatrix J_f_c(finePb->HHO->nElements * nCellUnknowns, coarsePb->HHO->nElements * nCellUnknowns);
+		parallelLoop.Fill(J_f_c);
+		return J_f_c;
+	}
+
 	SparseMatrix GetGlobalCanonicalInjectionMatrixCoarseToFineFaces()
 	{
 		Diffusion_HHO<Dim>* finePb = this->_problem;
@@ -594,16 +700,16 @@ class MultigridForHHO : public Multigrid
 {
 private:
 	Diffusion_HHO<Dim>* _problem;
-	int _prolongationCode = 1;
+	Prolongation _prolongationCode = Prolongation::CellInterp_Trace;
 	FunctionalBasis<Dim>* _cellInterpolationBasis;
 	string _weightCode = "k";
 public:
 
-	MultigridForHHO(Diffusion_HHO<Dim>* problem, int prolongationCode, FunctionalBasis<Dim>* cellInterpolationBasis, string weightCode)
+	MultigridForHHO(Diffusion_HHO<Dim>* problem, Prolongation prolongationCode, FunctionalBasis<Dim>* cellInterpolationBasis, string weightCode)
 		: MultigridForHHO(problem, prolongationCode, cellInterpolationBasis, weightCode, 0)
 	{}
 
-	MultigridForHHO(Diffusion_HHO<Dim>* problem, int prolongationCode, FunctionalBasis<Dim>* cellInterpolationBasis, string weightCode, int nLevels)
+	MultigridForHHO(Diffusion_HHO<Dim>* problem, Prolongation prolongationCode, FunctionalBasis<Dim>* cellInterpolationBasis, string weightCode, int nLevels)
 		: Multigrid(nLevels)
 	{
 		this->_problem = problem;
@@ -617,21 +723,38 @@ public:
 	void BeginSerialize(ostream& os) const override
 	{
 		os << "MultigridForHHO" << endl;
-		os << "\t" << "Prolongation       : " << _prolongationCode << endl;
-		if (_prolongationCode != 5)
+		os << "\t" << "Prolongation       : ";
+		if (_prolongationCode == Prolongation::CellInterp_Trace)
+			os << "coarse cell interpolation + trace on fine faces ";
+		else if (_prolongationCode == Prolongation::CellInterp_Inject_Trace)
+			os << "coarse cell interpolation + injection coarse to fine cells + trace on fine faces ";
+		else if (_prolongationCode == Prolongation::CellInterp_L2proj_Trace)
+			os << "coarse cell interpolation + L2-projection to fine cells + trace on fine faces ";
+		else if (_prolongationCode == Prolongation::CellInterp_InjectAndTrace)
+			os << "injection for common faces, and coarse cell interpolation + trace for the other ";
+		else if (_prolongationCode == Prolongation::CellInterp_Inject_Adjoint)
+			os << "coarse cell interpolation + injection coarse to fine cells + adjoint of cell interpolation ";
+		else if (_prolongationCode == Prolongation::Wildey)
+			os << "Wildey et al. ";
+		else if (_prolongationCode == Prolongation::FaceInject)
+			os << "injection coarse to fine faces ";
+		os << "[-prolong " << (unsigned)_prolongationCode << "]" << endl;
+
+		if (_prolongationCode != Prolongation::FaceInject)
 		{
 			os << "\t" << "Cell interpolation : ";
 			if (_cellInterpolationBasis == _problem->HHO->CellBasis)
-				os << "k";
+				os << "k [-cell-interp 2]";
 			else if (_cellInterpolationBasis == _problem->HHO->ReconstructionBasis)
-				os << "k+1";
+				os << "k+1 [-cell-interp 1]";
 			os << endl;
 		}
+
 		os << "\t" << "Weighting          : ";
 		if (_weightCode.compare("k") == 0)
-			os << "proportional to the diffusion coefficient (code k)";
+			os << "proportional to the diffusion coefficient [-weight k]";
 		else if (_weightCode.compare("a") == 0)
-			os << "simple average (code a)";
+			os << "simple average [-weight a]";
 		os << endl;
 	}
 

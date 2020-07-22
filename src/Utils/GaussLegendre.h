@@ -664,6 +664,37 @@ public:
 		return sum;
 	}
 
+	template <int Dim>
+	vector<RefPoint> QuadraturePoints()
+	{
+		vector<RefPoint> points;
+		if (Dim == 1)
+		{
+			for (int i = 0; i < this->nPoints; i++)
+				points.push_back(RefPoint(this->points[i]));
+		}
+		else if (Dim == 2)
+		{
+			for (int i = 0; i < this->nPoints; i++)
+			{
+				for (int j = 0; j < this->nPoints; j++)
+					points.push_back(RefPoint(this->points[i], this->points[j]));
+			}
+		}
+		else if (Dim == 3)
+		{
+			for (int i = 0; i < this->nPoints; i++)
+			{
+				for (int j = 0; j < this->nPoints; j++)
+				{
+					for (int k = 0; k < this->nPoints; k++)
+						points.push_back(RefPoint(this->points[i], this->points[j], this->points[k]));
+				}
+			}
+		}
+		return points;
+	}
+
 	static void Init()
 	{
 		if (_saved.size() == 0)

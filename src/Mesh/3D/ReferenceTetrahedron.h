@@ -36,6 +36,12 @@ public:
 		assert(false);
 	}
 
+	vector<RefPoint> QuadraturePoints() const
+	{
+		Keast keast;
+		return keast.Points();
+	}
+
 	double Integral(RefFunction func) const override
 	{
 		Keast keast;

@@ -62,4 +62,9 @@ public:
 			sum += func(_points[i]) * _weights[i];
 		return sum;
 	}
+
+	inline vector<RefPoint> Points()
+	{
+		return _points;
+	}
 };

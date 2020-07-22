@@ -31,6 +31,12 @@ public:
 		assert(false);
 	}
 
+	vector<RefPoint> QuadraturePoints() const
+	{
+		Dunavant dunavant;
+		return dunavant.Points();
+	}
+
 	double Integral(RefFunction func) const override
 	{
 		Dunavant dunavant;

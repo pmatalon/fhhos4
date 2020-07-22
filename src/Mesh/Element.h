@@ -1,10 +1,12 @@
 #pragma once
 #include <vector>
 #include <map>
+#include <set>
 #include "Vertex.h"
 #include "GeometricShapeWithReferenceShape.h"
 #include "../Problem/SourceFunction.h"
 #include "../Problem/DiffusionPartition.h"
+using namespace std;
 
 template <int Dim>
 class Face;
@@ -14,17 +16,21 @@ template <int Dim>
 class Element 
 {
 private:
-	std::map<Face<Dim>*, int> _facesLocalNumbering;
+	map<Face<Dim>*, int> _facesLocalNumbering;
 public:
 	BigNumber Number;
-	std::vector<Face<Dim>*> Faces;
+	vector<Face<Dim>*> Faces;
 
-	double Kappa = 1; // constant diffusion coefficient (used in DG)
+	// Diffusion coefficient //
+	double Kappa = 1; // constant diffusion coefficient (deprecated but still used in DG)
 	Tensor<Dim>* DiffTensor = nullptr;
 
-	std::vector<Element<Dim>*> FinerElements;
+	// Intergrid links //
+	vector<Element<Dim>*> FinerElements;
 	Element<Dim>* CoarserElement = nullptr;
-	std::vector<Face<Dim>*> FinerFacesRemoved;
+	vector<Face<Dim>*> FinerFacesRemoved;
+	vector<Element<Dim>*> OverlappingFineElements; // Used for non-nested meshes. It contains at least FinerElements.
+
 
 	Element(BigNumber number)
 	{
@@ -232,6 +238,16 @@ public:
 		assert(false);
 	}
 
+	int LocalNumberOfOverlapping(Element<Dim>* finerElement)
+	{
+		for (int i = 0; i < this->OverlappingFineElements.size(); i++)
+		{
+			if (this->OverlappingFineElements[i] == finerElement)
+				return i;
+		}
+		assert(false);
+	}
+
 	inline int LocalNumberOf(Face<Dim>* face)
 	{
 		return this->_facesLocalNumbering[face];
@@ -255,9 +271,57 @@ public:
 		return measure;
 	}
 
+	vector<Element<Dim>*> Neighbours()
+	{
+		set<Element<Dim>*> neighbours;
+		for (Face<Dim>* f : this->Faces)
+		{
+			if (f->IsDomainBoundary)
+				continue;
+			Element<Dim>* neighbour = f->GetNeighbour(this);
+			if (neighbour)
+				neighbours.insert(neighbour);
+		}
+
+		return vector<Element<Dim>*>(neighbours.begin(), neighbours.end());
+	}
+
+	void SetOverlappingFineElements()
+	{
+		set<Element<Dim>*> s;
+		for (auto fe : this->FinerElements)
+			s.insert(fe);
+
+		for (Element<Dim>* neighbour : this->Neighbours())
+		{
+			for (auto fe : neighbour->FinerElements)
+			{
+				if (s.find(fe) == s.end() && fe->Overlaps(this))
+					s.insert(fe);
+			}
+		}
+
+		this->OverlappingFineElements = vector<Element<Dim>*>(s.begin(), s.end());
+	}
+
+	bool Overlaps(Element<Dim>* other)
+	{
+		for (DomPoint p : this->QuadraturePoints())
+		{
+			if (other->Contains(p))
+				return true;
+		}
+		return false;
+	}
+
 	//-------------------//
 	//     Integrals     //
 	//-------------------//
+
+	vector<DomPoint> QuadraturePoints() const
+	{
+		return Shape()->QuadraturePoints();
+	}
 
 	virtual double Integral(BasisFunction<Dim>* phi) const
 	{

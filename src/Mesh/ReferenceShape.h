@@ -30,6 +30,8 @@ public:
 		assert(false);
 	}
 
+	virtual vector<RefPoint> QuadraturePoints() const = 0;
+
 	virtual double Integral(RefFunction func) const = 0;
 	virtual double Integral(RefFunction func, int polynomialDegree) const = 0;
 

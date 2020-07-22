@@ -193,27 +193,43 @@ void print_usage() {
 	cout << "      Coarsening strategy of the multigrid." << endl;
 	cout << "              s   - standard coarsening (merge colinear faces on the coarse mesh)" << endl;
 	cout << "              a   - agglomeration coarsening (keep fine faces on the coarse mesh)" << endl;
-	cout << "              l   - agglomeration coarsening by most colinear/coplanar faces" << endl;
-	cout << "              c   - (experimental) agglomeration coarsening by closest center" << endl;
-	cout << "              i   - (experimental) agglomeration coarsening by largest interface" << endl;
-	cout << "              p   - (experimental) agglomeration coarsening by seed points" << endl;
-	cout << "              f   - (experimental) face coarsening: the faces are coarsened and all kept on the coarse skeleton. Requires -g 1." << endl;
-	cout << "              r   - fine meshes obtained by structured refinement of the coarse mesh using a splitting method" << endl;
+	cout << "              l   - (experimental) agglomeration coarsening by most collinear/coplanar faces (non-nested!)" << endl;
+	cout << "              c   - (experimental) agglomeration coarsening by closest center (non-nested!)" << endl;
+	cout << "              i   - agglomeration coarsening by largest interface (non-nested)" << endl;
+	cout << "              p   - (experimental) agglomeration coarsening by seed points (non-nested!)" << endl;
+	cout << "              f   - face coarsening: the faces are coarsened and all kept on the coarse skeleton. Requires -g 1." << endl;
+	cout << "              r   - fine meshes obtained by structured refinement of the coarse mesh using GMSH's splitting method" << endl;
 	cout << "              b   - fine meshes obtained by structured refinement of the coarse mesh using the Bey method" << endl;
 	cout << endl;
 	cout << "-prolong NUM" << endl;
 	cout << "      How the prolongation operator is built." << endl;
-	cout << "              1  - Step 1: Interpolation from coarse faces to coarse cells (refer to -cell-interp argument)" << endl;
-	cout << "                   Step 2: L2-projection on the fine faces" << endl;
-	cout << "              2  - Step 1: Interpolation from coarse faces to coarse cells (refer to -cell-interp argument)" << endl;
+	cout << "              " << (unsigned)Prolongation::CellInterp_Trace << "  - ";
+	cout <<                    "Step 1: Interpolation from coarse faces to coarse cells (refer to -cell-interp argument)" << endl;
+	cout << "                   Step 2: Trace on the fine faces" << endl;
+	cout << "              " << (unsigned)Prolongation::CellInterp_InjectAndTrace << "  - ";
+	cout <<                    "Step 1: Interpolation from coarse faces to coarse cells (refer to -cell-interp argument)" << endl;
 	cout << "                   Step 2: On faces present on both fine and coarse meshes, we keep the polynomials identical." << endl;
-	cout << "                           On faces interior to coarse elements, L2-projection from the cell polynomials." << endl;
-	cout << "              3  - Step 1: Interpolation from coarse faces to coarse cells" << endl;
-	cout << "                   Step 2: Adjoint of the same interpolation on the fine mesh" << endl;
-	cout << "              4  - Algorithm from Wildey et al.: the coarse level is built by static condensation of the fine faces interior to coarse elements." << endl;
+	cout << "                           On faces interior to coarse elements, trace of the cell polynomials." << endl;
+	cout << "              " << (unsigned)Prolongation::CellInterp_Inject_Adjoint << "  - ";
+	cout <<                    "Step 1: Interpolation from coarse faces to coarse cells (refer to -cell-interp argument)" << endl;
+	cout << "                   Step 2: Canonical injection from coarse to fine cells" << endl;
+	cout << "                   Step 3: Adjoint of the cell interpolation on the fine mesh" << endl;
+	cout << "              " << (unsigned)Prolongation::Wildey << "  - ";
+	cout <<                    "Algorithm from Wildey et al.: the coarse level is built by static condensation of the fine faces interior to coarse elements." << endl;
 	cout << "                   The prolongation solves those condensed unknowns." << endl;
 	cout << "                   To reproduce Wildey et al.'s algorithm, this option should be used with '-g 1 -cycle V,1,1,*2'." << endl;
-	cout << "              5  - Canonical injection from coarse faces to fine faces (implemented to be used with option -cs f)." << endl;
+	cout << "              " << (unsigned)Prolongation::FaceInject << "  - ";
+	cout <<                    "Canonical injection from coarse faces to fine faces (implemented to be used with option -cs f)." << endl;
+	cout << "              " << (unsigned)Prolongation::CellInterp_Inject_Trace << "  - ";
+	cout <<                    "Same as 1, but another implementation:" << endl;
+	cout << "                   Step 1: Interpolation from coarse faces to coarse cells (refer to -cell-interp argument)" << endl;
+	cout << "                   Step 2: Canonical injection from coarse to fine cells" << endl;
+	cout << "                   Step 3: Trace on the fine faces" << endl;
+	cout << "              " << (unsigned)Prolongation::CellInterp_L2proj_Trace << "  - ";
+	cout <<                    "Non-nested variant of " << (unsigned)Prolongation::CellInterp_Trace << " and " << (unsigned)Prolongation::CellInterp_Inject_Trace << ":" << endl;
+	cout << "                   Step 1: Interpolation from coarse faces to coarse cells (refer to -cell-interp argument)" << endl;
+	cout << "                   Step 2: L2-projection onto the fine cells" << endl;
+	cout << "                   Step 3: Trace on the fine faces" << endl;
 	cout << endl;
 	cout << "-cell-interp NUM" << endl;
 	cout << "      In the polongation, degree of the polynomial interpolated on the cells from the faces." << endl;
@@ -553,9 +569,22 @@ int main(int argc, char* argv[])
 			case OPT_ProlongationCode:
 			{
 				int prolongationCode = atoi(optarg);
-				if (prolongationCode < 1 || prolongationCode > 5)
-					argument_error("check -prolong argument. Expecting 1, 2, 3, 4 or 5.");
-				args.Solver.MG.ProlongationCode = prolongationCode;
+				if (prolongationCode == (unsigned)Prolongation::CellInterp_Trace)
+					args.Solver.MG.ProlongationCode = Prolongation::CellInterp_Trace;
+				else if (prolongationCode == (unsigned)Prolongation::CellInterp_InjectAndTrace)
+					args.Solver.MG.ProlongationCode = Prolongation::CellInterp_InjectAndTrace;
+				else if (prolongationCode == (unsigned)Prolongation::CellInterp_Inject_Adjoint)
+					args.Solver.MG.ProlongationCode = Prolongation::CellInterp_Inject_Adjoint;
+				else if (prolongationCode == (unsigned)Prolongation::CellInterp_Inject_Trace)
+					args.Solver.MG.ProlongationCode = Prolongation::CellInterp_Inject_Trace;
+				else if (prolongationCode == (unsigned)Prolongation::CellInterp_L2proj_Trace)
+					args.Solver.MG.ProlongationCode = Prolongation::CellInterp_L2proj_Trace;
+				else if (prolongationCode == (unsigned)Prolongation::FaceInject)
+					args.Solver.MG.ProlongationCode = Prolongation::FaceInject;
+				else if (prolongationCode == (unsigned)Prolongation::Wildey)
+					args.Solver.MG.ProlongationCode = Prolongation::Wildey;
+				else
+					argument_error("unknown prolongation code. Check -prolong argument.");
 				break;
 			}
 			case 'l': 
@@ -682,9 +711,9 @@ int main(int argc, char* argv[])
 		if (args.Discretization.Method.compare("hho") == 0 && args.Discretization.StaticCondensation && args.Problem.Dimension > 1)
 		{
 			args.Solver.SolverCode = "mg";
-			if ((args.Solver.MG.ProlongationCode == 4 || args.Solver.MG.ProlongationCode == 5) && !args.Solver.MG.UseGalerkinOperator)
+			if ((args.Solver.MG.ProlongationCode == Prolongation::Wildey || args.Solver.MG.ProlongationCode == Prolongation::FaceInject) && !args.Solver.MG.UseGalerkinOperator)
 			{
-				Utils::Warning("The multigrid with prolongation code " + to_string(args.Solver.MG.ProlongationCode) + " requires the Galerkin operator. Option -g 0 ignored.");
+				Utils::Warning("The multigrid with prolongation code " + to_string((unsigned)args.Solver.MG.ProlongationCode) + " requires the Galerkin operator. Option -g 0 ignored.");
 				args.Solver.MG.UseGalerkinOperator = true;
 			}
 		}
@@ -705,8 +734,8 @@ int main(int argc, char* argv[])
 	if ((args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("pcgmg") == 0) && args.Discretization.Method.compare("hho") == 0 && !args.Discretization.StaticCondensation)
 		argument_error("Multigrid only applicable if the static condensation is enabled.");
 
-	if ((args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("pcgmg") == 0) && args.Solver.MG.ProlongationCode == 4 && !args.Solver.MG.UseGalerkinOperator)
-		argument_error("To use the prolongationCode 4, you must also use the Galerkin operator. To do so, add option -g 1.");
+	if ((args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("pcgmg") == 0) && args.Solver.MG.ProlongationCode == Prolongation::Wildey && !args.Solver.MG.UseGalerkinOperator)
+		argument_error("To use the prolongationCode " + to_string((unsigned)Prolongation::Wildey) + ", you must also use the Galerkin operator. To do so, add option -g 1.");
 	
 	args.Solver.MG.CoarseningStgy = CoarseningStrategy::StandardCoarsening;
 	if (args.Solver.MG.CoarseningStgyCode.compare("default") == 0)

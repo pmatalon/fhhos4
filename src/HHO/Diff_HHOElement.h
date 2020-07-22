@@ -117,6 +117,44 @@ public:
 		return J;
 	}
 
+	DenseMatrix ComputeL2ProjectionMatrixCoarseToFine(FunctionalBasis<Dim>* cellBasis)
+	{
+		assert(this->OverlappingFineElements.size() > 0);
+		DenseMatrix J(cellBasis->Size() * this->OverlappingFineElements.size(), cellBasis->Size());
+
+		for (auto e : this->OverlappingFineElements)
+		{
+			Diff_HHOElement<Dim>* fineElement = dynamic_cast<Diff_HHOElement<Dim>*>(e);
+
+			DenseMatrix fineCoarseMass(cellBasis->Size(), cellBasis->Size());
+			for (BasisFunction<Dim>* finePhi : cellBasis->LocalFunctions)
+			{
+				for (BasisFunction<Dim>* coarsePhi : cellBasis->LocalFunctions)
+				{
+					RefFunction functionToIntegrate = [this, fineElement, finePhi, coarsePhi](RefPoint fineRefPoint) {
+						DomPoint domPoint = fineElement->ConvertToDomain(fineRefPoint);
+						if (this->Contains(domPoint))
+						{
+							RefPoint coarseRefPoint = this->ConvertToReference(domPoint);
+							return finePhi->Eval(fineRefPoint)*coarsePhi->Eval(coarseRefPoint);
+						}
+						else
+							return 0.0;
+					};
+
+					double integral = fineElement->Integral(functionToIntegrate); // use all quadrature points because it's not a polynomial
+					fineCoarseMass(finePhi->LocalNumber, coarsePhi->LocalNumber) = integral;
+				}
+			}
+
+			DenseMatrix fineMass = fineElement->CellMassMatrix(cellBasis);
+
+			J.block(this->LocalNumberOfOverlapping(fineElement)*cellBasis->Size(), 0, cellBasis->Size(), cellBasis->Size()) = fineMass.inverse() * fineCoarseMass;
+		}
+
+		return J;
+	}
+
 	Vector Reconstruct(Vector hybridVector)
 	{
 		return this->P * hybridVector;
