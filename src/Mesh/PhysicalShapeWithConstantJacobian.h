@@ -2,10 +2,10 @@
 #include "PhysicalShape.h"
 
 template <int Dim>
-class GeometricShapeWithConstantJacobian : public PhysicalShape<Dim>
+class PhysicalShapeWithConstantJacobian : public PhysicalShape<Dim>
 {
 public:
-	GeometricShapeWithConstantJacobian() : PhysicalShape<Dim>() {}
+	PhysicalShapeWithConstantJacobian() : PhysicalShape<Dim>() {}
 
 	//-----------------------//
 	//   Virtual functions   //

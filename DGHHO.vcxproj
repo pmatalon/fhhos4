@@ -138,7 +138,7 @@
     <ClInclude Include="src\Mesh\CartesianFace.h" />
     <ClInclude Include="src\Mesh\CartesianShape.h" />
     <ClInclude Include="src\Mesh\GeometricShape.h" />
-    <ClInclude Include="src\Mesh\GeometricShapeWithConstantJacobian.h" />
+    <ClInclude Include="src\Mesh\PhysicalShapeWithConstantJacobian.h" />
     <ClInclude Include="src\Mesh\PhysicalShape.h" />
     <ClInclude Include="src\Mesh\GMSHMesh.h" />
     <ClInclude Include="src\Mesh\Mesh.h" />

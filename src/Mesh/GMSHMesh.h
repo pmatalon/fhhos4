@@ -94,6 +94,10 @@ private:
 
 	void Build()
 	{
+		//gmsh::vectorpair dimTags;
+		//gmsh::model::getPhysicalGroups(dimTags, Dim);
+
+
 		//----------//
 		// Vertices //
 		//----------//

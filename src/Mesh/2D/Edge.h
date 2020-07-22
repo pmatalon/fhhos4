@@ -4,7 +4,7 @@
 #include "../CartesianShape.h"
 #include "../../Utils/Geometry.h"
 
-class EdgeShape : public GeometricShapeWithConstantJacobian<1>
+class EdgeShape : public PhysicalShapeWithConstantJacobian<1>
 {
 private:
 	double _width;
@@ -13,7 +13,7 @@ public:
 	Vertex* Vertex1;
 	Vertex* Vertex2;
 
-	EdgeShape(Vertex* v1, Vertex* v2) : GeometricShapeWithConstantJacobian<1>()
+	EdgeShape(Vertex* v1, Vertex* v2) : PhysicalShapeWithConstantJacobian<1>()
 	{
 		Vertex1 = v1;
 		Vertex2 = v2;

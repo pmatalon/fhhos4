@@ -1,6 +1,6 @@
 #pragma once
 #include "ReferenceCartesianShape.h"
-#include "GeometricShapeWithConstantJacobian.h"
+#include "PhysicalShapeWithConstantJacobian.h"
 
 enum class CartesianShapeOrientation : unsigned
 {
@@ -13,7 +13,7 @@ enum class CartesianShapeOrientation : unsigned
 };
 
 template <int DomainDim, int ShapeDim = DomainDim>
-class CartesianShape : public GeometricShapeWithConstantJacobian<ShapeDim>
+class CartesianShape : public PhysicalShapeWithConstantJacobian<ShapeDim>
 {
 private:
 	vector<Vertex*> _vertices;
@@ -619,11 +619,11 @@ private:
 public:
 	double Integral(RefFunction func) const override
 	{
-		return GeometricShapeWithConstantJacobian<ShapeDim>::Integral(func);
+		return PhysicalShapeWithConstantJacobian<ShapeDim>::Integral(func);
 	}
 	double Integral(RefFunction func, int polynomialDegree) const override
 	{
-		return GeometricShapeWithConstantJacobian<ShapeDim>::Integral(func, polynomialDegree);
+		return PhysicalShapeWithConstantJacobian<ShapeDim>::Integral(func, polynomialDegree);
 	}
 };
 

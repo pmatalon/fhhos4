@@ -1,10 +1,10 @@
 #pragma once
 #include "../Vertex.h"
 #include "ReferenceTetrahedron.h"
-#include "../GeometricShapeWithConstantJacobian.h"
+#include "../PhysicalShapeWithConstantJacobian.h"
 using namespace std;
 
-class TetrahedronShape : public GeometricShapeWithConstantJacobian<3>
+class TetrahedronShape : public PhysicalShapeWithConstantJacobian<3>
 {
 private:
 	double _diameter;
@@ -179,11 +179,11 @@ public:
 
 	virtual double Integral(DomFunction globalFunction) const
 	{
-		return GeometricShapeWithConstantJacobian<3>::Integral(globalFunction);
+		return PhysicalShapeWithConstantJacobian<3>::Integral(globalFunction);
 	}
 	virtual double Integral(DomFunction globalFunction, int polynomialDegree) const
 	{
-		return GeometricShapeWithConstantJacobian<3>::Integral(globalFunction, polynomialDegree);
+		return PhysicalShapeWithConstantJacobian<3>::Integral(globalFunction, polynomialDegree);
 	}
 
 	//-------------------------------------------------------------------//

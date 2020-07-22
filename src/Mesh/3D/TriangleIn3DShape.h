@@ -1,11 +1,11 @@
 #pragma once
 #include "../Vertex.h"
 #include "../ReferenceTriangle.h"
-#include "../GeometricShapeWithConstantJacobian.h"
+#include "../PhysicalShapeWithConstantJacobian.h"
 #include "../2D/TriangleShape.h"
 using namespace std;
 
-class TriangleIn3DShape : public GeometricShapeWithConstantJacobian<2>
+class TriangleIn3DShape : public PhysicalShapeWithConstantJacobian<2>
 {
 private:
 	double _diameter;
@@ -191,11 +191,11 @@ public:
 
 	virtual double Integral(DomFunction globalFunction) const
 	{
-		return GeometricShapeWithConstantJacobian<2>::Integral(globalFunction);
+		return PhysicalShapeWithConstantJacobian<2>::Integral(globalFunction);
 	}
 	virtual double Integral(DomFunction globalFunction, int polynomialDegree) const
 	{
-		return GeometricShapeWithConstantJacobian<2>::Integral(globalFunction, polynomialDegree);
+		return PhysicalShapeWithConstantJacobian<2>::Integral(globalFunction, polynomialDegree);
 	}
 
 	//-------------------------------------------------------------------//
