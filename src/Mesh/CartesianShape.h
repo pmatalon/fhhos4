@@ -175,7 +175,7 @@ public:
 	//       Geometric information         //
 	//-------------------------------------//
 
-	GeometricShapeWithReferenceShape<ShapeDim>* CreateCopy() const
+	PhysicalShape<ShapeDim>* CreateCopy() const
 	{
 		return new CartesianShape<DomainDim,ShapeDim>(*this);
 	}
@@ -506,7 +506,7 @@ public:
 			return DetJacobian() * pow(invJ(0, 0), 2) * RefCartShape.StiffnessTerm(phi1, phi2);
 		}
 		else
-			return GeometricShapeWithReferenceShape<ShapeDim>::ComputeIntegralGradGrad(phi1, phi2);
+			return PhysicalShape<ShapeDim>::ComputeIntegralGradGrad(phi1, phi2);
 	}
 
 	//-----------------------------//
@@ -521,7 +521,7 @@ public:
 			return DetJacobian() * pow(invJ(0, 0), 2) * RefCartShape.ReconstructKStiffnessTerm(K, phi1, phi2);
 		}
 		else
-			return GeometricShapeWithReferenceShape<ShapeDim>::ComputeIntegralKGradGrad(K, phi1, phi2);
+			return PhysicalShape<ShapeDim>::ComputeIntegralKGradGrad(K, phi1, phi2);
 	}
 
 private:

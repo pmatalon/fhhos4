@@ -194,9 +194,6 @@
     <ClInclude Include="src\Mesh\GeometricShape.h">
       <Filter>Mesh</Filter>
     </ClInclude>
-    <ClInclude Include="src\Mesh\GeometricShapeWithReferenceShape.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
     <ClInclude Include="src\Mesh\2D\TriangleShape.h">
       <Filter>Mesh\2D</Filter>
     </ClInclude>
@@ -332,6 +329,9 @@
     </ClInclude>
     <ClInclude Include="src\Utils\MatlabScript.h">
       <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\PhysicalShape.h">
+      <Filter>Mesh</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

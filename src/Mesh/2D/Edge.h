@@ -28,7 +28,7 @@ public:
 		_center = DomPoint((Vertex1->X + Vertex2->X) / 2, (Vertex1->Y + Vertex2->Y) / 2);
 	}
 	
-	GeometricShapeWithReferenceShape<1>* CreateCopy() const
+	PhysicalShape<1>* CreateCopy() const
 	{
 		return new EdgeShape(*this);
 	}
@@ -160,7 +160,7 @@ public:
 	//                 Face implementation                //
 	//----------------------------------------------------//
 
-	GeometricShapeWithReferenceShape<1>* Shape() const override
+	PhysicalShape<1>* Shape() const override
 	{
 		return _shape;
 	}

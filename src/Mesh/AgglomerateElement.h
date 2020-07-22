@@ -46,7 +46,7 @@ public:
 	//                 Element implementation                //
 	//-------------------------------------------------------//
 
-	GeometricShapeWithReferenceShape<Dim>* Shape() const
+	PhysicalShape<Dim>* Shape() const
 	{
 		return _shape;
 	}
@@ -87,7 +87,7 @@ DimVector<2> AgglomerateElement<2>::OuterNormalVector(Face<2>* face) const
 	// Condition 2: n.AC < 0
 	// Find a 3rd point C inside the element to implement n.AC < 0
 	// (the element's center doesn't work because the polygon might not be convex)
-	GeometricShapeWithReferenceShape<2>* ss = _shape->ClosestSubShape(face->Center());
+	PhysicalShape<2>* ss = _shape->ClosestSubShape(face->Center());
 	DomPoint C = ss->Center();
 	DimVector<2> AC = Vect<2>(A, C);
 	if (n.dot(AC) > 0)

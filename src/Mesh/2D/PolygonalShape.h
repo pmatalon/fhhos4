@@ -19,7 +19,7 @@ typedef std::list<Polygon_2>                                Polygon_list;
 
 
 
-class PolygonalShape : public GeometricShapeWithReferenceShape<2>
+class PolygonalShape : public PhysicalShape<2>
 {
 private:
 	vector<Vertex*> _vertices;
@@ -30,7 +30,7 @@ private:
 	Vertex* _center;
 	double _inRadius;
 
-	vector<GeometricShapeWithReferenceShape<2>*> _triangulation;
+	vector<PhysicalShape<2>*> _triangulation;
 	QuadrilateralShape* _boundingBox;
 
 public:
@@ -101,7 +101,7 @@ public:
 		_boundingBox = Geometry::CreateBoundingBox(_vertices);
 
 		_measure = 0;
-		for (GeometricShapeWithReferenceShape<2>* t : _triangulation)
+		for (PhysicalShape<2>* t : _triangulation)
 			_measure += t->Measure();
 
 		assert(abs(_measure - _cgalPolygon.area()) < 1e-12);
@@ -131,11 +131,11 @@ private:
 			_triangulation = CGALTriangulation();
 	}
 
-	static vector<GeometricShapeWithReferenceShape<2>*> TriangulationByCenter(vector<Vertex*> vertices)
+	static vector<PhysicalShape<2>*> TriangulationByCenter(vector<Vertex*> vertices)
 	{
 		// Requirement: the polygon defined by the vertices must be convex!
 
-		vector<GeometricShapeWithReferenceShape<2>*> triangles;
+		vector<PhysicalShape<2>*> triangles;
 
 		double sumX = 0;
 		double sumY = 0;
@@ -173,9 +173,9 @@ private:
 		// report the error in some way.
 	}*/
 
-	vector<GeometricShapeWithReferenceShape<2>*> CGALTriangulation()
+	vector<PhysicalShape<2>*> CGALTriangulation()
 	{
-		vector<GeometricShapeWithReferenceShape<2>*> triangulation;
+		vector<PhysicalShape<2>*> triangulation;
 
 		Polygon_list partition_polys;
 
@@ -194,7 +194,7 @@ private:
 			}
 			else
 			{
-				vector<GeometricShapeWithReferenceShape<2>*> subTriangles = TriangulationByCenter(vertices);
+				vector<PhysicalShape<2>*> subTriangles = TriangulationByCenter(vertices);
 				for (auto tri : subTriangles)
 					triangulation.push_back(tri);
 			}
@@ -217,7 +217,7 @@ private:
 	}
 
 public:
-	GeometricShapeWithReferenceShape<2>* CreateCopy() const
+	PhysicalShape<2>* CreateCopy() const
 	{
 		PolygonalShape* copy = new PolygonalShape(*this);
 		//copy->_triangulation = Triangulation(copy->_vertices);
@@ -230,7 +230,7 @@ public:
 	{
 		return true;
 	}
-	vector<GeometricShapeWithReferenceShape<2>*> SubShapes() const override
+	vector<PhysicalShape<2>*> SubShapes() const override
 	{
 		return _triangulation;
 	}
@@ -284,7 +284,7 @@ public:
 	}
 	inline bool Contains(DomPoint p) const override
 	{
-		/*for (GeometricShapeWithReferenceShape<2>* t : _triangulation)
+		/*for (PhysicalShape<2>* t : _triangulation)
 		{
 			if (t->Contains(p))
 				return true;
@@ -327,7 +327,7 @@ public:
 		};
 
 		double integral = 0;
-		for (GeometricShapeWithReferenceShape<2>* t : _triangulation)
+		for (PhysicalShape<2>* t : _triangulation)
 			integral += t->Integral(boundingBoxFunction);
 		return integral;
 	}
@@ -342,7 +342,7 @@ public:
 		};
 
 		double integral = 0;
-		for (GeometricShapeWithReferenceShape<2>* t : _triangulation)
+		for (PhysicalShape<2>* t : _triangulation)
 			integral += t->Integral(boundingBoxFunction, polynomialDegree);
 		return integral;
 	}
@@ -377,7 +377,7 @@ public:
 
 	~PolygonalShape()
 	{
-		for (GeometricShapeWithReferenceShape<2>* t : _triangulation)
+		for (PhysicalShape<2>* t : _triangulation)
 			delete t;
 		delete _center;
 		delete _boundingBox;

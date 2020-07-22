@@ -1,11 +1,11 @@
 #pragma once
-#include "GeometricShapeWithReferenceShape.h"
+#include "PhysicalShape.h"
 
 template <int Dim>
-class GeometricShapeWithConstantJacobian : public GeometricShapeWithReferenceShape<Dim>
+class GeometricShapeWithConstantJacobian : public PhysicalShape<Dim>
 {
 public:
-	GeometricShapeWithConstantJacobian() : GeometricShapeWithReferenceShape<Dim>() {}
+	GeometricShapeWithConstantJacobian() : PhysicalShape<Dim>() {}
 
 	//-----------------------//
 	//   Virtual functions   //
@@ -116,10 +116,10 @@ public:
 
 	virtual double Integral(DomFunction globalFunction) const
 	{
-		return GeometricShapeWithReferenceShape<Dim>::Integral(globalFunction);
+		return PhysicalShape<Dim>::Integral(globalFunction);
 	}
 	virtual double Integral(DomFunction globalFunction, int polynomialDegree) const
 	{
-		return GeometricShapeWithReferenceShape<Dim>::Integral(globalFunction, polynomialDegree);
+		return PhysicalShape<Dim>::Integral(globalFunction, polynomialDegree);
 	}
 };

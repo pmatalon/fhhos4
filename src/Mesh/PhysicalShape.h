@@ -2,12 +2,11 @@
 #include "ReferenceShape.h"
 #include "../Problem/Tensor.h"
 
-// Must be renamed in DomainShape
 template <int Dim>
-class GeometricShapeWithReferenceShape : public GeometricShape<Dim>
+class PhysicalShape : public GeometricShape<Dim>
 {
 public:
-	GeometricShapeWithReferenceShape() : GeometricShape<Dim>() {}
+	PhysicalShape() : GeometricShape<Dim>() {}
 
 	//-----------------------//
 	//   Virtual functions   //
@@ -32,7 +31,7 @@ public:
 	virtual double DetJacobian(RefPoint p) const = 0;
 	virtual int DetJacobianDegree() const = 0;
 
-	virtual GeometricShapeWithReferenceShape<Dim>* CreateCopy() const = 0;
+	virtual PhysicalShape<Dim>* CreateCopy() const = 0;
 
 	//--------------------//
 	//      Geometry      //
@@ -48,7 +47,7 @@ public:
 		return false;
 	}
 
-	bool HasSameVertices(GeometricShapeWithReferenceShape<Dim>* other, bool compareCoordinates = false)
+	bool HasSameVertices(PhysicalShape<Dim>* other, bool compareCoordinates = false)
 	{
 		if (this->Vertices().size() != other->Vertices().size())
 			return false;
@@ -61,7 +60,7 @@ public:
 		return true;
 	}
 
-	bool Contains(GeometricShapeWithReferenceShape<Dim>* other)
+	bool Contains(PhysicalShape<Dim>* other)
 	{
 		if (!this->Contains(other->Center()))
 			return false;
@@ -82,7 +81,7 @@ public:
 	{
 		return false;
 	}
-	virtual vector<GeometricShapeWithReferenceShape<Dim>*> SubShapes() const
+	virtual vector<PhysicalShape<Dim>*> SubShapes() const
 	{
 		assert(false);
 	}
@@ -96,9 +95,9 @@ public:
 		assert(false && "To be implemented in subclasses");
 	}
 
-	bool IsIn(vector<GeometricShapeWithReferenceShape<Dim>*> list)
+	bool IsIn(vector<PhysicalShape<Dim>*> list)
 	{
-		for (GeometricShapeWithReferenceShape<Dim>* s : list)
+		for (PhysicalShape<Dim>* s : list)
 		{
 			if (s == this)
 				return true;

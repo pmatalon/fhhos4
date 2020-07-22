@@ -35,7 +35,7 @@ public:
 	//                      Element implementation                      //
 	//------------------------------------------------------------------//
 
-	GeometricShapeWithReferenceShape<Dim>* Shape() const override
+	PhysicalShape<Dim>* Shape() const override
 	{
 		return _shape;
 	}

@@ -77,7 +77,7 @@ public:
 		_inverseMapping = mapping.inverse();
 	}
 
-	GeometricShapeWithReferenceShape<2>* CreateCopy() const
+	PhysicalShape<2>* CreateCopy() const
 	{
 		return new TriangleIn3DShape(*this);
 	}

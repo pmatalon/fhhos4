@@ -3,7 +3,7 @@
 #include <map>
 #include <set>
 #include "Vertex.h"
-#include "GeometricShapeWithReferenceShape.h"
+#include "PhysicalShape.h"
 #include "../Problem/SourceFunction.h"
 #include "../Problem/DiffusionPartition.h"
 using namespace std;
@@ -41,7 +41,7 @@ public:
 	//   Virtual functions   //
 	//-----------------------//
 
-	virtual GeometricShapeWithReferenceShape<Dim>* Shape() const = 0;
+	virtual PhysicalShape<Dim>* Shape() const = 0;
 
 	//---------------------------//
 	//   Geometric information   //

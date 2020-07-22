@@ -40,7 +40,7 @@ public:
 	//   Virtual functions   //
 	//-----------------------//
 
-	virtual GeometricShapeWithReferenceShape<Dim-1>* Shape() const = 0;
+	virtual PhysicalShape<Dim-1>* Shape() const = 0;
 
 	virtual void ExportFaceToMatlab(FILE* file) = 0;
 

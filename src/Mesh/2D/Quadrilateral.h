@@ -40,7 +40,7 @@ public:
 	//                 Element implementation                //
 	//-------------------------------------------------------//
 
-	GeometricShapeWithReferenceShape<2>* Shape() const
+	PhysicalShape<2>* Shape() const
 	{
 		return _shape;
 	}

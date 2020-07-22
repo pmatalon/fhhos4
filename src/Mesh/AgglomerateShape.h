@@ -1,10 +1,10 @@
 #pragma once
-#include "GeometricShapeWithReferenceShape.h"
+#include "PhysicalShape.h"
 #include "2D/Quadrilateral.h"
 using namespace std;
 
 template <int Dim>
-class AgglomerateShape : public GeometricShapeWithReferenceShape<Dim>
+class AgglomerateShape : public PhysicalShape<Dim>
 {
 protected:
 	vector<Vertex*> _vertices;
@@ -14,30 +14,30 @@ protected:
 	DomPoint _center;
 	double _inRadius;
 
-	vector<GeometricShapeWithReferenceShape<Dim>*> _subShapes;
-	GeometricShapeWithReferenceShape<Dim>* _boundingBox = nullptr;
+	vector<PhysicalShape<Dim>*> _subShapes;
+	PhysicalShape<Dim>* _boundingBox = nullptr;
 
 public:
-	AgglomerateShape(GeometricShapeWithReferenceShape<Dim>* s) : GeometricShapeWithReferenceShape<Dim>()
+	AgglomerateShape(PhysicalShape<Dim>* s) : PhysicalShape<Dim>()
 	{
 		Add(s);
 	}
 
-	void Add(GeometricShapeWithReferenceShape<Dim>* s)
+	void Add(PhysicalShape<Dim>* s)
 	{
 		AgglomerateShape* a = dynamic_cast<AgglomerateShape*>(s);
 		if (a)
 		{
-			for (GeometricShapeWithReferenceShape<Dim>* ss : s->SubShapes())
+			for (PhysicalShape<Dim>* ss : s->SubShapes())
 			{
-				GeometricShapeWithReferenceShape<Dim>* copy = ss->CreateCopy();
+				PhysicalShape<Dim>* copy = ss->CreateCopy();
 				assert(!this->Contains(copy->Center()));
 				_subShapes.push_back(copy);
 			}
 		}
 		else
 		{
-			GeometricShapeWithReferenceShape<Dim>* copy = s->CreateCopy();
+			PhysicalShape<Dim>* copy = s->CreateCopy();
 			assert(!this->Contains(copy->Center()));
 			_subShapes.push_back(copy);
 		}
@@ -47,12 +47,12 @@ public:
 	{
 		return true;
 	}
-	vector<GeometricShapeWithReferenceShape<Dim>*> SubShapes() const override
+	vector<PhysicalShape<Dim>*> SubShapes() const override
 	{
 		return _subShapes;
 	}
 
-	GeometricShapeWithReferenceShape<Dim>* CreateCopy() const
+	PhysicalShape<Dim>* CreateCopy() const
 	{
 		AgglomerateShape* copy = new AgglomerateShape(*this);
 		copy->_boundingBox = this->_boundingBox->CreateCopy();
@@ -78,8 +78,8 @@ public:
 		if (*oldIntersect == *newIntersect)
 			return;
 
-		vector<GeometricShapeWithReferenceShape<Dim>*> subShapesToDelete;
-		for (GeometricShapeWithReferenceShape<Dim>* ss : _subShapes)
+		vector<PhysicalShape<Dim>*> subShapesToDelete;
+		for (PhysicalShape<Dim>* ss : _subShapes)
 		{
 			if (ss->HasVertex(oldIntersect))
 			{
@@ -99,7 +99,7 @@ public:
 								if (v != oldIntersect)
 									vertices.push_back(v);
 							}
-							ss = dynamic_cast<GeometricShapeWithReferenceShape<Dim>*>(new TriangleShape(vertices[0], vertices[1], vertices[2]));
+							ss = dynamic_cast<PhysicalShape<Dim>*>(new TriangleShape(vertices[0], vertices[1], vertices[2]));
 							assert(ss);
 						}
 						else
@@ -195,14 +195,14 @@ public:
 			_center = DomPoint(sumX / _vertices.size(), sumY / _vertices.size(), sumZ / _vertices.size());
 
 			_measure = 0;
-			for (GeometricShapeWithReferenceShape<Dim>* s : _subShapes)
+			for (PhysicalShape<Dim>* s : _subShapes)
 				_measure += s->Measure();
 
 			// TODO
 			_inRadius = 0;
 
 			if (Dim == 2)
-				_boundingBox = dynamic_cast<GeometricShapeWithReferenceShape<Dim>*>(Geometry::CreateBoundingBox(_vertices));
+				_boundingBox = dynamic_cast<PhysicalShape<Dim>*>(Geometry::CreateBoundingBox(_vertices));
 			else
 				assert(false && "To be implemented");
 		}
@@ -255,18 +255,18 @@ public:
 	}
 	inline bool Contains(DomPoint p) const override
 	{
-		for (GeometricShapeWithReferenceShape<Dim>* s : _subShapes)
+		for (PhysicalShape<Dim>* s : _subShapes)
 		{
 			if (s->Contains(p))
 				return true;
 		}
 		return false;
 	}
-	GeometricShapeWithReferenceShape<Dim>* ClosestSubShape(DomPoint p)
+	PhysicalShape<Dim>* ClosestSubShape(DomPoint p)
 	{
-		GeometricShapeWithReferenceShape<Dim>* closestSubShape = nullptr;
+		PhysicalShape<Dim>* closestSubShape = nullptr;
 		double minDistance = 0;
-		for (GeometricShapeWithReferenceShape<Dim>* s : _subShapes)
+		for (PhysicalShape<Dim>* s : _subShapes)
 		{
 			double distance = Vect<Dim>(s->Center(), p).norm();
 			if (!closestSubShape || distance < minDistance)
@@ -332,7 +332,7 @@ public:
 		QuadrilateralShape* quad = dynamic_cast<QuadrilateralShape*>(_boundingBox); // TODO remove
 
 		double integral = 0;
-		for (GeometricShapeWithReferenceShape<Dim>* t : _subShapes)
+		for (PhysicalShape<Dim>* t : _subShapes)
 			integral += t->Integral(boundingBoxFunction);
 		return integral;
 	}
@@ -347,7 +347,7 @@ public:
 		};
 
 		double integral = 0;
-		for (GeometricShapeWithReferenceShape<Dim>* s : _subShapes)
+		for (PhysicalShape<Dim>* s : _subShapes)
 			integral += s->Integral(boundingBoxFunction, polynomialDegree);
 		return integral;
 	}
@@ -382,7 +382,7 @@ public:
 
 	virtual ~AgglomerateShape()
 	{
-		for (GeometricShapeWithReferenceShape<Dim>* s : _subShapes)
+		for (PhysicalShape<Dim>* s : _subShapes)
 			delete s;
 		if (_subShapes.size() > 1)
 			delete _boundingBox;
@@ -394,7 +394,7 @@ public:
 
 	void UnitTests() const
 	{
-		GeometricShapeWithReferenceShape<Dim>::UnitTests();
+		PhysicalShape<Dim>::UnitTests();
 
 		assert(_subShapes.size() > 0);
 		CheckIfTwoSubShapesOverlap();

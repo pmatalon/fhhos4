@@ -41,7 +41,7 @@ public:
 	//                 Face implementation                //
 	//----------------------------------------------------//
 
-	GeometricShapeWithReferenceShape<Dim-1>* Shape() const override
+	PhysicalShape<Dim-1>* Shape() const override
 	{
 		return _shape;
 	}

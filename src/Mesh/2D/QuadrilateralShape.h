@@ -1,10 +1,10 @@
 #pragma once
 #include "../Vertex.h"
 #include "../ReferenceCartesianShape.h"
-#include "../GeometricShapeWithReferenceShape.h"
+#include "../PhysicalShape.h"
 using namespace std;
 
-class QuadrilateralShape : public GeometricShapeWithReferenceShape<2>
+class QuadrilateralShape : public PhysicalShape<2>
 {
 private:
 	double _diameter;
@@ -78,7 +78,7 @@ public:
 			b3 = 0;
 	}
 
-	GeometricShapeWithReferenceShape<2>* CreateCopy() const
+	PhysicalShape<2>* CreateCopy() const
 	{
 		return new QuadrilateralShape(*this);
 	}

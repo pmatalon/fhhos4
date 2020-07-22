@@ -56,7 +56,7 @@ public:
 		_inverseJacobianTranspose = inverseJacobian.transpose();
 	}
 
-	GeometricShapeWithReferenceShape<2>* CreateCopy() const
+	PhysicalShape<2>* CreateCopy() const
 	{
 		return new TriangleShape(*this);
 	}

@@ -78,7 +78,7 @@ public:
 		//assert(abs(_detJacobian - 1 / inverseJacobian.determinant()) < 1e-14);
 	}
 
-	GeometricShapeWithReferenceShape<3>* CreateCopy() const
+	PhysicalShape<3>* CreateCopy() const
 	{
 		return new TetrahedronShape(*this);
 	}
