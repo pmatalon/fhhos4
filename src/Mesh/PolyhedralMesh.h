@@ -345,6 +345,9 @@ private:
 		coarseMesh->Vertices = vector<Vertex*>(vertices.begin(), vertices.end());
 	}
 
+	//-------------------------------------------------------------------------------------------------------------------------//
+	// Browse the neighbours: if the interface with one of them is made of multiple faces, they're collapsed into a single one //
+	//-------------------------------------------------------------------------------------------------------------------------//
 	void CollapseInterfacesMadeOfMultipleFaces(Element<Dim>* e)
 	{
 		// avoid the destruction of the element
@@ -375,14 +378,14 @@ private:
 					AgglomerateShape<Dim>* shape = dynamic_cast<AgglomerateShape<Dim>*>(agglo->Shape());
 					shape->ExportSubShapesToMatlab();
 				}*/
-				/*if (this->FineMesh && this->FineMesh->FineMesh && n->Number == 136)
+				/*if (this->FineMesh && this->FineMesh->FineMesh && n->Number == 97)
 				{
-					this->ExportFacesToMatlab("/mnt/c/Users/pierr/Desktop/Matrices/coarse3.dat");
-					AgglomerateElement<Dim>* agglo = dynamic_cast<AgglomerateElement<Dim>*>(this->Elements[136]);
+					this->ExportFacesToMatlab("/mnt/c/Users/pierr/Desktop/Matrices/coarse2.dat");
+					AgglomerateElement<Dim>* agglo = dynamic_cast<AgglomerateElement<Dim>*>(this->Elements[11]);
 					AgglomerateShape<Dim>* shape = dynamic_cast<AgglomerateShape<Dim>*>(agglo->Shape());
 					shape->ExportSubShapesToMatlab();
 				}*/
-				this->ExportFacesToMatlab("/mnt/c/Users/pierr/Desktop/Matrices/coarse2.dat");
+				//this->ExportFacesToMatlab("/mnt/c/Users/pierr/Desktop/Matrices/coarse2.dat");
 				Agglomerate(faces);
 
 				/*if (this->FineMesh && coarseMesh->Elements.size() > elementToAnalyze && (ce == coarseMesh->Elements[elementToAnalyze] || n == coarseMesh->Elements[elementToAnalyze]))
@@ -849,20 +852,20 @@ private:
 			if (neighbourForAggreg)
 			{
 				// Agglomeration
-				Element<Dim>* macroElement = coarseMesh->AgglomerateFineElements({ e, neighbourForAggreg });
+				Element<Dim>* macroElement = coarseMesh->AgglomerateFineElements(e, neighbourForAggreg);
 				coarseMesh->CollapseInterfacesMadeOfMultipleFaces(macroElement);
 			}
 			else
 			{
 				// If all the neighbours have already been aggregated, then we aggregate with the closest macroElement.
-				AgglomerateElement<Dim>* coarseNeighbourForAggreg = nullptr;
+				Element<Dim>* coarseNeighbourForAggreg = nullptr;
 				for (Face<Dim>* f : e->Faces)
 				{
 					if (f->IsDomainBoundary)
 						continue;
 
-					AgglomerateElement<Dim>* macroNeighbour = dynamic_cast<AgglomerateElement<Dim>*>(f->GetNeighbour(e)->CoarserElement);
-					double distance = Vect<2>(e->Center(), macroNeighbour->Center()).norm();
+					Element<Dim>* macroNeighbour = f->GetNeighbour(e)->CoarserElement;
+					double distance = Vect<Dim>(e->Center(), macroNeighbour->Center()).norm();
 					if (!coarseNeighbourForAggreg || distance < closestDistance)
 					{
 						coarseNeighbourForAggreg = macroNeighbour;
@@ -874,8 +877,8 @@ private:
 					Utils::FatalError("Element cannot be aggregated. Weird...");
 
 				// Agglomeration
-				coarseMesh->AgglomerateFineElementToCoarse(e, coarseNeighbourForAggreg);
-				coarseMesh->CollapseInterfacesMadeOfMultipleFaces(coarseNeighbourForAggreg);
+				Element<Dim>* macroElement = coarseMesh->AgglomerateFineElementToCoarse(e, coarseNeighbourForAggreg);
+				coarseMesh->CollapseInterfacesMadeOfMultipleFaces(macroElement);
 			}
 		}
 
@@ -1128,7 +1131,7 @@ private:
 		// Kept faces are cloned for the coarse mesh and linked to their clones and the coarse element.
 		for (Face<Dim>* ff : facesToClone)
 			this->CloneAndAddFace(ff, newCoarseElement);
-		
+
 		assert(newCoarseElement->Faces.size() > 2);
 		if (Dim == 2)
 			assert(newCoarseElement->Faces.size() == newCoarseElement->Vertices().size());

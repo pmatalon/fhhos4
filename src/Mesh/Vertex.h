@@ -35,6 +35,22 @@ public:
 		return false;
 	}
 
+	Vertex* GetClosestIn(vector<Vertex*> list)
+	{
+		double minDistance = 0;
+		Vertex* closest = nullptr;
+		for (auto v : list)
+		{
+			double distance = sqrt(pow(this->X - v->X, 2) + pow(this->Y - v->Y, 2) + pow(this->Z - v->Z, 2));
+			if (!closest || distance < minDistance)
+			{
+				closest = v;
+				minDistance = distance;
+			}
+		}
+		return closest;
+	}
+
 	virtual ~Vertex() {}
 };
 
@@ -80,4 +96,10 @@ DomPoint Middle(Vertex* A, Vertex* B)
 	else if (Dim == 3)
 		return DomPoint((A->X + B->X) / 2, (A->Y + B->Y) / 2, (A->Z + B->Z) / 2);
 	assert(false);
+}
+
+template<int Dim>
+bool AreCollinear(DimVector<Dim> v1, DimVector<Dim> v2)
+{
+	return abs(abs(v1.dot(v2)) - v1.norm()*v2.norm()) < 1e-14;
 }

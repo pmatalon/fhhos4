@@ -17,6 +17,22 @@ public:
 		return _list[_i];
 	}
 
+	T GetNext()
+	{
+		int j = _i + 1;
+		if (j == _list.size())
+			j = 0;
+		return _list[j];
+	}
+
+	T GetPrevious()
+	{
+		int j = _i - 1;
+		if (j < 0)
+			j = _list.size() - 1;
+		return _list[j];
+	}
+
 	size_t Index() { return _i; }
 
 	void MoveNext()

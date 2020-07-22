@@ -381,7 +381,19 @@ public:
 		if (this->IsConvex())
 		{
 			DomPoint C = this->Center();
-			assert(this->Contains(C) && "The element does not contain its centroid."); // comment this line if Contains() is not implemented
+			bool containsCenter = this->Contains(C); // comment this test if Contains() is not implemented
+			if (!containsCenter)
+			{
+				if (this->Shape()->IsMadeOfSubShapes())
+				{
+					cout << "Analysis of the problem:" << endl;
+					cout << "Matlab script to plot the subshapes of element " << this->Number << ":" << endl;
+					this->Shape()->ExportSubShapesToMatlab();
+					cout << endl;
+				}
+			}
+			assert(containsCenter && "The element does not contain its centroid.");
+
 
 			for (Face<Dim>* f : this->Faces)
 			{

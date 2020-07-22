@@ -148,6 +148,41 @@ public:
 		return macroElementVertices;
 	}
 
+	void RemoveIntersections(vector<Face<2>*> oldFaces, Face<2>* newFace)
+	{
+		// Identification of the vertices to remove (those which belong to 2 faces)
+		vector<Vertex*> verticesToRemove;
+		for (int i = 0; i < oldFaces.size(); i++)
+		{
+			Face<2>* fi = oldFaces[i];
+			for (Vertex* v : fi->Vertices())
+			{
+				for (int j = i + 1; j < oldFaces.size(); j++)
+				{
+					Face<2>* fj = oldFaces[j];
+					if (fj->HasVertex(v))
+					{
+						verticesToRemove.push_back(v);
+						break;
+					}
+				}
+			}
+		}
+
+		// Adds all the vertices in the same order, except the intersection vertices
+		vector<Vertex*> newVertices;
+		for (Vertex* v : _shape->Vertices())
+		{
+			if (!v->IsIn(verticesToRemove))
+				newVertices.push_back(v);
+		}
+
+		assert(newVertices.size() > 2);
+
+		// Recompute all the information about the shape (diameter, etc.)
+		_shape->Init(newVertices);
+	}
+
 	virtual ~Polygon()
 	{
 		if (_shape)

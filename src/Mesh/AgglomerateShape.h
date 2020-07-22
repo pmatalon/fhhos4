@@ -64,6 +64,15 @@ public:
 		return _subShapes.empty();
 	}
 
+	/*void Reshape(vector<Vertex*> newVertices)
+	{
+		for (auto ss : _subShapes)
+			delete ss;
+		_subShapes.clear();
+
+		_subShapes = Geometry::Triangulation<Dim>(newVertices);
+	}*/
+
 	void ReshapeByMovingIntersection(Vertex* oldIntersect, Vertex* newIntersect) override
 	{
 		if (*oldIntersect == *newIntersect)

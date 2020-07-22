@@ -157,7 +157,11 @@ void AgglomerateElement<2>::RemoveIntersections(vector<Face<2>*> oldFaces, Face<
 	}
 
 	for (Vertex* oldV : verticesToMove)
-		_shape->ReshapeByMovingIntersection(oldV, C);
+	{
+		Vertex* goToVertex = oldV->GetClosestIn(newFace->Vertices());
+		_shape->ReshapeByMovingIntersection(oldV, goToVertex);
+	}
+	//_shape->Reshape(newVertices);
 
 	_shape->CheckIfTwoSubShapesOverlap();
 

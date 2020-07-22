@@ -2,12 +2,28 @@
 #include "../../Utils/Geometry.h"
 #include "../CartesianShape.h"
 #include "TriangleShape.h"
+#include "../../Utils/RotatingList.h"
+#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+#include <CGAL/partition_2.h>
+#include <CGAL/Partition_traits_2.h>
+#include <cassert>
+#include <list>
 using namespace std;
+
+// CGAL types
+typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
+typedef CGAL::Partition_traits_2<K>                         Traits;
+typedef Traits::Polygon_2                                   Polygon_2;
+typedef Traits::Point_2                                     Point_2;
+typedef std::list<Polygon_2>                                Polygon_list;
+
+
 
 class PolygonalShape : public GeometricShapeWithReferenceShape<2>
 {
 private:
 	vector<Vertex*> _vertices;
+	Polygon_2 _cgalPolygon; // Polygon of the CGAL library
 
 	double _diameter;
 	double _measure;
@@ -22,14 +38,43 @@ public:
 	PolygonalShape(vector<Vertex*> vertices) 
 		: _vertices(vertices)
 	{
-		assert(vertices.size() >= 3);
-		Init();
+		Init(vertices);
 	}
 
 	PolygonalShape(const PolygonalShape& shape) = default;
 
+	void Init(vector<Vertex*> vertices)
+	{
+		assert(vertices.size() >= 3);
+		_vertices = vertices;
+
+		_cgalPolygon.clear();
+
+		// Bug of CGAL: https://github.com/CGAL/cgal/issues/2575
+		// The partitioning function used for the decomposition in convex sub-parts will fail if two edges are collinear.
+		// So we need to remove the "useless" vertices for the creation of the CGAL polygon.
+		RotatingList<Vertex*> vert(_vertices);
+		for (int i = 0; i < _vertices.size(); ++i)
+		{
+			Vertex* v = vert.Get();
+			DimVector<2> v1 = Vect<2>(vert.GetPrevious(), v);
+			DimVector<2> v2 = Vect<2>(v, vert.GetNext());
+			if (!AreCollinear(v1, v2))
+				_cgalPolygon.push_back(Point_2(v->X, v->Y));
+			vert.MoveNext();
+		}
+		//for (Vertex* v : vertices)
+			//_cgalPolygon.push_back(Point_2(v->X, v->Y));
+		assert(vertices.size() >= 3);
+
+		Init();
+	}
+
 	void Init()
 	{
+		assert(_cgalPolygon.is_simple());
+		assert(_cgalPolygon.is_counterclockwise_oriented());
+
 		_diameter = 0;
 		double sumX = 0;
 		double sumY = 0;
@@ -50,7 +95,8 @@ public:
 		
 		_center = new Vertex(0, sumX / _vertices.size(), sumY / _vertices.size());
 
-		_triangulation = Triangulation(_vertices);
+		_triangulation.clear();
+		Triangulation();
 
 		_boundingBox = Geometry::CreateBoundingBox(_vertices);
 
@@ -58,11 +104,34 @@ public:
 		for (GeometricShapeWithReferenceShape<2>* t : _triangulation)
 			_measure += t->Measure();
 
+		assert(abs(_measure - _cgalPolygon.area()) < 1e-12);
+
 		// TODO
 		_inRadius = 0;
 	}
 
-	static vector<GeometricShapeWithReferenceShape<2>*> Triangulation(vector<Vertex*> vertices)
+private:
+	void Triangulation()
+	{
+		if (_vertices.size() == 3)
+		{
+			TriangleShape* triangle = new TriangleShape(_vertices[0], _vertices[1], _vertices[2]);
+			_triangulation.push_back(triangle);
+		}
+		else if (_vertices.size() == 4 && this->IsConvex())
+		{
+			TriangleShape* triangle1 = new TriangleShape(_vertices[0], _vertices[1], _vertices[2]);
+			_triangulation.push_back(triangle1);
+			TriangleShape* triangle2 = new TriangleShape(_vertices[2], _vertices[3], _vertices[0]);
+			_triangulation.push_back(triangle2);
+		}
+		else if (this->IsConvex())
+			_triangulation = TriangulationByCenter(_vertices);
+		else
+			_triangulation = CGALTriangulation();
+	}
+
+	static vector<GeometricShapeWithReferenceShape<2>*> TriangulationByCenter(vector<Vertex*> vertices)
 	{
 		// Requirement: the polygon defined by the vertices must be convex!
 
@@ -94,11 +163,66 @@ public:
 		return triangles;
 	}
 
+	/*static void my_cgal_failure_handler(
+		const char *type,
+		const char *expr,
+		const char* file,
+		int line,
+		const char* msg)
+	{
+		// report the error in some way.
+	}*/
+
+	vector<GeometricShapeWithReferenceShape<2>*> CGALTriangulation()
+	{
+		vector<GeometricShapeWithReferenceShape<2>*> triangulation;
+
+		Polygon_list partition_polys;
+
+		//CGAL::Failure_function prev; // save the CGAL failure function
+		//prev = CGAL::set_error_handler(my_cgal_failure_handler); // replace it with my own
+		CGAL::greene_approx_convex_partition_2(_cgalPolygon.vertices_begin(), _cgalPolygon.vertices_end(), back_inserter(partition_polys));
+		//CGAL::set_error_handler(prev); // put the old one back
+
+		for (Polygon_2 p : partition_polys)
+		{
+			vector<Vertex*> vertices = Vertices(p);
+			if (p.size() == 3)
+			{
+				TriangleShape* subTriangle = new TriangleShape(vertices[0], vertices[1], vertices[2]);
+				triangulation.push_back(subTriangle);
+			}
+			else
+			{
+				vector<GeometricShapeWithReferenceShape<2>*> subTriangles = TriangulationByCenter(vertices);
+				for (auto tri : subTriangles)
+					triangulation.push_back(tri);
+			}
+		}
+
+		return triangulation;
+	}
+
+private:
+	static vector<Vertex*> Vertices(Polygon_2& poly)
+	{
+		vector<Vertex*> vertices;
+		for (auto it = poly.vertices_begin(); it != poly.vertices_end(); it++)
+		{
+			Point_2 p = *it;
+			Vertex* v = new Vertex(0, p.x(), p.y());
+			vertices.push_back(v);
+		}
+		return vertices;
+	}
+
+public:
 	GeometricShapeWithReferenceShape<2>* CreateCopy() const
 	{
 		PolygonalShape* copy = new PolygonalShape(*this);
-		copy->_triangulation = Triangulation(copy->_vertices);
-		copy->_boundingBox = static_cast<QuadrilateralShape*>(this->_boundingBox->CreateCopy());
+		//copy->_triangulation = Triangulation(copy->_vertices);
+		//copy->_boundingBox = static_cast<QuadrilateralShape*>(this->_boundingBox->CreateCopy());
+		copy->Init();
 		return copy;
 	}
 
@@ -140,7 +264,7 @@ public:
 	}
 	inline bool IsConvex() const override
 	{
-		if (_vertices.size() < 4)
+		/*if (_vertices.size() < 4)
 			return true;
 		// Not convex if a cord is outside the shape
 		for (int i = 0; i < _vertices.size(); i++)
@@ -151,7 +275,8 @@ public:
 					return false;
 			}
 		}
-		return true;
+		return true;*/
+		return _cgalPolygon.is_convex();
 	}
 	inline double InRadius() const override
 	{
@@ -159,12 +284,37 @@ public:
 	}
 	inline bool Contains(DomPoint p) const override
 	{
-		for (GeometricShapeWithReferenceShape<2>* t : _triangulation)
+		/*for (GeometricShapeWithReferenceShape<2>* t : _triangulation)
 		{
 			if (t->Contains(p))
 				return true;
 		}
+		return false;*/
+		switch (CGAL::bounded_side_2(_cgalPolygon.vertices_begin(), _cgalPolygon.vertices_end(), Point_2(p.X, p.Y), K()))
+		{
+			case CGAL::ON_BOUNDED_SIDE: // inside
+				return true;
+			case CGAL::ON_BOUNDARY: // on the boundary
+				return true;
+			case CGAL::ON_UNBOUNDED_SIDE: // outside
+				return false;
+		}
 		return false;
+	}
+
+	void ExportSubShapesToMatlab() const override
+	{
+		MatlabScript script;
+		vector<string> options = { "r", "b", "g", "c", "m", "y" };
+		for (int i = 0; i < _triangulation.size(); i++)
+		{
+			string option = options[i % options.size()];
+			auto vertices = _triangulation[i]->Vertices();
+			if (vertices.size() == 3)
+				script.PlotTriangle(*vertices[0], *vertices[1], *vertices[2], option);
+			else
+				assert(false && "To implement");
+		}
 	}
 
 	double Integral(RefFunction boundingBoxDefinedFunction) const override
