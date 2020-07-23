@@ -23,6 +23,9 @@ class PolygonalShape : public PhysicalShape<2>
 {
 private:
 	vector<Vertex*> _vertices;
+
+	bool _isInitialized = false;
+
 	Polygon_2 _cgalPolygon; // Polygon of the CGAL library
 
 	double _diameter;
@@ -31,23 +34,38 @@ private:
 	double _inRadius;
 
 	vector<PhysicalShape<2>*> _triangulation;
-	QuadrilateralShape* _boundingBox;
+	QuadrilateralShape* _boundingBox = nullptr;
 
 public:
 
-	PolygonalShape(vector<Vertex*> vertices) 
+	PolygonalShape(vector<Vertex*> vertices, bool createTriangulationAndBoundingBox = true)
 		: _vertices(vertices)
 	{
-		Init(vertices);
+		assert(vertices.size() >= 3);
+		_vertices = vertices;
+		Init(createTriangulationAndBoundingBox);
 	}
 
 	PolygonalShape(const PolygonalShape& shape) = default;
 
-	void Init(vector<Vertex*> vertices)
+	void SetVertices(vector<Vertex*> vertices)
 	{
 		assert(vertices.size() >= 3);
 		_vertices = vertices;
+		_isInitialized = false;
+		_cgalPolygon.clear();
+		_triangulation.clear();
+		if (_boundingBox)
+		{
+			delete _boundingBox;
+			_boundingBox = nullptr;
+		}
+		Init(false);
+	}
 
+private:
+	void CreateCGALPolygon()
+	{
 		_cgalPolygon.clear();
 
 		// Bug of CGAL: https://github.com/CGAL/cgal/issues/2575
@@ -65,13 +83,17 @@ public:
 		}
 		//for (Vertex* v : vertices)
 			//_cgalPolygon.push_back(Point_2(v->X, v->Y));
-		assert(vertices.size() >= 3);
-
-		Init();
+		//assert(_vertices.size() >= 3);
 	}
 
-	void Init()
+public:
+	void Init(bool createTriangulationAndBoundingBox = true)
 	{
+		if (_isInitialized)
+			return;
+
+		CreateCGALPolygon();
+
 		assert(_cgalPolygon.is_simple());
 		assert(_cgalPolygon.is_counterclockwise_oriented());
 
@@ -95,24 +117,25 @@ public:
 		
 		_center = new Vertex(0, sumX / _vertices.size(), sumY / _vertices.size());
 
-		_triangulation.clear();
-		Triangulation();
+		_measure = _cgalPolygon.area();
 
-		_boundingBox = Geometry::CreateBoundingBox(_vertices);
-
-		_measure = 0;
-		for (PhysicalShape<2>* t : _triangulation)
-			_measure += t->Measure();
-
-		assert(abs(_measure - _cgalPolygon.area()) < 1e-12);
+		if (createTriangulationAndBoundingBox)
+		{
+			ComputeTriangulation();
+			ComputeBoundingBox();
+		}
 
 		// TODO
 		_inRadius = 0;
+
+		_isInitialized = true;
 	}
 
-private:
-	void Triangulation()
+	void ComputeTriangulation()
 	{
+		if (!_triangulation.empty())
+			return;
+
 		if (_vertices.size() == 3)
 		{
 			TriangleShape* triangle = new TriangleShape(_vertices[0], _vertices[1], _vertices[2]);
@@ -126,12 +149,20 @@ private:
 			_triangulation.push_back(triangle2);
 		}
 		else if (this->IsConvex())
-			_triangulation = TriangulationByCenter(_vertices);
+			_triangulation = BarycentricTriangulation(_vertices);
 		else
 			_triangulation = CGALTriangulation();
 	}
 
-	static vector<PhysicalShape<2>*> TriangulationByCenter(vector<Vertex*> vertices)
+	void ComputeBoundingBox()
+	{
+		if (_boundingBox)
+			return;
+		_boundingBox = Geometry::CreateBoundingBox(_vertices);
+	}
+
+private:
+	static vector<PhysicalShape<2>*> BarycentricTriangulation(vector<Vertex*> vertices)
 	{
 		// Requirement: the polygon defined by the vertices must be convex!
 
@@ -194,7 +225,7 @@ private:
 			}
 			else
 			{
-				vector<PhysicalShape<2>*> subTriangles = TriangulationByCenter(vertices);
+				vector<PhysicalShape<2>*> subTriangles = BarycentricTriangulation(vertices);
 				for (auto tri : subTriangles)
 					triangulation.push_back(tri);
 			}
@@ -204,6 +235,7 @@ private:
 	}
 
 private:
+	// Get vertices from CGAL polygon
 	static vector<Vertex*> Vertices(Polygon_2& poly)
 	{
 		vector<Vertex*> vertices;
@@ -220,9 +252,6 @@ public:
 	PhysicalShape<2>* CreateCopy() const
 	{
 		PolygonalShape* copy = new PolygonalShape(*this);
-		//copy->_triangulation = Triangulation(copy->_vertices);
-		//copy->_boundingBox = static_cast<QuadrilateralShape*>(this->_boundingBox->CreateCopy());
-		copy->Init();
 		return copy;
 	}
 
@@ -232,6 +261,7 @@ public:
 	}
 	vector<PhysicalShape<2>*> SubShapes() const override
 	{
+		assert(_triangulation.size() > 0);
 		return _triangulation;
 	}
 
@@ -243,6 +273,22 @@ public:
 	inline vector<Vertex*> Vertices() const override
 	{
 		return _vertices;
+	}
+
+	PhysicalShape<2>* ClosestSubShape(DomPoint p)
+	{
+		PhysicalShape<2>* closestSubShape = nullptr;
+		double minDistance = 0;
+		for (PhysicalShape<2>* s : _triangulation)
+		{
+			double distance = Vect<2>(s->Center(), p).norm();
+			if (!closestSubShape || distance < minDistance)
+			{
+				closestSubShape = s;
+				minDistance = distance;
+			}
+		}
+		return closestSubShape;
 	}
 
 	bool IsDegenerated() const override
@@ -304,6 +350,7 @@ public:
 
 	void ExportSubShapesToMatlab() const override
 	{
+		assert(_triangulation.size() > 0);
 		MatlabScript script;
 		vector<string> options = { "r", "b", "g", "c", "m", "y" };
 		for (int i = 0; i < _triangulation.size(); i++)
@@ -319,6 +366,8 @@ public:
 
 	double Integral(RefFunction boundingBoxDefinedFunction) const override
 	{
+		assert(_triangulation.size() > 0);
+
 		// For the inner triangles, the bounding box is the domain
 		DomFunction boundingBoxFunction = [this, boundingBoxDefinedFunction](DomPoint boundingBoxPoint)
 		{
@@ -334,6 +383,8 @@ public:
 
 	double Integral(RefFunction boundingBoxDefinedFunction, int polynomialDegree) const override
 	{
+		assert(_triangulation.size() > 0);
+
 		// For the inner triangles, the bounding box is the domain
 		DomFunction boundingBoxFunction = [this, boundingBoxDefinedFunction](DomPoint boundingBoxPoint)
 		{
@@ -386,6 +437,15 @@ public:
 	//-------------------------------------------------------------------//
 	//                            Unit tests                             //
 	//-------------------------------------------------------------------//
+
+	void UnitTests() const override
+	{
+		double sumMeasures = 0;
+		for (PhysicalShape<2>* t : _triangulation)
+			sumMeasures += t->Measure();
+		assert(abs(sumMeasures - _cgalPolygon.area()) < 1e-12);
+		PhysicalShape<2>::UnitTests();
+	}
 
 	static void Test()
 	{

@@ -12,20 +12,20 @@ private:
 
 public:
 	// Constructor creating the polygon from the adjonction of two elements
-	Polygon(int number, Element<2>* e1, Element<2>* e2, vector<Face<2>*> facesToRemove) :
+	Polygon(int number, Element<2>* e1, Element<2>* e2, vector<Face<2>*> facesToRemove, bool createTriangulationAndBoundingBox = true) :
 		Element(number),
 		Diff_DGElement<2>(number),
 		Diff_HHOElement<2>(number)
 	{
-		_shape = new PolygonalShape(MacroPolygonVertices(e1, e2, facesToRemove));
+		_shape = new PolygonalShape(MacroPolygonVertices(e1, e2, facesToRemove), createTriangulationAndBoundingBox);
 	}
 
-	Polygon(int number, vector<Vertex*> vertices) :
+	Polygon(int number, vector<Vertex*> vertices, bool createTriangulationAndBoundingBox = true) :
 		Element(number),
 		Diff_DGElement<2>(number),
 		Diff_HHOElement<2>(number)
 	{
-		_shape = new PolygonalShape(vertices);
+		_shape = new PolygonalShape(vertices, createTriangulationAndBoundingBox);
 	}
 
 	inline vector<Vertex*> Vertices()
@@ -52,12 +52,21 @@ public:
 		// =>  n = (-AB.Y, AB.X)
 		n << A->Y - B->Y, B->X - A->X;
 
+		n = n.normalized();
+
 		// Condition 2: n.AC < 0
-		DimVector<2> AC = this->Center() - *A;
+		// Find a 3rd point C inside the element to implement n.AC < 0
+		DomPoint C = this->Center();
+		if (!this->IsConvex())
+		{
+			// the element's center doesn't work if the polygon is not be convex
+			PhysicalShape<2>* ss = _shape->ClosestSubShape(face->Center());
+			C = ss->Center();
+		}
+		DimVector<2> AC = Vect<2>(A, C);
 		if (n.dot(AC) > 0)
 			n = -1 * n;
-		
-		n = n.normalized();
+
 		return n;
 	}
 
@@ -179,8 +188,7 @@ public:
 
 		assert(newVertices.size() > 2);
 
-		// Recompute all the information about the shape (diameter, etc.)
-		_shape->Init(newVertices);
+		_shape->SetVertices(newVertices);
 	}
 
 	virtual ~Polygon()

@@ -72,6 +72,21 @@ public:
 		this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
 	}
 
+	virtual void Init()
+	{
+		ElementParallelLoop<Dim> parallelLoop(this->Elements);
+		parallelLoop.Execute([](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				// Make Init() available for all element classes
+				PolygonalShape* p = dynamic_cast<PolygonalShape*>(e->Shape());
+				if (p)
+				{
+					p->ComputeTriangulation();
+					p->ComputeBoundingBox();
+				}
+			});
+	}
+
 private:
 	//-------------------------------------------------//
 	//                                                 //
@@ -734,6 +749,7 @@ private:
 		}
 
 		RemoveIntermediaryCoarsenings(coarseMesh);
+		coarseMesh->Init();
 	}
 
 	//----------------------------------------------------------------------------//
@@ -816,9 +832,11 @@ private:
 					continue;
 
 				// Init choice criterion
-				double distance = Vect<2>(e->Center(), neighbour->Center()).norm();
+				double distance = 0;
 				double interfaceMeasure = 0;
-				if (strategy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface)
+				if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter)
+					distance = Vect<2>(e->Center(), neighbour->Center()).norm();
+				else if (strategy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface)
 				{
 					for (Face<Dim>* fInterface : e->Faces)
 					{
@@ -1292,7 +1310,7 @@ Element<3>* PolyhedralMesh<3>::CreatePolyhedron(vector<Vertex*> vertices)
 template<>
 Element<2>* PolyhedralMesh<2>::CreateMacroElement(Element<2>* e1, Element<2>* e2, vector<Face<2>*> facesToRemove)
 {
-	Polygon* macroElement = new Polygon(0, e1, e2, facesToRemove);
+	Polygon* macroElement = new Polygon(0, e1, e2, facesToRemove, false);
 	return macroElement;
 }
 
