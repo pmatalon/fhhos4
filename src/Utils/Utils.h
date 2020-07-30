@@ -71,4 +71,4 @@ public:
 string Utils::BeginRed    = "\033[1;31m";
 string Utils::BeginGreen  = "\033[1;32m";
 string Utils::BeginYellow = "\033[1;33m";
-string Utils::EndColor    = "\033[0m\n";
+string Utils::EndColor    = "\033[0m";

@@ -68,6 +68,8 @@ public:
 		else
 			Mesh<Dim>::CoarsenMesh(strategy);
 
+		this->CoarseMesh->FillBoundaryAndIteriorFaceLists();
+
 		this->CoarseMesh->SetDiffusionCoefficient(this->_diffusionPartition);
 		this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
 	}
@@ -369,15 +371,8 @@ private:
 		if (e->Faces.size() == 3)
 			return;
 
-		for (Face<Dim>* f : e->Faces)
+		for (Element<Dim>* n : e->Neighbours())
 		{
-			if (f->IsDomainBoundary)
-				continue;
-
-			Element<Dim>* n = f->GetNeighbour(e);
-			if (!n) // no neighbour is affected yet
-				continue;
-
 			// avoid the destruction of the neighbour
 			if (n->Faces.size() == 3)
 				continue;
@@ -410,10 +405,13 @@ private:
 					AgglomerateShape<Dim>* shape = dynamic_cast<AgglomerateShape<Dim>*>(agglo->Shape());
 					shape->ExportSubShapesToMatlab();
 				}*/
-
-				break;
 			}
 		}
+
+		/*if (e->IsOnBoundary())
+		{
+			// TODO agglomerate (at least) collinear faces
+		}*/
 	}
 
 
@@ -817,7 +815,7 @@ private:
 			if (e->CoarserElement)
 				continue; // element already aggregated
 
-			// Find the closest neighbour of e still available for aggregation
+			// Find the neighbour still available for aggregation under a distance/largest interface criterion
 			Element<Dim>* neighbourForAggreg = nullptr;
 			double closestDistance = -1;
 			double largestInterface = -1;
@@ -835,7 +833,7 @@ private:
 				double distance = 0;
 				double interfaceMeasure = 0;
 				if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter)
-					distance = Vect<2>(e->Center(), neighbour->Center()).norm();
+					distance = Vect<Dim>(e->Center(), neighbour->Center()).norm();
 				else if (strategy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface)
 				{
 					for (Face<Dim>* fInterface : e->Faces)
@@ -869,32 +867,66 @@ private:
 
 			if (neighbourForAggreg)
 			{
-				// Agglomeration
+				//-------------------------------------------------------------//
+				//           Agglomeration with another fine element           //
+				//-------------------------------------------------------------//
 				Element<Dim>* macroElement = coarseMesh->AgglomerateFineElements(e, neighbourForAggreg);
 				coarseMesh->CollapseInterfacesMadeOfMultipleFaces(macroElement);
 			}
 			else
 			{
-				// If all the neighbours have already been aggregated, then we aggregate with the closest macroElement.
+				// If all the neighbours have already been aggregated, then we aggregate with a macroElement under the same criterion
 				Element<Dim>* coarseNeighbourForAggreg = nullptr;
+				double closestDistance = -1;
+				double largestInterface = -1;
 				for (Face<Dim>* f : e->Faces)
 				{
 					if (f->IsDomainBoundary)
 						continue;
 
 					Element<Dim>* macroNeighbour = f->GetNeighbour(e)->CoarserElement;
-					double distance = Vect<Dim>(e->Center(), macroNeighbour->Center()).norm();
-					if (!coarseNeighbourForAggreg || distance < closestDistance)
+
+					double distance = 0;
+					double interfaceMeasure = 0;
+					if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter)
+						distance = Vect<Dim>(e->Center(), macroNeighbour->Center()).norm();
+					else if (strategy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface)
+					{
+						for (Face<Dim>* fInterface : e->Faces)
+						{
+							if (fInterface->IsDomainBoundary || fInterface->IsRemovedOnCoarserGrid || fInterface->GetNeighbour(e)->CoarserElement != macroNeighbour)
+								continue;
+							interfaceMeasure += fInterface->Measure();
+						}
+					}
+
+					if (!coarseNeighbourForAggreg)
 					{
 						coarseNeighbourForAggreg = macroNeighbour;
 						closestDistance = distance;
+						largestInterface = interfaceMeasure;
+					}
+					else
+					{
+						if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter && distance < closestDistance)
+						{
+							coarseNeighbourForAggreg = macroNeighbour;
+							closestDistance = distance;
+						}
+						else if (strategy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface && interfaceMeasure > largestInterface)
+						{
+							coarseNeighbourForAggreg = macroNeighbour;
+							largestInterface = interfaceMeasure;
+						}
 					}
 				}
 
 				if (!coarseNeighbourForAggreg)
 					Utils::FatalError("Element cannot be aggregated. Weird...");
 
-				// Agglomeration
+				//--------------------------------------------------------//
+				//           Agglomeration with a coarse element          //
+				//--------------------------------------------------------//
 				Element<Dim>* macroElement = coarseMesh->AgglomerateFineElementToCoarse(e, coarseNeighbourForAggreg);
 				coarseMesh->CollapseInterfacesMadeOfMultipleFaces(macroElement);
 			}
@@ -1059,7 +1091,7 @@ private:
 				f->IsRemovedOnCoarserGrid = true;
 				coarseElement->FinerFacesRemoved.push_back(f);
 				coarseElement->RemoveFace(f->CoarseFace);
-				this->RemoveFace(f->CoarseFace);
+				this->RemoveFace(f->CoarseFace, false);
 				delete f->CoarseFace;
 				f->CoarseFace = nullptr;
 			}
@@ -1136,7 +1168,7 @@ private:
 			newCoarseElement->FinerFacesRemoved.push_back(ff);
 
 			// Remove f->CoarseFace from this->Faces
-			this->RemoveFace(ff->CoarseFace);
+			this->RemoveFace(ff->CoarseFace, false);
 			delete ff->CoarseFace;
 			ff->CoarseFace = nullptr;
 		}
@@ -1232,7 +1264,22 @@ private:
 		mergedFace->Element1 = elem1;
 		mergedFace->Element2 = elem2;
 
+		/*if (elem1->Number == 37 && elem2 && elem2->Number == 38)
+		{
+			cout << "BEFORE:" << endl;
+			cout << "Elem1:" << endl;
+			elem1->Shape()->ExportToMatlab();
+			cout << "Elem2:" << endl;
+			elem2->Shape()->ExportToMatlab("b");
+		}*/
+
 		elem1->ReplaceFaces(faces, mergedFace);
+		/*if (elem1->Number == 37 && elem2 && elem2->Number == 38)
+		{
+			cout << "AFTER:" << endl;
+			cout << "Elem1:" << endl;
+			elem1->Shape()->ExportToMatlab();
+		}*/
 		if (elem2)
 			elem2->ReplaceFaces(faces, mergedFace);
 
@@ -1249,12 +1296,12 @@ private:
 		// Remove the faces from the mesh
 		for (Face<Dim>* f : faces)
 		{
-			this->RemoveFace(f);
+			this->RemoveFace(f, false);
 			delete f;
 		}
 
 		// Add mergedFace to the list
-		this->AddFace(mergedFace);
+		this->AddFace(mergedFace, false);
 	}
 
 	void CloneAndAddFace(Face<Dim>* f, Element<Dim>* macroElement)
@@ -1271,7 +1318,7 @@ private:
 			copy->FinerFaces.push_back(f);
 
 			// Add copied face to the list of coarse faces
-			this->AddFace(copy);
+			this->AddFace(copy, false);
 		}
 		else
 		{

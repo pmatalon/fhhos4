@@ -70,23 +70,28 @@ public:
 		double alpha = PB.cross(PC).norm() / (2 * triangleArea);
 		double beta = PC.cross(PA).norm() / (2 * triangleArea);
 		double gamma = PA.cross(PB).norm() / (2 * triangleArea);
-		return (alpha >= 0 && alpha <= 1) 
-			&& (beta >= 0 && beta <= 1) 
-			&& (gamma >= 0 && gamma <= 1) 
-			&& (abs(alpha + beta + gamma -1) < 1e-3 * triangleDiameter);
+
+		double tol = Point::Tolerance / triangleDiameter;
+		return alpha + tol > 0 && alpha < 1 + tol    // alpha >= 0 && alpha <= 1
+			&& beta  + tol > 0 && beta  < 1 + tol    // beta  >= 0 && beta  <= 1
+			&& gamma + tol > 0 && gamma < 1 + tol    // gamma >= 0 && gamma <= 1
+			&& (abs(alpha + beta + gamma -1) < tol); // alpha + beta + gamma = 1
 	}
 
 	static bool IsInTetrahedron(DomPoint A, DomPoint B, DomPoint C, DomPoint D, DomPoint P, double tetraVolume, double tetraDiameter)
 	{
+		// Barycentric coordinates
 		double alpha = VolumeTetra(P, B, C, D) / tetraVolume;
 		double beta = VolumeTetra(A, P, C, D) / tetraVolume;
 		double gamma = VolumeTetra(A, B, P, D) / tetraVolume;
 		double delta = VolumeTetra(A, B, C, P) / tetraVolume;
-		return (alpha >= 0 && alpha <= 1) 
-			&& (beta >= 0 && beta <= 1) 
-			&& (gamma >= 0 && gamma <= 1) 
-			&& (delta >= 0 && delta <= 1) 
-			&& (abs(alpha + beta + gamma + delta - 1) < 1e-3 * tetraDiameter);
+
+		double tol = Point::Tolerance / tetraDiameter;
+		return alpha + tol > 0 && alpha < 1 + tol    // alpha >= 0 && alpha <= 1
+			&& beta  + tol > 0 && beta  < 1 + tol    // beta  >= 0 && beta  <= 1
+			&& gamma + tol > 0 && gamma < 1 + tol    // gamma >= 0 && gamma <= 1
+			&& delta + tol > 0 && delta < 1 + tol    // delta >= 0 && delta <= 1
+			&& (abs(alpha + beta + gamma + delta - 1) < tol); // alpha + beta + gamma + delta = 1
 	}
 
 	static double VolumeTetra(DomPoint A, DomPoint B, DomPoint C, DomPoint D)

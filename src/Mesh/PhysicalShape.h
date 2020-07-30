@@ -74,6 +74,11 @@ public:
 		return true;
 	}
 
+	virtual void ExportToMatlab(string color = "r") const
+	{
+		assert(false && "To be implemented in the subclass");
+	}
+
 	// For squares, triangles, etc, just one subshape: itself.
 	// For polyhedra: decomposition into simplices.
 	// For agglomerates: list of shapes forming the agglomerate.

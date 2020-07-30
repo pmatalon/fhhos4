@@ -1,6 +1,7 @@
 #pragma once
 #include <fstream>
 #include "Types.h"
+#include "RotatingList.h"
 #include "../Mesh/Point.h"
 using namespace std;
 
@@ -37,7 +38,19 @@ public:
 
 	void PlotSegment(DomPoint p1, DomPoint p2, string color)
 	{
-		Out() << "plot3(axes, [" << p1.X << "; " << p2.X << "], [" << p1.Y << "; " << p2.Y << "], [0;0], 'LineWidth', 1, 'Color', '" << color << "');" << endl;
+		Out() << "plot(axes, [" << p1.X << "; " << p2.X << "], [" << p1.Y << "; " << p2.Y << "], 'LineWidth', 1, 'Color', '" << color << "');" << endl;
+		// use plot3 in 3D
+	}
+
+	void PlotPolygonEdges(vector<Vertex*> vertices, string color)
+	{
+		RotatingList<Vertex*> vert(vertices);
+		for (int i = 0; i < vert.Size(); i++)
+		{
+			Vertex* v1 = vert.GetAndMoveNext();
+			Vertex* v2 = vert.Get();
+			PlotSegment(v1, v2, color);
+		}
 	}
 
 	void PlotTriangle(DomPoint A, DomPoint B, DomPoint C, string color)

@@ -2,7 +2,6 @@
 #include "../../Utils/Geometry.h"
 #include "../CartesianShape.h"
 #include "TriangleShape.h"
-#include "../../Utils/RotatingList.h"
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/partition_2.h>
 #include <CGAL/Partition_traits_2.h>
@@ -94,8 +93,13 @@ public:
 
 		CreateCGALPolygon();
 
-		assert(_cgalPolygon.is_simple());
-		assert(_cgalPolygon.is_counterclockwise_oriented());
+		if (!_cgalPolygon.is_simple())
+		{
+			ExportToMatlab("m");
+			Utils::Warning("This polygon is not simple.");
+		}
+		else
+			assert(_cgalPolygon.is_counterclockwise_oriented());
 
 		_diameter = 0;
 		double sumX = 0;
@@ -236,7 +240,7 @@ private:
 
 private:
 	// Get vertices from CGAL polygon
-	static vector<Vertex*> Vertices(Polygon_2& poly)
+	static vector<Vertex*> Vertices(const Polygon_2& poly)
 	{
 		vector<Vertex*> vertices;
 		for (auto it = poly.vertices_begin(); it != poly.vertices_end(); it++)
@@ -273,22 +277,6 @@ public:
 	inline vector<Vertex*> Vertices() const override
 	{
 		return _vertices;
-	}
-
-	PhysicalShape<2>* ClosestSubShape(DomPoint p)
-	{
-		PhysicalShape<2>* closestSubShape = nullptr;
-		double minDistance = 0;
-		for (PhysicalShape<2>* s : _triangulation)
-		{
-			double distance = Vect<2>(s->Center(), p).norm();
-			if (!closestSubShape || distance < minDistance)
-			{
-				closestSubShape = s;
-				minDistance = distance;
-			}
-		}
-		return closestSubShape;
 	}
 
 	bool IsDegenerated() const override
@@ -362,6 +350,20 @@ public:
 			else
 				assert(false && "To implement");
 		}
+	}
+
+	void ExportToMatlab(string color = "r") const override
+	{
+		MatlabScript script;
+		script.PlotPolygonEdges(_vertices, color);
+		script.Out() << endl;
+	}
+
+	void ExportCGALPolyToMatlab() const
+	{
+		MatlabScript script;
+		script.PlotPolygonEdges(Vertices(_cgalPolygon), "b");
+		script.Out() << endl;
 	}
 
 	double Integral(RefFunction boundingBoxDefinedFunction) const override
@@ -440,10 +442,24 @@ public:
 
 	void UnitTests() const override
 	{
+		assert(_cgalPolygon.is_simple());
+		assert(_cgalPolygon.is_counterclockwise_oriented());
+
 		double sumMeasures = 0;
 		for (PhysicalShape<2>* t : _triangulation)
 			sumMeasures += t->Measure();
-		assert(abs(sumMeasures - _cgalPolygon.area()) < 1e-12);
+		double eps = 1e-4*_measure;
+		if (abs(sumMeasures - _cgalPolygon.area()) >= eps)
+		{
+			cout << "Shape using vertices:" << endl;
+			this->ExportToMatlab();
+			cout << "Shape using CGAL vertices:" << endl;
+			this->ExportCGALPolyToMatlab();
+			cout << "Subshapes:" << endl;
+			this->ExportSubShapesToMatlab();
+			assert(abs(sumMeasures - _cgalPolygon.area()) < eps);
+		}
+
 		PhysicalShape<2>::UnitTests();
 	}
 

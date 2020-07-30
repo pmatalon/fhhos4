@@ -57,11 +57,25 @@ public:
 		// Condition 2: n.AC < 0
 		// Find a 3rd point C inside the element to implement n.AC < 0
 		DomPoint C = this->Center();
-		if (!this->IsConvex())
+		if (!this->IsConvex() && !face->IsDomainBoundary)
 		{
 			// the element's center doesn't work if the polygon is not be convex
-			PhysicalShape<2>* ss = _shape->ClosestSubShape(face->Center());
-			C = ss->Center();
+			PhysicalShape<2>* faceSubshape = nullptr;
+			for (PhysicalShape<2>* ss : _shape->SubShapes())
+			{
+				if (ss->Contains(*A) && ss->Contains(*B))
+				{
+					faceSubshape = ss;
+					break;
+				}
+			}
+			if (!faceSubshape)
+			{
+				cout << "Error: no sub-shape found for " << *face << endl;
+				_shape->ExportSubShapesToMatlab();
+				assert(faceSubshape);
+			}
+			C = faceSubshape->Center();
 		}
 		DimVector<2> AC = Vect<2>(A, C);
 		if (n.dot(AC) > 0)

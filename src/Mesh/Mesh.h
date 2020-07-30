@@ -82,19 +82,23 @@ public:
 		Utils::FatalError("Unmanaged refinement strategy");
 	}
 
-	void AddFace(Face<Dim>* f)
+	void AddFace(Face<Dim>* f, bool addToBoundaryAndIteriorLists = true)
 	{
 		if (f->Number == -1)
 			f->Number = this->Faces.size();
 
 		this->Faces.push_back(f);
-		if (f->IsDomainBoundary)
-			this->BoundaryFaces.push_back(f);
-		else
-			this->InteriorFaces.push_back(f);
+
+		if (addToBoundaryAndIteriorLists)
+		{
+			if (f->IsDomainBoundary)
+				this->BoundaryFaces.push_back(f);
+			else
+				this->InteriorFaces.push_back(f);
+		}
 	}
 
-	void RemoveFace(Face<Dim>* f)
+	void RemoveFace(Face<Dim>* f, bool removeFromBoundaryAndIteriorLists = true)
 	{
 		BigNumber iToRemove = f->Number;
 		assert(this->Faces[iToRemove] == f);
@@ -102,25 +106,46 @@ public:
 		for (int i = iToRemove; i < this->Faces.size(); i++)
 			this->Faces[i]->Number = i;
 
-		// TODO: optimize
-		BigNumber i = 0;
-		if (f->IsDomainBoundary)
+		if (removeFromBoundaryAndIteriorLists)
 		{
-			for (i = 0; i < this->BoundaryFaces.size(); i++)
+			// TODO: optimize
+			BigNumber i = 0;
+			if (f->IsDomainBoundary)
 			{
-				if (this->BoundaryFaces[i] == f)
-					break;
+				for (i = 0; i < this->BoundaryFaces.size(); i++)
+				{
+					if (this->BoundaryFaces[i] == f)
+						break;
+				}
+				this->BoundaryFaces.erase(this->BoundaryFaces.begin() + i);
 			}
-			this->BoundaryFaces.erase(this->BoundaryFaces.begin() + i);
+			else
+			{
+				for (i = 0; i < this->InteriorFaces.size(); i++)
+				{
+					if (this->InteriorFaces[i] == f)
+						break;
+				}
+				this->InteriorFaces.erase(this->InteriorFaces.begin() + i);
+			}
 		}
-		else
+	}
+
+	void FillBoundaryAndIteriorFaceLists()
+	{
+		assert((this->BoundaryFaces.empty() && this->InteriorFaces.empty()) || (!this->BoundaryFaces.empty() && !this->InteriorFaces.empty()));
+
+		if (!this->BoundaryFaces.empty() || !this->InteriorFaces.empty())
+			return;
+
+		this->InteriorFaces.reserve(this->Faces.size());
+
+		for (Face<Dim>* f : this->Faces)
 		{
-			for (i = 0; i < this->InteriorFaces.size(); i++)
-			{
-				if (this->InteriorFaces[i] == f)
-					break;
-			}
-			this->InteriorFaces.erase(this->InteriorFaces.begin() + i);
+			if (f->IsDomainBoundary)
+				this->BoundaryFaces.push_back(f);
+			else
+				this->InteriorFaces.push_back(f);
 		}
 	}
 

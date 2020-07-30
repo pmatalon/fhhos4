@@ -279,7 +279,7 @@ public:
 			if (f->IsDomainBoundary)
 				continue;
 			Element<Dim>* neighbour = f->GetNeighbour(this);
-			if (neighbour)
+			if (neighbour) // no neighbour might be affected yet
 				neighbours.insert(neighbour);
 		}
 
