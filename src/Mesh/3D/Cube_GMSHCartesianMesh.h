@@ -5,7 +5,7 @@ using namespace std;
 class Cube_GMSHCartesianMesh : public GMSHMesh<3>
 {
 public:
-	Cube_GMSHCartesianMesh() : GMSHMesh("cube4cart.geo", "GMSH Cartesian", "gmsh-cart")
+	Cube_GMSHCartesianMesh() : GMSHMesh("3D/cube4cart.geo", "GMSH Cartesian", "gmsh-cart")
 	{}
 private:
 	Cube_GMSHCartesianMesh(string description, string fileNamePart) : GMSHMesh(description, fileNamePart)

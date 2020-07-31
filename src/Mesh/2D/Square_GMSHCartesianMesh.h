@@ -5,7 +5,7 @@ using namespace std;
 class Square_GMSHCartesianMesh : public GMSHMesh<2>
 {
 public:
-	Square_GMSHCartesianMesh() : GMSHMesh("square4cart.geo")
+	Square_GMSHCartesianMesh() : GMSHMesh("2D/square4cart.geo")
 	{
 		this->_description = "GMSH Cartesian";
 		this->_fileNamePart = "gmsh-cart";

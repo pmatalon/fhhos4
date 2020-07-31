@@ -1,9 +1,9 @@
-/*DefineConstant[
+DefineConstant[
   N = {3, Name "Input/1Points "}
-];*/
+];
 L=1;
-//h=L/N; 
-h=0;
+h=L/N; 
+//h=0;
 
 Point (1) = {0, 0, 0, h};
 Point (2) = {L, 0, 0, h};

@@ -5,7 +5,7 @@ using namespace std;
 class Square_GMSHTriangularMesh : public GMSHMesh<2>
 {
 public:
-	Square_GMSHTriangularMesh() : GMSHMesh("square4tri.geo")
+	Square_GMSHTriangularMesh() : GMSHMesh("2D/square4tri.geo")
 	{
 		this->_description = "GMSH triangular";
 		this->_fileNamePart = "gmsh-tri";

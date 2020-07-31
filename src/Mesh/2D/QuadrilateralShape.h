@@ -230,8 +230,8 @@ public:
 			else
 				assert(false);
 		}
-		if (abs(t) > 1.1 || abs(u) > 1.1)
-			assert(false && "The point is not included in the quadrilateral");
+		//if (abs(t) > 1.1 || abs(u) > 1.1)
+			//assert(false && "The point is not included in the quadrilateral");
 		return RefPoint(t, u);
 	}
 

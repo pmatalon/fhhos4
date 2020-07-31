@@ -6,7 +6,7 @@ class Cube_GMSHTetrahedralMesh : public GMSHTetrahedralMesh
 {
 public:
 	Cube_GMSHTetrahedralMesh() :
-		GMSHTetrahedralMesh("cube4tetra.geo", "GMSH tetrahedral", "gmsh-tetra")
+		GMSHTetrahedralMesh("3D/cube4tetra.geo", "GMSH tetrahedral", "gmsh-tetra")
 	{}
 
 private:
