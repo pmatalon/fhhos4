@@ -195,7 +195,8 @@ void print_usage() {
 	cout << "              a   - agglomeration coarsening (keep fine faces on the coarse mesh)" << endl;
 	cout << "              l   - (experimental) agglomeration coarsening by most collinear/coplanar faces (non-nested!)" << endl;
 	cout << "              c   - (experimental) agglomeration coarsening by closest center (non-nested!)" << endl;
-	cout << "              i   - agglomeration coarsening by largest interface (non-nested)" << endl;
+	cout << "              g   - (experimental) agglomeration coarsening by closest face (non-nested!)" << endl;
+	cout << "              i   - (experimental) agglomeration coarsening by largest interface (non-nested)" << endl;
 	cout << "              p   - (experimental) agglomeration coarsening by seed points (non-nested!)" << endl;
 	cout << "              f   - face coarsening: the faces are coarsened and all kept on the coarse skeleton. Requires -g 1." << endl;
 	cout << "              r   - fine meshes obtained by structured refinement of the coarse mesh using GMSH's splitting method" << endl;
@@ -760,6 +761,8 @@ int main(int argc, char* argv[])
 		args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByMostCoplanarFaces;
 	else if (args.Solver.MG.CoarseningStgyCode.compare("c") == 0)
 		args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByClosestCenter;
+	else if (args.Solver.MG.CoarseningStgyCode.compare("g") == 0)
+		args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByClosestFace;
 	else if (args.Solver.MG.CoarseningStgyCode.compare("i") == 0)
 		args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByLargestInterface;
 	else if (args.Solver.MG.CoarseningStgyCode.compare("p") == 0)

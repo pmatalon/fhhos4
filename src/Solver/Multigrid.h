@@ -326,6 +326,10 @@ public:
 			os << "agglomeration [-cs a]" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByMostCoplanarFaces)
 			os << "agglomeration by most coplanar faces [-cs l]" << endl;
+		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter)
+			os << "agglomeration by closest element center [-cs c]" << endl;
+		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByClosestFace)
+			os << "agglomeration by closest face center [-cs g]" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface)
 			os << "agglomeration by largest interface [-cs i]" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::SplittingRefinement)

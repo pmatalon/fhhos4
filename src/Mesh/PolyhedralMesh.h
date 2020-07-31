@@ -59,7 +59,9 @@ public:
 			CoarsenByAgglomerationByVertexRemoval();
 		else if (strategy == CoarseningStrategy::AgglomerationCoarseningByMostCoplanarFaces)
 			CoarsenByAgglomerationByMostCoplanarFaces();
-		else if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter || strategy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface)
+		else if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter 
+			  || strategy == CoarseningStrategy::AgglomerationCoarseningByClosestFace 
+			  || strategy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface)
 			CoarsenByAgglomerationByPairs(strategy);
 		else if (strategy == CoarseningStrategy::AgglomerationCoarseningBySeedPoints)
 			CoarsenByAgglomerationBySeedPoints();
@@ -834,6 +836,8 @@ private:
 				double interfaceMeasure = 0;
 				if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter)
 					distance = Vect<Dim>(e->Center(), neighbour->Center()).norm();
+				else if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestFace)
+					distance = Vect<Dim>(e->Center(), f->Center()).norm();
 				else if (strategy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface)
 				{
 					for (Face<Dim>* fInterface : e->Faces)
@@ -853,6 +857,11 @@ private:
 				else
 				{
 					if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter && distance < closestDistance)
+					{
+						neighbourForAggreg = neighbour;
+						closestDistance = distance;
+					}
+					else if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestFace && distance < closestDistance)
 					{
 						neighbourForAggreg = neighbour;
 						closestDistance = distance;
@@ -890,6 +899,8 @@ private:
 					double interfaceMeasure = 0;
 					if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter)
 						distance = Vect<Dim>(e->Center(), macroNeighbour->Center()).norm();
+					else if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestFace)
+						distance = Vect<Dim>(e->Center(), f->Center()).norm();
 					else if (strategy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface)
 					{
 						for (Face<Dim>* fInterface : e->Faces)
@@ -909,6 +920,11 @@ private:
 					else
 					{
 						if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter && distance < closestDistance)
+						{
+							coarseNeighbourForAggreg = macroNeighbour;
+							closestDistance = distance;
+						}
+						else if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestFace && distance < closestDistance)
 						{
 							coarseNeighbourForAggreg = macroNeighbour;
 							closestDistance = distance;
