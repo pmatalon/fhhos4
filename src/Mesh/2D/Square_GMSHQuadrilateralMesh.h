@@ -5,7 +5,7 @@ using namespace std;
 class Square_GMSHQuadrilateralMesh : public GMSHMesh<2>
 {
 public:
-	Square_GMSHQuadrilateralMesh() : GMSHMesh("2D/square_quad.msh")
+	Square_GMSHQuadrilateralMesh() : GMSHMesh("2D/square4quadrants_quad.msh")
 	{
 		this->_description = "GMSH quadrilateral";
 		this->_fileNamePart = "gmsh-quad";
