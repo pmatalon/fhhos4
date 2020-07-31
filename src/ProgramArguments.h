@@ -67,5 +67,5 @@ struct ProgramArguments
 	ProblemArguments Problem;
 	DiscretizationArguments Discretization;
 	SolverArguments Solver;
-	string OutputDirectory = ".";
+	string OutputDirectory = "./out";
 };

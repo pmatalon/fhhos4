@@ -267,7 +267,7 @@ void print_usage() {
 	cout << "              t   - run unit Tests" << endl;
 	cout << endl;
 	cout << "-o PATH" << endl;
-	cout << "      Output directory to export files (default: ./)." << endl;
+	cout << "      Output directory to export files (default: ./out)." << endl;
 	cout << endl;
 	cout << "--------------------------------------------------------" << endl;
 }
