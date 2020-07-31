@@ -415,34 +415,37 @@ public:
 				}
 			}
 
-			for (Face<Dim>* cf : CoarseMesh->Faces)
+			if (CoarseMesh->ComesFrom.CS != CoarseningStrategy::IndependentRemeshing)
 			{
-				assert(cf->FinerFaces.size() > 0);
-				for (Face<Dim>* ff : cf->FinerFaces)
+				for (Face<Dim>* cf : CoarseMesh->Faces)
 				{
-					assert(!ff->IsRemovedOnCoarserGrid);
-					assert(ff->CoarseFace == cf);
-				}
-			}
-
-			for (Face<Dim>* ff : this->Faces)
-			{
-				if (ff->IsRemovedOnCoarserGrid)
-				{
-					Element<Dim>* ce1 = ff->Element1->CoarserElement;
-					Element<Dim>* ce2 = ff->Element2->CoarserElement;
-					assert(ce1 == ce2);
-
-					bool ffIsReferenced = false;
-					for (Face<Dim>* removedFace : ce1->FinerFacesRemoved)
+					assert(cf->FinerFaces.size() > 0);
+					for (Face<Dim>* ff : cf->FinerFaces)
 					{
-						if (ff == removedFace)
-						{
-							ffIsReferenced = true;
-							break;
-						}
+						assert(!ff->IsRemovedOnCoarserGrid);
+						assert(ff->CoarseFace == cf);
 					}
-					assert(ffIsReferenced);
+				}
+
+				for (Face<Dim>* ff : this->Faces)
+				{
+					if (ff->IsRemovedOnCoarserGrid)
+					{
+						Element<Dim>* ce1 = ff->Element1->CoarserElement;
+						Element<Dim>* ce2 = ff->Element2->CoarserElement;
+						assert(ce1 == ce2);
+
+						bool ffIsReferenced = false;
+						for (Face<Dim>* removedFace : ce1->FinerFacesRemoved)
+						{
+							if (ff == removedFace)
+							{
+								ffIsReferenced = true;
+								break;
+							}
+						}
+						assert(ffIsReferenced);
+					}
 				}
 			}
 

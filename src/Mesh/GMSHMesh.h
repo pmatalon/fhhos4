@@ -27,6 +27,7 @@ template <int Dim>
 class GMSHMesh : virtual public PolyhedralMesh<Dim>
 {
 protected:
+	string _gmshFilePath;
 	string _description = "GMSH file";
 	string _fileNamePart = "gmsh-file";
 
@@ -35,11 +36,19 @@ protected:
 	double _h = -1;
 	double _regularity = 1;
 public:
-	GMSHMesh(string mshFile, string description, string fileNamePart) : PolyhedralMesh<Dim>()
+	GMSHMesh(string mshFile, string description, string fileNamePart, double h = -1) : PolyhedralMesh<Dim>()
 	{
 		_description = description;
 		_fileNamePart = fileNamePart;
 		mshFile = SearchFile(mshFile);
+		_gmshFilePath = mshFile;
+
+		bool tmpFileCreated = false;
+		if (h != -1)
+		{
+			mshFile = SetH(mshFile, h);
+			tmpFileCreated = true;
+		}
 
 		gmsh::initialize();
 		//gmsh::option::setNumber("General.Terminal", 1);
@@ -50,6 +59,9 @@ public:
 		gmsh::open(mshFile);
 
 		Build();
+
+		if (tmpFileCreated)
+			remove(mshFile.c_str());
 	}
 
 	GMSHMesh(string mshFile) : GMSHMesh(mshFile, "GMSH file", "gmsh-file")
@@ -84,12 +96,46 @@ private:
 			if (Utils::FileExists(Mesh<Dim>::MeshDirectory + mshFile))
 				mshFile = Mesh<Dim>::MeshDirectory + mshFile;
 			else
-			{
-				cout << Utils::BeginRed << "File not found: " << mshFile << Utils::EndColor;
-				exit(EXIT_FAILURE);
-			}
+				Utils::FatalError("File not found: " + mshFile);
 		}
 		return mshFile;
+	}
+
+	static string SetH(string geoFile, double h)
+	{
+		string geoFileWithH = Mesh<Dim>::MeshDirectory + "temporary_set_h.geo";
+		ofstream gmshScriptWithH(geoFileWithH);
+		ifstream gmshScript(geoFile);
+
+		if (!gmshScriptWithH.is_open())
+		{
+			gmshScript.close();
+			Utils::FatalError("Unable to create temporary file " + geoFileWithH);
+		}
+
+		bool hFound = false;
+		string line;
+		while (getline(gmshScript, line))
+		{
+			if (line.find("h =") == 0 || line.find("h=") == 0)
+			{
+				hFound = true;
+				gmshScriptWithH << "h = " << h << ";\r" << endl;
+			}
+			else
+				gmshScriptWithH << line << endl;
+		}
+
+		gmshScript.close();
+		gmshScriptWithH.close();
+
+		if (!hFound)
+		{
+			remove(geoFileWithH.c_str());
+			Utils::FatalError("No variable h declared in the file " + geoFile);
+		}
+
+		return geoFileWithH;
 	}
 
 	void Build()
@@ -226,7 +272,13 @@ public:
 	{
 		if (strategy == CoarseningStrategy::SplittingRefinement || strategy == CoarseningStrategy::BeyRefinement)
 			return;
-		PolyhedralMesh<Dim>::CoarsenMesh(strategy);
+		else if (strategy == CoarseningStrategy::IndependentRemeshing)
+			IndependentRemesh();
+		else
+			PolyhedralMesh<Dim>::CoarsenMesh(strategy);
+
+		this->CoarseMesh->SetDiffusionCoefficient(this->_diffusionPartition);
+		this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
 	}
 
 	virtual void RefineMesh(CoarseningStrategy strategy)
@@ -254,7 +306,7 @@ public:
 		gmsh::model::mesh::refine();
 
 		// Building our own mesh objects from the GMSH ones
-		GMSHMesh<Dim>* fineMesh = CreateEmptyGMSHMesh();
+		GMSHMesh<Dim>* fineMesh = CreateNewGMSHMesh();
 		fineMesh->ComesFrom.CS = CoarseningStrategy::SplittingRefinement;
 
 		this->FineMesh = fineMesh;
@@ -283,12 +335,33 @@ public:
 		fineMesh->LinkFacesToCoarseFaces();
 	}
 
-	virtual GMSHMesh<Dim>* CreateEmptyGMSHMesh()
+	virtual GMSHMesh<Dim>* CreateNewGMSHMesh()
 	{
 		return new GMSHMesh<Dim>(this->_description, this->_fileNamePart);
 	}
 
 private:
+	void IndependentRemesh()
+	{
+		cout << "Coarsening by independent remeshing" << endl;
+
+		GMSHMesh<Dim>* fineMesh = this;
+
+		GMSHMesh<Dim>* coarseMesh = new GMSHMesh<Dim>(_gmshFilePath, _description, _fileNamePart, fineMesh->H() * 2);
+		coarseMesh->ComesFrom.CS = CoarseningStrategy::IndependentRemeshing;
+
+		fineMesh->CoarseMesh = coarseMesh;
+		coarseMesh->FineMesh = fineMesh;
+
+		for (Element<Dim>* fine : fineMesh->Elements)
+		{
+			Element<Dim>* coarse = coarseMesh->LocateElementThatEmbeds(fine);
+			coarse->FinerElements.push_back(fine);
+			fine->CoarserElement = coarse;
+		}
+	}
+
+
 	Element<Dim>* LocateElementThatEmbeds(Element<Dim>* finerElement)
 	{
 		size_t coarseElementTag;

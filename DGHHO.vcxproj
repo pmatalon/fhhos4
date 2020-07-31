@@ -111,10 +111,11 @@
     <ClInclude Include="src\Mesh\2D\Square_GMSHCartesianMesh.h" />
     <ClInclude Include="src\Mesh\2D\Square_GMSHQuadrilateralMesh.h" />
     <ClInclude Include="src\Mesh\2D\Square_GMSHTriangularMesh.h" />
-    <ClInclude Include="src\Mesh\2D\Square_GMSHUnstructuredTriangularMesh.h" />
+    <ClInclude Include="src\Mesh\2D\Square4quadrants_GMSHUnstructTriangularMesh.h" />
     <ClInclude Include="src\Mesh\2D\Polygon.h" />
     <ClInclude Include="src\Mesh\2D\PolygonalShape.h" />
     <ClInclude Include="src\Mesh\2D\Quadrilateral.h" />
+    <ClInclude Include="src\Mesh\2D\Square_GMSHUnstructTriangularMesh.h" />
     <ClInclude Include="src\Mesh\2D\Square_QuadrilateralAsPolygonalMesh.h" />
     <ClInclude Include="src\Mesh\2D\QuadrilateralShape.h" />
     <ClInclude Include="src\Mesh\2D\Square_QuadrilateralMesh.h" />

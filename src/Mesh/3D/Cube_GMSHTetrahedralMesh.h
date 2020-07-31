@@ -14,7 +14,7 @@ private:
 	{}
 
 protected:
-	virtual GMSHMesh<3>* CreateEmptyGMSHMesh() override
+	virtual GMSHMesh<3>* CreateNewGMSHMesh() override
 	{
 		return new Cube_GMSHTetrahedralMesh(this->_description, this->_fileNamePart);
 	}

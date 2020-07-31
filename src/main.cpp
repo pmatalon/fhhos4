@@ -48,15 +48,16 @@ void print_usage() {
 	cout << endl;
 	cout << "-mesh CODE" << endl;
 	cout << "      Type of mesh. (Default: cart)" << endl;
-	cout << "               cart          - Unit square/cube discretized by an in-house uniform Cartesian mesh" << endl;
-	cout << "               tri           - Unit square discretized by an in-house uniform trianglular mesh" << endl;
-	cout << "               quad          - Unit square discretized by an in-house uniform quadrilateral mesh (use argument -stretch to configure)" << endl;
-	cout << "               gmsh-cart     - Unit square discretized by a uniform Cartesian mesh built by GMSH" << endl;
-	cout << "               gmsh-tri      - Unit square discretized by a uniform triangular mesh built by GMSH from successive refinements of a coarse mesh" << endl;
-	cout << "               gmsh-uns-tri  - Unit square discretized by an unstructured triangular mesh built by GMSH from successive refinements of a coarse mesh" << endl;
-	cout << "               tetra         - Unit cube discretized by a uniform tetrahedral mesh embedded in a Cartesian mesh" << endl;
-	cout << "               gmsh-tetra    - Unit cube discretized by a uniform tetrahedral mesh built by GMSH from successive refinements of a coarse mesh" << endl;
-	cout << "               gmsh          - .msh or .geo GMSH file given in the argument -file" << endl;
+	cout << "            cart                - Unit square/cube discretized by an in-house uniform Cartesian mesh" << endl;
+	cout << "            tri                 - Unit square discretized by an in-house uniform trianglular mesh" << endl;
+	cout << "            quad                - Unit square discretized by an in-house uniform quadrilateral mesh (use argument -stretch to configure)" << endl;
+	cout << "            gmsh-cart           - Unit square discretized by a uniform Cartesian mesh built by GMSH" << endl;
+	cout << "            gmsh-tri            - Unit square discretized by a uniform triangular mesh built by GMSH from successive refinements of a coarse mesh" << endl;
+	cout << "            4quad-gmsh-uns-tri  - Unit square with 4 quandrants discretized by an unstructured triangular mesh built by GMSH from successive refinements of a coarse mesh" << endl;
+	cout << "            gmsh-uns-tri        - Unit square discretized by an unstructured triangular mesh built by GMSH" << endl;
+	cout << "            tetra               - Unit cube discretized by a uniform tetrahedral mesh embedded in a Cartesian mesh" << endl;
+	cout << "            gmsh-tetra          - Unit cube discretized by a uniform tetrahedral mesh built by GMSH from successive refinements of a coarse mesh" << endl;
+	cout << "            gmsh                - .msh or .geo GMSH file given in the argument -file" << endl;
 	cout << endl;
 	cout << "-n NUM" << endl;
 	cout << "      Number of subdivisions in each cartesian dimension of the unit square/cube (default: 16)." << endl;
@@ -198,6 +199,7 @@ void print_usage() {
 	cout << "              g   - (experimental) agglomeration coarsening by closest face (non-nested!)" << endl;
 	cout << "              i   - (experimental) agglomeration coarsening by largest interface (non-nested)" << endl;
 	cout << "              p   - (experimental) agglomeration coarsening by seed points (non-nested!)" << endl;
+	cout << "              m   - independant remeshing by GMSH with double the mesh size (non-nested!)" << endl;
 	cout << "              f   - face coarsening: the faces are coarsened and all kept on the coarse skeleton. Requires -g 1." << endl;
 	cout << "              r   - fine meshes obtained by structured refinement of the coarse mesh using GMSH's splitting method" << endl;
 	cout << "              b   - fine meshes obtained by structured refinement of the coarse mesh using the Bey method" << endl;
@@ -767,6 +769,8 @@ int main(int argc, char* argv[])
 		args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByLargestInterface;
 	else if (args.Solver.MG.CoarseningStgyCode.compare("p") == 0)
 		args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningBySeedPoints;
+	else if (args.Solver.MG.CoarseningStgyCode.compare("m") == 0)
+		args.Solver.MG.CoarseningStgy = CoarseningStrategy::IndependentRemeshing;
 	else if (args.Solver.MG.CoarseningStgyCode.compare("f") == 0)
 		args.Solver.MG.CoarseningStgy = CoarseningStrategy::FaceCoarsening;
 	else if (args.Solver.MG.CoarseningStgyCode.compare("r") == 0)
@@ -778,6 +782,9 @@ int main(int argc, char* argv[])
 
 	if ((args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("pcgmg") == 0) && args.Solver.MG.CoarseningStgy == CoarseningStrategy::FaceCoarsening && !args.Solver.MG.UseGalerkinOperator)
 		argument_error("To use the face coarsening, you must also use the Galerkin operator. To do so, add option -g 1.");
+
+	if ((args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("pcgmg") == 0) && args.Solver.MG.CoarseningStgy == CoarseningStrategy::IndependentRemeshing && args.Solver.MG.ProlongationCode != Prolongation::CellInterp_L2proj_Trace)
+		argument_error("The coarsening by independent remeshing is only applicable with the non-nested version of the multigrid (-prolong " + to_string((unsigned)Prolongation::CellInterp_L2proj_Trace) + ").");
 
 	args.Actions = Action::LogAssembly;
 	for (size_t i = 0; i < args.ActionCodes.length(); i++)

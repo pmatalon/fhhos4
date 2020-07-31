@@ -13,7 +13,8 @@
 #ifdef GMSH_ENABLED
 #include "Mesh/2D/Square_GMSHCartesianMesh.h"
 #include "Mesh/2D/Square_GMSHTriangularMesh.h"
-#include "Mesh/2D/Square_GMSHUnstructuredTriangularMesh.h"
+#include "Mesh/2D/Square4quadrants_GMSHUnstructTriangularMesh.h"
+#include "Mesh/2D/Square_GMSHUnstructTriangularMesh.h"
 #include "Mesh/2D/Square_GMSHQuadrilateralMesh.h"
 #include "Mesh/3D/Cube_GMSHTetrahedralMesh.h"
 #include "Mesh/3D/Cube_GMSHCartesianMesh.h"
@@ -656,10 +657,20 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 		Mesh<2>* coarseMesh = new Square_GMSHTriangularMesh();
 		fineMesh = coarseMesh->RefineUntilNElements(2*nx*ny, refinementStgy);
 	}
+	else if (meshCode.compare("4quad-gmsh-uns-tri") == 0)
+	{
+		Mesh<2>* coarseMesh = new Square4quadrants_GMSHUnstructTriangularMesh();
+		fineMesh = coarseMesh->RefineUntilNElements(2*nx*ny, refinementStgy);
+	}
 	else if (meshCode.compare("gmsh-uns-tri") == 0)
 	{
-		Mesh<2>* coarseMesh = new Square_GMSHUnstructuredTriangularMesh();
-		fineMesh = coarseMesh->RefineUntilNElements(2*nx*ny, refinementStgy);
+		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::SplittingRefinement)
+		{
+			Mesh<2>* coarseMesh = new Square_GMSHUnstructTriangularMesh(8);
+			fineMesh = coarseMesh->RefineUntilNElements(2 * nx*ny, refinementStgy);
+		}
+		else
+			fineMesh = new Square_GMSHUnstructTriangularMesh(args.Discretization.N);
 	}
 	else if (meshCode.compare("gmsh-quad") == 0)
 	{
