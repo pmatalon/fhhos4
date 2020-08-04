@@ -26,6 +26,8 @@ enum class CoarseningStrategy : unsigned
 	AgglomerationCoarseningByLargestInterface,
 	AgglomerationCoarseningBySeedPoints,
 	AgglomerationCoarseningByMostCoplanarFaces,
+	AgglomerationCoarseningByFaceNeighbours,
+	AgglomerationCoarseningByVertexNeighbours,
 	IndependentRemeshing,
 	FaceCoarsening,
 	SplittingRefinement,

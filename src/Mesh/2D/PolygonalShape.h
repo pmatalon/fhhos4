@@ -156,6 +156,8 @@ public:
 			_triangulation = BarycentricTriangulation(_vertices);
 		else
 			_triangulation = CGALTriangulation();
+
+		assert(_triangulation.size() > 0);
 	}
 
 	void ComputeBoundingBox()
@@ -354,15 +356,28 @@ public:
 
 	void ExportToMatlab(string color = "r") const override
 	{
+		cout << "%-- Shape using vertices:" << endl;
+		ExportVerticesToMatlab(color);
+		cout << "%-- Shape using CGAL vertices:" << endl;
+		ExportCGALPolyToMatlab();
+		if (_triangulation.size() > 0)
+		{
+			cout << "%-- Subshapes:" << endl;
+			ExportSubShapesToMatlab();
+		}
+	}
+
+	void ExportVerticesToMatlab(string color = "r") const
+	{
 		MatlabScript script;
 		script.PlotPolygonEdges(_vertices, color);
 		script.Out() << endl;
 	}
 
-	void ExportCGALPolyToMatlab() const
+	void ExportCGALPolyToMatlab(string color = "b") const
 	{
 		MatlabScript script;
-		script.PlotPolygonEdges(Vertices(_cgalPolygon), "b");
+		script.PlotPolygonEdges(Vertices(_cgalPolygon), color);
 		script.Out() << endl;
 	}
 
@@ -451,12 +466,7 @@ public:
 		double eps = 1e-4*_measure;
 		if (abs(sumMeasures - _cgalPolygon.area()) >= eps)
 		{
-			cout << "Shape using vertices:" << endl;
 			this->ExportToMatlab();
-			cout << "Shape using CGAL vertices:" << endl;
-			this->ExportCGALPolyToMatlab();
-			cout << "Subshapes:" << endl;
-			this->ExportSubShapesToMatlab();
 			assert(abs(sumMeasures - _cgalPolygon.area()) < eps);
 		}
 

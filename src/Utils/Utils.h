@@ -50,10 +50,32 @@ public:
 		return AB;
 	}
 
+	template <typename T>
+	static inline vector<T> SymmetricDifference(vector<T> A, vector<T> B)
+	{
+		vector<T> v1 = A;
+		vector<T> v2 = B;
+
+		sort(v1.begin(), v1.end());
+		sort(v2.begin(), v2.end());
+
+		vector<T> symDifference;
+
+		set_symmetric_difference(v1.begin(), v1.end(),
+								 v2.begin(), v2.end(),
+								 std::back_inserter(symDifference));
+		return symDifference;
+	}
+
 	static string BeginRed;
 	static string BeginGreen;
 	static string BeginYellow;
 	static string EndColor;
+
+	static void Error(string msg)
+	{
+		cout << Utils::BeginRed << "Error: " << msg << Utils::EndColor << endl;
+	}
 
 	static void FatalError(string msg)
 	{

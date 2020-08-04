@@ -98,6 +98,15 @@ public:
 		}
 	}
 
+	void RemoveElement(Element<Dim>* e)
+	{
+		BigNumber iToRemove = e->Number;
+		assert(this->Elements[iToRemove] == e);
+		this->Elements.erase(this->Elements.begin() + e->Number);
+		for (int i = iToRemove; i < this->Elements.size(); i++)
+			this->Elements[i]->Number = i;
+	}
+
 	void RemoveFace(Face<Dim>* f, bool removeFromBoundaryAndIteriorLists = true)
 	{
 		BigNumber iToRemove = f->Number;
@@ -131,7 +140,7 @@ public:
 		}
 	}
 
-	void FillBoundaryAndIteriorFaceLists()
+	void FillBoundaryAndInteriorFaceLists()
 	{
 		assert((this->BoundaryFaces.empty() && this->InteriorFaces.empty()) || (!this->BoundaryFaces.empty() && !this->InteriorFaces.empty()));
 
@@ -338,18 +347,13 @@ public:
 						cout << "One of them is not pointing outwards." << endl;
 						double d = abs(n.dot(n2) + 1);
 						auto c = e->Center();
-						if (e->Shape()->IsMadeOfSubShapes())
-						{
-							cout << "Matlab script to plot the subshapes of element " << e->Number << ":" << endl;
-							e->Shape()->ExportSubShapesToMatlab();
-							cout << endl;
-						}
-						if (neighbour->Shape()->IsMadeOfSubShapes())
-						{
-							cout << "Matlab script to plot the subshapes of element " << neighbour->Number << ":" << endl;
-							neighbour->Shape()->ExportSubShapesToMatlab();
-							cout << endl;
-						}
+						cout << "Matlab script to plot element " << e->Number << ":" << endl;
+						e->ExportToMatlab();
+						cout << endl;
+						cout << "Matlab script to plot element " << neighbour->Number << ":" << endl;
+						neighbour->ExportToMatlab();
+						cout << endl;
+
 						n = e->OuterNormalVector(f);
 						n2 = neighbour->OuterNormalVector(f);
 						e->UnitTests();

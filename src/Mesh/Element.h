@@ -80,6 +80,10 @@ public:
 	{
 		return Shape()->Contains(p);
 	}
+	virtual void ExportToMatlab(string color = "r") const
+	{
+		return Shape()->ExportToMatlab(color);
+	}
 	virtual DimVector<Dim> OuterNormalVector(Face<Dim>* face) const = 0;
 
 	// Transformation to reference element
@@ -159,22 +163,7 @@ public:
 
 	vector<Face<Dim>*> NonCommonFacesWith(Element<Dim>* other)
 	{
-		vector<Face<Dim>*> faces;
-		for (Face<Dim>* f1 : this->Faces)
-		{
-			bool otherAlsoHasIt = false;
-			for (Face<Dim>* f2 : other->Faces)
-			{
-				if (f1 == f2)
-				{
-					otherAlsoHasIt = true;
-					break;
-				}
-			}
-			if (!otherAlsoHasIt)
-				faces.push_back(f1);
-		}
-		return faces;
+		return Utils::SymmetricDifference<Face<Dim>*>(this->Faces, other->Faces);
 	}
 
 	bool HasFace(Face<Dim>* face)
@@ -220,6 +209,16 @@ public:
 		this->Faces.push_back(mergedFace);
 
 		RemoveIntersections(faces, mergedFace);
+	}
+
+	bool WillDegenerateIfReplacement(vector<Face<Dim>*> faces, Face<Dim>* mergedFace)
+	{
+		for (Face<Dim>* f : this->Faces)
+		{
+			if (!f->IsIn(faces) && mergedFace->Contains(f->Center()))
+				return true;
+		}
+		return false;
 	}
 
 protected:
@@ -288,6 +287,9 @@ public:
 
 	void SetOverlappingFineElements()
 	{
+		//if (!this->OverlappingFineElements.empty())
+			//return;
+
 		set<Element<Dim>*> s;
 		for (auto fe : this->FinerElements)
 			s.insert(fe);
@@ -418,7 +420,7 @@ public:
 		}
 		os << ", ";
 		Shape()->Serialize(os);
-		if (this->DiffTensor->LargestEigenValue > 1)
+		if (this->DiffTensor && this->DiffTensor->LargestEigenValue > 1)
 		{
 			os << ", k=";
 			os << this->DiffTensor->LargestEigenValue;

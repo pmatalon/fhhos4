@@ -344,6 +344,7 @@ public:
 			if (args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("cgmg") == 0 || args.Solver.SolverCode.compare("fcgmg") == 0)
 			{
 				mesh->ExportFacesToMatlab(args.OutputDirectory + "/fine.dat");
+				mesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_fine.m");
 
 				// 1st coarsening
 				mesh->CoarsenMesh(args.Solver.MG.CoarseningStgy);

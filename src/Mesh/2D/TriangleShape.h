@@ -153,6 +153,12 @@ public:
 		return p;
 	}
 
+	void ExportToMatlab(string color = "r") const override
+	{
+		MatlabScript script;
+		script.PlotTriangle(*V1, *V2, *V3, color);
+	}
+
 	void Serialize(ostream& os) const override
 	{
 		os << "Triangle";

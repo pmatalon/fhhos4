@@ -336,6 +336,12 @@
     <ClInclude Include="src\Mesh\2D\Square_GMSHUnstructTriangularMesh.h">
       <Filter>Mesh\2D</Filter>
     </ClInclude>
+    <ClInclude Include="src\Mesh\Interface.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\Agglo.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

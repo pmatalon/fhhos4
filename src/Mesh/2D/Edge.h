@@ -117,6 +117,12 @@ public:
 		}
 	}
 
+	void ExportToMatlab(string color = "r") const override
+	{
+		MatlabScript script;
+		script.PlotSegment(Vertex1, Vertex2, color);
+	}
+
 	void Serialize(ostream& os) const override
 	{
 		Vertex1->Serialize(os, 2);

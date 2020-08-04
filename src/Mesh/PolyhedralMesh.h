@@ -5,6 +5,7 @@
 #include "Mesh.h"
 #include "2D/Polygon.h"
 #include "AgglomerateElement.h"
+#include "Agglo.h"
 using namespace std;
 
 template <int Dim>
@@ -65,12 +66,16 @@ public:
 			CoarsenByAgglomerationByPairs(strategy);
 		else if (strategy == CoarseningStrategy::AgglomerationCoarseningBySeedPoints)
 			CoarsenByAgglomerationBySeedPoints();
+		else if (strategy == CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
+			CoarsenByAgglomerationByFaceNeighbours();
+		else if (strategy == CoarseningStrategy::AgglomerationCoarseningByVertexNeighbours)
+			CoarsenByAgglomerationByVertexNeighbours();
 		else if (strategy == CoarseningStrategy::FaceCoarsening)
 			FaceCoarsening();
 		else
 			Mesh<Dim>::CoarsenMesh(strategy);
 
-		this->CoarseMesh->FillBoundaryAndIteriorFaceLists();
+		this->CoarseMesh->FillBoundaryAndInteriorFaceLists();
 
 		this->CoarseMesh->SetDiffusionCoefficient(this->_diffusionPartition);
 		this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
@@ -104,7 +109,7 @@ private:
 		this->CoarseMesh = coarseMesh;
 		coarseMesh->FineMesh = this;
 
-		BigNumber elementToAnalyze = 999999999999;
+		//BigNumber elementToAnalyze = 999999999999;
 
 		// Associate to each vertex the list of faces it connects
 		map<Vertex*, vector<Face<Dim>*>> vertexFaceMap = this->BuildVertexFaceMap();
@@ -200,13 +205,13 @@ private:
 
 			Element<Dim>* coarseElement1 = coarseMesh->AgglomerateFineElements(agglomerate1);
 
-			if (this->FineMesh && coarseMesh->Elements.size() > elementToAnalyze)
+			/*if (this->FineMesh && coarseMesh->Elements.size() > elementToAnalyze)
 			{
 				coarseMesh->ExportFacesToMatlab("/mnt/c/Users/pierr/Desktop/Matrices/coarse2.dat");
 				AgglomerateElement<Dim>* agglo = dynamic_cast<AgglomerateElement<Dim>*>(coarseMesh->Elements[elementToAnalyze]);
 				AgglomerateShape<Dim>* shape = dynamic_cast<AgglomerateShape<Dim>*>(agglo->Shape());
 				shape->ExportSubShapesToMatlab();
-			}
+			}*/
 
 			// Do not process the neighbouring vertices
 			for (Element<Dim>* ea : agglomerate1)
@@ -241,13 +246,13 @@ private:
 				}
 				Element<Dim>* coarseElement2 = coarseMesh->AgglomerateFineElements(agglomerate2);
 
-				if (this->FineMesh && coarseMesh->Elements.size() > elementToAnalyze)
+				/*if (this->FineMesh && coarseMesh->Elements.size() > elementToAnalyze)
 				{
 					coarseMesh->ExportFacesToMatlab("/mnt/c/Users/pierr/Desktop/Matrices/coarse2.dat");
 					AgglomerateElement<Dim>* agglo = dynamic_cast<AgglomerateElement<Dim>*>(coarseMesh->Elements[elementToAnalyze]);
 					AgglomerateShape<Dim>* shape = dynamic_cast<AgglomerateShape<Dim>*>(agglo->Shape());
 					shape->ExportSubShapesToMatlab();
-				}
+				}*/
 
 				// Do not process the neighbouring vertices
 				for (Element<Dim>* ea : agglomerate2)
@@ -267,23 +272,23 @@ private:
 			// If f1 and f2 are not totally coplanar, then the nestedness is lost.
 			// However, if they are close to coplanar, it's still okay because the coarse mesh can be seen
 			// as a slightly perturbed nested mesh.
-			if (this->FineMesh && coarseMesh->Elements.size() > elementToAnalyze)
+			/*if (this->FineMesh && coarseMesh->Elements.size() > elementToAnalyze)
 			{
 				coarseMesh->ExportFacesToMatlab("/mnt/c/Users/pierr/Desktop/Matrices/coarse2.dat");
 				AgglomerateElement<Dim>* agglo = dynamic_cast<AgglomerateElement<Dim>*>(coarseMesh->Elements[elementToAnalyze]);
 				AgglomerateShape<Dim>* shape = dynamic_cast<AgglomerateShape<Dim>*>(agglo->Shape());
 				shape->ExportSubShapesToMatlab();
-			}
+			}*/
 
 			coarseMesh->AgglomerateFineFaces(f1, f2);
 
-			if (this->FineMesh && coarseMesh->Elements.size() > elementToAnalyze)
+			/*if (this->FineMesh && coarseMesh->Elements.size() > elementToAnalyze)
 			{
 				coarseMesh->ExportFacesToMatlab("/mnt/c/Users/pierr/Desktop/Matrices/coarse2.dat");
 				AgglomerateElement<Dim>* agglo = dynamic_cast<AgglomerateElement<Dim>*>(coarseMesh->Elements[elementToAnalyze]);
 				AgglomerateShape<Dim>* shape = dynamic_cast<AgglomerateShape<Dim>*>(agglo->Shape());
 				shape->ExportSubShapesToMatlab();
-			}
+			}*/
 
 			coarseMesh->CollapseInterfacesMadeOfMultipleFaces(coarseElement1);
 		}
@@ -330,13 +335,13 @@ private:
 			else
 				coarseMesh->AgglomerateFineElementToCoarse(e, dynamic_cast<AgglomerateElement<Dim>*>(smallestNeighbour));
 
-			if (this->FineMesh && coarseMesh->Elements.size() > elementToAnalyze && (e == coarseMesh->Elements[elementToAnalyze] || smallestNeighbour == coarseMesh->Elements[elementToAnalyze]))
+			/*if (this->FineMesh && coarseMesh->Elements.size() > elementToAnalyze && (e == coarseMesh->Elements[elementToAnalyze] || smallestNeighbour == coarseMesh->Elements[elementToAnalyze]))
 			{
 				coarseMesh->ExportFacesToMatlab("/mnt/c/Users/pierr/Desktop/Matrices/coarse2.dat");
 				AgglomerateElement<Dim>* agglo = dynamic_cast<AgglomerateElement<Dim>*>(coarseMesh->Elements[elementToAnalyze]);
 				AgglomerateShape<Dim>* shape = dynamic_cast<AgglomerateShape<Dim>*>(agglo->Shape());
 				shape->ExportSubShapesToMatlab();
-			}
+			}*/
 		}
 
 
@@ -369,18 +374,10 @@ private:
 	//-------------------------------------------------------------------------------------------------------------------------//
 	void CollapseInterfacesMadeOfMultipleFaces(Element<Dim>* e)
 	{
-		// avoid the destruction of the element
-		if (e->Faces.size() == 3)
-			return;
-
 		for (Element<Dim>* n : e->Neighbours())
 		{
-			// avoid the destruction of the neighbour
-			if (n->Faces.size() == 3)
-				continue;
-
-			vector<Face<Dim>*> faces = e->InterfaceWith(n);
-			if (faces.size() > 1)
+			vector<Face<Dim>*> interfaceFaces = e->InterfaceWith(n);
+			if (interfaceFaces.size() > 1)
 			{
 				/*if (this->FineMesh && coarseMesh->Elements.size() > elementToAnalyze && (ce == coarseMesh->Elements[elementToAnalyze] || n == coarseMesh->Elements[elementToAnalyze]))
 					//if (this->FineMesh && this->FineMesh->FineMesh && faces[0]->Number == 289 && faces[1]->Number == 292)
@@ -390,23 +387,37 @@ private:
 					AgglomerateShape<Dim>* shape = dynamic_cast<AgglomerateShape<Dim>*>(agglo->Shape());
 					shape->ExportSubShapesToMatlab();
 				}*/
-				/*if (this->FineMesh && this->FineMesh->FineMesh && n->Number == 97)
+				/*if (this->FineMesh && (n->Number == 810 || e->Number == 810))
 				{
-					this->ExportFacesToMatlab("/mnt/c/Users/pierr/Desktop/Matrices/coarse2.dat");
-					AgglomerateElement<Dim>* agglo = dynamic_cast<AgglomerateElement<Dim>*>(this->Elements[11]);
-					AgglomerateShape<Dim>* shape = dynamic_cast<AgglomerateShape<Dim>*>(agglo->Shape());
-					shape->ExportSubShapesToMatlab();
+					this->ExportFacesToMatlab("/mnt/c/Users/pierr/Desktop/Matrices/coarse1.dat");
+					//AgglomerateElement<Dim>* agglo = dynamic_cast<AgglomerateElement<Dim>*>(this->Elements[11]);
+					//AgglomerateShape<Dim>* shape = dynamic_cast<AgglomerateShape<Dim>*>(agglo->Shape());
+					e->Shape()->ExportToMatlab();
+					n->Shape()->ExportToMatlab();
 				}*/
-				//this->ExportFacesToMatlab("/mnt/c/Users/pierr/Desktop/Matrices/coarse2.dat");
-				Agglomerate(faces);
+				//this->ExportFacesToMatlab("/mnt/c/Users/pierr/Desktop/Matrices/coarse1.dat");
+				bool wouldDegenerateE = e->Faces.size() - interfaceFaces.size() + 1 <= Dim;
+				bool wouldDegenerateN = n->Faces.size() - interfaceFaces.size() + 1 <= Dim;
 
-				/*if (this->FineMesh && coarseMesh->Elements.size() > elementToAnalyze && (ce == coarseMesh->Elements[elementToAnalyze] || n == coarseMesh->Elements[elementToAnalyze]))
+				if (!wouldDegenerateE && !wouldDegenerateN)
+					Agglomerate(interfaceFaces);
+				else
 				{
-					coarseMesh->ExportFacesToMatlab("/mnt/c/Users/pierr/Desktop/Matrices/coarse2.dat");
-					AgglomerateElement<Dim>* agglo = dynamic_cast<AgglomerateElement<Dim>*>(coarseMesh->Elements[elementToAnalyze]);
-					AgglomerateShape<Dim>* shape = dynamic_cast<AgglomerateShape<Dim>*>(agglo->Shape());
-					shape->ExportSubShapesToMatlab();
-				}*/
+					// We can't collpase the faces of the interface, otherwise one element will degenerate (i.e. number of faces <= Dim)
+					Utils::Warning("Attempt to perform an operation which would result in a degenerate element. Agglomerating the elements instead.");
+					/*cout << "%-- " << *e << endl;
+					e->ExportToMatlab("r");
+					cout << "%-- " << *n << endl;
+					n->ExportToMatlab("b");*/
+
+					Element<Dim>* newE = Agglomerate(e, n);
+
+					//cout << "%-- " << *newE << endl;
+					//newE->ExportToMatlab("m");
+
+					CollapseInterfacesMadeOfMultipleFaces(newE);
+					return;
+				}
 			}
 		}
 
@@ -546,6 +557,90 @@ private:
 		}
 		dynamic_cast<PolyhedralMesh<Dim>*>(this->FineMesh)->AddSeedAssociation(e, e);
 		return macroElement;
+	}
+
+	//---------------------------------------------//
+	//                                             //
+	//        Coarsening by face neighbours        //
+	//                                             //
+	//---------------------------------------------//
+
+	void CoarsenByAgglomerationByFaceNeighbours()
+	{
+		PolyhedralMesh<Dim>* coarseMesh = new PolyhedralMesh<Dim>();
+		this->CoarseMesh = coarseMesh;
+		coarseMesh->FineMesh = this;
+
+		for (Element<Dim>* currentElem : this->Elements)
+		{
+			if (currentElem->CoarserElement)
+				continue;
+
+			vector<Element<Dim>*> availableNeighbours = AvailableFaceNeighbours(currentElem);
+
+			if (availableNeighbours.size() > 0)
+			{
+				availableNeighbours.push_back(currentElem);
+				Element<Dim>* coarseElement = coarseMesh->AgglomerateFineElements(availableNeighbours);
+				coarseMesh->CollapseInterfacesMadeOfMultipleFaces(coarseElement);
+			}
+			else
+			{
+				Element<Dim>* coarseNeighbourForAggreg = this->FittestCoarseNeighbour(currentElem, CoarseningStrategy::AgglomerationCoarseningByClosestCenter);
+				if (!coarseNeighbourForAggreg)
+					Utils::FatalError("Element cannot be aggregated. Weird...");
+
+				Element<Dim>* macroElement = coarseMesh->AgglomerateFineElementToCoarse(currentElem, coarseNeighbourForAggreg);
+				coarseMesh->CollapseInterfacesMadeOfMultipleFaces(macroElement);
+			}
+
+		}
+
+		coarseMesh->Init();
+	}
+
+	//-----------------------------------------------//
+	//                                               //
+	//        Coarsening by vertex neighbours        //
+	//                                               //
+	//-----------------------------------------------//
+
+	void CoarsenByAgglomerationByVertexNeighbours()
+	{
+		PolyhedralMesh<Dim>* coarseMesh = new PolyhedralMesh<Dim>();
+		this->CoarseMesh = coarseMesh;
+		coarseMesh->FineMesh = this;
+
+		// Associate to each vertex the list of elements it connects
+		map<Vertex*, vector<Element<Dim>*>> vertexElements = BuildVertexElementMap();
+
+		for (Element<Dim>* currentElem : this->Elements)
+		{
+			if (currentElem->CoarserElement)
+				continue;
+
+			vector<Element<Dim>*> availableNeighbours = AvailableVertexNeighbours(currentElem, vertexElements);
+
+			if (availableNeighbours.size() > 0)
+			{
+				availableNeighbours.push_back(currentElem);
+				Element<Dim>* coarseElement = coarseMesh->AgglomerateFineElements(availableNeighbours);
+				coarseMesh->CollapseInterfacesMadeOfMultipleFaces(coarseElement);
+			}
+			else
+			{
+				Element<Dim>* coarseNeighbourForAggreg = this->FittestCoarseNeighbour(currentElem, CoarseningStrategy::AgglomerationCoarseningByClosestCenter);
+				if (!coarseNeighbourForAggreg)
+					Utils::FatalError("Element cannot be aggregated. Weird...");
+
+				Element<Dim>* macroElement = coarseMesh->AgglomerateFineElementToCoarse(currentElem, coarseNeighbourForAggreg);
+				coarseMesh->CollapseInterfacesMadeOfMultipleFaces(macroElement);
+			}
+
+		}
+
+		vertexElements.clear();
+		coarseMesh->Init();
 	}
 
 	//--------------------------------------------//
@@ -816,63 +911,9 @@ private:
 		{
 			if (e->CoarserElement)
 				continue; // element already aggregated
-
+			
 			// Find the neighbour still available for aggregation under a distance/largest interface criterion
-			Element<Dim>* neighbourForAggreg = nullptr;
-			double closestDistance = -1;
-			double largestInterface = -1;
-
-			for (Face<Dim>* f : e->Faces)
-			{
-				if (f->IsDomainBoundary || f->IsRemovedOnCoarserGrid)
-					continue;
-
-				Element<Dim>* neighbour = f->GetNeighbour(e);
-				if (neighbour->CoarserElement) // already aggregated
-					continue;
-
-				// Init choice criterion
-				double distance = 0;
-				double interfaceMeasure = 0;
-				if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter)
-					distance = Vect<Dim>(e->Center(), neighbour->Center()).norm();
-				else if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestFace)
-					distance = Vect<Dim>(e->Center(), f->Center()).norm();
-				else if (strategy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface)
-				{
-					for (Face<Dim>* fInterface : e->Faces)
-					{
-						if (fInterface->IsDomainBoundary || fInterface->IsRemovedOnCoarserGrid || fInterface->GetNeighbour(e) != neighbour)
-							continue;
-						interfaceMeasure += fInterface->Measure();
-					}
-				}
-
-				if (!neighbourForAggreg)
-				{
-					neighbourForAggreg = neighbour;
-					closestDistance = distance;
-					largestInterface = interfaceMeasure;
-				}
-				else
-				{
-					if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter && distance < closestDistance)
-					{
-						neighbourForAggreg = neighbour;
-						closestDistance = distance;
-					}
-					else if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestFace && distance < closestDistance)
-					{
-						neighbourForAggreg = neighbour;
-						closestDistance = distance;
-					}
-					else if (strategy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface && interfaceMeasure > largestInterface)
-					{
-						neighbourForAggreg = neighbour;
-						largestInterface = interfaceMeasure;
-					}
-				}
-			}
+			Element<Dim>* neighbourForAggreg = this->FittestAvailableNeighbour(e, strategy);
 
 			if (neighbourForAggreg)
 			{
@@ -885,57 +926,7 @@ private:
 			else
 			{
 				// If all the neighbours have already been aggregated, then we aggregate with a macroElement under the same criterion
-				Element<Dim>* coarseNeighbourForAggreg = nullptr;
-				double closestDistance = -1;
-				double largestInterface = -1;
-				for (Face<Dim>* f : e->Faces)
-				{
-					if (f->IsDomainBoundary)
-						continue;
-
-					Element<Dim>* macroNeighbour = f->GetNeighbour(e)->CoarserElement;
-
-					double distance = 0;
-					double interfaceMeasure = 0;
-					if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter)
-						distance = Vect<Dim>(e->Center(), macroNeighbour->Center()).norm();
-					else if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestFace)
-						distance = Vect<Dim>(e->Center(), f->Center()).norm();
-					else if (strategy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface)
-					{
-						for (Face<Dim>* fInterface : e->Faces)
-						{
-							if (fInterface->IsDomainBoundary || fInterface->IsRemovedOnCoarserGrid || fInterface->GetNeighbour(e)->CoarserElement != macroNeighbour)
-								continue;
-							interfaceMeasure += fInterface->Measure();
-						}
-					}
-
-					if (!coarseNeighbourForAggreg)
-					{
-						coarseNeighbourForAggreg = macroNeighbour;
-						closestDistance = distance;
-						largestInterface = interfaceMeasure;
-					}
-					else
-					{
-						if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter && distance < closestDistance)
-						{
-							coarseNeighbourForAggreg = macroNeighbour;
-							closestDistance = distance;
-						}
-						else if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestFace && distance < closestDistance)
-						{
-							coarseNeighbourForAggreg = macroNeighbour;
-							closestDistance = distance;
-						}
-						else if (strategy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface && interfaceMeasure > largestInterface)
-						{
-							coarseNeighbourForAggreg = macroNeighbour;
-							largestInterface = interfaceMeasure;
-						}
-					}
-				}
+				Element<Dim>* coarseNeighbourForAggreg = this->FittestCoarseNeighbour(e, strategy);
 
 				if (!coarseNeighbourForAggreg)
 					Utils::FatalError("Element cannot be aggregated. Weird...");
@@ -959,6 +950,153 @@ private:
 	//        General useful methods        //
 	//                                      //
 	//--------------------------------------//
+
+	vector<Element<Dim>*> AvailableFaceNeighbours(Element<Dim>* elem)
+	{
+		vector<Element<Dim>*> availableNeighbours;
+		for (Element<Dim>* n : elem->Neighbours())
+		{
+			if (!n->CoarserElement)
+				availableNeighbours.push_back(n);
+		}
+
+		return availableNeighbours;
+	}
+
+	vector<Element<Dim>*> AvailableVertexNeighbours(Element<Dim>* elem, map<Vertex*, vector<Element<Dim>*>>& vertexElements)
+	{
+		set<Element<Dim>*> availableNeighboursSet;
+		for (Vertex* v : elem->Vertices())
+		{
+			auto vertexNeighbours = vertexElements[v];
+			for (Element<Dim>* e : vertexNeighbours)
+			{
+				if (e != elem && !e->CoarserElement)
+					availableNeighboursSet.insert(e);
+			}
+		}
+
+		return vector<Element<Dim>*>(availableNeighboursSet.begin(), availableNeighboursSet.end());
+	}
+
+	Element<Dim>* FittestAvailableNeighbour(Element<Dim>* e, CoarseningStrategy strategy)
+	{
+		// Find the neighbour still available for aggregation under a distance/largest interface criterion
+		Element<Dim>* neighbourForAggreg = nullptr;
+		double closestDistance = -1;
+		double largestInterface = -1;
+
+		for (Face<Dim>* f : e->Faces)
+		{
+			if (f->IsDomainBoundary || f->IsRemovedOnCoarserGrid)
+				continue;
+
+			Element<Dim>* neighbour = f->GetNeighbour(e);
+			if (neighbour->CoarserElement) // already aggregated
+				continue;
+
+			// Init choice criterion
+			double distance = 0;
+			double interfaceMeasure = 0;
+			if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter)
+				distance = Vect<Dim>(e->Center(), neighbour->Center()).norm();
+			else if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestFace)
+				distance = Vect<Dim>(e->Center(), f->Center()).norm();
+			else if (strategy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface)
+			{
+				for (Face<Dim>* fInterface : e->Faces)
+				{
+					if (fInterface->IsDomainBoundary || fInterface->IsRemovedOnCoarserGrid || fInterface->GetNeighbour(e) != neighbour)
+						continue;
+					interfaceMeasure += fInterface->Measure();
+				}
+			}
+
+			if (!neighbourForAggreg)
+			{
+				neighbourForAggreg = neighbour;
+				closestDistance = distance;
+				largestInterface = interfaceMeasure;
+			}
+			else
+			{
+				if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter && distance < closestDistance)
+				{
+					neighbourForAggreg = neighbour;
+					closestDistance = distance;
+				}
+				else if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestFace && distance < closestDistance)
+				{
+					neighbourForAggreg = neighbour;
+					closestDistance = distance;
+				}
+				else if (strategy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface && interfaceMeasure > largestInterface)
+				{
+					neighbourForAggreg = neighbour;
+					largestInterface = interfaceMeasure;
+				}
+			}
+		}
+
+		return neighbourForAggreg;
+	}
+
+	Element<Dim>* FittestCoarseNeighbour(Element<Dim>* e, CoarseningStrategy strategy)
+	{
+		Element<Dim>* coarseNeighbourForAggreg = nullptr;
+		double closestDistance = -1;
+		double largestInterface = -1;
+		for (Face<Dim>* f : e->Faces)
+		{
+			if (f->IsDomainBoundary)
+				continue;
+
+			Element<Dim>* macroNeighbour = f->GetNeighbour(e)->CoarserElement;
+
+			double distance = 0;
+			double interfaceMeasure = 0;
+			if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter)
+				distance = Vect<Dim>(e->Center(), macroNeighbour->Center()).norm();
+			else if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestFace)
+				distance = Vect<Dim>(e->Center(), f->Center()).norm();
+			else if (strategy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface)
+			{
+				for (Face<Dim>* fInterface : e->Faces)
+				{
+					if (fInterface->IsDomainBoundary || fInterface->IsRemovedOnCoarserGrid || fInterface->GetNeighbour(e)->CoarserElement != macroNeighbour)
+						continue;
+					interfaceMeasure += fInterface->Measure();
+				}
+			}
+
+			if (!coarseNeighbourForAggreg)
+			{
+				coarseNeighbourForAggreg = macroNeighbour;
+				closestDistance = distance;
+				largestInterface = interfaceMeasure;
+			}
+			else
+			{
+				if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter && distance < closestDistance)
+				{
+					coarseNeighbourForAggreg = macroNeighbour;
+					closestDistance = distance;
+				}
+				else if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestFace && distance < closestDistance)
+				{
+					coarseNeighbourForAggreg = macroNeighbour;
+					closestDistance = distance;
+				}
+				else if (strategy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface && interfaceMeasure > largestInterface)
+				{
+					coarseNeighbourForAggreg = macroNeighbour;
+					largestInterface = interfaceMeasure;
+				}
+			}
+		}
+
+		return coarseNeighbourForAggreg;
+	}
 
 
 	//--------------------------------------------------------------------//
@@ -1019,43 +1157,8 @@ private:
 		for (Element<Dim>* e : fineElements)
 			assert(!e->CoarserElement);
 
-		// Collect the faces interfacing the elements
-		vector<Face<Dim>*> facesToRemove;
-
-		// Initialisation of the coarse macro-element
-		AgglomerateElement<Dim>* coarseElement = new AgglomerateElement<Dim>(this->Elements.size(), fineElements[0]);
-		coarseElement->Faces = fineElements[0]->Faces;
-		fineElements[0]->CoarserElement = coarseElement;
-
-		for (int i = 0; i < fineElements.size(); i++)
-		{
-			Element<Dim>* e1 = fineElements[i];
-			for (Face<Dim>* f : e1->Faces)
-			{
-				Element<Dim>* neighbour = f->GetNeighbour(e1);
-				bool neighbourMustBeAgglomerated = false;
-				for (int j = i + 1; j < fineElements.size(); j++)
-				{
-					if (fineElements[j] == neighbour)
-					{
-						neighbourMustBeAgglomerated = true;
-						break;
-					}
-				}
-
-				if (neighbourMustBeAgglomerated)
-				{
-					facesToRemove.push_back(f);
-					if (!neighbour->CoarserElement)
-					{
-						// Agglomeration
-						coarseElement->Add(neighbour);
-						neighbour->CoarserElement = coarseElement;
-						coarseElement->Faces = Utils::Join(neighbour->NonCommonFacesWith(coarseElement), coarseElement->NonCommonFacesWith(neighbour));
-					}
-				}
-			}
-		}
+		Agglo<Dim> agglo(fineElements);
+		Element<Dim>* coarseElement = CreatePolyhedron(agglo.Vertices());
 
 		for (Element<Dim>* e : fineElements)
 		{
@@ -1063,7 +1166,7 @@ private:
 			coarseElement->FinerElements.push_back(e);
 		}
 
-		for (Face<Dim>* f : facesToRemove)
+		for (Face<Dim>* f : agglo.RemovedFaces())
 		{
 			f->IsRemovedOnCoarserGrid = true;
 			coarseElement->FinerFacesRemoved.push_back(f);
@@ -1074,12 +1177,9 @@ private:
 		this->Elements.push_back(coarseElement);
 
 		// Kept faces are cloned for the coarse mesh and linked to their clones and the coarse element.
-		vector<Face<Dim>*> facesToClone = coarseElement->Faces;
-		coarseElement->Faces.clear();
-		for (Face<Dim>* f : facesToClone)
+		for (Face<Dim>* f : agglo.Faces)
 			this->CloneAndAddFace(f, coarseElement);
 
-		coarseElement->Init();
 		assert(coarseElement->Vertices().size() > 2);
 
 		assert(coarseElement->Faces.size() > 2);
@@ -1169,6 +1269,9 @@ private:
 		newCoarseElement->FinerElements.push_back(fineElement);
 		fineElement->CoarserElement = newCoarseElement;
 
+		for (Face<Dim>* ff : coarseElement->FinerFacesRemoved)
+			newCoarseElement->FinerFacesRemoved.push_back(ff);
+
 		for (Face<Dim>* cf : coarseFacesToKeep)
 		{
 			if (cf->Element1 == coarseElement)
@@ -1205,10 +1308,68 @@ private:
 		return newCoarseElement;
 	}
 
+	Element<Dim>* Agglomerate(Element<Dim>* e1, Element<Dim>* e2)
+	{
+		vector<Element<Dim>*> v{ e1, e2 };
+		return Agglomerate(v);
+	}
+
+	Element<Dim>* Agglomerate(vector<Element<Dim>*> elements)
+	{
+		Agglo<Dim> agglo(elements);
+		Element<Dim>* newElement = CreatePolyhedron(agglo.Vertices());
+
+		for (Element<Dim>* e : elements)
+		{
+			for (Face<Dim>* f : e->Faces)
+			{
+				if (f->Element1 == e)
+					f->Element1 = newElement;
+				if (f->Element2 == e)
+					f->Element2 = newElement;
+			}
+			for (Element<Dim>* fe : e->FinerElements)
+			{
+				fe->CoarserElement = newElement;
+				newElement->FinerElements.push_back(fe);
+			}
+			for (Face<Dim>* ff : e->FinerFacesRemoved)
+				newElement->FinerFacesRemoved.push_back(ff);
+		}
+
+		for (Face<Dim>* f : agglo.RemovedFaces())
+		{
+			for (Face<Dim>* ff : f->FinerFaces)
+			{
+				ff->IsRemovedOnCoarserGrid = true;
+				newElement->FinerFacesRemoved.push_back(ff);
+			}
+			this->RemoveFace(f, false);
+		}
+
+		newElement->Faces = agglo.Faces;
+
+		// Replace the first element with the new one
+		newElement->Number = elements[0]->Number;
+		this->Elements[newElement->Number] = newElement;
+		delete elements[0];
+		// ... and remove the others
+		for (int i = 1; i < elements.size(); i++)
+			this->RemoveElement(elements[i]);
+
+		assert(newElement->Vertices().size() > 2);
+		assert(newElement->Faces.size() > 2);
+		if (Dim == 2)
+			assert(newElement->Faces.size() == newElement->Vertices().size());
+
+		return newElement;
+	}
+
 	void AgglomerateFineFaces(Face<Dim>* f1, Face<Dim>* f2)
 	{
 		// f1 and f2 are one level higher than 'this'
-		Agglomerate({ f1->CoarseFace, f2->CoarseFace });
+		vector<Face<Dim>*> v{ f1->CoarseFace, f2->CoarseFace };
+		Agglomerate(v);
 	}
 
 	void Agglomerate(vector<Face<Dim>*> faces)
@@ -1216,56 +1377,36 @@ private:
 		assert(faces.size() > 1);
 		// 'faces' must be at the same level as 'this'
 
-		// Identification of the vertices to remove (those which belong to 2 faces)
-		vector<Vertex*> verticesToRemove;
-		map<Vertex*, set<Face<Dim>*>> mapVertexFaces;
-		for (int i = 0; i < faces.size(); i++)
-		{
-			Face<Dim>* fi = faces[i];
-			for (Vertex* v : fi->Vertices())
-			{
-				mapVertexFaces[v].insert(fi);
-				for (int j = i + 1; j < faces.size(); j++)
-				{
-					Face<Dim>* fj = faces[j];
-					if (fj->HasVertex(v))
-					{
-						verticesToRemove.push_back(v);
-						mapVertexFaces[v].insert(fj);
-						break;
-					}
-				}
-			}
-		}
-		if (verticesToRemove.size() != faces.size() - 1)
+		Interface<Dim> interf(faces);
+		if (interf.HasHoles())
 		{
 			Utils::Warning("Attempt to perform an operation which would result in an element rounding another one. Refused.");
 			return;
 		}
-		//assert(verticesToRemove.size() == faces.size() - 1);
 
-		// The two vertices to keep
-		Vertex* v1 = nullptr;
-		Vertex* v2 = nullptr;
+		assert(interf.BoundaryVertices().size() == 2);
 
-		for (auto const& it : mapVertexFaces)
+		Edge* mergedEdge = new Edge(0, interf.BoundaryVertices()[0], interf.BoundaryVertices()[1]);
+		Face<Dim>* mergedFace = dynamic_cast<Face<Dim>*>(mergedEdge);
+
+		Element<Dim>* elem1 = faces[0]->Element1;
+		Element<Dim>* elem2 = faces[0]->Element2;
+		if (elem1->WillDegenerateIfReplacement(faces, mergedFace) || (elem2 && elem2->WillDegenerateIfReplacement(faces, mergedFace)))
 		{
-			if (it.second.size() == 1)
+			Utils::Warning("Attempt to perform a face collapsing which would result in a degenerate element. Refused.");
+			/*cout << "%-- Elem1" << endl;
+			elem1->ExportToMatlab("r");
+			if (elem2)
 			{
-				if (!v1)
-					v1 = it.first;
-				else if (!v2)
-				{
-					v2 = it.first;
-					break;
-				}
+				cout << "%-- Elem2" << endl;
+				elem1->ExportToMatlab("c");
 			}
-			else
-				assert(it.second.size() == 2);
+			cout << "%-- Collapsed face:" << endl;
+			mergedFace->ExportToMatlab("m");*/
+			return;
 		}
 
-		Edge* mergedEdge = new Edge(0, v1, v2);
-		ReplaceFaces(faces, dynamic_cast<Face<Dim>*>(mergedEdge));
+		ReplaceFaces(faces, mergedFace);
 	}
 
 	void ReplaceFaces(vector<Face<Dim>*> faces, Face<Dim>* mergedFace)
@@ -1280,7 +1421,7 @@ private:
 		mergedFace->Element1 = elem1;
 		mergedFace->Element2 = elem2;
 
-		/*if (elem1->Number == 37 && elem2 && elem2->Number == 38)
+		/*if (elem1->Number == 666 && elem2 && elem2->Number == 666)
 		{
 			cout << "BEFORE:" << endl;
 			cout << "Elem1:" << endl;
@@ -1290,7 +1431,7 @@ private:
 		}*/
 
 		elem1->ReplaceFaces(faces, mergedFace);
-		/*if (elem1->Number == 37 && elem2 && elem2->Number == 38)
+		/*if (elem1->Number == 237 && elem2 && elem2->Number == 275)
 		{
 			cout << "AFTER:" << endl;
 			cout << "Elem1:" << endl;
@@ -1360,7 +1501,7 @@ template<>
 Element<2>* PolyhedralMesh<2>::CreatePolyhedron(vector<Vertex*> vertices)
 {
 	BigNumber elementNumber = this->Elements.size();
-	Polygon* macroElement = new Polygon(elementNumber, vertices);
+	Polygon* macroElement = new Polygon(elementNumber, vertices, false);
 	return macroElement;
 }
 

@@ -69,6 +69,10 @@ public:
 	{
 		return Shape()->Vertices();
 	}
+	virtual void ExportToMatlab(string color = "r") const
+	{
+		return Shape()->ExportToMatlab(color);
+	}
 
 	bool HasVertex(Vertex* v, bool compareCoordinates = false)
 	{

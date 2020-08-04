@@ -199,6 +199,8 @@ void print_usage() {
 	cout << "              g   - (experimental) agglomeration coarsening by closest face (non-nested!)" << endl;
 	cout << "              i   - (experimental) agglomeration coarsening by largest interface (non-nested)" << endl;
 	cout << "              p   - (experimental) agglomeration coarsening by seed points (non-nested!)" << endl;
+	cout << "              n   - (experimental) agglomeration coarsening by face neighbours (non-nested!)" << endl;
+	cout << "              v   - (experimental) agglomeration coarsening by vertex neighbours (non-nested!)" << endl;
 	cout << "              m   - independant remeshing by GMSH with double the mesh size (non-nested!)" << endl;
 	cout << "              f   - face coarsening: the faces are coarsened and all kept on the coarse skeleton. Requires -g 1." << endl;
 	cout << "              r   - fine meshes obtained by structured refinement of the coarse mesh using GMSH's splitting method" << endl;
@@ -769,6 +771,10 @@ int main(int argc, char* argv[])
 		args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByLargestInterface;
 	else if (args.Solver.MG.CoarseningStgyCode.compare("p") == 0)
 		args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningBySeedPoints;
+	else if (args.Solver.MG.CoarseningStgyCode.compare("n") == 0)
+		args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours;
+	else if (args.Solver.MG.CoarseningStgyCode.compare("v") == 0)
+		args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByVertexNeighbours;
 	else if (args.Solver.MG.CoarseningStgyCode.compare("m") == 0)
 		args.Solver.MG.CoarseningStgy = CoarseningStrategy::IndependentRemeshing;
 	else if (args.Solver.MG.CoarseningStgyCode.compare("f") == 0)

@@ -71,9 +71,9 @@ public:
 			}
 			if (!faceSubshape)
 			{
-				cout << "Error: no sub-shape found for " << *face << endl;
 				_shape->ExportSubShapesToMatlab();
-				assert(faceSubshape);
+				face->Shape()->ExportToMatlab("k");
+				Utils::FatalError("Cannot compute the direction of the normal vector.");
 			}
 			C = faceSubshape->Center();
 		}
@@ -109,31 +109,43 @@ public:
 			Vertex* lastInterfaceVertex = nullptr;
 			int iFirstInterfaceVertex = -1;
 			int iLastInterfaceVertex = -1;
+
 			int n = Face<2>::NumberOfFacesContainingVertex(facesToRemove, e1Vertices.Get());
-			while (n == 1)
+			// while we're in one extermity of the interface
+			while (n == 1) 
 			{
 				e1Vertices.MoveNext();
 				n = Face<2>::NumberOfFacesContainingVertex(facesToRemove, e1Vertices.Get());
 			}
+
 			if (n == 0)
 			{
+				// We're outside the interface
+				// We move in e1 in the direct order until we find the interface again...
 				e1Vertices.MoveNext();
 				while (!Face<2>::IsInFaces(facesToRemove, e1Vertices.Get()))
 					e1Vertices.MoveNext();
+				// ... which gives the first interface vertex
 				iFirstInterfaceVertex = e1Vertices.Index();
 				firstInterfaceVertex = e1Vertices.Get();
 
+				// Then we iterate over the vertices of the interface
 				e1Vertices.MoveNext();
 				while (Face<2>::IsInTwoFaces(facesToRemove, e1Vertices.Get()))
+				//while (Face<2>::IsInFaces(facesToRemove, e1Vertices.Get()))
 					e1Vertices.MoveNext();
+				// until we get out of the interface
+				//e1Vertices.MoveBack();
 				iLastInterfaceVertex = e1Vertices.Index();
 				lastInterfaceVertex = e1Vertices.Get();
 			}
 			else // n >= 2
 			{
+				// We're inside the interface
 				e1Vertices.MoveNext();
 				while (Face<2>::IsInTwoFaces(facesToRemove, e1Vertices.Get()))
 					e1Vertices.MoveNext();
+				//e1Vertices.MoveBack();
 				iLastInterfaceVertex = e1Vertices.Index();
 				lastInterfaceVertex = e1Vertices.Get();
 
@@ -144,27 +156,51 @@ public:
 				firstInterfaceVertex = e1Vertices.Get();
 			}
 
-
 			// Add all the vertices of e1 from lastInterfaceVertex to firstInterfaceVertex
+			macroElementVertices.push_back(lastInterfaceVertex);
 			e1Vertices.GoTo(iLastInterfaceVertex);
+			e1Vertices.MoveNext();
 			while (e1Vertices.Index() != iFirstInterfaceVertex)
 			{
 				macroElementVertices.push_back(e1Vertices.Get());
 				e1Vertices.MoveNext();
 			}
-			macroElementVertices.push_back(firstInterfaceVertex);
+			if (firstInterfaceVertex != lastInterfaceVertex)
+				macroElementVertices.push_back(firstInterfaceVertex);
 
-
-			// Skip all vertices of e2 until you get to firstInterfaceVertex
-			RotatingList<Vertex*> e2Vertices(e2->Vertices());
-			e2Vertices.GoTo(firstInterfaceVertex);
-
-			// Add e2's vertices
-			e2Vertices.MoveNext();
-			while (e2Vertices.Get() != lastInterfaceVertex)
+			if (firstInterfaceVertex != lastInterfaceVertex)
 			{
-				macroElementVertices.push_back(e2Vertices.Get());
+				// Skip all vertices of e2 until you get to firstInterfaceVertex
+				RotatingList<Vertex*> e2Vertices(e2->Vertices());
+				e2Vertices.GoTo(firstInterfaceVertex);
+
+				// Add e2's vertices
 				e2Vertices.MoveNext();
+				int i = 0;
+				while (e2Vertices.Get() != lastInterfaceVertex && i++ < e2Vertices.Size())
+				{
+					macroElementVertices.push_back(e2Vertices.Get());
+					e2Vertices.MoveNext();
+				}
+				if (i > e2Vertices.Size())
+				{
+					MatlabScript script;
+					script.PlotPolygonEdges(e1->Vertices(), "r");
+					script.Out() << endl;
+					script.PlotPolygonEdges(e2->Vertices(), "b");
+					script.Out() << endl;
+					Utils::FatalError("Agglomeration failed: lastInterfaceVertex not found in e2.");
+				}
+			}
+
+			if (macroElementVertices.size() != e1->Vertices().size() + e2->Vertices().size() - 2 - 2 * (facesToRemove.size() - 1))
+			{
+				MatlabScript script;
+				script.PlotPolygonEdges(e1->Vertices(), "r");
+				script.Out() << endl;
+				script.PlotPolygonEdges(e2->Vertices(), "b");
+				script.Out() << endl;
+				Utils::FatalError("Agglomeration failed: the agglomerate does not have the expected number of vertices.");
 			}
 		}
 
