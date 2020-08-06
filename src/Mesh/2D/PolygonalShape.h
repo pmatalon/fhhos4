@@ -5,6 +5,7 @@
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/partition_2.h>
 #include <CGAL/Partition_traits_2.h>
+#include <CGAL/convex_hull_2.h>
 #include <cassert>
 #include <list>
 using namespace std;
@@ -96,10 +97,13 @@ public:
 		if (!_cgalPolygon.is_simple())
 		{
 			ExportToMatlab("m");
-			Utils::Warning("This polygon is not simple.");
+			Utils::Warning("Non simple polygon detected.");
 		}
-		else
-			assert(_cgalPolygon.is_counterclockwise_oriented());
+		else if (!_cgalPolygon.is_counterclockwise_oriented())
+		{
+			ExportToMatlab("m");
+			Utils::FatalError("Clockwise-oriented polygon detected.");
+		}
 
 		_diameter = 0;
 		double sumX = 0;
@@ -240,6 +244,22 @@ private:
 		return triangulation;
 	}
 
+public:
+	bool ConvexHullEmbeds(PhysicalShape<2>* s) const override
+	{
+		vector<Point_2> convexHullPoints;
+		CGAL::convex_hull_2(_cgalPolygon.vertices_begin(), _cgalPolygon.vertices_end(), back_inserter(convexHullPoints));
+
+		Polygon_2 convexHull(convexHullPoints.begin(), convexHullPoints.end());
+
+		for (Vertex* v : s->Vertices())
+		{
+			if (!CGALPolyContains(convexHull, Point_2(v->X, v->Y)))
+				return false;
+		}
+		return true;
+	}
+
 private:
 	// Get vertices from CGAL polygon
 	static vector<Vertex*> Vertices(const Polygon_2& poly)
@@ -326,18 +346,25 @@ public:
 				return true;
 		}
 		return false;*/
-		switch (CGAL::bounded_side_2(_cgalPolygon.vertices_begin(), _cgalPolygon.vertices_end(), Point_2(p.X, p.Y), K()))
+		return CGALPolyContains(_cgalPolygon, Point_2(p.X, p.Y));
+	}
+
+private:
+	static bool CGALPolyContains(const Polygon_2& poly, Point_2 p)
+	{
+		switch (CGAL::bounded_side_2(poly.vertices_begin(), poly.vertices_end(), p, K()))
 		{
-			case CGAL::ON_BOUNDED_SIDE: // inside
-				return true;
-			case CGAL::ON_BOUNDARY: // on the boundary
-				return true;
-			case CGAL::ON_UNBOUNDED_SIDE: // outside
-				return false;
+		case CGAL::ON_BOUNDED_SIDE: // inside
+			return true;
+		case CGAL::ON_BOUNDARY: // on the boundary
+			return true;
+		case CGAL::ON_UNBOUNDED_SIDE: // outside
+			return false;
 		}
 		return false;
 	}
 
+public:
 	void ExportSubShapesToMatlab() const override
 	{
 		assert(_triangulation.size() > 0);

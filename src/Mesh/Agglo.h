@@ -30,7 +30,17 @@ public:
 
 		AddNeighboursRecursively(elements[0]);
 
-		assert(_elemsToAgglomerate.empty());
+		if (!_elemsToAgglomerate.empty())
+		{
+			cout << "%-------------------- Agglomerate -----------------" << endl;
+			this->ExportToMatlab("b");
+			for (Element<Dim>* e : _elemsToAgglomerate)
+			{
+				cout << "%-------------------- Element that hasn't been agglomerated -----------------" << endl;
+				e->ExportToMatlab("r");
+			}
+			Utils::FatalError("Agglomeration failed: some elements have not been agglomerated for some reason...");
+		}
 	}
 
 	inline vector<Vertex*> Vertices() const override
@@ -58,7 +68,10 @@ private:
 				vector<Face<Dim>*> interfaceFaces = this->InterfaceWith(neighbour);
 				Interface<Dim> interf(interfaceFaces);
 				if (interf.HasHoles())
+				{
+					recursion.push_back(neighbour);
 					continue; // we'll do this one later so we don't surround an element (one of its neighbours will process it)
+				}
 
 				_removedFaces = Utils::Join(_removedFaces, interfaceFaces);
 				// Agglomeration

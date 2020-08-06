@@ -71,7 +71,7 @@ public:
 		double beta = PC.cross(PA).norm() / (2 * triangleArea);
 		double gamma = PA.cross(PB).norm() / (2 * triangleArea);
 
-		double tol = 1e-4;// Point::Tolerance / triangleDiameter;
+		double tol = Utils::Eps;// Point::Tolerance / triangleDiameter;
 		return alpha + tol > 0 && alpha < 1 + tol    // alpha >= 0 && alpha <= 1
 			&& beta  + tol > 0 && beta  < 1 + tol    // beta  >= 0 && beta  <= 1
 			&& gamma + tol > 0 && gamma < 1 + tol    // gamma >= 0 && gamma <= 1
@@ -86,7 +86,7 @@ public:
 		double gamma = VolumeTetra(A, B, P, D) / tetraVolume;
 		double delta = VolumeTetra(A, B, C, P) / tetraVolume;
 
-		double tol = 1e-4;// Point::Tolerance / tetraDiameter;
+		double tol = Utils::Eps;// Point::Tolerance / tetraDiameter;
 		return alpha + tol > 0 && alpha < 1 + tol    // alpha >= 0 && alpha <= 1
 			&& beta  + tol > 0 && beta  < 1 + tol    // beta  >= 0 && beta  <= 1
 			&& gamma + tol > 0 && gamma < 1 + tol    // gamma >= 0 && gamma <= 1

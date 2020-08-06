@@ -14,8 +14,6 @@ class PolyhedralMesh : public Mesh<Dim>
 private:
 	double _regularity = 0;
 public:
-	const int AgglomerateSize = 4*Dim;
-
 	PolyhedralMesh() : Mesh<Dim>()
 	{}
 
@@ -280,7 +278,8 @@ private:
 				shape->ExportSubShapesToMatlab();
 			}*/
 
-			coarseMesh->AgglomerateFineFaces(f1, f2);
+			FaceCollapsingStatus status = coarseMesh->AgglomerateFineFaces(f1, f2);
+			assert(status == FaceCollapsingStatus::Ok);
 
 			/*if (this->FineMesh && coarseMesh->Elements.size() > elementToAnalyze)
 			{
@@ -290,7 +289,7 @@ private:
 				shape->ExportSubShapesToMatlab();
 			}*/
 
-			coarseMesh->CollapseInterfacesMadeOfMultipleFaces(coarseElement1);
+			coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(coarseElement1);
 		}
 
 		vertexFaceMap.clear();
@@ -349,7 +348,7 @@ private:
 		// We merge the faces which are part of the same interface between two elements //
 		//------------------------------------------------------------------------------//
 		for (Element<Dim>* ce : coarseMesh->Elements)
-			coarseMesh->CollapseInterfacesMadeOfMultipleFaces(ce);
+			coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(ce);
 
 		/*if (this->FineMesh && coarseMesh->Elements.size() > 8)
 		{
@@ -372,59 +371,33 @@ private:
 	//-------------------------------------------------------------------------------------------------------------------------//
 	// Browse the neighbours: if the interface with one of them is made of multiple faces, they're collapsed into a single one //
 	//-------------------------------------------------------------------------------------------------------------------------//
-	void CollapseInterfacesMadeOfMultipleFaces(Element<Dim>* e)
+	void TryCollapseInterfacesMadeOfMultipleFaces(Element<Dim>* e)
 	{
 		for (Element<Dim>* n : e->Neighbours())
 		{
-			vector<Face<Dim>*> interfaceFaces = e->InterfaceWith(n);
-			if (interfaceFaces.size() > 1)
+			FaceCollapsingStatus status = TryCollapseInterfaceBetween(e, n);
+			if (status == FaceCollapsingStatus::ElementFullDegeneration || status == FaceCollapsingStatus::OneElementEmbeddedInConvexHullOfTheOther)
 			{
-				/*if (this->FineMesh && coarseMesh->Elements.size() > elementToAnalyze && (ce == coarseMesh->Elements[elementToAnalyze] || n == coarseMesh->Elements[elementToAnalyze]))
-					//if (this->FineMesh && this->FineMesh->FineMesh && faces[0]->Number == 289 && faces[1]->Number == 292)
-				{
-					coarseMesh->ExportFacesToMatlab("/mnt/c/Users/pierr/Desktop/Matrices/coarse3.dat");
-					AgglomerateElement<Dim>* agglo = dynamic_cast<AgglomerateElement<Dim>*>(coarseMesh->Elements[elementToAnalyze]);
-					AgglomerateShape<Dim>* shape = dynamic_cast<AgglomerateShape<Dim>*>(agglo->Shape());
-					shape->ExportSubShapesToMatlab();
-				}*/
-				/*if (this->FineMesh && (n->Number == 810 || e->Number == 810))
-				{
-					this->ExportFacesToMatlab("/mnt/c/Users/pierr/Desktop/Matrices/coarse1.dat");
-					//AgglomerateElement<Dim>* agglo = dynamic_cast<AgglomerateElement<Dim>*>(this->Elements[11]);
-					//AgglomerateShape<Dim>* shape = dynamic_cast<AgglomerateShape<Dim>*>(agglo->Shape());
-					e->Shape()->ExportToMatlab();
-					n->Shape()->ExportToMatlab();
-				}*/
-				//this->ExportFacesToMatlab("/mnt/c/Users/pierr/Desktop/Matrices/coarse1.dat");
-				bool wouldDegenerateE = e->Faces.size() - interfaceFaces.size() + 1 <= Dim;
-				bool wouldDegenerateN = n->Faces.size() - interfaceFaces.size() + 1 <= Dim;
-
-				if (!wouldDegenerateE && !wouldDegenerateN)
-					Agglomerate(interfaceFaces);
-				else
-				{
-					// We can't collpase the faces of the interface, otherwise one element will degenerate (i.e. number of faces <= Dim)
-					Utils::Warning("Attempt to perform an operation which would result in a degenerate element. Agglomerating the elements instead.");
-					/*cout << "%-- " << *e << endl;
-					e->ExportToMatlab("r");
-					cout << "%-- " << *n << endl;
-					n->ExportToMatlab("b");*/
-
-					Element<Dim>* newE = Agglomerate(e, n);
-
-					//cout << "%-- " << *newE << endl;
-					//newE->ExportToMatlab("m");
-
-					CollapseInterfacesMadeOfMultipleFaces(newE);
-					return;
-				}
+				// We can't collpase the faces, otherwise one element will degenerate. Agglomerating the elements instead.
+				Element<Dim>* newE = Agglomerate(e, n);
+				TryCollapseInterfacesMadeOfMultipleFaces(newE);
+				return;
 			}
+			// Any other failing status, abort the collapsing.
 		}
 
 		/*if (e->IsOnBoundary())
 		{
 			// TODO agglomerate (at least) collinear faces
 		}*/
+	}
+
+	FaceCollapsingStatus TryCollapseInterfaceBetween(Element<Dim>* e1, Element<Dim>* e2)
+	{
+		vector<Face<Dim>*> interfaceFaces = e1->InterfaceWith(e2);
+		if (interfaceFaces.size() > 1)
+			return TryCollapse(interfaceFaces);
+		return FaceCollapsingStatus::Ok;
 	}
 
 
@@ -582,7 +555,7 @@ private:
 			{
 				availableNeighbours.push_back(currentElem);
 				Element<Dim>* coarseElement = coarseMesh->AgglomerateFineElements(availableNeighbours);
-				coarseMesh->CollapseInterfacesMadeOfMultipleFaces(coarseElement);
+				coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(coarseElement);
 			}
 			else
 			{
@@ -590,11 +563,36 @@ private:
 				if (!coarseNeighbourForAggreg)
 					Utils::FatalError("Element cannot be aggregated. Weird...");
 
-				Element<Dim>* macroElement = coarseMesh->AgglomerateFineElementToCoarse(currentElem, coarseNeighbourForAggreg);
-				coarseMesh->CollapseInterfacesMadeOfMultipleFaces(macroElement);
+				Element<Dim>* coarseElement = coarseMesh->AgglomerateFineElementToCoarse(currentElem, coarseNeighbourForAggreg);
+				coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(coarseElement);
 			}
-
 		}
+
+		list<Face<Dim>*> uncoarsenedFaces;
+		for (Face<Dim>* f : this->Faces)
+		{
+			if (!f->IsDomainBoundary && !f->IsRemovedOnCoarserGrid && !f->HasBeenCoarsened())
+				uncoarsenedFaces.push_back(f);
+		}
+
+		/*cout << uncoarsenedFaces.size() << " faces not removed or coarsened remain." << endl;
+
+		typename list<Face<Dim>*>::iterator it = uncoarsenedFaces.begin();
+		while (it != uncoarsenedFaces.end())
+		{
+			Face<Dim>* f = *it;
+			if (f->IsRemovedOnCoarserGrid || f->HasBeenCoarsened())
+				uncoarsenedFaces.erase(it);
+			else
+			{
+				TryCollapseInterfaceBetween(f->Element1, f->Element2);
+				if (interfaceHasBeenCollapsed)
+					uncoarsenedFaces.erase(it);
+			}
+			it++;
+		}*/
+
+		cout << uncoarsenedFaces.size() << " faces not removed or coarsened remain (out of " << this->Faces.size() << " faces)." << endl;
 
 		coarseMesh->Init();
 	}
@@ -625,7 +623,7 @@ private:
 			{
 				availableNeighbours.push_back(currentElem);
 				Element<Dim>* coarseElement = coarseMesh->AgglomerateFineElements(availableNeighbours);
-				coarseMesh->CollapseInterfacesMadeOfMultipleFaces(coarseElement);
+				coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(coarseElement);
 			}
 			else
 			{
@@ -634,7 +632,7 @@ private:
 					Utils::FatalError("Element cannot be aggregated. Weird...");
 
 				Element<Dim>* macroElement = coarseMesh->AgglomerateFineElementToCoarse(currentElem, coarseNeighbourForAggreg);
-				coarseMesh->CollapseInterfacesMadeOfMultipleFaces(macroElement);
+				coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(macroElement);
 			}
 
 		}
@@ -654,54 +652,47 @@ private:
 	//-----------------//
 	void CoarsenByAgglomerationByVertexRemoval()
 	{
-		/*if (this->Elements.size() <= AgglomerateSize)
+		PolyhedralMesh<Dim>* coarseMesh = new PolyhedralMesh<Dim>();
+
+		// Associate to each vertex the list of elements it connects
+		map<Vertex*, vector<Element<Dim>*>> vertexElements = BuildVertexElementMap();
+
+		// Sort the vertices by number of elements
+		sort(this->Vertices.begin(), this->Vertices.end(), [&vertexElements](Vertex* v1, Vertex* v2) { return vertexElements[v1].size() > vertexElements[v2].size(); });
+
+		for (Vertex* v : this->Vertices)
 		{
-			cout << "Error: impossible to build coarse mesh. Only " << this->Elements.size() << " element(s) left." << endl;
-		}
-		else*/
-		{
-			PolyhedralMesh<Dim>* coarseMesh = new PolyhedralMesh<Dim>();
+			vector<Element<Dim>*> elementsAroundV = vertexElements[v];
 
-			// Associate to each vertex the list of elements it connects
-			map<Vertex*, vector<Element<Dim>*>> vertexElements = BuildVertexElementMap();
+			if (elementsAroundV.empty()) // the vertex has been discarded (see below)
+				continue;
 
-			// Sort the vertices by number of elements
-			sort(this->Vertices.begin(), this->Vertices.end(), [&vertexElements](Vertex* v1, Vertex* v2) { return vertexElements[v1].size() > vertexElements[v2].size(); });
-
-			for (Vertex* v : this->Vertices)
+			/*bool vIsOnBoundary = true;
+			for (Element<Dim>* e : elementsAroundV)
 			{
-				vector<Element<Dim>*> elementsAroundV = vertexElements[v];
-
-				if (elementsAroundV.empty()) // the vertex has been discarded (see below)
-					continue;
-
-				/*bool vIsOnBoundary = true;
-				for (Element<Dim>* e : elementsAroundV)
+				if (!e->IsOnBoundary())
 				{
-					if (!e->IsOnBoundary())
-					{
-						vIsOnBoundary = false;
-						break;
-					}
-				}
-				if (vIsOnBoundary)
-					continue;*/
-
-				for (Element<Dim>* e : elementsAroundV)
-					assert(e->CoarserElement == nullptr);
-
-				coarseMesh->AgglomerateByVertexRemoval(elementsAroundV, v);
-
-				// All the vertices of the agglomerated elements are dicarded for future agglomeration
-				for (Element<Dim>* e : elementsAroundV)
-				{
-					for (Vertex* v2 : e->Shape()->Vertices())
-						vertexElements[v2].clear();
+					vIsOnBoundary = false;
+					break;
 				}
 			}
+			if (vIsOnBoundary)
+				continue;*/
 
-			this->CoarseMesh = coarseMesh;
+			for (Element<Dim>* e : elementsAroundV)
+				assert(e->CoarserElement == nullptr);
+
+			coarseMesh->AgglomerateByVertexRemoval(elementsAroundV, v);
+
+			// All the vertices of the agglomerated elements are dicarded for future agglomeration
+			for (Element<Dim>* e : elementsAroundV)
+			{
+				for (Vertex* v2 : e->Shape()->Vertices())
+					vertexElements[v2].clear();
+			}
 		}
+
+		this->CoarseMesh = coarseMesh;
 	}
 
 
@@ -921,7 +912,7 @@ private:
 				//           Agglomeration with another fine element           //
 				//-------------------------------------------------------------//
 				Element<Dim>* macroElement = coarseMesh->AgglomerateFineElements(e, neighbourForAggreg);
-				coarseMesh->CollapseInterfacesMadeOfMultipleFaces(macroElement);
+				coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(macroElement);
 			}
 			else
 			{
@@ -935,12 +926,12 @@ private:
 				//           Agglomeration with a coarse element          //
 				//--------------------------------------------------------//
 				Element<Dim>* macroElement = coarseMesh->AgglomerateFineElementToCoarse(e, coarseNeighbourForAggreg);
-				coarseMesh->CollapseInterfacesMadeOfMultipleFaces(macroElement);
+				coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(macroElement);
 			}
 		}
 
 		for (Element<Dim>* ce : coarseMesh->Elements)
-			coarseMesh->CollapseInterfacesMadeOfMultipleFaces(ce);
+			coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(ce);
 	}
 
 
@@ -1365,48 +1356,25 @@ private:
 		return newElement;
 	}
 
-	void AgglomerateFineFaces(Face<Dim>* f1, Face<Dim>* f2)
+	FaceCollapsingStatus AgglomerateFineFaces(Face<Dim>* f1, Face<Dim>* f2)
 	{
 		// f1 and f2 are one level higher than 'this'
-		vector<Face<Dim>*> v{ f1->CoarseFace, f2->CoarseFace };
-		Agglomerate(v);
+		return TryCollapse({ f1->CoarseFace, f2->CoarseFace });
 	}
 
-	void Agglomerate(vector<Face<Dim>*> faces)
+	FaceCollapsingStatus TryCollapse(vector<Face<Dim>*> faces)
 	{
 		assert(faces.size() > 1);
 		// 'faces' must be at the same level as 'this'
 
 		Interface<Dim> interf(faces);
-		if (interf.HasHoles())
-		{
-			Utils::Warning("Attempt to perform an operation which would result in an element rounding another one. Refused.");
-			return;
-		}
 
-		assert(interf.BoundaryVertices().size() == 2);
+		FaceCollapsingStatus status = interf.AnalyzeCollapsing();
+		if (status != FaceCollapsingStatus::Ok)
+			return status;
 
-		Edge* mergedEdge = new Edge(0, interf.BoundaryVertices()[0], interf.BoundaryVertices()[1]);
-		Face<Dim>* mergedFace = dynamic_cast<Face<Dim>*>(mergedEdge);
-
-		Element<Dim>* elem1 = faces[0]->Element1;
-		Element<Dim>* elem2 = faces[0]->Element2;
-		if (elem1->WillDegenerateIfReplacement(faces, mergedFace) || (elem2 && elem2->WillDegenerateIfReplacement(faces, mergedFace)))
-		{
-			Utils::Warning("Attempt to perform a face collapsing which would result in a degenerate element. Refused.");
-			/*cout << "%-- Elem1" << endl;
-			elem1->ExportToMatlab("r");
-			if (elem2)
-			{
-				cout << "%-- Elem2" << endl;
-				elem1->ExportToMatlab("c");
-			}
-			cout << "%-- Collapsed face:" << endl;
-			mergedFace->ExportToMatlab("m");*/
-			return;
-		}
-
-		ReplaceFaces(faces, mergedFace);
+		ReplaceFaces(interf.Faces(), interf.CollapsedFace());
+		return FaceCollapsingStatus::Ok;
 	}
 
 	void ReplaceFaces(vector<Face<Dim>*> faces, Face<Dim>* mergedFace)
@@ -1421,22 +1389,7 @@ private:
 		mergedFace->Element1 = elem1;
 		mergedFace->Element2 = elem2;
 
-		/*if (elem1->Number == 666 && elem2 && elem2->Number == 666)
-		{
-			cout << "BEFORE:" << endl;
-			cout << "Elem1:" << endl;
-			elem1->Shape()->ExportToMatlab();
-			cout << "Elem2:" << endl;
-			elem2->Shape()->ExportToMatlab("b");
-		}*/
-
 		elem1->ReplaceFaces(faces, mergedFace);
-		/*if (elem1->Number == 237 && elem2 && elem2->Number == 275)
-		{
-			cout << "AFTER:" << endl;
-			cout << "Elem1:" << endl;
-			elem1->Shape()->ExportToMatlab();
-		}*/
 		if (elem2)
 			elem2->ReplaceFaces(faces, mergedFace);
 

@@ -105,8 +105,11 @@ private:
 	{
 		string geoFileWithH = Mesh<Dim>::MeshDirectory + "temporary_set_h.geo";
 		ofstream gmshScriptWithH(geoFileWithH);
+
+		cout << "Opening file " << geoFile << endl;
 		ifstream gmshScript(geoFile);
 
+		cout << "Setting h = " << h << endl;
 		if (!gmshScriptWithH.is_open())
 		{
 			gmshScript.close();

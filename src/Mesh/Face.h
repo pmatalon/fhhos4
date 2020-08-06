@@ -84,6 +84,48 @@ public:
 		return this->Shape()->HasSameVertices(other->Shape(), compareCoordinates);
 	}
 
+	bool HasCommonVerticesWith(Face<Dim>* other, bool compareCoordinates = false)
+	{
+		for (Vertex* v : this->Vertices())
+		{
+			if (other->HasVertex(v, compareCoordinates))
+				return true;
+		}
+		return false;
+	}
+
+	bool IntersectsWith(Face<Dim>* other)
+	{
+		assert(Dim == 2);
+
+		// https://en.wikipedia.org/wiki/Line%E2%80%93line_intersection
+
+		DomPoint P1 = *this->Vertices()[0];
+		double x1 = P1.X;
+		double y1 = P1.Y;
+		DomPoint P2 = *this->Vertices()[1];
+		double x2 = P2.X;
+		double y2 = P2.Y;
+
+		DomPoint P3 = *other->Vertices()[0];
+		double x3 = P3.X;
+		double y3 = P3.Y;
+		DomPoint P4 = *other->Vertices()[1];
+		double x4 = P4.X;
+		double y4 = P4.Y;
+
+		double denom = (x1 - x2)*(y3 - y4) - (y1 - y2)*(x3 - x4);
+		if (abs(denom) < Utils::NumericalZero)
+			return false; // the two lines are parallel
+
+		double t =  ((x1 - x3)*(y3 - y4) - (y1 - y3)*(x3 - x4)) / denom;
+		double u = -((x1 - x2)*(y1 - y3) - (y1 - y2)*(x1 - x3)) / denom;
+
+		double eps = Utils::Eps;
+		return t + eps > 0 && t < 1 + eps  // t in [0,1]
+			&& u + eps > 0 && u < 1 + eps; // u in [0,1]
+	}
+
 	bool IsIn(vector<Face<Dim>*> list)
 	{
 		for (Face<Dim>* f : list)
@@ -182,6 +224,11 @@ public:
 				return i;
 		}
 		assert(false);
+	}
+
+	bool HasBeenCoarsened()
+	{
+		return this->CoarseFace->FinerFaces.size() > 1;
 	}
 
 	//-----------------------------//

@@ -134,6 +134,11 @@ public:
 				while (Face<2>::IsInTwoFaces(facesToRemove, e1Vertices.Get()))
 				//while (Face<2>::IsInFaces(facesToRemove, e1Vertices.Get()))
 					e1Vertices.MoveNext();
+				if (!Face<2>::IsInFaces(facesToRemove, e1Vertices.Get())) // happens if the faces to remove are circular
+				{
+					assert(facesToRemove.size() == e2->Faces.size()); // which means that e2 is embedded in e1
+					e1Vertices.MoveBack();
+				}
 				// until we get out of the interface
 				//e1Vertices.MoveBack();
 				iLastInterfaceVertex = e1Vertices.Index();
@@ -145,7 +150,11 @@ public:
 				e1Vertices.MoveNext();
 				while (Face<2>::IsInTwoFaces(facesToRemove, e1Vertices.Get()))
 					e1Vertices.MoveNext();
-				//e1Vertices.MoveBack();
+				if (!Face<2>::IsInFaces(facesToRemove, e1Vertices.Get())) // happens if the faces to remove are circular
+				{
+					assert(facesToRemove.size() == e2->Faces.size()); // which means that e2 is embedded in e1
+					e1Vertices.MoveBack();
+				}
 				iLastInterfaceVertex = e1Vertices.Index();
 				lastInterfaceVertex = e1Vertices.Get();
 
@@ -184,22 +193,14 @@ public:
 				}
 				if (i > e2Vertices.Size())
 				{
-					MatlabScript script;
-					script.PlotPolygonEdges(e1->Vertices(), "r");
-					script.Out() << endl;
-					script.PlotPolygonEdges(e2->Vertices(), "b");
-					script.Out() << endl;
+					PlotMatlab(e1, e2, firstInterfaceVertex, lastInterfaceVertex);
 					Utils::FatalError("Agglomeration failed: lastInterfaceVertex not found in e2.");
 				}
 			}
 
 			if (macroElementVertices.size() != e1->Vertices().size() + e2->Vertices().size() - 2 - 2 * (facesToRemove.size() - 1))
 			{
-				MatlabScript script;
-				script.PlotPolygonEdges(e1->Vertices(), "r");
-				script.Out() << endl;
-				script.PlotPolygonEdges(e2->Vertices(), "b");
-				script.Out() << endl;
+				PlotMatlab(e1, e2, firstInterfaceVertex, lastInterfaceVertex);
 				Utils::FatalError("Agglomeration failed: the agglomerate does not have the expected number of vertices.");
 			}
 		}
@@ -207,6 +208,19 @@ public:
 		return macroElementVertices;
 	}
 
+private:
+	static void PlotMatlab(Element<2>* e1, Element<2>* e2, Vertex* firstInterfaceVertex, Vertex* lastInterfaceVertex)
+	{
+		MatlabScript script;
+		script.PlotPolygonEdges(e1->Vertices(), "r");
+		script.Out() << endl;
+		script.PlotPolygonEdges(e2->Vertices(), "b");
+		script.Out() << endl;
+		script.PlotText(*firstInterfaceVertex, "firstInterfaceVertex");
+		script.PlotText(*lastInterfaceVertex, "lastInterfaceVertex");
+	}
+
+public:
 	void RemoveIntersections(vector<Face<2>*> oldFaces, Face<2>* newFace)
 	{
 		// Identification of the vertices to remove (those which belong to 2 faces)

@@ -56,6 +56,7 @@ public:
 		//   Mesh   //
 		//----------//
 
+		cout << "----------------------- Mesh construction -------------------------" << endl;
 		Mesh<Dim>* mesh = BuildMesh(args);
 
 		if ((args.Actions & Action::UnitTests) == Action::UnitTests)

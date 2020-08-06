@@ -67,6 +67,9 @@ public:
 		return symDifference;
 	}
 
+	static double Eps;
+	static double NumericalZero;
+
 	static string BeginRed;
 	static string BeginGreen;
 	static string BeginYellow;
@@ -90,6 +93,10 @@ public:
 	}
 
 };
+
+double Utils::Eps = 1e-4;
+double Utils::NumericalZero = 1e-12;
+
 string Utils::BeginRed    = "\033[1;31m";
 string Utils::BeginGreen  = "\033[1;32m";
 string Utils::BeginYellow = "\033[1;33m";

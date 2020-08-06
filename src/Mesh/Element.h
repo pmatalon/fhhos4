@@ -80,6 +80,10 @@ public:
 	{
 		return Shape()->Contains(p);
 	}
+	virtual bool ConvexHullEmbeds(Element<Dim>* other) const
+	{
+		return Shape()->ConvexHullEmbeds(other->Shape());
+	}
 	virtual void ExportToMatlab(string color = "r") const
 	{
 		return Shape()->ExportToMatlab(color);
@@ -197,7 +201,7 @@ public:
 	}
 
 	// Replace faces with their agglomeration //
-	void ReplaceFaces(vector<Face<Dim>*> faces, Face<Dim>* mergedFace)
+	void ReplaceFaces(vector<Face<Dim>*> faces, Face<Dim>* collapsedFace)
 	{
 		vector<Face<Dim>*> currentFaces(this->Faces);
 		this->Faces.clear();
@@ -206,19 +210,9 @@ public:
 			if (!f->IsIn(faces))
 				this->Faces.push_back(f);
 		}
-		this->Faces.push_back(mergedFace);
+		this->Faces.push_back(collapsedFace);
 
-		RemoveIntersections(faces, mergedFace);
-	}
-
-	bool WillDegenerateIfReplacement(vector<Face<Dim>*> faces, Face<Dim>* mergedFace)
-	{
-		for (Face<Dim>* f : this->Faces)
-		{
-			if (!f->IsIn(faces) && mergedFace->Contains(f->Center()))
-				return true;
-		}
-		return false;
+		RemoveIntersections(faces, collapsedFace);
 	}
 
 protected:

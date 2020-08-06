@@ -44,3 +44,14 @@ enum class Prolongation : unsigned
 	Wildey = 4,
 	FaceInject = 5
 };
+
+enum class FaceCollapsingStatus : unsigned
+{
+	Ok,
+	NotEnoughFaces,
+	InterfaceHasHoles,
+	ElementFullDegeneration,
+	ElementPartialDegeneration,
+	CrossedPolygon,
+	OneElementEmbeddedInConvexHullOfTheOther
+};

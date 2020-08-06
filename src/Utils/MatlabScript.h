@@ -58,7 +58,7 @@ public:
 		Out() << "fill(axes, [" << A.X << ";" << B.X << ";" << C.X << "], [" << A.Y << "; " << B.Y << ";" << C.Y << "], '" << color << "', 'LineStyle','none', 'FaceAlpha', 0.5);" << endl;
 	}
 
-	void PlotText(DomPoint p, string text, string color)
+	void PlotText(DomPoint p, string text, string color = "k")
 	{
 		Out() << "text(axes, " << p.X << ", " << p.Y << ", '" << text << "', 'Color', '" << color << "');" << endl;
 	}

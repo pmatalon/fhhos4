@@ -74,6 +74,20 @@ public:
 		return true;
 	}
 
+	virtual bool ConvexHullEmbeds(PhysicalShape<Dim>* other) const
+	{
+		if (IsConvex())
+		{
+			for (Vertex* v : other->Vertices())
+			{
+				if (Contains(*v))
+					return false;
+			}
+			return true;
+		}
+		assert(false);
+	}
+
 	virtual void ExportToMatlab(string color = "r") const
 	{
 		assert(false && "To be implemented in the subclass");

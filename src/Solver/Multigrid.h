@@ -324,6 +324,8 @@ public:
 			os << "standard [-cs s]" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarsening)
 			os << "agglomeration [-cs a]" << endl;
+		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
+			os << "agglomeration by face neighbours [-cs n]" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByMostCoplanarFaces)
 			os << "agglomeration by most coplanar faces [-cs l]" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter)
