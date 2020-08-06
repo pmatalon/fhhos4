@@ -289,6 +289,7 @@ protected:
 	{
 		os << "Multigrid" << endl;
 	}
+	virtual void EndSerialize(ostream& os) const {}
 
 public:
 	virtual void Serialize(ostream& os) const override
@@ -354,6 +355,8 @@ public:
 			os << endl;
 			Utils::Warning("Note that without relaxation parameter, the (block) Jacobi iteration is not a smoother. You can use 'bj23' (under-relaxation parameter = 2/3) instead.");
 		}
+
+		EndSerialize(cout);
 	}
 
 	void PrintCycleSchema()

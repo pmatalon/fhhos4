@@ -64,7 +64,7 @@ public:
 			remove(mshFile.c_str());
 	}
 
-	GMSHMesh(string mshFile) : GMSHMesh(mshFile, "GMSH file", "gmsh-file")
+	GMSHMesh(string mshFile, double h = -1) : GMSHMesh(mshFile, "GMSH file", "gmsh-file", h)
 	{}
 
 	static int GetDimension(string mshFile)
@@ -95,8 +95,14 @@ private:
 		{
 			if (Utils::FileExists(Mesh<Dim>::MeshDirectory + mshFile))
 				mshFile = Mesh<Dim>::MeshDirectory + mshFile;
+			else if (Utils::FileExists(Mesh<Dim>::MeshDirectory + to_string(Dim) + "D/" + mshFile))
+				mshFile = Mesh<Dim>::MeshDirectory + to_string(Dim) + "D/" + mshFile;
 			else
-				Utils::FatalError("File not found: " + mshFile);
+			{
+				Utils::Error("File not found: " + mshFile);
+				Utils::Error("File not found: " + Mesh<Dim>::MeshDirectory + mshFile);
+				Utils::FatalError("File not found: " + Mesh<Dim>::MeshDirectory + to_string(Dim) + "D/" + mshFile);
+			}
 		}
 		return mshFile;
 	}

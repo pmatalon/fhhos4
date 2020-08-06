@@ -79,17 +79,19 @@ public:
 	{
 		cout << Utils::BeginRed << "Error: " << msg << Utils::EndColor << endl;
 	}
-
 	static void FatalError(string msg)
 	{
 		cout << Utils::BeginRed << "Error: " << msg << Utils::EndColor << endl;
 		cout << "------------------------- FAILURE -------------------------" << endl;
 		exit(EXIT_FAILURE);
 	}
-
 	static void Warning(string msg)
 	{
-		cout << Utils::BeginYellow << "Warning: " << msg << Utils::EndColor << endl;
+		Warning(cout, msg);
+	}
+	static void Warning(ostream& os, string msg)
+	{
+		os << Utils::BeginYellow << "Warning: " << msg << Utils::EndColor << endl;
 	}
 
 };

@@ -56,7 +56,9 @@ public:
 		//   Mesh   //
 		//----------//
 
-		cout << "----------------------- Mesh construction -------------------------" << endl;
+		cout << "-----------------------------------------------------------" << endl;
+		cout << "-                   Mesh construction                     -" << endl;
+		cout << "-----------------------------------------------------------" << endl;
 		Mesh<Dim>* mesh = BuildMesh(args);
 
 		if ((args.Actions & Action::UnitTests) == Action::UnitTests)
@@ -392,7 +394,9 @@ public:
 			Utils::FatalError("Unknown discretization.");
 
 		cout << endl;
-		cout << "----------------------- Assembly -------------------------" << endl;
+		cout << "----------------------------------------------------------" << endl;
+		cout << "-                       Assembly                         -" << endl;
+		cout << "----------------------------------------------------------" << endl;
 		Timer assemblyTimer;
 		assemblyTimer.Start();
 
@@ -408,7 +412,9 @@ public:
 		if ((args.Actions & Action::SolveSystem) == Action::SolveSystem)
 		{
 			cout << endl;
-			cout << "------------------- Linear system solution ------------------" << endl;
+			cout << "----------------------------------------------------------" << endl;
+			cout << "-                 Linear system solution                 -" << endl;
+			cout << "----------------------------------------------------------" << endl;
 
 			int blockSizeForBlockSolver = 1;
 			if (args.Discretization.Method.compare("dg") == 0)
@@ -442,6 +448,11 @@ public:
 
 				if ((args.Actions & Action::ExtractSolution) == Action::ExtractSolution || ((args.Actions & Action::ComputeL2Error) == Action::ComputeL2Error && exactSolution != NULL))
 				{
+
+					cout << "----------------------------------------------------------" << endl;
+					cout << "-                     Post-processing                    -" << endl;
+					cout << "----------------------------------------------------------" << endl;
+
 					hhoPb->ReconstructHigherOrderApproximation();
 					if ((args.Actions & Action::ExtractSolution) == Action::ExtractSolution)
 					{
@@ -602,12 +613,14 @@ private:
 		{
 			iterativeSolver->ComputeExactSolution = A.rows() <= 2000;
 			solver->Setup(A);
+			cout << "Solving..." << endl;
 			x = iterativeSolver->Solve(b, initialGuessCode);
 			cout << iterativeSolver->IterationCount << " iterations." << endl;
 		}
 		else
 		{
 			solver->Setup(A);
+			cout << "Solving..." << endl;
 			x = solver->Solve(b);
 		}
 
@@ -630,6 +643,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 {
 	BigNumber nx = args.Discretization.N;
 	BigNumber ny = args.Discretization.Ny == -1 ? args.Discretization.N : args.Discretization.Ny;
+	double h = 1.0 / args.Discretization.N;
 	string meshCode = args.Discretization.MeshCode;
 	double stretch = args.Discretization.Stretch;
 
@@ -681,8 +695,13 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 	}
 	else if (meshCode.compare("gmsh") == 0)
 	{
-		Mesh<2>* coarseMesh = new GMSHMesh<2>(args.Discretization.MeshFilePath);
-		fineMesh = coarseMesh->RefineUntilNElements(2*nx*ny, refinementStgy);
+		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::SplittingRefinement)
+		{
+			Mesh<2>* coarseMesh = new GMSHMesh<2>(args.Discretization.MeshFilePath);
+			fineMesh = coarseMesh->RefineUntilNElements(2 * nx*ny, refinementStgy);
+		}
+		else
+			fineMesh = new GMSHMesh<2>(args.Discretization.MeshFilePath, h);
 	}
 #endif // GMSH_ENABLED
 	else

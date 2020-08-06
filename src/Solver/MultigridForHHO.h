@@ -35,6 +35,7 @@ public:
 			noCoarserMeshProvided = true;
 			return;
 		}
+		cout << "\tCoarsening mesh" << endl;
 		_problem->_mesh->CoarsenMesh(coarseningStgy);
 		if (_problem->_mesh->CoarseMesh->InteriorFaces.size() == 0)
 			coarsestPossibleMeshReached = true;
@@ -756,6 +757,20 @@ public:
 		else if (_weightCode.compare("a") == 0)
 			os << "simple average [-weight a]";
 		os << endl;
+	}
+
+	void EndSerialize(ostream& os) const override
+	{
+		if ((this->CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours
+			|| this->CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter
+			|| this->CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByClosestFace
+			|| this->CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface
+			|| this->CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByVertexNeighbours)
+			&& _prolongationCode != Prolongation::CellInterp_L2proj_Trace)
+		{
+			os << endl;
+			Utils::Warning(os, "The selected coarsening strategy generates non-nested meshes, while the selected prolongation operator is made for nested meshes. Option '-prolong " + to_string((unsigned)Prolongation::CellInterp_L2proj_Trace) + "' recommended.");
+		}
 	}
 
 	Vector Solve(const Vector& b, string initialGuessCode) override
