@@ -1,8 +1,8 @@
 #pragma once
 #include <gmsh.h>
 #include "PolyhedralMesh.h"
-#include "2D/Quadrilateral.h"
-#include "3D/Tetrahedron.h"
+#include "2D/QuadrilateralElement.h"
+#include "3D/TetrahedralElement.h"
 #include "2D/Square_TriangularMesh.h"
 using namespace std;
 
@@ -506,7 +506,7 @@ Element<2>* GMSHMesh<2>::CreateElement(int elemType, size_t elementTag, const ve
 		size_t nodeTag3 = elementNodes[elemNodeIndex + 2];
 		size_t nodeTag4 = elementNodes[elemNodeIndex + 3];
 
-		e = new Quadrilateral(elemNumber, GetVertex(nodeTag1), GetVertex(nodeTag2), GetVertex(nodeTag3), GetVertex(nodeTag4));
+		e = new QuadrilateralElement(elemNumber, GetVertex(nodeTag1), GetVertex(nodeTag2), GetVertex(nodeTag3), GetVertex(nodeTag4));
 		_elementExternalNumbers.insert({ elementTag, e });
 		elemNodeIndex += 4;
 	}
@@ -516,7 +516,7 @@ Element<2>* GMSHMesh<2>::CreateElement(int elemType, size_t elementTag, const ve
 		size_t nodeTag2 = elementNodes[elemNodeIndex + 1];
 		size_t nodeTag3 = elementNodes[elemNodeIndex + 2];
 
-		e = new Triangle(elemNumber, GetVertex(nodeTag1), GetVertex(nodeTag2), GetVertex(nodeTag3));
+		e = new TriangularElement(elemNumber, GetVertex(nodeTag1), GetVertex(nodeTag2), GetVertex(nodeTag3));
 		_elementExternalNumbers.insert({ elementTag, e });
 		elemNodeIndex += 3;
 	}
@@ -541,7 +541,7 @@ Element<3>* GMSHMesh<3>::CreateElement(int elemType, size_t elementTag, const ve
 		size_t nodeTag3 = elementNodes[elemNodeIndex + 2];
 		size_t nodeTag4 = elementNodes[elemNodeIndex + 3];
 
-		e = new Tetrahedron(elemNumber, GetVertex(nodeTag1), GetVertex(nodeTag2), GetVertex(nodeTag3), GetVertex(nodeTag4));
+		e = new TetrahedralElement(elemNumber, GetVertex(nodeTag1), GetVertex(nodeTag2), GetVertex(nodeTag3), GetVertex(nodeTag4));
 		_elementExternalNumbers.insert({ elementTag, e });
 		elemNodeIndex += 4;
 	}
@@ -565,7 +565,7 @@ Element<3>* GMSHMesh<3>::CreateElement(int elemType, size_t elementTag, const ve
 		Vertex* frontRightBottomCorner = v3;
 		Vertex* frontRightTopCorner = v4;
 
-		e = new Parallelepiped(elemNumber, backLeftBottomCorner, frontLeftBottomCorner, backRightBottomCorner, backLeftTopCorner, frontLeftTopCorner, backRightTopCorner, frontRightBottomCorner, frontRightTopCorner);
+		e = new ParallelepipedElement(elemNumber, backLeftBottomCorner, frontLeftBottomCorner, backRightBottomCorner, backLeftTopCorner, frontLeftTopCorner, backRightTopCorner, frontRightBottomCorner, frontRightTopCorner);
 		_elementExternalNumbers.insert({ elementTag, e });
 		elemNodeIndex += 8;
 	}

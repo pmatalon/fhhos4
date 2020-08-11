@@ -3,7 +3,7 @@
 #include <list>
 #include <algorithm>
 #include "Mesh.h"
-#include "2D/Polygon.h"
+#include "2D/PolygonalElement.h"
 #include "AgglomerateElement.h"
 #include "Agglo.h"
 using namespace std;
@@ -1454,7 +1454,7 @@ template<>
 Element<2>* PolyhedralMesh<2>::CreatePolyhedron(vector<Vertex*> vertices)
 {
 	BigNumber elementNumber = this->Elements.size();
-	Polygon* macroElement = new Polygon(elementNumber, vertices, false);
+	PolygonalElement* macroElement = new PolygonalElement(elementNumber, vertices, false);
 	return macroElement;
 }
 
@@ -1467,7 +1467,7 @@ Element<3>* PolyhedralMesh<3>::CreatePolyhedron(vector<Vertex*> vertices)
 template<>
 Element<2>* PolyhedralMesh<2>::CreateMacroElement(Element<2>* e1, Element<2>* e2, vector<Face<2>*> facesToRemove)
 {
-	Polygon* macroElement = new Polygon(0, e1, e2, facesToRemove, false);
+	PolygonalElement* macroElement = new PolygonalElement(0, e1, e2, facesToRemove, false);
 	return macroElement;
 }
 

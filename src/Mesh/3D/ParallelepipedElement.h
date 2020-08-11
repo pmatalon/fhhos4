@@ -1,7 +1,7 @@
 #pragma once
 #include "../CartesianElement.h"
 
-class Parallelepiped : public CartesianElement<3>
+class ParallelepipedElement : public CartesianElement<3>
 {
 public:
 	Face<3>* TopFace;
@@ -21,7 +21,7 @@ public:
 	Vertex* FrontRightBottomCorner;
 	Vertex* FrontRightTopCorner;
 
-	Parallelepiped(int number, Vertex* backLeftBottomCorner, Vertex* frontLeftBottomCorner, Vertex* backRightBottomCorner, Vertex* backLeftTopCorner, Vertex* frontLeftTopCorner, Vertex* backRightTopCorner, Vertex* frontRightBottomCorner, Vertex* frontRightTopCorner) :
+	ParallelepipedElement(int number, Vertex* backLeftBottomCorner, Vertex* frontLeftBottomCorner, Vertex* backRightBottomCorner, Vertex* backLeftTopCorner, Vertex* frontLeftTopCorner, Vertex* backRightTopCorner, Vertex* frontRightBottomCorner, Vertex* frontRightTopCorner) :
 		Element(number), 
 		CartesianElement(number, backLeftBottomCorner, frontLeftBottomCorner->X - backLeftBottomCorner->X, backRightBottomCorner->Y - backLeftBottomCorner->Y, backLeftTopCorner->Z - backLeftBottomCorner->Z)
 		// back  : x <-- x,    front: x <-- x + width

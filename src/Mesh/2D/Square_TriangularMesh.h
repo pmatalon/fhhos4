@@ -1,13 +1,12 @@
 #pragma once
-#include <vector>
-#include "Triangle.h"
+#include "TriangularElement.h"
 #include "../PolyhedralMesh.h"
 using namespace std;
 
-class LowerTriangle : public Triangle
+class LowerTriangle : public TriangularElement
 {
 public:
-	LowerTriangle(int number, Vertex* v1, Vertex* v2, Vertex* v3) : Triangle(number, v1, v2, v3), Element(number) {}
+	LowerTriangle(int number, Vertex* v1, Vertex* v2, Vertex* v3) : TriangularElement(number, v1, v2, v3), Element(number) {}
 
 	Edge* GetEdge(Vertex* v1, Vertex* v2)
 	{
@@ -25,10 +24,10 @@ public:
 	Edge* WestEdge() { return GetEdge(this->V3(), this->V1()); }
 };
 
-class UpperTriangle : public Triangle
+class UpperTriangle : public TriangularElement
 {
 public:
-	UpperTriangle(int number, Vertex* v1, Vertex* v2, Vertex* v3) : Triangle(number, v1, v2, v3), Element(number) {}
+	UpperTriangle(int number, Vertex* v1, Vertex* v2, Vertex* v3) : TriangularElement(number, v1, v2, v3), Element(number) {}
 
 	Edge* GetEdge(Vertex* v1, Vertex* v2)
 	{
@@ -90,9 +89,9 @@ public:
 				Vertex* topLeftCorner     = Vertices[indexV(ix,     iy + 1)];
 				Vertex* topRightCorner    = Vertices[indexV(ix + 1, iy + 1)];
 				Vertex* bottomRightCorner = Vertices[indexV(ix + 1, iy    )];
-				Triangle* lowerTriangle = new LowerTriangle(number, bottomLeftCorner, bottomRightCorner, topLeftCorner);
+				TriangularElement* lowerTriangle = new LowerTriangle(number, bottomLeftCorner, bottomRightCorner, topLeftCorner);
 				this->Elements.push_back(lowerTriangle);
-				Triangle* upperTriangle = new UpperTriangle(number + 1, topLeftCorner, bottomRightCorner, topRightCorner);
+				TriangularElement* upperTriangle = new UpperTriangle(number + 1, topLeftCorner, bottomRightCorner, topRightCorner);
 				this->Elements.push_back(upperTriangle);
 			}
 		}
@@ -107,14 +106,14 @@ public:
 		for (BigNumber ix = 0; ix < nx; ++ix)
 		{
 			// South boundary
-			Triangle* lowerTriangle = dynamic_cast<Triangle*>(this->Elements[index(ix, 0)]);
+			TriangularElement* lowerTriangle = dynamic_cast<TriangularElement*>(this->Elements[index(ix, 0)]);
 			Edge* southBoundary = new Edge(numberInterface++, lowerTriangle->V1(), lowerTriangle->V2(), lowerTriangle);
 			this->Faces.push_back(southBoundary);
 			this->BoundaryFaces.push_back(southBoundary);
 			lowerTriangle->AddFace(southBoundary);
 
 			// North boundary
-			Triangle* upperTriangle = dynamic_cast<Triangle*>(this->Elements[index(ix, ny - 1) + 1]);
+			TriangularElement* upperTriangle = dynamic_cast<TriangularElement*>(this->Elements[index(ix, ny - 1) + 1]);
 			Edge* northBoundary = new Edge(numberInterface++, upperTriangle->V1(), upperTriangle->V3(), upperTriangle);
 			this->Faces.push_back(northBoundary);
 			this->BoundaryFaces.push_back(northBoundary);
@@ -124,14 +123,14 @@ public:
 		for (BigNumber iy = 0; iy < ny; ++iy)
 		{
 			// West boundary
-			Triangle* lowerTriangle = dynamic_cast<Triangle*>(this->Elements[index(0, iy)]);
+			TriangularElement* lowerTriangle = dynamic_cast<TriangularElement*>(this->Elements[index(0, iy)]);
 			Edge* westBoundary = new Edge(numberInterface++, lowerTriangle->V3(), lowerTriangle->V1(), lowerTriangle);
 			this->Faces.push_back(westBoundary);
 			this->BoundaryFaces.push_back(westBoundary);
 			lowerTriangle->AddFace(westBoundary);
 
 			// East boundary
-			Triangle* upperTriangle = dynamic_cast<Triangle*>(this->Elements[index(nx-1, iy)+1]);
+			TriangularElement* upperTriangle = dynamic_cast<TriangularElement*>(this->Elements[index(nx-1, iy)+1]);
 			Edge* eastBoundary = new Edge(numberInterface++, upperTriangle->V2(), upperTriangle->V3(), upperTriangle);
 			this->Faces.push_back(eastBoundary);
 			this->BoundaryFaces.push_back(eastBoundary);
@@ -142,8 +141,8 @@ public:
 		{
 			for (BigNumber ix = 0; ix < nx; ix++)
 			{
-				Triangle* lowerTriangle = dynamic_cast<Triangle*>(this->Elements[index(ix, iy)]);
-				Triangle* upperTriangle = dynamic_cast<Triangle*>(this->Elements[index(ix, iy)+1]);
+				TriangularElement* lowerTriangle = dynamic_cast<TriangularElement*>(this->Elements[index(ix, iy)]);
+				TriangularElement* upperTriangle = dynamic_cast<TriangularElement*>(this->Elements[index(ix, iy)+1]);
 
 				Edge* interface = new Edge(numberInterface++, lowerTriangle->V3(), lowerTriangle->V2(), lowerTriangle, upperTriangle);
 				this->Faces.push_back(interface);
@@ -154,7 +153,7 @@ public:
 				if (ix != nx - 1)
 				{
 					// East
-					Triangle* eastNeighbour = dynamic_cast<Triangle*>(this->Elements[index(ix + 1, iy)]);
+					TriangularElement* eastNeighbour = dynamic_cast<TriangularElement*>(this->Elements[index(ix + 1, iy)]);
 					interface = new Edge(numberInterface++, eastNeighbour->V3(), eastNeighbour->V1(), upperTriangle, eastNeighbour);
 					this->Faces.push_back(interface);
 					this->InteriorFaces.push_back(interface);
@@ -164,7 +163,7 @@ public:
 				if (iy != ny - 1)
 				{
 					// North
-					Triangle* northNeighbour = dynamic_cast<Triangle*>(this->Elements[index(ix, iy + 1)]);
+					TriangularElement* northNeighbour = dynamic_cast<TriangularElement*>(this->Elements[index(ix, iy + 1)]);
 					interface = new Edge(numberInterface++, northNeighbour->V1(), northNeighbour->V2(), upperTriangle, northNeighbour);
 					this->Faces.push_back(interface);
 					this->InteriorFaces.push_back(interface);
@@ -184,7 +183,7 @@ public:
 
 		for (auto e : this->Elements)
 		{
-			Triangle* t = dynamic_cast<Triangle*>(e);
+			TriangularElement* t = dynamic_cast<TriangularElement*>(e);
 			assert(t->Faces.size() == 3);
 
 			//assert(t->Shape()->DetJacobian() == 1/t->Shape()->InverseJacobianTranspose().determinant());
@@ -221,8 +220,8 @@ public:
 		Vertex topRight(number,    1, 1);
 		Vertex topLeft(number,     0, 1);
 
-		Triangle lower(number, &bottomLeft, &bottomRight, &topLeft);
-		Triangle upper(number, &topLeft, &bottomRight, &topRight);
+		TriangularElement lower(number, &bottomLeft, &bottomRight, &topLeft);
+		TriangularElement upper(number, &topLeft, &bottomRight, &topRight);
 
 		/*double lowerIntegral = lower.Integral(domX, 1);
 		assert(abs(lowerIntegral - 1.0 / 6) < 1e-14);

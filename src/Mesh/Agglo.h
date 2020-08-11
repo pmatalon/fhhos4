@@ -130,7 +130,7 @@ void Agglo<2>::Agglomerate(Element<2>* e, vector<Face<2>*> interfaceFaces)
 		cout << "%------------------------- Adding this element --------------------------------" << endl;
 		script.PlotPolygonEdges(e->Vertices(), "c");
 	}*/
-	_vertices = Polygon::MacroPolygonVertices(this, e, interfaceFaces);
+	_vertices = PolygonalElement::MacroPolygonVertices(this, e, interfaceFaces);
 	//cout << "%------------------------- Result --------------------------------" << endl;
 	//script.PlotPolygonEdges(this->Vertices(), "r");
 	//cout << endl;

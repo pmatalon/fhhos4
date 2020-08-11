@@ -3,7 +3,7 @@
 #include "CartesianEdge.h"
 using namespace std;
 
-class Rectangle : public CartesianElement<2>
+class RectangularElement : public CartesianElement<2>
 {
 public:
 	Face<2>* NorthFace;
@@ -16,7 +16,7 @@ public:
 	Vertex* TopRightCorner;
 	Vertex* BottomRightCorner;
 
-	Rectangle(int number, Vertex* bottomLeftCorner, Vertex* topLeftCorner, Vertex* topRightCorner, Vertex* bottomRightCorner) :
+	RectangularElement(int number, Vertex* bottomLeftCorner, Vertex* topLeftCorner, Vertex* topRightCorner, Vertex* bottomRightCorner) :
 		Element(number), 
 		CartesianElement(number, bottomLeftCorner, bottomRightCorner->X - bottomLeftCorner->X, topLeftCorner->Y - bottomLeftCorner->Y)
 	{

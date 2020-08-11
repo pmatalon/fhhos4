@@ -5,13 +5,13 @@
 #include "Edge.h"
 using namespace std;
 
-class Quadrilateral : public Diff_DGElement<2>, public Diff_HHOElement<2>
+class QuadrilateralElement : public Diff_DGElement<2>, public Diff_HHOElement<2>
 {
 private:
 	QuadrilateralShape* _shape;
 
 public:
-	Quadrilateral(int number, Vertex* v1, Vertex* v2, Vertex* v3, Vertex* v4) :
+	QuadrilateralElement(int number, Vertex* v1, Vertex* v2, Vertex* v3, Vertex* v4) :
 		Element(number),
 		Diff_DGElement<2>(number),
 		Diff_HHOElement<2>(number)
@@ -65,7 +65,7 @@ public:
 		return n;
 	}
 	
-	virtual ~Quadrilateral()
+	virtual ~QuadrilateralElement()
 	{
 		if (_shape)
 			delete _shape;

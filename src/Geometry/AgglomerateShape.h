@@ -1,6 +1,6 @@
 #pragma once
 #include "PhysicalShape.h"
-#include "../Mesh/2D/Quadrilateral.h"
+#include "../Mesh/2D/QuadrilateralElement.h"
 using namespace std;
 
 template <int Dim>

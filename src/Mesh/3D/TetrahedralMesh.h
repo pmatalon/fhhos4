@@ -1,6 +1,6 @@
 #pragma once
 #include "../PolyhedralMesh.h"
-#include "Tetrahedron.h"
+#include "TetrahedralElement.h"
 using namespace std;
 
 class TetrahedralMesh : virtual public PolyhedralMesh<3>
@@ -79,7 +79,7 @@ protected:
 		BigNumber faceNumber = 0;
 		for (Element<3>* e : this->Elements)
 		{
-			Tetrahedron* coarseTetra = dynamic_cast<Tetrahedron*>(e);
+			TetrahedralElement* coarseTetra = dynamic_cast<TetrahedralElement*>(e);
 
 			MeshVertex<3>* V0 = fineMesh->_verticesByNumber.at(coarseTetra->V1()->Number);
 			MeshVertex<3>* V1 = fineMesh->_verticesByNumber.at(coarseTetra->V2()->Number);
@@ -136,16 +136,16 @@ protected:
 			}
 
 			// Corners of the tetrahedra
-			Tetrahedron* cornerTetra1 = fineMesh->CreateAndAddNewTetra(elemNumber++, V0, V01, V02, V03, coarseTetra);
-			Tetrahedron* cornerTetra2 = fineMesh->CreateAndAddNewTetra(elemNumber++, V01, V1, V12, V13, coarseTetra);
-			Tetrahedron* cornerTetra3 = fineMesh->CreateAndAddNewTetra(elemNumber++, V02, V12, V2, V23, coarseTetra);
-			Tetrahedron* cornerTetra4 = fineMesh->CreateAndAddNewTetra(elemNumber++, V03, V13, V23, V3, coarseTetra);
+			TetrahedralElement* cornerTetra1 = fineMesh->CreateAndAddNewTetra(elemNumber++, V0, V01, V02, V03, coarseTetra);
+			TetrahedralElement* cornerTetra2 = fineMesh->CreateAndAddNewTetra(elemNumber++, V01, V1, V12, V13, coarseTetra);
+			TetrahedralElement* cornerTetra3 = fineMesh->CreateAndAddNewTetra(elemNumber++, V02, V12, V2, V23, coarseTetra);
+			TetrahedralElement* cornerTetra4 = fineMesh->CreateAndAddNewTetra(elemNumber++, V03, V13, V23, V3, coarseTetra);
 
 			// Octahedron
-			Tetrahedron* octaTetra1 = fineMesh->CreateAndAddNewTetra(elemNumber++, V01, V02, V03, V13, coarseTetra);
-			Tetrahedron* octaTetra2 = fineMesh->CreateAndAddNewTetra(elemNumber++, V01, V02, V12, V13, coarseTetra);
-			Tetrahedron* octaTetra3 = fineMesh->CreateAndAddNewTetra(elemNumber++, V02, V03, V13, V23, coarseTetra);
-			Tetrahedron* octaTetra4 = fineMesh->CreateAndAddNewTetra(elemNumber++, V02, V12, V13, V23, coarseTetra);
+			TetrahedralElement* octaTetra1 = fineMesh->CreateAndAddNewTetra(elemNumber++, V01, V02, V03, V13, coarseTetra);
+			TetrahedralElement* octaTetra2 = fineMesh->CreateAndAddNewTetra(elemNumber++, V01, V02, V12, V13, coarseTetra);
+			TetrahedralElement* octaTetra3 = fineMesh->CreateAndAddNewTetra(elemNumber++, V02, V03, V13, V23, coarseTetra);
+			TetrahedralElement* octaTetra4 = fineMesh->CreateAndAddNewTetra(elemNumber++, V02, V12, V13, V23, coarseTetra);
 
 			//--------------------//
 			//    Create faces    //
@@ -212,9 +212,9 @@ protected:
 		return nullptr;
 	}
 
-	Tetrahedron* CreateAndAddNewTetra(BigNumber elemNumber, MeshVertex<3>* V1, MeshVertex<3>* V2, MeshVertex<3>* V3, MeshVertex<3>* V4, Tetrahedron* coarseTetra = nullptr)
+	TetrahedralElement* CreateAndAddNewTetra(BigNumber elemNumber, MeshVertex<3>* V1, MeshVertex<3>* V2, MeshVertex<3>* V3, MeshVertex<3>* V4, TetrahedralElement* coarseTetra = nullptr)
 	{
-		Tetrahedron* tetra = new Tetrahedron(elemNumber, V1, V2, V3, V4);
+		TetrahedralElement* tetra = new TetrahedralElement(elemNumber, V1, V2, V3, V4);
 
 		V1->Elements.push_back(tetra);
 		V2->Elements.push_back(tetra);
@@ -238,7 +238,7 @@ protected:
 		return tetra;
 	}
 
-	void CreateFaceIfNeeded(Tetrahedron* tetra, BigNumber& faceNumber, MeshVertex<3>* V1, MeshVertex<3>* V2, MeshVertex<3>* V3)
+	void CreateFaceIfNeeded(TetrahedralElement* tetra, BigNumber& faceNumber, MeshVertex<3>* V1, MeshVertex<3>* V2, MeshVertex<3>* V3)
 	{
 		Face<3>* face = this->ExistingFaceWithVertices(vector<MeshVertex<3>*> {V1, V2, V3});
 		if (!face)
@@ -260,7 +260,7 @@ protected:
 		tetra->AddFace(face);
 	}
 
-	void CreateInteriorFace(Tetrahedron* tetra1, Tetrahedron* tetra2, BigNumber& faceNumber, MeshVertex<3>* V1, MeshVertex<3>* V2, MeshVertex<3>* V3)
+	void CreateInteriorFace(TetrahedralElement* tetra1, TetrahedralElement* tetra2, BigNumber& faceNumber, MeshVertex<3>* V1, MeshVertex<3>* V2, MeshVertex<3>* V3)
 	{
 		Face<3>* face = new TriangularFace(faceNumber++, V1, V2, V3, tetra1, tetra2);
 		face->IsDomainBoundary = false;

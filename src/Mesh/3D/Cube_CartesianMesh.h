@@ -1,6 +1,6 @@
 #pragma once
 #include <vector>
-#include "Parallelepiped.h"
+#include "ParallelepipedElement.h"
 #include "RectangularFace.h"
 #include "../Mesh.h"
 
@@ -62,7 +62,7 @@ public:
 					Vertex* backRightTopCorner     = Vertices[indexV(ix,   iy+1, iz+1)]; 
 					Vertex* frontRightBottomCorner = Vertices[indexV(ix+1, iy+1, iz)];
 					Vertex* frontRightTopCorner    = Vertices[indexV(ix+1, iy+1, iz+1)];
-					Parallelepiped* element = new Parallelepiped(index(ix, iy, iz), backLeftBottomCorner, frontLeftBottomCorner, backRightBottomCorner, backLeftTopCorner, frontLeftTopCorner, backRightTopCorner, frontRightBottomCorner, frontRightTopCorner);
+					ParallelepipedElement* element = new ParallelepipedElement(index(ix, iy, iz), backLeftBottomCorner, frontLeftBottomCorner, backRightBottomCorner, backLeftTopCorner, frontLeftTopCorner, backRightTopCorner, frontRightBottomCorner, frontRightTopCorner);
 					this->Elements.push_back(element);
 				}
 			}
@@ -80,14 +80,14 @@ public:
 			for (BigNumber ix = 0; ix < nx; ++ix)
 			{
 				// Bottom boundary
-				Parallelepiped* element = dynamic_cast<Parallelepiped*>(this->Elements[index(ix, iy, 0)]);
+				ParallelepipedElement* element = dynamic_cast<ParallelepipedElement*>(this->Elements[index(ix, iy, 0)]);
 				RectangularFace* bottomBoundary = new RectangularFace(numberInterface++, element->BackLeftBottomCorner, element->FrontLeftBottomCorner, element->BackRightBottomCorner, element, CartesianShapeOrientation::InXOY);
 				this->Faces.push_back(bottomBoundary);
 				this->BoundaryFaces.push_back(bottomBoundary);
 				element->SetBottomFace(bottomBoundary);
 
 				// Top boundary
-				element = dynamic_cast<Parallelepiped*>(this->Elements[index(ix, iy, nz - 1)]);
+				element = dynamic_cast<ParallelepipedElement*>(this->Elements[index(ix, iy, nz - 1)]);
 				RectangularFace* topBoundary = new RectangularFace(numberInterface++, element->BackLeftTopCorner, element->FrontLeftTopCorner, element->BackRightTopCorner, element, CartesianShapeOrientation::InXOY);
 				this->Faces.push_back(topBoundary);
 				this->BoundaryFaces.push_back(topBoundary);
@@ -100,14 +100,14 @@ public:
 			for (BigNumber ix = 0; ix < nx; ++ix)
 			{
 				// Left boundary
-				Parallelepiped* element = dynamic_cast<Parallelepiped*>(this->Elements[index(ix, 0, iz)]);
+				ParallelepipedElement* element = dynamic_cast<ParallelepipedElement*>(this->Elements[index(ix, 0, iz)]);
 				RectangularFace* leftBoundary = new RectangularFace(numberInterface++, element->BackLeftBottomCorner, element->FrontLeftBottomCorner, element->BackLeftTopCorner, element, CartesianShapeOrientation::InXOZ);
 				this->Faces.push_back(leftBoundary);
 				this->BoundaryFaces.push_back(leftBoundary);
 				element->SetLeftFace(leftBoundary);
 
 				// Right boundary
-				element = dynamic_cast<Parallelepiped*>(this->Elements[index(ix, ny - 1, iz)]);
+				element = dynamic_cast<ParallelepipedElement*>(this->Elements[index(ix, ny - 1, iz)]);
 				RectangularFace* rightBoundary = new RectangularFace(numberInterface++, element->BackRightBottomCorner, element->FrontRightBottomCorner, element->BackRightTopCorner, element, CartesianShapeOrientation::InXOZ);
 				this->Faces.push_back(rightBoundary);
 				this->BoundaryFaces.push_back(rightBoundary);
@@ -120,14 +120,14 @@ public:
 			for (BigNumber iy = 0; iy < ny; ++iy)
 			{
 				// Back boundary
-				Parallelepiped* element = dynamic_cast<Parallelepiped*>(this->Elements[index(0, iy, iz)]);
+				ParallelepipedElement* element = dynamic_cast<ParallelepipedElement*>(this->Elements[index(0, iy, iz)]);
 				RectangularFace* backBoundary = new RectangularFace(numberInterface++, element->BackLeftBottomCorner, element->BackRightBottomCorner, element->BackLeftTopCorner, element, CartesianShapeOrientation::InYOZ);
 				this->Faces.push_back(backBoundary);
 				this->BoundaryFaces.push_back(backBoundary);
 				element->SetBackFace(backBoundary);
 
 				// Front boundary
-				element = dynamic_cast<Parallelepiped*>(this->Elements[index(nx - 1, iy, iz)]);
+				element = dynamic_cast<ParallelepipedElement*>(this->Elements[index(nx - 1, iy, iz)]);
 				RectangularFace* frontBoundary = new RectangularFace(numberInterface++, element->FrontLeftBottomCorner, element->FrontRightBottomCorner, element->FrontLeftTopCorner, element, CartesianShapeOrientation::InYOZ);
 				this->Faces.push_back(frontBoundary);
 				this->BoundaryFaces.push_back(frontBoundary);
@@ -141,11 +141,11 @@ public:
 			{
 				for (BigNumber ix = 0; ix < nx; ++ix)
 				{
-					Parallelepiped* element = dynamic_cast<Parallelepiped*>(this->Elements[index(ix, iy, iz)]);
+					ParallelepipedElement* element = dynamic_cast<ParallelepipedElement*>(this->Elements[index(ix, iy, iz)]);
 					if (ix != nx - 1)
 					{
 						// Front
-						Parallelepiped* frontNeighbour = dynamic_cast<Parallelepiped*>(this->Elements[index(ix+1, iy, iz)]);
+						ParallelepipedElement* frontNeighbour = dynamic_cast<ParallelepipedElement*>(this->Elements[index(ix+1, iy, iz)]);
 						RectangularFace* interface = new RectangularFace(numberInterface++, element->FrontLeftBottomCorner, element->FrontRightBottomCorner, element->FrontLeftTopCorner, element, frontNeighbour, CartesianShapeOrientation::InYOZ);
 						this->Faces.push_back(interface);
 						this->InteriorFaces.push_back(interface);
@@ -155,7 +155,7 @@ public:
 					if (iy != ny - 1)
 					{
 						// Right
-						Parallelepiped* rightNeighbour = dynamic_cast<Parallelepiped*>(this->Elements[index(ix, iy+1, iz)]);
+						ParallelepipedElement* rightNeighbour = dynamic_cast<ParallelepipedElement*>(this->Elements[index(ix, iy+1, iz)]);
 						RectangularFace* interface = new RectangularFace(numberInterface++, element->BackRightBottomCorner, element->FrontRightBottomCorner, element->BackRightTopCorner, element, rightNeighbour, CartesianShapeOrientation::InXOZ);
 						this->Faces.push_back(interface);
 						this->InteriorFaces.push_back(interface);
@@ -165,7 +165,7 @@ public:
 					if (iz != nz - 1)
 					{
 						// Top
-						Parallelepiped* topNeighbour = dynamic_cast<Parallelepiped*>(this->Elements[index(ix, iy, iz+1)]);
+						ParallelepipedElement* topNeighbour = dynamic_cast<ParallelepipedElement*>(this->Elements[index(ix, iy, iz+1)]);
 						RectangularFace* interface = new RectangularFace(numberInterface++, element->BackLeftTopCorner, element->FrontLeftTopCorner, element->BackRightTopCorner, element, topNeighbour, CartesianShapeOrientation::InXOY);
 						this->Faces.push_back(interface);
 						this->InteriorFaces.push_back(interface);
@@ -237,8 +237,8 @@ private:
 				{
 					for (BigNumber ix = 0; ix < nx; ++ix)
 					{
-						Parallelepiped* fineElement = dynamic_cast<Parallelepiped*>(this->Elements[index(ix, iy, iz)]);
-						Parallelepiped* coarseElement = dynamic_cast<Parallelepiped*>(coarseMesh->Elements[coarseMesh->index(ix / 2, iy / 2, iz / 2)]);
+						ParallelepipedElement* fineElement = dynamic_cast<ParallelepipedElement*>(this->Elements[index(ix, iy, iz)]);
+						ParallelepipedElement* coarseElement = dynamic_cast<ParallelepipedElement*>(coarseMesh->Elements[coarseMesh->index(ix / 2, iy / 2, iz / 2)]);
 
 						coarseElement->FinerElements.push_back(fineElement);
 						fineElement->CoarserElement = coarseElement;

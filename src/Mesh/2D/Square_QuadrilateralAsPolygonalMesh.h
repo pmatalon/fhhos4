@@ -1,5 +1,5 @@
 #pragma once
-#include "Polygon.h"
+#include "PolygonalElement.h"
 #include "../PolyhedralMesh.h"
 using namespace std;
 
@@ -55,7 +55,7 @@ public:
 				Vertex* topRightCorner    = Vertices[indexV(ix + 1, iy + 1)];
 				Vertex* bottomRightCorner = Vertices[indexV(ix + 1, iy    )];
 				vector<Vertex*> vertices = { bottomLeftCorner, bottomRightCorner, topRightCorner, topLeftCorner };
-				Polygon* p = new Polygon(number, vertices);
+				PolygonalElement* p = new PolygonalElement(number, vertices);
 				this->Elements.push_back(p);
 			}
 		}
@@ -70,14 +70,14 @@ public:
 		for (BigNumber ix = 0; ix < nx; ++ix)
 		{
 			// South boundary
-			Polygon* p = dynamic_cast<Polygon*>(this->Elements[index(ix, 0)]);
+			PolygonalElement* p = dynamic_cast<PolygonalElement*>(this->Elements[index(ix, 0)]);
 			Edge* southBoundary = new Edge(numberInterface++, p->Vertices()[0], p->Vertices()[1], p);
 			this->Faces.push_back(southBoundary);
 			this->BoundaryFaces.push_back(southBoundary);
 			p->AddFace(southBoundary);
 
 			// North boundary
-			p = dynamic_cast<Polygon*>(this->Elements[index(ix, ny - 1)]);
+			p = dynamic_cast<PolygonalElement*>(this->Elements[index(ix, ny - 1)]);
 			Edge* northBoundary = new Edge(numberInterface++, p->Vertices()[3], p->Vertices()[2], p);
 			this->Faces.push_back(northBoundary);
 			this->BoundaryFaces.push_back(northBoundary);
@@ -87,14 +87,14 @@ public:
 		for (BigNumber iy = 0; iy < ny; ++iy)
 		{
 			// West boundary
-			Polygon* p = dynamic_cast<Polygon*>(this->Elements[index(0, iy)]);
+			PolygonalElement* p = dynamic_cast<PolygonalElement*>(this->Elements[index(0, iy)]);
 			Edge* westBoundary = new Edge(numberInterface++, p->Vertices()[0], p->Vertices()[3], p);
 			this->Faces.push_back(westBoundary);
 			this->BoundaryFaces.push_back(westBoundary);
 			p->AddFace(westBoundary);
 
 			// East boundary
-			p = dynamic_cast<Polygon*>(this->Elements[index(nx-1, iy)]);
+			p = dynamic_cast<PolygonalElement*>(this->Elements[index(nx-1, iy)]);
 			Edge* eastBoundary = new Edge(numberInterface++, p->Vertices()[1], p->Vertices()[2], p);
 			this->Faces.push_back(eastBoundary);
 			this->BoundaryFaces.push_back(eastBoundary);
@@ -105,11 +105,11 @@ public:
 		{
 			for (BigNumber ix = 0; ix < nx; ix++)
 			{
-				Polygon* element = dynamic_cast<Polygon*>(this->Elements[index(ix, iy)]);
+				PolygonalElement* element = dynamic_cast<PolygonalElement*>(this->Elements[index(ix, iy)]);
 				if (ix != nx - 1)
 				{
 					// East
-					Polygon* eastNeighbour = dynamic_cast<Polygon*>(this->Elements[index(ix + 1, iy)]);
+					PolygonalElement* eastNeighbour = dynamic_cast<PolygonalElement*>(this->Elements[index(ix + 1, iy)]);
 					Edge* interface = new Edge(numberInterface++, eastNeighbour->Vertices()[0], eastNeighbour->Vertices()[3], element, eastNeighbour);
 					this->Faces.push_back(interface);
 					this->InteriorFaces.push_back(interface);
@@ -119,7 +119,7 @@ public:
 				if (iy != ny - 1)
 				{
 					// North
-					Polygon* northNeighbour = dynamic_cast<Polygon*>(this->Elements[index(ix, iy + 1)]);
+					PolygonalElement* northNeighbour = dynamic_cast<PolygonalElement*>(this->Elements[index(ix, iy + 1)]);
 					Edge* interface = new Edge(numberInterface++, northNeighbour->Vertices()[0], northNeighbour->Vertices()[1], element, northNeighbour);
 					this->Faces.push_back(interface);
 					this->InteriorFaces.push_back(interface);

@@ -1,7 +1,7 @@
 #pragma once
 #include "../Problem/DiffusionProblem.h"
 #include "../Geometry/CartesianShape.h"
-#include "../Mesh/2D/Triangle.h"
+#include "../Geometry/2D/TriangleShape.h"
 #include "../Utils/Action.h"
 #include "../Utils/ParallelLoop.h"
 #include "Diff_DGElement.h"

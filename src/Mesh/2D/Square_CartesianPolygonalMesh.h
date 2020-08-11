@@ -1,6 +1,6 @@
 #pragma once
 #include "../PolyhedralMesh.h"
-#include "RectangularPolygon.h"
+#include "RectangularPolygonalElement.h"
 using namespace std;
 
 class Square_CartesianPolygonalMesh : public PolyhedralMesh<2>
@@ -49,7 +49,7 @@ public:
 				Vertex* topLeftCorner     = Vertices[indexV(ix,     iy + 1)];
 				Vertex* topRightCorner    = Vertices[indexV(ix + 1, iy + 1)];
 				Vertex* bottomRightCorner = Vertices[indexV(ix + 1, iy    )];
-				RectangularPolygon* rectangle = new RectangularPolygon(number, bottomLeftCorner, topLeftCorner, topRightCorner, bottomRightCorner);
+				RectangularPolygonalElement* rectangle = new RectangularPolygonalElement(number, bottomLeftCorner, topLeftCorner, topRightCorner, bottomRightCorner);
 				this->Elements.push_back(rectangle);
 			}
 		}
@@ -64,14 +64,14 @@ public:
 		for (BigNumber ix = 0; ix < nx; ++ix)
 		{
 			// South boundary
-			RectangularPolygon* rectangle = dynamic_cast<RectangularPolygon*>(this->Elements[index(ix, 0)]);
+			RectangularPolygonalElement* rectangle = dynamic_cast<RectangularPolygonalElement*>(this->Elements[index(ix, 0)]);
 			CartesianEdge* southBoundary = new CartesianEdge(numberInterface++, rectangle->BottomLeftCorner, rectangle->BottomRightCorner, rectangle, CartesianShapeOrientation::Horizontal);
 			this->Faces.push_back(southBoundary);
 			this->BoundaryFaces.push_back(southBoundary);
 			rectangle->AddSouthFace(southBoundary);
 
 			// North boundary
-			rectangle = dynamic_cast<RectangularPolygon*>(this->Elements[index(ix, ny - 1)]);
+			rectangle = dynamic_cast<RectangularPolygonalElement*>(this->Elements[index(ix, ny - 1)]);
 			CartesianEdge* northBoundary = new CartesianEdge(numberInterface++, rectangle->TopLeftCorner, rectangle->TopRightCorner, rectangle, CartesianShapeOrientation::Horizontal);
 			this->Faces.push_back(northBoundary);
 			this->BoundaryFaces.push_back(northBoundary);
@@ -81,14 +81,14 @@ public:
 		for (BigNumber iy = 0; iy < ny; ++iy)
 		{
 			// West boundary
-			RectangularPolygon* rectangle = dynamic_cast<RectangularPolygon*>(this->Elements[index(0, iy)]);
+			RectangularPolygonalElement* rectangle = dynamic_cast<RectangularPolygonalElement*>(this->Elements[index(0, iy)]);
 			CartesianEdge* westBoundary = new CartesianEdge(numberInterface++, rectangle->BottomLeftCorner, rectangle->TopLeftCorner, rectangle, CartesianShapeOrientation::Vertical);
 			this->Faces.push_back(westBoundary);
 			this->BoundaryFaces.push_back(westBoundary);
 			rectangle->AddWestFace(westBoundary);
 
 			// East boundary
-			rectangle = dynamic_cast<RectangularPolygon*>(this->Elements[index(nx - 1, iy)]);
+			rectangle = dynamic_cast<RectangularPolygonalElement*>(this->Elements[index(nx - 1, iy)]);
 			CartesianEdge* eastBoundary = new CartesianEdge(numberInterface++, rectangle->BottomRightCorner, rectangle->TopRightCorner, rectangle, CartesianShapeOrientation::Vertical);
 			this->Faces.push_back(eastBoundary);
 			this->BoundaryFaces.push_back(eastBoundary);
@@ -99,11 +99,11 @@ public:
 		{
 			for (BigNumber ix = 0; ix < nx; ix++)
 			{
-				RectangularPolygon* element = dynamic_cast<RectangularPolygon*>(this->Elements[index(ix, iy)]);
+				RectangularPolygonalElement* element = dynamic_cast<RectangularPolygonalElement*>(this->Elements[index(ix, iy)]);
 				if (ix != nx - 1)
 				{
 					// East
-					RectangularPolygon* eastNeighbour = dynamic_cast<RectangularPolygon*>(this->Elements[index(ix + 1, iy)]);
+					RectangularPolygonalElement* eastNeighbour = dynamic_cast<RectangularPolygonalElement*>(this->Elements[index(ix + 1, iy)]);
 					CartesianEdge* interface = new CartesianEdge(numberInterface++, eastNeighbour->BottomLeftCorner, eastNeighbour->TopLeftCorner, element, eastNeighbour, CartesianShapeOrientation::Vertical);
 					this->Faces.push_back(interface);
 					this->InteriorFaces.push_back(interface);
@@ -113,7 +113,7 @@ public:
 				if (iy != ny - 1)
 				{
 					// North
-					RectangularPolygon* northNeighbour = dynamic_cast<RectangularPolygon*>(this->Elements[index(ix, iy + 1)]);
+					RectangularPolygonalElement* northNeighbour = dynamic_cast<RectangularPolygonalElement*>(this->Elements[index(ix, iy + 1)]);
 					CartesianEdge* interface = new CartesianEdge(numberInterface++, northNeighbour->BottomLeftCorner, northNeighbour->BottomRightCorner, element, northNeighbour, CartesianShapeOrientation::Horizontal);
 					this->Faces.push_back(interface);
 					this->InteriorFaces.push_back(interface);
@@ -190,13 +190,13 @@ public:
 		{
 			for (BigNumber j = 0; j < nx / 2; ++j)
 			{
-				RectangularPolygon* bottomLeftElement = dynamic_cast<RectangularPolygon*>(this->Elements[2 * i * nx + 2 * j]);
-				RectangularPolygon* bottomRightElement = dynamic_cast<RectangularPolygon*>(this->Elements[2 * i * nx + 2 * j + 1]);
-				RectangularPolygon* topLeftElement = dynamic_cast<RectangularPolygon*>(this->Elements[(2 * i + 1) * nx + 2 * j]);
-				RectangularPolygon* topRightElement = dynamic_cast<RectangularPolygon*>(this->Elements[(2 * i + 1) * nx + 2 * j + 1]);
+				RectangularPolygonalElement* bottomLeftElement = dynamic_cast<RectangularPolygonalElement*>(this->Elements[2 * i * nx + 2 * j]);
+				RectangularPolygonalElement* bottomRightElement = dynamic_cast<RectangularPolygonalElement*>(this->Elements[2 * i * nx + 2 * j + 1]);
+				RectangularPolygonalElement* topLeftElement = dynamic_cast<RectangularPolygonalElement*>(this->Elements[(2 * i + 1) * nx + 2 * j]);
+				RectangularPolygonalElement* topRightElement = dynamic_cast<RectangularPolygonalElement*>(this->Elements[(2 * i + 1) * nx + 2 * j + 1]);
 
 				// Coarse element
-				RectangularPolygon* coarseElement = new RectangularPolygon(i*nx / 2 + j, bottomLeftElement->BottomLeftCorner, topLeftElement->TopLeftCorner, topRightElement->TopRightCorner, bottomRightElement->BottomRightCorner);
+				RectangularPolygonalElement* coarseElement = new RectangularPolygonalElement(i*nx / 2 + j, bottomLeftElement->BottomLeftCorner, topLeftElement->TopLeftCorner, topRightElement->TopRightCorner, bottomRightElement->BottomRightCorner);
 				coarseMesh->Elements.push_back(coarseElement);
 
 				coarseElement->FinerElements.push_back(bottomLeftElement);
@@ -231,7 +231,7 @@ public:
 				}
 				else
 				{
-					RectangularPolygon* leftNeighbour = dynamic_cast<RectangularPolygon*>(coarseMesh->Elements[i * nx / 2 + j - 1]);
+					RectangularPolygonalElement* leftNeighbour = dynamic_cast<RectangularPolygonalElement*>(coarseMesh->Elements[i * nx / 2 + j - 1]);
 					coarseElement->SetWestFacesFromNeighbour(leftNeighbour);
 				}
 
@@ -293,7 +293,7 @@ public:
 				}
 				else
 				{
-					RectangularPolygon* bottomNeighbour = dynamic_cast<RectangularPolygon*>(coarseMesh->Elements[(i - 1) * nx / 2 + j]);
+					RectangularPolygonalElement* bottomNeighbour = dynamic_cast<RectangularPolygonalElement*>(coarseMesh->Elements[(i - 1) * nx / 2 + j]);
 					coarseElement->SetSouthFacesFromNeighbour(bottomNeighbour);
 				}
 

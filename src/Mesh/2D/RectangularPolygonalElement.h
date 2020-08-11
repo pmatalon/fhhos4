@@ -4,7 +4,7 @@
 #include "CartesianEdge.h"
 using namespace std;
 
-class RectangularPolygon : public CartesianElement<2>
+class RectangularPolygonalElement : public CartesianElement<2>
 {
 public:
 	vector<Face<2>*> NorthFaces;
@@ -17,7 +17,7 @@ public:
 	Vertex* TopRightCorner;
 	Vertex* BottomRightCorner;
 
-	RectangularPolygon(int number, Vertex* bottomLeftCorner, Vertex* topLeftCorner, Vertex* topRightCorner, Vertex* bottomRightCorner) :
+	RectangularPolygonalElement(int number, Vertex* bottomLeftCorner, Vertex* topLeftCorner, Vertex* topRightCorner, Vertex* bottomRightCorner) :
 		Element(number), 
 		CartesianElement(number, bottomLeftCorner, bottomRightCorner->X - bottomLeftCorner->X, topLeftCorner->Y - bottomLeftCorner->Y)
 	{
@@ -51,7 +51,7 @@ public:
 		this->WestFaces.push_back(face);
 	}
 
-	void SetWestFacesFromNeighbour(RectangularPolygon* leftNeighbour)
+	void SetWestFacesFromNeighbour(RectangularPolygonalElement* leftNeighbour)
 	{
 		for (Face<2>* f : leftNeighbour->EastFaces)
 		{
@@ -60,7 +60,7 @@ public:
 		}
 	}
 
-	void SetSouthFacesFromNeighbour(RectangularPolygon* bottomNeighbour)
+	void SetSouthFacesFromNeighbour(RectangularPolygonalElement* bottomNeighbour)
 	{
 		for (Face<2>* f : bottomNeighbour->NorthFaces)
 		{

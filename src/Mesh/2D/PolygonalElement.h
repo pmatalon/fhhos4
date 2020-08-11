@@ -5,14 +5,14 @@
 #include "../../Utils/RotatingList.h"
 using namespace std;
 
-class Polygon : public Diff_DGElement<2>, public Diff_HHOElement<2>
+class PolygonalElement : public Diff_DGElement<2>, public Diff_HHOElement<2>
 {
 private:
 	PolygonalShape* _shape = nullptr;
 
 public:
 	// Constructor creating the polygon from the adjonction of two elements
-	Polygon(int number, Element<2>* e1, Element<2>* e2, vector<Face<2>*> facesToRemove, bool createTriangulationAndBoundingBox = true) :
+	PolygonalElement(int number, Element<2>* e1, Element<2>* e2, vector<Face<2>*> facesToRemove, bool createTriangulationAndBoundingBox = true) :
 		Element(number),
 		Diff_DGElement<2>(number),
 		Diff_HHOElement<2>(number)
@@ -20,7 +20,7 @@ public:
 		_shape = new PolygonalShape(MacroPolygonVertices(e1, e2, facesToRemove), createTriangulationAndBoundingBox);
 	}
 
-	Polygon(int number, vector<Vertex*> vertices, bool createTriangulationAndBoundingBox = true) :
+	PolygonalElement(int number, vector<Vertex*> vertices, bool createTriangulationAndBoundingBox = true) :
 		Element(number),
 		Diff_DGElement<2>(number),
 		Diff_HHOElement<2>(number)
@@ -255,7 +255,7 @@ public:
 		_shape->SetVertices(newVertices);
 	}
 
-	virtual ~Polygon()
+	virtual ~PolygonalElement()
 	{
 		if (_shape)
 			delete _shape;

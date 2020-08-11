@@ -5,13 +5,13 @@
 #include "Edge.h"
 using namespace std;
 
-class Triangle : public Diff_DGElement<2>, public Diff_HHOElement<2>
+class TriangularElement : public Diff_DGElement<2>, public Diff_HHOElement<2>
 {
 private:
 	TriangleShape* _shape;
 
 public:
-	Triangle(int number, Vertex* v1, Vertex* v2, Vertex* v3) :
+	TriangularElement(int number, Vertex* v1, Vertex* v2, Vertex* v3) :
 		Element(number),
 		Diff_DGElement<2>(number),
 		Diff_HHOElement<2>(number)
@@ -86,7 +86,7 @@ public:
 		return n;
 	}
 
-	virtual ~Triangle()
+	virtual ~TriangularElement()
 	{
 		if (_shape)
 			delete _shape;

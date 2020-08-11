@@ -7,7 +7,7 @@ class Cube_CartesianTetrahedralMesh : public TetrahedralMesh
 {
 private:
 	Cube_CartesianMesh* _cartMesh = nullptr;
-	map<Parallelepiped*, vector<Tetrahedron*>> _tetrasInCube;
+	map<ParallelepipedElement*, vector<TetrahedralElement*>> _tetrasInCube;
 
 public:
 	Cube_CartesianTetrahedralMesh(BigNumber n) : Cube_CartesianTetrahedralMesh(new Cube_CartesianMesh(n, n, n))
@@ -28,7 +28,7 @@ public:
 		BigNumber faceNumber = 0;
 		for (Element<3>* e : _cartMesh->Elements)
 		{
-			Parallelepiped* cube = dynamic_cast<Parallelepiped*>(e);
+			ParallelepipedElement* cube = dynamic_cast<ParallelepipedElement*>(e);
 
 			MeshVertex<3>* v_000 = _verticesByNumber.at(cube->BackLeftBottomCorner->Number);
 			MeshVertex<3>* v_100 = _verticesByNumber.at(cube->FrontLeftBottomCorner->Number);
@@ -39,14 +39,14 @@ public:
 			MeshVertex<3>* v_011 = _verticesByNumber.at(cube->BackRightTopCorner->Number);
 			MeshVertex<3>* v_001 = _verticesByNumber.at(cube->BackLeftTopCorner->Number);
 
-			Tetrahedron* tetra0 = this->CreateAndAddNewTetra(elemNumber++, v_010, v_110, v_111, v_100);
-			Tetrahedron* tetra1 = this->CreateAndAddNewTetra(elemNumber++, v_111, v_010, v_100, v_000);
-			Tetrahedron* tetra2 = this->CreateAndAddNewTetra(elemNumber++, v_000, v_100, v_111, v_101);
-			Tetrahedron* tetra3 = this->CreateAndAddNewTetra(elemNumber++, v_111, v_010, v_000, v_011);
-			Tetrahedron* tetra4 = this->CreateAndAddNewTetra(elemNumber++, v_101, v_111, v_000, v_011);
-			Tetrahedron* tetra5 = this->CreateAndAddNewTetra(elemNumber++, v_101, v_000, v_001, v_011);
+			TetrahedralElement* tetra0 = this->CreateAndAddNewTetra(elemNumber++, v_010, v_110, v_111, v_100);
+			TetrahedralElement* tetra1 = this->CreateAndAddNewTetra(elemNumber++, v_111, v_010, v_100, v_000);
+			TetrahedralElement* tetra2 = this->CreateAndAddNewTetra(elemNumber++, v_000, v_100, v_111, v_101);
+			TetrahedralElement* tetra3 = this->CreateAndAddNewTetra(elemNumber++, v_111, v_010, v_000, v_011);
+			TetrahedralElement* tetra4 = this->CreateAndAddNewTetra(elemNumber++, v_101, v_111, v_000, v_011);
+			TetrahedralElement* tetra5 = this->CreateAndAddNewTetra(elemNumber++, v_101, v_000, v_001, v_011);
 
-			vector<Tetrahedron*> tetrasInCube(6);
+			vector<TetrahedralElement*> tetrasInCube(6);
 			tetrasInCube[0] = tetra0;
 			tetrasInCube[1] = tetra1;
 			tetrasInCube[2] = tetra2;
@@ -106,16 +106,16 @@ public:
 
 		for (Element<3>* fc : _cartMesh->Elements)
 		{
-			Parallelepiped* fineCube = dynamic_cast<Parallelepiped*>(fc);
-			vector<Tetrahedron*> fineTetras = this->_tetrasInCube.at(fineCube);
+			ParallelepipedElement* fineCube = dynamic_cast<ParallelepipedElement*>(fc);
+			vector<TetrahedralElement*> fineTetras = this->_tetrasInCube.at(fineCube);
 			assert(fineTetras.size() == 6);
 
-			vector<Tetrahedron*> coarseTetras = coarseMesh->_tetrasInCube.at(dynamic_cast<Parallelepiped*>(fineCube->CoarserElement));
+			vector<TetrahedralElement*> coarseTetras = coarseMesh->_tetrasInCube.at(dynamic_cast<ParallelepipedElement*>(fineCube->CoarserElement));
 			assert(coarseTetras.size() == 6);
 
-			for (Tetrahedron* fineTetra : fineTetras)
+			for (TetrahedralElement* fineTetra : fineTetras)
 			{
-				for (Tetrahedron* coarseTetra : coarseTetras)
+				for (TetrahedralElement* coarseTetra : coarseTetras)
 				{
 					if (coarseTetra->Contains(fineTetra->Center()))
 					{

@@ -1,9 +1,8 @@
 #pragma once
 #include "../Problem/DiffusionProblem.h"
+#include "../Geometry/3D/TetrahedronShape.h"
 #include "Diff_HHOElement.h"
 #include "../Utils/ElementParallelLoop.h"
-#include "../Mesh/2D/Triangle.h"
-#include "../Mesh/3D/Tetrahedron.h"
 using namespace std;
 
 template <int Dim>
@@ -143,17 +142,17 @@ public:
 		CartesianShape<Dim, Dim - 1>::InitReferenceShape()->ComputeAndStoreFaceMassMatrix(faceBasis);
 		if (Dim == 2)
 		{
-			// - Triangle
+			// - TriangularElement
 			TriangleShape::InitReferenceShape()->ComputeAndStoreCellMassMatrix((FunctionalBasis<2>*)cellBasis);
 			TriangleShape::InitReferenceShape()->ComputeAndStoreReconstructMassMatrix((FunctionalBasis<2>*)reconstructionBasis);
-			//Triangle::RefTriangle.ComputeAndStoreCellStiffnessMatrix((FunctionalBasis<2>*)cellBasis);
-			//Triangle::RefTriangle.ComputeAndStoreReconstructK1StiffnessMatrix(this->_diffusionPartition->K1, reconstructionBasis);
-			//Triangle::RefTriangle.ComputeAndStoreReconstructK2StiffnessMatrix(this->_diffusionPartition->K2, reconstructionBasis);
+			//TriangleShape::InitReferenceShape().ComputeAndStoreCellStiffnessMatrix((FunctionalBasis<2>*)cellBasis);
+			//TriangleShape::InitReferenceShape().ComputeAndStoreReconstructK1StiffnessMatrix(this->_diffusionPartition->K1, reconstructionBasis);
+			//TriangleShape::InitReferenceShape().ComputeAndStoreReconstructK2StiffnessMatrix(this->_diffusionPartition->K2, reconstructionBasis);
 			TriangleShape::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix((FunctionalBasis<2>*)cellBasis, (FunctionalBasis<2>*)reconstructionBasis);
 		}
 		else if (Dim == 3)
 		{
-			// - Tetrahedron
+			// - TetrahedralElement
 			TetrahedronShape::InitReferenceShape()->ComputeAndStoreCellMassMatrix((FunctionalBasis<3>*)cellBasis);
 			TetrahedronShape::InitReferenceShape()->ComputeAndStoreReconstructMassMatrix((FunctionalBasis<3>*)reconstructionBasis);
 			TetrahedronShape::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix((FunctionalBasis<3>*)cellBasis, (FunctionalBasis<3>*)reconstructionBasis);

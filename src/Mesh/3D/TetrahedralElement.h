@@ -5,13 +5,13 @@
 #include "TriangularFace.h"
 using namespace std;
 
-class Tetrahedron : public Diff_DGElement<3>, public Diff_HHOElement<3>
+class TetrahedralElement : public Diff_DGElement<3>, public Diff_HHOElement<3>
 {
 private:
 	TetrahedronShape* _shape;
 
 public:
-	Tetrahedron(BigNumber number, Vertex* v1, Vertex* v2, Vertex* v3, Vertex* v4) :
+	TetrahedralElement(BigNumber number, Vertex* v1, Vertex* v2, Vertex* v3, Vertex* v4) :
 		Element(number),
 		Diff_DGElement<3>(number),
 		Diff_HHOElement<3>(number)
@@ -73,7 +73,7 @@ public:
 		return n;
 	}
 
-	virtual ~Tetrahedron()
+	virtual ~TetrahedralElement()
 	{
 		if (_shape)
 			delete _shape;
