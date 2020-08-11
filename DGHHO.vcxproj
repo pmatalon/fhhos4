@@ -91,8 +91,8 @@
   </PropertyGroup>
   <ItemGroup>
     <ClCompile Include="src/main.cpp" />
-    <ClCompile Include="src\Utils\Dunavant\triangle_dunavant_rule.cpp" />
-    <ClCompile Include="src\Utils\Keast\tetrahedron_keast_rule.cpp" />
+    <ClCompile Include="src\QuadratureRules\Dunavant\triangle_dunavant_rule.cpp" />
+    <ClCompile Include="src\QuadratureRules\Keast\tetrahedron_keast_rule.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src/FunctionalBasis/BasisFunctionFactory.h" />
@@ -168,7 +168,6 @@
     <ClInclude Include="src\HHO\Diffusion_HHO.h" />
     <ClInclude Include="src\HHO\Diff_HHOElement.h" />
     <ClInclude Include="src\HHO\Diff_HHOFace.h" />
-    <ClInclude Include="src/Utils/GaussLegendre.h" />
     <ClInclude Include="src/Utils/NonZeroCoefficients.h" />
     <ClInclude Include="src/Utils/Utils.h" />
     <ClInclude Include="src/Problem/DiffusionPartition.h" />
@@ -177,6 +176,11 @@
     <ClInclude Include="src\Problem\Tensor.h" />
     <ClInclude Include="src\Problem\DiffusionProblem.h" />
     <ClInclude Include="src/Problem/SourceFunction.h" />
+    <ClInclude Include="src\QuadratureRules\Dunavant\Dunavant.h" />
+    <ClInclude Include="src\QuadratureRules\Dunavant\triangle_dunavant_rule.hpp" />
+    <ClInclude Include="src\QuadratureRules\Keast\Keast.h" />
+    <ClInclude Include="src\QuadratureRules\Keast\tetrahedron_keast_rule.hpp" />
+    <ClInclude Include="src\QuadratureRules\GaussLegendre\GaussLegendre.h" />
     <ClInclude Include="src\Mesh\Vertex.h" />
     <ClInclude Include="src\Program.h" />
     <ClInclude Include="src\ProgramArguments.h" />
@@ -197,12 +201,8 @@
     <ClInclude Include="src\Solver\SmootherFactory.h" />
     <ClInclude Include="src\Solver\Solver.h" />
     <ClInclude Include="src\Utils\Action.h" />
-    <ClInclude Include="src\Utils\Dunavant\Dunavant.h" />
-    <ClInclude Include="src\Utils\Dunavant\triangle_dunavant_rule.hpp" />
     <ClInclude Include="src\Utils\ElementParallelLoop.h" />
     <ClInclude Include="src\Utils\Geometry.h" />
-    <ClInclude Include="src\Utils\Keast\Keast.h" />
-    <ClInclude Include="src\Utils\Keast\tetrahedron_keast_rule.hpp" />
     <ClInclude Include="src\Utils\MatlabScript.h" />
     <ClInclude Include="src\Utils\ParallelLoop.h" />
     <ClInclude Include="src\Utils\RotatingList.h" />

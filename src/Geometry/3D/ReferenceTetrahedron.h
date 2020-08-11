@@ -1,6 +1,6 @@
 #pragma once
 #include "../ReferenceShape.h"
-#include "../../Utils/Keast/Keast.h"
+#include "../../QuadratureRules/Keast/Keast.h"
 
 class ReferenceTetrahedron : public ReferenceShape<3>
 {

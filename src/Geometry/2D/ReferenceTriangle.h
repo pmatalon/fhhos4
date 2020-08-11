@@ -1,6 +1,6 @@
 #pragma once
 #include "../ReferenceShape.h"
-#include "../../Utils/Dunavant/Dunavant.h"
+#include "../../QuadratureRules/Dunavant/Dunavant.h"
 
 class ReferenceTriangle : public ReferenceShape<2>
 {

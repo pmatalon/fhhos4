@@ -2,11 +2,11 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="src/main.cpp" />
-    <ClCompile Include="src\Utils\Dunavant\triangle_dunavant_rule.cpp">
-      <Filter>Utils\Dunavant</Filter>
+    <ClCompile Include="src\QuadratureRules\Keast\tetrahedron_keast_rule.cpp">
+      <Filter>QuadratureRules\Keast</Filter>
     </ClCompile>
-    <ClCompile Include="src\Utils\Keast\tetrahedron_keast_rule.cpp">
-      <Filter>Utils\Keast</Filter>
+    <ClCompile Include="src\QuadratureRules\Dunavant\triangle_dunavant_rule.cpp">
+      <Filter>QuadratureRules\Dunavant</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -33,9 +33,6 @@
     </ClInclude>
     <ClInclude Include="src/FunctionalBasis/FunctionalBasis.h">
       <Filter>FunctionalBasis</Filter>
-    </ClInclude>
-    <ClInclude Include="src/Utils/GaussLegendre.h">
-      <Filter>Utils</Filter>
     </ClInclude>
     <ClInclude Include="src/FunctionalBasis/Legendre1D.h">
       <Filter>FunctionalBasis</Filter>
@@ -155,14 +152,8 @@
     <ClInclude Include="src\Problem\BoundaryConditions.h">
       <Filter>Problem</Filter>
     </ClInclude>
-    <ClInclude Include="src\Utils\Dunavant\triangle_dunavant_rule.hpp">
-      <Filter>Utils\Dunavant</Filter>
-    </ClInclude>
     <ClInclude Include="src\Mesh\2D\CartesianEdge.h">
       <Filter>Mesh\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Utils\Dunavant\Dunavant.h">
-      <Filter>Utils\Dunavant</Filter>
     </ClInclude>
     <ClInclude Include="src\Mesh\2D\Edge.h">
       <Filter>Mesh\2D</Filter>
@@ -178,12 +169,6 @@
     </ClInclude>
     <ClInclude Include="src\Mesh\3D\TriangularFace.h">
       <Filter>Mesh\3D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Utils\Keast\Keast.h">
-      <Filter>Utils\Keast</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Utils\Keast\tetrahedron_keast_rule.hpp">
-      <Filter>Utils\Keast</Filter>
     </ClInclude>
     <ClInclude Include="src\ProgramArguments.h" />
     <ClInclude Include="src\Mesh\3D\TetrahedralMesh.h">
@@ -345,6 +330,21 @@
     <ClInclude Include="src\Geometry\2D\ReferenceTriangle.h">
       <Filter>Geometry\2D</Filter>
     </ClInclude>
+    <ClInclude Include="src\QuadratureRules\Dunavant\Dunavant.h">
+      <Filter>QuadratureRules\Dunavant</Filter>
+    </ClInclude>
+    <ClInclude Include="src\QuadratureRules\Dunavant\triangle_dunavant_rule.hpp">
+      <Filter>QuadratureRules\Dunavant</Filter>
+    </ClInclude>
+    <ClInclude Include="src\QuadratureRules\Keast\Keast.h">
+      <Filter>QuadratureRules\Keast</Filter>
+    </ClInclude>
+    <ClInclude Include="src\QuadratureRules\Keast\tetrahedron_keast_rule.hpp">
+      <Filter>QuadratureRules\Keast</Filter>
+    </ClInclude>
+    <ClInclude Include="src\QuadratureRules\GaussLegendre\GaussLegendre.h">
+      <Filter>QuadratureRules\GaussLegendre</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
@@ -374,12 +374,6 @@
     <Filter Include="Problem">
       <UniqueIdentifier>{3544142f-e11c-4d90-972d-2935e996d616}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Utils\Dunavant">
-      <UniqueIdentifier>{9e267a7d-8baa-4693-8915-0a99d9065f34}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Utils\Keast">
-      <UniqueIdentifier>{ac5f4816-0e50-4bd5-afed-8f2aa7aa9f59}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Geometry">
       <UniqueIdentifier>{ca3f71f6-ee5e-4863-8c02-a856f6b59c0f}</UniqueIdentifier>
     </Filter>
@@ -391,6 +385,18 @@
     </Filter>
     <Filter Include="Geometry\3D">
       <UniqueIdentifier>{75729409-1dee-45df-90f2-aff850dafef6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="QuadratureRules">
+      <UniqueIdentifier>{0291c21a-a846-4e03-a04a-b30f06342806}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="QuadratureRules\Dunavant">
+      <UniqueIdentifier>{4a73e2fc-2e81-47cd-a7e1-b866a4c91d2e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="QuadratureRules\Keast">
+      <UniqueIdentifier>{11856eda-cf75-4d81-9edc-34f6ad638120}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="QuadratureRules\GaussLegendre">
+      <UniqueIdentifier>{5ed631eb-356a-42b0-917c-74a3675aa1f0}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
