@@ -2,7 +2,6 @@
 #include "../../Mesh/Vertex.h"
 #include "ReferenceTriangle.h"
 #include "../PhysicalShapeWithConstantJacobian.h"
-#include "../../Utils/Geometry.h"
 using namespace std;
 
 class Triangle : public PhysicalShapeWithConstantJacobian<2>
@@ -119,7 +118,26 @@ public:
 	}
 	inline bool Contains(DomPoint p) const override
 	{
-		return Geometry::IsInTriangle(*V1, *V2, *V3, p, _measure, _diameter);
+		return TriangleContains(*V1, *V2, *V3, p, _measure);
+	}
+
+	static bool TriangleContains(DomPoint A, DomPoint B, DomPoint C, DomPoint P, double triangleArea)
+	{
+		// From https://math.stackexchange.com/questions/4322/check-whether-a-point-is-within-a-3d-triangle
+
+		DimVector<3> PA = Vect<3>(P, A);
+		DimVector<3> PB = Vect<3>(P, B);
+		DimVector<3> PC = Vect<3>(P, C);
+		// Barycentric coordinates
+		double alpha = PB.cross(PC).norm() / (2 * triangleArea);
+		double beta = PC.cross(PA).norm() / (2 * triangleArea);
+		double gamma = PA.cross(PB).norm() / (2 * triangleArea);
+
+		double tol = Utils::Eps;
+		return alpha + tol > 0 && alpha < 1 + tol    // alpha >= 0 && alpha <= 1
+			&& beta + tol > 0 && beta < 1 + tol    // beta  >= 0 && beta  <= 1
+			&& gamma + tol > 0 && gamma < 1 + tol    // gamma >= 0 && gamma <= 1
+			&& (abs(alpha + beta + gamma - 1) < tol); // alpha + beta + gamma = 1
 	}
 
 	inline double DetJacobian() const

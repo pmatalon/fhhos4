@@ -70,7 +70,15 @@ public:
 	}
 	inline bool Contains(DomPoint p) const override
 	{
-		return Geometry::IsInSegment(*Vertex1, *Vertex2, p);
+		return SegmentContains(*Vertex1, *Vertex2, p);
+	}
+
+	static bool SegmentContains(DomPoint A, DomPoint B, DomPoint P)
+	{
+		DimVector<2> AB = B - A;
+		DimVector<2> AP = P - A;
+		double AB_dot_AP = AB.dot(AP);
+		return AB_dot_AP > 0 && AB_dot_AP < AB.dot(AB) && abs(AB_dot_AP - AB.norm()*AP.norm()) < Point::Tolerance;
 	}
 
 	inline double DetJacobian() const override

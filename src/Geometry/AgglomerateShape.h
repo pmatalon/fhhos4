@@ -202,7 +202,7 @@ public:
 			_inRadius = 0;
 
 			if (Dim == 2)
-				_boundingBox = dynamic_cast<PhysicalShape<Dim>*>(Geometry::CreateBoundingBox(_vertices));
+				_boundingBox = dynamic_cast<PhysicalShape<Dim>*>(Polygon::CreateBoundingBox(_vertices));
 			else
 				assert(false && "To be implemented");
 		}

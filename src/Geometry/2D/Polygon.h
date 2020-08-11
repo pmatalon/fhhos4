@@ -1,7 +1,7 @@
 #pragma once
-#include "../../Utils/Geometry.h"
 #include "../CartesianShape.h"
 #include "Triangle.h"
+#include "Quadrilateral.h"
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/partition_2.h>
 #include <CGAL/Partition_traits_2.h>
@@ -168,7 +168,35 @@ public:
 	{
 		if (_boundingBox)
 			return;
-		_boundingBox = Geometry::CreateBoundingBox(_vertices);
+		_boundingBox = CreateBoundingBox(_vertices);
+	}
+
+	static Quadrilateral* CreateBoundingBox(vector<Vertex*> vertices)
+	{
+		double maxX = -INFINITY;
+		double maxY = -INFINITY;
+		double minX = INFINITY;
+		double minY = INFINITY;
+		for (Vertex* v : vertices)
+		{
+			if (v->X > maxX)
+				maxX = v->X;
+			if (v->Y > maxY)
+				maxY = v->Y;
+			if (v->X < minX)
+				minX = v->X;
+			if (v->Y < minY)
+				minY = v->Y;
+		}
+
+		int number = -1;
+		Vertex* lowerLeft = new Vertex(number, minX, minY);
+		Vertex* lowerRight = new Vertex(number, maxX, minY);
+		Vertex* upperRight = new Vertex(number, maxX, maxY);
+		Vertex* upperLeft = new Vertex(number, minX, maxY);
+
+		Quadrilateral* boundingRectangle = new Quadrilateral(lowerLeft, lowerRight, upperRight, upperLeft);
+		return boundingRectangle;
 	}
 
 private:

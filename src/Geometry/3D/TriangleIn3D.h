@@ -123,7 +123,7 @@ public:
 	}
 	inline bool Contains(DomPoint p) const override
 	{
-		return Geometry::IsInTriangle(*V1, *V2, *V3, p, _measure, _diameter);
+		return Triangle::TriangleContains(*V1, *V2, *V3, p, _measure);
 	}
 
 	inline double DetJacobian() const

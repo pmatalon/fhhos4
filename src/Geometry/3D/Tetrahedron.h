@@ -125,7 +125,32 @@ public:
 	}
 	inline bool Contains(DomPoint p) const override
 	{
-		return Geometry::IsInTetrahedron(*V1, *V2, *V3, *V4, p, _measure, _diameter);
+		return TetrahedronContains(*V1, *V2, *V3, *V4, p, _measure);
+	}
+
+	static bool TetrahedronContains(DomPoint A, DomPoint B, DomPoint C, DomPoint D, DomPoint P, double tetraVolume)
+	{
+		// Barycentric coordinates
+		double alpha = Tetrahedron::Volume(P, B, C, D) / tetraVolume;
+		double beta = Tetrahedron::Volume(A, P, C, D) / tetraVolume;
+		double gamma = Tetrahedron::Volume(A, B, P, D) / tetraVolume;
+		double delta = Tetrahedron::Volume(A, B, C, P) / tetraVolume;
+
+		double tol = Utils::Eps;
+		return alpha + tol > 0 && alpha < 1 + tol    // alpha >= 0 && alpha <= 1
+			&& beta + tol > 0 && beta < 1 + tol    // beta  >= 0 && beta  <= 1
+			&& gamma + tol > 0 && gamma < 1 + tol    // gamma >= 0 && gamma <= 1
+			&& delta + tol > 0 && delta < 1 + tol    // delta >= 0 && delta <= 1
+			&& (abs(alpha + beta + gamma + delta - 1) < tol); // alpha + beta + gamma + delta = 1
+	}
+
+	static double Volume(DomPoint A, DomPoint B, DomPoint C, DomPoint D)
+	{
+		DimMatrix<3> m;
+		m.col(0) = Vect<3>(A, B);
+		m.col(1) = Vect<3>(A, C);
+		m.col(2) = Vect<3>(A, D);
+		return abs(m.determinant()) / 6;
 	}
 
 	inline double DetJacobian() const

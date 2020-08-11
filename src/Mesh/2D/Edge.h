@@ -2,7 +2,6 @@
 #include "../../DG/Diff_DGFace.h"
 #include "../../HHO/Diff_HHOFace.h"
 #include "../../Geometry/2D/Segment.h"
-#include "../../Utils/Geometry.h"
 
 class Edge : public Diff_DGFace<2>, public Diff_HHOFace<2>
 {
