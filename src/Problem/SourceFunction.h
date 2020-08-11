@@ -1,6 +1,6 @@
 #pragma once
 #include <functional>
-#include "../Mesh/Point.h"
+#include "../Geometry/Point.h"
 
 class SourceFunction
 {

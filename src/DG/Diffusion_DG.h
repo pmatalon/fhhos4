@@ -1,6 +1,6 @@
 #pragma once
 #include "../Problem/DiffusionProblem.h"
-#include "../Mesh/CartesianShape.h"
+#include "../Geometry/CartesianShape.h"
 #include "../Mesh/2D/Triangle.h"
 #include "../Utils/Action.h"
 #include "../Utils/ParallelLoop.h"

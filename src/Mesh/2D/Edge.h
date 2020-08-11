@@ -1,7 +1,7 @@
 #pragma once
 #include "../../DG/Diff_DGFace.h"
 #include "../../HHO/Diff_HHOFace.h"
-#include "../CartesianShape.h"
+#include "../../Geometry/CartesianShape.h"
 #include "../../Utils/Geometry.h"
 
 class EdgeShape : public PhysicalShapeWithConstantJacobian<1>

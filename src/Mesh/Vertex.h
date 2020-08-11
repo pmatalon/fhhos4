@@ -1,5 +1,5 @@
 #pragma once
-#include "Point.h"
+#include "../Geometry/Point.h"
 #include "../Utils/Types.h"
 using namespace std;
 
@@ -102,4 +102,15 @@ template<int Dim>
 bool AreCollinear(DimVector<Dim> v1, DimVector<Dim> v2)
 {
 	return abs(abs(v1.dot(v2)) - v1.norm()*v2.norm()) < 1e-14;
+}
+
+template<int Dim>
+DomPoint AddVector(DomPoint p, DimVector<Dim> v)
+{
+	if (Dim == 1)
+		return DomPoint(p.X + v[0]);
+	else if (Dim == 2)
+		return DomPoint(p.X + v[0], p.Y + v[1]);
+	else if (Dim == 3)
+		return DomPoint(p.X + v[0], p.Y + v[1], p.Z + v[2]);
 }

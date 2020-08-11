@@ -1,5 +1,5 @@
 #pragma once
-#include "../Vertex.h"
+#include "../../Mesh/Vertex.h"
 #include "ReferenceTetrahedron.h"
 #include "../PhysicalShapeWithConstantJacobian.h"
 using namespace std;

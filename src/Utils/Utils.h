@@ -2,7 +2,7 @@
 #include <fstream>
 #include <functional>
 #include "Types.h"
-#include "../Mesh/Point.h"
+#include "../Geometry/Point.h"
 using namespace std;
 
 using RefFunction = function<double(RefPoint)>;

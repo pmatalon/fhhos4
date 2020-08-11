@@ -3,7 +3,7 @@
 #include <vector>
 #include "../Types.h"
 #include "triangle_dunavant_rule.hpp"
-#include "../../Mesh/Point.h"
+#include "../../Geometry/Point.h"
 using namespace triangle_dunavant_rule;
 using namespace std;
 

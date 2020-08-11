@@ -3,7 +3,7 @@
 #include <map>
 #include <set>
 #include "Vertex.h"
-#include "PhysicalShape.h"
+#include "../Geometry/PhysicalShape.h"
 #include "../Problem/SourceFunction.h"
 #include "../Problem/DiffusionPartition.h"
 using namespace std;

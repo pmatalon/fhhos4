@@ -1,5 +1,5 @@
 #pragma once
-#include "../Vertex.h"
+#include "../../Mesh/Vertex.h"
 #include "../ReferenceCartesianShape.h"
 #include "../PhysicalShape.h"
 using namespace std;

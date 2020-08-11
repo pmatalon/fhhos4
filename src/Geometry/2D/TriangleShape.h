@@ -1,5 +1,5 @@
 #pragma once
-#include "../Vertex.h"
+#include "../../Mesh/Vertex.h"
 #include "../ReferenceTriangle.h"
 #include "../PhysicalShapeWithConstantJacobian.h"
 #include "../../Utils/Geometry.h"

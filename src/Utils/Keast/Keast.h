@@ -3,7 +3,7 @@
 #include <vector>
 #include "../Types.h"
 #include "tetrahedron_keast_rule.hpp"
-#include "../../Mesh/Point.h"
+#include "../../Geometry/Point.h"
 using namespace tetrahedron_keast_rule;
 using namespace std;
 

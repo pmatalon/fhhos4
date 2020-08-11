@@ -1,7 +1,7 @@
 #pragma once
 #include "../../DG/Diff_DGElement.h"
 #include "../../HHO/Diff_HHOElement.h"
-#include "TriangleShape.h"
+#include "../../Geometry/2D/TriangleShape.h"
 #include "Edge.h"
 using namespace std;
 

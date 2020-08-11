@@ -2,7 +2,7 @@
 #include <fstream>
 #include "Types.h"
 #include "RotatingList.h"
-#include "../Mesh/Point.h"
+#include "../Geometry/Point.h"
 using namespace std;
 
 class MatlabScript

@@ -1,7 +1,7 @@
 #pragma once
 #include "../../DG/Diff_DGFace.h"
 #include "../../HHO/Diff_HHOFace.h"
-#include "TriangleIn3DShape.h"
+#include "../../Geometry/3D/TriangleIn3DShape.h"
 
 class TriangularFace : public Diff_DGFace<3>, public Diff_HHOFace<3>
 {

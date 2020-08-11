@@ -46,9 +46,6 @@
     <ClInclude Include="src/Utils/NonZeroCoefficients.h">
       <Filter>Utils</Filter>
     </ClInclude>
-    <ClInclude Include="src/Mesh/Point.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
     <ClInclude Include="src/FunctionalBasis/TensorPolynomial.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
@@ -69,12 +66,6 @@
     </ClInclude>
     <ClInclude Include="src\Utils\ParallelLoop.h">
       <Filter>Utils</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\CartesianShape.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\ReferenceCartesianShape.h">
-      <Filter>Mesh</Filter>
     </ClInclude>
     <ClInclude Include="src\Solver\Multigrid.h">
       <Filter>Solver</Filter>
@@ -182,31 +173,13 @@
     <ClInclude Include="src\Mesh\2D\CartesianEdge.h">
       <Filter>Mesh\2D</Filter>
     </ClInclude>
-    <ClInclude Include="src\Mesh\ReferenceTriangle.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
     <ClInclude Include="src\Utils\Dunavant\Dunavant.h">
       <Filter>Utils\Dunavant</Filter>
     </ClInclude>
     <ClInclude Include="src\Mesh\2D\Edge.h">
       <Filter>Mesh\2D</Filter>
     </ClInclude>
-    <ClInclude Include="src\Mesh\GeometricShape.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\2D\TriangleShape.h">
-      <Filter>Mesh\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\ReferenceShape.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
     <ClInclude Include="src\Mesh\2D\Quadrilateral.h">
-      <Filter>Mesh\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\2D\QuadrilateralShape.h">
-      <Filter>Mesh\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\2D\PolygonalShape.h">
       <Filter>Mesh\2D</Filter>
     </ClInclude>
     <ClInclude Include="src\Mesh\2D\Polygon.h">
@@ -224,16 +197,7 @@
     <ClInclude Include="src\Mesh\3D\Tetrahedron.h">
       <Filter>Mesh\3D</Filter>
     </ClInclude>
-    <ClInclude Include="src\Mesh\3D\TetrahedronShape.h">
-      <Filter>Mesh\3D</Filter>
-    </ClInclude>
     <ClInclude Include="src\Mesh\3D\TriangularFace.h">
-      <Filter>Mesh\3D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\3D\ReferenceTetrahedron.h">
-      <Filter>Mesh\3D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\3D\TriangleIn3DShape.h">
       <Filter>Mesh\3D</Filter>
     </ClInclude>
     <ClInclude Include="src\Utils\Keast\Keast.h">
@@ -312,9 +276,6 @@
     <ClInclude Include="src\DG\Diff_DGFace.h">
       <Filter>DG</Filter>
     </ClInclude>
-    <ClInclude Include="src\Mesh\AgglomerateShape.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
     <ClInclude Include="src\Mesh\AgglomerateElement.h">
       <Filter>Mesh</Filter>
     </ClInclude>
@@ -323,12 +284,6 @@
     </ClInclude>
     <ClInclude Include="src\Utils\MatlabScript.h">
       <Filter>Utils</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\PhysicalShape.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\PhysicalShapeWithConstantJacobian.h">
-      <Filter>Mesh</Filter>
     </ClInclude>
     <ClInclude Include="src\Mesh\2D\Square4quadrants_GMSHUnstructTriangularMesh.h">
       <Filter>Mesh\2D</Filter>
@@ -342,6 +297,51 @@
     <ClInclude Include="src\Mesh\Agglo.h">
       <Filter>Mesh</Filter>
     </ClInclude>
+    <ClInclude Include="src\Geometry\GeometricShape.h">
+      <Filter>Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Geometry\PhysicalShape.h">
+      <Filter>Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Geometry\AgglomerateShape.h">
+      <Filter>Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Geometry\CartesianShape.h">
+      <Filter>Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Geometry\PhysicalShapeWithConstantJacobian.h">
+      <Filter>Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Geometry\Point.h">
+      <Filter>Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Geometry\ReferenceCartesianShape.h">
+      <Filter>Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Geometry\ReferenceShape.h">
+      <Filter>Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Geometry\ReferenceTriangle.h">
+      <Filter>Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Geometry\2D\PolygonalShape.h">
+      <Filter>Geometry\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Geometry\2D\QuadrilateralShape.h">
+      <Filter>Geometry\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Geometry\2D\TriangleShape.h">
+      <Filter>Geometry\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Geometry\3D\ReferenceTetrahedron.h">
+      <Filter>Geometry\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Geometry\3D\TetrahedronShape.h">
+      <Filter>Geometry\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Geometry\3D\TriangleIn3DShape.h">
+      <Filter>Geometry\3D</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
@@ -349,9 +349,6 @@
     </Filter>
     <Filter Include="Mesh">
       <UniqueIdentifier>{089b5862-0021-4e98-a5ab-bd18df16a8d9}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="FunctionalBasis">
-      <UniqueIdentifier>{6da564fc-5853-4076-bdfa-41507d49f132}</UniqueIdentifier>
     </Filter>
     <Filter Include="DG">
       <UniqueIdentifier>{7cd70dab-3d97-4983-bc8d-6c981af51b1d}</UniqueIdentifier>
@@ -379,6 +376,18 @@
     </Filter>
     <Filter Include="Utils\Keast">
       <UniqueIdentifier>{ac5f4816-0e50-4bd5-afed-8f2aa7aa9f59}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Geometry">
+      <UniqueIdentifier>{ca3f71f6-ee5e-4863-8c02-a856f6b59c0f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="FunctionalBasis">
+      <UniqueIdentifier>{6da564fc-5853-4076-bdfa-41507d49f132}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Geometry\2D">
+      <UniqueIdentifier>{5f4d4409-6185-48be-9072-29fb9cd5013c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Geometry\3D">
+      <UniqueIdentifier>{75729409-1dee-45df-90f2-aff850dafef6}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
