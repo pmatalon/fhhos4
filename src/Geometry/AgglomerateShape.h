@@ -85,12 +85,12 @@ public:
 			{
 				if (ss->HasVertex(newIntersect)) // 2 vertices become one, the subshape loses a vertex
 				{
-					TriangleShape* triangle = dynamic_cast<TriangleShape*>(ss);
+					Triangle* triangle = dynamic_cast<Triangle*>(ss);
 					if (triangle) // if it's a triangle, it degenerates
 						subShapesToDelete.push_back(ss);
 					else
 					{
-						QuadrilateralShape* quad = dynamic_cast<QuadrilateralShape*>(ss);
+						Quadrilateral* quad = dynamic_cast<Quadrilateral*>(ss);
 						if (quad) // the quadrilateral turns into a triangle
 						{
 							vector<Vertex*> vertices(3);
@@ -99,7 +99,7 @@ public:
 								if (v != oldIntersect)
 									vertices.push_back(v);
 							}
-							ss = dynamic_cast<PhysicalShape<Dim>*>(new TriangleShape(vertices[0], vertices[1], vertices[2]));
+							ss = dynamic_cast<PhysicalShape<Dim>*>(new Triangle(vertices[0], vertices[1], vertices[2]));
 							assert(ss);
 						}
 						else
@@ -329,7 +329,7 @@ public:
 			return boundingBoxDefinedFunction(p);
 		};
 
-		QuadrilateralShape* quad = dynamic_cast<QuadrilateralShape*>(_boundingBox); // TODO remove
+		Quadrilateral* quad = dynamic_cast<Quadrilateral*>(_boundingBox); // TODO remove
 
 		double integral = 0;
 		for (PhysicalShape<Dim>* t : _subShapes)

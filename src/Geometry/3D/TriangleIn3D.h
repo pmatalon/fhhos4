@@ -1,11 +1,10 @@
 #pragma once
 #include "../../Mesh/Vertex.h"
-#include "../ReferenceTriangle.h"
 #include "../PhysicalShapeWithConstantJacobian.h"
-#include "../2D/TriangleShape.h"
+#include "../2D/Triangle.h"
 using namespace std;
 
-class TriangleIn3DShape : public PhysicalShapeWithConstantJacobian<2>
+class TriangleIn3D : public PhysicalShapeWithConstantJacobian<2>
 {
 private:
 	double _diameter;
@@ -25,7 +24,7 @@ public:
 	Vertex* V2;
 	Vertex* V3;
 
-	TriangleIn3DShape(Vertex* v1, Vertex* v2, Vertex* v3)
+	TriangleIn3D(Vertex* v1, Vertex* v2, Vertex* v3)
 	{
 		V1 = v1;
 		V2 = v2;
@@ -33,7 +32,7 @@ public:
 		Init();
 	}
 
-	TriangleIn3DShape(const TriangleIn3DShape& shape) = default;
+	TriangleIn3D(const TriangleIn3D& shape) = default;
 
 	void Init()
 	{
@@ -79,12 +78,12 @@ public:
 
 	PhysicalShape<2>* CreateCopy() const
 	{
-		return new TriangleIn3DShape(*this);
+		return new TriangleIn3D(*this);
 	}
 
 	ReferenceShape<2>* RefShape() const
 	{
-		return &TriangleShape::RefTriangle;
+		return &Triangle::RefTriangle;
 	}
 	
 	inline vector<Vertex*> Vertices() const override
@@ -99,7 +98,7 @@ public:
 
 	static ReferenceTriangle* InitReferenceShape()
 	{
-		return &TriangleShape::RefTriangle;
+		return &Triangle::RefTriangle;
 	}
 
 	inline double Diameter() const override
@@ -209,7 +208,7 @@ public:
 		Vertex lowerRight(number, 1, -1, 1);
 		Vertex upperLeft(number, -1, 1, 5);
 
-		TriangleIn3DShape t(&lowerLeft, &lowerRight, &upperLeft);
+		TriangleIn3D t(&lowerLeft, &lowerRight, &upperLeft);
 
 		t.UnitTests();
 
@@ -232,7 +231,7 @@ public:
 		Vertex v1(number, 4.5, 1.8, 0.21);
 		Vertex v2(number, 4, 1.7, 0);
 		Vertex v3(number, 4, 1.7, 1);
-		TriangleIn3DShape t2(&v1, &v2, &v3);
+		TriangleIn3D t2(&v1, &v2, &v3);
 		t2.ConvertToReference(DomPoint(4.2, 1.7, 0.1));
 
 	}

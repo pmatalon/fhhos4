@@ -1,12 +1,12 @@
 #pragma once
-#include "../Geometry/2D/QuadrilateralShape.h"
+#include "../Geometry/2D/Quadrilateral.h"
 using namespace std;
 
 class Geometry
 {
 public:
 
-	static QuadrilateralShape* CreateBoundingBox(vector<Vertex*> vertices)
+	static Quadrilateral* CreateBoundingBox(vector<Vertex*> vertices)
 	{
 		double maxX = -INFINITY;
 		double maxY = -INFINITY;
@@ -30,7 +30,7 @@ public:
 		Vertex* upperRight = new Vertex(number, maxX, maxY);
 		Vertex* upperLeft = new Vertex(number, minX, maxY);
 
-		QuadrilateralShape* boundingRectangle = new QuadrilateralShape(lowerLeft, lowerRight, upperRight, upperLeft);
+		Quadrilateral* boundingRectangle = new Quadrilateral(lowerLeft, lowerRight, upperRight, upperLeft);
 		return boundingRectangle;
 	}
 

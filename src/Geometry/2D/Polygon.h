@@ -1,7 +1,7 @@
 #pragma once
 #include "../../Utils/Geometry.h"
 #include "../CartesianShape.h"
-#include "TriangleShape.h"
+#include "Triangle.h"
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/partition_2.h>
 #include <CGAL/Partition_traits_2.h>
@@ -19,7 +19,7 @@ typedef std::list<Polygon_2>                                Polygon_list;
 
 
 
-class PolygonalShape : public PhysicalShape<2>
+class Polygon : public PhysicalShape<2>
 {
 private:
 	vector<Vertex*> _vertices;
@@ -34,11 +34,11 @@ private:
 	double _inRadius;
 
 	vector<PhysicalShape<2>*> _triangulation;
-	QuadrilateralShape* _boundingBox = nullptr;
+	Quadrilateral* _boundingBox = nullptr;
 
 public:
 
-	PolygonalShape(vector<Vertex*> vertices, bool createTriangulationAndBoundingBox = true)
+	Polygon(vector<Vertex*> vertices, bool createTriangulationAndBoundingBox = true)
 		: _vertices(vertices)
 	{
 		assert(vertices.size() >= 3);
@@ -46,7 +46,7 @@ public:
 		Init(createTriangulationAndBoundingBox);
 	}
 
-	PolygonalShape(const PolygonalShape& shape) = default;
+	Polygon(const Polygon& shape) = default;
 
 	void SetVertices(vector<Vertex*> vertices)
 	{
@@ -146,14 +146,14 @@ public:
 
 		if (_vertices.size() == 3)
 		{
-			TriangleShape* triangle = new TriangleShape(_vertices[0], _vertices[1], _vertices[2]);
+			Triangle* triangle = new Triangle(_vertices[0], _vertices[1], _vertices[2]);
 			_triangulation.push_back(triangle);
 		}
 		else if (_vertices.size() == 4 && this->IsConvex())
 		{
-			TriangleShape* triangle1 = new TriangleShape(_vertices[0], _vertices[1], _vertices[2]);
+			Triangle* triangle1 = new Triangle(_vertices[0], _vertices[1], _vertices[2]);
 			_triangulation.push_back(triangle1);
-			TriangleShape* triangle2 = new TriangleShape(_vertices[2], _vertices[3], _vertices[0]);
+			Triangle* triangle2 = new Triangle(_vertices[2], _vertices[3], _vertices[0]);
 			_triangulation.push_back(triangle2);
 		}
 		else if (this->IsConvex())
@@ -190,14 +190,14 @@ private:
 
 		if (vertices.size() == 3)
 		{
-			TriangleShape* triangle = new TriangleShape(vertices[0], vertices[1], vertices[2]);
+			Triangle* triangle = new Triangle(vertices[0], vertices[1], vertices[2]);
 			triangles.push_back(triangle);
 		}
 		else
 		{
 			for (int i = 0; i < vertices.size(); i++)
 			{
-				TriangleShape* subTriangle = new TriangleShape(vertices[i], vertices[(i + 1) % vertices.size()], center);
+				Triangle* subTriangle = new Triangle(vertices[i], vertices[(i + 1) % vertices.size()], center);
 				triangles.push_back(subTriangle);
 			}
 		}
@@ -230,7 +230,7 @@ private:
 			vector<Vertex*> vertices = Vertices(p);
 			if (p.size() == 3)
 			{
-				TriangleShape* subTriangle = new TriangleShape(vertices[0], vertices[1], vertices[2]);
+				Triangle* subTriangle = new Triangle(vertices[0], vertices[1], vertices[2]);
 				triangulation.push_back(subTriangle);
 			}
 			else
@@ -277,7 +277,7 @@ private:
 public:
 	PhysicalShape<2>* CreateCopy() const
 	{
-		PolygonalShape* copy = new PolygonalShape(*this);
+		Polygon* copy = new Polygon(*this);
 		return copy;
 	}
 
@@ -470,7 +470,7 @@ public:
 		os << "Polygon";
 	}
 
-	~PolygonalShape()
+	~Polygon()
 	{
 		for (PhysicalShape<2>* t : _triangulation)
 			delete t;
@@ -508,7 +508,7 @@ public:
 		Vertex upperRight(number, 1, 1);
 		Vertex upperLeft(number, -1, 1);
 		vector<Vertex*> vertices{ &lowerLeft, &lowerRight, &upperRight, &upperLeft };
-		PolygonalShape polygRefSquare(vertices);
+		Polygon polygRefSquare(vertices);
 
 		//--------------------------------------//
 		polygRefSquare.UnitTests();
@@ -544,7 +544,7 @@ public:
 		lowerRight = Vertex(number, h, 0);
 		upperRight = Vertex(number, h, h);
 		upperLeft = Vertex(number, 0, h);
-		PolygonalShape polygSquare(vector<Vertex*>{ &lowerLeft, &lowerRight, &upperRight, &upperLeft });
+		Polygon polygSquare(vector<Vertex*>{ &lowerLeft, &lowerRight, &upperRight, &upperLeft });
 		RectangleShape realSquare(&lowerLeft, h);
 		integralOverRealSquare = realSquare.Integral(anyFunction);
 		integralOverPolygonalSquare = polygSquare.Integral(anyFunction);
@@ -556,7 +556,7 @@ public:
 		lowerRight = Vertex(number, h, 0);
 		upperRight = Vertex(number, h, h);
 		upperLeft = Vertex(number, 0, h);
-		PolygonalShape polygSquare1(vector<Vertex*>{ &lowerLeft, &lowerRight, &upperRight, &upperLeft });
+		Polygon polygSquare1(vector<Vertex*>{ &lowerLeft, &lowerRight, &upperRight, &upperLeft });
 		realSquare = RectangleShape(&lowerLeft, h);
 		integralOverRealSquare = realSquare.Integral(anyFunction);
 		integralOverPolygonalSquare = polygSquare1.Integral(anyFunction);

@@ -182,7 +182,7 @@ public:
 
 	void ReshapeByMovingIntersection(Vertex* oldIntersect, Vertex* newIntersect) override
 	{
-		assert(false && "Cannot be reshaped. Must create a new shape (in 2D, a QuadrilateralShape)");
+		assert(false && "Cannot be reshaped. Must create a new shape (in 2D, a Quadrilateral)");
 	}
 
 	ReferenceShape<ShapeDim>* RefShape() const

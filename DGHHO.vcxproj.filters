@@ -300,25 +300,7 @@
     <ClInclude Include="src\Geometry\ReferenceShape.h">
       <Filter>Geometry</Filter>
     </ClInclude>
-    <ClInclude Include="src\Geometry\ReferenceTriangle.h">
-      <Filter>Geometry</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Geometry\2D\PolygonalShape.h">
-      <Filter>Geometry\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Geometry\2D\QuadrilateralShape.h">
-      <Filter>Geometry\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Geometry\2D\TriangleShape.h">
-      <Filter>Geometry\2D</Filter>
-    </ClInclude>
     <ClInclude Include="src\Geometry\3D\ReferenceTetrahedron.h">
-      <Filter>Geometry\3D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Geometry\3D\TetrahedronShape.h">
-      <Filter>Geometry\3D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Geometry\3D\TriangleIn3DShape.h">
       <Filter>Geometry\3D</Filter>
     </ClInclude>
     <ClInclude Include="src\Mesh\2D\PolygonalElement.h">
@@ -341,6 +323,27 @@
     </ClInclude>
     <ClInclude Include="src\Mesh\3D\TetrahedralElement.h">
       <Filter>Mesh\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Geometry\2D\Segment.h">
+      <Filter>Geometry\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Geometry\3D\Tetrahedron.h">
+      <Filter>Geometry\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Geometry\3D\TriangleIn3D.h">
+      <Filter>Geometry\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Geometry\2D\Triangle.h">
+      <Filter>Geometry\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Geometry\2D\Polygon.h">
+      <Filter>Geometry\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Geometry\2D\Quadrilateral.h">
+      <Filter>Geometry\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Geometry\2D\ReferenceTriangle.h">
+      <Filter>Geometry\2D</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

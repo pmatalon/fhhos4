@@ -1,7 +1,7 @@
 #pragma once
 #include "../Problem/DiffusionProblem.h"
 #include "../Geometry/CartesianShape.h"
-#include "../Geometry/2D/TriangleShape.h"
+#include "../Geometry/2D/Triangle.h"
 #include "../Utils/Action.h"
 #include "../Utils/ParallelLoop.h"
 #include "Diff_DGElement.h"
@@ -78,7 +78,7 @@ public:
 		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreMassMatrix(basis);
 		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreStiffnessMatrix(basis);
 		if (Dim == 2)
-			TriangleShape::InitReferenceShape()->ComputeAndStoreMassMatrix((FunctionalBasis<2>*)basis);
+			Triangle::InitReferenceShape()->ComputeAndStoreMassMatrix((FunctionalBasis<2>*)basis);
 		
 		//--------------------------------------------//
 		// Iteration on the elements: diagonal blocks //

@@ -85,7 +85,7 @@ public:
 		parallelLoop.Execute([](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
 			{
 				// Make Init() available for all element classes
-				PolygonalShape* p = dynamic_cast<PolygonalShape*>(e->Shape());
+				Polygon* p = dynamic_cast<Polygon*>(e->Shape());
 				if (p)
 				{
 					p->ComputeTriangulation();

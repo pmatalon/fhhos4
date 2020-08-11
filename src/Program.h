@@ -64,11 +64,11 @@ public:
 		if ((args.Actions & Action::UnitTests) == Action::UnitTests)
 		{
 			// Unit tests
-			TriangleShape::Test();
-			QuadrilateralShape::Test();
-			PolygonalShape::Test();
-			TetrahedronShape::Test();
-			TriangleIn3DShape::Test();
+			Triangle::Test();
+			Quadrilateral::Test();
+			Polygon::Test();
+			Tetrahedron::Test();
+			TriangleIn3D::Test();
 
 			mesh->SanityCheck();
 			if (args.Discretization.N <= 2)

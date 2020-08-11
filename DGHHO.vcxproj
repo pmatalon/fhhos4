@@ -105,6 +105,7 @@
     <ClInclude Include="src/FunctionalBasis/FunctionalBasis.h" />
     <ClInclude Include="src/FunctionalBasis/TensorPolynomial.h" />
     <ClInclude Include="src\FunctionalBasis\Hemker1D.h" />
+    <ClInclude Include="src\Geometry\2D\Segment.h" />
     <ClInclude Include="src\Geometry\GeometricShape.h" />
     <ClInclude Include="src\Geometry\AgglomerateShape.h" />
     <ClInclude Include="src\Geometry\CartesianShape.h" />
@@ -112,13 +113,13 @@
     <ClInclude Include="src\Geometry\PhysicalShape.h" />
     <ClInclude Include="src\Geometry\ReferenceCartesianShape.h" />
     <ClInclude Include="src\Geometry\ReferenceShape.h" />
-    <ClInclude Include="src\Geometry\ReferenceTriangle.h" />
     <ClInclude Include="src\Geometry\Point.h" />
-    <ClInclude Include="src\Geometry\2D\PolygonalShape.h" />
-    <ClInclude Include="src\Geometry\2D\QuadrilateralShape.h" />
-    <ClInclude Include="src\Geometry\2D\TriangleShape.h" />
-    <ClInclude Include="src\Geometry\3D\TetrahedronShape.h" />
-    <ClInclude Include="src\Geometry\3D\TriangleIn3DShape.h" />
+    <ClInclude Include="src\Geometry\2D\Polygon.h" />
+    <ClInclude Include="src\Geometry\2D\Quadrilateral.h" />
+    <ClInclude Include="src\Geometry\2D\Triangle.h" />
+    <ClInclude Include="src\Geometry\2D\ReferenceTriangle.h" />
+    <ClInclude Include="src\Geometry\3D\Tetrahedron.h" />
+    <ClInclude Include="src\Geometry\3D\TriangleIn3D.h" />
     <ClInclude Include="src\Geometry\3D\ReferenceTetrahedron.h" />
     <ClInclude Include="src\HHO\HHOParameters.h" />
     <ClInclude Include="src\Mesh\2D\Square_CartesianPolygonalMesh.h" />

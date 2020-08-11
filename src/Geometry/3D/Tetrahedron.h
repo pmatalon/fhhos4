@@ -4,7 +4,7 @@
 #include "../PhysicalShapeWithConstantJacobian.h"
 using namespace std;
 
-class TetrahedronShape : public PhysicalShapeWithConstantJacobian<3>
+class Tetrahedron : public PhysicalShapeWithConstantJacobian<3>
 {
 private:
 	double _diameter;
@@ -24,7 +24,7 @@ public:
 
 	static ReferenceTetrahedron RefTetra;
 
-	TetrahedronShape(Vertex* v1, Vertex* v2, Vertex* v3, Vertex* v4)
+	Tetrahedron(Vertex* v1, Vertex* v2, Vertex* v3, Vertex* v4)
 	{
 		assert(*v1 != *v2 && *v1 != *v3 && *v1 != *v4 && *v2 != *v3 && *v2 != *v4 && *v3 != *v4);
 		V1 = v1;
@@ -34,7 +34,7 @@ public:
 		Init();
 	}
 
-	TetrahedronShape(const TetrahedronShape& shape) = default;
+	Tetrahedron(const Tetrahedron& shape) = default;
 
 	void Init()
 	{
@@ -80,7 +80,7 @@ public:
 
 	PhysicalShape<3>* CreateCopy() const
 	{
-		return new TetrahedronShape(*this);
+		return new Tetrahedron(*this);
 	}
 
 	ReferenceShape<3>* RefShape() const
@@ -198,7 +198,7 @@ public:
 		Vertex C(number, 1, 4, 1);
 		Vertex D(number, 1, 1, 4);
 
-		TetrahedronShape t(&A, &B, &C, &D);
+		Tetrahedron t(&A, &B, &C, &D);
 
 		t.UnitTests();
 
@@ -226,4 +226,4 @@ public:
 	}
 };
 
-ReferenceTetrahedron TetrahedronShape::RefTetra = ReferenceTetrahedron();
+ReferenceTetrahedron Tetrahedron::RefTetra = ReferenceTetrahedron();

@@ -1,11 +1,11 @@
 #pragma once
 #include "../../Mesh/Vertex.h"
-#include "../ReferenceTriangle.h"
+#include "ReferenceTriangle.h"
 #include "../PhysicalShapeWithConstantJacobian.h"
 #include "../../Utils/Geometry.h"
 using namespace std;
 
-class TriangleShape : public PhysicalShapeWithConstantJacobian<2>
+class Triangle : public PhysicalShapeWithConstantJacobian<2>
 {
 private:
 	double _diameter;
@@ -23,7 +23,7 @@ public:
 
 	static ReferenceTriangle RefTriangle;
 
-	TriangleShape(Vertex* v1, Vertex* v2, Vertex* v3) 
+	Triangle(Vertex* v1, Vertex* v2, Vertex* v3) 
 	{
 		V1 = v1;
 		V2 = v2;
@@ -31,7 +31,7 @@ public:
 		Init();
 	}
 
-	TriangleShape(const TriangleShape& shape) = default;
+	Triangle(const Triangle& shape) = default;
 
 	void Init()
 	{
@@ -58,7 +58,7 @@ public:
 
 	PhysicalShape<2>* CreateCopy() const
 	{
-		return new TriangleShape(*this);
+		return new Triangle(*this);
 	}
 
 	ReferenceShape<2>* RefShape() const
@@ -195,7 +195,7 @@ public:
 		Vertex lowerRight(number, 1, -1);
 		Vertex upperLeft(number, -1, 1);
 
-		TriangleShape t(&lowerLeft, &lowerRight, &upperLeft);
+		Triangle t(&lowerLeft, &lowerRight, &upperLeft);
 
 		t.UnitTests();
 
@@ -209,4 +209,4 @@ public:
 	}
 };
 
-ReferenceTriangle TriangleShape::RefTriangle = ReferenceTriangle();
+ReferenceTriangle Triangle::RefTriangle = ReferenceTriangle();

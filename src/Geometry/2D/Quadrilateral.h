@@ -4,7 +4,7 @@
 #include "../PhysicalShape.h"
 using namespace std;
 
-class QuadrilateralShape : public PhysicalShape<2>
+class Quadrilateral : public PhysicalShape<2>
 {
 private:
 	double _diameter;
@@ -30,7 +30,7 @@ public:
 
 	static ReferenceCartesianShape<2> RefSquare;
 
-	QuadrilateralShape(Vertex* v1, Vertex* v2, Vertex* v3, Vertex* v4)
+	Quadrilateral(Vertex* v1, Vertex* v2, Vertex* v3, Vertex* v4)
 	{
 		V1 = v1;
 		V2 = v2;
@@ -40,7 +40,7 @@ public:
 	}
 
 	// Copy constructor
-	QuadrilateralShape(const QuadrilateralShape& shape) = default;
+	Quadrilateral(const Quadrilateral& shape) = default;
 
 	void Init()
 	{
@@ -80,7 +80,7 @@ public:
 
 	PhysicalShape<2>* CreateCopy() const
 	{
-		return new QuadrilateralShape(*this);
+		return new Quadrilateral(*this);
 	}
 
 	ReferenceShape<2>* RefShape() const
@@ -262,7 +262,7 @@ public:
 		Vertex upperRight(number, 2, 2);
 		Vertex upperLeft(number, -1, 1);
 
-		QuadrilateralShape q(&lowerLeft, &lowerRight, &upperRight, &upperLeft);
+		Quadrilateral q(&lowerLeft, &lowerRight, &upperRight, &upperLeft);
 
 		q.UnitTests();
 
@@ -279,9 +279,9 @@ public:
 		Vertex V2(number, 0.13, 0);
 		Vertex V3(number, 0.13, 0.05);
 		Vertex V4(number, 0, 0.05);
-		QuadrilateralShape q2(&V1, &V2, &V3, &V4);
+		Quadrilateral q2(&V1, &V2, &V3, &V4);
 		DomPoint dom = q.ConvertToDomain(RefPoint(-0.069222, 0.534611));
 	}
 };
 
-ReferenceCartesianShape<2> QuadrilateralShape::RefSquare = ReferenceCartesianShape<2>();
+ReferenceCartesianShape<2> Quadrilateral::RefSquare = ReferenceCartesianShape<2>();

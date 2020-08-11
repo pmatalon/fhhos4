@@ -1,14 +1,14 @@
 #pragma once
 #include "../../DG/Diff_DGElement.h"
 #include "../../HHO/Diff_HHOElement.h"
-#include "../../Geometry/3D/TetrahedronShape.h"
+#include "../../Geometry/3D/Tetrahedron.h"
 #include "TriangularFace.h"
 using namespace std;
 
 class TetrahedralElement : public Diff_DGElement<3>, public Diff_HHOElement<3>
 {
 private:
-	TetrahedronShape* _shape;
+	Tetrahedron* _shape;
 
 public:
 	TetrahedralElement(BigNumber number, Vertex* v1, Vertex* v2, Vertex* v3, Vertex* v4) :
@@ -16,7 +16,7 @@ public:
 		Diff_DGElement<3>(number),
 		Diff_HHOElement<3>(number)
 	{
-		_shape = new TetrahedronShape(v1, v2, v3, v4);
+		_shape = new Tetrahedron(v1, v2, v3, v4);
 	}
 
 	inline Vertex* V1()

@@ -1,14 +1,14 @@
 #pragma once
 #include "../../DG/Diff_DGElement.h"
 #include "../../HHO/Diff_HHOElement.h"
-#include "../../Geometry/2D/PolygonalShape.h"
+#include "../../Geometry/2D/Polygon.h"
 #include "../../Utils/RotatingList.h"
 using namespace std;
 
 class PolygonalElement : public Diff_DGElement<2>, public Diff_HHOElement<2>
 {
 private:
-	PolygonalShape* _shape = nullptr;
+	Polygon* _shape = nullptr;
 
 public:
 	// Constructor creating the polygon from the adjonction of two elements
@@ -17,7 +17,7 @@ public:
 		Diff_DGElement<2>(number),
 		Diff_HHOElement<2>(number)
 	{
-		_shape = new PolygonalShape(MacroPolygonVertices(e1, e2, facesToRemove), createTriangulationAndBoundingBox);
+		_shape = new Polygon(MacroPolygonVertices(e1, e2, facesToRemove), createTriangulationAndBoundingBox);
 	}
 
 	PolygonalElement(int number, vector<Vertex*> vertices, bool createTriangulationAndBoundingBox = true) :
@@ -25,7 +25,7 @@ public:
 		Diff_DGElement<2>(number),
 		Diff_HHOElement<2>(number)
 	{
-		_shape = new PolygonalShape(vertices, createTriangulationAndBoundingBox);
+		_shape = new Polygon(vertices, createTriangulationAndBoundingBox);
 	}
 
 	inline vector<Vertex*> Vertices()
