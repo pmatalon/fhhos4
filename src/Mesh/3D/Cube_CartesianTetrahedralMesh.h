@@ -87,10 +87,13 @@ public:
 	{
 		return "Cartesian tetrahedral";
 	}
-
 	virtual string FileNamePart() override
 	{
-		return "carttetra";
+		return "cart-tetra";
+	}
+	string GeometryDescription() override
+	{
+		return "Cube";
 	}
 
 	void CoarsenMesh(CoarseningStrategy strategy) override

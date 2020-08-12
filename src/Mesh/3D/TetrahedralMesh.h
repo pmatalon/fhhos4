@@ -12,10 +12,12 @@ protected:
 public:
 	TetrahedralMesh() : PolyhedralMesh()
 	{}
+	TetrahedralMesh(string geometryDescription) : PolyhedralMesh(geometryDescription)
+	{}
 
 	virtual string Description() override
 	{
-		return "Tetrahedral";
+		return "Unstructured tetrahedral";
 	}
 
 	virtual string FileNamePart() override
@@ -49,7 +51,7 @@ protected:
 	{
 		cout << "Mesh refinement using Bey's method" << endl;
 
-		TetrahedralMesh* fineMesh = new TetrahedralMesh();
+		TetrahedralMesh* fineMesh = new TetrahedralMesh(this->GeometryDescription());
 		fineMesh->ComesFrom.CS = CoarseningStrategy::BeyRefinement;
 		fineMesh->ComesFrom.nFineElementsByCoarseElement = 8;
 		fineMesh->ComesFrom.nFineFacesAddedByCoarseElement = 8;

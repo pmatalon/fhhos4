@@ -6,6 +6,7 @@ using namespace std;
 struct ProblemArguments
 {
 	int Dimension = -1;
+	string GeoCode = "square";
 	string RHSCode = "sine";
 	double Kappa1 = 1;
 	double Kappa2 = 1;
@@ -19,8 +20,8 @@ struct DiscretizationArguments
 	BigNumber Ny = -1;
 	BigNumber Nz = -1;
 	string Method = "hho";
-	string MeshCode = "tri";
-	string MeshFilePath = "";
+	string Mesher = "inhouse";
+	string MeshCode = "default";
 	double Stretch = 0.5;
 	string Stabilization = "hho";
 	string BasisCode = "legendre";

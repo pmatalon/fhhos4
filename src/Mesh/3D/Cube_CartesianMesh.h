@@ -178,14 +178,17 @@ public:
 
 	}
 
-	string Description()
+	string Description() override
 	{
 		return "Cartesian " + to_string(this->Nx) + " x " + to_string(this->Ny) + " x " + to_string(this->Nz);
 	}
-
-	string FileNamePart()
+	string FileNamePart() override
 	{
-		return "cart-n" + to_string(this->Nx);
+		return "cube-cart-n" + to_string(this->Nx);
+	}
+	string GeometryDescription() override
+	{
+		return "Cube";
 	}
 
 	double H()

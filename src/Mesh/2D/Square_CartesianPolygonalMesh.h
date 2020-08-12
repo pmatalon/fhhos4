@@ -142,7 +142,12 @@ public:
 
 	string FileNamePart() override
 	{
-		return "n" + to_string(this->Nx);
+		return "square-cartpoly-n" + to_string(this->Nx);
+	}
+
+	string GeometryDescription() override
+	{
+		return "Square";
 	}
 
 	double H() override

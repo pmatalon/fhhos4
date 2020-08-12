@@ -1,4 +1,4 @@
-Include "cube4tetra.geo";
+Include "cube_tetra.geo";
 
 Recombine Surface "*";
 Recombine Volume "*";

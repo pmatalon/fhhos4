@@ -70,6 +70,7 @@ public:
 
 	virtual string Description() = 0;
 	virtual string FileNamePart() = 0;
+	virtual string GeometryDescription() = 0;
 	virtual double H() = 0;
 	virtual double Regularity() = 0;
 
@@ -454,7 +455,7 @@ public:
 			}
 
 			Mesh<Dim>* meshToGetInfo = nullptr;
-			if (this->ComesFrom.CS == CoarseningStrategy::SplittingRefinement || this->ComesFrom.CS == CoarseningStrategy::BeyRefinement)
+			if (this->ComesFrom.CS == CoarseningStrategy::GMSHSplittingRefinement || this->ComesFrom.CS == CoarseningStrategy::BeyRefinement)
 				meshToGetInfo = this;
 			else if (CoarseMesh->ComesFrom.CS == CoarseningStrategy::StandardCoarsening || CoarseMesh->ComesFrom.CS == CoarseningStrategy::AgglomerationCoarsening)
 				meshToGetInfo = CoarseMesh;
@@ -490,6 +491,7 @@ public:
 
 	Mesh<Dim>* RefineUntilNElements(BigNumber nElements, CoarseningStrategy strategy)
 	{
+		cout << "Building fine mesh by successive refinement of the coarse mesh" << endl;
 		Mesh<Dim>* mesh = this;
 		while (mesh->Elements.size() < nElements)
 		{

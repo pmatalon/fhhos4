@@ -122,9 +122,12 @@
     <ClInclude Include="src\Geometry\3D\TriangleIn3D.h" />
     <ClInclude Include="src\Geometry\3D\ReferenceTetrahedron.h" />
     <ClInclude Include="src\HHO\HHOParameters.h" />
+    <ClInclude Include="src\Mesh\2D\Square4quadrants_GMSHCartesianMesh.h" />
+    <ClInclude Include="src\Mesh\2D\Square4quadrants_GMSHTriangularMesh.h" />
     <ClInclude Include="src\Mesh\2D\Square_CartesianPolygonalMesh.h" />
     <ClInclude Include="src\Mesh\2D\Edge.h" />
     <ClInclude Include="src\Mesh\2D\Square_GMSHCartesianMesh.h" />
+    <ClInclude Include="src\Mesh\2D\Square4quadrants_GMSHQuadrilateralMesh.h" />
     <ClInclude Include="src\Mesh\2D\Square_GMSHQuadrilateralMesh.h" />
     <ClInclude Include="src\Mesh\2D\Square_GMSHTriangularMesh.h" />
     <ClInclude Include="src\Mesh\2D\Square4quadrants_GMSHUnstructTriangularMesh.h" />
@@ -145,6 +148,7 @@
     <ClInclude Include="src\Mesh\3D\TriangularFace.h" />
     <ClInclude Include="src\Mesh\Agglo.h" />
     <ClInclude Include="src\Mesh\AgglomerateElement.h" />
+    <ClInclude Include="src\Mesh\AllMeshes.h" />
     <ClInclude Include="src\Mesh\CartesianElement.h" />
     <ClInclude Include="src\Mesh\CartesianFace.h" />
     <ClInclude Include="src\Mesh\Interface.h" />
@@ -185,6 +189,7 @@
     <ClInclude Include="src\Program.h" />
     <ClInclude Include="src\ProgramArguments.h" />
     <ClInclude Include="src\Solver\AGMG.h" />
+    <ClInclude Include="src\Solver\AllSolvers.h" />
     <ClInclude Include="src\Solver\BlockJacobi.h" />
     <ClInclude Include="src\Solver\BlockSOR.h" />
     <ClInclude Include="src\Solver\ConjugateGradient.h" />

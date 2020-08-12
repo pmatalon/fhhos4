@@ -6,16 +6,16 @@ class Cube_GMSHTetrahedralMesh : public GMSHTetrahedralMesh
 {
 public:
 	Cube_GMSHTetrahedralMesh() :
-		GMSHTetrahedralMesh("3D/cube4tetra.geo", "GMSH tetrahedral", "gmsh-tetra")
+		GMSHTetrahedralMesh("3D/cube_tetra.geo", "GMSH unstructured tetrahedral", "gmsh-tetra", "Cube")
 	{}
 
 private:
-	Cube_GMSHTetrahedralMesh(string description, string fileNamePart) : GMSHTetrahedralMesh(description, fileNamePart)
+	Cube_GMSHTetrahedralMesh(string description, string fileNamePart, string geometryDescription) : GMSHTetrahedralMesh(description, fileNamePart, geometryDescription)
 	{}
 
 protected:
 	virtual GMSHMesh<3>* CreateNewGMSHMesh() override
 	{
-		return new Cube_GMSHTetrahedralMesh(this->_description, this->_fileNamePart);
+		return new Cube_GMSHTetrahedralMesh(this->_description, this->_fileNamePart, this->_geometryDescription);
 	}
 };

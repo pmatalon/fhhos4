@@ -10,10 +10,6 @@
 
 >	make
 
-#### Launch program
+#### Launch help command to view arguments and examples
 
->	./bin/Release/dghho -d 2 -discr hho -mesh cart -n 8 -p 2
-
-#### Help
-
->	./bin/dghho -h
+>	./bin/Release/dghho -h

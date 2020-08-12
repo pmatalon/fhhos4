@@ -30,16 +30,20 @@ protected:
 	string _gmshFilePath;
 	string _description = "GMSH file";
 	string _fileNamePart = "gmsh-file";
+	string _geometryDescription = "unknown";
 
 	map<size_t, Element<Dim>*> _elementExternalNumbers;
 	map<size_t, MeshVertex<Dim>*> _vertexExternalNumbers;
 	double _h = -1;
 	double _regularity = 1;
 public:
-	GMSHMesh(string mshFile, string description, string fileNamePart, double h = -1) : PolyhedralMesh<Dim>()
+	GMSHMesh(string mshFile, string description, string fileNamePart, double h = -1) 
+		: PolyhedralMesh<Dim>()
 	{
 		_description = description;
 		_fileNamePart = fileNamePart;
+		_geometryDescription = mshFile;
+
 		mshFile = SearchFile(mshFile);
 		_gmshFilePath = mshFile;
 
@@ -54,7 +58,8 @@ public:
 		//gmsh::option::setNumber("General.Terminal", 1);
 		//gmsh::option::setNumber("General.Verbosity", 99);
 
-		cout << "Opening file " << mshFile << endl;
+		if (h == -1)
+			cout << "Opening file " << mshFile << endl;
 
 		gmsh::open(mshFile);
 
@@ -64,18 +69,14 @@ public:
 			remove(mshFile.c_str());
 	}
 
+	GMSHMesh(string mshFile, string description, string fileNamePart, string geometryDescription, double h = -1)
+		: GMSHMesh(mshFile, description, fileNamePart, h)
+	{
+		_geometryDescription = geometryDescription;
+	}
+
 	GMSHMesh(string mshFile, double h = -1) : GMSHMesh(mshFile, "GMSH file", "gmsh-file", h)
 	{}
-
-	static int GetDimension(string mshFile)
-	{
-		mshFile = SearchFile(mshFile);
-		gmsh::initialize();
-		gmsh::open(mshFile);
-		int d = gmsh::model::getDimension();
-		gmsh::finalize();
-		return d;
-	}
 protected:
 	GMSHMesh(string description, string fileNamePart) : PolyhedralMesh<Dim>()
 	{
@@ -87,6 +88,17 @@ protected:
 	// Dim-specific functions
 	virtual Element<Dim>* CreateElement(int elemType, size_t elementTag, const vector<size_t>& elementNodes, size_t& elemNodeIndex, BigNumber elemNumber) { return nullptr; }
 	void CreateFaces(int elemType, BigNumber& faceNumber) { }
+
+public:
+	static int GetDimension(string mshFile)
+	{
+		mshFile = SearchFile(mshFile);
+		gmsh::initialize();
+		gmsh::open(mshFile);
+		int d = gmsh::model::getDimension();
+		gmsh::finalize();
+		return d;
+	}
 
 private:
 	static string SearchFile(string mshFile)
@@ -261,10 +273,13 @@ public:
 	{
 		return _description;
 	}
-
 	string FileNamePart() override
 	{
 		return _fileNamePart;
+	}
+	string GeometryDescription() override
+	{
+		return _geometryDescription;
 	}
 
 	double H() override
@@ -279,7 +294,7 @@ public:
 
 	void CoarsenMesh(CoarseningStrategy strategy) override
 	{
-		if (strategy == CoarseningStrategy::SplittingRefinement || strategy == CoarseningStrategy::BeyRefinement)
+		if (strategy == CoarseningStrategy::GMSHSplittingRefinement || strategy == CoarseningStrategy::BeyRefinement)
 			return;
 		else if (strategy == CoarseningStrategy::IndependentRemeshing)
 			IndependentRemesh();
@@ -295,7 +310,7 @@ public:
 		if (this->FineMesh)
 			assert(false && "Mesh already refined!");
 
-		if (strategy == CoarseningStrategy::SplittingRefinement)
+		if (strategy == CoarseningStrategy::GMSHSplittingRefinement)
 			RefineMeshBySplitting();
 		else
 			PolyhedralMesh<Dim>::RefineMesh(strategy);
@@ -316,7 +331,7 @@ public:
 
 		// Building our own mesh objects from the GMSH ones
 		GMSHMesh<Dim>* fineMesh = CreateNewGMSHMesh();
-		fineMesh->ComesFrom.CS = CoarseningStrategy::SplittingRefinement;
+		fineMesh->ComesFrom.CS = CoarseningStrategy::GMSHSplittingRefinement;
 
 		this->FineMesh = fineMesh;
 		this->FineMesh->CoarseMesh = this;
@@ -346,7 +361,9 @@ public:
 
 	virtual GMSHMesh<Dim>* CreateNewGMSHMesh()
 	{
-		return new GMSHMesh<Dim>(this->_description, this->_fileNamePart);
+		GMSHMesh<Dim>* mesh = new GMSHMesh<Dim>(this->_description, this->_fileNamePart);
+		mesh->_geometryDescription = this->_geometryDescription;
+		return mesh;
 	}
 
 private:

@@ -13,9 +13,16 @@ class PolyhedralMesh : public Mesh<Dim>
 {
 private:
 	double _regularity = 0;
+protected:
+	string _geometryDescription;
 public:
 	PolyhedralMesh() : Mesh<Dim>()
 	{}
+
+	PolyhedralMesh(string geometryDescription) : Mesh<Dim>()
+	{
+		_geometryDescription = geometryDescription;
+	}
 
 	virtual string Description() override
 	{
@@ -23,10 +30,13 @@ public:
 			return "Polygonal";
 		return "Polyhedral";
 	}
-
 	virtual string FileNamePart() override
 	{
 		return "polyhedral";
+	}
+	virtual string GeometryDescription() override
+	{
+		return _geometryDescription;
 	}
 
 	virtual double H() override
@@ -51,7 +61,7 @@ public:
 	{
 		if (this->CoarseMesh)
 			return;
-		if (strategy == CoarseningStrategy::SplittingRefinement || strategy == CoarseningStrategy::BeyRefinement)
+		if (strategy == CoarseningStrategy::GMSHSplittingRefinement || strategy == CoarseningStrategy::BeyRefinement)
 			return;
 		
 		if (strategy == CoarseningStrategy::AgglomerationCoarsening)

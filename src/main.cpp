@@ -11,8 +11,14 @@ void print_usage() {
 	cout << "                          Problem definition                          " << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << endl;
-	cout << "-d NUM" << endl;
-	cout << "      Space dimension of the domain: 1, 2 or 3 (derived from the mesh if not set)." << endl;
+	cout << "-geo CODE" << endl;
+	cout << "      Geometry: in-house test cases, or imported from GMSH." << endl;
+	cout << "            segment           - Unit segment (1D)" << endl;
+	cout << "            square            - Unit square" << endl;
+	cout << "            square4quadrants  - Unit square divided into 4 quadrants" << endl;
+	cout << "            cube              - Unit cube" << endl;
+	cout << "            <file>            - GMSH .geo or .msh file" << endl;
+	cout << "                                Use relative or absolute path, or simply the file name if the file is stored in the folder data/mesh/" << endl;
 	cout << endl;
 	cout << "-heterog NUM" << endl;
 	cout << "      Heterogeneity ratio. Constant diffusion coefficient in one part of the domain partition" << endl;
@@ -43,25 +49,26 @@ void print_usage() {
 	cout << "               kellogg - (2D only) heterogeneous diffusion-specific analytical solution (known benchmark)" << endl;
 	cout << endl;
 	cout << "----------------------------------------------------------------------" << endl;
-	cout << "                             Discretization                           " << endl;
+	cout << "                                  Mesh                                " << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << endl;
 	cout << "-mesh CODE" << endl;
-	cout << "      Type of mesh. (Default: cart)" << endl;
-	cout << "            cart                - Unit square/cube discretized by an in-house uniform Cartesian mesh" << endl;
-	cout << "            tri                 - Unit square discretized by an in-house uniform trianglular mesh" << endl;
-	cout << "            quad                - Unit square discretized by an in-house uniform quadrilateral mesh (use argument -stretch to configure)" << endl;
-	cout << "            gmsh-cart           - Unit square discretized by a uniform Cartesian mesh built by GMSH" << endl;
-	cout << "            gmsh-tri            - Unit square discretized by a uniform triangular mesh built by GMSH from successive refinements of a coarse mesh" << endl;
-	cout << "            4quad-gmsh-uns-tri  - Unit square with 4 quandrants discretized by an unstructured triangular mesh built by GMSH from successive refinements of a coarse mesh" << endl;
-	cout << "            gmsh-uns-tri        - Unit square discretized by an unstructured triangular mesh built by GMSH" << endl;
-	cout << "            tetra               - Unit cube discretized by a uniform tetrahedral mesh embedded in a Cartesian mesh" << endl;
-	cout << "            gmsh-tetra          - Unit cube discretized by a uniform tetrahedral mesh built by GMSH from successive refinements of a coarse mesh" << endl;
-	cout << "            gmsh                - .msh or .geo GMSH file given in the argument -file" << endl;
+	cout << "      Type of mesh (default: unstructured simplicial)." << endl;
+	cout << "            cart      - Cartesian" << endl;
+	cout << "            stri      - Structured triangular" << endl;
+	cout << "            tri       - Unstructured triangular" << endl;
+	cout << "            quad      - Unstructured quadrilateral (see also argument -stretch)" << endl;
+	cout << "            stetra    - Structured tetrahedral (embedded in a Cartesian mesh)" << endl;
+	cout << "            tetra     - Unstructured tetrahedral" << endl;
+	cout << endl;
+	cout << "-mesher CODE" << endl;
+	cout << "      Mesher used: in-house or imported file from GMSH." << endl;
+	cout << "            inhouse   - in-house (default for geometries 'segment', 'square', 'cube')" << endl;
+	cout << "            gmsh      - GMSH (default for imported files)" << endl;
 	cout << endl;
 	cout << "-n NUM" << endl;
 	cout << "      Number of subdivisions in each cartesian dimension of the unit square/cube (default: 16)." << endl;
-	cout << "      If used with -ny or -nz, then used for -nx." << endl;
+	cout << "      If used in conjonction with -ny or -nz, then the value is used for -nx." << endl;
 	cout << endl;
 	cout << "-nx NUM" << endl;
 	cout << "      Number of subdivisions in the x dimension of the unit square/cube (default: 16)." << endl;
@@ -72,13 +79,13 @@ void print_usage() {
 	cout << "-nz NUM" << endl;
 	cout << "      Number of subdivisions in the z dimension of the unit square/cube (default: same as -n or -nx). Used only for the meshes 'cart', 'tri', 'quad'." << endl;
 	cout << endl;
-	cout << "-file PATH" << endl;
-	cout << "      GMSH file (.geo or .msh) containing the geometry or the mesh. Requires option -mesh gmsh." << endl;
-	cout << "      To be used with the multigrid (whose levels will be built by successive refinements), the file must contain the COARSE mesh." << endl;
-	cout << endl;
 	cout << "-stretch NUM" << endl;
-	cout << "      0 <= NUM < 1   stretching factor of the quadrilateral element used in the 'quad' mesh." << endl;
+	cout << "      0 <= NUM < 1   stretching factor of the quadrilateral element used in the 'quad' mesh of the 'inhouse' mesher." << endl;
 	cout << "      0 yields square elements. Default is 0.5: the top right corner is moved to the right 0.5 times the element's width." << endl;
+	cout << endl;
+	cout << "----------------------------------------------------------------------" << endl;
+	cout << "                             Discretization                           " << endl;
+	cout << "----------------------------------------------------------------------" << endl;
 	cout << endl;
 	cout << "-discr CODE" << endl;
 	cout << "      Discretization method (default: hho)." << endl;
@@ -273,7 +280,47 @@ void print_usage() {
 	cout << "-o PATH" << endl;
 	cout << "      Output directory to export files (default: ./out)." << endl;
 	cout << endl;
-	cout << "--------------------------------------------------------" << endl;
+	cout << "----------------------------------------------------------------------" << endl;
+	cout << "                      Examples and typical use cases                  " << endl;
+	cout << "----------------------------------------------------------------------" << endl;
+	cout << endl;
+	cout << "First example setting the geometry, the type of mesh and its granularity, and the degree of approximation." << endl;
+	cout << "Homogeneous diffusion problem in the unit square, using a Cartesian mesh 16x16 and providing a quadratic approximation:" << endl;
+	cout << "              -geo square -mesh cart -n 16 -p 2" << endl;
+	cout << endl;
+	cout << "Heterogeneous problem in the unit square. The domain partition describing the heterogeneity pattern is a chiasmus." << endl;
+	cout << "The heterogeneity ratio between the two subdomains is set to 1e4." << endl;
+	cout << "              -geo square -partition chiasmus -heterog 1e4" << endl;
+	cout << "Other use case: the heterogeneity ratio, as well as as non-homogeneous Dirichlet conditions, are set such that it corresponds to a Kellogg problem." << endl;
+	cout << "              -geo square -partition chiasmus -rhs kellogg" << endl;
+	cout << endl;
+	cout << "Import a GMSH file describing the geometry (.geo) or the mesh (.msh)." << endl;
+	cout << "You can use relative or absolute path, or simply the file name if the file is stored in /data/mesh/." << endl;
+	cout << "              -geo file_in_data_mesh_folder.geo" << endl;
+	cout << "              -geo /path/to/my/file.geo" << endl;
+	cout << endl;
+	cout << "Configure the parameter k the HHO discretization." << endl;
+	cout << "The argument -p allows to set the desired polynomial degree of the approximation. In HHO, it corresponds to the degree after higher-order reconstruction, i.e. p=k+1." << endl;
+	cout << "So setting k=2 is done by" << endl;
+	cout << "              -p 3" << endl;
+	cout << endl;
+	cout << "Use DG-SIPG discretization instead of HHO:" << endl;
+	cout << "              -discr dg" << endl;
+	cout << endl;
+	cout << "Choose the linear solver, for instance the Multigrid developed for HHO:" << endl;
+	cout << "              -s mg" << endl;
+	cout << endl;
+	cout << "Set the Multigrid cycle to V(1,3), the pre- and post-smoothers to the Block-Jacobi iteration using 2/3 as relaxation parameter:" << endl;
+	cout << "              -cycle V,1,3 -smoothers bj23,bj23" << endl;
+	cout << endl;
+	cout << "For unstructured meshes, use a coarsening strategy which also coarsens the faces (-cs n). This will build a hierarchy of non-nested meshes." << endl;
+	cout << "To be compliant, you must set the prolongation operator to its non-nested version (which uses the L2-projection from the coarse cells onto the fine ones)." << endl;
+	cout << "              -cs n -prolong 7" << endl;
+	cout << endl;
+	cout << "Use the multigrid as a preconditioner for a Flexible Conjugate Gradient, along with the K-cycle:" << endl;
+	cout << "              -s fcgmg -cycle K,1,1" << endl;
+	cout << endl;
+	cout << "----------------------------------------------------------------------" << endl;
 }
 
 void argument_error(string msg)
@@ -298,18 +345,20 @@ int main(int argc, char* argv[])
 
 	enum {
 		// Problem
-		OPT_RightHandSide = 1000,
+		OPT_Geometry = 1000,
+		OPT_RightHandSide,
 		OPT_Heterogeneity,
 		OPT_Anisotropy,
 		OPT_Partition,
-		// Discretization
+		// Mesh
+		OPT_Mesh,
+		OPT_Mesher,
 		OPT_Nx,
 		OPT_Ny,
 		OPT_Nz,
-		OPT_Discretization,
-		OPT_Mesh,
-		OPT_MeshFilePath,
 		OPT_Stretch,
+		// Discretization
+		OPT_Discretization,
 		OPT_Stabilization,
 		OPT_NoStaticCondensation,
 		OPT_Penalization,
@@ -333,17 +382,19 @@ int main(int argc, char* argv[])
 
 	static struct option long_opts[] = {
 		 // Problem
+		 { "geo", required_argument, NULL, OPT_Geometry },
 		 { "rhs", required_argument, NULL, OPT_RightHandSide },
 		 { "heterog", required_argument, NULL, OPT_Heterogeneity },
 		 { "aniso", required_argument, NULL, OPT_Anisotropy },
 		 { "partition", required_argument, NULL, OPT_Partition },
-		 // Discretization
+		 // Mesh
+		 { "mesh", required_argument, NULL, OPT_Mesh },
+		 { "mesher", required_argument, NULL, OPT_Mesher },
 		 { "nx", required_argument, NULL, OPT_Nx },
 		 { "ny", required_argument, NULL, OPT_Ny },
-		 { "discr", required_argument, NULL, OPT_Discretization },
-		 { "mesh", required_argument, NULL, OPT_Mesh },
-		 { "file", required_argument, NULL, OPT_MeshFilePath },
 		 { "stretch", required_argument, NULL, OPT_Stretch },
+		 // Discretization
+		 { "discr", required_argument, NULL, OPT_Discretization },
 		 { "stab", required_argument, NULL, OPT_Stabilization },
 		 { "no-static-cond", required_argument, NULL, OPT_NoStaticCondensation },
 		 { "pen", required_argument, NULL, OPT_Penalization },
@@ -367,9 +418,13 @@ int main(int argc, char* argv[])
 		 { NULL, 0, NULL, 0 }
 	};
 
+	//------------------------------------------//
+	//            Get user arguments            //
+	//------------------------------------------//
+
 	int long_index = 0;
 	int option = 0;
-	while ((option = getopt_long_only(argc, argv, "d:s:n:b:p:a:l:o:w:g:h", long_opts, &long_index)) != -1)
+	while ((option = getopt_long_only(argc, argv, "s:n:b:p:a:l:o:w:g:h", long_opts, &long_index)) != -1)
 	{
 		switch (option) 
 		{
@@ -377,14 +432,14 @@ int main(int argc, char* argv[])
 			//     Problem     //
 			//-----------------//
 
-			case 'd': 
-			{
-				int dimension = atoi(optarg);
-				if (dimension < 1 || dimension > 3)
-					argument_error("dimension " + to_string(dimension) + "! Are you kidding?! Stop wasting my time.");
-				args.Problem.Dimension = dimension;
+			case OPT_Geometry:
+				args.Problem.GeoCode = optarg;
+				if (   args.Problem.GeoCode.compare("segment") != 0
+					&& args.Problem.GeoCode.compare("square") != 0
+					&& args.Problem.GeoCode.compare("square4quadrants") != 0
+					&& args.Problem.GeoCode.compare("cube") != 0)
+					args.Discretization.Mesher = "gmsh";
 				break;
-			}
 			case OPT_RightHandSide:
 				args.Problem.RHSCode = optarg;
 				break;
@@ -404,9 +459,29 @@ int main(int argc, char* argv[])
 			}
 
 			//--------------------//
-			//   Discretization   //
+			//        Mesh        //
 			//--------------------//
 
+			case OPT_Mesh:
+			{
+				string meshCode = optarg;
+				if (   meshCode.compare("cart") != 0
+					&& meshCode.compare("cart-poly") != 0
+					&& meshCode.compare("stri") != 0
+					&& meshCode.compare("tri") != 0
+					&& meshCode.compare("tetra") != 0
+					&& meshCode.compare("stetra") != 0
+					&& meshCode.compare("quad") != 0
+					&& meshCode.compare("quad-poly") != 0)
+					argument_error("unknown mesh code '" + meshCode + "'. Check -mesh argument.");
+				args.Discretization.MeshCode = meshCode;
+				break;
+			}
+			case OPT_Mesher:
+				args.Discretization.Mesher = optarg;
+				if (args.Discretization.Mesher.compare("inhouse") != 0 && args.Discretization.Mesher.compare("gmsh"))
+					argument_error("unknown mesher '" + args.Discretization.Mesher + "'. Check -mesher argument.");
+				break;
 			case 'n':
 			case OPT_Nx:
 				args.Discretization.N = stoul(optarg, nullptr, 0);
@@ -417,6 +492,14 @@ int main(int argc, char* argv[])
 			case OPT_Nz:
 				args.Discretization.Nz = stoul(optarg, nullptr, 0);
 				break;
+			case OPT_Stretch:
+				args.Discretization.Stretch = atof(optarg);
+				break;
+
+			//--------------------//
+			//   Discretization   //
+			//--------------------//
+
 			case OPT_Discretization:
 			{
 				string discretization = optarg;
@@ -425,31 +508,6 @@ int main(int argc, char* argv[])
 				args.Discretization.Method = discretization;
 				break;
 			}
-			case OPT_Mesh:
-			{
-				string meshCode = optarg;
-				if (   meshCode.compare("cart") != 0
-					&& meshCode.compare("cart-poly") != 0
-					&& meshCode.compare("tri") != 0
-					&& meshCode.compare("gmsh-cart") != 0
-					&& meshCode.compare("gmsh-tri") != 0
-					&& meshCode.compare("gmsh-quad") != 0
-					&& meshCode.compare("gmsh-uns-tri") != 0
-					&& meshCode.compare("tetra") != 0
-					&& meshCode.compare("gmsh-tetra") != 0
-					&& meshCode.compare("gmsh") != 0
-					&& meshCode.compare("quad") != 0
-					&& meshCode.compare("quad-poly") != 0)
-					argument_error("unknown mesh code '" + meshCode + "'. Check -mesh argument.");
-				args.Discretization.MeshCode = meshCode;
-				break;
-			}
-			case OPT_MeshFilePath:
-				args.Discretization.MeshFilePath = optarg;
-				break;
-			case OPT_Stretch:
-				args.Discretization.Stretch = atof(optarg);
-				break;
 			case OPT_Stabilization:
 			{
 				string stabilization = optarg;
@@ -646,24 +704,31 @@ int main(int argc, char* argv[])
 		}
 	}
 
+
+	//------------------------------------------//
+	//             Problem dimension            //
+	//------------------------------------------//
+
 	if (args.Problem.Dimension == -1)
 	{
-		if (args.Discretization.MeshCode.compare("tri") == 0 ||
-			args.Discretization.MeshCode.compare("gmsh-tri") == 0 ||
-			args.Discretization.MeshCode.compare("gmsh-uns-tri") == 0 ||
-			args.Discretization.MeshCode.compare("quad") == 0 ||
-			args.Discretization.MeshCode.compare("gmsh-quad") == 0)
+		if (args.Problem.GeoCode.compare("segment") == 0)
+			args.Problem.Dimension = 1;
+		else if (args.Problem.GeoCode.compare("square") == 0 || args.Problem.GeoCode.compare("square4quadrants") == 0)
 			args.Problem.Dimension = 2;
-		else if (args.Discretization.MeshCode.compare("tetra") == 0 ||
-			args.Discretization.MeshCode.compare("gmsh-tetra") == 0)
+		else if (args.Problem.GeoCode.compare("cube") == 0)
 			args.Problem.Dimension = 3;
 #ifdef GMSH_ENABLED
-		else if (args.Discretization.MeshCode.compare("gmsh") == 0)
-			args.Problem.Dimension = GMSHMesh<2>::GetDimension(args.Discretization.MeshFilePath);
-#endif
 		else
-			argument_error("The dimension of the domain is missing. Please define it with option -d.");
+			args.Problem.Dimension = GMSHMesh<2>::GetDimension(args.Problem.GeoCode);
+#else
+		else
+			argument_error("Unknown geometry.");
+#endif
 	}
+
+	//------------------------------------------//
+	//               Heterogeneity              //
+	//------------------------------------------//
 
 	if (args.Problem.Dimension != 1 && args.Problem.RHSCode.compare("heterog") == 0)
 		argument_error("-rhs heterog is only supported in 1D.");
@@ -673,11 +738,11 @@ int main(int argc, char* argv[])
 		if (args.Problem.Dimension != 2)
 			argument_error("-rhs kellogg is only supported in 2D.");
 		if (args.Problem.Kappa1 != 1)
-			cout << "Warning: -heterog argument is ignored due to -rhs kellogg" << endl;
+			Utils::Warning("-heterog argument is ignored due to -rhs kellogg");
 		if (args.Problem.AnisotropyRatio != 1)
-			cout << "Warning: -haniso argument is ignored due to -rhs kellogg" << endl;
+			Utils::Warning("Warning: -haniso argument is ignored due to -rhs kellogg");
 		if (args.Problem.Partition.compare("chiasmus") != 0)
-			cout << "Warning: -partition argument is ignored due to -rhs kellogg" << endl;
+			Utils::Warning("Warning: -partition argument is ignored due to -rhs kellogg");
 
 		args.Problem.Partition = "chiasmus";
 		args.Problem.AnisotropyRatio = 1;
@@ -694,22 +759,37 @@ int main(int argc, char* argv[])
 	if (args.Discretization.Method.compare("hho") == 0 && args.Discretization.PolyDegree == 0)
 		argument_error("HHO does not exist with p = 0. Linear approximation at least (p >= 1).");
 
+	//------------------------------------------//
+	//                   Mesh                   //
+	//------------------------------------------//
+
 #ifndef GMSH_ENABLED
-	if (args.Discretization.MeshCode.find("gmsh") != string::npos)
+	if (args.Discretization.Mesher.compare("gmsh") == 0)
 		argument_error("GMSH is disabled. Recompile with the cmake option -DENABLE_GMSH=ON to use GMSH meshes, or choose another argument for -mesh.");
 #endif // GMSH_ENABLED
 
-	if ((args.Discretization.MeshCode.compare("tri") == 0 || args.Discretization.MeshCode.compare("gmsh-tri") == 0 || args.Discretization.MeshCode.compare("gmsh-uns-tri") == 0) && args.Problem.Dimension != 2)
-		argument_error("The triangular mesh in only available in 2D.");
+	if (args.Discretization.MeshCode.compare("default") == 0)
+	{
+		if (args.Problem.Dimension == 1)
+			args.Discretization.MeshCode = "cart";
+		else if (args.Problem.Dimension == 2)
+			args.Discretization.MeshCode = args.Discretization.Mesher.compare("inhouse") == 0 ? "stri" : "tri";
+		else if (args.Problem.Dimension == 3)
+			args.Discretization.MeshCode = args.Discretization.Mesher.compare("inhouse") == 0 ? "stetra" : "tetra";
+	}
 
-	if ((args.Discretization.MeshCode.compare("quad") == 0 || args.Discretization.MeshCode.compare("gmsh-quad") == 0) && args.Problem.Dimension != 2)
-		argument_error("The quadrilateral mesh in only available in 2D.");
+	if ((args.Discretization.MeshCode.compare("tri") == 0 || args.Discretization.MeshCode.compare("stri") == 0) && args.Problem.Dimension != 2)
+		argument_error("Triangular mesh in only available in 2D.");
 
-	if ((args.Discretization.MeshCode.compare("gmsh-tetra") == 0 || args.Discretization.MeshCode.compare("tetra") == 0) && args.Problem.Dimension != 3)
-		argument_error("The tetrahedral mesh in only available in 3D.");
+	if (args.Discretization.MeshCode.compare("quad") == 0 && args.Problem.Dimension != 2)
+		argument_error("Quadrilateral mesh in only available in 2D.");
 
-	if (args.Discretization.MeshCode.compare("gmsh") == 0 && args.Discretization.MeshFilePath.compare("") == 0)
-		argument_error("The GMSH file path is missing. Add the argument -file.");
+	if ((args.Discretization.MeshCode.compare("tetra") == 0 || args.Discretization.MeshCode.compare("stetra") == 0) && args.Problem.Dimension != 3)
+		argument_error("Tetrahedral mesh in only available in 3D.");
+
+	//------------------------------------------//
+	//                  Solver                  //
+	//------------------------------------------//
 
 	if (args.Solver.SolverCode.compare("default") == 0)
 	{
@@ -742,20 +822,22 @@ int main(int argc, char* argv[])
 	if ((args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("pcgmg") == 0) && args.Solver.MG.ProlongationCode == Prolongation::Wildey && !args.Solver.MG.UseGalerkinOperator)
 		argument_error("To use the prolongationCode " + to_string((unsigned)Prolongation::Wildey) + ", you must also use the Galerkin operator. To do so, add option -g 1.");
 	
+	//------------------------------------------//
+	//           Coarsening strategy            //
+	//------------------------------------------//
+
 	args.Solver.MG.CoarseningStgy = CoarseningStrategy::StandardCoarsening;
 	if (args.Solver.MG.CoarseningStgyCode.compare("default") == 0)
 	{
-		if (args.Discretization.MeshCode.find("gmsh") == 0)
+		if (   args.Discretization.MeshCode.compare("tri") == 0
+			|| args.Discretization.MeshCode.compare("quad") == 0
+			|| args.Discretization.MeshCode.compare("tetra") == 0)
 		{
-			if (args.Problem.Dimension == 2)
-				args.Solver.MG.CoarseningStgy = CoarseningStrategy::SplittingRefinement;
-			else if (args.Discretization.MeshCode.compare("gmsh-tetra") == 0)
+			if (args.Discretization.MeshCode.compare("tetra") == 0)
 				args.Solver.MG.CoarseningStgy = CoarseningStrategy::BeyRefinement;
-			else
-				args.Solver.MG.CoarseningStgy = CoarseningStrategy::SplittingRefinement;
+			else if (args.Discretization.Mesher.compare("gmsh") == 0)
+				args.Solver.MG.CoarseningStgy = CoarseningStrategy::GMSHSplittingRefinement;
 		}
-		else
-			args.Solver.MG.CoarseningStgy = CoarseningStrategy::StandardCoarsening;
 	}
 	else if (args.Solver.MG.CoarseningStgyCode.compare("s") == 0)
 		args.Solver.MG.CoarseningStgy = CoarseningStrategy::StandardCoarsening;
@@ -780,7 +862,7 @@ int main(int argc, char* argv[])
 	else if (args.Solver.MG.CoarseningStgyCode.compare("f") == 0)
 		args.Solver.MG.CoarseningStgy = CoarseningStrategy::FaceCoarsening;
 	else if (args.Solver.MG.CoarseningStgyCode.compare("r") == 0)
-		args.Solver.MG.CoarseningStgy = CoarseningStrategy::SplittingRefinement;
+		args.Solver.MG.CoarseningStgy = CoarseningStrategy::GMSHSplittingRefinement;
 	else if (args.Solver.MG.CoarseningStgyCode.compare("b") == 0)
 		args.Solver.MG.CoarseningStgy = CoarseningStrategy::BeyRefinement;
 	else
@@ -791,6 +873,10 @@ int main(int argc, char* argv[])
 
 	if ((args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("pcgmg") == 0) && args.Solver.MG.CoarseningStgy == CoarseningStrategy::IndependentRemeshing && args.Solver.MG.ProlongationCode != Prolongation::CellInterp_L2proj_Trace)
 		argument_error("The coarsening by independent remeshing is only applicable with the non-nested version of the multigrid (-prolong " + to_string((unsigned)Prolongation::CellInterp_L2proj_Trace) + ").");
+
+	//------------------------------------------//
+	//                 Actions                  //
+	//------------------------------------------//
 
 	args.Actions = Action::LogAssembly;
 	for (size_t i = 0; i < args.ActionCodes.length(); i++)

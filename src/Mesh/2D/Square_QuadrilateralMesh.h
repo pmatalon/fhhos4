@@ -147,10 +147,13 @@ public:
 	{
 		return "Quadrilateral " + to_string(this->Nx) + " x " + to_string(this->Ny);
 	}
-
 	string FileNamePart() override
 	{
-		return "n" + to_string(this->Nx);
+		return "square-quad-n" + to_string(this->Nx);
+	}
+	string GeometryDescription() override
+	{
+		return "Square";
 	}
 
 	double H() override

@@ -146,9 +146,9 @@ public:
 		currentLevel->Setup();
 
 		if (coarsestPossibleMeshReached)
-			cout << Utils::BeginYellow << "Warning: impossible to coarsen the mesh any more." << Utils::EndColor;
+			Utils::Warning("impossible to coarsen the mesh any more.");
 		if (noCoarserMeshProvided)
-			cout << Utils::BeginYellow << "Warning: cannot build coarser level because no coarser mesh has been provided." << Utils::EndColor;
+			Utils::Warning("cannot define a lower level because no coarser mesh has been provided.");
 
 		this->SetupCoarseSolver();
 
@@ -335,7 +335,7 @@ public:
 			os << "agglomeration by closest face center [-cs g]" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface)
 			os << "agglomeration by largest interface [-cs i]" << endl;
-		else if (CoarseningStgy == CoarseningStrategy::SplittingRefinement)
+		else if (CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
 			os << "GMSH refinement by splitting from coarse mesh [-cs r]" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::BeyRefinement)
 			os << "Bey's refinement from coarse mesh [-cs b]" << endl;

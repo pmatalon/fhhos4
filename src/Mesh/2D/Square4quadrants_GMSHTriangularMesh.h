@@ -2,12 +2,15 @@
 #include "../GMSHMesh.h"
 using namespace std;
 
-class Square_GMSHUnstructTriangularMesh : public GMSHMesh<2>
+class Square4quadrants_GMSHTriangularMesh : public GMSHMesh<2>
 {
 public:
-	Square_GMSHUnstructTriangularMesh(BigNumber n) 
-		: GMSHMesh("2D/square.geo", "GMSH unstructured triangular", "square-gmsh-tri", "Square", 1.0/n)
-	{}
+	Square4quadrants_GMSHTriangularMesh(BigNumber n) : GMSHMesh("2D/square4quadrants_stri.geo", 1.0/n)
+	{
+		this->_description = "GMSH structured triangular";
+		this->_fileNamePart = "square4quadrants-gmsh-stri";
+		this->_geometryDescription = "Square 4 quadrants";
+	}
 
 	void RefineMeshBySplitting() override
 	{

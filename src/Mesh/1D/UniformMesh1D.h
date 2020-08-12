@@ -62,10 +62,13 @@ public:
 	{
 		return "Uniform, " + to_string(this->N) + " subdivisions";
 	}
-
 	string FileNamePart()
 	{
 		return "n" + to_string(this->N);
+	}
+	string GeometryDescription()
+	{
+		return "1D unit segment";
 	}
 
 	double H()

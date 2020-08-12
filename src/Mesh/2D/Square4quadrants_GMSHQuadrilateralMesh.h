@@ -2,14 +2,14 @@
 #include "../GMSHMesh.h"
 using namespace std;
 
-class Square_GMSHCartesianMesh : public GMSHMesh<2>
+class Square4quadrants_GMSHQuadrilateralMesh : public GMSHMesh<2>
 {
 public:
-	Square_GMSHCartesianMesh() : GMSHMesh("2D/square_cart.geo")
+	Square4quadrants_GMSHQuadrilateralMesh() : GMSHMesh("2D/square4quadrants_quad.msh")
 	{
-		this->_description = "GMSH Cartesian";
-		this->_fileNamePart = "square-gmsh-cart";
-		this->_geometryDescription = "Square";
+		this->_description = "GMSH quadrilateral";
+		this->_fileNamePart = "square4quadrants-gmsh-quad";
+		this->_geometryDescription = "Square 4 quadrants";
 	}
 
 	void RefineMeshBySplitting() override

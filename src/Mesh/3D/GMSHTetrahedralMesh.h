@@ -9,8 +9,8 @@ public:
 	GMSHTetrahedralMesh(string mshFile) :
 		GMSHMesh(mshFile)
 	{}
-	GMSHTetrahedralMesh(string mshFile, string description, string fileNamePart) :
-		GMSHMesh(mshFile, description, fileNamePart)
+	GMSHTetrahedralMesh(string mshFile, string description, string fileNamePart, string geometryDescription) :
+		GMSHMesh(mshFile, description, fileNamePart, geometryDescription)
 	{}
 
 	string Description() override
@@ -33,8 +33,11 @@ public:
 		return GMSHMesh<3>::Regularity();
 	}
 protected:
-	GMSHTetrahedralMesh(string description, string fileNamePart) : GMSHMesh(description, fileNamePart)
-	{}
+	GMSHTetrahedralMesh(string description, string fileNamePart, string geometryDescription) 
+		: GMSHMesh(description, fileNamePart)
+	{
+		this->_geometryDescription = geometryDescription;
+	}
 
 public:
 	void RefineMeshBySplitting() override
@@ -50,7 +53,7 @@ public:
 		if (this->FineMesh)
 			assert(false && "Mesh already refined!");
 
-		if (strategy == CoarseningStrategy::SplittingRefinement)
+		if (strategy == CoarseningStrategy::GMSHSplittingRefinement)
 			this->RefineMeshBySplitting();
 		else if (strategy == CoarseningStrategy::BeyRefinement)
 			TetrahedralMesh::RefineMeshByBeyMethod();
@@ -61,6 +64,6 @@ public:
 protected:
 	virtual GMSHMesh<3>* CreateNewGMSHMesh() override
 	{
-		return new GMSHTetrahedralMesh(this->_description, this->_fileNamePart);
+		return new GMSHTetrahedralMesh(this->_description, this->_fileNamePart, this->_geometryDescription);
 	}
 };

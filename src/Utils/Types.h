@@ -30,7 +30,7 @@ enum class CoarseningStrategy : unsigned
 	AgglomerationCoarseningByVertexNeighbours,
 	IndependentRemeshing,
 	FaceCoarsening,
-	SplittingRefinement,
+	GMSHSplittingRefinement,
 	BeyRefinement
 };
 

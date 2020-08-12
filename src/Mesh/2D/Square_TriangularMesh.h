@@ -242,12 +242,15 @@ private:
 public:
 	string Description() override
 	{
-		return "Triangular " + to_string(this->Nx) + " x " + to_string(this->Ny);
+		return "Structured triangular " + to_string(this->Nx) + " x " + to_string(this->Ny);
 	}
-
 	string FileNamePart() override
 	{
-		return "tri-n" + to_string(this->Nx);
+		return "square-stri-n" + to_string(this->Nx);
+	}
+	string GeometryDescription() override
+	{
+		return "Square";
 	}
 
 	double H() override

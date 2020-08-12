@@ -29,7 +29,7 @@ public:
 			sprintf(res, "_heterog%g", this->_diffusionPartition->HeterogeneityRatio);
 			heterogeneityString = res;
 		}
-		this->_fileName = "Poisson" + to_string(Dim) + "D" + this->_rhsCode + heterogeneityString + "_" + this->_mesh->FileNamePart();
+		this->_fileName = "Diffusion" + to_string(Dim) + "D" + this->_rhsCode + heterogeneityString + "_" + this->_mesh->FileNamePart();
 	}
 
 	void PrintPhysicalProblem() override
@@ -56,7 +56,9 @@ public:
 			}
 		}
 
-		cout << "Analytical solution: ";
+		cout << "    Geometry           : " << this->_mesh->GeometryDescription() << endl;
+
+		cout << "    Analytical solution: ";
 		if (this->_rhsCode.compare("sine") == 0)
 			cout << "sine function";
 		else if (this->_rhsCode.compare("poly") == 0)

@@ -5,10 +5,11 @@ using namespace std;
 class Square_GMSHQuadrilateralMesh : public GMSHMesh<2>
 {
 public:
-	Square_GMSHQuadrilateralMesh() : GMSHMesh("2D/square4quadrants_quad.msh")
+	Square_GMSHQuadrilateralMesh() : GMSHMesh("2D/square_quad.geo")
 	{
 		this->_description = "GMSH quadrilateral";
-		this->_fileNamePart = "gmsh-quad";
+		this->_fileNamePart = "square-gmsh-quad";
+		this->_geometryDescription = "Square";
 	}
 
 	void RefineMeshBySplitting() override
