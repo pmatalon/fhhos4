@@ -67,6 +67,24 @@ public:
 		return symDifference;
 	}
 
+	static string FileName(const string& filePath)
+	{
+		return filePath.substr(filePath.find_last_of("/\\") + 1);
+	}
+	static string RemoveExtension(const string& fileName)
+	{
+		string::size_type const p(fileName.find_last_of('.'));
+		return fileName.substr(0, p);
+	}
+	static string FileNameWithoutExtension(const string& filePath)
+	{
+		return RemoveExtension(FileName(filePath));
+	}
+	static string Directory(const string& filePath)
+	{
+		return filePath.substr(0, filePath.find_last_of("/\\"));
+	}
+
 	static double Eps;
 	static double NumericalZero;
 

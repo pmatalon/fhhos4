@@ -5,8 +5,8 @@ using namespace std;
 class Square_GMSHUnstructTriangularMesh : public GMSHMesh<2>
 {
 public:
-	Square_GMSHUnstructTriangularMesh(BigNumber n) 
-		: GMSHMesh("2D/square.geo", "GMSH unstructured triangular", "square-gmsh-tri", "Square", 1.0/n)
+	Square_GMSHUnstructTriangularMesh(BigNumber n) :
+		GMSHMesh("2D/square_tri.geo", "GMSH unstructured triangular", "square-gmsh-tri", "Square", n)
 	{}
 
 	void RefineMeshBySplitting() override

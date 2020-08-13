@@ -1,6 +1,5 @@
 L = 1;
-N = 10;
-h = 1/N;
+// h is defined in the files that include this one
 
 // Corners
 Point(1) = {0, 0, 0, h};

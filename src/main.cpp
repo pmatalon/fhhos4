@@ -829,15 +829,10 @@ int main(int argc, char* argv[])
 	args.Solver.MG.CoarseningStgy = CoarseningStrategy::StandardCoarsening;
 	if (args.Solver.MG.CoarseningStgyCode.compare("default") == 0)
 	{
-		if (   args.Discretization.MeshCode.compare("tri") == 0
-			|| args.Discretization.MeshCode.compare("quad") == 0
-			|| args.Discretization.MeshCode.compare("tetra") == 0)
-		{
-			if (args.Discretization.MeshCode.compare("tetra") == 0)
-				args.Solver.MG.CoarseningStgy = CoarseningStrategy::BeyRefinement;
-			else if (args.Discretization.Mesher.compare("gmsh") == 0)
-				args.Solver.MG.CoarseningStgy = CoarseningStrategy::GMSHSplittingRefinement;
-		}
+		if (args.Discretization.MeshCode.compare("tetra") == 0)
+			args.Solver.MG.CoarseningStgy = CoarseningStrategy::BeyRefinement;
+		else if (args.Discretization.Mesher.compare("gmsh") == 0)
+			args.Solver.MG.CoarseningStgy = CoarseningStrategy::GMSHSplittingRefinement;
 	}
 	else if (args.Solver.MG.CoarseningStgyCode.compare("s") == 0)
 		args.Solver.MG.CoarseningStgy = CoarseningStrategy::StandardCoarsening;

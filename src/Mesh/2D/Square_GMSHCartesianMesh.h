@@ -5,12 +5,9 @@ using namespace std;
 class Square_GMSHCartesianMesh : public GMSHMesh<2>
 {
 public:
-	Square_GMSHCartesianMesh() : GMSHMesh("2D/square_cart.geo")
-	{
-		this->_description = "GMSH Cartesian";
-		this->_fileNamePart = "square-gmsh-cart";
-		this->_geometryDescription = "Square";
-	}
+	Square_GMSHCartesianMesh(BigNumber n) :
+		GMSHMesh("2D/square_cart.geo", "GMSH Cartesian", "square-gmsh-cart", "Square", n)
+	{}
 
 	void RefineMeshBySplitting() override
 	{

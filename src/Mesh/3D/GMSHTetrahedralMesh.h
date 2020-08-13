@@ -6,11 +6,11 @@ using namespace std;
 class GMSHTetrahedralMesh : public GMSHMesh<3>, public TetrahedralMesh
 {
 public:
-	GMSHTetrahedralMesh(string mshFile) :
-		GMSHMesh(mshFile)
+	GMSHTetrahedralMesh(string mshFile, BigNumber n = 0) :
+		GMSHMesh(mshFile, n)
 	{}
-	GMSHTetrahedralMesh(string mshFile, string description, string fileNamePart, string geometryDescription) :
-		GMSHMesh(mshFile, description, fileNamePart, geometryDescription)
+	GMSHTetrahedralMesh(string mshFile, string description, string fileNamePart, string geometryDescription, BigNumber n = 0) :
+		GMSHMesh(mshFile, description, fileNamePart, geometryDescription, n)
 	{}
 
 	string Description() override

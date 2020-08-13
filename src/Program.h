@@ -620,9 +620,9 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 {
 	string geoCode = args.Problem.GeoCode;
 	string mesher = args.Discretization.Mesher;
+	BigNumber n = args.Discretization.N;
 	BigNumber nx = args.Discretization.N;
 	BigNumber ny = args.Discretization.Ny == -1 ? args.Discretization.N : args.Discretization.Ny;
-	double h = 1.0 / args.Discretization.N;
 	string meshCode = args.Discretization.MeshCode;
 	double stretch = args.Discretization.Stretch;
 
@@ -658,28 +658,43 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 		{
 			if (meshCode.compare("cart") == 0)
 			{
-				Mesh<2>* coarseMesh = new Square_GMSHCartesianMesh();
-				fineMesh = coarseMesh->RefineUntilNElements(nx*ny, refinementStgy);
+				if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
+				{
+					Mesh<2>* coarseMesh = new Square_GMSHCartesianMesh(n < 16 ? 2 : 16);
+					fineMesh = coarseMesh->RefineUntilNElements(nx*ny, refinementStgy);
+				}
+				else
+					fineMesh = new Square_GMSHCartesianMesh(n);
 			}
 			else if (meshCode.compare("stri") == 0)
 			{
-				Mesh<2>* coarseMesh = new Square_GMSHTriangularMesh();
-				fineMesh = coarseMesh->RefineUntilNElements(2 * nx*ny, refinementStgy);
+				if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
+				{
+					Mesh<2>* coarseMesh = new Square_GMSHTriangularMesh(n < 16 ? 2 : 16);
+					fineMesh = coarseMesh->RefineUntilNElements(2 * nx*ny, refinementStgy);
+				}
+				else
+					fineMesh = new Square_GMSHTriangularMesh(n);
 			}
 			else if (meshCode.compare("tri") == 0)
 			{
 				if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
 				{
-					Mesh<2>* coarseMesh = new Square_GMSHUnstructTriangularMesh(8);
+					Mesh<2>* coarseMesh = new Square_GMSHUnstructTriangularMesh(n < 16 ? 2 : 16);
 					fineMesh = coarseMesh->RefineUntilNElements(2 * nx*ny, refinementStgy);
 				}
 				else
-					fineMesh = new Square_GMSHUnstructTriangularMesh(args.Discretization.N);
+					fineMesh = new Square_GMSHUnstructTriangularMesh(n);
 			}
 			else if (meshCode.compare("quad") == 0)
 			{
-				Mesh<2>* coarseMesh = new Square_GMSHQuadrilateralMesh();
-				fineMesh = coarseMesh->RefineUntilNElements(nx*ny, refinementStgy);
+				if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
+				{
+					Mesh<2>* coarseMesh = new Square_GMSHQuadrilateralMesh(n < 16 ? 2 : 16);
+					fineMesh = coarseMesh->RefineUntilNElements(nx*ny, refinementStgy);
+				}
+				else
+					fineMesh = new Square_GMSHQuadrilateralMesh(n);
 			}
 			else
 				Utils::FatalError("The requested mesh is not managed with this geometry.");
@@ -714,30 +729,45 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 #ifdef GMSH_ENABLED
 		else if (mesher.compare("gmsh") == 0)
 		{
-			if (meshCode.compare("tri") == 0)
+			if (meshCode.compare("cart") == 0)
 			{
 				if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
 				{
-					Mesh<2>* coarseMesh = new Square4quadrants_GMSHUnstructTriangularMesh();
+					Mesh<2>* coarseMesh = new Square4quadrants_GMSHCartesianMesh(n < 16 ? 2 : 16);
+					fineMesh = coarseMesh->RefineUntilNElements(nx*ny, refinementStgy);
+				}
+				else
+					fineMesh = new Square4quadrants_GMSHCartesianMesh(n);
+			}
+			else if (meshCode.compare("tri") == 0)
+			{
+				if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
+				{
+					Mesh<2>* coarseMesh = new Square4quadrants_GMSHUnstructTriangularMesh(n < 16 ? 2 : 16);
 					fineMesh = coarseMesh->RefineUntilNElements(2 * nx*ny, refinementStgy);
 				}
 				else
-					fineMesh = new Square4quadrants_GMSHUnstructTriangularMesh(args.Discretization.N);
+					fineMesh = new Square4quadrants_GMSHUnstructTriangularMesh(n);
 			}
 			else if (meshCode.compare("stri") == 0)
 			{
 				if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
 				{
-					Mesh<2>* coarseMesh = new Square4quadrants_GMSHTriangularMesh(4);
+					Mesh<2>* coarseMesh = new Square4quadrants_GMSHTriangularMesh(n < 16 ? 2 : 16);
 					fineMesh = coarseMesh->RefineUntilNElements(2 * nx*ny, refinementStgy);
 				}
 				else
-					fineMesh = new Square4quadrants_GMSHTriangularMesh(args.Discretization.N);
+					fineMesh = new Square4quadrants_GMSHTriangularMesh(n);
 			}
 			else if (meshCode.compare("quad") == 0)
 			{
-				Mesh<2>* coarseMesh = new Square4quadrants_GMSHQuadrilateralMesh();
-				fineMesh = coarseMesh->RefineUntilNElements(nx*ny, refinementStgy);
+				if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
+				{
+					Mesh<2>* coarseMesh = new Square4quadrants_GMSHQuadrilateralMesh(n < 16 ? 2 : 16);
+					fineMesh = coarseMesh->RefineUntilNElements(nx*ny, refinementStgy);
+				}
+				else
+					fineMesh = new Square4quadrants_GMSHQuadrilateralMesh(n);
 			}
 			else
 				Utils::FatalError("The requested mesh is not managed with this geometry.");
@@ -755,19 +785,14 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 			Utils::FatalError("The geometry is imported from a GMSH file, the mesher should be 'gmsh'. Use '-mesher gmsh' instead.");
 
 #ifdef GMSH_ENABLED
-		if (meshCode.compare("tri") == 0)
+		string filePath = geoCode;
+		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
 		{
-			string filePath = geoCode;
-			if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
-			{
-				Mesh<2>* coarseMesh = new GMSHMesh<2>(filePath);
-				fineMesh = coarseMesh->RefineUntilNElements(2 * nx*ny, refinementStgy);
-			}
-			else
-				fineMesh = new GMSHMesh<2>(filePath, h);
+			Mesh<2>* coarseMesh = new GMSHMesh<2>(filePath);
+			fineMesh = coarseMesh->RefineUntilNElements(2 * nx*ny, refinementStgy);
 		}
 		else
-			Utils::FatalError("When the geometry is imported from a GMSH file, only unstructured triangular meshing is allowed. Use '-mesh tri' instead.");
+			fineMesh = new GMSHMesh<2>(filePath, n);
 #endif // GMSH_ENABLED
 	}
 	
@@ -794,6 +819,7 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args)
 	string meshCode = args.Discretization.MeshCode;
 	CoarseningStrategy refinementStgy = args.Solver.MG.CoarseningStgy;
 
+	Mesh<3>* fineMesh = nullptr;
 	//------------------------//
 	//          Cube          //
 	//------------------------//
@@ -803,17 +829,14 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args)
 		{
 			if (meshCode.compare("cart") == 0)
 			{
-				Cube_CartesianMesh* fineMesh = new Cube_CartesianMesh(nx, ny, nz);
+				fineMesh = new Cube_CartesianMesh(nx, ny, nz);
 
 				assert(fineMesh->Elements.size() == nx * ny*nz);
 				if (nx == ny && ny == nz)
 					assert(fineMesh->Faces.size() == 3 * n*n*(n + 1));
-
-				return fineMesh;
 			}
 			else if (meshCode.compare("stetra") == 0)
 			{
-				Mesh<3>* fineMesh;
 				if (refinementStgy == CoarseningStrategy::StandardCoarsening)
 					fineMesh = new Cube_CartesianTetrahedralMesh(n);
 				else
@@ -825,8 +848,6 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args)
 				assert(fineMesh->Elements.size() == 6 * nx*ny*nz);
 				if (nx == ny && ny == nz)
 					assert(fineMesh->Faces.size() == 12 * n*n*n + 6 * n*n);
-
-				return fineMesh;
 			}
 			else if (meshCode.compare("tetra") == 0)
 				Utils::FatalError("The in-house mesher does not build unstructured meshes. Use '-mesh stetra' or '-mesher gmsh'.");
@@ -841,26 +862,32 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args)
 				if (nx != ny || nx != nz)
 					Utils::FatalError("Options -ny, -nz are not managed with this mesh");
 
-				Mesh<3>* coarseMesh = new Cube_GMSHCartesianMesh();
-				Mesh<3>* fineMesh = coarseMesh->RefineUntilNElements(n*n*n, refinementStgy);
+				if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
+				{
+					Mesh<3>* coarseMesh = new Cube_GMSHCartesianMesh(2);
+					fineMesh = coarseMesh->RefineUntilNElements(n*n*n, refinementStgy);
 
-				assert(fineMesh->Elements.size() == n * n*n);
-				assert(fineMesh->Faces.size() == 3 * n*n*(n + 1));
-
-				return fineMesh;
+					assert(fineMesh->Elements.size() == n * n*n);
+					assert(fineMesh->Faces.size() == 3 * n*n*(n + 1));
+				}
+				else
+					fineMesh = new Cube_GMSHCartesianMesh(n);
 			}
 			else if (meshCode.compare("tetra") == 0)
 			{
 				if (nx != ny || nx != nz)
 					Utils::FatalError("Options -ny, -nz are not managed with this mesh");
 
-				Mesh<3>* coarseMesh = new Cube_GMSHTetrahedralMesh();
-				Mesh<3>* fineMesh = coarseMesh->RefineUntilNElements(6 * n*n*n, refinementStgy);
+				if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement || args.Solver.MG.CoarseningStgy == CoarseningStrategy::BeyRefinement)
+				{
+					Mesh<3>* coarseMesh = new Cube_GMSHTetrahedralMesh(2);
+					fineMesh = coarseMesh->RefineUntilNElements(6 * n*n*n, refinementStgy);
 
-				assert(fineMesh->Elements.size() == 6 * n*n*n);
-				assert(fineMesh->Faces.size() == 12 * n*n*n + 6 * n*n);
-
-				return fineMesh;
+					assert(fineMesh->Elements.size() == 6 * n*n*n);
+					assert(fineMesh->Faces.size() == 12 * n*n*n + 6 * n*n);
+				}
+				else
+					fineMesh = new Cube_GMSHTetrahedralMesh(n);
 			}
 			else
 				Utils::FatalError("The requested mesh is not managed with this geometry.");
@@ -887,12 +914,15 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args)
 				coarseMesh = new GMSHTetrahedralMesh(filePath);
 			else
 				coarseMesh = new GMSHMesh<3>(filePath);
-			Mesh<3>* fineMesh = coarseMesh->RefineUntilNElements(6 * n*n*n, refinementStgy);
-			return fineMesh;
+			fineMesh = coarseMesh->RefineUntilNElements(6 * n*n*n, refinementStgy);
 		}
 		else
 			Utils::FatalError("When the geometry is imported from a GMSH file, only unstructured tetrahedral meshing is allowed. Use '-mesh tetra' instead.");
 #endif // GMSH_ENABLED
 	}
-	assert(false);
+
+	if (args.Solver.MG.CoarseningStgy != CoarseningStrategy::BeyRefinement && args.Solver.MG.CoarseningStgy != CoarseningStrategy::GMSHSplittingRefinement && fineMesh->CoarseMesh)
+		fineMesh->DeleteCoarseMeshes();
+
+	return fineMesh;
 }

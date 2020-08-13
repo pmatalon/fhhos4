@@ -36,21 +36,24 @@ protected:
 	map<size_t, MeshVertex<Dim>*> _vertexExternalNumbers;
 	double _h = -1;
 	double _regularity = 1;
+	BigNumber _N;
 public:
-	GMSHMesh(string mshFile, string description, string fileNamePart, double h = -1) 
+	GMSHMesh(string mshFile, string description, string fileNamePart, BigNumber n = 0) 
 		: PolyhedralMesh<Dim>()
 	{
 		_description = description;
 		_fileNamePart = fileNamePart;
-		_geometryDescription = mshFile;
+		_geometryDescription = Utils::FileNameWithoutExtension(mshFile);
+
+		_N = n;
 
 		mshFile = SearchFile(mshFile);
 		_gmshFilePath = mshFile;
 
 		bool tmpFileCreated = false;
-		if (h != -1)
+		if (n != 0)
 		{
-			mshFile = SetH(mshFile, h);
+			mshFile = SetN(mshFile, n);
 			tmpFileCreated = true;
 		}
 
@@ -58,7 +61,7 @@ public:
 		//gmsh::option::setNumber("General.Terminal", 1);
 		//gmsh::option::setNumber("General.Verbosity", 99);
 
-		if (h == -1)
+		if (n == 0)
 			cout << "Opening file " << mshFile << endl;
 
 		gmsh::open(mshFile);
@@ -69,13 +72,14 @@ public:
 			remove(mshFile.c_str());
 	}
 
-	GMSHMesh(string mshFile, string description, string fileNamePart, string geometryDescription, double h = -1)
-		: GMSHMesh(mshFile, description, fileNamePart, h)
+	GMSHMesh(string mshFile, string description, string fileNamePart, string geometryDescription, BigNumber N = 0) :
+		GMSHMesh(mshFile, description, fileNamePart, N)
 	{
 		_geometryDescription = geometryDescription;
 	}
 
-	GMSHMesh(string mshFile, double h = -1) : GMSHMesh(mshFile, "GMSH file", "gmsh-file", h)
+	GMSHMesh(string mshFile, BigNumber N = 0) : 
+		GMSHMesh(mshFile, "GMSH file", "gmsh-file", N)
 	{}
 protected:
 	GMSHMesh(string description, string fileNamePart) : PolyhedralMesh<Dim>()
@@ -90,6 +94,11 @@ protected:
 	void CreateFaces(int elemType, BigNumber& faceNumber) { }
 
 public:
+	BigNumber N()
+	{
+		return _N > 0 ? _N : (1/_h - 1);
+	}
+
 	static int GetDimension(string mshFile)
 	{
 		mshFile = SearchFile(mshFile);
@@ -107,56 +116,60 @@ private:
 		{
 			if (Utils::FileExists(Mesh<Dim>::MeshDirectory + mshFile))
 				mshFile = Mesh<Dim>::MeshDirectory + mshFile;
-			else if (Utils::FileExists(Mesh<Dim>::MeshDirectory + to_string(Dim) + "D/" + mshFile))
-				mshFile = Mesh<Dim>::MeshDirectory + to_string(Dim) + "D/" + mshFile;
+			else if (Utils::FileExists(Mesh<Dim>::MeshDirectory + "2D/" + mshFile))
+				mshFile = Mesh<Dim>::MeshDirectory + "2D/" + mshFile;
+			else if (Utils::FileExists(Mesh<Dim>::MeshDirectory + "3D/" + mshFile))
+				mshFile = Mesh<Dim>::MeshDirectory + "3D/" + mshFile;
 			else
 			{
 				Utils::Error("File not found: " + mshFile);
 				Utils::Error("File not found: " + Mesh<Dim>::MeshDirectory + mshFile);
-				Utils::FatalError("File not found: " + Mesh<Dim>::MeshDirectory + to_string(Dim) + "D/" + mshFile);
+				Utils::FatalError("File not found: " + Mesh<Dim>::MeshDirectory + "2D/" + mshFile);
+				Utils::FatalError("File not found: " + Mesh<Dim>::MeshDirectory + "3D/" + mshFile);
 			}
 		}
 		return mshFile;
 	}
 
-	static string SetH(string geoFile, double h)
+	static string SetN(string geoFile, BigNumber n)
 	{
-		string geoFileWithH = Mesh<Dim>::MeshDirectory + "temporary_set_h.geo";
-		ofstream gmshScriptWithH(geoFileWithH);
+		assert(n > 1);
+		string geoFileWithN = Utils::Directory(geoFile) + "/" + Utils::FileNameWithoutExtension(geoFile) + "_tmp_set_N.geo";
+		ofstream gmshScriptWithN(geoFileWithN);
 
 		cout << "Opening file " << geoFile << endl;
 		ifstream gmshScript(geoFile);
 
-		cout << "Setting h = " << h << endl;
-		if (!gmshScriptWithH.is_open())
+		cout << "Setting N = " << n << endl;
+		if (!gmshScriptWithN.is_open())
 		{
 			gmshScript.close();
-			Utils::FatalError("Unable to create temporary file " + geoFileWithH);
+			Utils::FatalError("Unable to create temporary file " + geoFileWithN);
 		}
 
-		bool hFound = false;
+		bool NFound = false;
 		string line;
 		while (getline(gmshScript, line))
 		{
-			if (line.find("h =") == 0 || line.find("h=") == 0)
+			if (line.find("N =") == 0 || line.find("N=") == 0)
 			{
-				hFound = true;
-				gmshScriptWithH << "h = " << h << ";\r" << endl;
+				NFound = true;
+				gmshScriptWithN << "N = " << n << ";\r" << endl;
 			}
 			else
-				gmshScriptWithH << line << endl;
+				gmshScriptWithN << line << endl;
 		}
 
 		gmshScript.close();
-		gmshScriptWithH.close();
+		gmshScriptWithN.close();
 
-		if (!hFound)
+		if (!NFound)
 		{
-			remove(geoFileWithH.c_str());
-			Utils::FatalError("No variable h declared in the file " + geoFile);
+			remove(geoFileWithN.c_str());
+			Utils::FatalError("No variable N declared in the file " + geoFile);
 		}
 
-		return geoFileWithH;
+		return geoFileWithN;
 	}
 
 	void Build()
@@ -373,7 +386,7 @@ private:
 
 		GMSHMesh<Dim>* fineMesh = this;
 
-		GMSHMesh<Dim>* coarseMesh = new GMSHMesh<Dim>(_gmshFilePath, _description, _fileNamePart, fineMesh->H() * 2);
+		GMSHMesh<Dim>* coarseMesh = new GMSHMesh<Dim>(_gmshFilePath, _description, _fileNamePart, fineMesh->N() / 2);
 		coarseMesh->ComesFrom.CS = CoarseningStrategy::IndependentRemeshing;
 
 		fineMesh->CoarseMesh = coarseMesh;

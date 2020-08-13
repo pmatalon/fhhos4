@@ -5,12 +5,9 @@ using namespace std;
 class Square4quadrants_GMSHTriangularMesh : public GMSHMesh<2>
 {
 public:
-	Square4quadrants_GMSHTriangularMesh(BigNumber n) : GMSHMesh("2D/square4quadrants_stri.geo", 1.0/n)
-	{
-		this->_description = "GMSH structured triangular";
-		this->_fileNamePart = "square4quadrants-gmsh-stri";
-		this->_geometryDescription = "Square 4 quadrants";
-	}
+	Square4quadrants_GMSHTriangularMesh(BigNumber n) : 
+		GMSHMesh("2D/square4quadrants_stri.geo", "GMSH structured triangular", "square4quadrants-gmsh-stri", "Square 4 quadrants", n / 2) // n/2 because it builds n subdivisions in each quadrant
+	{}
 
 	void RefineMeshBySplitting() override
 	{

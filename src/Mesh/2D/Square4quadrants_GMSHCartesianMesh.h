@@ -5,12 +5,9 @@ using namespace std;
 class Square4quadrants_GMSHCartesianMesh : public GMSHMesh<2>
 {
 public:
-	Square4quadrants_GMSHCartesianMesh() : GMSHMesh("2D/square4quadrants_cart.geo")
-	{
-		this->_description = "GMSH Cartesian";
-		this->_fileNamePart = "square4quadrants-gmsh-cart";
-		this->_geometryDescription = "Square 4 quadrants";
-	}
+	Square4quadrants_GMSHCartesianMesh(BigNumber n) : 
+		GMSHMesh("2D/square4quadrants_cart.geo", "GMSH Cartesian", "square4quadrants-gmsh-cart", "Square 4 quadrants", n/2) // n/2 because it builds n subdivisions in each quadrant
+	{}
 
 	void RefineMeshBySplitting() override
 	{
@@ -19,5 +16,4 @@ public:
 		this->FineMesh->ComesFrom.nFineFacesAddedByCoarseElement = 4;
 		this->FineMesh->ComesFrom.nFineFacesByKeptCoarseFace = 2;
 	}
-
 };

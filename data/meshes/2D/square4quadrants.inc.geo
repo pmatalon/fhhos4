@@ -1,8 +1,5 @@
-// Gmsh project created on Fri Dec 13 13:50:13 2019
-//SetFactory("OpenCASCADE");
 L = 1;
-N = 2;
-h = 1/N;
+// h is defined in the files that include this one
 
 // Corners
 Point(1) = {0, 0, 0, h};

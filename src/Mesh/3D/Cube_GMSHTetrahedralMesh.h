@@ -5,12 +5,13 @@ using namespace std;
 class Cube_GMSHTetrahedralMesh : public GMSHTetrahedralMesh
 {
 public:
-	Cube_GMSHTetrahedralMesh() :
-		GMSHTetrahedralMesh("3D/cube_tetra.geo", "GMSH unstructured tetrahedral", "gmsh-tetra", "Cube")
+	Cube_GMSHTetrahedralMesh(BigNumber n) :
+		GMSHTetrahedralMesh("3D/cube_tetra.geo", "GMSH unstructured tetrahedral", "gmsh-tetra", "Cube", n)
 	{}
 
 private:
-	Cube_GMSHTetrahedralMesh(string description, string fileNamePart, string geometryDescription) : GMSHTetrahedralMesh(description, fileNamePart, geometryDescription)
+	Cube_GMSHTetrahedralMesh(string description, string fileNamePart, string geometryDescription) : 
+		GMSHTetrahedralMesh(description, fileNamePart, geometryDescription)
 	{}
 
 protected:

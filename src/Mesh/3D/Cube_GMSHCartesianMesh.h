@@ -5,10 +5,12 @@ using namespace std;
 class Cube_GMSHCartesianMesh : public GMSHMesh<3>
 {
 public:
-	Cube_GMSHCartesianMesh() : GMSHMesh("3D/cube_cart.geo", "GMSH Cartesian", "gmsh-cart", "Cube")
+	Cube_GMSHCartesianMesh(BigNumber n) : 
+		GMSHMesh("3D/cube_cart.geo", "GMSH Cartesian", "gmsh-cart", "Cube", n)
 	{}
 private:
-	Cube_GMSHCartesianMesh(string description, string fileNamePart) : GMSHMesh(description, fileNamePart)
+	Cube_GMSHCartesianMesh(string description, string fileNamePart, string geometryDescription) :
+		GMSHMesh(description, fileNamePart, geometryDescription)
 	{}
 
 public:
@@ -23,6 +25,6 @@ public:
 protected:
 	virtual GMSHMesh<3>* CreateNewGMSHMesh() override
 	{
-		return new Cube_GMSHCartesianMesh(this->_description, this->_fileNamePart);
+		return new Cube_GMSHCartesianMesh(this->_description, this->_fileNamePart, this->_geometryDescription);
 	}
 };

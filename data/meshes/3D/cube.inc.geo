@@ -1,6 +1,5 @@
 L=1;
-N = 2;
-h = 1/N;
+// h is defined in the files that include this one
 
 Point (1) = {0, 0, 0, h};
 Point (2) = {L, 0, 0, h};
