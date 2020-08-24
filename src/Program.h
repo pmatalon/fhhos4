@@ -660,7 +660,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 			{
 				if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
 				{
-					Mesh<2>* coarseMesh = new Square_GMSHCartesianMesh(n < 16 ? 2 : 16);
+					Mesh<2>* coarseMesh = new Square_GMSHCartesianMesh(n <= 16 ? 2 : 16);
 					fineMesh = coarseMesh->RefineUntilNElements(nx*ny, refinementStgy);
 				}
 				else
@@ -670,7 +670,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 			{
 				if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
 				{
-					Mesh<2>* coarseMesh = new Square_GMSHTriangularMesh(n < 16 ? 2 : 16);
+					Mesh<2>* coarseMesh = new Square_GMSHTriangularMesh(n <= 16 ? 2 : 16);
 					fineMesh = coarseMesh->RefineUntilNElements(2 * nx*ny, refinementStgy);
 				}
 				else
@@ -680,7 +680,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 			{
 				if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
 				{
-					Mesh<2>* coarseMesh = new Square_GMSHUnstructTriangularMesh(n < 16 ? 2 : 16);
+					Mesh<2>* coarseMesh = new Square_GMSHUnstructTriangularMesh(n <= 16 ? 2 : 16);
 					fineMesh = coarseMesh->RefineUntilNElements(2 * nx*ny, refinementStgy);
 				}
 				else
@@ -690,7 +690,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 			{
 				if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
 				{
-					Mesh<2>* coarseMesh = new Square_GMSHQuadrilateralMesh(n < 16 ? 2 : 16);
+					Mesh<2>* coarseMesh = new Square_GMSHQuadrilateralMesh(n <= 16 ? 2 : 16);
 					fineMesh = coarseMesh->RefineUntilNElements(nx*ny, refinementStgy);
 				}
 				else
@@ -733,7 +733,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 			{
 				if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
 				{
-					Mesh<2>* coarseMesh = new Square4quadrants_GMSHCartesianMesh(n < 16 ? 2 : 16);
+					Mesh<2>* coarseMesh = new Square4quadrants_GMSHCartesianMesh(n <= 16 ? 4 : 16);
 					fineMesh = coarseMesh->RefineUntilNElements(nx*ny, refinementStgy);
 				}
 				else
@@ -743,7 +743,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 			{
 				if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
 				{
-					Mesh<2>* coarseMesh = new Square4quadrants_GMSHUnstructTriangularMesh(n < 16 ? 2 : 16);
+					Mesh<2>* coarseMesh = new Square4quadrants_GMSHUnstructTriangularMesh(n <= 16 ? 4 : 16);
 					fineMesh = coarseMesh->RefineUntilNElements(2 * nx*ny, refinementStgy);
 				}
 				else
@@ -753,7 +753,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 			{
 				if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
 				{
-					Mesh<2>* coarseMesh = new Square4quadrants_GMSHTriangularMesh(n < 16 ? 2 : 16);
+					Mesh<2>* coarseMesh = new Square4quadrants_GMSHTriangularMesh(n <= 16 ? 4 : 16);
 					fineMesh = coarseMesh->RefineUntilNElements(2 * nx*ny, refinementStgy);
 				}
 				else
@@ -763,7 +763,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 			{
 				if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
 				{
-					Mesh<2>* coarseMesh = new Square4quadrants_GMSHQuadrilateralMesh(n < 16 ? 2 : 16);
+					Mesh<2>* coarseMesh = new Square4quadrants_GMSHQuadrilateralMesh(n <= 16 ? 4 : 16);
 					fineMesh = coarseMesh->RefineUntilNElements(nx*ny, refinementStgy);
 				}
 				else

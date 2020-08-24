@@ -162,6 +162,7 @@
     <ClInclude Include="src\Mesh\1D\InterfacePoint.h" />
     <ClInclude Include="src\Mesh\2D\CartesianEdge.h" />
     <ClInclude Include="src\Mesh\2D\RectangularElement.h" />
+    <ClInclude Include="src\Mesh\PhysicalGroup.h" />
     <ClInclude Include="src\Mesh\PolyhedralMesh.h" />
     <ClInclude Include="src/Mesh/3D/RectangularFace.h" />
     <ClInclude Include="src/Mesh/Face.h" />

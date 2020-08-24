@@ -21,6 +21,8 @@ public:
 	BigNumber Number;
 	vector<Face<Dim>*> Faces;
 
+	int PhysicalGroupId = 0;
+
 	// Diffusion coefficient //
 	double Kappa = 1; // constant diffusion coefficient (deprecated but still used in DG)
 	Tensor<Dim>* DiffTensor = nullptr;

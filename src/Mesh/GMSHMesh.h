@@ -174,10 +174,21 @@ private:
 
 	void Build()
 	{
-		//gmsh::vectorpair dimTags;
-		//gmsh::model::getPhysicalGroups(dimTags, Dim);
+		//-----------------//
+		// Physical groups //
+		//-----------------//
 
+		gmsh::vectorpair phyGroupsDimTags;
+		gmsh::model::getPhysicalGroups(phyGroupsDimTags, Dim);
 
+		vector<PhysicalGroup> physicalGroups;
+		for (size_t i = 0; i < phyGroupsDimTags.size(); i++)
+		{
+			PhysicalGroup phyGroup(phyGroupsDimTags[i].second);
+			gmsh::model::getPhysicalName(Dim, phyGroup.Id, phyGroup.Name);
+			physicalGroups.push_back(phyGroup);
+		}
+		
 		//----------//
 		// Vertices //
 		//----------//
@@ -192,7 +203,7 @@ private:
 		// If .geo file, the mesh hasn't been generated
 		if (nodeTags.empty())
 		{
-			gmsh::model::mesh::generate(Dim);
+			gmsh::model::mesh::generate(Dim); // mesh generation
 			gmsh::model::mesh::getNodes(nodeTags, coord, parametricCoord, Dim, -1, includeBoundary, returnParametricCoord);
 			if (nodeTags.empty())
 			{
@@ -219,36 +230,61 @@ private:
 		//----------//
 
 		vector<int> elementTypes;
-		vector<vector<size_t>> elementTags;
-		vector<vector<size_t>> elemNodeTags;
-		gmsh::model::mesh::getElements(elementTypes, elementTags, elemNodeTags, Dim, -1);
-
 		BigNumber elemNumber = 0;
-		for (int i = 0; i < elementTypes.size(); i++)
+
+		// Get entities (surfaces in 2D, volumes in 3D). For simple geometries, entities corresponds to physical groups.
+		gmsh::vectorpair entitiesDimTags;
+		gmsh::model::getEntities(entitiesDimTags, Dim);
+		for (int k = 0; k < entitiesDimTags.size(); k++)
 		{
-			int elemType = elementTypes[i];
-			vector<size_t> elements = elementTags[i];
-			vector<size_t> elementNodes = elemNodeTags[i];
+			int entityTag = entitiesDimTags[k].second;
 
-			size_t elemNodeIndex = 0;
-			for (size_t j = 0; j < elements.size(); j++)
+			vector<int> physicalTags;
+			gmsh::model::getPhysicalGroupsForEntity(Dim, entityTag, physicalTags);
+			if (!physicalGroups.empty() && physicalTags.empty())
+				Utils::FatalError("Entity " + to_string(entityTag) + " has no physical group. Check GMSH file.");
+			if (physicalGroups.empty() && !physicalTags.empty())
+				Utils::FatalError("Entity " + to_string(entityTag) + " has a physical group although no physical group has been defined. This should never happen.");
+			if (physicalTags.size() > 1)
+				Utils::FatalError("Entity " + to_string(entityTag) + " must have only one physical group (" + to_string(physicalTags.size()) + " found). Check GMSH file.");
+			
+			int physicalGroupId = physicalGroups.empty() ? 0 : physicalTags[0];
+
+
+			// Get elements in this entity
+			elementTypes.clear();
+			vector<vector<size_t>> elementTags;
+			vector<vector<size_t>> elemNodeTags;
+			gmsh::model::mesh::getElements(elementTypes, elementTags, elemNodeTags, Dim, entityTag);
+
+			for (int i = 0; i < elementTypes.size(); i++)
 			{
-				Element<Dim>* e = CreateElement(elemType, elements[j], elementNodes, elemNodeIndex, elemNumber);
+				int elemType = elementTypes[i];
+				vector<size_t> elements = elementTags[i];
+				vector<size_t> elementNodes = elemNodeTags[i];
 
-				for (Vertex* v : e->Shape()->Vertices())
+				size_t elemNodeIndex = 0;
+				for (size_t j = 0; j < elements.size(); j++)
 				{
-					MeshVertex<Dim>* mv = (MeshVertex<Dim>*)v;
-					mv->Elements.push_back(e);
+					Element<Dim>* e = CreateElement(elemType, elements[j], elementNodes, elemNodeIndex, elemNumber);
+
+					e->PhysicalGroupId = physicalGroupId;
+
+					for (Vertex* v : e->Vertices())
+					{
+						MeshVertex<Dim>* mv = (MeshVertex<Dim>*)v;
+						mv->Elements.push_back(e);
+					}
+
+					this->Elements.push_back(e);
+					elemNumber++;
+
+					if (e->Diameter() > this->_h)
+						this->_h = e->Diameter();
+
+					if (e->Regularity() < this->_regularity)
+						this->_regularity = e->Regularity();
 				}
-
-				this->Elements.push_back(e);
-				elemNumber++;
-
-				if (e->Diameter() > this->_h)
-					this->_h = e->Diameter();
-
-				if (e->Regularity() < this->_regularity)
-					this->_regularity = e->Regularity();
 			}
 		}
 

@@ -1,4 +1,4 @@
-L = 1;
+L = 1; // size of the square
 // h is defined in the files that include this one
 
 // Corners
@@ -40,3 +40,9 @@ Plane Surface(1) = {1};
 Plane Surface(2) = {2};
 Plane Surface(3) = {3};
 Plane Surface(4) = {4};
+
+// Define physical surfaces
+Physical Surface("quadrantBottomLeft")  = {1};
+Physical Surface("quadrantBottomRight") = {2};
+Physical Surface("quadrantTopRight")    = {3};
+Physical Surface("quadrantTopLeft")     = {4};

@@ -2,6 +2,7 @@
 #include <vector>
 #include "Element.h"
 #include "Face.h"
+#include "PhysicalGroup.h"
 #include "../Utils/ParallelLoop.h"
 #include "../Utils/MatlabScript.h"
 using namespace std;
@@ -398,6 +399,8 @@ public:
 				for (Element<Dim>* fe : this->Elements)
 				{
 					assert(fe->CoarserElement != nullptr);
+
+					assert(fe->PhysicalGroupId == fe->CoarserElement->PhysicalGroupId);
 
 					bool feIsReferenced = false;
 					for (Element<Dim>* e : fe->CoarserElement->FinerElements)
