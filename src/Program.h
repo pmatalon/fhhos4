@@ -87,8 +87,8 @@ public:
 		//   Analytical solution and source function   //
 		//---------------------------------------------//
 
-		DomFunction exactSolution = NULL;
-		SourceFunction* sourceFunction;
+		DomFunction exactSolution = nullptr;
+		DomFunction sourceFunction = nullptr;
 
 		if (Dim == 1)
 		{
@@ -102,7 +102,11 @@ public:
 						return sin(4 * M_PI * x) / (16 * pow(M_PI, 2));
 					};
 				}
-				sourceFunction = new SourceFunction1D([](double x) { return sin(4 * M_PI * x); });
+				sourceFunction = [](DomPoint p)
+				{
+					double x = p.X;
+					return sin(4 * M_PI * x);
+				};
 			}
 			else if (args.Problem.RHSCode.compare("poly") == 0)
 			{
@@ -114,7 +118,7 @@ public:
 						return x * (1 - x);
 					};
 				}
-				sourceFunction = new SourceFunction1D([](double x) { return 2; });
+				sourceFunction = [](DomPoint p) { return 2; };
 			}
 			else if (args.Problem.RHSCode.compare("heterog") == 0)
 			{
@@ -131,7 +135,7 @@ public:
 					else
 						return 4 * a2 * pow(x - 1, 2) + 2 * b2 * (x - 1);
 				};
-				sourceFunction = new SourceFunction1D([&diffusionPartition](double x) { return 4; });
+				sourceFunction = [&diffusionPartition](DomPoint p) { return 4; };
 			}
 			else
 				Utils::FatalError("'" + args.Problem.RHSCode + "' is unknown or not implemented in 1D. Check -rhs argument.");
@@ -151,7 +155,12 @@ public:
 						return 2 / (a + b) * sin(4 * M_PI * x)*sin(4 * M_PI * y);
 					};
 				}
-				sourceFunction = new SourceFunction2D([](double x, double y) { return 2 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y); });
+				sourceFunction = [](DomPoint p)
+				{
+					double x = p.X;
+					double y = p.Y;
+					return 2 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y);
+				};
 			}
 			else if (args.Problem.RHSCode.compare("poly") == 0)
 			{
@@ -164,7 +173,12 @@ public:
 						return x * (1 - x) * y*(1 - y);
 					};
 				}
-				sourceFunction = new SourceFunction2D([](double x, double y) { return 2 * (y*(1 - y) + x * (1 - x)); });
+				sourceFunction = [](DomPoint p)
+				{
+					double x = p.X;
+					double y = p.Y;
+					return 2 * (y*(1 - y) + x * (1 - x));
+				};
 			}
 			else if (args.Problem.RHSCode.compare("exp") == 0)
 			{
@@ -177,7 +191,12 @@ public:
 						return exp(x*y*y);
 					};
 				}
-				sourceFunction = new SourceFunction2D([](double x, double y) { return (-pow(y,4) - 2*x*(1+2*x*y*y))*exp(x*y*y); });
+				sourceFunction = [](DomPoint p)
+				{
+					double x = p.X;
+					double y = p.Y;
+					return (-pow(y,4) - 2*x*(1+2*x*y*y))*exp(x*y*y);
+				};
 			}
 			else if (args.Problem.RHSCode.compare("one") == 0)
 			{
@@ -185,7 +204,7 @@ public:
 				{
 					exactSolution = [](DomPoint p) { return 1; };
 				}
-				sourceFunction = new SourceFunction2D([](double x, double y) { return 0; });
+				sourceFunction = [](DomPoint p) { return 0; };
 			}
 			else if (args.Problem.RHSCode.compare("zero") == 0)
 			{
@@ -193,7 +212,7 @@ public:
 				{
 					exactSolution = [](DomPoint p) { return 0; };
 				}
-				sourceFunction = new SourceFunction2D([](double x, double y) { return 0; });
+				sourceFunction = [](DomPoint p) { return 0; };
 			}
 			else if (args.Problem.RHSCode.compare("x") == 0)
 			{
@@ -201,7 +220,7 @@ public:
 				{
 					exactSolution = [](DomPoint p) { return p.X; };
 				}
-				sourceFunction = new SourceFunction2D([](double x, double y) { return 0; });
+				sourceFunction = [](DomPoint p) { return 0; };
 			}
 			else if (args.Problem.RHSCode.compare("kellogg") == 0)
 			{
@@ -246,7 +265,7 @@ public:
 						assert(false);
 					};
 				}
-				sourceFunction = new SourceFunction2D([](double x, double y) { return 0; });
+				sourceFunction = [](DomPoint p) { return 0; };
 			}
 			else
 				Utils::FatalError("'" + args.Problem.RHSCode + "' is unknown or not implemented in 2D. Check -rhs argument.");
@@ -265,7 +284,13 @@ public:
 						return sin(4 * M_PI * x)*sin(4 * M_PI * y)*sin(4 * M_PI * z);
 					};
 				}
-				sourceFunction = new SourceFunction3D([](double x, double y, double z) {  return 3 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y)*sin(4 * M_PI * z); });
+				sourceFunction = [](DomPoint p)
+				{
+					double x = p.X;
+					double y = p.Y;
+					double z = p.Z;
+					return 3 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y)*sin(4 * M_PI * z);
+				};
 			}
 			else if (args.Problem.RHSCode.compare("poly") == 0)
 			{
@@ -279,7 +304,13 @@ public:
 						return x * (1 - x)*y*(1 - y)*z*(1 - z);
 					};
 				}
-				sourceFunction = new SourceFunction3D([](double x, double y, double z) { return 2 * ((y*(1 - y)*z*(1 - z) + x * (1 - x)*z*(1 - z) + x * (1 - x)*y*(1 - y))); });
+				sourceFunction = [](DomPoint p)
+				{
+					double x = p.X;
+					double y = p.Y;
+					double z = p.Z;
+					return 2 * ((y*(1 - y)*z*(1 - z) + x * (1 - x)*z*(1 - z) + x * (1 - x)*y*(1 - y)));
+				};
 			}
 			else if (args.Problem.RHSCode.compare("exp") == 0)
 			{
@@ -293,7 +324,13 @@ public:
 						return exp(x*y*y*z*z*z);
 					};
 				}
-				sourceFunction = new SourceFunction3D([](double x, double y, double z) { return -(pow(y, 4)*pow(z, 6) + 2 * x*pow(z, 3) + 4 * x*x*y*y*pow(z, 6) + 6 * x*y*y*z + 9 * x*x*pow(y, 4)*pow(z, 4))*exp(x*y*y*z*z*z); });
+				sourceFunction = [](DomPoint p)
+				{
+					double x = p.X;
+					double y = p.Y;
+					double z = p.Z;
+					return -(pow(y, 4)*pow(z, 6) + 2 * x*pow(z, 3) + 4 * x*x*y*y*pow(z, 6) + 6 * x*y*y*z + 9 * x*x*pow(y, 4)*pow(z, 4))*exp(x*y*y*z*z*z);
+				};
 			}
 			else
 				Utils::FatalError("'" + args.Problem.RHSCode + "' is unknown or not implemented in 3D. Check -rhs argument.");
@@ -468,7 +505,6 @@ public:
 		//--------------------------//
 		
 		delete mesh;
-		delete sourceFunction;
 		if (args.Discretization.Method.compare("dg") == 0)
 		{
 			Diffusion_DG<Dim>* dgPb = static_cast<Diffusion_DG<Dim>*>(problem);

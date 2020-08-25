@@ -19,7 +19,7 @@ public:
 	Vector ReconstructedSolution;
 	Vector GlobalHybridSolution;
 
-	Diffusion_HHO(Mesh<Dim>* mesh, string rhsCode, SourceFunction* sourceFunction, HHOParameters<Dim>* hho, bool staticCondensation, DiffusionPartition<Dim>* diffusionPartition, BoundaryConditions* bc, string outputDirectory)
+	Diffusion_HHO(Mesh<Dim>* mesh, string rhsCode, DomFunction sourceFunction, HHOParameters<Dim>* hho, bool staticCondensation, DiffusionPartition<Dim>* diffusionPartition, BoundaryConditions* bc, string outputDirectory)
 		: DiffusionProblem<Dim>(mesh, diffusionPartition, rhsCode, sourceFunction, bc, outputDirectory)
 	{	
 		this->HHO = hho;

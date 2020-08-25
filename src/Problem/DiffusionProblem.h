@@ -10,11 +10,11 @@ class DiffusionProblem : public Problem<Dim>
 protected:
 	DiffusionPartition<Dim>* _diffusionPartition;
 	string _rhsCode;
-	SourceFunction* _sourceFunction;
+	DomFunction _sourceFunction;
 	BoundaryConditions* _boundaryConditions;
 public:
 
-	DiffusionProblem(Mesh<Dim>* mesh, DiffusionPartition<Dim>* diffusionPartition, string rhsCode, SourceFunction* sourceFunction, BoundaryConditions* bc, string outputDirectory)
+	DiffusionProblem(Mesh<Dim>* mesh, DiffusionPartition<Dim>* diffusionPartition, string rhsCode, DomFunction sourceFunction, BoundaryConditions* bc, string outputDirectory)
 		: Problem<Dim>(mesh, outputDirectory)
 	{
 		this->_diffusionPartition = diffusionPartition;

@@ -383,11 +383,11 @@ public:
 		return Integral(errorFunction);
 	}
 
-	double SourceTerm(BasisFunction<Dim>* phi, SourceFunction* f)
+	double SourceTerm(BasisFunction<Dim>* phi, DomFunction f)
 	{
 		RefFunction sourceTimesBasisFunction = [this, f, phi](RefPoint refElementPoint) {
 			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
-			return f->Eval(domainPoint) * phi->Eval(refElementPoint);
+			return f(domainPoint) * phi->Eval(refElementPoint);
 		};
 
 		return Integral(sourceTimesBasisFunction);
