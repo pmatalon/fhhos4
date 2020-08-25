@@ -341,6 +341,8 @@ int main(int argc, char* argv[])
 	Mesh<2>::MeshDirectory = meshDirectory;
 	Mesh<3>::MeshDirectory = meshDirectory;
 
+	bool defaultCycle = true;
+
 	ProgramArguments args;
 
 	enum {
@@ -579,6 +581,7 @@ int main(int argc, char* argv[])
 
 			case OPT_MGCycle:
 			{
+				defaultCycle = false;
 				string s(optarg);
 				regex pattern("^([vwkVWK]),([[:digit:]]+),([[:digit:]]+)(,([*+-])([[:digit:]]+))?$");
 				smatch matches;
@@ -826,13 +829,16 @@ int main(int argc, char* argv[])
 	//           Coarsening strategy            //
 	//------------------------------------------//
 
-	args.Solver.MG.CoarseningStgy = CoarseningStrategy::StandardCoarsening;
 	if (args.Solver.MG.CoarseningStgyCode.compare("default") == 0)
 	{
-		if (args.Discretization.MeshCode.compare("tetra") == 0)
+		if (args.Problem.Dimension == 2 && args.Solver.MG.ProlongationCode == Prolongation::CellInterp_L2proj_Trace)
+			args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours;
+		else if (args.Discretization.MeshCode.compare("tetra") == 0)
 			args.Solver.MG.CoarseningStgy = CoarseningStrategy::BeyRefinement;
 		else if (args.Discretization.Mesher.compare("gmsh") == 0)
 			args.Solver.MG.CoarseningStgy = CoarseningStrategy::GMSHSplittingRefinement;
+		else
+			args.Solver.MG.CoarseningStgy = CoarseningStrategy::StandardCoarsening;
 	}
 	else if (args.Solver.MG.CoarseningStgyCode.compare("s") == 0)
 		args.Solver.MG.CoarseningStgy = CoarseningStrategy::StandardCoarsening;
@@ -868,6 +874,13 @@ int main(int argc, char* argv[])
 
 	if ((args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("pcgmg") == 0) && args.Solver.MG.CoarseningStgy == CoarseningStrategy::IndependentRemeshing && args.Solver.MG.ProlongationCode != Prolongation::CellInterp_L2proj_Trace)
 		argument_error("The coarsening by independent remeshing is only applicable with the non-nested version of the multigrid (-prolong " + to_string((unsigned)Prolongation::CellInterp_L2proj_Trace) + ").");
+
+
+	if (defaultCycle)
+	{
+		args.Solver.MG.PreSmoothingIterations = 0;
+		args.Solver.MG.PostSmoothingIterations = args.Problem.Dimension == 3 ? 5 : 3;
+	}
 
 	//------------------------------------------//
 	//                 Actions                  //

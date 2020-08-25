@@ -319,6 +319,10 @@ public:
 
 		mesh->SetBoundaryConditions(&bc);
 
+		//---------------------------//
+		//   Coarsening unit tests   //
+		//---------------------------//
+
 		if ((args.Actions & Action::UnitTests) == Action::UnitTests)
 		{
 			if (args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("cgmg") == 0 || args.Solver.SolverCode.compare("fcgmg") == 0)
