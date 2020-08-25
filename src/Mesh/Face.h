@@ -79,6 +79,20 @@ public:
 		return this->Shape()->HasVertex(v, compareCoordinates);
 	}
 
+	// Transformation to reference element
+	virtual DomPoint ConvertToDomain(RefPoint refPoint) const
+	{
+		return Shape()->ConvertToDomain(refPoint);
+	}
+	virtual RefPoint ConvertToReference(DomPoint domainPoint) const
+	{
+		return Shape()->ConvertToReference(domainPoint);
+	}
+
+	//---------------------------------------//
+	//   Relations to other faces/elements   //
+	//---------------------------------------//
+
 	bool HasSameVertices(Face<Dim>* other, bool compareCoordinates = false)
 	{
 		return this->Shape()->HasSameVertices(other->Shape(), compareCoordinates);
@@ -172,30 +186,6 @@ public:
 
 	virtual Face<Dim>* CreateSameGeometricFace(BigNumber number, Element<Dim>* element1) = 0;
 
-	// Transformation to reference element
-	virtual DomPoint ConvertToDomain(RefPoint refPoint) const
-	{
-		return Shape()->ConvertToDomain(refPoint);
-	}
-	virtual RefPoint ConvertToReference(DomPoint domainPoint) const
-	{
-		return Shape()->ConvertToReference(domainPoint);
-	}
-
-	// Integral
-	virtual double Integral(RefFunction func) const
-	{
-		return Shape()->Integral(func);
-	}
-	virtual double Integral(RefFunction func, int polynomialDegree) const
-	{
-		return Shape()->Integral(func, polynomialDegree);
-	}
-
-	//---------------------------------------//
-	//   Relations to other faces/elements   //
-	//---------------------------------------//
-
 	bool IsBetween(Element<Dim>* element1, Element<Dim>* element2)
 	{
 		if (element1 == element2 && (element1 == this->Element1 || element1 == this->Element2))
@@ -229,6 +219,19 @@ public:
 	bool HasBeenCoarsened()
 	{
 		return this->CoarseFace->FinerFaces.size() > 1;
+	}
+
+	//------------------------//
+	//        Integral        //
+	//------------------------//
+
+	virtual double Integral(RefFunction func) const
+	{
+		return Shape()->Integral(func);
+	}
+	virtual double Integral(RefFunction func, int polynomialDegree) const
+	{
+		return Shape()->Integral(func, polynomialDegree);
 	}
 
 	//-----------------------------//

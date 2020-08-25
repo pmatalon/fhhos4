@@ -101,7 +101,8 @@ DomPoint Middle(Vertex* A, Vertex* B)
 template<int Dim>
 bool AreCollinear(DimVector<Dim> v1, DimVector<Dim> v2)
 {
-	return abs(abs(v1.dot(v2)) - v1.norm()*v2.norm()) < 1e-14;
+	double v1_norm_v2_norm = v1.norm()*v2.norm();
+	return abs(abs(v1.dot(v2)) - v1_norm_v2_norm) / v1_norm_v2_norm < 1e-12;
 }
 
 template<int Dim>

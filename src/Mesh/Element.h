@@ -156,13 +156,10 @@ public:
 	vector<Face<Dim>*> InterfaceWith(Element<Dim>* other)
 	{
 		vector<Face<Dim>*> faces;
-		for (Face<Dim>* f1 : this->Faces)
+		for (Face<Dim>* f : this->Faces)
 		{
-			for (Face<Dim>* f2 : other->Faces)
-			{
-				if (f1 == f2)
-					faces.push_back(f1);
-			}
+			if (find(other->Faces.begin(), other->Faces.end(), f) != other->Faces.end())
+				faces.push_back(f);
 		}
 		return faces;
 	}
@@ -170,6 +167,17 @@ public:
 	vector<Face<Dim>*> NonCommonFacesWith(Element<Dim>* other)
 	{
 		return Utils::SymmetricDifference<Face<Dim>*>(this->Faces, other->Faces);
+	}
+
+	vector<Face<Dim>*> BoundaryFaces()
+	{
+		vector<Face<Dim>*> faces;
+		for (Face<Dim>* f : this->Faces)
+		{
+			if (f->IsDomainBoundary)
+				faces.push_back(f);
+		}
+		return faces;
 	}
 
 	bool HasFace(Face<Dim>* face)

@@ -396,18 +396,48 @@ private:
 			// Any other failing status, abort the collapsing.
 		}
 
-		/*if (e->IsOnBoundary())
-		{
-			// TODO agglomerate (at least) collinear faces
-		}*/
+		if (e->IsOnBoundary())
+			FaceCollapsingStatus status = TryCollapseBoundaryFaces(e);
 	}
 
 	FaceCollapsingStatus TryCollapseInterfaceBetween(Element<Dim>* e1, Element<Dim>* e2)
 	{
 		vector<Face<Dim>*> interfaceFaces = e1->InterfaceWith(e2);
-		if (interfaceFaces.size() > 1)
+
+		if (interfaceFaces.size() == 1)
+			return FaceCollapsingStatus::Ok;
+
+		if (e1->PhysicalGroupId == e2->PhysicalGroupId)
 			return TryCollapse(interfaceFaces);
+		else
+		{
+			// Collapse only collinear faces
+			Interface<Dim> interf(interfaceFaces);
+			CollapseCoplanarFaces(interf);
+			return FaceCollapsingStatus::Ok;
+		}
+	}
+
+	FaceCollapsingStatus TryCollapseBoundaryFaces(Element<Dim>* e)
+	{
+		vector<Face<Dim>*> boundaryFaces = e->BoundaryFaces();
+		if (boundaryFaces.size() < 2)
+			return FaceCollapsingStatus::Ok;
+
+		// Collapse only collinear faces
+		Interface<Dim> interf(boundaryFaces);
+		CollapseCoplanarFaces(interf);
 		return FaceCollapsingStatus::Ok;
+	}
+
+	void CollapseCoplanarFaces(Interface<Dim>& interf)
+	{
+		list<set<Face<Dim>*>> coplanarSubsets = interf.CoplanarSubsets();
+		for (set<Face<Dim>*> subset : coplanarSubsets)
+		{
+			Interface<Dim> subInterf(vector<Face<Dim>*>(subset.begin(), subset.end()));
+			ReplaceFaces(subInterf.Faces(), subInterf.CollapsedFace());
+		}
 	}
 
 

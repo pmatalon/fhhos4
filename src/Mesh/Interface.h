@@ -55,6 +55,14 @@ public:
 	{
 		return _faces;
 	}
+
+	bool IsPhysicalBoundary()
+	{
+		if (_faces[0]->IsDomainBoundary)
+			return true;
+		return _faces[0]->Element1->PhysicalGroupId != _faces[0]->Element2->PhysicalGroupId;
+	}
+
 	inline map<Vertex*, set<Face<Dim>*>> MapVertexFaces()
 	{
 		return _mapVertexFaces;
@@ -169,6 +177,66 @@ private:
 			}
 		}
 		return FaceCollapsingStatus::Ok;
+	}
+
+public:
+	list<set<Face<Dim>*>> CoplanarSubsets()
+	{
+		assert(Dim == 2);
+
+		list<set<Face<Dim>*>> subsets;
+
+		for (Vertex* v : _interiorVertices)
+		{
+			auto it = _mapVertexFaces[v].begin();
+			Face<Dim>* f1 = *it; it++;
+			Face<Dim>* f2 = *it;
+			vector<Vertex*> f1Vertices = f1->Vertices();
+			vector<Vertex*> f2Vertices = f2->Vertices();
+
+			DimVector<2> v1 = Vect<2>(f1Vertices[0], f1Vertices[1]);
+			DimVector<2> v2 = Vect<2>(f2Vertices[0], f2Vertices[1]);
+			if (AreCollinear(v1, v2))
+				subsets.push_back({ f1, f2 });
+		}
+
+		// Iterate over the pairs of collinear faces
+		for (auto itSubset1 = subsets.begin(); itSubset1 != subsets.end(); itSubset1++)
+		{
+			set<Face<Dim>*>& subset1 = *itSubset1;
+			
+			// Iterate over the current subsets to see if it can be put into one
+			for (auto itSubset2 = subsets.begin(); itSubset2 != subsets.end(); )
+			{
+				if (itSubset1 == itSubset2)
+				{
+					itSubset2++;
+					continue;
+				}
+
+				set<Face<Dim>*> subset2 = *itSubset2;
+				bool areDisjoint = true;
+				for (auto it = subset2.begin(); it != subset2.end(); )
+				{
+					if (subset1.find(*it) != subset1.end())
+					{
+						areDisjoint = false;
+						break;
+					}
+					it++;
+				}
+
+				if (!areDisjoint)
+				{
+					subset1.insert(subset2.begin(), subset2.end()); // merge
+					itSubset2 = subsets.erase(itSubset2);
+				}
+				else
+					itSubset2++;
+			}
+		}
+
+		return subsets;
 	}
 
 private:
