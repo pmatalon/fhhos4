@@ -19,8 +19,8 @@ public:
 	Vector ReconstructedSolution;
 	Vector GlobalHybridSolution;
 
-	Diffusion_HHO(Mesh<Dim>* mesh, string rhsCode, DomFunction sourceFunction, HHOParameters<Dim>* hho, bool staticCondensation, DiffusionPartition<Dim>* diffusionPartition, BoundaryConditions* bc, string outputDirectory)
-		: DiffusionProblem<Dim>(mesh, diffusionPartition, rhsCode, sourceFunction, bc, outputDirectory)
+	Diffusion_HHO(Mesh<Dim>* mesh, TestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool staticCondensation, string outputDirectory)
+		: DiffusionProblem<Dim>(mesh, testCase, outputDirectory)
 	{	
 		this->HHO = hho;
 		this->_staticCondensation = staticCondensation;
@@ -40,7 +40,7 @@ public:
 	Diffusion_HHO<Dim>* GetProblemOnCoarserMesh()
 	{
 		HHOParameters<Dim>* coarseHHO = new HHOParameters<Dim>(this->_mesh->CoarseMesh, HHO->Stabilization, HHO->ReconstructionBasis, HHO->CellBasis, HHO->FaceBasis);
-		return new Diffusion_HHO<Dim>(this->_mesh->CoarseMesh, this->_rhsCode, this->_sourceFunction, coarseHHO, _staticCondensation, this->_diffusionPartition, this->_boundaryConditions, this->_outputDirectory);
+		return new Diffusion_HHO<Dim>(this->_mesh->CoarseMesh, this->_testCase, coarseHHO, _staticCondensation, this->_outputDirectory);
 	}
 
 	double L2Error(DomFunction exactSolution) override
@@ -58,7 +58,9 @@ public:
 
 		double constant = ConvergenceHiddenConstant(k);
 		double upperBound;
-		if ((this->_rhsCode.compare("sine") == 0 || this->_rhsCode.compare("poly") == 0 || this->_rhsCode.compare("zero") == 0) && this->_diffusionPartition->IsHomogeneous) // solution is H^{r+2} with r in <= k
+		if ((  this->_testCase->Code().compare("sine") == 0
+			|| this->_testCase->Code().compare("poly") == 0
+			|| this->_testCase->Code().compare("zero") == 0) && this->_diffusionPartition->IsHomogeneous) // solution is H^{r+2} with r in <= k
 		{
 			double r = k;
 			if (k == 0)
@@ -66,7 +68,7 @@ public:
 			else
 				upperBound = constant * pow(h, r + 2);
 		}
-		else if (this->_rhsCode.compare("kellogg") == 0) // solution is H^{1+eps}
+		else if (this->_testCase->Code().compare("kellogg") == 0) // solution is H^{1+eps}
 		{
 			double eps = 0.1;
 			upperBound = constant * pow(h, 2 * eps); // source: Di Pietro's mail, but he's not totally sure...

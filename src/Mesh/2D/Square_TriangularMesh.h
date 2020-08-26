@@ -246,7 +246,7 @@ public:
 	}
 	string FileNamePart() override
 	{
-		return "square-stri-n" + to_string(this->Nx);
+		return "square-inhouse-stri-n" + to_string(this->Nx);
 	}
 	string GeometryDescription() override
 	{

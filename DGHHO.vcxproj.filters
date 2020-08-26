@@ -146,9 +146,6 @@
     <ClInclude Include="src/Problem/Problem.h">
       <Filter>Problem</Filter>
     </ClInclude>
-    <ClInclude Include="src/Problem/SourceFunction.h">
-      <Filter>Problem</Filter>
-    </ClInclude>
     <ClInclude Include="src\Problem\BoundaryConditions.h">
       <Filter>Problem</Filter>
     </ClInclude>
@@ -360,6 +357,51 @@
     <ClInclude Include="src\Mesh\PhysicalGroup.h">
       <Filter>Mesh</Filter>
     </ClInclude>
+    <ClInclude Include="src\TestCases\TestCase.h">
+      <Filter>TestCases</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\TestCaseFactory.h">
+      <Filter>TestCases</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\1D\Heterogeneity1DTestCase.h">
+      <Filter>TestCases\1D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\1D\SineSolution1DTestCase.h">
+      <Filter>TestCases\1D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\2D\SineSolution2DTestCase.h">
+      <Filter>TestCases\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\2D\KelloggTestCase.h">
+      <Filter>TestCases\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\1D\PolySolution1DTestCase.h">
+      <Filter>TestCases\1D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\2D\PolySolution2DTestCase.h">
+      <Filter>TestCases\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\2D\ExpSolution2DTestCase.h">
+      <Filter>TestCases\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\2D\OneSolution2DTestCase.h">
+      <Filter>TestCases\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\2D\XSolution2DTestCase.h">
+      <Filter>TestCases\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\2D\ZeroSolution2DTestCase.h">
+      <Filter>TestCases\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\3D\SineSolution3DTestCase.h">
+      <Filter>TestCases\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\3D\PolySolution3DTestCase.h">
+      <Filter>TestCases\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\3D\ExpSolution3DTestCase.h">
+      <Filter>TestCases\3D</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
@@ -412,6 +454,18 @@
     </Filter>
     <Filter Include="QuadratureRules\GaussLegendre">
       <UniqueIdentifier>{5ed631eb-356a-42b0-917c-74a3675aa1f0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="TestCases">
+      <UniqueIdentifier>{bded7988-9cca-4a9d-90fa-b6170175c815}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="TestCases\1D">
+      <UniqueIdentifier>{1b093572-0888-4866-8ec9-5f4d612bd50c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="TestCases\2D">
+      <UniqueIdentifier>{9e5f2d2e-7840-45a8-a1af-cd6998bcda65}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="TestCases\3D">
+      <UniqueIdentifier>{6eab9b73-ff39-406e-888d-cff70fdbbd5b}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

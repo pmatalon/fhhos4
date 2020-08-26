@@ -3,6 +3,7 @@
 #include "DG/Diffusion_DG.h"
 #include "HHO/Diffusion_HHO.h"
 #include "Mesh/AllMeshes.h"
+#include "TestCases/TestCaseFactory.h"
 #include "Utils/Action.h"
 #include "Utils/Timer.h"
 #include "Solver/AllSolvers.h"
@@ -68,7 +69,7 @@ public:
 			rotationAngleInDegrees = 0;
 			args.Problem.AnisotropyRatio = 1;
 		}
-		double rotationAngleInRandians = rotationAngleInDegrees * M_PI / 180;
+		double rotationAngleInRadians = rotationAngleInDegrees * M_PI / 180;
 		DimVector<Dim> anisotropyCoefficients1 = args.Problem.Kappa1 * DimVector<Dim>::Ones(Dim);
 		DimVector<Dim> anisotropyCoefficients2 = args.Problem.Kappa2 * DimVector<Dim>::Ones(Dim);
 		if (Dim > 1)
@@ -76,285 +77,19 @@ public:
 			anisotropyCoefficients1[0] = args.Problem.AnisotropyRatio * anisotropyCoefficients1[1];
 			anisotropyCoefficients2[0] = args.Problem.AnisotropyRatio * anisotropyCoefficients2[1];
 		}
-		Tensor<Dim> diffTensor1(anisotropyCoefficients1, rotationAngleInRandians);
-		Tensor<Dim> diffTensor2(anisotropyCoefficients2, rotationAngleInRandians);
+		Tensor<Dim> diffTensor1(anisotropyCoefficients1, rotationAngleInRadians);
+		Tensor<Dim> diffTensor2(anisotropyCoefficients2, rotationAngleInRadians);
 
 		DiffusionPartition<Dim> diffusionPartition(args.Problem.Partition, &diffTensor1, &diffTensor2);
 
+		//------------------------------------------------------------------------//
+		//   Test case defining the source function and the boundary conditions   //
+		//------------------------------------------------------------------------//
+
+		TestCase<Dim>* testCase = TestCaseFactory<Dim>::Create(args.Problem.TestCaseCode, &diffusionPartition, args.Problem.BCCode);
+
 		mesh->SetDiffusionCoefficient(&diffusionPartition);
-		
-		//---------------------------------------------//
-		//   Analytical solution and source function   //
-		//---------------------------------------------//
-
-		DomFunction exactSolution = nullptr;
-		DomFunction sourceFunction = nullptr;
-
-		if (Dim == 1)
-		{
-			if (args.Problem.RHSCode.compare("sine") == 0)
-			{
-				if (diffusionPartition.IsHomogeneous)
-				{
-					exactSolution = [](DomPoint p)
-					{
-						double x = p.X;
-						return sin(4 * M_PI * x) / (16 * pow(M_PI, 2));
-					};
-				}
-				sourceFunction = [](DomPoint p)
-				{
-					double x = p.X;
-					return sin(4 * M_PI * x);
-				};
-			}
-			else if (args.Problem.RHSCode.compare("poly") == 0)
-			{
-				if (diffusionPartition.IsHomogeneous)
-				{
-					exactSolution = [](DomPoint p)
-					{
-						double x = p.X;
-						return x * (1 - x);
-					};
-				}
-				sourceFunction = [](DomPoint p) { return 2; };
-			}
-			else if (args.Problem.RHSCode.compare("heterog") == 0)
-			{
-				exactSolution = [&diffusionPartition](DomPoint p)
-				{
-					double x = p.X;
-					double alpha = diffusionPartition.Kappa1;
-					double a1 = -1 / (2 * alpha);
-					double a2 = -0.5;
-					double b1 = (1 + 3 * alpha) / (2 * alpha*(1 + alpha));
-					double b2 = -(alpha + 3) / (2 * (1 + alpha));
-					if (diffusionPartition.IsInPart1(p))
-						return 4 * a1 *pow(x, 2) + 2 * b1 * x;
-					else
-						return 4 * a2 * pow(x - 1, 2) + 2 * b2 * (x - 1);
-				};
-				sourceFunction = [&diffusionPartition](DomPoint p) { return 4; };
-			}
-			else
-				Utils::FatalError("'" + args.Problem.RHSCode + "' is unknown or not implemented in 1D. Check -rhs argument.");
-		}
-		else if (Dim == 2)
-		{
-			if (args.Problem.RHSCode.compare("sine") == 0)
-			{
-				if (diffusionPartition.IsHomogeneous && rotationAngleInDegrees == 0)
-				{
-					exactSolution = [anisotropyCoefficients1](DomPoint p)
-					{
-						double x = p.X;
-						double y = p.Y;
-						double a = anisotropyCoefficients1[0];
-						double b = anisotropyCoefficients1[1];
-						return 2 / (a + b) * sin(4 * M_PI * x)*sin(4 * M_PI * y);
-					};
-				}
-				sourceFunction = [](DomPoint p)
-				{
-					double x = p.X;
-					double y = p.Y;
-					return 2 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y);
-				};
-			}
-			else if (args.Problem.RHSCode.compare("poly") == 0)
-			{
-				if (diffusionPartition.IsHomogeneous && diffusionPartition.IsIsotropic)
-				{
-					exactSolution = [](DomPoint p)
-					{
-						double x = p.X;
-						double y = p.Y;
-						return x * (1 - x) * y*(1 - y);
-					};
-				}
-				sourceFunction = [](DomPoint p)
-				{
-					double x = p.X;
-					double y = p.Y;
-					return 2 * (y*(1 - y) + x * (1 - x));
-				};
-			}
-			else if (args.Problem.RHSCode.compare("exp") == 0)
-			{
-				if (diffusionPartition.IsHomogeneous && diffusionPartition.IsIsotropic)
-				{
-					exactSolution = [](DomPoint p)
-					{
-						double x = p.X;
-						double y = p.Y;
-						return exp(x*y*y);
-					};
-				}
-				sourceFunction = [](DomPoint p)
-				{
-					double x = p.X;
-					double y = p.Y;
-					return (-pow(y,4) - 2*x*(1+2*x*y*y))*exp(x*y*y);
-				};
-			}
-			else if (args.Problem.RHSCode.compare("one") == 0)
-			{
-				if (diffusionPartition.IsHomogeneous && diffusionPartition.IsIsotropic)
-				{
-					exactSolution = [](DomPoint p) { return 1; };
-				}
-				sourceFunction = [](DomPoint p) { return 0; };
-			}
-			else if (args.Problem.RHSCode.compare("zero") == 0)
-			{
-				if (diffusionPartition.IsHomogeneous && diffusionPartition.IsIsotropic)
-				{
-					exactSolution = [](DomPoint p) { return 0; };
-				}
-				sourceFunction = [](DomPoint p) { return 0; };
-			}
-			else if (args.Problem.RHSCode.compare("x") == 0)
-			{
-				if (diffusionPartition.IsHomogeneous && diffusionPartition.IsIsotropic)
-				{
-					exactSolution = [](DomPoint p) { return p.X; };
-				}
-				sourceFunction = [](DomPoint p) { return 0; };
-			}
-			else if (args.Problem.RHSCode.compare("kellogg") == 0)
-			{
-				if (diffusionPartition.IsIsotropic)
-				{
-					exactSolution = [](DomPoint p)
-					{
-						// Conversion from [0,1]x[0,1] to [-1,1]x[-1,1]
-						double x = 2 * p.X - 1;
-						double y = 2 * p.Y - 1;
-
-						// Conversion to polar coordinates (r, t)
-						double r = sqrt(x*x + y * y);
-						double t = 0;
-						if (x > 0 && y >= 0)
-							t = atan(y / x);
-						else if (x > 0 && y < 0)
-							t = atan(y / x) + 2 * M_PI;
-						else if (x < 0)
-							t = atan(y / x) + M_PI;
-						else if (x == 0 && y > 0)
-							t = M_PI / 2;
-						else if (x == 0 && y < 0)
-							t = 3 * M_PI / 2;
-						else
-							assert(false);
-
-						// Function in polar coordinates
-						double eps = 0.1;
-						double nu = M_PI / 4;
-						double ksi = -14.9225565104455152;
-
-						if (t >= 0 && t <= M_PI / 2)
-							return pow(r, eps) * cos((M_PI / 2 - ksi)*eps) * cos((t - M_PI / 2 + nu)*eps);
-						if (t >= M_PI / 2 && t <= M_PI)
-							return pow(r, eps) * cos(nu*eps) * cos((t - M_PI + ksi)*eps);
-						if (t >= M_PI && t <= 3 * M_PI / 2)
-							return pow(r, eps) * cos(ksi*eps) * cos((t - M_PI - nu)*eps);
-						if (t >= 3 * M_PI / 2 && t <= 2 * M_PI)
-							return pow(r, eps) * cos((M_PI / 2 - nu)*eps) * cos((t - 3 * M_PI / 2 - ksi)*eps);
-
-						assert(false);
-					};
-				}
-				sourceFunction = [](DomPoint p) { return 0; };
-			}
-			else
-				Utils::FatalError("'" + args.Problem.RHSCode + "' is unknown or not implemented in 2D. Check -rhs argument.");
-		}
-		else if (Dim == 3)
-		{
-			if (args.Problem.RHSCode.compare("sine") == 0)
-			{
-				if (diffusionPartition.IsHomogeneous && diffusionPartition.IsIsotropic)
-				{
-					exactSolution = [](DomPoint p)
-					{
-						double x = p.X;
-						double y = p.Y;
-						double z = p.Z;
-						return sin(4 * M_PI * x)*sin(4 * M_PI * y)*sin(4 * M_PI * z);
-					};
-				}
-				sourceFunction = [](DomPoint p)
-				{
-					double x = p.X;
-					double y = p.Y;
-					double z = p.Z;
-					return 3 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y)*sin(4 * M_PI * z);
-				};
-			}
-			else if (args.Problem.RHSCode.compare("poly") == 0)
-			{
-				if (diffusionPartition.IsHomogeneous && diffusionPartition.IsIsotropic)
-				{
-					exactSolution = [](DomPoint p)
-					{
-						double x = p.X;
-						double y = p.Y;
-						double z = p.Z;
-						return x * (1 - x)*y*(1 - y)*z*(1 - z);
-					};
-				}
-				sourceFunction = [](DomPoint p)
-				{
-					double x = p.X;
-					double y = p.Y;
-					double z = p.Z;
-					return 2 * ((y*(1 - y)*z*(1 - z) + x * (1 - x)*z*(1 - z) + x * (1 - x)*y*(1 - y)));
-				};
-			}
-			else if (args.Problem.RHSCode.compare("exp") == 0)
-			{
-				if (diffusionPartition.IsHomogeneous && diffusionPartition.IsIsotropic)
-				{
-					exactSolution = [](DomPoint p)
-					{
-						double x = p.X;
-						double y = p.Y;
-						double z = p.Z;
-						return exp(x*y*y*z*z*z);
-					};
-				}
-				sourceFunction = [](DomPoint p)
-				{
-					double x = p.X;
-					double y = p.Y;
-					double z = p.Z;
-					return -(pow(y, 4)*pow(z, 6) + 2 * x*pow(z, 3) + 4 * x*x*y*y*pow(z, 6) + 6 * x*y*y*z + 9 * x*x*pow(y, 4)*pow(z, 4))*exp(x*y*y*z*z*z);
-				};
-			}
-			else
-				Utils::FatalError("'" + args.Problem.RHSCode + "' is unknown or not implemented in 3D. Check -rhs argument.");
-		}
-
-		//-------------------------//
-		//   Boundary conditions   //
-		//-------------------------//
-
-		function<BoundaryConditionType(DomPoint)> getBoundaryConditionType = [](DomPoint p)
-		{
-			return BoundaryConditionType::Dirichlet;
-		};
-		DomFunction dirichletBC = [exactSolution](DomPoint p)
-		{
-			if (exactSolution != nullptr)
-				return exactSolution(p);
-			return 0.0; 
-		};
-		DomFunction neumannBC = [](DomPoint p) { return 0; };
-
-		BoundaryConditions bc(getBoundaryConditionType, dirichletBC, neumannBC);
-
-		mesh->SetBoundaryConditions(&bc);
+		mesh->SetBoundaryConditions(&testCase->BC);
 
 		//---------------------------//
 		//   Coarsening unit tests   //
@@ -396,7 +131,7 @@ public:
 		if (args.Discretization.Method.compare("dg") == 0)
 		{
 			FunctionalBasis<Dim>* basis = new FunctionalBasis<Dim>(args.Discretization.BasisCode, args.Discretization.PolyDegree, args.Discretization.UsePolynomialSpaceQ);
-			problem = new Diffusion_DG<Dim>(mesh, args.Problem.RHSCode, sourceFunction, &diffusionPartition, args.OutputDirectory, basis, args.Discretization.PenalizationCoefficient);
+			problem = new Diffusion_DG<Dim>(mesh, testCase, args.OutputDirectory, basis, args.Discretization.PenalizationCoefficient);
 		}
 		else if (args.Discretization.Method.compare("hho") == 0)
 		{
@@ -406,7 +141,7 @@ public:
 
 			HHOParameters<Dim>* hho = new HHOParameters<Dim>(mesh, args.Discretization.Stabilization, reconstructionBasis, cellBasis, faceBasis);
 
-			problem = new Diffusion_HHO<Dim>(mesh, args.Problem.RHSCode, sourceFunction, hho, args.Discretization.StaticCondensation, &diffusionPartition, &bc, args.OutputDirectory);
+			problem = new Diffusion_HHO<Dim>(mesh, testCase, hho, args.Discretization.StaticCondensation, args.OutputDirectory);
 		}
 		else
 			Utils::FatalError("Unknown discretization.");
@@ -464,7 +199,7 @@ public:
 				if (args.Discretization.StaticCondensation && (args.Actions & Action::ExtractSolution) == Action::ExtractSolution)
 					hhoPb->ExtractTraceSystemSolution();
 
-				if ((args.Actions & Action::ExtractSolution) == Action::ExtractSolution || ((args.Actions & Action::ComputeL2Error) == Action::ComputeL2Error && exactSolution != NULL))
+				if ((args.Actions & Action::ExtractSolution) == Action::ExtractSolution || ((args.Actions & Action::ComputeL2Error) == Action::ComputeL2Error && testCase->ExactSolution))
 				{
 
 					cout << "----------------------------------------------------------" << endl;
@@ -487,9 +222,9 @@ public:
 			//       L2 error       //
 			//----------------------//
 
-			if ((args.Actions & Action::ComputeL2Error) == Action::ComputeL2Error && exactSolution != NULL)
+			if ((args.Actions & Action::ComputeL2Error) == Action::ComputeL2Error && testCase->ExactSolution)
 			{
-				double error = problem->L2Error(exactSolution);
+				double error = problem->L2Error(testCase->ExactSolution);
 				cout << endl << "L2 Error = " << std::scientific << error << endl;
 
 				if (args.Discretization.Method.compare("hho") == 0)
@@ -519,6 +254,7 @@ public:
 			delete hhoPb->HHO;
 		}
 		delete problem;
+		delete testCase;
 		GaussLegendre::Free();
 
 		totalTimer.Stop();

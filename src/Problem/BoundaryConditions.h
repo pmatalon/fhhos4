@@ -12,10 +12,18 @@ enum class BoundaryConditionType : unsigned
 class BoundaryConditions
 {
 public:
-	function<BoundaryConditionType(DomPoint)> GetBoundaryConditionType;
-	DomFunction DirichletFunction;
-	DomFunction NeumannFunction;
-	bool HomogeneousDirichlet = false;
+	string Description;
+	function<BoundaryConditionType(DomPoint)> GetBoundaryConditionType = nullptr;
+	DomFunction DirichletFunction = nullptr;
+	DomFunction NeumannFunction = nullptr;
+
+	BoundaryConditions()
+	{
+		Description = "Dirichlet";
+		GetBoundaryConditionType = DirichletEverywhere;
+		DirichletFunction = Homogeneous;
+		NeumannFunction = Homogeneous;
+	}
 
 	BoundaryConditions(function<BoundaryConditionType(DomPoint)> getBoundaryConditionType, DomFunction dirichletFunction, DomFunction neumannFunction)
 	{
@@ -23,4 +31,14 @@ public:
 		this->DirichletFunction = dirichletFunction;
 		this->NeumannFunction = neumannFunction;
 	}
+
+	static BoundaryConditionType DirichletEverywhere(DomPoint p)
+	{
+		return BoundaryConditionType::Dirichlet;
+	};
+
+	static double Homogeneous(DomPoint p)
+	{
+		return 0.0;
+	};
 };

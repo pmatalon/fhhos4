@@ -7,11 +7,12 @@ struct ProblemArguments
 {
 	int Dimension = -1;
 	string GeoCode = "square";
-	string RHSCode = "sine";
+	string TestCaseCode = "sine";
 	double Kappa1 = 1;
 	double Kappa2 = 1;
 	double AnisotropyRatio = 1;
 	string Partition = "chiasmus";
+	string BCCode = "d";
 };
 
 struct DiscretizationArguments

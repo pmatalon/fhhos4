@@ -1,6 +1,5 @@
 #pragma once
 #include "../Mesh/Element.h"
-#include "../Problem/SourceFunction.h"
 #include "HHOParameters.h"
 #include "Diff_HHOFace.h"
 

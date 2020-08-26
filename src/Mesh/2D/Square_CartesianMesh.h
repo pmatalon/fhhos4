@@ -162,7 +162,7 @@ public:
 
 	string FileNamePart() override
 	{
-		return "square-cart-n" + to_string(this->Nx);
+		return "square-inhouse-cart-n" + to_string(this->Nx);
 	}
 
 	string GeometryDescription() override

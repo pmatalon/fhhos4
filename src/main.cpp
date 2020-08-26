@@ -20,6 +20,24 @@ void print_usage() {
 	cout << "            <file>            - GMSH .geo or .msh file" << endl;
 	cout << "                                Use relative or absolute path, or simply the file name if the file is stored in the folder data/mesh/" << endl;
 	cout << endl;
+	cout << "-tc CODE" << endl;
+	cout << "      Test case code. The test case defines the source function of the problem as well as the available predefined boundary conditions (default: sine)." << endl;
+	cout << "      In some, it also determines the analytical solution in the homogeneous isotropic case so that the L2 error can be computed." << endl;
+	cout << "               sine    - the source function and the analytical solution are a sine functions" << endl;
+	cout << "               poly    - the source function is constant, the analytical solution is a polynomial of total degree 2*d" << endl;
+	cout << "               zero    - the source function and the analytical solution are 0" << endl;
+	cout << "               one     - the source function is 0, the analytical solution is 1" << endl;
+	cout << "               x       - the source function is 0, the analytical solution is x" << endl;
+	cout << "               heterog - (1D only) heterogeneous diffusion-specific analytical solution" << endl;
+	cout << "               kellogg - (2D only) heterogeneous diffusion-specific analytical solution (known benchmark)" << endl;
+	cout << "               <other> - to be defined in the code for specific problems" << endl;
+	cout << endl;
+	cout << "-bc CODE" << endl;
+	cout << "      Boundary conditions, according to what the selected test case allows." << endl;
+	cout << "            d          - Dirichlet (default)" << endl;
+	cout << "            m          - Mixed Neumann-Dirichlet" << endl;
+	cout << "            <other>    - Test case-specific boundary conditions" << endl;
+	cout << endl;
 	cout << "-heterog NUM" << endl;
 	cout << "      Heterogeneity ratio. Constant diffusion coefficient in one part of the domain partition" << endl;
 	cout << "      while equals to 1 in the second part." << endl;
@@ -36,17 +54,6 @@ void print_usage() {
 	cout << "               halves     - the domain is split into two vertical halves" << endl;
 	cout << "               chiasmus   - chiasmus shape (default)" << endl;
 	cout << "               circle     - the domain is split into two parts by a circle of center (1/2, 1/2) and of radius 1/4" << endl;
-	cout << endl;
-	cout << "-rhs CODE" << endl;
-	cout << "      Right-hand side code determining the source function (default: sine)." << endl;
-	cout << "      It also determines the analytical solution in the homogeneous isotropic case." << endl;
-	cout << "               sine    - the source function and the analytical solution are a sine functions" << endl;
-	cout << "               poly    - the source function is constant, the analytical solution is a polynomial of total degree 2*d" << endl;
-	cout << "               zero    - the source function and the analytical solution are 0" << endl;
-	cout << "               one     - the source function is 0, the analytical solution is 1" << endl;
-	cout << "               x       - the source function is 0, the analytical solution is x" << endl;
-	cout << "               heterog - (1D only) heterogeneous diffusion-specific analytical solution" << endl;
-	cout << "               kellogg - (2D only) heterogeneous diffusion-specific analytical solution (known benchmark)" << endl;
 	cout << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << "                                  Mesh                                " << endl;
@@ -292,7 +299,7 @@ void print_usage() {
 	cout << "The heterogeneity ratio between the two subdomains is set to 1e4." << endl;
 	cout << "              -geo square -partition chiasmus -heterog 1e4" << endl;
 	cout << "Other use case: the heterogeneity ratio, as well as as non-homogeneous Dirichlet conditions, are set such that it corresponds to a Kellogg problem." << endl;
-	cout << "              -geo square -partition chiasmus -rhs kellogg" << endl;
+	cout << "              -geo square4quadrants -rhs kellogg" << endl;
 	cout << endl;
 	cout << "Import a GMSH file describing the geometry (.geo) or the mesh (.msh)." << endl;
 	cout << "You can use relative or absolute path, or simply the file name if the file is stored in /data/mesh/." << endl;
@@ -348,7 +355,9 @@ int main(int argc, char* argv[])
 	enum {
 		// Problem
 		OPT_Geometry = 1000,
-		OPT_RightHandSide,
+		OPT_TestCase,
+		OPT_RightHandSide, // deprecated
+		OPT_BoundaryConditions,
 		OPT_Heterogeneity,
 		OPT_Anisotropy,
 		OPT_Partition,
@@ -385,7 +394,9 @@ int main(int argc, char* argv[])
 	static struct option long_opts[] = {
 		 // Problem
 		 { "geo", required_argument, NULL, OPT_Geometry },
-		 { "rhs", required_argument, NULL, OPT_RightHandSide },
+		 { "tc", required_argument, NULL, OPT_TestCase },
+		 { "rhs", required_argument, NULL, OPT_RightHandSide }, // deprecated
+		 { "bc", required_argument, NULL, OPT_BoundaryConditions },
 		 { "heterog", required_argument, NULL, OPT_Heterogeneity },
 		 { "aniso", required_argument, NULL, OPT_Anisotropy },
 		 { "partition", required_argument, NULL, OPT_Partition },
@@ -442,8 +453,12 @@ int main(int argc, char* argv[])
 					&& args.Problem.GeoCode.compare("cube") != 0)
 					args.Discretization.Mesher = "gmsh";
 				break;
+			case OPT_TestCase:
 			case OPT_RightHandSide:
-				args.Problem.RHSCode = optarg;
+				args.Problem.TestCaseCode = optarg;
+				break;
+			case OPT_BoundaryConditions:
+				args.Problem.BCCode = optarg;
 				break;
 			case OPT_Heterogeneity: 
 				args.Problem.Kappa1 = atof(optarg);
@@ -733,10 +748,10 @@ int main(int argc, char* argv[])
 	//               Heterogeneity              //
 	//------------------------------------------//
 
-	if (args.Problem.Dimension != 1 && args.Problem.RHSCode.compare("heterog") == 0)
+	if (args.Problem.Dimension != 1 && args.Problem.TestCaseCode.compare("heterog") == 0)
 		argument_error("-rhs heterog is only supported in 1D.");
 
-	if (args.Problem.RHSCode.compare("kellogg") == 0)
+	if (args.Problem.TestCaseCode.compare("kellogg") == 0)
 	{
 		if (args.Problem.Dimension != 2)
 			argument_error("-rhs kellogg is only supported in 2D.");

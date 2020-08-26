@@ -4,7 +4,6 @@
 #include <set>
 #include "Vertex.h"
 #include "../Geometry/PhysicalShape.h"
-#include "../Problem/SourceFunction.h"
 #include "../Problem/DiffusionPartition.h"
 using namespace std;
 

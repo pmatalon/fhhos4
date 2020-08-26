@@ -64,7 +64,7 @@ public:
 	}
 	string FileNamePart()
 	{
-		return "n" + to_string(this->N);
+		return "segment-inhouse-cart-n" + to_string(this->N);
 	}
 	string GeometryDescription()
 	{

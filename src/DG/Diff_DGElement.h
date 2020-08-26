@@ -1,6 +1,5 @@
 #pragma once
 #include "../Mesh/Element.h"
-#include "../Problem/SourceFunction.h"
 
 template <int Dim>
 class Diff_DGElement : virtual public Element<Dim>
