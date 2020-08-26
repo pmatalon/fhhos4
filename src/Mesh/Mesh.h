@@ -194,7 +194,6 @@ public:
 		ParallelLoop<Element<Dim>*, EmptyResultChunk> parallelLoop(this->Elements);
 		parallelLoop.Execute([&diffusionField](Element<Dim>* e, ParallelChunk<EmptyResultChunk>* chunk)
 			{
-				e->SetDiffusionField(diffusionField); // For DG
 				e->SetDiffusionTensor(diffusionField);
 			});
 

@@ -15,7 +15,7 @@ public:
 		this->ExactSolution = [diffusionField](DomPoint p)
 		{
 			double x = p.X;
-			double alpha = diffusionField->Kappa1;
+			double alpha = diffusionField->K1->LargestEigenValue;
 			double a1 = -1 / (2 * alpha);
 			double a2 = -0.5;
 			double b1 = (1 + 3 * alpha) / (2 * alpha*(1 + alpha));

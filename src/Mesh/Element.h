@@ -396,14 +396,10 @@ public:
 	//     Misc     //
 	//--------------//
 
-	// For DG
-	void SetDiffusionField(DiffusionField<Dim>* diffusionField)
-	{
-		this->Kappa = diffusionField->Coefficient(Center());
-	}
 	void SetDiffusionTensor(DiffusionField<Dim>* diffusionField)
 	{
 		this->DiffTensor = diffusionField->DiffTensor(Center());
+		this->Kappa = DiffTensor->LargestEigenValue; // still used in DG
 	}
 
 	virtual void Serialize(ostream& os) const

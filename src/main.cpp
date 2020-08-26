@@ -771,6 +771,9 @@ int main(int argc, char* argv[])
 	if (args.Problem.Dimension > 1 && args.Discretization.Method.compare("dg") == 0 && args.Discretization.PolyDegree == 0)
 		argument_error("In 2D/3D, DG is not a convergent scheme for p = 0.");
 
+	if (args.Discretization.Method.compare("dg") == 0 && args.Problem.BCCode.compare("d") != 0)
+		argument_error("In DG, only Dirichlet conditions are implemented.");
+
 	if (args.Problem.Dimension == 1 && args.Discretization.Method.compare("hho") == 0 && args.Discretization.PolyDegree != 1)
 		argument_error("HHO in 1D only exists for p = 1.");
 
