@@ -58,7 +58,7 @@ public:
 	vector<Face<Dim>*> DirichletFaces;
 	vector<Face<Dim>*> NeumannFaces;
 
-	DiffusionPartition<Dim>* _diffusionPartition = nullptr;
+	DiffusionField<Dim>* _diffusionField = nullptr;
 	BoundaryConditions* _boundaryConditions = nullptr;
 
 	Mesh<Dim>* CoarseMesh = nullptr;
@@ -187,19 +187,19 @@ public:
 		return nullptr;
 	}
 
-	void SetDiffusionCoefficient(DiffusionPartition<Dim>* diffusionPartition)
+	void SetDiffusionField(DiffusionField<Dim>* diffusionField)
 	{
-		this->_diffusionPartition = diffusionPartition;
+		this->_diffusionField = diffusionField;
 
 		ParallelLoop<Element<Dim>*, EmptyResultChunk> parallelLoop(this->Elements);
-		parallelLoop.Execute([&diffusionPartition](Element<Dim>* e, ParallelChunk<EmptyResultChunk>* chunk)
+		parallelLoop.Execute([&diffusionField](Element<Dim>* e, ParallelChunk<EmptyResultChunk>* chunk)
 			{
-				e->SetDiffusionCoefficient(diffusionPartition); // For DG
-				e->SetDiffusionTensor(diffusionPartition);
+				e->SetDiffusionField(diffusionField); // For DG
+				e->SetDiffusionTensor(diffusionField);
 			});
 
 		if (this->CoarseMesh)
-			this->CoarseMesh->SetDiffusionCoefficient(diffusionPartition);
+			this->CoarseMesh->SetDiffusionField(diffusionField);
 	}
 
 	void SetBoundaryConditions(BoundaryConditions* bc)

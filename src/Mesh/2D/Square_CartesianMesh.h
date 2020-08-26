@@ -189,7 +189,7 @@ public:
 		else
 			PolyhedralMesh<2>::CoarsenMesh(strategy);
 
-		this->CoarseMesh->SetDiffusionCoefficient(this->_diffusionPartition);
+		this->CoarseMesh->SetDiffusionField(this->_diffusionField);
 		this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
 	}
 

@@ -4,7 +4,7 @@
 #include <set>
 #include "Vertex.h"
 #include "../Geometry/PhysicalShape.h"
-#include "../Problem/DiffusionPartition.h"
+#include "../Problem/DiffusionField.h"
 using namespace std;
 
 template <int Dim>
@@ -397,13 +397,13 @@ public:
 	//--------------//
 
 	// For DG
-	void SetDiffusionCoefficient(DiffusionPartition<Dim>* diffusionPartition)
+	void SetDiffusionField(DiffusionField<Dim>* diffusionField)
 	{
-		this->Kappa = diffusionPartition->Coefficient(Center());
+		this->Kappa = diffusionField->Coefficient(Center());
 	}
-	void SetDiffusionTensor(DiffusionPartition<Dim>* diffusionPartition)
+	void SetDiffusionTensor(DiffusionField<Dim>* diffusionField)
 	{
-		this->DiffTensor = diffusionPartition->DiffTensor(Center());
+		this->DiffTensor = diffusionField->DiffTensor(Center());
 	}
 
 	virtual void Serialize(ostream& os) const

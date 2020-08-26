@@ -5,15 +5,15 @@ using namespace std;
 class KelloggTestCase : public TestCase<2>
 {
 public:
-	KelloggTestCase(DiffusionPartition<2>* diffusionPartition, string bcCode) :
-		TestCase(diffusionPartition)
+	KelloggTestCase(DiffusionField<2>* diffusionField, string bcCode) :
+		TestCase(diffusionField)
 	{
 		if (bcCode.compare("d") != 0)
 			Utils::FatalError("The requested boundary conditions are not defined in this test case.");
 
 		this->SourceFunction = this->Source;
 		this->BC.DirichletFunction = this->Solution;
-		if (this->DiffPartition->IsIsotropic)
+		if (this->DiffField->IsIsotropic)
 			this->ExactSolution = this->Solution;
 	}
 

@@ -5,14 +5,14 @@ using namespace std;
 class PolySolution3DTestCase : public TestCase<3>
 {
 public:
-	PolySolution3DTestCase(DiffusionPartition<3>* diffusionPartition, string bcCode) : 
-		TestCase(diffusionPartition)
+	PolySolution3DTestCase(DiffusionField<3>* diffusionField, string bcCode) : 
+		TestCase(diffusionField)
 	{
 		if (bcCode.compare("d") != 0 && bcCode.compare("m") != 0)
 			Utils::FatalError("The requested boundary conditions are not defined in this test case.");
 
 		this->SourceFunction = this->Source;
-		if (this->DiffPartition->IsHomogeneous && this->DiffPartition->IsIsotropic && bcCode.compare("d") == 0)
+		if (this->DiffField->IsHomogeneous && this->DiffField->IsIsotropic && bcCode.compare("d") == 0)
 			this->ExactSolution = this->Solution;
 
 		if (bcCode.compare("m") == 0)

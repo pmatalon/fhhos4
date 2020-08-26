@@ -8,7 +8,7 @@ class DiffusionProblem : public Problem<Dim>
 {
 protected:
 	TestCase<Dim>* _testCase;
-	DiffusionPartition<Dim>* _diffusionPartition;
+	DiffusionField<Dim>* _diffusionField;
 	DomFunction _sourceFunction;
 	BoundaryConditions* _boundaryConditions;
 public:
@@ -17,15 +17,15 @@ public:
 		: Problem<Dim>(mesh, outputDirectory)
 	{
 		this->_testCase = testCase;
-		this->_diffusionPartition = testCase->DiffPartition;
+		this->_diffusionField = testCase->DiffField;
 		this->_sourceFunction = testCase->SourceFunction;
 		this->_boundaryConditions = &testCase->BC;
 
 		string heterogeneityString = "";
-		if (testCase->Code().compare("kellogg") != 0 && !this->_diffusionPartition->IsHomogeneous)
+		if (testCase->Code().compare("kellogg") != 0 && !this->_diffusionField->IsHomogeneous)
 		{
 			char res[32];
-			sprintf(res, "_heterog%g", this->_diffusionPartition->HeterogeneityRatio);
+			sprintf(res, "_heterog%g", this->_diffusionField->HeterogeneityRatio);
 			heterogeneityString = res;
 		}
 		this->_fileName = "Diffusion" + to_string(Dim) + "D" + testCase->Code() + heterogeneityString + "_" + this->_mesh->FileNamePart();
@@ -34,24 +34,24 @@ public:
 	void PrintPhysicalProblem() override
 	{
 		cout << "Problem: Diffusion " << Dim << "D";
-		if (this->_diffusionPartition->IsHomogeneous && this->_diffusionPartition->IsIsotropic)
+		if (this->_diffusionField->IsHomogeneous && this->_diffusionField->IsIsotropic)
 			cout << " (homogeneous and isotropic)" << endl;
 		else
 		{
 			cout << endl;
-			if (this->_diffusionPartition->IsHomogeneous)
+			if (this->_diffusionField->IsHomogeneous)
 			{
 				cout << "    Homogeneous coefficient" << endl;
-				cout << "    Anisotropic: ratio = " << this->_diffusionPartition->K1->AnisotropyRatio << endl;
+				cout << "    Anisotropic: ratio = " << this->_diffusionField->K1->AnisotropyRatio << endl;
 			}
 			else
 			{
-				cout << "    Heterogeneous coefficient: partition = " << this->_diffusionPartition->Partition << endl;
-				cout << "                               ratio     = " << scientific << this->_diffusionPartition->HeterogeneityRatio << fixed << endl;
-				if (this->_diffusionPartition->IsIsotropic)
+				cout << "    Heterogeneous coefficient: partition = " << this->_diffusionField->Partition << endl;
+				cout << "                               ratio     = " << scientific << this->_diffusionField->HeterogeneityRatio << fixed << endl;
+				if (this->_diffusionField->IsIsotropic)
 					cout << "    Isotropic" << endl;
 				else
-					cout << "    Anisotropic: ratio = " << this->_diffusionPartition->K1->AnisotropyRatio << endl;
+					cout << "    Anisotropic: ratio = " << this->_diffusionField->K1->AnisotropyRatio << endl;
 			}
 		}
 

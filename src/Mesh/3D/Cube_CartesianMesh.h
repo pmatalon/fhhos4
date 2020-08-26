@@ -208,9 +208,9 @@ public:
 		else
 			Mesh<3>::CoarsenMesh(strategy);
 
-		if (this->_diffusionPartition)
+		if (this->_diffusionField)
 		{
-			this->CoarseMesh->SetDiffusionCoefficient(this->_diffusionPartition);
+			this->CoarseMesh->SetDiffusionField(this->_diffusionField);
 			this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
 		}
 	}

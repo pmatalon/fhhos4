@@ -80,15 +80,15 @@ public:
 		Tensor<Dim> diffTensor1(anisotropyCoefficients1, rotationAngleInRadians);
 		Tensor<Dim> diffTensor2(anisotropyCoefficients2, rotationAngleInRadians);
 
-		DiffusionPartition<Dim> diffusionPartition(args.Problem.Partition, &diffTensor1, &diffTensor2);
+		DiffusionField<Dim> diffusionField(args.Problem.Partition, &diffTensor1, &diffTensor2);
 
 		//------------------------------------------------------------------------//
 		//   Test case defining the source function and the boundary conditions   //
 		//------------------------------------------------------------------------//
 
-		TestCase<Dim>* testCase = TestCaseFactory<Dim>::Create(args.Problem.TestCaseCode, &diffusionPartition, args.Problem.BCCode);
+		TestCase<Dim>* testCase = TestCaseFactory<Dim>::Create(args.Problem.TestCaseCode, &diffusionField, args.Problem.BCCode);
 
-		mesh->SetDiffusionCoefficient(&diffusionPartition);
+		mesh->SetDiffusionField(&diffusionField);
 		mesh->SetBoundaryConditions(&testCase->BC);
 
 		//---------------------------//

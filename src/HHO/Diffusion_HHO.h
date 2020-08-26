@@ -60,7 +60,7 @@ public:
 		double upperBound;
 		if ((  this->_testCase->Code().compare("sine") == 0
 			|| this->_testCase->Code().compare("poly") == 0
-			|| this->_testCase->Code().compare("zero") == 0) && this->_diffusionPartition->IsHomogeneous) // solution is H^{r+2} with r in <= k
+			|| this->_testCase->Code().compare("zero") == 0) && this->_diffusionField->IsHomogeneous) // solution is H^{r+2} with r in <= k
 		{
 			double r = k;
 			if (k == 0)
@@ -138,8 +138,8 @@ public:
 		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreCellMassMatrix(cellBasis);
 		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreReconstructMassMatrix(reconstructionBasis);
 		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreCellStiffnessMatrix(cellBasis);
-		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreReconstructK1StiffnessMatrix(this->_diffusionPartition->K1, reconstructionBasis);
-		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreReconstructK2StiffnessMatrix(this->_diffusionPartition->K2, reconstructionBasis);
+		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreReconstructK1StiffnessMatrix(this->_diffusionField->K1, reconstructionBasis);
+		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreReconstructK2StiffnessMatrix(this->_diffusionField->K2, reconstructionBasis);
 		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix(cellBasis, reconstructionBasis);
 		CartesianShape<Dim, Dim - 1>::InitReferenceShape()->ComputeAndStoreFaceMassMatrix(faceBasis);
 		if (Dim == 2)
@@ -148,8 +148,8 @@ public:
 			Triangle::InitReferenceShape()->ComputeAndStoreCellMassMatrix((FunctionalBasis<2>*)cellBasis);
 			Triangle::InitReferenceShape()->ComputeAndStoreReconstructMassMatrix((FunctionalBasis<2>*)reconstructionBasis);
 			//Triangle::InitReferenceShape().ComputeAndStoreCellStiffnessMatrix((FunctionalBasis<2>*)cellBasis);
-			//Triangle::InitReferenceShape().ComputeAndStoreReconstructK1StiffnessMatrix(this->_diffusionPartition->K1, reconstructionBasis);
-			//Triangle::InitReferenceShape().ComputeAndStoreReconstructK2StiffnessMatrix(this->_diffusionPartition->K2, reconstructionBasis);
+			//Triangle::InitReferenceShape().ComputeAndStoreReconstructK1StiffnessMatrix(this->_diffusionField->K1, reconstructionBasis);
+			//Triangle::InitReferenceShape().ComputeAndStoreReconstructK2StiffnessMatrix(this->_diffusionField->K2, reconstructionBasis);
 			Triangle::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix((FunctionalBasis<2>*)cellBasis, (FunctionalBasis<2>*)reconstructionBasis);
 		}
 		else if (Dim == 3)

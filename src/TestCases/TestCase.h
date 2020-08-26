@@ -1,6 +1,6 @@
 #pragma once
 #include "../Utils/Utils.h"
-#include "../Problem/DiffusionPartition.h"
+#include "../Problem/DiffusionField.h"
 #include "../Problem/BoundaryConditions.h"
 using namespace std;
 
@@ -10,12 +10,12 @@ class TestCase
 public:
 	DomFunction SourceFunction = nullptr;
 	DomFunction ExactSolution = nullptr;
-	DiffusionPartition<Dim>* DiffPartition;
+	DiffusionField<Dim>* DiffField;
 	BoundaryConditions BC;
 
-	TestCase(DiffusionPartition<Dim>* diffusionPartition)
+	TestCase(DiffusionField<Dim>* diffusionField)
 	{
-		DiffPartition = diffusionPartition;
+		DiffField = diffusionField;
 	}
 
 	virtual string Code() = 0;

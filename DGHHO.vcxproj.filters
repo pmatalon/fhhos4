@@ -140,9 +140,6 @@
     <ClInclude Include="src\Problem\Tensor.h">
       <Filter>Problem</Filter>
     </ClInclude>
-    <ClInclude Include="src/Problem/DiffusionPartition.h">
-      <Filter>Problem</Filter>
-    </ClInclude>
     <ClInclude Include="src/Problem/Problem.h">
       <Filter>Problem</Filter>
     </ClInclude>
@@ -401,6 +398,9 @@
     </ClInclude>
     <ClInclude Include="src\TestCases\3D\ExpSolution3DTestCase.h">
       <Filter>TestCases\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Problem\DiffusionField.h">
+      <Filter>Problem</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

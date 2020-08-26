@@ -5,7 +5,7 @@
 using namespace std;
 
 template <int Dim>
-class DiffusionPartition
+class DiffusionField
 {
 public:
 	string Partition;
@@ -18,7 +18,7 @@ public:
 	bool IsIsotropic = true;
 	double HeterogeneityRatio = 1;
 
-	DiffusionPartition(string partition, Tensor<Dim>* k1, Tensor<Dim>* k2)
+	DiffusionField(string partition, Tensor<Dim>* k1, Tensor<Dim>* k2)
 	{
 		this->Partition = partition;
 		if (partition.compare("halves") == 0 || Dim == 1)

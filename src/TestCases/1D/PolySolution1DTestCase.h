@@ -5,14 +5,14 @@ using namespace std;
 class PolySolution1DTestCase : public TestCase<1>
 {
 public:
-	PolySolution1DTestCase(DiffusionPartition<1>* diffusionPartition, string bcCode) :
-		TestCase(diffusionPartition)
+	PolySolution1DTestCase(DiffusionField<1>* diffusionField, string bcCode) :
+		TestCase(diffusionField)
 	{
 		if (bcCode.compare("d") != 0)
 			Utils::FatalError("This test case runs only with Dirichlet conditions");
 
 		this->SourceFunction = Source;
-		if (this->DiffPartition->IsHomogeneous)
+		if (this->DiffField->IsHomogeneous)
 			this->ExactSolution = Solution;
 	}
 

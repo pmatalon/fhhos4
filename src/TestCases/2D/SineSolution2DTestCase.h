@@ -5,12 +5,12 @@ using namespace std;
 class SineSolution2DTestCase : public TestCase<2>
 {
 public:
-	SineSolution2DTestCase(DiffusionPartition<2>* diffusionPartition, string bcCode) : 
-		TestCase(diffusionPartition)
+	SineSolution2DTestCase(DiffusionField<2>* diffusionField, string bcCode) : 
+		TestCase(diffusionField)
 	{
 		this->SourceFunction = this->Source;
 
-		if (this->DiffPartition->IsHomogeneous && this->DiffPartition->IsIsotropic && bcCode.compare("d") == 0)
+		if (this->DiffField->IsHomogeneous && this->DiffField->IsIsotropic && bcCode.compare("d") == 0)
 			this->ExactSolution = this->Solution;
 
 		if (bcCode.compare("d") == 0)
