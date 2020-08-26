@@ -8,9 +8,9 @@ struct ProblemArguments
 	int Dimension = -1;
 	string GeoCode = "square";
 	string TestCaseCode = "sine";
-	double Kappa1 = 1;
-	double Kappa2 = 1;
+	double HeterogeneityRatio = 1;
 	double AnisotropyRatio = 1;
+	double AnisotropyAngleInDegrees = 0;
 	string Partition = "chiasmus";
 	string BCCode = "d";
 };

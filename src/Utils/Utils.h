@@ -26,6 +26,11 @@ public:
 		return f;
 	}
 
+	static bool IsPowerOf2(BigNumber n)
+	{
+		return (n & (n - 1)) == 0;
+	}
+
 	static string MatrixInfo(const SparseMatrix& M, string name)
 	{
 		double density = (double)M.nonZeros() / (M.rows() * M.cols()) * 100;

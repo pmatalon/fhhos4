@@ -63,15 +63,11 @@ public:
 		//   Diffusion heterogeneity and anisotropy   //
 		//--------------------------------------------//
 
-		double rotationAngleInDegrees = 0;
-		if (args.Discretization.Method.compare("dg") == 0)
-		{
-			rotationAngleInDegrees = 0;
-			args.Problem.AnisotropyRatio = 1;
-		}
-		double rotationAngleInRadians = rotationAngleInDegrees * M_PI / 180;
-		DimVector<Dim> anisotropyCoefficients1 = args.Problem.Kappa1 * DimVector<Dim>::Ones(Dim);
-		DimVector<Dim> anisotropyCoefficients2 = args.Problem.Kappa2 * DimVector<Dim>::Ones(Dim);
+		double rotationAngleInRadians = args.Problem.AnisotropyAngleInDegrees * M_PI / 180;
+		double kappa1 = args.Problem.HeterogeneityRatio;
+		double kappa2 = 1;
+		DimVector<Dim> anisotropyCoefficients1 = kappa1 * DimVector<Dim>::Ones(Dim);
+		DimVector<Dim> anisotropyCoefficients2 = kappa2 * DimVector<Dim>::Ones(Dim);
 		if (Dim > 1)
 		{
 			anisotropyCoefficients1[0] = args.Problem.AnisotropyRatio * anisotropyCoefficients1[1];
@@ -486,7 +482,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 	{
 		if (mesher.compare("inhouse") == 0)
 		{
-			if (pow(sqrt(nx), 2) == (double)nx && pow(sqrt(ny), 2) == (double)ny)
+			if (Utils::IsPowerOf2(nx) && Utils::IsPowerOf2(ny))
 			{
 				if (meshCode.compare("cart") == 0)
 					fineMesh = new Square_CartesianMesh(nx, ny);
@@ -500,7 +496,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 					Utils::FatalError("The requested mesh is not managed with this geometry.");
 			}
 			else
-				Utils::FatalError("N must be a power of 2.");
+				Utils::FatalError("This geometry requires N to be a power of 2.");
 		}
 #ifdef GMSH_ENABLED
 		else if (mesher.compare("gmsh") == 0)

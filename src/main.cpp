@@ -42,7 +42,7 @@ void print_usage() {
 	cout << "      Heterogeneity ratio. Constant diffusion coefficient in one part of the domain partition" << endl;
 	cout << "      while equals to 1 in the second part." << endl;
 	cout << "      Ex:       1             - homogeneous diffusion (default)" << endl;
-	cout << "                0 < NUM < 1   - to be used with -rhs heterog" << endl;
+	cout << "                0 < NUM < 1   - to be used with -tc heterog" << endl;
 	cout << "                1e4           - allows to set the order of magnitude of the ratio" << endl;
 	cout << endl;
 	cout << "-aniso NUM" << endl;
@@ -299,7 +299,7 @@ void print_usage() {
 	cout << "The heterogeneity ratio between the two subdomains is set to 1e4." << endl;
 	cout << "              -geo square -partition chiasmus -heterog 1e4" << endl;
 	cout << "Other use case: the heterogeneity ratio, as well as as non-homogeneous Dirichlet conditions, are set such that it corresponds to a Kellogg problem." << endl;
-	cout << "              -geo square4quadrants -rhs kellogg" << endl;
+	cout << "              -geo square4quadrants -tc kellogg" << endl;
 	cout << endl;
 	cout << "Import a GMSH file describing the geometry (.geo) or the mesh (.msh)." << endl;
 	cout << "You can use relative or absolute path, or simply the file name if the file is stored in /data/mesh/." << endl;
@@ -461,7 +461,7 @@ int main(int argc, char* argv[])
 				args.Problem.BCCode = optarg;
 				break;
 			case OPT_Heterogeneity: 
-				args.Problem.Kappa1 = atof(optarg);
+				args.Problem.HeterogeneityRatio = atof(optarg);
 				break;
 			case OPT_Anisotropy:
 				args.Problem.AnisotropyRatio = atof(optarg);
@@ -749,23 +749,24 @@ int main(int argc, char* argv[])
 	//------------------------------------------//
 
 	if (args.Problem.Dimension != 1 && args.Problem.TestCaseCode.compare("heterog") == 0)
-		argument_error("-rhs heterog is only supported in 1D.");
+		argument_error("-tc heterog is only supported in 1D.");
 
 	if (args.Problem.TestCaseCode.compare("kellogg") == 0)
 	{
 		if (args.Problem.Dimension != 2)
-			argument_error("-rhs kellogg is only supported in 2D.");
-		if (args.Problem.Kappa1 != 1)
-			Utils::Warning("-heterog argument is ignored due to -rhs kellogg");
+			argument_error("-tc kellogg is only supported in 2D.");
+		if (args.Problem.HeterogeneityRatio != 1)
+			Utils::Warning("-heterog argument is ignored due to -tc kellogg");
 		if (args.Problem.AnisotropyRatio != 1)
-			Utils::Warning("Warning: -haniso argument is ignored due to -rhs kellogg");
+			Utils::Warning("-aniso argument is ignored due to -tc kellogg");
 		if (args.Problem.Partition.compare("chiasmus") != 0)
-			Utils::Warning("Warning: -partition argument is ignored due to -rhs kellogg");
+			Utils::Warning("-partition argument is ignored due to -tc kellogg");
 
 		args.Problem.Partition = "chiasmus";
 		args.Problem.AnisotropyRatio = 1;
-		args.Problem.Kappa1 = 1;
-		args.Problem.Kappa2 = 161.4476387975881;
+		double kappa1 = 1;
+		double kappa2 = 161.4476387975881;
+		args.Problem.HeterogeneityRatio = kappa1 / kappa2;
 	}
 
 	if (args.Problem.Dimension > 1 && args.Discretization.Method.compare("dg") == 0 && args.Discretization.PolyDegree == 0)
@@ -773,6 +774,9 @@ int main(int argc, char* argv[])
 
 	if (args.Discretization.Method.compare("dg") == 0 && args.Problem.BCCode.compare("d") != 0)
 		argument_error("In DG, only Dirichlet conditions are implemented.");
+
+	if (args.Discretization.Method.compare("dg") == 0 && args.Problem.AnisotropyRatio != 1)
+		argument_error("In DG, anisotropy is not implemented.");
 
 	if (args.Problem.Dimension == 1 && args.Discretization.Method.compare("hho") == 0 && args.Discretization.PolyDegree != 1)
 		argument_error("HHO in 1D only exists for p = 1.");

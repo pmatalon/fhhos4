@@ -31,7 +31,7 @@ TestCase<1>* TestCaseFactory<1>::Create(string tcCode, DiffusionField<1>* diffus
 	if (tcCode.compare("heterog") == 0)
 		return new Heterogeneity1DTestCase(diffusionField, bcCode);
 
-	Utils::FatalError("Test case '" + tcCode + "' is unknown or not implemented in 1D. Check -rhs argument.");
+	Utils::FatalError("Test case '" + tcCode + "' is unknown or not implemented in 1D. Check -tc argument.");
 }
 
 template <>
@@ -52,7 +52,7 @@ TestCase<2>* TestCaseFactory<2>::Create(string tcCode, DiffusionField<2>* diffus
 	if (tcCode.compare("kellogg") == 0)
 		return new KelloggTestCase(diffusionField, bcCode);
 
-	Utils::FatalError("Test case '" + tcCode + "' is unknown or not implemented in 2D. Check -rhs argument.");
+	Utils::FatalError("Test case '" + tcCode + "' is unknown or not implemented in 2D. Check -tc argument.");
 }
 
 template <>
@@ -65,5 +65,5 @@ TestCase<3>* TestCaseFactory<3>::Create(string tcCode, DiffusionField<3>* diffus
 	if (tcCode.compare("exp") == 0)
 		return new ExpSolution3DTestCase(diffusionField, bcCode);
 
-	Utils::FatalError("Test case '" + tcCode + "' is unknown or not implemented in 3D. Check -rhs argument.");
+	Utils::FatalError("Test case '" + tcCode + "' is unknown or not implemented in 3D. Check -tc argument.");
 }
