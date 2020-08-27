@@ -12,6 +12,7 @@ private:
 public:
 	BigNumber Number;
 	bool IsDomainBoundary;
+	int PhysicalBoundaryId = 0;
 	Element<Dim>* Element1;
 	Element<Dim>* Element2;
 
@@ -26,11 +27,11 @@ public:
 		this->Number = number;
 		this->Element1 = element1;
 		this->Element2 = element2;
-		this->IsDomainBoundary = element2 == NULL;
+		this->IsDomainBoundary = (element2 == nullptr);
 		this->_boundaryConditionType = BoundaryConditionType::NotOnBoundary;
 	}
 	Face(BigNumber number, Element<Dim>* element1)
-		:Face(number, element1, NULL)
+		:Face(number, element1, nullptr)
 	{
 		this->IsDomainBoundary = true;
 		this->_boundaryConditionType = BoundaryConditionType::Dirichlet;

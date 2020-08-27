@@ -92,6 +92,7 @@ protected:
 	// Dim-specific functions
 	virtual Element<Dim>* CreateElement(int elemType, size_t elementTag, const vector<size_t>& elementNodes, size_t& elemNodeIndex, BigNumber elemNumber) { return nullptr; }
 	void CreateFaces(int elemType, BigNumber& faceNumber) { }
+	virtual Face<Dim>* GetBoundaryFaceFromGMSHNodes(int faceType, const vector<size_t>& faceNodes, size_t& faceNodeIndex) { return nullptr; }
 
 public:
 	BigNumber N()
@@ -178,16 +179,8 @@ private:
 		// Physical groups //
 		//-----------------//
 
-		gmsh::vectorpair phyGroupsDimTags;
-		gmsh::model::getPhysicalGroups(phyGroupsDimTags, Dim);
-
-		vector<PhysicalGroup> physicalGroups;
-		for (size_t i = 0; i < phyGroupsDimTags.size(); i++)
-		{
-			PhysicalGroup phyGroup(phyGroupsDimTags[i].second);
-			gmsh::model::getPhysicalName(Dim, phyGroup.Id, phyGroup.Name);
-			physicalGroups.push_back(phyGroup);
-		}
+		vector<PhysicalGroup> physicalGroups = GetPhysicalGroups(Dim);
+		vector<PhysicalGroup> boundaries = GetPhysicalGroups(Dim-1);
 		
 		//----------//
 		// Vertices //
@@ -292,23 +285,88 @@ private:
 		//   Faces   //
 		//-----------//
 
+		// Create all the faces
 		BigNumber faceNumber = 0;
 		for (int i = 0; i < elementTypes.size(); i++)
 		{
 			int elemType = elementTypes[i];
 			CreateFaces(elemType, faceNumber);
 		}
+
+		// Affectation of the physical boundaries
+		if (!boundaries.empty())
+		{
+			gmsh::vectorpair faceEntitiesDimTags;
+			gmsh::model::getEntities(faceEntitiesDimTags, Dim - 1);
+
+			vector<int> faceTypes;
+			int nFaces = 0;
+			for (int k = 0; k < faceEntitiesDimTags.size(); k++)
+			{
+				int entityTag = faceEntitiesDimTags[k].second;
+
+				vector<int> physicalTags;
+				gmsh::model::getPhysicalGroupsForEntity(Dim - 1, entityTag, physicalTags);
+
+				if (physicalTags.empty())
+					continue;
+				if (physicalTags.size() > 1)
+					Utils::FatalError("Entity " + to_string(entityTag) + " must have only one physical group (" + to_string(physicalTags.size()) + " found). Check GMSH file.");
+
+				int physicalBoundaryId = physicalTags[0];
+
+				// Get faces in this entity
+				faceTypes.clear();
+				vector<vector<size_t>> faceTags;
+				vector<vector<size_t>> faceNodeTags;
+				gmsh::model::mesh::getElements(faceTypes, faceTags, faceNodeTags, Dim - 1, entityTag);
+
+				for (int i = 0; i < faceTypes.size(); i++)
+				{
+					int faceType = faceTypes[i];
+					vector<size_t> faces = faceTags[i];
+					vector<size_t> faceNodes = faceNodeTags[i];
+
+					size_t faceNodeIndex = 0;
+					for (size_t j = 0; j < faces.size(); j++)
+					{
+						Face<Dim>* f = GetBoundaryFaceFromGMSHNodes(faceType, faceNodes, faceNodeIndex);
+						f->PhysicalBoundaryId = physicalBoundaryId;
+					}
+				}
+			}
+		}
+
 	}
 
 protected:
-	inline MeshVertex<Dim>* GetVertex(BigNumber nodeTag)
+	inline MeshVertex<Dim>* GetVertexFromGMSHTag(BigNumber nodeTag)
 	{
 		return _vertexExternalNumbers.at(nodeTag);
 	}
 
-	inline Element<Dim>* GetElement(BigNumber elementTag)
+	inline Element<Dim>* GetElementFromGMSHTag(BigNumber elementTag)
 	{
 		return _elementExternalNumbers.at(elementTag);
+	}
+
+	inline Face<Dim>* GetFaceFromGMSHTag(BigNumber faceTag)
+	{
+		return _faceExternalNumbers.at(faceTag);
+	}
+
+	static vector<PhysicalGroup> GetPhysicalGroups(int dim)
+	{
+		gmsh::vectorpair phyGroupsDimTags;
+		gmsh::model::getPhysicalGroups(phyGroupsDimTags, dim);
+		vector<PhysicalGroup> physicalGroups;
+		for (size_t i = 0; i < phyGroupsDimTags.size(); i++)
+		{
+			PhysicalGroup phyGroup(phyGroupsDimTags[i].second);
+			gmsh::model::getPhysicalName(dim, phyGroup.Id, phyGroup.Name);
+			physicalGroups.push_back(phyGroup);
+		}
+		return physicalGroups;
 	}
 
 public:
@@ -453,7 +511,7 @@ private:
 			coarseElementType, coarseElementNodes, u, v, w, // useless parameters for us
 			Dim, strictResearch);
 
-		return GetElement(coarseElementTag);
+		return GetElementFromGMSHTag(coarseElementTag);
 	}
 
 protected:
@@ -572,7 +630,7 @@ Element<2>* GMSHMesh<2>::CreateElement(int elemType, size_t elementTag, const ve
 		size_t nodeTag3 = elementNodes[elemNodeIndex + 2];
 		size_t nodeTag4 = elementNodes[elemNodeIndex + 3];
 
-		e = new QuadrilateralElement(elemNumber, GetVertex(nodeTag1), GetVertex(nodeTag2), GetVertex(nodeTag3), GetVertex(nodeTag4));
+		e = new QuadrilateralElement(elemNumber, GetVertexFromGMSHTag(nodeTag1), GetVertexFromGMSHTag(nodeTag2), GetVertexFromGMSHTag(nodeTag3), GetVertexFromGMSHTag(nodeTag4));
 		_elementExternalNumbers.insert({ elementTag, e });
 		elemNodeIndex += 4;
 	}
@@ -582,7 +640,7 @@ Element<2>* GMSHMesh<2>::CreateElement(int elemType, size_t elementTag, const ve
 		size_t nodeTag2 = elementNodes[elemNodeIndex + 1];
 		size_t nodeTag3 = elementNodes[elemNodeIndex + 2];
 
-		e = new TriangularElement(elemNumber, GetVertex(nodeTag1), GetVertex(nodeTag2), GetVertex(nodeTag3));
+		e = new TriangularElement(elemNumber, GetVertexFromGMSHTag(nodeTag1), GetVertexFromGMSHTag(nodeTag2), GetVertexFromGMSHTag(nodeTag3));
 		_elementExternalNumbers.insert({ elementTag, e });
 		elemNodeIndex += 3;
 	}
@@ -607,20 +665,20 @@ Element<3>* GMSHMesh<3>::CreateElement(int elemType, size_t elementTag, const ve
 		size_t nodeTag3 = elementNodes[elemNodeIndex + 2];
 		size_t nodeTag4 = elementNodes[elemNodeIndex + 3];
 
-		e = new TetrahedralElement(elemNumber, GetVertex(nodeTag1), GetVertex(nodeTag2), GetVertex(nodeTag3), GetVertex(nodeTag4));
+		e = new TetrahedralElement(elemNumber, GetVertexFromGMSHTag(nodeTag1), GetVertexFromGMSHTag(nodeTag2), GetVertexFromGMSHTag(nodeTag3), GetVertexFromGMSHTag(nodeTag4));
 		_elementExternalNumbers.insert({ elementTag, e });
 		elemNodeIndex += 4;
 	}
 	else if (elemType == GMSH_Hexahedron && this->FileNamePart().compare("gmsh-cart") == 0)
 	{
-		Vertex* v1 = GetVertex(elementNodes[elemNodeIndex]);     // (0, 1, 1)
-		Vertex* v2 = GetVertex(elementNodes[elemNodeIndex + 1]); // (0, 1, 0)
-		Vertex* v3 = GetVertex(elementNodes[elemNodeIndex + 2]); // (1, 1, 0)
-		Vertex* v4 = GetVertex(elementNodes[elemNodeIndex + 3]); // (1, 1, 1)
-		Vertex* v5 = GetVertex(elementNodes[elemNodeIndex + 4]); // (0, 0, 1)
-		Vertex* v6 = GetVertex(elementNodes[elemNodeIndex + 5]); // (0, 0, 0)
-		Vertex* v7 = GetVertex(elementNodes[elemNodeIndex + 6]); // (1, 0, 0)
-		Vertex* v8 = GetVertex(elementNodes[elemNodeIndex + 7]); // (1, 0, 1)
+		Vertex* v1 = GetVertexFromGMSHTag(elementNodes[elemNodeIndex]);     // (0, 1, 1)
+		Vertex* v2 = GetVertexFromGMSHTag(elementNodes[elemNodeIndex + 1]); // (0, 1, 0)
+		Vertex* v3 = GetVertexFromGMSHTag(elementNodes[elemNodeIndex + 2]); // (1, 1, 0)
+		Vertex* v4 = GetVertexFromGMSHTag(elementNodes[elemNodeIndex + 3]); // (1, 1, 1)
+		Vertex* v5 = GetVertexFromGMSHTag(elementNodes[elemNodeIndex + 4]); // (0, 0, 1)
+		Vertex* v6 = GetVertexFromGMSHTag(elementNodes[elemNodeIndex + 5]); // (0, 0, 0)
+		Vertex* v7 = GetVertexFromGMSHTag(elementNodes[elemNodeIndex + 6]); // (1, 0, 0)
+		Vertex* v8 = GetVertexFromGMSHTag(elementNodes[elemNodeIndex + 7]); // (1, 0, 1)
 
 		Vertex* backLeftBottomCorner = v6;
 		Vertex* frontLeftBottomCorner = v7;
@@ -653,8 +711,8 @@ void GMSHMesh<2>::CreateFaces(int elemType, BigNumber& faceNumber)
 
 	for (size_t j = 0; j < edgeNodes.size(); j += 2)
 	{
-		MeshVertex<2>* v1 = (MeshVertex<2>*)GetVertex(edgeNodes[j]);
-		MeshVertex<2>* v2 = (MeshVertex<2>*)GetVertex(edgeNodes[j + 1]);
+		MeshVertex<2>* v1 = (MeshVertex<2>*)GetVertexFromGMSHTag(edgeNodes[j]);
+		MeshVertex<2>* v2 = (MeshVertex<2>*)GetVertexFromGMSHTag(edgeNodes[j + 1]);
 
 		bool edgeAlreadyExists = false;
 		for (Face<2>* f : v1->Faces)
@@ -734,7 +792,7 @@ void GMSHMesh<3>::CreateFaces(int elemType, BigNumber& faceNumber)
 		vector<MeshVertex<3>*> vertices(nFaceVertices);
 		for (int k = 0; k < nFaceVertices; k++)
 		{
-			MeshVertex<3>* v = (MeshVertex<3>*)GetVertex(faceNodes[j+k]);
+			MeshVertex<3>* v = (MeshVertex<3>*)GetVertexFromGMSHTag(faceNodes[j+k]);
 			vertices[k] = v;
 		}
 
@@ -892,4 +950,24 @@ void GMSHMesh<3>::CreateFaces(int elemType, BigNumber& faceNumber)
 		for (MeshVertex<3>* v : vertices)
 			v->Faces.push_back(face);
 	}
+}
+
+
+
+
+template<>
+Face<2>* GMSHMesh<2>::GetBoundaryFaceFromGMSHNodes(int faceType, const vector<size_t>& faceNodes, size_t& faceNodeIndex)
+{
+	assert(faceType == GMSHElementTypes::GMSH_Segment);
+
+	MeshVertex<2>* v1 = (MeshVertex<2>*)GetVertexFromGMSHTag(faceNodes[faceNodeIndex]);
+	MeshVertex<2>* v2 = (MeshVertex<2>*)GetVertexFromGMSHTag(faceNodes[faceNodeIndex + 1]);
+	faceNodeIndex += 2;
+
+	for (Face<2>* f : v1->Faces)
+	{
+		if (f->IsDomainBoundary && f->HasVertex(v2))
+			return f;
+	}
+	assert(false && "Face not found");
 }
