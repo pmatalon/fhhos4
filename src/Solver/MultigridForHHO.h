@@ -211,11 +211,14 @@ private:
 			
 			int nFaceUnknowns = finePb->HHO->nFaceUnknowns;
 
-			FaceParallelLoop<Dim> parallelLoop(finePb->_mesh->InteriorFaces);
+			FaceParallelLoop<Dim> parallelLoop(finePb->_mesh->Faces);
 			parallelLoop.ReserveChunkCoeffsSize(nFaceUnknowns * 2 * nFaceUnknowns);
 
 			parallelLoop.Execute([this, P_algo1, J_faces, nFaceUnknowns](Face<Dim>* f, ParallelChunk<CoeffsChunk>* chunk)
 				{
+					if (f->HasDirichletBC())
+						return;
+
 					Diff_HHOFace<Dim>* fineFace = dynamic_cast<Diff_HHOFace<Dim>*>(f);
 					if (f->IsRemovedOnCoarserGrid)
 						chunk->Results.Coeffs.CopyRows(fineFace->Number*nFaceUnknowns, nFaceUnknowns, P_algo1);
@@ -223,7 +226,7 @@ private:
 						chunk->Results.Coeffs.CopyRows(fineFace->Number*nFaceUnknowns, nFaceUnknowns, J_faces);
 				});
 
-			P = SparseMatrix(finePb->HHO->nInteriorFaces * nFaceUnknowns, coarsePb->HHO->nInteriorFaces * nFaceUnknowns);
+			P = SparseMatrix(finePb->HHO->nInteriorAndNeumannFaces * nFaceUnknowns, coarsePb->HHO->nInteriorAndNeumannFaces * nFaceUnknowns);
 			parallelLoop.Fill(P);
 		}
 		else if (_prolongationCode == Prolongation::CellInterp_Inject_Adjoint)
@@ -270,7 +273,7 @@ private:
 						Face<Dim>* condensedFineFace = coarseElem->FinerFacesRemoved[i];
 						for (Face<Dim>* coarseFace : coarseElem->Faces)
 						{
-							if (coarseFace->IsDomainBoundary)
+							if (coarseFace->HasDirichletBC())
 								continue;
 
 							BigNumber coarseFaceLocalNumberInCoarseElem = coarseElem->LocalNumberOf(coarseFace);
@@ -280,7 +283,7 @@ private:
 
 					for (Face<Dim>* cf : coarseElem->Faces)
 					{
-						if (cf->IsDomainBoundary)
+						if (cf->HasDirichletBC())
 							continue;
 
 						Diff_HHOFace<Dim>* coarseFace = dynamic_cast<Diff_HHOFace<Dim>*>(cf);
@@ -293,7 +296,7 @@ private:
 					}
 				});
 
-			P = SparseMatrix(finePb->HHO->nInteriorFaces * nFaceUnknowns, coarsePb->HHO->nInteriorFaces * nFaceUnknowns);
+			P = SparseMatrix(finePb->HHO->nInteriorAndNeumannFaces * nFaceUnknowns, coarsePb->HHO->nInteriorAndNeumannFaces * nFaceUnknowns);
 			parallelLoop.Fill(P);
 		}
 		else if (_prolongationCode == Prolongation::FaceInject)
@@ -376,7 +379,9 @@ private:
 
 	inline double Weight(Element<Dim>* element, Face<Dim>* face)
 	{
-		if (_weightCode.compare("k") == 0)
+		if (face->IsDomainBoundary)
+			return 1;
+		else if (_weightCode.compare("k") == 0)
 		{
 			auto n = element->OuterNormalVector(face);
 			double k = (element->DiffTensor * n).dot(n);
@@ -418,7 +423,7 @@ private:
 
 				for (auto f : element->Faces)
 				{
-					if (f->IsDomainBoundary)
+					if (f->HasDirichletBC())
 						continue;
 
 					Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
@@ -455,7 +460,7 @@ private:
 
 				for (auto f : element->Faces)
 				{
-					if (f->IsDomainBoundary)
+					if (f->HasDirichletBC())
 						continue;
 
 					Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
@@ -488,7 +493,7 @@ private:
 
 				for (auto f : element->Faces)
 				{
-					if (f->IsDomainBoundary)
+					if (f->HasDirichletBC())
 						continue;
 
 					Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
@@ -515,14 +520,17 @@ private:
 		int nFaceUnknowns = finePb->HHO->nFaceUnknowns;
 		int nCellUnknowns = _cellInterpolationBasis->Size();
 
-		FaceParallelLoop<Dim> parallelLoop(finePb->_mesh->InteriorFaces);
+		FaceParallelLoop<Dim> parallelLoop(finePb->_mesh->Faces);
 		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nFaceUnknowns);
 
 		parallelLoop.Execute([this, nCellUnknowns, nFaceUnknowns](Face<Dim>* f, ParallelChunk<CoeffsChunk>* chunk)
 			{
+				if (f->HasDirichletBC())
+					return;
+
 				Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
 				BigNumber faceGlobalNumber = face->Number;
-				if (face->IsRemovedOnCoarserGrid)
+				if (face->IsDomainBoundary || face->IsRemovedOnCoarserGrid)
 				{
 					Element<Dim>* coarseElem = face->Element1->CoarserElement;
 					BigNumber coarseElemGlobalNumber = coarseElem->Number;
@@ -574,7 +582,7 @@ private:
 
 				for (auto f : element->Faces)
 				{
-					if (f->IsDomainBoundary)
+					if (f->HasDirichletBC())
 						continue;
 
 					Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
@@ -665,11 +673,14 @@ private:
 		FunctionalBasis<Dim - 1>* faceBasis = finePb->HHO->FaceBasis;
 		int nFaceUnknowns = faceBasis->Size();
 
-		FaceParallelLoop<Dim> parallelLoop(coarseMesh->InteriorFaces);
+		FaceParallelLoop<Dim> parallelLoop(coarseMesh->Faces);
 		parallelLoop.ReserveChunkCoeffsSize(nFaceUnknowns * 2 * nFaceUnknowns);
 
 		parallelLoop.Execute([this, faceBasis, nFaceUnknowns](Face<Dim>* cf, ParallelChunk<CoeffsChunk>* chunk)
 			{
+				if (cf->HasDirichletBC())
+					return;
+
 				Diff_HHOFace<Dim>* coarseFace = dynamic_cast<Diff_HHOFace<Dim>*>(cf);
 
 				DenseMatrix local_J_f_c = coarseFace->ComputeCanonicalInjectionMatrixCoarseToFine(faceBasis);
@@ -683,7 +694,7 @@ private:
 				}
 			});
 
-		SparseMatrix J_f_c(finePb->HHO->nInteriorFaces * nFaceUnknowns, coarsePb->HHO->nInteriorFaces * nFaceUnknowns);
+		SparseMatrix J_f_c(finePb->HHO->nInteriorAndNeumannFaces * nFaceUnknowns, coarsePb->HHO->nInteriorAndNeumannFaces * nFaceUnknowns);
 		parallelLoop.Fill(J_f_c);
 		return J_f_c;
 	}

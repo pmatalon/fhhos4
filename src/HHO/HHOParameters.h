@@ -14,6 +14,7 @@ struct HHOParameters
 	BigNumber nBoundaryFaces;
 	BigNumber nDirichletFaces;
 	BigNumber nNeumannFaces;
+	BigNumber nInteriorAndNeumannFaces;
 
 	int nFaceUnknowns;
 	int nCellUnknowns;
@@ -41,13 +42,14 @@ struct HHOParameters
 		nBoundaryFaces = mesh->BoundaryFaces.size();
 		nDirichletFaces = mesh->DirichletFaces.size();
 		nNeumannFaces = mesh->NeumannFaces.size();
+		nInteriorAndNeumannFaces = nInteriorFaces + nNeumannFaces;
 
 		nFaceUnknowns = faceBasis->Size();
 		nCellUnknowns = cellBasis->Size();
 		nReconstructUnknowns = reconstructionBasis->Size();
 
 		nTotalCellUnknowns = nElements * nCellUnknowns;
-		nTotalFaceUnknowns = (nInteriorFaces + nNeumannFaces) * nFaceUnknowns;
+		nTotalFaceUnknowns = nInteriorAndNeumannFaces * nFaceUnknowns;
 		nTotalHybridUnknowns = nTotalCellUnknowns + nTotalFaceUnknowns;
 		nTotalHybridCoeffs = nTotalCellUnknowns + nFaces * nFaceUnknowns;
 
