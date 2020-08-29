@@ -381,6 +381,7 @@ public:
 
 		// Dirichlet
 		this->_dirichletCond = Vector(HHO->nDirichletUnknowns);
+		assert(!this->_mesh->DirichletFaces.empty());
 		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->DirichletFaces, [this, faceBasis](Face<Dim>* f)
 			{
 				Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
@@ -388,7 +389,6 @@ public:
 				this->_dirichletCond.segment(i, HHO->nFaceUnknowns) = face->InvFaceMassMatrix()*face->ProjectOnBasis(faceBasis, this->_boundaryConditions->DirichletFunction);
 			}
 		);
-		//cout << this->_dirichletCond << endl;
 		this->_globalRHS -= extendedMatrix.topRightCorner(HHO->nTotalHybridUnknowns, HHO->nDirichletUnknowns) * this->_dirichletCond;
 
 		//---------------------//

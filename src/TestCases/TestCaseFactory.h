@@ -9,6 +9,7 @@
 #include "2D/OneSolution2DTestCase.h"
 #include "2D/XSolution2DTestCase.h"
 #include "2D/KelloggTestCase.h"
+#include "2D/BarWith4HolesTestCase.h"
 #include "3D/SineSolution3DTestCase.h"
 #include "3D/PolySolution3DTestCase.h"
 #include "3D/ExpSolution3DTestCase.h"
@@ -51,6 +52,8 @@ TestCase<2>* TestCaseFactory<2>::Create(string tcCode, DiffusionField<2>* diffus
 		return new XSolution2DTestCase(diffusionField, bcCode);
 	if (tcCode.compare("kellogg") == 0)
 		return new KelloggTestCase(diffusionField, bcCode);
+	if (tcCode.compare("barwith4holes") == 0)
+		return new BarWith4HolesTestCase(diffusionField, bcCode);
 
 	Utils::FatalError("Test case '" + tcCode + "' is unknown or not implemented in 2D. Check -tc argument.");
 }

@@ -5,6 +5,7 @@
 #include "Vertex.h"
 #include "../Geometry/PhysicalShape.h"
 #include "../Problem/DiffusionField.h"
+#include "PhysicalGroup.h"
 using namespace std;
 
 template <int Dim>

@@ -83,18 +83,18 @@ public:
 		else
 			Mesh<Dim>::CoarsenMesh(strategy);
 
-		this->CoarseMesh->FillBoundaryAndInteriorFaceLists();
-
 		this->CoarseMesh->SetDiffusionField(this->_diffusionField);
-		this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
 	}
 
-	virtual void Init()
+protected:
+	virtual void FinalizeCoarsening() override
 	{
-		ElementParallelLoop<Dim> parallelLoop(this->Elements);
+		Mesh<Dim>::FinalizeCoarsening();
+
+		ElementParallelLoop<Dim> parallelLoop(this->CoarseMesh->Elements);
 		parallelLoop.Execute([](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
 			{
-				// Make Init() available for all element classes
+				// TODO: Make Init() available for all element classes
 				Polygon* p = dynamic_cast<Polygon*>(e->Shape());
 				if (p)
 				{
@@ -114,8 +114,7 @@ private:
 	void CoarsenByAgglomerationByMostCoplanarFaces()
 	{
 		PolyhedralMesh<Dim>* coarseMesh = new PolyhedralMesh<Dim>();
-		this->CoarseMesh = coarseMesh;
-		coarseMesh->FineMesh = this;
+		this->InitializeCoarsening(coarseMesh);
 
 		//BigNumber elementToAnalyze = 999999999999;
 
@@ -376,6 +375,8 @@ private:
 				vertices.insert(v);
 		}
 		coarseMesh->Vertices = vector<Vertex*>(vertices.begin(), vertices.end());
+
+		this->FinalizeCoarsening();
 	}
 
 	//-------------------------------------------------------------------------------------------------------------------------//
@@ -504,8 +505,7 @@ private:
 	void CoarsenByAgglomerationBySeedPoints()
 	{
 		PolyhedralMesh<Dim>* coarseMesh = new PolyhedralMesh<Dim>();
-		this->CoarseMesh = coarseMesh;
-		coarseMesh->FineMesh = this;
+		this->InitializeCoarsening(coarseMesh);
 
 		for (Element<Dim>* e : this->Elements)
 		{
@@ -531,6 +531,7 @@ private:
 		}
 
 		_seedElements.clear();
+		this->FinalizeCoarsening();
 	}
 
 	bool CanBeSeed(Element<Dim>* e)
@@ -581,8 +582,7 @@ private:
 	void CoarsenByAgglomerationByFaceNeighbours()
 	{
 		PolyhedralMesh<Dim>* coarseMesh = new PolyhedralMesh<Dim>();
-		this->CoarseMesh = coarseMesh;
-		coarseMesh->FineMesh = this;
+		this->InitializeCoarsening(coarseMesh);
 
 		for (Element<Dim>* currentElem : this->Elements)
 		{
@@ -634,7 +634,7 @@ private:
 
 		cout << uncoarsenedFaces.size() << " faces not removed or coarsened remain (out of " << this->Faces.size() << " faces)." << endl;
 
-		coarseMesh->Init();
+		this->FinalizeCoarsening();
 	}
 
 	//-----------------------------------------------//
@@ -646,8 +646,7 @@ private:
 	void CoarsenByAgglomerationByVertexNeighbours()
 	{
 		PolyhedralMesh<Dim>* coarseMesh = new PolyhedralMesh<Dim>();
-		this->CoarseMesh = coarseMesh;
-		coarseMesh->FineMesh = this;
+		this->InitializeCoarsening(coarseMesh);
 
 		// Associate to each vertex the list of elements it connects
 		map<Vertex*, vector<Element<Dim>*>> vertexElements = BuildVertexElementMap();
@@ -678,7 +677,7 @@ private:
 		}
 
 		vertexElements.clear();
-		coarseMesh->Init();
+		this->FinalizeCoarsening();
 	}
 
 	//--------------------------------------------//
@@ -693,6 +692,7 @@ private:
 	void CoarsenByAgglomerationByVertexRemoval()
 	{
 		PolyhedralMesh<Dim>* coarseMesh = new PolyhedralMesh<Dim>();
+		this->InitializeCoarsening(coarseMesh);
 
 		// Associate to each vertex the list of elements it connects
 		map<Vertex*, vector<Element<Dim>*>> vertexElements = BuildVertexElementMap();
@@ -731,8 +731,7 @@ private:
 					vertexElements[v2].clear();
 			}
 		}
-
-		this->CoarseMesh = coarseMesh;
+		this->FinalizeCoarsening();
 	}
 
 
@@ -876,7 +875,7 @@ private:
 		}
 
 		RemoveIntermediaryCoarsenings(coarseMesh);
-		coarseMesh->Init();
+		this->FinalizeCoarsening();
 	}
 
 	//----------------------------------------------------------------------------//
@@ -936,8 +935,7 @@ private:
 	void AggregatePairsOfElements(CoarseningStrategy strategy)
 	{
 		PolyhedralMesh<Dim>* coarseMesh = new PolyhedralMesh<Dim>();
-		this->CoarseMesh = coarseMesh;
-		coarseMesh->FineMesh = this;
+		this->InitializeCoarsening(coarseMesh);
 
 		for (Element<Dim>* e : this->Elements)
 		{
@@ -1438,6 +1436,14 @@ private:
 		// The faces and mergedFace must be at the same level.
 
 		mergedFace->IsDomainBoundary = faces[0]->IsDomainBoundary;
+		for (Face<Dim>* f : faces)
+		{
+			if (faces[0]->BoundaryPart)
+				assert(f->BoundaryPart->Id == faces[0]->BoundaryPart->Id && "To be agglomerated, all faces must have the same BoundaryPart.");
+			else
+				assert(!f->BoundaryPart && "To be agglomerated, all faces must have the same BoundaryPart.");
+		}
+		mergedFace->BoundaryPart = faces[0]->BoundaryPart;
 
 		// Replace in the elements
 		Element<Dim>* elem1 = faces[0]->Element1;
@@ -1478,6 +1484,7 @@ private:
 			BigNumber faceNumber = this->Faces.size();
 			Face<Dim>* copy = f->CreateSameGeometricFace(faceNumber, macroElement);
 			copy->IsDomainBoundary = f->IsDomainBoundary;
+			copy->BoundaryPart = f->BoundaryPart;
 
 			// Associate
 			f->CoarseFace = copy;

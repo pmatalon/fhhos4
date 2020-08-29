@@ -38,7 +38,7 @@ protected:
 	double _regularity = 1;
 	BigNumber _N;
 public:
-	GMSHMesh(string mshFile, string description, string fileNamePart, BigNumber n = 0) 
+	GMSHMesh(string mshFile, string description, string fileNamePart, BigNumber n = 0, bool buildMesh = true) 
 		: PolyhedralMesh<Dim>()
 	{
 		_description = description;
@@ -66,7 +66,8 @@ public:
 
 		gmsh::open(mshFile);
 
-		Build();
+		if (buildMesh)
+			Build();
 
 		if (tmpFileCreated)
 			remove(mshFile.c_str());
@@ -86,7 +87,6 @@ protected:
 	{
 		_description = description;
 		_fileNamePart = fileNamePart;
-		Build();
 	}
 
 	// Dim-specific functions
@@ -179,8 +179,10 @@ private:
 		// Physical groups //
 		//-----------------//
 
-		vector<PhysicalGroup> physicalGroups = GetPhysicalGroups(Dim);
-		vector<PhysicalGroup> boundaries = GetPhysicalGroups(Dim-1);
+		if (this->PhysicalParts.empty())
+			this->PhysicalParts = GetPhysicalGroups();
+		if (this->BoundaryParts.empty())
+			this->BoundaryParts = GetBoundaryGroups();
 		
 		//----------//
 		// Vertices //
@@ -234,14 +236,14 @@ private:
 
 			vector<int> physicalTags;
 			gmsh::model::getPhysicalGroupsForEntity(Dim, entityTag, physicalTags);
-			if (!physicalGroups.empty() && physicalTags.empty())
+			if (!this->PhysicalParts.empty() && physicalTags.empty())
 				Utils::FatalError("Entity " + to_string(entityTag) + " has no physical group. Check GMSH file.");
-			if (physicalGroups.empty() && !physicalTags.empty())
+			if (this->PhysicalParts.empty() && !physicalTags.empty())
 				Utils::FatalError("Entity " + to_string(entityTag) + " has a physical group although no physical group has been defined. This should never happen.");
 			if (physicalTags.size() > 1)
 				Utils::FatalError("Entity " + to_string(entityTag) + " must have only one physical group (" + to_string(physicalTags.size()) + " found). Check GMSH file.");
 			
-			int physicalGroupId = physicalGroups.empty() ? 0 : physicalTags[0];
+			int physicalGroupId = this->PhysicalParts.empty() ? 0 : physicalTags[0];
 
 
 			// Get elements in this entity
@@ -294,7 +296,7 @@ private:
 		}
 
 		// Affectation of the physical boundaries
-		if (!boundaries.empty())
+		if (!this->BoundaryParts.empty())
 		{
 			gmsh::vectorpair faceEntitiesDimTags;
 			gmsh::model::getEntities(faceEntitiesDimTags, Dim - 1);
@@ -313,7 +315,16 @@ private:
 				if (physicalTags.size() > 1)
 					Utils::FatalError("Entity " + to_string(entityTag) + " must have only one physical group (" + to_string(physicalTags.size()) + " found). Check GMSH file.");
 
-				int physicalBoundaryId = physicalTags[0];
+				BoundaryGroup* boundaryPart = nullptr;
+				for (BoundaryGroup* bp : this->BoundaryParts)
+				{
+					if (bp->Id == physicalTags[0])
+					{
+						boundaryPart = bp;
+						break;
+					}
+				}
+				assert(boundaryPart);
 
 				// Get faces in this entity
 				faceTypes.clear();
@@ -331,7 +342,7 @@ private:
 					for (size_t j = 0; j < faces.size(); j++)
 					{
 						Face<Dim>* f = GetBoundaryFaceFromGMSHNodes(faceType, faceNodes, faceNodeIndex);
-						f->PhysicalBoundaryId = physicalBoundaryId;
+						f->BoundaryPart = boundaryPart;
 					}
 				}
 			}
@@ -350,20 +361,29 @@ protected:
 		return _elementExternalNumbers.at(elementTag);
 	}
 
-	inline Face<Dim>* GetFaceFromGMSHTag(BigNumber faceTag)
-	{
-		return _faceExternalNumbers.at(faceTag);
-	}
-
-	static vector<PhysicalGroup> GetPhysicalGroups(int dim)
+	vector<PhysicalGroup*> GetPhysicalGroups()
 	{
 		gmsh::vectorpair phyGroupsDimTags;
-		gmsh::model::getPhysicalGroups(phyGroupsDimTags, dim);
-		vector<PhysicalGroup> physicalGroups;
+		gmsh::model::getPhysicalGroups(phyGroupsDimTags, Dim);
+		vector<PhysicalGroup*> physicalGroups;
 		for (size_t i = 0; i < phyGroupsDimTags.size(); i++)
 		{
-			PhysicalGroup phyGroup(phyGroupsDimTags[i].second);
-			gmsh::model::getPhysicalName(dim, phyGroup.Id, phyGroup.Name);
+			PhysicalGroup* phyGroup = new PhysicalGroup(phyGroupsDimTags[i].second);
+			gmsh::model::getPhysicalName(Dim, phyGroup->Id, phyGroup->Name);
+			physicalGroups.push_back(phyGroup);
+		}
+		return physicalGroups;
+	}
+
+	vector<BoundaryGroup*> GetBoundaryGroups()
+	{
+		gmsh::vectorpair phyGroupsDimTags;
+		gmsh::model::getPhysicalGroups(phyGroupsDimTags, Dim-1);
+		vector<BoundaryGroup*> physicalGroups;
+		for (size_t i = 0; i < phyGroupsDimTags.size(); i++)
+		{
+			BoundaryGroup* phyGroup = new BoundaryGroup(phyGroupsDimTags[i].second);
+			gmsh::model::getPhysicalName(Dim-1, phyGroup->Id, phyGroup->Name);
 			physicalGroups.push_back(phyGroup);
 		}
 		return physicalGroups;
@@ -409,7 +429,6 @@ public:
 			PolyhedralMesh<Dim>::CoarsenMesh(strategy);
 
 		this->CoarseMesh->SetDiffusionField(this->_diffusionField);
-		this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
 	}
 
 	virtual void RefineMesh(CoarseningStrategy strategy)
@@ -438,10 +457,9 @@ public:
 
 		// Building our own mesh objects from the GMSH ones
 		GMSHMesh<Dim>* fineMesh = CreateNewGMSHMesh();
+		this->InitializeRefinement(fineMesh);
 		fineMesh->ComesFrom.CS = CoarseningStrategy::GMSHSplittingRefinement;
-
-		this->FineMesh = fineMesh;
-		this->FineMesh->CoarseMesh = this;
+		fineMesh->Build();
 
 		// Save the fine mesh in a temporary file because we're going to reload the coarse one
 		gmsh::write(fine_mesh_tmp_file);
@@ -464,6 +482,8 @@ public:
 
 		// Continue linking
 		fineMesh->LinkFacesToCoarseFaces();
+
+		this->FinalizeRefinement();
 	}
 
 	virtual GMSHMesh<Dim>* CreateNewGMSHMesh()
@@ -480,11 +500,10 @@ private:
 
 		GMSHMesh<Dim>* fineMesh = this;
 
-		GMSHMesh<Dim>* coarseMesh = new GMSHMesh<Dim>(_gmshFilePath, _description, _fileNamePart, fineMesh->N() / 2);
+		GMSHMesh<Dim>* coarseMesh = new GMSHMesh<Dim>(_gmshFilePath, _description, _fileNamePart, fineMesh->N() / 2, false);
+		this->InitializeCoarsening(coarseMesh);
 		coarseMesh->ComesFrom.CS = CoarseningStrategy::IndependentRemeshing;
-
-		fineMesh->CoarseMesh = coarseMesh;
-		coarseMesh->FineMesh = fineMesh;
+		coarseMesh->Build();
 
 		for (Element<Dim>* fine : fineMesh->Elements)
 		{
@@ -492,6 +511,8 @@ private:
 			coarse->FinerElements.push_back(fine);
 			fine->CoarserElement = coarse;
 		}
+
+		this->FinalizeCoarsening();
 	}
 
 
@@ -504,9 +525,7 @@ private:
 		double u, v, w;
 		bool strictResearch = true;
 
-		vector<std::string> names;
-		gmsh::model::list(names);
-
+		// If this function fails, check that a Physical Surface (if 2D) is defined in the file (if Physical Lines exist, then a Physical Surface must also exist!).
 		gmsh::model::mesh::getElementByCoordinates(fineCenter.X, fineCenter.Y, fineCenter.Z, coarseElementTag,
 			coarseElementType, coarseElementNodes, u, v, w, // useless parameters for us
 			Dim, strictResearch);

@@ -1,12 +1,12 @@
-// N=4;
+N = 4;
 h = 1/N;
 L=10; // [0,L]x[-1,1]
 r=0.3;
 
 Point(1) = {0, -1, 0, h}; 
 Point(2) = {L, -1, 0, h};
-Point(3) = {L, 1, 0, h};
-Point(4) = {0,1, 0, h};
+Point(3) = {L,  1, 0, h};
+Point(4) = {0,  1, 0, h};
 
 ip=newp;
 For t In {1:4}
@@ -53,13 +53,13 @@ Physical Point(40) = {40};
 Physical Point(41) = {41};
 Physical Point(42) = {42};
 
-Physical Line(1) = {4};
-Physical Line(2) = {1};
-Physical Line(3) = {2};
-Physical Line(4) = {3};
-Physical Line(12) = {6, 5};
-Physical Line(14) = {8, 7};
-Physical Line(16) = {10, 9};
-Physical Line(18) = {12, 11};
+Physical Line("leftBoundary")   = {4};
+Physical Line("bottomBoundary") = {1};
+Physical Line("rightBoundary")  = {2};
+Physical Line("topBoundary")    = {3};
+Physical Line("hole1")          = {6, 5};
+Physical Line("hole2")          = {8, 7};
+Physical Line("hole3")          = {10, 9};
+Physical Line("hole4")          = {12, 11};
 
-Physical Surface(1) = {18};
+Physical Surface("domain") = {18};

@@ -1,19 +1,13 @@
 #pragma once
 #include "../Utils/Utils.h"
+#include "../Mesh/PhysicalGroup.h"
 using namespace std;
-
-enum class BoundaryConditionType : unsigned
-{
-	NotOnBoundary = 0,
-	Dirichlet = 1,
-	Neumann = 2
-};
 
 class BoundaryConditions
 {
 public:
 	string Description;
-	function<BoundaryConditionType(DomPoint)> GetBoundaryConditionType = nullptr;
+	function<BoundaryConditionType(BoundaryGroup*)> GetBoundaryConditionType = nullptr;
 	DomFunction DirichletFunction = nullptr;
 	DomFunction NeumannFunction = nullptr;
 
@@ -25,17 +19,22 @@ public:
 		NeumannFunction = Homogeneous;
 	}
 
-	BoundaryConditions(function<BoundaryConditionType(DomPoint)> getBoundaryConditionType, DomFunction dirichletFunction, DomFunction neumannFunction)
+	BoundaryConditions(function<BoundaryConditionType(BoundaryGroup*)> getBoundaryConditionType, DomFunction dirichletFunction, DomFunction neumannFunction)
 	{
 		this->GetBoundaryConditionType = getBoundaryConditionType;
 		this->DirichletFunction = dirichletFunction;
 		this->NeumannFunction = neumannFunction;
 	}
 
-	static BoundaryConditionType DirichletEverywhere(DomPoint p)
+	static BoundaryConditionType DirichletEverywhere(BoundaryGroup* boundaryPart)
 	{
 		return BoundaryConditionType::Dirichlet;
 	};
+
+	static BoundaryConditionType MixedConditionsExample(BoundaryGroup* boundaryPart)
+	{
+		return boundaryPart->Name.compare("bottomBoundary") == 0 ? BoundaryConditionType::Dirichlet : BoundaryConditionType::Neumann;
+	}
 
 	static double Homogeneous(DomPoint p)
 	{

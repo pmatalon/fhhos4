@@ -8,17 +8,47 @@ class Square_CartesianPolygonalMesh : public PolyhedralMesh<2>
 public:
 	BigNumber Nx;
 	BigNumber Ny;
+	bool With4Quadrants;
 
-	Square_CartesianPolygonalMesh() : PolyhedralMesh() {}
+	Square_CartesianPolygonalMesh(bool with4Quadrants) : PolyhedralMesh()
+	{
+		this->With4Quadrants = with4Quadrants;
+	}
 
-	Square_CartesianPolygonalMesh(BigNumber nx, BigNumber ny) : PolyhedralMesh()
+	Square_CartesianPolygonalMesh(BigNumber nx, BigNumber ny, bool with4Quadrants = false, bool buildMesh = true) : PolyhedralMesh()
 	{
 		// nx = ny falls down to square elements
 		this->Nx = nx;
 		this->Ny = ny;
+		this->With4Quadrants = with4Quadrants;
+
+		if (with4Quadrants && (nx % 2 == 1 || ny % 2 == 1))
+			Utils::FatalError("Building the mesh for a square with 4 quadrants requires the number of subdivisions in each direction to be even.");
+
+		if (buildMesh)
+			Build();
+	}
+
+	void Build()
+	{
+		BigNumber nx = this->Nx;
+		BigNumber ny = this->Ny;
 
 		double hx = 1.0 / nx;
 		double hy = 1.0 / ny;
+
+		// Boundary parts
+		if (this->BoundaryParts.empty())
+		{
+			this->BoundaryParts.push_back(new BoundaryGroup(1, "bottomBoundary"));
+			this->BoundaryParts.push_back(new BoundaryGroup(2, "rightBoundary"));
+			this->BoundaryParts.push_back(new BoundaryGroup(3, "topBoundary"));
+			this->BoundaryParts.push_back(new BoundaryGroup(4, "leftBoundary"));
+		}
+		BoundaryGroup* squareBottomBoundary = this->BoundaryParts[0];
+		BoundaryGroup* squareRightBoundary = this->BoundaryParts[1];
+		BoundaryGroup* squareTopBoundary = this->BoundaryParts[2];
+		BoundaryGroup* squareLeftBoundary = this->BoundaryParts[3];
 
 		//----------//
 		// Vertices //
@@ -69,6 +99,7 @@ public:
 			this->Faces.push_back(southBoundary);
 			this->BoundaryFaces.push_back(southBoundary);
 			rectangle->AddSouthFace(southBoundary);
+			southBoundary->BoundaryPart = squareBottomBoundary;
 
 			// North boundary
 			rectangle = dynamic_cast<RectangularPolygonalElement*>(this->Elements[index(ix, ny - 1)]);
@@ -76,6 +107,7 @@ public:
 			this->Faces.push_back(northBoundary);
 			this->BoundaryFaces.push_back(northBoundary);
 			rectangle->AddNorthFace(northBoundary);
+			northBoundary->BoundaryPart = squareTopBoundary;
 		}
 
 		for (BigNumber iy = 0; iy < ny; ++iy)
@@ -86,6 +118,7 @@ public:
 			this->Faces.push_back(westBoundary);
 			this->BoundaryFaces.push_back(westBoundary);
 			rectangle->AddWestFace(westBoundary);
+			westBoundary->BoundaryPart = squareLeftBoundary;
 
 			// East boundary
 			rectangle = dynamic_cast<RectangularPolygonalElement*>(this->Elements[index(nx - 1, iy)]);
@@ -93,6 +126,7 @@ public:
 			this->Faces.push_back(eastBoundary);
 			this->BoundaryFaces.push_back(eastBoundary);
 			rectangle->AddEastFace(eastBoundary);
+			eastBoundary->BoundaryPart = squareRightBoundary;
 		}
 
 		for (BigNumber iy = 0; iy < ny; iy++)
@@ -142,12 +176,13 @@ public:
 
 	string FileNamePart() override
 	{
-		return "square-cartpoly-n" + to_string(this->Nx);
+		string geo = this->With4Quadrants ? "square4quadrants" : "square";
+		return geo + "-inhouse-cartpoly-n" + to_string(this->Nx);
 	}
 
 	string GeometryDescription() override
 	{
-		return "Square";
+		return this->With4Quadrants ? "Square with 4 quadrants" : "Square";
 	}
 
 	double H() override
@@ -168,7 +203,6 @@ public:
 			PolyhedralMesh<2>::CoarsenMesh(strategy);
 
 		this->CoarseMesh->SetDiffusionField(this->_diffusionField);
-		this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
 	}
 
 	void CoarsenByAgglomerationAndKeepFineFaces()
@@ -182,7 +216,8 @@ public:
 			return;
 		}
 
-		Square_CartesianPolygonalMesh* coarseMesh = new Square_CartesianPolygonalMesh();
+		Square_CartesianPolygonalMesh* coarseMesh = new Square_CartesianPolygonalMesh(this->With4Quadrants);
+		this->InitializeCoarsening(coarseMesh);
 		coarseMesh->Nx = nx / 2;
 		coarseMesh->Ny = ny / 2;
 		coarseMesh->ComesFrom.CS = CoarseningStrategy::AgglomerationCoarsening;
@@ -325,8 +360,7 @@ public:
 				}
 			}
 		}
-
-		this->CoarseMesh = coarseMesh;
+		this->FinalizeCoarsening();
 	}
 
 };

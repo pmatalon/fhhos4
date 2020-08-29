@@ -16,6 +16,13 @@ using DimVector = Eigen::Matrix<double, Dim, 1>;
 template<int Dim>
 using DimMatrix = Eigen::Matrix<double, Dim, Dim>;
 
+enum class BoundaryConditionType : unsigned
+{
+	NotOnBoundary = 0,
+	Dirichlet = 1,
+	Neumann = 2
+};
+
 enum class CoarseningStrategy : unsigned
 {
 	None,

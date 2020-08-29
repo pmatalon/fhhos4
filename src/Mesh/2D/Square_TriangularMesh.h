@@ -50,15 +50,41 @@ class Square_TriangularMesh : public PolyhedralMesh<2>
 public:
 	BigNumber Nx;
 	BigNumber Ny;
+	bool With4Quadrants;
 
-	Square_TriangularMesh(BigNumber nx, BigNumber ny) : PolyhedralMesh()
+	Square_TriangularMesh(BigNumber nx, BigNumber ny, bool with4Quadrants = false, bool buildMesh = true) : PolyhedralMesh()
 	{
 		// nx = ny falls down to square elements
 		this->Nx = nx;
 		this->Ny = ny;
+		this->With4Quadrants = with4Quadrants;
 
+		if (with4Quadrants && (nx % 2 == 1 || ny % 2 == 1))
+			Utils::FatalError("Building the mesh for a square with 4 quadrants requires the number of subdivisions in each direction to be even.");
+
+		if (buildMesh)
+			Build();
+	}
+
+	void Build()
+	{
+		BigNumber nx = this->Nx;
+		BigNumber ny = this->Ny;
 		double hx = 1.0 / nx;
 		double hy = 1.0 / ny;
+
+		// Boundary parts
+		if (this->BoundaryParts.empty())
+		{
+			this->BoundaryParts.push_back(new BoundaryGroup(1, "bottomBoundary"));
+			this->BoundaryParts.push_back(new BoundaryGroup(2, "rightBoundary"));
+			this->BoundaryParts.push_back(new BoundaryGroup(3, "topBoundary"));
+			this->BoundaryParts.push_back(new BoundaryGroup(4, "leftBoundary"));
+		}
+		BoundaryGroup* squareBottomBoundary = this->BoundaryParts[0];
+		BoundaryGroup* squareRightBoundary = this->BoundaryParts[1];
+		BoundaryGroup* squareTopBoundary = this->BoundaryParts[2];
+		BoundaryGroup* squareLeftBoundary = this->BoundaryParts[3];
 
 		//----------//
 		// Vertices //
@@ -111,6 +137,7 @@ public:
 			this->Faces.push_back(southBoundary);
 			this->BoundaryFaces.push_back(southBoundary);
 			lowerTriangle->AddFace(southBoundary);
+			southBoundary->BoundaryPart = squareBottomBoundary;
 
 			// North boundary
 			TriangularElement* upperTriangle = dynamic_cast<TriangularElement*>(this->Elements[index(ix, ny - 1) + 1]);
@@ -118,6 +145,7 @@ public:
 			this->Faces.push_back(northBoundary);
 			this->BoundaryFaces.push_back(northBoundary);
 			upperTriangle->AddFace(northBoundary);
+			northBoundary->BoundaryPart = squareTopBoundary;
 		}
 
 		for (BigNumber iy = 0; iy < ny; ++iy)
@@ -128,6 +156,7 @@ public:
 			this->Faces.push_back(westBoundary);
 			this->BoundaryFaces.push_back(westBoundary);
 			lowerTriangle->AddFace(westBoundary);
+			westBoundary->BoundaryPart = squareLeftBoundary;
 
 			// East boundary
 			TriangularElement* upperTriangle = dynamic_cast<TriangularElement*>(this->Elements[index(nx-1, iy)+1]);
@@ -135,6 +164,7 @@ public:
 			this->Faces.push_back(eastBoundary);
 			this->BoundaryFaces.push_back(eastBoundary);
 			upperTriangle->AddFace(eastBoundary);
+			eastBoundary->BoundaryPart = squareRightBoundary;
 		}
 
 		for (BigNumber iy = 0; iy < ny; iy++)
@@ -246,11 +276,12 @@ public:
 	}
 	string FileNamePart() override
 	{
-		return "square-inhouse-stri-n" + to_string(this->Nx);
+		string geo = this->With4Quadrants ? "square4quadrants" : "square";
+		return geo + "-inhouse-stri-n" + to_string(this->Nx);
 	}
 	string GeometryDescription() override
 	{
-		return "Square";
+		return this->With4Quadrants ? "Square with 4 quadrants" : "Square";
 	}
 
 	double H() override
@@ -266,7 +297,7 @@ public:
 	void CoarsenMesh(CoarseningStrategy strategy) override
 	{
 		if (strategy == CoarseningStrategy::StandardCoarsening)
-			Standard();
+			StandardCoarsening();
 		//else if (strategy == CoarseningStrategy::AgglomerationCoarsening)
 			//CoarsenByAgglomerationAndKeepFineFaces();
 		else
@@ -274,8 +305,6 @@ public:
 
 		if (this->_diffusionField)
 			this->CoarseMesh->SetDiffusionField(this->_diffusionField);
-		if (this->_boundaryConditions)
-			this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
 	}
 
 	void RefineMesh(CoarseningStrategy strategy) override
@@ -283,7 +312,7 @@ public:
 		Utils::FatalError("Refinement strategy not implemented!");
 	}
 
-	void Standard()
+	void StandardCoarsening()
 	{
 		BigNumber nx = this->Nx;
 		BigNumber ny = this->Ny;
@@ -294,11 +323,13 @@ public:
 		}
 		else
 		{
-			Square_TriangularMesh* coarseMesh = new Square_TriangularMesh(nx / 2, ny / 2);
+			Square_TriangularMesh* coarseMesh = new Square_TriangularMesh(nx / 2, ny / 2, this->With4Quadrants, false);
+			this->InitializeCoarsening(coarseMesh);
 			coarseMesh->ComesFrom.CS = CoarseningStrategy::StandardCoarsening;
 			coarseMesh->ComesFrom.nFineElementsByCoarseElement = 4;
 			coarseMesh->ComesFrom.nFineFacesAddedByCoarseElement = 3;
 			coarseMesh->ComesFrom.nFineFacesByKeptCoarseFace = 2;
+			coarseMesh->Build();
 
 			for (BigNumber row = 0; row < ny; ++row)
 			{
@@ -382,9 +413,8 @@ public:
 					}
 				}
 			}
-
-			this->CoarseMesh = coarseMesh;
 			//SanityCheckStandardCoarsening();
+			this->FinalizeCoarsening();
 		}
 	}
 

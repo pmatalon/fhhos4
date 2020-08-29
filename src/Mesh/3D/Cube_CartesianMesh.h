@@ -209,10 +209,7 @@ public:
 			Mesh<3>::CoarsenMesh(strategy);
 
 		if (this->_diffusionField)
-		{
 			this->CoarseMesh->SetDiffusionField(this->_diffusionField);
-			this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
-		}
 	}
 
 private:
@@ -229,6 +226,7 @@ private:
 		else
 		{
 			Cube_CartesianMesh* coarseMesh = new Cube_CartesianMesh(nx / 2, ny / 2, nz / 2);
+			this->InitializeCoarsening(coarseMesh);
 			coarseMesh->ComesFrom.CS = CoarseningStrategy::StandardCoarsening;
 			coarseMesh->ComesFrom.nFineElementsByCoarseElement = 8;
 			coarseMesh->ComesFrom.nFineFacesAddedByCoarseElement = 12;
@@ -286,8 +284,7 @@ private:
 					}
 				}
 			}
-
-			this->CoarseMesh = coarseMesh;
+			this->FinalizeCoarsening();
 		}
 	}
 

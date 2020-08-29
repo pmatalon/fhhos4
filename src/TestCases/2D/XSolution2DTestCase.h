@@ -20,7 +20,7 @@ public:
 
 		if (bcCode.compare("m") == 0)
 		{
-			this->BC.GetBoundaryConditionType = MixedConditions;
+			this->BC.GetBoundaryConditionType = BoundaryConditions::MixedConditionsExample;
 			this->BC.Description = "Mixed Neumann-Dirichlet";
 		}
 	}
@@ -43,10 +43,5 @@ private:
 	static double Solution(DomPoint p)
 	{
 		return p.X;
-	}
-
-	static BoundaryConditionType MixedConditions(DomPoint p)
-	{
-		return p.X == 0 ? BoundaryConditionType::Dirichlet : BoundaryConditionType::Neumann;
 	}
 };

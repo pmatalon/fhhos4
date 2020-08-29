@@ -6,13 +6,10 @@ using namespace std;
 template <int Dim>
 class Face
 {
-private:
-	BoundaryConditionType _boundaryConditionType;
-	DomFunction _boundaryConditionFunction = [](DomPoint p) { return 0; };
 public:
 	BigNumber Number;
 	bool IsDomainBoundary;
-	int PhysicalBoundaryId = 0;
+	BoundaryGroup* BoundaryPart = nullptr;
 	Element<Dim>* Element1;
 	Element<Dim>* Element2;
 
@@ -28,13 +25,11 @@ public:
 		this->Element1 = element1;
 		this->Element2 = element2;
 		this->IsDomainBoundary = (element2 == nullptr);
-		this->_boundaryConditionType = BoundaryConditionType::NotOnBoundary;
 	}
 	Face(BigNumber number, Element<Dim>* element1)
 		:Face(number, element1, nullptr)
 	{
 		this->IsDomainBoundary = true;
-		this->_boundaryConditionType = BoundaryConditionType::Dirichlet;
 	}
 
 	//-----------------------//
@@ -239,29 +234,14 @@ public:
 	//     Problem information     //
 	//-----------------------------//
 
-	void SetBoundaryConditions(BoundaryConditions* bc)
-	{
-		assert(IsDomainBoundary);
-		if (bc->GetBoundaryConditionType(this->Center()) == BoundaryConditionType::Dirichlet)
-		{
-			this->_boundaryConditionType = BoundaryConditionType::Dirichlet;
-			this->_boundaryConditionFunction = bc->DirichletFunction;
-		}
-		else
-		{
-			this->_boundaryConditionType = BoundaryConditionType::Neumann;
-			this->_boundaryConditionFunction = bc->NeumannFunction;
-		}
-	}
-
 	inline bool HasDirichletBC()
 	{
-		return IsDomainBoundary && _boundaryConditionType == BoundaryConditionType::Dirichlet;
+		return IsDomainBoundary && (!BoundaryPart || BoundaryPart->Condition == BoundaryConditionType::Dirichlet);
 	}
 
 	inline bool HasNeumannBC()
 	{
-		return IsDomainBoundary && _boundaryConditionType == BoundaryConditionType::Neumann;
+		return IsDomainBoundary && BoundaryPart && BoundaryPart->Condition == BoundaryConditionType::Neumann;
 	}
 
 	//--------------//

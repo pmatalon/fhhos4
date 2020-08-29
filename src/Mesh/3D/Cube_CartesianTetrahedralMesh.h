@@ -103,8 +103,7 @@ public:
 
 		_cartMesh->CoarsenMesh(strategy);
 		Cube_CartesianTetrahedralMesh* coarseMesh = new Cube_CartesianTetrahedralMesh(dynamic_cast<Cube_CartesianMesh*>(_cartMesh->CoarseMesh));
-		this->CoarseMesh = coarseMesh;
-		coarseMesh->FineMesh = this;
+		this->InitializeCoarsening(coarseMesh);
 		coarseMesh->ComesFrom.CS = CoarseningStrategy::StandardCoarsening;
 
 		for (Element<3>* fc : _cartMesh->Elements)
@@ -135,7 +134,7 @@ public:
 		this->LinkFacesToCoarseFaces();
 
 		this->CoarseMesh->SetDiffusionField(this->_diffusionField);
-		this->CoarseMesh->SetBoundaryConditions(this->_boundaryConditions);
+		this->FinalizeCoarsening();
 	}
 
 	~Cube_CartesianTetrahedralMesh()

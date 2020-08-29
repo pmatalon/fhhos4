@@ -2,7 +2,6 @@
 #include <vector>
 #include "Element.h"
 #include "Face.h"
-#include "PhysicalGroup.h"
 #include "../Utils/ParallelLoop.h"
 #include "../Utils/MatlabScript.h"
 using namespace std;
@@ -58,8 +57,10 @@ public:
 	vector<Face<Dim>*> DirichletFaces;
 	vector<Face<Dim>*> NeumannFaces;
 
+	vector<PhysicalGroup*> PhysicalParts;
+	vector<BoundaryGroup*> BoundaryParts;
+
 	DiffusionField<Dim>* _diffusionField = nullptr;
-	BoundaryConditions* _boundaryConditions = nullptr;
 
 	Mesh<Dim>* CoarseMesh = nullptr;
 	Mesh<Dim>* FineMesh = nullptr;
@@ -74,15 +75,6 @@ public:
 	virtual string GeometryDescription() = 0;
 	virtual double H() = 0;
 	virtual double Regularity() = 0;
-
-	virtual void CoarsenMesh(CoarseningStrategy strategy)
-	{
-		Utils::FatalError("Unmanaged coarsening strategy");
-	}
-	virtual void RefineMesh(CoarseningStrategy strategy)
-	{
-		Utils::FatalError("Unmanaged refinement strategy");
-	}
 
 	void AddFace(Face<Dim>* f, bool addToBoundaryAndIteriorLists = true)
 	{
@@ -142,24 +134,6 @@ public:
 		}
 	}
 
-	void FillBoundaryAndInteriorFaceLists()
-	{
-		assert((this->BoundaryFaces.empty() && this->InteriorFaces.empty()) || (!this->BoundaryFaces.empty() && !this->InteriorFaces.empty()));
-
-		if (!this->BoundaryFaces.empty() || !this->InteriorFaces.empty())
-			return;
-
-		this->InteriorFaces.reserve(this->Faces.size());
-
-		for (Face<Dim>* f : this->Faces)
-		{
-			if (f->IsDomainBoundary)
-				this->BoundaryFaces.push_back(f);
-			else
-				this->InteriorFaces.push_back(f);
-		}
-	}
-
 	double SkeletonMeasure()
 	{
 		double measure = 0;
@@ -203,27 +177,13 @@ public:
 
 	void SetBoundaryConditions(BoundaryConditions* bc)
 	{
-		if (!this->DirichletFaces.empty() || !this->NeumannFaces.empty())
-			return;
-
-		this->_boundaryConditions = bc;
-
-		ParallelLoop<Face<Dim>*, EmptyResultChunk> parallelLoop(this->BoundaryFaces);
-		parallelLoop.Execute([bc](Face<Dim>* f, ParallelChunk<EmptyResultChunk>* chunk)
-			{
-				f->SetBoundaryConditions(bc);
-			});
-		
-		for (auto f : this->BoundaryFaces)
+		for (BoundaryGroup* boundary : BoundaryParts)
 		{
-			if (f->HasDirichletBC())
-				this->DirichletFaces.push_back(f);
-			else if (f->HasNeumannBC())
-				this->NeumannFaces.push_back(f);
+			boundary->Condition = bc->GetBoundaryConditionType(boundary);
+			boundary->ConditionFunction = boundary->Condition == BoundaryConditionType::Neumann ? bc->NeumannFunction : bc->DirichletFunction;
 		}
-
-		if (this->CoarseMesh)
-			this->CoarseMesh->SetBoundaryConditions(bc);
+		
+		FillDirichletAndNeumannFaceLists();
 	}
 
 	void ExportFacesToMatlab(string outputDirectory, bool dummy)
@@ -246,6 +206,86 @@ public:
 		for (auto e : this->Elements)
 			script.PlotText(e->Center(), to_string(e->Number), "r");
 	}
+
+	virtual void CoarsenMesh(CoarseningStrategy strategy)
+	{
+		Utils::FatalError("Unmanaged coarsening strategy");
+	}
+	virtual void RefineMesh(CoarseningStrategy strategy)
+	{
+		Utils::FatalError("Unmanaged refinement strategy");
+	}
+
+protected:
+	virtual void InitializeCoarsening(Mesh<Dim>* coarseMesh)
+	{
+		this->CoarseMesh = coarseMesh;
+		coarseMesh->FineMesh = this;
+
+		coarseMesh->PhysicalParts = this->PhysicalParts;
+		coarseMesh->BoundaryParts = this->BoundaryParts;
+	}
+
+	virtual void InitializeRefinement(Mesh<Dim>* fineMesh)
+	{
+		this->FineMesh = fineMesh;
+		fineMesh->CoarseMesh = this;
+
+		fineMesh->PhysicalParts = this->PhysicalParts;
+		fineMesh->BoundaryParts = this->BoundaryParts;
+	}
+
+	virtual void FinalizeCoarsening()
+	{
+		CoarseMesh->FillBoundaryAndInteriorFaceLists();
+		CoarseMesh->FillDirichletAndNeumannFaceLists();
+	}
+
+	virtual void FinalizeRefinement()
+	{
+		//FineMesh->FillBoundaryAndInteriorFaceLists();
+		//FineMesh->FillDirichletAndNeumannFaceLists();
+	}
+
+	void FillBoundaryAndInteriorFaceLists()
+	{
+		assert((this->BoundaryFaces.empty() && this->InteriorFaces.empty()) || (!this->BoundaryFaces.empty() && !this->InteriorFaces.empty()));
+
+		if (!this->BoundaryFaces.empty() || !this->InteriorFaces.empty())
+			return;
+
+		this->InteriorFaces.reserve(this->Faces.size());
+
+		for (Face<Dim>* f : this->Faces)
+		{
+			if (f->IsDomainBoundary)
+				this->BoundaryFaces.push_back(f);
+			else
+				this->InteriorFaces.push_back(f);
+		}
+	}
+
+	void FillDirichletAndNeumannFaceLists()
+	{
+		if (!this->DirichletFaces.empty() || !this->NeumannFaces.empty())
+			return;
+
+		assert(!this->BoundaryFaces.empty());
+
+		for (Face<Dim>* f : this->BoundaryFaces)
+		{
+			if (f->HasDirichletBC())
+				this->DirichletFaces.push_back(f);
+			else if (f->HasNeumannBC())
+				this->NeumannFaces.push_back(f);
+			else
+				assert(false);
+		}
+
+		if (CoarseMesh)
+			CoarseMesh->FillDirichletAndNeumannFaceLists();
+	}
+
 
 	void LinkFacesToCoarseFaces()
 	{
@@ -312,6 +352,7 @@ public:
 		}
 	}
 
+public:
 	virtual void Serialize(ostream& os) const
 	{
 		for (auto element : this->Elements)
@@ -326,6 +367,7 @@ public:
 		return os;
 	}
 
+	// Performs sanity checks to verify that the mesh correctly built
 	virtual void SanityCheck()
 	{
 		for (auto e : this->Elements)
@@ -363,17 +405,17 @@ public:
 					assert(abs(n.dot(n2) + 1) < 1e-15);
 				}
 				else
-					assert(e->IsOnBoundary());
+					assert(e->IsOnBoundary() && "This element has no neighbour on the other side of this face, althoug it's not supposed to be on the boundary.");
 			}
 		}
 
 		for (auto f : this->BoundaryFaces)
 		{
-			assert(f->IsDomainBoundary);
+			assert(f->IsDomainBoundary && "This face is in the BoundaryFaces list but has not the flag IsDomainBoundary.");
 			if (this->ComesFrom.CS != CoarseningStrategy::FaceCoarsening)
 			{
-				assert(f->Element1);
-				assert(!f->Element2);
+				assert(f->Element1 && "This face is on the boundary but has no Element1.");
+				assert(!f->Element2 && "This face is on the boundary but connects two elements.");
 			}
 		}
 
@@ -382,43 +424,55 @@ public:
 			assert(!f->IsDomainBoundary);
 			if (this->ComesFrom.CS != CoarseningStrategy::FaceCoarsening)
 			{
-				assert(f->Element1);
-				assert(f->Element2);
+				assert(f->Element1 && "This face is in the interior but has no Element1.");
+				assert(f->Element2 && "This face is in the interior but has no Element2.");
 			}
 		}
 
-		assert(this->BoundaryFaces.size() + this->InteriorFaces.size() == this->Faces.size());
+		assert(this->BoundaryFaces.size() + this->InteriorFaces.size() == this->Faces.size() && "Boundary faces + interior faces does NOT add up to the total number of faces.");
 		
 		if (CoarseMesh)
 		{
 			CoarseMesh->SanityCheck();
 
+			// Links between coarse and fine meshes
+
+			assert(this->PhysicalParts.size() == CoarseMesh->PhysicalParts.size() && "Discrepency in the PhysicalParts of the fine and coarse meshes.");
+			assert(this->BoundaryParts.size() == CoarseMesh->BoundaryParts.size() && "Discrepency in the BoundaryParts of the fine and coarse meshes.");
+
+			for (int i = 0; i < this->PhysicalParts.size(); i++)
+				assert(this->PhysicalParts[i] == CoarseMesh->PhysicalParts[i] && "The PhysicalParts in fine and coarse meshes must have the same addresses.");
+			for (int i = 0; i < this->BoundaryParts.size(); i++)
+				assert(this->BoundaryParts[i] == CoarseMesh->BoundaryParts[i] && "The BoundaryParts in fine and coarse meshes must have the same addresses.");
+
+			assert(this->NeumannFaces.empty() == CoarseMesh->NeumannFaces.empty() && "The fine or coarse mesh has NeumannFaces while the other has none.");
+
 			if (CoarseMesh->ComesFrom.CS != CoarseningStrategy::FaceCoarsening)
 			{
 				for (Element<Dim>* fe : this->Elements)
 				{
-					assert(fe->CoarserElement != nullptr);
+					assert(fe->CoarserElement != nullptr && "This fine element has no coarse element.");
 
-					assert(fe->PhysicalGroupId == fe->CoarserElement->PhysicalGroupId);
+					assert(fe->PhysicalGroupId == fe->CoarserElement->PhysicalGroupId && "Associated fine and coarse element have different PhysicalGroupId.");
 
 					bool feIsReferenced = false;
 					for (Element<Dim>* e : fe->CoarserElement->FinerElements)
 					{
-						assert(e->CoarserElement == fe->CoarserElement);
+						assert(e->CoarserElement == fe->CoarserElement && "Discrepency in the link between fine and coarse elements.");
 						if (e == fe)
 						{
 							feIsReferenced = true;
 							break;
 						}
 					}
-					assert(feIsReferenced);
+					assert(feIsReferenced && "This fine element is not referenced in the list FinerElements of its associated coarse element.");
 				}
 
 				for (Element<Dim>* ce : CoarseMesh->Elements)
 				{
-					assert(ce->FinerElements.size() > 0);
+					assert(ce->FinerElements.size() > 0 && "This coarse element doesn't have any finer element.");
 					for (Face<Dim>* ff : ce->FinerFacesRemoved)
-						assert(ff->IsRemovedOnCoarserGrid);
+						assert(ff->IsRemovedOnCoarserGrid && "This face is supposed to be removed inside this coarse element, but the flag IsRemovedOnCoarserGrid is not set.");
 				}
 			}
 
@@ -426,11 +480,11 @@ public:
 			{
 				for (Face<Dim>* cf : CoarseMesh->Faces)
 				{
-					assert(cf->FinerFaces.size() > 0);
+					assert(cf->FinerFaces.size() > 0 && "This coarse face doesn't have any finer face.");
 					for (Face<Dim>* ff : cf->FinerFaces)
 					{
-						assert(!ff->IsRemovedOnCoarserGrid);
-						assert(ff->CoarseFace == cf);
+						assert(!ff->IsRemovedOnCoarserGrid && "This fine face is referenced in the list FinerFaces of a coarse face, but is flagged IsRemovedOnCoarserGrid.");
+						assert(ff->CoarseFace == cf && "Discrepency in the link between fine and coarse faces.");
 					}
 				}
 
@@ -440,7 +494,7 @@ public:
 					{
 						Element<Dim>* ce1 = ff->Element1->CoarserElement;
 						Element<Dim>* ce2 = ff->Element2->CoarserElement;
-						assert(ce1 == ce2);
+						assert(ce1 == ce2 && "This fine face is flagged IsRemovedOnCoarserGrid but Element1->CoarserElement != Element2->CoarserElement.");
 
 						bool ffIsReferenced = false;
 						for (Face<Dim>* removedFace : ce1->FinerFacesRemoved)
@@ -451,11 +505,28 @@ public:
 								break;
 							}
 						}
-						assert(ffIsReferenced);
+						assert(ffIsReferenced && "This fine face is flagged IsRemovedOnCoarserGrid but is not referenced in the list FinerFacesRemoved of the coarse element it's supposed to be inside.");
 					}
+
+					if (ff->IsDomainBoundary)
+						assert(ff->CoarseFace && "This boundary face has no coarse face.");
 				}
 			}
 
+			for (Face<Dim>* ff : this->Faces)
+			{
+				if (ff->IsRemovedOnCoarserGrid)
+					continue;
+				if (ff->BoundaryPart)
+				{
+					assert(ff->CoarseFace->BoundaryPart && "This fine face has a BoundaryPart but its coarsened one has none.");
+					assert(ff->CoarseFace->BoundaryPart == ff->BoundaryPart && "This face and its coarsened one have different BoundaryParts.");
+				}
+				else
+					assert(!ff->CoarseFace->BoundaryPart && "This fine face has no BoundaryPart but its coarsened one has one.");
+			}
+
+			
 			Mesh<Dim>* meshToGetInfo = nullptr;
 			if (this->ComesFrom.CS == CoarseningStrategy::GMSHSplittingRefinement || this->ComesFrom.CS == CoarseningStrategy::BeyRefinement)
 				meshToGetInfo = this;
@@ -470,8 +541,8 @@ public:
 
 				for (Element<Dim>* ce : CoarseMesh->Elements)
 				{
-					assert(ce->FinerElements.size() == nFineElementsByCoarseElement);
-					assert(ce->FinerFacesRemoved.size() == nFineFacesAddedByCoarseElement);
+					assert(ce->FinerElements.size() == nFineElementsByCoarseElement && "This coarse element does not have the expected number of fine elements.");
+					assert(ce->FinerFacesRemoved.size() == nFineFacesAddedByCoarseElement && "This coarse element does not have the expected number of FinerFacesRemoved.");
 				}
 				BigNumber finerFacesAdded = nFineFacesAddedByCoarseElement * CoarseMesh->Elements.size();
 				assert(this->Elements.size() == nFineElementsByCoarseElement * CoarseMesh->Elements.size());
@@ -493,7 +564,7 @@ public:
 
 	Mesh<Dim>* RefineUntilNElements(BigNumber nElements, CoarseningStrategy strategy)
 	{
-		cout << "Building fine mesh by successive refinement of the coarse mesh" << endl;
+		cout << "Building fine mesh by successive refinements of the coarse mesh" << endl;
 		Mesh<Dim>* mesh = this;
 		while (mesh->Elements.size() < nElements)
 		{
@@ -535,6 +606,14 @@ public:
 		for (size_t i = 0; i < this->Vertices.size(); ++i)
 			delete this->Vertices[i];
 		this->Vertices.clear();
+
+		if (!FineMesh)
+		{
+			for (size_t i = 0; i < this->PhysicalParts.size(); ++i)
+				delete this->PhysicalParts[i];
+			for (size_t i = 0; i < this->BoundaryParts.size(); ++i)
+				delete this->BoundaryParts[i];
+		}
 	}
 };
 

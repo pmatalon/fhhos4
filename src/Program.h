@@ -95,26 +95,45 @@ public:
 		{
 			if (args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("cgmg") == 0 || args.Solver.SolverCode.compare("fcgmg") == 0)
 			{
-				mesh->ExportFacesToMatlab(args.OutputDirectory + "/fine.dat");
-				mesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_fine.m");
+				if (args.Solver.MG.CoarseningStgy != CoarseningStrategy::GMSHSplittingRefinement && args.Solver.MG.CoarseningStgy != CoarseningStrategy::BeyRefinement)
+				{
+					mesh->ExportFacesToMatlab(args.OutputDirectory + "/fine.dat");
+					mesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_fine.m");
 
-				// 1st coarsening
-				mesh->CoarsenMesh(args.Solver.MG.CoarseningStgy);
-				mesh->CoarseMesh->ExportFacesToMatlab(args.OutputDirectory + "/coarse1.dat");
-				mesh->CoarseMesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_coarse1.m");
-				mesh->SanityCheck();
-				// 2nd coarsening
-				mesh->CoarseMesh->CoarsenMesh(args.Solver.MG.CoarseningStgy);
-				mesh->CoarseMesh->CoarseMesh->ExportFacesToMatlab(args.OutputDirectory + "/coarse2.dat");
-				mesh->CoarseMesh->CoarseMesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_coarse2.m");
-				mesh->SanityCheck();
-				// 3rd coarsening
-				mesh->CoarseMesh->CoarseMesh->CoarsenMesh(args.Solver.MG.CoarseningStgy);
-				mesh->CoarseMesh->CoarseMesh->CoarseMesh->ExportFacesToMatlab(args.OutputDirectory + "/coarse3.dat");
-				mesh->CoarseMesh->CoarseMesh->CoarseMesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_coarse3.m");
-				mesh->SanityCheck();
-				//cout << *mesh << endl << endl;
-				//cout << "Coarse mesh" << endl << *(mesh->CoarseMesh) << endl << endl;
+					// 1st coarsening
+					mesh->CoarsenMesh(args.Solver.MG.CoarseningStgy);
+					mesh->CoarseMesh->ExportFacesToMatlab(args.OutputDirectory + "/coarse1.dat");
+					mesh->CoarseMesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_coarse1.m");
+					mesh->SanityCheck();
+					// 2nd coarsening
+					mesh->CoarseMesh->CoarsenMesh(args.Solver.MG.CoarseningStgy);
+					mesh->CoarseMesh->CoarseMesh->ExportFacesToMatlab(args.OutputDirectory + "/coarse2.dat");
+					mesh->CoarseMesh->CoarseMesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_coarse2.m");
+					mesh->SanityCheck();
+					// 3rd coarsening
+					mesh->CoarseMesh->CoarseMesh->CoarsenMesh(args.Solver.MG.CoarseningStgy);
+					mesh->CoarseMesh->CoarseMesh->CoarseMesh->ExportFacesToMatlab(args.OutputDirectory + "/coarse3.dat");
+					mesh->CoarseMesh->CoarseMesh->CoarseMesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_coarse3.m");
+					mesh->SanityCheck();
+					//cout << *mesh << endl << endl;
+					//cout << "Coarse mesh" << endl << *(mesh->CoarseMesh) << endl << endl;
+				}
+				else
+				{
+					mesh->ExportFacesToMatlab(args.OutputDirectory + "/fine.dat");
+					mesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_fine.m");
+
+					if (mesh->CoarseMesh)
+					{
+						mesh->CoarseMesh->ExportFacesToMatlab(args.OutputDirectory + "/coarse1.dat");
+						mesh->CoarseMesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_coarse1.m");
+						if (mesh->CoarseMesh->CoarseMesh)
+						{
+							mesh->CoarseMesh->CoarseMesh->ExportFacesToMatlab(args.OutputDirectory + "/coarse2.dat");
+							mesh->CoarseMesh->CoarseMesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_coarse2.m");
+						}
+					}
+				}
 			}
 		}
 
@@ -480,23 +499,19 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 	//-------------------------------//
 	else if (geoCode.compare("square4quadrants") == 0)
 	{
+		bool with4quadrants = true;
 		if (mesher.compare("inhouse") == 0)
 		{
-			if (Utils::IsPowerOf2(nx) && Utils::IsPowerOf2(ny))
-			{
-				if (meshCode.compare("cart") == 0)
-					fineMesh = new Square_CartesianMesh(nx, ny);
-				else if (meshCode.compare("cart-poly") == 0)
-					fineMesh = new Square_CartesianPolygonalMesh(nx, ny);
-				else if (meshCode.compare("stri") == 0)
-					fineMesh = new Square_TriangularMesh(nx, ny);
-				else if (meshCode.compare("tri") == 0)
-					Utils::FatalError("The in-house mesher does not build unstructured meshes. Use '-mesh stri' or '-mesher gmsh' instead.");
-				else
-					Utils::FatalError("The requested mesh is not managed with this geometry.");
-			}
+			if (meshCode.compare("cart") == 0)
+				fineMesh = new Square_CartesianMesh(nx, ny, with4quadrants);
+			else if (meshCode.compare("cart-poly") == 0)
+				fineMesh = new Square_CartesianPolygonalMesh(nx, ny, with4quadrants);
+			else if (meshCode.compare("stri") == 0)
+				fineMesh = new Square_TriangularMesh(nx, ny, with4quadrants);
+			else if (meshCode.compare("tri") == 0)
+				Utils::FatalError("The in-house mesher does not build unstructured meshes. Use '-mesh stri' or '-mesher gmsh' instead.");
 			else
-				Utils::FatalError("This geometry requires N to be a power of 2.");
+				Utils::FatalError("The requested mesh is not managed with this geometry.");
 		}
 #ifdef GMSH_ENABLED
 		else if (mesher.compare("gmsh") == 0)
@@ -560,7 +575,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 		string filePath = geoCode;
 		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
 		{
-			Mesh<2>* coarseMesh = new GMSHMesh<2>(filePath);
+			Mesh<2>* coarseMesh = new GMSHMesh<2>(filePath, 2);
 			fineMesh = coarseMesh->RefineUntilNElements(2 * nx*ny, refinementStgy);
 		}
 		else
@@ -683,7 +698,7 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args)
 
 			Mesh<3>* coarseMesh;
 			if (refinementStgy == CoarseningStrategy::BeyRefinement)
-				coarseMesh = new GMSHTetrahedralMesh(filePath);
+				coarseMesh = new GMSHTetrahedralMesh(filePath, 2);
 			else
 				coarseMesh = new GMSHMesh<3>(filePath);
 			fineMesh = coarseMesh->RefineUntilNElements(6 * n*n*n, refinementStgy);

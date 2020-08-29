@@ -2,16 +2,13 @@
 #include "../TestCase.h"
 using namespace std;
 
-class SineSolution2DTestCase : public TestCase<2>
+class BarWith4HolesTestCase : public TestCase<2>
 {
 public:
-	SineSolution2DTestCase(DiffusionField<2>* diffusionField, string bcCode) : 
+	BarWith4HolesTestCase(DiffusionField<2>* diffusionField, string bcCode) :
 		TestCase(diffusionField)
 	{
 		this->SourceFunction = this->Source;
-
-		if (this->DiffField->IsHomogeneous && this->DiffField->IsIsotropic && bcCode.compare("d") == 0)
-			this->ExactSolution = this->Solution;
 
 		if (bcCode.compare("d") == 0)
 		{
@@ -20,12 +17,12 @@ public:
 			this->BC.DirichletFunction = BoundaryConditions::Homogeneous;
 			this->BC.Description = "Homogeneous Dirichlet";
 		}
-		else if (bcCode.compare("m") == 0)
+		else if (bcCode.compare("nholes") == 0)
 		{
-			this->BC.GetBoundaryConditionType = BoundaryConditions::MixedConditionsExample;
+			this->BC.GetBoundaryConditionType = NeumannOnHoles;
 			this->BC.DirichletFunction = BoundaryConditions::Homogeneous;
 			this->BC.NeumannFunction = BoundaryConditions::Homogeneous;
-			this->BC.Description = "Mixed Neumann-Dirichlet";
+			this->BC.Description = "Neumann on the holes";
 		}
 		else
 			Utils::FatalError("The requested boundary conditions are not defined in this test case.");
@@ -33,11 +30,11 @@ public:
 
 	string Code() override
 	{
-		return "sine";
+		return "barwith4holes";
 	}
 	string Description() override
 	{
-		return "Sine function";
+		return "Bar with 4 holes";
 	}
 
 private:
@@ -48,12 +45,10 @@ private:
 		return 2 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y);
 	}
 
-	static double Solution(DomPoint p)
+	static BoundaryConditionType NeumannOnHoles(BoundaryGroup* boundaryPart)
 	{
-		double x = p.X;
-		double y = p.Y;
-		double a = 1;//anisotropyCoefficients1[0];
-		double b = 1;//anisotropyCoefficients1[1];
-		return 2 / (a + b) * sin(4 * M_PI * x)*sin(4 * M_PI * y);
+		if (boundaryPart->Name.rfind("hole", 0) == 0) // starts with "hole"
+			return BoundaryConditionType::Neumann;
+		return BoundaryConditionType::Dirichlet;
 	}
 };
