@@ -408,7 +408,7 @@ private:
 		if (interfaceFaces.size() == 1)
 			return FaceCollapsingStatus::Ok;
 
-		if (e1->PhysicalGroupId == e2->PhysicalGroupId)
+		if (e1->IsInSamePhysicalPartAs(e2))
 			return TryCollapse(interfaceFaces);
 		else
 		{
@@ -832,7 +832,7 @@ private:
 
 		// Creation of the polygonal macro-element
 		Element<Dim>* macroElement = CreatePolyhedron(macroElementVertices);
-		macroElement->PhysicalGroupId = fineElements[0]->PhysicalGroupId;
+		macroElement->PhysicalPart = fineElements[0]->PhysicalPart;
 
 		// Link between macro-element and fine elements
 		for (Element<Dim>* e : fineElements)
@@ -986,7 +986,7 @@ private:
 		vector<Element<Dim>*> availableNeighbours;
 		for (Element<Dim>* n : elem->Neighbours())
 		{
-			if (elem->PhysicalGroupId == n->PhysicalGroupId && !n->CoarserElement)
+			if (n->IsInSamePhysicalPartAs(elem) && !n->CoarserElement)
 				availableNeighbours.push_back(n);
 		}
 
@@ -1082,7 +1082,7 @@ private:
 				continue;
 
 			Element<Dim>* macroNeighbour = f->GetNeighbour(e)->CoarserElement;
-			if (!macroNeighbour || macroNeighbour->PhysicalGroupId != e->PhysicalGroupId)
+			if (!macroNeighbour || !macroNeighbour->IsInSamePhysicalPartAs(e))
 				continue;
 
 			double distance = 0;
@@ -1137,7 +1137,7 @@ private:
 	//--------------------------------------------------------------------//
 	Element<Dim>* AgglomerateFineElements(Element<Dim>* e1, Element<Dim>* e2)
 	{
-		assert(e1->PhysicalGroupId = e2->PhysicalGroupId);
+		assert(e1->IsInSamePhysicalPartAs(e2));
 
 		// Collect the faces interfacing these two elements //
 		vector<Face<Dim>*> facesToRemove;
@@ -1157,7 +1157,7 @@ private:
 
 		// Creation of the polygonal macro-element
 		Element<Dim>* coarseElement = CreateMacroElement(e1, e2, facesToRemove);
-		coarseElement->PhysicalGroupId = e1->PhysicalGroupId;
+		coarseElement->PhysicalPart = e1->PhysicalPart;
 
 		// Links between the coarse element and the fine elements
 		coarseElement->FinerElements.push_back(e1);
@@ -1192,12 +1192,12 @@ private:
 		for (Element<Dim>* e : fineElements)
 		{
 			assert(!e->CoarserElement);
-			assert(e->PhysicalGroupId == fineElements[0]->PhysicalGroupId && "Agglomeration of elements from different physical groups is not allowed!");
+			assert(e->IsInSamePhysicalPartAs(fineElements[0]) && "Agglomeration of elements from different physical groups is not allowed!");
 		}
 
 		Agglo<Dim> agglo(fineElements);
 		Element<Dim>* coarseElement = CreatePolyhedron(agglo.Vertices());
-		coarseElement->PhysicalGroupId = fineElements[0]->PhysicalGroupId;
+		coarseElement->PhysicalPart = fineElements[0]->PhysicalPart;
 
 		for (Element<Dim>* e : fineElements)
 		{
@@ -1231,7 +1231,7 @@ private:
 	void AgglomerateFineElementToCoarse(Element<Dim>* fineElement, AgglomerateElement<Dim>* coarseElement)
 	{
 		assert(!fineElement->CoarserElement);
-		assert(fineElement->PhysicalGroupId == coarseElement->PhysicalGroupId && "Agglomeration of elements from different physical groups is not allowed!");
+		assert(fineElement->IsInSamePhysicalPartAs(coarseElement) && "Agglomeration of elements from different physical groups is not allowed!");
 
 		// Add the fine element to the agglomerate
 		coarseElement->Add(fineElement);
@@ -1266,7 +1266,7 @@ private:
 
 	Element<Dim>* AgglomerateFineElementToCoarse(Element<Dim>* fineElement, Element<Dim>* coarseElement)
 	{
-		assert(fineElement->PhysicalGroupId == coarseElement->PhysicalGroupId && "Agglomeration of elements from different physical groups is not allowed!");
+		assert(fineElement->IsInSamePhysicalPartAs(coarseElement) && "Agglomeration of elements from different physical groups is not allowed!");
 
 		// Collect the fine faces interfacing these two elements //
 		vector<Face<Dim>*> facesToRemove;
@@ -1301,7 +1301,7 @@ private:
 		
 		// Creation of the polygonal macro-element
 		Element<Dim>* newCoarseElement = CreateMacroElement(fineElement, coarseElement, facesToRemove);
-		newCoarseElement->PhysicalGroupId = coarseElement->PhysicalGroupId;
+		newCoarseElement->PhysicalPart = coarseElement->PhysicalPart;
 
 		// Links between the macro element and the fine elements
 		for (Element<Dim>* fe : coarseElement->FinerElements)
@@ -1361,11 +1361,11 @@ private:
 	{
 		Agglo<Dim> agglo(elements);
 		Element<Dim>* newElement = CreatePolyhedron(agglo.Vertices());
-		newElement->PhysicalGroupId = elements[0]->PhysicalGroupId;
+		newElement->PhysicalPart = elements[0]->PhysicalPart;
 
 		for (Element<Dim>* e : elements)
 		{
-			assert(e->PhysicalGroupId == elements[0]->PhysicalGroupId && "Agglomeration of elements from different physical groups is not allowed!");
+			assert(e->IsInSamePhysicalPartAs(elements[0]) && "Agglomeration of elements from different physical groups is not allowed!");
 			for (Face<Dim>* f : e->Faces)
 			{
 				if (f->Element1 == e)

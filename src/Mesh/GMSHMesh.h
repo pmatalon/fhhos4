@@ -243,8 +243,16 @@ private:
 			if (physicalTags.size() > 1)
 				Utils::FatalError("Entity " + to_string(entityTag) + " must have only one physical group (" + to_string(physicalTags.size()) + " found). Check GMSH file.");
 			
-			int physicalGroupId = this->PhysicalParts.empty() ? 0 : physicalTags[0];
-
+			PhysicalGroup* physicalPart = nullptr;
+			for (PhysicalGroup* pp : this->PhysicalParts)
+			{
+				if (pp->Id == physicalTags[0])
+				{
+					physicalPart = pp;
+					break;
+				}
+			}
+			assert(physicalPart);
 
 			// Get elements in this entity
 			elementTypes.clear();
@@ -263,7 +271,7 @@ private:
 				{
 					Element<Dim>* e = CreateElement(elemType, elements[j], elementNodes, elemNodeIndex, elemNumber);
 
-					e->PhysicalGroupId = physicalGroupId;
+					e->PhysicalPart = physicalPart;
 
 					for (Vertex* v : e->Vertices())
 					{

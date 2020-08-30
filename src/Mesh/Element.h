@@ -21,7 +21,7 @@ public:
 	BigNumber Number;
 	vector<Face<Dim>*> Faces;
 
-	int PhysicalGroupId = 0;
+	PhysicalGroup* PhysicalPart = nullptr;
 
 	// Diffusion coefficient //
 	double Kappa = 1; // constant diffusion coefficient (deprecated but still used in DG)
@@ -287,6 +287,11 @@ public:
 		}
 
 		return vector<Element<Dim>*>(neighbours.begin(), neighbours.end());
+	}
+
+	bool IsInSamePhysicalPartAs(Element<Dim>* other)
+	{
+		return (!this->PhysicalPart && !other->PhysicalPart) || this->PhysicalPart == other->PhysicalPart;
 	}
 
 	void SetOverlappingFineElements()

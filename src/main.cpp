@@ -748,6 +748,9 @@ int main(int argc, char* argv[])
 	//               Heterogeneity              //
 	//------------------------------------------//
 
+	if (args.Problem.GeoCode.compare("square") == 0 && args.Problem.HeterogeneityRatio != 1)
+		Utils::Warning("The geometry 'square' has only one physical part: -heterog argument is ignored. Use 'square4quadrants' instead to run an heterogeneous problem.");
+
 	if (args.Problem.Dimension != 1 && args.Problem.TestCaseCode.compare("heterog") == 0)
 		argument_error("-tc heterog is only supported in 1D.");
 

@@ -37,6 +37,26 @@ public:
 		double hx = 1.0 / nx;
 		double hy = 1.0 / ny;
 
+		// Physical parts
+		PhysicalGroup* quadrantBottomLeft = nullptr;
+		PhysicalGroup * quadrantBottomRight = nullptr;
+		PhysicalGroup * quadrantTopRight = nullptr;
+		PhysicalGroup* quadrantTopLeft = nullptr;
+		if (this->With4Quadrants)
+		{
+			if (this->PhysicalParts.empty())
+			{
+				this->PhysicalParts.push_back(new PhysicalGroup(1, "quadrantBottomLeft"));
+				this->PhysicalParts.push_back(new PhysicalGroup(2, "quadrantBottomRight"));
+				this->PhysicalParts.push_back(new PhysicalGroup(3, "quadrantTopRight"));
+				this->PhysicalParts.push_back(new PhysicalGroup(4, "quadrantTopLeft"));
+			}
+			quadrantBottomLeft = this->PhysicalParts[0];
+			quadrantBottomRight = this->PhysicalParts[1];
+			quadrantTopRight = this->PhysicalParts[2];
+			quadrantTopLeft = this->PhysicalParts[3];
+		}
+
 		// Boundary parts
 		if (this->BoundaryParts.empty())
 		{
@@ -81,6 +101,18 @@ public:
 				Vertex* bottomRightCorner = Vertices[indexV(ix + 1, iy    )];
 				RectangularPolygonalElement* rectangle = new RectangularPolygonalElement(number, bottomLeftCorner, topLeftCorner, topRightCorner, bottomRightCorner);
 				this->Elements.push_back(rectangle);
+
+				if (this->With4Quadrants)
+				{
+					if (ix < nx / 2 && iy < ny / 2)
+						rectangle->PhysicalPart = quadrantBottomLeft;
+					else if (ix >= nx / 2 && iy < ny / 2)
+						rectangle->PhysicalPart = quadrantBottomRight;
+					else if (ix >= nx / 2 && iy >= ny / 2)
+						rectangle->PhysicalPart = quadrantTopRight;
+					else
+						rectangle->PhysicalPart = quadrantTopLeft;
+				}
 			}
 		}
 

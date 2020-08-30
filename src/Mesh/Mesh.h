@@ -453,7 +453,10 @@ public:
 				{
 					assert(fe->CoarserElement != nullptr && "This fine element has no coarse element.");
 
-					assert(fe->PhysicalGroupId == fe->CoarserElement->PhysicalGroupId && "Associated fine and coarse element have different PhysicalGroupId.");
+					if (fe->PhysicalPart)
+						assert(fe->PhysicalPart == fe->CoarserElement->PhysicalPart && "Associated fine and coarse element have different PhysicalParts.");
+					else
+						assert(!fe->CoarserElement->PhysicalPart && "This fine element has a PhysicalPart while its associated coarse element has none.");
 
 					bool feIsReferenced = false;
 					for (Element<Dim>* e : fe->CoarserElement->FinerElements)

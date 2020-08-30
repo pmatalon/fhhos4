@@ -73,6 +73,26 @@ public:
 		double hx = 1.0 / nx;
 		double hy = 1.0 / ny;
 
+		// Physical parts
+		PhysicalGroup* quadrantBottomLeft = nullptr;
+		PhysicalGroup * quadrantBottomRight = nullptr;
+		PhysicalGroup * quadrantTopRight = nullptr;
+		PhysicalGroup* quadrantTopLeft = nullptr;
+		if (this->With4Quadrants)
+		{
+			if (this->PhysicalParts.empty())
+			{
+				this->PhysicalParts.push_back(new PhysicalGroup(1, "quadrantBottomLeft"));
+				this->PhysicalParts.push_back(new PhysicalGroup(2, "quadrantBottomRight"));
+				this->PhysicalParts.push_back(new PhysicalGroup(3, "quadrantTopRight"));
+				this->PhysicalParts.push_back(new PhysicalGroup(4, "quadrantTopLeft"));
+			}
+			quadrantBottomLeft = this->PhysicalParts[0];
+			quadrantBottomRight = this->PhysicalParts[1];
+			quadrantTopRight = this->PhysicalParts[2];
+			quadrantTopLeft = this->PhysicalParts[3];
+		}
+
 		// Boundary parts
 		if (this->BoundaryParts.empty())
 		{
@@ -119,6 +139,29 @@ public:
 				this->Elements.push_back(lowerTriangle);
 				TriangularElement* upperTriangle = new UpperTriangle(number + 1, topLeftCorner, bottomRightCorner, topRightCorner);
 				this->Elements.push_back(upperTriangle);
+				if (this->With4Quadrants)
+				{
+					if (ix < nx / 2 && iy < ny / 2)
+					{
+						lowerTriangle->PhysicalPart = quadrantBottomLeft;
+						upperTriangle->PhysicalPart = quadrantBottomLeft;
+					}
+					else if (ix >= nx / 2 && iy < ny / 2)
+					{
+						lowerTriangle->PhysicalPart = quadrantBottomRight;
+						upperTriangle->PhysicalPart = quadrantBottomRight;
+					}
+					else if (ix >= nx / 2 && iy >= ny / 2)
+					{
+						lowerTriangle->PhysicalPart = quadrantTopRight;
+						upperTriangle->PhysicalPart = quadrantTopRight;
+					}
+					else
+					{
+						lowerTriangle->PhysicalPart = quadrantTopLeft;
+						upperTriangle->PhysicalPart = quadrantTopLeft;
+					}
+				}
 			}
 		}
 
