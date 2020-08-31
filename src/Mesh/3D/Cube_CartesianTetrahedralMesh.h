@@ -13,10 +13,23 @@ public:
 	Cube_CartesianTetrahedralMesh(BigNumber n) : Cube_CartesianTetrahedralMesh(new Cube_CartesianMesh(n, n, n))
 	{}
 
-	Cube_CartesianTetrahedralMesh(Cube_CartesianMesh* cartMesh) : TetrahedralMesh()
+	Cube_CartesianTetrahedralMesh(Cube_CartesianMesh* cartMesh, bool buildMesh = true) : TetrahedralMesh()
 	{
 		_cartMesh = cartMesh;
+		if (buildMesh)
+			Build();
+	}
 
+private:
+	void Build()
+	{
+		// Physical parts
+		PhysicalGroup<3>* domain = nullptr;
+		if (this->PhysicalParts.empty())
+			this->PhysicalParts = CubeGeometry::PhysicalParts();
+		domain = this->PhysicalParts[0];
+
+		// Vertices
 		for (Vertex* cartV : _cartMesh->Vertices)
 		{
 			MeshVertex<3>* v = new MeshVertex<3>(*cartV);
@@ -24,6 +37,7 @@ public:
 			this->_verticesByNumber.insert({ v->Number, v });
 		}
 
+		// Elements
 		BigNumber elemNumber = 0;
 		BigNumber faceNumber = 0;
 		for (Element<3>* e : _cartMesh->Elements)
@@ -45,6 +59,12 @@ public:
 			TetrahedralElement* tetra3 = this->CreateAndAddNewTetra(elemNumber++, v_111, v_010, v_000, v_011);
 			TetrahedralElement* tetra4 = this->CreateAndAddNewTetra(elemNumber++, v_101, v_111, v_000, v_011);
 			TetrahedralElement* tetra5 = this->CreateAndAddNewTetra(elemNumber++, v_101, v_000, v_001, v_011);
+			tetra0->PhysicalPart = domain;
+			tetra1->PhysicalPart = domain;
+			tetra2->PhysicalPart = domain;
+			tetra3->PhysicalPart = domain;
+			tetra4->PhysicalPart = domain;
+			tetra5->PhysicalPart = domain;
 
 			vector<TetrahedralElement*> tetrasInCube(6);
 			tetrasInCube[0] = tetra0;
@@ -83,6 +103,7 @@ public:
 		}
 	}
 
+public:
 	virtual string Description() override
 	{
 		return "Cartesian tetrahedral";
@@ -102,9 +123,10 @@ public:
 			TetrahedralMesh::CoarsenMesh(strategy);
 
 		_cartMesh->CoarsenMesh(strategy);
-		Cube_CartesianTetrahedralMesh* coarseMesh = new Cube_CartesianTetrahedralMesh(dynamic_cast<Cube_CartesianMesh*>(_cartMesh->CoarseMesh));
+		Cube_CartesianTetrahedralMesh* coarseMesh = new Cube_CartesianTetrahedralMesh(dynamic_cast<Cube_CartesianMesh*>(_cartMesh->CoarseMesh), false);
 		this->InitializeCoarsening(coarseMesh);
 		coarseMesh->ComesFrom.CS = CoarseningStrategy::StandardCoarsening;
+		coarseMesh->Build();
 
 		for (Element<3>* fc : _cartMesh->Elements)
 		{
@@ -133,7 +155,6 @@ public:
 
 		this->LinkFacesToCoarseFaces();
 
-		this->CoarseMesh->SetDiffusionField(this->_diffusionField);
 		this->FinalizeCoarsening();
 	}
 

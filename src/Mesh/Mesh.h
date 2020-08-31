@@ -57,10 +57,8 @@ public:
 	vector<Face<Dim>*> DirichletFaces;
 	vector<Face<Dim>*> NeumannFaces;
 
-	vector<PhysicalGroup*> PhysicalParts;
+	vector<PhysicalGroup<Dim>*> PhysicalParts;
 	vector<BoundaryGroup*> BoundaryParts;
-
-	DiffusionField<Dim>* _diffusionField = nullptr;
 
 	Mesh<Dim>* CoarseMesh = nullptr;
 	Mesh<Dim>* FineMesh = nullptr;
@@ -163,16 +161,10 @@ public:
 
 	void SetDiffusionField(DiffusionField<Dim>* diffusionField)
 	{
-		this->_diffusionField = diffusionField;
-
-		ParallelLoop<Element<Dim>*, EmptyResultChunk> parallelLoop(this->Elements);
-		parallelLoop.Execute([&diffusionField](Element<Dim>* e, ParallelChunk<EmptyResultChunk>* chunk)
-			{
-				e->SetDiffusionTensor(diffusionField);
-			});
-
-		if (this->CoarseMesh)
-			this->CoarseMesh->SetDiffusionField(diffusionField);
+		for (PhysicalGroup<Dim>* phyPart : PhysicalParts)
+		{
+			phyPart->ConstantDiffTensor = diffusionField->ConstantDiffTensor(phyPart);
+		}
 	}
 
 	void SetBoundaryConditions(BoundaryConditions* bc)
@@ -209,6 +201,8 @@ public:
 
 	virtual void CoarsenMesh(CoarseningStrategy strategy)
 	{
+		if (Utils::IsRefinementStrategy(strategy))
+			return;
 		Utils::FatalError("Unmanaged coarsening strategy");
 	}
 	virtual void RefineMesh(CoarseningStrategy strategy)
@@ -242,25 +236,23 @@ protected:
 	}
 
 	virtual void FinalizeRefinement()
-	{
-		//FineMesh->FillBoundaryAndInteriorFaceLists();
-		//FineMesh->FillDirichletAndNeumannFaceLists();
-	}
+	{}
 
 	void FillBoundaryAndInteriorFaceLists()
 	{
-		assert((this->BoundaryFaces.empty() && this->InteriorFaces.empty()) || (!this->BoundaryFaces.empty() && !this->InteriorFaces.empty()));
-
-		if (!this->BoundaryFaces.empty() || !this->InteriorFaces.empty())
+		bool fillBoundaryFaces = this->BoundaryFaces.empty();
+		bool fillInteriorFaces = this->InteriorFaces.empty();
+		if (!fillBoundaryFaces && !fillInteriorFaces)
 			return;
 
-		this->InteriorFaces.reserve(this->Faces.size());
+		if (fillInteriorFaces)
+			this->InteriorFaces.reserve(this->Faces.size());
 
 		for (Face<Dim>* f : this->Faces)
 		{
-			if (f->IsDomainBoundary)
+			if (fillBoundaryFaces && f->IsDomainBoundary)
 				this->BoundaryFaces.push_back(f);
-			else
+			else if (fillInteriorFaces && !f->IsDomainBoundary)
 				this->InteriorFaces.push_back(f);
 		}
 	}
@@ -456,7 +448,7 @@ public:
 					if (fe->PhysicalPart)
 						assert(fe->PhysicalPart == fe->CoarserElement->PhysicalPart && "Associated fine and coarse element have different PhysicalParts.");
 					else
-						assert(!fe->CoarserElement->PhysicalPart && "This fine element has a PhysicalPart while its associated coarse element has none.");
+						assert(!fe->CoarserElement->PhysicalPart && "This fine element has no PhysicalPart while its associated coarse element has one.");
 
 					bool feIsReferenced = false;
 					for (Element<Dim>* e : fe->CoarserElement->FinerElements)
@@ -531,7 +523,7 @@ public:
 
 			
 			Mesh<Dim>* meshToGetInfo = nullptr;
-			if (this->ComesFrom.CS == CoarseningStrategy::GMSHSplittingRefinement || this->ComesFrom.CS == CoarseningStrategy::BeyRefinement)
+			if (Utils::IsRefinementStrategy(this->ComesFrom.CS))
 				meshToGetInfo = this;
 			else if (CoarseMesh->ComesFrom.CS == CoarseningStrategy::StandardCoarsening || CoarseMesh->ComesFrom.CS == CoarseningStrategy::AgglomerationCoarsening)
 				meshToGetInfo = CoarseMesh;

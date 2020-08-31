@@ -5,15 +5,37 @@ using namespace std;
 class KelloggTestCase : public TestCase<2>
 {
 public:
-	KelloggTestCase(DiffusionField<2>* diffusionField, string bcCode) :
-		TestCase(diffusionField)
+	KelloggTestCase(ProblemArguments pb) :
+		TestCase()
 	{
-		if (bcCode.compare("d") != 0)
+		if (pb.GeoCode.compare("square4quadrants") != 0)
+			Utils::FatalError("The Kellogg test case is only compatible with the 'square4quadrants' geometry.");
+		
+		// Diffusion field
+		if (pb.HeterogeneityRatio != 1)
+			Utils::Warning("The heterogeneity ratio of the Kellogg problem is fixed. Ignoring -heterog argument.");
+		if (pb.AnisotropyRatio != 1)
+			Utils::Warning("The Kellogg problem is isotropic. Ignoring -aniso argument.");
+		if (pb.AnisotropyAngle != 0)
+			Utils::Warning("The Kellogg problem is isotropic. Ignoring -aniso-angle argument.");
+
+		double anisotropyRatio = 1;
+		double anisotropyAngle = 0;
+		double kappa1 = 1;
+		double kappa2 = 161.4476387975881;
+		double heterogeneityRatio = kappa1 / kappa2;
+
+		this->DiffField = Square4quadrantsGeometry::DiffField(heterogeneityRatio, anisotropyRatio, anisotropyAngle);
+
+		// Source function
+		this->SourceFunction = this->Source;
+
+		// Boundary conditions
+		if (pb.BCCode.compare("d") != 0)
 			Utils::FatalError("The requested boundary conditions are not defined in this test case.");
 
-		this->SourceFunction = this->Source;
 		this->BC.DirichletFunction = this->Solution;
-		if (this->DiffField->IsIsotropic)
+		if (this->DiffField.IsIsotropic)
 			this->ExactSolution = this->Solution;
 	}
 

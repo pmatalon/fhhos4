@@ -243,8 +243,8 @@ private:
 			if (physicalTags.size() > 1)
 				Utils::FatalError("Entity " + to_string(entityTag) + " must have only one physical group (" + to_string(physicalTags.size()) + " found). Check GMSH file.");
 			
-			PhysicalGroup* physicalPart = nullptr;
-			for (PhysicalGroup* pp : this->PhysicalParts)
+			PhysicalGroup<Dim>* physicalPart = nullptr;
+			for (PhysicalGroup<Dim>* pp : this->PhysicalParts)
 			{
 				if (pp->Id == physicalTags[0])
 				{
@@ -369,14 +369,14 @@ protected:
 		return _elementExternalNumbers.at(elementTag);
 	}
 
-	vector<PhysicalGroup*> GetPhysicalGroups()
+	vector<PhysicalGroup<Dim>*> GetPhysicalGroups()
 	{
 		gmsh::vectorpair phyGroupsDimTags;
 		gmsh::model::getPhysicalGroups(phyGroupsDimTags, Dim);
-		vector<PhysicalGroup*> physicalGroups;
+		vector<PhysicalGroup<Dim>*> physicalGroups;
 		for (size_t i = 0; i < phyGroupsDimTags.size(); i++)
 		{
-			PhysicalGroup* phyGroup = new PhysicalGroup(phyGroupsDimTags[i].second);
+			PhysicalGroup<Dim>* phyGroup = new PhysicalGroup<Dim>(phyGroupsDimTags[i].second);
 			gmsh::model::getPhysicalName(Dim, phyGroup->Id, phyGroup->Name);
 			physicalGroups.push_back(phyGroup);
 		}
@@ -429,14 +429,12 @@ public:
 
 	void CoarsenMesh(CoarseningStrategy strategy) override
 	{
-		if (strategy == CoarseningStrategy::GMSHSplittingRefinement || strategy == CoarseningStrategy::BeyRefinement)
+		if (Utils::IsRefinementStrategy(strategy))
 			return;
 		else if (strategy == CoarseningStrategy::IndependentRemeshing)
 			IndependentRemesh();
 		else
 			PolyhedralMesh<Dim>::CoarsenMesh(strategy);
-
-		this->CoarseMesh->SetDiffusionField(this->_diffusionField);
 	}
 
 	virtual void RefineMesh(CoarseningStrategy strategy)

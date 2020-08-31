@@ -13,8 +13,8 @@ public:
 		auto n1 = element1->OuterNormalVector(this);
 		auto n2 = element2->OuterNormalVector(this);
 
-		double k1 = element1->Kappa;
-		double k2 = element2->Kappa;
+		double k1 = element1->Kappa();
+		double k2 = element2->Kappa();
 
 		double weight1 = 1;
 		double weight2 = 1;
@@ -23,9 +23,9 @@ public:
 			Element<Dim>* elementOnTheOtherSide1 = element1->ElementOnTheOtherSideOf(this);
 			Element<Dim>* elementOnTheOtherSide2 = element2->ElementOnTheOtherSideOf(this);
 			double l1 = k1;
-			double l2 = elementOnTheOtherSide1->Kappa;
-			weight1 = elementOnTheOtherSide1->Kappa / (l1 + l2);
-			weight2 = elementOnTheOtherSide2->Kappa / (l1 + l2);
+			double l2 = elementOnTheOtherSide1->Kappa();
+			weight1 = elementOnTheOtherSide1->Kappa() / (l1 + l2);
+			weight2 = elementOnTheOtherSide2->Kappa() / (l1 + l2);
 		}
 
 		auto phi1 = element1->EvalPhiOnFace(this, p_phi1);
@@ -60,11 +60,11 @@ public:
 		int polynomialDegree = p_phi1->GetDegree() + p_phi2->GetDegree();
 		double integralJump1ScalarJump2 = this->Integral(functionToIntegrate, polynomialDegree);
 
-		double diffusionDependantCoefficient = element1->Kappa;
+		double diffusionDependantCoefficient = element1->Kappa();
 		if (!this->IsDomainBoundary)
 		{
-			double k1 = this->Element1->Kappa;
-			double k2 = this->Element2->Kappa;
+			double k1 = this->Element1->Kappa();
+			double k2 = this->Element2->Kappa();
 			diffusionDependantCoefficient = 2 * k1*k2 / (k1 + k2);
 		}
 

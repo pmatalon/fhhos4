@@ -10,6 +10,7 @@
 #include "2D/XSolution2DTestCase.h"
 #include "2D/KelloggTestCase.h"
 #include "2D/BarWith4HolesTestCase.h"
+#include "2D/SquareCircleTestCase.h"
 #include "3D/SineSolution3DTestCase.h"
 #include "3D/PolySolution3DTestCase.h"
 #include "3D/ExpSolution3DTestCase.h"
@@ -19,54 +20,56 @@ template <int Dim>
 class TestCaseFactory
 {
 public:
-	static TestCase<Dim>* Create(string tcCode, DiffusionField<Dim>* diffusionField, string bcCode) { assert(false); }
+	static TestCase<Dim>* Create(ProblemArguments pb) { assert(false); }
 };
 
 template <>
-TestCase<1>* TestCaseFactory<1>::Create(string tcCode, DiffusionField<1>* diffusionField, string bcCode)
+TestCase<1>* TestCaseFactory<1>::Create(ProblemArguments pb)
 {
-	if (tcCode.compare("sine") == 0)
-		return new SineSolution1DTestCase(diffusionField, bcCode);
-	if (tcCode.compare("poly") == 0)
-		return new PolySolution1DTestCase(diffusionField, bcCode);
-	if (tcCode.compare("heterog") == 0)
-		return new Heterogeneity1DTestCase(diffusionField, bcCode);
+	if (pb.TestCaseCode.compare("sine") == 0)
+		return new SineSolution1DTestCase(pb);
+	if (pb.TestCaseCode.compare("poly") == 0)
+		return new PolySolution1DTestCase(pb);
+	if (pb.TestCaseCode.compare("heterog") == 0)
+		return new Heterogeneity1DTestCase(pb);
 
-	Utils::FatalError("Test case '" + tcCode + "' is unknown or not implemented in 1D. Check -tc argument.");
+	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 1D. Check -tc argument.");
 }
 
 template <>
-TestCase<2>* TestCaseFactory<2>::Create(string tcCode, DiffusionField<2>* diffusionField, string bcCode)
+TestCase<2>* TestCaseFactory<2>::Create(ProblemArguments pb)
 {
-	if (tcCode.compare("sine") == 0)
-		return new SineSolution2DTestCase(diffusionField, bcCode);
-	if (tcCode.compare("poly") == 0)
-		return new PolySolution2DTestCase(diffusionField, bcCode);
-	if (tcCode.compare("exp") == 0)
-		return new ExpSolution2DTestCase(diffusionField, bcCode);
-	if (tcCode.compare("zero") == 0)
-		return new ZeroSolution2DTestCase(diffusionField, bcCode);
-	if (tcCode.compare("one") == 0)
-		return new OneSolution2DTestCase(diffusionField, bcCode);
-	if (tcCode.compare("x") == 0)
-		return new XSolution2DTestCase(diffusionField, bcCode);
-	if (tcCode.compare("kellogg") == 0)
-		return new KelloggTestCase(diffusionField, bcCode);
-	if (tcCode.compare("barwith4holes") == 0)
-		return new BarWith4HolesTestCase(diffusionField, bcCode);
+	if (pb.TestCaseCode.compare("sine") == 0)
+		return new SineSolution2DTestCase(pb);
+	if (pb.TestCaseCode.compare("poly") == 0)
+		return new PolySolution2DTestCase(pb);
+	if (pb.TestCaseCode.compare("exp") == 0)
+		return new ExpSolution2DTestCase(pb);
+	if (pb.TestCaseCode.compare("zero") == 0)
+		return new ZeroSolution2DTestCase(pb);
+	if (pb.TestCaseCode.compare("one") == 0)
+		return new OneSolution2DTestCase(pb);
+	if (pb.TestCaseCode.compare("x") == 0)
+		return new XSolution2DTestCase(pb);
+	if (pb.TestCaseCode.compare("kellogg") == 0)
+		return new KelloggTestCase(pb);
+	if (pb.TestCaseCode.compare("barwith4holes") == 0)
+		return new BarWith4HolesTestCase(pb);
+	if (pb.TestCaseCode.compare("squarecircle") == 0)
+		return new SquareCircleTestCase(pb);
 
-	Utils::FatalError("Test case '" + tcCode + "' is unknown or not implemented in 2D. Check -tc argument.");
+	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 2D. Check -tc argument.");
 }
 
 template <>
-TestCase<3>* TestCaseFactory<3>::Create(string tcCode, DiffusionField<3>* diffusionField, string bcCode)
+TestCase<3>* TestCaseFactory<3>::Create(ProblemArguments pb)
 {
-	if (tcCode.compare("sine") == 0)
-		return new SineSolution3DTestCase(diffusionField, bcCode);
-	if (tcCode.compare("poly") == 0)
-		return new PolySolution3DTestCase(diffusionField, bcCode);
-	if (tcCode.compare("exp") == 0)
-		return new ExpSolution3DTestCase(diffusionField, bcCode);
+	if (pb.TestCaseCode.compare("sine") == 0)
+		return new SineSolution3DTestCase(pb);
+	if (pb.TestCaseCode.compare("poly") == 0)
+		return new PolySolution3DTestCase(pb);
+	if (pb.TestCaseCode.compare("exp") == 0)
+		return new ExpSolution3DTestCase(pb);
 
-	Utils::FatalError("Test case '" + tcCode + "' is unknown or not implemented in 3D. Check -tc argument.");
+	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 3D. Check -tc argument.");
 }

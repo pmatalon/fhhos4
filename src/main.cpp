@@ -39,21 +39,18 @@ void print_usage() {
 	cout << "            <other>    - Test case-specific boundary conditions" << endl;
 	cout << endl;
 	cout << "-heterog NUM" << endl;
-	cout << "      Heterogeneity ratio. Constant diffusion coefficient in one part of the domain partition" << endl;
-	cout << "      while equals to 1 in the second part." << endl;
+	cout << "      Heterogeneity ratio. Has an effect only if multiple physical parts are defined in the geometry." << endl;
 	cout << "      Ex:       1             - homogeneous diffusion (default)" << endl;
 	cout << "                0 < NUM < 1   - to be used with -tc heterog" << endl;
 	cout << "                1e4           - allows to set the order of magnitude of the ratio" << endl;
 	cout << endl;
 	cout << "-aniso NUM" << endl;
-	cout << "      Anisotropy ratio valid across the whole domain." << endl;
+	cout << "      Anisotropy ratio (valid across the whole domain)." << endl;
 	cout << "      Example: 1e4" << endl;
 	cout << endl;
-	cout << "-partition CODE" << endl;
-	cout << "      Domain partition describing the heterogeneity pattern in case of heterogeneous diffusion." << endl;
-	cout << "               halves     - the domain is split into two vertical halves" << endl;
-	cout << "               chiasmus   - chiasmus shape (default)" << endl;
-	cout << "               circle     - the domain is split into two parts by a circle of center (1/2, 1/2) and of radius 1/4" << endl;
+	cout << "-aniso-angle NUM" << endl;
+	cout << "      Anisotropy angle expressed in degrees (valid across the whole domain)." << endl;
+	cout << "      Example: 45" << endl;
 	cout << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << "                                  Mesh                                " << endl;
@@ -295,9 +292,9 @@ void print_usage() {
 	cout << "Homogeneous diffusion problem in the unit square, using a Cartesian mesh 16x16 and providing a quadratic approximation:" << endl;
 	cout << "              -geo square -mesh cart -n 16 -p 2" << endl;
 	cout << endl;
-	cout << "Heterogeneous problem in the unit square. The domain partition describing the heterogeneity pattern is a chiasmus." << endl;
+	cout << "Heterogeneous problem in the unit square. The domain partition describing the heterogeneity pattern is a chiasmus (4 quadrants)." << endl;
 	cout << "The heterogeneity ratio between the two subdomains is set to 1e4." << endl;
-	cout << "              -geo square -partition chiasmus -heterog 1e4" << endl;
+	cout << "              -geo square4quadrants -heterog 1e4" << endl;
 	cout << "Other use case: the heterogeneity ratio, as well as as non-homogeneous Dirichlet conditions, are set such that it corresponds to a Kellogg problem." << endl;
 	cout << "              -geo square4quadrants -tc kellogg" << endl;
 	cout << endl;
@@ -358,9 +355,9 @@ int main(int argc, char* argv[])
 		OPT_TestCase,
 		OPT_RightHandSide, // deprecated
 		OPT_BoundaryConditions,
-		OPT_Heterogeneity,
-		OPT_Anisotropy,
-		OPT_Partition,
+		OPT_HeterogeneityRatio,
+		OPT_AnisotropyRatio,
+		OPT_AnisotropyAngle,
 		// Mesh
 		OPT_Mesh,
 		OPT_Mesher,
@@ -397,9 +394,9 @@ int main(int argc, char* argv[])
 		 { "tc", required_argument, NULL, OPT_TestCase },
 		 { "rhs", required_argument, NULL, OPT_RightHandSide }, // deprecated
 		 { "bc", required_argument, NULL, OPT_BoundaryConditions },
-		 { "heterog", required_argument, NULL, OPT_Heterogeneity },
-		 { "aniso", required_argument, NULL, OPT_Anisotropy },
-		 { "partition", required_argument, NULL, OPT_Partition },
+		 { "heterog", required_argument, NULL, OPT_HeterogeneityRatio },
+		 { "aniso", required_argument, NULL, OPT_AnisotropyRatio },
+		 { "aniso-angle", required_argument, NULL, OPT_AnisotropyAngle },
 		 // Mesh
 		 { "mesh", required_argument, NULL, OPT_Mesh },
 		 { "mesher", required_argument, NULL, OPT_Mesher },
@@ -460,20 +457,15 @@ int main(int argc, char* argv[])
 			case OPT_BoundaryConditions:
 				args.Problem.BCCode = optarg;
 				break;
-			case OPT_Heterogeneity: 
+			case OPT_HeterogeneityRatio: 
 				args.Problem.HeterogeneityRatio = atof(optarg);
 				break;
-			case OPT_Anisotropy:
+			case OPT_AnisotropyRatio:
 				args.Problem.AnisotropyRatio = atof(optarg);
 				break;
-			case OPT_Partition:
-			{
-				string partition = optarg;
-				if (partition.compare("halves") != 0 && partition.compare("chiasmus") != 0 && partition.compare("circle") != 0)
-					argument_error("unknown partition '" + partition + "'. Check -partition argument.");
-				args.Problem.Partition = partition;
+			case OPT_AnisotropyAngle:
+				args.Problem.AnisotropyAngle = atof(optarg) * M_PI / 180; // conversion degrees to radians
 				break;
-			}
 
 			//--------------------//
 			//        Mesh        //
@@ -750,28 +742,7 @@ int main(int argc, char* argv[])
 
 	if (args.Problem.GeoCode.compare("square") == 0 && args.Problem.HeterogeneityRatio != 1)
 		Utils::Warning("The geometry 'square' has only one physical part: -heterog argument is ignored. Use 'square4quadrants' instead to run an heterogeneous problem.");
-
-	if (args.Problem.Dimension != 1 && args.Problem.TestCaseCode.compare("heterog") == 0)
-		argument_error("-tc heterog is only supported in 1D.");
-
-	if (args.Problem.TestCaseCode.compare("kellogg") == 0)
-	{
-		if (args.Problem.Dimension != 2)
-			argument_error("-tc kellogg is only supported in 2D.");
-		if (args.Problem.HeterogeneityRatio != 1)
-			Utils::Warning("-heterog argument is ignored due to -tc kellogg");
-		if (args.Problem.AnisotropyRatio != 1)
-			Utils::Warning("-aniso argument is ignored due to -tc kellogg");
-		if (args.Problem.Partition.compare("chiasmus") != 0)
-			Utils::Warning("-partition argument is ignored due to -tc kellogg");
-
-		args.Problem.Partition = "chiasmus";
-		args.Problem.AnisotropyRatio = 1;
-		double kappa1 = 1;
-		double kappa2 = 161.4476387975881;
-		args.Problem.HeterogeneityRatio = kappa1 / kappa2;
-	}
-
+	
 	if (args.Problem.Dimension > 1 && args.Discretization.Method.compare("dg") == 0 && args.Discretization.PolyDegree == 0)
 		argument_error("In 2D/3D, DG is not a convergent scheme for p = 0.");
 

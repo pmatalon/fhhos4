@@ -90,6 +90,11 @@ public:
 		return filePath.substr(0, filePath.find_last_of("/\\"));
 	}
 
+	static bool IsRefinementStrategy(CoarseningStrategy stgy)
+	{
+		return stgy == CoarseningStrategy::BeyRefinement || stgy == CoarseningStrategy::GMSHSplittingRefinement;
+	}
+
 	static double Eps;
 	static double NumericalZero;
 

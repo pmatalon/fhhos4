@@ -1,6 +1,8 @@
 #pragma once
 #include "TriangularElement.h"
 #include "../PolyhedralMesh.h"
+#include "SquareGeometry.h"
+#include "Square4quadrantsGeometry.h"
 using namespace std;
 
 class LowerTriangle : public TriangularElement
@@ -74,33 +76,30 @@ public:
 		double hy = 1.0 / ny;
 
 		// Physical parts
-		PhysicalGroup* quadrantBottomLeft = nullptr;
-		PhysicalGroup * quadrantBottomRight = nullptr;
-		PhysicalGroup * quadrantTopRight = nullptr;
-		PhysicalGroup* quadrantTopLeft = nullptr;
+		PhysicalGroup<2>* domain = nullptr;
+		PhysicalGroup<2>* quadrantBottomLeft = nullptr;
+		PhysicalGroup<2>* quadrantBottomRight = nullptr;
+		PhysicalGroup<2>* quadrantTopRight = nullptr;
+		PhysicalGroup<2>* quadrantTopLeft = nullptr;
 		if (this->With4Quadrants)
 		{
 			if (this->PhysicalParts.empty())
-			{
-				this->PhysicalParts.push_back(new PhysicalGroup(1, "quadrantBottomLeft"));
-				this->PhysicalParts.push_back(new PhysicalGroup(2, "quadrantBottomRight"));
-				this->PhysicalParts.push_back(new PhysicalGroup(3, "quadrantTopRight"));
-				this->PhysicalParts.push_back(new PhysicalGroup(4, "quadrantTopLeft"));
-			}
+				this->PhysicalParts = Square4quadrantsGeometry::PhysicalParts();
 			quadrantBottomLeft = this->PhysicalParts[0];
 			quadrantBottomRight = this->PhysicalParts[1];
 			quadrantTopRight = this->PhysicalParts[2];
 			quadrantTopLeft = this->PhysicalParts[3];
 		}
+		else
+		{
+			if (this->PhysicalParts.empty())
+				this->PhysicalParts = SquareGeometry::PhysicalParts();
+			domain = this->PhysicalParts[0];
+		}
 
 		// Boundary parts
 		if (this->BoundaryParts.empty())
-		{
-			this->BoundaryParts.push_back(new BoundaryGroup(1, "bottomBoundary"));
-			this->BoundaryParts.push_back(new BoundaryGroup(2, "rightBoundary"));
-			this->BoundaryParts.push_back(new BoundaryGroup(3, "topBoundary"));
-			this->BoundaryParts.push_back(new BoundaryGroup(4, "leftBoundary"));
-		}
+			this->BoundaryParts = SquareGeometry::BoundaryParts();
 		BoundaryGroup* squareBottomBoundary = this->BoundaryParts[0];
 		BoundaryGroup* squareRightBoundary = this->BoundaryParts[1];
 		BoundaryGroup* squareTopBoundary = this->BoundaryParts[2];
@@ -161,6 +160,11 @@ public:
 						lowerTriangle->PhysicalPart = quadrantTopLeft;
 						upperTriangle->PhysicalPart = quadrantTopLeft;
 					}
+				}
+				else
+				{
+					lowerTriangle->PhysicalPart = domain;
+					upperTriangle->PhysicalPart = domain;
 				}
 			}
 		}
@@ -345,9 +349,6 @@ public:
 			//CoarsenByAgglomerationAndKeepFineFaces();
 		else
 			PolyhedralMesh<2>::CoarsenMesh(strategy);
-
-		if (this->_diffusionField)
-			this->CoarseMesh->SetDiffusionField(this->_diffusionField);
 	}
 
 	void RefineMesh(CoarseningStrategy strategy) override

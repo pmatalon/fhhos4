@@ -47,6 +47,7 @@ public:
 	{
 		Face<2>* copy = new Edge(number, _shape->Vertex1, _shape->Vertex2, element1);
 		copy->IsDomainBoundary = this->IsDomainBoundary;
+		copy->BoundaryPart = this->BoundaryPart;
 		return copy;
 	}
 

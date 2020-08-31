@@ -17,7 +17,7 @@ public:
 		: Problem<Dim>(mesh, outputDirectory)
 	{
 		this->_testCase = testCase;
-		this->_diffusionField = testCase->DiffField;
+		this->_diffusionField = &testCase->DiffField;
 		this->_sourceFunction = testCase->SourceFunction;
 		this->_boundaryConditions = &testCase->BC;
 
@@ -46,8 +46,7 @@ public:
 			}
 			else
 			{
-				cout << "    Heterogeneous coefficient: partition = " << this->_diffusionField->Partition << endl;
-				cout << "                               ratio     = " << scientific << this->_diffusionField->HeterogeneityRatio << fixed << endl;
+				cout << "    Heterogeneous coefficient: ratio = " << scientific << this->_diffusionField->HeterogeneityRatio << fixed << endl;
 				if (this->_diffusionField->IsIsotropic)
 					cout << "    Isotropic" << endl;
 				else

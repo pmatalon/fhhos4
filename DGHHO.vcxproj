@@ -122,8 +122,11 @@
     <ClInclude Include="src\Geometry\3D\TriangleIn3D.h" />
     <ClInclude Include="src\Geometry\3D\ReferenceTetrahedron.h" />
     <ClInclude Include="src\HHO\HHOParameters.h" />
+    <ClInclude Include="src\Mesh\1D\SegmentGeometry.h" />
+    <ClInclude Include="src\Mesh\2D\Square4quadrantsGeometry.h" />
     <ClInclude Include="src\Mesh\2D\Square4quadrants_GMSHCartesianMesh.h" />
     <ClInclude Include="src\Mesh\2D\Square4quadrants_GMSHTriangularMesh.h" />
+    <ClInclude Include="src\Mesh\2D\SquareGeometry.h" />
     <ClInclude Include="src\Mesh\2D\Square_CartesianPolygonalMesh.h" />
     <ClInclude Include="src\Mesh\2D\Edge.h" />
     <ClInclude Include="src\Mesh\2D\Square_GMSHCartesianMesh.h" />
@@ -139,6 +142,7 @@
     <ClInclude Include="src\Mesh\2D\RectangularPolygonalElement.h" />
     <ClInclude Include="src\Mesh\2D\TriangularElement.h" />
     <ClInclude Include="src\Mesh\2D\Square_TriangularMesh.h" />
+    <ClInclude Include="src\Mesh\3D\CubeGeometry.h" />
     <ClInclude Include="src\Mesh\3D\Cube_CartesianTetrahedralMesh.h" />
     <ClInclude Include="src\Mesh\3D\Cube_GMSHCartesianMesh.h" />
     <ClInclude Include="src\Mesh\3D\Cube_GMSHTetrahedralMesh.h" />
@@ -214,6 +218,7 @@
     <ClInclude Include="src\TestCases\2D\OneSolution2DTestCase.h" />
     <ClInclude Include="src\TestCases\2D\PolySolution2DTestCase.h" />
     <ClInclude Include="src\TestCases\2D\SineSolution2DTestCase.h" />
+    <ClInclude Include="src\TestCases\2D\SquareCircleTestCase.h" />
     <ClInclude Include="src\TestCases\2D\XSolution2DTestCase.h" />
     <ClInclude Include="src\TestCases\2D\ZeroSolution2DTestCase.h" />
     <ClInclude Include="src\TestCases\3D\ExpSolution3DTestCase.h" />

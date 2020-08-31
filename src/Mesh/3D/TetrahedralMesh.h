@@ -52,13 +52,11 @@ protected:
 		cout << "Mesh refinement using Bey's method" << endl;
 
 		TetrahedralMesh* fineMesh = new TetrahedralMesh(this->GeometryDescription());
+		this->InitializeRefinement(fineMesh);
 		fineMesh->ComesFrom.CS = CoarseningStrategy::BeyRefinement;
 		fineMesh->ComesFrom.nFineElementsByCoarseElement = 8;
 		fineMesh->ComesFrom.nFineFacesAddedByCoarseElement = 8;
 		fineMesh->ComesFrom.nFineFacesByKeptCoarseFace = 4;
-
-		this->FineMesh = fineMesh;
-		fineMesh->CoarseMesh = this;
 
 		//----------------------------//
 		//    Copy coarse vertices    //
@@ -149,6 +147,15 @@ protected:
 			TetrahedralElement* octaTetra3 = fineMesh->CreateAndAddNewTetra(elemNumber++, V02, V03, V13, V23, coarseTetra);
 			TetrahedralElement* octaTetra4 = fineMesh->CreateAndAddNewTetra(elemNumber++, V02, V12, V13, V23, coarseTetra);
 
+			cornerTetra1->PhysicalPart = coarseTetra->PhysicalPart;
+			cornerTetra2->PhysicalPart = coarseTetra->PhysicalPart;
+			cornerTetra3->PhysicalPart = coarseTetra->PhysicalPart;
+			cornerTetra4->PhysicalPart = coarseTetra->PhysicalPart;
+			octaTetra1->PhysicalPart = coarseTetra->PhysicalPart;
+			octaTetra2->PhysicalPart = coarseTetra->PhysicalPart;
+			octaTetra3->PhysicalPart = coarseTetra->PhysicalPart;
+			octaTetra4->PhysicalPart = coarseTetra->PhysicalPart;
+
 			//--------------------//
 			//    Create faces    //
 			//--------------------//
@@ -204,6 +211,8 @@ protected:
 		//------------------------------//
 
 		fineMesh->LinkFacesToCoarseFaces();
+
+		this->FinalizeRefinement();
 	}
 
 	MeshVertex<3>* ExistingNewVertex(map<DomPoint, MeshVertex<3>*> &newVertices, DomPoint p)

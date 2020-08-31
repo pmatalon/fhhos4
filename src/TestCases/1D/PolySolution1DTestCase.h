@@ -1,18 +1,25 @@
 #pragma once
 #include "../TestCase.h"
+#include "../../Mesh/1D/SegmentGeometry.h"
 using namespace std;
 
 class PolySolution1DTestCase : public TestCase<1>
 {
 public:
-	PolySolution1DTestCase(DiffusionField<1>* diffusionField, string bcCode) :
-		TestCase(diffusionField)
+	PolySolution1DTestCase(ProblemArguments pb) :
+		TestCase()
 	{
-		if (bcCode.compare("d") != 0)
+		// Diffusion field
+		this->DiffField = SegmentGeometry::DiffField(pb.HeterogeneityRatio);
+
+		// Source function
+		this->SourceFunction = Source;
+
+		// Boundary conditions
+		if (pb.BCCode.compare("d") != 0)
 			Utils::FatalError("This test case runs only with Dirichlet conditions");
 
-		this->SourceFunction = Source;
-		if (this->DiffField->IsHomogeneous)
+		if (this->DiffField.IsHomogeneous)
 			this->ExactSolution = Solution;
 	}
 

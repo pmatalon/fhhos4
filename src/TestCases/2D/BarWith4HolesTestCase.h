@@ -5,19 +5,27 @@ using namespace std;
 class BarWith4HolesTestCase : public TestCase<2>
 {
 public:
-	BarWith4HolesTestCase(DiffusionField<2>* diffusionField, string bcCode) :
-		TestCase(diffusionField)
+	BarWith4HolesTestCase(ProblemArguments pb) :
+		TestCase()
 	{
+		// Diffusion field
+		if (pb.HeterogeneityRatio != 1)
+			Utils::FatalError("This test case does not allow heterogeneity.");
+
+		this->DiffField = DiffusionField<2>(pb.AnisotropyRatio, pb.AnisotropyAngle);
+
+		// Source function
 		this->SourceFunction = this->Source;
 
-		if (bcCode.compare("d") == 0)
+		// Boundary conditions
+		if (pb.BCCode.compare("d") == 0)
 		{
 			// These are already the default value, but I reset them as an example of how to apply boundary conditions.
 			this->BC.GetBoundaryConditionType = BoundaryConditions::DirichletEverywhere;
 			this->BC.DirichletFunction = BoundaryConditions::Homogeneous;
 			this->BC.Description = "Homogeneous Dirichlet";
 		}
-		else if (bcCode.compare("nholes") == 0)
+		else if (pb.BCCode.compare("nholes") == 0)
 		{
 			this->BC.GetBoundaryConditionType = NeumannOnHoles;
 			this->BC.DirichletFunction = BoundaryConditions::Homogeneous;

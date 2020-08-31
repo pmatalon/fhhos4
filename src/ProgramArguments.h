@@ -10,8 +10,7 @@ struct ProblemArguments
 	string TestCaseCode = "sine";
 	double HeterogeneityRatio = 1;
 	double AnisotropyRatio = 1;
-	double AnisotropyAngleInDegrees = 0;
-	string Partition = "chiasmus";
+	double AnisotropyAngle = 0; // in radians
 	string BCCode = "d";
 };
 

@@ -3,6 +3,7 @@
 #include "ParallelepipedElement.h"
 #include "RectangularFace.h"
 #include "../Mesh.h"
+#include "CubeGeometry.h"
 
 using namespace std;
 
@@ -13,16 +14,33 @@ public:
 	BigNumber Ny;
 	BigNumber Nz;
 
-	Cube_CartesianMesh(BigNumber nx, BigNumber ny, BigNumber nz) : Mesh()
+	Cube_CartesianMesh(BigNumber nx, BigNumber ny, BigNumber nz, bool buildMesh = true) : Mesh()
 	{
 		// nx = ny = nz falls down to cubic elements
 		this->Nx = nx;
 		this->Ny = ny;
 		this->Nz = nz;
 
+		if (buildMesh)
+			Build();
+	}
+
+private:
+	void Build()
+	{
+		BigNumber nx = this->Nx;
+		BigNumber ny = this->Ny;
+		BigNumber nz = this->Nz;
+
 		double hx = 1 / (double)nx;
 		double hy = 1 / (double)ny;
 		double hz = 1 / (double)nz;
+
+		// Physical parts
+		PhysicalGroup<3>* domain = nullptr;
+		if (this->PhysicalParts.empty())
+			this->PhysicalParts = CubeGeometry::PhysicalParts();
+		domain = this->PhysicalParts[0];
 
 		//----------//
 		// Vertices //
@@ -63,6 +81,7 @@ public:
 					Vertex* frontRightBottomCorner = Vertices[indexV(ix+1, iy+1, iz)];
 					Vertex* frontRightTopCorner    = Vertices[indexV(ix+1, iy+1, iz+1)];
 					ParallelepipedElement* element = new ParallelepipedElement(index(ix, iy, iz), backLeftBottomCorner, frontLeftBottomCorner, backRightBottomCorner, backLeftTopCorner, frontLeftTopCorner, backRightTopCorner, frontRightBottomCorner, frontRightTopCorner);
+					element->PhysicalPart = domain;
 					this->Elements.push_back(element);
 				}
 			}
@@ -178,6 +197,7 @@ public:
 
 	}
 
+public:
 	string Description() override
 	{
 		return "Cartesian " + to_string(this->Nx) + " x " + to_string(this->Ny) + " x " + to_string(this->Nz);
@@ -207,9 +227,6 @@ public:
 			StandardCoarsening();
 		else
 			Mesh<3>::CoarsenMesh(strategy);
-
-		if (this->_diffusionField)
-			this->CoarseMesh->SetDiffusionField(this->_diffusionField);
 	}
 
 private:
@@ -225,12 +242,13 @@ private:
 		}
 		else
 		{
-			Cube_CartesianMesh* coarseMesh = new Cube_CartesianMesh(nx / 2, ny / 2, nz / 2);
+			Cube_CartesianMesh* coarseMesh = new Cube_CartesianMesh(nx / 2, ny / 2, nz / 2, false);
 			this->InitializeCoarsening(coarseMesh);
 			coarseMesh->ComesFrom.CS = CoarseningStrategy::StandardCoarsening;
 			coarseMesh->ComesFrom.nFineElementsByCoarseElement = 8;
 			coarseMesh->ComesFrom.nFineFacesAddedByCoarseElement = 12;
 			coarseMesh->ComesFrom.nFineFacesByKeptCoarseFace = 4;
+			coarseMesh->Build();
 
 			for (BigNumber iz = 0; iz < nz; ++iz)
 			{

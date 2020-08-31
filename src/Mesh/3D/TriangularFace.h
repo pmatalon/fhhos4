@@ -47,6 +47,7 @@ public:
 	{
 		Face<3>* copy = new TriangularFace(number, _shape->V1, _shape->V2, _shape->V3, element1);
 		copy->IsDomainBoundary = this->IsDomainBoundary;
+		copy->BoundaryPart = this->BoundaryPart;
 		return copy;
 	}
 

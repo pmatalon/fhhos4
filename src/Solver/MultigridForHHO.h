@@ -30,7 +30,7 @@ public:
 
 	void CoarsenMesh(CoarseningStrategy coarseningStgy, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override
 	{
-		if ((coarseningStgy == CoarseningStrategy::GMSHSplittingRefinement || coarseningStgy == CoarseningStrategy::BeyRefinement) && _problem->_mesh->CoarseMesh == nullptr)
+		if (Utils::IsRefinementStrategy(coarseningStgy) && _problem->_mesh->CoarseMesh == nullptr)
 		{
 			noCoarserMeshProvided = true;
 			return;
@@ -384,13 +384,13 @@ private:
 		else if (_weightCode.compare("k") == 0)
 		{
 			auto n = element->OuterNormalVector(face);
-			double k = (element->DiffTensor * n).dot(n);
+			double k = (element->DiffTensor() * n).dot(n);
 
 			auto n1 = face->Element1->OuterNormalVector(face);
-			double k1 = (face->Element1->DiffTensor * n1).dot(n1);
+			double k1 = (face->Element1->DiffTensor() * n1).dot(n1);
 
 			auto n2 = face->Element2->OuterNormalVector(face);
-			double k2 = (face->Element2->DiffTensor * n2).dot(n2);
+			double k2 = (face->Element2->DiffTensor() * n2).dot(n2);
 
 			return k / (k1 + k2);
 		}

@@ -59,43 +59,24 @@ public:
 			}*/
 		}
 
-		//--------------------------------------------//
-		//   Diffusion heterogeneity and anisotropy   //
-		//--------------------------------------------//
+		//-------------------------------------------------------------------------------------------//
+		//   Test case defining the source function, boundary conditions and diffusion coefficient   //
+		//-------------------------------------------------------------------------------------------//
 
-		double rotationAngleInRadians = args.Problem.AnisotropyAngleInDegrees * M_PI / 180;
-		double kappa1 = args.Problem.HeterogeneityRatio;
-		double kappa2 = 1;
-		DimVector<Dim> anisotropyCoefficients1 = kappa1 * DimVector<Dim>::Ones(Dim);
-		DimVector<Dim> anisotropyCoefficients2 = kappa2 * DimVector<Dim>::Ones(Dim);
-		if (Dim > 1)
-		{
-			anisotropyCoefficients1[0] = args.Problem.AnisotropyRatio * anisotropyCoefficients1[1];
-			anisotropyCoefficients2[0] = args.Problem.AnisotropyRatio * anisotropyCoefficients2[1];
-		}
-		Tensor<Dim> diffTensor1(anisotropyCoefficients1, rotationAngleInRadians);
-		Tensor<Dim> diffTensor2(anisotropyCoefficients2, rotationAngleInRadians);
+		TestCase<Dim>* testCase = TestCaseFactory<Dim>::Create(args.Problem);
 
-		DiffusionField<Dim> diffusionField(args.Problem.Partition, &diffTensor1, &diffTensor2);
-
-		//------------------------------------------------------------------------//
-		//   Test case defining the source function and the boundary conditions   //
-		//------------------------------------------------------------------------//
-
-		TestCase<Dim>* testCase = TestCaseFactory<Dim>::Create(args.Problem.TestCaseCode, &diffusionField, args.Problem.BCCode);
-
-		mesh->SetDiffusionField(&diffusionField);
+		mesh->SetDiffusionField(&testCase->DiffField);
 		mesh->SetBoundaryConditions(&testCase->BC);
 
 		//---------------------------//
 		//   Coarsening unit tests   //
 		//---------------------------//
 
-		if ((args.Actions & Action::UnitTests) == Action::UnitTests)
+		if ((args.Actions & Action::UnitTests) == Action::UnitTests && Dim == 2)
 		{
 			if (args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("cgmg") == 0 || args.Solver.SolverCode.compare("fcgmg") == 0)
 			{
-				if (args.Solver.MG.CoarseningStgy != CoarseningStrategy::GMSHSplittingRefinement && args.Solver.MG.CoarseningStgy != CoarseningStrategy::BeyRefinement)
+				if (!Utils::IsRefinementStrategy(args.Solver.MG.CoarseningStgy))
 				{
 					mesh->ExportFacesToMatlab(args.OutputDirectory + "/fine.dat");
 					mesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_fine.m");
@@ -417,9 +398,10 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 	string meshCode = args.Discretization.MeshCode;
 	double stretch = args.Discretization.Stretch;
 
-	CoarseningStrategy refinementStgy = args.Solver.MG.CoarseningStgy;
-	if (args.Solver.MG.CoarseningStgy != CoarseningStrategy::BeyRefinement && args.Solver.MG.CoarseningStgy != CoarseningStrategy::GMSHSplittingRefinement)
-		refinementStgy = CoarseningStrategy::GMSHSplittingRefinement;
+	CoarseningStrategy refinementStgy = Utils::IsRefinementStrategy(args.Solver.MG.CoarseningStgy) ? args.Solver.MG.CoarseningStgy : CoarseningStrategy::GMSHSplittingRefinement;
+
+	if (refinementStgy == CoarseningStrategy::BeyRefinement)
+		Utils::FatalError("Bey's refinement method is only applicable to 3D tetrahedral meshes.");
 
 	Mesh<2>* fineMesh = nullptr;
 	//-------------------//
@@ -429,6 +411,9 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 	{
 		if (mesher.compare("inhouse") == 0)
 		{
+			if (Utils::IsRefinementStrategy(args.Solver.MG.CoarseningStgy))
+				Utils::FatalError("Unmanaged refinement strategy.");
+
 			if (meshCode.compare("cart") == 0)
 				fineMesh = new Square_CartesianMesh(nx, ny);
 			else if (meshCode.compare("cart-poly") == 0)
@@ -502,6 +487,9 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 		bool with4quadrants = true;
 		if (mesher.compare("inhouse") == 0)
 		{
+			if (Utils::IsRefinementStrategy(args.Solver.MG.CoarseningStgy))
+				Utils::FatalError("Unmanaged refinement strategy.");
+
 			if (meshCode.compare("cart") == 0)
 				fineMesh = new Square_CartesianMesh(nx, ny, with4quadrants);
 			else if (meshCode.compare("cart-poly") == 0)
@@ -583,7 +571,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 #endif // GMSH_ENABLED
 	}
 	
-	if (args.Solver.MG.CoarseningStgy != CoarseningStrategy::BeyRefinement && args.Solver.MG.CoarseningStgy != CoarseningStrategy::GMSHSplittingRefinement && fineMesh->CoarseMesh)
+	if (!Utils::IsRefinementStrategy(args.Solver.MG.CoarseningStgy) && fineMesh->CoarseMesh)
 		fineMesh->DeleteCoarseMeshes();
 
 	return fineMesh;
@@ -614,6 +602,9 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args)
 	{
 		if (mesher.compare("inhouse") == 0)
 		{
+			if (Utils::IsRefinementStrategy(args.Solver.MG.CoarseningStgy))
+				Utils::FatalError("Unmanaged refinement strategy.");
+
 			if (meshCode.compare("cart") == 0)
 			{
 				fineMesh = new Cube_CartesianMesh(nx, ny, nz);
@@ -665,7 +656,7 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args)
 				if (nx != ny || nx != nz)
 					Utils::FatalError("Options -ny, -nz are not managed with this mesh");
 
-				if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement || args.Solver.MG.CoarseningStgy == CoarseningStrategy::BeyRefinement)
+				if (Utils::IsRefinementStrategy(args.Solver.MG.CoarseningStgy))
 				{
 					Mesh<3>* coarseMesh = new Cube_GMSHTetrahedralMesh(2);
 					fineMesh = coarseMesh->RefineUntilNElements(6 * n*n*n, refinementStgy);
@@ -708,7 +699,7 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args)
 #endif // GMSH_ENABLED
 	}
 
-	if (args.Solver.MG.CoarseningStgy != CoarseningStrategy::BeyRefinement && args.Solver.MG.CoarseningStgy != CoarseningStrategy::GMSHSplittingRefinement && fineMesh->CoarseMesh)
+	if (!Utils::IsRefinementStrategy(args.Solver.MG.CoarseningStgy) && fineMesh->CoarseMesh)
 		fineMesh->DeleteCoarseMeshes();
 
 	return fineMesh;

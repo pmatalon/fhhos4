@@ -1,5 +1,5 @@
 L = 1;
-N = 10;
+N = 64;
 h = 1/(N+1);
 
 // Square
@@ -16,7 +16,7 @@ Line(4) = {4, 1};
 Line Loop(5) = {1, 2, 3, 4};
 
 // Boundary
-Physical Line(1) = {1, 2, 3, 4};
+Physical Line("externalBoundary") = {1, 2, 3, 4};
 
 // Circle points
 Point(5) = {L/2, L/2, 0, h}; // Center
@@ -25,7 +25,7 @@ Point(7) = {3*L/4, L/2, 0, h}; // Right
 //Point(8) = {L/2, 3*L/4, 0, h}; // Top
 //Point(9) = {L/2, L/4, 0, h}; // Bottom
 
-// 4 cicle arcs
+// 4 circle arcs
 //Circle(10) = {7, 5, 8};
 //Circle(11) = {8, 5, 6};
 //Circle(12) = {6, 5, 9};
@@ -36,12 +36,12 @@ Circle(11) = {7, 5, 6};
 // Circle
 //Line Loop(6) = {10, 11, 12, 13};
 Line Loop(6) = {10, 11};
-Physical Line(2) = {6};
+Physical Line("circle") = {6};
 
-Transfinite Line {1, 2, 3, 4} = 4;
+//Transfinite Line {1, 2, 3, 4} = 4;
 
 Plane Surface(14) = {5, 6};
-Physical Surface(1) = {14};
+Physical Surface("square") = {14};
 
 Plane Surface(15) = {6};
-Physical Surface(2) = {15};
+Physical Surface("disk") = {15};

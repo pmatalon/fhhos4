@@ -21,11 +21,7 @@ public:
 	BigNumber Number;
 	vector<Face<Dim>*> Faces;
 
-	PhysicalGroup* PhysicalPart = nullptr;
-
-	// Diffusion coefficient //
-	double Kappa = 1; // constant diffusion coefficient (deprecated but still used in DG)
-	Tensor<Dim>* DiffTensor = nullptr;
+	PhysicalGroup<Dim>* PhysicalPart = nullptr;
 
 	// Intergrid links //
 	vector<Element<Dim>*> FinerElements;
@@ -402,10 +398,17 @@ public:
 	//     Misc     //
 	//--------------//
 
-	void SetDiffusionTensor(DiffusionField<Dim>* diffusionField)
+	// Constant diffusion tensor
+	Tensor<Dim>* DiffTensor() const
 	{
-		this->DiffTensor = diffusionField->DiffTensor(Center());
-		this->Kappa = DiffTensor->LargestEigenValue; // still used in DG
+		assert(PhysicalPart && "This element has no physical part.");
+		return PhysicalPart->ConstantDiffTensor;
+	}
+
+	// Constant isotropic diffusion coefficient (deprecated but still used in DG)
+	double Kappa() const
+	{
+		return DiffTensor()->LargestEigenValue;
 	}
 
 	virtual void Serialize(ostream& os) const
@@ -425,10 +428,10 @@ public:
 		}
 		os << ", ";
 		Shape()->Serialize(os);
-		if (this->DiffTensor && this->DiffTensor->LargestEigenValue > 1)
+		if (this->DiffTensor() && this->DiffTensor()->LargestEigenValue > 1)
 		{
 			os << ", k=";
-			os << this->DiffTensor->LargestEigenValue;
+			os << this->DiffTensor()->LargestEigenValue;
 		}
 	}
 

@@ -2,6 +2,7 @@
 #include "../Mesh.h"
 #include "Interval.h"
 #include "InterfacePoint.h"
+#include "SegmentGeometry.h"
 
 class UniformMesh1D : public Mesh<1>
 {
@@ -11,6 +12,11 @@ public:
 	UniformMesh1D(BigNumber n) : Mesh()
 	{
 		this->N = n;
+
+		this->PhysicalParts = SegmentGeometry::PhysicalParts();
+		PhysicalGroup<1>* leftPart = this->PhysicalParts[0];
+		PhysicalGroup<1>* rightPart = this->PhysicalParts[1];
+
 		this->Elements.reserve(n);
 		this->Faces.reserve(n + 1);
 		double h = (double)1 / n;
@@ -30,6 +36,7 @@ public:
 			Interval* element = new Interval(k, leftFace->V, rightFace->V);
 			element->SetLeftInterface(leftFace);
 			element->SetRightInterface(rightFace);
+			element->PhysicalPart = k < n / 2 ? leftPart : rightPart;
 			this->Elements.push_back(element);
 		}
 

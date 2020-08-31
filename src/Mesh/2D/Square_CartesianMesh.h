@@ -5,6 +5,8 @@
 #include "Square_CartesianPolygonalMesh.h"
 #include "CartesianEdge.h"
 #include "../PolyhedralMesh.h"
+#include "SquareGeometry.h"
+#include "Square4quadrantsGeometry.h"
 using namespace std;
 
 class Square_CartesianMesh : public PolyhedralMesh<2>
@@ -37,33 +39,30 @@ public:
 		double hy = 1 / (double)ny;
 
 		// Physical parts
-		PhysicalGroup* quadrantBottomLeft = nullptr;
-		PhysicalGroup * quadrantBottomRight = nullptr;
-		PhysicalGroup * quadrantTopRight = nullptr;
-		PhysicalGroup* quadrantTopLeft = nullptr;
+		PhysicalGroup<2>* domain = nullptr;
+		PhysicalGroup<2>* quadrantBottomLeft = nullptr;
+		PhysicalGroup<2>* quadrantBottomRight = nullptr;
+		PhysicalGroup<2>* quadrantTopRight = nullptr;
+		PhysicalGroup<2>* quadrantTopLeft = nullptr;
 		if (this->With4Quadrants)
 		{
 			if (this->PhysicalParts.empty())
-			{
-				this->PhysicalParts.push_back(new PhysicalGroup(1, "quadrantBottomLeft"));
-				this->PhysicalParts.push_back(new PhysicalGroup(2, "quadrantBottomRight"));
-				this->PhysicalParts.push_back(new PhysicalGroup(3, "quadrantTopRight"));
-				this->PhysicalParts.push_back(new PhysicalGroup(4, "quadrantTopLeft"));
-			}
+				this->PhysicalParts = Square4quadrantsGeometry::PhysicalParts();
 			quadrantBottomLeft = this->PhysicalParts[0];
 			quadrantBottomRight = this->PhysicalParts[1];
 			quadrantTopRight = this->PhysicalParts[2];
 			quadrantTopLeft = this->PhysicalParts[3];
 		}
+		else
+		{
+			if (this->PhysicalParts.empty())
+				this->PhysicalParts = SquareGeometry::PhysicalParts();
+			domain = this->PhysicalParts[0];
+		}
 
 		// Boundary parts
 		if (this->BoundaryParts.empty())
-		{
-			this->BoundaryParts.push_back(new BoundaryGroup(1, "bottomBoundary"));
-			this->BoundaryParts.push_back(new BoundaryGroup(2, "rightBoundary"));
-			this->BoundaryParts.push_back(new BoundaryGroup(3, "topBoundary"));
-			this->BoundaryParts.push_back(new BoundaryGroup(4, "leftBoundary"));
-		}
+			this->BoundaryParts = SquareGeometry::BoundaryParts();
 		BoundaryGroup* squareBottomBoundary = this->BoundaryParts[0];
 		BoundaryGroup* squareRightBoundary = this->BoundaryParts[1];
 		BoundaryGroup* squareTopBoundary = this->BoundaryParts[2];
@@ -117,6 +116,8 @@ public:
 					else
 						rectangle->PhysicalPart = quadrantTopLeft;
 				}
+				else
+					rectangle->PhysicalPart = domain;
 			}
 		}
 
@@ -252,8 +253,6 @@ public:
 			CoarsenByAgglomerationAndKeepFineFaces();
 		else
 			PolyhedralMesh<2>::CoarsenMesh(strategy);
-
-		this->CoarseMesh->SetDiffusionField(this->_diffusionField);
 	}
 
 	void StandardCoarsening()
@@ -349,6 +348,8 @@ public:
 				RectangularPolygonalElement* coarseElement = new RectangularPolygonalElement(i*nx / 2 + j, bottomLeftElement->BottomLeftCorner, topLeftElement->TopLeftCorner, topRightElement->TopRightCorner, bottomRightElement->BottomRightCorner);
 				coarseMesh->Elements.push_back(coarseElement);
 
+				coarseElement->PhysicalPart = bottomLeftElement->PhysicalPart;
+
 				coarseElement->FinerElements.push_back(bottomLeftElement);
 				coarseElement->FinerElements.push_back(bottomRightElement);
 				coarseElement->FinerElements.push_back(topLeftElement);
@@ -365,9 +366,11 @@ public:
 					Face<2>* bottomWestFace = bottomLeftElement->WestFace->CreateSameGeometricFace(faceNumber++, coarseElement);
 					bottomLeftElement->WestFace->CoarseFace = bottomWestFace;
 					bottomWestFace->FinerFaces.push_back(bottomLeftElement->WestFace);
+
 					Face<2>* topWestFace = topLeftElement->WestFace->CreateSameGeometricFace(faceNumber++, coarseElement);
 					topLeftElement->WestFace->CoarseFace = topWestFace;
 					topWestFace->FinerFaces.push_back(topLeftElement->WestFace);
+
 					coarseElement->AddWestFace(bottomWestFace);
 					coarseElement->AddWestFace(topWestFace);
 					coarseMesh->AddFace(bottomWestFace);
@@ -383,9 +386,13 @@ public:
 				Face<2>* leftNorthFace = topLeftElement->NorthFace->CreateSameGeometricFace(faceNumber++, coarseElement);
 				topLeftElement->NorthFace->CoarseFace = leftNorthFace;
 				leftNorthFace->FinerFaces.push_back(topLeftElement->NorthFace);
+				//leftNorthFace->BoundaryPart = topLeftElement->NorthFace->BoundaryPart;
+
 				Face<2>* rightNorthFace = topRightElement->NorthFace->CreateSameGeometricFace(faceNumber++, coarseElement);
 				topRightElement->NorthFace->CoarseFace = rightNorthFace;
 				rightNorthFace->FinerFaces.push_back(topRightElement->NorthFace);
+				//rightNorthFace->BoundaryPart = topRightElement->NorthFace->BoundaryPart;
+
 				coarseElement->AddNorthFace(leftNorthFace);
 				coarseElement->AddNorthFace(rightNorthFace);
 				coarseMesh->AddFace(leftNorthFace);
@@ -395,9 +402,13 @@ public:
 				Face<2>* topEastFace = topRightElement->EastFace->CreateSameGeometricFace(faceNumber++, coarseElement);
 				topRightElement->EastFace->CoarseFace = topEastFace;
 				topEastFace->FinerFaces.push_back(topRightElement->EastFace);
+				//topEastFace->BoundaryPart = topRightElement->EastFace->BoundaryPart;
+
 				Face<2>* bottomEastFace = bottomRightElement->EastFace->CreateSameGeometricFace(faceNumber++, coarseElement);
 				bottomRightElement->EastFace->CoarseFace = bottomEastFace;
 				bottomEastFace->FinerFaces.push_back(bottomRightElement->EastFace);
+				//bottomEastFace->BoundaryPart = bottomRightElement->EastFace->BoundaryPart;
+
 				coarseElement->AddEastFace(topEastFace);
 				coarseElement->AddEastFace(bottomEastFace);
 				coarseMesh->AddFace(topEastFace);
@@ -409,9 +420,11 @@ public:
 					Face<2>* rightSouthFace = bottomRightElement->SouthFace->CreateSameGeometricFace(faceNumber++, coarseElement);
 					bottomRightElement->SouthFace->CoarseFace = rightSouthFace;
 					rightSouthFace->FinerFaces.push_back(bottomRightElement->SouthFace);
+
 					Face<2>* leftSouthFace = bottomLeftElement->SouthFace->CreateSameGeometricFace(faceNumber++, coarseElement);
 					bottomLeftElement->SouthFace->CoarseFace = leftSouthFace;
 					leftSouthFace->FinerFaces.push_back(bottomLeftElement->SouthFace);
+
 					coarseElement->AddSouthFace(rightSouthFace);
 					coarseElement->AddSouthFace(leftSouthFace);
 					coarseMesh->AddFace(rightSouthFace);

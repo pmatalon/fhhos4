@@ -1,26 +1,33 @@
 #pragma once
 #include "../TestCase.h"
+#include "../../Mesh/1D/SegmentGeometry.h"
 using namespace std;
 
 class Heterogeneity1DTestCase : public TestCase<1>
 {
 public:
-	Heterogeneity1DTestCase(DiffusionField<1>* diffusionField, string bcCode) :
-		TestCase(diffusionField)
+	Heterogeneity1DTestCase(ProblemArguments pb) :
+		TestCase()
 	{
-		if (bcCode.compare("d") != 0)
+		// Diffusion field
+		this->DiffField = SegmentGeometry::DiffField(pb.HeterogeneityRatio);
+
+		// Source function
+		this->SourceFunction = Source;
+
+		// Boundary conditions
+		if (pb.BCCode.compare("d") != 0)
 			Utils::FatalError("This test case runs only with Dirichlet conditions");
 
-		this->SourceFunction = Source;
-		this->ExactSolution = [diffusionField](DomPoint p)
+		this->ExactSolution = [this](DomPoint p)
 		{
 			double x = p.X;
-			double alpha = diffusionField->K1->LargestEigenValue;
+			double alpha = this->DiffField.K1->LargestEigenValue;
 			double a1 = -1 / (2 * alpha);
 			double a2 = -0.5;
 			double b1 = (1 + 3 * alpha) / (2 * alpha*(1 + alpha));
 			double b2 = -(alpha + 3) / (2 * (1 + alpha));
-			if (diffusionField->IsInPart1(p))
+			if (x < 0.5)
 				return 4 * a1 *pow(x, 2) + 2 * b1 * x;
 			else
 				return 4 * a2 * pow(x - 1, 2) + 2 * b2 * (x - 1);

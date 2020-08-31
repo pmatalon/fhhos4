@@ -10,13 +10,11 @@ class TestCase
 public:
 	DomFunction SourceFunction = nullptr;
 	DomFunction ExactSolution = nullptr;
-	DiffusionField<Dim>* DiffField;
+	DiffusionField<Dim> DiffField;
 	BoundaryConditions BC;
 
-	TestCase(DiffusionField<Dim>* diffusionField)
-	{
-		DiffField = diffusionField;
-	}
+	TestCase()
+	{}
 
 	virtual string Code() = 0;
 	virtual string Description() = 0;

@@ -4,11 +4,13 @@
 #include "../Utils/Types.h"
 using namespace std;
 
+template <int Dim>
 class PhysicalGroup
 {
 public:
 	int Id;
 	string Name;
+	Tensor<Dim>* ConstantDiffTensor = nullptr;
 
 	PhysicalGroup(int id)
 	{
@@ -22,12 +24,22 @@ public:
 	}
 };
 
-class BoundaryGroup : public PhysicalGroup
+class BoundaryGroup
 {
 public:
-	BoundaryGroup(int id) : PhysicalGroup(id) {}
-	BoundaryGroup(int id, string name) : PhysicalGroup(id, name) {}
-
+	int Id;
+	string Name;
 	BoundaryConditionType Condition = BoundaryConditionType::NotOnBoundary;
 	DomFunction ConditionFunction = nullptr;
+
+	BoundaryGroup(int id)
+	{
+		this->Id = id;
+	}
+
+	BoundaryGroup(int id, string name) :
+		BoundaryGroup(id)
+	{
+		this->Name = name;
+	}
 };

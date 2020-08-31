@@ -83,7 +83,8 @@ public:
 			return this->_reconstructK1StiffnessMatrix(phi1->LocalNumber, phi2->LocalNumber);
 		else if (K == _K2)
 			return this->_reconstructK2StiffnessMatrix(phi1->LocalNumber, phi2->LocalNumber);
-		assert(false);
+		else
+			return this->ComputeIntegralKGradGrad(K, phi1, phi2);
 	}
 
 	void ComputeAndStoreCellStiffnessMatrix(FunctionalBasis<Dim>* basis)
@@ -93,6 +94,7 @@ public:
 	}
 	void ComputeAndStoreReconstructK1StiffnessMatrix(Tensor<Dim>* K, FunctionalBasis<Dim>* basis)
 	{
+		assert(K);
 		if (_reconstructK1StiffnessMatrix.rows() == 0)
 		{
 			_reconstructK1StiffnessMatrix = ComputeAndReturnKStiffnessMatrix(K, basis);
@@ -101,6 +103,7 @@ public:
 	}
 	void ComputeAndStoreReconstructK2StiffnessMatrix(Tensor<Dim>* K, FunctionalBasis<Dim>* basis)
 	{
+		assert(K);
 		if (_reconstructK2StiffnessMatrix.rows() == 0)
 		{
 			_reconstructK2StiffnessMatrix = ComputeAndReturnKStiffnessMatrix(K, basis);
@@ -122,6 +125,7 @@ private:
 
 	DenseMatrix ComputeAndReturnKStiffnessMatrix(Tensor<Dim>* K, FunctionalBasis<Dim>* basis)
 	{
+		assert(K);
 		DenseMatrix stiffnessMatrix = DenseMatrix(basis->Size(), basis->Size());
 		for (BasisFunction<Dim>* phi1 : basis->LocalFunctions)
 		{
@@ -148,6 +152,7 @@ public:
 
 	double ComputeIntegralKGradGrad(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{
+		assert(K);
 		if (phi1->GetDegree() == 0 || phi2->GetDegree() == 0)
 			return 0;
 

@@ -13,13 +13,38 @@ public:
 	double AnisotropyRatio;
 	double RotationAngle;
 
+	// Isotropic tensor
+	Tensor()
+		: Tensor(1)
+	{ }
+
+	// Isotropic tensor with kappa as diffusion coefficient
+	Tensor(double kappa)
+		: Tensor(kappa * DimVector<Dim>::Ones(), 0)
+	{ }
+
+	// Anisotropic tensor with no rotation angle
 	Tensor(DimVector<Dim> anisotropyCoefficients)
 		: Tensor(anisotropyCoefficients, 0)
 	{ }
 
+	Tensor(double kappa, double anisotropyRatio, double rotationAngle)
+	{
+		DimVector<Dim> anisotropyCoefficients = kappa * DimVector<Dim>::Ones();
+		anisotropyCoefficients[0] = anisotropyRatio * anisotropyCoefficients[0];
+		Init(anisotropyCoefficients, rotationAngle);
+	}
+
+	// Anisotropic tensor.
+	// 'rotationAngle' must be expressed in radians.
 	Tensor(DimVector<Dim> anisotropyCoefficients, double rotationAngle)
 	{
-		//this->TensorMatrix = Utils::CreateTensor(anisotropyCoefficients, rotationAngle);
+		Init(anisotropyCoefficients, rotationAngle);
+	}
+
+private:
+	void Init(DimVector<Dim> anisotropyCoefficients, double rotationAngle)
+	{
 		Eigen::Matrix<double, Dim, Dim> Q;
 		if (Dim == 1)
 			Q << 1;
@@ -40,18 +65,7 @@ public:
 		this->RotationAngle = rotationAngle;
 	}
 
-	static Tensor<Dim>* Isotropic(double coeff)
-	{
-		DimVector<Dim> isotropyCoefficients = coeff * DimVector<Dim>::Ones(Dim);
-		Tensor<Dim>* K = new Tensor<Dim>(isotropyCoefficients, 0);
-		return K;
-	}
-
-	static Tensor<Dim>* Isotropic()
-	{
-		return Isotropic(1);
-	}
-
+public:
 	bool operator==(Tensor<Dim>& other)
 	{
 		return (this->TensorMatrix - other.TensorMatrix).isZero(0);

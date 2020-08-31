@@ -234,8 +234,12 @@ public:
 	}
 	inline bool Contains(DomPoint p) const override
 	{
-		if (DomainDim == 2 && ShapeDim == 2)
+		if (DomainDim == 1 && ShapeDim == 1)
+			return (Origin->X <= p.X && p.X <= Origin->X + WidthX);
+		else if (DomainDim == 2 && ShapeDim == 2)
 			return (Origin->X <= p.X && p.X <= Origin->X + WidthX) && (Origin->Y <= p.Y && p.Y <= Origin->Y + WidthY);
+		else if (DomainDim == 3 && ShapeDim == 3)
+			return (Origin->X <= p.X && p.X <= Origin->X + WidthX) && (Origin->Y <= p.Y && p.Y <= Origin->Y + WidthY) && (Origin->Z <= p.Z && p.Z <= Origin->Z + WidthZ);
 		else
 			assert(false && "Not implemented");
 	}

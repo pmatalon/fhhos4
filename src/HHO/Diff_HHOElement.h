@@ -277,7 +277,7 @@ private:
 		for (BasisFunction<Dim>* phi1 : HHO->ReconstructionBasis->LocalFunctions)
 		{
 			for (BasisFunction<Dim>* phi2 : HHO->ReconstructionBasis->LocalFunctions)
-				reconstructionMatrixToInvert(phi1->LocalNumber, phi2->LocalNumber) = this->IntegralKGradGradReconstruct(this->DiffTensor, phi1, phi2);
+				reconstructionMatrixToInvert(phi1->LocalNumber, phi2->LocalNumber) = this->IntegralKGradGradReconstruct(this->DiffTensor(), phi1, phi2);
 		}
 	}
 
@@ -345,7 +345,7 @@ private:
 		if (reconstructPhi->GetDegree() == 0)
 			return 0;
 
-		double integralGradGrad = this->ComputeIntegralKGradGrad(this->DiffTensor, reconstructPhi, cellPhi);
+		double integralGradGrad = this->ComputeIntegralKGradGrad(this->DiffTensor(), reconstructPhi, cellPhi);
 
 		double sumFaces = 0;
 		for (auto f : this->Faces)
@@ -357,7 +357,7 @@ private:
 			auto normal = this->OuterNormalVector(face);
 
 			RefFunction functionToIntegrate = [this, phi, gradPhi, normal](RefPoint p) {
-				return (this->DiffTensor * gradPhi(p)).dot(normal) * phi(p);
+				return (this->DiffTensor() * gradPhi(p)).dot(normal) * phi(p);
 			};
 
 			int polynomialDegree = reconstructPhi->GetDegree() - 1 + cellPhi->GetDegree();
@@ -378,7 +378,7 @@ private:
 		auto normal = this->OuterNormalVector(face);
 
 		RefFunction functionToIntegrate = [this, facePhi, gradPhi, normal](RefPoint p) {
-			return (this->DiffTensor * gradPhi(p)).dot(normal) * facePhi->Eval(p);
+			return (this->DiffTensor() * gradPhi(p)).dot(normal) * facePhi->Eval(p);
 		};
 
 		int polynomialDegree = reconstructPhi->GetDegree() - 1 + facePhi->GetDegree();
@@ -416,7 +416,7 @@ private:
 
 				DenseMatrix DiffTF = Df - ProjFT * Dt;
 				double h = face->Diameter();
-				this->Astab += DiffTF.transpose() * Mf * DiffTF * (this->DiffTensor * normal).dot(normal) / h;
+				this->Astab += DiffTF.transpose() * Mf * DiffTF * (this->DiffTensor() * normal).dot(normal) / h;
 			}
 		}
 		else if (HHO->Stabilization.compare("hdg") == 0)
@@ -436,7 +436,7 @@ private:
 
 				DenseMatrix DiffTF = Fpart - ProjFT * Tpart;
 				double h = face->Diameter();
-				this->Astab += DiffTF.transpose() * Mf * DiffTF * (this->DiffTensor * normal).dot(normal) / h;
+				this->Astab += DiffTF.transpose() * Mf * DiffTF * (this->DiffTensor() * normal).dot(normal) / h;
 			}
 		}
 		else

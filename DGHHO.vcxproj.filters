@@ -405,6 +405,21 @@
     <ClInclude Include="src\TestCases\2D\BarWith4HolesTestCase.h">
       <Filter>TestCases\2D</Filter>
     </ClInclude>
+    <ClInclude Include="src\Mesh\2D\SquareGeometry.h">
+      <Filter>Mesh\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\2D\Square4quadrantsGeometry.h">
+      <Filter>Mesh\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\1D\SegmentGeometry.h">
+      <Filter>Mesh\1D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh\3D\CubeGeometry.h">
+      <Filter>Mesh\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\2D\SquareCircleTestCase.h">
+      <Filter>TestCases\2D</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

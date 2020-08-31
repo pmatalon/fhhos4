@@ -9,7 +9,7 @@ public:
 
 	double VolumicTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{
-		return this->Kappa * this->StiffnessTerm(phi1, phi2);
+		return this->Kappa() * this->StiffnessTerm(phi1, phi2);
 	}
 
 	double StiffnessTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)

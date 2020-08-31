@@ -50,6 +50,7 @@ public:
 	{
 		Face<Dim>* copy = new CartesianFace<Dim>(number, element1, nullptr, _shape);
 		copy->IsDomainBoundary = this->IsDomainBoundary;
+		copy->BoundaryPart = this->BoundaryPart;
 		return copy;
 	}
 

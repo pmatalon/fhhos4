@@ -61,8 +61,6 @@ public:
 	{
 		if (this->CoarseMesh)
 			return;
-		if (strategy == CoarseningStrategy::GMSHSplittingRefinement || strategy == CoarseningStrategy::BeyRefinement)
-			return;
 		
 		if (strategy == CoarseningStrategy::AgglomerationCoarsening)
 			CoarsenByAgglomerationByVertexRemoval();
@@ -82,8 +80,6 @@ public:
 			FaceCoarsening();
 		else
 			Mesh<Dim>::CoarsenMesh(strategy);
-
-		this->CoarseMesh->SetDiffusionField(this->_diffusionField);
 	}
 
 protected:
@@ -1483,8 +1479,6 @@ private:
 			// Clone face
 			BigNumber faceNumber = this->Faces.size();
 			Face<Dim>* copy = f->CreateSameGeometricFace(faceNumber, macroElement);
-			copy->IsDomainBoundary = f->IsDomainBoundary;
-			copy->BoundaryPart = f->BoundaryPart;
 
 			// Associate
 			f->CoarseFace = copy;
