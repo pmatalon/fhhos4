@@ -14,9 +14,9 @@ Line(3) = {3, 4}; // top
 Line(4) = {4, 1}; // left
 
 Line Loop(1) = {1, 2, 3, 4};
+Physical Curve("externalBoundary") = {1, 2, 3, 4};
 
 s = 2; // size of the hole
-holeId = 2;
 
 xShift = 1;
 yShift = 1;
@@ -26,7 +26,6 @@ nHolesPerCol = 4;
 
 For j In {1:nHolesPerCol}
 	For i In {1:nHolesPerRow}
-		// square hole
 		holeId = 10*((j-1)*nHolesPerRow + i);
 		
 		x = xShift + (i-1)*2*s;
@@ -53,12 +52,9 @@ For j In {1:nHolesPerCol}
 		Line(left)   = {topLeftCorner, bottomLeftCorner};     // left
 		
 		Line Loop(holeId) = {bottom, right, top, left};
+		Physical Curve(Sprintf("hole_%g_%g", i, j)) = {bottom, right, top, left};
 	EndFor
 EndFor
 
-Plane Surface(100) = {1, 10,20,30,40,50,60, 70,80,90,100,110,120, 130,140,150,160,170,180, 190,200,210,220,230,240};
-
-Physical Line("externalBoundary") = {1};
-Physical Line("holes")            = {10,20,30,40,50,60, 70,80,90,100,110,120, 130,140,150,160,170,180, 190,200,210,220,230,240};
-
+Plane Surface(100) = {1, 10,20,30,40,50,60, 70,80,90,100,110,120, 130,140,150,160,170,180, 190,200,210,220,230,240}; // Loop Ids
 Physical Surface("domain") = {100};
