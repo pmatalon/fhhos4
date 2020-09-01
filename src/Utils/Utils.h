@@ -76,6 +76,10 @@ public:
 	{
 		return filePath.substr(filePath.find_last_of("/\\") + 1);
 	}
+	static bool HasExtension(const string& filePath)
+	{
+		return filePath.find('.') != string::npos;
+	}
 	static string RemoveExtension(const string& fileName)
 	{
 		string::size_type const p(fileName.find_last_of('.'));
@@ -88,6 +92,14 @@ public:
 	static string Directory(const string& filePath)
 	{
 		return filePath.substr(0, filePath.find_last_of("/\\"));
+	}
+
+	static bool IsPredefinedGeometry(string geo)
+	{
+		return geo.compare("segment") == 0
+			|| geo.compare("square") == 0
+			|| geo.compare("square4quadrants") == 0
+			|| geo.compare("cube") == 0;
 	}
 
 	static bool IsRefinementStrategy(CoarseningStrategy stgy)

@@ -21,8 +21,9 @@ void print_usage() {
 	cout << "                                Use relative or absolute path, or simply the file name if the file is stored in the folder data/mesh/" << endl;
 	cout << endl;
 	cout << "-tc CODE" << endl;
-	cout << "      Test case code. The test case defines the source function of the problem as well as the available predefined boundary conditions (default: sine)." << endl;
+	cout << "      Test case code. The test case defines the source function of the problem, the diffusion field, as well as available predefined boundary conditions." << endl;
 	cout << "      In some, it also determines the analytical solution in the homogeneous isotropic case so that the L2 error can be computed." << endl;
+	cout << "      The following test cases are predefined and available for the simple geometries listed in the -geo argument." << endl;
 	cout << "               sine    - the source function and the analytical solution are a sine functions" << endl;
 	cout << "               poly    - the source function is constant, the analytical solution is a polynomial of total degree 2*d" << endl;
 	cout << "               zero    - the source function and the analytical solution are 0" << endl;
@@ -30,7 +31,7 @@ void print_usage() {
 	cout << "               x       - the source function is 0, the analytical solution is x" << endl;
 	cout << "               heterog - (1D only) heterogeneous diffusion-specific analytical solution" << endl;
 	cout << "               kellogg - (2D only) heterogeneous diffusion-specific analytical solution (known benchmark)" << endl;
-	cout << "               <other> - to be defined in the code for specific problems" << endl;
+	cout << "      When the geometry given is a GMSH file, a test case with same code as the file name must be defined." << endl;
 	cout << endl;
 	cout << "-bc CODE" << endl;
 	cout << "      Boundary conditions, according to what the selected test case allows." << endl;
@@ -444,10 +445,7 @@ int main(int argc, char* argv[])
 
 			case OPT_Geometry:
 				args.Problem.GeoCode = optarg;
-				if (   args.Problem.GeoCode.compare("segment") != 0
-					&& args.Problem.GeoCode.compare("square") != 0
-					&& args.Problem.GeoCode.compare("square4quadrants") != 0
-					&& args.Problem.GeoCode.compare("cube") != 0)
+				if (!Utils::IsPredefinedGeometry(args.Problem.GeoCode))
 					args.Discretization.Mesher = "gmsh";
 				break;
 			case OPT_TestCase:
@@ -734,6 +732,15 @@ int main(int argc, char* argv[])
 		else
 			argument_error("Unknown geometry.");
 #endif
+	}
+
+	// Test case
+	if (args.Problem.TestCaseCode.compare("default") == 0)
+	{
+		if (Utils::IsPredefinedGeometry(args.Problem.GeoCode))
+			args.Problem.TestCaseCode = "sine";
+		else
+			args.Problem.TestCaseCode = Utils::FileNameWithoutExtension(args.Problem.GeoCode);
 	}
 
 	//------------------------------------------//

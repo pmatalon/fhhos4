@@ -7,7 +7,7 @@ struct ProblemArguments
 {
 	int Dimension = -1;
 	string GeoCode = "square";
-	string TestCaseCode = "sine";
+	string TestCaseCode = "default";
 	double HeterogeneityRatio = 1;
 	double AnisotropyRatio = 1;
 	double AnisotropyAngle = 0; // in radians

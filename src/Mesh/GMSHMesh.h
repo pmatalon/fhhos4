@@ -38,22 +38,22 @@ protected:
 	double _regularity = 1;
 	BigNumber _N;
 public:
-	GMSHMesh(string mshFile, string description, string fileNamePart, BigNumber n = 0, bool buildMesh = true) 
+	GMSHMesh(string geoFile, string description, string fileNamePart, BigNumber n = 0, bool buildMesh = true) 
 		: PolyhedralMesh<Dim>()
 	{
 		_description = description;
 		_fileNamePart = fileNamePart;
-		_geometryDescription = Utils::FileNameWithoutExtension(mshFile);
+		_geometryDescription = Utils::FileNameWithoutExtension(geoFile);
 
 		_N = n;
 
-		mshFile = SearchFile(mshFile);
-		_gmshFilePath = mshFile;
+		geoFile = SearchFile(geoFile);
+		_gmshFilePath = geoFile;
 
 		bool tmpFileCreated = false;
 		if (n != 0)
 		{
-			mshFile = SetN(mshFile, n);
+			geoFile = SetN(geoFile, n);
 			tmpFileCreated = true;
 		}
 
@@ -62,25 +62,25 @@ public:
 		//gmsh::option::setNumber("General.Verbosity", 99);
 
 		if (n == 0)
-			cout << "Opening file " << mshFile << endl;
+			cout << "Opening file " << geoFile << endl;
 
-		gmsh::open(mshFile);
+		gmsh::open(geoFile);
 
 		if (buildMesh)
 			Build();
 
 		if (tmpFileCreated)
-			remove(mshFile.c_str());
+			remove(geoFile.c_str());
 	}
 
-	GMSHMesh(string mshFile, string description, string fileNamePart, string geometryDescription, BigNumber N = 0) :
-		GMSHMesh(mshFile, description, fileNamePart, N)
+	GMSHMesh(string geoFile, string description, string fileNamePart, string geometryDescription, BigNumber N = 0) :
+		GMSHMesh(geoFile, description, fileNamePart, N)
 	{
 		_geometryDescription = geometryDescription;
 	}
 
-	GMSHMesh(string mshFile, BigNumber N = 0) : 
-		GMSHMesh(mshFile, "GMSH file", "gmsh-file", N)
+	GMSHMesh(string geoFile, BigNumber N = 0) :
+		GMSHMesh(geoFile, "GMSH file", "gmsh-file", N)
 	{}
 protected:
 	GMSHMesh(string description, string fileNamePart) : PolyhedralMesh<Dim>()
@@ -100,36 +100,38 @@ public:
 		return _N > 0 ? _N : (1/_h - 1);
 	}
 
-	static int GetDimension(string mshFile)
+	static int GetDimension(string geoFile)
 	{
-		mshFile = SearchFile(mshFile);
+		geoFile = SearchFile(geoFile);
 		gmsh::initialize();
-		gmsh::open(mshFile);
+		gmsh::open(geoFile);
 		int d = gmsh::model::getDimension();
 		gmsh::finalize();
 		return d;
 	}
 
 private:
-	static string SearchFile(string mshFile)
+	static string SearchFile(string geoFile)
 	{
-		if (!Utils::FileExists(mshFile))
+		if (!Utils::HasExtension(geoFile))
+			geoFile += ".geo";
+		if (!Utils::FileExists(geoFile))
 		{
-			if (Utils::FileExists(Mesh<Dim>::MeshDirectory + mshFile))
-				mshFile = Mesh<Dim>::MeshDirectory + mshFile;
-			else if (Utils::FileExists(Mesh<Dim>::MeshDirectory + "2D/" + mshFile))
-				mshFile = Mesh<Dim>::MeshDirectory + "2D/" + mshFile;
-			else if (Utils::FileExists(Mesh<Dim>::MeshDirectory + "3D/" + mshFile))
-				mshFile = Mesh<Dim>::MeshDirectory + "3D/" + mshFile;
+			if (Utils::FileExists(Mesh<Dim>::MeshDirectory + geoFile))
+				geoFile = Mesh<Dim>::MeshDirectory + geoFile;
+			else if (Utils::FileExists(Mesh<Dim>::MeshDirectory + "2D/" + geoFile))
+				geoFile = Mesh<Dim>::MeshDirectory + "2D/" + geoFile;
+			else if (Utils::FileExists(Mesh<Dim>::MeshDirectory + "3D/" + geoFile))
+				geoFile = Mesh<Dim>::MeshDirectory + "3D/" + geoFile;
 			else
 			{
-				Utils::Error("File not found: " + mshFile);
-				Utils::Error("File not found: " + Mesh<Dim>::MeshDirectory + mshFile);
-				Utils::FatalError("File not found: " + Mesh<Dim>::MeshDirectory + "2D/" + mshFile);
-				Utils::FatalError("File not found: " + Mesh<Dim>::MeshDirectory + "3D/" + mshFile);
+				Utils::Error("File not found: " + geoFile);
+				Utils::Error("File not found: " + Mesh<Dim>::MeshDirectory + geoFile);
+				Utils::FatalError("File not found: " + Mesh<Dim>::MeshDirectory + "2D/" + geoFile);
+				Utils::FatalError("File not found: " + Mesh<Dim>::MeshDirectory + "3D/" + geoFile);
 			}
 		}
-		return mshFile;
+		return geoFile;
 	}
 
 	static string SetN(string geoFile, BigNumber n)
