@@ -420,6 +420,9 @@
     <ClInclude Include="src\TestCases\2D\SquareCircleTestCase.h">
       <Filter>TestCases\2D</Filter>
     </ClInclude>
+    <ClInclude Include="src\TestCases\2D\SquareHolesTestCase.h">
+      <Filter>TestCases\2D</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
