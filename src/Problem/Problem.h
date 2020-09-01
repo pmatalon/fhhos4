@@ -23,9 +23,19 @@ public:
 		this->_outputDirectory = outputDirectory;
 	}
 
+	string GetFilePathPrefix()
+	{
+		return this->_outputDirectory + "/" + this->_fileName;
+	}
+
 	string GetFilePath(string suffix)
 	{
-		return this->_outputDirectory + "/" + this->_fileName + "_" + suffix + ".dat";
+		return GetFilePath(suffix, ".dat");
+	}
+
+	string GetFilePath(string suffix, string extension)
+	{
+		return GetFilePathPrefix() + "_" + suffix + extension;
 	}
 
 	virtual void PrintPhysicalProblem() = 0;
@@ -46,6 +56,8 @@ public:
 	{
 		this->ExtractSolution(this->SystemSolution);
 	}
+
+	virtual void ExportSolutionToGMSH() = 0;
 
 	virtual ~Problem()
 	{	}

@@ -18,6 +18,7 @@ class Element
 private:
 	map<Face<Dim>*, int> _facesLocalNumbering;
 public:
+	BigNumber Id;
 	BigNumber Number;
 	vector<Face<Dim>*> Faces;
 
@@ -382,6 +383,12 @@ public:
 		};
 
 		return Integral(errorFunction);
+	}
+
+	double EvalApproximateSolution(FunctionalBasis<Dim>* basis, const Vector &globalCoeffs, DomPoint evaluationPoint)
+	{
+		RefFunction localApproximate = basis->GetApproximateFunction(globalCoeffs, this->Number * basis->NumberOfLocalFunctionsInElement(this));
+		return localApproximate(this->ConvertToReference(evaluationPoint));
 	}
 
 	double SourceTerm(BasisFunction<Dim>* phi, DomFunction f)

@@ -195,7 +195,9 @@ public:
 				if (args.Discretization.StaticCondensation && (args.Actions & Action::ExtractSolution) == Action::ExtractSolution)
 					hhoPb->ExtractTraceSystemSolution();
 
-				if ((args.Actions & Action::ExtractSolution) == Action::ExtractSolution || ((args.Actions & Action::ComputeL2Error) == Action::ComputeL2Error && testCase->ExactSolution))
+				if (    (args.Actions & Action::ExtractSolution) == Action::ExtractSolution 
+					|| ((args.Actions & Action::ComputeL2Error) == Action::ComputeL2Error && testCase->ExactSolution)
+					||  (args.Actions & Action::ExportSolutionToGMSH) == Action::ExportSolutionToGMSH)
 				{
 
 					cout << "----------------------------------------------------------" << endl;
@@ -208,6 +210,9 @@ public:
 						hhoPb->ExtractHybridSolution();
 						hhoPb->ExtractSolution();
 					}
+
+					if ((args.Actions & Action::ExportSolutionToGMSH) == Action::ExportSolutionToGMSH)
+						hhoPb->ExportSolutionToGMSH();
 				}
 
 				if ((args.Actions & Action::ExportFaces) == Action::ExportFaces)

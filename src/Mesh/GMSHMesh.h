@@ -640,6 +640,35 @@ public:
 			assert(false);
 	}
 
+	void ExportSolutionToGMSH(FunctionalBasis<Dim>* basis, const Vector &solution, const string& outputFilePathPrefix) override
+	{
+		int viewId = gmsh::view::add("potential");
+		string modelName = Utils::FileNameWithoutExtension(this->_gmshFilePath) + "_tmp_set_N";
+
+		vector<std::string> names;
+		gmsh::model::list(names);
+
+		vector<size_t> elementTags;
+		vector<vector<double>> values;
+		elementTags.reserve(this->Elements.size());
+		values.reserve(this->Elements.size());
+		for (Element<Dim>* e : this->Elements)
+		{
+			elementTags.push_back(e->Id);
+			double value = e->EvalApproximateSolution(basis, solution, e->Center());
+			values.push_back({ value });
+		}
+		gmsh::view::addModelData(viewId, 0, modelName, "ElementData", elementTags, values);
+
+		string meshFilePath = outputFilePathPrefix + ".msh";
+		string dataFilePath = outputFilePathPrefix + ".pos";
+
+		gmsh::write(meshFilePath);
+		gmsh::view::write(viewId, dataFilePath);
+
+		cout << "Solution exported for GMSH to \t" << dataFilePath << endl;
+	}
+
 };
 
 //-------------//
@@ -674,6 +703,7 @@ Element<2>* GMSHMesh<2>::CreateElement(int elemType, size_t elementTag, const ve
 	else
 		assert(false && "GMSH element type not managed.");
 
+	e->Id = elementTag;
 	return e;
 }
 
@@ -722,6 +752,8 @@ Element<3>* GMSHMesh<3>::CreateElement(int elemType, size_t elementTag, const ve
 	}
 	else
 		assert(false && "GMSH element type not managed.");
+
+	e->Id = elementTag;
 	return e;
 }
 

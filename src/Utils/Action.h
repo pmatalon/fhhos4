@@ -11,7 +11,8 @@ enum class Action : unsigned
 	ExtractSolution				= 1 << 6,
 	LogAssembly					= 1 << 7,
 	ComputeL2Error              = 1 << 8,
-	UnitTests                   = 1 << 9
+	UnitTests                   = 1 << 9,
+	ExportSolutionToGMSH        = 1 << 10
 };
 
 Action operator &(Action lhs, Action rhs)

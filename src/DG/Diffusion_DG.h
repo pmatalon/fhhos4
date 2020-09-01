@@ -306,5 +306,10 @@ public:
 		}
 
 	}
+
+	void ExportSolutionToGMSH() override
+	{
+		this->_mesh->ExportSolutionToGMSH(this->Basis, this->SystemSolution, this->GetFilePathPrefix());
+	}
 };
 

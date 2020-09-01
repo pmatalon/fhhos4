@@ -278,6 +278,7 @@ void print_usage() {
 	cout << "              f   - export Faces for Matlab" << endl;
 	cout << "              s   - Solve system" << endl;
 	cout << "              v   - export solution Vector (requires 's')" << endl;
+	cout << "              g   - export solution to GMSH (requires 's')" << endl;
 	cout << "              m   - export Multigrid matrices" << endl;
 	cout << "              r   - compute L2 eRRor against the analytical solution (if known)" << endl;
 	cout << "              t   - run unit Tests" << endl;
@@ -904,6 +905,8 @@ int main(int argc, char* argv[])
 			args.Actions |= Action::ExportMultigridMatrices;
 		else if (args.ActionCodes[i] == 'v')
 			args.Actions |= Action::ExtractSolution;
+		else if (args.ActionCodes[i] == 'g')
+			args.Actions |= Action::ExportSolutionToGMSH;
 		else if (args.ActionCodes[i] == 'r')
 			args.Actions |= Action::ComputeL2Error;
 		else if (args.ActionCodes[i] == 't')

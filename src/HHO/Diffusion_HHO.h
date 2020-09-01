@@ -540,6 +540,11 @@ public:
 		Problem<Dim>::ExtractSolution(this->ReconstructedSolution);
 	}
 
+	void ExportSolutionToGMSH() override
+	{
+		this->_mesh->ExportSolutionToGMSH(this->HHO->ReconstructionBasis, this->ReconstructedSolution, this->GetFilePathPrefix());
+	}
+
 	SparseMatrix GetInverseAtt()
 	{
 		ElementParallelLoop<Dim> parallelLoop(this->_mesh->Elements);

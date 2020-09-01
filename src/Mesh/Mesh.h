@@ -199,6 +199,11 @@ public:
 			script.PlotText(e->Center(), to_string(e->Number), "r");
 	}
 
+	virtual void ExportSolutionToGMSH(FunctionalBasis<Dim>* basis, const Vector &solution, const string& outputFilePathPrefix)
+	{
+		Utils::Warning("Impossible to export the solution to GMSH because this mesh does not come from GMSH.");
+	}
+
 	virtual void CoarsenMesh(CoarseningStrategy strategy)
 	{
 		if (Utils::IsRefinementStrategy(strategy))
