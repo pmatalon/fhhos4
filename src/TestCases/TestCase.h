@@ -2,6 +2,7 @@
 #include "../Utils/Utils.h"
 #include "../Problem/DiffusionField.h"
 #include "../Problem/BoundaryConditions.h"
+#include "../ProgramArguments.h"
 using namespace std;
 
 template <int Dim>

@@ -2,10 +2,10 @@
 #include "../TestCase.h"
 using namespace std;
 
-class BarWith4HolesTestCase : public TestCase<2>
+class SquareHolesTestCase : public TestCase<2>
 {
 public:
-	BarWith4HolesTestCase(ProblemArguments pb) :
+	SquareHolesTestCase(ProblemArguments pb) :
 		TestCase()
 	{
 		// Diffusion field
@@ -38,11 +38,11 @@ public:
 
 	string Code() override
 	{
-		return "barwith4holes";
+		return "squareholes";
 	}
 	string Description() override
 	{
-		return "Bar with 4 circular holes";
+		return "Rectangle with 24 square holes";
 	}
 
 private:

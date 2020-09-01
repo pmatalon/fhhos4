@@ -29,11 +29,18 @@ public:
 	static BoundaryConditionType DirichletEverywhere(BoundaryGroup* boundaryPart)
 	{
 		return BoundaryConditionType::Dirichlet;
-	};
+	}
 
 	static BoundaryConditionType MixedConditionsExample(BoundaryGroup* boundaryPart)
 	{
 		return boundaryPart->Name.compare("bottomBoundary") == 0 ? BoundaryConditionType::Dirichlet : BoundaryConditionType::Neumann;
+	}
+
+	static BoundaryConditionType NeumannOnHoles(BoundaryGroup* boundaryPart)
+	{
+		if (boundaryPart->Name.rfind("hole", 0) == 0) // starts with "hole"
+			return BoundaryConditionType::Neumann;
+		return BoundaryConditionType::Dirichlet;
 	}
 
 	static double Homogeneous(DomPoint p)

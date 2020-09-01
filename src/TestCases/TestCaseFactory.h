@@ -11,6 +11,7 @@
 #include "2D/KelloggTestCase.h"
 #include "2D/BarWith4HolesTestCase.h"
 #include "2D/SquareCircleTestCase.h"
+#include "2D/SquareHolesTestCase.h"
 #include "3D/SineSolution3DTestCase.h"
 #include "3D/PolySolution3DTestCase.h"
 #include "3D/ExpSolution3DTestCase.h"
@@ -57,6 +58,8 @@ TestCase<2>* TestCaseFactory<2>::Create(ProblemArguments pb)
 		return new BarWith4HolesTestCase(pb);
 	if (pb.TestCaseCode.compare("squarecircle") == 0)
 		return new SquareCircleTestCase(pb);
+	if (pb.TestCaseCode.compare("squareholes") == 0)
+		return new SquareHolesTestCase(pb);
 
 	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 2D. Check -tc argument.");
 }
