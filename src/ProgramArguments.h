@@ -6,7 +6,7 @@ struct ProblemArguments
 {
 	int Dimension = -1;
 	string GeoCode = "square";
-	string TestCaseCode = "default";
+	string TestCaseCode = "";
 	double HeterogeneityRatio = 1;
 	double AnisotropyRatio = 1;
 	double AnisotropyAngle = 0; // in radians
@@ -19,7 +19,7 @@ struct DiscretizationArguments
 	BigNumber Ny = -1;
 	BigNumber Nz = -1;
 	string Method = "hho";
-	string Mesher = "inhouse";
+	string Mesher = "gmsh";
 	string MeshCode = "default";
 	double Stretch = 0.5;
 	string Stabilization = "hho";
@@ -33,7 +33,7 @@ struct DiscretizationArguments
 struct MultigridArguments
 {
 	int Levels = 0;
-	Prolongation ProlongationCode = Prolongation::CellInterp_L2proj_Trace;
+	Prolongation ProlongationCode = Prolongation::Default;
 	int MatrixMaxSizeForCoarsestLevel = 1000;
 	char CycleLetter = 'V';
 	int WLoops = 1;
@@ -46,8 +46,7 @@ struct MultigridArguments
 	int PostSmoothingIterations = 1;
 	int CoarseLevelChangeSmoothingCoeff = 0;
 	char CoarseLevelChangeSmoothingOperator = '+';
-	string CoarseningStgyCode = "default";
-	CoarseningStrategy CoarseningStgy;
+	CoarseningStrategy CoarseningStgy = CoarseningStrategy::None;
 	BigNumber CoarseN = 2;
 };
 

@@ -15,7 +15,16 @@ public:
 		this->DiffField = DiffusionField<2>(pb.AnisotropyRatio, pb.AnisotropyAngle);
 
 		// Source function
-		this->SourceFunction = this->Source;
+		this->SourceFunction = [](DomPoint p)
+		{
+			double x = p.X;
+			double y = p.Y;
+			if (x * x + y * y <= 2)
+				return 1.0;
+			if (x >= 7 && x <= 8 && y >= -0.5 && y <= 0.2)
+				return 1.0;
+			return 0.0;
+		};
 
 		// Boundary conditions
 		if (pb.BCCode.compare("d") == 0)
@@ -43,13 +52,5 @@ public:
 	string Description() override
 	{
 		return "Bar with 4 circular holes";
-	}
-
-private:
-	static double Source(DomPoint p)
-	{
-		double x = p.X;
-		double y = p.Y;
-		return 2 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y);
 	}
 };

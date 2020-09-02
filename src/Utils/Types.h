@@ -43,6 +43,7 @@ enum class CoarseningStrategy : unsigned
 
 enum class Prolongation : unsigned
 {
+	Default = 0,
 	CellInterp_Trace = 1,
 	CellInterp_Inject_Trace = 6,
 	CellInterp_L2proj_Trace = 7,

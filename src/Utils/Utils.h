@@ -120,6 +120,16 @@ public:
 		return stgy == CoarseningStrategy::BeyRefinement || stgy == CoarseningStrategy::GMSHSplittingRefinement;
 	}
 
+	static bool BuildsNestedMeshHierarchy(CoarseningStrategy stgy)
+	{
+		return IsRefinementStrategy(stgy) || stgy == CoarseningStrategy::StandardCoarsening;
+	}
+
+	static bool RequiresNestedHierarchy(Prolongation p)
+	{
+		return p != Prolongation::CellInterp_L2proj_Trace;
+	}
+
 	static double Eps;
 	static double NumericalZero;
 
