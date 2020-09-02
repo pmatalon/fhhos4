@@ -52,9 +52,9 @@ public:
 		Eigen::saveMarketVector(M, filePath);
 	}
 
-	virtual void ExtractSolution()
+	virtual void ExportSolutionVector()
 	{
-		this->ExtractSolution(this->SystemSolution);
+		this->ExportSolutionVector(this->SystemSolution);
 	}
 
 	virtual void ExportSolutionToGMSH() = 0;
@@ -63,20 +63,20 @@ public:
 	{	}
 
 protected:
-	void ExtractSolution(Vector solution)
+	void ExportSolutionVector(Vector solution)
 	{
-		this->ExtractSolution(solution, "");
+		this->ExportSolutionVector(solution, "");
 	}
 
-	void ExtractSolution(Vector solution, string suffix)
+	void ExportSolutionVector(Vector solution, string suffix)
 	{
 		string solutionFilePath = GetFilePath("solution" + suffix);
 		Eigen::saveMarketVector(solution, solutionFilePath);
-		cout << "Solution exported to \t" << solutionFilePath << endl;
+		cout << "Solution vector exported to   " << solutionFilePath << endl;
 	}
 
 public:
-	virtual void Assemble(Action action) = 0;
+	virtual void Assemble(ActionsArguments actions) = 0;
 
 	virtual double L2Error(DomFunction exactSolution) = 0;
 

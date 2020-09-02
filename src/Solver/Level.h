@@ -16,7 +16,7 @@ public:
 	Level* FinerLevel = nullptr;
 	Level* CoarserLevel = nullptr;
 
-	bool ExportMatrices = false;
+	bool ExportComponents = false;
 	BigNumber SetupComputationalWork = 0;
 
 	FlexibleConjugateGradient* FCG = nullptr; // used in K-cycle
@@ -86,7 +86,7 @@ public:
 			cout << PostSmoother->Iterations() << " iteration" << (PostSmoother->Iterations() > 1 ? "s" : "") << endl;
 		}
 
-		if (ExportMatrices)
+		if (ExportComponents)
 		{
 			this->ExportMatrix(OperatorMatrix, "A");
 			

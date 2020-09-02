@@ -218,6 +218,10 @@ void print_usage() {
 	cout << "              r   - fine meshes obtained by structured refinement of the coarse mesh using GMSH's splitting method" << endl;
 	cout << "              b   - fine meshes obtained by structured refinement of the coarse mesh using the Bey method" << endl;
 	cout << endl;
+	cout << "-coarse-n NUM" << endl;
+	cout << "      If a refinement strategy is used, sets the mesh size of the starting coarse mesh." << endl;
+	cout << "      The chosen value will set the variable N defined at the beginning of the GMSH .geo file." << endl;
+	cout << endl;
 	cout << "-prolong NUM" << endl;
 	cout << "      How the prolongation operator is built." << endl;
 	cout << "              " << (unsigned)Prolongation::CellInterp_Trace << "  - ";
@@ -271,20 +275,26 @@ void print_usage() {
 	cout << "              1     - sequential execution" << endl;
 	cout << "              other - requested number of threads" << endl;
 	cout << endl;
-	cout << "-a {CODE}+" << endl;
-	cout << "      Action (default: sr)." << endl;
-	cout << "              e   - Export system" << endl;
-	cout << "              c   - export all Components of the matrix in separate files" << endl;
-	cout << "              f   - export Faces for Matlab" << endl;
-	cout << "              s   - Solve system" << endl;
-	cout << "              v   - export solution Vector (requires 's')" << endl;
-	cout << "              g   - export solution to GMSH (requires 's')" << endl;
-	cout << "              m   - export Multigrid matrices" << endl;
-	cout << "              r   - compute L2 eRRor against the analytical solution (if known)" << endl;
-	cout << "              t   - run unit Tests" << endl;
+	cout << "-export CODES" << endl;
+	cout << "      Data export. The CODES must be comma-separated." << endl;
+	cout << "              lsys    - linear system" << endl;
+	cout << "              amat    - matrices decomposed by assembly terms in separate files (consistency, stabilization, mass, etc.)" << endl;
+	cout << "              mesh    - mesh to be used in Matlab" << endl;
+	cout << "              solvect - solution vector(s)" << endl;
+	cout << "              solgmsh - solution files (.pos and .msh) to be used in GMSH for visualization" << endl;
+	cout << "              mg      - Multigrid components (intergrid operator matrices, coarse meshes, etc.)" << endl;
 	cout << endl;
 	cout << "-o PATH" << endl;
 	cout << "      Output directory to export files (default: ./out)." << endl;
+	cout << endl;
+	cout << "-not-solve" << endl;
+	cout << "      Do not solve the linear system." << endl;
+	cout << endl;
+	cout << "-gmsh-log" << endl;
+	cout << "      Enable GMSH to log in the console." << endl;
+	cout << endl;
+	cout << "-ut" << endl;
+	cout << "      Run unit tests." << endl;
 	cout << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << "                      Examples and typical use cases                  " << endl;
@@ -386,8 +396,13 @@ int main(int argc, char* argv[])
 		OPT_CoarseMatrixSize,
 		OPT_Smoothers,
 		OPT_CoarseningStrategy,
+		OPT_CoarseN,
 		// Misc
-		OPT_Threads
+		OPT_Threads,
+		OPT_Export,
+		OPT_DoNotSolve,
+		OPT_UnitTests,
+		OPT_GMSHLog
 	};
 
 	static struct option long_opts[] = {
@@ -424,9 +439,14 @@ int main(int argc, char* argv[])
 		 { "coarse-size", required_argument, NULL, OPT_CoarseMatrixSize },
 		 { "smoothers", required_argument, NULL, OPT_Smoothers },
 		 { "cs", required_argument, NULL, OPT_CoarseningStrategy },
+		 { "coarse-n", required_argument, NULL, OPT_CoarseN },
 		 // Misc
 		 { "help", no_argument, NULL, 'h' },
 		 { "threads", required_argument, NULL, OPT_Threads },
+		 { "export", required_argument, NULL, OPT_Export },
+		 { "not-solve", no_argument, NULL, OPT_DoNotSolve },
+		 { "ut", no_argument, NULL, OPT_UnitTests },
+		 { "gmsh-log", no_argument, NULL, OPT_GMSHLog },
 		 { NULL, 0, NULL, 0 }
 	};
 
@@ -436,7 +456,7 @@ int main(int argc, char* argv[])
 
 	int long_index = 0;
 	int option = 0;
-	while ((option = getopt_long_only(argc, argv, "s:n:b:p:a:l:o:w:g:h", long_opts, &long_index)) != -1)
+	while ((option = getopt_long_only(argc, argv, "s:n:b:p:l:o:w:g:h", long_opts, &long_index)) != -1)
 	{
 		switch (option) 
 		{
@@ -687,6 +707,9 @@ int main(int argc, char* argv[])
 				args.Solver.MG.CoarseningStgyCode = coarseningStgyCode;
 				break;
 			}
+			case OPT_CoarseN:
+				args.Solver.MG.CoarseN = stoul(optarg, nullptr, 0);
+				break;
 
 			//----------------//
 			//      Misc      //
@@ -696,11 +719,39 @@ int main(int argc, char* argv[])
 				print_usage();
 				exit(EXIT_SUCCESS);
 				break;
-			case 'a':
-				args.ActionCodes = optarg;
-				break;
 			case OPT_Threads:
 				BaseParallelLoop::SetDefaultNThreads(atoi(optarg));
+				break;
+			case OPT_Export:
+			{
+				vector<string> exports = Utils::Explode(optarg, ',');
+				for (string code : exports)
+				{
+					if (code.compare("lsys") == 0)
+						args.Actions.ExportLinearSystem = true;
+					else if (code.compare("amat") == 0)
+						args.Actions.ExportAssemblyTermMatrices = true;
+					else if (code.compare("mesh") == 0)
+						args.Actions.ExportMeshToMatlab = true;
+					else if (code.compare("solvect") == 0)
+						args.Actions.ExportSolutionVectors = true;
+					else if (code.compare("solgmsh") == 0)
+						args.Actions.ExportSolutionToGMSH = true;
+					else if (code.compare("mg") == 0)
+						args.Actions.ExportMultigridComponents = true;
+					else
+						argument_error("unknown export option '" + code + "'.");
+				}
+				break;
+			}
+			case OPT_DoNotSolve:
+				args.Actions.SolveLinearSystem = false;
+				break;
+			case OPT_UnitTests:
+				args.Actions.UnitTests = true;
+				break;
+			case OPT_GMSHLog:
+				args.Actions.GMSHLogEnabled = true;
 				break;
 			case 'o': 
 				args.OutputDirectory = optarg;
@@ -712,7 +763,6 @@ int main(int argc, char* argv[])
 			}
 		}
 	}
-
 
 	//------------------------------------------//
 	//             Problem dimension            //
@@ -734,6 +784,8 @@ int main(int argc, char* argv[])
 			argument_error("Unknown geometry.");
 #endif
 	}
+
+	GMSHMesh<3>::GMSHLogEnabled = true;
 
 	// Test case
 	if (args.Problem.TestCaseCode.compare("default") == 0)
@@ -885,38 +937,7 @@ int main(int argc, char* argv[])
 		args.Solver.MG.PreSmoothingIterations = 0;
 		args.Solver.MG.PostSmoothingIterations = args.Problem.Dimension == 3 ? 5 : 3;
 	}
-
-	//------------------------------------------//
-	//                 Actions                  //
-	//------------------------------------------//
-
-	args.Actions = Action::LogAssembly;
-	for (size_t i = 0; i < args.ActionCodes.length(); i++)
-	{
-		if (args.ActionCodes[i] == 'e')
-			args.Actions |= Action::ExtractSystem;
-		else if (args.ActionCodes[i] == 'c')
-			args.Actions |= Action::ExtractComponentMatrices;
-		else if (args.ActionCodes[i] == 'f')
-			args.Actions |= Action::ExportFaces;
-		else if (args.ActionCodes[i] == 's')
-			args.Actions |= Action::SolveSystem;
-		else if (args.ActionCodes[i] == 'm')
-			args.Actions |= Action::ExportMultigridMatrices;
-		else if (args.ActionCodes[i] == 'v')
-			args.Actions |= Action::ExtractSolution;
-		else if (args.ActionCodes[i] == 'g')
-			args.Actions |= Action::ExportSolutionToGMSH;
-		else if (args.ActionCodes[i] == 'r')
-			args.Actions |= Action::ComputeL2Error;
-		else if (args.ActionCodes[i] == 't')
-			args.Actions |= Action::UnitTests;
-		else
-		{
-			string character(1, args.ActionCodes[i]);
-			argument_error("unknown action '" + character + "'. Check -a argument.");
-		}
-	}
+	
 
 	Program* program = nullptr;
 	if (args.Problem.Dimension == 1)

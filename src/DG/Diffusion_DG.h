@@ -2,7 +2,6 @@
 #include "../Problem/DiffusionProblem.h"
 #include "../Geometry/CartesianShape.h"
 #include "../Geometry/2D/Triangle.h"
-#include "../Utils/Action.h"
 #include "../Utils/ParallelLoop.h"
 #include "Diff_DGElement.h"
 #include "Diff_DGFace.h"
@@ -49,13 +48,13 @@ public:
 		return Problem<Dim>::L2Error(Basis, this->SystemSolution, exactSolution);
 	}
 
-	void Assemble(Action action) override
+	void Assemble(ActionsArguments actions) override
 	{
 		auto mesh = this->_mesh;
 		auto basis = this->Basis;
 		auto penalizationCoefficient = this->_penalizationCoefficient;
 
-		if ((action & Action::LogAssembly) == Action::LogAssembly)
+		if (actions.LogAssembly)
 		{
 			this->PrintPhysicalProblem();
 			this->PrintDiscretization();
@@ -72,8 +71,11 @@ public:
 		BigNumber nUnknowns = static_cast<int>(mesh->Elements.size()) * basis->NumberOfLocalFunctionsInElement(NULL);
 		this->b = Vector(nUnknowns);
 
-		cout << "--------------------------------------------------------" << endl;
-		cout << "Assembly..." << endl;
+		if (actions.LogAssembly)
+		{
+			cout << "--------------------------------------------------------" << endl;
+			cout << "Assembly..." << endl;
+		}
 
 		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreMassMatrix(basis);
 		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreStiffnessMatrix(basis);
@@ -96,14 +98,14 @@ public:
 		{
 			ParallelChunk<EmptyResultChunk>* chunk = parallelLoop.Chunks[threadNumber];
 
-			chunk->ThreadFuture = std::async([this, mesh, basis, action, penalizationCoefficient, chunk, &chunksMatrixCoeffs, &chunksMassMatrixCoeffs, &chunksVolumicCoeffs, &chunksCouplingCoeffs, &chunksPenCoeffs]()
+			chunk->ThreadFuture = std::async([this, mesh, basis, &actions, penalizationCoefficient, chunk, &chunksMatrixCoeffs, &chunksMassMatrixCoeffs, &chunksVolumicCoeffs, &chunksCouplingCoeffs, &chunksPenCoeffs]()
 			{
 				BigNumber nnzApproximate = chunk->Size() * basis->Size() * (2 * Dim + 1);
 				NonZeroCoefficients matrixCoeffs(nnzApproximate);
-				NonZeroCoefficients massMatrixCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
-				NonZeroCoefficients volumicCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
-				NonZeroCoefficients couplingCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
-				NonZeroCoefficients penCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
+				NonZeroCoefficients massMatrixCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
+				NonZeroCoefficients volumicCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
+				NonZeroCoefficients couplingCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
+				NonZeroCoefficients penCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
 
 				for (BigNumber iElem = chunk->Start; iElem < chunk->End; iElem++)
 				{
@@ -139,14 +141,14 @@ public:
 
 							//cout << "\t\t TOTAL = " << volumicTerm + coupling + penalization << endl;
 
-							if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
+							if (actions.ExportAssemblyTermMatrices)
 							{
 								volumicCoeffs.Add(basisFunction1, basisFunction2, volumicTerm);
 								couplingCoeffs.Add(basisFunction1, basisFunction2, coupling);
 								penCoeffs.Add(basisFunction1, basisFunction2, penalization);
 							}
 							matrixCoeffs.Add(basisFunction1, basisFunction2, volumicTerm + coupling + penalization);
-							if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
+							if (actions.ExportAssemblyTermMatrices)
 							{
 								double massTerm = element->MassTerm(phi1, phi2);
 								massMatrixCoeffs.Add(basisFunction1, basisFunction2, massTerm);
@@ -169,10 +171,10 @@ public:
 
 		BigNumber nnzApproximate = mesh->Elements.size() * basis->Size() * (2 * Dim + 1);
 		NonZeroCoefficients matrixCoeffs(nnzApproximate);
-		NonZeroCoefficients massMatrixCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
-		NonZeroCoefficients volumicCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
-		NonZeroCoefficients couplingCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
-		NonZeroCoefficients penCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
+		NonZeroCoefficients massMatrixCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
+		NonZeroCoefficients volumicCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
+		NonZeroCoefficients couplingCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
+		NonZeroCoefficients penCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
 
 		parallelLoop.Wait();
 
@@ -206,12 +208,12 @@ public:
 		{
 			ParallelChunk<EmptyResultChunk>* chunk = parallelLoopFaces.Chunks[threadNumber];
 
-			chunk->ThreadFuture = std::async([this, mesh, basis, action, penalizationCoefficient, chunk, &chunksMatrixCoeffs, &chunksCouplingCoeffs, &chunksPenCoeffs]()
+			chunk->ThreadFuture = std::async([this, mesh, basis, &actions, penalizationCoefficient, chunk, &chunksMatrixCoeffs, &chunksCouplingCoeffs, &chunksPenCoeffs]()
 			{
 				BigNumber nnzApproximate = chunk->Size() * basis->Size() * (2 * Dim + 1);
 				NonZeroCoefficients matrixCoeffs(nnzApproximate);
-				NonZeroCoefficients couplingCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
-				NonZeroCoefficients penCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
+				NonZeroCoefficients couplingCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
+				NonZeroCoefficients penCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
 
 				for (BigNumber iElem = chunk->Start; iElem < chunk->End; ++iElem)
 				{
@@ -234,7 +236,7 @@ public:
 
 							//cout << "\t\t\t c=" << coupling << "\tp=" << penalization << endl;
 
-							if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
+							if (actions.ExportAssemblyTermMatrices)
 							{
 								couplingCoeffs.Add(basisFunction1, basisFunction2, coupling);
 								couplingCoeffs.Add(basisFunction2, basisFunction1, coupling);
@@ -272,7 +274,7 @@ public:
 		matrixCoeffs.Fill(this->A);
 		cout << "nnz(A) = " << this->A.nonZeros() << endl;
 
-		if ((action & Action::ExtractSystem) == Action::ExtractSystem)
+		if (actions.ExportLinearSystem)
 		{
 			cout << "Export..." << endl;
 			Eigen::saveMarket(this->A, matrixFilePath);
@@ -282,7 +284,7 @@ public:
 			cout << "RHS exported to \t" << rhsFilePath << endl;
 		}
 
-		if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
+		if (actions.ExportAssemblyTermMatrices)
 		{
 			SparseMatrix M(nUnknowns, nUnknowns);
 			massMatrixCoeffs.Fill(M);

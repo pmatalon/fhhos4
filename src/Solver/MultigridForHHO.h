@@ -57,10 +57,10 @@ public:
 			this->_problem->ExportMatrix(M, "level" + to_string(levelNumber) + "_" + suffix);
 	}
 
-	void ExportFaces(Mesh<Dim>* levelMesh, int levelNumber)
+	void ExportMeshToMatlab(Mesh<Dim>* levelMesh, int levelNumber)
 	{
 		if (!this->IsFinestLevel())
-			dynamic_cast<LevelForHHO<Dim>*>(this->FinerLevel)->ExportFaces(levelMesh, levelNumber);
+			dynamic_cast<LevelForHHO<Dim>*>(this->FinerLevel)->ExportMeshToMatlab(levelMesh, levelNumber);
 		else
 		{
 			string filePath = this->_problem->GetFilePath("level" + to_string(levelNumber) + "_faces");
@@ -89,8 +89,8 @@ private:
 		else
 			cout << "\t\tMesh                : " << this->_problem->_mesh->Elements.size() << " elements, regularity = " << this->_problem->_mesh->Regularity() << endl;
 
-		if (ExportMatrices)
-			this->ExportFaces(this->_problem->_mesh, this->Number);
+		if (ExportComponents)
+			this->ExportMeshToMatlab(this->_problem->_mesh, this->Number);
 
 		if (!IsCoarsestLevel())
 		{
@@ -99,7 +99,11 @@ private:
 			if (this->UseGalerkinOperator)
 				coarsePb->InitHHO();
 			else
-				coarsePb->Assemble(Action::None);
+			{
+				ActionsArguments actions;
+				actions.LogAssembly = false;
+				coarsePb->Assemble(actions);
+			}
 		}
 	}
 
@@ -119,7 +123,7 @@ private:
 			SparseMatrix I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
 			SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCoarseCellsToFineFaces();
 
-			if (ExportMatrices)
+			if (ExportComponents)
 			{
 				Level::ExportMatrix(I_c, "I_c");
 				Level::ExportMatrix(Pi_f, "Pi_f");
@@ -143,7 +147,7 @@ private:
 			SparseMatrix J_f_c = GetGlobalCanonicalInjectionMatrixCoarseToFineElements();
 			SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
 
-			if (ExportMatrices)
+			if (ExportComponents)
 			{
 				Level::ExportMatrix(I_c, "I_c");
 				Level::ExportMatrix(J_f_c, "J_f_c");
@@ -175,7 +179,7 @@ private:
 			SparseMatrix J_f_c = GetGlobalL2ProjectionMatrixCoarseToFineElements();
 			SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
 
-			if (ExportMatrices)
+			if (ExportComponents)
 			{
 				Level::ExportMatrix(I_c, "I_c");
 				Level::ExportMatrix(J_f_c, "J_f_c");
@@ -197,7 +201,7 @@ private:
 
 			SparseMatrix J_faces = GetGlobalCanonicalInjectionMatrixCoarseToFineFaces();
 
-			if (ExportMatrices)
+			if (ExportComponents)
 			{
 				Level::ExportMatrix(I_c, "I_c");
 				Level::ExportMatrix(Pi_f, "Pi_f");
@@ -242,7 +246,7 @@ private:
 			SparseMatrix J_f_c = GetGlobalCanonicalInjectionMatrixCoarseToFineElements();
 			SparseMatrix K_f = GetGlobalMatrixFindFacesWhichReconstructCells(finePb);
 
-			if (ExportMatrices)
+			if (ExportComponents)
 			{
 				Level::ExportMatrix(I_c, "I_c");
 				Level::ExportMatrix(J_f_c, "J_f_c");

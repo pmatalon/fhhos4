@@ -1,6 +1,5 @@
 #pragma once
 #include "Utils/Types.h"
-#include "Utils/Action.h"
 using namespace std;
 
 struct ProblemArguments
@@ -49,6 +48,7 @@ struct MultigridArguments
 	char CoarseLevelChangeSmoothingOperator = '+';
 	string CoarseningStgyCode = "default";
 	CoarseningStrategy CoarseningStgy;
+	BigNumber CoarseN = 2;
 };
 
 struct SolverArguments
@@ -61,10 +61,24 @@ struct SolverArguments
 	MultigridArguments MG;
 };
 
+struct ActionsArguments
+{
+	bool SolveLinearSystem = true;
+	bool ExportLinearSystem = false;
+	bool ExportAssemblyTermMatrices = false;
+	bool ExportMeshToMatlab = false;
+	bool ExportMultigridComponents = false;
+	bool ExportSolutionVectors = false;
+	bool ExportSolutionToGMSH = false;
+	bool LogAssembly = true;
+	bool UnitTests = false;
+	bool GMSHLogEnabled = false;
+};
+
 struct ProgramArguments
 {
 	string ActionCodes = "sr";
-	Action Actions;
+	ActionsArguments Actions;
 	ProblemArguments Problem;
 	DiscretizationArguments Discretization;
 	SolverArguments Solver;

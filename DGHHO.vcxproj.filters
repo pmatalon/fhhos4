@@ -52,9 +52,6 @@
     <ClInclude Include="src\Mesh\Mesh.h">
       <Filter>Mesh</Filter>
     </ClInclude>
-    <ClInclude Include="src\Utils\Action.h">
-      <Filter>Utils</Filter>
-    </ClInclude>
     <ClInclude Include="src\FunctionalBasis\Hemker1D.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
@@ -422,6 +419,9 @@
     </ClInclude>
     <ClInclude Include="src\TestCases\2D\SquareHolesTestCase.h">
       <Filter>TestCases\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\DefaultTestCase.h">
+      <Filter>TestCases</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

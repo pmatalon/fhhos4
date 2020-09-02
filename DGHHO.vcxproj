@@ -225,9 +225,9 @@
     <ClInclude Include="src\TestCases\3D\ExpSolution3DTestCase.h" />
     <ClInclude Include="src\TestCases\3D\PolySolution3DTestCase.h" />
     <ClInclude Include="src\TestCases\3D\SineSolution3DTestCase.h" />
+    <ClInclude Include="src\TestCases\DefaultTestCase.h" />
     <ClInclude Include="src\TestCases\TestCase.h" />
     <ClInclude Include="src\TestCases\TestCaseFactory.h" />
-    <ClInclude Include="src\Utils\Action.h" />
     <ClInclude Include="src\Utils\ElementParallelLoop.h" />
     <ClInclude Include="src\Utils\MatlabScript.h" />
     <ClInclude Include="src\Utils\ParallelLoop.h" />

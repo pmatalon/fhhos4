@@ -94,7 +94,20 @@ public:
 		return filePath.substr(0, filePath.find_last_of("/\\"));
 	}
 
-	static bool IsPredefinedGeometry(string geo)
+	static vector<string> Explode(const string& stringList, char separator)
+	{
+		stringstream ss(stringList);
+		vector<string> result;
+		while (ss.good())
+		{
+			string substr;
+			getline(ss, substr, separator);
+			result.push_back(substr);
+		}
+		return result;
+	}
+
+	static bool IsPredefinedGeometry(const string& geo)
 	{
 		return geo.compare("segment") == 0
 			|| geo.compare("square") == 0

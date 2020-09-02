@@ -38,6 +38,8 @@ protected:
 	double _regularity = 1;
 	BigNumber _N;
 public:
+	static bool GMSHLogEnabled;
+
 	GMSHMesh(string geoFile, string description, string fileNamePart, BigNumber n = 0, bool buildMesh = true) 
 		: PolyhedralMesh<Dim>()
 	{
@@ -58,8 +60,11 @@ public:
 		}
 
 		gmsh::initialize();
-		//gmsh::option::setNumber("General.Terminal", 1);
-		//gmsh::option::setNumber("General.Verbosity", 99);
+		if (GMSHLogEnabled)
+		{
+			gmsh::option::setNumber("General.Terminal", 1);
+			gmsh::option::setNumber("General.Verbosity", 99);
+		}
 
 		if (n == 0)
 			cout << "Opening file " << geoFile << endl;
@@ -168,8 +173,7 @@ private:
 
 		if (!NFound)
 		{
-			remove(geoFileWithN.c_str());
-			Utils::FatalError("No variable N declared in the file " + geoFile);
+			Utils::Warning("No variable N declared in the file " + geoFile + ". Using the file as is.");
 		}
 
 		return geoFileWithN;
@@ -467,6 +471,12 @@ public:
 		GMSHMesh<Dim>* fineMesh = CreateNewGMSHMesh();
 		this->InitializeRefinement(fineMesh);
 		fineMesh->ComesFrom.CS = CoarseningStrategy::GMSHSplittingRefinement;
+		if (dynamic_cast<TetrahedralElement*>(this->Elements[0]))
+		{
+			fineMesh->ComesFrom.nFineElementsByCoarseElement = 8;
+			fineMesh->ComesFrom.nFineFacesAddedByCoarseElement = 8;
+			fineMesh->ComesFrom.nFineFacesByKeptCoarseFace = 4;
+		}
 		fineMesh->Build();
 
 		// Save the fine mesh in a temporary file because we're going to reload the coarse one
@@ -481,6 +491,26 @@ public:
 			Element<Dim>* coarse = LocateElementThatEmbeds(fine);
 			coarse->FinerElements.push_back(fine);
 			fine->CoarserElement = coarse;
+		}
+
+		if (fineMesh->ComesFrom.HasDetails())
+		{
+			bool warnings = false;
+			for (Element<Dim>* coarse : this->Elements)
+			{
+				if (coarse->FinerElements.size() != fineMesh->ComesFrom.nFineElementsByCoarseElement)
+				{
+					Utils::Warning("After refinement, " + to_string(coarse->FinerElements.size()) + " fine tetrahedra have been found for the tetrahedron of Tag " + to_string(coarse->Id) + ", which is weird.");
+					warnings = true;
+				}
+			}
+			if (warnings)
+			{
+				string msg = "These warnings usually happen when the refined mesh has some highly distorted elements (confirm by enabling GMSH logging with the option -gmsh-log).\n";
+				msg += "As a consequence, the link between fine and coarse elements might be impossible to retrieve, causing a fatal error later.\n";
+				msg += "To avoid this problem, try starting the refinement process from a finer mesh by using the option -coarse-n.";
+				Utils::Error(msg);
+			}
 		}
 
 		// Remove coarse temporary file and reload the fine mesh
@@ -643,10 +673,11 @@ public:
 	void ExportSolutionToGMSH(FunctionalBasis<Dim>* basis, const Vector &solution, const string& outputFilePathPrefix) override
 	{
 		int viewId = gmsh::view::add("potential");
-		string modelName = Utils::FileNameWithoutExtension(this->_gmshFilePath) + "_tmp_set_N";
 
-		vector<std::string> names;
-		gmsh::model::list(names);
+		vector<std::string> modelNames;
+		gmsh::model::list(modelNames);
+		string modelName = modelNames[modelNames.size() - 1];
+		//string modelName = Utils::FileNameWithoutExtension(this->_gmshFilePath) + "_tmp_set_N";
 
 		vector<size_t> elementTags;
 		vector<vector<double>> values;
@@ -666,7 +697,7 @@ public:
 		gmsh::write(meshFilePath);
 		gmsh::view::write(viewId, dataFilePath);
 
-		cout << "Solution exported for GMSH to \t" << dataFilePath << endl;
+		cout << "Solution exported for GMSH to " << dataFilePath << endl;
 	}
 
 };
@@ -884,16 +915,7 @@ void GMSHMesh<3>::CreateFaces(int elemType, BigNumber& faceNumber)
 			bool eHasAllVertices = true;
 			for (int k = 1; k < nFaceVertices; k++)
 			{
-				bool eHasVertexk = false;
-				for (Element<3>* ek : vertices[k]->Elements)
-				{
-					if (ek == e)
-					{
-						eHasVertexk = true;
-						break;
-					}
-				}
-				if (!eHasVertexk)
+				if (!vertices[k]->IsVertexOf(e))
 				{
 					eHasAllVertices = false;
 					break;
@@ -912,6 +934,8 @@ void GMSHMesh<3>::CreateFaces(int elemType, BigNumber& faceNumber)
 				face = new TriangularFace(faceNumber++, vertices[0], vertices[1], vertices[2], neighbours[0]);
 			else if (neighbours.size() == 2)
 				face = new TriangularFace(faceNumber++, vertices[0], vertices[1], vertices[2], neighbours[0], neighbours[1]);
+			else
+				assert(false);
 		}
 		else if (faceType == GMSHFaceTypes::GMSH_QuadrilateralFace && this->FileNamePart().compare("gmsh-cart") == 0)
 		{
@@ -1030,3 +1054,28 @@ Face<2>* GMSHMesh<2>::GetBoundaryFaceFromGMSHNodes(int faceType, const vector<si
 	}
 	assert(false && "Face not found");
 }
+
+template<>
+Face<3>* GMSHMesh<3>::GetBoundaryFaceFromGMSHNodes(int faceType, const vector<size_t>& faceNodes, size_t& faceNodeIndex)
+{
+	assert(faceType == GMSHElementTypes::GMSH_Triangle);
+
+	MeshVertex<3>* v1 = (MeshVertex<3>*)GetVertexFromGMSHTag(faceNodes[faceNodeIndex]);
+	MeshVertex<3>* v2 = (MeshVertex<3>*)GetVertexFromGMSHTag(faceNodes[faceNodeIndex + 1]);
+	MeshVertex<3>* v3 = (MeshVertex<3>*)GetVertexFromGMSHTag(faceNodes[faceNodeIndex + 2]);
+	faceNodeIndex += 3;
+
+	for (Face<3>* f : v1->Faces)
+	{
+		if (f->IsDomainBoundary && f->HasVertex(v2) && f->HasVertex(v3))
+			return f;
+	}
+	assert(false && "Face not found");
+}
+
+template <>
+bool GMSHMesh<1>::GMSHLogEnabled = false;
+template <>
+bool GMSHMesh<2>::GMSHLogEnabled = false;
+template <>
+bool GMSHMesh<3>::GMSHLogEnabled = false;

@@ -38,6 +38,16 @@ public:
 	MeshVertex(BigNumber number, DomPoint p) : Vertex(number, p) {}
 	MeshVertex(const Vertex v) : Vertex(v) {}
 
+	bool IsVertexOf(Element<Dim>* e)
+	{
+		for (Element<3>* e2 : this->Elements)
+		{
+			if (e2 == e)
+				return true;
+		}
+		return false;
+	}
+
 	~MeshVertex() override
 	{
 		Elements.clear();
@@ -178,10 +188,12 @@ public:
 		FillDirichletAndNeumannFaceLists();
 	}
 
-	void ExportFacesToMatlab(string outputDirectory, bool dummy)
+	void ExportToMatlab(string outputDirectory)
 	{
-		string filePath = outputDirectory + "/faces" + to_string(Dim) + "D_" + FileNamePart() + ".dat";
-		ExportFacesToMatlab(filePath);
+		string faceFilePath = outputDirectory + "/mesh_faces_" + to_string(Dim) + "D_" + FileNamePart() + ".dat";
+		ExportFacesToMatlab(faceFilePath);
+		string elemFilePath = outputDirectory + "/mesh_elements_" + to_string(Dim) + "D_" + FileNamePart() + ".dat";
+		ExportElementCentersToMatlab(elemFilePath);
 	}
 	virtual void ExportFacesToMatlab(string filePath)
 	{
@@ -190,7 +202,7 @@ public:
 		for (Face<Dim>* f : this->Faces)
 			f->ExportFaceToMatlab(file);
 		fclose(file);
-		cout << "Faces exported to \t" << filePath << endl;
+		cout << "Faces exported to         " << filePath << endl;
 	}
 	void ExportElementCentersToMatlab(string filePath)
 	{
@@ -299,6 +311,7 @@ protected:
 					{
 						fineFace->CoarseFace = coarseFace;
 						coarseFace->FinerFaces.push_back(fineFace);
+						fineFace->BoundaryPart = coarseFace->BoundaryPart;
 						break;
 					}
 				}
@@ -306,27 +319,12 @@ protected:
 				// In that case, we take the closest one w.r.t. the centers
 				if (!fineFace->CoarseFace)
 				{
-					double smallestDistance = -1;
-					Face<Dim>* closestCoarseFace = nullptr;
-					for (Face<Dim>* coarseFace : fineFace->Element1->CoarserElement->Faces)
-					{
-						if (coarseFace->IsDomainBoundary)
-						{
-							double distance = Vect<Dim>(fineFace->Center(), coarseFace->Center()).norm();
-							if (!closestCoarseFace || distance < smallestDistance)
-							{
-								smallestDistance = distance;
-								closestCoarseFace = coarseFace;
-							}
-						}
-					}
-					if (closestCoarseFace)
-					{
-						fineFace->CoarseFace = closestCoarseFace;
-						closestCoarseFace->FinerFaces.push_back(fineFace);
-					}
-					else
-						assert(false && "A coarse face should have been found.");
+					Face<Dim>* closestCoarseFace = fineFace->ClosestFaceAmongst(fineFace->Element1->CoarserElement->Faces, true);
+					assert(closestCoarseFace && "A coarse face should have been found.");
+
+					fineFace->CoarseFace = closestCoarseFace;
+					closestCoarseFace->FinerFaces.push_back(fineFace);
+					fineFace->BoundaryPart = closestCoarseFace->BoundaryPart;
 				}
 			}
 			// Interior face
@@ -337,11 +335,14 @@ protected:
 				fineFace->IsRemovedOnCoarserGrid = coarseElement1 == coarseElement2;
 				if (!fineFace->IsRemovedOnCoarserGrid)
 				{
-					// TODO: change CommonFaceWith so it returns a vector of faces (local refinement)
-					Face<Dim>* coarseFace = coarseElement1->CommonFaceWith(coarseElement2);
-					assert(coarseFace != nullptr);
-					fineFace->CoarseFace = coarseFace;
-					coarseFace->FinerFaces.push_back(fineFace);
+					vector<Face<Dim>*> coarseFaces = coarseElement1->InterfaceWith(coarseElement2);
+					assert(!coarseFaces.empty());
+					Face<Dim>* closestCoarseFace = fineFace->ClosestFaceAmongst(fineFace->Element1->CoarserElement->Faces, false);
+					assert(closestCoarseFace && "A coarse face should have been found.");
+
+					fineFace->CoarseFace = closestCoarseFace;
+					closestCoarseFace->FinerFaces.push_back(fineFace);
+					fineFace->BoundaryPart = closestCoarseFace->BoundaryPart;
 				}
 				else
 					coarseElement1->FinerFacesRemoved.push_back(fineFace);

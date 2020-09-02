@@ -19,14 +19,14 @@ public:
 		if (pb.BCCode.compare("d") != 0 && pb.BCCode.compare("m") != 0)
 			Utils::FatalError("The requested boundary conditions are not defined in this test case.");
 
-		if (this->DiffField.IsHomogeneous && this->DiffField.IsIsotropic && pb.BCCode.compare("d") == 0)
-			this->ExactSolution = this->Solution;
-
 		if (pb.BCCode.compare("m") == 0)
 		{
 			this->BC.GetBoundaryConditionType = BoundaryConditions::MixedConditionsExample;
 			this->BC.Description = "Mixed Neumann-Dirichlet";
 		}
+
+		if (pb.GeoCode.compare("cube") == 0 && this->DiffField.IsHomogeneous && this->DiffField.IsIsotropic && pb.BCCode.compare("d") == 0)
+			this->ExactSolution = this->Solution;
 	}
 
 	string Code() override

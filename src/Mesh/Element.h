@@ -141,6 +141,8 @@ public:
 	{
 		for (Face<Dim>* f1 : this->Faces)
 		{
+			if (f1->IsDomainBoundary)
+				continue;
 			for (Face<Dim>* f2 : other->Faces)
 			{
 				if (f1 == f2)
@@ -155,6 +157,8 @@ public:
 		vector<Face<Dim>*> faces;
 		for (Face<Dim>* f : this->Faces)
 		{
+			if (f->IsDomainBoundary)
+				continue;
 			if (find(other->Faces.begin(), other->Faces.end(), f) != other->Faces.end())
 				faces.push_back(f);
 		}

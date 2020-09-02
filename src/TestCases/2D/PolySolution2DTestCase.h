@@ -13,6 +13,8 @@ public:
 			this->DiffField = SquareGeometry::DiffField(pb.AnisotropyRatio, pb.AnisotropyAngle);
 		else if (pb.GeoCode.compare("square4quadrants") == 0)
 			this->DiffField = Square4quadrantsGeometry::DiffField(pb.HeterogeneityRatio, pb.AnisotropyRatio, pb.AnisotropyAngle);
+		else
+			this->DiffField = DiffusionField<2>(pb.AnisotropyRatio, pb.AnisotropyAngle);
 
 		// Source function
 		this->SourceFunction = this->Source;
@@ -28,7 +30,7 @@ public:
 		}
 
 		// Exact solution
-		if (this->DiffField.IsHomogeneous && this->DiffField.IsIsotropic && pb.BCCode.compare("d") == 0)
+		if ((pb.GeoCode.compare("square") == 0 || pb.GeoCode.compare("square4quadrants") == 0) && this->DiffField.IsHomogeneous && this->DiffField.IsIsotropic && pb.BCCode.compare("d") == 0)
 			this->ExactSolution = this->Solution;
 	}
 

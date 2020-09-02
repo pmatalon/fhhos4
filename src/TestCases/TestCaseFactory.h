@@ -1,4 +1,5 @@
 #pragma once
+#include "DefaultTestCase.h"
 #include "1D/SineSolution1DTestCase.h"
 #include "1D/PolySolution1DTestCase.h"
 #include "1D/Heterogeneity1DTestCase.h"
@@ -27,6 +28,8 @@ public:
 template <>
 TestCase<1>* TestCaseFactory<1>::Create(ProblemArguments pb)
 {
+	if (pb.TestCaseCode.compare("default") == 0)
+		return new DefaultTestCase<1>(pb);
 	if (pb.TestCaseCode.compare("sine") == 0)
 		return new SineSolution1DTestCase(pb);
 	if (pb.TestCaseCode.compare("poly") == 0)
@@ -34,12 +37,14 @@ TestCase<1>* TestCaseFactory<1>::Create(ProblemArguments pb)
 	if (pb.TestCaseCode.compare("heterog") == 0)
 		return new Heterogeneity1DTestCase(pb);
 
-	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 1D. Check -tc argument.");
+	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 3D. Check -tc argument.");
 }
 
 template <>
 TestCase<2>* TestCaseFactory<2>::Create(ProblemArguments pb)
 {
+	if (pb.TestCaseCode.compare("default") == 0)
+		return new DefaultTestCase<2>(pb);
 	if (pb.TestCaseCode.compare("sine") == 0)
 		return new SineSolution2DTestCase(pb);
 	if (pb.TestCaseCode.compare("poly") == 0)
@@ -61,12 +66,14 @@ TestCase<2>* TestCaseFactory<2>::Create(ProblemArguments pb)
 	if (pb.TestCaseCode.compare("squareholes") == 0)
 		return new SquareHolesTestCase(pb);
 
-	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 2D. Check -tc argument.");
+	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 3D. Check -tc argument.");
 }
 
 template <>
 TestCase<3>* TestCaseFactory<3>::Create(ProblemArguments pb)
 {
+	if (pb.TestCaseCode.compare("default") == 0)
+		return new DefaultTestCase<3>(pb);
 	if (pb.TestCaseCode.compare("sine") == 0)
 		return new SineSolution3DTestCase(pb);
 	if (pb.TestCaseCode.compare("poly") == 0)

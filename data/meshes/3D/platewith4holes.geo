@@ -1,5 +1,6 @@
+//N = 16; // do not work if N is define for some reason...
+L = 10; // [0,L]x[-1,1]
 h = 1/N;
-L=10; // [0,L]x[-1,1]
 r=0.3;
 
 Point(1) = {0, 0, -1, h}; 

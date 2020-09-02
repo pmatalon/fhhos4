@@ -217,6 +217,25 @@ public:
 		return this->CoarseFace->FinerFaces.size() > 1;
 	}
 
+	Face<Dim>* ClosestFaceAmongst(vector<Face<Dim>*> list, bool isDomainBoundary)
+	{
+		double smallestDistance = -1;
+		Face<Dim>* closestFace = nullptr;
+		for (Face<Dim>* f : list)
+		{
+			if (f->IsDomainBoundary == isDomainBoundary)
+			{
+				double distance = Vect<Dim>(this->Center(), f->Center()).norm();
+				if (!closestFace || distance < smallestDistance)
+				{
+					smallestDistance = distance;
+					closestFace = f;
+				}
+			}
+		}
+		return closestFace;
+	}
+
 	//------------------------//
 	//        Integral        //
 	//------------------------//

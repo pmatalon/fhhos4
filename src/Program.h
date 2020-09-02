@@ -4,7 +4,6 @@
 #include "HHO/Diffusion_HHO.h"
 #include "Mesh/AllMeshes.h"
 #include "TestCases/TestCaseFactory.h"
-#include "Utils/Action.h"
 #include "Utils/Timer.h"
 #include "Solver/AllSolvers.h"
 using namespace std;
@@ -39,7 +38,7 @@ public:
 		cout << "-----------------------------------------------------------" << endl;
 		Mesh<Dim>* mesh = BuildMesh(args);
 
-		if ((args.Actions & Action::UnitTests) == Action::UnitTests)
+		if (args.Actions.UnitTests)
 		{
 			// Unit tests
 			Triangle::Test();
@@ -72,7 +71,7 @@ public:
 		//   Coarsening unit tests   //
 		//---------------------------//
 
-		if ((args.Actions & Action::UnitTests) == Action::UnitTests && Dim == 2)
+		if (args.Actions.UnitTests && Dim == 2)
 		{
 			if (args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("cgmg") == 0 || args.Solver.SolverCode.compare("fcgmg") == 0)
 			{
@@ -158,7 +157,7 @@ public:
 		//       Linear system solution       //
 		//------------------------------------//
 
-		if ((args.Actions & Action::SolveSystem) == Action::SolveSystem)
+		if (args.Actions.SolveLinearSystem)
 		{
 			cout << endl;
 			cout << "----------------------------------------------------------" << endl;
@@ -186,44 +185,41 @@ public:
 
 			if (args.Discretization.Method.compare("dg") == 0)
 			{
-				if ((args.Actions & Action::ExtractSolution) == Action::ExtractSolution)
-					problem->ExtractSolution();
+				if (args.Actions.ExportSolutionVectors)
+					problem->ExportSolutionVector();
 			}
 			else if (args.Discretization.Method.compare("hho") == 0)
 			{
 				Diffusion_HHO<Dim>* hhoPb = static_cast<Diffusion_HHO<Dim>*>(problem);
-				if (args.Discretization.StaticCondensation && (args.Actions & Action::ExtractSolution) == Action::ExtractSolution)
-					hhoPb->ExtractTraceSystemSolution();
 
-				if (    (args.Actions & Action::ExtractSolution) == Action::ExtractSolution 
-					|| ((args.Actions & Action::ComputeL2Error) == Action::ComputeL2Error && testCase->ExactSolution)
-					||  (args.Actions & Action::ExportSolutionToGMSH) == Action::ExportSolutionToGMSH)
+				if (args.Actions.ExportSolutionVectors || args.Actions.ExportSolutionToGMSH)
 				{
-
 					cout << "----------------------------------------------------------" << endl;
 					cout << "-                     Post-processing                    -" << endl;
 					cout << "----------------------------------------------------------" << endl;
 
 					hhoPb->ReconstructHigherOrderApproximation();
-					if ((args.Actions & Action::ExtractSolution) == Action::ExtractSolution)
+					if (args.Actions.ExportSolutionVectors)
 					{
+						if (args.Discretization.StaticCondensation)
+							hhoPb->ExtractTraceSystemSolution();
 						hhoPb->ExtractHybridSolution();
-						hhoPb->ExtractSolution();
+						hhoPb->ExportSolutionVector();
 					}
-
-					if ((args.Actions & Action::ExportSolutionToGMSH) == Action::ExportSolutionToGMSH)
-						hhoPb->ExportSolutionToGMSH();
 				}
 
-				if ((args.Actions & Action::ExportFaces) == Action::ExportFaces)
-					mesh->ExportFacesToMatlab(args.OutputDirectory, true);
+				if (args.Actions.ExportMeshToMatlab)
+					mesh->ExportToMatlab(args.OutputDirectory);
 			}
+
+			if (args.Actions.ExportSolutionToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
+				problem->ExportSolutionToGMSH();
 
 			//----------------------//
 			//       L2 error       //
 			//----------------------//
 
-			if ((args.Actions & Action::ComputeL2Error) == Action::ComputeL2Error && testCase->ExactSolution)
+			if (testCase->ExactSolution)
 			{
 				double error = problem->L2Error(testCase->ExactSolution);
 				cout << endl << "L2 Error = " << std::scientific << error << endl;
@@ -295,7 +291,7 @@ private:
 				mg->CoarseLevelChangeSmoothingCoeff = args.Solver.MG.CoarseLevelChangeSmoothingCoeff;
 				mg->CoarseLevelChangeSmoothingOperator = args.Solver.MG.CoarseLevelChangeSmoothingOperator;
 				mg->CoarseningStgy = args.Solver.MG.CoarseningStgy;
-				mg->ExportMatrices = (args.Actions & Action::ExportMultigridMatrices) == Action::ExportMultigridMatrices;
+				mg->ExportComponents = args.Actions.ExportMultigridComponents;
 
 				if (args.Solver.SolverCode.compare("mg") == 0)
 					solver = mg;
@@ -395,6 +391,7 @@ Mesh<1>* ProgramDim<1>::BuildMesh(ProgramArguments& args)
 template <>
 Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 {
+	GMSHMesh<2>::GMSHLogEnabled = args.Actions.GMSHLogEnabled;
 	string geoCode = args.Problem.GeoCode;
 	string mesher = args.Discretization.Mesher;
 	BigNumber n = args.Discretization.N;
@@ -568,7 +565,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 		string filePath = geoCode;
 		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
 		{
-			Mesh<2>* coarseMesh = new GMSHMesh<2>(filePath, 2);
+			Mesh<2>* coarseMesh = new GMSHMesh<2>(filePath, args.Solver.MG.CoarseN);
 			fineMesh = coarseMesh->RefineUntilNElements(2 * nx*ny, refinementStgy);
 		}
 		else
@@ -590,6 +587,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 template <>
 Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args)
 {
+	GMSHMesh<3>::GMSHLogEnabled = args.Actions.GMSHLogEnabled;
 	string geoCode = args.Problem.GeoCode;
 	string mesher = args.Discretization.Mesher;
 	BigNumber n = args.Discretization.N;
@@ -647,7 +645,7 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args)
 
 				if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
 				{
-					Mesh<3>* coarseMesh = new Cube_GMSHCartesianMesh(2);
+					Mesh<3>* coarseMesh = new Cube_GMSHCartesianMesh(args.Solver.MG.CoarseN);
 					fineMesh = coarseMesh->RefineUntilNElements(n*n*n, refinementStgy);
 
 					assert(fineMesh->Elements.size() == n * n*n);
@@ -663,7 +661,7 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args)
 
 				if (Utils::IsRefinementStrategy(args.Solver.MG.CoarseningStgy))
 				{
-					Mesh<3>* coarseMesh = new Cube_GMSHTetrahedralMesh(2);
+					Mesh<3>* coarseMesh = new Cube_GMSHTetrahedralMesh(args.Solver.MG.CoarseN);
 					fineMesh = coarseMesh->RefineUntilNElements(6 * n*n*n, refinementStgy);
 
 					assert(fineMesh->Elements.size() == 6 * n*n*n);
@@ -693,11 +691,16 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args)
 				Utils::FatalError("-ny, -ny not managed with this mesh");
 
 			Mesh<3>* coarseMesh;
-			if (refinementStgy == CoarseningStrategy::BeyRefinement)
-				coarseMesh = new GMSHTetrahedralMesh(filePath, 2);
+			if (Utils::IsRefinementStrategy(args.Solver.MG.CoarseningStgy))
+			{
+				if (refinementStgy == CoarseningStrategy::BeyRefinement)
+					coarseMesh = new GMSHTetrahedralMesh(filePath, args.Solver.MG.CoarseN);
+				else if (refinementStgy == CoarseningStrategy::GMSHSplittingRefinement)
+					coarseMesh = new GMSHMesh<3>(filePath, args.Solver.MG.CoarseN);
+				fineMesh = coarseMesh->RefineUntilNElements(6 * n*n*n, refinementStgy);
+			}
 			else
-				coarseMesh = new GMSHMesh<3>(filePath);
-			fineMesh = coarseMesh->RefineUntilNElements(6 * n*n*n, refinementStgy);
+				fineMesh = new GMSHMesh<3>(filePath, n);
 		}
 		else
 			Utils::FatalError("When the geometry is imported from a GMSH file, only unstructured tetrahedral meshing is allowed. Use '-mesh tetra' instead.");

@@ -107,14 +107,14 @@ public:
 		cout << "System size   : " << (this->_staticCondensation ? HHO->nTotalFaceUnknowns : HHO->nTotalHybridUnknowns) << " (" << (this->_staticCondensation ? "statically condensed" : "no static condensation") << ")" << endl;
 	}
 
-	void Assemble(Action action)
+	void Assemble(ActionsArguments actions) override
 	{
 		Mesh<Dim>* mesh = this->_mesh;
 		FunctionalBasis<Dim>* reconstructionBasis = HHO->ReconstructionBasis;
 		FunctionalBasis<Dim>* cellBasis = HHO->CellBasis;
 		FunctionalBasis<Dim - 1>* faceBasis = HHO->FaceBasis;
 
-		if ((action & Action::LogAssembly) == Action::LogAssembly)
+		if (actions.LogAssembly)
 		{
 			this->PrintPhysicalProblem();
 			this->PrintDiscretization();
@@ -127,7 +127,7 @@ public:
 		string reconstructionMatrixFilePath	= this->GetFilePath("Reconstruct");
 		string rhsFilePath					= this->GetFilePath("b");
 
-		if ((action & Action::LogAssembly) == Action::LogAssembly)
+		if (actions.LogAssembly)
 			cout << endl << "Assembly..." << endl;
 
 		this->_globalRHS = Vector(HHO->nTotalHybridUnknowns);
@@ -171,21 +171,21 @@ public:
 		ParallelLoop<Element<Dim>*, EmptyResultChunk> parallelLoop(mesh->Elements);
 
 		vector<NonZeroCoefficients> chunksMatrixCoeffs(parallelLoop.NThreads);
-		vector<NonZeroCoefficients> chunksConsistencyCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? parallelLoop.NThreads : 0);
-		vector<NonZeroCoefficients> chunksStabilizationCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? parallelLoop.NThreads : 0);
-		vector<NonZeroCoefficients> chunksReconstructionCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? parallelLoop.NThreads : 0);
+		vector<NonZeroCoefficients> chunksConsistencyCoeffs(actions.ExportAssemblyTermMatrices ? parallelLoop.NThreads : 0);
+		vector<NonZeroCoefficients> chunksStabilizationCoeffs(actions.ExportAssemblyTermMatrices ? parallelLoop.NThreads : 0);
+		vector<NonZeroCoefficients> chunksReconstructionCoeffs(actions.ExportAssemblyTermMatrices ? parallelLoop.NThreads : 0);
 		
 		for (unsigned int threadNumber = 0; threadNumber < parallelLoop.NThreads; threadNumber++)
 		{
 			ParallelChunk<EmptyResultChunk>* chunk = parallelLoop.Chunks[threadNumber];
 
-			chunk->ThreadFuture = std::async([this, mesh, cellBasis, faceBasis, reconstructionBasis, action, chunk, &chunksMatrixCoeffs, &chunksConsistencyCoeffs, &chunksStabilizationCoeffs, &chunksReconstructionCoeffs]()
+			chunk->ThreadFuture = std::async([this, mesh, cellBasis, faceBasis, reconstructionBasis, actions, chunk, &chunksMatrixCoeffs, &chunksConsistencyCoeffs, &chunksStabilizationCoeffs, &chunksReconstructionCoeffs]()
 				{
 					BigNumber nnzApproximate = chunk->Size() * (pow(HHO->nCellUnknowns, 2) + 4 * pow(HHO->nFaceUnknowns, 2) + HHO->nCellUnknowns * 4 * HHO->nFaceUnknowns);
 					NonZeroCoefficients matrixCoeffs(nnzApproximate);
-					NonZeroCoefficients consistencyCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
-					NonZeroCoefficients stabilizationCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
-					NonZeroCoefficients reconstructionCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
+					NonZeroCoefficients consistencyCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
+					NonZeroCoefficients stabilizationCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
+					NonZeroCoefficients reconstructionCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
 
 					for (BigNumber iElem = chunk->Start; iElem < chunk->End; iElem++)
 					{
@@ -211,7 +211,7 @@ public:
 
 									double matrixTerm = element->MatrixTerm(cellPhi1, cellPhi2);
 									matrixCoeffs.Add(i, j, matrixTerm);
-									if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
+									if (actions.ExportAssemblyTermMatrices)
 									{
 										double consistencyTerm = element->ConsistencyTerm(cellPhi1, cellPhi2);
 										consistencyCoeffs.Add(i, j, consistencyTerm);
@@ -239,7 +239,7 @@ public:
 									double matrixTerm = element->MatrixTerm(face, cellPhi, facePhi);
 									matrixCoeffs.Add(i, j, matrixTerm);
 									matrixCoeffs.Add(j, i, matrixTerm);
-									if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices && !face->HasDirichletBC())
+									if (actions.ExportAssemblyTermMatrices && !face->HasDirichletBC())
 									{
 										double consistencyTerm = element->ConsistencyTerm(face, cellPhi, facePhi);
 										consistencyCoeffs.Add(i, j, consistencyTerm);
@@ -270,7 +270,7 @@ public:
 
 										double matrixTerm = element->MatrixTerm(face1, facePhi1, face2, facePhi2);
 										matrixCoeffs.Add(i, j, matrixTerm);
-										if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices && !face1->HasDirichletBC() && !face2->HasDirichletBC())
+										if (actions.ExportAssemblyTermMatrices && !face1->HasDirichletBC() && !face2->HasDirichletBC())
 										{
 											double consistencyTerm = element->ConsistencyTerm(face1, facePhi1, face2, facePhi2);
 											consistencyCoeffs.Add(i, j, consistencyTerm);
@@ -297,7 +297,7 @@ public:
 						// Global reconstruction matrix (for export) //
 						//-------------------------------------------//
 
-						if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
+						if (actions.ExportAssemblyTermMatrices)
 						{
 							for (BasisFunction<Dim>* reconstructPhi : reconstructionBasis->LocalFunctions)
 							{
@@ -320,7 +320,7 @@ public:
 					}
 
 					chunksMatrixCoeffs[chunk->ThreadNumber] = matrixCoeffs;
-					if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
+					if (actions.ExportAssemblyTermMatrices)
 					{
 						chunksConsistencyCoeffs[chunk->ThreadNumber] = consistencyCoeffs;
 						chunksStabilizationCoeffs[chunk->ThreadNumber] = stabilizationCoeffs;
@@ -336,16 +336,16 @@ public:
 
 		BigNumber nnzApproximate = mesh->Elements.size() * (pow(HHO->nCellUnknowns, 2) + 4 * pow(HHO->nFaceUnknowns, 2) + HHO->nCellUnknowns * 4 * HHO->nFaceUnknowns);
 		NonZeroCoefficients matrixCoeffs(nnzApproximate);
-		NonZeroCoefficients consistencyCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
-		NonZeroCoefficients stabilizationCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
-		NonZeroCoefficients reconstructionCoeffs((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices ? nnzApproximate : 0);
+		NonZeroCoefficients consistencyCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
+		NonZeroCoefficients stabilizationCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
+		NonZeroCoefficients reconstructionCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
 
 		parallelLoop.Wait();
 
 		for (unsigned int threadNumber = 0; threadNumber < parallelLoop.NThreads; threadNumber++)
 		{
 			matrixCoeffs.Add(chunksMatrixCoeffs[threadNumber]);
-			if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
+			if (actions.ExportAssemblyTermMatrices)
 			{
 				consistencyCoeffs.Add(chunksConsistencyCoeffs[threadNumber]);
 				stabilizationCoeffs.Add(chunksStabilizationCoeffs[threadNumber]);
@@ -354,7 +354,7 @@ public:
 		}
 
 		chunksMatrixCoeffs.clear();
-		if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
+		if (actions.ExportAssemblyTermMatrices)
 		{
 			chunksConsistencyCoeffs.clear();
 			chunksStabilizationCoeffs.clear();
@@ -399,7 +399,7 @@ public:
 
 		if (this->_staticCondensation)
 		{
-			if ((action & Action::LogAssembly) == Action::LogAssembly)
+			if (actions.LogAssembly)
 				cout << "Static condensation..." << endl;
 
 			SparseMatrix Aff = this->_globalSystemMatrix.bottomRightCorner(HHO->nTotalFaceUnknowns, HHO->nTotalFaceUnknowns);
@@ -419,14 +419,14 @@ public:
 			this->b = this->_globalRHS;
 		}
 
-		if ((action & Action::LogAssembly) == Action::LogAssembly)
+		if (actions.LogAssembly)
 			cout << Utils::MatrixInfo(this->A, "A") << endl;
 
 		//------------------//
 		//      Export      //
 		//------------------//
 
-		if ((action & Action::ExtractSystem) == Action::ExtractSystem)
+		if (actions.ExportLinearSystem)
 		{
 			cout << "Export:" << endl;
 			Eigen::saveMarket(this->A, matrixFilePath);
@@ -436,7 +436,7 @@ public:
 			cout << "RHS exported to                   " << rhsFilePath << endl;
 		}
 
-		if ((action & Action::ExtractComponentMatrices) == Action::ExtractComponentMatrices)
+		if (actions.ExportAssemblyTermMatrices)
 		{
 			SparseMatrix Acons = SparseMatrix(HHO->nTotalHybridUnknowns, HHO->nTotalHybridUnknowns);
 			consistencyCoeffs.Fill(Acons);
@@ -526,18 +526,18 @@ public:
 	{
 		if (this->_staticCondensation)
 		{
-			Problem<Dim>::ExtractSolution(this->SystemSolution, "Faces");
+			Problem<Dim>::ExportSolutionVector(this->SystemSolution, "Faces");
 		}
 	}
 
 	void ExtractHybridSolution()
 	{
-		Problem<Dim>::ExtractSolution(this->GlobalHybridSolution, "Hybrid");
+		Problem<Dim>::ExportSolutionVector(this->GlobalHybridSolution, "Hybrid");
 	}
 
-	void ExtractSolution() override
+	void ExportSolutionVector() override
 	{
-		Problem<Dim>::ExtractSolution(this->ReconstructedSolution);
+		Problem<Dim>::ExportSolutionVector(this->ReconstructedSolution);
 	}
 
 	void ExportSolutionToGMSH() override

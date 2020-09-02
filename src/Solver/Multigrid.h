@@ -27,7 +27,7 @@ public:
 	int BlockSizeForBlockSmoothers = -1;
 	double RelaxationParameter = 1;
 	CoarseningStrategy CoarseningStgy = CoarseningStrategy::StandardCoarsening;
-	bool ExportMatrices = false;
+	bool ExportComponents = false;
 	bool DoNotCreateLevels = false;
 
 	Multigrid(int nLevels) : IterativeSolver()
@@ -68,7 +68,7 @@ public:
 		this->_fineLevel->PreSmoother = this->_fineLevel->CreateSmoother(PreSmootherCode, PreSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
 		this->_fineLevel->PostSmoother = this->_fineLevel->CreateSmoother(PostSmootherCode, PostSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
 		this->_fineLevel->UseGalerkinOperator = false;
-		this->_fineLevel->ExportMatrices = ExportMatrices;
+		this->_fineLevel->ExportComponents = ExportComponents;
 
 		Level* currentLevel = this->_fineLevel;
 		bool noCoarserMeshProvided = false;
@@ -110,7 +110,7 @@ public:
 			coarseLevel->PostSmoother = coarseLevel->CreateSmoother(PostSmootherCode, postSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
 
 			coarseLevel->UseGalerkinOperator = UseGalerkinOperator;
-			coarseLevel->ExportMatrices = ExportMatrices;
+			coarseLevel->ExportComponents = ExportComponents;
 
 			// FCG if K-cycle
 			if (this->Cycle == 'K')
@@ -199,7 +199,7 @@ private:
 		SparseMatrix A = level->OperatorMatrix;
 		Vector x;
 
-		if (this->ExportMatrices)
+		if (this->ExportComponents)
 			level->ExportVector(b, "it" + to_string(this->IterationCount) + "_b");
 
 		if (level->IsCoarsestLevel())
@@ -211,7 +211,7 @@ private:
 		{
 			x = initialGuess;
 
-			if (this->ExportMatrices)
+			if (this->ExportComponents)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_beforePreSmoothing");
 
 			//---------------//
@@ -220,7 +220,7 @@ private:
 
 			x = level->PreSmoother->Smooth(x, b);                                    result.AddCost(level->PreSmoother->SolvingComputationalWork());
 
-			if (this->ExportMatrices)
+			if (this->ExportComponents)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPreSmoothing");
 
 			//----------------------//
@@ -258,7 +258,7 @@ private:
 			// Coarse-grid correction //
 			//------------------------//
 
-			if (this->ExportMatrices)
+			if (this->ExportComponents)
 			{
 				level->ExportVector(ec, "it" + to_string(this->IterationCount) + "_ce");
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol");
@@ -268,7 +268,7 @@ private:
 
 			x = x + level->Prolong(ec);                                              result.AddCost(level->ProlongCost());
 
-			if (this->ExportMatrices)
+			if (this->ExportComponents)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_cgc");
 
 			//----------------//
@@ -277,7 +277,7 @@ private:
 
 			x = level->PostSmoother->Smooth(x, b);                                   result.AddCost(level->PostSmoother->SolvingComputationalWork());
 
-			if (this->ExportMatrices)
+			if (this->ExportComponents)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPostSmoothing");
 		}
 
