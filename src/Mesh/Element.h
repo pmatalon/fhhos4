@@ -302,13 +302,16 @@ public:
 
 		set<Element<Dim>*> s;
 		for (auto fe : this->FinerElements)
+		{
+			assert(fe->PhysicalPart == this->PhysicalPart);
 			s.insert(fe);
+		}
 
 		for (Element<Dim>* neighbour : this->Neighbours())
 		{
 			for (auto fe : neighbour->FinerElements)
 			{
-				if (s.find(fe) == s.end() && fe->Overlaps(this))
+				if (fe->PhysicalPart == this->PhysicalPart && s.find(fe) == s.end() && fe->Overlaps(this))
 					s.insert(fe);
 			}
 		}
