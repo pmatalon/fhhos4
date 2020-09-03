@@ -427,7 +427,7 @@ private:
 		return FaceCollapsingStatus::Ok;
 	}
 
-	void CollapseCoplanarFaces(Interface<Dim>& interf)
+	void CollapseCoplanarFaces(const Interface<Dim>& interf)
 	{
 		list<set<Face<Dim>*>> coplanarSubsets = interf.CoplanarSubsets();
 		for (set<Face<Dim>*> subset : coplanarSubsets)

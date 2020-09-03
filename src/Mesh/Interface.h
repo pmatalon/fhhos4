@@ -180,7 +180,7 @@ private:
 	}
 
 public:
-	list<set<Face<Dim>*>> CoplanarSubsets()
+	list<set<Face<Dim>*>> CoplanarSubsets() const
 	{
 		assert(Dim == 2);
 
@@ -188,7 +188,8 @@ public:
 
 		for (Vertex* v : _interiorVertices)
 		{
-			auto it = _mapVertexFaces[v].begin();
+			set<Face<Dim>*> vFaces = _mapVertexFaces.at(v);
+			auto it = vFaces.cbegin();
 			Face<Dim>* f1 = *it; it++;
 			Face<Dim>* f2 = *it;
 			vector<Vertex*> f1Vertices = f1->Vertices();
@@ -204,7 +205,7 @@ public:
 		for (auto itSubset1 = subsets.begin(); itSubset1 != subsets.end(); itSubset1++)
 		{
 			set<Face<Dim>*>& subset1 = *itSubset1;
-			
+
 			// Iterate over the current subsets to see if it can be put into one
 			for (auto itSubset2 = subsets.begin(); itSubset2 != subsets.end(); )
 			{
@@ -229,7 +230,8 @@ public:
 				if (!areDisjoint)
 				{
 					subset1.insert(subset2.begin(), subset2.end()); // merge
-					itSubset2 = subsets.erase(itSubset2);
+					subsets.erase(itSubset2);
+					itSubset2 = subsets.begin();
 				}
 				else
 					itSubset2++;

@@ -260,10 +260,15 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>/mnt/c/Users/pierr/Documents/Source/Repos/dghho/eigen-eigen-b3f3d4950030;$(ProjectPublicIncludePath);%(ClCompile.AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>/mnt/c/Users/pierr/Documents/Source/Repos/dghho/eigen-eigen-b3f3d4950030;$(ProjectPublicIncludePath);%(ClCompile.AdditionalIncludeDirectories);/mnt/c/Users/pierr/Documents/Source/Repos/dghho/gmsh-4.4.1-Linux64-sdk/include</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>GMSH_ENABLED</PreprocessorDefinitions>
+      <CppLanguageStandard>c++14</CppLanguageStandard>
+      <Optimization>Disabled</Optimization>
     </ClCompile>
     <Link>
       <AdditionalOptions>-fopenmp %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalLibraryDirectories>/mnt/c/Users/pierr/Documents/Source/Repos/dghho/gmsh-4.4.1-Linux64-sdk/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <LibraryDependencies>gmsh;gmp;gmpxx;mpfr;boost_thread;boost_system;boost_chrono;boost_date_time;boost_atomic</LibraryDependencies>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
