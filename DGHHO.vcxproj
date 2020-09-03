@@ -213,6 +213,7 @@
     <ClInclude Include="src\TestCases\1D\PolySolution1DTestCase.h" />
     <ClInclude Include="src\TestCases\1D\SineSolution1DTestCase.h" />
     <ClInclude Include="src\TestCases\2D\BarWith4HolesTestCase.h" />
+    <ClInclude Include="src\TestCases\2D\EDFTestCase.h" />
     <ClInclude Include="src\TestCases\2D\ExpSolution2DTestCase.h" />
     <ClInclude Include="src\TestCases\2D\KelloggTestCase.h" />
     <ClInclude Include="src\TestCases\2D\OneSolution2DTestCase.h" />
