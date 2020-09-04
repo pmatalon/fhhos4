@@ -7,17 +7,26 @@ h = domainWidth/N;
 // Bottom stripe //
 //---------------//
 stripeHeight = 5;
-Point(1) = {          0,            0, 0, h}; // bottom-left corner
-Point(2) = {domainWidth,            0, 0, h}; // bottom-right corner
-Point(3) = {domainWidth, stripeHeight, 0, h}; // top-right corner
-Point(4) = {          0, stripeHeight, 0, h}; // top-left corner
 
-Line(1) = {1, 2}; // bottom
-Line(2) = {2, 3}; // right
-Line(3) = {3, 4}; // top
-Line(4) = {4, 1}; // left
+stripeBL = 1;
+stripeBR = 2;
+stripeTR = 3;
+stripeTL = 4;
+Point(stripeBL) = {          0,            0, 0, h}; // bottom-left corner
+Point(stripeBR) = {domainWidth,            0, 0, h}; // bottom-right corner
+Point(stripeTR) = {domainWidth, stripeHeight, 0, h}; // top-right corner
+Point(stripeTL) = {          0, stripeHeight, 0, h}; // top-left corner
 
-Line Loop(100) = {1, 2, 3, 4};
+stripeB = 1;
+stripeR = 2;
+stripeT = 3;
+stripeL = 4;
+Line(stripeB) = {stripeBL, stripeBR}; // bottom
+Line(stripeR) = {stripeBR, stripeTR}; // right
+Line(stripeT) = {stripeTR, stripeTL}; // top
+Line(stripeL) = {stripeTL, stripeBL}; // left
+
+Line Loop(100) = {stripeB, stripeR, stripeT, stripeL}; // Line Ids
 Plane Surface(200) = {100}; // Loop Ids
 Physical Surface("bottomStripe") = {200};
 
@@ -27,17 +36,26 @@ Physical Surface("bottomStripe") = {200};
 rectangleOriginX = 4;
 rectangleOriginY = 10;
 rectangleWidth = 24;
-Point(5) = {rectangleOriginX,                rectangleOriginY, 0, h}; // bottom-left corner
-Point(6) = {rectangleOriginX+rectangleWidth, rectangleOriginY, 0, h}; // bottom-right corner
-Point(7) = {rectangleOriginX+rectangleWidth, domainHeight,     0, h}; // top-right corner
-Point(8) = {rectangleOriginX,                domainHeight,     0, h}; // top-left corner
 
-Line(5) = {5, 6}; // bottom
-Line(6) = {6, 7}; // right
-Line(7) = {7, 8}; // top
-Line(8) = {8, 5}; // left
+rectangleBL = 5;
+rectangleBR = 6;
+rectangleTR = 7;
+rectangleTL = 8;
+Point(rectangleBL) = {rectangleOriginX,                rectangleOriginY, 0, h}; // bottom-left corner
+Point(rectangleBR) = {rectangleOriginX+rectangleWidth, rectangleOriginY, 0, h}; // bottom-right corner
+Point(rectangleTR) = {rectangleOriginX+rectangleWidth, domainHeight,     0, h}; // top-right corner
+Point(rectangleTL) = {rectangleOriginX,                domainHeight,     0, h}; // top-left corner
 
-Line Loop(101) = {5, 6, 7, 8};
+rectangleB = 5;
+rectangleR = 6;
+rectangleT = 7;
+rectangleL = 8;
+Line(rectangleB) = {rectangleBL, rectangleBR}; // bottom
+Line(rectangleR) = {rectangleBR, rectangleTR}; // right
+Line(rectangleT) = {rectangleTR, rectangleTL}; // top
+Line(rectangleL) = {rectangleTL, rectangleBL}; // left
+
+Line Loop(101) = {rectangleB, rectangleR, rectangleT, rectangleL}; // Line Ids
 Plane Surface(201) = {101}; // Loop Ids
 Physical Surface("topRectangle") = {201};
 
@@ -48,17 +66,26 @@ pieceHeight = 1;
 pieceWidth = 3;
 pieceOriginX = 12;
 pieceOriginY = rectangleOriginY-pieceHeight;
-Point(9)  = {pieceOriginX,            pieceOriginY,             0, h}; // bottom-left corner
-Point(10) = {pieceOriginX+pieceWidth, pieceOriginY,             0, h}; // bottom-right corner
-Point(11) = {pieceOriginX+pieceWidth, pieceOriginY+pieceHeight, 0, h}; // top-right corner
-Point(12) = {pieceOriginX,            pieceOriginY+pieceHeight, 0, h}; // top-left corner
 
-Line(9)  = { 9, 10}; // bottom
-Line(10) = {10, 11}; // right
-Line(11) = {11, 12}; // top
-Line(12) = {12,  9}; // left
+lpieceBL =  9;
+lpieceBR = 10;
+lpieceTR = 11;
+lpieceTL = 12;
+Point(lpieceBL) = {pieceOriginX,            pieceOriginY,             0, h}; // bottom-left corner
+Point(lpieceBR) = {pieceOriginX+pieceWidth, pieceOriginY,             0, h}; // bottom-right corner
+Point(lpieceTR) = {pieceOriginX+pieceWidth, pieceOriginY+pieceHeight, 0, h}; // top-right corner
+Point(lpieceTL) = {pieceOriginX,            pieceOriginY+pieceHeight, 0, h}; // top-left corner
 
-Line Loop(102) = {9, 10, 11, 12};
+lpieceB =  9;
+lpieceR = 10;
+lpieceT = 11;
+lpieceL = 12;
+Line(lpieceB) = {lpieceBL, lpieceBR}; // bottom
+Line(lpieceR) = {lpieceBR, lpieceTR}; // right
+Line(lpieceT) = {lpieceTR, lpieceTL}; // top
+Line(lpieceL) = {lpieceTL, lpieceBL}; // left
+
+Line Loop(102) = {lpieceB, lpieceR, lpieceT, lpieceL}; // Line Ids
 Plane Surface(202) = {102}; // Loop Ids
 Physical Surface("leftLittlePiece") = {202};
 
@@ -66,38 +93,55 @@ Physical Surface("leftLittlePiece") = {202};
 // Right little piece //
 //--------------------//
 pieceOriginX += 5;
-Point(13) = {pieceOriginX,            pieceOriginY,             0, h}; // bottom-left corner
-Point(14) = {pieceOriginX+pieceWidth, pieceOriginY,             0, h}; // bottom-right corner
-Point(15) = {pieceOriginX+pieceWidth, pieceOriginY+pieceHeight, 0, h}; // top-right corner
-Point(16) = {pieceOriginX,            pieceOriginY+pieceHeight, 0, h}; // top-left corner
 
-Line(13) = {13, 14}; // bottom
-Line(14) = {14, 15}; // right
-Line(15) = {15, 16}; // top
-Line(16) = {16, 13}; // left
+rpieceBL = 13;
+rpieceBR = 14;
+rpieceTR = 15;
+rpieceTL = 16;
+Point(rpieceBL) = {pieceOriginX,            pieceOriginY,             0, h}; // bottom-left corner
+Point(rpieceBR) = {pieceOriginX+pieceWidth, pieceOriginY,             0, h}; // bottom-right corner
+Point(rpieceTR) = {pieceOriginX+pieceWidth, pieceOriginY+pieceHeight, 0, h}; // top-right corner
+Point(rpieceTL) = {pieceOriginX,            pieceOriginY+pieceHeight, 0, h}; // top-left corner
 
-Line Loop(103) = {13, 14, 15, 16};
+rpieceB = 13;
+rpieceR = 14;
+rpieceT = 15;
+rpieceL = 16;
+Line(rpieceB) = {rpieceBL, rpieceBR}; // bottom
+Line(rpieceR) = {rpieceBR, rpieceTR}; // right
+Line(rpieceT) = {rpieceTR, rpieceTL}; // top
+Line(rpieceL) = {rpieceTL, rpieceBL}; // left
+
+Line Loop(103) = {rpieceB, rpieceR, rpieceT, rpieceL}; // Line Ids
 Plane Surface(203) = {103}; // Loop Ids
 Physical Surface("rightLittlePiece") = {203};
 
 //---------------------------//
 // Weird shape in the middle //
 //---------------------------//
-Point(17) = {          0, domainHeight, 0, h}; // top-left corner of the domain
-Point(18) = {domainWidth, domainHeight, 0, h}; // top-right corner of the domain
+domainTL = 17;
+domainTR = 18;
+Point(domainTL) = {          0, domainHeight, 0, h}; // top-left corner of the domain
+Point(domainTR) = {domainWidth, domainHeight, 0, h}; // top-right corner of the domain
 
-Line(17) = {17,  4}; // left
-Line(19) = { 3, 18}; // right     {bottom pt, top pt}
-Line(20) = { 8, 17}; // top-left  {right pt, left pt}
-Line(21) = {18,  7}; // top-right {right pt, left pt}
-Line(22) = { 6, 15}; // bottom-right of the top rectangle {right pt, left pt}
-Line(23) = {16, 11}; // between the little pieces {right pt, left pt}
-Line(24) = {12,  5}; // bottom-left of the top rectangle {right pt, left pt}
+verticalTL = 17;
+verticalTR = 19;
+horizontalTL = 20;
+horizontalTR = 21;
+rectangleHorizBR = 22;
+edgeBetweenPieces = 23;
+rectangleHorizBL = 24;
+Line(verticalTL)        = {domainTL,    stripeTL};    // left      {top pt, bottom pt}
+Line(verticalTR)        = {stripeTR,    domainTR};    // right     {bottom pt, top pt}
+Line(horizontalTL)      = {rectangleTL, domainTL};    // top-left  {right pt, left pt}
+Line(horizontalTR)      = {domainTR,    rectangleTR}; // top-right {right pt, left pt}
+Line(rectangleHorizBR)  = {rectangleBR, rpieceTR};    // bottom-right of the top rectangle {right pt, left pt}
+Line(edgeBetweenPieces) = {rpieceTL,    lpieceTR};    // between the little pieces {right pt, left pt}
+Line(rectangleHorizBL)  = {lpieceTL,    rectangleBL}; // bottom-left of the top rectangle {right pt, left pt}
 
-Line Loop(104) = {-3, 19, 21, -6, 22, -14, -13, -16, 23, -10, -9, -12, 24, -8, 20, 17};
+Line Loop(104) = {-stripeT, verticalTR, horizontalTR, -rectangleR, rectangleHorizBR, -rpieceR,-rpieceB,-rpieceL, edgeBetweenPieces, -lpieceR,-lpieceB,-lpieceL, rectangleHorizBL, -rectangleL, horizontalTL, verticalTL}; // Line Ids
 Plane Surface(204) = {104}; // Loop Ids
 Physical Surface("weirdShapeInTheMiddle") = {204};
 
 
-
-Physical Curve("externalBoundary") = {1, 2, 19, 21, 7, 20, 17, 4}; // Line Ids
+Physical Curve("externalBoundary") = {stripeB, stripeR, verticalTR, horizontalTR, rectangleT, horizontalTL, verticalTL, stripeL}; // Line Ids

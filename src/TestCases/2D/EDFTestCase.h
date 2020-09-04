@@ -4,15 +4,20 @@ using namespace std;
 
 class EDFTestCase : public TestCase<2>
 {
+private:
+	Tensor<2>* tensorWeirdShapeInTheMiddle;
+	Tensor<2>* tensorBottomStripe;
+	Tensor<2>* tensorTopRectangle;
+	Tensor<2>* tensorLittlePiece;
 public:
 	EDFTestCase(ProblemArguments pb) :
 		TestCase()
 	{
 		// Diffusion field
-		Tensor<2>* tensorWeirdShapeInTheMiddle = new Tensor<2>(                        1,     pb.AnisotropyRatio, pb.AnisotropyAngle);
-		Tensor<2>* tensorBottomStripe          = new Tensor<2>(    pb.HeterogeneityRatio,     pb.AnisotropyRatio, pb.AnisotropyAngle);
-		Tensor<2>* tensorTopRectangle          = new Tensor<2>(pow(pb.HeterogeneityRatio, 2), pb.AnisotropyRatio, pb.AnisotropyAngle);
-		Tensor<2>* tensorLittlePiece           = new Tensor<2>(    pb.HeterogeneityRatio,     pb.AnisotropyRatio, pb.AnisotropyAngle);
+		tensorWeirdShapeInTheMiddle = new Tensor<2>(                    1, pb.AnisotropyRatio, pb.AnisotropyAngle);
+		tensorBottomStripe          = new Tensor<2>(                    7, pb.AnisotropyRatio, pb.AnisotropyAngle);
+		tensorTopRectangle          = new Tensor<2>(                    4, pb.AnisotropyRatio, pb.AnisotropyAngle);
+		tensorLittlePiece           = new Tensor<2>(pb.HeterogeneityRatio, pb.AnisotropyRatio, pb.AnisotropyAngle);
 
 		map<string, Tensor<2>*> tensors;
 		tensors.insert({ "bottomStripe", tensorBottomStripe });
@@ -28,9 +33,20 @@ public:
 		{
 			double x = p.X;
 			double y = p.Y;
-			if (x * x + y * y <= 2)
-				return 5.0;
-			if (x >= 20 && x <= 25 && y >= 4 && y <= 9)
+			// left
+			if (pow(x-5, 2) + pow(y-10, 2) <= 8)
+				return 1.0;
+			// middle
+			if (pow(x - 15, 2) + pow(y - 6, 2) <= 8)
+				return 1.0;
+			// top
+			if (pow(x - 15, 2) + pow(y - 12, 2) <= 8)
+				return 1.0;
+			// top
+			if (pow(x - 24, 2) + pow(y - 8, 2) <= 4)
+				return 1.0;
+			// right
+			if (x >= 26 && x <= 30 && y >= 9 && y <= 13)
 				return 1.0;
 			return 0.0;
 		};
@@ -54,5 +70,13 @@ public:
 	string Description() override
 	{
 		return "EDF";
+	}
+
+	~EDFTestCase()
+	{
+		delete tensorWeirdShapeInTheMiddle;
+		delete tensorBottomStripe;
+		delete tensorTopRectangle;
+		delete tensorLittlePiece;
 	}
 };

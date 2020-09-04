@@ -178,6 +178,7 @@ public:
 
 			Solver* solver = CreateSolver(args, problem, blockSizeForBlockSolver);
 			problem->SystemSolution = Solve(solver, problem->A, problem->b, args.Solver.InitialGuessCode);
+			delete solver;
 
 			//-----------------------------//
 			//       Solution export       //
@@ -373,8 +374,6 @@ private:
 			cout << "Solving..." << endl;
 			x = solver->Solve(b);
 		}
-
-		delete solver;
 
 		solverTimer.Stop();
 		cout << "Solving time: CPU = " << solverTimer.CPU() << ", elapsed = " << solverTimer.Elapsed() << endl << endl;

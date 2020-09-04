@@ -122,6 +122,8 @@ protected:
 			return false;
 		if (IterationCount >= MaxIterations)
 			return true;
+		if (isinf(result.NormalizedResidualNorm))
+			Utils::FatalError("divergence of the solver");
 		if (StoppingCrit == StoppingCriteria::NormalizedResidual && result.NormalizedResidualNorm < this->Tolerance)
 			return true;
 		return false;

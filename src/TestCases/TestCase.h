@@ -19,4 +19,7 @@ public:
 
 	virtual string Code() = 0;
 	virtual string Description() = 0;
+
+	virtual ~TestCase()
+	{}
 };
