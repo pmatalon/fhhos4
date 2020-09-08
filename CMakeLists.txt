@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 3.1)
 
 project(dghho)
 
-option(ENABLE_GMSH "Build with the GMSH interface" OFF)
+option(ENABLE_GMSH "Build with the GMSH interface" ON)
 option(ENABLE_AGMG "Build with AGMG" OFF)
 
 set(EXECUTABLE_OUTPUT_PATH bin/${CMAKE_BUILD_TYPE})
@@ -29,8 +29,8 @@ add_executable(dghho ${source_files})
 #	message(FATAL_ERROR "CGAL not found.")
 #endif()
 #target_link_libraries(dghho CGAL)
-find_package(CGAL REQUIRED COMPONENTS Core)
-target_link_libraries(dghho CGAL::CGAL CGAL::CGAL_Core)
+find_package(CGAL)
+target_link_libraries(dghho CGAL::CGAL)
 
 # Include Eigen
 include_directories(eigen-eigen-b3f3d4950030)
@@ -47,7 +47,7 @@ if (ENABLE_GMSH)
 	endif()
 	message(STATUS "GMSH enabled")
 else()
-	message(STATUS "GMSH disabled")
+	message(STATUS "GMSH disabled. Add -DENABLE_GMSH=ON to enable it.")
 endif()
 
 # Include pthread
@@ -88,5 +88,5 @@ if(ENABLE_AGMG)
 
 	message(STATUS "AGMG enabled")
 else()
-	message(STATUS "AGMG disabled")
+	message(STATUS "AGMG disabled. Add -DENABLE_AGMG=ON to enable it.")
 endif()
