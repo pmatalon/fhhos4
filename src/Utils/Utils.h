@@ -5,12 +5,21 @@
 #include "../Geometry/Point.h"
 using namespace std;
 
+#ifndef ROOT_PATH
+#define ROOT_PATH "./"
+#endif // !ROOT_PATH
+
 using RefFunction = function<double(RefPoint)>;
 using DomFunction = function<double(DomPoint)>;
 
 class Utils
 {
 public:
+	static string RootPath()
+	{
+		return ROOT_PATH;
+	}
+
 	static int Binomial(int n, int p)
 	{
 		if (p != 0 && n != p)

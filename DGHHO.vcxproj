@@ -246,7 +246,7 @@
       <AdditionalOptions>
       </AdditionalOptions>
       <Verbose>true</Verbose>
-      <PreprocessorDefinitions>GMSH_ENABLED</PreprocessorDefinitions>
+      <PreprocessorDefinitions>GMSH_ENABLED;ROOT_PATH="/mnt/c/Users/pierr/Documents/Source/Repos/dghho"</PreprocessorDefinitions>
       <CppLanguageStandard>c++14</CppLanguageStandard>
     </ClCompile>
     <Link>

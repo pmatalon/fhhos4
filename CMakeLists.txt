@@ -19,6 +19,8 @@ file(
 add_executable(dghho ${source_files})
 #add_executable(dghho "${PROJECT_SOURCE_DIR}/src/main.cpp")
 
+add_definitions(-DROOT_PATH="${CMAKE_SOURCE_DIR}")
+
 # Include CGAL
 #add_definitions(-DCGAL_DIR="${CMAKE_SOURCE_DIR}/cgal")
 #include_directories("/usr/include/CGAL")

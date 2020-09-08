@@ -353,7 +353,7 @@ int main(int argc, char* argv[])
 	cout << "-----------------------------------------------------------" << endl;
 	Eigen::initParallel();
 
-	string meshDirectory = "/mnt/c/Users/pierr/Documents/Source/Repos/dghho/data/meshes/";
+	string meshDirectory = Utils::RootPath() + "/data/meshes/";
 	Mesh<2>::MeshDirectory = meshDirectory;
 	Mesh<3>::MeshDirectory = meshDirectory;
 
