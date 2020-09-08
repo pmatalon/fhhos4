@@ -295,35 +295,50 @@ public:
 		return (!this->PhysicalPart && !other->PhysicalPart) || this->PhysicalPart == other->PhysicalPart;
 	}
 
-	void SetOverlappingFineElements()
+	void SetOverlappingFineElements(CoarseningStrategy stgy)
 	{
 		//if (!this->OverlappingFineElements.empty())
 			//return;
 
-		set<Element<Dim>*> s;
+		set<Element<Dim>*> overlapping;
+		set<Element<Dim>*> tested;
 		for (auto fe : this->FinerElements)
 		{
 			assert(fe->PhysicalPart == this->PhysicalPart);
-			s.insert(fe);
+			overlapping.insert(fe);
+			tested.insert(fe);
 		}
 
-		for (Element<Dim>* neighbour : this->Neighbours())
+		if (!Utils::BuildsNestedMeshHierarchy(stgy))
 		{
-			for (auto fe : neighbour->FinerElements)
+			for (Element<Dim>* neighbour : this->Neighbours())
 			{
-				if (fe->PhysicalPart == this->PhysicalPart && s.find(fe) == s.end() && fe->Overlaps(this))
-					s.insert(fe);
+				for (auto fe : neighbour->FinerElements)
+				{
+					if (fe->PhysicalPart == this->PhysicalPart && tested.find(fe) == tested.end() && fe->Overlaps(this))
+						overlapping.insert(fe);
+					tested.insert(fe);
+					if (stgy != CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
+					{
+						for (Element<Dim>* feNeighbour : fe->Neighbours())
+						{
+							if (feNeighbour->PhysicalPart == this->PhysicalPart && tested.find(feNeighbour) == tested.end() && feNeighbour->Overlaps(this))
+								overlapping.insert(feNeighbour);
+							tested.insert(feNeighbour);
+						}
+					}
+				}
 			}
 		}
 
-		this->OverlappingFineElements = vector<Element<Dim>*>(s.begin(), s.end());
+		this->OverlappingFineElements = vector<Element<Dim>*>(overlapping.begin(), overlapping.end());
 	}
 
 	bool Overlaps(Element<Dim>* other)
 	{
-		for (DomPoint p : this->QuadraturePoints())
+		for (Vertex* v : this->Vertices())
 		{
-			if (other->Contains(p))
+			if (other->Contains(*v))
 				return true;
 		}
 		return false;
@@ -464,6 +479,8 @@ public:
 	virtual void UnitTests() const
 	{
 		Shape()->UnitTests();
+
+		assert(this->PhysicalPart);
 
 		// The following tests are valid if the element is convex
 		if (this->IsConvex())

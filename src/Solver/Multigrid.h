@@ -341,6 +341,8 @@ public:
 			os << "Bey's refinement from coarse mesh [-cs b]" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::FaceCoarsening)
 			os << "face coarsening [-cs f]" << endl;
+		else if (CoarseningStgy == CoarseningStrategy::IndependentRemeshing)
+			os << "independant remeshing [-cs m]" << endl;
 		else
 			os << "unknown" << endl;
 

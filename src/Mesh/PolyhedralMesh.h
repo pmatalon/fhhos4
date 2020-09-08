@@ -111,6 +111,7 @@ private:
 	{
 		PolyhedralMesh<Dim>* coarseMesh = new PolyhedralMesh<Dim>();
 		this->InitializeCoarsening(coarseMesh);
+		coarseMesh->ComesFrom.CS = CoarseningStrategy::AgglomerationCoarseningByMostCoplanarFaces;
 
 		//BigNumber elementToAnalyze = 999999999999;
 
@@ -502,6 +503,7 @@ private:
 	{
 		PolyhedralMesh<Dim>* coarseMesh = new PolyhedralMesh<Dim>();
 		this->InitializeCoarsening(coarseMesh);
+		coarseMesh->ComesFrom.CS = CoarseningStrategy::AgglomerationCoarseningBySeedPoints;
 
 		for (Element<Dim>* e : this->Elements)
 		{
@@ -579,6 +581,7 @@ private:
 	{
 		PolyhedralMesh<Dim>* coarseMesh = new PolyhedralMesh<Dim>();
 		this->InitializeCoarsening(coarseMesh);
+		coarseMesh->ComesFrom.CS = CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours;
 
 		for (Element<Dim>* currentElem : this->Elements)
 		{
@@ -643,6 +646,7 @@ private:
 	{
 		PolyhedralMesh<Dim>* coarseMesh = new PolyhedralMesh<Dim>();
 		this->InitializeCoarsening(coarseMesh);
+		coarseMesh->ComesFrom.CS = CoarseningStrategy::AgglomerationCoarseningByVertexNeighbours;
 
 		// Associate to each vertex the list of elements it connects
 		map<Vertex*, vector<Element<Dim>*>> vertexElements = BuildVertexElementMap();
@@ -1553,9 +1557,8 @@ template <>
 void PolyhedralMesh<2>::FaceCoarsening()
 {
 	PolyhedralMesh<2>* coarseSkeleton = new PolyhedralMesh<2>();
+	this->InitializeCoarsening(coarseSkeleton);
 	coarseSkeleton->ComesFrom.CS = CoarseningStrategy::FaceCoarsening;
-	this->CoarseMesh = coarseSkeleton;
-	coarseSkeleton->FineMesh = this;
 
 	// Copy all vertices
 	map<size_t, MeshVertex<2>*> verticesByNumber;
@@ -1642,4 +1645,5 @@ void PolyhedralMesh<2>::FaceCoarsening()
 		if (!face1->CoarseFace)
 			Utils::Warning("Face " + to_string(face1->Number) + " has not been coarsened.");
 	}
+	this->FinalizeCoarsening();
 }

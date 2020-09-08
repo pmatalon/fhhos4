@@ -917,7 +917,7 @@ int main(int argc, char* argv[])
 		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::FaceCoarsening && !args.Solver.MG.UseGalerkinOperator)
 			argument_error("To use the face coarsening, you must also use the Galerkin operator. To do so, add option -g 1.");
 
-		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::IndependentRemeshing && args.Solver.MG.ProlongationCode != Prolongation::CellInterp_L2proj_Trace)
+		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::IndependentRemeshing && (args.Solver.MG.ProlongationCode != Prolongation::CellInterp_L2proj_Trace && args.Solver.MG.ProlongationCode != Prolongation::Default))
 			argument_error("The coarsening by independent remeshing is only applicable with the non-nested version of the multigrid (-prolong " + to_string((unsigned)Prolongation::CellInterp_L2proj_Trace) + ").");
 
 		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::None)

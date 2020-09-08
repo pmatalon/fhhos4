@@ -512,19 +512,19 @@ public:
 					if (ff->IsDomainBoundary)
 						assert(ff->CoarseFace && "This boundary face has no coarse face.");
 				}
-			}
 
-			for (Face<Dim>* ff : this->Faces)
-			{
-				if (ff->IsRemovedOnCoarserGrid)
-					continue;
-				if (ff->BoundaryPart)
+				for (Face<Dim>* ff : this->Faces)
 				{
-					assert(ff->CoarseFace->BoundaryPart && "This fine face has a BoundaryPart but its coarsened one has none.");
-					assert(ff->CoarseFace->BoundaryPart == ff->BoundaryPart && "This face and its coarsened one have different BoundaryParts.");
+					if (ff->IsRemovedOnCoarserGrid)
+						continue;
+					if (ff->BoundaryPart)
+					{
+						assert(ff->CoarseFace->BoundaryPart && "This fine face has a BoundaryPart but its coarsened one has none.");
+						assert(ff->CoarseFace->BoundaryPart == ff->BoundaryPart && "This face and its coarsened one have different BoundaryParts.");
+					}
+					else
+						assert(!ff->CoarseFace->BoundaryPart && "This fine face has no BoundaryPart but its coarsened one has one.");
 				}
-				else
-					assert(!ff->CoarseFace->BoundaryPart && "This fine face has no BoundaryPart but its coarsened one has one.");
 			}
 
 			

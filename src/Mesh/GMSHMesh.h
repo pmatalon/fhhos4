@@ -548,6 +548,25 @@ private:
 			Element<Dim>* coarse = coarseMesh->LocateElementThatEmbeds(fine);
 			coarse->FinerElements.push_back(fine);
 			fine->CoarserElement = coarse;
+			assert(coarse->PhysicalPart == fine->PhysicalPart);
+		}
+
+		for (Element<Dim>* coarse : coarseMesh->Elements)
+		{
+			if (coarse->FinerElements.empty())
+			{
+				for (Element<Dim>* neighbour : coarse->Neighbours())
+				{
+					if (neighbour->PhysicalPart != coarse->PhysicalPart)
+						continue;
+					for (Element<Dim>* fe : neighbour->FinerElements)
+					{
+						if (fe->Overlaps(coarse))
+							coarse->FinerElements.push_back(fe);
+					}
+				}
+				assert(!coarse->FinerElements.empty());
+			}
 		}
 
 		this->FinalizeCoarsening();
@@ -556,19 +575,24 @@ private:
 
 	Element<Dim>* LocateElementThatEmbeds(Element<Dim>* finerElement)
 	{
-		size_t coarseElementTag;
-		int coarseElementType;
-		DomPoint fineCenter = finerElement->Center();
-		vector<size_t> coarseElementNodes;
+		size_t coarseElementTag = LocateGMSHElementContaining(finerElement->Center());
+		return GetElementFromGMSHTag(coarseElementTag);
+	}
+
+	size_t LocateGMSHElementContaining(DomPoint p)
+	{
+		size_t elementTag;
+		int elementType;
+		vector<size_t> elementNodes;
 		double u, v, w;
 		bool strictResearch = true;
 
 		// If this function fails, check that a Physical Surface (if 2D) is defined in the file (if Physical Lines exist, then a Physical Surface must also exist!).
-		gmsh::model::mesh::getElementByCoordinates(fineCenter.X, fineCenter.Y, fineCenter.Z, coarseElementTag,
-			coarseElementType, coarseElementNodes, u, v, w, // useless parameters for us
+		gmsh::model::mesh::getElementByCoordinates(p.X, p.Y, p.Z, elementTag,
+			elementType, elementNodes, u, v, w, // useless parameters for us
 			Dim, strictResearch);
 
-		return GetElementFromGMSHTag(coarseElementTag);
+		return elementTag;
 	}
 
 protected:

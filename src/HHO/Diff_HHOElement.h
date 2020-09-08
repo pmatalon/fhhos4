@@ -123,6 +123,11 @@ public:
 
 		for (auto e : this->OverlappingFineElements)
 		{
+			if (e->PhysicalPart != this->PhysicalPart)
+			{
+				Utils::Warning("This coarse element is overlapped by a fine one that is not in the same physical part. The coarsening/refinement strategy must prevent that.");
+				continue;
+			}
 			Diff_HHOElement<Dim>* fineElement = dynamic_cast<Diff_HHOElement<Dim>*>(e);
 
 			DenseMatrix fineCoarseMass(cellBasis->Size(), cellBasis->Size());
@@ -130,7 +135,7 @@ public:
 			{
 				for (BasisFunction<Dim>* coarsePhi : cellBasis->LocalFunctions)
 				{
-					RefFunction functionToIntegrate = [this, fineElement, finePhi, coarsePhi](RefPoint fineRefPoint) {
+					RefFunction finePhiCoarsePhi = [this, fineElement, finePhi, coarsePhi](RefPoint fineRefPoint) {
 						DomPoint domPoint = fineElement->ConvertToDomain(fineRefPoint);
 						if (this->Contains(domPoint))
 						{
@@ -141,7 +146,7 @@ public:
 							return 0.0;
 					};
 
-					double integral = fineElement->Integral(functionToIntegrate); // use all quadrature points because it's not a polynomial
+					double integral = fineElement->Integral(finePhiCoarsePhi); // use all quadrature points because it's not a polynomial
 					fineCoarseMass(finePhi->LocalNumber, coarsePhi->LocalNumber) = integral;
 				}
 			}

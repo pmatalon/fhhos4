@@ -169,10 +169,13 @@ private:
 			// Step 3: Trace on the fine faces.                                    //
 			//---------------------------------------------------------------------//
 
+			CoarseningStrategy stgy = coarsePb->_mesh->ComesFrom.CS;
+			if (stgy == CoarseningStrategy::None)
+				stgy = finePb->_mesh->ComesFrom.CS;
 			ElementParallelLoop<Dim> parallelLoop(coarsePb->_mesh->Elements);
-			parallelLoop.Execute([](Element<Dim>* ce, ParallelChunk<CoeffsChunk>* chunk)
+			parallelLoop.Execute([stgy](Element<Dim>* ce, ParallelChunk<CoeffsChunk>* chunk)
 				{
-					ce->SetOverlappingFineElements();
+					ce->SetOverlappingFineElements(stgy);
 				});
 
 			SparseMatrix I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
