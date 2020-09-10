@@ -425,7 +425,7 @@ private:
 		}
 
 		if (e->IsOnBoundary())
-			FaceCollapsingStatus status = TryCollapseBoundaryFaces(e);
+			TryCollapseBoundaryFaces(e);
 
 		if (makeItThreadSafe)
 			e->Mutex.unlock();
@@ -682,7 +682,7 @@ private:
 		while (!remainingFineElements.empty())
 		{
 			ElementParallelLoop<Dim> parallelLoop(remainingFineElements);
-			parallelLoop.Execute([this, coarseMesh, &elementsAreAgglomerated](Element<Dim>* currentElem)
+			parallelLoop.Execute([this, coarseMesh](Element<Dim>* currentElem)
 				{
 					assert(!currentElem->CoarserElement);
 					Element<Dim>* coarseNeighbourForAggreg = this->FittestCoarseNeighbour(currentElem, CoarseningStrategy::AgglomerationCoarseningByClosestCenter);
@@ -695,7 +695,6 @@ private:
 						{
 							assert(!coarseNeighbourForAggreg->IsDeleted);
 							Element<Dim>* coarseElement = coarseMesh->AgglomerateFineElementToCoarse(currentElem, coarseNeighbourForAggreg);
-							elementsAreAgglomerated = true;
 						}
 						coarseNeighbourForAggreg->Mutex.unlock();
 					}
@@ -1412,6 +1411,7 @@ private:
 		
 		// Creation of the polygonal macro-element
 		Element<Dim>* newCoarseElement = CreateMacroElement(fineElement, coarseElement, facesToRemove);
+		newCoarseElement->Mutex.lock();
 		newCoarseElement->Id = this->NewElementId();
 		newCoarseElement->PhysicalPart = coarseElement->PhysicalPart;
 
@@ -1455,6 +1455,7 @@ private:
 		if (Dim == 2)
 			assert(newCoarseElement->Faces.size() == newCoarseElement->Vertices().size());
 
+		newCoarseElement->Mutex.unlock();
 		return newCoarseElement;
 	}
 
@@ -1597,7 +1598,7 @@ private:
 		}
 		else
 		{
-			if (!f->CoarseFace->Element2);
+			if (!f->CoarseFace->Element2)
 				f->CoarseFace->Element2 = macroElement;
 
 			assert(f->CoarseFace->Element1 != f->CoarseFace->Element2);
@@ -1671,6 +1672,7 @@ template<>
 Element<3>* PolyhedralMesh<3>::CreateMacroElement(Element<3>* e1, Element<3>* e2, vector<Face<3>*> facesToRemove)
 {
 	Utils::FatalError("Not implemented in 3D.");
+	return nullptr;
 }
 
 template<>
@@ -1686,6 +1688,7 @@ template<>
 Face<3>* PolyhedralMesh<3>::CreateMacroFace(Face<3>* f1, Face<3>* f2, Vertex* vertexToRemove)
 {
 	Utils::FatalError("Not implemented in 3D.");
+	return nullptr;
 }
 
 template <>
