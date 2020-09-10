@@ -42,7 +42,14 @@ public:
 	//   Virtual functions   //
 	//-----------------------//
 
-	virtual PhysicalShape<Dim>* Shape() const = 0;
+	virtual PhysicalShape<Dim>* Shape() const
+	{
+		if (this->IsDeleted)
+			Utils::FatalError("A method has been called on a deleted element!");
+		else
+			Utils::FatalError("The method Element.Shape() should be implemented in the subclass.");
+		return nullptr;
+	}
 
 	//---------------------------//
 	//   Geometric information   //
