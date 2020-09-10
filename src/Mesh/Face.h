@@ -17,6 +17,8 @@ public:
 	vector<Face<Dim>*> FinerFaces;
 	Face<Dim>* CoarseFace = nullptr;
 
+	mutex Mutex;
+	bool IsDeleted = false;
 public:
 	Face() { assert(false); }
 	Face(BigNumber number, Element<Dim>* element1, Element<Dim>* element2)
@@ -292,5 +294,8 @@ public:
 		Shape()->Serialize(os);
 	}
 
-	virtual ~Face() {}
+	virtual ~Face()
+	{
+		this->IsDeleted = true;
+	}
 };

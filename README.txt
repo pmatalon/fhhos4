@@ -7,6 +7,7 @@
 ## or install with Spack (Spack installation steps here: https://spack-tutorial.readthedocs.io/en/latest/tutorial_basics.html)
 
 > spack install cgal
+> module load boost-headers
 > module load cgal
 
 #### Use CMake to build the makefile

@@ -58,6 +58,8 @@ public:
 template <int Dim>
 class Mesh
 {
+private:
+	atomic<uint32_t> _currentElementId{ 0 };
 public:
 	vector<Vertex*> Vertices;
 	vector<Element<Dim>*> Elements;
@@ -74,6 +76,9 @@ public:
 	Mesh<Dim>* FineMesh = nullptr;
 	CoarseningStrategyDetails ComesFrom;
 
+	mutex MutexElements;
+	mutex MutexFaces;
+
 	static string MeshDirectory;
 
 	Mesh() {}
@@ -84,12 +89,44 @@ public:
 	virtual double H() = 0;
 	virtual double Regularity() = 0;
 
+	BigNumber NewElementId()
+	{
+		return _currentElementId++;
+	}
+
+	void AddElement(Element<Dim>* e)
+	{
+		MutexElements.lock();
+		if (e->Id == 0)
+			e->Id = this->NewElementId();
+		if (e->Number == -1 || e->Number == 0)
+			e->Number = this->Elements.size();
+		this->Elements.push_back(e);
+		MutexElements.unlock();
+	}
+
+	void RemoveElement(Element<Dim>* e)
+	{
+		e->IsDeleted = true;
+	}
+
+	void ReplaceAndDeleteElement(Element<Dim>* oldElement, Element<Dim>* newElement)
+	{
+		newElement->Number = oldElement->Number;
+		AddElement(newElement);
+		oldElement->IsDeleted = true;
+	}
+
 	void AddFace(Face<Dim>* f, bool addToBoundaryAndIteriorLists = true)
 	{
-		if (f->Number == -1)
+		MutexFaces.lock();
+
+		if (f->Number == -1 || f->Number == 0)
 			f->Number = this->Faces.size();
 
+		int s = this->Faces.size();
 		this->Faces.push_back(f);
+		assert(this->Faces.size() == s + 1);
 
 		if (addToBoundaryAndIteriorLists)
 		{
@@ -98,24 +135,13 @@ public:
 			else
 				this->InteriorFaces.push_back(f);
 		}
-	}
 
-	void RemoveElement(Element<Dim>* e)
-	{
-		BigNumber iToRemove = e->Number;
-		assert(this->Elements[iToRemove] == e);
-		this->Elements.erase(this->Elements.begin() + e->Number);
-		for (int i = iToRemove; i < this->Elements.size(); i++)
-			this->Elements[i]->Number = i;
+		MutexFaces.unlock();
 	}
 
 	void RemoveFace(Face<Dim>* f, bool removeFromBoundaryAndIteriorLists = true)
 	{
-		BigNumber iToRemove = f->Number;
-		assert(this->Faces[iToRemove] == f);
-		this->Faces.erase(this->Faces.begin() + f->Number);
-		for (int i = iToRemove; i < this->Faces.size(); i++)
-			this->Faces[i]->Number = i;
+		f->IsDeleted = true;
 
 		if (removeFromBoundaryAndIteriorLists)
 		{
@@ -140,6 +166,36 @@ public:
 				this->InteriorFaces.erase(this->InteriorFaces.begin() + i);
 			}
 		}
+	}
+
+	void FinalizeCreation()
+	{
+		vector<Element<Dim>*> tmpElements(this->Elements.begin(), this->Elements.end());
+		this->Elements.clear();
+		for (Element<Dim>* e : tmpElements)
+		{
+			if (e->IsDeleted)
+				delete e;
+			else
+				this->Elements.push_back(e);
+		}
+
+		vector<Face<Dim>*> tmpFaces(this->Faces.begin(), this->Faces.end());
+		this->Faces.clear();
+		for (Face<Dim>* f : tmpFaces)
+		{
+			if (f->IsDeleted)
+				delete f;
+			else
+				this->Faces.push_back(f);
+		}
+
+		BigNumber number = 0;
+		for (Element<Dim>* e : this->Elements)
+			e->Number = number++;
+		number = 0;
+		for (Face<Dim>* f : this->Faces)
+			f->Number = number++;
 	}
 
 	double SkeletonMeasure()
@@ -248,6 +304,7 @@ protected:
 
 	virtual void FinalizeCoarsening()
 	{
+		CoarseMesh->FinalizeCreation();
 		CoarseMesh->FillBoundaryAndInteriorFaceLists();
 		CoarseMesh->FillDirichletAndNeumannFaceLists();
 	}
@@ -371,10 +428,16 @@ public:
 		for (auto e : this->Elements)
 			e->UnitTests();
 
+		for (auto f : this->Faces)
+			assert(!f->IsDeleted);
+
 		for (auto e : this->Elements)
 		{
+			assert(!e->IsDeleted);
 			for (auto f : e->Faces)
 			{
+				assert(!f->IsDeleted);
+
 				auto n = e->OuterNormalVector(f);
 
 				auto neighbour = f->GetNeighbour(e);
@@ -428,7 +491,7 @@ public:
 		}
 
 		assert(this->BoundaryFaces.size() + this->InteriorFaces.size() == this->Faces.size() && "Boundary faces + interior faces does NOT add up to the total number of faces.");
-		
+				
 		if (CoarseMesh)
 		{
 			CoarseMesh->SanityCheck();

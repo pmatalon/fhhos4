@@ -1,7 +1,7 @@
 #pragma once
-#include <vector>
 #include <map>
 #include <set>
+#include <mutex>
 #include "Vertex.h"
 #include "../Geometry/PhysicalShape.h"
 #include "../Problem/DiffusionField.h"
@@ -18,7 +18,7 @@ class Element
 private:
 	map<Face<Dim>*, int> _facesLocalNumbering;
 public:
-	BigNumber Id;
+	BigNumber Id = 0;
 	BigNumber Number;
 	vector<Face<Dim>*> Faces;
 
@@ -30,6 +30,8 @@ public:
 	vector<Face<Dim>*> FinerFacesRemoved;
 	vector<Element<Dim>*> OverlappingFineElements; // Used for non-nested meshes. It contains at least FinerElements.
 
+	mutex Mutex;
+	bool IsDeleted = false;
 
 	Element(BigNumber number)
 	{
@@ -280,7 +282,7 @@ public:
 		set<Element<Dim>*> neighbours;
 		for (Face<Dim>* f : this->Faces)
 		{
-			if (f->IsDomainBoundary)
+			if (f->IsDomainBoundary || f->IsDeleted)
 				continue;
 			Element<Dim>* neighbour = f->GetNeighbour(this);
 			if (neighbour) // no neighbour might be affected yet
@@ -470,7 +472,10 @@ public:
 		return os;
 	}
 
-	virtual ~Element() {}
+	virtual ~Element()
+	{ 
+		this->IsDeleted = true;
+	}
 
 	//-------------------------------------------------------------------//
 	//                            Unit tests                             //

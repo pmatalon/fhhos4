@@ -379,23 +379,56 @@ private:
 	//-------------------------------------------------------------------------------------------------------------------------//
 	// Browse the neighbours: if the interface with one of them is made of multiple faces, they're collapsed into a single one //
 	//-------------------------------------------------------------------------------------------------------------------------//
-	void TryCollapseInterfacesMadeOfMultipleFaces(Element<Dim>* e)
+	void TryCollapseInterfacesMadeOfMultipleFaces(Element<Dim>* e, bool makeItThreadSafe = false)
 	{
+		if (makeItThreadSafe && !e->Mutex.try_lock())
+			return;
+
+		bool retryIfElementChanges = false;
+			
 		for (Element<Dim>* n : e->Neighbours())
 		{
+			if (makeItThreadSafe && !n->Mutex.try_lock())
+				continue;
+
 			FaceCollapsingStatus status = TryCollapseInterfaceBetween(e, n);
-			if (status == FaceCollapsingStatus::ElementFullDegeneration || status == FaceCollapsingStatus::OneElementEmbeddedInConvexHullOfTheOther)
+			if (status == FaceCollapsingStatus::Ok && retryIfElementChanges)
+			{
+				if (makeItThreadSafe)
+				{
+					e->Mutex.unlock();
+					n->Mutex.unlock();
+				}
+				TryCollapseInterfacesMadeOfMultipleFaces(e, makeItThreadSafe);
+				return;
+			}
+			else if (status == FaceCollapsingStatus::ElementFullDegeneration || status == FaceCollapsingStatus::OneElementEmbeddedInConvexHullOfTheOther)
 			{
 				// We can't collpase the faces, otherwise one element will degenerate. Agglomerating the elements instead.
 				Element<Dim>* newE = Agglomerate(e, n);
-				TryCollapseInterfacesMadeOfMultipleFaces(newE);
+				if (makeItThreadSafe)
+				{
+					e->Mutex.unlock();
+					n->Mutex.unlock();
+				}
+				TryCollapseInterfacesMadeOfMultipleFaces(newE, makeItThreadSafe);
 				return;
 			}
+			else if (status == FaceCollapsingStatus::CrossedPolygon || status == FaceCollapsingStatus::ElementPartialDegeneration)
+			{
+				retryIfElementChanges = true;
+			}
 			// Any other failing status, abort the collapsing.
+
+			if (makeItThreadSafe)
+				n->Mutex.unlock();
 		}
 
 		if (e->IsOnBoundary())
 			FaceCollapsingStatus status = TryCollapseBoundaryFaces(e);
+
+		if (makeItThreadSafe)
+			e->Mutex.unlock();
 	}
 
 	FaceCollapsingStatus TryCollapseInterfaceBetween(Element<Dim>* e1, Element<Dim>* e2)
@@ -403,7 +436,7 @@ private:
 		vector<Face<Dim>*> interfaceFaces = e1->InterfaceWith(e2);
 
 		if (interfaceFaces.size() == 1)
-			return FaceCollapsingStatus::Ok;
+			return FaceCollapsingStatus::NotEnoughFaces;
 
 		if (e1->IsInSamePhysicalPartAs(e2))
 			return TryCollapse(interfaceFaces);
@@ -420,7 +453,7 @@ private:
 	{
 		vector<Face<Dim>*> boundaryFaces = e->BoundaryFaces();
 		if (boundaryFaces.size() < 2)
-			return FaceCollapsingStatus::Ok;
+			return FaceCollapsingStatus::NotEnoughFaces;
 
 		// Collapse only collinear faces
 		Interface<Dim> interf(boundaryFaces);
@@ -583,55 +616,115 @@ private:
 		this->InitializeCoarsening(coarseMesh);
 		coarseMesh->ComesFrom.CS = CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours;
 
-		for (Element<Dim>* currentElem : this->Elements)
+		// Element agglomeration, 1st pass
+		// Agglomerate fine elements together
+
+		vector<Element<Dim>*> remainingFineElements = this->Elements;
+		random_shuffle(remainingFineElements.begin(), remainingFineElements.end());
+		//cout << "\t" << remainingFineElements.size() << " fine elements to coarsen" << endl;
+
+		bool elementsAreAgglomerated = true;
+		while (elementsAreAgglomerated)
 		{
-			if (currentElem->CoarserElement)
-				continue;
+			elementsAreAgglomerated = false;
+			ElementParallelLoop<Dim> parallelLoop(remainingFineElements);
+			parallelLoop.Execute([this, coarseMesh, &elementsAreAgglomerated](Element<Dim>* currentElem)
+				{
+					if (currentElem->CoarserElement)
+						return;
 
-			vector<Element<Dim>*> availableNeighbours = AvailableFaceNeighbours(currentElem);
+					if (!currentElem->Mutex.try_lock())
+						return;
 
-			if (availableNeighbours.size() > 0)
+					// Lock neighbours
+					vector<Element<Dim>*> availableNeighbours = LockAvailableFaceNeighbours(currentElem);
+					if (availableNeighbours.empty())
+					{
+						currentElem->Mutex.unlock();
+						return;
+					}
+
+					// Agglomeration
+					availableNeighbours.push_back(currentElem);
+					Element<Dim>* coarseElement = coarseMesh->AgglomerateFineElements(availableNeighbours);
+					elementsAreAgglomerated = true;
+
+					for (Element<Dim>* neighbour : availableNeighbours)
+						neighbour->Mutex.unlock();
+				});
+
+			// Face collapsing
+			ElementParallelLoop<Dim> parallelLoopCollapseFaces(coarseMesh->Elements);
+			parallelLoopCollapseFaces.Execute([coarseMesh](Element<Dim>* coarseElement)
+				{
+					if (!coarseElement->IsDeleted)
+						coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(coarseElement, true);
+				});
+
+			if (elementsAreAgglomerated)
 			{
-				availableNeighbours.push_back(currentElem);
-				Element<Dim>* coarseElement = coarseMesh->AgglomerateFineElements(availableNeighbours);
-				coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(coarseElement);
-			}
-			else
-			{
-				Element<Dim>* coarseNeighbourForAggreg = this->FittestCoarseNeighbour(currentElem, CoarseningStrategy::AgglomerationCoarseningByClosestCenter);
-				if (!coarseNeighbourForAggreg)
-					Utils::FatalError("Element cannot be aggregated. Weird...");
-
-				Element<Dim>* coarseElement = coarseMesh->AgglomerateFineElementToCoarse(currentElem, coarseNeighbourForAggreg);
-				coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(coarseElement);
+				RemoveCoarsenedElements(remainingFineElements);
+				//cout << "\t" << remainingFineElements.size() << " fine elements to coarsen" << endl;
 			}
 		}
 
-		list<Face<Dim>*> uncoarsenedFaces;
+		for (Element<Dim>* coarseElement : coarseMesh->Elements)
+		{
+			if (!coarseElement->IsDeleted)
+				coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(coarseElement);
+		}
+
+		// Element agglomeration, 2nd pass
+		// Agglomerate the remaining fine elements with their closest coarse neighbour
+
+		//cout << "\t" << remainingFineElements.size() << " to agglomerate with coarse elements" << endl;
+
+		while (!remainingFineElements.empty())
+		{
+			ElementParallelLoop<Dim> parallelLoop(remainingFineElements);
+			parallelLoop.Execute([this, coarseMesh, &elementsAreAgglomerated](Element<Dim>* currentElem)
+				{
+					assert(!currentElem->CoarserElement);
+					Element<Dim>* coarseNeighbourForAggreg = this->FittestCoarseNeighbour(currentElem, CoarseningStrategy::AgglomerationCoarseningByClosestCenter);
+					if (!coarseNeighbourForAggreg)
+						Utils::FatalError("Element cannot be aggregated. Weird...");
+
+					if (coarseNeighbourForAggreg->Mutex.try_lock())
+					{
+						if (!coarseNeighbourForAggreg->IsDeleted)
+						{
+							assert(!coarseNeighbourForAggreg->IsDeleted);
+							Element<Dim>* coarseElement = coarseMesh->AgglomerateFineElementToCoarse(currentElem, coarseNeighbourForAggreg);
+							elementsAreAgglomerated = true;
+						}
+						coarseNeighbourForAggreg->Mutex.unlock();
+					}
+				});
+
+			ElementParallelLoop<Dim> parallelLoopCollapseFaces(remainingFineElements);
+			parallelLoopCollapseFaces.Execute([coarseMesh](Element<Dim>* fineElement)
+				{
+					if (fineElement->CoarserElement)
+						coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(fineElement->CoarserElement, true);
+				});
+
+			RemoveCoarsenedElements(remainingFineElements);
+			//cout << "\t" << remainingFineElements.size() << " fine elements to coarsen" << endl;
+		}
+
+		for (Element<Dim>* coarseElement : coarseMesh->Elements)
+		{
+			if (!coarseElement->IsDeleted)
+				coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(coarseElement);
+		}
+
+		/*list<Face<Dim>*> uncoarsenedFaces;
 		for (Face<Dim>* f : this->Faces)
 		{
-			if (!f->IsDomainBoundary && !f->IsRemovedOnCoarserGrid && !f->HasBeenCoarsened())
+			if (!f->IsDeleted && !f->IsRemovedOnCoarserGrid && !f->HasBeenCoarsened())
 				uncoarsenedFaces.push_back(f);
 		}
-
-		/*cout << uncoarsenedFaces.size() << " faces not removed or coarsened remain." << endl;
-
-		typename list<Face<Dim>*>::iterator it = uncoarsenedFaces.begin();
-		while (it != uncoarsenedFaces.end())
-		{
-			Face<Dim>* f = *it;
-			if (f->IsRemovedOnCoarserGrid || f->HasBeenCoarsened())
-				uncoarsenedFaces.erase(it);
-			else
-			{
-				TryCollapseInterfaceBetween(f->Element1, f->Element2);
-				if (interfaceHasBeenCollapsed)
-					uncoarsenedFaces.erase(it);
-			}
-			it++;
-		}*/
-
-		cout << uncoarsenedFaces.size() << " faces not removed or coarsened remain (out of " << this->Faces.size() << " faces)." << endl;
+		cout << (uncoarsenedFaces.size()*100) / this->Faces.size() << "% unchanged faces." << endl;*/
 
 		this->FinalizeCoarsening();
 	}
@@ -851,8 +944,7 @@ private:
 			macroElement->FinerFacesRemoved.push_back(f);
 
 		// Add macro-element to the list
-		macroElement->Number = this->Elements.size();
-		this->Elements.push_back(macroElement);
+		this->AddElement(macroElement);
 
 		return macroElement;
 	}
@@ -981,6 +1073,14 @@ private:
 	//                                      //
 	//--------------------------------------//
 
+	void RemoveCoarsenedElements(vector<Element<Dim>*>& list)
+	{
+		vector<Element<Dim>*> uncoarsened;
+		uncoarsened.reserve(list.size());
+		copy_if(list.begin(), list.end(), back_inserter(uncoarsened), [](Element<Dim>* e) { return !e->CoarserElement; });
+		list = uncoarsened;
+	}
+
 	vector<Element<Dim>*> AvailableFaceNeighbours(Element<Dim>* elem)
 	{
 		vector<Element<Dim>*> availableNeighbours;
@@ -988,6 +1088,20 @@ private:
 		{
 			if (n->IsInSamePhysicalPartAs(elem) && !n->CoarserElement)
 				availableNeighbours.push_back(n);
+		}
+
+		return availableNeighbours;
+	}
+
+	vector<Element<Dim>*> LockAvailableFaceNeighbours(Element<Dim>* elem)
+	{
+		vector<Element<Dim>*> availableNeighbours;
+		for (Element<Dim>* n : elem->Neighbours())
+		{
+			if (n->IsInSamePhysicalPartAs(elem) && !n->CoarserElement && n->Mutex.try_lock())
+			{
+				availableNeighbours.push_back(n);
+			}
 		}
 
 		return availableNeighbours;
@@ -1172,8 +1286,7 @@ private:
 		}
 
 		// Add coarse element to the list
-		coarseElement->Number = this->Elements.size();
-		this->Elements.push_back(coarseElement);
+		this->AddElement(coarseElement);
 
 		// Kept faces are cloned for the coarse mesh and linked to their clones and the coarse element.
 		for (Face<Dim>* f : facesToClone)
@@ -1212,8 +1325,7 @@ private:
 		}
 
 		// Add coarse element to the list
-		coarseElement->Number = this->Elements.size();
-		this->Elements.push_back(coarseElement);
+		this->AddElement(coarseElement);
 
 		// Kept faces are cloned for the coarse mesh and linked to their clones and the coarse element.
 		for (Face<Dim>* f : agglo.Faces)
@@ -1248,7 +1360,6 @@ private:
 				coarseElement->FinerFacesRemoved.push_back(f);
 				coarseElement->RemoveFace(f->CoarseFace);
 				this->RemoveFace(f->CoarseFace, false);
-				delete f->CoarseFace;
 				f->CoarseFace = nullptr;
 			}
 			else // Kept faces are cloned for the coarse mesh and linked to their clones and the coarse element.
@@ -1301,6 +1412,7 @@ private:
 		
 		// Creation of the polygonal macro-element
 		Element<Dim>* newCoarseElement = CreateMacroElement(fineElement, coarseElement, facesToRemove);
+		newCoarseElement->Id = this->NewElementId();
 		newCoarseElement->PhysicalPart = coarseElement->PhysicalPart;
 
 		// Links between the macro element and the fine elements
@@ -1328,17 +1440,12 @@ private:
 		{
 			ff->IsRemovedOnCoarserGrid = true;
 			newCoarseElement->FinerFacesRemoved.push_back(ff);
-
-			// Remove f->CoarseFace from this->Faces
 			this->RemoveFace(ff->CoarseFace, false);
-			delete ff->CoarseFace;
 			ff->CoarseFace = nullptr;
 		}
 
 		// Delete the old coarse element and replace it with the new one
-		newCoarseElement->Number = coarseElement->Number;
-		delete coarseElement;
-		this->Elements[newCoarseElement->Number] = newCoarseElement;
+		this->ReplaceAndDeleteElement(coarseElement, newCoarseElement);
 
 		// Kept faces are cloned for the coarse mesh and linked to their clones and the coarse element.
 		for (Face<Dim>* ff : facesToClone)
@@ -1361,6 +1468,7 @@ private:
 	{
 		Agglo<Dim> agglo(elements);
 		Element<Dim>* newElement = CreatePolyhedron(agglo.Vertices());
+		newElement->Id = this->NewElementId();
 		newElement->PhysicalPart = elements[0]->PhysicalPart;
 
 		for (Element<Dim>* e : elements)
@@ -1395,9 +1503,7 @@ private:
 		newElement->Faces = agglo.Faces;
 
 		// Replace the first element with the new one
-		newElement->Number = elements[0]->Number;
-		this->Elements[newElement->Number] = newElement;
-		delete elements[0];
+		this->ReplaceAndDeleteElement(elements[0], newElement);
 		// ... and remove the others
 		for (int i = 1; i < elements.size(); i++)
 			this->RemoveElement(elements[i]);
@@ -1467,10 +1573,7 @@ private:
 
 		// Remove the faces from the mesh
 		for (Face<Dim>* f : faces)
-		{
 			this->RemoveFace(f, false);
-			delete f;
-		}
 
 		// Add mergedFace to the list
 		this->AddFace(mergedFace, false);
@@ -1478,6 +1581,7 @@ private:
 
 	void CloneAndAddFace(Face<Dim>* f, Element<Dim>* macroElement)
 	{
+		f->Mutex.lock();
 		if (!f->CoarseFace) // this face has not already been created by a previous aggregation
 		{
 			// Clone face
@@ -1493,12 +1597,43 @@ private:
 		}
 		else
 		{
-			assert(f->CoarseFace->Element2 == nullptr);
-			f->CoarseFace->Element2 = macroElement;
+			if (!f->CoarseFace->Element2);
+				f->CoarseFace->Element2 = macroElement;
 
 			assert(f->CoarseFace->Element1 != f->CoarseFace->Element2);
 		}
+		f->Mutex.unlock();
 		macroElement->AddFace(f->CoarseFace);
+	}
+
+public:
+	virtual void SanityCheck() override
+	{
+		Mesh<Dim>::SanityCheck();
+
+		if (this->ComesFrom.CS == CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
+		{
+			for (Element<Dim>* e : this->Elements)
+			{
+				for (Element<Dim>* n : e->Neighbours())
+				{
+					if (e->PhysicalPart == n->PhysicalPart/* && e->Faces.size() > 3 && n->Faces.size() > 3*/)
+					{
+						auto faces = e->InterfaceWith(n);
+						if (faces.size() != 1)
+						{
+							FaceCollapsingStatus status = TryCollapseInterfaceBetween(e, n);
+							if (status == FaceCollapsingStatus::Ok)
+							{
+								e->ExportToMatlab("r");
+								n->ExportToMatlab("m");
+								assert(faces.size() == 1 && "After face collapsing, neighbours in the same physical part should have only one face in common.");
+							}
+						}
+					}
+				}
+			}
+		}
 	}
 
 	//-----------------------------------------------//

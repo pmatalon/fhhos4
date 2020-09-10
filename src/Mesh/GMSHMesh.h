@@ -285,7 +285,7 @@ private:
 						mv->Elements.push_back(e);
 					}
 
-					this->Elements.push_back(e);
+					this->AddElement(e);
 					elemNumber++;
 
 					if (e->Diameter() > this->_h)
