@@ -95,7 +95,7 @@ protected:
 	}
 
 	// Dim-specific functions
-	virtual Element<Dim>* CreateElement(int elemType, size_t elementTag, const vector<size_t>& elementNodes, size_t& elemNodeIndex, BigNumber elemNumber) { return nullptr; }
+	virtual Element<Dim>* CreateElement(int elemType, size_t elementTag, const vector<size_t>& elementNodes, size_t& elemNodeIndex) { return nullptr; }
 	void CreateFaces(int elemType, BigNumber& faceNumber) { }
 	virtual Face<Dim>* GetBoundaryFaceFromGMSHNodes(int faceType, const vector<size_t>& faceNodes, size_t& faceNodeIndex) { return nullptr; }
 
@@ -204,6 +204,7 @@ private:
 		// If .geo file, the mesh hasn't been generated
 		if (nodeTags.empty())
 		{
+			cout << "Generating the mesh by GMSH..." << endl;
 			gmsh::model::mesh::generate(Dim); // mesh generation
 			gmsh::model::mesh::getNodes(nodeTags, coord, parametricCoord, Dim, -1, includeBoundary, returnParametricCoord);
 			if (nodeTags.empty())
@@ -212,6 +213,8 @@ private:
 				exit(EXIT_FAILURE);
 			}
 		}
+
+		cout << "Building internal mesh objects..." << endl;
 
 		this->Vertices.reserve(nodeTags.size());
 		BigNumber vertexNumber = 0;
@@ -231,7 +234,6 @@ private:
 		//----------//
 
 		vector<int> elementTypes;
-		BigNumber elemNumber = 0;
 
 		// Get entities (surfaces in 2D, volumes in 3D). For simple geometries, entities corresponds to physical groups.
 		gmsh::vectorpair entitiesDimTags;
@@ -266,35 +268,56 @@ private:
 			vector<vector<size_t>> elemNodeTags;
 			gmsh::model::mesh::getElements(elementTypes, elementTags, elemNodeTags, Dim, entityTag);
 
-			for (int i = 0; i < elementTypes.size(); i++)
+			struct ChunkResult
 			{
-				int elemType = elementTypes[i];
-				vector<size_t> elements = elementTags[i];
-				vector<size_t> elementNodes = elemNodeTags[i];
+				vector<Element<Dim>*> Elements;
+				double h = -1;
+				double regularity = 2;
+			};
 
-				size_t elemNodeIndex = 0;
-				for (size_t j = 0; j < elements.size(); j++)
+			NumberParallelLoop<ChunkResult> parallelLoop(elementTypes.size());
+			parallelLoop.Execute([this, &elementTypes, &elementTags, &elemNodeTags, physicalPart](BigNumber i, ParallelChunk<ChunkResult>* chunk)
 				{
-					Element<Dim>* e = CreateElement(elemType, elements[j], elementNodes, elemNodeIndex, elemNumber);
+					int elemType = elementTypes[i];
+					vector<size_t> elements = elementTags[i];
+					vector<size_t> elementNodes = elemNodeTags[i];
 
-					e->PhysicalPart = physicalPart;
-
-					for (Vertex* v : e->Vertices())
+					size_t elemNodeIndex = 0;
+					for (size_t j = 0; j < elements.size(); j++)
 					{
-						MeshVertex<Dim>* mv = (MeshVertex<Dim>*)v;
-						mv->Elements.push_back(e);
+						Element<Dim>* e = CreateElement(elemType, elements[j], elementNodes, elemNodeIndex);
+
+						e->PhysicalPart = physicalPart;
+
+						for (Vertex* v : e->Vertices())
+						{
+							MeshVertex<Dim>* mv = (MeshVertex<Dim>*)v;
+							mv->Mutex.lock();
+							mv->Elements.push_back(e);
+							mv->Mutex.unlock();
+						}
+
+						chunk->Results.Elements.push_back(e);
+
+						if (e->Diameter() > chunk->Results.h)
+							chunk->Results.h = e->Diameter();
+
+						if (e->Regularity() < chunk->Results.regularity)
+							chunk->Results.regularity = e->Regularity();
 					}
+				});
+			
+			parallelLoop.AggregateChunkResults([this](ChunkResult& chunk)
+				{
+					for (Element<Dim>* e : chunk.Elements)
+						this->AddElement(e, false);
 
-					this->AddElement(e);
-					elemNumber++;
+					if (chunk.h > this->_h)
+						this->_h = chunk.h;
 
-					if (e->Diameter() > this->_h)
-						this->_h = e->Diameter();
-
-					if (e->Regularity() < this->_regularity)
-						this->_regularity = e->Regularity();
-				}
-			}
+					if (chunk.h < this->_regularity)
+						this->_regularity = chunk.h;
+				});
 		}
 
 		//-----------//
@@ -316,7 +339,6 @@ private:
 			gmsh::model::getEntities(faceEntitiesDimTags, Dim - 1);
 
 			vector<int> faceTypes;
-			int nFaces = 0;
 			for (int k = 0; k < faceEntitiesDimTags.size(); k++)
 			{
 				int entityTag = faceEntitiesDimTags[k].second;
@@ -731,7 +753,7 @@ public:
 //-------------//
 
 template <>
-Element<2>* GMSHMesh<2>::CreateElement(int elemType, size_t elementTag, const vector<size_t>& elementNodes, size_t& elemNodeIndex, BigNumber elemNumber)
+Element<2>* GMSHMesh<2>::CreateElement(int elemType, size_t elementTag, const vector<size_t>& elementNodes, size_t& elemNodeIndex)
 { 
 	Element<2>* e = nullptr;
 	if (elemType == GMSH_Quadrilateral)
@@ -741,7 +763,7 @@ Element<2>* GMSHMesh<2>::CreateElement(int elemType, size_t elementTag, const ve
 		size_t nodeTag3 = elementNodes[elemNodeIndex + 2];
 		size_t nodeTag4 = elementNodes[elemNodeIndex + 3];
 
-		e = new QuadrilateralElement(elemNumber, GetVertexFromGMSHTag(nodeTag1), GetVertexFromGMSHTag(nodeTag2), GetVertexFromGMSHTag(nodeTag3), GetVertexFromGMSHTag(nodeTag4));
+		e = new QuadrilateralElement(0, GetVertexFromGMSHTag(nodeTag1), GetVertexFromGMSHTag(nodeTag2), GetVertexFromGMSHTag(nodeTag3), GetVertexFromGMSHTag(nodeTag4));
 		_elementExternalNumbers.insert({ elementTag, e });
 		elemNodeIndex += 4;
 	}
@@ -751,7 +773,7 @@ Element<2>* GMSHMesh<2>::CreateElement(int elemType, size_t elementTag, const ve
 		size_t nodeTag2 = elementNodes[elemNodeIndex + 1];
 		size_t nodeTag3 = elementNodes[elemNodeIndex + 2];
 
-		e = new TriangularElement(elemNumber, GetVertexFromGMSHTag(nodeTag1), GetVertexFromGMSHTag(nodeTag2), GetVertexFromGMSHTag(nodeTag3));
+		e = new TriangularElement(0, GetVertexFromGMSHTag(nodeTag1), GetVertexFromGMSHTag(nodeTag2), GetVertexFromGMSHTag(nodeTag3));
 		_elementExternalNumbers.insert({ elementTag, e });
 		elemNodeIndex += 3;
 	}
@@ -767,7 +789,7 @@ Element<2>* GMSHMesh<2>::CreateElement(int elemType, size_t elementTag, const ve
 //-------------//
 
 template <>
-Element<3>* GMSHMesh<3>::CreateElement(int elemType, size_t elementTag, const vector<size_t>& elementNodes, size_t& elemNodeIndex, BigNumber elemNumber)
+Element<3>* GMSHMesh<3>::CreateElement(int elemType, size_t elementTag, const vector<size_t>& elementNodes, size_t& elemNodeIndex)
 {
 	Element<3>* e = nullptr;
 	if (elemType == GMSH_Tetrahedron)
@@ -777,7 +799,7 @@ Element<3>* GMSHMesh<3>::CreateElement(int elemType, size_t elementTag, const ve
 		size_t nodeTag3 = elementNodes[elemNodeIndex + 2];
 		size_t nodeTag4 = elementNodes[elemNodeIndex + 3];
 
-		e = new TetrahedralElement(elemNumber, GetVertexFromGMSHTag(nodeTag1), GetVertexFromGMSHTag(nodeTag2), GetVertexFromGMSHTag(nodeTag3), GetVertexFromGMSHTag(nodeTag4));
+		e = new TetrahedralElement(0, GetVertexFromGMSHTag(nodeTag1), GetVertexFromGMSHTag(nodeTag2), GetVertexFromGMSHTag(nodeTag3), GetVertexFromGMSHTag(nodeTag4));
 		_elementExternalNumbers.insert({ elementTag, e });
 		elemNodeIndex += 4;
 	}
@@ -801,7 +823,7 @@ Element<3>* GMSHMesh<3>::CreateElement(int elemType, size_t elementTag, const ve
 		Vertex* frontRightBottomCorner = v3;
 		Vertex* frontRightTopCorner = v4;
 
-		e = new ParallelepipedElement(elemNumber, backLeftBottomCorner, frontLeftBottomCorner, backRightBottomCorner, backLeftTopCorner, frontLeftTopCorner, backRightTopCorner, frontRightBottomCorner, frontRightTopCorner);
+		e = new ParallelepipedElement(0, backLeftBottomCorner, frontLeftBottomCorner, backRightBottomCorner, backLeftTopCorner, frontLeftTopCorner, backRightTopCorner, frontRightBottomCorner, frontRightTopCorner);
 		_elementExternalNumbers.insert({ elementTag, e });
 		elemNodeIndex += 8;
 	}

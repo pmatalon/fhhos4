@@ -32,6 +32,8 @@ public:
 	vector<Element<Dim>*> Elements;
 	vector<Face<Dim>*> Faces;
 
+	mutex Mutex;
+
 	MeshVertex(BigNumber number, double x) : Vertex(number, x) {}
 	MeshVertex(BigNumber number, double x, double y) : Vertex(number, x, y) {}
 	MeshVertex(BigNumber number, double x, double y, double z) : Vertex(number, x, y, z) {}
@@ -94,15 +96,19 @@ public:
 		return _currentElementId++;
 	}
 
-	void AddElement(Element<Dim>* e)
+	void AddElement(Element<Dim>* e, bool lock = true)
 	{
-		MutexElements.lock();
+		if (lock)
+			MutexElements.lock();
+
 		if (e->Id == 0)
 			e->Id = this->NewElementId();
 		if (e->Number == -1 || e->Number == 0)
 			e->Number = this->Elements.size();
 		this->Elements.push_back(e);
-		MutexElements.unlock();
+
+		if (lock)
+			MutexElements.unlock();
 	}
 
 	void RemoveElement(Element<Dim>* e)
