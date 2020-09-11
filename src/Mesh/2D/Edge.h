@@ -9,10 +9,10 @@ private:
 	Segment* _shape;
 public:
 
-	Edge(BigNumber number, Vertex* v1, Vertex* v2, Element<2>* element1, Element<2>* element2) : 
+	Edge(BigNumber number, Vertex* v1, Vertex* v2, Element<2>* element1, Element<2>* element2) :
+		Face(number, element1, element2),
 		Diff_DGFace(number, element1, element2),
-		Diff_HHOFace(number, element1, element2),
-		Face(number, element1, element2)
+		Diff_HHOFace(number, element1, element2)
 	{
 		_shape = new Segment(v1, v2);
 	}

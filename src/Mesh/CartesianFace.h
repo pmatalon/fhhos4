@@ -28,9 +28,9 @@ public:
 
 private:
 	CartesianFace(BigNumber number, Element<Dim>* element1, Element<Dim>* element2, CartesianShape<Dim, Dim - 1>* shape) :
+		Face<Dim>(number, element1, element2),
 		Diff_DGFace<Dim>(number, element1, element2),
-		Diff_HHOFace<Dim>(number, element1, element2),
-		Face<Dim>(number, element1,  element2)
+		Diff_HHOFace<Dim>(number, element1, element2)
 	{
 		_shape = new CartesianShape<Dim, Dim - 1>(*shape);
 	}

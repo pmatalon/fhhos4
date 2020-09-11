@@ -8,7 +8,7 @@ using namespace std;
 class LowerTriangle : public TriangularElement
 {
 public:
-	LowerTriangle(int number, Vertex* v1, Vertex* v2, Vertex* v3) : TriangularElement(number, v1, v2, v3), Element(number) {}
+	LowerTriangle(int number, Vertex* v1, Vertex* v2, Vertex* v3) : Element(number), TriangularElement(number, v1, v2, v3) {}
 
 	Edge* GetEdge(Vertex* v1, Vertex* v2)
 	{
@@ -29,7 +29,7 @@ public:
 class UpperTriangle : public TriangularElement
 {
 public:
-	UpperTriangle(int number, Vertex* v1, Vertex* v2, Vertex* v3) : TriangularElement(number, v1, v2, v3), Element(number) {}
+	UpperTriangle(int number, Vertex* v1, Vertex* v2, Vertex* v3) : Element(number), TriangularElement(number, v1, v2, v3) {}
 
 	Edge* GetEdge(Vertex* v1, Vertex* v2)
 	{

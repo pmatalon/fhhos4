@@ -10,9 +10,9 @@ private:
 public:
 
 	TriangularFace(BigNumber number, Vertex* v1, Vertex* v2, Vertex* v3, Element<3>* element1, Element<3>* element2) :
+		Face(number, element1, element2),
 		Diff_DGFace(number, element1, element2),
-		Diff_HHOFace(number, element1, element2),
-		Face(number, element1, element2)
+		Diff_HHOFace(number, element1, element2)
 	{
 		_shape = new TriangleIn3D(v1, v2, v3);
 	}

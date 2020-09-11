@@ -208,7 +208,7 @@ public:
 			return this->Element2;
 		else if (element == this->Element2)
 			return this->Element1;
-		return NULL;
+		return nullptr;
 	}
 
 	int LocalNumberOf(Face<Dim>* finerFace)
