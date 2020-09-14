@@ -114,7 +114,7 @@ public:
 		assert(false && "To be implemented in subclasses");
 	}
 
-	bool IsIn(vector<PhysicalShape<Dim>*> list)
+	bool IsIn(const vector<PhysicalShape<Dim>*>& list)
 	{
 		for (PhysicalShape<Dim>* s : list)
 		{

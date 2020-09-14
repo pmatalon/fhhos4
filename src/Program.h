@@ -199,7 +199,7 @@ public:
 			{
 				Diffusion_HHO<Dim>* hhoPb = static_cast<Diffusion_HHO<Dim>*>(problem);
 
-				if (args.Actions.ExportSolutionVectors || args.Actions.ExportSolutionToGMSH)
+				if (args.Actions.ExportSolutionVectors || args.Actions.ExportSolutionToGMSH || testCase->ExactSolution)
 				{
 					cout << "----------------------------------------------------------" << endl;
 					cout << "-                     Post-processing                    -" << endl;

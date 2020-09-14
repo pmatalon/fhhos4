@@ -57,7 +57,7 @@ public:
 	}
 
 private:
-	virtual void RemoveIntersections(vector<Face<Dim>*> faces, Face<Dim>* mergedFace) override
+	virtual void RemoveIntersections(const vector<Face<Dim>*>& faces, Face<Dim>* mergedFace) override
 	{
 		assert(false);
 	}
@@ -103,7 +103,7 @@ DimVector<3> AgglomerateElement<3>::OuterNormalVector(Face<3>* face) const
 }
 
 template<>
-void AgglomerateElement<2>::RemoveIntersections(vector<Face<2>*> oldFaces, Face<2>* newFace)
+void AgglomerateElement<2>::RemoveIntersections(const vector<Face<2>*>& oldFaces, Face<2>* newFace)
 {
 	// Identification of the vertices to remove (those which belong to 2 faces)
 	vector<Vertex*> verticesToRemove;
@@ -186,7 +186,7 @@ void AgglomerateElement<2>::RemoveIntersections(vector<Face<2>*> oldFaces, Face<
 }
 
 template<>
-void AgglomerateElement<3>::RemoveIntersections(vector<Face<3>*> faces, Face<3>* newFace)
+void AgglomerateElement<3>::RemoveIntersections(const vector<Face<3>*>& faces, Face<3>* newFace)
 {
 	assert(false && "To be implemented");
 }

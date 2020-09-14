@@ -38,17 +38,16 @@ private:
 
 public:
 
-	Polygon(vector<Vertex*> vertices, bool createTriangulationAndBoundingBox = true)
+	Polygon(const vector<Vertex*>& vertices, bool createTriangulationAndBoundingBox = true)
 		: _vertices(vertices)
 	{
 		assert(vertices.size() >= 3);
-		_vertices = vertices;
 		Init(createTriangulationAndBoundingBox);
 	}
 
 	Polygon(const Polygon& shape) = default;
 
-	void SetVertices(vector<Vertex*> vertices)
+	void SetVertices(const vector<Vertex*>& vertices)
 	{
 		assert(vertices.size() >= 3);
 		_vertices = vertices;
@@ -171,7 +170,7 @@ public:
 		_boundingBox = CreateBoundingBox(_vertices);
 	}
 
-	static Quadrilateral* CreateBoundingBox(vector<Vertex*> vertices)
+	static Quadrilateral* CreateBoundingBox(const vector<Vertex*>& vertices)
 	{
 		double maxX = -INFINITY;
 		double maxY = -INFINITY;
@@ -200,7 +199,7 @@ public:
 	}
 
 private:
-	static vector<PhysicalShape<2>*> BarycentricTriangulation(vector<Vertex*> vertices)
+	static vector<PhysicalShape<2>*> BarycentricTriangulation(const vector<Vertex*>& vertices)
 	{
 		// Requirement: the polygon defined by the vertices must be convex!
 

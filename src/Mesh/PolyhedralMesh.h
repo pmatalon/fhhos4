@@ -434,6 +434,7 @@ private:
 	FaceCollapsingStatus TryCollapseInterfaceBetween(Element<Dim>* e1, Element<Dim>* e2)
 	{
 		vector<Face<Dim>*> interfaceFaces = e1->InterfaceWith(e2);
+		assert(!interfaceFaces.empty());
 
 		if (interfaceFaces.size() == 1)
 			return FaceCollapsingStatus::NotEnoughFaces;
@@ -875,7 +876,7 @@ private:
 	// Creates the macro-element obtained after removing a vertex, //
 	// adds it to the mesh, and return it.                         //
 	//-------------------------------------------------------------//
-	Element<Dim>* AgglomerateByVertexRemoval(vector<Element<Dim>*> fineElements, Vertex* removedVertex)
+	Element<Dim>* AgglomerateByVertexRemoval(const vector<Element<Dim>*>& fineElements, Vertex* removedVertex)
 	{
 		//-----------------------------------------------------------------------------------------------------------//
 		// Requirement: fineElements must be sorted in direct (= counter-clockwise) order around the removed vertex. //
@@ -1298,7 +1299,7 @@ private:
 		return coarseElement;
 	}
 
-	Element<Dim>* AgglomerateFineElements(vector<Element<Dim>*> fineElements)
+	Element<Dim>* AgglomerateFineElements(const vector<Element<Dim>*>& fineElements)
 	{
 		//assert(fineElements.size() > 1 || fineElements[0]->IsOnBoundary());
 		for (Element<Dim>* e : fineElements)
@@ -1465,7 +1466,7 @@ private:
 		return Agglomerate(v);
 	}
 
-	Element<Dim>* Agglomerate(vector<Element<Dim>*> elements)
+	Element<Dim>* Agglomerate(const vector<Element<Dim>*>& elements)
 	{
 		Agglo<Dim> agglo(elements);
 		Element<Dim>* newElement = CreatePolyhedron(agglo.Vertices());
@@ -1523,7 +1524,7 @@ private:
 		return TryCollapse({ f1->CoarseFace, f2->CoarseFace });
 	}
 
-	FaceCollapsingStatus TryCollapse(vector<Face<Dim>*> faces)
+	FaceCollapsingStatus TryCollapse(const vector<Face<Dim>*>& faces)
 	{
 		assert(faces.size() > 1);
 		// 'faces' must be at the same level as 'this'
@@ -1538,7 +1539,7 @@ private:
 		return FaceCollapsingStatus::Ok;
 	}
 
-	void ReplaceFaces(vector<Face<Dim>*> faces, Face<Dim>* mergedFace)
+	void ReplaceFaces(const vector<Face<Dim>*>& faces, Face<Dim>* mergedFace)
 	{
 		// The faces and mergedFace must be at the same level.
 
@@ -1641,7 +1642,7 @@ public:
 	// Dim-specific functions (implementation below) //
 	//-----------------------------------------------//
 	Element<Dim>* CreatePolyhedron(vector<Vertex*> vertices) { return nullptr; }
-	Element<Dim>* CreateMacroElement(Element<Dim>* e1, Element<Dim>* e2, vector<Face<Dim>*> facesToRemove) { return nullptr; }
+	Element<Dim>* CreateMacroElement(Element<Dim>* e1, Element<Dim>* e2, const vector<Face<Dim>*>& facesToRemove) { return nullptr; }
 	Face<Dim>* CreateMacroFace(Face<Dim>* f1, Face<Dim>* f2, Vertex* vertexToRemove) { return nullptr; }
 	void FaceCoarsening() { assert(false); };
 };
@@ -1662,14 +1663,14 @@ Element<3>* PolyhedralMesh<3>::CreatePolyhedron(vector<Vertex*> vertices)
 }
 
 template<>
-Element<2>* PolyhedralMesh<2>::CreateMacroElement(Element<2>* e1, Element<2>* e2, vector<Face<2>*> facesToRemove)
+Element<2>* PolyhedralMesh<2>::CreateMacroElement(Element<2>* e1, Element<2>* e2, const vector<Face<2>*>& facesToRemove)
 {
 	PolygonalElement* macroElement = new PolygonalElement(0, e1, e2, facesToRemove, false);
 	return macroElement;
 }
 
 template<>
-Element<3>* PolyhedralMesh<3>::CreateMacroElement(Element<3>* e1, Element<3>* e2, vector<Face<3>*> facesToRemove)
+Element<3>* PolyhedralMesh<3>::CreateMacroElement(Element<3>* e1, Element<3>* e2, const vector<Face<3>*>& facesToRemove)
 {
 	Utils::FatalError("Not implemented in 3D.");
 	return nullptr;

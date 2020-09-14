@@ -212,7 +212,7 @@ public:
 		return measure;
 	}
 
-	Face<Dim>* ExistingFaceWithVertices(vector<MeshVertex<Dim>*> vertices)
+	Face<Dim>* ExistingFaceWithVertices(const vector<MeshVertex<Dim>*>& vertices)
 	{
 		for (Face<Dim>* f : vertices[0]->Faces)
 		{

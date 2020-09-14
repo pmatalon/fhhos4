@@ -212,7 +212,7 @@ public:
 		return this->Shape()->HasSameVertices(other->Shape(), compareCoordinates);
 	}
 
-	bool IsIn(vector<Element<Dim>*> list)
+	bool IsIn(const vector<Element<Dim>*>& list)
 	{
 		for (Element<Dim>* e : list)
 		{
@@ -223,7 +223,7 @@ public:
 	}
 
 	// Replace faces with their agglomeration //
-	void ReplaceFaces(vector<Face<Dim>*> faces, Face<Dim>* collapsedFace)
+	void ReplaceFaces(const vector<Face<Dim>*>& faces, Face<Dim>* collapsedFace)
 	{
 		vector<Face<Dim>*> currentFaces(this->Faces);
 		this->Faces.clear();
@@ -238,7 +238,7 @@ public:
 	}
 
 protected:
-	virtual void RemoveIntersections(vector<Face<Dim>*> oldFaces, Face<Dim>* newFace)
+	virtual void RemoveIntersections(const vector<Face<Dim>*>& oldFaces, Face<Dim>* newFace)
 	{
 		assert(false);
 	}

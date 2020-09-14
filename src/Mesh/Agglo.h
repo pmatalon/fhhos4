@@ -96,7 +96,7 @@ private:
 	// Dim-specific functions (implementation below) //
 	//-----------------------------------------------//
 private:
-	void Agglomerate(Element<Dim>* e, vector<Face<Dim>*> interfaceFaces) { assert(false); }
+	void Agglomerate(Element<Dim>* e, const vector<Face<Dim>*>& interfaceFaces) { assert(false); }
 
 	//-------------------------------------------------------//
 	//                 Element implementation                //
@@ -120,7 +120,7 @@ public:
 };
 
 template<>
-void Agglo<2>::Agglomerate(Element<2>* e, vector<Face<2>*> interfaceFaces)
+void Agglo<2>::Agglomerate(Element<2>* e, const vector<Face<2>*>& interfaceFaces)
 {
 	/*if (e->Number == 534 && interfaceFaces.size() == 3)
 	{

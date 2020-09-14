@@ -145,7 +145,7 @@ public:
 			&& u + eps > 0 && u < 1 + eps; // u in [0,1]
 	}
 
-	bool IsIn(vector<Face<Dim>*> list)
+	bool IsIn(const vector<Face<Dim>*>& list)
 	{
 		for (Face<Dim>* f : list)
 		{
@@ -155,7 +155,7 @@ public:
 		return false;
 	}
 
-	static int NumberOfFacesContainingVertex(vector<Face<Dim>*> faces, Vertex* v)
+	static int NumberOfFacesContainingVertex(const vector<Face<Dim>*>& faces, Vertex* v)
 	{
 		int nFacesContainingV = 0;
 		for (Face<Dim>* f : faces)
@@ -170,7 +170,7 @@ public:
 		return nFacesContainingV;
 	}
 
-	static bool IsInFaces(vector<Face<Dim>*> faces, Vertex* v)
+	static bool IsInFaces(const vector<Face<Dim>*>& faces, Vertex* v)
 	{
 		bool vertexIsInFaces = false;
 		for (Face<Dim>* f : faces)
@@ -184,7 +184,7 @@ public:
 		return vertexIsInFaces;
 	}
 
-	static bool IsInTwoFaces(vector<Face<Dim>*> faces, Vertex* v)
+	static bool IsInTwoFaces(const vector<Face<Dim>*>& faces, Vertex* v)
 	{
 		return NumberOfFacesContainingVertex(faces, v) >= 2;
 	}
@@ -226,7 +226,7 @@ public:
 		return this->CoarseFace->FinerFaces.size() > 1;
 	}
 
-	Face<Dim>* ClosestFaceAmongst(vector<Face<Dim>*> list, bool isDomainBoundary)
+	Face<Dim>* ClosestFaceAmongst(const vector<Face<Dim>*>& list, bool isDomainBoundary)
 	{
 		double smallestDistance = -1;
 		Face<Dim>* closestFace = nullptr;

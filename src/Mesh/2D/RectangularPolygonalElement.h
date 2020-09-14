@@ -90,7 +90,7 @@ public:
 	}
 
 private:
-	bool isIn(vector<Face<2>*> faces, Face<2>* f) const
+	bool isIn(const vector<Face<2>*>& faces, Face<2>* f) const
 	{
 		auto it = find(faces.begin(), faces.end(), f);
 		if (it != faces.end())

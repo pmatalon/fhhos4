@@ -55,7 +55,7 @@ public:
 	}
 
 	template <typename T>
-	static inline vector<T> Join(vector<T> A, vector<T> B)
+	static inline vector<T> Join(const vector<T>& A, const vector<T>& B)
 	{
 		vector<T> AB;
 		AB.reserve(A.size() + B.size()); // preallocate memory
@@ -65,7 +65,7 @@ public:
 	}
 
 	template <typename T>
-	static inline vector<T> SymmetricDifference(vector<T> A, vector<T> B)
+	static inline vector<T> SymmetricDifference(const vector<T>& A, const vector<T>& B)
 	{
 		vector<T> v1 = A;
 		vector<T> v2 = B;

@@ -124,17 +124,17 @@ template <class T, class ResultT = CoeffsChunk>//, typename enable_if<is_base_of
 class ParallelLoop : public BaseChunksParallelLoop<ResultT>
 {
 	//static_assert(std::is_base_of<ParallelChunk, ChunkT>::value, "ChunkT must inherit from ParallelChunk");
-
+private:
+	const vector<T>& _list;
 public:
-	vector<T> List;
 
-	ParallelLoop(vector<T> list) :ParallelLoop(list, BaseParallelLoop::DefaultNThreads) {}
+	ParallelLoop(const vector<T>& list) : 
+		ParallelLoop(list, BaseParallelLoop::DefaultNThreads) {}
 	
-	ParallelLoop(vector<T> list, unsigned int nThreads) :
-		BaseChunksParallelLoop<ResultT>(list.size(), nThreads)
-	{
-		List = list;
-	}
+	ParallelLoop(const vector<T>& list, unsigned int nThreads) :
+		BaseChunksParallelLoop<ResultT>(list.size(), nThreads),
+		_list(list)
+	{}
 
 	void Execute(function<void(T)> functionToExecute)
 	{
@@ -142,7 +142,7 @@ public:
 		{
 			ParallelChunk<ResultT>* chunk = this->Chunks[0];
 			for (BigNumber i = chunk->Start; i < chunk->End; ++i)
-				functionToExecute(this->List[i]);
+				functionToExecute(this->_list[i]);
 		}
 		else
 		{
@@ -152,7 +152,7 @@ public:
 				chunk->ThreadFuture = std::async(std::launch::async, [chunk, this, functionToExecute]()
 					{
 						for (BigNumber i = chunk->Start; i < chunk->End; ++i)
-							functionToExecute(this->List[i]);
+							functionToExecute(this->_list[i]);
 					}
 				);
 			}
@@ -166,7 +166,7 @@ public:
 		{
 			ParallelChunk<ResultT>* chunk = this->Chunks[0];
 			for (BigNumber i = chunk->Start; i < chunk->End; ++i)
-				functionToExecute(this->List[i], chunk);
+				functionToExecute(this->_list[i], chunk);
 		}
 		else
 		{
@@ -176,7 +176,7 @@ public:
 				chunk->ThreadFuture = std::async(std::launch::async, [chunk, this, functionToExecute]()
 					{
 						for (BigNumber i = chunk->Start; i < chunk->End; ++i)
-							functionToExecute(this->List[i], chunk);
+							functionToExecute(this->_list[i], chunk);
 					}
 				);
 			}
@@ -184,7 +184,7 @@ public:
 		}
 	}
 
-	static void Execute(vector<T> list, function<void(T)> functionToExecute)
+	static void Execute(const vector<T>& list, function<void(T)> functionToExecute)
 	{
 		ParallelLoop parallelLoop(list);
 		parallelLoop.Execute(functionToExecute);

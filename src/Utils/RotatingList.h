@@ -8,7 +8,7 @@ private:
 	vector<T> _list;
 	int _i = 0;
 public:
-	RotatingList(vector<T> v) : _list(v) {}
+	RotatingList(const vector<T>& v) : _list(v) {}
 
 	size_t Size() { return _list.size(); }
 

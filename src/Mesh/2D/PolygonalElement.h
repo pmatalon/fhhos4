@@ -12,7 +12,7 @@ private:
 
 public:
 	// Constructor creating the polygon from the adjonction of two elements
-	PolygonalElement(int number, Element<2>* e1, Element<2>* e2, vector<Face<2>*> facesToRemove, bool createTriangulationAndBoundingBox = true) :
+	PolygonalElement(int number, Element<2>* e1, Element<2>* e2, const vector<Face<2>*>& facesToRemove, bool createTriangulationAndBoundingBox = true) :
 		Element(number),
 		Diff_DGElement<2>(number),
 		Diff_HHOElement<2>(number)
@@ -20,7 +20,7 @@ public:
 		_shape = new Polygon(MacroPolygonVertices(e1, e2, facesToRemove), createTriangulationAndBoundingBox);
 	}
 
-	PolygonalElement(int number, vector<Vertex*> vertices, bool createTriangulationAndBoundingBox = true) :
+	PolygonalElement(int number, const vector<Vertex*>& vertices, bool createTriangulationAndBoundingBox = true) :
 		Element(number),
 		Diff_DGElement<2>(number),
 		Diff_HHOElement<2>(number)
@@ -84,7 +84,7 @@ public:
 		return n;
 	}
 
-	static vector<Vertex*> MacroPolygonVertices(Element<2>* e1, Element<2>* e2, vector<Face<2>*> facesToRemove)
+	static vector<Vertex*> MacroPolygonVertices(Element<2>* e1, Element<2>* e2, const vector<Face<2>*>& facesToRemove)
 	{
 		// We need to keep them in the direct order!
 		vector<Vertex*> macroElementVertices;
@@ -221,7 +221,7 @@ private:
 	}
 
 public:
-	void RemoveIntersections(vector<Face<2>*> oldFaces, Face<2>* newFace)
+	void RemoveIntersections(const vector<Face<2>*>& oldFaces, Face<2>* newFace)
 	{
 		// Identification of the vertices to remove (those which belong to 2 faces)
 		vector<Vertex*> verticesToRemove;

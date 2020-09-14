@@ -684,7 +684,7 @@ protected:
 		}
 	}
 
-	void Reorder(vector<Face<Dim>*>& listToReorder, vector<Face<Dim>*> orderedList)
+	void Reorder(vector<Face<Dim>*>& listToReorder, const vector<Face<Dim>*>& orderedList)
 	{
 		assert(listToReorder.size() == orderedList.size());
 		listToReorder.clear();

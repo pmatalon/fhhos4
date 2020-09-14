@@ -27,7 +27,7 @@ public:
 			this->coefficients.push_back(Eigen::Triplet<double>(i, j, value));
 	}
 
-	inline void Add(NonZeroCoefficients &chunk)
+	inline void Add(const NonZeroCoefficients &chunk)
 	{
 		this->coefficients.insert(this->coefficients.end(), chunk.coefficients.begin(), chunk.coefficients.end());
 	}

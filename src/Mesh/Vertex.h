@@ -25,7 +25,7 @@ public:
 		this->Number = number;
 	}
 
-	bool IsIn(vector<Vertex*> list)
+	bool IsIn(const vector<Vertex*>& list)
 	{
 		for (Vertex* v : list)
 		{
@@ -35,7 +35,7 @@ public:
 		return false;
 	}
 
-	Vertex* GetClosestIn(vector<Vertex*> list)
+	Vertex* GetClosestIn(const vector<Vertex*>& list)
 	{
 		double minDistance = 0;
 		Vertex* closest = nullptr;
