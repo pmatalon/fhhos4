@@ -172,8 +172,17 @@ private:
 			CoarseningStrategy stgy = coarsePb->_mesh->ComesFrom.CS;
 			if (stgy == CoarseningStrategy::None)
 				stgy = finePb->_mesh->ComesFrom.CS;
-			ElementParallelLoop<Dim> parallelLoop(coarsePb->_mesh->Elements);
-			parallelLoop.Execute([stgy](Element<Dim>* ce, ParallelChunk<CoeffsChunk>* chunk)
+
+			// CheckIfFullyEmbeddedInCoarseElement
+			ElementParallelLoop<Dim> parallelLoop(finePb->_mesh->Elements);
+			parallelLoop.Execute([stgy](Element<Dim>* fe, ParallelChunk<CoeffsChunk>* chunk)
+				{
+					fe->CheckIfFullyEmbeddedInCoarseElement(stgy);
+				});
+
+			// SetOverlappingFineElements
+			ElementParallelLoop<Dim> parallelLoop2(coarsePb->_mesh->Elements);
+			parallelLoop2.Execute([stgy](Element<Dim>* ce, ParallelChunk<CoeffsChunk>* chunk)
 				{
 					ce->SetOverlappingFineElements(stgy);
 				});

@@ -137,7 +137,20 @@ public:
 				{
 					RefFunction finePhiCoarsePhi = [this, fineElement, finePhi, coarsePhi](RefPoint fineRefPoint) {
 						DomPoint domPoint = fineElement->ConvertToDomain(fineRefPoint);
-						if (this->Contains(domPoint))
+
+						/*if ((fineElement->CoarserElement == this && fineElement->IsFullyEmbeddedInCoarseElement) && !this->Contains(domPoint))
+						{
+							cout << endl << "% Coarse element: " << endl;
+							this->ExportToMatlab("r");
+							cout << endl << "% Fine element: " << endl;
+							fineElement->ExportToMatlab("b");
+							cout << endl << "% Quadrature point: " << endl;
+							MatlabScript s;
+							s.PlotPoint(domPoint, "k+");
+							this->Contains(domPoint);
+							this->FullyEmbeds(fineElement);
+						}*/
+						if ((fineElement->CoarserElement == this && fineElement->IsFullyEmbeddedInCoarseElement) || this->Contains(domPoint))
 						{
 							RefPoint coarseRefPoint = this->ConvertToReference(domPoint);
 							return finePhi->Eval(fineRefPoint)*coarsePhi->Eval(coarseRefPoint);
@@ -146,7 +159,14 @@ public:
 							return 0.0;
 					};
 
-					double integral = fineElement->Integral(finePhiCoarsePhi); // use all quadrature points because it's not a polynomial
+					double integral = 0;
+					if (fineElement->CoarserElement == this && fineElement->IsFullyEmbeddedInCoarseElement)
+					{
+						int degree = finePhi->GetDegree() + coarsePhi->GetDegree();
+						integral = fineElement->Integral(finePhiCoarsePhi, degree);
+					}
+					else
+						integral = fineElement->Integral(finePhiCoarsePhi); // use all quadrature points because it's not a polynomial
 					fineCoarseMass(finePhi->LocalNumber, coarsePhi->LocalNumber) = integral;
 				}
 			}

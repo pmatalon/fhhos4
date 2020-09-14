@@ -15,7 +15,7 @@ private:
 	vector<double> _weights;
 
 public:
-	Dunavant() : Dunavant(10)
+	Dunavant() : Dunavant(11)
 	{}
 
 	Dunavant(int degree)

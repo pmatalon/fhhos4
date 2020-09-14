@@ -128,7 +128,7 @@ public:
 	//     Integrals     //
 	//-------------------//
 
-	vector<DomPoint> QuadraturePoints() const
+	virtual vector<DomPoint> QuadraturePoints() const
 	{
 		vector<RefPoint> refPoints = RefShape()->QuadraturePoints();
 		vector<DomPoint> domPoints;

@@ -411,15 +411,15 @@ public:
 
 	void ExportToMatlab(string color = "r") const override
 	{
-		cout << "%-- Shape using vertices:" << endl;
+		//cout << "%-- Shape using vertices:" << endl;
 		ExportVerticesToMatlab(color);
-		cout << "%-- Shape using CGAL vertices:" << endl;
+		/*cout << "%-- Shape using CGAL vertices:" << endl;
 		ExportCGALPolyToMatlab();
 		if (_triangulation.size() > 0)
 		{
 			cout << "%-- Subshapes:" << endl;
 			ExportSubShapesToMatlab();
-		}
+		}*/
 	}
 
 	void ExportVerticesToMatlab(string color = "r") const
@@ -434,6 +434,18 @@ public:
 		MatlabScript script;
 		script.PlotPolygonEdges(Vertices(_cgalPolygon), color);
 		script.Out() << endl;
+	}
+
+	//------------------------------//
+	//           Integral           //
+	//------------------------------//
+
+	vector<DomPoint> QuadraturePoints() const override
+	{
+		vector<DomPoint> points;
+		for (PhysicalShape<2>* t : _triangulation)
+			points = Utils::Join(points, t->QuadraturePoints());
+		return points;
 	}
 
 	double Integral(RefFunction boundingBoxDefinedFunction) const override
@@ -469,6 +481,10 @@ public:
 			integral += t->Integral(boundingBoxFunction, polynomialDegree);
 		return integral;
 	}
+
+
+
+
 
 	inline double DetJacobian(RefPoint pointInReferenceSquare) const
 	{

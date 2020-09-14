@@ -6,6 +6,7 @@
 #include "../Geometry/PhysicalShape.h"
 #include "../Problem/DiffusionField.h"
 #include "PhysicalGroup.h"
+#include "../Utils/MatlabScript.h"
 using namespace std;
 
 template <int Dim>
@@ -29,6 +30,7 @@ public:
 	Element<Dim>* CoarserElement = nullptr;
 	vector<Face<Dim>*> FinerFacesRemoved;
 	vector<Element<Dim>*> OverlappingFineElements; // Used for non-nested meshes. It contains at least FinerElements.
+	bool IsFullyEmbeddedInCoarseElement = false;
 
 	mutex Mutex;
 	bool IsDeleted = false;
@@ -304,6 +306,14 @@ public:
 		return (!this->PhysicalPart && !other->PhysicalPart) || this->PhysicalPart == other->PhysicalPart;
 	}
 
+	void CheckIfFullyEmbeddedInCoarseElement(CoarseningStrategy stgy)
+	{
+		if (Utils::BuildsNestedMeshHierarchy(stgy))
+			this->IsFullyEmbeddedInCoarseElement = true;
+		else
+			this->IsFullyEmbeddedInCoarseElement == this->CoarserElement->FullyEmbeds(this);
+	}
+
 	void SetOverlappingFineElements(CoarseningStrategy stgy)
 	{
 		//if (!this->OverlappingFineElements.empty())
@@ -324,14 +334,14 @@ public:
 			{
 				for (auto fe : neighbour->FinerElements)
 				{
-					if (fe->PhysicalPart == this->PhysicalPart && tested.find(fe) == tested.end() && fe->Overlaps(this))
+					if (fe->PhysicalPart == this->PhysicalPart && !fe->IsFullyEmbeddedInCoarseElement && tested.find(fe) == tested.end() && fe->Overlaps(this))
 						overlapping.insert(fe);
 					tested.insert(fe);
 					if (stgy != CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
 					{
 						for (Element<Dim>* feNeighbour : fe->Neighbours())
 						{
-							if (feNeighbour->PhysicalPart == this->PhysicalPart && tested.find(feNeighbour) == tested.end() && feNeighbour->Overlaps(this))
+							if (feNeighbour->PhysicalPart == this->PhysicalPart && !fe->IsFullyEmbeddedInCoarseElement && tested.find(feNeighbour) == tested.end() && feNeighbour->Overlaps(this))
 								overlapping.insert(feNeighbour);
 							tested.insert(feNeighbour);
 						}
@@ -343,11 +353,21 @@ public:
 		this->OverlappingFineElements = vector<Element<Dim>*>(overlapping.begin(), overlapping.end());
 	}
 
+	bool FullyEmbeds(Element<Dim>* other)
+	{
+		for (Vertex* v : other->Vertices())
+		{
+			if (!this->Contains(*v))
+				return false;
+		}
+		return true;
+	}
+
 	bool Overlaps(Element<Dim>* other)
 	{
-		for (Vertex* v : this->Vertices())
+		for (DomPoint domPoint : this->QuadraturePoints())
 		{
-			if (other->Contains(*v))
+			if (other->Contains(domPoint))
 				return true;
 		}
 		return false;
