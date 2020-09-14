@@ -18,6 +18,8 @@ class Element
 {
 private:
 	map<Face<Dim>*, int> _facesLocalNumbering;
+	map<Element<Dim>*, int> _finerElementsLocalNumbering;
+	map<Element<Dim>*, int> _overlappingFineElementsLocalNumbering;
 public:
 	BigNumber Id = 0;
 	BigNumber Number;
@@ -29,9 +31,11 @@ public:
 	vector<Element<Dim>*> FinerElements;
 	Element<Dim>* CoarserElement = nullptr;
 	vector<Face<Dim>*> FinerFacesRemoved;
-	vector<Element<Dim>*> OverlappingFineElements; // Used for non-nested meshes. It contains at least FinerElements.
+	// Used for non-nested meshes. It contains at least FinerElements.
+	vector<Element<Dim>*> OverlappingFineElements;
 	bool IsFullyEmbeddedInCoarseElement = false;
 
+	// Used during mesh construction
 	mutex Mutex;
 	bool IsDeleted = false;
 
@@ -142,6 +146,34 @@ public:
 		for (Face<Dim>* f : this->Faces)
 			this->_facesLocalNumbering.insert({ f, faceLocalNumber++ });
 	}
+	void InitFinerElementsLocalNumbering()
+	{
+		this->_finerElementsLocalNumbering.clear();
+		int localNumber = 0;
+		for (Element<Dim>* e : this->FinerElements)
+			this->_finerElementsLocalNumbering.insert({ e, localNumber++ });
+	}
+	void InitOverlappingElementsLocalNumbering()
+	{
+		this->_overlappingFineElementsLocalNumbering.clear();
+		int localNumber = 0;
+		for (Element<Dim>* e : this->OverlappingFineElements)
+			this->_overlappingFineElementsLocalNumbering.insert({ e, localNumber++ });
+	}
+
+
+	inline int LocalNumberOf(Element<Dim>* finerElement)
+	{
+		return this->_finerElementsLocalNumbering[finerElement];
+	}
+	inline int LocalNumberOfOverlapping(Element<Dim>* finerElement)
+	{
+		return this->_overlappingFineElementsLocalNumbering[finerElement];
+	}
+	inline int LocalNumberOf(Face<Dim>* face)
+	{
+		return this->_facesLocalNumbering[face];
+	}
 
 	Element<Dim>* ElementOnTheOtherSideOf(Face<Dim>* face)
 	{
@@ -225,7 +257,7 @@ public:
 	// Replace faces with their agglomeration //
 	void ReplaceFaces(const vector<Face<Dim>*>& faces, Face<Dim>* collapsedFace)
 	{
-		vector<Face<Dim>*> currentFaces(this->Faces);
+		vector<Face<Dim>*> currentFaces = this->Faces;
 		this->Faces.clear();
 		for (Face<Dim>* f : currentFaces)
 		{
@@ -243,30 +275,6 @@ protected:
 		assert(false);
 	}
 public:
-	int LocalNumberOf(Element<Dim>* finerElement)
-	{
-		for (int i = 0; i < this->FinerElements.size(); i++)
-		{
-			if (this->FinerElements[i] == finerElement)
-				return i;
-		}
-		assert(false);
-	}
-
-	int LocalNumberOfOverlapping(Element<Dim>* finerElement)
-	{
-		for (int i = 0; i < this->OverlappingFineElements.size(); i++)
-		{
-			if (this->OverlappingFineElements[i] == finerElement)
-				return i;
-		}
-		assert(false);
-	}
-
-	inline int LocalNumberOf(Face<Dim>* face)
-	{
-		return this->_facesLocalNumbering[face];
-	}
 
 	bool IsOnBoundary()
 	{

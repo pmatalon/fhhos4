@@ -185,6 +185,7 @@ private:
 			parallelLoop2.Execute([stgy](Element<Dim>* ce, ParallelChunk<CoeffsChunk>* chunk)
 				{
 					ce->SetOverlappingFineElements(stgy);
+					ce->InitOverlappingElementsLocalNumbering();
 				});
 
 			SparseMatrix I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);

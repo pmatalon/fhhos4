@@ -2,7 +2,7 @@
 #include <vector>
 #include "Element.h"
 #include "Face.h"
-#include "../Utils/ParallelLoop.h"
+#include "../Utils/ElementParallelLoop.h"
 #include "../Utils/MatlabScript.h"
 using namespace std;
 
@@ -202,6 +202,8 @@ public:
 		number = 0;
 		for (Face<Dim>* f : this->Faces)
 			f->Number = number++;
+
+		this->InitFaceLocalNumbering();
 	}
 
 	double SkeletonMeasure()
@@ -290,6 +292,24 @@ public:
 	}
 
 protected:
+	void InitFaceLocalNumbering()
+	{
+		ElementParallelLoop<Dim> parallelLoop(this->Elements);
+		parallelLoop.Execute([](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				e->InitFaceLocalNumbering();
+			});
+	}
+
+	void InitFinerElementsLocalNumbering()
+	{
+		ElementParallelLoop<Dim> parallelLoop(this->Elements);
+		parallelLoop.Execute([](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				e->InitFinerElementsLocalNumbering();
+			});
+	}
+
 	virtual void InitializeCoarsening(Mesh<Dim>* coarseMesh)
 	{
 		this->CoarseMesh = coarseMesh;
@@ -313,10 +333,14 @@ protected:
 		CoarseMesh->FinalizeCreation();
 		CoarseMesh->FillBoundaryAndInteriorFaceLists();
 		CoarseMesh->FillDirichletAndNeumannFaceLists();
+
+		CoarseMesh->InitFinerElementsLocalNumbering();
 	}
 
 	virtual void FinalizeRefinement()
-	{}
+	{
+		this->InitFinerElementsLocalNumbering();
+	}
 
 	void FillBoundaryAndInteriorFaceLists()
 	{

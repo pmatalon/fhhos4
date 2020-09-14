@@ -13,7 +13,7 @@ private:
 	vector<Vertex*> _boundaryVertices;
 	Face<Dim>* _collapsedFace = nullptr;
 public:
-	Interface(vector<Face<Dim>*> faces) : _faces(faces)
+	Interface(const vector<Face<Dim>*>& faces) : _faces(faces)
 	{
 		Init();
 	}
