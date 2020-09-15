@@ -70,6 +70,7 @@ struct ActionsArguments
 	bool ExportSolutionVectors = false;
 	bool ExportSolutionToGMSH = false;
 	bool LogAssembly = true;
+	bool AssembleRightHandSide = true;
 	bool UnitTests = false;
 	bool GMSHLogEnabled = false;
 };

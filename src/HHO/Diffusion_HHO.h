@@ -118,7 +118,6 @@ public:
 		{
 			this->PrintPhysicalProblem();
 			this->PrintDiscretization();
-			cout << "Parallelism   : " << (BaseParallelLoop::GetDefaultNThreads() == 1 ? "sequential execution" : to_string(BaseParallelLoop::GetDefaultNThreads()) + " threads") << endl;
 		}
 
 		string matrixFilePath				= this->GetFilePath("A");
@@ -130,8 +129,11 @@ public:
 		if (actions.LogAssembly)
 			cout << endl << "Assembly..." << endl;
 
-		this->_globalRHS = Vector(HHO->nTotalHybridUnknowns);
-		this->_globalRHS.tail(HHO->nTotalFaceUnknowns) = Vector::Zero(HHO->nTotalFaceUnknowns);
+		if (actions.AssembleRightHandSide)
+		{
+			this->_globalRHS = Vector(HHO->nTotalHybridUnknowns);
+			this->_globalRHS.tail(HHO->nTotalFaceUnknowns) = Vector::Zero(HHO->nTotalFaceUnknowns);
+		}
 
 		// Compute some useful integrals on reference element and store them
 		// - Cartesian element
@@ -287,10 +289,13 @@ public:
 						// Right-hand side //
 						//-----------------//
 
-						for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions)
+						if (actions.AssembleRightHandSide)
 						{
-							BigNumber i = DOFNumber(element, cellPhi);
-							this->_globalRHS(i) = element->SourceTerm(cellPhi, this->_sourceFunction);
+							for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions)
+							{
+								BigNumber i = DOFNumber(element, cellPhi);
+								this->_globalRHS(i) = element->SourceTerm(cellPhi, this->_sourceFunction);
+							}
 						}
 
 						//-------------------------------------------//
@@ -373,13 +378,16 @@ public:
 		//---------------------------------//
 
 		// Neumann
-		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->NeumannFaces, [this, faceBasis](Face<Dim>* f)
-			{
-				Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
-				BigNumber i = FirstDOFGlobalNumber(f);
-				this->_globalRHS.segment(i, HHO->nFaceUnknowns) = face->ProjectOnBasis(faceBasis, this->_boundaryConditions->NeumannFunction);
-			}
-		);
+		if (actions.AssembleRightHandSide)
+		{
+			ParallelLoop<Face<Dim>*>::Execute(this->_mesh->NeumannFaces, [this, faceBasis](Face<Dim>* f)
+				{
+					Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
+					BigNumber i = FirstDOFGlobalNumber(f);
+					this->_globalRHS.segment(i, HHO->nFaceUnknowns) = face->ProjectOnBasis(faceBasis, this->_boundaryConditions->NeumannFunction);
+				}
+			);
+		}
 
 		// Dirichlet
 		this->_dirichletCond = Vector(HHO->nDirichletUnknowns);
@@ -391,7 +399,8 @@ public:
 				this->_dirichletCond.segment(i, HHO->nFaceUnknowns) = face->InvFaceMassMatrix()*face->ProjectOnBasis(faceBasis, this->_boundaryConditions->DirichletFunction);
 			}
 		);
-		this->_globalRHS -= extendedMatrix.topRightCorner(HHO->nTotalHybridUnknowns, HHO->nDirichletUnknowns) * this->_dirichletCond;
+		if (actions.AssembleRightHandSide)
+			this->_globalRHS -= extendedMatrix.topRightCorner(HHO->nTotalHybridUnknowns, HHO->nDirichletUnknowns) * this->_dirichletCond;
 
 		//---------------------//
 		// Static condensation //
@@ -405,13 +414,20 @@ public:
 			SparseMatrix Aff = this->_globalSystemMatrix.bottomRightCorner(HHO->nTotalFaceUnknowns, HHO->nTotalFaceUnknowns);
 			SparseMatrix Atf = this->_globalSystemMatrix.topRightCorner(HHO->nTotalCellUnknowns, HHO->nTotalFaceUnknowns);
 
+			// Delete the content of _globalSystemMatrix, we don't need it anymore
+			this->_globalSystemMatrix = SparseMatrix(0, 0);
+
 			SparseMatrix inverseAtt = GetInverseAtt();
 
+			// Schur complement
 			this->A = (Aff - Atf.transpose() * inverseAtt * Atf).pruned();
 
-			Vector bt = this->_globalRHS.head(HHO->nTotalCellUnknowns);
-			Vector bf = this->_globalRHS.tail(HHO->nTotalFaceUnknowns);
-			this->b = bf - Atf.transpose() * inverseAtt * bt;
+			if (actions.AssembleRightHandSide)
+			{
+				Vector bt = this->_globalRHS.head(HHO->nTotalCellUnknowns);
+				Vector bf = this->_globalRHS.tail(HHO->nTotalFaceUnknowns);
+				this->b = bf - Atf.transpose() * inverseAtt * bt;
+			}
 		}
 		else
 		{

@@ -102,6 +102,7 @@ private:
 			{
 				ActionsArguments actions;
 				actions.LogAssembly = false;
+				actions.AssembleRightHandSide = false;
 				coarsePb->Assemble(actions);
 			}
 		}
