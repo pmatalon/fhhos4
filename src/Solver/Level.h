@@ -7,9 +7,12 @@ class Level
 {
 public:
 	int Number;
-	SparseMatrix OperatorMatrix;
+	const SparseMatrix* OperatorMatrix = nullptr;
 	bool UseGalerkinOperator = false;
+private:
+	SparseMatrix _galerkinOperator;
 
+public:
 	Smoother* PreSmoother = nullptr;
 	Smoother* PostSmoother = nullptr;
 
@@ -50,22 +53,25 @@ public:
 		if (this->IsFinestLevel())
 		{
 			cout << "\t\tFine grid operator  : "; cout.flush();
-			cout << Utils::MatrixInfo(this->OperatorMatrix, "A") << endl;
+			cout << Utils::MatrixInfo(*this->OperatorMatrix, "A") << endl;
 		}
 		else
 		{
 			if (this->UseGalerkinOperator)
 			{
 				cout << "\t\tGalerkin operator   : "; cout.flush();
-				this->OperatorMatrix = FinerLevel->R * FinerLevel->OperatorMatrix * FinerLevel->P;
+				this->_galerkinOperator = FinerLevel->R * *(FinerLevel->OperatorMatrix) * FinerLevel->P;
+				this->OperatorMatrix = &this->_galerkinOperator;
 			}
 			else
 			{
 				cout << "\t\tDiscretized operator: "; cout.flush();
 				SetupDiscretizedOperator();
 			}
-			cout << Utils::MatrixInfo(this->OperatorMatrix, "A") << endl;
+			cout << Utils::MatrixInfo(*this->OperatorMatrix, "A") << endl;
 		}
+
+		const SparseMatrix &A = *this->OperatorMatrix;
 
 		if (!this->IsCoarsestLevel())
 		{
@@ -78,17 +84,17 @@ public:
 			cout << Utils::MatrixInfo(this->R, "R") << endl;
 
 			cout << "\t\tPreSmoothing        : "; cout.flush();
-			PreSmoother->Setup(this->OperatorMatrix);
+			PreSmoother->Setup(A);
 			cout << PreSmoother->Iterations() << " iteration" << (PreSmoother->Iterations() > 1 ? "s" : "") <<  endl;
 
 			cout << "\t\tPostSmoothing       : "; cout.flush();
-			PostSmoother->Setup(this->OperatorMatrix);
+			PostSmoother->Setup(A);
 			cout << PostSmoother->Iterations() << " iteration" << (PostSmoother->Iterations() > 1 ? "s" : "") << endl;
 		}
 
 		if (ExportComponents)
 		{
-			this->ExportMatrix(OperatorMatrix, "A");
+			this->ExportMatrix(A, "A");
 			
 			if (!this->IsCoarsestLevel())
 			{
@@ -98,7 +104,7 @@ public:
 		}
 
 		if (FCG)
-			FCG->Setup(this->OperatorMatrix);
+			FCG->Setup(A);
 	}
 
 	Vector Restrict(Vector& vectorOnThisLevel)

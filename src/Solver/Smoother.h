@@ -25,7 +25,7 @@ public:
 		return _solver->MaxIterations;
 	}
 
-	void Setup(SparseMatrix& A)
+	void Setup(const SparseMatrix& A)
 	{
 		if (_solver->MaxIterations > 0)
 			_solver->Setup(A);

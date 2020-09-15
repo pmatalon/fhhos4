@@ -64,7 +64,7 @@ public:
 
 		cout << "Setup..." << endl;
 
-		this->_fineLevel->OperatorMatrix = A;
+		this->_fineLevel->OperatorMatrix = &A;
 		this->_fineLevel->PreSmoother = this->_fineLevel->CreateSmoother(PreSmootherCode, PreSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
 		this->_fineLevel->PostSmoother = this->_fineLevel->CreateSmoother(PostSmootherCode, PostSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
 		this->_fineLevel->UseGalerkinOperator = false;
@@ -181,7 +181,7 @@ protected:
 		while (level->CoarserLevel != nullptr)
 			level = level->CoarserLevel;
 
-		this->_coarseSolver->Setup(level->OperatorMatrix);
+		this->_coarseSolver->Setup(*level->OperatorMatrix);
 	}
 
 private:
@@ -196,7 +196,7 @@ private:
 
 	Vector MultigridCycle(Level* level, const Vector& b, Vector& initialGuess, IterationResult& result)
 	{
-		SparseMatrix A = level->OperatorMatrix;
+		const SparseMatrix A = *level->OperatorMatrix;
 		Vector x;
 
 		if (this->ExportComponents)

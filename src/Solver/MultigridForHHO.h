@@ -71,7 +71,7 @@ public:
 private:
 	void SetupDiscretizedOperator() override 
 	{
-		this->OperatorMatrix = this->_problem->A;
+		this->OperatorMatrix = &this->_problem->A;
 	}
 
 	/*Smoother* CreateSmoother(string smootherCode, int nSmootherIterations, int blockSize, double omega) override
@@ -283,7 +283,7 @@ private:
 			parallelLoop.Execute([this, finePb, nFaceUnknowns](Element<Dim>* ce, ParallelChunk<CoeffsChunk>* chunk)
 				{
 					Diff_HHOElement<Dim>* coarseElem = dynamic_cast<Diff_HHOElement<Dim>*>(ce);
-					DenseMatrix resolveCondensedFinerFacesFromCoarseBoundary = coarseElem->StaticallyCondenseInteriorFinerFaces(this->OperatorMatrix);
+					DenseMatrix resolveCondensedFinerFacesFromCoarseBoundary = coarseElem->StaticallyCondenseInteriorFinerFaces(*this->OperatorMatrix);
 
 					for (int i = 0; i < coarseElem->FinerFacesRemoved.size(); i++)
 					{
