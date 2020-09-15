@@ -64,9 +64,9 @@ public:
 		this->invD = vector<Eigen::FullPivLU<DenseMatrix>>(nb);
 
 		NumberParallelLoop<EmptyResultChunk> parallelLoop(nb);
-		parallelLoop.Execute([this](BigNumber i, ParallelChunk<EmptyResultChunk>* chunk)
+		parallelLoop.Execute([this, &A](BigNumber i, ParallelChunk<EmptyResultChunk>* chunk)
 			{
-				DenseMatrix Di = this->A.block(i * _blockSize, i * _blockSize, _blockSize, _blockSize);
+				DenseMatrix Di = A.block(i * _blockSize, i * _blockSize, _blockSize, _blockSize);
 				this->invD[i].compute(Di);
 			});
 
@@ -77,6 +77,8 @@ private:
 	IterationResult ExecuteOneIteration(const Vector& b, Vector& xOld, const IterationResult& oldResult) override
 	{
 		IterationResult result(oldResult);
+
+		const SparseMatrix& A = *this->Matrix;
 
 		auto nb = A.rows() / _blockSize;
 
@@ -96,6 +98,8 @@ private:
 protected:
 	inline void ProcessBlockRow(BigNumber currentBlockRow, const Vector& b, const Vector& xOld, Vector& xNew)
 	{
+		const SparseMatrix& A = *this->Matrix;
+
 		// BlockRow i: [ --- Li --- | Di | --- Ui --- ]
 
 		Vector tmp_x = _omega * b.segment(currentBlockRow * _blockSize, _blockSize);

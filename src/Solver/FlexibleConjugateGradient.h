@@ -38,6 +38,8 @@ public:
 public:
 	Vector Solve(const Vector& b, Vector& initialGuess) override
 	{
+		const SparseMatrix& A = *this->Matrix;
+
 		// Compared to CG, the work of 1 iteration of FCG is 1 more dot product by previous direction saved.
 		// FCG(1) costs 1 more dot product by iteration than CG, i.e. 1 matrix-vector multiplication + 3 dot products.
 		this->SolvingComputationalWork = 0; 

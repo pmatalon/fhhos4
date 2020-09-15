@@ -26,6 +26,8 @@ public:
 private:
 	Vector Solve(const Vector& b, Vector& initialGuess) override
 	{
+		const SparseMatrix& A = *this->Matrix;
+
 		this->SolvingComputationalWork = 0; // The work of one iteration of CG is 1 matrix-vector product + 2 dot products
 
 		if (this->ComputeExactSolution)

@@ -22,13 +22,13 @@ public:
 	bool ComputeExactSolution = false;
 	StoppingCriteria StoppingCrit = StoppingCriteria::NormalizedResidual;
 
-	SparseMatrix A;
+	const SparseMatrix* Matrix;
 
 	IterativeSolver() : Solver() {}
 
 	virtual void Setup(const SparseMatrix& A) override
 	{
-		this->A = A;
+		this->Matrix = &A;
 		if (this->ComputeExactSolution)
 			this->_directSolver.compute(A);
 	}
@@ -54,6 +54,8 @@ public:
 
 	virtual Vector Solve(const Vector& b, Vector& initialGuess)
 	{
+		const SparseMatrix& A = *this->Matrix;
+
 		this->SolvingComputationalWork = 0;
 
 		if (this->ComputeExactSolution)
