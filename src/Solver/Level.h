@@ -105,6 +105,8 @@ public:
 
 		if (FCG)
 			FCG->Setup(A);
+
+		OnEndSetup();
 	}
 
 	Vector Restrict(Vector& vectorOnThisLevel)
@@ -161,6 +163,7 @@ public:
 
 protected:
 	virtual void OnStartSetup() {}
+	virtual void OnEndSetup() {}
 	virtual void SetupDiscretizedOperator() {}
 	virtual void SetupRestriction() = 0;
 	virtual void SetupProlongation() = 0;

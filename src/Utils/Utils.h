@@ -48,6 +48,37 @@ public:
 		return "size(" + name + ")=" + to_string(M.rows()) + "x" + to_string(M.cols()) + ", \tnnz(" + name + ")=" + to_string(M.nonZeros()) + ", \tdensity(" + name + ")=" + to_string(density) + "%";
 	}
 
+	static void Empty(DenseMatrix& M)
+	{
+		M = DenseMatrix(0, 0);
+	}
+
+	static size_t MemoryUsage(const SparseMatrix& M)
+	{
+		return M.nonZeros() * (sizeof(double) + 2* sizeof(Eigen::Index));
+	}
+	static size_t MemoryUsage(const Vector& v)
+	{
+		return v.rows() * sizeof(double);
+	}
+
+	static string MemoryString(size_t bytes)
+	{
+		stringstream ss;
+		ss.precision(2);
+
+		double kilos = bytes / 1024.0;
+		double megs = kilos / 1024.0;
+		double gigs = megs / 1024.0;
+		if (gigs >= 1)
+			ss << gigs << "GB";
+		else if (megs >= 1)
+			ss << megs << "MB";
+		else
+			ss << kilos << "KB";
+		return ss.str();
+	}
+
 	static bool FileExists(string filename)
 	{
 		ifstream ifile(filename);

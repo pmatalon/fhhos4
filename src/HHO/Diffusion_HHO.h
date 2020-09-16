@@ -11,8 +11,9 @@ class Diffusion_HHO : public DiffusionProblem<Dim>
 private:
 	bool _staticCondensation = false;
 
-	SparseMatrix _globalSystemMatrix;
-	Vector _globalRHS;
+	// We save what we need to reconstruct the higher-order approximation after solving the linear system
+	SparseMatrix Atf;
+	Vector bt;
 	Vector _dirichletCond;
 public:
 	HHOParameters<Dim>* HHO;
@@ -107,6 +108,10 @@ public:
 		cout << "System size   : " << (this->_staticCondensation ? HHO->nTotalFaceUnknowns : HHO->nTotalHybridUnknowns) << " (" << (this->_staticCondensation ? "statically condensed" : "no static condensation") << ")" << endl;
 	}
 
+	//--------------------------------------------//
+	// Performs the assembly of the linear system //
+	//--------------------------------------------//
+
 	void Assemble(ActionsArguments actions) override
 	{
 		Mesh<Dim>* mesh = this->_mesh;
@@ -129,10 +134,11 @@ public:
 		if (actions.LogAssembly)
 			cout << endl << "Assembly..." << endl;
 
+		Vector globalRHS;
 		if (actions.AssembleRightHandSide)
 		{
-			this->_globalRHS = Vector(HHO->nTotalHybridUnknowns);
-			this->_globalRHS.tail(HHO->nTotalFaceUnknowns) = Vector::Zero(HHO->nTotalFaceUnknowns);
+			globalRHS = Vector(HHO->nTotalHybridUnknowns);
+			globalRHS.tail(HHO->nTotalFaceUnknowns) = Vector::Zero(HHO->nTotalFaceUnknowns);
 		}
 
 		// Compute some useful integrals on reference element and store them
@@ -181,7 +187,7 @@ public:
 		{
 			ParallelChunk<EmptyResultChunk>* chunk = parallelLoop.Chunks[threadNumber];
 
-			chunk->ThreadFuture = std::async([this, mesh, cellBasis, faceBasis, reconstructionBasis, actions, chunk, &chunksMatrixCoeffs, &chunksConsistencyCoeffs, &chunksStabilizationCoeffs, &chunksReconstructionCoeffs]()
+			chunk->ThreadFuture = std::async([this, mesh, cellBasis, faceBasis, reconstructionBasis, actions, chunk, &globalRHS, &chunksMatrixCoeffs, &chunksConsistencyCoeffs, &chunksStabilizationCoeffs, &chunksReconstructionCoeffs]()
 				{
 					BigNumber nnzApproximate = chunk->Size() * (pow(HHO->nCellUnknowns, 2) + 4 * pow(HHO->nFaceUnknowns, 2) + HHO->nCellUnknowns * 4 * HHO->nFaceUnknowns);
 					NonZeroCoefficients matrixCoeffs(nnzApproximate);
@@ -200,9 +206,9 @@ public:
 
 						if (!this->_staticCondensation)
 						{
-							//-------------//
-							// Cell / Cell //
-							//-------------//
+							//-----------------------//
+							// Att (cell/cell terms) //
+							//-----------------------//
 
 							for (BasisFunction<Dim>* cellPhi1 : cellBasis->LocalFunctions)
 							{
@@ -225,9 +231,9 @@ public:
 							}
 						}
 
-						//-------------//
-						// Cell / Face //
-						//-------------//
+						//----------------------------//
+						// Atf, Aft (cell/face terms) //
+						//----------------------------//
 
 						for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions)
 						{
@@ -255,9 +261,9 @@ public:
 							}
 						}
 
-						//-------------//
-						// Face / Face //
-						//-------------//
+						//-----------------------//
+						// Aff (face/face terms) //
+						//-----------------------//
 
 						for (auto face1 : element->Faces)
 						{
@@ -294,13 +300,13 @@ public:
 							for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions)
 							{
 								BigNumber i = DOFNumber(element, cellPhi);
-								this->_globalRHS(i) = element->SourceTerm(cellPhi, this->_sourceFunction);
+								globalRHS(i) = element->SourceTerm(cellPhi, this->_sourceFunction);
 							}
 						}
 
-						//-------------------------------------------//
-						// Global reconstruction matrix (for export) //
-						//-------------------------------------------//
+						//------------------------------------------------//
+						// Global reconstruction matrix (only for export) //
+						//------------------------------------------------//
 
 						if (actions.ExportAssemblyTermMatrices)
 						{
@@ -366,12 +372,32 @@ public:
 			chunksReconstructionCoeffs.clear();
 		}
 
+		//-----------------------------------//
+		// Delete now useless local matrices //
+		//-----------------------------------//
+
+		ElementParallelLoop<Dim> parallelLoopE(mesh->Elements);
+		parallelLoopE.Execute([](Element<Dim>* element)
+			{
+				Diff_HHOElement<Dim>* e = dynamic_cast<Diff_HHOElement<Dim>*>(element);
+				e->DeleteUselessMatricesAfterAssembly();
+			});
+
+		FaceParallelLoop<Dim> parallelLoopF(mesh->Faces);
+		parallelLoopF.Execute([](Face<Dim>* face)
+			{
+				Diff_HHOFace<Dim>* f = dynamic_cast<Diff_HHOFace<Dim>*>(face);
+				f->DeleteUselessMatricesAfterAssembly();
+			});
+
 
 		SparseMatrix extendedMatrix = SparseMatrix(HHO->nTotalHybridCoeffs, HHO->nTotalHybridCoeffs);
 		matrixCoeffs.Fill(extendedMatrix);
 
-		// Extended matrix where the Dirichlet "unknowns" are eliminated
-		this->_globalSystemMatrix = extendedMatrix.topLeftCorner(HHO->nTotalHybridUnknowns, HHO->nTotalHybridUnknowns);
+		// The global system matrix is the extended matrix where the Dirichlet "unknowns" are eliminated
+		SparseMatrix globalSystemMatrix = extendedMatrix.topLeftCorner(HHO->nTotalHybridUnknowns, HHO->nTotalHybridUnknowns);
+
+		this->Atf = globalSystemMatrix.topRightCorner(HHO->nTotalCellUnknowns, HHO->nTotalFaceUnknowns); // save this part for the reconstruction
 
 		//---------------------------------//
 		// Boundary conditions enforcement //
@@ -380,11 +406,11 @@ public:
 		// Neumann
 		if (actions.AssembleRightHandSide)
 		{
-			ParallelLoop<Face<Dim>*>::Execute(this->_mesh->NeumannFaces, [this, faceBasis](Face<Dim>* f)
+			ParallelLoop<Face<Dim>*>::Execute(this->_mesh->NeumannFaces, [this, faceBasis, &globalRHS](Face<Dim>* f)
 				{
 					Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
 					BigNumber i = FirstDOFGlobalNumber(f);
-					this->_globalRHS.segment(i, HHO->nFaceUnknowns) = face->ProjectOnBasis(faceBasis, this->_boundaryConditions->NeumannFunction);
+					globalRHS.segment(i, HHO->nFaceUnknowns) = face->ProjectOnBasis(faceBasis, this->_boundaryConditions->NeumannFunction);
 				}
 			);
 		}
@@ -400,7 +426,7 @@ public:
 			}
 		);
 		if (actions.AssembleRightHandSide)
-			this->_globalRHS -= extendedMatrix.topRightCorner(HHO->nTotalHybridUnknowns, HHO->nDirichletUnknowns) * this->_dirichletCond;
+			globalRHS -= extendedMatrix.topRightCorner(HHO->nTotalHybridUnknowns, HHO->nDirichletUnknowns) * this->_dirichletCond;
 
 		//---------------------//
 		// Static condensation //
@@ -411,11 +437,7 @@ public:
 			if (actions.LogAssembly)
 				cout << "Static condensation..." << endl;
 
-			SparseMatrix Aff = this->_globalSystemMatrix.bottomRightCorner(HHO->nTotalFaceUnknowns, HHO->nTotalFaceUnknowns);
-			SparseMatrix Atf = this->_globalSystemMatrix.topRightCorner(HHO->nTotalCellUnknowns, HHO->nTotalFaceUnknowns);
-
-			// Delete the content of _globalSystemMatrix, we don't need it anymore
-			this->_globalSystemMatrix = SparseMatrix(0, 0);
+			SparseMatrix Aff = globalSystemMatrix.bottomRightCorner(HHO->nTotalFaceUnknowns, HHO->nTotalFaceUnknowns);
 
 			SparseMatrix inverseAtt = GetInverseAtt();
 
@@ -424,15 +446,17 @@ public:
 
 			if (actions.AssembleRightHandSide)
 			{
-				Vector bt = this->_globalRHS.head(HHO->nTotalCellUnknowns);
-				Vector bf = this->_globalRHS.tail(HHO->nTotalFaceUnknowns);
+				this->bt = globalRHS.head(HHO->nTotalCellUnknowns); // save for reconstruction
+				Vector bf = globalRHS.tail(HHO->nTotalFaceUnknowns); // not used in the reconstruction, no need to save it
+
+				// Right-hand side of the condensed system
 				this->b = bf - Atf.transpose() * inverseAtt * bt;
 			}
 		}
 		else
 		{
-			this->A = this->_globalSystemMatrix;
-			this->b = this->_globalRHS;
+			this->A = globalSystemMatrix;
+			this->b = globalRHS;
 		}
 
 		if (actions.LogAssembly)
@@ -493,6 +517,9 @@ public:
 		);
 	}
 
+	//-------------------------------------------------------------------------------------------------//
+	// After solving the faces, construction of the higher-order approximation using the reconstructor //
+	//-------------------------------------------------------------------------------------------------//
 	void ReconstructHigherOrderApproximation()
 	{
 		Vector globalReconstructedSolution(HHO->nElements * HHO->nReconstructUnknowns);
@@ -503,8 +530,6 @@ public:
 			cout << "Solving cell unknowns..." << endl;
 			Vector facesSolution = this->SystemSolution;
 
-			SparseMatrix Atf = this->_globalSystemMatrix.topRightCorner(HHO->nTotalCellUnknowns, HHO->nTotalFaceUnknowns);
-			Vector bt = this->_globalRHS.head(HHO->nTotalCellUnknowns);
 			SparseMatrix inverseAtt = GetInverseAtt();
 
 			this->GlobalHybridSolution.head(HHO->nTotalCellUnknowns) = inverseAtt * (bt - Atf * facesSolution);
@@ -527,9 +552,7 @@ public:
 				Vector localHybridSolution(HHO->nCellUnknowns + HHO->nFaceUnknowns * element->Faces.size());
 				localHybridSolution.head(HHO->nCellUnknowns) = this->GlobalHybridSolution.segment(FirstDOFGlobalNumber(element), HHO->nCellUnknowns);
 				for (auto face : element->Faces)
-				{
 					localHybridSolution.segment(element->FirstDOFNumber(face), HHO->nFaceUnknowns) = this->GlobalHybridSolution.segment(FirstDOFGlobalNumber(face), HHO->nFaceUnknowns);
-				}
 
 				Vector localReconstructedSolution = element->Reconstruct(localHybridSolution);
 				globalReconstructedSolution.segment(element->Number * HHO->nReconstructUnknowns, HHO->nReconstructUnknowns) = localReconstructedSolution;
@@ -538,12 +561,13 @@ public:
 		this->ReconstructedSolution = globalReconstructedSolution;
 	}
 
+	//---------------------------------------//
+	//                Exports                //
+	//---------------------------------------//
 	void ExtractTraceSystemSolution()
 	{
 		if (this->_staticCondensation)
-		{
 			Problem<Dim>::ExportSolutionVector(this->SystemSolution, "Faces");
-		}
 	}
 
 	void ExtractHybridSolution()

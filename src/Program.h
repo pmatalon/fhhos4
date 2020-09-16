@@ -27,6 +27,8 @@ public:
 		Timer totalTimer;
 		totalTimer.Start();
 
+		cout << "Shared memory parallelism: " << (BaseParallelLoop::GetDefaultNThreads() == 1 ? "sequential execution" : to_string(BaseParallelLoop::GetDefaultNThreads()) + " threads") << endl;
+
 		GaussLegendre::Init();
 
 		//----------//
@@ -155,6 +157,7 @@ public:
 		assemblyTimer.Start();
 
 		problem->Assemble(args.Actions);
+		cout << "System storage: " << Utils::MemoryString(Utils::MemoryUsage(problem->A) + Utils::MemoryUsage(problem->b)) << endl;
 			
 		assemblyTimer.Stop();
 		cout << endl << "Assembly time: CPU = " << assemblyTimer.CPU() << ", elapsed = " << assemblyTimer.Elapsed() << endl;

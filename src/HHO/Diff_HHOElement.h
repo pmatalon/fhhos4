@@ -7,7 +7,6 @@ template <int Dim>
 class Diff_HHOElement : virtual public Element<Dim>
 {
 private:
-	DenseMatrix _cellMassMatrix;
 	DenseMatrix _projFromReconstruct;
 public:
 	HHOParameters<Dim>* HHO;
@@ -59,9 +58,9 @@ public:
 	{
 		this->HHO = hho;
 
-		this->_cellMassMatrix = this->CellMassMatrix(hho->CellBasis);
+		DenseMatrix cellMassMatrix = this->CellMassMatrix(hho->CellBasis);
 		DenseMatrix Nt = this->CellReconstructMassMatrix(hho->CellBasis, hho->ReconstructionBasis);
-		this->_projFromReconstruct = _cellMassMatrix.inverse() * Nt;
+		this->_projFromReconstruct = cellMassMatrix.inverse() * Nt;
 
 		this->AssembleReconstructionAndConsistencyMatrices();
 		this->AssembleStabilizationMatrix();
@@ -73,11 +72,6 @@ public:
 		//auto Aff = A.bottomRightCorner(nTotalFaceUnknowns, nTotalFaceUnknowns);
 		//auto Atf = A.topRightCorner(nCellUnknowns, nTotalFaceUnknowns);
 		this->invAtt = Att.inverse();
-	}
-
-	DenseMatrix CellMassMatrix()
-	{
-		return this->_cellMassMatrix;
 	}
 	
 	DenseMatrix ComputeCanonicalInjectionMatrixCoarseToFine(FunctionalBasis<Dim>* cellBasis)
@@ -430,8 +424,8 @@ private:
 				Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
 				auto normal = this->OuterNormalVector(face);
 				DenseMatrix Mf = face->FaceMassMatrix();
-				DenseMatrix ProjF = face->GetProjFromReconstruct(this);
-				DenseMatrix ProjFT = face->GetProjFromCell(this);
+				DenseMatrix ProjF = face->TraceUsingReconstructBasis(this);
+				DenseMatrix ProjFT = face->TraceUsingCellBasis(this);
 
 				DenseMatrix Df = ProjF * this->P;
 				for (int i = 0; i < Df.rows(); i++)
@@ -449,7 +443,7 @@ private:
 				Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
 				auto normal = this->OuterNormalVector(face);
 				DenseMatrix Mf = face->FaceMassMatrix();
-				DenseMatrix ProjFT = face->GetProjFromCell(this);
+				DenseMatrix ProjFT = face->TraceUsingCellBasis(this);
 
 				DenseMatrix Fpart = DenseMatrix::Zero(HHO->nFaceUnknowns, nHybridUnknowns);
 				Fpart.middleCols(FirstDOFNumber(face), HHO->nFaceUnknowns) = DenseMatrix::Identity(HHO->nFaceUnknowns, HHO->nFaceUnknowns);
@@ -596,5 +590,26 @@ public:
 	int FirstDOFNumber(Face<Dim> * face)
 	{
 		return HHO->nCellUnknowns + this->LocalNumberOf(face) * HHO->nFaceUnknowns;
+	}
+
+	//--------------------------------------------------------//
+	//        Delete matrices when they become useless        //
+	//--------------------------------------------------------//
+public:
+	void DeleteUselessMatricesAfterAssembly()
+	{
+		Utils::Empty(Acons);
+		Utils::Empty(Astab);
+		Utils::Empty(_projFromReconstruct);
+	}
+
+	void DeleteUselessMatricesAfterMultigridSetup(bool needToReconstructSolutionLater)
+	{
+		Utils::Empty(A);
+		if (!needToReconstructSolutionLater)
+		{
+			Utils::Empty(P);
+			Utils::Empty(invAtt);
+		}
 	}
 };

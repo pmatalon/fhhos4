@@ -12,18 +12,15 @@ private:
 	DenseMatrix _faceMassMatrix;
 	DenseMatrix _invFaceMassMatrix;
 
-	DenseMatrix _elem1_massCellFace;
-	DenseMatrix _elem1_massReconstructFace;
-	DenseMatrix _elem2_massCellFace;
-	DenseMatrix _elem2_massReconstructFace;
+	// Takes the trace of degree k of the reconstruction basis of element 1
+	DenseMatrix _traceFromElem1UsingReconstructBasis;
+	// Takes the trace of degree k of the reconstruction basis of element 2
+	DenseMatrix _traceFromElem2UsingReconstructBasis;
 
-	// Project a (k+1)-polynomial on the face
-	DenseMatrix _elem1_projFromReconstruct;
-	DenseMatrix _elem2_projFromReconstruct;
-
-	// Project a k-polynomial on the face
-	DenseMatrix _elem1_projFromCell;
-	DenseMatrix _elem2_projFromCell;
+	// Takes the trace of cell basis of element 1
+	DenseMatrix _traceFromElem1UsingCellBasis;
+	// Takes the trace of cell basis of element 2
+	DenseMatrix _traceFromElem2UsingCellBasis;
 public:
 	HHOParameters<Dim>* HHO;
 
@@ -41,18 +38,14 @@ public:
 
 		if (this->Element1 != nullptr)
 		{
-			this->_elem1_massReconstructFace = this->MassMatrix(HHO->FaceBasis, this->Element1, HHO->ReconstructionBasis);
-			this->_elem1_massCellFace = this->MassMatrix(HHO->FaceBasis, this->Element1, HHO->CellBasis);
-			this->_elem1_projFromReconstruct = this->_invFaceMassMatrix * _elem1_massReconstructFace;
-			this->_elem1_projFromCell = this->_invFaceMassMatrix * _elem1_massCellFace;
+			this->_traceFromElem1UsingCellBasis        = ComputeTraceMatrix(this->Element1, HHO->CellBasis);
+			this->_traceFromElem1UsingReconstructBasis = ComputeTraceMatrix(this->Element1, HHO->ReconstructionBasis);
 		}
 
 		if (this->Element2 != nullptr)
 		{
-			this->_elem2_massReconstructFace = this->MassMatrix(HHO->FaceBasis, this->Element2, HHO->ReconstructionBasis);
-			this->_elem2_massCellFace = this->MassMatrix(HHO->FaceBasis, this->Element2, HHO->CellBasis);
-			this->_elem2_projFromReconstruct = this->_invFaceMassMatrix * _elem2_massReconstructFace;
-			this->_elem2_projFromCell = this->_invFaceMassMatrix * _elem2_massCellFace;
+			this->_traceFromElem2UsingCellBasis        = ComputeTraceMatrix(this->Element2, HHO->CellBasis);
+			this->_traceFromElem2UsingReconstructBasis = ComputeTraceMatrix(this->Element2, HHO->ReconstructionBasis);
 		}
 	}
 
@@ -97,47 +90,37 @@ public:
 		return this->Integral(functionToIntegrate, polynomialDegree);
 	}
 
-	DenseMatrix GetMassCellFace(Element<Dim>* element)
+	DenseMatrix TraceUsingReconstructBasis(Element<Dim>* element)
 	{
+		assert(_traceFromElem1UsingReconstructBasis.rows() > 0);
 		if (element == this->Element1)
-			return _elem1_massCellFace;
+			return _traceFromElem1UsingReconstructBasis;
 		else if (element == this->Element2)
-			return _elem2_massCellFace;
-		assert(false);
+			return _traceFromElem2UsingReconstructBasis;
+		else
+			return ComputeTraceMatrix(element, HHO->ReconstructionBasis);
 	}
 
-	DenseMatrix GetMassReconstructFace(Element<Dim>* element)
+	DenseMatrix TraceUsingCellBasis(Element<Dim>* element)
 	{
+		assert(_traceFromElem1UsingCellBasis.rows() > 0);
 		if (element == this->Element1)
-			return _elem1_massReconstructFace;
+			return _traceFromElem1UsingCellBasis;
 		else if (element == this->Element2)
-			return _elem2_massReconstructFace;
-		assert(false);
+			return _traceFromElem2UsingCellBasis;
+		else
+			return ComputeTraceMatrix(element, HHO->CellBasis);
 	}
 
-	DenseMatrix GetProjFromReconstruct(Element<Dim>* element)
+	DenseMatrix Trace(Element<Dim>* element, FunctionalBasis<Dim>* cellInterpolationBasis)
 	{
-		if (element == this->Element1)
-			return _elem1_projFromReconstruct;
-		else if (element == this->Element2)
-			return _elem2_projFromReconstruct;
+		if (cellInterpolationBasis == HHO->CellBasis)
+			return TraceUsingCellBasis(element);
+		else if (cellInterpolationBasis == HHO->ReconstructionBasis)
+			return TraceUsingReconstructBasis(element);
+		//else
+			//return ComputeTraceMatrix(element, cellInterpolationBasis);
 		assert(false);
-	}
-
-	DenseMatrix GetProjFromCell(Element<Dim>* element)
-	{
-		if (element == this->Element1)
-			return _elem1_projFromCell;
-		else if (element == this->Element2)
-			return _elem2_projFromCell;
-		assert(false);
-	}
-
-	DenseMatrix GetProjFromCell(Element<Dim>* element, FunctionalBasis<Dim>* cellInterpolationBasis)
-	{
-		DenseMatrix massFaceCell = this->MassMatrix(HHO->FaceBasis, element, cellInterpolationBasis);
-		DenseMatrix projFromCell = this->_invFaceMassMatrix * massFaceCell;
-		return projFromCell;
 	}
 
 	double ProjectOnBasisFunction(BasisFunction<Dim - 1>* phi, DomFunction f)
@@ -191,5 +174,27 @@ public:
 		}
 
 		return J;
+	}
+
+	void DeleteUselessMatricesAfterAssembly()
+	{
+		Utils::Empty(_faceMassMatrix);
+	}
+
+	void DeleteUselessMatricesAfterMultigridSetup()
+	{
+		Utils::Empty(_invFaceMassMatrix);
+		Utils::Empty(_traceFromElem1UsingReconstructBasis);
+		Utils::Empty(_traceFromElem2UsingReconstructBasis);
+		Utils::Empty(_traceFromElem1UsingCellBasis);
+		Utils::Empty(_traceFromElem2UsingCellBasis);
+	}
+
+private:
+	DenseMatrix ComputeTraceMatrix(Element<Dim>* e, FunctionalBasis<Dim>* cellBasis)
+	{
+		assert(_invFaceMassMatrix.rows() > 0);
+		DenseMatrix massCellFace = this->MassMatrix(HHO->FaceBasis, e, cellBasis);
+		return _invFaceMassMatrix * massCellFace;
 	}
 };

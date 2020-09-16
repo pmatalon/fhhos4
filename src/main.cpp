@@ -350,7 +350,6 @@ int main(int argc, char* argv[])
 {
 	cout << "-------------------------- START --------------------------" << endl;
 	cout << "Option -h for help." << endl;
-	cout << "-----------------------------------------------------------" << endl;
 	Eigen::initParallel();
 
 	string meshDirectory = Utils::RootPath() + "/data/meshes/";

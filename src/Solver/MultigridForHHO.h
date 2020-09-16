@@ -336,6 +336,25 @@ private:
 		R = RestrictionScalingFactor() * P.transpose();
 	}
 
+	void OnEndSetup() override
+	{
+		bool needToReconstructSolutionLater = IsFinestLevel();
+
+		ElementParallelLoop<Dim> parallelLoopE(_problem->_mesh->Elements);
+		parallelLoopE.Execute([needToReconstructSolutionLater](Element<Dim>* element)
+			{
+				Diff_HHOElement<Dim>* e = dynamic_cast<Diff_HHOElement<Dim>*>(element);
+				e->DeleteUselessMatricesAfterMultigridSetup(needToReconstructSolutionLater);
+			});
+
+		FaceParallelLoop<Dim> parallelLoopF(_problem->_mesh->Faces);
+		parallelLoopF.Execute([](Face<Dim>* face)
+			{
+				Diff_HHOFace<Dim>* f = dynamic_cast<Diff_HHOFace<Dim>*>(face);
+				f->DeleteUselessMatricesAfterMultigridSetup();
+			});
+	}
+
 private:
 	double RestrictionScalingFactor()
 	{
@@ -520,7 +539,7 @@ private:
 					BigNumber faceGlobalNumber = face->Number;
 
 					double weight = Weight(element, face);
-					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, elemGlobalNumber*nCellUnknowns, weight*face->GetProjFromCell(element, _cellInterpolationBasis));
+					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, elemGlobalNumber*nCellUnknowns, weight*face->Trace(element, _cellInterpolationBasis));
 				}
 			});
 
@@ -553,7 +572,7 @@ private:
 					Element<Dim>* coarseElem = face->Element1->CoarserElement;
 					BigNumber coarseElemGlobalNumber = coarseElem->Number;
 
-					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, coarseElemGlobalNumber*nCellUnknowns, face->GetProjFromCell(coarseElem, _cellInterpolationBasis));
+					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, coarseElemGlobalNumber*nCellUnknowns, face->Trace(coarseElem, _cellInterpolationBasis));
 				}
 				else
 				{
@@ -564,11 +583,11 @@ private:
 
 					//double weight1 = Weight(coarseElem1, face->CoarseFace); // Careful with using face->CoarseFace when the mesh isn't nested...
 					double weight1 = Weight(face->Element1, face);
-					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, coarseElem1GlobalNumber*nCellUnknowns, weight1*face->GetProjFromCell(coarseElem1, _cellInterpolationBasis));
+					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, coarseElem1GlobalNumber*nCellUnknowns, weight1*face->Trace(coarseElem1, _cellInterpolationBasis));
 
 					//double weight2 = Weight(coarseElem2, face->CoarseFace);
 					double weight2 = Weight(face->Element2, face);
-					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, coarseElem2GlobalNumber*nCellUnknowns, weight2*face->GetProjFromCell(coarseElem2, _cellInterpolationBasis));
+					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, coarseElem2GlobalNumber*nCellUnknowns, weight2*face->Trace(coarseElem2, _cellInterpolationBasis));
 
 					assert(abs(weight1 + weight2 - 1) < 1e-12);
 				}
