@@ -11,6 +11,7 @@ protected:
 
 public:
 	CartesianElement(BigNumber number, DomPoint* origin, double width) :
+		Element<Dim>(number),
 		Diff_DGElement<Dim>(number),
 		Diff_HHOElement<Dim>(number)
 	{
@@ -18,6 +19,7 @@ public:
 	}
 
 	CartesianElement(BigNumber number, DomPoint* origin, double widthX, double widthY) :
+		Element<Dim>(number),
 		Diff_DGElement<Dim>(number),
 		Diff_HHOElement<Dim>(number)
 	{
@@ -25,6 +27,7 @@ public:
 	}
 
 	CartesianElement(BigNumber number, DomPoint* origin, double widthX, double widthY, double widthZ) :
+		Element<Dim>(number),
 		Diff_DGElement<Dim>(number),
 		Diff_HHOElement<Dim>(number)
 	{

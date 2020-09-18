@@ -124,7 +124,7 @@ protected:
 			return false;
 		if (IterationCount >= MaxIterations)
 			return true;
-		if (isinf(result.NormalizedResidualNorm))
+		if (std::isinf(result.NormalizedResidualNorm)) // do not remove the prefix std:: or it can become ambiguous according to the compiler
 			Utils::FatalError("divergence of the solver");
 		if (StoppingCrit == StoppingCriteria::NormalizedResidual && result.NormalizedResidualNorm < this->Tolerance)
 			return true;
