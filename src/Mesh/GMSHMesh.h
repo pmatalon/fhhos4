@@ -299,11 +299,8 @@ private:
 
 						chunk->Results.Elements.push_back(e);
 
-						if (e->Diameter() > chunk->Results.h)
-							chunk->Results.h = e->Diameter();
-
-						if (e->Regularity() < chunk->Results.regularity)
-							chunk->Results.regularity = e->Regularity();
+						chunk->Results.h          = max(chunk->Results.h,          e->Diameter());
+						chunk->Results.regularity = min(chunk->Results.regularity, e->Regularity());
 					}
 				});
 			
@@ -312,11 +309,8 @@ private:
 					for (Element<Dim>* e : chunk.Elements)
 						this->AddElement(e, false);
 
-					if (chunk.h > this->_h)
-						this->_h = chunk.h;
-
-					if (chunk.h < this->_regularity)
-						this->_regularity = chunk.h;
+					_h          = max(_h,          chunk.h);
+					_regularity = min(_regularity, chunk.regularity);
 				});
 		}
 
