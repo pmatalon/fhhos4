@@ -50,6 +50,6 @@ private:
 	{
 		double x = p.X;
 		double y = p.Y;
-		return 2 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y);
+		return 2 * (y*(1 - y) + x * (1 - x));
 	}
 };
