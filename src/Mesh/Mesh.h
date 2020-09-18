@@ -91,6 +91,11 @@ public:
 	virtual double H() = 0;
 	virtual double Regularity() = 0;
 
+	double CoarseningFactor()
+	{
+		return FineMesh ? this->H() / FineMesh->H() : 0;
+	}
+
 	BigNumber NewElementId()
 	{
 		return _currentElementId++;

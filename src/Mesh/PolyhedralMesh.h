@@ -12,6 +12,7 @@ template <int Dim>
 class PolyhedralMesh : public Mesh<Dim>
 {
 private:
+	double _h = 0;
 	double _regularity = 0;
 protected:
 	string _geometryDescription;
@@ -41,7 +42,12 @@ public:
 
 	virtual double H() override
 	{
-		assert(false);
+		if (_h == 0)
+		{
+			for (Element<Dim>* e : this->Elements)
+				_h = max(_h, e->Diameter());
+		}
+		return _h;
 	}
 
 	virtual double Regularity() override
@@ -49,10 +55,7 @@ public:
 		if (_regularity == 0)
 		{
 			for (Element<Dim>* e : this->Elements)
-			{
-				if (e->Regularity() < _regularity)
-					_regularity = e->Regularity();
-			}
+				_regularity = min(_regularity, e->Regularity());
 		}
 		return _regularity;
 	}

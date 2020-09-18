@@ -87,7 +87,17 @@ private:
 		if (_prolongationCode == Prolongation::FaceInject)
 			cout << "\t\tMesh                : " << this->_problem->_mesh->Faces.size() << " faces" << endl;
 		else
-			cout << "\t\tMesh                : " << this->_problem->_mesh->Elements.size() << " elements, regularity = " << this->_problem->_mesh->Regularity() << endl;
+		{
+			cout << "\t\tMesh                : " << this->_problem->_mesh->Elements.size() << " elements, regularity = ";
+			double regularity = this->_problem->_mesh->Regularity();
+			if (regularity == 0)
+				cout << "unknown";
+			else
+				cout << regularity;
+			if (!this->IsFinestLevel())
+				cout << ", coarsening factor = " << this->_problem->_mesh->CoarseningFactor();
+			cout << endl;
+		}
 
 		if (ExportComponents)
 			this->ExportMeshToMatlab(this->_problem->_mesh, this->Number);
