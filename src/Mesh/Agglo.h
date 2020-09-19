@@ -11,7 +11,7 @@ private:
 	list<Element<Dim>*> _elemsToAgglomerate;
 	vector<Face<Dim>*> _removedFaces;
 public:
-	Agglo(vector<Element<Dim>*> elements) :
+	Agglo(const vector<Element<Dim>*>& elements) :
 		Element<Dim>(0),
 		_vertices(elements[0]->Vertices()),
 		_elemsToAgglomerate(elements.begin()+1, elements.end())
@@ -32,13 +32,37 @@ public:
 
 		if (!_elemsToAgglomerate.empty())
 		{
-			cout << "%-------------------- Agglomerate -----------------" << endl;
-			this->ExportToMatlab("b");
-			for (Element<Dim>* e : _elemsToAgglomerate)
+			cout << "%-------------------- 1. Original elements to agglomerate -----------------" << endl;
+			for (Element<Dim>* e : elements)
 			{
-				cout << "%-------------------- Element that hasn't been agglomerated -----------------" << endl;
+				cout << "%---- Elem " << e->Number << endl;
 				e->ExportToMatlab("r");
 			}
+			cout << "%-------------------- 2. Computed agglomerate -----------------" << endl;
+			this->ExportToMatlab("b");
+			cout << "%-------------------- 3. Non-agglomerated elements -----------------" << endl;
+			for (Element<Dim>* e : _elemsToAgglomerate)
+			{
+				cout << "%---- Elem " << e->Number << endl;
+				e->ExportToMatlab("r");
+			}
+			cout << "%-------------------- 4. C++ to debug -----------------" << endl;
+			cout << setprecision(8);
+			for (Vertex* v : this->Vertices())
+			{
+				cout << "Vertex* v" << v->Number << " = new Vertex(" << v->Number << ", " << v->X << ", " << v->Y << ");" << endl;
+			}
+			for (Element<Dim>* e : elements)
+			{
+				cout << "PolygonalElement e" << e->Number << " = new PolygonalElement(" << e->Number << ", {";
+				for (Vertex* v : e->Vertices())
+					cout << "v" << v->Number << ", ";
+				cout << "}, false);" << endl;
+			}
+			cout << "Agglo* agglo = new Agglo({";
+			for (Element<Dim>* e : elements)
+				cout << "e" << e->Number << ", ";
+			cout << "});" << endl;
 			Utils::FatalError("Agglomeration failed: some elements have not been agglomerated for some reason...");
 		}
 	}
