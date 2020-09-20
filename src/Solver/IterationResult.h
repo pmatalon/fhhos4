@@ -8,6 +8,12 @@ private:
 	double _bNorm;
 	bool _computeError = false;
 	Vector _exactSolution;
+
+	double _oldResidualNorm = -1;
+	double _iterationConvRate = 0;
+	list<double> _previousItConvRates;
+	double _asymptoticConvRate = 0;
+
 	BigNumber _iterationComputationalWork = 0;
 	BigNumber _solvingComputationalWork = 0;
 	Timer _solvingTimer;
@@ -33,6 +39,8 @@ public:
 		this->_bNorm = oldResult._bNorm;
 		this->_computeError = oldResult._computeError;
 		this->_exactSolution = oldResult._exactSolution;
+		this->_oldResidualNorm = oldResult.NormalizedResidualNorm;
+		this->_previousItConvRates = oldResult._previousItConvRates;
 	}
 
 	BigNumber SolvingComputationalWork()
@@ -69,6 +77,19 @@ public:
 		this->r = r;
 		this->ResidualNorm = r.norm();
 		this->NormalizedResidualNorm = _bNorm > 0 ? ResidualNorm / _bNorm : ResidualNorm;
+
+		if (_oldResidualNorm != -1)
+		{
+			this->_iterationConvRate = this->NormalizedResidualNorm / _oldResidualNorm;
+
+			if (this->_previousItConvRates.size() == 5)
+				this->_previousItConvRates.pop_front();
+			this->_previousItConvRates.push_back(this->_iterationConvRate);
+			this->_asymptoticConvRate = 1;
+			for (double r : _previousItConvRates)
+				this->_asymptoticConvRate *= r;
+			this->_asymptoticConvRate = pow(this->_asymptoticConvRate, 1.0 / _previousItConvRates.size());
+		}
 	}
 
 	bool IsResidualSet()
@@ -91,21 +112,63 @@ public:
 
 	friend ostream& operator<<(ostream& os, const IterationResult& result)
 	{
+		int IterWidth = 3;
+		int normalizedResWidth = 17;
+		int relativeErrorWidth = 17;
+		int convRateWidth = 16;
+		int computWorkWidth = 15;
+		int cpuTimeWidth = 9;
 		if (result.IterationNumber == 0)
 		{
-			os << "It.\tNormalized res";
+			os << setw(IterWidth);
+			os << "It";
+
+			os << setw(normalizedResWidth);
+			os << "Norm. residual";
+
 			if (result.RelativeErrorNorm != -1)
-				os << "\tRelative err";
-			os << "\tComput. work";
-			os << "\tCPU time";
+			{
+				os << setw(relativeErrorWidth);
+				os << "Relative err.";
+			}
+
+			//os << setw(convRateWidth);
+			//os << "It. conv. rate";
+
+			os << setw(convRateWidth);
+			os << "Asymp. cv rate";
+
+			os << setw(computWorkWidth);
+			os << "Comput. work";
+
+			os << setw(cpuTimeWidth);
+			os << "CPU time";
 		}
 		else
 		{
-			os << result.IterationNumber << "\t" << std::scientific << result.NormalizedResidualNorm;
+			os << setw(IterWidth);
+			os << result.IterationNumber;
+
+			os << setw(normalizedResWidth);
+			os << std::scientific << result.NormalizedResidualNorm;
+			
 			if (result.RelativeErrorNorm != -1)
-				os << "\t" << result.RelativeErrorNorm;
-			os << "\t" << result._solvingComputationalWork;
-			os << "\t\t" << result._solvingTimer.CPU().InMilliseconds;
+			{
+				os << setw(relativeErrorWidth);
+				os << result.RelativeErrorNorm;
+			}
+
+			//os << setw(convRateWidth);
+			//os << std::defaultfloat << result._iterationConvRate;
+
+			os << setw(convRateWidth);
+			os << std::defaultfloat << result._asymptoticConvRate;
+
+			os << setw(computWorkWidth);
+			os << result._solvingComputationalWork;
+
+			os << setw(cpuTimeWidth);
+			os << result._solvingTimer.CPU().InMilliseconds;
 		}
 		return os;
 	}
