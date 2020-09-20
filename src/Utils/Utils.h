@@ -112,6 +112,15 @@ public:
 		return symDifference;
 	}
 
+	template <typename T>
+	static inline bool HasDuplicates(vector<T> v)
+	{
+		sort(v.begin(), v.end());
+		auto it = unique(v.begin(), v.end());
+		bool wasUnique = (it == v.end());
+		return !wasUnique;
+	}
+
 	static string FileName(const string& filePath)
 	{
 		return filePath.substr(filePath.find_last_of("/\\") + 1);

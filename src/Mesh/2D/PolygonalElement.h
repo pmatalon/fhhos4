@@ -148,8 +148,14 @@ public:
 			{
 				// We're inside the interface
 				e1Vertices.MoveNext();
-				while (Face<2>::IsInTwoFaces(facesToRemove, e1Vertices.Get()))
+				int i = 0;
+				while (Face<2>::IsInTwoFaces(facesToRemove, e1Vertices.Get()) && i++ < e1Vertices.Size())
 					e1Vertices.MoveNext();
+				if (i > e1Vertices.Size())
+				{
+					PlotMatlab(e1, e2, nullptr, nullptr);
+					Utils::FatalError("Agglomeration failed: step 1.");
+				}
 				if (!Face<2>::IsInFaces(facesToRemove, e1Vertices.Get())) // happens if the faces to remove are circular
 				{
 					assert(facesToRemove.size() == e2->Faces.size()); // which means that e2 is embedded in e1
@@ -216,8 +222,10 @@ private:
 		script.Out() << endl;
 		script.PlotPolygonEdges(e2->Vertices(), "b");
 		script.Out() << endl;
-		script.PlotText(*firstInterfaceVertex, "firstInterfaceVertex");
-		script.PlotText(*lastInterfaceVertex, "lastInterfaceVertex");
+		if (firstInterfaceVertex)
+			script.PlotText(*firstInterfaceVertex, "firstInterfaceVertex");
+		if (lastInterfaceVertex)
+			script.PlotText(*lastInterfaceVertex, "lastInterfaceVertex");
 	}
 
 public:

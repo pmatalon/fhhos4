@@ -651,7 +651,8 @@ private:
 					// Agglomeration
 					availableNeighbours.push_back(currentElem);
 					Element<Dim>* coarseElement = coarseMesh->AgglomerateFineElements(availableNeighbours);
-					elementsAreAgglomerated = true;
+					if (coarseElement)
+						elementsAreAgglomerated = true;
 
 					for (Element<Dim>* neighbour : availableNeighbours)
 						neighbour->Mutex.unlock();
@@ -1312,6 +1313,9 @@ private:
 		}
 
 		Agglo<Dim> agglo(fineElements);
+		if (!agglo.Success)
+			return nullptr;
+
 		Element<Dim>* coarseElement = CreatePolyhedron(agglo.Vertices());
 		coarseElement->PhysicalPart = fineElements[0]->PhysicalPart;
 

@@ -11,28 +11,20 @@ private:
 	list<Element<Dim>*> _elemsToAgglomerate;
 	vector<Face<Dim>*> _removedFaces;
 public:
+	bool Success = true;
+
 	Agglo(const vector<Element<Dim>*>& elements) :
 		Element<Dim>(0),
 		_vertices(elements[0]->Vertices()),
 		_elemsToAgglomerate(elements.begin()+1, elements.end())
 	{
 		this->Faces = elements[0]->Faces;
-		/*if (elements[0]->Number == 564)
-		{
-			cout << "%------------------------- Elements to agglomerate -------------------------------" << endl;
-			for (Element<Dim>* e : elements)
-			{
-				cout << "% " << *e << endl;
-				e->Shape()->ExportToMatlab();
-			}
-			cout << endl;
-		}*/
 
 		AddNeighboursRecursively(elements[0]);
 
 		if (!_elemsToAgglomerate.empty())
 		{
-			cout << "%-------------------- 1. Original elements to agglomerate -----------------" << endl;
+			/*cout << "%-------------------- 1. Original elements to agglomerate -----------------" << endl;
 			for (Element<Dim>* e : elements)
 			{
 				cout << "%---- Elem " << e->Number << endl;
@@ -44,27 +36,14 @@ public:
 			for (Element<Dim>* e : _elemsToAgglomerate)
 			{
 				cout << "%---- Elem " << e->Number << endl;
-				e->ExportToMatlab("r");
-			}
-			cout << "%-------------------- 4. C++ to debug -----------------" << endl;
-			cout << setprecision(8);
-			for (Vertex* v : this->Vertices())
-			{
-				cout << "Vertex* v" << v->Number << " = new Vertex(" << v->Number << ", " << v->X << ", " << v->Y << ");" << endl;
-			}
-			for (Element<Dim>* e : elements)
-			{
-				cout << "PolygonalElement e" << e->Number << " = new PolygonalElement(" << e->Number << ", {";
-				for (Vertex* v : e->Vertices())
-					cout << "v" << v->Number << ", ";
-				cout << "}, false);" << endl;
-			}
-			cout << "Agglo* agglo = new Agglo({";
-			for (Element<Dim>* e : elements)
-				cout << "e" << e->Number << ", ";
-			cout << "});" << endl;
-			Utils::FatalError("Agglomeration failed: some elements have not been agglomerated for some reason...");
+				e->ExportToMatlab("m");
+			}*/
+
+			// The agglomeration results in surrounding an element that wasn't part of the agglomeration because it had no face in common with the current element.
+			Success = false;
 		}
+		else if (Utils::HasDuplicates(_vertices))
+			Success = false; // non-simple polygon
 	}
 
 	inline vector<Vertex*> Vertices() const override
@@ -98,12 +77,6 @@ private:
 				}
 
 				_removedFaces = Utils::Join(_removedFaces, interfaceFaces);
-				// Agglomeration
-				/*if (e->Number == 534)
-				{
-					this->ExportToMatlab("b");
-					cout << endl;
-				}*/
 				this->Agglomerate(neighbour, interfaceFaces);
 				this->Faces = Utils::SymmetricDifference<Face<Dim>*>(this->Faces, neighbour->Faces);
 				_elemsToAgglomerate.erase(it);
@@ -146,16 +119,5 @@ public:
 template<>
 void Agglo<2>::Agglomerate(Element<2>* e, const vector<Face<2>*>& interfaceFaces)
 {
-	/*if (e->Number == 534 && interfaceFaces.size() == 3)
-	{
-		MatlabScript script;
-		cout << "%------------------------- Current agglomeration --------------------------------" << endl;
-		script.PlotPolygonEdges(this->Vertices(), "m");
-		cout << "%------------------------- Adding this element --------------------------------" << endl;
-		script.PlotPolygonEdges(e->Vertices(), "c");
-	}*/
 	_vertices = PolygonalElement::MacroPolygonVertices(this, e, interfaceFaces);
-	//cout << "%------------------------- Result --------------------------------" << endl;
-	//script.PlotPolygonEdges(this->Vertices(), "r");
-	//cout << endl;
 }
