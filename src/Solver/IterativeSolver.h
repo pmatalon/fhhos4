@@ -111,6 +111,7 @@ protected:
 		if (this->ComputeExactSolution)
 			result.SetExactSolution(this->_exactSolution);
 		result.SetX(x);
+		result.SetTolerance(this->Tolerance);
 		return result;
 	}
 

@@ -13,6 +13,7 @@ private:
 	double _iterationConvRate = 0;
 	list<double> _previousItConvRates;
 	double _asymptoticConvRate = 0;
+	double _tolerance = 1e-8;
 
 	BigNumber _iterationComputationalWork = 0;
 	BigNumber _solvingComputationalWork = 0;
@@ -41,6 +42,7 @@ public:
 		this->_exactSolution = oldResult._exactSolution;
 		this->_oldResidualNorm = oldResult.NormalizedResidualNorm;
 		this->_previousItConvRates = oldResult._previousItConvRates;
+		this->_tolerance = oldResult._tolerance;
 	}
 
 	BigNumber SolvingComputationalWork()
@@ -70,6 +72,11 @@ public:
 	{
 		this->_exactSolution = exactSolution;
 		this->_computeError = true;
+	}
+
+	void SetTolerance(double tol)
+	{
+		this->_tolerance = tol;
 	}
 
 	void SetResidual(const Vector& r)
@@ -116,8 +123,10 @@ public:
 		int normalizedResWidth = 17;
 		int relativeErrorWidth = 17;
 		int convRateWidth = 16;
+		int predictedIterationsWidth = 14;
 		int computWorkWidth = 15;
-		int cpuTimeWidth = 9;
+		int cpuTimeWidth = 10;
+		int remainingTimeWidth = 16;
 		if (result.IterationNumber == 0)
 		{
 			os << setw(IterWidth);
@@ -138,11 +147,17 @@ public:
 			os << setw(convRateWidth);
 			os << "Asymp. cv rate";
 
+			os << setw(predictedIterationsWidth);
+			os << "Predic. it.";
+
 			os << setw(computWorkWidth);
 			os << "Comput. work";
 
 			os << setw(cpuTimeWidth);
 			os << "CPU time";
+
+			os << setw(remainingTimeWidth);
+			os << "Remaining time";
 		}
 		else
 		{
@@ -164,11 +179,21 @@ public:
 			os << setw(convRateWidth);
 			os << std::defaultfloat << result._asymptoticConvRate;
 
+			os << setw(predictedIterationsWidth);
+			int remainingIterations = abs(ceil(log(result._tolerance / result.NormalizedResidualNorm) / log(result._asymptoticConvRate)));
+			os << result.IterationNumber + remainingIterations;
+
 			os << setw(computWorkWidth);
 			os << result._solvingComputationalWork;
 
 			os << setw(cpuTimeWidth);
 			os << result._solvingTimer.CPU().InMilliseconds;
+
+			os << setw(remainingTimeWidth);
+			Duration d(result._solvingTimer.CPU().InMilliseconds / result.IterationNumber * remainingIterations);
+			stringstream ss;
+			ss << d;
+			os << ss.str().substr(0, 8);
 		}
 		return os;
 	}
