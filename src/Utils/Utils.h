@@ -52,6 +52,14 @@ public:
 	{
 		M = DenseMatrix(0, 0);
 	}
+	static void Empty(SparseMatrix& M)
+	{
+		M = SparseMatrix(0, 0);
+	}
+	static void Empty(Vector& v)
+	{
+		v = Vector(0);
+	}
 
 	static size_t MemoryUsage(const SparseMatrix& M)
 	{

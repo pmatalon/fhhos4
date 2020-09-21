@@ -603,13 +603,13 @@ public:
 		Utils::Empty(_projFromReconstruct);
 	}
 
-	void DeleteUselessMatricesAfterMultigridSetup(bool needToReconstructSolutionLater)
+	void DeleteUselessMatricesAfterMultigridSetup()
 	{
 		Utils::Empty(A);
-		if (!needToReconstructSolutionLater)
+		/*if (!needToReconstructSolutionLater)
 		{
 			Utils::Empty(P);
 			Utils::Empty(invAtt);
-		}
+		}*/
 	}
 };

@@ -421,10 +421,7 @@ protected:
 
 public:
 	virtual ~GMSHMesh()
-	{
-		if (!this->CoarseMesh)
-			gmsh::finalize();
-	}
+	{}
 
 	string Description() override
 	{

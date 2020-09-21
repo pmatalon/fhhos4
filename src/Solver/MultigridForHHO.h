@@ -348,21 +348,28 @@ private:
 
 	void OnEndSetup() override
 	{
-		bool needToReconstructSolutionLater = IsFinestLevel();
+		// If finest level, delete everything you don't need to reconstruct the solution at the end
+		if (IsFinestLevel())
+		{
+			ElementParallelLoop<Dim> parallelLoopE(_problem->_mesh->Elements);
+			parallelLoopE.Execute([](Element<Dim>* element)
+				{
+					Diff_HHOElement<Dim>* e = dynamic_cast<Diff_HHOElement<Dim>*>(element);
+					e->DeleteUselessMatricesAfterMultigridSetup();
+				});
 
-		ElementParallelLoop<Dim> parallelLoopE(_problem->_mesh->Elements);
-		parallelLoopE.Execute([needToReconstructSolutionLater](Element<Dim>* element)
-			{
-				Diff_HHOElement<Dim>* e = dynamic_cast<Diff_HHOElement<Dim>*>(element);
-				e->DeleteUselessMatricesAfterMultigridSetup(needToReconstructSolutionLater);
-			});
+			FaceParallelLoop<Dim> parallelLoopF(_problem->_mesh->Faces);
+			parallelLoopF.Execute([](Face<Dim>* face)
+				{
+					Diff_HHOFace<Dim>* f = dynamic_cast<Diff_HHOFace<Dim>*>(face);
+					f->DeleteUselessMatricesAfterMultigridSetup();
+				});
+		}
 
-		FaceParallelLoop<Dim> parallelLoopF(_problem->_mesh->Faces);
-		parallelLoopF.Execute([](Face<Dim>* face)
-			{
-				Diff_HHOFace<Dim>* f = dynamic_cast<Diff_HHOFace<Dim>*>(face);
-				f->DeleteUselessMatricesAfterMultigridSetup();
-			});
+		// On the coarse levels, delete the whole mesh
+		_problem->_mesh->CoarseMesh = nullptr;
+		if (!IsFinestLevel())
+			delete _problem->_mesh;
 	}
 
 private:

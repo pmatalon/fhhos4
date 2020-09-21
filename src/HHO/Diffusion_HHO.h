@@ -462,6 +462,13 @@ public:
 		if (actions.LogAssembly)
 			cout << Utils::MatrixInfo(this->A, "A") << endl;
 
+		if (!actions.AssembleRightHandSide)
+		{
+			// We won't be reconstructing the solution, so ne need to keep that
+			Utils::Empty(this->Atf);
+			Utils::Empty(this->_dirichletCond);
+		}
+
 		//------------------//
 		//      Export      //
 		//------------------//

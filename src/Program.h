@@ -79,6 +79,13 @@ public:
 			{
 				if (!Utils::IsRefinementStrategy(args.Solver.MG.CoarseningStgy))
 				{
+					/*Mesh<Dim>* m = mesh;
+					while (true)
+					{
+						cout << "Coarsening..." << endl;
+						m->CoarsenMesh(args.Solver.MG.CoarseningStgy);
+						m = m->CoarseMesh;
+					}*/
 					mesh->ExportFacesToMatlab(args.OutputDirectory + "/fine.dat");
 					mesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_fine.m");
 
@@ -247,6 +254,8 @@ public:
 		//--------------------------//
 		
 		delete mesh;
+		if (args.Discretization.Mesher.compare("gmsh") == 0)
+			gmsh::finalize();
 		if (args.Discretization.Method.compare("dg") == 0)
 		{
 			Diffusion_DG<Dim>* dgPb = static_cast<Diffusion_DG<Dim>*>(problem);

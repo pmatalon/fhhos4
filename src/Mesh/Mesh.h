@@ -62,6 +62,7 @@ class Mesh
 {
 private:
 	atomic<uint32_t> _currentElementId{ 0 };
+	double _coarseningFactor = 0;
 public:
 	vector<Vertex*> Vertices;
 	vector<Element<Dim>*> Elements;
@@ -93,7 +94,7 @@ public:
 
 	double CoarseningFactor()
 	{
-		return FineMesh ? this->H() / FineMesh->H() : 0;
+		return _coarseningFactor;
 	}
 
 	BigNumber NewElementId()
@@ -338,13 +339,14 @@ protected:
 		CoarseMesh->FinalizeCreation();
 		CoarseMesh->FillBoundaryAndInteriorFaceLists();
 		CoarseMesh->FillDirichletAndNeumannFaceLists();
-
 		CoarseMesh->InitFinerElementsLocalNumbering();
+		CoarseMesh->_coarseningFactor = CoarseMesh->H() / this->H();
 	}
 
 	virtual void FinalizeRefinement()
 	{
 		this->InitFinerElementsLocalNumbering();
+		this->_coarseningFactor = this->H() / FineMesh->H();
 	}
 
 	void FillBoundaryAndInteriorFaceLists()
