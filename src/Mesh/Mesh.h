@@ -431,7 +431,7 @@ protected:
 				{
 					vector<Face<Dim>*> coarseFaces = coarseElement1->InterfaceWith(coarseElement2);
 					assert(!coarseFaces.empty());
-					Face<Dim>* closestCoarseFace = fineFace->ClosestFaceAmongst(fineFace->Element1->CoarserElement->Faces, false);
+					Face<Dim>* closestCoarseFace = fineFace->ClosestFaceAmongst(coarseFaces, false);
 					assert(closestCoarseFace && "A coarse face should have been found.");
 
 					fineFace->CoarseFace = closestCoarseFace;
@@ -626,6 +626,32 @@ public:
 						assert(!ff->CoarseFace->BoundaryPart && "This fine face has no BoundaryPart but its coarsened one has one.");
 				}
 			}
+
+
+			struct ChunkResult { double total = 0; };
+			ParallelLoop<Element<Dim>*, ChunkResult> parallelLoopFine(this->Elements);
+			parallelLoopFine.Execute([](Element<Dim>* e, ParallelChunk<ChunkResult>* chunk)
+				{
+					chunk->Results.total += e->Measure();
+				});
+			double fineMeshTotalMeasure = 0;
+			parallelLoopFine.AggregateChunkResults([&fineMeshTotalMeasure](ChunkResult& chunk)
+				{
+					fineMeshTotalMeasure += chunk.total;
+				});
+			
+			ParallelLoop<Element<Dim>*, ChunkResult> parallelLoopCoarse(CoarseMesh->Elements);
+			parallelLoopCoarse.Execute([](Element<Dim>* e, ParallelChunk<ChunkResult>* chunk)
+				{
+					chunk->Results.total += e->Measure();
+				});
+			double coarseMeshTotalMeasure = 0;
+			parallelLoopCoarse.AggregateChunkResults([&coarseMeshTotalMeasure](ChunkResult& chunk)
+				{
+					coarseMeshTotalMeasure += chunk.total;
+				});
+
+			assert(abs(coarseMeshTotalMeasure - fineMeshTotalMeasure) < 1e-12 && "Fine and coarse meshes should have the same total measure.");
 
 			
 			Mesh<Dim>* meshToGetInfo = nullptr;
