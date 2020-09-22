@@ -16,11 +16,11 @@ public:
 
 	//-----------------------//
 
-	inline DimMatrix<Dim> InverseJacobianTranspose(RefPoint p) const override
+	inline DimMatrix<Dim> InverseJacobianTranspose(const RefPoint& p) const override
 	{
 		return InverseJacobianTranspose();
 	}
-	inline double DetJacobian(RefPoint p) const override
+	inline double DetJacobian(const RefPoint& p) const override
 	{
 		return DetJacobian();
 	}
@@ -54,7 +54,7 @@ public:
 
 		DimMatrix<Dim> invJ = InverseJacobianTranspose();
 
-		RefFunction functionToIntegrate = [phi1, phi2, invJ](RefPoint p) {
+		RefFunction functionToIntegrate = [phi1, phi2, invJ](const RefPoint& p) {
 			DimVector<Dim> gradPhi1 = invJ * phi1->Grad(p);
 			DimVector<Dim> gradPhi2 = invJ * phi2->Grad(p);
 			return gradPhi1.dot(gradPhi2);
@@ -71,7 +71,7 @@ public:
 
 		DimMatrix<Dim> invJ = InverseJacobianTranspose();
 
-		RefFunction functionToIntegrate = [K, phi1, phi2, invJ](RefPoint p) {
+		RefFunction functionToIntegrate = [K, phi1, phi2, invJ](const RefPoint& p) {
 			DimVector<Dim> gradPhi1 = invJ * phi1->Grad(p);
 			DimVector<Dim> gradPhi2 = invJ * phi2->Grad(p);
 			return (K * gradPhi1).dot(gradPhi2);

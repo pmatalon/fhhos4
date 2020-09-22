@@ -54,14 +54,14 @@ public:
 	}
 
 private:
-	static double Source(DomPoint p)
+	static double Source(const DomPoint& p)
 	{
 		double x = p.X;
 		double y = p.Y;
 		return 2 * pow(4 * M_PI, 2) * sin(4 * M_PI * x)*sin(4 * M_PI * y);
 	}
 
-	static double Solution(DomPoint p)
+	static double Solution(const DomPoint& p)
 	{
 		double x = p.X;
 		double y = p.Y;

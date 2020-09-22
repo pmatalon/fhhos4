@@ -8,8 +8,8 @@ class BasisFunction
 {
 public:
 	int LocalNumber = -1;
-	virtual double Eval(RefPoint p) = 0;
-	virtual DimVector<Dim> Grad(RefPoint p) = 0;
+	virtual double Eval(const RefPoint& p) = 0;
+	virtual DimVector<Dim> Grad(const RefPoint& p) = 0;
 	virtual int GetDegree() = 0;
 	virtual string ToString() = 0;
 	virtual ~BasisFunction() {}
@@ -22,11 +22,11 @@ public:
 	{
 		this->LocalNumber = 0;
 	}
-	double Eval(RefPoint p) override
+	double Eval(const RefPoint& p) override
 	{
 		return 1;
 	}
-	virtual DimVector<0> Grad(RefPoint p) override
+	virtual DimVector<0> Grad(const RefPoint& p) override
 	{
 		return DimVector<0>();
 	}
@@ -46,7 +46,7 @@ public:
 	virtual double Eval(double x) = 0;
 	virtual double EvalDerivative(double x) = 0;
 
-	DimVector<1> Grad(RefPoint p) override
+	DimVector<1> Grad(const RefPoint& p) override
 	{
 		return this->Grad(p.X);
 	}
@@ -56,7 +56,7 @@ public:
 		g << EvalDerivative(x);
 		return g;
 	}
-	double Eval(RefPoint p) override
+	double Eval(const RefPoint& p) override
 	{
 		return Eval(p.X);
 	}
@@ -76,7 +76,7 @@ public:
 	virtual double Eval(double x, double y) = 0;
 	virtual double EvalGradX(double x, double y) = 0;
 	virtual double EvalGradY(double x, double y) = 0;
-	double Eval(RefPoint p) override
+	double Eval(const RefPoint& p) override
 	{
 		return Eval(p.X, p.Y);
 	}
@@ -86,7 +86,7 @@ public:
 		g << EvalGradX(x, y), EvalGradY(x, y);
 		return g;
 	}
-	DimVector<2> Grad(RefPoint p) override
+	DimVector<2> Grad(const RefPoint& p) override
 	{
 		return this->Grad(p.X, p.Y);
 	}
@@ -99,7 +99,7 @@ public:
 	virtual double EvalGradX(double x, double y, double z) = 0;
 	virtual double EvalGradY(double x, double y, double z) = 0;
 	virtual double EvalGradZ(double x, double y, double z) = 0;
-	double Eval(RefPoint p) override
+	double Eval(const RefPoint& p) override
 	{
 		return Eval(p.X, p.Y, p.Z);
 	}
@@ -109,7 +109,7 @@ public:
 		g << EvalGradX(x, y, z), EvalGradY(x, y, z), EvalGradZ(x, y, z);
 		return g;
 	}
-	DimVector<3> Grad(RefPoint p) override
+	DimVector<3> Grad(const RefPoint& p) override
 	{
 		return this->Grad(p.X, p.Y, p.Z);
 	}

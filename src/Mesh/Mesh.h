@@ -37,7 +37,7 @@ public:
 	MeshVertex(BigNumber number, double x) : Vertex(number, x) {}
 	MeshVertex(BigNumber number, double x, double y) : Vertex(number, x, y) {}
 	MeshVertex(BigNumber number, double x, double y, double z) : Vertex(number, x, y, z) {}
-	MeshVertex(BigNumber number, DomPoint p) : Vertex(number, p) {}
+	MeshVertex(BigNumber number, const DomPoint& p) : Vertex(number, p) {}
 	MeshVertex(const Vertex v) : Vertex(v) {}
 
 	bool IsVertexOf(Element<Dim>* e)

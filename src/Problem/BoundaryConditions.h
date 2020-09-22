@@ -43,7 +43,7 @@ public:
 		return BoundaryConditionType::Dirichlet;
 	}
 
-	static double Homogeneous(DomPoint p)
+	static double Homogeneous(const DomPoint& p)
 	{
 		return 0.0;
 	};

@@ -395,7 +395,7 @@ private:
 		// Scaling conservation:
 		// Actually rescales correctly, but that's not what we want //
 		/*Diffusion_HHO<Dim>* finePb = this->_problem;
-		DomFunction constantOne = [](DomPoint p) { return 1; };
+		DomFunction constantOne = [](const DomPoint& p) { return 1; };
 		Vector constantOneDoFs = finePb->ProjectOnFaceDiscreteSpace(constantOne);
 
 		double skeletonMeasure = 0;
@@ -413,7 +413,7 @@ private:
 		//------------- Try 4 -------------//
 		/*Diffusion_HHO<Dim>* finePb = this->_problem;
 		Diffusion_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
-		DomFunction constantOne = [](DomPoint p) { return 1; };
+		DomFunction constantOne = [](const DomPoint& p) { return 1; };
 		Vector constantOneDoFs = coarsePb->ProjectOnFaceDiscreteSpace(constantOne);
 
 		double coarseProduct = constantOneDoFs.transpose() * coarsePb->A * constantOneDoFs;
@@ -843,7 +843,7 @@ public:
 		Vector initialGuess;
 		if (initialGuessCode.compare("smooth") == 0)
 		{
-			DomFunction coarseErrorFunction = [](DomPoint p)
+			DomFunction coarseErrorFunction = [](const DomPoint& p)
 			{
 				double x = p.X;
 				double y = p.Y;

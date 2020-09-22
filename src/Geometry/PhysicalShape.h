@@ -19,16 +19,16 @@ public:
 
 	virtual bool IsConvex() const = 0;
 
-	virtual bool Contains(DomPoint p) const = 0;
+	virtual bool Contains(const DomPoint& p) const = 0;
 
 	virtual bool IsDegenerated() const = 0;
 
 	// Transformation to reference element
-	virtual DomPoint ConvertToDomain(RefPoint refPoint) const = 0; // Mapping
-	virtual RefPoint ConvertToReference(DomPoint domainPoint) const = 0; // Inverse mapping
+	virtual DomPoint ConvertToDomain(const RefPoint& refPoint) const = 0; // Mapping
+	virtual RefPoint ConvertToReference(const DomPoint& domainPoint) const = 0; // Inverse mapping
 
-	virtual DimMatrix<Dim> InverseJacobianTranspose(RefPoint p) const = 0;
-	virtual double DetJacobian(RefPoint p) const = 0;
+	virtual DimMatrix<Dim> InverseJacobianTranspose(const RefPoint& p) const = 0;
+	virtual double DetJacobian(const RefPoint& p) const = 0;
 	virtual int DetJacobianDegree() const = 0;
 
 	virtual PhysicalShape<Dim>* CreateCopy() const = 0;
@@ -144,7 +144,7 @@ public:
 
 	virtual double Integral(RefFunction f) const override
 	{
-		RefFunction func = [this, f](RefPoint p) {
+		RefFunction func = [this, f](const RefPoint& p) {
 			return DetJacobian(p) * f(p);
 		};
 		return RefShape()->Integral(func);
@@ -152,7 +152,7 @@ public:
 
 	virtual double Integral(RefFunction f, int polynomialDegree) const override
 	{
-		RefFunction func = [this, f](RefPoint p) {
+		RefFunction func = [this, f](const RefPoint& p) {
 			return DetJacobian(p) * f(p);
 		};
 		return RefShape()->Integral(func, polynomialDegree + DetJacobianDegree());
@@ -160,7 +160,7 @@ public:
 
 	virtual double Integral(DomFunction globalFunction) const
 	{
-		RefFunction refFunction = [this, globalFunction](RefPoint refElementPoint) {
+		RefFunction refFunction = [this, globalFunction](const RefPoint& refElementPoint) {
 			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
 			return globalFunction(domainPoint);
 		};
@@ -170,7 +170,7 @@ public:
 
 	virtual double Integral(DomFunction globalFunction, int polynomialDegree) const
 	{
-		RefFunction refFunction = [this, globalFunction](RefPoint refElementPoint) {
+		RefFunction refFunction = [this, globalFunction](const RefPoint& refElementPoint) {
 			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
 			return globalFunction(domainPoint);
 		};
@@ -187,7 +187,7 @@ public:
 		if (phi1->GetDegree() == 0 || phi2->GetDegree() == 0)
 			return 0;
 
-		RefFunction functionToIntegrate = [this, phi1, phi2](RefPoint p) {
+		RefFunction functionToIntegrate = [this, phi1, phi2](const RefPoint& p) {
 			DimMatrix<Dim> invJ = InverseJacobianTranspose(p);
 			DimVector<Dim> gradPhi1 = invJ * phi1->Grad(p);
 			DimVector<Dim> gradPhi2 = invJ * phi2->Grad(p);
@@ -203,7 +203,7 @@ public:
 		if (phi1->GetDegree() == 0 || phi2->GetDegree() == 0)
 			return 0;
 
-		RefFunction functionToIntegrate = [this, K, phi1, phi2](RefPoint p) {
+		RefFunction functionToIntegrate = [this, K, phi1, phi2](const RefPoint& p) {
 			DimMatrix<Dim> invJ = InverseJacobianTranspose(p);
 			DimVector<Dim> gradPhi1 = invJ * phi1->Grad(p);
 			DimVector<Dim> gradPhi2 = invJ * phi2->Grad(p);

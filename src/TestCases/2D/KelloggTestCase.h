@@ -49,12 +49,12 @@ public:
 	}
 
 private:
-	static double Source(DomPoint p)
+	static double Source(const DomPoint& p)
 	{
 		return 0;
 	}
 
-	static double Solution(DomPoint p)
+	static double Solution(const DomPoint& p)
 	{
 		// Conversion from [0,1]x[0,1] to [-1,1]x[-1,1]
 		double x = 2 * p.X - 1;

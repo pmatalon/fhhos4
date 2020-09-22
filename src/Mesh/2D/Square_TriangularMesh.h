@@ -255,8 +255,8 @@ public:
 	void SanityCheck() override
 	{
 		Mesh::SanityCheck();
-		RefFunction refX = [](RefPoint p) { return p.X; };
-		DomFunction domX = [](DomPoint p) { return p.X; };
+		RefFunction refX = [](const RefPoint& p) { return p.X; };
+		DomFunction domX = [](const DomPoint& p) { return p.X; };
 
 		for (auto e : this->Elements)
 		{

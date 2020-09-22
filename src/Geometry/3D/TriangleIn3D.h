@@ -121,7 +121,7 @@ public:
 	{
 		return _inRadius;
 	}
-	inline bool Contains(DomPoint p) const override
+	inline bool Contains(const DomPoint& p) const override
 	{
 		return Triangle::TriangleContains(*V1, *V2, *V3, p, _measure);
 	}
@@ -135,7 +135,7 @@ public:
 		assert(false);
 	}
 
-	DomPoint ConvertToDomain(RefPoint refPoint) const
+	DomPoint ConvertToDomain(const RefPoint& refPoint) const
 	{
 		double t = refPoint.X;
 		double u = refPoint.Y;
@@ -147,7 +147,7 @@ public:
 		return p;
 	}
 
-	RefPoint ConvertToReference(DomPoint domainPoint) const
+	RefPoint ConvertToReference(const DomPoint& domainPoint) const
 	{
 		double x = domainPoint.X;
 		double y = domainPoint.Y;

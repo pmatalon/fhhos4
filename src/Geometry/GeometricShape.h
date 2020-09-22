@@ -37,7 +37,7 @@ public:
 
 	virtual double Integral(BasisFunction<Dim>* phi) const
 	{
-		RefFunction func = [phi](RefPoint p) {
+		RefFunction func = [phi](const RefPoint& p) {
 			return phi->Eval(p);
 		};
 		return Integral(func, phi->GetDegree());
@@ -77,7 +77,7 @@ protected:
 
 	double ComputeMassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
 	{
-		RefFunction functionToIntegrate = [phi1, phi2](RefPoint p) {
+		RefFunction functionToIntegrate = [phi1, phi2](const RefPoint& p) {
 			return phi1->Eval(p)*phi2->Eval(p);
 		};
 
@@ -92,8 +92,8 @@ protected:
 public:
 	virtual void UnitTests() const
 	{
-		RefFunction refOne = [](RefPoint p) { return 1; };
-		DomFunction domOne = [](DomPoint p) { return 1; };
+		RefFunction refOne = [](const RefPoint& p) { return 1; };
+		DomFunction domOne = [](const DomPoint& p) { return 1; };
 
 		double measure = Measure();
 

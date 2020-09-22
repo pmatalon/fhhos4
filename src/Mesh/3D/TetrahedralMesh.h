@@ -215,7 +215,7 @@ protected:
 		this->FinalizeRefinement();
 	}
 
-	MeshVertex<3>* ExistingNewVertex(map<DomPoint, MeshVertex<3>*> &newVertices, DomPoint p)
+	MeshVertex<3>* ExistingNewVertex(map<DomPoint, MeshVertex<3>*> &newVertices, const DomPoint& p)
 	{
 		map<DomPoint, MeshVertex<3>*>::iterator it = newVertices.find(p);
 		if (it != newVertices.end())

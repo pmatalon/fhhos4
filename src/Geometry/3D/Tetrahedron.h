@@ -123,12 +123,12 @@ public:
 	{
 		return _inRadius;
 	}
-	inline bool Contains(DomPoint p) const override
+	inline bool Contains(const DomPoint& p) const override
 	{
 		return TetrahedronContains(*V1, *V2, *V3, *V4, p, _measure);
 	}
 
-	static bool TetrahedronContains(DomPoint A, DomPoint B, DomPoint C, DomPoint D, DomPoint P, double tetraVolume)
+	static bool TetrahedronContains(const DomPoint& A, const DomPoint& B, const DomPoint& C, const DomPoint& D, const DomPoint& P, double tetraVolume)
 	{
 		// Barycentric coordinates
 		double alpha = Tetrahedron::Volume(P, B, C, D) / tetraVolume;
@@ -144,7 +144,7 @@ public:
 			&& (abs(alpha + beta + gamma + delta - 1) < tol); // alpha + beta + gamma + delta = 1
 	}
 
-	static double Volume(DomPoint A, DomPoint B, DomPoint C, DomPoint D)
+	static double Volume(const DomPoint& A, const DomPoint& B, const DomPoint& C, const DomPoint& D)
 	{
 		DimMatrix<3> m;
 		m.col(0) = Vect<3>(A, B);
@@ -163,7 +163,7 @@ public:
 	}
 
 	// Mapping
-	DomPoint ConvertToDomain(RefPoint refPoint) const
+	DomPoint ConvertToDomain(const RefPoint& refPoint) const
 	{
 		double t = refPoint.X;
 		double u = refPoint.Y;
@@ -177,7 +177,7 @@ public:
 	}
 
 	// Inverse mapping
-	RefPoint ConvertToReference(DomPoint domainPoint) const
+	RefPoint ConvertToReference(const DomPoint& domainPoint) const
 	{
 		DimVector<3> tuv = _inverseMapping * Vect<3>(*V1, domainPoint);
 		RefPoint p(tuv(0), tuv(1), tuv(2));

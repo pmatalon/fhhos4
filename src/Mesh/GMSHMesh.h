@@ -592,7 +592,7 @@ private:
 		return GetElementFromGMSHTag(coarseElementTag);
 	}
 
-	size_t LocateGMSHElementContaining(DomPoint p)
+	size_t LocateGMSHElementContaining(const DomPoint& p)
 	{
 		size_t elementTag;
 		int elementType;

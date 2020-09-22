@@ -32,12 +32,12 @@ public:
 		return "Polynomial function";
 	}
 
-	static double Source(DomPoint p)
+	static double Source(const DomPoint& p)
 	{
 		return 2;
 	}
 
-	static double Solution(DomPoint p)
+	static double Solution(const DomPoint& p)
 	{
 		double x = p.X;
 		return x * (1 - x);

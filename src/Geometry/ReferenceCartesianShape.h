@@ -142,7 +142,7 @@ public:
 		if (phi1->GetDegree() == 0 || phi2->GetDegree() == 0)
 			return 0;
 
-		RefFunction functionToIntegrate = [phi1, phi2](RefPoint p) {
+		RefFunction functionToIntegrate = [phi1, phi2](const RefPoint& p) {
 			return phi1->Grad(p).dot(phi2->Grad(p));
 		};
 
@@ -156,7 +156,7 @@ public:
 		if (phi1->GetDegree() == 0 || phi2->GetDegree() == 0)
 			return 0;
 
-		RefFunction functionToIntegrate = [K, phi1, phi2](RefPoint p) {
+		RefFunction functionToIntegrate = [K, phi1, phi2](const RefPoint& p) {
 			return (K * phi1->Grad(p)).dot(phi2->Grad(p));
 		};
 

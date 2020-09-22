@@ -26,7 +26,7 @@ public:
 		return _file.is_open() ? _file : std::cout;
 	}
 
-	void PlotPoint(DomPoint p, string options)
+	void PlotPoint(const DomPoint& p, string options)
 	{
 		Out() << "plot(axes, " << p.X << ", " << p.Y << ",'" << options << "');" << endl;
 	}
@@ -36,7 +36,7 @@ public:
 		PlotSegment(*v1, *v2, color);
 	}
 
-	void PlotSegment(DomPoint p1, DomPoint p2, string color)
+	void PlotSegment(const DomPoint& p1, const DomPoint& p2, string color)
 	{
 		Out() << "plot(axes, [" << p1.X << "; " << p2.X << "], [" << p1.Y << "; " << p2.Y << "], 'LineWidth', 1, 'Color', '" << color << "');" << endl;
 		// use plot3 in 3D
@@ -53,12 +53,12 @@ public:
 		}
 	}
 
-	void PlotTriangle(DomPoint A, DomPoint B, DomPoint C, string color)
+	void PlotTriangle(const DomPoint& A, const DomPoint& B, const DomPoint& C, string color)
 	{
 		Out() << "fill(axes, [" << A.X << ";" << B.X << ";" << C.X << "], [" << A.Y << "; " << B.Y << ";" << C.Y << "], '" << color << "', 'LineStyle','none', 'FaceAlpha', 0.5);" << endl;
 	}
 
-	void PlotText(DomPoint p, string text, string color = "k")
+	void PlotText(const DomPoint& p, string text, string color = "k")
 	{
 		Out() << "text(axes, " << p.X << ", " << p.Y << ", '" << text << "', 'Color', '" << color << "');" << endl;
 	}

@@ -20,7 +20,7 @@ public:
 	{
 		this->Number = number;
 	}
-	Vertex(BigNumber number, DomPoint p) : DomPoint(p)
+	Vertex(BigNumber number, const DomPoint& p) : DomPoint(p)
 	{
 		this->Number = number;
 	}
@@ -106,7 +106,7 @@ bool AreCollinear(DimVector<Dim> v1, DimVector<Dim> v2)
 }
 
 template<int Dim>
-DomPoint AddVector(DomPoint p, DimVector<Dim> v)
+DomPoint AddVector(const DomPoint& p, DimVector<Dim> v)
 {
 	if (Dim == 1)
 		return DomPoint(p.X + v[0]);

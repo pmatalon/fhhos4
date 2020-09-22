@@ -15,7 +15,7 @@ public:
 		this->DiffField = DiffusionField<2>(pb.AnisotropyRatio, pb.AnisotropyAngle);
 
 		// Source function
-		this->SourceFunction = [](DomPoint p)
+		this->SourceFunction = [](const DomPoint& p)
 		{
 			double x = p.X;
 			double y = p.Y;

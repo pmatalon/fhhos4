@@ -253,7 +253,7 @@ public:
 	{
 		return _inRadius;
 	}
-	inline bool Contains(DomPoint p) const override
+	inline bool Contains(const DomPoint& p) const override
 	{
 		for (PhysicalShape<Dim>* s : _subShapes)
 		{
@@ -262,7 +262,7 @@ public:
 		}
 		return false;
 	}
-	PhysicalShape<Dim>* ClosestSubShape(DomPoint p)
+	PhysicalShape<Dim>* ClosestSubShape(const DomPoint& p)
 	{
 		PhysicalShape<Dim>* closestSubShape = nullptr;
 		double minDistance = 0;
@@ -323,7 +323,7 @@ public:
 	double Integral(RefFunction boundingBoxDefinedFunction) const override
 	{
 		// For the inner triangles, the bounding box is the domain
-		DomFunction boundingBoxFunction = [this, boundingBoxDefinedFunction](DomPoint boundingBoxPoint)
+		DomFunction boundingBoxFunction = [this, boundingBoxDefinedFunction](const DomPoint& boundingBoxPoint)
 		{
 			RefPoint p = _boundingBox->ConvertToReference(boundingBoxPoint);
 			return boundingBoxDefinedFunction(p);
@@ -340,7 +340,7 @@ public:
 	double Integral(RefFunction boundingBoxDefinedFunction, int polynomialDegree) const override
 	{
 		// For the inner triangles, the bounding box is the domain
-		DomFunction boundingBoxFunction = [this, boundingBoxDefinedFunction](DomPoint boundingBoxPoint)
+		DomFunction boundingBoxFunction = [this, boundingBoxDefinedFunction](const DomPoint& boundingBoxPoint)
 		{
 			RefPoint p = _boundingBox->ConvertToReference(boundingBoxPoint);
 			return boundingBoxDefinedFunction(p);
@@ -352,11 +352,11 @@ public:
 		return integral;
 	}
 
-	inline double DetJacobian(RefPoint pointInReferenceSquare) const
+	inline double DetJacobian(const RefPoint& pointInReferenceSquare) const
 	{
 		return _boundingBox->DetJacobian(pointInReferenceSquare);
 	}
-	inline DimMatrix<Dim> InverseJacobianTranspose(RefPoint pointInReferenceSquare) const
+	inline DimMatrix<Dim> InverseJacobianTranspose(const RefPoint& pointInReferenceSquare) const
 	{
 		return _boundingBox->InverseJacobianTranspose(pointInReferenceSquare);
 	}
@@ -365,12 +365,12 @@ public:
 		return _boundingBox->DetJacobianDegree();
 	}
 
-	DomPoint ConvertToDomain(RefPoint pointInReferenceSquare) const
+	DomPoint ConvertToDomain(const RefPoint& pointInReferenceSquare) const
 	{
 		return _boundingBox->ConvertToDomain(pointInReferenceSquare);
 	}
 
-	RefPoint ConvertToReference(DomPoint domainPoint) const
+	RefPoint ConvertToReference(const DomPoint& domainPoint) const
 	{
 		return _boundingBox->ConvertToReference(domainPoint);
 	}

@@ -232,7 +232,7 @@ public:
 	{
 		return _inRadius;
 	}
-	inline bool Contains(DomPoint p) const override
+	inline bool Contains(const DomPoint& p) const override
 	{
 		if (DomainDim == 1 && ShapeDim == 1)
 			return (Origin->X <= p.X && p.X <= Origin->X + WidthX);
@@ -327,7 +327,7 @@ public:
 		return invJ;
 	}
 
-	DomPoint ConvertToDomain(RefPoint referenceElementPoint) const
+	DomPoint ConvertToDomain(const RefPoint& referenceElementPoint) const
 	{
 		DomPoint p;
 		if (ShapeDim == DomainDim)
@@ -410,7 +410,7 @@ public:
 		return p;
 	}
 
-	RefPoint ConvertToReference(DomPoint domainPoint) const
+	RefPoint ConvertToReference(const DomPoint& domainPoint) const
 	{
 		RefPoint refPoint;
 		if (ShapeDim == DomainDim)

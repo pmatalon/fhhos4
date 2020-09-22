@@ -46,12 +46,12 @@ public:
 	}
 
 private:
-	static double Source(DomPoint p)
+	static double Source(const DomPoint& p)
 	{
 		return 0;
 	}
 
-	static double Solution(DomPoint p)
+	static double Solution(const DomPoint& p)
 	{
 		return p.X;
 	}

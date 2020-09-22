@@ -65,6 +65,8 @@ public:
 		this->AssembleReconstructionAndConsistencyMatrices();
 		this->AssembleStabilizationMatrix();
 
+		Utils::Empty(_projFromReconstruct);
+
 		//int nTotalFaceUnknowns = this->Faces.size() * hho->nFaceUnknowns;
 
 		this->A = Acons + Astab;
@@ -88,7 +90,7 @@ public:
 			{
 				for (BasisFunction<Dim>* coarsePhi : cellBasis->LocalFunctions)
 				{
-					RefFunction functionToIntegrate = [this, fineElement, finePhi, coarsePhi](RefPoint fineRefPoint) {
+					RefFunction functionToIntegrate = [this, fineElement, finePhi, coarsePhi](const RefPoint& fineRefPoint) {
 						DomPoint domPoint = fineElement->ConvertToDomain(fineRefPoint);
 						RefPoint coarseRefPoint = this->ConvertToReference(domPoint);
 						return finePhi->Eval(fineRefPoint)*coarsePhi->Eval(coarseRefPoint);
@@ -127,7 +129,7 @@ public:
 			{
 				for (BasisFunction<Dim>* coarsePhi : cellBasis->LocalFunctions)
 				{
-					RefFunction finePhiCoarsePhi = [this, fineElement, finePhi, coarsePhi](RefPoint fineRefPoint) {
+					RefFunction finePhiCoarsePhi = [this, fineElement, finePhi, coarsePhi](const RefPoint& fineRefPoint) {
 						DomPoint domPoint = fineElement->ConvertToDomain(fineRefPoint);
 
 						/*if ((fineElement->CoarserElement == this && fineElement->IsFullyEmbeddedInCoarseElement) && !this->Contains(domPoint))
@@ -373,7 +375,7 @@ private:
 			auto gradPhi = this->GradPhiOnFace(face, reconstructPhi);
 			auto normal = this->OuterNormalVector(face);
 
-			RefFunction functionToIntegrate = [this, phi, gradPhi, normal](RefPoint p) {
+			RefFunction functionToIntegrate = [this, phi, gradPhi, normal](const RefPoint& p) {
 				return (this->DiffTensor() * gradPhi(p)).dot(normal) * phi(p);
 			};
 
@@ -394,7 +396,7 @@ private:
 		auto gradPhi = this->GradPhiOnFace(face, reconstructPhi);
 		auto normal = this->OuterNormalVector(face);
 
-		RefFunction functionToIntegrate = [this, facePhi, gradPhi, normal](RefPoint p) {
+		RefFunction functionToIntegrate = [this, facePhi, gradPhi, normal](const RefPoint& p) {
 			return (this->DiffTensor() * gradPhi(p)).dot(normal) * facePhi->Eval(p);
 		};
 
@@ -600,7 +602,6 @@ public:
 	{
 		Utils::Empty(Acons);
 		Utils::Empty(Astab);
-		Utils::Empty(_projFromReconstruct);
 	}
 
 	void DeleteUselessMatricesAfterMultigridSetup()

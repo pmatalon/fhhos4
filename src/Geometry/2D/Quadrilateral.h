@@ -138,12 +138,12 @@ public:
 	{
 		return _inRadius;
 	}
-	inline bool Contains(DomPoint p) const override
+	inline bool Contains(const DomPoint& p) const override
 	{
 		assert(false && "Not implemented");
 	}
 
-	double DetJacobian(RefPoint p) const override
+	double DetJacobian(const RefPoint& p) const override
 	{
 		DimMatrix<2> jacobianMatrix = JacobianMatrix(p);
 		return jacobianMatrix.determinant();
@@ -152,12 +152,12 @@ public:
 	{
 		return 2;
 	}
-	DimMatrix<2> InverseJacobianTranspose(RefPoint p) const
+	DimMatrix<2> InverseJacobianTranspose(const RefPoint& p) const
 	{
 		DimMatrix<2> jacobianMatrix = JacobianMatrix(p);
 		return jacobianMatrix.inverse().transpose();
 	}
-	DimMatrix<2> JacobianMatrix(RefPoint p) const
+	DimMatrix<2> JacobianMatrix(const RefPoint& p) const
 	{
 		double t = p.X;
 		double u = p.Y;
@@ -173,7 +173,7 @@ public:
 
 	// Formulas in Silva et al. "Exact and efficient interpolation using finite elements shape functions" (2009)
 	// where ksi = t, eta = u
-	DomPoint ConvertToDomain(RefPoint refPoint) const
+	DomPoint ConvertToDomain(const RefPoint& refPoint) const
 	{
 		double t = refPoint.X;
 		double u = refPoint.Y;
@@ -184,7 +184,7 @@ public:
 		return p;
 	}
 
-	RefPoint ConvertToReference(DomPoint domainPoint) const
+	RefPoint ConvertToReference(const DomPoint& domainPoint) const
 	{
 		double t, u;
 

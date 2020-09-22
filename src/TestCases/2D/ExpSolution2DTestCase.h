@@ -46,14 +46,14 @@ public:
 	}
 
 private:
-	static double Source(DomPoint p)
+	static double Source(const DomPoint& p)
 	{
 		double x = p.X;
 		double y = p.Y;
 		return (-pow(y, 4) - 2 * x*(1 + 2 * x*y*y))*exp(x*y*y);
 	}
 
-	static double Solution(DomPoint p)
+	static double Solution(const DomPoint& p)
 	{
 		double x = p.X;
 		double y = p.Y;

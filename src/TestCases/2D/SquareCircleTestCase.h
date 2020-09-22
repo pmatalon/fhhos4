@@ -34,7 +34,7 @@ public:
 	}
 
 private:
-	static double Source(DomPoint p)
+	static double Source(const DomPoint& p)
 	{
 		double x = p.X;
 		double y = p.Y;

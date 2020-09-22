@@ -9,8 +9,8 @@ using namespace std;
 #define ROOT_PATH "./"
 #endif // !ROOT_PATH
 
-using RefFunction = function<double(RefPoint)>;
-using DomFunction = function<double(DomPoint)>;
+using RefFunction = function<double(const RefPoint&)>;
+using DomFunction = function<double(const DomPoint&)>;
 
 class Utils
 {

@@ -19,7 +19,7 @@ public:
 		if (pb.BCCode.compare("d") != 0)
 			Utils::FatalError("This test case runs only with Dirichlet conditions");
 
-		this->ExactSolution = [this](DomPoint p)
+		this->ExactSolution = [this](const DomPoint& p)
 		{
 			double x = p.X;
 			double alpha = this->DiffField.K1->LargestEigenValue;
@@ -43,7 +43,7 @@ public:
 		return "Heterogeneous-specific test case. The solution is a continuous piecewise polynomial function.";
 	}
 
-	static double Source(DomPoint p)
+	static double Source(const DomPoint& p)
 	{
 		return 4;
 	}

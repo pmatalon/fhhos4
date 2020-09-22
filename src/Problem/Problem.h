@@ -94,7 +94,7 @@ protected:
 			{
 				auto approximate = basis->GetApproximateFunction(solution, element->Number * basis->NumberOfLocalFunctionsInElement(element));
 				chunk->Results.absoluteError += element->L2ErrorPow2(approximate, exactSolution);
-				chunk->Results.normExactSolution += element->Integral([exactSolution](DomPoint p) { return pow(exactSolution(p), 2); });
+				chunk->Results.normExactSolution += element->Integral([exactSolution](const DomPoint& p) { return pow(exactSolution(p), 2); });
 			});
 
 

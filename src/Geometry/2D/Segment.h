@@ -68,12 +68,12 @@ public:
 	{
 		return 0;
 	}
-	inline bool Contains(DomPoint p) const override
+	inline bool Contains(const DomPoint& p) const override
 	{
 		return SegmentContains(*Vertex1, *Vertex2, p);
 	}
 
-	static bool SegmentContains(DomPoint A, DomPoint B, DomPoint P)
+	static bool SegmentContains(const DomPoint& A, const DomPoint& B, const DomPoint& P)
 	{
 		DimVector<2> AB = B - A;
 		DimVector<2> AP = P - A;
@@ -90,7 +90,7 @@ public:
 		assert(false);
 	}
 
-	DomPoint ConvertToDomain(RefPoint referenceElementPoint) const override
+	DomPoint ConvertToDomain(const RefPoint& referenceElementPoint) const override
 	{
 		double x1 = Vertex1->X;
 		double x2 = Vertex2->X;
@@ -103,7 +103,7 @@ public:
 		return p;
 	}
 
-	RefPoint ConvertToReference(DomPoint domainPoint) const override
+	RefPoint ConvertToReference(const DomPoint& domainPoint) const override
 	{
 		double x1 = Vertex1->X;
 		double x2 = Vertex2->X;

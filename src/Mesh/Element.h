@@ -90,7 +90,7 @@ public:
 	{
 		return Shape()->Vertices();
 	}
-	virtual bool Contains(DomPoint p) const
+	virtual bool Contains(const DomPoint& p) const
 	{
 		return Shape()->Contains(p);
 	}
@@ -105,16 +105,16 @@ public:
 	virtual DimVector<Dim> OuterNormalVector(Face<Dim>* face) const = 0;
 
 	// Transformation to reference element
-	virtual DomPoint ConvertToDomain(RefPoint refPoint) const
+	virtual DomPoint ConvertToDomain(const RefPoint& refPoint) const
 	{
 		return Shape()->ConvertToDomain(refPoint);
 	}
-	virtual RefPoint ConvertToReference(DomPoint domainPoint) const
+	virtual RefPoint ConvertToReference(const DomPoint& domainPoint) const
 	{
 		return Shape()->ConvertToReference(domainPoint);
 	}
 private:
-	inline DimMatrix<Dim> InverseJacobianTranspose(RefPoint p) const
+	inline DimMatrix<Dim> InverseJacobianTranspose(const RefPoint& p) const
 	{
 		return Shape()->InverseJacobianTranspose(p);
 	}
@@ -413,7 +413,7 @@ public:
 
 	virtual RefFunction EvalPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* phi)
 	{
-		RefFunction evalOnFace = [this, face, phi](RefPoint refPoint1D) {
+		RefFunction evalOnFace = [this, face, phi](const RefPoint& refPoint1D) {
 			DomPoint domainPoint2D = face->ConvertToDomain(refPoint1D);
 			RefPoint refPoint2D = this->ConvertToReference(domainPoint2D);
 			return phi->Eval(refPoint2D);
@@ -423,7 +423,7 @@ public:
 
 	virtual function<DimVector<Dim>(RefPoint)> GradPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* phi)
 	{
-		function<DimVector<Dim>(RefPoint)> gradOnFace = [this, face, phi](RefPoint refPoint1D) {
+		function<DimVector<Dim>(RefPoint)> gradOnFace = [this, face, phi](const RefPoint& refPoint1D) {
 			DomPoint domainPoint2D = face->ConvertToDomain(refPoint1D);
 			RefPoint refPoint2D = this->ConvertToReference(domainPoint2D);
 			DimVector<Dim> gradPhi = phi->Grad(refPoint2D);
@@ -436,7 +436,7 @@ public:
 
 	double L2ErrorPow2(RefFunction approximate, DomFunction exactSolution) const
 	{
-		RefFunction errorFunction = [this, exactSolution, approximate](RefPoint refElementPoint) {
+		RefFunction errorFunction = [this, exactSolution, approximate](const RefPoint& refElementPoint) {
 			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
 			return pow(exactSolution(domainPoint) - approximate(refElementPoint), 2);
 		};
@@ -444,7 +444,7 @@ public:
 		return Integral(errorFunction);
 	}
 
-	double EvalApproximateSolution(FunctionalBasis<Dim>* basis, const Vector &globalCoeffs, DomPoint evaluationPoint)
+	double EvalApproximateSolution(FunctionalBasis<Dim>* basis, const Vector &globalCoeffs, const DomPoint& evaluationPoint)
 	{
 		RefFunction localApproximate = basis->GetApproximateFunction(globalCoeffs, this->Number * basis->NumberOfLocalFunctionsInElement(this));
 		return localApproximate(this->ConvertToReference(evaluationPoint));
@@ -452,7 +452,7 @@ public:
 
 	double SourceTerm(BasisFunction<Dim>* phi, DomFunction f)
 	{
-		RefFunction sourceTimesBasisFunction = [this, f, phi](RefPoint refElementPoint) {
+		RefFunction sourceTimesBasisFunction = [this, f, phi](const RefPoint& refElementPoint) {
 			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
 			return f(domainPoint) * phi->Eval(refElementPoint);
 		};

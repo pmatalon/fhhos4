@@ -33,13 +33,13 @@ public:
 		return "Sine function";
 	}
 
-	static double Source(DomPoint p)
+	static double Source(const DomPoint& p)
 	{
 		double x = p.X;
 		return sin(4 * M_PI * x);
 	}
 
-	static double Solution(DomPoint p)
+	static double Solution(const DomPoint& p)
 	{
 		double x = p.X;
 		return sin(4 * M_PI * x) / (16 * pow(M_PI, 2));

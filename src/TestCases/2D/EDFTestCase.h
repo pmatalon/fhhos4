@@ -29,7 +29,7 @@ public:
 		this->DiffField = DiffusionField<2>(tensors);
 
 		// Source function
-		this->SourceFunction = [](DomPoint p)
+		this->SourceFunction = [](const DomPoint& p)
 		{
 			double x = p.X;
 			double y = p.Y;
@@ -81,7 +81,7 @@ public:
 			Utils::FatalError("The requested boundary conditions are not defined in this test case.");
 	}
 
-	static bool IsInDisk(DomPoint c, double r, DomPoint p)
+	static bool IsInDisk(const DomPoint& c, double r, const DomPoint& p)
 	{
 		if (pow(p.X - c.X, 2) + pow(p.Y - c.Y, 2) <= r)
 			return true;

@@ -116,12 +116,12 @@ public:
 	{
 		return _inRadius;
 	}
-	inline bool Contains(DomPoint p) const override
+	inline bool Contains(const DomPoint& p) const override
 	{
 		return TriangleContains(*V1, *V2, *V3, p, _measure);
 	}
 
-	static bool TriangleContains(DomPoint A, DomPoint B, DomPoint C, DomPoint P, double triangleArea)
+	static bool TriangleContains(const DomPoint& A, const DomPoint& B, const DomPoint& C, const DomPoint& P, double triangleArea)
 	{
 		// From https://math.stackexchange.com/questions/4322/check-whether-a-point-is-within-a-3d-triangle
 
@@ -149,7 +149,7 @@ public:
 		return _inverseJacobianTranspose;
 	}
 
-	DomPoint ConvertToDomain(RefPoint refPoint) const
+	DomPoint ConvertToDomain(const RefPoint& refPoint) const
 	{
 		double t = refPoint.X;
 		double u = refPoint.Y;
@@ -160,7 +160,7 @@ public:
 		return p;
 	}
 
-	RefPoint ConvertToReference(DomPoint domainPoint) const
+	RefPoint ConvertToReference(const DomPoint& domainPoint) const
 	{
 		double x = domainPoint.X;
 		double y = domainPoint.Y;

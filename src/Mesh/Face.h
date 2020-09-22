@@ -66,7 +66,7 @@ public:
 	{
 		return Shape()->Center();
 	}
-	virtual bool Contains(DomPoint p) const
+	virtual bool Contains(const DomPoint& p) const
 	{
 		return Shape()->Contains(p);
 	}
@@ -85,11 +85,11 @@ public:
 	}
 
 	// Transformation to reference element
-	virtual DomPoint ConvertToDomain(RefPoint refPoint) const
+	virtual DomPoint ConvertToDomain(const RefPoint& refPoint) const
 	{
 		return Shape()->ConvertToDomain(refPoint);
 	}
-	virtual RefPoint ConvertToReference(DomPoint domainPoint) const
+	virtual RefPoint ConvertToReference(const DomPoint& domainPoint) const
 	{
 		return Shape()->ConvertToReference(domainPoint);
 	}
