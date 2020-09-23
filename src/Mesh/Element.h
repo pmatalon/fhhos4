@@ -326,6 +326,30 @@ public:
 		return vector<Element<Dim>*>(neighbours.begin(), neighbours.end());
 	}
 
+	vector<Element<Dim>*> VertexNeighbours()
+	{
+		set<Element<Dim>*> vertexNeighbours;
+		vector<Element<Dim>*> faceNeigbours = this->Neighbours();
+		vertexNeighbours.insert(faceNeigbours.begin(), faceNeigbours.end());
+
+		for (Element<Dim>* n : faceNeigbours)
+		{
+			for (Element<Dim>* n2 : n->Neighbours())
+			{
+				if (n2 == this)
+					continue;
+
+				for (Vertex* v : n2->Vertices())
+				{
+					if (this->HasVertex(v))
+						vertexNeighbours.insert(n2);
+				}
+			}
+		}
+
+		return vector<Element<Dim>*>(vertexNeighbours.begin(), vertexNeighbours.end());
+	}
+
 	bool IsInSamePhysicalPartAs(Element<Dim>* other)
 	{
 		return (!this->PhysicalPart && !other->PhysicalPart) || this->PhysicalPart == other->PhysicalPart;
@@ -355,24 +379,46 @@ public:
 
 		if (!Utils::BuildsNestedMeshHierarchy(stgy))
 		{
-			for (Element<Dim>* neighbour : this->Neighbours())
+			for (Element<Dim>* neighbour : this->VertexNeighbours())
 			{
 				for (auto fe : neighbour->FinerElements)
 				{
 					if (fe->PhysicalPart == this->PhysicalPart && !fe->IsFullyEmbeddedInCoarseElement && tested.find(fe) == tested.end() && fe->Overlaps(this))
 						overlapping.insert(fe);
 					tested.insert(fe);
-					if (stgy != CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
+					/*if (stgy != CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
 					{
 						for (Element<Dim>* feNeighbour : fe->Neighbours())
 						{
 							if (feNeighbour->PhysicalPart == this->PhysicalPart && !fe->IsFullyEmbeddedInCoarseElement && tested.find(feNeighbour) == tested.end() && feNeighbour->Overlaps(this))
+							{
+								cout << "2nd degree neighbour added" << endl;
+								cout << "% coarse element" << endl;
+								this->ExportToMatlab("r");
+								fe->ExportToMatlab("b");
 								overlapping.insert(feNeighbour);
+							}
 							tested.insert(feNeighbour);
 						}
-					}
+					}*/
 				}
 			}
+
+			/*for (Element<Dim>* neighbour : this->VertexNeighbours())
+			{
+				for (auto fe : neighbour->FinerElements)
+				{
+					if (fe->PhysicalPart == this->PhysicalPart && !fe->IsFullyEmbeddedInCoarseElement && tested.find(fe) == tested.end() && fe->Overlaps(this))
+					{
+						cout << "2nd degree neighbour added" << endl;
+						cout << "% coarse element" << endl;
+						this->ExportToMatlab("r");
+						fe->ExportToMatlab("b");
+						overlapping.insert(fe);
+					}
+					tested.insert(fe);
+				}
+			}*/
 		}
 
 		this->OverlappingFineElements = vector<Element<Dim>*>(overlapping.begin(), overlapping.end());
