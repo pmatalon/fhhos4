@@ -5,6 +5,9 @@
 template <int Dim>
 class PhysicalShape : public GeometricShape<Dim>
 {
+private:
+	map<RefPoint, DomPoint> _domPoints;
+
 public:
 	PhysicalShape() : GeometricShape<Dim>() {}
 
@@ -124,6 +127,52 @@ public:
 		return false;
 	}
 
+	//----------------------------------------//
+	// Correspondance RefPoint/DomPoint saved //
+	//----------------------------------------//
+
+	DomPoint ConvertToDomain(const RefPoint& refPoint, bool getDomPointFromSaved) const
+	{
+		auto it = _domPoints.find(refPoint);
+		if (it != _domPoints.end())
+			return it->second;
+		return this->ConvertToDomain(refPoint);
+	}
+	virtual DomPoint ConvertToDomainAndSaveResult(const RefPoint& refPoint)
+	{
+		auto it = _domPoints.find(refPoint);
+		if (it != _domPoints.end())
+			return it->second;
+		DomPoint domPoint = this->ConvertToDomain(refPoint);
+		SaveDomPoint(refPoint, domPoint);
+		return domPoint;
+	}
+	void ComputeAndSaveDomPoint(const RefPoint& refPoint)
+	{
+		DomPoint domPoint = this->ConvertToDomain(refPoint);
+		SaveDomPoint(refPoint, domPoint);
+	}
+	void ComputeAndSaveQuadraturePoints(int polynomialDegree)
+	{
+		for (const RefPoint& refPoint : RefShape()->QuadraturePoints(polynomialDegree))
+			ConvertToDomainAndSaveResult(refPoint);
+	}
+	void ComputeAndSaveQuadraturePoints()
+	{
+		for (const RefPoint& refPoint : RefShape()->QuadraturePoints())
+			ConvertToDomainAndSaveResult(refPoint);
+	}
+private:
+	inline void SaveDomPoint(const RefPoint& refPoint, const DomPoint& domPoint)
+	{
+		_domPoints.insert(pair<RefPoint, DomPoint>(refPoint, domPoint));
+	}
+public:
+	inline void EmptySavedDomPoints()
+	{
+		_domPoints.clear();
+	}
+
 	//-------------------//
 	//     Integrals     //
 	//-------------------//
@@ -133,7 +182,7 @@ public:
 		vector<RefPoint> refPoints = RefShape()->QuadraturePoints();
 		vector<DomPoint> domPoints;
 		for (RefPoint refPoint : refPoints)
-			domPoints.push_back(this->ConvertToDomain(refPoint));
+			domPoints.push_back(this->ConvertToDomain(refPoint, true));
 		return domPoints;
 	}
 
@@ -161,7 +210,7 @@ public:
 	virtual double Integral(DomFunction globalFunction) const
 	{
 		RefFunction refFunction = [this, globalFunction](const RefPoint& refElementPoint) {
-			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
+			DomPoint domainPoint = this->ConvertToDomain(refElementPoint, true);
 			return globalFunction(domainPoint);
 		};
 
@@ -171,7 +220,7 @@ public:
 	virtual double Integral(DomFunction globalFunction, int polynomialDegree) const
 	{
 		RefFunction refFunction = [this, globalFunction](const RefPoint& refElementPoint) {
-			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
+			DomPoint domainPoint = this->ConvertToDomain(refElementPoint, true);
 			return globalFunction(domainPoint);
 		};
 

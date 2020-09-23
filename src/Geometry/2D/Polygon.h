@@ -35,7 +35,7 @@ private:
 
 	vector<PhysicalShape<2>*> _triangulation;
 	Quadrilateral* _boundingBox = nullptr;
-
+	vector<DomPoint> _quadraturePoints;
 public:
 
 	Polygon(const vector<Vertex*>& vertices, bool createTriangulationAndBoundingBox = true)
@@ -54,6 +54,7 @@ public:
 		_isInitialized = false;
 		_cgalPolygon.clear();
 		_triangulation.clear();
+		_quadraturePoints.clear();
 		if (_boundingBox)
 		{
 			delete _boundingBox;
@@ -161,6 +162,8 @@ public:
 			_triangulation = CGALTriangulation();
 
 		assert(_triangulation.size() > 0);
+
+		InitQuadraturePoints();
 	}
 
 	void ComputeBoundingBox()
@@ -271,6 +274,18 @@ private:
 		return triangulation;
 	}
 
+	void InitQuadraturePoints()
+	{
+		for (PhysicalShape<2>* t : _triangulation)
+		{
+			for (const RefPoint& refPoint : t->RefShape()->QuadraturePoints())
+			{
+				DomPoint domPoint = t->ConvertToDomain(refPoint);//this->ConvertToDomainAndSaveResult(refPoint);
+				_quadraturePoints.push_back(domPoint);
+			}
+		}
+	}
+
 public:
 	bool ConvexHullEmbeds(PhysicalShape<2>* s) const override
 	{
@@ -377,7 +392,7 @@ public:
 	}
 
 private:
-	static bool CGALPolyContains(const Polygon_2& poly, Point_2 p)
+	static bool CGALPolyContains(const Polygon_2& poly, const Point_2& p)
 	{
 		switch (CGAL::bounded_side_2(poly.vertices_begin(), poly.vertices_end(), p, K()))
 		{
@@ -441,10 +456,7 @@ public:
 
 	vector<DomPoint> QuadraturePoints() const override
 	{
-		vector<DomPoint> points;
-		for (PhysicalShape<2>* t : _triangulation)
-			points = Utils::Join(points, t->QuadraturePoints());
-		return points;
+		return _quadraturePoints;
 	}
 
 	double Integral(RefFunction boundingBoxDefinedFunction) const override

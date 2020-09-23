@@ -107,11 +107,32 @@ public:
 	// Transformation to reference element
 	virtual DomPoint ConvertToDomain(const RefPoint& refPoint) const
 	{
-		return Shape()->ConvertToDomain(refPoint);
+		return Shape()->ConvertToDomain(refPoint, true);
 	}
 	virtual RefPoint ConvertToReference(const DomPoint& domainPoint) const
 	{
 		return Shape()->ConvertToReference(domainPoint);
+	}
+
+	//----------------------------------------//
+	// Correspondance RefPoint/DomPoint saved //
+	//----------------------------------------//
+
+	DomPoint ConvertToDomainAndSaveResult(const RefPoint& refPoint)
+	{
+		return Shape()->ConvertToDomainAndSaveResult(refPoint);
+	}
+	void ComputeAndSaveQuadraturePoints(int polynomialDegree)
+	{
+		Shape()->ComputeAndSaveQuadraturePoints(polynomialDegree);
+	}
+	void ComputeAndSaveQuadraturePoints()
+	{
+		Shape()->ComputeAndSaveQuadraturePoints();
+	}
+	inline void EmptySavedDomPoints()
+	{
+		Shape()->EmptySavedDomPoints();
 	}
 private:
 	inline DimMatrix<Dim> InverseJacobianTranspose(const RefPoint& p) const
@@ -373,12 +394,47 @@ public:
 
 	bool Overlaps(Element<Dim>* other)
 	{
-		for (DomPoint domPoint : this->QuadraturePoints())
+		for (const DomPoint& domPoint : this->QuadraturePoints())
 		{
 			if (other->Contains(domPoint))
 				return true;
 		}
 		return false;
+	}
+
+	void CheckIfFullyOverlapped()
+	{
+		for (DomPoint domPoint : this->QuadraturePoints())
+		{
+			bool overlappingFineElementFound = false;
+			for (Element<Dim>* fe : this->OverlappingFineElements)
+			{
+				if (fe->Contains(domPoint))
+				{
+					overlappingFineElementFound = true;
+					break;
+				}
+			}
+			if (!overlappingFineElementFound)
+			{
+				cout << "% Coarse element" << endl;
+				this->ExportToMatlab("r");
+				cout << "% Point" << endl;
+				MatlabScript s;
+				s.PlotPoint(domPoint, "k+");
+				for (Element<Dim>* fe : this->OverlappingFineElements)
+				{
+					cout << "% Fine element" << endl;
+					fe->ExportToMatlab("b");
+				}
+				cout << endl;
+				for (Element<Dim>* fe : this->OverlappingFineElements)
+				{
+					fe->Contains(domPoint);
+				}
+				cout << endl;
+			}
+		}
 	}
 
 	//-------------------//

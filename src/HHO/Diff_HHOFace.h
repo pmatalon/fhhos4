@@ -33,6 +33,9 @@ public:
 
 		this->HHO = hho;
 
+		//this->ComputeAndSaveQuadraturePoints(HHO->FaceBasis->GetDegree());
+		this->ComputeAndSaveQuadraturePoints();
+
 		this->_faceMassMatrix = this->FaceMassMatrix(HHO->FaceBasis);
 		this->_invFaceMassMatrix = this->_faceMassMatrix.inverse();
 
@@ -188,6 +191,7 @@ public:
 		Utils::Empty(_traceFromElem2UsingReconstructBasis);
 		Utils::Empty(_traceFromElem1UsingCellBasis);
 		Utils::Empty(_traceFromElem2UsingCellBasis);
+		this->EmptySavedDomPoints();
 	}
 
 private:

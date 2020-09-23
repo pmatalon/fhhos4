@@ -58,6 +58,10 @@ public:
 	{
 		this->HHO = hho;
 
+		//this->ComputeAndSaveQuadraturePoints(hho->CellBasis->GetDegree());
+		//this->ComputeAndSaveQuadraturePoints(hho->ReconstructionBasis->GetDegree());
+		this->ComputeAndSaveQuadraturePoints();
+
 		DenseMatrix cellMassMatrix = this->CellMassMatrix(hho->CellBasis);
 		DenseMatrix Nt = this->CellReconstructMassMatrix(hho->CellBasis, hho->ReconstructionBasis);
 		this->_projFromReconstruct = cellMassMatrix.inverse() * Nt;
@@ -113,7 +117,7 @@ public:
 	DenseMatrix ComputeL2ProjectionMatrixCoarseToFine(FunctionalBasis<Dim>* cellBasis)
 	{
 		assert(this->OverlappingFineElements.size() > 0);
-		DenseMatrix J(cellBasis->Size() * this->OverlappingFineElements.size(), cellBasis->Size());
+		DenseMatrix L2Proj(cellBasis->Size() * this->OverlappingFineElements.size(), cellBasis->Size());
 
 		for (auto e : this->OverlappingFineElements)
 		{
@@ -130,9 +134,9 @@ public:
 				for (BasisFunction<Dim>* coarsePhi : cellBasis->LocalFunctions)
 				{
 					RefFunction finePhiCoarsePhi = [this, fineElement, finePhi, coarsePhi](const RefPoint& fineRefPoint) {
-						DomPoint domPoint = fineElement->ConvertToDomain(fineRefPoint);
+						DomPoint fineDomPoint = fineElement->ConvertToDomainAndSaveResult(fineRefPoint);
 
-						/*if ((fineElement->CoarserElement == this && fineElement->IsFullyEmbeddedInCoarseElement) && !this->Contains(domPoint))
+						/*if ((fineElement->CoarserElement == this && fineElement->IsFullyEmbeddedInCoarseElement) && !this->Contains(fineDomPoint))
 						{
 							cout << endl << "% Coarse element: " << endl;
 							this->ExportToMatlab("r");
@@ -140,13 +144,13 @@ public:
 							fineElement->ExportToMatlab("b");
 							cout << endl << "% Quadrature point: " << endl;
 							MatlabScript s;
-							s.PlotPoint(domPoint, "k+");
-							this->Contains(domPoint);
+							s.PlotPoint(fineDomPoint, "k+");
+							this->Contains(fineDomPoint);
 							this->FullyEmbeds(fineElement);
 						}*/
-						if ((fineElement->CoarserElement == this && fineElement->IsFullyEmbeddedInCoarseElement) || this->Contains(domPoint))
+						if ((fineElement->CoarserElement == this && fineElement->IsFullyEmbeddedInCoarseElement) || this->Contains(fineDomPoint))
 						{
-							RefPoint coarseRefPoint = this->ConvertToReference(domPoint);
+							RefPoint coarseRefPoint = this->ConvertToReference(fineDomPoint);
 							return finePhi->Eval(fineRefPoint)*coarsePhi->Eval(coarseRefPoint);
 						}
 						else
@@ -167,10 +171,10 @@ public:
 
 			DenseMatrix fineMass = fineElement->CellMassMatrix(cellBasis);
 
-			J.block(this->LocalNumberOfOverlapping(fineElement)*cellBasis->Size(), 0, cellBasis->Size(), cellBasis->Size()) = fineMass.inverse() * fineCoarseMass;
+			L2Proj.block(this->LocalNumberOfOverlapping(fineElement)*cellBasis->Size(), 0, cellBasis->Size(), cellBasis->Size()) = fineMass.inverse() * fineCoarseMass;
 		}
 
-		return J;
+		return L2Proj;
 	}
 
 	Vector Reconstruct(Vector hybridVector)
@@ -607,6 +611,7 @@ public:
 	void DeleteUselessMatricesAfterMultigridSetup()
 	{
 		Utils::Empty(A);
+		this->EmptySavedDomPoints();
 		/*if (!needToReconstructSolutionLater)
 		{
 			Utils::Empty(P);

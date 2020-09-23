@@ -186,31 +186,32 @@ private:
 
 			// CheckIfFullyEmbeddedInCoarseElement
 			ElementParallelLoop<Dim> parallelLoop(finePb->_mesh->Elements);
-			parallelLoop.Execute([stgy](Element<Dim>* fe, ParallelChunk<CoeffsChunk>* chunk)
+			parallelLoop.Execute([stgy](Element<Dim>* fe)
 				{
 					fe->CheckIfFullyEmbeddedInCoarseElement(stgy);
 				});
 
 			// SetOverlappingFineElements
 			ElementParallelLoop<Dim> parallelLoop2(coarsePb->_mesh->Elements);
-			parallelLoop2.Execute([stgy](Element<Dim>* ce, ParallelChunk<CoeffsChunk>* chunk)
+			parallelLoop2.Execute([stgy](Element<Dim>* ce)
 				{
 					ce->SetOverlappingFineElements(stgy);
 					ce->InitOverlappingElementsLocalNumbering();
+					//ce->CheckIfFullyOverlapped();
 				});
 
 			SparseMatrix I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
-			SparseMatrix J_f_c = GetGlobalL2ProjectionMatrixCoarseToFineElements();
+			SparseMatrix L2Proj = GetGlobalL2ProjectionMatrixCoarseToFineElements();
 			SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
 
 			if (ExportComponents)
 			{
 				Level::ExportMatrix(I_c, "I_c");
-				Level::ExportMatrix(J_f_c, "J_f_c");
+				Level::ExportMatrix(L2Proj, "J_f_c");
 				Level::ExportMatrix(Pi_f, "Pi_f");
 			}
 
-			P = Pi_f * J_f_c * I_c;
+			P = Pi_f * L2Proj * I_c;
 		}
 		else if (_prolongationCode == Prolongation::CellInterp_InjectAndTrace)
 		{
@@ -702,20 +703,20 @@ private:
 			{
 				Diff_HHOElement<Dim>* coarseElement = dynamic_cast<Diff_HHOElement<Dim>*>(ce);
 
-				DenseMatrix local_J_f_c = coarseElement->ComputeL2ProjectionMatrixCoarseToFine(_cellInterpolationBasis);
+				DenseMatrix localL2Proj = coarseElement->ComputeL2ProjectionMatrixCoarseToFine(_cellInterpolationBasis);
 				for (auto fineElement : coarseElement->OverlappingFineElements)
 				{
 					BigNumber coarseElemGlobalNumber = coarseElement->Number;
 					BigNumber fineElemGlobalNumber = fineElement->Number;
 					BigNumber fineElemLocalNumber = coarseElement->LocalNumberOfOverlapping(fineElement);
 
-					chunk->Results.Coeffs.Add(fineElemGlobalNumber*nCellUnknowns, coarseElemGlobalNumber*nCellUnknowns, local_J_f_c.block(fineElemLocalNumber*nCellUnknowns, 0, nCellUnknowns, nCellUnknowns));
+					chunk->Results.Coeffs.Add(fineElemGlobalNumber*nCellUnknowns, coarseElemGlobalNumber*nCellUnknowns, localL2Proj.block(fineElemLocalNumber*nCellUnknowns, 0, nCellUnknowns, nCellUnknowns));
 				}
 			});
 
-		SparseMatrix J_f_c(finePb->HHO->nElements * nCellUnknowns, coarsePb->HHO->nElements * nCellUnknowns);
-		parallelLoop.Fill(J_f_c);
-		return J_f_c;
+		SparseMatrix L2Proj(finePb->HHO->nElements * nCellUnknowns, coarsePb->HHO->nElements * nCellUnknowns);
+		parallelLoop.Fill(L2Proj);
+		return L2Proj;
 	}
 
 	SparseMatrix GetGlobalCanonicalInjectionMatrixCoarseToFineFaces()

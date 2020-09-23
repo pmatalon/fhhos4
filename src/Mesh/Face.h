@@ -87,11 +87,32 @@ public:
 	// Transformation to reference element
 	virtual DomPoint ConvertToDomain(const RefPoint& refPoint) const
 	{
-		return Shape()->ConvertToDomain(refPoint);
+		return Shape()->ConvertToDomain(refPoint, true);
 	}
 	virtual RefPoint ConvertToReference(const DomPoint& domainPoint) const
 	{
 		return Shape()->ConvertToReference(domainPoint);
+	}
+
+	//----------------------------------------//
+	// Correspondance RefPoint/DomPoint saved //
+	//----------------------------------------//
+
+	DomPoint ConvertToDomainAndSaveResult(const RefPoint& refPoint)
+	{
+		return Shape()->ConvertToDomainAndSaveResult(refPoint);
+	}
+	void ComputeAndSaveQuadraturePoints(int polynomialDegree)
+	{
+		Shape()->ComputeAndSaveQuadraturePoints(polynomialDegree);
+	}
+	void ComputeAndSaveQuadraturePoints()
+	{
+		Shape()->ComputeAndSaveQuadraturePoints();
+	}
+	inline void EmptySavedDomPoints()
+	{
+		Shape()->EmptySavedDomPoints();
 	}
 
 	//---------------------------------------//

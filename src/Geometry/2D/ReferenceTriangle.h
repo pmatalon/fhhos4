@@ -37,6 +37,12 @@ public:
 		return dunavant.Points();
 	}
 
+	vector<RefPoint> QuadraturePoints(int polynomialDegree) const
+	{
+		Dunavant dunavant(polynomialDegree);
+		return dunavant.Points();
+	}
+
 	double Integral(RefFunction func) const override
 	{
 		Dunavant dunavant;

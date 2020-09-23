@@ -1620,13 +1620,13 @@ public:
 	{
 		Mesh<Dim>::SanityCheck();
 
-		if (this->ComesFrom.CS == CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
+		/*if (this->ComesFrom.CS == CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
 		{
 			for (Element<Dim>* e : this->Elements)
 			{
 				for (Element<Dim>* n : e->Neighbours())
 				{
-					if (e->PhysicalPart == n->PhysicalPart/* && e->Faces.size() > 3 && n->Faces.size() > 3*/)
+					if (e->PhysicalPart == n->PhysicalPart)
 					{
 						auto faces = e->InterfaceWith(n);
 						if (faces.size() != 1)
@@ -1642,7 +1642,7 @@ public:
 					}
 				}
 			}
-		}
+		}*/
 	}
 
 	//-----------------------------------------------//

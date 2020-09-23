@@ -42,6 +42,12 @@ public:
 		return keast.Points();
 	}
 
+	vector<RefPoint> QuadraturePoints(int polynomialDegree) const
+	{
+		Keast keast(polynomialDegree);
+		return keast.Points();
+	}
+
 	double Integral(RefFunction func) const override
 	{
 		Keast keast;
