@@ -134,7 +134,7 @@ public:
 				for (BasisFunction<Dim>* coarsePhi : cellBasis->LocalFunctions)
 				{
 					RefFunction finePhiCoarsePhi = [this, fineElement, finePhi, coarsePhi](const RefPoint& fineRefPoint) {
-						DomPoint fineDomPoint = fineElement->ConvertToDomainAndSaveResult(fineRefPoint);
+						DomPoint fineDomPoint = fineElement->ConvertToDomainAndSaveResult(fineRefPoint, true);
 
 						/*if ((fineElement->CoarserElement == this && fineElement->IsFullyEmbeddedInCoarseElement) && !this->Contains(fineDomPoint))
 						{

@@ -118,9 +118,9 @@ public:
 	// Correspondance RefPoint/DomPoint saved //
 	//----------------------------------------//
 
-	DomPoint ConvertToDomainAndSaveResult(const RefPoint& refPoint)
+	DomPoint ConvertToDomainAndSaveResult(const RefPoint& refPoint, bool lock = false)
 	{
-		return Shape()->ConvertToDomainAndSaveResult(refPoint);
+		return Shape()->ConvertToDomainAndSaveResult(refPoint, lock);
 	}
 	void ComputeAndSaveQuadraturePoints(int polynomialDegree)
 	{
@@ -267,12 +267,8 @@ public:
 
 	bool IsIn(const vector<Element<Dim>*>& list)
 	{
-		for (Element<Dim>* e : list)
-		{
-			if (e == this)
-				return true;
-		}
-		return false;
+		auto it = find(list.begin(), list.end(), this);
+		return it != list.end();
 	}
 
 	// Replace faces with their agglomeration //

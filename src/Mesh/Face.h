@@ -168,12 +168,8 @@ public:
 
 	bool IsIn(const vector<Face<Dim>*>& list)
 	{
-		for (Face<Dim>* f : list)
-		{
-			if (f == this)
-				return true;
-		}
-		return false;
+		auto it = find(list.begin(), list.end(), this);
+		return it != list.end();
 	}
 
 	static int NumberOfFacesContainingVertex(const vector<Face<Dim>*>& faces, Vertex* v)

@@ -1,15 +1,20 @@
 #pragma once
 #include "ReferenceShape.h"
 #include "../Problem/Tensor.h"
+#include <mutex>
+using namespace std;
 
 template <int Dim>
 class PhysicalShape : public GeometricShape<Dim>
 {
 private:
 	map<RefPoint, DomPoint> _domPoints;
-
+	mutex* _mutex;
 public:
-	PhysicalShape() : GeometricShape<Dim>() {}
+	PhysicalShape() : GeometricShape<Dim>()
+	{
+		_mutex = new mutex;
+	}
 
 	//-----------------------//
 	//   Virtual functions   //
@@ -42,12 +47,9 @@ public:
 
 	bool HasVertex(Vertex* v, bool compareCoordinates = false)
 	{
-		for (Vertex* v2 : this->Vertices())
-		{
-			if (v == v2 || (compareCoordinates && *v == *v2))
-				return true;
-		}
-		return false;
+		auto vertices = this->Vertices();
+		auto it = find_if(vertices.begin(), vertices.end(), [v, compareCoordinates](Vertex* v2) { return v == v2 || (compareCoordinates && *v == *v2); });
+		return it != vertices.end();
 	}
 
 	bool HasSameVertices(PhysicalShape<Dim>* other, bool compareCoordinates = false)
@@ -138,13 +140,17 @@ public:
 			return it->second;
 		return this->ConvertToDomain(refPoint);
 	}
-	virtual DomPoint ConvertToDomainAndSaveResult(const RefPoint& refPoint)
+	virtual DomPoint ConvertToDomainAndSaveResult(const RefPoint& refPoint, bool lock = false)
 	{
 		auto it = _domPoints.find(refPoint);
 		if (it != _domPoints.end())
 			return it->second;
 		DomPoint domPoint = this->ConvertToDomain(refPoint);
+		if (lock)
+			_mutex->lock();
 		SaveDomPoint(refPoint, domPoint);
+		if (lock)
+			_mutex->unlock();
 		return domPoint;
 	}
 	void ComputeAndSaveDomPoint(const RefPoint& refPoint)
@@ -299,5 +305,10 @@ public:
 	virtual double IntegralKGradGradReconstruct(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{
 		return this->ComputeIntegralKGradGrad(K, phi1, phi2);
+	}
+
+	virtual ~PhysicalShape()
+	{
+		delete _mutex;
 	}
 };
