@@ -402,7 +402,7 @@ public:
 		this->OverlappingFineElements = vector<Element<Dim>*>(overlapping.begin(), overlapping.end());
 	}
 
-	inline bool CheckOverlapping(Element<Dim>* fineElement, set<Element<Dim>*>& overlapping, set<Element<Dim>*>& tested)
+	inline void CheckOverlapping(Element<Dim>* fineElement, set<Element<Dim>*>& overlapping, set<Element<Dim>*>& tested)
 	{
 		if (   fineElement->PhysicalPart == this->PhysicalPart 
 			&& !fineElement->IsFullyEmbeddedInCoarseElement 
