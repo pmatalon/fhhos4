@@ -7,6 +7,8 @@ using namespace std;
 class TriangleIn3D : public PhysicalShapeWithConstantJacobian<2>
 {
 private:
+	vector<Vertex*> _vertices;
+
 	double _diameter;
 	double _measure;
 	DomPoint _center;
@@ -20,22 +22,24 @@ private:
 	double _detJacobian;
 
 public:
-	Vertex* V1;
-	Vertex* V2;
-	Vertex* V3;
-
 	TriangleIn3D(Vertex* v1, Vertex* v2, Vertex* v3)
 	{
-		V1 = v1;
-		V2 = v2;
-		V3 = v3;
+		_vertices = vector<Vertex*>{ v1, v2, v3 };
 		Init();
 	}
 
 	TriangleIn3D(const TriangleIn3D& shape) = default;
 
+	inline Vertex* V1() const { return _vertices[0]; }
+	inline Vertex* V2() const { return _vertices[1]; }
+	inline Vertex* V3() const { return _vertices[2]; }
+
 	void Init()
 	{
+		Vertex* V1 = _vertices[0];
+		Vertex* V2 = _vertices[1];
+		Vertex* V3 = _vertices[2];
+
 		DimVector<3> v12 = Vect<3>(V1, V2);
 		DimVector<3> v13 = Vect<3>(V1, V3);
 		DimVector<3> v23 = Vect<3>(V2, V3);
@@ -86,9 +90,9 @@ public:
 		return &Triangle::RefTriangle;
 	}
 	
-	inline vector<Vertex*> Vertices() const override
+	inline const vector<Vertex*>& Vertices() const override
 	{
-		return vector<Vertex*> { V1, V2, V3 };
+		return _vertices;
 	}
 
 	bool IsDegenerated() const override
@@ -123,7 +127,7 @@ public:
 	}
 	inline bool Contains(const DomPoint& p) const override
 	{
-		return Triangle::TriangleContains(*V1, *V2, *V3, p, _measure);
+		return Triangle::TriangleContains(*V1(), *V2(), *V3(), p, _measure);
 	}
 
 	inline double DetJacobian() const
@@ -137,6 +141,10 @@ public:
 
 	DomPoint ConvertToDomain(const RefPoint& refPoint) const
 	{
+		Vertex* V1 = _vertices[0];
+		Vertex* V2 = _vertices[1];
+		Vertex* V3 = _vertices[2];
+
 		double t = refPoint.X;
 		double u = refPoint.Y;
 
@@ -149,6 +157,10 @@ public:
 
 	RefPoint ConvertToReference(const DomPoint& domainPoint) const
 	{
+		Vertex* V1 = _vertices[0];
+		Vertex* V2 = _vertices[1];
+		Vertex* V3 = _vertices[2];
+
 		double x = domainPoint.X;
 		double y = domainPoint.Y;
 		double z = domainPoint.Z;
@@ -176,11 +188,11 @@ public:
 	{
 		os << "Triangle";
 		os << " ";
-		V1->Serialize(os, 3);
+		V1()->Serialize(os, 3);
 		os << "--";
-		V2->Serialize(os, 3);
+		V2()->Serialize(os, 3);
 		os << "--";
-		V3->Serialize(os, 3);
+		V3()->Serialize(os, 3);
 	}
 
 	//---------------------------------------------------------------------//

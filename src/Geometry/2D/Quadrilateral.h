@@ -7,6 +7,8 @@ using namespace std;
 class Quadrilateral : public PhysicalShape<2>
 {
 private:
+	vector<Vertex*> _vertices;
+
 	double _diameter;
 	double _measure;
 	DomPoint _center;
@@ -23,19 +25,11 @@ private:
 	double b3;
 
 public:
-	Vertex* V1;
-	Vertex* V2;
-	Vertex* V3;
-	Vertex* V4;
-
 	static ReferenceCartesianShape<2> RefSquare;
 
 	Quadrilateral(Vertex* v1, Vertex* v2, Vertex* v3, Vertex* v4)
 	{
-		V1 = v1;
-		V2 = v2;
-		V3 = v3;
-		V4 = v4;
+		_vertices = vector<Vertex*>{ v1, v2, v3, v4 };
 		Init();
 	}
 
@@ -44,6 +38,11 @@ public:
 
 	void Init()
 	{
+		Vertex* V1 = _vertices[0];
+		Vertex* V2 = _vertices[1];
+		Vertex* V3 = _vertices[2];
+		Vertex* V4 = _vertices[3];
+
 		double diag13 = (*V3 - *V1).norm();
 		double diag24 = (*V4 - *V2).norm();
 		double edge12 = (*V2 - *V1).norm();
@@ -88,9 +87,9 @@ public:
 		return &RefSquare;
 	}
 
-	inline vector<Vertex*> Vertices() const override
+	inline const vector<Vertex*>& Vertices() const override
 	{
-		return vector<Vertex*> { V1, V2, V3, V4 };
+		return _vertices;
 	}
 
 	bool IsDegenerated() const override
@@ -100,6 +99,11 @@ public:
 
 	void ReshapeByMovingIntersection(Vertex* oldIntersect, Vertex* newIntersect) override
 	{
+		Vertex* V1 = _vertices[0];
+		Vertex* V2 = _vertices[1];
+		Vertex* V3 = _vertices[2];
+		Vertex* V4 = _vertices[3];
+
 		if (*V1 == *oldIntersect)
 			V1 = newIntersect;
 		else if (*V2 == *oldIntersect)
@@ -239,6 +243,11 @@ public:
 
 	void Serialize(ostream& os) const override
 	{
+		Vertex* V1 = _vertices[0];
+		Vertex* V2 = _vertices[1];
+		Vertex* V3 = _vertices[2];
+		Vertex* V4 = _vertices[3];
+
 		os << "Quadrilateral";
 		os << " ";
 		V1->Serialize(os, 2);

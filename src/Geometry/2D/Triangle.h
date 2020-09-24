@@ -7,6 +7,8 @@ using namespace std;
 class Triangle : public PhysicalShapeWithConstantJacobian<2>
 {
 private:
+	vector<Vertex*> _vertices;
+
 	double _diameter;
 	double _measure;
 	DomPoint _center;
@@ -16,24 +18,26 @@ private:
 	double _detJacobian;
 
 public:
-	Vertex* V1;
-	Vertex* V2;
-	Vertex* V3;
-
 	static ReferenceTriangle RefTriangle;
 
 	Triangle(Vertex* v1, Vertex* v2, Vertex* v3) 
 	{
-		V1 = v1;
-		V2 = v2;
-		V3 = v3;
+		_vertices = vector<Vertex*>{ v1, v2, v3 };
 		Init();
 	}
+
+	inline Vertex* V1() const { return _vertices[0]; }
+	inline Vertex* V2() const { return _vertices[1]; }
+	inline Vertex* V3() const { return _vertices[2]; }
 
 	Triangle(const Triangle& shape) = default;
 
 	void Init()
 	{
+		Vertex* V1 = _vertices[0];
+		Vertex* V2 = _vertices[1];
+		Vertex* V3 = _vertices[2];
+
 		double lengthEdge12 = sqrt(pow(V2->X - V1->X, 2) + pow(V2->Y - V1->Y, 2));
 		double lengthEdge23 = sqrt(pow(V3->X - V2->X, 2) + pow(V3->Y - V2->Y, 2));
 		double lengthEdge13 = sqrt(pow(V3->X - V1->X, 2) + pow(V3->Y - V1->Y, 2));
@@ -65,13 +69,17 @@ public:
 		return &RefTriangle;
 	}
 	
-	inline vector<Vertex*> Vertices() const override
+	inline const vector<Vertex*>& Vertices() const override
 	{
-		return vector<Vertex*> { V1, V2, V3 };
+		return _vertices;
 	}
 
 	bool IsDegenerated() const override
 	{
+		Vertex* V1 = _vertices[0];
+		Vertex* V2 = _vertices[1];
+		Vertex* V3 = _vertices[2];
+
 		DimVector<2> V1V2 = Vect<2>(V1, V2);
 		DimVector<2> V1V3 = Vect<2>(V1, V3);
 		double cross = V1V2[0] * V1V3[1] - V1V2[1] * V1V3[0];
@@ -80,6 +88,10 @@ public:
 
 	void ReshapeByMovingIntersection(Vertex* oldIntersect, Vertex* newIntersect) override
 	{
+		Vertex* V1 = _vertices[0];
+		Vertex* V2 = _vertices[1];
+		Vertex* V3 = _vertices[2];
+
 		if (*V1 == *oldIntersect)
 			V1 = newIntersect;
 		else if (*V2 == *oldIntersect)
@@ -118,6 +130,9 @@ public:
 	}
 	inline bool Contains(const DomPoint& p) const override
 	{
+		Vertex* V1 = _vertices[0];
+		Vertex* V2 = _vertices[1];
+		Vertex* V3 = _vertices[2];
 		return TriangleContains(*V1, *V2, *V3, p, _measure);
 	}
 
@@ -151,6 +166,10 @@ public:
 
 	DomPoint ConvertToDomain(const RefPoint& refPoint) const
 	{
+		Vertex* V1 = _vertices[0];
+		Vertex* V2 = _vertices[1];
+		Vertex* V3 = _vertices[2];
+
 		double t = refPoint.X;
 		double u = refPoint.Y;
 
@@ -162,6 +181,10 @@ public:
 
 	RefPoint ConvertToReference(const DomPoint& domainPoint) const
 	{
+		Vertex* V1 = _vertices[0];
+		Vertex* V2 = _vertices[1];
+		Vertex* V3 = _vertices[2];
+
 		double x = domainPoint.X;
 		double y = domainPoint.Y;
 
@@ -173,12 +196,19 @@ public:
 
 	void ExportToMatlab(string color = "r") const override
 	{
+		Vertex* V1 = _vertices[0];
+		Vertex* V2 = _vertices[1];
+		Vertex* V3 = _vertices[2];
 		MatlabScript script;
 		script.PlotTriangle(*V1, *V2, *V3, color);
 	}
 
 	void Serialize(ostream& os) const override
 	{
+		Vertex* V1 = _vertices[0];
+		Vertex* V2 = _vertices[1];
+		Vertex* V3 = _vertices[2];
+
 		os << "Triangle";
 		os << " ";
 		V1->Serialize(os, 2);

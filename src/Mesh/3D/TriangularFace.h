@@ -21,18 +21,9 @@ public:
 		TriangularFace(number, v1, v2, v3, element1, nullptr)
 	{ }
 
-	inline Vertex* Vertex1() const
-	{
-		return _shape->V1;
-	}
-	inline Vertex* Vertex2() const
-	{
-		return _shape->V2;
-	}
-	inline Vertex* Vertex3() const
-	{
-		return _shape->V3;
-	}
+	inline Vertex* Vertex1() const { return _shape->V1(); }
+	inline Vertex* Vertex2() const { return _shape->V2(); }
+	inline Vertex* Vertex3() const { return _shape->V3(); }
 
 	//----------------------------------------------------//
 	//                 Face implementation                //
@@ -45,7 +36,7 @@ public:
 
 	Face<3>* CreateSameGeometricFace(BigNumber number, Element<3>* element1)
 	{
-		Face<3>* copy = new TriangularFace(number, _shape->V1, _shape->V2, _shape->V3, element1);
+		Face<3>* copy = new TriangularFace(number, _shape->V1(), _shape->V2(), _shape->V3(), element1);
 		copy->IsDomainBoundary = this->IsDomainBoundary;
 		copy->BoundaryPart = this->BoundaryPart;
 		return copy;

@@ -23,7 +23,7 @@ public:
 	// Geometry
 	virtual ReferenceShape<Dim>* RefShape() const = 0;
 
-	virtual vector<Vertex*> Vertices() const = 0;
+	virtual const vector<Vertex*>& Vertices() const = 0;
 
 	virtual bool IsConvex() const = 0;
 

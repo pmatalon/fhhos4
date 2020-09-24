@@ -27,11 +27,11 @@ public:
 
 	inline Vertex* Vertex1() const
 	{
-		return _shape->Vertex1;
+		return _shape->Vertex1();
 	}
 	inline Vertex* Vertex2() const
 	{
-		return _shape->Vertex2;
+		return _shape->Vertex2();
 	}
 	
 	//----------------------------------------------------//
@@ -45,7 +45,7 @@ public:
 
 	Face<2>* CreateSameGeometricFace(BigNumber number, Element<2>* element1)
 	{
-		Face<2>* copy = new Edge(number, _shape->Vertex1, _shape->Vertex2, element1);
+		Face<2>* copy = new Edge(number, _shape->Vertex1(), _shape->Vertex2(), element1);
 		copy->IsDomainBoundary = this->IsDomainBoundary;
 		copy->BoundaryPart = this->BoundaryPart;
 		return copy;
@@ -54,7 +54,7 @@ public:
 	void ExportFaceToMatlab(FILE* file)
 	{
 		//             Number  x1    y1    x2    y2 IsDomainBoundary IsRemovedOnCoarserGrid
-		fprintf(file, "%lu %.17g %.17g %.17g %.17g %d %d\n", this->Number, _shape->Vertex1->X, _shape->Vertex1->Y, _shape->Vertex2->X, _shape->Vertex2->Y, this->IsDomainBoundary, this->IsRemovedOnCoarserGrid);
+		fprintf(file, "%lu %.17g %.17g %.17g %.17g %d %d\n", this->Number, _shape->Vertex1()->X, _shape->Vertex1()->Y, _shape->Vertex2()->X, _shape->Vertex2()->Y, this->IsDomainBoundary, this->IsRemovedOnCoarserGrid);
 	}
 
 	virtual ~Edge()

@@ -86,7 +86,7 @@ public:
 	{
 		return Shape()->Regularity();
 	}
-	virtual vector<Vertex*> Vertices() const
+	virtual const vector<Vertex*>& Vertices() const
 	{
 		return Shape()->Vertices();
 	}

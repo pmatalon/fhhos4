@@ -19,18 +19,9 @@ public:
 		_shape = new Triangle(v1, v2, v3);
 	}
 
-	inline Vertex* V1()
-	{
-		return _shape->V1;
-	}
-	inline Vertex* V2()
-	{
-		return _shape->V2;
-	}
-	inline Vertex* V3()
-	{
-		return _shape->V3;
-	}
+	inline Vertex* V1() { return _shape->V1(); }
+	inline Vertex* V2() { return _shape->V2(); }
+	inline Vertex* V3() { return _shape->V3(); }
 
 	//-------------------------------------------------------//
 	//                 Element implementation                //
@@ -54,26 +45,26 @@ public:
 
 		// Condition 2: n.AC < 0
 		Vertex* C = nullptr;
-		if (edge->Vertex1() == _shape->V1)
+		if (edge->Vertex1() == _shape->V1())
 		{
-			if (edge->Vertex2() == _shape->V2)
-				C = _shape->V3;
+			if (edge->Vertex2() == _shape->V2())
+				C = _shape->V3();
 			else
-				C = _shape->V2;
+				C = _shape->V2();
 		}
-		else if (edge->Vertex1() == _shape->V2)
+		else if (edge->Vertex1() == _shape->V2())
 		{
-			if (edge->Vertex2() == _shape->V1)
-				C = _shape->V3;
+			if (edge->Vertex2() == _shape->V1())
+				C = _shape->V3();
 			else
-				C = _shape->V1;
+				C = _shape->V1();
 		}
-		else if (edge->Vertex1() == _shape->V3)
+		else if (edge->Vertex1() == _shape->V3())
 		{
-			if (edge->Vertex2() == _shape->V1)
-				C = _shape->V2;
+			if (edge->Vertex2() == _shape->V1())
+				C = _shape->V2();
 			else
-				C = _shape->V1;
+				C = _shape->V1();
 		}
 		else
 			assert(false);

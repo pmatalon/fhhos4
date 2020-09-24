@@ -7,6 +7,8 @@ using namespace std;
 class Tetrahedron : public PhysicalShapeWithConstantJacobian<3>
 {
 private:
+	vector<Vertex*> _vertices;
+
 	double _diameter;
 	double _measure;
 	DomPoint _center;
@@ -17,27 +19,29 @@ private:
 	double _detJacobian;
 
 public:
-	Vertex* V1;
-	Vertex* V2;
-	Vertex* V3;
-	Vertex* V4;
-
 	static ReferenceTetrahedron RefTetra;
 
 	Tetrahedron(Vertex* v1, Vertex* v2, Vertex* v3, Vertex* v4)
 	{
 		assert(*v1 != *v2 && *v1 != *v3 && *v1 != *v4 && *v2 != *v3 && *v2 != *v4 && *v3 != *v4);
-		V1 = v1;
-		V2 = v2;
-		V3 = v3;
-		V4 = v4;
+		_vertices = vector<Vertex*>{ v1, v2, v3, v4 };
 		Init();
 	}
 
 	Tetrahedron(const Tetrahedron& shape) = default;
 
+	inline Vertex* V1() const { return _vertices[0]; }
+	inline Vertex* V2() const { return _vertices[1]; }
+	inline Vertex* V3() const { return _vertices[2]; }
+	inline Vertex* V4() const { return _vertices[3]; }
+
 	void Init()
 	{
+		Vertex* V1 = _vertices[0];
+		Vertex* V2 = _vertices[1];
+		Vertex* V3 = _vertices[2];
+		Vertex* V4 = _vertices[3];
+
 		DimVector<3> v12 = Vect<3>(V1, V2);
 		DimVector<3> v13 = Vect<3>(V1, V3);
 		DimVector<3> v14 = Vect<3>(V1, V4);
@@ -88,9 +92,9 @@ public:
 		return &RefTetra;
 	}
 	
-	inline vector<Vertex*> Vertices() const override
+	inline const vector<Vertex*>& Vertices() const override
 	{
-		return vector<Vertex*> { V1, V2, V3, V4 };
+		return _vertices;
 	}
 
 	bool IsDegenerated() const override
@@ -125,6 +129,10 @@ public:
 	}
 	inline bool Contains(const DomPoint& p) const override
 	{
+		Vertex* V1 = _vertices[0];
+		Vertex* V2 = _vertices[1];
+		Vertex* V3 = _vertices[2];
+		Vertex* V4 = _vertices[3];
 		return TetrahedronContains(*V1, *V2, *V3, *V4, p, _measure);
 	}
 
@@ -165,6 +173,11 @@ public:
 	// Mapping
 	DomPoint ConvertToDomain(const RefPoint& refPoint) const
 	{
+		Vertex* V1 = _vertices[0];
+		Vertex* V2 = _vertices[1];
+		Vertex* V3 = _vertices[2];
+		Vertex* V4 = _vertices[3];
+
 		double t = refPoint.X;
 		double u = refPoint.Y;
 		double v = refPoint.Z;
@@ -179,6 +192,7 @@ public:
 	// Inverse mapping
 	RefPoint ConvertToReference(const DomPoint& domainPoint) const
 	{
+		Vertex* V1 = _vertices[0];
 		DimVector<3> tuv = _inverseMapping * Vect<3>(*V1, domainPoint);
 		RefPoint p(tuv(0), tuv(1), tuv(2));
 		return p;
@@ -188,13 +202,13 @@ public:
 	{
 		os << "Tetrahedron";
 		os << " ";
-		V1->Serialize(os, 3);
+		V1()->Serialize(os, 3);
 		os << "--";
-		V2->Serialize(os, 3);
+		V2()->Serialize(os, 3);
 		os << "--";
-		V3->Serialize(os, 3);
+		V3()->Serialize(os, 3);
 		os << "--";
-		V4->Serialize(os, 3);
+		V4()->Serialize(os, 3);
 	}
 
 	//---------------------------------------------------------------------//

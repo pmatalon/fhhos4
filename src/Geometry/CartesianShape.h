@@ -197,7 +197,7 @@ public:
 		_vertices = vector<Vertex*>(vertices);
 	}
 
-	inline vector<Vertex*> Vertices() const override
+	inline const vector<Vertex*>& Vertices() const override
 	{
 		return _vertices;
 	}

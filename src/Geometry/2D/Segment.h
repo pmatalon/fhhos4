@@ -7,23 +7,26 @@ using namespace std;
 class Segment : public PhysicalShapeWithConstantJacobian<1>
 {
 private:
+	vector<Vertex*> _vertices;
 	double _width;
 	DomPoint _center;
 public:
-	Vertex* Vertex1;
-	Vertex* Vertex2;
-
 	Segment(Vertex* v1, Vertex* v2) : PhysicalShapeWithConstantJacobian<1>()
 	{
-		Vertex1 = v1;
-		Vertex2 = v2;
+		_vertices = vector<Vertex*>{ v1, v2 };
 		Init();
 	}
 
 	Segment(const Segment& shape) = default;
 
+	inline Vertex* Vertex1() const { return _vertices[0]; }
+	inline Vertex* Vertex2() const { return _vertices[1]; }
+
 	inline void Init()
 	{
+		Vertex* Vertex1 = _vertices[0];
+		Vertex* Vertex2 = _vertices[1];
+
 		_width = sqrt(pow(Vertex2->X - Vertex1->X, 2) + pow(Vertex2->Y - Vertex1->Y, 2));
 		_center = DomPoint((Vertex1->X + Vertex2->X) / 2, (Vertex1->Y + Vertex2->Y) / 2);
 	}
@@ -38,14 +41,14 @@ public:
 		return &CartesianShape<2, 1>::RefCartShape;
 	}
 
-	inline vector<Vertex*> Vertices() const override
+	inline const vector<Vertex*>& Vertices() const override
 	{
-		return vector<Vertex*> {Vertex1, Vertex2};
+		return _vertices;
 	}
 
 	bool IsDegenerated() const override
 	{
-		return *Vertex1 == *Vertex2;
+		return *_vertices[0] == *_vertices[1];
 	}
 
 	inline double Diameter() const override
@@ -70,7 +73,7 @@ public:
 	}
 	inline bool Contains(const DomPoint& p) const override
 	{
-		return SegmentContains(*Vertex1, *Vertex2, p);
+		return SegmentContains(*_vertices[0], *_vertices[1], p);
 	}
 
 	static bool SegmentContains(const DomPoint& A, const DomPoint& B, const DomPoint& P)
@@ -92,6 +95,9 @@ public:
 
 	DomPoint ConvertToDomain(const RefPoint& referenceElementPoint) const override
 	{
+		Vertex* Vertex1 = _vertices[0];
+		Vertex* Vertex2 = _vertices[1];
+
 		double x1 = Vertex1->X;
 		double x2 = Vertex2->X;
 		double y1 = Vertex1->Y;
@@ -105,6 +111,9 @@ public:
 
 	RefPoint ConvertToReference(const DomPoint& domainPoint) const override
 	{
+		Vertex* Vertex1 = _vertices[0];
+		Vertex* Vertex2 = _vertices[1];
+
 		double x1 = Vertex1->X;
 		double x2 = Vertex2->X;
 		double y1 = Vertex1->Y;
@@ -128,13 +137,13 @@ public:
 	void ExportToMatlab(string color = "r") const override
 	{
 		MatlabScript script;
-		script.PlotSegment(Vertex1, Vertex2, color);
+		script.PlotSegment(_vertices[0], _vertices[1], color);
 	}
 
 	void Serialize(ostream& os) const override
 	{
-		Vertex1->Serialize(os, 2);
+		_vertices[0]->Serialize(os, 2);
 		os << "--";
-		Vertex2->Serialize(os, 2);
+		_vertices[1]->Serialize(os, 2);
 	}
 };

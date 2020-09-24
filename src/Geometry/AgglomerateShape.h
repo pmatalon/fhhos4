@@ -213,7 +213,7 @@ public:
 		assert(false && "Dim-specific function");
 	}
 
-	inline vector<Vertex*> Vertices() const override
+	inline const vector<Vertex*>& Vertices() const override
 	{
 		return _vertices;
 	}

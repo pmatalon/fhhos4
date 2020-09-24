@@ -19,22 +19,10 @@ public:
 		_shape = new Quadrilateral(v1, v2, v3, v4);
 	}
 
-	inline Vertex* V1()
-	{
-		return _shape->V1;
-	}
-	inline Vertex* V2()
-	{
-		return _shape->V2;
-	}
-	inline Vertex* V3()
-	{
-		return _shape->V3;
-	}
-	inline Vertex* V4()
-	{
-		return _shape->V4;
-	}
+	inline Vertex* V1() { return _shape->Vertices()[0]; }
+	inline Vertex* V2() { return _shape->Vertices()[1]; }
+	inline Vertex* V3() { return _shape->Vertices()[2]; }
+	inline Vertex* V4() { return _shape->Vertices()[3]; }
 
 	//-------------------------------------------------------//
 	//                 Element implementation                //
