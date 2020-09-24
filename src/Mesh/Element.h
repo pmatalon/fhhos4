@@ -265,6 +265,11 @@ public:
 		return this->Shape()->HasSameVertices(other->Shape(), compareCoordinates);
 	}
 
+	bool HasOneVertexInCommonWith(Element<Dim>* other)
+	{
+		return this->Shape()->HasOneVertexInCommonWith(other->Shape());
+	}
+
 	bool IsIn(const vector<Element<Dim>*>& list)
 	{
 		auto it = find(list.begin(), list.end(), this);
@@ -381,47 +386,30 @@ public:
 		{
 			for (Element<Dim>* neighbour : this->VertexNeighbours())
 			{
-				for (auto fe : neighbour->FinerElements)
+				for (auto fe1 : neighbour->FinerElements)
 				{
-					if (fe->PhysicalPart == this->PhysicalPart && !fe->IsFullyEmbeddedInCoarseElement && tested.find(fe) == tested.end() && fe->Overlaps(this))
-						overlapping.insert(fe);
-					tested.insert(fe);
-					/*if (stgy != CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
+					CheckOverlapping(fe1, overlapping, tested);
+					for (Element<Dim>* fe2 : fe1->VertexNeighbours())
 					{
-						for (Element<Dim>* feNeighbour : fe->Neighbours())
-						{
-							if (feNeighbour->PhysicalPart == this->PhysicalPart && !fe->IsFullyEmbeddedInCoarseElement && tested.find(feNeighbour) == tested.end() && feNeighbour->Overlaps(this))
-							{
-								cout << "2nd degree neighbour added" << endl;
-								cout << "% coarse element" << endl;
-								this->ExportToMatlab("r");
-								fe->ExportToMatlab("b");
-								overlapping.insert(feNeighbour);
-							}
-							tested.insert(feNeighbour);
-						}
-					}*/
+						CheckOverlapping(fe2, overlapping, tested);
+						for (Element<Dim>* fe3 : fe2->VertexNeighbours())
+							CheckOverlapping(fe3, overlapping, tested);
+					}
 				}
 			}
-
-			/*for (Element<Dim>* neighbour : this->VertexNeighbours())
-			{
-				for (auto fe : neighbour->FinerElements)
-				{
-					if (fe->PhysicalPart == this->PhysicalPart && !fe->IsFullyEmbeddedInCoarseElement && tested.find(fe) == tested.end() && fe->Overlaps(this))
-					{
-						cout << "2nd degree neighbour added" << endl;
-						cout << "% coarse element" << endl;
-						this->ExportToMatlab("r");
-						fe->ExportToMatlab("b");
-						overlapping.insert(fe);
-					}
-					tested.insert(fe);
-				}
-			}*/
 		}
 
 		this->OverlappingFineElements = vector<Element<Dim>*>(overlapping.begin(), overlapping.end());
+	}
+
+	inline bool CheckOverlapping(Element<Dim>* fineElement, set<Element<Dim>*>& overlapping, set<Element<Dim>*>& tested)
+	{
+		if (   fineElement->PhysicalPart == this->PhysicalPart 
+			&& !fineElement->IsFullyEmbeddedInCoarseElement 
+			&& tested.find(fineElement) == tested.end()
+			&& fineElement->Overlaps(this))
+			overlapping.insert(fineElement);
+		tested.insert(fineElement);
 	}
 
 	bool FullyEmbeds(Element<Dim>* other)
@@ -436,6 +424,17 @@ public:
 
 	bool Overlaps(Element<Dim>* other)
 	{
+		if (!this->HasOneVertexInCommonWith(other))
+		{
+			// If no vertex in common, then if 1 vertex of the first element is inside the other, then overlapping.
+			for (Vertex* v : other->Vertices())
+			{
+				if (this->Contains(*v))
+					return true;
+			}
+		}
+		// we need to use the quadrature points (which are inside, not on a face)
+		// to rule out elements that are just simple non-overlapping neighbours.
 		for (const DomPoint& domPoint : this->QuadraturePoints())
 		{
 			if (other->Contains(domPoint))

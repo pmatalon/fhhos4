@@ -65,6 +65,16 @@ public:
 		return true;
 	}
 
+	bool HasOneVertexInCommonWith(PhysicalShape<Dim>* other)
+	{
+		for (Vertex* v : other->Vertices())
+		{
+			if (this->HasVertex(v))
+				return true;
+		}
+		return false;
+	}
+
 	bool Contains(PhysicalShape<Dim>* other)
 	{
 		if (!this->Contains(other->Center()))

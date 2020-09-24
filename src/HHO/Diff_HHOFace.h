@@ -34,7 +34,7 @@ public:
 		this->HHO = hho;
 
 		//this->ComputeAndSaveQuadraturePoints(HHO->FaceBasis->GetDegree());
-		this->ComputeAndSaveQuadraturePoints();
+		//this->ComputeAndSaveQuadraturePoints();
 
 		this->_faceMassMatrix = this->FaceMassMatrix(HHO->FaceBasis);
 		this->_invFaceMassMatrix = this->_faceMassMatrix.inverse();

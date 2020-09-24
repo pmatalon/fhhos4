@@ -60,7 +60,7 @@ public:
 
 		//this->ComputeAndSaveQuadraturePoints(hho->CellBasis->GetDegree());
 		//this->ComputeAndSaveQuadraturePoints(hho->ReconstructionBasis->GetDegree());
-		this->ComputeAndSaveQuadraturePoints();
+		//this->ComputeAndSaveQuadraturePoints();
 
 		DenseMatrix cellMassMatrix = this->CellMassMatrix(hho->CellBasis);
 		DenseMatrix Nt = this->CellReconstructMassMatrix(hho->CellBasis, hho->ReconstructionBasis);
