@@ -23,6 +23,7 @@ class Polygon : public PhysicalShape<2>
 {
 private:
 	vector<Vertex*> _vertices;
+	vector<Vertex*> _nonColinearVertices;
 
 	bool _isInitialized = false;
 
@@ -51,6 +52,7 @@ public:
 	{
 		assert(vertices.size() >= 3);
 		_vertices = vertices;
+		_nonColinearVertices.clear();
 		_isInitialized = false;
 		_cgalPolygon.clear();
 		_triangulation.clear();
@@ -67,6 +69,7 @@ private:
 	void CreateCGALPolygon()
 	{
 		_cgalPolygon.clear();
+		_nonColinearVertices.clear();
 
 		// Bug of CGAL: https://github.com/CGAL/cgal/issues/2575
 		// The partitioning function used for the decomposition in convex sub-parts will fail if two edges are collinear.
@@ -78,7 +81,10 @@ private:
 			DimVector<2> v1 = Vect<2>(vert.GetPrevious(), v);
 			DimVector<2> v2 = Vect<2>(v, vert.GetNext());
 			if (!AreCollinear(v1, v2))
+			{
 				_cgalPolygon.push_back(Point_2(v->X, v->Y));
+				_nonColinearVertices.push_back(v);
+			}
 			vert.MoveNext();
 		}
 		//for (Vertex* v : vertices)
@@ -144,24 +150,14 @@ public:
 		if (!_triangulation.empty())
 			return;
 
-		if (_vertices.size() == 3)
-		{
-			Triangle* triangle = new Triangle(_vertices[0], _vertices[1], _vertices[2]);
-			_triangulation.push_back(triangle);
-		}
-		else if (_vertices.size() == 4 && this->IsConvex())
-		{
-			Triangle* triangle1 = new Triangle(_vertices[0], _vertices[1], _vertices[2]);
-			_triangulation.push_back(triangle1);
-			Triangle* triangle2 = new Triangle(_vertices[2], _vertices[3], _vertices[0]);
-			_triangulation.push_back(triangle2);
-		}
-		else if (this->IsConvex())
-			_triangulation = BarycentricTriangulation(_vertices);
+		if (_nonColinearVertices.size() <= 3 || this->IsConvex())
+			_triangulation = ConvexTriangulation(_nonColinearVertices);
 		else
 			_triangulation = CGALTriangulation();
 
 		assert(_triangulation.size() > 0);
+
+		//cout << _nonColinearVertices.size() << " vertices, " << _triangulation.size() << " subshapes" << endl;
 
 		InitQuadraturePoints();
 	}
@@ -202,6 +198,40 @@ public:
 	}
 
 private:
+	static vector<PhysicalShape<2>*> ConvexTriangulation(const vector<Vertex*>& vertices)
+	{
+		assert(vertices.size() > 2);
+		vector<PhysicalShape<2>*> triangles;
+		if (vertices.size() == 3)
+		{
+			Triangle* triangle = new Triangle(vertices[0], vertices[1], vertices[2]);
+			triangles.push_back(triangle);
+		}
+		else if (vertices.size() == 4)
+		{
+			Triangle* triangle1 = new Triangle(vertices[0], vertices[1], vertices[2]);
+			triangles.push_back(triangle1);
+			Triangle* triangle2 = new Triangle(vertices[2], vertices[3], vertices[0]);
+			triangles.push_back(triangle2);
+			// Uncomment when Contains() is implemented for the Quadrilateral
+			//Quadrilateral* q = new Quadrilateral(vertices[0], vertices[1], vertices[2], vertices[3]);
+			//triangles.push_back(q);
+		}
+		else
+		{
+			Triangle* triangle = new Triangle(vertices[0], vertices[1], vertices[2]);
+			triangles.push_back(triangle);
+
+			vector<Vertex*> remainingVertices;
+			for (int i = 2; i < vertices.size(); i++)
+				remainingVertices.push_back(vertices[i]);
+			remainingVertices.push_back(vertices[0]);
+			vector<PhysicalShape<2>*> otherShapes = ConvexTriangulation(remainingVertices);
+			for (auto s : otherShapes)
+				triangles.push_back(s);
+		}
+		return triangles;
+	}
 	static vector<PhysicalShape<2>*> BarycentricTriangulation(const vector<Vertex*>& vertices)
 	{
 		// Requirement: the polygon defined by the vertices must be convex!
@@ -258,17 +288,9 @@ private:
 		for (Polygon_2 p : partition_polys)
 		{
 			vector<Vertex*> vertices = Vertices(p);
-			if (p.size() == 3)
-			{
-				Triangle* subTriangle = new Triangle(vertices[0], vertices[1], vertices[2]);
-				triangulation.push_back(subTriangle);
-			}
-			else
-			{
-				vector<PhysicalShape<2>*> subTriangles = BarycentricTriangulation(vertices);
-				for (auto tri : subTriangles)
-					triangulation.push_back(tri);
-			}
+			vector<PhysicalShape<2>*> subTriangles = ConvexTriangulation(vertices);
+			for (auto tri : subTriangles)
+				triangulation.push_back(tri);
 		}
 
 		return triangulation;
