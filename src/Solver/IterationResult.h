@@ -85,7 +85,7 @@ public:
 		this->ResidualNorm = r.norm();
 		this->NormalizedResidualNorm = _bNorm > 0 ? ResidualNorm / _bNorm : ResidualNorm;
 
-		if (_oldResidualNorm != -1)
+		if (IterationNumber > 1 && _oldResidualNorm != -1)
 		{
 			this->_iterationConvRate = this->NormalizedResidualNorm / _oldResidualNorm;
 
@@ -177,11 +177,20 @@ public:
 			//os << std::defaultfloat << result._iterationConvRate;
 
 			os << setw(convRateWidth);
-			os << std::defaultfloat << result._asymptoticConvRate;
+			if (result.IterationNumber == 1)
+				os << " ";
+			else
+				os << std::defaultfloat << result._asymptoticConvRate;
 
 			os << setw(predictedIterationsWidth);
-			int remainingIterations = abs(ceil(log(result._tolerance / result.NormalizedResidualNorm) / log(result._asymptoticConvRate)));
-			os << result.IterationNumber + remainingIterations;
+			int remainingIterations = 0;
+			if (result.IterationNumber == 1)
+				os << " ";
+			else
+			{
+				remainingIterations = abs(ceil(log(result._tolerance / result.NormalizedResidualNorm) / log(result._asymptoticConvRate)));
+				os << result.IterationNumber + remainingIterations;
+			}
 
 			os << setw(computWorkWidth);
 			os << result._solvingComputationalWork;
@@ -190,10 +199,15 @@ public:
 			os << result._solvingTimer.CPU().InMilliseconds;
 
 			os << setw(remainingTimeWidth);
-			Duration d(result._solvingTimer.CPU().InMilliseconds / result.IterationNumber * remainingIterations);
-			stringstream ss;
-			ss << d;
-			os << ss.str().substr(0, 8);
+			if (result.IterationNumber == 1)
+				os << " ";
+			else
+			{
+				Duration d(result._solvingTimer.CPU().InMilliseconds / result.IterationNumber * remainingIterations);
+				stringstream ss;
+				ss << d;
+				os << ss.str().substr(0, 8);
+			}
 		}
 		return os;
 	}
