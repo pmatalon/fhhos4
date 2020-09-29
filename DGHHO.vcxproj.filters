@@ -426,6 +426,9 @@
     <ClInclude Include="src\TestCases\2D\EDFTestCase.h">
       <Filter>TestCases\2D</Filter>
     </ClInclude>
+    <ClInclude Include="src\Geometry\CGALConvert.h">
+      <Filter>Geometry</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

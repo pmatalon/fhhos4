@@ -1,33 +1,24 @@
 #pragma once
+#include "../../Utils/RotatingList.h"
+#include "../../Utils/MatlabScript.h"
 #include "../CartesianShape.h"
+#include "../CGALConvert.h"
 #include "Triangle.h"
 #include "Quadrilateral.h"
-#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
-#include <CGAL/partition_2.h>
-#include <CGAL/Partition_traits_2.h>
 #include <CGAL/convex_hull_2.h>
 #include <cassert>
 #include <list>
 using namespace std;
 
-// CGAL types
-typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
-typedef CGAL::Partition_traits_2<K>                         Traits;
-typedef Traits::Polygon_2                                   Polygon_2;
-typedef Traits::Point_2                                     Point_2;
-typedef std::list<Polygon_2>                                Polygon_list;
-
-
+typedef exactKernel chosenKernel;
 
 class Polygon : public PhysicalShape<2>
 {
 private:
 	vector<Vertex*> _vertices;
-	vector<Vertex*> _nonColinearVertices;
+	//vector<Vertex*> _nonColinearVertices;
 
-	bool _isInitialized = false;
-
-	Polygon_2 _cgalPolygon; // Polygon of the CGAL library
+	CGAL::Polygon_2<chosenKernel> _cgalPolygon; // Polygon of the CGAL library
 
 	double _diameter;
 	double _measure;
@@ -37,80 +28,67 @@ private:
 	vector<PhysicalShape<2>*> _triangulation;
 	Quadrilateral* _boundingBox = nullptr;
 	vector<DomPoint> _quadraturePoints;
-public:
 
-	Polygon(const vector<Vertex*>& vertices, bool createTriangulationAndBoundingBox = true)
+public:
+	Polygon(const vector<Vertex*>& vertices, bool createTriangulationAndBoundingBox, bool checkForColinearVertices)
 		: _vertices(vertices)
 	{
 		assert(vertices.size() >= 3);
+		InitCGALPolygon(checkForColinearVertices);
 		Init(createTriangulationAndBoundingBox);
 	}
 
 	Polygon(const Polygon& shape) = default;
 
-	void SetVertices(const vector<Vertex*>& vertices)
+private:
+	Polygon(const CGAL::Polygon_2<chosenKernel>& cgalPolygon, bool createTriangulationAndBoundingBox)
+		: _cgalPolygon(cgalPolygon)
 	{
-		assert(vertices.size() >= 3);
-		_vertices = vertices;
-		_nonColinearVertices.clear();
-		_isInitialized = false;
-		_cgalPolygon.clear();
-		_triangulation.clear();
-		_quadraturePoints.clear();
-		if (_boundingBox)
-		{
-			delete _boundingBox;
-			_boundingBox = nullptr;
-		}
-		Init(false);
+		_vertices = CGALWrapper::ToVertices(cgalPolygon);
+		Init(createTriangulationAndBoundingBox);
 	}
 
 private:
-	void CreateCGALPolygon()
+	void InitCGALPolygon(bool checkForColinearVertices)
 	{
-		_cgalPolygon.clear();
-		_nonColinearVertices.clear();
-
 		// Bug of CGAL: https://github.com/CGAL/cgal/issues/2575
 		// The partitioning function used for the decomposition in convex sub-parts will fail if two edges are collinear.
 		// So we need to remove the "useless" vertices for the creation of the CGAL polygon.
-		RotatingList<Vertex*> vert(_vertices);
-		for (int i = 0; i < _vertices.size(); ++i)
-		{
-			Vertex* v = vert.Get();
-			DimVector<2> v1 = Vect<2>(vert.GetPrevious(), v);
-			DimVector<2> v2 = Vect<2>(v, vert.GetNext());
-			if (!AreCollinear(v1, v2))
-			{
-				_cgalPolygon.push_back(Point_2(v->X, v->Y));
-				_nonColinearVertices.push_back(v);
-			}
-			vert.MoveNext();
-		}
-		//for (Vertex* v : vertices)
-			//_cgalPolygon.push_back(Point_2(v->X, v->Y));
-		//assert(_vertices.size() >= 3);
-	}
 
-public:
-	void Init(bool createTriangulationAndBoundingBox = true)
-	{
-		if (_isInitialized)
-			return;
-
-		CreateCGALPolygon();
+		//_nonColinearVertices = checkForColinearVertices ? NonColinearVertices(_vertices) : _vertices;
+		//CGALWrapper::FillPolygon(_nonColinearVertices, _cgalPolygon);
+		CGALWrapper::FillPolygon(_vertices, _cgalPolygon);
 
 		if (!_cgalPolygon.is_simple())
 		{
 			ExportToMatlab("m");
-			Utils::Warning("Non simple polygon detected.");
+			Utils::FatalError("Non simple polygon detected.");
 		}
 		else if (!_cgalPolygon.is_counterclockwise_oriented())
 		{
 			ExportToMatlab("m");
 			Utils::FatalError("Clockwise-oriented polygon detected.");
 		}
+	}
 
+	static vector<Vertex*> NonColinearVertices(const vector<Vertex*>& vertices)
+	{
+		vector<Vertex*> nonColinearVertices;
+		RotatingList<Vertex*> vert(vertices);
+		for (int i = 0; i < vertices.size(); ++i)
+		{
+			Vertex* v = vert.Get();
+			DimVector<2> v1 = Vect<2>(vert.GetPrevious(), v);
+			DimVector<2> v2 = Vect<2>(v, vert.GetNext());
+			if (!AreCollinear(v1, v2))
+				nonColinearVertices.push_back(v);
+			vert.MoveNext();
+		}
+		return nonColinearVertices;
+	}
+
+	void Init(bool createTriangulationAndBoundingBox)
+	{
 		_diameter = 0;
 		double sumX = 0;
 		double sumY = 0;
@@ -131,7 +109,7 @@ public:
 		
 		_center = new Vertex(0, sumX / _vertices.size(), sumY / _vertices.size());
 
-		_measure = _cgalPolygon.area();
+		_measure = CGAL::to_double(_cgalPolygon.area());
 
 		if (createTriangulationAndBoundingBox)
 		{
@@ -141,25 +119,22 @@ public:
 
 		// TODO
 		_inRadius = 0;
-
-		_isInitialized = true;
 	}
 
+public:
 	void ComputeTriangulation()
 	{
 		if (!_triangulation.empty())
 			return;
 
-		if (_nonColinearVertices.size() <= 3 || this->IsConvex())
-			_triangulation = ConvexTriangulation(_nonColinearVertices);
+		if (_vertices.size() <= 3 || this->IsConvex())
+			_triangulation = ConvexTriangulation(_vertices);
 		else
 			_triangulation = CGALTriangulation();
 
 		assert(_triangulation.size() > 0);
 
-		//cout << _nonColinearVertices.size() << " vertices, " << _triangulation.size() << " subshapes" << endl;
-
-		InitQuadraturePoints();
+		//InitQuadraturePoints();
 	}
 
 	void ComputeBoundingBox()
@@ -278,16 +253,16 @@ private:
 	{
 		vector<PhysicalShape<2>*> triangulation;
 
-		Polygon_list partition_polys;
+		list<CGAL::Partition_traits_2<chosenKernel>::Polygon_2> partition_polys;
 
 		//CGAL::Failure_function prev; // save the CGAL failure function
 		//prev = CGAL::set_error_handler(my_cgal_failure_handler); // replace it with my own
 		CGAL::greene_approx_convex_partition_2(_cgalPolygon.vertices_begin(), _cgalPolygon.vertices_end(), back_inserter(partition_polys));
 		//CGAL::set_error_handler(prev); // put the old one back
 
-		for (Polygon_2 p : partition_polys)
+		for (CGAL::Partition_traits_2<chosenKernel>::Polygon_2 p : partition_polys)
 		{
-			vector<Vertex*> vertices = Vertices(p);
+			vector<Vertex*> vertices = CGALWrapper::ToVertices(p);
 			vector<PhysicalShape<2>*> subTriangles = ConvexTriangulation(vertices);
 			for (auto tri : subTriangles)
 				triangulation.push_back(tri);
@@ -311,35 +286,76 @@ private:
 public:
 	bool ConvexHullEmbeds(PhysicalShape<2>* s) const override
 	{
-		vector<Point_2> convexHullPoints;
+		vector<CGAL::Point_2<chosenKernel>> convexHullPoints;
 		CGAL::convex_hull_2(_cgalPolygon.vertices_begin(), _cgalPolygon.vertices_end(), back_inserter(convexHullPoints));
 
-		Polygon_2 convexHull(convexHullPoints.begin(), convexHullPoints.end());
+		CGAL::Polygon_2<chosenKernel> convexHull(convexHullPoints.begin(), convexHullPoints.end());
 
 		for (Vertex* v : s->Vertices())
 		{
-			if (!CGALPolyContains(convexHull, Point_2(v->X, v->Y)))
+			if (!CGALWrapper::CGALPolyContains(convexHull, CGAL::Point_2<chosenKernel>(v->X, v->Y)))
 				return false;
 		}
 		return true;
 	}
 
-private:
-	// Get vertices from CGAL polygon
-	static vector<Vertex*> Vertices(const Polygon_2& poly)
+	/*bool IntersectsWith(PhysicalShape<2>* other) override
 	{
-		vector<Vertex*> vertices;
-		for (auto it = poly.vertices_begin(); it != poly.vertices_end(); it++)
+		Polygon* otherPolygon = dynamic_cast<Polygon*>(other);
+		if (otherPolygon)
 		{
-			Point_2 p = *it;
-			Vertex* v = new Vertex(0, p.x(), p.y());
-			vertices.push_back(v);
+			bool res = CGAL::do_intersect(_cgalPolygon, otherPolygon->_cgalPolygon);
+			return res;
 		}
-		return vertices;
+		else
+		{
+			auto otherPolygon = CGALWrapper::CreatePolygon<exactKernel>(other->Vertices());
+			bool res = CGAL::do_intersect(_cgalPolygon, otherPolygon);
+			return res;
+		}
+	}*/
+
+	vector<PhysicalShape<2>*> IntersectionWith(PhysicalShape<2>* other) override
+	{
+		// Compute the intersection
+		vector<PhysicalShape<2>*> intersection;
+		list<CGAL::Polygon_with_holes_2<exactKernel>> intersectionPolygons;
+		Polygon* otherPolygon = dynamic_cast<Polygon*>(other);
+		if (otherPolygon)
+			CGAL::intersection(_cgalPolygon, otherPolygon->_cgalPolygon, back_inserter(intersectionPolygons));
+		else
+		{
+			auto otherShape = CGALWrapper::CreatePolygon<exactKernel>(other->Vertices());
+			CGAL::intersection(_cgalPolygon, otherShape, back_inserter(intersectionPolygons));
+		}
+
+		// The intersection can be made of multiple polygons
+		for (auto cgalPolyWithHoles : intersectionPolygons)
+		{
+			CGAL::Polygon_2<chosenKernel> cgalPoly = cgalPolyWithHoles.outer_boundary();
+
+			if (cgalPoly.area() < Utils::NumericalZero * this->Measure())
+				continue; // the intersection is the interface
+
+			/*if (!cgalPoly.is_simple())
+			{
+				cout << "% Poly 1" << endl;
+				this->ExportToMatlab("r");
+				cout << "% Poly 2" << endl;
+				other->ExportToMatlab("b");
+				cout << "% Intersection" << endl;
+				ExportCGALPolyToMatlab(cgalPoly, "m");
+				Utils::Warning("Intersection polygon is not simple.");
+			}*/
+			Polygon* intersectionPolygon = new Polygon(cgalPoly, true);
+			intersection.push_back(intersectionPolygon);
+		}
+		return intersection;
 	}
 
+
 public:
-	PhysicalShape<2>* CreateCopy() const
+	virtual PhysicalShape<2>* CreateCopy() const override
 	{
 		Polygon* copy = new Polygon(*this);
 		return copy;
@@ -355,7 +371,7 @@ public:
 		return _triangulation;
 	}
 
-	ReferenceShape<2>* RefShape() const
+	virtual ReferenceShape<2>* RefShape() const override
 	{
 		return &RectangleShape::RefCartShape;
 	}
@@ -384,18 +400,6 @@ public:
 	}
 	inline bool IsConvex() const override
 	{
-		/*if (_vertices.size() < 4)
-			return true;
-		// Not convex if a cord is outside the shape
-		for (int i = 0; i < _vertices.size(); i++)
-		{
-			for (int j = i + 1; j < _vertices.size(); j++)
-			{
-				if (!Contains(DomPoint::Middle(*_vertices[i], *_vertices[j])))
-					return false;
-			}
-		}
-		return true;*/
 		return _cgalPolygon.is_convex();
 	}
 	inline double InRadius() const override
@@ -404,28 +408,7 @@ public:
 	}
 	inline bool Contains(const DomPoint& p) const override
 	{
-		/*for (PhysicalShape<2>* t : _triangulation)
-		{
-			if (t->Contains(p))
-				return true;
-		}
-		return false;*/
-		return CGALPolyContains(_cgalPolygon, Point_2(p.X, p.Y));
-	}
-
-private:
-	static bool CGALPolyContains(const Polygon_2& poly, const Point_2& p)
-	{
-		switch (CGAL::bounded_side_2(poly.vertices_begin(), poly.vertices_end(), p, K()))
-		{
-		case CGAL::ON_BOUNDED_SIDE: // inside
-			return true;
-		case CGAL::ON_BOUNDARY: // on the boundary
-			return true;
-		case CGAL::ON_UNBOUNDED_SIDE: // outside
-			return false;
-		}
-		return false;
+		return CGALWrapper::CGALPolyContains(_cgalPolygon, CGAL::Point_2<chosenKernel>(p.X, p.Y));
 	}
 
 public:
@@ -468,7 +451,14 @@ public:
 	void ExportCGALPolyToMatlab(string color = "b") const
 	{
 		MatlabScript script;
-		script.PlotPolygonEdges(Vertices(_cgalPolygon), color);
+		script.PlotPolygonEdges(CGALWrapper::ToVertices(_cgalPolygon), color);
+		script.Out() << endl;
+	}
+
+	void ExportCGALPolyToMatlab(const CGAL::Polygon_2<chosenKernel>& cgalPoly, string color = "b") const
+	{
+		MatlabScript script;
+		script.PlotPolygonEdges(CGALWrapper::ToVertices(cgalPoly), color);
 		script.Out() << endl;
 	}
 
@@ -585,7 +575,7 @@ public:
 		Vertex upperRight(number, 1, 1);
 		Vertex upperLeft(number, -1, 1);
 		vector<Vertex*> vertices{ &lowerLeft, &lowerRight, &upperRight, &upperLeft };
-		Polygon polygRefSquare(vertices);
+		Polygon polygRefSquare(vertices, true, false);
 
 		//--------------------------------------//
 		polygRefSquare.UnitTests();
@@ -621,7 +611,7 @@ public:
 		lowerRight = Vertex(number, h, 0);
 		upperRight = Vertex(number, h, h);
 		upperLeft = Vertex(number, 0, h);
-		Polygon polygSquare(vector<Vertex*>{ &lowerLeft, &lowerRight, &upperRight, &upperLeft });
+		Polygon polygSquare(vector<Vertex*>{ &lowerLeft, &lowerRight, &upperRight, &upperLeft }, true, false);
 		RectangleShape realSquare(&lowerLeft, h);
 		integralOverRealSquare = realSquare.Integral(anyFunction);
 		integralOverPolygonalSquare = polygSquare.Integral(anyFunction);
@@ -633,7 +623,7 @@ public:
 		lowerRight = Vertex(number, h, 0);
 		upperRight = Vertex(number, h, h);
 		upperLeft = Vertex(number, 0, h);
-		Polygon polygSquare1(vector<Vertex*>{ &lowerLeft, &lowerRight, &upperRight, &upperLeft });
+		Polygon polygSquare1(vector<Vertex*>{ &lowerLeft, &lowerRight, &upperRight, &upperLeft }, true, false);
 		realSquare = RectangleShape(&lowerLeft, h);
 		integralOverRealSquare = realSquare.Integral(anyFunction);
 		integralOverPolygonalSquare = polygSquare1.Integral(anyFunction);

@@ -17,7 +17,7 @@ public:
 		Diff_DGElement<2>(number),
 		Diff_HHOElement<2>(number)
 	{
-		_shape = new Polygon(MacroPolygonVertices(e1, e2, facesToRemove), createTriangulationAndBoundingBox);
+		_shape = new Polygon(MacroPolygonVertices(e1, e2, facesToRemove), createTriangulationAndBoundingBox, true);
 	}
 
 	PolygonalElement(int number, const vector<Vertex*>& vertices, bool createTriangulationAndBoundingBox = true) :
@@ -25,7 +25,7 @@ public:
 		Diff_DGElement<2>(number),
 		Diff_HHOElement<2>(number)
 	{
-		_shape = new Polygon(vertices, createTriangulationAndBoundingBox);
+		_shape = new Polygon(vertices, createTriangulationAndBoundingBox, true);
 	}
 
 	inline vector<Vertex*> Vertices()
@@ -260,7 +260,8 @@ public:
 
 		assert(newVertices.size() > 2);
 
-		_shape->SetVertices(newVertices);
+		delete _shape;
+		_shape = new Polygon(newVertices, false, true);
 	}
 
 	virtual ~PolygonalElement()

@@ -184,20 +184,12 @@ private:
 			if (stgy == CoarseningStrategy::None)
 				stgy = finePb->_mesh->ComesFrom.CS;
 
-			// CheckIfFullyEmbeddedInCoarseElement
-			ElementParallelLoop<Dim> parallelLoop(finePb->_mesh->Elements);
-			parallelLoop.Execute([stgy](Element<Dim>* fe)
-				{
-					fe->CheckIfFullyEmbeddedInCoarseElement(stgy);
-				});
-
 			// SetOverlappingFineElements
 			ElementParallelLoop<Dim> parallelLoop2(coarsePb->_mesh->Elements);
 			parallelLoop2.Execute([stgy](Element<Dim>* ce)
 				{
 					ce->SetOverlappingFineElements(stgy);
 					ce->InitOverlappingElementsLocalNumbering();
-					//ce->CheckIfFullyOverlapped();
 				});
 
 			SparseMatrix I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
@@ -704,14 +696,24 @@ private:
 				Diff_HHOElement<Dim>* coarseElement = dynamic_cast<Diff_HHOElement<Dim>*>(ce);
 
 				DenseMatrix localL2Proj = coarseElement->ComputeL2ProjectionMatrixCoarseToFine(_cellInterpolationBasis);
-				for (auto fineElement : coarseElement->OverlappingFineElements)
+				for (auto it = coarseElement->OverlappingFineElements.begin(); it != coarseElement->OverlappingFineElements.end(); it++)
 				{
+					Element<Dim>* fineElement = it->first;
 					BigNumber coarseElemGlobalNumber = coarseElement->Number;
 					BigNumber fineElemGlobalNumber = fineElement->Number;
 					BigNumber fineElemLocalNumber = coarseElement->LocalNumberOfOverlapping(fineElement);
 
 					chunk->Results.Coeffs.Add(fineElemGlobalNumber*nCellUnknowns, coarseElemGlobalNumber*nCellUnknowns, localL2Proj.block(fineElemLocalNumber*nCellUnknowns, 0, nCellUnknowns, nCellUnknowns));
 				}
+
+				// Deletion of the intersections
+				for (auto it = coarseElement->OverlappingFineElements.begin(); it != coarseElement->OverlappingFineElements.end(); it++)
+				{
+					vector<PhysicalShape<Dim>*> intersectionCoarseFine = it->second;
+					for (PhysicalShape<Dim>* intersection : intersectionCoarseFine)
+						delete intersection;
+				}
+				coarseElement->OverlappingFineElements.clear();
 			});
 
 		SparseMatrix L2Proj(finePb->HHO->nElements * nCellUnknowns, coarsePb->HHO->nElements * nCellUnknowns);

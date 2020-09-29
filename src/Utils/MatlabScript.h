@@ -2,7 +2,7 @@
 #include <fstream>
 #include "Types.h"
 #include "RotatingList.h"
-#include "../Geometry/Point.h"
+#include "../Mesh/Vertex.h"
 using namespace std;
 
 class MatlabScript
@@ -29,6 +29,12 @@ public:
 	void PlotPoint(const DomPoint& p, string options)
 	{
 		Out() << "plot(axes, " << p.X << ", " << p.Y << ",'" << options << "');" << endl;
+	}
+
+	void Plot(const vector<Vertex*>& vertices, string options = "k+")
+	{
+		for (auto v : vertices)
+			PlotPoint(*v, options);
 	}
 
 	void PlotSegment(Vertex* v1, Vertex* v2, string color)

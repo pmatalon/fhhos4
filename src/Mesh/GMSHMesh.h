@@ -574,7 +574,7 @@ private:
 						continue;
 					for (Element<Dim>* fe : neighbour->FinerElements)
 					{
-						if (fe->Overlaps(coarse))
+						if (!coarse->IntersectionWith(fe).empty())
 							coarse->FinerElements.push_back(fe);
 					}
 				}

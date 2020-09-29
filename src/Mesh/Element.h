@@ -32,8 +32,7 @@ public:
 	Element<Dim>* CoarserElement = nullptr;
 	vector<Face<Dim>*> FinerFacesRemoved;
 	// Used for non-nested meshes. It contains at least FinerElements.
-	vector<Element<Dim>*> OverlappingFineElements;
-	bool IsFullyEmbeddedInCoarseElement = false;
+	map<Element<Dim>*, vector<PhysicalShape<Dim>*>> OverlappingFineElements;
 
 	// Used during mesh construction
 	mutex Mutex;
@@ -178,8 +177,11 @@ public:
 	{
 		this->_overlappingFineElementsLocalNumbering.clear();
 		int localNumber = 0;
-		for (Element<Dim>* e : this->OverlappingFineElements)
+		for (auto it = this->OverlappingFineElements.begin(); it != this->OverlappingFineElements.end(); it++)
+		{
+			Element<Dim>* e = it->first;
 			this->_overlappingFineElementsLocalNumbering.insert({ e, localNumber++ });
+		}
 	}
 
 
@@ -360,27 +362,24 @@ public:
 		return (!this->PhysicalPart && !other->PhysicalPart) || this->PhysicalPart == other->PhysicalPart;
 	}
 
-	void CheckIfFullyEmbeddedInCoarseElement(CoarseningStrategy stgy)
+	vector<PhysicalShape<Dim>*> IntersectionWith(Element<Dim>* other)
 	{
-		if (Utils::BuildsNestedMeshHierarchy(stgy))
-			this->IsFullyEmbeddedInCoarseElement = true;
-		else
-			this->IsFullyEmbeddedInCoarseElement == this->CoarserElement->FullyEmbeds(this);
+		return this->Shape()->IntersectionWith(other->Shape());
 	}
 
 	void SetOverlappingFineElements(CoarseningStrategy stgy)
 	{
-		//if (!this->OverlappingFineElements.empty())
-			//return;
-
-		set<Element<Dim>*> overlapping;
 		set<Element<Dim>*> tested;
+		double overlappingMeasure = 0;
+		bool stop = false;
 		for (auto fe : this->FinerElements)
 		{
 			assert(fe->PhysicalPart == this->PhysicalPart);
-			overlapping.insert(fe);
-			tested.insert(fe);
+			CheckOverlapping(fe, tested, overlappingMeasure, stop);
 		}
+
+		if (stop)
+			return;
 
 		if (!Utils::BuildsNestedMeshHierarchy(stgy))
 		{
@@ -388,94 +387,44 @@ public:
 			{
 				for (auto fe1 : neighbour->FinerElements)
 				{
-					CheckOverlapping(fe1, overlapping, tested);
+					CheckOverlapping(fe1, tested, overlappingMeasure, stop);
+					if (stop)
+						return;
 					for (Element<Dim>* fe2 : fe1->VertexNeighbours())
 					{
-						CheckOverlapping(fe2, overlapping, tested);
+						CheckOverlapping(fe2, tested, overlappingMeasure, stop);
+						if (stop)
+							return;
 						for (Element<Dim>* fe3 : fe2->VertexNeighbours())
-							CheckOverlapping(fe3, overlapping, tested);
+						{
+							CheckOverlapping(fe3, tested, overlappingMeasure, stop);
+							if (stop)
+								return;
+						}
 					}
 				}
 			}
 		}
 
-		this->OverlappingFineElements = vector<Element<Dim>*>(overlapping.begin(), overlapping.end());
+		Utils::FatalError("error in the computation of the overlapping elements: a coarse element is not fully overlapped by finer ones.");
 	}
 
-	inline void CheckOverlapping(Element<Dim>* fineElement, set<Element<Dim>*>& overlapping, set<Element<Dim>*>& tested)
+	inline void CheckOverlapping(Element<Dim>* fineElement, set<Element<Dim>*>& tested, double& overlappingMeasure, bool& stop)
 	{
-		if (   fineElement->PhysicalPart == this->PhysicalPart 
-			&& !fineElement->IsFullyEmbeddedInCoarseElement 
-			&& tested.find(fineElement) == tested.end()
-			&& fineElement->Overlaps(this))
-			overlapping.insert(fineElement);
+		if (this->IsInSamePhysicalPartAs(fineElement)
+			&& tested.find(fineElement) == tested.end())
+		{
+			vector<PhysicalShape<Dim>*> intersection = this->IntersectionWith(fineElement);
+			if (!intersection.empty())
+			{
+				this->OverlappingFineElements.insert({ fineElement , intersection });
+				for (PhysicalShape<Dim>* intersec : intersection)
+					overlappingMeasure += intersec->Measure();
+				if (abs(overlappingMeasure - this->Measure()) < Utils::Eps * this->Measure())
+					stop = true;
+			}
+		}
 		tested.insert(fineElement);
-	}
-
-	bool FullyEmbeds(Element<Dim>* other)
-	{
-		for (Vertex* v : other->Vertices())
-		{
-			if (!this->Contains(*v))
-				return false;
-		}
-		return true;
-	}
-
-	bool Overlaps(Element<Dim>* other)
-	{
-		if (!this->HasOneVertexInCommonWith(other))
-		{
-			// If no vertex in common, then if 1 vertex of the first element is inside the other, then overlapping.
-			for (Vertex* v : other->Vertices())
-			{
-				if (this->Contains(*v))
-					return true;
-			}
-		}
-		// we need to use the quadrature points (which are inside, not on a face)
-		// to rule out elements that are just simple non-overlapping neighbours.
-		for (const DomPoint& domPoint : this->QuadraturePoints())
-		{
-			if (other->Contains(domPoint))
-				return true;
-		}
-		return false;
-	}
-
-	void CheckIfFullyOverlapped()
-	{
-		for (DomPoint domPoint : this->QuadraturePoints())
-		{
-			bool overlappingFineElementFound = false;
-			for (Element<Dim>* fe : this->OverlappingFineElements)
-			{
-				if (fe->Contains(domPoint))
-				{
-					overlappingFineElementFound = true;
-					break;
-				}
-			}
-			if (!overlappingFineElementFound)
-			{
-				cout << "% Coarse element" << endl;
-				this->ExportToMatlab("r");
-				cout << "% Point" << endl;
-				MatlabScript s;
-				s.PlotPoint(domPoint, "k+");
-				for (Element<Dim>* fe : this->OverlappingFineElements)
-				{
-					cout << "% Fine element" << endl;
-					fe->ExportToMatlab("b");
-				}
-				cout << endl;
-				for (Element<Dim>* fe : this->OverlappingFineElements)
-				{
-					fe->Contains(domPoint);
-				}
-				cout << endl;
-			}
-		}
 	}
 
 	//-------------------//

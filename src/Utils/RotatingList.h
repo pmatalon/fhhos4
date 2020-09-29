@@ -1,4 +1,6 @@
 #pragma once
+#include <vector>
+#include <assert.h>
 using namespace std;
 
 template <typename T>

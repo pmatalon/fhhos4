@@ -116,55 +116,38 @@ public:
 
 	DenseMatrix ComputeL2ProjectionMatrixCoarseToFine(FunctionalBasis<Dim>* cellBasis)
 	{
-		assert(this->OverlappingFineElements.size() > 0);
+		assert(!this->OverlappingFineElements.empty());
 		DenseMatrix L2Proj(cellBasis->Size() * this->OverlappingFineElements.size(), cellBasis->Size());
 
-		for (auto e : this->OverlappingFineElements)
+		for (auto it = this->OverlappingFineElements.begin(); it != this->OverlappingFineElements.end(); it++)
 		{
-			if (e->PhysicalPart != this->PhysicalPart)
+			Element<Dim>* fe = it->first;
+			if (!fe->IsInSamePhysicalPartAs(this))
 			{
 				Utils::Warning("This coarse element is overlapped by a fine one that is not in the same physical part. The coarsening/refinement strategy must prevent that.");
 				continue;
 			}
-			Diff_HHOElement<Dim>* fineElement = dynamic_cast<Diff_HHOElement<Dim>*>(e);
-
+			Diff_HHOElement<Dim>* fineElement = dynamic_cast<Diff_HHOElement<Dim>*>(fe);
 			DenseMatrix fineCoarseMass(cellBasis->Size(), cellBasis->Size());
+
+			vector<PhysicalShape<Dim>*> intersectionCoarseFine = it->second;
+
 			for (BasisFunction<Dim>* finePhi : cellBasis->LocalFunctions)
 			{
 				for (BasisFunction<Dim>* coarsePhi : cellBasis->LocalFunctions)
 				{
-					RefFunction finePhiCoarsePhi = [this, fineElement, finePhi, coarsePhi](const RefPoint& fineRefPoint) {
-						DomPoint fineDomPoint = fineElement->ConvertToDomainAndSaveResult(fineRefPoint, true);
-
-						/*if ((fineElement->CoarserElement == this && fineElement->IsFullyEmbeddedInCoarseElement) && !this->Contains(fineDomPoint))
-						{
-							cout << endl << "% Coarse element: " << endl;
-							this->ExportToMatlab("r");
-							cout << endl << "% Fine element: " << endl;
-							fineElement->ExportToMatlab("b");
-							cout << endl << "% Quadrature point: " << endl;
-							MatlabScript s;
-							s.PlotPoint(fineDomPoint, "k+");
-							this->Contains(fineDomPoint);
-							this->FullyEmbeds(fineElement);
-						}*/
-						if ((fineElement->CoarserElement == this && fineElement->IsFullyEmbeddedInCoarseElement) || this->Contains(fineDomPoint))
-						{
-							RefPoint coarseRefPoint = this->ConvertToReference(fineDomPoint);
-							return finePhi->Eval(fineRefPoint)*coarsePhi->Eval(coarseRefPoint);
-						}
-						else
-							return 0.0;
-					};
-
 					double integral = 0;
-					if (fineElement->CoarserElement == this && fineElement->IsFullyEmbeddedInCoarseElement)
+					int degree = finePhi->GetDegree() + coarsePhi->GetDegree();
+					for (PhysicalShape<Dim>* intersection : intersectionCoarseFine)
 					{
-						int degree = finePhi->GetDegree() + coarsePhi->GetDegree();
-						integral = fineElement->Integral(finePhiCoarsePhi, degree);
+						RefFunction finePhiCoarsePhi = [this, fineElement, intersection, finePhi, coarsePhi](const RefPoint& intersectionRefPoint) {
+							DomPoint domPoint = intersection->ConvertToDomainAndSaveResult(intersectionRefPoint, true);
+							RefPoint fineRefPoint = fineElement->ConvertToReference(domPoint);
+							RefPoint coarseRefPoint = this->ConvertToReference(domPoint);
+							return finePhi->Eval(fineRefPoint)*coarsePhi->Eval(coarseRefPoint);
+						};
+						integral += intersection->Integral(finePhiCoarsePhi, degree);
 					}
-					else
-						integral = fineElement->Integral(finePhiCoarsePhi); // use all quadrature points because it's not a polynomial
 					fineCoarseMass(finePhi->LocalNumber, coarsePhi->LocalNumber) = integral;
 				}
 			}

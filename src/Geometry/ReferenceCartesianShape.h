@@ -1,6 +1,7 @@
 #pragma once
 #include "ReferenceShape.h"
 #include "../QuadratureRules/GaussLegendre/GaussLegendre.h"
+#include "../Problem/Tensor.h"
 
 template <int Dim>
 class ReferenceCartesianShape : public ReferenceShape<Dim>
