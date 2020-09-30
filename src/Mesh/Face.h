@@ -38,14 +38,23 @@ public:
 	//   Virtual functions   //
 	//-----------------------//
 
-	virtual PhysicalShape<Dim-1>* Shape() const
-	{
+	virtual const PhysicalShape<Dim - 1>* Shape() const = 0;
+	/*{
 		if (this->IsDeleted)
 			Utils::FatalError("A method has been called on a deleted face!");
 		else
 			Utils::FatalError("The method Face.Shape() should be implemented in the subclass.");
 		return nullptr;
-	}
+	}*/
+	virtual PhysicalShape<Dim - 1>* Shape() = 0;
+	/*{
+		if (this->IsDeleted)
+			Utils::FatalError("A method has been called on a deleted face!");
+		else
+			Utils::FatalError("The method Face.Shape() should be implemented in the subclass.");
+		return nullptr;
+	}*/
+
 
 	virtual void ExportFaceToMatlab(FILE* file) = 0;
 

@@ -8,21 +8,20 @@ using namespace std;
 class TetrahedralElement : public Diff_DGElement<3>, public Diff_HHOElement<3>
 {
 private:
-	Tetrahedron* _shape;
+	Tetrahedron _shape;
 
 public:
 	TetrahedralElement(BigNumber number, Vertex* v1, Vertex* v2, Vertex* v3, Vertex* v4) :
 		Element(number),
 		Diff_DGElement<3>(number),
-		Diff_HHOElement<3>(number)
-	{
-		_shape = new Tetrahedron(v1, v2, v3, v4);
-	}
+		Diff_HHOElement<3>(number),
+		_shape(v1, v2, v3, v4)
+	{}
 
-	inline Vertex* V1() { return _shape->V1(); }
-	inline Vertex* V2() { return _shape->V2(); }
-	inline Vertex* V3() { return _shape->V3(); }
-	inline Vertex* V4() { return _shape->V4(); }
+	inline Vertex* V1() { return _shape.V1(); }
+	inline Vertex* V2() { return _shape.V2(); }
+	inline Vertex* V3() { return _shape.V3(); }
+	inline Vertex* V4() { return _shape.V4(); }
 
 	//-------------------------------------------------------//
 	//                 Element implementation                //
@@ -30,11 +29,11 @@ public:
 
 	PhysicalShape<3>* Shape() override
 	{
-		return _shape;
+		return &_shape;
 	}
 	const PhysicalShape<3>* Shape() const override
 	{
-		return _shape;
+		return &_shape;
 	}
 
 	DimVector<3> OuterNormalVector(Face<3>* f) const
@@ -66,10 +65,7 @@ public:
 	}
 
 	virtual ~TetrahedralElement()
-	{
-		if (_shape)
-			delete _shape;
-	}
+	{}
 
 	//-------------------------------------------------------------------//
 	//                            Unit tests                             //

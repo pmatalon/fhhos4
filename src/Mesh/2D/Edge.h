@@ -6,16 +6,15 @@
 class Edge : public Diff_DGFace<2>, public Diff_HHOFace<2>
 {
 private:
-	Segment* _shape;
+	Segment _shape;
 public:
 
 	Edge(BigNumber number, Vertex* v1, Vertex* v2, Element<2>* element1, Element<2>* element2) :
 		Face(number, element1, element2),
 		Diff_DGFace(number, element1, element2),
-		Diff_HHOFace(number, element1, element2)
-	{
-		_shape = new Segment(v1, v2);
-	}
+		Diff_HHOFace(number, element1, element2),
+		_shape(v1, v2)
+	{}
 
 	Edge(BigNumber number, Vertex* v1, Vertex* v2, Element<2>* element1) :
 		Edge(number, v1, v2, element1, nullptr)
@@ -27,25 +26,29 @@ public:
 
 	inline Vertex* Vertex1() const
 	{
-		return _shape->Vertex1();
+		return _shape.Vertex1();
 	}
 	inline Vertex* Vertex2() const
 	{
-		return _shape->Vertex2();
+		return _shape.Vertex2();
 	}
 	
 	//----------------------------------------------------//
 	//                 Face implementation                //
 	//----------------------------------------------------//
 
-	PhysicalShape<1>* Shape() const override
+	const PhysicalShape<1>* Shape() const override
 	{
-		return _shape;
+		return &_shape;
+	}
+	PhysicalShape<1>* Shape() override
+	{
+		return &_shape;
 	}
 
 	Face<2>* CreateSameGeometricFace(BigNumber number, Element<2>* element1)
 	{
-		Face<2>* copy = new Edge(number, _shape->Vertex1(), _shape->Vertex2(), element1);
+		Face<2>* copy = new Edge(number, _shape.Vertex1(), _shape.Vertex2(), element1);
 		copy->IsDomainBoundary = this->IsDomainBoundary;
 		copy->BoundaryPart = this->BoundaryPart;
 		return copy;
@@ -54,12 +57,9 @@ public:
 	void ExportFaceToMatlab(FILE* file)
 	{
 		//             Number  x1    y1    x2    y2 IsDomainBoundary IsRemovedOnCoarserGrid
-		fprintf(file, "%lu %.17g %.17g %.17g %.17g %d %d\n", this->Number, _shape->Vertex1()->X, _shape->Vertex1()->Y, _shape->Vertex2()->X, _shape->Vertex2()->Y, this->IsDomainBoundary, this->IsRemovedOnCoarserGrid);
+		fprintf(file, "%lu %.17g %.17g %.17g %.17g %d %d\n", this->Number, _shape.Vertex1()->X, _shape.Vertex1()->Y, _shape.Vertex2()->X, _shape.Vertex2()->Y, this->IsDomainBoundary, this->IsRemovedOnCoarserGrid);
 	}
 
 	virtual ~Edge()
-	{
-		if (_shape)
-			delete _shape;
-	}
+	{}
 };

@@ -8,20 +8,19 @@ using namespace std;
 class TriangularElement : public Diff_DGElement<2>, public Diff_HHOElement<2>
 {
 private:
-	Triangle* _shape;
+	Triangle _shape;
 
 public:
 	TriangularElement(int number, Vertex* v1, Vertex* v2, Vertex* v3) :
 		Element(number),
 		Diff_DGElement<2>(number),
-		Diff_HHOElement<2>(number)
-	{
-		_shape = new Triangle(v1, v2, v3);
-	}
+		Diff_HHOElement<2>(number),
+		_shape(v1, v2, v3)
+	{}
 
-	inline Vertex* V1() { return _shape->V1(); }
-	inline Vertex* V2() { return _shape->V2(); }
-	inline Vertex* V3() { return _shape->V3(); }
+	inline Vertex* V1() { return _shape.V1(); }
+	inline Vertex* V2() { return _shape.V2(); }
+	inline Vertex* V3() { return _shape.V3(); }
 
 	//-------------------------------------------------------//
 	//                 Element implementation                //
@@ -29,11 +28,11 @@ public:
 
 	PhysicalShape<2>* Shape() override
 	{
-		return _shape;
+		return &_shape;
 	}
 	const PhysicalShape<2>* Shape() const override
 	{
-		return _shape;
+		return &_shape;
 	}
 
 	DimVector<2> OuterNormalVector(Face<2>* face) const
@@ -49,26 +48,26 @@ public:
 
 		// Condition 2: n.AC < 0
 		Vertex* C = nullptr;
-		if (edge->Vertex1() == _shape->V1())
+		if (edge->Vertex1() == _shape.V1())
 		{
-			if (edge->Vertex2() == _shape->V2())
-				C = _shape->V3();
+			if (edge->Vertex2() == _shape.V2())
+				C = _shape.V3();
 			else
-				C = _shape->V2();
+				C = _shape.V2();
 		}
-		else if (edge->Vertex1() == _shape->V2())
+		else if (edge->Vertex1() == _shape.V2())
 		{
-			if (edge->Vertex2() == _shape->V1())
-				C = _shape->V3();
+			if (edge->Vertex2() == _shape.V1())
+				C = _shape.V3();
 			else
-				C = _shape->V1();
+				C = _shape.V1();
 		}
-		else if (edge->Vertex1() == _shape->V3())
+		else if (edge->Vertex1() == _shape.V3())
 		{
-			if (edge->Vertex2() == _shape->V1())
-				C = _shape->V2();
+			if (edge->Vertex2() == _shape.V1())
+				C = _shape.V2();
 			else
-				C = _shape->V1();
+				C = _shape.V1();
 		}
 		else
 			assert(false);
@@ -82,10 +81,7 @@ public:
 	}
 
 	virtual ~TriangularElement()
-	{
-		if (_shape)
-			delete _shape;
-	}
+	{}
 
 	//-------------------------------------------------------------------//
 	//                            Unit tests                             //

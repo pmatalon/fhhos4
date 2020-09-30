@@ -8,21 +8,20 @@ using namespace std;
 class QuadrilateralElement : public Diff_DGElement<2>, public Diff_HHOElement<2>
 {
 private:
-	Quadrilateral* _shape;
+	Quadrilateral _shape;
 
 public:
 	QuadrilateralElement(int number, Vertex* v1, Vertex* v2, Vertex* v3, Vertex* v4) :
 		Element(number),
 		Diff_DGElement<2>(number),
-		Diff_HHOElement<2>(number)
-	{
-		_shape = new Quadrilateral(v1, v2, v3, v4);
-	}
+		Diff_HHOElement<2>(number),
+		_shape(v1, v2, v3, v4)
+	{}
 
-	inline Vertex* V1() { return _shape->Vertices()[0]; }
-	inline Vertex* V2() { return _shape->Vertices()[1]; }
-	inline Vertex* V3() { return _shape->Vertices()[2]; }
-	inline Vertex* V4() { return _shape->Vertices()[3]; }
+	inline Vertex* V1() { return _shape.Vertices()[0]; }
+	inline Vertex* V2() { return _shape.Vertices()[1]; }
+	inline Vertex* V3() { return _shape.Vertices()[2]; }
+	inline Vertex* V4() { return _shape.Vertices()[3]; }
 
 	//-------------------------------------------------------//
 	//                 Element implementation                //
@@ -30,11 +29,11 @@ public:
 
 	PhysicalShape<2>* Shape() override
 	{
-		return _shape;
+		return &_shape;
 	}
 	const PhysicalShape<2>* Shape() const override
 	{
-		return _shape;
+		return &_shape;
 	}
 
 	DimVector<2> OuterNormalVector(Face<2>* face) const
@@ -58,10 +57,7 @@ public:
 	}
 	
 	virtual ~QuadrilateralElement()
-	{
-		if (_shape)
-			delete _shape;
-	}
+	{}
 
 	//-------------------------------------------------------------------//
 	//                            Unit tests                             //
