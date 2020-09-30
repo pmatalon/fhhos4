@@ -47,7 +47,16 @@ public:
 	//   Virtual functions   //
 	//-----------------------//
 
-	virtual PhysicalShape<Dim>* Shape() const
+	virtual PhysicalShape<Dim>* Shape()
+	{
+		if (this->IsDeleted)
+			Utils::FatalError("A method has been called on a deleted element!");
+		else
+			Utils::FatalError("The method Element.Shape() should be implemented in the subclass.");
+		return nullptr;
+	}
+
+	virtual const PhysicalShape<Dim>* Shape() const
 	{
 		if (this->IsDeleted)
 			Utils::FatalError("A method has been called on a deleted element!");

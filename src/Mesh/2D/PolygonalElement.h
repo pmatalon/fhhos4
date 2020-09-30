@@ -8,38 +8,42 @@ using namespace std;
 class PolygonalElement : public Diff_DGElement<2>, public Diff_HHOElement<2>
 {
 private:
-	Polygon* _shape = nullptr;
+	Polygon _shape;
 
 public:
 	// Constructor creating the polygon from the adjonction of two elements
 	PolygonalElement(int number, Element<2>* e1, Element<2>* e2, const vector<Face<2>*>& facesToRemove, bool createTriangulationAndBoundingBox = true) :
 		Element(number),
 		Diff_DGElement<2>(number),
-		Diff_HHOElement<2>(number)
+		Diff_HHOElement<2>(number),
+		_shape(MacroPolygonVertices(e1, e2, facesToRemove), createTriangulationAndBoundingBox, true)
 	{
-		_shape = new Polygon(MacroPolygonVertices(e1, e2, facesToRemove), createTriangulationAndBoundingBox, true);
 	}
 
 	PolygonalElement(int number, const vector<Vertex*>& vertices, bool createTriangulationAndBoundingBox = true) :
 		Element(number),
 		Diff_DGElement<2>(number),
-		Diff_HHOElement<2>(number)
+		Diff_HHOElement<2>(number),
+		_shape(vertices, createTriangulationAndBoundingBox, true)
 	{
-		_shape = new Polygon(vertices, createTriangulationAndBoundingBox, true);
 	}
 
 	inline vector<Vertex*> Vertices()
 	{
-		return _shape->Vertices();
+		return _shape.Vertices();
 	}
 
 	//-------------------------------------------------------//
 	//                 Element implementation                //
 	//-------------------------------------------------------//
 
-	PhysicalShape<2>* Shape() const
+	PhysicalShape<2>* Shape() override
 	{
-		return _shape;
+		return &_shape;
+	}
+	const PhysicalShape<2>* Shape() const override
+	{
+		return &_shape;
 	}
 
 	DimVector<2> OuterNormalVector(Face<2>* face) const
@@ -61,7 +65,7 @@ public:
 		{
 			// the element's center doesn't work if the polygon is not be convex
 			PhysicalShape<2>* faceSubshape = nullptr;
-			for (PhysicalShape<2>* ss : _shape->SubShapes())
+			for (PhysicalShape<2>* ss : _shape.SubShapes())
 			{
 				if (ss->Contains(*A) && ss->Contains(*B))
 				{
@@ -71,7 +75,7 @@ public:
 			}
 			if (!faceSubshape)
 			{
-				_shape->ExportSubShapesToMatlab();
+				_shape.ExportSubShapesToMatlab();
 				face->Shape()->ExportToMatlab("k");
 				Utils::FatalError("Cannot compute the direction of the normal vector.");
 			}
@@ -82,6 +86,19 @@ public:
 			n = -1 * n;
 
 		return n;
+	}
+	
+	//-------------------------------------------------------//
+	//                    Polygon-specific                   //
+	//-------------------------------------------------------//
+
+	void ComputeTriangulation()
+	{
+		_shape.ComputeTriangulation();
+	}
+	void ComputeBoundingBox()
+	{
+		_shape.ComputeBoundingBox();
 	}
 
 	static vector<Vertex*> MacroPolygonVertices(Element<2>* e1, Element<2>* e2, const vector<Face<2>*>& facesToRemove)
@@ -252,7 +269,7 @@ public:
 
 		// Adds all the vertices in the same order, except the intersection vertices
 		vector<Vertex*> newVertices;
-		for (Vertex* v : _shape->Vertices())
+		for (Vertex* v : _shape.Vertices())
 		{
 			if (!v->IsIn(verticesToRemove))
 				newVertices.push_back(v);
@@ -260,14 +277,11 @@ public:
 
 		assert(newVertices.size() > 2);
 
-		delete _shape;
-		_shape = new Polygon(newVertices, false, true);
+		_shape = Polygon(newVertices, false, true);
 	}
 
 	virtual ~PolygonalElement()
 	{
-		if (_shape)
-			delete _shape;
 	}
 
 };

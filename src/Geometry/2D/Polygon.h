@@ -22,7 +22,7 @@ private:
 
 	double _diameter;
 	double _measure;
-	Vertex* _center;
+	DomPoint _center;
 	double _inRadius;
 
 	vector<PhysicalShape<2>*> _triangulation;
@@ -107,7 +107,7 @@ private:
 			sumY += v1->Y;
 		}
 		
-		_center = new Vertex(0, sumX / _vertices.size(), sumY / _vertices.size());
+		_center = DomPoint(sumX / _vertices.size(), sumY / _vertices.size());
 
 		_measure = CGAL::to_double(_cgalPolygon.area());
 
@@ -284,7 +284,7 @@ private:
 	}
 
 public:
-	bool ConvexHullEmbeds(PhysicalShape<2>* s) const override
+	bool ConvexHullEmbeds(const PhysicalShape<2>* s) const override
 	{
 		vector<CGAL::Point_2<chosenKernel>> convexHullPoints;
 		CGAL::convex_hull_2(_cgalPolygon.vertices_begin(), _cgalPolygon.vertices_end(), back_inserter(convexHullPoints));
@@ -315,12 +315,12 @@ public:
 		}
 	}*/
 
-	vector<PhysicalShape<2>*> IntersectionWith(PhysicalShape<2>* other) override
+	vector<PhysicalShape<2>*> IntersectionWith(const PhysicalShape<2>* other) const override
 	{
 		// Compute the intersection
 		vector<PhysicalShape<2>*> intersection;
 		list<CGAL::Polygon_with_holes_2<exactKernel>> intersectionPolygons;
-		Polygon* otherPolygon = dynamic_cast<Polygon*>(other);
+		const Polygon* otherPolygon = dynamic_cast<const Polygon*>(other);
 		if (otherPolygon)
 			CGAL::intersection(_cgalPolygon, otherPolygon->_cgalPolygon, back_inserter(intersectionPolygons));
 		else
@@ -396,7 +396,7 @@ public:
 	}
 	inline DomPoint Center() const override
 	{
-		return *_center;
+		return _center;
 	}
 	inline bool IsConvex() const override
 	{
@@ -541,8 +541,8 @@ public:
 	{
 		for (PhysicalShape<2>* t : _triangulation)
 			delete t;
-		delete _center;
-		delete _boundingBox;
+		if (_boundingBox)
+			delete _boundingBox;
 	}
 
 	//-------------------------------------------------------------------//

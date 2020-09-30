@@ -23,9 +23,9 @@ public:
 		Add(s);
 	}
 
-	void Add(PhysicalShape<Dim>* s)
+	void Add(const PhysicalShape<Dim>* s)
 	{
-		AgglomerateShape* a = dynamic_cast<AgglomerateShape*>(s);
+		const AgglomerateShape* a = dynamic_cast<const AgglomerateShape*>(s);
 		if (a)
 		{
 			for (PhysicalShape<Dim>* ss : s->SubShapes())

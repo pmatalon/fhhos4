@@ -44,7 +44,7 @@ public:
 	}
 
 protected:
-	DenseMatrix ComputeAndReturnMassMatrix(FunctionalBasis<Dim>* basis)
+	DenseMatrix ComputeAndReturnMassMatrix(FunctionalBasis<Dim>* basis) const
 	{
 		DenseMatrix M = DenseMatrix(basis->Size(), basis->Size());
 		for (BasisFunction<Dim>* phi1 : basis->LocalFunctions)
@@ -61,7 +61,7 @@ protected:
 		return M;
 	}
 
-	DenseMatrix ComputeAndReturnMassMatrix(FunctionalBasis<Dim>* basis1, FunctionalBasis<Dim>* basis2)
+	DenseMatrix ComputeAndReturnMassMatrix(FunctionalBasis<Dim>* basis1, FunctionalBasis<Dim>* basis2) const
 	{
 		DenseMatrix M(basis1->LocalFunctions.size(), basis2->LocalFunctions.size());
 		for (BasisFunction<Dim>* phi1 : basis1->LocalFunctions)

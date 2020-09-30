@@ -85,7 +85,7 @@ public:
 	//             DG             //
 	//----------------------------//
 
-	inline double MassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) override
+	inline double MassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const override
 	{
 		return DetJacobian() * this->RefShape()->MassTerm(phi1, phi2);
 	}
@@ -94,17 +94,17 @@ public:
 	//             HHO             //
 	//-----------------------------//
 
-	inline DenseMatrix FaceMassMatrix(FunctionalBasis<Dim>* basis) override
+	inline DenseMatrix FaceMassMatrix(FunctionalBasis<Dim>* basis) const override
 	{
 		return DetJacobian() * this->RefShape()->FaceMassMatrix(basis);
 	}
 
-	inline DenseMatrix CellMassMatrix(FunctionalBasis<Dim>* basis) override
+	inline DenseMatrix CellMassMatrix(FunctionalBasis<Dim>* basis) const override
 	{
 		return DetJacobian() * this->RefShape()->CellMassMatrix(basis);
 	}
 
-	inline DenseMatrix CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) override
+	inline DenseMatrix CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) const override
 	{
 		return DetJacobian() * this->RefShape()->CellReconstructMassMatrix(cellBasis, reconstructBasis);
 	}

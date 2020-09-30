@@ -9,7 +9,7 @@ class PhysicalShape : public GeometricShape<Dim>
 {
 private:
 	map<RefPoint, DomPoint> _domPoints;
-	mutex* _mutex;
+	mutex* _mutex = nullptr;
 public:
 	PhysicalShape() : GeometricShape<Dim>()
 	{
@@ -45,14 +45,14 @@ public:
 	//      Geometry      //
 	//--------------------//
 
-	bool HasVertex(Vertex* v, bool compareCoordinates = false)
+	bool HasVertex(Vertex* v, bool compareCoordinates = false) const
 	{
 		auto vertices = this->Vertices();
 		auto it = find_if(vertices.begin(), vertices.end(), [v, compareCoordinates](Vertex* v2) { return v == v2 || (compareCoordinates && *v == *v2); });
 		return it != vertices.end();
 	}
 
-	bool HasSameVertices(PhysicalShape<Dim>* other, bool compareCoordinates = false)
+	bool HasSameVertices(const PhysicalShape<Dim>* other, bool compareCoordinates = false) const
 	{
 		if (this->Vertices().size() != other->Vertices().size())
 			return false;
@@ -89,7 +89,7 @@ public:
 		return true;
 	}
 
-	virtual bool ConvexHullEmbeds(PhysicalShape<Dim>* other) const
+	virtual bool ConvexHullEmbeds(const PhysicalShape<Dim>* other) const
 	{
 		if (IsConvex())
 		{
@@ -103,7 +103,7 @@ public:
 		assert(false);
 	}
 
-	virtual vector<PhysicalShape<Dim>*> IntersectionWith(PhysicalShape<Dim>* other)
+	virtual vector<PhysicalShape<Dim>*> IntersectionWith(const PhysicalShape<Dim>* other) const
 	{
 		assert(false);
 	}
@@ -288,12 +288,12 @@ public:
 	//             DG             //
 	//----------------------------//
 
-	virtual double MassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
+	virtual double MassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
 	{
 		return this->ComputeMassTerm(phi1, phi2);
 	}
 
-	virtual double StiffnessTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
+	virtual double StiffnessTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
 	{
 		return this->ComputeIntegralGradGrad(phi1, phi2);
 	}
@@ -302,28 +302,33 @@ public:
 	//             HHO             //
 	//-----------------------------//
 
-	virtual DenseMatrix FaceMassMatrix(FunctionalBasis<Dim>* basis)
+	virtual DenseMatrix FaceMassMatrix(FunctionalBasis<Dim>* basis) const
 	{
 		return this->ComputeAndReturnMassMatrix(basis);
 	}
 
-	virtual DenseMatrix CellMassMatrix(FunctionalBasis<Dim>* basis)
+	virtual DenseMatrix CellMassMatrix(FunctionalBasis<Dim>* basis) const
 	{
 		return this->ComputeAndReturnMassMatrix(basis);
 	}
 
-	virtual DenseMatrix CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis)
+	virtual DenseMatrix CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) const
 	{
 		return this->ComputeAndReturnMassMatrix(cellBasis, reconstructBasis);
 	}
 
-	virtual double IntegralKGradGradReconstruct(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
+	virtual double IntegralKGradGradReconstruct(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
 	{
 		return this->ComputeIntegralKGradGrad(K, phi1, phi2);
 	}
 
 	virtual ~PhysicalShape()
 	{
-		delete _mutex;
+		// TODO find a way to deallocate safely
+		/*if (_mutex)
+		{
+			delete _mutex;
+			_mutex = nullptr;
+		}*/
 	}
 };

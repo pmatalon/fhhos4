@@ -38,7 +38,11 @@ public:
 	//                      Element implementation                      //
 	//------------------------------------------------------------------//
 
-	PhysicalShape<Dim>* Shape() const override
+	PhysicalShape<Dim>* Shape() override
+	{
+		return _shape;
+	}
+	const PhysicalShape<Dim>* Shape() const override
 	{
 		return _shape;
 	}

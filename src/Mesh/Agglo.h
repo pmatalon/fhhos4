@@ -99,7 +99,11 @@ private:
 	//                 Element implementation                //
 	//-------------------------------------------------------//
 public:
-	PhysicalShape<Dim>* Shape() const
+	PhysicalShape<Dim>* Shape() override
+	{
+		assert(false);
+	}
+	const PhysicalShape<Dim>* Shape() const override
 	{
 		assert(false);
 	}

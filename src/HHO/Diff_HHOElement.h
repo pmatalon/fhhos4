@@ -32,17 +32,17 @@ public:
 	//----------------------------//
 
 private:
-	double IntegralKGradGradReconstruct(Tensor<Dim>* K, BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2)
+	double IntegralKGradGradReconstruct(Tensor<Dim>* K, BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2) const
 	{
 		return this->Shape()->IntegralKGradGradReconstruct(K, reconstructPhi1, reconstructPhi2);
 	}
 
-	DenseMatrix CellMassMatrix(FunctionalBasis<Dim>* basis)
+	DenseMatrix CellMassMatrix(FunctionalBasis<Dim>* basis) const
 	{
 		return this->Shape()->CellMassMatrix(basis);
 	}
 
-	DenseMatrix CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis)
+	DenseMatrix CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) const
 	{
 		return this->Shape()->CellReconstructMassMatrix(cellBasis, reconstructBasis);
 	}

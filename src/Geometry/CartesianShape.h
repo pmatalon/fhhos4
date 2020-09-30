@@ -502,7 +502,7 @@ public:
 	//             DG             //
 	//----------------------------//
 
-	double StiffnessTerm(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2) override
+	double StiffnessTerm(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2) const override
 	{
 		if (this->IsRegular)
 		{
@@ -517,7 +517,7 @@ public:
 	//             HHO             //
 	//-----------------------------//
 	
-	double IntegralKGradGradReconstruct(Tensor<ShapeDim>* K, BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2) override
+	double IntegralKGradGradReconstruct(Tensor<ShapeDim>* K, BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2) const override
 	{
 		if (this->IsRegular)
 		{
