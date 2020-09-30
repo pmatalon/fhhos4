@@ -351,6 +351,7 @@ int main(int argc, char* argv[])
 	cout << "-------------------------- START --------------------------" << endl;
 	cout << "Option -h for help." << endl;
 	Eigen::initParallel();
+	CGALWrapper::Configure();
 
 	string meshDirectory = Utils::RootPath() + "/data/meshes/";
 	Mesh<2>::MeshDirectory = meshDirectory;

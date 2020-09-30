@@ -1,4 +1,4 @@
-#### 1. Install CGAL (see https://doc.cgal.org/latest/Manual/usage.html)
+#### 1. Install CGAL version 5.0 or later (see https://doc.cgal.org/latest/Manual/usage.html)
 
      ## install with the package manager
 
@@ -9,7 +9,7 @@
 > spack install cgal
 > spack load cgal 
 
-#### 2. Install GMSH (see http://gmsh.info/#Download)
+#### 2. Install GMSH version 4.6 or later (see http://gmsh.info/#Download)
 
 > mkdir gmsh       # create it wherever you want
 > cd gmsh

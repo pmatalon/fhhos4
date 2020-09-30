@@ -17,7 +17,26 @@ typedef CGAL::Exact_predicates_inexact_constructions_kernel inexactKernel;
 
 class CGALWrapper
 {
+private:
+	static void my_cgal_failure_handler(
+		const char *type,
+		const char *expr,
+		const char* file,
+		int line,
+		const char* msg)
+	{
+		Utils::Error("CGAL error!");
+	}
+
 public:
+	static void Configure()
+	{
+		/*CGAL::Failure_function prev; // save the CGAL failure function
+		prev = CGAL::set_error_handler(my_cgal_failure_handler); // replace it with my own
+		CGAL::set_error_handler(prev); // put the old one back*/
+		CGAL::set_error_handler(my_cgal_failure_handler);
+	}
+
 	template <typename CGALKernel>
 	static CGAL::Polygon_2<CGALKernel> CreatePolygonWithColinearityChecking(const vector<Vertex*>& vertices)
 	{
@@ -106,5 +125,61 @@ public:
 			return false;
 		}
 		return false;
+	}
+
+	template <typename CGALKernel>
+	static vector<CGAL::Polygon_2<CGALKernel>> ToSimplePolygons(const CGAL::Polygon_2<CGALKernel>& poly)
+	{
+		vector<CGAL::Polygon_2<CGALKernel>> simplePolys;
+
+		vector<CGAL::Point_2<CGALKernel>> points;
+		CGAL::Point_2<CGALKernel> doublon;
+		for (auto it = poly.vertices_begin(); it != poly.vertices_end(); it++)
+		{
+			CGAL::Point_2<CGALKernel> p = *it;
+			if (find(points.begin(), points.end(), p) != points.end())
+			{
+				doublon = p;
+				break;
+			}
+			points.push_back(p);
+		}
+		typename CGAL::Polygon_2<CGALKernel>::Vertex_const_circulator vertex = poly.vertices_circulator();
+		while (*vertex != doublon)
+			vertex++;
+
+		CGAL::Polygon_2<CGALKernel> simplePoly1;
+		do {
+			simplePoly1.push_back(*vertex);
+			vertex++;
+		} while (*vertex != doublon);
+
+		CGAL::Polygon_2<CGALKernel> simplePoly2;
+		do {
+			simplePoly2.push_back(*vertex);
+			vertex++;
+		} while (*vertex != doublon);
+
+		if (simplePoly1.size() > 2)
+		{
+			if (simplePoly1.is_simple())
+				simplePolys.push_back(simplePoly1);
+			else
+				simplePolys = ToSimplePolygons(simplePoly1);
+		}
+
+		if (simplePoly2.size() > 2)
+		{
+			if (simplePoly2.is_simple())
+				simplePolys.push_back(simplePoly2);
+			else
+			{
+				auto otherSimplePolys = ToSimplePolygons(simplePoly2);
+				for (auto sp : otherSimplePolys)
+					simplePolys.push_back(sp);
+			}
+		}
+
+		return simplePolys;
 	}
 };

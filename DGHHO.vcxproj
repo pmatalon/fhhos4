@@ -265,7 +265,7 @@
       <AdditionalIncludeDirectories>/mnt/c/Users/pierr/Documents/Source/Repos/dghho/eigen-eigen-b3f3d4950030;$(ProjectPublicIncludePath);%(ClCompile.AdditionalIncludeDirectories);/mnt/c/Users/pierr/Documents/Source/Repos/dghho/gmsh-4.4.1-Linux64-sdk/include</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>GMSH_ENABLED;ROOT_PATH="/mnt/c/Users/pierr/Documents/Source/Repos/dghho"</PreprocessorDefinitions>
       <CppLanguageStandard>c++14</CppLanguageStandard>
-      <Optimization>Full</Optimization>
+      <Optimization>MaxSpeed</Optimization>
       <ThreadSafeStatics>Yes</ThreadSafeStatics>
       <RelaxIEEE>false</RelaxIEEE>
     </ClCompile>

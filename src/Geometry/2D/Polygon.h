@@ -239,26 +239,23 @@ private:
 		return triangles;
 	}
 
-	/*static void my_cgal_failure_handler(
-		const char *type,
-		const char *expr,
-		const char* file,
-		int line,
-		const char* msg)
-	{
-		// report the error in some way.
-	}*/
-
 	vector<PhysicalShape<2>*> CGALTriangulation()
 	{
 		vector<PhysicalShape<2>*> triangulation;
 
 		list<CGAL::Partition_traits_2<chosenKernel>::Polygon_2> partition_polys;
 
-		//CGAL::Failure_function prev; // save the CGAL failure function
-		//prev = CGAL::set_error_handler(my_cgal_failure_handler); // replace it with my own
-		CGAL::greene_approx_convex_partition_2(_cgalPolygon.vertices_begin(), _cgalPolygon.vertices_end(), back_inserter(partition_polys));
-		//CGAL::set_error_handler(prev); // put the old one back
+		try
+		{
+			//CGAL::greene_approx_convex_partition_2(_cgalPolygon.vertices_begin(), _cgalPolygon.vertices_end(), back_inserter(partition_polys));
+			CGAL::optimal_convex_partition_2(_cgalPolygon.vertices_begin(), _cgalPolygon.vertices_end(), back_inserter(partition_polys));
+		}
+		catch (CGAL::Failure_exception e)
+		{
+			cout << endl;
+			this->ExportCGALPolyToMatlab();
+			Utils::FatalError("CGAL failed to compute a partitioning of the above polygon: " + e.message());
+		}
 
 		for (CGAL::Partition_traits_2<chosenKernel>::Polygon_2 p : partition_polys)
 		{
@@ -321,12 +318,23 @@ public:
 		vector<PhysicalShape<2>*> intersection;
 		list<CGAL::Polygon_with_holes_2<exactKernel>> intersectionPolygons;
 		const Polygon* otherPolygon = dynamic_cast<const Polygon*>(other);
-		if (otherPolygon)
-			CGAL::intersection(_cgalPolygon, otherPolygon->_cgalPolygon, back_inserter(intersectionPolygons));
-		else
+		try
 		{
-			auto otherShape = CGALWrapper::CreatePolygon<exactKernel>(other->Vertices());
-			CGAL::intersection(_cgalPolygon, otherShape, back_inserter(intersectionPolygons));
+			if (otherPolygon)
+				CGAL::intersection(_cgalPolygon, otherPolygon->_cgalPolygon, back_inserter(intersectionPolygons));
+			else
+			{
+				auto otherShape = CGALWrapper::CreatePolygon<exactKernel>(other->Vertices());
+				CGAL::intersection(_cgalPolygon, otherShape, back_inserter(intersectionPolygons));
+			}
+		}
+		catch (CGAL::Failure_exception e)
+		{
+			cout << endl;
+			ExportCGALPolyToMatlab();
+			if (otherPolygon)
+				ExportCGALPolyToMatlab(otherPolygon->_cgalPolygon);
+			Utils::FatalError("CGAL failed to compute the intersection between the two above polygons: " + e.message());
 		}
 
 		// The intersection can be made of multiple polygons
@@ -337,18 +345,34 @@ public:
 			if (cgalPoly.area() < Utils::NumericalZero * this->Measure())
 				continue; // the intersection is the interface
 
-			/*if (!cgalPoly.is_simple())
+			if (!cgalPoly.is_simple())
 			{
-				cout << "% Poly 1" << endl;
+				/*cout << "% Poly 1" << endl;
 				this->ExportToMatlab("r");
 				cout << "% Poly 2" << endl;
 				other->ExportToMatlab("b");
 				cout << "% Intersection" << endl;
-				ExportCGALPolyToMatlab(cgalPoly, "m");
-				Utils::Warning("Intersection polygon is not simple.");
-			}*/
-			Polygon* intersectionPolygon = new Polygon(cgalPoly, true);
-			intersection.push_back(intersectionPolygon);
+				ExportCGALPolyToMatlab(cgalPoly, "m");*/
+
+				vector<CGAL::Polygon_2<chosenKernel>> simplePolys = CGALWrapper::ToSimplePolygons(cgalPoly);
+				for (auto sp : simplePolys)
+				{
+					if (sp.area() < Utils::NumericalZero * this->Measure())
+						continue;
+
+					//cout << "% Simple poly" << endl;
+					//ExportCGALPolyToMatlab(sp, "g");
+
+					Polygon* intersectionPolygon = new Polygon(sp, true);
+					intersection.push_back(intersectionPolygon);
+				}
+				//Utils::Warning("Intersection polygon is not simple.");
+			}
+			else
+			{
+				Polygon* intersectionPolygon = new Polygon(cgalPoly, true);
+				intersection.push_back(intersectionPolygon);
+			}
 		}
 		return intersection;
 	}
