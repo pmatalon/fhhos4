@@ -106,7 +106,7 @@
     <ClInclude Include="src/FunctionalBasis/TensorPolynomial.h" />
     <ClInclude Include="src\FunctionalBasis\Hemker1D.h" />
     <ClInclude Include="src\Geometry\2D\Segment.h" />
-    <ClInclude Include="src\Geometry\CGALConvert.h" />
+    <ClInclude Include="src\Geometry\CGALWrapper.h" />
     <ClInclude Include="src\Geometry\GeometricShape.h" />
     <ClInclude Include="src\Geometry\AgglomerateShape.h" />
     <ClInclude Include="src\Geometry\CartesianShape.h" />

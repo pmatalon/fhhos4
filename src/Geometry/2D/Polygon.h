@@ -2,7 +2,7 @@
 #include "../../Utils/RotatingList.h"
 #include "../../Utils/MatlabScript.h"
 #include "../CartesianShape.h"
-#include "../CGALConvert.h"
+#include "../CGALWrapper.h"
 #include "Triangle.h"
 #include "Quadrilateral.h"
 #include <CGAL/convex_hull_2.h>
