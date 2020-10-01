@@ -10,7 +10,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(ENABLE_GMSH "Build with the GMSH interface" ON)
 option(ENABLE_AGMG "Build with AGMG" OFF)
 
-set(EXECUTABLE_OUTPUT_PATH bin/${CMAKE_BUILD_TYPE})
+set(EXECUTABLE_OUTPUT_PATH bin/)
 
 # show compiler commands
 set(CMAKE_VERBOSE_MAKEFILE ON)
@@ -27,15 +27,6 @@ add_executable(dghho ${source_files})
 add_definitions(-DROOT_PATH="${CMAKE_SOURCE_DIR}")
 
 # Include CGAL
-#add_definitions(-DCGAL_DIR="${CMAKE_SOURCE_DIR}/cgal")
-#include_directories("/usr/include/CGAL")
-#find_library(CGAL_LIB NAMES CGAL)
-#if(CGAL_LIB)
-#	message(STATUS "Found CGAL: ${CGAL_LIB}")
-#else()
-#	message(FATAL_ERROR "CGAL not found.")
-#endif()
-#target_link_libraries(dghho CGAL)
 find_package(CGAL)
 target_link_libraries(dghho CGAL::CGAL)
 
@@ -50,7 +41,7 @@ if (ENABLE_GMSH)
 		target_link_libraries(dghho "${GMSH_LIB}") # -lgmsh
 		add_definitions(-DGMSH_ENABLED)
 	else()
-		message(FATAL_ERROR "GMSH not found. Must be compiled and put in a standard directory or in ${CMAKE_SOURCE_DIR}/gmsh-4.4.1-Linux64-sdk/lib")
+		message(FATAL_ERROR "GMSH dynamic libraries not found. GMSH must be compiled with the option -DENABLE_BUILD_DYNAMIC=1 and the libraries put in a standard directory or in ${CMAKE_SOURCE_DIR}/gmsh-4.4.1-Linux64-sdk/lib")
 	endif()
 	message(STATUS "GMSH enabled")
 else()

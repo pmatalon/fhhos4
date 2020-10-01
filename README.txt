@@ -1,3 +1,4 @@
+###############################################################################################
 #### 1. Install CGAL version 5.0 or later (see https://doc.cgal.org/latest/Manual/usage.html)
 
      ## install with the package manager
@@ -9,24 +10,26 @@
 > spack install cgal
 > spack load cgal 
 
+###############################################################################################
 #### 2. Install GMSH version 4.6 or later (see http://gmsh.info/#Download)
 
-> mkdir gmsh       # create it wherever you want
-> cd gmsh
+> mkdir gmsh && cd gmsh      # create it wherever you want
 > wget gmsh.info/src/gmsh-4.6.0-source.tgz
 > tar zxvf gmsh-4.6.0-source.tgz
-> gmsh-4.6.0-source
-> mkdir build
-> cd build
+> cd gmsh-4.6.0-source/
+> mkdir build && cd build
 > cmake -DENABLE_BUILD_DYNAMIC=1 .. # if issue with cgns, add option -DENABLE_CGNS=0 
 > make
 
-#### 3. Use CMake to build the makefile
+###############################################################################################
+#### 3. Use CMake to build dghho
 
-> cd dghho
-> cmake -DCMAKE_BUILD_TYPE=Release .    # add -G "Unix Makefiles" if necessary
+> cd <path/to/dghho>
+> mkdir build && cd build
+> cmake -DCMAKE_BUILD_TYPE=Release ..    # add -G "Unix Makefiles" if necessary
 > make
 
+###############################################################################################
 #### 4. Launch help command to view arguments and examples
 
-> ./bin/Release/dghho -h
+> ./bin/dghho -h
