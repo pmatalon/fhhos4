@@ -120,7 +120,7 @@ public:
 	{
 		return false;
 	}
-	virtual vector<PhysicalShape<Dim>*> SubShapes() const
+	virtual vector<const PhysicalShape<Dim>*> SubShapes() const
 	{
 		assert(false);
 	}

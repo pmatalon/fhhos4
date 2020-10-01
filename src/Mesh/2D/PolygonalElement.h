@@ -64,8 +64,8 @@ public:
 		if (!this->IsConvex() && !face->IsDomainBoundary)
 		{
 			// the element's center doesn't work if the polygon is not be convex
-			PhysicalShape<2>* faceSubshape = nullptr;
-			for (PhysicalShape<2>* ss : _shape.SubShapes())
+			const PhysicalShape<2>* faceSubshape = nullptr;
+			for (const PhysicalShape<2>* ss : _shape.SubShapes())
 			{
 				if (ss->Contains(*A) && ss->Contains(*B))
 				{

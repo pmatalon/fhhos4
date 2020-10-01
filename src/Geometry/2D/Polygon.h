@@ -25,7 +25,7 @@ private:
 	DomPoint _center;
 	double _inRadius;
 
-	vector<PhysicalShape<2>*> _triangulation;
+	vector<Triangle> _triangulation;
 	Quadrilateral* _boundingBox = nullptr;
 	vector<DomPoint> _quadraturePoints;
 
@@ -173,37 +173,28 @@ public:
 	}
 
 private:
-	static vector<PhysicalShape<2>*> ConvexTriangulation(const vector<Vertex*>& vertices)
+	static vector<Triangle> ConvexTriangulation(const vector<Vertex*>& vertices)
 	{
 		assert(vertices.size() > 2);
-		vector<PhysicalShape<2>*> triangles;
+		vector<Triangle> triangles;
 		if (vertices.size() == 3)
-		{
-			Triangle* triangle = new Triangle(vertices[0], vertices[1], vertices[2]);
-			triangles.push_back(triangle);
-		}
+			triangles.emplace_back(vertices[0], vertices[1], vertices[2]);
 		else if (vertices.size() == 4)
 		{
-			Triangle* triangle1 = new Triangle(vertices[0], vertices[1], vertices[2]);
-			triangles.push_back(triangle1);
-			Triangle* triangle2 = new Triangle(vertices[2], vertices[3], vertices[0]);
-			triangles.push_back(triangle2);
-			// Uncomment when Contains() is implemented for the Quadrilateral
-			//Quadrilateral* q = new Quadrilateral(vertices[0], vertices[1], vertices[2], vertices[3]);
-			//triangles.push_back(q);
+			triangles.emplace_back(vertices[0], vertices[1], vertices[2]);
+			triangles.emplace_back(vertices[2], vertices[3], vertices[0]);
 		}
 		else
 		{
-			Triangle* triangle = new Triangle(vertices[0], vertices[1], vertices[2]);
-			triangles.push_back(triangle);
+			triangles.emplace_back(vertices[0], vertices[1], vertices[2]);
 
 			vector<Vertex*> remainingVertices;
 			for (int i = 2; i < vertices.size(); i++)
 				remainingVertices.push_back(vertices[i]);
 			remainingVertices.push_back(vertices[0]);
-			vector<PhysicalShape<2>*> otherShapes = ConvexTriangulation(remainingVertices);
-			for (auto s : otherShapes)
-				triangles.push_back(s);
+			vector<Triangle> otherTriangles = ConvexTriangulation(remainingVertices);
+			for (auto t : otherTriangles)
+				triangles.push_back(t);
 		}
 		return triangles;
 	}
@@ -239,9 +230,9 @@ private:
 		return triangles;
 	}
 
-	vector<PhysicalShape<2>*> CGALTriangulation()
+	vector<Triangle> CGALTriangulation()
 	{
-		vector<PhysicalShape<2>*> triangulation;
+		vector<Triangle> triangulation;
 
 		list<CGAL::Partition_traits_2<chosenKernel>::Polygon_2> partition_polys;
 
@@ -260,7 +251,7 @@ private:
 		for (CGAL::Partition_traits_2<chosenKernel>::Polygon_2 p : partition_polys)
 		{
 			vector<Vertex*> vertices = CGALWrapper::ToVertices(p);
-			vector<PhysicalShape<2>*> subTriangles = ConvexTriangulation(vertices);
+			vector<Triangle> subTriangles = ConvexTriangulation(vertices);
 			for (auto tri : subTriangles)
 				triangulation.push_back(tri);
 		}
@@ -270,11 +261,11 @@ private:
 
 	void InitQuadraturePoints()
 	{
-		for (PhysicalShape<2>* t : _triangulation)
+		for (Triangle& t : _triangulation)
 		{
-			for (const RefPoint& refPoint : t->RefShape()->QuadraturePoints())
+			for (const RefPoint& refPoint : t.RefShape()->QuadraturePoints())
 			{
-				DomPoint domPoint = t->ConvertToDomain(refPoint);//this->ConvertToDomainAndSaveResult(refPoint);
+				DomPoint domPoint = t.ConvertToDomain(refPoint);//this->ConvertToDomainAndSaveResult(refPoint);
 				_quadraturePoints.push_back(domPoint);
 			}
 		}
@@ -389,10 +380,16 @@ public:
 	{
 		return true;
 	}
-	vector<PhysicalShape<2>*> SubShapes() const override
+	vector<const PhysicalShape<2>*> SubShapes() const override
 	{
 		assert(_triangulation.size() > 0);
-		return _triangulation;
+		vector<const PhysicalShape<2>*> subShapes;
+		for (const Triangle& t : _triangulation)
+		{
+			const PhysicalShape<2>* ps = &t;
+			subShapes.push_back(ps);
+		}
+		return subShapes;
 	}
 
 	virtual ReferenceShape<2>* RefShape() const override
@@ -444,7 +441,7 @@ public:
 		for (int i = 0; i < _triangulation.size(); i++)
 		{
 			string option = options[i % options.size()];
-			auto vertices = _triangulation[i]->Vertices();
+			auto vertices = _triangulation[i].Vertices();
 			if (vertices.size() == 3)
 				script.PlotTriangle(*vertices[0], *vertices[1], *vertices[2], option);
 			else
@@ -507,8 +504,8 @@ public:
 		};
 
 		double integral = 0;
-		for (PhysicalShape<2>* t : _triangulation)
-			integral += t->Integral(boundingBoxFunction);
+		for (const Triangle& t : _triangulation)
+			integral += t.Integral(boundingBoxFunction);
 		return integral;
 	}
 
@@ -524,8 +521,8 @@ public:
 		};
 
 		double integral = 0;
-		for (PhysicalShape<2>* t : _triangulation)
-			integral += t->Integral(boundingBoxFunction, polynomialDegree);
+		for (const Triangle& t : _triangulation)
+			integral += t.Integral(boundingBoxFunction, polynomialDegree);
 		return integral;
 	}
 
@@ -563,8 +560,6 @@ public:
 
 	~Polygon()
 	{
-		for (PhysicalShape<2>* t : _triangulation)
-			delete t;
 		if (_boundingBox)
 			delete _boundingBox;
 	}
@@ -579,8 +574,8 @@ public:
 		assert(_cgalPolygon.is_counterclockwise_oriented());
 
 		double sumMeasures = 0;
-		for (PhysicalShape<2>* t : _triangulation)
-			sumMeasures += t->Measure();
+		for (const Triangle& t : _triangulation)
+			sumMeasures += t.Measure();
 		double eps = 1e-4*_measure;
 		if (abs(sumMeasures - _cgalPolygon.area()) >= eps)
 		{
