@@ -108,7 +108,6 @@
     <ClInclude Include="src\Geometry\2D\Segment.h" />
     <ClInclude Include="src\Geometry\CGALWrapper.h" />
     <ClInclude Include="src\Geometry\GeometricShape.h" />
-    <ClInclude Include="src\Geometry\AgglomerateShape.h" />
     <ClInclude Include="src\Geometry\CartesianShape.h" />
     <ClInclude Include="src\Geometry\PhysicalShapeWithConstantJacobian.h" />
     <ClInclude Include="src\Geometry\PhysicalShape.h" />
@@ -152,7 +151,6 @@
     <ClInclude Include="src\Mesh\3D\TetrahedralElement.h" />
     <ClInclude Include="src\Mesh\3D\TriangularFace.h" />
     <ClInclude Include="src\Mesh\Agglo.h" />
-    <ClInclude Include="src\Mesh\AgglomerateElement.h" />
     <ClInclude Include="src\Mesh\AllMeshes.h" />
     <ClInclude Include="src\Mesh\CartesianElement.h" />
     <ClInclude Include="src\Mesh\CartesianFace.h" />

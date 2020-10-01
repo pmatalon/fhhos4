@@ -225,9 +225,6 @@
     <ClInclude Include="src\DG\Diff_DGFace.h">
       <Filter>DG</Filter>
     </ClInclude>
-    <ClInclude Include="src\Mesh\AgglomerateElement.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
     <ClInclude Include="src\Utils\RotatingList.h">
       <Filter>Utils</Filter>
     </ClInclude>
@@ -250,9 +247,6 @@
       <Filter>Geometry</Filter>
     </ClInclude>
     <ClInclude Include="src\Geometry\PhysicalShape.h">
-      <Filter>Geometry</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Geometry\AgglomerateShape.h">
       <Filter>Geometry</Filter>
     </ClInclude>
     <ClInclude Include="src\Geometry\CartesianShape.h">

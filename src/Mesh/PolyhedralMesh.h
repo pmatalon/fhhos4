@@ -4,7 +4,6 @@
 #include <algorithm>
 #include "Mesh.h"
 #include "2D/PolygonalElement.h"
-#include "AgglomerateElement.h"
 #include "Agglo.h"
 using namespace std;
 
@@ -212,14 +211,6 @@ private:
 
 			Element<Dim>* coarseElement1 = coarseMesh->AgglomerateFineElements(agglomerate1);
 
-			/*if (this->FineMesh && coarseMesh->Elements.size() > elementToAnalyze)
-			{
-				coarseMesh->ExportFacesToMatlab("/mnt/c/Users/pierr/Desktop/Matrices/coarse2.dat");
-				AgglomerateElement<Dim>* agglo = dynamic_cast<AgglomerateElement<Dim>*>(coarseMesh->Elements[elementToAnalyze]);
-				AgglomerateShape<Dim>* shape = dynamic_cast<AgglomerateShape<Dim>*>(agglo->Shape());
-				shape->ExportSubShapesToMatlab();
-			}*/
-
 			// Do not process the neighbouring vertices
 			for (Element<Dim>* ea : agglomerate1)
 			{
@@ -253,14 +244,6 @@ private:
 				}
 				Element<Dim>* coarseElement2 = coarseMesh->AgglomerateFineElements(agglomerate2);
 
-				/*if (this->FineMesh && coarseMesh->Elements.size() > elementToAnalyze)
-				{
-					coarseMesh->ExportFacesToMatlab("/mnt/c/Users/pierr/Desktop/Matrices/coarse2.dat");
-					AgglomerateElement<Dim>* agglo = dynamic_cast<AgglomerateElement<Dim>*>(coarseMesh->Elements[elementToAnalyze]);
-					AgglomerateShape<Dim>* shape = dynamic_cast<AgglomerateShape<Dim>*>(agglo->Shape());
-					shape->ExportSubShapesToMatlab();
-				}*/
-
 				// Do not process the neighbouring vertices
 				for (Element<Dim>* ea : agglomerate2)
 				{
@@ -279,24 +262,9 @@ private:
 			// If f1 and f2 are not totally coplanar, then the nestedness is lost.
 			// However, if they are close to coplanar, it's still okay because the coarse mesh can be seen
 			// as a slightly perturbed nested mesh.
-			/*if (this->FineMesh && coarseMesh->Elements.size() > elementToAnalyze)
-			{
-				coarseMesh->ExportFacesToMatlab("/mnt/c/Users/pierr/Desktop/Matrices/coarse2.dat");
-				AgglomerateElement<Dim>* agglo = dynamic_cast<AgglomerateElement<Dim>*>(coarseMesh->Elements[elementToAnalyze]);
-				AgglomerateShape<Dim>* shape = dynamic_cast<AgglomerateShape<Dim>*>(agglo->Shape());
-				shape->ExportSubShapesToMatlab();
-			}*/
 
 			FaceCollapsingStatus status = coarseMesh->AgglomerateFineFaces(f1, f2);
 			assert(status == FaceCollapsingStatus::Ok);
-
-			/*if (this->FineMesh && coarseMesh->Elements.size() > elementToAnalyze)
-			{
-				coarseMesh->ExportFacesToMatlab("/mnt/c/Users/pierr/Desktop/Matrices/coarse2.dat");
-				AgglomerateElement<Dim>* agglo = dynamic_cast<AgglomerateElement<Dim>*>(coarseMesh->Elements[elementToAnalyze]);
-				AgglomerateShape<Dim>* shape = dynamic_cast<AgglomerateShape<Dim>*>(agglo->Shape());
-				shape->ExportSubShapesToMatlab();
-			}*/
 
 			coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(coarseElement1);
 		}
@@ -341,15 +309,7 @@ private:
 			if (smallestNeighbourIsFine)
 				coarseMesh->AgglomerateFineElements({ e, smallestNeighbour });
 			else
-				coarseMesh->AgglomerateFineElementToCoarse(e, dynamic_cast<AgglomerateElement<Dim>*>(smallestNeighbour));
-
-			/*if (this->FineMesh && coarseMesh->Elements.size() > elementToAnalyze && (e == coarseMesh->Elements[elementToAnalyze] || smallestNeighbour == coarseMesh->Elements[elementToAnalyze]))
-			{
-				coarseMesh->ExportFacesToMatlab("/mnt/c/Users/pierr/Desktop/Matrices/coarse2.dat");
-				AgglomerateElement<Dim>* agglo = dynamic_cast<AgglomerateElement<Dim>*>(coarseMesh->Elements[elementToAnalyze]);
-				AgglomerateShape<Dim>* shape = dynamic_cast<AgglomerateShape<Dim>*>(agglo->Shape());
-				shape->ExportSubShapesToMatlab();
-			}*/
+				coarseMesh->AgglomerateFineElementToCoarse(e, smallestNeighbour);
 		}
 
 
@@ -358,14 +318,6 @@ private:
 		//------------------------------------------------------------------------------//
 		for (Element<Dim>* ce : coarseMesh->Elements)
 			coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(ce);
-
-		/*if (this->FineMesh && coarseMesh->Elements.size() > 8)
-		{
-			coarseMesh->ExportFacesToMatlab("/mnt/c/Users/pierr/Desktop/Matrices/coarse2.dat");
-			AgglomerateElement<Dim>* agglo = dynamic_cast<AgglomerateElement<Dim>*>(coarseMesh->Elements[8]);
-			AgglomerateShape<Dim>* shape = dynamic_cast<AgglomerateShape<Dim>*>(agglo->Shape());
-			shape->ExportSubShapesToMatlab();
-		}*/
 
 		// Set the coarse vertex list
 		set<Vertex*> vertices;
@@ -1346,41 +1298,6 @@ private:
 
 		return coarseElement;
 	}
-
-	void AgglomerateFineElementToCoarse(Element<Dim>* fineElement, AgglomerateElement<Dim>* coarseElement)
-	{
-		assert(!fineElement->CoarserElement);
-		assert(fineElement->IsInSamePhysicalPartAs(coarseElement) && "Agglomeration of elements from different physical groups is not allowed!");
-
-		// Add the fine element to the agglomerate
-		coarseElement->Add(fineElement);
-		fineElement->CoarserElement = coarseElement;
-		coarseElement->FinerElements.push_back(fineElement);
-
-		// Collect the faces interfacing the elements
-		for (Face<Dim>* f : fineElement->Faces)
-		{
-			// Face to remove
-			if (!f->IsDomainBoundary && f->GetNeighbour(fineElement)->CoarserElement == coarseElement)
-			{
-				f->IsRemovedOnCoarserGrid = true;
-				coarseElement->FinerFacesRemoved.push_back(f);
-				coarseElement->RemoveFace(f->CoarseFace);
-				this->RemoveFace(f->CoarseFace, false);
-				f->CoarseFace = nullptr;
-			}
-			else // Kept faces are cloned for the coarse mesh and linked to their clones and the coarse element.
-				this->CloneAndAddFace(f, coarseElement);
-		}
-
-		// Recompute the shape of the agglomerate
-		coarseElement->Init();
-		assert(coarseElement->Vertices().size() > 2);
-		assert(coarseElement->Faces.size() > 2);
-		if (Dim == 2)
-			assert(coarseElement->Faces.size() == coarseElement->Vertices().size());
-	}
-
 
 	Element<Dim>* AgglomerateFineElementToCoarse(Element<Dim>* fineElement, Element<Dim>* coarseElement)
 	{
