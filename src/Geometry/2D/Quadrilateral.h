@@ -12,8 +12,8 @@ private:
 	DomPoint v3;
 	DomPoint v4;
 
-	double _diameter;
-	double _measure;
+	double _diameter = 0;
+	double _measure = 0;
 	DomPoint _center;
 	double _inRadius;
 
@@ -29,6 +29,8 @@ private:
 
 public:
 	static ReferenceCartesianShape<2> RefSquare;
+
+	Quadrilateral() {}
 
 	Quadrilateral(const DomPoint& p1, const DomPoint& p2, const DomPoint& p3, const DomPoint& p4)
 		: v1(p1), v2(p2), v3(p3), v4(p4)

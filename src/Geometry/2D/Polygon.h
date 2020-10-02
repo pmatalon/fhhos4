@@ -26,7 +26,7 @@ private:
 	double _inRadius;
 
 	vector<Triangle> _triangulation;
-	Quadrilateral* _boundingBox = nullptr;
+	Quadrilateral _boundingBox;
 	vector<DomPoint> _quadraturePoints;
 
 public:
@@ -141,12 +141,12 @@ public:
 
 	void ComputeBoundingBox()
 	{
-		if (_boundingBox)
+		if (_boundingBox.Measure() > 0)
 			return;
 		_boundingBox = CreateBoundingBox(_vertices);
 	}
 
-	static Quadrilateral* CreateBoundingBox(const vector<DomPoint>& vertices)
+	static Quadrilateral CreateBoundingBox(const vector<DomPoint>& vertices)
 	{
 		double maxX = -INFINITY;
 		double maxY = -INFINITY;
@@ -169,7 +169,7 @@ public:
 		DomPoint upperRight(maxX, maxY);
 		DomPoint upperLeft (minX, maxY);
 
-		Quadrilateral* boundingRectangle = new Quadrilateral(lowerLeft, lowerRight, upperRight, upperLeft);
+		Quadrilateral boundingRectangle(lowerLeft, lowerRight, upperRight, upperLeft);
 		return boundingRectangle;
 	}
 
@@ -500,7 +500,7 @@ public:
 		// For the inner triangles, the bounding box is the domain
 		DomFunction boundingBoxFunction = [this, boundingBoxDefinedFunction](const DomPoint& boundingBoxPoint)
 		{
-			RefPoint p = _boundingBox->ConvertToReference(boundingBoxPoint);
+			RefPoint p = _boundingBox.ConvertToReference(boundingBoxPoint);
 			return boundingBoxDefinedFunction(p);
 		};
 
@@ -517,7 +517,7 @@ public:
 		// For the inner triangles, the bounding box is the domain
 		DomFunction boundingBoxFunction = [this, boundingBoxDefinedFunction](const DomPoint& boundingBoxPoint)
 		{
-			RefPoint p = _boundingBox->ConvertToReference(boundingBoxPoint);
+			RefPoint p = _boundingBox.ConvertToReference(boundingBoxPoint);
 			return boundingBoxDefinedFunction(p);
 		};
 
@@ -533,25 +533,25 @@ public:
 
 	inline double DetJacobian(const RefPoint& pointInReferenceSquare) const
 	{
-		return _boundingBox->DetJacobian(pointInReferenceSquare);
+		return _boundingBox.DetJacobian(pointInReferenceSquare);
 	}
 	inline DimMatrix<2> InverseJacobianTranspose(const RefPoint& pointInReferenceSquare) const
 	{
-		return _boundingBox->InverseJacobianTranspose(pointInReferenceSquare);
+		return _boundingBox.InverseJacobianTranspose(pointInReferenceSquare);
 	}
 	inline int DetJacobianDegree() const
 	{
-		return _boundingBox->DetJacobianDegree();
+		return _boundingBox.DetJacobianDegree();
 	}
 
 	DomPoint ConvertToDomain(const RefPoint& pointInReferenceSquare) const
 	{
-		return _boundingBox->ConvertToDomain(pointInReferenceSquare);
+		return _boundingBox.ConvertToDomain(pointInReferenceSquare);
 	}
 
 	RefPoint ConvertToReference(const DomPoint& domainPoint) const
 	{
-		return _boundingBox->ConvertToReference(domainPoint);
+		return _boundingBox.ConvertToReference(domainPoint);
 	}
 
 	void Serialize(ostream& os) const override
@@ -560,10 +560,7 @@ public:
 	}
 
 	~Polygon()
-	{
-		if (_boundingBox)
-			delete _boundingBox;
-	}
+	{}
 
 	//-------------------------------------------------------------------//
 	//                            Unit tests                             //
