@@ -38,76 +38,73 @@ public:
 	}
 
 	template <typename CGALKernel>
-	static CGAL::Polygon_2<CGALKernel> CreatePolygonWithColinearityChecking(const vector<Vertex*>& vertices)
+	static CGAL::Polygon_2<CGALKernel> CreatePolygonWithColinearityChecking(const vector<DomPoint>& vertices)
 	{
-		RotatingList<Vertex*> vert(vertices);
+		RotatingList<DomPoint> vert(vertices);
 		CGAL::Polygon_2<CGALKernel> cgalPolygon;
 		for (int i = 0; i < vertices.size(); ++i)
 		{
-			Vertex* v = vert.Get();
+			DomPoint v = vert.Get();
 			DimVector<2> v1 = Vect<2>(vert.GetPrevious(), v);
 			DimVector<2> v2 = Vect<2>(v, vert.GetNext());
 			if (!AreCollinear(v1, v2))
-				cgalPolygon.push_back(CGAL::Point_2<CGALKernel>(v->X, v->Y));
+				cgalPolygon.push_back(CGAL::Point_2<CGALKernel>(v.X, v.Y));
 			vert.MoveNext();
 		}
 		return cgalPolygon;
 	}
 
 	template <typename CGALKernel>
-	static CGAL::Polygon_2<CGALKernel> CreatePolygon(const vector<Vertex*>& vertices, bool checkColinearity = false)
+	static CGAL::Polygon_2<CGALKernel> CreatePolygon(const vector<DomPoint>& vertices, bool checkColinearity = false)
 	{
 		if (checkColinearity)
 			return CreatePolygonWithColinearityChecking<CGALKernel>(vertices);
 
 		CGAL::Polygon_2<CGALKernel> cgalPolygon;
-		for (Vertex* v : vertices)
-			cgalPolygon.push_back(CGAL::Point_2<CGALKernel>(v->X, v->Y));
+		for (const DomPoint& v : vertices)
+			cgalPolygon.push_back(CGAL::Point_2<CGALKernel>(v.X, v.Y));
 		return cgalPolygon;
 	}
 
 	template <typename CGALKernel>
-	static void FillPolygon(const vector<Vertex*>& vertices, CGAL::Polygon_2<CGALKernel>& polyToFill)
+	static void FillPolygon(const vector<DomPoint>& vertices, CGAL::Polygon_2<CGALKernel>& polyToFill)
 	{
 		assert(vertices.size() >= 3);
-		for (Vertex* v : vertices)
-			polyToFill.push_back(CGAL::Point_2<CGALKernel>(v->X, v->Y));
+		for (const DomPoint& v : vertices)
+			polyToFill.push_back(CGAL::Point_2<CGALKernel>(v.X, v.Y));
 	}
 
 	// Get vertices from CGAL polygon
 	template <typename CGALKernel>
-	static vector<Vertex*> ToVertices(const CGAL::Polygon_2<CGALKernel>& poly)
+	static vector<DomPoint> ToVertices(const CGAL::Polygon_2<CGALKernel>& poly)
 	{
-		vector<Vertex*> vertices;
+		vector<DomPoint> vertices;
 		for (auto it = poly.vertices_begin(); it != poly.vertices_end(); it++)
 		{
 			CGAL::Point_2<CGALKernel> p = *it;
-			Vertex* v = new Vertex(0, CGAL::to_double(p.x()), CGAL::to_double(p.y()));
-			vertices.push_back(v);
+			vertices.emplace_back(CGAL::to_double(p.x()), CGAL::to_double(p.y()));
 		}
 		return vertices;
 	}
 
-	static vector<Vertex*> ToVertices(const CGAL::Partition_traits_2<inexactKernel>::Polygon_2& poly)
+	static vector<DomPoint> ToVertices(const CGAL::Partition_traits_2<inexactKernel>::Polygon_2& poly)
 	{
-		vector<Vertex*> vertices;
+		vector<DomPoint> vertices;
 		for (auto it = poly.vertices_begin(); it != poly.vertices_end(); it++)
 		{
 			CGAL::Point_2<inexactKernel> p = *it;
-			Vertex* v = new Vertex(0, p.x(), p.y());
-			vertices.push_back(v);
+			vertices.emplace_back(p.x(), p.y());
 		}
 		return vertices;
 	}
 
-	static vector<Vertex*> ToVertices(const CGAL::Partition_traits_2<exactKernel>::Polygon_2& poly)
+	static vector<DomPoint> ToVertices(const CGAL::Partition_traits_2<exactKernel>::Polygon_2& poly)
 	{
-		vector<Vertex*> vertices;
+		vector<DomPoint> vertices;
 		for (auto it = poly.vertices_begin(); it != poly.vertices_end(); it++)
 		{
 			CGAL::Point_2<exactKernel> p = *it;
-			Vertex* v = new Vertex(0, CGAL::to_double(p.x()), CGAL::to_double(p.y()));
-			vertices.push_back(v);
+			vertices.emplace_back(CGAL::to_double(p.x()), CGAL::to_double(p.y()));
 		}
 		return vertices;
 	}

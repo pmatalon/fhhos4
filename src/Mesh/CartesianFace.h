@@ -9,6 +9,7 @@ class CartesianFace : public Diff_DGFace<Dim>, public Diff_HHOFace<Dim>
 {
 protected:
 	CartesianShape<Dim, Dim - 1> _shape;
+	vector<Vertex*> _vertices;
 public:
 
 	CartesianFace(BigNumber number, Vertex* origin, double width, Element<Dim>* element1, Element<Dim>* element2, CartesianShapeOrientation orientation) :
@@ -48,6 +49,17 @@ public:
 		return &_shape;
 	}
 
+	inline void SetVertices(const vector<Vertex*>& vertices)
+	{
+		_vertices = vertices;
+		_shape.SetVertices(Vertex::ToDomPoints(vertices));
+	}
+
+	vector<Vertex*> Vertices() const override
+	{
+		return _vertices;
+	}
+
 	Face<Dim>* CreateSameGeometricFace(BigNumber number, Element<Dim>* element1)
 	{
 		Face<Dim>* copy = new CartesianFace<Dim>(number, element1, nullptr, _shape);
@@ -75,12 +87,6 @@ public:
 	}
 
 	virtual ~CartesianFace()
-	{
-		/*if (_shape)
-		{
-			delete _shape;
-			_shape = nullptr;
-		}*/
-	}
+	{}
 
 };

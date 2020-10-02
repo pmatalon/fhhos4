@@ -10,18 +10,28 @@ class TetrahedralElement : public Diff_DGElement<3>, public Diff_HHOElement<3>
 private:
 	Tetrahedron _shape;
 
+	Vertex* _v1;
+	Vertex* _v2;
+	Vertex* _v3;
+	Vertex* _v4;
+
 public:
 	TetrahedralElement(BigNumber number, Vertex* v1, Vertex* v2, Vertex* v3, Vertex* v4) :
 		Element(number),
 		Diff_DGElement<3>(number),
 		Diff_HHOElement<3>(number),
-		_shape(v1, v2, v3, v4)
-	{}
+		_shape(*v1, *v2, *v3, *v4)
+	{
+		_v1 = v1;
+		_v2 = v2;
+		_v3 = v3;
+		_v4 = v4;
+	}
 
-	inline Vertex* V1() { return _shape.V1(); }
-	inline Vertex* V2() { return _shape.V2(); }
-	inline Vertex* V3() { return _shape.V3(); }
-	inline Vertex* V4() { return _shape.V4(); }
+	inline Vertex* V1() { return _v1; }
+	inline Vertex* V2() { return _v2; }
+	inline Vertex* V3() { return _v3; }
+	inline Vertex* V4() { return _v4; }
 
 	//-------------------------------------------------------//
 	//                 Element implementation                //
@@ -36,7 +46,12 @@ public:
 		return &_shape;
 	}
 
-	DimVector<3> OuterNormalVector(Face<3>* f) const
+	vector<Vertex*> Vertices() const override
+	{
+		return { _v1, _v2, _v3, _v4 };
+	}
+
+	DimVector<3> OuterNormalVector(Face<3>* f) const override
 	{
 		TriangularFace* face = dynamic_cast<TriangularFace*>(f);
 		Vertex* A = face->Vertex1();
@@ -49,7 +64,7 @@ public:
 		// Condition 1: n.AB = 0 and n.AC = 0
 		DimVector<3> n = AB.cross(AC);
 
-		for (Vertex* D : this->Shape()->Vertices())
+		for (Vertex* D : this->Vertices())
 		{
 			if (D != A && D != B && D != C)
 			{

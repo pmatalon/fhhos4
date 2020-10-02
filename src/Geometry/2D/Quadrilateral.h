@@ -7,7 +7,10 @@ using namespace std;
 class Quadrilateral : public PhysicalShape<2>
 {
 private:
-	vector<Vertex*> _vertices;
+	DomPoint v1;
+	DomPoint v2;
+	DomPoint v3;
+	DomPoint v4;
 
 	double _diameter;
 	double _measure;
@@ -27,9 +30,9 @@ private:
 public:
 	static ReferenceCartesianShape<2> RefSquare;
 
-	Quadrilateral(Vertex* v1, Vertex* v2, Vertex* v3, Vertex* v4)
+	Quadrilateral(const DomPoint& p1, const DomPoint& p2, const DomPoint& p3, const DomPoint& p4)
+		: v1(p1), v2(p2), v3(p3), v4(p4)
 	{
-		_vertices = vector<Vertex*>{ v1, v2, v3, v4 };
 		Init();
 	}
 
@@ -38,17 +41,12 @@ public:
 
 	void Init()
 	{
-		Vertex* V1 = _vertices[0];
-		Vertex* V2 = _vertices[1];
-		Vertex* V3 = _vertices[2];
-		Vertex* V4 = _vertices[3];
-
-		double diag13 = (*V3 - *V1).norm();
-		double diag24 = (*V4 - *V2).norm();
-		double edge12 = (*V2 - *V1).norm();
-		double edge23 = (*V3 - *V2).norm();
-		double edge34 = (*V4 - *V3).norm();
-		double edge41 = (*V1 - *V4).norm();
+		double diag13 = (v3 - v1).norm();
+		double diag24 = (v4 - v2).norm();
+		double edge12 = (v2 - v1).norm();
+		double edge23 = (v3 - v2).norm();
+		double edge34 = (v4 - v3).norm();
+		double edge41 = (v1 - v4).norm();
 
 		_diameter = max(diag13, diag24);
 
@@ -56,19 +54,19 @@ public:
 
 		_inRadius = 2 * _measure / (edge12 + edge23 + edge34 + edge41);
 
-		_center = DomPoint((V1->X + V2->X + V3->X + V4->X) / 4, (V1->Y + V2->Y + V3->Y + V4->Y) / 4);
+		_center = DomPoint((v1.X + v2.X + v3.X + v4.X) / 4, (v1.Y + v2.Y + v3.Y + v4.Y) / 4);
 
 		// x = a0 + a1*t + a2*u + a3*t*u
 		// y = b0 + b1*t + b2*u + b3*t*u
-		a0 = 0.25 * ( V1->X + V2->X + V3->X + V4->X);
-		a1 = 0.25 * (-V1->X + V2->X + V3->X - V4->X);
-		a2 = 0.25 * (-V1->X - V2->X + V3->X + V4->X);
-		a3 = 0.25 * ( V1->X - V2->X + V3->X - V4->X);
+		a0 = 0.25 * ( v1.X + v2.X + v3.X + v4.X);
+		a1 = 0.25 * (-v1.X + v2.X + v3.X - v4.X);
+		a2 = 0.25 * (-v1.X - v2.X + v3.X + v4.X);
+		a3 = 0.25 * ( v1.X - v2.X + v3.X - v4.X);
 
-		b0 = 0.25 * ( V1->Y + V2->Y + V3->Y + V4->Y);
-		b1 = 0.25 * (-V1->Y + V2->Y + V3->Y - V4->Y);
-		b2 = 0.25 * (-V1->Y - V2->Y + V3->Y + V4->Y);
-		b3 = 0.25 * ( V1->Y - V2->Y + V3->Y - V4->Y);
+		b0 = 0.25 * ( v1.Y + v2.Y + v3.Y + v4.Y);
+		b1 = 0.25 * (-v1.Y + v2.Y + v3.Y - v4.Y);
+		b2 = 0.25 * (-v1.Y - v2.Y + v3.Y + v4.Y);
+		b3 = 0.25 * ( v1.Y - v2.Y + v3.Y - v4.Y);
 
 		// Sometimes a3 or b3 can be really small, but not zero. Then we set it to zero be tested in ConvertToReference()
 		if (abs(a3 / _measure) < 1e-10)
@@ -87,34 +85,14 @@ public:
 		return &RefSquare;
 	}
 
-	inline const vector<Vertex*>& Vertices() const override
+	inline vector<DomPoint> Vertices() const override
 	{
-		return _vertices;
+		return vector<DomPoint>{ v1, v2, v3, v4 };
 	}
 
 	bool IsDegenerated() const override
 	{
 		assert(false && "To implement");
-	}
-
-	void ReshapeByMovingIntersection(Vertex* oldIntersect, Vertex* newIntersect) override
-	{
-		Vertex* V1 = _vertices[0];
-		Vertex* V2 = _vertices[1];
-		Vertex* V3 = _vertices[2];
-		Vertex* V4 = _vertices[3];
-
-		if (*V1 == *oldIntersect)
-			V1 = newIntersect;
-		else if (*V2 == *oldIntersect)
-			V2 = newIntersect;
-		else if (*V3 == *oldIntersect)
-			V3 = newIntersect;
-		else if (*V4 == *oldIntersect)
-			V4 = newIntersect;
-		else
-			assert(false && "This quadrilateral does not have this vertex.");
-		Init();
 	}
 
 	static ReferenceCartesianShape<2>* InitReferenceShape()
@@ -243,20 +221,15 @@ public:
 
 	void Serialize(ostream& os) const override
 	{
-		Vertex* V1 = _vertices[0];
-		Vertex* V2 = _vertices[1];
-		Vertex* V3 = _vertices[2];
-		Vertex* V4 = _vertices[3];
-
 		os << "Quadrilateral";
 		os << " ";
-		V1->Serialize(os, 2);
+		v1.Serialize(os, 2);
 		os << "-";
-		V2->Serialize(os, 2);
+		v2.Serialize(os, 2);
 		os << "-";
-		V3->Serialize(os, 2);
+		v3.Serialize(os, 2);
 		os << "-";
-		V4->Serialize(os, 2);
+		v4.Serialize(os, 2);
 	}
 
 	//-------------------------------------------------------------------//
@@ -266,12 +239,12 @@ public:
 	static void Test()
 	{
 		int number = 0;
-		Vertex lowerLeft(number, -1, -1);
-		Vertex lowerRight(number, 1, -1);
-		Vertex upperRight(number, 2, 2);
-		Vertex upperLeft(number, -1, 1);
+		DomPoint lowerLeft(-1, -1);
+		DomPoint lowerRight(1, -1);
+		DomPoint upperRight(2, 2);
+		DomPoint upperLeft(-1, 1);
 
-		Quadrilateral q(&lowerLeft, &lowerRight, &upperRight, &upperLeft);
+		Quadrilateral q(lowerLeft, lowerRight, upperRight, upperLeft);
 
 		q.UnitTests();
 
@@ -284,11 +257,11 @@ public:
 		assert(urRef == RefPoint(1, 1));
 
 
-		Vertex V1(number, 0, 0);
-		Vertex V2(number, 0.13, 0);
-		Vertex V3(number, 0.13, 0.05);
-		Vertex V4(number, 0, 0.05);
-		Quadrilateral q2(&V1, &V2, &V3, &V4);
+		DomPoint V1(0, 0);
+		DomPoint V2(0.13, 0);
+		DomPoint V3(0.13, 0.05);
+		DomPoint V4(0, 0.05);
+		Quadrilateral q2(V1, V2, V3, V4);
 		DomPoint dom = q.ConvertToDomain(RefPoint(-0.069222, 0.534611));
 	}
 };

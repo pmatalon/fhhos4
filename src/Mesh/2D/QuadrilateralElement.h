@@ -10,18 +10,28 @@ class QuadrilateralElement : public Diff_DGElement<2>, public Diff_HHOElement<2>
 private:
 	Quadrilateral _shape;
 
+	Vertex* _v1;
+	Vertex* _v2;
+	Vertex* _v3;
+	Vertex* _v4;
+
 public:
 	QuadrilateralElement(int number, Vertex* v1, Vertex* v2, Vertex* v3, Vertex* v4) :
 		Element(number),
 		Diff_DGElement<2>(number),
 		Diff_HHOElement<2>(number),
-		_shape(v1, v2, v3, v4)
-	{}
+		_shape(*v1, *v2, *v3, *v4)
+	{
+		_v1 = v1;
+		_v2 = v2;
+		_v3 = v3;
+		_v4 = v4;
+	}
 
-	inline Vertex* V1() { return _shape.Vertices()[0]; }
-	inline Vertex* V2() { return _shape.Vertices()[1]; }
-	inline Vertex* V3() { return _shape.Vertices()[2]; }
-	inline Vertex* V4() { return _shape.Vertices()[3]; }
+	inline Vertex* V1() { return _v1; }
+	inline Vertex* V2() { return _v2; }
+	inline Vertex* V3() { return _v3; }
+	inline Vertex* V4() { return _v4; }
 
 	//-------------------------------------------------------//
 	//                 Element implementation                //
@@ -34,6 +44,11 @@ public:
 	const PhysicalShape<2>* Shape() const override
 	{
 		return &_shape;
+	}
+
+	vector<Vertex*> Vertices() const override
+	{
+		return { _v1, _v2, _v3, _v4 };
 	}
 
 	DimVector<2> OuterNormalVector(Face<2>* face) const

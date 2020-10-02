@@ -12,6 +12,7 @@ public:
 		CartesianFace<1>(number, v, 0, NULL, NULL, CartesianShapeOrientation::None)
 	{
 		this->V = v;
+		this->SetVertices({ v });
 		this->IsDomainBoundary = false;
 	}
 

@@ -9,28 +9,30 @@ class PolygonalElement : public Diff_DGElement<2>, public Diff_HHOElement<2>
 {
 private:
 	Polygon _shape;
-
+	vector<Vertex*> _vertices;
 public:
 	// Constructor creating the polygon from the adjonction of two elements
 	PolygonalElement(int number, Element<2>* e1, Element<2>* e2, const vector<Face<2>*>& facesToRemove, bool createTriangulationAndBoundingBox = true) :
 		Element(number),
 		Diff_DGElement<2>(number),
-		Diff_HHOElement<2>(number),
-		_shape(MacroPolygonVertices(e1, e2, facesToRemove), createTriangulationAndBoundingBox, true)
+		Diff_HHOElement<2>(number)
 	{
+		_vertices = MacroPolygonVertices(e1, e2, facesToRemove);
+		_shape = Polygon(Vertex::ToDomPoints(_vertices), createTriangulationAndBoundingBox, true);
 	}
 
 	PolygonalElement(int number, const vector<Vertex*>& vertices, bool createTriangulationAndBoundingBox = true) :
 		Element(number),
 		Diff_DGElement<2>(number),
 		Diff_HHOElement<2>(number),
-		_shape(vertices, createTriangulationAndBoundingBox, true)
+		_vertices(vertices),
+		_shape(Vertex::ToDomPoints(vertices), createTriangulationAndBoundingBox, true)
 	{
 	}
 
 	inline vector<Vertex*> Vertices()
 	{
-		return _shape.Vertices();
+		return _vertices;
 	}
 
 	//-------------------------------------------------------//
@@ -44,6 +46,11 @@ public:
 	const PhysicalShape<2>* Shape() const override
 	{
 		return &_shape;
+	}
+
+	vector<Vertex*> Vertices() const override
+	{
+		return _vertices;
 	}
 
 	DimVector<2> OuterNormalVector(Face<2>* face) const
@@ -269,15 +276,16 @@ public:
 
 		// Adds all the vertices in the same order, except the intersection vertices
 		vector<Vertex*> newVertices;
-		for (Vertex* v : _shape.Vertices())
+		for (Vertex* v : _vertices)
 		{
 			if (!v->IsIn(verticesToRemove))
 				newVertices.push_back(v);
 		}
 
 		assert(newVertices.size() > 2);
+		_vertices = newVertices;
 
-		_shape = Polygon(newVertices, false, true);
+		_shape = Polygon(Vertex::ToDomPoints(newVertices), false, true);
 	}
 
 	virtual ~PolygonalElement()

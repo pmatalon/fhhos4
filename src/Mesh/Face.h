@@ -55,6 +55,7 @@ public:
 		return nullptr;
 	}*/
 
+	virtual vector<Vertex*> Vertices() const = 0;
 
 	virtual void ExportFaceToMatlab(FILE* file) = 0;
 
@@ -79,18 +80,9 @@ public:
 	{
 		return Shape()->Contains(p);
 	}
-	virtual vector<Vertex*> Vertices() const
-	{
-		return Shape()->Vertices();
-	}
 	virtual void ExportToMatlab(string color = "r") const
 	{
 		return Shape()->ExportToMatlab(color);
-	}
-
-	bool HasVertex(Vertex* v, bool compareCoordinates = false)
-	{
-		return this->Shape()->HasVertex(v, compareCoordinates);
 	}
 
 	// Transformation to reference element
@@ -128,9 +120,24 @@ public:
 	//   Relations to other faces/elements   //
 	//---------------------------------------//
 
+	bool HasVertex(Vertex* v, bool compareCoordinates = false)
+	{
+		auto vertices = this->Vertices();
+		auto it = find_if(vertices.begin(), vertices.end(), [v, compareCoordinates](Vertex* v2) { return v == v2 || (compareCoordinates && *v == *v2); });
+		return it != vertices.end();
+	}
+
 	bool HasSameVertices(Face<Dim>* other, bool compareCoordinates = false)
 	{
-		return this->Shape()->HasSameVertices(other->Shape(), compareCoordinates);
+		if (this->Vertices().size() != other->Vertices().size())
+			return false;
+
+		for (Vertex* v : this->Vertices())
+		{
+			if (!other->HasVertex(v, compareCoordinates))
+				return false;
+		}
+		return true;
 	}
 
 	bool HasCommonVerticesWith(Face<Dim>* other, bool compareCoordinates = false)
@@ -142,7 +149,7 @@ public:
 		}
 		return false;
 	}
-
+	
 	bool IntersectsWith(Face<Dim>* other)
 	{
 		assert(Dim == 2);

@@ -59,6 +59,17 @@ public:
 		}
 	}
 
+	void PlotPolygonEdges(const vector<DomPoint>& vertices, string color)
+	{
+		RotatingList<DomPoint> vert(vertices);
+		for (int i = 0; i < vert.Size(); i++)
+		{
+			DomPoint v1 = vert.GetAndMoveNext();
+			DomPoint v2 = vert.Get();
+			PlotSegment(v1, v2, color);
+		}
+	}
+
 	void PlotTriangle(const DomPoint& A, const DomPoint& B, const DomPoint& C, string color)
 	{
 		Out() << "fill(axes, [" << A.X << ";" << B.X << ";" << C.X << "], [" << A.Y << "; " << B.Y << ";" << C.Y << "], '" << color << "', 'LineStyle','none', 'FaceAlpha', 0.5);" << endl;

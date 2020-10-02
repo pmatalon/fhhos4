@@ -51,6 +51,14 @@ public:
 		return closest;
 	}
 
+	static vector<DomPoint> ToDomPoints(const vector<Vertex*>& list)
+	{
+		vector<DomPoint> points;
+		for (auto v : list)
+			points.push_back(*v);
+		return points;
+	}
+
 	virtual ~Vertex() {}
 };
 

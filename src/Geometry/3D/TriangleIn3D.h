@@ -7,7 +7,9 @@ using namespace std;
 class TriangleIn3D : public PhysicalShapeWithConstantJacobian<2>
 {
 private:
-	vector<Vertex*> _vertices;
+	DomPoint v1;
+	DomPoint v2;
+	DomPoint v3;
 
 	double _diameter;
 	double _measure;
@@ -22,32 +24,24 @@ private:
 	double _detJacobian;
 
 public:
-	TriangleIn3D(Vertex* v1, Vertex* v2, Vertex* v3)
+	TriangleIn3D(const DomPoint& p1, const DomPoint& p2, const DomPoint& p3)
+		: v1(p1), v2(p2), v3(p3)
 	{
-		_vertices = vector<Vertex*>{ v1, v2, v3 };
 		Init();
 	}
 
 	TriangleIn3D(const TriangleIn3D& shape) = default;
 
-	inline Vertex* V1() const { return _vertices[0]; }
-	inline Vertex* V2() const { return _vertices[1]; }
-	inline Vertex* V3() const { return _vertices[2]; }
-
 	void Init()
 	{
-		Vertex* V1 = _vertices[0];
-		Vertex* V2 = _vertices[1];
-		Vertex* V3 = _vertices[2];
-
-		DimVector<3> v12 = Vect<3>(V1, V2);
-		DimVector<3> v13 = Vect<3>(V1, V3);
-		DimVector<3> v23 = Vect<3>(V2, V3);
+		DimVector<3> v12 = Vect<3>(v1, v2);
+		DimVector<3> v13 = Vect<3>(v1, v3);
+		DimVector<3> v23 = Vect<3>(v2, v3);
 		_diameter = max({ v12.norm(), v13.norm(), v23.norm() });
 
 		_measure = 0.5 * v12.cross(v13).norm();
 
-		_center = DomPoint((V1->X + V2->X + V3->X) / 3, (V1->Y + V2->Y + V3->Y) / 3, (V1->Z + V2->Z + V3->Z) / 3);
+		_center = DomPoint((v1.X + v2.X + v3.X) / 3, (v1.Y + v2.Y + v3.Y) / 3, (v1.Z + v2.Z + v3.Z) / 3);
 
 		_inRadius = 2 * _measure / (v12.norm() + v13.norm() + v23.norm());
 
@@ -55,22 +49,22 @@ public:
 		
 		DimMatrix<2> mapping;
 		mapping <<
-			V2->X - V1->X, V3->X - V1->X,
-			V2->Y - V1->Y, V3->Y - V1->Y;
+			v2.X - v1.X, v3.X - v1.X,
+			v2.Y - v1.Y, v3.Y - v1.Y;
 		if (abs(mapping.determinant()) > 1e-12)
 			_doNotUseZ = true;
 		else
 		{
 			mapping <<
-				V2->X - V1->X, V3->X - V1->X,
-				V2->Z - V1->Z, V3->Z - V1->Z;
+				v2.X - v1.X, v3.X - v1.X,
+				v2.Z - v1.Z, v3.Z - v1.Z;
 			if (abs(mapping.determinant()) > 1e-12)
 				_doNotUseY = true;
 			else
 			{
 				mapping <<
-					V2->Y - V1->Y, V3->Y - V1->Y,
-					V2->Z - V1->Z, V3->Z - V1->Z;
+					v2.Y - v1.Y, v3.Y - v1.Y,
+					v2.Z - v1.Z, v3.Z - v1.Z;
 				if (abs(mapping.determinant()) > 1e-12)
 					_doNotUseX = true;
 				else
@@ -90,9 +84,9 @@ public:
 		return &Triangle::RefTriangle;
 	}
 	
-	inline const vector<Vertex*>& Vertices() const override
+	inline vector<DomPoint> Vertices() const override
 	{
-		return _vertices;
+		return vector<DomPoint>{ v1, v2, v3 };
 	}
 
 	bool IsDegenerated() const override
@@ -127,7 +121,7 @@ public:
 	}
 	inline bool Contains(const DomPoint& p) const override
 	{
-		return Triangle::TriangleContains(*V1(), *V2(), *V3(), p, _measure);
+		return Triangle::TriangleContains(v1, v2, v3, p, _measure);
 	}
 
 	inline double DetJacobian() const
@@ -141,37 +135,29 @@ public:
 
 	DomPoint ConvertToDomain(const RefPoint& refPoint) const
 	{
-		Vertex* V1 = _vertices[0];
-		Vertex* V2 = _vertices[1];
-		Vertex* V3 = _vertices[2];
-
 		double t = refPoint.X;
 		double u = refPoint.Y;
 
 		DomPoint p;
-		p.X = (V2->X - V1->X) * t + (V3->X - V1->X)*u + V1->X;
-		p.Y = (V2->Y - V1->Y) * t + (V3->Y - V1->Y)*u + V1->Y;
-		p.Z = (V2->Z - V1->Z) * t + (V3->Z - V1->Z)*u + V1->Z;
+		p.X = (v2.X - v1.X) * t + (v3.X - v1.X)*u + v1.X;
+		p.Y = (v2.Y - v1.Y) * t + (v3.Y - v1.Y)*u + v1.Y;
+		p.Z = (v2.Z - v1.Z) * t + (v3.Z - v1.Z)*u + v1.Z;
 		return p;
 	}
 
 	RefPoint ConvertToReference(const DomPoint& domainPoint) const
 	{
-		Vertex* V1 = _vertices[0];
-		Vertex* V2 = _vertices[1];
-		Vertex* V3 = _vertices[2];
-
 		double x = domainPoint.X;
 		double y = domainPoint.Y;
 		double z = domainPoint.Z;
 
 		DimVector<2> v;
 		if (_doNotUseZ)
-			v << x - V1->X, y - V1->Y;
+			v << x - v1.X, y - v1.Y;
 		else if (_doNotUseY)
-			v << x - V1->X, z - V1->Z;
+			v << x - v1.X, z - v1.Z;
 		else if (_doNotUseX)
-			v << y - V1->Y, z - V1->Z;
+			v << y - v1.Y, z - v1.Z;
 
 		DimVector<2> tu = _inverseMapping * v;
 		double t = tu(0);
@@ -188,11 +174,11 @@ public:
 	{
 		os << "Triangle";
 		os << " ";
-		V1()->Serialize(os, 3);
+		v1.Serialize(os, 3);
 		os << "--";
-		V2()->Serialize(os, 3);
+		v2.Serialize(os, 3);
 		os << "--";
-		V3()->Serialize(os, 3);
+		v3.Serialize(os, 3);
 	}
 
 	//---------------------------------------------------------------------//
@@ -215,12 +201,11 @@ public:
 
 	static void Test()
 	{
-		int number = 0;
-		Vertex lowerLeft(number, -1, -1, 0);
-		Vertex lowerRight(number, 1, -1, 1);
-		Vertex upperLeft(number, -1, 1, 5);
+		DomPoint lowerLeft(-1, -1, 0);
+		DomPoint lowerRight(1, -1, 1);
+		DomPoint upperLeft(-1, 1, 5);
 
-		TriangleIn3D t(&lowerLeft, &lowerRight, &upperLeft);
+		TriangleIn3D t(lowerLeft, lowerRight, upperLeft);
 
 		t.UnitTests();
 
@@ -240,10 +225,10 @@ public:
 		assert(upperLeft == ulDom);
 
 		//-----------------------------------------------------
-		Vertex v1(number, 4.5, 1.8, 0.21);
-		Vertex v2(number, 4, 1.7, 0);
-		Vertex v3(number, 4, 1.7, 1);
-		TriangleIn3D t2(&v1, &v2, &v3);
+		DomPoint v1(4.5, 1.8, 0.21);
+		DomPoint v2(4, 1.7, 0);
+		DomPoint v3(4, 1.7, 1);
+		TriangleIn3D t2(v1, v2, v3);
 		t2.ConvertToReference(DomPoint(4.2, 1.7, 0.1));
 
 	}

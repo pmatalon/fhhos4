@@ -7,7 +7,10 @@ using namespace std;
 class Tetrahedron : public PhysicalShapeWithConstantJacobian<3>
 {
 private:
-	vector<Vertex*> _vertices;
+	DomPoint v1;
+	DomPoint v2;
+	DomPoint v3;
+	DomPoint v4;
 
 	double _diameter;
 	double _measure;
@@ -21,33 +24,28 @@ private:
 public:
 	static ReferenceTetrahedron RefTetra;
 
-	Tetrahedron(Vertex* v1, Vertex* v2, Vertex* v3, Vertex* v4)
+	Tetrahedron(const DomPoint& p1, const DomPoint& p2, const DomPoint& p3, const DomPoint& p4)
+		: v1(p1), v2(p2), v3(p3), v4(p4)
 	{
-		assert(*v1 != *v2 && *v1 != *v3 && *v1 != *v4 && *v2 != *v3 && *v2 != *v4 && *v3 != *v4);
-		_vertices = vector<Vertex*>{ v1, v2, v3, v4 };
+		assert(p1 != p2 && p1 != p3 && p1 != p4 && p2 != p3 && p2 != p4 && p3 != p4);
 		Init();
 	}
 
 	Tetrahedron(const Tetrahedron& shape) = default;
 
-	inline Vertex* V1() const { return _vertices[0]; }
-	inline Vertex* V2() const { return _vertices[1]; }
-	inline Vertex* V3() const { return _vertices[2]; }
-	inline Vertex* V4() const { return _vertices[3]; }
+	inline DomPoint V1() const { return v1; }
+	inline DomPoint V2() const { return v2; }
+	inline DomPoint V3() const { return v3; }
+	inline DomPoint V4() const { return v4; }
 
 	void Init()
 	{
-		Vertex* V1 = _vertices[0];
-		Vertex* V2 = _vertices[1];
-		Vertex* V3 = _vertices[2];
-		Vertex* V4 = _vertices[3];
-
-		DimVector<3> v12 = Vect<3>(V1, V2);
-		DimVector<3> v13 = Vect<3>(V1, V3);
-		DimVector<3> v14 = Vect<3>(V1, V4);
-		DimVector<3> v23 = Vect<3>(V2, V3);
-		DimVector<3> v24 = Vect<3>(V2, V4);
-		DimVector<3> v34 = Vect<3>(V3, V4);
+		DimVector<3> v12 = Vect<3>(v1, v2);
+		DimVector<3> v13 = Vect<3>(v1, v3);
+		DimVector<3> v14 = Vect<3>(v1, v4);
+		DimVector<3> v23 = Vect<3>(v2, v3);
+		DimVector<3> v24 = Vect<3>(v2, v4);
+		DimVector<3> v34 = Vect<3>(v3, v4);
 		double lengthEdge12 = v12.norm();
 		double lengthEdge13 = v13.norm();
 		double lengthEdge14 = v14.norm();
@@ -62,7 +60,7 @@ public:
 		m.col(2) = v14;
 		_measure = abs(m.determinant()) / 6;
 
-		_center = DomPoint((V1->X + V2->X + V3->X + V4->X) / 4, (V1->Y + V2->Y + V3->Y + V4->Y) / 4, (V1->Z + V2->Z + V3->Z + V4->Z) / 4);
+		_center = DomPoint((v1.X + v2.X + v3.X + v4.X) / 4, (v1.Y + v2.Y + v3.Y + v4.Y) / 4, (v1.Z + v2.Z + v3.Z + v4.Z) / 4);
 
 		_inRadius = 3 * _measure / (0.5*v12.cross(v13).norm() + 0.5*v13.cross(v14).norm() + 0.5*v14.cross(v12).norm() + 0.5*v23.cross(v24).norm());
 
@@ -71,9 +69,9 @@ public:
 
 		DimMatrix<3> mapping;
 		mapping <<
-			V2->X - V1->X, V3->X - V1->X, V4->X - V1->X,
-			V2->Y - V1->Y, V3->Y - V1->Y, V4->Y - V1->Y,
-			V2->Z - V1->Z, V3->Z - V1->Z, V4->Z - V1->Z;
+			v2.X - v1.X, v3.X - v1.X, v4.X - v1.X,
+			v2.Y - v1.Y, v3.Y - v1.Y, v4.Y - v1.Y,
+			v2.Z - v1.Z, v3.Z - v1.Z, v4.Z - v1.Z;
 		_inverseMapping = mapping.inverse();
 
 		DimMatrix<3> inverseJacobian = _inverseMapping;
@@ -92,9 +90,9 @@ public:
 		return &RefTetra;
 	}
 	
-	inline const vector<Vertex*>& Vertices() const override
+	inline vector<DomPoint> Vertices() const override
 	{
-		return _vertices;
+		return vector<DomPoint>{ v1, v2, v3, v4 };
 	}
 
 	bool IsDegenerated() const override
@@ -129,11 +127,7 @@ public:
 	}
 	inline bool Contains(const DomPoint& p) const override
 	{
-		Vertex* V1 = _vertices[0];
-		Vertex* V2 = _vertices[1];
-		Vertex* V3 = _vertices[2];
-		Vertex* V4 = _vertices[3];
-		return TetrahedronContains(*V1, *V2, *V3, *V4, p, _measure);
+		return TetrahedronContains(v1, v2, v3, v4, p, _measure);
 	}
 
 	static bool TetrahedronContains(const DomPoint& A, const DomPoint& B, const DomPoint& C, const DomPoint& D, const DomPoint& P, double tetraVolume)
@@ -173,27 +167,21 @@ public:
 	// Mapping
 	DomPoint ConvertToDomain(const RefPoint& refPoint) const
 	{
-		Vertex* V1 = _vertices[0];
-		Vertex* V2 = _vertices[1];
-		Vertex* V3 = _vertices[2];
-		Vertex* V4 = _vertices[3];
-
 		double t = refPoint.X;
 		double u = refPoint.Y;
 		double v = refPoint.Z;
 
 		DomPoint p;
-		p.X = (V2->X - V1->X)*t + (V3->X - V1->X)*u + (V4->X - V1->X)*v + V1->X;
-		p.Y = (V2->Y - V1->Y)*t + (V3->Y - V1->Y)*u + (V4->Y - V1->Y)*v + V1->Y;
-		p.Z = (V2->Z - V1->Z)*t + (V3->Z - V1->Z)*u + (V4->Z - V1->Z)*v + V1->Z;
+		p.X = (v2.X - v1.X)*t + (v3.X - v1.X)*u + (v4.X - v1.X)*v + v1.X;
+		p.Y = (v2.Y - v1.Y)*t + (v3.Y - v1.Y)*u + (v4.Y - v1.Y)*v + v1.Y;
+		p.Z = (v2.Z - v1.Z)*t + (v3.Z - v1.Z)*u + (v4.Z - v1.Z)*v + v1.Z;
 		return p;
 	}
 
 	// Inverse mapping
 	RefPoint ConvertToReference(const DomPoint& domainPoint) const
 	{
-		Vertex* V1 = _vertices[0];
-		DimVector<3> tuv = _inverseMapping * Vect<3>(*V1, domainPoint);
+		DimVector<3> tuv = _inverseMapping * Vect<3>(v1, domainPoint);
 		RefPoint p(tuv(0), tuv(1), tuv(2));
 		return p;
 	}
@@ -202,13 +190,13 @@ public:
 	{
 		os << "Tetrahedron";
 		os << " ";
-		V1()->Serialize(os, 3);
+		v1.Serialize(os, 3);
 		os << "--";
-		V2()->Serialize(os, 3);
+		v2.Serialize(os, 3);
 		os << "--";
-		V3()->Serialize(os, 3);
+		v3.Serialize(os, 3);
 		os << "--";
-		V4()->Serialize(os, 3);
+		v4.Serialize(os, 3);
 	}
 
 	//---------------------------------------------------------------------//
@@ -231,13 +219,12 @@ public:
 
 	static void Test()
 	{
-		int number = 0;
-		Vertex A(number, 1, 1, 1);
-		Vertex B(number, 4, 1, 1);
-		Vertex C(number, 1, 4, 1);
-		Vertex D(number, 1, 1, 4);
+		DomPoint A(1, 1, 1);
+		DomPoint B(4, 1, 1);
+		DomPoint C(1, 4, 1);
+		DomPoint D(1, 1, 4);
 
-		Tetrahedron t(&A, &B, &C, &D);
+		Tetrahedron t(A, B, C, D);
 
 		t.UnitTests();
 

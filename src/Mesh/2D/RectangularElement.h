@@ -24,7 +24,7 @@ public:
 		TopLeftCorner = topLeftCorner;
 		TopRightCorner = topRightCorner;
 		BottomRightCorner = bottomRightCorner;
-		this->_shape->SetVertices(vector<Vertex*> {bottomLeftCorner, bottomRightCorner, topRightCorner, topLeftCorner});
+		this->SetVertices({ bottomLeftCorner, bottomRightCorner, topRightCorner, topLeftCorner});
 	}
 
 	void SetNorthInterface(CartesianEdge* face)
@@ -55,7 +55,7 @@ public:
 	//                 Element implementation                //
 	//-------------------------------------------------------//
 
-	DimVector<2> OuterNormalVector(Face<2>* face) const
+	DimVector<2> OuterNormalVector(Face<2>* face) const override
 	{
 		DimVector<2> n;
 		if (face == this->NorthFace)

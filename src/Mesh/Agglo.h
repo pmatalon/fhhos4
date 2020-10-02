@@ -46,7 +46,7 @@ public:
 			Success = false; // non-simple polygon
 	}
 
-	inline const vector<Vertex*>& Vertices() const override
+	inline vector<Vertex*> Vertices() const override
 	{
 		return _vertices;
 	}

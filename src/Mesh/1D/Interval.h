@@ -10,11 +10,13 @@ public:
 	Interval(BigNumber number, Vertex* left, Vertex* right) :
 		Element(number),
 		CartesianElement(number, left, right->X - left->X)
-	{ }
+	{
+		this->SetVertices({ left, right });
+	}
 
 	inline double Width()
 	{
-		return this->_shape->WidthX;
+		return this->_shape.WidthX;
 	}
 	
 	void SetLeftInterface(Face<1>* face)
@@ -33,7 +35,7 @@ public:
 	//                 Element implementation                //
 	//-------------------------------------------------------//
 
-	DimVector<1> OuterNormalVector(Face<1>* interface) const
+	DimVector<1> OuterNormalVector(Face<1>* interface) const override
 	{
 		DimVector<1> n;
 		if (interface == this->Left)

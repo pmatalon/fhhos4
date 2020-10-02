@@ -7,32 +7,29 @@ template <int Dim>
 class CartesianElement : public Diff_DGElement<Dim>, public Diff_HHOElement<Dim>
 {
 protected:
-	CartesianShape<Dim>* _shape;
-
+	CartesianShape<Dim> _shape;
+	vector<Vertex*> _vertices;
 public:
 	CartesianElement(BigNumber number, DomPoint* origin, double width) :
 		Element<Dim>(number),
 		Diff_DGElement<Dim>(number),
-		Diff_HHOElement<Dim>(number)
-	{
-		_shape = new CartesianShape<Dim>(origin, width);
-	}
+		Diff_HHOElement<Dim>(number),
+		_shape(origin, width)
+	{}
 
 	CartesianElement(BigNumber number, DomPoint* origin, double widthX, double widthY) :
 		Element<Dim>(number),
 		Diff_DGElement<Dim>(number),
-		Diff_HHOElement<Dim>(number)
-	{
-		_shape = new CartesianShape<Dim>(origin, widthX, widthY);
-	}
+		Diff_HHOElement<Dim>(number),
+		_shape(origin, widthX, widthY)
+	{}
 
 	CartesianElement(BigNumber number, DomPoint* origin, double widthX, double widthY, double widthZ) :
 		Element<Dim>(number),
 		Diff_DGElement<Dim>(number),
-		Diff_HHOElement<Dim>(number)
-	{
-		_shape = new CartesianShape<Dim>(origin, widthX, widthY, widthZ);
-	}
+		Diff_HHOElement<Dim>(number),
+		_shape(origin, widthX, widthY, widthZ)
+	{}
 
 	//------------------------------------------------------------------//
 	//                      Element implementation                      //
@@ -40,16 +37,24 @@ public:
 
 	PhysicalShape<Dim>* Shape() override
 	{
-		return _shape;
+		return &_shape;
 	}
 	const PhysicalShape<Dim>* Shape() const override
 	{
-		return _shape;
+		return &_shape;
+	}
+
+	inline void SetVertices(const vector<Vertex*>& vertices)
+	{
+		_vertices = vertices;
+		_shape.SetVertices(Vertex::ToDomPoints(vertices));
+	}
+
+	vector<Vertex*> Vertices() const override
+	{
+		return _vertices;
 	}
 
 	virtual ~CartesianElement()
-	{
-		if (_shape)
-			delete _shape;
-	}
+	{}
 };

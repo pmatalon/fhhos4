@@ -25,6 +25,7 @@ public:
 		TopLeftCorner = topLeftCorner;
 		TopRightCorner = topRightCorner;
 		BottomRightCorner = bottomRightCorner;
+		this->SetVertices({ bottomLeftCorner, bottomRightCorner, topRightCorner, topLeftCorner });
 	}
 
 	void AddNorthFace(Face<2>* face)
@@ -73,29 +74,20 @@ public:
 	//                 Element implementation                //
 	//-------------------------------------------------------//
 
-	DimVector<2> OuterNormalVector(Face<2>* face) const
+	DimVector<2> OuterNormalVector(Face<2>* face) const override
 	{
 		DimVector<2> n;
-		if (isIn(this->NorthFaces, face))
+		if (face->IsIn(this->NorthFaces))
 			n << 0, 1;
-		else if (isIn(this->SouthFaces, face))
+		else if (face->IsIn(this->SouthFaces))
 			n << 0, -1;
-		else if (isIn(this->EastFaces, face))
+		else if (face->IsIn(this->EastFaces))
 			n << 1, 0;
-		else if (isIn(this->WestFaces, face))
+		else if (face->IsIn(this->WestFaces))
 			n << -1, 0;
 		else
 			assert(false);
 		return n;
-	}
-
-private:
-	bool isIn(const vector<Face<2>*>& faces, Face<2>* f) const
-	{
-		auto it = find(faces.begin(), faces.end(), f);
-		if (it != faces.end())
-			return true;
-		return false;
 	}
 
 };

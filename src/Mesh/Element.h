@@ -65,6 +65,8 @@ public:
 		return nullptr;
 	}
 
+	virtual vector<Vertex*> Vertices() const = 0;
+
 	//---------------------------//
 	//   Geometric information   //
 	//---------------------------//
@@ -93,10 +95,6 @@ public:
 	virtual double Regularity() const
 	{
 		return Shape()->Regularity();
-	}
-	virtual const vector<Vertex*>& Vertices() const
-	{
-		return Shape()->Vertices();
 	}
 	virtual bool Contains(const DomPoint& p) const
 	{
@@ -268,12 +266,22 @@ public:
 
 	bool HasVertex(Vertex* v, bool compareCoordinates = false)
 	{
-		return this->Shape()->HasVertex(v, compareCoordinates);
+		auto vertices = this->Vertices();
+		auto it = find_if(vertices.begin(), vertices.end(), [v, compareCoordinates](Vertex* v2) { return v == v2 || (compareCoordinates && *v == *v2); });
+		return it != vertices.end();
 	}
 
 	bool HasSameVertices(Element<Dim>* other, bool compareCoordinates = false)
 	{
-		return this->Shape()->HasSameVertices(other->Shape(), compareCoordinates);
+		if (this->Vertices().size() != other->Vertices().size())
+			return false;
+
+		for (Vertex* v : this->Vertices())
+		{
+			if (!other->HasVertex(v, compareCoordinates))
+				return false;
+		}
+		return true;
 	}
 
 	bool HasOneVertexInCommonWith(Element<Dim>* other)
@@ -598,12 +606,12 @@ public:
 			for (Face<Dim>* f : this->Faces)
 			{
 				DimVector<Dim> n = this->OuterNormalVector(f);
-				for (Vertex* v : f->Shape()->Vertices())
+				for (Vertex* v : f->Vertices())
 				{
 					DimVector<Dim> VC = Vect<Dim>(*v, C);
 					assert(VC.dot(n) < 0);
 
-					for (Vertex* v2 : f->Shape()->Vertices())
+					for (Vertex* v2 : f->Vertices())
 					{
 						if (v2 != v)
 						{

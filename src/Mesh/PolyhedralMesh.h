@@ -776,7 +776,7 @@ private:
 			// All the vertices of the agglomerated elements are dicarded for future agglomeration
 			for (Element<Dim>* e : elementsAroundV)
 			{
-				for (Vertex* v2 : e->Shape()->Vertices())
+				for (Vertex* v2 : e->Vertices())
 					vertexElements[v2].clear();
 			}
 		}
@@ -794,7 +794,7 @@ private:
 		// Add the elements to the list of their respective vertices
 		for (Element<Dim>* e : this->Elements)
 		{
-			for (Vertex* v : e->Shape()->Vertices())
+			for (Vertex* v : e->Vertices())
 				vertexElements[v].push_back(e);
 		}
 
@@ -866,7 +866,7 @@ private:
 					auto ret = keptFaces.insert(f);
 					if (ret.second) // if f isn't already in the list keptFaces
 					{
-						for (Vertex* v : f->Shape()->Vertices())
+						for (Vertex* v : f->Vertices())
 						{
 							// TODO: Comment s'assurer qu'on les ajoute bien dans l'ordre direct ?
 							if (find(macroElementVertices.begin(), macroElementVertices.end(), v) == macroElementVertices.end())
@@ -1271,6 +1271,8 @@ private:
 		Element<Dim>* coarseElement = CreatePolyhedron(agglo.Vertices());
 		coarseElement->PhysicalPart = fineElements[0]->PhysicalPart;
 
+		assert(coarseElement->Vertices().size() > 2);
+
 		for (Element<Dim>* e : fineElements)
 		{
 			e->CoarserElement = coarseElement;
@@ -1289,8 +1291,6 @@ private:
 		// Kept faces are cloned for the coarse mesh and linked to their clones and the coarse element.
 		for (Face<Dim>* f : agglo.Faces)
 			this->CloneAndAddFace(f, coarseElement);
-
-		assert(coarseElement->Vertices().size() > 2);
 
 		assert(coarseElement->Faces.size() > 2);
 		if (Dim == 2)

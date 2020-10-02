@@ -7,7 +7,9 @@ using namespace std;
 class Triangle : public PhysicalShapeWithConstantJacobian<2>
 {
 private:
-	vector<Vertex*> _vertices;
+	DomPoint v1;
+	DomPoint v2;
+	DomPoint v3;
 
 	double _diameter;
 	double _measure;
@@ -20,42 +22,38 @@ private:
 public:
 	static ReferenceTriangle RefTriangle;
 
-	Triangle(Vertex* v1, Vertex* v2, Vertex* v3) 
+	Triangle(const DomPoint& p1, const DomPoint& p2, const DomPoint& p3)
+		: v1(p1), v2(p2), v3(p3)
 	{
-		_vertices = vector<Vertex*>{ v1, v2, v3 };
 		Init();
 	}
 
-	inline Vertex* V1() const { return _vertices[0]; }
-	inline Vertex* V2() const { return _vertices[1]; }
-	inline Vertex* V3() const { return _vertices[2]; }
+	inline DomPoint V1() const { return v1; }
+	inline DomPoint V2() const { return v2; }
+	inline DomPoint V3() const { return v3; }
 
 	Triangle(const Triangle& shape) = default;
 
 	void Init()
 	{
-		Vertex* V1 = _vertices[0];
-		Vertex* V2 = _vertices[1];
-		Vertex* V3 = _vertices[2];
-
-		double lengthEdge12 = sqrt(pow(V2->X - V1->X, 2) + pow(V2->Y - V1->Y, 2));
-		double lengthEdge23 = sqrt(pow(V3->X - V2->X, 2) + pow(V3->Y - V2->Y, 2));
-		double lengthEdge13 = sqrt(pow(V3->X - V1->X, 2) + pow(V3->Y - V1->Y, 2));
+		double lengthEdge12 = sqrt(pow(v2.X - v1.X, 2) + pow(v2.Y - v1.Y, 2));
+		double lengthEdge23 = sqrt(pow(v3.X - v2.X, 2) + pow(v3.Y - v2.Y, 2));
+		double lengthEdge13 = sqrt(pow(v3.X - v1.X, 2) + pow(v3.Y - v1.Y, 2));
 		_diameter = max(lengthEdge12, max(lengthEdge23, lengthEdge13));
 
-		_measure = 0.5 * abs(V1->X * (V2->Y - V3->Y) + V2->X * (V3->Y - V1->Y) + V3->X * (V1->Y - V2->Y));
+		_measure = 0.5 * abs(v1.X * (v2.Y - v3.Y) + v2.X * (v3.Y - v1.Y) + v3.X * (v1.Y - v2.Y));
 
 		_inRadius = 2 * _measure / (lengthEdge12 + lengthEdge23 + lengthEdge13);
 
-		_center = DomPoint((V1->X + V2->X + V3->X) / 3, (V1->Y + V2->Y + V3->Y) / 3);
+		_center = DomPoint((v1.X + v2.X + v3.X) / 3, (v1.Y + v2.Y + v3.Y) / 3);
 
 		_detJacobian = _measure / RefTriangle.Measure();
 
 		DimMatrix<2> inverseJacobian;
-		inverseJacobian(0, 0) = (V3->Y - V1->Y) / ((V3->Y - V1->Y)*(V2->X - V1->X) - (V3->X - V1->X)*(V2->Y - V1->Y));
-		inverseJacobian(0, 1) = -(V3->X - V1->X) / ((V3->Y - V1->Y)*(V2->X - V1->X) - (V3->X - V1->X)*(V2->Y - V1->Y));
-		inverseJacobian(1, 0) = (V2->Y - V1->Y) / ((V2->Y - V1->Y)*(V3->X - V1->X) - (V2->X - V1->X)*(V3->Y - V1->Y));
-		inverseJacobian(1, 1) = -(V2->X - V1->X) / ((V2->Y - V1->Y)*(V3->X - V1->X) - (V2->X - V1->X)*(V3->Y - V1->Y));
+		inverseJacobian(0, 0) = (v3.Y - v1.Y) / ((v3.Y - v1.Y)*(v2.X - v1.X) - (v3.X - v1.X)*(v2.Y - v1.Y));
+		inverseJacobian(0, 1) = -(v3.X - v1.X) / ((v3.Y - v1.Y)*(v2.X - v1.X) - (v3.X - v1.X)*(v2.Y - v1.Y));
+		inverseJacobian(1, 0) = (v2.Y - v1.Y) / ((v2.Y - v1.Y)*(v3.X - v1.X) - (v2.X - v1.X)*(v3.Y - v1.Y));
+		inverseJacobian(1, 1) = -(v2.X - v1.X) / ((v2.Y - v1.Y)*(v3.X - v1.X) - (v2.X - v1.X)*(v3.Y - v1.Y));
 		_inverseJacobianTranspose = inverseJacobian.transpose();
 	}
 
@@ -69,38 +67,17 @@ public:
 		return &RefTriangle;
 	}
 	
-	inline const vector<Vertex*>& Vertices() const override
+	inline vector<DomPoint> Vertices() const override
 	{
-		return _vertices;
+		return vector<DomPoint>{ v1, v2, v3 };
 	}
 
 	bool IsDegenerated() const override
 	{
-		Vertex* V1 = _vertices[0];
-		Vertex* V2 = _vertices[1];
-		Vertex* V3 = _vertices[2];
-
-		DimVector<2> V1V2 = Vect<2>(V1, V2);
-		DimVector<2> V1V3 = Vect<2>(V1, V3);
+		DimVector<2> V1V2 = Vect<2>(v1, v2);
+		DimVector<2> V1V3 = Vect<2>(v1, v3);
 		double cross = V1V2[0] * V1V3[1] - V1V2[1] * V1V3[0];
 		return abs(cross) < Point::Tolerance;
-	}
-
-	void ReshapeByMovingIntersection(Vertex* oldIntersect, Vertex* newIntersect) override
-	{
-		Vertex* V1 = _vertices[0];
-		Vertex* V2 = _vertices[1];
-		Vertex* V3 = _vertices[2];
-
-		if (*V1 == *oldIntersect)
-			V1 = newIntersect;
-		else if (*V2 == *oldIntersect)
-			V2 = newIntersect;
-		else if (*V3 == *oldIntersect)
-			V3 = newIntersect;
-		else
-			assert(false && "This triangle does not have this vertex.");
-		Init();
 	}
 
 	static ReferenceTriangle* InitReferenceShape()
@@ -130,10 +107,7 @@ public:
 	}
 	inline bool Contains(const DomPoint& p) const override
 	{
-		Vertex* V1 = _vertices[0];
-		Vertex* V2 = _vertices[1];
-		Vertex* V3 = _vertices[2];
-		return TriangleContains(*V1, *V2, *V3, p, _measure);
+		return TriangleContains(v1, v2, v3, p, _measure);
 	}
 
 	static bool TriangleContains(const DomPoint& A, const DomPoint& B, const DomPoint& C, const DomPoint& P, double triangleArea)
@@ -166,56 +140,45 @@ public:
 
 	DomPoint ConvertToDomain(const RefPoint& refPoint) const
 	{
-		Vertex* V1 = _vertices[0];
-		Vertex* V2 = _vertices[1];
-		Vertex* V3 = _vertices[2];
-
 		double t = refPoint.X;
 		double u = refPoint.Y;
 
 		DomPoint p;
-		p.X = (V2->X - V1->X) * t + (V3->X - V1->X)*u + V1->X;
-		p.Y = (V2->Y - V1->Y) * t + (V3->Y - V1->Y)*u + V1->Y;
+		p.X = (v2.X - v1.X) * t + (v3.X - v1.X)*u + v1.X;
+		p.Y = (v2.Y - v1.Y) * t + (v3.Y - v1.Y)*u + v1.Y;
 		return p;
 	}
 
 	RefPoint ConvertToReference(const DomPoint& domainPoint) const
 	{
-		Vertex* V1 = _vertices[0];
+		/*Vertex* V1 = _vertices[0];
 		Vertex* V2 = _vertices[1];
-		Vertex* V3 = _vertices[2];
+		Vertex* V3 = _vertices[2];*/
 
 		double x = domainPoint.X;
 		double y = domainPoint.Y;
 
-		double t = ((V3->Y - V1->Y)*(x - V1->X) - (V3->X - V1->X)*(y - V1->Y)) / ((V3->Y - V1->Y)*(V2->X - V1->X) - (V3->X - V1->X)*(V2->Y - V1->Y));
-		double u = ((V2->Y - V1->Y)*(x - V1->X) - (V2->X - V1->X)*(y - V1->Y)) / ((V2->Y - V1->Y)*(V3->X - V1->X) - (V2->X - V1->X)*(V3->Y - V1->Y));
+		double t = ((v3.Y - v1.Y)*(x - v1.X) - (v3.X - v1.X)*(y - v1.Y)) / ((v3.Y - v1.Y)*(v2.X - v1.X) - (v3.X - v1.X)*(v2.Y - v1.Y));
+		double u = ((v2.Y - v1.Y)*(x - v1.X) - (v2.X - v1.X)*(y - v1.Y)) / ((v2.Y - v1.Y)*(v3.X - v1.X) - (v2.X - v1.X)*(v3.Y - v1.Y));
 		RefPoint p(t, u);
 		return p;
 	}
 
 	void ExportToMatlab(string color = "r") const override
 	{
-		Vertex* V1 = _vertices[0];
-		Vertex* V2 = _vertices[1];
-		Vertex* V3 = _vertices[2];
 		MatlabScript script;
-		script.PlotTriangle(*V1, *V2, *V3, color);
+		script.PlotTriangle(v1, v2, v3, color);
 	}
 
 	void Serialize(ostream& os) const override
 	{
-		Vertex* V1 = _vertices[0];
-		Vertex* V2 = _vertices[1];
-		Vertex* V3 = _vertices[2];
-
 		os << "Triangle";
 		os << " ";
-		V1->Serialize(os, 2);
+		v1.Serialize(os, 2);
 		os << "--";
-		V2->Serialize(os, 2);
+		v2.Serialize(os, 2);
 		os << "--";
-		V3->Serialize(os, 2);
+		v3.Serialize(os, 2);
 	}
 
 	//---------------------------------------------------------------------//
@@ -238,12 +201,11 @@ public:
 
 	static void Test()
 	{
-		int number = 0;
-		Vertex lowerLeft(number, -1, -1);
-		Vertex lowerRight(number, 1, -1);
-		Vertex upperLeft(number, -1, 1);
+		DomPoint lowerLeft(-1, -1);
+		DomPoint lowerRight(1, -1);
+		DomPoint upperLeft(-1, 1);
 
-		Triangle t(&lowerLeft, &lowerRight, &upperLeft);
+		Triangle t(lowerLeft, lowerRight, upperLeft);
 
 		t.UnitTests();
 

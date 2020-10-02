@@ -36,7 +36,7 @@ public:
 		BackRightTopCorner = backRightTopCorner;
 		FrontRightBottomCorner = frontRightBottomCorner;
 		FrontRightTopCorner = frontRightTopCorner;
-		this->_shape->SetVertices(vector<Vertex*> {backLeftBottomCorner, frontLeftBottomCorner, backRightBottomCorner, backLeftTopCorner,
+		this->SetVertices({ backLeftBottomCorner, frontLeftBottomCorner, backRightBottomCorner, backLeftTopCorner,
 			frontLeftTopCorner, backRightTopCorner, frontRightBottomCorner, frontRightTopCorner});
 	}
 
@@ -80,7 +80,7 @@ public:
 	//                 Element implementation                //
 	//-------------------------------------------------------//
 
-	DimVector<3> OuterNormalVector(Face<3>* face) const
+	DimVector<3> OuterNormalVector(Face<3>* face) const override
 	{
 		DimVector<3> n;
 		if (face == this->TopFace)

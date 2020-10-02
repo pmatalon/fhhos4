@@ -23,7 +23,7 @@ public:
 	// Geometry
 	virtual ReferenceShape<Dim>* RefShape() const = 0;
 
-	virtual const vector<Vertex*>& Vertices() const = 0;
+	virtual vector<DomPoint> Vertices() const = 0;
 
 	virtual bool IsConvex() const = 0;
 
@@ -45,57 +45,13 @@ public:
 	//      Geometry      //
 	//--------------------//
 
-	bool HasVertex(Vertex* v, bool compareCoordinates = false) const
-	{
-		auto vertices = this->Vertices();
-		auto it = find_if(vertices.begin(), vertices.end(), [v, compareCoordinates](Vertex* v2) { return v == v2 || (compareCoordinates && *v == *v2); });
-		return it != vertices.end();
-	}
-
-	bool HasSameVertices(const PhysicalShape<Dim>* other, bool compareCoordinates = false) const
-	{
-		if (this->Vertices().size() != other->Vertices().size())
-			return false;
-
-		for (Vertex* v : this->Vertices())
-		{
-			if (!other->HasVertex(v, compareCoordinates))
-				return false;
-		}
-		return true;
-	}
-
-	bool HasOneVertexInCommonWith(PhysicalShape<Dim>* other)
-	{
-		for (Vertex* v : other->Vertices())
-		{
-			if (this->HasVertex(v))
-				return true;
-		}
-		return false;
-	}
-
-	bool Contains(PhysicalShape<Dim>* other)
-	{
-		if (!this->Contains(other->Center()))
-			return false;
-
-		for (auto v : other->Vertices())
-		{
-			if (!this->HasVertex(v, true) && !this->Contains(*v))
-				return false;
-		}
-
-		return true;
-	}
-
 	virtual bool ConvexHullEmbeds(const PhysicalShape<Dim>* other) const
 	{
 		if (IsConvex())
 		{
-			for (Vertex* v : other->Vertices())
+			for (const DomPoint& v : other->Vertices())
 			{
-				if (Contains(*v))
+				if (Contains(v))
 					return false;
 			}
 			return true;
@@ -127,11 +83,6 @@ public:
 	virtual void ExportSubShapesToMatlab() const
 	{
 		assert(false);
-	}
-
-	virtual void ReshapeByMovingIntersection(Vertex* oldIntersect, Vertex* newIntersect)
-	{
-		assert(false && "To be implemented in subclasses");
 	}
 
 	bool IsIn(const vector<PhysicalShape<Dim>*>& list)

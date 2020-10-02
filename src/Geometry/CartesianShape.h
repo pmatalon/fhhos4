@@ -16,7 +16,7 @@ template <int DomainDim, int ShapeDim = DomainDim>
 class CartesianShape : public PhysicalShapeWithConstantJacobian<ShapeDim>
 {
 private:
-	vector<Vertex*> _vertices;
+	vector<DomPoint> _vertices;
 
 	double _diameter;
 	double _measure;
@@ -180,11 +180,6 @@ public:
 		return new CartesianShape<DomainDim,ShapeDim>(*this);
 	}
 
-	void ReshapeByMovingIntersection(Vertex* oldIntersect, Vertex* newIntersect) override
-	{
-		assert(false && "Cannot be reshaped. Must create a new shape (in 2D, a Quadrilateral)");
-	}
-
 	ReferenceShape<ShapeDim>* RefShape() const
 	{
 		return &RefCartShape;
@@ -192,12 +187,12 @@ public:
 
 	// Not a great solution, the vertices should pass by the constructor,
 	// but hey, a little "quick and dirty" can't do no harm bro...!
-	inline void SetVertices(vector<Vertex*> vertices)
+	inline void SetVertices(const vector<DomPoint>& vertices)
 	{
-		_vertices = vector<Vertex*>(vertices);
+		_vertices = vertices;
 	}
 
-	inline const vector<Vertex*>& Vertices() const override
+	inline vector<DomPoint> Vertices() const override
 	{
 		return _vertices;
 	}

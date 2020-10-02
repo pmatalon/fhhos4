@@ -15,7 +15,7 @@ typedef exactKernel chosenKernel;
 class Polygon : public PhysicalShape<2>
 {
 private:
-	vector<Vertex*> _vertices;
+	vector<DomPoint> _vertices;
 	//vector<Vertex*> _nonColinearVertices;
 
 	CGAL::Polygon_2<chosenKernel> _cgalPolygon; // Polygon of the CGAL library
@@ -30,7 +30,9 @@ private:
 	vector<DomPoint> _quadraturePoints;
 
 public:
-	Polygon(const vector<Vertex*>& vertices, bool createTriangulationAndBoundingBox, bool checkForColinearVertices)
+	Polygon() {}
+
+	Polygon(const vector<DomPoint>& vertices, bool createTriangulationAndBoundingBox, bool checkForColinearVertices)
 		: _vertices(vertices)
 	{
 		assert(vertices.size() >= 3);
@@ -92,19 +94,19 @@ private:
 		_diameter = 0;
 		double sumX = 0;
 		double sumY = 0;
-		for (Vertex* v1 : _vertices)
+		for (const DomPoint& v1 : _vertices)
 		{
-			for (Vertex* v2 : _vertices)
+			for (const DomPoint& v2 : _vertices)
 			{
 				if (v1 != v2)
 				{
-					double diagonal12 = (*v2 - *v1).norm();
+					double diagonal12 = (v2 - v1).norm();
 					if (diagonal12 > _diameter)
 						_diameter = diagonal12;
 				}
 			}
-			sumX += v1->X;
-			sumY += v1->Y;
+			sumX += v1.X;
+			sumY += v1.Y;
 		}
 		
 		_center = DomPoint(sumX / _vertices.size(), sumY / _vertices.size());
@@ -144,36 +146,35 @@ public:
 		_boundingBox = CreateBoundingBox(_vertices);
 	}
 
-	static Quadrilateral* CreateBoundingBox(const vector<Vertex*>& vertices)
+	static Quadrilateral* CreateBoundingBox(const vector<DomPoint>& vertices)
 	{
 		double maxX = -INFINITY;
 		double maxY = -INFINITY;
 		double minX = INFINITY;
 		double minY = INFINITY;
-		for (Vertex* v : vertices)
+		for (const DomPoint& v : vertices)
 		{
-			if (v->X > maxX)
-				maxX = v->X;
-			if (v->Y > maxY)
-				maxY = v->Y;
-			if (v->X < minX)
-				minX = v->X;
-			if (v->Y < minY)
-				minY = v->Y;
+			if (v.X > maxX)
+				maxX = v.X;
+			if (v.Y > maxY)
+				maxY = v.Y;
+			if (v.X < minX)
+				minX = v.X;
+			if (v.Y < minY)
+				minY = v.Y;
 		}
 
-		int number = -1;
-		Vertex* lowerLeft = new Vertex(number, minX, minY);
-		Vertex* lowerRight = new Vertex(number, maxX, minY);
-		Vertex* upperRight = new Vertex(number, maxX, maxY);
-		Vertex* upperLeft = new Vertex(number, minX, maxY);
+		DomPoint lowerLeft (minX, minY);
+		DomPoint lowerRight(maxX, minY);
+		DomPoint upperRight(maxX, maxY);
+		DomPoint upperLeft (minX, maxY);
 
 		Quadrilateral* boundingRectangle = new Quadrilateral(lowerLeft, lowerRight, upperRight, upperLeft);
 		return boundingRectangle;
 	}
 
 private:
-	static vector<Triangle> ConvexTriangulation(const vector<Vertex*>& vertices)
+	static vector<Triangle> ConvexTriangulation(const vector<DomPoint>& vertices)
 	{
 		assert(vertices.size() > 2);
 		vector<Triangle> triangles;
@@ -188,7 +189,7 @@ private:
 		{
 			triangles.emplace_back(vertices[0], vertices[1], vertices[2]);
 
-			vector<Vertex*> remainingVertices;
+			vector<DomPoint> remainingVertices;
 			for (int i = 2; i < vertices.size(); i++)
 				remainingVertices.push_back(vertices[i]);
 			remainingVertices.push_back(vertices[0]);
@@ -198,7 +199,7 @@ private:
 		}
 		return triangles;
 	}
-	static vector<PhysicalShape<2>*> BarycentricTriangulation(const vector<Vertex*>& vertices)
+	static vector<PhysicalShape<2>*> BarycentricTriangulation(const vector<DomPoint>& vertices)
 	{
 		// Requirement: the polygon defined by the vertices must be convex!
 
@@ -206,13 +207,13 @@ private:
 
 		double sumX = 0;
 		double sumY = 0;
-		for (Vertex* v : vertices)
+		for (const DomPoint& v : vertices)
 		{
-			sumX += v->X;
-			sumY += v->Y;
+			sumX += v.X;
+			sumY += v.Y;
 		}
 
-		Vertex* center = new Vertex(-1, sumX / vertices.size(), sumY / vertices.size());
+		DomPoint center(sumX / vertices.size(), sumY / vertices.size());
 
 		if (vertices.size() == 3)
 		{
@@ -250,7 +251,7 @@ private:
 
 		for (CGAL::Partition_traits_2<chosenKernel>::Polygon_2 p : partition_polys)
 		{
-			vector<Vertex*> vertices = CGALWrapper::ToVertices(p);
+			vector<DomPoint> vertices = CGALWrapper::ToVertices(p);
 			vector<Triangle> subTriangles = ConvexTriangulation(vertices);
 			for (auto tri : subTriangles)
 				triangulation.push_back(tri);
@@ -279,9 +280,9 @@ public:
 
 		CGAL::Polygon_2<chosenKernel> convexHull(convexHullPoints.begin(), convexHullPoints.end());
 
-		for (Vertex* v : s->Vertices())
+		for (const DomPoint& v : s->Vertices())
 		{
-			if (!CGALWrapper::CGALPolyContains(convexHull, CGAL::Point_2<chosenKernel>(v->X, v->Y)))
+			if (!CGALWrapper::CGALPolyContains(convexHull, CGAL::Point_2<chosenKernel>(v.X, v.Y)))
 				return false;
 		}
 		return true;
@@ -397,7 +398,7 @@ public:
 		return &RectangleShape::RefCartShape;
 	}
 
-	inline const vector<Vertex*>& Vertices() const override
+	inline vector<DomPoint> Vertices() const override
 	{
 		return _vertices;
 	}
@@ -443,7 +444,7 @@ public:
 			string option = options[i % options.size()];
 			auto vertices = _triangulation[i].Vertices();
 			if (vertices.size() == 3)
-				script.PlotTriangle(*vertices[0], *vertices[1], *vertices[2], option);
+				script.PlotTriangle(vertices[0], vertices[1], vertices[2], option);
 			else
 				assert(false && "To implement");
 		}
@@ -588,12 +589,11 @@ public:
 
 	static void Test()
 	{
-		int number = 0;
-		Vertex lowerLeft(number, -1, -1);
-		Vertex lowerRight(number, 1, -1);
-		Vertex upperRight(number, 1, 1);
-		Vertex upperLeft(number, -1, 1);
-		vector<Vertex*> vertices{ &lowerLeft, &lowerRight, &upperRight, &upperLeft };
+		DomPoint lowerLeft(-1, -1);
+		DomPoint lowerRight(1, -1);
+		DomPoint upperRight(1, 1);
+		DomPoint upperLeft(-1, 1);
+		vector<DomPoint> vertices{ lowerLeft, lowerRight, upperRight, upperLeft };
 		Polygon polygRefSquare(vertices, true, false);
 
 		//--------------------------------------//
@@ -626,11 +626,11 @@ public:
 
 		//--------------------------------------//
 		double h = 2;
-		lowerLeft = Vertex(number, 0, 0);
-		lowerRight = Vertex(number, h, 0);
-		upperRight = Vertex(number, h, h);
-		upperLeft = Vertex(number, 0, h);
-		Polygon polygSquare(vector<Vertex*>{ &lowerLeft, &lowerRight, &upperRight, &upperLeft }, true, false);
+		lowerLeft = DomPoint(0, 0);
+		lowerRight = DomPoint(h, 0);
+		upperRight = DomPoint(h, h);
+		upperLeft = DomPoint(0, h);
+		Polygon polygSquare(vector<DomPoint>{ lowerLeft, lowerRight, upperRight, upperLeft }, true, false);
 		RectangleShape realSquare(&lowerLeft, h);
 		integralOverRealSquare = realSquare.Integral(anyFunction);
 		integralOverPolygonalSquare = polygSquare.Integral(anyFunction);
@@ -638,11 +638,11 @@ public:
 
 		//--------------------------------------//
 		h = 1;
-		lowerLeft = Vertex(number, 0, 0);
-		lowerRight = Vertex(number, h, 0);
-		upperRight = Vertex(number, h, h);
-		upperLeft = Vertex(number, 0, h);
-		Polygon polygSquare1(vector<Vertex*>{ &lowerLeft, &lowerRight, &upperRight, &upperLeft }, true, false);
+		lowerLeft = DomPoint(0, 0);
+		lowerRight = DomPoint(h, 0);
+		upperRight = DomPoint(h, h);
+		upperLeft = DomPoint(0, h);
+		Polygon polygSquare1(vector<DomPoint>{ lowerLeft, lowerRight, upperRight, upperLeft }, true, false);
 		realSquare = RectangleShape(&lowerLeft, h);
 		integralOverRealSquare = realSquare.Integral(anyFunction);
 		integralOverPolygonalSquare = polygSquare1.Integral(anyFunction);
