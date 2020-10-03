@@ -24,6 +24,8 @@ private:
 public:
 	static ReferenceTetrahedron RefTetra;
 
+	Tetrahedron() {}
+
 	Tetrahedron(const DomPoint& p1, const DomPoint& p2, const DomPoint& p3, const DomPoint& p4)
 		: v1(p1), v2(p2), v3(p3), v4(p4)
 	{

@@ -25,6 +25,8 @@ public:
 
 	DenseMatrix invAtt;
 
+	Diff_HHOElement() : Element<Dim>() {}
+
 	Diff_HHOElement(BigNumber number) : Element<Dim>(number) {}
 
 	//----------------------------//

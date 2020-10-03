@@ -36,6 +36,8 @@ public:
 	//   Constructors   //
 	//------------------//
 
+	CartesianShape() {}
+
 	CartesianShape(const CartesianShape &) = default; // Copy constructor
 
 	CartesianShape(DomPoint* origin, double width)

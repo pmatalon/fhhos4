@@ -5,6 +5,8 @@ template <int Dim>
 class Diff_DGElement : virtual public Element<Dim>
 {
 public:
+	Diff_DGElement() : Element<Dim>() {}
+
 	Diff_DGElement(BigNumber number) : Element<Dim>(number) {}
 
 	double VolumicTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const

@@ -10,6 +10,8 @@ protected:
 	CartesianShape<Dim> _shape;
 	vector<Vertex*> _vertices;
 public:
+	CartesianElement() {}
+
 	CartesianElement(BigNumber number, DomPoint* origin, double width) :
 		Element<Dim>(number),
 		Diff_DGElement<Dim>(number),

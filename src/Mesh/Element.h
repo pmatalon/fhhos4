@@ -38,6 +38,30 @@ public:
 	mutex Mutex;
 	bool IsDeleted = false;
 
+	//-----------------------//
+	//      Constructors     //
+	//-----------------------//
+
+	Element() {}
+
+	// Copy constructor
+	Element(const Element<Dim>& e)
+	{
+		// The default copy constructor doesn't work because the mutex is not a copyable object
+		Id = e.Id;
+		Number = e.Number;
+		PhysicalPart = e.PhysicalPart;
+	}
+
+	// Assignment operator
+	Element<Dim>& operator=(const Element<Dim>& e)
+	{
+		Id = e.Id;
+		Number = e.Number;
+		PhysicalPart = e.PhysicalPart;
+		return *this;
+	}
+
 	Element(BigNumber number)
 	{
 		this->Number = number;

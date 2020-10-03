@@ -3,13 +3,22 @@
 #include <list>
 #include <algorithm>
 #include "Mesh.h"
+#include "2D/TriangularElement.h"
+#include "2D/QuadrilateralElement.h"
 #include "2D/PolygonalElement.h"
+#include "3D/TetrahedralElement.h"
+#include "3D/ParallelepipedElement.h"
 #include "Agglo.h"
 using namespace std;
 
 template <int Dim>
 class PolyhedralMesh : public Mesh<Dim>
 {
+protected:
+	vector<QuadrilateralElement> _quadrilateralElements;
+	vector<TriangularElement> _triangularElements;
+	vector<TetrahedralElement> _tetrahedralElements;
+	vector<ParallelepipedElement> _parallelepipedElements;
 private:
 	double _h = 0;
 	double _regularity = 0;
@@ -1560,6 +1569,16 @@ public:
 				}
 			}
 		}*/
+	}
+
+	virtual ~PolyhedralMesh()
+	{
+		if (_quadrilateralElements.empty() && _triangularElements.empty() && _tetrahedralElements.empty() && _parallelepipedElements.empty())
+		{
+			for (size_t i = 0; i < this->Elements.size(); ++i)
+				delete this->Elements[i];
+			this->Elements.clear();
+		}
 	}
 
 	//-----------------------------------------------//

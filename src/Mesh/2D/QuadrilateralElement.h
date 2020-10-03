@@ -10,12 +10,14 @@ class QuadrilateralElement : public Diff_DGElement<2>, public Diff_HHOElement<2>
 private:
 	Quadrilateral _shape;
 
-	Vertex* _v1;
-	Vertex* _v2;
-	Vertex* _v3;
-	Vertex* _v4;
+	Vertex* _v1 = nullptr;
+	Vertex* _v2 = nullptr;
+	Vertex* _v3 = nullptr;
+	Vertex* _v4 = nullptr;
 
 public:
+	QuadrilateralElement() {}
+
 	QuadrilateralElement(int number, Vertex* v1, Vertex* v2, Vertex* v3, Vertex* v4) :
 		Element(number),
 		Diff_DGElement<2>(number),

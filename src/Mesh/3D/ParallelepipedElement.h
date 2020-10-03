@@ -21,6 +21,8 @@ public:
 	Vertex* FrontRightBottomCorner;
 	Vertex* FrontRightTopCorner;
 
+	ParallelepipedElement() {}
+
 	ParallelepipedElement(int number, Vertex* backLeftBottomCorner, Vertex* frontLeftBottomCorner, Vertex* backRightBottomCorner, Vertex* backLeftTopCorner, Vertex* frontLeftTopCorner, Vertex* backRightTopCorner, Vertex* frontRightBottomCorner, Vertex* frontRightTopCorner) :
 		Element(number), 
 		CartesianElement(number, backLeftBottomCorner, frontLeftBottomCorner->X - backLeftBottomCorner->X, backRightBottomCorner->Y - backLeftBottomCorner->Y, backLeftTopCorner->Z - backLeftBottomCorner->Z)

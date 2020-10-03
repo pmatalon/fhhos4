@@ -22,6 +22,8 @@ private:
 public:
 	static ReferenceTriangle RefTriangle;
 
+	Triangle() {}
+
 	Triangle(const DomPoint& p1, const DomPoint& p2, const DomPoint& p3)
 		: v1(p1), v2(p2), v3(p3)
 	{
