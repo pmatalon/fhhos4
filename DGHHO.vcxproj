@@ -229,6 +229,7 @@
     <ClInclude Include="src\TestCases\TestCase.h" />
     <ClInclude Include="src\TestCases\TestCaseFactory.h" />
     <ClInclude Include="src\Utils\ElementParallelLoop.h" />
+    <ClInclude Include="src\Utils\FileSystem.h" />
     <ClInclude Include="src\Utils\MatlabScript.h" />
     <ClInclude Include="src\Utils\ParallelLoop.h" />
     <ClInclude Include="src\Utils\RotatingList.h" />
@@ -238,6 +239,9 @@
   <ItemGroup>
     <Text Include="CMakeLists.txt" />
     <Text Include="README.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include=".gitignore" />
   </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -263,7 +267,7 @@
       <AdditionalIncludeDirectories>/mnt/c/Users/pierr/Documents/Source/Repos/dghho/eigen-eigen-b3f3d4950030;$(ProjectPublicIncludePath);%(ClCompile.AdditionalIncludeDirectories);/mnt/c/Users/pierr/Documents/Source/Repos/dghho/gmsh-4.4.1-Linux64-sdk/include</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>GMSH_ENABLED;ROOT_PATH="/mnt/c/Users/pierr/Documents/Source/Repos/dghho"</PreprocessorDefinitions>
       <CppLanguageStandard>c++14</CppLanguageStandard>
-      <Optimization>MaxSpeed</Optimization>
+      <Optimization>Full</Optimization>
       <ThreadSafeStatics>Yes</ThreadSafeStatics>
       <RelaxIEEE>false</RelaxIEEE>
     </ClCompile>

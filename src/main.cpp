@@ -290,6 +290,9 @@ void print_usage() {
 	cout << "-not-solve" << endl;
 	cout << "      Do not solve the linear system." << endl;
 	cout << endl;
+	cout << "-no-cache" << endl;
+	cout << "      Do not use the cached meshes." << endl;
+	cout << endl;
 	cout << "-gmsh-log" << endl;
 	cout << "      Enable GMSH to log in the console." << endl;
 	cout << endl;
@@ -353,10 +356,6 @@ int main(int argc, char* argv[])
 	Eigen::initParallel();
 	CGALWrapper::Configure();
 
-	string meshDirectory = Utils::RootPath() + "/data/meshes/";
-	Mesh<2>::MeshDirectory = meshDirectory;
-	Mesh<3>::MeshDirectory = meshDirectory;
-
 	bool defaultCycle = true;
 
 	ProgramArguments args;
@@ -401,6 +400,7 @@ int main(int argc, char* argv[])
 		OPT_Threads,
 		OPT_Export,
 		OPT_DoNotSolve,
+		OPT_NoCache,
 		OPT_UnitTests,
 		OPT_GMSHLog
 	};
@@ -445,6 +445,7 @@ int main(int argc, char* argv[])
 		 { "threads", required_argument, NULL, OPT_Threads },
 		 { "export", required_argument, NULL, OPT_Export },
 		 { "not-solve", no_argument, NULL, OPT_DoNotSolve },
+		 { "no-cache", no_argument, NULL, OPT_NoCache },
 		 { "ut", no_argument, NULL, OPT_UnitTests },
 		 { "gmsh-log", no_argument, NULL, OPT_GMSHLog },
 		 { NULL, 0, NULL, 0 }
@@ -774,6 +775,9 @@ int main(int argc, char* argv[])
 			case OPT_DoNotSolve:
 				args.Actions.SolveLinearSystem = false;
 				break;
+			case OPT_NoCache:
+				args.Actions.UseCache = false;
+				break;
 			case OPT_UnitTests:
 				args.Actions.UnitTests = true;
 				break;
@@ -820,7 +824,7 @@ int main(int argc, char* argv[])
 		if (Utils::IsPredefinedGeometry(args.Problem.GeoCode))
 			args.Problem.TestCaseCode = "default";
 		else
-			args.Problem.TestCaseCode = Utils::FileNameWithoutExtension(args.Problem.GeoCode);
+			args.Problem.TestCaseCode = FileSystem::FileNameWithoutExtension(args.Problem.GeoCode);
 	}
 
 	//------------------------------------------//

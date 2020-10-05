@@ -423,6 +423,9 @@
     <ClInclude Include="src\Geometry\CGALWrapper.h">
       <Filter>Geometry</Filter>
     </ClInclude>
+    <ClInclude Include="src\Utils\FileSystem.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
@@ -492,5 +495,8 @@
   <ItemGroup>
     <Text Include="README.txt" />
     <Text Include="CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include=".gitignore" />
   </ItemGroup>
 </Project>

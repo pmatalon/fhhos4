@@ -37,43 +37,83 @@ protected:
 	BigNumber _N;
 public:
 	static bool GMSHLogEnabled;
+	static bool UseCache;
 
-	GMSHMesh(string geoFile, string description, string fileNamePart, BigNumber n = 0, bool buildMesh = true) 
+	GMSHMesh(string gmshFile, string description, string fileNamePart, BigNumber n = 0, bool buildMesh = true) 
 		: PolyhedralMesh<Dim>()
 	{
 		_description = description;
 		_fileNamePart = fileNamePart;
-		_geometryDescription = Utils::FileNameWithoutExtension(geoFile);
+		_geometryDescription = FileSystem::FileNameWithoutExtension(gmshFile);
+		string extension = FileSystem::Extension(gmshFile);
 
 		_N = n;
 
-		geoFile = SearchFile(geoFile);
-		_gmshFilePath = geoFile;
+		gmshFile = SearchFile(gmshFile);
+		_gmshFilePath = gmshFile;
 
-		bool tmpFileCreated = false;
-		if (n != 0)
-		{
-			geoFile = SetN(geoFile, n);
-			tmpFileCreated = true;
-		}
-
+		// Initialize GMSH
 		gmsh::initialize();
+
+		// Enable the logs from GMSH to be printed in the console
 		if (GMSHLogEnabled)
 		{
 			gmsh::option::setNumber("General.Terminal", 1);
 			gmsh::option::setNumber("General.Verbosity", 99);
 		}
 
-		if (n == 0)
-			cout << "Opening file " << geoFile << endl;
+		bool tmpGeoFileCreated = false;
+		string mshFile;
+		if (extension.compare("geo") == 0)
+		{
+			string mshFileInCache = Mesh<Dim>::CacheDirectory + _geometryDescription + (n == 0 ? "" : "_N" + to_string(n)) + ".msh";
 
-		gmsh::open(geoFile);
+			if (UseCache && FileSystem::FileExists(mshFileInCache))
+			{
+				cout << "Loading file from cache: " << mshFileInCache << endl;
+				gmsh::open(mshFileInCache);
+			}
+			else
+			{
+				if (n != 0)
+				{
+					string tmpGeoFile = SetN(gmshFile, n);
+					tmpGeoFileCreated = true;
+					cout << "Loading file: " << tmpGeoFile << endl;
+					gmsh::open(tmpGeoFile);
+					remove(tmpGeoFile.c_str());
+				}
+				else
+				{
+					cout << "Loading file: " << gmshFile << endl;
+					gmsh::open(gmshFile);
+				}
+
+				// Generate the mesh
+				cout << "Generating the mesh by GMSH..." << endl;
+				gmsh::model::mesh::generate(Dim);
+
+				if (UseCache)
+				{
+					// Write the mesh in cache
+					cout << "Saving the mesh in cache" << endl;
+					FileSystem::CreateDirectoryIfNotExist(Mesh<Dim>::CacheDirectory);
+					gmsh::write(mshFileInCache);
+					if (!FileSystem::FileExists(mshFileInCache))
+						Utils::Error("Failed to write the file " + mshFileInCache);
+				}
+			}
+		}
+		else if (extension.compare("msh") == 0)
+		{
+			cout << "Loading file: " << gmshFile << endl;
+			gmsh::open(gmshFile);
+		}
+		else
+			Utils::FatalError("Unknown file extension: '" + extension + "'. Only .geo and .msh allowed.");
 
 		if (buildMesh)
 			Build();
-
-		if (tmpFileCreated)
-			remove(geoFile.c_str());
 	}
 
 	GMSHMesh(string geoFile, string description, string fileNamePart, string geometryDescription, BigNumber N = 0) :
@@ -93,7 +133,7 @@ protected:
 	}
 
 	// Dim-specific functions
-	virtual Element<Dim>* CreateElement(int elemType, size_t elementTag, const vector<size_t>& elementNodes, size_t elemIndex) { return nullptr; }
+	virtual Element<Dim>* CreateElement(int elemType, const vector<size_t>& elementNodes, size_t elemIndex) { return nullptr; }
 	void CreateFaces(int elemType, BigNumber& faceNumber) { }
 	virtual Face<Dim>* GetBoundaryFaceFromGMSHNodes(int faceType, const vector<size_t>& faceNodes, size_t& faceNodeIndex) { return nullptr; }
 
@@ -116,15 +156,15 @@ public:
 private:
 	static string SearchFile(string geoFile)
 	{
-		if (!Utils::HasExtension(geoFile))
+		if (!FileSystem::HasExtension(geoFile))
 			geoFile += ".geo";
-		if (!Utils::FileExists(geoFile))
+		if (!FileSystem::FileExists(geoFile))
 		{
-			if (Utils::FileExists(Mesh<Dim>::MeshDirectory + geoFile))
+			if (FileSystem::FileExists(Mesh<Dim>::MeshDirectory + geoFile))
 				geoFile = Mesh<Dim>::MeshDirectory + geoFile;
-			else if (Utils::FileExists(Mesh<Dim>::MeshDirectory + "2D/" + geoFile))
+			else if (FileSystem::FileExists(Mesh<Dim>::MeshDirectory + "2D/" + geoFile))
 				geoFile = Mesh<Dim>::MeshDirectory + "2D/" + geoFile;
-			else if (Utils::FileExists(Mesh<Dim>::MeshDirectory + "3D/" + geoFile))
+			else if (FileSystem::FileExists(Mesh<Dim>::MeshDirectory + "3D/" + geoFile))
 				geoFile = Mesh<Dim>::MeshDirectory + "3D/" + geoFile;
 			else
 			{
@@ -140,10 +180,10 @@ private:
 	static string SetN(string geoFile, BigNumber n)
 	{
 		assert(n > 1);
-		string geoFileWithN = Utils::Directory(geoFile) + "/" + Utils::FileNameWithoutExtension(geoFile) + "_tmp_set_N.geo";
+		string geoFileWithN = FileSystem::Directory(geoFile) + "/" + FileSystem::FileNameWithoutExtension(geoFile) + "_N" + to_string(n) + ".tmp.geo";
 		ofstream gmshScriptWithN(geoFileWithN);
 
-		cout << "Opening file " << geoFile << endl;
+		cout << "Opening file: " << geoFile << endl;
 		ifstream gmshScript(geoFile);
 
 		cout << "Setting N = " << n << endl;
@@ -284,8 +324,10 @@ private:
 				NumberParallelLoop<ChunkResult> parallelLoop(elements.size());
 				parallelLoop.Execute([this, elemType, &elements, &elementNodes, &physicalPart](BigNumber j, ParallelChunk<ChunkResult>* chunk)
 					{
-						Element<Dim>* e = CreateElement(elemType, elements[j], elementNodes, j);
+						size_t elementTag = elements[j];
+						Element<Dim>* e = CreateElement(elemType, elementNodes, j);
 
+						e->Id = elementTag;
 						e->PhysicalPart = physicalPart;
 
 						for (Vertex* v : e->Vertices())
@@ -305,7 +347,10 @@ private:
 				parallelLoop.AggregateChunkResults([this](ChunkResult& chunk)
 					{
 						for (Element<Dim>* e : chunk.Elements)
+						{
 							this->AddElement(e, false);
+							_elementExternalNumbers.insert({ e->Id, e });
+						}
 
 						_h          = max(_h,          chunk.h);
 						_regularity = min(_regularity, chunk.regularity);
@@ -758,7 +803,7 @@ public:
 //-------------//
 
 template <>
-Element<2>* GMSHMesh<2>::CreateElement(int elemType, size_t elementTag, const vector<size_t>& elementNodes, size_t elemIndex)
+Element<2>* GMSHMesh<2>::CreateElement(int elemType, const vector<size_t>& elementNodes, size_t elemIndex)
 { 
 	Element<2>* e = nullptr;
 	if (elemType == GMSH_Quadrilateral)
@@ -771,7 +816,6 @@ Element<2>* GMSHMesh<2>::CreateElement(int elemType, size_t elementTag, const ve
 
 		_quadrilateralElements[elemIndex] = QuadrilateralElement(0, GetVertexFromGMSHTag(nodeTag1), GetVertexFromGMSHTag(nodeTag2), GetVertexFromGMSHTag(nodeTag3), GetVertexFromGMSHTag(nodeTag4));
 		e = &_quadrilateralElements[elemIndex];
-		_elementExternalNumbers.insert({ elementTag, e });
 	}
 	else if (elemType == GMSH_Triangle)
 	{
@@ -782,12 +826,9 @@ Element<2>* GMSHMesh<2>::CreateElement(int elemType, size_t elementTag, const ve
 
 		_triangularElements[elemIndex] = TriangularElement(0, GetVertexFromGMSHTag(nodeTag1), GetVertexFromGMSHTag(nodeTag2), GetVertexFromGMSHTag(nodeTag3));
 		e = &_triangularElements[elemIndex];
-		_elementExternalNumbers.insert({ elementTag, e });
 	}
 	else
 		assert(false && "GMSH element type not managed.");
-
-	e->Id = elementTag;
 	return e;
 }
 
@@ -796,7 +837,7 @@ Element<2>* GMSHMesh<2>::CreateElement(int elemType, size_t elementTag, const ve
 //-------------//
 
 template <>
-Element<3>* GMSHMesh<3>::CreateElement(int elemType, size_t elementTag, const vector<size_t>& elementNodes, size_t elemIndex)
+Element<3>* GMSHMesh<3>::CreateElement(int elemType, const vector<size_t>& elementNodes, size_t elemIndex)
 {
 	Element<3>* e = nullptr;
 	if (elemType == GMSH_Tetrahedron)
@@ -809,7 +850,6 @@ Element<3>* GMSHMesh<3>::CreateElement(int elemType, size_t elementTag, const ve
 
 		_tetrahedralElements[elemIndex] = TetrahedralElement(0, GetVertexFromGMSHTag(nodeTag1), GetVertexFromGMSHTag(nodeTag2), GetVertexFromGMSHTag(nodeTag3), GetVertexFromGMSHTag(nodeTag4));
 		e = &_tetrahedralElements[elemIndex];
-		_elementExternalNumbers.insert({ elementTag, e });
 	}
 	else if (elemType == GMSH_Hexahedron && this->FileNamePart().compare("gmsh-cart") == 0)
 	{
@@ -834,12 +874,9 @@ Element<3>* GMSHMesh<3>::CreateElement(int elemType, size_t elementTag, const ve
 
 		_parallelepipedElements[elemIndex] = ParallelepipedElement(0, backLeftBottomCorner, frontLeftBottomCorner, backRightBottomCorner, backLeftTopCorner, frontLeftTopCorner, backRightTopCorner, frontRightBottomCorner, frontRightTopCorner);
 		e = &_parallelepipedElements[elemIndex];
-		_elementExternalNumbers.insert({ elementTag, e });
 	}
 	else
 		assert(false && "GMSH element type not managed.");
-
-	e->Id = elementTag;
 	return e;
 }
 
@@ -1134,3 +1171,10 @@ template <>
 bool GMSHMesh<2>::GMSHLogEnabled = false;
 template <>
 bool GMSHMesh<3>::GMSHLogEnabled = false;
+
+template <>
+bool GMSHMesh<1>::UseCache = true;
+template <>
+bool GMSHMesh<2>::UseCache = true;
+template <>
+bool GMSHMesh<3>::UseCache = true;

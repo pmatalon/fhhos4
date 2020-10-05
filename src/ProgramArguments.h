@@ -63,6 +63,7 @@ struct SolverArguments
 struct ActionsArguments
 {
 	bool SolveLinearSystem = true;
+	bool UseCache = true;
 	bool ExportLinearSystem = false;
 	bool ExportAssemblyTermMatrices = false;
 	bool ExportMeshToMatlab = false;

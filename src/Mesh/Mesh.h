@@ -1,9 +1,9 @@
 #pragma once
-#include <vector>
 #include "Element.h"
 #include "Face.h"
 #include "../Utils/ElementParallelLoop.h"
 #include "../Utils/MatlabScript.h"
+#include "../Utils/FileSystem.h"
 using namespace std;
 
 struct CoarseningStrategyDetails
@@ -83,6 +83,7 @@ public:
 	mutex MutexFaces;
 
 	static string MeshDirectory;
+	static string CacheDirectory;
 
 	Mesh() {}
 
@@ -91,6 +92,12 @@ public:
 	virtual string GeometryDescription() = 0;
 	virtual double H() = 0;
 	virtual double Regularity() = 0;
+
+	static void SetDirectories()
+	{
+		MeshDirectory = FileSystem::RootPath() + "/data/meshes/";
+		CacheDirectory = FileSystem::RootPath() + "/data/cache/";
+	}
 
 	double CoarseningFactor()
 	{
@@ -742,3 +749,5 @@ public:
 
 template <int Dim>
 string Mesh<Dim>::MeshDirectory = "";
+template <int Dim>
+string Mesh<Dim>::CacheDirectory = "";

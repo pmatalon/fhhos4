@@ -5,21 +5,12 @@
 #include "../Geometry/Point.h"
 using namespace std;
 
-#ifndef ROOT_PATH
-#define ROOT_PATH "./"
-#endif // !ROOT_PATH
-
 using RefFunction = function<double(const RefPoint&)>;
 using DomFunction = function<double(const DomPoint&)>;
 
 class Utils
 {
 public:
-	static string RootPath()
-	{
-		return ROOT_PATH;
-	}
-
 	static int Binomial(int n, int p)
 	{
 		if (p != 0 && n != p)
@@ -87,12 +78,6 @@ public:
 		return ss.str();
 	}
 
-	static bool FileExists(string filename)
-	{
-		ifstream ifile(filename);
-		return ifile.good();
-	}
-
 	template <typename T>
 	static inline vector<T> Join(const vector<T>& A, const vector<T>& B)
 	{
@@ -127,28 +112,6 @@ public:
 		auto it = unique(v.begin(), v.end());
 		bool wasUnique = (it == v.end());
 		return !wasUnique;
-	}
-
-	static string FileName(const string& filePath)
-	{
-		return filePath.substr(filePath.find_last_of("/\\") + 1);
-	}
-	static bool HasExtension(const string& filePath)
-	{
-		return filePath.find('.') != string::npos;
-	}
-	static string RemoveExtension(const string& fileName)
-	{
-		string::size_type const p(fileName.find_last_of('.'));
-		return fileName.substr(0, p);
-	}
-	static string FileNameWithoutExtension(const string& filePath)
-	{
-		return RemoveExtension(FileName(filePath));
-	}
-	static string Directory(const string& filePath)
-	{
-		return filePath.substr(0, filePath.find_last_of("/\\"));
 	}
 
 	static vector<string> Explode(const string& stringList, char separator)

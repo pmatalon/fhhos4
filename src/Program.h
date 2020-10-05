@@ -38,6 +38,11 @@ public:
 		cout << "-----------------------------------------------------------" << endl;
 		cout << "-                   Mesh construction                     -" << endl;
 		cout << "-----------------------------------------------------------" << endl;
+
+		Mesh<Dim>::SetDirectories();
+		GMSHMesh<Dim>::GMSHLogEnabled = args.Actions.GMSHLogEnabled;
+		GMSHMesh<Dim>::UseCache = args.Actions.UseCache;
+
 		Mesh<Dim>* mesh = BuildMesh(args);
 
 		if (args.Actions.UnitTests)
@@ -408,7 +413,6 @@ Mesh<1>* ProgramDim<1>::BuildMesh(ProgramArguments& args)
 template <>
 Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 {
-	GMSHMesh<2>::GMSHLogEnabled = args.Actions.GMSHLogEnabled;
 	string geoCode = args.Problem.GeoCode;
 	string mesher = args.Discretization.Mesher;
 	BigNumber n = args.Discretization.N;
@@ -604,7 +608,6 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 template <>
 Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args)
 {
-	GMSHMesh<3>::GMSHLogEnabled = args.Actions.GMSHLogEnabled;
 	string geoCode = args.Problem.GeoCode;
 	string mesher = args.Discretization.Mesher;
 	BigNumber n = args.Discretization.N;
