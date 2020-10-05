@@ -17,6 +17,7 @@ enum GMSHElementTypes
 
 enum GMSHFaceTypes
 {
+	GMSH_SegmentFace,
 	GMSH_TriangleFace = 3,
 	GMSH_QuadrilateralFace = 4
 };
@@ -319,7 +320,7 @@ private:
 				vector<size_t> elements = elementTags[i];
 				vector<size_t> elementNodes = elemNodeTags[i];
 
-				AllocateContiguousMemory(elemType, elements.size());
+				AllocateContiguousMemoryForElements(elemType, elements.size());
 
 				NumberParallelLoop<ChunkResult> parallelLoop(elements.size());
 				parallelLoop.Execute([this, elemType, &elements, &elementNodes, &physicalPart](BigNumber j, ParallelChunk<ChunkResult>* chunk)
@@ -464,8 +465,10 @@ protected:
 		return physicalGroups;
 	}
 
-	void AllocateContiguousMemory(int elemType, BigNumber numberOfElements)
+	void AllocateContiguousMemoryForElements(int elemType, BigNumber numberOfElements)
 	{
+		this->Elements.reserve(numberOfElements);
+
 		if (elemType == GMSH_Quadrilateral)
 			this->_quadrilateralElements = vector<QuadrilateralElement>(numberOfElements);
 		else if (elemType == GMSH_Triangle)
@@ -474,6 +477,18 @@ protected:
 			this->_tetrahedralElements = vector<TetrahedralElement>(numberOfElements);
 		else if (elemType == GMSH_Hexahedron)
 			this->_parallelepipedElements = vector<ParallelepipedElement>(numberOfElements);
+		else
+			Utils::FatalError("GMSH element type not managed.");
+	}
+
+	void AllocateContiguousMemoryForFaces(GMSHFaceTypes faceType, BigNumber numberOfFaces)
+	{
+		this->Faces.reserve(numberOfFaces);
+
+		if (Dim == 2)
+			this->_edgeFaces.reserve(numberOfFaces);
+		else if (faceType == GMSHFaceTypes::GMSH_TriangleFace)
+			this->_triangularFaces.reserve(numberOfFaces);
 		else
 			Utils::FatalError("GMSH element type not managed.");
 	}
@@ -891,6 +906,8 @@ void GMSHMesh<2>::CreateFaces(int elemType, BigNumber& faceNumber)
 	bool onlyPrimaryNodes = true;
 	gmsh::model::mesh::getElementEdgeNodes(elemType, edgeNodes, -1, onlyPrimaryNodes);
 
+	AllocateContiguousMemoryForFaces(GMSHFaceTypes::GMSH_SegmentFace, edgeNodes.size() / 2);
+
 	for (size_t j = 0; j < edgeNodes.size(); j += 2)
 	{
 		MeshVertex<2>* v1 = (MeshVertex<2>*)GetVertexFromGMSHTag(edgeNodes[j]);
@@ -924,13 +941,15 @@ void GMSHMesh<2>::CreateFaces(int elemType, BigNumber& faceNumber)
 		Edge* edge;
 		if (neighbours.size() == 1)
 		{
-			edge = new Edge(faceNumber++, v1, v2, neighbours[0]);
+			this->_edgeFaces.emplace_back(faceNumber++, v1, v2, neighbours[0]);
+			edge = &this->_edgeFaces.back();
 			neighbours[0]->AddFace(edge);
 			this->BoundaryFaces.push_back(edge);
 		}
 		else if (neighbours.size() == 2)
 		{
-			edge = new Edge(faceNumber++, v1, v2, neighbours[0], neighbours[1]);
+			this->_edgeFaces.emplace_back(faceNumber++, v1, v2, neighbours[0], neighbours[1]);
+			edge = &this->_edgeFaces.back();
 			neighbours[0]->AddFace(edge);
 			neighbours[1]->AddFace(edge);
 			this->InteriorFaces.push_back(edge);
@@ -950,7 +969,7 @@ void GMSHMesh<2>::CreateFaces(int elemType, BigNumber& faceNumber)
 template <>
 void GMSHMesh<3>::CreateFaces(int elemType, BigNumber& faceNumber)
 {
-	int faceType = -1;
+	GMSHFaceTypes faceType;
 	int nFaceVertices = -1;
 	if (elemType == GMSHElementTypes::GMSH_Tetrahedron)
 	{
@@ -968,6 +987,8 @@ void GMSHMesh<3>::CreateFaces(int elemType, BigNumber& faceNumber)
 	vector<size_t> faceNodes;
 	bool onlyPrimaryNodes = true;
 	gmsh::model::mesh::getElementFaceNodes(elemType, faceType, faceNodes, -1, onlyPrimaryNodes);
+
+	AllocateContiguousMemoryForFaces(faceType, faceNodes.size() / nFaceVertices);
 
 	for (size_t j = 0; j < faceNodes.size(); j += nFaceVertices)
 	{
@@ -1023,9 +1044,15 @@ void GMSHMesh<3>::CreateFaces(int elemType, BigNumber& faceNumber)
 		if (faceType == GMSHFaceTypes::GMSH_TriangleFace)
 		{
 			if (neighbours.size() == 1)
-				face = new TriangularFace(faceNumber++, vertices[0], vertices[1], vertices[2], neighbours[0]);
+			{
+				this->_triangularFaces.emplace_back(faceNumber++, vertices[0], vertices[1], vertices[2], neighbours[0]);
+				face = &this->_triangularFaces.back();
+			}
 			else if (neighbours.size() == 2)
-				face = new TriangularFace(faceNumber++, vertices[0], vertices[1], vertices[2], neighbours[0], neighbours[1]);
+			{
+				this->_triangularFaces.emplace_back(faceNumber++, vertices[0], vertices[1], vertices[2], neighbours[0], neighbours[1]);
+				face = &this->_triangularFaces.back();
+			}
 			else
 				assert(false);
 		}

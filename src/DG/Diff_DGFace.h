@@ -6,6 +6,8 @@ template <int Dim>
 class Diff_DGFace : virtual public Face<Dim>
 {
 public:
+	Diff_DGFace() {}
+
 	Diff_DGFace(BigNumber number, Element<Dim>* element1, Element<Dim>* element2) : Face<Dim>(number, element1, element2) {}
 
 	virtual double CouplingTerm(Element<Dim>* element1, BasisFunction<Dim>* p_phi1, Element<Dim>* element2, BasisFunction<Dim>* p_phi2)

@@ -19,6 +19,9 @@ protected:
 	vector<TriangularElement> _triangularElements;
 	vector<TetrahedralElement> _tetrahedralElements;
 	vector<ParallelepipedElement> _parallelepipedElements;
+
+	vector<Edge> _edgeFaces;
+	vector<TriangularFace> _triangularFaces;
 private:
 	double _h = 0;
 	double _regularity = 0;
@@ -1578,6 +1581,13 @@ public:
 			for (size_t i = 0; i < this->Elements.size(); ++i)
 				delete this->Elements[i];
 			this->Elements.clear();
+		}
+
+		if (_edgeFaces.empty() && _triangularFaces.empty())
+		{
+			for (size_t i = 0; i < this->Faces.size(); ++i)
+				delete this->Faces[i];
+			this->Faces.clear();
 		}
 	}
 

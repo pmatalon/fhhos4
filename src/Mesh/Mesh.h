@@ -726,10 +726,6 @@ public:
 
 	virtual ~Mesh() 
 	{
-		for (size_t i = 0; i < this->Faces.size(); ++i)
-			delete this->Faces[i];
-		this->Faces.clear();
-
 		if (CoarseMesh)
 			delete CoarseMesh;
 

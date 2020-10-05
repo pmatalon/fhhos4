@@ -12,6 +12,8 @@ private:
 	double _width;
 	DomPoint _center;
 public:
+	Segment() {}
+
 	Segment(const DomPoint& p1, const DomPoint& p2)
 		: PhysicalShapeWithConstantJacobian<1>(), v1(p1), v2(p2)
 	{

@@ -24,6 +24,8 @@ private:
 public:
 	HHOParameters<Dim>* HHO;
 
+	Diff_HHOFace() {}
+
 	Diff_HHOFace(BigNumber number, Element<Dim>* element1, Element<Dim>* element2) : Face<Dim>(number, element1, element2) {}
 
 	void InitHHO(HHOParameters<Dim>* hho)

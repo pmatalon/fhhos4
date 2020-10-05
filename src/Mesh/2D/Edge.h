@@ -7,9 +7,10 @@ class Edge : public Diff_DGFace<2>, public Diff_HHOFace<2>
 {
 private:
 	Segment _shape;
-	Vertex* _v1;
-	Vertex* _v2;
+	Vertex* _v1 = nullptr;
+	Vertex* _v2 = nullptr;
 public:
+	Edge() {}
 
 	Edge(BigNumber number, Vertex* v1, Vertex* v2, Element<2>* element1, Element<2>* element2) :
 		Face(number, element1, element2),

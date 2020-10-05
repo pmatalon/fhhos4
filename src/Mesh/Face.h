@@ -20,7 +20,8 @@ public:
 	mutex Mutex;
 	bool IsDeleted = false;
 public:
-	Face() { assert(false); }
+	Face() {}
+
 	Face(BigNumber number, Element<Dim>* element1, Element<Dim>* element2)
 	{
 		this->Number = number;
@@ -32,6 +33,28 @@ public:
 		:Face(number, element1, nullptr)
 	{
 		this->IsDomainBoundary = true;
+	}
+
+	// Copy constructor
+	Face(const Face<Dim>& f)
+	{
+		// The default copy constructor doesn't work because the mutex is not a copyable object
+		Number = f.Number;
+		IsDomainBoundary = f.IsDomainBoundary;
+		BoundaryPart = f.BoundaryPart;
+		Element1 = f.Element1;
+		Element2 = f.Element2;
+	}
+
+	// Assignment operator
+	Face<Dim>& operator=(const Face<Dim>& f)
+	{
+		Number = f.Number;
+		IsDomainBoundary = f.IsDomainBoundary;
+		BoundaryPart = f.BoundaryPart;
+		Element1 = f.Element1;
+		Element2 = f.Element2;
+		return *this;
 	}
 
 	//-----------------------//
