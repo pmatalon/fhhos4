@@ -27,6 +27,7 @@ add_executable(dghho ${source_files})
 add_definitions(-DROOT_PATH="${CMAKE_SOURCE_DIR}")
 
 # Include CGAL
+set(CGAL_DIR "${CMAKE_SOURCE_DIR}/dependencies/cgal/CGAL-5.1")
 find_package(CGAL)
 target_link_libraries(dghho CGAL::CGAL)
 

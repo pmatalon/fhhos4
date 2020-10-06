@@ -10,6 +10,12 @@
 > spack install cgal
 > spack load cgal 
 
+     ## or install with the sources
+
+> mkdir cgal && cd cgal      # create it wherever you want
+> wget https://github.com/CGAL/cgal/releases/download/v5.1/CGAL-5.1.tar.xz
+> tar xf CGAL-5.1.tar.xz     # the path to CGAL must then be added to the cmake command via -DCGAL_DIR=<path>/cgal/CGAL-5.1
+
 ###############################################################################################
 #### 2. Install GMSH version 4.6 or later (see http://gmsh.info/#Download)
 
