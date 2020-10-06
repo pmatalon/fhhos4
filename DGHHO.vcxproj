@@ -245,7 +245,7 @@
   </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>/mnt/c/Users/pierr/Documents/Source/Repos/dghho/dependencies/eigen/eigen-eigen-b3f3d4950030;$(ProjectPublicIncludePath);%(ClCompile.AdditionalIncludeDirectories);/mnt/c/Users/pierr/Documents/Source/Repos/dghho/gmsh-4.4.1-Linux64-sdk/include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>/mnt/c/Users/pierr/Documents/Source/Repos/dghho/dependencies/eigen/eigen-eigen-b3f3d4950030;$(ProjectPublicIncludePath);%(ClCompile.AdditionalIncludeDirectories);/mnt/c/Users/pierr/Documents/Source/Repos/gmsh/api</AdditionalIncludeDirectories>
       <AdditionalOptions>
       </AdditionalOptions>
       <Verbose>true</Verbose>
@@ -256,7 +256,7 @@
     <Link>
       <AdditionalOptions>-fopenmp %(AdditionalOptions)</AdditionalOptions>
       <LibraryDependencies>gmsh;gmp;gmpxx;mpfr;boost_thread;boost_system;boost_chrono;boost_date_time;boost_atomic</LibraryDependencies>
-      <AdditionalLibraryDirectories>/mnt/c/Users/pierr/Documents/Source/Repos/dghho/gmsh-4.4.1-Linux64-sdk/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>/mnt/c/Users/pierr/Documents/Source/Repos/gmsh/build;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <ShowProgress>false</ShowProgress>
       <VerboseOutput>false</VerboseOutput>
       <Trace>false</Trace>
@@ -264,7 +264,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>/mnt/c/Users/pierr/Documents/Source/Repos/dghho/dependencies/eigen/eigen-eigen-b3f3d4950030;$(ProjectPublicIncludePath);%(ClCompile.AdditionalIncludeDirectories);/mnt/c/Users/pierr/Documents/Source/Repos/dghho/gmsh-4.4.1-Linux64-sdk/include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>/mnt/c/Users/pierr/Documents/Source/Repos/dghho/dependencies/eigen/eigen-eigen-b3f3d4950030;$(ProjectPublicIncludePath);%(ClCompile.AdditionalIncludeDirectories);/mnt/c/Users/pierr/Documents/Source/Repos/gmsh/api</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>GMSH_ENABLED;ROOT_PATH="/mnt/c/Users/pierr/Documents/Source/Repos/dghho"</PreprocessorDefinitions>
       <CppLanguageStandard>c++14</CppLanguageStandard>
       <Optimization>Full</Optimization>
@@ -273,7 +273,7 @@
     </ClCompile>
     <Link>
       <AdditionalOptions>-fopenmp %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalLibraryDirectories>/mnt/c/Users/pierr/Documents/Source/Repos/dghho/gmsh-4.4.1-Linux64-sdk/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>/mnt/c/Users/pierr/Documents/Source/Repos/gmsh/build;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <LibraryDependencies>gmsh;gmp;gmpxx;mpfr;boost_thread;boost_system;boost_chrono;boost_date_time;boost_atomic</LibraryDependencies>
       <NoExecStackRequired>false</NoExecStackRequired>
     </Link>

@@ -1,3 +1,14 @@
+This program depends on the following third-party softwares:
+- Eigen
+- CGAL (version 5.0 or later)
+- GMSH (version 4.6 or later)
+
+Eigen and CGAL are header-only libraries, they are shipped with this code and shall be compiled simultaneously with the program.
+So without the need for a specific version of those libraries, you have nothing to do. You can then skip step 1.
+Only GMSH is to be installed. To do so, follow step 2.
+Finally, build the program following step 3.
+
+
 ###############################################################################################
 #### 1. Install CGAL version 5.0 or later (see https://doc.cgal.org/latest/Manual/usage.html)
 
@@ -24,15 +35,15 @@
 > tar zxvf gmsh-4.6.0-source.tgz
 > cd gmsh-4.6.0-source/
 > mkdir build && cd build
-> cmake -DENABLE_BUILD_DYNAMIC=1 .. # if issue with cgns, add option -DENABLE_CGNS=0 
+> cmake -DENABLE_BUILD_DYNAMIC=1 ..       # if issue with cgns, add option -DENABLE_CGNS=0 
 > make
 
 ###############################################################################################
 #### 3. Use CMake to build dghho
 
-> cd <path/to/dghho>
+> cd <path-to-dghho>
 > mkdir build && cd build
-> cmake -DCMAKE_BUILD_TYPE=Release ..    # add -G "Unix Makefiles" if necessary
+> cmake -DCMAKE_BUILD_TYPE=Release -DGMSH_API=<path-to-gmsh>/api -DGMSH_LIB=<path-to-gmsh>/build/libgmsh.so ..
 > make
 
 ###############################################################################################
