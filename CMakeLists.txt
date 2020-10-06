@@ -31,7 +31,7 @@ find_package(CGAL)
 target_link_libraries(dghho CGAL::CGAL)
 
 # Include Eigen
-include_directories(eigen-eigen-b3f3d4950030)
+include_directories(dependencies/eigen/eigen-eigen-b3f3d4950030)
 
 # Include GMSH
 if (ENABLE_GMSH)
