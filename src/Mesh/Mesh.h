@@ -724,6 +724,11 @@ public:
 		this->ComesFrom = CoarseningStrategyDetails(CoarseningStrategy::None);
 	}
 
+	virtual void SetOverlappingFineElements()
+	{
+		assert(false);
+	}
+
 	virtual ~Mesh() 
 	{
 		if (CoarseMesh)

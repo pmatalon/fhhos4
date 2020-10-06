@@ -42,12 +42,16 @@ public:
 
 	Polygon(const Polygon& shape) = default;
 
-private:
 	Polygon(const CGAL::Polygon_2<chosenKernel>& cgalPolygon, bool createTriangulationAndBoundingBox)
 		: _cgalPolygon(cgalPolygon)
 	{
 		_vertices = CGALWrapper::ToVertices(cgalPolygon);
 		Init(createTriangulationAndBoundingBox);
+	}
+
+	const CGAL::Polygon_2<chosenKernel>& CGALPolygon() const
+	{
+		return _cgalPolygon;
 	}
 
 private:
@@ -304,72 +308,7 @@ public:
 		}
 	}*/
 
-	vector<PhysicalShape<2>*> IntersectionWith(const PhysicalShape<2>* other) const override
-	{
-		// Compute the intersection
-		vector<PhysicalShape<2>*> intersection;
-		list<CGAL::Polygon_with_holes_2<exactKernel>> intersectionPolygons;
-		const Polygon* otherPolygon = dynamic_cast<const Polygon*>(other);
-		try
-		{
-			if (otherPolygon)
-				CGAL::intersection(_cgalPolygon, otherPolygon->_cgalPolygon, back_inserter(intersectionPolygons));
-			else
-			{
-				auto otherShape = CGALWrapper::CreatePolygon<exactKernel>(other->Vertices());
-				CGAL::intersection(_cgalPolygon, otherShape, back_inserter(intersectionPolygons));
-			}
-		}
-		catch (CGAL::Failure_exception e)
-		{
-			cout << endl;
-			ExportCGALPolyToMatlab();
-			if (otherPolygon)
-				ExportCGALPolyToMatlab(otherPolygon->_cgalPolygon);
-			Utils::FatalError("CGAL failed to compute the intersection between the two above polygons: " + e.message());
-		}
-
-		// The intersection can be made of multiple polygons
-		for (auto cgalPolyWithHoles : intersectionPolygons)
-		{
-			CGAL::Polygon_2<chosenKernel> cgalPoly = cgalPolyWithHoles.outer_boundary();
-
-			if (cgalPoly.area() < Utils::NumericalZero * this->Measure())
-				continue; // the intersection is the interface
-
-			if (!cgalPoly.is_simple())
-			{
-				/*cout << "% Poly 1" << endl;
-				this->ExportToMatlab("r");
-				cout << "% Poly 2" << endl;
-				other->ExportToMatlab("b");
-				cout << "% Intersection" << endl;
-				ExportCGALPolyToMatlab(cgalPoly, "m");*/
-
-				vector<CGAL::Polygon_2<chosenKernel>> simplePolys = CGALWrapper::ToSimplePolygons(cgalPoly);
-				for (auto sp : simplePolys)
-				{
-					if (sp.area() < Utils::NumericalZero * this->Measure())
-						continue;
-
-					//cout << "% Simple poly" << endl;
-					//ExportCGALPolyToMatlab(sp, "g");
-
-					Polygon* intersectionPolygon = new Polygon(sp, true);
-					intersection.push_back(intersectionPolygon);
-				}
-				//Utils::Warning("Intersection polygon is not simple.");
-			}
-			else
-			{
-				Polygon* intersectionPolygon = new Polygon(cgalPoly, true);
-				intersection.push_back(intersectionPolygon);
-			}
-		}
-		return intersection;
-	}
-
-
+	
 public:
 	virtual PhysicalShape<2>* CreateCopy() const override
 	{

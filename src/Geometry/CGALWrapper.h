@@ -179,4 +179,61 @@ public:
 
 		return simplePolys;
 	}
+
+	template <typename CGALKernel>
+	static vector<CGAL::Polygon_2<CGALKernel>> Intersection(const CGAL::Polygon_2<CGALKernel>& poly1, const CGAL::Polygon_2<CGALKernel>& poly2)
+	{
+		// Compute the intersection
+		vector<CGAL::Polygon_2<CGALKernel>> intersection;
+		list<CGAL::Polygon_with_holes_2<exactKernel>> intersectionPolygons;
+		try
+		{
+			CGAL::intersection(poly1, poly2, back_inserter(intersectionPolygons));
+		}
+		catch (CGAL::Failure_exception e)
+		{
+			/*cout << endl;
+			ExportCGALPolyToMatlab();
+			if (otherPolygon)
+				ExportCGALPolyToMatlab(otherPolygon->_cgalPolygon);*/
+			Utils::FatalError("CGAL failed to compute the intersection between the two above polygons: " + e.message());
+		}
+
+		// The intersection can be made of multiple polygons
+		for (auto polyWithHoles : intersectionPolygons)
+		{
+			CGAL::Polygon_2<CGALKernel> p = polyWithHoles.outer_boundary();
+
+			if (p.area() < Utils::NumericalZero * poly1.area())
+				continue; // the intersection is the interface
+
+			if (!p.is_simple())
+			{
+				/*cout << "% Poly 1" << endl;
+				this->ExportToMatlab("r");
+				cout << "% Poly 2" << endl;
+				other->ExportToMatlab("b");
+				cout << "% Intersection" << endl;
+				ExportCGALPolyToMatlab(cgalPoly, "m");*/
+
+				vector<CGAL::Polygon_2<CGALKernel>> simplePolys = CGALWrapper::ToSimplePolygons(p);
+				for (auto sp : simplePolys)
+				{
+					if (sp.area() < Utils::NumericalZero * poly1.area())
+						continue;
+
+					//cout << "% Simple poly" << endl;
+					//ExportCGALPolyToMatlab(sp, "g");
+
+					intersection.push_back(sp);
+				}
+				//Utils::Warning("Intersection polygon is not simple.");
+			}
+			else
+			{
+				intersection.push_back(p);
+			}
+		}
+		return intersection;
+	}
 };

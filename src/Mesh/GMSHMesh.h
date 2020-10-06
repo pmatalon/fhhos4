@@ -648,8 +648,11 @@ private:
 						continue;
 					for (Element<Dim>* fe : neighbour->FinerElements)
 					{
-						if (!coarse->IntersectionWith(fe).empty())
+						if (!PolyhedralMesh<Dim>::Intersection(coarse, fe).empty())
+						{
 							coarse->FinerElements.push_back(fe);
+							break;
+						}
 					}
 				}
 				assert(!coarse->FinerElements.empty());

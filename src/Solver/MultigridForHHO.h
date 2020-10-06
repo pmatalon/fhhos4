@@ -180,17 +180,7 @@ private:
 			// Step 3: Trace on the fine faces.                                    //
 			//---------------------------------------------------------------------//
 
-			CoarseningStrategy stgy = coarsePb->_mesh->ComesFrom.CS;
-			if (stgy == CoarseningStrategy::None)
-				stgy = finePb->_mesh->ComesFrom.CS;
-
-			// SetOverlappingFineElements
-			ElementParallelLoop<Dim> parallelLoop2(coarsePb->_mesh->Elements);
-			parallelLoop2.Execute([stgy](Element<Dim>* ce)
-				{
-					ce->SetOverlappingFineElements(stgy);
-					ce->InitOverlappingElementsLocalNumbering();
-				});
+			coarsePb->_mesh->SetOverlappingFineElements();
 
 			SparseMatrix I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
 			SparseMatrix L2Proj = GetGlobalL2ProjectionMatrixCoarseToFineElements();

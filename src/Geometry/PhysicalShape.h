@@ -59,11 +59,6 @@ public:
 		assert(false);
 	}
 
-	virtual vector<PhysicalShape<Dim>*> IntersectionWith(const PhysicalShape<Dim>* other) const
-	{
-		assert(false);
-	}
-
 	virtual void ExportToMatlab(string color = "r") const
 	{
 		assert(false && "To be implemented in the subclass");

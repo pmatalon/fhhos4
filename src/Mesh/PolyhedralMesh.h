@@ -1545,6 +1545,94 @@ private:
 	}
 
 public:
+	void SetOverlappingFineElements() override
+	{
+		CoarseningStrategy stgy = this->ComesFrom.CS;
+		if (stgy == CoarseningStrategy::None)
+			stgy = this->FineMesh->ComesFrom.CS;
+
+		ElementParallelLoop<Dim> parallelLoop(this->Elements);
+		parallelLoop.Execute([stgy](Element<Dim>* ce)
+			{
+				SetOverlappingFineElements(ce, stgy);
+				ce->InitOverlappingElementsLocalNumbering();
+			});
+	}
+
+private:
+	static void SetOverlappingFineElements(Element<Dim>* ce, CoarseningStrategy stgy)
+	{
+		set<Element<Dim>*> tested;
+		double overlappingMeasure = 0;
+		bool stop = false;
+		for (auto fe : ce->FinerElements)
+		{
+			assert(fe->PhysicalPart == ce->PhysicalPart);
+			CheckOverlapping(ce, fe, tested, overlappingMeasure, stop);
+		}
+
+		if (stop)
+			return;
+
+		if (!Utils::BuildsNestedMeshHierarchy(stgy))
+		{
+			for (Element<Dim>* neighbour : ce->VertexNeighbours())
+			{
+				for (auto fe1 : neighbour->FinerElements)
+				{
+					CheckOverlapping(ce, fe1, tested, overlappingMeasure, stop);
+					if (stop)
+						return;
+					for (Element<Dim>* fe2 : fe1->VertexNeighbours())
+					{
+						CheckOverlapping(ce, fe2, tested, overlappingMeasure, stop);
+						if (stop)
+							return;
+						for (Element<Dim>* fe3 : fe2->VertexNeighbours())
+						{
+							CheckOverlapping(ce, fe3, tested, overlappingMeasure, stop);
+							if (stop)
+								return;
+						}
+					}
+				}
+			}
+		}
+
+		Utils::FatalError("error in the computation of the overlapping elements: a coarse element is not fully overlapped by finer ones.");
+	}
+
+	static void CheckOverlapping(Element<Dim>* ce, Element<Dim>* fe, set<Element<Dim>*>& tested, double& overlappingMeasure, bool& stop)
+	{
+		if (ce->IsInSamePhysicalPartAs(fe) && tested.find(fe) == tested.end())
+		{
+			vector<PhysicalShape<Dim>*> intersection = Intersection(ce, fe);
+			if (!intersection.empty())
+			{
+				ce->OverlappingFineElements.insert({ fe , intersection });
+				for (PhysicalShape<Dim>* intersec : intersection)
+					overlappingMeasure += intersec->Measure();
+				if (abs(overlappingMeasure - ce->Measure()) < Utils::Eps * ce->Measure())
+					stop = true;
+			}
+		}
+		tested.insert(fe);
+	}
+
+private:
+	static CGAL::Polygon_2<exactKernel> ConvertToCGALPolygon(Element<Dim>* e)
+	{
+		assert(Dim == 2);
+		CGAL::Polygon_2<exactKernel> cgalPoly;
+		const Polygon* poly = dynamic_cast<const Polygon*>(e->Shape());
+		if (poly)
+			cgalPoly = poly->CGALPolygon();
+		else
+			cgalPoly = CGALWrapper::CreatePolygon<exactKernel>(e->Shape()->Vertices());
+		return cgalPoly;
+	}
+
+public:
 	virtual void SanityCheck() override
 	{
 		Mesh<Dim>::SanityCheck();
@@ -1597,6 +1685,7 @@ public:
 	Element<Dim>* CreatePolyhedron(vector<Vertex*> vertices) { return nullptr; }
 	Element<Dim>* CreateMacroElement(Element<Dim>* e1, Element<Dim>* e2, const vector<Face<Dim>*>& facesToRemove) { return nullptr; }
 	Face<Dim>* CreateMacroFace(Face<Dim>* f1, Face<Dim>* f2, Vertex* vertexToRemove) { return nullptr; }
+	static vector<PhysicalShape<Dim>*> Intersection(Element<Dim>* e1, Element<Dim>* e2) { assert(false); }
 	void FaceCoarsening() { assert(false); };
 };
 
@@ -1643,6 +1732,20 @@ Face<3>* PolyhedralMesh<3>::CreateMacroFace(Face<3>* f1, Face<3>* f2, Vertex* ve
 {
 	Utils::FatalError("Not implemented in 3D.");
 	return nullptr;
+}
+
+template<>
+vector<PhysicalShape<2>*> PolyhedralMesh<2>::Intersection(Element<2>* e1, Element<2>* e2)
+{
+	CGAL::Polygon_2<exactKernel> cgalPoly1 = ConvertToCGALPolygon(e1);
+	CGAL::Polygon_2<exactKernel> cgalPoly2 = ConvertToCGALPolygon(e2);
+
+	vector<CGAL::Polygon_2<exactKernel>> inters = CGALWrapper::Intersection(cgalPoly1, cgalPoly2);
+
+	vector<PhysicalShape<2>*> intersectionPolygons;
+	for (const CGAL::Polygon_2<exactKernel>& p : inters)
+		intersectionPolygons.push_back(new Polygon(p, true));
+	return intersectionPolygons;
 }
 
 template <>
