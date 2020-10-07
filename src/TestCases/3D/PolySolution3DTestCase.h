@@ -1,6 +1,6 @@
 #pragma once
 #include "../TestCase.h"
-#include "../../Mesh/3D/CubeGeometry.h"
+#include "../../Mesher/CubeGeometry.h"
 using namespace std;
 
 class PolySolution3DTestCase : public TestCase<3>

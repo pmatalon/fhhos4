@@ -1,6 +1,6 @@
 #pragma once
-#include "../GMSHMesh.h"
-#include "TetrahedralMesh.h"
+#include "GMSHMesh.h"
+#include "../../Mesh/3D/TetrahedralMesh.h"
 using namespace std;
 
 class GMSHTetrahedralMesh : public GMSHMesh<3>, public TetrahedralMesh

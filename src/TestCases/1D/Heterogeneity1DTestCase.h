@@ -1,6 +1,6 @@
 #pragma once
 #include "../TestCase.h"
-#include "../../Mesh/1D/SegmentGeometry.h"
+#include "../../Mesher/SegmentGeometry.h"
 using namespace std;
 
 class Heterogeneity1DTestCase : public TestCase<1>

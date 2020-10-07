@@ -1,8 +1,8 @@
 #pragma once
-#include "../PolyhedralMesh.h"
-#include "RectangularPolygonalElement.h"
-#include "SquareGeometry.h"
-#include "Square4quadrantsGeometry.h"
+#include "../../Mesh/PolyhedralMesh.h"
+#include "../../Mesh/2D/RectangularPolygonalElement.h"
+#include "../SquareGeometry.h"
+#include "../Square4quadrantsGeometry.h"
 using namespace std;
 
 class Square_CartesianPolygonalMesh : public PolyhedralMesh<2>

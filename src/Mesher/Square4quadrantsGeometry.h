@@ -1,5 +1,5 @@
 #pragma once
-#include "../../Problem/DiffusionField.h"
+#include "../Problem/DiffusionField.h"
 using namespace std;
 
 class Square4quadrantsGeometry

@@ -1,8 +1,8 @@
 #pragma once
-#include "../Mesh.h"
-#include "Interval.h"
-#include "InterfacePoint.h"
-#include "SegmentGeometry.h"
+#include "../../Mesh/Mesh.h"
+#include "../../Mesh/1D/Interval.h"
+#include "../../Mesh/1D/InterfacePoint.h"
+#include "../SegmentGeometry.h"
 
 class UniformMesh1D : public Mesh<1>
 {

@@ -1,9 +1,9 @@
 #pragma once
 #include <vector>
-#include "ParallelepipedElement.h"
-#include "RectangularFace.h"
-#include "../Mesh.h"
-#include "CubeGeometry.h"
+#include "../../Mesh/3D/ParallelepipedElement.h"
+#include "../../Mesh/3D/RectangularFace.h"
+#include "../../Mesh/Mesh.h"
+#include "../CubeGeometry.h"
 
 using namespace std;
 

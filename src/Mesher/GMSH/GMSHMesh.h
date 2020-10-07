@@ -1,7 +1,7 @@
 #pragma once
 #include <gmsh.h>
-#include "PolyhedralMesh.h"
-#include "2D/Square_TriangularMesh.h"
+#include "../../Mesh/PolyhedralMesh.h"
+#include "../InHouse/Square_TriangularMesh.h"
 using namespace std;
 
 enum GMSHElementTypes

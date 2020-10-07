@@ -1,12 +1,12 @@
 #pragma once
 #include <vector>
-#include "RectangularElement.h"
-#include "RectangularPolygonalElement.h"
+#include "../../Mesh/2D/RectangularElement.h"
+#include "../../Mesh/2D/RectangularPolygonalElement.h"
 #include "Square_CartesianPolygonalMesh.h"
-#include "CartesianEdge.h"
-#include "../PolyhedralMesh.h"
-#include "SquareGeometry.h"
-#include "Square4quadrantsGeometry.h"
+#include "../../Mesh/2D/CartesianEdge.h"
+#include "../../Mesh/PolyhedralMesh.h"
+#include "../SquareGeometry.h"
+#include "../Square4quadrantsGeometry.h"
 using namespace std;
 
 class Square_CartesianMesh : public PolyhedralMesh<2>

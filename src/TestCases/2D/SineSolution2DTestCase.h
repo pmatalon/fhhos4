@@ -1,7 +1,7 @@
 #pragma once
 #include "../TestCase.h"
-#include "../../Mesh/2D/SquareGeometry.h"
-#include "../../Mesh/2D/Square4quadrantsGeometry.h"
+#include "../../Mesher/SquareGeometry.h"
+#include "../../Mesher/Square4quadrantsGeometry.h"
 using namespace std;
 
 class SineSolution2DTestCase : public TestCase<2>

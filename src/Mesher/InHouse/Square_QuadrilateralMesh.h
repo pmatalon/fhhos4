@@ -1,17 +1,19 @@
 #pragma once
-#include "PolygonalElement.h"
-#include "../PolyhedralMesh.h"
+#include "../../Mesh/2D/QuadrilateralElement.h"
+#include "../../Mesh/PolyhedralMesh.h"
 using namespace std;
 
-class Square_QuadrilateralAsPolygonalMesh : public PolyhedralMesh<2>
+class Square_QuadrilateralMesh : public PolyhedralMesh<2>
 {
 public:
 	BigNumber Nx;
 	BigNumber Ny;
+	double XShift;
 
-	Square_QuadrilateralAsPolygonalMesh(BigNumber nx, BigNumber ny, double xShiftAsFraction) : PolyhedralMesh()
+	Square_QuadrilateralMesh(BigNumber nx, BigNumber ny, double xShiftAsFraction) : PolyhedralMesh()
 	{
-		// nx = ny falls down to square elements
+		this->XShift = xShiftAsFraction;
+
 		this->Nx = nx;
 		this->Ny = ny;
 
@@ -54,9 +56,8 @@ public:
 				Vertex* topLeftCorner     = Vertices[indexV(ix,     iy + 1)];
 				Vertex* topRightCorner    = Vertices[indexV(ix + 1, iy + 1)];
 				Vertex* bottomRightCorner = Vertices[indexV(ix + 1, iy    )];
-				vector<Vertex*> vertices = { bottomLeftCorner, bottomRightCorner, topRightCorner, topLeftCorner };
-				PolygonalElement* p = new PolygonalElement(number, vertices);
-				this->Elements.push_back(p);
+				QuadrilateralElement* quad = new QuadrilateralElement(number, bottomLeftCorner, bottomRightCorner, topRightCorner, topLeftCorner);
+				this->Elements.push_back(quad);
 			}
 		}
 
@@ -70,47 +71,47 @@ public:
 		for (BigNumber ix = 0; ix < nx; ++ix)
 		{
 			// South boundary
-			PolygonalElement* p = dynamic_cast<PolygonalElement*>(this->Elements[index(ix, 0)]);
-			Edge* southBoundary = new Edge(numberInterface++, p->Vertices()[0], p->Vertices()[1], p);
+			QuadrilateralElement* quad = dynamic_cast<QuadrilateralElement*>(this->Elements[index(ix, 0)]);
+			Edge* southBoundary = new Edge(numberInterface++, quad->V1(), quad->V2(), quad);
 			this->Faces.push_back(southBoundary);
 			this->BoundaryFaces.push_back(southBoundary);
-			p->AddFace(southBoundary);
+			quad->AddFace(southBoundary);
 
 			// North boundary
-			p = dynamic_cast<PolygonalElement*>(this->Elements[index(ix, ny - 1)]);
-			Edge* northBoundary = new Edge(numberInterface++, p->Vertices()[3], p->Vertices()[2], p);
+			quad = dynamic_cast<QuadrilateralElement*>(this->Elements[index(ix, ny - 1)]);
+			Edge* northBoundary = new Edge(numberInterface++, quad->V4(), quad->V3(), quad);
 			this->Faces.push_back(northBoundary);
 			this->BoundaryFaces.push_back(northBoundary);
-			p->AddFace(northBoundary);
+			quad->AddFace(northBoundary);
 		}
 
 		for (BigNumber iy = 0; iy < ny; ++iy)
 		{
 			// West boundary
-			PolygonalElement* p = dynamic_cast<PolygonalElement*>(this->Elements[index(0, iy)]);
-			Edge* westBoundary = new Edge(numberInterface++, p->Vertices()[0], p->Vertices()[3], p);
+			QuadrilateralElement* quad = dynamic_cast<QuadrilateralElement*>(this->Elements[index(0, iy)]);
+			Edge* westBoundary = new Edge(numberInterface++, quad->V1(), quad->V4(), quad);
 			this->Faces.push_back(westBoundary);
 			this->BoundaryFaces.push_back(westBoundary);
-			p->AddFace(westBoundary);
+			quad->AddFace(westBoundary);
 
 			// East boundary
-			p = dynamic_cast<PolygonalElement*>(this->Elements[index(nx-1, iy)]);
-			Edge* eastBoundary = new Edge(numberInterface++, p->Vertices()[1], p->Vertices()[2], p);
+			quad = dynamic_cast<QuadrilateralElement*>(this->Elements[index(nx-1, iy)]);
+			Edge* eastBoundary = new Edge(numberInterface++, quad->V2(), quad->V3(), quad);
 			this->Faces.push_back(eastBoundary);
 			this->BoundaryFaces.push_back(eastBoundary);
-			p->AddFace(eastBoundary);
+			quad->AddFace(eastBoundary);
 		}
 
 		for (BigNumber iy = 0; iy < ny; iy++)
 		{
 			for (BigNumber ix = 0; ix < nx; ix++)
 			{
-				PolygonalElement* element = dynamic_cast<PolygonalElement*>(this->Elements[index(ix, iy)]);
+				QuadrilateralElement* element = dynamic_cast<QuadrilateralElement*>(this->Elements[index(ix, iy)]);
 				if (ix != nx - 1)
 				{
 					// East
-					PolygonalElement* eastNeighbour = dynamic_cast<PolygonalElement*>(this->Elements[index(ix + 1, iy)]);
-					Edge* interface = new Edge(numberInterface++, eastNeighbour->Vertices()[0], eastNeighbour->Vertices()[3], element, eastNeighbour);
+					QuadrilateralElement* eastNeighbour = dynamic_cast<QuadrilateralElement*>(this->Elements[index(ix + 1, iy)]);
+					Edge* interface = new Edge(numberInterface++, eastNeighbour->V1(), eastNeighbour->V4(), element, eastNeighbour);
 					this->Faces.push_back(interface);
 					this->InteriorFaces.push_back(interface);
 					element->AddFace(interface);
@@ -119,8 +120,8 @@ public:
 				if (iy != ny - 1)
 				{
 					// North
-					PolygonalElement* northNeighbour = dynamic_cast<PolygonalElement*>(this->Elements[index(ix, iy + 1)]);
-					Edge* interface = new Edge(numberInterface++, northNeighbour->Vertices()[0], northNeighbour->Vertices()[1], element, northNeighbour);
+					QuadrilateralElement* northNeighbour = dynamic_cast<QuadrilateralElement*>(this->Elements[index(ix, iy + 1)]);
+					Edge* interface = new Edge(numberInterface++, northNeighbour->V1(), northNeighbour->V2(), element, northNeighbour);
 					this->Faces.push_back(interface);
 					this->InteriorFaces.push_back(interface);
 					element->AddFace(interface);
@@ -144,11 +145,11 @@ private:
 public:
 	string Description() override
 	{
-		return "Quadrilaterals as polygons " + to_string(this->Nx) + " x " + to_string(this->Ny);
+		return "Quadrilateral " + to_string(this->Nx) + " x " + to_string(this->Ny);
 	}
 	string FileNamePart() override
 	{
-		return "square-quad-poly-n" + to_string(this->Nx);
+		return "square-quad-n" + to_string(this->Nx);
 	}
 	string GeometryDescription() override
 	{

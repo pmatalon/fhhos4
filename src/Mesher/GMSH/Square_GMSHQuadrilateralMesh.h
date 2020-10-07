@@ -1,12 +1,12 @@
 #pragma once
-#include "../GMSHMesh.h"
+#include "GMSHMesh.h"
 using namespace std;
 
-class Square_GMSHCartesianMesh : public GMSHMesh<2>
+class Square_GMSHQuadrilateralMesh : public GMSHMesh<2>
 {
 public:
-	Square_GMSHCartesianMesh(BigNumber n) :
-		GMSHMesh("2D/square_cart.geo", "GMSH Cartesian", "square-gmsh-cart", "Square", n)
+	Square_GMSHQuadrilateralMesh(BigNumber n) : 
+		GMSHMesh("2D/square_quad.geo", "GMSH quadrilateral", "square-gmsh-quad", "Square", n)
 	{}
 
 	void RefineMeshBySplitting() override

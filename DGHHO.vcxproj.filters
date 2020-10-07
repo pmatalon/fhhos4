@@ -152,53 +152,11 @@
     <ClInclude Include="src\Mesh\PolyhedralMesh.h">
       <Filter>Mesh</Filter>
     </ClInclude>
-    <ClInclude Include="src\Mesh\GMSHMesh.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
     <ClInclude Include="src\Mesh\3D\TriangularFace.h">
       <Filter>Mesh\3D</Filter>
     </ClInclude>
     <ClInclude Include="src\ProgramArguments.h" />
     <ClInclude Include="src\Mesh\3D\TetrahedralMesh.h">
-      <Filter>Mesh\3D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\1D\UniformMesh1D.h">
-      <Filter>Mesh\1D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\2D\Square_GMSHTriangularMesh.h">
-      <Filter>Mesh\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\2D\Square_QuadrilateralAsPolygonalMesh.h">
-      <Filter>Mesh\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\2D\Square_QuadrilateralMesh.h">
-      <Filter>Mesh\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\2D\Square_TriangularMesh.h">
-      <Filter>Mesh\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\3D\Cube_CartesianTetrahedralMesh.h">
-      <Filter>Mesh\3D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\3D\Cube_GMSHTetrahedralMesh.h">
-      <Filter>Mesh\3D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\2D\Square_CartesianMesh.h">
-      <Filter>Mesh\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\2D\Square_CartesianPolygonalMesh.h">
-      <Filter>Mesh\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\2D\Square_GMSHCartesianMesh.h">
-      <Filter>Mesh\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\3D\Cube_CartesianMesh.h">
-      <Filter>Mesh\3D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\3D\Cube_GMSHCartesianMesh.h">
-      <Filter>Mesh\3D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\3D\GMSHTetrahedralMesh.h">
       <Filter>Mesh\3D</Filter>
     </ClInclude>
     <ClInclude Include="src\Solver\FlexibleConjugateGradient.h">
@@ -230,12 +188,6 @@
     </ClInclude>
     <ClInclude Include="src\Utils\MatlabScript.h">
       <Filter>Utils</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\2D\Square4quadrants_GMSHUnstructTriangularMesh.h">
-      <Filter>Mesh\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\2D\Square_GMSHUnstructTriangularMesh.h">
-      <Filter>Mesh\2D</Filter>
     </ClInclude>
     <ClInclude Include="src\Mesh\Interface.h">
       <Filter>Mesh</Filter>
@@ -324,23 +276,8 @@
     <ClInclude Include="src\QuadratureRules\GaussLegendre\GaussLegendre.h">
       <Filter>QuadratureRules\GaussLegendre</Filter>
     </ClInclude>
-    <ClInclude Include="src\Mesh\2D\Square4quadrants_GMSHCartesianMesh.h">
-      <Filter>Mesh\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\2D\Square4quadrants_GMSHTriangularMesh.h">
-      <Filter>Mesh\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\AllMeshes.h">
-      <Filter>Mesh</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\2D\Square4quadrants_GMSHQuadrilateralMesh.h">
-      <Filter>Mesh\2D</Filter>
-    </ClInclude>
     <ClInclude Include="src\Solver\AllSolvers.h">
       <Filter>Solver</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\2D\Square_GMSHQuadrilateralMesh.h">
-      <Filter>Mesh\2D</Filter>
     </ClInclude>
     <ClInclude Include="src\Mesh\PhysicalGroup.h">
       <Filter>Mesh</Filter>
@@ -396,18 +333,6 @@
     <ClInclude Include="src\TestCases\2D\BarWith4HolesTestCase.h">
       <Filter>TestCases\2D</Filter>
     </ClInclude>
-    <ClInclude Include="src\Mesh\2D\SquareGeometry.h">
-      <Filter>Mesh\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\2D\Square4quadrantsGeometry.h">
-      <Filter>Mesh\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\1D\SegmentGeometry.h">
-      <Filter>Mesh\1D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mesh\3D\CubeGeometry.h">
-      <Filter>Mesh\3D</Filter>
-    </ClInclude>
     <ClInclude Include="src\TestCases\2D\SquareCircleTestCase.h">
       <Filter>TestCases\2D</Filter>
     </ClInclude>
@@ -425,6 +350,81 @@
     </ClInclude>
     <ClInclude Include="src\Utils\FileSystem.h">
       <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesher\AllMeshes.h">
+      <Filter>Mesher</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesher\CubeGeometry.h">
+      <Filter>Mesher</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesher\SegmentGeometry.h">
+      <Filter>Mesher</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesher\Square4quadrantsGeometry.h">
+      <Filter>Mesher</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesher\SquareGeometry.h">
+      <Filter>Mesher</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesher\GMSH\Square_GMSHCartesianMesh.h">
+      <Filter>Mesher\GMSH</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesher\GMSH\Square_GMSHQuadrilateralMesh.h">
+      <Filter>Mesher\GMSH</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesher\GMSH\Square_GMSHTriangularMesh.h">
+      <Filter>Mesher\GMSH</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesher\GMSH\Square_GMSHUnstructTriangularMesh.h">
+      <Filter>Mesher\GMSH</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesher\GMSH\Square4quadrants_GMSHCartesianMesh.h">
+      <Filter>Mesher\GMSH</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesher\GMSH\Square4quadrants_GMSHQuadrilateralMesh.h">
+      <Filter>Mesher\GMSH</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesher\GMSH\Square4quadrants_GMSHTriangularMesh.h">
+      <Filter>Mesher\GMSH</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesher\GMSH\Square4quadrants_GMSHUnstructTriangularMesh.h">
+      <Filter>Mesher\GMSH</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesher\GMSH\GMSHTetrahedralMesh.h">
+      <Filter>Mesher\GMSH</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesher\GMSH\Cube_GMSHTetrahedralMesh.h">
+      <Filter>Mesher\GMSH</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesher\GMSH\Cube_GMSHCartesianMesh.h">
+      <Filter>Mesher\GMSH</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesher\InHouse\Square_CartesianMesh.h">
+      <Filter>Mesher\InHouse</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesher\InHouse\Square_CartesianPolygonalMesh.h">
+      <Filter>Mesher\InHouse</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesher\InHouse\Square_QuadrilateralAsPolygonalMesh.h">
+      <Filter>Mesher\InHouse</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesher\InHouse\Square_QuadrilateralMesh.h">
+      <Filter>Mesher\InHouse</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesher\InHouse\Square_TriangularMesh.h">
+      <Filter>Mesher\InHouse</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesher\InHouse\UniformMesh1D.h">
+      <Filter>Mesher\InHouse</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesher\InHouse\Cube_CartesianMesh.h">
+      <Filter>Mesher\InHouse</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesher\InHouse\Cube_CartesianTetrahedralMesh.h">
+      <Filter>Mesher\InHouse</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesher\GMSH\GMSHMesh.h">
+      <Filter>Mesher\GMSH</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -490,6 +490,15 @@
     </Filter>
     <Filter Include="TestCases\3D">
       <UniqueIdentifier>{6eab9b73-ff39-406e-888d-cff70fdbbd5b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Mesher">
+      <UniqueIdentifier>{af6c1030-5562-4914-8ff7-21c9456cd080}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Mesher\InHouse">
+      <UniqueIdentifier>{5129d27c-1b76-430e-b2a8-da33e7c1d28c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Mesher\GMSH">
+      <UniqueIdentifier>{5329c89b-b928-431c-b12a-f9fbb1eacb04}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

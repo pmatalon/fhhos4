@@ -1,5 +1,5 @@
 #pragma once
-#include "../GMSHMesh.h"
+#include "GMSHMesh.h"
 using namespace std;
 
 class Cube_GMSHCartesianMesh : public GMSHMesh<3>

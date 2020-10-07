@@ -1,8 +1,8 @@
 #pragma once
-#include "TriangularElement.h"
-#include "../PolyhedralMesh.h"
-#include "SquareGeometry.h"
-#include "Square4quadrantsGeometry.h"
+#include "../../Mesh/2D/TriangularElement.h"
+#include "../../Mesh/PolyhedralMesh.h"
+#include "../SquareGeometry.h"
+#include "../Square4quadrantsGeometry.h"
 using namespace std;
 
 class LowerTriangle : public TriangularElement
