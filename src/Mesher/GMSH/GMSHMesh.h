@@ -46,7 +46,6 @@ public:
 		_description = description;
 		_fileNamePart = fileNamePart;
 		_geometryDescription = FileSystem::FileNameWithoutExtension(gmshFile);
-		string extension = FileSystem::Extension(gmshFile);
 
 		_N = n;
 
@@ -65,6 +64,7 @@ public:
 
 		bool tmpGeoFileCreated = false;
 		string mshFile;
+		string extension = FileSystem::Extension(gmshFile);
 		if (extension.compare("geo") == 0)
 		{
 			string mshFileInCache = Mesh<Dim>::CacheDirectory + _geometryDescription + (n == 0 ? "" : "_N" + to_string(n)) + ".msh";

@@ -809,7 +809,10 @@ int main(int argc, char* argv[])
 			args.Problem.Dimension = 3;
 #ifdef GMSH_ENABLED
 		else
+		{
+			Mesh<2>::SetDirectories();
 			args.Problem.Dimension = GMSHMesh<2>::GetDimension(args.Problem.GeoCode);
+		}
 #else
 		else
 			argument_error("Unknown geometry.");
