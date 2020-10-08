@@ -134,7 +134,7 @@ protected:
 	}
 
 	// Dim-specific functions
-	virtual Element<Dim>* CreateElement(int elemType, const vector<size_t>& elementNodes, size_t elemIndex) { return nullptr; }
+	virtual Element<Dim>* CreateElement(int elemType, const vector<size_t>& elementNodes, size_t start, size_t elemIndex) { return nullptr; }
 	void CreateFaces(int elemType, BigNumber& faceNumber) { }
 	virtual Face<Dim>* GetBoundaryFaceFromGMSHNodes(int faceType, const vector<size_t>& faceNodes, size_t& faceNodeIndex) { return nullptr; }
 
@@ -272,11 +272,36 @@ private:
 		// Elements //
 		//----------//
 
-		vector<int> elementTypes;
-
 		// Get entities (surfaces in 2D, volumes in 3D). For simple geometries, entities corresponds to physical groups.
 		gmsh::vectorpair entitiesDimTags;
 		gmsh::model::getEntities(entitiesDimTags, Dim);
+
+		if (entitiesDimTags.size() > 1) // if = 1, then the memory allocation is done when processing elements
+		{
+			// Get the total number of elements to allocate the memory
+
+			//gmsh::model::mesh::getElementTypes(elementTypes, Dim);
+			vector<int> elementTypes;
+			vector<vector<size_t>> elementTags;
+			vector<vector<size_t>> elemNodeTags;
+			gmsh::model::mesh::getElements(elementTypes, elementTags, elemNodeTags, Dim);
+			for (size_t i = 0; i < elementTypes.size(); i++)
+			{
+				int elemType = elementTypes[i];
+				vector<size_t> elements = elementTags[i];
+				vector<size_t> elementNodes = elemNodeTags[i];
+
+				AllocateContiguousMemoryForElements(elemType, elements.size());
+			}
+		}
+
+
+		vector<int> elementTypes;
+		elementTypes.clear();
+
+		//map<int, vector<size_t>> entityIndexInMemory; // map<entity, vector<number_of_elements_per_type>>
+		map<int, size_t> elementsAlreadyInMemory; // the key (int) is the GMSH elemType
+
 		for (int k = 0; k < entitiesDimTags.size(); k++)
 		{
 			int entityTag = entitiesDimTags[k].second;
@@ -320,13 +345,18 @@ private:
 				vector<size_t> elements = elementTags[i];
 				vector<size_t> elementNodes = elemNodeTags[i];
 
-				AllocateContiguousMemoryForElements(elemType, elements.size());
+				if (entitiesDimTags.size() == 1) // if > 1, then already allocated above
+					AllocateContiguousMemoryForElements(elemType, elements.size());
+
+				if (elementsAlreadyInMemory.find(elemType) == elementsAlreadyInMemory.end())
+					elementsAlreadyInMemory.insert({ elemType, 0 });
+				size_t nElementsAlreadyInMemory = elementsAlreadyInMemory[elemType];
 
 				NumberParallelLoop<ChunkResult> parallelLoop(elements.size());
-				parallelLoop.Execute([this, elemType, &elements, &elementNodes, &physicalPart](BigNumber j, ParallelChunk<ChunkResult>* chunk)
+				parallelLoop.Execute([this, elemType, nElementsAlreadyInMemory, &elements, &elementNodes, &physicalPart](BigNumber j, ParallelChunk<ChunkResult>* chunk)
 					{
 						size_t elementTag = elements[j];
-						Element<Dim>* e = CreateElement(elemType, elementNodes, j);
+						Element<Dim>* e = CreateElement(elemType, elementNodes, nElementsAlreadyInMemory, j);
 
 						e->Id = elementTag;
 						e->PhysicalPart = physicalPart;
@@ -357,6 +387,7 @@ private:
 						_regularity = min(_regularity, chunk.regularity);
 					});
 
+				elementsAlreadyInMemory[elemType] += elements.size();
 			}
 		}
 
@@ -821,7 +852,7 @@ public:
 //-------------//
 
 template <>
-Element<2>* GMSHMesh<2>::CreateElement(int elemType, const vector<size_t>& elementNodes, size_t elemIndex)
+Element<2>* GMSHMesh<2>::CreateElement(int elemType, const vector<size_t>& elementNodes, size_t start, size_t elemIndex)
 { 
 	Element<2>* e = nullptr;
 	if (elemType == GMSH_Quadrilateral)
@@ -832,8 +863,8 @@ Element<2>* GMSHMesh<2>::CreateElement(int elemType, const vector<size_t>& eleme
 		size_t nodeTag3 = elementNodes[elemNodeIndex + 2];
 		size_t nodeTag4 = elementNodes[elemNodeIndex + 3];
 
-		_quadrilateralElements[elemIndex] = QuadrilateralElement(0, GetVertexFromGMSHTag(nodeTag1), GetVertexFromGMSHTag(nodeTag2), GetVertexFromGMSHTag(nodeTag3), GetVertexFromGMSHTag(nodeTag4));
-		e = &_quadrilateralElements[elemIndex];
+		_quadrilateralElements[start + elemIndex] = QuadrilateralElement(0, GetVertexFromGMSHTag(nodeTag1), GetVertexFromGMSHTag(nodeTag2), GetVertexFromGMSHTag(nodeTag3), GetVertexFromGMSHTag(nodeTag4));
+		e = &_quadrilateralElements[start + elemIndex];
 	}
 	else if (elemType == GMSH_Triangle)
 	{
@@ -842,8 +873,8 @@ Element<2>* GMSHMesh<2>::CreateElement(int elemType, const vector<size_t>& eleme
 		size_t nodeTag2 = elementNodes[elemNodeIndex + 1];
 		size_t nodeTag3 = elementNodes[elemNodeIndex + 2];
 
-		_triangularElements[elemIndex] = TriangularElement(0, GetVertexFromGMSHTag(nodeTag1), GetVertexFromGMSHTag(nodeTag2), GetVertexFromGMSHTag(nodeTag3));
-		e = &_triangularElements[elemIndex];
+		_triangularElements[start + elemIndex] = TriangularElement(0, GetVertexFromGMSHTag(nodeTag1), GetVertexFromGMSHTag(nodeTag2), GetVertexFromGMSHTag(nodeTag3));
+		e = &_triangularElements[start + elemIndex];
 	}
 	else
 		assert(false && "GMSH element type not managed.");
@@ -855,7 +886,7 @@ Element<2>* GMSHMesh<2>::CreateElement(int elemType, const vector<size_t>& eleme
 //-------------//
 
 template <>
-Element<3>* GMSHMesh<3>::CreateElement(int elemType, const vector<size_t>& elementNodes, size_t elemIndex)
+Element<3>* GMSHMesh<3>::CreateElement(int elemType, const vector<size_t>& elementNodes, size_t start, size_t elemIndex)
 {
 	Element<3>* e = nullptr;
 	if (elemType == GMSH_Tetrahedron)
@@ -866,8 +897,8 @@ Element<3>* GMSHMesh<3>::CreateElement(int elemType, const vector<size_t>& eleme
 		size_t nodeTag3 = elementNodes[elemNodeIndex + 2];
 		size_t nodeTag4 = elementNodes[elemNodeIndex + 3];
 
-		_tetrahedralElements[elemIndex] = TetrahedralElement(0, GetVertexFromGMSHTag(nodeTag1), GetVertexFromGMSHTag(nodeTag2), GetVertexFromGMSHTag(nodeTag3), GetVertexFromGMSHTag(nodeTag4));
-		e = &_tetrahedralElements[elemIndex];
+		_tetrahedralElements[start + elemIndex] = TetrahedralElement(0, GetVertexFromGMSHTag(nodeTag1), GetVertexFromGMSHTag(nodeTag2), GetVertexFromGMSHTag(nodeTag3), GetVertexFromGMSHTag(nodeTag4));
+		e = &_tetrahedralElements[start + elemIndex];
 	}
 	else if (elemType == GMSH_Hexahedron && this->FileNamePart().compare("gmsh-cart") == 0)
 	{
@@ -890,8 +921,8 @@ Element<3>* GMSHMesh<3>::CreateElement(int elemType, const vector<size_t>& eleme
 		Vertex* frontRightBottomCorner = v3;
 		Vertex* frontRightTopCorner = v4;
 
-		_parallelepipedElements[elemIndex] = ParallelepipedElement(0, backLeftBottomCorner, frontLeftBottomCorner, backRightBottomCorner, backLeftTopCorner, frontLeftTopCorner, backRightTopCorner, frontRightBottomCorner, frontRightTopCorner);
-		e = &_parallelepipedElements[elemIndex];
+		_parallelepipedElements[start + elemIndex] = ParallelepipedElement(0, backLeftBottomCorner, frontLeftBottomCorner, backRightBottomCorner, backLeftTopCorner, frontLeftTopCorner, backRightTopCorner, frontRightBottomCorner, frontRightTopCorner);
+		e = &_parallelepipedElements[start + elemIndex];
 	}
 	else
 		assert(false && "GMSH element type not managed.");
