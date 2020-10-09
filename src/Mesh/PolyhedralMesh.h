@@ -71,6 +71,32 @@ public:
 		return _regularity;
 	}
 
+	virtual size_t MemoryUsage() override
+	{
+		size_t verticesUsage = this->Vertices.size() * sizeof(Vertex);
+		size_t verticesPointers = this->Vertices.size() * sizeof(Vertex*);
+
+		size_t elementsUsage = _quadrilateralElements.size() * sizeof(QuadrilateralElement)
+			+ _triangularElements.size() * sizeof(TriangularElement)
+			+ _tetrahedralElements.size() * sizeof(TetrahedralElement)
+			+ _parallelepipedElements.size() * sizeof(ParallelepipedElement);
+		if (Dim == 2)
+			elementsUsage += this->Elements.size() * 3 * sizeof(Face<Dim>*); // at least 3 faces
+		else if (Dim == 2)
+			elementsUsage += this->Elements.size() * 4 * sizeof(Face<Dim>*); // at least 4 faces
+		size_t elementsPointers = this->Elements.size() * sizeof(Element<Dim>*);
+
+		size_t oneFaceUsage = 0;
+		if (Dim == 2)
+			oneFaceUsage = sizeof(Edge);
+		else if (Dim == 2)
+			oneFaceUsage = sizeof(TriangleIn3D);
+		size_t facesUsage = this->Faces.size() * oneFaceUsage;
+		size_t facesPointers = this->Faces.size() * sizeof(Face<Dim>*);
+
+		return verticesUsage + verticesPointers + elementsUsage + elementsPointers + facesUsage + facesPointers;
+	}
+
 	virtual void CoarsenMesh(CoarseningStrategy strategy) override
 	{
 		if (this->CoarseMesh)

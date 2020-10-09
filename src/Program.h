@@ -45,6 +45,8 @@ public:
 
 		Mesh<Dim>* mesh = BuildMesh(args);
 
+		cout << "Mesh storage > " << Utils::MemoryString(mesh->MemoryUsage()) << endl;
+
 		if (args.Actions.UnitTests)
 		{
 			// Unit tests

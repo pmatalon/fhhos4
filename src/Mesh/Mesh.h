@@ -219,6 +219,11 @@ public:
 		this->InitFaceLocalNumbering();
 	}
 
+	virtual size_t MemoryUsage()
+	{
+		return 0;
+	}
+
 	double SkeletonMeasure()
 	{
 		double measure = 0;

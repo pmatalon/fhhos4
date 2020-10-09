@@ -64,13 +64,17 @@ public:
 	static string MemoryString(size_t bytes)
 	{
 		stringstream ss;
-		ss.precision(2);
+		ss << fixed;
+		ss.precision(0);
 
 		double kilos = bytes / 1024.0;
 		double megs = kilos / 1024.0;
 		double gigs = megs / 1024.0;
 		if (gigs >= 1)
+		{
+			ss.precision(1);
 			ss << gigs << "GB";
+		}
 		else if (megs >= 1)
 			ss << megs << "MB";
 		else
