@@ -242,16 +242,7 @@ private:
 
 		// If .geo file, the mesh hasn't been generated
 		if (nodeTags.empty())
-		{
-			cout << "Generating the mesh by GMSH..." << endl;
-			gmsh::model::mesh::generate(Dim); // mesh generation
-			gmsh::model::mesh::getNodes(nodeTags, coord, parametricCoord, Dim, -1, includeBoundary, returnParametricCoord);
-			if (nodeTags.empty())
-			{
-				cout << Utils::BeginRed << "Error: the mesh generation failed. Try commenting the line SetFactory(\"OpenCASCADE\"); (if there is one)." << Utils::EndColor;
-				exit(EXIT_FAILURE);
-			}
-		}
+			Utils::FatalError("The mesh isn't readable.");
 
 		cout << "Building internal mesh objects..." << endl;
 
@@ -299,7 +290,6 @@ private:
 		vector<int> elementTypes;
 		elementTypes.clear();
 
-		//map<int, vector<size_t>> entityIndexInMemory; // map<entity, vector<number_of_elements_per_type>>
 		map<int, size_t> elementsAlreadyInMemory; // the key (int) is the GMSH elemType
 
 		for (int k = 0; k < entitiesDimTags.size(); k++)
