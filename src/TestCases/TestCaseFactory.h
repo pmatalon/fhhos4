@@ -17,6 +17,7 @@
 #include "3D/SineSolution3DTestCase.h"
 #include "3D/PolySolution3DTestCase.h"
 #include "3D/ExpSolution3DTestCase.h"
+#include "3D/PlateWith4HolesTestCase.h"
 using namespace std;
 
 template <int Dim>
@@ -83,6 +84,8 @@ TestCase<3>* TestCaseFactory<3>::Create(ProblemArguments pb)
 		return new PolySolution3DTestCase(pb);
 	if (pb.TestCaseCode.compare("exp") == 0)
 		return new ExpSolution3DTestCase(pb);
+	if (pb.TestCaseCode.compare("platewith4holes") == 0)
+		return new PlateWith4HolesTestCase(pb);
 
 	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 3D. Check -tc argument.");
 }

@@ -36,6 +36,9 @@ protected:
 	double _h = -1;
 	double _regularity = 1;
 	BigNumber _N;
+private:
+	string _mshFilePath;
+	bool _mshFileIsTmp = false;
 public:
 	static bool GMSHLogEnabled;
 	static bool UseCache;
@@ -104,6 +107,9 @@ public:
 						Utils::Error("Failed to write the file " + mshFileInCache);
 				}
 			}
+
+			if (UseCache)
+				_mshFilePath = mshFileInCache;
 		}
 		else if (extension.compare("msh") == 0)
 		{
@@ -152,6 +158,11 @@ public:
 		int d = gmsh::model::getDimension();
 		gmsh::finalize();
 		return d;
+	}
+
+	static void CloseGMSH()
+	{
+		gmsh::finalize();
 	}
 
 private:
@@ -624,7 +635,9 @@ public:
 		// Remove coarse temporary file and reload the fine mesh
 		remove(coarse_mesh_tmp_file.c_str());
 		gmsh::open(fine_mesh_tmp_file);
-		remove(fine_mesh_tmp_file.c_str());
+		
+		fineMesh->_mshFilePath = fine_mesh_tmp_file;
+		fineMesh->_mshFileIsTmp = true;
 
 		// Continue linking
 		fineMesh->LinkFacesToCoarseFaces();
@@ -642,6 +655,9 @@ public:
 private:
 	void IndependentRemesh()
 	{
+		if (this->N() == 1)
+			return;
+
 		cout << "Coarsening by independent remeshing" << endl;
 
 		GMSHMesh<Dim>* fineMesh = this;
@@ -654,16 +670,20 @@ private:
 		for (Element<Dim>* fine : fineMesh->Elements)
 		{
 			Element<Dim>* coarse = coarseMesh->LocateElementThatEmbeds(fine);
+			if (!coarse->IsInSamePhysicalPartAs(fine))
+				Utils::Warning("Coarse and fine elements aren't located in the same physical part. Something is wrong...");
 			coarse->FinerElements.push_back(fine);
 			fine->CoarserElement = coarse;
 			assert(coarse->PhysicalPart == fine->PhysicalPart);
 		}
 
+		CloseGMSH();
+
 		for (Element<Dim>* coarse : coarseMesh->Elements)
 		{
 			if (coarse->FinerElements.empty())
 			{
-				for (Element<Dim>* neighbour : coarse->Neighbours())
+				/*for (Element<Dim>* neighbour : coarse->Neighbours())
 				{
 					if (neighbour->PhysicalPart != coarse->PhysicalPart)
 						continue;
@@ -676,7 +696,8 @@ private:
 						}
 					}
 				}
-				assert(!coarse->FinerElements.empty());
+				assert(!coarse->FinerElements.empty());*/
+				Utils::Warning("This coarse element does not have any fine element.");
 			}
 		}
 
@@ -807,12 +828,17 @@ public:
 
 	void ExportSolutionToGMSH(FunctionalBasis<Dim>* basis, const Vector &solution, const string& outputFilePathPrefix) override
 	{
+		assert(!_mshFilePath.empty());
+		gmsh::initialize();
+		gmsh::open(_mshFilePath);
+		if (_mshFileIsTmp)
+			remove(_mshFilePath.c_str());
+
 		int viewId = gmsh::view::add("potential");
 
 		vector<std::string> modelNames;
 		gmsh::model::list(modelNames);
 		string modelName = modelNames[modelNames.size() - 1];
-		//string modelName = Utils::FileNameWithoutExtension(this->_gmshFilePath) + "_tmp_set_N";
 
 		vector<size_t> elementTags;
 		vector<vector<double>> values;
@@ -833,6 +859,7 @@ public:
 		gmsh::view::write(viewId, dataFilePath);
 
 		cout << "Solution exported for GMSH to " << dataFilePath << endl;
+		gmsh::finalize();
 	}
 
 };

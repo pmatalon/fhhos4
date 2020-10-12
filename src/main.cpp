@@ -204,19 +204,19 @@ void print_usage() {
 	cout << endl;
 	cout << "-cs CODE" << endl;
 	cout << "      Coarsening strategy of the multigrid." << endl;
-	cout << "              s   - standard coarsening (merge colinear faces on the coarse mesh)" << endl;
-	cout << "              a   - agglomeration coarsening (keep fine faces on the coarse mesh)" << endl;
-	cout << "              l   - (experimental) agglomeration coarsening by most collinear/coplanar faces (non-nested!)" << endl;
-	cout << "              c   - (experimental) agglomeration coarsening by closest center (non-nested!)" << endl;
-	cout << "              g   - (experimental) agglomeration coarsening by closest face (non-nested!)" << endl;
-	cout << "              i   - (experimental) agglomeration coarsening by largest interface (non-nested)" << endl;
-	cout << "              p   - (experimental) agglomeration coarsening by seed points (non-nested!)" << endl;
-	cout << "              n   - (experimental) agglomeration coarsening by face neighbours (non-nested!)" << endl;
-	cout << "              v   - (experimental) agglomeration coarsening by vertex neighbours (non-nested!)" << endl;
-	cout << "              m   - independant remeshing by GMSH with double the mesh size (non-nested!)" << endl;
-	cout << "              f   - face coarsening: the faces are coarsened and all kept on the coarse skeleton. Requires -g 1." << endl;
-	cout << "              r   - fine meshes obtained by structured refinement of the coarse mesh using GMSH's splitting method" << endl;
-	cout << "              b   - fine meshes obtained by structured refinement of the coarse mesh using the Bey method" << endl;
+	cout << "              s   - Standard coarsening (merge colinear faces on the coarse mesh)" << endl;
+	cout << "              a   - Agglomeration coarsening (keep fine faces on the coarse mesh)" << endl;
+	cout << "              l   - (Experimental) agglomeration coarsening by most collinear/coplanar faces (non-nested!)" << endl;
+	cout << "              c   - (Experimental) agglomeration coarsening by closest center (non-nested!)" << endl;
+	cout << "              g   - (Experimental) agglomeration coarsening by closest face (non-nested!)" << endl;
+	cout << "              i   - (Experimental) agglomeration coarsening by largest interface (non-nested)" << endl;
+	cout << "              p   - (Experimental) agglomeration coarsening by seed points (non-nested!)" << endl;
+	cout << "              n   - (Experimental) agglomeration coarsening by face neighbours (non-nested!)" << endl;
+	cout << "              v   - (Experimental) agglomeration coarsening by vertex neighbours (non-nested!)" << endl;
+	cout << "              m   - Independant remeshing by GMSH with double the mesh size (non-nested!)." << endl;
+	cout << "              f   - Face coarsening: the faces are coarsened and all kept on the coarse skeleton. Requires -g 1." << endl;
+	cout << "              r   - Fine meshes obtained by structured refinement of the coarse mesh using GMSH's splitting method" << endl;
+	cout << "              b   - Fine meshes obtained by structured refinement of the coarse mesh using the Bey method" << endl;
 	cout << endl;
 	cout << "-coarse-n NUM" << endl;
 	cout << "      If a refinement strategy is used, sets the mesh size of the starting coarse mesh." << endl;
@@ -251,6 +251,8 @@ void print_usage() {
 	cout << "                   Step 1: Interpolation from coarse faces to coarse cells (refer to -cell-interp argument)" << endl;
 	cout << "                   Step 2: L2-projection onto the fine cells" << endl;
 	cout << "                   Step 3: Trace on the fine faces" << endl;
+	cout << "              " << (unsigned)Prolongation::CellInterp_ApproxL2proj_Trace << "  - ";
+	cout <<                    "Variant of " << (unsigned)Prolongation::CellInterp_L2proj_Trace << " where the L2-projection is not computed exactly but has the same approximation properties." << endl;
 	cout << endl;
 	cout << "-cell-interp NUM" << endl;
 	cout << "      In the polongation, degree of the polynomial interpolated on the cells from the faces." << endl;
@@ -359,6 +361,8 @@ int main(int argc, char* argv[])
 	bool defaultCycle = true;
 
 	ProgramArguments args;
+	args.OutputDirectory = FileSystem::RootPath() + "/out";
+	FileSystem::CreateDirectoryIfNotExist(args.OutputDirectory);
 
 	enum {
 		// Problem
@@ -662,22 +666,9 @@ int main(int argc, char* argv[])
 			case OPT_ProlongationCode:
 			{
 				int prolongationCode = atoi(optarg);
-				if (prolongationCode == (unsigned)Prolongation::CellInterp_Trace)
-					args.Solver.MG.ProlongationCode = Prolongation::CellInterp_Trace;
-				else if (prolongationCode == (unsigned)Prolongation::CellInterp_InjectAndTrace)
-					args.Solver.MG.ProlongationCode = Prolongation::CellInterp_InjectAndTrace;
-				else if (prolongationCode == (unsigned)Prolongation::CellInterp_Inject_Adjoint)
-					args.Solver.MG.ProlongationCode = Prolongation::CellInterp_Inject_Adjoint;
-				else if (prolongationCode == (unsigned)Prolongation::CellInterp_Inject_Trace)
-					args.Solver.MG.ProlongationCode = Prolongation::CellInterp_Inject_Trace;
-				else if (prolongationCode == (unsigned)Prolongation::CellInterp_L2proj_Trace)
-					args.Solver.MG.ProlongationCode = Prolongation::CellInterp_L2proj_Trace;
-				else if (prolongationCode == (unsigned)Prolongation::FaceInject)
-					args.Solver.MG.ProlongationCode = Prolongation::FaceInject;
-				else if (prolongationCode == (unsigned)Prolongation::Wildey)
-					args.Solver.MG.ProlongationCode = Prolongation::Wildey;
-				else
+				if (prolongationCode < 1 || prolongationCode > 8)
 					argument_error("unknown prolongation code. Check -prolong argument.");
+				args.Solver.MG.ProlongationCode = static_cast<Prolongation>(prolongationCode);
 				break;
 			}
 			case 'l': 
@@ -924,7 +915,10 @@ int main(int argc, char* argv[])
 		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::FaceCoarsening && !args.Solver.MG.UseGalerkinOperator)
 			argument_error("To use the face coarsening, you must also use the Galerkin operator. To do so, add option -g 1.");
 
-		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::IndependentRemeshing && (args.Solver.MG.ProlongationCode != Prolongation::CellInterp_L2proj_Trace && args.Solver.MG.ProlongationCode != Prolongation::Default))
+		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::IndependentRemeshing && 
+			args.Solver.MG.ProlongationCode != Prolongation::CellInterp_L2proj_Trace &&
+			args.Solver.MG.ProlongationCode != Prolongation::CellInterp_ApproxL2proj_Trace &&
+			args.Solver.MG.ProlongationCode != Prolongation::Default)
 			argument_error("The coarsening by independent remeshing is only applicable with the non-nested version of the multigrid (-prolong " + to_string((unsigned)Prolongation::CellInterp_L2proj_Trace) + ").");
 
 		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::None)

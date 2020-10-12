@@ -277,3 +277,4 @@ cmake_install.cmake
 Makefile
 
 /data/cache/
+/out/

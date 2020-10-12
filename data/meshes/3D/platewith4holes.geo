@@ -1,4 +1,4 @@
-//N = 16; // do not work if N is define for some reason...
+N = 2;
 L = 10; // [0,L]x[-1,1]
 h = 1/N;
 r=0.3;

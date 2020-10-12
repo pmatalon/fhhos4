@@ -44,8 +44,7 @@ public:
 		GMSHMesh<Dim>::UseCache = args.Actions.UseCache;
 
 		Mesh<Dim>* mesh = BuildMesh(args);
-		if (args.Discretization.Mesher.compare("gmsh") == 0 && !args.Actions.ExportSolutionToGMSH)
-			gmsh::finalize();
+		GMSHMesh<Dim>::CloseGMSH();
 
 		cout << "Mesh storage > " << Utils::MemoryString(mesh->MemoryUsage()) << endl;
 
@@ -239,10 +238,7 @@ public:
 			}
 
 			if (args.Actions.ExportSolutionToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
-			{
 				problem->ExportSolutionToGMSH();
-				gmsh::finalize();
-			}
 
 			//----------------------//
 			//       L2 error       //

@@ -30,14 +30,15 @@ public:
 
 	void CoarsenMesh(CoarseningStrategy coarseningStgy, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override
 	{
-		if (Utils::IsRefinementStrategy(coarseningStgy) && _problem->_mesh->CoarseMesh == nullptr)
+		Mesh<Dim> mesh = _problem->_mesh;
+		if (Utils::IsRefinementStrategy(coarseningStgy) && mesh->CoarseMesh == nullptr)
 		{
 			noCoarserMeshProvided = true;
 			return;
 		}
 		cout << "\tCoarsening mesh" << endl;
-		_problem->_mesh->CoarsenMesh(coarseningStgy);
-		if (_problem->_mesh->CoarseMesh->InteriorFaces.size() == 0)
+		mesh->CoarsenMesh(coarseningStgy);
+		if (!mesh->CoarseMesh || mesh->CoarseMesh->InteriorFaces.size() == 0)
 			coarsestPossibleMeshReached = true;
 	}
 
@@ -178,12 +179,46 @@ private:
 			// Step 2: Instead of the canonical injection which is now impossible, //
 			//         L2-projection onto the fine cells.                          //
 			// Step 3: Trace on the fine faces.                                    //
+			//                                                                     //
+			// Details: To be computed exactly, the L2-projection requires the     //
+			//          computation of the intersection between the coarse and     //
+			//          fine elements, which is costly.                            //
 			//---------------------------------------------------------------------//
 
 			coarsePb->_mesh->SetOverlappingFineElements();
 
 			SparseMatrix I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
 			SparseMatrix L2Proj = GetGlobalL2ProjectionMatrixCoarseToFineElements();
+			SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
+
+			if (ExportComponents)
+			{
+				Level::ExportMatrix(I_c, "I_c");
+				Level::ExportMatrix(L2Proj, "J_f_c");
+				Level::ExportMatrix(Pi_f, "Pi_f");
+			}
+
+			P = Pi_f * L2Proj * I_c;
+		}
+		else if (_prolongationCode == Prolongation::CellInterp_ApproxL2proj_Trace)
+		{
+			//---------------------------------------------------------------------//
+			//                      Non-nested variant                             //
+			// Step 1: Interpolation from coarse faces to coarse cells.            //
+			// Step 2: Instead of the canonical injection which is now impossible, //
+			//         L2-projection onto the fine cells.                          //
+			//         However, because the exact L2-proj is costly to compute,    //
+			//         we do it approximately in such a way that it has the same   //
+			//         approximation properties.                                   //
+			// Step 3: Trace on the fine faces.                                    //
+			//                                                                     //
+			// Details: This is actually the exact same code as                    //
+			//          CellInterp_Inject_Trace (the L2-proj is implemented as the //
+			//          canonical injection).                                      //
+			//---------------------------------------------------------------------//
+
+			SparseMatrix I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
+			SparseMatrix L2Proj = GetGlobalCanonicalInjectionMatrixCoarseToFineElements();
 			SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
 
 			if (ExportComponents)
@@ -789,6 +824,8 @@ public:
 			os << "coarse cell interpolation + injection coarse to fine cells + trace on fine faces ";
 		else if (_prolongationCode == Prolongation::CellInterp_L2proj_Trace)
 			os << "coarse cell interpolation + L2-projection to fine cells + trace on fine faces ";
+		else if (_prolongationCode == Prolongation::CellInterp_ApproxL2proj_Trace)
+			os << "coarse cell interpolation + L2-projection to fine cells (approx.) + trace on fine faces ";
 		else if (_prolongationCode == Prolongation::CellInterp_InjectAndTrace)
 			os << "injection for common faces, and coarse cell interpolation + trace for the other ";
 		else if (_prolongationCode == Prolongation::CellInterp_Inject_Adjoint)

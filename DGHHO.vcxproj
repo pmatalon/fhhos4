@@ -223,6 +223,7 @@
     <ClInclude Include="src\TestCases\2D\XSolution2DTestCase.h" />
     <ClInclude Include="src\TestCases\2D\ZeroSolution2DTestCase.h" />
     <ClInclude Include="src\TestCases\3D\ExpSolution3DTestCase.h" />
+    <ClInclude Include="src\TestCases\3D\PlateWith4HolesTestCase.h" />
     <ClInclude Include="src\TestCases\3D\PolySolution3DTestCase.h" />
     <ClInclude Include="src\TestCases\3D\SineSolution3DTestCase.h" />
     <ClInclude Include="src\TestCases\DefaultTestCase.h" />
