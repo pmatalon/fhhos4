@@ -30,7 +30,7 @@ public:
 
 	void CoarsenMesh(CoarseningStrategy coarseningStgy, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override
 	{
-		Mesh<Dim> mesh = _problem->_mesh;
+		Mesh<Dim>* mesh = _problem->_mesh;
 		if (Utils::IsRefinementStrategy(coarseningStgy) && mesh->CoarseMesh == nullptr)
 		{
 			noCoarserMeshProvided = true;
