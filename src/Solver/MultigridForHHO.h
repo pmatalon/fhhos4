@@ -127,7 +127,7 @@ private:
 		if (_prolongationCode == Prolongation::CellInterp_Trace)
 		{
 			//----------------------------------------------------------//
-			//                       Default method                     //
+			//                       Nested meshes                      //
 			// Step 1: Interpolation from coarse faces to coarse cells. //
 			// Step 2: Trace on the fine faces.                         //
 			//----------------------------------------------------------//
@@ -203,7 +203,7 @@ private:
 		else if (_prolongationCode == Prolongation::CellInterp_ApproxL2proj_Trace)
 		{
 			//---------------------------------------------------------------------//
-			//                      Non-nested variant                             //
+			//                 Non-nested variant (less costly)                    //
 			// Step 1: Interpolation from coarse faces to coarse cells.            //
 			// Step 2: Instead of the canonical injection which is now impossible, //
 			//         L2-projection onto the fine cells.                          //
@@ -217,6 +217,9 @@ private:
 			//          canonical injection).                                      //
 			//---------------------------------------------------------------------//
 
+			// The coarse element associated to every mesh element must be the closest one.
+			// Every fine element must appear in only one coarse element's FinerElements list.
+			
 			SparseMatrix I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
 			SparseMatrix L2Proj = GetGlobalCanonicalInjectionMatrixCoarseToFineElements();
 			SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
@@ -856,15 +859,11 @@ public:
 
 	void EndSerialize(ostream& os) const override
 	{
-		if ((this->CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours
-			|| this->CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter
-			|| this->CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByClosestFace
-			|| this->CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface
-			|| this->CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByVertexNeighbours)
-			&& _prolongationCode != Prolongation::CellInterp_L2proj_Trace)
+		if (!Utils::BuildsNestedMeshHierarchy(this->CoarseningStgy)
+			&& _prolongationCode != Prolongation::CellInterp_L2proj_Trace && _prolongationCode != Prolongation::CellInterp_ApproxL2proj_Trace)
 		{
 			os << endl;
-			Utils::Warning(os, "The selected coarsening strategy generates non-nested meshes, while the selected prolongation operator is made for nested meshes. Option '-prolong " + to_string((unsigned)Prolongation::CellInterp_L2proj_Trace) + "' recommended.");
+			Utils::Warning(os, "The selected coarsening strategy generates non-nested meshes, while the selected prolongation operator is made for nested meshes. Option -prolong " + to_string((unsigned)Prolongation::CellInterp_L2proj_Trace) + " or " + to_string((unsigned)Prolongation::CellInterp_ApproxL2proj_Trace) + " recommended.");
 		}
 	}
 

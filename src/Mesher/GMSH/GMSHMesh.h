@@ -674,19 +674,17 @@ private:
 				Utils::Warning("Coarse and fine elements aren't located in the same physical part. Something is wrong...");
 			coarse->FinerElements.push_back(fine);
 			fine->CoarserElement = coarse;
-			assert(coarse->PhysicalPart == fine->PhysicalPart);
 		}
 
 		CloseGMSH();
 
-		for (Element<Dim>* coarse : coarseMesh->Elements)
+		/*for (Element<Dim>* coarse : coarseMesh->Elements)
 		{
 			if (coarse->FinerElements.empty())
 			{
-				/*for (Element<Dim>* neighbour : coarse->Neighbours())
+				Utils::Warning("This coarse element does not have any fine element.");
+				for (Element<Dim>* neighbour : coarse->NeighboursInSamePhysicalPart())
 				{
-					if (neighbour->PhysicalPart != coarse->PhysicalPart)
-						continue;
 					for (Element<Dim>* fe : neighbour->FinerElements)
 					{
 						if (!PolyhedralMesh<Dim>::Intersection(coarse, fe).empty())
@@ -696,10 +694,9 @@ private:
 						}
 					}
 				}
-				assert(!coarse->FinerElements.empty());*/
-				Utils::Warning("This coarse element does not have any fine element.");
+				assert(!coarse->FinerElements.empty());
 			}
-		}
+		}*/
 
 		this->FinalizeCoarsening();
 	}

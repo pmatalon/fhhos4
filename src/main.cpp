@@ -287,7 +287,7 @@ void print_usage() {
 	cout << "              mg      - Multigrid components (intergrid operator matrices, coarse meshes, etc.)" << endl;
 	cout << endl;
 	cout << "-o PATH" << endl;
-	cout << "      Output directory to export files (default: ./out)." << endl;
+	cout << "      Output directory to export files." << endl;
 	cout << endl;
 	cout << "-not-solve" << endl;
 	cout << "      Do not solve the linear system." << endl;
@@ -919,7 +919,7 @@ int main(int argc, char* argv[])
 			args.Solver.MG.ProlongationCode != Prolongation::CellInterp_L2proj_Trace &&
 			args.Solver.MG.ProlongationCode != Prolongation::CellInterp_ApproxL2proj_Trace &&
 			args.Solver.MG.ProlongationCode != Prolongation::Default)
-			argument_error("The coarsening by independent remeshing is only applicable with the non-nested version of the multigrid (-prolong " + to_string((unsigned)Prolongation::CellInterp_L2proj_Trace) + ").");
+			argument_error("The coarsening by independent remeshing is only applicable with the non-nested versions of the multigrid (-prolong " + to_string((unsigned)Prolongation::CellInterp_L2proj_Trace) + " or " + to_string((unsigned)Prolongation::CellInterp_ApproxL2proj_Trace) + ").");
 
 		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::None)
 		{
@@ -928,7 +928,7 @@ int main(int argc, char* argv[])
 				if (args.Solver.MG.ProlongationCode == Prolongation::Default)
 				{
 					args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours;
-					args.Solver.MG.ProlongationCode = Prolongation::CellInterp_L2proj_Trace;
+					args.Solver.MG.ProlongationCode = Prolongation::CellInterp_ApproxL2proj_Trace;
 				}
 				else if (Utils::RequiresNestedHierarchy(args.Solver.MG.ProlongationCode))
 					args.Solver.MG.CoarseningStgy = CoarseningStrategy::GMSHSplittingRefinement;
@@ -940,7 +940,7 @@ int main(int argc, char* argv[])
 				if (args.Discretization.Mesher.compare("inhouse") == 0 && args.Discretization.MeshCode.compare("tetra") == 0)
 					args.Solver.MG.CoarseningStgy = CoarseningStrategy::BeyRefinement;
 				else
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::GMSHSplittingRefinement;
+					args.Solver.MG.CoarseningStgy = CoarseningStrategy::IndependentRemeshing;
 			}
 		}
 
@@ -949,7 +949,7 @@ int main(int argc, char* argv[])
 			if (Utils::BuildsNestedMeshHierarchy(args.Solver.MG.CoarseningStgy))
 				args.Solver.MG.ProlongationCode = Prolongation::CellInterp_Trace;
 			else
-				args.Solver.MG.ProlongationCode = Prolongation::CellInterp_L2proj_Trace;
+				args.Solver.MG.ProlongationCode = Prolongation::CellInterp_ApproxL2proj_Trace;
 		}
 
 		if (defaultCycle)

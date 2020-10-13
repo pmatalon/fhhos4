@@ -359,7 +359,7 @@ public:
 		return measure;
 	}
 
-	vector<Element<Dim>*> Neighbours()
+	vector<Element<Dim>*> Neighbours(bool onlyInTheSamePhysicalPart = false)
 	{
 		set<Element<Dim>*> neighbours;
 		for (Face<Dim>* f : this->Faces)
@@ -367,22 +367,27 @@ public:
 			if (f->IsDomainBoundary || f->IsDeleted)
 				continue;
 			Element<Dim>* neighbour = f->GetNeighbour(this);
-			if (neighbour) // no neighbour might be affected yet
+			if (neighbour && (!onlyInTheSamePhysicalPart || this->IsInSamePhysicalPartAs(neighbour))) // no neighbour might be affected yet
 				neighbours.insert(neighbour);
 		}
 
 		return vector<Element<Dim>*>(neighbours.begin(), neighbours.end());
 	}
 
-	vector<Element<Dim>*> VertexNeighbours()
+	vector<Element<Dim>*> NeighboursInSamePhysicalPart()
+	{
+		return Neighbours(true);
+	}
+
+	vector<Element<Dim>*> VertexNeighbours(bool onlyInTheSamePhysicalPart = true)
 	{
 		set<Element<Dim>*> vertexNeighbours;
-		vector<Element<Dim>*> faceNeigbours = this->Neighbours();
+		vector<Element<Dim>*> faceNeigbours = this->Neighbours(onlyInTheSamePhysicalPart);
 		vertexNeighbours.insert(faceNeigbours.begin(), faceNeigbours.end());
 
 		for (Element<Dim>* n : faceNeigbours)
 		{
-			for (Element<Dim>* n2 : n->Neighbours())
+			for (Element<Dim>* n2 : n->Neighbours(onlyInTheSamePhysicalPart))
 			{
 				if (n2 == this)
 					continue;
@@ -402,7 +407,7 @@ public:
 	{
 		return (!this->PhysicalPart && !other->PhysicalPart) || this->PhysicalPart == other->PhysicalPart;
 	}
-
+	
 	//-------------------//
 	//     Integrals     //
 	//-------------------//

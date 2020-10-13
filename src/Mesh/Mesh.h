@@ -583,7 +583,9 @@ public:
 
 				for (Element<Dim>* ce : CoarseMesh->Elements)
 				{
-					assert(ce->FinerElements.size() > 0 && "This coarse element doesn't have any finer element.");
+					if (Utils::BuildsNestedMeshHierarchy(CoarseMesh->ComesFrom.CS))
+						assert(ce->FinerElements.size() > 0 && "This coarse element doesn't have any finer element.");
+
 					for (Face<Dim>* ff : ce->FinerFacesRemoved)
 						assert(ff->IsRemovedOnCoarserGrid && "This face is supposed to be removed inside this coarse element, but the flag IsRemovedOnCoarserGrid is not set.");
 				}
@@ -603,7 +605,7 @@ public:
 
 				for (Face<Dim>* ff : this->Faces)
 				{
-					if (ff->IsRemovedOnCoarserGrid)
+					if (ff->IsRemovedOnCoarserGrid && Utils::BuildsNestedMeshHierarchy(CoarseMesh->ComesFrom.CS))
 					{
 						Element<Dim>* ce1 = ff->Element1->CoarserElement;
 						Element<Dim>* ce2 = ff->Element2->CoarserElement;

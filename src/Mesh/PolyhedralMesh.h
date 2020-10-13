@@ -125,7 +125,36 @@ public:
 protected:
 	virtual void FinalizeCoarsening() override
 	{
-		Mesh<Dim>::FinalizeCoarsening();
+		CoarseningStrategy stgy = this->CoarseMesh->ComesFrom.CS;
+		if (stgy != CoarseningStrategy::IndependentRemeshing && !Utils::BuildsNestedMeshHierarchy(stgy))
+		{
+			ElementParallelLoop<Dim> parallelLoopC(this->CoarseMesh->Elements);
+			parallelLoopC.Execute([](Element<Dim>* ce)
+				{
+					ce->FinerElements.clear();
+				});
+
+			ElementParallelLoop<Dim> parallelLoopF(this->Elements);
+			parallelLoopF.Execute([](Element<Dim>* fe)
+				{
+					Element<Dim>* ce = fe->CoarserElement;
+					if (!ce->Contains(fe->Center()))
+					{
+						vector<Element<Dim>*> candidates = ce->VertexNeighbours();
+						for (auto e : candidates)
+						{
+							if (e->Contains(fe->Center()))
+							{
+								fe->CoarserElement = e;
+								break;
+							}
+						}
+					}
+					fe->CoarserElement->Mutex.lock();
+					fe->CoarserElement->FinerElements.push_back(fe);
+					fe->CoarserElement->Mutex.unlock();
+				});
+		}
 
 		ElementParallelLoop<Dim> parallelLoop(this->CoarseMesh->Elements);
 		parallelLoop.Execute([](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
@@ -138,6 +167,8 @@ protected:
 					p->ComputeBoundingBox();
 				}
 			});
+
+		Mesh<Dim>::FinalizeCoarsening();
 	}
 
 private:
@@ -379,7 +410,7 @@ private:
 
 		bool retryIfElementChanges = false;
 			
-		for (Element<Dim>* n : e->Neighbours())
+		for (Element<Dim>* n : e->Neighbours(false))
 		{
 			if (makeItThreadSafe && !n->Mutex.try_lock())
 				continue;
@@ -438,8 +469,7 @@ private:
 		{
 			// Collapse only collinear faces
 			Interface<Dim> interf(interfaceFaces);
-			CollapseCoplanarFaces(interf);
-			return FaceCollapsingStatus::Ok;
+			return TryCollapseCoplanarFaces(interf);
 		}
 	}
 
@@ -451,18 +481,20 @@ private:
 
 		// Collapse only collinear faces
 		Interface<Dim> interf(boundaryFaces);
-		CollapseCoplanarFaces(interf);
-		return FaceCollapsingStatus::Ok;
+		return TryCollapseCoplanarFaces(interf);
 	}
 
-	void CollapseCoplanarFaces(const Interface<Dim>& interf)
+	FaceCollapsingStatus TryCollapseCoplanarFaces(const Interface<Dim>& interf)
 	{
 		list<set<Face<Dim>*>> coplanarSubsets = interf.CoplanarSubsets();
+		if (coplanarSubsets.empty())
+			return FaceCollapsingStatus::NotEnoughFaces;
 		for (set<Face<Dim>*> subset : coplanarSubsets)
 		{
 			Interface<Dim> subInterf(vector<Face<Dim>*>(subset.begin(), subset.end()));
 			ReplaceFaces(subInterf.Faces(), subInterf.CollapsedFace());
 		}
+		return FaceCollapsingStatus::Ok;
 	}
 
 
@@ -673,16 +705,23 @@ private:
 		// Agglomerate the remaining fine elements with their closest coarse neighbour
 
 		//cout << "\t" << remainingFineElements.size() << " to agglomerate with coarse elements" << endl;
+		bool cancelCoarsening = false;
 
 		while (!remainingFineElements.empty())
 		{
 			ElementParallelLoop<Dim> parallelLoop(remainingFineElements);
-			parallelLoop.Execute([this, coarseMesh](Element<Dim>* currentElem)
+			parallelLoop.Execute([this, coarseMesh, &cancelCoarsening](Element<Dim>* currentElem)
 				{
+					if (cancelCoarsening)
+						return;
 					assert(!currentElem->CoarserElement);
 					Element<Dim>* coarseNeighbourForAggreg = this->FittestCoarseNeighbour(currentElem, CoarseningStrategy::AgglomerationCoarseningByClosestCenter);
 					if (!coarseNeighbourForAggreg)
-						Utils::FatalError("Element cannot be aggregated. Weird...");
+					{
+						Utils::Warning("No more agglomeration possible in this mesh or this physical region. Coarsening aborted.");
+						cancelCoarsening = true;
+						return;
+					}
 
 					if (coarseNeighbourForAggreg->Mutex.try_lock())
 					{
@@ -694,6 +733,13 @@ private:
 						coarseNeighbourForAggreg->Mutex.unlock();
 					}
 				});
+
+			if (cancelCoarsening)
+			{
+				delete coarseMesh;
+				this->CoarseMesh = nullptr;
+				return;
+			}
 
 			ElementParallelLoop<Dim> parallelLoopCollapseFaces(remainingFineElements);
 			parallelLoopCollapseFaces.Execute([coarseMesh](Element<Dim>* fineElement)
@@ -1078,9 +1124,9 @@ private:
 	vector<Element<Dim>*> AvailableFaceNeighbours(Element<Dim>* elem)
 	{
 		vector<Element<Dim>*> availableNeighbours;
-		for (Element<Dim>* n : elem->Neighbours())
+		for (Element<Dim>* n : elem->NeighboursInSamePhysicalPart())
 		{
-			if (n->IsInSamePhysicalPartAs(elem) && !n->CoarserElement)
+			if (!n->CoarserElement)
 				availableNeighbours.push_back(n);
 		}
 
@@ -1090,12 +1136,10 @@ private:
 	vector<Element<Dim>*> LockAvailableFaceNeighbours(Element<Dim>* elem)
 	{
 		vector<Element<Dim>*> availableNeighbours;
-		for (Element<Dim>* n : elem->Neighbours())
+		for (Element<Dim>* n : elem->NeighboursInSamePhysicalPart())
 		{
-			if (n->IsInSamePhysicalPartAs(elem) && !n->CoarserElement && n->Mutex.try_lock())
-			{
+			if (!n->CoarserElement && n->Mutex.try_lock())
 				availableNeighbours.push_back(n);
-			}
 		}
 
 		return availableNeighbours;
@@ -1667,20 +1711,17 @@ public:
 		{
 			for (Element<Dim>* e : this->Elements)
 			{
-				for (Element<Dim>* n : e->Neighbours())
+				for (Element<Dim>* n : e->NeighboursInSamePhysicalPart())
 				{
-					if (e->PhysicalPart == n->PhysicalPart)
+					auto faces = e->InterfaceWith(n);
+					if (faces.size() != 1)
 					{
-						auto faces = e->InterfaceWith(n);
-						if (faces.size() != 1)
+						FaceCollapsingStatus status = TryCollapseInterfaceBetween(e, n);
+						if (status == FaceCollapsingStatus::Ok)
 						{
-							FaceCollapsingStatus status = TryCollapseInterfaceBetween(e, n);
-							if (status == FaceCollapsingStatus::Ok)
-							{
-								e->ExportToMatlab("r");
-								n->ExportToMatlab("m");
-								assert(faces.size() == 1 && "After face collapsing, neighbours in the same physical part should have only one face in common.");
-							}
+							e->ExportToMatlab("r");
+							n->ExportToMatlab("m");
+							assert(faces.size() == 1 && "After face collapsing, neighbours in the same physical part should have only one face in common.");
 						}
 					}
 				}

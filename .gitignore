@@ -276,5 +276,6 @@ CMakeCache.txt
 cmake_install.cmake
 Makefile
 
+/build/
 /data/cache/
 /out/
