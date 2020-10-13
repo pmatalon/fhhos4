@@ -176,174 +176,160 @@ public:
 		// Parallel loop on the elements //
 		//-------------------------------//
 
-		ParallelLoop<Element<Dim>*, EmptyResultChunk> parallelLoop(mesh->Elements);
-
-		vector<NonZeroCoefficients> chunksMatrixCoeffs(parallelLoop.NThreads);
-		vector<NonZeroCoefficients> chunksConsistencyCoeffs(actions.ExportAssemblyTermMatrices ? parallelLoop.NThreads : 0);
-		vector<NonZeroCoefficients> chunksStabilizationCoeffs(actions.ExportAssemblyTermMatrices ? parallelLoop.NThreads : 0);
-		vector<NonZeroCoefficients> chunksReconstructionCoeffs(actions.ExportAssemblyTermMatrices ? parallelLoop.NThreads : 0);
-		
-		for (unsigned int threadNumber = 0; threadNumber < parallelLoop.NThreads; threadNumber++)
+		struct AssemblyResult
 		{
-			ParallelChunk<EmptyResultChunk>* chunk = parallelLoop.Chunks[threadNumber];
+			NonZeroCoefficients MatrixCoeffs;
+			NonZeroCoefficients ConsistencyCoeffs;
+			NonZeroCoefficients StabilizationCoeffs;
+			NonZeroCoefficients ReconstructionCoeffs;
+		};
 
-			chunk->ThreadFuture = std::async([this, mesh, cellBasis, faceBasis, reconstructionBasis, actions, chunk, &globalRHS, &chunksMatrixCoeffs, &chunksConsistencyCoeffs, &chunksStabilizationCoeffs, &chunksReconstructionCoeffs]()
+		ParallelLoop<Element<Dim>*, AssemblyResult> parallelLoop(mesh->Elements);
+
+		parallelLoop.InitChunks([this, actions](ParallelChunk<AssemblyResult>* chunk)
+			{
+				BigNumber nnzApproximate = chunk->Size() * (pow(HHO->nCellUnknowns, 2) + 4 * pow(HHO->nFaceUnknowns, 2) + HHO->nCellUnknowns * 4 * HHO->nFaceUnknowns);
+				chunk->Results.MatrixCoeffs         = NonZeroCoefficients(nnzApproximate);
+				chunk->Results.ConsistencyCoeffs    = NonZeroCoefficients(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
+				chunk->Results.StabilizationCoeffs  = NonZeroCoefficients(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
+				chunk->Results.ReconstructionCoeffs = NonZeroCoefficients(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
+			});
+
+		parallelLoop.Execute([this, mesh, cellBasis, faceBasis, reconstructionBasis, actions, &globalRHS](Element<Dim>* e, ParallelChunk<AssemblyResult>* chunk)
+			{
+				Diff_HHOElement<Dim>* element = dynamic_cast<Diff_HHOElement<Dim>*>(e);
+
+				if (!this->_staticCondensation)
 				{
-					BigNumber nnzApproximate = chunk->Size() * (pow(HHO->nCellUnknowns, 2) + 4 * pow(HHO->nFaceUnknowns, 2) + HHO->nCellUnknowns * 4 * HHO->nFaceUnknowns);
-					NonZeroCoefficients matrixCoeffs(nnzApproximate);
-					NonZeroCoefficients consistencyCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
-					NonZeroCoefficients stabilizationCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
-					NonZeroCoefficients reconstructionCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
+					//-----------------------//
+					// Att (cell/cell terms) //
+					//-----------------------//
 
-					for (BigNumber iElem = chunk->Start; iElem < chunk->End; iElem++)
+					for (BasisFunction<Dim>* cellPhi1 : cellBasis->LocalFunctions)
 					{
-						//--------------//
-						//   Assembly   //
-						//--------------//
-
-						//cout << "Element " << element->Number << endl;
-						Diff_HHOElement<Dim>* element = dynamic_cast<Diff_HHOElement<Dim>*>(mesh->Elements[iElem]);
-
-						if (!this->_staticCondensation)
+						BigNumber i = DOFNumber(element, cellPhi1);
+						for (BasisFunction<Dim>* cellPhi2 : cellBasis->LocalFunctions)
 						{
-							//-----------------------//
-							// Att (cell/cell terms) //
-							//-----------------------//
+							BigNumber j = DOFNumber(element, cellPhi2);
 
-							for (BasisFunction<Dim>* cellPhi1 : cellBasis->LocalFunctions)
+							double matrixTerm = element->MatrixTerm(cellPhi1, cellPhi2);
+							chunk->Results.MatrixCoeffs.Add(i, j, matrixTerm);
+							if (actions.ExportAssemblyTermMatrices)
 							{
-								BigNumber i = DOFNumber(element, cellPhi1);
-								for (BasisFunction<Dim>* cellPhi2 : cellBasis->LocalFunctions)
-								{
-									BigNumber j = DOFNumber(element, cellPhi2);
+								double consistencyTerm = element->ConsistencyTerm(cellPhi1, cellPhi2);
+								chunk->Results.ConsistencyCoeffs.Add(i, j, consistencyTerm);
 
-									double matrixTerm = element->MatrixTerm(cellPhi1, cellPhi2);
-									matrixCoeffs.Add(i, j, matrixTerm);
-									if (actions.ExportAssemblyTermMatrices)
-									{
-										double consistencyTerm = element->ConsistencyTerm(cellPhi1, cellPhi2);
-										consistencyCoeffs.Add(i, j, consistencyTerm);
-
-										double stabilizationTerm = element->StabilizationTerm(cellPhi1, cellPhi2);
-										stabilizationCoeffs.Add(i, j, stabilizationTerm);
-									}
-								}
+								double stabilizationTerm = element->StabilizationTerm(cellPhi1, cellPhi2);
+								chunk->Results.StabilizationCoeffs.Add(i, j, stabilizationTerm);
 							}
 						}
-
-						//----------------------------//
-						// Atf, Aft (cell/face terms) //
-						//----------------------------//
-
-						for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions)
-						{
-							BigNumber i = DOFNumber(element, cellPhi);
-							for (auto face : element->Faces)
-							{
-								for (BasisFunction<Dim - 1>* facePhi : faceBasis->LocalFunctions)
-								{
-									BigNumber j = DOFNumber(face, facePhi);
-
-									double matrixTerm = element->MatrixTerm(face, cellPhi, facePhi);
-									matrixCoeffs.Add(i, j, matrixTerm);
-									matrixCoeffs.Add(j, i, matrixTerm);
-									if (actions.ExportAssemblyTermMatrices && !face->HasDirichletBC())
-									{
-										double consistencyTerm = element->ConsistencyTerm(face, cellPhi, facePhi);
-										consistencyCoeffs.Add(i, j, consistencyTerm);
-										consistencyCoeffs.Add(j, i, consistencyTerm);
-
-										double stabilizationTerm = element->StabilizationTerm(face, cellPhi, facePhi);
-										stabilizationCoeffs.Add(i, j, stabilizationTerm);
-										stabilizationCoeffs.Add(j, i, stabilizationTerm);
-									}
-								}
-							}
-						}
-
-						//-----------------------//
-						// Aff (face/face terms) //
-						//-----------------------//
-
-						for (auto face1 : element->Faces)
-						{
-							for (BasisFunction<Dim - 1>* facePhi1 : faceBasis->LocalFunctions)
-							{
-								BigNumber i = DOFNumber(face1, facePhi1);
-								for (auto face2 : element->Faces)
-								{
-									for (BasisFunction<Dim - 1>* facePhi2 : faceBasis->LocalFunctions)
-									{
-										BigNumber j = DOFNumber(face2, facePhi2);
-
-										double matrixTerm = element->MatrixTerm(face1, facePhi1, face2, facePhi2);
-										matrixCoeffs.Add(i, j, matrixTerm);
-										if (actions.ExportAssemblyTermMatrices && !face1->HasDirichletBC() && !face2->HasDirichletBC())
-										{
-											double consistencyTerm = element->ConsistencyTerm(face1, facePhi1, face2, facePhi2);
-											consistencyCoeffs.Add(i, j, consistencyTerm);
-
-											double stabilizationTerm = element->StabilizationTerm(face1, facePhi1, face2, facePhi2);
-											stabilizationCoeffs.Add(i, j, stabilizationTerm);
-										}
-									}
-								}
-							}
-						}
-
-						//-----------------//
-						// Right-hand side //
-						//-----------------//
-
-						if (actions.AssembleRightHandSide)
-						{
-							for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions)
-							{
-								BigNumber i = DOFNumber(element, cellPhi);
-								globalRHS(i) = element->SourceTerm(cellPhi, this->_sourceFunction);
-							}
-						}
-
-						//------------------------------------------------//
-						// Global reconstruction matrix (only for export) //
-						//------------------------------------------------//
-
-						if (actions.ExportAssemblyTermMatrices)
-						{
-							for (BasisFunction<Dim>* reconstructPhi : reconstructionBasis->LocalFunctions)
-							{
-								BigNumber i = element->Number * reconstructionBasis->Size() + reconstructPhi->LocalNumber;
-								for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions)
-								{
-									BigNumber j = DOFNumber(element, cellPhi);
-									reconstructionCoeffs.Add(i, j, element->ReconstructionTerm(reconstructPhi, cellPhi));
-								}
-								for (auto face : element->Faces)
-								{
-									for (BasisFunction<Dim - 1>* facePhi : faceBasis->LocalFunctions)
-									{
-										BigNumber j = DOFNumber(face, facePhi);
-										reconstructionCoeffs.Add(i, j, element->ReconstructionTerm(reconstructPhi, face, facePhi));
-									}
-								}
-							}
-						}
-					}
-
-					chunksMatrixCoeffs[chunk->ThreadNumber] = matrixCoeffs;
-					if (actions.ExportAssemblyTermMatrices)
-					{
-						chunksConsistencyCoeffs[chunk->ThreadNumber] = consistencyCoeffs;
-						chunksStabilizationCoeffs[chunk->ThreadNumber] = stabilizationCoeffs;
-						chunksReconstructionCoeffs[chunk->ThreadNumber] = reconstructionCoeffs;
 					}
 				}
-			);
-		}
+
+				//----------------------------//
+				// Atf, Aft (cell/face terms) //
+				//----------------------------//
+
+				for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions)
+				{
+					BigNumber i = DOFNumber(element, cellPhi);
+					for (auto face : element->Faces)
+					{
+						for (BasisFunction<Dim - 1>* facePhi : faceBasis->LocalFunctions)
+						{
+							BigNumber j = DOFNumber(face, facePhi);
+
+							double matrixTerm = element->MatrixTerm(face, cellPhi, facePhi);
+							chunk->Results.MatrixCoeffs.Add(i, j, matrixTerm);
+							chunk->Results.MatrixCoeffs.Add(j, i, matrixTerm);
+							if (actions.ExportAssemblyTermMatrices && !face->HasDirichletBC())
+							{
+								double consistencyTerm = element->ConsistencyTerm(face, cellPhi, facePhi);
+								chunk->Results.ConsistencyCoeffs.Add(i, j, consistencyTerm);
+								chunk->Results.ConsistencyCoeffs.Add(j, i, consistencyTerm);
+
+								double stabilizationTerm = element->StabilizationTerm(face, cellPhi, facePhi);
+								chunk->Results.StabilizationCoeffs.Add(i, j, stabilizationTerm);
+								chunk->Results.StabilizationCoeffs.Add(j, i, stabilizationTerm);
+							}
+						}
+					}
+				}
+
+				//-----------------------//
+				// Aff (face/face terms) //
+				//-----------------------//
+
+				for (auto face1 : element->Faces)
+				{
+					for (BasisFunction<Dim - 1>* facePhi1 : faceBasis->LocalFunctions)
+					{
+						BigNumber i = DOFNumber(face1, facePhi1);
+						for (auto face2 : element->Faces)
+						{
+							for (BasisFunction<Dim - 1>* facePhi2 : faceBasis->LocalFunctions)
+							{
+								BigNumber j = DOFNumber(face2, facePhi2);
+
+								double matrixTerm = element->MatrixTerm(face1, facePhi1, face2, facePhi2);
+								chunk->Results.MatrixCoeffs.Add(i, j, matrixTerm);
+								if (actions.ExportAssemblyTermMatrices && !face1->HasDirichletBC() && !face2->HasDirichletBC())
+								{
+									double consistencyTerm = element->ConsistencyTerm(face1, facePhi1, face2, facePhi2);
+									chunk->Results.ConsistencyCoeffs.Add(i, j, consistencyTerm);
+
+									double stabilizationTerm = element->StabilizationTerm(face1, facePhi1, face2, facePhi2);
+									chunk->Results.StabilizationCoeffs.Add(i, j, stabilizationTerm);
+								}
+							}
+						}
+					}
+				}
+
+				//-----------------//
+				// Right-hand side //
+				//-----------------//
+
+				if (actions.AssembleRightHandSide)
+				{
+					for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions)
+					{
+						BigNumber i = DOFNumber(element, cellPhi);
+						globalRHS(i) = element->SourceTerm(cellPhi, this->_sourceFunction);
+					}
+				}
+
+				//------------------------------------------------//
+				// Global reconstruction matrix (only for export) //
+				//------------------------------------------------//
+
+				if (actions.ExportAssemblyTermMatrices)
+				{
+					for (BasisFunction<Dim>* reconstructPhi : reconstructionBasis->LocalFunctions)
+					{
+						BigNumber i = element->Number * reconstructionBasis->Size() + reconstructPhi->LocalNumber;
+						for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions)
+						{
+							BigNumber j = DOFNumber(element, cellPhi);
+							chunk->Results.ReconstructionCoeffs.Add(i, j, element->ReconstructionTerm(reconstructPhi, cellPhi));
+						}
+						for (auto face : element->Faces)
+						{
+							for (BasisFunction<Dim - 1>* facePhi : faceBasis->LocalFunctions)
+							{
+								BigNumber j = DOFNumber(face, facePhi);
+								chunk->Results.ReconstructionCoeffs.Add(i, j, element->ReconstructionTerm(reconstructPhi, face, facePhi));
+							}
+						}
+					}
+				}
+			});
 
 		//------------------------------------//
 		// Aggregation of the parallel chunks //
 		//------------------------------------//
+
+		cout << "Memory allocation for the global list of coefficients" << endl;
 
 		BigNumber nnzApproximate = mesh->Elements.size() * (pow(HHO->nCellUnknowns, 2) + 4 * pow(HHO->nFaceUnknowns, 2) + HHO->nCellUnknowns * 4 * HHO->nFaceUnknowns);
 		NonZeroCoefficients matrixCoeffs(nnzApproximate);
@@ -351,30 +337,25 @@ public:
 		NonZeroCoefficients stabilizationCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
 		NonZeroCoefficients reconstructionCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
 
-		parallelLoop.Wait();
+		cout << "Aggregation of the parallel chunks into the global list" << endl;
 
-		for (unsigned int threadNumber = 0; threadNumber < parallelLoop.NThreads; threadNumber++)
-		{
-			matrixCoeffs.Add(chunksMatrixCoeffs[threadNumber]);
-			if (actions.ExportAssemblyTermMatrices)
+		parallelLoop.AggregateChunkResults([&matrixCoeffs, &consistencyCoeffs, &stabilizationCoeffs, &reconstructionCoeffs, actions](AssemblyResult& chunkResult)
 			{
-				consistencyCoeffs.Add(chunksConsistencyCoeffs[threadNumber]);
-				stabilizationCoeffs.Add(chunksStabilizationCoeffs[threadNumber]);
-				reconstructionCoeffs.Add(chunksReconstructionCoeffs[threadNumber]);
-			}
-		}
-
-		chunksMatrixCoeffs.clear();
-		if (actions.ExportAssemblyTermMatrices)
-		{
-			chunksConsistencyCoeffs.clear();
-			chunksStabilizationCoeffs.clear();
-			chunksReconstructionCoeffs.clear();
-		}
+				matrixCoeffs.Add(chunkResult.MatrixCoeffs);
+				chunkResult.MatrixCoeffs.Clear();
+				if (actions.ExportAssemblyTermMatrices)
+				{
+					consistencyCoeffs.Add(chunkResult.ConsistencyCoeffs);
+					stabilizationCoeffs.Add(chunkResult.StabilizationCoeffs);
+					reconstructionCoeffs.Add(chunkResult.ReconstructionCoeffs);
+				}
+			});
 
 		//-----------------------------------//
 		// Delete now useless local matrices //
 		//-----------------------------------//
+
+		cout << "Delete now useless local matrices" << endl;
 
 		ElementParallelLoop<Dim> parallelLoopE(mesh->Elements);
 		parallelLoopE.Execute([](Element<Dim>* element)
@@ -391,8 +372,19 @@ public:
 			});
 
 
+		cout << "Reserve memory for extendedMatrix" << endl;
+
 		SparseMatrix extendedMatrix = SparseMatrix(HHO->nTotalHybridCoeffs, HHO->nTotalHybridCoeffs);
+		extendedMatrix.reserve(matrixCoeffs.Size());
+
+		cout << "Fill extendedMatrix" << endl;
 		matrixCoeffs.Fill(extendedMatrix);
+
+		cout << "Clear coefficients" << endl;
+		matrixCoeffs.Clear();
+		consistencyCoeffs.Clear();
+		stabilizationCoeffs.Clear();
+		reconstructionCoeffs.Clear();
 
 		// The global system matrix is the extended matrix where the Dirichlet "unknowns" are eliminated
 		SparseMatrix globalSystemMatrix = extendedMatrix.topLeftCorner(HHO->nTotalHybridUnknowns, HHO->nTotalHybridUnknowns);

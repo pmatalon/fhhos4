@@ -92,10 +92,10 @@ public:
 		assert(start == loopSize);
 	}
 
-	void InitChunkResults(function<void(ResultT&)> functionInitChunkResults)
+	void InitChunks(function<void(ParallelChunk<ResultT>*)> functionInitChunks)
 	{
 		for (unsigned int threadNumber = 0; threadNumber < NThreads; threadNumber++)
-			functionInitChunkResults(Chunks[threadNumber]->Results);
+			functionInitChunks(Chunks[threadNumber]);
 	}
 
 	void AggregateChunkResults(function<void(ResultT&)> aggregate)

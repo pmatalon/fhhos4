@@ -313,7 +313,7 @@ protected:
 	void InitFaceLocalNumbering()
 	{
 		ElementParallelLoop<Dim> parallelLoop(this->Elements);
-		parallelLoop.Execute([](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+		parallelLoop.Execute([](Element<Dim>* e)
 			{
 				e->InitFaceLocalNumbering();
 			});
@@ -322,7 +322,7 @@ protected:
 	void InitFinerElementsLocalNumbering()
 	{
 		ElementParallelLoop<Dim> parallelLoop(this->Elements);
-		parallelLoop.Execute([](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+		parallelLoop.Execute([](Element<Dim>* e)
 			{
 				e->InitFinerElementsLocalNumbering();
 			});

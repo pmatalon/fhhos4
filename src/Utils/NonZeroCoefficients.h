@@ -12,9 +12,17 @@ public:
 		this->coefficients.reserve(nnzApproximate);
 	}
 
-
-
 	NonZeroCoefficients() {}
+
+	size_t Size()
+	{
+		return coefficients.size();
+	}
+
+	void Clear()
+	{
+		coefficients.clear();
+	}
 
 	//Reserve()
 	/*NonZeroCoefficients(BigNumber nRows, BigNumber nCols, BigNumber nnzApproximate) : Done(nRows, nCols)
