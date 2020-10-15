@@ -125,37 +125,7 @@ public:
 protected:
 	virtual void FinalizeCoarsening() override
 	{
-		CoarseningStrategy stgy = this->CoarseMesh->ComesFrom.CS;
-		if (stgy != CoarseningStrategy::IndependentRemeshing && !Utils::BuildsNestedMeshHierarchy(stgy))
-		{
-			ElementParallelLoop<Dim> parallelLoopC(this->CoarseMesh->Elements);
-			parallelLoopC.Execute([](Element<Dim>* ce)
-				{
-					ce->FinerElements.clear();
-				});
-
-			ElementParallelLoop<Dim> parallelLoopF(this->Elements);
-			parallelLoopF.Execute([](Element<Dim>* fe)
-				{
-					Element<Dim>* ce = fe->CoarserElement;
-					if (!ce->Contains(fe->Center()))
-					{
-						vector<Element<Dim>*> candidates = ce->VertexNeighbours();
-						for (auto e : candidates)
-						{
-							if (e->Contains(fe->Center()))
-							{
-								fe->CoarserElement = e;
-								break;
-							}
-						}
-					}
-					fe->CoarserElement->Mutex.lock();
-					fe->CoarserElement->FinerElements.push_back(fe);
-					fe->CoarserElement->Mutex.unlock();
-				});
-		}
-
+		// Compute triangulation and bounding box of the polygons
 		ElementParallelLoop<Dim> parallelLoop(this->CoarseMesh->Elements);
 		parallelLoop.Execute([](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
 			{
@@ -1559,17 +1529,12 @@ private:
 		}
 		mergedFace->BoundaryPart = faces[0]->BoundaryPart;
 
-		// Replace in the elements
 		Element<Dim>* elem1 = faces[0]->Element1;
 		Element<Dim>* elem2 = faces[0]->Element2;
 		mergedFace->Element1 = elem1;
 		mergedFace->Element2 = elem2;
 
-		elem1->ReplaceFaces(faces, mergedFace);
-		if (elem2)
-			elem2->ReplaceFaces(faces, mergedFace);
-
-		// Links
+		// Intergrid links
 		for (Face<Dim>* f : faces)
 		{
 			for (Face<Dim>* ff : f->FinerFaces)
@@ -1578,6 +1543,11 @@ private:
 				ff->CoarseFace = mergedFace;
 			}
 		}
+
+		// Replace the faces in the elements (reshape the polygon, update the vertices, transfer finer elements to the neighbours if needed)
+		elem1->ReplaceFaces(faces, mergedFace);
+		if (elem2)
+			elem2->ReplaceFaces(faces, mergedFace);
 
 		// Remove the faces from the mesh
 		for (Face<Dim>* f : faces)

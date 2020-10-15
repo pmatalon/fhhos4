@@ -27,6 +27,8 @@ public:
 
 	virtual bool IsConvex() const = 0;
 
+	virtual DomPoint InteriorPoint() const = 0;
+
 	virtual bool Contains(const DomPoint& p) const = 0;
 
 	virtual bool IsDegenerated() const = 0;

@@ -359,6 +359,13 @@ public:
 	{
 		return _center;
 	}
+	inline DomPoint InteriorPoint() const override
+	{
+		if (IsConvex() || Contains(_center))
+			return _center;
+		assert(!_triangulation.empty());
+		return _triangulation[0].Center();
+	}
 	inline bool IsConvex() const override
 	{
 		return _cgalPolygon.is_convex();

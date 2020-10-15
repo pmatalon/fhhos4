@@ -99,6 +99,10 @@ public:
 	{
 		return _center;
 	}
+	inline DomPoint InteriorPoint() const override
+	{
+		return _center;
+	}
 	inline bool IsConvex() const override
 	{
 		return true;

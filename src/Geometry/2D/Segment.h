@@ -63,6 +63,10 @@ public:
 	{
 		return _center;
 	}
+	inline DomPoint InteriorPoint() const override
+	{
+		return _center;
+	}
 	inline bool IsConvex() const override
 	{
 		return true;
@@ -81,7 +85,7 @@ public:
 		DimVector<2> AB = B - A;
 		DimVector<2> AP = P - A;
 		double AB_dot_AP = AB.dot(AP);
-		return AB_dot_AP > 0 && AB_dot_AP < AB.dot(AB) && abs(AB_dot_AP - AB.norm()*AP.norm()) < Point::Tolerance;
+		return AB_dot_AP > 0 && AB_dot_AP < AB.dot(AB) && abs(AB_dot_AP - AB.norm()*AP.norm()) < Utils::Eps*AB_dot_AP;
 	}
 
 	inline double DetJacobian() const override

@@ -73,6 +73,9 @@ public:
 	void PlotTriangle(const DomPoint& A, const DomPoint& B, const DomPoint& C, string color)
 	{
 		Out() << "fill(axes, [" << A.X << ";" << B.X << ";" << C.X << "], [" << A.Y << "; " << B.Y << ";" << C.Y << "], '" << color << "', 'LineStyle','none', 'FaceAlpha', 0.5);" << endl;
+		PlotSegment(A, B, color);
+		PlotSegment(B, C, color);
+		PlotSegment(C, A, color);
 	}
 
 	void PlotText(const DomPoint& p, string text, string color = "k")

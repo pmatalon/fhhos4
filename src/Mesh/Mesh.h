@@ -581,14 +581,19 @@ public:
 					assert(feIsReferenced && "This fine element is not referenced in the list FinerElements of its associated coarse element.");
 				}
 
+				BigNumber totalFinerElements = 0;
 				for (Element<Dim>* ce : CoarseMesh->Elements)
 				{
+					totalFinerElements += ce->FinerElements.size();
+
 					if (Utils::BuildsNestedMeshHierarchy(CoarseMesh->ComesFrom.CS))
 						assert(ce->FinerElements.size() > 0 && "This coarse element doesn't have any finer element.");
 
 					for (Face<Dim>* ff : ce->FinerFacesRemoved)
 						assert(ff->IsRemovedOnCoarserGrid && "This face is supposed to be removed inside this coarse element, but the flag IsRemovedOnCoarserGrid is not set.");
 				}
+
+				assert(totalFinerElements == this->Elements.size() && "Discrepency between the number of elements in the fine mesh and the number of fine elements associated to coarse elements.");
 			}
 
 			if (CoarseMesh->ComesFrom.CS != CoarseningStrategy::IndependentRemeshing)

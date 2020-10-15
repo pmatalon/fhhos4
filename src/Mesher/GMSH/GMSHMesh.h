@@ -678,25 +678,23 @@ private:
 
 		CloseGMSH();
 
-		/*for (Element<Dim>* coarse : coarseMesh->Elements)
+		for (Element<Dim>* coarse : coarseMesh->Elements)
 		{
-			if (coarse->FinerElements.empty())
+			//if (coarse->FinerElements.size() > 5 || coarse->FinerElements.size() < 2)
+			/*if (coarse->Id % (coarseMesh->Elements.size()/13) == 0)
 			{
-				Utils::Warning("This coarse element does not have any fine element.");
-				for (Element<Dim>* neighbour : coarse->NeighboursInSamePhysicalPart())
+				cout << "%---------- coarse " << endl;
+				coarse->ExportToMatlab("b");
+				for (auto fe : coarse->FinerElements)
 				{
-					for (Element<Dim>* fe : neighbour->FinerElements)
-					{
-						if (!PolyhedralMesh<Dim>::Intersection(coarse, fe).empty())
-						{
-							coarse->FinerElements.push_back(fe);
-							break;
-						}
-					}
+					cout << "% fine " << endl;
+					fe->ExportToMatlab("m");
 				}
-				assert(!coarse->FinerElements.empty());
-			}
-		}*/
+			}*/
+
+			if (coarse->FinerElements.empty())
+				Utils::Warning("This coarse element does not have any fine element.");
+		}
 
 		this->FinalizeCoarsening();
 	}

@@ -108,6 +108,10 @@ public:
 	{
 		return Shape()->Center();
 	}
+	virtual DomPoint InteriorPoint() const
+	{
+		return Shape()->InteriorPoint();
+	}
 	virtual bool IsConvex() const
 	{
 		return Shape()->IsConvex();
@@ -280,9 +284,14 @@ public:
 
 	bool HasFace(Face<Dim>* face)
 	{
-		for (Face<Dim>* f : this->Faces)
+		return find(this->Faces.begin(), this->Faces.end(), face) != this->Faces.end();
+	}
+
+	bool HasAny(vector<Face<Dim>*> faces)
+	{
+		for (Face<Dim>* f : faces)
 		{
-			if (f == face)
+			if (this->HasFace(f))
 				return true;
 		}
 		return false;
@@ -331,7 +340,44 @@ public:
 		}
 		this->Faces.push_back(collapsedFace);
 
+		double oldMeasure = this->Measure();
 		RemoveIntersections(faces, collapsedFace);
+		double newMeasure = this->Measure();
+
+		// Some fine elements associated to this coarse one might now be more overlapping the other coarse elements.
+		// So we change the association.
+		if (!collapsedFace->IsDomainBoundary && newMeasure < oldMeasure)
+		{
+			Element<Dim>* neighbour = collapsedFace->GetNeighbour(this);
+			auto it = this->FinerElements.begin();
+			while (it != this->FinerElements.end())
+			{
+				Element<Dim>* fe = *it;
+				if (fe->HasAny(collapsedFace->FinerFaces))
+				{
+					DomPoint p = fe->InteriorPoint();
+					if (!this->Contains(p) && !collapsedFace->Contains(p) && neighbour->Contains(p))
+					{
+						/*cout << "%---------- this " << endl;
+						this->ExportToMatlab("b");
+						cout << "% neighbour " << endl;
+						neighbour->ExportToMatlab("m");
+						cout << "% transfered finer element (b --> m) " << endl;
+						fe->ExportToMatlab("r");
+						MatlabScript s;
+						s.PlotPoint(p, "rx");*/
+
+						// Transfer to the neighbour
+						fe->CoarserElement = neighbour;
+						neighbour->FinerElements.push_back(fe);
+						it = this->FinerElements.erase(it);
+						continue;
+					}
+				}
+				it++;
+			}
+		}
+
 	}
 
 protected:
