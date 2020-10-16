@@ -39,9 +39,9 @@ private:
 		return this->Shape()->IntegralKGradGradReconstruct(K, reconstructPhi1, reconstructPhi2);
 	}
 
-	DenseMatrix CellMassMatrix(FunctionalBasis<Dim>* basis) const
+	DenseMatrix MassMatrix(FunctionalBasis<Dim>* basis) const
 	{
-		return this->Shape()->CellMassMatrix(basis);
+		return this->Shape()->MassMatrix(basis);
 	}
 
 	DenseMatrix CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) const
@@ -64,7 +64,7 @@ public:
 		//this->ComputeAndSaveQuadraturePoints(hho->ReconstructionBasis->GetDegree());
 		//this->ComputeAndSaveQuadraturePoints();
 
-		DenseMatrix cellMassMatrix = this->CellMassMatrix(hho->CellBasis);
+		DenseMatrix cellMassMatrix = this->MassMatrix(hho->CellBasis);
 		DenseMatrix Nt = this->CellReconstructMassMatrix(hho->CellBasis, hho->ReconstructionBasis);
 		this->_projFromReconstruct = cellMassMatrix.inverse() * Nt;
 
@@ -107,7 +107,7 @@ public:
 				}
 			}
 			
-			DenseMatrix fineMass = fineElement->CellMassMatrix(cellBasis);
+			DenseMatrix fineMass = fineElement->MassMatrix(cellBasis);
 
 			J.block(this->LocalNumberOf(fineElement)*cellBasis->Size(), 0, cellBasis->Size(), cellBasis->Size()) = fineMass.inverse() * fineCoarseMass;
 		}
@@ -153,7 +153,7 @@ public:
 				}
 			}
 
-			DenseMatrix fineMass = fineElement->CellMassMatrix(cellBasis);
+			DenseMatrix fineMass = fineElement->MassMatrix(cellBasis);
 
 			L2Proj.block(this->LocalNumberOfOverlapping(fineElement)*cellBasis->Size(), 0, cellBasis->Size(), cellBasis->Size()) = fineMass.inverse() * fineCoarseMass;
 		}
@@ -413,7 +413,7 @@ private:
 			{
 				Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
 				auto normal = this->OuterNormalVector(face);
-				DenseMatrix Mf = face->FaceMassMatrix();
+				DenseMatrix Mf = face->MassMatrix();
 				DenseMatrix ProjF = face->TraceUsingReconstructBasis(this);
 				DenseMatrix ProjFT = face->TraceUsingCellBasis(this);
 
@@ -432,7 +432,7 @@ private:
 			{
 				Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
 				auto normal = this->OuterNormalVector(face);
-				DenseMatrix Mf = face->FaceMassMatrix();
+				DenseMatrix Mf = face->MassMatrix();
 				DenseMatrix ProjFT = face->TraceUsingCellBasis(this);
 
 				DenseMatrix Fpart = DenseMatrix::Zero(HHO->nFaceUnknowns, nHybridUnknowns);
@@ -465,7 +465,7 @@ public:
 		{
 			Diff_HHOFace<Dim>* f = dynamic_cast<Diff_HHOFace<Dim>*>(face);
 			int localNumber = this->LocalNumberOf(f);
-			boundaryMassMatrix.block(localNumber, localNumber, HHO->nFaceUnknowns, HHO->nFaceUnknowns) = f->FaceMassMatrix();
+			boundaryMassMatrix.block(localNumber, localNumber, HHO->nFaceUnknowns, HHO->nFaceUnknowns) = f->MassMatrix();
 		}
 
 		DenseMatrix C = ReconstructionFromFacesMatrix();

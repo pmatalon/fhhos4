@@ -179,33 +179,36 @@ public:
 		// Compute integrals on reference elements //
 		//-----------------------------------------//
 
-		// Compute some useful integrals on reference element and store them
-		// - Cartesian element
-		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreCellMassMatrix(cellBasis);
-		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreReconstructMassMatrix(reconstructionBasis);
-		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreCellStiffnessMatrix(cellBasis);
-		if (this->_diffusionField->K1)
-			CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreReconstructK1StiffnessMatrix(this->_diffusionField->K1, reconstructionBasis);
-		if (this->_diffusionField->K2)
-			CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreReconstructK2StiffnessMatrix(this->_diffusionField->K2, reconstructionBasis);
-		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix(cellBasis, reconstructionBasis);
-		CartesianShape<Dim, Dim - 1>::InitReferenceShape()->ComputeAndStoreFaceMassMatrix(faceBasis);
-		if (Dim == 2)
+		if (actions.AssembleRightHandSide)
 		{
-			// - TriangularElement
-			Triangle::InitReferenceShape()->ComputeAndStoreCellMassMatrix((FunctionalBasis<2>*)cellBasis);
-			Triangle::InitReferenceShape()->ComputeAndStoreReconstructMassMatrix((FunctionalBasis<2>*)reconstructionBasis);
-			//Triangle::InitReferenceShape().ComputeAndStoreCellStiffnessMatrix((FunctionalBasis<2>*)cellBasis);
-			//Triangle::InitReferenceShape().ComputeAndStoreReconstructK1StiffnessMatrix(this->_diffusionField->K1, reconstructionBasis);
-			//Triangle::InitReferenceShape().ComputeAndStoreReconstructK2StiffnessMatrix(this->_diffusionField->K2, reconstructionBasis);
-			Triangle::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix((FunctionalBasis<2>*)cellBasis, (FunctionalBasis<2>*)reconstructionBasis);
-		}
-		else if (Dim == 3)
-		{
-			// - TetrahedralElement
-			Tetrahedron::InitReferenceShape()->ComputeAndStoreCellMassMatrix((FunctionalBasis<3>*)cellBasis);
-			Tetrahedron::InitReferenceShape()->ComputeAndStoreReconstructMassMatrix((FunctionalBasis<3>*)reconstructionBasis);
-			Tetrahedron::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix((FunctionalBasis<3>*)cellBasis, (FunctionalBasis<3>*)reconstructionBasis);
+			// Compute some useful integrals on reference element and store them
+			// - Cartesian element
+			CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreMassMatrix(cellBasis);
+			CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreMassMatrix(reconstructionBasis);
+			CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreCellStiffnessMatrix(cellBasis);
+			if (this->_diffusionField->K1)
+				CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreReconstructK1StiffnessMatrix(this->_diffusionField->K1, reconstructionBasis);
+			if (this->_diffusionField->K2)
+				CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreReconstructK2StiffnessMatrix(this->_diffusionField->K2, reconstructionBasis);
+			CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix(cellBasis, reconstructionBasis);
+			CartesianShape<Dim, Dim - 1>::InitReferenceShape()->ComputeAndStoreMassMatrix(faceBasis);
+			if (Dim == 2)
+			{
+				// - TriangularElement
+				Triangle::InitReferenceShape()->ComputeAndStoreMassMatrix((FunctionalBasis<2>*)cellBasis);
+				Triangle::InitReferenceShape()->ComputeAndStoreMassMatrix((FunctionalBasis<2>*)reconstructionBasis);
+				//Triangle::InitReferenceShape().ComputeAndStoreCellStiffnessMatrix((FunctionalBasis<2>*)cellBasis);
+				//Triangle::InitReferenceShape().ComputeAndStoreReconstructK1StiffnessMatrix(this->_diffusionField->K1, reconstructionBasis);
+				//Triangle::InitReferenceShape().ComputeAndStoreReconstructK2StiffnessMatrix(this->_diffusionField->K2, reconstructionBasis);
+				Triangle::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix((FunctionalBasis<2>*)cellBasis, (FunctionalBasis<2>*)reconstructionBasis);
+			}
+			else if (Dim == 3)
+			{
+				// - TetrahedralElement
+				Tetrahedron::InitReferenceShape()->ComputeAndStoreMassMatrix((FunctionalBasis<3>*)cellBasis);
+				Tetrahedron::InitReferenceShape()->ComputeAndStoreMassMatrix((FunctionalBasis<3>*)reconstructionBasis);
+				Tetrahedron::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix((FunctionalBasis<3>*)cellBasis, (FunctionalBasis<3>*)reconstructionBasis);
+			}
 		}
 
 		//----------------------------//
@@ -490,7 +493,7 @@ public:
 			{
 				Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
 				BigNumber i = FirstDOFGlobalNumber(f) - HHO->nTotalHybridUnknowns;
-				this->_dirichletCond.segment(i, HHO->nFaceUnknowns) = face->InvFaceMassMatrix()*face->ProjectOnBasis(faceBasis, this->_boundaryConditions->DirichletFunction);
+				this->_dirichletCond.segment(i, HHO->nFaceUnknowns) = face->InvMassMatrix()*face->ProjectOnBasis(faceBasis, this->_boundaryConditions->DirichletFunction);
 			}
 		);
 		if (actions.AssembleRightHandSide)
@@ -690,10 +693,10 @@ public:
 				Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
 				BigNumber i = face->Number * faceBasis->Size();// FirstDOFGlobalNumber(f);
 
-				DenseMatrix m = face->InvFaceMassMatrix();
+				DenseMatrix m = face->InvMassMatrix();
 				Vector v = face->ProjectOnBasis(faceBasis, func);
 
-				vectorOfDoFs.segment(i, HHO->nFaceUnknowns) = face->InvFaceMassMatrix()*face->ProjectOnBasis(faceBasis, func);
+				vectorOfDoFs.segment(i, HHO->nFaceUnknowns) = face->InvMassMatrix()*face->ProjectOnBasis(faceBasis, func);
 			}
 		);
 		return vectorOfDoFs;

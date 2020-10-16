@@ -250,12 +250,7 @@ public:
 	//             HHO             //
 	//-----------------------------//
 
-	virtual DenseMatrix FaceMassMatrix(FunctionalBasis<Dim>* basis) const
-	{
-		return this->ComputeAndReturnMassMatrix(basis);
-	}
-
-	virtual DenseMatrix CellMassMatrix(FunctionalBasis<Dim>* basis) const
+	virtual DenseMatrix MassMatrix(FunctionalBasis<Dim>* basis) const
 	{
 		return this->ComputeAndReturnMassMatrix(basis);
 	}

@@ -4,23 +4,16 @@
 template <int Dim>
 class ReferenceShape : public GeometricShape<Dim>
 {
-protected:
-	// For DG
-	DenseMatrix _massMatrix;
+private:
+	DenseMatrix _massMatrix1;
+	FunctionalBasis<Dim>* _massMatrix1Basis = nullptr;
 
-	// For HHO
-	DenseMatrix _cellMassMatrix;
-	FunctionalBasis<Dim>* _cellMassMatrixBasis;
-
-	DenseMatrix _reconstructMassMatrix;
-	FunctionalBasis<Dim>* _reconstructMassMatrixBasis;
+	DenseMatrix _massMatrix2;
+	FunctionalBasis<Dim>* _massMatrix2Basis = nullptr;
 
 	DenseMatrix _cellReconstructMassMatrix;
 	FunctionalBasis<Dim>* _cellReconstructMassMatrixCellBasis;
 	FunctionalBasis<Dim>* _cellReconstructMassMatrixReconstructBasis;
-
-	DenseMatrix _faceMassMatrix;
-	FunctionalBasis<Dim>* _faceMassMatrixBasis;
 
 public:
 	ReferenceShape() {}
@@ -56,23 +49,20 @@ public:
 
 	double MassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{
-		return this->_massMatrix(phi1->LocalNumber, phi2->LocalNumber);
-	}
-
-	void ComputeAndStoreMassMatrix(FunctionalBasis<Dim>* basis)
-	{
-		if (_massMatrix.rows() == 0)
-			_massMatrix = this->ComputeAndReturnMassMatrix(basis);
+		return this->_massMatrix1(phi1->LocalNumber, phi2->LocalNumber);
 	}
 
 	//---------//
 	//   HHO   //
 	//---------//
 
-	DenseMatrix CellMassMatrix(FunctionalBasis<Dim>* basis)
+	DenseMatrix MassMatrix(FunctionalBasis<Dim>* basis)
 	{
-		if (basis == _cellMassMatrixBasis)
-			return _cellMassMatrix;
+		if (basis == _massMatrix1Basis)
+			return _massMatrix1;
+		else if (basis == _massMatrix2Basis)
+			return _massMatrix2;
+		Utils::Warning("The mass matrix for this basis should be computed once and stored for this reference element.");
 		return this->ComputeAndReturnMassMatrix(basis);
 	}
 	DenseMatrix CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis)
@@ -81,36 +71,35 @@ public:
 			return _cellReconstructMassMatrix;
 		return this->ComputeAndReturnMassMatrix(cellBasis, reconstructBasis);
 	}
-	DenseMatrix ReconstructMassMatrix(FunctionalBasis<Dim>* basis)
+	void ComputeAndStoreMassMatrix(FunctionalBasis<Dim>* basis)
 	{
-		if (basis == _reconstructMassMatrixBasis)
-			return _reconstructMassMatrix;
-		return this->ComputeAndReturnMassMatrix(basis);
-	}
-	DenseMatrix FaceMassMatrix(FunctionalBasis<Dim>* basis)
-	{
-		if (basis == _faceMassMatrixBasis)
-			return _faceMassMatrix;
-		return this->ComputeAndReturnMassMatrix(basis);
+		if (!_massMatrix1Basis)
+			ComputeAndStoreMassMatrix1(basis);
+		else if (!_massMatrix2Basis)
+			ComputeAndStoreMassMatrix2(basis);
+		else
+			assert(false);
 	}
 
+private:
+	void ComputeAndStoreMassMatrix1(FunctionalBasis<Dim>* basis)
+	{
+		if (_massMatrix1.rows() == 0)
+		{
+			_massMatrix1 = this->ComputeAndReturnMassMatrix(basis);
+			_massMatrix1Basis = basis;
+		}
+	}
+	void ComputeAndStoreMassMatrix2(FunctionalBasis<Dim>* basis)
+	{
+		if (_massMatrix2.rows() == 0)
+		{
+			_massMatrix2 = this->ComputeAndReturnMassMatrix(basis);
+			_massMatrix2Basis = basis;
+		}
+	}
 
-	void ComputeAndStoreCellMassMatrix(FunctionalBasis<Dim>* basis)
-	{
-		if (_cellMassMatrix.rows() == 0)
-		{
-			_cellMassMatrix = this->ComputeAndReturnMassMatrix(basis);
-			_cellMassMatrixBasis = basis;
-		}
-	}
-	void ComputeAndStoreReconstructMassMatrix(FunctionalBasis<Dim>* basis)
-	{
-		if (_reconstructMassMatrix.rows() == 0)
-		{
-			_reconstructMassMatrix = this->ComputeAndReturnMassMatrix(basis);
-			_reconstructMassMatrixBasis = basis;
-		}
-	}
+public:
 	void ComputeAndStoreCellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis)
 	{
 		if (_cellReconstructMassMatrix.rows() == 0)
@@ -118,14 +107,6 @@ public:
 			_cellReconstructMassMatrix = this->ComputeAndReturnMassMatrix(cellBasis, reconstructBasis);
 			_cellReconstructMassMatrixCellBasis = cellBasis;
 			_cellReconstructMassMatrixReconstructBasis = reconstructBasis;
-		}
-	}
-	void ComputeAndStoreFaceMassMatrix(FunctionalBasis<Dim>* basis)
-	{
-		if (_faceMassMatrix.rows() == 0)
-		{
-			_faceMassMatrix = this->ComputeAndReturnMassMatrix(basis);
-			_faceMassMatrixBasis = basis;
 		}
 	}
 

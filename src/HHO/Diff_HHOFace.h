@@ -9,18 +9,8 @@ template <int Dim>
 class Diff_HHOFace : virtual public Face<Dim>
 {
 private:
-	DenseMatrix _faceMassMatrix;
-	DenseMatrix _invFaceMassMatrix;
-
-	// Takes the trace of degree k of the reconstruction basis of element 1
-	DenseMatrix _traceFromElem1UsingReconstructBasis;
-	// Takes the trace of degree k of the reconstruction basis of element 2
-	DenseMatrix _traceFromElem2UsingReconstructBasis;
-
-	// Takes the trace of cell basis of element 1
-	DenseMatrix _traceFromElem1UsingCellBasis;
-	// Takes the trace of cell basis of element 2
-	DenseMatrix _traceFromElem2UsingCellBasis;
+	DenseMatrix _massMatrix;
+	DenseMatrix _invMassMatrix;
 public:
 	HHOParameters<Dim>* HHO;
 
@@ -30,7 +20,7 @@ public:
 
 	void InitHHO(HHOParameters<Dim>* hho)
 	{
-		if (this->_faceMassMatrix.rows() > 0)
+		if (this->_massMatrix.rows() > 0)
 			return;
 
 		this->HHO = hho;
@@ -38,35 +28,19 @@ public:
 		//this->ComputeAndSaveQuadraturePoints(HHO->FaceBasis->GetDegree());
 		//this->ComputeAndSaveQuadraturePoints();
 
-		this->_faceMassMatrix = this->FaceMassMatrix(HHO->FaceBasis);
-		this->_invFaceMassMatrix = this->_faceMassMatrix.inverse();
-
-		if (this->Element1 != nullptr)
-		{
-			this->_traceFromElem1UsingCellBasis        = ComputeTraceMatrix(this->Element1, HHO->CellBasis);
-			this->_traceFromElem1UsingReconstructBasis = ComputeTraceMatrix(this->Element1, HHO->ReconstructionBasis);
-		}
-
-		if (this->Element2 != nullptr)
-		{
-			this->_traceFromElem2UsingCellBasis        = ComputeTraceMatrix(this->Element2, HHO->CellBasis);
-			this->_traceFromElem2UsingReconstructBasis = ComputeTraceMatrix(this->Element2, HHO->ReconstructionBasis);
-		}
+		//this->_faceMassMatrix = this->FaceMassMatrix(HHO->FaceBasis);
+		this->_massMatrix = this->Shape()->MassMatrix(HHO->FaceBasis);
+		this->_invMassMatrix = this->_massMatrix.inverse();
 	}
 
-	DenseMatrix FaceMassMatrix()
+	DenseMatrix MassMatrix()
 	{
-		return this->_faceMassMatrix;
+		return this->_massMatrix;
 	}
 
-	DenseMatrix InvFaceMassMatrix()
+	DenseMatrix InvMassMatrix()
 	{
-		return this->_invFaceMassMatrix;
-	}
-
-	DenseMatrix FaceMassMatrix(FunctionalBasis<Dim-1>* basis)
-	{
-		return this->Shape()->FaceMassMatrix(basis);
+		return this->_invMassMatrix;
 	}
 
 	DenseMatrix MassMatrix(FunctionalBasis<Dim - 1>* basis, Element<Dim>* element, FunctionalBasis<Dim>* cellBasis)
@@ -97,24 +71,12 @@ public:
 
 	DenseMatrix TraceUsingReconstructBasis(Element<Dim>* element)
 	{
-		assert(_traceFromElem1UsingReconstructBasis.rows() > 0);
-		if (element == this->Element1)
-			return _traceFromElem1UsingReconstructBasis;
-		else if (element == this->Element2)
-			return _traceFromElem2UsingReconstructBasis;
-		else
-			return ComputeTraceMatrix(element, HHO->ReconstructionBasis);
+		return ComputeTraceMatrix(element, HHO->ReconstructionBasis);
 	}
 
 	DenseMatrix TraceUsingCellBasis(Element<Dim>* element)
 	{
-		assert(_traceFromElem1UsingCellBasis.rows() > 0);
-		if (element == this->Element1)
-			return _traceFromElem1UsingCellBasis;
-		else if (element == this->Element2)
-			return _traceFromElem2UsingCellBasis;
-		else
-			return ComputeTraceMatrix(element, HHO->CellBasis);
+		return ComputeTraceMatrix(element, HHO->CellBasis);
 	}
 
 	DenseMatrix Trace(Element<Dim>* element, FunctionalBasis<Dim>* cellInterpolationBasis)
@@ -173,7 +135,7 @@ public:
 				}
 			}
 
-			DenseMatrix invFineMass = fineFace->InvFaceMassMatrix();
+			DenseMatrix invFineMass = fineFace->InvMassMatrix();
 
 			J.block(this->LocalNumberOf(fineFace)*faceBasis->Size(), 0, faceBasis->Size(), faceBasis->Size()) = invFineMass * fineCoarseMass;
 		}
@@ -183,24 +145,20 @@ public:
 
 	void DeleteUselessMatricesAfterAssembly()
 	{
-		Utils::Empty(_faceMassMatrix);
+		Utils::Empty(_massMatrix);
 	}
 
 	void DeleteUselessMatricesAfterMultigridSetup()
 	{
-		Utils::Empty(_invFaceMassMatrix);
-		Utils::Empty(_traceFromElem1UsingReconstructBasis);
-		Utils::Empty(_traceFromElem2UsingReconstructBasis);
-		Utils::Empty(_traceFromElem1UsingCellBasis);
-		Utils::Empty(_traceFromElem2UsingCellBasis);
+		Utils::Empty(_invMassMatrix);
 		this->EmptySavedDomPoints();
 	}
 
 private:
 	DenseMatrix ComputeTraceMatrix(Element<Dim>* e, FunctionalBasis<Dim>* cellBasis)
 	{
-		assert(_invFaceMassMatrix.rows() > 0);
+		assert(_invMassMatrix.rows() > 0);
 		DenseMatrix massCellFace = this->MassMatrix(HHO->FaceBasis, e, cellBasis);
-		return _invFaceMassMatrix * massCellFace;
+		return _invMassMatrix * massCellFace;
 	}
 };
