@@ -94,14 +94,14 @@ public:
 	//             HHO             //
 	//-----------------------------//
 
-	inline DenseMatrix MassMatrix(FunctionalBasis<Dim>* basis) const override
+	DenseMatrix MassMatrix(FunctionalBasis<Dim>* basis) const override
 	{
-		return DetJacobian() * this->RefShape()->MassMatrix(basis);
+		return DetJacobian() * this->RefShape()->StoredMassMatrix(basis);
 	}
 
-	inline DenseMatrix CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) const override
+	DenseMatrix CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) const override
 	{
-		return DetJacobian() * this->RefShape()->CellReconstructMassMatrix(cellBasis, reconstructBasis);
+		return DetJacobian() * this->RefShape()->StoredCellReconstructMassMatrix();
 	}
 
 	//---------------------------------------------------------------------//

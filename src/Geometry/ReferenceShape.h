@@ -12,8 +12,6 @@ private:
 	FunctionalBasis<Dim>* _massMatrix2Basis = nullptr;
 
 	DenseMatrix _cellReconstructMassMatrix;
-	FunctionalBasis<Dim>* _cellReconstructMassMatrixCellBasis;
-	FunctionalBasis<Dim>* _cellReconstructMassMatrixReconstructBasis;
 
 public:
 	ReferenceShape() {}
@@ -47,7 +45,7 @@ public:
 	//   DG   //
 	//--------//
 
-	double MassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
+	double MassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
 	{
 		return this->_massMatrix1(phi1->LocalNumber, phi2->LocalNumber);
 	}
@@ -56,58 +54,41 @@ public:
 	//   HHO   //
 	//---------//
 
-	DenseMatrix MassMatrix(FunctionalBasis<Dim>* basis)
+	const DenseMatrix& StoredMassMatrix(FunctionalBasis<Dim>* basis) const
 	{
 		if (basis == _massMatrix1Basis)
 			return _massMatrix1;
 		else if (basis == _massMatrix2Basis)
 			return _massMatrix2;
-		Utils::Warning("The mass matrix for this basis should be computed once and stored for this reference element.");
-		return this->ComputeAndReturnMassMatrix(basis);
+		assert(false && "The mass matrix for this basis should be computed once and stored for this reference element.");
 	}
-	DenseMatrix CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis)
+
+	const DenseMatrix& StoredCellReconstructMassMatrix() const
 	{
-		if (cellBasis == _cellReconstructMassMatrixCellBasis && reconstructBasis == _cellReconstructMassMatrixReconstructBasis)
-			return _cellReconstructMassMatrix;
-		return this->ComputeAndReturnMassMatrix(cellBasis, reconstructBasis);
+		assert(_cellReconstructMassMatrix.rows() > 0 && "The cell-reconstruct mass matrix should be computed once and stored for this reference element.");
+		return _cellReconstructMassMatrix;
 	}
+
 	void ComputeAndStoreMassMatrix(FunctionalBasis<Dim>* basis)
 	{
 		if (!_massMatrix1Basis)
-			ComputeAndStoreMassMatrix1(basis);
-		else if (!_massMatrix2Basis)
-			ComputeAndStoreMassMatrix2(basis);
-		else
-			assert(false);
-	}
-
-private:
-	void ComputeAndStoreMassMatrix1(FunctionalBasis<Dim>* basis)
-	{
-		if (_massMatrix1.rows() == 0)
 		{
 			_massMatrix1 = this->ComputeAndReturnMassMatrix(basis);
 			_massMatrix1Basis = basis;
 		}
-	}
-	void ComputeAndStoreMassMatrix2(FunctionalBasis<Dim>* basis)
-	{
-		if (_massMatrix2.rows() == 0)
+		else if (!_massMatrix2Basis)
 		{
 			_massMatrix2 = this->ComputeAndReturnMassMatrix(basis);
 			_massMatrix2Basis = basis;
 		}
+		else
+			assert(false && "Only 2 mass matrices can be stored.");
 	}
-
-public:
+	
 	void ComputeAndStoreCellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis)
 	{
-		if (_cellReconstructMassMatrix.rows() == 0)
-		{
-			_cellReconstructMassMatrix = this->ComputeAndReturnMassMatrix(cellBasis, reconstructBasis);
-			_cellReconstructMassMatrixCellBasis = cellBasis;
-			_cellReconstructMassMatrixReconstructBasis = reconstructBasis;
-		}
+		assert(_cellReconstructMassMatrix.rows() == 0 && "The cellReconstructMassMatrix is already computed.");
+		_cellReconstructMassMatrix = this->ComputeAndReturnMassMatrix(cellBasis, reconstructBasis);
 	}
 
 };
