@@ -24,6 +24,11 @@ public:
 		coefficients.clear();
 	}
 
+	static size_t SizeOfNonZero()
+	{
+		return sizeof(Eigen::Triplet<double>);
+	}
+
 	//Reserve()
 	/*NonZeroCoefficients(BigNumber nRows, BigNumber nCols, BigNumber nnzApproximate) : Done(nRows, nCols)
 	{

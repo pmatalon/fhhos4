@@ -60,6 +60,18 @@ public:
 	{
 		return v.rows() * sizeof(double);
 	}
+	static size_t SparseMatrixMemoryUsage(size_t nonZeroes)
+	{
+		return nonZeroes * (sizeof(double) + 2 * sizeof(Eigen::Index));
+	}
+	static size_t DenseMatrixMemoryUsage(BigNumber rows, BigNumber cols)
+	{
+		return cols * rows * sizeof(double) + sizeof(DenseMatrix);
+	}
+	static size_t VectorMemoryUsage(BigNumber rows)
+	{
+		return rows * sizeof(double);
+	}
 
 	static string MemoryString(size_t bytes)
 	{

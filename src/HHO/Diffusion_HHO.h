@@ -134,12 +134,50 @@ public:
 		if (actions.LogAssembly)
 			cout << endl << "Assembly..." << endl;
 
-		Vector globalRHS;
-		if (actions.AssembleRightHandSide)
-		{
-			globalRHS = Vector(HHO->nTotalHybridUnknowns);
-			globalRHS.tail(HHO->nTotalFaceUnknowns) = Vector::Zero(HHO->nTotalFaceUnknowns);
-		}
+		//------------------------//
+		//      Memory usage      //
+		//------------------------//
+
+		// Element local matrices
+		int nFacesPerElement = Dim == 3 ? 4 : 3;
+		int nCoeffs_Att = pow(HHO->nCellUnknowns, 2);
+		int nCoeffs_Atf = HHO->nCellUnknowns * nFacesPerElement * HHO->nFaceUnknowns;
+		int nCoeffs_Aff = nFacesPerElement * pow(HHO->nFaceUnknowns, 2);
+
+		int nCoeffs_At = nCoeffs_Att + 2 * nCoeffs_Atf + nCoeffs_Aff;
+
+		int nCoeffs_P = HHO->nReconstructUnknowns * (HHO->nCellUnknowns + nFacesPerElement * HHO->nFaceUnknowns);
+
+		int nCoeffs_localElemMatrices = nCoeffs_At; // A
+		nCoeffs_localElemMatrices += nCoeffs_At; // invA
+		nCoeffs_localElemMatrices += nCoeffs_P; // P (reconstructor)
+		size_t localElemMatricesMemory = nCoeffs_localElemMatrices * sizeof(double);
+
+		size_t totalElemLocalMatricesMemory = mesh->Elements.size() * localElemMatricesMemory;
+
+		// Face local matrices
+		int nCoeffs_Mass = pow(HHO->nFaceUnknowns, 2);
+		int nCoeffs_invMass = nCoeffs_Mass;
+
+		int nCoeffs_localFaceMatrices = nCoeffs_Mass + nCoeffs_invMass;
+		size_t localFaceMatricesMemory = nCoeffs_localFaceMatrices * sizeof(double);
+
+		size_t totalFaceLocalMatricesMemory = mesh->Faces.size() * localFaceMatricesMemory;
+
+
+		size_t localNonZeroVectorMemory = nCoeffs_At * NonZeroCoefficients::SizeOfNonZero();
+		size_t globalNonZeroVectorMemory = mesh->Elements.size() * localNonZeroVectorMemory;
+
+		size_t sparseMatrixMemory = Utils::SparseMatrixMemoryUsage(mesh->Elements.size() * nCoeffs_At);
+
+		size_t requiredMemory = totalElemLocalMatricesMemory + totalFaceLocalMatricesMemory + Utils::VectorMemoryUsage(HHO->nTotalHybridUnknowns) + globalNonZeroVectorMemory + sparseMatrixMemory;
+
+		if (actions.LogAssembly)
+			cout << "\tRequired memory > " << Utils::MemoryString(requiredMemory) << endl;
+
+		//-----------------------------------------//
+		// Compute integrals on reference elements //
+		//-----------------------------------------//
 
 		// Compute some useful integrals on reference element and store them
 		// - Cartesian element
@@ -170,7 +208,31 @@ public:
 			Tetrahedron::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix((FunctionalBasis<3>*)cellBasis, (FunctionalBasis<3>*)reconstructionBasis);
 		}
 
+		//----------------------------//
+		//   Compute local matrices   //
+		//----------------------------//
+
+		if (actions.LogAssembly)
+			cout << "\tCompute local matrices (allocation of " + Utils::MemoryString(totalElemLocalMatricesMemory) + ")" << endl;
 		this->InitHHO();
+
+		if (!actions.ExportAssemblyTermMatrices)
+		{
+			ElementParallelLoop<Dim> parallelLoopE(mesh->Elements);
+			parallelLoopE.Execute([](Element<Dim>* element)
+				{
+					Diff_HHOElement<Dim>* e = dynamic_cast<Diff_HHOElement<Dim>*>(element);
+					e->DeleteUselessMatricesAfterAssembly(); // Acons, Astab
+				});
+		}
+
+		// Allocation of the right-hand side
+		Vector globalRHS;
+		if (actions.AssembleRightHandSide)
+		{
+			globalRHS = Vector(HHO->nTotalHybridUnknowns);
+			globalRHS.tail(HHO->nTotalFaceUnknowns) = Vector::Zero(HHO->nTotalFaceUnknowns);
+		}
 
 		//-------------------------------//
 		// Parallel loop on the elements //
@@ -186,9 +248,12 @@ public:
 
 		ParallelLoop<Element<Dim>*, AssemblyResult> parallelLoop(mesh->Elements);
 
-		parallelLoop.InitChunks([this, actions](ParallelChunk<AssemblyResult>* chunk)
+		if (actions.LogAssembly)
+			cout << "\tParallel recovery of the non-zero coefficients in chunks (allocation of " + to_string(parallelLoop.NThreads) + "x" + Utils::MemoryString((mesh->Elements.size() / parallelLoop.NThreads) * localNonZeroVectorMemory) + " = " + Utils::MemoryString(globalNonZeroVectorMemory) + ")" << endl;
+
+		parallelLoop.InitChunks([nCoeffs_At, actions](ParallelChunk<AssemblyResult>* chunk)
 			{
-				BigNumber nnzApproximate = chunk->Size() * (pow(HHO->nCellUnknowns, 2) + 4 * pow(HHO->nFaceUnknowns, 2) + HHO->nCellUnknowns * 4 * HHO->nFaceUnknowns);
+				BigNumber nnzApproximate = chunk->Size() * nCoeffs_At;
 				chunk->Results.MatrixCoeffs         = NonZeroCoefficients(nnzApproximate);
 				chunk->Results.ConsistencyCoeffs    = NonZeroCoefficients(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
 				chunk->Results.StabilizationCoeffs  = NonZeroCoefficients(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
@@ -241,7 +306,9 @@ public:
 
 							double matrixTerm = element->MatrixTerm(face, cellPhi, facePhi);
 							chunk->Results.MatrixCoeffs.Add(i, j, matrixTerm);
-							chunk->Results.MatrixCoeffs.Add(j, i, matrixTerm);
+							if (!this->_staticCondensation)
+								chunk->Results.MatrixCoeffs.Add(j, i, matrixTerm);
+
 							if (actions.ExportAssemblyTermMatrices && !face->HasDirichletBC())
 							{
 								double consistencyTerm = element->ConsistencyTerm(face, cellPhi, facePhi);
@@ -324,38 +391,13 @@ public:
 					}
 				}
 			});
-
-		//------------------------------------//
-		// Aggregation of the parallel chunks //
-		//------------------------------------//
-
-		cout << "Memory allocation for the global list of coefficients" << endl;
-
-		BigNumber nnzApproximate = mesh->Elements.size() * (pow(HHO->nCellUnknowns, 2) + 4 * pow(HHO->nFaceUnknowns, 2) + HHO->nCellUnknowns * 4 * HHO->nFaceUnknowns);
-		NonZeroCoefficients matrixCoeffs(nnzApproximate);
-		NonZeroCoefficients consistencyCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
-		NonZeroCoefficients stabilizationCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
-		NonZeroCoefficients reconstructionCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
-
-		cout << "Aggregation of the parallel chunks into the global list" << endl;
-
-		parallelLoop.AggregateChunkResults([&matrixCoeffs, &consistencyCoeffs, &stabilizationCoeffs, &reconstructionCoeffs, actions](AssemblyResult& chunkResult)
-			{
-				matrixCoeffs.Add(chunkResult.MatrixCoeffs);
-				chunkResult.MatrixCoeffs.Clear();
-				if (actions.ExportAssemblyTermMatrices)
-				{
-					consistencyCoeffs.Add(chunkResult.ConsistencyCoeffs);
-					stabilizationCoeffs.Add(chunkResult.StabilizationCoeffs);
-					reconstructionCoeffs.Add(chunkResult.ReconstructionCoeffs);
-				}
-			});
-
+		
 		//-----------------------------------//
 		// Delete now useless local matrices //
 		//-----------------------------------//
 
-		cout << "Delete now useless local matrices" << endl;
+		if (actions.LogAssembly)
+			cout << "\tDelete now useless local matrices" << endl;
 
 		ElementParallelLoop<Dim> parallelLoopE(mesh->Elements);
 		parallelLoopE.Execute([](Element<Dim>* element)
@@ -371,21 +413,55 @@ public:
 				f->DeleteUselessMatricesAfterAssembly();
 			});
 
+		//------------------------------------//
+		// Aggregation of the parallel chunks //
+		//------------------------------------//
 
-		cout << "Reserve memory for extendedMatrix" << endl;
+		if (actions.LogAssembly)
+			cout << "\tAggregation of the parallel chunks into the global list of non-zeroes (allocation of " + Utils::MemoryString(globalNonZeroVectorMemory) + ")" << endl;
 
-		SparseMatrix extendedMatrix = SparseMatrix(HHO->nTotalHybridCoeffs, HHO->nTotalHybridCoeffs);
+		BigNumber nnzApproximate = mesh->Elements.size() * nCoeffs_At;
+		NonZeroCoefficients matrixCoeffs(nnzApproximate);
+		NonZeroCoefficients consistencyCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
+		NonZeroCoefficients stabilizationCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
+		NonZeroCoefficients reconstructionCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
+
+		parallelLoop.AggregateChunkResults([&matrixCoeffs, &consistencyCoeffs, &stabilizationCoeffs, &reconstructionCoeffs, actions](AssemblyResult& chunkResult)
+			{
+				matrixCoeffs.Add(chunkResult.MatrixCoeffs);
+
+				if (actions.LogAssembly)
+					cout << "\t\tChunk of " + Utils::MemoryString(chunkResult.MatrixCoeffs.Size()*NonZeroCoefficients::SizeOfNonZero()) + " freed" << endl;
+				chunkResult.MatrixCoeffs = NonZeroCoefficients(0);
+
+				if (actions.ExportAssemblyTermMatrices)
+				{
+					consistencyCoeffs.Add(chunkResult.ConsistencyCoeffs);
+					stabilizationCoeffs.Add(chunkResult.StabilizationCoeffs);
+					reconstructionCoeffs.Add(chunkResult.ReconstructionCoeffs);
+				}
+			});
+
+		//-------------------------------------//
+		//    Assembly of the sparse matrix    //
+		//-------------------------------------//
+
+		if (actions.LogAssembly)
+			cout << "\tReserve memory for the global matrix (allocation of " + Utils::MemoryString(Utils::SparseMatrixMemoryUsage(matrixCoeffs.Size())) + ")" << endl;
+
+		SparseMatrix extendedMatrix(HHO->nTotalHybridCoeffs, HHO->nTotalHybridCoeffs);
 		extendedMatrix.reserve(matrixCoeffs.Size());
 
-		cout << "Fill extendedMatrix" << endl;
+		if (actions.LogAssembly)
+			cout << "\tFill matrix with non-zero coefficients" << endl;
 		matrixCoeffs.Fill(extendedMatrix);
 
-		cout << "Clear coefficients" << endl;
-		matrixCoeffs.Clear();
-		consistencyCoeffs.Clear();
-		stabilizationCoeffs.Clear();
-		reconstructionCoeffs.Clear();
+		if (actions.LogAssembly)
+			cout << "\tFree global vector of non-zero coefficients" << endl;
+		
+		matrixCoeffs = NonZeroCoefficients(0);
 
+		
 		// The global system matrix is the extended matrix where the Dirichlet "unknowns" are eliminated
 		SparseMatrix globalSystemMatrix = extendedMatrix.topLeftCorner(HHO->nTotalHybridUnknowns, HHO->nTotalHybridUnknowns);
 
@@ -420,6 +496,10 @@ public:
 		if (actions.AssembleRightHandSide)
 			globalRHS -= extendedMatrix.topRightCorner(HHO->nTotalHybridUnknowns, HHO->nDirichletUnknowns) * this->_dirichletCond;
 
+		Utils::Empty(extendedMatrix);
+		//std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+		
+
 		//---------------------//
 		// Static condensation //
 		//---------------------//
@@ -430,6 +510,7 @@ public:
 				cout << "Static condensation..." << endl;
 
 			SparseMatrix Aff = globalSystemMatrix.bottomRightCorner(HHO->nTotalFaceUnknowns, HHO->nTotalFaceUnknowns);
+			Utils::Empty(globalSystemMatrix);
 
 			SparseMatrix inverseAtt = GetInverseAtt();
 
