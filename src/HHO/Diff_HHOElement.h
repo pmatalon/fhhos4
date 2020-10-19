@@ -6,8 +6,6 @@
 template <int Dim>
 class Diff_HHOElement : virtual public Element<Dim>
 {
-private:
-	DenseMatrix _projFromReconstruct;
 public:
 	HHOParameters<Dim>* HHO;
 
@@ -64,14 +62,8 @@ public:
 		//this->ComputeAndSaveQuadraturePoints(hho->ReconstructionBasis->GetDegree());
 		//this->ComputeAndSaveQuadraturePoints();
 
-		DenseMatrix cellMassMatrix = this->MassMatrix(hho->CellBasis);
-		DenseMatrix Nt = this->CellReconstructMassMatrix(hho->CellBasis, hho->ReconstructionBasis);
-		this->_projFromReconstruct = cellMassMatrix.inverse() * Nt;
-
 		this->AssembleReconstructionAndConsistencyMatrices();
 		this->AssembleStabilizationMatrix();
-
-		Utils::Empty(_projFromReconstruct);
 
 		//int nTotalFaceUnknowns = this->Faces.size() * hho->nFaceUnknowns;
 
@@ -284,16 +276,22 @@ private:
 		for (BasisFunction<Dim>* phi1 : HHO->ReconstructionBasis->LocalFunctions)
 		{
 			for (BasisFunction<Dim>* phi2 : HHO->ReconstructionBasis->LocalFunctions)
-				reconstructionMatrixToInvert(phi1->LocalNumber, phi2->LocalNumber) = this->IntegralKGradGradReconstruct(this->DiffTensor(), phi1, phi2);
+			{
+				if (phi2->LocalNumber > phi1->LocalNumber)
+					break;
+				double value = this->IntegralKGradGradReconstruct(this->DiffTensor(), phi1, phi2);
+				reconstructionMatrixToInvert(phi1->LocalNumber, phi2->LocalNumber) = value;
+				reconstructionMatrixToInvert(phi2->LocalNumber, phi1->LocalNumber) = value;
+			}
 		}
 	}
 
 	void AssembleMeanValueCondition(DenseMatrix & reconstructionMatrixToInvert)
 	{
-		int last = HHO->ReconstructionBasis->NumberOfLocalFunctionsInElement(NULL);
+		int last = HHO->ReconstructionBasis->Size();
 		for (BasisFunction<Dim>* phi : HHO->ReconstructionBasis->LocalFunctions)
 		{
-			double meanValue = this->Integral(phi);
+			double meanValue = this->Integral(phi); // TODO: this can be computed only once on the reference element
 			reconstructionMatrixToInvert(last, phi->LocalNumber) = meanValue;
 			reconstructionMatrixToInvert(phi->LocalNumber, last) = meanValue;
 		}
@@ -301,9 +299,9 @@ private:
 
 	void AssembleMeanValueConditionRHS(DenseMatrix & rhsMatrix)
 	{
-		int last = HHO->ReconstructionBasis->NumberOfLocalFunctionsInElement(NULL);
+		int last = HHO->ReconstructionBasis->Size();
 		for (BasisFunction<Dim>* phi : HHO->CellBasis->LocalFunctions)
-			rhsMatrix(last, phi->LocalNumber) = this->Integral(phi);
+			rhsMatrix(last, phi->LocalNumber) = this->Integral(phi); // TODO: this can be computed only once on the reference element
 	}
 
 	DenseMatrix AssembleRHSMatrix()
@@ -404,7 +402,10 @@ private:
 
 		if (HHO->Stabilization.compare("hho") == 0)
 		{
-			DenseMatrix ProjT = _projFromReconstruct;
+			DenseMatrix cellMassMatrix = this->MassMatrix(HHO->CellBasis);
+			DenseMatrix Nt = this->CellReconstructMassMatrix(HHO->CellBasis, HHO->ReconstructionBasis);
+
+			DenseMatrix ProjT = cellMassMatrix.inverse() * Nt;
 			DenseMatrix Dt = ProjT * this->P;
 			for (int i = 0; i < Dt.rows(); i++)
 				Dt(i, i) -= 1;
