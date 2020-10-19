@@ -191,23 +191,23 @@ public:
 			if (this->_diffusionField->K2)
 				CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreReconstructK2StiffnessMatrix(this->_diffusionField->K2, reconstructionBasis);
 			CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix(cellBasis, reconstructionBasis);
+			// - Cartesian face
 			CartesianShape<Dim, Dim - 1>::InitReferenceShape()->ComputeAndStoreMassMatrix(faceBasis);
 			if (Dim == 2)
 			{
-				// - TriangularElement
+				// - Triangular element
 				Triangle::InitReferenceShape()->ComputeAndStoreMassMatrix((FunctionalBasis<2>*)cellBasis);
 				Triangle::InitReferenceShape()->ComputeAndStoreMassMatrix((FunctionalBasis<2>*)reconstructionBasis);
-				//Triangle::InitReferenceShape().ComputeAndStoreCellStiffnessMatrix((FunctionalBasis<2>*)cellBasis);
-				//Triangle::InitReferenceShape().ComputeAndStoreReconstructK1StiffnessMatrix(this->_diffusionField->K1, reconstructionBasis);
-				//Triangle::InitReferenceShape().ComputeAndStoreReconstructK2StiffnessMatrix(this->_diffusionField->K2, reconstructionBasis);
 				Triangle::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix((FunctionalBasis<2>*)cellBasis, (FunctionalBasis<2>*)reconstructionBasis);
 			}
 			else if (Dim == 3)
 			{
-				// - TetrahedralElement
+				// - Tetrahedral element
 				Tetrahedron::InitReferenceShape()->ComputeAndStoreMassMatrix((FunctionalBasis<3>*)cellBasis);
 				Tetrahedron::InitReferenceShape()->ComputeAndStoreMassMatrix((FunctionalBasis<3>*)reconstructionBasis);
 				Tetrahedron::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix((FunctionalBasis<3>*)cellBasis, (FunctionalBasis<3>*)reconstructionBasis);
+				// - Triangular face
+				Triangle::InitReferenceShape()->ComputeAndStoreMassMatrix((FunctionalBasis<2>*)faceBasis);
 			}
 		}
 
