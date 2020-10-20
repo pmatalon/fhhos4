@@ -4,7 +4,7 @@
 
 class NonZeroCoefficients
 {
-private:
+protected:
 	vector<Eigen::Triplet<double>> coefficients;
 public:
 	NonZeroCoefficients(BigNumber nnzApproximate)
@@ -13,6 +13,11 @@ public:
 	}
 
 	NonZeroCoefficients() {}
+
+	void Reserve(BigNumber nnzApproximate)
+	{
+		this->coefficients.reserve(nnzApproximate);
+	}
 
 	size_t Size()
 	{
@@ -29,23 +34,18 @@ public:
 		return sizeof(Eigen::Triplet<double>);
 	}
 
-	//Reserve()
-	/*NonZeroCoefficients(BigNumber nRows, BigNumber nCols, BigNumber nnzApproximate) : Done(nRows, nCols)
-	{
-		this->coefficients.reserve(nnzApproximate);
-	}*/
-	inline void Add(BigNumber i, BigNumber j, double value)
+	void Add(BigNumber i, BigNumber j, double value)
 	{
 		if (abs(value) > 1e-15)
 			this->coefficients.push_back(Eigen::Triplet<double>(i, j, value));
 	}
 
-	inline void Add(const NonZeroCoefficients &chunk)
+	void Add(const NonZeroCoefficients &chunk)
 	{
 		this->coefficients.insert(this->coefficients.end(), chunk.coefficients.begin(), chunk.coefficients.end());
 	}
 
-	inline void Add(BigNumber iStart, BigNumber jStart, const DenseMatrix &m)
+	void Add(BigNumber iStart, BigNumber jStart, const DenseMatrix &m)
 	{
 		for (int i = 0; i < m.rows(); ++i)
 		{

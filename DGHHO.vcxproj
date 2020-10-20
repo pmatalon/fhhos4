@@ -121,6 +121,7 @@
     <ClInclude Include="src\Geometry\3D\Tetrahedron.h" />
     <ClInclude Include="src\Geometry\3D\TriangleIn3D.h" />
     <ClInclude Include="src\Geometry\3D\ReferenceTetrahedron.h" />
+    <ClInclude Include="src\HHO\Diffusion_HHOMatrix.h" />
     <ClInclude Include="src\HHO\HHOParameters.h" />
     <ClInclude Include="src\Mesher\AllMeshes.h" />
     <ClInclude Include="src\Mesher\CubeGeometry.h" />

@@ -22,10 +22,11 @@ struct HHOParameters
 
 	BigNumber nTotalCellUnknowns;
 	BigNumber nTotalFaceUnknowns;
+	BigNumber nTotalFaceCoeffs;
 	BigNumber nTotalHybridUnknowns;
 	BigNumber nTotalHybridCoeffs;
 
-	BigNumber nDirichletUnknowns;
+	BigNumber nDirichletCoeffs;
 	BigNumber nNeumannUnknowns;
 
 	string Stabilization;
@@ -50,10 +51,11 @@ struct HHOParameters
 
 		nTotalCellUnknowns = nElements * nCellUnknowns;
 		nTotalFaceUnknowns = nInteriorAndNeumannFaces * nFaceUnknowns;
+		nTotalFaceCoeffs = nFaces * nFaceUnknowns;
 		nTotalHybridUnknowns = nTotalCellUnknowns + nTotalFaceUnknowns;
-		nTotalHybridCoeffs = nTotalCellUnknowns + nFaces * nFaceUnknowns;
+		nTotalHybridCoeffs = nTotalCellUnknowns + nTotalFaceCoeffs;
 
-		nDirichletUnknowns = nDirichletFaces * nFaceUnknowns;
+		nDirichletCoeffs = nDirichletFaces * nFaceUnknowns;
 		nNeumannUnknowns = nNeumannFaces * nFaceUnknowns;
 
 		Stabilization = stabilization;

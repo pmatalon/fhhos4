@@ -429,6 +429,9 @@
     <ClInclude Include="src\TestCases\3D\PlateWith4HolesTestCase.h">
       <Filter>TestCases\3D</Filter>
     </ClInclude>
+    <ClInclude Include="src\HHO\Diffusion_HHOMatrix.h">
+      <Filter>HHO</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
