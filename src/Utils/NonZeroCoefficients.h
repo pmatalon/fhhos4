@@ -36,14 +36,8 @@ public:
 
 	void Add(BigNumber i, BigNumber j, double value)
 	{
-		SparseMatrixIndex ii = i;
-		SparseMatrixIndex jj = j;
-		if (ii < 0)
-			Utils::FatalError("Conversion to SparseMatrixIndex failed: " + to_string(i) + " --> " + to_string(ii));
-		if (jj < 0)
-			Utils::FatalError("Conversion to SparseMatrixIndex failed: " + to_string(j) + " --> " + to_string(jj));
 		if (abs(value) > 1e-15)
-			this->coefficients.push_back(Eigen::Triplet<double, SparseMatrixIndex>(ii, jj, value));
+			this->coefficients.push_back(Eigen::Triplet<double, SparseMatrixIndex>(i, j, value));
 	}
 
 	void Add(const NonZeroCoefficients &chunk)
@@ -78,7 +72,7 @@ public:
 
 	friend ostream& operator<<(ostream& os, const NonZeroCoefficients& nnzCoeffs)
 	{
-		for (Eigen::Triplet<double> t : nnzCoeffs.coefficients)
+		for (Eigen::Triplet<double, SparseMatrixIndex> t : nnzCoeffs.coefficients)
 			os << t.row() << "\t" << t.col() << "\t" << t.value() << endl;
 		return os;
 	}
