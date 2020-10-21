@@ -54,7 +54,7 @@ public:
 
 	static size_t MemoryUsage(const SparseMatrix& M)
 	{
-		return M.nonZeros() * (sizeof(double) + 2* sizeof(Eigen::Index));
+		return M.nonZeros() * (sizeof(double) + 2* sizeof(SparseMatrix::StorageIndex));
 	}
 	static size_t MemoryUsage(const Vector& v)
 	{
@@ -62,7 +62,7 @@ public:
 	}
 	static size_t SparseMatrixMemoryUsage(size_t nonZeroes)
 	{
-		return nonZeroes * (sizeof(double) + 2 * sizeof(Eigen::Index));
+		return nonZeroes * (sizeof(double) + 2 * sizeof(SparseMatrix::StorageIndex));
 	}
 	static size_t DenseMatrixMemoryUsage(BigNumber rows, BigNumber cols)
 	{

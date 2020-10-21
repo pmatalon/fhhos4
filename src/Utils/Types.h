@@ -4,7 +4,12 @@
 
 typedef std::size_t BigNumber;
 
-using SparseMatrix = Eigen::SparseMatrix<double, Eigen::RowMajor>;
+using SparseMatrixIndex = int;//intmax_t;
+
+using RowMajorSparseMatrix = Eigen::SparseMatrix<double, Eigen::RowMajor, SparseMatrixIndex>;
+
+using SparseMatrix = RowMajorSparseMatrix;
+
 
 using DenseMatrix = Eigen::MatrixXd;
 

@@ -10,7 +10,7 @@ protected:
 	double _omega;
 
 	vector<Eigen::FullPivLU<DenseMatrix>> invD;
-	Eigen::SparseMatrix<double, Eigen::RowMajor> _rowMajorA;
+	RowMajorSparseMatrix _rowMajorA;
 public:
 
 	BlockJacobi(int blockSize, double omega = 1)
@@ -109,7 +109,7 @@ protected:
 			BigNumber iBlock = currentBlockRow;
 			BigNumber i = iBlock * _blockSize + k;
 			// RowMajor --> the following line iterates over the non-zeros of the i-th row.
-			for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(A.IsRowMajor ? A : _rowMajorA, i); it; ++it)
+			for (RowMajorSparseMatrix::InnerIterator it(A.IsRowMajor ? A : _rowMajorA, i); it; ++it)
 			{
 				auto j = it.col();
 				auto jBlock = j / this->_blockSize;

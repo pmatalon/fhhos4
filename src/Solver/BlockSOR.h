@@ -17,7 +17,7 @@ protected:
 	Direction _direction;
 
 	vector<Eigen::FullPivLU<DenseMatrix>> invD;
-	Eigen::SparseMatrix<double, Eigen::RowMajor> _rowMajorA;
+	RowMajorSparseMatrix _rowMajorA;
 public:
 	BlockSOR(int blockSize, double omega) : BlockSOR(blockSize, omega, Direction::Forward) {}
 
@@ -111,7 +111,7 @@ private:
 			BigNumber iBlock = currentBlockRow;
 			BigNumber i = iBlock * _blockSize + k;
 			// RowMajor --> the following line iterates over the non-zeros of the i-th row.
-			for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(A.IsRowMajor ? A : _rowMajorA, i); it; ++it)
+			for (RowMajorSparseMatrix::InnerIterator it(A.IsRowMajor ? A : _rowMajorA, i); it; ++it)
 			{
 				auto j = it.col();
 				auto jBlock = j / this->_blockSize;

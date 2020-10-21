@@ -5,7 +5,7 @@
 class NonZeroCoefficients
 {
 protected:
-	vector<Eigen::Triplet<double>> coefficients;
+	vector<Eigen::Triplet<double, SparseMatrixIndex>> coefficients;
 public:
 	NonZeroCoefficients(BigNumber nnzApproximate)
 	{
@@ -36,8 +36,14 @@ public:
 
 	void Add(BigNumber i, BigNumber j, double value)
 	{
+		SparseMatrixIndex ii = i;
+		SparseMatrixIndex jj = j;
+		if (ii < 0)
+			Utils::FatalError("Conversion to SparseMatrixIndex failed: " + to_string(i) + " --> " + to_string(ii));
+		if (jj < 0)
+			Utils::FatalError("Conversion to SparseMatrixIndex failed: " + to_string(j) + " --> " + to_string(jj));
 		if (abs(value) > 1e-15)
-			this->coefficients.push_back(Eigen::Triplet<double>(i, j, value));
+			this->coefficients.push_back(Eigen::Triplet<double, SparseMatrixIndex>(ii, jj, value));
 	}
 
 	void Add(const NonZeroCoefficients &chunk)
