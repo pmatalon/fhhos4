@@ -43,7 +43,7 @@ Finally, build the program following step 3.
 
 > cd <path-to-dghho>
 > mkdir build && cd build
-> cmake -DCMAKE_BUILD_TYPE=Release -DGMSH_API=<path-to-gmsh>/api -DGMSH_LIB=<path-to-gmsh>/build/libgmsh.so ..
+> cmake -DCMAKE_BUILD_TYPE=Release -DGMSH_API=<path>/gmsh/gmsh-4.6.0-source/api -DGMSH_LIB=<path>/gmsh/gmsh-4.6.0-source/build/libgmsh.so ..
 > make
 
 ###############################################################################################

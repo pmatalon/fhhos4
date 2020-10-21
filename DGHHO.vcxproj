@@ -157,6 +157,7 @@
     <ClInclude Include="src\Mesh\3D\TetrahedralElement.h" />
     <ClInclude Include="src\Mesh\3D\TriangularFace.h" />
     <ClInclude Include="src\Mesh\Agglo.h" />
+    <ClInclude Include="src\Mesh\AgglomerationException.h" />
     <ClInclude Include="src\Mesh\CartesianElement.h" />
     <ClInclude Include="src\Mesh\CartesianFace.h" />
     <ClInclude Include="src\Mesh\Interface.h" />

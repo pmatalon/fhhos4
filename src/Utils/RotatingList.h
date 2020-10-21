@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <assert.h>
+#include <exception>
 using namespace std;
 
 template <typename T>
@@ -72,6 +73,6 @@ public:
 				return;
 			}
 		}
-		assert(false && "Object not found in the list");
+		throw new ios_base::failure("Object not found in the list");
 	}
 };

@@ -78,6 +78,24 @@ public:
 		PlotSegment(C, A, color);
 	}
 
+	void PlotPolygon(const vector<DomPoint>& vertices, string color)
+	{
+		stringstream X;
+		stringstream Y;
+		for (int i = 0; i < vertices.size(); i++)
+		{
+			X << vertices[i].X;
+			Y << vertices[i].Y;
+			if (i < vertices.size() - 1)
+			{
+				X << ";";
+				Y << ";";
+			}
+		}
+		Out() << "fill(axes, [" << X.str() << "], [" << Y.str() << "], '" << color << "', 'LineStyle','none', 'FaceAlpha', 0.5);" << endl;
+		PlotPolygonEdges(vertices, color);
+	}
+
 	void PlotText(const DomPoint& p, string text, string color = "k")
 	{
 		Out() << "text(axes, " << p.X << ", " << p.Y << ", '" << text << "', 'Color', '" << color << "');" << endl;

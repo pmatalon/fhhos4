@@ -8,9 +8,22 @@
 #include <CGAL/convex_hull_2.h>
 #include <cassert>
 #include <list>
+#include <exception>
 using namespace std;
 
 typedef exactKernel chosenKernel;
+
+class InvalidPolygonException : public exception
+{
+public:
+	vector<DomPoint> Vertices;
+	InvalidPolygonException(const vector<DomPoint>& vertices) : Vertices(vertices)
+	{}
+	virtual const char* what() const throw()
+	{
+		return "InvalidPolygonException";
+	}
+};
 
 class Polygon : public PhysicalShape<2>
 {
@@ -67,13 +80,15 @@ private:
 
 		if (!_cgalPolygon.is_simple())
 		{
+			Utils::Error("Non simple polygon detected. Printed below for Matlab:");
 			ExportToMatlab("m");
-			Utils::FatalError("Non simple polygon detected.");
+			throw new InvalidPolygonException(_vertices);
 		}
 		else if (!_cgalPolygon.is_counterclockwise_oriented())
 		{
+			Utils::Error("Clockwise-oriented polygon detected. Printed below for Matlab:");
 			ExportToMatlab("m");
-			Utils::FatalError("Clockwise-oriented polygon detected.");
+			throw new InvalidPolygonException(_vertices);
 		}
 	}
 
@@ -398,15 +413,9 @@ public:
 
 	void ExportToMatlab(string color = "r") const override
 	{
-		//cout << "%-- Shape using vertices:" << endl;
-		ExportVerticesToMatlab(color);
-		/*cout << "%-- Shape using CGAL vertices:" << endl;
-		ExportCGALPolyToMatlab();
-		if (_triangulation.size() > 0)
-		{
-			cout << "%-- Subshapes:" << endl;
-			ExportSubShapesToMatlab();
-		}*/
+		MatlabScript script;
+		script.PlotPolygon(_vertices, color);
+		script.Out() << endl;
 	}
 
 	void ExportVerticesToMatlab(string color = "r") const

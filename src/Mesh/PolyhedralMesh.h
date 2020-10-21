@@ -1361,7 +1361,7 @@ private:
 		vector<Face<Dim>*> coarseFacesToKeep;
 		for (Face<Dim>* ff : fineElement->Faces)
 		{
-			if (!ff->IsDomainBoundary && ff->GetNeighbour(fineElement)->CoarserElement == coarseElement)
+			if (!ff->IsDomainBoundary && ff->CoarseFace && coarseElement->HasFace(ff->CoarseFace))
 				facesToRemove.push_back(ff);
 			else
 				facesToClone.push_back(ff);
@@ -1387,7 +1387,21 @@ private:
 		}
 		
 		// Creation of the polygonal macro-element
-		Element<Dim>* newCoarseElement = CreateMacroElement(fineElement, coarseElement, facesToRemove);
+		Element<Dim>* newCoarseElement;
+		try
+		{
+			newCoarseElement = CreateMacroElement(fineElement, coarseElement, facesToRemove);
+		}
+		catch (exception* e)
+		{
+			string error(e->what());
+			Utils::Error("An exception occured during the agglomeration of a fine and coarse elements: " + error);
+			cout << "% ------------------- Fine element:" << endl;
+			fineElement->ExportToMatlab("r");
+			cout << "% ------------------- Coarse element:" << endl;
+			coarseElement->ExportToMatlab("b");
+			throw e;
+		}
 		newCoarseElement->Mutex.lock();
 		newCoarseElement->Id = this->NewElementId();
 		newCoarseElement->PhysicalPart = coarseElement->PhysicalPart;

@@ -3,6 +3,7 @@
 #include "../../HHO/Diff_HHOElement.h"
 #include "../../Geometry/2D/Polygon.h"
 #include "../../Utils/RotatingList.h"
+#include "../AgglomerationException.h"
 using namespace std;
 
 class PolygonalElement : public Diff_DGElement<2>, public Diff_HHOElement<2>
@@ -178,7 +179,7 @@ public:
 				if (i > e1Vertices.Size())
 				{
 					PlotMatlab(e1, e2, nullptr, nullptr);
-					Utils::FatalError("Agglomeration failed: step 1.");
+					throw new AgglomerationException("Agglomeration failed: step 1.");
 				}
 				if (!Face<2>::IsInFaces(facesToRemove, e1Vertices.Get())) // happens if the faces to remove are circular
 				{
@@ -224,14 +225,14 @@ public:
 				if (i > e2Vertices.Size())
 				{
 					PlotMatlab(e1, e2, firstInterfaceVertex, lastInterfaceVertex);
-					Utils::FatalError("Agglomeration failed: lastInterfaceVertex not found in e2.");
+					throw new AgglomerationException("Agglomeration failed: lastInterfaceVertex not found in e2.");
 				}
 			}
 
 			if (macroElementVertices.size() != e1->Vertices().size() + e2->Vertices().size() - 2 - 2 * (facesToRemove.size() - 1))
 			{
 				PlotMatlab(e1, e2, firstInterfaceVertex, lastInterfaceVertex);
-				Utils::FatalError("Agglomeration failed: the agglomerate does not have the expected number of vertices.");
+				throw new AgglomerationException("Agglomeration failed: the agglomerate does not have the expected number of vertices.");
 			}
 		}
 

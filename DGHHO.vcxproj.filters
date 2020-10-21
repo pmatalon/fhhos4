@@ -432,6 +432,9 @@
     <ClInclude Include="src\HHO\Diffusion_HHOMatrix.h">
       <Filter>HHO</Filter>
     </ClInclude>
+    <ClInclude Include="src\Mesh\AgglomerationException.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
