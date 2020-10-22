@@ -100,9 +100,9 @@ public:
 		for (int degree = 0; degree < 5; degree++)
 		{
 			double integral = Integral(refOne, degree);
-			assert(abs(integral - measure) < 1e-4*measure);
+			assert(abs(integral - measure) < Utils::Eps*measure);
 		}
 		double integral = Integral(domOne);
-		assert(abs(integral - measure) < 1e-4*measure);
+		assert(abs(integral - measure) < Utils::Eps*measure);
 	}
 };

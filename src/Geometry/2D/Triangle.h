@@ -113,10 +113,16 @@ public:
 	}
 	inline bool Contains(const DomPoint& p) const override
 	{
-		return TriangleContains(v1, v2, v3, p, _measure);
+		return TriangleContains(v1, v2, v3, p, _measure, false);
 	}
 
-	static bool TriangleContains(const DomPoint& A, const DomPoint& B, const DomPoint& C, const DomPoint& P, double triangleArea)
+	// Use the large tolerance when you known the point is either outside or on the edges
+	inline bool Contains(const DomPoint& p, bool largeTolerance) const
+	{
+		return TriangleContains(v1, v2, v3, p, _measure, largeTolerance);
+	}
+
+	static bool TriangleContains(const DomPoint& A, const DomPoint& B, const DomPoint& C, const DomPoint& P, double triangleArea, bool largeTolerance = false)
 	{
 		// From https://math.stackexchange.com/questions/4322/check-whether-a-point-is-within-a-3d-triangle
 
@@ -129,6 +135,9 @@ public:
 		double gamma = PA.cross(PB).norm() / (2 * triangleArea);
 
 		double tol = Utils::Eps;
+		if (largeTolerance)
+			tol *= 100;
+
 		return alpha + tol > 0 && alpha < 1 + tol    // alpha >= 0 && alpha <= 1
 			&& beta + tol > 0 && beta < 1 + tol    // beta  >= 0 && beta  <= 1
 			&& gamma + tol > 0 && gamma < 1 + tol    // gamma >= 0 && gamma <= 1

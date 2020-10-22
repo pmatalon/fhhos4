@@ -71,23 +71,28 @@ public:
 		DomPoint C = this->Center();
 		if (!this->IsConvex() && !face->IsDomainBoundary)
 		{
-			// the element's center doesn't work if the polygon is not be convex
-			const PhysicalShape<2>* faceSubshape = nullptr;
-			for (const PhysicalShape<2>* ss : _shape.SubShapes())
+			// the element's center doesn't work if the polygon is not convex
+			const Triangle* triangle = nullptr;
+			for (const Triangle& t : _shape.Triangulation())
 			{
-				if (ss->Contains(*A) && ss->Contains(*B))
+				//bool containsA = ss->Contains(*A);
+				if (t.Contains(*A, true) && t.Contains(*B, true))
 				{
-					faceSubshape = ss;
+					triangle = &t;
 					break;
 				}
 			}
-			if (!faceSubshape)
+			if (!triangle)
 			{
 				_shape.ExportSubShapesToMatlab();
-				face->Shape()->ExportToMatlab("k");
+				MatlabScript s;
+				s.PlotText(*A, "A");
+				s.PlotText(*B, "B");
+
+				OuterNormalVector(face);
 				Utils::FatalError("Cannot compute the direction of the normal vector.");
 			}
-			C = faceSubshape->Center();
+			C = triangle->Center();
 		}
 		DimVector<2> AC = Vect<2>(A, C);
 		if (n.dot(AC) > 0)
@@ -126,7 +131,8 @@ public:
 		}
 		else
 		{
-			assert(!facesToRemove.empty());
+			if (facesToRemove.empty())
+				throw new AgglomerationException("Agglomeration failed: facesToRemove.empty().");
 
 			// Find the first and last vertices (in the direct order) of the interface between the two elements
 			RotatingList<Vertex*> e1Vertices(e1->Vertices());

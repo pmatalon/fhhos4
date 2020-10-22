@@ -26,7 +26,7 @@ public:
 		return _file.is_open() ? _file : std::cout;
 	}
 
-	void PlotPoint(const DomPoint& p, string options)
+	void PlotPoint(const DomPoint& p, string options = "k+")
 	{
 		Out() << "plot(axes, " << p.X << ", " << p.Y << ",'" << options << "');" << endl;
 	}

@@ -500,17 +500,17 @@ public:
 						cout << "One of them is not pointing outwards." << endl;
 						double d = abs(n.dot(n2) + 1);
 						auto c = e->Center();
-						cout << "Matlab script to plot element " << e->Number << ":" << endl;
+						cout << "%------- Matlab script to plot element " << e->Number << ":" << endl;
 						e->ExportToMatlab();
 						cout << endl;
-						cout << "Matlab script to plot element " << neighbour->Number << ":" << endl;
+						cout << "%------- Matlab script to plot element " << neighbour->Number << ":" << endl;
 						neighbour->ExportToMatlab();
 						cout << endl;
 
 						n = e->OuterNormalVector(f);
 						n2 = neighbour->OuterNormalVector(f);
 						e->UnitTests();
-						assert(false && "Problem with normal vectors: one of them is not pointing outwards.");
+						Utils::FatalError("Problem with normal vectors: one of them is not pointing outwards.");
 					}
 					assert(abs(n.dot(n2) + 1) < 1e-15);
 				}

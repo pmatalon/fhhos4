@@ -31,6 +31,10 @@ public:
 		return (n & (n - 1)) == 0;
 	}
 
+	//--------------//
+	//   Matrices   //
+	//--------------//
+
 	static string MatrixInfo(const SparseMatrix& M, string name)
 	{
 		double density = (double)M.nonZeros() / (M.rows() * M.cols()) * 100;
@@ -51,6 +55,10 @@ public:
 	{
 		v = Vector(0);
 	}
+
+	//------------//
+	//   Memory   //
+	//------------//
 
 	static size_t MemoryUsage(const SparseMatrix& M)
 	{
@@ -93,6 +101,10 @@ public:
 			ss << kilos << "KB";
 		return ss.str();
 	}
+
+	//-------------//
+	//   Vectors   //
+	//-------------//
 
 	template <typename T>
 	static inline vector<T> Join(const vector<T>& A, const vector<T>& B)
@@ -143,6 +155,10 @@ public:
 		return result;
 	}
 
+	//---------------------------//
+	//   Coarsening/Refinement   //
+	//---------------------------//
+
 	static bool IsPredefinedGeometry(const string& geo)
 	{
 		return geo.compare("segment") == 0
@@ -168,6 +184,10 @@ public:
 
 	static double Eps;
 	static double NumericalZero;
+
+	//-------------//
+	//   Logging   //
+	//-------------//
 
 	static string BeginRed;
 	static string BeginGreen;

@@ -107,14 +107,22 @@ DomPoint Middle(Vertex* A, Vertex* B)
 }
 
 template<int Dim>
-bool AreCollinear(DimVector<Dim> v1, DimVector<Dim> v2)
+bool AreColinear(const DomPoint& p1, const DomPoint& p2, const DomPoint& p3)
+{
+	DimVector<Dim> v1 = Vect<Dim>(p1, p2);
+	DimVector<Dim> v2 = Vect<Dim>(p2, p3);
+	return AreCollinear(v1, v2);
+}
+
+template<int Dim>
+bool AreCollinear(const DimVector<Dim>& v1, const DimVector<Dim>& v2)
 {
 	double v1_norm_v2_norm = v1.norm()*v2.norm();
 	return abs(abs(v1.dot(v2)) - v1_norm_v2_norm) / v1_norm_v2_norm < 1e-12;
 }
 
 template<int Dim>
-DomPoint AddVector(const DomPoint& p, DimVector<Dim> v)
+DomPoint AddVector(const DomPoint& p, const DimVector<Dim>& v)
 {
 	if (Dim == 1)
 		return DomPoint(p.X + v[0]);

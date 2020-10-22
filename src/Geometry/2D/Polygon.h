@@ -151,7 +151,16 @@ public:
 		if (_vertices.size() <= 3 || this->IsConvex())
 			_triangulation = ConvexTriangulation(_vertices);
 		else
-			_triangulation = CGALTriangulation();
+			_triangulation = NonConvexTriangulation();
+
+		auto it = _triangulation.begin();
+		while (it != _triangulation.end())
+		{
+			if (it->Measure() < Utils::Eps*this->_measure)
+				it = _triangulation.erase(it);
+			else
+				it++;
+		}
 
 		assert(_triangulation.size() > 0);
 
@@ -208,10 +217,12 @@ private:
 		{
 			triangles.emplace_back(vertices[0], vertices[1], vertices[2]);
 
+			// remove vertices[1]
 			vector<DomPoint> remainingVertices;
 			for (int i = 2; i < vertices.size(); i++)
 				remainingVertices.push_back(vertices[i]);
 			remainingVertices.push_back(vertices[0]);
+
 			vector<Triangle> otherTriangles = ConvexTriangulation(remainingVertices);
 			for (auto t : otherTriangles)
 				triangles.push_back(t);
@@ -250,16 +261,16 @@ private:
 		return triangles;
 	}
 
-	vector<Triangle> CGALTriangulation()
+	vector<Triangle> NonConvexTriangulation()
 	{
 		vector<Triangle> triangulation;
 
-		list<CGAL::Partition_traits_2<chosenKernel>::Polygon_2> partition_polys;
+		list<CGAL::Partition_traits_2<chosenKernel>::Polygon_2> convexPartition;
 
 		try
 		{
-			//CGAL::greene_approx_convex_partition_2(_cgalPolygon.vertices_begin(), _cgalPolygon.vertices_end(), back_inserter(partition_polys));
-			CGAL::optimal_convex_partition_2(_cgalPolygon.vertices_begin(), _cgalPolygon.vertices_end(), back_inserter(partition_polys));
+			//CGAL::greene_approx_convex_partition_2(_cgalPolygon.vertices_begin(), _cgalPolygon.vertices_end(), back_inserter(convexPartition));
+			CGAL::optimal_convex_partition_2(_cgalPolygon.vertices_begin(), _cgalPolygon.vertices_end(), back_inserter(convexPartition));
 		}
 		catch (CGAL::Failure_exception e)
 		{
@@ -268,7 +279,9 @@ private:
 			Utils::FatalError("CGAL failed to compute a partitioning of the above polygon: " + e.message());
 		}
 
-		for (CGAL::Partition_traits_2<chosenKernel>::Polygon_2 p : partition_polys)
+		assert(convexPartition.size() > 1);
+
+		for (CGAL::Partition_traits_2<chosenKernel>::Polygon_2 p : convexPartition)
 		{
 			vector<DomPoint> vertices = CGALWrapper::ToVertices(p);
 			vector<Triangle> subTriangles = ConvexTriangulation(vertices);
@@ -345,6 +358,11 @@ public:
 			subShapes.push_back(ps);
 		}
 		return subShapes;
+	}
+
+	const vector<Triangle>& Triangulation() const
+	{
+		return _triangulation;
 	}
 
 	virtual ReferenceShape<2>* RefShape() const override
@@ -529,11 +547,11 @@ public:
 		double sumMeasures = 0;
 		for (const Triangle& t : _triangulation)
 			sumMeasures += t.Measure();
-		double eps = 1e-4*_measure;
-		if (abs(sumMeasures - _cgalPolygon.area()) >= eps)
+		double eps = Utils::Eps*_measure;
+		if (abs(sumMeasures - CGAL::to_double(_cgalPolygon.area())) >= eps)
 		{
 			this->ExportToMatlab();
-			assert(abs(sumMeasures - _cgalPolygon.area()) < eps);
+			assert(abs(sumMeasures - CGAL::to_double(_cgalPolygon.area())) < eps);
 		}
 
 		PhysicalShape<2>::UnitTests();
