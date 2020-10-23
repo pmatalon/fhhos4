@@ -650,25 +650,11 @@ private:
 						neighbour->Mutex.unlock();
 				});
 
-			// Face collapsing
-			ElementParallelLoop<Dim> parallelLoopCollapseFaces(coarseMesh->Elements);
-			parallelLoopCollapseFaces.Execute([coarseMesh](Element<Dim>* coarseElement)
-				{
-					if (!coarseElement->IsDeleted)
-						coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(coarseElement, true);
-				});
-
 			if (elementsAreAgglomerated)
 			{
 				RemoveCoarsenedElements(remainingFineElements);
 				//cout << "\t" << remainingFineElements.size() << " fine elements to coarsen" << endl;
 			}
-		}
-
-		for (Element<Dim>* coarseElement : coarseMesh->Elements)
-		{
-			if (!coarseElement->IsDeleted)
-				coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(coarseElement);
 		}
 
 		// Element agglomeration, 2nd pass
@@ -711,30 +697,25 @@ private:
 				return;
 			}
 
-			ElementParallelLoop<Dim> parallelLoopCollapseFaces(remainingFineElements);
-			parallelLoopCollapseFaces.Execute([coarseMesh](Element<Dim>* fineElement)
-				{
-					if (fineElement->CoarserElement)
-						coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(fineElement->CoarserElement, true);
-				});
-
 			RemoveCoarsenedElements(remainingFineElements);
 			//cout << "\t" << remainingFineElements.size() << " fine elements to coarsen" << endl;
 		}
 
-		for (Element<Dim>* coarseElement : coarseMesh->Elements)
-		{
-			if (!coarseElement->IsDeleted)
-				coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(coarseElement);
-		}
-
+		// Face collapsing
+		ElementParallelLoop<Dim> parallelLoopCollapseFaces(coarseMesh->Elements);
+		parallelLoopCollapseFaces.Execute([coarseMesh](Element<Dim>* coarseElement)
+			{
+				if (!coarseElement->IsDeleted)
+					coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(coarseElement, true);
+			}); 
+		
 		/*list<Face<Dim>*> uncoarsenedFaces;
 		for (Face<Dim>* f : this->Faces)
 		{
 			if (!f->IsDeleted && !f->IsRemovedOnCoarserGrid && !f->HasBeenCoarsened())
 				uncoarsenedFaces.push_back(f);
 		}
-		cout << (uncoarsenedFaces.size()*100) / this->Faces.size() << "% unchanged faces." << endl;*/
+		cout << (uncoarsenedFaces.size() * 100) / this->Faces.size() << "% unchanged faces." << endl;*/
 
 		this->FinalizeCoarsening();
 	}
