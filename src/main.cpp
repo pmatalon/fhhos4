@@ -974,7 +974,15 @@ int main(int argc, char* argv[])
 	else if (args.Problem.Dimension == 3)
 		program = new ProgramDim<3>();
 
-	program->Start(args);
+	try
+	{
+		program->Start(args);
+	}
+	catch (exception* e)
+	{
+		string error(e->what());
+		Utils::FatalError("Unhandled exception: " + error);
+	}
 
 	delete program;
 
