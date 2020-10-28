@@ -707,7 +707,13 @@ private:
 			{
 				if (!coarseElement->IsDeleted)
 					coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(coarseElement, true);
-			}); 
+			});
+
+		for (Face<Dim>* f : coarseMesh->Faces)
+		{
+			if (!f->IsDeleted && !f->IsDomainBoundary && !f->FinerFaces[0]->HasBeenCoarsened())
+				coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(f->Element1, false);
+		}
 		
 		/*list<Face<Dim>*> uncoarsenedFaces;
 		for (Face<Dim>* f : this->Faces)
