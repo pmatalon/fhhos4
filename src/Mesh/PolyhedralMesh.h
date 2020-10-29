@@ -97,7 +97,7 @@ public:
 		return verticesUsage + verticesPointers + elementsUsage + elementsPointers + facesUsage + facesPointers;
 	}
 
-	virtual void CoarsenMesh(CoarseningStrategy strategy) override
+	virtual void CoarsenMesh(CoarseningStrategy strategy, int coarseningFactor) override
 	{
 		if (this->CoarseMesh)
 			return;
@@ -119,7 +119,7 @@ public:
 		else if (strategy == CoarseningStrategy::FaceCoarsening)
 			FaceCoarsening();
 		else
-			Mesh<Dim>::CoarsenMesh(strategy);
+			Mesh<Dim>::CoarsenMesh(strategy, coarseningFactor);
 	}
 
 protected:

@@ -99,8 +99,8 @@ public:
 				cout << "Generating the mesh by GMSH..." << endl;
 				gmsh::model::mesh::generate(Dim);
 
-				//string optimizationMethod;
-				//gmsh::model::mesh::optimize(optimizationMethod);
+				string optimizationMethod;
+				gmsh::model::mesh::optimize(optimizationMethod);
 
 				if (UseCache)
 				{
@@ -557,14 +557,14 @@ public:
 		return _regularity;
 	}
 
-	void CoarsenMesh(CoarseningStrategy strategy) override
+	void CoarsenMesh(CoarseningStrategy strategy, int coarseningFactor) override
 	{
 		if (Utils::IsRefinementStrategy(strategy))
 			return;
 		else if (strategy == CoarseningStrategy::IndependentRemeshing)
-			IndependentRemesh();
+			IndependentRemesh(coarseningFactor);
 		else
-			PolyhedralMesh<Dim>::CoarsenMesh(strategy);
+			PolyhedralMesh<Dim>::CoarsenMesh(strategy, coarseningFactor);
 	}
 
 	virtual void RefineMesh(CoarseningStrategy strategy)
@@ -658,7 +658,7 @@ public:
 	}
 
 private:
-	void IndependentRemesh()
+	void IndependentRemesh(int coarseningFactor)
 	{
 		if (this->N() == 1)
 			return;
@@ -667,7 +667,7 @@ private:
 
 		GMSHMesh<Dim>* fineMesh = this;
 
-		GMSHMesh<Dim>* coarseMesh = new GMSHMesh<Dim>(_gmshFilePath, _description, _fileNamePart, fineMesh->N() / 2, false);
+		GMSHMesh<Dim>* coarseMesh = new GMSHMesh<Dim>(_gmshFilePath, _description, _fileNamePart, fineMesh->N() / coarseningFactor, false);
 		this->InitializeCoarsening(coarseMesh);
 		coarseMesh->ComesFrom.CS = CoarseningStrategy::IndependentRemeshing;
 		coarseMesh->Build();
@@ -698,22 +698,72 @@ private:
 			}*/
 
 			if (coarse->FinerElements.empty())
+			{
 				Utils::Warning("This coarse element does not have any fine element.");
+				Element<Dim>* closestFine = nullptr;
+				Element<Dim>* coarseToClosestFine = nullptr;
+				double closestDistance = -1;
+				for (Element<Dim>* n : coarse->VertexNeighbours())
+				{
+					/*for (auto it = n->FinerElements.begin(); it != n->FinerElements.end(); it++)
+					{
+						Element<Dim>* fine = *it;*/
+					for (Element<Dim>* fine : n->FinerElements)
+					{
+						double distance = Vect<Dim>(coarse->Center(), fine->Center()).norm();
+						if (!closestFine || distance < closestDistance)
+						{
+							closestFine = fine;
+							coarseToClosestFine = n;
+							closestDistance = distance;
+						}
+					}
+				}
+				auto it = find(coarseToClosestFine->FinerElements.begin(), coarseToClosestFine->FinerElements.end(), closestFine);
+				assert(it != coarseToClosestFine->FinerElements.end());
+				coarseToClosestFine->FinerElements.erase(it);
+				//assert(!coarseToClosestFine->FinerElements.empty());
+				coarse->FinerElements.push_back(closestFine);
+				closestFine->CoarserElement = coarse;
+			}
 		}
 
 		this->FinalizeCoarsening();
 	}
 
 
-	Element<Dim>* LocateElementThatEmbedsMostOf(Element<Dim>* finerElement)
+	Element<Dim>* LocateElementThatEmbedsMostOf(Element<Dim>* fineElement)
 	{
-		size_t coarseElementTag = LocateGMSHElementContaining(finerElement->Center(), true);
-		if (coarseElementTag == 0)
+		DomPoint center = fineElement->Center();
+		size_t coarseElementTag = LocateGMSHElementContaining(center, true);
+		if (coarseElementTag > 0)
 		{
-			Utils::Warning("No coarse element contains the barycenter of this fine element (Id=" + to_string(finerElement->Id) + ", Number=" + to_string(finerElement->Number) + ", IsOnBoundary=" + to_string(finerElement->IsOnBoundary()) + "). Getting the closest.");
-			coarseElementTag = LocateGMSHElementContaining(finerElement->Center(), false);
+			Element<Dim>* ce = GetElementFromGMSHTag(coarseElementTag);
+			assert(ce->Contains(center));
+			return ce;
 		}
-		return GetElementFromGMSHTag(coarseElementTag);
+		else
+		{
+			Utils::Warning("No coarse element contains the barycenter of this fine element (Id=" + to_string(fineElement->Id) + ", Number=" + to_string(fineElement->Number) + ", IsOnBoundary=" + to_string(fineElement->IsOnBoundary()) + "). Getting the closest.");
+			coarseElementTag = LocateGMSHElementContaining(center, false);
+			Element<Dim>* ce = GetElementFromGMSHTag(coarseElementTag);
+
+			if (!ce->IsInSamePhysicalPartAs(fineElement))
+				Utils::FatalError("TODO: find closest element in the same PhysicalPart");
+
+			Element<Dim>* closest = ce;
+			double closestDistance = Vect<Dim>(center, ce->Center()).norm();
+			for (Element<Dim>* e : ce->VertexNeighbours())
+			{
+				double distance = Vect<Dim>(center, e->Center()).norm();
+				if (distance < closestDistance)
+				{
+					closest = e;
+					closestDistance = distance;
+				}
+			}
+			return closest;
+		}
 	}
 
 	// if !strictSearch, then finds the closest element
@@ -802,7 +852,7 @@ protected:
 
 		if (this->CoarseMesh)
 		{
-			myMesh->CoarsenMesh(CoarseningStrategy::StandardCoarsening);
+			myMesh->CoarsenMesh(CoarseningStrategy::StandardCoarsening, 2);
 			dynamic_cast<GMSHMesh<Dim>*>(this->CoarseMesh)->RenumberLike(myMesh->CoarseMesh);
 		}
 	}

@@ -47,6 +47,7 @@ struct MultigridArguments
 	int CoarseLevelChangeSmoothingCoeff = 0;
 	char CoarseLevelChangeSmoothingOperator = '+';
 	CoarseningStrategy CoarseningStgy = CoarseningStrategy::None;
+	int CoarseningFactor = 2;
 	BigNumber CoarseN = 2;
 };
 

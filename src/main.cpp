@@ -222,6 +222,9 @@ void print_usage() {
 	cout << "      If a refinement strategy is used, sets the mesh size of the starting coarse mesh." << endl;
 	cout << "      The chosen value will set the variable N defined at the beginning of the GMSH .geo file." << endl;
 	cout << endl;
+	cout << "-coarsening-factor NUM" << endl;
+	cout << "      Coarsening factor (H/h), default 2. Only used for independant remeshing." << endl;
+	cout << endl;
 	cout << "-prolong NUM" << endl;
 	cout << "      How the prolongation operator is built." << endl;
 	cout << "              " << (unsigned)Prolongation::CellInterp_Trace << "  - ";
@@ -399,6 +402,7 @@ int main(int argc, char* argv[])
 		OPT_CoarseMatrixSize,
 		OPT_Smoothers,
 		OPT_CoarseningStrategy,
+		OPT_CoarseningFactor,
 		OPT_CoarseN,
 		// Misc
 		OPT_Threads,
@@ -443,6 +447,7 @@ int main(int argc, char* argv[])
 		 { "coarse-size", required_argument, NULL, OPT_CoarseMatrixSize },
 		 { "smoothers", required_argument, NULL, OPT_Smoothers },
 		 { "cs", required_argument, NULL, OPT_CoarseningStrategy },
+		 { "coarsening-factor", required_argument, NULL, OPT_CoarseningFactor },
 		 { "coarse-n", required_argument, NULL, OPT_CoarseN },
 		 // Misc
 		 { "help", no_argument, NULL, 'h' },
@@ -726,6 +731,9 @@ int main(int argc, char* argv[])
 					argument_error("unknown coarsening strategy code '" + coarseningStgyCode + "'. Check -cs argument.");
 				break;
 			}
+			case OPT_CoarseningFactor:
+				args.Solver.MG.CoarseningFactor = atoi(optarg);
+				break;
 			case OPT_CoarseN:
 				args.Solver.MG.CoarseN = stoul(optarg, nullptr, 0);
 				break;

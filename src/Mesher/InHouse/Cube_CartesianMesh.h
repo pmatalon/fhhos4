@@ -221,12 +221,12 @@ public:
 		return 1;
 	}
 
-	void CoarsenMesh(CoarseningStrategy strategy)
+	void CoarsenMesh(CoarseningStrategy strategy, int coarseningFactor)
 	{
 		if (strategy == CoarseningStrategy::StandardCoarsening)
 			StandardCoarsening();
 		else
-			Mesh<3>::CoarsenMesh(strategy);
+			Mesh<3>::CoarsenMesh(strategy, coarseningFactor);
 	}
 
 private:

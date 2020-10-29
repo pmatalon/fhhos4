@@ -28,7 +28,7 @@ public:
 		return _problem->HHO->nTotalFaceUnknowns;
 	}
 
-	void CoarsenMesh(CoarseningStrategy coarseningStgy, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override
+	void CoarsenMesh(CoarseningStrategy coarseningStgy, int coarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override
 	{
 		Mesh<Dim>* mesh = _problem->_mesh;
 		if (Utils::IsRefinementStrategy(coarseningStgy) && mesh->CoarseMesh == nullptr)
@@ -37,7 +37,7 @@ public:
 			return;
 		}
 		cout << "\tCoarsening mesh" << endl;
-		mesh->CoarsenMesh(coarseningStgy);
+		mesh->CoarsenMesh(coarseningStgy, coarseningFactor);
 		if (!mesh->CoarseMesh || mesh->CoarseMesh->InteriorFaces.size() == 0)
 			coarsestPossibleMeshReached = true;
 	}

@@ -341,14 +341,14 @@ public:
 		return this->Elements[0]->Regularity();
 	}
 
-	void CoarsenMesh(CoarseningStrategy strategy) override
+	void CoarsenMesh(CoarseningStrategy strategy, int coarseningFactor) override
 	{
 		if (strategy == CoarseningStrategy::StandardCoarsening)
 			StandardCoarsening();
 		//else if (strategy == CoarseningStrategy::AgglomerationCoarsening)
 			//CoarsenByAgglomerationAndKeepFineFaces();
 		else
-			PolyhedralMesh<2>::CoarsenMesh(strategy);
+			PolyhedralMesh<2>::CoarsenMesh(strategy, coarseningFactor);
 	}
 
 	void RefineMesh(CoarseningStrategy strategy) override

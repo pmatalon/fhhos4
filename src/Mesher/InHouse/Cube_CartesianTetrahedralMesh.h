@@ -117,12 +117,12 @@ public:
 		return "Cube";
 	}
 
-	void CoarsenMesh(CoarseningStrategy strategy) override
+	void CoarsenMesh(CoarseningStrategy strategy, int coarseningFactor) override
 	{
 		if (strategy != CoarseningStrategy::StandardCoarsening)
-			TetrahedralMesh::CoarsenMesh(strategy);
+			TetrahedralMesh::CoarsenMesh(strategy, coarseningFactor);
 
-		_cartMesh->CoarsenMesh(strategy);
+		_cartMesh->CoarsenMesh(strategy, coarseningFactor);
 		Cube_CartesianTetrahedralMesh* coarseMesh = new Cube_CartesianTetrahedralMesh(dynamic_cast<Cube_CartesianMesh*>(_cartMesh->CoarseMesh), false);
 		this->InitializeCoarsening(coarseMesh);
 		coarseMesh->ComesFrom.CS = CoarseningStrategy::StandardCoarsening;

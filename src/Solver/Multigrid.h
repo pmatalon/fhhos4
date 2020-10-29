@@ -27,6 +27,7 @@ public:
 	int BlockSizeForBlockSmoothers = -1;
 	double RelaxationParameter = 1;
 	CoarseningStrategy CoarseningStgy = CoarseningStrategy::StandardCoarsening;
+	int CoarseningFactor = 2;
 	bool ExportComponents = false;
 	bool DoNotCreateLevels = false;
 
@@ -77,7 +78,7 @@ public:
 		while ((_automaticNumberOfLevels && currentLevel->NUnknowns() > MatrixMaxSizeForCoarsestLevel) || (levelNumber < _nLevels - 1))
 		{
 			// Can we coarsen the mesh?
-			currentLevel->CoarsenMesh(this->CoarseningStgy, noCoarserMeshProvided, coarsestPossibleMeshReached);
+			currentLevel->CoarsenMesh(this->CoarseningStgy, this->CoarseningFactor, noCoarserMeshProvided, coarsestPossibleMeshReached);
 			if (noCoarserMeshProvided || coarsestPossibleMeshReached)
 				break;
 
