@@ -64,6 +64,8 @@ public:
 			gmsh::option::setNumber("General.Terminal", 1);
 			gmsh::option::setNumber("General.Verbosity", 99);
 		}
+		else
+			gmsh::option::setNumber("General.Terminal", 0);
 
 		bool tmpGeoFileCreated = false;
 		string mshFile;
@@ -96,6 +98,9 @@ public:
 				// Generate the mesh
 				cout << "Generating the mesh by GMSH..." << endl;
 				gmsh::model::mesh::generate(Dim);
+
+				//string optimizationMethod;
+				//gmsh::model::mesh::optimize(optimizationMethod);
 
 				if (UseCache)
 				{
@@ -191,7 +196,7 @@ private:
 
 	static string SetN(string geoFile, BigNumber n)
 	{
-		assert(n > 1);
+		assert(n > 0);
 		string geoFileWithN = FileSystem::Directory(geoFile) + "/" + FileSystem::FileNameWithoutExtension(geoFile) + "_N" + to_string(n) + ".tmp.geo";
 		ofstream gmshScriptWithN(geoFileWithN);
 
@@ -607,7 +612,7 @@ public:
 		// Linking fine/coarse elements
 		for (Element<Dim>* fine : fineMesh->Elements)
 		{
-			Element<Dim>* coarse = LocateElementThatEmbeds(fine);
+			Element<Dim>* coarse = LocateElementThatEmbedsMostOf(fine);
 			coarse->FinerElements.push_back(fine);
 			fine->CoarserElement = coarse;
 		}
@@ -669,7 +674,7 @@ private:
 
 		for (Element<Dim>* fine : fineMesh->Elements)
 		{
-			Element<Dim>* coarse = coarseMesh->LocateElementThatEmbeds(fine);
+			Element<Dim>* coarse = coarseMesh->LocateElementThatEmbedsMostOf(fine);
 			if (!coarse->IsInSamePhysicalPartAs(fine))
 				Utils::Warning("Coarse and fine elements aren't located in the same physical part. Something is wrong...");
 			coarse->FinerElements.push_back(fine);
@@ -700,24 +705,37 @@ private:
 	}
 
 
-	Element<Dim>* LocateElementThatEmbeds(Element<Dim>* finerElement)
+	Element<Dim>* LocateElementThatEmbedsMostOf(Element<Dim>* finerElement)
 	{
-		size_t coarseElementTag = LocateGMSHElementContaining(finerElement->Center());
+		size_t coarseElementTag = LocateGMSHElementContaining(finerElement->Center(), true);
+		if (coarseElementTag == 0)
+		{
+			Utils::Warning("No coarse element contains the barycenter of this fine element (Id=" + to_string(finerElement->Id) + ", Number=" + to_string(finerElement->Number) + ", IsOnBoundary=" + to_string(finerElement->IsOnBoundary()) + "). Getting the closest.");
+			coarseElementTag = LocateGMSHElementContaining(finerElement->Center(), false);
+		}
 		return GetElementFromGMSHTag(coarseElementTag);
 	}
 
-	size_t LocateGMSHElementContaining(const DomPoint& p)
+	// if !strictSearch, then finds the closest element
+	size_t LocateGMSHElementContaining(const DomPoint& p, bool strictSearch)
 	{
+		// outputs of the gmsh function
 		size_t elementTag;
 		int elementType;
 		vector<size_t> elementNodes;
 		double u, v, w;
-		bool strictResearch = true;
 
 		// If this function fails, check that a Physical Surface (if 2D) is defined in the file (if Physical Lines exist, then a Physical Surface must also exist!).
-		gmsh::model::mesh::getElementByCoordinates(p.X, p.Y, p.Z, elementTag,
-			elementType, elementNodes, u, v, w, // useless parameters for us
-			Dim, strictResearch);
+		try
+		{
+			gmsh::model::mesh::getElementByCoordinates(p.X, p.Y, p.Z, elementTag,
+				elementType, elementNodes, u, v, w, // useless parameters for us
+				Dim, strictSearch);
+		}
+		catch (...)
+		{
+			return 0;
+		}
 
 		return elementTag;
 	}
