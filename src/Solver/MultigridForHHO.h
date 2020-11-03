@@ -191,6 +191,8 @@ private:
 			SparseMatrix L2Proj = GetGlobalL2ProjectionMatrixCoarseToFineElements();
 			SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
 
+			coarsePb->_mesh->DeleteOverlappingFineElementsInformation();
+
 			if (ExportComponents)
 			{
 				Level::ExportMatrix(I_c, "I_c");
@@ -203,7 +205,9 @@ private:
 		else if (_prolongationCode == Prolongation::CellInterp_ApproxL2proj_Trace)
 		{
 			//---------------------------------------------------------------------//
-			//                 Non-nested variant (less costly)                    //
+			//                        Non-nested variant                           //
+			//            with approximate L2-projection (less costly)             //
+			//                                                                     //
 			// Step 1: Interpolation from coarse faces to coarse cells.            //
 			// Step 2: Instead of the canonical injection which is now impossible, //
 			//         L2-projection onto the fine cells.                          //
@@ -222,6 +226,39 @@ private:
 			
 			SparseMatrix I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
 			SparseMatrix L2Proj = GetGlobalCanonicalInjectionMatrixCoarseToFineElements();
+			SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
+
+			if (ExportComponents)
+			{
+				Level::ExportMatrix(I_c, "I_c");
+				Level::ExportMatrix(L2Proj, "J_f_c");
+				Level::ExportMatrix(Pi_f, "Pi_f");
+			}
+
+			P = Pi_f * L2Proj * I_c;
+		}
+		else if (_prolongationCode == Prolongation::CellInterp_FinerApproxL2proj_Trace)
+		{
+			//---------------------------------------------------------------------//
+			//                        Non-nested variant                           //
+			//               with a finer approximate L2-projection                //
+			//                                                                     //
+			// Step 1: Interpolation from coarse faces to coarse cells.            //
+			// Step 2: Approximate L2-projection onto the fine cells.              //
+			// Step 3: Trace on the fine faces.                                    //
+			//                                                                     //
+			// Details: Derived from the previous approximate L2-projection.       //
+			//          The fine elements are now refined and the subelements      //
+			//          associated to coarse elements accordingly.                 //
+			//          The implementation is the same as the exact L2-proj        //
+			//          though. Except that the coarse/fine intersection are the   //
+			//          subelements.                                               //
+			//---------------------------------------------------------------------//
+
+			coarsePb->_mesh->SetOverlappingFineElementsSubTriangles();
+
+			SparseMatrix I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
+			SparseMatrix L2Proj = GetGlobalL2ProjectionMatrixCoarseToFineElements();//GetFinerApproxL2ProjMatrixCoarseToFineElements();
 			SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
 
 			if (ExportComponents)
@@ -733,15 +770,6 @@ private:
 
 					chunk->Results.Coeffs.Add(fineElemGlobalNumber*nCellUnknowns, coarseElemGlobalNumber*nCellUnknowns, localL2Proj.block(fineElemLocalNumber*nCellUnknowns, 0, nCellUnknowns, nCellUnknowns));
 				}
-
-				// Deletion of the intersections
-				for (auto it = coarseElement->OverlappingFineElements.begin(); it != coarseElement->OverlappingFineElements.end(); it++)
-				{
-					vector<PhysicalShape<Dim>*> intersectionCoarseFine = it->second;
-					for (PhysicalShape<Dim>* intersection : intersectionCoarseFine)
-						delete intersection;
-				}
-				coarseElement->OverlappingFineElements.clear();
 			});
 
 		SparseMatrix L2Proj(finePb->HHO->nElements * nCellUnknowns, coarsePb->HHO->nElements * nCellUnknowns);
@@ -822,13 +850,15 @@ public:
 		os << "MultigridForHHO" << endl;
 		os << "\t" << "Prolongation       : ";
 		if (_prolongationCode == Prolongation::CellInterp_Trace)
-			os << "coarse cell interpolation + trace on fine faces ";
+			os << "coarse cell interpolation + trace/proj. on fine faces ";
 		else if (_prolongationCode == Prolongation::CellInterp_Inject_Trace)
 			os << "coarse cell interpolation + injection coarse to fine cells + trace on fine faces ";
 		else if (_prolongationCode == Prolongation::CellInterp_L2proj_Trace)
-			os << "coarse cell interpolation + L2-projection to fine cells + trace on fine faces ";
+			os << "coarse cell interpolation + L2-proj. to fine cells + trace on fine faces ";
 		else if (_prolongationCode == Prolongation::CellInterp_ApproxL2proj_Trace)
-			os << "coarse cell interpolation + L2-projection to fine cells (approx.) + trace on fine faces ";
+			os << "coarse cell interpolation + approx. L2-proj. to fine cells + trace on fine faces ";
+		else if (_prolongationCode == Prolongation::CellInterp_FinerApproxL2proj_Trace)
+			os << "coarse cell interpolation + approx. L2-proj. with subtriangulation + trace on fine faces ";
 		else if (_prolongationCode == Prolongation::CellInterp_InjectAndTrace)
 			os << "injection for common faces, and coarse cell interpolation + trace for the other ";
 		else if (_prolongationCode == Prolongation::CellInterp_Inject_Adjoint)
@@ -859,11 +889,10 @@ public:
 
 	void EndSerialize(ostream& os) const override
 	{
-		if (!Utils::BuildsNestedMeshHierarchy(this->CoarseningStgy)
-			&& _prolongationCode != Prolongation::CellInterp_L2proj_Trace && _prolongationCode != Prolongation::CellInterp_ApproxL2proj_Trace)
+		if (Utils::RequiresNestedHierarchy(_prolongationCode) && !Utils::BuildsNestedMeshHierarchy(this->CoarseningStgy))
 		{
 			os << endl;
-			Utils::Warning(os, "The selected coarsening strategy generates non-nested meshes, while the selected prolongation operator is made for nested meshes. Option -prolong " + to_string((unsigned)Prolongation::CellInterp_L2proj_Trace) + " or " + to_string((unsigned)Prolongation::CellInterp_ApproxL2proj_Trace) + " recommended.");
+			Utils::Warning(os, "The selected coarsening strategy generates non-nested meshes, while the selected prolongation operator is made for nested meshes. Option -prolong " + to_string((unsigned)Prolongation::CellInterp_L2proj_Trace) + ", " + to_string((unsigned)Prolongation::CellInterp_ApproxL2proj_Trace) + " or " + to_string((unsigned)Prolongation::CellInterp_FinerApproxL2proj_Trace) + " recommended.");
 		}
 	}
 

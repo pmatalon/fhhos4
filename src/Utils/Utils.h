@@ -179,7 +179,7 @@ public:
 
 	static bool RequiresNestedHierarchy(Prolongation p)
 	{
-		return p != Prolongation::CellInterp_L2proj_Trace;
+		return p != Prolongation::CellInterp_L2proj_Trace && p != Prolongation::CellInterp_ApproxL2proj_Trace && p != Prolongation::CellInterp_FinerApproxL2proj_Trace;
 	}
 
 	static double Eps;

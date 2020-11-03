@@ -132,9 +132,14 @@ public:
 	{
 		return Shape()->ConvexHullEmbeds(other->Shape());
 	}
-	virtual void ExportToMatlab(string color = "r") const
+	virtual void ExportToMatlab(string color = "r", bool writeNumber = false) const
 	{
-		return Shape()->ExportToMatlab(color);
+		Shape()->ExportToMatlab(color);
+		if (writeNumber)
+		{
+			MatlabScript s;
+			s.PlotText(Center(), to_string(this->Number));
+		}
 	}
 	virtual DimVector<Dim> OuterNormalVector(Face<Dim>* face) const = 0;
 
@@ -146,6 +151,11 @@ public:
 	virtual RefPoint ConvertToReference(const DomPoint& domainPoint) const
 	{
 		return Shape()->ConvertToReference(domainPoint);
+	}
+
+	virtual void Refine()
+	{
+		Shape()->Refine();
 	}
 
 	//----------------------------------------//
@@ -226,7 +236,11 @@ public:
 	}
 	inline int LocalNumberOfOverlapping(Element<Dim>* finerElement)
 	{
-		return this->_overlappingFineElementsLocalNumbering[finerElement];
+		auto it = this->_overlappingFineElementsLocalNumbering.find(finerElement);
+		if (it != this->_overlappingFineElementsLocalNumbering.end())
+			return it->second;
+		else
+			assert(false && "_overlappingFineElementsLocalNumbering probably not initialized");
 	}
 	inline int LocalNumberOf(Face<Dim>* face)
 	{
@@ -319,7 +333,12 @@ public:
 
 	bool HasOneVertexInCommonWith(Element<Dim>* other)
 	{
-		return this->Shape()->HasOneVertexInCommonWith(other->Shape());
+		for (Vertex* v : this->Vertices())
+		{
+			if (other->HasVertex(v))
+				return true;
+		}
+		return false;
 	}
 
 	bool IsIn(const vector<Element<Dim>*>& list)
@@ -429,24 +448,39 @@ public:
 	{
 		set<Element<Dim>*> vertexNeighbours;
 		vector<Element<Dim>*> faceNeigbours = this->Neighbours(onlyInTheSamePhysicalPart);
-		vertexNeighbours.insert(faceNeigbours.begin(), faceNeigbours.end());
 
-		for (Element<Dim>* n : faceNeigbours)
+		set<Element<Dim>*> tested;
+
+		set<Element<Dim>*> remaining;
+		remaining.insert(faceNeigbours.begin(), faceNeigbours.end());
+		while (!remaining.empty())
 		{
-			for (Element<Dim>* n2 : n->Neighbours(onlyInTheSamePhysicalPart))
-			{
-				if (n2 == this)
-					continue;
+			auto it = remaining.begin();
+			Element<Dim>* candidate = *it;
 
-				for (Vertex* v : n2->Vertices())
+			remaining.erase(it);
+
+			if (candidate->HasOneVertexInCommonWith(this))
+			{
+				vertexNeighbours.insert(candidate);
+
+				for (Element<Dim>* n : candidate->Neighbours(onlyInTheSamePhysicalPart))
 				{
-					if (this->HasVertex(v))
-						vertexNeighbours.insert(n2);
+					if (n == this || tested.find(n) != tested.end())
+						continue;
+					remaining.insert(n);
 				}
 			}
+			tested.insert(candidate);
 		}
 
 		return vector<Element<Dim>*>(vertexNeighbours.begin(), vertexNeighbours.end());
+	}
+
+	vector<Element<Dim>*> ThisAndVertexNeighbours(bool onlyInTheSamePhysicalPart = true)
+	{
+		vector<Element<Dim>*> list{ this };
+		return Utils::Join(list, VertexNeighbours(onlyInTheSamePhysicalPart));
 	}
 
 	bool IsInSamePhysicalPartAs(Element<Dim>* other)

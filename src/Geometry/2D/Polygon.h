@@ -201,6 +201,13 @@ public:
 		return boundingRectangle;
 	}
 
+	void Refine() override
+	{
+		if (!_triangulation.empty())
+			return;
+		ComputeTriangulation();
+	}
+
 private:
 	static vector<Triangle> ConvexTriangulation(const vector<DomPoint>& vertices)
 	{
@@ -355,6 +362,17 @@ public:
 		for (const Triangle& t : _triangulation)
 		{
 			const PhysicalShape<2>* ps = &t;
+			subShapes.push_back(ps);
+		}
+		return subShapes;
+	}
+	vector<PhysicalShape<2>*> SubShapes() override
+	{
+		assert(_triangulation.size() > 0);
+		vector<PhysicalShape<2>*> subShapes;
+		for (Triangle& t : _triangulation)
+		{
+			PhysicalShape<2>* ps = &t;
 			subShapes.push_back(ps);
 		}
 		return subShapes;

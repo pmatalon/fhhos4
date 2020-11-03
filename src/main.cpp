@@ -256,6 +256,8 @@ void print_usage() {
 	cout << "                   Step 3: Trace on the fine faces" << endl;
 	cout << "              " << (unsigned)Prolongation::CellInterp_ApproxL2proj_Trace << "  - ";
 	cout <<                    "Variant of " << (unsigned)Prolongation::CellInterp_L2proj_Trace << " where the L2-projection is not computed exactly but has the same approximation properties." << endl;
+	cout << "              " << (unsigned)Prolongation::CellInterp_FinerApproxL2proj_Trace << "  - ";
+	cout <<                    "Variant of " << (unsigned)Prolongation::CellInterp_ApproxL2proj_Trace << " where the L2-projection is better approximated (by subtriangulation of the elements)." << endl;
 	cout << endl;
 	cout << "-cell-interp NUM" << endl;
 	cout << "      In the polongation, degree of the polynomial interpolated on the cells from the faces." << endl;
@@ -671,7 +673,7 @@ int main(int argc, char* argv[])
 			case OPT_ProlongationCode:
 			{
 				int prolongationCode = atoi(optarg);
-				if (prolongationCode < 1 || prolongationCode > 8)
+				if (prolongationCode < 1 || prolongationCode > 9)
 					argument_error("unknown prolongation code. Check -prolong argument.");
 				args.Solver.MG.ProlongationCode = static_cast<Prolongation>(prolongationCode);
 				break;
@@ -924,10 +926,9 @@ int main(int argc, char* argv[])
 			argument_error("To use the face coarsening, you must also use the Galerkin operator. To do so, add option -g 1.");
 
 		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::IndependentRemeshing && 
-			args.Solver.MG.ProlongationCode != Prolongation::CellInterp_L2proj_Trace &&
-			args.Solver.MG.ProlongationCode != Prolongation::CellInterp_ApproxL2proj_Trace &&
+			Utils::RequiresNestedHierarchy(args.Solver.MG.ProlongationCode) &&
 			args.Solver.MG.ProlongationCode != Prolongation::Default)
-			argument_error("The coarsening by independent remeshing is only applicable with the non-nested versions of the multigrid (-prolong " + to_string((unsigned)Prolongation::CellInterp_L2proj_Trace) + " or " + to_string((unsigned)Prolongation::CellInterp_ApproxL2proj_Trace) + ").");
+			argument_error("The coarsening by independent remeshing is only applicable with the non-nested versions of the multigrid (-prolong " + to_string((unsigned)Prolongation::CellInterp_L2proj_Trace) + ", " + to_string((unsigned)Prolongation::CellInterp_ApproxL2proj_Trace) + " or " + to_string((unsigned)Prolongation::CellInterp_FinerApproxL2proj_Trace) + ").");
 
 		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::None)
 		{
@@ -935,13 +936,13 @@ int main(int argc, char* argv[])
 			{
 				if (args.Solver.MG.ProlongationCode == Prolongation::Default)
 				{
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours;
-					args.Solver.MG.ProlongationCode = Prolongation::CellInterp_ApproxL2proj_Trace;
+					args.Solver.MG.CoarseningStgy = CoarseningStrategy::IndependentRemeshing;
+					args.Solver.MG.ProlongationCode = Prolongation::CellInterp_FinerApproxL2proj_Trace;
 				}
 				else if (Utils::RequiresNestedHierarchy(args.Solver.MG.ProlongationCode))
 					args.Solver.MG.CoarseningStgy = CoarseningStrategy::GMSHSplittingRefinement;
 				else
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours;
+					args.Solver.MG.CoarseningStgy = CoarseningStrategy::IndependentRemeshing;
 			}
 			else
 			{
@@ -957,7 +958,7 @@ int main(int argc, char* argv[])
 			if (Utils::BuildsNestedMeshHierarchy(args.Solver.MG.CoarseningStgy))
 				args.Solver.MG.ProlongationCode = Prolongation::CellInterp_Trace;
 			else
-				args.Solver.MG.ProlongationCode = Prolongation::CellInterp_ApproxL2proj_Trace;
+				args.Solver.MG.ProlongationCode = Prolongation::CellInterp_FinerApproxL2proj_Trace;
 		}
 
 		if (defaultCycle)

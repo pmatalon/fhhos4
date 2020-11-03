@@ -131,6 +131,12 @@ public:
 		assert(false && "Not implemented");
 	}
 
+	void Refine() override
+	{
+		assert(false && "Not implemented");
+		Utils::FatalError("TO BE IMPLEMENTED");
+	}
+
 	double DetJacobian(const RefPoint& p) const override
 	{
 		DimMatrix<2> jacobianMatrix = JacobianMatrix(p);

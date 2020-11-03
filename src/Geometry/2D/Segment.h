@@ -88,6 +88,12 @@ public:
 		return AB_dot_AP > 0 && AB_dot_AP < AB.dot(AB) && abs(AB_dot_AP - AB.norm()*AP.norm()) < Utils::Eps*AB_dot_AP;
 	}
 
+	void Refine() override
+	{
+		assert(false && "Not implemented");
+		Utils::FatalError("TO BE IMPLEMENTED");
+	}
+
 	inline double DetJacobian() const override
 	{
 		return _width / RefShape()->Measure();

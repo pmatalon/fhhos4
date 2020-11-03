@@ -741,6 +741,27 @@ public:
 		assert(false);
 	}
 
+	virtual void SetOverlappingFineElementsSubTriangles()
+	{
+		assert(false);
+	}
+
+	void DeleteOverlappingFineElementsInformation()
+	{
+		ElementParallelLoop<Dim> parallelLoop(this->Elements);
+		parallelLoop.Execute([](Element<Dim>* e)
+			{
+				// Deletion of the intersections
+				for (auto it = e->OverlappingFineElements.begin(); it != e->OverlappingFineElements.end(); it++)
+				{
+					vector<PhysicalShape<Dim>*> intersectionCoarseFine = it->second;
+					for (PhysicalShape<Dim>* intersection : intersectionCoarseFine)
+						delete intersection;
+				}
+				e->OverlappingFineElements.clear();
+			});
+	}
+
 	virtual ~Mesh() 
 	{
 		if (CoarseMesh)

@@ -21,13 +21,15 @@ private:
 	DimMatrix<3> _inverseJacobianTranspose;
 	double _detJacobian;
 
+	vector<Tetrahedron> _refinement;
+
 public:
 	static ReferenceTetrahedron RefTetra;
 
 	Tetrahedron() {}
 
 	Tetrahedron(const DomPoint& p1, const DomPoint& p2, const DomPoint& p3, const DomPoint& p4)
-		: v1(p1), v2(p2), v3(p3), v4(p4)
+		: v1(p1), v2(p2), v3(p3), v4(p4), _refinement(0)
 	{
 		assert(p1 != p2 && p1 != p3 && p1 != p4 && p2 != p3 && p2 != p4 && p3 != p4);
 		Init();
@@ -159,6 +161,56 @@ public:
 		m.col(1) = Vect<3>(A, C);
 		m.col(2) = Vect<3>(A, D);
 		return abs(m.determinant()) / 6;
+	}
+
+	void Refine() override
+	{
+		if (!_refinement.empty())
+			return;
+
+		_refinement.reserve(8);
+
+		DomPoint m12 = Middle<3>(v1, v2);
+		DomPoint m13 = Middle<3>(v1, v3);
+		DomPoint m14 = Middle<3>(v1, v4);
+		DomPoint m23 = Middle<3>(v2, v3);
+		DomPoint m24 = Middle<3>(v2, v4);
+		DomPoint m34 = Middle<3>(v3, v4);
+
+		// Corners of the tetrahedron
+		_refinement.emplace_back( v1, m12, m13, m14);
+		_refinement.emplace_back(m12,  v2, m23, m24);
+		_refinement.emplace_back(m13, m23,  v3, m34);
+		_refinement.emplace_back(m14, m24, m34,  v4);
+
+		// Remaining octahedron
+		_refinement.emplace_back(m12, m13, m14, m24);
+		_refinement.emplace_back(m12, m13, m23, m24);
+		_refinement.emplace_back(m13, m14, m24, m34);
+		_refinement.emplace_back(m13, m23, m24, m34);
+	}
+
+	vector<const PhysicalShape<3>*> SubShapes() const override
+	{
+		assert(_refinement.size() > 0);
+		vector<const PhysicalShape<3>*> subShapes;
+		for (const Tetrahedron& t : _refinement)
+		{
+			const PhysicalShape<3>* ps = &t;
+			subShapes.push_back(ps);
+		}
+		return subShapes;
+	}
+	vector<PhysicalShape<3>*> SubShapes() override
+	{
+		assert(_refinement.size() > 0);
+		vector<PhysicalShape<3>*> subShapes;
+		for (Tetrahedron& t : _refinement)
+		{
+			PhysicalShape<3>* ps = &t;
+			subShapes.push_back(ps);
+		}
+		return subShapes;
 	}
 
 	inline double DetJacobian() const

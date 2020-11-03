@@ -19,13 +19,15 @@ private:
 	DimMatrix<2> _inverseJacobianTranspose;
 	double _detJacobian;
 
+	vector<Triangle> _refinement;
+
 public:
 	static ReferenceTriangle RefTriangle;
 
 	Triangle() {}
 
 	Triangle(const DomPoint& p1, const DomPoint& p2, const DomPoint& p3)
-		: v1(p1), v2(p2), v3(p3)
+		: v1(p1), v2(p2), v3(p3), _refinement(0)
 	{
 		Init();
 	}
@@ -142,6 +144,46 @@ public:
 			&& beta + tol > 0 && beta < 1 + tol    // beta  >= 0 && beta  <= 1
 			&& gamma + tol > 0 && gamma < 1 + tol    // gamma >= 0 && gamma <= 1
 			&& (abs(alpha + beta + gamma - 1) < tol); // alpha + beta + gamma = 1
+	}
+
+	void Refine() override
+	{
+		if (!_refinement.empty())
+			return;
+
+		_refinement.reserve(4);
+		
+		DomPoint m12 = Middle<2>(v1, v2);
+		DomPoint m23 = Middle<2>(v2, v3);
+		DomPoint m31 = Middle<2>(v3, v1);
+
+		_refinement.emplace_back(v1, m12, m31);
+		_refinement.emplace_back(m12, v2, m23);
+		_refinement.emplace_back(m23, v3, m31);
+		_refinement.emplace_back(m12, m23, m31);
+	}
+
+	vector<const PhysicalShape<2>*> SubShapes() const override
+	{
+		assert(_refinement.size() > 0);
+		vector<const PhysicalShape<2>*> subShapes;
+		for (const Triangle& t : _refinement)
+		{
+			const PhysicalShape<2>* ps = &t;
+			subShapes.push_back(ps);
+		}
+		return subShapes;
+	}
+	vector<PhysicalShape<2>*> SubShapes() override
+	{
+		assert(_refinement.size() > 0);
+		vector<PhysicalShape<2>*> subShapes;
+		for (Triangle& t : _refinement)
+		{
+			PhysicalShape<2>* ps = &t;
+			subShapes.push_back(ps);
+		}
+		return subShapes;
 	}
 
 	inline double DetJacobian() const

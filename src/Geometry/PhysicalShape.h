@@ -43,6 +43,8 @@ public:
 
 	virtual PhysicalShape<Dim>* CreateCopy() const = 0;
 
+	virtual void Refine() = 0;
+
 	//--------------------//
 	//      Geometry      //
 	//--------------------//
@@ -74,6 +76,10 @@ public:
 		return false;
 	}
 	virtual vector<const PhysicalShape<Dim>*> SubShapes() const
+	{
+		assert(false);
+	}
+	virtual vector<PhysicalShape<Dim>*> SubShapes()
 	{
 		assert(false);
 	}

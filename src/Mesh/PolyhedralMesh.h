@@ -1660,6 +1660,86 @@ private:
 		tested.insert(fe);
 	}
 
+public:
+	void SetOverlappingFineElementsSubTriangles() override
+	{
+		CoarseningStrategy stgy = this->ComesFrom.CS;
+		if (stgy == CoarseningStrategy::None)
+			stgy = this->FineMesh->ComesFrom.CS;
+
+		ElementParallelLoop<Dim> parallelLoopFine(this->FineMesh->Elements);
+		parallelLoopFine.Execute([stgy](Element<Dim>* fe)
+			{
+				if (!Utils::BuildsNestedMeshHierarchy(stgy))
+					fe->Refine();
+				SetOverlappingFineElementsSubTriangles(fe, stgy);
+			});
+
+		ElementParallelLoop<Dim> parallelLoop(this->Elements);
+		parallelLoop.Execute([](Element<Dim>* ce)
+			{
+				ce->InitOverlappingElementsLocalNumbering();
+			});
+	}
+
+private:
+	static void SetOverlappingFineElementsSubTriangles(Element<Dim>* fe, CoarseningStrategy stgy)
+	{
+		if (Utils::BuildsNestedMeshHierarchy(stgy))
+		{
+			Element<Dim>* ce = fe->CoarserElement;
+			ce->Mutex.lock();
+			ce->OverlappingFineElements.insert({ fe , {fe->Shape()} });
+			ce->Mutex.unlock();
+			return;
+		}
+
+		for (PhysicalShape<Dim>* subShape : fe->Shape()->SubShapes())
+		{
+			vector<Element<Dim>*> coarseCandidates = fe->CoarserElement->ThisAndVertexNeighbours();
+			bool found = false;
+			for (Element<Dim>* ce : coarseCandidates)
+			{
+				if (ce->Contains(subShape->Center()))
+				{
+					ce->Mutex.lock();
+					auto it = ce->OverlappingFineElements.find(fe);
+					if (it == ce->OverlappingFineElements.end())
+						ce->OverlappingFineElements.insert({ fe , {subShape} });
+					else
+						it->second.push_back(subShape);
+					ce->Mutex.unlock();
+					found = true;
+					break;
+				}
+			}
+			if (!found)
+			{
+				/*cout << "% --------- coarse element" << endl;
+				fe->CoarserElement->ExportToMatlab("y", true);
+				for (Element<Dim>* ce : fe->CoarserElement->ThisAndVertexNeighbours())
+				{
+					cout << "% --------- coarse candidate" << endl;
+					ce->ExportToMatlab("b", true);
+				}
+				cout << "% --------- fine element" << endl;
+				fe->ExportToMatlab("g");
+				cout << "% --------- subshape" << endl;
+				subShape->ExportToMatlab("r");*/
+				Utils::Warning("A fine subshape's center is not in any coarse element");
+				/*// Affectation to the coarse element associated to fe
+				Element<Dim>* ce = fe->CoarserElement;
+				ce->Mutex.lock();
+				auto it = ce->OverlappingFineElements.find(fe);
+				if (it == ce->OverlappingFineElements.end())
+					ce->OverlappingFineElements.insert({ fe , {subShape} });
+				else
+					it->second.push_back(subShape);
+				ce->Mutex.unlock();*/
+			}
+		}
+	}
+
 private:
 	static CGAL::Polygon_2<exactKernel> ConvertToCGALPolygon(Element<Dim>* e)
 	{

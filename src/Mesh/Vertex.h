@@ -95,15 +95,21 @@ DimVector<Dim> Vect(Vertex* A, Point B)
 }
 
 template<int Dim>
-DomPoint Middle(Vertex* A, Vertex* B)
+DomPoint Middle(const DomPoint& A, const DomPoint& B)
 {
 	if (Dim == 1)
-		return DomPoint((A->X + B->X) / 2);
+		return DomPoint((A.X + B.X) / 2);
 	else if (Dim == 2)
-		return DomPoint((A->X + B->X) / 2, (A->Y + B->Y) / 2);
+		return DomPoint((A.X + B.X) / 2, (A.Y + B.Y) / 2);
 	else if (Dim == 3)
-		return DomPoint((A->X + B->X) / 2, (A->Y + B->Y) / 2, (A->Z + B->Z) / 2);
+		return DomPoint((A.X + B.X) / 2, (A.Y + B.Y) / 2, (A.Z + B.Z) / 2);
 	assert(false);
+}
+
+template<int Dim>
+DomPoint Middle(Vertex* A, Vertex* B)
+{
+	return Middle<Dim>(*A, *B);
 }
 
 template<int Dim>

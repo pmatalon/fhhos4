@@ -245,6 +245,12 @@ public:
 			assert(false && "Not implemented");
 	}
 
+	void Refine() override
+	{
+		assert(false && "Not implemented");
+		Utils::FatalError("TO BE IMPLEMENTED");
+	}
+
 	void Serialize(ostream& os) const
 	{
 		if (ShapeDim == 2)

@@ -128,6 +128,11 @@ public:
 		return Triangle::TriangleContains(v1, v2, v3, p, _measure);
 	}
 
+	void Refine() override
+	{
+		Utils::FatalError("TO BE IMPLEMENTED");
+	}
+
 	inline double DetJacobian() const
 	{
 		return _detJacobian;
