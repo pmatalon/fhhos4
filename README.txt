@@ -35,7 +35,7 @@ Finally, build the program following step 3.
 > tar zxvf gmsh-4.6.0-source.tgz
 > cd gmsh-4.6.0-source/
 > mkdir build && cd build
-> cmake -DENABLE_BUILD_DYNAMIC=1 ..       # if issue with cgns, add option -DENABLE_CGNS=0 
+> cmake -DENABLE_BUILD_DYNAMIC=1 -DENABLE_FLTK=0 ..       # if issue with cgns, add option -DENABLE_CGNS=0 
 > make
 
 ###############################################################################################
