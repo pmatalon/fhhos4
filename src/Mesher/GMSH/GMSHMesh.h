@@ -683,6 +683,7 @@ private:
 
 		CloseGMSH();
 
+		int nCoarseWithoutFine = 0;
 		for (Element<Dim>* coarse : coarseMesh->Elements)
 		{
 			//if (coarse->FinerElements.size() > 5 || coarse->FinerElements.size() < 2)
@@ -699,15 +700,14 @@ private:
 
 			if (coarse->FinerElements.empty())
 			{
-				Utils::Warning("This coarse element does not have any fine element.");
-				Element<Dim>* closestFine = nullptr;
+				nCoarseWithoutFine++;
+
+				// Associate the closest fine element
+				/*Element<Dim>* closestFine = nullptr;
 				Element<Dim>* coarseToClosestFine = nullptr;
 				double closestDistance = -1;
 				for (Element<Dim>* n : coarse->VertexNeighbours())
 				{
-					/*for (auto it = n->FinerElements.begin(); it != n->FinerElements.end(); it++)
-					{
-						Element<Dim>* fine = *it;*/
 					for (Element<Dim>* fine : n->FinerElements)
 					{
 						double distance = Vect<Dim>(coarse->Center(), fine->Center()).norm();
@@ -724,9 +724,11 @@ private:
 				coarseToClosestFine->FinerElements.erase(it);
 				//assert(!coarseToClosestFine->FinerElements.empty());
 				coarse->FinerElements.push_back(closestFine);
-				closestFine->CoarserElement = coarse;
+				closestFine->CoarserElement = coarse;*/
 			}
 		}
+		if (nCoarseWithoutFine > 0)
+			Utils::Warning(to_string(nCoarseWithoutFine) + " coarse elements do not have any fine element.");
 
 		this->FinalizeCoarsening();
 	}
