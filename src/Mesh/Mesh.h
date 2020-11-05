@@ -762,6 +762,56 @@ public:
 			});
 	}
 
+	void PlotClustersForApproxL2(bool useOverlappingElements)
+	{
+		vector<string> colors = { "r", "b", "g", "k", "m", "y", "c" };
+		//RotatingList<string> colors({ "r", "b", "g", "k", "m", "y", "c" });
+		MatlabScript s("/mnt/c/Users/pierr/Desktop/approx_L2_1.m");
+		s.Add("figure, axes = gca; hold(axes, 'on');");
+		s.Add("axis(axes, 'equal');");
+		s.Add("axes.Visible = false;");
+
+		for (Element<Dim>* coarse : this->Elements)
+		{
+			s.Comment("---------------------------------------");
+			//string color = colors.Get();//.[coarse->Number % colors.size()];
+			string color = colors[coarse->Number % colors.size()];
+			if (coarse->Number == 0)
+				color = "y";
+			else if (coarse->Number == 3)
+				color = "b";
+			else if (coarse->Number == 6)
+				color = "m";
+			else if (coarse->Number == 16)
+				color = "k";
+
+			if (useOverlappingElements)
+			{
+				for (auto it = coarse->OverlappingFineElements.begin(); it != coarse->OverlappingFineElements.end(); it++)
+				{
+					Element<Dim>* fe = it->first;
+					vector<PhysicalShape<Dim>*> subShapesInCoarse = it->second;
+					for (auto ss : subShapesInCoarse)
+						s.PlotPolygon(ss->Vertices(), color, "-");
+				}
+			}
+			else
+			{
+				for (auto fe : coarse->FinerElements)
+					s.PlotPolygon(fe->Shape()->Vertices(), color, "-");
+			}
+		}
+		s.Comment("---------------------------------------------");
+		s.Comment("--------------------COARSE-------------------");
+		s.Comment("---------------------------------------------");
+		for (Element<Dim>* coarse : this->Elements)
+		{
+			s.Comment("---------------------------------------");
+			s.PlotPolygonEdges(coarse->Shape()->Vertices(), "k", 3);
+			//s.PlotText(coarse->Center(), to_string(coarse->Number));
+		}
+	}
+
 	virtual ~Mesh() 
 	{
 		if (CoarseMesh)
