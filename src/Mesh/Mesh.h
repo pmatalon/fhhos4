@@ -764,26 +764,43 @@ public:
 
 	void PlotClustersForApproxL2(bool useOverlappingElements)
 	{
-		vector<string> colors = { "r", "b", "g", "k", "m", "y", "c" };
-		//RotatingList<string> colors({ "r", "b", "g", "k", "m", "y", "c" });
+		//vector<string> colors = { "r", "b", "g", "k", "m", "y", "c" };
+		RotatingList<string> colors({ "r", "b", "g", "k", "m", "y", "c" });
 		MatlabScript s("/mnt/c/Users/pierr/Desktop/approx_L2_1.m");
 		s.Add("figure, axes = gca; hold(axes, 'on');");
 		s.Add("axis(axes, 'equal');");
 		s.Add("axes.Visible = false;");
 
+		map<Element<Dim>*, string> elementColors;
+
 		for (Element<Dim>* coarse : this->Elements)
 		{
 			s.Comment("---------------------------------------");
-			//string color = colors.Get();//.[coarse->Number % colors.size()];
-			string color = colors[coarse->Number % colors.size()];
-			if (coarse->Number == 0)
-				color = "y";
-			else if (coarse->Number == 3)
-				color = "b";
-			else if (coarse->Number == 6)
-				color = "m";
-			else if (coarse->Number == 16)
-				color = "k";
+			int nTestedColors = 0;
+			string color = colors.GetAndMoveNext();
+			//string color = colors[coarse->Number % colors.size()];
+			bool colorDifferentFromNeighbours = true;
+			do
+			{
+				colorDifferentFromNeighbours = true;
+				for (Element<Dim>* neighbour : coarse->Neighbours(false))
+				{
+					auto it = elementColors.find(neighbour);
+					if (it != elementColors.end())
+					{
+						string neighbourColor = it->second;
+						if (color.compare(neighbourColor) == 0)
+						{
+							colorDifferentFromNeighbours = false;
+							nTestedColors++;
+							color = colors.GetAndMoveNext();
+							break;
+						}
+					}
+				}
+			} while (!colorDifferentFromNeighbours && nTestedColors < colors.Size());
+
+			elementColors.insert({ coarse, color });
 
 			if (useOverlappingElements)
 			{

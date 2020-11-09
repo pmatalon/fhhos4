@@ -224,8 +224,10 @@ private:
 			// The coarse element associated to every mesh element must be the closest one.
 			// Every fine element must appear in only one coarse element's FinerElements list.
 
+#ifndef NDEBUG
 			//coarsePb->_mesh->PlotClustersForApproxL2(false);
-			
+#endif // !NDEBUG
+
 			SparseMatrix I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
 			SparseMatrix L2Proj = GetGlobalCanonicalInjectionMatrixCoarseToFineElements();
 			SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
@@ -258,7 +260,9 @@ private:
 			//---------------------------------------------------------------------//
 
 			coarsePb->_mesh->SetOverlappingFineElementsSubTriangles();
+#ifndef NDEBUG
 			//coarsePb->_mesh->PlotClustersForApproxL2(true);
+#endif // !NDEBUG
 
 			SparseMatrix I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
 			SparseMatrix L2Proj = GetGlobalL2ProjectionMatrixCoarseToFineElements();
