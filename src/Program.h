@@ -382,8 +382,9 @@ private:
 
 	Vector Solve(Solver* solver, const SparseMatrix& A, const Vector& b, string initialGuessCode)
 	{
-		Timer solverTimer;
-		solverTimer.Start();
+		Timer totalSolvingTimer;
+		totalSolvingTimer.Start();
+		Timer setupTimer;
 
 		cout << "Solver: " << *solver << endl << endl;
 
@@ -392,20 +393,29 @@ private:
 		if (iterativeSolver != nullptr)
 		{
 			iterativeSolver->ComputeExactSolution = A.rows() <= 2000;
+
+			setupTimer.Start();
 			solver->Setup(A);
+			setupTimer.Stop();
+
 			cout << "Solving..." << endl;
 			x = iterativeSolver->Solve(b, initialGuessCode);
 			cout << iterativeSolver->IterationCount << " iterations." << endl;
 		}
 		else
 		{
+			setupTimer.Start();
 			solver->Setup(A);
+			setupTimer.Stop();
+
 			cout << "Solving..." << endl;
 			x = solver->Solve(b);
 		}
 
-		solverTimer.Stop();
-		cout << "Solving time: CPU = " << solverTimer.CPU() << ", elapsed = " << solverTimer.Elapsed() << endl << endl;
+		totalSolvingTimer.Stop();
+		cout << "Setup time        : CPU = " << setupTimer.CPU()        << ", elapsed = " << setupTimer.Elapsed()        << endl;
+		cout << "Total solving time: CPU = " << totalSolvingTimer.CPU() << ", elapsed = " << totalSolvingTimer.Elapsed() << endl;
+		cout << endl;
 		return x;
 	}
 };
