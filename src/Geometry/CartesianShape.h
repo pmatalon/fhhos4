@@ -245,7 +245,7 @@ public:
 			assert(false && "Not implemented");
 	}
 
-	void Refine() override
+	void RefineWithoutCoarseOverlap(const vector<PhysicalShape<ShapeDim - 1>*>& doNotCross) override
 	{
 		assert(false && "Not implemented");
 		Utils::FatalError("TO BE IMPLEMENTED");

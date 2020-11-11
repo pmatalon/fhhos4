@@ -679,6 +679,7 @@ private:
 				Utils::Warning("Coarse and fine elements aren't located in the same physical part. Something is wrong...");
 			coarse->FinerElements.push_back(fine);
 			fine->CoarserElement = coarse;
+			fine->IsFullyEmbeddedInCoarseElement = false;
 		}
 
 		CloseGMSH();

@@ -2,6 +2,7 @@
 #include "../../Mesh/Vertex.h"
 #include "ReferenceTriangle.h"
 #include "../PhysicalShapeWithConstantJacobian.h"
+#include "Segment.h"
 using namespace std;
 
 class Triangle : public PhysicalShapeWithConstantJacobian<2>
@@ -146,13 +147,144 @@ public:
 			&& (abs(alpha + beta + gamma - 1) < tol); // alpha + beta + gamma = 1
 	}
 
-	void Refine() override
+	void RefineWithoutCoarseOverlap(const vector<PhysicalShape<1>*>& doNotCross) override
 	{
 		if (!_refinement.empty())
 			return;
 
+		if (doNotCross.empty())
+		{
+			_refinement.push_back(*this);
+			return;
+		}
+
+		double eps = Utils::Eps*this->Diameter();
+
+		RotatingList<DomPoint> vertices({ v1, v2, v3 });
+		for (int i = 0; i < 3; i++)
+		{
+			vertices.GoTo(i);
+			DomPoint p1 = vertices.GetAndMoveNext(); // fine
+			DomPoint p2 = vertices.GetAndMoveNext(); // fine
+			DomPoint p3 = vertices.GetAndMoveNext(); // fine
+			for (PhysicalShape<1>* coarseEdge : doNotCross)
+			{
+				DomPoint A = coarseEdge->Vertices()[0]; // coarse
+				DomPoint B = coarseEdge->Vertices()[1]; // coarse
+
+				vector<PhysicalShape<1>*> remainingDoNotCross;
+				for (auto ce : doNotCross)
+				{
+					if (ce != coarseEdge)
+						remainingDoNotCross.push_back(ce);
+				}
+
+				if (Vect<2>(p1, A).norm() < eps || Vect<2>(p1, B).norm() < eps) // p1 == A || p1 == B
+				{
+					bool areParallel;
+					DomPoint intersection;
+					bool intersectionIsInSegments;
+					Segment::Intersection(p2, p3, A, B, areParallel, intersection, intersectionIsInSegments);
+					if (areParallel || !intersectionIsInSegments)
+					{
+						RefineWithoutCoarseOverlap(remainingDoNotCross);
+						return;
+					}
+					else
+					{
+						// Split the triangle into 2 subtriangles
+						Triangle t1(p1, p2, intersection);
+						t1.RefineWithoutCoarseOverlap(remainingDoNotCross);
+						for (Triangle& subT : t1._refinement)
+							_refinement.push_back(subT);
+
+						Triangle t2(p1, intersection, p3);
+						t2.RefineWithoutCoarseOverlap(remainingDoNotCross);
+						for (Triangle& subT : t2._refinement)
+							_refinement.push_back(subT);
+						return;
+					}
+				}
+				else if (Vect<2>(p2, A).norm() < eps || Vect<2>(p2, B).norm() < eps) // p2 == A || p2 == B
+				{
+					bool areParallel;
+					DomPoint intersection;
+					bool intersectionIsInSegments;
+					Segment::Intersection(p1, p3, A, B, areParallel, intersection, intersectionIsInSegments);
+					if (areParallel || !intersectionIsInSegments)
+					{
+						RefineWithoutCoarseOverlap(remainingDoNotCross);
+						return;
+					}
+					else
+					{
+						// Split the triangle into 2 subtriangles
+						Triangle t1(p2, p3, intersection);
+						t1.RefineWithoutCoarseOverlap(remainingDoNotCross);
+						for (Triangle& subT : t1._refinement)
+							_refinement.push_back(subT);
+
+						Triangle t2(p2, intersection, p1);
+						t2.RefineWithoutCoarseOverlap(remainingDoNotCross);
+						for (Triangle& subT : t2._refinement)
+							_refinement.push_back(subT);
+						return;
+					}
+				}
+				else
+				{
+					bool areParallel;
+					DomPoint intersection;
+					bool intersectionIsInSegments;
+					Segment::Intersection(p1, p2, A, B, areParallel, intersection, intersectionIsInSegments);
+
+					if (areParallel || 
+						!intersectionIsInSegments || 
+						Vect<2>(intersection, p1).norm() < eps || 
+						Vect<2>(intersection, p2).norm() < eps || 
+						Vect<2>(intersection, p3).norm() < eps)
+						continue;
+					else
+					{
+						/*MatlabScript s;
+						s.Comment("----------- process triangle");
+						s.OpenFigure();
+						this->ExportToMatlab("r");
+						s.PlotText(p1, "_1", "k");
+						s.PlotText(p2, "_2", "k");
+						s.PlotText(p3, "_3", "k");
+						coarseEdge->ExportToMatlab("b");
+						s.PlotText(intersection, "intersection p1p2/AB", "b");*/
+
+						// Split the triangle into 2 subtriangles
+						Triangle t1(p3, p1, intersection);
+						if (t1.Measure() > Utils::Eps*this->Measure())
+						{
+							t1.RefineWithoutCoarseOverlap(doNotCross);
+							for (Triangle& subT : t1._refinement)
+								_refinement.push_back(subT);
+						}
+
+						Triangle t2(p2, p3, intersection);
+						if (t2.Measure() > Utils::Eps*this->Measure())
+						{
+							t2.RefineWithoutCoarseOverlap(doNotCross);
+							for (Triangle& subT : t2._refinement)
+								_refinement.push_back(subT);
+						}
+						return;
+					}
+				}
+			}
+		}
+		_refinement.push_back(*this);
+		return;
+	}
+
+	void RefineByConnectionOfTheMiddleEdges()
+	{
 		_refinement.reserve(4);
-		
+
 		DomPoint m12 = Middle<2>(v1, v2);
 		DomPoint m23 = Middle<2>(v2, v3);
 		DomPoint m31 = Middle<2>(v3, v1);
@@ -163,27 +295,27 @@ public:
 		_refinement.emplace_back(m12, m23, m31);
 	}
 
-	vector<const PhysicalShape<2>*> SubShapes() const override
+	vector<const PhysicalShape<2>*> RefinedShapes() const override
 	{
 		assert(_refinement.size() > 0);
-		vector<const PhysicalShape<2>*> subShapes;
+		vector<const PhysicalShape<2>*> refinedShapes;
 		for (const Triangle& t : _refinement)
 		{
 			const PhysicalShape<2>* ps = &t;
-			subShapes.push_back(ps);
+			refinedShapes.push_back(ps);
 		}
-		return subShapes;
+		return refinedShapes;
 	}
-	vector<PhysicalShape<2>*> SubShapes() override
+	vector<PhysicalShape<2>*> RefinedShapes() override
 	{
 		assert(_refinement.size() > 0);
-		vector<PhysicalShape<2>*> subShapes;
+		vector<PhysicalShape<2>*> refinedShapes;
 		for (Triangle& t : _refinement)
 		{
 			PhysicalShape<2>* ps = &t;
-			subShapes.push_back(ps);
+			refinedShapes.push_back(ps);
 		}
-		return subShapes;
+		return refinedShapes;
 	}
 
 	inline double DetJacobian() const

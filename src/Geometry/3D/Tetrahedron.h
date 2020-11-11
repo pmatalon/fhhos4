@@ -163,7 +163,13 @@ public:
 		return abs(m.determinant()) / 6;
 	}
 
-	void Refine() override
+	void RefineWithoutCoarseOverlap(const vector<PhysicalShape<2>*>& doNotCross) override
+	{
+		assert(false && "RefineWithoutCoarseOverlap() not implemented for the tetrahedron.");
+		Utils::FatalError("RefineWithoutCoarseOverlap() not implemented for the tetrahedron.");
+	}
+
+	void RefineByBey()
 	{
 		if (!_refinement.empty())
 			return;
@@ -178,10 +184,10 @@ public:
 		DomPoint m34 = Middle<3>(v3, v4);
 
 		// Corners of the tetrahedron
-		_refinement.emplace_back( v1, m12, m13, m14);
-		_refinement.emplace_back(m12,  v2, m23, m24);
-		_refinement.emplace_back(m13, m23,  v3, m34);
-		_refinement.emplace_back(m14, m24, m34,  v4);
+		_refinement.emplace_back(v1, m12, m13, m14);
+		_refinement.emplace_back(m12, v2, m23, m24);
+		_refinement.emplace_back(m13, m23, v3, m34);
+		_refinement.emplace_back(m14, m24, m34, v4);
 
 		// Remaining octahedron
 		_refinement.emplace_back(m12, m13, m14, m24);
@@ -190,27 +196,27 @@ public:
 		_refinement.emplace_back(m13, m23, m24, m34);
 	}
 
-	vector<const PhysicalShape<3>*> SubShapes() const override
+	vector<const PhysicalShape<3>*> RefinedShapes() const override
 	{
 		assert(_refinement.size() > 0);
-		vector<const PhysicalShape<3>*> subShapes;
+		vector<const PhysicalShape<3>*> refinedShapes;
 		for (const Tetrahedron& t : _refinement)
 		{
 			const PhysicalShape<3>* ps = &t;
-			subShapes.push_back(ps);
+			refinedShapes.push_back(ps);
 		}
-		return subShapes;
+		return refinedShapes;
 	}
-	vector<PhysicalShape<3>*> SubShapes() override
+	vector<PhysicalShape<3>*> RefinedShapes() override
 	{
 		assert(_refinement.size() > 0);
-		vector<PhysicalShape<3>*> subShapes;
+		vector<PhysicalShape<3>*> refinedShapes;
 		for (Tetrahedron& t : _refinement)
 		{
 			PhysicalShape<3>* ps = &t;
-			subShapes.push_back(ps);
+			refinedShapes.push_back(ps);
 		}
-		return subShapes;
+		return refinedShapes;
 	}
 
 	inline double DetJacobian() const

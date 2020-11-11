@@ -71,6 +71,17 @@ public:
 		fprintf(file, "%lu %.17g %.17g %.17g %.17g %d %d\n", this->Number, _v1->X, _v1->Y, _v2->X, _v2->Y, this->IsDomainBoundary, this->IsRemovedOnCoarserGrid);
 	}
 
+	virtual bool IntersectsWith(Face<2>* other)
+	{
+		Edge* otherEdge = dynamic_cast<Edge*>(other);
+
+		bool areParallel;
+		DomPoint intersection;
+		bool intersectionIsInSegments;
+		_shape.IntersectionWith(otherEdge->_shape, areParallel, intersection, intersectionIsInSegments);
+		return !areParallel && intersectionIsInSegments;
+	}
+
 	virtual ~Edge()
 	{}
 };

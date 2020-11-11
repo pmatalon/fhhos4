@@ -61,18 +61,22 @@ public:
 
 	void Reset() { _i = 0; }
 
-	void GoTo(size_t index) { _i = index; }
+	bool GoTo(size_t index)
+	{
+		_i = index;
+		return true;
+	}
 
-	void GoTo(T obj)
+	bool GoTo(T obj)
 	{
 		for (int j = 0; j < _list.size(); j++)
 		{
 			if (_list[j] == obj)
 			{
 				_i = j;
-				return;
+				return true;
 			}
 		}
-		throw new ios_base::failure("Object not found in the list");
+		return false;
 	}
 };

@@ -81,6 +81,11 @@ public:
 		return n;
 	}
 
+	void Refine() override
+	{
+		_shape.RefineByBey();
+	}
+
 	virtual ~TetrahedralElement()
 	{}
 

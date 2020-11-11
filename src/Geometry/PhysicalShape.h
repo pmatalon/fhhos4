@@ -43,7 +43,7 @@ public:
 
 	virtual PhysicalShape<Dim>* CreateCopy() const = 0;
 
-	virtual void Refine() = 0;
+	virtual void RefineWithoutCoarseOverlap(const vector<PhysicalShape<Dim - 1>*>& doNotCross) = 0;
 
 	//--------------------//
 	//      Geometry      //
@@ -68,13 +68,12 @@ public:
 		assert(false && "To be implemented in the subclass");
 	}
 
-	// For squares, triangles, etc, just one subshape: itself.
-	// For polyhedra: decomposition into simplices.
-	// For agglomerates: list of shapes forming the agglomerate.
-	virtual bool IsMadeOfSubShapes() const
+	virtual bool IsGeneralPolygon() const
 	{
 		return false;
 	}
+	// For squares, triangles, etc, just one subshape: itself.
+	// For polyhedra: decomposition into simplices.
 	virtual vector<const PhysicalShape<Dim>*> SubShapes() const
 	{
 		assert(false);
@@ -83,7 +82,17 @@ public:
 	{
 		assert(false);
 	}
+
 	virtual void ExportSubShapesToMatlab() const
+	{
+		assert(false);
+	}
+
+	virtual vector<const PhysicalShape<Dim>*> RefinedShapes() const
+	{
+		assert(false);
+	}
+	virtual vector<PhysicalShape<Dim>*> RefinedShapes()
 	{
 		assert(false);
 	}

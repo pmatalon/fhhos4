@@ -133,7 +133,7 @@ protected:
 				PolygonalElement* p = dynamic_cast<PolygonalElement*>(e);
 				if (p)
 				{
-					p->ComputeTriangulation();
+					p->ComputeMinimalTriangulation();
 					p->ComputeBoundingBox();
 				}
 			});
@@ -1670,8 +1670,26 @@ public:
 		ElementParallelLoop<Dim> parallelLoopFine(this->FineMesh->Elements);
 		parallelLoopFine.Execute([stgy](Element<Dim>* fe)
 			{
-				if (!Utils::BuildsNestedMeshHierarchy(stgy))
-					fe->Refine();
+				if (!Utils::BuildsNestedMeshHierarchy(stgy) && !fe->IsFullyEmbeddedInCoarseElement)
+				{
+					if (stgy == CoarseningStrategy::IndependentRemeshing)
+						fe->Refine();
+					else
+						fe->RefineWithoutCoarseOverlap();
+
+					/*if (fe->CoarserElement->Number == 16 && fe->Number == 164) // (16,164) (38, 152) (38, 40)
+					{
+						MatlabScript s;
+						s.Comment("--------------------COARSE-------------------");
+						s.PlotPolygonEdges(fe->CoarserElement->Shape()->Vertices(), "k", 3);
+						s.Comment("FINE " + to_string(fe->Number));
+						for (auto ss : fe->Shape()->RefinedShapes())
+							s.PlotPolygon(ss->Vertices(), "r", "-");
+
+						fe->RefineWithoutCoarseOverlap();
+					}*/
+				}
+
 				SetOverlappingFineElementsSubTriangles(fe, stgy);
 			});
 
@@ -1685,7 +1703,7 @@ public:
 private:
 	static void SetOverlappingFineElementsSubTriangles(Element<Dim>* fe, CoarseningStrategy stgy)
 	{
-		if (Utils::BuildsNestedMeshHierarchy(stgy))
+		if (Utils::BuildsNestedMeshHierarchy(stgy) || fe->IsFullyEmbeddedInCoarseElement)
 		{
 			Element<Dim>* ce = fe->CoarserElement;
 			ce->Mutex.lock();
@@ -1694,7 +1712,7 @@ private:
 			return;
 		}
 
-		for (PhysicalShape<Dim>* subShape : fe->Shape()->SubShapes())
+		for (PhysicalShape<Dim>* subShape : fe->Shape()->RefinedShapes())
 		{
 			vector<Element<Dim>*> coarseCandidates = fe->CoarserElement->ThisAndVertexNeighbours();
 			bool found = false;

@@ -128,9 +128,9 @@ public:
 		return Triangle::TriangleContains(v1, v2, v3, p, _measure);
 	}
 
-	void Refine() override
+	void RefineWithoutCoarseOverlap(const vector<PhysicalShape<1>*>& doNotCross) override
 	{
-		Utils::FatalError("TO BE IMPLEMENTED");
+		Utils::FatalError("NOT SUPPOSED TO BE CALLED");
 	}
 
 	inline double DetJacobian() const

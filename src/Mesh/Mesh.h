@@ -767,7 +767,7 @@ public:
 		//vector<string> colors = { "r", "b", "g", "k", "m", "y", "c" };
 		RotatingList<string> colors({ "r", "b", "g", "k", "m", "y", "c" });
 		MatlabScript s("/mnt/c/Users/pierr/Desktop/approx_L2_1.m");
-		s.Add("figure, axes = gca; hold(axes, 'on');");
+		s.OpenFigure();
 		s.Add("axis(axes, 'equal');");
 		s.Add("axes.Visible = false;");
 
@@ -802,12 +802,14 @@ public:
 
 			elementColors.insert({ coarse, color });
 
+			s.Comment("----- coarse " + to_string(coarse->Number));
 			if (useOverlappingElements)
 			{
 				for (auto it = coarse->OverlappingFineElements.begin(); it != coarse->OverlappingFineElements.end(); it++)
 				{
 					Element<Dim>* fe = it->first;
 					vector<PhysicalShape<Dim>*> subShapesInCoarse = it->second;
+					s.Comment("----- fine " + to_string(fe->Number));
 					for (auto ss : subShapesInCoarse)
 						s.PlotPolygon(ss->Vertices(), color, "-");
 				}
@@ -815,7 +817,10 @@ public:
 			else
 			{
 				for (auto fe : coarse->FinerElements)
+				{
+					s.Comment("----- fine " + to_string(fe->Number));
 					s.PlotPolygon(fe->Shape()->Vertices(), color, "-");
+				}
 			}
 		}
 		s.Comment("---------------------------------------------");

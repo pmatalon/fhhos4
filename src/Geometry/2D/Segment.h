@@ -88,7 +88,7 @@ public:
 		return AB_dot_AP > 0 && AB_dot_AP < AB.dot(AB) && abs(AB_dot_AP - AB.norm()*AP.norm()) < Utils::Eps*AB_dot_AP;
 	}
 
-	void Refine() override
+	void RefineWithoutCoarseOverlap(const vector<PhysicalShape<0>*>& doNotCross) override
 	{
 		assert(false && "Not implemented");
 		Utils::FatalError("TO BE IMPLEMENTED");
@@ -149,5 +149,47 @@ public:
 		v1.Serialize(os, 2);
 		os << "--";
 		v2.Serialize(os, 2);
+	}
+
+	void IntersectionWith(const Segment& other, bool &areParallel, DomPoint& intersection, bool& intersectionIsInSegments)
+	{
+		Intersection(v1, v2, other.v1, other.v2, areParallel, intersection, intersectionIsInSegments);
+	}
+
+	static void Intersection(DomPoint segment1p1, DomPoint segment1p2, DomPoint segment2p1, DomPoint segment2p2, bool &areParallel, DomPoint& intersection, bool& intersectionIsInSegments)
+	{
+		// https://en.wikipedia.org/wiki/Line%E2%80%93line_intersection
+
+		areParallel = false;
+		intersection = DomPoint();
+
+		// Line 1
+		double x1 = segment1p1.X;
+		double y1 = segment1p1.Y;
+		double x2 = segment1p2.X;
+		double y2 = segment1p2.Y;
+
+		// Line 2
+		double x3 = segment2p1.X;
+		double y3 = segment2p1.Y;
+		double x4 = segment2p2.X;
+		double y4 = segment2p2.Y;
+
+		double denom = (x1 - x2)*(y3 - y4) - (y1 - y2)*(x3 - x4);
+		if (abs(denom) < Utils::NumericalZero)
+		{
+			areParallel = true;
+			return;
+		}
+
+		double t = ((x1 - x3)*(y3 - y4) - (y1 - y3)*(x3 - x4)) / denom;
+		double u = -((x1 - x2)*(y1 - y3) - (y1 - y2)*(x1 - x3)) / denom;
+
+		double eps = Utils::Eps;
+		intersectionIsInSegments = t + eps > 0 && t < 1 + eps  // t in [0,1]
+			                    && u + eps > 0 && u < 1 + eps; // u in [0,1]
+
+		intersection.X = x1 + t * (x2 - x1);
+		intersection.Y = y1 + t * (y2 - y1);
 	}
 };

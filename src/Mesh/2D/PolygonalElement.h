@@ -105,9 +105,9 @@ public:
 	//                    Polygon-specific                   //
 	//-------------------------------------------------------//
 
-	void ComputeTriangulation()
+	void ComputeMinimalTriangulation()
 	{
-		_shape.ComputeTriangulation();
+		_shape.ComputeMinimalTriangulation();
 	}
 	void ComputeBoundingBox()
 	{

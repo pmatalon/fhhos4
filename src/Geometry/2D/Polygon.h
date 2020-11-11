@@ -25,6 +25,12 @@ public:
 	}
 };
 
+enum PolygonalTriangulation
+{
+	Barycentric,
+	OneVertex
+};
+
 class Polygon : public PhysicalShape<2>
 {
 private:
@@ -41,6 +47,10 @@ private:
 	vector<Triangle> _triangulation;
 	Quadrilateral _boundingBox;
 	vector<DomPoint> _quadraturePoints;
+	vector<Triangle> _refinement;
+
+	const static PolygonalTriangulation MinimalTriangulationMethod        = PolygonalTriangulation::OneVertex;
+	const static PolygonalTriangulation MinimalOverlapTriangulationMethod = PolygonalTriangulation::OneVertex;
 
 public:
 	Polygon() {}
@@ -134,7 +144,7 @@ private:
 
 		if (createTriangulationAndBoundingBox)
 		{
-			ComputeTriangulation();
+			ComputeMinimalTriangulation();
 			ComputeBoundingBox();
 		}
 
@@ -143,15 +153,15 @@ private:
 	}
 
 public:
-	void ComputeTriangulation()
+	void ComputeMinimalTriangulation()
 	{
 		if (!_triangulation.empty())
 			return;
 
 		if (_vertices.size() <= 3 || this->IsConvex())
-			_triangulation = ConvexTriangulation(_vertices);
+			_triangulation = ConvexTriangulation(_vertices, MinimalTriangulationMethod, {});
 		else
-			_triangulation = NonConvexTriangulation();
+			_triangulation = NonConvexTriangulation(MinimalTriangulationMethod, {});
 
 		auto it = _triangulation.begin();
 		while (it != _triangulation.end())
@@ -201,46 +211,71 @@ public:
 		return boundingRectangle;
 	}
 
-	void Refine() override
+	void RefineWithoutCoarseOverlap(const vector<PhysicalShape<1>*>& doNotCross) override
 	{
-		if (!_triangulation.empty())
-			return;
-		ComputeTriangulation();
+		if (this->IsConvex())
+			_refinement = ConvexTriangulation(_vertices, MinimalOverlapTriangulationMethod, doNotCross);
+		else
+			_refinement = NonConvexTriangulation(MinimalOverlapTriangulationMethod, doNotCross);
+
+		auto it = _refinement.begin();
+		while (it != _refinement.end())
+		{
+			if (it->Measure() < Utils::Eps*this->_measure)
+				it = _refinement.erase(it);
+			else
+				it++;
+		}
+
+		assert(_refinement.size() > 0);
 	}
 
 private:
-	static vector<Triangle> ConvexTriangulation(const vector<DomPoint>& vertices)
+	static vector<Triangle> ConvexTriangulation(const vector<DomPoint>& vertices, PolygonalTriangulation triangulationMethod, const vector<PhysicalShape<1>*>& doNotCross)
 	{
 		assert(vertices.size() > 2);
+		if (triangulationMethod == PolygonalTriangulation::Barycentric)
+			return BarycentricTriangulation(vertices);
+		else if (triangulationMethod == PolygonalTriangulation::OneVertex)
+			return OneVertexTriangulation(vertices, doNotCross);
+		assert(false);
+	}
+
+	static vector<Triangle> OneVertexTriangulation(const vector<DomPoint>& vertices, const vector<PhysicalShape<1>*>& doNotCross)
+	{
 		vector<Triangle> triangles;
-		if (vertices.size() == 3)
-			triangles.emplace_back(vertices[0], vertices[1], vertices[2]);
-		else if (vertices.size() == 4)
-		{
-			triangles.emplace_back(vertices[0], vertices[1], vertices[2]);
-			triangles.emplace_back(vertices[2], vertices[3], vertices[0]);
-		}
-		else
-		{
-			triangles.emplace_back(vertices[0], vertices[1], vertices[2]);
 
-			// remove vertices[1]
-			vector<DomPoint> remainingVertices;
-			for (int i = 2; i < vertices.size(); i++)
-				remainingVertices.push_back(vertices[i]);
-			remainingVertices.push_back(vertices[0]);
+		RotatingList<DomPoint> rotatingVertices(vertices);
 
-			vector<Triangle> otherTriangles = ConvexTriangulation(remainingVertices);
+		DomPoint p1 = rotatingVertices.GetAndMoveNext();
+		DomPoint p2 = rotatingVertices.GetAndMoveNext();
+		DomPoint p3 = rotatingVertices.Get();
+
+		Triangle t(p1, p2, p3);
+		t.RefineWithoutCoarseOverlap(doNotCross);
+		for (PhysicalShape<2>* subT : t.RefinedShapes())
+			triangles.push_back(*static_cast<Triangle*>(subT));
+
+		if (vertices.size() > 3)
+		{
+			// remove p2
+			vector<DomPoint> remainingVertices{ p1 };
+			for (int i = 0; i < vertices.size()-2; i++)
+				remainingVertices.push_back(rotatingVertices.GetAndMoveNext());
+
+			// and recursion...
+			vector<Triangle> otherTriangles = OneVertexTriangulation(remainingVertices, doNotCross);
 			for (auto t : otherTriangles)
 				triangles.push_back(t);
 		}
 		return triangles;
 	}
-	static vector<PhysicalShape<2>*> BarycentricTriangulation(const vector<DomPoint>& vertices)
+
+	static vector<Triangle> BarycentricTriangulation(const vector<DomPoint>& vertices)
 	{
 		// Requirement: the polygon defined by the vertices must be convex!
 
-		vector<PhysicalShape<2>*> triangles;
+		vector<Triangle> triangles;
 
 		double sumX = 0;
 		double sumY = 0;
@@ -253,22 +288,16 @@ private:
 		DomPoint center(sumX / vertices.size(), sumY / vertices.size());
 
 		if (vertices.size() == 3)
-		{
-			Triangle* triangle = new Triangle(vertices[0], vertices[1], vertices[2]);
-			triangles.push_back(triangle);
-		}
+			triangles.emplace_back(vertices[0], vertices[1], vertices[2]);
 		else
 		{
 			for (int i = 0; i < vertices.size(); i++)
-			{
-				Triangle* subTriangle = new Triangle(vertices[i], vertices[(i + 1) % vertices.size()], center);
-				triangles.push_back(subTriangle);
-			}
+				triangles.emplace_back(vertices[i], vertices[(i + 1) % vertices.size()], center);
 		}
 		return triangles;
 	}
 
-	vector<Triangle> NonConvexTriangulation()
+	vector<Triangle> NonConvexTriangulation(PolygonalTriangulation triangulationMethod, const vector<PhysicalShape<1>*>& doNotCross)
 	{
 		vector<Triangle> triangulation;
 
@@ -291,7 +320,7 @@ private:
 		for (CGAL::Partition_traits_2<chosenKernel>::Polygon_2 p : convexPartition)
 		{
 			vector<DomPoint> vertices = CGALWrapper::ToVertices(p);
-			vector<Triangle> subTriangles = ConvexTriangulation(vertices);
+			vector<Triangle> subTriangles = ConvexTriangulation(vertices, triangulationMethod, doNotCross);
 			for (auto tri : subTriangles)
 				triangulation.push_back(tri);
 		}
@@ -351,7 +380,7 @@ public:
 		return copy;
 	}
 
-	bool IsMadeOfSubShapes() const override
+	bool IsGeneralPolygon() const override
 	{
 		return true;
 	}
@@ -376,6 +405,29 @@ public:
 			subShapes.push_back(ps);
 		}
 		return subShapes;
+	}
+
+	vector<const PhysicalShape<2>*> RefinedShapes() const override
+	{
+		assert(_refinement.size() > 0);
+		vector<const PhysicalShape<2>*> refinedShapes;
+		for (const Triangle& t : _refinement)
+		{
+			const PhysicalShape<2>* ps = &t;
+			refinedShapes.push_back(ps);
+		}
+		return refinedShapes;
+	}
+	vector<PhysicalShape<2>*> RefinedShapes() override
+	{
+		assert(_refinement.size() > 0);
+		vector<PhysicalShape<2>*> refinedShapes;
+		for (Triangle& t : _refinement)
+		{
+			PhysicalShape<2>* ps = &t;
+			refinedShapes.push_back(ps);
+		}
+		return refinedShapes;
 	}
 
 	const vector<Triangle>& Triangulation() const
@@ -602,7 +654,7 @@ public:
 		//--------------------------------------//
 		RefFunction refX = [](const RefPoint& p) { return p.X; };
 		double integral = polygRefSquare.Integral(refX);
-		assert(integral == 0);
+		assert(abs(integral) < Utils::NumericalZero);
 
 		//--------------------------------------//
 		RefFunction anyFunction = [](const RefPoint& p) { return p.X + p.Y*p.Y + 1; };

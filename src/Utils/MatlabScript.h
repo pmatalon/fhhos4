@@ -31,6 +31,11 @@ public:
 		Out() << s << endl;
 	}
 
+	void OpenFigure()
+	{
+		Out() << "figure, axes = gca; hold(axes, 'on');" << endl;
+	}
+
 	void PlotPoint(const DomPoint& p, string options = "k+")
 	{
 		Out() << "plot(axes, " << p.X << ", " << p.Y << ",'" << options << "');" << endl;

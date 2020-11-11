@@ -95,6 +95,11 @@ public:
 		return n;
 	}
 
+	void Refine() override
+	{
+		_shape.RefineByConnectionOfTheMiddleEdges();
+	}
+
 	virtual ~TriangularElement()
 	{}
 

@@ -30,6 +30,7 @@ public:
 	// Intergrid links //
 	vector<Element<Dim>*> FinerElements;
 	Element<Dim>* CoarserElement = nullptr;
+	bool IsFullyEmbeddedInCoarseElement = true;
 	vector<Face<Dim>*> FinerFacesRemoved;
 	// Used for non-nested meshes. It contains at least FinerElements.
 	map<Element<Dim>*, vector<PhysicalShape<Dim>*>> OverlappingFineElements;
@@ -153,9 +154,22 @@ public:
 		return Shape()->ConvertToReference(domainPoint);
 	}
 
+	virtual void RefineWithoutCoarseOverlap()
+	{
+		vector<PhysicalShape<Dim - 1>*> doNotCross;
+		for (Face<Dim>* cf : CoarserElement->Faces)
+		{
+			if (cf->FinerFaces.size() > 1 && this->HasAny(cf->FinerFaces))
+			{
+				doNotCross.push_back(cf->Shape());
+			}
+		}
+		Shape()->RefineWithoutCoarseOverlap(doNotCross);
+	}
+
 	virtual void Refine()
 	{
-		Shape()->Refine();
+		assert(false && "To be implemented");
 	}
 
 	//----------------------------------------//
@@ -359,13 +373,11 @@ public:
 		}
 		this->Faces.push_back(collapsedFace);
 
-		double oldMeasure = this->Measure();
 		RemoveIntersections(faces, collapsedFace);
-		double newMeasure = this->Measure();
 
 		// Some fine elements associated to this coarse one might now be more overlapping the other coarse elements.
 		// So we change the association.
-		if (!collapsedFace->IsDomainBoundary && newMeasure < oldMeasure)
+		if (!collapsedFace->IsDomainBoundary)
 		{
 			Element<Dim>* neighbour = collapsedFace->GetNeighbour(this);
 			auto it = this->FinerElements.begin();
@@ -374,6 +386,7 @@ public:
 				Element<Dim>* fe = *it;
 				if (fe->HasAny(collapsedFace->FinerFaces))
 				{
+					fe->IsFullyEmbeddedInCoarseElement = false;
 					DomPoint p = fe->InteriorPoint();
 					if (!this->Contains(p) && !collapsedFace->Contains(p) && neighbour->Contains(p))
 					{
@@ -636,7 +649,7 @@ public:
 			bool containsCenter = this->Contains(C); // comment this test if Contains() is not implemented
 			if (!containsCenter)
 			{
-				if (this->Shape()->IsMadeOfSubShapes())
+				if (this->Shape()->IsGeneralPolygon())
 				{
 					cout << "Analysis of the problem:" << endl;
 					cout << "Matlab script to plot the subshapes of element " << this->Number << ":" << endl;
