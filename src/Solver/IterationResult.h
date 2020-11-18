@@ -120,17 +120,18 @@ public:
 	friend ostream& operator<<(ostream& os, const IterationResult& result)
 	{
 		int IterWidth = 3;
+		int predictedIterationsWidth = 6;
 		int normalizedResWidth = 17;
-		int relativeErrorWidth = 17;
-		int convRateWidth = 16;
-		int predictedIterationsWidth = 14;
+		int relativeErrorWidth = 15;
+		int iterationConvRateWidth = 13;
+		int asymptoticConvRateWidth = 16;
 		int computWorkWidth = 15;
 		int cpuTimeWidth = 10;
-		int remainingTimeWidth = 16;
+		int remainingTimeWidth = 14;
 		if (result.IterationNumber == 0)
 		{
-			os << setw(IterWidth);
-			os << "It";
+			os << setw(IterWidth + predictedIterationsWidth);
+			os << "Iteration";
 
 			os << setw(normalizedResWidth);
 			os << "Norm. residual";
@@ -141,14 +142,11 @@ public:
 				os << "Relative err.";
 			}
 
-			//os << setw(convRateWidth);
-			//os << "It. conv. rate";
+			os << setw(iterationConvRateWidth);
+			os << "It. cv rate";
 
-			os << setw(convRateWidth);
+			os << setw(asymptoticConvRateWidth);
 			os << "Asymp. cv rate";
-
-			os << setw(predictedIterationsWidth);
-			os << "Predic. it.";
 
 			os << setw(computWorkWidth);
 			os << "Comput. work";
@@ -157,12 +155,27 @@ public:
 			os << "CPU time";
 
 			os << setw(remainingTimeWidth);
-			os << "Remaining time";
+			os << "Remain. time";
 		}
 		else
 		{
 			os << setw(IterWidth);
 			os << result.IterationNumber;
+
+			os << setw(predictedIterationsWidth);
+			int remainingIterations = -1;
+			if (result.IterationNumber == 1)
+				os << "";
+			else
+			{
+				if (result._asymptoticConvRate < 1)
+				{
+					remainingIterations = abs(ceil(log(result._tolerance / result.NormalizedResidualNorm) / log(result._asymptoticConvRate)));
+					os << "/ " + to_string(result.IterationNumber + remainingIterations);
+				}
+				else
+					os << "/ Inf";
+			}
 
 			os << setw(normalizedResWidth);
 			os << std::scientific << result.NormalizedResidualNorm;
@@ -173,24 +186,14 @@ public:
 				os << result.RelativeErrorNorm;
 			}
 
-			//os << setw(convRateWidth);
-			//os << std::defaultfloat << result._iterationConvRate;
+			os << setw(iterationConvRateWidth);
+			os << std::defaultfloat << result._iterationConvRate;
 
-			os << setw(convRateWidth);
+			os << setw(asymptoticConvRateWidth);
 			if (result.IterationNumber == 1)
 				os << " ";
 			else
 				os << std::defaultfloat << result._asymptoticConvRate;
-
-			os << setw(predictedIterationsWidth);
-			int remainingIterations = 0;
-			if (result.IterationNumber == 1)
-				os << " ";
-			else
-			{
-				remainingIterations = abs(ceil(log(result._tolerance / result.NormalizedResidualNorm) / log(result._asymptoticConvRate)));
-				os << result.IterationNumber + remainingIterations;
-			}
 
 			os << setw(computWorkWidth);
 			os << result._solvingComputationalWork;
@@ -201,6 +204,8 @@ public:
 			os << setw(remainingTimeWidth);
 			if (result.IterationNumber == 1)
 				os << " ";
+			else if (remainingIterations == -1)
+				os << "Inf";
 			else
 			{
 				Duration d(result._solvingTimer.CPU().InMilliseconds / result.IterationNumber * remainingIterations);
