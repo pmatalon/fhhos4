@@ -194,14 +194,20 @@ public:
 					{
 						// Split the triangle into 2 subtriangles
 						Triangle t1(p1, p2, intersection);
-						t1.RefineWithoutCoarseOverlap(remainingDoNotCross);
-						for (Triangle& subT : t1._refinement)
-							_refinement.push_back(subT);
+						if (t1.Measure() > Utils::Eps*this->Measure())
+						{
+							t1.RefineWithoutCoarseOverlap(remainingDoNotCross);
+							for (Triangle& subT : t1._refinement)
+								_refinement.push_back(subT);
+						}
 
 						Triangle t2(p1, intersection, p3);
-						t2.RefineWithoutCoarseOverlap(remainingDoNotCross);
-						for (Triangle& subT : t2._refinement)
-							_refinement.push_back(subT);
+						if (t2.Measure() > Utils::Eps*this->Measure())
+						{
+							t2.RefineWithoutCoarseOverlap(remainingDoNotCross);
+							for (Triangle& subT : t2._refinement)
+								_refinement.push_back(subT);
+						}
 						return;
 					}
 				}
@@ -220,14 +226,20 @@ public:
 					{
 						// Split the triangle into 2 subtriangles
 						Triangle t1(p2, p3, intersection);
-						t1.RefineWithoutCoarseOverlap(remainingDoNotCross);
-						for (Triangle& subT : t1._refinement)
-							_refinement.push_back(subT);
+						if (t1.Measure() > Utils::Eps*this->Measure())
+						{
+							t1.RefineWithoutCoarseOverlap(remainingDoNotCross);
+							for (Triangle& subT : t1._refinement)
+								_refinement.push_back(subT);
+						}
 
 						Triangle t2(p2, intersection, p1);
-						t2.RefineWithoutCoarseOverlap(remainingDoNotCross);
-						for (Triangle& subT : t2._refinement)
-							_refinement.push_back(subT);
+						if (t2.Measure() > Utils::Eps*this->Measure())
+						{
+							t2.RefineWithoutCoarseOverlap(remainingDoNotCross);
+							for (Triangle& subT : t2._refinement)
+								_refinement.push_back(subT);
+						}
 						return;
 					}
 				}
