@@ -1733,17 +1733,19 @@ private:
 			}
 			if (!found)
 			{
-				/*cout << "% --------- coarse element" << endl;
+#ifndef NDEBUG
+				cout << "% --------- coarse element" << endl;
 				fe->CoarserElement->ExportToMatlab("y", true);
 				for (Element<Dim>* ce : fe->CoarserElement->ThisAndVertexNeighbours())
 				{
 					cout << "% --------- coarse candidate" << endl;
 					ce->ExportToMatlab("b", true);
 				}
-				cout << "% --------- fine element" << endl;
+				cout << "% --------- fine element "  << fe->Number << endl;
 				fe->ExportToMatlab("g");
 				cout << "% --------- subshape" << endl;
-				subShape->ExportToMatlab("r");*/
+				subShape->ExportToMatlab("r");
+#endif // !NDEBUG
 				Utils::Warning("A fine subshape's center is not in any coarse element");
 				/*// Affectation to the coarse element associated to fe
 				Element<Dim>* ce = fe->CoarserElement;

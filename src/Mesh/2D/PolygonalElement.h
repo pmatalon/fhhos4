@@ -75,7 +75,6 @@ public:
 			const Triangle* triangle = nullptr;
 			for (const Triangle& t : _shape.Triangulation())
 			{
-				//bool containsA = ss->Contains(*A);
 				if (t.Contains(*A, true) && t.Contains(*B, true))
 				{
 					triangle = &t;
@@ -84,13 +83,25 @@ public:
 			}
 			if (!triangle)
 			{
-				_shape.ExportSubShapesToMatlab();
+				/*_shape.ExportSubShapesToMatlab();
 				MatlabScript s;
 				s.PlotText(*A, "A");
 				s.PlotText(*B, "B");
+				//OuterNormalVector(face);
+				Utils::FatalError("Cannot compute the direction of the normal vector.");*/
 
-				OuterNormalVector(face);
-				Utils::FatalError("Cannot compute the direction of the normal vector.");
+				// Find the closest subshape's center to the middle of [A,B]
+				DomPoint M = Middle<2>(A, B);
+				double minDistance = -1;
+				for (const Triangle& t : _shape.Triangulation())
+				{
+					double distance = Vect<2>(M, t.Center()).norm();
+					if (!triangle || distance < minDistance)
+					{
+						triangle = &t;
+						minDistance = distance;
+					}
+				}
 			}
 			C = triangle->Center();
 		}
