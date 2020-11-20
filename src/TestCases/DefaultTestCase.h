@@ -13,13 +13,7 @@ public:
 		this->DiffField = DiffusionField<Dim>(pb.AnisotropyRatio, pb.AnisotropyAngle);
 
 		// Source function
-		this->SourceFunction = [](const DomPoint& p)
-		{
-			double x = p.X;
-			double y = p.Y;
-			double z = p.Z;
-			return x*x + y*y + z*z <= 0.1 ? 1.0 : 0.0;
-		};
+		this->SourceFunction = this->DiscontinuousSource;
 
 		// Boundary conditions
 		if (pb.BCCode.compare("d") != 0)

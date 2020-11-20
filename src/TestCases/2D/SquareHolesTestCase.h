@@ -15,7 +15,10 @@ public:
 		this->DiffField = DiffusionField<2>(pb.AnisotropyRatio, pb.AnisotropyAngle);
 
 		// Source function
-		this->SourceFunction = this->Source;
+		if (pb.SourceCode.compare("") == 0)
+			this->SourceFunction = this->PolySource2D;
+		else
+			Utils::FatalError("Unmanaged source code");
 
 		// Boundary conditions
 		if (pb.BCCode.compare("d") == 0)
@@ -43,13 +46,5 @@ public:
 	string Description() override
 	{
 		return "Rectangle with 24 square holes";
-	}
-
-private:
-	static double Source(const DomPoint& p)
-	{
-		double x = p.X;
-		double y = p.Y;
-		return 2 * (y*(1 - y) + x * (1 - x));
 	}
 };

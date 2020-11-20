@@ -21,17 +21,24 @@ void print_usage() {
 	cout << "                                Use relative or absolute path, or simply the file name if the file is stored in the folder data/mesh/" << endl;
 	cout << endl;
 	cout << "-tc CODE" << endl;
-	cout << "      Test case code. The test case defines the source function of the problem, the diffusion field, as well as available predefined boundary conditions." << endl;
-	cout << "      In some, it also determines the analytical solution in the homogeneous isotropic case so that the L2 error can be computed." << endl;
+	cout << "      Test case code. By default, it is defined as the geometry." << endl;
+	cout << "      The test case defines the source function of the problem, the diffusion field, as well as available predefined boundary conditions." << endl;
+	cout << "      By default, the test case is defined as the geometry." << endl;
+	cout << "      When the geometry given is a GMSH file, a test case with same code as the file name should be defined in the source code. Alternatively, you can use" << endl;
+	cout << "               default - discontinuous source function, homogeneous Dirichlet conditions" << endl;
+	cout << "      Additional specific test cases:" << endl;
+	cout << "               heterog - ('segment' geometry only) heterogeneous diffusion-specific analytical solution" << endl;
+	cout << "               kellogg - ('square4quadrants' geometry only) heterogeneous diffusion-specific analytical solution (known benchmark)" << endl;
+	cout << endl;
+	cout << "-source CODE" << endl;
+	cout << "      Code allowing to change the default source function defined in the test case." << endl;
+	cout << "      For some, it also determines the analytical solution in the homogeneous isotropic case so that the L2 error can be computed." << endl;
 	cout << "      The following test cases are predefined and available for the simple geometries listed in the -geo argument." << endl;
 	cout << "               sine    - the source function and the analytical solution are a sine functions" << endl;
 	cout << "               poly    - the source function is constant, the analytical solution is a polynomial of total degree 2*d" << endl;
 	cout << "               zero    - the source function and the analytical solution are 0" << endl;
 	cout << "               one     - the source function is 0, the analytical solution is 1" << endl;
 	cout << "               x       - the source function is 0, the analytical solution is x" << endl;
-	cout << "               heterog - (1D only) heterogeneous diffusion-specific analytical solution" << endl;
-	cout << "               kellogg - (2D only) heterogeneous diffusion-specific analytical solution (known benchmark)" << endl;
-	cout << "      When the geometry given is a GMSH file, a test case with same code as the file name must be defined." << endl;
 	cout << endl;
 	cout << "-bc CODE" << endl;
 	cout << "      Boundary conditions, according to what the selected test case allows." << endl;
@@ -373,7 +380,7 @@ int main(int argc, char* argv[])
 		// Problem
 		OPT_Geometry = 1000,
 		OPT_TestCase,
-		OPT_RightHandSide, // deprecated
+		OPT_Source,
 		OPT_BoundaryConditions,
 		OPT_HeterogeneityRatio,
 		OPT_AnisotropyRatio,
@@ -419,7 +426,7 @@ int main(int argc, char* argv[])
 		 // Problem
 		 { "geo", required_argument, NULL, OPT_Geometry },
 		 { "tc", required_argument, NULL, OPT_TestCase },
-		 { "rhs", required_argument, NULL, OPT_RightHandSide }, // deprecated
+		 { "source", required_argument, NULL, OPT_Source },
 		 { "bc", required_argument, NULL, OPT_BoundaryConditions },
 		 { "heterog", required_argument, NULL, OPT_HeterogeneityRatio },
 		 { "aniso", required_argument, NULL, OPT_AnisotropyRatio },
@@ -482,8 +489,10 @@ int main(int argc, char* argv[])
 					args.Discretization.Mesher = "gmsh";
 				break;
 			case OPT_TestCase:
-			case OPT_RightHandSide:
 				args.Problem.TestCaseCode = optarg;
+				break;
+			case OPT_Source:
+				args.Problem.SourceCode = optarg;
 				break;
 			case OPT_BoundaryConditions:
 				args.Problem.BCCode = optarg;
@@ -826,7 +835,7 @@ int main(int argc, char* argv[])
 	if (args.Problem.TestCaseCode.compare("") == 0)
 	{
 		if (Utils::IsPredefinedGeometry(args.Problem.GeoCode))
-			args.Problem.TestCaseCode = "default";
+			args.Problem.TestCaseCode = args.Problem.GeoCode;
 		else
 			args.Problem.TestCaseCode = FileSystem::FileNameWithoutExtension(args.Problem.GeoCode);
 	}

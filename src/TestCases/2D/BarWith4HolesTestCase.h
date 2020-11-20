@@ -15,16 +15,21 @@ public:
 		this->DiffField = DiffusionField<2>(pb.AnisotropyRatio, pb.AnisotropyAngle);
 
 		// Source function
-		this->SourceFunction = [](const DomPoint& p)
+		if (pb.SourceCode.compare("") == 0)
 		{
-			double x = p.X;
-			double y = p.Y;
-			if (x * x + y * y <= 2)
-				return 1.0;
-			if (x >= 7 && x <= 8 && y >= -0.5 && y <= 0.2)
-				return 1.0;
-			return 0.0;
-		};
+			this->SourceFunction = [](const DomPoint& p)
+			{
+				double x = p.X;
+				double y = p.Y;
+				if (x * x + y * y <= 2)
+					return 1.0;
+				if (x >= 7 && x <= 8 && y >= -0.5 && y <= 0.2)
+					return 1.0;
+				return 0.0;
+			};
+		}
+		else
+			Utils::FatalError("Unmanaged source code");
 
 		// Boundary conditions
 		if (pb.BCCode.compare("d") == 0)

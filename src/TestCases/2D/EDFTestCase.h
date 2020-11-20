@@ -29,45 +29,38 @@ public:
 		this->DiffField = DiffusionField<2>(tensors);
 
 		// Source function
-		this->SourceFunction = [](const DomPoint& p)
+		if (pb.SourceCode.compare("") == 0)
 		{
-			double x = p.X;
-			double y = p.Y;
+			this->SourceFunction = [](const DomPoint& p)
+			{
+				double x = p.X;
+				double y = p.Y;
 
-			double r = 6;
-			double power = 1.0;
-			// left
-			if (IsInDisk(DomPoint(5, 10), r, p))
-				return power;
-			// middle
-			if (IsInDisk(DomPoint(15, 6), r, p))
-				return power;
-			// middle
-			if (IsInDisk(DomPoint(24, 8), r, p))
-				return power;
-			// right
-			if (IsInDisk(DomPoint(28, 11), r, p))
-				return power;
+				double r = 6;
+				double power = 1.0;
+				// left
+				if (Utils::IsInDisk(DomPoint(5, 10), r, p))
+					return power;
+				// middle
+				if (Utils::IsInDisk(DomPoint(15, 6), r, p))
+					return power;
+				// middle
+				if (Utils::IsInDisk(DomPoint(24, 8), r, p))
+					return power;
+				// right
+				if (Utils::IsInDisk(DomPoint(28, 11), r, p))
+					return power;
 
-			// bottom
-			r = 2;
-			power = 7;
-			if (IsInDisk(DomPoint(1, 2), r, p))
-				return power;
-			/*if (IsInDisk(DomPoint(7, 2), r, p))
-				return power;
-			if (IsInDisk(DomPoint(13, 2), r, p))
-				return power;
-			if (IsInDisk(DomPoint(19, 2), r, p))
-				return power;
-			if (IsInDisk(DomPoint(25, 2), r, p))
-				return power;
-			if (IsInDisk(DomPoint(31, 2), r, p))
-				return power;*/
-			//if (x >= 26 && x <= 30 && y >= 9 && y <= 13)
-				//return 1.0;
-			return 0.0;
-		};
+				// bottom
+				r = 2;
+				power = 7;
+				if (Utils::IsInDisk(DomPoint(1, 2), r, p))
+					return power;
+				return 0.0;
+			};
+		}
+		else
+			Utils::FatalError("Unmanaged source code");
 
 		// Boundary conditions
 		if (pb.BCCode.compare("d") == 0)
@@ -79,13 +72,6 @@ public:
 		}
 		else
 			Utils::FatalError("The requested boundary conditions are not defined in this test case.");
-	}
-
-	static bool IsInDisk(const DomPoint& c, double r, const DomPoint& p)
-	{
-		if (pow(p.X - c.X, 2) + pow(p.Y - c.Y, 2) <= r)
-			return true;
-		return false;
 	}
 
 	string Code() override

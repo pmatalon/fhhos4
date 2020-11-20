@@ -2,20 +2,30 @@
 #include "../TestCase.h"
 using namespace std;
 
-class SquareCircleTestCase : public TestCase<2>
+class MagnetismTestCase : public TestCase<2>
 {
 private:
-	Tensor<2> diffTensorSquare;
-	Tensor<2> diffTensorCircle;
+	Tensor<2> tensorExterior;
+	Tensor<2> tensorMiddle;
+	Tensor<2> tensorInterior;
+	Tensor<2> tensorLittlePieces;
 public:
-	SquareCircleTestCase(ProblemArguments pb) :
+	MagnetismTestCase(ProblemArguments pb) :
 		TestCase()
 	{
 		// Diffusion field
-		diffTensorSquare = Tensor<2>(pb.HeterogeneityRatio, pb.AnisotropyRatio, pb.AnisotropyAngle);
-		diffTensorCircle = Tensor<2>(1                    , pb.AnisotropyRatio, pb.AnisotropyAngle);
+		tensorExterior     = Tensor<2>(pb.HeterogeneityRatio      , pb.AnisotropyRatio, pb.AnisotropyAngle);
+		tensorMiddle       = Tensor<2>(                          1, pb.AnisotropyRatio, pb.AnisotropyAngle);
+		tensorInterior     = Tensor<2>(pb.HeterogeneityRatio      , pb.AnisotropyRatio, pb.AnisotropyAngle);
+		tensorLittlePieces = Tensor<2>(sqrt(pb.HeterogeneityRatio), pb.AnisotropyRatio, pb.AnisotropyAngle);
 
-		this->DiffField = DiffusionField<2>("square", &diffTensorSquare, "disk", &diffTensorCircle);
+		map<string, Tensor<2>*> tensors;
+		tensors.insert({ "Exterior", &tensorExterior });
+		tensors.insert({ "Middle", &tensorMiddle });
+		tensors.insert({ "Interior", &tensorInterior });
+		tensors.insert({ "LittlePieces", &tensorLittlePieces });
+
+		this->DiffField = DiffusionField<2>(tensors);
 
 		// Source function
 		if (pb.SourceCode.compare("") == 0)
@@ -27,23 +37,26 @@ public:
 
 				double r = 6;
 				double power = 1.0;
-				// left
-				if (Utils::IsInDisk(DomPoint(5, 10), r, p))
+				/*// left
+				if (IsInDisk(DomPoint(5, 10), r, p))
 					return power;
 				// middle
-				if (Utils::IsInDisk(DomPoint(15, 6), r, p))
+				if (IsInDisk(DomPoint(15, 6), r, p))
 					return power;
 				// middle
-				if (Utils::IsInDisk(DomPoint(24, 8), r, p))
+				if (IsInDisk(DomPoint(24, 8), r, p))
 					return power;
 				// right
-				if (Utils::IsInDisk(DomPoint(28, 11), r, p))
-					return power;
+				if (IsInDisk(DomPoint(28, 11), r, p))
+					return power;*/
 
-				// bottom
-				r = 2;
+					// bottom
+				/*r = 2;
 				power = 7;
-				if (Utils::IsInDisk(DomPoint(1, 2), r, p))
+				if (Utils::IsInDisk(DomPoint(1, 2), r, p))*/
+				r = 0.01;
+				power = 1e-6;
+				if (Utils::IsInDisk(DomPoint(0, 0.8), r, p))
 					return power;
 				return 0.0;
 			};
@@ -62,23 +75,14 @@ public:
 		// Boundary conditions
 		if (pb.BCCode.compare("d") == 0)
 		{
-			// These are already the default value, but I reset them as an example of how to apply boundary conditions.
 			this->BC.GetBoundaryConditionType = BoundaryConditions::DirichletEverywhere;
-			this->BC.DirichletFunction = BoundaryConditions::Homogeneous;
-			/*this->BC.DirichletFunction = [&pb](const DomPoint& p)
-			{
-				return 1 / pb.HeterogeneityRatio;
-			};*/
+			this->BC.DirichletFunction = BoundaryConditions::Homogeneous;//this->SineSolution2D; //BoundaryConditions::Homogeneous;
 			this->BC.Description = "Homogeneous Dirichlet";
 		}
 		else if (pb.BCCode.compare("m") == 0)
 		{
 			this->BC.GetBoundaryConditionType = BoundaryConditions::MixedConditionsExample;
 			this->BC.DirichletFunction = BoundaryConditions::Homogeneous;
-			/*this->BC.DirichletFunction = [&pb](const DomPoint& p)
-			{
-				return pb.HeterogeneityRatio;
-			};*/
 			this->BC.NeumannFunction = BoundaryConditions::Homogeneous;
 			this->BC.Description = "Mixed Neumann-Dirichlet";
 		}
@@ -88,10 +92,10 @@ public:
 
 	string Code() override
 	{
-		return "squarecircle";
+		return "magnetism";
 	}
 	string Description() override
 	{
-		return "Square embedding a circle";
+		return "Magnetism";
 	}
 };

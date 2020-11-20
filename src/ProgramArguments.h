@@ -7,6 +7,7 @@ struct ProblemArguments
 	int Dimension = -1;
 	string GeoCode = "square";
 	string TestCaseCode = "";
+	string SourceCode = "";
 	double HeterogeneityRatio = 1;
 	double AnisotropyRatio = 1;
 	double AnisotropyAngle = 0; // in radians

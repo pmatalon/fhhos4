@@ -28,7 +28,7 @@ public:
 		this->DiffField = Square4quadrantsGeometry::DiffField(heterogeneityRatio, anisotropyRatio, anisotropyAngle);
 
 		// Source function
-		this->SourceFunction = this->Source;
+		this->SourceFunction = this->Zero;
 
 		// Boundary conditions
 		if (pb.BCCode.compare("d") != 0)
@@ -49,10 +49,10 @@ public:
 	}
 
 private:
-	static double Source(const DomPoint& p)
+	/*static double Source(const DomPoint& p)
 	{
 		return 0;
-	}
+	}*/
 
 	static double Solution(const DomPoint& p)
 	{

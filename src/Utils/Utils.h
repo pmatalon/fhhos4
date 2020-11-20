@@ -31,6 +31,13 @@ public:
 		return (n & (n - 1)) == 0;
 	}
 
+	static bool IsInDisk(const DomPoint& c, double r, const DomPoint& p)
+	{
+		if (pow(p.X - c.X, 2) + pow(p.Y - c.Y, 2) <= r)
+			return true;
+		return false;
+	}
+
 	//--------------//
 	//   Matrices   //
 	//--------------//

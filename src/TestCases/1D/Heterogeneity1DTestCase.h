@@ -13,7 +13,10 @@ public:
 		this->DiffField = SegmentGeometry::DiffField(pb.HeterogeneityRatio);
 
 		// Source function
-		this->SourceFunction = Source;
+		this->SourceFunction = [](const DomPoint& p)
+		{
+			return 4.0;
+		};
 
 		// Boundary conditions
 		if (pb.BCCode.compare("d") != 0)
@@ -41,10 +44,5 @@ public:
 	string Description() override
 	{
 		return "Heterogeneous-specific test case. The solution is a continuous piecewise polynomial function.";
-	}
-
-	static double Source(const DomPoint& p)
-	{
-		return 4;
 	}
 };

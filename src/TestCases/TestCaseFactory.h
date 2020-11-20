@@ -1,22 +1,15 @@
 #pragma once
 #include "DefaultTestCase.h"
-#include "1D/SineSolution1DTestCase.h"
-#include "1D/PolySolution1DTestCase.h"
+#include "1D/SegmentTestCase.h"
 #include "1D/Heterogeneity1DTestCase.h"
-#include "2D/SineSolution2DTestCase.h"
-#include "2D/PolySolution2DTestCase.h"
-#include "2D/ExpSolution2DTestCase.h"
-#include "2D/ZeroSolution2DTestCase.h"
-#include "2D/OneSolution2DTestCase.h"
-#include "2D/XSolution2DTestCase.h"
+#include "2D/SquareTestCase.h"
 #include "2D/KelloggTestCase.h"
 #include "2D/BarWith4HolesTestCase.h"
 #include "2D/SquareCircleTestCase.h"
 #include "2D/SquareHolesTestCase.h"
 #include "2D/EDFTestCase.h"
-#include "3D/SineSolution3DTestCase.h"
-#include "3D/PolySolution3DTestCase.h"
-#include "3D/ExpSolution3DTestCase.h"
+#include "2D/MagnetismTestCase.h"
+#include "3D/CubeTestCase.h"
 #include "3D/PlateWith4HolesTestCase.h"
 using namespace std;
 
@@ -32,10 +25,8 @@ TestCase<1>* TestCaseFactory<1>::Create(ProblemArguments pb)
 {
 	if (pb.TestCaseCode.compare("default") == 0)
 		return new DefaultTestCase<1>(pb);
-	if (pb.TestCaseCode.compare("sine") == 0)
-		return new SineSolution1DTestCase(pb);
-	if (pb.TestCaseCode.compare("poly") == 0)
-		return new PolySolution1DTestCase(pb);
+	if (pb.TestCaseCode.compare("segment") == 0)
+		return new SegmentTestCase(pb);
 	if (pb.TestCaseCode.compare("heterog") == 0)
 		return new Heterogeneity1DTestCase(pb);
 
@@ -47,18 +38,10 @@ TestCase<2>* TestCaseFactory<2>::Create(ProblemArguments pb)
 {
 	if (pb.TestCaseCode.compare("default") == 0)
 		return new DefaultTestCase<2>(pb);
-	if (pb.TestCaseCode.compare("sine") == 0)
-		return new SineSolution2DTestCase(pb);
-	if (pb.TestCaseCode.compare("poly") == 0)
-		return new PolySolution2DTestCase(pb);
-	if (pb.TestCaseCode.compare("exp") == 0)
-		return new ExpSolution2DTestCase(pb);
-	if (pb.TestCaseCode.compare("zero") == 0)
-		return new ZeroSolution2DTestCase(pb);
-	if (pb.TestCaseCode.compare("one") == 0)
-		return new OneSolution2DTestCase(pb);
-	if (pb.TestCaseCode.compare("x") == 0)
-		return new XSolution2DTestCase(pb);
+	if (pb.TestCaseCode.compare("square") == 0)
+		return new SquareTestCase(pb);
+	if (pb.TestCaseCode.compare("square4quadrants") == 0)
+		return new SquareTestCase(pb);
 	if (pb.TestCaseCode.compare("kellogg") == 0)
 		return new KelloggTestCase(pb);
 	if (pb.TestCaseCode.compare("barwith4holes") == 0)
@@ -69,6 +52,8 @@ TestCase<2>* TestCaseFactory<2>::Create(ProblemArguments pb)
 		return new SquareHolesTestCase(pb);
 	if (pb.TestCaseCode.compare("edf") == 0)
 		return new EDFTestCase(pb);
+	if (pb.TestCaseCode.compare("magnetism") == 0)
+		return new MagnetismTestCase(pb);
 
 	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 3D. Check -tc argument.");
 }
@@ -78,12 +63,8 @@ TestCase<3>* TestCaseFactory<3>::Create(ProblemArguments pb)
 {
 	if (pb.TestCaseCode.compare("default") == 0)
 		return new DefaultTestCase<3>(pb);
-	if (pb.TestCaseCode.compare("sine") == 0)
-		return new SineSolution3DTestCase(pb);
-	if (pb.TestCaseCode.compare("poly") == 0)
-		return new PolySolution3DTestCase(pb);
-	if (pb.TestCaseCode.compare("exp") == 0)
-		return new ExpSolution3DTestCase(pb);
+	if (pb.TestCaseCode.compare("cube") == 0)
+		return new CubeTestCase(pb);
 	if (pb.TestCaseCode.compare("platewith4holes") == 0)
 		return new PlateWith4HolesTestCase(pb);
 

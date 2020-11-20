@@ -291,41 +291,8 @@
     <ClInclude Include="src\TestCases\1D\Heterogeneity1DTestCase.h">
       <Filter>TestCases\1D</Filter>
     </ClInclude>
-    <ClInclude Include="src\TestCases\1D\SineSolution1DTestCase.h">
-      <Filter>TestCases\1D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TestCases\2D\SineSolution2DTestCase.h">
-      <Filter>TestCases\2D</Filter>
-    </ClInclude>
     <ClInclude Include="src\TestCases\2D\KelloggTestCase.h">
       <Filter>TestCases\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TestCases\1D\PolySolution1DTestCase.h">
-      <Filter>TestCases\1D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TestCases\2D\PolySolution2DTestCase.h">
-      <Filter>TestCases\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TestCases\2D\ExpSolution2DTestCase.h">
-      <Filter>TestCases\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TestCases\2D\OneSolution2DTestCase.h">
-      <Filter>TestCases\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TestCases\2D\XSolution2DTestCase.h">
-      <Filter>TestCases\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TestCases\2D\ZeroSolution2DTestCase.h">
-      <Filter>TestCases\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TestCases\3D\SineSolution3DTestCase.h">
-      <Filter>TestCases\3D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TestCases\3D\PolySolution3DTestCase.h">
-      <Filter>TestCases\3D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TestCases\3D\ExpSolution3DTestCase.h">
-      <Filter>TestCases\3D</Filter>
     </ClInclude>
     <ClInclude Include="src\Problem\DiffusionField.h">
       <Filter>Problem</Filter>
@@ -434,6 +401,16 @@
     </ClInclude>
     <ClInclude Include="src\Mesh\AgglomerationException.h">
       <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\2D\MagnetismTestCase.h" />
+    <ClInclude Include="src\TestCases\2D\SquareTestCase.h">
+      <Filter>TestCases\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\1D\SegmentTestCase.h">
+      <Filter>TestCases\1D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\3D\CubeTestCase.h">
+      <Filter>TestCases\3D</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
