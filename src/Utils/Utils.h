@@ -3,6 +3,7 @@
 #include <functional>
 #include "Types.h"
 #include "../Geometry/Point.h"
+#include "../ProgramArguments.h"
 using namespace std;
 
 using RefFunction = function<double(const RefPoint&)>;
@@ -11,6 +12,13 @@ using DomFunction = function<double(const DomPoint&)>;
 class Utils
 {
 public:
+
+	static ProgramArguments ProgramArgs;
+
+	//-------------//
+	// Computation //
+	//-------------//
+
 	static int Binomial(int n, int p)
 	{
 		if (p != 0 && n != p)
@@ -221,6 +229,8 @@ public:
 	}
 
 };
+
+ProgramArguments Utils::ProgramArgs;
 
 double Utils::Eps = 1e-4;
 double Utils::NumericalZero = 1e-12;

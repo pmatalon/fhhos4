@@ -31,7 +31,7 @@ private:
 		this->SolvingComputationalWork = 0; // The work of one iteration of CG is 1 matrix-vector product + 2 dot products
 
 		if (this->ComputeExactSolution)
-			this->_exactSolution = this->_directSolver.solve(b);
+			this->ExactSolution = this->_directSolver.solve(b);
 
 		IterationResult result = CreateFirstIterationResult(b, initialGuess);
 

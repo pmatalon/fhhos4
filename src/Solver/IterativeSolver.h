@@ -13,8 +13,8 @@ class IterativeSolver : public Solver
 {
 protected:
 	Eigen::SparseLU<SparseMatrix> _directSolver;
-	Vector _exactSolution;
 public:
+	Vector ExactSolution;
 	double Tolerance = 1e-3;
 	int MaxIterations = 200;
 	int IterationCount = 0;
@@ -59,7 +59,7 @@ public:
 		this->SolvingComputationalWork = 0;
 
 		if (this->ComputeExactSolution)
-			this->_exactSolution = this->_directSolver.solve(b);
+			this->ExactSolution = this->_directSolver.solve(b);
 
 		this->IterationCount = 0;
 
@@ -109,7 +109,7 @@ protected:
 		IterationResult result;
 		result.SetB(b);
 		if (this->ComputeExactSolution)
-			result.SetExactSolution(this->_exactSolution);
+			result.SetExactSolution(this->ExactSolution);
 		result.SetX(x);
 		result.SetTolerance(this->Tolerance);
 		return result;

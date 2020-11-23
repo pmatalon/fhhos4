@@ -32,8 +32,13 @@ public:
 	Element<Dim>* CoarserElement = nullptr;
 	bool IsFullyEmbeddedInCoarseElement = true;
 	vector<Face<Dim>*> FinerFacesRemoved;
+
 	// Used for non-nested meshes. It contains at least FinerElements.
 	map<Element<Dim>*, vector<PhysicalShape<Dim>*>> OverlappingFineElements;
+
+	// Used during the non-nested mesh coarsening.
+	// Coarse faces not to cross during element refinement for the L2 projection.
+	set<Face<Dim>*> CoarseFacesNotToCross;
 
 	// Used during mesh construction
 	mutex Mutex;
@@ -157,14 +162,13 @@ public:
 	virtual void RefineWithoutCoarseOverlap()
 	{
 		vector<PhysicalShape<Dim - 1>*> doNotCross;
-		for (Face<Dim>* cf : CoarserElement->Faces)
+		for (Face<Dim>* cf : CoarseFacesNotToCross)
 		{
-			if (cf->FinerFaces.size() > 1 && this->HasAny(cf->FinerFaces))
-			{
 				doNotCross.push_back(cf->Shape());
-			}
 		}
 		Shape()->RefineWithoutCoarseOverlap(doNotCross);
+
+		CoarseFacesNotToCross = set<Face<Dim>*>(); // free memory
 	}
 
 	virtual void Refine()
@@ -315,11 +319,21 @@ public:
 		return find(this->Faces.begin(), this->Faces.end(), face) != this->Faces.end();
 	}
 
-	bool HasAny(vector<Face<Dim>*> faces)
+	bool HasAny(const vector<Face<Dim>*>& faces)
 	{
 		for (Face<Dim>* f : faces)
 		{
 			if (this->HasFace(f))
+				return true;
+		}
+		return false;
+	}
+
+	bool HasAny(const vector<Vertex*>& vertices)
+	{
+		for (Vertex* v : vertices)
+		{
+			if (this->HasVertex(v, false))
 				return true;
 		}
 		return false;
@@ -361,59 +375,10 @@ public:
 		return it != list.end();
 	}
 
-	// Replace faces with their agglomeration //
-	void ReplaceFaces(const vector<Face<Dim>*>& faces, Face<Dim>* collapsedFace)
-	{
-		vector<Face<Dim>*> currentFaces = this->Faces;
-		this->Faces.clear();
-		for (Face<Dim>* f : currentFaces)
-		{
-			if (!f->IsIn(faces))
-				this->Faces.push_back(f);
-		}
-		this->Faces.push_back(collapsedFace);
+	
 
-		RemoveIntersections(faces, collapsedFace);
-
-		// Some fine elements associated to this coarse one might now be more overlapping the other coarse elements.
-		// So we change the association.
-		if (!collapsedFace->IsDomainBoundary)
-		{
-			Element<Dim>* neighbour = collapsedFace->GetNeighbour(this);
-			auto it = this->FinerElements.begin();
-			while (it != this->FinerElements.end())
-			{
-				Element<Dim>* fe = *it;
-				if (fe->HasAny(collapsedFace->FinerFaces))
-				{
-					fe->IsFullyEmbeddedInCoarseElement = false;
-					DomPoint p = fe->InteriorPoint();
-					if (!this->Contains(p) && !collapsedFace->Contains(p) && neighbour->Contains(p))
-					{
-						/*cout << "%---------- this " << endl;
-						this->ExportToMatlab("b");
-						cout << "% neighbour " << endl;
-						neighbour->ExportToMatlab("m");
-						cout << "% transfered finer element (b --> m) " << endl;
-						fe->ExportToMatlab("r");
-						MatlabScript s;
-						s.PlotPoint(p, "rx");*/
-
-						// Transfer to the neighbour
-						fe->CoarserElement = neighbour;
-						neighbour->FinerElements.push_back(fe);
-						it = this->FinerElements.erase(it);
-						continue;
-					}
-				}
-				it++;
-			}
-		}
-
-	}
-
-protected:
-	virtual void RemoveIntersections(const vector<Face<Dim>*>& oldFaces, Face<Dim>* newFace)
+public:
+	virtual void RemoveIntersections(const vector<Vertex*>& verticesToRemove)
 	{
 		assert(false);
 	}
@@ -499,6 +464,16 @@ public:
 	bool IsInSamePhysicalPartAs(Element<Dim>* other)
 	{
 		return (!this->PhysicalPart && !other->PhysicalPart) || this->PhysicalPart == other->PhysicalPart;
+	}
+
+	bool IsAtPhysicalPartBoundary()
+	{
+		for (Element<Dim>* n : this->Neighbours(false))
+		{
+			if (!this->IsInSamePhysicalPartAs(n))
+				return true;
+		}
+		return false;
 	}
 	
 	//-------------------//

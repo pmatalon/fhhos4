@@ -55,7 +55,7 @@ public:
 				power = 7;
 				if (Utils::IsInDisk(DomPoint(1, 2), r, p))*/
 				r = 0.01;
-				power = 1e-6;
+				power = 1;// 1e-6;
 				if (Utils::IsInDisk(DomPoint(0, 0.8), r, p))
 					return power;
 				return 0.0;

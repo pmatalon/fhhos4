@@ -24,6 +24,8 @@ public:
 
 	void Start(ProgramArguments& args)
 	{
+		Utils::ProgramArgs = args;
+
 		Timer totalTimer;
 		totalTimer.Start();
 
@@ -206,6 +208,14 @@ public:
 
 			Solver* solver = CreateSolver(args, problem, blockSizeForBlockSolver);
 			problem->SystemSolution = Solve(solver, problem->A, problem->b, args.Solver.InitialGuessCode);
+
+			if (args.Actions.ExportErrorToGMSH)
+			{
+				IterativeSolver* iterativeSolver = dynamic_cast<IterativeSolver*>(solver);
+				if (iterativeSolver)
+					problem->ExportErrorToGMSH(iterativeSolver->ExactSolution - problem->SystemSolution);
+			}
+
 			delete solver;
 
 			//-----------------------------//
@@ -392,7 +402,7 @@ private:
 		IterativeSolver* iterativeSolver = dynamic_cast<IterativeSolver*>(solver);
 		if (iterativeSolver != nullptr)
 		{
-			iterativeSolver->ComputeExactSolution = A.rows() <= 2000;
+			iterativeSolver->ComputeExactSolution = Utils::ProgramArgs.Actions.ExportErrorToGMSH || A.rows() <= 2000;
 
 			setupTimer.Start();
 			solver->Setup(A);

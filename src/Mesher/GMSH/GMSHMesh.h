@@ -275,6 +275,20 @@ private:
 			}
 		}
 
+		// Get vertices defining the geometry.
+		// These vertices must be conserved at every level of coarsening.
+		nodeTags.clear();
+		gmsh::model::mesh::getNodes(nodeTags, coord, parametricCoord, 0, -1, true, false);
+		//int nodeTagsSize = nodeTags.size();
+		//MatlabScript s;
+		//s.OpenFigure();
+		for (size_t i = 0; i < nodeTags.size(); i++)
+		{
+			MeshVertex<Dim>* v = GetVertexFromGMSHTag(nodeTags[i]);
+			this->_geometricVertices.insert(v);
+			//s.PlotPoint(*v);
+		}
+
 		//----------//
 		// Elements //
 		//----------//
@@ -892,7 +906,7 @@ public:
 			assert(false);
 	}
 
-	void ExportSolutionToGMSH(FunctionalBasis<Dim>* basis, const Vector &solution, const string& outputFilePathPrefix) override
+	void ExportToGMSH(FunctionalBasis<Dim>* basis, const Vector &coeffs, const string& outputFilePathPrefix, const string& suffix) override
 	{
 		assert(!_mshFilePath.empty());
 		gmsh::initialize();
@@ -900,7 +914,7 @@ public:
 		if (_mshFileIsTmp)
 			remove(_mshFilePath.c_str());
 
-		int viewId = gmsh::view::add("potential");
+		int viewId = gmsh::view::add(suffix);
 
 		vector<std::string> modelNames;
 		gmsh::model::list(modelNames);
@@ -913,18 +927,18 @@ public:
 		for (Element<Dim>* e : this->Elements)
 		{
 			elementTags.push_back(e->Id);
-			double value = e->EvalApproximateSolution(basis, solution, e->Center());
+			double value = e->EvalApproximateSolution(basis, coeffs, e->Center());
 			values.push_back({ value });
 		}
 		gmsh::view::addModelData(viewId, 0, modelName, "ElementData", elementTags, values);
 
-		string meshFilePath = outputFilePathPrefix + ".msh";
-		string dataFilePath = outputFilePathPrefix + ".pos";
+		string meshFilePath = outputFilePathPrefix + "_" + suffix + ".msh";
+		string dataFilePath = outputFilePathPrefix + "_" + suffix + ".pos";
 
 		gmsh::write(meshFilePath);
 		gmsh::view::write(viewId, dataFilePath);
 
-		cout << "Solution exported for GMSH to " << dataFilePath << endl;
+		cout << suffix << " exported for GMSH to " << dataFilePath << endl;
 		gmsh::finalize();
 	}
 

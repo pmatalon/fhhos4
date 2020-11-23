@@ -68,6 +68,11 @@ public:
 		this->_solvingTimer.Stop();
 	}
 
+	Vector Residual() const
+	{
+		return this->r;
+	}
+
 	void SetExactSolution(const Vector exactSolution)
 	{
 		this->_exactSolution = exactSolution;
@@ -174,7 +179,7 @@ public:
 					os << "/ " + to_string(result.IterationNumber + remainingIterations);
 				}
 				else
-					os << "/ Inf";
+					os << "/ -";
 			}
 
 			os << setw(normalizedResWidth);
@@ -187,7 +192,10 @@ public:
 			}
 
 			os << setw(iterationConvRateWidth);
-			os << std::defaultfloat << result._iterationConvRate;
+			if (result.IterationNumber == 1)
+				os << " ";
+			else
+				os << std::defaultfloat << result._iterationConvRate;
 
 			os << setw(asymptoticConvRateWidth);
 			if (result.IterationNumber == 1)
@@ -205,7 +213,7 @@ public:
 			if (result.IterationNumber == 1)
 				os << " ";
 			else if (remainingIterations == -1)
-				os << "Inf";
+				os << "-";
 			else
 			{
 				Duration d(result._solvingTimer.CPU().InMilliseconds / result.IterationNumber * remainingIterations);

@@ -224,6 +224,12 @@ void print_usage() {
 	cout << "              f   - Face coarsening: the faces are coarsened and all kept on the coarse skeleton. Requires -g 1." << endl;
 	cout << "              r   - Fine meshes obtained by structured refinement of the coarse mesh using GMSH's splitting method" << endl;
 	cout << "              b   - Fine meshes obtained by structured refinement of the coarse mesh using the Bey method" << endl;
+	cout << "-bfc CODE" << endl;
+	cout << "      Face collapsing method used at the domain boundaries or physical parts boundaries. Requires -cs n." << endl;
+	cout << "              d   - Disabled" << endl;
+	cout << "              c   - Collinear only" << endl;
+	cout << "              p   - By pairs" << endl;
+	cout << "              m   - Maximum" << endl;
 	cout << endl;
 	cout << "-coarse-n NUM" << endl;
 	cout << "      If a refinement strategy is used, sets the mesh size of the starting coarse mesh." << endl;
@@ -296,6 +302,7 @@ void print_usage() {
 	cout << "              mesh    - mesh to be used in Matlab" << endl;
 	cout << "              solvect - solution vector(s)" << endl;
 	cout << "              solgmsh - solution files (.pos and .msh) to be used in GMSH for visualization" << endl;
+	cout << "              errgmsh - error computed against the solution of an exact solver to be used in GMSH for visualization" << endl;
 	cout << "              mg      - Multigrid components (intergrid operator matrices, coarse meshes, etc.)" << endl;
 	cout << endl;
 	cout << "-o PATH" << endl;
@@ -411,6 +418,7 @@ int main(int argc, char* argv[])
 		OPT_CoarseMatrixSize,
 		OPT_Smoothers,
 		OPT_CoarseningStrategy,
+		OPT_BoundaryFaceCollapsing,
 		OPT_CoarseningFactor,
 		OPT_CoarseN,
 		// Misc
@@ -456,6 +464,7 @@ int main(int argc, char* argv[])
 		 { "coarse-size", required_argument, NULL, OPT_CoarseMatrixSize },
 		 { "smoothers", required_argument, NULL, OPT_Smoothers },
 		 { "cs", required_argument, NULL, OPT_CoarseningStrategy },
+		 { "bfc", required_argument, NULL, OPT_BoundaryFaceCollapsing },
 		 { "coarsening-factor", required_argument, NULL, OPT_CoarseningFactor },
 		 { "coarse-n", required_argument, NULL, OPT_CoarseN },
 		 // Misc
@@ -742,6 +751,21 @@ int main(int argc, char* argv[])
 					argument_error("unknown coarsening strategy code '" + coarseningStgyCode + "'. Check -cs argument.");
 				break;
 			}
+			case OPT_BoundaryFaceCollapsing:
+			{
+				string code = optarg;
+				if (code.compare("d") == 0)
+					args.Solver.MG.BoundaryFaceCollapsing = FaceCollapsing::Disabled;
+				else if (code.compare("c") == 0)
+					args.Solver.MG.BoundaryFaceCollapsing = FaceCollapsing::OnlyCollinear;
+				else if (code.compare("p") == 0)
+					args.Solver.MG.BoundaryFaceCollapsing = FaceCollapsing::ByPairs;
+				else if (code.compare("m") == 0)
+					args.Solver.MG.BoundaryFaceCollapsing = FaceCollapsing::Max;
+				else
+					argument_error("unknown boundary face collapsing code '" + code + "'. Check -cs argument.");
+				break;
+			}
 			case OPT_CoarseningFactor:
 				args.Solver.MG.CoarseningFactor = atoi(optarg);
 				break;
@@ -775,6 +799,8 @@ int main(int argc, char* argv[])
 						args.Actions.ExportSolutionVectors = true;
 					else if (code.compare("solgmsh") == 0)
 						args.Actions.ExportSolutionToGMSH = true;
+					else if (code.compare("errgmsh") == 0)
+						args.Actions.ExportErrorToGMSH = true;
 					else if (code.compare("mg") == 0)
 						args.Actions.ExportMultigridComponents = true;
 					else

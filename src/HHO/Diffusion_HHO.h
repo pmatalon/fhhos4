@@ -753,7 +753,14 @@ public:
 
 	void ExportSolutionToGMSH() override
 	{
-		this->_mesh->ExportSolutionToGMSH(this->HHO->ReconstructionBasis, this->ReconstructedSolution, this->GetFilePathPrefix());
+		this->_mesh->ExportToGMSH(this->HHO->ReconstructionBasis, this->ReconstructedSolution, this->GetFilePathPrefix(), "potential");
+	}
+
+	void ExportErrorToGMSH(const Vector& faceCoeffs) override
+	{
+		SparseMatrix inverseAtt = Inverse_A_T_T();
+		Vector cellCoeffs = inverseAtt * (B_T - A_T_ndF * faceCoeffs);
+		this->_mesh->ExportToGMSH(this->HHO->CellBasis, cellCoeffs, this->GetFilePathPrefix(), "error");
 	}
 
 	SparseMatrix Inverse_A_T_T()

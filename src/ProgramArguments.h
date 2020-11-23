@@ -50,6 +50,7 @@ struct MultigridArguments
 	CoarseningStrategy CoarseningStgy = CoarseningStrategy::None;
 	int CoarseningFactor = 2;
 	BigNumber CoarseN = 2;
+	FaceCollapsing BoundaryFaceCollapsing = FaceCollapsing::Max;
 };
 
 struct SolverArguments
@@ -72,6 +73,7 @@ struct ActionsArguments
 	bool ExportMultigridComponents = false;
 	bool ExportSolutionVectors = false;
 	bool ExportSolutionToGMSH = false;
+	bool ExportErrorToGMSH = false;
 	bool LogAssembly = true;
 	bool AssembleRightHandSide = true;
 	bool UnitTests = false;

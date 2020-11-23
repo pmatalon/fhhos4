@@ -89,6 +89,7 @@ public:
 				s.PlotText(*B, "B");
 				//OuterNormalVector(face);
 				Utils::FatalError("Cannot compute the direction of the normal vector.");*/
+				Utils::Warning("Difficulty to compute the direction of the normal vector.");
 
 				// Find the closest subshape's center to the middle of [A,B]
 				DomPoint M = Middle<2>(A, B);
@@ -271,27 +272,8 @@ private:
 	}
 
 public:
-	void RemoveIntersections(const vector<Face<2>*>& oldFaces, Face<2>* newFace)
+	void RemoveIntersections(const vector<Vertex*>& verticesToRemove)//const vector<Face<2>*>& oldFaces, Face<2>* newFace)
 	{
-		// Identification of the vertices to remove (those which belong to 2 faces)
-		vector<Vertex*> verticesToRemove;
-		for (int i = 0; i < oldFaces.size(); i++)
-		{
-			Face<2>* fi = oldFaces[i];
-			for (Vertex* v : fi->Vertices())
-			{
-				for (int j = i + 1; j < oldFaces.size(); j++)
-				{
-					Face<2>* fj = oldFaces[j];
-					if (fj->HasVertex(v))
-					{
-						verticesToRemove.push_back(v);
-						break;
-					}
-				}
-			}
-		}
-
 		// Adds all the vertices in the same order, except the intersection vertices
 		vector<Vertex*> newVertices;
 		for (Vertex* v : _vertices)

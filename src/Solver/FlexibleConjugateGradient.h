@@ -45,7 +45,7 @@ public:
 		this->SolvingComputationalWork = 0; 
 
 		if (this->ComputeExactSolution)
-			this->_exactSolution = this->_directSolver.solve(b);
+			this->ExactSolution = this->_directSolver.solve(b);
 
 		IterationResult result = CreateFirstIterationResult(b, initialGuess);
 

@@ -64,9 +64,18 @@ enum class FaceCollapsingStatus : unsigned
 {
 	Ok,
 	NotEnoughFaces,
+	GeometricErosion,
 	InterfaceHasHoles,
 	ElementFullDegeneration,
 	ElementPartialDegeneration,
 	CrossedPolygon,
 	OneElementEmbeddedInConvexHullOfTheOther
+};
+
+enum class FaceCollapsing : unsigned
+{
+	Disabled,
+	OnlyCollinear,
+	ByPairs,
+	Max
 };

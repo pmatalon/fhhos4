@@ -437,9 +437,19 @@ private:
 			return TryCollapse(interfaceFaces);
 		else
 		{
-			// Collapse only collinear faces
-			Interface<Dim> interf(interfaceFaces);
-			return TryCollapseCoplanarFaces(interf);
+			if (Utils::ProgramArgs.Solver.MG.BoundaryFaceCollapsing == FaceCollapsing::Disabled)
+				return FaceCollapsingStatus::NotEnoughFaces;
+			else if (Utils::ProgramArgs.Solver.MG.BoundaryFaceCollapsing == FaceCollapsing::OnlyCollinear)
+			{
+				Interface<Dim> interf(interfaceFaces);
+				return TryCollapseCoplanarFaces(interf);
+			}
+			else if (Utils::ProgramArgs.Solver.MG.BoundaryFaceCollapsing == FaceCollapsing::ByPairs)
+				return TryCollapseByPairs(interfaceFaces);
+			else if (Utils::ProgramArgs.Solver.MG.BoundaryFaceCollapsing == FaceCollapsing::Max)
+				return TryCollapse(interfaceFaces);
+			else
+				Utils::FatalError("Unmanaged FaceCollapsing mode");
 		}
 	}
 
@@ -449,9 +459,19 @@ private:
 		if (boundaryFaces.size() < 2)
 			return FaceCollapsingStatus::NotEnoughFaces;
 
-		// Collapse only collinear faces
-		Interface<Dim> interf(boundaryFaces);
-		return TryCollapseCoplanarFaces(interf);
+		if (Utils::ProgramArgs.Solver.MG.BoundaryFaceCollapsing == FaceCollapsing::Disabled)
+			return FaceCollapsingStatus::NotEnoughFaces;
+		else if (Utils::ProgramArgs.Solver.MG.BoundaryFaceCollapsing == FaceCollapsing::OnlyCollinear)
+		{
+			Interface<Dim> interf(boundaryFaces);
+			return TryCollapseCoplanarFaces(interf);
+		}
+		else if (Utils::ProgramArgs.Solver.MG.BoundaryFaceCollapsing == FaceCollapsing::ByPairs)
+			return TryCollapseByPairs(boundaryFaces);
+		else if (Utils::ProgramArgs.Solver.MG.BoundaryFaceCollapsing == FaceCollapsing::Max)
+			return TryCollapse(boundaryFaces);
+		else
+			Utils::FatalError("Unmanaged FaceCollapsing mode");
 	}
 
 	FaceCollapsingStatus TryCollapseCoplanarFaces(const Interface<Dim>& interf)
@@ -462,7 +482,7 @@ private:
 		for (set<Face<Dim>*> subset : coplanarSubsets)
 		{
 			Interface<Dim> subInterf(vector<Face<Dim>*>(subset.begin(), subset.end()));
-			ReplaceFaces(subInterf.Faces(), subInterf.CollapsedFace());
+			Collapse(subInterf);
 		}
 		return FaceCollapsingStatus::Ok;
 	}
@@ -721,7 +741,23 @@ private:
 			if (!f->IsDeleted && !f->IsRemovedOnCoarserGrid && !f->HasBeenCoarsened())
 				uncoarsenedFaces.push_back(f);
 		}
-		cout << (uncoarsenedFaces.size() * 100) / this->Faces.size() << "% unchanged faces." << endl;*/
+		cout << (uncoarsenedFaces.size() * 100) / this->Faces.size() << "% unchanged faces." << endl;
+
+		int nFacesAtPhysicalBoundary = 0;
+		int nUncorsenedFacesAtPhysicalBoundary = 0;
+		for (Face<Dim>* f : this->Faces)
+		{
+			if (f->IsDeleted || f->IsDomainBoundary)
+				continue;
+			bool isAtPhysicalBoundary = !f->Element1->IsInSamePhysicalPartAs(f->Element2);
+			if (!isAtPhysicalBoundary)
+				continue;
+			nFacesAtPhysicalBoundary++;
+			if (!f->IsRemovedOnCoarserGrid && !f->HasBeenCoarsened())
+				nUncorsenedFacesAtPhysicalBoundary++;
+		}
+		if (nFacesAtPhysicalBoundary > 0)
+			cout << (nUncorsenedFacesAtPhysicalBoundary * 100) / nFacesAtPhysicalBoundary << "% unchanged faces at physical boundaries." << endl;*/
 
 		this->FinalizeCoarsening();
 	}
@@ -1501,6 +1537,42 @@ private:
 		return TryCollapse({ f1->CoarseFace, f2->CoarseFace });
 	}
 
+	FaceCollapsingStatus TryCollapseByPairs(const vector<Face<Dim>*>& interfaceFaces)
+	{
+		set<Face<Dim>*> faces;
+		for (Face<Dim>* f : interfaceFaces)
+		{
+			assert(f->FinerFaces.size() < 3);
+			if (f->FinerFaces.size() == 1)
+				faces.insert(f);
+		}
+
+		FaceCollapsingStatus returnStatus = FaceCollapsingStatus::NotEnoughFaces;
+		while (faces.size() > 1)
+		{
+			auto it1 = faces.begin();
+			Face<Dim>* f1 = *it1;
+			auto it2 = it1;
+			it2++;
+			while (it2 != faces.end())
+			{
+				Face<Dim>* f2 = *it2;
+				FaceCollapsingStatus status = TryCollapse({ f1, f2 });
+				if (status == FaceCollapsingStatus::Ok)
+				{
+					returnStatus = FaceCollapsingStatus::Ok;
+					faces.erase(it2);
+					break;
+				}
+				else if (returnStatus != FaceCollapsingStatus::Ok && status != FaceCollapsingStatus::InterfaceHasHoles)
+					returnStatus = status;
+				it2++;
+			}
+			faces.erase(it1);
+		}
+		return returnStatus;
+	}
+
 	FaceCollapsingStatus TryCollapse(const vector<Face<Dim>*>& faces)
 	{
 		assert(faces.size() > 1);
@@ -1508,17 +1580,27 @@ private:
 
 		Interface<Dim> interf(faces);
 
+		assert(!this->_geometricVertices.empty());
+		for (Vertex* v : interf.InteriorVertices())
+		{
+			if (this->_geometricVertices.find(v) != this->_geometricVertices.end())
+				return FaceCollapsingStatus::GeometricErosion;
+		}
+
 		FaceCollapsingStatus status = interf.AnalyzeCollapsing();
 		if (status != FaceCollapsingStatus::Ok)
 			return status;
 
-		ReplaceFaces(interf.Faces(), interf.CollapsedFace());
+		Collapse(interf);
 		return FaceCollapsingStatus::Ok;
 	}
 
-	void ReplaceFaces(const vector<Face<Dim>*>& faces, Face<Dim>* mergedFace)
+	void Collapse(Interface<Dim>& interf)
 	{
 		// The faces and mergedFace must be at the same level.
+
+		vector<Face<Dim>*> faces = interf.Faces();
+		Face<Dim>* mergedFace = interf.CollapsedFace();
 
 		mergedFace->IsDomainBoundary = faces[0]->IsDomainBoundary;
 		for (Face<Dim>* f : faces)
@@ -1546,16 +1628,90 @@ private:
 		}
 
 		// Replace the faces in the elements (reshape the polygon, update the vertices, transfer finer elements to the neighbours if needed)
-		elem1->ReplaceFaces(faces, mergedFace);
+		Collapse(elem1, interf);
 		if (elem2)
-			elem2->ReplaceFaces(faces, mergedFace);
+			Collapse(elem2, interf);
 
 		// Remove the faces from the mesh
 		for (Face<Dim>* f : faces)
+		{
+			// If it's a collapsed face, we also need to remove its references in CoarseFacesNotToCross
+			if (f->FinerFaces.size() > 1)
+				RemoveFromCoarseFacesNotToCross(f);
 			this->RemoveFace(f, false);
+		}
 
 		// Add mergedFace to the list
 		this->AddFace(mergedFace, false);
+	}
+
+	static void RemoveFromCoarseFacesNotToCross(Face<Dim>* cf)
+	{
+		vector<Element<Dim>*> fineElements = cf->Element1->FinerElements;
+		if (cf->Element2)
+			fineElements = Utils::Join(fineElements, cf->Element2->FinerElements);
+		for (Element<Dim>* fe : fineElements)
+		{
+			auto it = fe->CoarseFacesNotToCross.find(cf);
+			if (it != fe->CoarseFacesNotToCross.end())
+				fe->CoarseFacesNotToCross.erase(it);
+		}
+	}
+
+	// Replace faces with their agglomeration //
+	void Collapse(Element<Dim>* e, Interface<Dim> interf)
+	{
+		vector<Face<Dim>*> faces = interf.Faces();
+		Face<Dim>* collapsedFace = interf.CollapsedFace();
+
+		vector<Face<Dim>*> currentFaces = e->Faces;
+		e->Faces.clear();
+		for (Face<Dim>* f : currentFaces)
+		{
+			if (!f->IsIn(faces))
+				e->Faces.push_back(f);
+		}
+		e->Faces.push_back(collapsedFace);
+
+		e->RemoveIntersections(interf.InteriorVertices());
+
+		// Some fine elements associated to this coarse one might now be more overlapping the other coarse elements.
+		// So we change the association.
+		if (!collapsedFace->IsDomainBoundary)
+		{
+			Element<Dim>* neighbour = collapsedFace->GetNeighbour(e);
+
+			auto it = e->FinerElements.begin();
+			while (it != e->FinerElements.end())
+			{
+				Element<Dim>* fe = *it;
+				if (fe->IsInSamePhysicalPartAs(neighbour) && (fe->HasAny(collapsedFace->FinerFaces) || fe->HasAny(interf.InteriorVertices())))
+				{
+					fe->IsFullyEmbeddedInCoarseElement = false;
+					fe->CoarseFacesNotToCross.insert(collapsedFace);
+					DomPoint p = fe->InteriorPoint();
+					if (!e->Contains(p) && !collapsedFace->Contains(p) && neighbour->Contains(p))
+					{
+						/*cout << "%---------- this " << endl;
+						this->ExportToMatlab("b");
+						cout << "% neighbour " << endl;
+						neighbour->ExportToMatlab("m");
+						cout << "% transfered finer element (b --> m) " << endl;
+						fe->ExportToMatlab("r");
+						MatlabScript s;
+						s.PlotPoint(p, "rx");*/
+
+						// Transfer to the neighbour
+						fe->CoarserElement = neighbour;
+						neighbour->FinerElements.push_back(fe);
+						it = e->FinerElements.erase(it);
+						continue;
+					}
+				}
+				it++;
+			}
+		}
+
 	}
 
 	void CloneAndAddFace(Face<Dim>* f, Element<Dim>* macroElement)
@@ -1640,7 +1796,8 @@ private:
 			}
 		}
 
-		Utils::FatalError("error in the computation of the overlapping elements: a coarse element is not fully overlapped by finer ones.");
+		if (!ce->IsAtPhysicalPartBoundary())
+			Utils::FatalError("error in the computation of the overlapping elements: a coarse element is not fully overlapped by finer ones.");
 	}
 
 	static void CheckOverlapping(Element<Dim>* ce, Element<Dim>* fe, set<Element<Dim>*>& tested, double& overlappingMeasure, bool& stop)
@@ -1714,6 +1871,7 @@ private:
 
 		for (PhysicalShape<Dim>* subShape : fe->Shape()->RefinedShapes())
 		{
+			assert(fe->IsInSamePhysicalPartAs(fe->CoarserElement));
 			vector<Element<Dim>*> coarseCandidates = fe->CoarserElement->ThisAndVertexNeighbours();
 			bool found = false;
 			for (Element<Dim>* ce : coarseCandidates)
@@ -1734,20 +1892,25 @@ private:
 			if (!found)
 			{
 #ifndef NDEBUG
-				cout << "% --------- coarse element" << endl;
+				MatlabScript s;
+				s.Comment("--------- coarse element");
 				fe->CoarserElement->ExportToMatlab("y", true);
-				for (Element<Dim>* ce : fe->CoarserElement->ThisAndVertexNeighbours())
+				for (Element<Dim>* ce : fe->CoarserElement->ThisAndVertexNeighbours(true))
 				{
-					cout << "% --------- coarse candidate" << endl;
+					s.Comment("--------- coarse candidate");
 					ce->ExportToMatlab("b", true);
 				}
-				cout << "% --------- fine element "  << fe->Number << endl;
+				s.Comment("--------- fine element " + to_string(fe->Number));
 				fe->ExportToMatlab("g");
-				cout << "% --------- subshape" << endl;
+				s.Comment("--------- subshape");
 				subShape->ExportToMatlab("r");
 #endif // !NDEBUG
-				Utils::Warning("A fine subshape's center is not in any coarse element");
-				/*// Affectation to the coarse element associated to fe
+				if (!fe->IsAtPhysicalPartBoundary() && !fe->IsOnBoundary())
+					Utils::Warning("A fine subshape's center that is not a domain/physical region boundary is not in any coarse element");
+				else if (fe->IsAtPhysicalPartBoundary())
+					Utils::Warning("A fine subshape's center (at physical boundary) is not in any coarse element of same physical part");
+
+				// Affectation to the coarse element associated to fe
 				Element<Dim>* ce = fe->CoarserElement;
 				ce->Mutex.lock();
 				auto it = ce->OverlappingFineElements.find(fe);
@@ -1755,7 +1918,7 @@ private:
 					ce->OverlappingFineElements.insert({ fe , {subShape} });
 				else
 					it->second.push_back(subShape);
-				ce->Mutex.unlock();*/
+				ce->Mutex.unlock();
 			}
 		}
 	}

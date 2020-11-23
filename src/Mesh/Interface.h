@@ -51,7 +51,7 @@ public:
 		}
 	}
 
-	inline vector<Face<Dim>*> Faces()
+	inline vector<Face<Dim>*> Faces() const
 	{
 		return _faces;
 	}
@@ -67,11 +67,11 @@ public:
 	{
 		return _mapVertexFaces;
 	}
-	inline vector<Vertex*> InteriorVertices()
+	inline vector<Vertex*>& InteriorVertices()
 	{
 		return _interiorVertices;
 	}
-	vector<Vertex*> BoundaryVertices()
+	vector<Vertex*>& BoundaryVertices()
 	{
 		return _boundaryVertices;
 	}

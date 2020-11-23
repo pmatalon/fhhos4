@@ -117,8 +117,16 @@ public:
 			Element<Dim>* fe = it->first;
 			if (!fe->IsInSamePhysicalPartAs(this))
 			{
-				Utils::Warning("This coarse element is overlapped by a fine one that is not in the same physical part. The coarsening/refinement strategy must prevent that.");
-				continue;
+				MatlabScript s;
+				s.OpenFigure();
+				s.Comment("---------------- Coarse element overlapped by the fine");
+				this->ExportToMatlab("b");
+				s.Comment("---------------- Coarse element associated to the fine");
+				fe->CoarserElement->ExportToMatlab("y");
+				s.Comment("---------------- Fine element");
+				fe->ExportToMatlab("r");
+				assert(false);
+				Utils::FatalError("This coarse element is declared overlapped by a fine one that is not in the same physical part. The coarsening/refinement strategy must prevent that.");
 			}
 			Diff_HHOElement<Dim>* fineElement = dynamic_cast<Diff_HHOElement<Dim>*>(fe);
 			DenseMatrix fineCoarseMass(cellBasis->Size(), cellBasis->Size());

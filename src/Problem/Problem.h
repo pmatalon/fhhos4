@@ -58,6 +58,7 @@ public:
 	}
 
 	virtual void ExportSolutionToGMSH() = 0;
+	virtual void ExportErrorToGMSH(const Vector& coeffs) = 0;
 
 	virtual ~Problem()
 	{	}

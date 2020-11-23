@@ -311,7 +311,12 @@ public:
 
 	void ExportSolutionToGMSH() override
 	{
-		this->_mesh->ExportSolutionToGMSH(this->Basis, this->SystemSolution, this->GetFilePathPrefix());
+		this->_mesh->ExportToGMSH(this->Basis, this->SystemSolution, this->GetFilePathPrefix(), "potential");
+	}
+
+	void ExportErrorToGMSH(const Vector& coeffs) override
+	{
+		this->_mesh->ExportToGMSH(this->Basis, coeffs, this->GetFilePathPrefix(), "error");
 	}
 };
 

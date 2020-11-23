@@ -63,6 +63,9 @@ class Mesh
 private:
 	atomic<uint32_t> _currentElementId{ 0 };
 	double _coarseningFactor = 0;
+protected:
+	// Vertices to keep at all levels to avoid "eroding" the geometry
+	set<Vertex*> _geometricVertices;
 public:
 	vector<Vertex*> Vertices;
 	vector<Element<Dim>*> Elements;
@@ -293,7 +296,7 @@ public:
 			script.PlotText(e->Center(), to_string(e->Number), "r");
 	}
 
-	virtual void ExportSolutionToGMSH(FunctionalBasis<Dim>* basis, const Vector &solution, const string& outputFilePathPrefix)
+	virtual void ExportToGMSH(FunctionalBasis<Dim>* basis, const Vector &coeffs, const string& outputFilePathPrefix, const string& suffix)
 	{
 		Utils::Warning("Impossible to export the solution to GMSH because this mesh does not come from GMSH.");
 	}
@@ -335,6 +338,8 @@ protected:
 
 		coarseMesh->PhysicalParts = this->PhysicalParts;
 		coarseMesh->BoundaryParts = this->BoundaryParts;
+
+		coarseMesh->_geometricVertices = this->_geometricVertices;
 	}
 
 	virtual void InitializeRefinement(Mesh<Dim>* fineMesh)
@@ -344,6 +349,8 @@ protected:
 
 		fineMesh->PhysicalParts = this->PhysicalParts;
 		fineMesh->BoundaryParts = this->BoundaryParts;
+
+		fineMesh->_geometricVertices = this->_geometricVertices;
 	}
 
 	virtual void FinalizeCoarsening()
@@ -830,7 +837,7 @@ public:
 		{
 			s.Comment("---------------------------------------");
 			s.PlotPolygonEdges(coarse->Shape()->Vertices(), "k", 3);
-			//s.PlotText(coarse->Center(), to_string(coarse->Number));
+			s.PlotText(coarse->Center(), to_string(coarse->Number));
 		}
 	}
 
