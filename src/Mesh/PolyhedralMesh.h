@@ -1454,6 +1454,8 @@ private:
 		{
 			ff->IsRemovedOnCoarserGrid = true;
 			newCoarseElement->FinerFacesRemoved.push_back(ff);
+			if (ff->CoarseFace->FinerFaces.size() > 1 && !ff->CoarseFace->IsDeleted)
+				RemoveFromCoarseFacesNotToCross(ff->CoarseFace);
 			this->RemoveFace(ff->CoarseFace, false);
 			ff->CoarseFace = nullptr;
 		}
@@ -1910,15 +1912,25 @@ private:
 				else if (fe->IsAtPhysicalPartBoundary())
 					Utils::Warning("A fine subshape's center (at physical boundary) is not in any coarse element of same physical part");
 
-				// Affectation to the coarse element associated to fe
-				Element<Dim>* ce = fe->CoarserElement;
-				ce->Mutex.lock();
-				auto it = ce->OverlappingFineElements.find(fe);
-				if (it == ce->OverlappingFineElements.end())
-					ce->OverlappingFineElements.insert({ fe , {subShape} });
+				// Affectation to the closest coarse element
+				Element<Dim>* closestCoarse = nullptr;
+				double minDistance = -1;
+				for (Element<Dim>* ce : coarseCandidates)
+				{
+					double distance = Vect<Dim>(subShape->Center(), ce->Center()).norm();
+					if (!closestCoarse || distance < minDistance)
+					{
+						closestCoarse = ce;
+						minDistance = distance;
+					}
+				}
+				closestCoarse->Mutex.lock();
+				auto it = closestCoarse->OverlappingFineElements.find(fe);
+				if (it == closestCoarse->OverlappingFineElements.end())
+					closestCoarse->OverlappingFineElements.insert({ fe , {subShape} });
 				else
 					it->second.push_back(subShape);
-				ce->Mutex.unlock();
+				closestCoarse->Mutex.unlock();
 			}
 		}
 	}

@@ -164,7 +164,10 @@ public:
 		vector<PhysicalShape<Dim - 1>*> doNotCross;
 		for (Face<Dim>* cf : CoarseFacesNotToCross)
 		{
+			if (!cf->IsDeleted)
 				doNotCross.push_back(cf->Shape());
+			else // should never happen
+				Utils::FatalError("Coarse face " + to_string(cf->Number) + " deleted (fine elem id " + to_string(this->Id) + ")");
 		}
 		Shape()->RefineWithoutCoarseOverlap(doNotCross);
 
