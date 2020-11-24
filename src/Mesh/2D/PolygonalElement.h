@@ -72,39 +72,45 @@ public:
 		if (!this->IsConvex() && !face->IsDomainBoundary)
 		{
 			// the element's center doesn't work if the polygon is not convex
-			const Triangle* triangle = nullptr;
-			for (const Triangle& t : _shape.Triangulation())
-			{
-				if (t.Contains(*A, true) && t.Contains(*B, true))
-				{
-					triangle = &t;
-					break;
-				}
-			}
-			if (!triangle)
-			{
-				/*_shape.ExportSubShapesToMatlab();
-				MatlabScript s;
-				s.PlotText(*A, "A");
-				s.PlotText(*B, "B");
-				//OuterNormalVector(face);
-				Utils::FatalError("Cannot compute the direction of the normal vector.");*/
-				Utils::Warning("Difficulty to compute the direction of the normal vector.");
 
-				// Find the closest subshape's center to the middle of [A,B]
-				DomPoint M = Middle<2>(A, B);
-				double minDistance = -1;
-				for (const Triangle& t : _shape.Triangulation())
-				{
-					double distance = Vect<2>(M, t.Center()).norm();
-					if (!triangle || distance < minDistance)
-					{
-						triangle = &t;
-						minDistance = distance;
-					}
-				}
+			Element<2>* neighbour = face->GetNeighbour(this);
+			if (neighbour->IsConvex())
+				return -neighbour->OuterNormalVector(face);
+
+			RotatingList<Vertex*> r(this->Vertices());
+			bool found = r.GoTo(A);
+			assert(found);
+			if (r.GetPrevious() == B)
+			{
+				Vertex* tmp = A;
+				A = B;
+				B = tmp;
 			}
-			C = triangle->Center();
+			else
+			{
+				assert(r.GetNext() == B);
+				r.MoveNext();
+			}
+			r.MoveNext();
+			Vertex* O = r.GetAndMoveNext();
+			while (O != A)
+			{
+				double areaABO = A->X * (B->Y - O->Y) + B->X * (O->Y - A->Y) + O->X * (A->Y - B->Y);
+				if (areaABO > Utils::NumericalZero)
+					break;
+				O = r.GetAndMoveNext();
+			}
+			assert(O != A && O != B);
+			C = *O;
+
+			/*MatlabScript s;
+			s.Comment("-----------------------------------");
+			s.OpenFigure();
+			s.PlotPolygonEdges(_shape.Vertices(), "k", 2);
+			s.PlotSegment(face->Vertices()[0], face->Vertices()[1], "r-", 2);
+			s.PlotText(*A, "A");
+			s.PlotText(*B, "B");
+			s.PlotText(C, "C");*/
 		}
 		DimVector<2> AC = Vect<2>(A, C);
 		if (n.dot(AC) > 0)

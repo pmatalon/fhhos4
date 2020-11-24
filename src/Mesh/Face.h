@@ -231,7 +231,7 @@ public:
 		return true;
 	}
 
-	Element<Dim>* GetNeighbour(Element<Dim>* element)
+	Element<Dim>* GetNeighbour(const Element<Dim>* element)
 	{
 		if (element == this->Element1)
 			return this->Element2;
