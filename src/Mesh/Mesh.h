@@ -500,7 +500,7 @@ public:
 				if (neighbour != nullptr)
 				{
 					auto n2 = neighbour->OuterNormalVector(f);
-					if (abs(n.dot(n2) + 1) >= 1e-15)
+					if (abs(n.dot(n2) + 1) >= Utils::NumericalZero)
 					{
 						// Analysis of the problem
 						cout << "Problem with normal vectors at " << *f << endl;
@@ -508,18 +508,19 @@ public:
 						double d = abs(n.dot(n2) + 1);
 						auto c = e->Center();
 						cout << "%------- Matlab script to plot element " << e->Number << ":" << endl;
-						e->ExportToMatlab();
+						e->ExportToMatlab("r", true);
 						cout << endl;
 						cout << "%------- Matlab script to plot element " << neighbour->Number << ":" << endl;
-						neighbour->ExportToMatlab();
+						neighbour->ExportToMatlab("b", true);
 						cout << endl;
+						MatlabScript s;
+						s.PlotSegment(f->Vertices()[0], f->Vertices()[1], "k-", 2);
 
 						n = e->OuterNormalVector(f);
 						n2 = neighbour->OuterNormalVector(f);
 						e->UnitTests();
 						Utils::FatalError("Problem with normal vectors: one of them is not pointing outwards.");
 					}
-					assert(abs(n.dot(n2) + 1) < 1e-15);
 				}
 				else
 					assert(e->IsOnBoundary() && "This element has no neighbour on the other side of this face, althoug it's not supposed to be on the boundary.");
@@ -677,7 +678,8 @@ public:
 					coarseMeshTotalMeasure += chunk.total;
 				});
 
-			assert(abs(coarseMeshTotalMeasure - fineMeshTotalMeasure) < 1e-12 && "Fine and coarse meshes should have the same total measure.");
+			if (abs(coarseMeshTotalMeasure - fineMeshTotalMeasure) > Utils::NumericalZero)
+				Utils::Error("Fine and coarse meshes should have the same total measure.");
 
 			
 			Mesh<Dim>* meshToGetInfo = nullptr;

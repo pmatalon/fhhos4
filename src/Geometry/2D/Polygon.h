@@ -620,8 +620,11 @@ public:
 		double eps = Utils::Eps*_measure;
 		if (abs(sumMeasures - CGAL::to_double(_cgalPolygon.area())) >= eps)
 		{
-			this->ExportToMatlab();
-			assert(abs(sumMeasures - CGAL::to_double(_cgalPolygon.area())) < eps);
+			cout << "%---- Polygon";
+			this->ExportToMatlab("y");
+			cout << "%---- Subshapes";
+			this->ExportSubShapesToMatlab();
+			Utils::Error("The subshapes do not fully cover the polygon (only " + to_string(sumMeasures/_measure * 100)+ "%)");
 		}
 
 		PhysicalShape<2>::UnitTests();

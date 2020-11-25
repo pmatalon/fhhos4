@@ -100,9 +100,18 @@ public:
 		for (int degree = 0; degree < 5; degree++)
 		{
 			double integral = Integral(refOne, degree);
-			assert(abs(integral - measure) < Utils::Eps*measure);
+			if (abs(integral - measure) > Utils::Eps*measure)
+			{
+				assert(false);
+				Utils::Error("The integral of the function 1 over the element is not equal to its measure (local)");
+				break;
+			}
 		}
 		double integral = Integral(domOne);
-		assert(abs(integral - measure) < Utils::Eps*measure);
+		if (abs(integral - measure) > Utils::Eps*measure)
+		{
+			assert(false);
+			Utils::Error("The integral of the function 1 over the element is not equal to its measure (global)");
+		}
 	}
 };

@@ -119,11 +119,20 @@ public:
 			{
 				MatlabScript s;
 				s.OpenFigure();
-				s.Comment("---------------- Coarse element overlapped by the fine");
+				string phypart = "no physical part";
+				if (this->PhysicalPart)
+					phypart = this->PhysicalPart->Name;
+				s.Comment("---------------- Coarse element overlapped by the fine (phy part = " + phypart + ")");
 				this->ExportToMatlab("b");
-				s.Comment("---------------- Coarse element associated to the fine");
+				phypart = "no physical part";
+				if (this->PhysicalPart)
+					phypart = fe->CoarserElement->PhysicalPart->Name;
+				s.Comment("---------------- Coarse element associated to the fine (phy part = " + phypart + ")");
 				fe->CoarserElement->ExportToMatlab("y");
-				s.Comment("---------------- Fine element");
+				phypart = "no physical part";
+				if (this->PhysicalPart)
+					phypart = fe->PhysicalPart->Name;
+				s.Comment("---------------- Fine element (phy part = " + phypart + ")");
 				fe->ExportToMatlab("r");
 				assert(false);
 				Utils::FatalError("This coarse element is declared overlapped by a fine one that is not in the same physical part. The coarsening/refinement strategy must prevent that.");
