@@ -771,6 +771,41 @@ public:
 			});
 	}
 
+	void ExportToMatlab2(string filePath = "")
+	{
+		//vector<string> colors = { "r", "b", "m", "g", "y", "c" };
+		RotatingList<string> colors({ "r", "b", "m", "k", "g", "y", "c" });
+		MatlabScript s(filePath);
+		s.OpenFigure();
+		s.Add("axis(axes, 'equal');");
+		s.Add("axes.Visible = false;");
+
+		map<PhysicalGroup<Dim>*, string> phyColors;
+		for (PhysicalGroup<Dim>* pp : this->PhysicalParts)
+			phyColors.insert({ pp, colors.GetAndMoveNext() });
+
+		for (Element<Dim>* e : this->Elements)
+		{
+			if (!e->PhysicalPart || e->PhysicalPart->Name.compare("domain") == 0)
+			{
+				s.PlotPolygonEdges(e->Shape()->Vertices(), "k");
+			}
+			else
+			{
+				string color = phyColors.at(e->PhysicalPart);//colors[e->PhysicalPart->Id % colors.size()];
+				s.PlotPolygon(e->Shape()->Vertices(), color);
+			}
+			//s.PlotText(e->Center(), to_string(e->Number));
+		}
+
+		for (Face<Dim>* f : this->Faces)
+		{
+			bool isAtPhysicalBoundary = !f->IsDomainBoundary && !f->Element1->IsInSamePhysicalPartAs(f->Element2);
+			if (f->IsDomainBoundary || isAtPhysicalBoundary)
+				s.PlotSegment(f->Vertices()[0], f->Vertices()[1], "k", 1);
+		}
+	}
+
 	void PlotClustersForApproxL2(bool useOverlappingElements)
 	{
 		//vector<string> colors = { "r", "b", "g", "k", "m", "y", "c" };

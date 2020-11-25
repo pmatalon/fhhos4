@@ -28,7 +28,7 @@ class GMSHMesh : virtual public PolyhedralMesh<Dim>
 protected:
 	string _gmshFilePath;
 	string _description = "GMSH file";
-	string _fileNamePart = "gmsh-file";
+	string _fileNamePart = "";
 	string _geometryDescription = "unknown";
 
 	map<size_t, Element<Dim>*> _elementExternalNumbers;
@@ -135,7 +135,7 @@ public:
 	}
 
 	GMSHMesh(string geoFile, BigNumber N = 0) :
-		GMSHMesh(geoFile, "GMSH file", "gmsh-file", N)
+		GMSHMesh(geoFile, "GMSH file", "", N)
 	{}
 protected:
 	GMSHMesh(string description, string fileNamePart) : PolyhedralMesh<Dim>()
@@ -894,7 +894,7 @@ protected:
 public:
 	virtual void RenumberLikeMe()
 	{
-		if (this->_fileNamePart.compare("gmsh-tri") == 0)
+		if (this->_fileNamePart.compare("gmsh_tri") == 0)
 		{
 			BigNumber n = sqrt(this->Elements.size() / 2);
 			Square_TriangularMesh* myMesh = new Square_TriangularMesh(n, n);
@@ -997,7 +997,7 @@ Element<3>* GMSHMesh<3>::CreateElement(int elemType, const vector<size_t>& eleme
 		_tetrahedralElements[start + elemIndex] = TetrahedralElement(0, GetVertexFromGMSHTag(nodeTag1), GetVertexFromGMSHTag(nodeTag2), GetVertexFromGMSHTag(nodeTag3), GetVertexFromGMSHTag(nodeTag4));
 		e = &_tetrahedralElements[start + elemIndex];
 	}
-	else if (elemType == GMSH_Hexahedron && this->FileNamePart().compare("gmsh-cart") == 0)
+	else if (elemType == GMSH_Hexahedron && this->FileNamePart().compare("gmsh_cart") == 0)
 	{
 		size_t elemNodeIndex = 8 * elemIndex;
 		Vertex* v1 = GetVertexFromGMSHTag(elementNodes[elemNodeIndex]);     // (0, 1, 1)
@@ -1187,7 +1187,7 @@ void GMSHMesh<3>::CreateFaces(int elemType, BigNumber& faceNumber)
 			else
 				assert(false);
 		}
-		else if (faceType == GMSHFaceTypes::GMSH_QuadrilateralFace && this->FileNamePart().compare("gmsh-cart") == 0)
+		else if (faceType == GMSHFaceTypes::GMSH_QuadrilateralFace && this->FileNamePart().compare("gmsh_cart") == 0)
 		{
 			Vertex* v1 = vertices[0]; // (0, 1, 1)
 			Vertex* v2 = vertices[1]; // (1, 1, 1)

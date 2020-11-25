@@ -6,7 +6,7 @@ class Square4quadrants_GMSHTriangularMesh : public GMSHMesh<2>
 {
 public:
 	Square4quadrants_GMSHTriangularMesh(BigNumber n) : 
-		GMSHMesh("2D/square4quadrants_stri.geo", "GMSH structured triangular", "square4quadrants-gmsh-stri", "Square 4 quadrants", n / 2) // n/2 because it builds n subdivisions in each quadrant
+		GMSHMesh("2D/square4quadrants_stri.geo", "GMSH structured triangular", "square4quadrants_gmsh_stri", "Square 4 quadrants", n / 2) // n/2 because it builds n subdivisions in each quadrant
 	{}
 
 	void RefineMeshBySplitting() override

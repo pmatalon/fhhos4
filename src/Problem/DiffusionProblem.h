@@ -28,7 +28,9 @@ public:
 			sprintf(res, "_heterog%g", this->_diffusionField->HeterogeneityRatio);
 			heterogeneityString = res;
 		}
-		this->_fileName = "Diffusion" + to_string(Dim) + "D" + testCase->Code() + heterogeneityString + "_" + this->_mesh->FileNamePart();
+		this->_fileName = "Diff" + to_string(Dim) + "D_" + testCase->Code() + heterogeneityString;
+		if (!this->_mesh->FileNamePart().empty())
+			this->_fileName += "_" + this->_mesh->FileNamePart();
 	}
 
 	void PrintPhysicalProblem() override

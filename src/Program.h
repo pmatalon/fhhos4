@@ -64,7 +64,7 @@ public:
 			if (args.Discretization.N <= 2)
 				cout << *mesh << endl << endl;
 
-			/*if (args.Discretization.MeshCode.compare("gmsh-tri") == 0)
+			/*if (args.Discretization.MeshCode.compare("gmsh_tri") == 0)
 			{
 				GMSHMesh<Dim>* gmshMesh = dynamic_cast<GMSHMesh<Dim>*>(mesh);
 				gmshMesh->RenumberLikeMe();
@@ -94,11 +94,18 @@ public:
 					while (true)
 					{
 						cout << "Coarsening..." << endl;
-						m->CoarsenMesh(args.Solver.MG.CoarseningStgy);
+						m->CoarsenMesh(args.Solver.MG.CoarseningStgy, args.Solver.MG.CoarseningFactor);
 						m = m->CoarseMesh;
+						m->ExportToMatlab2();
+						if (!m)
+							break;
+						cout << "Sanity check..." << endl;
+						m->SanityCheck();
 					}*/
+
+					/*cout << "Export..." << endl;
 					mesh->ExportFacesToMatlab(args.OutputDirectory + "/fine.dat");
-					mesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_fine.m");
+					mesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_fine.m");*/
 
 					// 1st coarsening
 					cout << "Coarsening..." << endl;

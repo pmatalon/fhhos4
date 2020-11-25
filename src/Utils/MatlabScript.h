@@ -18,7 +18,8 @@ public:
 	}
 	MatlabScript(string filePath) : _filePath(filePath)
 	{
-		_file.open(filePath.c_str());
+		if (!filePath.empty())
+			_file.open(filePath.c_str());
 	}
 
 	ostream& Out()

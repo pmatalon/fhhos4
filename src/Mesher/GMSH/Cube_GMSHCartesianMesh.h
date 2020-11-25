@@ -6,7 +6,7 @@ class Cube_GMSHCartesianMesh : public GMSHMesh<3>
 {
 public:
 	Cube_GMSHCartesianMesh(BigNumber n) : 
-		GMSHMesh("3D/cube_cart.geo", "GMSH Cartesian", "gmsh-cart", "Cube", n)
+		GMSHMesh("3D/cube_cart.geo", "GMSH Cartesian", "gmsh_cart", "Cube", n)
 	{}
 private:
 	Cube_GMSHCartesianMesh(string description, string fileNamePart, string geometryDescription) :

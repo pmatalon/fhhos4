@@ -64,8 +64,8 @@ public:
 			dynamic_cast<LevelForHHO<Dim>*>(this->FinerLevel)->ExportMeshToMatlab(levelMesh, levelNumber);
 		else
 		{
-			string filePath = this->_problem->GetFilePath("level" + to_string(levelNumber) + "_faces");
-			levelMesh->ExportFacesToMatlab(filePath);
+			string filePath = this->_problem->GetFilePath("level" + to_string(levelNumber) + "_mesh", ".m");
+			levelMesh->ExportToMatlab2(filePath);
 		}
 	}
 
