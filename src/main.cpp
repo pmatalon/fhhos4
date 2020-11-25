@@ -304,6 +304,7 @@ void print_usage() {
 	cout << "              solgmsh - solution files (.pos and .msh) to be used in GMSH for visualization" << endl;
 	cout << "              errgmsh - error computed against the solution of an exact solver to be used in GMSH for visualization" << endl;
 	cout << "              mg      - Multigrid components (intergrid operator matrices, coarse meshes, etc.)" << endl;
+	cout << "              mgit    - Multigrid iteration vectors: for each iteration, right-hand side, solution before/after smoothing, etc." << endl;
 	cout << endl;
 	cout << "-o PATH" << endl;
 	cout << "      Output directory to export files." << endl;
@@ -803,6 +804,8 @@ int main(int argc, char* argv[])
 						args.Actions.ExportErrorToGMSH = true;
 					else if (code.compare("mg") == 0)
 						args.Actions.ExportMultigridComponents = true;
+					else if (code.compare("mgit") == 0)
+						args.Actions.ExportMultigridIterationVectors = true;
 					else
 						argument_error("unknown export option '" + code + "'.");
 				}

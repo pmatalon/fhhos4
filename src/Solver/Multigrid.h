@@ -200,7 +200,7 @@ private:
 		const SparseMatrix A = *level->OperatorMatrix;
 		Vector x;
 
-		if (this->ExportComponents)
+		if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
 			level->ExportVector(b, "it" + to_string(this->IterationCount) + "_b");
 
 		if (level->IsCoarsestLevel())
@@ -212,7 +212,7 @@ private:
 		{
 			x = initialGuess;
 
-			if (this->ExportComponents)
+			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_beforePreSmoothing");
 
 			//---------------//
@@ -221,7 +221,7 @@ private:
 
 			x = level->PreSmoother->Smooth(x, b);                                    result.AddCost(level->PreSmoother->SolvingComputationalWork());
 
-			if (this->ExportComponents)
+			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPreSmoothing");
 
 			//----------------------//
@@ -259,7 +259,7 @@ private:
 			// Coarse-grid correction //
 			//------------------------//
 
-			if (this->ExportComponents)
+			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
 			{
 				level->ExportVector(ec, "it" + to_string(this->IterationCount) + "_ce");
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol");
@@ -269,7 +269,7 @@ private:
 
 			x = x + level->Prolong(ec);                                              result.AddCost(level->ProlongCost());
 
-			if (this->ExportComponents)
+			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_cgc");
 
 			//----------------//
@@ -278,7 +278,7 @@ private:
 
 			x = level->PostSmoother->Smooth(x, b);                                   result.AddCost(level->PostSmoother->SolvingComputationalWork());
 
-			if (this->ExportComponents)
+			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPostSmoothing");
 		}
 

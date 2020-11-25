@@ -71,6 +71,7 @@ struct ActionsArguments
 	bool ExportAssemblyTermMatrices = false;
 	bool ExportMeshToMatlab = false;
 	bool ExportMultigridComponents = false;
+	bool ExportMultigridIterationVectors = false;
 	bool ExportSolutionVectors = false;
 	bool ExportSolutionToGMSH = false;
 	bool ExportErrorToGMSH = false;
