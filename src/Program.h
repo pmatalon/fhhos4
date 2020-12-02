@@ -33,6 +33,12 @@ public:
 
 		GaussLegendre::Init();
 
+		//-------------------------------------------------------------------------------------------//
+		//   Test case defining the source function, boundary conditions and diffusion coefficient   //
+		//-------------------------------------------------------------------------------------------//
+
+		TestCase<Dim>* testCase = TestCaseFactory<Dim>::Create(args.Problem);
+		
 		//----------//
 		//   Mesh   //
 		//----------//
@@ -45,10 +51,18 @@ public:
 		GMSHMesh<Dim>::GMSHLogEnabled = args.Actions.GMSHLogEnabled;
 		GMSHMesh<Dim>::UseCache = args.Actions.UseCache;
 
-		Mesh<Dim>* mesh = BuildMesh(args);
+		Mesh<Dim>* mesh = BuildMesh(args, testCase);
 		GMSHMesh<Dim>::CloseGMSH();
 
 		cout << "Mesh storage > " << Utils::MemoryString(mesh->MemoryUsage()) << endl;
+
+
+		mesh->SetDiffusionField(&testCase->DiffField);
+		mesh->SetBoundaryConditions(&testCase->BC);
+
+		//------------------------//
+		//       Unit tests       //
+		//------------------------//
 
 		if (args.Actions.UnitTests)
 		{
@@ -70,15 +84,6 @@ public:
 				gmshMesh->RenumberLikeMe();
 			}*/
 		}
-
-		//-------------------------------------------------------------------------------------------//
-		//   Test case defining the source function, boundary conditions and diffusion coefficient   //
-		//-------------------------------------------------------------------------------------------//
-
-		TestCase<Dim>* testCase = TestCaseFactory<Dim>::Create(args.Problem);
-
-		mesh->SetDiffusionField(&testCase->DiffField);
-		mesh->SetBoundaryConditions(&testCase->BC);
 
 		//---------------------------//
 		//   Coarsening unit tests   //
@@ -305,7 +310,7 @@ public:
 	}
 
 private:
-	Mesh<Dim>* BuildMesh(ProgramArguments& args) { return nullptr; }
+	Mesh<Dim>* BuildMesh(ProgramArguments& args, TestCase<Dim>* testCase) { return nullptr; }
 
 	Solver* CreateSolver(const ProgramArguments& args, Problem<Dim>* problem, int blockSize)
 	{
@@ -438,13 +443,13 @@ private:
 };
 
 template <>
-Mesh<1>* ProgramDim<1>::BuildMesh(ProgramArguments& args)
+Mesh<1>* ProgramDim<1>::BuildMesh(ProgramArguments& args, TestCase<1>* testCase)
 {
 	return new UniformMesh1D(args.Discretization.N);
 }
 
 template <>
-Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
+Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase)
 {
 	string geoCode = args.Problem.GeoCode;
 	string mesher = args.Discretization.Mesher;
@@ -619,11 +624,11 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 		string filePath = geoCode;
 		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
 		{
-			Mesh<2>* coarseMesh = new GMSHMesh<2>(filePath, args.Solver.MG.CoarseN);
+			Mesh<2>* coarseMesh = new GMSHMesh<2>(testCase, filePath, args.Solver.MG.CoarseN);
 			fineMesh = coarseMesh->RefineUntilNElements(2 * nx*ny, refinementStgy);
 		}
 		else
-			fineMesh = new GMSHMesh<2>(filePath, n);
+			fineMesh = new GMSHMesh<2>(testCase, filePath, n);
 #endif // GMSH_ENABLED
 	}
 	
@@ -639,7 +644,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args)
 
 
 template <>
-Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args)
+Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args, TestCase<3>* testCase)
 {
 	string geoCode = args.Problem.GeoCode;
 	string mesher = args.Discretization.Mesher;
@@ -747,13 +752,13 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args)
 			if (Utils::IsRefinementStrategy(args.Solver.MG.CoarseningStgy))
 			{
 				if (refinementStgy == CoarseningStrategy::BeyRefinement)
-					coarseMesh = new GMSHTetrahedralMesh(filePath, args.Solver.MG.CoarseN);
+					coarseMesh = new GMSHTetrahedralMesh(testCase, filePath, args.Solver.MG.CoarseN);
 				else if (refinementStgy == CoarseningStrategy::GMSHSplittingRefinement)
-					coarseMesh = new GMSHMesh<3>(filePath, args.Solver.MG.CoarseN);
+					coarseMesh = new GMSHMesh<3>(testCase, filePath, args.Solver.MG.CoarseN);
 				fineMesh = coarseMesh->RefineUntilNElements(6 * n*n*n, refinementStgy);
 			}
 			else
-				fineMesh = new GMSHMesh<3>(filePath, n);
+				fineMesh = new GMSHMesh<3>(testCase, filePath, n);
 		}
 		else
 			Utils::FatalError("When the geometry is imported from a GMSH file, only unstructured tetrahedral meshing is allowed. Use '-mesh tetra' instead.");

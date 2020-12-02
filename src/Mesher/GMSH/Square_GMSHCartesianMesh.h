@@ -6,7 +6,7 @@ class Square_GMSHCartesianMesh : public GMSHMesh<2>
 {
 public:
 	Square_GMSHCartesianMesh(BigNumber n) :
-		GMSHMesh("2D/square_cart.geo", "GMSH Cartesian", "square_gmsh_cart", "Square", n)
+		GMSHMesh(nullptr, "2D/square_cart.geo", "GMSH Cartesian", "square_gmsh_cart", "Square", n)
 	{}
 
 	void RefineMeshBySplitting() override

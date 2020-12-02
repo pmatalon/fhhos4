@@ -26,6 +26,7 @@ template <int Dim>
 class GMSHMesh : virtual public PolyhedralMesh<Dim>
 {
 protected:
+	TestCase<Dim>* _testCase = nullptr;
 	string _gmshFilePath;
 	string _description = "GMSH file";
 	string _fileNamePart = "";
@@ -43,9 +44,10 @@ public:
 	static bool GMSHLogEnabled;
 	static bool UseCache;
 
-	GMSHMesh(string gmshFile, string description, string fileNamePart, BigNumber n = 0, bool buildMesh = true) 
+	GMSHMesh(TestCase<Dim>* testCase, string gmshFile, string description, string fileNamePart, BigNumber n = 0, bool buildMesh = true)
 		: PolyhedralMesh<Dim>()
 	{
+		_testCase = testCase;
 		_description = description;
 		_fileNamePart = fileNamePart;
 		_geometryDescription = FileSystem::FileNameWithoutExtension(gmshFile);
@@ -128,14 +130,14 @@ public:
 			Build();
 	}
 
-	GMSHMesh(string geoFile, string description, string fileNamePart, string geometryDescription, BigNumber N = 0) :
-		GMSHMesh(geoFile, description, fileNamePart, N)
+	GMSHMesh(TestCase<Dim>* testCase, string geoFile, string description, string fileNamePart, string geometryDescription, BigNumber N = 0) :
+		GMSHMesh(testCase, geoFile, description, fileNamePart, N)
 	{
 		_geometryDescription = geometryDescription;
 	}
 
-	GMSHMesh(string geoFile, BigNumber N = 0) :
-		GMSHMesh(geoFile, "GMSH file", "", N)
+	GMSHMesh(TestCase<Dim>* testCase, string geoFile, BigNumber N = 0) :
+		GMSHMesh(testCase, geoFile, "GMSH file", "", N)
 	{}
 protected:
 	GMSHMesh(string description, string fileNamePart) : PolyhedralMesh<Dim>()
@@ -244,7 +246,7 @@ private:
 			this->PhysicalParts = GetPhysicalGroups();
 		if (this->BoundaryParts.empty())
 			this->BoundaryParts = GetBoundaryGroups();
-		
+
 		//----------//
 		// Vertices //
 		//----------//
@@ -260,8 +262,6 @@ private:
 		if (nodeTags.empty())
 			Utils::FatalError("The mesh isn't readable.");
 
-		cout << "Building internal mesh objects..." << endl;
-
 		this->Vertices.reserve(nodeTags.size());
 		BigNumber vertexNumber = 0;
 		for (size_t i = 0; i < nodeTags.size(); i++)
@@ -275,23 +275,94 @@ private:
 			}
 		}
 
+		//--------------------//
+		// Geometric vertices //
+		//--------------------//
+
 		// Get vertices defining the geometry.
 		// These vertices must be conserved at every level of coarsening.
-		nodeTags.clear();
-		gmsh::model::mesh::getNodes(nodeTags, coord, parametricCoord, 0, -1, true, false);
-		//int nodeTagsSize = nodeTags.size();
-		//MatlabScript s;
-		//s.OpenFigure();
-		for (size_t i = 0; i < nodeTags.size(); i++)
+
+		if (this->ComesFrom.CS == CoarseningStrategy::IndependentRemeshing)
+			this->_geometricVertices.clear();
+
+		gmsh::vectorpair entitiesDim0Tags;
+		gmsh::model::getEntities(entitiesDim0Tags, 0);
+		nodeTags = vector<size_t>();
+		map<int, MeshVertex<Dim>*> pointTagVertex;
+		for (int i = 0; i < entitiesDim0Tags.size(); i++)
 		{
-			MeshVertex<Dim>* v = GetVertexFromGMSHTag(nodeTags[i]);
+			// Geometric point
+			int pointTag = entitiesDim0Tags[i].second;
+			if (_testCase)
+			{
+				auto it = find(_testCase->GeometricPointExclusionList.begin(), _testCase->GeometricPointExclusionList.end(), pointTag);
+				if (it != _testCase->GeometricPointExclusionList.end())
+					continue; // point excluded
+			}
+
+			// Find associated vertex
+			gmsh::model::mesh::getNodes(nodeTags, coord, parametricCoord, 0, pointTag, true, false);
+			if (nodeTags.size() == 0)
+			{
+				Utils::Warning("No mesh vertex has been found for the geometric point " + to_string(pointTag) + ". If it corresponds to the center of a circle, you can ignore this warning.");
+				continue;
+			}
+			else if (nodeTags.size() > 1)
+				Utils::Warning("Multiple mesh vertices have been found for the geometric point " + to_string(pointTag) + ". Using the first one.");
+			
+			MeshVertex<Dim>* v = GetVertexFromGMSHTag(nodeTags[0]);
+			if (!v)
+				Utils::Warning("The GMSH node of tag " + to_string(nodeTags[0]) + " corresponding to the geometric point " + to_string(pointTag) + " has not been found in the node list given by GMSH.");
 			this->_geometricVertices.insert(v);
-			//s.PlotPoint(*v);
+			pointTagVertex.insert({ pointTag , v });
+		}
+		cout << this->_geometricVertices.size() << " geometric points to conserve found." << endl;
+
+		//------------------------//
+		//   Re-entrant corners   // 
+		//------------------------//
+
+		if (Utils::ProgramArgs.Solver.MG.ReEntrantCornerManagement != ReEntrantCornerMgmt::Disabled && this->_reEntrantCorners.empty() && _testCase)
+		{
+			for (auto it = _testCase->ReEntrantGeometricPoints.begin(); it != _testCase->ReEntrantGeometricPoints.end(); it++)
+			{
+				PhysicalGroup<Dim>* phyPart = this->GetPhysicalGroup(it->first);
+				if (!phyPart)
+					Utils::FatalError("Unknown PhysicalPart '" + it->first + "'. Check ReEntrantGeometricPoints in the test case.");
+
+				auto itRC = this->_reEntrantCorners.find(phyPart);
+				if (itRC == this->_reEntrantCorners.end())
+					this->_reEntrantCorners.insert({ phyPart, {} });
+
+				for (int pointTag : it->second)
+				{
+					MeshVertex<Dim>* v = pointTagVertex.at(pointTag);
+					this->_reEntrantCorners.at(phyPart).push_back(v);
+				}
+			}
+
+			if (_testCase->Code().compare("magnetism") == 0)
+			{
+				double smallCircleR = 0.4;
+				double mediumCircleR = 0.5;
+				double bigCircleR = 0.8;
+				for (Vertex* v : this->Vertices)
+				{
+					if (abs(v->X*v->X + v->Y*v->Y - smallCircleR * smallCircleR) < 1e-8)
+						this->_reEntrantCorners.at(this->PhysicalParts[1]).push_back(v); // Middle
+					else if (abs(v->X*v->X + v->Y*v->Y - bigCircleR * bigCircleR) < 1e-8)
+						this->_reEntrantCorners.at(this->PhysicalParts[0]).push_back(v); // Exterior
+					else if (abs(v->X*v->X + v->Y*v->Y - mediumCircleR * mediumCircleR) < 1e-8 && abs(v->X) < 0.2 && v->Y > 0)
+						this->_reEntrantCorners.at(this->PhysicalParts[0]).push_back(v); // Exterior
+				}
+			}
 		}
 
 		//----------//
 		// Elements //
 		//----------//
+
+		cout << "Building elements..." << endl;
 
 		// Get entities (surfaces in 2D, volumes in 3D). For simple geometries, entities corresponds to physical groups.
 		gmsh::vectorpair entitiesDimTags;
@@ -329,22 +400,24 @@ private:
 			vector<int> physicalTags;
 			gmsh::model::getPhysicalGroupsForEntity(Dim, entityTag, physicalTags);
 			if (!this->PhysicalParts.empty() && physicalTags.empty())
-				Utils::FatalError("Entity " + to_string(entityTag) + " has no physical group. Check GMSH file.");
+				Utils::FatalError("Entity " + to_string(entityTag) + " has no physical part. Check GMSH file.");
 			if (this->PhysicalParts.empty() && !physicalTags.empty())
-				Utils::FatalError("Entity " + to_string(entityTag) + " has a physical group although no physical group has been defined. This should never happen.");
+				Utils::FatalError("Entity " + to_string(entityTag) + " has a physical part although no physical part has been defined. This should never happen.");
 			if (physicalTags.size() > 1)
-				Utils::FatalError("Entity " + to_string(entityTag) + " must have only one physical group (" + to_string(physicalTags.size()) + " found). Check GMSH file.");
+				Utils::FatalError("Entity " + to_string(entityTag) + " must have only one physical part (" + to_string(physicalTags.size()) + " found). Check GMSH file.");
 			
-			PhysicalGroup<Dim>* physicalPart = nullptr;
-			for (PhysicalGroup<Dim>* pp : this->PhysicalParts)
+			PhysicalGroup<Dim>* physicalPart = this->GetPhysicalGroup(physicalTags[0]);
+			if (!physicalPart)
 			{
-				if (pp->Id == physicalTags[0])
-				{
-					physicalPart = pp;
-					break;
-				}
+				// Id not found, search by name
+				string phyName;
+				gmsh::model::getPhysicalName(Dim, physicalTags[0], phyName);
+				physicalPart = this->GetPhysicalGroup(phyName);
+				if (physicalPart)
+					Utils::FatalError("Entity " + to_string(entityTag) + " has an unknown physical part (id=" + to_string(physicalTags[0]) + ", name=\"" + phyName + "\"). However it has the same name of a known one. If the GMSH file has changed, there may be discrepencies with the meshes stored in cache. Try emptying the cache for this geometry or use the option -no-cache.");
+				else
+					Utils::FatalError("Entity " + to_string(entityTag) + " has an unknown physical part (id=" + to_string(physicalTags[0]) + ", name=\"" + phyName + "\"). Check GMSH file.");
 			}
-			assert(physicalPart);
 
 			// Get elements in this entity
 			elementTypes.clear();
@@ -415,6 +488,8 @@ private:
 		//   Faces   //
 		//-----------//
 
+		cout << "Building faces..." << endl;
+
 		// Create all the faces
 		BigNumber faceNumber = 0;
 		for (int i = 0; i < elementTypes.size(); i++)
@@ -442,16 +517,18 @@ private:
 				if (physicalTags.size() > 1)
 					Utils::FatalError("Entity " + to_string(entityTag) + " must have only one physical group (" + to_string(physicalTags.size()) + " found). Check GMSH file.");
 
-				BoundaryGroup* boundaryPart = nullptr;
-				for (BoundaryGroup* bp : this->BoundaryParts)
+				BoundaryGroup* boundaryPart = this->GetBoundaryGroup(physicalTags[0]);
+				if (!boundaryPart)
 				{
-					if (bp->Id == physicalTags[0])
-					{
-						boundaryPart = bp;
-						break;
-					}
+					// Id not found, search by name
+					string phyName;
+					gmsh::model::getPhysicalName(Dim-1, physicalTags[0], phyName);
+					boundaryPart = this->GetBoundaryGroup(phyName);
+					if (boundaryPart)
+						Utils::FatalError("Entity " + to_string(entityTag) + " has an unknown boundary part (id=" + to_string(physicalTags[0]) + ", name=\"" + phyName + "\"). However it has the same name of a known one. If the GMSH file has changed, there may be discrepencies with the meshes stored in cache. Try emptying the cache for this geometry or use the option -no-cache.");
+					else
+						Utils::FatalError("Entity " + to_string(entityTag) + " has an unknown boundary part (id=" + to_string(physicalTags[0]) + ", name=\"" + phyName + "\"). Check GMSH file.");
 				}
-				assert(boundaryPart);
 
 				// Get faces in this entity
 				faceTypes.clear();
@@ -475,12 +552,36 @@ private:
 			}
 		}
 
+
+		if (this->ComesFrom.CS == CoarseningStrategy::None)
+		{
+			for (auto it = this->_reEntrantCorners.begin(); it != this->_reEntrantCorners.end(); it++)
+			{
+				PhysicalGroup<Dim>* phyPart = it->first;
+				for (Vertex* v : it->second)
+				{
+					MeshVertex<Dim>* rc = dynamic_cast<MeshVertex<Dim>*>(v);
+					if (!rc)
+						break;
+					for (Element<Dim>* e : rc->Elements)
+					{
+						if (e->PhysicalPart == phyPart)
+							e->HasReEntrantCorner = true;
+					}
+				}
+			}
+		}
+
 	}
 
 protected:
 	inline MeshVertex<Dim>* GetVertexFromGMSHTag(BigNumber nodeTag)
 	{
-		return _vertexExternalNumbers.at(nodeTag);
+		auto it = _vertexExternalNumbers.find(nodeTag);
+		if (it != _vertexExternalNumbers.end())
+			return it->second;
+		else
+			return nullptr;
 	}
 
 	inline Element<Dim>* GetElementFromGMSHTag(BigNumber elementTag)
@@ -499,6 +600,21 @@ protected:
 			gmsh::model::getPhysicalName(Dim, phyGroup->Id, phyGroup->Name);
 			physicalGroups.push_back(phyGroup);
 		}
+
+		if (physicalGroups.empty())
+			cout << "No physical parts found." << endl;
+		else
+		{
+			cout << physicalGroups.size() << " physical parts found: ";
+			for (PhysicalGroup<Dim>* pp : physicalGroups)
+			{
+				cout << "(" << pp->Id << ") " << pp->Name;
+				if (pp != physicalGroups.back())
+					cout << ", ";
+			}
+			cout << "." << endl;
+		}
+
 		return physicalGroups;
 	}
 
@@ -513,6 +629,21 @@ protected:
 			gmsh::model::getPhysicalName(Dim-1, phyGroup->Id, phyGroup->Name);
 			physicalGroups.push_back(phyGroup);
 		}
+
+		if (physicalGroups.empty())
+			cout << "No boundary parts found." << endl;
+		else
+		{
+			cout << physicalGroups.size() << " boundary parts found: ";
+			for (BoundaryGroup* bp : physicalGroups)
+			{
+				cout << "(" << bp->Id << ") " << bp->Name;
+				if (bp != physicalGroups.back())
+					cout << ", ";
+			}
+			cout << "." << endl;
+		}
+
 		return physicalGroups;
 	}
 
@@ -681,7 +812,7 @@ private:
 
 		GMSHMesh<Dim>* fineMesh = this;
 
-		GMSHMesh<Dim>* coarseMesh = new GMSHMesh<Dim>(_gmshFilePath, _description, _fileNamePart, fineMesh->N() / coarseningFactor, false);
+		GMSHMesh<Dim>* coarseMesh = new GMSHMesh<Dim>(_testCase, _gmshFilePath, _description, _fileNamePart, fineMesh->N() / coarseningFactor, false);
 		this->InitializeCoarsening(coarseMesh);
 		coarseMesh->ComesFrom.CS = CoarseningStrategy::IndependentRemeshing;
 		coarseMesh->Build();
@@ -1043,6 +1174,10 @@ void GMSHMesh<2>::CreateFaces(int elemType, BigNumber& faceNumber)
 	{
 		MeshVertex<2>* v1 = (MeshVertex<2>*)GetVertexFromGMSHTag(edgeNodes[j]);
 		MeshVertex<2>* v2 = (MeshVertex<2>*)GetVertexFromGMSHTag(edgeNodes[j + 1]);
+		if (!v1)
+			Utils::FatalError("No GMSH node of tag " + to_string(edgeNodes[j]));
+		if (!v2)
+			Utils::FatalError("No GMSH node of tag " + to_string(edgeNodes[j + 1]));
 
 		bool edgeAlreadyExists = false;
 		for (Face<2>* f : v1->Faces)

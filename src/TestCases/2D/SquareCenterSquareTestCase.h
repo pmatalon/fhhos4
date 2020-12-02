@@ -2,20 +2,20 @@
 #include "../TestCase.h"
 using namespace std;
 
-class SquareCircleTestCase : public TestCase<2>
+class SquareCenterSquareTestCase : public TestCase<2>
 {
 private:
-	Tensor<2> diffTensorSquare;
-	Tensor<2> diffTensorCircle;
+	Tensor<2> diffTensorBig;
+	Tensor<2> diffTensorSmall;
 public:
-	SquareCircleTestCase(ProblemArguments pb) :
+	SquareCenterSquareTestCase(ProblemArguments pb) :
 		TestCase()
 	{
 		// Diffusion field
-		diffTensorSquare = Tensor<2>(pb.HeterogeneityRatio, pb.AnisotropyRatio, pb.AnisotropyAngle);
-		diffTensorCircle = Tensor<2>(1                    , pb.AnisotropyRatio, pb.AnisotropyAngle);
+		diffTensorBig   = Tensor<2>(pb.HeterogeneityRatio, pb.AnisotropyRatio, pb.AnisotropyAngle);
+		diffTensorSmall = Tensor<2>(1                    , pb.AnisotropyRatio, pb.AnisotropyAngle);
 
-		this->DiffField = DiffusionField<2>("square", &diffTensorSquare, "disk", &diffTensorCircle);
+		this->DiffField = DiffusionField<2>("big", &diffTensorBig, "small", &diffTensorSmall);
 
 		// Source function
 		if (pb.SourceCode.compare("") == 0)
@@ -84,17 +84,14 @@ public:
 		}
 		else
 			Utils::FatalError("The requested boundary conditions are not defined in this test case.");
-
-		// GMSH geometric points to ignore 
-		this->GeometricPointExclusionList = { 5 };
 	}
 
 	string Code() override
 	{
-		return "squarecircle";
+		return "squarecentersquare";
 	}
 	string Description() override
 	{
-		return "Square embedding a circle";
+		return "Small square at the center of a big square";
 	}
 };

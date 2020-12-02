@@ -51,6 +51,7 @@ struct MultigridArguments
 	int CoarseningFactor = 2;
 	BigNumber CoarseN = 2;
 	FaceCollapsing BoundaryFaceCollapsing = FaceCollapsing::Max;
+	ReEntrantCornerMgmt ReEntrantCornerManagement = ReEntrantCornerMgmt::Disabled;
 };
 
 struct SolverArguments

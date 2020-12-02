@@ -88,6 +88,13 @@ public:
 		}
 		else
 			Utils::FatalError("The requested boundary conditions are not defined in this test case.");
+
+		// GMSH geometric points to ignore 
+		this->GeometricPointExclusionList = { 1, 2, 3, 6, 37, 39, 100 };
+
+		// Re-entrant corners
+		this->ReEntrantGeometricPoints.insert({ "Middle", {24, 34} });
+		this->ReEntrantGeometricPoints.insert({ "Exterior", {21, 31} });
 	}
 
 	string Code() override

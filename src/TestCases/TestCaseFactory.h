@@ -6,6 +6,8 @@
 #include "2D/KelloggTestCase.h"
 #include "2D/BarWith4HolesTestCase.h"
 #include "2D/SquareCircleTestCase.h"
+#include "2D/SquareCornerSquareTestCase.h"
+#include "2D/SquareCenterSquareTestCase.h"
 #include "2D/SquareHolesTestCase.h"
 #include "2D/EDFTestCase.h"
 #include "2D/MagnetismTestCase.h"
@@ -48,6 +50,10 @@ TestCase<2>* TestCaseFactory<2>::Create(ProblemArguments pb)
 		return new BarWith4HolesTestCase(pb);
 	if (pb.TestCaseCode.compare("squarecircle") == 0)
 		return new SquareCircleTestCase(pb);
+	if (pb.TestCaseCode.compare("squarecornersquare") == 0)
+		return new SquareCornerSquareTestCase(pb);
+	if (pb.TestCaseCode.compare("squarecentersquare") == 0)
+		return new SquareCenterSquareTestCase(pb);
 	if (pb.TestCaseCode.compare("squareholes") == 0)
 		return new SquareHolesTestCase(pb);
 	if (pb.TestCaseCode.compare("edf") == 0)

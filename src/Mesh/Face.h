@@ -150,6 +150,16 @@ public:
 		return it != vertices.end();
 	}
 
+	bool HasAny(const vector<Vertex*>& vertices)
+	{
+		for (Vertex* v : vertices)
+		{
+			if (this->HasVertex(v, false))
+				return true;
+		}
+		return false;
+	}
+
 	bool HasSameVertices(Face<Dim>* other, bool compareCoordinates = false)
 	{
 		if (this->Vertices().size() != other->Vertices().size())

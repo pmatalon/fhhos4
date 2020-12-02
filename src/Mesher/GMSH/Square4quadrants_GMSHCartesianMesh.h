@@ -6,7 +6,7 @@ class Square4quadrants_GMSHCartesianMesh : public GMSHMesh<2>
 {
 public:
 	Square4quadrants_GMSHCartesianMesh(BigNumber n) : 
-		GMSHMesh("2D/square4quadrants_cart.geo", "GMSH Cartesian", "square4quadrants_gmsh_cart", "Square 4 quadrants", n/2) // n/2 because it builds n subdivisions in each quadrant
+		GMSHMesh(nullptr, "2D/square4quadrants_cart.geo", "GMSH Cartesian", "square4quadrants_gmsh_cart", "Square 4 quadrants", n/2) // n/2 because it builds n subdivisions in each quadrant
 	{}
 
 	void RefineMeshBySplitting() override

@@ -14,6 +14,12 @@ public:
 	DiffusionField<Dim> DiffField;
 	BoundaryConditions BC;
 
+	// GMSH Point ids
+	vector<int> GeometricPointExclusionList;
+
+	map<string, vector<int>> ReEntrantGeometricPoints;
+	map<string, vector<string>> ReEntrantBoundary;
+
 	TestCase()
 	{}
 

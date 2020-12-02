@@ -6,7 +6,7 @@ class Square_GMSHQuadrilateralMesh : public GMSHMesh<2>
 {
 public:
 	Square_GMSHQuadrilateralMesh(BigNumber n) : 
-		GMSHMesh("2D/square_quad.geo", "GMSH quadrilateral", "square_gmsh_quad", "Square", n)
+		GMSHMesh(nullptr, "2D/square_quad.geo", "GMSH quadrilateral", "square_gmsh_quad", "Square", n)
 	{}
 
 	void RefineMeshBySplitting() override

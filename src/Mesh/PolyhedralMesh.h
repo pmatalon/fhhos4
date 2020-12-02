@@ -635,6 +635,45 @@ private:
 		// Element agglomeration, 1st pass
 		// Agglomerate fine elements together
 
+		bool cancelCoarsening = false;
+
+		// Start by the elements at re-entrant corners
+		if (Utils::ProgramArgs.Solver.MG.ReEntrantCornerManagement == ReEntrantCornerMgmt::AgglomerateFirst)
+		{
+			for (Element<Dim>* e : this->Elements)
+			{
+				if (!e->HasReEntrantCorner || e->CoarserElement)
+					continue;
+
+				vector<Element<Dim>*> availableNeighbours = LockAvailableFaceNeighbours(e, true);
+				if (availableNeighbours.empty())
+				{
+					e->Mutex.unlock();
+					/*Utils::Warning("No more agglomeration possible in this mesh or this physical region. Coarsening aborted.");
+					cancelCoarsening = true;
+					coarseMesh->ExportToMatlab2("/mnt/c/Users/pierr/Desktop/mesh_in_construct.m");
+					e->ExportToMatlab("k");
+					return;*/
+					continue;
+				}
+
+				// Agglomeration
+				availableNeighbours.push_back(e);
+				Element<Dim>* coarseElement = coarseMesh->AgglomerateFineElements(availableNeighbours, true);
+				if (!coarseElement)
+				{
+					Utils::Warning("No more agglomeration possible in this mesh or this physical region. Coarsening aborted.");
+					cancelCoarsening = true;
+					//return;
+				}
+				for (Element<Dim>* neighbour : availableNeighbours)
+					neighbour->Mutex.unlock();
+				if (cancelCoarsening)
+					return;
+			}
+		}
+
+
 		vector<Element<Dim>*> remainingFineElements = this->Elements;
 		random_shuffle(remainingFineElements.begin(), remainingFineElements.end());
 		//cout << "\t" << remainingFineElements.size() << " fine elements to coarsen" << endl;
@@ -681,7 +720,6 @@ private:
 		// Agglomerate the remaining fine elements with their closest coarse neighbour
 
 		//cout << "\t" << remainingFineElements.size() << " to agglomerate with coarse elements" << endl;
-		bool cancelCoarsening = false;
 
 		while (!remainingFineElements.empty())
 		{
@@ -694,8 +732,13 @@ private:
 					Element<Dim>* coarseNeighbourForAggreg = this->FittestCoarseNeighbour(currentElem, CoarseningStrategy::AgglomerationCoarseningByClosestCenter);
 					if (!coarseNeighbourForAggreg)
 					{
-						Utils::Warning("No more agglomeration possible in this mesh or this physical region. Coarsening aborted.");
-						cancelCoarsening = true;
+						if (!cancelCoarsening)
+						{
+							cancelCoarsening = true;
+							//coarseMesh->ExportToMatlab2("/mnt/c/Users/pierr/Desktop/mesh_in_construct.m");
+							//currentElem->ExportToMatlab("k");
+							Utils::Warning("No more agglomeration possible in this mesh or this physical region. Coarsening aborted.");
+						}
 						return;
 					}
 
@@ -1126,13 +1169,22 @@ private:
 		return availableNeighbours;
 	}
 
-	vector<Element<Dim>*> LockAvailableFaceNeighbours(Element<Dim>* elem)
+	vector<Element<Dim>*> LockAvailableFaceNeighbours(Element<Dim>* elem, bool doesntFitIfShareReEntrantCorner = false)
 	{
+		vector<Vertex*> reentrantCorners;
+		if (doesntFitIfShareReEntrantCorner)
+			reentrantCorners = ReEntrantCorners(elem);
+
 		vector<Element<Dim>*> availableNeighbours;
 		for (Element<Dim>* n : elem->NeighboursInSamePhysicalPart())
 		{
-			if (!n->CoarserElement && n->Mutex.try_lock())
+			bool checkReEntrantCornersOk = !doesntFitIfShareReEntrantCorner || !n->HasAny(reentrantCorners);
+			if (!n->CoarserElement && checkReEntrantCornersOk && n->Mutex.try_lock())
+			{
 				availableNeighbours.push_back(n);
+				if (doesntFitIfShareReEntrantCorner)
+					reentrantCorners = Utils::Join(reentrantCorners, ReEntrantCorners(n));
+			}
 		}
 
 		return availableNeighbours;
@@ -1218,6 +1270,9 @@ private:
 
 	Element<Dim>* FittestCoarseNeighbour(Element<Dim>* e, CoarseningStrategy strategy)
 	{
+		bool mustCheckReEntrantCorners = Utils::ProgramArgs.Solver.MG.ReEntrantCornerManagement != ReEntrantCornerMgmt::Disabled;
+		vector<Vertex*> reentrantCorners = ReEntrantCorners(e);
+
 		Element<Dim>* coarseNeighbourForAggreg = nullptr;
 		double closestDistance = -1;
 		double largestInterface = -1;
@@ -1228,6 +1283,9 @@ private:
 
 			Element<Dim>* macroNeighbour = f->GetNeighbour(e)->CoarserElement;
 			if (!macroNeighbour || !macroNeighbour->IsInSamePhysicalPartAs(e))
+				continue;
+
+			if (mustCheckReEntrantCorners && macroNeighbour->HasAny(reentrantCorners))
 				continue;
 
 			double distance = 0;
@@ -1273,6 +1331,24 @@ private:
 		}
 
 		return coarseNeighbourForAggreg;
+	}
+
+	vector<Vertex*> ReEntrantCorners(Element<Dim>* e)
+	{
+		vector<Vertex*> reentrantCorners;
+		if (Utils::ProgramArgs.Solver.MG.ReEntrantCornerManagement != ReEntrantCornerMgmt::Disabled)
+		{
+			auto it = this->_reEntrantCorners.find(e->PhysicalPart);
+			if (it != this->_reEntrantCorners.end())
+			{
+				for (Vertex* corner : it->second)
+				{
+					if (e->HasVertex(corner))
+						reentrantCorners.push_back(corner);
+				}
+			}
+		}
+		return reentrantCorners;
 	}
 
 
@@ -1330,13 +1406,37 @@ private:
 		return coarseElement;
 	}
 
-	Element<Dim>* AgglomerateFineElements(const vector<Element<Dim>*>& fineElements)
+	Element<Dim>* AgglomerateFineElements(const vector<Element<Dim>*>& fineElements, bool checkNoSharedReEntrantCorner = false)
 	{
 		//assert(fineElements.size() > 1 || fineElements[0]->IsOnBoundary());
 		for (Element<Dim>* e : fineElements)
 		{
 			assert(!e->CoarserElement);
 			assert(e->IsInSamePhysicalPartAs(fineElements[0]) && "Agglomeration of elements from different physical groups is not allowed!");
+		}
+
+		// Check re-entrant corners
+		if (checkNoSharedReEntrantCorner)
+		{
+			for (int i = 0; i < fineElements.size(); i++)
+			{
+				vector<Vertex*> reentrantCorners = ReEntrantCorners(fineElements[i]);
+				for (int j = i + 1; j < fineElements.size(); j++)
+				{
+					if (fineElements[j]->HasAny(reentrantCorners))
+					{
+						MatlabScript s;
+						s.OpenFigure();
+						for (Element<Dim>* e : fineElements)
+							s.PlotPolygonEdges(e->Shape()->Vertices(), "k");
+						fineElements[i]->ExportToMatlab("r", true);
+						fineElements[j]->ExportToMatlab("r", true);
+						for (Vertex* rc : reentrantCorners)
+							s.PlotPoint(*rc, "b+");
+						Utils::FatalError("Agglomeration of elements sharing a reentrant corner is not allowed.");
+					}
+				}
+			}
 		}
 
 		Agglo<Dim> agglo(fineElements);
@@ -1352,6 +1452,8 @@ private:
 		{
 			e->CoarserElement = coarseElement;
 			coarseElement->FinerElements.push_back(e);
+			if (e->HasReEntrantCorner)
+				coarseElement->HasReEntrantCorner = true;
 		}
 
 		for (Face<Dim>* f : agglo.RemovedFaces())
@@ -1374,10 +1476,10 @@ private:
 		return coarseElement;
 	}
 
-	Element<Dim>* AgglomerateFineElementToCoarse(Element<Dim>* fineElement, Element<Dim>* coarseElement)
+	Element<Dim>* AgglomerateFineElementToCoarse(Element<Dim>* fineElement, Element<Dim>* coarseElement, bool checkNoSharedReEntrantCorner = false)
 	{
 		assert(fineElement->IsInSamePhysicalPartAs(coarseElement) && "Agglomeration of elements from different physical groups is not allowed!");
-
+		
 		// Collect the fine faces interfacing these two elements //
 		vector<Face<Dim>*> facesToRemove;
 		vector<Face<Dim>*> facesToClone;
@@ -1408,6 +1510,17 @@ private:
 			if (mustBeKept)
 				coarseFacesToKeep.push_back(cf);
 		}
+
+		// Check re-entrant corners
+		if (checkNoSharedReEntrantCorner)
+		{
+			vector<Vertex*> reentrantCorners = ReEntrantCorners(fineElement);
+			for (Face<Dim>* f : facesToRemove)
+			{
+				if (f->HasAny(reentrantCorners))
+					Utils::FatalError("Agglomeration of elements sharing a reentrant corner is not allowed.");
+			}
+		}
 		
 		// Creation of the polygonal macro-element
 		Element<Dim>* newCoarseElement;
@@ -1428,6 +1541,7 @@ private:
 		newCoarseElement->Mutex.lock();
 		newCoarseElement->Id = this->NewElementId();
 		newCoarseElement->PhysicalPart = coarseElement->PhysicalPart;
+		newCoarseElement->HasReEntrantCorner = coarseElement->HasReEntrantCorner;
 
 		// Links between the macro element and the fine elements
 		for (Element<Dim>* fe : coarseElement->FinerElements)
@@ -1437,6 +1551,8 @@ private:
 		}
 		newCoarseElement->FinerElements.push_back(fineElement);
 		fineElement->CoarserElement = newCoarseElement;
+		if (fineElement->HasReEntrantCorner)
+			newCoarseElement->HasReEntrantCorner = true;
 
 		for (Face<Dim>* ff : coarseElement->FinerFacesRemoved)
 			newCoarseElement->FinerFacesRemoved.push_back(ff);

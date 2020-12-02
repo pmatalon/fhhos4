@@ -4,6 +4,7 @@
 #include "../Utils/ElementParallelLoop.h"
 #include "../Utils/MatlabScript.h"
 #include "../Utils/FileSystem.h"
+#include "../TestCases/TestCase.h"
 using namespace std;
 
 struct CoarseningStrategyDetails
@@ -66,6 +67,7 @@ private:
 protected:
 	// Vertices to keep at all levels to avoid "eroding" the geometry
 	set<Vertex*> _geometricVertices;
+	map<PhysicalGroup<Dim>*, vector<Vertex*>> _reEntrantCorners;
 public:
 	vector<Vertex*> Vertices;
 	vector<Element<Dim>*> Elements;
@@ -340,6 +342,7 @@ protected:
 		coarseMesh->BoundaryParts = this->BoundaryParts;
 
 		coarseMesh->_geometricVertices = this->_geometricVertices;
+		coarseMesh->_reEntrantCorners = this->_reEntrantCorners;
 	}
 
 	virtual void InitializeRefinement(Mesh<Dim>* fineMesh)
@@ -351,6 +354,7 @@ protected:
 		fineMesh->BoundaryParts = this->BoundaryParts;
 
 		fineMesh->_geometricVertices = this->_geometricVertices;
+		fineMesh->_reEntrantCorners = this->_reEntrantCorners;
 	}
 
 	virtual void FinalizeCoarsening()
@@ -406,6 +410,44 @@ protected:
 
 		if (CoarseMesh)
 			CoarseMesh->FillDirichletAndNeumannFaceLists();
+	}
+
+	PhysicalGroup<Dim>* GetPhysicalGroup(int id)
+	{
+		for (PhysicalGroup<Dim>* pp : this->PhysicalParts)
+		{
+			if (pp->Id == id)
+				return pp;
+		}
+		return nullptr;
+	}
+	PhysicalGroup<Dim>* GetPhysicalGroup(string name)
+	{
+		for (PhysicalGroup<Dim>* pp : this->PhysicalParts)
+		{
+			if (name.compare(pp->Name) == 0)
+				return pp;
+		}
+		return nullptr;
+	}
+
+	BoundaryGroup* GetBoundaryGroup(int id)
+	{
+		for (BoundaryGroup* bp : this->BoundaryParts)
+		{
+			if (bp->Id == id)
+				return bp;
+		}
+		return nullptr;
+	}
+	BoundaryGroup* GetBoundaryGroup(string name)
+	{
+		for (BoundaryGroup* bp : this->BoundaryParts)
+		{
+			if (name.compare(bp->Name) == 0)
+				return bp;
+		}
+		return nullptr;
 	}
 
 
@@ -786,10 +828,10 @@ public:
 
 		for (Element<Dim>* e : this->Elements)
 		{
+			if (e->IsDeleted)
+				continue;
 			if (!e->PhysicalPart || e->PhysicalPart->Name.compare("domain") == 0)
-			{
 				s.PlotPolygonEdges(e->Shape()->Vertices(), "k");
-			}
 			else
 			{
 				string color = phyColors.at(e->PhysicalPart);//colors[e->PhysicalPart->Id % colors.size()];
@@ -800,7 +842,7 @@ public:
 
 		for (Face<Dim>* f : this->Faces)
 		{
-			bool isAtPhysicalBoundary = !f->IsDomainBoundary && !f->Element1->IsInSamePhysicalPartAs(f->Element2);
+			bool isAtPhysicalBoundary = f->Element2 && !f->Element1->IsInSamePhysicalPartAs(f->Element2);
 			if (f->IsDomainBoundary || isAtPhysicalBoundary)
 				s.PlotSegment(f->Vertices()[0], f->Vertices()[1], "k", 1);
 		}
@@ -874,7 +916,7 @@ public:
 		{
 			s.Comment("---------------------------------------");
 			s.PlotPolygonEdges(coarse->Shape()->Vertices(), "k", 3);
-			s.PlotText(coarse->Center(), to_string(coarse->Number));
+			//s.PlotText(coarse->Center(), to_string(coarse->Number));
 		}
 	}
 

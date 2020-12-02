@@ -6,7 +6,7 @@ class Square_GMSHTriangularMesh : public GMSHMesh<2>
 {
 public:
 	Square_GMSHTriangularMesh(BigNumber n) : 
-		GMSHMesh("2D/square_stri.geo", "GMSH structured triangular", "square_gmsh_stri", "Square", n)
+		GMSHMesh(nullptr, "2D/square_stri.geo", "GMSH structured triangular", "square_gmsh_stri", "Square", n)
 	{}
 
 	void RefineMeshBySplitting() override

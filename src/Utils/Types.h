@@ -79,3 +79,9 @@ enum class FaceCollapsing : unsigned
 	ByPairs,
 	Max
 };
+
+enum class ReEntrantCornerMgmt : unsigned
+{
+	Disabled,
+	AgglomerateFirst
+};

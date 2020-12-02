@@ -43,6 +43,7 @@ public:
 	// Used during mesh construction
 	mutex Mutex;
 	bool IsDeleted = false;
+	bool HasReEntrantCorner = false;
 
 	//-----------------------//
 	//      Constructors     //
