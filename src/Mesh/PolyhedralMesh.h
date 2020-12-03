@@ -1630,6 +1630,9 @@ private:
 				ff->IsRemovedOnCoarserGrid = true;
 				newElement->FinerFacesRemoved.push_back(ff);
 			}
+			// If it's a collapsed face, we also need to remove its references in CoarseFacesNotToCross
+			if (f->FinerFaces.size() > 1)
+				RemoveFromCoarseFacesNotToCross(f);
 			this->RemoveFace(f, false);
 		}
 
