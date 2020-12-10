@@ -118,7 +118,33 @@ public:
 			delete chunk;
 		}
 	}
+
+	// Specialization when ResultT = CoeffsChunk
+	void ReserveChunkCoeffsSize(BigNumber nnzForOneLoopIteration)
+	{
+		static_assert(std::is_same<ResultT, CoeffsChunk>::value, "Works only with CoeffsChunk!");
+		for (unsigned int threadNumber = 0; threadNumber < this->NThreads; threadNumber++)
+		{
+			ParallelChunk<CoeffsChunk>* chunk = this->Chunks[threadNumber];
+			chunk->Results.Coeffs = NonZeroCoefficients(chunk->Size() * nnzForOneLoopIteration);
+		}
+	}
+	void Fill(SparseMatrix &m)
+	{
+		static_assert(std::is_same<ResultT, CoeffsChunk>::value, "Works only with CoeffsChunk!");
+		NonZeroCoefficients global;
+		for (unsigned int threadNumber = 0; threadNumber < this->NThreads; threadNumber++)
+		{
+			ParallelChunk<CoeffsChunk>* chunk = this->Chunks[threadNumber];
+			global.Add(chunk->Results.Coeffs);
+		}
+		global.Fill(m);
+	}
 };
+
+//----------------------------//
+//     List parallel loop     //
+//----------------------------//
 
 template <class T, class ResultT = CoeffsChunk>//, typename enable_if<is_base_of<ParallelChunk, ChunkT>::value>::type = ParallelChunk >
 class ParallelLoop : public BaseChunksParallelLoop<ResultT>
@@ -191,6 +217,10 @@ public:
 	}
 };
 
+//----------------------------//
+//    Number parallel loop    //
+//----------------------------//
+
 template <class ResultT = CoeffsChunk>
 class NumberParallelLoop : public BaseChunksParallelLoop<ResultT>
 {
@@ -255,5 +285,6 @@ public:
 		parallelLoop.Execute(functionToExecute);
 	}
 };
+
 
 unsigned int BaseParallelLoop::DefaultNThreads = std::thread::hardware_concurrency();
