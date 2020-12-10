@@ -13,9 +13,12 @@ private:
 	bool _staticCondensation = false;
 
 	// We save what we need to reconstruct the higher-order approximation after solving the linear system:
-
-	// Matrix part
+public:
+	// Matrix parts
+	SparseMatrix A_T_T;
 	SparseMatrix A_T_ndF;
+	SparseMatrix A_ndF_ndF;
+private:
 	// Cell part of the right-hand side
 	Vector B_T;
 	// Solution on the Dirichlet faces
@@ -508,9 +511,9 @@ public:
 		//    Assembly of the sparse matrix    //
 		//-------------------------------------//
 		
-		SparseMatrix A_T_T(HHO->nTotalCellUnknowns, HHO->nTotalCellUnknowns);
 		if (!_staticCondensation)
 		{
+			this->A_T_T = SparseMatrix(HHO->nTotalCellUnknowns, HHO->nTotalCellUnknowns);
 			A_T_T.reserve(A_T_T_Coeffs.Size());
 			A_T_T_Coeffs.Fill(A_T_T);
 			A_T_T_Coeffs = A_T_T_Block<Dim>();
@@ -587,7 +590,7 @@ public:
 		// Static condensation //
 		//---------------------//
 
-		SparseMatrix A_ndF_ndF = A_F_F.topLeftCorner(HHO->nTotalFaceUnknowns, HHO->nTotalFaceUnknowns);
+		this->A_ndF_ndF = A_F_F.topLeftCorner(HHO->nTotalFaceUnknowns, HHO->nTotalFaceUnknowns);
 		Utils::Empty(A_F_F);
 
 		if (this->_staticCondensation)
@@ -607,11 +610,17 @@ public:
 		else
 		{
 			Problem<Dim>::A = SparseMatrix(HHO->nTotalHybridUnknowns, HHO->nTotalHybridUnknowns);
-			Utils::FatalError("Eigen does not allow to write blocks in a SparseMatrix. The non-condensed matrix is temporary unavailable.");
+			//Utils::FatalError("Eigen does not allow to write blocks in a SparseMatrix. The non-condensed matrix is temporary unavailable.");
 			/*Problem<Dim>::A.topLeftCorner(A_T_T.rows(), A_T_T.cols()) = A_T_T;
 			Problem<Dim>::A.topRightCorner(A_T_ndF.rows(), A_T_ndF.cols()) = A_T_ndF;
 			Problem<Dim>::A.bottomLeftCorner(A_T_ndF.cols(), A_T_ndF.rows()) = A_T_ndF.transpose();
 			Problem<Dim>::A.bottomRightCorner(A_ndF_ndF.rows(), A_ndF_ndF.cols()) = A_ndF_ndF;*/
+			NonZeroCoefficients Acoeffs(A_T_T.nonZeros() + 2 * A_T_ndF.nonZeros() + A_ndF_ndF.nonZeros());
+			Acoeffs.Add(           0,            0, A_T_T);    // topLeftCorner
+			Acoeffs.Add(           0, A_T_T.cols(), A_T_ndF);  // topRightCorner
+			Acoeffs.Add(A_T_T.rows(),            0, A_T_ndF.transpose().eval()); // bottomLeftCorner
+			Acoeffs.Add(A_T_T.rows(), A_T_T.cols(), A_ndF_ndF); // bottomRightCorner
+			Acoeffs.Fill(Problem<Dim>::A);
 
 			Problem<Dim>::b = Vector(HHO->nTotalHybridUnknowns);
 			Problem<Dim>::b.head(B_T.rows()) = B_T;
@@ -620,6 +629,12 @@ public:
 
 		if (actions.LogAssembly)
 			cout << Utils::MatrixInfo(this->A, "A") << endl;
+
+		if (this->_staticCondensation)
+		{
+			Utils::Empty(this->A_T_T);
+			Utils::Empty(this->A_ndF_ndF);
+		}
 
 		if (!actions.AssembleRightHandSide)
 		{
