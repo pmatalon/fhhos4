@@ -53,22 +53,14 @@ class CondensedAlgebraicMesh
 private:
 	int _cellBlockSize;
 	int _faceBlockSize;
+
+	const SparseMatrix* A_T_T;
+	const SparseMatrix* A_T_F;
+public:
 	vector<AlgebraicElement> _elements;
 	vector<AlgebraicFace> _faces;
 	vector<ElementAggregate> _coarseElements;
 	vector<FaceAggregate> _coarseFaces;
-
-	const SparseMatrix* A_T_T;
-	const SparseMatrix* A_T_F;
-	const SparseMatrix* A_F_F;
-	const SparseMatrix* inv_A_T_T;
-public:
-	SparseMatrix A_T_Tc;
-	SparseMatrix A_T_Fc;
-	SparseMatrix A_F_Fc;
-	SparseMatrix* inv_A_T_Tc;
-
-	SparseMatrix P;
 
 public:
 	CondensedAlgebraicMesh(int cellBlockSize, int faceBlockSize)
@@ -77,11 +69,13 @@ public:
 		this->_faceBlockSize = faceBlockSize;
 	}
 
-	void Build(const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F)
+	void Build(const SparseMatrix& A_T_T, const SparseMatrix& A_T_F)
 	{
+		assert(A_T_T.rows() > 0 && A_T_F.rows() > 0);
+		assert(A_T_T.rows() == A_T_F.rows());
+
 		this->A_T_T = &A_T_T;
 		this->A_T_F = &A_T_F;
-		this->A_F_F = &A_F_F;
 
 		if (!A_T_F.IsRowMajor)
 			assert("A_T_F must be row-major");
@@ -91,8 +85,6 @@ public:
 
 		BigNumber nFaces = A_T_F.cols() / _faceBlockSize;
 		this->_faces = vector<AlgebraicFace>(nFaces);
-
-		//cout << "A_T_F" << endl << *A_T_F << endl;
 
 		//-------------------------//
 		// Filling elements' faces //
@@ -174,10 +166,10 @@ public:
 			if (elem.Neighbours.empty())
 				coarsestPossibleMeshReached = true;
 
-			//DenseMatrix blockI = A_T_T->block(i*_cellBlockSize, i*_cellBlockSize, _cellBlockSize, _cellBlockSize);
-			BigNumber strongestNeighbour;
+			AlgebraicElement* strongestNeighbour;
 			for (AlgebraicElement* neighbour : elem.Neighbours)
 			{
+				//DenseMatrix blockI = A_T_F->block(i*_cellBlockSize, i*_cellBlockSize, _cellBlockSize, _cellBlockSize);
 				if (!neighbour->IsAggregated)
 				{
 					Aggregate(elem, *neighbour);
@@ -290,61 +282,5 @@ private:
 		}
 		else
 			Aggregate(e2, e1);
-	}
-
-public:
-	void ComputeProlongation()
-	{
-		// Cell-prolongation Q_T
-		DenseMatrix Id = DenseMatrix::Identity(_cellBlockSize, _cellBlockSize);
-		NumberParallelLoop<CoeffsChunk> parallelLoopQ_T(_elements.size());
-		parallelLoopQ_T.Execute([this, &Id](BigNumber elemNumber, ParallelChunk<CoeffsChunk>* chunk)
-			{
-				AlgebraicElement& elem = _elements[elemNumber];
-				chunk->Results.Coeffs.Add(elem.Number, elem.CoarseElement->Number, Id);
-			});
-		SparseMatrix Q_T = SparseMatrix(_elements.size()*_cellBlockSize, _coarseElements.size()*_cellBlockSize);
-		parallelLoopQ_T.Fill(Q_T);
-
-		// Face-prolongation Q_F
-		Id = DenseMatrix::Identity(_faceBlockSize, _faceBlockSize);
-		NumberParallelLoop<CoeffsChunk> parallelLoopQ_F(_coarseFaces.size());
-		parallelLoopQ_F.Execute([this, &Id](BigNumber faceAggNumber, ParallelChunk<CoeffsChunk>* chunk)
-			{
-				FaceAggregate* agg = &_coarseFaces[faceAggNumber];
-				for (AlgebraicFace* face : agg->FineFaces)
-					chunk->Results.Coeffs.Add(face->Number, agg->Number, Id);
-			});
-		SparseMatrix Q_F = SparseMatrix(_faces.size()*_faceBlockSize, _coarseFaces.size()*_faceBlockSize);
-		parallelLoopQ_F.Fill(Q_F);
-
-		// Pi: average on both sides of each face
-		DenseMatrix traceOfConstant = DenseMatrix::Zero(_faceBlockSize, _cellBlockSize);
-		traceOfConstant(0, 0) = 1;
-		NumberParallelLoop<CoeffsChunk> parallelLoopPi(_faces.size());
-		parallelLoopPi.Execute([this, &traceOfConstant](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
-			{
-				AlgebraicFace& face = _faces[faceNumber];
-				for (AlgebraicElement* elem : face.Elements)
-					chunk->Results.Coeffs.Add(faceNumber, elem->Number, 1.0 / face.Elements.size()*traceOfConstant);
-			});
-		SparseMatrix Pi = SparseMatrix(_faces.size()*_faceBlockSize, _elements.size()*_cellBlockSize);
-		parallelLoopPi.Fill(Pi);
-
-		if (!inv_A_T_T)
-			inv_A_T_T = new SparseMatrix(Utils::InvertBlockDiagMatrix(*A_T_T, _cellBlockSize));
-
-		this->A_T_Tc = Q_T.transpose() * (*A_T_T) * Q_T;
-		this->A_T_Fc = Q_T.transpose() * (*A_T_F) * Q_F;
-
-		this->inv_A_T_Tc = new SparseMatrix(Utils::InvertBlockDiagMatrix(A_T_Tc, _cellBlockSize));
-
-		SparseMatrix Theta = -(*inv_A_T_Tc) * A_T_Fc;
-		this->P = Pi * Q_T * Theta;
-
-		if (true)
-			this->A_F_Fc = Q_F.transpose() * (*A_F_F) * Q_F;
-		else
-			this->A_F_Fc = P.transpose() * (*A_F_F) * P;
 	}
 };
