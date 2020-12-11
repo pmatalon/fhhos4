@@ -1,6 +1,6 @@
 #pragma once
 #include <vector>
-#include "Utils.h"
+#include "Types.h"
 
 class NonZeroCoefficients
 {

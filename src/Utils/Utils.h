@@ -2,6 +2,7 @@
 #include <fstream>
 #include <functional>
 #include "Types.h"
+#include "ParallelLoop.h"
 #include "../Geometry/Point.h"
 #include "../ProgramArguments.h"
 using namespace std;
@@ -56,6 +57,21 @@ public:
 		//double roundedDensity = (int)(density * 10.0) / 10.0;
 		//int roundedDensity = ceil(density);
 		return "size(" + name + ")=" + to_string(M.rows()) + "x" + to_string(M.cols()) + ", \tnnz(" + name + ")=" + to_string(M.nonZeros()) + ", \tdensity(" + name + ")=" + to_string(density) + "%";
+	}
+
+	static SparseMatrix InvertBlockDiagMatrix(const SparseMatrix& M, int blockSize)
+	{
+		BigNumber nElements = M.rows() / blockSize;
+		NumberParallelLoop<> parallelLoop(nElements);
+		parallelLoop.ReserveChunkCoeffsSize(blockSize * blockSize);
+		parallelLoop.Execute([&M, blockSize](BigNumber i, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				DenseMatrix block = M.block(i * blockSize, i * blockSize, blockSize, blockSize);
+				chunk->Results.Coeffs.Add(i * blockSize, i * blockSize, block.inverse());
+			});
+		SparseMatrix invM(M.rows(), M.cols());
+		parallelLoop.Fill(invM);
+		return invM;
 	}
 
 	static void Empty(DenseMatrix& M)

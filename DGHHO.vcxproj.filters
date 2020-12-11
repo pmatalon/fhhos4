@@ -423,6 +423,9 @@
     <ClInclude Include="src\Solver\CondensedAMG.h">
       <Filter>Solver</Filter>
     </ClInclude>
+    <ClInclude Include="src\Solver\CondensedAlgebraicMesh.h">
+      <Filter>Solver</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
