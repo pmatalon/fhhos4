@@ -42,6 +42,12 @@ public:
 			_solver->Setup(A);
 	}
 
+	void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F)
+	{
+		if (_solver)
+			_solver->Setup(A, A_T_T, A_T_F, A_F_F);
+	}
+
 	Vector Solve(const Vector& b)
 	{
 		if (_solver)

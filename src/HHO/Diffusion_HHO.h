@@ -10,17 +10,16 @@ template <int Dim>
 class Diffusion_HHO : public DiffusionProblem<Dim>
 {
 private:
-	bool _staticCondensation = false;
-
-	// We save what we need to reconstruct the higher-order approximation after solving the linear system:
+	bool _staticCondensation = true;
+	bool _saveMatrixBlocks = false;
 public:
 	// Matrix parts
 	SparseMatrix A_T_T;
-	SparseMatrix A_T_ndF;
+	SparseMatrix A_T_ndF; // used to reconstruct the the higher-order approximation after solving the linear system
 	SparseMatrix A_ndF_ndF;
 private:
-	// Cell part of the right-hand side
-	Vector B_T;
+	// Cell part of the right-hand side, used to reconstruct the the higher-order approximation after solving the linear system
+	Vector B_T; 
 	// Solution on the Dirichlet faces
 	Vector x_dF;
 public:
@@ -28,11 +27,12 @@ public:
 	Vector ReconstructedSolution;
 	Vector GlobalHybridSolution;
 
-	Diffusion_HHO(Mesh<Dim>* mesh, TestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool staticCondensation, string outputDirectory)
+	Diffusion_HHO(Mesh<Dim>* mesh, TestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool staticCondensation, bool saveMatrixBlocks, string outputDirectory)
 		: DiffusionProblem<Dim>(mesh, testCase, outputDirectory)
 	{	
 		this->HHO = hho;
 		this->_staticCondensation = staticCondensation;
+		this->_saveMatrixBlocks = saveMatrixBlocks;
 
 		this->_fileName = this->_fileName + "_HHO_" + HHO->ReconstructionBasis->Name() + (_staticCondensation ? "" : "_nostaticcond");
 
@@ -49,7 +49,7 @@ public:
 	Diffusion_HHO<Dim>* GetProblemOnCoarserMesh()
 	{
 		HHOParameters<Dim>* coarseHHO = new HHOParameters<Dim>(this->_mesh->CoarseMesh, HHO->Stabilization, HHO->ReconstructionBasis, HHO->CellBasis, HHO->FaceBasis);
-		return new Diffusion_HHO<Dim>(this->_mesh->CoarseMesh, this->_testCase, coarseHHO, _staticCondensation, this->_outputDirectory);
+		return new Diffusion_HHO<Dim>(this->_mesh->CoarseMesh, this->_testCase, coarseHHO, _staticCondensation, _saveMatrixBlocks, this->_outputDirectory);
 	}
 
 	double L2Error(DomFunction exactSolution) override
@@ -296,7 +296,7 @@ public:
 					chunk->Results.StabilizationCoeffs = NonZeroCoefficients(nnzApproximate);
 					chunk->Results.ReconstructionCoeffs = NonZeroCoefficients(nnzApproximate);
 				}
-				if (!this->_staticCondensation)
+				if (!this->_staticCondensation || this->_saveMatrixBlocks)
 				{
 					chunk->Results.A_T_T_Coeffs = A_T_T_Block<Dim>(HHO->nCellUnknowns);
 					chunk->Results.A_T_T_Coeffs.Reserve(chunk->Size() * nCoeffs_A_T_T);
@@ -312,7 +312,7 @@ public:
 			{
 				Diff_HHOElement<Dim>* element = dynamic_cast<Diff_HHOElement<Dim>*>(e);
 
-				if (!this->_staticCondensation)
+				if (!this->_staticCondensation || this->_saveMatrixBlocks)
 				{
 					//-------------------------//
 					// A_T_T (cell/cell terms) //
@@ -475,7 +475,7 @@ public:
 		A_T_T_Block<Dim> A_T_T_Coeffs(HHO->nCellUnknowns);
 		A_T_F_Block<Dim> A_T_F_Coeffs(HHO->nCellUnknowns, HHO->nFaceUnknowns);
 		A_F_F_Block<Dim> A_F_F_Coeffs(HHO->nFaceUnknowns);
-		if (!this->_staticCondensation)
+		if (!this->_staticCondensation || this->_saveMatrixBlocks)
 			A_T_T_Coeffs.Reserve(mesh->Elements.size() * nCoeffs_A_T_T);
 		A_T_F_Coeffs.Reserve(mesh->Elements.size() * nCoeffs_A_T_F);
 		A_F_F_Coeffs.Reserve(mesh->Faces.size() * nCoeffs_A_F_F);
@@ -487,7 +487,7 @@ public:
 
 		parallelLoop.AggregateChunkResults([this, &A_T_T_Coeffs, &A_T_F_Coeffs, &A_F_F_Coeffs, &consistencyCoeffs, &stabilizationCoeffs, &reconstructionCoeffs, actions](AssemblyResult& chunkResult)
 			{
-				if (!this->_staticCondensation)
+				if (!this->_staticCondensation || this->_saveMatrixBlocks)
 				{
 					A_T_T_Coeffs.Add(chunkResult.A_T_T_Coeffs);
 					chunkResult.A_T_T_Coeffs = A_T_T_Block<Dim>();
@@ -511,7 +511,7 @@ public:
 		//    Assembly of the sparse matrix    //
 		//-------------------------------------//
 		
-		if (!_staticCondensation)
+		if (!this->_staticCondensation || this->_saveMatrixBlocks)
 		{
 			this->A_T_T = SparseMatrix(HHO->nTotalCellUnknowns, HHO->nTotalCellUnknowns);
 			A_T_T.reserve(A_T_T_Coeffs.Size());
@@ -610,11 +610,6 @@ public:
 		else
 		{
 			Problem<Dim>::A = SparseMatrix(HHO->nTotalHybridUnknowns, HHO->nTotalHybridUnknowns);
-			//Utils::FatalError("Eigen does not allow to write blocks in a SparseMatrix. The non-condensed matrix is temporary unavailable.");
-			/*Problem<Dim>::A.topLeftCorner(A_T_T.rows(), A_T_T.cols()) = A_T_T;
-			Problem<Dim>::A.topRightCorner(A_T_ndF.rows(), A_T_ndF.cols()) = A_T_ndF;
-			Problem<Dim>::A.bottomLeftCorner(A_T_ndF.cols(), A_T_ndF.rows()) = A_T_ndF.transpose();
-			Problem<Dim>::A.bottomRightCorner(A_ndF_ndF.rows(), A_ndF_ndF.cols()) = A_ndF_ndF;*/
 			NonZeroCoefficients Acoeffs(A_T_T.nonZeros() + 2 * A_T_ndF.nonZeros() + A_ndF_ndF.nonZeros());
 			Acoeffs.Add(           0,            0, A_T_T);    // topLeftCorner
 			Acoeffs.Add(           0, A_T_T.cols(), A_T_ndF);  // topRightCorner
@@ -630,7 +625,7 @@ public:
 		if (actions.LogAssembly)
 			cout << Utils::MatrixInfo(this->A, "A") << endl;
 
-		if (this->_staticCondensation)
+		if (this->_staticCondensation && !this->_saveMatrixBlocks)
 		{
 			Utils::Empty(this->A_T_T);
 			Utils::Empty(this->A_ndF_ndF);

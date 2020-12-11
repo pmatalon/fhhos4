@@ -54,6 +54,24 @@ public:
 		}
 	}
 
+	void Add(BigNumber iStart, BigNumber jStart, const RowMajorSparseMatrix &m)
+	{
+		for (int k = 0; k < m.outerSize(); ++k)
+		{
+			for (RowMajorSparseMatrix::InnerIterator it(m, k); it; ++it)
+				Add(iStart + it.row(), jStart + it.col(), it.value());
+		}
+	}
+
+	void Add(BigNumber iStart, BigNumber jStart, const ColMajorSparseMatrix &m)
+	{
+		for (int k = 0; k < m.outerSize(); ++k)
+		{
+			for (ColMajorSparseMatrix::InnerIterator it(m, k); it; ++it)
+				Add(iStart + it.row(), jStart + it.col(), it.value());
+		}
+	}
+
 	inline void CopyRows(BigNumber iStart, int nRows, const Eigen::SparseMatrix<double, Eigen::RowMajor> &m)
 	{
 		for (int i = 0; i < nRows; ++i)

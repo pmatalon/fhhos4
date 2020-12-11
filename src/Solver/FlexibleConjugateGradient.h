@@ -35,6 +35,13 @@ public:
 		this->SetupComputationalWork = this->Precond.SetupComputationalWork();
 	}
 
+	void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F) override
+	{
+		IterativeSolver::Setup(A);
+		this->Precond.Setup(A, A_T_T, A_T_F, A_F_F);
+		this->SetupComputationalWork = this->Precond.SetupComputationalWork();
+	}
+
 public:
 	Vector Solve(const Vector& b, Vector& initialGuess) override
 	{

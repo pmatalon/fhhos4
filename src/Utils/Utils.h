@@ -217,6 +217,7 @@ public:
 	{
 		cout << Utils::BeginRed << "Error: " << msg << Utils::EndColor << endl;
 		cout << "------------------------- FAILURE -------------------------" << endl;
+		assert(false);
 		exit(EXIT_FAILURE);
 	}
 	static void Warning(string msg)

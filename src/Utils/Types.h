@@ -7,6 +7,7 @@ typedef std::size_t BigNumber;
 using SparseMatrixIndex = intmax_t; // in Eigen, default value is int, but it is not sufficient for big matrices
 
 using RowMajorSparseMatrix = Eigen::SparseMatrix<double, Eigen::RowMajor, SparseMatrixIndex>;
+using ColMajorSparseMatrix = Eigen::SparseMatrix<double, Eigen::ColMajor, SparseMatrixIndex>;
 
 using SparseMatrix = RowMajorSparseMatrix;
 

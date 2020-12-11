@@ -68,7 +68,6 @@ public:
 		this->_fineLevel->OperatorMatrix = &A;
 		this->_fineLevel->PreSmoother = this->_fineLevel->CreateSmoother(PreSmootherCode, PreSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
 		this->_fineLevel->PostSmoother = this->_fineLevel->CreateSmoother(PostSmootherCode, PostSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
-		this->_fineLevel->UseGalerkinOperator = false;
 		this->_fineLevel->ExportComponents = ExportComponents;
 
 		Level* currentLevel = this->_fineLevel;
@@ -153,7 +152,7 @@ public:
 
 		this->SetupCoarseSolver();
 
-		if (this->Cycle == 'K')
+		if (this->Cycle == 'K' && !currentLevel->IsFinestLevel())
 		{
 			Multigrid* mg = static_cast<Multigrid*>(currentLevel->FCG->Precond.GetSolver());
 			mg->_coarseSolver = this->_coarseSolver;
@@ -300,7 +299,7 @@ public:
 		os << "\t" << "Cycle              : ";
 		if (this->Cycle == 'K')
 			os << "K";
-		if (this->WLoops == 1)
+		else if (this->WLoops == 1)
 			os << "V";
 		else if (this->WLoops == 2)
 			os << "W";

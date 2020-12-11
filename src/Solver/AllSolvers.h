@@ -2,6 +2,7 @@
 #include "ConjugateGradient.h"
 #include "FlexibleConjugateGradient.h"
 #include "MultigridForHHO.h"
+#include "CondensedAMG.h"
 #include "BlockJacobi.h"
 #include "EigenCG.h"
 #ifdef AGMG_ENABLED

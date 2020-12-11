@@ -148,6 +148,8 @@ void print_usage() {
 	cout << "              mg        - Custom multigrid for HHO" << endl;
 	cout << "              cgmg      - Conjugate Gradient, preconditioned with the custom multigrid for HHO 'mg'" << endl;
 	cout << "              fcgmg     - Flexible Conjugate Gradient FCG(1), preconditioned with the custom multigrid for HHO 'mg' (meant to be used with K-cycle)" << endl;
+	cout << "              camg      - Condensed AMG (for hybrid discretizations with static condensation)" << endl;
+	cout << "              fcgcamg   - Flexible Conjugate Gradient FCG(1), preconditioned with CondensedAMG 'camg' (meant to be used with K-cycle)" << endl;
 	cout << "              agmg      - Yvan Notay's AGMG solver" << endl;
 	cout << "      For the block solvers, the block size is set to the number of DOFs per cell (DG) or face (HHO)." << endl;
 	cout << "      Jacobi, Gauss-Seidel and SOR can use argument -relax to change the relaxation parameter." << endl;
@@ -456,7 +458,7 @@ int main(int argc, char* argv[])
 		 // Discretization
 		 { "discr", required_argument, NULL, OPT_Discretization },
 		 { "stab", required_argument, NULL, OPT_Stabilization },
-		 { "no-static-cond", required_argument, NULL, OPT_NoStaticCondensation },
+		 { "no-static-cond", no_argument, NULL, OPT_NoStaticCondensation },
 		 { "pen", required_argument, NULL, OPT_Penalization },
 		 { "poly-space", required_argument, NULL, OPT_PolySpace },
 		 // Solver
@@ -968,7 +970,7 @@ int main(int argc, char* argv[])
 	//                Multigrid                 //
 	//------------------------------------------//
 
-	if (args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("pcgmg") == 0)
+	if (args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("fcgmg") == 0)
 	{
 		if (args.Discretization.Method.compare("dg") == 0)
 			argument_error("Multigrid only applicable on HHO discretization.");
@@ -1020,6 +1022,22 @@ int main(int argc, char* argv[])
 
 		if (defaultCycle)
 		{
+			args.Solver.MG.PreSmoothingIterations = 0;
+			if (args.Problem.Dimension < 3)
+				args.Solver.MG.PostSmoothingIterations = 3;
+			else
+				args.Solver.MG.PostSmoothingIterations = Utils::IsRefinementStrategy(args.Solver.MG.CoarseningStgy) ? 10 : 6;
+		}
+	}
+
+	if (args.Solver.SolverCode.compare("camg") == 0 || args.Solver.SolverCode.compare("fcgcamg") == 0)
+	{
+		if (args.Discretization.Method.compare("dg") == 0)
+			argument_error("Multigrid only applicable on HHO discretization.");
+
+		if (defaultCycle)
+		{
+			args.Solver.MG.CycleLetter = args.Solver.SolverCode.compare("fcgcamg") == 0 ? 'K' : 'V';
 			args.Solver.MG.PreSmoothingIterations = 0;
 			if (args.Problem.Dimension < 3)
 				args.Solver.MG.PostSmoothingIterations = 3;

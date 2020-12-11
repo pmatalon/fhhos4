@@ -33,6 +33,11 @@ public:
 			this->_directSolver.compute(A);
 	}
 
+	virtual void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F)
+	{
+		Utils::FatalError("This solver is not compatible with matrix blocks arising from a hybrid discretization.");
+	}
+
 	Vector Solve(const Vector& b) override
 	{
 		return Solve(b, "0");

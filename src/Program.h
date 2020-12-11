@@ -52,7 +52,8 @@ public:
 		GMSHMesh<Dim>::UseCache = args.Actions.UseCache;
 
 		Mesh<Dim>* mesh = BuildMesh(args, testCase);
-		GMSHMesh<Dim>::CloseGMSH();
+		if (args.Discretization.Mesher.compare("gmsh") == 0)
+			GMSHMesh<Dim>::CloseGMSH();
 
 		cout << "Mesh storage > " << Utils::MemoryString(mesh->MemoryUsage()) << endl;
 
@@ -177,7 +178,8 @@ public:
 
 			HHOParameters<Dim>* hho = new HHOParameters<Dim>(mesh, args.Discretization.Stabilization, reconstructionBasis, cellBasis, faceBasis);
 
-			problem = new Diffusion_HHO<Dim>(mesh, testCase, hho, args.Discretization.StaticCondensation, args.OutputDirectory);
+			bool saveMatrixBlocks = args.Solver.SolverCode.compare("camg") == 0 || args.Solver.SolverCode.compare("fcgcamg") == 0;
+			problem = new Diffusion_HHO<Dim>(mesh, testCase, hho, args.Discretization.StaticCondensation, saveMatrixBlocks, args.OutputDirectory);
 		}
 		else
 			Utils::FatalError("Unknown discretization.");
@@ -219,7 +221,7 @@ public:
 			}
 
 			Solver* solver = CreateSolver(args, problem, blockSizeForBlockSolver);
-			problem->SystemSolution = Solve(solver, problem->A, problem->b, args.Solver.InitialGuessCode);
+			problem->SystemSolution = Solve(solver, problem, args.Solver.InitialGuessCode);
 
 			if (args.Actions.ExportErrorToGMSH)
 			{
@@ -363,6 +365,34 @@ private:
 			else
 				assert(false && "Multigrid only applicable on HHO discretization with static condensation.");
 		}
+		else if (args.Solver.SolverCode.compare("camg") == 0 || args.Solver.SolverCode.compare("fcgcamg") == 0)
+		{
+			Diffusion_HHO<Dim>* hhoProblem = dynamic_cast<Diffusion_HHO<Dim>*>(problem);
+			CondensedAMG* mg = new CondensedAMG(hhoProblem->HHO->nCellUnknowns, hhoProblem->HHO->nFaceUnknowns, args.Solver.MG.Levels);
+			mg->MatrixMaxSizeForCoarsestLevel = args.Solver.MG.MatrixMaxSizeForCoarsestLevel;
+			mg->Cycle = args.Solver.MG.CycleLetter;
+			mg->WLoops = args.Solver.MG.WLoops;
+			mg->UseGalerkinOperator = args.Solver.MG.UseGalerkinOperator;
+			mg->PreSmootherCode = args.Solver.MG.PreSmootherCode;
+			mg->PostSmootherCode = args.Solver.MG.PostSmootherCode;
+			mg->PreSmoothingIterations = args.Solver.MG.PreSmoothingIterations;
+			mg->PostSmoothingIterations = args.Solver.MG.PostSmoothingIterations;
+			mg->RelaxationParameter = args.Solver.RelaxationParameter;
+			mg->CoarseLevelChangeSmoothingCoeff = args.Solver.MG.CoarseLevelChangeSmoothingCoeff;
+			mg->CoarseLevelChangeSmoothingOperator = args.Solver.MG.CoarseLevelChangeSmoothingOperator;
+			mg->CoarseningStgy = args.Solver.MG.CoarseningStgy;
+			mg->CoarseningFactor = args.Solver.MG.CoarseningFactor;
+			mg->ExportComponents = args.Actions.ExportMultigridComponents;
+
+			if (args.Solver.SolverCode.compare("camg") == 0)
+				solver = mg;
+			else if (args.Solver.SolverCode.compare("fcgcamg") == 0)
+			{
+				FlexibleConjugateGradient* fcg = new FlexibleConjugateGradient(1);
+				fcg->Precond = Preconditioner(mg);
+				solver = fcg;
+			}
+		}
 		else if (args.Solver.SolverCode.compare("lu") == 0)
 			solver = new EigenSparseLU();
 		else if (args.Solver.SolverCode.compare("cg") == 0)
@@ -390,7 +420,7 @@ private:
 			solver = new AGMG(tolerance);
 #endif // AGMG_ENABLED
 		else
-			assert(false && "Unknown solver or not applicable!");
+			Utils::FatalError("Unknown solver or not applicable.");
 
 		IterativeSolver* iterativeSolver = dynamic_cast<IterativeSolver*>(solver);
 		if (iterativeSolver != nullptr)
@@ -402,7 +432,7 @@ private:
 		return solver;
 	}
 
-	Vector Solve(Solver* solver, const SparseMatrix& A, const Vector& b, string initialGuessCode)
+	Vector Solve(Solver* solver, Problem<Dim>* problem, string initialGuessCode)
 	{
 		Timer totalSolvingTimer;
 		totalSolvingTimer.Start();
@@ -414,24 +444,30 @@ private:
 		IterativeSolver* iterativeSolver = dynamic_cast<IterativeSolver*>(solver);
 		if (iterativeSolver != nullptr)
 		{
-			iterativeSolver->ComputeExactSolution = Utils::ProgramArgs.Actions.ExportErrorToGMSH || A.rows() <= 2000;
+			iterativeSolver->ComputeExactSolution = Utils::ProgramArgs.Actions.ExportErrorToGMSH || problem->A.rows() <= 2000;
 
 			setupTimer.Start();
-			solver->Setup(A);
+			if (Utils::ProgramArgs.Solver.SolverCode.compare("camg") == 0 || Utils::ProgramArgs.Solver.SolverCode.compare("fcgcamg") == 0)
+			{
+				Diffusion_HHO<Dim>* hhoPb = static_cast<Diffusion_HHO<Dim>*>(problem);
+				iterativeSolver->Setup(hhoPb->A, hhoPb->A_T_T, hhoPb->A_T_ndF, hhoPb->A_ndF_ndF);
+			}
+			else
+				solver->Setup(problem->A);
 			setupTimer.Stop();
 
 			cout << "Solving..." << endl;
-			x = iterativeSolver->Solve(b, initialGuessCode);
+			x = iterativeSolver->Solve(problem->b, initialGuessCode);
 			cout << iterativeSolver->IterationCount << " iterations." << endl;
 		}
 		else
 		{
 			setupTimer.Start();
-			solver->Setup(A);
+			solver->Setup(problem->A);
 			setupTimer.Stop();
 
 			cout << "Solving..." << endl;
-			x = solver->Solve(b);
+			x = solver->Solve(problem->b);
 		}
 
 		totalSolvingTimer.Stop();
