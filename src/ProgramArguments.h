@@ -34,7 +34,9 @@ struct DiscretizationArguments
 struct MultigridArguments
 {
 	int Levels = 0;
-	Prolongation ProlongationCode = Prolongation::Default;
+	int ProlongationCode = 0;
+	Prolongation GMGProlong = Prolongation::Default;
+	CAMGProlongation CAMGProlong = CAMGProlongation::P;
 	int MatrixMaxSizeForCoarsestLevel = 1000;
 	char CycleLetter = 'V';
 	int WLoops = 1;

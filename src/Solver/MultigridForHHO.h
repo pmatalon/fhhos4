@@ -8,17 +8,17 @@ template <int Dim>
 class LevelForHHO : public Level
 {
 private:
-	Prolongation _prolongationCode = Prolongation::CellInterp_Trace;
+	Prolongation _prolongation = Prolongation::CellInterp_Trace;
 	FunctionalBasis<Dim>* _cellInterpolationBasis;
 	string _weightCode = "k";
 public:
 	Diffusion_HHO<Dim>* _problem;
 
-	LevelForHHO(int number, Diffusion_HHO<Dim>* problem, Prolongation prolongationCode, FunctionalBasis<Dim>* cellInterpolationBasis, string weightCode)
+	LevelForHHO(int number, Diffusion_HHO<Dim>* problem, Prolongation prolongation, FunctionalBasis<Dim>* cellInterpolationBasis, string weightCode)
 		: Level(number)
 	{
 		this->_problem = problem;
-		this->_prolongationCode = prolongationCode;
+		this->_prolongation = prolongation;
 		this->_cellInterpolationBasis = cellInterpolationBasis;
 		this->_weightCode = weightCode;
 	}
@@ -85,7 +85,7 @@ private:
 
 	void OnStartSetup() override
 	{
-		if (_prolongationCode == Prolongation::FaceInject)
+		if (_prolongation == Prolongation::FaceInject)
 			cout << "\t\tMesh                : " << this->_problem->_mesh->Faces.size() << " faces" << endl;
 		else
 		{
@@ -124,7 +124,7 @@ private:
 		Diffusion_HHO<Dim>* finePb = this->_problem;
 		Diffusion_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
 
-		if (_prolongationCode == Prolongation::CellInterp_Trace)
+		if (_prolongation == Prolongation::CellInterp_Trace)
 		{
 			//----------------------------------------------------------//
 			//                       Nested meshes                      //
@@ -146,7 +146,7 @@ private:
 
 			P = Pi_f * I_c;
 		}
-		else if (_prolongationCode == Prolongation::CellInterp_Inject_Trace)
+		else if (_prolongation == Prolongation::CellInterp_Inject_Trace)
 		{
 			//----------------------------------------------------------//
 			//          Same method, other implementation               //
@@ -171,7 +171,7 @@ private:
 
 			P = Pi_f * J_f_c * I_c;
 		}
-		else if (_prolongationCode == Prolongation::CellInterp_L2proj_Trace)
+		else if (_prolongation == Prolongation::CellInterp_L2proj_Trace)
 		{
 			//---------------------------------------------------------------------//
 			//                      Non-nested variant                             //
@@ -202,7 +202,7 @@ private:
 
 			P = Pi_f * L2Proj * I_c;
 		}
-		else if (_prolongationCode == Prolongation::CellInterp_ApproxL2proj_Trace)
+		else if (_prolongation == Prolongation::CellInterp_ApproxL2proj_Trace)
 		{
 			//---------------------------------------------------------------------//
 			//                        Non-nested variant                           //
@@ -241,7 +241,7 @@ private:
 
 			P = Pi_f * L2Proj * I_c;
 		}
-		else if (_prolongationCode == Prolongation::CellInterp_FinerApproxL2proj_Trace)
+		else if (_prolongation == Prolongation::CellInterp_FinerApproxL2proj_Trace)
 		{
 			//---------------------------------------------------------------------//
 			//                        Non-nested variant                           //
@@ -277,7 +277,7 @@ private:
 
 			P = Pi_f * L2Proj * I_c;
 		}
-		else if (_prolongationCode == Prolongation::CellInterp_InjectAndTrace)
+		else if (_prolongation == Prolongation::CellInterp_InjectAndTrace)
 		{
 			//---------------------------------------------------------------------------------------------//
 			// Step 1: Interpolation from coarse faces to coarse cells.                                    //
@@ -322,7 +322,7 @@ private:
 			P = SparseMatrix(finePb->HHO->nInteriorAndNeumannFaces * nFaceUnknowns, coarsePb->HHO->nInteriorAndNeumannFaces * nFaceUnknowns);
 			parallelLoop.Fill(P);
 		}
-		else if (_prolongationCode == Prolongation::CellInterp_Inject_Adjoint)
+		else if (_prolongation == Prolongation::CellInterp_Inject_Adjoint)
 		{
 			//-------------------------------------------------------------//
 			//                           Daniel's                          //
@@ -344,7 +344,7 @@ private:
 
 			P = K_f * J_f_c * I_c;
 		}
-		else if (_prolongationCode == Prolongation::Wildey)
+		else if (_prolongation == Prolongation::Wildey)
 		{
 			//-------------------------------------------------------------------------------------------------//
 			//                                           Wildey et al.                                         //
@@ -392,7 +392,7 @@ private:
 			P = SparseMatrix(finePb->HHO->nInteriorAndNeumannFaces * nFaceUnknowns, coarsePb->HHO->nInteriorAndNeumannFaces * nFaceUnknowns);
 			parallelLoop.Fill(P);
 		}
-		else if (_prolongationCode == Prolongation::FaceInject)
+		else if (_prolongation == Prolongation::FaceInject)
 		{
 			//----------------------------------------------------------------//
 			// Canonical injection from coarse faces to fine faces.           //
@@ -832,51 +832,51 @@ class MultigridForHHO : public Multigrid
 {
 private:
 	Diffusion_HHO<Dim>* _problem;
-	Prolongation _prolongationCode = Prolongation::CellInterp_Trace;
+	Prolongation _prolongation = Prolongation::CellInterp_Trace;
 	FunctionalBasis<Dim>* _cellInterpolationBasis;
 	string _weightCode = "k";
 public:
 
-	MultigridForHHO(Diffusion_HHO<Dim>* problem, Prolongation prolongationCode, FunctionalBasis<Dim>* cellInterpolationBasis, string weightCode)
-		: MultigridForHHO(problem, prolongationCode, cellInterpolationBasis, weightCode, 0)
+	MultigridForHHO(Diffusion_HHO<Dim>* problem, Prolongation prolongation, FunctionalBasis<Dim>* cellInterpolationBasis, string weightCode)
+		: MultigridForHHO(problem, prolongation, cellInterpolationBasis, weightCode, 0)
 	{}
 
-	MultigridForHHO(Diffusion_HHO<Dim>* problem, Prolongation prolongationCode, FunctionalBasis<Dim>* cellInterpolationBasis, string weightCode, int nLevels)
+	MultigridForHHO(Diffusion_HHO<Dim>* problem, Prolongation prolongation, FunctionalBasis<Dim>* cellInterpolationBasis, string weightCode, int nLevels)
 		: Multigrid(nLevels)
 	{
 		this->_problem = problem;
-		this->_prolongationCode = prolongationCode;
+		this->_prolongation = prolongation;
 		this->_cellInterpolationBasis = cellInterpolationBasis;
 		this->_weightCode = weightCode;
 		this->BlockSizeForBlockSmoothers = problem->HHO->nFaceUnknowns;
-		this->_fineLevel = new LevelForHHO<Dim>(0, problem, _prolongationCode, _cellInterpolationBasis, _weightCode);
+		this->_fineLevel = new LevelForHHO<Dim>(0, problem, _prolongation, _cellInterpolationBasis, _weightCode);
 	}
 
 	void BeginSerialize(ostream& os) const override
 	{
 		os << "MultigridForHHO" << endl;
 		os << "\t" << "Prolongation       : ";
-		if (_prolongationCode == Prolongation::CellInterp_Trace)
+		if (_prolongation == Prolongation::CellInterp_Trace)
 			os << "coarse cell interpolation + trace/proj. on fine faces ";
-		else if (_prolongationCode == Prolongation::CellInterp_Inject_Trace)
+		else if (_prolongation == Prolongation::CellInterp_Inject_Trace)
 			os << "coarse cell interpolation + injection coarse to fine cells + trace on fine faces ";
-		else if (_prolongationCode == Prolongation::CellInterp_L2proj_Trace)
+		else if (_prolongation == Prolongation::CellInterp_L2proj_Trace)
 			os << "coarse cell interpolation + L2-proj. to fine cells + trace on fine faces ";
-		else if (_prolongationCode == Prolongation::CellInterp_ApproxL2proj_Trace)
+		else if (_prolongation == Prolongation::CellInterp_ApproxL2proj_Trace)
 			os << "coarse cell interpolation + approx. L2-proj. to fine cells + trace on fine faces ";
-		else if (_prolongationCode == Prolongation::CellInterp_FinerApproxL2proj_Trace)
+		else if (_prolongation == Prolongation::CellInterp_FinerApproxL2proj_Trace)
 			os << "coarse cell interpolation + approx. L2-proj. with subtriangulation + trace on fine faces ";
-		else if (_prolongationCode == Prolongation::CellInterp_InjectAndTrace)
+		else if (_prolongation == Prolongation::CellInterp_InjectAndTrace)
 			os << "injection for common faces, and coarse cell interpolation + trace for the other ";
-		else if (_prolongationCode == Prolongation::CellInterp_Inject_Adjoint)
+		else if (_prolongation == Prolongation::CellInterp_Inject_Adjoint)
 			os << "coarse cell interpolation + injection coarse to fine cells + adjoint of cell interpolation ";
-		else if (_prolongationCode == Prolongation::Wildey)
+		else if (_prolongation == Prolongation::Wildey)
 			os << "Wildey et al. ";
-		else if (_prolongationCode == Prolongation::FaceInject)
+		else if (_prolongation == Prolongation::FaceInject)
 			os << "injection coarse to fine faces ";
-		os << "[-prolong " << (unsigned)_prolongationCode << "]" << endl;
+		os << "[-prolong " << (unsigned)_prolongation << "]" << endl;
 
-		if (_prolongationCode != Prolongation::FaceInject)
+		if (_prolongation != Prolongation::FaceInject)
 		{
 			os << "\t" << "Cell interpolation : ";
 			if (_cellInterpolationBasis == _problem->HHO->CellBasis)
@@ -896,7 +896,7 @@ public:
 
 	void EndSerialize(ostream& os) const override
 	{
-		if (Utils::RequiresNestedHierarchy(_prolongationCode) && !Utils::BuildsNestedMeshHierarchy(this->CoarseningStgy))
+		if (Utils::RequiresNestedHierarchy(_prolongation) && !Utils::BuildsNestedMeshHierarchy(this->CoarseningStgy))
 		{
 			os << endl;
 			Utils::Warning(os, "The selected coarsening strategy generates non-nested meshes, while the selected prolongation operator is made for nested meshes. Option -prolong " + to_string((unsigned)Prolongation::CellInterp_L2proj_Trace) + ", " + to_string((unsigned)Prolongation::CellInterp_ApproxL2proj_Trace) + " or " + to_string((unsigned)Prolongation::CellInterp_FinerApproxL2proj_Trace) + " recommended.");
@@ -946,7 +946,7 @@ protected:
 	{
 		LevelForHHO<Dim>* hhoFineLevel = dynamic_cast<LevelForHHO<Dim>*>(fineLevel);
 		Diffusion_HHO<Dim>* coarseProblem = hhoFineLevel->_problem->GetProblemOnCoarserMesh();
-		LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(fineLevel->Number + 1, coarseProblem, _prolongationCode, _cellInterpolationBasis, _weightCode);
+		LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(fineLevel->Number + 1, coarseProblem, _prolongation, _cellInterpolationBasis, _weightCode);
 		return coarseLevel;
 	}
 };

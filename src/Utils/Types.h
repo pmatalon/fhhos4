@@ -61,6 +61,13 @@ enum class Prolongation : unsigned
 	FaceInject = 5
 };
 
+enum class CAMGProlongation : unsigned
+{
+	P = 1,
+	P1P2 = 2,
+	Q_F = 3,
+};
+
 enum class FaceCollapsingStatus : unsigned
 {
 	Ok,

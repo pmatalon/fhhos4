@@ -7,6 +7,7 @@ using namespace std;
 class CondensedLevel : public Level
 {
 private:
+	CAMGProlongation _prolongation = CAMGProlongation::P;
 	int _cellBlockSize;
 	int _faceBlockSize;
 	CondensedAlgebraicMesh _mesh;
@@ -25,11 +26,12 @@ private:
 	SparseMatrix* inv_A_T_Tc;
 
 public:
-	CondensedLevel(int number, int cellBlockSize, int faceBlockSize)
+	CondensedLevel(int number, int cellBlockSize, int faceBlockSize, CAMGProlongation prolongation)
 		: Level(number), _mesh(cellBlockSize, faceBlockSize)
 	{
 		this->_cellBlockSize = cellBlockSize;
 		this->_faceBlockSize = faceBlockSize;
+		this->_prolongation = prolongation;
 	}
 
 	BigNumber NUnknowns() override
@@ -44,6 +46,8 @@ public:
 
 	void CoarsenMesh(CoarseningStrategy coarseningStgy, int coarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override
 	{
+		cout << "\tDouble pairwise aggregation" << endl;
+
 		_mesh.Build(*A_T_T, *A_T_F);
 
 		//----------------------------//
@@ -54,28 +58,73 @@ public:
 		if (coarsestPossibleMeshReached)
 			return;
 
+		/*cout << "------------- Elem" << endl;
+		for (ElementAggregate& agg : _mesh._coarseElements)
+		{
+			cout << "(";
+			for (auto e : agg.FineElements)
+				cout << e->Number << ", ";
+			cout << ")" << endl;
+		}
+
+		cout << "------------- Faces" << endl;
+		for (FaceAggregate& agg : _mesh._coarseFaces)
+		{
+			cout << "(";
+			for (auto f : agg.FineFaces)
+				cout << f->Number << ", ";
+			cout << ")" << endl;
+		}*/
+
 		//-------------------------------//
 		// Intermediate coarse operators //
 		//-------------------------------//
 
 		// Prolongation operator with only one 1 coefficient per row
-		SparseMatrix Q_Ti = BuildQ_T(_mesh);
-		SparseMatrix Q_Fi = BuildQ_F(_mesh);
+		SparseMatrix Q_T1 = BuildQ_T(_mesh);
+		SparseMatrix Q_F1 = BuildQ_F(_mesh);
 
 		// Intermediate coarse operators
-		SparseMatrix A_T_Ti = Q_Ti.transpose() * (*A_T_T) * Q_Ti;
-		SparseMatrix A_T_Fi = Q_Ti.transpose() * (*A_T_F) * Q_Fi;
+		SparseMatrix A_T_T1 = Q_T1.transpose() * (*A_T_T) * Q_T1;
+		SparseMatrix A_T_F1 = Q_T1.transpose() * (*A_T_F) * Q_F1;
+
+		SparseMatrix inv_A_T_T1 = Utils::InvertBlockDiagMatrix(A_T_T1, _cellBlockSize);
+		SparseMatrix Theta1 = -inv_A_T_T1 * A_T_F1;
+		SparseMatrix Pi1 = BuildTrace(_mesh);
+
+		SparseMatrix P1 = Pi1 * Q_T1 * Theta1;
 
 		//-----------------------------//
 		// Second pairwise aggregation //
 		//-----------------------------//
 
 		CondensedAlgebraicMesh coarseMesh(_cellBlockSize, _faceBlockSize);
-		coarseMesh.Build(A_T_Ti, A_T_Fi);
+		coarseMesh.Build(A_T_T1, A_T_F1);
 		coarseMesh.PairWiseAggregate(coarsestPossibleMeshReached);
 		if (coarsestPossibleMeshReached)
 			return;
 
+		/*cout << "*******************************************************************" << endl;
+
+		cout << "------------- Elem" << endl;
+		for (ElementAggregate& agg : coarseMesh._coarseElements)
+		{
+			cout << "(";
+			for (auto e : agg.FineElements)
+				cout << e->Number << ", ";
+			cout << ")" << endl;
+		}
+
+		cout << "------------- Faces" << endl;
+		for (FaceAggregate& agg : coarseMesh._coarseFaces)
+		{
+			cout << "(";
+			for (auto f : agg.FineFaces)
+				cout << f->Number << ", ";
+			cout << ")" << endl;
+		}*/
+
+		/*
 		// Assembly of the double-aggregates
 		vector<vector<AlgebraicElement*>> doubleElemAggregates(coarseMesh._coarseElements.size());
 		NumberParallelLoop<EmptyResultChunk> parallelLoopE(coarseMesh._coarseElements.size());
@@ -106,40 +155,51 @@ public:
 				}
 				doubleFaceAggregates[secondAggregNumber] = doubleAggregate;
 			});
-
+		*/
 		//------------------//
 		// Coarse operators //
 		//------------------//
 
-		SparseMatrix Q_T = BuildQ_T(doubleElemAggregates);
-		SparseMatrix Q_F = BuildQ_F(doubleFaceAggregates);
+		//SparseMatrix Q_T = BuildQ_T(doubleElemAggregates);
+		//SparseMatrix Q_F = BuildQ_F(doubleFaceAggregates);
 
-		this->A_T_Tc = Q_T.transpose() * (*A_T_T) * Q_T;
-		this->A_T_Fc = Q_T.transpose() * (*A_T_F) * Q_F;
+		SparseMatrix Q_T2 = BuildQ_T(coarseMesh);
+		SparseMatrix Q_F2 = BuildQ_F(coarseMesh);
+
+		this->A_T_Tc = Q_T2.transpose() * A_T_T1 * Q_T2;
+		this->A_T_Fc = Q_T2.transpose() * A_T_F1 * Q_F2;
+
+		SparseMatrix Q_T = Q_T1 * Q_T2;
+		SparseMatrix Q_F = Q_F1 * Q_F2;
+
+		// Theta: reconstruction from the coarse faces to the coarse cells
+		this->inv_A_T_Tc = new SparseMatrix(Utils::InvertBlockDiagMatrix(A_T_Tc, _cellBlockSize));
+		SparseMatrix Theta2 = -(*inv_A_T_Tc) * A_T_Fc;
+		//cout << Utils::MatrixInfo(Theta2, "Theta2") << endl;
+
+		// Pi: average on both sides of each face
+		SparseMatrix Pi2 = BuildTrace(coarseMesh);
+		//cout << Utils::MatrixInfo(Pi2, "Pi2") << endl;
 
 		//-----------------------//
 		// Prolongation operator //
 		//-----------------------//
 
-		// Theta: reconstruction from the coarse faces to the coarse cells
-		this->inv_A_T_Tc = new SparseMatrix(Utils::InvertBlockDiagMatrix(A_T_Tc, _cellBlockSize));
-		SparseMatrix Theta = -(*inv_A_T_Tc) * A_T_Fc;
+		if (_prolongation == CAMGProlongation::P)
+		{
+			this->P = Pi2 * Q_T * Theta2;
+		}
+		else if (_prolongation == CAMGProlongation::P1P2)
+		{
+			SparseMatrix P2 = Pi2 * Q_T2 * Theta2;
+			this->P = P1 * P2;
+		}
+		else if (_prolongation == CAMGProlongation::Q_F)
+		{
+			this->P = Q_F;
+		}
 
-		// Pi: average on both sides of each face
-		DenseMatrix traceOfConstant = DenseMatrix::Zero(_faceBlockSize, _cellBlockSize);
-		traceOfConstant(0, 0) = 1;
-		NumberParallelLoop<CoeffsChunk> parallelLoopPi(_mesh._faces.size());
-		parallelLoopPi.Execute([this, &traceOfConstant](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
-			{
-				AlgebraicFace& face = _mesh._faces[faceNumber];
-				for (AlgebraicElement* elem : face.Elements)
-					chunk->Results.Coeffs.Add(faceNumber, elem->Number, 1.0 / face.Elements.size()*traceOfConstant);
-			});
-		SparseMatrix Pi = SparseMatrix(_mesh._faces.size()*_faceBlockSize, _mesh._elements.size()*_cellBlockSize);
-		parallelLoopPi.Fill(Pi);
-
-		// Prolongation
-		this->P = Pi * Q_T * Theta;
+		cout << "Computing coarse A_F_F" << endl;
 
 		if (true)
 			this->A_F_Fc = Q_F.transpose() * (*A_F_F) * Q_F;
@@ -167,19 +227,51 @@ private:
 	SparseMatrix BuildQ_F(const CondensedAlgebraicMesh& mesh)
 	{
 		DenseMatrix Id = DenseMatrix::Identity(_faceBlockSize, _faceBlockSize);
-		NumberParallelLoop<CoeffsChunk> parallelLoopQ_F(mesh._coarseFaces.size());
-		parallelLoopQ_F.Execute([this, &mesh, &Id](BigNumber faceAggNumber, ParallelChunk<CoeffsChunk>* chunk)
+
+		NumberParallelLoop<CoeffsChunk> parallelLoop1(mesh._faces.size());
+		parallelLoop1.Execute([this, &mesh, &Id](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
 			{
-				const FaceAggregate* agg = &mesh._coarseFaces[faceAggNumber];
-				for (AlgebraicFace* face : agg->FineFaces)
-					chunk->Results.Coeffs.Add(face->Number, agg->Number, Id);
+				const AlgebraicFace* face = &mesh._faces[faceNumber];
+				if (face->IsRemovedOnCoarseMesh)
+				{
+					ElementAggregate* elemAggreg = face->Elements[0]->CoarseElement;
+					for (FaceAggregate* coarseFace : elemAggreg->CoarseFaces)
+						chunk->Results.Coeffs.Add(face->Number, coarseFace->Number, 1.0 / elemAggreg->CoarseFaces.size() * Id);
+				}
+				else
+					chunk->Results.Coeffs.Add(face->Number, face->CoarseFace->Number, Id);
 			});
+
+
 		SparseMatrix Q_F = SparseMatrix(mesh._faces.size()*_faceBlockSize, mesh._coarseFaces.size()*_faceBlockSize);
-		parallelLoopQ_F.Fill(Q_F);
+		parallelLoop1.Fill(Q_F);
 		return Q_F;
 	}
 
+	SparseMatrix BuildTrace(const CondensedAlgebraicMesh& mesh)
+	{
+		// Pi: average on both sides of each face
+		DenseMatrix traceOfConstant = DenseMatrix::Zero(_faceBlockSize, _cellBlockSize);
+		traceOfConstant(0, 0) = 1;
 
+		NumberParallelLoop<CoeffsChunk> parallelLoopPi(mesh._faces.size());
+		parallelLoopPi.Execute([&mesh, &traceOfConstant](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				const AlgebraicFace& face = mesh._faces[faceNumber];
+				if (face.IsRemovedOnCoarseMesh)
+					chunk->Results.Coeffs.Add(faceNumber, face.Elements[0]->Number, traceOfConstant);
+				else
+				{
+					for (AlgebraicElement* elem : face.Elements)
+						chunk->Results.Coeffs.Add(faceNumber, elem->Number, 1.0 / face.Elements.size()*traceOfConstant);
+				}
+			});
+		SparseMatrix Pi = SparseMatrix(mesh._faces.size()*_faceBlockSize, mesh._elements.size()*_cellBlockSize);
+		parallelLoopPi.Fill(Pi);
+		return Pi;
+	}
+
+/*
 	// Cell prolongation Q_T with only one 1 coefficient per row
 	SparseMatrix BuildQ_T(const vector<vector<AlgebraicElement*>>& aggregates)
 	{
@@ -200,17 +292,25 @@ private:
 	SparseMatrix BuildQ_F(vector<vector<AlgebraicFace*>> aggregates)
 	{
 		DenseMatrix Id = DenseMatrix::Identity(_faceBlockSize, _faceBlockSize);
-		NumberParallelLoop<CoeffsChunk> parallelLoop(aggregates.size());
-		parallelLoop.Execute([this, &aggregates, &Id](BigNumber aggregNumber, ParallelChunk<CoeffsChunk>* chunk)
+		NumberParallelLoop<CoeffsChunk> parallelLoop(_mesh._faces.size());
+		parallelLoop.Execute([this, &Id](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
 			{
-				const vector<AlgebraicFace*>& aggreg = aggregates[aggregNumber];
-				for (AlgebraicFace* face : aggreg)
-					chunk->Results.Coeffs.Add(face->Number, aggregNumber, Id);
+				const AlgebraicFace* face = &_mesh._faces[faceNumber];
+				if (face->IsRemovedOnCoarseMesh)
+				{
+					ElementAggregate* elemAggreg = face->Elements[0]->CoarseElement;
+					double sum = 0;
+					for (FaceAggregate* coarseFace : elemAggreg->CoarseFaces)
+						chunk->Results.Coeffs.Add(face->Number, coarseFace->Number, 1.0 / elemAggreg->CoarseFaces.size() * Id);
+				}
+				else
+					chunk->Results.Coeffs.Add(face->Number, face->CoarseFace->Number, Id);
 			});
+
 		SparseMatrix Q_F = SparseMatrix(_mesh._faces.size()*_faceBlockSize, aggregates.size()*_faceBlockSize);
 		parallelLoop.Fill(Q_F);
 		return Q_F;
-	}
+	}*/
 public:
 	void SetupDiscretizedOperator() override 
 	{
@@ -219,14 +319,26 @@ public:
 	}
 
 	void OnStartSetup() override
-	{}
+	{
+		cout << "\t\tMesh                : " << this->A_T_T->rows() / _cellBlockSize << " elements, " << this->A_F_F->rows() / _faceBlockSize << " faces";
+		if (!this->IsFinestLevel())
+		{
+			CondensedLevel* fine = dynamic_cast<CondensedLevel*>(this->FinerLevel);
+			double nFine = fine->A_F_F->rows();
+			double nCoarse = this->A_F_F->rows();
+			cout << ", coarsening factor = " << (nFine/nCoarse);
+		}
+		cout << endl;
+	}
 
 	void SetupProlongation() override
 	{}
 
 	void SetupRestriction() override
 	{
-		R = P.transpose();
+		double scalingFactor = 1.0;
+		//scalingFactor = 1.0 / 4.0;
+		R = scalingFactor * P.transpose();
 	}
 
 	void OnEndSetup() override
@@ -251,23 +363,33 @@ public:
 class CondensedAMG : public Multigrid
 {
 private:
+	CAMGProlongation _prolongation = CAMGProlongation::P;
 	int _cellBlockSize;
 	int _faceBlockSize;
 public:
 
-	CondensedAMG(int cellBlockSize, int faceBlockSize, int nLevels = 0)
+	CondensedAMG(int cellBlockSize, int faceBlockSize, CAMGProlongation prolongation, int nLevels = 0)
 		: Multigrid(nLevels)
 	{
 		this->_cellBlockSize = cellBlockSize;
 		this->_faceBlockSize = faceBlockSize;
+		this->_prolongation = prolongation;
 		this->BlockSizeForBlockSmoothers = faceBlockSize;
 		this->UseGalerkinOperator = true;
-		this->_fineLevel = new CondensedLevel(0, cellBlockSize, faceBlockSize);
+		this->_fineLevel = new CondensedLevel(0, cellBlockSize, faceBlockSize, prolongation);
 	}
 
 	void BeginSerialize(ostream& os) const override
 	{
 		os << "CondensedAMG" << endl;
+		os << "\t" << "Prolongation       : ";
+		if (_prolongation == CAMGProlongation::P)
+			os << "P ";
+		else if (_prolongation == CAMGProlongation::P1P2)
+			os << "P1P2 ";
+		else if (_prolongation == CAMGProlongation::Q_F)
+			os << "Q_F ";
+		os << "[-prolong " << (unsigned)_prolongation << "]" << endl;
 	}
 
 	void EndSerialize(ostream& os) const override
@@ -300,7 +422,7 @@ public:
 protected:
 	Level* CreateCoarseLevel(Level* fineLevel) override
 	{
-		CondensedLevel* coarseLevel = new CondensedLevel(fineLevel->Number + 1, this->_cellBlockSize, this->_faceBlockSize);
+		CondensedLevel* coarseLevel = new CondensedLevel(fineLevel->Number + 1, _cellBlockSize, _faceBlockSize, _prolongation);
 		return coarseLevel;
 	}
 };

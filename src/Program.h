@@ -331,7 +331,7 @@ private:
 				else
 					assert(false);
 
-				MultigridForHHO<Dim>* mg = new MultigridForHHO<Dim>(hhoProblem, args.Solver.MG.ProlongationCode, cellInterpolationBasis, args.Solver.MG.WeightCode, args.Solver.MG.Levels);
+				MultigridForHHO<Dim>* mg = new MultigridForHHO<Dim>(hhoProblem, args.Solver.MG.GMGProlong, cellInterpolationBasis, args.Solver.MG.WeightCode, args.Solver.MG.Levels);
 				mg->MatrixMaxSizeForCoarsestLevel = args.Solver.MG.MatrixMaxSizeForCoarsestLevel;
 				mg->Cycle = args.Solver.MG.CycleLetter;
 				mg->WLoops = args.Solver.MG.WLoops;
@@ -368,7 +368,7 @@ private:
 		else if (args.Solver.SolverCode.compare("camg") == 0 || args.Solver.SolverCode.compare("fcgcamg") == 0)
 		{
 			Diffusion_HHO<Dim>* hhoProblem = dynamic_cast<Diffusion_HHO<Dim>*>(problem);
-			CondensedAMG* mg = new CondensedAMG(hhoProblem->HHO->nCellUnknowns, hhoProblem->HHO->nFaceUnknowns, args.Solver.MG.Levels);
+			CondensedAMG* mg = new CondensedAMG(hhoProblem->HHO->nCellUnknowns, hhoProblem->HHO->nFaceUnknowns, args.Solver.MG.CAMGProlong, args.Solver.MG.Levels);
 			mg->MatrixMaxSizeForCoarsestLevel = args.Solver.MG.MatrixMaxSizeForCoarsestLevel;
 			mg->Cycle = args.Solver.MG.CycleLetter;
 			mg->WLoops = args.Solver.MG.WLoops;

@@ -11,7 +11,7 @@ struct AlgebraicElement
 	vector<AlgebraicFace*> Faces;
 	vector<AlgebraicElement*> Neighbours;
 	bool IsAggregated = false;
-	ElementAggregate* CoarseElement;
+	ElementAggregate* CoarseElement = nullptr;
 };
 
 struct ElementAggregate;
@@ -22,7 +22,7 @@ struct AlgebraicFace
 	vector<AlgebraicElement*> Elements;
 	bool IsRemovedOnCoarseMesh = false;
 	vector<ElementAggregate*> CoarseElements;
-	FaceAggregate* CoarseFace;
+	FaceAggregate* CoarseFace = nullptr;
 	mutex Mutex;
 };
 
@@ -31,7 +31,9 @@ struct ElementAggregate
 	BigNumber Number;
 	vector<AlgebraicElement*> FineElements;
 	vector<AlgebraicFace*> FineFaces;
+	vector<AlgebraicFace*> RemovedFineFaces;
 	map<ElementAggregate*, vector<AlgebraicFace*>> Neighbours;
+	vector<FaceAggregate*> CoarseFaces;
 
 	ElementAggregate(BigNumber number, vector<AlgebraicElement*> elements)
 		: Number(number), FineElements(elements) 
@@ -166,24 +168,14 @@ public:
 			if (elem.Neighbours.empty())
 				coarsestPossibleMeshReached = true;
 
-			AlgebraicElement* strongestNeighbour;
-			for (AlgebraicElement* neighbour : elem.Neighbours)
-			{
-				//DenseMatrix blockI = A_T_F->block(i*_cellBlockSize, i*_cellBlockSize, _cellBlockSize, _cellBlockSize);
-				if (!neighbour->IsAggregated)
-				{
-					Aggregate(elem, *neighbour);
-					break;
-				}
-			}
+			AlgebraicElement* strongestNeighbour = StrongestNeighbour(elem, true);
+			// If no neighbour available, get the already aggregated strongest neighbour
+			if (!strongestNeighbour)
+				strongestNeighbour = StrongestNeighbour(elem, false);
+			
+			assert(strongestNeighbour);
 
-			// If no neighbour available
-			if (!elem.IsAggregated)
-			{
-				// Aggregate with first neighbour
-				AlgebraicElement* neighbour = elem.Neighbours[0];
-				Aggregate(elem, *neighbour);
-			}
+			Aggregate(elem, *strongestNeighbour);
 		}
 
 		// Removal of faces shared by elements in the same aggregate.
@@ -204,6 +196,8 @@ public:
 							{
 								// This face is shared by elem1 and elem2, so we remove it on the coarse grid
 								face->IsRemovedOnCoarseMesh = true;
+								coarseElem.RemovedFineFaces.push_back(face);
+								//face->CoarseElements.push_back(&coarseElem);
 								break;
 							}
 						}
@@ -244,7 +238,8 @@ public:
 
 		// Face aggregation:
 		// Collapse faces interfacing two element aggregates.
-		_coarseFaces.reserve(_faces.size() / 3);
+
+		this->_coarseFaces.reserve(_faces.size()); // must reserve sufficient space
 		for (ElementAggregate& coarseElem : _coarseElements)
 		{
 			for (auto it = coarseElem.Neighbours.begin(); it != coarseElem.Neighbours.end(); it++)
@@ -254,14 +249,44 @@ public:
 				if (!fineFaces.front()->CoarseFace)
 				{
 					_coarseFaces.emplace_back(_coarseFaces.size(), fineFaces);
+					FaceAggregate* coarseFace = &_coarseFaces.back(); // if _coarseFaces is reallocated, all the pointers already taken are invalid 
 					for (AlgebraicFace* fineFace : fineFaces)
-						fineFace->CoarseFace = &_coarseFaces.back();
+						fineFace->CoarseFace = coarseFace;
+					coarseElem.CoarseFaces.push_back(coarseFace);
+					neighbour->CoarseFaces.push_back(coarseFace);
 				}
 			}
 		}
 	}
 
 private:
+	AlgebraicElement* StrongestNeighbour(const AlgebraicElement& e, bool checkAvailability)
+	{
+		AlgebraicElement* strongestNeighbour = nullptr;
+		double strongestNegativeCoupling = 0;
+		for (AlgebraicFace* f : e.Faces)
+		{
+			for (AlgebraicElement* n : f->Elements)
+			{
+				if (n == &e || (checkAvailability && n->IsAggregated))
+					continue;
+
+				DenseMatrix couplingElemFace = A_T_F->block(e.Number*_cellBlockSize, f->Number*_faceBlockSize, _cellBlockSize, _faceBlockSize);
+				double coupling = couplingElemFace(0, 0);
+				if (coupling < strongestNegativeCoupling)
+				{
+					/*if (e.Number == 18 && !checkAvailability)
+					{
+						cout << "Neighbour " << n->Number << " with coupling " << coupling << endl;
+					}*/
+					strongestNegativeCoupling = coupling;
+					strongestNeighbour = n;
+				}
+			}
+		}
+		return strongestNeighbour;
+	}
+
 	void Aggregate(AlgebraicElement& e1, AlgebraicElement& e2)
 	{
 		assert(!(e1.IsAggregated && e2.IsAggregated));

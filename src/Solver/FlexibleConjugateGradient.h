@@ -81,15 +81,17 @@ public:
 			Vector d = z;
 			for (Direction const& directionk : _previousDirections)
 			{
-				Vector dk         = directionk.d;
-				Vector Adk        = directionk.Ad;
+				const Vector& dk  = directionk.d;
+				const Vector& Adk = directionk.Ad;
 				double dk_dot_Adk = directionk.d_dot_Ad;
 
 				d -= z.dot(Adk) / dk_dot_Adk * dk;                   result.AddCost(2 * z.rows());     // Cost: 1 Dot
 			}
+			assert(d.norm() > 0);
 
 			Vector Ad = A * d;                                       result.AddCost(2 * A.nonZeros()); // Cost: 1 sparse MatVec
 			double d_dot_Ad = d.dot(Ad);                             result.AddCost(2 * d.rows());     // Cost: 1 Dot
+			assert(d_dot_Ad != 0);
 
 			// Step length in the direction of research
 			double alpha = r.dot(d) / d_dot_Ad;                      result.AddCost(2 * r.rows());     // Cost: 1 Dot

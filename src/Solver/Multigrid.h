@@ -152,10 +152,15 @@ public:
 
 		this->SetupCoarseSolver();
 
-		if (this->Cycle == 'K' && !currentLevel->IsFinestLevel())
+		if (this->Cycle == 'K')
 		{
-			Multigrid* mg = static_cast<Multigrid*>(currentLevel->FCG->Precond.GetSolver());
-			mg->_coarseSolver = this->_coarseSolver;
+			Level* level = this->_fineLevel->CoarserLevel;
+			while (level)
+			{
+				Multigrid* mg = static_cast<Multigrid*>(level->FCG->Precond.GetSolver());
+				mg->_coarseSolver = this->_coarseSolver;
+				level = level->CoarserLevel;
+			}
 		}
 
 		cout << "\t--> " << _nLevels << " levels built." << endl;
@@ -251,7 +256,12 @@ private:
 			}
 			else if (this->Cycle == 'K')
 			{
-				ec = level->CoarserLevel->FCG->Solve(rc, ec);                        result.AddCost(level->CoarserLevel->FCG->SolvingComputationalWork);
+				if (level->CoarserLevel->IsCoarsestLevel())
+					ec = MultigridCycle(level->CoarserLevel, rc, ec, result); // exact solution
+				else
+				{
+					ec = level->CoarserLevel->FCG->Solve(rc, ec);                    result.AddCost(level->CoarserLevel->FCG->SolvingComputationalWork);
+				}
 			}
 
 			//------------------------//
