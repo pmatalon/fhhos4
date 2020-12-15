@@ -82,7 +82,7 @@ public:
 		if (!A_T_F.IsRowMajor)
 			assert("A_T_F must be row-major");
 
-		BigNumber nElements = A_T_T.rows() / _cellBlockSize;
+		BigNumber nElements = A_T_F.rows() / _cellBlockSize;
 		this->_elements = vector<AlgebraicElement>(nElements);
 
 		BigNumber nFaces = A_T_F.cols() / _faceBlockSize;
@@ -166,14 +166,21 @@ public:
 				continue;
 
 			if (elem.Neighbours.empty())
+			{
 				coarsestPossibleMeshReached = true;
+				return;
+			}
 
 			AlgebraicElement* strongestNeighbour = StrongestNeighbour(elem, true);
 			// If no neighbour available, get the already aggregated strongest neighbour
 			if (!strongestNeighbour)
 				strongestNeighbour = StrongestNeighbour(elem, false);
 			
-			assert(strongestNeighbour);
+			if (!strongestNeighbour)
+			{
+				coarsestPossibleMeshReached = true;
+				return;
+			}
 
 			Aggregate(elem, *strongestNeighbour);
 		}
@@ -264,6 +271,9 @@ private:
 	{
 		AlgebraicElement* strongestNeighbour = nullptr;
 		double strongestNegativeCoupling = 0;
+		int smallestAggregateSize = 1000000;
+		DenseMatrix elemBlock = A_T_T->block(e.Number*_cellBlockSize, e.Number*_cellBlockSize, _cellBlockSize, _cellBlockSize);
+		double elemKappa = elemBlock(0, 0);
 		for (AlgebraicFace* f : e.Faces)
 		{
 			for (AlgebraicElement* n : f->Elements)
@@ -271,16 +281,36 @@ private:
 				if (n == &e || (checkAvailability && n->IsAggregated))
 					continue;
 
+				DenseMatrix neighourBlock = A_T_T->block(n->Number*_cellBlockSize, n->Number*_cellBlockSize, _cellBlockSize, _cellBlockSize);
+				double neighbourKappa = neighourBlock(0, 0);
+				double minKappa = min(elemKappa, neighbourKappa);
+				double maxKappa = max(elemKappa, neighbourKappa);
+				if (maxKappa/minKappa > 10)
+					continue;
+
 				DenseMatrix couplingElemFace = A_T_F->block(e.Number*_cellBlockSize, f->Number*_faceBlockSize, _cellBlockSize, _faceBlockSize);
 				double coupling = couplingElemFace(0, 0);
+
+
 				if (coupling < strongestNegativeCoupling)
 				{
 					/*if (e.Number == 18 && !checkAvailability)
+						cout << "Neighbour " << n->Number << " with coupling " << coupling << endl;*/
+					if (checkAvailability)
 					{
-						cout << "Neighbour " << n->Number << " with coupling " << coupling << endl;
-					}*/
-					strongestNegativeCoupling = coupling;
-					strongestNeighbour = n;
+						strongestNegativeCoupling = coupling;
+						strongestNeighbour = n;
+					}
+					else
+					{
+						int aggregateSize = n->CoarseElement->FineElements.size();
+						if (aggregateSize < smallestAggregateSize)
+						{
+							strongestNegativeCoupling = coupling;
+							strongestNeighbour = n;
+							smallestAggregateSize = aggregateSize;
+						}
+					}
 				}
 			}
 		}
