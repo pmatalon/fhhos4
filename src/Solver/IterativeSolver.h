@@ -132,7 +132,7 @@ protected:
 			return true;
 		if (std::isinf(result.NormalizedResidualNorm)) // do not remove the prefix std:: or it can become ambiguous according to the compiler
 			Utils::FatalError("divergence of the solver");
-		if (isnan(result.NormalizedResidualNorm))
+		if (std::isnan(result.NormalizedResidualNorm))
 			Utils::FatalError("the residual is NaN.");
 		if (StoppingCrit == StoppingCriteria::NormalizedResidual && result.NormalizedResidualNorm < this->Tolerance)
 			return true;
