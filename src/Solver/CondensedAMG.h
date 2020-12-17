@@ -79,11 +79,12 @@ public:
 		// Cell-prolongation operator with only one 1 coefficient per row
 		SparseMatrix Q_T1 = BuildQ_T(_mesh);
 		// Cell-prolongation operator with only one 1 coefficient per row for kept or aggregated faces, average for removed faces
-		SparseMatrix Q_F1 = BuildQ_F(_mesh);
+		SparseMatrix Q_F1 = BuildQ_F(_mesh, *A_F_F);
 
 		// Intermediate coarse operators
 		SparseMatrix A_T_T1 = Q_T1.transpose() * (*A_T_T) * Q_T1;
 		SparseMatrix A_T_F1 = Q_T1.transpose() * (*A_T_F) * Q_F1;
+		SparseMatrix A_F_F1 = Q_F1.transpose() * (*A_F_F) * Q_F1;
 
 		//-----------------------------//
 		// Second pairwise aggregation //
@@ -96,7 +97,7 @@ public:
 			return;
 
 		SparseMatrix Q_T2 = BuildQ_T(coarseMesh);
-		SparseMatrix Q_F2 = BuildQ_F(coarseMesh);
+		SparseMatrix Q_F2 = BuildQ_F(coarseMesh, A_F_F1);
 
 		this->A_T_Tc = Q_T2.transpose() * A_T_T1 * Q_T2;
 		this->A_T_Fc = Q_T2.transpose() * A_T_F1 * Q_F2;
@@ -187,13 +188,11 @@ public:
 
 		cout << "Computing coarse A_F_F" << endl;
 
-		if (!this->UseGalerkinOperator)
-		{
-			if (true)
-				this->A_F_Fc = Q_F.transpose() * (*A_F_F) * Q_F;
-			else
-				this->A_F_Fc = P.transpose() * (*A_F_F) * P;
-		}
+		//if (!this->UseGalerkinOperator)
+		//{
+			this->A_F_Fc = Q_F.transpose() * (*A_F_F) * Q_F;
+			//this->A_F_Fc = P.transpose() * (*A_F_F) * P;
+		//}
 	}
 
 private:
@@ -213,19 +212,52 @@ private:
 	}
 
 	// Face prolongation Q_F
-	SparseMatrix BuildQ_F(const CondensedAlgebraicMesh& mesh)
+	SparseMatrix BuildQ_F(const CondensedAlgebraicMesh& mesh, const SparseMatrix A_F_F)
 	{
+		bool enableAnisotropyManagement = false;
 		DenseMatrix Id = DenseMatrix::Identity(_faceBlockSize, _faceBlockSize);
 
 		NumberParallelLoop<CoeffsChunk> parallelLoop1(mesh._faces.size());
-		parallelLoop1.Execute([this, &mesh, &Id](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
+		parallelLoop1.Execute([this, &mesh, &Id, enableAnisotropyManagement, &A_F_F](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
 			{
 				const AlgebraicFace* face = &mesh._faces[faceNumber];
 				if (face->IsRemovedOnCoarseMesh)
 				{
 					ElementAggregate* elemAggreg = face->Elements[0]->CoarseElement;
-					for (FaceAggregate* coarseFace : elemAggreg->CoarseFaces)
-						chunk->Results.Coeffs.Add(face->Number, coarseFace->Number, 1.0 / elemAggreg->CoarseFaces.size() * Id);
+
+					if (enableAnisotropyManagement)
+					{
+						map<FaceAggregate*, double> couplings;
+						double totalCouplings = 0;
+						for (FaceAggregate* coarseFace : elemAggreg->CoarseFaces)
+						{
+							double avgCouplingCoarseFace = 0;
+							for (AlgebraicFace* f : coarseFace->FineFaces)
+							{
+								DenseMatrix couplingBlock = A_F_F.block(face->Number*_faceBlockSize, f->Number*_faceBlockSize, _faceBlockSize, _faceBlockSize);
+								double couplingFineFace = couplingBlock(0, 0);
+								avgCouplingCoarseFace += couplingFineFace;
+							}
+							avgCouplingCoarseFace /= coarseFace->FineFaces.size();
+							if (avgCouplingCoarseFace < 0)
+							{
+								couplings.insert({ coarseFace, avgCouplingCoarseFace });
+								totalCouplings += avgCouplingCoarseFace;
+							}
+						}
+
+						for (auto it = couplings.begin(); it != couplings.end(); it++)
+						{
+							FaceAggregate* coarseFace = it->first;
+							double coupling = it->second;
+							chunk->Results.Coeffs.Add(face->Number, coarseFace->Number, -coupling / abs(totalCouplings) * Id);
+						}
+					}
+					else
+					{
+						for (FaceAggregate* coarseFace : elemAggreg->CoarseFaces)
+							chunk->Results.Coeffs.Add(face->Number, coarseFace->Number, 1.0 / elemAggreg->CoarseFaces.size() * Id);
+					}
 				}
 				else
 					chunk->Results.Coeffs.Add(face->Number, face->CoarseFace->Number, Id);
