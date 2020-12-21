@@ -957,7 +957,7 @@ int main(int argc, char* argv[])
 	else if (args.Solver.SolverCode.compare("camg") == 0 || args.Solver.SolverCode.compare("fcgcamg") == 0)
 	{
 		if (args.Solver.MG.ProlongationCode == 0)
-			args.Solver.MG.CAMGProlong = CAMGProlongation::P;
+			args.Solver.MG.CAMGProlong = CAMGProlongation::Q_F;
 		else
 			args.Solver.MG.CAMGProlong = static_cast<CAMGProlongation>(args.Solver.MG.ProlongationCode);
 	}
@@ -1055,14 +1055,7 @@ int main(int argc, char* argv[])
 			argument_error("Multigrid only applicable on HHO discretization.");
 
 		if (defaultCycle)
-		{
-			args.Solver.MG.CycleLetter = args.Solver.SolverCode.compare("fcgcamg") == 0 ? 'K' : 'V';
-			args.Solver.MG.PreSmoothingIterations = 0;
-			if (args.Problem.Dimension < 3)
-				args.Solver.MG.PostSmoothingIterations = 3;
-			else
-				args.Solver.MG.PostSmoothingIterations = Utils::IsRefinementStrategy(args.Solver.MG.CoarseningStgy) ? 10 : 6;
-		}
+			args.Solver.MG.CycleLetter = 'K';
 	}
 	
 	//------------------------------------------//
