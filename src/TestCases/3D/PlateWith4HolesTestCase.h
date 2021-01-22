@@ -47,10 +47,10 @@ public:
 
 	string Code() override
 	{
-		return "barwith4holes";
+		return "platewith4holes";
 	}
 	string Description() override
 	{
-		return "Bar with 4 circular holes";
+		return "Plate with 4 circular holes";
 	}
 };
