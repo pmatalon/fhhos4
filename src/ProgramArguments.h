@@ -54,6 +54,7 @@ struct MultigridArguments
 	BigNumber CoarseN = 2;
 	FaceCollapsing BoundaryFaceCollapsing = FaceCollapsing::Max;
 	ReEntrantCornerMgmt ReEntrantCornerManagement = ReEntrantCornerMgmt::Disabled;
+	bool ManageAnisotropy = true; // used only in CAMG
 };
 
 struct SolverArguments

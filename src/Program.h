@@ -109,9 +109,9 @@ public:
 						m->SanityCheck();
 					}*/
 
-					/*cout << "Export..." << endl;
+					cout << "Export..." << endl;
 					mesh->ExportFacesToMatlab(args.OutputDirectory + "/fine.dat");
-					mesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_fine.m");*/
+					mesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_fine.m");
 
 					// 1st coarsening
 					cout << "Coarsening..." << endl;
@@ -262,7 +262,10 @@ public:
 				}
 
 				if (args.Actions.ExportMeshToMatlab)
+				{
 					mesh->ExportToMatlab(args.OutputDirectory);
+					mesh->ExportToMatlab2(args.OutputDirectory + "/mesh.m");
+				}
 			}
 
 			if (args.Actions.ExportSolutionToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
