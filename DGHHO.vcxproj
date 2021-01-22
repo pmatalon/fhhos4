@@ -193,11 +193,13 @@
     <ClInclude Include="src\Mesh\Vertex.h" />
     <ClInclude Include="src\Program.h" />
     <ClInclude Include="src\ProgramArguments.h" />
+    <ClInclude Include="src\Solver\AggregAMG.h" />
     <ClInclude Include="src\Solver\AGMG.h" />
+    <ClInclude Include="src\Solver\AlgebraicMesh.h" />
     <ClInclude Include="src\Solver\AllSolvers.h" />
     <ClInclude Include="src\Solver\BlockJacobi.h" />
     <ClInclude Include="src\Solver\BlockSOR.h" />
-    <ClInclude Include="src\Solver\CondensedAlgebraicMesh.h" />
+    <ClInclude Include="src\Solver\HybridAlgebraicMesh.h" />
     <ClInclude Include="src\Solver\CondensedAMG.h" />
     <ClInclude Include="src\Solver\ConjugateGradient.h" />
     <ClInclude Include="src\Solver\EigenCG.h" />

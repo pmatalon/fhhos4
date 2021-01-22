@@ -1,56 +1,56 @@
 #pragma once
-#include "Multigrid.h"
+#include "../Utils/Utils.h"
 #include <mutex>
 using namespace std;
 
-struct AlgebraicFace;
-struct ElementAggregate;
-struct AlgebraicElement
+struct HybridAlgebraicFace;
+struct HybridElementAggregate;
+struct HybridAlgebraicElement
 {
 	BigNumber Number;
-	vector<AlgebraicFace*> Faces;
-	vector<AlgebraicElement*> Neighbours;
+	vector<HybridAlgebraicFace*> Faces;
+	vector<HybridAlgebraicElement*> Neighbours;
 	bool IsAggregated = false;
-	ElementAggregate* CoarseElement = nullptr;
+	HybridElementAggregate* CoarseElement = nullptr;
 };
 
-struct ElementAggregate;
-struct FaceAggregate;
-struct AlgebraicFace
+struct HybridElementAggregate;
+struct HybridFaceAggregate;
+struct HybridAlgebraicFace
 {
 	BigNumber Number;
-	vector<AlgebraicElement*> Elements;
+	vector<HybridAlgebraicElement*> Elements;
 	bool IsRemovedOnCoarseMesh = false;
-	vector<ElementAggregate*> CoarseElements;
-	FaceAggregate* CoarseFace = nullptr;
+	vector<HybridElementAggregate*> CoarseElements;
+	HybridFaceAggregate* CoarseFace = nullptr;
 	mutex Mutex;
 };
 
-struct ElementAggregate
+struct HybridElementAggregate
 {
 	BigNumber Number;
-	vector<AlgebraicElement*> FineElements;
-	vector<AlgebraicFace*> FineFaces;
-	vector<AlgebraicFace*> RemovedFineFaces;
-	map<ElementAggregate*, vector<AlgebraicFace*>> Neighbours;
-	vector<FaceAggregate*> CoarseFaces;
+	vector<HybridAlgebraicElement*> FineElements;
+	vector<HybridAlgebraicFace*> FineFaces;
+	vector<HybridAlgebraicFace*> RemovedFineFaces;
+	map<HybridElementAggregate*, vector<HybridAlgebraicFace*>> Neighbours;
+	vector<HybridFaceAggregate*> CoarseFaces;
 
-	ElementAggregate(BigNumber number, vector<AlgebraicElement*> elements)
+	HybridElementAggregate(BigNumber number, vector<HybridAlgebraicElement*> elements)
 		: Number(number), FineElements(elements) 
 	{}
 };
 
-struct FaceAggregate
+struct HybridFaceAggregate
 {
 	BigNumber Number;
-	vector<AlgebraicFace*> FineFaces;
+	vector<HybridAlgebraicFace*> FineFaces;
 	
-	FaceAggregate(BigNumber number, vector<AlgebraicFace*> faces)
+	HybridFaceAggregate(BigNumber number, vector<HybridAlgebraicFace*> faces)
 		: Number(number), FineFaces(faces)
 	{}
 };
 
-class CondensedAlgebraicMesh
+class HybridAlgebraicMesh
 {
 private:
 	int _cellBlockSize;
@@ -60,13 +60,13 @@ private:
 	const SparseMatrix* A_T_F;
 	const SparseMatrix* A_F_F;
 public:
-	vector<AlgebraicElement> _elements;
-	vector<AlgebraicFace> _faces;
-	vector<ElementAggregate> _coarseElements;
-	vector<FaceAggregate> _coarseFaces;
+	vector<HybridAlgebraicElement> _elements;
+	vector<HybridAlgebraicFace> _faces;
+	vector<HybridElementAggregate> _coarseElements;
+	vector<HybridFaceAggregate> _coarseFaces;
 
 public:
-	CondensedAlgebraicMesh(int cellBlockSize, int faceBlockSize)
+	HybridAlgebraicMesh(int cellBlockSize, int faceBlockSize)
 	{
 		this->_cellBlockSize = cellBlockSize;
 		this->_faceBlockSize = faceBlockSize;
@@ -85,10 +85,10 @@ public:
 			assert("A_T_F must be row-major");
 
 		BigNumber nElements = A_T_F.rows() / _cellBlockSize;
-		this->_elements = vector<AlgebraicElement>(nElements);
+		this->_elements = vector<HybridAlgebraicElement>(nElements);
 
 		BigNumber nFaces = A_T_F.cols() / _faceBlockSize;
-		this->_faces = vector<AlgebraicFace>(nFaces);
+		this->_faces = vector<HybridAlgebraicFace>(nFaces);
 
 		//-------------------------//
 		// Filling elements' faces //
@@ -97,14 +97,14 @@ public:
 		NumberParallelLoop<EmptyResultChunk> parallelLoopElem(_elements.size());
 		parallelLoopElem.Execute([this, &A_T_F](BigNumber elemNumber, ParallelChunk<EmptyResultChunk>* chunk)
 			{
-				AlgebraicElement& elem = _elements[elemNumber];
+				HybridAlgebraicElement& elem = _elements[elemNumber];
 				elem.Number = elemNumber;
 
 				// RowMajor --> the following line iterates over the non-zeros of the elemNumber-th row.
 				for (SparseMatrix::InnerIterator it(A_T_F, elemNumber*_cellBlockSize); it; ++it)
 				{
 					BigNumber faceNumber = it.col() / _faceBlockSize;
-					AlgebraicFace* face = &_faces[faceNumber];
+					HybridAlgebraicFace* face = &_faces[faceNumber];
 					if (find(elem.Faces.begin(), elem.Faces.end(), face) == elem.Faces.end())
 					{
 						//face->Number = faceNumber;
@@ -123,7 +123,7 @@ public:
 		NumberParallelLoop<EmptyResultChunk> parallelLoopFace(_faces.size());
 		parallelLoopFace.Execute([this, &A_T_F_ColMajor](BigNumber faceNumber)
 			{
-				AlgebraicFace& face = _faces[faceNumber];
+				HybridAlgebraicFace& face = _faces[faceNumber];
 				face.Number = faceNumber;
 
 				// ColMajor --> the following line iterates over the non-zeros of the faceNumber-th col.
@@ -131,7 +131,7 @@ public:
 				{
 					assert(it.col() / _faceBlockSize == faceNumber);
 					BigNumber elemNumber = it.row() / _cellBlockSize;
-					AlgebraicElement* elem = &_elements[elemNumber];
+					HybridAlgebraicElement* elem = &_elements[elemNumber];
 					if (find(face.Elements.begin(), face.Elements.end(), elem) == face.Elements.end())
 						face.Elements.push_back(elem);
 				}
@@ -144,10 +144,10 @@ public:
 		parallelLoopElem = NumberParallelLoop<EmptyResultChunk>(_elements.size());
 		parallelLoopElem.Execute([this](BigNumber elemNumber)
 			{
-				AlgebraicElement& elem = _elements[elemNumber];
-				for (AlgebraicFace* face : elem.Faces)
+				HybridAlgebraicElement& elem = _elements[elemNumber];
+				for (HybridAlgebraicFace* face : elem.Faces)
 				{
-					for (AlgebraicElement* neighbour : face->Elements)
+					for (HybridAlgebraicElement* neighbour : face->Elements)
 					{
 						if (neighbour->Number != elem.Number)
 							elem.Neighbours.push_back(neighbour);
@@ -163,7 +163,7 @@ public:
 
 		for (BigNumber i = 0; i < _elements.size(); i++)
 		{
-			AlgebraicElement& elem = _elements[i];
+			HybridAlgebraicElement& elem = _elements[i];
 			if (elem.IsAggregated)
 				continue;
 
@@ -173,7 +173,7 @@ public:
 				return;
 			}
 
-			AlgebraicElement* strongestNeighbour = StrongestNeighbour(elem, true);
+			HybridAlgebraicElement* strongestNeighbour = StrongestNeighbour(elem, true);
 			// If no neighbour available, get the already aggregated strongest neighbour
 			if (!strongestNeighbour)
 				strongestNeighbour = StrongestNeighbour(elem, false);
@@ -192,15 +192,15 @@ public:
 		NumberParallelLoop<EmptyResultChunk> parallelLoopCE(_coarseElements.size());
 		parallelLoopCE.Execute([this](BigNumber coarseElemNumber)
 			{
-				ElementAggregate& coarseElem = _coarseElements[coarseElemNumber];
+				HybridElementAggregate& coarseElem = _coarseElements[coarseElemNumber];
 				for (int i = 0; i < coarseElem.FineElements.size(); i++)
 				{
-					AlgebraicElement* elem1 = coarseElem.FineElements[i];
-					for (AlgebraicFace* face : elem1->Faces)
+					HybridAlgebraicElement* elem1 = coarseElem.FineElements[i];
+					for (HybridAlgebraicFace* face : elem1->Faces)
 					{
 						for (int j = i + 1; j < coarseElem.FineElements.size(); j++)
 						{
-							AlgebraicElement* elem2 = coarseElem.FineElements[j];
+							HybridAlgebraicElement* elem2 = coarseElem.FineElements[j];
 							if (find(elem2->Faces.begin(), elem2->Faces.end(), face) != elem2->Faces.end())
 							{
 								// This face is shared by elem1 and elem2, so we remove it on the coarse grid
@@ -227,11 +227,11 @@ public:
 		parallelLoopCE = NumberParallelLoop<EmptyResultChunk>(_coarseElements.size());
 		parallelLoopCE.Execute([this](BigNumber coarseElemNumber)
 			{
-				ElementAggregate* coarseElem = &_coarseElements[coarseElemNumber];
-				set<ElementAggregate*> neighbours;
-				for (AlgebraicFace* face : coarseElem->FineFaces)
+				HybridElementAggregate* coarseElem = &_coarseElements[coarseElemNumber];
+				set<HybridElementAggregate*> neighbours;
+				for (HybridAlgebraicFace* face : coarseElem->FineFaces)
 				{
-					for (ElementAggregate* neighbour : face->CoarseElements)
+					for (HybridElementAggregate* neighbour : face->CoarseElements)
 					{
 						if (neighbour != coarseElem)
 						{
@@ -249,17 +249,17 @@ public:
 		// Collapse faces interfacing two element aggregates.
 
 		this->_coarseFaces.reserve(_faces.size()); // must reserve sufficient space
-		for (ElementAggregate& coarseElem : _coarseElements)
+		for (HybridElementAggregate& coarseElem : _coarseElements)
 		{
 			for (auto it = coarseElem.Neighbours.begin(); it != coarseElem.Neighbours.end(); it++)
 			{
-				ElementAggregate* neighbour = it->first;
-				vector<AlgebraicFace*> fineFaces = it->second;
+				HybridElementAggregate* neighbour = it->first;
+				vector<HybridAlgebraicFace*> fineFaces = it->second;
 				if (!fineFaces.front()->CoarseFace)
 				{
 					_coarseFaces.emplace_back(_coarseFaces.size(), fineFaces);
-					FaceAggregate* coarseFace = &_coarseFaces.back(); // if _coarseFaces is reallocated, all the pointers already taken are invalid 
-					for (AlgebraicFace* fineFace : fineFaces)
+					HybridFaceAggregate* coarseFace = &_coarseFaces.back(); // if _coarseFaces is reallocated, all the pointers already taken are invalid 
+					for (HybridAlgebraicFace* fineFace : fineFaces)
 						fineFace->CoarseFace = coarseFace;
 					coarseElem.CoarseFaces.push_back(coarseFace);
 					neighbour->CoarseFaces.push_back(coarseFace);
@@ -270,14 +270,14 @@ public:
 		if (Utils::ProgramArgs.Solver.MG.ManageAnisotropy)
 		{
 			// Agglomerate removed faces
-			for (AlgebraicFace& face : _faces)
+			for (HybridAlgebraicFace& face : _faces)
 			{
 				if (!face.IsRemovedOnCoarseMesh)
 					continue;
 
 				assert(!face.CoarseFace);
 
-				AlgebraicFace* strongestNeighbour = StrongestNeighbour(face);
+				HybridAlgebraicFace* strongestNeighbour = StrongestNeighbour(face);
 				if (strongestNeighbour)
 				{
 					face.CoarseFace = strongestNeighbour->CoarseFace;
@@ -298,16 +298,16 @@ public:
 	}
 
 private:
-	AlgebraicElement* StrongestNeighbour(const AlgebraicElement& e, bool checkAvailability)
+	HybridAlgebraicElement* StrongestNeighbour(const HybridAlgebraicElement& e, bool checkAvailability)
 	{
-		AlgebraicElement* strongestNeighbour = nullptr;
+		HybridAlgebraicElement* strongestNeighbour = nullptr;
 		double strongestNegativeCoupling = 0;
 		int smallestAggregateSize = 1000000;
 		DenseMatrix elemBlock = A_T_T->block(e.Number*_cellBlockSize, e.Number*_cellBlockSize, _cellBlockSize, _cellBlockSize);
 		double elemKappa = elemBlock(0, 0);
-		for (AlgebraicFace* f : e.Faces)
+		for (HybridAlgebraicFace* f : e.Faces)
 		{
-			for (AlgebraicElement* n : f->Elements)
+			for (HybridAlgebraicElement* n : f->Elements)
 			{
 				if (n == &e || (checkAvailability && n->IsAggregated))
 					continue;
@@ -344,14 +344,14 @@ private:
 		return strongestNeighbour;
 	}
 
-	AlgebraicFace* StrongestNeighbour(const AlgebraicFace& f, vector<const AlgebraicFace*> tabooList = {})
+	HybridAlgebraicFace* StrongestNeighbour(const HybridAlgebraicFace& f, vector<const HybridAlgebraicFace*> tabooList = {})
 	{
-		AlgebraicFace* strongestNeighbour = nullptr;
+		HybridAlgebraicFace* strongestNeighbour = nullptr;
 		double strongestNegativeCoupling = 0;
 		int smallestAggregateSize = 1000000;
-		for (AlgebraicElement* e : f.Elements)
+		for (HybridAlgebraicElement* e : f.Elements)
 		{
-			for (AlgebraicFace* n : e->Faces)
+			for (HybridAlgebraicFace* n : e->Faces)
 			{
 				if (n == &f)
 					continue;
@@ -388,13 +388,13 @@ private:
 		return strongestNeighbour;
 	}
 
-	void Aggregate(AlgebraicElement& e1, AlgebraicElement& e2)
+	void Aggregate(HybridAlgebraicElement& e1, HybridAlgebraicElement& e2)
 	{
 		assert(!(e1.IsAggregated && e2.IsAggregated));
 
 		if (!e1.IsAggregated && !e2.IsAggregated)
 		{
-			_coarseElements.push_back(ElementAggregate(_coarseElements.size(), { &e1, &e2 }));
+			_coarseElements.push_back(HybridElementAggregate(_coarseElements.size(), { &e1, &e2 }));
 			e1.IsAggregated = true;
 			e2.IsAggregated = true;
 			e1.CoarseElement = &_coarseElements.back();

@@ -151,6 +151,7 @@ void print_usage() {
 	cout << "              camg      - Condensed AMG (for hybrid discretizations with static condensation)" << endl;
 	cout << "              fcgcamg   - Flexible Conjugate Gradient FCG(1), preconditioned with CondensedAMG 'camg' (meant to be used with K-cycle)" << endl;
 	cout << "              agmg      - Yvan Notay's AGMG solver" << endl;
+	cout << "              aggregamg - In-house implementation of AGMG" << endl;
 	cout << "      For the block solvers, the block size is set to the number of DOFs per cell (DG) or face (HHO)." << endl;
 	cout << "      Jacobi, Gauss-Seidel and SOR can use argument -relax to change the relaxation parameter." << endl;
 	cout << endl;
@@ -1054,6 +1055,12 @@ int main(int argc, char* argv[])
 		if (args.Discretization.Method.compare("dg") == 0)
 			argument_error("Multigrid only applicable on HHO discretization.");
 
+		if (defaultCycle)
+			args.Solver.MG.CycleLetter = 'K';
+	}
+
+	if (args.Solver.SolverCode.compare("aggregamg") == 0 || args.Solver.SolverCode.compare("fcgaggregamg") == 0)
+	{
 		if (defaultCycle)
 			args.Solver.MG.CycleLetter = 'K';
 	}

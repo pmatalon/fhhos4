@@ -1,6 +1,7 @@
 #pragma once
 #include <mutex>
-#include "CondensedAlgebraicMesh.h"
+#include "HybridAlgebraicMesh.h"
+#include "AlgebraicMesh.h"
 #include "Multigrid.h"
 using namespace std;
 
@@ -10,7 +11,7 @@ private:
 	CAMGProlongation _prolongation = CAMGProlongation::P;
 	int _cellBlockSize;
 	int _faceBlockSize;
-	CondensedAlgebraicMesh _mesh;
+	HybridAlgebraicMesh _mesh;
 public:
 	const SparseMatrix* A_T_T;
 	const SparseMatrix* A_T_F;
@@ -64,7 +65,7 @@ public:
 			return;
 
 		/*cout << "------------- Elem" << endl;
-		for (ElementAggregate& agg : _mesh._coarseElements)
+		for (HybridElementAggregate& agg : _mesh._coarseElements)
 		{
 			cout << "(";
 			for (auto e : agg.FineElements)
@@ -73,7 +74,7 @@ public:
 		}
 
 		cout << "------------- Faces" << endl;
-		for (FaceAggregate& agg : _mesh._coarseFaces)
+		for (HybridFaceAggregate& agg : _mesh._coarseFaces)
 		{
 			cout << "(";
 			for (auto f : agg.FineFaces)
@@ -100,7 +101,7 @@ public:
 		// Second pairwise aggregation //
 		//-----------------------------//
 
-		CondensedAlgebraicMesh coarseMesh(_cellBlockSize, _faceBlockSize);
+		HybridAlgebraicMesh coarseMesh(_cellBlockSize, _faceBlockSize);
 		coarseMesh.Build(A_T_T1, A_T_F1, A_F_F1);
 		coarseMesh.PairWiseAggregate(coarsestPossibleMeshReached);
 		if (coarsestPossibleMeshReached)
@@ -118,31 +119,31 @@ public:
 
 		/*
 		// Assembly of the double-aggregates
-		vector<vector<AlgebraicElement*>> doubleElemAggregates(coarseMesh._coarseElements.size());
+		vector<vector<HybridAlgebraicElement*>> doubleElemAggregates(coarseMesh._coarseElements.size());
 		NumberParallelLoop<EmptyResultChunk> parallelLoopE(coarseMesh._coarseElements.size());
 		parallelLoopE.Execute([this, &coarseMesh, &doubleElemAggregates](BigNumber secondAggregNumber)
 			{
-				ElementAggregate& agg2 = coarseMesh._coarseElements[secondAggregNumber];
-				vector<AlgebraicElement*> doubleAggregate;
-				for (AlgebraicElement* ce1 : agg2.FineElements)
+				HybridElementAggregate& agg2 = coarseMesh._coarseElements[secondAggregNumber];
+				vector<HybridAlgebraicElement*> doubleAggregate;
+				for (HybridAlgebraicElement* ce1 : agg2.FineElements)
 				{
-					ElementAggregate& agg1 = _mesh._coarseElements[ce1->Number];
-					for (AlgebraicElement* fe : agg1.FineElements)
+					HybridElementAggregate& agg1 = _mesh._coarseElements[ce1->Number];
+					for (HybridAlgebraicElement* fe : agg1.FineElements)
 						doubleAggregate.push_back(fe);
 				}
 				doubleElemAggregates[secondAggregNumber] = doubleAggregate;
 			});
 
-		vector<vector<AlgebraicFace*>> doubleFaceAggregates(coarseMesh._coarseFaces.size());
+		vector<vector<HybridAlgebraicFace*>> doubleFaceAggregates(coarseMesh._coarseFaces.size());
 		NumberParallelLoop<EmptyResultChunk> parallelLoopF(coarseMesh._coarseFaces.size());
 		parallelLoopF.Execute([this, &coarseMesh, &doubleFaceAggregates](BigNumber secondAggregNumber)
 			{
-				FaceAggregate& agg2 = coarseMesh._coarseFaces[secondAggregNumber];
-				vector<AlgebraicFace*> doubleAggregate;
-				for (AlgebraicFace* cf1 : agg2.FineFaces)
+				HybridFaceAggregate& agg2 = coarseMesh._coarseFaces[secondAggregNumber];
+				vector<HybridAlgebraicFace*> doubleAggregate;
+				for (HybridAlgebraicFace* cf1 : agg2.FineFaces)
 				{
-					FaceAggregate& agg1 = _mesh._coarseFaces[cf1->Number];
-					for (AlgebraicFace* fe : agg1.FineFaces)
+					HybridFaceAggregate& agg1 = _mesh._coarseFaces[cf1->Number];
+					for (HybridAlgebraicFace* fe : agg1.FineFaces)
 						doubleAggregate.push_back(fe);
 				}
 				doubleFaceAggregates[secondAggregNumber] = doubleAggregate;
@@ -215,13 +216,13 @@ public:
 
 private:
 	// Cell prolongation Q_T with only one 1 coefficient per row
-	SparseMatrix BuildQ_T(const CondensedAlgebraicMesh& mesh)
+	SparseMatrix BuildQ_T(const HybridAlgebraicMesh& mesh)
 	{
 		DenseMatrix Id = DenseMatrix::Identity(_cellBlockSize, _cellBlockSize);
 		NumberParallelLoop<CoeffsChunk> parallelLoopQ_T(mesh._elements.size());
 		parallelLoopQ_T.Execute([this, &mesh, &Id](BigNumber elemNumber, ParallelChunk<CoeffsChunk>* chunk)
 			{
-				const AlgebraicElement& elem = mesh._elements[elemNumber];
+				const HybridAlgebraicElement& elem = mesh._elements[elemNumber];
 				chunk->Results.Coeffs.Add(elem.Number, elem.CoarseElement->Number, Id);
 			});
 		SparseMatrix Q_T = SparseMatrix(mesh._elements.size()*_cellBlockSize, mesh._coarseElements.size()*_cellBlockSize);
@@ -230,7 +231,7 @@ private:
 	}
 
 	// Face prolongation Q_F
-	SparseMatrix BuildQ_F(const CondensedAlgebraicMesh& mesh, const SparseMatrix A_F_F)
+	SparseMatrix BuildQ_F(const HybridAlgebraicMesh& mesh, const SparseMatrix A_F_F)
 	{
 		bool enableAnisotropyManagement = false;
 		DenseMatrix Id = DenseMatrix::Identity(_faceBlockSize, _faceBlockSize);
@@ -238,20 +239,20 @@ private:
 		NumberParallelLoop<CoeffsChunk> parallelLoop1(mesh._faces.size());
 		parallelLoop1.Execute([this, &mesh, &Id, enableAnisotropyManagement, &A_F_F](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
 			{
-				const AlgebraicFace* face = &mesh._faces[faceNumber];
+				const HybridAlgebraicFace* face = &mesh._faces[faceNumber];
 				if (face->IsRemovedOnCoarseMesh && (!Utils::ProgramArgs.Solver.MG.ManageAnisotropy || !face->CoarseFace))
 				{
 					// Take the average value of the coarse element faces
-					ElementAggregate* elemAggreg = face->Elements[0]->CoarseElement;
+					HybridElementAggregate* elemAggreg = face->Elements[0]->CoarseElement;
 
 					if (enableAnisotropyManagement)
 					{
-						map<FaceAggregate*, double> couplings;
+						map<HybridFaceAggregate*, double> couplings;
 						double totalCouplings = 0;
-						for (FaceAggregate* coarseFace : elemAggreg->CoarseFaces)
+						for (HybridFaceAggregate* coarseFace : elemAggreg->CoarseFaces)
 						{
 							double avgCouplingCoarseFace = 0;
-							for (AlgebraicFace* f : coarseFace->FineFaces)
+							for (HybridAlgebraicFace* f : coarseFace->FineFaces)
 							{
 								DenseMatrix couplingBlock = A_F_F.block(face->Number*_faceBlockSize, f->Number*_faceBlockSize, _faceBlockSize, _faceBlockSize);
 								double couplingFineFace = couplingBlock(0, 0);
@@ -267,14 +268,14 @@ private:
 
 						for (auto it = couplings.begin(); it != couplings.end(); it++)
 						{
-							FaceAggregate* coarseFace = it->first;
+							HybridFaceAggregate* coarseFace = it->first;
 							double coupling = it->second;
 							chunk->Results.Coeffs.Add(face->Number, coarseFace->Number, -coupling / abs(totalCouplings) * Id);
 						}
 					}
 					else
 					{
-						for (FaceAggregate* coarseFace : elemAggreg->CoarseFaces)
+						for (HybridFaceAggregate* coarseFace : elemAggreg->CoarseFaces)
 							chunk->Results.Coeffs.Add(face->Number, coarseFace->Number, 1.0 / elemAggreg->CoarseFaces.size() * Id);
 					}
 				}
@@ -288,14 +289,14 @@ private:
 		return Q_F;
 	}
 
-	SparseMatrix BuildQ_F_0Interior(const CondensedAlgebraicMesh& mesh)
+	SparseMatrix BuildQ_F_0Interior(const HybridAlgebraicMesh& mesh)
 	{
 		DenseMatrix Id = DenseMatrix::Identity(_faceBlockSize, _faceBlockSize);
 
 		NumberParallelLoop<CoeffsChunk> parallelLoop(mesh._faces.size());
 		parallelLoop.Execute([this, &mesh, &Id](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
 			{
-				const AlgebraicFace* face = &mesh._faces[faceNumber];
+				const HybridAlgebraicFace* face = &mesh._faces[faceNumber];
 				if (!face->IsRemovedOnCoarseMesh)
 					chunk->Results.Coeffs.Add(face->Number, face->CoarseFace->Number, Id);
 			});
@@ -306,7 +307,7 @@ private:
 		return Q_F;
 	}
 
-	SparseMatrix BuildTrace(const CondensedAlgebraicMesh& mesh)
+	SparseMatrix BuildTrace(const HybridAlgebraicMesh& mesh)
 	{
 		// Pi: average on both sides of each face
 		DenseMatrix traceOfConstant = DenseMatrix::Zero(_faceBlockSize, _cellBlockSize);
@@ -315,12 +316,12 @@ private:
 		NumberParallelLoop<CoeffsChunk> parallelLoopPi(mesh._faces.size());
 		parallelLoopPi.Execute([&mesh, &traceOfConstant](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
 			{
-				const AlgebraicFace& face = mesh._faces[faceNumber];
+				const HybridAlgebraicFace& face = mesh._faces[faceNumber];
 				if (face.IsRemovedOnCoarseMesh)
 					chunk->Results.Coeffs.Add(faceNumber, face.Elements[0]->Number, traceOfConstant);
 				else
 				{
-					for (AlgebraicElement* elem : face.Elements)
+					for (HybridAlgebraicElement* elem : face.Elements)
 						chunk->Results.Coeffs.Add(faceNumber, elem->Number, 1.0 / face.Elements.size()*traceOfConstant);
 				}
 			});
@@ -331,14 +332,14 @@ private:
 
 /*
 	// Cell prolongation Q_T with only one 1 coefficient per row
-	SparseMatrix BuildQ_T(const vector<vector<AlgebraicElement*>>& aggregates)
+	SparseMatrix BuildQ_T(const vector<vector<HybridAlgebraicElement*>>& aggregates)
 	{
 		DenseMatrix Id = DenseMatrix::Identity(_cellBlockSize, _cellBlockSize);
 		NumberParallelLoop<CoeffsChunk> parallelLoop(aggregates.size());
 		parallelLoop.Execute([this, &aggregates, &Id](BigNumber aggregNumber, ParallelChunk<CoeffsChunk>* chunk)
 			{
-				const vector<AlgebraicElement*>& aggreg = aggregates[aggregNumber];
-				for (AlgebraicElement* e : aggreg)
+				const vector<HybridAlgebraicElement*>& aggreg = aggregates[aggregNumber];
+				for (HybridAlgebraicElement* e : aggreg)
 					chunk->Results.Coeffs.Add(e->Number, aggregNumber, Id);
 			});
 		SparseMatrix Q_T = SparseMatrix(_mesh._elements.size()*_cellBlockSize, aggregates.size()*_cellBlockSize);
@@ -347,18 +348,18 @@ private:
 	}
 
 	// Face prolongation Q_F with only one 1 coefficient per row
-	SparseMatrix BuildQ_F(vector<vector<AlgebraicFace*>> aggregates)
+	SparseMatrix BuildQ_F(vector<vector<HybridAlgebraicFace*>> aggregates)
 	{
 		DenseMatrix Id = DenseMatrix::Identity(_faceBlockSize, _faceBlockSize);
 		NumberParallelLoop<CoeffsChunk> parallelLoop(_mesh._faces.size());
 		parallelLoop.Execute([this, &Id](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
 			{
-				const AlgebraicFace* face = &_mesh._faces[faceNumber];
+				const HybridAlgebraicFace* face = &_mesh._faces[faceNumber];
 				if (face->IsRemovedOnCoarseMesh)
 				{
-					ElementAggregate* elemAggreg = face->Elements[0]->CoarseElement;
+					HybridElementAggregate* elemAggreg = face->Elements[0]->CoarseElement;
 					double sum = 0;
-					for (FaceAggregate* coarseFace : elemAggreg->CoarseFaces)
+					for (HybridFaceAggregate* coarseFace : elemAggreg->CoarseFaces)
 						chunk->Results.Coeffs.Add(face->Number, coarseFace->Number, 1.0 / elemAggreg->CoarseFaces.size() * Id);
 				}
 				else

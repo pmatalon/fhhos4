@@ -396,6 +396,33 @@ private:
 				solver = fcg;
 			}
 		}
+		else if (args.Solver.SolverCode.compare("aggregamg") == 0 || args.Solver.SolverCode.compare("fcgaggregamg") == 0)
+		{
+			AggregAMG* mg = new AggregAMG(blockSize, args.Solver.MG.Levels);
+			mg->MatrixMaxSizeForCoarsestLevel = args.Solver.MG.MatrixMaxSizeForCoarsestLevel;
+			mg->Cycle = args.Solver.MG.CycleLetter;
+			mg->WLoops = args.Solver.MG.WLoops;
+			mg->UseGalerkinOperator = args.Solver.MG.UseGalerkinOperator;
+			mg->PreSmootherCode = args.Solver.MG.PreSmootherCode;
+			mg->PostSmootherCode = args.Solver.MG.PostSmootherCode;
+			mg->PreSmoothingIterations = args.Solver.MG.PreSmoothingIterations;
+			mg->PostSmoothingIterations = args.Solver.MG.PostSmoothingIterations;
+			mg->RelaxationParameter = args.Solver.RelaxationParameter;
+			mg->CoarseLevelChangeSmoothingCoeff = args.Solver.MG.CoarseLevelChangeSmoothingCoeff;
+			mg->CoarseLevelChangeSmoothingOperator = args.Solver.MG.CoarseLevelChangeSmoothingOperator;
+			mg->CoarseningStgy = args.Solver.MG.CoarseningStgy;
+			mg->CoarseningFactor = args.Solver.MG.CoarseningFactor;
+			mg->ExportComponents = args.Actions.ExportMultigridComponents;
+
+			if (args.Solver.SolverCode.compare("aggregamg") == 0)
+				solver = mg;
+			else if (args.Solver.SolverCode.compare("fcgaggregamg") == 0)
+			{
+				FlexibleConjugateGradient* fcg = new FlexibleConjugateGradient(1);
+				fcg->Precond = Preconditioner(mg);
+				solver = fcg;
+			}
+		}
 		else if (args.Solver.SolverCode.compare("lu") == 0)
 			solver = new EigenSparseLU();
 		else if (args.Solver.SolverCode.compare("cg") == 0)

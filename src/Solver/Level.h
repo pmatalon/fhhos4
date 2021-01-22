@@ -60,8 +60,8 @@ public:
 			if (this->UseGalerkinOperator)
 			{
 				cout << "\t\tGalerkin operator   : "; cout.flush();
-				this->_galerkinOperator = FinerLevel->R * *(FinerLevel->OperatorMatrix) * FinerLevel->P;
-				this->OperatorMatrix = &this->_galerkinOperator;
+				if (!this->OperatorMatrix)
+					ComputeGalerkinOperator();
 			}
 			else
 			{
@@ -109,6 +109,12 @@ public:
 		OnEndSetup();
 	}
 
+	void ComputeGalerkinOperator()
+	{
+		this->_galerkinOperator = FinerLevel->R * *(FinerLevel->OperatorMatrix) * FinerLevel->P;
+		this->OperatorMatrix = &this->_galerkinOperator;
+	}
+
 	Vector Restrict(Vector& vectorOnThisLevel)
 	{
 		Vector coarseVector = R * vectorOnThisLevel;
@@ -131,7 +137,15 @@ public:
 		return 2 * P.nonZeros();
 	}
 
-	virtual BigNumber NUnknowns() = 0;
+	virtual BigNumber NUnknowns()
+	{
+		if (this->OperatorMatrix)
+			return this->OperatorMatrix->rows();
+		else if (!this->IsFinestLevel())
+			return this->FinerLevel->P.cols();
+		assert(false && "NUnknowns() should be overriden");
+	}
+
 	virtual void CoarsenMesh(CoarseningStrategy coarseningStgy, int coarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) = 0;
 
 	virtual void ExportVector(const Vector& v, string suffix, int levelNumber) = 0;
