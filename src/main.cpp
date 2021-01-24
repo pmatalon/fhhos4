@@ -203,14 +203,16 @@ void print_usage() {
 	cout << "              1    - Galerkin operator" << endl;
 	cout << endl;
 	cout << "-smoothers CODE,CODE" << endl;
-	cout << "      Pre-smoother,post-smoother: \"gs,rgs\" for example." << endl;
+	cout << "      Pre-smoother,post-smoother: \"bgs,rbgs\" for example." << endl;
 	cout << "              j    - Jacobi" << endl;
 	cout << "              gs   - Gauss-Seidel" << endl;
 	cout << "              rgs  - Reverse Gauss-Seidel" << endl;
+	cout << "              sgs  - Symmetric Gauss-Seidel" << endl;
 	cout << "              bj   - Block Jacobi: the block size is set to the number of DOFs per face" << endl;
 	cout << "              bj23 - Block Jacobi with a damping factor of 2/3" << endl;
 	cout << "              bgs  - Block Gauss-Seidel: the block size is set to the number of DOFs per face" << endl;
 	cout << "              rbgs - Reverse Block Gauss-Seidel" << endl;
+	cout << "              sbgs - Symmetric Block Gauss-Seidel" << endl;
 	cout << endl;
 	cout << "-cs CODE" << endl;
 	cout << "      Coarsening strategy of the multigrid." << endl;

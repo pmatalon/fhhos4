@@ -18,6 +18,9 @@ public:
 		if (smootherCode.compare("rbsor") == 0 || smootherCode.compare("rbgs") == 0)
 			return new BlockSORSmoother(blockSize, omega, Direction::Backward, nSmootherIterations);
 
+		if (smootherCode.compare("sbsor") == 0 || smootherCode.compare("sbgs") == 0)
+			return new BlockSORSmoother(blockSize, omega, Direction::Symmetric, nSmootherIterations);
+
 		if (smootherCode.compare("j") == 0)
 			return new BlockJacobiSmoother(1, omega, nSmootherIterations);
 		if (smootherCode.compare("bj") == 0)

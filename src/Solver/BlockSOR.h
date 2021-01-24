@@ -6,7 +6,8 @@ using namespace std;
 enum class Direction : unsigned
 {
 	Forward = 0,
-	Backward = 1
+	Backward = 1,
+	Symmetric
 };
 
 class BlockSOR : public IterativeSolver
@@ -30,19 +31,30 @@ public:
 
 	virtual void Serialize(ostream& os) const override
 	{
+		if (_direction == Direction::Symmetric)
+			os << "Symmetric ";
 		if (_blockSize != 1)
 			os << "Block ";
-		if (_omega == 1)
-			os << "Gauss-Seidel ";
-		else
-			os << "SOR ";
+		os << (_omega == 1 ? "Gauss-Seidel" : "SOR");
 
-		os << " (";
+		if (_direction != Direction::Symmetric || _blockSize != 1 || _omega != 1)
+			os << " (";
 		if (_blockSize != 1)
-			os << "blockSize=" << _blockSize << ", ";
+		{
+			os << "blockSize=" << _blockSize;
+			if (_omega != 1 || _direction != Direction::Symmetric)
+				os << ", ";
+		}
 		if (_omega != 1)
-			os << "omega=" << _omega << ", ";
-		os << "direction=" << (_direction == Direction::Forward ? "forward" : "backward") << ")";
+		{
+			os << "omega=" << _omega;
+			if (_direction != Direction::Symmetric)
+				os << ", ";
+		}
+		if (_direction != Direction::Symmetric)
+			os << "direction=" << (_direction == Direction::Forward ? "forward" : "backward");
+		if (_direction != Direction::Symmetric || _blockSize != 1 || _omega != 1)
+			os << ")";
 	}
 
 	//------------------------------------------------//
@@ -81,14 +93,24 @@ private:
 			for (BigNumber i = 0; i < nb; ++i)
 				ProcessBlockRow(i, b, x);
 		}
-		else
+		else if (_direction == Direction::Backward)
 		{
+			for (BigNumber i = 0; i < nb; ++i)
+				ProcessBlockRow(nb - i - 1, b, x);
+		}
+		else // Symmetric
+		{
+			// Forward
+			for (BigNumber i = 0; i < nb; ++i)
+				ProcessBlockRow(i, b, x);
+			// Backward
 			for (BigNumber i = 0; i < nb; ++i)
 				ProcessBlockRow(nb - i - 1, b, x);
 		}
 
 		result.SetX(x);
-		result.AddCost(2 * A.nonZeros() + nb * pow(_blockSize, 2));
+		double sweepCost = 2 * A.nonZeros() + nb * pow(_blockSize, 2);
+		result.AddCost(_direction == Direction::Symmetric ? 2*sweepCost : sweepCost);
 		return result;
 	}
 

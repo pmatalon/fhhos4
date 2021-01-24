@@ -60,6 +60,11 @@ public:
 		return this->x;
 	}
 
+	Vector& X()
+	{
+		return this->x;
+	}
+
 	void SetX(const Vector& x)
 	{
 		this->x = x;

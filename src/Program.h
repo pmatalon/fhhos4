@@ -435,12 +435,16 @@ private:
 			solver = new BlockJacobi(1, args.Solver.RelaxationParameter);
 		else if (args.Solver.SolverCode.compare("sor") == 0 || args.Solver.SolverCode.compare("gs") == 0)
 			solver = new BlockSOR(1, args.Solver.RelaxationParameter, Direction::Forward);
+		else if (args.Solver.SolverCode.compare("ssor") == 0 || args.Solver.SolverCode.compare("sgs") == 0)
+			solver = new BlockSOR(1, args.Solver.RelaxationParameter, Direction::Symmetric);
 		else if (args.Solver.SolverCode.compare("rsor") == 0 || args.Solver.SolverCode.compare("rgs") == 0)
 			solver = new BlockSOR(1, args.Solver.RelaxationParameter, Direction::Backward);
 		else if (args.Solver.SolverCode.compare("bsor") == 0 || args.Solver.SolverCode.compare("bgs") == 0)
 			solver = new BlockSOR(blockSize, args.Solver.RelaxationParameter, Direction::Forward);
 		else if (args.Solver.SolverCode.compare("rbsor") == 0 || args.Solver.SolverCode.compare("rbgs") == 0)
 			solver = new BlockSOR(blockSize, args.Solver.RelaxationParameter, Direction::Backward);
+		else if (args.Solver.SolverCode.compare("sbsor") == 0 || args.Solver.SolverCode.compare("sbgs") == 0)
+			solver = new BlockSOR(blockSize, args.Solver.RelaxationParameter, Direction::Symmetric);
 		else if (args.Solver.SolverCode.compare("bj") == 0)
 			solver = new BlockJacobi(blockSize, args.Solver.RelaxationParameter);
 		else if (args.Solver.SolverCode.compare("bj23") == 0)
