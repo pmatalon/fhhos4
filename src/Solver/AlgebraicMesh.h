@@ -52,14 +52,18 @@ public:
 				AlgebraicElement& elem = _elements[elemNumber];
 				elem.Number = elemNumber;
 
-				// RowMajor --> the following line iterates over the non-zeros of the elemNumber-th row.
-				for (SparseMatrix::InnerIterator it(A, elemNumber*_blockSize); it; ++it)
+				for (int k = 0; k < _blockSize; k++)
 				{
-					BigNumber neighbourNumber = it.col() / _blockSize;
-					if (neighbourNumber != elemNumber)
+					// RowMajor --> the following line iterates over the non-zeros of the elemNumber-th row.
+					for (SparseMatrix::InnerIterator it(A, elemNumber*_blockSize + k); it; ++it)
 					{
-						AlgebraicElement* neighbour = &_elements[neighbourNumber];
-						elem.Neighbours.push_back(neighbour);
+						BigNumber neighbourNumber = it.col() / _blockSize;
+						if (neighbourNumber != elemNumber)
+						{
+							AlgebraicElement* neighbour = &_elements[neighbourNumber];
+							if (find(elem.Neighbours.begin(), elem.Neighbours.end(), neighbour) == elem.Neighbours.end())
+								elem.Neighbours.push_back(neighbour);
+						}
 					}
 				}
 			});
@@ -103,22 +107,24 @@ private:
 		AlgebraicElement* strongestNeighbour = nullptr;
 		double strongestNegativeCoupling = 0;
 		int smallestAggregateSize = 1000000;
-		//DenseMatrix elemBlock = A->block(e.Number*_blockSize, e.Number*_blockSize, _blockSize, _blockSize);
-		//double elemKappa = elemBlock(0, 0);
 		for (AlgebraicElement* n : e.Neighbours)
 		{
 			if (n == &e || (checkAvailability && n->IsAggregated))
 				continue;
 
-			/*DenseMatrix neighourBlock = A->block(n->Number*_blockSize, n->Number*_blockSize, _blockSize, _blockSize);
-			double neighbourKappa = neighourBlock(0, 0);
-			double minKappa = min(elemKappa, neighbourKappa);
-			double maxKappa = max(elemKappa, neighbourKappa);
-			if (maxKappa/minKappa > 10)
-				continue;*/
-
 			DenseMatrix couplingBlock = A->block(e.Number*_blockSize, n->Number*_blockSize, _blockSize, _blockSize);
-			double coupling = couplingBlock(0, 0);
+			//double coupling = couplingBlock(0, 0);
+			//Eigen::VectorXd eigenVals = (couplingBlock.transpose()*couplingBlock).selfadjointView().eigenvalues();
+			//cout << "Trace = " << endl << couplingBlock.trace() << endl;
+			/*Eigen::SelfAdjointEigenSolver<DenseMatrix> es(couplingBlock.transpose()*couplingBlock);
+			Eigen::VectorXd eigenVals = es.eigenvalues();
+			cout << "Eigenvalues = " << endl << eigenVals << endl;
+			cout << "sqrt(Eigenvalues) = " << endl << eigenVals.cwiseSqrt() << endl;
+			//cout << eigenVals.cwiseSqrt().minCoeff() << endl;
+			cout << endl;
+			double coupling = eigenVals.cwiseSqrt().minCoeff();*/
+			double coupling = couplingBlock.trace();
+
 			if (coupling < strongestNegativeCoupling)
 			{
 				if (checkAvailability)
