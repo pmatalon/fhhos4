@@ -8,20 +8,18 @@ class AggregLevel : public Level
 {
 private:
 	int _blockSize;
+	double _strongCouplingThreshold;
 	AlgebraicMesh _mesh;
-//public:
-	//const SparseMatrix* A;
 private:
 	SparseMatrix Q_T;
 	SparseMatrix Q_F;
 
-	//SparseMatrix Ac;
-
 public:
-	AggregLevel(int number, int blockSize)
-		: Level(number), _mesh(blockSize)
+	AggregLevel(int number, int blockSize, double strongCouplingThreshold)
+		: Level(number), _mesh(blockSize, strongCouplingThreshold)
 	{
 		this->_blockSize = blockSize;
+		this->_strongCouplingThreshold = strongCouplingThreshold;
 	}
 
 	/*BigNumber NUnknowns() override
@@ -59,12 +57,14 @@ public:
 		{
 			cout << "(";
 			for (auto e : agg.FineElements)
-				cout << e->Number << ", ";
+				cout << (e->Number) << ", ";
 			cout << ")" << endl;
 		}*/
 
 		// Cell-prolongation operator with only one 1 coefficient per row
 		SparseMatrix Q_T1 = BuildQ_T(_mesh);
+
+		//ExportMatrix(Q_T1, "P", 0);
 		
 		// Intermediate coarse operators
 		SparseMatrix A1 = Q_T1.transpose() * (*this->OperatorMatrix) * Q_T1;
@@ -73,7 +73,7 @@ public:
 		// Second pairwise aggregation //
 		//-----------------------------//
 
-		AlgebraicMesh coarseMesh(_blockSize);
+		AlgebraicMesh coarseMesh(_blockSize, _strongCouplingThreshold);
 		coarseMesh.Build(A1);
 		coarseMesh.PairWiseAggregate(coarsestPossibleMeshReached);
 		if (coarsestPossibleMeshReached)
@@ -128,15 +128,17 @@ class AggregAMG : public Multigrid
 {
 private:
 	int _blockSize;
+	double _strongCouplingThreshold;
 public:
 
-	AggregAMG(int blockSize, int nLevels = 0)
+	AggregAMG(int blockSize, double strongCouplingThreshold, int nLevels = 0)
 		: Multigrid(nLevels)
 	{
 		this->_blockSize = blockSize;
+		this->_strongCouplingThreshold = strongCouplingThreshold;
 		this->BlockSizeForBlockSmoothers = blockSize;
 		this->UseGalerkinOperator = true;
-		this->_fineLevel = new AggregLevel(0, blockSize);
+		this->_fineLevel = new AggregLevel(0, blockSize, strongCouplingThreshold);
 	}
 
 	void BeginSerialize(ostream& os) const override
@@ -158,7 +160,7 @@ public:
 protected:
 	Level* CreateCoarseLevel(Level* fineLevel) override
 	{
-		AggregLevel* coarseLevel = new AggregLevel(fineLevel->Number + 1, _blockSize);
+		AggregLevel* coarseLevel = new AggregLevel(fineLevel->Number + 1, _blockSize, _strongCouplingThreshold);
 		return coarseLevel;
 	}
 };

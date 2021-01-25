@@ -405,7 +405,7 @@ private:
 		}
 		else if (args.Solver.SolverCode.compare("aggregamg") == 0 || args.Solver.SolverCode.compare("fcgaggregamg") == 0)
 		{
-			AggregAMG* mg = new AggregAMG(blockSize, args.Solver.MG.Levels);
+			AggregAMG* mg = new AggregAMG(blockSize, 0.25, args.Solver.MG.Levels);
 			mg->MatrixMaxSizeForCoarsestLevel = args.Solver.MG.MatrixMaxSizeForCoarsestLevel;
 			mg->Cycle = args.Solver.MG.CycleLetter;
 			mg->WLoops = args.Solver.MG.WLoops;
