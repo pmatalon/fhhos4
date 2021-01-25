@@ -64,6 +64,7 @@ struct SolverArguments
 	double Tolerance = 1e-8;
 	int MaxIterations = 200;
 	double RelaxationParameter = 1;
+	int BlockSize = -1;
 	MultigridArguments MG;
 };
 

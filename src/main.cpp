@@ -137,21 +137,21 @@ void print_usage() {
 	cout << endl;
 	cout << "-s SOLVER" << endl;
 	cout << "      Linear solver." << endl;
-	cout << "              default   - 'lu' for small problems, 'eigencg' for bigger problems, 'mg' for HHO" << endl;
-	cout << "              lu        - LU factorization (Eigen library)" << endl;
-	cout << "              cg        - Conjugate Gradient, no preconditioner" << endl;
-	cout << "              eigencg   - Conjugate Gradient (Eigen library) with diagonal preconditioner" << endl;
-	cout << "              fcg       - Flexible Conjugate Gradient (truncation-restart: FCG(1)), no preconditioner" << endl;
-	cout << "              [b]j      - [Block] Jacobi" << endl;
-	cout << "              [r][b]gs  - [Reverse order] [Block] Gauss-Seidel" << endl;
-	cout << "              [r][b]sor - [Reverse order] [Block] SOR (identical to gs, both can use argument -relax)" << endl;
-	cout << "              mg        - Custom multigrid for HHO" << endl;
-	cout << "              cgmg      - Conjugate Gradient, preconditioned with the custom multigrid for HHO 'mg'" << endl;
-	cout << "              fcgmg     - Flexible Conjugate Gradient FCG(1), preconditioned with the custom multigrid for HHO 'mg' (meant to be used with K-cycle)" << endl;
-	cout << "              camg      - Condensed AMG (for hybrid discretizations with static condensation)" << endl;
-	cout << "              fcgcamg   - Flexible Conjugate Gradient FCG(1), preconditioned with CondensedAMG 'camg' (meant to be used with K-cycle)" << endl;
-	cout << "              agmg      - Yvan Notay's AGMG solver" << endl;
-	cout << "              aggregamg - In-house implementation of AGMG" << endl;
+	cout << "              default     - 'lu' for small problems, 'eigencg' for bigger problems, 'mg' for HHO" << endl;
+	cout << "              lu          - LU factorization (Eigen library)" << endl;
+	cout << "              cg          - Conjugate Gradient, no preconditioner" << endl;
+	cout << "              eigencg     - Conjugate Gradient (Eigen library) with diagonal preconditioner" << endl;
+	cout << "              fcg         - Flexible Conjugate Gradient (truncation-restart: FCG(1)), no preconditioner" << endl;
+	cout << "              [b]j        - [Block] Jacobi" << endl;
+	cout << "              [r|s][b]gs  - [Reverse order|Symmetric] [Block] Gauss-Seidel" << endl;
+	cout << "              [r|s][b]sor - [Reverse order|Symmetric] [Block] SOR (identical to gs, both can use argument -relax)" << endl;
+	cout << "              mg          - Custom multigrid for HHO" << endl;
+	cout << "              cgmg        - Conjugate Gradient, preconditioned with the custom multigrid for HHO 'mg'" << endl;
+	cout << "              fcgmg       - Flexible Conjugate Gradient FCG(1), preconditioned with the custom multigrid for HHO 'mg' (meant to be used with K-cycle)" << endl;
+	cout << "              camg        - Condensed AMG (for hybrid discretizations with static condensation)" << endl;
+	cout << "              fcgcamg     - Flexible Conjugate Gradient FCG(1), preconditioned with CondensedAMG 'camg' (meant to be used with K-cycle)" << endl;
+	cout << "              agmg        - Yvan Notay's AGMG solver" << endl;
+	cout << "              aggregamg   - In-house implementation of AGMG" << endl;
 	cout << "      For the block solvers, the block size is set to the number of DOFs per cell (DG) or face (HHO)." << endl;
 	cout << "      Jacobi, Gauss-Seidel and SOR can use argument -relax to change the relaxation parameter." << endl;
 	cout << endl;
@@ -169,7 +169,11 @@ void print_usage() {
 	cout << "      Maximum number of iterations for the iterative solver (default: 200)." << endl;
 	cout << endl;
 	cout << "-relax NUM" << endl;
-	cout << "      Relaxation parameter in (0,2) used for the Jacobi, Gauss-Seidel, SOR and their derived versions (default: 1)." << endl;
+	cout << "      Relaxation parameter used for Jacobi, Gauss-Seidel, SOR and their derived versions (default: 1)." << endl;
+	cout << endl;
+	cout << "-block-size NUM" << endl;
+	cout << "      Forces a block size for the block verions of Jacobi, Gauss-Seidel, SOR." << endl;
+	cout << "      By default, the value is adapted to the space dimension and the polynomial order of the discretization." << endl;
 	cout << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << "                                 Multigrid                            " << endl;
@@ -430,6 +434,7 @@ int main(int argc, char* argv[])
 		OPT_Tolerance,
 		OPT_MaxIterations,
 		OPT_Relaxation,
+		OPT_BlockSize,
 		// Multigrid
 		OPT_MGCycle,
 		OPT_CellInterpCode,
@@ -477,6 +482,7 @@ int main(int argc, char* argv[])
 		 { "tol", required_argument, NULL, OPT_Tolerance },
 		 { "max-iter", required_argument, NULL, OPT_MaxIterations },
 		 { "relax", required_argument, NULL, OPT_Relaxation },
+		 { "block-size", required_argument, NULL, OPT_BlockSize },
 		 // Multigrid
 		 { "cycle", required_argument, NULL, OPT_MGCycle },
 		 { "cell-interp", required_argument, NULL, OPT_CellInterpCode },
@@ -651,6 +657,9 @@ int main(int argc, char* argv[])
 				break;
 			case OPT_Relaxation:
 				args.Solver.RelaxationParameter = atof(optarg);
+				break;
+			case OPT_BlockSize:
+				args.Solver.BlockSize = atoi(optarg);
 				break;
 
 			//---------------//

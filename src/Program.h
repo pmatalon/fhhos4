@@ -208,16 +208,21 @@ public:
 			cout << "-                 Linear system solution                 -" << endl;
 			cout << "----------------------------------------------------------" << endl;
 
-			int blockSizeForBlockSolver = 1;
-			if (args.Discretization.Method.compare("dg") == 0)
+			int blockSizeForBlockSolver = -1;
+			if (args.Solver.BlockSize != -1)
+				blockSizeForBlockSolver = args.Solver.BlockSize;
+			else
 			{
-				Diffusion_DG<Dim>* dgPb = static_cast<Diffusion_DG<Dim>*>(problem);
-				blockSizeForBlockSolver = dgPb->Basis->Size();
-			}
-			else if (args.Discretization.Method.compare("hho") == 0)
-			{
-				Diffusion_HHO<Dim>* hhoPb = static_cast<Diffusion_HHO<Dim>*>(problem);
-				blockSizeForBlockSolver = hhoPb->HHO->FaceBasis->Size();
+				if (args.Discretization.Method.compare("dg") == 0)
+				{
+					Diffusion_DG<Dim>* dgPb = static_cast<Diffusion_DG<Dim>*>(problem);
+					blockSizeForBlockSolver = dgPb->Basis->Size();
+				}
+				else if (args.Discretization.Method.compare("hho") == 0)
+				{
+					Diffusion_HHO<Dim>* hhoPb = static_cast<Diffusion_HHO<Dim>*>(problem);
+					blockSizeForBlockSolver = hhoPb->HHO->FaceBasis->Size();
+				}
 			}
 
 			Solver* solver = CreateSolver(args, problem, blockSizeForBlockSolver);
@@ -344,6 +349,7 @@ private:
 				mg->PreSmoothingIterations = args.Solver.MG.PreSmoothingIterations;
 				mg->PostSmoothingIterations = args.Solver.MG.PostSmoothingIterations;
 				mg->RelaxationParameter = args.Solver.RelaxationParameter;
+				mg->BlockSizeForBlockSmoothers = blockSize;
 				mg->CoarseLevelChangeSmoothingCoeff = args.Solver.MG.CoarseLevelChangeSmoothingCoeff;
 				mg->CoarseLevelChangeSmoothingOperator = args.Solver.MG.CoarseLevelChangeSmoothingOperator;
 				mg->CoarseningStgy = args.Solver.MG.CoarseningStgy;
@@ -381,6 +387,7 @@ private:
 			mg->PreSmoothingIterations = args.Solver.MG.PreSmoothingIterations;
 			mg->PostSmoothingIterations = args.Solver.MG.PostSmoothingIterations;
 			mg->RelaxationParameter = args.Solver.RelaxationParameter;
+			mg->BlockSizeForBlockSmoothers = blockSize;
 			mg->CoarseLevelChangeSmoothingCoeff = args.Solver.MG.CoarseLevelChangeSmoothingCoeff;
 			mg->CoarseLevelChangeSmoothingOperator = args.Solver.MG.CoarseLevelChangeSmoothingOperator;
 			mg->CoarseningStgy = args.Solver.MG.CoarseningStgy;
@@ -402,12 +409,13 @@ private:
 			mg->MatrixMaxSizeForCoarsestLevel = args.Solver.MG.MatrixMaxSizeForCoarsestLevel;
 			mg->Cycle = args.Solver.MG.CycleLetter;
 			mg->WLoops = args.Solver.MG.WLoops;
-			mg->UseGalerkinOperator = args.Solver.MG.UseGalerkinOperator;
+			//mg->UseGalerkinOperator = args.Solver.MG.UseGalerkinOperator;
 			mg->PreSmootherCode = args.Solver.MG.PreSmootherCode;
 			mg->PostSmootherCode = args.Solver.MG.PostSmootherCode;
 			mg->PreSmoothingIterations = args.Solver.MG.PreSmoothingIterations;
 			mg->PostSmoothingIterations = args.Solver.MG.PostSmoothingIterations;
 			mg->RelaxationParameter = args.Solver.RelaxationParameter;
+			mg->BlockSizeForBlockSmoothers = blockSize;
 			mg->CoarseLevelChangeSmoothingCoeff = args.Solver.MG.CoarseLevelChangeSmoothingCoeff;
 			mg->CoarseLevelChangeSmoothingOperator = args.Solver.MG.CoarseLevelChangeSmoothingOperator;
 			mg->CoarseningStgy = args.Solver.MG.CoarseningStgy;
