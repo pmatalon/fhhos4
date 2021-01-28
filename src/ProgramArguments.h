@@ -36,7 +36,9 @@ struct MultigridArguments
 	int Levels = 0;
 	int ProlongationCode = 0;
 	Prolongation GMGProlong = Prolongation::Default;
-	CAMGProlongation CAMGProlong = CAMGProlongation::P;
+	int FaceProlongationCode = 0;
+	CAMGFaceProlongation CAMGFaceProlong = CAMGFaceProlongation::FaceAggregates;
+	CAMGProlongation CAMGProlong = CAMGProlongation::ReconstructionTrace1Step;
 	int MatrixMaxSizeForCoarsestLevel = 1000;
 	char CycleLetter = 'V';
 	int WLoops = 1;

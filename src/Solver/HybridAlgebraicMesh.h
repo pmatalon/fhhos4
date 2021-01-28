@@ -100,16 +100,19 @@ public:
 				HybridAlgebraicElement& elem = _elements[elemNumber];
 				elem.Number = elemNumber;
 
-				// RowMajor --> the following line iterates over the non-zeros of the elemNumber-th row.
-				for (SparseMatrix::InnerIterator it(A_T_F, elemNumber*_cellBlockSize); it; ++it)
+				for (int k = 0; k < _cellBlockSize; k++)
 				{
-					BigNumber faceNumber = it.col() / _faceBlockSize;
-					HybridAlgebraicFace* face = &_faces[faceNumber];
-					if (find(elem.Faces.begin(), elem.Faces.end(), face) == elem.Faces.end())
+					// RowMajor --> the following line iterates over the non-zeros of the elemNumber-th row.
+					for (SparseMatrix::InnerIterator it(A_T_F, elemNumber*_cellBlockSize + k); it; ++it)
 					{
-						//face->Number = faceNumber;
-						elem.Faces.push_back(face);
-						//face->Elements.push_back(&elem);
+						BigNumber faceNumber = it.col() / _faceBlockSize;
+						HybridAlgebraicFace* face = &_faces[faceNumber];
+						if (find(elem.Faces.begin(), elem.Faces.end(), face) == elem.Faces.end())
+						{
+							//face->Number = faceNumber;
+							elem.Faces.push_back(face);
+							//face->Elements.push_back(&elem);
+						}
 					}
 				}
 			});
@@ -156,7 +159,7 @@ public:
 			});
 	}
 
-	void PairWiseAggregate(bool& coarsestPossibleMeshReached)
+	void PairWiseAggregate(CoarseningStrategy coarseningStgy, bool& coarsestPossibleMeshReached)
 	{
 		// Element aggregation
 		_coarseElements.reserve(_elements.size() / 2);
@@ -246,28 +249,33 @@ public:
 			});
 
 		// Face aggregation:
-		// Collapse faces interfacing two element aggregates.
 
 		this->_coarseFaces.reserve(_faces.size()); // must reserve sufficient space
-		for (HybridElementAggregate& coarseElem : _coarseElements)
+		if (coarseningStgy == CoarseningStrategy::CAMGCollapseElementInterfaces ||
+			coarseningStgy == CoarseningStrategy::CAMGCollapseElementInterfacesAndTyrAggregInteriorToBoundaries)
 		{
-			for (auto it = coarseElem.Neighbours.begin(); it != coarseElem.Neighbours.end(); it++)
+			// Collapse faces interfacing two element aggregates.
+			for (HybridElementAggregate& coarseElem : _coarseElements)
 			{
-				HybridElementAggregate* neighbour = it->first;
-				vector<HybridAlgebraicFace*> fineFaces = it->second;
-				if (!fineFaces.front()->CoarseFace)
+				for (auto it = coarseElem.Neighbours.begin(); it != coarseElem.Neighbours.end(); it++)
 				{
-					_coarseFaces.emplace_back(_coarseFaces.size(), fineFaces);
-					HybridFaceAggregate* coarseFace = &_coarseFaces.back(); // if _coarseFaces is reallocated, all the pointers already taken are invalid 
-					for (HybridAlgebraicFace* fineFace : fineFaces)
-						fineFace->CoarseFace = coarseFace;
-					coarseElem.CoarseFaces.push_back(coarseFace);
-					neighbour->CoarseFaces.push_back(coarseFace);
+					HybridElementAggregate* neighbour = it->first;
+					vector<HybridAlgebraicFace*> fineFaces = it->second;
+					if (!fineFaces.front()->CoarseFace)
+					{
+						_coarseFaces.emplace_back(_coarseFaces.size(), fineFaces);
+						HybridFaceAggregate* coarseFace = &_coarseFaces.back(); // if _coarseFaces is reallocated, all the pointers already taken are invalid
+						for (HybridAlgebraicFace* fineFace : fineFaces)
+							fineFace->CoarseFace = coarseFace;
+						coarseElem.CoarseFaces.push_back(coarseFace);
+						neighbour->CoarseFaces.push_back(coarseFace);
+					}
 				}
 			}
 		}
 
-		if (Utils::ProgramArgs.Solver.MG.ManageAnisotropy)
+
+		if (coarseningStgy == CoarseningStrategy::CAMGCollapseElementInterfacesAndTyrAggregInteriorToBoundaries)
 		{
 			// Agglomerate removed faces
 			for (HybridAlgebraicFace& face : _faces)
@@ -291,8 +299,6 @@ public:
 					coarsestPossibleMeshReached = true;
 					return;*/
 				}
-
-				
 			}
 		}
 	}

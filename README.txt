@@ -2,11 +2,13 @@ This program depends on the following third-party softwares:
 - Eigen
 - CGAL (version 5.0 or later)
 - GMSH (version 4.6 or later)
+Optional:
+- AGMG (version 3.3.5 or later)
 
 Eigen and CGAL are header-only libraries, they are shipped with this code and shall be compiled simultaneously with the program.
 So without the need for a specific version of those libraries, you have nothing to do. You can then skip step 1.
 Only GMSH is to be installed. To do so, follow step 2.
-Finally, build the program following step 3.
+Finally, build the program following step 4.
 
 
 ###############################################################################################
@@ -39,11 +41,21 @@ Finally, build the program following step 3.
 > make
 
 ###############################################################################################
-#### 3. Use CMake to build dghho
+#### 3. (Optional) Install AGMG version 3.3.5 or later
+#### AGMG must be compiled to get the .o files
+
+> mkdir agmg && cd agmg     # create it wherever you want
+> mv <path>/AGMG_3.3.5-aca.for.tar.gz .
+> tar -xvf AGMG_3.3.5-aca.for.tar.gz
+> cd AGMG_3.3.5-aca/Example_seq/
+> make                      # the .o files should be in the SRC/ directory
+
+###############################################################################################
+#### 4. Use CMake to build dghho
 
 > cd <path-to-dghho>
 > mkdir build && cd build
-> cmake -DCMAKE_BUILD_TYPE=Release -DGMSH_API=<path>/gmsh/gmsh-4.6.0-source/api -DGMSH_LIB=<path>/gmsh/gmsh-4.6.0-source/build/libgmsh.so ..
+> cmake -DCMAKE_BUILD_TYPE=Release -DGMSH_API=<path>/gmsh/gmsh-4.6.0-source/api -DGMSH_LIB=<path>/gmsh/gmsh-4.6.0-source/build/libgmsh.so -DENABLE_AGMG=ON -DAGMG_DIR=<path>/agmg/AGMG_3.3.5-aca/SRC ..
 > make
 
 ###############################################################################################

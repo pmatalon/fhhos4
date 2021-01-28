@@ -9,15 +9,17 @@ extern "C" void dagmg_(int*, double*, int*, int*, double*, double*, int*, int*, 
 class AGMG : public Solver
 {
 private:
-	SparseMatrix A;
+	const SparseMatrix* A;
 
 public:
 	double Tolerance;
+	int MaxIterations;
 
-	AGMG(double tolerance) : Solver() 
+	AGMG(double tolerance, int maxIterations) : Solver() 
 	{
 #ifdef AGMG_ENABLED
 		this->Tolerance = tolerance;
+		this->MaxIterations = maxIterations;
 #else
 		assert(false && "AGMG is disabled. The source must be recompiled with the appropriate option to use AGMG.");
 #endif
@@ -30,18 +32,18 @@ public:
 
 	void Setup(const SparseMatrix& A) override
 	{
-		this->A = A;
+		this->A = &A;
 	}
 
 	Vector Solve(const Vector& b) override
 	{
 #ifdef AGMG_ENABLED
 		int ijob = 0, nrest = 1;
-		int nun = this->A.cols();
-		int nnz = this->A.nonZeros();
+		int nun = this->A->cols();
+		int nnz = this->A->nonZeros();
 
 		/*      maximal number of iterations */
-		int iter = 100;
+		int iter = this->MaxIterations;
 		/*      tolerance on relative residual norm */
 		double tol = this->Tolerance;
 		/*      unit number for output messages: 6 => standard output */
@@ -60,15 +62,15 @@ public:
 		/*        next set entries */
 		for (int i = 0; i < nnz; i++)
 		{
-			a[i] = this->A.valuePtr()[i];
-			ja[i] = this->A.innerIndexPtr()[i] + 1;
+			a[i] = this->A->valuePtr()[i];
+			ja[i] = this->A->innerIndexPtr()[i] + 1;
 		}
 		for (int i = 0; i < nun; i++)
 		{
-			ia[i] = this->A.outerIndexPtr()[i] + 1;
+			ia[i] = this->A->outerIndexPtr()[i] + 1;
 			f[i] = b[i];
 		}
-		ia[nun] = this->A.outerIndexPtr()[nun] + 1; // last value
+		ia[nun] = this->A->outerIndexPtr()[nun] + 1; // last value
 
 		/*      call agmg
 		argument 5 (ijob)  is 0 because we want a complete solve

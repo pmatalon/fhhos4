@@ -220,10 +220,11 @@ void print_usage() {
 	cout << endl;
 	cout << "-cs CODE" << endl;
 	cout << "      Coarsening strategy of the multigrid." << endl;
+	cout << "      'mg':" << endl;
 	cout << "              s   - Standard coarsening (merge colinear faces on the coarse mesh)" << endl;
 	cout << "              r   - Fine meshes obtained by structured refinement of the coarse mesh using GMSH's splitting method" << endl;
 	cout << "              b   - Fine meshes obtained by Bey's tetrahedral refinements of coarse meshes" << endl;
-	cout << "              m   - Independant remeshing by GMSH with double the mesh size (non-nested!)." << endl;
+	cout << "              m   - Independant remeshing by GMSH with double the mesh size (non-nested!)" << endl;
 	cout << "              n   - Agglomeration coarsening with face collapsing (non-nested!)" << endl;
 	cout << "              a   - (Experimental) Agglomeration coarsening (keep fine faces on the coarse mesh)" << endl;
 	cout << "              l   - (Experimental) agglomeration coarsening by most collinear/coplanar faces (non-nested!)" << endl;
@@ -233,6 +234,10 @@ void print_usage() {
 	cout << "              p   - (Experimental) agglomeration coarsening by seed points (non-nested!)" << endl;
 	cout << "              v   - (Experimental) agglomeration coarsening by vertex neighbours (non-nested!)" << endl;
 	cout << "              f   - (Experimental) Face coarsening: the faces are coarsened and all kept on the coarse skeleton. Requires -g 1." << endl;
+	cout << "      'camg':" << endl;
+	cout << "              x   - Collapse interfaces made of multiple faces" << endl;
+	cout << "              y   - Collapse interfaces made of multiple faces and try to aggregate interior faces to the boundary ones" << endl;
+	cout << "              z   - Aggregate all faces using A_F_F" << endl;
 	cout << endl;
 	cout << "-bfc CODE" << endl;
 	cout << "      Face collapsing method used at the domain boundaries or physical parts boundaries. Requires -cs n." << endl;
@@ -288,20 +293,31 @@ void print_usage() {
 	cout << "              " << (unsigned)Prolongation::CellInterp_FinerApproxL2proj_Trace << "  - ";
 	cout <<                    "Variant of " << (unsigned)Prolongation::CellInterp_ApproxL2proj_Trace << " where the L2-projection is better approximated (by subtriangulation of the elements)." << endl;
 	cout << "      Values for CondensedAMG:" << endl;
-	cout << "              " << (unsigned)CAMGProlongation::P << "  - ";
-	cout <<                    "P (with cell-reconstruction)" << endl;
-	cout << "              " << (unsigned)CAMGProlongation::P1P2 << "  - ";
-	cout <<                    "P1P2" << endl;
-	cout << "              " << (unsigned)CAMGProlongation::Q_F << "  - ";
-	cout <<                    "Q_F" << endl;
+	cout << "              " << (unsigned)CAMGProlongation::ReconstructionTrace1Step << "  - ";
+	cout <<                    "cell-reconstruction + double injection + trace" << endl;
+	cout << "              " << (unsigned)CAMGProlongation::ReconstructionTrace2Steps << "  - ";
+	cout <<                    "cell-reconstruction + injection + trace + cell-reconstruction + injection + trace" << endl;
+	cout << "              " << (unsigned)CAMGProlongation::FaceProlongation << "  - ";
+	cout <<                    "face injection" << endl;
+	cout << "              " << (unsigned)CAMGProlongation::ReconstructThenInjectOrTrace << "  - ";
+	cout <<                    "cell-reconstruction + injection + trace for interior faces, injection for boundary faces" << endl;
+	cout << endl;
+	cout << "-face-prolong NUM" << endl;
+	cout << "      Intermediate face prolongation operator used in 'camg'." << endl;
+	cout << "              " << (unsigned)CAMGFaceProlongation::BoundaryAggregatesInteriorAverage << "  - ";
+	cout <<	                    "1 non-zero for aggregated faces, average for interior non-aggregated faces" << endl;
+	cout << "              " << (unsigned)CAMGFaceProlongation::BoundaryAggregatesInteriorZero << "  - ";
+	cout <<                     "1 non-zero for boundary faces, nothing for interior faces" << endl;
+	cout << "              " << (unsigned)CAMGFaceProlongation::FaceAggregates << "  - ";
+	cout <<                     "1 non-zero per face (as in AGMG)" << endl;
 	cout << endl;
 	cout << "-cell-interp NUM" << endl;
-	cout << "      In the polongation, degree of the polynomial interpolated on the cells from the faces." << endl;
+	cout << "      In the polongation of 'mg', degree of the polynomial interpolated on the cells from the faces." << endl;
 	cout << "              1   - degree k+1: recover cell unknowns by solving the local problem and apply the local reconstructor (default)" << endl;
 	cout << "              2   - degree k  : recover cell unknowns by solving the local problem" << endl;
 	cout << endl;
 	cout << "-weight CODE" << endl;
-	cout << "      In the polongation, weighting factor of the projection to the fine faces." << endl;
+	cout << "      In the polongation of 'mg', weighting factor of the projection to the fine faces." << endl;
 	cout << "              k   - proportional to the diffusion coefficient (default)" << endl;
 	cout << "              a   - simple average (1/2)" << endl;
 	cout << endl;
@@ -440,6 +456,7 @@ int main(int argc, char* argv[])
 		OPT_CellInterpCode,
 		OPT_Weight,
 		OPT_ProlongationCode,
+		OPT_FaceProlongationCode,
 		OPT_CoarseMatrixSize,
 		OPT_Smoothers,
 		OPT_CoarseningStrategy,
@@ -488,6 +505,7 @@ int main(int argc, char* argv[])
 		 { "cell-interp", required_argument, NULL, OPT_CellInterpCode },
 		 { "weight", required_argument, NULL, OPT_Weight },
 		 { "prolong", required_argument, NULL, OPT_ProlongationCode },
+		 { "face-prolong", required_argument, NULL, OPT_FaceProlongationCode },
 		 { "coarse-size", required_argument, NULL, OPT_CoarseMatrixSize },
 		 { "smoothers", required_argument, NULL, OPT_Smoothers },
 		 { "cs", required_argument, NULL, OPT_CoarseningStrategy },
@@ -727,6 +745,14 @@ int main(int argc, char* argv[])
 				args.Solver.MG.ProlongationCode = prolongationCode;
 				break;
 			}
+			case OPT_FaceProlongationCode:
+			{
+				int prolongationCode = atoi(optarg);
+				if (prolongationCode < 1 || prolongationCode > 3)
+					argument_error("unknown face prolongation code. Check -face-prolong argument.");
+				args.Solver.MG.FaceProlongationCode = prolongationCode;
+				break;
+			}
 			case 'l': 
 				args.Solver.MG.Levels = atoi(optarg);
 				break;
@@ -777,7 +803,13 @@ int main(int argc, char* argv[])
 				else if (coarseningStgyCode.compare("r") == 0)
 					args.Solver.MG.CoarseningStgy = CoarseningStrategy::GMSHSplittingRefinement;
 				else if (coarseningStgyCode.compare("b") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::BeyRefinement;
+					args.Solver.MG.CoarseningStgy = CoarseningStrategy::BeyRefinement; 
+				else if (coarseningStgyCode.compare("x") == 0)
+					args.Solver.MG.CoarseningStgy = CoarseningStrategy::CAMGCollapseElementInterfaces;
+				else if (coarseningStgyCode.compare("y") == 0)
+					args.Solver.MG.CoarseningStgy = CoarseningStrategy::CAMGCollapseElementInterfacesAndTyrAggregInteriorToBoundaries;
+				else if (coarseningStgyCode.compare("z") == 0)
+					args.Solver.MG.CoarseningStgy = CoarseningStrategy::CAMGAggregFaces;
 				else
 					argument_error("unknown coarsening strategy code '" + coarseningStgyCode + "'. Check -cs argument.");
 				break;
@@ -969,9 +1001,10 @@ int main(int argc, char* argv[])
 	else if (args.Solver.SolverCode.compare("camg") == 0 || args.Solver.SolverCode.compare("fcgcamg") == 0)
 	{
 		if (args.Solver.MG.ProlongationCode == 0)
-			args.Solver.MG.CAMGProlong = CAMGProlongation::Q_F;
+			args.Solver.MG.CAMGProlong = CAMGProlongation::FaceProlongation;
 		else
 			args.Solver.MG.CAMGProlong = static_cast<CAMGProlongation>(args.Solver.MG.ProlongationCode);
+		args.Solver.MG.CAMGFaceProlong = args.Solver.MG.FaceProlongationCode == 0 ? CAMGFaceProlongation::FaceAggregates : static_cast<CAMGFaceProlongation>(args.Solver.MG.FaceProlongationCode);
 	}
 
 

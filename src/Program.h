@@ -377,7 +377,7 @@ private:
 		else if (args.Solver.SolverCode.compare("camg") == 0 || args.Solver.SolverCode.compare("fcgcamg") == 0)
 		{
 			Diffusion_HHO<Dim>* hhoProblem = dynamic_cast<Diffusion_HHO<Dim>*>(problem);
-			CondensedAMG* mg = new CondensedAMG(hhoProblem->HHO->nCellUnknowns, hhoProblem->HHO->nFaceUnknowns, args.Solver.MG.CAMGProlong, args.Solver.MG.Levels);
+			CondensedAMG* mg = new CondensedAMG(hhoProblem->HHO->nCellUnknowns, hhoProblem->HHO->nFaceUnknowns, args.Solver.MG.CAMGFaceProlong, args.Solver.MG.CAMGProlong, args.Solver.MG.Levels);
 			mg->MatrixMaxSizeForCoarsestLevel = args.Solver.MG.MatrixMaxSizeForCoarsestLevel;
 			mg->Cycle = args.Solver.MG.CycleLetter;
 			mg->WLoops = args.Solver.MG.WLoops;
@@ -458,8 +458,8 @@ private:
 		else if (args.Solver.SolverCode.compare("bj23") == 0)
 			solver = new BlockJacobi(blockSize, 2.0/3.0);
 #ifdef AGMG_ENABLED
-		else if (args.Solver.solverCode.compare("agmg") == 0)
-			solver = new AGMG(tolerance);
+		else if (args.Solver.SolverCode.compare("agmg") == 0)
+			solver = new AGMG(args.Solver.Tolerance, args.Solver.MaxIterations);
 #endif // AGMG_ENABLED
 		else
 			Utils::FatalError("Unknown solver or not applicable.");

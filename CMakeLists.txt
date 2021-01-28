@@ -15,16 +15,26 @@ set(EXECUTABLE_OUTPUT_PATH bin/)
 # show compiler commands
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
-# Executable file
+# Files to compile
 file(
 	GLOB_RECURSE
 	source_files
 	src/*
 )
-add_executable(dghho ${source_files})
-#add_executable(dghho "${PROJECT_SOURCE_DIR}/src/main.cpp")
 
 add_definitions(-DROOT_PATH="${CMAKE_SOURCE_DIR}")
+
+# Include AGMG compiled files
+if(ENABLE_AGMG)
+	SET(OBJS ${AGMG_DIR}/dagmg.o ${AGMG_DIR}/dagmg_mumps.o)
+	add_definitions(-DAGMG_ENABLED)
+	message(STATUS "AGMG enabled")
+else()
+	message(STATUS "AGMG disabled. Add -DENABLE_AGMG=ON and -DAGMG_DIR=<path/to/.o/files> to enable it.")
+endif()
+
+# Executable file
+add_executable(dghho ${OBJS} ${source_files})
 
 # Include CGAL
 set(CGAL_DIR "${CMAKE_SOURCE_DIR}/dependencies/cgal/CGAL-5.1")
@@ -83,18 +93,5 @@ if(ENABLE_AGMG)
 		message(FATAL_ERROR "LAPACK not found.")
 	endif()
 
-	find_library(TPL_AGMG_LIB NAMES agmg PATHS ${TPL_AGMG_LIB_PATH})
-	if(TPL_AGMG_LIB)
-		message(STATUS "Found AGMG: ${TPL_AGMG_LIB}")
-	else()
-		message(FATAL_ERROR "AGMG not found.")
-	endif()
-
-	target_link_libraries(dghho "-lgfortran" "-lm" ${TPL_AGMG_LIB} ${TPL_LAPACK_LIB} ${TPL_BLAS_LIB})
-
-	add_definitions(-DAGMG_ENABLED)
-
-	message(STATUS "AGMG enabled")
-else()
-	message(STATUS "AGMG disabled. Add -DENABLE_AGMG=ON to enable it.")
+	target_link_libraries(dghho "-lgfortran" "-lm" ${TPL_LAPACK_LIB} ${TPL_BLAS_LIB})
 endif()
