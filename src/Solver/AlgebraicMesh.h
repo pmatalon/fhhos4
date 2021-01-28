@@ -8,8 +8,8 @@ struct AlgebraicElement
 {
 	BigNumber Number;
 	vector<pair<AlgebraicElement*, double>> Neighbours;
-	int NStrongNeighbours = 0;
-	bool IsAggregated = false;
+	vector<AlgebraicElement*> StrongNeighbours; // sorted by descending strength (the strongest neighbour is first)
+	int NElementsIAmStrongNeighbourOf = 0;
 	ElementAggregate* CoarseElement = nullptr;
 };
 
@@ -18,8 +18,8 @@ struct ElementAggregate
 	BigNumber Number;
 	vector<AlgebraicElement*> FineElements;
 
-	ElementAggregate(BigNumber number, vector<AlgebraicElement*> elements)
-		: Number(number), FineElements(elements) 
+	ElementAggregate(BigNumber number)
+		: Number(number)
 	{}
 };
 
@@ -87,9 +87,13 @@ public:
 
 				for (auto it = elem.Neighbours.begin(); it != elem.Neighbours.end(); ++it)
 				{
+					AlgebraicElement* neighbour = it->first;
 					double coupling = it->second;
 					if (IsStronglyCoupled(elem, coupling))
-						elem.NStrongNeighbours++;
+					{
+						elem.StrongNeighbours.push_back(neighbour);
+						neighbour->NElementsIAmStrongNeighbourOf++;
+					}
 					else
 						break;
 				}
@@ -98,84 +102,62 @@ public:
 
 	void PairWiseAggregate(bool& coarsestPossibleMeshReached)
 	{
-		_coarseElements.reserve(_elements.size() / 2);
+		_coarseElements.reserve(_elements.size()); // we need to be sure that the vector won't be resized
 
-		vector<AlgebraicElement*> sortedElements;
+		list<AlgebraicElement*> elementsToProcess;
 		for (AlgebraicElement& e : _elements)
-			sortedElements.push_back(&e);
-		sort(sortedElements.begin(), sortedElements.end(),
-			[](AlgebraicElement* e1, AlgebraicElement* e2)
+		{
+			if (e.Neighbours.empty())
 			{
-				return e1->NStrongNeighbours < e2->NStrongNeighbours; // Sort by ascending number of strong neighbours
-			});
+				coarsestPossibleMeshReached = true;
+				return;
+			}
+			elementsToProcess.push_back(&e);
+		}
+
+		elementsToProcess.sort(CompareNElementsIAmStrongNeighbourOf);
 
 		// Element aggregation
-		for (BigNumber i = 0; i < sortedElements.size(); i++)
+		while (!elementsToProcess.empty())
 		{
-			AlgebraicElement* elem = sortedElements[i];
-			if (elem->IsAggregated)
+			AlgebraicElement* elem = elementsToProcess.front();
+			elementsToProcess.pop_front();
+
+			if (elem->CoarseElement)
 				continue;
 
-			if (elem->Neighbours.empty())
+			// New aggregate
+			_coarseElements.emplace_back(_coarseElements.size());
+			ElementAggregate* aggregate = &_coarseElements.back();
+
+			// Add elem
+			AddToAggregate(*elem, *aggregate);
+
+			AlgebraicElement* neighbour = StrongestAvailableNeighbour(*elem);
+			if (neighbour)
 			{
-				coarsestPossibleMeshReached = true;
-				return;
+				// Add neighbour?
+				bool strongConnectionIsReciprocal = find(neighbour->StrongNeighbours.begin(), neighbour->StrongNeighbours.end(), elem) != neighbour->StrongNeighbours.end();
+				if (strongConnectionIsReciprocal)
+					AddToAggregate(*neighbour, *aggregate);
 			}
 
-			AlgebraicElement* strongestNeighbour = StrongestNeighbour(*elem, true);
-			// If no neighbour available, get the already aggregated strongest neighbour
-			if (!strongestNeighbour)
-				strongestNeighbour = StrongestNeighbour(*elem, false);
-			
-			if (!strongestNeighbour)
-			{
-				coarsestPossibleMeshReached = true;
-				return;
-			}
-
-			Aggregate(*elem, *strongestNeighbour);
+			elementsToProcess.sort(CompareNElementsIAmStrongNeighbourOf);
 		}
 	}
 
 private:
-	AlgebraicElement* StrongestNeighbour(const AlgebraicElement& e, bool checkAvailability)
+	static bool CompareNElementsIAmStrongNeighbourOf(AlgebraicElement* e1, AlgebraicElement* e2)
 	{
-		AlgebraicElement* strongestNeighbour = nullptr;
-		double strongestNegativeCoupling = 0;
-		int smallestAggregateSize = 1000000;
-		for (auto it = e.Neighbours.begin(); it != e.Neighbours.end(); ++it)
-		{
-			AlgebraicElement* n = it->first;
-			double coupling = it->second;
+		return e1->NElementsIAmStrongNeighbourOf < e2->NElementsIAmStrongNeighbourOf; // Sort by ascending number
+	}
 
-			if (checkAvailability && n->IsAggregated)
-				continue;
-
-			if (!IsStronglyCoupled(e, coupling))
-				break; // the neighbours are sorted, so if this one is not strongly coupled, the next ones won't be.
-
-			if (checkAvailability)
-			{
-				strongestNeighbour = n;
-				break;
-			}
-			else
-			{
-				if (coupling <= strongestNegativeCoupling)
-				{
-					strongestNegativeCoupling = coupling;
-					int aggregateSize = n->CoarseElement->FineElements.size();
-					if (aggregateSize < smallestAggregateSize)
-					{
-						strongestNeighbour = n;
-						smallestAggregateSize = aggregateSize;
-					}
-				}
-				else
-					break;
-			}
-		}
-		return strongestNeighbour;
+	AlgebraicElement* StrongestAvailableNeighbour(const AlgebraicElement& e)
+	{
+		auto it = find_if(e.StrongNeighbours.begin(), e.StrongNeighbours.end(), [](AlgebraicElement* n) { return !n->CoarseElement; });
+		if (it != e.StrongNeighbours.end())
+			return *it;
+		return nullptr;
 	}
 
 	double CouplingValue(const AlgebraicElement& e1, const AlgebraicElement& e2)
@@ -200,26 +182,15 @@ private:
 		return coupling < 0 && coupling < _strongCouplingThreshold * e.Neighbours[0].second;
 	}
 
-	
-	void Aggregate(AlgebraicElement& e1, AlgebraicElement& e2)
+	void AddToAggregate(AlgebraicElement& e, ElementAggregate& aggregate)
 	{
-		assert(!(e1.IsAggregated && e2.IsAggregated));
+		aggregate.FineElements.push_back(&e);
+		e.CoarseElement = &aggregate;
 
-		if (!e1.IsAggregated && !e2.IsAggregated)
+		for (AlgebraicElement* n : e.StrongNeighbours)
 		{
-			_coarseElements.push_back(ElementAggregate(_coarseElements.size(), { &e1, &e2 }));
-			e1.IsAggregated = true;
-			e2.IsAggregated = true;
-			e1.CoarseElement = &_coarseElements.back();
-			e2.CoarseElement = &_coarseElements.back();
+			if (!n->CoarseElement)
+				n->NElementsIAmStrongNeighbourOf--;
 		}
-		else if (e1.IsAggregated)
-		{
-			e1.CoarseElement->FineElements.push_back(&e2);
-			e2.IsAggregated = true;
-			e2.CoarseElement = e1.CoarseElement;
-		}
-		else
-			Aggregate(e2, e1);
 	}
 };

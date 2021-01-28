@@ -377,7 +377,7 @@ private:
 		else if (args.Solver.SolverCode.compare("camg") == 0 || args.Solver.SolverCode.compare("fcgcamg") == 0)
 		{
 			Diffusion_HHO<Dim>* hhoProblem = dynamic_cast<Diffusion_HHO<Dim>*>(problem);
-			CondensedAMG* mg = new CondensedAMG(hhoProblem->HHO->nCellUnknowns, hhoProblem->HHO->nFaceUnknowns, args.Solver.MG.CAMGFaceProlong, args.Solver.MG.CAMGProlong, args.Solver.MG.Levels);
+			CondensedAMG* mg = new CondensedAMG(hhoProblem->HHO->nCellUnknowns, hhoProblem->HHO->nFaceUnknowns, 0.25, args.Solver.MG.CAMGFaceProlong, args.Solver.MG.CAMGProlong, args.Solver.MG.Levels);
 			mg->MatrixMaxSizeForCoarsestLevel = args.Solver.MG.MatrixMaxSizeForCoarsestLevel;
 			mg->Cycle = args.Solver.MG.CycleLetter;
 			mg->WLoops = args.Solver.MG.WLoops;

@@ -12,6 +12,7 @@ private:
 	CAMGProlongation _multigridProlong = CAMGProlongation::ReconstructionTrace1Step;
 	int _cellBlockSize;
 	int _faceBlockSize;
+	double _strongCouplingThreshold;
 	HybridAlgebraicMesh _mesh;
 public:
 	const SparseMatrix* A_T_T;
@@ -28,11 +29,12 @@ private:
 	SparseMatrix* inv_A_T_Tc;
 
 public:
-	CondensedLevel(int number, int cellBlockSize, int faceBlockSize, CAMGFaceProlongation faceProlong, CAMGProlongation prolongation)
-		: Level(number), _mesh(cellBlockSize, faceBlockSize)
+	CondensedLevel(int number, int cellBlockSize, int faceBlockSize, double strongCouplingThreshold, CAMGFaceProlongation faceProlong, CAMGProlongation prolongation)
+		: Level(number), _mesh(cellBlockSize, faceBlockSize, strongCouplingThreshold)
 	{
 		this->_cellBlockSize = cellBlockSize;
 		this->_faceBlockSize = faceBlockSize;
+		this->_strongCouplingThreshold = strongCouplingThreshold;
 		this->_multigridProlong = prolongation;
 		this->_faceProlong = faceProlong;
 	}
@@ -132,7 +134,7 @@ public:
 		// Second pairwise aggregation //
 		//-----------------------------//
 
-		HybridAlgebraicMesh coarseMesh(_cellBlockSize, _faceBlockSize);
+		HybridAlgebraicMesh coarseMesh(_cellBlockSize, _faceBlockSize, _strongCouplingThreshold);
 		coarseMesh.Build(A_T_T1, A_T_F1, A_F_F1);
 		coarseMesh.PairWiseAggregate(coarseningStgy, coarsestPossibleMeshReached);
 		if (coarsestPossibleMeshReached)
@@ -152,8 +154,11 @@ public:
 		{
 			Q_F2 = BuildQ_F_0Interior(coarseMesh);
 		}
-		else if (coarseningStgy == CoarseningStrategy::CAMGAggregFaces && this->_faceProlong == CAMGFaceProlongation::FaceAggregates)
+		else if (this->_faceProlong == CAMGFaceProlongation::FaceAggregates)
 		{
+			if (coarseningStgy != CoarseningStrategy::CAMGAggregFaces)
+				Utils::FatalError("This coarsening strategy is incompatible with this face prolongation operator.");
+
 			AlgebraicMesh skeleton2(_faceBlockSize, 0);
 			//skeleton2.Build(A_F_F1);
 			skeleton2.Build(Q_F1.transpose() * *(this->OperatorMatrix) * Q_F1);
@@ -267,11 +272,11 @@ public:
 			SparseMatrix P2 = Theta1.transpose() * Q_T2 * Theta2;
 			this->P = P1 * P2;
 		}
-		else if (_multigridProlong == CAMGProlongation::ReconstructThenInjectOrTrace) // 5
+		else if (_multigridProlong == CAMGProlongation::ReconstructTraceOrInject) // 5
 		{
 			SparseMatrix inv_A_T_T1 = Utils::InvertBlockDiagMatrix(A_T_T1, _cellBlockSize);
 			SparseMatrix Theta1 = -inv_A_T_T1 * A_T_F1; // Reconstruct
-			SparseMatrix Pi1 = BuildTrace(_mesh); // Trace
+			SparseMatrix Pi1 = BuildTraceOnRemovedFaces(_mesh); // Trace
 												  // Inject = Q_F1 
 			SparseMatrix ReconstructAndTrace1 = Pi1 * Q_T1 * Theta1;
 
@@ -292,7 +297,7 @@ public:
 
 			this->inv_A_T_Tc = new SparseMatrix(Utils::InvertBlockDiagMatrix(A_T_Tc, _cellBlockSize));
 			SparseMatrix Theta2 = -(*inv_A_T_Tc) * A_T_Fc;
-			SparseMatrix Pi2 = BuildTrace(coarseMesh);
+			SparseMatrix Pi2 = BuildTraceOnRemovedFaces(coarseMesh);
 			SparseMatrix ReconstructAndTrace2 = Pi2 * Q_T2 * Theta2;
 
 
@@ -462,6 +467,24 @@ private:
 		return Pi;
 	}
 
+	SparseMatrix BuildTraceOnRemovedFaces(const HybridAlgebraicMesh& mesh)
+	{
+		// Pi: average on both sides of each face
+		DenseMatrix traceOfConstant = DenseMatrix::Zero(_faceBlockSize, _cellBlockSize);
+		traceOfConstant(0, 0) = 1;
+
+		NumberParallelLoop<CoeffsChunk> parallelLoopPi(mesh._faces.size());
+		parallelLoopPi.Execute([this, &mesh, &traceOfConstant](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				const HybridAlgebraicFace& face = mesh._faces[faceNumber];
+				if (face.IsRemovedOnCoarseMesh)
+					chunk->Results.Coeffs.Add(faceNumber*_faceBlockSize, face.Elements[0]->Number*_cellBlockSize, traceOfConstant);
+			});
+		SparseMatrix Pi = SparseMatrix(mesh._faces.size()*_faceBlockSize, mesh._elements.size()*_cellBlockSize);
+		parallelLoopPi.Fill(Pi);
+		return Pi;
+	}
+
 public:
 	void OnStartSetup() override
 	{
@@ -512,18 +535,20 @@ private:
 	CAMGProlongation _multigridProlong = CAMGProlongation::ReconstructionTrace1Step;
 	int _cellBlockSize;
 	int _faceBlockSize;
+	double _strongCouplingThreshold;
 public:
 
-	CondensedAMG(int cellBlockSize, int faceBlockSize, CAMGFaceProlongation faceProlong, CAMGProlongation prolongation, int nLevels = 0)
+	CondensedAMG(int cellBlockSize, int faceBlockSize, double strongCouplingThreshold, CAMGFaceProlongation faceProlong, CAMGProlongation prolongation, int nLevels = 0)
 		: Multigrid(nLevels)
 	{
 		this->_cellBlockSize = cellBlockSize;
 		this->_faceBlockSize = faceBlockSize;
+		this->_strongCouplingThreshold = strongCouplingThreshold;
 		this->_multigridProlong = prolongation;
 		this->_faceProlong = faceProlong;
 		this->BlockSizeForBlockSmoothers = faceBlockSize;
 		this->UseGalerkinOperator = true;
-		this->_fineLevel = new CondensedLevel(0, cellBlockSize, faceBlockSize, faceProlong, prolongation);
+		this->_fineLevel = new CondensedLevel(0, cellBlockSize, faceBlockSize, strongCouplingThreshold, faceProlong, prolongation);
 	}
 
 	void BeginSerialize(ostream& os) const override
@@ -569,7 +594,7 @@ public:
 protected:
 	Level* CreateCoarseLevel(Level* fineLevel) override
 	{
-		CondensedLevel* coarseLevel = new CondensedLevel(fineLevel->Number + 1, _cellBlockSize, _faceBlockSize, _faceProlong, _multigridProlong);
+		CondensedLevel* coarseLevel = new CondensedLevel(fineLevel->Number + 1, _cellBlockSize, _faceBlockSize, _strongCouplingThreshold, _faceProlong, _multigridProlong);
 		return coarseLevel;
 	}
 };

@@ -46,7 +46,7 @@ enum class CoarseningStrategy : unsigned
 	GMSHSplittingRefinement,
 	BeyRefinement,
 	CAMGCollapseElementInterfaces,
-	CAMGCollapseElementInterfacesAndTyrAggregInteriorToBoundaries,
+	CAMGCollapseElementInterfacesAndTryAggregInteriorToBoundaries,
 	CAMGAggregFaces
 };
 
@@ -70,7 +70,7 @@ enum class CAMGProlongation : unsigned
 	ReconstructionTrace2Steps = 2,
 	FaceProlongation = 3,
 	ReconstructionTranspose2Steps = 4,
-	ReconstructThenInjectOrTrace = 5
+	ReconstructTraceOrInject = 5
 };
 
 enum class CAMGFaceProlongation : unsigned

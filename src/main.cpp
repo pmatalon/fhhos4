@@ -299,7 +299,7 @@ void print_usage() {
 	cout <<                    "cell-reconstruction + injection + trace + cell-reconstruction + injection + trace" << endl;
 	cout << "              " << (unsigned)CAMGProlongation::FaceProlongation << "  - ";
 	cout <<                    "face injection" << endl;
-	cout << "              " << (unsigned)CAMGProlongation::ReconstructThenInjectOrTrace << "  - ";
+	cout << "              " << (unsigned)CAMGProlongation::ReconstructTraceOrInject << "  - ";
 	cout <<                    "cell-reconstruction + injection + trace for interior faces, injection for boundary faces" << endl;
 	cout << endl;
 	cout << "-face-prolong NUM" << endl;
@@ -807,7 +807,7 @@ int main(int argc, char* argv[])
 				else if (coarseningStgyCode.compare("x") == 0)
 					args.Solver.MG.CoarseningStgy = CoarseningStrategy::CAMGCollapseElementInterfaces;
 				else if (coarseningStgyCode.compare("y") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::CAMGCollapseElementInterfacesAndTyrAggregInteriorToBoundaries;
+					args.Solver.MG.CoarseningStgy = CoarseningStrategy::CAMGCollapseElementInterfacesAndTryAggregInteriorToBoundaries;
 				else if (coarseningStgyCode.compare("z") == 0)
 					args.Solver.MG.CoarseningStgy = CoarseningStrategy::CAMGAggregFaces;
 				else
