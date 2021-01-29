@@ -13,7 +13,6 @@ private:
 	int _cellBlockSize;
 	int _faceBlockSize;
 	double _strongCouplingThreshold;
-	HybridAlgebraicMesh _mesh;
 public:
 	const SparseMatrix* A_T_T;
 	const SparseMatrix* A_T_F;
@@ -30,7 +29,7 @@ private:
 
 public:
 	CondensedLevel(int number, int cellBlockSize, int faceBlockSize, double strongCouplingThreshold, CAMGFaceProlongation faceProlong, CAMGProlongation prolongation)
-		: Level(number), _mesh(cellBlockSize, faceBlockSize, strongCouplingThreshold)
+		: Level(number)
 	{
 		this->_cellBlockSize = cellBlockSize;
 		this->_faceBlockSize = faceBlockSize;
@@ -54,6 +53,9 @@ public:
 
 	void CoarsenMesh(CoarseningStrategy coarseningStgy, int coarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override
 	{
+		noCoarserMeshProvided = false;
+		coarsestPossibleMeshReached = false;
+
 		if (!this->OperatorMatrix)
 		{
 			if (this->UseGalerkinOperator)
@@ -62,114 +64,44 @@ public:
 				SetupDiscretizedOperator();
 		}
 
-		cout << "\tDouble pairwise aggregation" << endl;
-
-		_mesh.Build(*A_T_T, *A_T_F, *A_F_F);
-
-		//----------------------------//
-		// First pairwise aggregation //
-		//----------------------------//
-
-		_mesh.PairWiseAggregate(coarseningStgy, coarsestPossibleMeshReached);
-		if (coarsestPossibleMeshReached)
-			return;
-
-		/*cout << "------------- Elem" << endl;
-		for (HybridElementAggregate& agg : _mesh._coarseElements)
+		const SparseMatrix* A_T_T1 = A_T_T;
+		const SparseMatrix* A_T_F1 = A_T_F;
+		const SparseMatrix* A_F_F1 = A_F_F;
+		SparseMatrix *A_T_T2, *A_T_F2, *A_F_F2, *P;
+		double coarseningRatio = 0;
+		double nCoarsenings = 0;
+		//while (coarseningRatio < 3)
+		for (int i = 0; i < 2; i++)
 		{
-			cout << "(";
-			for (auto e : agg.FineElements)
-				cout << e->Number << ", ";
-			cout << ")" << endl;
-		}
+			cout << "\tPairwise aggregation" << endl;
 
-		cout << "------------- Faces" << endl;
-		for (HybridFaceAggregate& agg : _mesh._coarseFaces)
-		{
-			cout << "(";
-			for (auto f : agg.FineFaces)
-				cout << f->Number << ", ";
-			cout << ")" << endl;
-		}*/
-
-		// Cell-prolongation operator with only one 1 coefficient per row
-		SparseMatrix Q_T1 = BuildQ_T(_mesh);
-
-		SparseMatrix Q_F1;
-		if (this->_faceProlong == CAMGFaceProlongation::BoundaryAggregatesInteriorAverage)
-		{
-			// Face-prolongation operator with only one 1 coefficient per row for kept or aggregated faces, average for removed faces
-			Q_F1 = BuildQ_F(_mesh, *A_F_F);
-		}
-		else if (this->_faceProlong == CAMGFaceProlongation::BoundaryAggregatesInteriorZero)
-		{
-			Q_F1 = BuildQ_F_0Interior(_mesh);
-		}
-		else if (this->_faceProlong == CAMGFaceProlongation::FaceAggregates)
-		{
-			if (coarseningStgy != CoarseningStrategy::CAMGAggregFaces)
-				Utils::FatalError("This coarsening strategy is incompatible with this face prolongation operator.");
-
-			//ExportMatrix(*A_F_F, "A_F_F", 0);
-			AlgebraicMesh skeleton1(_faceBlockSize, 0);
-			//skeleton1.Build(*A_F_F);
-			skeleton1.Build(*this->OperatorMatrix);
-			skeleton1.PairWiseAggregate(coarsestPossibleMeshReached); 
+			std::tie(A_T_T2, A_T_F2, A_F_F2, P, coarsestPossibleMeshReached) = PairwiseAggregate(*A_T_T1, *A_T_F1, *A_F_F1, coarseningStgy);
 			if (coarsestPossibleMeshReached)
 				return;
-			Q_F1 = BuildQ_F_AllAggregated(skeleton1);
-		}
-		else
-			Utils::FatalError("Unmanaged -face-prolong");
 
-		// Intermediate coarse operators
-		SparseMatrix A_T_T1 = Q_T1.transpose() * (*A_T_T) * Q_T1;
-		SparseMatrix A_T_F1 = Q_T1.transpose() * (*A_T_F) * Q_F1;
-		SparseMatrix A_F_F1 = Q_F1.transpose() * (*A_F_F) * Q_F1;
+			if (nCoarsenings > 0)
+				delete A_T_T1, A_T_F1, A_F_F1;
 
-		//ExportMatrix(Q_F1, "Q_F1", 0);
-		//ExportMatrix(A_F_F1, "A_F_F1", 0);
+			A_T_T1 = A_T_T2;
+			A_T_F1 = A_T_F2;
+			A_F_F1 = A_F_F2;
 
-		//-----------------------------//
-		// Second pairwise aggregation //
-		//-----------------------------//
+			if (nCoarsenings == 0)
+				this->P = *P;
+			else
+				this->P = this->P * *P;
 
-		HybridAlgebraicMesh coarseMesh(_cellBlockSize, _faceBlockSize, _strongCouplingThreshold);
-		coarseMesh.Build(A_T_T1, A_T_F1, A_F_F1);
-		coarseMesh.PairWiseAggregate(coarseningStgy, coarsestPossibleMeshReached);
-		if (coarsestPossibleMeshReached)
-		{
-			ExportMatrix(A_T_T1, "A_T_T1", 0);
-			return;
+			delete P;
+
+			double nFine = this->A_T_F->cols();
+			double nCoarse = A_T_F1->cols();
+			coarseningRatio = nFine / nCoarse;
+			nCoarsenings++;
 		}
 
-		SparseMatrix Q_T2 = BuildQ_T(coarseMesh);
-
-		SparseMatrix Q_F2;
-		if (this->_faceProlong == CAMGFaceProlongation::BoundaryAggregatesInteriorAverage)
-		{
-			Q_F2 = BuildQ_F(coarseMesh, A_F_F1);
-		}
-		else if (this->_faceProlong == CAMGFaceProlongation::BoundaryAggregatesInteriorZero)
-		{
-			Q_F2 = BuildQ_F_0Interior(coarseMesh);
-		}
-		else if (this->_faceProlong == CAMGFaceProlongation::FaceAggregates)
-		{
-			if (coarseningStgy != CoarseningStrategy::CAMGAggregFaces)
-				Utils::FatalError("This coarsening strategy is incompatible with this face prolongation operator.");
-
-			AlgebraicMesh skeleton2(_faceBlockSize, 0);
-			//skeleton2.Build(A_F_F1);
-			skeleton2.Build(Q_F1.transpose() * *(this->OperatorMatrix) * Q_F1);
-			skeleton2.PairWiseAggregate(coarsestPossibleMeshReached);
-			if (coarsestPossibleMeshReached)
-				return;
-			Q_F2 = BuildQ_F_AllAggregated(skeleton2);
-		}
-
-		this->A_T_Tc = Q_T2.transpose() * A_T_T1 * Q_T2;
-		this->A_T_Fc = Q_T2.transpose() * A_T_F1 * Q_F2;
+		this->A_T_Tc = *A_T_T2;
+		this->A_T_Fc = *A_T_F2;
+		this->A_F_Fc = *A_F_F2;
 
 		/*
 		// Assembly of the double-aggregates
@@ -181,7 +113,7 @@ public:
 				vector<HybridAlgebraicElement*> doubleAggregate;
 				for (HybridAlgebraicElement* ce1 : agg2.FineElements)
 				{
-					HybridElementAggregate& agg1 = _mesh._coarseElements[ce1->Number];
+					HybridElementAggregate& agg1 = mesh._coarseElements[ce1->Number];
 					for (HybridAlgebraicElement* fe : agg1.FineElements)
 						doubleAggregate.push_back(fe);
 				}
@@ -196,7 +128,7 @@ public:
 				vector<HybridAlgebraicFace*> doubleAggregate;
 				for (HybridAlgebraicFace* cf1 : agg2.FineFaces)
 				{
-					HybridFaceAggregate& agg1 = _mesh._coarseFaces[cf1->Number];
+					HybridFaceAggregate& agg1 = mesh._coarseFaces[cf1->Number];
 					for (HybridAlgebraicFace* fe : agg1.FineFaces)
 						doubleAggregate.push_back(fe);
 				}
@@ -207,59 +139,91 @@ public:
 		//SparseMatrix FaceProlongation = BuildQ_F(doubleFaceAggregates);
 		*/
 
-		//------------------//
-		// Coarse operators //
-		//------------------//
+	}
 
-		SparseMatrix Q_T = Q_T1 * Q_T2;
-		/*SparseMatrix*/ Q_F = Q_F1 * Q_F2;
+	// Returns <A_T_Tc, A_T_Fc, A_F_Fc, P, coarsestPossibleMeshReached>
+	tuple<SparseMatrix*, SparseMatrix*, SparseMatrix*, SparseMatrix*, bool> PairwiseAggregate(const SparseMatrix A_T_T, const SparseMatrix A_T_F, const SparseMatrix A_F_F, CoarseningStrategy coarseningStgy)
+	{
+		HybridAlgebraicMesh mesh(_cellBlockSize, _faceBlockSize, _strongCouplingThreshold);
+		mesh.Build(A_T_T, A_T_F, A_F_F);
 
+		bool coarsestPossibleMeshReached = false;
+		mesh.PairWiseAggregate(coarseningStgy, coarsestPossibleMeshReached);
+		if (coarsestPossibleMeshReached)
+			return tuple<SparseMatrix*, SparseMatrix*, SparseMatrix*, SparseMatrix*, bool>(nullptr, nullptr, nullptr, nullptr, coarsestPossibleMeshReached);
 
-		//-----------------------//
-		// Prolongation operator //
-		//-----------------------//
-
-		if (_multigridProlong == CAMGProlongation::ReconstructionTrace1Step) // 1
+		/*cout << "------------- Elem" << endl;
+		for (HybridElementAggregate& agg : mesh._coarseElements)
 		{
-			SparseMatrix inv_A_T_T1 = Utils::InvertBlockDiagMatrix(A_T_T1, _cellBlockSize);
-			// Theta: reconstruction from the coarse faces to the coarse cells
-			SparseMatrix Theta1 = -inv_A_T_T1 * A_T_F1;
-			// Pi: average on both sides of each face
-			SparseMatrix Pi1 = BuildTrace(_mesh);
-
-			this->inv_A_T_Tc = new SparseMatrix(Utils::InvertBlockDiagMatrix(A_T_Tc, _cellBlockSize));
-			SparseMatrix Theta2 = -(*inv_A_T_Tc) * A_T_Fc;
-			SparseMatrix Pi2 = BuildTrace(coarseMesh);
-
-			this->P = Pi1 * Q_T * Theta2;
+			cout << "(";
+			for (auto e : agg.FineElements)
+				cout << e->Number << ", ";
+			cout << ")" << endl;
 		}
-		else if (_multigridProlong == CAMGProlongation::ReconstructionTrace2Steps) // 2
+
+		cout << "------------- Faces" << endl;
+		for (HybridFaceAggregate& agg : mesh._coarseFaces)
 		{
-			// + Galerkin oprator + (A_F_Fc = P^T*A_F_F*P) = perfect convergence (16 it), but Galerkin operators very dense
-			// -g 1 -prolong 2 -face-prolong 3 -cs z
+			cout << "(";
+			for (auto f : agg.FineFaces)
+				cout << f->Number << ", ";
+			cout << ")" << endl;
+		}*/
 
-			SparseMatrix inv_A_T_T1 = Utils::InvertBlockDiagMatrix(A_T_T1, _cellBlockSize);
+		// Cell-prolongation operator with only one 1 coefficient per row
+		SparseMatrix Q_T = BuildQ_T(mesh);
+
+		SparseMatrix* Q_F;
+		if (this->_faceProlong == CAMGFaceProlongation::BoundaryAggregatesInteriorAverage)
+		{
+			// Face-prolongation operator with only one 1 coefficient per row for kept or aggregated faces, average for removed faces
+			Q_F = new SparseMatrix(BuildQ_F(mesh, A_F_F));
+		}
+		else if (this->_faceProlong == CAMGFaceProlongation::BoundaryAggregatesInteriorZero)
+		{
+			Q_F = new SparseMatrix(BuildQ_F_0Interior(mesh));
+		}
+		else if (this->_faceProlong == CAMGFaceProlongation::FaceAggregates)
+		{
+			if (coarseningStgy != CoarseningStrategy::CAMGAggregFaces)
+				Utils::FatalError("This coarsening strategy is incompatible with this face prolongation operator.");
+
+			//ExportMatrix(*A_F_F, "A_F_F", 0);
+			AlgebraicMesh skeleton1(_faceBlockSize, 0);
+			//skeleton1.Build(*A_F_F);
+			skeleton1.Build(*this->OperatorMatrix);
+			skeleton1.PairWiseAggregate(coarsestPossibleMeshReached);
+			if (coarsestPossibleMeshReached)
+				return tuple<SparseMatrix*, SparseMatrix*, SparseMatrix*, SparseMatrix*, bool>(nullptr, nullptr, nullptr, nullptr, coarsestPossibleMeshReached);
+			Q_F = new SparseMatrix(BuildQ_F_AllAggregated(skeleton1));
+		}
+		else
+			Utils::FatalError("Unmanaged -face-prolong");
+
+		// Intermediate coarse operators
+		SparseMatrix* A_T_Tc     = new SparseMatrix(Q_T.transpose() * A_T_T * Q_T);
+		SparseMatrix* A_T_Fc_tmp = new SparseMatrix(Q_T.transpose() * A_T_F * *Q_F);
+		//SparseMatrix A_F_Fc_tmp  = Q_F->transpose() * (*A_F_F) * *Q_F;
+
+		SparseMatrix* P;
+		if (_multigridProlong == CAMGProlongation::ReconstructionTrace1Step || _multigridProlong == CAMGProlongation::ReconstructionTrace2Steps) // 1
+		{
+			SparseMatrix inv_A_T_Tc = Utils::InvertBlockDiagMatrix(*A_T_Tc, _cellBlockSize);
 			// Theta: reconstruction from the coarse faces to the coarse cells
-			SparseMatrix Theta1 = -inv_A_T_T1 * A_T_F1;
+			SparseMatrix Theta = -inv_A_T_Tc * *A_T_Fc_tmp;
 			// Pi: average on both sides of each face
-			SparseMatrix Pi1 = BuildTrace(_mesh);
-			SparseMatrix P1 = Pi1 * Q_T1 * Theta1;
+			SparseMatrix Pi = BuildTrace(mesh);
 
-			this->inv_A_T_Tc = new SparseMatrix(Utils::InvertBlockDiagMatrix(A_T_Tc, _cellBlockSize));
-			SparseMatrix Theta2 = -(*inv_A_T_Tc) * A_T_Fc;
-			SparseMatrix Pi2 = BuildTrace(coarseMesh);
-
-			SparseMatrix P2 = Pi2 * Q_T2 * Theta2;
-			this->P = P1 * P2;
+			P = new SparseMatrix(Pi * Q_T * Theta);
 		}
 		else if (_multigridProlong == CAMGProlongation::FaceProlongation) // 3
 		{
 			// -g 1 -prolong 3 -face-prolong 3 -cs z
-			this->P = Q_F;
+			P = Q_F;
 		}
 		else if (_multigridProlong == CAMGProlongation::ReconstructionTranspose2Steps) // 4
 		{
-			SparseMatrix inv_A_T_T1 = Utils::InvertBlockDiagMatrix(A_T_T1, _cellBlockSize);
+			/*SparseMatrix inv_A_T_T1 = Utils::InvertBlockDiagMatrix(A_T_T1, _cellBlockSize);
 			// Theta: reconstruction from the coarse faces to the coarse cells
 			SparseMatrix Theta1 = -inv_A_T_T1 * A_T_F1;
 			// Pi: transpose of Theta
@@ -270,62 +234,36 @@ public:
 			this->inv_A_T_Tc = new SparseMatrix(Utils::InvertBlockDiagMatrix(A_T_Tc, _cellBlockSize));
 			SparseMatrix Theta2 = -(*inv_A_T_Tc) * A_T_Fc;
 			SparseMatrix P2 = Theta1.transpose() * Q_T2 * Theta2;
-			this->P = P1 * P2;
+			this->P = P1 * P2;*/
 		}
 		else if (_multigridProlong == CAMGProlongation::ReconstructTraceOrInject) // 5
 		{
-			SparseMatrix inv_A_T_T1 = Utils::InvertBlockDiagMatrix(A_T_T1, _cellBlockSize);
-			SparseMatrix Theta1 = -inv_A_T_T1 * A_T_F1; // Reconstruct
-			SparseMatrix Pi1 = BuildTraceOnRemovedFaces(_mesh); // Trace
-												  // Inject = Q_F1 
-			SparseMatrix ReconstructAndTrace1 = Pi1 * Q_T1 * Theta1;
+			SparseMatrix inv_A_T_Tc = Utils::InvertBlockDiagMatrix(*A_T_Tc, _cellBlockSize);
+			SparseMatrix Theta = -inv_A_T_Tc * *A_T_Fc_tmp;   // Reconstruct
+			SparseMatrix Pi = BuildTraceOnRemovedFaces(mesh); // Trace
+												              // Inject = Q_F
+			SparseMatrix ReconstructAndTrace1 = Pi * Q_T * Theta;
 
-			NumberParallelLoop<CoeffsChunk> parallelLoop(_mesh._faces.size());
+			NumberParallelLoop<CoeffsChunk> parallelLoop(mesh._faces.size());
 			parallelLoop.ReserveChunkCoeffsSize(_faceBlockSize * 2 * _faceBlockSize);
-			parallelLoop.Execute([this, &ReconstructAndTrace1, &Q_F1](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
+			parallelLoop.Execute([this, &ReconstructAndTrace1, &Q_F, &mesh](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
 				{
-					const HybridAlgebraicFace* face = &_mesh._faces[faceNumber];
+					const HybridAlgebraicFace* face = &mesh._faces[faceNumber];
 					if (face->IsRemovedOnCoarseMesh)
 						chunk->Results.Coeffs.CopyRows(faceNumber*_faceBlockSize, _faceBlockSize, ReconstructAndTrace1);
 					else
-						chunk->Results.Coeffs.CopyRows(faceNumber*_faceBlockSize, _faceBlockSize, Q_F1);
+						chunk->Results.Coeffs.CopyRows(faceNumber*_faceBlockSize, _faceBlockSize, *Q_F);
 				});
-			SparseMatrix P1(Q_F1.rows(), Q_F1.cols());
-			parallelLoop.Fill(P1);
-
-			// -----------------
-
-			this->inv_A_T_Tc = new SparseMatrix(Utils::InvertBlockDiagMatrix(A_T_Tc, _cellBlockSize));
-			SparseMatrix Theta2 = -(*inv_A_T_Tc) * A_T_Fc;
-			SparseMatrix Pi2 = BuildTraceOnRemovedFaces(coarseMesh);
-			SparseMatrix ReconstructAndTrace2 = Pi2 * Q_T2 * Theta2;
-
-
-			NumberParallelLoop<CoeffsChunk> parallelLoop2(coarseMesh._faces.size());
-			parallelLoop2.ReserveChunkCoeffsSize(_faceBlockSize * 2 * _faceBlockSize);
-			parallelLoop2.Execute([this, &ReconstructAndTrace2, &Q_F2, &coarseMesh](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
-				{
-					const HybridAlgebraicFace* face = &coarseMesh._faces[faceNumber];
-					if (face->IsRemovedOnCoarseMesh)
-						chunk->Results.Coeffs.CopyRows(faceNumber*_faceBlockSize, _faceBlockSize, ReconstructAndTrace2);
-					else
-						chunk->Results.Coeffs.CopyRows(faceNumber*_faceBlockSize, _faceBlockSize, Q_F2);
-				});
-			SparseMatrix P2(Q_F2.rows(), Q_F2.cols());
-			parallelLoop2.Fill(P2);
-
-			this->P = P1 * P2;
+			P = new SparseMatrix(Q_F->rows(), Q_F->cols());
+			parallelLoop.Fill(*P);
 		}
 		else
 			Utils::FatalError("Unmanaged prolongation");
 
+		SparseMatrix* A_T_Fc = new SparseMatrix(Q_T.transpose() * A_T_F * *P);
+		SparseMatrix* A_F_Fc = new SparseMatrix(P->transpose() * A_F_F * *P);
 
-		//if (!this->UseGalerkinOperator)
-		//{
-			//cout << "Computing coarse A_F_F" << endl;
-			//this->A_F_Fc = Q_F.transpose() * (*A_F_F) * Q_F;
-			this->A_F_Fc = P.transpose() * (*A_F_F) * P;
-		//}
+		return tuple<SparseMatrix*, SparseMatrix*, SparseMatrix*, SparseMatrix*, bool>(A_T_Tc, A_T_Fc, A_F_Fc, P, coarsestPossibleMeshReached);
 	}
 
 	void SetupDiscretizedOperator() override
