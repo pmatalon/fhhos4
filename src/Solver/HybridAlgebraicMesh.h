@@ -189,48 +189,8 @@ public:
 
 	void PairWiseAggregate(CoarseningStrategy coarseningStgy, bool& coarsestPossibleMeshReached)
 	{
-		// Element aggregation
-		_coarseElements.reserve(_elements.size());
-
-		list<HybridAlgebraicElement*> elementsToProcess;
-		for (HybridAlgebraicElement& e : _elements)
-		{
-			if (e.Neighbours.empty())
-			{
-				coarsestPossibleMeshReached = true;
-				return;
-			}
-			elementsToProcess.push_back(&e);
-		}
-		elementsToProcess.sort(CompareNElementsIAmStrongNeighbourOf);
-
-		while (!elementsToProcess.empty())
-		{
-			HybridAlgebraicElement* elem = elementsToProcess.front();
-			elementsToProcess.pop_front();
-
-			if (elem->CoarseElement)
-				continue;
-
-			// New aggregate
-			_coarseElements.emplace_back(_coarseElements.size());
-			HybridElementAggregate* aggregate = &_coarseElements.back();
-
-			// Add elem
-			AddToAggregate(*elem, *aggregate);
-
-			HybridAlgebraicElement* neighbour = StrongestAvailableNeighbour(*elem);
-			if (neighbour)
-			{
-				// Add neighbour?
-				bool strongConnectionIsReciprocal = find(neighbour->StrongNeighbours.begin(), neighbour->StrongNeighbours.end(), elem) != neighbour->StrongNeighbours.end();
-				if (strongConnectionIsReciprocal)
-					AddToAggregate(*neighbour, *aggregate);
-			}
-
-			elementsToProcess.sort(CompareNElementsIAmStrongNeighbourOf);
-		}
-
+		PairWiseElementAggregate(coarsestPossibleMeshReached);
+		
 		// Removal of faces shared by elements in the same aggregate.
 		// Determination of the faces of the aggregates.
 		NumberParallelLoop<EmptyResultChunk> parallelLoopCE(_coarseElements.size());
@@ -343,6 +303,74 @@ public:
 	}
 
 private:
+	void PairWiseElementAggregate(bool& coarsestPossibleMeshReached)
+	{
+		_coarseElements.reserve(_elements.size()); // we need to be sure that the vector won't be resized
+
+		HybridAlgebraicElement* nextElement = &_elements[0];
+
+		for (HybridAlgebraicElement& e : _elements)
+		{
+			if (e.Neighbours.empty())
+			{
+				coarsestPossibleMeshReached = true;
+				return;
+			}
+			if (e.NElementsIAmStrongNeighbourOf < nextElement->NElementsIAmStrongNeighbourOf)
+				nextElement = &e;
+		}
+
+		// Element aggregation
+		while (nextElement)
+		{
+			HybridAlgebraicElement* elem = nextElement;
+			nextElement = nullptr;
+			int currentMin = elem->NElementsIAmStrongNeighbourOf;
+
+			assert(!elem->CoarseElement);
+
+			// New aggregate
+			_coarseElements.emplace_back(_coarseElements.size());
+			HybridElementAggregate* aggregate = &_coarseElements.back();
+
+			// Add elem
+			AddToAggregate(*elem, *aggregate);
+
+			HybridAlgebraicElement* neighbour = StrongestAvailableNeighbour(*elem);
+			if (neighbour)
+			{
+				// Add neighbour?
+				bool strongConnectionIsReciprocal = find(neighbour->StrongNeighbours.begin(), neighbour->StrongNeighbours.end(), elem) != neighbour->StrongNeighbours.end();
+				if (strongConnectionIsReciprocal)
+					AddToAggregate(*neighbour, *aggregate);
+			}
+
+			nextElement = NextElementInTheNeighbourhood(*aggregate, currentMin);
+
+			if (!nextElement)
+			{
+				// find first non processed element that has currentMin, or else the next superior value
+				HybridAlgebraicElement* candidateNextElement = nullptr;
+				for (HybridAlgebraicElement& e : _elements)
+				{
+					if (e.CoarseElement)
+						continue;
+
+					if (e.NElementsIAmStrongNeighbourOf == currentMin)
+					{
+						nextElement = &e;
+						break;
+					}
+					else if (!candidateNextElement || e.NElementsIAmStrongNeighbourOf < candidateNextElement->NElementsIAmStrongNeighbourOf)
+						candidateNextElement = &e;
+				}
+
+				if (!nextElement)
+					nextElement = candidateNextElement;
+			}
+		}
+	}
+
 	static bool CompareNElementsIAmStrongNeighbourOf(HybridAlgebraicElement* e1, HybridAlgebraicElement* e2)
 	{
 		return e1->NElementsIAmStrongNeighbourOf < e2->NElementsIAmStrongNeighbourOf; // Sort by ascending number
@@ -433,5 +461,37 @@ private:
 			if (!n->CoarseElement)
 				n->NElementsIAmStrongNeighbourOf--;
 		}
+	}
+
+	HybridAlgebraicElement* NextElementInTheNeighbourhood(const HybridElementAggregate& aggregate, int currentMin)
+	{
+		HybridAlgebraicElement* nextElement = nullptr;
+		for (HybridAlgebraicElement* e : aggregate.FineElements)
+		{
+			for (HybridAlgebraicElement* n : e->StrongNeighbours)
+			{
+				if (!n->CoarseElement && n->NElementsIAmStrongNeighbourOf < currentMin)
+				{
+					nextElement = n;
+					currentMin = n->NElementsIAmStrongNeighbourOf;
+				}
+			}
+		}
+		if (nextElement)
+			return nextElement;
+
+		for (HybridAlgebraicElement* e : aggregate.FineElements)
+		{
+			for (HybridAlgebraicElement* n : e->StrongNeighbours)
+			{
+				if (!n->CoarseElement && n->NElementsIAmStrongNeighbourOf == currentMin)
+				{
+					return n;
+					break;
+				}
+			}
+		}
+
+		return nullptr;
 	}
 };

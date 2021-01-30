@@ -208,6 +208,12 @@ private:
 	{
 		aggregate.FineElements.push_back(&e);
 		e.CoarseElement = &aggregate;
+
+		for (AlgebraicElement* n : e.StrongNeighbours)
+		{
+			if (!n->CoarseElement)
+				n->NElementsIAmStrongNeighbourOf--;
+		}
 	}
 
 	AlgebraicElement* NextElementInTheNeighbourhood(const ElementAggregate& aggregate, int currentMin)
@@ -217,14 +223,10 @@ private:
 		{
 			for (AlgebraicElement* n : e->StrongNeighbours)
 			{
-				if (!n->CoarseElement)
+				if (!n->CoarseElement && n->NElementsIAmStrongNeighbourOf < currentMin)
 				{
-					n->NElementsIAmStrongNeighbourOf--;
-					if (n->NElementsIAmStrongNeighbourOf < currentMin)
-					{
-						nextElement = n;
-						currentMin = n->NElementsIAmStrongNeighbourOf;
-					}
+					nextElement = n;
+					currentMin = n->NElementsIAmStrongNeighbourOf;
 				}
 			}
 		}
@@ -235,13 +237,10 @@ private:
 		{
 			for (AlgebraicElement* n : e->StrongNeighbours)
 			{
-				if (!n->CoarseElement)
+				if (!n->CoarseElement && n->NElementsIAmStrongNeighbourOf == currentMin)
 				{
-					if (n->NElementsIAmStrongNeighbourOf == currentMin)
-					{
-						return n;
-						break;
-					}
+					return n;
+					break;
 				}
 			}
 		}
