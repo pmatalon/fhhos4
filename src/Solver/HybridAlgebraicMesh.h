@@ -309,17 +309,6 @@ private:
 
 		HybridAlgebraicElement* nextElement = &_elements[0];
 
-		for (HybridAlgebraicElement& e : _elements)
-		{
-			if (e.Neighbours.empty())
-			{
-				coarsestPossibleMeshReached = true;
-				return;
-			}
-			if (e.NElementsIAmStrongNeighbourOf < nextElement->NElementsIAmStrongNeighbourOf)
-				nextElement = &e;
-		}
-
 		// Element aggregation
 		while (nextElement)
 		{
@@ -345,28 +334,13 @@ private:
 					AddToAggregate(*neighbour, *aggregate);
 			}
 
-			nextElement = NextElementInTheNeighbourhood(*aggregate, currentMin);
+			nextElement = NextElementInTheNeighbourhood(*aggregate);
 
 			if (!nextElement)
 			{
-				// find first non processed element that has currentMin, or else the next superior value
-				HybridAlgebraicElement* candidateNextElement = nullptr;
-				for (HybridAlgebraicElement& e : _elements)
-				{
-					if (e.CoarseElement)
-						continue;
-
-					if (e.NElementsIAmStrongNeighbourOf == currentMin)
-					{
-						nextElement = &e;
-						break;
-					}
-					else if (!candidateNextElement || e.NElementsIAmStrongNeighbourOf < candidateNextElement->NElementsIAmStrongNeighbourOf)
-						candidateNextElement = &e;
-				}
-
-				if (!nextElement)
-					nextElement = candidateNextElement;
+				auto it = find_if(_elements.begin(), _elements.end(), [](const HybridAlgebraicElement& e) { return !e.CoarseElement; });
+				if (it != _elements.end())
+					nextElement = &*it;
 			}
 		}
 	}
@@ -463,35 +437,21 @@ private:
 		}
 	}
 
-	HybridAlgebraicElement* NextElementInTheNeighbourhood(const HybridElementAggregate& aggregate, int currentMin)
+	HybridAlgebraicElement* NextElementInTheNeighbourhood(const HybridElementAggregate& aggregate)
 	{
 		HybridAlgebraicElement* nextElement = nullptr;
+		int min = 1000000000;
 		for (HybridAlgebraicElement* e : aggregate.FineElements)
 		{
 			for (HybridAlgebraicElement* n : e->StrongNeighbours)
 			{
-				if (!n->CoarseElement && n->NElementsIAmStrongNeighbourOf < currentMin)
+				if (!n->CoarseElement && n->NElementsIAmStrongNeighbourOf < min)
 				{
 					nextElement = n;
-					currentMin = n->NElementsIAmStrongNeighbourOf;
+					min = n->NElementsIAmStrongNeighbourOf;
 				}
 			}
 		}
-		if (nextElement)
-			return nextElement;
-
-		for (HybridAlgebraicElement* e : aggregate.FineElements)
-		{
-			for (HybridAlgebraicElement* n : e->StrongNeighbours)
-			{
-				if (!n->CoarseElement && n->NElementsIAmStrongNeighbourOf == currentMin)
-				{
-					return n;
-					break;
-				}
-			}
-		}
-
-		return nullptr;
+		return nextElement;
 	}
 };
