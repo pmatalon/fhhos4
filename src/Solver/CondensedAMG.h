@@ -150,9 +150,7 @@ public:
 	// Returns <A_T_Tc, A_T_Fc, A_F_Fc, P, Q_F, coarsestPossibleMeshReached>
 	tuple<SparseMatrix*, SparseMatrix*, SparseMatrix*, SparseMatrix*, SparseMatrix*, bool> PairwiseAggregate(const SparseMatrix A_T_T, const SparseMatrix A_T_F, const SparseMatrix A_F_F, CoarseningStrategy coarseningStgy)
 	{
-		cout << "A_T_T: " << A_T_T.rows() << endl;
 		HybridAlgebraicMesh mesh(_cellBlockSize, _faceBlockSize, _strongCouplingThreshold);
-		ExportMatrix(A_T_F, "A_T_F", 0);
 		mesh.Build(A_T_T, A_T_F, A_F_F);
 
 		bool coarsestPossibleMeshReached = false;
@@ -403,6 +401,7 @@ private:
 					chunk->Results.Coeffs.Add(faceNumber*_faceBlockSize, face.Elements[0]->Number*_cellBlockSize, traceOfConstant);
 				else
 				{
+					assert(!face.Elements.empty());
 					for (HybridAlgebraicElement* elem : face.Elements)
 						chunk->Results.Coeffs.Add(faceNumber*_faceBlockSize, elem->Number*_cellBlockSize, 1.0 / face.Elements.size()*traceOfConstant);
 				}
