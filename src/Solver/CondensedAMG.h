@@ -67,7 +67,7 @@ public:
 		const SparseMatrix* A_T_T1 = A_T_T;
 		const SparseMatrix* A_T_F1 = A_T_F;
 		const SparseMatrix* A_F_F1 = A_F_F;
-		SparseMatrix *A_T_T2, *A_T_F2, *A_F_F2, *P;
+		SparseMatrix *A_T_T2, *A_T_F2, *A_F_F2, *P, *Q_F;
 		double coarseningRatio = 0;
 		double nCoarsenings = 0;
 		//while (coarseningRatio < 3)
@@ -75,7 +75,7 @@ public:
 		{
 			cout << "\tPairwise aggregation" << endl;
 
-			std::tie(A_T_T2, A_T_F2, A_F_F2, P, coarsestPossibleMeshReached) = PairwiseAggregate(*A_T_T1, *A_T_F1, *A_F_F1, coarseningStgy);
+			std::tie(A_T_T2, A_T_F2, A_F_F2, P, Q_F, coarsestPossibleMeshReached) = PairwiseAggregate(*A_T_T1, *A_T_F1, *A_F_F1, coarseningStgy);
 			if (coarsestPossibleMeshReached)
 				return;
 
@@ -87,11 +87,17 @@ public:
 			A_F_F1 = A_F_F2;
 
 			if (nCoarsenings == 0)
+			{
 				this->P = *P;
+				this->Q_F = *Q_F;
+			}
 			else
+			{
 				this->P = this->P * *P;
+				this->Q_F = this->Q_F * *Q_F;
+			}
 
-			delete P;
+			delete P, Q_F;
 
 			double nFine = this->A_T_F->cols();
 			double nCoarse = A_T_F1->cols();
@@ -141,16 +147,18 @@ public:
 
 	}
 
-	// Returns <A_T_Tc, A_T_Fc, A_F_Fc, P, coarsestPossibleMeshReached>
-	tuple<SparseMatrix*, SparseMatrix*, SparseMatrix*, SparseMatrix*, bool> PairwiseAggregate(const SparseMatrix A_T_T, const SparseMatrix A_T_F, const SparseMatrix A_F_F, CoarseningStrategy coarseningStgy)
+	// Returns <A_T_Tc, A_T_Fc, A_F_Fc, P, Q_F, coarsestPossibleMeshReached>
+	tuple<SparseMatrix*, SparseMatrix*, SparseMatrix*, SparseMatrix*, SparseMatrix*, bool> PairwiseAggregate(const SparseMatrix A_T_T, const SparseMatrix A_T_F, const SparseMatrix A_F_F, CoarseningStrategy coarseningStgy)
 	{
+		cout << "A_T_T: " << A_T_T.rows() << endl;
 		HybridAlgebraicMesh mesh(_cellBlockSize, _faceBlockSize, _strongCouplingThreshold);
+		ExportMatrix(A_T_F, "A_T_F", 0);
 		mesh.Build(A_T_T, A_T_F, A_F_F);
 
 		bool coarsestPossibleMeshReached = false;
 		mesh.PairWiseAggregate(coarseningStgy, coarsestPossibleMeshReached);
 		if (coarsestPossibleMeshReached)
-			return tuple<SparseMatrix*, SparseMatrix*, SparseMatrix*, SparseMatrix*, bool>(nullptr, nullptr, nullptr, nullptr, coarsestPossibleMeshReached);
+			return { nullptr, nullptr, nullptr, nullptr, nullptr, coarsestPossibleMeshReached };
 
 		/*cout << "------------- Elem" << endl;
 		for (HybridElementAggregate& agg : mesh._coarseElements)
@@ -189,13 +197,13 @@ public:
 				Utils::FatalError("This coarsening strategy is incompatible with this face prolongation operator.");
 
 			//ExportMatrix(*A_F_F, "A_F_F", 0);
-			AlgebraicMesh skeleton1(_faceBlockSize, 0);
-			//skeleton1.Build(*A_F_F);
-			skeleton1.Build(*this->OperatorMatrix);
-			skeleton1.PairWiseAggregate(coarsestPossibleMeshReached);
+			AlgebraicMesh skeleton(_faceBlockSize, 0);
+			//skeleton.Build(*A_F_F);
+			skeleton.Build(*this->OperatorMatrix);
+			skeleton.PairWiseAggregate(coarsestPossibleMeshReached);
 			if (coarsestPossibleMeshReached)
-				return tuple<SparseMatrix*, SparseMatrix*, SparseMatrix*, SparseMatrix*, bool>(nullptr, nullptr, nullptr, nullptr, coarsestPossibleMeshReached);
-			Q_F = new SparseMatrix(BuildQ_F_AllAggregated(skeleton1));
+				return { nullptr, nullptr, nullptr, nullptr, nullptr, coarsestPossibleMeshReached };
+			Q_F = new SparseMatrix(BuildQ_F_AllAggregated(skeleton));
 		}
 		else
 			Utils::FatalError("Unmanaged -face-prolong");
@@ -203,7 +211,6 @@ public:
 		// Intermediate coarse operators
 		SparseMatrix* A_T_Tc     = new SparseMatrix(Q_T.transpose() * A_T_T * Q_T);
 		SparseMatrix* A_T_Fc_tmp = new SparseMatrix(Q_T.transpose() * A_T_F * *Q_F);
-		//SparseMatrix A_F_Fc_tmp  = Q_F->transpose() * (*A_F_F) * *Q_F;
 
 		SparseMatrix* P;
 		if (_multigridProlong == CAMGProlongation::ReconstructionTrace1Step || _multigridProlong == CAMGProlongation::ReconstructionTrace2Steps) // 1
@@ -263,7 +270,7 @@ public:
 		SparseMatrix* A_T_Fc = new SparseMatrix(Q_T.transpose() * A_T_F * *P);
 		SparseMatrix* A_F_Fc = new SparseMatrix(P->transpose() * A_F_F * *P);
 
-		return tuple<SparseMatrix*, SparseMatrix*, SparseMatrix*, SparseMatrix*, bool>(A_T_Tc, A_T_Fc, A_F_Fc, P, coarsestPossibleMeshReached);
+		return { A_T_Tc, A_T_Fc, A_F_Fc, P, Q_F, coarsestPossibleMeshReached };
 	}
 
 	void SetupDiscretizedOperator() override
