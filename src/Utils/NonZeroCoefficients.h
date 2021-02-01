@@ -72,11 +72,11 @@ public:
 		}
 	}
 
-	inline void CopyRows(BigNumber iStart, int nRows, const Eigen::SparseMatrix<double, Eigen::RowMajor> &m)
+	inline void CopyRows(BigNumber iStart, int nRows, const RowMajorSparseMatrix &m)
 	{
 		for (int i = 0; i < nRows; ++i)
 		{
-			for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(m, iStart + i); it; ++it)
+			for (RowMajorSparseMatrix::InnerIterator it(m, iStart + i); it; ++it)
 			{
 				Add(it.row(), it.col(), it.value());
 			}
