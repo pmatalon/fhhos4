@@ -554,9 +554,13 @@ int main(int argc, char* argv[])
 				break;
 			case OPT_HeterogeneityRatio: 
 				args.Problem.HeterogeneityRatio = atof(optarg);
+				if (args.Problem.HeterogeneityRatio <= 0)
+					argument_error("heterogeneity ratio must be > 0. Check -heterog argument.");
 				break;
 			case OPT_AnisotropyRatio:
 				args.Problem.AnisotropyRatio = atof(optarg);
+				if (args.Problem.AnisotropyRatio <= 0)
+					argument_error("anisotropy ratio must be > 0. Check -aniso argument.");
 				break;
 			case OPT_AnisotropyAngle:
 				args.Problem.AnisotropyAngle = atof(optarg) * M_PI / 180; // conversion degrees to radians
