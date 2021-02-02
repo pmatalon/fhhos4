@@ -754,7 +754,7 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args, TestCase<3>* testCase)
 			}
 			else if (meshCode.compare("stetra") == 0)
 			{
-				if (refinementStgy == CoarseningStrategy::StandardCoarsening)
+				if (refinementStgy == CoarseningStrategy::StandardCoarsening || Utils::IsAlgebraic(args.Solver.MG.CoarseningStgy))
 					fineMesh = new Cube_CartesianTetrahedralMesh(n);
 				else
 				{

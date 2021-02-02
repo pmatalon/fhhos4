@@ -208,6 +208,13 @@ public:
 		return IsRefinementStrategy(stgy) || stgy == CoarseningStrategy::StandardCoarsening;
 	}
 
+	static bool IsAlgebraic(CoarseningStrategy stgy)
+	{
+		return stgy == CoarseningStrategy::CAMGCollapseElementInterfaces ||
+			stgy == CoarseningStrategy::CAMGCollapseElementInterfacesAndTryAggregInteriorToBoundaries ||
+			stgy == CoarseningStrategy::CAMGAggregFaces;
+	}
+
 	static bool RequiresNestedHierarchy(Prolongation p)
 	{
 		return p != Prolongation::CellInterp_L2proj_Trace && p != Prolongation::CellInterp_ApproxL2proj_Trace && p != Prolongation::CellInterp_FinerApproxL2proj_Trace;
