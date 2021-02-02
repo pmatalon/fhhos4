@@ -210,6 +210,12 @@ public:
 		SparseMatrix* A_T_Tc     = new SparseMatrix(Q_T.transpose() * A_T_T * Q_T);
 		SparseMatrix* A_T_Fc_tmp = new SparseMatrix(Q_T.transpose() * A_T_F * *Q_F);
 
+		/*ExportMatrix(A_T_F, "A_T_F", 0);
+		ExportMatrix(Q_T, "Q_T", 0);
+		ExportMatrix(*Q_F, "Q_F", 0);
+		ExportMatrix(*A_T_Tc, "A_T_Tc", 0);
+		ExportMatrix(*A_T_Fc_tmp, "A_T_Fc", 0);*/
+
 		SparseMatrix* P;
 		if (_multigridProlong == CAMGProlongation::ReconstructionTrace1Step || _multigridProlong == CAMGProlongation::ReconstructionTrace2Steps) // 1
 		{
@@ -265,7 +271,8 @@ public:
 		else
 			Utils::FatalError("Unmanaged prolongation");
 
-		SparseMatrix* A_T_Fc = new SparseMatrix(Q_T.transpose() * A_T_F * *P);
+		//SparseMatrix* A_T_Fc = new SparseMatrix(Q_T.transpose() * A_T_F * *P); // Kills -prolong 1 or 2
+		SparseMatrix* A_T_Fc = A_T_Fc_tmp;
 		SparseMatrix* A_F_Fc = new SparseMatrix(P->transpose() * A_F_F * *P);
 
 		return { A_T_Tc, A_T_Fc, A_F_Fc, P, Q_F, coarsestPossibleMeshReached };

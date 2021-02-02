@@ -22,7 +22,7 @@ public:
 		Eigen::ComputationInfo info = _solver.info();
 		if (info != Eigen::ComputationInfo::Success)
 		{
-			cout << "----------------- A -------------------" << A << endl;
+			//cout << "----------------- A -------------------" << A << endl;
 			cout << "Error: SparseLU failed to execute with the code " << info << ": " << _solver.lastErrorMessage() << endl;
 			exit(EXIT_FAILURE);
 		}

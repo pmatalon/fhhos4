@@ -93,6 +93,8 @@ public:
 		BigNumber nFaces = A_T_F.cols() / _faceBlockSize;
 		this->_faces = vector<HybridAlgebraicFace>(nFaces);
 
+		//cout << nElements << " elements, " << nFaces << " faces found" << endl;
+
 		//-------------------------//
 		// Filling elements' faces //
 		//-------------------------//
@@ -300,6 +302,10 @@ public:
 				}
 			}
 		}
+
+		//cout << _coarseElements.size() << " coarse elements, " << _coarseFaces.size() << " coarse faces" << endl;
+		if (_coarseFaces.empty())
+			coarsestPossibleMeshReached = true;
 	}
 
 private:
