@@ -74,6 +74,10 @@ public:
 		bool noCoarserMeshProvided = false;
 		bool coarsestPossibleMeshReached = false;
 		int levelNumber = 0;
+		double operatorComplexity = 0;
+		double fineNNZ = (double)this->_fineLevel->OperatorMatrix->nonZeros();
+		double gridComplexity = 0;
+		double fineNUnknowns = (double)this->_fineLevel->NUnknowns();
 		while ((_automaticNumberOfLevels && currentLevel->NUnknowns() > MatrixMaxSizeForCoarsestLevel) || (levelNumber < _nLevels - 1))
 		{
 			// Can we coarsen the mesh?
@@ -139,11 +143,17 @@ public:
 			// Setup fine level
 			currentLevel->Setup();
 
+			operatorComplexity += currentLevel->OperatorMatrix->nonZeros() / fineNNZ;
+			gridComplexity += currentLevel->NUnknowns() / fineNUnknowns;
+
 			currentLevel = coarseLevel;
 		}
 
 		_nLevels = levelNumber + 1;
 		currentLevel->Setup();
+
+		operatorComplexity += currentLevel->OperatorMatrix->nonZeros() / fineNNZ;
+		gridComplexity += currentLevel->NUnknowns() / fineNUnknowns;
 
 		if (coarsestPossibleMeshReached)
 			Utils::Warning("impossible to coarsen the mesh any more.");
@@ -164,6 +174,8 @@ public:
 		}
 
 		cout << "\t--> " << _nLevels << " levels built." << endl;
+		cout << "\tOperator complexity: " << operatorComplexity << endl;
+		cout << "\tGrid complexity    : " << gridComplexity << endl;
 
 		if (this->WLoops > 1)
 			PrintCycleSchema();
