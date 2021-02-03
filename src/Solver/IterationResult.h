@@ -131,41 +131,59 @@ public:
 	{
 		int IterWidth = 3;
 		int predictedIterationsWidth = 6;
-		int normalizedResWidth = 17;
-		int relativeErrorWidth = 15;
-		int iterationConvRateWidth = 13;
-		int asymptoticConvRateWidth = 16;
+		int normalizedResWidth = 12;
+		int relativeErrorWidth = 12;
+		int iterationConvRateWidth = 11;
+		int asymptoticConvRateWidth = 12;
 		int computWorkWidth = 15;
 		int cpuTimeWidth = 10;
-		int remainingTimeWidth = 14;
+		int remainingTimeWidth = 11;
+
+		cout.precision(2);
 		if (result.IterationNumber == 0)
 		{
+			// Label row 1
 			os << setw(IterWidth + predictedIterationsWidth);
-			os << "Iteration";
-
+			os << "";
 			os << setw(normalizedResWidth);
-			os << "Norm. residual";
-
+			os << "Relative";
 			if (result.RelativeErrorNorm != -1)
 			{
 				os << setw(relativeErrorWidth);
-				os << "Relative err.";
+				os << "Relative";
 			}
-
 			os << setw(iterationConvRateWidth);
-			os << "It. cv rate";
-
+			os << "Iteration";
 			os << setw(asymptoticConvRateWidth);
-			os << "Asymp. cv rate";
-
+			os << "Asymptotic";
 			os << setw(computWorkWidth);
-			os << "Comput. work";
-
-			os << setw(cpuTimeWidth);
-			os << "CPU time";
-
+			os << "Computational";
+			//os << setw(cpuTimeWidth);
+			//os << "";
 			os << setw(remainingTimeWidth);
-			os << "Remain. time";
+			os << "Remaining";
+			os << endl;
+
+			// Label row 2
+			os << setw(IterWidth + predictedIterationsWidth);
+			os << "Iteration";
+			os << setw(normalizedResWidth);
+			os << "residual";
+			if (result.RelativeErrorNorm != -1)
+			{
+				os << setw(relativeErrorWidth);
+				os << "error";
+			}
+			os << setw(iterationConvRateWidth);
+			os << "cv rate";
+			os << setw(asymptoticConvRateWidth);
+			os << "cv rate";
+			os << setw(computWorkWidth);
+			os << "work";
+			//os << setw(cpuTimeWidth);
+			//os << "CPU time";
+			os << setw(remainingTimeWidth);
+			os << "time";
 		}
 		else
 		{
@@ -211,8 +229,8 @@ public:
 			os << setw(computWorkWidth);
 			os << result._solvingComputationalWork;
 
-			os << setw(cpuTimeWidth);
-			os << result._solvingTimer.CPU().InMilliseconds;
+			//os << setw(cpuTimeWidth);
+			//os << result._solvingTimer.CPU().InMilliseconds;
 
 			os << setw(remainingTimeWidth);
 			if (result.IterationNumber == 1)

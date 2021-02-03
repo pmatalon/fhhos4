@@ -79,6 +79,8 @@ private:
 		if (this->PrintIterationResults)
 			cout << endl;
 
+		this->SolvingComputationalWork = result.SolvingComputationalWork();
+
 		return x;
 	}
 };

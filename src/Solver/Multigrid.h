@@ -173,9 +173,11 @@ public:
 			}
 		}
 
-		cout << "\t--> " << _nLevels << " levels built." << endl;
+		cout << endl;
+		cout << "\tLevels             : " << _nLevels << endl;
 		cout << "\tOperator complexity: " << operatorComplexity << endl;
 		cout << "\tGrid complexity    : " << gridComplexity << endl;
+		cout << endl;
 
 		if (this->WLoops > 1)
 			PrintCycleSchema();

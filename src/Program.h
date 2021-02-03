@@ -476,9 +476,10 @@ private:
 
 	Vector Solve(Solver* solver, Problem<Dim>* problem, string initialGuessCode)
 	{
-		Timer totalSolvingTimer;
-		totalSolvingTimer.Start();
 		Timer setupTimer;
+		Timer solvingTimer;
+		Timer totalTimer;
+		totalTimer.Start();
 
 		cout << "Solver: " << *solver << endl << endl;
 
@@ -499,8 +500,10 @@ private:
 			setupTimer.Stop();
 
 			cout << "Solving..." << endl;
+			solvingTimer.Start();
 			x = iterativeSolver->Solve(problem->b, initialGuessCode);
-			cout << iterativeSolver->IterationCount << " iterations." << endl;
+			solvingTimer.Stop();
+			cout << iterativeSolver->IterationCount << " iterations." << endl << endl;
 		}
 		else
 		{
@@ -509,12 +512,60 @@ private:
 			setupTimer.Stop();
 
 			cout << "Solving..." << endl;
+			solvingTimer.Start();
 			x = solver->Solve(problem->b);
+			solvingTimer.Stop();
+			cout << endl;
 		}
+		totalTimer.Stop();
 
-		totalSolvingTimer.Stop();
-		cout << "Setup time        : CPU = " << setupTimer.CPU()        << ", elapsed = " << setupTimer.Elapsed()        << endl;
-		cout << "Total solving time: CPU = " << totalSolvingTimer.CPU() << ", elapsed = " << totalSolvingTimer.Elapsed() << endl;
+		int sizeTime = 14;
+		int sizeWork = 14;
+
+		cout << "        |    CPU time    |  Elapsed time  ";
+		if (iterativeSolver != nullptr)
+			cout << "|  Comput. work  ";
+		cout << endl;
+		cout << "-------------------------------------------";
+		if (iterativeSolver != nullptr)
+			cout << "----------------";
+		cout << endl;
+
+		cout << "Setup   | " << setw(sizeTime) << setupTimer.CPU()                  << " | " << setw(sizeTime) << setupTimer.Elapsed();
+		if (iterativeSolver != nullptr)
+			cout << " | " << setw(sizeWork) << iterativeSolver->SetupComputationalWork;
+		cout << endl;
+		cout << "        | " << setw(sizeTime-3) << setupTimer.CPU().InMilliseconds   << " ms | " << setw(sizeTime-3) << setupTimer.Elapsed().InMilliseconds << " ms ";
+		if (iterativeSolver != nullptr)
+			cout << "|";
+		cout << endl;
+		cout << "-------------------------------------------";
+		if (iterativeSolver != nullptr)
+			cout << "----------------";
+		cout << endl;
+
+		cout << "Solving | " << setw(sizeTime) << solvingTimer.CPU()                  <<    " | " << setw(sizeTime) << solvingTimer.Elapsed();
+		if (iterativeSolver != nullptr)
+			cout << " | " << setw(sizeWork) << iterativeSolver->SolvingComputationalWork;
+		cout << endl;
+		cout << "        | " << setw(sizeTime-3) << solvingTimer.CPU().InMilliseconds << " ms | " << setw(sizeTime-3) << solvingTimer.Elapsed().InMilliseconds << " ms ";
+		if (iterativeSolver != nullptr)
+			cout << "|";
+		cout << endl;
+		cout << "-------------------------------------------";
+		if (iterativeSolver != nullptr)
+			cout << "----------------";
+		cout << endl;
+
+		cout << "Total   | " << setw(sizeTime) << totalTimer.CPU()                  <<    " | " << setw(sizeTime) << totalTimer.Elapsed();
+		if (iterativeSolver != nullptr)
+			cout << " | " << setw(sizeWork) << (iterativeSolver->SetupComputationalWork + iterativeSolver->SolvingComputationalWork);
+		cout << endl;
+		cout << "        | " << setw(sizeTime-3) << totalTimer.CPU().InMilliseconds   << " ms | " << setw(sizeTime-3) << totalTimer.Elapsed().InMilliseconds << " ms ";
+		if (iterativeSolver != nullptr)
+			cout << "|";
+		cout << endl;
+
 		cout << endl;
 		return x;
 	}

@@ -28,20 +28,22 @@ public:
 
 	friend ostream& operator<<(ostream& os, const Duration& d)
 	{
+		stringstream ss;
 		if (d._hh < 10)
-			os << "0";
-		os << d._hh << ":";
+			ss << "0";
+		ss << d._hh << ":";
 		if (d._mm < 10)
-			os << "0";
-		os << d._mm << ":";
+			ss << "0";
+		ss << d._mm << ":";
 		if (d._ss < 10)
-			os << "0";
-		os << d._ss << ".";
+			ss << "0";
+		ss << d._ss << ".";
 		if (d._ms < 100)
-			os << "0";
+			ss << "0";
 		if (d._ms < 10)
-			os << "0";
-		os << d._ms;
+			ss << "0";
+		ss << d._ms;
+		os << ss.str();
 		return os;
 	}
 };
