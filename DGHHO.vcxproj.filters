@@ -432,6 +432,9 @@
     <ClInclude Include="src\Solver\AggregAMG.h">
       <Filter>Solver</Filter>
     </ClInclude>
+    <ClInclude Include="src\Solver\GaussSeidel.h">
+      <Filter>Solver</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

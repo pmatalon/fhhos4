@@ -9,17 +9,42 @@ public:
 	static Smoother* Create(string smootherCode, int nSmootherIterations, int blockSize, double omega)
 	{
 		if (smootherCode.compare("sor") == 0 || smootherCode.compare("gs") == 0)
-			return new BlockSORSmoother(1, omega, Direction::Forward, nSmootherIterations);
+		{
+			if (blockSize == 1 && omega == 1)
+				return new GaussSeidelSmoother(Direction::Forward, nSmootherIterations);
+			else
+				return new BlockSORSmoother(1, omega, Direction::Forward, nSmootherIterations);
+		}
 		if (smootherCode.compare("rsor") == 0 || smootherCode.compare("rgs") == 0)
-			return new BlockSORSmoother(1, omega, Direction::Backward, nSmootherIterations);
+		{
+			if (blockSize == 1 && omega == 1)
+				return new GaussSeidelSmoother(Direction::Backward, nSmootherIterations);
+			else
+				return new BlockSORSmoother(1, omega, Direction::Backward, nSmootherIterations);
+		}
 
 		if (smootherCode.compare("bsor") == 0 || smootherCode.compare("bgs") == 0)
-			return new BlockSORSmoother(blockSize, omega, Direction::Forward, nSmootherIterations);
+		{
+			if (blockSize == 1 && omega == 1)
+				return new GaussSeidelSmoother(Direction::Forward, nSmootherIterations);
+			else
+				return new BlockSORSmoother(blockSize, omega, Direction::Forward, nSmootherIterations);
+		}
 		if (smootherCode.compare("rbsor") == 0 || smootherCode.compare("rbgs") == 0)
-			return new BlockSORSmoother(blockSize, omega, Direction::Backward, nSmootherIterations);
+		{
+			if (blockSize == 1 && omega == 1)
+				return new GaussSeidelSmoother(Direction::Backward, nSmootherIterations);
+			else
+				return new BlockSORSmoother(blockSize, omega, Direction::Backward, nSmootherIterations);
+		}
 
 		if (smootherCode.compare("sbsor") == 0 || smootherCode.compare("sbgs") == 0)
-			return new BlockSORSmoother(blockSize, omega, Direction::Symmetric, nSmootherIterations);
+		{
+			if (blockSize == 1 && omega == 1)
+				return new GaussSeidelSmoother(Direction::Symmetric, nSmootherIterations);
+			else
+				return new BlockSORSmoother(blockSize, omega, Direction::Symmetric, nSmootherIterations);
+		}
 
 		if (smootherCode.compare("j") == 0)
 			return new BlockJacobiSmoother(1, omega, nSmootherIterations);

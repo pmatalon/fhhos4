@@ -67,15 +67,18 @@ public:
 		if (!A.IsRowMajor)
 			this->_rowMajorA = A;
 
-		auto nb = A.rows() / _blockSize;
-		this->invD = vector<Eigen::FullPivLU<DenseMatrix>>(nb);
+		if (_blockSize != 1)
+		{
+			auto nb = A.rows() / _blockSize;
+			this->invD = vector<Eigen::FullPivLU<DenseMatrix>>(nb);
 
-		NumberParallelLoop<EmptyResultChunk> parallelLoop(nb);
-		parallelLoop.Execute([this, &A](BigNumber i, ParallelChunk<EmptyResultChunk>* chunk)
-			{
-				DenseMatrix Di = A.block(i * _blockSize, i * _blockSize, _blockSize, _blockSize);
-				this->invD[i].compute(Di);
-			});
+			NumberParallelLoop<EmptyResultChunk> parallelLoop(nb);
+			parallelLoop.Execute([this, &A](BigNumber i, ParallelChunk<EmptyResultChunk>* chunk)
+				{
+					DenseMatrix Di = A.block(i * _blockSize, i * _blockSize, _blockSize, _blockSize);
+					this->invD[i].compute(Di);
+				});
+		}
 
 		this->SetupComputationalWork = 2.0 / 3.0*pow(_blockSize, 3);
 	}
@@ -90,22 +93,50 @@ private:
 		auto nb = A.rows() / _blockSize;
 		if (_direction == Direction::Forward)
 		{
-			for (BigNumber i = 0; i < nb; ++i)
-				ProcessBlockRow(i, b, x);
+			if (_blockSize == 1)
+			{
+				for (BigNumber i = 0; i < nb; ++i)
+					ProcessRow(i, b, x);
+			}
+			else
+			{
+				for (BigNumber i = 0; i < nb; ++i)
+					ProcessBlockRow(i, b, x);
+			}
 		}
 		else if (_direction == Direction::Backward)
 		{
-			for (BigNumber i = 0; i < nb; ++i)
-				ProcessBlockRow(nb - i - 1, b, x);
+			if (_blockSize == 1)
+			{
+				for (BigNumber i = 0; i < nb; ++i)
+					ProcessRow(nb - i - 1, b, x);
+			}
+			else
+			{
+				for (BigNumber i = 0; i < nb; ++i)
+					ProcessBlockRow(nb - i - 1, b, x);
+			}
 		}
 		else // Symmetric
 		{
-			// Forward
-			for (BigNumber i = 0; i < nb; ++i)
-				ProcessBlockRow(i, b, x);
-			// Backward
-			for (BigNumber i = 0; i < nb; ++i)
-				ProcessBlockRow(nb - i - 1, b, x);
+			if (_blockSize == 1)
+			{
+				// Forward
+				for (BigNumber i = 0; i < nb; ++i)
+					ProcessRow(i, b, x);
+				// Backward
+				for (BigNumber i = 0; i < nb; ++i)
+					ProcessRow(nb - i - 1, b, x);
+			}
+			else
+			{
+				// Forward
+				for (BigNumber i = 0; i < nb; ++i)
+					ProcessBlockRow(i, b, x);
+				// Backward
+				for (BigNumber i = 0; i < nb; ++i)
+					ProcessBlockRow(nb - i - 1, b, x);
+			}
 		}
 
 		result.SetX(x);
@@ -114,7 +145,7 @@ private:
 		return result;
 	}
 
-	inline void ProcessBlockRow(BigNumber currentBlockRow, const Vector& b, Vector& x)
+	void ProcessBlockRow(BigNumber currentBlockRow, const Vector& b, Vector& x)
 	{
 		const SparseMatrix& A = *this->Matrix;
 
@@ -146,5 +177,30 @@ private:
 		}
 
 		x.segment(currentBlockRow * _blockSize, _blockSize) = this->invD[currentBlockRow].solve(tmp_x);
+	}
+
+	// Same as ProcessBlockRow, but optimized for blockSize = 1
+	void ProcessRow(BigNumber currentRow, const Vector& b, Vector& x)
+	{
+		BigNumber i = currentRow;
+		const SparseMatrix& A = *this->Matrix;
+		double tmp_x = _omega != 1 ? _omega * b(i) : b(i);
+		double a_ii = 0;
+
+		// RowMajor --> the following line iterates over the non-zeros of the i-th row.
+		for (RowMajorSparseMatrix::InnerIterator it(A.IsRowMajor ? A : _rowMajorA, i); it; ++it)
+		{
+			auto j = it.col();
+			auto a_ij = it.value();
+			if (i == j) // Di
+			{
+				tmp_x += (1 - _omega) * a_ij * x(j);
+				a_ii = a_ij;
+			}
+			else // Li and Ui
+				tmp_x += -_omega * a_ij * x(j);
+		}
+
+		x(i) = tmp_x / a_ii;
 	}
 };

@@ -1,6 +1,7 @@
 #pragma once
 #include "BlockSOR.h"
 #include "BlockJacobi.h"
+#include "GaussSeidel.h"
 using namespace std;
 
 class Smoother
@@ -64,4 +65,10 @@ class BlockSORSmoother : public Smoother
 {
 public:
 	BlockSORSmoother(int blockSize, double omega, Direction direction, int nSmoothingIterations) : Smoother(new BlockSOR(blockSize, omega, direction), nSmoothingIterations) {}
+};
+
+class GaussSeidelSmoother : public Smoother
+{
+public:
+	GaussSeidelSmoother(Direction direction, int nSmoothingIterations) : Smoother(new GaussSeidel(direction), nSmoothingIterations) {}
 };
