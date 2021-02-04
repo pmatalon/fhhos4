@@ -155,7 +155,7 @@ public:
 					{
 						if (neighbour->Number != elem.Number)
 						{
-							double coupling = this->CouplingValue(elem, *face);
+							double coupling = this->CouplingValue(elem, *neighbour, *face);
 							elem.Neighbours.push_back({ neighbour, coupling });
 						}
 					}
@@ -212,7 +212,7 @@ public:
 								// This face is shared by elem1 and elem2, so we remove it on the coarse grid
 								face->IsRemovedOnCoarseMesh = true;
 								coarseElem.RemovedFineFaces.push_back(face);
-								//face->CoarseElements.push_back(&coarseElem);
+								face->CoarseElements.push_back(&coarseElem);
 								break;
 							}
 						}
@@ -313,6 +313,9 @@ private:
 	{
 		_coarseElements.reserve(_elements.size()); // we need to be sure that the vector won't be resized
 
+		int nSingletons = 0;
+		int nPairs = 0;
+
 		HybridAlgebraicElement* nextElement = &_elements[0];
 
 		// Element aggregation
@@ -337,8 +340,15 @@ private:
 				// Add neighbour?
 				bool strongConnectionIsReciprocal = find(neighbour->StrongNeighbours.begin(), neighbour->StrongNeighbours.end(), elem) != neighbour->StrongNeighbours.end();
 				if (strongConnectionIsReciprocal)
+				{
 					AddToAggregate(*neighbour, *aggregate);
+					nPairs++;
+				}
+				else
+					nSingletons++;
 			}
+			else
+				nSingletons++;
 
 			nextElement = NextElementInTheNeighbourhood(*aggregate);
 
@@ -349,6 +359,7 @@ private:
 					nextElement = &*it;
 			}
 		}
+		//cout << "Singletons: " << nSingletons << ", pairs: " << nPairs << endl;
 	}
 
 	static bool CompareNElementsIAmStrongNeighbourOf(HybridAlgebraicElement* e1, HybridAlgebraicElement* e2)
@@ -364,11 +375,15 @@ private:
 		return nullptr;
 	}
 
-	double CouplingValue(const HybridAlgebraicElement& e, const HybridAlgebraicFace& f)
+	double CouplingValue(const HybridAlgebraicElement& e1, const HybridAlgebraicElement& e2, const HybridAlgebraicFace& f)
 	{
-		DenseMatrix couplingBlock = A_T_F->block(e.Number*_cellBlockSize, f.Number*_faceBlockSize, _cellBlockSize, _faceBlockSize);
+		/*DenseMatrix e1Block = A_T_T->block(e1.Number*_cellBlockSize, e1.Number*_cellBlockSize, _cellBlockSize, _cellBlockSize);
+		double kappa1 = e1Block(0, 0);
+		DenseMatrix e2Block = A_T_T->block(e2.Number*_cellBlockSize, e2.Number*_cellBlockSize, _cellBlockSize, _cellBlockSize);
+		double kappa2 = e2Block(0, 0);*/
+		DenseMatrix couplingBlock = A_T_F->block(e1.Number*_cellBlockSize, f.Number*_faceBlockSize, _cellBlockSize, _faceBlockSize);
 		double coupling = couplingBlock.trace();
-		return coupling;
+		return /*kappa1/kappa2* */coupling;
 	}
 
 	bool IsStronglyCoupled(const HybridAlgebraicElement& e, double coupling)

@@ -104,7 +104,19 @@ public:
 	{
 		_coarseElements.reserve(_elements.size()); // we need to be sure that the vector won't be resized
 
+		int nSingletons = 0;
+		int nPairs = 0;
+
 		AlgebraicElement* nextElement = &_elements[0];
+		/*int min = _elements[0].NElementsIAmStrongNeighbourOf;
+		for (AlgebraicElement& e : _elements)
+		{
+			if (e.NElementsIAmStrongNeighbourOf < min)
+			{
+				nextElement = &e;
+				min = e.NElementsIAmStrongNeighbourOf;
+			}
+		}*/
 
 		// Element aggregation
 		while (nextElement)
@@ -128,8 +140,15 @@ public:
 				// Add neighbour?
 				bool strongConnectionIsReciprocal = find(neighbour->StrongNeighbours.begin(), neighbour->StrongNeighbours.end(), elem) != neighbour->StrongNeighbours.end();
 				if (strongConnectionIsReciprocal)
+				{
 					AddToAggregate(*neighbour, *aggregate);
+					nPairs++;
+				}
+				else
+					nSingletons++;
 			}
+			else
+				nSingletons++;
 
 			nextElement = NextElementInTheNeighbourhood(*aggregate);
 
@@ -138,8 +157,19 @@ public:
 				auto it = find_if(_elements.begin(), _elements.end(), [](const AlgebraicElement& e) { return !e.CoarseElement; });
 				if (it != _elements.end())
 					nextElement = &*it;
+				/*min = 100000;
+				for (AlgebraicElement& e : _elements)
+				{
+					if (!e.CoarseElement && e.NElementsIAmStrongNeighbourOf < min)
+					{
+						nextElement = &e;
+						min = e.NElementsIAmStrongNeighbourOf;
+					}
+				}*/
 			}
 		}
+
+		//cout << "Singletons: " << nSingletons << ", pairs: " << nPairs << endl;
 	}
 
 private:
