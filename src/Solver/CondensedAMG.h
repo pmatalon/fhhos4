@@ -68,6 +68,7 @@ public:
 		const SparseMatrix* A_T_F1 = A_T_F;
 		const SparseMatrix* A_F_F1 = A_F_F;
 		SparseMatrix *A_T_T2, *A_T_F2, *A_F_F2, *P, *Q_F;
+		const SparseMatrix* schur = this->OperatorMatrix;
 		double coarseningRatio = 0;
 		double nCoarsenings = 0;
 		//while (coarseningRatio < 3)
@@ -75,7 +76,7 @@ public:
 		{
 			cout << "\tPairwise aggregation" << endl;
 
-			std::tie(A_T_T2, A_T_F2, A_F_F2, P, Q_F, coarsestPossibleMeshReached) = PairwiseAggregate(*A_T_T1, *A_T_F1, *A_F_F1, coarseningStgy);
+			std::tie(A_T_T2, A_T_F2, A_F_F2, P, Q_F, coarsestPossibleMeshReached) = PairwiseAggregate(*A_T_T1, *A_T_F1, *A_F_F1, *schur, coarseningStgy);
 			if (coarsestPossibleMeshReached)
 				return;
 
@@ -86,6 +87,7 @@ public:
 			A_T_F1 = A_T_F2;
 			A_F_F1 = A_F_F2;
 
+
 			if (nCoarsenings == 0)
 			{
 				this->P = *P;
@@ -95,6 +97,14 @@ public:
 			{
 				this->P = this->P * *P;
 				this->Q_F = this->Q_F * *Q_F;
+			}
+
+			if (this->_faceProlong == CAMGFaceProlongation::FaceAggregates)
+			{
+				const SparseMatrix* oldSchur = schur;
+				schur = new SparseMatrix(P->transpose() * (*oldSchur) * (*P));
+				if (nCoarsenings > 0)
+					delete oldSchur;
 			}
 
 			delete P, Q_F;
@@ -111,7 +121,7 @@ public:
 	}
 
 	// Returns <A_T_Tc, A_T_Fc, A_F_Fc, P, Q_F, coarsestPossibleMeshReached>
-	tuple<SparseMatrix*, SparseMatrix*, SparseMatrix*, SparseMatrix*, SparseMatrix*, bool> PairwiseAggregate(const SparseMatrix A_T_T, const SparseMatrix A_T_F, const SparseMatrix A_F_F, CoarseningStrategy coarseningStgy)
+	tuple<SparseMatrix*, SparseMatrix*, SparseMatrix*, SparseMatrix*, SparseMatrix*, bool> PairwiseAggregate(const SparseMatrix A_T_T, const SparseMatrix A_T_F, const SparseMatrix A_F_F, const SparseMatrix schur, CoarseningStrategy coarseningStgy)
 	{
 		//ExportMatrix(A_T_T, "A_T_T", 0);
 		//ExportMatrix(A_T_F, "A_T_F", 0);
@@ -157,12 +167,9 @@ public:
 		}
 		else if (this->_faceProlong == CAMGFaceProlongation::FaceAggregates)
 		{
-			if (coarseningStgy != CoarseningStrategy::CAMGAggregFaces)
-				Utils::FatalError("This coarsening strategy is incompatible with this face prolongation operator.");
-
 			AlgebraicMesh skeleton(_faceBlockSize, 0);
 			//skeleton.Build(*A_F_F);
-			skeleton.Build(*this->OperatorMatrix);
+			skeleton.Build(schur);
 			skeleton.PairWiseAggregate(coarsestPossibleMeshReached);
 			if (coarsestPossibleMeshReached)
 				return { nullptr, nullptr, nullptr, nullptr, nullptr, coarsestPossibleMeshReached };
