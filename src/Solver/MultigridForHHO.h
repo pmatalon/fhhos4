@@ -408,7 +408,7 @@ private:
 
 	void SetupRestriction() override
 	{
-		R = RestrictionScalingFactor() * P.transpose();
+		R = (RestrictionScalingFactor() * P.transpose()).eval();
 	}
 
 	void OnEndSetup() override

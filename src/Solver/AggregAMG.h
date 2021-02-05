@@ -22,11 +22,6 @@ public:
 		this->_strongCouplingThreshold = strongCouplingThreshold;
 	}
 
-	/*BigNumber NUnknowns() override
-	{
-		return A->rows();
-	}*/
-
 	void ExportVector(const Vector& v, string suffix, int levelNumber) override
 	{ }
 
@@ -120,7 +115,7 @@ public:
 	void SetupRestriction() override
 	{
 		double scalingFactor = 1.0;
-		R = scalingFactor * P.transpose();
+		R = (scalingFactor * P.transpose()).eval();
 	}
 };
 
