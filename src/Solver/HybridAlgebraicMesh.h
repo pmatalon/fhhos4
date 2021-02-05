@@ -58,10 +58,11 @@ private:
 	int _faceBlockSize;
 	double _strongCouplingThreshold;
 
+public:
 	const SparseMatrix* A_T_T;
 	const SparseMatrix* A_T_F;
 	const SparseMatrix* A_F_F;
-public:
+
 	vector<HybridAlgebraicElement> _elements;
 	vector<HybridAlgebraicFace> _faces;
 	vector<HybridElementAggregate> _coarseElements;

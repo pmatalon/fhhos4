@@ -123,8 +123,9 @@ public:
 	// Returns <A_T_Tc, A_T_Fc, A_F_Fc, P, Q_F, coarsestPossibleMeshReached>
 	tuple<SparseMatrix*, SparseMatrix*, SparseMatrix*, SparseMatrix*, SparseMatrix*, bool> PairwiseAggregate(const SparseMatrix A_T_T, const SparseMatrix A_T_F, const SparseMatrix A_F_F, const SparseMatrix schur, CoarseningStrategy coarseningStgy)
 	{
-		//ExportMatrix(A_T_T, "A_T_T", 0);
-		//ExportMatrix(A_T_F, "A_T_F", 0);
+		ExportMatrix(A_T_T, "A_T_T", 0);
+		ExportMatrix(A_T_F, "A_T_F", 0);
+		ExportMatrix(A_F_F, "A_F_F", 0);
 
 		HybridAlgebraicMesh mesh(_cellBlockSize, _faceBlockSize, _strongCouplingThreshold);
 		mesh.Build(A_T_T, A_T_F, A_F_F);
@@ -223,8 +224,29 @@ public:
 			SparseMatrix inv_A_T_Tc = Utils::InvertBlockDiagMatrix(*A_T_Tc, _cellBlockSize);
 			SparseMatrix Theta = -inv_A_T_Tc * *A_T_Fc_tmp;   // Reconstruct
 			SparseMatrix Pi = BuildCoarseTraceOnFineRemovedFaces(mesh); // Trace
-												              // Inject = Q_F
+
 			SparseMatrix ReconstructAndTrace1 = Pi * Theta;
+
+			NumberParallelLoop<CoeffsChunk> parallelLoop(mesh._faces.size());
+			parallelLoop.ReserveChunkCoeffsSize(_faceBlockSize * 2 * _faceBlockSize);
+			parallelLoop.Execute([this, &ReconstructAndTrace1, &Q_F, &mesh](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
+				{
+					const HybridAlgebraicFace* face = &mesh._faces[faceNumber];
+					if (face->IsRemovedOnCoarseMesh)
+						chunk->Results.Coeffs.CopyRows(faceNumber*_faceBlockSize, _faceBlockSize, ReconstructAndTrace1);
+					else
+						chunk->Results.Coeffs.CopyRows(faceNumber*_faceBlockSize, _faceBlockSize, *Q_F);
+				});
+			P = new SparseMatrix(Q_F->rows(), Q_F->cols());
+			parallelLoop.Fill(*P);
+		}
+		else if (_multigridProlong == CAMGProlongation::HighOrder) // 6
+		{
+			SparseMatrix inv_A_T_Tc = Utils::InvertBlockDiagMatrix(*A_T_Tc, _cellBlockSize);
+			SparseMatrix Theta = -inv_A_T_Tc * *A_T_Fc_tmp;   // Reconstruct
+			SparseMatrix Pi = BuildTraceOnRemovedFaces(mesh);
+			
+			SparseMatrix ReconstructAndTrace1 = Pi * Q_T * Theta;
 
 			NumberParallelLoop<CoeffsChunk> parallelLoop(mesh._faces.size());
 			parallelLoop.ReserveChunkCoeffsSize(_faceBlockSize * 2 * _faceBlockSize);
@@ -244,6 +266,7 @@ public:
 
 		//SparseMatrix* A_T_Fc = new SparseMatrix(Q_T.transpose() * A_T_F * *P); // Kills -prolong 1 or 2
 		SparseMatrix* A_T_Fc = A_T_Fc_tmp;
+		//SparseMatrix* A_F_Fc = new SparseMatrix(Q_F->transpose() * A_F_F * *Q_F);
 		SparseMatrix* A_F_Fc = new SparseMatrix(P->transpose() * A_F_F * *P);
 
 		return { A_T_Tc, A_T_Fc, A_F_Fc, P, Q_F, coarsestPossibleMeshReached };
@@ -392,7 +415,6 @@ private:
 
 	SparseMatrix BuildCoarseTraceOnFineRemovedFaces(const HybridAlgebraicMesh& mesh)
 	{
-		// Pi: average on both sides of each face
 		DenseMatrix traceOfConstant = DenseMatrix::Zero(_faceBlockSize, _cellBlockSize);
 		traceOfConstant(0, 0) = 1;
 
@@ -404,6 +426,26 @@ private:
 					chunk->Results.Coeffs.Add(faceNumber*_faceBlockSize, face.CoarseElements[0]->Number*_cellBlockSize, traceOfConstant);
 			});
 		SparseMatrix Pi = SparseMatrix(mesh._faces.size()*_faceBlockSize, mesh._coarseElements.size()*_cellBlockSize);
+		parallelLoopPi.Fill(Pi);
+		return Pi;
+	}
+
+	SparseMatrix BuildTraceOnRemovedFaces(const HybridAlgebraicMesh& mesh)
+	{
+		NumberParallelLoop<CoeffsChunk> parallelLoopPi(mesh._faces.size());
+		parallelLoopPi.Execute([this, &mesh](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				const HybridAlgebraicFace& face = mesh._faces[faceNumber];
+				if (face.IsRemovedOnCoarseMesh)
+				{
+					BigNumber elemNumber = face.Elements[0]->Number;
+					DenseMatrix faceMass = mesh.A_F_F->block(faceNumber * _faceBlockSize, faceNumber * _faceBlockSize, _faceBlockSize, _faceBlockSize);
+					DenseMatrix cellFaceMass = mesh.A_T_F->block(elemNumber * _cellBlockSize, faceNumber * _faceBlockSize, _cellBlockSize, _faceBlockSize);
+					DenseMatrix trace = faceMass.inverse() * cellFaceMass.transpose();
+					chunk->Results.Coeffs.Add(faceNumber*_faceBlockSize, elemNumber*_cellBlockSize, trace);
+				}
+			});
+		SparseMatrix Pi = SparseMatrix(mesh._faces.size()*_faceBlockSize, mesh._elements.size()*_cellBlockSize);
 		parallelLoopPi.Fill(Pi);
 		return Pi;
 	}
@@ -429,7 +471,8 @@ public:
 	{
 		double scalingFactor = 1.0;
 		//scalingFactor = 1.0 / 4.0;
-		R = scalingFactor * P.transpose();
+		R = (scalingFactor * P.transpose()).eval();
+		//R = scalingFactor * P.transpose();
 	}
 
 	void OnEndSetup() override

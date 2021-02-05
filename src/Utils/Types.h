@@ -70,7 +70,8 @@ enum class CAMGProlongation : unsigned
 	ReconstructionTrace2Steps = 2,
 	FaceProlongation = 3,
 	ReconstructionTranspose2Steps = 4,
-	ReconstructTraceOrInject = 5
+	ReconstructTraceOrInject = 5,
+	HighOrder = 6
 };
 
 enum class CAMGFaceProlongation : unsigned
