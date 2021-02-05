@@ -123,4 +123,47 @@ protected:
 
 		xNew.segment(currentBlockRow * _blockSize, _blockSize) = this->invD[currentBlockRow].solve(tmp_x);
 	}
+
+public:
+	SparseMatrix IterationMatrix()
+	{
+		const SparseMatrix& A = *this->Matrix;
+		NonZeroCoefficients coeffs(A.nonZeros());
+
+		DenseMatrix oneMinusOmegaIdentity = (1 - _omega)*DenseMatrix::Identity(_blockSize, _blockSize);
+
+		for (int iBlock = 0; iBlock < A.rows() / _blockSize; iBlock++)
+		{
+			vector<BigNumber> jBlocksTreated;
+			BigNumber rowBlock = iBlock * _blockSize;
+
+			for (int k = 0; k < _blockSize; k++)
+			{
+				BigNumber row = iBlock * _blockSize + k;
+				for (RowMajorSparseMatrix::InnerIterator it(A, row); it; ++it)
+				{
+					auto j = it.col();
+					auto jBlock = j / this->_blockSize;
+
+					if (find(jBlocksTreated.begin(), jBlocksTreated.end(), jBlock) != jBlocksTreated.end())
+						continue;
+
+					if (iBlock == jBlock) // Di
+						coeffs.Add(rowBlock, rowBlock, oneMinusOmegaIdentity);
+					else
+					{
+						BigNumber colBlock = jBlock * _blockSize;
+						DenseMatrix A_ij = A.block(rowBlock, colBlock, _blockSize, _blockSize);
+						DenseMatrix jacobiBlock = -_omega * this->invD[iBlock].solve(A_ij);
+						coeffs.Add(rowBlock, colBlock, jacobiBlock);
+					}
+
+					jBlocksTreated.push_back(jBlock);
+				}
+			}
+		}
+		SparseMatrix J(A.rows(), A.cols());
+		coeffs.Fill(J);
+		return J;
+	}
 };

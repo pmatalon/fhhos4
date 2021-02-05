@@ -6,6 +6,7 @@
 #include "AggregAMG.h"
 #include "BlockJacobi.h"
 #include "EigenCG.h"
+#include "HighOrderAggregAMG.h"
 #ifdef AGMG_ENABLED
 #include "AGMG.h"
 #endif

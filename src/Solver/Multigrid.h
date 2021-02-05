@@ -8,12 +8,12 @@ class Multigrid : public IterativeSolver
 {
 protected:
 	Level* _fineLevel = nullptr;
-	Solver* _coarseSolver = nullptr;
 private:
 	bool _automaticNumberOfLevels;
 	int _nLevels;
 	NonZeroCoefficients _cycleSchema; // used only for drawing the cycle in the console
 public:
+	Solver* CoarseSolver = nullptr;
 	char Cycle = 'V';
 	int WLoops = 1; // 1 --> V-cycle, >= 2 --> W-cycle 
 	int MatrixMaxSizeForCoarsestLevel;
@@ -168,7 +168,7 @@ public:
 			while (level)
 			{
 				Multigrid* mg = static_cast<Multigrid*>(level->FCG->Precond.GetSolver());
-				mg->_coarseSolver = this->_coarseSolver;
+				mg->CoarseSolver = this->CoarseSolver;
 				level = level->CoarserLevel;
 			}
 		}
@@ -193,14 +193,14 @@ protected:
 	{
 		cout << "\t\tSetup coarse solver..." << endl;
 
-		if (this->_coarseSolver == nullptr)
-			this->_coarseSolver = new EigenSparseLU();
+		if (this->CoarseSolver == nullptr)
+			this->CoarseSolver = new EigenSparseLU();
 
 		Level* level = this->_fineLevel;
 		while (level->CoarserLevel != nullptr)
 			level = level->CoarserLevel;
 
-		this->_coarseSolver->Setup(*level->OperatorMatrix);
+		this->CoarseSolver->Setup(*level->OperatorMatrix);
 	}
 
 private:
@@ -223,8 +223,8 @@ private:
 
 		if (level->IsCoarsestLevel())
 		{
-			x = _coarseSolver->Solve(b);
-			//result.AddCost(_coarseSolver->SolvingComputationalWork);
+			x = CoarseSolver->Solve(b);
+			result.AddCost(CoarseSolver->SolvingComputationalWork);
 		}
 		else
 		{
@@ -381,6 +381,11 @@ public:
 			os << endl;
 			Utils::Warning("Note that without relaxation parameter, the (block) Jacobi iteration is not a smoother. You can use 'bj23' (under-relaxation parameter = 2/3) instead.");
 		}
+		if (this->CoarseSolver)
+		{
+			os << endl;
+			os << "\t" << "Coarse solver      : " << (*this->CoarseSolver);
+		}
 
 		EndSerialize(cout);
 	}
@@ -448,6 +453,6 @@ public:
 	virtual ~Multigrid()
 	{
 		delete _fineLevel;
-		delete _coarseSolver;
+		delete CoarseSolver;
 	}
 };

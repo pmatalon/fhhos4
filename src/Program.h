@@ -340,21 +340,7 @@ private:
 					assert(false);
 
 				MultigridForHHO<Dim>* mg = new MultigridForHHO<Dim>(hhoProblem, args.Solver.MG.GMGProlong, cellInterpolationBasis, args.Solver.MG.WeightCode, args.Solver.MG.Levels);
-				mg->MatrixMaxSizeForCoarsestLevel = args.Solver.MG.MatrixMaxSizeForCoarsestLevel;
-				mg->Cycle = args.Solver.MG.CycleLetter;
-				mg->WLoops = args.Solver.MG.WLoops;
-				mg->UseGalerkinOperator = args.Solver.MG.UseGalerkinOperator;
-				mg->PreSmootherCode = args.Solver.MG.PreSmootherCode;
-				mg->PostSmootherCode = args.Solver.MG.PostSmootherCode;
-				mg->PreSmoothingIterations = args.Solver.MG.PreSmoothingIterations;
-				mg->PostSmoothingIterations = args.Solver.MG.PostSmoothingIterations;
-				mg->RelaxationParameter = args.Solver.RelaxationParameter;
-				mg->BlockSizeForBlockSmoothers = blockSize;
-				mg->CoarseLevelChangeSmoothingCoeff = args.Solver.MG.CoarseLevelChangeSmoothingCoeff;
-				mg->CoarseLevelChangeSmoothingOperator = args.Solver.MG.CoarseLevelChangeSmoothingOperator;
-				mg->CoarseningStgy = args.Solver.MG.CoarseningStgy;
-				mg->CoarseningFactor = args.Solver.MG.CoarseningFactor;
-				mg->ExportComponents = args.Actions.ExportMultigridComponents;
+				SetMultigridParameters(mg, args, blockSize);
 
 				if (args.Solver.SolverCode.compare("mg") == 0)
 					solver = mg;
@@ -378,21 +364,7 @@ private:
 		{
 			Diffusion_HHO<Dim>* hhoProblem = dynamic_cast<Diffusion_HHO<Dim>*>(problem);
 			CondensedAMG* mg = new CondensedAMG(hhoProblem->HHO->nCellUnknowns, hhoProblem->HHO->nFaceUnknowns, 0.25, args.Solver.MG.CAMGFaceProlong, args.Solver.MG.CAMGProlong, args.Solver.MG.Levels);
-			mg->MatrixMaxSizeForCoarsestLevel = args.Solver.MG.MatrixMaxSizeForCoarsestLevel;
-			mg->Cycle = args.Solver.MG.CycleLetter;
-			mg->WLoops = args.Solver.MG.WLoops;
-			mg->UseGalerkinOperator = args.Solver.MG.UseGalerkinOperator;
-			mg->PreSmootherCode = args.Solver.MG.PreSmootherCode;
-			mg->PostSmootherCode = args.Solver.MG.PostSmootherCode;
-			mg->PreSmoothingIterations = args.Solver.MG.PreSmoothingIterations;
-			mg->PostSmoothingIterations = args.Solver.MG.PostSmoothingIterations;
-			mg->RelaxationParameter = args.Solver.RelaxationParameter;
-			mg->BlockSizeForBlockSmoothers = blockSize;
-			mg->CoarseLevelChangeSmoothingCoeff = args.Solver.MG.CoarseLevelChangeSmoothingCoeff;
-			mg->CoarseLevelChangeSmoothingOperator = args.Solver.MG.CoarseLevelChangeSmoothingOperator;
-			mg->CoarseningStgy = args.Solver.MG.CoarseningStgy;
-			mg->CoarseningFactor = args.Solver.MG.CoarseningFactor;
-			mg->ExportComponents = args.Actions.ExportMultigridComponents;
+			SetMultigridParameters(mg, args, blockSize);
 
 			if (args.Solver.SolverCode.compare("camg") == 0)
 				solver = mg;
@@ -406,25 +378,41 @@ private:
 		else if (args.Solver.SolverCode.compare("aggregamg") == 0 || args.Solver.SolverCode.compare("fcgaggregamg") == 0)
 		{
 			AggregAMG* mg = new AggregAMG(blockSize, 0.25, args.Solver.MG.Levels);
-			mg->MatrixMaxSizeForCoarsestLevel = args.Solver.MG.MatrixMaxSizeForCoarsestLevel;
-			mg->Cycle = args.Solver.MG.CycleLetter;
-			mg->WLoops = args.Solver.MG.WLoops;
-			//mg->UseGalerkinOperator = args.Solver.MG.UseGalerkinOperator;
-			mg->PreSmootherCode = args.Solver.MG.PreSmootherCode;
-			mg->PostSmootherCode = args.Solver.MG.PostSmootherCode;
-			mg->PreSmoothingIterations = args.Solver.MG.PreSmoothingIterations;
-			mg->PostSmoothingIterations = args.Solver.MG.PostSmoothingIterations;
-			mg->RelaxationParameter = args.Solver.RelaxationParameter;
-			mg->BlockSizeForBlockSmoothers = blockSize;
-			mg->CoarseLevelChangeSmoothingCoeff = args.Solver.MG.CoarseLevelChangeSmoothingCoeff;
-			mg->CoarseLevelChangeSmoothingOperator = args.Solver.MG.CoarseLevelChangeSmoothingOperator;
-			mg->CoarseningStgy = args.Solver.MG.CoarseningStgy;
-			mg->CoarseningFactor = args.Solver.MG.CoarseningFactor;
-			mg->ExportComponents = args.Actions.ExportMultigridComponents;
+			SetMultigridParameters(mg, args, blockSize);
+			mg->UseGalerkinOperator = 1;
 
 			if (args.Solver.SolverCode.compare("aggregamg") == 0)
 				solver = mg;
 			else if (args.Solver.SolverCode.compare("fcgaggregamg") == 0)
+			{
+				FlexibleConjugateGradient* fcg = new FlexibleConjugateGradient(1);
+				fcg->Precond = Preconditioner(mg);
+				solver = fcg;
+			}
+		}
+		else if (args.Solver.SolverCode.compare("hoaggregamg") == 0 || args.Solver.SolverCode.compare("fcghoaggregamg") == 0)
+		{
+			HighOrderAggregAMG* mg = new HighOrderAggregAMG(blockSize, 0.25, 2.0/3.0, 2);
+			SetMultigridParameters(mg, args, blockSize);
+			mg->UseGalerkinOperator = 1;
+
+			int nLevelCoarseSolver = args.Solver.MG.Levels > 0 ? args.Solver.MG.Levels-1 : 0;
+			AggregAMG* lowOrderAMG = new AggregAMG(1, 0.25, nLevelCoarseSolver);
+			lowOrderAMG->BlockSizeForBlockSmoothers = 1;
+			lowOrderAMG->Cycle = 'K';
+			lowOrderAMG->PreSmoothingIterations = 1;
+			lowOrderAMG->PostSmoothingIterations = 1;
+
+			FlexibleConjugateGradient* fcgAggregAMG = new FlexibleConjugateGradient(1);
+			fcgAggregAMG->Precond = Preconditioner(lowOrderAMG);
+			fcgAggregAMG->MaxIterations = 1;
+			fcgAggregAMG->PrintIterationResults = false;
+
+			mg->CoarseSolver = fcgAggregAMG;
+
+			if (args.Solver.SolverCode.compare("hoaggregamg") == 0)
+				solver = mg;
+			else if (args.Solver.SolverCode.compare("fcghoaggregamg") == 0)
 			{
 				FlexibleConjugateGradient* fcg = new FlexibleConjugateGradient(1);
 				fcg->Precond = Preconditioner(mg);
@@ -472,6 +460,25 @@ private:
 		}
 
 		return solver;
+	}
+
+	void SetMultigridParameters(Multigrid* mg, const ProgramArguments& args, int blockSize)
+	{
+		mg->MatrixMaxSizeForCoarsestLevel = args.Solver.MG.MatrixMaxSizeForCoarsestLevel;
+		mg->Cycle = args.Solver.MG.CycleLetter;
+		mg->WLoops = args.Solver.MG.WLoops;
+		mg->UseGalerkinOperator = args.Solver.MG.UseGalerkinOperator;
+		mg->PreSmootherCode = args.Solver.MG.PreSmootherCode;
+		mg->PostSmootherCode = args.Solver.MG.PostSmootherCode;
+		mg->PreSmoothingIterations = args.Solver.MG.PreSmoothingIterations;
+		mg->PostSmoothingIterations = args.Solver.MG.PostSmoothingIterations;
+		mg->RelaxationParameter = args.Solver.RelaxationParameter;
+		mg->BlockSizeForBlockSmoothers = blockSize;
+		mg->CoarseLevelChangeSmoothingCoeff = args.Solver.MG.CoarseLevelChangeSmoothingCoeff;
+		mg->CoarseLevelChangeSmoothingOperator = args.Solver.MG.CoarseLevelChangeSmoothingOperator;
+		mg->CoarseningStgy = args.Solver.MG.CoarseningStgy;
+		mg->CoarseningFactor = args.Solver.MG.CoarseningFactor;
+		mg->ExportComponents = args.Actions.ExportMultigridComponents;
 	}
 
 	Vector Solve(Solver* solver, Problem<Dim>* problem, string initialGuessCode)

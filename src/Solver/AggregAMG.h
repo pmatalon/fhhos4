@@ -101,8 +101,7 @@ public:
 		cout << "\t\tMesh                : " << this->NUnknowns() / _blockSize << " elements";
 		if (!this->IsFinestLevel())
 		{
-			AggregLevel* fine = dynamic_cast<AggregLevel*>(this->FinerLevel);
-			double nFine = fine->NUnknowns();
+			double nFine = this->FinerLevel->NUnknowns();
 			double nCoarse = this->NUnknowns();
 			cout << ", coarsening factor = " << (nFine/nCoarse);
 		}
