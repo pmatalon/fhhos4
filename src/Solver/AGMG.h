@@ -6,6 +6,16 @@ using namespace std;
 extern "C" void dagmg_(int*, double*, int*, int*, double*, double*, int*, int*, int*, int*, double*);
 #endif
 
+enum class AGMGJob : int 
+{
+	Setup_SolveWithoutInitialGuess_MemoryRelease = 0,
+	Setup_SolveWithInitialGuess_MemoryRelease = 10,
+	Setup = 1,
+	SolveWithoutInitialGuess = 202,
+	SolveWithInitialGuess = 212,
+	MemoryRelease = -1
+};
+
 class AGMG : public Solver
 {
 private:
@@ -21,7 +31,7 @@ public:
 		this->Tolerance = tolerance;
 		this->MaxIterations = maxIterations;
 #else
-		assert(false && "AGMG is disabled. The source must be recompiled with the appropriate option to use AGMG.");
+		Utils::FatalError("AGMG is disabled. The source must be recompiled with the appropriate option to use AGMG.");
 #endif
 	}
 
@@ -33,31 +43,18 @@ public:
 	void Setup(const SparseMatrix& A) override
 	{
 		this->A = &A;
-	}
 
-	Vector Solve(const Vector& b) override
-	{
 #ifdef AGMG_ENABLED
-		int ijob = 0, nrest = 1;
-		int nun = this->A->cols();
+		int n = this->A->cols();
 		int nnz = this->A->nonZeros();
-
-		/*      maximal number of iterations */
-		int iter = this->MaxIterations;
-		/*      tolerance on relative residual norm */
-		double tol = this->Tolerance;
-		/*      unit number for output messages: 6 => standard output */
-		int iprint = 6;
 
 		/*      generate the matrix in required format (CSR) */
 		/*        first allocate the vectors with correct size */
-		double *a, *f, *x;
+		double *a;
 		int *ja, *ia;
-		ia = new int[nun + 1];
+		ia = new int[n + 1];
 		ja = new int[nnz];
 		a = new double[nnz];
-		f = new double[nun];
-		x = new double[nun];
 
 		/*        next set entries */
 		for (int i = 0; i < nnz; i++)
@@ -65,25 +62,50 @@ public:
 			a[i] = this->A->valuePtr()[i];
 			ja[i] = this->A->innerIndexPtr()[i] + 1;
 		}
-		for (int i = 0; i < nun; i++)
-		{
+		for (int i = 0; i < n; i++)
 			ia[i] = this->A->outerIndexPtr()[i] + 1;
-			f[i] = b[i];
-		}
-		ia[nun] = this->A->outerIndexPtr()[nun] + 1; // last value
+		ia[n] = this->A->outerIndexPtr()[n] + 1; // last value
 
-		/*      call agmg
-		argument 5 (ijob)  is 0 because we want a complete solve
-		argument 7 (nrest) is 1 because we want to use flexible CG
-						 (the matrix is symmetric positive definite) */
-		dagmg_(&nun, a, ja, ia, f, x, &ijob, &iprint, &nrest, &iter, &tol);
+		int job = (int)AGMGJob::Setup;
+		int iprint = 6; // unit number for output messages: 6 => standard output
+		int nrest = 1; // 1 because we want to use flexible CG (the matrix is symmetric positive definite)
+		int iterations;
+		double tolerance;
+		cout << "before" << endl;
+		dagmg_(&n, a, ja, ia, nullptr, nullptr, &job, &iprint, &nrest, &iterations, &tolerance);
+		cout << "after" << endl;
+
+		delete ia, ja, a;
+#endif
+	}
+
+	Vector Solve(const Vector& b) override
+	{
+#ifdef AGMG_ENABLED
+		int n = this->A->cols();
+
+		/*      generate the matrix in required format (CSR) */
+		/*        first allocate the vectors with correct size */
+		double *f, *x;
+		f = new double[n];
+		x = new double[n];
+
+		for (int i = 0; i < n; i++)
+			f[i] = b[i];
+
+		int job = (int)AGMGJob::SolveWithoutInitialGuess;
+		int iprint = 6; // unit number for output messages: 6 => standard output
+		int nrest = 1; // 1 because we want to use flexible CG (the matrix is symmetric positive definite)
+		int iterations = this->MaxIterations;
+		double tolerance = this->Tolerance;
+		dagmg_(&n, nullptr, nullptr, nullptr, f, x, &job, &iprint, &nrest, &iterations, &tolerance);
 
 		// copy into solution
-		Vector solution = Vector(nun);
-		for (int i = 0; i < nun; i++)
+		Vector solution = Vector(n);
+		for (int i = 0; i < n; i++)
 			solution[i] = x[i];
 
-		delete ia, ja, a, f, x;
+		delete f, x;
 		return solution;
 #endif
 	}
