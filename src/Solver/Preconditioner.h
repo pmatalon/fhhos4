@@ -14,6 +14,7 @@ public:
 		_solver = solver;
 		_solver->ComputeExactSolution = false;
 		_solver->PrintIterationResults = false;
+		_solver->StoppingCrit = StoppingCriteria::MaxIterations;
 		_solver->MaxIterations = 1;
 	}
 

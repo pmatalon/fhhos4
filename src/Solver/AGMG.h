@@ -22,7 +22,7 @@ public:
 	AGMG() : IterativeSolver()
 	{
 #ifndef AGMG_ENABLED
-		Utils::FatalError("AGMG is disabled. The source must be recompiled with the appropriate option to use AGMG.");
+		Utils::Error("AGMG is disabled. The source must be recompiled with the appropriate option to use AGMG.");
 #endif
 	}
 
