@@ -324,8 +324,8 @@ private:
 
 	Solver* CreateSolver(const ProgramArguments& args, Problem<Dim>* problem, int blockSize)
 	{
-		Solver* solver = NULL;
-		if (args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("cgmg") == 0 || args.Solver.SolverCode.compare("fcgmg") == 0)
+		Solver* solver = nullptr;
+		if (args.Solver.SolverCode.compare("mg") == 0)
 		{
 			if (args.Discretization.StaticCondensation)
 			{
@@ -341,78 +341,62 @@ private:
 
 				MultigridForHHO<Dim>* mg = new MultigridForHHO<Dim>(hhoProblem, args.Solver.MG.GMGProlong, cellInterpolationBasis, args.Solver.MG.WeightCode, args.Solver.MG.Levels);
 				SetMultigridParameters(mg, args, blockSize);
-
-				if (args.Solver.SolverCode.compare("mg") == 0)
-					solver = mg;
-				else if (args.Solver.SolverCode.compare("cgmg") == 0)
-				{
-					ConjugateGradient* cg = new ConjugateGradient();
-					cg->Precond = Preconditioner(mg);
-					solver = cg;
-				}
-				else if (args.Solver.SolverCode.compare("fcgmg") == 0)
-				{
-					FlexibleConjugateGradient* fcg = new FlexibleConjugateGradient(1);
-					fcg->Precond = Preconditioner(mg);
-					solver = fcg;
-				}
+				solver = mg;
 			}
 			else
 				assert(false && "Multigrid only applicable on HHO discretization with static condensation.");
 		}
-		else if (args.Solver.SolverCode.compare("camg") == 0 || args.Solver.SolverCode.compare("fcgcamg") == 0)
+		else if (args.Solver.SolverCode.compare("camg") == 0)
 		{
 			Diffusion_HHO<Dim>* hhoProblem = dynamic_cast<Diffusion_HHO<Dim>*>(problem);
 			CondensedAMG* mg = new CondensedAMG(hhoProblem->HHO->nCellUnknowns, hhoProblem->HHO->nFaceUnknowns, 0.25, args.Solver.MG.CAMGFaceProlong, args.Solver.MG.CAMGProlong, args.Solver.MG.Levels);
 			SetMultigridParameters(mg, args, blockSize);
-
-			if (args.Solver.SolverCode.compare("camg") == 0)
-				solver = mg;
-			else if (args.Solver.SolverCode.compare("fcgcamg") == 0)
-			{
-				FlexibleConjugateGradient* fcg = new FlexibleConjugateGradient(1);
-				fcg->Precond = Preconditioner(mg);
-				solver = fcg;
-			}
+			solver = mg;
 		}
-		else if (args.Solver.SolverCode.compare("aggregamg") == 0 || args.Solver.SolverCode.compare("fcgaggregamg") == 0)
+		else if (args.Solver.SolverCode.compare("aggregamg") == 0)
 		{
 			AggregAMG* mg = new AggregAMG(blockSize, 0.25, args.Solver.MG.Levels);
 			SetMultigridParameters(mg, args, blockSize);
 			mg->UseGalerkinOperator = 1;
-
-			if (args.Solver.SolverCode.compare("aggregamg") == 0)
-				solver = mg;
-			else if (args.Solver.SolverCode.compare("fcgaggregamg") == 0)
-			{
-				FlexibleConjugateGradient* fcg = new FlexibleConjugateGradient(1);
-				fcg->Precond = Preconditioner(mg);
-				solver = fcg;
-			}
+			solver = mg;
 		}
-		else if (args.Solver.SolverCode.compare("hoaggregamg") == 0 || args.Solver.SolverCode.compare("fcghoaggregamg") == 0)
+		else if (args.Solver.SolverCode.compare("hoaggregamg") == 0)
 		{
 			HighOrderAggregAMG* mg = new HighOrderAggregAMG(blockSize, 0.25, 2.0 / 3.0, 2);
 			SetMultigridParameters(mg, args, blockSize);
 			mg->UseGalerkinOperator = 1;
-
-			if (args.Solver.SolverCode.compare("hoaggregamg") == 0)
-				solver = mg;
-			else if (args.Solver.SolverCode.compare("fcghoaggregamg") == 0)
-			{
-				FlexibleConjugateGradient* fcg = new FlexibleConjugateGradient(1);
-				fcg->Precond = Preconditioner(mg);
-				solver = fcg;
-			}
+			solver = mg;
 		}
 		else if (args.Solver.SolverCode.compare("lu") == 0)
 			solver = new EigenSparseLU();
-		else if (args.Solver.SolverCode.compare("cg") == 0)
-			solver = new ConjugateGradient();
 		else if (args.Solver.SolverCode.compare("eigencg") == 0)
 			solver = new EigenCG();
-		else if (args.Solver.SolverCode.compare("fcg") == 0)
-			solver = new FlexibleConjugateGradient();
+		else if (args.Solver.SolverCode.rfind("cg", 0) == 0) // if SolverCode starts with "cg"
+		{
+			ConjugateGradient* cg = new ConjugateGradient();
+			string preconditionerCode = args.Solver.SolverCode.substr(2, args.Solver.SolverCode.length() - 2);
+			if (!preconditionerCode.empty())
+			{
+				ProgramArguments precondArgs = args;
+				precondArgs.Solver.SolverCode = preconditionerCode;
+				Solver* precondSolver = CreateSolver(precondArgs, problem, blockSize);
+				cg->Precond = Preconditioner(dynamic_cast<IterativeSolver*>(precondSolver));
+			}
+			solver = cg;
+		}
+		else if (args.Solver.SolverCode.rfind("fcg", 0) == 0) // if SolverCode starts with "fcg"
+		{
+			FlexibleConjugateGradient* fcg = new FlexibleConjugateGradient(1);
+			string preconditionerCode = args.Solver.SolverCode.substr(3, args.Solver.SolverCode.length() - 3);
+			if (!preconditionerCode.empty())
+			{
+				ProgramArguments precondArgs = args;
+				precondArgs.Solver.SolverCode = preconditionerCode;
+				Solver* precondSolver = CreateSolver(precondArgs, problem, blockSize);
+				fcg->Precond = Preconditioner(dynamic_cast<IterativeSolver*>(precondSolver));
+			}
+			solver = fcg;
+		}
 		else if (args.Solver.SolverCode.compare("j") == 0)
 			solver = new BlockJacobi(1, args.Solver.RelaxationParameter);
 		else if (args.Solver.SolverCode.compare("sor") == 0 || args.Solver.SolverCode.compare("gs") == 0)
