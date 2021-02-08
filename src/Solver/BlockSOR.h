@@ -78,9 +78,9 @@ public:
 					DenseMatrix Di = A.block(i * _blockSize, i * _blockSize, _blockSize, _blockSize);
 					this->invD[i].compute(Di);
 				});
-		}
 
-		this->SetupComputationalWork = 2.0 / 3.0*pow(_blockSize, 3);
+			this->SetupComputationalWork = nb * 2.0/3.0*pow(_blockSize, 3);
+		}
 	}
 
 private:

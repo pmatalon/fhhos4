@@ -70,7 +70,7 @@ public:
 				this->invD[i].compute(Di);
 			});
 
-		this->SetupComputationalWork = 2.0 / 3.0*pow(_blockSize, 3);
+		this->SetupComputationalWork = nb * 2.0/3.0*pow(_blockSize, 3);
 	}
 
 private:
@@ -91,6 +91,7 @@ private:
 			});
 
 		result.SetX(xNew);
+		xOld = xNew;
 		result.AddCost(2 * A.nonZeros() + nb * pow(_blockSize, 2));
 		return result;
 	}
