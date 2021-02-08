@@ -242,10 +242,7 @@ void print_usage() {
 	cout << "              z   - Aggregate all faces using A_F_F" << endl;
 	cout << endl;
 	cout << "-coarse-solver CODE" << endl;
-	cout << "      Default: 'lu'." << endl;
-	cout << "              lu          " << endl;
-	cout << "              fcgaggregamg" << endl;
-	cout << "              agmg        " << endl;
+	cout << "      Any solver code (see -solver). Only purely algebraic solvers are allowed. Default: 'lu' (LU factorization)." << endl;
 	cout << endl;
 	cout << "-bfc CODE" << endl;
 	cout << "      Face collapsing method used at the domain boundaries or physical parts boundaries. Requires -cs n." << endl;

@@ -396,31 +396,6 @@ private:
 			SetMultigridParameters(mg, args, blockSize);
 			mg->UseGalerkinOperator = 1;
 
-			if (args.Solver.MG.CoarseSolverCode.compare("agmg") == 0)
-			{
-				ProgramArguments argsCoarseSolver;
-				argsCoarseSolver.Solver.SolverCode = "agmg";
-				argsCoarseSolver.Solver.MaxIterations = 200;
-				argsCoarseSolver.Solver.PrintIterationResults = false;
-				mg->CoarseSolver = CreateSolver(argsCoarseSolver, nullptr, 1);
-			}
-			else
-			{
-				int nLevelCoarseSolver = args.Solver.MG.Levels > 0 ? args.Solver.MG.Levels - 1 : 0;
-				AggregAMG* lowOrderAMG = new AggregAMG(1, 0.25, nLevelCoarseSolver);
-				lowOrderAMG->BlockSizeForBlockSmoothers = 1;
-				lowOrderAMG->Cycle = 'K';
-				lowOrderAMG->PreSmoothingIterations = 1;
-				lowOrderAMG->PostSmoothingIterations = 1;
-
-				FlexibleConjugateGradient* fcgAggregAMG = new FlexibleConjugateGradient(1);
-				fcgAggregAMG->Precond = Preconditioner(lowOrderAMG);
-				fcgAggregAMG->MaxIterations = 1;
-				fcgAggregAMG->PrintIterationResults = false;
-
-				mg->CoarseSolver = fcgAggregAMG;
-			}
-
 			if (args.Solver.SolverCode.compare("hoaggregamg") == 0)
 				solver = mg;
 			else if (args.Solver.SolverCode.compare("fcghoaggregamg") == 0)
@@ -489,6 +464,16 @@ private:
 		mg->CoarseningStgy = args.Solver.MG.CoarseningStgy;
 		mg->CoarseningFactor = args.Solver.MG.CoarseningFactor;
 		mg->ExportComponents = args.Actions.ExportMultigridComponents;
+
+		// Coarse solver
+		ProgramArguments argsCoarseSolver;
+		argsCoarseSolver.Solver.SolverCode = args.Solver.MG.CoarseSolverCode;
+		argsCoarseSolver.Solver.MaxIterations = 200;
+		argsCoarseSolver.Solver.Tolerance = args.Solver.Tolerance;
+		argsCoarseSolver.Solver.PrintIterationResults = false;
+		if (args.Solver.MG.CoarseSolverCode.compare("fcgaggregamg") == 0)
+			argsCoarseSolver.Solver.MG.CycleLetter = 'K';
+		mg->CoarseSolver = CreateSolver(argsCoarseSolver, nullptr, 1);
 	}
 
 	Vector Solve(Solver* solver, Problem<Dim>* problem, string initialGuessCode)
