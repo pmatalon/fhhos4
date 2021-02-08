@@ -32,9 +32,9 @@ public:
 			_solver->Setup(A);
 	}
 
-	Vector Smooth(Vector& x, const Vector& b)
+	void Smooth(Vector& x, const Vector& b)
 	{
-		return _solver->Solve(b, false, x);
+		_solver->Solve(b, false, x);
 	}
 
 	friend ostream& operator<<(ostream& os, const Smoother& s)

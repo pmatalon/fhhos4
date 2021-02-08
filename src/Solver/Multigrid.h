@@ -234,7 +234,7 @@ private:
 			// Pre-smoothing //
 			//---------------//
 
-			x = level->PreSmoother->Smooth(x, b);                                    result.AddCost(level->PreSmoother->SolvingComputationalWork());
+			level->PreSmoother->Smooth(x, b);                                    result.AddCost(level->PreSmoother->SolvingComputationalWork());
 
 			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPreSmoothing");
@@ -272,7 +272,7 @@ private:
 					MultigridCycle(level->CoarserLevel, rc, ec, result); // exact solution
 				else
 				{
-					ec = level->CoarserLevel->FCG->Solve(rc, ecEqualZero, ec);                    result.AddCost(level->CoarserLevel->FCG->SolvingComputationalWork);
+					level->CoarserLevel->FCG->Solve(rc, ecEqualZero, ec);                    result.AddCost(level->CoarserLevel->FCG->SolvingComputationalWork);
 				}
 			}
 
@@ -297,7 +297,7 @@ private:
 			// Post-smoothing //
 			//----------------//
 
-			x = level->PostSmoother->Smooth(x, b);                                   result.AddCost(level->PostSmoother->SolvingComputationalWork());
+			level->PostSmoother->Smooth(x, b);                                   result.AddCost(level->PostSmoother->SolvingComputationalWork());
 
 			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPostSmoothing");

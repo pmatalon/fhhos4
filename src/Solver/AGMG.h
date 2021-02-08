@@ -67,7 +67,7 @@ public:
 		delete ia, ja, a;
 	}
 
-	Vector Solve(const Vector& b, bool zeroInitialGuess, Vector& initialGuess) override
+	void Solve(const Vector& b, bool zeroInitialGuess, Vector& initialGuess) override
 	{
 		// TODO: Manage initialGuess
 
@@ -96,11 +96,9 @@ public:
 		dagmg_(&n, nullptr, nullptr, nullptr, f, x, &job, &iprint, &nrest, &iterations, &tolerance);
 #endif
 		// copy into solution
-		Vector solution = Vector(n);
 		for (int i = 0; i < n; i++)
-			solution[i] = x[i];
+			initialGuess[i] = x[i];
 
 		delete f, x;
-		return solution;
 	}
 };

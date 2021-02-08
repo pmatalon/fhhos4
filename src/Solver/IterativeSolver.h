@@ -45,23 +45,24 @@ public:
 
 	virtual Vector Solve(const Vector& b, string initialGuessCode)
 	{
-		Vector initialGuess;
+		Vector x;
 		bool zeroInitialGuess = false;
 		if (initialGuessCode.compare("0") == 0)
 		{
-			initialGuess = Vector::Zero(b.rows());
+			x = Vector::Zero(b.rows());
 			zeroInitialGuess = true;
 		}
 		else if (initialGuessCode.compare("1") == 0)
-			initialGuess = Vector::Ones(b.rows());
+			x = Vector::Ones(b.rows());
 		else if (initialGuessCode.compare("rand") == 0)
-			initialGuess = Vector::Random(b.rows());
+			x = Vector::Random(b.rows());
 		else
 			Utils::FatalError("Unknown initial guess code");
-		return Solve(b, zeroInitialGuess, initialGuess);
+		Solve(b, zeroInitialGuess, x);
+		return x;
 	}
 
-	virtual Vector Solve(const Vector& b, bool zeroInitialGuess, Vector& initialGuess)
+	virtual void Solve(const Vector& b, bool zeroInitialGuess, Vector& initialGuess)
 	{
 		const SparseMatrix& A = *this->Matrix;
 
@@ -77,7 +78,7 @@ public:
 		if (MaxIterations == 0)
 		{
 			result.SetX(x);
-			return x;
+			return;
 		}
 
 		if (StoppingCrit == StoppingCriteria::NormalizedResidual)
@@ -111,8 +112,6 @@ public:
 			cout << endl;
 
 		this->SolvingComputationalWork = result.SolvingComputationalWork();
-
-		return x;
 	}
 
 	virtual ~IterativeSolver() {}

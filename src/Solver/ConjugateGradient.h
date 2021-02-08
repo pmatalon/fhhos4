@@ -24,7 +24,7 @@ public:
 	}
 
 private:
-	Vector Solve(const Vector& b, bool zeroInitialGuess, Vector& initialGuess) override
+	void Solve(const Vector& b, bool zeroInitialGuess, Vector& initialGuess) override
 	{
 		const SparseMatrix& A = *this->Matrix;
 
@@ -86,7 +86,5 @@ private:
 			cout << endl;
 
 		this->SolvingComputationalWork = result.SolvingComputationalWork();
-
-		return x;
 	}
 };
