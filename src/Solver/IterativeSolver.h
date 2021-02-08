@@ -71,12 +71,13 @@ public:
 			this->ExactSolution = this->_directSolver.solve(b);
 
 		this->IterationCount = 0;
+		Vector& x = initialGuess;
 
-		IterationResult result = CreateFirstIterationResult(b, initialGuess);
+		IterationResult result = CreateFirstIterationResult(b, x);
 		if (MaxIterations == 0)
 		{
-			result.SetX(initialGuess);
-			return initialGuess;
+			result.SetX(x);
+			return x;
 		}
 
 		if (StoppingCrit == StoppingCriteria::NormalizedResidual)
@@ -85,7 +86,7 @@ public:
 				result.SetResidual(b);
 			else
 			{
-				result.SetResidual(b - A * initialGuess);
+				result.SetResidual(b - A * x);
 				result.AddCost(2 * A.nonZeros());
 			}
 		}
@@ -94,13 +95,12 @@ public:
 
 		while (!StoppingCriteriaReached(result))
 		{
-			auto x = result.X();
 			result = ExecuteOneIteration(b, x, result);
 			this->IterationCount++;
 
 			if (!result.IsResidualSet() && StoppingCrit == StoppingCriteria::NormalizedResidual)
 			{
-				result.SetResidual(b - A * result.X());
+				result.SetResidual(b - A * x);
 				result.AddCost(2 * A.nonZeros());
 			}
 			if (this->PrintIterationResults)
@@ -112,7 +112,7 @@ public:
 
 		this->SolvingComputationalWork = result.SolvingComputationalWork();
 
-		return result.X();
+		return x;
 	}
 
 	virtual ~IterativeSolver() {}

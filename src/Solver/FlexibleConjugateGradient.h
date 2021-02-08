@@ -59,7 +59,7 @@ public:
 		// Init restart parameters
 		_previousDirections = list<Direction>();
 
-		Vector x = initialGuess;
+		Vector& x = initialGuess;
 		Vector r;
 		if (zeroInitialGuess)
 			r = b;
@@ -104,10 +104,10 @@ public:
 
 			// Moving from the current solution to the next
 			// by taking the step in the direction of research
-			x = x + alpha * d;
+			x += alpha * d;
 
 			// New residual
-			r = r - alpha * Ad;
+			r -= alpha * Ad;
 
 			// Restart?
 			if (_previousDirections.size() == this->Truncation)

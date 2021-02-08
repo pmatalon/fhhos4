@@ -18,8 +18,6 @@ private:
 	BigNumber _iterationComputationalWork = 0;
 	BigNumber _solvingComputationalWork = 0;
 	Timer _solvingTimer;
-	Vector x;
-	Vector r;
 	Vector e;
 public:
 	int IterationNumber = 0;
@@ -55,27 +53,11 @@ public:
 		this->_bNorm = b.norm();
 	}
 
-	Vector X() const
-	{
-		return this->x;
-	}
-
-	Vector& X()
-	{
-		return this->x;
-	}
-
 	void SetX(const Vector& x)
 	{
-		this->x = x;
 		if (_computeError)
-			ComputeError();
+			ComputeError(x);
 		this->_solvingTimer.Stop();
-	}
-
-	Vector Residual() const
-	{
-		return this->r;
 	}
 
 	void SetExactSolution(const Vector exactSolution)
@@ -91,7 +73,6 @@ public:
 
 	void SetResidual(const Vector& r)
 	{
-		this->r = r;
 		this->ResidualNorm = r.norm();
 		this->NormalizedResidualNorm = _bNorm > 0 ? ResidualNorm / _bNorm : ResidualNorm;
 
@@ -103,8 +84,8 @@ public:
 				this->_previousItConvRates.pop_front();
 			this->_previousItConvRates.push_back(this->_iterationConvRate);
 			this->_asymptoticConvRate = 1;
-			for (double r : _previousItConvRates)
-				this->_asymptoticConvRate *= r;
+			for (double cr : _previousItConvRates)
+				this->_asymptoticConvRate *= cr;
 			this->_asymptoticConvRate = pow(this->_asymptoticConvRate, 1.0 / _previousItConvRates.size());
 		}
 	}
@@ -114,7 +95,7 @@ public:
 		return ResidualNorm != -1;
 	}
 
-	void ComputeError()
+	void ComputeError(const Vector& x)
 	{
 		this->e = _exactSolution - x;
 		double exactSolNorm = _exactSolution.norm();

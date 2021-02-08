@@ -35,7 +35,7 @@ private:
 
 		IterationResult result = CreateFirstIterationResult(b, initialGuess);
 
-		Vector x = initialGuess;
+		Vector& x = initialGuess;
 		Vector r;
 		if (zeroInitialGuess)
 			r = b;
@@ -63,11 +63,11 @@ private:
 
 			Vector Ad = A * d;                                  result.AddCost(2 * A.nonZeros()); // Cost: 1 sparse MatVec
 			double alpha = r_dot_z / (d.dot(Ad));               result.AddCost(2 * r.rows());     // Cost: 1 Dot
-			x = x + alpha * d;
+			x += alpha * d;
 
 			double old_r_dot_old_z = r_dot_z; // save the dot product before overwriting r and z
 
-			r = r - alpha * Ad;
+			r -= alpha * Ad;
 			z = Precond.Solve(r);                               result.AddCost(Precond.SolvingComputationalWork()); // Cost: preconditioner
 
 			r_dot_z = r.dot(z);                                 result.AddCost(2 * r.rows());     // Cost: 1 Dot
