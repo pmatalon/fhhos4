@@ -208,15 +208,14 @@ private:
 	IterationResult ExecuteOneIteration(const Vector& b, Vector& x, const IterationResult& oldResult) override
 	{
 		IterationResult result(oldResult);
-		x = MultigridCycle(this->_fineLevel, b, x, result);
+		MultigridCycle(this->_fineLevel, b, x, result);
 		result.SetX(x);
 		return result;
 	}
 
-	Vector MultigridCycle(Level* level, const Vector& b, Vector& initialGuess, IterationResult& result)
+	void MultigridCycle(Level* level, const Vector& b, Vector& x, IterationResult& result)
 	{
 		const SparseMatrix A = *level->OperatorMatrix;
-		Vector x;
 
 		if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
 			level->ExportVector(b, "it" + to_string(this->IterationCount) + "_b");
@@ -228,8 +227,6 @@ private:
 		}
 		else
 		{
-			x = initialGuess;
-
 			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_beforePreSmoothing");
 
@@ -264,7 +261,7 @@ private:
 			{
 				for (int i = 0; i < this->WLoops; ++i)
 				{
-					ec = MultigridCycle(level->CoarserLevel, rc, ec, result);
+					MultigridCycle(level->CoarserLevel, rc, ec, result);
 					if (level->CoarserLevel->IsCoarsestLevel())
 						break;
 				}
@@ -272,7 +269,7 @@ private:
 			else if (this->Cycle == 'K')
 			{
 				if (level->CoarserLevel->IsCoarsestLevel())
-					ec = MultigridCycle(level->CoarserLevel, rc, ec, result); // exact solution
+					MultigridCycle(level->CoarserLevel, rc, ec, result); // exact solution
 				else
 				{
 					ec = level->CoarserLevel->FCG->Solve(rc, ecEqualZero, ec);                    result.AddCost(level->CoarserLevel->FCG->SolvingComputationalWork);
@@ -287,11 +284,11 @@ private:
 			{
 				level->ExportVector(ec, "it" + to_string(this->IterationCount) + "_ce");
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol");
-				auto cgc = level->Prolong(ec);
+				Vector cgc = level->Prolong(ec);
 				level->ExportVector(cgc, "it" + to_string(this->IterationCount) + "_cgc");
 			}
 
-			x = x + level->Prolong(ec);                                              result.AddCost(level->ProlongCost());
+			x += level->Prolong(ec);                                              result.AddCost(level->ProlongCost());
 
 			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_cgc");
@@ -305,8 +302,6 @@ private:
 			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPostSmoothing");
 		}
-
-		return x;
 	}
 
 protected:
