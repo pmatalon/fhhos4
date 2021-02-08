@@ -392,23 +392,34 @@ private:
 		}
 		else if (args.Solver.SolverCode.compare("hoaggregamg") == 0 || args.Solver.SolverCode.compare("fcghoaggregamg") == 0)
 		{
-			HighOrderAggregAMG* mg = new HighOrderAggregAMG(blockSize, 0.25, 2.0/3.0, 2);
+			HighOrderAggregAMG* mg = new HighOrderAggregAMG(blockSize, 0.25, 2.0 / 3.0, 2);
 			SetMultigridParameters(mg, args, blockSize);
 			mg->UseGalerkinOperator = 1;
 
-			int nLevelCoarseSolver = args.Solver.MG.Levels > 0 ? args.Solver.MG.Levels-1 : 0;
-			AggregAMG* lowOrderAMG = new AggregAMG(1, 0.25, nLevelCoarseSolver);
-			lowOrderAMG->BlockSizeForBlockSmoothers = 1;
-			lowOrderAMG->Cycle = 'K';
-			lowOrderAMG->PreSmoothingIterations = 1;
-			lowOrderAMG->PostSmoothingIterations = 1;
+			if (args.Solver.MG.CoarseSolverCode.compare("agmg") == 0)
+			{
+				ProgramArguments argsCoarseSolver;
+				argsCoarseSolver.Solver.SolverCode = "agmg";
+				argsCoarseSolver.Solver.MaxIterations = 200;
+				argsCoarseSolver.Solver.PrintIterationResults = false;
+				mg->CoarseSolver = CreateSolver(argsCoarseSolver, nullptr, 1);
+			}
+			else
+			{
+				int nLevelCoarseSolver = args.Solver.MG.Levels > 0 ? args.Solver.MG.Levels - 1 : 0;
+				AggregAMG* lowOrderAMG = new AggregAMG(1, 0.25, nLevelCoarseSolver);
+				lowOrderAMG->BlockSizeForBlockSmoothers = 1;
+				lowOrderAMG->Cycle = 'K';
+				lowOrderAMG->PreSmoothingIterations = 1;
+				lowOrderAMG->PostSmoothingIterations = 1;
 
-			FlexibleConjugateGradient* fcgAggregAMG = new FlexibleConjugateGradient(1);
-			fcgAggregAMG->Precond = Preconditioner(lowOrderAMG);
-			fcgAggregAMG->MaxIterations = 1;
-			fcgAggregAMG->PrintIterationResults = false;
+				FlexibleConjugateGradient* fcgAggregAMG = new FlexibleConjugateGradient(1);
+				fcgAggregAMG->Precond = Preconditioner(lowOrderAMG);
+				fcgAggregAMG->MaxIterations = 1;
+				fcgAggregAMG->PrintIterationResults = false;
 
-			mg->CoarseSolver = fcgAggregAMG;
+				mg->CoarseSolver = fcgAggregAMG;
+			}
 
 			if (args.Solver.SolverCode.compare("hoaggregamg") == 0)
 				solver = mg;
@@ -444,11 +455,9 @@ private:
 		else if (args.Solver.SolverCode.compare("bj") == 0)
 			solver = new BlockJacobi(blockSize, args.Solver.RelaxationParameter);
 		else if (args.Solver.SolverCode.compare("bj23") == 0)
-			solver = new BlockJacobi(blockSize, 2.0/3.0);
-#ifdef AGMG_ENABLED
+			solver = new BlockJacobi(blockSize, 2.0 / 3.0);
 		else if (args.Solver.SolverCode.compare("agmg") == 0)
-			solver = new AGMG(args.Solver.Tolerance, args.Solver.MaxIterations);
-#endif // AGMG_ENABLED
+			solver = new AGMG();
 		else
 			Utils::FatalError("Unknown solver or not applicable.");
 
@@ -457,6 +466,7 @@ private:
 		{
 			iterativeSolver->Tolerance = args.Solver.Tolerance;
 			iterativeSolver->MaxIterations = args.Solver.MaxIterations;
+			iterativeSolver->PrintIterationResults = args.Solver.PrintIterationResults;
 		}
 
 		return solver;

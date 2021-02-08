@@ -905,9 +905,9 @@ public:
 
 	Vector Solve(const Vector& b, string initialGuessCode) override
 	{
-		Vector initialGuess;
 		if (initialGuessCode.compare("smooth") == 0)
 		{
+			Vector initialGuess;
 			DomFunction coarseErrorFunction = [](const DomPoint& p)
 			{
 				double x = p.X;
@@ -934,11 +934,10 @@ public:
 			}
 
 			initialGuess = -prolongatedError;
+			return Multigrid::Solve(b, false, initialGuess);
 		}
 		else
 			return Multigrid::Solve(b, initialGuessCode);
-
-		return Multigrid::Solve(b, initialGuess);
 	}
 	
 protected:

@@ -34,7 +34,7 @@ public:
 
 	Vector Smooth(Vector& x, const Vector& b)
 	{
-		return _solver->Solve(b, x);
+		return _solver->Solve(b, false, x);
 	}
 
 	friend ostream& operator<<(ostream& os, const Smoother& s)

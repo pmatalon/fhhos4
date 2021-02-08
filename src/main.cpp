@@ -241,6 +241,12 @@ void print_usage() {
 	cout << "              y   - Collapse interfaces made of multiple faces and try to aggregate interior faces to the boundary ones" << endl;
 	cout << "              z   - Aggregate all faces using A_F_F" << endl;
 	cout << endl;
+	cout << "-coarse-solver CODE" << endl;
+	cout << "      Default: 'lu'." << endl;
+	cout << "              lu          " << endl;
+	cout << "              fcgaggregamg" << endl;
+	cout << "              agmg        " << endl;
+	cout << endl;
 	cout << "-bfc CODE" << endl;
 	cout << "      Face collapsing method used at the domain boundaries or physical parts boundaries. Requires -cs n." << endl;
 	cout << "              d   - Disabled" << endl;
@@ -462,6 +468,7 @@ int main(int argc, char* argv[])
 		OPT_CoarseMatrixSize,
 		OPT_Smoothers,
 		OPT_CoarseningStrategy,
+		OPT_CoarseSolver,
 		OPT_BoundaryFaceCollapsing,
 		OPT_ReEntrantCornerManagement,
 		OPT_CoarseningFactor,
@@ -512,6 +519,7 @@ int main(int argc, char* argv[])
 		 { "smoothers", required_argument, NULL, OPT_Smoothers },
 		 { "cs", required_argument, NULL, OPT_CoarseningStrategy },
 		 { "bfc", required_argument, NULL, OPT_BoundaryFaceCollapsing },
+		 { "coarse-solver", required_argument, NULL, OPT_CoarseSolver },
 		 { "rcm", required_argument, NULL, OPT_ReEntrantCornerManagement },
 		 { "coarsening-factor", required_argument, NULL, OPT_CoarseningFactor },
 		 { "coarse-n", required_argument, NULL, OPT_CoarseN },
@@ -818,6 +826,12 @@ int main(int argc, char* argv[])
 					args.Solver.MG.CoarseningStgy = CoarseningStrategy::CAMGAggregFaces;
 				else
 					argument_error("unknown coarsening strategy code '" + coarseningStgyCode + "'. Check -cs argument.");
+				break;
+			}
+			case OPT_CoarseSolver:
+			{
+				string code = optarg;
+				args.Solver.MG.CoarseSolverCode = code;
 				break;
 			}
 			case OPT_BoundaryFaceCollapsing:

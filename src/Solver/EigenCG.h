@@ -29,9 +29,13 @@ public:
 		_solver.setTolerance(this->Tolerance);
 	}
 
-	Vector Solve(const Vector& b, Vector& initialGuess) override
+	Vector Solve(const Vector& b, bool zeroInitialGuess, Vector& initialGuess) override
 	{
-		Vector x = _solver.solveWithGuess(b, initialGuess);
+		Vector x;
+		if (zeroInitialGuess)
+			x = _solver.solve(b);
+		else
+			x = _solver.solveWithGuess(b, initialGuess);
 		this->IterationCount = _solver.iterations();
 		return x;
 	}

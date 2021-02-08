@@ -24,7 +24,7 @@ public:
 	}
 
 private:
-	Vector Solve(const Vector& b, Vector& initialGuess) override
+	Vector Solve(const Vector& b, bool zeroInitialGuess, Vector& initialGuess) override
 	{
 		const SparseMatrix& A = *this->Matrix;
 
@@ -36,7 +36,13 @@ private:
 		IterationResult result = CreateFirstIterationResult(b, initialGuess);
 
 		Vector x = initialGuess;
-		Vector r = b - A * x;                               result.AddCost(2 * A.nonZeros()); // Cost: 1 sparse MatVec
+		Vector r;
+		if (zeroInitialGuess)
+			r = b;
+		else
+		{
+			r = b - A * x;                               result.AddCost(2 * A.nonZeros()); // Cost: 1 sparse MatVec
+		}
 		result.SetResidual(r);
 
 		double beta = 0;

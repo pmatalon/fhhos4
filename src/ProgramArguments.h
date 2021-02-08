@@ -54,6 +54,7 @@ struct MultigridArguments
 	CoarseningStrategy CoarseningStgy = CoarseningStrategy::None;
 	int CoarseningFactor = 2;
 	BigNumber CoarseN = 2;
+	string CoarseSolverCode = "lu";
 	FaceCollapsing BoundaryFaceCollapsing = FaceCollapsing::Max;
 	ReEntrantCornerMgmt ReEntrantCornerManagement = ReEntrantCornerMgmt::Disabled;
 	bool ManageAnisotropy = true; // used only in CAMG
@@ -65,6 +66,7 @@ struct SolverArguments
 	string InitialGuessCode = "0";
 	double Tolerance = 1e-8;
 	int MaxIterations = 200;
+	bool PrintIterationResults = true;
 	double RelaxationParameter = 1;
 	int BlockSize = -1;
 	MultigridArguments MG;

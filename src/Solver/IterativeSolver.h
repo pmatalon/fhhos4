@@ -46,18 +46,22 @@ public:
 	virtual Vector Solve(const Vector& b, string initialGuessCode)
 	{
 		Vector initialGuess;
+		bool zeroInitialGuess = false;
 		if (initialGuessCode.compare("0") == 0)
+		{
 			initialGuess = Vector::Zero(b.rows());
+			zeroInitialGuess = true;
+		}
 		else if (initialGuessCode.compare("1") == 0)
 			initialGuess = Vector::Ones(b.rows());
 		else if (initialGuessCode.compare("rand") == 0)
 			initialGuess = Vector::Random(b.rows());
 		else
-			assert(false);
-		return Solve(b, initialGuess);
+			Utils::FatalError("Unknown initial guess code");
+		return Solve(b, zeroInitialGuess, initialGuess);
 	}
 
-	virtual Vector Solve(const Vector& b, Vector& initialGuess)
+	virtual Vector Solve(const Vector& b, bool zeroInitialGuess, Vector& initialGuess)
 	{
 		const SparseMatrix& A = *this->Matrix;
 
@@ -77,8 +81,13 @@ public:
 
 		if (StoppingCrit == StoppingCriteria::NormalizedResidual)
 		{
-			result.SetResidual(b - A * initialGuess);
-			result.AddCost(2 * A.nonZeros());
+			if (zeroInitialGuess)
+				result.SetResidual(b);
+			else
+			{
+				result.SetResidual(b - A * initialGuess);
+				result.AddCost(2 * A.nonZeros());
+			}
 		}
 		if (this->PrintIterationResults)
 			cout << result << endl;
@@ -89,7 +98,7 @@ public:
 			result = ExecuteOneIteration(b, x, result);
 			this->IterationCount++;
 
-			if (!result.IsResidualSet())
+			if (!result.IsResidualSet() && StoppingCrit == StoppingCriteria::NormalizedResidual)
 			{
 				result.SetResidual(b - A * result.X());
 				result.AddCost(2 * A.nonZeros());
@@ -130,12 +139,15 @@ protected:
 			return false;
 		if (IterationCount >= MaxIterations)
 			return true;
-		if (std::isinf(result.NormalizedResidualNorm)) // do not remove the prefix std:: or it can become ambiguous according to the compiler
-			Utils::FatalError("divergence of the solver");
-		if (std::isnan(result.NormalizedResidualNorm))
-			Utils::FatalError("the residual is NaN.");
-		if (StoppingCrit == StoppingCriteria::NormalizedResidual && result.NormalizedResidualNorm < this->Tolerance)
-			return true;
+		if (StoppingCrit == StoppingCriteria::NormalizedResidual)
+		{
+			if (std::isinf(result.NormalizedResidualNorm)) // do not remove the prefix std:: or it can become ambiguous according to the compiler
+				Utils::FatalError("divergence of the solver");
+			if (std::isnan(result.NormalizedResidualNorm))
+				Utils::FatalError("the residual is NaN.");
+			if (result.NormalizedResidualNorm < this->Tolerance)
+				return true;
+		}
 		return false;
 	}
 };

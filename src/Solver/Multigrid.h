@@ -259,6 +259,7 @@ private:
 			//--------------------------------------------------//
 
 			Vector ec = Vector::Zero(rc.rows());
+			bool ecEqualZero = true;
 			if (this->Cycle == 'V' || this->Cycle == 'W')
 			{
 				for (int i = 0; i < this->WLoops; ++i)
@@ -274,7 +275,7 @@ private:
 					ec = MultigridCycle(level->CoarserLevel, rc, ec, result); // exact solution
 				else
 				{
-					ec = level->CoarserLevel->FCG->Solve(rc, ec);                    result.AddCost(level->CoarserLevel->FCG->SolvingComputationalWork);
+					ec = level->CoarserLevel->FCG->Solve(rc, ecEqualZero, ec);                    result.AddCost(level->CoarserLevel->FCG->SolvingComputationalWork);
 				}
 			}
 

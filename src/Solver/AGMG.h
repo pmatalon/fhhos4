@@ -1,5 +1,5 @@
 #pragma once
-#include "Solver.h"
+#include "IterativeSolver.h"
 using namespace std;
 
 #ifdef AGMG_ENABLED
@@ -16,21 +16,12 @@ enum class AGMGJob : int
 	MemoryRelease = -1
 };
 
-class AGMG : public Solver
+class AGMG : public IterativeSolver
 {
-private:
-	const SparseMatrix* A;
-
 public:
-	double Tolerance;
-	int MaxIterations;
-
-	AGMG(double tolerance, int maxIterations) : Solver() 
+	AGMG() : IterativeSolver()
 	{
-#ifdef AGMG_ENABLED
-		this->Tolerance = tolerance;
-		this->MaxIterations = maxIterations;
-#else
+#ifndef AGMG_ENABLED
 		Utils::FatalError("AGMG is disabled. The source must be recompiled with the appropriate option to use AGMG.");
 #endif
 	}
@@ -42,11 +33,10 @@ public:
 
 	void Setup(const SparseMatrix& A) override
 	{
-		this->A = &A;
+		IterativeSolver::Setup(A);
 
-#ifdef AGMG_ENABLED
-		int n = this->A->cols();
-		int nnz = this->A->nonZeros();
+		int n = A.cols();
+		int nnz = A.nonZeros();
 
 		/*      generate the matrix in required format (CSR) */
 		/*        first allocate the vectors with correct size */
@@ -59,32 +49,30 @@ public:
 		/*        next set entries */
 		for (int i = 0; i < nnz; i++)
 		{
-			a[i] = this->A->valuePtr()[i];
-			ja[i] = this->A->innerIndexPtr()[i] + 1;
+			a[i] = A.valuePtr()[i];
+			ja[i] = A.innerIndexPtr()[i] + 1;
 		}
 		for (int i = 0; i < n; i++)
-			ia[i] = this->A->outerIndexPtr()[i] + 1;
-		ia[n] = this->A->outerIndexPtr()[n] + 1; // last value
+			ia[i] = A.outerIndexPtr()[i] + 1;
+		ia[n] = A.outerIndexPtr()[n] + 1; // last value
 
 		int job = (int)AGMGJob::Setup;
 		int iprint = 6; // unit number for output messages: 6 => standard output
 		int nrest = 1; // 1 because we want to use flexible CG (the matrix is symmetric positive definite)
 		int iterations;
 		double tolerance;
-		cout << "before" << endl;
+#ifdef AGMG_ENABLED
 		dagmg_(&n, a, ja, ia, nullptr, nullptr, &job, &iprint, &nrest, &iterations, &tolerance);
-		cout << "after" << endl;
-
-		delete ia, ja, a;
 #endif
+		delete ia, ja, a;
 	}
 
-	Vector Solve(const Vector& b) override
+	Vector Solve(const Vector& b, bool zeroInitialGuess, Vector& initialGuess) override
 	{
-#ifdef AGMG_ENABLED
-		int n = this->A->cols();
+		// TODO: Manage initialGuess
 
-		/*      generate the matrix in required format (CSR) */
+		int n = this->Matrix->cols();
+
 		/*        first allocate the vectors with correct size */
 		double *f, *x;
 		f = new double[n];
@@ -93,13 +81,20 @@ public:
 		for (int i = 0; i < n; i++)
 			f[i] = b[i];
 
-		int job = (int)AGMGJob::SolveWithoutInitialGuess;
-		int iprint = 6; // unit number for output messages: 6 => standard output
+		if (!zeroInitialGuess)
+		{
+			for (int i = 0; i < n; i++)
+				x[i] = initialGuess[i];
+		}
+
+		int job = zeroInitialGuess ? (int)AGMGJob::SolveWithoutInitialGuess : (int)AGMGJob::SolveWithInitialGuess;
+		int iprint = this->PrintIterationResults ? 6 : -1; // unit number for output messages: 6 => standard output
 		int nrest = 1; // 1 because we want to use flexible CG (the matrix is symmetric positive definite)
 		int iterations = this->MaxIterations;
 		double tolerance = this->Tolerance;
+#ifdef AGMG_ENABLED
 		dagmg_(&n, nullptr, nullptr, nullptr, f, x, &job, &iprint, &nrest, &iterations, &tolerance);
-
+#endif
 		// copy into solution
 		Vector solution = Vector(n);
 		for (int i = 0; i < n; i++)
@@ -107,6 +102,5 @@ public:
 
 		delete f, x;
 		return solution;
-#endif
 	}
 };
