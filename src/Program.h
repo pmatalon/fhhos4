@@ -325,50 +325,64 @@ private:
 	Solver* CreateSolver(const ProgramArguments& args, Problem<Dim>* problem, int blockSize)
 	{
 		Solver* solver = nullptr;
-		if (args.Solver.SolverCode.compare("mg") == 0)
-		{
-			if (args.Discretization.StaticCondensation)
-			{
-				Diffusion_HHO<Dim>* hhoProblem = dynamic_cast<Diffusion_HHO<Dim>*>(problem);
+		string GaussSeidelRelaxation1 = "The relaxation parameter of Gauss-Seidel is 1. Delete -relax arg to remove this warning, or use -s sor.";
 
-				FunctionalBasis<Dim>* cellInterpolationBasis;
-				if (args.Solver.MG.CellInterpolationCode == 1)
-					cellInterpolationBasis = hhoProblem->HHO->ReconstructionBasis;
-				else if (args.Solver.MG.CellInterpolationCode == 2)
-					cellInterpolationBasis = hhoProblem->HHO->CellBasis;
-				else
-					assert(false);
-
-				MultigridForHHO<Dim>* mg = new MultigridForHHO<Dim>(hhoProblem, args.Solver.MG.GMGProlong, cellInterpolationBasis, args.Solver.MG.WeightCode, args.Solver.MG.Levels);
-				SetMultigridParameters(mg, args, blockSize);
-				solver = mg;
-			}
-			else
-				assert(false && "Multigrid only applicable on HHO discretization with static condensation.");
-		}
-		else if (args.Solver.SolverCode.compare("camg") == 0)
-		{
-			Diffusion_HHO<Dim>* hhoProblem = dynamic_cast<Diffusion_HHO<Dim>*>(problem);
-			CondensedAMG* mg = new CondensedAMG(hhoProblem->HHO->nCellUnknowns, hhoProblem->HHO->nFaceUnknowns, 0.25, args.Solver.MG.CAMGFaceProlong, args.Solver.MG.CAMGProlong, args.Solver.MG.Levels);
-			SetMultigridParameters(mg, args, blockSize);
-			solver = mg;
-		}
-		else if (args.Solver.SolverCode.compare("aggregamg") == 0)
-		{
-			AggregAMG* mg = new AggregAMG(blockSize, 0.25, args.Solver.MG.Levels);
-			SetMultigridParameters(mg, args, blockSize);
-			mg->UseGalerkinOperator = 1;
-			solver = mg;
-		}
-		else if (args.Solver.SolverCode.compare("hoaggregamg") == 0)
-		{
-			HighOrderAggregAMG* mg = new HighOrderAggregAMG(blockSize, 0.25, 2.0 / 3.0, 2);
-			SetMultigridParameters(mg, args, blockSize);
-			mg->UseGalerkinOperator = 1;
-			solver = mg;
-		}
-		else if (args.Solver.SolverCode.compare("lu") == 0)
+		if (args.Solver.SolverCode.compare("lu") == 0)
 			solver = new EigenSparseLU();
+		else if (args.Solver.SolverCode.compare("j") == 0)
+			solver = new BlockJacobi(1, args.Solver.RelaxationParameter);
+		else if (args.Solver.SolverCode.compare("gs") == 0)
+		{
+			if (args.Solver.RelaxationParameter != 1)
+				Utils::Warning(GaussSeidelRelaxation1);
+			solver = new GaussSeidel(Direction::Forward);
+		}
+		else if (args.Solver.SolverCode.compare("rgs") == 0)
+		{
+			if (args.Solver.RelaxationParameter != 1)
+				Utils::Warning(GaussSeidelRelaxation1);
+			solver = new GaussSeidel(Direction::Backward);
+		}
+		else if (args.Solver.SolverCode.compare("sgs") == 0)
+		{
+			if (args.Solver.RelaxationParameter != 1)
+				Utils::Warning(GaussSeidelRelaxation1);
+			solver = new GaussSeidel(Direction::Symmetric);
+		}
+		else if (args.Solver.SolverCode.compare("sor") == 0)
+			solver = new BlockSOR(1, args.Solver.RelaxationParameter, Direction::Forward);
+		else if (args.Solver.SolverCode.compare("rsor") == 0)
+			solver = new BlockSOR(1, args.Solver.RelaxationParameter, Direction::Backward);
+		else if (args.Solver.SolverCode.compare("ssor") == 0)
+			solver = new BlockSOR(1, args.Solver.RelaxationParameter, Direction::Symmetric);
+		else if (args.Solver.SolverCode.compare("bj") == 0)
+			solver = new BlockJacobi(blockSize, args.Solver.RelaxationParameter);
+		else if (args.Solver.SolverCode.compare("bj23") == 0)
+			solver = new BlockJacobi(blockSize, 2.0 / 3.0);
+		else if (args.Solver.SolverCode.compare("bgs") == 0)
+		{
+			if (args.Solver.RelaxationParameter != 1)
+				Utils::Warning(GaussSeidelRelaxation1);
+			solver = new BlockSOR(blockSize, 1, Direction::Forward);
+		}
+		else if (args.Solver.SolverCode.compare("rbgs") == 0)
+		{
+			if (args.Solver.RelaxationParameter != 1)
+				Utils::Warning(GaussSeidelRelaxation1);
+			solver = new BlockSOR(blockSize, 1, Direction::Backward);
+		}
+		else if (args.Solver.SolverCode.compare("sbgs") == 0)
+		{
+			if (args.Solver.RelaxationParameter != 1)
+				Utils::Warning(GaussSeidelRelaxation1);
+			solver = new BlockSOR(blockSize, 1, Direction::Symmetric);
+		}
+		else if (args.Solver.SolverCode.compare("bsor") == 0)
+			solver = new BlockSOR(blockSize, args.Solver.RelaxationParameter, Direction::Forward);
+		else if (args.Solver.SolverCode.compare("rbsor") == 0)
+			solver = new BlockSOR(blockSize, args.Solver.RelaxationParameter, Direction::Backward);
+		else if (args.Solver.SolverCode.compare("sbsor") == 0)
+			solver = new BlockSOR(blockSize, args.Solver.RelaxationParameter, Direction::Symmetric);
 		else if (args.Solver.SolverCode.compare("eigencg") == 0)
 			solver = new EigenCG();
 		else if (args.Solver.SolverCode.rfind("cg", 0) == 0) // if SolverCode starts with "cg"
@@ -397,31 +411,55 @@ private:
 			}
 			solver = fcg;
 		}
-		else if (args.Solver.SolverCode.compare("j") == 0)
-			solver = new BlockJacobi(1, args.Solver.RelaxationParameter);
-		else if (args.Solver.SolverCode.compare("sor") == 0 || args.Solver.SolverCode.compare("gs") == 0)
-			solver = new BlockSOR(1, args.Solver.RelaxationParameter, Direction::Forward);
-		else if (args.Solver.SolverCode.compare("ssor") == 0 || args.Solver.SolverCode.compare("sgs") == 0)
-			solver = new BlockSOR(1, args.Solver.RelaxationParameter, Direction::Symmetric);
-		else if (args.Solver.SolverCode.compare("rsor") == 0 || args.Solver.SolverCode.compare("rgs") == 0)
-			solver = new BlockSOR(1, args.Solver.RelaxationParameter, Direction::Backward);
-		else if (args.Solver.SolverCode.compare("bsor") == 0 || args.Solver.SolverCode.compare("bgs") == 0)
-			solver = new BlockSOR(blockSize, args.Solver.RelaxationParameter, Direction::Forward);
-		else if (args.Solver.SolverCode.compare("rbsor") == 0 || args.Solver.SolverCode.compare("rbgs") == 0)
-			solver = new BlockSOR(blockSize, args.Solver.RelaxationParameter, Direction::Backward);
-		else if (args.Solver.SolverCode.compare("sbsor") == 0 || args.Solver.SolverCode.compare("sbgs") == 0)
-			solver = new BlockSOR(blockSize, args.Solver.RelaxationParameter, Direction::Symmetric);
-		else if (args.Solver.SolverCode.compare("bj") == 0)
-			solver = new BlockJacobi(blockSize, args.Solver.RelaxationParameter);
-		else if (args.Solver.SolverCode.compare("bj23") == 0)
-			solver = new BlockJacobi(blockSize, 2.0 / 3.0);
 		else if (args.Solver.SolverCode.compare("agmg") == 0)
 			solver = new AGMG();
+		else if (args.Solver.SolverCode.compare("mg") == 0)
+		{
+			if (args.Discretization.StaticCondensation)
+			{
+				Diffusion_HHO<Dim>* hhoProblem = dynamic_cast<Diffusion_HHO<Dim>*>(problem);
+
+				FunctionalBasis<Dim>* cellInterpolationBasis;
+				if (args.Solver.MG.CellInterpolationCode == 1)
+					cellInterpolationBasis = hhoProblem->HHO->ReconstructionBasis;
+				else if (args.Solver.MG.CellInterpolationCode == 2)
+					cellInterpolationBasis = hhoProblem->HHO->CellBasis;
+				else
+					assert(false);
+
+				MultigridForHHO<Dim>* mg = new MultigridForHHO<Dim>(hhoProblem, args.Solver.MG.GMGProlong, cellInterpolationBasis, args.Solver.MG.WeightCode, args.Solver.MG.Levels);
+				SetMultigridParameters(mg, args, blockSize);
+				solver = mg;
+			}
+			else
+				Utils::FatalError("The Multigrid for HHO (-s mg) only applicable on HHO discretization with static condensation.");
+		}
+		else if (args.Solver.SolverCode.compare("camg") == 0)
+		{
+			Diffusion_HHO<Dim>* hhoProblem = dynamic_cast<Diffusion_HHO<Dim>*>(problem);
+			CondensedAMG* mg = new CondensedAMG(hhoProblem->HHO->nCellUnknowns, hhoProblem->HHO->nFaceUnknowns, 0.25, args.Solver.MG.CAMGFaceProlong, args.Solver.MG.CAMGProlong, args.Solver.MG.Levels);
+			SetMultigridParameters(mg, args, blockSize);
+			solver = mg;
+		}
+		else if (args.Solver.SolverCode.compare("aggregamg") == 0)
+		{
+			AggregAMG* mg = new AggregAMG(blockSize, 0.25, args.Solver.MG.Levels);
+			SetMultigridParameters(mg, args, blockSize);
+			mg->UseGalerkinOperator = 1;
+			solver = mg;
+		}
+		else if (args.Solver.SolverCode.compare("hoaggregamg") == 0)
+		{
+			HighOrderAggregAMG* mg = new HighOrderAggregAMG(blockSize, 0.25, 2.0 / 3.0, 2);
+			SetMultigridParameters(mg, args, blockSize);
+			mg->UseGalerkinOperator = 1;
+			solver = mg;
+		}
 		else
 			Utils::FatalError("Unknown solver or not applicable.");
 
 		IterativeSolver* iterativeSolver = dynamic_cast<IterativeSolver*>(solver);
-		if (iterativeSolver != nullptr)
+		if (iterativeSolver)
 		{
 			iterativeSolver->Tolerance = args.Solver.Tolerance;
 			iterativeSolver->MaxIterations = args.Solver.MaxIterations;
