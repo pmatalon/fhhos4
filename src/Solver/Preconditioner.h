@@ -49,11 +49,11 @@ public:
 			_solver->Setup(A, A_T_T, A_T_F, A_F_F);
 	}
 
-	Vector Solve(const Vector& b)
+	Vector Apply(const Vector& r)
 	{
 		if (_solver)
-			return _solver->Solve(b);
-		return b;
+			return _solver->Solve(r);
+		return r;
 	}
 	
 	BigNumber SetupComputationalWork()

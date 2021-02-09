@@ -79,7 +79,7 @@ public:
 			result = IterationResult(result);
 
 			// Apply the preconditioner
-			Vector z = Precond.Solve(r);                             result.AddCost(Precond.SolvingComputationalWork()); // Cost: preconditioner
+			Vector z = Precond.Apply(r);                             result.AddCost(Precond.SolvingComputationalWork()); // Cost: preconditioner
 
 			// The final direction of research, d, is found by 
 			// A-orthogonalizing z with the previous directions of research, 

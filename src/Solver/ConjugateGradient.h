@@ -46,7 +46,7 @@ private:
 		result.SetResidual(r);
 
 		double beta = 0;
-		Vector z = Precond.Solve(r);                        result.AddCost(Precond.SolvingComputationalWork()); // Cost: preconditioner
+		Vector z = Precond.Apply(r);                        result.AddCost(Precond.SolvingComputationalWork()); // Cost: preconditioner
 		Vector d = z;
 		double r_dot_z = r.dot(z);                          result.AddCost(2 * r.rows());    // Cost: 1 Dot
 		this->IterationCount = 0;
@@ -68,7 +68,7 @@ private:
 			double old_r_dot_old_z = r_dot_z; // save the dot product before overwriting r and z
 
 			r -= alpha * Ad;
-			z = Precond.Solve(r);                               result.AddCost(Precond.SolvingComputationalWork()); // Cost: preconditioner
+			z = Precond.Apply(r);                               result.AddCost(Precond.SolvingComputationalWork()); // Cost: preconditioner
 
 			r_dot_z = r.dot(z);                                 result.AddCost(2 * r.rows());     // Cost: 1 Dot
 			beta = r_dot_z / old_r_dot_old_z;
