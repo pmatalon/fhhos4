@@ -10,9 +10,10 @@ private:
 	int _blockSize;
 	double _strongCouplingThreshold;
 	AlgebraicMesh _mesh;
-private:
-	SparseMatrix Q_T;
-	SparseMatrix Q_F;
+	vector<ElementAggregate> _aggregates;
+	double _restrictionCost = 0;
+public:
+	SparseMatrix Ac;
 
 public:
 	AggregLevel(int number, int blockSize, double strongCouplingThreshold)
@@ -32,9 +33,6 @@ public:
 
 	void CoarsenMesh(CoarseningStrategy coarseningStgy, int coarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override
 	{
-		if (!this->OperatorMatrix)
-			ComputeGalerkinOperator();
-
 		cout << "\tDouble pairwise aggregation" << endl;
 
 		_mesh.Build(*this->OperatorMatrix);
@@ -47,39 +45,87 @@ public:
 		if (coarsestPossibleMeshReached)
 			return;
 
-		/*cout << "------------- Elem" << endl;
-		for (ElementAggregate& agg : _mesh._coarseElements)
-		{
-			cout << "(";
-			for (auto e : agg.FineElements)
-				cout << (e->Number) << ", ";
-			cout << ")" << endl;
-		}*/
-
 		// Cell-prolongation operator with only one 1 coefficient per row
-		SparseMatrix Q_T1 = BuildQ_T(_mesh);
+		//SparseMatrix Q_T1 = BuildQ_T(_mesh);
 
-		//ExportMatrix(Q_T1, "P", 0);
-		
-		// Intermediate coarse operators
-		SparseMatrix A1 = Q_T1.transpose() * (*this->OperatorMatrix) * Q_T1;
+		// Intermediate coarse operator
+		SparseMatrix A1 = GalerkinOperator(*this->OperatorMatrix, _mesh);
 
 		//-----------------------------//
 		// Second pairwise aggregation //
 		//-----------------------------//
 
 		AlgebraicMesh coarseMesh(_blockSize, _strongCouplingThreshold);
+		coarseMesh.FinerMesh = &_mesh;
 		coarseMesh.Build(A1);
 		coarseMesh.PairWiseAggregate(coarsestPossibleMeshReached);
 		if (coarsestPossibleMeshReached)
 			return;
 
-		SparseMatrix Q_T2 = BuildQ_T(coarseMesh);
+		//SparseMatrix Q_T2 = BuildQ_T(coarseMesh);
+		//this->P = Q_T1 * Q_T2;
 
-		this->P = Q_T1 * Q_T2;
+		this->Ac = GalerkinOperator(A1, coarseMesh);
+
+		//-----------------------------------//
+		// Assembly of the double-aggregates //
+		//-----------------------------------//
+
+		_aggregates = vector<ElementAggregate>(coarseMesh._coarseElements.size());
+		NumberParallelLoop<EmptyResultChunk> parallelLoop(coarseMesh._coarseElements.size());
+		parallelLoop.Execute([this, &coarseMesh](BigNumber finalAggregNumber)
+			{
+				ElementAggregate& finalAggreg = _aggregates[finalAggregNumber];
+				finalAggreg.Number = finalAggregNumber;
+				finalAggreg.FineElements = GetFineElements(coarseMesh._coarseElements[finalAggregNumber], coarseMesh);
+				for (AlgebraicElement* e : finalAggreg.FineElements)
+					e->FinalAggregate = &finalAggreg;
+			});
+
+		_restrictionCost = 0;
+		for (ElementAggregate& a : _aggregates)
+			_restrictionCost += a.FineElements.size();
 	}
 
 private:
+	vector<AlgebraicElement*> GetFineElements(const ElementAggregate& aggreg, const AlgebraicMesh& mesh)
+	{
+		if (!mesh.FinerMesh)
+			return aggreg.FineElements;
+		
+		vector<AlgebraicElement*> fineElements;
+		for (AlgebraicElement* e : aggreg.FineElements)
+		{
+			ElementAggregate& finerAggreg = mesh.FinerMesh->_coarseElements[e->Number];
+			fineElements = Utils::Join(fineElements, GetFineElements(finerAggreg, *mesh.FinerMesh));
+		}
+		return fineElements;
+	}
+
+	SparseMatrix GalerkinOperator(const SparseMatrix& A, const AlgebraicMesh& mesh)
+	{
+		// Formula (2.3) of Notay's 2010 paper
+		NonZeroCoefficients coeffs(A.nonZeros());
+		for (BigNumber k = 0; k < A.rows(); k++)
+		{
+			for (RowMajorSparseMatrix::InnerIterator it(A, k); it; ++it)
+			{
+				auto l = it.col();
+				double a_kl = it.value();
+
+				auto i = mesh._elements[k].CoarseElement->Number;
+				auto j = mesh._elements[l].CoarseElement->Number;
+
+				coeffs.Add(i, j, a_kl);
+			}
+		}
+
+		SparseMatrix Ac(mesh._coarseElements.size(), mesh._coarseElements.size());
+		coeffs.Fill(Ac);
+		return Ac;
+	}
+
+
 	// Cell prolongation Q_T with only one 1 coefficient per row
 	SparseMatrix BuildQ_T(const AlgebraicMesh& mesh)
 	{
@@ -108,13 +154,58 @@ public:
 		cout << endl;
 	}
 
-	void SetupProlongation() override
-	{}
-
-	void SetupRestriction() override
+	Vector Prolong(Vector& coarseV) override
 	{
-		double scalingFactor = 1.0;
-		R = (scalingFactor * P.transpose()).eval();
+		if (_blockSize == 1)
+		{
+			Vector fineV(_mesh._elements.size());
+			for (AlgebraicElement& e : _mesh._elements)
+				fineV[e.Number] = coarseV[e.FinalAggregate->Number];
+			return fineV;
+		}
+		else
+		{
+			Vector fineV = Vector::Zero(_mesh._elements.size() * _blockSize);
+			for (AlgebraicElement& e : _mesh._elements)
+				fineV[e.Number * _blockSize] = coarseV[e.FinalAggregate->Number * _blockSize];
+			return fineV;
+		}
+	}
+
+	double ProlongCost() override
+	{
+		return 0;
+	}
+
+	Vector Restrict(Vector& fineV) override
+	{
+		if (_blockSize == 1)
+		{
+			Vector coarseV = Vector::Zero(_aggregates.size() * _blockSize);
+			for (ElementAggregate& a : _aggregates)
+			{
+				coarseV[a.Number * _blockSize] = 0;
+				for (AlgebraicElement* e : a.FineElements)
+					coarseV[a.Number * _blockSize] += fineV[e->Number * _blockSize];
+			}
+			return coarseV;
+		}
+		else
+		{
+			Vector coarseV(_aggregates.size());
+			for (ElementAggregate& a : _aggregates)
+			{
+				coarseV[a.Number] = 0;
+				for (AlgebraicElement* e : a.FineElements)
+					coarseV[a.Number] += fineV[e->Number];
+			}
+			return coarseV;
+		}
+	}
+
+	double RestrictCost() override
+	{
+		return _restrictionCost;
 	}
 };
 
@@ -155,6 +246,7 @@ protected:
 	Level* CreateCoarseLevel(Level* fineLevel) override
 	{
 		AggregLevel* coarseLevel = new AggregLevel(fineLevel->Number + 1, _blockSize, _strongCouplingThreshold);
+		coarseLevel->OperatorMatrix = &dynamic_cast<AggregLevel*>(fineLevel)->Ac;
 		return coarseLevel;
 	}
 };

@@ -115,24 +115,24 @@ public:
 		this->OperatorMatrix = &this->_galerkinOperator;
 	}
 
-	Vector Restrict(Vector& vectorOnThisLevel)
+	virtual Vector Restrict(Vector& vectorOnThisLevel)
 	{
 		Vector coarseVector = R * vectorOnThisLevel;
 		return coarseVector;
 	}
 
-	double RestrictCost()
+	virtual double RestrictCost()
 	{
 		return 2 * R.nonZeros();
 	}
 
-	Vector Prolong(Vector& vectorOnTheCoarserLevel)
+	virtual Vector Prolong(Vector& vectorOnTheCoarserLevel)
 	{
 		Vector vectorOnThisLevel = P * vectorOnTheCoarserLevel;
 		return vectorOnThisLevel;
 	}
 
-	double ProlongCost()
+	virtual double ProlongCost()
 	{
 		return 2 * P.nonZeros();
 	}
@@ -179,6 +179,6 @@ protected:
 	virtual void OnStartSetup() {}
 	virtual void OnEndSetup() {}
 	virtual void SetupDiscretizedOperator() {}
-	virtual void SetupRestriction() = 0;
-	virtual void SetupProlongation() = 0;
+	virtual void SetupRestriction() {}
+	virtual void SetupProlongation() {}
 };
