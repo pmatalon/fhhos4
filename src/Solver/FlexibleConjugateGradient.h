@@ -9,18 +9,19 @@ class FlexibleConjugateGradient : public IterativeSolver
 private:
 	struct Direction
 	{
-		Vector d;
-		Vector Ad;
+		Vector* d;
+		Vector* Ad;
 		double d_dot_Ad;
 	};
-	list<Direction> _previousDirections;
 public:
 	Preconditioner Precond;
 	int Truncation; // max number of previous search direction to use for A-orthogonalization
+	bool Restart = false;
 
-	FlexibleConjugateGradient(int truncation = 1)
+	FlexibleConjugateGradient(int truncation = 1, bool restart = false)
 	{
 		Truncation = truncation;
+		Restart = restart;
 	}
 
 	virtual void Serialize(ostream& os) const override
@@ -57,7 +58,7 @@ public:
 		IterationResult result = CreateFirstIterationResult(b, initialGuess);
 
 		// Init restart parameters
-		_previousDirections = list<Direction>();
+		list<Direction> previousDirections;
 
 		Vector& x = initialGuess;
 		Vector r;
@@ -65,7 +66,7 @@ public:
 			r = b;
 		else
 		{
-			r = b - A * x;                                       result.AddCost(2 * A.nonZeros()); // Cost: 1 sparse MatVec
+			r = b - A * x;                                           result.AddCost(2 * A.nonZeros()); // Cost: 1 sparse MatVec
 		}
 		result.SetResidual(r);
 
@@ -84,39 +85,45 @@ public:
 			// The final direction of research, d, is found by 
 			// A-orthogonalizing z with the previous directions of research, 
 			// according to the truncation / restart method chosen.
-			Vector d = z;
-			for (Direction const& directionk : _previousDirections)
+
+			Vector* d = new Vector(z);
+			for (Direction const& directionk : previousDirections)
 			{
-				const Vector& dk  = directionk.d;
-				const Vector& Adk = directionk.Ad;
+				Vector& dk  = *directionk.d;
+				Vector& Adk = *directionk.Ad;
 				double dk_dot_Adk = directionk.d_dot_Ad;
 
-				d -= z.dot(Adk) / dk_dot_Adk * dk;                   result.AddCost(2 * z.rows());     // Cost: 1 Dot
+				*d -= z.dot(Adk) / dk_dot_Adk * dk;                   result.AddCost(2 * z.rows());     // Cost: 1 Dot
 			}
-			assert(d.norm() > 0);
+			assert(d->norm() > 0);
 
-			Vector Ad = A * d;                                       result.AddCost(2 * A.nonZeros()); // Cost: 1 sparse MatVec
-			double d_dot_Ad = d.dot(Ad);                             result.AddCost(2 * d.rows());     // Cost: 1 Dot
+			Vector* Ad = new Vector(A * (*d));                        result.AddCost(2 * A.nonZeros()); // Cost: 1 sparse MatVec
+			double d_dot_Ad = d->dot(*Ad);                            result.AddCost(2 * d->rows());     // Cost: 1 Dot
 			assert(d_dot_Ad != 0);
 
 			// Step length in the direction of research
-			double alpha = r.dot(d) / d_dot_Ad;                      result.AddCost(2 * r.rows());     // Cost: 1 Dot
+			double alpha = r.dot(*d) / d_dot_Ad;                      result.AddCost(2 * r.rows());     // Cost: 1 Dot
 
 			// Moving from the current solution to the next
 			// by taking the step in the direction of research
-			x += alpha * d;
+			x += alpha * (*d);
 
 			// New residual
-			r -= alpha * Ad;
+			r -= alpha * (*Ad);
 
 			// Restart?
-			if (_previousDirections.size() == this->Truncation)
-				_previousDirections.clear();
+			if (previousDirections.size() == this->Truncation)
+			{
+				if (this->Restart)
+					Clear(previousDirections);
+				else
+					DeleteOldest(previousDirections);
+			}
 
 			// The direction of research is saved 
 			// (even after a restart, as advised by Notay)
 			Direction direction = { d, Ad, d_dot_Ad };
-			_previousDirections.push_back(direction);
+			previousDirections.push_back(direction);
 
 			//---------- End of iteration ----------//
 			this->IterationCount++;
@@ -128,11 +135,30 @@ public:
 				cout << result << endl;
 		}
 
-		_previousDirections.clear();
+		Clear(previousDirections);
 
 		if (this->PrintIterationResults)
 			cout << endl;
 
 		this->SolvingComputationalWork = result.SolvingComputationalWork();
+	}
+
+private:
+	void Clear(list<Direction>& previousDirections)
+	{
+		for (Direction& directionk : previousDirections)
+		{
+			delete directionk.d;
+			delete directionk.Ad;
+		}
+		previousDirections.clear();
+	}
+
+	void DeleteOldest(list<Direction>& previousDirections)
+	{
+		Direction& oldestDirection = previousDirections.front();
+		delete oldestDirection.d;
+		delete oldestDirection.Ad;
+		previousDirections.pop_front();
 	}
 };
