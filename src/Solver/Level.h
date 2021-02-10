@@ -22,7 +22,7 @@ public:
 	bool ExportComponents = false;
 	BigNumber SetupComputationalWork = 0;
 
-	FlexibleConjugateGradient* FCG = nullptr; // used in K-cycle
+	//FlexibleConjugateGradient* FCG = nullptr; // used in K-cycle
 
 protected:
 	SparseMatrix R;
@@ -103,8 +103,8 @@ public:
 			}
 		}
 
-		if (FCG)
-			FCG->Setup(A);
+		//if (FCG)
+			//FCG->Setup(A);
 
 		OnEndSetup();
 	}
@@ -171,8 +171,8 @@ public:
 		delete PostSmoother;
 		if (CoarserLevel)
 			delete CoarserLevel;
-		if (FCG)
-			delete FCG;
+		//if (FCG)
+			//delete FCG;
 	}
 
 protected:

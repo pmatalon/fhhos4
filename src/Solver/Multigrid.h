@@ -116,7 +116,7 @@ public:
 			coarseLevel->UseGalerkinOperator = UseGalerkinOperator;
 			coarseLevel->ExportComponents = ExportComponents;
 
-			// FCG if K-cycle
+			/*// FCG if K-cycle
 			if (this->Cycle == 'K')
 			{
 				FlexibleConjugateGradient* fcg = new FlexibleConjugateGradient();
@@ -134,7 +134,7 @@ public:
 				fcg->MaxIterations = 2;
 				fcg->StoppingCrit = StoppingCriteria::NormalizedResidual;
 				fcg->Tolerance = 0.25;
-			}
+			}*/
 
 			// Link between levels
 			currentLevel->CoarserLevel = coarseLevel;
@@ -162,7 +162,7 @@ public:
 
 		this->SetupCoarseSolver();
 
-		if (this->Cycle == 'K')
+		/*if (this->Cycle == 'K')
 		{
 			Level* level = this->_fineLevel->CoarserLevel;
 			while (level)
@@ -171,7 +171,7 @@ public:
 				mg->CoarseSolver = this->CoarseSolver;
 				level = level->CoarserLevel;
 			}
-		}
+		}*/
 
 		cout << endl;
 		cout << "\tLevels             : " << _nLevels << endl;
@@ -272,7 +272,8 @@ private:
 					MultigridCycle(level->CoarserLevel, rc, ec, result); // exact solution
 				else
 				{
-					level->CoarserLevel->FCG->Solve(rc, ecEqualZero, ec);                    result.AddCost(level->CoarserLevel->FCG->SolvingComputationalWork);
+					//level->CoarserLevel->FCG->Solve(rc, ecEqualZero, ec);                    result.AddCost(level->CoarserLevel->FCG->SolvingComputationalWork);
+					FCGForKCycle(level->CoarserLevel, rc, ec, result);
 				}
 			}
 
@@ -301,6 +302,35 @@ private:
 
 			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPostSmoothing");
+		}
+	}
+
+private:
+	void FCGForKCycle(Level* level, Vector& r, Vector& x, IterationResult& result)
+	{
+		const SparseMatrix& A = *level->OperatorMatrix;
+		double t = 0.25;
+
+		Vector c = Vector::Zero(x.rows());
+		MultigridCycle(level, r, c, result);
+		Vector v = A * c;                                                    result.AddCost(2 * A.nonZeros()); // Cost: 1 sparse MatVec
+		double rho1 = c.dot(v);                                              result.AddCost(2 * c.rows());     // Cost: 1 Dot
+		double alpha1 = c.dot(r);                                            result.AddCost(2 * c.rows());     // Cost: 1 Dot
+
+		double r_norm_old = r.norm();
+		r -= alpha1 / rho1 * v;
+		if (r.norm() <= t * r_norm_old)
+			x = alpha1 / rho1 * c;
+		else
+		{
+			Vector d = Vector::Zero(x.rows());
+			MultigridCycle(level, r, d, result);
+			Vector w = A * d;                                                result.AddCost(2 * A.nonZeros()); // Cost: 1 sparse MatVec
+			double gamma = d.dot(v);                                         result.AddCost(2 * d.rows());     // Cost: 1 Dot
+			double beta = d.dot(w);                                          result.AddCost(2 * d.rows());     // Cost: 1 Dot
+			double alpha2 = d.dot(r);                                        result.AddCost(2 * d.rows());     // Cost: 1 Dot
+			double rho2 = beta - gamma * gamma / rho1;
+			x = (alpha1/rho1 - gamma*alpha2/(rho1*rho2))*c + alpha2 / rho2 * d;
 		}
 	}
 
