@@ -11,8 +11,8 @@ enum class AGMGJob : int
 	Setup_SolveWithoutInitialGuess_MemoryRelease = 0,
 	Setup_SolveWithInitialGuess_MemoryRelease = 10,
 	Setup = 1,
-	SolveWithoutInitialGuess = 202,
-	SolveWithInitialGuess = 212,
+	SolveWithoutInitialGuess = 202, // should be  2 (problem with RowMajor/ColorMajor)
+	SolveWithInitialGuess = 212,    // should be 12 (problem with RowMajor/ColorMajor)
 	MemoryRelease = -1
 };
 
@@ -98,6 +98,8 @@ public:
 		// copy into solution
 		for (int i = 0; i < n; i++)
 			initialGuess[i] = x[i];
+
+		this->IterationCount = iterations;
 
 		delete f, x;
 	}
