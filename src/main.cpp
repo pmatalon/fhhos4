@@ -420,7 +420,9 @@ int main(int argc, char* argv[])
 	cout << "-------------------------- START --------------------------" << endl;
 	cout << "Option -h for help." << endl;
 	Eigen::initParallel();
+#ifdef CGAL_ENABLED
 	CGALWrapper::Configure();
+#endif
 
 	bool defaultCycle = true;
 

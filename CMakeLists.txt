@@ -2,13 +2,15 @@ cmake_minimum_required (VERSION 3.1)
 
 project(dghho)
 
+option(ENABLE_GMSH "Build with the GMSH interface" ON)
+option(ENABLE_AGMG "Build with AGMG" OFF)
+option(ENABLE_CGAL "Build with CGAL" ON)
+
 # enable C++14 (for CGAL)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-option(ENABLE_GMSH "Build with the GMSH interface" ON)
-option(ENABLE_AGMG "Build with AGMG" OFF)
 
 set(EXECUTABLE_OUTPUT_PATH bin/)
 
@@ -37,9 +39,14 @@ endif()
 add_executable(dghho ${OBJS} ${source_files})
 
 # Include CGAL
-set(CGAL_DIR "${CMAKE_SOURCE_DIR}/dependencies/cgal/CGAL-5.1")
-find_package(CGAL)
-target_link_libraries(dghho CGAL::CGAL)
+if(ENABLE_CGAL)
+	set(CGAL_DIR "${CMAKE_SOURCE_DIR}/dependencies/cgal/CGAL-5.1")
+	find_package(CGAL)
+	target_link_libraries(dghho CGAL::CGAL)
+	add_definitions(-DCGAL_ENABLED)
+else()
+	message(STATUS "CGAL disabled. Add -DENABLE_CGAL=ON to enable it.")
+endif()
 
 # Include Eigen
 include_directories(dependencies/eigen/eigen-eigen-b3f3d4950030)

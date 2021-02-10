@@ -1,5 +1,4 @@
 #pragma once
-#include "../../Mesh/2D/PolygonalElement.h"
 #include "../../Mesh/PolyhedralMesh.h"
 using namespace std;
 

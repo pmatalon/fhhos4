@@ -253,7 +253,7 @@
       <AdditionalOptions>
       </AdditionalOptions>
       <Verbose>true</Verbose>
-      <PreprocessorDefinitions>GMSH_ENABLED;ROOT_PATH="/mnt/c/Users/pierr/Documents/Source/Repos/dghho"</PreprocessorDefinitions>
+      <PreprocessorDefinitions>GMSH_ENABLED;CGAL_ENABLED;ROOT_PATH="/mnt/c/Users/pierr/Documents/Source/Repos/dghho"</PreprocessorDefinitions>
       <CppLanguageStandard>c++14</CppLanguageStandard>
       <Optimization>Disabled</Optimization>
     </ClCompile>

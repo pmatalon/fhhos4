@@ -1,4 +1,5 @@
 #pragma once
+#include <iomanip>
 #include "ProgramArguments.h"
 #include "DG/Diffusion_DG.h"
 #include "HHO/Diffusion_HHO.h"
@@ -70,7 +71,9 @@ public:
 			// Unit tests
 			Triangle::Test();
 			Quadrilateral::Test();
+#ifdef CGAL_ENABLED
 			Polygon::Test();
+#endif
 			Tetrahedron::Test();
 			TriangleIn3D::Test();
 
@@ -636,8 +639,10 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase)
 				fineMesh = new Square_TriangularMesh(nx, ny);
 			else if (meshCode.compare("quad") == 0)
 				fineMesh = new Square_QuadrilateralMesh(nx, ny, stretch);
+#ifdef CGAL_ENABLED
 			else if (meshCode.compare("quad-poly") == 0)
 				fineMesh = new Square_QuadrilateralAsPolygonalMesh(nx, ny, stretch);
+#endif
 			else if (meshCode.compare("tri") == 0)
 				Utils::FatalError("The in-house mesher does not build unstructured meshes. Use '-mesher gmsh' or '-mesh stri' instead.");
 			else

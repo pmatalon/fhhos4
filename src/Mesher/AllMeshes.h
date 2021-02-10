@@ -5,7 +5,9 @@
 #include "InHouse/Square_CartesianPolygonalMesh.h"
 #include "InHouse/Square_TriangularMesh.h"
 #include "InHouse/Square_QuadrilateralMesh.h"
+#ifdef CGAL_ENABLED
 #include "InHouse/Square_QuadrilateralAsPolygonalMesh.h"
+#endif // CGAL_ENABLED
 
 #include "InHouse/Cube_CartesianMesh.h"
 #include "InHouse/Cube_CartesianTetrahedralMesh.h"

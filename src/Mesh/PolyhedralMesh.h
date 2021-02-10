@@ -5,7 +5,9 @@
 #include "Mesh.h"
 #include "2D/TriangularElement.h"
 #include "2D/QuadrilateralElement.h"
+#ifdef CGAL_ENABLED
 #include "2D/PolygonalElement.h"
+#endif // CGAL_ENABLED
 #include "3D/TetrahedralElement.h"
 #include "3D/ParallelepipedElement.h"
 #include "Agglo.h"
@@ -125,6 +127,7 @@ public:
 protected:
 	virtual void FinalizeCoarsening() override
 	{
+#ifdef CGAL_ENABLED
 		// Compute triangulation and bounding box of the polygons
 		ElementParallelLoop<Dim> parallelLoop(this->CoarseMesh->Elements);
 		parallelLoop.Execute([](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
@@ -137,6 +140,7 @@ protected:
 					p->ComputeBoundingBox();
 				}
 			});
+#endif
 
 		Mesh<Dim>::FinalizeCoarsening();
 	}
@@ -2055,6 +2059,7 @@ private:
 	}
 
 private:
+#ifdef CGAL_ENABLED
 	static CGAL::Polygon_2<exactKernel> ConvertToCGALPolygon(Element<Dim>* e)
 	{
 		assert(Dim == 2);
@@ -2066,6 +2071,7 @@ private:
 			cgalPoly = CGALWrapper::CreatePolygon<exactKernel>(e->Shape()->Vertices());
 		return cgalPoly;
 	}
+#endif
 
 public:
 	virtual void SanityCheck() override
@@ -2125,9 +2131,13 @@ public:
 template<>
 Element<2>* PolyhedralMesh<2>::CreatePolyhedron(vector<Vertex*> vertices)
 {
+#ifdef CGAL_ENABLED
 	BigNumber elementNumber = this->Elements.size();
 	PolygonalElement* macroElement = new PolygonalElement(elementNumber, vertices, false);
 	return macroElement;
+#else
+	Utils::FatalError("CGAL is disabled. To use polygonal elements, recompile with the option -DENABLE_CGAL=ON");
+#endif
 }
 
 template<>
@@ -2139,8 +2149,12 @@ Element<3>* PolyhedralMesh<3>::CreatePolyhedron(vector<Vertex*> vertices)
 template<>
 Element<2>* PolyhedralMesh<2>::CreateMacroElement(Element<2>* e1, Element<2>* e2, const vector<Face<2>*>& facesToRemove)
 {
+#ifdef CGAL_ENABLED
 	PolygonalElement* macroElement = new PolygonalElement(0, e1, e2, facesToRemove, false);
 	return macroElement;
+#else
+	Utils::FatalError("CGAL is disabled. To use polygonal elements, recompile with the option -DENABLE_CGAL=ON");
+#endif
 }
 
 template<>
@@ -2169,6 +2183,7 @@ Face<3>* PolyhedralMesh<3>::CreateMacroFace(Face<3>* f1, Face<3>* f2, Vertex* ve
 template<>
 vector<PhysicalShape<2>*> PolyhedralMesh<2>::Intersection(Element<2>* e1, Element<2>* e2)
 {
+#ifdef CGAL_ENABLED
 	CGAL::Polygon_2<exactKernel> cgalPoly1 = ConvertToCGALPolygon(e1);
 	CGAL::Polygon_2<exactKernel> cgalPoly2 = ConvertToCGALPolygon(e2);
 
@@ -2178,6 +2193,9 @@ vector<PhysicalShape<2>*> PolyhedralMesh<2>::Intersection(Element<2>* e1, Elemen
 	for (const CGAL::Polygon_2<exactKernel>& p : inters)
 		intersectionPolygons.push_back(new Polygon(p, true));
 	return intersectionPolygons;
+#else
+	Utils::FatalError("CGAL is disabled. To use polygonal elements, recompile with the option -DENABLE_CGAL=ON");
+#endif
 }
 
 template <>
