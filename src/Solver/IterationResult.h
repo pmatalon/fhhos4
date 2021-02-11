@@ -15,8 +15,8 @@ private:
 	double _asymptoticConvRate = 0;
 	double _tolerance = 1e-8;
 
-	BigNumber _iterationComputationalWork = 0;
-	BigNumber _solvingComputationalWork = 0;
+	size_t _iterationComputationalWork = 0;
+	size_t _solvingComputationalWork = 0;
 	Timer _solvingTimer;
 	Vector e;
 public:
@@ -102,7 +102,7 @@ public:
 		this->RelativeErrorNorm = exactSolNorm > 0 ? e.norm() / _exactSolution.norm() : e.norm();
 	}
 
-	void AddCost(BigNumber cost)
+	void AddCost(size_t cost)
 	{
 		_iterationComputationalWork += cost;
 		_solvingComputationalWork += cost;

@@ -5,8 +5,8 @@ using namespace std;
 class Solver
 {
 public:
-	BigNumber SetupComputationalWork = 0;
-	BigNumber SolvingComputationalWork = 0;
+	size_t SetupComputationalWork = 0;
+	size_t SolvingComputationalWork = 0;
 
 	Solver() { }
 
