@@ -7,10 +7,13 @@ struct ElementAggregate;
 struct AlgebraicElement
 {
 	BigNumber Number;
+	mutex Mutex;
 	vector<pair<AlgebraicElement*, double>> Neighbours;
 	vector<AlgebraicElement*> StrongNeighbours; // sorted by descending strength (the strongest neighbour is first)
 	int NElementsIAmStrongNeighbourOf = 0;
 	ElementAggregate* CoarseElement = nullptr;
+	ElementAggregate* FinalAggregate = nullptr;
+	BigNumber FinalAggregateNumber;
 };
 
 struct ElementAggregate
@@ -20,6 +23,9 @@ struct ElementAggregate
 
 	ElementAggregate(BigNumber number)
 		: Number(number)
+	{}
+
+	ElementAggregate()
 	{}
 };
 
@@ -33,6 +39,8 @@ private:
 public:
 	vector<AlgebraicElement> _elements;
 	vector<ElementAggregate> _coarseElements;
+
+	AlgebraicMesh* FinerMesh = nullptr;
 
 public:
 	AlgebraicMesh(int blockSize, double strongCouplingThreshold)
@@ -92,7 +100,9 @@ public:
 					if (IsStronglyCoupled(elem, coupling))
 					{
 						elem.StrongNeighbours.push_back(neighbour);
+						neighbour->Mutex.lock();
 						neighbour->NElementsIAmStrongNeighbourOf++;
+						neighbour->Mutex.unlock();
 					}
 					else
 						break;
@@ -107,8 +117,9 @@ public:
 		int nSingletons = 0;
 		int nPairs = 0;
 
+		BigNumber remainingElements = _elements.size();
 		AlgebraicElement* nextElement = &_elements[0];
-		/*int min = _elements[0].NElementsIAmStrongNeighbourOf;
+		int min = _elements[0].NElementsIAmStrongNeighbourOf;
 		for (AlgebraicElement& e : _elements)
 		{
 			if (e.NElementsIAmStrongNeighbourOf < min)
@@ -116,7 +127,7 @@ public:
 				nextElement = &e;
 				min = e.NElementsIAmStrongNeighbourOf;
 			}
-		}*/
+		}
 
 		// Element aggregation
 		while (nextElement)
@@ -133,30 +144,45 @@ public:
 
 			// Add elem
 			AddToAggregate(*elem, *aggregate);
+			remainingElements--;
 
 			AlgebraicElement* neighbour = StrongestAvailableNeighbour(*elem);
 			if (neighbour)
 			{
 				// Add neighbour?
-				bool strongConnectionIsReciprocal = find(neighbour->StrongNeighbours.begin(), neighbour->StrongNeighbours.end(), elem) != neighbour->StrongNeighbours.end();
-				if (strongConnectionIsReciprocal)
-				{
+				//bool strongConnectionIsReciprocal = find(neighbour->StrongNeighbours.begin(), neighbour->StrongNeighbours.end(), elem) != neighbour->StrongNeighbours.end();
+				//if (strongConnectionIsReciprocal)
+				//{
 					AddToAggregate(*neighbour, *aggregate);
+					remainingElements--;
 					nPairs++;
-				}
-				else
-					nSingletons++;
+				//}
+				//else
+					//nSingletons++;
 			}
 			else
 				nSingletons++;
 
 			nextElement = NextElementInTheNeighbourhood(*aggregate);
 
-			if (!nextElement)
+			if (!nextElement && remainingElements > 0)
 			{
-				auto it = find_if(_elements.begin(), _elements.end(), [](const AlgebraicElement& e) { return !e.CoarseElement; });
-				if (it != _elements.end())
-					nextElement = &*it;
+				// Browse the previous aggregates in the reverse order to find the next element
+				BigNumber i = aggregate->Number - 1;
+				while (!nextElement && i >= 0)
+				//for (BigNumber i = aggregate->Number - 1; i >= 0; i--)
+				{
+					const ElementAggregate& previousAgg = _coarseElements[i];
+					nextElement = NextElementInTheNeighbourhood(previousAgg);
+					i--;
+				}
+
+				if (!nextElement)
+				{
+					auto it = find_if(_elements.begin(), _elements.end(), [](const AlgebraicElement& e) { return !e.CoarseElement; });
+					if (it != _elements.end())
+						nextElement = &*it;
+				}
 				/*min = 100000;
 				for (AlgebraicElement& e : _elements)
 				{
@@ -184,6 +210,25 @@ private:
 		if (it != e.StrongNeighbours.end())
 			return *it;
 		return nullptr;
+		/*double bestCoupling = e.Neighbours[0].second;
+
+		for (int i = 0; i< e.Neighbours.size(); i++)
+		{
+			const pair<AlgebraicElement*, double>& p = e.Neighbours[i];
+			AlgebraicElement* n = p.first;
+			if (n->CoarseElement)
+				continue;
+
+			if (i == 0)
+				return n;
+
+			double coupling = p.second;
+			if (abs(coupling - bestCoupling) < Utils::Eps * bestCoupling)
+				return n;
+			else
+				return nullptr;
+		}
+		return nullptr;*/
 	}
 
 	double CouplingValue(const AlgebraicElement& e1, const AlgebraicElement& e2)
@@ -226,8 +271,9 @@ private:
 		int min = 1000000000;
 		for (AlgebraicElement* e : aggregate.FineElements)
 		{
-			for (AlgebraicElement* n : e->StrongNeighbours)
+			for (pair<AlgebraicElement*, double>& p : e->Neighbours)
 			{
+				AlgebraicElement* n = p.first;
 				if (!n->CoarseElement && n->NElementsIAmStrongNeighbourOf < min)
 				{
 					nextElement = n;
