@@ -8,6 +8,7 @@ struct HybridElementAggregate;
 struct HybridAlgebraicElement
 {
 	BigNumber Number;
+	mutex Mutex;
 	vector<HybridAlgebraicFace*> Faces;
 	vector<pair<HybridAlgebraicElement*, double>> Neighbours;
 	vector<HybridAlgebraicElement*> StrongNeighbours; // sorted by descending strength (the strongest neighbour is first)
@@ -181,7 +182,9 @@ public:
 						if (maxKappa / minKappa < 10)
 						{
 							elem.StrongNeighbours.push_back(neighbour);
+							neighbour->Mutex.lock();
 							neighbour->NElementsIAmStrongNeighbourOf++;
+							neighbour->Mutex.unlock();
 						}
 					}
 					else
