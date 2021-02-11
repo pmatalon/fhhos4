@@ -1,6 +1,6 @@
 #pragma once
 #include "../Utils/Utils.h"
-#include <mutex>
+#include "AlgebraicMesh.h"
 using namespace std;
 
 struct HybridAlgebraicFace;
@@ -192,7 +192,8 @@ public:
 
 	void PairWiseAggregate(CoarseningStrategy coarseningStgy, bool& coarsestPossibleMeshReached)
 	{
-		PairWiseElementAggregate(coarsestPossibleMeshReached);
+		PairwiseAggregation<HybridAlgebraicElement, HybridElementAggregate> aggregProcess;
+		_coarseElements = aggregProcess.Perform(_elements, coarsestPossibleMeshReached);
 		
 		// Removal of faces shared by elements in the same aggregate.
 		// Determination of the faces of the aggregates.
@@ -310,70 +311,9 @@ public:
 	}
 
 private:
-	void PairWiseElementAggregate(bool& coarsestPossibleMeshReached)
-	{
-		_coarseElements.reserve(_elements.size()); // we need to be sure that the vector won't be resized
-
-		int nSingletons = 0;
-		int nPairs = 0;
-
-		HybridAlgebraicElement* nextElement = &_elements[0];
-
-		// Element aggregation
-		while (nextElement)
-		{
-			HybridAlgebraicElement* elem = nextElement;
-			nextElement = nullptr;
-			int currentMin = elem->NElementsIAmStrongNeighbourOf;
-
-			assert(!elem->CoarseElement);
-
-			// New aggregate
-			_coarseElements.emplace_back(_coarseElements.size());
-			HybridElementAggregate* aggregate = &_coarseElements.back();
-
-			// Add elem
-			AddToAggregate(*elem, *aggregate);
-
-			HybridAlgebraicElement* neighbour = StrongestAvailableNeighbour(*elem);
-			if (neighbour)
-			{
-				// Add neighbour?
-				bool strongConnectionIsReciprocal = find(neighbour->StrongNeighbours.begin(), neighbour->StrongNeighbours.end(), elem) != neighbour->StrongNeighbours.end();
-				if (strongConnectionIsReciprocal)
-				{
-					AddToAggregate(*neighbour, *aggregate);
-					nPairs++;
-				}
-				else
-					nSingletons++;
-			}
-			else
-				nSingletons++;
-
-			nextElement = NextElementInTheNeighbourhood(*aggregate);
-
-			if (!nextElement)
-			{
-				auto it = find_if(_elements.begin(), _elements.end(), [](const HybridAlgebraicElement& e) { return !e.CoarseElement; });
-				if (it != _elements.end())
-					nextElement = &*it;
-			}
-		}
-		//cout << "Singletons: " << nSingletons << ", pairs: " << nPairs << endl;
-	}
-
 	static bool CompareNElementsIAmStrongNeighbourOf(HybridAlgebraicElement* e1, HybridAlgebraicElement* e2)
 	{
 		return e1->NElementsIAmStrongNeighbourOf < e2->NElementsIAmStrongNeighbourOf; // Sort by ascending number
-	}
-
-	HybridAlgebraicElement* StrongestAvailableNeighbour(const HybridAlgebraicElement& e)
-	{
-		auto it = find_if(e.StrongNeighbours.begin(), e.StrongNeighbours.end(), [](HybridAlgebraicElement* n) { return !n->CoarseElement; });
-		if (it != e.StrongNeighbours.end())
-			return *it;
-		return nullptr;
 	}
 
 	double CouplingValue(const HybridAlgebraicElement& e1, const HybridAlgebraicElement& e2, const HybridAlgebraicFace& f)
@@ -445,35 +385,5 @@ private:
 		DenseMatrix couplingBlock = A_F_F->block(f1.Number*_faceBlockSize, f2.Number*_faceBlockSize, _faceBlockSize, _faceBlockSize);
 		double coupling = couplingBlock.trace();
 		return coupling;
-	}
-
-	void AddToAggregate(HybridAlgebraicElement& e, HybridElementAggregate& aggregate)
-	{
-		aggregate.FineElements.push_back(&e);
-		e.CoarseElement = &aggregate;
-
-		for (HybridAlgebraicElement* n : e.StrongNeighbours)
-		{
-			if (!n->CoarseElement)
-				n->NElementsIAmStrongNeighbourOf--;
-		}
-	}
-
-	HybridAlgebraicElement* NextElementInTheNeighbourhood(const HybridElementAggregate& aggregate)
-	{
-		HybridAlgebraicElement* nextElement = nullptr;
-		int min = 1000000000;
-		for (HybridAlgebraicElement* e : aggregate.FineElements)
-		{
-			for (HybridAlgebraicElement* n : e->StrongNeighbours)
-			{
-				if (!n->CoarseElement && n->NElementsIAmStrongNeighbourOf < min)
-				{
-					nextElement = n;
-					min = n->NElementsIAmStrongNeighbourOf;
-				}
-			}
-		}
-		return nextElement;
 	}
 };

@@ -1,5 +1,6 @@
 #pragma once
 #include "../Utils/Utils.h"
+#include "PairwiseAggregation.h"
 #include <mutex>
 using namespace std;
 
@@ -112,123 +113,14 @@ public:
 
 	void PairWiseAggregate(bool& coarsestPossibleMeshReached)
 	{
-		_coarseElements.reserve(_elements.size()); // we need to be sure that the vector won't be resized
-
-		int nSingletons = 0;
-		int nPairs = 0;
-
-		BigNumber remainingElements = _elements.size();
-		AlgebraicElement* nextElement = &_elements[0];
-		int min = _elements[0].NElementsIAmStrongNeighbourOf;
-		for (AlgebraicElement& e : _elements)
-		{
-			if (e.NElementsIAmStrongNeighbourOf < min)
-			{
-				nextElement = &e;
-				min = e.NElementsIAmStrongNeighbourOf;
-			}
-		}
-
-		// Element aggregation
-		while (nextElement)
-		{
-			AlgebraicElement* elem = nextElement;
-			nextElement = nullptr;
-			int currentMin = elem->NElementsIAmStrongNeighbourOf;
-
-			assert(!elem->CoarseElement);
-
-			// New aggregate
-			_coarseElements.emplace_back(_coarseElements.size());
-			ElementAggregate* aggregate = &_coarseElements.back();
-
-			// Add elem
-			AddToAggregate(*elem, *aggregate);
-			remainingElements--;
-
-			AlgebraicElement* neighbour = StrongestAvailableNeighbour(*elem);
-			if (neighbour)
-			{
-				// Add neighbour?
-				//bool strongConnectionIsReciprocal = find(neighbour->StrongNeighbours.begin(), neighbour->StrongNeighbours.end(), elem) != neighbour->StrongNeighbours.end();
-				//if (strongConnectionIsReciprocal)
-				//{
-					AddToAggregate(*neighbour, *aggregate);
-					remainingElements--;
-					nPairs++;
-				//}
-				//else
-					//nSingletons++;
-			}
-			else
-				nSingletons++;
-
-			nextElement = NextElementInTheNeighbourhood(*aggregate);
-
-			if (!nextElement && remainingElements > 0)
-			{
-				// Browse the previous aggregates in the reverse order to find the next element
-				BigNumber i = aggregate->Number - 1;
-				while (!nextElement && i >= 0)
-				//for (BigNumber i = aggregate->Number - 1; i >= 0; i--)
-				{
-					const ElementAggregate& previousAgg = _coarseElements[i];
-					nextElement = NextElementInTheNeighbourhood(previousAgg);
-					i--;
-				}
-
-				if (!nextElement)
-				{
-					auto it = find_if(_elements.begin(), _elements.end(), [](const AlgebraicElement& e) { return !e.CoarseElement; });
-					if (it != _elements.end())
-						nextElement = &*it;
-				}
-				/*min = 100000;
-				for (AlgebraicElement& e : _elements)
-				{
-					if (!e.CoarseElement && e.NElementsIAmStrongNeighbourOf < min)
-					{
-						nextElement = &e;
-						min = e.NElementsIAmStrongNeighbourOf;
-					}
-				}*/
-			}
-		}
-
-		//cout << "Singletons: " << nSingletons << ", pairs: " << nPairs << endl;
+		PairwiseAggregation<AlgebraicElement, ElementAggregate> aggregProcess;
+		_coarseElements = aggregProcess.Perform(_elements, coarsestPossibleMeshReached);
 	}
 
 private:
 	static bool CompareNElementsIAmStrongNeighbourOf(AlgebraicElement* e1, AlgebraicElement* e2)
 	{
 		return e1->NElementsIAmStrongNeighbourOf < e2->NElementsIAmStrongNeighbourOf; // Sort by ascending number
-	}
-
-	AlgebraicElement* StrongestAvailableNeighbour(const AlgebraicElement& e)
-	{
-		auto it = find_if(e.StrongNeighbours.begin(), e.StrongNeighbours.end(), [](AlgebraicElement* n) { return !n->CoarseElement; });
-		if (it != e.StrongNeighbours.end())
-			return *it;
-		return nullptr;
-		/*double bestCoupling = e.Neighbours[0].second;
-
-		for (int i = 0; i< e.Neighbours.size(); i++)
-		{
-			const pair<AlgebraicElement*, double>& p = e.Neighbours[i];
-			AlgebraicElement* n = p.first;
-			if (n->CoarseElement)
-				continue;
-
-			if (i == 0)
-				return n;
-
-			double coupling = p.second;
-			if (abs(coupling - bestCoupling) < Utils::Eps * bestCoupling)
-				return n;
-			else
-				return nullptr;
-		}
-		return nullptr;*/
 	}
 
 	double CouplingValue(const AlgebraicElement& e1, const AlgebraicElement& e2)
@@ -251,36 +143,5 @@ private:
 	bool IsStronglyCoupled(const AlgebraicElement& e, double coupling)
 	{
 		return coupling < 0 && coupling < _strongCouplingThreshold * e.Neighbours[0].second;
-	}
-
-	void AddToAggregate(AlgebraicElement& e, ElementAggregate& aggregate)
-	{
-		aggregate.FineElements.push_back(&e);
-		e.CoarseElement = &aggregate;
-
-		for (AlgebraicElement* n : e.StrongNeighbours)
-		{
-			if (!n->CoarseElement)
-				n->NElementsIAmStrongNeighbourOf--;
-		}
-	}
-
-	AlgebraicElement* NextElementInTheNeighbourhood(const ElementAggregate& aggregate)
-	{
-		AlgebraicElement* nextElement = nullptr;
-		int min = 1000000000;
-		for (AlgebraicElement* e : aggregate.FineElements)
-		{
-			for (pair<AlgebraicElement*, double>& p : e->Neighbours)
-			{
-				AlgebraicElement* n = p.first;
-				if (!n->CoarseElement && n->NElementsIAmStrongNeighbourOf < min)
-				{
-					nextElement = n;
-					min = n->NElementsIAmStrongNeighbourOf;
-				}
-			}
-		}
-		return nextElement;
 	}
 };
