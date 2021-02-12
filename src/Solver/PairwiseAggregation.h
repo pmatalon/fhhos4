@@ -15,25 +15,13 @@ public:
 		int nPairs = 0;
 
 		BigNumber remainingElements = elements.size();
-		E* nextElement = &elements[0];
-		int min = elements[0].NElementsIAmStrongNeighbourOf;
-		for (E& e : elements)
-		{
-			if (e.NElementsIAmStrongNeighbourOf < min)
-			{
-				nextElement = &e;
-				min = e.NElementsIAmStrongNeighbourOf;
-			}
-		}
+		vector<E*> orderedList = OrderElementsByPriority(elements);
 
 		// Element aggregation
-		while (nextElement)
+		for (E* elem : orderedList)
 		{
-			E* elem = nextElement;
-			nextElement = nullptr;
-			int currentMin = elem->NElementsIAmStrongNeighbourOf;
-
-			assert(!elem->CoarseElement);
+			if (elem->CoarseElement)
+				continue;
 
 			// New aggregate
 			aggregates.emplace_back(aggregates.size());
@@ -46,62 +34,142 @@ public:
 			E* neighbour = StrongestAvailableNeighbour(*elem);
 			if (neighbour)
 			{
-				// Add neighbour?
-				//bool strongConnectionIsReciprocal = find(neighbour->StrongNeighbours.begin(), neighbour->StrongNeighbours.end(), elem) != neighbour->StrongNeighbours.end();
-				//if (strongConnectionIsReciprocal)
-				//{
 				AddToAggregate(*neighbour, *aggregate);
 				remainingElements--;
 				nPairs++;
-				//}
-				//else
-					//nSingletons++;
 			}
 			else
 				nSingletons++;
 
-			nextElement = NextElementInTheNeighbourhood(*aggregate);
-
-			if (!nextElement && remainingElements > 0)
-			{
-				// Browse the previous aggregates in the reverse order to find the next element
-				BigNumber i = aggregate->Number - 1;
-				while (!nextElement && i >= 0)
-					//for (BigNumber i = aggregate->Number - 1; i >= 0; i--)
-				{
-					const A& previousAgg = aggregates[i];
-					nextElement = NextElementInTheNeighbourhood(previousAgg);
-					i--;
-				}
-
-				if (!nextElement)
-				{
-					auto it = find_if(elements.begin(), elements.end(), [](const E& e) { return !e.CoarseElement; });
-					if (it != elements.end())
-						nextElement = &*it;
-				}
-				/*min = 100000;
-				for (E& e : elements)
-				{
-					if (!e.CoarseElement && e.NElementsIAmStrongNeighbourOf < min)
-					{
-						nextElement = &e;
-						min = e.NElementsIAmStrongNeighbourOf;
-					}
-				}*/
-			}
+			if (remainingElements == 0)
+				break;
 		}
+
+		double coarseningRatio = (double)elements.size() / (double)aggregates.size();
+		if (coarseningRatio <= 1.01)
+			coarsestPossibleMeshReached = true;
 
 		//cout << "Singletons: " << nSingletons << ", pairs: " << nPairs << endl;
 		return aggregates;
 	}
 private:
+	vector<E*> OrderElementsByPriority(vector<E>& elements)
+	{
+		vector<E*> aggregationOrdering(elements.size());
+		BigNumber orderNumber = 0;
+
+		vector<bool> isNumbered(elements.size());
+		for (BigNumber i = 0; i < elements.size(); ++i)
+			isNumbered[i] = false;
+
+		// Find one element that has the minimum value of NElementsIAmStrongNeighbourOf
+		E* startingElement = &elements[0];
+		int min = elements[0].NElementsIAmStrongNeighbourOf;
+		for (E& e : elements)
+		{
+			if (e.NElementsIAmStrongNeighbourOf < min)
+			{
+				startingElement = &e;
+				min = e.NElementsIAmStrongNeighbourOf;
+			}
+		}
+
+		// Number this element
+		aggregationOrdering[orderNumber++] = startingElement;
+		isNumbered[startingElement->Number] = true;
+
+		// Number the neighbours
+		BigNumber currentElement = 0;
+		for (BigNumber i = 0; i < elements.size(); i++)
+			NumberNeighbours(aggregationOrdering[i], aggregationOrdering, isNumbered, orderNumber);
+		assert(orderNumber == elements.size());
+		
+		return aggregationOrdering;
+	}
+
+	void NumberNeighbours(E* e, vector<E*>& aggregationOrdering, vector<bool>& isNumbered, BigNumber& orderNumber)
+	{
+		// Get unnumbered neighbours
+		vector<E*> unnumberedNeighbours;
+		for (pair<E*, double>& p : e->Neighbours)
+		{
+			if (!isNumbered[p.first->Number])
+				unnumberedNeighbours.push_back(p.first);
+		}
+		if (unnumberedNeighbours.empty())
+			return;
+
+		// Sort neighbours by ascending NElementsIAmStrongNeighbourOf
+		sort(unnumberedNeighbours.begin(), unnumberedNeighbours.end(), [](E* n1, E* n2) { return n1->NElementsIAmStrongNeighbourOf < n2->NElementsIAmStrongNeighbourOf; });
+		
+		// Number neighbours
+		for (E* n : unnumberedNeighbours)
+		{
+			aggregationOrdering[orderNumber++] = n;
+			isNumbered[n->Number] = true;
+		}
+	}
+
 	E* StrongestAvailableNeighbour(const E& e)
 	{
-		auto it = find_if(e.StrongNeighbours.begin(), e.StrongNeighbours.end(), [](E* n) { return !n->CoarseElement; });
+		// !!!!!! Be very careful in changing this !!!!!!
+		// A bad choice of neighbour may result, after several aggregation pass, at elements that have only one neighbour,
+		// which leads to a very slow coarsening.
+		double min = 100000000;
+		E* chosenOne = nullptr;
+		for (E* n : e.StrongNeighbours)
+		{
+			if (!n->CoarseElement && n->NElementsIAmStrongNeighbourOf < min)
+			{
+				chosenOne = n;
+				min = n->NElementsIAmStrongNeighbourOf;
+			}
+		}
+		return chosenOne;
+
+		/*auto it = find_if(e.StrongNeighbours.begin(), e.StrongNeighbours.end(), [](E* n) { return !n->CoarseElement; });
 		if (it != e.StrongNeighbours.end())
 			return *it;
-		return nullptr;
+		return nullptr;*/
+
+		/*E* firstAvailableStrongNeighbour = nullptr;
+		auto it = find_if(e.StrongNeighbours.begin(), e.StrongNeighbours.end(), [](E* n) { return !n->CoarseElement; });
+		if (it != e.StrongNeighbours.end())
+			firstAvailableStrongNeighbour = *it;
+		else
+			return nullptr;
+
+		vector<E*> candidates;
+		candidates.push_back(firstAvailableStrongNeighbour);
+		double bestAvailableCoupling = 1;
+		for (int i = 0; i < e.Neighbours.size(); i++)
+		{
+			const pair<E*, double>& p = e.Neighbours[i];
+			E* n = p.first;
+			if (n == firstAvailableStrongNeighbour)
+			{
+				bestAvailableCoupling = p.second;
+				continue;
+			}
+			if (bestAvailableCoupling != 1 && !n->CoarseElement)
+			{
+				if (abs(p.second - bestAvailableCoupling) < Utils::Eps * bestAvailableCoupling)
+					candidates.push_back(n);
+			}
+		}
+
+		double min = firstAvailableStrongNeighbour->NElementsIAmStrongNeighbourOf;
+		E* chosenOne = firstAvailableStrongNeighbour;
+		for (E* n : candidates)
+		{
+			if (n->NElementsIAmStrongNeighbourOf < min)
+			{
+				chosenOne = n;
+				min = n->NElementsIAmStrongNeighbourOf;
+			}
+		}
+		return chosenOne;*/
+
 		/*double bestCoupling = e.Neighbours[0].second;
 
 		for (int i = 0; i< e.Neighbours.size(); i++)
@@ -133,24 +201,5 @@ private:
 			if (!n->CoarseElement)
 				n->NElementsIAmStrongNeighbourOf--;
 		}
-	}
-
-	E* NextElementInTheNeighbourhood(const A& aggregate)
-	{
-		E* nextElement = nullptr;
-		int min = 1000000000;
-		for (E* e : aggregate.FineElements)
-		{
-			for (pair<E*, double>& p : e->Neighbours)
-			{
-				E* n = p.first;
-				if (!n->CoarseElement && n->NElementsIAmStrongNeighbourOf < min)
-				{
-					nextElement = n;
-					min = n->NElementsIAmStrongNeighbourOf;
-				}
-			}
-		}
-		return nextElement;
 	}
 };
