@@ -11,6 +11,7 @@ private:
 	double _strongCouplingThreshold;
 	AlgebraicMesh _mesh;
 	vector<ElementAggregate> _aggregates;
+	vector<vector<BigNumber>> _numberAggregates;
 	double _restrictionCost = 0;
 public:
 	SparseMatrix Ac;
@@ -27,13 +28,19 @@ public:
 	{ }
 
 	void ExportMatrix(const SparseMatrix& M, string suffix, int levelNumber) override
-	{ 
-		Eigen::saveMarket(M, Utils::ProgramArgs.OutputDirectory + "/" + suffix + ".dat");
+	{
+		string file = Utils::ProgramArgs.OutputDirectory + "/" + suffix;
+		if (levelNumber > 0)
+			file += "_" + to_string(levelNumber);
+		file += ".dat";
+		Eigen::saveMarket(M, file);
 	}
 
 	void CoarsenMesh(CoarseningStrategy coarseningStgy, int coarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override
 	{
-		cout << "\tDouble pairwise aggregation" << endl;
+		cout << "\tBuild algebraic mesh" << endl;
+
+		//ExportMatrix(*this->OperatorMatrix, "A", 0);
 
 		_mesh.Build(*this->OperatorMatrix);
 
@@ -41,12 +48,14 @@ public:
 		// First pairwise aggregation //
 		//----------------------------//
 
+		cout << "\tPairwise aggregation 1" << endl;
 		_mesh.PairWiseAggregate(coarsestPossibleMeshReached);
 		if (coarsestPossibleMeshReached)
 			return;
 
-		// Cell-prolongation operator with only one 1 coefficient per row
-		//SparseMatrix Q_T1 = BuildQ_T(_mesh);
+		/*// Cell-prolongation operator with only one 1 coefficient per row
+		SparseMatrix Q_T1 = BuildQ_T(_mesh);
+		SparseMatrix A1_old = Q_T1.transpose()* *this->OperatorMatrix * Q_T1;*/
 
 		// Intermediate coarse operator
 		SparseMatrix A1 = GalerkinOperator(*this->OperatorMatrix, _mesh);
@@ -55,15 +64,21 @@ public:
 		// Second pairwise aggregation //
 		//-----------------------------//
 
+		cout << "\tBuild intermediary coarse mesh" << endl;
+
 		AlgebraicMesh coarseMesh(_blockSize, _strongCouplingThreshold);
 		coarseMesh.FinerMesh = &_mesh;
 		coarseMesh.Build(A1);
+
+		cout << "\tPairwise aggregation 2" << endl;
+
 		coarseMesh.PairWiseAggregate(coarsestPossibleMeshReached);
 		if (coarsestPossibleMeshReached)
 			return;
 
-		//SparseMatrix Q_T2 = BuildQ_T(coarseMesh);
-		//this->P = Q_T1 * Q_T2;
+		/*SparseMatrix Q_T2 = BuildQ_T(coarseMesh);
+		SparseMatrix Ac_old = Q_T2.transpose()* A1_old * Q_T2;
+		//this->P = Q_T1 * Q_T2;*/
 
 		this->Ac = GalerkinOperator(A1, coarseMesh);
 
@@ -72,16 +87,22 @@ public:
 		//-----------------------------------//
 
 		_aggregates = vector<ElementAggregate>(coarseMesh._coarseElements.size());
+		_numberAggregates = vector<vector<BigNumber>>(coarseMesh._coarseElements.size());
 		NumberParallelLoop<EmptyResultChunk> parallelLoop(coarseMesh._coarseElements.size());
 		parallelLoop.Execute([this, &coarseMesh](BigNumber finalAggregNumber)
 			{
 				ElementAggregate& finalAggreg = _aggregates[finalAggregNumber];
+				vector<BigNumber>& finalNumberAggreg = _numberAggregates[finalAggregNumber];
 				finalAggreg.Number = finalAggregNumber;
 				finalAggreg.FineElements = GetFineElements(coarseMesh._coarseElements[finalAggregNumber], coarseMesh);
 				for (AlgebraicElement* e : finalAggreg.FineElements)
+				{
 					e->FinalAggregate = &finalAggreg;
+					e->FinalAggregateNumber = finalAggreg.Number;
+					finalNumberAggreg.push_back(e->Number);
+				}
 			});
-
+		
 		_restrictionCost = 0;
 		for (ElementAggregate& a : _aggregates)
 			_restrictionCost += a.FineElements.size();
@@ -159,8 +180,11 @@ public:
 		if (_blockSize == 1)
 		{
 			Vector fineV(_mesh._elements.size());
-			for (AlgebraicElement& e : _mesh._elements)
+			/*for (AlgebraicElement& e : _mesh._elements)
 				fineV[e.Number] = coarseV[e.FinalAggregate->Number];
+			return fineV;*/
+			for (AlgebraicElement& e : _mesh._elements)
+				fineV[e.Number] = coarseV[e.FinalAggregateNumber];
 			return fineV;
 		}
 		else
@@ -181,23 +205,33 @@ public:
 	{
 		if (_blockSize == 1)
 		{
+			/*Vector coarseV(_aggregates.size());
+			for (ElementAggregate& a : _aggregates)
+			{
+				coarseV[a.Number] = 0;
+				for (AlgebraicElement* e : a.FineElements)
+					coarseV[a.Number] += fineV[e->Number];
+			}
+			return coarseV;*/
+			Vector coarseV(_numberAggregates.size());
+			for (BigNumber i = 0; i < _numberAggregates.size(); i++)
+			{
+				vector<BigNumber> fineElements = _numberAggregates[i];
+				coarseV[i] = 0;
+				for (BigNumber fineI : fineElements)
+					coarseV[i] += fineV[fineI];
+			}
+			return coarseV;
+
+		}
+		else
+		{
 			Vector coarseV = Vector::Zero(_aggregates.size() * _blockSize);
 			for (ElementAggregate& a : _aggregates)
 			{
 				coarseV[a.Number * _blockSize] = 0;
 				for (AlgebraicElement* e : a.FineElements)
 					coarseV[a.Number * _blockSize] += fineV[e->Number * _blockSize];
-			}
-			return coarseV;
-		}
-		else
-		{
-			Vector coarseV(_aggregates.size());
-			for (ElementAggregate& a : _aggregates)
-			{
-				coarseV[a.Number] = 0;
-				for (AlgebraicElement* e : a.FineElements)
-					coarseV[a.Number] += fineV[e->Number];
 			}
 			return coarseV;
 		}
