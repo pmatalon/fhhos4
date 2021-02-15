@@ -6,6 +6,8 @@ option(ENABLE_GMSH "Build with the GMSH interface" ON)
 option(ENABLE_AGMG "Build with AGMG" OFF)
 option(ENABLE_CGAL "Build with CGAL" ON)
 
+option(SMALL_INDEX "Use type 'int' for the indexes" OFF)
+
 # enable C++14 (for CGAL)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -25,6 +27,10 @@ file(
 )
 
 add_definitions(-DROOT_PATH="${CMAKE_SOURCE_DIR}")
+
+if(SMALL_INDEX)
+	add_definitions(-DSMALL_INDEX)
+endif()
 
 # Include AGMG compiled files
 if(ENABLE_AGMG)
