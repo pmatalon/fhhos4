@@ -30,6 +30,11 @@ public:
 		Timer totalTimer;
 		totalTimer.Start();
 
+#ifdef SMALL_INDEX
+		cout << "Index type: int" << endl;
+#else
+		cout << "Index type: size_t" << endl;
+#endif
 		cout << "Shared memory parallelism: " << (BaseParallelLoop::GetDefaultNThreads() == 1 ? "sequential execution" : to_string(BaseParallelLoop::GetDefaultNThreads()) + " threads") << endl;
 
 		GaussLegendre::Init();

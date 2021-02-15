@@ -68,7 +68,7 @@ public:
 	void ExportFaceToMatlab(FILE* file)
 	{
 		//             Number  x1    y1    x2    y2 IsDomainBoundary IsRemovedOnCoarserGrid
-		fprintf(file, "%lu %.17g %.17g %.17g %.17g %d %d\n", this->Number, _v1->X, _v1->Y, _v2->X, _v2->Y, this->IsDomainBoundary, this->IsRemovedOnCoarserGrid);
+		fprintf(file, "%d %.17g %.17g %.17g %.17g %d %d\n", static_cast<int>(this->Number), _v1->X, _v1->Y, _v2->X, _v2->Y, this->IsDomainBoundary, this->IsRemovedOnCoarserGrid);
 	}
 
 	virtual bool IntersectsWith(Face<2>* other)

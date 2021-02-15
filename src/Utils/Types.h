@@ -2,9 +2,13 @@
 #include <Eigen/Sparse>
 #include <Eigen/Dense>
 
-typedef std::size_t BigNumber;
-
+#ifdef SMALL_INDEX
+using BigNumber = int;
+using SparseMatrixIndex = int;
+#else
+using BigNumber = std::size_t;
 using SparseMatrixIndex = intmax_t; // in Eigen, default value is int, but it is not sufficient for big matrices
+#endif // SMALL_INDEX
 
 using RowMajorSparseMatrix = Eigen::SparseMatrix<double, Eigen::RowMajor, SparseMatrixIndex>;
 using ColMajorSparseMatrix = Eigen::SparseMatrix<double, Eigen::ColMajor, SparseMatrixIndex>;
