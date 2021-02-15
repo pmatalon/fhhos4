@@ -120,6 +120,9 @@ protected:
 	IterationResult CreateFirstIterationResult(const Vector& b, const Vector& x)
 	{
 		IterationResult result;
+		if (this->MaxIterations == 0 || !this->PrintIterationResults)
+			return result;
+		result.SetA(*this->Matrix);
 		result.SetB(b);
 		if (this->ComputeExactSolution)
 			result.SetExactSolution(this->ExactSolution);

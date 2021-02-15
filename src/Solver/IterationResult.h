@@ -8,6 +8,7 @@ private:
 	double _bNorm;
 	bool _computeError = false;
 	Vector _exactSolution;
+	size_t _oneFineMatVecWork = 0;
 
 	double _oldResidualNorm = -1;
 	double _iterationConvRate = 0;
@@ -38,6 +39,7 @@ public:
 		this->_bNorm = oldResult._bNorm;
 		this->_computeError = oldResult._computeError;
 		this->_exactSolution = oldResult._exactSolution;
+		this->_oneFineMatVecWork = oldResult._oneFineMatVecWork;
 		this->_oldResidualNorm = oldResult.NormalizedResidualNorm;
 		this->_previousItConvRates = oldResult._previousItConvRates;
 		this->_tolerance = oldResult._tolerance;
@@ -46,6 +48,11 @@ public:
 	BigNumber SolvingComputationalWork()
 	{
 		return _solvingComputationalWork;
+	}
+
+	void SetA(const SparseMatrix& A)
+	{
+		this->_oneFineMatVecWork = 2 * A.nonZeros();
 	}
 
 	void SetB(const Vector& b)
@@ -117,6 +124,7 @@ public:
 		int iterationConvRateWidth = 11;
 		int asymptoticConvRateWidth = 12;
 		int computWorkWidth = 15;
+		int nFineMatVecWidth = 8;
 		int cpuTimeWidth = 10;
 		int remainingTimeWidth = 11;
 
@@ -141,6 +149,8 @@ public:
 			os << "Computational";
 			//os << setw(cpuTimeWidth);
 			//os << "";
+			os << setw(nFineMatVecWidth);
+			os << "Fine";
 			os << setw(remainingTimeWidth);
 			os << "Remaining";
 			os << endl;
@@ -163,6 +173,8 @@ public:
 			os << "work";
 			//os << setw(cpuTimeWidth);
 			//os << "CPU time";
+			os << setw(nFineMatVecWidth);
+			os << "MatVec";
 			os << setw(remainingTimeWidth);
 			os << "time";
 		}
@@ -212,6 +224,9 @@ public:
 
 			//os << setw(cpuTimeWidth);
 			//os << result._solvingTimer.CPU().InMilliseconds;
+
+			os << setw(nFineMatVecWidth);
+			os << (result._solvingComputationalWork / result._oneFineMatVecWork);
 
 			os << setw(remainingTimeWidth);
 			if (result.IterationNumber == 1)
