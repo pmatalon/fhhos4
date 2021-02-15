@@ -123,7 +123,7 @@ public:
 
 					// 1st coarsening
 					cout << "Coarsening..." << endl;
-					mesh->CoarsenMesh(args.Solver.MG.CoarseningStgy, args.Solver.MG.CoarseningFactor);
+					mesh->CoarsenMesh(args.Solver.MG.CoarseningStgy, args.Solver.MG.FaceCoarseningStgy, args.Solver.MG.CoarseningFactor);
 					/*cout << "Export..." << endl;
 					mesh->CoarseMesh->ExportFacesToMatlab(args.OutputDirectory + "/coarse1.dat");
 					mesh->CoarseMesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_coarse1.m");*/
@@ -131,7 +131,7 @@ public:
 					mesh->SanityCheck();
 					// 2nd coarsening
 					cout << "Coarsening..." << endl;
-					mesh->CoarseMesh->CoarsenMesh(args.Solver.MG.CoarseningStgy, args.Solver.MG.CoarseningFactor);
+					mesh->CoarseMesh->CoarsenMesh(args.Solver.MG.CoarseningStgy, args.Solver.MG.FaceCoarseningStgy, args.Solver.MG.CoarseningFactor);
 					/*cout << "Export..." << endl;
 					mesh->CoarseMesh->CoarseMesh->ExportFacesToMatlab(args.OutputDirectory + "/coarse2.dat");
 					mesh->CoarseMesh->CoarseMesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_coarse2.m");*/
@@ -139,7 +139,7 @@ public:
 					mesh->CoarseMesh->SanityCheck();
 					// 3rd coarsening
 					cout << "Coarsening..." << endl;
-					mesh->CoarseMesh->CoarseMesh->CoarsenMesh(args.Solver.MG.CoarseningStgy, args.Solver.MG.CoarseningFactor);
+					mesh->CoarseMesh->CoarseMesh->CoarsenMesh(args.Solver.MG.CoarseningStgy, args.Solver.MG.FaceCoarseningStgy, args.Solver.MG.CoarseningFactor);
 					/*cout << "Export..." << endl;
 					mesh->CoarseMesh->CoarseMesh->CoarseMesh->ExportFacesToMatlab(args.OutputDirectory + "/coarse3.dat");
 					mesh->CoarseMesh->CoarseMesh->CoarseMesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_coarse3.m");*/
@@ -492,6 +492,7 @@ private:
 		mg->CoarseLevelChangeSmoothingCoeff = args.Solver.MG.CoarseLevelChangeSmoothingCoeff;
 		mg->CoarseLevelChangeSmoothingOperator = args.Solver.MG.CoarseLevelChangeSmoothingOperator;
 		mg->CoarseningStgy = args.Solver.MG.CoarseningStgy;
+		mg->FaceCoarseningStgy = args.Solver.MG.FaceCoarseningStgy;
 		mg->CoarseningFactor = args.Solver.MG.CoarseningFactor;
 		mg->ExportComponents = args.Actions.ExportMultigridComponents;
 
@@ -839,7 +840,7 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args, TestCase<3>* testCase)
 			}
 			else if (meshCode.compare("stetra") == 0)
 			{
-				if (refinementStgy == CoarseningStrategy::StandardCoarsening || Utils::IsAlgebraic(args.Solver.MG.CoarseningStgy))
+				if (refinementStgy == CoarseningStrategy::StandardCoarsening || Utils::IsAlgebraic(args.Solver.SolverCode))
 					fineMesh = new Cube_CartesianTetrahedralMesh(n);
 				else
 				{

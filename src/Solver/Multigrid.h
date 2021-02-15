@@ -27,6 +27,7 @@ public:
 	int BlockSizeForBlockSmoothers = -1;
 	double RelaxationParameter = 1;
 	CoarseningStrategy CoarseningStgy = CoarseningStrategy::StandardCoarsening;
+	FaceCoarseningStrategy FaceCoarseningStgy = FaceCoarseningStrategy::InterfaceCollapsing;
 	int CoarseningFactor = 2;
 	bool ExportComponents = false;
 	bool DoNotCreateLevels = false;
@@ -81,7 +82,7 @@ public:
 		while ((_automaticNumberOfLevels && currentLevel->NUnknowns() > MatrixMaxSizeForCoarsestLevel) || (levelNumber < _nLevels - 1))
 		{
 			// Can we coarsen the mesh?
-			currentLevel->CoarsenMesh(this->CoarseningStgy, this->CoarseningFactor, noCoarserMeshProvided, coarsestPossibleMeshReached);
+			currentLevel->CoarsenMesh(this->CoarseningStgy, this->FaceCoarseningStgy, this->CoarseningFactor, noCoarserMeshProvided, coarsestPossibleMeshReached);
 			if (noCoarserMeshProvided || coarsestPossibleMeshReached)
 				break;
 
@@ -346,7 +347,7 @@ public:
 	{
 		BeginSerialize(cout);
 
-		os << "\t" << "Cycle              : ";
+		os << "\t" << "Cycle                   : ";
 		if (this->Cycle == 'K')
 			os << "K";
 		else if (this->WLoops == 1)
@@ -362,7 +363,7 @@ public:
 			os << "," << CoarseLevelChangeSmoothingOperator << CoarseLevelChangeSmoothingCoeff;
 		os << ")" << endl;
 
-		os << "\t" << "Levels             : ";
+		os << "\t" << "Levels                  : ";
 		if (_automaticNumberOfLevels && _nLevels == 0)
 			os << "automatic coarsening until matrix size <= " << MatrixMaxSizeForCoarsestLevel << endl;
 		else if (_automaticNumberOfLevels && _nLevels > 0)
@@ -370,36 +371,50 @@ public:
 		else
 			os << _nLevels << endl;
 
-		os << "\t" << "Coarsening strategy: ";
+		os << "\t" << "Coarsening strategy     : ";
 		if (CoarseningStgy == CoarseningStrategy::StandardCoarsening)
 			os << "standard [-cs s]" << endl;
-		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarsening)
-			os << "agglomeration [-cs a]" << endl;
-		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
-			os << "agglomeration by face neighbours [-cs n]" << endl;
-		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByMostCoplanarFaces)
-			os << "agglomeration by most coplanar faces [-cs l]" << endl;
-		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter)
-			os << "agglomeration by closest element center [-cs c]" << endl;
-		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByClosestFace)
-			os << "agglomeration by closest face center [-cs g]" << endl;
-		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface)
-			os << "agglomeration by largest interface [-cs i]" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
 			os << "GMSH refinement by splitting from coarse mesh [-cs r]" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::BeyRefinement)
 			os << "Bey's refinement from coarse mesh [-cs b]" << endl;
-		else if (CoarseningStgy == CoarseningStrategy::FaceCoarsening)
-			os << "face coarsening [-cs f]" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::IndependentRemeshing)
 			os << "independant remeshing [-cs m]" << endl;
+		else if (CoarseningStgy == CoarseningStrategy::DoublePairwiseAggregation)
+			os << "double pairwise aggregation [-cs dpa]" << endl;
+		//else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarsening)
+			//os << "agglomeration [-cs a]" << endl;
+		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
+			os << "agglomeration by face neighbours [-cs n]" << endl;
+		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByMostCoplanarFaces)
+			os << "agglomeration by most coplanar faces [-cs mcf]" << endl;
+		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter)
+			os << "agglomeration by closest element center [-cs cc]" << endl;
+		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByClosestFace)
+			os << "agglomeration by closest face center [-cs clf]" << endl;
+		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface)
+			os << "agglomeration by largest interface [-cs li]" << endl;
+		else if (CoarseningStgy == CoarseningStrategy::FaceCoarsening)
+			os << "face coarsening [-cs f]" << endl;
+		else
+			os << "unknown" << endl;
+
+		os << "\t" << "Face coarsening strategy: ";
+		if (Utils::IsRefinementStrategy(CoarseningStgy) || CoarseningStgy == CoarseningStrategy::IndependentRemeshing)
+			os << "NA" << endl;
+		else if (FaceCoarseningStgy == FaceCoarseningStrategy::None)
+			os << "none" << endl;
+		else if (FaceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsing)
+			os << "interface collapsing [-fcs c]" << endl;
+		else if (FaceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsingAndTryAggregInteriorToInterfaces)
+			os << "interface collapsing and try aggregate interior faces too [-fcs i]" << endl;
 		else
 			os << "unknown" << endl;
 
 		Smoother* preSmoother = this->_fineLevel->CreateSmoother(PreSmootherCode, PreSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
 		Smoother* postSmoother = this->_fineLevel->CreateSmoother(PostSmootherCode, PostSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
-		os << "\t" << "Pre-smoothing      : " << *preSmoother << endl;
-		os << "\t" << "Post-smoothing     : " << *postSmoother;
+		os << "\t" << "Pre-smoothing           : " << *preSmoother << endl;
+		os << "\t" << "Post-smoothing          : " << *postSmoother;
 		delete preSmoother;
 		delete postSmoother;
 		if (PreSmootherCode.compare("bj") == 0 || PostSmootherCode.compare("bj") == 0)
@@ -410,7 +425,7 @@ public:
 		if (this->CoarseSolver)
 		{
 			os << endl;
-			os << "\t" << "Coarse solver      : " << (*this->CoarseSolver);
+			os << "\t" << "Coarse solver           : " << (*this->CoarseSolver);
 		}
 
 		EndSerialize(cout);

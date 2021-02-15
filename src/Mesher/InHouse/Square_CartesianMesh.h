@@ -245,14 +245,19 @@ public:
 		return min((double)this->Nx, (double)this->Ny) / max((double)this->Nx, (double)this->Ny);
 	}
 
-	void CoarsenMesh(CoarseningStrategy strategy, int coarseningFactor) override
+	void CoarsenMesh(CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, int coarseningFactor) override
 	{
-		if (strategy == CoarseningStrategy::StandardCoarsening)
-			StandardCoarsening();
-		else if (strategy == CoarseningStrategy::AgglomerationCoarsening)
-			CoarsenByAgglomerationAndKeepFineFaces();
+		if (elemCoarseningStgy == CoarseningStrategy::StandardCoarsening)
+		{
+			if (faceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsing)
+				StandardCoarsening();
+			else if (faceCoarseningStgy == FaceCoarseningStrategy::None)
+				CoarsenByAgglomerationAndKeepFineFaces();
+			else
+				Utils::FatalError("Unmanaged face coarsening strategy");
+		}
 		else
-			PolyhedralMesh<2>::CoarsenMesh(strategy, coarseningFactor);
+			PolyhedralMesh<2>::CoarsenMesh(elemCoarseningStgy, faceCoarseningStgy, coarseningFactor);
 	}
 
 	void StandardCoarsening()
@@ -328,7 +333,7 @@ public:
 		this->InitializeCoarsening(coarseMesh);
 		coarseMesh->Nx = nx / 2;
 		coarseMesh->Ny = ny / 2;
-		coarseMesh->ComesFrom.CS = CoarseningStrategy::AgglomerationCoarsening;
+		coarseMesh->ComesFrom.CS = CoarseningStrategy::StandardCoarsening;
 		coarseMesh->ComesFrom.nFineElementsByCoarseElement = 4;
 		coarseMesh->ComesFrom.nFineFacesAddedByCoarseElement = 4;
 		coarseMesh->ComesFrom.nFineFacesByKeptCoarseFace = 1;

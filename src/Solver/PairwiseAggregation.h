@@ -79,7 +79,6 @@ private:
 		isNumbered[startingElement->Number] = true;
 
 		// Number the neighbours
-		BigNumber currentElement = 0;
 		for (BigNumber i = 0; i < elements.size(); i++)
 			NumberNeighbours(aggregationOrdering[i], aggregationOrdering, isNumbered, orderNumber);
 		assert(orderNumber == elements.size());
@@ -106,6 +105,7 @@ private:
 		for (E* n : unnumberedNeighbours)
 		{
 			aggregationOrdering[orderNumber++] = n;
+			assert(!isNumbered[n->Number]);
 			isNumbered[n->Number] = true;
 		}
 	}

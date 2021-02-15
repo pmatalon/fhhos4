@@ -193,10 +193,26 @@ public:
 			});
 	}
 
-	void PairWiseAggregate(CoarseningStrategy coarseningStgy, bool& coarsestPossibleMeshReached)
+	void Coarsen(CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, bool& coarsestPossibleMeshReached)
 	{
-		PairwiseAggregation<HybridAlgebraicElement, HybridElementAggregate> aggregProcess;
-		_coarseElements = aggregProcess.Perform(_elements, coarsestPossibleMeshReached);
+		coarsestPossibleMeshReached = false;
+
+		if (elemCoarseningStgy == CoarseningStrategy::DoublePairwiseAggregation)
+		{
+			cout << "\tElement pairwise aggregation" << endl;
+			PairwiseAggregation<HybridAlgebraicElement, HybridElementAggregate> aggregProcess;
+			_coarseElements = aggregProcess.Perform(_elements, coarsestPossibleMeshReached);
+		}
+		else if (elemCoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
+		{
+			cout << "\tElement agglomeration" << endl;
+			Utils::FatalError("Unmanaged element coarsening strategy: TODO");
+		}
+		else
+			Utils::FatalError("Unmanaged element coarsening strategy");
+
+		if (coarsestPossibleMeshReached)
+			return;
 		
 		// Removal of faces shared by elements in the same aggregate.
 		// Determination of the faces of the aggregates.
@@ -258,9 +274,11 @@ public:
 
 		// Face aggregation by collapsing multiple interfaces
 		this->_coarseFaces.reserve(_faces.size()); // must reserve sufficient space
-		if (coarseningStgy == CoarseningStrategy::CAMGCollapseElementInterfaces ||
-			coarseningStgy == CoarseningStrategy::CAMGCollapseElementInterfacesAndTryAggregInteriorToBoundaries)
+		if (faceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsing ||
+			faceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsingAndTryAggregInteriorToInterfaces)
 		{
+			cout << "\tInterface collapsing" << endl;
+
 			// Collapse faces interfacing two element aggregates.
 			for (HybridElementAggregate& coarseElem : _coarseElements)
 			{
@@ -281,8 +299,10 @@ public:
 			}
 		}
 
-		if (coarseningStgy == CoarseningStrategy::CAMGCollapseElementInterfacesAndTryAggregInteriorToBoundaries)
+		if (faceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsingAndTryAggregInteriorToInterfaces)
 		{
+			cout << "\tInterior faces agglomeration" << endl;
+
 			// Agglomerate removed faces
 			for (HybridAlgebraicFace& face : _faces)
 			{

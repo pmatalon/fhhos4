@@ -51,7 +51,7 @@ public:
 		Eigen::saveMarket(M, Utils::ProgramArgs.OutputDirectory + "/" + suffix + ".dat");
 	}
 
-	void CoarsenMesh(CoarseningStrategy coarseningStgy, int coarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override
+	void CoarsenMesh(CoarseningStrategy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, int coarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override
 	{
 		noCoarserMeshProvided = false;
 		coarsestPossibleMeshReached = false;
@@ -70,13 +70,16 @@ public:
 		SparseMatrix *A_T_T2, *A_T_F2, *A_F_F2, *P, *Q_F;
 		const SparseMatrix* schur = this->OperatorMatrix;
 		double coarseningRatio = 0;
-		double nCoarsenings = 0;
-		//while (coarseningRatio < 3)
-		for (int i = 0; i < 2; i++)
-		{
-			cout << "\tPairwise aggregation" << endl;
+		//double nCoarsenings = 0;
+		
+		int numberOfPasses = 1;
+		if (coarseningStgy == CoarseningStrategy::DoublePairwiseAggregation)
+			numberOfPasses = 2;
 
-			std::tie(A_T_T2, A_T_F2, A_F_F2, P, Q_F, coarsestPossibleMeshReached) = PairwiseAggregate(*A_T_T1, *A_T_F1, *A_F_F1, *schur, coarseningStgy);
+		//while (coarseningRatio < 3)
+		for (int nCoarsenings = 0; nCoarsenings < numberOfPasses; nCoarsenings++)
+		{
+			std::tie(A_T_T2, A_T_F2, A_F_F2, P, Q_F, coarsestPossibleMeshReached) = Coarsen(*A_T_T1, *A_T_F1, *A_F_F1, *schur, coarseningStgy, faceCoarseningStgy);
 			if (coarsestPossibleMeshReached)
 				return;
 
@@ -86,7 +89,6 @@ public:
 			A_T_T1 = A_T_T2;
 			A_T_F1 = A_T_F2;
 			A_F_F1 = A_F_F2;
-
 
 			if (nCoarsenings == 0)
 			{
@@ -109,10 +111,12 @@ public:
 
 			delete P, Q_F;
 
-			double nFine = this->A_T_F->cols();
-			double nCoarse = A_T_F1->cols();
-			coarseningRatio = nFine / nCoarse;
-			nCoarsenings++;
+			if (A_T_F1)
+			{
+				double nFine = this->A_T_F->cols();
+				double nCoarse = A_T_F1->cols();
+				coarseningRatio = nFine / nCoarse;
+			}
 		}
 
 		this->A_T_Tc = *A_T_T2;
@@ -121,19 +125,25 @@ public:
 	}
 
 	// Returns <A_T_Tc, A_T_Fc, A_F_Fc, P, Q_F, coarsestPossibleMeshReached>
-	tuple<SparseMatrix*, SparseMatrix*, SparseMatrix*, SparseMatrix*, SparseMatrix*, bool> PairwiseAggregate(const SparseMatrix A_T_T, const SparseMatrix A_T_F, const SparseMatrix A_F_F, const SparseMatrix schur, CoarseningStrategy coarseningStgy)
+	tuple<SparseMatrix*, SparseMatrix*, SparseMatrix*, SparseMatrix*, SparseMatrix*, bool> Coarsen(const SparseMatrix A_T_T, const SparseMatrix A_T_F, const SparseMatrix A_F_F, const SparseMatrix schur, CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy)
 	{
-		ExportMatrix(A_T_T, "A_T_T", 0);
-		ExportMatrix(A_T_F, "A_T_F", 0);
-		ExportMatrix(A_F_F, "A_F_F", 0);
-
-		HybridAlgebraicMesh mesh(_cellBlockSize, _faceBlockSize, _strongCouplingThreshold);
-		mesh.Build(A_T_T, A_T_F, A_F_F);
+		//ExportMatrix(A_T_T, "A_T_T", 0);
+		//ExportMatrix(A_T_F, "A_T_F", 0);
+		//ExportMatrix(A_F_F, "A_F_F", 0);
 
 		bool coarsestPossibleMeshReached = false;
-		mesh.PairWiseAggregate(coarseningStgy, coarsestPossibleMeshReached);
-		if (coarsestPossibleMeshReached)
-			return { nullptr, nullptr, nullptr, nullptr, nullptr, coarsestPossibleMeshReached };
+
+		bool onlyFacesUsed = this->_faceProlong == CAMGFaceProlongation::FaceAggregates && _multigridProlong == CAMGProlongation::FaceProlongation;
+
+		HybridAlgebraicMesh mesh(_cellBlockSize, _faceBlockSize, _strongCouplingThreshold);
+		if (!onlyFacesUsed)
+		{
+			mesh.Build(A_T_T, A_T_F, A_F_F);
+
+			mesh.Coarsen(elemCoarseningStgy, faceCoarseningStgy, coarsestPossibleMeshReached);
+			if (coarsestPossibleMeshReached)
+				return { nullptr, nullptr, nullptr, nullptr, nullptr, coarsestPossibleMeshReached };
+		}
 
 		/*cout << "------------- Elem" << endl;
 		for (HybridElementAggregate& agg : mesh._coarseElements)
@@ -180,8 +190,13 @@ public:
 			Utils::FatalError("Unmanaged -face-prolong");
 
 		// Intermediate coarse operators
-		SparseMatrix* A_T_Tc     = new SparseMatrix(Q_T.transpose() * A_T_T * Q_T);
-		SparseMatrix* A_T_Fc_tmp = new SparseMatrix(Q_T.transpose() * A_T_F * *Q_F);
+		SparseMatrix* A_T_Tc = nullptr;
+		SparseMatrix* A_T_Fc_tmp = nullptr;
+		if (!onlyFacesUsed)
+		{
+			A_T_Tc     = new SparseMatrix(Q_T.transpose() * A_T_T * Q_T);
+			A_T_Fc_tmp = new SparseMatrix(Q_T.transpose() * A_T_F * *Q_F);
+		}
 
 		/*ExportMatrix(Q_T, "Q_T", 0);
 		ExportMatrix(*Q_F, "Q_F", 0);
@@ -514,19 +529,33 @@ public:
 		this->_faceProlong = faceProlong;
 		this->BlockSizeForBlockSmoothers = faceBlockSize;
 		this->UseGalerkinOperator = true;
+		this->CoarseningStgy = CoarseningStrategy::DoublePairwiseAggregation;
+		this->FaceCoarseningStgy = FaceCoarseningStrategy::InterfaceCollapsing;
 		this->_fineLevel = new CondensedLevel(0, cellBlockSize, faceBlockSize, strongCouplingThreshold, faceProlong, prolongation);
 	}
 
 	void BeginSerialize(ostream& os) const override
 	{
 		os << "CondensedAMG" << endl;
-		os << "\t" << "Prolongation       : ";
+
+		os << "\t" << "Face prolongation       : ";
+		if (_faceProlong == CAMGFaceProlongation::BoundaryAggregatesInteriorAverage)
+			os << "aggregate interface faces, avg on interior faces ";
+		else if (_faceProlong == CAMGFaceProlongation::BoundaryAggregatesInteriorZero)
+			os << "aggregate interface faces, 0 on interior faces ";
+		else if (_faceProlong == CAMGFaceProlongation::FaceAggregates)
+			os << "aggregate all faces ";
+		os << "[-face-prolong " << (unsigned)_faceProlong << "]" << endl;
+
+		os << "\t" << "Prolongation            : ";
 		if (_multigridProlong == CAMGProlongation::ReconstructionTrace1Step)
 			os << "ReconstructionTrace1Step ";
 		else if (_multigridProlong == CAMGProlongation::ReconstructionTrace2Steps)
 			os << "ReconstructionTrace2Steps ";
 		else if (_multigridProlong == CAMGProlongation::FaceProlongation)
 			os << "FaceProlongation ";
+		else if (_multigridProlong == CAMGProlongation::ReconstructTraceOrInject)
+			os << "ReconstructTraceOrInject ";
 		os << "[-prolong " << (unsigned)_multigridProlong << "]" << endl;
 	}
 

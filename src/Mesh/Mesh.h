@@ -303,9 +303,9 @@ public:
 		Utils::Warning("Impossible to export the solution to GMSH because this mesh does not come from GMSH.");
 	}
 
-	virtual void CoarsenMesh(CoarseningStrategy strategy, int coarseningFactor)
+	virtual void CoarsenMesh(CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, int coarseningFactor)
 	{
-		if (Utils::IsRefinementStrategy(strategy))
+		if (Utils::IsRefinementStrategy(elemCoarseningStgy))
 			return;
 		Utils::FatalError("Unmanaged coarsening strategy");
 	}
@@ -727,7 +727,7 @@ public:
 			Mesh<Dim>* meshToGetInfo = nullptr;
 			if (Utils::IsRefinementStrategy(this->ComesFrom.CS))
 				meshToGetInfo = this;
-			else if (CoarseMesh->ComesFrom.CS == CoarseningStrategy::StandardCoarsening || CoarseMesh->ComesFrom.CS == CoarseningStrategy::AgglomerationCoarsening)
+			else if (CoarseMesh->ComesFrom.CS == CoarseningStrategy::StandardCoarsening)
 				meshToGetInfo = CoarseMesh;
 
 			if (meshToGetInfo != nullptr && meshToGetInfo->ComesFrom.HasDetails())

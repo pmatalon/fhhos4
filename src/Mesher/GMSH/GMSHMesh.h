@@ -702,14 +702,14 @@ public:
 		return _regularity;
 	}
 
-	void CoarsenMesh(CoarseningStrategy strategy, int coarseningFactor) override
+	void CoarsenMesh(CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, int coarseningFactor) override
 	{
-		if (Utils::IsRefinementStrategy(strategy))
+		if (Utils::IsRefinementStrategy(elemCoarseningStgy))
 			return;
-		else if (strategy == CoarseningStrategy::IndependentRemeshing)
+		else if (elemCoarseningStgy == CoarseningStrategy::IndependentRemeshing)
 			IndependentRemesh(coarseningFactor);
 		else
-			PolyhedralMesh<Dim>::CoarsenMesh(strategy, coarseningFactor);
+			PolyhedralMesh<Dim>::CoarsenMesh(elemCoarseningStgy, faceCoarseningStgy, coarseningFactor);
 	}
 
 	virtual void RefineMesh(CoarseningStrategy strategy)
@@ -1000,7 +1000,7 @@ protected:
 
 		if (this->CoarseMesh)
 		{
-			myMesh->CoarsenMesh(CoarseningStrategy::StandardCoarsening, 2);
+			myMesh->CoarsenMesh(CoarseningStrategy::StandardCoarsening, FaceCoarseningStrategy::InterfaceCollapsing, 2);
 			dynamic_cast<GMSHMesh<Dim>*>(this->CoarseMesh)->RenumberLike(myMesh->CoarseMesh);
 		}
 	}

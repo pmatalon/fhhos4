@@ -37,7 +37,7 @@ enum class CoarseningStrategy : unsigned
 {
 	None,
 	StandardCoarsening,
-	AgglomerationCoarsening,
+	AgglomerationCoarseningByVertexRemoval,
 	AgglomerationCoarseningByClosestCenter,
 	AgglomerationCoarseningByClosestFace,
 	AgglomerationCoarseningByLargestInterface,
@@ -49,9 +49,14 @@ enum class CoarseningStrategy : unsigned
 	FaceCoarsening,
 	GMSHSplittingRefinement,
 	BeyRefinement,
-	CAMGCollapseElementInterfaces,
-	CAMGCollapseElementInterfacesAndTryAggregInteriorToBoundaries,
-	CAMGAggregFaces
+	DoublePairwiseAggregation
+};
+
+enum class FaceCoarseningStrategy : unsigned
+{
+	None,
+	InterfaceCollapsing,
+	InterfaceCollapsingAndTryAggregInteriorToInterfaces
 };
 
 enum class Prolongation : unsigned

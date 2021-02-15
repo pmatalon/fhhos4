@@ -146,7 +146,7 @@ public:
 		assert(false && "NUnknowns() should be overriden");
 	}
 
-	virtual void CoarsenMesh(CoarseningStrategy coarseningStgy, int coarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) = 0;
+	virtual void CoarsenMesh(CoarseningStrategy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, int coarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) = 0;
 
 	virtual void ExportVector(const Vector& v, string suffix, int levelNumber) = 0;
 	virtual void ExportMatrix(const SparseMatrix& M, string suffix, int levelNumber) = 0;

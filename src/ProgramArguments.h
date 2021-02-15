@@ -37,8 +37,8 @@ struct MultigridArguments
 	int ProlongationCode = 0;
 	Prolongation GMGProlong = Prolongation::Default;
 	int FaceProlongationCode = 0;
-	CAMGFaceProlongation CAMGFaceProlong = CAMGFaceProlongation::FaceAggregates;
-	CAMGProlongation CAMGProlong = CAMGProlongation::ReconstructionTrace1Step;
+	CAMGFaceProlongation CAMGFaceProlong = CAMGFaceProlongation::BoundaryAggregatesInteriorAverage;
+	CAMGProlongation CAMGProlong = CAMGProlongation::ReconstructTraceOrInject;
 	int MatrixMaxSizeForCoarsestLevel = 1000;
 	char CycleLetter = 'V';
 	int WLoops = 1;
@@ -52,6 +52,7 @@ struct MultigridArguments
 	int CoarseLevelChangeSmoothingCoeff = 0;
 	char CoarseLevelChangeSmoothingOperator = '+';
 	CoarseningStrategy CoarseningStgy = CoarseningStrategy::None;
+	FaceCoarseningStrategy FaceCoarseningStgy = FaceCoarseningStrategy::InterfaceCollapsing;
 	int CoarseningFactor = 2;
 	BigNumber CoarseN = 2;
 	string CoarseSolverCode = "lu";

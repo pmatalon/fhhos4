@@ -28,16 +28,16 @@ public:
 		return _problem->HHO->nTotalFaceUnknowns;
 	}
 
-	void CoarsenMesh(CoarseningStrategy coarseningStgy, int coarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override
+	void CoarsenMesh(CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, int coarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override
 	{
 		Mesh<Dim>* mesh = _problem->_mesh;
-		if (Utils::IsRefinementStrategy(coarseningStgy) && mesh->CoarseMesh == nullptr)
+		if (Utils::IsRefinementStrategy(elemCoarseningStgy) && mesh->CoarseMesh == nullptr)
 		{
 			noCoarserMeshProvided = true;
 			return;
 		}
 		cout << "\tCoarsening mesh" << endl;
-		mesh->CoarsenMesh(coarseningStgy, coarseningFactor);
+		mesh->CoarsenMesh(elemCoarseningStgy, faceCoarseningStgy, coarseningFactor);
 		if (!mesh->CoarseMesh || mesh->CoarseMesh->InteriorFaces.size() == 0)
 			coarsestPossibleMeshReached = true;
 	}
@@ -855,7 +855,7 @@ public:
 	void BeginSerialize(ostream& os) const override
 	{
 		os << "MultigridForHHO" << endl;
-		os << "\t" << "Prolongation       : ";
+		os << "\t" << "Prolongation            : ";
 		if (_prolongation == Prolongation::CellInterp_Trace)
 			os << "coarse cell interpolation + trace/proj. on fine faces ";
 		else if (_prolongation == Prolongation::CellInterp_Inject_Trace)
@@ -878,7 +878,7 @@ public:
 
 		if (_prolongation != Prolongation::FaceInject)
 		{
-			os << "\t" << "Cell interpolation : ";
+			os << "\t" << "Cell interpolation      : ";
 			if (_cellInterpolationBasis == _problem->HHO->CellBasis)
 				os << "k [-cell-interp 2]";
 			else if (_cellInterpolationBasis == _problem->HHO->ReconstructionBasis)
@@ -886,7 +886,7 @@ public:
 			os << endl;
 		}
 
-		os << "\t" << "Weighting          : ";
+		os << "\t" << "Weighting               : ";
 		if (_weightCode.compare("k") == 0)
 			os << "proportional to the diffusion coefficient [-weight k]";
 		else if (_weightCode.compare("a") == 0)

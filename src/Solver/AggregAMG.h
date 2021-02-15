@@ -36,7 +36,7 @@ public:
 		Eigen::saveMarket(M, file);
 	}
 
-	void CoarsenMesh(CoarseningStrategy coarseningStgy, int coarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override
+	void CoarsenMesh(CoarseningStrategy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, int coarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override
 	{
 		cout << "\tBuild algebraic mesh" << endl;
 
@@ -47,6 +47,9 @@ public:
 		//----------------------------//
 		// First pairwise aggregation //
 		//----------------------------//
+
+		if (coarseningStgy != CoarseningStrategy::DoublePairwiseAggregation)
+			Utils::FatalError("Unmanaged coarsening strategy");
 
 		cout << "\tPairwise aggregation 1" << endl;
 		_mesh.PairWiseAggregate(coarsestPossibleMeshReached);
@@ -257,6 +260,7 @@ public:
 		this->_strongCouplingThreshold = strongCouplingThreshold;
 		this->BlockSizeForBlockSmoothers = blockSize;
 		this->UseGalerkinOperator = true;
+		this->CoarseningStgy = CoarseningStrategy::DoublePairwiseAggregation;
 		this->_fineLevel = new AggregLevel(0, blockSize, strongCouplingThreshold);
 	}
 

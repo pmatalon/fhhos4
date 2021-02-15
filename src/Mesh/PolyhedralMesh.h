@@ -99,29 +99,29 @@ public:
 		return verticesUsage + verticesPointers + elementsUsage + elementsPointers + facesUsage + facesPointers;
 	}
 
-	virtual void CoarsenMesh(CoarseningStrategy strategy, int coarseningFactor) override
+	virtual void CoarsenMesh(CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, int coarseningFactor) override
 	{
 		if (this->CoarseMesh)
 			return;
 		
-		if (strategy == CoarseningStrategy::AgglomerationCoarsening)
+		if (elemCoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByVertexRemoval)
 			CoarsenByAgglomerationByVertexRemoval();
-		else if (strategy == CoarseningStrategy::AgglomerationCoarseningByMostCoplanarFaces)
+		else if (elemCoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByMostCoplanarFaces)
 			CoarsenByAgglomerationByMostCoplanarFaces();
-		else if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter 
-			  || strategy == CoarseningStrategy::AgglomerationCoarseningByClosestFace 
-			  || strategy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface)
-			CoarsenByAgglomerationByPairs(strategy);
-		else if (strategy == CoarseningStrategy::AgglomerationCoarseningBySeedPoints)
+		else if (elemCoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter
+			  || elemCoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByClosestFace
+			  || elemCoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface)
+			CoarsenByAgglomerationByPairs(elemCoarseningStgy);
+		else if (elemCoarseningStgy == CoarseningStrategy::AgglomerationCoarseningBySeedPoints)
 			CoarsenByAgglomerationBySeedPoints();
-		else if (strategy == CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
-			CoarsenByAgglomerationByFaceNeighbours();
-		else if (strategy == CoarseningStrategy::AgglomerationCoarseningByVertexNeighbours)
+		else if (elemCoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
+			CoarsenByAgglomerationByFaceNeighbours(faceCoarseningStgy);
+		else if (elemCoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByVertexNeighbours)
 			CoarsenByAgglomerationByVertexNeighbours();
-		else if (strategy == CoarseningStrategy::FaceCoarsening)
+		else if (elemCoarseningStgy == CoarseningStrategy::FaceCoarsening)
 			FaceCoarsening();
 		else
-			Mesh<Dim>::CoarsenMesh(strategy, coarseningFactor);
+			Mesh<Dim>::CoarsenMesh(elemCoarseningStgy, faceCoarseningStgy, coarseningFactor);
 	}
 
 protected:
@@ -630,14 +630,16 @@ private:
 	//                                             //
 	//---------------------------------------------//
 
-	void CoarsenByAgglomerationByFaceNeighbours()
+	void CoarsenByAgglomerationByFaceNeighbours(FaceCoarseningStrategy faceCoarseningStgy)
 	{
 		PolyhedralMesh<Dim>* coarseMesh = new PolyhedralMesh<Dim>();
 		this->InitializeCoarsening(coarseMesh);
 		coarseMesh->ComesFrom.CS = CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours;
 
-		// Element agglomeration, 1st pass
-		// Agglomerate fine elements together
+		//------------------------------------//
+		// Element agglomeration, 1st pass    //
+		// Agglomerate fine elements together //
+		//------------------------------------//
 
 		bool cancelCoarsening = false;
 
@@ -720,8 +722,10 @@ private:
 			}
 		}
 
-		// Element agglomeration, 2nd pass
-		// Agglomerate the remaining fine elements with their closest coarse neighbour
+		//-----------------------------------------------------------------------------//
+		// Element agglomeration, 2nd pass                                             //
+		// Agglomerate the remaining fine elements with their closest coarse neighbour //
+		//-----------------------------------------------------------------------------//
 
 		//cout << "\t" << remainingFineElements.size() << " to agglomerate with coarse elements" << endl;
 
@@ -768,43 +772,55 @@ private:
 			//cout << "\t" << remainingFineElements.size() << " fine elements to coarsen" << endl;
 		}
 
-		// Face collapsing
-		ElementParallelLoop<Dim> parallelLoopCollapseFaces(coarseMesh->Elements);
-		parallelLoopCollapseFaces.Execute([coarseMesh](Element<Dim>* coarseElement)
+		//-----------------------//
+		//    Face collapsing    //
+		//-----------------------//
+
+		if (faceCoarseningStgy == FaceCoarseningStrategy::None)
+		{
+			// do nothing
+		}
+		else if (faceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsing)
+		{
+			ElementParallelLoop<Dim> parallelLoopCollapseFaces(coarseMesh->Elements);
+			parallelLoopCollapseFaces.Execute([coarseMesh](Element<Dim>* coarseElement)
+				{
+					if (!coarseElement->IsDeleted)
+						coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(coarseElement, true);
+				});
+
+			for (Face<Dim>* f : coarseMesh->Faces)
 			{
-				if (!coarseElement->IsDeleted)
-					coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(coarseElement, true);
-			});
+				if (!f->IsDeleted && !f->IsDomainBoundary && !f->FinerFaces[0]->HasBeenCoarsened())
+					coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(f->Element1, false);
+			}
 
-		for (Face<Dim>* f : coarseMesh->Faces)
-		{
-			if (!f->IsDeleted && !f->IsDomainBoundary && !f->FinerFaces[0]->HasBeenCoarsened())
-				coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(f->Element1, false);
-		}
-		
-		/*list<Face<Dim>*> uncoarsenedFaces;
-		for (Face<Dim>* f : this->Faces)
-		{
-			if (!f->IsDeleted && !f->IsRemovedOnCoarserGrid && !f->HasBeenCoarsened())
-				uncoarsenedFaces.push_back(f);
-		}
-		cout << (uncoarsenedFaces.size() * 100) / this->Faces.size() << "% unchanged faces." << endl;
+			/*list<Face<Dim>*> uncoarsenedFaces;
+			for (Face<Dim>* f : this->Faces)
+			{
+				if (!f->IsDeleted && !f->IsRemovedOnCoarserGrid && !f->HasBeenCoarsened())
+					uncoarsenedFaces.push_back(f);
+			}
+			cout << (uncoarsenedFaces.size() * 100) / this->Faces.size() << "% unchanged faces." << endl;
 
-		int nFacesAtPhysicalBoundary = 0;
-		int nUncorsenedFacesAtPhysicalBoundary = 0;
-		for (Face<Dim>* f : this->Faces)
-		{
-			if (f->IsDeleted || f->IsDomainBoundary)
-				continue;
-			bool isAtPhysicalBoundary = !f->Element1->IsInSamePhysicalPartAs(f->Element2);
-			if (!isAtPhysicalBoundary)
-				continue;
-			nFacesAtPhysicalBoundary++;
-			if (!f->IsRemovedOnCoarserGrid && !f->HasBeenCoarsened())
-				nUncorsenedFacesAtPhysicalBoundary++;
+			int nFacesAtPhysicalBoundary = 0;
+			int nUncorsenedFacesAtPhysicalBoundary = 0;
+			for (Face<Dim>* f : this->Faces)
+			{
+				if (f->IsDeleted || f->IsDomainBoundary)
+					continue;
+				bool isAtPhysicalBoundary = !f->Element1->IsInSamePhysicalPartAs(f->Element2);
+				if (!isAtPhysicalBoundary)
+					continue;
+				nFacesAtPhysicalBoundary++;
+				if (!f->IsRemovedOnCoarserGrid && !f->HasBeenCoarsened())
+					nUncorsenedFacesAtPhysicalBoundary++;
+			}
+			if (nFacesAtPhysicalBoundary > 0)
+				cout << (nUncorsenedFacesAtPhysicalBoundary * 100) / nFacesAtPhysicalBoundary << "% unchanged faces at physical boundaries." << endl;*/
 		}
-		if (nFacesAtPhysicalBoundary > 0)
-			cout << (nUncorsenedFacesAtPhysicalBoundary * 100) / nFacesAtPhysicalBoundary << "% unchanged faces at physical boundaries." << endl;*/
+		else
+			Utils::FatalError("Unmanaged face coarsening strategy");
 
 		this->FinalizeCoarsening();
 	}

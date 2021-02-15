@@ -208,11 +208,9 @@ public:
 		return IsRefinementStrategy(stgy) || stgy == CoarseningStrategy::StandardCoarsening;
 	}
 
-	static bool IsAlgebraic(CoarseningStrategy stgy)
+	static bool IsAlgebraic(string solverCode)
 	{
-		return stgy == CoarseningStrategy::CAMGCollapseElementInterfaces ||
-			stgy == CoarseningStrategy::CAMGCollapseElementInterfacesAndTryAggregInteriorToBoundaries ||
-			stgy == CoarseningStrategy::CAMGAggregFaces;
+		return EndsWith(solverCode, "amg");
 	}
 
 	static bool RequiresNestedHierarchy(Prolongation p)
@@ -250,6 +248,12 @@ public:
 	static void Warning(ostream& os, string msg)
 	{
 		os << Utils::BeginYellow << "Warning: " << msg << Utils::EndColor << endl;
+	}
+
+
+	static bool EndsWith(const std::string& str, const std::string& suffix)
+	{
+		return str.size() >= suffix.size() && 0 == str.compare(str.size() - suffix.size(), suffix.size(), suffix);
 	}
 
 };

@@ -341,14 +341,17 @@ public:
 		return this->Elements[0]->Regularity();
 	}
 
-	void CoarsenMesh(CoarseningStrategy strategy, int coarseningFactor) override
+	void CoarsenMesh(CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, int coarseningFactor) override
 	{
-		if (strategy == CoarseningStrategy::StandardCoarsening)
-			StandardCoarsening();
-		//else if (strategy == CoarseningStrategy::AgglomerationCoarsening)
-			//CoarsenByAgglomerationAndKeepFineFaces();
+		if (elemCoarseningStgy == CoarseningStrategy::StandardCoarsening)
+		{
+			if (faceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsing)
+				StandardCoarsening();
+			else
+				Utils::FatalError("Unmanaged face coarsening strategy");
+		}
 		else
-			PolyhedralMesh<2>::CoarsenMesh(strategy, coarseningFactor);
+			PolyhedralMesh<2>::CoarsenMesh(elemCoarseningStgy, faceCoarseningStgy, coarseningFactor);
 	}
 
 	void RefineMesh(CoarseningStrategy strategy) override

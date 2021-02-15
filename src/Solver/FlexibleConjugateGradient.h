@@ -93,7 +93,7 @@ public:
 				Vector& Adk = *directionk.Ad;
 				double dk_dot_Adk = directionk.d_dot_Ad;
 
-				*d -= z.dot(Adk) / dk_dot_Adk * dk;                   result.AddCost(2 * z.rows());     // Cost: 1 Dot
+				*d -= (z.dot(Adk) / dk_dot_Adk) * dk;                   result.AddCost(2 * z.rows());     // Cost: 1 Dot
 			}
 			assert(d->norm() > 0);
 

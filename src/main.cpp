@@ -223,23 +223,31 @@ void print_usage() {
 	cout << "-cs CODE" << endl;
 	cout << "      Coarsening strategy of the multigrid." << endl;
 	cout << "      'mg':" << endl;
-	cout << "              s   - Standard coarsening (merge colinear faces on the coarse mesh)" << endl;
-	cout << "              r   - Fine meshes obtained by structured refinement of the coarse mesh using GMSH's splitting method" << endl;
-	cout << "              b   - Fine meshes obtained by Bey's tetrahedral refinements of coarse meshes" << endl;
-	cout << "              m   - Independant remeshing by GMSH with double the mesh size (non-nested!)" << endl;
-	cout << "              n   - Agglomeration coarsening with face collapsing (non-nested!)" << endl;
-	cout << "              a   - (Experimental) Agglomeration coarsening (keep fine faces on the coarse mesh)" << endl;
-	cout << "              l   - (Experimental) agglomeration coarsening by most collinear/coplanar faces (non-nested!)" << endl;
-	cout << "              c   - (Experimental) agglomeration coarsening by closest center (non-nested!)" << endl;
-	cout << "              g   - (Experimental) agglomeration coarsening by closest face (non-nested!)" << endl;
-	cout << "              i   - (Experimental) agglomeration coarsening by largest interface (non-nested)" << endl;
-	cout << "              p   - (Experimental) agglomeration coarsening by seed points (non-nested!)" << endl;
-	cout << "              v   - (Experimental) agglomeration coarsening by vertex neighbours (non-nested!)" << endl;
-	cout << "              f   - (Experimental) Face coarsening: the faces are coarsened and all kept on the coarse skeleton. Requires -g 1." << endl;
-	cout << "      'camg':" << endl;
+	cout << "              s    - Standard coarsening (only for structured meshes built by the in-house mesher)" << endl;
+	cout << "              r    - Fine meshes obtained by structured refinement of the coarse mesh using GMSH's splitting method" << endl;
+	cout << "              b    - Fine meshes obtained by Bey's tetrahedral refinements of coarse meshes" << endl;
+	cout << "              m    - Independant remeshing by GMSH with double the mesh size (non-nested!)" << endl;
+	cout << "              n    - Agglomeration coarsening with face collapsing (non-nested!)" << endl;
+	cout << "              dpa  - Double pairwise aggregation" << endl;
+	cout << "              vr   - (Experimental) Agglomeration coarsening by vertex removal" << endl;
+	cout << "              mcf  - (Experimental) agglomeration coarsening by most collinear/coplanar faces" << endl;
+	cout << "              cc   - (Experimental) agglomeration coarsening by closest center" << endl;
+	cout << "              clf  - (Experimental) agglomeration coarsening by closest face" << endl;
+	cout << "              li   - (Experimental) agglomeration coarsening by largest interface" << endl;
+	cout << "              seed - (Experimental) agglomeration coarsening by seed points" << endl;
+	cout << "              vn   - (Experimental) agglomeration coarsening by vertex neighbours" << endl;
+	cout << "              f    - (Experimental) Face coarsening: the faces are coarsened and all kept on the coarse skeleton. Requires -g 1." << endl;
+	/*cout << "      'camg':" << endl;
 	cout << "              x   - Collapse interfaces made of multiple faces" << endl;
 	cout << "              y   - Collapse interfaces made of multiple faces and try to aggregate interior faces to the boundary ones" << endl;
-	cout << "              z   - Aggregate all faces using A_F_F" << endl;
+	cout << "              z   - Aggregate all faces using A_F_F" << endl;*/
+	cout << endl;
+	cout << "-fcs CODE" << endl;
+	cout << "      Face coarsening (default: c)." << endl;
+	cout << "              c   - Collapse interfaces made of multiple faces" << endl;
+	cout << "              n   - None (fine faces are kept as is on the coarse mesh)" << endl;
+	cout << "              i   - Collapse interfaces made of multiple faces and try to aggregate interior faces to the boundary ones" << endl;
+	//cout << "              z   - Aggregate all faces using A_F_F" << endl;
 	cout << endl;
 	cout << "-coarse-solver CODE" << endl;
 	cout << "      Any solver code (see -solver). Only purely algebraic solvers are allowed. Default: 'lu' (LU factorization)." << endl;
@@ -467,6 +475,7 @@ int main(int argc, char* argv[])
 		OPT_CoarseMatrixSize,
 		OPT_Smoothers,
 		OPT_CoarseningStrategy,
+		OPT_FaceCoarseningStrategy,
 		OPT_CoarseSolver,
 		OPT_BoundaryFaceCollapsing,
 		OPT_ReEntrantCornerManagement,
@@ -517,6 +526,7 @@ int main(int argc, char* argv[])
 		 { "coarse-size", required_argument, NULL, OPT_CoarseMatrixSize },
 		 { "smoothers", required_argument, NULL, OPT_Smoothers },
 		 { "cs", required_argument, NULL, OPT_CoarseningStrategy },
+		 { "fcs", required_argument, NULL, OPT_FaceCoarseningStrategy },
 		 { "bfc", required_argument, NULL, OPT_BoundaryFaceCollapsing },
 		 { "coarse-solver", required_argument, NULL, OPT_CoarseSolver },
 		 { "rcm", required_argument, NULL, OPT_ReEntrantCornerManagement },
@@ -793,38 +803,53 @@ int main(int argc, char* argv[])
 				string coarseningStgyCode = optarg;
 				if (coarseningStgyCode.compare("s") == 0)
 					args.Solver.MG.CoarseningStgy = CoarseningStrategy::StandardCoarsening;
-				else if (coarseningStgyCode.compare("a") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarsening;
-				else if (coarseningStgyCode.compare("l") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByMostCoplanarFaces;
-				else if (coarseningStgyCode.compare("c") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByClosestCenter;
-				else if (coarseningStgyCode.compare("g") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByClosestFace;
-				else if (coarseningStgyCode.compare("i") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByLargestInterface;
-				else if (coarseningStgyCode.compare("p") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningBySeedPoints;
-				else if (coarseningStgyCode.compare("n") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours;
-				else if (coarseningStgyCode.compare("v") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByVertexNeighbours;
-				else if (coarseningStgyCode.compare("m") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::IndependentRemeshing;
-				else if (coarseningStgyCode.compare("f") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::FaceCoarsening;
 				else if (coarseningStgyCode.compare("r") == 0)
 					args.Solver.MG.CoarseningStgy = CoarseningStrategy::GMSHSplittingRefinement;
 				else if (coarseningStgyCode.compare("b") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::BeyRefinement; 
-				else if (coarseningStgyCode.compare("x") == 0)
+					args.Solver.MG.CoarseningStgy = CoarseningStrategy::BeyRefinement;
+				else if (coarseningStgyCode.compare("m") == 0)
+					args.Solver.MG.CoarseningStgy = CoarseningStrategy::IndependentRemeshing;
+				else if (coarseningStgyCode.compare("n") == 0)
+					args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours;
+				else if (coarseningStgyCode.compare("dpa") == 0)
+					args.Solver.MG.CoarseningStgy = CoarseningStrategy::DoublePairwiseAggregation;
+				else if (coarseningStgyCode.compare("vr") == 0)
+					args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByVertexRemoval;
+				else if (coarseningStgyCode.compare("mcf") == 0)
+					args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByMostCoplanarFaces;
+				else if (coarseningStgyCode.compare("cc") == 0)
+					args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByClosestCenter;
+				else if (coarseningStgyCode.compare("clf") == 0)
+					args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByClosestFace;
+				else if (coarseningStgyCode.compare("li") == 0)
+					args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByLargestInterface;
+				else if (coarseningStgyCode.compare("seed") == 0)
+					args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningBySeedPoints;
+				else if (coarseningStgyCode.compare("vn") == 0)
+					args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByVertexNeighbours;
+				else if (coarseningStgyCode.compare("f") == 0)
+					args.Solver.MG.CoarseningStgy = CoarseningStrategy::FaceCoarsening;
+				/*else if (coarseningStgyCode.compare("x") == 0)
 					args.Solver.MG.CoarseningStgy = CoarseningStrategy::CAMGCollapseElementInterfaces;
 				else if (coarseningStgyCode.compare("y") == 0)
 					args.Solver.MG.CoarseningStgy = CoarseningStrategy::CAMGCollapseElementInterfacesAndTryAggregInteriorToBoundaries;
 				else if (coarseningStgyCode.compare("z") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::CAMGAggregFaces;
+					args.Solver.MG.CoarseningStgy = CoarseningStrategy::CAMGAggregFaces;*/
 				else
 					argument_error("unknown coarsening strategy code '" + coarseningStgyCode + "'. Check -cs argument.");
+				break;
+			}
+			case OPT_FaceCoarseningStrategy:
+			{
+				string fcsCode = optarg;
+				if (fcsCode.compare("c") == 0)
+					args.Solver.MG.FaceCoarseningStgy = FaceCoarseningStrategy::InterfaceCollapsing;
+				else if (fcsCode.compare("n") == 0)
+					args.Solver.MG.FaceCoarseningStgy = FaceCoarseningStrategy::None;
+				else if (fcsCode.compare("i") == 0)
+					args.Solver.MG.FaceCoarseningStgy = FaceCoarseningStrategy::InterfaceCollapsingAndTryAggregInteriorToInterfaces;
+				else
+					argument_error("unknown face coarsening strategy code '" + fcsCode + "'. Check -fcs argument.");
 				break;
 			}
 			case OPT_CoarseSolver:
@@ -1020,10 +1045,10 @@ int main(int argc, char* argv[])
 	else if (args.Solver.SolverCode.compare("camg") == 0 || args.Solver.SolverCode.compare("fcgcamg") == 0)
 	{
 		if (args.Solver.MG.ProlongationCode == 0)
-			args.Solver.MG.CAMGProlong = CAMGProlongation::FaceProlongation;
+			args.Solver.MG.CAMGProlong = CAMGProlongation::ReconstructTraceOrInject;
 		else
 			args.Solver.MG.CAMGProlong = static_cast<CAMGProlongation>(args.Solver.MG.ProlongationCode);
-		args.Solver.MG.CAMGFaceProlong = args.Solver.MG.FaceProlongationCode == 0 ? CAMGFaceProlongation::FaceAggregates : static_cast<CAMGFaceProlongation>(args.Solver.MG.FaceProlongationCode);
+		args.Solver.MG.CAMGFaceProlong = args.Solver.MG.FaceProlongationCode == 0 ? CAMGFaceProlongation::BoundaryAggregatesInteriorAverage : static_cast<CAMGFaceProlongation>(args.Solver.MG.FaceProlongationCode);
 	}
 
 
@@ -1118,12 +1143,18 @@ int main(int argc, char* argv[])
 		if (args.Discretization.Method.compare("dg") == 0)
 			argument_error("Multigrid only applicable on HHO discretization.");
 
+		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::None)
+			args.Solver.MG.CoarseningStgy = CoarseningStrategy::DoublePairwiseAggregation;
+
 		if (defaultCycle)
 			args.Solver.MG.CycleLetter = 'K';
 	}
 
 	if (args.Solver.SolverCode.compare("aggregamg") == 0 || args.Solver.SolverCode.compare("fcgaggregamg") == 0)
 	{
+		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::None)
+			args.Solver.MG.CoarseningStgy = CoarseningStrategy::DoublePairwiseAggregation;
+
 		if (defaultCycle)
 			args.Solver.MG.CycleLetter = 'K';
 	}

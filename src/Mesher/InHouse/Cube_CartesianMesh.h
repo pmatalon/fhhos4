@@ -221,12 +221,17 @@ public:
 		return 1;
 	}
 
-	void CoarsenMesh(CoarseningStrategy strategy, int coarseningFactor)
+	void CoarsenMesh(CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, int coarseningFactor)
 	{
-		if (strategy == CoarseningStrategy::StandardCoarsening)
-			StandardCoarsening();
+		if (elemCoarseningStgy == CoarseningStrategy::StandardCoarsening)
+		{
+			if (faceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsing)
+				StandardCoarsening();
+			else
+				Utils::FatalError("Unmanaged face coarsening strategy");
+		}
 		else
-			Mesh<3>::CoarsenMesh(strategy, coarseningFactor);
+			Mesh<3>::CoarsenMesh(elemCoarseningStgy, faceCoarseningStgy, coarseningFactor);
 	}
 
 private:
