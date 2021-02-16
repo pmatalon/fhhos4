@@ -120,7 +120,7 @@ protected:
 	IterationResult CreateFirstIterationResult(const Vector& b, const Vector& x)
 	{
 		IterationResult result;
-		if (this->MaxIterations == 0 || !this->PrintIterationResults)
+		if (this->MaxIterations == 0 || this->StoppingCrit == StoppingCriteria::MaxIterations)
 			return result;
 		result.SetA(*this->Matrix);
 		result.SetB(b);

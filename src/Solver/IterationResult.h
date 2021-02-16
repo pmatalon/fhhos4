@@ -5,7 +5,7 @@ using namespace std;
 class IterationResult
 {
 private:
-	double _bNorm;
+	double _bNorm = -1;
 	bool _computeError = false;
 	Vector _exactSolution;
 	size_t _oneFineMatVecWork = 0;
@@ -81,6 +81,7 @@ public:
 	void SetResidual(const Vector& r)
 	{
 		this->ResidualNorm = r.norm();
+		assert(_bNorm >= 0);
 		this->NormalizedResidualNorm = _bNorm > 0 ? ResidualNorm / _bNorm : ResidualNorm;
 
 		if (IterationNumber > 1 && _oldResidualNorm != -1)

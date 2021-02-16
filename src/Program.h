@@ -502,8 +502,11 @@ private:
 		argsCoarseSolver.Solver.MaxIterations = 200;
 		argsCoarseSolver.Solver.Tolerance = args.Solver.Tolerance;
 		argsCoarseSolver.Solver.PrintIterationResults = false;
-		if (args.Solver.MG.CoarseSolverCode.compare("fcgaggregamg") == 0)
+		if (Utils::EndsWith(args.Solver.MG.CoarseSolverCode, "aggregamg"))
+		{
+			argsCoarseSolver.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours;
 			argsCoarseSolver.Solver.MG.CycleLetter = 'K';
+		}
 		mg->CoarseSolver = CreateSolver(argsCoarseSolver, nullptr, 1);
 	}
 
