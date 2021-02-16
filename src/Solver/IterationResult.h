@@ -98,6 +98,12 @@ public:
 		}
 	}
 
+	void SetResidualAsB()
+	{
+		this->ResidualNorm = _bNorm;
+		this->NormalizedResidualNorm = 1;
+	}
+
 	bool IsResidualSet()
 	{
 		return ResidualNorm != -1;

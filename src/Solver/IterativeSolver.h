@@ -84,7 +84,7 @@ public:
 		if (StoppingCrit == StoppingCriteria::NormalizedResidual)
 		{
 			if (zeroInitialGuess)
-				result.SetResidual(b);
+				result.SetResidualAsB();
 			else
 			{
 				result.SetResidual(b - A * x);
