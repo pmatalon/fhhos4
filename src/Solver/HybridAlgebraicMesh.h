@@ -329,7 +329,7 @@ public:
 			}
 		}
 
-		//cout << _coarseElements.size() << " coarse elements, " << CoarseFaces.size() << " coarse faces" << endl;
+		//cout << CoarseElements.size() << " coarse elements, " << CoarseFaces.size() << " coarse faces" << endl;
 		if (CoarseFaces.empty())
 			coarsestPossibleMeshReached = true;
 	}

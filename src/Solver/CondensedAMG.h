@@ -146,7 +146,7 @@ public:
 		}
 
 		/*cout << "------------- Elem" << endl;
-		for (HybridElementAggregate& agg : mesh._coarseElements)
+		for (HybridElementAggregate& agg : mesh.CoarseElements)
 		{
 			cout << "(";
 			for (auto e : agg.FineElements)
@@ -434,13 +434,13 @@ private:
 	SparseMatrix BuildQ_F_AllAggregated(const AlgebraicMesh& skeleton)
 	{
 		DenseMatrix Id = DenseMatrix::Identity(_faceBlockSize, _faceBlockSize);
-		NumberParallelLoop<CoeffsChunk> parallelLoop(skeleton._elements.size());
+		NumberParallelLoop<CoeffsChunk> parallelLoop(skeleton.Elements.size());
 		parallelLoop.Execute([this, &skeleton, &Id](BigNumber elemNumber, ParallelChunk<CoeffsChunk>* chunk)
 			{
-				const AlgebraicElement& elem = skeleton._elements[elemNumber];
+				const AlgebraicElement& elem = skeleton.Elements[elemNumber];
 				chunk->Results.Coeffs.Add(elem.Number*_faceBlockSize, elem.CoarseElement->Number*_faceBlockSize, Id);
 			});
-		SparseMatrix Q_F = SparseMatrix(skeleton._elements.size()*_faceBlockSize, skeleton._coarseElements.size()*_faceBlockSize);
+		SparseMatrix Q_F = SparseMatrix(skeleton.Elements.size()*_faceBlockSize, skeleton.CoarseElements.size()*_faceBlockSize);
 		parallelLoop.Fill(Q_F);
 		return Q_F;
 	}

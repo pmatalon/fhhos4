@@ -88,15 +88,15 @@ public:
 			// Assembly of the double-aggregates //
 			//-----------------------------------//
 
-			_aggregates = vector<ElementAggregate>(coarseMesh._coarseElements.size());
-			_numberAggregates = vector<vector<BigNumber>>(coarseMesh._coarseElements.size());
-			NumberParallelLoop<EmptyResultChunk> parallelLoop(coarseMesh._coarseElements.size());
+			_aggregates = vector<ElementAggregate>(coarseMesh.CoarseElements.size());
+			_numberAggregates = vector<vector<BigNumber>>(coarseMesh.CoarseElements.size());
+			NumberParallelLoop<EmptyResultChunk> parallelLoop(coarseMesh.CoarseElements.size());
 			parallelLoop.Execute([this, &coarseMesh](BigNumber finalAggregNumber)
 				{
 					ElementAggregate& finalAggreg = _aggregates[finalAggregNumber];
 					vector<BigNumber>& finalNumberAggreg = _numberAggregates[finalAggregNumber];
 					finalAggreg.Number = finalAggregNumber;
-					finalAggreg.FineElements = GetFineElements(coarseMesh._coarseElements[finalAggregNumber], coarseMesh);
+					finalAggreg.FineElements = GetFineElements(coarseMesh.CoarseElements[finalAggregNumber], coarseMesh);
 					for (AlgebraicElement* e : finalAggreg.FineElements)
 					{
 						e->FinalAggregate = &finalAggreg;
@@ -118,15 +118,15 @@ public:
 			// Assembly of the final aggregates //
 			//----------------------------------//
 
-			_aggregates = vector<ElementAggregate>(_mesh._coarseElements.size());
-			_numberAggregates = vector<vector<BigNumber>>(_mesh._coarseElements.size());
-			NumberParallelLoop<EmptyResultChunk> parallelLoop(_mesh._coarseElements.size());
+			_aggregates = vector<ElementAggregate>(_mesh.CoarseElements.size());
+			_numberAggregates = vector<vector<BigNumber>>(_mesh.CoarseElements.size());
+			NumberParallelLoop<EmptyResultChunk> parallelLoop(_mesh.CoarseElements.size());
 			parallelLoop.Execute([this](BigNumber finalAggregNumber)
 				{
 					ElementAggregate& finalAggreg = _aggregates[finalAggregNumber];
 					vector<BigNumber>& finalNumberAggreg = _numberAggregates[finalAggregNumber];
 					finalAggreg.Number = finalAggregNumber;
-					finalAggreg.FineElements = GetFineElements(_mesh._coarseElements[finalAggregNumber], _mesh);
+					finalAggreg.FineElements = GetFineElements(_mesh.CoarseElements[finalAggregNumber], _mesh);
 					for (AlgebraicElement* e : finalAggreg.FineElements)
 					{
 						e->FinalAggregate = &finalAggreg;
@@ -154,7 +154,7 @@ private:
 		vector<AlgebraicElement*> fineElements;
 		for (AlgebraicElement* e : aggreg.FineElements)
 		{
-			ElementAggregate& finerAggreg = mesh.FinerMesh->_coarseElements[e->Number];
+			ElementAggregate& finerAggreg = mesh.FinerMesh->CoarseElements[e->Number];
 			fineElements = Utils::Join(fineElements, GetFineElements(finerAggreg, *mesh.FinerMesh));
 		}
 		return fineElements;
@@ -171,14 +171,14 @@ private:
 				auto l = it.col();
 				double a_kl = it.value();
 
-				auto i = mesh._elements[k].CoarseElement->Number;
-				auto j = mesh._elements[l].CoarseElement->Number;
+				auto i = mesh.Elements[k].CoarseElement->Number;
+				auto j = mesh.Elements[l].CoarseElement->Number;
 
 				coeffs.Add(i, j, a_kl);
 			}
 		}
 
-		SparseMatrix Ac(mesh._coarseElements.size(), mesh._coarseElements.size());
+		SparseMatrix Ac(mesh.CoarseElements.size(), mesh.CoarseElements.size());
 		coeffs.Fill(Ac);
 		return Ac;
 	}
@@ -188,13 +188,13 @@ private:
 	SparseMatrix BuildQ_T(const AlgebraicMesh& mesh)
 	{
 		DenseMatrix Id = DenseMatrix::Identity(_blockSize, _blockSize);
-		NumberParallelLoop<CoeffsChunk> parallelLoopQ_T(mesh._elements.size());
+		NumberParallelLoop<CoeffsChunk> parallelLoopQ_T(mesh.Elements.size());
 		parallelLoopQ_T.Execute([this, &mesh, &Id](BigNumber elemNumber, ParallelChunk<CoeffsChunk>* chunk)
 			{
-				const AlgebraicElement& elem = mesh._elements[elemNumber];
+				const AlgebraicElement& elem = mesh.Elements[elemNumber];
 				chunk->Results.Coeffs.Add(elem.Number*_blockSize, elem.CoarseElement->Number*_blockSize, Id);
 			});
-		SparseMatrix Q_T = SparseMatrix(mesh._elements.size()*_blockSize, mesh._coarseElements.size()*_blockSize);
+		SparseMatrix Q_T = SparseMatrix(mesh.Elements.size()*_blockSize, mesh.CoarseElements.size()*_blockSize);
 		parallelLoopQ_T.Fill(Q_T);
 		return Q_T;
 	}
@@ -216,18 +216,18 @@ public:
 	{
 		if (_blockSize == 1)
 		{
-			Vector fineV(_mesh._elements.size());
-			/*for (AlgebraicElement& e : _mesh._elements)
+			Vector fineV(_mesh.Elements.size());
+			/*for (AlgebraicElement& e : _mesh.Elements)
 				fineV[e.Number] = coarseV[e.FinalAggregate->Number];
 			return fineV;*/
-			for (AlgebraicElement& e : _mesh._elements)
+			for (AlgebraicElement& e : _mesh.Elements)
 				fineV[e.Number] = coarseV[e.FinalAggregateNumber];
 			return fineV;
 		}
 		else
 		{
-			Vector fineV = Vector::Zero(_mesh._elements.size() * _blockSize);
-			for (AlgebraicElement& e : _mesh._elements)
+			Vector fineV = Vector::Zero(_mesh.Elements.size() * _blockSize);
+			for (AlgebraicElement& e : _mesh.Elements)
 				fineV[e.Number * _blockSize] = coarseV[e.FinalAggregate->Number * _blockSize];
 			return fineV;
 		}

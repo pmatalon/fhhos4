@@ -39,8 +39,8 @@ private:
 
 	const SparseMatrix* A;
 public:
-	vector<AlgebraicElement> _elements;
-	vector<ElementAggregate> _coarseElements;
+	vector<AlgebraicElement> Elements;
+	vector<ElementAggregate> CoarseElements;
 
 	AlgebraicMesh* FinerMesh = nullptr;
 
@@ -56,21 +56,21 @@ public:
 		this->A = &A;
 
 		BigNumber nElements = A.rows() / _blockSize;
-		this->_elements = vector<AlgebraicElement>(nElements);
+		this->Elements = vector<AlgebraicElement>(nElements);
 
 		// Numbering
-		NumberParallelLoop<EmptyResultChunk> parallelLoop(_elements.size());
+		NumberParallelLoop<EmptyResultChunk> parallelLoop(Elements.size());
 		parallelLoop.Execute([this](BigNumber elemNumber, ParallelChunk<EmptyResultChunk>* chunk)
 			{
-				AlgebraicElement& elem = _elements[elemNumber];
+				AlgebraicElement& elem = Elements[elemNumber];
 				elem.Number = elemNumber;
 			});
 
 		// Neighbours and coupling
-		NumberParallelLoop<EmptyResultChunk> parallelLoop2(_elements.size());
+		NumberParallelLoop<EmptyResultChunk> parallelLoop2(Elements.size());
 		parallelLoop2.Execute([this, &A](BigNumber elemNumber, ParallelChunk<EmptyResultChunk>* chunk)
 			{
-				AlgebraicElement& elem = _elements[elemNumber];
+				AlgebraicElement& elem = Elements[elemNumber];
 				for (int k = 0; k < _blockSize; k++)
 				{
 					// RowMajor --> the following line iterates over the non-zeros of the elemNumber-th row.
@@ -79,7 +79,7 @@ public:
 						BigNumber neighbourNumber = it.col() / _blockSize;
 						if (neighbourNumber != elemNumber)
 						{
-							AlgebraicElement* neighbour = &_elements[neighbourNumber];
+							AlgebraicElement* neighbour = &Elements[neighbourNumber];
 							if (find_if(elem.Neighbours.begin(), elem.Neighbours.end(), [neighbour](const pair<AlgebraicElement*, double>& n) { return n.first == neighbour; }) == elem.Neighbours.end())
 							{
 								double coupling = this->CouplingValue(elem, *neighbour);
@@ -115,13 +115,13 @@ public:
 	void PairWiseAggregate(bool& coarsestPossibleMeshReached)
 	{
 		PairwiseAggregation<AlgebraicElement, ElementAggregate> aggregProcess;
-		_coarseElements = aggregProcess.Perform(_elements, coarsestPossibleMeshReached);
+		CoarseElements = aggregProcess.Perform(Elements, coarsestPossibleMeshReached);
 	}
 
 	void AllNeighbourAggregate(bool& coarsestPossibleMeshReached)
 	{
 		AllNeighbourAggregation<AlgebraicElement, ElementAggregate> aggregProcess;
-		_coarseElements = aggregProcess.Perform(_elements, coarsestPossibleMeshReached);
+		CoarseElements = aggregProcess.Perform(Elements, coarsestPossibleMeshReached);
 	}
 
 private:
