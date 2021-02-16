@@ -101,7 +101,7 @@ public:
 				this->Q_F = this->Q_F * *Q_F;
 			}
 
-			if (this->_faceProlong == CAMGFaceProlongation::FaceAggregates)
+			if (this->_faceProlong == CAMGFaceProlongation::FaceAggregates || this->_multigridProlong == CAMGProlongation::ReconstructSmoothedTraceOrInject)
 			{
 				const SparseMatrix* oldSchur = schur;
 				schur = new SparseMatrix(P->transpose() * (*oldSchur) * (*P));
@@ -125,7 +125,7 @@ public:
 	}
 
 	// Returns <A_T_Tc, A_T_Fc, A_F_Fc, P, Q_F, coarsestPossibleMeshReached>
-	tuple<SparseMatrix*, SparseMatrix*, SparseMatrix*, SparseMatrix*, SparseMatrix*, bool> Coarsen(const SparseMatrix A_T_T, const SparseMatrix A_T_F, const SparseMatrix A_F_F, const SparseMatrix schur, CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy)
+	tuple<SparseMatrix*, SparseMatrix*, SparseMatrix*, SparseMatrix*, SparseMatrix*, bool> Coarsen(const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F, const SparseMatrix& schur, CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy)
 	{
 		//ExportMatrix(A_T_T, "A_T_T", 0);
 		//ExportMatrix(A_T_F, "A_T_F", 0);
@@ -240,22 +240,63 @@ public:
 			SparseMatrix Theta = -inv_A_T_Tc * *A_T_Fc_tmp;   // Reconstruct
 			SparseMatrix Pi = BuildCoarseTraceOnFineRemovedFaces(mesh); // Trace
 
-			SparseMatrix ReconstructAndTrace1 = Pi * Theta;
+			SparseMatrix ReconstructAndTrace = Pi * Theta;
 
 			NumberParallelLoop<CoeffsChunk> parallelLoop(mesh._faces.size());
 			parallelLoop.ReserveChunkCoeffsSize(_faceBlockSize * 2 * _faceBlockSize);
-			parallelLoop.Execute([this, &ReconstructAndTrace1, &Q_F, &mesh](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
+			parallelLoop.Execute([this, &ReconstructAndTrace, &Q_F, &mesh](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
 				{
 					const HybridAlgebraicFace* face = &mesh._faces[faceNumber];
 					if (face->IsRemovedOnCoarseMesh)
-						chunk->Results.Coeffs.CopyRows(faceNumber*_faceBlockSize, _faceBlockSize, ReconstructAndTrace1);
+						chunk->Results.Coeffs.CopyRows(faceNumber*_faceBlockSize, _faceBlockSize, ReconstructAndTrace);
 					else
 						chunk->Results.Coeffs.CopyRows(faceNumber*_faceBlockSize, _faceBlockSize, *Q_F);
 				});
 			P = new SparseMatrix(Q_F->rows(), Q_F->cols());
 			parallelLoop.Fill(*P);
 		}
-		else if (_multigridProlong == CAMGProlongation::HighOrder) // 6
+		else if (_multigridProlong == CAMGProlongation::ReconstructSmoothedTraceOrInject) // 6
+		{
+			SparseMatrix inv_A_T_Tc = Utils::InvertBlockDiagMatrix(*A_T_Tc, _cellBlockSize);
+			SparseMatrix Theta = -inv_A_T_Tc * *A_T_Fc_tmp;   // Reconstruct
+			SparseMatrix Pi = BuildCoarseTraceOnFineRemovedFaces(mesh); // Trace
+			//SparseMatrix Pi = BuildCoarseTraceOnFineFaces(mesh); // Trace
+
+			SparseMatrix ReconstructAndTrace = Pi * Theta;
+
+			NumberParallelLoop<CoeffsChunk> parallelLoop(mesh._faces.size());
+			parallelLoop.ReserveChunkCoeffsSize(_faceBlockSize * 2 * _faceBlockSize);
+			parallelLoop.Execute([this, &ReconstructAndTrace, &Q_F, &mesh](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
+				{
+					const HybridAlgebraicFace* face = &mesh._faces[faceNumber];
+					if (face->IsRemovedOnCoarseMesh)
+						chunk->Results.Coeffs.CopyRows(faceNumber*_faceBlockSize, _faceBlockSize, ReconstructAndTrace);
+					else
+						chunk->Results.Coeffs.CopyRows(faceNumber*_faceBlockSize, _faceBlockSize, *Q_F);
+				});
+			SparseMatrix ReconstructTraceOrInject(Q_F->rows(), Q_F->cols());
+			parallelLoop.Fill(ReconstructTraceOrInject);
+
+			BlockJacobi blockJacobi(_faceBlockSize, 2.0/3.0);
+			blockJacobi.Setup(schur);
+			SparseMatrix J = blockJacobi.IterationMatrix(); // Smoothing
+
+			SparseMatrix ReconstructAndSmoothedTrace = J * ReconstructTraceOrInject;
+
+			NumberParallelLoop<CoeffsChunk> parallelLoop2(mesh._faces.size());
+			parallelLoop2.ReserveChunkCoeffsSize(_faceBlockSize * 2 * _faceBlockSize);
+			parallelLoop2.Execute([this, &ReconstructAndSmoothedTrace, &Q_F, &mesh](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
+				{
+					const HybridAlgebraicFace* face = &mesh._faces[faceNumber];
+					if (face->IsRemovedOnCoarseMesh)
+						chunk->Results.Coeffs.CopyRows(faceNumber*_faceBlockSize, _faceBlockSize, ReconstructAndSmoothedTrace);
+					else
+						chunk->Results.Coeffs.CopyRows(faceNumber*_faceBlockSize, _faceBlockSize, *Q_F);
+				});
+			P = new SparseMatrix(Q_F->rows(), Q_F->cols());
+			parallelLoop2.Fill(*P);
+		}
+		else if (_multigridProlong == CAMGProlongation::HighOrder) // 7
 		{
 			SparseMatrix inv_A_T_Tc = Utils::InvertBlockDiagMatrix(*A_T_Tc, _cellBlockSize);
 			SparseMatrix Theta = -inv_A_T_Tc * *A_T_Fc_tmp;   // Reconstruct
@@ -439,6 +480,23 @@ private:
 				const HybridAlgebraicFace& face = mesh._faces[faceNumber];
 				if (face.IsRemovedOnCoarseMesh)
 					chunk->Results.Coeffs.Add(faceNumber*_faceBlockSize, face.CoarseElements[0]->Number*_cellBlockSize, traceOfConstant);
+			});
+		SparseMatrix Pi = SparseMatrix(mesh._faces.size()*_faceBlockSize, mesh._coarseElements.size()*_cellBlockSize);
+		parallelLoopPi.Fill(Pi);
+		return Pi;
+	}
+
+	SparseMatrix BuildCoarseTraceOnFineFaces(const HybridAlgebraicMesh& mesh)
+	{
+		DenseMatrix traceOfConstant = DenseMatrix::Zero(_faceBlockSize, _cellBlockSize);
+		traceOfConstant(0, 0) = 1;
+
+		NumberParallelLoop<CoeffsChunk> parallelLoopPi(mesh._faces.size());
+		parallelLoopPi.Execute([this, &mesh, &traceOfConstant](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				const HybridAlgebraicFace& face = mesh._faces[faceNumber];
+				for (HybridElementAggregate* ce : face.CoarseElements)
+					chunk->Results.Coeffs.Add(faceNumber*_faceBlockSize, ce->Number*_cellBlockSize, (1.0 / face.CoarseElements.size())*traceOfConstant);
 			});
 		SparseMatrix Pi = SparseMatrix(mesh._faces.size()*_faceBlockSize, mesh._coarseElements.size()*_cellBlockSize);
 		parallelLoopPi.Fill(Pi);

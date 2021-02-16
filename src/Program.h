@@ -554,7 +554,7 @@ private:
 
 		int sizeTime = 14;
 		int sizeWork = 14;
-		int sizeMatVec = 12;
+		int sizeMatVec = 13;
 
 		auto oneFineMatVecWork = 2 * problem->A.nonZeros();
 
