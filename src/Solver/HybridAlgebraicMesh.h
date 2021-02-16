@@ -206,7 +206,8 @@ public:
 		else if (elemCoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
 		{
 			cout << "\tElement agglomeration" << endl;
-			Utils::FatalError("Unmanaged element coarsening strategy: TODO");
+			AllNeighbourAggregation<HybridAlgebraicElement, HybridElementAggregate> aggregProcess;
+			_coarseElements = aggregProcess.Perform(_elements, coarsestPossibleMeshReached);
 		}
 		else
 			Utils::FatalError("Unmanaged element coarsening strategy");

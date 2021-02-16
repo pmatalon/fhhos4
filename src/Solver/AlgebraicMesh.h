@@ -1,6 +1,7 @@
 #pragma once
 #include "../Utils/Utils.h"
 #include "PairwiseAggregation.h"
+#include "AllNeighbourAggregation.h"
 #include <mutex>
 using namespace std;
 
@@ -114,6 +115,12 @@ public:
 	void PairWiseAggregate(bool& coarsestPossibleMeshReached)
 	{
 		PairwiseAggregation<AlgebraicElement, ElementAggregate> aggregProcess;
+		_coarseElements = aggregProcess.Perform(_elements, coarsestPossibleMeshReached);
+	}
+
+	void AllNeighbourAggregate(bool& coarsestPossibleMeshReached)
+	{
+		AllNeighbourAggregation<AlgebraicElement, ElementAggregate> aggregProcess;
 		_coarseElements = aggregProcess.Perform(_elements, coarsestPossibleMeshReached);
 	}
 

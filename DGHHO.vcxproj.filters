@@ -441,6 +441,9 @@
     <ClInclude Include="src\Solver\PairwiseAggregation.h">
       <Filter>Solver</Filter>
     </ClInclude>
+    <ClInclude Include="src\Solver\AllNeighbourAggregation.h">
+      <Filter>Solver</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

@@ -44,68 +44,102 @@ public:
 
 		_mesh.Build(*this->OperatorMatrix);
 
-		//----------------------------//
-		// First pairwise aggregation //
-		//----------------------------//
+		if (coarseningStgy == CoarseningStrategy::DoublePairwiseAggregation)
+		{
+			//----------------------------//
+			// First pairwise aggregation //
+			//----------------------------//
 
-		if (coarseningStgy != CoarseningStrategy::DoublePairwiseAggregation)
-			Utils::FatalError("Unmanaged coarsening strategy");
+			cout << "\tPairwise aggregation 1" << endl;
+			_mesh.PairWiseAggregate(coarsestPossibleMeshReached);
+			if (coarsestPossibleMeshReached)
+				return;
 
-		cout << "\tPairwise aggregation 1" << endl;
-		_mesh.PairWiseAggregate(coarsestPossibleMeshReached);
-		if (coarsestPossibleMeshReached)
-			return;
+			/*// Cell-prolongation operator with only one 1 coefficient per row
+			SparseMatrix Q_T1 = BuildQ_T(_mesh);
+			SparseMatrix A1_old = Q_T1.transpose()* *this->OperatorMatrix * Q_T1;*/
 
-		/*// Cell-prolongation operator with only one 1 coefficient per row
-		SparseMatrix Q_T1 = BuildQ_T(_mesh);
-		SparseMatrix A1_old = Q_T1.transpose()* *this->OperatorMatrix * Q_T1;*/
+			// Intermediate coarse operator
+			SparseMatrix A1 = GalerkinOperator(*this->OperatorMatrix, _mesh);
 
-		// Intermediate coarse operator
-		SparseMatrix A1 = GalerkinOperator(*this->OperatorMatrix, _mesh);
+			//-----------------------------//
+			// Second pairwise aggregation //
+			//-----------------------------//
 
-		//-----------------------------//
-		// Second pairwise aggregation //
-		//-----------------------------//
+			cout << "\tBuild intermediary coarse mesh" << endl;
 
-		cout << "\tBuild intermediary coarse mesh" << endl;
+			AlgebraicMesh coarseMesh(_blockSize, _strongCouplingThreshold);
+			coarseMesh.FinerMesh = &_mesh;
+			coarseMesh.Build(A1);
 
-		AlgebraicMesh coarseMesh(_blockSize, _strongCouplingThreshold);
-		coarseMesh.FinerMesh = &_mesh;
-		coarseMesh.Build(A1);
+			cout << "\tPairwise aggregation 2" << endl;
 
-		cout << "\tPairwise aggregation 2" << endl;
+			coarseMesh.PairWiseAggregate(coarsestPossibleMeshReached);
+			if (coarsestPossibleMeshReached)
+				return;
 
-		coarseMesh.PairWiseAggregate(coarsestPossibleMeshReached);
-		if (coarsestPossibleMeshReached)
-			return;
+			/*SparseMatrix Q_T2 = BuildQ_T(coarseMesh);
+			SparseMatrix Ac_old = Q_T2.transpose()* A1_old * Q_T2;
+			//this->P = Q_T1 * Q_T2;*/
 
-		/*SparseMatrix Q_T2 = BuildQ_T(coarseMesh);
-		SparseMatrix Ac_old = Q_T2.transpose()* A1_old * Q_T2;
-		//this->P = Q_T1 * Q_T2;*/
+			this->Ac = GalerkinOperator(A1, coarseMesh);
 
-		this->Ac = GalerkinOperator(A1, coarseMesh);
+			//-----------------------------------//
+			// Assembly of the double-aggregates //
+			//-----------------------------------//
 
-		//-----------------------------------//
-		// Assembly of the double-aggregates //
-		//-----------------------------------//
-
-		_aggregates = vector<ElementAggregate>(coarseMesh._coarseElements.size());
-		_numberAggregates = vector<vector<BigNumber>>(coarseMesh._coarseElements.size());
-		NumberParallelLoop<EmptyResultChunk> parallelLoop(coarseMesh._coarseElements.size());
-		parallelLoop.Execute([this, &coarseMesh](BigNumber finalAggregNumber)
-			{
-				ElementAggregate& finalAggreg = _aggregates[finalAggregNumber];
-				vector<BigNumber>& finalNumberAggreg = _numberAggregates[finalAggregNumber];
-				finalAggreg.Number = finalAggregNumber;
-				finalAggreg.FineElements = GetFineElements(coarseMesh._coarseElements[finalAggregNumber], coarseMesh);
-				for (AlgebraicElement* e : finalAggreg.FineElements)
+			_aggregates = vector<ElementAggregate>(coarseMesh._coarseElements.size());
+			_numberAggregates = vector<vector<BigNumber>>(coarseMesh._coarseElements.size());
+			NumberParallelLoop<EmptyResultChunk> parallelLoop(coarseMesh._coarseElements.size());
+			parallelLoop.Execute([this, &coarseMesh](BigNumber finalAggregNumber)
 				{
-					e->FinalAggregate = &finalAggreg;
-					e->FinalAggregateNumber = finalAggreg.Number;
-					finalNumberAggreg.push_back(e->Number);
-				}
-			});
-		
+					ElementAggregate& finalAggreg = _aggregates[finalAggregNumber];
+					vector<BigNumber>& finalNumberAggreg = _numberAggregates[finalAggregNumber];
+					finalAggreg.Number = finalAggregNumber;
+					finalAggreg.FineElements = GetFineElements(coarseMesh._coarseElements[finalAggregNumber], coarseMesh);
+					for (AlgebraicElement* e : finalAggreg.FineElements)
+					{
+						e->FinalAggregate = &finalAggreg;
+						e->FinalAggregateNumber = finalAggreg.Number;
+						finalNumberAggreg.push_back(e->Number);
+					}
+				});
+		}
+		else if (coarseningStgy == CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
+		{
+			cout << "\tElement agglomeration" << endl;
+			_mesh.AllNeighbourAggregate(coarsestPossibleMeshReached);
+			if (coarsestPossibleMeshReached)
+				return;
+
+			this->Ac = GalerkinOperator(*this->OperatorMatrix, _mesh);
+
+			//----------------------------------//
+			// Assembly of the final aggregates //
+			//----------------------------------//
+
+			_aggregates = vector<ElementAggregate>(_mesh._coarseElements.size());
+			_numberAggregates = vector<vector<BigNumber>>(_mesh._coarseElements.size());
+			NumberParallelLoop<EmptyResultChunk> parallelLoop(_mesh._coarseElements.size());
+			parallelLoop.Execute([this](BigNumber finalAggregNumber)
+				{
+					ElementAggregate& finalAggreg = _aggregates[finalAggregNumber];
+					vector<BigNumber>& finalNumberAggreg = _numberAggregates[finalAggregNumber];
+					finalAggreg.Number = finalAggregNumber;
+					finalAggreg.FineElements = GetFineElements(_mesh._coarseElements[finalAggregNumber], _mesh);
+					for (AlgebraicElement* e : finalAggreg.FineElements)
+					{
+						e->FinalAggregate = &finalAggreg;
+						e->FinalAggregateNumber = finalAggreg.Number;
+						finalNumberAggreg.push_back(e->Number);
+					}
+				});
+		}
+		else
+			Utils::FatalError("Unmanaged element coarsening strategy");
+
+
+
 		_restrictionCost = 0;
 		for (ElementAggregate& a : _aggregates)
 			_restrictionCost += a.FineElements.size();
