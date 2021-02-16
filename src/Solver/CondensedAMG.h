@@ -155,7 +155,7 @@ public:
 		}
 
 		cout << "------------- Faces" << endl;
-		for (HybridFaceAggregate& agg : mesh._coarseFaces)
+		for (HybridFaceAggregate& agg : mesh.CoarseFaces)
 		{
 			cout << "(";
 			for (auto f : agg.FineFaces)
@@ -242,11 +242,11 @@ public:
 
 			SparseMatrix ReconstructAndTrace = Pi * Theta;
 
-			NumberParallelLoop<CoeffsChunk> parallelLoop(mesh._faces.size());
+			NumberParallelLoop<CoeffsChunk> parallelLoop(mesh.Faces.size());
 			parallelLoop.ReserveChunkCoeffsSize(_faceBlockSize * 2 * _faceBlockSize);
 			parallelLoop.Execute([this, &ReconstructAndTrace, &Q_F, &mesh](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
 				{
-					const HybridAlgebraicFace* face = &mesh._faces[faceNumber];
+					const HybridAlgebraicFace* face = &mesh.Faces[faceNumber];
 					if (face->IsRemovedOnCoarseMesh)
 						chunk->Results.Coeffs.CopyRows(faceNumber*_faceBlockSize, _faceBlockSize, ReconstructAndTrace);
 					else
@@ -264,11 +264,11 @@ public:
 
 			SparseMatrix ReconstructAndTrace = Pi * Theta;
 
-			NumberParallelLoop<CoeffsChunk> parallelLoop(mesh._faces.size());
+			NumberParallelLoop<CoeffsChunk> parallelLoop(mesh.Faces.size());
 			parallelLoop.ReserveChunkCoeffsSize(_faceBlockSize * 2 * _faceBlockSize);
 			parallelLoop.Execute([this, &ReconstructAndTrace, &Q_F, &mesh](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
 				{
-					const HybridAlgebraicFace* face = &mesh._faces[faceNumber];
+					const HybridAlgebraicFace* face = &mesh.Faces[faceNumber];
 					if (face->IsRemovedOnCoarseMesh)
 						chunk->Results.Coeffs.CopyRows(faceNumber*_faceBlockSize, _faceBlockSize, ReconstructAndTrace);
 					else
@@ -283,11 +283,11 @@ public:
 
 			SparseMatrix ReconstructAndSmoothedTrace = J * ReconstructTraceOrInject;
 
-			NumberParallelLoop<CoeffsChunk> parallelLoop2(mesh._faces.size());
+			NumberParallelLoop<CoeffsChunk> parallelLoop2(mesh.Faces.size());
 			parallelLoop2.ReserveChunkCoeffsSize(_faceBlockSize * 2 * _faceBlockSize);
 			parallelLoop2.Execute([this, &ReconstructAndSmoothedTrace, &Q_F, &mesh](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
 				{
-					const HybridAlgebraicFace* face = &mesh._faces[faceNumber];
+					const HybridAlgebraicFace* face = &mesh.Faces[faceNumber];
 					if (face->IsRemovedOnCoarseMesh)
 						chunk->Results.Coeffs.CopyRows(faceNumber*_faceBlockSize, _faceBlockSize, ReconstructAndSmoothedTrace);
 					else
@@ -304,11 +304,11 @@ public:
 			
 			SparseMatrix ReconstructAndTrace1 = Pi * Q_T * Theta;
 
-			NumberParallelLoop<CoeffsChunk> parallelLoop(mesh._faces.size());
+			NumberParallelLoop<CoeffsChunk> parallelLoop(mesh.Faces.size());
 			parallelLoop.ReserveChunkCoeffsSize(_faceBlockSize * 2 * _faceBlockSize);
 			parallelLoop.Execute([this, &ReconstructAndTrace1, &Q_F, &mesh](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
 				{
-					const HybridAlgebraicFace* face = &mesh._faces[faceNumber];
+					const HybridAlgebraicFace* face = &mesh.Faces[faceNumber];
 					if (face->IsRemovedOnCoarseMesh)
 						chunk->Results.Coeffs.CopyRows(faceNumber*_faceBlockSize, _faceBlockSize, ReconstructAndTrace1);
 					else
@@ -343,13 +343,13 @@ private:
 	SparseMatrix BuildQ_T(const HybridAlgebraicMesh& mesh)
 	{
 		DenseMatrix Id = DenseMatrix::Identity(_cellBlockSize, _cellBlockSize);
-		NumberParallelLoop<CoeffsChunk> parallelLoopQ_T(mesh._elements.size());
+		NumberParallelLoop<CoeffsChunk> parallelLoopQ_T(mesh.Elements.size());
 		parallelLoopQ_T.Execute([this, &mesh, &Id](BigNumber elemNumber, ParallelChunk<CoeffsChunk>* chunk)
 			{
-				const HybridAlgebraicElement& elem = mesh._elements[elemNumber];
+				const HybridAlgebraicElement& elem = mesh.Elements[elemNumber];
 				chunk->Results.Coeffs.Add(elem.Number*_cellBlockSize, elem.CoarseElement->Number*_cellBlockSize, Id);
 			});
-		SparseMatrix Q_T = SparseMatrix(mesh._elements.size()*_cellBlockSize, mesh._coarseElements.size()*_cellBlockSize);
+		SparseMatrix Q_T = SparseMatrix(mesh.Elements.size()*_cellBlockSize, mesh.CoarseElements.size()*_cellBlockSize);
 		parallelLoopQ_T.Fill(Q_T);
 		return Q_T;
 	}
@@ -360,10 +360,10 @@ private:
 		bool enableAnisotropyManagement = false;
 		DenseMatrix Id = DenseMatrix::Identity(_faceBlockSize, _faceBlockSize);
 
-		NumberParallelLoop<CoeffsChunk> parallelLoop1(mesh._faces.size());
+		NumberParallelLoop<CoeffsChunk> parallelLoop1(mesh.Faces.size());
 		parallelLoop1.Execute([this, &mesh, &Id, enableAnisotropyManagement, &A_F_F](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
 			{
-				const HybridAlgebraicFace* face = &mesh._faces[faceNumber];
+				const HybridAlgebraicFace* face = &mesh.Faces[faceNumber];
 				if (face->IsRemovedOnCoarseMesh && (!Utils::ProgramArgs.Solver.MG.ManageAnisotropy || !face->CoarseFace))
 				{
 					// Take the average value of the coarse element faces
@@ -408,7 +408,7 @@ private:
 			});
 
 
-		SparseMatrix Q_F = SparseMatrix(mesh._faces.size()*_faceBlockSize, mesh._coarseFaces.size()*_faceBlockSize);
+		SparseMatrix Q_F = SparseMatrix(mesh.Faces.size()*_faceBlockSize, mesh.CoarseFaces.size()*_faceBlockSize);
 		parallelLoop1.Fill(Q_F);
 		return Q_F;
 	}
@@ -417,16 +417,16 @@ private:
 	{
 		DenseMatrix Id = DenseMatrix::Identity(_faceBlockSize, _faceBlockSize);
 
-		NumberParallelLoop<CoeffsChunk> parallelLoop(mesh._faces.size());
+		NumberParallelLoop<CoeffsChunk> parallelLoop(mesh.Faces.size());
 		parallelLoop.Execute([this, &mesh, &Id](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
 			{
-				const HybridAlgebraicFace* face = &mesh._faces[faceNumber];
+				const HybridAlgebraicFace* face = &mesh.Faces[faceNumber];
 				if (!face->IsRemovedOnCoarseMesh)
 					chunk->Results.Coeffs.Add(face->Number*_faceBlockSize, face->CoarseFace->Number*_faceBlockSize, Id);
 			});
 
 
-		SparseMatrix Q_F = SparseMatrix(mesh._faces.size()*_faceBlockSize, mesh._coarseFaces.size()*_faceBlockSize);
+		SparseMatrix Q_F = SparseMatrix(mesh.Faces.size()*_faceBlockSize, mesh.CoarseFaces.size()*_faceBlockSize);
 		parallelLoop.Fill(Q_F);
 		return Q_F;
 	}
@@ -451,10 +451,10 @@ private:
 		DenseMatrix traceOfConstant = DenseMatrix::Zero(_faceBlockSize, _cellBlockSize);
 		traceOfConstant(0, 0) = 1;
 
-		NumberParallelLoop<CoeffsChunk> parallelLoopPi(mesh._faces.size());
+		NumberParallelLoop<CoeffsChunk> parallelLoopPi(mesh.Faces.size());
 		parallelLoopPi.Execute([this, &mesh, &traceOfConstant](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
 			{
-				const HybridAlgebraicFace& face = mesh._faces[faceNumber];
+				const HybridAlgebraicFace& face = mesh.Faces[faceNumber];
 				if (face.IsRemovedOnCoarseMesh)
 					chunk->Results.Coeffs.Add(faceNumber*_faceBlockSize, face.Elements[0]->Number*_cellBlockSize, traceOfConstant);
 				else
@@ -464,7 +464,7 @@ private:
 						chunk->Results.Coeffs.Add(faceNumber*_faceBlockSize, elem->Number*_cellBlockSize, 1.0 / face.Elements.size()*traceOfConstant);
 				}
 			});
-		SparseMatrix Pi = SparseMatrix(mesh._faces.size()*_faceBlockSize, mesh._elements.size()*_cellBlockSize);
+		SparseMatrix Pi = SparseMatrix(mesh.Faces.size()*_faceBlockSize, mesh.Elements.size()*_cellBlockSize);
 		parallelLoopPi.Fill(Pi);
 		return Pi;
 	}
@@ -474,14 +474,14 @@ private:
 		DenseMatrix traceOfConstant = DenseMatrix::Zero(_faceBlockSize, _cellBlockSize);
 		traceOfConstant(0, 0) = 1;
 
-		NumberParallelLoop<CoeffsChunk> parallelLoopPi(mesh._faces.size());
+		NumberParallelLoop<CoeffsChunk> parallelLoopPi(mesh.Faces.size());
 		parallelLoopPi.Execute([this, &mesh, &traceOfConstant](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
 			{
-				const HybridAlgebraicFace& face = mesh._faces[faceNumber];
+				const HybridAlgebraicFace& face = mesh.Faces[faceNumber];
 				if (face.IsRemovedOnCoarseMesh)
 					chunk->Results.Coeffs.Add(faceNumber*_faceBlockSize, face.CoarseElements[0]->Number*_cellBlockSize, traceOfConstant);
 			});
-		SparseMatrix Pi = SparseMatrix(mesh._faces.size()*_faceBlockSize, mesh._coarseElements.size()*_cellBlockSize);
+		SparseMatrix Pi = SparseMatrix(mesh.Faces.size()*_faceBlockSize, mesh.CoarseElements.size()*_cellBlockSize);
 		parallelLoopPi.Fill(Pi);
 		return Pi;
 	}
@@ -491,24 +491,24 @@ private:
 		DenseMatrix traceOfConstant = DenseMatrix::Zero(_faceBlockSize, _cellBlockSize);
 		traceOfConstant(0, 0) = 1;
 
-		NumberParallelLoop<CoeffsChunk> parallelLoopPi(mesh._faces.size());
+		NumberParallelLoop<CoeffsChunk> parallelLoopPi(mesh.Faces.size());
 		parallelLoopPi.Execute([this, &mesh, &traceOfConstant](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
 			{
-				const HybridAlgebraicFace& face = mesh._faces[faceNumber];
+				const HybridAlgebraicFace& face = mesh.Faces[faceNumber];
 				for (HybridElementAggregate* ce : face.CoarseElements)
 					chunk->Results.Coeffs.Add(faceNumber*_faceBlockSize, ce->Number*_cellBlockSize, (1.0 / face.CoarseElements.size())*traceOfConstant);
 			});
-		SparseMatrix Pi = SparseMatrix(mesh._faces.size()*_faceBlockSize, mesh._coarseElements.size()*_cellBlockSize);
+		SparseMatrix Pi = SparseMatrix(mesh.Faces.size()*_faceBlockSize, mesh.CoarseElements.size()*_cellBlockSize);
 		parallelLoopPi.Fill(Pi);
 		return Pi;
 	}
 
 	SparseMatrix BuildTraceOnRemovedFaces(const HybridAlgebraicMesh& mesh)
 	{
-		NumberParallelLoop<CoeffsChunk> parallelLoopPi(mesh._faces.size());
+		NumberParallelLoop<CoeffsChunk> parallelLoopPi(mesh.Faces.size());
 		parallelLoopPi.Execute([this, &mesh](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
 			{
-				const HybridAlgebraicFace& face = mesh._faces[faceNumber];
+				const HybridAlgebraicFace& face = mesh.Faces[faceNumber];
 				if (face.IsRemovedOnCoarseMesh)
 				{
 					BigNumber elemNumber = face.Elements[0]->Number;
@@ -518,7 +518,7 @@ private:
 					chunk->Results.Coeffs.Add(faceNumber*_faceBlockSize, elemNumber*_cellBlockSize, trace);
 				}
 			});
-		SparseMatrix Pi = SparseMatrix(mesh._faces.size()*_faceBlockSize, mesh._elements.size()*_cellBlockSize);
+		SparseMatrix Pi = SparseMatrix(mesh.Faces.size()*_faceBlockSize, mesh.Elements.size()*_cellBlockSize);
 		parallelLoopPi.Fill(Pi);
 		return Pi;
 	}

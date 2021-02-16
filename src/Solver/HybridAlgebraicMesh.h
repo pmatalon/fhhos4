@@ -64,10 +64,10 @@ public:
 	const SparseMatrix* A_T_F;
 	const SparseMatrix* A_F_F;
 
-	vector<HybridAlgebraicElement> _elements;
-	vector<HybridAlgebraicFace> _faces;
-	vector<HybridElementAggregate> _coarseElements;
-	vector<HybridFaceAggregate> _coarseFaces;
+	vector<HybridAlgebraicElement> Elements;
+	vector<HybridAlgebraicFace> Faces;
+	vector<HybridElementAggregate> CoarseElements;
+	vector<HybridFaceAggregate> CoarseFaces;
 
 public:
 	HybridAlgebraicMesh(int cellBlockSize, int faceBlockSize, double strongCouplingThreshold)
@@ -90,10 +90,10 @@ public:
 			assert("A_T_F must be row-major");
 
 		BigNumber nElements = A_T_F.rows() / _cellBlockSize;
-		this->_elements = vector<HybridAlgebraicElement>(nElements);
+		this->Elements = vector<HybridAlgebraicElement>(nElements);
 
 		BigNumber nFaces = A_T_F.cols() / _faceBlockSize;
-		this->_faces = vector<HybridAlgebraicFace>(nFaces);
+		this->Faces = vector<HybridAlgebraicFace>(nFaces);
 
 		//cout << nElements << " elements, " << nFaces << " faces found" << endl;
 
@@ -101,10 +101,10 @@ public:
 		// Filling elements' faces //
 		//-------------------------//
 
-		NumberParallelLoop<EmptyResultChunk> parallelLoopElem(_elements.size());
+		NumberParallelLoop<EmptyResultChunk> parallelLoopElem(Elements.size());
 		parallelLoopElem.Execute([this, &A_T_F](BigNumber elemNumber, ParallelChunk<EmptyResultChunk>* chunk)
 			{
-				HybridAlgebraicElement& elem = _elements[elemNumber];
+				HybridAlgebraicElement& elem = Elements[elemNumber];
 				elem.Number = elemNumber;
 
 				for (int k = 0; k < _cellBlockSize; k++)
@@ -113,7 +113,7 @@ public:
 					for (SparseMatrix::InnerIterator it(A_T_F, elemNumber*_cellBlockSize + k); it; ++it)
 					{
 						BigNumber faceNumber = it.col() / _faceBlockSize;
-						HybridAlgebraicFace* face = &_faces[faceNumber];
+						HybridAlgebraicFace* face = &Faces[faceNumber];
 						if (find(elem.Faces.begin(), elem.Faces.end(), face) == elem.Faces.end())
 							elem.Faces.push_back(face);
 					}
@@ -126,10 +126,10 @@ public:
 
 		ColMajorSparseMatrix A_T_F_ColMajor = A_T_F;
 
-		NumberParallelLoop<EmptyResultChunk> parallelLoopFace(_faces.size());
+		NumberParallelLoop<EmptyResultChunk> parallelLoopFace(Faces.size());
 		parallelLoopFace.Execute([this, &A_T_F_ColMajor](BigNumber faceNumber)
 			{
-				HybridAlgebraicFace& face = _faces[faceNumber];
+				HybridAlgebraicFace& face = Faces[faceNumber];
 				face.Number = faceNumber;
 
 				// ColMajor --> the following line iterates over the non-zeros of the faceNumber-th col.
@@ -137,7 +137,7 @@ public:
 				{
 					assert(it.col() / _faceBlockSize == faceNumber);
 					BigNumber elemNumber = it.row() / _cellBlockSize;
-					HybridAlgebraicElement* elem = &_elements[elemNumber];
+					HybridAlgebraicElement* elem = &Elements[elemNumber];
 					if (find(face.Elements.begin(), face.Elements.end(), elem) == face.Elements.end())
 						face.Elements.push_back(elem);
 				}
@@ -147,10 +147,10 @@ public:
 		// Element neighbours //
 		//--------------------//
 
-		parallelLoopElem = NumberParallelLoop<EmptyResultChunk>(_elements.size());
+		parallelLoopElem = NumberParallelLoop<EmptyResultChunk>(Elements.size());
 		parallelLoopElem.Execute([this](BigNumber elemNumber)
 			{
-				HybridAlgebraicElement& elem = _elements[elemNumber];
+				HybridAlgebraicElement& elem = Elements[elemNumber];
 				for (HybridAlgebraicFace* face : elem.Faces)
 				{
 					for (HybridAlgebraicElement* neighbour : face->Elements)
@@ -201,13 +201,13 @@ public:
 		{
 			cout << "\tElement pairwise aggregation" << endl;
 			PairwiseAggregation<HybridAlgebraicElement, HybridElementAggregate> aggregProcess;
-			_coarseElements = aggregProcess.Perform(_elements, coarsestPossibleMeshReached);
+			CoarseElements = aggregProcess.Perform(Elements, coarsestPossibleMeshReached);
 		}
 		else if (elemCoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
 		{
 			cout << "\tElement agglomeration" << endl;
 			AllNeighbourAggregation<HybridAlgebraicElement, HybridElementAggregate> aggregProcess;
-			_coarseElements = aggregProcess.Perform(_elements, coarsestPossibleMeshReached);
+			CoarseElements = aggregProcess.Perform(Elements, coarsestPossibleMeshReached);
 		}
 		else
 			Utils::FatalError("Unmanaged element coarsening strategy");
@@ -217,10 +217,10 @@ public:
 		
 		// Removal of faces shared by elements in the same aggregate.
 		// Determination of the faces of the aggregates.
-		NumberParallelLoop<EmptyResultChunk> parallelLoopCE(_coarseElements.size());
+		NumberParallelLoop<EmptyResultChunk> parallelLoopCE(CoarseElements.size());
 		parallelLoopCE.Execute([this](BigNumber coarseElemNumber)
 			{
-				HybridElementAggregate& coarseElem = _coarseElements[coarseElemNumber];
+				HybridElementAggregate& coarseElem = CoarseElements[coarseElemNumber];
 				for (int i = 0; i < coarseElem.FineElements.size(); i++)
 				{
 					HybridAlgebraicElement* elem1 = coarseElem.FineElements[i];
@@ -252,10 +252,10 @@ public:
 			});
 
 		// Computation of the aggregates' neighbours
-		parallelLoopCE = NumberParallelLoop<EmptyResultChunk>(_coarseElements.size());
+		parallelLoopCE = NumberParallelLoop<EmptyResultChunk>(CoarseElements.size());
 		parallelLoopCE.Execute([this](BigNumber coarseElemNumber)
 			{
-				HybridElementAggregate* coarseElem = &_coarseElements[coarseElemNumber];
+				HybridElementAggregate* coarseElem = &CoarseElements[coarseElemNumber];
 				set<HybridElementAggregate*> neighbours;
 				for (HybridAlgebraicFace* face : coarseElem->FineFaces)
 				{
@@ -274,14 +274,14 @@ public:
 			});
 
 		// Face aggregation by collapsing multiple interfaces
-		this->_coarseFaces.reserve(_faces.size()); // must reserve sufficient space
+		this->CoarseFaces.reserve(Faces.size()); // must reserve sufficient space
 		if (faceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsing ||
 			faceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsingAndTryAggregInteriorToInterfaces)
 		{
 			cout << "\tInterface collapsing" << endl;
 
 			// Collapse faces interfacing two element aggregates.
-			for (HybridElementAggregate& coarseElem : _coarseElements)
+			for (HybridElementAggregate& coarseElem : CoarseElements)
 			{
 				for (auto it = coarseElem.Neighbours.begin(); it != coarseElem.Neighbours.end(); it++)
 				{
@@ -289,8 +289,8 @@ public:
 					vector<HybridAlgebraicFace*> fineFaces = it->second;
 					if (!fineFaces.front()->CoarseFace)
 					{
-						_coarseFaces.emplace_back(_coarseFaces.size(), fineFaces);
-						HybridFaceAggregate* coarseFace = &_coarseFaces.back(); // if _coarseFaces is reallocated, all the pointers already taken are invalid
+						CoarseFaces.emplace_back(CoarseFaces.size(), fineFaces);
+						HybridFaceAggregate* coarseFace = &CoarseFaces.back(); // if CoarseFaces is reallocated, all the pointers already taken are invalid
 						for (HybridAlgebraicFace* fineFace : fineFaces)
 							fineFace->CoarseFace = coarseFace;
 						coarseElem.CoarseFaces.push_back(coarseFace);
@@ -305,7 +305,7 @@ public:
 			cout << "\tInterior faces agglomeration" << endl;
 
 			// Agglomerate removed faces
-			for (HybridAlgebraicFace& face : _faces)
+			for (HybridAlgebraicFace& face : Faces)
 			{
 				if (!face.IsRemovedOnCoarseMesh)
 					continue;
@@ -329,8 +329,8 @@ public:
 			}
 		}
 
-		//cout << _coarseElements.size() << " coarse elements, " << _coarseFaces.size() << " coarse faces" << endl;
-		if (_coarseFaces.empty())
+		//cout << _coarseElements.size() << " coarse elements, " << CoarseFaces.size() << " coarse faces" << endl;
+		if (CoarseFaces.empty())
 			coarsestPossibleMeshReached = true;
 	}
 
