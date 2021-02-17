@@ -216,7 +216,7 @@ private:
 
 	void MultigridCycle(Level* level, const Vector& b, Vector& x, IterationResult& result)
 	{
-		const SparseMatrix A = *level->OperatorMatrix;
+		const SparseMatrix& A = *level->OperatorMatrix;
 
 		if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
 			level->ExportVector(b, "it" + to_string(this->IterationCount) + "_b");
