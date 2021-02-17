@@ -45,7 +45,7 @@ public:
 		this->_tolerance = oldResult._tolerance;
 	}
 
-	BigNumber SolvingComputationalWork()
+	size_t SolvingComputationalWork()
 	{
 		return _solvingComputationalWork;
 	}
@@ -67,7 +67,7 @@ public:
 		this->_solvingTimer.Stop();
 	}
 
-	void SetExactSolution(const Vector exactSolution)
+	void SetExactSolution(const Vector& exactSolution)
 	{
 		this->_exactSolution = exactSolution;
 		this->_computeError = true;
