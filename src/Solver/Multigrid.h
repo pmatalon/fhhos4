@@ -245,7 +245,7 @@ private:
 			// Residual computation //
 			//----------------------//
 
-			//Vector r = b - A * x;                                                    result.AddCost(2 * A.nonZeros());
+			//Vector r = b - A * x;                                                    result.AddCost(Cost::DAXPY(A));
 			
 			//------------------------------------------------//
 			// Restriction of the residual on the coarse grid //
@@ -291,7 +291,7 @@ private:
 				level->ExportVector(cgc, "it" + to_string(this->IterationCount) + "_cgc");
 			}
 
-			x += level->Prolong(ec);                                              result.AddCost(level->ProlongCost());
+			x += level->Prolong(ec);                                              result.AddCost(level->ProlongCost() + Cost::AddVec(x));
 
 			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_cgc");
@@ -315,9 +315,9 @@ private:
 
 		Vector c = Vector::Zero(x.rows());
 		MultigridCycle(level, r, c, result);
-		Vector v = A * c;                                                    result.AddCost(2 * A.nonZeros()); // Cost: 1 sparse MatVec
-		double rho1 = c.dot(v);                                              result.AddCost(2 * c.rows());     // Cost: 1 Dot
-		double alpha1 = c.dot(r);                                            result.AddCost(2 * c.rows());     // Cost: 1 Dot
+		Vector v = A * c;                                                    result.AddCost(Cost::MatVec(A));
+		double rho1 = c.dot(v);                                              result.AddCost(Cost::Dot(c));
+		double alpha1 = c.dot(r);                                            result.AddCost(Cost::Dot(c));
 
 		double r_norm_old = r.norm();
 		r -= alpha1 / rho1 * v;
@@ -327,10 +327,10 @@ private:
 		{
 			Vector d = Vector::Zero(x.rows());
 			MultigridCycle(level, r, d, result);
-			Vector w = A * d;                                                result.AddCost(2 * A.nonZeros()); // Cost: 1 sparse MatVec
-			double gamma = d.dot(v);                                         result.AddCost(2 * d.rows());     // Cost: 1 Dot
-			double beta = d.dot(w);                                          result.AddCost(2 * d.rows());     // Cost: 1 Dot
-			double alpha2 = d.dot(r);                                        result.AddCost(2 * d.rows());     // Cost: 1 Dot
+			Vector w = A * d;                                                result.AddCost(Cost::MatVec(A));
+			double gamma = d.dot(v);                                         result.AddCost(Cost::Dot(d));
+			double beta = d.dot(w);                                          result.AddCost(Cost::Dot(d));
+			double alpha2 = d.dot(r);                                        result.AddCost(Cost::Dot(d));
 			double rho2 = beta - gamma * gamma / rho1;
 			x = (alpha1/rho1 - gamma*alpha2/(rho1*rho2))*c + alpha2 / rho2 * d;
 		}

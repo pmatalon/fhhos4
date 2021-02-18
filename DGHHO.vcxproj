@@ -234,6 +234,7 @@
     <ClInclude Include="src\TestCases\DefaultTestCase.h" />
     <ClInclude Include="src\TestCases\TestCase.h" />
     <ClInclude Include="src\TestCases\TestCaseFactory.h" />
+    <ClInclude Include="src\Utils\Cost.h" />
     <ClInclude Include="src\Utils\ElementParallelLoop.h" />
     <ClInclude Include="src\Utils\FileSystem.h" />
     <ClInclude Include="src\Utils\MatlabScript.h" />

@@ -1,5 +1,6 @@
 #pragma once
 #include "../Utils/Utils.h"
+#include "../Utils/Cost.h"
 using namespace std;
 
 class Solver

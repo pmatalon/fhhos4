@@ -66,7 +66,7 @@ public:
 			r = b;
 		else
 		{
-			r = b - A * x;                                           result.AddCost(2 * A.nonZeros()); // Cost: 1 sparse MatVec
+			r = b - A * x;                                           result.AddCost(Cost::DAXPY(A));
 		}
 		result.SetResidual(r);
 
@@ -80,7 +80,7 @@ public:
 			result = IterationResult(result);
 
 			// Apply the preconditioner
-			Vector z = Precond.Apply(r);                             result.AddCost(Precond.SolvingComputationalWork()); // Cost: preconditioner
+			Vector z = Precond.Apply(r);                             result.AddCost(Precond.SolvingComputationalWork());
 
 			// The final direction of research, d, is found by 
 			// A-orthogonalizing z with the previous directions of research, 
@@ -93,16 +93,16 @@ public:
 				Vector& Adk = *directionk.Ad;
 				double dk_dot_Adk = directionk.d_dot_Ad;
 
-				*d -= (z.dot(Adk) / dk_dot_Adk) * dk;                   result.AddCost(2 * z.rows());     // Cost: 1 Dot
+				*d -= (z.dot(Adk) / dk_dot_Adk) * dk;                 result.AddCost(Cost::Dot(z));
 			}
 			assert(d->norm() > 0);
 
-			Vector* Ad = new Vector(A * (*d));                        result.AddCost(2 * A.nonZeros()); // Cost: 1 sparse MatVec
-			double d_dot_Ad = d->dot(*Ad);                            result.AddCost(2 * d->rows());     // Cost: 1 Dot
+			Vector* Ad = new Vector(A * (*d));                        result.AddCost(Cost::MatVec(A));
+			double d_dot_Ad = d->dot(*Ad);                            result.AddCost(Cost::Dot(*d));
 			assert(d_dot_Ad != 0);
 
 			// Step length in the direction of research
-			double alpha = r.dot(*d) / d_dot_Ad;                      result.AddCost(2 * r.rows());     // Cost: 1 Dot
+			double alpha = r.dot(*d) / d_dot_Ad;                      result.AddCost(Cost::Dot(r));
 
 			// Moving from the current solution to the next
 			// by taking the step in the direction of research

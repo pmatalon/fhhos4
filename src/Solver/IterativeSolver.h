@@ -84,8 +84,7 @@ public:
 				result.SetResidualAsB();
 			else
 			{
-				result.SetResidual(b - A * x);
-				result.AddCost(2 * A.nonZeros());
+				result.SetResidual(b - A * x);                                  result.AddCost(Cost::DAXPY(A));
 			}
 		}
 		if (this->PrintIterationResults)
@@ -132,7 +131,7 @@ public:
 				r = b;
 			else
 			{
-				r = b - A * x;                                     result.AddCost(2 * A.nonZeros());
+				r = b - A * x;                                     result.AddCost(Cost::DAXPY(A));
 			}
 			return r;
 		}
@@ -149,7 +148,7 @@ public:
 			}
 			else
 			{
-				r = b - A * x;                                     result.AddCost(2 * A.nonZeros());
+				r = b - A * x;                                     result.AddCost(Cost::DAXPY(A));
 				result.SetResidual(r);
 			}
 		}
@@ -202,7 +201,7 @@ protected:
 		const SparseMatrix& A = *this->Matrix;
 
 		result = ExecuteOneIteration(b, x, oldResult);
-		r = b - A * x;                                         result.AddCost(2 * A.nonZeros());
+		r = b - A * x;                                         result.AddCost(Cost::DAXPY(A));
 
 		return p;
 	}

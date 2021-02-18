@@ -41,14 +41,14 @@ private:
 			r = b;
 		else
 		{
-			r = b - A * x;                               result.AddCost(2 * A.nonZeros()); // Cost: 1 sparse MatVec
+			r = b - A * x;                                  result.AddCost(Cost::DAXPY(A));
 		}
 		result.SetResidual(r);
 
 		double beta = 0;
-		Vector z = Precond.Apply(r);                        result.AddCost(Precond.SolvingComputationalWork()); // Cost: preconditioner
+		Vector z = Precond.Apply(r);                        result.AddCost(Precond.SolvingComputationalWork());
 		Vector d = z;
-		double r_dot_z = r.dot(z);                          result.AddCost(2 * r.rows());    // Cost: 1 Dot
+		double r_dot_z = r.dot(z);                          result.AddCost(Cost::Dot(r));
 		this->IterationCount = 0;
 
 		if (this->PrintIterationResults)
@@ -61,16 +61,16 @@ private:
 			if (this->IterationCount > 0)
 				d = z + beta * d;
 
-			Vector Ad = A * d;                                  result.AddCost(2 * A.nonZeros()); // Cost: 1 sparse MatVec
-			double alpha = r_dot_z / (d.dot(Ad));               result.AddCost(2 * r.rows());     // Cost: 1 Dot
+			Vector Ad = A * d;                                  result.AddCost(Cost::MatVec(A));
+			double alpha = r_dot_z / (d.dot(Ad));               result.AddCost(Cost::Dot(r));
 			x += alpha * d;
 
 			double old_r_dot_old_z = r_dot_z; // save the dot product before overwriting r and z
 
 			r -= alpha * Ad;
-			z = Precond.Apply(r);                               result.AddCost(Precond.SolvingComputationalWork()); // Cost: preconditioner
+			z = Precond.Apply(r);                               result.AddCost(Precond.SolvingComputationalWork());
 
-			r_dot_z = r.dot(z);                                 result.AddCost(2 * r.rows());     // Cost: 1 Dot
+			r_dot_z = r.dot(z);                                 result.AddCost(Cost::Dot(r));
 			beta = r_dot_z / old_r_dot_old_z;
 
 			this->IterationCount++;

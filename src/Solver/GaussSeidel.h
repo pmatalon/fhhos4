@@ -59,8 +59,10 @@ private:
 			Utils::FatalError("direction not managed");
 
 		result.SetX(x);
-		double sweepCost = 2 * A.nonZeros() + A.rows();
-		result.AddCost(_direction == Direction::Symmetric ? 2 * sweepCost : sweepCost);
+		double sweepCost = 2 * A.nonZeros() + A.rows(); // 1 DAXPY
+		if (_direction == Direction::Symmetric)
+			sweepCost *= 2;
+		result.AddCost(sweepCost);
 		return result;
 	}
 
@@ -79,7 +81,7 @@ private:
 			r = BackwardSweepAndComputeResidual(b, x);
 		else if (_direction == Direction::Symmetric)
 		{
-			r = ForwardSweepAndComputeResidual(b, x);
+			ForwardSweep(b, x);
 			r = BackwardSweepAndComputeResidual(b, x);
 		}
 		else
@@ -88,7 +90,10 @@ private:
 		result.SetX(x);
 
 		double sweepCost = 2 * A.nonZeros() + A.rows();
-		result.AddCost(_direction == Direction::Symmetric ? 2 * sweepCost : sweepCost);
+		if (_direction == Direction::Symmetric)
+			sweepCost *= 2;
+		double residualCost = Cost::DAXPY(NNZ::StrictTriPart(A), A.rows());
+		result.AddCost(sweepCost + residualCost);
 
 		return p;
 	}
@@ -115,11 +120,11 @@ private:
 		auto L_plus_D = A.triangularView<Eigen::Lower>();
 
 		// Sweep: x(new) = (L+D)^{-1} * (b-Ux)
-		Vector Ux = U * x;
-		x = L_plus_D.solve(b - Ux);
+		Vector Ux = U * x;                        // Cost::MatVec(NNZ::StrictTriPart(A), A.rows());
+		x = L_plus_D.solve(b - Ux);               // Cost::AddVec(b) + Cost::SpFWElimination(NNZ::TriPart(A))
 
 		// Residual: Ux(old) - Ux(new)
-		Vector r = Ux - U * x; // 
+		Vector r = Ux - U * x;                    // Cost::DAXPY(NNZ::StrictTriPart(A), A.rows())
 		return r;
 	}
 

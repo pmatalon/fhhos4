@@ -444,6 +444,9 @@
     <ClInclude Include="src\Solver\AllNeighbourAggregation.h">
       <Filter>Solver</Filter>
     </ClInclude>
+    <ClInclude Include="src\Utils\Cost.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
