@@ -58,11 +58,11 @@ public:
 			x = Vector::Random(b.rows());
 		else
 			Utils::FatalError("Unknown initial guess code");
-		Solve(b, zeroInitialGuess, x);
+		Solve(b, x, zeroInitialGuess);
 		return x;
 	}
 
-	virtual void Solve(const Vector& b, bool zeroInitialGuess, Vector& initialGuess)
+	virtual void Solve(const Vector& b, Vector& initialGuess, bool zeroInitialGuess)
 	{
 		const SparseMatrix& A = *this->Matrix;
 
@@ -73,6 +73,7 @@ public:
 
 		this->IterationCount = 0;
 		Vector& x = initialGuess;
+		bool xEquals0 = zeroInitialGuess;
 
 		IterationResult result = CreateFirstIterationResult(b, x);
 		if (MaxIterations == 0)
@@ -92,7 +93,7 @@ public:
 
 		while (!StoppingCriteriaReached(result))
 		{
-			result = ExecuteOneIteration(b, x, result);
+			result = ExecuteOneIteration(b, x, xEquals0, result);
 			this->IterationCount++;
 
 			if (!result.IsResidualSet() && StoppingCrit == StoppingCriteria::NormalizedResidual)
@@ -110,7 +111,7 @@ public:
 		this->SolvingComputationalWork = result.SolvingComputationalWork();
 	}
 
-	virtual Vector SolveAndComputeResidual(const Vector& b, bool zeroInitialGuess, Vector& initialGuess)
+	virtual Vector SolveAndComputeResidual(const Vector& b, Vector& initialGuess, bool zeroInitialGuess)
 	{
 		const SparseMatrix& A = *this->Matrix;
 
@@ -121,6 +122,7 @@ public:
 
 		this->IterationCount = 0;
 		Vector& x = initialGuess;
+		bool xEquals0 = zeroInitialGuess;
 
 		Vector r;
 
@@ -158,7 +160,7 @@ public:
 
 		while (!StoppingCriteriaReached(result))
 		{
-			std::tie(result, r) = ExecuteOneIterationAndComputeResidual(b, x, result);
+			std::tie(result, r) = ExecuteOneIterationAndComputeResidual(b, x, xEquals0, result);
 			this->IterationCount++;
 
 			if (StoppingCrit == StoppingCriteria::NormalizedResidual)
@@ -191,16 +193,16 @@ protected:
 		return result;
 	}
 
-	virtual IterationResult ExecuteOneIteration(const Vector& b, Vector& x, const IterationResult& oldResult) { assert(false); };
+	virtual IterationResult ExecuteOneIteration(const Vector& b, Vector& x, bool& xEquals0, const IterationResult& oldResult) { assert(false); };
 	
-	virtual pair<IterationResult, Vector> ExecuteOneIterationAndComputeResidual(const Vector& b, Vector& x, const IterationResult& oldResult) 
+	virtual pair<IterationResult, Vector> ExecuteOneIterationAndComputeResidual(const Vector& b, Vector& x, bool& xEquals0, const IterationResult& oldResult)
 	{ 
 		pair<IterationResult, Vector> p;
 		auto&[result, r] = p;
 
 		const SparseMatrix& A = *this->Matrix;
 
-		result = ExecuteOneIteration(b, x, oldResult);
+		result = ExecuteOneIteration(b, x, xEquals0, oldResult);
 		r = b - A * x;                                         result.AddCost(Cost::DAXPY(A));
 
 		return p;

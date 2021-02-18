@@ -29,7 +29,7 @@ public:
 		_solver.setTolerance(this->Tolerance);
 	}
 
-	void Solve(const Vector& b, bool zeroInitialGuess, Vector& initialGuess) override
+	void Solve(const Vector& b, Vector& initialGuess, bool zeroInitialGuess) override
 	{
 		Vector& x = initialGuess;
 		if (zeroInitialGuess)

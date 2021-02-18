@@ -44,7 +44,7 @@ public:
 	}
 
 public:
-	void Solve(const Vector& b, bool zeroInitialGuess, Vector& initialGuess) override
+	void Solve(const Vector& b, Vector& initialGuess, bool zeroInitialGuess) override
 	{
 		const SparseMatrix& A = *this->Matrix;
 

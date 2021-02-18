@@ -40,33 +40,28 @@ public:
 	}
 
 private:
-	IterationResult ExecuteOneIteration(const Vector& b, Vector& x, const IterationResult& oldResult) override
+	IterationResult ExecuteOneIteration(const Vector& b, Vector& x, bool& xEquals0, const IterationResult& oldResult) override
 	{
 		IterationResult result(oldResult);
 
 		const SparseMatrix& A = *this->Matrix;
 
 		if (_direction == Direction::Forward)
-			ForwardSweep(b, x);
+			ForwardSweep(b, x, xEquals0, result);
 		else if (_direction == Direction::Backward)
-			BackwardSweep(b, x);
+			BackwardSweep(b, x, xEquals0, result);
 		else if (_direction == Direction::Symmetric)
 		{
-			ForwardSweep(b, x);
-			BackwardSweep(b, x);
+			ForwardSweep(b, x, xEquals0, result);
+			BackwardSweep(b, x, xEquals0, result);
 		}
 		else
 			Utils::FatalError("direction not managed");
 
-		result.SetX(x);
-		double sweepCost = 2 * A.nonZeros() + A.rows(); // 1 DAXPY
-		if (_direction == Direction::Symmetric)
-			sweepCost *= 2;
-		result.AddCost(sweepCost);
 		return result;
 	}
 
-	pair<IterationResult, Vector> ExecuteOneIterationAndComputeResidual(const Vector& b, Vector& x, const IterationResult& oldResult) override
+	pair<IterationResult, Vector> ExecuteOneIterationAndComputeResidual(const Vector& b, Vector& x, bool& xEquals0, const IterationResult& oldResult) override
 	{
 		pair<IterationResult, Vector> p;
 		auto&[result, r] = p;
@@ -76,85 +71,124 @@ private:
 		const SparseMatrix& A = *this->Matrix;
 
 		if (_direction == Direction::Forward)
-			r = ForwardSweepAndComputeResidual(b, x);
+			r = ForwardSweepAndComputeResidual(b, x, xEquals0, result);
 		else if (_direction == Direction::Backward)
-			r = BackwardSweepAndComputeResidual(b, x);
+			r = BackwardSweepAndComputeResidual(b, x, xEquals0, result);
 		else if (_direction == Direction::Symmetric)
 		{
-			ForwardSweep(b, x);
-			r = BackwardSweepAndComputeResidual(b, x);
+			ForwardSweep(b, x, xEquals0, result);
+			r = BackwardSweepAndComputeResidual(b, x, xEquals0, result);
 		}
 		else
 			Utils::FatalError("direction not managed");
 
 		result.SetX(x);
-
-		double sweepCost = 2 * A.nonZeros() + A.rows();
-		if (_direction == Direction::Symmetric)
-			sweepCost *= 2;
-		double residualCost = Cost::DAXPY(NNZ::StrictTriPart(A), A.rows());
-		result.AddCost(sweepCost + residualCost);
-
 		return p;
 	}
 
-	void ForwardSweep(const Vector& b, Vector& x)
+	void ForwardSweep(const Vector& b, Vector& x, bool& xEquals0, IterationResult& result)
 	{
 		const SparseMatrix& A = *this->Matrix;
 		if (_useEigen)
 		{
-			Vector v = b - A.triangularView<Eigen::StrictlyUpper>() * x;
-			x = A.triangularView<Eigen::Lower>().solve(v);
+			if (!xEquals0)
+			{
+				Vector v = b - A.triangularView<Eigen::StrictlyUpper>() * x;      result.AddCost(Cost::DAXPY(NNZ::StrictTriPart(A), A.rows()));
+				x = A.triangularView<Eigen::Lower>().solve(v);                    result.AddCost(Cost::SpFWElimination(NNZ::TriPart(A)));
+			}
+			else
+			{
+				x = A.triangularView<Eigen::Lower>().solve(b);                    result.AddCost(Cost::SpFWElimination(NNZ::TriPart(A)));
+			}
 		}
 		else
 		{
 			for (BigNumber i = 0; i < A.rows(); ++i)
 				ProcessRow(i, b, x);
+			                                                                      result.AddCost(2 * A.nonZeros() + A.rows());
 		}
+		xEquals0 = false;
 	}
 
-	Vector ForwardSweepAndComputeResidual(const Vector& b, Vector& x)
+	Vector ForwardSweepAndComputeResidual(const Vector& b, Vector& x, bool& xEquals0, IterationResult& result)
 	{
 		const SparseMatrix& A = *this->Matrix;
 		auto U = A.triangularView<Eigen::StrictlyUpper>();
 		auto L_plus_D = A.triangularView<Eigen::Lower>();
 
-		// Sweep: x(new) = (L+D)^{-1} * (b-Ux)
-		Vector Ux = U * x;                        // Cost::MatVec(NNZ::StrictTriPart(A), A.rows());
-		x = L_plus_D.solve(b - Ux);               // Cost::AddVec(b) + Cost::SpFWElimination(NNZ::TriPart(A))
+		Vector r;
+		if (!xEquals0)
+		{
+			// Sweep: x(new) = (L+D)^{-1} * (b-Ux)
+			Vector Ux = U * x;                                    result.AddCost(Cost::SpMatVec(NNZ::StrictTriPart(A)));
+			x = L_plus_D.solve(b - Ux);                           result.AddCost(Cost::AddVec(b) + Cost::SpFWElimination(NNZ::TriPart(A)));
+			xEquals0 = false;
 
-		// Residual: Ux(old) - Ux(new)
-		Vector r = Ux - U * x;                    // Cost::DAXPY(NNZ::StrictTriPart(A), A.rows())
+			// Residual: Ux(old) - Ux(new)
+			r = Ux - U * x;                                       result.AddCost(Cost::DAXPY(NNZ::StrictTriPart(A), A.rows()));
+		}
+		else
+		{
+			// Sweep
+			x = L_plus_D.solve(b);                                result.AddCost(Cost::SpFWElimination(NNZ::TriPart(A)));
+			xEquals0 = false;
+
+			// Residual
+			r = - U * x;                                          result.AddCost(Cost::DAXPY(NNZ::StrictTriPart(A), A.rows()));
+		}
 		return r;
 	}
 
-	void BackwardSweep(const Vector& b, Vector& x)
+	void BackwardSweep(const Vector& b, Vector& x, bool& xEquals0, IterationResult& result)
 	{
 		const SparseMatrix& A = *this->Matrix;
 		if (_useEigen)
 		{
-			Vector v = b - A.triangularView<Eigen::StrictlyLower>() * x;
-			x = A.triangularView<Eigen::Upper>().solve(v);
+			if (!xEquals0)
+			{
+				Vector v = b - A.triangularView<Eigen::StrictlyLower>() * x;      result.AddCost(Cost::DAXPY(NNZ::StrictTriPart(A), A.rows()));
+				x = A.triangularView<Eigen::Upper>().solve(v);                    result.AddCost(Cost::SpBWSubstitution(NNZ::TriPart(A)));
+			}
+			else
+			{
+				x = A.triangularView<Eigen::Upper>().solve(b);                    result.AddCost(Cost::SpBWSubstitution(NNZ::TriPart(A)));
+			}
 		}
 		else
 		{
 			for (BigNumber i = 0; i < A.rows(); ++i)
 				ProcessRow(A.rows() - i - 1, b, x);
+			                                                                      result.AddCost(2 * A.nonZeros() + A.rows());
 		}
+		xEquals0 = false;
 	}
 
-	Vector BackwardSweepAndComputeResidual(const Vector& b, Vector& x)
+	Vector BackwardSweepAndComputeResidual(const Vector& b, Vector& x, bool& xEquals0, IterationResult& result)
 	{
 		const SparseMatrix& A = *this->Matrix;
 		auto L = A.triangularView<Eigen::StrictlyLower>();
 		auto D_plus_U = A.triangularView<Eigen::Upper>();
 
-		// Sweep: x(new) = (D+U)^{-1} * (b-Lx)
-		Vector Lx = L * x;
-		x = D_plus_U.solve(b - Lx);
+		Vector r;
+		if (!xEquals0)
+		{
+			// Sweep: x(new) = (D+U)^{-1} * (b-Lx)
+			Vector Lx = L * x;                                    result.AddCost(Cost::SpMatVec(NNZ::StrictTriPart(A)));
+			x = D_plus_U.solve(b - Lx);                           result.AddCost(Cost::AddVec(b) + Cost::SpBWSubstitution(NNZ::TriPart(A)));
+			xEquals0 = false;
 
-		// Residual: Lx(old) - Lx(new)
-		Vector r = Lx - L * x;
+			// Residual: Lx(old) - Lx(new)
+			r = Lx - L * x;                                       result.AddCost(Cost::DAXPY(NNZ::StrictTriPart(A), A.rows()));
+		}
+		else
+		{
+			// Sweep
+			x = D_plus_U.solve(b);                                result.AddCost(Cost::SpBWSubstitution(NNZ::TriPart(A)));
+			xEquals0 = false;
+
+			// Residual: Lx(old) - Lx(new)
+			r = - L * x;                                          result.AddCost(Cost::DAXPY(NNZ::StrictTriPart(A), A.rows()));
+		}
 		return r;
 	}
 

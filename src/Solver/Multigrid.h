@@ -206,15 +206,15 @@ protected:
 
 private:
 
-	IterationResult ExecuteOneIteration(const Vector& b, Vector& x, const IterationResult& oldResult) override
+	IterationResult ExecuteOneIteration(const Vector& b, Vector& x, bool& xEquals0, const IterationResult& oldResult) override
 	{
 		IterationResult result(oldResult);
-		MultigridCycle(this->_fineLevel, b, x, result);
+		MultigridCycle(this->_fineLevel, b, x, xEquals0, result);
 		result.SetX(x);
 		return result;
 	}
 
-	void MultigridCycle(Level* level, const Vector& b, Vector& x, IterationResult& result)
+	void MultigridCycle(Level* level, const Vector& b, Vector& x, bool& xEquals0, IterationResult& result)
 	{
 		const SparseMatrix& A = *level->OperatorMatrix;
 
@@ -223,8 +223,8 @@ private:
 
 		if (level->IsCoarsestLevel())
 		{
-			x = CoarseSolver->Solve(b);
-			result.AddCost(CoarseSolver->SolvingComputationalWork);
+			x = CoarseSolver->Solve(b);                                              result.AddCost(CoarseSolver->SolvingComputationalWork);
+			xEquals0 = false;
 		}
 		else
 		{
@@ -236,7 +236,7 @@ private:
 			//---------------//
 
 			//level->PreSmoother->Smooth(x, b);                                        result.AddCost(level->PreSmoother->SolvingComputationalWork());
-			Vector r = level->PreSmoother->SmoothAndComputeResidual(x, b);           result.AddCost(level->PreSmoother->SolvingComputationalWork());
+			Vector r = level->PreSmoother->SmoothAndComputeResidual(x, b, xEquals0);  result.AddCost(level->PreSmoother->SolvingComputationalWork());
 
 			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPreSmoothing");
@@ -258,12 +258,12 @@ private:
 			//--------------------------------------------------//
 
 			Vector ec = Vector::Zero(rc.rows());
-			bool ecEqualZero = true;
+			bool ecEquals0 = true;
 			if (this->Cycle == 'V' || this->Cycle == 'W')
 			{
 				for (int i = 0; i < this->WLoops; ++i)
 				{
-					MultigridCycle(level->CoarserLevel, rc, ec, result);
+					MultigridCycle(level->CoarserLevel, rc, ec, ecEquals0, result);
 					if (level->CoarserLevel->IsCoarsestLevel())
 						break;
 				}
@@ -271,11 +271,11 @@ private:
 			else if (this->Cycle == 'K')
 			{
 				if (level->CoarserLevel->IsCoarsestLevel())
-					MultigridCycle(level->CoarserLevel, rc, ec, result); // exact solution
+					MultigridCycle(level->CoarserLevel, rc, ec, ecEquals0, result); // exact solution
 				else
 				{
 					//level->CoarserLevel->FCG->Solve(rc, ecEqualZero, ec);                    result.AddCost(level->CoarserLevel->FCG->SolvingComputationalWork);
-					FCGForKCycle(level->CoarserLevel, rc, ec, result);
+					FCGForKCycle(level->CoarserLevel, rc, ec, ecEquals0, result);
 				}
 			}
 
@@ -300,7 +300,8 @@ private:
 			// Post-smoothing //
 			//----------------//
 
-			level->PostSmoother->Smooth(x, b);                                   result.AddCost(level->PostSmoother->SolvingComputationalWork());
+			assert(!xEquals0);
+			level->PostSmoother->Smooth(x, b, xEquals0);                          result.AddCost(level->PostSmoother->SolvingComputationalWork());
 
 			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPostSmoothing");
@@ -308,13 +309,14 @@ private:
 	}
 
 private:
-	void FCGForKCycle(Level* level, Vector& r, Vector& x, IterationResult& result)
+	void FCGForKCycle(Level* level, Vector& r, Vector& x, bool& xEquals0, IterationResult& result)
 	{
 		const SparseMatrix& A = *level->OperatorMatrix;
 		double t = 0.25;
 
 		Vector c = Vector::Zero(x.rows());
-		MultigridCycle(level, r, c, result);
+		bool cEquals0 = true;
+		MultigridCycle(level, r, c, cEquals0, result);
 		Vector v = A * c;                                                    result.AddCost(Cost::MatVec(A));
 		double rho1 = c.dot(v);                                              result.AddCost(Cost::Dot(c));
 		double alpha1 = c.dot(r);                                            result.AddCost(Cost::Dot(c));
@@ -326,7 +328,8 @@ private:
 		else
 		{
 			Vector d = Vector::Zero(x.rows());
-			MultigridCycle(level, r, d, result);
+			bool dEquals0 = true;
+			MultigridCycle(level, r, d, dEquals0, result);
 			Vector w = A * d;                                                result.AddCost(Cost::MatVec(A));
 			double gamma = d.dot(v);                                         result.AddCost(Cost::Dot(d));
 			double beta = d.dot(w);                                          result.AddCost(Cost::Dot(d));

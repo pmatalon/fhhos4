@@ -934,7 +934,7 @@ public:
 			}
 
 			initialGuess = -prolongatedError;
-			Multigrid::Solve(b, false, initialGuess);
+			Multigrid::Solve(b, initialGuess, false);
 			return initialGuess;
 		}
 		else

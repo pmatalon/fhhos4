@@ -32,14 +32,17 @@ public:
 			_solver->Setup(A);
 	}
 
-	void Smooth(Vector& x, const Vector& b)
+	void Smooth(Vector& x, const Vector& b, bool& xEquals0)
 	{
-		_solver->Solve(b, false, x);
+		_solver->Solve(b, x, xEquals0);
+		xEquals0 = false;
 	}
 
-	Vector SmoothAndComputeResidual(Vector& x, const Vector& b)
+	Vector SmoothAndComputeResidual(Vector& x, const Vector& b, bool& xEquals0)
 	{
-		return _solver->SolveAndComputeResidual(b, false, x);
+		Vector r = _solver->SolveAndComputeResidual(b, x, xEquals0);
+		xEquals0 = false;
+		return r;
 	}
 
 	friend ostream& operator<<(ostream& os, const Smoother& s)

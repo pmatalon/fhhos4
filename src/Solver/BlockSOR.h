@@ -84,7 +84,7 @@ public:
 	}
 
 private:
-	IterationResult ExecuteOneIteration(const Vector& b, Vector& x, const IterationResult& oldResult) override
+	IterationResult ExecuteOneIteration(const Vector& b, Vector& x, bool& xEquals0, const IterationResult& oldResult) override
 	{
 		IterationResult result(oldResult);
 
