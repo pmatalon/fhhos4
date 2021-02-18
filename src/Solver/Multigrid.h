@@ -235,7 +235,8 @@ private:
 			// Pre-smoothing //
 			//---------------//
 
-			level->PreSmoother->Smooth(x, b);                                    result.AddCost(level->PreSmoother->SolvingComputationalWork());
+			//level->PreSmoother->Smooth(x, b);                                        result.AddCost(level->PreSmoother->SolvingComputationalWork());
+			Vector r = level->PreSmoother->SmoothAndComputeResidual(x, b);           result.AddCost(level->PreSmoother->SolvingComputationalWork());
 
 			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPreSmoothing");
@@ -244,7 +245,7 @@ private:
 			// Residual computation //
 			//----------------------//
 
-			Vector r = b - A * x;                                                    result.AddCost(2 * A.nonZeros());
+			//Vector r = b - A * x;                                                    result.AddCost(2 * A.nonZeros());
 			
 			//------------------------------------------------//
 			// Restriction of the residual on the coarse grid //

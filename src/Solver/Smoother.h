@@ -37,6 +37,11 @@ public:
 		_solver->Solve(b, false, x);
 	}
 
+	Vector SmoothAndComputeResidual(Vector& x, const Vector& b)
+	{
+		return _solver->SolveAndComputeResidual(b, false, x);
+	}
+
 	friend ostream& operator<<(ostream& os, const Smoother& s)
 	{
 		os << *(s._solver);

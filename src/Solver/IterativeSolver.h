@@ -76,10 +76,7 @@ public:
 
 		IterationResult result = CreateFirstIterationResult(b, x);
 		if (MaxIterations == 0)
-		{
-			result.SetX(x);
 			return;
-		}
 
 		if (StoppingCrit == StoppingCriteria::NormalizedResidual)
 		{
@@ -114,6 +111,70 @@ public:
 		this->SolvingComputationalWork = result.SolvingComputationalWork();
 	}
 
+	virtual Vector SolveAndComputeResidual(const Vector& b, bool zeroInitialGuess, Vector& initialGuess)
+	{
+		const SparseMatrix& A = *this->Matrix;
+
+		this->SolvingComputationalWork = 0;
+
+		if (this->ComputeExactSolution)
+			this->ExactSolution = this->_directSolver.solve(b);
+
+		this->IterationCount = 0;
+		Vector& x = initialGuess;
+
+		Vector r;
+
+		IterationResult result = CreateFirstIterationResult(b, x);
+		if (MaxIterations == 0)
+		{
+			if (zeroInitialGuess)
+				r = b;
+			else
+			{
+				r = b - A * x;                                     result.AddCost(2 * A.nonZeros());
+			}
+			return r;
+		}
+
+		if (MaxIterations == 0)
+			return r;
+
+		if (StoppingCrit == StoppingCriteria::NormalizedResidual)
+		{
+			if (zeroInitialGuess)
+			{
+				r = b;
+				result.SetResidualAsB();
+			}
+			else
+			{
+				r = b - A * x;                                     result.AddCost(2 * A.nonZeros());
+				result.SetResidual(r);
+			}
+		}
+
+		if (this->PrintIterationResults)
+			cout << result << endl;
+
+		while (!StoppingCriteriaReached(result))
+		{
+			std::tie(result, r) = ExecuteOneIterationAndComputeResidual(b, x, result);
+			this->IterationCount++;
+
+			if (StoppingCrit == StoppingCriteria::NormalizedResidual)
+				result.SetResidual(r);
+
+			if (this->PrintIterationResults)
+				cout << result << endl;
+		}
+
+		if (this->PrintIterationResults)
+			cout << endl;
+
+		this->SolvingComputationalWork = result.SolvingComputationalWork();
+	}
+
 	virtual ~IterativeSolver() {}
 
 protected:
@@ -132,6 +193,19 @@ protected:
 	}
 
 	virtual IterationResult ExecuteOneIteration(const Vector& b, Vector& x, const IterationResult& oldResult) { assert(false); };
+	
+	virtual pair<IterationResult, Vector> ExecuteOneIterationAndComputeResidual(const Vector& b, Vector& x, const IterationResult& oldResult) 
+	{ 
+		pair<IterationResult, Vector> p;
+		auto&[result, r] = p;
+
+		const SparseMatrix& A = *this->Matrix;
+
+		result = ExecuteOneIteration(b, x, oldResult);
+		r = b - A * x;                                         result.AddCost(2 * A.nonZeros());
+
+		return p;
+	}
 
 	bool StoppingCriteriaReached(const IterationResult& result)
 	{
