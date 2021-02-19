@@ -313,7 +313,7 @@ private:
 
 			if (computeAx)
 			{
-				r = level->PostSmoother->SmoothAndComputeResidual(x, b, xEquals0);    result.AddCost(level->PreSmoother->SolvingComputationalWork());
+				r = level->PostSmoother->SmoothAndComputeResidual(x, b, xEquals0);    result.AddCost(level->PostSmoother->SolvingComputationalWork());
 				result.Ax = b - r;                                                    result.AddCost(Cost::AddVec(b));
 			}
 			else
