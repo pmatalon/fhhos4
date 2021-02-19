@@ -306,7 +306,7 @@ private:
 
 			assert(!xEquals0);
 			level->PostSmoother->Smooth(x, b, xEquals0);                          result.AddCost(level->PostSmoother->SolvingComputationalWork());
-
+			
 			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPostSmoothing");
 		}
@@ -319,9 +319,12 @@ private:
 		double t = 0.25;
 		Vector x;
 
-		Vector c = Vector::Zero(x.rows());
+		// Apply multigrid preconditioner: c = Prec(r)
+		Vector c = Vector::Zero(r.rows());
 		bool cEquals0 = true;
 		MultigridCycle(level, r, c, cEquals0, result);
+
+		// 1st iteration of FCG
 		Vector v = A * c;                                                         result.AddCost(Cost::MatVec(A));
 		double rho1 = c.dot(v);                                                   result.AddCost(Cost::Dot(c));
 		double alpha1 = c.dot(r);                                                 result.AddCost(Cost::Dot(c));
@@ -335,9 +338,12 @@ private:
 		}
 		else
 		{
-			Vector d = Vector::Zero(x.rows());
+			// Apply multigrid preconditioner: d = Prec(r)
+			Vector d = Vector::Zero(r.rows());
 			bool dEquals0 = true;
 			MultigridCycle(level, r, d, dEquals0, result);
+
+			// 2nd iteration of FCG
 			Vector w = A * d;                                                     result.AddCost(Cost::MatVec(A));
 			double gamma = d.dot(v);                                              result.AddCost(Cost::Dot(d));
 			double beta = d.dot(w);                                               result.AddCost(Cost::Dot(d));
