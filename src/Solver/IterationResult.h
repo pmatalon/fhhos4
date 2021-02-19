@@ -1,5 +1,6 @@
 #pragma once
 #include "../Utils/Timer.h"
+#include "../Utils/Cost.h"
 using namespace std;
 
 class IterationResult
@@ -80,7 +81,7 @@ public:
 
 	void SetResidual(const Vector& r)
 	{
-		this->ResidualNorm = r.norm();
+		this->ResidualNorm = r.norm();                                         this->AddCost(Cost::Norm(r));
 		assert(_bNorm >= 0);
 		this->NormalizedResidualNorm = _bNorm > 0 ? ResidualNorm / _bNorm : ResidualNorm;
 

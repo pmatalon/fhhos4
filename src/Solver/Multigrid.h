@@ -257,10 +257,11 @@ private:
 			// Residual equation Ae=r solved on the coarse grid //
 			//--------------------------------------------------//
 
-			Vector ec = Vector::Zero(rc.rows());
-			bool ecEquals0 = true;
+			Vector ec;
 			if (this->Cycle == 'V' || this->Cycle == 'W')
 			{
+				ec = Vector::Zero(rc.rows());
+				bool ecEquals0 = true;
 				for (int i = 0; i < this->WLoops; ++i)
 				{
 					MultigridCycle(level->CoarserLevel, rc, ec, ecEquals0, result);
@@ -271,11 +272,14 @@ private:
 			else if (this->Cycle == 'K')
 			{
 				if (level->CoarserLevel->IsCoarsestLevel())
+				{
+					bool ecEquals0 = true;
 					MultigridCycle(level->CoarserLevel, rc, ec, ecEquals0, result); // exact solution
+				}
 				else
 				{
 					//level->CoarserLevel->FCG->Solve(rc, ecEqualZero, ec);                    result.AddCost(level->CoarserLevel->FCG->SolvingComputationalWork);
-					FCGForKCycle(level->CoarserLevel, rc, ec, ecEquals0, result);
+					ec = FCGForKCycle(level->CoarserLevel, rc, result);
 				}
 			}
 
@@ -309,34 +313,39 @@ private:
 	}
 
 private:
-	void FCGForKCycle(Level* level, Vector& r, Vector& x, bool& xEquals0, IterationResult& result)
+	Vector FCGForKCycle(Level* level, Vector& r, IterationResult& result)
 	{
 		const SparseMatrix& A = *level->OperatorMatrix;
 		double t = 0.25;
+		Vector x;
 
 		Vector c = Vector::Zero(x.rows());
 		bool cEquals0 = true;
 		MultigridCycle(level, r, c, cEquals0, result);
-		Vector v = A * c;                                                    result.AddCost(Cost::MatVec(A));
-		double rho1 = c.dot(v);                                              result.AddCost(Cost::Dot(c));
-		double alpha1 = c.dot(r);                                            result.AddCost(Cost::Dot(c));
+		Vector v = A * c;                                                         result.AddCost(Cost::MatVec(A));
+		double rho1 = c.dot(v);                                                   result.AddCost(Cost::Dot(c));
+		double alpha1 = c.dot(r);                                                 result.AddCost(Cost::Dot(c));
 
-		double r_norm_old = r.norm();
-		r -= alpha1 / rho1 * v;
-		if (r.norm() <= t * r_norm_old)
-			x = alpha1 / rho1 * c;
+		double r_norm_old = r.norm();                                             result.AddCost(Cost::Norm(r));
+		r -= (alpha1 / rho1) * v;                                                 result.AddCost(Cost::VectorDAXPY(r));
+		double r_norm_new = r.norm();                                             result.AddCost(Cost::Norm(r));
+		if (r_norm_new <= t * r_norm_old)
+		{
+			x = (alpha1 / rho1) * c;                                              result.AddCost(Cost::ConstantVec(x));
+		}
 		else
 		{
 			Vector d = Vector::Zero(x.rows());
 			bool dEquals0 = true;
 			MultigridCycle(level, r, d, dEquals0, result);
-			Vector w = A * d;                                                result.AddCost(Cost::MatVec(A));
-			double gamma = d.dot(v);                                         result.AddCost(Cost::Dot(d));
-			double beta = d.dot(w);                                          result.AddCost(Cost::Dot(d));
-			double alpha2 = d.dot(r);                                        result.AddCost(Cost::Dot(d));
+			Vector w = A * d;                                                     result.AddCost(Cost::MatVec(A));
+			double gamma = d.dot(v);                                              result.AddCost(Cost::Dot(d));
+			double beta = d.dot(w);                                               result.AddCost(Cost::Dot(d));
+			double alpha2 = d.dot(r);                                             result.AddCost(Cost::Dot(d));
 			double rho2 = beta - gamma * gamma / rho1;
-			x = (alpha1/rho1 - gamma*alpha2/(rho1*rho2))*c + alpha2 / rho2 * d;
+			x = (alpha1/rho1 - gamma*alpha2/(rho1*rho2))*c + (alpha2 / rho2) * d; result.AddCost(2*Cost::ConstantVec(x) + Cost::AddVec(x));
 		}
+		return x;
 	}
 
 protected:

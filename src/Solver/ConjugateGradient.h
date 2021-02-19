@@ -38,12 +38,15 @@ private:
 		Vector& x = initialGuess;
 		Vector r;
 		if (zeroInitialGuess)
+		{
 			r = b;
+			result.SetResidualAsB();
+		}
 		else
 		{
 			r = b - A * x;                                  result.AddCost(Cost::DAXPY(A));
+			result.SetResidual(r);
 		}
-		result.SetResidual(r);
 
 		double beta = 0;
 		Vector z = Precond.Apply(r);                        result.AddCost(Precond.SolvingComputationalWork());
@@ -63,11 +66,11 @@ private:
 
 			Vector Ad = A * d;                                  result.AddCost(Cost::MatVec(A));
 			double alpha = r_dot_z / (d.dot(Ad));               result.AddCost(Cost::Dot(r));
-			x += alpha * d;
+			x += alpha * d;                                     result.AddCost(Cost::VectorDAXPY(x));
 
 			double old_r_dot_old_z = r_dot_z; // save the dot product before overwriting r and z
 
-			r -= alpha * Ad;
+			r -= alpha * Ad;                                    result.AddCost(Cost::VectorDAXPY(r));
 			z = Precond.Apply(r);                               result.AddCost(Precond.SolvingComputationalWork());
 
 			r_dot_z = r.dot(z);                                 result.AddCost(Cost::Dot(r));

@@ -63,12 +63,15 @@ public:
 		Vector& x = initialGuess;
 		Vector r;
 		if (zeroInitialGuess)
+		{
 			r = b;
+			result.SetResidualAsB();
+		}
 		else
 		{
 			r = b - A * x;                                           result.AddCost(Cost::DAXPY(A));
+			result.SetResidual(r);
 		}
-		result.SetResidual(r);
 
 		this->IterationCount = 0;
 
@@ -93,7 +96,9 @@ public:
 				Vector& Adk = *directionk.Ad;
 				double dk_dot_Adk = directionk.d_dot_Ad;
 
-				*d -= (z.dot(Adk) / dk_dot_Adk) * dk;                 result.AddCost(Cost::Dot(z));
+				// A-orthogonalization
+				double z_dot_Adk = z.dot(Adk);                        result.AddCost(Cost::Dot(z));
+				*d -= (z_dot_Adk / dk_dot_Adk) * dk;                  result.AddCost(Cost::VectorDAXPY(*d));
 			}
 			assert(d->norm() > 0);
 
@@ -106,10 +111,10 @@ public:
 
 			// Moving from the current solution to the next
 			// by taking the step in the direction of research
-			x += alpha * (*d);
+			x += alpha * (*d);                                        result.AddCost(Cost::VectorDAXPY(x));
 
 			// New residual
-			r -= alpha * (*Ad);
+			r -= alpha * (*Ad);                                       result.AddCost(Cost::VectorDAXPY(r));
 
 			// Restart?
 			if (previousDirections.size() == this->Truncation)
