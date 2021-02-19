@@ -160,11 +160,15 @@ public:
 
 		while (!StoppingCriteriaReached(result))
 		{
-			std::tie(result, r) = ExecuteOneIterationAndComputeResidual(b, x, xEquals0, result);
+			if (StoppingCrit == StoppingCriteria::MaxIterations && this->IterationCount < this->MaxIterations - 1)
+				result = ExecuteOneIteration(b, x, xEquals0, result); // No need to compute the residual until the last iteration
+			else
+			{
+				std::tie(result, r) = ExecuteOneIterationAndComputeResidual(b, x, xEquals0, result);
+				if (StoppingCrit == StoppingCriteria::NormalizedResidual)
+					result.SetResidual(r);
+			}
 			this->IterationCount++;
-
-			if (StoppingCrit == StoppingCriteria::NormalizedResidual)
-				result.SetResidual(r);
 
 			if (this->PrintIterationResults)
 				cout << result << endl;
