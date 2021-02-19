@@ -110,6 +110,30 @@ private:
 		xEquals0 = false;
 	}
 
+	void BackwardSweep(const Vector& b, Vector& x, bool& xEquals0, IterationResult& result)
+	{
+		const SparseMatrix& A = *this->Matrix;
+		if (_useEigen)
+		{
+			if (!xEquals0)
+			{
+				Vector v = b - A.triangularView<Eigen::StrictlyLower>() * x;      result.AddCost(Cost::DAXPY(NNZ::StrictTriPart(A), A.rows()));
+				x = A.triangularView<Eigen::Upper>().solve(v);                    result.AddCost(Cost::SpBWSubstitution(NNZ::TriPart(A)));
+			}
+			else
+			{
+				x = A.triangularView<Eigen::Upper>().solve(b);                    result.AddCost(Cost::SpBWSubstitution(NNZ::TriPart(A)));
+			}
+		}
+		else
+		{
+			for (BigNumber i = 0; i < A.rows(); ++i)
+				ProcessRow(A.rows() - i - 1, b, x);
+			result.AddCost(2 * A.nonZeros() + A.rows());
+		}
+		xEquals0 = false;
+	}
+
 	Vector ForwardSweepAndComputeResidual(const Vector& b, Vector& x, bool& xEquals0, IterationResult& result)
 	{
 		const SparseMatrix& A = *this->Matrix;
@@ -137,30 +161,6 @@ private:
 			r = - U * x;                                          result.AddCost(Cost::DAXPY(NNZ::StrictTriPart(A), A.rows()));
 		}
 		return r;
-	}
-
-	void BackwardSweep(const Vector& b, Vector& x, bool& xEquals0, IterationResult& result)
-	{
-		const SparseMatrix& A = *this->Matrix;
-		if (_useEigen)
-		{
-			if (!xEquals0)
-			{
-				Vector v = b - A.triangularView<Eigen::StrictlyLower>() * x;      result.AddCost(Cost::DAXPY(NNZ::StrictTriPart(A), A.rows()));
-				x = A.triangularView<Eigen::Upper>().solve(v);                    result.AddCost(Cost::SpBWSubstitution(NNZ::TriPart(A)));
-			}
-			else
-			{
-				x = A.triangularView<Eigen::Upper>().solve(b);                    result.AddCost(Cost::SpBWSubstitution(NNZ::TriPart(A)));
-			}
-		}
-		else
-		{
-			for (BigNumber i = 0; i < A.rows(); ++i)
-				ProcessRow(A.rows() - i - 1, b, x);
-			                                                                      result.AddCost(2 * A.nonZeros() + A.rows());
-		}
-		xEquals0 = false;
 	}
 
 	Vector BackwardSweepAndComputeResidual(const Vector& b, Vector& x, bool& xEquals0, IterationResult& result)
