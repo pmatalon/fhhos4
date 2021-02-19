@@ -209,12 +209,14 @@ private:
 	IterationResult ExecuteOneIteration(const Vector& b, Vector& x, bool& xEquals0, const IterationResult& oldResult) override
 	{
 		IterationResult result(oldResult);
-		MultigridCycle(this->_fineLevel, b, x, xEquals0, result);
+
+		bool computeAx = false;
+		MultigridCycle(this->_fineLevel, b, x, xEquals0, computeAx, result);
 		result.SetX(x);
 		return result;
 	}
 
-	void MultigridCycle(Level* level, const Vector& b, Vector& x, bool& xEquals0, IterationResult& result)
+	void MultigridCycle(Level* level, const Vector& b, Vector& x, bool& xEquals0, bool computeAx, IterationResult& result)
 	{
 		const SparseMatrix& A = *level->OperatorMatrix;
 
@@ -246,7 +248,7 @@ private:
 			//----------------------//
 
 			//Vector r = b - A * x;                                                    result.AddCost(Cost::DAXPY(A));
-			
+
 			//------------------------------------------------//
 			// Restriction of the residual on the coarse grid //
 			//------------------------------------------------//
@@ -264,22 +266,25 @@ private:
 				bool ecEquals0 = true;
 				for (int i = 0; i < this->WLoops; ++i)
 				{
-					MultigridCycle(level->CoarserLevel, rc, ec, ecEquals0, result);
+					IterationResult coarseResult;
+					MultigridCycle(level->CoarserLevel, rc, ec, ecEquals0, false, coarseResult);   result.AddCost(coarseResult.SolvingComputationalWork());
 					if (level->CoarserLevel->IsCoarsestLevel())
 						break;
 				}
 			}
 			else if (this->Cycle == 'K')
 			{
+				IterationResult coarseResult;
 				if (level->CoarserLevel->IsCoarsestLevel())
 				{
 					bool ecEquals0 = true;
-					MultigridCycle(level->CoarserLevel, rc, ec, ecEquals0, result); // exact solution
+					MultigridCycle(level->CoarserLevel, rc, ec, ecEquals0, false, coarseResult); // exact solution
+					                                                                               result.AddCost(coarseResult.SolvingComputationalWork());
 				}
 				else
 				{
 					//level->CoarserLevel->FCG->Solve(rc, ecEqualZero, ec);                    result.AddCost(level->CoarserLevel->FCG->SolvingComputationalWork);
-					ec = FCGForKCycle(level->CoarserLevel, rc, result);
+					ec = FCGForKCycle(level->CoarserLevel, rc, coarseResult);                      result.AddCost(coarseResult.SolvingComputationalWork());
 				}
 			}
 
@@ -305,8 +310,16 @@ private:
 			//----------------//
 
 			assert(!xEquals0);
-			level->PostSmoother->Smooth(x, b, xEquals0);                          result.AddCost(level->PostSmoother->SolvingComputationalWork());
-			
+
+			if (computeAx)
+			{
+				r = level->PostSmoother->SmoothAndComputeResidual(x, b, xEquals0);    result.AddCost(level->PreSmoother->SolvingComputationalWork());
+				result.Ax = b - r;                                                    result.AddCost(Cost::AddVec(b));
+			}
+			else
+			{
+				level->PostSmoother->Smooth(x, b, xEquals0);                          result.AddCost(level->PostSmoother->SolvingComputationalWork());
+			}
 			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPostSmoothing");
 		}
@@ -322,10 +335,13 @@ private:
 		// Apply multigrid preconditioner: c = Prec(r)
 		Vector c = Vector::Zero(r.rows());
 		bool cEquals0 = true;
-		MultigridCycle(level, r, c, cEquals0, result);
+		bool computeAc = true;
+		IterationResult precResult1;
+		MultigridCycle(level, r, c, cEquals0, computeAc, precResult1);            result.AddCost(precResult1.SolvingComputationalWork());
 
 		// 1st iteration of FCG
-		Vector v = A * c;                                                         result.AddCost(Cost::MatVec(A));
+		//Vector v = A * c;                                                         result.AddCost(Cost::MatVec(A));
+		Vector& v = precResult1.Ax; // v = A*c
 		double rho1 = c.dot(v);                                                   result.AddCost(Cost::Dot(c));
 		double alpha1 = c.dot(r);                                                 result.AddCost(Cost::Dot(c));
 
@@ -341,10 +357,13 @@ private:
 			// Apply multigrid preconditioner: d = Prec(r)
 			Vector d = Vector::Zero(r.rows());
 			bool dEquals0 = true;
-			MultigridCycle(level, r, d, dEquals0, result);
+			bool computeAd = true;
+			IterationResult precResult2;
+			MultigridCycle(level, r, d, dEquals0, computeAd, precResult2);        result.AddCost(precResult2.SolvingComputationalWork());
 
 			// 2nd iteration of FCG
-			Vector w = A * d;                                                     result.AddCost(Cost::MatVec(A));
+			//Vector w = A * d;                                                     result.AddCost(Cost::MatVec(A));
+			Vector& w = precResult2.Ax; // w = A*d
 			double gamma = d.dot(v);                                              result.AddCost(Cost::Dot(d));
 			double beta = d.dot(w);                                               result.AddCost(Cost::Dot(d));
 			double alpha2 = d.dot(r);                                             result.AddCost(Cost::Dot(d));

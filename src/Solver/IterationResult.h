@@ -27,6 +27,8 @@ public:
 	double NormalizedResidualNorm = -1;
 	double RelativeErrorNorm = -1;
 
+	Vector Ax;
+
 	IterationResult()
 	{
 		this->_solvingTimer.Start();
