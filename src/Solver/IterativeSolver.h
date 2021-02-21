@@ -21,6 +21,8 @@ public:
 	bool PrintIterationResults = true;
 	bool ComputeExactSolution = false;
 	StoppingCriteria StoppingCrit = StoppingCriteria::NormalizedResidual;
+	Vector Residual;
+	Vector Ax;
 
 	const SparseMatrix* Matrix;
 
@@ -38,6 +40,11 @@ public:
 		Utils::FatalError("This solver is not compatible with matrix blocks arising from a hybrid discretization.");
 	}
 
+	virtual bool CanOptimizeResidualComputation()
+	{
+		return false;
+	}
+
 	Vector Solve(const Vector& b) override
 	{
 		return Solve(b, "0");
@@ -46,11 +53,11 @@ public:
 	virtual Vector Solve(const Vector& b, string initialGuessCode)
 	{
 		Vector x;
-		bool zeroInitialGuess = false;
+		bool xEquals0 = false;
 		if (initialGuessCode.compare("0") == 0)
 		{
 			x = Vector::Zero(b.rows());
-			zeroInitialGuess = true;
+			xEquals0 = true;
 		}
 		else if (initialGuessCode.compare("1") == 0)
 			x = Vector::Ones(b.rows());
@@ -58,115 +65,108 @@ public:
 			x = Vector::Random(b.rows());
 		else
 			Utils::FatalError("Unknown initial guess code");
-		Solve(b, x, zeroInitialGuess);
+
+		Solve(b, x, xEquals0);
 		return x;
 	}
 
-	virtual void Solve(const Vector& b, Vector& initialGuess, bool zeroInitialGuess)
+	virtual void Solve(const Vector& b, Vector& x, bool xEquals0)
 	{
-		const SparseMatrix& A = *this->Matrix;
-
-		this->SolvingComputationalWork = 0;
-
-		if (this->ComputeExactSolution)
-			this->ExactSolution = this->_directSolver.solve(b);
-
-		this->IterationCount = 0;
-		Vector& x = initialGuess;
-		bool xEquals0 = zeroInitialGuess;
-
-		IterationResult result = CreateFirstIterationResult(b, x);
-		if (MaxIterations == 0)
-			return;
-
-		if (StoppingCrit == StoppingCriteria::NormalizedResidual)
-		{
-			if (zeroInitialGuess)
-				result.SetResidualAsB();
-			else
-			{
-				result.SetResidual(b - A * x);                                  result.AddCost(Cost::DAXPY(A));
-			}
-		}
-		if (this->PrintIterationResults)
-			cout << result << endl;
-
-		while (!StoppingCriteriaReached(result))
-		{
-			result = ExecuteOneIteration(b, x, xEquals0, result);
-			this->IterationCount++;
-
-			if (!result.IsResidualSet() && StoppingCrit == StoppingCriteria::NormalizedResidual)
-			{
-				result.SetResidual(b - A * x);
-				result.AddCost(2 * A.nonZeros());
-			}
-			if (this->PrintIterationResults)
-				cout << result << endl;
-		}
-
-		if (this->PrintIterationResults)
-			cout << endl;
-
-		this->SolvingComputationalWork = result.SolvingComputationalWork();
+		bool computeResidual = false;
+		bool computeAx = false;
+		Solve(b, x, xEquals0, computeResidual, computeAx);
 	}
 
-	virtual Vector SolveAndComputeResidual(const Vector& b, Vector& initialGuess, bool zeroInitialGuess)
+	virtual void Solve(const Vector& b, Vector& x, bool xEquals0, bool computeResidual, bool computeAx)
 	{
 		const SparseMatrix& A = *this->Matrix;
 
 		this->SolvingComputationalWork = 0;
+		this->Residual = Vector();
 
 		if (this->ComputeExactSolution)
 			this->ExactSolution = this->_directSolver.solve(b);
 
 		this->IterationCount = 0;
-		Vector& x = initialGuess;
-		bool xEquals0 = zeroInitialGuess;
-
-		Vector r;
-
+		
 		IterationResult result = CreateFirstIterationResult(b, x);
 		if (MaxIterations == 0)
 		{
-			if (zeroInitialGuess)
-				r = b;
-			else
+			if (computeResidual && !computeAx)
 			{
-				r = b - A * x;                                     result.AddCost(Cost::DAXPY(A));
+				if (xEquals0)
+					this->Residual = b;
+				else
+				{
+					this->Residual = b - A * x;                              result.AddCost(Cost::DAXPY(A));
+				}
 			}
-			return r;
+			else if (computeResidual && computeAx)
+			{
+				if (xEquals0)
+				{
+					this->Residual = b;
+					this->Ax = Vector::Zero(b.rows());
+				}
+				else
+				{
+					this->Ax = A * x;                                        result.AddCost(Cost::MatVec(A));
+					this->Residual = b - this->Ax;                           result.AddCost(Cost::AddVec(b));
+				}
+			}
+			else if (computeAx)
+			{
+				if (xEquals0)
+					this->Ax = Vector::Zero(b.rows());
+				else
+				{
+					this->Ax = A * x;                                        result.AddCost(Cost::MatVec(A));
+				}
+			}
+			return;
 		}
-
-		if (MaxIterations == 0)
-			return r;
 
 		if (StoppingCrit == StoppingCriteria::NormalizedResidual)
 		{
-			if (zeroInitialGuess)
-			{
-				r = b;
+			if (xEquals0)
 				result.SetResidualAsB();
-			}
 			else
 			{
-				r = b - A * x;                                     result.AddCost(Cost::DAXPY(A));
-				result.SetResidual(r);
+				this->Residual = b - A * x;                                          result.AddCost(Cost::DAXPY(A));
+				result.SetResidualNorm(this->Residual.norm());                       result.AddCost(Cost::Norm(b));
 			}
 		}
 
 		if (this->PrintIterationResults)
 			cout << result << endl;
 
+
 		while (!StoppingCriteriaReached(result))
 		{
-			if (StoppingCrit == StoppingCriteria::MaxIterations && this->IterationCount < this->MaxIterations - 1)
-				result = ExecuteOneIteration(b, x, xEquals0, result); // No need to compute the residual until the last iteration
+			if (!CanOptimizeResidualComputation())
+			{
+				result = ExecuteOneIteration(b, x, xEquals0, false, false, result);
+				if (!result.IsResidualSet() && StoppingCrit == StoppingCriteria::NormalizedResidual)
+				{
+					this->Residual = b - A * x;                                          result.AddCost(Cost::DAXPY(A));
+					result.SetResidualNorm(this->Residual.norm());                       result.AddCost(Cost::Norm(b));
+				}                                      
+			}
 			else
 			{
-				std::tie(result, r) = ExecuteOneIterationAndComputeResidual(b, x, xEquals0, result);
-				if (StoppingCrit == StoppingCriteria::NormalizedResidual)
-					result.SetResidual(r);
+				if (StoppingCrit == StoppingCriteria::MaxIterations)
+				{
+					if ((!computeResidual && !computeAx) || this->IterationCount < this->MaxIterations - 1)
+						result = ExecuteOneIteration(b, x, xEquals0, false, false, result); // No need to compute the residual until the last iteration
+					else
+						result = ExecuteOneIteration(b, x, xEquals0, computeResidual, computeAx, result);
+				}
+				else
+				{
+					result = ExecuteOneIteration(b, x, xEquals0, true, computeAx, result);
+					assert(result.Residual.rows() > 0);
+					result.SetResidualNorm(result.Residual.norm());                                                result.AddCost(Cost::Norm(b));
+				}
 			}
 			this->IterationCount++;
 
@@ -178,6 +178,10 @@ public:
 			cout << endl;
 
 		this->SolvingComputationalWork = result.SolvingComputationalWork();
+		if (computeResidual)
+			this->Residual = std::move(result.Residual);
+		if (computeAx)
+			this->Ax = std::move(result.Ax);
 	}
 
 	virtual ~IterativeSolver() {}
@@ -197,20 +201,8 @@ protected:
 		return result;
 	}
 
-	virtual IterationResult ExecuteOneIteration(const Vector& b, Vector& x, bool& xEquals0, const IterationResult& oldResult) { assert(false); };
-	
-	virtual pair<IterationResult, Vector> ExecuteOneIterationAndComputeResidual(const Vector& b, Vector& x, bool& xEquals0, const IterationResult& oldResult)
-	{ 
-		pair<IterationResult, Vector> p;
-		auto&[result, r] = p;
+	virtual IterationResult ExecuteOneIteration(const Vector& b, Vector& x, bool& xEquals0, bool computeResidual, bool computeAx, const IterationResult& oldResult) { assert(false); };
 
-		const SparseMatrix& A = *this->Matrix;
-
-		result = ExecuteOneIteration(b, x, xEquals0, oldResult);
-		r = b - A * x;                                         result.AddCost(Cost::DAXPY(A));
-
-		return p;
-	}
 
 	bool StoppingCriteriaReached(const IterationResult& result)
 	{

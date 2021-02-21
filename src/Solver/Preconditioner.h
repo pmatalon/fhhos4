@@ -28,6 +28,11 @@ public:
 		return _solver == nullptr;
 	}
 
+	bool CanOptimizeResidualComputation()
+	{
+		return !_solver ? false : _solver->CanOptimizeResidualComputation();
+	}
+
 	friend ostream& operator<<(ostream& os, const Preconditioner& p)
 	{
 		if (p._solver)
@@ -54,6 +59,21 @@ public:
 		if (_solver)
 			return _solver->Solve(r);
 		return r;
+	}
+
+	pair<Vector, Vector> ApplyAndComputeAe(const Vector& r)
+	{
+		assert(_solver);
+
+		pair<Vector, Vector> p;
+		auto&[e, Ae] = p;
+
+		e = Vector::Zero(r.rows());
+		bool eEquals0 = true;
+		_solver->Solve(r, e, eEquals0, false, true);
+		Ae = std::move(_solver->Ax);
+
+		return p;
 	}
 	
 	BigNumber SetupComputationalWork()

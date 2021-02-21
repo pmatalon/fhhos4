@@ -74,9 +74,10 @@ public:
 	}
 
 private:
-	IterationResult ExecuteOneIteration(const Vector& b, Vector& xOld, bool& xEquals0, const IterationResult& oldResult) override
+	IterationResult ExecuteOneIteration(const Vector& b, Vector& xOld, bool& xEquals0, bool computeResidual, bool computeAx, const IterationResult& oldResult) override
 	{
 		IterationResult result(oldResult);
+		assert(!computeResidual && !computeAx);
 
 		const SparseMatrix& A = *this->Matrix;
 

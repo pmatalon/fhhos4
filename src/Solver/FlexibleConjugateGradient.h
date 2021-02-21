@@ -44,7 +44,7 @@ public:
 	}
 
 public:
-	void Solve(const Vector& b, Vector& initialGuess, bool zeroInitialGuess) override
+	void Solve(const Vector& b, Vector& x, bool xEquals0, bool computeResidual, bool computeAx) override
 	{
 		const SparseMatrix& A = *this->Matrix;
 
@@ -55,22 +55,21 @@ public:
 		if (this->ComputeExactSolution)
 			this->ExactSolution = this->_directSolver.solve(b);
 
-		IterationResult result = CreateFirstIterationResult(b, initialGuess);
+		IterationResult result = CreateFirstIterationResult(b, x);
 
 		// Init restart parameters
 		list<Direction> previousDirections;
 
-		Vector& x = initialGuess;
-		Vector r;
-		if (zeroInitialGuess)
+		Vector& r = this->Residual;
+		if (xEquals0)
 		{
 			r = b;
 			result.SetResidualAsB();
 		}
 		else
 		{
-			r = b - A * x;                                           result.AddCost(Cost::DAXPY(A));
-			result.SetResidual(r);
+			r = b - A * x;                                            result.AddCost(Cost::DAXPY(A));
+			result.SetResidualNorm(r.norm());                         result.AddCost(Cost::Norm(r));
 		}
 
 		this->IterationCount = 0;
@@ -83,13 +82,26 @@ public:
 			result = IterationResult(result);
 
 			// Apply the preconditioner
-			Vector z = Precond.Apply(r);                             result.AddCost(Precond.SolvingComputationalWork());
+			Vector z, Az;
+			if (Precond.CanOptimizeResidualComputation())
+			{
+				std::tie(z, Az) = Precond.ApplyAndComputeAe(r);    result.AddCost(Precond.SolvingComputationalWork());
+			}
+			else
+			{
+				z = Precond.Apply(r);                              result.AddCost(Precond.SolvingComputationalWork());
+			}
 
 			// The final direction of research, d, is found by 
 			// A-orthogonalizing z with the previous directions of research, 
 			// according to the truncation / restart method chosen.
 
 			Vector* d = new Vector(z);
+
+			Vector* Ad = nullptr;
+			if (Precond.CanOptimizeResidualComputation())
+				Ad = new Vector(std::move(Az));
+
 			for (Direction const& directionk : previousDirections)
 			{
 				Vector& dk  = *directionk.d;
@@ -99,10 +111,19 @@ public:
 				// A-orthogonalization
 				double z_dot_Adk = z.dot(Adk);                        result.AddCost(Cost::Dot(z));
 				*d -= (z_dot_Adk / dk_dot_Adk) * dk;                  result.AddCost(Cost::VectorDAXPY(*d));
+
+				if (Precond.CanOptimizeResidualComputation())
+				{
+					*Ad -= (z_dot_Adk / dk_dot_Adk) * Adk;            result.AddCost(Cost::VectorDAXPY(*d));
+				}
 			}
 			assert(d->norm() > 0);
 
-			Vector* Ad = new Vector(A * (*d));                        result.AddCost(Cost::MatVec(A));
+			if (!Ad)
+			{
+				Ad = new Vector(A * (*d));                            result.AddCost(Cost::MatVec(A));
+			}
+
 			double d_dot_Ad = d->dot(*Ad);                            result.AddCost(Cost::Dot(*d));
 			assert(d_dot_Ad != 0);
 
@@ -134,7 +155,7 @@ public:
 			this->IterationCount++;
 
 			result.SetX(x);
-			result.SetResidual(r);
+			result.SetResidualNorm(r.norm());                         result.AddCost(Cost::Norm(r));
 
 			if (this->PrintIterationResults)
 				cout << result << endl;

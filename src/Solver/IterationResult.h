@@ -27,6 +27,7 @@ public:
 	double NormalizedResidualNorm = -1;
 	double RelativeErrorNorm = -1;
 
+	Vector Residual;
 	Vector Ax;
 
 	IterationResult()
@@ -48,6 +49,9 @@ public:
 		this->_tolerance = oldResult._tolerance;
 	}
 
+	// Move assignment operator
+	IterationResult& operator=(IterationResult&& result) = default;
+
 	size_t SolvingComputationalWork()
 	{
 		return _solvingComputationalWork;
@@ -55,7 +59,7 @@ public:
 
 	void SetA(const SparseMatrix& A)
 	{
-		this->_oneFineMatVecWork = 2 * A.nonZeros();
+		this->_oneFineMatVecWork = Cost::MatVec(A);
 	}
 
 	void SetB(const Vector& b)
@@ -81,9 +85,9 @@ public:
 		this->_tolerance = tol;
 	}
 
-	void SetResidual(const Vector& r)
+	void SetResidualNorm(double rNorm)
 	{
-		this->ResidualNorm = r.norm();                                         this->AddCost(Cost::Norm(r));
+		this->ResidualNorm = rNorm;
 		assert(_bNorm >= 0);
 		this->NormalizedResidualNorm = _bNorm > 0 ? ResidualNorm / _bNorm : ResidualNorm;
 

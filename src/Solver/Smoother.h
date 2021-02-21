@@ -32,17 +32,22 @@ public:
 			_solver->Setup(A);
 	}
 
+	bool CanOptimizeResidualComputation()
+	{
+		return _solver->CanOptimizeResidualComputation() && _solver->MaxIterations > 0;
+	}
+
 	void Smooth(Vector& x, const Vector& b, bool& xEquals0)
 	{
-		_solver->Solve(b, x, xEquals0);
+		_solver->Solve(b, x, xEquals0, false, false);
 		xEquals0 = false;
 	}
 
-	Vector SmoothAndComputeResidual(Vector& x, const Vector& b, bool& xEquals0)
+	Vector&& SmoothAndComputeResidual(Vector& x, const Vector& b, bool& xEquals0)
 	{
-		Vector r = _solver->SolveAndComputeResidual(b, x, xEquals0);
+		_solver->Solve(b, x, xEquals0, true, false);
 		xEquals0 = false;
-		return r;
+		return std::move(_solver->Residual);
 	}
 
 	friend ostream& operator<<(ostream& os, const Smoother& s)

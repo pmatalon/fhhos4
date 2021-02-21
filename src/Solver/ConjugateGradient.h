@@ -45,7 +45,7 @@ private:
 		else
 		{
 			r = b - A * x;                                  result.AddCost(Cost::DAXPY(A));
-			result.SetResidual(r);
+			result.SetResidualNorm(r.norm());               result.AddCost(Cost::Norm(r));
 		}
 
 		double beta = 0;
@@ -79,7 +79,7 @@ private:
 			this->IterationCount++;
 
 			result.SetX(x);
-			result.SetResidual(r);
+			result.SetResidualNorm(r.norm());                   result.AddCost(Cost::Norm(r));
 
 			if (this->PrintIterationResults)
 				cout << result << endl;

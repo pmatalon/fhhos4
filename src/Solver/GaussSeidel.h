@@ -39,51 +39,51 @@ public:
 		this->SetupComputationalWork = 0;
 	}
 
-private:
-	IterationResult ExecuteOneIteration(const Vector& b, Vector& x, bool& xEquals0, const IterationResult& oldResult) override
+	bool CanOptimizeResidualComputation() override
 	{
-		IterationResult result(oldResult);
-
-		const SparseMatrix& A = *this->Matrix;
-
-		if (_direction == Direction::Forward)
-			ForwardSweep(b, x, xEquals0, result);
-		else if (_direction == Direction::Backward)
-			BackwardSweep(b, x, xEquals0, result);
-		else if (_direction == Direction::Symmetric)
-		{
-			ForwardSweep(b, x, xEquals0, result);
-			BackwardSweep(b, x, xEquals0, result);
-		}
-		else
-			Utils::FatalError("direction not managed");
-
-		return result;
+		return true;
 	}
 
-	pair<IterationResult, Vector> ExecuteOneIterationAndComputeResidual(const Vector& b, Vector& x, bool& xEquals0, const IterationResult& oldResult) override
+private:
+	IterationResult ExecuteOneIteration(const Vector& b, Vector& x, bool& xEquals0, bool computeResidual, bool computeAx, const IterationResult& oldResult) override
 	{
-		pair<IterationResult, Vector> p;
-		auto&[result, r] = p;
-
-		result = IterationResult(oldResult);
+		IterationResult result(oldResult);
+		assert(!computeAx);
 
 		const SparseMatrix& A = *this->Matrix;
 
-		if (_direction == Direction::Forward)
-			r = ForwardSweepAndComputeResidual(b, x, xEquals0, result);
-		else if (_direction == Direction::Backward)
-			r = BackwardSweepAndComputeResidual(b, x, xEquals0, result);
-		else if (_direction == Direction::Symmetric)
+		if (!computeResidual)
 		{
-			ForwardSweep(b, x, xEquals0, result);
-			r = BackwardSweepAndComputeResidual(b, x, xEquals0, result);
+			if (_direction == Direction::Forward)
+				ForwardSweep(b, x, xEquals0, result);
+			else if (_direction == Direction::Backward)
+				BackwardSweep(b, x, xEquals0, result);
+			else if (_direction == Direction::Symmetric)
+			{
+				ForwardSweep(b, x, xEquals0, result);
+				BackwardSweep(b, x, xEquals0, result);
+			}
+			else
+				Utils::FatalError("direction not managed");
 		}
 		else
-			Utils::FatalError("direction not managed");
+		{
+			Vector& r = result.Residual;
+			if (_direction == Direction::Forward)
+				r = ForwardSweepAndComputeResidual(b, x, xEquals0, result);
+			else if (_direction == Direction::Backward)
+				r = BackwardSweepAndComputeResidual(b, x, xEquals0, result);
+			else if (_direction == Direction::Symmetric)
+			{
+				ForwardSweep(b, x, xEquals0, result);
+				r = BackwardSweepAndComputeResidual(b, x, xEquals0, result);
+			}
+			else
+				Utils::FatalError("direction not managed");
+		}
 
 		result.SetX(x);
-		return p;
+		return result;
 	}
 
 	void ForwardSweep(const Vector& b, Vector& x, bool& xEquals0, IterationResult& result)

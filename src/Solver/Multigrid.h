@@ -48,6 +48,11 @@ public:
 		}
 	}
 
+	bool CanOptimizeResidualComputation() override
+	{
+		return this->_fineLevel->PostSmoother->CanOptimizeResidualComputation();
+	}
+
 protected:
 	Multigrid() {};
 
@@ -206,17 +211,16 @@ protected:
 
 private:
 
-	IterationResult ExecuteOneIteration(const Vector& b, Vector& x, bool& xEquals0, const IterationResult& oldResult) override
+	IterationResult ExecuteOneIteration(const Vector& b, Vector& x, bool& xEquals0, bool computeResidual, bool computeAx, const IterationResult& oldResult) override
 	{
 		IterationResult result(oldResult);
 
-		bool computeAx = false;
-		MultigridCycle(this->_fineLevel, b, x, xEquals0, computeAx, result);
+		MultigridCycle(this->_fineLevel, b, x, xEquals0, computeResidual, computeAx, result);
 		result.SetX(x);
 		return result;
 	}
 
-	void MultigridCycle(Level* level, const Vector& b, Vector& x, bool& xEquals0, bool computeAx, IterationResult& result)
+	void MultigridCycle(Level* level, const Vector& b, Vector& x, bool& xEquals0, bool computeResidual, bool computeAx, IterationResult& result)
 	{
 		const SparseMatrix& A = *level->OperatorMatrix;
 
@@ -237,23 +241,27 @@ private:
 			// Pre-smoothing //
 			//---------------//
 
-			//level->PreSmoother->Smooth(x, b);                                        result.AddCost(level->PreSmoother->SolvingComputationalWork());
-			Vector r = level->PreSmoother->SmoothAndComputeResidual(x, b, xEquals0);  result.AddCost(level->PreSmoother->SolvingComputationalWork());
+			Vector r;
+			if (level->PreSmoother->CanOptimizeResidualComputation())
+			{
+				r = level->PreSmoother->SmoothAndComputeResidual(x, b, xEquals0);         result.AddCost(level->PreSmoother->SolvingComputationalWork());
+			}
+			else
+			{
+				level->PreSmoother->Smooth(x, b, xEquals0);                               result.AddCost(level->PreSmoother->SolvingComputationalWork());
+				// Residual computation
+				r = b - A * x;                                                            result.AddCost(Cost::DAXPY(A));
+			}
 
 			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPreSmoothing");
 
-			//----------------------//
-			// Residual computation //
-			//----------------------//
-
-			//Vector r = b - A * x;                                                    result.AddCost(Cost::DAXPY(A));
 
 			//------------------------------------------------//
 			// Restriction of the residual on the coarse grid //
 			//------------------------------------------------//
 
-			Vector rc = level->Restrict(r);                                          result.AddCost(level->RestrictCost());
+			Vector rc = level->Restrict(r);                                               result.AddCost(level->RestrictCost());
 
 			//--------------------------------------------------//
 			// Residual equation Ae=r solved on the coarse grid //
@@ -267,7 +275,7 @@ private:
 				for (int i = 0; i < this->WLoops; ++i)
 				{
 					IterationResult coarseResult;
-					MultigridCycle(level->CoarserLevel, rc, ec, ecEquals0, false, coarseResult);   result.AddCost(coarseResult.SolvingComputationalWork());
+					MultigridCycle(level->CoarserLevel, rc, ec, ecEquals0, false, false, coarseResult);   result.AddCost(coarseResult.SolvingComputationalWork());
 					if (level->CoarserLevel->IsCoarsestLevel())
 						break;
 				}
@@ -278,7 +286,7 @@ private:
 				if (level->CoarserLevel->IsCoarsestLevel())
 				{
 					bool ecEquals0 = true;
-					MultigridCycle(level->CoarserLevel, rc, ec, ecEquals0, false, coarseResult); // exact solution
+					MultigridCycle(level->CoarserLevel, rc, ec, ecEquals0, false, false, coarseResult); // exact solution
 					                                                                               result.AddCost(coarseResult.SolvingComputationalWork());
 				}
 				else
@@ -300,7 +308,7 @@ private:
 				level->ExportVector(cgc, "it" + to_string(this->IterationCount) + "_cgc");
 			}
 
-			x += level->Prolong(ec);                                              result.AddCost(level->ProlongCost() + Cost::AddVec(x));
+			x += level->Prolong(ec);                                                  result.AddCost(level->ProlongCost() + Cost::AddVec(x));
 
 			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_cgc");
@@ -311,14 +319,21 @@ private:
 
 			assert(!xEquals0);
 
-			if (computeAx)
+			if (level->PostSmoother->CanOptimizeResidualComputation() && (computeResidual || computeAx))
 			{
-				r = level->PostSmoother->SmoothAndComputeResidual(x, b, xEquals0);    result.AddCost(level->PostSmoother->SolvingComputationalWork());
-				result.Ax = b - r;                                                    result.AddCost(Cost::AddVec(b));
+				result.Residual = level->PostSmoother->SmoothAndComputeResidual(x, b, xEquals0);    result.AddCost(level->PostSmoother->SolvingComputationalWork());
+				if (computeAx)
+				{
+					result.Ax = b - result.Residual;                                                result.AddCost(Cost::AddVec(b));
+				}
 			}
 			else
 			{
 				level->PostSmoother->Smooth(x, b, xEquals0);                          result.AddCost(level->PostSmoother->SolvingComputationalWork());
+				if (computeAx)
+				{
+					result.Ax = A * x;                                                result.AddCost(Cost::MatVec(A));
+				}
 			}
 			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPostSmoothing");
@@ -337,7 +352,7 @@ private:
 		bool cEquals0 = true;
 		bool computeAc = true;
 		IterationResult precResult1;
-		MultigridCycle(level, r, c, cEquals0, computeAc, precResult1);            result.AddCost(precResult1.SolvingComputationalWork());
+		MultigridCycle(level, r, c, cEquals0, false, computeAc, precResult1);     result.AddCost(precResult1.SolvingComputationalWork());
 
 		// 1st iteration of FCG
 		//Vector v = A * c;                                                         result.AddCost(Cost::MatVec(A));
@@ -359,7 +374,7 @@ private:
 			bool dEquals0 = true;
 			bool computeAd = true;
 			IterationResult precResult2;
-			MultigridCycle(level, r, d, dEquals0, computeAd, precResult2);        result.AddCost(precResult2.SolvingComputationalWork());
+			MultigridCycle(level, r, d, dEquals0, false, computeAd, precResult2);  result.AddCost(precResult2.SolvingComputationalWork());
 
 			// 2nd iteration of FCG
 			//Vector w = A * d;                                                     result.AddCost(Cost::MatVec(A));
