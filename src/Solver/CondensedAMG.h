@@ -26,6 +26,8 @@ private:
 	SparseMatrix A_T_Fc;
 	SparseMatrix A_F_Fc;
 	SparseMatrix* inv_A_T_Tc;
+public:
+	SparseMatrix Ac;
 
 public:
 	CondensedLevel(int number, int cellBlockSize, int faceBlockSize, double strongCouplingThreshold, CAMGFaceProlongation faceProlong, CAMGProlongation prolongation)
@@ -67,8 +69,8 @@ public:
 		const SparseMatrix* A_T_T1 = A_T_T;
 		const SparseMatrix* A_T_F1 = A_T_F;
 		const SparseMatrix* A_F_F1 = A_F_F;
-		SparseMatrix *A_T_T2, *A_T_F2, *A_F_F2, *P, *Q_F;
-		const SparseMatrix* schur = this->OperatorMatrix;
+		SparseMatrix *A_T_T2, *A_T_F2, *A_F_F2, *P, *Q_F, *schur2;
+		const SparseMatrix* schur1 = this->OperatorMatrix;
 		double coarseningRatio = 0;
 		//double nCoarsenings = 0;
 		
@@ -79,16 +81,17 @@ public:
 		//while (coarseningRatio < 3)
 		for (int nCoarsenings = 0; nCoarsenings < numberOfPasses; nCoarsenings++)
 		{
-			std::tie(A_T_T2, A_T_F2, A_F_F2, P, Q_F, coarsestPossibleMeshReached) = Coarsen(*A_T_T1, *A_T_F1, *A_F_F1, *schur, coarseningStgy, faceCoarseningStgy);
+			std::tie(A_T_T2, A_T_F2, A_F_F2, P, Q_F, schur2, coarsestPossibleMeshReached) = Coarsen(*A_T_T1, *A_T_F1, *A_F_F1, *schur1, coarseningStgy, faceCoarseningStgy);
 			if (coarsestPossibleMeshReached)
 				return;
 
 			if (nCoarsenings > 0)
-				delete A_T_T1, A_T_F1, A_F_F1;
+				delete A_T_T1, A_T_F1, A_F_F1, schur1;
 
 			A_T_T1 = A_T_T2;
 			A_T_F1 = A_T_F2;
 			A_F_F1 = A_F_F2;
+			schur1 = schur2;
 
 			if (nCoarsenings == 0)
 			{
@@ -101,13 +104,13 @@ public:
 				this->Q_F = this->Q_F * *Q_F;
 			}
 
-			if (this->_faceProlong == CAMGFaceProlongation::FaceAggregates || this->_multigridProlong == CAMGProlongation::ReconstructSmoothedTraceOrInject)
+			/*if (this->_faceProlong == CAMGFaceProlongation::FaceAggregates || this->_multigridProlong == CAMGProlongation::ReconstructSmoothedTraceOrInject)
 			{
 				const SparseMatrix* oldSchur = schur;
 				schur = new SparseMatrix(P->transpose() * (*oldSchur) * (*P));
 				if (nCoarsenings > 0)
 					delete oldSchur;
-			}
+			}*/
 
 			delete P, Q_F;
 
@@ -122,10 +125,15 @@ public:
 		this->A_T_Tc = *A_T_T2;
 		this->A_T_Fc = *A_T_F2;
 		this->A_F_Fc = *A_F_F2;
+		this->Ac = SparseMatrix(*schur2);
+		delete schur2;
 	}
 
-	// Returns <A_T_Tc, A_T_Fc, A_F_Fc, P, Q_F, coarsestPossibleMeshReached>
-	tuple<SparseMatrix*, SparseMatrix*, SparseMatrix*, SparseMatrix*, SparseMatrix*, bool> Coarsen(const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F, const SparseMatrix& schur, CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy)
+
+
+
+	// Returns <A_T_Tc, A_T_Fc, A_F_Fc, P, Q_F, schurc, coarsestPossibleMeshReached>
+	tuple<SparseMatrix*, SparseMatrix*, SparseMatrix*, SparseMatrix*, SparseMatrix*, SparseMatrix*, bool> Coarsen(const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F, const SparseMatrix& schur, CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy)
 	{
 		//ExportMatrix(A_T_T, "A_T_T", 0);
 		//ExportMatrix(A_T_F, "A_T_F", 0);
@@ -142,7 +150,7 @@ public:
 
 			mesh.Coarsen(elemCoarseningStgy, faceCoarseningStgy, coarsestPossibleMeshReached);
 			if (coarsestPossibleMeshReached)
-				return { nullptr, nullptr, nullptr, nullptr, nullptr, coarsestPossibleMeshReached };
+				return { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, coarsestPossibleMeshReached };
 		}
 
 		/*cout << "------------- Elem" << endl;
@@ -183,7 +191,7 @@ public:
 			skeleton.Build(schur);
 			skeleton.PairWiseAggregate(coarsestPossibleMeshReached);
 			if (coarsestPossibleMeshReached)
-				return { nullptr, nullptr, nullptr, nullptr, nullptr, coarsestPossibleMeshReached };
+				return { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, coarsestPossibleMeshReached };
 			Q_F = new SparseMatrix(BuildQ_F_AllAggregated(skeleton));
 		}
 		else
@@ -300,7 +308,7 @@ public:
 		{
 			SparseMatrix inv_A_T_Tc = Utils::InvertBlockDiagMatrix(*A_T_Tc, _cellBlockSize);
 			SparseMatrix Theta = -inv_A_T_Tc * *A_T_Fc_tmp;   // Reconstruct
-			SparseMatrix Pi = BuildTraceOnRemovedFaces(mesh);
+			SparseMatrix Pi = BuildHighOrderTraceOnRemovedFaces(mesh);
 			
 			SparseMatrix ReconstructAndTrace1 = Pi * Q_T * Theta;
 
@@ -322,10 +330,15 @@ public:
 
 		//SparseMatrix* A_T_Fc = new SparseMatrix(Q_T.transpose() * A_T_F * *P); // Kills -prolong 1 or 2
 		SparseMatrix* A_T_Fc = A_T_Fc_tmp;
+
 		//SparseMatrix* A_F_Fc = new SparseMatrix(Q_F->transpose() * A_F_F * *Q_F);
 		SparseMatrix* A_F_Fc = new SparseMatrix(P->transpose() * A_F_F * *P);
 
-		return { A_T_Tc, A_T_Fc, A_F_Fc, P, Q_F, coarsestPossibleMeshReached };
+
+		//SparseMatrix* schurc = new SparseMatrix(ReduceSparsity(P->transpose() * schur * *P, mesh));
+		SparseMatrix* schurc = new SparseMatrix(P->transpose() * schur * *P);
+
+		return { A_T_Tc, A_T_Fc, A_F_Fc, P, Q_F, schurc, coarsestPossibleMeshReached };
 	}
 
 	void SetupDiscretizedOperator() override
@@ -355,7 +368,7 @@ private:
 	}
 
 	// Face prolongation FaceProlongation
-	SparseMatrix BuildQ_F(const HybridAlgebraicMesh& mesh, const SparseMatrix A_F_F)
+	SparseMatrix BuildQ_F(const HybridAlgebraicMesh& mesh, const SparseMatrix& A_F_F)
 	{
 		bool enableAnisotropyManagement = false;
 		DenseMatrix Id = DenseMatrix::Identity(_faceBlockSize, _faceBlockSize);
@@ -503,7 +516,7 @@ private:
 		return Pi;
 	}
 
-	SparseMatrix BuildTraceOnRemovedFaces(const HybridAlgebraicMesh& mesh)
+	SparseMatrix BuildHighOrderTraceOnRemovedFaces(const HybridAlgebraicMesh& mesh)
 	{
 		NumberParallelLoop<CoeffsChunk> parallelLoopPi(mesh.Faces.size());
 		parallelLoopPi.Execute([this, &mesh](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
@@ -512,15 +525,67 @@ private:
 				if (face.IsRemovedOnCoarseMesh)
 				{
 					BigNumber elemNumber = face.Elements[0]->Number;
-					DenseMatrix faceMass = mesh.A_F_F->block(faceNumber * _faceBlockSize, faceNumber * _faceBlockSize, _faceBlockSize, _faceBlockSize);
+					DenseMatrix faceMass     = mesh.A_F_F->block(faceNumber * _faceBlockSize, faceNumber * _faceBlockSize, _faceBlockSize, _faceBlockSize);
 					DenseMatrix cellFaceMass = mesh.A_T_F->block(elemNumber * _cellBlockSize, faceNumber * _faceBlockSize, _cellBlockSize, _faceBlockSize);
-					DenseMatrix trace = faceMass.inverse() * cellFaceMass.transpose();
+					DenseMatrix cellMass     = mesh.A_T_T->block(elemNumber * _cellBlockSize, elemNumber * _cellBlockSize, _cellBlockSize, _cellBlockSize);
+					DenseMatrix trace = -faceMass.inverse() * cellFaceMass.transpose();
+					//DenseMatrix trace = - cellFaceMass.transpose();
 					chunk->Results.Coeffs.Add(faceNumber*_faceBlockSize, elemNumber*_cellBlockSize, trace);
 				}
 			});
 		SparseMatrix Pi = SparseMatrix(mesh.Faces.size()*_faceBlockSize, mesh.Elements.size()*_cellBlockSize);
 		parallelLoopPi.Fill(Pi);
 		return Pi;
+	}
+
+	SparseMatrix ReduceSparsity(const SparseMatrix& A, const HybridAlgebraicMesh& mesh)
+	{
+		NumberParallelLoop<CoeffsChunk> parallelLoop(mesh.CoarseFaces.size());
+		parallelLoop.Execute([this, &A, &mesh](BigNumber coarseFaceNumber, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				const HybridFaceAggregate& cf = mesh.CoarseFaces[coarseFaceNumber];
+
+				for (int k = 0; k < _cellBlockSize; k++)
+				{
+					// RowMajor --> the following line iterates over the non-zeros of the elemNumber-th row.
+					for (SparseMatrix::InnerIterator it(A, coarseFaceNumber*_faceBlockSize + k); it; ++it)
+					{
+						BigNumber coarseFaceNumber2 = it.col() / _faceBlockSize;
+						const HybridFaceAggregate* cf2 = &mesh.CoarseFaces[coarseFaceNumber2];
+
+						bool cf2IsInCf1Stencil = false;
+						if (coarseFaceNumber == coarseFaceNumber2)
+							cf2IsInCf1Stencil = true;
+						else
+						{
+							for (HybridAlgebraicFace* ff : cf.FineFaces)
+							{
+								if (ff->IsRemovedOnCoarseMesh)
+									continue;
+								for (HybridElementAggregate* coarseElement : ff->CoarseElements)
+								{
+									if (find(coarseElement->CoarseFaces.begin(), coarseElement->CoarseFaces.end(), cf2) != coarseElement->CoarseFaces.end())
+									{
+										cf2IsInCf1Stencil = true;
+										break;
+									}
+								}
+								if (cf2IsInCf1Stencil)
+									break;
+							}
+						}
+						if (cf2IsInCf1Stencil)
+							chunk->Results.Coeffs.Add(it.row(), it.col(), it.value());
+					}
+				}
+			});
+
+		SparseMatrix A2(A.rows(), A.cols());
+		parallelLoop.Fill(A2);
+
+		cout << "A.nonZeros()=" << A.nonZeros() << ", A2.nonZeros()=" << A2.nonZeros() << endl;
+
+		return A2;
 	}
 
 public:
@@ -648,6 +713,7 @@ protected:
 	Level* CreateCoarseLevel(Level* fineLevel) override
 	{
 		CondensedLevel* coarseLevel = new CondensedLevel(fineLevel->Number + 1, _cellBlockSize, _faceBlockSize, _strongCouplingThreshold, _faceProlong, _multigridProlong);
+		coarseLevel->OperatorMatrix = &dynamic_cast<CondensedLevel*>(fineLevel)->Ac;
 		return coarseLevel;
 	}
 };

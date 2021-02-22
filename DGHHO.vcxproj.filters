@@ -447,6 +447,9 @@
     <ClInclude Include="src\Utils\Cost.h">
       <Filter>Utils</Filter>
     </ClInclude>
+    <ClInclude Include="src\Solver\BlockGaussSeidel.h">
+      <Filter>Solver</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

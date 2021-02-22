@@ -8,16 +8,21 @@ class SmootherFactory
 public:
 	static Smoother* Create(string smootherCode, int nSmootherIterations, int blockSize, double omega)
 	{
-		if (smootherCode.compare("sor") == 0 || smootherCode.compare("gs") == 0)
+		if (smootherCode.compare("gs") == 0)
+			return new GaussSeidelSmoother(Direction::Forward, nSmootherIterations);
+		if (smootherCode.compare("rgs") == 0)
+			return new GaussSeidelSmoother(Direction::Backward, nSmootherIterations);
+
+		if (smootherCode.compare("sor") == 0)
 		{
-			if (blockSize == 1 && omega == 1)
+			if (omega == 1)
 				return new GaussSeidelSmoother(Direction::Forward, nSmootherIterations);
 			else
 				return new BlockSORSmoother(1, omega, Direction::Forward, nSmootherIterations);
 		}
-		if (smootherCode.compare("rsor") == 0 || smootherCode.compare("rgs") == 0)
+		if (smootherCode.compare("rsor") == 0)
 		{
-			if (blockSize == 1 && omega == 1)
+			if (omega == 1)
 				return new GaussSeidelSmoother(Direction::Backward, nSmootherIterations);
 			else
 				return new BlockSORSmoother(1, omega, Direction::Backward, nSmootherIterations);
@@ -27,6 +32,8 @@ public:
 		{
 			if (blockSize == 1 && omega == 1)
 				return new GaussSeidelSmoother(Direction::Forward, nSmootherIterations);
+			else if (omega == 1)
+				return new BlockGaussSeidelSmoother(blockSize, Direction::Forward, nSmootherIterations);
 			else
 				return new BlockSORSmoother(blockSize, omega, Direction::Forward, nSmootherIterations);
 		}
@@ -34,6 +41,8 @@ public:
 		{
 			if (blockSize == 1 && omega == 1)
 				return new GaussSeidelSmoother(Direction::Backward, nSmootherIterations);
+			else if (omega == 1)
+				return new BlockGaussSeidelSmoother(blockSize, Direction::Backward, nSmootherIterations);
 			else
 				return new BlockSORSmoother(blockSize, omega, Direction::Backward, nSmootherIterations);
 		}
@@ -42,12 +51,16 @@ public:
 		{
 			if (blockSize == 1 && omega == 1)
 				return new GaussSeidelSmoother(Direction::Symmetric, nSmootherIterations);
+			else if (omega == 1)
+				return new BlockGaussSeidelSmoother(blockSize, Direction::Symmetric, nSmootherIterations);
 			else
 				return new BlockSORSmoother(blockSize, omega, Direction::Symmetric, nSmootherIterations);
 		}
 
 		if (smootherCode.compare("j") == 0)
 			return new BlockJacobiSmoother(1, omega, nSmootherIterations);
+		if (smootherCode.compare("j23") == 0)
+			return new BlockJacobiSmoother(1, 2.0/3.0, nSmootherIterations);
 		if (smootherCode.compare("bj") == 0)
 			return new BlockJacobiSmoother(blockSize, omega, nSmootherIterations);
 		if (smootherCode.compare("bj23") == 0)
