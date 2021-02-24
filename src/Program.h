@@ -167,6 +167,10 @@ public:
 			}
 		}
 
+		// Export source
+		if (args.Actions.ExportSourceToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
+			dynamic_cast<GMSHMesh<Dim>*>(mesh)->ExportToGMSH(testCase->SourceFunction, args.OutputDirectory + "/source", "source");
+
 		//----------------------//
 		//       Assembly       //
 		//----------------------//

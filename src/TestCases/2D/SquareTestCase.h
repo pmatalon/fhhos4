@@ -39,6 +39,8 @@ public:
 			this->SourceFunction = this->Zero;
 		else if (pb.SourceCode.compare("zero") == 0)
 			this->SourceFunction = this->Zero;
+		else if (pb.SourceCode.compare("radiator") == 0)
+			this->SourceFunction = RadiatorSource;
 		else
 			Utils::FatalError("Unmanaged source code");
 
@@ -128,5 +130,12 @@ public:
 			return "zero solution";
 		else
 			return _pb.SourceCode;
+	}
+
+	static double RadiatorSource(DomPoint p)
+	{
+		if (p.X >= 0.6 && p.X <= 0.9 && p.Y >= 0.2 && p.Y <= 0.3)
+			return 20;
+		return 0;
 	}
 };

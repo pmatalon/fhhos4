@@ -85,6 +85,7 @@ struct ActionsArguments
 	bool ExportSolutionVectors = false;
 	bool ExportSolutionToGMSH = false;
 	bool ExportErrorToGMSH = false;
+	bool ExportSourceToGMSH = false;
 	bool LogAssembly = true;
 	bool AssembleRightHandSide = true;
 	bool UnitTests = false;

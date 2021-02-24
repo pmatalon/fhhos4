@@ -349,14 +349,15 @@ void print_usage() {
 	cout << endl;
 	cout << "-export CODES" << endl;
 	cout << "      Data export. The CODES must be comma-separated." << endl;
-	cout << "              lsys    - linear system" << endl;
-	cout << "              amat    - matrices decomposed by assembly terms in separate files (consistency, stabilization, mass, etc.)" << endl;
-	cout << "              mesh    - mesh to be used in Matlab" << endl;
-	cout << "              solvect - solution vector(s)" << endl;
-	cout << "              solgmsh - solution files (.pos and .msh) to be used in GMSH for visualization" << endl;
-	cout << "              errgmsh - error computed against the solution of an exact solver to be used in GMSH for visualization" << endl;
-	cout << "              mg      - Multigrid components (intergrid operator matrices, coarse meshes, etc.)" << endl;
-	cout << "              mgit    - Multigrid iteration vectors: for each iteration, right-hand side, solution before/after smoothing, etc." << endl;
+	cout << "              lsys       - linear system" << endl;
+	cout << "              amat       - matrices decomposed by assembly terms in separate files (consistency, stabilization, mass, etc.)" << endl;
+	cout << "              mesh       - mesh to be used in Matlab" << endl;
+	cout << "              solvect    - solution vector(s)" << endl;
+	cout << "              solgmsh    - solution files (.pos and .msh) to be used in GMSH for visualization" << endl;
+	cout << "              errgmsh    - error computed against the solution of an exact solver to be used in GMSH for visualization" << endl;
+	cout << "              sourcegmsh - solution files (.pos and .msh) to be used in GMSH for visualization" << endl;
+	cout << "              mg         - Multigrid components (intergrid operator matrices, coarse meshes, etc.)" << endl;
+	cout << "              mgit       - Multigrid iteration vectors: for each iteration, right-hand side, solution before/after smoothing, etc." << endl;
 	cout << endl;
 	cout << "-o PATH" << endl;
 	cout << "      Output directory to export files." << endl;
@@ -919,6 +920,8 @@ int main(int argc, char* argv[])
 						args.Actions.ExportSolutionToGMSH = true;
 					else if (code.compare("errgmsh") == 0)
 						args.Actions.ExportErrorToGMSH = true;
+					else if (code.compare("sourcegmsh") == 0)
+						args.Actions.ExportSourceToGMSH = true;
 					else if (code.compare("mg") == 0)
 						args.Actions.ExportMultigridComponents = true;
 					else if (code.compare("mgit") == 0)

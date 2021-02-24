@@ -1073,6 +1073,40 @@ public:
 		gmsh::finalize();
 	}
 
+	void ExportToGMSH(DomFunction f, const string& outputFilePath, const string& dataName)
+	{
+		assert(!_mshFilePath.empty());
+		gmsh::initialize();
+		gmsh::open(_mshFilePath);
+		if (_mshFileIsTmp)
+			remove(_mshFilePath.c_str());
+
+		int viewId = gmsh::view::add(dataName);
+
+		vector<std::string> modelNames;
+		gmsh::model::list(modelNames);
+		string modelName = modelNames[modelNames.size() - 1];
+
+		vector<size_t> elementTags;
+		vector<vector<double>> values;
+		elementTags.reserve(this->Elements.size());
+		values.reserve(this->Elements.size());
+		for (Element<Dim>* e : this->Elements)
+		{
+			elementTags.push_back(e->Id);
+			double value = f(e->Center());
+			values.push_back({ value });
+		}
+		gmsh::view::addModelData(viewId, 0, modelName, "ElementData", elementTags, values);
+
+		string dataFilePath = outputFilePath + ".pos";
+
+		gmsh::view::write(viewId, dataFilePath);
+
+		cout << dataName << " exported for GMSH to " << dataFilePath << endl;
+		gmsh::finalize();
+	}
+
 };
 
 //-------------//
