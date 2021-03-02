@@ -68,7 +68,7 @@ public:
 		}
 		else
 		{
-			r = b - A * x;                                            result.AddCost(Cost::DAXPY(A));
+			r = b - A.selfadjointView<Eigen::Lower>() * x;            result.AddCost(Cost::DAXPY(A));
 			result.SetResidualNorm(r.norm());                         result.AddCost(Cost::Norm(r));
 		}
 
@@ -121,7 +121,7 @@ public:
 
 			if (!Ad)
 			{
-				Ad = new Vector(A * (*d));                            result.AddCost(Cost::MatVec(A));
+				Ad = new Vector(A.selfadjointView<Eigen::Lower>() * (*d));  result.AddCost(Cost::MatVec(A));
 			}
 
 			double d_dot_Ad = d->dot(*Ad);                            result.AddCost(Cost::Dot(*d));

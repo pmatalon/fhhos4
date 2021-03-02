@@ -202,7 +202,7 @@ public:
 		SparseMatrix* A_T_Fc_tmp = nullptr;
 		if (!onlyFacesUsed)
 		{
-			A_T_Tc     = new SparseMatrix(Q_T.transpose() * A_T_T * Q_T);
+			A_T_Tc     = new SparseMatrix(Q_T.transpose() * A_T_T.selfadjointView<Eigen::Lower>() * Q_T);
 			A_T_Fc_tmp = new SparseMatrix(Q_T.transpose() * A_T_F * *Q_F);
 		}
 
@@ -332,11 +332,11 @@ public:
 		SparseMatrix* A_T_Fc = A_T_Fc_tmp;
 
 		//SparseMatrix* A_F_Fc = new SparseMatrix(Q_F->transpose() * A_F_F * *Q_F);
-		SparseMatrix* A_F_Fc = new SparseMatrix(P->transpose() * A_F_F * *P);
+		SparseMatrix* A_F_Fc = new SparseMatrix(P->transpose() * A_F_F.selfadjointView<Eigen::Lower>() * *P);
 
 
 		//SparseMatrix* schurc = new SparseMatrix(ReduceSparsity(P->transpose() * schur * *P, mesh));
-		SparseMatrix* schurc = new SparseMatrix(P->transpose() * schur * *P);
+		SparseMatrix* schurc = new SparseMatrix(P->transpose() * schur.selfadjointView<Eigen::Lower>() * *P);
 
 		return { A_T_Tc, A_T_Fc, A_F_Fc, P, Q_F, schurc, coarsestPossibleMeshReached };
 	}
