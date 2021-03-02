@@ -241,10 +241,13 @@ private:
 			// Pre-smoothing //
 			//---------------//
 
+			auto flopBeforePreSmooth = result._iterationComputationalWork;
+
 			Vector r;
 			if (level->PreSmoother->CanOptimizeResidualComputation())
 			{
-				r = level->PreSmoother->SmoothAndComputeResidual(x, b, xEquals0);         result.AddCost(level->PreSmoother->SolvingComputationalWork());
+				level->PreSmoother->SmoothAndComputeResidualOrAx(x, b, xEquals0, true, false);    result.AddCost(level->PreSmoother->SolvingComputationalWork());
+				r = level->PreSmoother->Residual();
 			}
 			else
 			{
@@ -256,12 +259,19 @@ private:
 			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPreSmoothing");
 
+			auto flopPreSmoothAndRes = result._iterationComputationalWork - flopBeforePreSmooth;
+			//cout << "- flopPreSmoothAndRes = " << flopPreSmoothAndRes << endl;
 
 			//------------------------------------------------//
 			// Restriction of the residual on the coarse grid //
 			//------------------------------------------------//
 
+			auto flopBeforeRestrict = result._iterationComputationalWork;
+
 			Vector rc = level->Restrict(r);                                               result.AddCost(level->RestrictCost());
+
+			auto flopRestrict = result._iterationComputationalWork - flopBeforeRestrict;
+			//cout << "- flopRestrict = " << flopRestrict << endl;
 
 			//--------------------------------------------------//
 			// Residual equation Ae=r solved on the coarse grid //
@@ -319,13 +329,15 @@ private:
 
 			assert(!xEquals0);
 
+			auto flopBeforePostSmooth = result._iterationComputationalWork;
+
 			if (level->PostSmoother->CanOptimizeResidualComputation() && (computeResidual || computeAx))
 			{
-				result.Residual = level->PostSmoother->SmoothAndComputeResidual(x, b, xEquals0);    result.AddCost(level->PostSmoother->SolvingComputationalWork());
+				level->PostSmoother->SmoothAndComputeResidualOrAx(x, b, xEquals0, computeResidual, computeAx);    result.AddCost(level->PostSmoother->SolvingComputationalWork());
+				if (computeResidual)
+					result.Residual = level->PostSmoother->Residual();
 				if (computeAx)
-				{
-					result.Ax = b - result.Residual;                                                result.AddCost(Cost::AddVec(b));
-				}
+					result.Ax = level->PostSmoother->Ax();
 			}
 			else
 			{
@@ -333,10 +345,21 @@ private:
 				if (computeAx)
 				{
 					result.Ax = A * x;                                                result.AddCost(Cost::MatVec(A));
+					if (computeResidual)
+					{
+						result.Residual = b - result.Ax;                              result.AddCost(Cost::AddVec(b));
+					}
+				}
+				else if (computeResidual)
+				{
+					result.Residual = b - A*x;                                        result.AddCost(Cost::DAXPY(A));
 				}
 			}
 			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPostSmoothing");
+
+			auto flopPostSmooth = result._iterationComputationalWork - flopBeforePostSmooth;
+			//cout << "- flopPostSmooth = " << flopPostSmooth << endl;
 		}
 	}
 

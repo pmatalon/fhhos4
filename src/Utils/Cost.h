@@ -31,13 +31,20 @@ public:
 	}
 
 	// AX+Y
-	static size_t DAXPY(size_t nnz, size_t rows)
+	static size_t DAXPY(size_t nnz)
 	{
-		return 2 * nnz + rows;
+		return 2 * nnz;
 	}
 	static size_t DAXPY(const SparseMatrix& A)
 	{
-		return DAXPY(A.nonZeros(), A.rows());
+		return DAXPY(A.nonZeros());
+	}
+
+	// UX+Y or LX+Y where U=upper(A), L=lower(A)
+	// Requires A symmetric
+	static size_t DAXPY_StrictTri(const SparseMatrix& A)
+	{
+		return DAXPY(NNZ::StrictTriPart(A));
 	}
 
 	// Dense dot product
@@ -75,15 +82,26 @@ public:
 		return v.rows();
 	}
 
-	// Sparse forward elimination
-	static size_t SpFWElimination(size_t nnzL)
+
+	// Sparse forward elimination (A must be symmetric)
+	static size_t SpFWElimination(const SparseMatrix& A)
 	{
-		return 2 * nnzL;
+		return SpFWElimination(NNZ::StrictTriPart(A), A.rows());
+	}
+	// Sparse forward elimination
+	static size_t SpFWElimination(size_t nnzStrictL, size_t n)
+	{
+		return 2 * nnzStrictL + n;
 	}
 
-	// Sparse backward substitution
-	static size_t SpBWSubstitution(size_t nnzU)
+	// Sparse backward substitution (A must be symmetric)
+	static size_t SpBWSubstitution(const SparseMatrix& A)
 	{
-		return 2 * nnzU;
+		return SpBWSubstitution(NNZ::StrictTriPart(A), A.rows());
+	}
+	// Sparse backward substitution
+	static size_t SpBWSubstitution(size_t nnzStrictU, size_t n)
+	{
+		return 2 * nnzStrictU + n;
 	}
 };

@@ -48,11 +48,10 @@ private:
 	IterationResult ExecuteOneIteration(const Vector& b, Vector& x, bool& xEquals0, bool computeResidual, bool computeAx, const IterationResult& oldResult) override
 	{
 		IterationResult result(oldResult);
-		assert(!computeAx);
 
 		const SparseMatrix& A = *this->Matrix;
 
-		if (!computeResidual)
+		if (!computeResidual && !computeAx)
 		{
 			if (_direction == Direction::Forward)
 				ForwardSweep(b, x, xEquals0, result);
@@ -68,15 +67,14 @@ private:
 		}
 		else
 		{
-			Vector& r = result.Residual;
 			if (_direction == Direction::Forward)
-				r = ForwardSweepAndComputeResidual(b, x, xEquals0, result);
+				ForwardSweepAndComputeResidual(b, x, xEquals0, result);
 			else if (_direction == Direction::Backward)
-				r = BackwardSweepAndComputeResidual(b, x, xEquals0, result);
+				BackwardSweepAndComputeResidualOrAx(b, x, xEquals0, computeResidual, computeAx, result);
 			else if (_direction == Direction::Symmetric)
 			{
 				ForwardSweep(b, x, xEquals0, result);
-				r = BackwardSweepAndComputeResidual(b, x, xEquals0, result);
+				BackwardSweepAndComputeResidualOrAx(b, x, xEquals0, computeResidual, computeAx, result);
 			}
 			else
 				Utils::FatalError("direction not managed");
@@ -93,12 +91,12 @@ private:
 		{
 			if (!xEquals0)
 			{
-				Vector v = b - A.triangularView<Eigen::StrictlyUpper>() * x;      result.AddCost(Cost::DAXPY(NNZ::StrictTriPart(A), A.rows()));
-				x = A.triangularView<Eigen::Lower>().solve(v);                    result.AddCost(Cost::SpFWElimination(NNZ::TriPart(A)));
+				Vector v = b - A.triangularView<Eigen::StrictlyUpper>() * x;      result.AddCost(Cost::DAXPY_StrictTri(A));
+				x = A.triangularView<Eigen::Lower>().solve(v);                    result.AddCost(Cost::SpFWElimination(A));
 			}
 			else
 			{
-				x = A.triangularView<Eigen::Lower>().solve(b);                    result.AddCost(Cost::SpFWElimination(NNZ::TriPart(A)));
+				x = A.triangularView<Eigen::Lower>().solve(b);                    result.AddCost(Cost::SpFWElimination(A));
 			}
 		}
 		else
@@ -117,79 +115,92 @@ private:
 		{
 			if (!xEquals0)
 			{
-				Vector v = b - A.triangularView<Eigen::StrictlyLower>() * x;      result.AddCost(Cost::DAXPY(NNZ::StrictTriPart(A), A.rows()));
-				x = A.triangularView<Eigen::Upper>().solve(v);                    result.AddCost(Cost::SpBWSubstitution(NNZ::TriPart(A)));
+				Vector v = b - A.triangularView<Eigen::StrictlyLower>() * x;      result.AddCost(Cost::DAXPY_StrictTri(A));
+				x = A.triangularView<Eigen::Upper>().solve(v);                    result.AddCost(Cost::SpBWSubstitution(A));
 			}
 			else
 			{
-				x = A.triangularView<Eigen::Upper>().solve(b);                    result.AddCost(Cost::SpBWSubstitution(NNZ::TriPart(A)));
+				x = A.triangularView<Eigen::Upper>().solve(b);                    result.AddCost(Cost::SpBWSubstitution(A));
 			}
 		}
 		else
 		{
 			for (BigNumber i = 0; i < A.rows(); ++i)
 				ProcessRow(A.rows() - i - 1, b, x);
-			result.AddCost(2 * A.nonZeros() + A.rows());
+			                                                                      result.AddCost(2 * A.nonZeros() + A.rows());
 		}
 		xEquals0 = false;
 	}
 
-	Vector ForwardSweepAndComputeResidual(const Vector& b, Vector& x, bool& xEquals0, IterationResult& result)
+	void ForwardSweepAndComputeResidual(const Vector& b, Vector& x, bool& xEquals0, IterationResult& result)
 	{
 		const SparseMatrix& A = *this->Matrix;
 		auto U = A.triangularView<Eigen::StrictlyUpper>();
 		auto L_plus_D = A.triangularView<Eigen::Lower>();
 
-		Vector r;
 		if (!xEquals0)
 		{
 			// Sweep: x(new) = (L+D)^{-1} * (b-Ux)
 			Vector Ux = U * x;                                    result.AddCost(Cost::SpMatVec(NNZ::StrictTriPart(A)));
-			x = L_plus_D.solve(b - Ux);                           result.AddCost(Cost::AddVec(b) + Cost::SpFWElimination(NNZ::TriPart(A)));
+			x = L_plus_D.solve(b - Ux);                           result.AddCost(Cost::AddVec(b) + Cost::SpFWElimination(A));
 			xEquals0 = false;
 
 			// Residual: Ux(old) - Ux(new)
-			r = Ux - U * x;                                       result.AddCost(Cost::DAXPY(NNZ::StrictTriPart(A), A.rows()));
+			result.Residual = Ux - U * x;                         result.AddCost(Cost::DAXPY_StrictTri(A));
 		}
 		else
 		{
 			// Sweep
-			x = L_plus_D.solve(b);                                result.AddCost(Cost::SpFWElimination(NNZ::TriPart(A)));
+			x = L_plus_D.solve(b);                                result.AddCost(Cost::SpFWElimination(A));
 			xEquals0 = false;
 
-			// Residual
-			r = - U * x;                                          result.AddCost(Cost::DAXPY(NNZ::StrictTriPart(A), A.rows()));
+			// Residual: r = -Ux
+			result.Residual = -U * x;                                          result.AddCost(Cost::DAXPY_StrictTri(A));
 		}
-		return r;
 	}
 
-	Vector BackwardSweepAndComputeResidual(const Vector& b, Vector& x, bool& xEquals0, IterationResult& result)
+	void BackwardSweepAndComputeResidualOrAx(const Vector& b, Vector& x, bool& xEquals0, bool computeResidual, bool computeAx, IterationResult& result)
 	{
 		const SparseMatrix& A = *this->Matrix;
 		auto L = A.triangularView<Eigen::StrictlyLower>();
 		auto D_plus_U = A.triangularView<Eigen::Upper>();
 
-		Vector r;
 		if (!xEquals0)
 		{
 			// Sweep: x(new) = (D+U)^{-1} * (b-Lx)
-			Vector Lx = L * x;                                    result.AddCost(Cost::SpMatVec(NNZ::StrictTriPart(A)));
-			x = D_plus_U.solve(b - Lx);                           result.AddCost(Cost::AddVec(b) + Cost::SpBWSubstitution(NNZ::TriPart(A)));
+			Vector b_Lx = b - L*x;                                result.AddCost(Cost::DAXPY_StrictTri(A));
+			x = D_plus_U.solve(b_Lx);                             result.AddCost(Cost::SpBWSubstitution(A));
 			xEquals0 = false;
 
-			// Residual: Lx(old) - Lx(new)
-			r = Lx - L * x;                                       result.AddCost(Cost::DAXPY(NNZ::StrictTriPart(A), A.rows()));
+			if (computeAx || computeResidual)
+			{
+				result.Ax = b_Lx + L * x;                         result.AddCost(Cost::DAXPY_StrictTri(A));
+				if (computeResidual)
+				{
+					result.Residual = b - result.Ax;              result.AddCost(Cost::AddVec(b));
+				}
+			}
 		}
 		else
 		{
-			// Sweep
-			x = D_plus_U.solve(b);                                result.AddCost(Cost::SpBWSubstitution(NNZ::TriPart(A)));
+			// Sweep: x(new) = (D+U)^{-1} * b
+			x = D_plus_U.solve(b);                                result.AddCost(Cost::SpBWSubstitution(A));
 			xEquals0 = false;
 
-			// Residual: Lx(old) - Lx(new)
-			r = - L * x;                                          result.AddCost(Cost::DAXPY(NNZ::StrictTriPart(A), A.rows()));
+			if (computeAx)
+			{
+				result.Ax = b + L * x;                            result.AddCost(Cost::DAXPY_StrictTri(A));
+				if (computeResidual)
+				{
+					result.Residual = b - result.Ax;              result.AddCost(Cost::AddVec(b));
+				}
+			}
+			else if (computeResidual)
+			{
+				// Residual: Lx(old) - Lx(new)
+				result.Residual = -L * x;                         result.AddCost(Cost::DAXPY_StrictTri(A));
+			}
 		}
-		return r;
 	}
 
 	// Same as ProcessBlockRow, but optimized for blockSize = 1

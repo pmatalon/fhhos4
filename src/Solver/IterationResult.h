@@ -16,8 +16,9 @@ private:
 	list<double> _previousItConvRates;
 	double _asymptoticConvRate = 0;
 	double _tolerance = 1e-8;
-
+public:
 	size_t _iterationComputationalWork = 0;
+private:
 	size_t _solvingComputationalWork = 0;
 	Timer _solvingTimer;
 	Vector e;

@@ -44,11 +44,10 @@ public:
 		xEquals0 = false;
 	}
 
-	Vector&& SmoothAndComputeResidual(Vector& x, const Vector& b, bool& xEquals0)
+	void SmoothAndComputeResidualOrAx(Vector& x, const Vector& b, bool& xEquals0, bool computeResidual, bool computeAx)
 	{
-		_solver->Solve(b, x, xEquals0, true, false);
+		_solver->Solve(b, x, xEquals0, computeResidual, computeAx);
 		xEquals0 = false;
-		return std::move(_solver->Residual);
 	}
 
 	friend ostream& operator<<(ostream& os, const Smoother& s)
@@ -60,6 +59,16 @@ public:
 	BigNumber SolvingComputationalWork()
 	{
 		return _solver->SolvingComputationalWork;
+	}
+
+	Vector&& Residual()
+	{
+		return std::move(_solver->Residual);
+	}
+
+	Vector&& Ax()
+	{
+		return std::move(_solver->Ax);
 	}
 
 	virtual ~Smoother()
