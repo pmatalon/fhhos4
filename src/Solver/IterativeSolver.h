@@ -24,13 +24,11 @@ public:
 	Vector Residual;
 	Vector Ax;
 
-	const SparseMatrix* Matrix;
-
 	IterativeSolver() : Solver() {}
 
 	virtual void Setup(const SparseMatrix& A) override
 	{
-		this->Matrix = &A;
+		Solver::Setup(A);
 		if (this->ComputeExactSolution)
 			this->_directSolver.compute(A);
 	}

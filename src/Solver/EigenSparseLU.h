@@ -17,8 +17,10 @@ public:
 
 	void Setup(const SparseMatrix& A) override
 	{
+		Solver::Setup(A);
+		_solver.isSymmetric(true);
 		_solver.compute(A);
-		this->SetupComputationalWork = 2.0 / 3.0 * pow(A.rows(), 3); // LU factorization
+		this->SetupComputationalWork = Cost::LUFactorization(A);
 		Eigen::ComputationInfo info = _solver.info();
 		if (info != Eigen::ComputationInfo::Success)
 		{
@@ -30,9 +32,8 @@ public:
 
 	Vector Solve(const Vector& b) override
 	{
-		this->SolvingComputationalWork = 0;
 		Vector x = _solver.solve(b);
-		this->SolvingComputationalWork = b.rows() * b.rows(); // back substitution
+		this->SolvingComputationalWork = Cost::LUSolve(*this->Matrix);
 		return x;
 	}
 };

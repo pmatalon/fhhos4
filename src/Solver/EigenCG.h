@@ -18,6 +18,7 @@ public:
 
 	void Setup(const SparseMatrix& A) override
 	{
+		Solver::Setup(A);
 		_solver.compute(A);
 		Eigen::ComputationInfo info = _solver.info();
 		if (info != Eigen::ComputationInfo::Success)

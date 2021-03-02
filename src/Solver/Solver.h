@@ -6,6 +6,8 @@ using namespace std;
 class Solver
 {
 public:
+	const SparseMatrix* Matrix;
+
 	size_t SetupComputationalWork = 0;
 	size_t SolvingComputationalWork = 0;
 
@@ -19,7 +21,10 @@ public:
 		return os;
 	}
 
-	virtual void Setup(const SparseMatrix& A) = 0;
+	virtual void Setup(const SparseMatrix& A)
+	{
+		this->Matrix = &A;
+	}
 
 	virtual Vector Solve(const Vector& b) = 0;
 

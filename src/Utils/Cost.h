@@ -104,4 +104,14 @@ public:
 	{
 		return 2 * nnzStrictU + n;
 	}
+
+	static size_t LUFactorization(const SparseMatrix& A)
+	{
+		return 2.0 / 3.0 * pow(A.rows(), 3);
+	}
+
+	static size_t LUSolve(const SparseMatrix& A)
+	{
+		return pow(A.rows(), 2);
+	}
 };
