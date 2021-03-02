@@ -160,8 +160,8 @@ public:
 			os << "Iteration";
 			os << setw(asymptoticConvRateWidth);
 			os << "Asymptotic";
-			os << setw(computWorkWidth);
-			os << "Computational";
+			//os << setw(computWorkWidth);
+			//os << "Computational";
 			//os << setw(cpuTimeWidth);
 			//os << "";
 			os << setw(nFineMatVecWidth);
@@ -184,8 +184,8 @@ public:
 			os << "cv rate";
 			os << setw(asymptoticConvRateWidth);
 			os << "cv rate";
-			os << setw(computWorkWidth);
-			os << "work";
+			//os << setw(computWorkWidth);
+			//os << "work";
 			//os << setw(cpuTimeWidth);
 			//os << "CPU time";
 			os << setw(nFineMatVecWidth);
@@ -234,8 +234,8 @@ public:
 			else
 				os << std::defaultfloat << result._asymptoticConvRate;
 
-			os << setw(computWorkWidth);
-			os << result._solvingComputationalWork;
+			//os << setw(computWorkWidth);
+			//os << result._solvingComputationalWork;
 
 			//os << setw(cpuTimeWidth);
 			//os << result._solvingTimer.CPU().InMilliseconds;

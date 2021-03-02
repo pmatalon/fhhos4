@@ -559,50 +559,50 @@ private:
 		}
 		totalTimer.Stop();
 
-		int sizeTime = 14;
-		int sizeWork = 14;
-		int sizeMatVec = 13;
+		int sizeTime = 12;
+		int sizeWork = 8;
+		int sizeMatVec = 8;
 
-		auto oneFineDAXPY = Cost::DAXPY(problem->A);
+		auto oneFineMatVec = Cost::MatVec(problem->A);
 
-		cout << "        |    CPU time    |  Elapsed time  ";
+		cout << "        |   CPU time   | Elapsed time ";
 		if (iterativeSolver != nullptr)
-			cout << "|  Comput. work  |     DAXPY     ";
+			cout << "|  MFlops  |  MatVec  ";
 		cout << endl;
-		cout << "-------------------------------------------";
+		cout << "---------------------------------------";
 		if (iterativeSolver != nullptr)
-			cout << "--------------------------------";
+			cout << "---------------------";
 		cout << endl;
 
 		cout << "Setup   | " << setw(sizeTime) << setupTimer.CPU()                  << " | " << setw(sizeTime) << setupTimer.Elapsed();
 		if (iterativeSolver != nullptr)
-			cout << " | " << setw(sizeWork) << iterativeSolver->SetupComputationalWork << " | " << setw(sizeMatVec) << (iterativeSolver->SetupComputationalWork / oneFineDAXPY);
+			cout << " | " << setw(sizeWork) << (iterativeSolver->SetupComputationalWork / (size_t)1e6) << " | " << setw(sizeMatVec) << (iterativeSolver->SetupComputationalWork / oneFineMatVec);
 		cout << endl;
 		cout << "        | " << setw(sizeTime-3) << setupTimer.CPU().InMilliseconds   << " ms | " << setw(sizeTime-3) << setupTimer.Elapsed().InMilliseconds << " ms ";
 		if (iterativeSolver != nullptr)
 			cout << "| " << setw(sizeWork) << " " << " | " << setw(sizeMatVec);
 		cout << endl;
-		cout << "-------------------------------------------";
+		cout << "---------------------------------------";
 		if (iterativeSolver != nullptr)
-			cout << "--------------------------------";
+			cout << "---------------------";
 		cout << endl;
 
 		cout << "Solving | " << setw(sizeTime) << solvingTimer.CPU()                  <<    " | " << setw(sizeTime) << solvingTimer.Elapsed();
 		if (iterativeSolver != nullptr)
-			cout << " | " << setw(sizeWork) << iterativeSolver->SolvingComputationalWork << " | " << setw(sizeMatVec) << (iterativeSolver->SolvingComputationalWork / oneFineDAXPY);
+			cout << " | " << setw(sizeWork) << (iterativeSolver->SolvingComputationalWork / (size_t)1e6) << " | " << setw(sizeMatVec) << (iterativeSolver->SolvingComputationalWork / oneFineMatVec);
 		cout << endl;
 		cout << "        | " << setw(sizeTime-3) << solvingTimer.CPU().InMilliseconds << " ms | " << setw(sizeTime-3) << solvingTimer.Elapsed().InMilliseconds << " ms ";
 		if (iterativeSolver != nullptr)
 			cout << "| " << setw(sizeWork) << " " << " | " << setw(sizeMatVec);
 		cout << endl;
-		cout << "-------------------------------------------";
+		cout << "---------------------------------------";
 		if (iterativeSolver != nullptr)
-			cout << "--------------------------------";
+			cout << "---------------------";
 		cout << endl;
 
 		cout << "Total   | " << setw(sizeTime) << totalTimer.CPU()                  <<    " | " << setw(sizeTime) << totalTimer.Elapsed();
 		if (iterativeSolver != nullptr)
-			cout << " | " << setw(sizeWork) << (iterativeSolver->SetupComputationalWork + iterativeSolver->SolvingComputationalWork) << " | " << setw(sizeMatVec) << ((iterativeSolver->SetupComputationalWork + iterativeSolver->SolvingComputationalWork) / oneFineDAXPY);
+			cout << " | " << setw(sizeWork) << ((iterativeSolver->SetupComputationalWork + iterativeSolver->SolvingComputationalWork)/(size_t)1e6) << " | " << setw(sizeMatVec) << ((iterativeSolver->SetupComputationalWork + iterativeSolver->SolvingComputationalWork) / oneFineMatVec);
 		cout << endl;
 		cout << "        | " << setw(sizeTime-3) << totalTimer.CPU().InMilliseconds   << " ms | " << setw(sizeTime-3) << totalTimer.Elapsed().InMilliseconds << " ms ";
 		if (iterativeSolver != nullptr)
