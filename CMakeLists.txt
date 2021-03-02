@@ -2,17 +2,35 @@ cmake_minimum_required (VERSION 3.1)
 
 project(dghho)
 
-option(ENABLE_GMSH "Build with the GMSH interface" ON)
-option(ENABLE_AGMG "Build with AGMG" OFF)
-option(ENABLE_CGAL "Build with CGAL" ON)
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+message(STATUS "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
 
-option(SMALL_INDEX "Use type 'int' for the indexes" OFF)
+# c++ flags
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Ofast")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g") # uncomment this line and comment the one above to use Valgrind
 
 # enable C++17
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# program options
+option(ENABLE_GMSH "Build with the GMSH interface" ON)
+option(ENABLE_AGMG "Build with AGMG" OFF)
+option(ENABLE_CGAL "Build with CGAL" ON)
+option(SMALL_INDEX "Use type 'int' for the indexes" OFF)
+
+add_definitions(-DROOT_PATH="${CMAKE_SOURCE_DIR}")
+
+if(SMALL_INDEX)
+	add_definitions(-DSMALL_INDEX)
+	message(STATUS "SMALL_INDEX: ON (int)")
+else()
+	message(STATUS "SMALL_INDEX: OFF (size_t)")
+endif()
 
 set(EXECUTABLE_OUTPUT_PATH bin/)
 
@@ -26,17 +44,11 @@ file(
 	src/*
 )
 
-add_definitions(-DROOT_PATH="${CMAKE_SOURCE_DIR}")
-
-if(SMALL_INDEX)
-	add_definitions(-DSMALL_INDEX)
-endif()
-
 # Include AGMG compiled files
 if(ENABLE_AGMG)
+	message(STATUS "AGMG enabled")
 	SET(OBJS ${AGMG_DIR}/dagmg.o ${AGMG_DIR}/dagmg_mumps.o)
 	add_definitions(-DAGMG_ENABLED)
-	message(STATUS "AGMG enabled")
 else()
 	message(STATUS "AGMG disabled. Add -DENABLE_AGMG=ON and -DAGMG_DIR=<path/to/.o/files> to enable it.")
 endif()
@@ -46,6 +58,7 @@ add_executable(dghho ${OBJS} ${source_files})
 
 # Include CGAL
 if(ENABLE_CGAL)
+	message(STATUS "CGAL enabled")
 	set(CGAL_DIR "${CMAKE_SOURCE_DIR}/dependencies/cgal/CGAL-5.1")
 	find_package(CGAL)
 	target_link_libraries(dghho CGAL::CGAL)
@@ -85,10 +98,6 @@ endif()
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 target_link_libraries(dghho Threads::Threads)
-
-# c++ flags
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g") # uncomment this line and comment the one above to use Valgrind
 
 # Include AGMG (requires Blas and Lapack)
 if(ENABLE_AGMG)
