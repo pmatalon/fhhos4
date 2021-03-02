@@ -8,6 +8,7 @@ protected:
 	Direction _direction;
 	RowMajorSparseMatrix _rowMajorA;
 	bool _useEigen = true;
+	Vector invD; // inverses of the diagonal elements
 public:
 	GaussSeidel() : GaussSeidel(Direction::Forward) {}
 
@@ -35,6 +36,10 @@ public:
 		IterativeSolver::Setup(A);
 		if (!A.IsRowMajor)
 			this->_rowMajorA = A;
+
+		/*this->invD = Vector(A.rows());
+		for (BigNumber i = 0; i < A.rows(); ++i)
+			this->invD[i] = 1.0 / A.coeff(i, i);*/
 
 		this->SetupComputationalWork = 0;
 	}
@@ -152,6 +157,7 @@ private:
 		{
 			// Sweep
 			x = L_plus_D.solve(b);                                result.AddCost(Cost::SpFWElimination(A));
+			//ForwardElimination(x, b);                            result.AddCost(Cost::SpFWElimination(A));
 			xEquals0 = false;
 
 			// Residual: r = -Ux
@@ -170,6 +176,7 @@ private:
 			// Sweep: x(new) = (D+U)^{-1} * (b-Lx)
 			Vector b_Lx = b - L*x;                                result.AddCost(Cost::DAXPY_StrictTri(A));
 			x = D_plus_U.solve(b_Lx);                             result.AddCost(Cost::SpBWSubstitution(A));
+			//BackwardSubstitution(x, b_Lx);                        result.AddCost(Cost::SpBWSubstitution(A));
 			xEquals0 = false;
 
 			if (computeAx || computeResidual)
@@ -203,7 +210,60 @@ private:
 		}
 	}
 
-	// Same as ProcessBlockRow, but optimized for blockSize = 1
+	// Solves (L+D)x=b, where L is the strictly lower triangular part of A and D the diagonal
+	void ForwardElimination(Vector& x, const Vector& b)
+	{
+		const SparseMatrix& A = *this->Matrix;
+		//Vector x(A.rows());
+
+		for (BigNumber i = 0; i < A.rows(); ++i)
+		{
+			double tmp_x = b(i);
+
+			// RowMajor --> the following line iterates over the non-zeros of the i-th row.
+			for (RowMajorSparseMatrix::InnerIterator it(A, i); it; ++it)
+			{
+				BigNumber j = it.col(); 
+				if (i == j) // Ui or Di
+					break;
+				assert(i > j);
+				// Li
+				double a_ij = it.value();
+				tmp_x -= a_ij * x(j);
+			}
+
+			x(i) = tmp_x * this->invD[i];
+		}
+		//return x;
+	}
+
+	// Solves (D+U)x=b, where U is the strictly upper triangular part of A and D the diagonal
+	void BackwardSubstitution(Vector& x, const Vector& b)
+	{
+		const SparseMatrix& A = *this->Matrix;
+		//Vector x(A.rows());
+
+		for (BigNumber i = A.rows()-1; i >= 0; --i)
+		{
+			double tmp_x = b(i);
+
+			// RowMajor --> the following line iterates over the non-zeros of the i-th row.
+			for (RowMajorSparseMatrix::InnerIterator it(A, i); it; ++it)
+			{
+				BigNumber j = it.col();
+				if (i < j) // U
+				{
+					double a_ij = it.value();
+					tmp_x -= a_ij * x(j);
+				}
+			}
+
+			x(i) = tmp_x * this->invD[i];
+		}
+		//return x;
+	}
+
+	
 	void ProcessRow(BigNumber currentRow, const Vector& b, Vector& x)
 	{
 		BigNumber i = currentRow;
