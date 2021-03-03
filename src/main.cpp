@@ -139,6 +139,7 @@ void print_usage() {
 	cout << "      Linear solver for the solution of the system." << endl;
 	cout << "      - Direct methods:" << endl;
 	cout << "              lu           - LU factorization (Eigen library)" << endl;
+	cout << "              ch           - Cholesky factorization (Eigen library)" << endl;
 	cout << "      - Fixed-point iterative methods:" << endl;
 	cout << "              [b]j         - [Block] Jacobi. Use argument -relax to change the relaxation parameter." << endl;
 	cout << "              [b]j23       - [Block] Jacobi with 2/3 as relaxation parameter." << endl;
@@ -250,7 +251,7 @@ void print_usage() {
 	//cout << "              z   - Aggregate all faces using A_F_F" << endl;
 	cout << endl;
 	cout << "-coarse-solver CODE" << endl;
-	cout << "      Any solver code (see -solver). Only purely algebraic solvers are allowed. Default: 'lu' (LU factorization)." << endl;
+	cout << "      Any solver code (see -solver). Only purely algebraic solvers are allowed. Default: 'ch' (Cholesky factorization)." << endl;
 	cout << endl;
 	cout << "-bfc CODE" << endl;
 	cout << "      Face collapsing method used at the domain boundaries or physical parts boundaries. Requires -cs n." << endl;

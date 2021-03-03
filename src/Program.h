@@ -341,6 +341,8 @@ private:
 
 		if (args.Solver.SolverCode.compare("lu") == 0)
 			solver = new EigenSparseLU();
+		else if (args.Solver.SolverCode.compare("ch") == 0)
+			solver = new EigenSparseCholesky();
 		else if (args.Solver.SolverCode.compare("j") == 0)
 			solver = new BlockJacobi(1, args.Solver.RelaxationParameter);
 		else if (args.Solver.SolverCode.compare("gs") == 0)

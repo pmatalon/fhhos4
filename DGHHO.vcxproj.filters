@@ -450,6 +450,9 @@
     <ClInclude Include="src\Solver\BlockGaussSeidel.h">
       <Filter>Solver</Filter>
     </ClInclude>
+    <ClInclude Include="src\Solver\EigenSparseCholesky.h">
+      <Filter>Solver</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

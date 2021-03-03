@@ -12,7 +12,7 @@ public:
 
 	void Serialize(ostream& os) const override
 	{
-		os << "Sparse LU factorization (Eigen library)";
+		os << "LU factorization (Eigen library)";
 	}
 
 	void Setup(const SparseMatrix& A) override

@@ -55,7 +55,7 @@ struct MultigridArguments
 	FaceCoarseningStrategy FaceCoarseningStgy = FaceCoarseningStrategy::InterfaceCollapsing;
 	int CoarseningFactor = 2;
 	BigNumber CoarseN = 2;
-	string CoarseSolverCode = "lu";
+	string CoarseSolverCode = "ch";
 	FaceCollapsing BoundaryFaceCollapsing = FaceCollapsing::Max;
 	ReEntrantCornerMgmt ReEntrantCornerManagement = ReEntrantCornerMgmt::Disabled;
 	bool ManageAnisotropy = true; // used only in CAMG
