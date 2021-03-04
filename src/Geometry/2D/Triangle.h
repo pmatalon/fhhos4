@@ -160,137 +160,149 @@ public:
 
 		double eps = Utils::Eps*this->Diameter();
 
-		RotatingList<DomPoint> vertices({ v1, v2, v3 });
-		for (int i = 0; i < 3; i++)
+		PhysicalShape<1>* coarseEdge = doNotCross[0];
+		DomPoint A = coarseEdge->Vertices()[0];
+		DomPoint B = coarseEdge->Vertices()[1];
+
+		/*MatlabScript s;
+		s.Comment("----------- process triangle");
+		s.OpenFigure();
+		this->ExportToMatlab("r");
+		s.PlotText(v1, "_1", "k");
+		s.PlotText(v2, "_2", "k");
+		s.PlotText(v3, "_3", "k");
+		coarseEdge->ExportToMatlab("b");*/
+
+		vector<PhysicalShape<1>*> remainingDoNotCross;
+		for (auto ce : doNotCross)
 		{
-			vertices.GoTo(i);
-			DomPoint p1 = vertices.GetAndMoveNext(); // fine
-			DomPoint p2 = vertices.GetAndMoveNext(); // fine
-			DomPoint p3 = vertices.GetAndMoveNext(); // fine
-			for (PhysicalShape<1>* coarseEdge : doNotCross)
+			if (ce != coarseEdge)
+				remainingDoNotCross.push_back(ce);
+		}
+
+		// Check if there is a vertex in common between the triangle and the coarse edge
+		DomPoint* vi = nullptr; // vertex in common
+		DomPoint* vj = nullptr; // next in direct order
+		DomPoint* vk = nullptr; // next in direct order
+		if (Vect<2>(v1, A).norm() < eps || Vect<2>(v1, B).norm() < eps)      // v1 == A or B
+		{
+			vi = &v1; vj = &v2; vk = &v3;
+		}
+		else if (Vect<2>(v2, A).norm() < eps || Vect<2>(v2, B).norm() < eps) // v2 == A or B
+		{
+			vi = &v2; vj = &v3; vk = &v1;
+		}
+		else if (Vect<2>(v3, A).norm() < eps || Vect<2>(v3, B).norm() < eps) // v3 == A or B
+		{
+			vi = &v3; vj = &v1; vk = &v2;
+		}
+
+		if (vi != nullptr) // vertex in common
+		{
+			bool areParallel;
+			DomPoint intersection;
+			bool intersectionIsInSegments;
+			Segment::Intersection(*vj, *vk, A, B, areParallel, intersection, intersectionIsInSegments);
+			if (areParallel ||
+				!intersectionIsInSegments ||
+				Vect<2>(intersection, *vj).norm() < eps ||
+				Vect<2>(intersection, *vk).norm() < eps) // the intersection is not in the interior of [vj, vk]
 			{
-				DomPoint A = coarseEdge->Vertices()[0]; // coarse
-				DomPoint B = coarseEdge->Vertices()[1]; // coarse
-
-				vector<PhysicalShape<1>*> remainingDoNotCross;
-				for (auto ce : doNotCross)
+				RefineWithoutCoarseOverlap(remainingDoNotCross);
+			}
+			else // the coarse edge cuts the triangle in half
+			{
+				// Split the triangle into 2 subtriangles
+				Triangle t1(*vi, *vj, intersection);
+				if (t1.Measure() > Utils::Eps*this->Measure())
 				{
-					if (ce != coarseEdge)
-						remainingDoNotCross.push_back(ce);
+					t1.RefineWithoutCoarseOverlap(remainingDoNotCross);
+					for (Triangle& subT : t1._refinement)
+						_refinement.push_back(subT);
 				}
 
-				if (Vect<2>(p1, A).norm() < eps || Vect<2>(p1, B).norm() < eps) // p1 == A || p1 == B
+				Triangle t2(*vi, intersection, *vk);
+				if (t2.Measure() > Utils::Eps*this->Measure())
 				{
-					bool areParallel;
-					DomPoint intersection;
-					bool intersectionIsInSegments;
-					Segment::Intersection(p2, p3, A, B, areParallel, intersection, intersectionIsInSegments);
-					if (areParallel || !intersectionIsInSegments)
-					{
-						RefineWithoutCoarseOverlap(remainingDoNotCross);
-						return;
-					}
-					else
-					{
-						// Split the triangle into 2 subtriangles
-						Triangle t1(p1, p2, intersection);
-						if (t1.Measure() > Utils::Eps*this->Measure())
-						{
-							t1.RefineWithoutCoarseOverlap(remainingDoNotCross);
-							for (Triangle& subT : t1._refinement)
-								_refinement.push_back(subT);
-						}
-
-						Triangle t2(p1, intersection, p3);
-						if (t2.Measure() > Utils::Eps*this->Measure())
-						{
-							t2.RefineWithoutCoarseOverlap(remainingDoNotCross);
-							for (Triangle& subT : t2._refinement)
-								_refinement.push_back(subT);
-						}
-						return;
-					}
-				}
-				else if (Vect<2>(p2, A).norm() < eps || Vect<2>(p2, B).norm() < eps) // p2 == A || p2 == B
-				{
-					bool areParallel;
-					DomPoint intersection;
-					bool intersectionIsInSegments;
-					Segment::Intersection(p1, p3, A, B, areParallel, intersection, intersectionIsInSegments);
-					if (areParallel || !intersectionIsInSegments)
-					{
-						RefineWithoutCoarseOverlap(remainingDoNotCross);
-						return;
-					}
-					else
-					{
-						// Split the triangle into 2 subtriangles
-						Triangle t1(p2, p3, intersection);
-						if (t1.Measure() > Utils::Eps*this->Measure())
-						{
-							t1.RefineWithoutCoarseOverlap(remainingDoNotCross);
-							for (Triangle& subT : t1._refinement)
-								_refinement.push_back(subT);
-						}
-
-						Triangle t2(p2, intersection, p1);
-						if (t2.Measure() > Utils::Eps*this->Measure())
-						{
-							t2.RefineWithoutCoarseOverlap(remainingDoNotCross);
-							for (Triangle& subT : t2._refinement)
-								_refinement.push_back(subT);
-						}
-						return;
-					}
-				}
-				else
-				{
-					bool areParallel;
-					DomPoint intersection;
-					bool intersectionIsInSegments;
-					Segment::Intersection(p1, p2, A, B, areParallel, intersection, intersectionIsInSegments);
-
-					if (areParallel || 
-						!intersectionIsInSegments || 
-						Vect<2>(intersection, p1).norm() < eps || 
-						Vect<2>(intersection, p2).norm() < eps || 
-						Vect<2>(intersection, p3).norm() < eps)
-						continue;
-					else
-					{
-						/*MatlabScript s;
-						s.Comment("----------- process triangle");
-						s.OpenFigure();
-						this->ExportToMatlab("r");
-						s.PlotText(p1, "_1", "k");
-						s.PlotText(p2, "_2", "k");
-						s.PlotText(p3, "_3", "k");
-						coarseEdge->ExportToMatlab("b");
-						s.PlotText(intersection, "intersection p1p2/AB", "b");*/
-
-						// Split the triangle into 2 subtriangles
-						Triangle t1(p3, p1, intersection);
-						if (t1.Measure() > Utils::Eps*this->Measure())
-						{
-							t1.RefineWithoutCoarseOverlap(doNotCross);
-							for (Triangle& subT : t1._refinement)
-								_refinement.push_back(subT);
-						}
-
-						Triangle t2(p2, p3, intersection);
-						if (t2.Measure() > Utils::Eps*this->Measure())
-						{
-							t2.RefineWithoutCoarseOverlap(doNotCross);
-							for (Triangle& subT : t2._refinement)
-								_refinement.push_back(subT);
-						}
-						return;
-					}
+					t2.RefineWithoutCoarseOverlap(remainingDoNotCross);
+					for (Triangle& subT : t2._refinement)
+						_refinement.push_back(subT);
 				}
 			}
 		}
-		_refinement.push_back(*this);
-		return;
+		else // no vertex in common
+		{
+			// Look for an edge of the triangle that crosses the coarse edge
+			bool noEdgeCrossesTheCoarseEdge = true;
+			RotatingList<DomPoint> vertices({ v1, v2, v3 });
+			for (int i = 0; i < 3; i++)
+			{
+				vertices.GoTo(i);
+				DomPoint vi = vertices.GetAndMoveNext();
+				DomPoint vj = vertices.GetAndMoveNext();
+				DomPoint vk = vertices.GetAndMoveNext();
+
+				bool areParallel;
+				DomPoint intersection;
+				bool intersectionIsInSegments;
+				Segment::Intersection(vi, vj, A, B, areParallel, intersection, intersectionIsInSegments);
+
+				if (areParallel ||
+					!intersectionIsInSegments ||
+					Vect<2>(intersection, vi).norm() < eps ||
+					Vect<2>(intersection, vj).norm() < eps)
+					continue;
+				else
+				{
+					/*MatlabScript s;
+					s.Comment("----------- process triangle");
+					s.OpenFigure();
+					this->ExportToMatlab("r");
+					s.PlotText(vi, "_i", "k");
+					s.PlotText(vj, "_j", "k");
+					s.PlotText(vk, "_k", "k");
+					coarseEdge->ExportToMatlab("b");
+					s.PlotText(intersection, "intersection p1p2/AB", "b");*/
+
+					noEdgeCrossesTheCoarseEdge = false;
+
+					// Split the triangle into 2 subtriangles
+					Triangle t1(vk, vi, intersection);
+					if (t1.Measure() > Utils::Eps*this->Measure())
+					{
+						t1.RefineWithoutCoarseOverlap(doNotCross);
+						for (Triangle& subT : t1._refinement)
+							_refinement.push_back(subT);
+					}
+
+					Triangle t2(vj, vk, intersection);
+					if (t2.Measure() > Utils::Eps*this->Measure())
+					{
+						t2.RefineWithoutCoarseOverlap(doNotCross);
+						for (Triangle& subT : t2._refinement)
+							_refinement.push_back(subT);
+					}
+					break;
+				}
+			}
+
+			if (noEdgeCrossesTheCoarseEdge)
+				RefineWithoutCoarseOverlap(remainingDoNotCross);
+		}
+
+		if (_refinement.empty()) // can happen if the triangle is degenerated
+		{
+			MatlabScript s;
+			s.Comment("----------- process triangle");
+			s.OpenFigure();
+			this->ExportToMatlab("r");
+			s.PlotText(v1, "_1", "k");
+			s.PlotText(v2, "_2", "k");
+			s.PlotText(v3, "_3", "k");
+			coarseEdge->ExportToMatlab("b");
+			Utils::Warning("The refinement of this triangle yielded nothing. The triangle is probably degenerated. Using the whole triangle as refinement");
+			_refinement.push_back(*this);
+		}
 	}
 
 	void RefineByConnectionOfTheMiddleEdges()

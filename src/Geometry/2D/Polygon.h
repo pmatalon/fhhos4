@@ -252,9 +252,12 @@ private:
 		DomPoint p3 = rotatingVertices.Get();
 
 		Triangle t(p1, p2, p3);
-		t.RefineWithoutCoarseOverlap(doNotCross);
-		for (PhysicalShape<2>* subT : t.RefinedShapes())
-			triangles.push_back(*static_cast<Triangle*>(subT));
+		if (t.Measure() > Utils::NumericalZero)
+		{
+			t.RefineWithoutCoarseOverlap(doNotCross);
+			for (PhysicalShape<2>* subT : t.RefinedShapes())
+				triangles.push_back(*static_cast<Triangle*>(subT));
+		}
 
 		if (vertices.size() > 3)
 		{
