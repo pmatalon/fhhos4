@@ -251,6 +251,15 @@ public:
 		}
 	}
 
+	void AddOverlappingFineSubShape(Element<Dim>* fineElement, PhysicalShape<Dim>* subShape)
+	{
+		auto it = this->OverlappingFineElements.find(fineElement);
+		if (it == this->OverlappingFineElements.end())
+			this->OverlappingFineElements.insert({ fineElement , {subShape} });
+		else
+			it->second.push_back(subShape);
+	}
+
 
 	inline int LocalNumberOf(Element<Dim>* finerElement)
 	{

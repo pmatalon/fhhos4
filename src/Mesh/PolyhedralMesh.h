@@ -2020,11 +2020,7 @@ private:
 				if (ce->Contains(subShape->Center()))
 				{
 					ce->Mutex.lock();
-					auto it = ce->OverlappingFineElements.find(fe);
-					if (it == ce->OverlappingFineElements.end())
-						ce->OverlappingFineElements.insert({ fe , {subShape} });
-					else
-						it->second.push_back(subShape);
+					ce->AddOverlappingFineSubShape(fe, subShape);
 					ce->Mutex.unlock();
 					found = true;
 					break;
@@ -2032,26 +2028,9 @@ private:
 			}
 			if (!found)
 			{
-#ifndef NDEBUG
-				MatlabScript s;
-				s.Comment("--------- coarse element");
-				fe->CoarserElement->ExportToMatlab("y", true);
-				for (Element<Dim>* ce : fe->CoarserElement->ThisAndVertexNeighbours(true))
-				{
-					s.Comment("--------- coarse candidate");
-					ce->ExportToMatlab("b", true);
-				}
-				s.Comment("--------- fine element " + to_string(fe->Number));
-				fe->ExportToMatlab("g");
-				s.Comment("--------- subshape");
-				subShape->ExportToMatlab("r");
-#endif // !NDEBUG
-				if (!fe->IsAtPhysicalPartBoundary() && !fe->IsOnBoundary())
-					Utils::Warning("A fine subshape's center that is not a domain/physical region boundary is not in any coarse element");
-				else if (fe->IsAtPhysicalPartBoundary())
-					Utils::Warning("A fine subshape's center (at physical boundary) is not in any coarse element of same physical part");
+				// Look further in the neighbourhood...
 
-				// Affectation to the closest coarse element
+				// Find the closest coarse element
 				Element<Dim>* closestCoarse = nullptr;
 				double minDistance = -1;
 				for (Element<Dim>* ce : coarseCandidates)
@@ -2063,13 +2042,59 @@ private:
 						minDistance = distance;
 					}
 				}
-				closestCoarse->Mutex.lock();
-				auto it = closestCoarse->OverlappingFineElements.find(fe);
-				if (it == closestCoarse->OverlappingFineElements.end())
-					closestCoarse->OverlappingFineElements.insert({ fe , {subShape} });
-				else
-					it->second.push_back(subShape);
-				closestCoarse->Mutex.unlock();
+
+				// Look in its vertex neighbours
+				vector<Element<Dim>*> coarseCandidates = closestCoarse->VertexNeighbours();
+				bool found = false;
+				for (Element<Dim>* ce : coarseCandidates)
+				{
+					if (ce->Contains(subShape->Center()))
+					{
+						ce->Mutex.lock();
+						ce->AddOverlappingFineSubShape(fe, subShape);
+						ce->Mutex.unlock();
+						found = true;
+						break;
+					}
+				}
+				if (!found)
+				{
+#ifndef NDEBUG
+					MatlabScript s;
+					s.Comment("--------- coarse element");
+					fe->CoarserElement->ExportToMatlab("y", true);
+					for (Element<Dim>* ce : coarseCandidates)
+					{
+						s.Comment("--------- coarse candidate");
+						ce->ExportToMatlab("b", true);
+					}
+					s.Comment("--------- fine element " + to_string(fe->Number));
+					fe->ExportToMatlab("g");
+					s.Comment("--------- subshape");
+					subShape->ExportToMatlab("r");
+#endif // !NDEBUG
+					if (!fe->IsAtPhysicalPartBoundary() && !fe->IsOnBoundary())
+						Utils::Warning("A fine subshape's center that is not at domain/physical region boundary is not in any coarse element. Affectation to the closest coarse element amongst the vertex neighbours of the associated coarse element.");
+					else if (fe->IsAtPhysicalPartBoundary())
+						Utils::Warning("A fine subshape's center (at physical boundary) is not in any coarse element of same physical part. Affectation to the closest coarse element amongst the vertex neighbours of the associated coarse element.");
+				
+					// Affectation to the closest coarse element
+					closestCoarse = nullptr;
+					double minDistance = -1;
+					for (Element<Dim>* ce : coarseCandidates)
+					{
+						double distance = Vect<Dim>(subShape->Center(), ce->Center()).norm();
+						if (!closestCoarse || distance < minDistance)
+						{
+							closestCoarse = ce;
+							minDistance = distance;
+						}
+					}
+
+					closestCoarse->Mutex.lock();
+					closestCoarse->AddOverlappingFineSubShape(fe, subShape);
+					closestCoarse->Mutex.unlock();
+				}
 			}
 		}
 	}
