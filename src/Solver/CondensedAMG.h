@@ -304,7 +304,137 @@ public:
 			P = new SparseMatrix(Q_F->rows(), Q_F->cols());
 			parallelLoop2.Fill(*P);
 		}
-		else if (_multigridProlong == CAMGProlongation::HighOrder) // 7
+		else if (_multigridProlong == CAMGProlongation::FindInteriorThatReconstructs) // 7
+		{
+			int cbs = _cellBlockSize;
+			int fbs = _faceBlockSize;
+
+			SparseMatrix inv_A_T_Tc = Utils::InvertBlockDiagMatrix(*A_T_Tc, cbs);
+			SparseMatrix inv_A_T_T  = Utils::InvertBlockDiagMatrix(A_T_T, cbs);
+
+			NumberParallelLoop<CoeffsChunk> parallelLoop(mesh.CoarseElements.size());
+			//parallelLoop.ReserveChunkCoeffsSize(fbs * 2 * fbs);
+			parallelLoop.Execute([this, cbs, fbs, &A_T_F, &Q_F, &Q_T, &inv_A_T_T, &inv_A_T_Tc, A_T_Fc_tmp, &mesh](BigNumber ceNumber, ParallelChunk<CoeffsChunk>* chunk)
+				{
+					const HybridElementAggregate& ce = mesh.CoarseElements[ceNumber];
+
+					if (ce.RemovedFineFaces.empty())
+						return;
+
+					// Construction of Theta_Tc
+					DenseMatrix invA_Tc_Tc = inv_A_T_Tc.block(ce.Number, ce.Number, cbs, cbs);
+
+					DenseMatrix A_Tc_F(cbs, ce.CoarseFaces.size()*fbs);
+					for (int cfLocalNumber = 0; cfLocalNumber < ce.CoarseFaces.size(); cfLocalNumber++)
+					{
+						HybridFaceAggregate* cf = ce.CoarseFaces[cfLocalNumber];
+						A_Tc_F.block(0, cfLocalNumber*fbs, cbs, fbs) = A_T_Fc_tmp->block(ce.Number*cbs, cf->Number*fbs, cbs, fbs);
+					}
+					DenseMatrix Theta_Tc = -invA_Tc_Tc * A_Tc_F;
+
+					// Matrix for minimization problem
+					DenseMatrix M(ce.FineElements.size()*cbs, ce.RemovedFineFaces.size()*fbs);
+
+					// RHS for minimization problem
+					DenseMatrix f = DenseMatrix::Zero(ce.FineElements.size()*cbs, ce.CoarseFaces.size()*fbs);
+
+					for (int feLocalNumber = 0; feLocalNumber < ce.FineElements.size(); ++feLocalNumber)
+					{
+						HybridAlgebraicElement* fe = ce.FineElements[feLocalNumber];
+
+						// Construction of Theta_Tf
+						DenseMatrix invA_Tf_Tf = inv_A_T_T.block(fe->Number, fe->Number, cbs, cbs);
+						DenseMatrix A_Tf_F(cbs, fe->Faces.size()*fbs);
+						for (int ffLocalNumber = 0; ffLocalNumber < fe->Faces.size(); ffLocalNumber++)
+						{
+							HybridAlgebraicFace* ff = fe->Faces[ffLocalNumber];
+							A_Tf_F.block(0, ffLocalNumber*fbs, cbs, fbs) = A_T_F.block(fe->Number*cbs, ff->Number*fbs, cbs, fbs);
+						}
+						DenseMatrix Theta_Tf = -invA_Tf_Tf * A_Tf_F;
+						//cout << "Theta_Tf = " << endl << Theta_Tf << endl;
+						assert((Theta_Tf.array() > 0).all());
+
+						// Construction of Theta_Tf_int (part of Theta_Tf of interior faces)
+						//             and Theta_Tf_ext (part of Theta_Tf of exterior faces)
+						int nInteriorFaces = 0;
+						int nExteriorFaces = 0;
+						for (HybridAlgebraicFace* ff : fe->Faces)
+						{
+							if (ff->IsRemovedOnCoarseMesh)
+								nInteriorFaces++;
+							else
+								nExteriorFaces++;
+						}
+						DenseMatrix Theta_Tf_int = DenseMatrix::Zero(cbs, ce.RemovedFineFaces.size()*fbs);
+						DenseMatrix Theta_Tf_ext = DenseMatrix::Zero(cbs, nExteriorFaces*fbs);
+						int localExtFFNumber = 0;
+						DenseMatrix Q_F_restrict_partialTc_corestrict_partialTf = DenseMatrix::Zero(nExteriorFaces*fbs, ce.CoarseFaces.size()*fbs);
+						for (int ffLocalNumber = 0; ffLocalNumber < fe->Faces.size(); ffLocalNumber++)
+						{
+							HybridAlgebraicFace* ff = fe->Faces[ffLocalNumber];
+							if (ff->IsRemovedOnCoarseMesh)
+							{
+								int localNumberInCE = ce.LocalRemovedFineFaceNumber(ff);
+								Theta_Tf_int.block(0, localNumberInCE*fbs, cbs, fbs) = Theta_Tf.block(0, ffLocalNumber*fbs, cbs, fbs);
+								assert(Theta_Tf_int.norm() != 0);
+							}
+							else
+							{
+								//int localNumberInCE = ce.LocalFineFaceNumber(ff);
+								Theta_Tf_ext.block(0, localExtFFNumber*fbs, cbs, fbs) = Theta_Tf.block(0, ffLocalNumber*fbs, cbs, fbs);
+
+								Q_F_restrict_partialTc_corestrict_partialTf.block(localExtFFNumber*fbs, ce.LocalCoarseFaceNumber(ff->CoarseFace)*fbs, fbs, fbs) = Q_F->block(ff->Number*fbs, ff->CoarseFace->Number*fbs, fbs, fbs);
+								localExtFFNumber++;
+							}
+						}
+
+						// Part of matrix for minimization problem
+						M.middleRows(feLocalNumber*cbs, cbs) = Theta_Tf_int;
+
+						// Part of RHS for minimization problem
+						DenseMatrix Q_Tc_corestrict_Tf = Q_T.block(fe->Number*cbs, ce.Number*cbs, cbs, cbs);
+						DenseMatrix coarseReconstructionThenInjection = Q_Tc_corestrict_Tf * Theta_Tc;
+						DenseMatrix faceProlongThenFineReconstruction = Theta_Tf_ext * Q_F_restrict_partialTc_corestrict_partialTf;
+						f.middleRows(feLocalNumber*cbs, cbs) = coarseReconstructionThenInjection - faceProlongThenFineReconstruction;
+					}
+
+					DenseMatrix x = M.colPivHouseholderQr().solve(f);
+					/*if (std::isnan(x.norm()) || std::isinf(x.norm()))
+					{
+						cout << "M = " << endl << M << endl;
+						cout << "f = " << endl << f << endl;
+						assert(false);
+					}*/
+					for (HybridAlgebraicFace* ff : ce.RemovedFineFaces)
+					{
+						int localNumberInCE = ce.LocalRemovedFineFaceNumber(ff);
+						for (int localCoarseFaceNumber = 0; localCoarseFaceNumber < ce.CoarseFaces.size(); ++localCoarseFaceNumber)
+						{
+							HybridFaceAggregate* cf = ce.CoarseFaces[localCoarseFaceNumber];
+							chunk->Results.Coeffs.Add(ff->Number*fbs, cf->Number*fbs, x.block(localNumberInCE*fbs, localCoarseFaceNumber*fbs, fbs, fbs));
+						}
+					}
+				});
+
+			SparseMatrix InteriorThatReconstruct(Q_F->rows(), Q_F->cols());
+			parallelLoop.Fill(InteriorThatReconstruct);
+
+
+			NumberParallelLoop<CoeffsChunk> parallelLoop2(mesh.Faces.size());
+			parallelLoop2.ReserveChunkCoeffsSize(fbs * 2 * fbs);
+			parallelLoop2.Execute([this, fbs, &InteriorThatReconstruct, &Q_F, &mesh](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
+				{
+					const HybridAlgebraicFace* face = &mesh.Faces[faceNumber];
+					if (face->IsRemovedOnCoarseMesh)
+						chunk->Results.Coeffs.CopyRows(faceNumber*fbs, fbs, InteriorThatReconstruct);
+					else
+						chunk->Results.Coeffs.CopyRows(faceNumber*fbs, fbs, *Q_F);
+				});
+			P = new SparseMatrix(Q_F->rows(), Q_F->cols());
+			parallelLoop2.Fill(*P);
+
+		}
+		else if (_multigridProlong == CAMGProlongation::HighOrder) // 8
 		{
 			SparseMatrix inv_A_T_Tc = Utils::InvertBlockDiagMatrix(*A_T_Tc, _cellBlockSize);
 			SparseMatrix Theta = -inv_A_T_Tc * *A_T_Fc_tmp;   // Reconstruct

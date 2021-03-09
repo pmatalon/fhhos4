@@ -1151,7 +1151,11 @@ int main(int argc, char* argv[])
 			args.Solver.MG.CoarseningStgy = CoarseningStrategy::DoublePairwiseAggregation;
 
 		if (defaultCycle)
+		{
 			args.Solver.MG.CycleLetter = 'K';
+			args.Solver.MG.PreSmoothingIterations  = 1;
+			args.Solver.MG.PostSmoothingIterations = 2;
+		}
 	}
 
 	if (args.Solver.SolverCode.compare("aggregamg") == 0 || args.Solver.SolverCode.compare("fcgaggregamg") == 0)

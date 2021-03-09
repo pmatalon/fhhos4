@@ -40,6 +40,46 @@ struct HybridElementAggregate
 	HybridElementAggregate(BigNumber number)
 		: Number(number)
 	{}
+
+	int LocalFineElementNumber(HybridAlgebraicElement* fe) const
+	{
+		for (int i = 0; i < FineElements.size(); ++i)
+		{
+			if (fe == FineElements[i])
+				return i;
+		}
+		assert(false);
+	}
+
+	int LocalFineFaceNumber(HybridAlgebraicFace* ff) const
+	{
+		for (int i = 0; i < FineFaces.size(); ++i)
+		{
+			if (ff == FineFaces[i])
+				return i;
+		}
+		assert(false);
+	}
+
+	int LocalRemovedFineFaceNumber(HybridAlgebraicFace* ff) const
+	{
+		for (int i = 0; i < RemovedFineFaces.size(); ++i)
+		{
+			if (ff == RemovedFineFaces[i])
+				return i;
+		}
+		assert(false);
+	}
+
+	int LocalCoarseFaceNumber(HybridFaceAggregate* cf) const
+	{
+		for (int i = 0; i < CoarseFaces.size(); ++i)
+		{
+			if (cf == CoarseFaces[i])
+				return i;
+		}
+		assert(false);
+	}
 };
 
 struct HybridFaceAggregate

@@ -471,11 +471,16 @@ private:
 	//-------------------------------------------------------------------------//
 	//  Find polynomial faces which reconstruct the k+1 polynomial on the cell //
 	//  and minimize the L2-norm                                               //
+	//                     Min  1/2||x||^2_{L^2} = 1/2<x,M_F*x>                //
+	//                     C*x = I                                             //
 	//-------------------------------------------------------------------------//
 
 public:
 	DenseMatrix FindFacesPolyWhichReconstructOnTheCell()
 	{
+		//   | M_F  C^T | |x     |   |0|
+		//   | C    0   | |lambda| = |I|
+
 		// Assembly of the Lagrangian matrix
 		int nBoundaryUnknowns = this->Faces.size() * HHO->nFaceUnknowns;
 		DenseMatrix boundaryMassMatrix = DenseMatrix::Zero(nBoundaryUnknowns, nBoundaryUnknowns);

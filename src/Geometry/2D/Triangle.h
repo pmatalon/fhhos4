@@ -179,8 +179,13 @@ public:
 			if (ce != coarseEdge)
 				remainingDoNotCross.push_back(ce);
 		}
-
+		
 		// Check if there is a vertex in common between the triangle and the coarse edge
+
+		//         !!!!!!!!!!!!!!!!!!!!!!!
+		// Normally, this test could be removed (everything until "else // no vertex in common"),
+		// but the multigrid gives better performance with it for some reason...
+
 		DomPoint* vi = nullptr; // vertex in common
 		DomPoint* vj = nullptr; // next in direct order
 		DomPoint* vk = nullptr; // next in direct order
