@@ -303,7 +303,7 @@ public:
 		Utils::Warning("Impossible to export the solution to GMSH because this mesh does not come from GMSH.");
 	}
 
-	virtual void CoarsenMesh(CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, int coarseningFactor)
+	virtual void CoarsenMesh(CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor)
 	{
 		if (Utils::IsRefinementStrategy(elemCoarseningStgy))
 			return;

@@ -99,7 +99,7 @@ public:
 		return verticesUsage + verticesPointers + elementsUsage + elementsPointers + facesUsage + facesPointers;
 	}
 
-	virtual void CoarsenMesh(CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, int coarseningFactor) override
+	virtual void CoarsenMesh(CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor) override
 	{
 		if (this->CoarseMesh)
 			return;

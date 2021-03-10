@@ -237,7 +237,7 @@ public:
 	{
 		coarsestPossibleMeshReached = false;
 
-		if (elemCoarseningStgy == CoarseningStrategy::DoublePairwiseAggregation)
+		if (elemCoarseningStgy == CoarseningStrategy::DoublePairwiseAggregation || elemCoarseningStgy == CoarseningStrategy::MultiplePairwiseAggregation)
 		{
 			cout << "\tElement pairwise aggregation" << endl;
 			PairwiseAggregation<HybridAlgebraicElement, HybridElementAggregate> aggregProcess;

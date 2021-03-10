@@ -53,7 +53,7 @@ struct MultigridArguments
 	char CoarseLevelChangeSmoothingOperator = '+';
 	CoarseningStrategy CoarseningStgy = CoarseningStrategy::None;
 	FaceCoarseningStrategy FaceCoarseningStgy = FaceCoarseningStrategy::InterfaceCollapsing;
-	int CoarseningFactor = 2;
+	double CoarseningFactor = 0;
 	BigNumber CoarseN = 2;
 	string CoarseSolverCode = "ch";
 	FaceCollapsing BoundaryFaceCollapsing = FaceCollapsing::Max;

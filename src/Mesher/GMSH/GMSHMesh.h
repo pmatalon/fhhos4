@@ -702,12 +702,12 @@ public:
 		return _regularity;
 	}
 
-	void CoarsenMesh(CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, int coarseningFactor) override
+	void CoarsenMesh(CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor) override
 	{
 		if (Utils::IsRefinementStrategy(elemCoarseningStgy))
 			return;
 		else if (elemCoarseningStgy == CoarseningStrategy::IndependentRemeshing)
-			IndependentRemesh(coarseningFactor);
+			IndependentRemesh(round(coarseningFactor));
 		else
 			PolyhedralMesh<Dim>::CoarsenMesh(elemCoarseningStgy, faceCoarseningStgy, coarseningFactor);
 	}

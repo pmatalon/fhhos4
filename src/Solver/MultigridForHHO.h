@@ -28,7 +28,7 @@ public:
 		return _problem->HHO->nTotalFaceUnknowns;
 	}
 
-	void CoarsenMesh(CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, int coarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override
+	void CoarsenMesh(CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override
 	{
 		Mesh<Dim>* mesh = _problem->_mesh;
 		if (Utils::IsRefinementStrategy(elemCoarseningStgy) && mesh->CoarseMesh == nullptr)

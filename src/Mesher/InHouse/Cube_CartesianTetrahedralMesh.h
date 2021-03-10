@@ -117,7 +117,7 @@ public:
 		return "Cube";
 	}
 
-	void CoarsenMesh(CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, int coarseningFactor) override
+	void CoarsenMesh(CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor) override
 	{
 		if (elemCoarseningStgy != CoarseningStrategy::StandardCoarsening)
 			TetrahedralMesh::CoarsenMesh(elemCoarseningStgy, faceCoarseningStgy, coarseningFactor);

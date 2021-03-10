@@ -49,7 +49,8 @@ enum class CoarseningStrategy : unsigned
 	FaceCoarsening,
 	GMSHSplittingRefinement,
 	BeyRefinement,
-	DoublePairwiseAggregation
+	DoublePairwiseAggregation,
+	MultiplePairwiseAggregation
 };
 
 enum class FaceCoarseningStrategy : unsigned

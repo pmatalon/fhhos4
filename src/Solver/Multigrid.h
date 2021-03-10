@@ -28,7 +28,7 @@ public:
 	double RelaxationParameter = 1;
 	CoarseningStrategy CoarseningStgy = CoarseningStrategy::StandardCoarsening;
 	FaceCoarseningStrategy FaceCoarseningStgy = FaceCoarseningStrategy::InterfaceCollapsing;
-	int CoarseningFactor = 2;
+	double CoarseningFactor = 2;
 	bool ExportComponents = false;
 	bool DoNotCreateLevels = false;
 
@@ -458,8 +458,8 @@ public:
 			os << "independant remeshing [-cs m]" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::DoublePairwiseAggregation)
 			os << "double pairwise aggregation [-cs dpa]" << endl;
-		//else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarsening)
-			//os << "agglomeration [-cs a]" << endl;
+		else if (CoarseningStgy == CoarseningStrategy::MultiplePairwiseAggregation)
+			os << "multiple pairwise aggregation [-cs mpa -coarsening-factor " << Utils::ProgramArgs.Solver.MG.CoarseningFactor << "]" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
 			os << "agglomeration by face neighbours [-cs n]" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByMostCoplanarFaces)

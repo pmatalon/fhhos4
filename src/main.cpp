@@ -230,6 +230,7 @@ void print_usage() {
 	cout << "              m    - Independant remeshing by GMSH with double the mesh size (non-nested!)" << endl;
 	cout << "              n    - Agglomeration coarsening with face collapsing (non-nested!)" << endl;
 	cout << "              dpa  - Double pairwise aggregation" << endl;
+	cout << "              mpa  - Multiple pairwise aggregation (use -coarsening-factor)" << endl;
 	cout << "              vr   - (Experimental) Agglomeration coarsening by vertex removal" << endl;
 	cout << "              mcf  - (Experimental) agglomeration coarsening by most collinear/coplanar faces" << endl;
 	cout << "              cc   - (Experimental) agglomeration coarsening by closest center" << endl;
@@ -270,7 +271,9 @@ void print_usage() {
 	cout << "      The chosen value will set the variable N defined at the beginning of the GMSH .geo file." << endl;
 	cout << endl;
 	cout << "-coarsening-factor NUM" << endl;
-	cout << "      Coarsening factor (H/h), default 2. Only used for independant remeshing." << endl;
+	cout << "      Requested coarsening factor for the coarsening strategies compatible." << endl;
+	cout << "              Independent remeshing         (-cs r  ): coarsening factor H/h, default 2" << endl;
+	cout << "              Multiple pairwise aggregation (-cs mpa): coarsening factor #FineVariables/#CoarseVariables, default 3.5" << endl;
 	cout << endl;
 	cout << "-prolong NUM" << endl;
 	cout << "      How the prolongation operator is built." << endl;
@@ -435,6 +438,7 @@ int main(int argc, char* argv[])
 #endif
 
 	bool defaultCycle = true;
+	bool defaultCoarseOperator = true;
 
 	ProgramArguments args;
 	args.OutputDirectory = FileSystem::RootPath() + "/out";
@@ -791,6 +795,7 @@ int main(int argc, char* argv[])
 				break;
 			case 'g': 
 				args.Solver.MG.UseGalerkinOperator = atoi(optarg);
+				defaultCoarseOperator = false;
 				break;
 			case OPT_Smoothers:
 			{
@@ -815,6 +820,8 @@ int main(int argc, char* argv[])
 					args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours;
 				else if (coarseningStgyCode.compare("dpa") == 0)
 					args.Solver.MG.CoarseningStgy = CoarseningStrategy::DoublePairwiseAggregation;
+				else if (coarseningStgyCode.compare("mpa") == 0)
+					args.Solver.MG.CoarseningStgy = CoarseningStrategy::MultiplePairwiseAggregation;
 				else if (coarseningStgyCode.compare("vr") == 0)
 					args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByVertexRemoval;
 				else if (coarseningStgyCode.compare("mcf") == 0)
@@ -887,7 +894,7 @@ int main(int argc, char* argv[])
 				break;
 			}
 			case OPT_CoarseningFactor:
-				args.Solver.MG.CoarseningFactor = atoi(optarg);
+				args.Solver.MG.CoarseningFactor = atof(optarg);
 				break;
 			case OPT_CoarseN:
 				args.Solver.MG.CoarseN = stoul(optarg, nullptr, 0);
@@ -1049,7 +1056,7 @@ int main(int argc, char* argv[])
 	else if (args.Solver.SolverCode.compare("camg") == 0 || args.Solver.SolverCode.compare("fcgcamg") == 0)
 	{
 		if (args.Solver.MG.ProlongationCode == 0)
-			args.Solver.MG.CAMGProlong = CAMGProlongation::ReconstructTraceOrInject;
+			args.Solver.MG.CAMGProlong = CAMGProlongation::ReconstructSmoothedTraceOrInject;
 		else
 			args.Solver.MG.CAMGProlong = static_cast<CAMGProlongation>(args.Solver.MG.ProlongationCode);
 		args.Solver.MG.CAMGFaceProlong = args.Solver.MG.FaceProlongationCode == 0 ? CAMGFaceProlongation::BoundaryAggregatesInteriorAverage : static_cast<CAMGFaceProlongation>(args.Solver.MG.FaceProlongationCode);
@@ -1148,7 +1155,13 @@ int main(int argc, char* argv[])
 			argument_error("Multigrid only applicable on HHO discretization.");
 
 		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::None)
-			args.Solver.MG.CoarseningStgy = CoarseningStrategy::DoublePairwiseAggregation;
+			args.Solver.MG.CoarseningStgy = CoarseningStrategy::MultiplePairwiseAggregation;
+
+		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::MultiplePairwiseAggregation && args.Solver.MG.CoarseningFactor == 0)
+			args.Solver.MG.CoarseningFactor = 3.8;
+
+		if (defaultCoarseOperator)
+			args.Solver.MG.UseGalerkinOperator = true;
 
 		if (defaultCycle)
 		{
@@ -1160,12 +1173,21 @@ int main(int argc, char* argv[])
 
 	if (args.Solver.SolverCode.compare("aggregamg") == 0 || args.Solver.SolverCode.compare("fcgaggregamg") == 0)
 	{
+		if (!defaultCoarseOperator && !args.Solver.MG.UseGalerkinOperator)
+			Utils::Warning("AggregAMG uses the Galerkin operator. Argument -g 0 ignored.");
+
 		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::None)
 			args.Solver.MG.CoarseningStgy = CoarseningStrategy::DoublePairwiseAggregation;
 
 		if (defaultCycle)
 			args.Solver.MG.CycleLetter = 'K';
 	}
+
+
+	if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::MultiplePairwiseAggregation && args.Solver.MG.CoarseningFactor == 0)
+		args.Solver.MG.CoarseningFactor = 3.5;
+	else if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::IndependentRemeshing && args.Solver.MG.CoarseningFactor == 0)
+		args.Solver.MG.CoarseningFactor = 2;
 	
 	//------------------------------------------//
 	//             Launch program               //

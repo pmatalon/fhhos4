@@ -221,7 +221,7 @@ public:
 		return 1;
 	}
 
-	void CoarsenMesh(CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, int coarseningFactor)
+	void CoarsenMesh(CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor)
 	{
 		if (elemCoarseningStgy == CoarseningStrategy::StandardCoarsening)
 		{

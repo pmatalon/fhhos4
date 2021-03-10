@@ -53,7 +53,7 @@ public:
 		Eigen::saveMarket(M, Utils::ProgramArgs.OutputDirectory + "/" + suffix + ".dat");
 	}
 
-	void CoarsenMesh(CoarseningStrategy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, int coarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override
+	void CoarsenMesh(CoarseningStrategy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double requestedCoarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override
 	{
 		noCoarserMeshProvided = false;
 		coarsestPossibleMeshReached = false;
@@ -71,15 +71,10 @@ public:
 		const SparseMatrix* A_F_F1 = A_F_F;
 		SparseMatrix *A_T_T2, *A_T_F2, *A_F_F2, *P, *Q_F, *schur2;
 		const SparseMatrix* schur1 = this->OperatorMatrix;
-		double coarseningRatio = 0;
-		//double nCoarsenings = 0;
-		
-		int numberOfPasses = 1;
-		if (coarseningStgy == CoarseningStrategy::DoublePairwiseAggregation)
-			numberOfPasses = 2;
+		double actualCoarseningFactor = 0;
+		double nCoarsenings = 0;
 
-		//while (coarseningRatio < 3)
-		for (int nCoarsenings = 0; nCoarsenings < numberOfPasses; nCoarsenings++)
+		while (!CoarseningCriteriaReached(coarseningStgy, requestedCoarseningFactor, nCoarsenings, actualCoarseningFactor))
 		{
 			std::tie(A_T_T2, A_T_F2, A_F_F2, P, Q_F, schur2, coarsestPossibleMeshReached) = Coarsen(*A_T_T1, *A_T_F1, *A_F_F1, *schur1, coarseningStgy, faceCoarseningStgy);
 			if (coarsestPossibleMeshReached)
@@ -118,8 +113,9 @@ public:
 			{
 				double nFine = this->A_T_F->cols();
 				double nCoarse = A_T_F1->cols();
-				coarseningRatio = nFine / nCoarse;
+				actualCoarseningFactor = nFine / nCoarse;
 			}
+			nCoarsenings++;
 		}
 
 		this->A_T_Tc = *A_T_T2;
@@ -127,6 +123,18 @@ public:
 		this->A_F_Fc = *A_F_F2;
 		this->Ac = SparseMatrix(*schur2);
 		delete schur2;
+	}
+
+
+	bool CoarseningCriteriaReached(CoarseningStrategy coarseningStgy, double requestedCoarseningRatio, int nCoarseningsPerformed, double coarseningRatio)
+	{
+		if (coarseningStgy == CoarseningStrategy::DoublePairwiseAggregation)
+			return nCoarseningsPerformed == 2;
+		if (coarseningStgy == CoarseningStrategy::MultiplePairwiseAggregation)
+			return coarseningRatio >= requestedCoarseningRatio;
+		if (coarseningStgy == CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
+			return nCoarseningsPerformed == 1; // only 1 pass of coarsening
+		return coarseningRatio >= requestedCoarseningRatio;
 	}
 
 
