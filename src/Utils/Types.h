@@ -45,6 +45,7 @@ enum class CoarseningStrategy : unsigned
 	AgglomerationCoarseningByMostCoplanarFaces,
 	AgglomerationCoarseningByFaceNeighbours,
 	AgglomerationCoarseningByVertexNeighbours,
+	MultipleAgglomerationCoarseningByFaceNeighbours,
 	IndependentRemeshing,
 	FaceCoarsening,
 	GMSHSplittingRefinement,
@@ -76,8 +77,7 @@ enum class Prolongation : unsigned
 
 enum class CAMGProlongation : unsigned
 {
-	ReconstructionTrace1Step = 1,
-	ReconstructionTrace2Steps = 2,
+	ReconstructionTrace = 1,
 	FaceProlongation = 3,
 	ReconstructionTranspose2Steps = 4,
 	ReconstructTraceOrInject = 5,

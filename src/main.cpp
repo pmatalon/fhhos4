@@ -228,7 +228,8 @@ void print_usage() {
 	cout << "              r    - Fine meshes obtained by structured refinement of the coarse mesh using GMSH's splitting method" << endl;
 	cout << "              b    - Fine meshes obtained by Bey's tetrahedral refinements of coarse meshes" << endl;
 	cout << "              m    - Independant remeshing by GMSH with double the mesh size (non-nested!)" << endl;
-	cout << "              n    - Agglomeration coarsening with face collapsing (non-nested!)" << endl;
+	cout << "              n    - Agglomeration coarsening (agglomerate all face neighbours)" << endl;
+	cout << "              mn   - Multiple agglomeration coarsening (use -coarsening-factor)" << endl;
 	cout << "              dpa  - Double pairwise aggregation" << endl;
 	cout << "              mpa  - Multiple pairwise aggregation (use -coarsening-factor)" << endl;
 	cout << "              vr   - (Experimental) Agglomeration coarsening by vertex removal" << endl;
@@ -310,14 +311,14 @@ void print_usage() {
 	cout << "              " << (unsigned)Prolongation::CellInterp_FinerApproxL2proj_Trace << "  - ";
 	cout <<                    "Variant of " << (unsigned)Prolongation::CellInterp_ApproxL2proj_Trace << " where the L2-projection is better approximated (by subtriangulation of the elements)." << endl;
 	cout << "      Values for CondensedAMG:" << endl;
-	cout << "              " << (unsigned)CAMGProlongation::ReconstructionTrace1Step << "  - ";
+	cout << "              " << (unsigned)CAMGProlongation::ReconstructionTrace << "  - ";
 	cout <<                    "cell-reconstruction + double injection + trace" << endl;
-	cout << "              " << (unsigned)CAMGProlongation::ReconstructionTrace2Steps << "  - ";
-	cout <<                    "cell-reconstruction + injection + trace + cell-reconstruction + injection + trace" << endl;
 	cout << "              " << (unsigned)CAMGProlongation::FaceProlongation << "  - ";
 	cout <<                    "face injection" << endl;
 	cout << "              " << (unsigned)CAMGProlongation::ReconstructTraceOrInject << "  - ";
 	cout <<                    "cell-reconstruction + injection + trace for interior faces, injection for boundary faces" << endl;
+	cout << "              " << (unsigned)CAMGProlongation::ReconstructSmoothedTraceOrInject << "  - ";
+	cout <<                    "cell-reconstruction + trace + smoothing for interior faces, injection for boundary faces" << endl;
 	cout << endl;
 	cout << "-face-prolong NUM" << endl;
 	cout << "      Intermediate face prolongation operator used in 'camg'." << endl;
@@ -818,6 +819,8 @@ int main(int argc, char* argv[])
 					args.Solver.MG.CoarseningStgy = CoarseningStrategy::IndependentRemeshing;
 				else if (coarseningStgyCode.compare("n") == 0)
 					args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours;
+				else if (coarseningStgyCode.compare("mn") == 0)
+					args.Solver.MG.CoarseningStgy = CoarseningStrategy::MultipleAgglomerationCoarseningByFaceNeighbours;
 				else if (coarseningStgyCode.compare("dpa") == 0)
 					args.Solver.MG.CoarseningStgy = CoarseningStrategy::DoublePairwiseAggregation;
 				else if (coarseningStgyCode.compare("mpa") == 0)
@@ -1157,7 +1160,9 @@ int main(int argc, char* argv[])
 		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::None)
 			args.Solver.MG.CoarseningStgy = CoarseningStrategy::MultiplePairwiseAggregation;
 
-		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::MultiplePairwiseAggregation && args.Solver.MG.CoarseningFactor == 0)
+		if ((args.Solver.MG.CoarseningStgy == CoarseningStrategy::MultiplePairwiseAggregation || 
+			 args.Solver.MG.CoarseningStgy == CoarseningStrategy::MultipleAgglomerationCoarseningByFaceNeighbours)
+			&& args.Solver.MG.CoarseningFactor == 0)
 			args.Solver.MG.CoarseningFactor = 3.8;
 
 		if (defaultCoarseOperator)

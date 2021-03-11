@@ -9,7 +9,7 @@ class CondensedLevel : public Level
 {
 private:
 	CAMGFaceProlongation _faceProlong = CAMGFaceProlongation::FaceAggregates;
-	CAMGProlongation _multigridProlong = CAMGProlongation::ReconstructionTrace1Step;
+	CAMGProlongation _multigridProlong = CAMGProlongation::ReconstructSmoothedTraceOrInject;
 	int _cellBlockSize;
 	int _faceBlockSize;
 	double _strongCouplingThreshold;
@@ -134,7 +134,9 @@ public:
 			return coarseningRatio >= requestedCoarseningRatio;
 		if (coarseningStgy == CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
 			return nCoarseningsPerformed == 1; // only 1 pass of coarsening
-		return coarseningRatio >= requestedCoarseningRatio;
+		if (coarseningStgy == CoarseningStrategy::MultipleAgglomerationCoarseningByFaceNeighbours)
+			return coarseningRatio >= requestedCoarseningRatio; // only 1 pass of coarsening
+		return nCoarseningsPerformed == 1;
 	}
 
 
@@ -220,7 +222,7 @@ public:
 		ExportMatrix(*A_T_Fc_tmp, "A_T_Fc", 0);*/
 
 		SparseMatrix* P;
-		if (_multigridProlong == CAMGProlongation::ReconstructionTrace1Step || _multigridProlong == CAMGProlongation::ReconstructionTrace2Steps) // 1
+		if (_multigridProlong == CAMGProlongation::ReconstructionTrace) // 1
 		{
 			SparseMatrix inv_A_T_Tc = Utils::InvertBlockDiagMatrix(*A_T_Tc, _cellBlockSize);
 			// Theta: reconstruction from the coarse faces to the coarse cells
@@ -466,8 +468,8 @@ public:
 		else
 			Utils::FatalError("Unmanaged prolongation");
 
-		//SparseMatrix* A_T_Fc = new SparseMatrix(Q_T.transpose() * A_T_F * *P); // Kills -prolong 1 or 2
-		SparseMatrix* A_T_Fc = A_T_Fc_tmp;
+		SparseMatrix* A_T_Fc = new SparseMatrix(Q_T.transpose() * A_T_F * *P); // Kills -prolong 1 or 2 because P is then very dense
+		//SparseMatrix* A_T_Fc = A_T_Fc_tmp;
 
 		//SparseMatrix* A_F_Fc = new SparseMatrix(Q_F->transpose() * A_F_F * *Q_F);
 		SparseMatrix* A_F_Fc = new SparseMatrix(P->transpose() * A_F_F.selfadjointView<Eigen::Lower>() * *P);
@@ -774,7 +776,7 @@ class CondensedAMG : public Multigrid
 {
 private:
 	CAMGFaceProlongation _faceProlong = CAMGFaceProlongation::FaceAggregates;
-	CAMGProlongation _multigridProlong = CAMGProlongation::ReconstructionTrace1Step;
+	CAMGProlongation _multigridProlong = CAMGProlongation::ReconstructSmoothedTraceOrInject;
 	int _cellBlockSize;
 	int _faceBlockSize;
 	double _strongCouplingThreshold;
@@ -809,10 +811,8 @@ public:
 		os << "[-face-prolong " << (unsigned)_faceProlong << "]" << endl;
 
 		os << "\t" << "Prolongation            : ";
-		if (_multigridProlong == CAMGProlongation::ReconstructionTrace1Step)
-			os << "ReconstructionTrace1Step ";
-		else if (_multigridProlong == CAMGProlongation::ReconstructionTrace2Steps)
-			os << "ReconstructionTrace2Steps ";
+		if (_multigridProlong == CAMGProlongation::ReconstructionTrace)
+			os << "ReconstructionTrace ";
 		else if (_multigridProlong == CAMGProlongation::FaceProlongation)
 			os << "FaceProlongation ";
 		else if (_multigridProlong == CAMGProlongation::ReconstructTraceOrInject)

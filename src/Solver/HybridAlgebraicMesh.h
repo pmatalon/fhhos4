@@ -243,7 +243,7 @@ public:
 			PairwiseAggregation<HybridAlgebraicElement, HybridElementAggregate> aggregProcess;
 			CoarseElements = aggregProcess.Perform(Elements, coarsestPossibleMeshReached);
 		}
-		else if (elemCoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
+		else if (elemCoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours || elemCoarseningStgy == CoarseningStrategy::MultipleAgglomerationCoarseningByFaceNeighbours)
 		{
 			cout << "\tElement agglomeration" << endl;
 			AllNeighbourAggregation<HybridAlgebraicElement, HybridElementAggregate> aggregProcess;
