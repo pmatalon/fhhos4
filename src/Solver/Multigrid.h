@@ -462,6 +462,8 @@ public:
 			os << "multiple pairwise aggregation [-cs mpa -coarsening-factor " << Utils::ProgramArgs.Solver.MG.CoarseningFactor << "]" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
 			os << "agglomeration by face neighbours [-cs n]" << endl;
+		else if (CoarseningStgy == CoarseningStrategy::MultipleAgglomerationCoarseningByFaceNeighbours)
+			os << "multiple agglomeration by face neighbours [-cs mn -coarsening-factor " << Utils::ProgramArgs.Solver.MG.CoarseningFactor << "]" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByMostCoplanarFaces)
 			os << "agglomeration by most coplanar faces [-cs mcf]" << endl;
 		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter)
