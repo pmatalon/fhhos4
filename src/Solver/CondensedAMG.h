@@ -114,6 +114,8 @@ public:
 				double nFine = this->A_T_F->cols();
 				double nCoarse = A_T_F1->cols();
 				actualCoarseningFactor = nFine / nCoarse;
+				if (actualCoarseningFactor >= 10)
+					Utils::Warning("The coarsening seems a little too strong...");
 			}
 			nCoarsenings++;
 		}
