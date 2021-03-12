@@ -1890,7 +1890,7 @@ public:
 			stgy = this->FineMesh->ComesFrom.CS;
 
 		ElementParallelLoop<Dim> parallelLoop(this->Elements);
-		parallelLoop.Execute([stgy](Element<Dim>* ce)
+		parallelLoop.Execute([this, stgy](Element<Dim>* ce)
 			{
 				SetOverlappingFineElements(ce, stgy);
 				ce->InitOverlappingElementsLocalNumbering();
@@ -1966,7 +1966,7 @@ public:
 			stgy = this->FineMesh->ComesFrom.CS;
 
 		ElementParallelLoop<Dim> parallelLoopFine(this->FineMesh->Elements);
-		parallelLoopFine.Execute([stgy](Element<Dim>* fe)
+		parallelLoopFine.Execute([this, stgy](Element<Dim>* fe)
 			{
 				if (!Utils::BuildsNestedMeshHierarchy(stgy) && !fe->IsFullyEmbeddedInCoarseElement)
 				{
