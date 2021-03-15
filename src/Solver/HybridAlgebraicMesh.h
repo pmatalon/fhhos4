@@ -110,24 +110,27 @@ public:
 	vector<HybridFaceAggregate> CoarseFaces;
 
 public:
-	HybridAlgebraicMesh(int cellBlockSize, int faceBlockSize, double strongCouplingThreshold)
+	HybridAlgebraicMesh(const SparseMatrix* A_T_T, const SparseMatrix* A_T_F, const SparseMatrix* A_F_F, int cellBlockSize, int faceBlockSize, double strongCouplingThreshold)
 	{
+		assert(A_T_T->rows() > 0 && A_T_F->rows() > 0);
+		assert(A_T_T->rows() == A_T_F->rows());
+
+		this->A_T_T = A_T_T;
+		this->A_T_F = A_T_F;
+		this->A_F_F = A_F_F;
+
+		if (!A_T_F->IsRowMajor)
+			assert("A_T_F must be row-major");
+
 		this->_cellBlockSize = cellBlockSize;
 		this->_faceBlockSize = faceBlockSize;
 		this->_strongCouplingThreshold = strongCouplingThreshold;
 	}
 
-	void Build(const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F)
+	void Build()
 	{
-		assert(A_T_T.rows() > 0 && A_T_F.rows() > 0);
-		assert(A_T_T.rows() == A_T_F.rows());
-
-		this->A_T_T = &A_T_T;
-		this->A_T_F = &A_T_F;
-		this->A_F_F = &A_F_F;
-
-		if (!A_T_F.IsRowMajor)
-			assert("A_T_F must be row-major");
+		const SparseMatrix& A_T_T = *this->A_T_T;
+		const SparseMatrix& A_T_F = *this->A_T_F;
 
 		BigNumber nElements = A_T_F.rows() / _cellBlockSize;
 		this->Elements = vector<HybridAlgebraicElement>(nElements);
