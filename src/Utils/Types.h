@@ -78,6 +78,7 @@ enum class Prolongation : unsigned
 enum class CAMGProlongation : unsigned
 {
 	ReconstructionTrace = 1,
+	ChainedCoarseningProlongations = 2,
 	FaceProlongation = 3,
 	ReconstructionTranspose2Steps = 4,
 	ReconstructTraceOrInject = 5,

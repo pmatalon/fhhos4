@@ -311,8 +311,10 @@ void print_usage() {
 	cout << "              " << (unsigned)Prolongation::CellInterp_FinerApproxL2proj_Trace << "  - ";
 	cout <<                    "Variant of " << (unsigned)Prolongation::CellInterp_ApproxL2proj_Trace << " where the L2-projection is better approximated (by subtriangulation of the elements)." << endl;
 	cout << "      Values for CondensedAMG:" << endl;
+	cout << "              " << (unsigned)CAMGProlongation::ChainedCoarseningProlongations << "  - ";
+	cout <<                    "chained coarsening prolongations (use -coarsening-prolong to select)" << endl;
 	cout << "              " << (unsigned)CAMGProlongation::ReconstructionTrace << "  - ";
-	cout <<                    "cell-reconstruction + double injection + trace" << endl;
+	cout <<                    "cell-reconstruction + injection + trace" << endl;
 	cout << "              " << (unsigned)CAMGProlongation::FaceProlongation << "  - ";
 	cout <<                    "face injection" << endl;
 	cout << "              " << (unsigned)CAMGProlongation::ReconstructTraceOrInject << "  - ";
@@ -320,10 +322,13 @@ void print_usage() {
 	cout << "              " << (unsigned)CAMGProlongation::ReconstructSmoothedTraceOrInject << "  - ";
 	cout <<                    "cell-reconstruction + trace + smoothing for interior faces, injection for boundary faces" << endl;
 	cout << endl;
+	cout << "-coarsening-prolong NUM" << endl;
+	cout << "      Intermediate prolongation operator used to build the coarse levels in 'camg'. Same possble values as -prolong." << endl;
+	cout << endl;
 	cout << "-face-prolong NUM" << endl;
 	cout << "      Intermediate face prolongation operator used in 'camg'." << endl;
 	cout << "              " << (unsigned)CAMGFaceProlongation::BoundaryAggregatesInteriorAverage << "  - ";
-	cout <<	                    "1 non-zero for aggregated faces, average for interior non-aggregated faces" << endl;
+	cout <<                     "1 non-zero for aggregated faces, average for interior non-aggregated faces" << endl;
 	cout << "              " << (unsigned)CAMGFaceProlongation::BoundaryAggregatesInteriorZero << "  - ";
 	cout <<                     "1 non-zero for boundary faces, nothing for interior faces" << endl;
 	cout << "              " << (unsigned)CAMGFaceProlongation::FaceAggregates << "  - ";
@@ -477,7 +482,8 @@ int main(int argc, char* argv[])
 		OPT_MGCycle,
 		OPT_CellInterpCode,
 		OPT_Weight,
-		OPT_ProlongationCode,
+		OPT_MultigridProlongationCode,
+		OPT_CoarseningProlongationCode,
 		OPT_FaceProlongationCode,
 		OPT_CoarseMatrixSize,
 		OPT_Smoothers,
@@ -528,7 +534,8 @@ int main(int argc, char* argv[])
 		 { "cycle", required_argument, NULL, OPT_MGCycle },
 		 { "cell-interp", required_argument, NULL, OPT_CellInterpCode },
 		 { "weight", required_argument, NULL, OPT_Weight },
-		 { "prolong", required_argument, NULL, OPT_ProlongationCode },
+		 { "prolong", required_argument, NULL, OPT_MultigridProlongationCode },
+		 { "coarsening-prolong", required_argument, NULL, OPT_CoarseningProlongationCode },
 		 { "face-prolong", required_argument, NULL, OPT_FaceProlongationCode },
 		 { "coarse-size", required_argument, NULL, OPT_CoarseMatrixSize },
 		 { "smoothers", required_argument, NULL, OPT_Smoothers },
@@ -767,12 +774,20 @@ int main(int argc, char* argv[])
 				args.Solver.MG.WeightCode = weightCode;
 				break;
 			}
-			case OPT_ProlongationCode:
+			case OPT_MultigridProlongationCode:
 			{
 				int prolongationCode = atoi(optarg);
 				if (prolongationCode < 1 || prolongationCode > 9)
 					argument_error("unknown prolongation code. Check -prolong argument.");
 				args.Solver.MG.ProlongationCode = prolongationCode;
+				break;
+			}
+			case OPT_CoarseningProlongationCode:
+			{
+				int prolongationCode = atoi(optarg);
+				if (prolongationCode < 1 || prolongationCode > 9)
+					argument_error("unknown prolongation code. Check -coarsening-prolong argument.");
+				args.Solver.MG.CoarseningProlongationCode = prolongationCode;
 				break;
 			}
 			case OPT_FaceProlongationCode:
@@ -1059,10 +1074,11 @@ int main(int argc, char* argv[])
 	else if (args.Solver.SolverCode.compare("camg") == 0 || args.Solver.SolverCode.compare("fcgcamg") == 0)
 	{
 		if (args.Solver.MG.ProlongationCode == 0)
-			args.Solver.MG.CAMGProlong = CAMGProlongation::ReconstructSmoothedTraceOrInject;
+			args.Solver.MG.CAMGMultigridProlong = CAMGProlongation::ChainedCoarseningProlongations;
 		else
-			args.Solver.MG.CAMGProlong = static_cast<CAMGProlongation>(args.Solver.MG.ProlongationCode);
+			args.Solver.MG.CAMGMultigridProlong = static_cast<CAMGProlongation>(args.Solver.MG.ProlongationCode);
 		args.Solver.MG.CAMGFaceProlong = args.Solver.MG.FaceProlongationCode == 0 ? CAMGFaceProlongation::BoundaryAggregatesInteriorAverage : static_cast<CAMGFaceProlongation>(args.Solver.MG.FaceProlongationCode);
+		args.Solver.MG.CAMGCoarseningProlong = args.Solver.MG.CoarseningProlongationCode == 0 ? CAMGProlongation::ReconstructSmoothedTraceOrInject : static_cast<CAMGProlongation>(args.Solver.MG.CoarseningProlongationCode);
 	}
 
 

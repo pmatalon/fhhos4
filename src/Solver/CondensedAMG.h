@@ -9,6 +9,7 @@ class CondensedLevel : public Level
 {
 private:
 	CAMGFaceProlongation _faceProlong = CAMGFaceProlongation::FaceAggregates;
+	CAMGProlongation _coarseningProlong = CAMGProlongation::FaceProlongation;
 	CAMGProlongation _multigridProlong = CAMGProlongation::ReconstructSmoothedTraceOrInject;
 	int _cellBlockSize;
 	int _faceBlockSize;
@@ -19,7 +20,7 @@ public:
 	const SparseMatrix* A_F_F;
 	const SparseMatrix* inv_A_T_T;
 private:
-	SparseMatrix Q_T;
+	//SparseMatrix Q_T;
 	SparseMatrix Q_F;
 
 	SparseMatrix A_T_Tc;
@@ -30,14 +31,15 @@ public:
 	SparseMatrix Ac;
 
 public:
-	CondensedLevel(int number, int cellBlockSize, int faceBlockSize, double strongCouplingThreshold, CAMGFaceProlongation faceProlong, CAMGProlongation prolongation)
+	CondensedLevel(int number, int cellBlockSize, int faceBlockSize, double strongCouplingThreshold, CAMGFaceProlongation faceProlong, CAMGProlongation coarseningProlong, CAMGProlongation mgProlong)
 		: Level(number)
 	{
 		this->_cellBlockSize = cellBlockSize;
 		this->_faceBlockSize = faceBlockSize;
 		this->_strongCouplingThreshold = strongCouplingThreshold;
-		this->_multigridProlong = prolongation;
 		this->_faceProlong = faceProlong;
+		this->_coarseningProlong = coarseningProlong;
+		this->_multigridProlong = mgProlong;
 	}
 
 	BigNumber NUnknowns() override
@@ -72,7 +74,8 @@ public:
 		double actualCoarseningFactor = 0;
 		double nCoarsenings = 0;
 
-		mesh = new HybridAlgebraicMesh(A_T_T, A_T_F, A_F_F, _cellBlockSize, _faceBlockSize, _strongCouplingThreshold);
+		HybridAlgebraicMesh initialFineMesh(A_T_T, A_T_F, A_F_F, _cellBlockSize, _faceBlockSize, _strongCouplingThreshold);
+		mesh = &initialFineMesh;
 
 		while (!CoarseningCriteriaReached(coarseningStgy, requestedCoarseningFactor, nCoarsenings, actualCoarseningFactor))
 		{
@@ -84,32 +87,43 @@ public:
 			// Global prolongation operator
 			if (nCoarsenings == 0)
 			{
-				this->P = *auxP;
+				if (_multigridProlong == CAMGProlongation::ChainedCoarseningProlongations)
+					this->P = *auxP;
 				this->Q_F = *auxQ_F;
 			}
 			else
 			{
-				this->P = this->P * *auxP;
+				if (_multigridProlong == CAMGProlongation::ChainedCoarseningProlongations)
+					this->P = this->P * *auxP;
 				this->Q_F = this->Q_F * *auxQ_F;
 			}
 			delete auxP, auxQ_F;
 
 			// Global coarsening factor
-			double nFine = this->A_T_F->cols();
+			double nFine = initialFineMesh.A_T_F->cols();
 			double nCoarse = coarseMesh->A_T_F->cols();
 			actualCoarseningFactor = nFine / nCoarse;
+			cout << "\t\tCoarsening factor = " << actualCoarseningFactor << endl;
 			if (actualCoarseningFactor >= 10)
 				Utils::Warning("The coarsening seems a little too strong...");
+
 
 			// Prepare next coarsening
 			if (nCoarsenings > 0)
 			{
+				if (_multigridProlong != CAMGProlongation::ChainedCoarseningProlongations)
+				{
+					// Update global coarsening
+					UpdateGlobalCoarsening(initialFineMesh, *mesh);
+				}
+
+				// Memory release
 				delete mesh->A_T_T;
 				delete mesh->A_T_F;
 				if (mesh->A_F_F) delete mesh->A_F_F;
 				delete schur;
+				delete mesh;
 			}
-			delete mesh;
 
 			mesh = coarseMesh;
 			schur = auxSchur;
@@ -117,13 +131,111 @@ public:
 			nCoarsenings++;
 		}
 
-		this->A_T_Tc = *mesh->A_T_T;
-		this->A_T_Fc = *mesh->A_T_F;
-		this->A_F_Fc = *mesh->A_F_F;
-		delete mesh;
+		// Ending...
+		if (_multigridProlong == CAMGProlongation::ChainedCoarseningProlongations)
+		{
+			this->A_T_Tc = std::move(*coarseMesh->A_T_T);
+			this->A_T_Fc = std::move(*coarseMesh->A_T_F);
+			this->A_F_Fc = std::move(*coarseMesh->A_F_F);
+			this->Ac     = std::move(*schur);
+		}
+		else
+		{
+			// Multigrid prolongation
+			SparseMatrix Q_T = BuildQ_T(initialFineMesh);
+			SparseMatrix* P = BuildProlongation(_multigridProlong, initialFineMesh, *this->OperatorMatrix, *coarseMesh, Q_T, &Q_F);
+			this->P = std::move(*P);
+			delete P;
 
-		this->Ac = SparseMatrix(*schur);
+			this->A_T_Tc = std::move(*coarseMesh->A_T_T);
+			this->A_T_Fc =     Q_T.transpose() * (*this->A_T_F) * this->P;
+			this->A_F_Fc = this->P.transpose() * (*this->A_F_F) * this->P;
+			this->Ac     = this->P.transpose() * (*this->OperatorMatrix) * this->P;
+		}
+		delete coarseMesh;
 		delete schur;
+	}
+
+	void UpdateGlobalCoarsening(HybridAlgebraicMesh& initialFineMesh, HybridAlgebraicMesh& currentMesh)
+	{
+		NumberParallelLoop<EmptyResultChunk> parallelLoopE(currentMesh.CoarseElements.size());
+		parallelLoopE.Execute([this, &initialFineMesh, &currentMesh](BigNumber aggregNumber)
+			{
+				HybridElementAggregate& aggreg = currentMesh.CoarseElements[aggregNumber];
+				RemoveInitialFineFaces(initialFineMesh, aggreg);
+				UpdateInitialFineElements(initialFineMesh, aggreg);
+			});
+
+		NumberParallelLoop<EmptyResultChunk> parallelLoopF(currentMesh.CoarseFaces.size());
+		parallelLoopF.Execute([this, &initialFineMesh, &currentMesh](BigNumber aggregNumber)
+			{
+				HybridFaceAggregate& aggreg = currentMesh.CoarseFaces[aggregNumber];
+				UpdateRemainingInitialFineFaces(initialFineMesh, aggreg);
+			});
+
+		initialFineMesh.CoarseElements = std::move(currentMesh.CoarseElements);
+		initialFineMesh.CoarseFaces = std::move(currentMesh.CoarseFaces);
+	}
+
+	void UpdateInitialFineElements(HybridAlgebraicMesh& initialFineMesh, HybridElementAggregate& aggreg)
+	{
+		vector<HybridAlgebraicElement*> fineElements;
+		for (HybridAlgebraicElement* ce : aggreg.FineElements)
+		{
+			HybridElementAggregate& finerAggreg = initialFineMesh.CoarseElements[ce->Number];
+			for (HybridAlgebraicElement* fe : finerAggreg.FineElements)
+			{
+				fineElements.push_back(fe);
+				fe->CoarseElement = &aggreg;
+			}
+		}
+		aggreg.FineElements = fineElements;
+	}
+
+	void UpdateRemainingInitialFineFaces(HybridAlgebraicMesh& initialFineMesh, HybridFaceAggregate& aggreg)
+	{
+		vector<HybridAlgebraicFace*> fineFaces;
+		for (HybridAlgebraicFace* cf : aggreg.FineFaces)
+		{
+			HybridFaceAggregate& finerAggreg = initialFineMesh.CoarseFaces[cf->Number];
+			for (HybridAlgebraicFace* ff : finerAggreg.FineFaces)
+			{
+				assert(!ff->IsRemovedOnCoarseMesh);
+				fineFaces.push_back(ff);
+				ff->CoarseFace = &aggreg;
+				ff->CoarseElements = {};
+			}
+		}
+		aggreg.FineFaces = fineFaces;
+	}
+
+	void RemoveInitialFineFaces(HybridAlgebraicMesh& initialFineMesh, HybridElementAggregate& aggreg)
+	{
+		vector<HybridAlgebraicFace*> removedFineFaces;
+		for (HybridAlgebraicFace* cf : aggreg.RemovedFineFaces)
+		{
+			HybridFaceAggregate& finerAggreg = initialFineMesh.CoarseFaces[cf->Number];
+			for (HybridAlgebraicFace* ff : finerAggreg.FineFaces)
+			{
+				assert(!ff->IsRemovedOnCoarseMesh);
+				ff->IsRemovedOnCoarseMesh = true;
+				ff->CoarseFace = nullptr;
+				ff->CoarseElements = { &aggreg };
+				removedFineFaces.push_back(ff);
+			}
+		}
+		for (HybridAlgebraicElement* ce : aggreg.FineElements)
+		{
+			HybridElementAggregate& finerAggreg = initialFineMesh.CoarseElements[ce->Number];
+			for (HybridAlgebraicFace* ff : finerAggreg.RemovedFineFaces)
+			{
+				assert(ff->IsRemovedOnCoarseMesh);
+				assert(!ff->CoarseFace);
+				ff->CoarseElements = { &aggreg };
+				removedFineFaces.push_back(ff);
+			}
+		}
+		aggreg.RemovedFineFaces = removedFineFaces;
 	}
 
 
@@ -206,7 +318,7 @@ public:
 		ExportMatrix(*A_T_Fc_tmp, "A_T_Fc", 0);*/
 
 		// Multigrid prolongation
-		SparseMatrix* P = BuildProlongation(mesh, schur, auxCoarseMesh, Q_T, Q_F);
+		SparseMatrix* P = BuildProlongation(this->_coarseningProlong, mesh, schur, auxCoarseMesh, Q_T, Q_F);
 
 		SparseMatrix* A_T_Fc = new SparseMatrix(Q_T.transpose() * (*mesh.A_T_F) * (*P)); // Kills -prolong 1 or 2 because P is then very dense
 		//SparseMatrix* A_T_Fc = A_T_Fc_tmp;
@@ -215,18 +327,18 @@ public:
 		SparseMatrix* schurc = new SparseMatrix(P->transpose() * schur.selfadjointView<Eigen::Lower>() * *P);
 
 		HybridAlgebraicMesh* coarseMesh = new HybridAlgebraicMesh(A_T_Tc, A_T_Fc, A_F_Fc, _cellBlockSize, _faceBlockSize, _strongCouplingThreshold);
-
+		
 		return { coarseMesh, P, Q_F, schurc, coarsestPossibleMeshReached };
 	}
 
 
 
-	SparseMatrix* BuildProlongation(HybridAlgebraicMesh& mesh, const SparseMatrix& schur,
+	SparseMatrix* BuildProlongation(CAMGProlongation prolong, HybridAlgebraicMesh& mesh, const SparseMatrix& schur,
 									HybridAlgebraicMesh& coarseMesh,
 									const SparseMatrix& Q_T, SparseMatrix* Q_F)
 	{
 		SparseMatrix* P;
-		if (_multigridProlong == CAMGProlongation::ReconstructionTrace) // 1
+		if (prolong == CAMGProlongation::ReconstructionTrace) // 1
 		{
 			SparseMatrix inv_A_T_Tc = Utils::InvertBlockDiagMatrix(*coarseMesh.A_T_T, _cellBlockSize);
 			// Theta: reconstruction from the coarse faces to the coarse cells
@@ -236,12 +348,12 @@ public:
 
 			P = new SparseMatrix(Pi * Q_T * Theta);
 		}
-		else if (_multigridProlong == CAMGProlongation::FaceProlongation) // 3
+		else if (prolong == CAMGProlongation::FaceProlongation) // 3
 		{
 			// -g 1 -prolong 3 -face-prolong 3 -cs z
 			P = Q_F;
 		}
-		else if (_multigridProlong == CAMGProlongation::ReconstructionTranspose2Steps) // 4
+		else if (prolong == CAMGProlongation::ReconstructionTranspose2Steps) // 4
 		{
 			/*SparseMatrix inv_A_T_T1 = Utils::InvertBlockDiagMatrix(A_T_T1, _cellBlockSize);
 			// Theta: reconstruction from the coarse faces to the coarse cells
@@ -256,7 +368,7 @@ public:
 			SparseMatrix P2 = Theta1.transpose() * Q_T2 * Theta2;
 			this->P = P1 * P2;*/
 		}
-		else if (_multigridProlong == CAMGProlongation::ReconstructTraceOrInject) // 5
+		else if (prolong == CAMGProlongation::ReconstructTraceOrInject) // 5
 		{
 			SparseMatrix inv_A_T_Tc = Utils::InvertBlockDiagMatrix(*coarseMesh.A_T_T, _cellBlockSize);
 			SparseMatrix Theta = -inv_A_T_Tc * *coarseMesh.A_T_F;   // Reconstruct
@@ -277,7 +389,7 @@ public:
 			P = new SparseMatrix(Q_F->rows(), Q_F->cols());
 			parallelLoop.Fill(*P);
 		}
-		else if (_multigridProlong == CAMGProlongation::ReconstructSmoothedTraceOrInject) // 6
+		else if (prolong == CAMGProlongation::ReconstructSmoothedTraceOrInject) // 6
 		{
 			SparseMatrix inv_A_T_Tc = Utils::InvertBlockDiagMatrix(*coarseMesh.A_T_T, _cellBlockSize);
 			SparseMatrix Theta = -inv_A_T_Tc * *coarseMesh.A_T_F;   // Reconstruct
@@ -317,7 +429,7 @@ public:
 			P = new SparseMatrix(Q_F->rows(), Q_F->cols());
 			parallelLoop2.Fill(*P);
 		}
-		else if (_multigridProlong == CAMGProlongation::FindInteriorThatReconstructs) // 7
+		else if (prolong == CAMGProlongation::FindInteriorThatReconstructs) // 7
 		{
 			int cbs = _cellBlockSize;
 			int fbs = _faceBlockSize;
@@ -447,7 +559,7 @@ public:
 			parallelLoop2.Fill(*P);
 
 		}
-		else if (_multigridProlong == CAMGProlongation::HighOrder) // 8
+		else if (prolong == CAMGProlongation::HighOrder) // 8
 		{
 			SparseMatrix inv_A_T_Tc = Utils::InvertBlockDiagMatrix(*coarseMesh.A_T_T, _cellBlockSize);
 			SparseMatrix Theta = -inv_A_T_Tc * *coarseMesh.A_T_F;   // Reconstruct
@@ -473,29 +585,6 @@ public:
 
 		return P;
 	}
-
-
-
-
-	/*void BuildFineElementAggregates()
-	{
-		_aggregates = vector<ElementAggregate>(_mesh.CoarseElements.size());
-		_numberAggregates = vector<vector<BigNumber>>(_mesh.CoarseElements.size());
-		NumberParallelLoop<EmptyResultChunk> parallelLoop(_mesh.CoarseElements.size());
-		parallelLoop.Execute([this](BigNumber finalAggregNumber)
-			{
-				ElementAggregate& finalAggreg = _aggregates[finalAggregNumber];
-				vector<BigNumber>& finalNumberAggreg = _numberAggregates[finalAggregNumber];
-				finalAggreg.Number = finalAggregNumber;
-				finalAggreg.FineElements = GetFineElements(_mesh.CoarseElements[finalAggregNumber], _mesh);
-				for (AlgebraicElement* e : finalAggreg.FineElements)
-				{
-					e->FinalAggregate = &finalAggreg;
-					e->FinalAggregateNumber = finalAggreg.Number;
-					finalNumberAggreg.push_back(e->Number);
-				}
-			});
-	}*/
 
 	void SetupDiscretizedOperator() override
 	{
@@ -792,25 +881,27 @@ class CondensedAMG : public Multigrid
 {
 private:
 	CAMGFaceProlongation _faceProlong = CAMGFaceProlongation::FaceAggregates;
+	CAMGProlongation _coarseningProlong = CAMGProlongation::FaceProlongation;
 	CAMGProlongation _multigridProlong = CAMGProlongation::ReconstructSmoothedTraceOrInject;
 	int _cellBlockSize;
 	int _faceBlockSize;
 	double _strongCouplingThreshold;
 public:
 
-	CondensedAMG(int cellBlockSize, int faceBlockSize, double strongCouplingThreshold, CAMGFaceProlongation faceProlong, CAMGProlongation prolongation, int nLevels = 0)
+	CondensedAMG(int cellBlockSize, int faceBlockSize, double strongCouplingThreshold, CAMGFaceProlongation faceProlong, CAMGProlongation coarseningProlong, CAMGProlongation mgProlong, int nLevels = 0)
 		: Multigrid(nLevels)
 	{
 		this->_cellBlockSize = cellBlockSize;
 		this->_faceBlockSize = faceBlockSize;
 		this->_strongCouplingThreshold = strongCouplingThreshold;
-		this->_multigridProlong = prolongation;
 		this->_faceProlong = faceProlong;
+		this->_coarseningProlong = coarseningProlong;
+		this->_multigridProlong = mgProlong;
 		this->BlockSizeForBlockSmoothers = faceBlockSize;
 		this->UseGalerkinOperator = true;
 		this->CoarseningStgy = CoarseningStrategy::DoublePairwiseAggregation;
 		this->FaceCoarseningStgy = FaceCoarseningStrategy::InterfaceCollapsing;
-		this->_fineLevel = new CondensedLevel(0, cellBlockSize, faceBlockSize, strongCouplingThreshold, faceProlong, prolongation);
+		this->_fineLevel = new CondensedLevel(0, cellBlockSize, faceBlockSize, strongCouplingThreshold, faceProlong, coarseningProlong, mgProlong);
 	}
 
 	void BeginSerialize(ostream& os) const override
@@ -826,13 +917,28 @@ public:
 			os << "aggregate all faces ";
 		os << "[-face-prolong " << (unsigned)_faceProlong << "]" << endl;
 
-		os << "\t" << "Prolongation            : ";
+		os << "\t" << "Coarsening Prolongation : ";
+		if (_coarseningProlong == CAMGProlongation::ReconstructionTrace)
+			os << "ReconstructionTrace ";
+		else if (_coarseningProlong == CAMGProlongation::FaceProlongation)
+			os << "FaceProlongation ";
+		else if (_coarseningProlong == CAMGProlongation::ReconstructTraceOrInject)
+			os << "ReconstructTraceOrInject ";
+		else if (_coarseningProlong == CAMGProlongation::ReconstructSmoothedTraceOrInject)
+			os << "ReconstructSmoothedTraceOrInject ";
+		os << "[-prolong " << (unsigned)_coarseningProlong << "]" << endl;
+
+		os << "\t" << "Multigrid prolongation  : ";
 		if (_multigridProlong == CAMGProlongation::ReconstructionTrace)
 			os << "ReconstructionTrace ";
+		else if (_multigridProlong == CAMGProlongation::ChainedCoarseningProlongations)
+			os << "Chained coarsening prolongations ";
 		else if (_multigridProlong == CAMGProlongation::FaceProlongation)
 			os << "FaceProlongation ";
 		else if (_multigridProlong == CAMGProlongation::ReconstructTraceOrInject)
 			os << "ReconstructTraceOrInject ";
+		else if (_multigridProlong == CAMGProlongation::ReconstructSmoothedTraceOrInject)
+			os << "ReconstructSmoothedTraceOrInject ";
 		os << "[-prolong " << (unsigned)_multigridProlong << "]" << endl;
 	}
 
@@ -866,7 +972,7 @@ public:
 protected:
 	Level* CreateCoarseLevel(Level* fineLevel) override
 	{
-		CondensedLevel* coarseLevel = new CondensedLevel(fineLevel->Number + 1, _cellBlockSize, _faceBlockSize, _strongCouplingThreshold, _faceProlong, _multigridProlong);
+		CondensedLevel* coarseLevel = new CondensedLevel(fineLevel->Number + 1, _cellBlockSize, _faceBlockSize, _strongCouplingThreshold, _faceProlong, _coarseningProlong, _multigridProlong);
 		coarseLevel->OperatorMatrix = &dynamic_cast<CondensedLevel*>(fineLevel)->Ac;
 		return coarseLevel;
 	}

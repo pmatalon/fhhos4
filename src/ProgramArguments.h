@@ -37,8 +37,10 @@ struct MultigridArguments
 	int ProlongationCode = 0;
 	Prolongation GMGProlong = Prolongation::Default;
 	int FaceProlongationCode = 0;
+	int CoarseningProlongationCode = 0;
 	CAMGFaceProlongation CAMGFaceProlong = CAMGFaceProlongation::BoundaryAggregatesInteriorAverage;
-	CAMGProlongation CAMGProlong = CAMGProlongation::ReconstructTraceOrInject;
+	CAMGProlongation CAMGCoarseningProlong = CAMGProlongation::FaceProlongation;
+	CAMGProlongation CAMGMultigridProlong = CAMGProlongation::ReconstructTraceOrInject;
 	int MatrixMaxSizeForCoarsestLevel = 1000;
 	char CycleLetter = 'V';
 	int WLoops = 1;
