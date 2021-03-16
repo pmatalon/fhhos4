@@ -80,11 +80,12 @@ enum class CAMGProlongation : unsigned
 	ReconstructionTrace = 1,
 	ChainedCoarseningProlongations = 2,
 	FaceProlongation = 3,
-	ReconstructionTranspose2Steps = 4,
+	FaceProlongationAndInteriorSmoothing = 4,
 	ReconstructTraceOrInject = 5,
 	ReconstructSmoothedTraceOrInject = 6,
 	FindInteriorThatReconstructs = 7,
-	HighOrder = 8
+	HighOrder = 8,
+	ReconstructionTranspose2Steps = 9
 };
 
 enum class CAMGFaceProlongation : unsigned

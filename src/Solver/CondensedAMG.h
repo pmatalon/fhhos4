@@ -333,8 +333,7 @@ public:
 
 
 
-	SparseMatrix* BuildProlongation(CAMGProlongation prolong, HybridAlgebraicMesh& mesh, const SparseMatrix& schur,
-									HybridAlgebraicMesh& coarseMesh,
+	SparseMatrix* BuildProlongation(CAMGProlongation prolong, HybridAlgebraicMesh& mesh, const SparseMatrix& schur, HybridAlgebraicMesh& coarseMesh,
 									const SparseMatrix& Q_T, SparseMatrix* Q_F)
 	{
 		SparseMatrix* P;
@@ -353,20 +352,26 @@ public:
 			// -g 1 -prolong 3 -face-prolong 3 -cs z
 			P = Q_F;
 		}
-		else if (prolong == CAMGProlongation::ReconstructionTranspose2Steps) // 4
+		else if (prolong == CAMGProlongation::FaceProlongationAndInteriorSmoothing) // 4
 		{
-			/*SparseMatrix inv_A_T_T1 = Utils::InvertBlockDiagMatrix(A_T_T1, _cellBlockSize);
-			// Theta: reconstruction from the coarse faces to the coarse cells
-			SparseMatrix Theta1 = -inv_A_T_T1 * A_T_F1;
-			// Pi: transpose of Theta
-			SparseMatrix inv_A_T_T = Utils::InvertBlockDiagMatrix(*A_T_T, _cellBlockSize);
-			SparseMatrix Theta = -inv_A_T_T * *A_T_F;
-			SparseMatrix P1 = Theta.transpose() * Q_T1 * Theta1;
+			BlockJacobi blockJacobi(_faceBlockSize, 2.0 / 3.0);
+			blockJacobi.Setup(schur);
+			SparseMatrix J = blockJacobi.IterationMatrix(); // Smoothing
 
-			this->inv_A_T_Tc = new SparseMatrix(Utils::InvertBlockDiagMatrix(A_T_Tc, _cellBlockSize));
-			SparseMatrix Theta2 = -(*inv_A_T_Tc) * A_T_Fc;
-			SparseMatrix P2 = Theta1.transpose() * Q_T2 * Theta2;
-			this->P = P1 * P2;*/
+			SparseMatrix smoothedQ_F = J * (*Q_F);
+
+			NumberParallelLoop<CoeffsChunk> parallelLoop(mesh.Faces.size());
+			parallelLoop.ReserveChunkCoeffsSize(_faceBlockSize * 2 * _faceBlockSize);
+			parallelLoop.Execute([this, &smoothedQ_F, &Q_F, &mesh](BigNumber faceNumber, ParallelChunk<CoeffsChunk>* chunk)
+				{
+					const HybridAlgebraicFace* face = &mesh.Faces[faceNumber];
+					if (face->IsRemovedOnCoarseMesh)
+						chunk->Results.Coeffs.CopyRows(faceNumber*_faceBlockSize, _faceBlockSize, smoothedQ_F);
+					else
+						chunk->Results.Coeffs.CopyRows(faceNumber*_faceBlockSize, _faceBlockSize, *Q_F);
+				});
+			P = new SparseMatrix(Q_F->rows(), Q_F->cols());
+			parallelLoop.Fill(*P);
 		}
 		else if (prolong == CAMGProlongation::ReconstructTraceOrInject) // 5
 		{
@@ -579,6 +584,21 @@ public:
 				});
 			P = new SparseMatrix(Q_F->rows(), Q_F->cols());
 			parallelLoop.Fill(*P);
+		}
+		else if (prolong == CAMGProlongation::ReconstructionTranspose2Steps) // 9
+		{
+			/*SparseMatrix inv_A_T_T1 = Utils::InvertBlockDiagMatrix(A_T_T1, _cellBlockSize);
+			// Theta: reconstruction from the coarse faces to the coarse cells
+			SparseMatrix Theta1 = -inv_A_T_T1 * A_T_F1;
+			// Pi: transpose of Theta
+			SparseMatrix inv_A_T_T = Utils::InvertBlockDiagMatrix(*A_T_T, _cellBlockSize);
+			SparseMatrix Theta = -inv_A_T_T * *A_T_F;
+			SparseMatrix P1 = Theta.transpose() * Q_T1 * Theta1;
+
+			this->inv_A_T_Tc = new SparseMatrix(Utils::InvertBlockDiagMatrix(A_T_Tc, _cellBlockSize));
+			SparseMatrix Theta2 = -(*inv_A_T_Tc) * A_T_Fc;
+			SparseMatrix P2 = Theta1.transpose() * Q_T2 * Theta2;
+			this->P = P1 * P2;*/
 		}
 		else
 			Utils::FatalError("Unmanaged prolongation");
