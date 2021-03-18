@@ -248,7 +248,7 @@ public:
 		if (coarseningStgy == CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
 			return nCoarseningsPerformed == 1; // only 1 pass of coarsening
 		if (coarseningStgy == CoarseningStrategy::MultipleAgglomerationCoarseningByFaceNeighbours)
-			return coarseningRatio >= requestedCoarseningRatio; // only 1 pass of coarsening
+			return coarseningRatio >= requestedCoarseningRatio;
 		return nCoarseningsPerformed == 1;
 	}
 
@@ -919,7 +919,7 @@ public:
 		this->_multigridProlong = mgProlong;
 		this->BlockSizeForBlockSmoothers = faceBlockSize;
 		this->UseGalerkinOperator = true;
-		this->CoarseningStgy = CoarseningStrategy::DoublePairwiseAggregation;
+		this->CoarseningStgy = CoarseningStrategy::MultiplePairwiseAggregation;
 		this->FaceCoarseningStgy = FaceCoarseningStrategy::InterfaceCollapsing;
 		this->_fineLevel = new CondensedLevel(0, cellBlockSize, faceBlockSize, strongCouplingThreshold, faceProlong, coarseningProlong, mgProlong);
 	}
@@ -979,6 +979,10 @@ public:
 		fine->A_F_F = &A_F_F;
 		SparseMatrix* inv_A_T_T = new SparseMatrix(Utils::InvertBlockDiagMatrix(A_T_T, _cellBlockSize));
 		fine->inv_A_T_T = inv_A_T_T;
+
+		if (Utils::IsRefinementStrategy(this->CoarseningStgy))
+			this->CoarseningStgy = CoarseningStrategy::MultiplePairwiseAggregation;
+
 		Multigrid::Setup(A);
 	}
 

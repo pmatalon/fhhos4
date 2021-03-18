@@ -307,6 +307,13 @@ public:
 	{
 	}
 
+	void Setup(const SparseMatrix& A) override
+	{
+		if (Utils::IsRefinementStrategy(this->CoarseningStgy))
+			this->CoarseningStgy = CoarseningStrategy::DoublePairwiseAggregation;
+		Multigrid::Setup(A);
+	}
+
 	Vector Solve(const Vector& b, string initialGuessCode) override
 	{
 		if (initialGuessCode.compare("smooth") == 0)
