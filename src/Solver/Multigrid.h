@@ -50,7 +50,7 @@ public:
 
 	bool CanOptimizeResidualComputation() override
 	{
-		return this->_fineLevel->PostSmoother->CanOptimizeResidualComputation();
+		return this->_nLevels > 1 && this->_fineLevel->PostSmoother->CanOptimizeResidualComputation();
 	}
 
 protected:
