@@ -212,23 +212,16 @@ public:
 						return n1.second < n2.second; // Sort by ascending coupling
 					});
 
-				double elemKappa = this->DiffusionCoeff(elem);
 				for (auto it = elem.Neighbours.begin(); it != elem.Neighbours.end(); ++it)
 				{
 					HybridAlgebraicElement* neighbour = it->first;
 					double coupling = it->second;
 					if (IsStronglyCoupled(elem, coupling))
 					{
-						double neighbourKappa = this->DiffusionCoeff(*neighbour);
-						double minKappa = min(elemKappa, neighbourKappa);
-						double maxKappa = max(elemKappa, neighbourKappa);
-						if (maxKappa / minKappa < 10)
-						{
-							elem.StrongNeighbours.push_back(neighbour);
-							neighbour->Mutex.lock();
-							neighbour->NElementsIAmStrongNeighbourOf++;
-							neighbour->Mutex.unlock();
-						}
+						elem.StrongNeighbours.push_back(neighbour);
+						neighbour->Mutex.lock();
+						neighbour->NElementsIAmStrongNeighbourOf++;
+						neighbour->Mutex.unlock();
 					}
 					else
 						break;
@@ -385,13 +378,19 @@ private:
 
 	double CouplingValue(const HybridAlgebraicElement& e1, const HybridAlgebraicElement& e2, const HybridAlgebraicFace& f)
 	{
-		/*DenseMatrix e1Block = A_T_T->block(e1.Number*_cellBlockSize, e1.Number*_cellBlockSize, _cellBlockSize, _cellBlockSize);
-		double kappa1 = e1Block(0, 0);
-		DenseMatrix e2Block = A_T_T->block(e2.Number*_cellBlockSize, e2.Number*_cellBlockSize, _cellBlockSize, _cellBlockSize);
-		double kappa2 = e2Block(0, 0);*/
 		DenseMatrix couplingBlock = A_T_F->block(e1.Number*_cellBlockSize, f.Number*_faceBlockSize, _cellBlockSize, _faceBlockSize);
 		double coupling = couplingBlock.trace();
-		return /*kappa1/kappa2* */coupling;
+
+		//double e1Kappa = this->DiffusionCoeff(e1);
+		//double e2Kappa = this->DiffusionCoeff(e2);
+		double e1Kappa = abs(coupling);
+		DenseMatrix couplingBlock2 = A_T_F->block(e2.Number*_cellBlockSize, f.Number*_faceBlockSize, _cellBlockSize, _faceBlockSize);
+		double e2Kappa = abs(couplingBlock2.trace());
+
+		double minKappa = min(e1Kappa, e2Kappa);
+		double maxKappa = max(e1Kappa, e2Kappa);
+
+		return coupling * (minKappa / maxKappa);
 	}
 
 	bool IsStronglyCoupled(const HybridAlgebraicElement& e, double coupling)
@@ -399,12 +398,12 @@ private:
 		return coupling < 0 && coupling < _strongCouplingThreshold * e.Neighbours[0].second;
 	}
 
-	double DiffusionCoeff(const HybridAlgebraicElement& e)
+	/*double DiffusionCoeff(const HybridAlgebraicElement& e)
 	{
 		DenseMatrix elemBlock = A_T_T->block(e.Number*_cellBlockSize, e.Number*_cellBlockSize, _cellBlockSize, _cellBlockSize);
 		double kappa = elemBlock(0, 0);
 		return kappa;
-	}
+	}*/
 
 	HybridAlgebraicFace* StrongestNeighbour(const HybridAlgebraicFace& f, vector<const HybridAlgebraicFace*> tabooList = {})
 	{
