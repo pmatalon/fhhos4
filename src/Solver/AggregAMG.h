@@ -162,6 +162,9 @@ private:
 
 	SparseMatrix GalerkinOperator(const SparseMatrix& A, const AlgebraicMesh& mesh)
 	{
+		if (this->_blockSize > 1)
+			Utils::FatalError("The computation of the Galerkin operator has not been developed for a blockSize > 1.");
+
 		// Formula (2.3) of Notay's 2010 paper
 		NonZeroCoefficients coeffs(A.nonZeros());
 		for (BigNumber k = 0; k < A.rows(); k++)

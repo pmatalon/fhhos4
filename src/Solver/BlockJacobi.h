@@ -130,6 +130,7 @@ public:
 	SparseMatrix IterationMatrix()
 	{
 		const SparseMatrix& A = *this->Matrix;
+		// J = I - omega * D^-1 * A
 		NonZeroCoefficients coeffs(A.nonZeros());
 
 		DenseMatrix oneMinusOmegaIdentity = (1 - _omega)*DenseMatrix::Identity(_blockSize, _blockSize);

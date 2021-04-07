@@ -34,6 +34,9 @@ public:
 	CondensedLevel(int number, int cellBlockSize, int faceBlockSize, double strongCouplingThreshold, CAMGFaceProlongation faceProlong, CAMGProlongation coarseningProlong, CAMGProlongation mgProlong)
 		: Level(number)
 	{
+		if (cellBlockSize > 1 || faceBlockSize > 1)
+			Utils::Warning("This multigrid is efficient if cellBlockSize = faceBlockSize = 1. It may converge badly.");
+
 		this->_cellBlockSize = cellBlockSize;
 		this->_faceBlockSize = faceBlockSize;
 		this->_strongCouplingThreshold = strongCouplingThreshold;
