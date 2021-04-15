@@ -9,6 +9,7 @@
 #include "2D/SquareCornerSquareTestCase.h"
 #include "2D/SquareCenterSquareTestCase.h"
 #include "2D/SquareHolesTestCase.h"
+#include "2D/RoomWithWallTestCase.h"
 #include "2D/EDFTestCase.h"
 #include "2D/MagnetismTestCase.h"
 #include "3D/CubeTestCase.h"
@@ -32,7 +33,7 @@ TestCase<1>* TestCaseFactory<1>::Create(ProblemArguments pb)
 	if (pb.TestCaseCode.compare("heterog") == 0)
 		return new Heterogeneity1DTestCase(pb);
 
-	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 3D. Check -tc argument.");
+	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 1D. Check -tc argument.");
 }
 
 template <>
@@ -60,8 +61,10 @@ TestCase<2>* TestCaseFactory<2>::Create(ProblemArguments pb)
 		return new EDFTestCase(pb);
 	if (pb.TestCaseCode.compare("magnetism") == 0)
 		return new MagnetismTestCase(pb);
+	if (pb.TestCaseCode.compare("roomwithwall") == 0)
+		return new RoomWithWallTestCase(pb);
 
-	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 3D. Check -tc argument.");
+	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 2D. Check -tc argument.");
 }
 
 template <>

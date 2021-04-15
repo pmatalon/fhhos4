@@ -226,6 +226,7 @@
     <ClInclude Include="src\TestCases\2D\EDFTestCase.h" />
     <ClInclude Include="src\TestCases\2D\KelloggTestCase.h" />
     <ClInclude Include="src\TestCases\2D\MagnetismTestCase.h" />
+    <ClInclude Include="src\TestCases\2D\RoomWithWallTestCase.h" />
     <ClInclude Include="src\TestCases\2D\SquareCenterSquareTestCase.h" />
     <ClInclude Include="src\TestCases\2D\SquareCornerSquareTestCase.h" />
     <ClInclude Include="src\TestCases\2D\SquareTestCase.h" />

@@ -453,6 +453,9 @@
     <ClInclude Include="src\Solver\EigenSparseCholesky.h">
       <Filter>Solver</Filter>
     </ClInclude>
+    <ClInclude Include="src\TestCases\2D\RoomWithWallTestCase.h">
+      <Filter>TestCases\2D</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
