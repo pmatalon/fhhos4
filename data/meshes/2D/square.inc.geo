@@ -3,7 +3,7 @@ L = 1;
 
 // Corners
 Point(1) = {0, 0, 0, h};
-Point(2) = {L, 0, 0, h};
+Point(2) = {L, 0, 0, h_ref};
 Point(3) = {L, L, 0, h};
 Point(4) = {0, L, 0, h};
 

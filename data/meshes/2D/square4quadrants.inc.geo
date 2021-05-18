@@ -1,5 +1,6 @@
 L = 1; // size of the square
 // h is defined in the files that include this one
+// h_center
 
 // Corners
 Point(1) = {0, 0, 0, h};
@@ -7,7 +8,7 @@ Point(2) = {L, 0, 0, h};
 Point(3) = {0, L, 0, h};
 Point(4) = {L, L, 0, h};
 // Center
-Point(5) = {L/2, L/2, 0, h};
+Point(5) = {L/2, L/2, 0, h_center};
 // Middle edges
 Point(6) = {L/2, 0, 0, h};
 Point(7) = {0, L/2, 0, h};
