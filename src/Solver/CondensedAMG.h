@@ -949,7 +949,7 @@ public:
 			os << "ReconstructTraceOrInject ";
 		else if (_coarseningProlong == CAMGProlongation::ReconstructSmoothedTraceOrInject)
 			os << "ReconstructSmoothedTraceOrInject ";
-		os << "[-prolong " << (unsigned)_coarseningProlong << "]" << endl;
+		os << "[-coarsening-prolong " << (unsigned)_coarseningProlong << "]" << endl;
 
 		os << "\t" << "Multigrid prolongation  : ";
 		if (_multigridProlong == CAMGProlongation::ReconstructionTrace)

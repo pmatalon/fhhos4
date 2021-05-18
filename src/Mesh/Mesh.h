@@ -837,7 +837,7 @@ public:
 				string color = phyColors.at(e->PhysicalPart);//colors[e->PhysicalPart->Id % colors.size()];
 				s.PlotPolygon(e->Shape()->Vertices(), color);
 			}
-			s.PlotText(e->Center(), to_string(e->Number));
+			//s.PlotText(e->Center(), to_string(e->Number));
 		}
 
 		for (Face<Dim>* f : this->Faces)
