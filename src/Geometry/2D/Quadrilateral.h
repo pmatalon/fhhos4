@@ -128,13 +128,12 @@ public:
 	}
 	inline bool Contains(const DomPoint& p) const override
 	{
-		assert(false && "Not implemented");
+		Utils::FatalError("Method Contains() not implemented in class Quadrilateral");
 	}
 
 	void RefineWithoutCoarseOverlap(const vector<PhysicalShape<1>*>& doNotCross) override
 	{
-		assert(false && "Not implemented");
-		Utils::FatalError("TO BE IMPLEMENTED");
+		Utils::FatalError("Method RefineWithoutCoarseOverlap() not implemented in class Quadrilateral");
 	}
 
 	double DetJacobian(const RefPoint& p) const override

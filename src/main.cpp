@@ -1069,7 +1069,7 @@ int main(int argc, char* argv[])
 	//                  Solver                  //
 	//------------------------------------------//
 
-	if (args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("fcgmg") == 0)
+	if (args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("fcgmg") == 0 || args.Solver.SolverCode.compare("p_mg") == 0)
 		args.Solver.MG.GMGProlong = static_cast<Prolongation>(args.Solver.MG.ProlongationCode);
 	else if (args.Solver.SolverCode.compare("camg") == 0 || args.Solver.SolverCode.compare("fcgcamg") == 0)
 	{
@@ -1108,7 +1108,7 @@ int main(int argc, char* argv[])
 	//                Multigrid                 //
 	//------------------------------------------//
 
-	if (args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("fcgmg") == 0)
+	if (args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("fcgmg") == 0 || args.Solver.SolverCode.compare("p_mg") == 0)
 	{
 		if (args.Discretization.Method.compare("dg") == 0)
 			argument_error("Multigrid only applicable on HHO discretization.");
@@ -1133,8 +1133,10 @@ int main(int argc, char* argv[])
 			{
 				if (args.Solver.MG.GMGProlong == Prolongation::Default)
 				{
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::IndependentRemeshing;
-					args.Solver.MG.GMGProlong = Prolongation::CellInterp_FinerApproxL2proj_Trace;
+					if (args.Discretization.Mesher.compare("inhouse") == 0)
+						args.Solver.MG.CoarseningStgy = CoarseningStrategy::StandardCoarsening;
+					else
+						args.Solver.MG.CoarseningStgy = CoarseningStrategy::IndependentRemeshing;
 				}
 				else if (Utils::RequiresNestedHierarchy(args.Solver.MG.GMGProlong))
 					args.Solver.MG.CoarseningStgy = CoarseningStrategy::GMSHSplittingRefinement;
@@ -1145,6 +1147,8 @@ int main(int argc, char* argv[])
 			{
 				if (args.Discretization.Mesher.compare("inhouse") == 0 && args.Discretization.MeshCode.compare("tetra") == 0)
 					args.Solver.MG.CoarseningStgy = CoarseningStrategy::BeyRefinement;
+				else if (args.Discretization.Mesher.compare("inhouse") == 0 && args.Discretization.MeshCode.compare("cart") == 0)
+					args.Solver.MG.CoarseningStgy = CoarseningStrategy::StandardCoarsening;
 				else
 					args.Solver.MG.CoarseningStgy = CoarseningStrategy::IndependentRemeshing;
 			}
