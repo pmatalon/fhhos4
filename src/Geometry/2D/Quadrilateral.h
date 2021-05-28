@@ -2,6 +2,7 @@
 #include "../../Mesh/Vertex.h"
 #include "../ReferenceCartesianShape.h"
 #include "../PhysicalShape.h"
+#include "Triangle.h"
 using namespace std;
 
 class Quadrilateral : public PhysicalShape<2>
@@ -70,11 +71,15 @@ public:
 		b2 = 0.25 * (-v1.Y - v2.Y + v3.Y + v4.Y);
 		b3 = 0.25 * ( v1.Y - v2.Y + v3.Y - v4.Y);
 
-		// Sometimes a3 or b3 can be really small, but not zero. Then we set it to zero be tested in ConvertToReference()
+		// Sometimes a coefficient can be really small, but not zero. Then we set it to zero to be tested in ConvertToReference()
 		if (abs(a3 / _measure) < 1e-10)
 			a3 = 0;
 		if (abs(b3 / _measure) < 1e-10)
 			b3 = 0;
+		if (abs(a2 / _measure) < 1e-10)
+			a2 = 0;
+		if (abs(b2 / _measure) < 1e-10)
+			b2 = 0;
 	}
 
 	PhysicalShape<2>* CreateCopy() const
@@ -128,7 +133,7 @@ public:
 	}
 	inline bool Contains(const DomPoint& p) const override
 	{
-		Utils::FatalError("Method Contains() not implemented in class Quadrilateral");
+		return Triangle::TriangleContains(v1, v2, v3, p, _measure / 2) || Triangle::TriangleContains(v3, v4, v1, p, _measure / 2);
 	}
 
 	void RefineWithoutCoarseOverlap(const vector<PhysicalShape<1>*>& doNotCross) override
@@ -186,8 +191,25 @@ public:
 
 		if (a3 == 0 && b3 == 0)
 		{
-			t = (b2 * x0 - a2 * y0) / (b2 * a1 - a2 * b1);
-			u = (y0 - b1 * t) / b2;
+			// x0 = a1*t + a2*u
+			// y0 = b1*t + b2*u
+			if (a2 == 0)
+			{
+				assert(b2 != 0);
+				t = x0 / a1;
+				u = (y0 - b1 * t) / b2;
+			}
+			else if (b2 == 0)
+			{
+				assert(a2 != 0);
+				t = y0 / b1;
+				u = (x0 - a1 * t) / a2;
+			}
+			else
+			{
+				t = (b2 * x0 - a2 * y0) / (b2 * a1 - a2 * b1);
+				u = (y0 - b1 * t) / b2;
+			}
 		}
 		else
 		{
@@ -225,6 +247,7 @@ public:
 		}
 		//if (abs(t) > 1.1 || abs(u) > 1.1)
 			//assert(false && "The point is not included in the quadrilateral");
+		assert(!std::isnan(t) && !std::isnan(u));
 		return RefPoint(t, u);
 	}
 

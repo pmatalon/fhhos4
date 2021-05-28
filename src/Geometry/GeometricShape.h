@@ -100,6 +100,12 @@ public:
 		for (int degree = 0; degree < 5; degree++)
 		{
 			double integral = Integral(refOne, degree);
+			if (integral < 0)
+			{
+				assert(false);
+				Utils::Error("The integral of the function 1 over the element negative. The vertices are probably stored in the wrong order. Verify how the geometry or the mesh is built.");
+				break;
+			}
 			if (abs(integral - measure) > Utils::Eps*measure)
 			{
 				assert(false);

@@ -388,8 +388,7 @@ private:
 		}
 
 
-		vector<int> elementTypes;
-		elementTypes.clear();
+		set<int> meshElementTypes;
 
 		map<int, size_t> elementsAlreadyInMemory; // the key (int) is the GMSH elemType
 
@@ -397,6 +396,7 @@ private:
 		{
 			int entityTag = entitiesDimTags[k].second;
 
+			// Get physical group of this entity
 			vector<int> physicalTags;
 			gmsh::model::getPhysicalGroupsForEntity(Dim, entityTag, physicalTags);
 			if (!this->PhysicalParts.empty() && physicalTags.empty())
@@ -420,10 +420,13 @@ private:
 			}
 
 			// Get elements in this entity
-			elementTypes.clear();
+			vector<int> entityElementTypes;
 			vector<vector<size_t>> elementTags;
 			vector<vector<size_t>> elemNodeTags;
-			gmsh::model::mesh::getElements(elementTypes, elementTags, elemNodeTags, Dim, entityTag);
+			gmsh::model::mesh::getElements(entityElementTypes, elementTags, elemNodeTags, Dim, entityTag);
+
+			for (int elemType : entityElementTypes)
+				meshElementTypes.insert(elemType);
 
 			struct ChunkResult
 			{
@@ -432,9 +435,9 @@ private:
 				double regularity = 2;
 			};
 
-			for (size_t i = 0; i < elementTypes.size(); i++)
+			for (size_t i = 0; i < entityElementTypes.size(); i++)
 			{
-				int elemType = elementTypes[i];
+				int elemType = entityElementTypes[i];
 				vector<size_t> elements = elementTags[i];
 				vector<size_t> elementNodes = elemNodeTags[i];
 
@@ -492,11 +495,8 @@ private:
 
 		// Create all the faces
 		BigNumber faceNumber = 0;
-		for (int i = 0; i < elementTypes.size(); i++)
-		{
-			int elemType = elementTypes[i];
+		for (int elemType : meshElementTypes)
 			CreateFaces(elemType, faceNumber);
-		}
 
 		// Affectation of the physical boundaries
 		if (!this->BoundaryParts.empty())
@@ -1139,7 +1139,7 @@ Element<2>* GMSHMesh<2>::CreateElement(int elemType, const vector<size_t>& eleme
 		e = &_triangularElements[start + elemIndex];
 	}
 	else
-		assert(false && "GMSH element type not managed.");
+		Utils::FatalError("GMSH element type not managed.");
 	return e;
 }
 

@@ -396,7 +396,8 @@ protected:
 		if (!this->DirichletFaces.empty() || !this->NeumannFaces.empty())
 			return;
 
-		assert(!this->BoundaryFaces.empty());
+		if (this->BoundaryFaces.empty())
+			Utils::FatalError("No boundary faces!");
 
 		for (Face<Dim>* f : this->BoundaryFaces)
 		{

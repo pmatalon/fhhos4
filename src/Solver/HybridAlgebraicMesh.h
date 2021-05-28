@@ -161,6 +161,9 @@ public:
 							elem.Faces.push_back(face);
 					}
 				}
+
+				if (elem.Faces.empty())
+					Utils::Error("Element " + to_string(elemNumber) + " has no face (no non-zero coefficient in row " + to_string(elemNumber) + " of A_TF)");
 			});
 
 		//-------------------------//
