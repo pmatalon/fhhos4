@@ -11,6 +11,7 @@
 #include "2D/SquareHolesTestCase.h"
 #include "2D/RoomWithWallTestCase.h"
 #include "2D/EDFTestCase.h"
+#include "2D/HybridMeshTestCase.h"
 #include "2D/MagnetismTestCase.h"
 #include "3D/CubeTestCase.h"
 #include "3D/PlateWith4HolesTestCase.h"
@@ -33,7 +34,7 @@ TestCase<1>* TestCaseFactory<1>::Create(ProblemArguments pb)
 	if (pb.TestCaseCode.compare("heterog") == 0)
 		return new Heterogeneity1DTestCase(pb);
 
-	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 1D. Check -tc argument.");
+	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 1D. Check -tc argument or use '-tc default'.");
 }
 
 template <>
@@ -59,12 +60,14 @@ TestCase<2>* TestCaseFactory<2>::Create(ProblemArguments pb)
 		return new SquareHolesTestCase(pb);
 	if (pb.TestCaseCode.compare("edf") == 0)
 		return new EDFTestCase(pb);
+	if (pb.TestCaseCode.compare("hybridmesh") == 0)
+		return new HybridMeshTestCase(pb);
 	if (pb.TestCaseCode.compare("magnetism") == 0)
 		return new MagnetismTestCase(pb);
 	if (pb.TestCaseCode.compare("roomwithwall") == 0)
 		return new RoomWithWallTestCase(pb);
 
-	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 2D. Check -tc argument.");
+	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 2D. Check -tc argument or use '-tc default'.");
 }
 
 template <>
@@ -77,5 +80,5 @@ TestCase<3>* TestCaseFactory<3>::Create(ProblemArguments pb)
 	if (pb.TestCaseCode.compare("platewith4holes") == 0)
 		return new PlateWith4HolesTestCase(pb);
 
-	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 3D. Check -tc argument.");
+	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 3D. Check -tc argument or use '-tc default'.");
 }

@@ -456,6 +456,7 @@
     <ClInclude Include="src\TestCases\2D\RoomWithWallTestCase.h">
       <Filter>TestCases\2D</Filter>
     </ClInclude>
+    <ClInclude Include="src\TestCases\2D\HybridMeshTestCase.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

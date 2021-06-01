@@ -66,11 +66,11 @@ public:
 				this->K1 = k;
 			else
 			{
-				bool homogeneous = *k == *this->K1;
+				bool sameTensors = *k == *this->K1;
 
-				if (!this->K2 && !homogeneous)
+				if (!this->K2 && !sameTensors)
 					this->K2 = k;
-				if (!homogeneous)
+				if (!sameTensors && k->LargestEigenValue != this->K1->LargestEigenValue)
 					this->IsHomogeneous = false;
 			}
 
