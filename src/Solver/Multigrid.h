@@ -13,6 +13,7 @@ private:
 	int _nLevels;
 	NonZeroCoefficients _cycleSchema; // used only for drawing the cycle in the console
 public:
+	MGType MultigridType = MGType::h_Multigrid;
 	Solver* CoarseSolver = nullptr;
 	char Cycle = 'V';
 	int WLoops = 1; // 1 --> V-cycle, >= 2 --> W-cycle 
@@ -29,21 +30,32 @@ public:
 	CoarseningStrategy CoarseningStgy = CoarseningStrategy::StandardCoarsening;
 	FaceCoarseningStrategy FaceCoarseningStgy = FaceCoarseningStrategy::InterfaceCollapsing;
 	double CoarseningFactor = 2;
+	int CoarsePolyDegree = 1; // used in p-Multigrid
 	bool ExportComponents = false;
 	bool DoNotCreateLevels = false;
 
-	Multigrid(int nLevels) : IterativeSolver()
+	Multigrid(MGType multigridType, int nLevels) : IterativeSolver()
 	{
-		this->_automaticNumberOfLevels = nLevels <= 0;
-
-		if (this->_automaticNumberOfLevels)
+		this->MultigridType = multigridType;
+		if (multigridType == MGType::h_Multigrid)
 		{
-			this->_nLevels = 0;
-			this->MatrixMaxSizeForCoarsestLevel = 1000;
+			this->_automaticNumberOfLevels = nLevels <= 0;
+
+			if (this->_automaticNumberOfLevels)
+			{
+				this->_nLevels = 0;
+				this->MatrixMaxSizeForCoarsestLevel = 1000;
+			}
+			else
+			{
+				this->_nLevels = nLevels;
+				this->MatrixMaxSizeForCoarsestLevel = 0;
+			}
 		}
 		else
 		{
-			this->_nLevels = nLevels;
+			this->_automaticNumberOfLevels = true;
+			this->_nLevels = 0;
 			this->MatrixMaxSizeForCoarsestLevel = 0;
 		}
 	}
@@ -71,6 +83,9 @@ public:
 
 		cout << "Setup..." << endl;
 
+		if (!this->_fineLevel)
+			this->_fineLevel = this->CreateFineLevel();
+
 		this->_fineLevel->OperatorMatrix = &A;
 		this->_fineLevel->PreSmoother = this->_fineLevel->CreateSmoother(PreSmootherCode, PreSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
 		this->_fineLevel->PostSmoother = this->_fineLevel->CreateSmoother(PostSmootherCode, PostSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
@@ -84,12 +99,16 @@ public:
 		double fineNNZ = (double)this->_fineLevel->OperatorMatrix->nonZeros();
 		double gridComplexity = 0;
 		double fineNUnknowns = (double)this->_fineLevel->NUnknowns();
-		while ((_automaticNumberOfLevels && currentLevel->NUnknowns() > MatrixMaxSizeForCoarsestLevel) || (levelNumber < _nLevels - 1))
+
+		while (CoarseLevelNeeded(currentLevel, levelNumber))
 		{
-			// Can we coarsen the mesh?
-			currentLevel->CoarsenMesh(this->CoarseningStgy, this->FaceCoarseningStgy, this->CoarseningFactor, noCoarserMeshProvided, coarsestPossibleMeshReached);
-			if (noCoarserMeshProvided || coarsestPossibleMeshReached)
-				break;
+			if (MultigridType == MGType::h_Multigrid)
+			{
+				// Can we coarsen the mesh?
+				currentLevel->CoarsenMesh(this->CoarseningStgy, this->FaceCoarseningStgy, this->CoarseningFactor, noCoarserMeshProvided, coarsestPossibleMeshReached);
+				if (noCoarserMeshProvided || coarsestPossibleMeshReached)
+					break;
+			}
 
 			// Build coarse level
 			levelNumber++;
@@ -116,8 +135,10 @@ public:
 			else
 				assert(false);
 
-			coarseLevel->PreSmoother = coarseLevel->CreateSmoother(PreSmootherCode, preSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
-			coarseLevel->PostSmoother = coarseLevel->CreateSmoother(PostSmootherCode, postSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
+
+			int blockSize = MultigridType == MGType::h_Multigrid ? BlockSizeForBlockSmoothers : coarseLevel->BlockSizeForBlockSmoothers();
+			coarseLevel->PreSmoother  = coarseLevel->CreateSmoother( PreSmootherCode,  preSmoothingIterations, blockSize, RelaxationParameter);
+			coarseLevel->PostSmoother = coarseLevel->CreateSmoother(PostSmootherCode, postSmoothingIterations, blockSize, RelaxationParameter);
 
 			coarseLevel->UseGalerkinOperator = UseGalerkinOperator;
 			coarseLevel->ExportComponents = ExportComponents;
@@ -166,6 +187,7 @@ public:
 		if (noCoarserMeshProvided)
 			Utils::Warning("cannot define a lower level because no coarser mesh has been provided.");
 
+		this->InitializeCoarseSolver();
 		this->SetupCoarseSolver();
 
 		/*if (this->Cycle == 'K')
@@ -190,17 +212,24 @@ public:
 	}
 
 protected:
+	virtual Level* CreateFineLevel() const
+	{
+		assert(false && "Not implemented. This method must be implemented in the subclass.");
+	}
 	virtual Level* CreateCoarseLevel(Level* fineLevel)
 	{
 		assert(false && "Not implemented. This method must be implemented in the subclass.");
 	}
 
+	virtual void InitializeCoarseSolver()
+	{
+		if (!this->CoarseSolver)
+			this->CoarseSolver = new EigenSparseLU();
+	}
+
 	void SetupCoarseSolver()
 	{
 		cout << "\t\tSetup coarse solver..." << endl;
-
-		if (this->CoarseSolver == nullptr)
-			this->CoarseSolver = new EigenSparseLU();
 
 		Level* level = this->_fineLevel;
 		while (level->CoarserLevel != nullptr)
@@ -210,6 +239,15 @@ protected:
 	}
 
 private:
+
+	bool CoarseLevelNeeded(Level* currentLevel, int levelNumber)
+	{
+		if (MultigridType == MGType::h_Multigrid)
+			return (_automaticNumberOfLevels && currentLevel->NUnknowns() > MatrixMaxSizeForCoarsestLevel) || (levelNumber < _nLevels - 1);
+		else if (MultigridType == MGType::p_Multigrid)
+			return currentLevel->PolynomialDegree() > CoarsePolyDegree;
+		assert(false);
+	}
 
 	IterationResult ExecuteOneIteration(const Vector& b, Vector& x, bool& xEquals0, bool computeResidual, bool computeAx, const IterationResult& oldResult) override
 	{
@@ -439,60 +477,66 @@ public:
 			os << "," << CoarseLevelChangeSmoothingOperator << CoarseLevelChangeSmoothingCoeff;
 		os << ")" << endl;
 
-		os << "\t" << "Levels                  : ";
-		if (_automaticNumberOfLevels && _nLevels == 0)
-			os << "automatic coarsening until matrix size <= " << MatrixMaxSizeForCoarsestLevel << endl;
-		else if (_automaticNumberOfLevels && _nLevels > 0)
-			os << _nLevels << " (automatic)" << endl;
-		else
-			os << _nLevels << endl;
+		if (MultigridType == MGType::h_Multigrid)
+		{
+			os << "\t" << "Levels                  : ";
+			if (_automaticNumberOfLevels && _nLevels == 0)
+				os << "automatic coarsening until matrix size <= " << MatrixMaxSizeForCoarsestLevel << endl;
+			else if (_automaticNumberOfLevels && _nLevels > 0)
+				os << _nLevels << " (automatic)" << endl;
+			else
+				os << _nLevels << endl;
 
-		os << "\t" << "Coarsening strategy     : ";
-		if (CoarseningStgy == CoarseningStrategy::StandardCoarsening)
-			os << "standard [-cs s]" << endl;
-		else if (CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
-			os << "GMSH refinement by splitting from coarse mesh [-cs r]" << endl;
-		else if (CoarseningStgy == CoarseningStrategy::BeyRefinement)
-			os << "Bey's refinement from coarse mesh [-cs b]" << endl;
-		else if (CoarseningStgy == CoarseningStrategy::IndependentRemeshing)
-			os << "independant remeshing [-cs m]" << endl;
-		else if (CoarseningStgy == CoarseningStrategy::DoublePairwiseAggregation)
-			os << "double pairwise aggregation [-cs dpa]" << endl;
-		else if (CoarseningStgy == CoarseningStrategy::MultiplePairwiseAggregation)
-			os << "multiple pairwise aggregation [-cs mpa -coarsening-factor " << Utils::ProgramArgs.Solver.MG.CoarseningFactor << "]" << endl;
-		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
-			os << "agglomeration by face neighbours [-cs n]" << endl;
-		else if (CoarseningStgy == CoarseningStrategy::MultipleAgglomerationCoarseningByFaceNeighbours)
-			os << "multiple agglomeration by face neighbours [-cs mn -coarsening-factor " << Utils::ProgramArgs.Solver.MG.CoarseningFactor << "]" << endl;
-		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByMostCoplanarFaces)
-			os << "agglomeration by most coplanar faces [-cs mcf]" << endl;
-		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter)
-			os << "agglomeration by closest element center [-cs cc]" << endl;
-		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByClosestFace)
-			os << "agglomeration by closest face center [-cs clf]" << endl;
-		else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface)
-			os << "agglomeration by largest interface [-cs li]" << endl;
-		else if (CoarseningStgy == CoarseningStrategy::FaceCoarsening)
-			os << "face coarsening [-cs f]" << endl;
-		else
-			os << "unknown" << endl;
+			os << "\t" << "Coarsening strategy     : ";
+			if (CoarseningStgy == CoarseningStrategy::StandardCoarsening)
+				os << "standard [-cs s]" << endl;
+			else if (CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
+				os << "GMSH refinement by splitting from coarse mesh [-cs r]" << endl;
+			else if (CoarseningStgy == CoarseningStrategy::BeyRefinement)
+				os << "Bey's refinement from coarse mesh [-cs b]" << endl;
+			else if (CoarseningStgy == CoarseningStrategy::IndependentRemeshing)
+				os << "independant remeshing [-cs m]" << endl;
+			else if (CoarseningStgy == CoarseningStrategy::DoublePairwiseAggregation)
+				os << "double pairwise aggregation [-cs dpa]" << endl;
+			else if (CoarseningStgy == CoarseningStrategy::MultiplePairwiseAggregation)
+				os << "multiple pairwise aggregation [-cs mpa -coarsening-factor " << Utils::ProgramArgs.Solver.MG.CoarseningFactor << "]" << endl;
+			else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
+				os << "agglomeration by face neighbours [-cs n]" << endl;
+			else if (CoarseningStgy == CoarseningStrategy::MultipleAgglomerationCoarseningByFaceNeighbours)
+				os << "multiple agglomeration by face neighbours [-cs mn -coarsening-factor " << Utils::ProgramArgs.Solver.MG.CoarseningFactor << "]" << endl;
+			else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByMostCoplanarFaces)
+				os << "agglomeration by most coplanar faces [-cs mcf]" << endl;
+			else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter)
+				os << "agglomeration by closest element center [-cs cc]" << endl;
+			else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByClosestFace)
+				os << "agglomeration by closest face center [-cs clf]" << endl;
+			else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface)
+				os << "agglomeration by largest interface [-cs li]" << endl;
+			else if (CoarseningStgy == CoarseningStrategy::FaceCoarsening)
+				os << "face coarsening [-cs f]" << endl;
+			else
+				os << "unknown" << endl;
 
-		os << "\t" << "Face coarsening strategy: ";
-		if (Utils::IsRefinementStrategy(CoarseningStgy) || CoarseningStgy == CoarseningStrategy::IndependentRemeshing)
-			os << "NA" << endl;
-		else if (FaceCoarseningStgy == FaceCoarseningStrategy::None)
-			os << "none" << endl;
-		else if (FaceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsing)
-			os << "interface collapsing [-fcs c]" << endl;
-		else if (FaceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsingAndTryAggregInteriorToInterfaces)
-			os << "interface collapsing and try aggregate interior faces too [-fcs i]" << endl;
-		else
-			os << "unknown" << endl;
+			os << "\t" << "Face coarsening strategy: ";
+			if (Utils::IsRefinementStrategy(CoarseningStgy) || CoarseningStgy == CoarseningStrategy::IndependentRemeshing)
+				os << "NA" << endl;
+			else if (FaceCoarseningStgy == FaceCoarseningStrategy::None)
+				os << "none" << endl;
+			else if (FaceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsing)
+				os << "interface collapsing [-fcs c]" << endl;
+			else if (FaceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsingAndTryAggregInteriorToInterfaces)
+				os << "interface collapsing and try aggregate interior faces too [-fcs i]" << endl;
+			else
+				os << "unknown" << endl;
+		}
 
-		Smoother* preSmoother = this->_fineLevel->CreateSmoother(PreSmootherCode, PreSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
-		Smoother* postSmoother = this->_fineLevel->CreateSmoother(PostSmootherCode, PostSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
+		//Level* level = this->CreateFineLevel();
+		Smoother* preSmoother = SmootherFactory::Create(PreSmootherCode, PreSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
+		Smoother* postSmoother = SmootherFactory::Create(PostSmootherCode, PostSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
 		os << "\t" << "Pre-smoothing           : " << *preSmoother << endl;
 		os << "\t" << "Post-smoothing          : " << *postSmoother;
+		os.flush();
+		//delete level;
 		delete preSmoother;
 		delete postSmoother;
 		if (PreSmootherCode.compare("bj") == 0 || PostSmootherCode.compare("bj") == 0)
@@ -503,7 +547,11 @@ public:
 		if (this->CoarseSolver)
 		{
 			os << endl;
-			os << "\t" << "Coarse solver           : " << (*this->CoarseSolver);
+			os << "\t" << "Coarse solver           : ";
+			Multigrid* coarseMG = dynamic_cast<Multigrid*>(this->CoarseSolver);
+			if (coarseMG)
+				os << endl << "\t------------------------" << endl << "\t";
+			os << (*this->CoarseSolver);
 		}
 
 		EndSerialize(cout);

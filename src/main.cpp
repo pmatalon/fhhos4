@@ -154,6 +154,7 @@ void print_usage() {
 	cout << "      - Multigrid methods:" << endl;
 	cout << "              agmg         - Yvan Notay's AGMG solver" << endl;
 	cout << "              mg           - Custom multigrid for HHO" << endl;
+	cout << "              p_mg         - p-Multigrid to be used on top of mg" << endl;
 	cout << "              camg         - Condensed AMG (for hybrid discretizations with static condensation)" << endl;
 	cout << "              aggregamg    - In-house implementation of AGMG, without the outer Krylov iteration. Meant to be used with K-cycle and with FCG." << endl;
 	cout << "              hoaggregamg  - Algebraic p-multigrid on top of aggregamg" << endl;
@@ -279,37 +280,37 @@ void print_usage() {
 	cout << "-prolong NUM" << endl;
 	cout << "      How the prolongation operator is built." << endl;
 	cout << "      Values for the geometric multigrid for HHO:" << endl;
-	cout << "              " << (unsigned)Prolongation::CellInterp_Trace << "  - ";
+	cout << "              " << (unsigned)GMGProlongation::CellInterp_Trace << "  - ";
 	cout <<                    "Step 1: Interpolation from coarse faces to coarse cells (refer to -cell-interp argument)" << endl;
 	cout << "                   Step 2: Trace on the fine faces" << endl;
-	cout << "              " << (unsigned)Prolongation::CellInterp_InjectAndTrace << "  - ";
+	cout << "              " << (unsigned)GMGProlongation::CellInterp_InjectAndTrace << "  - ";
 	cout <<                    "Step 1: Interpolation from coarse faces to coarse cells (refer to -cell-interp argument)" << endl;
 	cout << "                   Step 2: On faces present on both fine and coarse meshes, we keep the polynomials identical." << endl;
 	cout << "                           On faces interior to coarse elements, trace of the cell polynomials." << endl;
-	cout << "              " << (unsigned)Prolongation::CellInterp_Inject_Adjoint << "  - ";
+	cout << "              " << (unsigned)GMGProlongation::CellInterp_Inject_Adjoint << "  - ";
 	cout <<                    "Step 1: Interpolation from coarse faces to coarse cells (refer to -cell-interp argument)" << endl;
 	cout << "                   Step 2: Canonical injection from coarse to fine cells" << endl;
 	cout << "                   Step 3: Adjoint of the cell interpolation on the fine mesh" << endl;
-	cout << "              " << (unsigned)Prolongation::Wildey << "  - ";
+	cout << "              " << (unsigned)GMGProlongation::Wildey << "  - ";
 	cout <<                    "Algorithm from Wildey et al.: the coarse level is built by static condensation of the fine faces interior to coarse elements." << endl;
 	cout << "                   The prolongation solves those condensed unknowns." << endl;
 	cout << "                   To reproduce Wildey et al.'s algorithm, this option should be used with '-g 1 -cycle V,1,1,*2'." << endl;
-	cout << "              " << (unsigned)Prolongation::FaceInject << "  - ";
+	cout << "              " << (unsigned)GMGProlongation::FaceInject << "  - ";
 	cout <<                    "Canonical injection from coarse faces to fine faces (implemented to be used with option -cs f)." << endl;
-	cout << "              " << (unsigned)Prolongation::CellInterp_Inject_Trace << "  - ";
+	cout << "              " << (unsigned)GMGProlongation::CellInterp_Inject_Trace << "  - ";
 	cout <<                    "Same as 1, but another implementation:" << endl;
 	cout << "                   Step 1: Interpolation from coarse faces to coarse cells (refer to -cell-interp argument)" << endl;
 	cout << "                   Step 2: Canonical injection from coarse to fine cells" << endl;
 	cout << "                   Step 3: Trace on the fine faces" << endl;
-	cout << "              " << (unsigned)Prolongation::CellInterp_L2proj_Trace << "  - ";
-	cout <<                    "Non-nested variant of " << (unsigned)Prolongation::CellInterp_Trace << " and " << (unsigned)Prolongation::CellInterp_Inject_Trace << ":" << endl;
+	cout << "              " << (unsigned)GMGProlongation::CellInterp_L2proj_Trace << "  - ";
+	cout <<                    "Non-nested variant of " << (unsigned)GMGProlongation::CellInterp_Trace << " and " << (unsigned)GMGProlongation::CellInterp_Inject_Trace << ":" << endl;
 	cout << "                   Step 1: Interpolation from coarse faces to coarse cells (refer to -cell-interp argument)" << endl;
 	cout << "                   Step 2: L2-projection onto the fine cells" << endl;
 	cout << "                   Step 3: Trace on the fine faces" << endl;
-	cout << "              " << (unsigned)Prolongation::CellInterp_ApproxL2proj_Trace << "  - ";
-	cout <<                    "Variant of " << (unsigned)Prolongation::CellInterp_L2proj_Trace << " where the L2-projection is not computed exactly but has the same approximation properties." << endl;
-	cout << "              " << (unsigned)Prolongation::CellInterp_FinerApproxL2proj_Trace << "  - ";
-	cout <<                    "Variant of " << (unsigned)Prolongation::CellInterp_ApproxL2proj_Trace << " where the L2-projection is better approximated (by subtriangulation of the elements)." << endl;
+	cout << "              " << (unsigned)GMGProlongation::CellInterp_ApproxL2proj_Trace << "  - ";
+	cout <<                    "Variant of " << (unsigned)GMGProlongation::CellInterp_L2proj_Trace << " where the L2-projection is not computed exactly but has the same approximation properties." << endl;
+	cout << "              " << (unsigned)GMGProlongation::CellInterp_FinerApproxL2proj_Trace << "  - ";
+	cout <<                    "Variant of " << (unsigned)GMGProlongation::CellInterp_ApproxL2proj_Trace << " where the L2-projection is better approximated (by subtriangulation of the elements)." << endl;
 	cout << "      Values for CondensedAMG:" << endl;
 	cout << "              " << (unsigned)CAMGProlongation::ChainedCoarseningProlongations << "  - ";
 	cout <<                    "chained coarsening prolongations (use -coarsening-prolong to select)" << endl;
@@ -445,6 +446,7 @@ int main(int argc, char* argv[])
 
 	bool defaultCycle = true;
 	bool defaultCoarseOperator = true;
+	bool defaultCoarseSolver = true;
 
 	ProgramArguments args;
 	args.OutputDirectory = FileSystem::RootPath() + "/out";
@@ -881,6 +883,7 @@ int main(int argc, char* argv[])
 			}
 			case OPT_CoarseSolver:
 			{
+				defaultCoarseSolver = false;
 				string code = optarg;
 				args.Solver.MG.CoarseSolverCode = code;
 				break;
@@ -1070,7 +1073,7 @@ int main(int argc, char* argv[])
 	//------------------------------------------//
 
 	if (args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("fcgmg") == 0 || args.Solver.SolverCode.compare("p_mg") == 0)
-		args.Solver.MG.GMGProlong = static_cast<Prolongation>(args.Solver.MG.ProlongationCode);
+		args.Solver.MG.GMGProlong = static_cast<GMGProlongation>(args.Solver.MG.ProlongationCode);
 	else if (args.Solver.SolverCode.compare("camg") == 0 || args.Solver.SolverCode.compare("fcgcamg") == 0)
 	{
 		if (args.Solver.MG.ProlongationCode == 0)
@@ -1087,7 +1090,7 @@ int main(int argc, char* argv[])
 		if (args.Discretization.Method.compare("hho") == 0 && args.Discretization.StaticCondensation && args.Problem.Dimension > 1)
 		{
 			args.Solver.SolverCode = "mg";
-			if ((args.Solver.MG.GMGProlong == Prolongation::Wildey || args.Solver.MG.GMGProlong == Prolongation::FaceInject) && !args.Solver.MG.UseGalerkinOperator)
+			if ((args.Solver.MG.GMGProlong == GMGProlongation::Wildey || args.Solver.MG.GMGProlong == GMGProlongation::FaceInject) && !args.Solver.MG.UseGalerkinOperator)
 			{
 				Utils::Warning("The multigrid with prolongation code " + to_string((unsigned)args.Solver.MG.GMGProlong) + " requires the Galerkin operator. Option -g 0 ignored.");
 				args.Solver.MG.UseGalerkinOperator = true;
@@ -1116,22 +1119,25 @@ int main(int argc, char* argv[])
 		if (!args.Discretization.StaticCondensation)
 			argument_error("Multigrid only applicable if the static condensation is enabled.");
 
-		if (args.Solver.MG.GMGProlong == Prolongation::Wildey && !args.Solver.MG.UseGalerkinOperator)
-			argument_error("To use the prolongationCode " + to_string((unsigned)Prolongation::Wildey) + ", you must also use the Galerkin operator. To do so, add option -g 1.");
+		if (args.Solver.MG.GMGProlong == GMGProlongation::Wildey && !args.Solver.MG.UseGalerkinOperator)
+			argument_error("To use the prolongationCode " + to_string((unsigned)GMGProlongation::Wildey) + ", you must also use the Galerkin operator. To do so, add option -g 1.");
 
 		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::FaceCoarsening && !args.Solver.MG.UseGalerkinOperator)
 			argument_error("To use the face coarsening, you must also use the Galerkin operator. To do so, add option -g 1.");
 
 		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::IndependentRemeshing && 
 			Utils::RequiresNestedHierarchy(args.Solver.MG.GMGProlong) &&
-			args.Solver.MG.GMGProlong != Prolongation::Default)
-			argument_error("The coarsening by independent remeshing is only applicable with the non-nested versions of the multigrid (-prolong " + to_string((unsigned)Prolongation::CellInterp_L2proj_Trace) + ", " + to_string((unsigned)Prolongation::CellInterp_ApproxL2proj_Trace) + " or " + to_string((unsigned)Prolongation::CellInterp_FinerApproxL2proj_Trace) + ").");
+			args.Solver.MG.GMGProlong != GMGProlongation::Default)
+			argument_error("The coarsening by independent remeshing is only applicable with the non-nested versions of the multigrid (-prolong " + to_string((unsigned)GMGProlongation::CellInterp_L2proj_Trace) + ", " + to_string((unsigned)GMGProlongation::CellInterp_ApproxL2proj_Trace) + " or " + to_string((unsigned)GMGProlongation::CellInterp_FinerApproxL2proj_Trace) + ").");
+
+		if (args.Solver.SolverCode.compare("p_mg") == 0 && defaultCoarseSolver)
+			args.Solver.MG.CoarseSolverCode = "mg";
 
 		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::None)
 		{
 			if (args.Problem.Dimension < 3)
 			{
-				if (args.Solver.MG.GMGProlong == Prolongation::Default)
+				if (args.Solver.MG.GMGProlong == GMGProlongation::Default)
 				{
 					if (args.Discretization.Mesher.compare("inhouse") == 0)
 						args.Solver.MG.CoarseningStgy = CoarseningStrategy::StandardCoarsening;
@@ -1154,12 +1160,12 @@ int main(int argc, char* argv[])
 			}
 		}
 
-		if (args.Solver.MG.GMGProlong == Prolongation::Default)
+		if (args.Solver.MG.GMGProlong == GMGProlongation::Default)
 		{
 			if (Utils::BuildsNestedMeshHierarchy(args.Solver.MG.CoarseningStgy))
-				args.Solver.MG.GMGProlong = Prolongation::CellInterp_Trace;
+				args.Solver.MG.GMGProlong = GMGProlongation::CellInterp_Trace;
 			else
-				args.Solver.MG.GMGProlong = Prolongation::CellInterp_FinerApproxL2proj_Trace;
+				args.Solver.MG.GMGProlong = GMGProlongation::CellInterp_FinerApproxL2proj_Trace;
 		}
 
 		if (defaultCycle)

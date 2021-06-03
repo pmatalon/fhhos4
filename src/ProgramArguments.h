@@ -35,7 +35,7 @@ struct MultigridArguments
 {
 	int Levels = 0;
 	int ProlongationCode = 0;
-	Prolongation GMGProlong = Prolongation::Default;
+	GMGProlongation GMGProlong = GMGProlongation::Default;
 	int FaceProlongationCode = 0;
 	int CoarseningProlongationCode = 0;
 	CAMGFaceProlongation CAMGFaceProlong = CAMGFaceProlongation::BoundaryAggregatesInteriorAverage;
@@ -90,6 +90,7 @@ struct ActionsArguments
 	bool ExportSourceToGMSH = false;
 	bool LogAssembly = true;
 	bool AssembleRightHandSide = true;
+	bool InitReferenceShapes = true;
 	bool UnitTests = false;
 	bool GMSHLogEnabled = false;
 };

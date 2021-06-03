@@ -291,14 +291,13 @@ private:
 public:
 
 	AggregAMG(int blockSize, double strongCouplingThreshold, int nLevels = 0)
-		: Multigrid(nLevels)
+		: Multigrid(MGType::h_Multigrid, nLevels)
 	{
 		this->_blockSize = blockSize;
 		this->_strongCouplingThreshold = strongCouplingThreshold;
 		this->BlockSizeForBlockSmoothers = blockSize;
 		this->UseGalerkinOperator = true;
 		this->CoarseningStgy = CoarseningStrategy::DoublePairwiseAggregation;
-		this->_fineLevel = new AggregLevel(0, blockSize, strongCouplingThreshold);
 	}
 
 	void BeginSerialize(ostream& os) const override
@@ -325,6 +324,11 @@ public:
 	}
 	
 protected:
+	Level* CreateFineLevel() const override
+	{
+		return new AggregLevel(0, _blockSize, _strongCouplingThreshold);
+	}
+
 	Level* CreateCoarseLevel(Level* fineLevel) override
 	{
 		AggregLevel* coarseLevel = new AggregLevel(fineLevel->Number + 1, _blockSize, _strongCouplingThreshold);

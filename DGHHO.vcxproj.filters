@@ -459,6 +459,9 @@
     <ClInclude Include="src\TestCases\2D\HybridMeshTestCase.h">
       <Filter>TestCases\2D</Filter>
     </ClInclude>
+    <ClInclude Include="src\Solver\P_MultigridForHHO.h">
+      <Filter>Solver</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

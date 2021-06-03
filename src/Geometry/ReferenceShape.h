@@ -5,13 +5,8 @@ template <int Dim>
 class ReferenceShape : public GeometricShape<Dim>
 {
 private:
-	DenseMatrix _massMatrix1;
-	FunctionalBasis<Dim>* _massMatrix1Basis = nullptr;
-
-	DenseMatrix _massMatrix2;
-	FunctionalBasis<Dim>* _massMatrix2Basis = nullptr;
-
-	DenseMatrix _cellReconstructMassMatrix;
+	map<FunctionalBasis<Dim>*, DenseMatrix> _massMatrices;
+	map<FunctionalBasis<Dim>*, DenseMatrix> _cellReconstructMatrices;
 
 public:
 	ReferenceShape() {}
@@ -47,7 +42,8 @@ public:
 
 	double MassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
 	{
-		return this->_massMatrix1(phi1->LocalNumber, phi2->LocalNumber);
+		assert(_massMatrices.size() == 1);
+		_massMatrices.begin()->second(phi1->LocalNumber, phi2->LocalNumber);
 	}
 
 	//---------//
@@ -56,39 +52,30 @@ public:
 
 	const DenseMatrix& StoredMassMatrix(FunctionalBasis<Dim>* basis) const
 	{
-		if (basis == _massMatrix1Basis)
-			return _massMatrix1;
-		else if (basis == _massMatrix2Basis)
-			return _massMatrix2;
+		auto it = _massMatrices.find(basis);
+		if (it != _massMatrices.end())
+			return it->second;
 		assert(false && "The mass matrix for this basis should be computed once and stored for this reference element.");
 	}
 
-	const DenseMatrix& StoredCellReconstructMassMatrix() const
+	const DenseMatrix& StoredCellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) const
 	{
-		assert(_cellReconstructMassMatrix.rows() > 0 && "The cell-reconstruct mass matrix should be computed once and stored for this reference element.");
-		return _cellReconstructMassMatrix;
+		auto it = _cellReconstructMatrices.find(cellBasis);
+		if (it != _cellReconstructMatrices.end())
+			return it->second;
+		assert(false && "The cell-reconstruct mass matrix should be computed once and stored for this reference element.");
 	}
 
 	void ComputeAndStoreMassMatrix(FunctionalBasis<Dim>* basis)
 	{
-		if (!_massMatrix1Basis)
-		{
-			_massMatrix1 = this->ComputeAndReturnMassMatrix(basis);
-			_massMatrix1Basis = basis;
-		}
-		else if (!_massMatrix2Basis)
-		{
-			_massMatrix2 = this->ComputeAndReturnMassMatrix(basis);
-			_massMatrix2Basis = basis;
-		}
-		else
-			assert(false && "Only 2 mass matrices can be stored.");
+		if (_massMatrices.find(basis) == _massMatrices.end())
+			_massMatrices[basis] = this->ComputeAndReturnMassMatrix(basis);
 	}
 	
 	void ComputeAndStoreCellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis)
 	{
-		assert(_cellReconstructMassMatrix.rows() == 0 && "The cellReconstructMassMatrix is already computed.");
-		_cellReconstructMassMatrix = this->ComputeAndReturnMassMatrix(cellBasis, reconstructBasis);
+		if (_cellReconstructMatrices.find(cellBasis) == _cellReconstructMatrices.end())
+			_cellReconstructMatrices[cellBasis] = this->ComputeAndReturnMassMatrix(cellBasis, reconstructBasis);
 	}
 
 };

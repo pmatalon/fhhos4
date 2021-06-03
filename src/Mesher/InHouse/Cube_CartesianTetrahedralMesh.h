@@ -161,6 +161,11 @@ public:
 		this->FinalizeCoarsening();
 	}
 
+	Mesh<3>* Copy() override
+	{
+		return new Cube_CartesianTetrahedralMesh(_cartMesh->Nx);
+	}
+
 	~Cube_CartesianTetrahedralMesh()
 	{
 		if (!this->FineMesh)

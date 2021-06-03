@@ -99,16 +99,17 @@ class HighOrderAggregAMG : public Multigrid
 private:
 	int _blockSize;
 	double _strongCouplingThreshold;
+	double _omega;
 public:
 
 	HighOrderAggregAMG(int blockSize, double strongCouplingThreshold, double omega, int nLevels = 0)
-		: Multigrid(nLevels)
+		: Multigrid(MGType::h_Multigrid, nLevels)
 	{
 		this->_blockSize = blockSize;
 		this->_strongCouplingThreshold = strongCouplingThreshold;
+		this->_omega = omega;
 		this->BlockSizeForBlockSmoothers = blockSize;
 		this->UseGalerkinOperator = true;
-		this->_fineLevel = new HighOrderAggregLevel(0, blockSize, omega);
 	}
 
 	void BeginSerialize(ostream& os) const override
@@ -128,6 +129,11 @@ public:
 	}
 	
 protected:
+	Level* CreateFineLevel() const override
+	{
+		return new HighOrderAggregLevel(0, _blockSize, _omega);
+	}
+
 	Level* CreateCoarseLevel(Level* fineLevel) override
 	{
 		//AggregLevel* coarseLevel = new AggregLevel(fineLevel->Number + 1, 1, _strongCouplingThreshold);

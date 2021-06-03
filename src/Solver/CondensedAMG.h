@@ -912,7 +912,7 @@ private:
 public:
 
 	CondensedAMG(int cellBlockSize, int faceBlockSize, double strongCouplingThreshold, CAMGFaceProlongation faceProlong, CAMGProlongation coarseningProlong, CAMGProlongation mgProlong, int nLevels = 0)
-		: Multigrid(nLevels)
+		: Multigrid(MGType::h_Multigrid, nLevels)
 	{
 		this->_cellBlockSize = cellBlockSize;
 		this->_faceBlockSize = faceBlockSize;
@@ -924,7 +924,6 @@ public:
 		this->UseGalerkinOperator = true;
 		this->CoarseningStgy = CoarseningStrategy::MultiplePairwiseAggregation;
 		this->FaceCoarseningStgy = FaceCoarseningStrategy::InterfaceCollapsing;
-		this->_fineLevel = new CondensedLevel(0, cellBlockSize, faceBlockSize, strongCouplingThreshold, faceProlong, coarseningProlong, mgProlong);
 	}
 
 	void BeginSerialize(ostream& os) const override
@@ -976,6 +975,7 @@ public:
 
 	void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F) override
 	{
+		this->_fineLevel = this->CreateFineLevel();
 		CondensedLevel* fine = dynamic_cast<CondensedLevel*>(this->_fineLevel);
 		fine->A_T_T = &A_T_T;
 		fine->A_T_F = &A_T_F;
@@ -997,6 +997,11 @@ public:
 	}
 	
 protected:
+	Level* CreateFineLevel() const override
+	{
+		return new CondensedLevel(0, _cellBlockSize, _faceBlockSize, _strongCouplingThreshold, _faceProlong, _coarseningProlong, _multigridProlong);
+	}
+
 	Level* CreateCoarseLevel(Level* fineLevel) override
 	{
 		CondensedLevel* coarseLevel = new CondensedLevel(fineLevel->Number + 1, _cellBlockSize, _faceBlockSize, _strongCouplingThreshold, _faceProlong, _coarseningProlong, _multigridProlong);

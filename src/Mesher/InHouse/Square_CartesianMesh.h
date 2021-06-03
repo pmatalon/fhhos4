@@ -11,7 +11,6 @@ using namespace std;
 
 class Square_CartesianMesh : public PolyhedralMesh<2>
 {
-private:
 public:
 	BigNumber Nx;
 	BigNumber Ny;
@@ -453,6 +452,11 @@ public:
 			}
 		}
 		this->FinalizeCoarsening();
+	}
+
+	Mesh<2>* Copy() override
+	{
+		return new Square_CartesianMesh(this->Nx, this->Ny, this->With4Quadrants);
 	}
 
 };

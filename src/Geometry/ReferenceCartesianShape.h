@@ -11,8 +11,6 @@ private:
 	DenseMatrix _stiffnessMatrix;
 
 	// For HHO
-	DenseMatrix _cellStiffnessMatrix;
-
 	DenseMatrix _reconstructK1StiffnessMatrix;
 	Tensor<Dim>* _K1;
 	DenseMatrix _reconstructK2StiffnessMatrix;
@@ -94,11 +92,6 @@ public:
 			return this->ComputeIntegralKGradGrad(K, phi1, phi2);
 	}
 
-	void ComputeAndStoreCellStiffnessMatrix(FunctionalBasis<Dim>* basis)
-	{
-		if (_cellStiffnessMatrix.rows() == 0)
-			_cellStiffnessMatrix = ComputeAndReturnStiffnessMatrix(basis);
-	}
 	void ComputeAndStoreReconstructK1StiffnessMatrix(Tensor<Dim>* K, FunctionalBasis<Dim>* basis)
 	{
 		assert(K);

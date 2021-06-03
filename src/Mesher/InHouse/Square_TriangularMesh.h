@@ -477,4 +477,8 @@ public:
 			assert(cf->FinerFaces.size() == 2);
 	}
 
+	Mesh<2>* Copy() override
+	{
+		return new Square_TriangularMesh(this->Nx, this->Ny, this->With4Quadrants);
+	}
 };

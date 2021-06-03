@@ -237,6 +237,16 @@ public:
 		return approximate;
 	}
 
+	FunctionalBasis<Dim> CreateSameBasisForDegree(int degree)
+	{
+		return FunctionalBasis<Dim>(this->_basisCode, degree, this->UsePolynomialSpaceQ);
+	}
+
+	FunctionalBasis<Dim> CreateSameBasisForLowerDegree()
+	{
+		return CreateSameBasisForDegree(this->_maxPolynomialDegree - 1);
+	}
+
 	virtual ~FunctionalBasis() 
 	{
 		for (auto phi : LocalFunctions)

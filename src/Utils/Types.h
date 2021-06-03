@@ -33,6 +33,12 @@ enum class BoundaryConditionType : unsigned
 	Neumann = 2
 };
 
+enum class MGType : unsigned
+{
+	h_Multigrid,
+	p_Multigrid
+};
+
 enum class CoarseningStrategy : unsigned
 {
 	None,
@@ -61,7 +67,7 @@ enum class FaceCoarseningStrategy : unsigned
 	InterfaceCollapsingAndTryAggregInteriorToInterfaces
 };
 
-enum class Prolongation : unsigned
+enum class GMGProlongation : unsigned
 {
 	Default = 0,
 	CellInterp_Trace = 1,

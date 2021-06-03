@@ -101,7 +101,7 @@ public:
 
 	DenseMatrix CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) const override
 	{
-		return DetJacobian() * this->RefShape()->StoredCellReconstructMassMatrix();
+		return DetJacobian() * this->RefShape()->StoredCellReconstructMassMatrix(cellBasis, reconstructBasis);
 	}
 
 	//---------------------------------------------------------------------//

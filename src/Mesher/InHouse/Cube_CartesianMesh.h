@@ -320,4 +320,10 @@ private:
 	{
 		return iz * Ny*Nx + iy * Nx + ix;
 	}
+
+public:
+	Mesh<3>* Copy() override
+	{
+		return new Cube_CartesianMesh(this->Nx, this->Ny, this->Nz);
+	}
 };

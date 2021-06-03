@@ -87,4 +87,9 @@ public:
 	{
 		return -1;
 	}
+
+	Mesh<1>* Copy() override
+	{
+		return new UniformMesh1D(this->N);
+	}
 };

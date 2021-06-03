@@ -431,22 +431,33 @@ private:
 		{
 			if (args.Discretization.StaticCondensation)
 			{
-				Diffusion_HHO<Dim>* hhoProblem = dynamic_cast<Diffusion_HHO<Dim>*>(problem);
-
-				FunctionalBasis<Dim>* cellInterpolationBasis;
-				if (args.Solver.MG.CellInterpolationCode == 1)
-					cellInterpolationBasis = hhoProblem->HHO->ReconstructionBasis;
-				else if (args.Solver.MG.CellInterpolationCode == 2)
-					cellInterpolationBasis = hhoProblem->HHO->CellBasis;
-				else
-					assert(false);
-
-				MultigridForHHO<Dim>* mg = new MultigridForHHO<Dim>(hhoProblem, args.Solver.MG.GMGProlong, cellInterpolationBasis, args.Solver.MG.WeightCode, args.Solver.MG.Levels);
+				MultigridForHHO<Dim>* mg = new MultigridForHHO<Dim>(args.Solver.MG.Levels);
+				mg->CellInterpolationCode = args.Solver.MG.CellInterpolationCode;
+				mg->Prolongation = args.Solver.MG.GMGProlong;
+				mg->WeightCode = args.Solver.MG.WeightCode;
+				if (problem)
+				{
+					Diffusion_HHO<Dim>* hhoProblem = dynamic_cast<Diffusion_HHO<Dim>*>(problem);
+					mg->InitializeWithProblem(hhoProblem);
+				}
 				SetMultigridParameters(mg, args, blockSize);
 				solver = mg;
 			}
 			else
 				Utils::FatalError("The Multigrid for HHO (-s mg) only applicable on HHO discretization with static condensation.");
+		}
+		else if (args.Solver.SolverCode.compare("p_mg") == 0)
+		{
+			if (args.Discretization.StaticCondensation)
+			{
+				Diffusion_HHO<Dim>* hhoProblem = dynamic_cast<Diffusion_HHO<Dim>*>(problem);
+
+				P_MultigridForHHO<Dim>* mg = new P_MultigridForHHO<Dim>(hhoProblem);
+				SetMultigridParameters(mg, args, blockSize);
+				solver = mg;
+			}
+			else
+				Utils::FatalError("The Multigrid for HHO only applicable on HHO discretization with static condensation.");
 		}
 		else if (args.Solver.SolverCode.compare("camg") == 0)
 		{
@@ -505,13 +516,22 @@ private:
 		// Coarse solver
 		ProgramArguments argsCoarseSolver;
 		argsCoarseSolver.Solver.SolverCode = args.Solver.MG.CoarseSolverCode;
-		argsCoarseSolver.Solver.MaxIterations = 200;
 		argsCoarseSolver.Solver.Tolerance = args.Solver.Tolerance;
 		argsCoarseSolver.Solver.PrintIterationResults = false;
 		if (Utils::EndsWith(args.Solver.MG.CoarseSolverCode, "aggregamg"))
 		{
 			argsCoarseSolver.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours;
 			argsCoarseSolver.Solver.MG.CycleLetter = 'K';
+		}
+		else if (args.Solver.MG.CoarseSolverCode.compare("mg") == 0 || args.Solver.MG.CoarseSolverCode.compare("fcgmg") == 0)
+		{
+			argsCoarseSolver.Solver.MaxIterations = 1;
+			argsCoarseSolver.Solver.MG.GMGProlong = args.Solver.MG.GMGProlong;
+			argsCoarseSolver.Solver.MG.FaceProlongationCode = args.Solver.MG.FaceProlongationCode;
+			argsCoarseSolver.Solver.MG.CoarseningStgy = args.Solver.MG.CoarseningStgy;
+			argsCoarseSolver.Solver.MG.FaceCoarseningStgy = args.Solver.MG.FaceCoarseningStgy;
+			argsCoarseSolver.Solver.MG.PreSmoothingIterations = 0;
+			argsCoarseSolver.Solver.MG.PostSmoothingIterations = Dim == 2 ? 3 : 6;
 		}
 		mg->CoarseSolver = CreateSolver(argsCoarseSolver, nullptr, 1);
 	}

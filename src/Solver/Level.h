@@ -85,11 +85,17 @@ public:
 
 			cout << "\t\tPreSmoothing        : "; cout.flush();
 			PreSmoother->Setup(A);
-			cout << PreSmoother->Iterations() << " iteration" << (PreSmoother->Iterations() > 1 ? "s" : "") <<  endl;
+			if (PreSmoother->Iterations() == 0)
+				cout << "none" << endl;
+			else
+				cout << PreSmoother->Iterations() << " iteration" << (PreSmoother->Iterations() > 1 ? "s" : "") << " of " << (*PreSmoother) << endl;
 
 			cout << "\t\tPostSmoothing       : "; cout.flush();
 			PostSmoother->Setup(A);
-			cout << PostSmoother->Iterations() << " iteration" << (PostSmoother->Iterations() > 1 ? "s" : "") << endl;
+			if (PostSmoother->Iterations() == 0)
+				cout << "none" << endl;
+			else
+				cout << PostSmoother->Iterations() << " iteration" << (PostSmoother->Iterations() > 1 ? "s" : "") << " of " << (*PostSmoother) << endl;
 		}
 
 		if (ExportComponents)
@@ -143,10 +149,23 @@ public:
 			return this->OperatorMatrix->rows();
 		else if (!this->IsFinestLevel())
 			return this->FinerLevel->P.cols();
-		assert(false && "NUnknowns() should be overriden");
+		assert(false && "Level::NUnknowns() must be overridden to use this level");
 	}
 
-	virtual void CoarsenMesh(CoarseningStrategy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) = 0;
+	virtual int PolynomialDegree()
+	{
+		assert(false && "Level::PolynomialDegree() must be overridden to use this level in a p-multigrid");
+	}
+
+	virtual int BlockSizeForBlockSmoothers()
+	{
+		assert(false && "Level::BlockSizeForBlockSmoothers() must be overridden to use this level in a p-multigrid");
+	}
+
+	virtual void CoarsenMesh(CoarseningStrategy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached)
+	{
+		assert(false && "Level::CoarsenMesh() must be overridden to use this level in an h-multigrid");
+	}
 
 	virtual void ExportVector(const Vector& v, string suffix, int levelNumber) = 0;
 	virtual void ExportMatrix(const SparseMatrix& M, string suffix, int levelNumber) = 0;
