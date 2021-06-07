@@ -72,7 +72,7 @@ enum class GMGProlongation : unsigned
 	Default = 0,
 	CellInterp_Trace = 1,
 	CellInterp_Inject_Trace = 6,
-	CellInterp_L2proj_Trace = 7,
+	CellInterp_ExactL2proj_Trace = 7,
 	CellInterp_ApproxL2proj_Trace = 8,
 	CellInterp_FinerApproxL2proj_Trace = 9,
 	CellInterp_InjectAndTrace = 2,

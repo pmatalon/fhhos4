@@ -182,7 +182,7 @@ private:
 
 			P = Pi_f * J_f_c * I_c;
 		}
-		else if (_prolongation == GMGProlongation::CellInterp_L2proj_Trace)
+		else if (_prolongation == GMGProlongation::CellInterp_ExactL2proj_Trace)
 		{
 			//---------------------------------------------------------------------//
 			//                      Non-nested variant                             //
@@ -887,8 +887,8 @@ public:
 			os << "coarse cell interpolation + trace/proj. on fine faces ";
 		else if (Prolongation == GMGProlongation::CellInterp_Inject_Trace)
 			os << "coarse cell interpolation + injection coarse to fine cells + trace on fine faces ";
-		else if (Prolongation == GMGProlongation::CellInterp_L2proj_Trace)
-			os << "coarse cell interpolation + L2-proj. to fine cells + trace on fine faces ";
+		else if (Prolongation == GMGProlongation::CellInterp_ExactL2proj_Trace)
+			os << "coarse cell interpolation + exact L2-proj. to fine cells + trace on fine faces ";
 		else if (Prolongation == GMGProlongation::CellInterp_ApproxL2proj_Trace)
 			os << "coarse cell interpolation + approx. L2-proj. to fine cells + trace on fine faces ";
 		else if (Prolongation == GMGProlongation::CellInterp_FinerApproxL2proj_Trace)
@@ -926,7 +926,7 @@ public:
 		if (Utils::RequiresNestedHierarchy(Prolongation) && !Utils::BuildsNestedMeshHierarchy(this->CoarseningStgy))
 		{
 			os << endl;
-			Utils::Warning(os, "The selected coarsening strategy generates non-nested meshes, while the selected prolongation operator is made for nested meshes. Option -prolong " + to_string((unsigned)GMGProlongation::CellInterp_L2proj_Trace) + ", " + to_string((unsigned)GMGProlongation::CellInterp_ApproxL2proj_Trace) + " or " + to_string((unsigned)GMGProlongation::CellInterp_FinerApproxL2proj_Trace) + " recommended.");
+			Utils::Warning(os, "The selected coarsening strategy generates non-nested meshes, while the selected prolongation operator is made for nested meshes. Option -prolong " + to_string((unsigned)GMGProlongation::CellInterp_ExactL2proj_Trace) + ", " + to_string((unsigned)GMGProlongation::CellInterp_ApproxL2proj_Trace) + " or " + to_string((unsigned)GMGProlongation::CellInterp_FinerApproxL2proj_Trace) + " recommended.");
 		}
 	}
 

@@ -302,13 +302,13 @@ void print_usage() {
 	cout << "                   Step 1: Interpolation from coarse faces to coarse cells (refer to -cell-interp argument)" << endl;
 	cout << "                   Step 2: Canonical injection from coarse to fine cells" << endl;
 	cout << "                   Step 3: Trace on the fine faces" << endl;
-	cout << "              " << (unsigned)GMGProlongation::CellInterp_L2proj_Trace << "  - ";
+	cout << "              " << (unsigned)GMGProlongation::CellInterp_ExactL2proj_Trace << "  - ";
 	cout <<                    "Non-nested variant of " << (unsigned)GMGProlongation::CellInterp_Trace << " and " << (unsigned)GMGProlongation::CellInterp_Inject_Trace << ":" << endl;
 	cout << "                   Step 1: Interpolation from coarse faces to coarse cells (refer to -cell-interp argument)" << endl;
-	cout << "                   Step 2: L2-projection onto the fine cells" << endl;
+	cout << "                   Step 2: Exact L2-projection onto the fine cells" << endl;
 	cout << "                   Step 3: Trace on the fine faces" << endl;
 	cout << "              " << (unsigned)GMGProlongation::CellInterp_ApproxL2proj_Trace << "  - ";
-	cout <<                    "Variant of " << (unsigned)GMGProlongation::CellInterp_L2proj_Trace << " where the L2-projection is not computed exactly but has the same approximation properties." << endl;
+	cout <<                    "Variant of " << (unsigned)GMGProlongation::CellInterp_ExactL2proj_Trace << " where the L2-projection is not computed exactly but has the same approximation properties." << endl;
 	cout << "              " << (unsigned)GMGProlongation::CellInterp_FinerApproxL2proj_Trace << "  - ";
 	cout <<                    "Variant of " << (unsigned)GMGProlongation::CellInterp_ApproxL2proj_Trace << " where the L2-projection is better approximated (by subtriangulation of the elements)." << endl;
 	cout << "      Values for CondensedAMG:" << endl;
@@ -1072,18 +1072,6 @@ int main(int argc, char* argv[])
 	//                  Solver                  //
 	//------------------------------------------//
 
-	if (args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("fcgmg") == 0 || args.Solver.SolverCode.compare("p_mg") == 0)
-		args.Solver.MG.GMGProlong = static_cast<GMGProlongation>(args.Solver.MG.ProlongationCode);
-	else if (args.Solver.SolverCode.compare("camg") == 0 || args.Solver.SolverCode.compare("fcgcamg") == 0)
-	{
-		if (args.Solver.MG.ProlongationCode == 0)
-			args.Solver.MG.CAMGMultigridProlong = CAMGProlongation::ChainedCoarseningProlongations;
-		else
-			args.Solver.MG.CAMGMultigridProlong = static_cast<CAMGProlongation>(args.Solver.MG.ProlongationCode);
-		args.Solver.MG.CAMGFaceProlong = args.Solver.MG.FaceProlongationCode == 0 ? CAMGFaceProlongation::BoundaryAggregatesInteriorAverage : static_cast<CAMGFaceProlongation>(args.Solver.MG.FaceProlongationCode);
-		args.Solver.MG.CAMGCoarseningProlong = args.Solver.MG.CoarseningProlongationCode == 0 ? CAMGProlongation::ReconstructSmoothedTraceOrInject : static_cast<CAMGProlongation>(args.Solver.MG.CoarseningProlongationCode);
-	}
-
 
 	if (args.Solver.SolverCode.compare("default") == 0)
 	{
@@ -1119,6 +1107,8 @@ int main(int argc, char* argv[])
 		if (!args.Discretization.StaticCondensation)
 			argument_error("Multigrid only applicable if the static condensation is enabled.");
 
+		args.Solver.MG.GMGProlong = static_cast<GMGProlongation>(args.Solver.MG.ProlongationCode);
+
 		if (args.Solver.MG.GMGProlong == GMGProlongation::Wildey && !args.Solver.MG.UseGalerkinOperator)
 			argument_error("To use the prolongationCode " + to_string((unsigned)GMGProlongation::Wildey) + ", you must also use the Galerkin operator. To do so, add option -g 1.");
 
@@ -1128,7 +1118,7 @@ int main(int argc, char* argv[])
 		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::IndependentRemeshing && 
 			Utils::RequiresNestedHierarchy(args.Solver.MG.GMGProlong) &&
 			args.Solver.MG.GMGProlong != GMGProlongation::Default)
-			argument_error("The coarsening by independent remeshing is only applicable with the non-nested versions of the multigrid (-prolong " + to_string((unsigned)GMGProlongation::CellInterp_L2proj_Trace) + ", " + to_string((unsigned)GMGProlongation::CellInterp_ApproxL2proj_Trace) + " or " + to_string((unsigned)GMGProlongation::CellInterp_FinerApproxL2proj_Trace) + ").");
+			argument_error("The coarsening by independent remeshing is only applicable with the non-nested versions of the multigrid (-prolong " + to_string((unsigned)GMGProlongation::CellInterp_ExactL2proj_Trace) + ", " + to_string((unsigned)GMGProlongation::CellInterp_ApproxL2proj_Trace) + " or " + to_string((unsigned)GMGProlongation::CellInterp_FinerApproxL2proj_Trace) + ").");
 
 		if (args.Solver.SolverCode.compare("p_mg") == 0 && defaultCoarseSolver)
 			args.Solver.MG.CoarseSolverCode = "mg";
@@ -1182,6 +1172,13 @@ int main(int argc, char* argv[])
 	{
 		if (args.Discretization.Method.compare("dg") == 0)
 			argument_error("Multigrid only applicable on HHO discretization.");
+
+		if (args.Solver.MG.ProlongationCode == 0)
+			args.Solver.MG.CAMGMultigridProlong = CAMGProlongation::ChainedCoarseningProlongations;
+		else
+			args.Solver.MG.CAMGMultigridProlong = static_cast<CAMGProlongation>(args.Solver.MG.ProlongationCode);
+		args.Solver.MG.CAMGFaceProlong = args.Solver.MG.FaceProlongationCode == 0 ? CAMGFaceProlongation::BoundaryAggregatesInteriorAverage : static_cast<CAMGFaceProlongation>(args.Solver.MG.FaceProlongationCode);
+		args.Solver.MG.CAMGCoarseningProlong = args.Solver.MG.CoarseningProlongationCode == 0 ? CAMGProlongation::ReconstructSmoothedTraceOrInject : static_cast<CAMGProlongation>(args.Solver.MG.CoarseningProlongationCode);
 
 		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::None)
 			args.Solver.MG.CoarseningStgy = CoarseningStrategy::MultiplePairwiseAggregation;

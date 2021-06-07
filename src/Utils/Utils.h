@@ -215,7 +215,7 @@ public:
 
 	static bool RequiresNestedHierarchy(GMGProlongation p)
 	{
-		return p != GMGProlongation::CellInterp_L2proj_Trace && p != GMGProlongation::CellInterp_ApproxL2proj_Trace && p != GMGProlongation::CellInterp_FinerApproxL2proj_Trace;
+		return p != GMGProlongation::CellInterp_ExactL2proj_Trace && p != GMGProlongation::CellInterp_ApproxL2proj_Trace && p != GMGProlongation::CellInterp_FinerApproxL2proj_Trace;
 	}
 
 	static double Eps;
