@@ -159,7 +159,7 @@ public:
 			return;
 
 		if (_vertices.size() <= 3 || this->IsConvex())
-			_triangulation = ConvexTriangulation(_vertices, MinimalTriangulationMethod, {});
+			_triangulation = ConvexTriangulation(_vertices, _measure, MinimalTriangulationMethod, {});
 		else
 			_triangulation = NonConvexTriangulation(MinimalTriangulationMethod, {});
 
@@ -214,7 +214,7 @@ public:
 	void RefineWithoutCoarseOverlap(const vector<PhysicalShape<1>*>& doNotCross) override
 	{
 		if (this->IsConvex())
-			_refinement = ConvexTriangulation(_vertices, MinimalOverlapTriangulationMethod, doNotCross);
+			_refinement = ConvexTriangulation(_vertices, _measure, MinimalOverlapTriangulationMethod, doNotCross);
 		else
 			_refinement = NonConvexTriangulation(MinimalOverlapTriangulationMethod, doNotCross);
 
@@ -231,17 +231,17 @@ public:
 	}
 
 private:
-	static vector<Triangle> ConvexTriangulation(const vector<DomPoint>& vertices, PolygonalTriangulation triangulationMethod, const vector<PhysicalShape<1>*>& doNotCross)
+	static vector<Triangle> ConvexTriangulation(const vector<DomPoint>& vertices, double measure, PolygonalTriangulation triangulationMethod, const vector<PhysicalShape<1>*>& doNotCross)
 	{
 		assert(vertices.size() > 2);
 		if (triangulationMethod == PolygonalTriangulation::Barycentric)
 			return BarycentricTriangulation(vertices);
 		else if (triangulationMethod == PolygonalTriangulation::OneVertex)
-			return OneVertexTriangulation(vertices, doNotCross);
+			return OneVertexTriangulation(vertices, measure, doNotCross);
 		assert(false);
 	}
 
-	static vector<Triangle> OneVertexTriangulation(const vector<DomPoint>& vertices, const vector<PhysicalShape<1>*>& doNotCross)
+	static vector<Triangle> OneVertexTriangulation(const vector<DomPoint>& vertices, double measure, const vector<PhysicalShape<1>*>& doNotCross)
 	{
 		vector<Triangle> triangles;
 
@@ -252,7 +252,7 @@ private:
 		DomPoint p3 = rotatingVertices.Get();
 
 		Triangle t(p1, p2, p3);
-		if (t.Measure() > Utils::NumericalZero)
+		if (t.Measure() > Utils::Eps*measure)
 		{
 			t.RefineWithoutCoarseOverlap(doNotCross);
 			for (PhysicalShape<2>* subT : t.RefinedShapes())
@@ -267,7 +267,7 @@ private:
 				remainingVertices.push_back(rotatingVertices.GetAndMoveNext());
 
 			// and recursion...
-			vector<Triangle> otherTriangles = OneVertexTriangulation(remainingVertices, doNotCross);
+			vector<Triangle> otherTriangles = OneVertexTriangulation(remainingVertices, measure, doNotCross);
 			for (auto t : otherTriangles)
 				triangles.push_back(t);
 		}
@@ -323,7 +323,7 @@ private:
 		for (CGAL::Partition_traits_2<chosenKernel>::Polygon_2 p : convexPartition)
 		{
 			vector<DomPoint> vertices = CGALWrapper::ToVertices(p);
-			vector<Triangle> subTriangles = ConvexTriangulation(vertices, triangulationMethod, doNotCross);
+			vector<Triangle> subTriangles = ConvexTriangulation(vertices, CGAL::to_double(p.area()), triangulationMethod, doNotCross);
 			for (auto tri : subTriangles)
 				triangulation.push_back(tri);
 		}
