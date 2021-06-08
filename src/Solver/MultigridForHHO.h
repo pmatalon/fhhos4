@@ -135,6 +135,11 @@ private:
 		Diffusion_HHO<Dim>* finePb = this->_problem;
 		Diffusion_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
 
+
+		/*cout << endl;
+		Timer totalProlongTimer;
+		totalProlongTimer.Start();*/
+
 		if (_prolongation == GMGProlongation::CellInterp_Trace)
 		{
 			//----------------------------------------------------------//
@@ -195,11 +200,19 @@ private:
 			//          computation of the intersection between the coarse and     //
 			//          fine elements, which is costly.                            //
 			//---------------------------------------------------------------------//
-
-			coarsePb->_mesh->SetOverlappingFineElements();
+			
+			//Timer intersectionTimer;
+			//intersectionTimer.Start();
+			coarsePb->_mesh->SetOverlappingFineElementsViaExactIntersection();
+			//intersectionTimer.Stop();
+			//cout << "Intersections: " << intersectionTimer.CPU().InMilliseconds << endl;
 
 			SparseMatrix I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
+			//Timer innerProdTimer;
+			//innerProdTimer.Start();
 			SparseMatrix L2Proj = GetGlobalL2ProjectionMatrixCoarseToFineElements();
+			//innerProdTimer.Stop();
+			//cout << "Inner products: " << innerProdTimer.CPU().InMilliseconds << endl;
 			SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
 
 			coarsePb->_mesh->DeleteOverlappingFineElementsInformation();
@@ -240,7 +253,11 @@ private:
 #endif // !NDEBUG
 
 			SparseMatrix I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
+			//Timer innerProdTimer;
+			//innerProdTimer.Start();
 			SparseMatrix L2Proj = GetGlobalCanonicalInjectionMatrixCoarseToFineElements();
+			//innerProdTimer.Stop();
+			//cout << "Inner products: " << innerProdTimer.CPU().InMilliseconds << endl;
 			SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
 
 			if (ExportComponents)
@@ -270,13 +287,21 @@ private:
 			//          subelements.                                               //
 			//---------------------------------------------------------------------//
 
+			//Timer subdivisionsTimer;
+			//subdivisionsTimer.Start();
 			coarsePb->_mesh->SetOverlappingFineElementsSubTriangles();
+			//subdivisionsTimer.Stop();
+			//cout << "Subdivisions: " << subdivisionsTimer.CPU().InMilliseconds << endl;
 #ifndef NDEBUG
 			//coarsePb->_mesh->PlotClustersForApproxL2(true);
 #endif // !NDEBUG
 
 			SparseMatrix I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
+			//Timer innerProdTimer;
+			//innerProdTimer.Start();
 			SparseMatrix L2Proj = GetGlobalL2ProjectionMatrixCoarseToFineElements();
+			//innerProdTimer.Stop();
+			//cout << "Inner products: " << innerProdTimer.CPU().InMilliseconds << endl;
 			SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb);
 
 			if (ExportComponents)
@@ -415,6 +440,9 @@ private:
 		}
 		else
 			Utils::FatalError("Unknown prolongationCode.");
+
+		//totalProlongTimer.Stop();
+		//cout << "Total prolong: " << totalProlongTimer.CPU().InMilliseconds << endl;
 	}
 
 	void SetupRestriction() override

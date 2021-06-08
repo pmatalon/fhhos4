@@ -788,7 +788,7 @@ public:
 		this->ComesFrom = CoarseningStrategyDetails(CoarseningStrategy::None);
 	}
 
-	virtual void SetOverlappingFineElements()
+	virtual void SetOverlappingFineElementsViaExactIntersection()
 	{
 		assert(false);
 	}

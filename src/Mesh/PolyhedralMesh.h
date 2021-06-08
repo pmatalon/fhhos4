@@ -1883,7 +1883,7 @@ private:
 	}
 
 public:
-	void SetOverlappingFineElements() override
+	void SetOverlappingFineElementsViaExactIntersection() override
 	{
 		CoarseningStrategy stgy = this->ComesFrom.CS;
 		if (stgy == CoarseningStrategy::None)
@@ -1892,13 +1892,13 @@ public:
 		ElementParallelLoop<Dim> parallelLoop(this->Elements);
 		parallelLoop.Execute([this, stgy](Element<Dim>* ce)
 			{
-				SetOverlappingFineElements(ce, stgy);
+				SetOverlappingFineElementsViaExactIntersection(ce, stgy);
 				ce->InitOverlappingElementsLocalNumbering();
 			});
 	}
 
 private:
-	static void SetOverlappingFineElements(Element<Dim>* ce, CoarseningStrategy stgy)
+	static void SetOverlappingFineElementsViaExactIntersection(Element<Dim>* ce, CoarseningStrategy stgy)
 	{
 		set<Element<Dim>*> tested;
 		double overlappingMeasure = 0;
