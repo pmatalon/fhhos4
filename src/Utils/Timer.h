@@ -51,6 +51,9 @@ public:
 class Timer
 {
 private:
+	bool _isPaused = false;
+	Timer* _pauseTimer = nullptr;
+
 	clock_t _cpu_start;
 	clock_t _cpu_stop;
 
@@ -61,8 +64,26 @@ public:
 
 	void Start()
 	{
-		_cpu_start = clock();
-		_elapsed_start = chrono::high_resolution_clock::now();
+		if (!_isPaused)
+		{
+			_cpu_start = clock();
+			_elapsed_start = chrono::high_resolution_clock::now();
+		}
+		else
+		{
+			_pauseTimer->Stop();
+			_cpu_start = _pauseTimer->_cpu_stop - (_cpu_stop - _cpu_start);
+			_isPaused = false;
+		}
+	}
+
+	void Pause()
+	{
+		if (!_pauseTimer)
+			_pauseTimer = new Timer();
+		this->Stop();
+		_pauseTimer->Start();
+		_isPaused = true;
 	}
 
 	void Stop()
@@ -83,5 +104,11 @@ public:
 		double durationInMilliseconds = chrono::duration_cast<chrono::duration<double, std::milli>>(_elapsed_stop - _elapsed_start).count();
 		Duration d(durationInMilliseconds);
 		return d;
+	}
+
+	~Timer()
+	{
+		if (_pauseTimer)
+			delete _pauseTimer;
 	}
 };

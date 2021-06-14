@@ -547,7 +547,7 @@ private:
 
 		Vector x;
 		IterativeSolver* iterativeSolver = dynamic_cast<IterativeSolver*>(solver);
-		if (iterativeSolver != nullptr)
+		if (iterativeSolver)
 		{
 			iterativeSolver->ComputeExactSolution = Utils::ProgramArgs.Actions.ExportErrorToGMSH || problem->A.rows() <= 2000;
 
@@ -566,6 +566,16 @@ private:
 			x = iterativeSolver->Solve(problem->b, initialGuessCode);
 			solvingTimer.Stop();
 			cout << iterativeSolver->IterationCount << " iterations." << endl << endl;
+
+			Multigrid* mg = dynamic_cast<Multigrid*>(iterativeSolver);
+			if (mg)
+			{
+				double total = mg->SmoothingAndResTimer.CPU().InMilliseconds + mg->IntergridTransferTimer.CPU().InMilliseconds + mg->CoarseSolverTimer.CPU().InMilliseconds;
+				cout << "\tSmoothing and res. computing: " << (mg->SmoothingAndResTimer.CPU().InMilliseconds / total * 100) << "%" << endl;
+				cout << "\tIntergrid transfers         : " << (mg->IntergridTransferTimer.CPU().InMilliseconds / total * 100) << "%" << endl;
+				cout << "\tCoarse solver               : " << (mg->CoarseSolverTimer.CPU().InMilliseconds / total * 100) << "%" << endl;
+				cout << endl;
+			}
 		}
 		else
 		{

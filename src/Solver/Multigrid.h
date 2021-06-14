@@ -34,6 +34,10 @@ public:
 	bool ExportComponents = false;
 	bool DoNotCreateLevels = false;
 
+	Timer SmoothingAndResTimer;
+	Timer IntergridTransferTimer;
+	Timer CoarseSolverTimer;
+
 	Multigrid(MGType multigridType, int nLevels) : IterativeSolver()
 	{
 		this->MultigridType = multigridType;
@@ -267,7 +271,9 @@ private:
 
 		if (level->IsCoarsestLevel())
 		{
+			                                                                         CoarseSolverTimer.Start();
 			x = CoarseSolver->Solve(b);                                              result.AddCost(CoarseSolver->SolvingComputationalWork);
+			                                                                         CoarseSolverTimer.Pause();
 			xEquals0 = false;
 		}
 		else
@@ -280,6 +286,7 @@ private:
 			//---------------//
 
 			auto flopBeforePreSmooth = result._iterationComputationalWork;
+			SmoothingAndResTimer.Start();
 
 			Vector r;
 			if (level->PreSmoother->CanOptimizeResidualComputation())
@@ -294,6 +301,8 @@ private:
 				r = b - A * x;                                                            result.AddCost(Cost::DAXPY(A));
 			}
 
+			SmoothingAndResTimer.Stop();
+
 			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPreSmoothing");
 
@@ -305,9 +314,11 @@ private:
 			//------------------------------------------------//
 
 			auto flopBeforeRestrict = result._iterationComputationalWork;
+			IntergridTransferTimer.Start();
 
 			Vector rc = level->Restrict(r);                                               result.AddCost(level->RestrictCost());
 
+			IntergridTransferTimer.Pause();
 			auto flopRestrict = result._iterationComputationalWork - flopBeforeRestrict;
 			//cout << "- flopRestrict = " << flopRestrict << endl;
 
@@ -356,7 +367,12 @@ private:
 				level->ExportVector(cgc, "it" + to_string(this->IterationCount) + "_cgc");
 			}
 
+
+			IntergridTransferTimer.Start();
+
 			x += level->Prolong(ec);                                                  result.AddCost(level->ProlongCost() + Cost::AddVec(x));
+
+			IntergridTransferTimer.Pause();
 
 			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_cgc");
@@ -368,6 +384,7 @@ private:
 			assert(!xEquals0);
 
 			auto flopBeforePostSmooth = result._iterationComputationalWork;
+			SmoothingAndResTimer.Start();
 
 			if (level->PostSmoother->CanOptimizeResidualComputation() && (computeResidual || computeAx))
 			{
@@ -393,6 +410,9 @@ private:
 					result.Residual = b - A*x;                                        result.AddCost(Cost::DAXPY(A));
 				}
 			}
+
+			SmoothingAndResTimer.Pause();
+
 			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPostSmoothing");
 
