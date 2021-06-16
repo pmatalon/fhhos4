@@ -16,10 +16,8 @@ private:
 	list<double> _previousItConvRates;
 	double _asymptoticConvRate = 0;
 	double _tolerance = 1e-8;
-public:
 	size_t _iterationComputationalWork = 0;
-private:
-	size_t _solvingComputationalWork = 0;
+	size_t _solvingComputationalWork = 0; // total of all iterations
 	Timer _solvingTimer;
 	Vector e;
 public:
@@ -128,6 +126,11 @@ public:
 	{
 		_iterationComputationalWork += cost;
 		_solvingComputationalWork += cost;
+	}
+
+	size_t IterationComputationalWork()
+	{
+		return _iterationComputationalWork;
 	}
 
 	friend ostream& operator<<(ostream& os, const IterationResult& result)

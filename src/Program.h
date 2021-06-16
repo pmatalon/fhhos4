@@ -570,11 +570,17 @@ private:
 			Multigrid* mg = dynamic_cast<Multigrid*>(iterativeSolver);
 			if (mg)
 			{
-				double total = mg->SmoothingAndResTimer.CPU().InMilliseconds + mg->IntergridTransferTimer.CPU().InMilliseconds + mg->CoarseSolverTimer.CPU().InMilliseconds;
-				cout << "\tSmoothing and res. computing: " << (mg->SmoothingAndResTimer.CPU().InMilliseconds / total * 100) << "%" << endl;
-				cout << "\tIntergrid transfers         : " << (mg->IntergridTransferTimer.CPU().InMilliseconds / total * 100) << "%" << endl;
-				cout << "\tCoarse solver               : " << (mg->CoarseSolverTimer.CPU().InMilliseconds / total * 100) << "%" << endl;
-				cout << endl;
+				int sizeTime = 7;
+				int sizeWork = 5;
+
+				double totalTime = solvingTimer.CPU().InMilliseconds;
+				size_t totalWork = iterativeSolver->SolvingComputationalWork;
+				cout << "\t                             | CPU time |   Work " << endl;
+				cout << "\t-------------------------------------------------" << endl;
+				cout << "\tSmoothing and res. computing | " << setw(sizeTime) << ((totalTime-mg->IntergridTransferTimer.CPU().InMilliseconds-mg->CoarseSolverTimer.CPU().InMilliseconds) / totalTime * 100) << "% | " << setw(sizeWork) << (double(totalWork - mg->IntergridTransferCost - mg->CoarseSolverCost)   / double(totalWork)*100) << "%" << endl;
+				cout << "\tIntergrid transfers          | " << setw(sizeTime) << (mg->IntergridTransferTimer.CPU().InMilliseconds / totalTime * 100) << "% | " << setw(sizeWork) << (double(mg->IntergridTransferCost) / double(totalWork)*100) << "%" << endl;
+				cout << "\tCoarse solver                | " << setw(sizeTime) << (mg->CoarseSolverTimer.CPU().InMilliseconds      / totalTime * 100) << "% | " << setw(sizeWork) << (double(mg->CoarseSolverCost)      / double(totalWork)*100) << "%" << endl;
+				cout << endl << endl;
 			}
 		}
 		else

@@ -77,6 +77,8 @@ public:
 
 	virtual void Solve(const Vector& b, Vector& x, bool xEquals0, bool computeResidual, bool computeAx)
 	{
+		DoBeforeSolving();
+
 		const SparseMatrix& A = *this->Matrix;
 
 		this->SolvingComputationalWork = 0;
@@ -185,6 +187,9 @@ public:
 	virtual ~IterativeSolver() {}
 
 protected:
+	virtual void DoBeforeSolving()
+	{}
+
 	IterationResult CreateFirstIterationResult(const Vector& b, const Vector& x)
 	{
 		IterationResult result;
