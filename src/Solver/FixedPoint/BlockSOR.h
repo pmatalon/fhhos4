@@ -1,7 +1,7 @@
 #pragma once
-#include "IterativeSolver.h"
-#include "EigenSparseLU.h"
-#include "EigenSparseCholesky.h"
+#include "../IterativeSolver.h"
+#include "../Direct/EigenSparseLU.h"
+#include "../Direct/EigenSparseCholesky.h"
 using namespace std;
 
 enum class Direction : unsigned

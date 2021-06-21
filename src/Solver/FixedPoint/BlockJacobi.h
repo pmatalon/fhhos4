@@ -1,6 +1,6 @@
 #pragma once
-#include "IterativeSolver.h"
-#include "../Utils/ParallelLoop.h"
+#include "../IterativeSolver.h"
+#include "../../Utils/ParallelLoop.h"
 using namespace std;
 
 class BlockJacobi : public IterativeSolver

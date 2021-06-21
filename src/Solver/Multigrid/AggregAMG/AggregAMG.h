@@ -1,7 +1,7 @@
 #pragma once
 #include <mutex>
 #include "AlgebraicMesh.h"
-#include "Multigrid.h"
+#include "../Multigrid.h"
 using namespace std;
 
 class AggregLevel : public Level
@@ -331,6 +331,9 @@ protected:
 
 	Level* CreateCoarseLevel(Level* fineLevel, CoarseningType coarseningType) override
 	{
+		if (coarseningType != CoarseningType::H)
+			Utils::FatalError("Only h-coarsening allowed for this multigrid.");
+
 		AggregLevel* coarseLevel = new AggregLevel(fineLevel->Number + 1, _blockSize, _strongCouplingThreshold);
 		coarseLevel->OperatorMatrix = &dynamic_cast<AggregLevel*>(fineLevel)->Ac;
 		return coarseLevel;

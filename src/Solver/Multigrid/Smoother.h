@@ -1,8 +1,8 @@
 #pragma once
-#include "BlockSOR.h"
-#include "BlockGaussSeidel.h"
-#include "BlockJacobi.h"
-#include "GaussSeidel.h"
+#include "../FixedPoint/BlockSOR.h"
+#include "../FixedPoint/BlockGaussSeidel.h"
+#include "../FixedPoint/BlockJacobi.h"
+#include "../FixedPoint/GaussSeidel.h"
 using namespace std;
 
 class Smoother

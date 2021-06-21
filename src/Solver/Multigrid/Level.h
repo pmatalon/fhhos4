@@ -1,6 +1,6 @@
 #pragma once
 #include "Smoother.h"
-#include "FlexibleConjugateGradient.h"
+#include "../Krylov/FlexibleConjugateGradient.h"
 using namespace std;
 
 class Level

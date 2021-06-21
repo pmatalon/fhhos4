@@ -1,5 +1,5 @@
 #pragma once
-#include "IterativeSolver.h"
+#include "../IterativeSolver.h"
 using namespace std;
 
 class EigenCG : public IterativeSolver

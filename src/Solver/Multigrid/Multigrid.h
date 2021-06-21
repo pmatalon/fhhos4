@@ -1,5 +1,5 @@
 #pragma once
-#include "IterativeSolver.h"
+#include "../IterativeSolver.h"
 #include "SmootherFactory.h"
 #include "Level.h"
 using namespace std;

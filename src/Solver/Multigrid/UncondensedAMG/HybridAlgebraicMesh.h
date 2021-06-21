@@ -1,6 +1,6 @@
 #pragma once
-#include "../Utils/Utils.h"
-#include "AlgebraicMesh.h"
+#include "../../../Utils/Utils.h"
+#include "../AggregAMG/AlgebraicMesh.h"
 using namespace std;
 
 struct HybridAlgebraicFace;

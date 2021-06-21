@@ -61,22 +61,7 @@
     <ClInclude Include="src\Utils\ParallelLoop.h">
       <Filter>Utils</Filter>
     </ClInclude>
-    <ClInclude Include="src\Solver\Multigrid.h">
-      <Filter>Solver</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Solver\Level.h">
-      <Filter>Solver</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Solver\Smoother.h">
-      <Filter>Solver</Filter>
-    </ClInclude>
     <ClInclude Include="src\Solver\IterativeSolver.h">
-      <Filter>Solver</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Solver\BlockSOR.h">
-      <Filter>Solver</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Solver\MultigridForHHO.h">
       <Filter>Solver</Filter>
     </ClInclude>
     <ClInclude Include="src\Solver\IterationResult.h">
@@ -100,30 +85,12 @@
     <ClInclude Include="src\Solver\Solver.h">
       <Filter>Solver</Filter>
     </ClInclude>
-    <ClInclude Include="src\Solver\EigenSparseLU.h">
-      <Filter>Solver</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Solver\EigenCG.h">
-      <Filter>Solver</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Solver\AGMG.h">
-      <Filter>Solver</Filter>
-    </ClInclude>
     <ClInclude Include="src\Program.h" />
-    <ClInclude Include="src\Solver\BlockJacobi.h">
-      <Filter>Solver</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Solver\SmootherFactory.h">
-      <Filter>Solver</Filter>
-    </ClInclude>
     <ClInclude Include="src\Utils\Types.h">
       <Filter>Utils</Filter>
     </ClInclude>
     <ClInclude Include="src\Utils\Timer.h">
       <Filter>Utils</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Solver\ConjugateGradient.h">
-      <Filter>Solver</Filter>
     </ClInclude>
     <ClInclude Include="src\Solver\Preconditioner.h">
       <Filter>Solver</Filter>
@@ -158,9 +125,6 @@
     <ClInclude Include="src\ProgramArguments.h" />
     <ClInclude Include="src\Mesh\3D\TetrahedralMesh.h">
       <Filter>Mesh\3D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Solver\FlexibleConjugateGradient.h">
-      <Filter>Solver</Filter>
     </ClInclude>
     <ClInclude Include="src\Problem\DiffusionProblem.h">
       <Filter>Problem</Filter>
@@ -420,38 +384,8 @@
     <ClInclude Include="src\TestCases\2D\SquareCenterSquareTestCase.h">
       <Filter>TestCases\2D</Filter>
     </ClInclude>
-    <ClInclude Include="src\Solver\CondensedAMG.h">
-      <Filter>Solver</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Solver\AlgebraicMesh.h">
-      <Filter>Solver</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Solver\HybridAlgebraicMesh.h">
-      <Filter>Solver</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Solver\AggregAMG.h">
-      <Filter>Solver</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Solver\GaussSeidel.h">
-      <Filter>Solver</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Solver\HighOrderAggregAMG.h">
-      <Filter>Solver</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Solver\PairwiseAggregation.h">
-      <Filter>Solver</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Solver\AllNeighbourAggregation.h">
-      <Filter>Solver</Filter>
-    </ClInclude>
     <ClInclude Include="src\Utils\Cost.h">
       <Filter>Utils</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Solver\BlockGaussSeidel.h">
-      <Filter>Solver</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Solver\EigenSparseCholesky.h">
-      <Filter>Solver</Filter>
     </ClInclude>
     <ClInclude Include="src\TestCases\2D\RoomWithWallTestCase.h">
       <Filter>TestCases\2D</Filter>
@@ -459,8 +393,74 @@
     <ClInclude Include="src\TestCases\2D\HybridMeshTestCase.h">
       <Filter>TestCases\2D</Filter>
     </ClInclude>
-    <ClInclude Include="src\Solver\P_MultigridForHHO.h">
-      <Filter>Solver</Filter>
+    <ClInclude Include="src\Solver\Direct\EigenSparseCholesky.h">
+      <Filter>Solver\Direct</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\Direct\EigenSparseLU.h">
+      <Filter>Solver\Direct</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\FixedPoint\BlockGaussSeidel.h">
+      <Filter>Solver\FixedPoint</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\FixedPoint\BlockJacobi.h">
+      <Filter>Solver\FixedPoint</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\FixedPoint\BlockSOR.h">
+      <Filter>Solver\FixedPoint</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\FixedPoint\GaussSeidel.h">
+      <Filter>Solver\FixedPoint</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\Krylov\ConjugateGradient.h">
+      <Filter>Solver\Krylov</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\Krylov\EigenCG.h">
+      <Filter>Solver\Krylov</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\Krylov\FlexibleConjugateGradient.h">
+      <Filter>Solver\Krylov</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\Multigrid\AGMG.h">
+      <Filter>Solver\Multigrid</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\Multigrid\Level.h">
+      <Filter>Solver\Multigrid</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\Multigrid\Smoother.h">
+      <Filter>Solver\Multigrid</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\Multigrid\SmootherFactory.h">
+      <Filter>Solver\Multigrid</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\Multigrid\Multigrid.h">
+      <Filter>Solver\Multigrid</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\Multigrid\AggregAMG\AggregAMG.h">
+      <Filter>Solver\Multigrid\AggregAMG</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\Multigrid\AggregAMG\AlgebraicMesh.h">
+      <Filter>Solver\Multigrid\AggregAMG</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\Multigrid\AggregAMG\AllNeighbourAggregation.h">
+      <Filter>Solver\Multigrid\AggregAMG</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\Multigrid\AggregAMG\HighOrderAggregAMG.h">
+      <Filter>Solver\Multigrid\AggregAMG</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\Multigrid\AggregAMG\PairwiseAggregation.h">
+      <Filter>Solver\Multigrid\AggregAMG</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\Multigrid\MultigridForHHO\MultigridForHHO.h">
+      <Filter>Solver\Multigrid\MultigridForHHO</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\Multigrid\MultigridForHHO\P_MultigridForHHO.h">
+      <Filter>Solver\Multigrid\MultigridForHHO</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\Multigrid\UncondensedAMG\CondensedAMG.h">
+      <Filter>Solver\Multigrid\UncondensedAMG</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\Multigrid\UncondensedAMG\HybridAlgebraicMesh.h">
+      <Filter>Solver\Multigrid\UncondensedAMG</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -535,6 +535,27 @@
     </Filter>
     <Filter Include="Mesher\GMSH">
       <UniqueIdentifier>{5329c89b-b928-431c-b12a-f9fbb1eacb04}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Solver\Direct">
+      <UniqueIdentifier>{401c8ebd-e12b-4101-bc68-4c1bea32620b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Solver\FixedPoint">
+      <UniqueIdentifier>{ff9bf2ce-f933-419d-b644-eb7268ac944a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Solver\Krylov">
+      <UniqueIdentifier>{aec56003-0c7d-4aeb-a8bb-b2d6292b1e7b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Solver\Multigrid">
+      <UniqueIdentifier>{08832248-49fb-478e-a747-6b1534550ad3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Solver\Multigrid\AggregAMG">
+      <UniqueIdentifier>{acf0ca4e-b82a-4327-89f6-08ec3d75857e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Solver\Multigrid\MultigridForHHO">
+      <UniqueIdentifier>{23533162-bb5b-4e7d-bfb7-d3bd513a4107}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Solver\Multigrid\UncondensedAMG">
+      <UniqueIdentifier>{acc25f76-6138-4312-8787-666852f7a952}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

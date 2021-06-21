@@ -1,5 +1,5 @@
 #pragma once
-#include "Solver.h"
+#include "../Solver.h"
 #include <Eigen/SparseCholesky>
 using namespace std;
 

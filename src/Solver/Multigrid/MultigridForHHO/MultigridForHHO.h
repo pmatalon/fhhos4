@@ -1,7 +1,7 @@
 #pragma once
-#include "Multigrid.h"
-#include "../HHO/Diffusion_HHO.h"
-#include "../Utils/ElementParallelLoop.h"
+#include "../Multigrid.h"
+#include "../../../HHO/Diffusion_HHO.h"
+#include "../../../Utils/ElementParallelLoop.h"
 using namespace std;
 
 template <int Dim>

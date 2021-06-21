@@ -1,6 +1,6 @@
 #pragma once
-#include "IterativeSolver.h"
-#include "Preconditioner.h"
+#include "../IterativeSolver.h"
+#include "../Preconditioner.h"
 #include <list>
 using namespace std;
 

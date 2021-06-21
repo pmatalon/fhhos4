@@ -1,8 +1,8 @@
 #pragma once
 #include <mutex>
 #include "HybridAlgebraicMesh.h"
-#include "AlgebraicMesh.h"
-#include "Multigrid.h"
+#include "../AggregAMG/AlgebraicMesh.h"
+#include "../Multigrid.h"
 using namespace std;
 
 class CondensedLevel : public Level
@@ -1004,6 +1004,9 @@ protected:
 
 	Level* CreateCoarseLevel(Level* fineLevel, CoarseningType coarseningType) override
 	{
+		if (coarseningType != CoarseningType::H)
+			Utils::FatalError("Only h-coarsening allowed for this multigrid.");
+
 		CondensedLevel* coarseLevel = new CondensedLevel(fineLevel->Number + 1, _cellBlockSize, _faceBlockSize, _strongCouplingThreshold, _faceProlong, _coarseningProlong, _multigridProlong);
 		coarseLevel->OperatorMatrix = &dynamic_cast<CondensedLevel*>(fineLevel)->Ac;
 		return coarseLevel;

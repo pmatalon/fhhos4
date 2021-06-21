@@ -1,5 +1,5 @@
 #pragma once
-#include "Solver.h"
+#include "../Solver.h"
 using namespace std;
 
 class EigenSparseLU : public Solver
