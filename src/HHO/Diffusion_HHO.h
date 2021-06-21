@@ -69,6 +69,16 @@ public:
 		return new Diffusion_HHO<Dim>(sameMesh, this->_testCase, lowerDegreeHHO, _staticCondensation, _saveMatrixBlocks, this->_outputDirectory);
 	}
 
+	Diffusion_HHO<Dim>* GetProblemOnCoarserMeshAndLowerDegree()
+	{
+		// Lower the degree of each basis
+		FunctionalBasis<Dim>* reconstructionBasis = new FunctionalBasis<Dim>(HHO->ReconstructionBasis->CreateSameBasisForLowerDegree());
+		FunctionalBasis<Dim>* cellBasis = new FunctionalBasis<Dim>(HHO->CellBasis->CreateSameBasisForLowerDegree());
+		FunctionalBasis<Dim - 1>* faceBasis = new FunctionalBasis<Dim - 1>(HHO->FaceBasis->CreateSameBasisForLowerDegree());
+		HHOParameters<Dim>* lowerDegreeCoarseMeshHHO = new HHOParameters<Dim>(this->_mesh->CoarseMesh, HHO->Stabilization, reconstructionBasis, cellBasis, faceBasis);
+		return new Diffusion_HHO<Dim>(this->_mesh->CoarseMesh, this->_testCase, lowerDegreeCoarseMeshHHO, _staticCondensation, _saveMatrixBlocks, this->_outputDirectory);
+	}
+
 	double L2Error(DomFunction exactSolution) override
 	{
 		return Problem<Dim>::L2Error(HHO->ReconstructionBasis, this->ReconstructedSolution, exactSolution);
@@ -205,35 +215,7 @@ public:
 		//-----------------------------------------//
 
 		if (actions.InitReferenceShapes)
-		{
-			// Compute some useful integrals on reference element and store them
-			// - Cartesian element
-			CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreMassMatrix(cellBasis);
-			CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreMassMatrix(reconstructionBasis);
-			if (this->_diffusionField->K1)
-				CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreReconstructK1StiffnessMatrix(this->_diffusionField->K1, reconstructionBasis);
-			if (this->_diffusionField->K2)
-				CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreReconstructK2StiffnessMatrix(this->_diffusionField->K2, reconstructionBasis);
-			CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix(cellBasis, reconstructionBasis);
-			// - Cartesian face
-			CartesianShape<Dim, Dim - 1>::InitReferenceShape()->ComputeAndStoreMassMatrix(faceBasis);
-			if (Dim == 2)
-			{
-				// - Triangular element
-				Triangle::InitReferenceShape()->ComputeAndStoreMassMatrix((FunctionalBasis<2>*)cellBasis);
-				Triangle::InitReferenceShape()->ComputeAndStoreMassMatrix((FunctionalBasis<2>*)reconstructionBasis);
-				Triangle::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix((FunctionalBasis<2>*)cellBasis, (FunctionalBasis<2>*)reconstructionBasis);
-			}
-			else if (Dim == 3)
-			{
-				// - Tetrahedral element
-				Tetrahedron::InitReferenceShape()->ComputeAndStoreMassMatrix((FunctionalBasis<3>*)cellBasis);
-				Tetrahedron::InitReferenceShape()->ComputeAndStoreMassMatrix((FunctionalBasis<3>*)reconstructionBasis);
-				Tetrahedron::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix((FunctionalBasis<3>*)cellBasis, (FunctionalBasis<3>*)reconstructionBasis);
-				// - Triangular face
-				Triangle::InitReferenceShape()->ComputeAndStoreMassMatrix((FunctionalBasis<2>*)faceBasis);
-			}
-		}
+			InitReferenceShapes();
 
 		//----------------------------//
 		//   Compute local matrices   //
@@ -692,20 +674,61 @@ public:
 	}
 
 
+	// Compute some useful integrals on reference element and store them
+	void InitReferenceShapes()
+	{
+		FunctionalBasis<Dim>* reconstructionBasis = HHO->ReconstructionBasis;
+		FunctionalBasis<Dim>* cellBasis = HHO->CellBasis;
+		FunctionalBasis<Dim - 1>* faceBasis = HHO->FaceBasis;
+
+		// - Cartesian element
+		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreMassMatrix(cellBasis);
+		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreMassMatrix(reconstructionBasis);
+		if (this->_diffusionField->K1)
+			CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreReconstructK1StiffnessMatrix(this->_diffusionField->K1, reconstructionBasis);
+		if (this->_diffusionField->K2)
+			CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreReconstructK2StiffnessMatrix(this->_diffusionField->K2, reconstructionBasis);
+		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix(cellBasis, reconstructionBasis);
+		// - Cartesian face
+		CartesianShape<Dim, Dim - 1>::InitReferenceShape()->ComputeAndStoreMassMatrix(faceBasis);
+		if (Dim == 2)
+		{
+			// - Triangular element
+			Triangle::InitReferenceShape()->ComputeAndStoreMassMatrix((FunctionalBasis<2>*)cellBasis);
+			Triangle::InitReferenceShape()->ComputeAndStoreMassMatrix((FunctionalBasis<2>*)reconstructionBasis);
+			Triangle::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix((FunctionalBasis<2>*)cellBasis, (FunctionalBasis<2>*)reconstructionBasis);
+		}
+		else if (Dim == 3)
+		{
+			// - Tetrahedral element
+			Tetrahedron::InitReferenceShape()->ComputeAndStoreMassMatrix((FunctionalBasis<3>*)cellBasis);
+			Tetrahedron::InitReferenceShape()->ComputeAndStoreMassMatrix((FunctionalBasis<3>*)reconstructionBasis);
+			Tetrahedron::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix((FunctionalBasis<3>*)cellBasis, (FunctionalBasis<3>*)reconstructionBasis);
+			// - Triangular face
+			Triangle::InitReferenceShape()->ComputeAndStoreMassMatrix((FunctionalBasis<2>*)faceBasis);
+		}
+	}
 
 
-
+	//------------------------------//
+	//           Init HHO           //
+	//------------------------------//
 	void InitHHO()
 	{
-		// Init faces //
+		InitHHO_Faces();
+		InitHHO_Elements();
+	}
+	void InitHHO_Faces()
+	{
 		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->Faces, [this](Face<Dim>* f)
 			{
 				Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
 				face->InitHHO(HHO);
 			}
 		);
-
-		// Init Elements //
+	}
+	void InitHHO_Elements()
+	{
 		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this](Element<Dim>* e)
 			{
 				Diff_HHOElement<Dim>* element = dynamic_cast<Diff_HHOElement<Dim>*>(e);

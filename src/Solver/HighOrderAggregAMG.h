@@ -103,7 +103,7 @@ private:
 public:
 
 	HighOrderAggregAMG(int blockSize, double strongCouplingThreshold, double omega, int nLevels = 0)
-		: Multigrid(MGType::h_Multigrid, nLevels)
+		: Multigrid(nLevels)
 	{
 		this->_blockSize = blockSize;
 		this->_strongCouplingThreshold = strongCouplingThreshold;
@@ -134,7 +134,7 @@ protected:
 		return new HighOrderAggregLevel(0, _blockSize, _omega);
 	}
 
-	Level* CreateCoarseLevel(Level* fineLevel) override
+	Level* CreateCoarseLevel(Level* fineLevel, CoarseningType coarseningType) override
 	{
 		//AggregLevel* coarseLevel = new AggregLevel(fineLevel->Number + 1, 1, _strongCouplingThreshold);
 		//return coarseLevel;

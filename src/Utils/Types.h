@@ -39,6 +39,22 @@ enum class MGType : unsigned
 	p_Multigrid
 };
 
+enum class HP_Strategy : unsigned
+{
+	H_only,
+	P_only,
+	P_then_H,
+	HP_then_H,
+	P_then_HP // then the coarse p must be set
+};
+
+enum class CoarseningType : unsigned
+{
+	H,
+	P,
+	HP
+};
+
 enum class CoarseningStrategy : unsigned
 {
 	None,

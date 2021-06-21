@@ -222,8 +222,16 @@ void print_usage() {
 	cout << "              rbgs - Reverse Block Gauss-Seidel" << endl;
 	cout << "              sbgs - Symmetric Block Gauss-Seidel" << endl;
 	cout << endl;
+	cout << "-hp-stgy CODE" << endl;
+	cout << "      hp-strategy to build the coarse levels in the case of high-order." << endl;
+	cout << "              h    - h only" << endl;
+	cout << "              p    - p only" << endl;
+	cout << "              p_h  - p, then h" << endl;
+	cout << "              hp_h - simultaneous hp, then h" << endl;
+	cout << "              p_hp - p, then simultaneous hp" << endl;
+	cout << endl;
 	cout << "-cs CODE" << endl;
-	cout << "      Coarsening strategy of the multigrid." << endl;
+	cout << "      Mesh coarsening strategy." << endl;
 	cout << "      'mg':" << endl;
 	cout << "              s    - Standard coarsening (only for structured meshes built by the in-house mesher)" << endl;
 	cout << "              r    - Fine meshes obtained by structured refinement of the coarse mesh using GMSH's splitting method" << endl;
@@ -481,6 +489,7 @@ int main(int argc, char* argv[])
 		OPT_Relaxation,
 		OPT_BlockSize,
 		// Multigrid
+		OPT_HP_Strategy,
 		OPT_MGCycle,
 		OPT_CellInterpCode,
 		OPT_Weight,
@@ -533,6 +542,7 @@ int main(int argc, char* argv[])
 		 { "relax", required_argument, NULL, OPT_Relaxation },
 		 { "block-size", required_argument, NULL, OPT_BlockSize },
 		 // Multigrid
+		 { "hp-stgy", required_argument, NULL, OPT_HP_Strategy },
 		 { "cycle", required_argument, NULL, OPT_MGCycle },
 		 { "cell-interp", required_argument, NULL, OPT_CellInterpCode },
 		 { "weight", required_argument, NULL, OPT_Weight },
@@ -723,6 +733,23 @@ int main(int argc, char* argv[])
 			//   Multigrid   //
 			//---------------//
 
+			case OPT_HP_Strategy:
+			{
+				string code = optarg;
+				if (code.compare("h") == 0)
+					args.Solver.MG.HP_Stgy = HP_Strategy::H_only;
+				else if (code.compare("p") == 0)
+					args.Solver.MG.HP_Stgy = HP_Strategy::P_only;
+				else if (code.compare("p_h") == 0)
+					args.Solver.MG.HP_Stgy = HP_Strategy::P_then_H;
+				else if (code.compare("p_hp") == 0)
+					args.Solver.MG.HP_Stgy = HP_Strategy::P_then_HP;
+				else if (code.compare("hp_h") == 0)
+					args.Solver.MG.HP_Stgy = HP_Strategy::HP_then_H;
+				else
+					argument_error("unknown hp-strategy code '" + code + "'. Check -hp-stgy argument.");
+				break;
+			}
 			case OPT_MGCycle:
 			{
 				defaultCycle = false;
@@ -765,7 +792,8 @@ int main(int argc, char* argv[])
 				int cellInterp = atoi(optarg);
 				if (cellInterp != 1 && cellInterp != 2)
 					argument_error("check -cell-interp argument. Expecting 1 or 2.");
-				args.Solver.MG.CellInterpolationCode = cellInterp;
+				if (cellInterp != 2)
+					args.Solver.MG.UseHigherOrderReconstruction = false;
 				break;
 			}
 			case OPT_Weight:

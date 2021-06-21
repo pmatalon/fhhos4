@@ -120,8 +120,9 @@ private:
 public:
 
 	P_MultigridForHHO(Diffusion_HHO<Dim>* problem)
-		: Multigrid(MGType::p_Multigrid, 0)
+		: Multigrid(0)
 	{
+		this->HP_Stgy = HP_Strategy::P_only;
 		this->_problem = problem;
 		this->BlockSizeForBlockSmoothers = problem->HHO->nFaceUnknowns;
 	}
@@ -139,7 +140,7 @@ protected:
 		return new P_LevelForHHO<Dim>(0, _problem);
 	}
 
-	Level* CreateCoarseLevel(Level* fineLevel) override
+	Level* CreateCoarseLevel(Level* fineLevel, CoarseningType coarseningType) override
 	{
 		P_LevelForHHO<Dim>* hhoFineLevel = dynamic_cast<P_LevelForHHO<Dim>*>(fineLevel);
 		Diffusion_HHO<Dim>* lowerDegreeProblem = hhoFineLevel->_problem->GetProblemForLowerDegree();

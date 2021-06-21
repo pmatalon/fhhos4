@@ -72,6 +72,11 @@ public:
 		n = n.normalized();
 		return n;
 	}
+
+	void Refine() override
+	{
+		Utils::FatalError("Method QuadrilateralElement::Refine() is not implemented!");
+	}
 	
 	virtual ~QuadrilateralElement()
 	{}

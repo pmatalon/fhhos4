@@ -31,4 +31,9 @@ public:
 	{
 		return basisCode.compare(Monomial1D::Code()) == 0 || basisCode.compare(Legendre1D::Code()) == 0;
 	}
+
+	static bool IsOrthogonalBasis(string basisCode)
+	{
+		return basisCode.compare(Legendre1D::Code()) == 0;
+	}
 };

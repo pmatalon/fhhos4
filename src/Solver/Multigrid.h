@@ -13,7 +13,6 @@ private:
 	int _nLevels;
 	NonZeroCoefficients _cycleSchema; // used only for drawing the cycle in the console
 public:
-	MGType MultigridType = MGType::h_Multigrid;
 	Solver* CoarseSolver = nullptr;
 	char Cycle = 'V';
 	int WLoops = 1; // 1 --> V-cycle, >= 2 --> W-cycle 
@@ -27,6 +26,7 @@ public:
 	char CoarseLevelChangeSmoothingOperator = '+';
 	int BlockSizeForBlockSmoothers = -1;
 	double RelaxationParameter = 1;
+	HP_Strategy HP_Stgy = HP_Strategy::H_only;
 	CoarseningStrategy CoarseningStgy = CoarseningStrategy::StandardCoarsening;
 	FaceCoarseningStrategy FaceCoarseningStgy = FaceCoarseningStrategy::InterfaceCollapsing;
 	double CoarseningFactor = 2;
@@ -39,11 +39,11 @@ public:
 	size_t IntergridTransferCost = 0;
 	size_t CoarseSolverCost = 0;
 
-	Multigrid(MGType multigridType, int nLevels) : IterativeSolver()
+	Multigrid(int nLevels) : IterativeSolver()
 	{
-		this->MultigridType = multigridType;
-		if (multigridType == MGType::h_Multigrid)
-		{
+		//this->MultigridType = multigridType;
+		//if (multigridType == MGType::h_Multigrid)
+		//{
 			this->_automaticNumberOfLevels = nLevels <= 0;
 
 			if (this->_automaticNumberOfLevels)
@@ -56,13 +56,13 @@ public:
 				this->_nLevels = nLevels;
 				this->MatrixMaxSizeForCoarsestLevel = 0;
 			}
-		}
+		/*}
 		else
 		{
 			this->_automaticNumberOfLevels = true;
 			this->_nLevels = 0;
 			this->MatrixMaxSizeForCoarsestLevel = 0;
-		}
+		}*/
 	}
 
 	bool CanOptimizeResidualComputation() override
@@ -107,7 +107,19 @@ public:
 
 		while (CoarseLevelNeeded(currentLevel, levelNumber))
 		{
-			if (MultigridType == MGType::h_Multigrid)
+			// Type of coarsening that must be performed
+			CoarseningType coarseningType = CoarseningType::H;
+			if (this->HP_Stgy == HP_Strategy::P_only)
+				coarseningType = CoarseningType::P;
+			else if (this->HP_Stgy == HP_Strategy::P_then_H && currentLevel->PolynomialDegree() != this->CoarsePolyDegree)
+				coarseningType = CoarseningType::P;
+			else if (this->HP_Stgy == HP_Strategy::P_then_HP)
+				coarseningType = currentLevel->PolynomialDegree() != this->CoarsePolyDegree ? CoarseningType::P : CoarseningType::HP;
+			else if (this->HP_Stgy == HP_Strategy::HP_then_H && currentLevel->PolynomialDegree() != this->CoarsePolyDegree)
+				coarseningType = CoarseningType::HP;
+			
+			// Mesh coarsening if needed
+			if (coarseningType == CoarseningType::H || coarseningType == CoarseningType::HP)
 			{
 				// Can we coarsen the mesh?
 				currentLevel->CoarsenMesh(this->CoarseningStgy, this->FaceCoarseningStgy, this->CoarseningFactor, noCoarserMeshProvided, coarsestPossibleMeshReached);
@@ -117,7 +129,8 @@ public:
 
 			// Build coarse level
 			levelNumber++;
-			Level* coarseLevel = CreateCoarseLevel(currentLevel);
+			Level* coarseLevel = CreateCoarseLevel(currentLevel, coarseningType);
+			coarseLevel->ComesFrom = coarseningType;
 
 			// Smoothers on coarse level
 			int preSmoothingIterations = currentLevel->PreSmoother->Iterations();
@@ -141,7 +154,7 @@ public:
 				assert(false);
 
 
-			int blockSize = MultigridType == MGType::h_Multigrid ? BlockSizeForBlockSmoothers : coarseLevel->BlockSizeForBlockSmoothers();
+			int blockSize = this->HP_Stgy == HP_Strategy::H_only ? BlockSizeForBlockSmoothers : coarseLevel->BlockSizeForBlockSmoothers();
 			coarseLevel->PreSmoother  = coarseLevel->CreateSmoother( PreSmootherCode,  preSmoothingIterations, blockSize, RelaxationParameter);
 			coarseLevel->PostSmoother = coarseLevel->CreateSmoother(PostSmootherCode, postSmoothingIterations, blockSize, RelaxationParameter);
 
@@ -227,7 +240,7 @@ protected:
 	{
 		assert(false && "Not implemented. This method must be implemented in the subclass.");
 	}
-	virtual Level* CreateCoarseLevel(Level* fineLevel)
+	virtual Level* CreateCoarseLevel(Level* fineLevel, CoarseningType coarseningType)
 	{
 		assert(false && "Not implemented. This method must be implemented in the subclass.");
 	}
@@ -253,11 +266,12 @@ private:
 
 	bool CoarseLevelNeeded(Level* currentLevel, int levelNumber)
 	{
-		if (MultigridType == MGType::h_Multigrid)
-			return (_automaticNumberOfLevels && currentLevel->NUnknowns() > MatrixMaxSizeForCoarsestLevel) || (levelNumber < _nLevels - 1);
-		else if (MultigridType == MGType::p_Multigrid)
-			return currentLevel->PolynomialDegree() > CoarsePolyDegree;
-		assert(false);
+		bool stillNeedToCoarsen = (_automaticNumberOfLevels && currentLevel->NUnknowns() > MatrixMaxSizeForCoarsestLevel) || (levelNumber < _nLevels - 1);
+		if (!stillNeedToCoarsen)
+			return false;
+		if (this->HP_Stgy == HP_Strategy::P_only && currentLevel->PolynomialDegree() == CoarsePolyDegree)
+			return false; // cannot p-coarsen anymore
+		return true;
 	}
 
 	IterationResult ExecuteOneIteration(const Vector& b, Vector& x, bool& xEquals0, bool computeResidual, bool computeAx, const IterationResult& oldResult) override
@@ -507,7 +521,7 @@ public:
 			os << "," << CoarseLevelChangeSmoothingOperator << CoarseLevelChangeSmoothingCoeff;
 		os << ")" << endl;
 
-		if (MultigridType == MGType::h_Multigrid)
+		if (this->HP_Stgy != HP_Strategy::P_only)
 		{
 			os << "\t" << "Levels                  : ";
 			if (_automaticNumberOfLevels && _nLevels == 0)

@@ -18,6 +18,7 @@ public:
 
 	Level* FinerLevel = nullptr;
 	Level* CoarserLevel = nullptr;
+	CoarseningType ComesFrom = CoarseningType::H;
 
 	bool ExportComponents = false;
 	BigNumber SetupComputationalWork = 0;

@@ -81,13 +81,13 @@ public:
 
 	DenseMatrix Trace(Element<Dim>* element, FunctionalBasis<Dim>* cellInterpolationBasis)
 	{
-		if (cellInterpolationBasis == HHO->CellBasis)
+		/*if (cellInterpolationBasis == HHO->CellBasis)
 			return TraceUsingCellBasis(element);
 		else if (cellInterpolationBasis == HHO->ReconstructionBasis)
 			return TraceUsingReconstructBasis(element);
-		//else
-			//return ComputeTraceMatrix(element, cellInterpolationBasis);
-		assert(false);
+		//else*/
+			return ComputeTraceMatrix(element, cellInterpolationBasis);
+		//assert(false);
 	}
 
 	double ProjectOnBasisFunction(BasisFunction<Dim - 1>* phi, DomFunction f)

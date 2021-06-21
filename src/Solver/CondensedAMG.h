@@ -912,7 +912,7 @@ private:
 public:
 
 	CondensedAMG(int cellBlockSize, int faceBlockSize, double strongCouplingThreshold, CAMGFaceProlongation faceProlong, CAMGProlongation coarseningProlong, CAMGProlongation mgProlong, int nLevels = 0)
-		: Multigrid(MGType::h_Multigrid, nLevels)
+		: Multigrid(nLevels)
 	{
 		this->_cellBlockSize = cellBlockSize;
 		this->_faceBlockSize = faceBlockSize;
@@ -1002,7 +1002,7 @@ protected:
 		return new CondensedLevel(0, _cellBlockSize, _faceBlockSize, _strongCouplingThreshold, _faceProlong, _coarseningProlong, _multigridProlong);
 	}
 
-	Level* CreateCoarseLevel(Level* fineLevel) override
+	Level* CreateCoarseLevel(Level* fineLevel, CoarseningType coarseningType) override
 	{
 		CondensedLevel* coarseLevel = new CondensedLevel(fineLevel->Number + 1, _cellBlockSize, _faceBlockSize, _strongCouplingThreshold, _faceProlong, _coarseningProlong, _multigridProlong);
 		coarseLevel->OperatorMatrix = &dynamic_cast<CondensedLevel*>(fineLevel)->Ac;

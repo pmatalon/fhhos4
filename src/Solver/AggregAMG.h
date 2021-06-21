@@ -291,7 +291,7 @@ private:
 public:
 
 	AggregAMG(int blockSize, double strongCouplingThreshold, int nLevels = 0)
-		: Multigrid(MGType::h_Multigrid, nLevels)
+		: Multigrid(nLevels)
 	{
 		this->_blockSize = blockSize;
 		this->_strongCouplingThreshold = strongCouplingThreshold;
@@ -329,7 +329,7 @@ protected:
 		return new AggregLevel(0, _blockSize, _strongCouplingThreshold);
 	}
 
-	Level* CreateCoarseLevel(Level* fineLevel) override
+	Level* CreateCoarseLevel(Level* fineLevel, CoarseningType coarseningType) override
 	{
 		AggregLevel* coarseLevel = new AggregLevel(fineLevel->Number + 1, _blockSize, _strongCouplingThreshold);
 		coarseLevel->OperatorMatrix = &dynamic_cast<AggregLevel*>(fineLevel)->Ac;

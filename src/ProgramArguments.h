@@ -33,6 +33,7 @@ struct DiscretizationArguments
 
 struct MultigridArguments
 {
+	HP_Strategy HP_Stgy = HP_Strategy::H_only;
 	int Levels = 0;
 	int ProlongationCode = 0;
 	GMGProlongation GMGProlong = GMGProlongation::Default;
@@ -44,7 +45,7 @@ struct MultigridArguments
 	int MatrixMaxSizeForCoarsestLevel = 1000;
 	char CycleLetter = 'V';
 	int WLoops = 1;
-	int CellInterpolationCode = 1;
+	int UseHigherOrderReconstruction = 1;
 	string WeightCode = "k";
 	bool UseGalerkinOperator = false;
 	string PreSmootherCode = "bgs";

@@ -432,7 +432,8 @@ private:
 			if (args.Discretization.StaticCondensation)
 			{
 				MultigridForHHO<Dim>* mg = new MultigridForHHO<Dim>(args.Solver.MG.Levels);
-				mg->CellInterpolationCode = args.Solver.MG.CellInterpolationCode;
+				mg->HP_Stgy = args.Solver.MG.HP_Stgy;
+				mg->UseHigherOrderReconstruction = args.Solver.MG.UseHigherOrderReconstruction;
 				mg->Prolongation = args.Solver.MG.GMGProlong;
 				mg->WeightCode = args.Solver.MG.WeightCode;
 				if (problem)

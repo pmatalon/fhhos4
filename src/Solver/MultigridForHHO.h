@@ -9,17 +9,17 @@ class LevelForHHO : public Level
 {
 private:
 	GMGProlongation _prolongation = GMGProlongation::CellInterp_Trace;
-	FunctionalBasis<Dim>* _cellInterpolationBasis;
+	bool _useHigherOrderReconstruction;
 	string _weightCode = "k";
 public:
 	Diffusion_HHO<Dim>* _problem;
 
-	LevelForHHO(int number, Diffusion_HHO<Dim>* problem, GMGProlongation prolongation, FunctionalBasis<Dim>* cellInterpolationBasis, string weightCode)
+	LevelForHHO(int number, Diffusion_HHO<Dim>* problem, GMGProlongation prolongation, bool useHigherOrderReconstruction, string weightCode)
 		: Level(number)
 	{
 		this->_problem = problem;
 		this->_prolongation = prolongation;
-		this->_cellInterpolationBasis = cellInterpolationBasis;
+		this->_useHigherOrderReconstruction = useHigherOrderReconstruction;
 		this->_weightCode = weightCode;
 	}
 
@@ -82,7 +82,32 @@ public:
 private:
 	void SetupDiscretizedOperator() override 
 	{
-		this->OperatorMatrix = &this->_problem->A;
+		if (this->ComesFrom == CoarseningType::H || this->ComesFrom == CoarseningType::HP)
+			this->OperatorMatrix = &this->_problem->A;
+		else
+		{
+			LevelForHHO<Dim>* finerLevel = dynamic_cast<LevelForHHO<Dim>*>(FinerLevel);
+
+			int nHigherDegreeUnknowns = finerLevel->_problem->HHO->nFaceUnknowns;
+			int nLowerDegreeUnknowns = this->_problem->HHO->nFaceUnknowns;
+			NumberParallelLoop<CoeffsChunk> parallelLoop(finerLevel->OperatorMatrix->rows() / nHigherDegreeUnknowns);
+			parallelLoop.Execute([this, nHigherDegreeUnknowns, nLowerDegreeUnknowns](BigNumber i, ParallelChunk<CoeffsChunk>* chunk)
+				{
+					for (int k = 0; k < nLowerDegreeUnknowns; k++)
+					{
+						for (RowMajorSparseMatrix::InnerIterator it(*this->FinerLevel->OperatorMatrix, i*nHigherDegreeUnknowns + k); it; ++it)
+						{
+							auto j = it.col() / nHigherDegreeUnknowns;
+							int l = it.col() - j * nHigherDegreeUnknowns;
+							if (l < nLowerDegreeUnknowns)
+								chunk->Results.Coeffs.Add(i*nLowerDegreeUnknowns + k, j*nLowerDegreeUnknowns + l, it.value());
+						}
+					}
+				});
+			SparseMatrix* Ac = new SparseMatrix(this->_problem->HHO->nTotalFaceUnknowns, this->_problem->HHO->nTotalFaceUnknowns);
+			parallelLoop.Fill(*Ac);
+			this->OperatorMatrix = Ac;
+		}
 	}
 
 	/*Smoother* CreateSmoother(string smootherCode, int nSmootherIterations, int blockSize, double omega) override
@@ -95,26 +120,39 @@ private:
 
 	void OnStartSetup() override
 	{
-		if (_prolongation == GMGProlongation::FaceInject)
-			cout << "\t\tMesh                : " << this->_problem->_mesh->Faces.size() << " faces" << endl;
-		else
+		if (this->ComesFrom == CoarseningType::P || this->ComesFrom == CoarseningType::HP)
+			cout << "\t\tk = " << this->PolynomialDegree() << endl;
+		if (this->ComesFrom == CoarseningType::H || this->ComesFrom == CoarseningType::HP)
 		{
-			cout << "\t\tMesh                : " << this->_problem->_mesh->Elements.size() << " elements, regularity = ";
-			double regularity = this->_problem->_mesh->Regularity();
-			if (regularity == 0)
-				cout << "unknown";
+			if (_prolongation == GMGProlongation::FaceInject)
+				cout << "\t\tMesh                : " << this->_problem->_mesh->Faces.size() << " faces" << endl;
 			else
-				cout << regularity;
-			if (!this->IsFinestLevel())
-				cout << ", coarsening factor = " << this->_problem->_mesh->CoarseningFactor();
-			cout << endl;
+			{
+				cout << "\t\tMesh                : " << this->_problem->_mesh->Elements.size() << " elements, regularity = ";
+				double regularity = this->_problem->_mesh->Regularity();
+				if (regularity == 0)
+					cout << "unknown";
+				else
+					cout << regularity;
+				if (!this->IsFinestLevel())
+					cout << ", coarsening factor = " << this->_problem->_mesh->CoarseningFactor();
+				cout << endl;
+			}
+
+			if (ExportComponents)
+				this->ExportMeshToMatlab(this->_problem->_mesh, this->Number);
 		}
 
-		if (ExportComponents)
-			this->ExportMeshToMatlab(this->_problem->_mesh, this->Number);
-
-		if (!IsCoarsestLevel())
+		if (!IsCoarsestLevel() &&
+			(this->CoarserLevel->ComesFrom == CoarseningType::H || this->CoarserLevel->ComesFrom == CoarseningType::HP))
 		{
+			if (this->ComesFrom == CoarseningType::P)
+			{
+				// to compute the trace on the faces at the end of the prolongation
+				this->_problem->InitReferenceShapes();
+				this->_problem->InitHHO_Faces();
+			}
+
 			Diffusion_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
 
 			if (this->UseGalerkinOperator)
@@ -124,13 +162,25 @@ private:
 				ActionsArguments actions;
 				actions.LogAssembly = false;
 				actions.AssembleRightHandSide = false;
-				actions.InitReferenceShapes = false;
+				//actions.InitReferenceShapes = (CoarserLevel->ComesFrom == CoarseningType::HP || CoarserLevel->ComesFrom == CoarseningType::H)
+					//&& this->ComesFrom == CoarseningType::P;
+				actions.InitReferenceShapes = true;
 				coarsePb->Assemble(actions);
 			}
 		}
 	}
 
 	void SetupProlongation() override
+	{
+		if (this->CoarserLevel->ComesFrom == CoarseningType::H || this->CoarserLevel->ComesFrom == CoarseningType::HP)
+			SetupProlongation_H();
+		else if (this->CoarserLevel->ComesFrom == CoarseningType::P)
+			SetupProlongation_P();
+		else
+			assert(false);
+	}
+
+	void SetupProlongation_H()
 	{
 		Diffusion_HHO<Dim>* finePb = this->_problem;
 		Diffusion_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
@@ -445,35 +495,84 @@ private:
 		//cout << "Total prolong: " << totalProlongTimer.CPU().InMilliseconds << endl;
 	}
 
+
+	void SetupProlongation_P()
+	{
+		string basis = this->_problem->HHO->FaceBasis->BasisCode();
+		if (!BasisFunctionFactory::IsHierarchicalBasis(basis) || !BasisFunctionFactory::IsOrthogonalBasis(basis))
+			Utils::FatalError("The natural injection is not implemented for non-hierarchical or non-orthogonal bases.");
+	}
+
+
 	void SetupRestriction() override
 	{
-		R = (RestrictionScalingFactor() * P.transpose()).eval();
+		if (this->CoarserLevel->ComesFrom == CoarseningType::H || this->CoarserLevel->ComesFrom == CoarseningType::HP)
+			R = (RestrictionScalingFactor() * P.transpose()).eval();
 	}
 
 	void OnEndSetup() override
 	{
-		// If finest level, delete everything you don't need to reconstruct the solution at the end
-		if (IsFinestLevel())
+		if (this->ComesFrom == CoarseningType::H || this->ComesFrom == CoarseningType::HP)
 		{
-			ElementParallelLoop<Dim> parallelLoopE(_problem->_mesh->Elements);
-			parallelLoopE.Execute([](Element<Dim>* element)
-				{
-					Diff_HHOElement<Dim>* e = dynamic_cast<Diff_HHOElement<Dim>*>(element);
-					e->DeleteUselessMatricesAfterMultigridSetup();
-				});
+			// If finest level, delete everything you don't need to reconstruct the solution at the end
+			if (IsFinestLevel())
+			{
+				ElementParallelLoop<Dim> parallelLoopE(_problem->_mesh->Elements);
+				parallelLoopE.Execute([](Element<Dim>* element)
+					{
+						Diff_HHOElement<Dim>* e = dynamic_cast<Diff_HHOElement<Dim>*>(element);
+						e->DeleteUselessMatricesAfterMultigridSetup();
+					});
 
-			FaceParallelLoop<Dim> parallelLoopF(_problem->_mesh->Faces);
-			parallelLoopF.Execute([](Face<Dim>* face)
-				{
-					Diff_HHOFace<Dim>* f = dynamic_cast<Diff_HHOFace<Dim>*>(face);
-					f->DeleteUselessMatricesAfterMultigridSetup();
-				});
+				FaceParallelLoop<Dim> parallelLoopF(_problem->_mesh->Faces);
+				parallelLoopF.Execute([](Face<Dim>* face)
+					{
+						Diff_HHOFace<Dim>* f = dynamic_cast<Diff_HHOFace<Dim>*>(face);
+						f->DeleteUselessMatricesAfterMultigridSetup();
+					});
+			}
+
+			// On the coarse levels, delete the whole mesh
+			_problem->_mesh->CoarseMesh = nullptr;
+			if (!IsFinestLevel())
+				delete _problem->_mesh;
 		}
+	}
 
-		// On the coarse levels, delete the whole mesh
-		_problem->_mesh->CoarseMesh = nullptr;
-		if (!IsFinestLevel())
-			delete _problem->_mesh;
+public:
+	Vector Prolong(Vector& vectorOnTheCoarserLevel) override
+	{
+		if (this->CoarserLevel->ComesFrom == CoarseningType::P)
+		{
+			Diffusion_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
+			auto nFaces = _problem->HHO->nInteriorAndNeumannFaces;
+			auto nHigherDegreeUnknowns = _problem->HHO->nFaceUnknowns;
+			auto nLowerDegreeUnknowns = coarsePb->HHO->nFaceUnknowns;
+			Vector vectorOnThisLevel = Vector::Zero(nFaces * nHigherDegreeUnknowns);
+			for (BigNumber i = 0; i < nFaces; i++)
+				vectorOnThisLevel.segment(i*nHigherDegreeUnknowns, nLowerDegreeUnknowns) = vectorOnTheCoarserLevel.segment(i*nLowerDegreeUnknowns, nLowerDegreeUnknowns);
+			return vectorOnThisLevel;
+		}
+		else
+			return Level::Prolong(vectorOnTheCoarserLevel);
+	}
+
+	Vector Restrict(Vector& vectorOnThisLevel) override
+	{
+		if (this->CoarserLevel->ComesFrom == CoarseningType::P)
+		{
+			// This is possible only if the basis is hierarchical and orthogonal
+			Diffusion_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
+			auto nFaces = _problem->HHO->nInteriorAndNeumannFaces;
+			auto nHigherDegreeUnknowns = _problem->HHO->nFaceUnknowns;
+			auto nLowerDegreeUnknowns = coarsePb->HHO->nFaceUnknowns;
+			Vector vectorOnTheCoarserLevel(nFaces * nLowerDegreeUnknowns);
+			for (BigNumber i = 0; i < nFaces; i++)
+				vectorOnTheCoarserLevel.segment(i*nLowerDegreeUnknowns, nLowerDegreeUnknowns) = vectorOnThisLevel.segment(i*nHigherDegreeUnknowns, nLowerDegreeUnknowns);
+			return vectorOnTheCoarserLevel;
+		}
+		else
+			return Level::Restrict(vectorOnThisLevel);
 	}
 
 private:
@@ -561,7 +660,8 @@ private:
 
 	SparseMatrix GetGlobalInterpolationMatrixFromFacesToCells(Diffusion_HHO<Dim>* problem)
 	{
-		int nCellUnknowns = _cellInterpolationBasis->Size();
+		FunctionalBasis<Dim>* cellInterpolationBasis = _useHigherOrderReconstruction ? problem->HHO->ReconstructionBasis : problem->HHO->CellBasis;
+		int nCellUnknowns = cellInterpolationBasis->Size();
 		int nFaceUnknowns = problem->HHO->nFaceUnknowns;
 
 		ElementParallelLoop<Dim> parallelLoop(problem->_mesh->Elements);
@@ -572,12 +672,10 @@ private:
 				Diff_HHOElement<Dim>* element = dynamic_cast<Diff_HHOElement<Dim>*>(e);
 
 				DenseMatrix cellInterpMatrix;
-				if (_cellInterpolationBasis == _problem->HHO->ReconstructionBasis)
+				if (_useHigherOrderReconstruction)
 					cellInterpMatrix = element->ReconstructionFromFacesMatrix();
-				else if (_cellInterpolationBasis == _problem->HHO->CellBasis)
-					cellInterpMatrix = element->SolveCellUnknownsMatrix();
 				else
-					assert(false);
+					cellInterpMatrix = element->SolveCellUnknownsMatrix();
 
 				for (auto f : element->Faces)
 				{
@@ -639,13 +737,14 @@ private:
 
 	SparseMatrix GetGlobalProjectorMatrixFromCellsToFaces(Diffusion_HHO<Dim>* problem)
 	{
+		FunctionalBasis<Dim>* cellInterpolationBasis = _useHigherOrderReconstruction ? problem->HHO->ReconstructionBasis : problem->HHO->CellBasis;
+		int nCellUnknowns = cellInterpolationBasis->Size();
 		int nFaceUnknowns = problem->HHO->nFaceUnknowns;
-		int nCellUnknowns = _cellInterpolationBasis->Size();
 
 		ElementParallelLoop<Dim> parallelLoop(problem->_mesh->Elements);
 		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nFaceUnknowns);
 
-		parallelLoop.Execute([this, nCellUnknowns, nFaceUnknowns](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+		parallelLoop.Execute([this, nCellUnknowns, nFaceUnknowns, cellInterpolationBasis](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
 			{
 				Diff_HHOElement<Dim>* element = dynamic_cast<Diff_HHOElement<Dim>*>(e);
 
@@ -660,7 +759,7 @@ private:
 					BigNumber faceGlobalNumber = face->Number;
 
 					double weight = Weight(element, face);
-					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, elemGlobalNumber*nCellUnknowns, weight*face->Trace(element, _cellInterpolationBasis));
+					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, elemGlobalNumber*nCellUnknowns, weight*face->Trace(element, cellInterpolationBasis));
 				}
 			});
 
@@ -675,13 +774,14 @@ private:
 		Diffusion_HHO<Dim>* finePb = this->_problem;
 		Diffusion_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
 
+		FunctionalBasis<Dim>* cellInterpolationBasis = _useHigherOrderReconstruction ? coarsePb->HHO->ReconstructionBasis : coarsePb->HHO->CellBasis;
+		int nCellUnknowns = cellInterpolationBasis->Size();
 		int nFaceUnknowns = finePb->HHO->nFaceUnknowns;
-		int nCellUnknowns = _cellInterpolationBasis->Size();
 
 		FaceParallelLoop<Dim> parallelLoop(finePb->_mesh->Faces);
 		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nFaceUnknowns);
 
-		parallelLoop.Execute([this, nCellUnknowns, nFaceUnknowns](Face<Dim>* f, ParallelChunk<CoeffsChunk>* chunk)
+		parallelLoop.Execute([this, nCellUnknowns, nFaceUnknowns, cellInterpolationBasis](Face<Dim>* f, ParallelChunk<CoeffsChunk>* chunk)
 			{
 				if (f->HasDirichletBC())
 					return;
@@ -693,7 +793,7 @@ private:
 					Element<Dim>* coarseElem = face->Element1->CoarserElement;
 					BigNumber coarseElemGlobalNumber = coarseElem->Number;
 
-					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, coarseElemGlobalNumber*nCellUnknowns, face->Trace(coarseElem, _cellInterpolationBasis));
+					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, coarseElemGlobalNumber*nCellUnknowns, face->Trace(coarseElem, cellInterpolationBasis));
 				}
 				else
 				{
@@ -704,11 +804,11 @@ private:
 
 					//double weight1 = Weight(coarseElem1, face->CoarseFace); // Careful with using face->CoarseFace when the mesh isn't nested...
 					double weight1 = Weight(face->Element1, face);
-					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, coarseElem1GlobalNumber*nCellUnknowns, weight1*face->Trace(coarseElem1, _cellInterpolationBasis));
+					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, coarseElem1GlobalNumber*nCellUnknowns, weight1*face->Trace(coarseElem1, cellInterpolationBasis));
 
 					//double weight2 = Weight(coarseElem2, face->CoarseFace);
 					double weight2 = Weight(face->Element2, face);
-					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, coarseElem2GlobalNumber*nCellUnknowns, weight2*face->Trace(coarseElem2, _cellInterpolationBasis));
+					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, coarseElem2GlobalNumber*nCellUnknowns, weight2*face->Trace(coarseElem2, cellInterpolationBasis));
 
 					assert(abs(weight1 + weight2 - 1) < 1e-12);
 				}
@@ -723,11 +823,11 @@ private:
 	// Min 1/2 ||  ||^2
 	SparseMatrix GetGlobalMatrixFindFacesWhichReconstructCells(Diffusion_HHO<Dim>* problem)
 	{
-		if (_cellInterpolationBasis != _problem->HHO->ReconstructionBasis)
+		if (!_useHigherOrderReconstruction)
 			assert(false && "This algo is only available if we reconstruct in degree k+1 on the cells.");
 
 		int nFaceUnknowns = problem->HHO->nFaceUnknowns;
-		int nCellUnknowns = _cellInterpolationBasis->Size();
+		int nCellUnknowns = problem->HHO->nReconstructUnknowns;
 
 		ElementParallelLoop<Dim> parallelLoop(problem->_mesh->Elements);
 		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nFaceUnknowns);
@@ -766,16 +866,20 @@ private:
 		Diffusion_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
 		Mesh<Dim>* coarseMesh = coarsePb->_mesh;
 
-		int nCellUnknowns = _cellInterpolationBasis->Size();
+		if (finePb->HHO->FaceBasis->GetDegree() != coarsePb->HHO->FaceBasis->GetDegree())
+			Utils::FatalError("L2-proj from coarse to fine elements only available if same degree at both levels. TODO: To be implemented!");
+
+		FunctionalBasis<Dim>* cellInterpolationBasis = _useHigherOrderReconstruction ? coarsePb->HHO->ReconstructionBasis : coarsePb->HHO->CellBasis;
+		int nCellUnknowns = cellInterpolationBasis->Size();
 
 		ElementParallelLoop<Dim> parallelLoop(coarseMesh->Elements);
 		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nCellUnknowns);
 
-		parallelLoop.Execute([this, nCellUnknowns](Element<Dim>* ce, ParallelChunk<CoeffsChunk>* chunk)
+		parallelLoop.Execute([this, nCellUnknowns, cellInterpolationBasis](Element<Dim>* ce, ParallelChunk<CoeffsChunk>* chunk)
 			{
 				Diff_HHOElement<Dim>* coarseElement = dynamic_cast<Diff_HHOElement<Dim>*>(ce);
 
-				DenseMatrix local_J_f_c = coarseElement->ComputeCanonicalInjectionMatrixCoarseToFine(_cellInterpolationBasis);
+				DenseMatrix local_J_f_c = coarseElement->ComputeCanonicalInjectionMatrixCoarseToFine(cellInterpolationBasis);
 				for (auto fineElement : coarseElement->FinerElements)
 				{
 					BigNumber coarseElemGlobalNumber = coarseElement->Number;
@@ -797,16 +901,20 @@ private:
 		Diffusion_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
 		Mesh<Dim>* coarseMesh = coarsePb->_mesh;
 
-		int nCellUnknowns = _cellInterpolationBasis->Size();
+		if (finePb->HHO->FaceBasis->GetDegree() != coarsePb->HHO->FaceBasis->GetDegree())
+			Utils::FatalError("L2-proj from coarse to fine elements only available if same degree at both levels. TODO: To be implemented!");
+
+		FunctionalBasis<Dim>* cellInterpolationBasis = _useHigherOrderReconstruction ? coarsePb->HHO->ReconstructionBasis : coarsePb->HHO->CellBasis;
+		int nCellUnknowns = cellInterpolationBasis->Size();
 
 		ElementParallelLoop<Dim> parallelLoop(coarseMesh->Elements);
 		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nCellUnknowns);
 
-		parallelLoop.Execute([this, nCellUnknowns](Element<Dim>* ce, ParallelChunk<CoeffsChunk>* chunk)
+		parallelLoop.Execute([this, nCellUnknowns, cellInterpolationBasis](Element<Dim>* ce, ParallelChunk<CoeffsChunk>* chunk)
 			{
 				Diff_HHOElement<Dim>* coarseElement = dynamic_cast<Diff_HHOElement<Dim>*>(ce);
 
-				DenseMatrix localL2Proj = coarseElement->ComputeL2ProjectionMatrixCoarseToFine(_cellInterpolationBasis);
+				DenseMatrix localL2Proj = coarseElement->ComputeL2ProjectionMatrixCoarseToFine(cellInterpolationBasis);
 				for (auto it = coarseElement->OverlappingFineElements.begin(); it != coarseElement->OverlappingFineElements.end(); it++)
 				{
 					Element<Dim>* fineElement = it->first;
@@ -871,10 +979,9 @@ class MultigridForHHO : public Multigrid
 {
 private:
 	Diffusion_HHO<Dim>* _problem;
-	FunctionalBasis<Dim>* _cellInterpolationBasis;
 public:
 	GMGProlongation Prolongation = GMGProlongation::CellInterp_Trace;
-	int CellInterpolationCode = 1;
+	bool UseHigherOrderReconstruction = true;
 	string WeightCode = "k";
 	
 	MultigridForHHO(Diffusion_HHO<Dim>* problem, int nLevels = 0)
@@ -886,25 +993,13 @@ public:
 	// Use Initialize after these constructors
 	MultigridForHHO() : MultigridForHHO(0)
 	{}
-	MultigridForHHO(int nLevels) : Multigrid(MGType::h_Multigrid, nLevels)
+	MultigridForHHO(int nLevels) : Multigrid(nLevels)
 	{}
 
 	void InitializeWithProblem(Diffusion_HHO<Dim>* problem)
 	{
 		this->_problem = problem;
-		if (CellInterpolationCode == 1)
-			this->_cellInterpolationBasis = problem->HHO->ReconstructionBasis;
-		else if (CellInterpolationCode == 2)
-			this->_cellInterpolationBasis = problem->HHO->CellBasis;
-		else
-			assert(false && "Unknown cellInterpolationCode");
 		this->BlockSizeForBlockSmoothers = problem->HHO->nFaceUnknowns;
-	}
-
-	void InitializeWithProblem(Diffusion_HHO<Dim>* problem, int cellInterpolationCode)
-	{
-		this->CellInterpolationCode = cellInterpolationCode;
-		this->InitializeWithProblem(problem);
 	}
 
 	void BeginSerialize(ostream& os) const override
@@ -934,9 +1029,9 @@ public:
 		if (Prolongation != GMGProlongation::FaceInject)
 		{
 			os << "\t" << "Cell interpolation      : ";
-			if (CellInterpolationCode == 2)
+			if (!UseHigherOrderReconstruction)
 				os << "k [-cell-interp 2]";
-			else if (CellInterpolationCode == 1)
+			else
 				os << "k+1 [-cell-interp 1]";
 			os << endl;
 		}
@@ -1000,14 +1095,24 @@ protected:
 	Level* CreateFineLevel() const override
 	{
 		assert(_problem && "The multigrid has not been initialized with a problem");
-		return new LevelForHHO<Dim>(0, _problem, Prolongation, _cellInterpolationBasis, WeightCode);
+		return new LevelForHHO<Dim>(0, _problem, Prolongation, UseHigherOrderReconstruction, WeightCode);
 	}
 
-	Level* CreateCoarseLevel(Level* fineLevel) override
+	Level* CreateCoarseLevel(Level* fineLevel, CoarseningType coarseningType) override
 	{
 		LevelForHHO<Dim>* hhoFineLevel = dynamic_cast<LevelForHHO<Dim>*>(fineLevel);
-		Diffusion_HHO<Dim>* coarseProblem = hhoFineLevel->_problem->GetProblemOnCoarserMesh();
-		LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(fineLevel->Number + 1, coarseProblem, Prolongation, _cellInterpolationBasis, WeightCode);
+
+		Diffusion_HHO<Dim>* coarseProblem;
+		if (coarseningType == CoarseningType::H)
+			coarseProblem = hhoFineLevel->_problem->GetProblemOnCoarserMesh();
+		else if (coarseningType == CoarseningType::P)
+			coarseProblem = hhoFineLevel->_problem->GetProblemForLowerDegree();
+		else if (coarseningType == CoarseningType::HP)
+			coarseProblem = hhoFineLevel->_problem->GetProblemOnCoarserMeshAndLowerDegree();
+		else
+			assert(false);
+		
+		LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(fineLevel->Number + 1, coarseProblem, Prolongation, UseHigherOrderReconstruction, WeightCode);
 		return coarseLevel;
 	}
 };
