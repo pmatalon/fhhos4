@@ -106,54 +106,6 @@ public:
 		return this->P * createHybridVectorFromFacesMatrix;
 	}
 
-	inline double MatrixTerm(BasisFunction<Dim>* cellPhi1, BasisFunction<Dim>* cellPhi2)
-	{
-		return this->A(DOFNumber(cellPhi1), DOFNumber(cellPhi2));
-	}
-	inline double MatrixTerm(Face<Dim>* face, BasisFunction<Dim>* cellPhi, BasisFunction<Dim - 1> * facePhi)
-	{
-		return this->A(DOFNumber(cellPhi), DOFNumber(face, facePhi));
-	}
-	inline double MatrixTerm(Face<Dim>* face1, BasisFunction<Dim - 1> * facePhi1, Face<Dim>* face2, BasisFunction<Dim - 1> * facePhi2)
-	{
-		return this->A(DOFNumber(face1, facePhi1), DOFNumber(face2, facePhi2));
-	}
-
-	inline double ConsistencyTerm(BasisFunction<Dim>* cellPhi1, BasisFunction<Dim>* cellPhi2)
-	{
-		return this->Acons(DOFNumber(cellPhi1), DOFNumber(cellPhi2));
-	}
-	inline double ConsistencyTerm(Face<Dim>* face, BasisFunction<Dim>* cellPhi, BasisFunction<Dim - 1> * facePhi)
-	{
-		return this->Acons(DOFNumber(cellPhi), DOFNumber(face, facePhi));
-	}
-	inline double ConsistencyTerm(Face<Dim>* face1, BasisFunction<Dim - 1> * facePhi1, Face<Dim>* face2, BasisFunction<Dim - 1> * facePhi2)
-	{
-		return this->Acons(DOFNumber(face1, facePhi1), DOFNumber(face2, facePhi2));
-	}
-
-	inline double StabilizationTerm(BasisFunction<Dim>* cellPhi1, BasisFunction<Dim>* cellPhi2)
-	{
-		return this->Astab(DOFNumber(cellPhi1), DOFNumber(cellPhi2));
-	}
-	inline double StabilizationTerm(Face<Dim>* face, BasisFunction<Dim>* cellPhi, BasisFunction<Dim - 1> * facePhi)
-	{
-		return this->Astab(DOFNumber(cellPhi), DOFNumber(face, facePhi));
-	}
-	inline double StabilizationTerm(Face<Dim>* face1, BasisFunction<Dim - 1> * facePhi1, Face<Dim>* face2, BasisFunction<Dim - 1> * facePhi2)
-	{
-		return this->Astab(DOFNumber(face1, facePhi1), DOFNumber(face2, facePhi2));
-	}
-
-	inline double ReconstructionTerm(BasisFunction<Dim>* reconstructPhi, BasisFunction<Dim>* cellPhi2)
-	{
-		return this->P(reconstructPhi->LocalNumber, DOFNumber(cellPhi2));
-	}
-	inline double ReconstructionTerm(BasisFunction<Dim>* reconstructPhi, Face<Dim>* face, BasisFunction<Dim - 1> * facePhi)
-	{
-		return this->P(reconstructPhi->LocalNumber, DOFNumber(face, facePhi));
-	}
-
 	virtual ~Diff_HHOElement() {}
 
 private:

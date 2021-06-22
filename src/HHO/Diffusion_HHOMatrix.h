@@ -19,15 +19,6 @@ public:
 	{
 		return e->Number * _nDoFsPerElement;
 	}
-
-	inline BigNumber Row(Element<Dim>* e, BasisFunction<Dim>* cellPhi)
-	{
-		return FirstRow(e) + cellPhi->LocalNumber;
-	}
-	inline BigNumber Col(Element<Dim>* e, BasisFunction<Dim>* cellPhi)
-	{
-		return Row(e, cellPhi);
-	}
 };
 
 
@@ -55,15 +46,6 @@ public:
 	{
 		return f->Number * _nDoFsPerFace;
 	}
-
-	inline BigNumber Row(Element<Dim>* e, BasisFunction<Dim>* cellPhi)
-	{
-		return FirstRow(e) + cellPhi->LocalNumber;
-	}
-	inline BigNumber Col(Face<Dim>* f, BasisFunction<Dim-1>* facePhi)
-	{
-		return FirstCol(f) + facePhi->LocalNumber;
-	}
 };
 
 
@@ -85,12 +67,8 @@ public:
 		return f->Number * _nDoFsPerFace;
 	}
 
-	inline BigNumber Row(Face<Dim>* f, BasisFunction<Dim-1>* facePhi)
+	inline BigNumber FirstCol(Face<Dim>* f)
 	{
-		return FirstRow(f) + facePhi->LocalNumber;
-	}
-	inline BigNumber Col(Face<Dim>* f, BasisFunction<Dim-1>* facePhi)
-	{
-		return Row(f, facePhi);
+		return FirstRow(f);
 	}
 };

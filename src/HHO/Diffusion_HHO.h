@@ -318,24 +318,12 @@ public:
 
 					A_T_T_Block<Dim>& A_T_T = chunk->Results.A_T_T_Coeffs;
 
-					for (BasisFunction<Dim>* cellPhi1 : cellBasis->LocalFunctions)
+					BigNumber i = A_T_T.FirstRow(element);
+					A_T_T.AddBlock(i, i, element->A, 0, 0, HHO->nCellUnknowns, HHO->nCellUnknowns);
+					if (actions.ExportAssemblyTermMatrices)
 					{
-						BigNumber i = A_T_T.Row(element, cellPhi1);
-						for (BasisFunction<Dim>* cellPhi2 : cellBasis->LocalFunctions)
-						{
-							BigNumber j = A_T_T.Col(element, cellPhi2);
-
-							double matrixTerm = element->MatrixTerm(cellPhi1, cellPhi2);
-							A_T_T.Add(i, j, matrixTerm);
-							if (actions.ExportAssemblyTermMatrices)
-							{
-								double consistencyTerm = element->ConsistencyTerm(cellPhi1, cellPhi2);
-								chunk->Results.ConsistencyCoeffs.Add(i, j, consistencyTerm);
-
-								double stabilizationTerm = element->StabilizationTerm(cellPhi1, cellPhi2);
-								chunk->Results.StabilizationCoeffs.Add(i, j, stabilizationTerm);
-							}
-						}
+						chunk->Results.ConsistencyCoeffs.AddBlock(i, i, element->Acons, 0, 0, HHO->nCellUnknowns, HHO->nCellUnknowns);
+						chunk->Results.StabilizationCoeffs.AddBlock(i, i, element->Astab, 0, 0, HHO->nCellUnknowns, HHO->nCellUnknowns);
 					}
 				}
 
@@ -345,29 +333,17 @@ public:
 
 				A_T_F_Block<Dim>& A_T_F = chunk->Results.A_T_F_Coeffs;
 
-				for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions)
+				BigNumber i = A_T_F.FirstRow(element);
+
+				for (auto face : element->Faces)
 				{
-					BigNumber i = A_T_F.Row(element, cellPhi);
-					for (auto face : element->Faces)
+					BigNumber j = A_T_F.FirstCol(face);
+					A_T_F.AddBlock(i, j, element->A, 0, element->FirstDOFNumber(face), HHO->nCellUnknowns, HHO->nFaceUnknowns);
+
+					if (actions.ExportAssemblyTermMatrices && !face->HasDirichletBC())
 					{
-						for (BasisFunction<Dim - 1>* facePhi : faceBasis->LocalFunctions)
-						{
-							BigNumber j = A_T_F.Col(face, facePhi);
-
-							double matrixTerm = element->MatrixTerm(face, cellPhi, facePhi);
-							A_T_F.Add(i, j, matrixTerm);
-
-							if (actions.ExportAssemblyTermMatrices && !face->HasDirichletBC())
-							{
-								double consistencyTerm = element->ConsistencyTerm(face, cellPhi, facePhi);
-								chunk->Results.ConsistencyCoeffs.Add(i, j, consistencyTerm);
-								chunk->Results.ConsistencyCoeffs.Add(j, i, consistencyTerm);
-
-								double stabilizationTerm = element->StabilizationTerm(face, cellPhi, facePhi);
-								chunk->Results.StabilizationCoeffs.Add(i, j, stabilizationTerm);
-								chunk->Results.StabilizationCoeffs.Add(j, i, stabilizationTerm);
-							}
-						}
+						chunk->Results.ConsistencyCoeffs.AddBlock(i, j, element->Acons, 0, element->FirstDOFNumber(face), HHO->nCellUnknowns, HHO->nFaceUnknowns);
+						chunk->Results.StabilizationCoeffs.AddBlock(i, j, element->Astab, 0, element->FirstDOFNumber(face), HHO->nCellUnknowns, HHO->nFaceUnknowns);
 					}
 				}
 
@@ -379,26 +355,15 @@ public:
 
 				for (auto face1 : element->Faces)
 				{
-					for (BasisFunction<Dim - 1>* facePhi1 : faceBasis->LocalFunctions)
+					BigNumber i = A_F_F.FirstRow(face1);
+					for (auto face2 : element->Faces)
 					{
-						BigNumber i = A_F_F.Row(face1, facePhi1);
-						for (auto face2 : element->Faces)
+						BigNumber j = A_F_F.FirstCol(face2);
+						A_F_F.AddBlock(i, j, element->A, element->FirstDOFNumber(face1), element->FirstDOFNumber(face2), HHO->nFaceUnknowns, HHO->nFaceUnknowns);
+						if (actions.ExportAssemblyTermMatrices && !face1->HasDirichletBC() && !face2->HasDirichletBC())
 						{
-							for (BasisFunction<Dim - 1>* facePhi2 : faceBasis->LocalFunctions)
-							{
-								BigNumber j = A_F_F.Col(face2, facePhi2);
-
-								double matrixTerm = element->MatrixTerm(face1, facePhi1, face2, facePhi2);
-								A_F_F.Add(i, j, matrixTerm);
-								if (actions.ExportAssemblyTermMatrices && !face1->HasDirichletBC() && !face2->HasDirichletBC())
-								{
-									double consistencyTerm = element->ConsistencyTerm(face1, facePhi1, face2, facePhi2);
-									chunk->Results.ConsistencyCoeffs.Add(i, j, consistencyTerm);
-
-									double stabilizationTerm = element->StabilizationTerm(face1, facePhi1, face2, facePhi2);
-									chunk->Results.StabilizationCoeffs.Add(i, j, stabilizationTerm);
-								}
-							}
+							chunk->Results.ConsistencyCoeffs.AddBlock(i, j, element->Acons, element->FirstDOFNumber(face1), element->FirstDOFNumber(face2), HHO->nFaceUnknowns, HHO->nFaceUnknowns);
+							chunk->Results.StabilizationCoeffs.AddBlock(i, j, element->Astab, element->FirstDOFNumber(face1), element->FirstDOFNumber(face2), HHO->nFaceUnknowns, HHO->nFaceUnknowns);
 						}
 					}
 				}
@@ -422,22 +387,13 @@ public:
 
 				if (actions.ExportAssemblyTermMatrices)
 				{
-					for (BasisFunction<Dim>* reconstructPhi : reconstructionBasis->LocalFunctions)
+					BigNumber i = element->Number * reconstructionBasis->Size();
+					BigNumber j = FirstDOFGlobalNumber(element);
+					chunk->Results.ReconstructionCoeffs.AddBlock(i, j, element->P, 0, 0, reconstructionBasis->Size(), HHO->nCellUnknowns);
+					for (auto face : element->Faces)
 					{
-						BigNumber i = element->Number * reconstructionBasis->Size() + reconstructPhi->LocalNumber;
-						for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions)
-						{
-							BigNumber j = DOFNumber(element, cellPhi);
-							chunk->Results.ReconstructionCoeffs.Add(i, j, element->ReconstructionTerm(reconstructPhi, cellPhi));
-						}
-						for (auto face : element->Faces)
-						{
-							for (BasisFunction<Dim - 1>* facePhi : faceBasis->LocalFunctions)
-							{
-								BigNumber j = DOFNumber(face, facePhi);
-								chunk->Results.ReconstructionCoeffs.Add(i, j, element->ReconstructionTerm(reconstructPhi, face, facePhi));
-							}
-						}
+						j = FirstDOFGlobalNumber(face);
+						chunk->Results.ReconstructionCoeffs.AddBlock(i, j, element->P, 0, element->FirstDOFNumber(face), reconstructionBasis->Size(), HHO->nFaceUnknowns);
 					}
 				}
 			});
@@ -877,10 +833,6 @@ private:
 	BigNumber DOFNumber(Element<Dim>* element, BasisFunction<Dim>* cellPhi)
 	{
 		return FirstDOFGlobalNumber(element) + cellPhi->LocalNumber;
-	}
-	BigNumber DOFNumber(Face<Dim>* face, BasisFunction<Dim-1>* facePhi)
-	{
-		return FirstDOFGlobalNumber(face) + facePhi->LocalNumber;
 	}
 	BigNumber FirstDOFGlobalNumber(Element<Dim>* element)
 	{

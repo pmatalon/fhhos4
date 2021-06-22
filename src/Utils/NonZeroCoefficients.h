@@ -72,6 +72,15 @@ public:
 		}
 	}
 
+	void AddBlock(BigNumber iStart, BigNumber jStart, const DenseMatrix &m, BigNumber iStart_in_m, BigNumber jStart_in_m, int nRows, int nCols)
+	{
+		for (int i = 0; i < nRows; ++i)
+		{
+			for (int j = 0; j < nCols; ++j)
+				Add(iStart + i, jStart + j, m(iStart_in_m + i, jStart_in_m + j));
+		}
+	}
+
 	inline void CopyRows(BigNumber iStart, int nRows, const RowMajorSparseMatrix &m)
 	{
 		for (int i = 0; i < nRows; ++i)
