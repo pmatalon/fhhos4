@@ -110,39 +110,6 @@ public:
 		return projection;
 	}
 
-	DenseMatrix ComputeCanonicalInjectionMatrixCoarseToFine(FunctionalBasis<Dim-1>* faceBasis)
-	{
-		DenseMatrix J(faceBasis->Size() * this->FinerFaces.size(), faceBasis->Size());
-
-		for (auto f : this->FinerFaces)
-		{
-			Diff_HHOFace<Dim>* fineFace = dynamic_cast<Diff_HHOFace<Dim>*>(f);
-
-			DenseMatrix fineCoarseMass(faceBasis->Size(), faceBasis->Size());
-			for (BasisFunction<Dim-1>* finePhi : faceBasis->LocalFunctions)
-			{
-				for (BasisFunction<Dim-1>* coarsePhi : faceBasis->LocalFunctions)
-				{
-					RefFunction functionToIntegrate = [this, fineFace, finePhi, coarsePhi](const RefPoint& fineRefPoint) {
-						DomPoint domPoint = fineFace->ConvertToDomain(fineRefPoint);
-						RefPoint coarseRefPoint = this->ConvertToReference(domPoint);
-						return finePhi->Eval(fineRefPoint)*coarsePhi->Eval(coarseRefPoint);
-					};
-
-					int polynomialDegree = finePhi->GetDegree() + coarsePhi->GetDegree();
-					double integral = fineFace->Integral(functionToIntegrate, polynomialDegree);
-					fineCoarseMass(finePhi->LocalNumber, coarsePhi->LocalNumber) = integral;
-				}
-			}
-
-			DenseMatrix invFineMass = fineFace->InvMassMatrix();
-
-			J.block(this->LocalNumberOf(fineFace)*faceBasis->Size(), 0, faceBasis->Size(), faceBasis->Size()) = invFineMass * fineCoarseMass;
-		}
-
-		return J;
-	}
-
 	void DeleteUselessMatricesAfterAssembly()
 	{
 		Utils::Empty(_massMatrix);
