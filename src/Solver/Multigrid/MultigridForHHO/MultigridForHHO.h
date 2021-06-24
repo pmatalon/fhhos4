@@ -149,10 +149,7 @@ private:
 			if (this->ComesFrom == CoarseningType::P) // so the problem hasn't been assembled at this level
 			{
 				this->_problem->InitReferenceShapes();
-				if (this->_prolongation == GMGProlongation::CellInterp_Trace)
-					this->_problem->InitHHO_Faces(); // to compute the trace on the faces at the end of the prolongation
-				else
-					this->_problem->InitHHO(); // to compute the canonical injection or L2-projection in the cells and the trace on the faces (TODO: optimize! No need to compute the local matrices!)
+				this->_problem->InitHHO_Faces(); // for the inverses of the mass matrices (to compute the trace on the faces at the end of the prolongation)
 			}
 
 			Diffusion_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
@@ -965,8 +962,7 @@ private:
 				}
 			}
 
-			Diff_HHOElement<Dim>* hhoFineElement = fineProblem->HHOElement(fineElement);
-			DenseMatrix fineMass = hhoFineElement->MassMatrix(fineCellBasis);
+			DenseMatrix fineMass = fineElement->MassMatrix(fineCellBasis);
 
 			J.block(coarseElement->LocalNumberOf(fineElement)*fineCellBasis->Size(), 0, fineCellBasis->Size(), coarseCellBasis->Size()) = fineMass.inverse() * fineCoarseMass;
 		}
@@ -1069,8 +1065,7 @@ private:
 				}
 			}
 
-			Diff_HHOElement<Dim>* hhoFineElement = fineProblem->HHOElement(fineElement);
-			DenseMatrix fineMass = hhoFineElement->MassMatrix(cellBasis);
+			DenseMatrix fineMass = fineElement->MassMatrix(cellBasis);
 
 			L2Proj.block(coarseElement->LocalNumberOfOverlapping(fineElement)*cellBasis->Size(), 0, cellBasis->Size(), cellBasis->Size()) = fineMass.inverse() * fineCoarseMass;
 		}

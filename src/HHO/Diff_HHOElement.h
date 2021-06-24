@@ -69,18 +69,18 @@ private:
 public:
 	DenseMatrix MassMatrix(FunctionalBasis<Dim>* basis) const
 	{
-		return this->MeshElement->Shape()->MassMatrix(basis);
+		return this->MeshElement->MassMatrix(basis);
 	}
 
 private:
 	double IntegralKGradGradReconstruct(Tensor<Dim>* K, BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2) const
 	{
-		return this->MeshElement->Shape()->IntegralKGradGradReconstruct(K, reconstructPhi1, reconstructPhi2);
+		return this->MeshElement->IntegralKGradGradReconstruct(K, reconstructPhi1, reconstructPhi2);
 	}
 
 	DenseMatrix CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) const
 	{
-		return this->MeshElement->Shape()->CellReconstructMassMatrix(cellBasis, reconstructBasis);
+		return this->MeshElement->CellReconstructMassMatrix(cellBasis, reconstructBasis);
 	}
 
 	double ComputeIntegralKGradGrad(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
