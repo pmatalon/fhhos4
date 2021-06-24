@@ -2,10 +2,9 @@
 #include "Vertex.h"
 #include "Face.h"
 #include "../Geometry/CartesianShape.h"
-#include "../HHO/Diff_HHOFace.h"
 
 template <int Dim>
-class CartesianFace : public Diff_DGFace<Dim>, public Diff_HHOFace<Dim>
+class CartesianFace : public Diff_DGFace<Dim>
 {
 protected:
 	CartesianShape<Dim, Dim - 1> _shape;
@@ -14,13 +13,11 @@ public:
 
 	CartesianFace(BigNumber number, Vertex* origin, double width, Element<Dim>* element1, Element<Dim>* element2, CartesianShapeOrientation orientation) :
 		Diff_DGFace<Dim>(number, element1, element2),
-		Diff_HHOFace<Dim>(number, element1, element2),
 		_shape(origin, width, orientation)
 	{}
 
 	CartesianFace(BigNumber number, Vertex* origin, double firstWidth, double secondWidth, Element<Dim>* element1, Element<Dim>* element2, CartesianShapeOrientation orientation) :
 		Diff_DGFace<Dim>(number, element1, element2),
-		Diff_HHOFace<Dim>(number, element1, element2),
 		_shape(origin, firstWidth, secondWidth, orientation)
 	{
 		assert(Dim == 3);
@@ -30,7 +27,6 @@ private:
 	CartesianFace(BigNumber number, Element<Dim>* element1, Element<Dim>* element2, const CartesianShape<Dim, Dim - 1>& shape) :
 		Face<Dim>(number, element1, element2),
 		Diff_DGFace<Dim>(number, element1, element2),
-		Diff_HHOFace<Dim>(number, element1, element2),
 		_shape(shape)
 	{}
 

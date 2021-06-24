@@ -1,12 +1,11 @@
 #pragma once
 #include "../../DG/Diff_DGElement.h"
-#include "../../HHO/Diff_HHOElement.h"
 #include "../../Geometry/2D/Polygon.h"
 #include "../../Utils/RotatingList.h"
 #include "../AgglomerationException.h"
 using namespace std;
 
-class PolygonalElement : public Diff_DGElement<2>, public Diff_HHOElement<2>
+class PolygonalElement : public Diff_DGElement<2>
 {
 private:
 	Polygon _shape;
@@ -15,8 +14,7 @@ public:
 	// Constructor creating the polygon from the adjonction of two elements
 	PolygonalElement(int number, Element<2>* e1, Element<2>* e2, const vector<Face<2>*>& facesToRemove, bool createTriangulationAndBoundingBox = true) :
 		Element(number),
-		Diff_DGElement<2>(number),
-		Diff_HHOElement<2>(number)
+		Diff_DGElement<2>(number)
 	{
 		_vertices = MacroPolygonVertices(e1, e2, facesToRemove);
 		_shape = Polygon(Vertex::ToDomPoints(_vertices), createTriangulationAndBoundingBox, true);
@@ -25,7 +23,6 @@ public:
 	PolygonalElement(int number, const vector<Vertex*>& vertices, bool createTriangulationAndBoundingBox = true) :
 		Element(number),
 		Diff_DGElement<2>(number),
-		Diff_HHOElement<2>(number),
 		_vertices(vertices),
 		_shape(Vertex::ToDomPoints(vertices), createTriangulationAndBoundingBox, true)
 	{

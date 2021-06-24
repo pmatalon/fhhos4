@@ -1,11 +1,10 @@
 #pragma once
 #include "../../DG/Diff_DGElement.h"
-#include "../../HHO/Diff_HHOElement.h"
 #include "../../Geometry/2D/Triangle.h"
 #include "Edge.h"
 using namespace std;
 
-class TriangularElement : public Diff_DGElement<2>, public Diff_HHOElement<2>
+class TriangularElement : public Diff_DGElement<2>
 {
 private:
 	Triangle _shape;
@@ -20,7 +19,6 @@ public:
 	TriangularElement(int number, Vertex* v1, Vertex* v2, Vertex* v3) :
 		Element(number),
 		Diff_DGElement<2>(number),
-		Diff_HHOElement<2>(number),
 		_shape(*v1, *v2, *v3)
 	{
 		_v1 = v1;

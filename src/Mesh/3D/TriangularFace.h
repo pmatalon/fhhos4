@@ -1,9 +1,8 @@
 #pragma once
 #include "../../DG/Diff_DGFace.h"
-#include "../../HHO/Diff_HHOFace.h"
 #include "../../Geometry/3D/TriangleIn3D.h"
 
-class TriangularFace : public Diff_DGFace<3>, public Diff_HHOFace<3>
+class TriangularFace : public Diff_DGFace<3>
 {
 private:
 	TriangleIn3D _shape;
@@ -16,7 +15,6 @@ public:
 	TriangularFace(BigNumber number, Vertex* v1, Vertex* v2, Vertex* v3, Element<3>* element1, Element<3>* element2) :
 		Face(number, element1, element2),
 		Diff_DGFace(number, element1, element2),
-		Diff_HHOFace(number, element1, element2),
 		_shape(*v1, *v2, *v3)
 	{
 		_v1 = v1;

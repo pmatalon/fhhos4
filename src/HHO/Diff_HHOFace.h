@@ -6,18 +6,53 @@ template <int Dim>
 class Diff_HHOElement;
 
 template <int Dim>
-class Diff_HHOFace : virtual public Face<Dim>
+class Diff_HHOFace
 {
 private:
 	DenseMatrix _massMatrix;
 	DenseMatrix _invMassMatrix;
 public:
+	Face<Dim>* MeshFace = nullptr;
 	HHOParameters<Dim>* HHO;
 
 	Diff_HHOFace() {}
 
-	Diff_HHOFace(BigNumber number, Element<Dim>* element1, Element<Dim>* element2) : Face<Dim>(number, element1, element2) {}
+	//--------------//
+	// Face wrapper //
+	//--------------//
 
+public:
+	inline BigNumber Number() const
+	{
+		return this->MeshFace->Number;
+	}
+	inline double Diameter() const
+	{
+		return this->MeshFace->Diameter();
+	}
+	inline bool HasDirichletBC()
+	{
+		return this->MeshFace->HasDirichletBC();
+	}
+	inline bool HasNeumannBC()
+	{
+		return this->MeshFace->HasNeumannBC();
+	}
+private:
+	inline DomPoint ConvertToDomain(const RefPoint& refPoint) const
+	{
+		return this->MeshFace->ConvertToDomain(refPoint);
+	}
+	inline RefPoint ConvertToReference(const DomPoint& domainPoint) const
+	{
+		return this->MeshFace->ConvertToReference(domainPoint);
+	}
+
+	//-----------//
+	//    HHO    //
+	//-----------//
+
+public:
 	void InitHHO(HHOParameters<Dim>* hho)
 	{
 		if (this->_massMatrix.rows() > 0)
@@ -29,7 +64,7 @@ public:
 		//this->ComputeAndSaveQuadraturePoints();
 
 		//this->_faceMassMatrix = this->FaceMassMatrix(HHO->FaceBasis);
-		this->_massMatrix = this->Shape()->MassMatrix(HHO->FaceBasis);
+		this->_massMatrix = this->MeshFace->Shape()->MassMatrix(HHO->FaceBasis);
 		this->_invMassMatrix = this->_massMatrix.inverse();
 	}
 
@@ -59,14 +94,14 @@ public:
 
 	double ComputeMassTerm(BasisFunction<Dim - 1>* facePhi, Element<Dim>* element, BasisFunction<Dim>* reconstructPhi)
 	{
-		auto reconstructPhiOnFace = element->EvalPhiOnFace(this, reconstructPhi);
+		auto reconstructPhiOnFace = element->EvalPhiOnFace(this->MeshFace, reconstructPhi);
 
 		RefFunction functionToIntegrate = [facePhi, reconstructPhiOnFace](const RefPoint& p) {
 			return facePhi->Eval(p) * reconstructPhiOnFace(p);
 		};
 
 		int polynomialDegree = facePhi->GetDegree() + reconstructPhi->GetDegree();
-		return this->Integral(functionToIntegrate, polynomialDegree);
+		return this->MeshFace->Integral(functionToIntegrate, polynomialDegree);
 	}
 
 	DenseMatrix TraceUsingReconstructBasis(Element<Dim>* element)
@@ -97,7 +132,7 @@ public:
 			return f(domainPoint) * phi->Eval(refElementPoint);
 		};
 
-		return this->Integral(functionToIntegrate);
+		return this->MeshFace->Integral(functionToIntegrate);
 	}
 
 	Vector ProjectOnBasis(FunctionalBasis<Dim - 1>* faceBasis, DomFunction f)
@@ -118,7 +153,7 @@ public:
 	void DeleteUselessMatricesAfterMultigridSetup()
 	{
 		Utils::Empty(_invMassMatrix);
-		this->EmptySavedDomPoints();
+		this->MeshFace->EmptySavedDomPoints();
 	}
 
 private:

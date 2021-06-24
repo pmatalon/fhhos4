@@ -12,6 +12,9 @@ class Diffusion_HHO : public DiffusionProblem<Dim>
 private:
 	bool _staticCondensation = true;
 	bool _saveMatrixBlocks = false;
+
+	vector<Diff_HHOElement<Dim>> _hhoElements;
+	vector<Diff_HHOFace<Dim>> _hhoFaces;
 public:
 	// Matrix parts
 	SparseMatrix A_T_T;
@@ -228,9 +231,9 @@ public:
 		if (!actions.ExportAssemblyTermMatrices)
 		{
 			ElementParallelLoop<Dim> parallelLoopE(mesh->Elements);
-			parallelLoopE.Execute([](Element<Dim>* element)
+			parallelLoopE.Execute([this](Element<Dim>* element)
 				{
-					Diff_HHOElement<Dim>* e = dynamic_cast<Diff_HHOElement<Dim>*>(element);
+					Diff_HHOElement<Dim>* e = HHOElement(element);
 					e->DeleteUselessMatricesAfterAssembly(); // Acons, Astab
 				});
 		}
@@ -308,7 +311,7 @@ public:
 
 		parallelLoop.Execute([this, mesh, cellBasis, faceBasis, reconstructionBasis, actions](Element<Dim>* e, ParallelChunk<AssemblyResult>* chunk)
 			{
-				Diff_HHOElement<Dim>* element = dynamic_cast<Diff_HHOElement<Dim>*>(e);
+				Diff_HHOElement<Dim>* element = HHOElement(e);
 
 				if (!this->_staticCondensation || this->_saveMatrixBlocks)
 				{
@@ -387,7 +390,7 @@ public:
 
 				if (actions.ExportAssemblyTermMatrices)
 				{
-					BigNumber i = element->Number * reconstructionBasis->Size();
+					BigNumber i = element->Number() * reconstructionBasis->Size();
 					BigNumber j = FirstDOFGlobalNumber(element);
 					chunk->Results.ReconstructionCoeffs.AddBlock(i, j, element->P, 0, 0, reconstructionBasis->Size(), HHO->nCellUnknowns);
 					for (auto face : element->Faces)
@@ -406,16 +409,16 @@ public:
 			cout << "\tDelete now useless local matrices" << endl;
 
 		ElementParallelLoop<Dim> parallelLoopE(mesh->Elements);
-		parallelLoopE.Execute([](Element<Dim>* element)
+		parallelLoopE.Execute([this](Element<Dim>* element)
 			{
-				Diff_HHOElement<Dim>* e = dynamic_cast<Diff_HHOElement<Dim>*>(element);
+				Diff_HHOElement<Dim>* e = HHOElement(element);
 				e->DeleteUselessMatricesAfterAssembly();
 			});
 
 		FaceParallelLoop<Dim> parallelLoopF(mesh->Faces);
-		parallelLoopF.Execute([](Face<Dim>* face)
+		parallelLoopF.Execute([this](Face<Dim>* face)
 			{
-				Diff_HHOFace<Dim>* f = dynamic_cast<Diff_HHOFace<Dim>*>(face);
+				Diff_HHOFace<Dim>* f = HHOFace(face);
 				f->DeleteUselessMatricesAfterAssembly();
 			});
 
@@ -509,8 +512,8 @@ public:
 		{
 			ParallelLoop<Face<Dim>*>::Execute(this->_mesh->NeumannFaces, [this, faceBasis, &B_ndF](Face<Dim>* f)
 				{
-					Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
-					BigNumber i = FirstDOFGlobalNumber(f) - HHO->nTotalCellUnknowns;
+					Diff_HHOFace<Dim>* face = HHOFace(f);
+					BigNumber i = FirstDOFGlobalNumber(face) - HHO->nTotalCellUnknowns;
 					B_ndF.segment(i, HHO->nFaceUnknowns) = face->ProjectOnBasis(faceBasis, this->_boundaryConditions->NeumannFunction);
 				}
 			);
@@ -521,8 +524,8 @@ public:
 		assert(!this->_mesh->DirichletFaces.empty());
 		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->DirichletFaces, [this, faceBasis](Face<Dim>* f)
 			{
-				Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
-				BigNumber i = FirstDOFGlobalNumber(f) - HHO->nTotalHybridUnknowns;
+				Diff_HHOFace<Dim>* face = HHOFace(f);
+				BigNumber i = FirstDOFGlobalNumber(face) - HHO->nTotalHybridUnknowns;
 				this->x_dF.segment(i, HHO->nFaceUnknowns) = face->InvMassMatrix()*face->ProjectOnBasis(faceBasis, this->_boundaryConditions->DirichletFunction);
 			}
 		);
@@ -676,21 +679,44 @@ public:
 	}
 	void InitHHO_Faces()
 	{
+		if (!_hhoFaces.empty())
+			Utils::Warning("The HHO faces of this problem have already been initialized.");
+
+		_hhoFaces = vector<Diff_HHOFace<Dim>>(this->_mesh->Faces.size());
+
 		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->Faces, [this](Face<Dim>* f)
 			{
-				Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
-				face->InitHHO(HHO);
+				_hhoFaces[f->Number].MeshFace = f;
+				_hhoFaces[f->Number].InitHHO(HHO);
 			}
 		);
 	}
 	void InitHHO_Elements()
 	{
+		if (!_hhoElements.empty())
+			Utils::Warning("The HHO elements of this problem have already been initialized.");
+
+		_hhoElements = vector<Diff_HHOElement<Dim>>(this->_mesh->Elements.size());
+
 		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this](Element<Dim>* e)
 			{
-				Diff_HHOElement<Dim>* element = dynamic_cast<Diff_HHOElement<Dim>*>(e);
-				element->InitHHO(HHO);
+				_hhoElements[e->Number].MeshElement = e;
+
+				for (Face<Dim>* f : e->Faces)
+					_hhoElements[e->Number].Faces.push_back(&this->_hhoFaces[f->Number]);
+
+				_hhoElements[e->Number].InitHHO(HHO);
 			}
 		);
+	}
+
+	Diff_HHOElement<Dim>* HHOElement(Element<Dim>* e)
+	{
+		return &this->_hhoElements[e->Number];
+	}
+	Diff_HHOFace<Dim>* HHOFace(Face<Dim>* f)
+	{
+		return &this->_hhoFaces[f->Number];
 	}
 
 	//-------------------------------------------------------------------------------------------------//
@@ -723,7 +749,7 @@ public:
 		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, &globalReconstructedSolution](Element<Dim>* e)
 			{
 				HHOParameters<Dim>* HHO = this->HHO;
-				Diff_HHOElement<Dim>* element = dynamic_cast<Diff_HHOElement<Dim>*>(e);
+				Diff_HHOElement<Dim>* element = HHOElement(e);
 
 				Vector localHybridSolution(HHO->nCellUnknowns + HHO->nFaceUnknowns * element->Faces.size());
 				localHybridSolution.head(HHO->nCellUnknowns) = this->GlobalHybridSolution.segment(FirstDOFGlobalNumber(element), HHO->nCellUnknowns);
@@ -731,7 +757,7 @@ public:
 					localHybridSolution.segment(element->FirstDOFNumber(face), HHO->nFaceUnknowns) = this->GlobalHybridSolution.segment(FirstDOFGlobalNumber(face), HHO->nFaceUnknowns);
 
 				Vector localReconstructedSolution = element->Reconstruct(localHybridSolution);
-				globalReconstructedSolution.segment(element->Number * HHO->nReconstructUnknowns, HHO->nReconstructUnknowns) = localReconstructedSolution;
+				globalReconstructedSolution.segment(element->Number() * HHO->nReconstructUnknowns, HHO->nReconstructUnknowns) = localReconstructedSolution;
 			});
 
 		this->ReconstructedSolution = globalReconstructedSolution;
@@ -774,8 +800,8 @@ public:
 		parallelLoop.ReserveChunkCoeffsSize(HHO->nCellUnknowns * HHO->nCellUnknowns);
 		parallelLoop.Execute([this](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
 			{
-				Diff_HHOElement<Dim>* element = dynamic_cast<Diff_HHOElement<Dim>*>(e);
-				chunk->Results.Coeffs.Add(element->Number * HHO->nCellUnknowns, element->Number * HHO->nCellUnknowns, element->invAtt);
+				Diff_HHOElement<Dim>* element = HHOElement(e);
+				chunk->Results.Coeffs.Add(element->Number() * HHO->nCellUnknowns, element->Number() * HHO->nCellUnknowns, element->invAtt);
 			});
 		SparseMatrix invA_T_T = SparseMatrix(HHO->nTotalCellUnknowns, HHO->nTotalCellUnknowns);
 		parallelLoop.Fill(invA_T_T);
@@ -790,8 +816,8 @@ public:
 			{
 				if (f->HasDirichletBC())
 					return;
-				Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
-				BigNumber i = face->Number * faceBasis->Size();// FirstDOFGlobalNumber(f);
+				Diff_HHOFace<Dim>* face = HHOFace(f);
+				BigNumber i = face->Number() * faceBasis->Size();// FirstDOFGlobalNumber(f);
 
 				DenseMatrix m = face->InvMassMatrix();
 				Vector v = face->ProjectOnBasis(faceBasis, func);
@@ -830,17 +856,17 @@ public:
 	}
 
 private:
-	BigNumber DOFNumber(Element<Dim>* element, BasisFunction<Dim>* cellPhi)
+	BigNumber DOFNumber(Diff_HHOElement<Dim>* element, BasisFunction<Dim>* cellPhi)
 	{
 		return FirstDOFGlobalNumber(element) + cellPhi->LocalNumber;
 	}
-	BigNumber FirstDOFGlobalNumber(Element<Dim>* element)
+	BigNumber FirstDOFGlobalNumber(Diff_HHOElement<Dim>* element)
 	{
-		return element->Number * HHO->CellBasis->Size();
+		return element->Number() * HHO->CellBasis->Size();
 	}
-	BigNumber FirstDOFGlobalNumber(Face<Dim>* face)
+	BigNumber FirstDOFGlobalNumber(Diff_HHOFace<Dim>* face)
 	{
-		return this->HHO->nTotalCellUnknowns + face->Number * HHO->FaceBasis->Size();
+		return this->HHO->nTotalCellUnknowns + face->Number() * HHO->FaceBasis->Size();
 	}
 };
 

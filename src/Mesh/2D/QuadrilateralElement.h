@@ -1,11 +1,10 @@
 #pragma once
 #include "../../DG/Diff_DGElement.h"
-#include "../../HHO/Diff_HHOElement.h"
 #include "../../Geometry/2D/Quadrilateral.h"
 #include "Edge.h"
 using namespace std;
 
-class QuadrilateralElement : public Diff_DGElement<2>, public Diff_HHOElement<2>
+class QuadrilateralElement : public Diff_DGElement<2>
 {
 private:
 	Quadrilateral _shape;
@@ -21,7 +20,6 @@ public:
 	QuadrilateralElement(int number, Vertex* v1, Vertex* v2, Vertex* v3, Vertex* v4) :
 		Element(number),
 		Diff_DGElement<2>(number),
-		Diff_HHOElement<2>(number),
 		_shape(*v1, *v2, *v3, *v4)
 	{
 		_v1 = v1;

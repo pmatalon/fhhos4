@@ -4,9 +4,12 @@
 #include "Diff_HHOFace.h"
 
 template <int Dim>
-class Diff_HHOElement : virtual public Element<Dim>
+class Diff_HHOElement
 {
 public:
+	Element<Dim>* MeshElement = nullptr;
+	vector<Diff_HHOFace<Dim>*> Faces;
+
 	HHOParameters<Dim>* HHO;
 
 	// Reconstruction operator as a matrix
@@ -23,9 +26,41 @@ public:
 
 	DenseMatrix invAtt;
 
-	Diff_HHOElement() : Element<Dim>() {}
+	Diff_HHOElement() {}
 
-	Diff_HHOElement(BigNumber number) : Element<Dim>(number) {}
+	//-----------------//
+	// Element wrapper //
+	//-----------------//
+
+	inline BigNumber Number() const
+	{
+		return this->MeshElement->Number;
+	}
+	inline int LocalNumberOf(Diff_HHOFace<Dim>* face)
+	{
+		return this->MeshElement->LocalNumberOf(face->MeshFace);
+	}
+	inline double SourceTerm(BasisFunction<Dim>* phi, DomFunction f)
+	{
+		return this->MeshElement->SourceTerm(phi, f);
+	}
+private:
+	inline Tensor<Dim>* DiffTensor() const
+	{
+		return this->MeshElement->DiffTensor();
+	}
+	inline DimVector<Dim> OuterNormalVector(Diff_HHOFace<Dim>* face) const
+	{
+		return this->MeshElement->OuterNormalVector(face->MeshFace);
+	}
+	inline RefFunction EvalPhiOnFace(Diff_HHOFace<Dim>* face, BasisFunction<Dim>* phi)
+	{
+		return this->MeshElement->EvalPhiOnFace(face->MeshFace, phi);
+	}
+	inline function<DimVector<Dim>(RefPoint)> GradPhiOnFace(Diff_HHOFace<Dim>* face, BasisFunction<Dim>* phi)
+	{
+		return this->MeshElement->GradPhiOnFace(face->MeshFace, phi);
+	}
 
 	//----------------------------//
 	//   HHO-specific integrals   //
@@ -34,23 +69,23 @@ public:
 public:
 	DenseMatrix MassMatrix(FunctionalBasis<Dim>* basis) const
 	{
-		return this->Shape()->MassMatrix(basis);
+		return this->MeshElement->Shape()->MassMatrix(basis);
 	}
 
 private:
 	double IntegralKGradGradReconstruct(Tensor<Dim>* K, BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2) const
 	{
-		return this->Shape()->IntegralKGradGradReconstruct(K, reconstructPhi1, reconstructPhi2);
+		return this->MeshElement->Shape()->IntegralKGradGradReconstruct(K, reconstructPhi1, reconstructPhi2);
 	}
 
 	DenseMatrix CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) const
 	{
-		return this->Shape()->CellReconstructMassMatrix(cellBasis, reconstructBasis);
+		return this->MeshElement->Shape()->CellReconstructMassMatrix(cellBasis, reconstructBasis);
 	}
 
 	double ComputeIntegralKGradGrad(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
 	{
-		return this->Shape()->ComputeIntegralKGradGrad(K, phi1, phi2);
+		return this->MeshElement->Shape()->ComputeIntegralKGradGrad(K, phi1, phi2);
 	}
 
 	//--------------------------------------------------------------------------------//
@@ -165,7 +200,7 @@ private:
 		int last = HHO->ReconstructionBasis->Size();
 		for (BasisFunction<Dim>* phi : HHO->ReconstructionBasis->LocalFunctions)
 		{
-			double meanValue = this->Integral(phi); // TODO: this can be computed only once on the reference element
+			double meanValue = this->MeshElement->Integral(phi); // TODO: this can be computed only once on the reference element
 			reconstructionMatrixToInvert(last, phi->LocalNumber) = meanValue;
 			reconstructionMatrixToInvert(phi->LocalNumber, last) = meanValue;
 		}
@@ -175,7 +210,7 @@ private:
 	{
 		int last = HHO->ReconstructionBasis->Size();
 		for (BasisFunction<Dim>* phi : HHO->CellBasis->LocalFunctions)
-			rhsMatrix(last, phi->LocalNumber) = this->Integral(phi); // TODO: this can be computed only once on the reference element
+			rhsMatrix(last, phi->LocalNumber) = this->MeshElement->Integral(phi); // TODO: this can be computed only once on the reference element
 	}
 
 	DenseMatrix AssembleRHSMatrix()
@@ -209,9 +244,8 @@ private:
 		}
 	}
 
-	void AssembleIntegrationByPartsRHS_face(DenseMatrix & rhsMatrix, Face<Dim> * f)
+	void AssembleIntegrationByPartsRHS_face(DenseMatrix & rhsMatrix, Diff_HHOFace<Dim> * face)
 	{
-		Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
 		for (BasisFunction<Dim>* reconstructPhi : HHO->ReconstructionBasis->LocalFunctions)
 		{
 			for (BasisFunction<Dim - 1> * facePhi : HHO->FaceBasis->LocalFunctions)
@@ -227,10 +261,8 @@ private:
 		double integralGradGrad = this->ComputeIntegralKGradGrad(this->DiffTensor(), reconstructPhi, cellPhi);
 
 		double sumFaces = 0;
-		for (auto f : this->Faces)
+		for (auto face : this->Faces)
 		{
-			Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
-
 			auto phi = this->EvalPhiOnFace(face, cellPhi);
 			auto gradPhi = this->GradPhiOnFace(face, reconstructPhi);
 			auto normal = this->OuterNormalVector(face);
@@ -240,7 +272,7 @@ private:
 			};
 
 			int polynomialDegree = reconstructPhi->GetDegree() - 1 + cellPhi->GetDegree();
-			double integralFace = face->Integral(functionToIntegrate, polynomialDegree);
+			double integralFace = face->MeshFace->Integral(functionToIntegrate, polynomialDegree);
 
 			sumFaces += integralFace;
 		}
@@ -261,7 +293,7 @@ private:
 		};
 
 		int polynomialDegree = reconstructPhi->GetDegree() - 1 + facePhi->GetDegree();
-		return face->Integral(functionToIntegrate, polynomialDegree);
+		return face->MeshFace->Integral(functionToIntegrate, polynomialDegree);
 	}
 
 	//---------------------------------------------//
@@ -284,13 +316,12 @@ private:
 			for (int i = 0; i < Dt.rows(); i++)
 				Dt(i, i) -= 1;
 
-			for (auto f : this->Faces)
+			for (auto face : this->Faces)
 			{
-				Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
 				auto normal = this->OuterNormalVector(face);
 				DenseMatrix Mf = face->MassMatrix();
-				DenseMatrix ProjF = face->TraceUsingReconstructBasis(this);
-				DenseMatrix ProjFT = face->TraceUsingCellBasis(this);
+				DenseMatrix ProjF = face->TraceUsingReconstructBasis(this->MeshElement);
+				DenseMatrix ProjFT = face->TraceUsingCellBasis(this->MeshElement);
 
 				DenseMatrix Df = ProjF * this->P;
 				for (int i = 0; i < Df.rows(); i++)
@@ -303,12 +334,11 @@ private:
 		}
 		else if (HHO->Stabilization.compare("hdg") == 0)
 		{
-			for (auto f : this->Faces)
+			for (auto face : this->Faces)
 			{
-				Diff_HHOFace<Dim>* face = dynamic_cast<Diff_HHOFace<Dim>*>(f);
 				auto normal = this->OuterNormalVector(face);
 				DenseMatrix Mf = face->MassMatrix();
-				DenseMatrix ProjFT = face->TraceUsingCellBasis(this);
+				DenseMatrix ProjFT = face->TraceUsingCellBasis(this->MeshElement);
 
 				DenseMatrix Fpart = DenseMatrix::Zero(HHO->nFaceUnknowns, nHybridUnknowns);
 				Fpart.middleCols(FirstDOFNumber(face), HHO->nFaceUnknowns) = DenseMatrix::Identity(HHO->nFaceUnknowns, HHO->nFaceUnknowns);
@@ -334,13 +364,13 @@ private:
 	{
 		return cellPhi->LocalNumber;
 	}
-	int DOFNumber(Face<Dim> * face, BasisFunction<Dim - 1> * facePhi)
+	int DOFNumber(Diff_HHOFace<Dim> * face, BasisFunction<Dim - 1> * facePhi)
 	{
 		return FirstDOFNumber(face) + facePhi->LocalNumber;
 	}
 
 public:
-	int FirstDOFNumber(Face<Dim> * face)
+	int FirstDOFNumber(Diff_HHOFace<Dim> * face)
 	{
 		return HHO->nCellUnknowns + this->LocalNumberOf(face) * HHO->nFaceUnknowns;
 	}
@@ -358,7 +388,7 @@ public:
 	void DeleteUselessMatricesAfterMultigridSetup()
 	{
 		Utils::Empty(A);
-		this->EmptySavedDomPoints();
+		this->MeshElement->EmptySavedDomPoints();
 		/*if (!needToReconstructSolutionLater)
 		{
 			Utils::Empty(P);

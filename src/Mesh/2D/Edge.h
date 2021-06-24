@@ -1,9 +1,8 @@
 #pragma once
 #include "../../DG/Diff_DGFace.h"
-#include "../../HHO/Diff_HHOFace.h"
 #include "../../Geometry/2D/Segment.h"
 
-class Edge : public Diff_DGFace<2>, public Diff_HHOFace<2>
+class Edge : public Diff_DGFace<2>
 {
 private:
 	Segment _shape;
@@ -15,7 +14,6 @@ public:
 	Edge(BigNumber number, Vertex* v1, Vertex* v2, Element<2>* element1, Element<2>* element2) :
 		Face(number, element1, element2),
 		Diff_DGFace(number, element1, element2),
-		Diff_HHOFace(number, element1, element2),
 		_shape(*v1, *v2)
 	{
 		_v1 = v1;

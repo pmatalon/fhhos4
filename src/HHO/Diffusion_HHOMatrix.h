@@ -15,9 +15,9 @@ public:
 		_nDoFsPerElement = nDoFsPerElement;
 	}
 
-	inline BigNumber FirstRow(Element<Dim>* e)
+	inline BigNumber FirstRow(Diff_HHOElement<Dim>* e)
 	{
-		return e->Number * _nDoFsPerElement;
+		return e->Number() * _nDoFsPerElement;
 	}
 };
 
@@ -38,13 +38,13 @@ public:
 		_nDoFsPerFace = nDoFsPerFace;
 	}
 
-	inline BigNumber FirstRow(Element<Dim>* e)
+	inline BigNumber FirstRow(Diff_HHOElement<Dim>* e)
 	{
-		return e->Number * _nDoFsPerElement;
+		return e->Number() * _nDoFsPerElement;
 	}
-	inline BigNumber FirstCol(Face<Dim>* f)
+	inline BigNumber FirstCol(Diff_HHOFace<Dim>* f)
 	{
-		return f->Number * _nDoFsPerFace;
+		return f->Number() * _nDoFsPerFace;
 	}
 };
 
@@ -62,12 +62,12 @@ public:
 		_nDoFsPerFace = nDoFsPerFace;
 	}
 
-	inline BigNumber FirstRow(Face<Dim>* f)
+	inline BigNumber FirstRow(Diff_HHOFace<Dim>* f)
 	{
-		return f->Number * _nDoFsPerFace;
+		return f->Number() * _nDoFsPerFace;
 	}
 
-	inline BigNumber FirstCol(Face<Dim>* f)
+	inline BigNumber FirstCol(Diff_HHOFace<Dim>* f)
 	{
 		return FirstRow(f);
 	}
