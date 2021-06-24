@@ -146,11 +146,13 @@ private:
 		if (!IsCoarsestLevel() &&
 			(this->CoarserLevel->ComesFrom == CoarseningType::H || this->CoarserLevel->ComesFrom == CoarseningType::HP))
 		{
-			if (this->ComesFrom == CoarseningType::P)
+			if (this->ComesFrom == CoarseningType::P) // so the problem hasn't been assembled at this level
 			{
-				// to compute the trace on the faces at the end of the prolongation
 				this->_problem->InitReferenceShapes();
-				this->_problem->InitHHO_Faces();
+				if (this->_prolongation == GMGProlongation::CellInterp_Trace)
+					this->_problem->InitHHO_Faces(); // to compute the trace on the faces at the end of the prolongation
+				else
+					this->_problem->InitHHO(); // to compute the canonical injection or L2-projection in the cells and the trace on the faces (TODO: optimize! No need to compute the local matrices!)
 			}
 
 			Diffusion_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
@@ -530,9 +532,13 @@ private:
 			}
 
 			// On the coarse levels, delete the whole mesh
-			_problem->_mesh->CoarseMesh = nullptr;
 			if (!IsFinestLevel())
+			{
+				if (_problem->_mesh->FineMesh)
+					_problem->_mesh->FineMesh->CoarseMesh = nullptr;
+				_problem->_mesh->CoarseMesh = nullptr;
 				delete _problem->_mesh;
+			}
 		}
 	}
 

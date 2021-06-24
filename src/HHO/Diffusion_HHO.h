@@ -57,27 +57,22 @@ public:
 
 	Diffusion_HHO<Dim>* GetProblemForLowerDegree()
 	{
-		// Copy the mesh
-		Mesh<Dim>* sameMesh = this->_mesh->Copy();
-		sameMesh->SetDiffusionField(&this->_testCase->DiffField);
-		sameMesh->SetBoundaryConditions(&this->_testCase->BC);
-		//sameMesh->FillBoundaryAndInteriorFaceLists();
-		//sameMesh->FillDirichletAndNeumannFaceLists();
-
 		// Lower the degree of each basis
-		FunctionalBasis<Dim>* reconstructionBasis = new FunctionalBasis<Dim>(HHO->ReconstructionBasis->CreateSameBasisForLowerDegree());
+		FunctionalBasis<Dim>* reconstructionBasis = HHO->CellBasis;
 		FunctionalBasis<Dim>* cellBasis = new FunctionalBasis<Dim>(HHO->CellBasis->CreateSameBasisForLowerDegree());
 		FunctionalBasis<Dim-1>* faceBasis = new FunctionalBasis<Dim-1>(HHO->FaceBasis->CreateSameBasisForLowerDegree());
+
 		HHOParameters<Dim>* lowerDegreeHHO = new HHOParameters<Dim>(this->_mesh, HHO->Stabilization, reconstructionBasis, cellBasis, faceBasis);
-		return new Diffusion_HHO<Dim>(sameMesh, this->_testCase, lowerDegreeHHO, _staticCondensation, _saveMatrixBlocks, this->_outputDirectory);
+		return new Diffusion_HHO<Dim>(this->_mesh, this->_testCase, lowerDegreeHHO, _staticCondensation, _saveMatrixBlocks, this->_outputDirectory);
 	}
 
 	Diffusion_HHO<Dim>* GetProblemOnCoarserMeshAndLowerDegree()
 	{
 		// Lower the degree of each basis
-		FunctionalBasis<Dim>* reconstructionBasis = new FunctionalBasis<Dim>(HHO->ReconstructionBasis->CreateSameBasisForLowerDegree());
+		FunctionalBasis<Dim>* reconstructionBasis = HHO->CellBasis;
 		FunctionalBasis<Dim>* cellBasis = new FunctionalBasis<Dim>(HHO->CellBasis->CreateSameBasisForLowerDegree());
 		FunctionalBasis<Dim - 1>* faceBasis = new FunctionalBasis<Dim - 1>(HHO->FaceBasis->CreateSameBasisForLowerDegree());
+
 		HHOParameters<Dim>* lowerDegreeCoarseMeshHHO = new HHOParameters<Dim>(this->_mesh->CoarseMesh, HHO->Stabilization, reconstructionBasis, cellBasis, faceBasis);
 		return new Diffusion_HHO<Dim>(this->_mesh->CoarseMesh, this->_testCase, lowerDegreeCoarseMeshHHO, _staticCondensation, _saveMatrixBlocks, this->_outputDirectory);
 	}
