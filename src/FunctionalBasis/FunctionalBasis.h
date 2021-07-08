@@ -17,7 +17,14 @@ protected:
 public:
 	bool UsePolynomialSpaceQ;
 	vector<BasisFunction<Dim>*> LocalFunctions;
+	bool IsHierarchical = true;
+	bool IsOrthogonal = false;
 
+protected:
+	FunctionalBasis()
+	{}
+
+public:
 	FunctionalBasis(string basisCode, int maxPolynomialDegree) 
 		: FunctionalBasis(basisCode, maxPolynomialDegree, false)
 	{}
@@ -28,6 +35,7 @@ public:
 		this->_maxPolynomialDegree = maxPolynomialDegree;
 		this->_basisCode = basisCode;
 		this->UsePolynomialSpaceQ = usePolynomialSpaceQ;
+		this->IsHierarchical = basisCode.compare(Monomial1D::Code()) == 0 || basisCode.compare(Legendre1D::Code()) == 0;
 
 		//----------//
 		//    0D    //

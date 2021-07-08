@@ -117,6 +117,9 @@ void print_usage() {
 	cout << "               bernstein" << endl;
 	cout << "               hemker" << endl;
 	cout << endl;
+	cout << "-onb {0|1}" << endl;
+	cout << "      If 1, then the local face bases are orthonormalized. Default: 1." << endl;
+	cout << endl;
 	cout << "-p NUM" << endl;
 	cout << "      Polynomial degree of approximation (default: 1). In HHO, k = p-1." << endl;
 	cout << endl;
@@ -479,6 +482,7 @@ int main(int argc, char* argv[])
 		// Discretization
 		OPT_Discretization,
 		OPT_Stabilization,
+		OPT_OrthonormalizeBases,
 		OPT_NoStaticCondensation,
 		OPT_Penalization,
 		OPT_PolySpace,
@@ -532,6 +536,7 @@ int main(int argc, char* argv[])
 		 // Discretization
 		 { "discr", required_argument, NULL, OPT_Discretization },
 		 { "stab", required_argument, NULL, OPT_Stabilization },
+		 { "onb", required_argument, NULL, OPT_OrthonormalizeBases },
 		 { "no-static-cond", no_argument, NULL, OPT_NoStaticCondensation },
 		 { "pen", required_argument, NULL, OPT_Penalization },
 		 { "poly-space", required_argument, NULL, OPT_PolySpace },
@@ -675,6 +680,17 @@ int main(int argc, char* argv[])
 				if (basisCode.compare("monomials") != 0 && basisCode.compare("legendre") != 0 && basisCode.compare("nlegendre") != 0 && basisCode.compare("bernstein") != 0 && basisCode.compare("hemker") != 0)
 					argument_error("unknown polynomial basis '" + basisCode + "'. Check -b argument.");
 				args.Discretization.BasisCode = basisCode;
+				break;
+			}
+			case OPT_OrthonormalizeBases:
+			{
+				int i = atoi(optarg);
+				if (i == 1)
+					args.Discretization.OrthonormalizeBases = true;
+				else if (i == 0)
+					args.Discretization.OrthonormalizeBases = false;
+				else
+					argument_error("check -onb argument. Accepted values: 0 or 1.");
 				break;
 			}
 			case 'p': 

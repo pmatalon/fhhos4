@@ -26,14 +26,4 @@ public:
 		exit(EXIT_FAILURE);
 		return NULL;
 	}
-
-	static bool IsHierarchicalBasis(string basisCode)
-	{
-		return basisCode.compare(Monomial1D::Code()) == 0 || basisCode.compare(Legendre1D::Code()) == 0;
-	}
-
-	static bool IsOrthogonalBasis(string basisCode)
-	{
-		return basisCode.compare(Legendre1D::Code()) == 0;
-	}
 };

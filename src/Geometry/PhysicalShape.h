@@ -247,6 +247,22 @@ public:
 		return Integral(functionToIntegrate, polynomialDegree);
 	}
 
+	double L2Norm(BasisFunction<Dim>* phi)
+	{
+		RefFunction func = [this, phi](const RefPoint& p) {
+			return pow(phi->Eval(p), 2);
+		};
+		return sqrt(this->Integral(func, 2 * phi->GetDegree()));
+	}
+
+	double L2InnerProduct(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
+	{
+		RefFunction func = [this, phi1, phi2](const RefPoint& p) {
+			return phi1->Eval(p) * phi2->Eval(p);
+		};
+		return this->Integral(func, phi1->GetDegree() + phi2->GetDegree());
+	}
+
 	//----------------------------//
 	//             DG             //
 	//----------------------------//
@@ -264,6 +280,11 @@ public:
 	//-----------------------------//
 	//             HHO             //
 	//-----------------------------//
+
+	DenseMatrix ComputeMassMatrix(FunctionalBasis<Dim>* basis) const
+	{
+		return this->ComputeAndReturnMassMatrix(basis);
+	}
 
 	virtual DenseMatrix MassMatrix(FunctionalBasis<Dim>* basis) const
 	{

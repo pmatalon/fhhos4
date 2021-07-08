@@ -248,7 +248,7 @@ private:
 	{
 		for (BasisFunction<Dim>* reconstructPhi : HHO->ReconstructionBasis->LocalFunctions)
 		{
-			for (BasisFunction<Dim - 1> * facePhi : HHO->FaceBasis->LocalFunctions)
+			for (BasisFunction<Dim - 1> * facePhi : face->Basis->LocalFunctions)
 				rhsMatrix(reconstructPhi->LocalNumber, DOFNumber(face, facePhi)) = this->IntegrationByPartsRHS_face(face, reconstructPhi, facePhi);
 		}
 	}

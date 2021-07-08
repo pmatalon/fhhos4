@@ -572,6 +572,7 @@ public:
 	//             HHO             //
 	//-----------------------------//
 
+public:
 	inline DenseMatrix MassMatrix(FunctionalBasis<Dim>* basis) const
 	{
 		return this->Shape()->MassMatrix(basis);

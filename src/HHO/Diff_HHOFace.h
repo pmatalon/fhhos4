@@ -1,5 +1,5 @@
 #pragma once
-#include "../FunctionalBasis/FunctionalBasis.h"
+#include "../FunctionalBasis/OrthonormalBasis.h"
 #include "HHOParameters.h"
 
 template <int Dim>
@@ -14,6 +14,7 @@ private:
 public:
 	Face<Dim>* MeshFace = nullptr;
 	HHOParameters<Dim>* HHO;
+	FunctionalBasis<Dim - 1>* Basis;
 
 	Diff_HHOFace() {}
 
@@ -60,12 +61,23 @@ public:
 
 		this->HHO = hho;
 
-		//this->ComputeAndSaveQuadraturePoints(HHO->FaceBasis->GetDegree());
+		//this->ComputeAndSaveQuadraturePoints(basis->GetDegree());
 		//this->ComputeAndSaveQuadraturePoints();
 
-		//this->_faceMassMatrix = this->FaceMassMatrix(HHO->FaceBasis);
-		this->_massMatrix = this->MeshFace->Shape()->MassMatrix(HHO->FaceBasis);
-		this->_invMassMatrix = this->_massMatrix.inverse();
+		if (hho->OrthonormalizeBases)
+		{
+			this->Basis = new OrthonormalBasis<Dim - 1>(HHO->FaceBasis, this->MeshFace->Shape());
+			//this->_massMatrix = this->MeshFace->Shape()->ComputeMassMatrix(basis);
+			//cout << "mass matrix: " << endl << _massMatrix << endl;
+			this->_massMatrix = DenseMatrix::Identity(this->Basis->Size(), this->Basis->Size());
+			this->_invMassMatrix = DenseMatrix::Identity(this->Basis->Size(), this->Basis->Size());
+		}
+		else
+		{
+			this->Basis = hho->FaceBasis;
+			this->_massMatrix = this->MeshFace->Shape()->MassMatrix(this->Basis);
+			this->_invMassMatrix = this->_massMatrix.inverse();
+		}
 	}
 
 	DenseMatrix MassMatrix()
@@ -160,7 +172,7 @@ private:
 	DenseMatrix ComputeTraceMatrix(Element<Dim>* e, FunctionalBasis<Dim>* cellBasis)
 	{
 		assert(_invMassMatrix.rows() > 0);
-		DenseMatrix massCellFace = this->MassMatrix(HHO->FaceBasis, e, cellBasis);
+		DenseMatrix massCellFace = this->MassMatrix(this->Basis, e, cellBasis);
 		return _invMassMatrix * massCellFace;
 	}
 };

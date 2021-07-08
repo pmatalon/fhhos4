@@ -54,6 +54,8 @@ protected:
 				if (phi2->LocalNumber > phi1->LocalNumber)
 					break;
 				double term = ComputeMassTerm(phi1, phi2);
+				if (abs(term) < Utils::NumericalZero)
+					term = 0;
 				M(phi1->LocalNumber, phi2->LocalNumber) = term;
 				M(phi2->LocalNumber, phi1->LocalNumber) = term;
 			}

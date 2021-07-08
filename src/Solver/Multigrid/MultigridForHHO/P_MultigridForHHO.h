@@ -64,7 +64,7 @@ public:
 
 				// If the bases are not hierarchical, then the bases for every degree have to be stored in ReferenceCartesianShape,
 				// on the model of what is done in ReferenceShape with the use of maps.
-				if (!BasisFunctionFactory::IsHierarchicalBasis(_problem->HHO->FaceBasis->BasisCode()))
+				if (!_problem->HHO->FaceBasis->IsHierarchical)
 					Utils::FatalError("This p-Multigrid is only implemented for the use of hierarchical bases.");
 				//actions.InitReferenceShapes = this->MultigridType == MGType::p_Multigrid;
 
@@ -85,7 +85,7 @@ public:
 
 		assert(higherBasis->BasisCode().compare(lowerBasis->BasisCode()) == 0 && "The bases must be the same");
 
-		if (!BasisFunctionFactory::IsHierarchicalBasis(higherBasis->BasisCode()))
+		if (!higherBasis->IsHierarchical)
 			Utils::FatalError("The natural injection is not implemented for non-hierarchical bases.");
 
 		FaceParallelLoop<Dim> parallelLoop(mesh->Faces);

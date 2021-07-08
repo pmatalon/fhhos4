@@ -442,7 +442,7 @@ private:
 
 			parallelLoop.Execute([this, finePb, coarsePb, nFaceUnknowns](Element<Dim>* coarseElem, ParallelChunk<CoeffsChunk>* chunk)
 				{
-					DenseMatrix resolveCondensedFinerFacesFromCoarseBoundary = StaticallyCondenseInteriorFinerFaces(coarseElem, *this->OperatorMatrix, coarsePb->HHO, finePb);
+					DenseMatrix resolveCondensedFinerFacesFromCoarseBoundary = StaticallyCondenseInteriorFinerFaces(coarseElem, *this->OperatorMatrix, coarsePb, finePb);
 
 					for (int i = 0; i < coarseElem->FinerFacesRemoved.size(); i++)
 					{
@@ -462,7 +462,7 @@ private:
 						if (coarseFace->HasDirichletBC())
 							continue;
 
-						DenseMatrix local_J_f_c = this->ComputeCanonicalInjectionMatrixCoarseToFine(coarseFace, finePb->HHO->FaceBasis, finePb);
+						DenseMatrix local_J_f_c = this->ComputeCanonicalInjectionMatrixCoarseToFine(coarseFace, coarsePb, finePb);
 						for (auto fineFace : coarseFace->FinerFaces)
 						{
 							BigNumber fineFaceLocalNumberInCoarseFace = coarseFace->LocalNumberOf(fineFace);
@@ -494,9 +494,8 @@ private:
 
 	void SetupProlongation_P()
 	{
-		string basis = this->_problem->HHO->FaceBasis->BasisCode();
-		if (!BasisFunctionFactory::IsHierarchicalBasis(basis) || !BasisFunctionFactory::IsOrthogonalBasis(basis))
-			Utils::FatalError("The natural injection is not implemented for non-hierarchical or non-orthogonal bases.");
+		if (!this->_problem->HHO->FaceBasis->IsHierarchical || !this->_problem->HHO->OrthonormalizeBases)
+			Utils::Warning("The natural injection for p-multigrid is not implemented for non-hierarchical or non-orthogonal bases.");
 	}
 
 
@@ -1083,18 +1082,20 @@ private:
 		Diffusion_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
 		Mesh<Dim>* coarseMesh = coarsePb->_mesh;
 
-		FunctionalBasis<Dim - 1>* faceBasis = finePb->HHO->FaceBasis;
-		int nFaceUnknowns = faceBasis->Size();
+		if (finePb->HHO->FaceBasis->GetDegree() != coarsePb->HHO->FaceBasis->GetDegree())
+			Utils::FatalError("GetGlobalCanonicalInjectionMatrixCoarseToFineFaces() is not implemented when coarse and fine bases don't have the same degree.");
+
+		int nFaceUnknowns = finePb->HHO->FaceBasis->Size();
 
 		FaceParallelLoop<Dim> parallelLoop(coarseMesh->Faces);
 		parallelLoop.ReserveChunkCoeffsSize(nFaceUnknowns * 2 * nFaceUnknowns);
 
-		parallelLoop.Execute([this, faceBasis, nFaceUnknowns, finePb](Face<Dim>* coarseFace, ParallelChunk<CoeffsChunk>* chunk)
+		parallelLoop.Execute([this, nFaceUnknowns, coarsePb, finePb](Face<Dim>* coarseFace, ParallelChunk<CoeffsChunk>* chunk)
 			{
 				if (coarseFace->HasDirichletBC())
 					return;
 
-				DenseMatrix local_J_f_c = this->ComputeCanonicalInjectionMatrixCoarseToFine(coarseFace, faceBasis, finePb);
+				DenseMatrix local_J_f_c = this->ComputeCanonicalInjectionMatrixCoarseToFine(coarseFace, coarsePb, finePb);
 				for (auto fineFace : coarseFace->FinerFaces)
 				{
 					BigNumber coarseFaceGlobalNumber = coarseFace->Number;
@@ -1112,16 +1113,24 @@ private:
 
 
 
-	DenseMatrix ComputeCanonicalInjectionMatrixCoarseToFine(Face<Dim>* coarseFace, FunctionalBasis<Dim - 1>* faceBasis, Diffusion_HHO<Dim>* fineProblem)
+	DenseMatrix ComputeCanonicalInjectionMatrixCoarseToFine(Face<Dim>* coarseFace, Diffusion_HHO<Dim>* coarseProblem, Diffusion_HHO<Dim>* fineProblem)
 	{
-		DenseMatrix J(faceBasis->Size() * coarseFace->FinerFaces.size(), faceBasis->Size());
+		int coarseFaceUnknowns = coarseProblem->HHO->nFaceUnknowns;
+		int fineFaceUnknowns = fineProblem->HHO->nFaceUnknowns;
+		assert(coarseFaceUnknowns <= fineFaceUnknowns);
+
+		DenseMatrix J(fineFaceUnknowns * coarseFace->FinerFaces.size(), coarseFaceUnknowns);
+
+		Diff_HHOFace<Dim>* coarseHHOFace = coarseProblem->HHOFace(coarseFace);
 
 		for (auto fineFace : coarseFace->FinerFaces)
 		{
-			DenseMatrix fineCoarseMass(faceBasis->Size(), faceBasis->Size());
-			for (BasisFunction<Dim - 1>* finePhi : faceBasis->LocalFunctions)
+			Diff_HHOFace<Dim>* fineHHOFace = fineProblem->HHOFace(fineFace);
+
+			DenseMatrix fineCoarseMass(fineFaceUnknowns, coarseFaceUnknowns);
+			for (BasisFunction<Dim - 1>* finePhi : fineHHOFace->Basis->LocalFunctions)
 			{
-				for (BasisFunction<Dim - 1>* coarsePhi : faceBasis->LocalFunctions)
+				for (BasisFunction<Dim - 1>* coarsePhi : coarseHHOFace->Basis->LocalFunctions)
 				{
 					RefFunction functionToIntegrate = [coarseFace, fineFace, finePhi, coarsePhi](const RefPoint& fineRefPoint) {
 						DomPoint domPoint = fineFace->ConvertToDomain(fineRefPoint);
@@ -1134,17 +1143,10 @@ private:
 					fineCoarseMass(finePhi->LocalNumber, coarsePhi->LocalNumber) = integral;
 				}
 			}
-
-			DenseMatrix invFineMass;
-			if (fineProblem->HHO->FaceBasis == faceBasis)
-			{
-				Diff_HHOFace<Dim>* hhoFineFace = fineProblem->HHOFace(fineFace);
-				invFineMass = hhoFineFace->InvMassMatrix();
-			}
+			if (coarseHHOFace->Basis->IsOrthogonal) // if orthogonal, the mass matrix is Identity, so its inverse is also Identity
+				J.block(coarseFace->LocalNumberOf(fineFace)*fineFaceUnknowns, 0, fineFaceUnknowns, coarseFaceUnknowns) = fineCoarseMass;
 			else
-				Utils::FatalError("ComputeCanonicalInjectionMatrixCoarseToFine() TO BE IMPLEMENTED");
-
-			J.block(coarseFace->LocalNumberOf(fineFace)*faceBasis->Size(), 0, faceBasis->Size(), faceBasis->Size()) = invFineMass * fineCoarseMass;
+				J.block(coarseFace->LocalNumberOf(fineFace)*fineFaceUnknowns, 0, fineFaceUnknowns, coarseFaceUnknowns) = fineHHOFace->InvMassMatrix() * fineCoarseMass;
 		}
 
 		return J;
@@ -1154,9 +1156,9 @@ private:
 	//  Used by the algorithm from Wildey et al. //
 	//-------------------------------------------//
 
-	DenseMatrix StaticallyCondenseInteriorFinerFaces(Element<Dim>* coarseElem, const SparseMatrix& fineA, HHOParameters<Dim>* hho, Diffusion_HHO<Dim>* fineProblem)
+	DenseMatrix StaticallyCondenseInteriorFinerFaces(Element<Dim>* coarseElem, const SparseMatrix& fineA, Diffusion_HHO<Dim>* coarsePb, Diffusion_HHO<Dim>* finePb)
 	{
-		int nFaceUnknowns = hho->nFaceUnknowns;
+		int nFaceUnknowns = coarsePb->HHO->nFaceUnknowns;
 
 		int nFineInteriorFaces = coarseElem->FinerFacesRemoved.size();
 		int nFineBoundaryFaces = 0;
@@ -1203,7 +1205,7 @@ private:
 			if (coarseFace->IsDomainBoundary)
 				continue;
 
-			DenseMatrix local_J_f_c = ComputeCanonicalInjectionMatrixCoarseToFine(coarseFace, hho->FaceBasis, fineProblem);
+			DenseMatrix local_J_f_c = ComputeCanonicalInjectionMatrixCoarseToFine(coarseFace, coarsePb, finePb);
 			for (auto fineFace : coarseFace->FinerFaces)
 			{
 				BigNumber fineFaceLocalNumberInCoarseFace = coarseFace->LocalNumberOf(fineFace);
