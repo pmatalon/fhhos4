@@ -46,8 +46,8 @@ struct MultigridArguments
 	int MatrixMaxSizeForCoarsestLevel = 1000;
 	char CycleLetter = 'V';
 	int WLoops = 1;
-	int UseHigherOrderReconstruction = 1;
-	string WeightCode = "k";
+	bool UseHigherOrderReconstruction = true;
+	bool UseHeterogeneousWeighting = true;
 	bool UseGalerkinOperator = false;
 	string PreSmootherCode = "bgs";
 	string PostSmootherCode = "rbgs";

@@ -435,7 +435,7 @@ private:
 				mg->HP_Stgy = args.Solver.MG.HP_Stgy;
 				mg->UseHigherOrderReconstruction = args.Solver.MG.UseHigherOrderReconstruction;
 				mg->Prolongation = args.Solver.MG.GMGProlong;
-				mg->WeightCode = args.Solver.MG.WeightCode;
+				mg->UseHeterogeneousWeighting = args.Solver.MG.UseHeterogeneousWeighting;
 				if (problem)
 				{
 					Diffusion_HHO<Dim>* hhoProblem = dynamic_cast<Diffusion_HHO<Dim>*>(problem);

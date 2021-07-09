@@ -10,17 +10,17 @@ class LevelForHHO : public Level
 private:
 	GMGProlongation _prolongation = GMGProlongation::CellInterp_Trace;
 	bool _useHigherOrderReconstruction;
-	string _weightCode = "k";
+	bool _useHeterogeneousWeighting;
 public:
 	Diffusion_HHO<Dim>* _problem;
 
-	LevelForHHO(int number, Diffusion_HHO<Dim>* problem, GMGProlongation prolongation, bool useHigherOrderReconstruction, string weightCode)
+	LevelForHHO(int number, Diffusion_HHO<Dim>* problem, GMGProlongation prolongation, bool useHigherOrderReconstruction, bool useHeterogeneousWeighting)
 		: Level(number)
 	{
 		this->_problem = problem;
 		this->_prolongation = prolongation;
 		this->_useHigherOrderReconstruction = useHigherOrderReconstruction;
-		this->_weightCode = weightCode;
+		this->_useHeterogeneousWeighting = useHeterogeneousWeighting;
 	}
 
 	BigNumber NUnknowns() override
@@ -652,7 +652,7 @@ private:
 	{
 		if (face->IsDomainBoundary)
 			return 1;
-		else if (_weightCode.compare("k") == 0)
+		else if (_useHeterogeneousWeighting)
 		{
 			auto n = element->OuterNormalVector(face);
 			double k = (element->DiffTensor() * n).dot(n);
@@ -665,10 +665,8 @@ private:
 
 			return k / (k1 + k2);
 		}
-		else if (_weightCode.compare("a") == 0)
-			return 0.5;
 		else
-			Utils::FatalError("Unknown weight code.");
+			return 0.5;
 		assert(false);
 	}
 
@@ -1254,7 +1252,7 @@ private:
 public:
 	GMGProlongation Prolongation = GMGProlongation::CellInterp_Trace;
 	bool UseHigherOrderReconstruction = true;
-	string WeightCode = "k";
+	bool UseHeterogeneousWeighting = true;
 	
 	MultigridForHHO(Diffusion_HHO<Dim>* problem, int nLevels = 0)
 		: Multigrid(MGType::h_Multigrid, nLevels)
@@ -1330,14 +1328,9 @@ public:
 			{
 				if (!UseHigherOrderReconstruction)
 					os << "\t" << "Higher-order reconstruc.: disabled" << endl;
-
-				os << "\t" << "Weighting               : ";
-				if (WeightCode.compare("k") == 0)
-					os << "proportional to the diffusion coefficient [-weight k]";
-				else if (WeightCode.compare("a") == 0)
-					os << "simple average [-weight a]";
+				if (!UseHeterogeneousWeighting)
+					os << "\t" << "Heterogeneous weighting : disabled" << endl;
 			}
-			os << endl;
 		}
 	}
 
@@ -1392,7 +1385,7 @@ protected:
 	Level* CreateFineLevel() const override
 	{
 		assert(_problem && "The multigrid has not been initialized with a problem");
-		return new LevelForHHO<Dim>(0, _problem, Prolongation, UseHigherOrderReconstruction, WeightCode);
+		return new LevelForHHO<Dim>(0, _problem, Prolongation, UseHigherOrderReconstruction, UseHeterogeneousWeighting);
 	}
 
 	Level* CreateCoarseLevel(Level* fineLevel, CoarseningType coarseningType) override
@@ -1409,7 +1402,7 @@ protected:
 		else
 			assert(false);
 		
-		LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(fineLevel->Number + 1, coarseProblem, Prolongation, UseHigherOrderReconstruction, WeightCode);
+		LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(fineLevel->Number + 1, coarseProblem, Prolongation, UseHigherOrderReconstruction, UseHeterogeneousWeighting);
 		return coarseLevel;
 	}
 };

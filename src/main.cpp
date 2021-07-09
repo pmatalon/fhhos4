@@ -350,10 +350,9 @@ void print_usage() {
 	cout << "      In the polongation of 'mg', disables the use of the higher-order reconstruction." << endl;
 	cout << "      The local cell polynomials in the intermediary step are obtained by solving the local problems only." << endl;
 	cout << endl;
-	cout << "-weight CODE" << endl;
-	cout << "      In the polongation of 'mg', weighting factor of the projection to the fine faces." << endl;
-	cout << "              k   - proportional to the diffusion coefficient (default)" << endl;
-	cout << "              a   - simple average (1/2)" << endl;
+	cout << "-disable-heterog-weight CODE" << endl;
+	cout << "      In the polongation of 'mg', disables the heterogeneous weighting." << endl;
+	cout << "      Homogeneous weighting is used instead, i.e. non-weighted average." << endl;
 	cout << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << "                             Miscellaneous                            " << endl;
@@ -495,7 +494,7 @@ int main(int argc, char* argv[])
 		OPT_HP_Strategy,
 		OPT_MGCycle,
 		OPT_DisableHigherOrderReconstruction,
-		OPT_Weight,
+		OPT_DisableHeterogeneousWeighting,
 		OPT_MultigridProlongationCode,
 		OPT_CoarseningProlongationCode,
 		OPT_FaceProlongationCode,
@@ -549,7 +548,7 @@ int main(int argc, char* argv[])
 		 { "hp-stgy", required_argument, NULL, OPT_HP_Strategy },
 		 { "cycle", required_argument, NULL, OPT_MGCycle },
 		 { "disable-hor", no_argument, NULL, OPT_DisableHigherOrderReconstruction },
-		 { "weight", required_argument, NULL, OPT_Weight },
+		 { "disable-heterog-weight", no_argument, NULL, OPT_DisableHeterogeneousWeighting },
 		 { "prolong", required_argument, NULL, OPT_MultigridProlongationCode },
 		 { "coarsening-prolong", required_argument, NULL, OPT_CoarseningProlongationCode },
 		 { "face-prolong", required_argument, NULL, OPT_FaceProlongationCode },
@@ -805,14 +804,9 @@ int main(int argc, char* argv[])
 			case OPT_DisableHigherOrderReconstruction:
 				args.Solver.MG.UseHigherOrderReconstruction = false;
 				break;
-			case OPT_Weight:
-			{
-				string weightCode = optarg;
-				if (weightCode.compare("k") != 0 && weightCode.compare("a") != 0)
-					argument_error("unknown weight code '" + weightCode + "'. Check -weight argument.");
-				args.Solver.MG.WeightCode = weightCode;
+			case OPT_DisableHeterogeneousWeighting:
+				args.Solver.MG.UseHeterogeneousWeighting = false;
 				break;
-			}
 			case OPT_MultigridProlongationCode:
 			{
 				int prolongationCode = atoi(optarg);
