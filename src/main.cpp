@@ -292,14 +292,14 @@ void print_usage() {
 	cout << "      How the prolongation operator is built." << endl;
 	cout << "      Values for the geometric multigrid for HHO:" << endl;
 	cout << "              " << (unsigned)GMGProlongation::CellInterp_Trace << "  - ";
-	cout <<                    "Step 1: Interpolation from coarse faces to coarse cells (refer to -cell-interp argument)" << endl;
+	cout <<                    "Step 1: Interpolation from coarse faces to coarse cells" << endl;
 	cout << "                   Step 2: Trace on the fine faces" << endl;
 	cout << "              " << (unsigned)GMGProlongation::CellInterp_InjectAndTrace << "  - ";
-	cout <<                    "Step 1: Interpolation from coarse faces to coarse cells (refer to -cell-interp argument)" << endl;
+	cout <<                    "Step 1: Interpolation from coarse faces to coarse cells" << endl;
 	cout << "                   Step 2: On faces present on both fine and coarse meshes, we keep the polynomials identical." << endl;
 	cout << "                           On faces interior to coarse elements, trace of the cell polynomials." << endl;
 	cout << "              " << (unsigned)GMGProlongation::CellInterp_Inject_Adjoint << "  - ";
-	cout <<                    "Step 1: Interpolation from coarse faces to coarse cells (refer to -cell-interp argument)" << endl;
+	cout <<                    "Step 1: Interpolation from coarse faces to coarse cells" << endl;
 	cout << "                   Step 2: Canonical injection from coarse to fine cells" << endl;
 	cout << "                   Step 3: Adjoint of the cell interpolation on the fine mesh" << endl;
 	cout << "              " << (unsigned)GMGProlongation::Wildey << "  - ";
@@ -310,12 +310,12 @@ void print_usage() {
 	cout <<                    "Canonical injection from coarse faces to fine faces (implemented to be used with option -cs f)." << endl;
 	cout << "              " << (unsigned)GMGProlongation::CellInterp_Inject_Trace << "  - ";
 	cout <<                    "Same as 1, but another implementation:" << endl;
-	cout << "                   Step 1: Interpolation from coarse faces to coarse cells (refer to -cell-interp argument)" << endl;
+	cout << "                   Step 1: Interpolation from coarse faces to coarse cells" << endl;
 	cout << "                   Step 2: Canonical injection from coarse to fine cells" << endl;
 	cout << "                   Step 3: Trace on the fine faces" << endl;
 	cout << "              " << (unsigned)GMGProlongation::CellInterp_ExactL2proj_Trace << "  - ";
 	cout <<                    "Non-nested variant of " << (unsigned)GMGProlongation::CellInterp_Trace << " and " << (unsigned)GMGProlongation::CellInterp_Inject_Trace << ":" << endl;
-	cout << "                   Step 1: Interpolation from coarse faces to coarse cells (refer to -cell-interp argument)" << endl;
+	cout << "                   Step 1: Interpolation from coarse faces to coarse cells" << endl;
 	cout << "                   Step 2: Exact L2-projection onto the fine cells" << endl;
 	cout << "                   Step 3: Trace on the fine faces" << endl;
 	cout << "              " << (unsigned)GMGProlongation::CellInterp_ApproxL2proj_Trace << "  - ";
@@ -346,10 +346,9 @@ void print_usage() {
 	cout << "              " << (unsigned)CAMGFaceProlongation::FaceAggregates << "  - ";
 	cout <<                     "1 non-zero per face (as in AGMG)" << endl;
 	cout << endl;
-	cout << "-cell-interp NUM" << endl;
-	cout << "      In the polongation of 'mg', degree of the polynomial interpolated on the cells from the faces." << endl;
-	cout << "              1   - degree k+1: recover cell unknowns by solving the local problem and apply the local reconstructor (default)" << endl;
-	cout << "              2   - degree k  : recover cell unknowns by solving the local problem" << endl;
+	cout << "-disable-hor" << endl;
+	cout << "      In the polongation of 'mg', disables the use of the higher-order reconstruction." << endl;
+	cout << "      The local cell polynomials in the intermediary step are obtained by solving the local problems only." << endl;
 	cout << endl;
 	cout << "-weight CODE" << endl;
 	cout << "      In the polongation of 'mg', weighting factor of the projection to the fine faces." << endl;
@@ -495,7 +494,7 @@ int main(int argc, char* argv[])
 		// Multigrid
 		OPT_HP_Strategy,
 		OPT_MGCycle,
-		OPT_CellInterpCode,
+		OPT_DisableHigherOrderReconstruction,
 		OPT_Weight,
 		OPT_MultigridProlongationCode,
 		OPT_CoarseningProlongationCode,
@@ -549,7 +548,7 @@ int main(int argc, char* argv[])
 		 // Multigrid
 		 { "hp-stgy", required_argument, NULL, OPT_HP_Strategy },
 		 { "cycle", required_argument, NULL, OPT_MGCycle },
-		 { "cell-interp", required_argument, NULL, OPT_CellInterpCode },
+		 { "disable-hor", no_argument, NULL, OPT_DisableHigherOrderReconstruction },
 		 { "weight", required_argument, NULL, OPT_Weight },
 		 { "prolong", required_argument, NULL, OPT_MultigridProlongationCode },
 		 { "coarsening-prolong", required_argument, NULL, OPT_CoarseningProlongationCode },
@@ -803,15 +802,9 @@ int main(int argc, char* argv[])
 					argument_error("syntax error in the multigrid cycle. Check -cycle argument.");
 				break;
 			}
-			case OPT_CellInterpCode:
-			{
-				int cellInterp = atoi(optarg);
-				if (cellInterp != 1 && cellInterp != 2)
-					argument_error("check -cell-interp argument. Expecting 1 or 2.");
-				if (cellInterp != 2)
-					args.Solver.MG.UseHigherOrderReconstruction = false;
+			case OPT_DisableHigherOrderReconstruction:
+				args.Solver.MG.UseHigherOrderReconstruction = false;
 				break;
-			}
 			case OPT_Weight:
 			{
 				string weightCode = optarg;

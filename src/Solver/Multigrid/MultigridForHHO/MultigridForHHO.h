@@ -1326,21 +1326,17 @@ public:
 				os << "injection coarse to fine faces ";
 			os << "[-prolong " << (unsigned)Prolongation << "]" << endl;
 
-			if (Prolongation != GMGProlongation::FaceInject)
+			if (Prolongation != GMGProlongation::FaceInject && Prolongation != GMGProlongation::Wildey)
 			{
-				os << "\t" << "Cell interpolation      : ";
 				if (!UseHigherOrderReconstruction)
-					os << "k [-cell-interp 2]";
-				else
-					os << "k+1 [-cell-interp 1]";
-				os << endl;
-			}
+					os << "\t" << "Higher-order reconstruc.: disabled" << endl;
 
-			os << "\t" << "Weighting               : ";
-			if (WeightCode.compare("k") == 0)
-				os << "proportional to the diffusion coefficient [-weight k]";
-			else if (WeightCode.compare("a") == 0)
-				os << "simple average [-weight a]";
+				os << "\t" << "Weighting               : ";
+				if (WeightCode.compare("k") == 0)
+					os << "proportional to the diffusion coefficient [-weight k]";
+				else if (WeightCode.compare("a") == 0)
+					os << "simple average [-weight a]";
+			}
 			os << endl;
 		}
 	}
