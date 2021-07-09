@@ -297,6 +297,15 @@ private:
 			// The coarse element associated to every mesh element must be the closest one.
 			// Every fine element must appear in only one coarse element's FinerElements list.
 
+
+			if (!Utils::BuildsNestedMeshHierarchy(coarsePb->_mesh->ComesFrom.CS) && coarsePb->_mesh->ComesFrom.CS != CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
+			{
+				if (Dim == 2 && this->PolynomialDegree() > 1)
+					Utils::Warning("The degree k=" + to_string(this->PolynomialDegree()) + " is too high to ensure enough accuracy of the approximate L2-projection. Non-optimal convergence may be observed. Option '-prolong " + to_string((unsigned)GMGProlongation::CellInterp_FinerApproxL2proj_Trace) + "' (approx. with subdivision) is recommended.");
+				else if (Dim == 3)
+					Utils::Warning("This rough approximation of the L2-projection does not work well in 3D. Non-optimal convergence may be observed. Option '-prolong " + to_string((unsigned)GMGProlongation::CellInterp_FinerApproxL2proj_Trace) + "' (approx. with subdivision) is recommended.");
+			}
+
 #ifndef NDEBUG
 			//coarsePb->_mesh->PlotClustersForApproxL2(false);
 #endif // !NDEBUG
@@ -335,6 +344,12 @@ private:
 			//          though. Except that the coarse/fine intersection are the   //
 			//          subelements.                                               //
 			//---------------------------------------------------------------------//
+
+			if (!Utils::BuildsNestedMeshHierarchy(coarsePb->_mesh->ComesFrom.CS) && coarsePb->_mesh->ComesFrom.CS != CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
+			{
+				if ((Dim == 2 && this->PolynomialDegree() > 3) || (Dim == 3 && this->PolynomialDegree() > 2))
+					Utils::Warning("The degree k=" + to_string(this->PolynomialDegree()) + " is too high to ensure enough accuracy of the approximate L2-projection. Non-optimal convergence may be observed.");
+			}
 
 			//Timer subdivisionsTimer;
 			//subdivisionsTimer.Start();
@@ -909,29 +924,29 @@ private:
 		Diffusion_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
 		Mesh<Dim>* coarseMesh = coarsePb->_mesh;
 
-		if (finePb->HHO->FaceBasis->GetDegree() != coarsePb->HHO->FaceBasis->GetDegree())
-			Utils::FatalError("L2-proj from coarse to fine elements only available if same degree at both levels. TODO: To be implemented!");
+		if (finePb->HHO->FaceBasis->GetDegree() < coarsePb->HHO->FaceBasis->GetDegree())
+			Utils::FatalError("Canonical injection from coarse to fine elements only available if fine degree > coarse degree.");
 
 		FunctionalBasis<Dim>* coarseBasis = _useHigherOrderReconstruction ? coarsePb->HHO->ReconstructionBasis : coarsePb->HHO->CellBasis;
-		int nCellUnknowns = coarseBasis->Size();
+		FunctionalBasis<Dim>* fineBasis = _useHigherOrderReconstruction ? finePb->HHO->ReconstructionBasis : finePb->HHO->CellBasis;
 
 		ElementParallelLoop<Dim> parallelLoop(coarseMesh->Elements);
-		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nCellUnknowns);
+		parallelLoop.ReserveChunkCoeffsSize(coarseBasis->Size() * 4 * fineBasis->Size());
 
-		parallelLoop.Execute([this, nCellUnknowns, coarseBasis, finePb](Element<Dim>* coarseElement, ParallelChunk<CoeffsChunk>* chunk)
+		parallelLoop.Execute([this, coarseBasis, fineBasis, finePb](Element<Dim>* coarseElement, ParallelChunk<CoeffsChunk>* chunk)
 			{
-				DenseMatrix local_J_f_c = ComputeCanonicalInjectionMatrixCoarseToFine(coarseElement, coarseBasis, coarseBasis, finePb);
+				DenseMatrix local_J_f_c = ComputeCanonicalInjectionMatrixCoarseToFine(coarseElement, coarseBasis, fineBasis, finePb);
 				for (auto fineElement : coarseElement->FinerElements)
 				{
 					BigNumber coarseElemGlobalNumber = coarseElement->Number;
 					BigNumber fineElemGlobalNumber = fineElement->Number;
 					BigNumber fineElemLocalNumber = coarseElement->LocalNumberOf(fineElement);
 
-					chunk->Results.Coeffs.Add(fineElemGlobalNumber*nCellUnknowns, coarseElemGlobalNumber*nCellUnknowns, local_J_f_c.block(fineElemLocalNumber*nCellUnknowns, 0, nCellUnknowns, nCellUnknowns));
+					chunk->Results.Coeffs.Add(fineElemGlobalNumber*fineBasis->Size(), coarseElemGlobalNumber*coarseBasis->Size(), local_J_f_c.block(fineElemLocalNumber*fineBasis->Size(), 0, fineBasis->Size(), coarseBasis->Size()));
 				}
 			});
 
-		SparseMatrix J_f_c(finePb->HHO->nElements * nCellUnknowns, coarsePb->HHO->nElements * nCellUnknowns);
+		SparseMatrix J_f_c(finePb->HHO->nElements * fineBasis->Size(), coarsePb->HHO->nElements * coarseBasis->Size());
 		parallelLoop.Fill(J_f_c);
 		return J_f_c;
 	}
@@ -980,18 +995,18 @@ private:
 		Diffusion_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
 		Mesh<Dim>* coarseMesh = coarsePb->_mesh;
 
-		if (finePb->HHO->FaceBasis->GetDegree() != coarsePb->HHO->FaceBasis->GetDegree())
-			Utils::FatalError("L2-proj from coarse to fine elements only available if same degree at both levels. TODO: To be implemented!");
+		if (finePb->HHO->FaceBasis->GetDegree() < coarsePb->HHO->FaceBasis->GetDegree())
+			Utils::FatalError("L2-proj from coarse to fine elements only available if fine degree > coarse degree.");
 
-		FunctionalBasis<Dim>* cellInterpolationBasis = _useHigherOrderReconstruction ? coarsePb->HHO->ReconstructionBasis : coarsePb->HHO->CellBasis;
-		int nCellUnknowns = cellInterpolationBasis->Size();
+		FunctionalBasis<Dim>* coarseBasis = _useHigherOrderReconstruction ? coarsePb->HHO->ReconstructionBasis : coarsePb->HHO->CellBasis;
+		FunctionalBasis<Dim>* fineBasis = _useHigherOrderReconstruction ? finePb->HHO->ReconstructionBasis : finePb->HHO->CellBasis;
 
 		ElementParallelLoop<Dim> parallelLoop(coarseMesh->Elements);
-		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nCellUnknowns);
+		parallelLoop.ReserveChunkCoeffsSize(fineBasis->Size() * 6 * coarseBasis->Size());
 
-		parallelLoop.Execute([this, nCellUnknowns, cellInterpolationBasis, finePb](Element<Dim>* coarseElement, ParallelChunk<CoeffsChunk>* chunk)
+		parallelLoop.Execute([this, coarseBasis, fineBasis, finePb](Element<Dim>* coarseElement, ParallelChunk<CoeffsChunk>* chunk)
 			{
-				DenseMatrix localL2Proj = ComputeL2ProjectionMatrixCoarseToFine(coarseElement, cellInterpolationBasis, finePb);
+				DenseMatrix localL2Proj = ComputeL2ProjectionMatrixCoarseToFine(coarseElement, coarseBasis, fineBasis, finePb);
 				for (auto it = coarseElement->OverlappingFineElements.begin(); it != coarseElement->OverlappingFineElements.end(); it++)
 				{
 					Element<Dim>* fineElement = it->first;
@@ -999,21 +1014,21 @@ private:
 					BigNumber fineElemGlobalNumber = fineElement->Number;
 					BigNumber fineElemLocalNumber = coarseElement->LocalNumberOfOverlapping(fineElement);
 
-					chunk->Results.Coeffs.Add(fineElemGlobalNumber*nCellUnknowns, coarseElemGlobalNumber*nCellUnknowns, localL2Proj.block(fineElemLocalNumber*nCellUnknowns, 0, nCellUnknowns, nCellUnknowns));
+					chunk->Results.Coeffs.Add(fineElemGlobalNumber*fineBasis->Size(), coarseElemGlobalNumber*coarseBasis->Size(), localL2Proj.block(fineElemLocalNumber*fineBasis->Size(), 0, fineBasis->Size(), coarseBasis->Size()));
 				}
 			});
 
-		SparseMatrix L2Proj(finePb->HHO->nElements * nCellUnknowns, coarsePb->HHO->nElements * nCellUnknowns);
+		SparseMatrix L2Proj(finePb->HHO->nElements * fineBasis->Size(), coarsePb->HHO->nElements * coarseBasis->Size());
 		parallelLoop.Fill(L2Proj);
 		return L2Proj;
 	}
 
 
 
-	DenseMatrix ComputeL2ProjectionMatrixCoarseToFine(Element<Dim>* coarseElement, FunctionalBasis<Dim>* cellBasis, Diffusion_HHO<Dim>* fineProblem)
+	DenseMatrix ComputeL2ProjectionMatrixCoarseToFine(Element<Dim>* coarseElement, FunctionalBasis<Dim>* coarseCellBasis, FunctionalBasis<Dim>* fineCellBasis, Diffusion_HHO<Dim>* fineProblem)
 	{
 		assert(!coarseElement->OverlappingFineElements.empty());
-		DenseMatrix L2Proj(cellBasis->Size() * coarseElement->OverlappingFineElements.size(), cellBasis->Size());
+		DenseMatrix L2Proj(fineCellBasis->Size() * coarseElement->OverlappingFineElements.size(), coarseCellBasis->Size());
 
 		for (auto it = coarseElement->OverlappingFineElements.begin(); it != coarseElement->OverlappingFineElements.end(); it++)
 		{
@@ -1040,13 +1055,13 @@ private:
 				assert(false);
 				Utils::FatalError("This coarse element is declared overlapped by a fine one that is not in the same physical part. The coarsening/refinement strategy must prevent that.");
 			}
-			DenseMatrix fineCoarseMass(cellBasis->Size(), cellBasis->Size());
+			DenseMatrix fineCoarseMass(fineCellBasis->Size(), coarseCellBasis->Size());
 
 			vector<PhysicalShape<Dim>*> intersectionCoarseFine = it->second;
 
-			for (BasisFunction<Dim>* finePhi : cellBasis->LocalFunctions)
+			for (BasisFunction<Dim>* finePhi : fineCellBasis->LocalFunctions)
 			{
-				for (BasisFunction<Dim>* coarsePhi : cellBasis->LocalFunctions)
+				for (BasisFunction<Dim>* coarsePhi : coarseCellBasis->LocalFunctions)
 				{
 					double integral = 0;
 					int degree = finePhi->GetDegree() + coarsePhi->GetDegree();
@@ -1064,9 +1079,9 @@ private:
 				}
 			}
 
-			DenseMatrix fineMass = fineElement->MassMatrix(cellBasis);
+			DenseMatrix fineMass = fineElement->MassMatrix(fineCellBasis);
 
-			L2Proj.block(coarseElement->LocalNumberOfOverlapping(fineElement)*cellBasis->Size(), 0, cellBasis->Size(), cellBasis->Size()) = fineMass.inverse() * fineCoarseMass;
+			L2Proj.block(coarseElement->LocalNumberOfOverlapping(fineElement)*fineCellBasis->Size(), 0, fineCellBasis->Size(), coarseCellBasis->Size()) = fineMass.inverse() * fineCoarseMass;
 		}
 
 		return L2Proj;
@@ -1257,48 +1272,77 @@ public:
 	{
 		this->_problem = problem;
 		this->BlockSizeForBlockSmoothers = problem->HHO->nFaceUnknowns;
+
+		if (problem->HHO->FaceBasis->GetDegree() == 0)
+			Utils::Warning("k=0 is a special case for this multigrid method. Non-optimal convergence may be observed, especially in 3D.");
 	}
 
 	void BeginSerialize(ostream& os) const override
 	{
 		os << "MultigridForHHO" << endl;
-		os << "\t" << "Prolongation            : ";
-		if (Prolongation == GMGProlongation::CellInterp_Trace)
-			os << "coarse cell interpolation + trace/proj. on fine faces ";
-		else if (Prolongation == GMGProlongation::CellInterp_Inject_Trace)
-			os << "coarse cell interpolation + injection coarse to fine cells + trace on fine faces ";
-		else if (Prolongation == GMGProlongation::CellInterp_ExactL2proj_Trace)
-			os << "coarse cell interpolation + exact L2-proj. to fine cells + trace on fine faces ";
-		else if (Prolongation == GMGProlongation::CellInterp_ApproxL2proj_Trace)
-			os << "coarse cell interpolation + approx. L2-proj. to fine cells + trace on fine faces ";
-		else if (Prolongation == GMGProlongation::CellInterp_FinerApproxL2proj_Trace)
-			os << "coarse cell interpolation + approx. L2-proj. with subtriangulation + trace on fine faces ";
-		else if (Prolongation == GMGProlongation::CellInterp_InjectAndTrace)
-			os << "injection for common faces, and coarse cell interpolation + trace for the other ";
-		else if (Prolongation == GMGProlongation::CellInterp_Inject_Adjoint)
-			os << "coarse cell interpolation + injection coarse to fine cells + adjoint of cell interpolation ";
-		else if (Prolongation == GMGProlongation::Wildey)
-			os << "Wildey et al. ";
-		else if (Prolongation == GMGProlongation::FaceInject)
-			os << "injection coarse to fine faces ";
-		os << "[-prolong " << (unsigned)Prolongation << "]" << endl;
 
-		if (Prolongation != GMGProlongation::FaceInject)
+		os << "\t" << "hp-strategy             : ";
+		if (this->HP_Stgy == HP_Strategy::HP_then_H)
+			os << "hp then h [-hp-stgy hp_h]";
+		else if (this->HP_Stgy == HP_Strategy::H_only)
+			os << "h only [-hp-stgy h]";
+		else if (this->HP_Stgy == HP_Strategy::P_only)
+			os << "p only [-hp-stgy p]";
+		else if (this->HP_Stgy == HP_Strategy::P_then_H)
+			os << "p then h [-hp-stgy p_h]";
+		else if (this->HP_Stgy == HP_Strategy::P_then_HP)
+			os << "p then hp [-hp-stgy p_hp]";
+		os << endl;
+
+		if (this->HP_Stgy == HP_Strategy::P_only || this->HP_Stgy == HP_Strategy::P_then_H || this->HP_Stgy == HP_Strategy::P_then_HP)
 		{
-			os << "\t" << "Cell interpolation      : ";
-			if (!UseHigherOrderReconstruction)
-				os << "k [-cell-interp 2]";
-			else
-				os << "k+1 [-cell-interp 1]";
+			os << "\t" << "p-prolongation          : natural injection ";
 			os << endl;
 		}
+		if (this->HP_Stgy == HP_Strategy::H_only || this->HP_Stgy == HP_Strategy::HP_then_H || this->HP_Stgy == HP_Strategy::P_then_H || this->HP_Stgy == HP_Strategy::P_then_HP)
+		{
+			if (this->HP_Stgy == HP_Strategy::H_only || this->HP_Stgy == HP_Strategy::P_then_H)
+				os << "\t" << "h-prolongation          : ";
+			else
+				os << "\t" << "hp-prolongation         : ";
 
-		os << "\t" << "Weighting               : ";
-		if (WeightCode.compare("k") == 0)
-			os << "proportional to the diffusion coefficient [-weight k]";
-		else if (WeightCode.compare("a") == 0)
-			os << "simple average [-weight a]";
-		os << endl;
+			if (Prolongation == GMGProlongation::CellInterp_Trace)
+				os << "coarse cell interpolation + trace/proj. on fine faces ";
+			else if (Prolongation == GMGProlongation::CellInterp_Inject_Trace)
+				os << "coarse cell interpolation + injection coarse to fine cells + trace on fine faces ";
+			else if (Prolongation == GMGProlongation::CellInterp_ExactL2proj_Trace)
+				os << "coarse cell interpolation + exact L2-proj. to fine cells + trace on fine faces ";
+			else if (Prolongation == GMGProlongation::CellInterp_ApproxL2proj_Trace)
+				os << "coarse cell interpolation + approx. L2-proj. to fine cells + trace on fine faces ";
+			else if (Prolongation == GMGProlongation::CellInterp_FinerApproxL2proj_Trace)
+				os << "coarse cell interpolation + approx. L2-proj. with subtriangulation + trace on fine faces ";
+			else if (Prolongation == GMGProlongation::CellInterp_InjectAndTrace)
+				os << "injection for common faces, and coarse cell interpolation + trace for the other ";
+			else if (Prolongation == GMGProlongation::CellInterp_Inject_Adjoint)
+				os << "coarse cell interpolation + injection coarse to fine cells + adjoint of cell interpolation ";
+			else if (Prolongation == GMGProlongation::Wildey)
+				os << "Wildey et al. ";
+			else if (Prolongation == GMGProlongation::FaceInject)
+				os << "injection coarse to fine faces ";
+			os << "[-prolong " << (unsigned)Prolongation << "]" << endl;
+
+			if (Prolongation != GMGProlongation::FaceInject)
+			{
+				os << "\t" << "Cell interpolation      : ";
+				if (!UseHigherOrderReconstruction)
+					os << "k [-cell-interp 2]";
+				else
+					os << "k+1 [-cell-interp 1]";
+				os << endl;
+			}
+
+			os << "\t" << "Weighting               : ";
+			if (WeightCode.compare("k") == 0)
+				os << "proportional to the diffusion coefficient [-weight k]";
+			else if (WeightCode.compare("a") == 0)
+				os << "simple average [-weight a]";
+			os << endl;
+		}
 	}
 
 	void EndSerialize(ostream& os) const override

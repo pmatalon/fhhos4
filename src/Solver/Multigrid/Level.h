@@ -78,11 +78,17 @@ public:
 		{
 			cout << "\t\tProlongation        : "; cout.flush();
 			SetupProlongation();
-			cout << Utils::MatrixInfo(this->P, "P") << endl;
+			if (this->P.rows() == 0)
+				cout << "matrix free" << endl;
+			else
+				cout << Utils::MatrixInfo(this->P, "P") << endl;
 
 			cout << "\t\tRestriction         : "; cout.flush();
 			SetupRestriction();
-			cout << Utils::MatrixInfo(this->R, "R") << endl;
+			if (this->R.rows() == 0)
+				cout << "matrix free" << endl;
+			else
+				cout << Utils::MatrixInfo(this->R, "R") << endl;
 
 			cout << "\t\tPreSmoothing        : "; cout.flush();
 			PreSmoother->Setup(A);
