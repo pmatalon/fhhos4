@@ -67,7 +67,7 @@ public:
 		if (hho->OrthonormalizeBases)
 		{
 			this->Basis = new OrthonormalBasis<Dim - 1>(HHO->FaceBasis, this->MeshFace->Shape());
-			//this->_massMatrix = this->MeshFace->Shape()->ComputeMassMatrix(basis);
+			//this->_massMatrix = this->MeshFace->Shape()->ComputeMassMatrix(this->Basis);
 			//cout << "mass matrix: " << endl << _massMatrix << endl;
 			this->_massMatrix = DenseMatrix::Identity(this->Basis->Size(), this->Basis->Size());
 			this->_invMassMatrix = DenseMatrix::Identity(this->Basis->Size(), this->Basis->Size());

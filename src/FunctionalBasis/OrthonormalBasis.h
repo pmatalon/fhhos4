@@ -26,25 +26,19 @@ public:
 			bool found = false;
 			for (int j = 1; j < this->_functions.size(); j++) // j=0 is excluded
 			{
-				if (component == this->_functions[i])
+				if (component == this->_functions[j])
 				{
 					found = true;
-					this->_coeffs[i] = this->_coeffs[i] - coeff_component;
+					this->_coeffs[j] -= coeff * coeff_component;
 					break;
 				}
 			}
 			if (!found)
 			{
 				_functions.push_back(component);
-				_coeffs.push_back(coeff_component);
+				_coeffs.push_back(-coeff * coeff_component);
 			}
 		}
-	}
-
-	void Minus(double coeff, BasisFunction<Dim>* phi)
-	{
-		_functions.push_back(phi);
-		_coeffs.push_back(-coeff);
 	}
 
 	void DivideBy(double coeff)
@@ -105,11 +99,9 @@ private:
 			OrthonormalBasisFunction<Dim>* phi = new OrthonormalBasisFunction<Dim>(basis->LocalFunctions[i]);
 			for (int j = 0; j < i; j++)
 			{
-				BasisFunction<Dim>* previousPhi = dynamic_cast<OrthonormalBasisFunction<Dim>*>(this->LocalFunctions[j]);
-
-				double innerprod = shape->L2InnerProduct(phi, previousPhi);
-				if (innerprod > Utils::Eps*shape->Measure())
-					phi->Minus(innerprod, previousPhi);
+				OrthonormalBasisFunction<Dim>* previousPhi = dynamic_cast<OrthonormalBasisFunction<Dim>*>(this->LocalFunctions[j]);
+				double innerprod = shape->ComputeMassTerm(phi, previousPhi);
+				phi->Minus(innerprod, previousPhi);
 			}
 			double norm = shape->L2Norm(phi);
 			phi->DivideBy(norm);

@@ -77,6 +77,7 @@ protected:
 		return M;
 	}
 
+public:
 	double ComputeMassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
 	{
 		RefFunction functionToIntegrate = [phi1, phi2](const RefPoint& p) {
@@ -85,6 +86,14 @@ protected:
 
 		int polynomialDegree = phi1->GetDegree() + phi2->GetDegree();
 		return Integral(functionToIntegrate, polynomialDegree);
+	}
+
+	double L2Norm(BasisFunction<Dim>* phi)
+	{
+		RefFunction func = [phi](const RefPoint& p) {
+			return pow(phi->Eval(p), 2);
+		};
+		return sqrt(this->Integral(func, 2 * phi->GetDegree()));
 	}
 
 	//-------------------------------------------------------------------//
