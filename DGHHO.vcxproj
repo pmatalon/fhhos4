@@ -186,7 +186,7 @@
     <ClInclude Include="src\Solver\Multigrid\AggregAMG\PairwiseAggregation.h" />
     <ClInclude Include="src\Solver\Multigrid\MultigridForHHO\MultigridForHHO.h" />
     <ClInclude Include="src\Solver\Multigrid\MultigridForHHO\P_MultigridForHHO.h" />
-    <ClInclude Include="src\Solver\Multigrid\UncondensedAMG\CondensedAMG.h" />
+    <ClInclude Include="src\Solver\Multigrid\UncondensedAMG\UncondensedAMG.h" />
     <ClInclude Include="src\Solver\Multigrid\UncondensedAMG\HybridAlgebraicMesh.h" />
     <ClInclude Include="src\Solver\Multigrid\AGMG.h" />
     <ClInclude Include="src\Solver\Multigrid\Level.h" />
@@ -195,6 +195,7 @@
     <ClInclude Include="src\Solver\Multigrid\SmootherFactory.h" />
     <ClInclude Include="src\Solver\AllSolvers.h" />
     <ClInclude Include="src\Solver\IterationResult.h" />
+    <ClInclude Include="src\Solver\Multigrid\UncondensedAMG\UncondensedLevel.h" />
     <ClInclude Include="src\Solver\Preconditioner.h" />
     <ClInclude Include="src\Solver\IterativeSolver.h" />
     <ClInclude Include="src\Solver\Solver.h" />

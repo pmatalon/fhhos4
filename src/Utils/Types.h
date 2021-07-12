@@ -97,7 +97,7 @@ enum class GMGProlongation : unsigned
 	FaceInject = 5
 };
 
-enum class CAMGProlongation : unsigned
+enum class UAMGProlongation : unsigned
 {
 	ReconstructionTrace = 1,
 	ChainedCoarseningProlongations = 2,
@@ -110,7 +110,7 @@ enum class CAMGProlongation : unsigned
 	ReconstructionTranspose2Steps = 9
 };
 
-enum class CAMGFaceProlongation : unsigned
+enum class UAMGFaceProlongation : unsigned
 {
 	BoundaryAggregatesInteriorAverage = 1,
 	BoundaryAggregatesInteriorZero = 2,

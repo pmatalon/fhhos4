@@ -190,7 +190,7 @@ public:
 
 			HHOParameters<Dim>* hho = new HHOParameters<Dim>(mesh, args.Discretization.Stabilization, reconstructionBasis, cellBasis, faceBasis, args.Discretization.OrthonormalizeBases);
 
-			bool saveMatrixBlocks = args.Solver.SolverCode.compare("camg") == 0 || args.Solver.SolverCode.compare("fcgcamg") == 0;
+			bool saveMatrixBlocks = args.Solver.SolverCode.compare("uamg") == 0 || args.Solver.SolverCode.compare("fcguamg") == 0;
 			problem = new Diffusion_HHO<Dim>(mesh, testCase, hho, args.Discretization.StaticCondensation, saveMatrixBlocks, args.OutputDirectory);
 		}
 		else
@@ -460,10 +460,10 @@ private:
 			else
 				Utils::FatalError("The Multigrid for HHO only applicable on HHO discretization with static condensation.");
 		}
-		else if (args.Solver.SolverCode.compare("camg") == 0)
+		else if (args.Solver.SolverCode.compare("uamg") == 0)
 		{
 			Diffusion_HHO<Dim>* hhoProblem = dynamic_cast<Diffusion_HHO<Dim>*>(problem);
-			CondensedAMG* mg = new CondensedAMG(hhoProblem->HHO->nCellUnknowns, hhoProblem->HHO->nFaceUnknowns, 0.25, args.Solver.MG.CAMGFaceProlong, args.Solver.MG.CAMGCoarseningProlong, args.Solver.MG.CAMGMultigridProlong, args.Solver.MG.Levels);
+			UncondensedAMG* mg = new UncondensedAMG(hhoProblem->HHO->nCellUnknowns, hhoProblem->HHO->nFaceUnknowns, 0.25, args.Solver.MG.UAMGFaceProlong, args.Solver.MG.UAMGCoarseningProlong, args.Solver.MG.UAMGMultigridProlong, args.Solver.MG.Levels);
 			SetMultigridParameters(mg, args, blockSize);
 			solver = mg;
 		}
@@ -553,7 +553,7 @@ private:
 			iterativeSolver->ComputeExactSolution = Utils::ProgramArgs.Actions.ExportErrorToGMSH || problem->A.rows() <= 2000;
 
 			setupTimer.Start();
-			if (Utils::ProgramArgs.Solver.SolverCode.compare("camg") == 0 || Utils::ProgramArgs.Solver.SolverCode.compare("fcgcamg") == 0)
+			if (Utils::ProgramArgs.Solver.SolverCode.compare("uamg") == 0 || Utils::ProgramArgs.Solver.SolverCode.compare("fcguamg") == 0)
 			{
 				Diffusion_HHO<Dim>* hhoPb = static_cast<Diffusion_HHO<Dim>*>(problem);
 				iterativeSolver->Setup(hhoPb->A, hhoPb->A_T_T, hhoPb->A_T_ndF, hhoPb->A_ndF_ndF);

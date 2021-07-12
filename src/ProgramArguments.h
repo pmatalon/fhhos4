@@ -40,9 +40,9 @@ struct MultigridArguments
 	GMGProlongation GMGProlong = GMGProlongation::Default;
 	int FaceProlongationCode = 0;
 	int CoarseningProlongationCode = 0;
-	CAMGFaceProlongation CAMGFaceProlong = CAMGFaceProlongation::BoundaryAggregatesInteriorAverage;
-	CAMGProlongation CAMGCoarseningProlong = CAMGProlongation::FaceProlongation;
-	CAMGProlongation CAMGMultigridProlong = CAMGProlongation::ReconstructTraceOrInject;
+	UAMGFaceProlongation UAMGFaceProlong = UAMGFaceProlongation::BoundaryAggregatesInteriorAverage;
+	UAMGProlongation UAMGCoarseningProlong = UAMGProlongation::FaceProlongation;
+	UAMGProlongation UAMGMultigridProlong = UAMGProlongation::ReconstructTraceOrInject;
 	int MatrixMaxSizeForCoarsestLevel = 1000;
 	char CycleLetter = 'V';
 	int WLoops = 1;
@@ -62,7 +62,7 @@ struct MultigridArguments
 	string CoarseSolverCode = "ch";
 	FaceCollapsing BoundaryFaceCollapsing = FaceCollapsing::Max;
 	ReEntrantCornerMgmt ReEntrantCornerManagement = ReEntrantCornerMgmt::Disabled;
-	bool ManageAnisotropy = true; // used only in CAMG
+	bool ManageAnisotropy = true; // used only in UAMG
 };
 
 struct SolverArguments

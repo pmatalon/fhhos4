@@ -158,7 +158,7 @@ void print_usage() {
 	cout << "              agmg         - Yvan Notay's AGMG solver" << endl;
 	cout << "              mg           - Custom multigrid for HHO" << endl;
 	cout << "              p_mg         - p-Multigrid to be used on top of mg" << endl;
-	cout << "              camg         - Condensed AMG (for hybrid discretizations with static condensation)" << endl;
+	cout << "              uamg         - Uncondensed AMG (for hybrid discretizations with static condensation)" << endl;
 	cout << "              aggregamg    - In-house implementation of AGMG, without the outer Krylov iteration. Meant to be used with K-cycle and with FCG." << endl;
 	cout << "              hoaggregamg  - Algebraic p-multigrid on top of aggregamg" << endl;
 	cout << endl;
@@ -252,10 +252,6 @@ void print_usage() {
 	cout << "              seed - (Experimental) agglomeration coarsening by seed points" << endl;
 	cout << "              vn   - (Experimental) agglomeration coarsening by vertex neighbours" << endl;
 	cout << "              f    - (Experimental) Face coarsening: the faces are coarsened and all kept on the coarse skeleton. Requires -g 1." << endl;
-	/*cout << "      'camg':" << endl;
-	cout << "              x   - Collapse interfaces made of multiple faces" << endl;
-	cout << "              y   - Collapse interfaces made of multiple faces and try to aggregate interior faces to the boundary ones" << endl;
-	cout << "              z   - Aggregate all faces using A_F_F" << endl;*/
 	cout << endl;
 	cout << "-fcs CODE" << endl;
 	cout << "      Face coarsening (default: c)." << endl;
@@ -322,28 +318,28 @@ void print_usage() {
 	cout <<                    "Variant of " << (unsigned)GMGProlongation::CellInterp_ExactL2proj_Trace << " where the L2-projection is not computed exactly but has the same approximation properties." << endl;
 	cout << "              " << (unsigned)GMGProlongation::CellInterp_FinerApproxL2proj_Trace << "  - ";
 	cout <<                    "Variant of " << (unsigned)GMGProlongation::CellInterp_ApproxL2proj_Trace << " where the L2-projection is better approximated (by subtriangulation of the elements)." << endl;
-	cout << "      Values for CondensedAMG:" << endl;
-	cout << "              " << (unsigned)CAMGProlongation::ChainedCoarseningProlongations << "  - ";
+	cout << "      Values for UncondensedAMG:" << endl;
+	cout << "              " << (unsigned)UAMGProlongation::ChainedCoarseningProlongations << "  - ";
 	cout <<                    "chained coarsening prolongations (use -coarsening-prolong to select)" << endl;
-	cout << "              " << (unsigned)CAMGProlongation::ReconstructionTrace << "  - ";
+	cout << "              " << (unsigned)UAMGProlongation::ReconstructionTrace << "  - ";
 	cout <<                    "cell-reconstruction + injection + trace" << endl;
-	cout << "              " << (unsigned)CAMGProlongation::FaceProlongation << "  - ";
+	cout << "              " << (unsigned)UAMGProlongation::FaceProlongation << "  - ";
 	cout <<                    "face injection" << endl;
-	cout << "              " << (unsigned)CAMGProlongation::ReconstructTraceOrInject << "  - ";
+	cout << "              " << (unsigned)UAMGProlongation::ReconstructTraceOrInject << "  - ";
 	cout <<                    "cell-reconstruction + injection + trace for interior faces, injection for boundary faces" << endl;
-	cout << "              " << (unsigned)CAMGProlongation::ReconstructSmoothedTraceOrInject << "  - ";
+	cout << "              " << (unsigned)UAMGProlongation::ReconstructSmoothedTraceOrInject << "  - ";
 	cout <<                    "cell-reconstruction + trace + smoothing for interior faces, injection for boundary faces" << endl;
 	cout << endl;
 	cout << "-coarsening-prolong NUM" << endl;
-	cout << "      Intermediate prolongation operator used to build the coarse levels in 'camg'. Same possble values as -prolong." << endl;
+	cout << "      Intermediate prolongation operator used to build the coarse levels in 'uamg'. Same possble values as -prolong." << endl;
 	cout << endl;
 	cout << "-face-prolong NUM" << endl;
-	cout << "      Intermediate face prolongation operator used in 'camg'." << endl;
-	cout << "              " << (unsigned)CAMGFaceProlongation::BoundaryAggregatesInteriorAverage << "  - ";
+	cout << "      Intermediate face prolongation operator used in 'uamg'." << endl;
+	cout << "              " << (unsigned)UAMGFaceProlongation::BoundaryAggregatesInteriorAverage << "  - ";
 	cout <<                     "1 non-zero for aggregated faces, average for interior non-aggregated faces" << endl;
-	cout << "              " << (unsigned)CAMGFaceProlongation::BoundaryAggregatesInteriorZero << "  - ";
+	cout << "              " << (unsigned)UAMGFaceProlongation::BoundaryAggregatesInteriorZero << "  - ";
 	cout <<                     "1 non-zero for boundary faces, nothing for interior faces" << endl;
-	cout << "              " << (unsigned)CAMGFaceProlongation::FaceAggregates << "  - ";
+	cout << "              " << (unsigned)UAMGFaceProlongation::FaceAggregates << "  - ";
 	cout <<                     "1 non-zero per face (as in AGMG)" << endl;
 	cout << endl;
 	cout << "-disable-hor" << endl;
@@ -889,12 +885,6 @@ int main(int argc, char* argv[])
 					args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByVertexNeighbours;
 				else if (coarseningStgyCode.compare("f") == 0)
 					args.Solver.MG.CoarseningStgy = CoarseningStrategy::FaceCoarsening;
-				/*else if (coarseningStgyCode.compare("x") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::CAMGCollapseElementInterfaces;
-				else if (coarseningStgyCode.compare("y") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::CAMGCollapseElementInterfacesAndTryAggregInteriorToBoundaries;
-				else if (coarseningStgyCode.compare("z") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::CAMGAggregFaces;*/
 				else
 					argument_error("unknown coarsening strategy code '" + coarseningStgyCode + "'. Check -cs argument.");
 				break;
@@ -1199,17 +1189,17 @@ int main(int argc, char* argv[])
 		}
 	}
 
-	if (args.Solver.SolverCode.compare("camg") == 0 || args.Solver.SolverCode.compare("fcgcamg") == 0)
+	if (args.Solver.SolverCode.compare("uamg") == 0 || args.Solver.SolverCode.compare("fcguamg") == 0)
 	{
 		if (args.Discretization.Method.compare("dg") == 0)
 			argument_error("Multigrid only applicable on HHO discretization.");
 
 		if (args.Solver.MG.ProlongationCode == 0)
-			args.Solver.MG.CAMGMultigridProlong = CAMGProlongation::ChainedCoarseningProlongations;
+			args.Solver.MG.UAMGMultigridProlong = UAMGProlongation::ChainedCoarseningProlongations;
 		else
-			args.Solver.MG.CAMGMultigridProlong = static_cast<CAMGProlongation>(args.Solver.MG.ProlongationCode);
-		args.Solver.MG.CAMGFaceProlong = args.Solver.MG.FaceProlongationCode == 0 ? CAMGFaceProlongation::BoundaryAggregatesInteriorAverage : static_cast<CAMGFaceProlongation>(args.Solver.MG.FaceProlongationCode);
-		args.Solver.MG.CAMGCoarseningProlong = args.Solver.MG.CoarseningProlongationCode == 0 ? CAMGProlongation::ReconstructSmoothedTraceOrInject : static_cast<CAMGProlongation>(args.Solver.MG.CoarseningProlongationCode);
+			args.Solver.MG.UAMGMultigridProlong = static_cast<UAMGProlongation>(args.Solver.MG.ProlongationCode);
+		args.Solver.MG.UAMGFaceProlong = args.Solver.MG.FaceProlongationCode == 0 ? UAMGFaceProlongation::BoundaryAggregatesInteriorAverage : static_cast<UAMGFaceProlongation>(args.Solver.MG.FaceProlongationCode);
+		args.Solver.MG.UAMGCoarseningProlong = args.Solver.MG.CoarseningProlongationCode == 0 ? UAMGProlongation::ReconstructSmoothedTraceOrInject : static_cast<UAMGProlongation>(args.Solver.MG.CoarseningProlongationCode);
 
 		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::None)
 			args.Solver.MG.CoarseningStgy = CoarseningStrategy::MultiplePairwiseAggregation;
