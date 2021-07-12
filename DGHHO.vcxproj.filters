@@ -468,6 +468,9 @@
     <ClInclude Include="src\Solver\Multigrid\UncondensedAMG\UncondensedAMG.h">
       <Filter>Solver\Multigrid\UncondensedAMG</Filter>
     </ClInclude>
+    <ClInclude Include="src\Solver\Multigrid\MultigridForHHO\LevelForHHO.h">
+      <Filter>Solver\Multigrid\MultigridForHHO</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
