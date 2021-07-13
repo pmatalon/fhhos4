@@ -9,7 +9,8 @@ class MultigridForHHO : public Multigrid
 private:
 	Diffusion_HHO<Dim>* _problem;
 public:
-	GMGProlongation Prolongation = GMGProlongation::CellInterp_Trace;
+	GMG_H_Prolongation H_Prolongation = GMG_H_Prolongation::CellInterp_Trace;
+	GMG_P_Prolongation P_Prolongation = GMG_P_Prolongation::Injection;
 	bool UseHigherOrderReconstruction = true;
 	bool UseHeterogeneousWeighting = true;
 	
@@ -53,8 +54,12 @@ public:
 
 		if (this->HP_Stgy == HP_Strategy::P_only || this->HP_Stgy == HP_Strategy::P_then_H || this->HP_Stgy == HP_Strategy::P_then_HP)
 		{
-			os << "\t" << "p-prolongation          : natural injection ";
-			os << endl;
+			os << "\t" << "p-prolongation          : ";
+			if (P_Prolongation == GMG_P_Prolongation::Injection)
+				os << "natural injection ";
+			else if (P_Prolongation == GMG_P_Prolongation::H_Prolongation)
+				os << "h-prolongation ";
+			os << "[-p-prolong " << (unsigned)P_Prolongation << "]" << endl;
 		}
 		if (this->HP_Stgy == HP_Strategy::H_only || this->HP_Stgy == HP_Strategy::HP_then_H || this->HP_Stgy == HP_Strategy::P_then_H || this->HP_Stgy == HP_Strategy::P_then_HP)
 		{
@@ -63,27 +68,27 @@ public:
 			else
 				os << "\t" << "hp-prolongation         : ";
 
-			if (Prolongation == GMGProlongation::CellInterp_Trace)
+			if (H_Prolongation == GMG_H_Prolongation::CellInterp_Trace)
 				os << "coarse cell interpolation + trace/proj. on fine faces ";
-			else if (Prolongation == GMGProlongation::CellInterp_Inject_Trace)
+			else if (H_Prolongation == GMG_H_Prolongation::CellInterp_Inject_Trace)
 				os << "coarse cell interpolation + injection coarse to fine cells + trace on fine faces ";
-			else if (Prolongation == GMGProlongation::CellInterp_ExactL2proj_Trace)
+			else if (H_Prolongation == GMG_H_Prolongation::CellInterp_ExactL2proj_Trace)
 				os << "coarse cell interpolation + exact L2-proj. to fine cells + trace on fine faces ";
-			else if (Prolongation == GMGProlongation::CellInterp_ApproxL2proj_Trace)
+			else if (H_Prolongation == GMG_H_Prolongation::CellInterp_ApproxL2proj_Trace)
 				os << "coarse cell interpolation + approx. L2-proj. to fine cells + trace on fine faces ";
-			else if (Prolongation == GMGProlongation::CellInterp_FinerApproxL2proj_Trace)
+			else if (H_Prolongation == GMG_H_Prolongation::CellInterp_FinerApproxL2proj_Trace)
 				os << "coarse cell interpolation + approx. L2-proj. with subtriangulation + trace on fine faces ";
-			else if (Prolongation == GMGProlongation::CellInterp_InjectAndTrace)
+			else if (H_Prolongation == GMG_H_Prolongation::CellInterp_InjectAndTrace)
 				os << "injection for common faces, and coarse cell interpolation + trace for the other ";
-			else if (Prolongation == GMGProlongation::CellInterp_Inject_Adjoint)
+			else if (H_Prolongation == GMG_H_Prolongation::CellInterp_Inject_Adjoint)
 				os << "coarse cell interpolation + injection coarse to fine cells + adjoint of cell interpolation ";
-			else if (Prolongation == GMGProlongation::Wildey)
+			else if (H_Prolongation == GMG_H_Prolongation::Wildey)
 				os << "Wildey et al. ";
-			else if (Prolongation == GMGProlongation::FaceInject)
+			else if (H_Prolongation == GMG_H_Prolongation::FaceInject)
 				os << "injection coarse to fine faces ";
-			os << "[-prolong " << (unsigned)Prolongation << "]" << endl;
+			os << "[-prolong " << (unsigned)H_Prolongation << "]" << endl;
 
-			if (Prolongation != GMGProlongation::FaceInject && Prolongation != GMGProlongation::Wildey)
+			if (H_Prolongation != GMG_H_Prolongation::FaceInject && H_Prolongation != GMG_H_Prolongation::Wildey)
 			{
 				if (!UseHigherOrderReconstruction)
 					os << "\t" << "Higher-order reconstruc.: disabled" << endl;
@@ -95,10 +100,10 @@ public:
 
 	void EndSerialize(ostream& os) const override
 	{
-		if (Utils::RequiresNestedHierarchy(Prolongation) && !Utils::BuildsNestedMeshHierarchy(this->CoarseningStgy))
+		if (Utils::RequiresNestedHierarchy(H_Prolongation) && !Utils::BuildsNestedMeshHierarchy(this->CoarseningStgy))
 		{
 			os << endl;
-			Utils::Warning(os, "The selected coarsening strategy generates non-nested meshes, while the selected prolongation operator is made for nested meshes. Option -prolong " + to_string((unsigned)GMGProlongation::CellInterp_ExactL2proj_Trace) + ", " + to_string((unsigned)GMGProlongation::CellInterp_ApproxL2proj_Trace) + " or " + to_string((unsigned)GMGProlongation::CellInterp_FinerApproxL2proj_Trace) + " recommended.");
+			Utils::Warning(os, "The selected coarsening strategy generates non-nested meshes, while the selected prolongation operator is made for nested meshes. Option -prolong " + to_string((unsigned)GMG_H_Prolongation::CellInterp_ExactL2proj_Trace) + ", " + to_string((unsigned)GMG_H_Prolongation::CellInterp_ApproxL2proj_Trace) + " or " + to_string((unsigned)GMG_H_Prolongation::CellInterp_FinerApproxL2proj_Trace) + " recommended.");
 		}
 	}
 
@@ -144,7 +149,7 @@ protected:
 	Level* CreateFineLevel() const override
 	{
 		assert(_problem && "The multigrid has not been initialized with a problem");
-		return new LevelForHHO<Dim>(0, _problem, Prolongation, UseHigherOrderReconstruction, UseHeterogeneousWeighting);
+		return new LevelForHHO<Dim>(0, _problem, H_Prolongation, P_Prolongation, UseHigherOrderReconstruction, UseHeterogeneousWeighting);
 	}
 
 	Level* CreateCoarseLevel(Level* fineLevel, CoarseningType coarseningType) override
@@ -161,7 +166,7 @@ protected:
 		else
 			assert(false);
 		
-		LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(fineLevel->Number + 1, coarseProblem, Prolongation, UseHigherOrderReconstruction, UseHeterogeneousWeighting);
+		LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(fineLevel->Number + 1, coarseProblem, H_Prolongation, P_Prolongation, UseHigherOrderReconstruction, UseHeterogeneousWeighting);
 		return coarseLevel;
 	}
 };

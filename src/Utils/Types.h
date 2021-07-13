@@ -83,7 +83,7 @@ enum class FaceCoarseningStrategy : unsigned
 	InterfaceCollapsingAndTryAggregInteriorToInterfaces
 };
 
-enum class GMGProlongation : unsigned
+enum class GMG_H_Prolongation : unsigned
 {
 	Default = 0,
 	CellInterp_Trace = 1,
@@ -95,6 +95,12 @@ enum class GMGProlongation : unsigned
 	CellInterp_Inject_Adjoint = 3,
 	Wildey = 4,
 	FaceInject = 5
+};
+
+enum class GMG_P_Prolongation : unsigned
+{
+	Injection = 1,
+	H_Prolongation = 2
 };
 
 enum class UAMGProlongation : unsigned

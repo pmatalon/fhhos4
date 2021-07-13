@@ -213,9 +213,9 @@ public:
 		return EndsWith(solverCode, "amg");
 	}
 
-	static bool RequiresNestedHierarchy(GMGProlongation p)
+	static bool RequiresNestedHierarchy(GMG_H_Prolongation p)
 	{
-		return p != GMGProlongation::CellInterp_ExactL2proj_Trace && p != GMGProlongation::CellInterp_ApproxL2proj_Trace && p != GMGProlongation::CellInterp_FinerApproxL2proj_Trace;
+		return p != GMG_H_Prolongation::CellInterp_ExactL2proj_Trace && p != GMG_H_Prolongation::CellInterp_ApproxL2proj_Trace && p != GMG_H_Prolongation::CellInterp_FinerApproxL2proj_Trace;
 	}
 
 	static double Eps;

@@ -434,7 +434,8 @@ private:
 				MultigridForHHO<Dim>* mg = new MultigridForHHO<Dim>(args.Solver.MG.Levels);
 				mg->HP_Stgy = args.Solver.MG.HP_Stgy;
 				mg->UseHigherOrderReconstruction = args.Solver.MG.UseHigherOrderReconstruction;
-				mg->Prolongation = args.Solver.MG.GMGProlong;
+				mg->H_Prolongation = args.Solver.MG.GMG_H_Prolong;
+				mg->P_Prolongation = args.Solver.MG.GMG_P_Prolong;
 				mg->UseHeterogeneousWeighting = args.Solver.MG.UseHeterogeneousWeighting;
 				if (problem)
 				{
@@ -527,7 +528,7 @@ private:
 		else if (args.Solver.MG.CoarseSolverCode.compare("mg") == 0 || args.Solver.MG.CoarseSolverCode.compare("fcgmg") == 0)
 		{
 			argsCoarseSolver.Solver.MaxIterations = 1;
-			argsCoarseSolver.Solver.MG.GMGProlong = args.Solver.MG.GMGProlong;
+			argsCoarseSolver.Solver.MG.GMG_H_Prolong = args.Solver.MG.GMG_H_Prolong;
 			argsCoarseSolver.Solver.MG.FaceProlongationCode = args.Solver.MG.FaceProlongationCode;
 			argsCoarseSolver.Solver.MG.CoarseningStgy = args.Solver.MG.CoarseningStgy;
 			argsCoarseSolver.Solver.MG.FaceCoarseningStgy = args.Solver.MG.FaceCoarseningStgy;

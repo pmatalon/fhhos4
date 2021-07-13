@@ -1,24 +1,25 @@
 #pragma once
 #include "../Level.h"
 #include "../../../HHO/Diffusion_HHO.h"
-#include "../../../Utils/ElementParallelLoop.h"
 using namespace std;
 
 template <int Dim>
 class LevelForHHO : public Level
 {
 private:
-	GMGProlongation _prolongation = GMGProlongation::CellInterp_Trace;
+	GMG_H_Prolongation _hProlongation = GMG_H_Prolongation::CellInterp_Trace;
+	GMG_P_Prolongation _pProlongation = GMG_P_Prolongation::Injection;
 	bool _useHigherOrderReconstruction;
 	bool _useHeterogeneousWeighting;
 public:
 	Diffusion_HHO<Dim>* _problem;
 
-	LevelForHHO(int number, Diffusion_HHO<Dim>* problem, GMGProlongation prolongation, bool useHigherOrderReconstruction, bool useHeterogeneousWeighting)
+	LevelForHHO(int number, Diffusion_HHO<Dim>* problem, GMG_H_Prolongation hProlongation, GMG_P_Prolongation pProlongation, bool useHigherOrderReconstruction, bool useHeterogeneousWeighting)
 		: Level(number)
 	{
 		this->_problem = problem;
-		this->_prolongation = prolongation;
+		this->_hProlongation = hProlongation;
+		this->_pProlongation = pProlongation;
 		this->_useHigherOrderReconstruction = useHigherOrderReconstruction;
 		this->_useHeterogeneousWeighting = useHeterogeneousWeighting;
 	}
@@ -124,7 +125,7 @@ private:
 			cout << "\t\tk = " << this->PolynomialDegree() << endl;
 		if (this->ComesFrom == CoarseningType::H || this->ComesFrom == CoarseningType::HP)
 		{
-			if (_prolongation == GMGProlongation::FaceInject)
+			if (_hProlongation == GMG_H_Prolongation::FaceInject)
 				cout << "\t\tMesh                : " << this->_problem->_mesh->Faces.size() << " faces" << endl;
 			else
 			{
@@ -143,10 +144,10 @@ private:
 				this->ExportMeshToMatlab(this->_problem->_mesh, this->Number);
 		}
 
-		if (!IsCoarsestLevel() &&
-			(this->CoarserLevel->ComesFrom == CoarseningType::H || this->CoarserLevel->ComesFrom == CoarseningType::HP))
+		if (!IsCoarsestLevel())
 		{
-			if (this->ComesFrom == CoarseningType::P) // so the problem hasn't been assembled at this level
+			if (this->ComesFrom == CoarseningType::P && _pProlongation == GMG_P_Prolongation::Injection && // so the problem hasn't been assembled at this level
+				(this->CoarserLevel->ComesFrom == CoarseningType::H || this->CoarserLevel->ComesFrom == CoarseningType::HP)) 
 			{
 				this->_problem->InitReferenceShapes();
 				this->_problem->InitHHO_Faces(); // for the inverses of the mass matrices (to compute the trace on the faces at the end of the prolongation)
@@ -154,17 +155,25 @@ private:
 
 			Diffusion_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
 
-			if (this->UseGalerkinOperator)
-				coarsePb->InitHHO();
-			else
+			if (this->CoarserLevel->ComesFrom == CoarseningType::P && _pProlongation == GMG_P_Prolongation::H_Prolongation)
 			{
-				ActionsArguments actions;
-				actions.LogAssembly = false;
-				actions.AssembleRightHandSide = false;
-				//actions.InitReferenceShapes = (CoarserLevel->ComesFrom == CoarseningType::HP || CoarserLevel->ComesFrom == CoarseningType::H)
-					//&& this->ComesFrom == CoarseningType::P;
-				actions.InitReferenceShapes = true;
-				coarsePb->Assemble(actions);
+				coarsePb->InitReferenceShapes();
+				coarsePb->InitHHO();
+			}
+			else if (this->CoarserLevel->ComesFrom == CoarseningType::H || this->CoarserLevel->ComesFrom == CoarseningType::HP)
+			{
+				if (this->UseGalerkinOperator)
+					coarsePb->InitHHO();
+				else
+				{
+					ActionsArguments actions;
+					actions.LogAssembly = false;
+					actions.AssembleRightHandSide = false;
+					//actions.InitReferenceShapes = (CoarserLevel->ComesFrom == CoarseningType::HP || CoarserLevel->ComesFrom == CoarseningType::H)
+						//&& this->ComesFrom == CoarseningType::P;
+					actions.InitReferenceShapes = true;
+					coarsePb->Assemble(actions);
+				}
 			}
 		}
 	}
@@ -189,7 +198,7 @@ private:
 		Timer totalProlongTimer;
 		totalProlongTimer.Start();*/
 
-		if (_prolongation == GMGProlongation::CellInterp_Trace)
+		if (_hProlongation == GMG_H_Prolongation::CellInterp_Trace)
 		{
 			//----------------------------------------------------------//
 			//                       Nested meshes                      //
@@ -211,7 +220,7 @@ private:
 
 			P = Pi_f * I_c;
 		}
-		else if (_prolongation == GMGProlongation::CellInterp_Inject_Trace)
+		else if (_hProlongation == GMG_H_Prolongation::CellInterp_Inject_Trace)
 		{
 			//----------------------------------------------------------//
 			//          Same method, other implementation               //
@@ -236,7 +245,7 @@ private:
 
 			P = Pi_f * J_f_c * I_c;
 		}
-		else if (_prolongation == GMGProlongation::CellInterp_ExactL2proj_Trace)
+		else if (_hProlongation == GMG_H_Prolongation::CellInterp_ExactL2proj_Trace)
 		{
 			//---------------------------------------------------------------------//
 			//                      Non-nested variant                             //
@@ -275,7 +284,7 @@ private:
 
 			P = Pi_f * L2Proj * I_c;
 		}
-		else if (_prolongation == GMGProlongation::CellInterp_ApproxL2proj_Trace)
+		else if (_hProlongation == GMG_H_Prolongation::CellInterp_ApproxL2proj_Trace)
 		{
 			//---------------------------------------------------------------------//
 			//                        Non-nested variant                           //
@@ -301,9 +310,9 @@ private:
 			if (!Utils::BuildsNestedMeshHierarchy(coarsePb->_mesh->ComesFrom.CS) && coarsePb->_mesh->ComesFrom.CS != CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
 			{
 				if (Dim == 2 && this->PolynomialDegree() > 1)
-					Utils::Warning("The degree k=" + to_string(this->PolynomialDegree()) + " is too high to ensure enough accuracy of the approximate L2-projection. Non-optimal convergence may be observed. Option '-prolong " + to_string((unsigned)GMGProlongation::CellInterp_FinerApproxL2proj_Trace) + "' (approx. with subdivision) is recommended.");
+					Utils::Warning("The degree k=" + to_string(this->PolynomialDegree()) + " is too high to ensure enough accuracy of the approximate L2-projection. Non-optimal convergence may be observed. Option '-prolong " + to_string((unsigned)GMG_H_Prolongation::CellInterp_FinerApproxL2proj_Trace) + "' (approx. with subdivision) is recommended.");
 				else if (Dim == 3)
-					Utils::Warning("This rough approximation of the L2-projection does not work well in 3D. Non-optimal convergence may be observed. Option '-prolong " + to_string((unsigned)GMGProlongation::CellInterp_FinerApproxL2proj_Trace) + "' (approx. with subdivision) is recommended.");
+					Utils::Warning("This rough approximation of the L2-projection does not work well in 3D. Non-optimal convergence may be observed. Option '-prolong " + to_string((unsigned)GMG_H_Prolongation::CellInterp_FinerApproxL2proj_Trace) + "' (approx. with subdivision) is recommended.");
 			}
 
 #ifndef NDEBUG
@@ -327,7 +336,7 @@ private:
 
 			P = Pi_f * L2Proj * I_c;
 		}
-		else if (_prolongation == GMGProlongation::CellInterp_FinerApproxL2proj_Trace)
+		else if (_hProlongation == GMG_H_Prolongation::CellInterp_FinerApproxL2proj_Trace)
 		{
 			//---------------------------------------------------------------------//
 			//                        Non-nested variant                           //
@@ -377,7 +386,7 @@ private:
 
 			P = Pi_f * L2Proj * I_c;
 		}
-		else if (_prolongation == GMGProlongation::CellInterp_InjectAndTrace)
+		else if (_hProlongation == GMG_H_Prolongation::CellInterp_InjectAndTrace)
 		{
 			//---------------------------------------------------------------------------------------------//
 			// Step 1: Interpolation from coarse faces to coarse cells.                                    //
@@ -421,7 +430,7 @@ private:
 			P = SparseMatrix(finePb->HHO->nInteriorAndNeumannFaces * nFaceUnknowns, coarsePb->HHO->nInteriorAndNeumannFaces * nFaceUnknowns);
 			parallelLoop.Fill(P);
 		}
-		else if (_prolongation == GMGProlongation::CellInterp_Inject_Adjoint)
+		else if (_hProlongation == GMG_H_Prolongation::CellInterp_Inject_Adjoint)
 		{
 			//-------------------------------------------------------------//
 			//                           Daniel's                          //
@@ -443,7 +452,7 @@ private:
 
 			P = K_f * J_f_c * I_c;
 		}
-		else if (_prolongation == GMGProlongation::Wildey)
+		else if (_hProlongation == GMG_H_Prolongation::Wildey)
 		{
 			//-------------------------------------------------------------------------------------------------//
 			//                                           Wildey et al.                                         //
@@ -489,7 +498,7 @@ private:
 			P = SparseMatrix(finePb->HHO->nInteriorAndNeumannFaces * nFaceUnknowns, coarsePb->HHO->nInteriorAndNeumannFaces * nFaceUnknowns);
 			parallelLoop.Fill(P);
 		}
-		else if (_prolongation == GMGProlongation::FaceInject)
+		else if (_hProlongation == GMG_H_Prolongation::FaceInject)
 		{
 			//----------------------------------------------------------------//
 			// Canonical injection from coarse faces to fine faces.           //
@@ -500,7 +509,7 @@ private:
 			P = J_faces;
 		}
 		else
-			Utils::FatalError("Unknown prolongationCode.");
+			Utils::FatalError("Unknown h-prolongation.");
 
 		//totalProlongTimer.Stop();
 		//cout << "Total prolong: " << totalProlongTimer.CPU().InMilliseconds << endl;
@@ -509,14 +518,38 @@ private:
 
 	void SetupProlongation_P()
 	{
-		if (!this->_problem->HHO->FaceBasis->IsHierarchical || !this->_problem->HHO->OrthonormalizeBases)
-			Utils::Warning("The natural injection for p-multigrid is not implemented for non-hierarchical or non-orthogonal bases.");
+		if (_pProlongation == GMG_P_Prolongation::Injection)
+		{
+			if (!this->_problem->HHO->FaceBasis->IsHierarchical || !this->_problem->HHO->OrthonormalizeBases)
+				Utils::Warning("The natural injection and restriction for p-multigrid are implemented based on the assumption that the face bases are hierarchical and orthonormalized. Degraded convergence may be experienced.");
+			// nothing to do
+		}
+		else if (_pProlongation == GMG_P_Prolongation::H_Prolongation)
+		{
+			Diffusion_HHO<Dim>* finePb = this->_problem;
+			Diffusion_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
+
+			if (!_useHigherOrderReconstruction)
+				Utils::FatalError("The higher-order reconstruction must be enabled to use this p-prolongation operator.");
+			if (finePb->HHO->FaceBasis->GetDegree() != coarsePb->HHO->FaceBasis->GetDegree() + 1)
+				Utils::FatalError("This p-prolongation operator can only be used if the difference between the fine and coarse levels is one degree exactly.");
+
+			SparseMatrix I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
+			SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb, finePb->HHO->CellBasis);
+			P = Pi_f * I_c;
+		}
+		else
+			Utils::FatalError("Unknown p-prolongation.");
 	}
 
 
 	void SetupRestriction() override
 	{
-		if (this->CoarserLevel->ComesFrom == CoarseningType::H || this->CoarserLevel->ComesFrom == CoarseningType::HP)
+		if (this->CoarserLevel->ComesFrom == CoarseningType::P && _pProlongation == GMG_P_Prolongation::Injection)
+		{
+			// nothing to do
+		}
+		else
 			R = (RestrictionScalingFactor() * P.transpose()).eval();
 	}
 
@@ -556,8 +589,9 @@ private:
 public:
 	Vector Prolong(Vector& vectorOnTheCoarserLevel) override
 	{
-		if (this->CoarserLevel->ComesFrom == CoarseningType::P)
+		if (this->CoarserLevel->ComesFrom == CoarseningType::P && _pProlongation == GMG_P_Prolongation::Injection)
 		{
+			// This is possible only if the basis is hierarchical
 			Diffusion_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
 			auto nFaces = _problem->HHO->nInteriorAndNeumannFaces;
 			auto nHigherDegreeUnknowns = _problem->HHO->nFaceUnknowns;
@@ -573,7 +607,7 @@ public:
 
 	Vector Restrict(Vector& vectorOnThisLevel) override
 	{
-		if (this->CoarserLevel->ComesFrom == CoarseningType::P)
+		if (this->CoarserLevel->ComesFrom == CoarseningType::P && _pProlongation == GMG_P_Prolongation::Injection)
 		{
 			// This is possible only if the basis is hierarchical and orthogonal
 			Diffusion_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
@@ -587,6 +621,22 @@ public:
 		}
 		else
 			return Level::Restrict(vectorOnThisLevel);
+	}
+
+	double ProlongCost() override
+	{
+		if (this->CoarserLevel->ComesFrom == CoarseningType::P && _pProlongation == GMG_P_Prolongation::Injection)
+			return 0;
+		else
+			return Level::ProlongCost();
+	}
+
+	double RestrictCost() override
+	{
+		if (this->CoarserLevel->ComesFrom == CoarseningType::P && _pProlongation == GMG_P_Prolongation::Injection)
+			return 0;
+		else
+			return Level::RestrictCost();
 	}
 
 private:
@@ -745,14 +795,19 @@ private:
 
 	SparseMatrix GetGlobalProjectorMatrixFromCellsToFaces(Diffusion_HHO<Dim>* problem)
 	{
-		FunctionalBasis<Dim>* cellInterpolationBasis = _useHigherOrderReconstruction ? problem->HHO->ReconstructionBasis : problem->HHO->CellBasis;
-		int nCellUnknowns = cellInterpolationBasis->Size();
+		FunctionalBasis<Dim>* cellBasis = _useHigherOrderReconstruction ? problem->HHO->ReconstructionBasis : problem->HHO->CellBasis;
+		return GetGlobalProjectorMatrixFromCellsToFaces(problem, cellBasis);
+	}
+
+	SparseMatrix GetGlobalProjectorMatrixFromCellsToFaces(Diffusion_HHO<Dim>* problem, FunctionalBasis<Dim>* cellBasis)
+	{
+		int nCellUnknowns = cellBasis->Size();
 		int nFaceUnknowns = problem->HHO->nFaceUnknowns;
 
 		ElementParallelLoop<Dim> parallelLoop(problem->_mesh->Elements);
 		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nFaceUnknowns);
 
-		parallelLoop.Execute([this, problem, nCellUnknowns, nFaceUnknowns, cellInterpolationBasis](Element<Dim>* element, ParallelChunk<CoeffsChunk>* chunk)
+		parallelLoop.Execute([this, problem, nCellUnknowns, nFaceUnknowns, cellBasis](Element<Dim>* element, ParallelChunk<CoeffsChunk>* chunk)
 			{
 				for (auto face : element->Faces)
 				{
@@ -765,7 +820,7 @@ private:
 					double weight = Weight(element, face);
 
 					Diff_HHOFace<Dim>* hhoFace = problem->HHOFace(face);
-					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, elemGlobalNumber*nCellUnknowns, weight*hhoFace->Trace(element, cellInterpolationBasis));
+					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, elemGlobalNumber*nCellUnknowns, weight*hhoFace->Trace(element, cellBasis));
 				}
 			});
 

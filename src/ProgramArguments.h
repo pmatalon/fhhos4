@@ -37,7 +37,8 @@ struct MultigridArguments
 	HP_Strategy HP_Stgy = HP_Strategy::H_only;
 	int Levels = 0;
 	int ProlongationCode = 0;
-	GMGProlongation GMGProlong = GMGProlongation::Default;
+	GMG_H_Prolongation GMG_H_Prolong = GMG_H_Prolongation::Default;
+	GMG_P_Prolongation GMG_P_Prolong = GMG_P_Prolongation::Injection;
 	int FaceProlongationCode = 0;
 	int CoarseningProlongationCode = 0;
 	UAMGFaceProlongation UAMGFaceProlong = UAMGFaceProlongation::BoundaryAggregatesInteriorAverage;

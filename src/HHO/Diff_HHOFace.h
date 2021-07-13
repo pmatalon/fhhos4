@@ -126,14 +126,14 @@ public:
 		return ComputeTraceMatrix(element, HHO->CellBasis);
 	}
 
-	DenseMatrix Trace(Element<Dim>* element, FunctionalBasis<Dim>* cellInterpolationBasis)
+	DenseMatrix Trace(Element<Dim>* element, FunctionalBasis<Dim>* cellBasis)
 	{
-		/*if (cellInterpolationBasis == HHO->CellBasis)
+		/*if (cellBasis == HHO->CellBasis)
 			return TraceUsingCellBasis(element);
-		else if (cellInterpolationBasis == HHO->ReconstructionBasis)
+		else if (cellBasis == HHO->ReconstructionBasis)
 			return TraceUsingReconstructBasis(element);
 		//else*/
-			return ComputeTraceMatrix(element, cellInterpolationBasis);
+			return ComputeTraceMatrix(element, cellBasis);
 		//assert(false);
 	}
 
