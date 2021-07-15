@@ -36,7 +36,7 @@ public:
 		Eigen::saveMarket(M, file);
 	}
 
-	void CoarsenMesh(CoarseningStrategy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override
+	void CoarsenMesh(H_CoarsStgy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override
 	{
 		cout << "\tBuild algebraic mesh" << endl;
 
@@ -44,7 +44,7 @@ public:
 
 		_mesh.Build(*this->OperatorMatrix);
 
-		if (coarseningStgy == CoarseningStrategy::DoublePairwiseAggregation)
+		if (coarseningStgy == H_CoarsStgy::DoublePairwiseAggregation)
 		{
 			//----------------------------//
 			// First pairwise aggregation //
@@ -105,7 +105,7 @@ public:
 					}
 				});
 		}
-		else if (coarseningStgy == CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
+		else if (coarseningStgy == H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours)
 		{
 			cout << "\tElement agglomeration" << endl;
 			_mesh.AllNeighbourAggregate(coarsestPossibleMeshReached);
@@ -297,7 +297,7 @@ public:
 		this->_strongCouplingThreshold = strongCouplingThreshold;
 		this->BlockSizeForBlockSmoothers = blockSize;
 		this->UseGalerkinOperator = true;
-		this->CoarseningStgy = CoarseningStrategy::DoublePairwiseAggregation;
+		this->H_CS = H_CoarsStgy::DoublePairwiseAggregation;
 	}
 
 	void BeginSerialize(ostream& os) const override
@@ -311,8 +311,8 @@ public:
 
 	void Setup(const SparseMatrix& A) override
 	{
-		if (Utils::IsRefinementStrategy(this->CoarseningStgy))
-			this->CoarseningStgy = CoarseningStrategy::DoublePairwiseAggregation;
+		if (Utils::IsRefinementStrategy(this->H_CS))
+			this->H_CS = H_CoarsStgy::DoublePairwiseAggregation;
 		Multigrid::Setup(A);
 	}
 

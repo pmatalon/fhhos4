@@ -35,12 +35,12 @@ public:
 		return _regularity;
 	}
 
-	virtual void RefineMesh(CoarseningStrategy strategy) override
+	virtual void RefineMesh(H_CoarsStgy strategy) override
 	{
 		if (this->FineMesh)
 			assert(false && "Mesh already refined!");
 
-		if (strategy == CoarseningStrategy::BeyRefinement)
+		if (strategy == H_CoarsStgy::BeyRefinement)
 			RefineMeshByBeyMethod();
 		else
 			PolyhedralMesh<3>::RefineMesh(strategy);
@@ -53,7 +53,7 @@ protected:
 
 		TetrahedralMesh* fineMesh = new TetrahedralMesh(this->GeometryDescription());
 		this->InitializeRefinement(fineMesh);
-		fineMesh->ComesFrom.CS = CoarseningStrategy::BeyRefinement;
+		fineMesh->ComesFrom.CS = H_CoarsStgy::BeyRefinement;
 		fineMesh->ComesFrom.nFineElementsByCoarseElement = 8;
 		fineMesh->ComesFrom.nFineFacesAddedByCoarseElement = 8;
 		fineMesh->ComesFrom.nFineFacesByKeptCoarseFace = 4;

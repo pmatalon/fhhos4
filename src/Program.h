@@ -102,13 +102,13 @@ public:
 		{
 			if (args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("cgmg") == 0 || args.Solver.SolverCode.compare("fcgmg") == 0)
 			{
-				if (!Utils::IsRefinementStrategy(args.Solver.MG.CoarseningStgy))
+				if (!Utils::IsRefinementStrategy(args.Solver.MG.H_CS))
 				{
 					/*Mesh<Dim>* m = mesh;
 					while (true)
 					{
 						cout << "Coarsening..." << endl;
-						m->CoarsenMesh(args.Solver.MG.CoarseningStgy, args.Solver.MG.CoarseningFactor);
+						m->CoarsenMesh(args.Solver.MG.H_CS, args.Solver.MG.CoarseningFactor);
 						m = m->CoarseMesh;
 						m->ExportToMatlab2();
 						if (!m)
@@ -123,7 +123,7 @@ public:
 
 					// 1st coarsening
 					cout << "Coarsening..." << endl;
-					mesh->CoarsenMesh(args.Solver.MG.CoarseningStgy, args.Solver.MG.FaceCoarseningStgy, args.Solver.MG.CoarseningFactor);
+					mesh->CoarsenMesh(args.Solver.MG.H_CS, args.Solver.MG.FaceCoarseningStgy, args.Solver.MG.CoarseningFactor);
 					/*cout << "Export..." << endl;
 					mesh->CoarseMesh->ExportFacesToMatlab(args.OutputDirectory + "/coarse1.dat");
 					mesh->CoarseMesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_coarse1.m");*/
@@ -131,7 +131,7 @@ public:
 					mesh->SanityCheck();
 					// 2nd coarsening
 					cout << "Coarsening..." << endl;
-					mesh->CoarseMesh->CoarsenMesh(args.Solver.MG.CoarseningStgy, args.Solver.MG.FaceCoarseningStgy, args.Solver.MG.CoarseningFactor);
+					mesh->CoarseMesh->CoarsenMesh(args.Solver.MG.H_CS, args.Solver.MG.FaceCoarseningStgy, args.Solver.MG.CoarseningFactor);
 					/*cout << "Export..." << endl;
 					mesh->CoarseMesh->CoarseMesh->ExportFacesToMatlab(args.OutputDirectory + "/coarse2.dat");
 					mesh->CoarseMesh->CoarseMesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_coarse2.m");*/
@@ -139,7 +139,7 @@ public:
 					mesh->CoarseMesh->SanityCheck();
 					// 3rd coarsening
 					cout << "Coarsening..." << endl;
-					mesh->CoarseMesh->CoarseMesh->CoarsenMesh(args.Solver.MG.CoarseningStgy, args.Solver.MG.FaceCoarseningStgy, args.Solver.MG.CoarseningFactor);
+					mesh->CoarseMesh->CoarseMesh->CoarsenMesh(args.Solver.MG.H_CS, args.Solver.MG.FaceCoarseningStgy, args.Solver.MG.CoarseningFactor);
 					/*cout << "Export..." << endl;
 					mesh->CoarseMesh->CoarseMesh->CoarseMesh->ExportFacesToMatlab(args.OutputDirectory + "/coarse3.dat");
 					mesh->CoarseMesh->CoarseMesh->CoarseMesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_coarse3.m");*/
@@ -511,7 +511,7 @@ private:
 		mg->BlockSizeForBlockSmoothers = blockSize;
 		mg->CoarseLevelChangeSmoothingCoeff = args.Solver.MG.CoarseLevelChangeSmoothingCoeff;
 		mg->CoarseLevelChangeSmoothingOperator = args.Solver.MG.CoarseLevelChangeSmoothingOperator;
-		mg->CoarseningStgy = args.Solver.MG.CoarseningStgy;
+		mg->H_CS = args.Solver.MG.H_CS;
 		mg->FaceCoarseningStgy = args.Solver.MG.FaceCoarseningStgy;
 		mg->CoarseningFactor = args.Solver.MG.CoarseningFactor;
 		mg->ExportComponents = args.Actions.ExportMultigridComponents;
@@ -523,7 +523,7 @@ private:
 		argsCoarseSolver.Solver.PrintIterationResults = false;
 		if (Utils::EndsWith(args.Solver.MG.CoarseSolverCode, "aggregamg"))
 		{
-			argsCoarseSolver.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours;
+			argsCoarseSolver.Solver.MG.H_CS = H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours;
 			argsCoarseSolver.Solver.MG.CycleLetter = 'K';
 		}
 		else if (args.Solver.MG.CoarseSolverCode.compare("mg") == 0 || args.Solver.MG.CoarseSolverCode.compare("fcgmg") == 0)
@@ -531,7 +531,7 @@ private:
 			argsCoarseSolver.Solver.MaxIterations = 1;
 			argsCoarseSolver.Solver.MG.GMG_H_Prolong = args.Solver.MG.GMG_H_Prolong;
 			argsCoarseSolver.Solver.MG.FaceProlongationCode = args.Solver.MG.FaceProlongationCode;
-			argsCoarseSolver.Solver.MG.CoarseningStgy = args.Solver.MG.CoarseningStgy;
+			argsCoarseSolver.Solver.MG.H_CS = args.Solver.MG.H_CS;
 			argsCoarseSolver.Solver.MG.FaceCoarseningStgy = args.Solver.MG.FaceCoarseningStgy;
 			argsCoarseSolver.Solver.MG.PreSmoothingIterations = 0;
 			argsCoarseSolver.Solver.MG.PostSmoothingIterations = Dim == 2 ? 3 : 6;
@@ -672,9 +672,9 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase)
 	string meshCode = args.Discretization.MeshCode;
 	double stretch = args.Discretization.Stretch;
 
-	CoarseningStrategy refinementStgy = Utils::IsRefinementStrategy(args.Solver.MG.CoarseningStgy) ? args.Solver.MG.CoarseningStgy : CoarseningStrategy::GMSHSplittingRefinement;
+	H_CoarsStgy refinementStgy = Utils::IsRefinementStrategy(args.Solver.MG.H_CS) ? args.Solver.MG.H_CS : H_CoarsStgy::GMSHSplittingRefinement;
 
-	if (refinementStgy == CoarseningStrategy::BeyRefinement)
+	if (refinementStgy == H_CoarsStgy::BeyRefinement)
 		Utils::FatalError("Bey's refinement method is only applicable to 3D tetrahedral meshes.");
 
 	Mesh<2>* fineMesh = nullptr;
@@ -685,7 +685,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase)
 	{
 		if (mesher.compare("inhouse") == 0)
 		{
-			if (Utils::IsRefinementStrategy(args.Solver.MG.CoarseningStgy))
+			if (Utils::IsRefinementStrategy(args.Solver.MG.H_CS))
 				Utils::FatalError("Unmanaged refinement strategy.");
 
 			if (meshCode.compare("cart") == 0)
@@ -710,7 +710,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase)
 		{
 			if (meshCode.compare("cart") == 0)
 			{
-				if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
+				if (args.Solver.MG.H_CS == H_CoarsStgy::GMSHSplittingRefinement)
 				{
 					Mesh<2>* coarseMesh = new Square_GMSHCartesianMesh(n <= 16 ? 2 : 16);
 					fineMesh = coarseMesh->RefineUntilNElements(nx*ny, refinementStgy);
@@ -720,7 +720,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase)
 			}
 			else if (meshCode.compare("stri") == 0)
 			{
-				if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
+				if (args.Solver.MG.H_CS == H_CoarsStgy::GMSHSplittingRefinement)
 				{
 					Mesh<2>* coarseMesh = new Square_GMSHTriangularMesh(n <= 16 ? 2 : 16);
 					fineMesh = coarseMesh->RefineUntilNElements(2 * nx*ny, refinementStgy);
@@ -730,7 +730,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase)
 			}
 			else if (meshCode.compare("tri") == 0)
 			{
-				if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
+				if (args.Solver.MG.H_CS == H_CoarsStgy::GMSHSplittingRefinement)
 				{
 					Mesh<2>* coarseMesh = new Square_GMSHUnstructTriangularMesh(n <= 16 ? 2 : 16);
 					fineMesh = coarseMesh->RefineUntilNElements(2 * nx*ny, refinementStgy);
@@ -740,7 +740,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase)
 			}
 			else if (meshCode.compare("quad") == 0)
 			{
-				if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
+				if (args.Solver.MG.H_CS == H_CoarsStgy::GMSHSplittingRefinement)
 				{
 					Mesh<2>* coarseMesh = new Square_GMSHQuadrilateralMesh(n <= 16 ? 2 : 16);
 					fineMesh = coarseMesh->RefineUntilNElements(nx*ny, refinementStgy);
@@ -763,7 +763,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase)
 		bool with4quadrants = true;
 		if (mesher.compare("inhouse") == 0)
 		{
-			if (Utils::IsRefinementStrategy(args.Solver.MG.CoarseningStgy))
+			if (Utils::IsRefinementStrategy(args.Solver.MG.H_CS))
 				Utils::FatalError("Unmanaged refinement strategy.");
 
 			if (meshCode.compare("cart") == 0)
@@ -782,7 +782,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase)
 		{
 			if (meshCode.compare("cart") == 0)
 			{
-				if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
+				if (args.Solver.MG.H_CS == H_CoarsStgy::GMSHSplittingRefinement)
 				{
 					Mesh<2>* coarseMesh = new Square4quadrants_GMSHCartesianMesh(n <= 16 ? 4 : 16);
 					fineMesh = coarseMesh->RefineUntilNElements(nx*ny, refinementStgy);
@@ -792,7 +792,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase)
 			}
 			else if (meshCode.compare("tri") == 0)
 			{
-				if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
+				if (args.Solver.MG.H_CS == H_CoarsStgy::GMSHSplittingRefinement)
 				{
 					Mesh<2>* coarseMesh = new Square4quadrants_GMSHUnstructTriangularMesh(n <= 16 ? 4 : 16);
 					fineMesh = coarseMesh->RefineUntilNElements(2 * nx*ny, refinementStgy);
@@ -802,7 +802,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase)
 			}
 			else if (meshCode.compare("stri") == 0)
 			{
-				if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
+				if (args.Solver.MG.H_CS == H_CoarsStgy::GMSHSplittingRefinement)
 				{
 					Mesh<2>* coarseMesh = new Square4quadrants_GMSHTriangularMesh(n <= 16 ? 4 : 16);
 					fineMesh = coarseMesh->RefineUntilNElements(2 * nx*ny, refinementStgy);
@@ -812,7 +812,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase)
 			}
 			else if (meshCode.compare("quad") == 0)
 			{
-				if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
+				if (args.Solver.MG.H_CS == H_CoarsStgy::GMSHSplittingRefinement)
 				{
 					Mesh<2>* coarseMesh = new Square4quadrants_GMSHQuadrilateralMesh(n <= 16 ? 4 : 16);
 					fineMesh = coarseMesh->RefineUntilNElements(nx*ny, refinementStgy);
@@ -837,7 +837,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase)
 
 #ifdef GMSH_ENABLED
 		string filePath = geoCode;
-		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
+		if (args.Solver.MG.H_CS == H_CoarsStgy::GMSHSplittingRefinement)
 		{
 			Mesh<2>* coarseMesh = new GMSHMesh<2>(testCase, filePath, args.Solver.MG.CoarseN);
 			fineMesh = coarseMesh->RefineUntilNElements(2 * nx*ny, refinementStgy);
@@ -847,7 +847,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase)
 #endif // GMSH_ENABLED
 	}
 	
-	if (!Utils::IsRefinementStrategy(args.Solver.MG.CoarseningStgy) && fineMesh->CoarseMesh)
+	if (!Utils::IsRefinementStrategy(args.Solver.MG.H_CS) && fineMesh->CoarseMesh)
 		fineMesh->DeleteCoarseMeshes();
 
 	return fineMesh;
@@ -868,7 +868,7 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args, TestCase<3>* testCase)
 	BigNumber ny = args.Discretization.Ny == -1 ? args.Discretization.N : args.Discretization.Ny;
 	BigNumber nz = args.Discretization.Nz == -1 ? args.Discretization.N : args.Discretization.Nz;
 	string meshCode = args.Discretization.MeshCode;
-	CoarseningStrategy refinementStgy = args.Solver.MG.CoarseningStgy;
+	H_CoarsStgy refinementStgy = args.Solver.MG.H_CS;
 
 	Mesh<3>* fineMesh = nullptr;
 	//------------------------//
@@ -878,7 +878,7 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args, TestCase<3>* testCase)
 	{
 		if (mesher.compare("inhouse") == 0)
 		{
-			if (Utils::IsRefinementStrategy(args.Solver.MG.CoarseningStgy))
+			if (Utils::IsRefinementStrategy(args.Solver.MG.H_CS))
 				Utils::FatalError("Unmanaged refinement strategy.");
 
 			if (meshCode.compare("cart") == 0)
@@ -891,7 +891,7 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args, TestCase<3>* testCase)
 			}
 			else if (meshCode.compare("stetra") == 0)
 			{
-				if (refinementStgy == CoarseningStrategy::StandardCoarsening || Utils::IsAlgebraic(args.Solver.SolverCode))
+				if (refinementStgy == H_CoarsStgy::StandardCoarsening || Utils::IsAlgebraic(args.Solver.SolverCode))
 					fineMesh = new Cube_CartesianTetrahedralMesh(n);
 				else
 				{
@@ -916,7 +916,7 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args, TestCase<3>* testCase)
 				if (nx != ny || nx != nz)
 					Utils::FatalError("Options -ny, -nz are not managed with this mesh");
 
-				if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
+				if (args.Solver.MG.H_CS == H_CoarsStgy::GMSHSplittingRefinement)
 				{
 					Mesh<3>* coarseMesh = new Cube_GMSHCartesianMesh(args.Solver.MG.CoarseN);
 					fineMesh = coarseMesh->RefineUntilNElements(n*n*n, refinementStgy);
@@ -932,7 +932,7 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args, TestCase<3>* testCase)
 				if (nx != ny || nx != nz)
 					Utils::FatalError("Options -ny, -nz are not managed with this mesh");
 
-				if (Utils::IsRefinementStrategy(args.Solver.MG.CoarseningStgy))
+				if (Utils::IsRefinementStrategy(args.Solver.MG.H_CS))
 				{
 					Mesh<3>* coarseMesh = new Cube_GMSHTetrahedralMesh(args.Solver.MG.CoarseN);
 					fineMesh = coarseMesh->RefineUntilNElements(6 * n*n*n, refinementStgy);
@@ -964,11 +964,11 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args, TestCase<3>* testCase)
 				Utils::FatalError("-ny, -ny not managed with this mesh");
 
 			Mesh<3>* coarseMesh;
-			if (Utils::IsRefinementStrategy(args.Solver.MG.CoarseningStgy))
+			if (Utils::IsRefinementStrategy(args.Solver.MG.H_CS))
 			{
-				if (refinementStgy == CoarseningStrategy::BeyRefinement)
+				if (refinementStgy == H_CoarsStgy::BeyRefinement)
 					coarseMesh = new GMSHTetrahedralMesh(testCase, filePath, args.Solver.MG.CoarseN);
-				else if (refinementStgy == CoarseningStrategy::GMSHSplittingRefinement)
+				else if (refinementStgy == H_CoarsStgy::GMSHSplittingRefinement)
 					coarseMesh = new GMSHMesh<3>(testCase, filePath, args.Solver.MG.CoarseN);
 				fineMesh = coarseMesh->RefineUntilNElements(6 * n*n*n, refinementStgy);
 			}
@@ -980,7 +980,7 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args, TestCase<3>* testCase)
 #endif // GMSH_ENABLED
 	}
 
-	if (!Utils::IsRefinementStrategy(args.Solver.MG.CoarseningStgy) && fineMesh->CoarseMesh)
+	if (!Utils::IsRefinementStrategy(args.Solver.MG.H_CS) && fineMesh->CoarseMesh)
 		fineMesh->DeleteCoarseMeshes();
 
 	return fineMesh;

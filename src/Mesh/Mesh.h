@@ -9,16 +9,16 @@ using namespace std;
 
 struct CoarseningStrategyDetails
 {
-	CoarseningStrategy CS;
+	H_CoarsStgy CS;
 	int nFineFacesAddedByCoarseElement = -1;
 	int nFineElementsByCoarseElement = -1;
 	int nFineFacesByKeptCoarseFace = -1;
 
-	CoarseningStrategyDetails(CoarseningStrategy cs)
+	CoarseningStrategyDetails(H_CoarsStgy cs)
 	{
 		CS = cs;
 	}
-	CoarseningStrategyDetails() : CoarseningStrategyDetails(CoarseningStrategy::None) {}
+	CoarseningStrategyDetails() : CoarseningStrategyDetails(H_CoarsStgy::None) {}
 
 	bool HasDetails()
 	{
@@ -303,13 +303,13 @@ public:
 		Utils::Warning("Impossible to export the solution to GMSH because this mesh does not come from GMSH.");
 	}
 
-	virtual void CoarsenMesh(CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor)
+	virtual void CoarsenMesh(H_CoarsStgy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor)
 	{
 		if (Utils::IsRefinementStrategy(elemCoarseningStgy))
 			return;
 		Utils::FatalError("Unmanaged coarsening strategy");
 	}
-	virtual void RefineMesh(CoarseningStrategy strategy)
+	virtual void RefineMesh(H_CoarsStgy strategy)
 	{
 		Utils::FatalError("Unmanaged refinement strategy");
 	}
@@ -573,7 +573,7 @@ public:
 		for (auto f : this->BoundaryFaces)
 		{
 			assert(f->IsDomainBoundary && "This face is in the BoundaryFaces list but has not the flag IsDomainBoundary.");
-			if (this->ComesFrom.CS != CoarseningStrategy::FaceCoarsening)
+			if (this->ComesFrom.CS != H_CoarsStgy::FaceCoarsening)
 			{
 				assert(f->Element1 && "This face is on the boundary but has no Element1.");
 				assert(!f->Element2 && "This face is on the boundary but connects two elements.");
@@ -583,7 +583,7 @@ public:
 		for (auto f : this->InteriorFaces)
 		{
 			assert(!f->IsDomainBoundary);
-			if (this->ComesFrom.CS != CoarseningStrategy::FaceCoarsening)
+			if (this->ComesFrom.CS != H_CoarsStgy::FaceCoarsening)
 			{
 				assert(f->Element1 && "This face is in the interior but has no Element1.");
 				assert(f->Element2 && "This face is in the interior but has no Element2.");
@@ -608,7 +608,7 @@ public:
 
 			assert(this->NeumannFaces.empty() == CoarseMesh->NeumannFaces.empty() && "The fine or coarse mesh has NeumannFaces while the other has none.");
 
-			if (CoarseMesh->ComesFrom.CS != CoarseningStrategy::FaceCoarsening)
+			if (CoarseMesh->ComesFrom.CS != H_CoarsStgy::FaceCoarsening)
 			{
 				for (Element<Dim>* fe : this->Elements)
 				{
@@ -647,7 +647,7 @@ public:
 				assert(totalFinerElements == this->Elements.size() && "Discrepency between the number of elements in the fine mesh and the number of fine elements associated to coarse elements.");
 			}
 
-			if (CoarseMesh->ComesFrom.CS != CoarseningStrategy::IndependentRemeshing)
+			if (CoarseMesh->ComesFrom.CS != H_CoarsStgy::IndependentRemeshing)
 			{
 				for (Face<Dim>* cf : CoarseMesh->Faces)
 				{
@@ -728,7 +728,7 @@ public:
 			Mesh<Dim>* meshToGetInfo = nullptr;
 			if (Utils::IsRefinementStrategy(this->ComesFrom.CS))
 				meshToGetInfo = this;
-			else if (CoarseMesh->ComesFrom.CS == CoarseningStrategy::StandardCoarsening)
+			else if (CoarseMesh->ComesFrom.CS == H_CoarsStgy::StandardCoarsening)
 				meshToGetInfo = CoarseMesh;
 
 			if (meshToGetInfo != nullptr && meshToGetInfo->ComesFrom.HasDetails())
@@ -749,7 +749,7 @@ public:
 		}
 	}
 
-	Mesh<Dim>* RefineNTimes(int nRefinements, CoarseningStrategy strategy)
+	Mesh<Dim>* RefineNTimes(int nRefinements, H_CoarsStgy strategy)
 	{
 		Mesh<Dim>* mesh = this;
 		for (int i = 0; i < nRefinements; i++)
@@ -760,7 +760,7 @@ public:
 		return mesh;
 	}
 
-	Mesh<Dim>* RefineUntilNElements(BigNumber nElements, CoarseningStrategy strategy)
+	Mesh<Dim>* RefineUntilNElements(BigNumber nElements, H_CoarsStgy strategy)
 	{
 		cout << "Building fine mesh by successive refinements of the coarse mesh" << endl;
 		Mesh<Dim>* mesh = this;
@@ -785,7 +785,7 @@ public:
 			f->IsRemovedOnCoarserGrid = false;
 		}
 
-		this->ComesFrom = CoarseningStrategyDetails(CoarseningStrategy::None);
+		this->ComesFrom = CoarseningStrategyDetails(H_CoarsStgy::None);
 	}
 
 	virtual void SetOverlappingFineElementsViaExactIntersection()

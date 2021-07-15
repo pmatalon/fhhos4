@@ -26,7 +26,7 @@ public:
 		this->_multigridProlong = mgProlong;
 		this->BlockSizeForBlockSmoothers = faceBlockSize;
 		this->UseGalerkinOperator = true;
-		this->CoarseningStgy = CoarseningStrategy::MultiplePairwiseAggregation;
+		this->H_CS = H_CoarsStgy::MultiplePairwiseAggregation;
 		this->FaceCoarseningStgy = FaceCoarseningStrategy::InterfaceCollapsing;
 	}
 
@@ -87,8 +87,8 @@ public:
 		SparseMatrix* inv_A_T_T = new SparseMatrix(Utils::InvertBlockDiagMatrix(A_T_T, _cellBlockSize));
 		fine->inv_A_T_T = inv_A_T_T;
 
-		if (Utils::IsRefinementStrategy(this->CoarseningStgy))
-			this->CoarseningStgy = CoarseningStrategy::MultiplePairwiseAggregation;
+		if (Utils::IsRefinementStrategy(this->H_CS))
+			this->H_CS = H_CoarsStgy::MultiplePairwiseAggregation;
 
 		Multigrid::Setup(A);
 	}

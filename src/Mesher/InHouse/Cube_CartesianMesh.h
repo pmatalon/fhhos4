@@ -221,9 +221,9 @@ public:
 		return 1;
 	}
 
-	void CoarsenMesh(CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor)
+	void CoarsenMesh(H_CoarsStgy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor)
 	{
-		if (elemCoarseningStgy == CoarseningStrategy::StandardCoarsening)
+		if (elemCoarseningStgy == H_CoarsStgy::StandardCoarsening)
 		{
 			if (faceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsing)
 				StandardCoarsening();
@@ -249,7 +249,7 @@ private:
 		{
 			Cube_CartesianMesh* coarseMesh = new Cube_CartesianMesh(nx / 2, ny / 2, nz / 2, false);
 			this->InitializeCoarsening(coarseMesh);
-			coarseMesh->ComesFrom.CS = CoarseningStrategy::StandardCoarsening;
+			coarseMesh->ComesFrom.CS = H_CoarsStgy::StandardCoarsening;
 			coarseMesh->ComesFrom.nFineElementsByCoarseElement = 8;
 			coarseMesh->ComesFrom.nFineFacesAddedByCoarseElement = 12;
 			coarseMesh->ComesFrom.nFineFacesByKeptCoarseFace = 4;

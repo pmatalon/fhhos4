@@ -58,7 +58,7 @@ public:
 		Eigen::saveMarket(M, Utils::ProgramArgs.OutputDirectory + "/" + suffix + ".dat");
 	}
 
-	void CoarsenMesh(CoarseningStrategy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double requestedCoarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override
+	void CoarsenMesh(H_CoarsStgy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double requestedCoarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override
 	{
 		noCoarserMeshProvided = false;
 		coarsestPossibleMeshReached = false;
@@ -242,15 +242,15 @@ public:
 	}
 
 
-	bool CoarseningCriteriaReached(CoarseningStrategy coarseningStgy, double requestedCoarseningRatio, int nCoarseningsPerformed, double coarseningRatio)
+	bool CoarseningCriteriaReached(H_CoarsStgy coarseningStgy, double requestedCoarseningRatio, int nCoarseningsPerformed, double coarseningRatio)
 	{
-		if (coarseningStgy == CoarseningStrategy::DoublePairwiseAggregation)
+		if (coarseningStgy == H_CoarsStgy::DoublePairwiseAggregation)
 			return nCoarseningsPerformed == 2;
-		if (coarseningStgy == CoarseningStrategy::MultiplePairwiseAggregation)
+		if (coarseningStgy == H_CoarsStgy::MultiplePairwiseAggregation)
 			return coarseningRatio >= requestedCoarseningRatio;
-		if (coarseningStgy == CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
+		if (coarseningStgy == H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours)
 			return nCoarseningsPerformed == 1; // only 1 pass of coarsening
-		if (coarseningStgy == CoarseningStrategy::MultipleAgglomerationCoarseningByFaceNeighbours)
+		if (coarseningStgy == H_CoarsStgy::MultipleAgglomerationCoarseningByFaceNeighbours)
 			return coarseningRatio >= requestedCoarseningRatio;
 		return nCoarseningsPerformed == 1;
 	}
@@ -259,7 +259,7 @@ public:
 
 
 	// Returns <coarseMesh, P, Q_F, schurc, coarsestPossibleMeshReached>
-	tuple<HybridAlgebraicMesh*, SparseMatrix*, SparseMatrix*, SparseMatrix*, bool> Coarsen(HybridAlgebraicMesh& mesh, const SparseMatrix& schur, CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy)
+	tuple<HybridAlgebraicMesh*, SparseMatrix*, SparseMatrix*, SparseMatrix*, bool> Coarsen(HybridAlgebraicMesh& mesh, const SparseMatrix& schur, H_CoarsStgy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy)
 	{
 		//ExportMatrix(A_T_T, "A_T_T", 0);
 		//ExportMatrix(A_T_F, "A_T_F", 0);

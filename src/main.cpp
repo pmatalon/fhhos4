@@ -923,37 +923,37 @@ int main(int argc, char* argv[])
 			{
 				string coarseningStgyCode = optarg;
 				if (coarseningStgyCode.compare("s") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::StandardCoarsening;
+					args.Solver.MG.H_CS = H_CoarsStgy::StandardCoarsening;
 				else if (coarseningStgyCode.compare("r") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::GMSHSplittingRefinement;
+					args.Solver.MG.H_CS = H_CoarsStgy::GMSHSplittingRefinement;
 				else if (coarseningStgyCode.compare("b") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::BeyRefinement;
+					args.Solver.MG.H_CS = H_CoarsStgy::BeyRefinement;
 				else if (coarseningStgyCode.compare("m") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::IndependentRemeshing;
+					args.Solver.MG.H_CS = H_CoarsStgy::IndependentRemeshing;
 				else if (coarseningStgyCode.compare("n") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours;
+					args.Solver.MG.H_CS = H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours;
 				else if (coarseningStgyCode.compare("mn") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::MultipleAgglomerationCoarseningByFaceNeighbours;
+					args.Solver.MG.H_CS = H_CoarsStgy::MultipleAgglomerationCoarseningByFaceNeighbours;
 				else if (coarseningStgyCode.compare("dpa") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::DoublePairwiseAggregation;
+					args.Solver.MG.H_CS = H_CoarsStgy::DoublePairwiseAggregation;
 				else if (coarseningStgyCode.compare("mpa") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::MultiplePairwiseAggregation;
+					args.Solver.MG.H_CS = H_CoarsStgy::MultiplePairwiseAggregation;
 				else if (coarseningStgyCode.compare("vr") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByVertexRemoval;
+					args.Solver.MG.H_CS = H_CoarsStgy::AgglomerationCoarseningByVertexRemoval;
 				else if (coarseningStgyCode.compare("mcf") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByMostCoplanarFaces;
+					args.Solver.MG.H_CS = H_CoarsStgy::AgglomerationCoarseningByMostCoplanarFaces;
 				else if (coarseningStgyCode.compare("cc") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByClosestCenter;
+					args.Solver.MG.H_CS = H_CoarsStgy::AgglomerationCoarseningByClosestCenter;
 				else if (coarseningStgyCode.compare("clf") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByClosestFace;
+					args.Solver.MG.H_CS = H_CoarsStgy::AgglomerationCoarseningByClosestFace;
 				else if (coarseningStgyCode.compare("li") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByLargestInterface;
+					args.Solver.MG.H_CS = H_CoarsStgy::AgglomerationCoarseningByLargestInterface;
 				else if (coarseningStgyCode.compare("seed") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningBySeedPoints;
+					args.Solver.MG.H_CS = H_CoarsStgy::AgglomerationCoarseningBySeedPoints;
 				else if (coarseningStgyCode.compare("vn") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::AgglomerationCoarseningByVertexNeighbours;
+					args.Solver.MG.H_CS = H_CoarsStgy::AgglomerationCoarseningByVertexNeighbours;
 				else if (coarseningStgyCode.compare("f") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::FaceCoarsening;
+					args.Solver.MG.H_CS = H_CoarsStgy::FaceCoarsening;
 				else
 					argument_error("unknown coarsening strategy code '" + coarseningStgyCode + "'. Check -cs argument.");
 				break;
@@ -1202,10 +1202,10 @@ int main(int argc, char* argv[])
 		if (args.Solver.MG.GMG_H_Prolong == GMG_H_Prolongation::Wildey && !args.Solver.MG.UseGalerkinOperator)
 			argument_error("To use the prolongationCode " + to_string((unsigned)GMG_H_Prolongation::Wildey) + ", you must also use the Galerkin operator. To do so, add option -g 1.");
 
-		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::FaceCoarsening && !args.Solver.MG.UseGalerkinOperator)
+		if (args.Solver.MG.H_CS == H_CoarsStgy::FaceCoarsening && !args.Solver.MG.UseGalerkinOperator)
 			argument_error("To use the face coarsening, you must also use the Galerkin operator. To do so, add option -g 1.");
 
-		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::IndependentRemeshing && 
+		if (args.Solver.MG.H_CS == H_CoarsStgy::IndependentRemeshing && 
 			Utils::RequiresNestedHierarchy(args.Solver.MG.GMG_H_Prolong) &&
 			args.Solver.MG.GMG_H_Prolong != GMG_H_Prolongation::Default)
 			argument_error("The coarsening by independent remeshing is only applicable with the non-nested versions of the multigrid (-prolong " + to_string((unsigned)GMG_H_Prolongation::CellInterp_ExactL2proj_Trace) + ", " + to_string((unsigned)GMG_H_Prolongation::CellInterp_ApproxL2proj_Trace) + " or " + to_string((unsigned)GMG_H_Prolongation::CellInterp_FinerApproxL2proj_Trace) + ").");
@@ -1213,36 +1213,36 @@ int main(int argc, char* argv[])
 		if (args.Solver.SolverCode.compare("p_mg") == 0 && defaultCoarseSolver)
 			args.Solver.MG.CoarseSolverCode = "mg";
 
-		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::None)
+		if (args.Solver.MG.H_CS == H_CoarsStgy::None)
 		{
 			if (args.Problem.Dimension < 3)
 			{
 				if (args.Solver.MG.GMG_H_Prolong == GMG_H_Prolongation::Default)
 				{
 					if (args.Discretization.Mesher.compare("inhouse") == 0)
-						args.Solver.MG.CoarseningStgy = CoarseningStrategy::StandardCoarsening;
+						args.Solver.MG.H_CS = H_CoarsStgy::StandardCoarsening;
 					else
-						args.Solver.MG.CoarseningStgy = CoarseningStrategy::IndependentRemeshing;
+						args.Solver.MG.H_CS = H_CoarsStgy::IndependentRemeshing;
 				}
 				else if (Utils::RequiresNestedHierarchy(args.Solver.MG.GMG_H_Prolong))
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::GMSHSplittingRefinement;
+					args.Solver.MG.H_CS = H_CoarsStgy::GMSHSplittingRefinement;
 				else
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::IndependentRemeshing;
+					args.Solver.MG.H_CS = H_CoarsStgy::IndependentRemeshing;
 			}
 			else
 			{
 				if (args.Discretization.Mesher.compare("inhouse") == 0 && args.Discretization.MeshCode.compare("tetra") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::BeyRefinement;
+					args.Solver.MG.H_CS = H_CoarsStgy::BeyRefinement;
 				else if (args.Discretization.Mesher.compare("inhouse") == 0 && args.Discretization.MeshCode.compare("cart") == 0)
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::StandardCoarsening;
+					args.Solver.MG.H_CS = H_CoarsStgy::StandardCoarsening;
 				else
-					args.Solver.MG.CoarseningStgy = CoarseningStrategy::IndependentRemeshing;
+					args.Solver.MG.H_CS = H_CoarsStgy::IndependentRemeshing;
 			}
 		}
 
 		if (args.Solver.MG.GMG_H_Prolong == GMG_H_Prolongation::Default)
 		{
-			if (Utils::BuildsNestedMeshHierarchy(args.Solver.MG.CoarseningStgy))
+			if (Utils::BuildsNestedMeshHierarchy(args.Solver.MG.H_CS))
 				args.Solver.MG.GMG_H_Prolong = GMG_H_Prolongation::CellInterp_Trace;
 			else
 				args.Solver.MG.GMG_H_Prolong = GMG_H_Prolongation::CellInterp_FinerApproxL2proj_Trace;
@@ -1254,7 +1254,7 @@ int main(int argc, char* argv[])
 			if (args.Problem.Dimension < 3)
 				args.Solver.MG.PostSmoothingIterations = 3;
 			else
-				args.Solver.MG.PostSmoothingIterations = Utils::IsRefinementStrategy(args.Solver.MG.CoarseningStgy) ? 10 : 6;
+				args.Solver.MG.PostSmoothingIterations = Utils::IsRefinementStrategy(args.Solver.MG.H_CS) ? 10 : 6;
 		}
 	}
 
@@ -1270,11 +1270,11 @@ int main(int argc, char* argv[])
 		args.Solver.MG.UAMGFaceProlong = args.Solver.MG.FaceProlongationCode == 0 ? UAMGFaceProlongation::BoundaryAggregatesInteriorAverage : static_cast<UAMGFaceProlongation>(args.Solver.MG.FaceProlongationCode);
 		args.Solver.MG.UAMGCoarseningProlong = args.Solver.MG.CoarseningProlongationCode == 0 ? UAMGProlongation::ReconstructSmoothedTraceOrInject : static_cast<UAMGProlongation>(args.Solver.MG.CoarseningProlongationCode);
 
-		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::None)
-			args.Solver.MG.CoarseningStgy = CoarseningStrategy::MultiplePairwiseAggregation;
+		if (args.Solver.MG.H_CS == H_CoarsStgy::None)
+			args.Solver.MG.H_CS = H_CoarsStgy::MultiplePairwiseAggregation;
 
-		if ((args.Solver.MG.CoarseningStgy == CoarseningStrategy::MultiplePairwiseAggregation || 
-			 args.Solver.MG.CoarseningStgy == CoarseningStrategy::MultipleAgglomerationCoarseningByFaceNeighbours)
+		if ((args.Solver.MG.H_CS == H_CoarsStgy::MultiplePairwiseAggregation || 
+			 args.Solver.MG.H_CS == H_CoarsStgy::MultipleAgglomerationCoarseningByFaceNeighbours)
 			&& args.Solver.MG.CoarseningFactor == 0)
 			args.Solver.MG.CoarseningFactor = 3.8;
 
@@ -1290,17 +1290,17 @@ int main(int argc, char* argv[])
 		if (!defaultCoarseOperator && !args.Solver.MG.UseGalerkinOperator)
 			Utils::Warning("AggregAMG uses the Galerkin operator. Argument -g 0 ignored.");
 
-		if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::None)
-			args.Solver.MG.CoarseningStgy = CoarseningStrategy::DoublePairwiseAggregation;
+		if (args.Solver.MG.H_CS == H_CoarsStgy::None)
+			args.Solver.MG.H_CS = H_CoarsStgy::DoublePairwiseAggregation;
 
 		if (defaultCycle)
 			args.Solver.MG.CycleLetter = 'K';
 	}
 
 
-	if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::MultiplePairwiseAggregation && args.Solver.MG.CoarseningFactor == 0)
+	if (args.Solver.MG.H_CS == H_CoarsStgy::MultiplePairwiseAggregation && args.Solver.MG.CoarseningFactor == 0)
 		args.Solver.MG.CoarseningFactor = 3.5;
-	else if (args.Solver.MG.CoarseningStgy == CoarseningStrategy::IndependentRemeshing && args.Solver.MG.CoarseningFactor == 0)
+	else if (args.Solver.MG.H_CS == H_CoarsStgy::IndependentRemeshing && args.Solver.MG.CoarseningFactor == 0)
 		args.Solver.MG.CoarseningFactor = 2;
 	
 	//------------------------------------------//

@@ -169,7 +169,7 @@ public:
 		assert(false && "Level::BlockSizeForBlockSmoothers() must be overridden to use this level in a p-multigrid");
 	}
 
-	virtual void CoarsenMesh(CoarseningStrategy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached)
+	virtual void CoarsenMesh(H_CoarsStgy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached)
 	{
 		assert(false && "Level::CoarsenMesh() must be overridden to use this level in an h-multigrid");
 	}

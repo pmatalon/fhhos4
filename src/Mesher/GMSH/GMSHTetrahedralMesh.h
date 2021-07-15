@@ -48,14 +48,14 @@ public:
 		this->FineMesh->ComesFrom.nFineFacesByKeptCoarseFace = 4;
 	}
 
-	void RefineMesh(CoarseningStrategy strategy) override
+	void RefineMesh(H_CoarsStgy strategy) override
 	{
 		if (this->FineMesh)
 			assert(false && "Mesh already refined!");
 
-		if (strategy == CoarseningStrategy::GMSHSplittingRefinement)
+		if (strategy == H_CoarsStgy::GMSHSplittingRefinement)
 			this->RefineMeshBySplitting();
-		else if (strategy == CoarseningStrategy::BeyRefinement)
+		else if (strategy == H_CoarsStgy::BeyRefinement)
 			TetrahedralMesh::RefineMeshByBeyMethod();
 		else
 			GMSHMesh<3>::RefineMesh(strategy);

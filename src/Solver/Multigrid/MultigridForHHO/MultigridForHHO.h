@@ -16,7 +16,7 @@ public:
 	bool UseHeterogeneousWeighting = true;
 	
 	MultigridForHHO(Diffusion_HHO<Dim>* problem, int nLevels = 0)
-		: Multigrid(MGType::h_Multigrid, nLevels)
+		: Multigrid(nLevels)
 	{
 		this->InitializeWithProblem(problem);
 	}
@@ -108,7 +108,7 @@ public:
 
 	void EndSerialize(ostream& os) const override
 	{
-		if (Utils::RequiresNestedHierarchy(H_Prolongation) && !Utils::BuildsNestedMeshHierarchy(this->CoarseningStgy))
+		if (Utils::RequiresNestedHierarchy(H_Prolongation) && !Utils::BuildsNestedMeshHierarchy(this->H_CS))
 		{
 			os << endl;
 			Utils::Warning(os, "The selected coarsening strategy generates non-nested meshes, while the selected prolongation operator is made for nested meshes. Option -prolong " + to_string((unsigned)GMG_H_Prolongation::CellInterp_ExactL2proj_Trace) + ", " + to_string((unsigned)GMG_H_Prolongation::CellInterp_ApproxL2proj_Trace) + " or " + to_string((unsigned)GMG_H_Prolongation::CellInterp_FinerApproxL2proj_Trace) + " recommended.");

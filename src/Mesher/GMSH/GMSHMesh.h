@@ -293,7 +293,7 @@ private:
 		// Get vertices defining the geometry.
 		// These vertices must be conserved at every level of coarsening.
 
-		if (this->ComesFrom.CS == CoarseningStrategy::IndependentRemeshing)
+		if (this->ComesFrom.CS == H_CoarsStgy::IndependentRemeshing)
 			this->_geometricVertices.clear();
 
 		gmsh::vectorpair entitiesDim0Tags;
@@ -572,7 +572,7 @@ private:
 		}
 
 
-		if (this->ComesFrom.CS == CoarseningStrategy::None)
+		if (this->ComesFrom.CS == H_CoarsStgy::None)
 		{
 			for (auto it = this->_reEntrantCorners.begin(); it != this->_reEntrantCorners.end(); it++)
 			{
@@ -721,22 +721,22 @@ public:
 		return _regularity;
 	}
 
-	void CoarsenMesh(CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor) override
+	void CoarsenMesh(H_CoarsStgy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor) override
 	{
 		if (Utils::IsRefinementStrategy(elemCoarseningStgy))
 			return;
-		else if (elemCoarseningStgy == CoarseningStrategy::IndependentRemeshing)
+		else if (elemCoarseningStgy == H_CoarsStgy::IndependentRemeshing)
 			IndependentRemesh(round(coarseningFactor));
 		else
 			PolyhedralMesh<Dim>::CoarsenMesh(elemCoarseningStgy, faceCoarseningStgy, coarseningFactor);
 	}
 
-	virtual void RefineMesh(CoarseningStrategy strategy)
+	virtual void RefineMesh(H_CoarsStgy strategy)
 	{
 		if (this->FineMesh)
 			assert(false && "Mesh already refined!");
 
-		if (strategy == CoarseningStrategy::GMSHSplittingRefinement)
+		if (strategy == H_CoarsStgy::GMSHSplittingRefinement)
 			RefineMeshBySplitting();
 		else
 			PolyhedralMesh<Dim>::RefineMesh(strategy);
@@ -758,7 +758,7 @@ public:
 		// Building our own mesh objects from the GMSH ones
 		GMSHMesh<Dim>* fineMesh = CreateNewGMSHMesh();
 		this->InitializeRefinement(fineMesh);
-		fineMesh->ComesFrom.CS = CoarseningStrategy::GMSHSplittingRefinement;
+		fineMesh->ComesFrom.CS = H_CoarsStgy::GMSHSplittingRefinement;
 		if (dynamic_cast<TetrahedralElement*>(this->Elements[0]))
 		{
 			fineMesh->ComesFrom.nFineElementsByCoarseElement = 8;
@@ -833,7 +833,7 @@ private:
 
 		GMSHMesh<Dim>* coarseMesh = new GMSHMesh<Dim>(_testCase, _gmshFilePath, _description, _fileNamePart, fineMesh->N() / coarseningFactor, false);
 		this->InitializeCoarsening(coarseMesh);
-		coarseMesh->ComesFrom.CS = CoarseningStrategy::IndependentRemeshing;
+		coarseMesh->ComesFrom.CS = H_CoarsStgy::IndependentRemeshing;
 		coarseMesh->Build();
 
 		for (Element<Dim>* fine : fineMesh->Elements)
@@ -1019,7 +1019,7 @@ protected:
 
 		if (this->CoarseMesh)
 		{
-			myMesh->CoarsenMesh(CoarseningStrategy::StandardCoarsening, FaceCoarseningStrategy::InterfaceCollapsing, 2);
+			myMesh->CoarsenMesh(H_CoarsStgy::StandardCoarsening, FaceCoarseningStrategy::InterfaceCollapsing, 2);
 			dynamic_cast<GMSHMesh<Dim>*>(this->CoarseMesh)->RenumberLike(myMesh->CoarseMesh);
 		}
 	}

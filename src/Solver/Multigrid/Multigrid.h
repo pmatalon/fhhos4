@@ -27,7 +27,8 @@ public:
 	int BlockSizeForBlockSmoothers = -1;
 	double RelaxationParameter = 1;
 	HP_CoarsStgy HP_CS = HP_CoarsStgy::H_only;
-	CoarseningStrategy CoarseningStgy = CoarseningStrategy::StandardCoarsening;
+	H_CoarsStgy H_CS = H_CoarsStgy::StandardCoarsening;
+	P_CoarsStgy P_CS = P_CoarsStgy::Minus1;
 	FaceCoarseningStrategy FaceCoarseningStgy = FaceCoarseningStrategy::InterfaceCollapsing;
 	double CoarseningFactor = 2;
 	int CoarsePolyDegree = 1; // used in p-Multigrid
@@ -117,12 +118,12 @@ public:
 				coarseningType = currentLevel->PolynomialDegree() != this->CoarsePolyDegree ? CoarseningType::P : CoarseningType::HP;
 			else if (this->HP_CS == HP_CoarsStgy::HP_then_H && currentLevel->PolynomialDegree() != this->CoarsePolyDegree)
 				coarseningType = CoarseningType::HP;
-			
+
 			// Mesh coarsening if needed
 			if (coarseningType == CoarseningType::H || coarseningType == CoarseningType::HP)
 			{
 				// Can we coarsen the mesh?
-				currentLevel->CoarsenMesh(this->CoarseningStgy, this->FaceCoarseningStgy, this->CoarseningFactor, noCoarserMeshProvided, coarsestPossibleMeshReached);
+				currentLevel->CoarsenMesh(this->H_CS, this->FaceCoarseningStgy, this->CoarseningFactor, noCoarserMeshProvided, coarsestPossibleMeshReached);
 				if (noCoarserMeshProvided || coarsestPossibleMeshReached)
 					break;
 			}
@@ -532,37 +533,37 @@ public:
 				os << _nLevels << endl;
 
 			os << "\t" << "Coarsening strategy     : ";
-			if (CoarseningStgy == CoarseningStrategy::StandardCoarsening)
+			if (H_CS == H_CoarsStgy::StandardCoarsening)
 				os << "standard [-cs s]" << endl;
-			else if (CoarseningStgy == CoarseningStrategy::GMSHSplittingRefinement)
+			else if (H_CS == H_CoarsStgy::GMSHSplittingRefinement)
 				os << "GMSH refinement by splitting from coarse mesh [-cs r]" << endl;
-			else if (CoarseningStgy == CoarseningStrategy::BeyRefinement)
+			else if (H_CS == H_CoarsStgy::BeyRefinement)
 				os << "Bey's refinement from coarse mesh [-cs b]" << endl;
-			else if (CoarseningStgy == CoarseningStrategy::IndependentRemeshing)
+			else if (H_CS == H_CoarsStgy::IndependentRemeshing)
 				os << "independant remeshing [-cs m]" << endl;
-			else if (CoarseningStgy == CoarseningStrategy::DoublePairwiseAggregation)
+			else if (H_CS == H_CoarsStgy::DoublePairwiseAggregation)
 				os << "double pairwise aggregation [-cs dpa]" << endl;
-			else if (CoarseningStgy == CoarseningStrategy::MultiplePairwiseAggregation)
+			else if (H_CS == H_CoarsStgy::MultiplePairwiseAggregation)
 				os << "multiple pairwise aggregation [-cs mpa -coarsening-factor " << Utils::ProgramArgs.Solver.MG.CoarseningFactor << "]" << endl;
-			else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
+			else if (H_CS == H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours)
 				os << "agglomeration by face neighbours [-cs n]" << endl;
-			else if (CoarseningStgy == CoarseningStrategy::MultipleAgglomerationCoarseningByFaceNeighbours)
+			else if (H_CS == H_CoarsStgy::MultipleAgglomerationCoarseningByFaceNeighbours)
 				os << "multiple agglomeration by face neighbours [-cs mn -coarsening-factor " << Utils::ProgramArgs.Solver.MG.CoarseningFactor << "]" << endl;
-			else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByMostCoplanarFaces)
+			else if (H_CS == H_CoarsStgy::AgglomerationCoarseningByMostCoplanarFaces)
 				os << "agglomeration by most coplanar faces [-cs mcf]" << endl;
-			else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter)
+			else if (H_CS == H_CoarsStgy::AgglomerationCoarseningByClosestCenter)
 				os << "agglomeration by closest element center [-cs cc]" << endl;
-			else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByClosestFace)
+			else if (H_CS == H_CoarsStgy::AgglomerationCoarseningByClosestFace)
 				os << "agglomeration by closest face center [-cs clf]" << endl;
-			else if (CoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface)
+			else if (H_CS == H_CoarsStgy::AgglomerationCoarseningByLargestInterface)
 				os << "agglomeration by largest interface [-cs li]" << endl;
-			else if (CoarseningStgy == CoarseningStrategy::FaceCoarsening)
+			else if (H_CS == H_CoarsStgy::FaceCoarsening)
 				os << "face coarsening [-cs f]" << endl;
 			else
 				os << "unknown" << endl;
 
 			os << "\t" << "Face coarsening strategy: ";
-			if (Utils::IsRefinementStrategy(CoarseningStgy) || CoarseningStgy == CoarseningStrategy::IndependentRemeshing)
+			if (Utils::IsRefinementStrategy(H_CS) || H_CS == H_CoarsStgy::IndependentRemeshing)
 				os << "NA" << endl;
 			else if (FaceCoarseningStgy == FaceCoarseningStrategy::None)
 				os << "none" << endl;

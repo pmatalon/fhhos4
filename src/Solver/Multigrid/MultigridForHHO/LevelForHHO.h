@@ -43,7 +43,7 @@ public:
 		return _problem->HHO->nFaceUnknowns;
 	}
 
-	void CoarsenMesh(CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override
+	void CoarsenMesh(H_CoarsStgy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override
 	{
 		Mesh<Dim>* mesh = _problem->_mesh;
 		if (Utils::IsRefinementStrategy(elemCoarseningStgy) && mesh->CoarseMesh == nullptr)
@@ -315,7 +315,7 @@ private:
 			// Every fine element must appear in only one coarse element's FinerElements list.
 
 
-			if (!Utils::BuildsNestedMeshHierarchy(coarsePb->_mesh->ComesFrom.CS) && coarsePb->_mesh->ComesFrom.CS != CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
+			if (!Utils::BuildsNestedMeshHierarchy(coarsePb->_mesh->ComesFrom.CS) && coarsePb->_mesh->ComesFrom.CS != H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours)
 			{
 				if (Dim == 2 && this->PolynomialDegree() > 1)
 					Utils::Warning("The degree k=" + to_string(this->PolynomialDegree()) + " is too high to ensure enough accuracy of the approximate L2-projection. Non-optimal convergence may be observed. Option '-prolong " + to_string((unsigned)GMG_H_Prolongation::CellInterp_FinerApproxL2proj_Trace) + "' (approx. with subdivision) is recommended.");
@@ -362,7 +362,7 @@ private:
 			//          subelements.                                               //
 			//---------------------------------------------------------------------//
 
-			if (!Utils::BuildsNestedMeshHierarchy(coarsePb->_mesh->ComesFrom.CS) && coarsePb->_mesh->ComesFrom.CS != CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
+			if (!Utils::BuildsNestedMeshHierarchy(coarsePb->_mesh->ComesFrom.CS) && coarsePb->_mesh->ComesFrom.CS != H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours)
 			{
 				if ((Dim == 2 && this->PolynomialDegree() > 3) || (Dim == 3 && this->PolynomialDegree() > 2))
 					Utils::Warning("The degree k=" + to_string(this->PolynomialDegree()) + " is too high to ensure enough accuracy of the approximate L2-projection. Non-optimal convergence may be observed.");

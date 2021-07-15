@@ -232,17 +232,17 @@ public:
 			});
 	}
 
-	void Coarsen(CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, bool& coarsestPossibleMeshReached)
+	void Coarsen(H_CoarsStgy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, bool& coarsestPossibleMeshReached)
 	{
 		coarsestPossibleMeshReached = false;
 
-		if (elemCoarseningStgy == CoarseningStrategy::DoublePairwiseAggregation || elemCoarseningStgy == CoarseningStrategy::MultiplePairwiseAggregation)
+		if (elemCoarseningStgy == H_CoarsStgy::DoublePairwiseAggregation || elemCoarseningStgy == H_CoarsStgy::MultiplePairwiseAggregation)
 		{
 			cout << "\tElement pairwise aggregation" << endl;
 			PairwiseAggregation<HybridAlgebraicElement, HybridElementAggregate> aggregProcess;
 			CoarseElements = aggregProcess.Perform(Elements, coarsestPossibleMeshReached);
 		}
-		else if (elemCoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours || elemCoarseningStgy == CoarseningStrategy::MultipleAgglomerationCoarseningByFaceNeighbours)
+		else if (elemCoarseningStgy == H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours || elemCoarseningStgy == H_CoarsStgy::MultipleAgglomerationCoarseningByFaceNeighbours)
 		{
 			cout << "\tElement agglomeration" << endl;
 			AllNeighbourAggregation<HybridAlgebraicElement, HybridElementAggregate> aggregProcess;

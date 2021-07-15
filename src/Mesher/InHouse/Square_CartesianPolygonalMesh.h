@@ -228,9 +228,9 @@ public:
 		return min((double)this->Nx, (double)this->Ny) / max((double)this->Nx, (double)this->Ny);
 	}
 
-	void CoarsenMesh(CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor) override
+	void CoarsenMesh(H_CoarsStgy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor) override
 	{
-		if (elemCoarseningStgy == CoarseningStrategy::StandardCoarsening)
+		if (elemCoarseningStgy == H_CoarsStgy::StandardCoarsening)
 		{
 			if (faceCoarseningStgy == FaceCoarseningStrategy::None)
 				CoarsenByAgglomerationAndKeepFineFaces();
@@ -256,7 +256,7 @@ public:
 		this->InitializeCoarsening(coarseMesh);
 		coarseMesh->Nx = nx / 2;
 		coarseMesh->Ny = ny / 2;
-		coarseMesh->ComesFrom.CS = CoarseningStrategy::StandardCoarsening;
+		coarseMesh->ComesFrom.CS = H_CoarsStgy::StandardCoarsening;
 		//coarseMesh->ComesFrom.nFineElementsByCoarseElement = 4;
 		//coarseMesh->ComesFrom.nFineFacesAddedByCoarseElement = 4;
 		//coarseMesh->ComesFrom.nFineFacesByKeptCoarseFace = 1;

@@ -341,9 +341,9 @@ public:
 		return this->Elements[0]->Regularity();
 	}
 
-	void CoarsenMesh(CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor) override
+	void CoarsenMesh(H_CoarsStgy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor) override
 	{
-		if (elemCoarseningStgy == CoarseningStrategy::StandardCoarsening)
+		if (elemCoarseningStgy == H_CoarsStgy::StandardCoarsening)
 		{
 			if (faceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsing)
 				StandardCoarsening();
@@ -354,7 +354,7 @@ public:
 			PolyhedralMesh<2>::CoarsenMesh(elemCoarseningStgy, faceCoarseningStgy, coarseningFactor);
 	}
 
-	void RefineMesh(CoarseningStrategy strategy) override
+	void RefineMesh(H_CoarsStgy strategy) override
 	{
 		Utils::FatalError("Refinement strategy not implemented!");
 	}
@@ -372,7 +372,7 @@ public:
 		{
 			Square_TriangularMesh* coarseMesh = new Square_TriangularMesh(nx / 2, ny / 2, this->With4Quadrants, false);
 			this->InitializeCoarsening(coarseMesh);
-			coarseMesh->ComesFrom.CS = CoarseningStrategy::StandardCoarsening;
+			coarseMesh->ComesFrom.CS = H_CoarsStgy::StandardCoarsening;
 			coarseMesh->ComesFrom.nFineElementsByCoarseElement = 4;
 			coarseMesh->ComesFrom.nFineFacesAddedByCoarseElement = 3;
 			coarseMesh->ComesFrom.nFineFacesByKeptCoarseFace = 2;

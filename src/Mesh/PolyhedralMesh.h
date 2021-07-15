@@ -99,26 +99,26 @@ public:
 		return verticesUsage + verticesPointers + elementsUsage + elementsPointers + facesUsage + facesPointers;
 	}
 
-	virtual void CoarsenMesh(CoarseningStrategy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor) override
+	virtual void CoarsenMesh(H_CoarsStgy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor) override
 	{
 		if (this->CoarseMesh)
 			return;
 		
-		if (elemCoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByVertexRemoval)
+		if (elemCoarseningStgy == H_CoarsStgy::AgglomerationCoarseningByVertexRemoval)
 			CoarsenByAgglomerationByVertexRemoval();
-		else if (elemCoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByMostCoplanarFaces)
+		else if (elemCoarseningStgy == H_CoarsStgy::AgglomerationCoarseningByMostCoplanarFaces)
 			CoarsenByAgglomerationByMostCoplanarFaces();
-		else if (elemCoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter
-			  || elemCoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByClosestFace
-			  || elemCoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface)
+		else if (elemCoarseningStgy == H_CoarsStgy::AgglomerationCoarseningByClosestCenter
+			  || elemCoarseningStgy == H_CoarsStgy::AgglomerationCoarseningByClosestFace
+			  || elemCoarseningStgy == H_CoarsStgy::AgglomerationCoarseningByLargestInterface)
 			CoarsenByAgglomerationByPairs(elemCoarseningStgy);
-		else if (elemCoarseningStgy == CoarseningStrategy::AgglomerationCoarseningBySeedPoints)
+		else if (elemCoarseningStgy == H_CoarsStgy::AgglomerationCoarseningBySeedPoints)
 			CoarsenByAgglomerationBySeedPoints();
-		else if (elemCoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
+		else if (elemCoarseningStgy == H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours)
 			CoarsenByAgglomerationByFaceNeighbours(faceCoarseningStgy);
-		else if (elemCoarseningStgy == CoarseningStrategy::AgglomerationCoarseningByVertexNeighbours)
+		else if (elemCoarseningStgy == H_CoarsStgy::AgglomerationCoarseningByVertexNeighbours)
 			CoarsenByAgglomerationByVertexNeighbours();
-		else if (elemCoarseningStgy == CoarseningStrategy::FaceCoarsening)
+		else if (elemCoarseningStgy == H_CoarsStgy::FaceCoarsening)
 			FaceCoarsening();
 		else
 			Mesh<Dim>::CoarsenMesh(elemCoarseningStgy, faceCoarseningStgy, coarseningFactor);
@@ -156,7 +156,7 @@ private:
 	{
 		PolyhedralMesh<Dim>* coarseMesh = new PolyhedralMesh<Dim>();
 		this->InitializeCoarsening(coarseMesh);
-		coarseMesh->ComesFrom.CS = CoarseningStrategy::AgglomerationCoarseningByMostCoplanarFaces;
+		coarseMesh->ComesFrom.CS = H_CoarsStgy::AgglomerationCoarseningByMostCoplanarFaces;
 
 		//BigNumber elementToAnalyze = 999999999999;
 
@@ -556,7 +556,7 @@ private:
 	{
 		PolyhedralMesh<Dim>* coarseMesh = new PolyhedralMesh<Dim>();
 		this->InitializeCoarsening(coarseMesh);
-		coarseMesh->ComesFrom.CS = CoarseningStrategy::AgglomerationCoarseningBySeedPoints;
+		coarseMesh->ComesFrom.CS = H_CoarsStgy::AgglomerationCoarseningBySeedPoints;
 
 		for (Element<Dim>* e : this->Elements)
 		{
@@ -634,7 +634,7 @@ private:
 	{
 		PolyhedralMesh<Dim>* coarseMesh = new PolyhedralMesh<Dim>();
 		this->InitializeCoarsening(coarseMesh);
-		coarseMesh->ComesFrom.CS = CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours;
+		coarseMesh->ComesFrom.CS = H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours;
 
 		//------------------------------------//
 		// Element agglomeration, 1st pass    //
@@ -737,7 +737,7 @@ private:
 					if (cancelCoarsening)
 						return;
 					assert(!currentElem->CoarserElement);
-					Element<Dim>* coarseNeighbourForAggreg = this->FittestCoarseNeighbour(currentElem, CoarseningStrategy::AgglomerationCoarseningByClosestCenter);
+					Element<Dim>* coarseNeighbourForAggreg = this->FittestCoarseNeighbour(currentElem, H_CoarsStgy::AgglomerationCoarseningByClosestCenter);
 					if (!coarseNeighbourForAggreg)
 					{
 						if (!cancelCoarsening)
@@ -835,7 +835,7 @@ private:
 	{
 		PolyhedralMesh<Dim>* coarseMesh = new PolyhedralMesh<Dim>();
 		this->InitializeCoarsening(coarseMesh);
-		coarseMesh->ComesFrom.CS = CoarseningStrategy::AgglomerationCoarseningByVertexNeighbours;
+		coarseMesh->ComesFrom.CS = H_CoarsStgy::AgglomerationCoarseningByVertexNeighbours;
 
 		// Associate to each vertex the list of elements it connects
 		map<Vertex*, vector<Element<Dim>*>> vertexElements = BuildVertexElementMap();
@@ -855,7 +855,7 @@ private:
 			}
 			else
 			{
-				Element<Dim>* coarseNeighbourForAggreg = this->FittestCoarseNeighbour(currentElem, CoarseningStrategy::AgglomerationCoarseningByClosestCenter);
+				Element<Dim>* coarseNeighbourForAggreg = this->FittestCoarseNeighbour(currentElem, H_CoarsStgy::AgglomerationCoarseningByClosestCenter);
 				if (!coarseNeighbourForAggreg)
 					Utils::FatalError("Element cannot be aggregated. Weird...");
 
@@ -1052,7 +1052,7 @@ private:
 	//                                                               //
 	//---------------------------------------------------------------//
 
-	void CoarsenByAgglomerationByPairs(CoarseningStrategy strategy)
+	void CoarsenByAgglomerationByPairs(H_CoarsStgy strategy)
 	{
 		// Intermediary coarsenings by pairs of elements //
 		PolyhedralMesh<Dim>* coarseMesh = this;
@@ -1120,7 +1120,7 @@ private:
 	//-------------------------------------------------------------------------------------------------------------------------//
 	// Creates a coarse mesh by aggregates of pairs of elements according to a criterion (closest center or largest interface) //
 	//-------------------------------------------------------------------------------------------------------------------------//
-	void AggregatePairsOfElements(CoarseningStrategy strategy)
+	void AggregatePairsOfElements(H_CoarsStgy strategy)
 	{
 		PolyhedralMesh<Dim>* coarseMesh = new PolyhedralMesh<Dim>();
 		this->InitializeCoarsening(coarseMesh);
@@ -1226,7 +1226,7 @@ private:
 		return vector<Element<Dim>*>(availableNeighboursSet.begin(), availableNeighboursSet.end());
 	}
 
-	Element<Dim>* FittestAvailableNeighbour(Element<Dim>* e, CoarseningStrategy strategy)
+	Element<Dim>* FittestAvailableNeighbour(Element<Dim>* e, H_CoarsStgy strategy)
 	{
 		// Find the neighbour still available for aggregation under a distance/largest interface criterion
 		Element<Dim>* neighbourForAggreg = nullptr;
@@ -1245,11 +1245,11 @@ private:
 			// Init choice criterion
 			double distance = 0;
 			double interfaceMeasure = 0;
-			if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter)
+			if (strategy == H_CoarsStgy::AgglomerationCoarseningByClosestCenter)
 				distance = Vect<Dim>(e->Center(), neighbour->Center()).norm();
-			else if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestFace)
+			else if (strategy == H_CoarsStgy::AgglomerationCoarseningByClosestFace)
 				distance = Vect<Dim>(e->Center(), f->Center()).norm();
-			else if (strategy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface)
+			else if (strategy == H_CoarsStgy::AgglomerationCoarseningByLargestInterface)
 			{
 				for (Face<Dim>* fInterface : e->Faces)
 				{
@@ -1267,17 +1267,17 @@ private:
 			}
 			else
 			{
-				if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter && distance < closestDistance)
+				if (strategy == H_CoarsStgy::AgglomerationCoarseningByClosestCenter && distance < closestDistance)
 				{
 					neighbourForAggreg = neighbour;
 					closestDistance = distance;
 				}
-				else if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestFace && distance < closestDistance)
+				else if (strategy == H_CoarsStgy::AgglomerationCoarseningByClosestFace && distance < closestDistance)
 				{
 					neighbourForAggreg = neighbour;
 					closestDistance = distance;
 				}
-				else if (strategy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface && interfaceMeasure > largestInterface)
+				else if (strategy == H_CoarsStgy::AgglomerationCoarseningByLargestInterface && interfaceMeasure > largestInterface)
 				{
 					neighbourForAggreg = neighbour;
 					largestInterface = interfaceMeasure;
@@ -1288,7 +1288,7 @@ private:
 		return neighbourForAggreg;
 	}
 
-	Element<Dim>* FittestCoarseNeighbour(Element<Dim>* e, CoarseningStrategy strategy)
+	Element<Dim>* FittestCoarseNeighbour(Element<Dim>* e, H_CoarsStgy strategy)
 	{
 		bool mustCheckReEntrantCorners = Utils::ProgramArgs.Solver.MG.ReEntrantCornerManagement != ReEntrantCornerMgmt::Disabled;
 		vector<Vertex*> reentrantCorners = ReEntrantCorners(e);
@@ -1310,11 +1310,11 @@ private:
 
 			double distance = 0;
 			double interfaceMeasure = 0;
-			if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter)
+			if (strategy == H_CoarsStgy::AgglomerationCoarseningByClosestCenter)
 				distance = Vect<Dim>(e->Center(), macroNeighbour->Center()).norm();
-			else if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestFace)
+			else if (strategy == H_CoarsStgy::AgglomerationCoarseningByClosestFace)
 				distance = Vect<Dim>(e->Center(), f->Center()).norm();
-			else if (strategy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface)
+			else if (strategy == H_CoarsStgy::AgglomerationCoarseningByLargestInterface)
 			{
 				for (Face<Dim>* fInterface : e->Faces)
 				{
@@ -1332,17 +1332,17 @@ private:
 			}
 			else
 			{
-				if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestCenter && distance < closestDistance)
+				if (strategy == H_CoarsStgy::AgglomerationCoarseningByClosestCenter && distance < closestDistance)
 				{
 					coarseNeighbourForAggreg = macroNeighbour;
 					closestDistance = distance;
 				}
-				else if (strategy == CoarseningStrategy::AgglomerationCoarseningByClosestFace && distance < closestDistance)
+				else if (strategy == H_CoarsStgy::AgglomerationCoarseningByClosestFace && distance < closestDistance)
 				{
 					coarseNeighbourForAggreg = macroNeighbour;
 					closestDistance = distance;
 				}
-				else if (strategy == CoarseningStrategy::AgglomerationCoarseningByLargestInterface && interfaceMeasure > largestInterface)
+				else if (strategy == H_CoarsStgy::AgglomerationCoarseningByLargestInterface && interfaceMeasure > largestInterface)
 				{
 					coarseNeighbourForAggreg = macroNeighbour;
 					largestInterface = interfaceMeasure;
@@ -1885,8 +1885,8 @@ private:
 public:
 	void SetOverlappingFineElementsViaExactIntersection() override
 	{
-		CoarseningStrategy stgy = this->ComesFrom.CS;
-		if (stgy == CoarseningStrategy::None)
+		H_CoarsStgy stgy = this->ComesFrom.CS;
+		if (stgy == H_CoarsStgy::None)
 			stgy = this->FineMesh->ComesFrom.CS;
 
 		ElementParallelLoop<Dim> parallelLoop(this->Elements);
@@ -1898,7 +1898,7 @@ public:
 	}
 
 private:
-	static void SetOverlappingFineElementsViaExactIntersection(Element<Dim>* ce, CoarseningStrategy stgy)
+	static void SetOverlappingFineElementsViaExactIntersection(Element<Dim>* ce, H_CoarsStgy stgy)
 	{
 		set<Element<Dim>*> tested;
 		double overlappingMeasure = 0;
@@ -1961,8 +1961,8 @@ private:
 public:
 	void SetOverlappingFineElementsSubTriangles() override
 	{
-		CoarseningStrategy stgy = this->ComesFrom.CS;
-		if (stgy == CoarseningStrategy::None)
+		H_CoarsStgy stgy = this->ComesFrom.CS;
+		if (stgy == H_CoarsStgy::None)
 			stgy = this->FineMesh->ComesFrom.CS;
 
 		ElementParallelLoop<Dim> parallelLoopFine(this->FineMesh->Elements);
@@ -1970,7 +1970,7 @@ public:
 			{
 				if (!Utils::BuildsNestedMeshHierarchy(stgy) && !fe->IsFullyEmbeddedInCoarseElement)
 				{
-					if (stgy == CoarseningStrategy::IndependentRemeshing)
+					if (stgy == H_CoarsStgy::IndependentRemeshing)
 						fe->Refine();
 					else
 						fe->RefineWithoutCoarseOverlap();
@@ -1999,7 +1999,7 @@ public:
 	}
 
 private:
-	static void SetOverlappingFineElementsSubTriangles(Element<Dim>* fe, CoarseningStrategy stgy)
+	static void SetOverlappingFineElementsSubTriangles(Element<Dim>* fe, H_CoarsStgy stgy)
 	{
 		if (Utils::BuildsNestedMeshHierarchy(stgy) || fe->IsFullyEmbeddedInCoarseElement)
 		{
@@ -2119,7 +2119,7 @@ public:
 	{
 		Mesh<Dim>::SanityCheck();
 
-		/*if (this->ComesFrom.CS == CoarseningStrategy::AgglomerationCoarseningByFaceNeighbours)
+		/*if (this->ComesFrom.CS == H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours)
 		{
 			for (Element<Dim>* e : this->Elements)
 			{
@@ -2244,7 +2244,7 @@ void PolyhedralMesh<2>::FaceCoarsening()
 {
 	PolyhedralMesh<2>* coarseSkeleton = new PolyhedralMesh<2>();
 	this->InitializeCoarsening(coarseSkeleton);
-	coarseSkeleton->ComesFrom.CS = CoarseningStrategy::FaceCoarsening;
+	coarseSkeleton->ComesFrom.CS = H_CoarsStgy::FaceCoarsening;
 
 	// Copy all vertices
 	map<size_t, MeshVertex<2>*> verticesByNumber;

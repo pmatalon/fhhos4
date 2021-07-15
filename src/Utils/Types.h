@@ -33,10 +33,11 @@ enum class BoundaryConditionType : unsigned
 	Neumann = 2
 };
 
-enum class MGType : unsigned
+enum class CoarseningType : unsigned
 {
-	h_Multigrid,
-	p_Multigrid
+	H,
+	P,
+	HP
 };
 
 enum class HP_CoarsStgy : unsigned
@@ -48,14 +49,7 @@ enum class HP_CoarsStgy : unsigned
 	P_then_HP // then the coarse p must be set
 };
 
-enum class CoarseningType : unsigned
-{
-	H,
-	P,
-	HP
-};
-
-enum class CoarseningStrategy : unsigned
+enum class H_CoarsStgy : unsigned
 {
 	None,
 	StandardCoarsening,
@@ -74,6 +68,13 @@ enum class CoarseningStrategy : unsigned
 	BeyRefinement,
 	DoublePairwiseAggregation,
 	MultiplePairwiseAggregation
+};
+
+enum class P_CoarsStgy : unsigned
+{
+	Minus1 = 1,
+	DivideBy2,
+	DirectToLow
 };
 
 enum class FaceCoarseningStrategy : unsigned

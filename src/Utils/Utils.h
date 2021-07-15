@@ -198,14 +198,14 @@ public:
 			|| geo.compare("cube") == 0;
 	}
 
-	static bool IsRefinementStrategy(CoarseningStrategy stgy)
+	static bool IsRefinementStrategy(H_CoarsStgy stgy)
 	{
-		return stgy == CoarseningStrategy::BeyRefinement || stgy == CoarseningStrategy::GMSHSplittingRefinement;
+		return stgy == H_CoarsStgy::BeyRefinement || stgy == H_CoarsStgy::GMSHSplittingRefinement;
 	}
 
-	static bool BuildsNestedMeshHierarchy(CoarseningStrategy stgy)
+	static bool BuildsNestedMeshHierarchy(H_CoarsStgy stgy)
 	{
-		return IsRefinementStrategy(stgy) || stgy == CoarseningStrategy::StandardCoarsening;
+		return IsRefinementStrategy(stgy) || stgy == H_CoarsStgy::StandardCoarsening;
 	}
 
 	static bool IsAlgebraic(string solverCode)

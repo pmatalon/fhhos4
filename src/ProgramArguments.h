@@ -34,7 +34,6 @@ struct DiscretizationArguments
 
 struct MultigridArguments
 {
-	HP_CoarsStgy HP_CS = HP_CoarsStgy::H_only;
 	int Levels = 0;
 	int ProlongationCode = 0;
 	GMG_H_Prolongation GMG_H_Prolong = GMG_H_Prolongation::Default;
@@ -57,7 +56,9 @@ struct MultigridArguments
 	int PostSmoothingIterations = 1;
 	int CoarseLevelChangeSmoothingCoeff = 0;
 	char CoarseLevelChangeSmoothingOperator = '+';
-	CoarseningStrategy CoarseningStgy = CoarseningStrategy::None;
+	HP_CoarsStgy HP_CS = HP_CoarsStgy::H_only;
+	H_CoarsStgy H_CS = H_CoarsStgy::None;
+	P_CoarsStgy P_CS = P_CoarsStgy::Minus1;
 	FaceCoarseningStrategy FaceCoarseningStgy = FaceCoarseningStrategy::InterfaceCollapsing;
 	double CoarseningFactor = 0;
 	BigNumber CoarseN = 2;
