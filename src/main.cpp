@@ -352,6 +352,14 @@ void print_usage() {
 	cout << "              " << (unsigned)GMG_P_Restriction::RemoveHigherOrders << "  - remove higher orders (default), which corresponds to the L2-proj. if the basis is hierarchical and orthonormalized" << endl;
 	cout << "              " << (unsigned)GMG_P_Restriction::P_Transpose << "  - transpose of p-prolongation" << endl;
 	cout << endl;
+	cout << "-hp-config NUM" << endl;
+	cout << "      Shortcut for the following set of arguments:" << endl;
+	cout << "              1  -   -hp-cs h" << endl;
+	cout << "              2  -   -hp-cs p_h  -p-prolong 1 -p-restrict 1" << endl;
+	cout << "              3  -   -hp-cs p_h  -p-prolong 2 -p-restrict 1" << endl;
+	cout << "              4  -   -hp-cs p_h  -p-prolong 2 -p-restrict 2" << endl;
+	cout << "              5  -   -hp-cs hp_h" << endl;
+	cout << endl;
 	cout << "-disable-hor" << endl;
 	cout << "      In the polongation of 'mg', disables the use of the higher-order reconstruction." << endl;
 	cout << "      The local cell polynomials in the intermediary step are obtained by solving the local problems only." << endl;
@@ -504,6 +512,7 @@ int main(int argc, char* argv[])
 		OPT_MultigridProlongationCode,
 		OPT_PProlongationCode,
 		OPT_PRestrictionCode,
+		OPT_HPConfig,
 		OPT_CoarseningProlongationCode,
 		OPT_FaceProlongationCode,
 		OPT_CoarseMatrixSize,
@@ -560,6 +569,7 @@ int main(int argc, char* argv[])
 		 { "prolong", required_argument, NULL, OPT_MultigridProlongationCode },
 		 { "p-prolong", required_argument, NULL, OPT_PProlongationCode },
 		 { "p-restrict", required_argument, NULL, OPT_PRestrictionCode },
+		 { "hp-config", required_argument, NULL, OPT_HPConfig },
 		 { "coarsening-prolong", required_argument, NULL, OPT_CoarseningProlongationCode },
 		 { "face-prolong", required_argument, NULL, OPT_FaceProlongationCode },
 		 { "coarse-size", required_argument, NULL, OPT_CoarseMatrixSize },
@@ -855,6 +865,35 @@ int main(int argc, char* argv[])
 				if (prolongationCode < 1 || prolongationCode > 3)
 					argument_error("unknown face prolongation code. Check -face-prolong argument.");
 				args.Solver.MG.FaceProlongationCode = prolongationCode;
+				break;
+			}
+			case OPT_HPConfig:
+			{
+				int code = atoi(optarg);
+				if (code < 1 || code > 5)
+					argument_error("unknown hp-configuration code. Check -hp-config argument.");
+				if (code == 1)
+					args.Solver.MG.HP_CS = HP_CoarsStgy::H_only;
+				else if (code == 2)
+				{
+					args.Solver.MG.HP_CS = HP_CoarsStgy::P_then_H;
+					args.Solver.MG.GMG_P_Prolong = GMG_P_Prolongation::Injection;
+					args.Solver.MG.GMG_P_Restrict = GMG_P_Restriction::RemoveHigherOrders;
+				}
+				else if (code == 3)
+				{
+					args.Solver.MG.HP_CS = HP_CoarsStgy::P_then_H;
+					args.Solver.MG.GMG_P_Prolong = GMG_P_Prolongation::H_Prolongation;
+					args.Solver.MG.GMG_P_Restrict = GMG_P_Restriction::RemoveHigherOrders;
+				}
+				else if (code == 4)
+				{
+					args.Solver.MG.HP_CS = HP_CoarsStgy::P_then_H;
+					args.Solver.MG.GMG_P_Prolong = GMG_P_Prolongation::H_Prolongation;
+					args.Solver.MG.GMG_P_Restrict = GMG_P_Restriction::P_Transpose;
+				}
+				else if (code == 5)
+					args.Solver.MG.HP_CS = HP_CoarsStgy::HP_then_H;
 				break;
 			}
 			case 'l': 
