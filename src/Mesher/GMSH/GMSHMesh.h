@@ -242,8 +242,19 @@ private:
 		// Physical groups //
 		//-----------------//
 
+		const int DefaultPhyGroup = -1;
+
 		if (this->PhysicalParts.empty())
+		{
 			this->PhysicalParts = GetPhysicalGroups();
+			if (this->PhysicalParts.empty())
+			{
+				cout << "Default physical part created." << endl;
+				PhysicalGroup<Dim>* defaultPhyPart = new PhysicalGroup<Dim>(DefaultPhyGroup, "Default");
+				this->PhysicalParts.push_back(defaultPhyPart);
+			}
+		}
+
 		if (this->BoundaryParts.empty())
 			this->BoundaryParts = GetBoundaryGroups();
 
@@ -399,24 +410,32 @@ private:
 			// Get physical group of this entity
 			vector<int> physicalTags;
 			gmsh::model::getPhysicalGroupsForEntity(Dim, entityTag, physicalTags);
-			if (!this->PhysicalParts.empty() && physicalTags.empty())
-				Utils::FatalError("Entity " + to_string(entityTag) + " has no physical part. Check GMSH file.");
-			if (this->PhysicalParts.empty() && !physicalTags.empty())
-				Utils::FatalError("Entity " + to_string(entityTag) + " has a physical part although no physical part has been defined. This should never happen.");
-			if (physicalTags.size() > 1)
-				Utils::FatalError("Entity " + to_string(entityTag) + " must have only one physical part (" + to_string(physicalTags.size()) + " found). Check GMSH file.");
-			
-			PhysicalGroup<Dim>* physicalPart = this->GetPhysicalGroup(physicalTags[0]);
-			if (!physicalPart)
+
+			PhysicalGroup<Dim>* physicalPart = nullptr;
+			// If no physical group, affect the default one, created above
+			if (physicalTags.empty())
 			{
-				// Id not found, search by name
-				string phyName;
-				gmsh::model::getPhysicalName(Dim, physicalTags[0], phyName);
-				physicalPart = this->GetPhysicalGroup(phyName);
-				if (physicalPart)
-					Utils::FatalError("Entity " + to_string(entityTag) + " has an unknown physical part (id=" + to_string(physicalTags[0]) + ", name=\"" + phyName + "\"). However it has the same name of a known one. If the GMSH file has changed, there may be discrepencies with the meshes stored in cache. Try emptying the cache for this geometry or use the option -no-cache.");
-				else
-					Utils::FatalError("Entity " + to_string(entityTag) + " has an unknown physical part (id=" + to_string(physicalTags[0]) + ", name=\"" + phyName + "\"). Check GMSH file.");
+				physicalPart = this->GetPhysicalGroup(DefaultPhyGroup);
+				if (!physicalPart)
+					Utils::FatalError("Entity " + to_string(entityTag) + " has no physical part. Check GMSH file.");
+			}
+			else
+			{
+				if (physicalTags.size() > 1)
+					Utils::FatalError("Entity " + to_string(entityTag) + " must have only one physical part (" + to_string(physicalTags.size()) + " found). Check GMSH file.");
+
+				physicalPart = this->GetPhysicalGroup(physicalTags[0]);
+				if (!physicalPart)
+				{
+					// Id not found, search by name
+					string phyName;
+					gmsh::model::getPhysicalName(Dim, physicalTags[0], phyName);
+					physicalPart = this->GetPhysicalGroup(phyName);
+					if (physicalPart)
+						Utils::FatalError("Entity " + to_string(entityTag) + " has an unknown physical part (id=" + to_string(physicalTags[0]) + ", name=\"" + phyName + "\"). However it has the same name of a known one. If the GMSH file has changed, there may be discrepencies with the meshes stored in cache. Try emptying the cache for this geometry or use the option -no-cache.");
+					else
+						Utils::FatalError("Entity " + to_string(entityTag) + " has an unknown physical part (id=" + to_string(physicalTags[0]) + ", name=\"" + phyName + "\"). Check GMSH file.");
+				}
 			}
 
 			// Get elements in this entity
