@@ -103,6 +103,12 @@ enum class GMG_P_Prolongation : unsigned
 	H_Prolongation = 2
 };
 
+enum class GMG_P_Restriction : unsigned
+{
+	RemoveHigherOrders = 1,
+	P_Transpose = 2
+};
+
 enum class UAMGProlongation : unsigned
 {
 	ReconstructionTrace = 1,

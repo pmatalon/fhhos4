@@ -39,6 +39,7 @@ struct MultigridArguments
 	int ProlongationCode = 0;
 	GMG_H_Prolongation GMG_H_Prolong = GMG_H_Prolongation::Default;
 	GMG_P_Prolongation GMG_P_Prolong = GMG_P_Prolongation::Injection;
+	GMG_P_Restriction GMG_P_Restrict = GMG_P_Restriction::RemoveHigherOrders;
 	int FaceProlongationCode = 0;
 	int CoarseningProlongationCode = 0;
 	UAMGFaceProlongation UAMGFaceProlong = UAMGFaceProlongation::BoundaryAggregatesInteriorAverage;

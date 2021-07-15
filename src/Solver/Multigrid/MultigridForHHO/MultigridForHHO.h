@@ -11,6 +11,7 @@ private:
 public:
 	GMG_H_Prolongation H_Prolongation = GMG_H_Prolongation::CellInterp_Trace;
 	GMG_P_Prolongation P_Prolongation = GMG_P_Prolongation::Injection;
+	GMG_P_Restriction P_Restriction = GMG_P_Restriction::RemoveHigherOrders;
 	bool UseHigherOrderReconstruction = true;
 	bool UseHeterogeneousWeighting = true;
 	
@@ -60,6 +61,13 @@ public:
 			else if (P_Prolongation == GMG_P_Prolongation::H_Prolongation)
 				os << "h-prolongation ";
 			os << "[-p-prolong " << (unsigned)P_Prolongation << "]" << endl;
+
+			os << "\t" << "p-restriction           : ";
+			if (P_Restriction == GMG_P_Restriction::RemoveHigherOrders)
+				os << "remove higher-order components ";
+			else if (P_Restriction == GMG_P_Restriction::P_Transpose)
+				os << "transpose of p-prolongation ";
+			os << "[-p-restrict " << (unsigned)P_Restriction << "]" << endl;
 		}
 		if (this->HP_Stgy == HP_Strategy::H_only || this->HP_Stgy == HP_Strategy::HP_then_H || this->HP_Stgy == HP_Strategy::P_then_H || this->HP_Stgy == HP_Strategy::P_then_HP)
 		{
@@ -105,6 +113,13 @@ public:
 			os << endl;
 			Utils::Warning(os, "The selected coarsening strategy generates non-nested meshes, while the selected prolongation operator is made for nested meshes. Option -prolong " + to_string((unsigned)GMG_H_Prolongation::CellInterp_ExactL2proj_Trace) + ", " + to_string((unsigned)GMG_H_Prolongation::CellInterp_ApproxL2proj_Trace) + " or " + to_string((unsigned)GMG_H_Prolongation::CellInterp_FinerApproxL2proj_Trace) + " recommended.");
 		}
+		if (this->HP_Stgy == HP_Strategy::P_only || this->HP_Stgy == HP_Strategy::P_then_H || this->HP_Stgy == HP_Strategy::P_then_HP)
+		{
+			if (P_Prolongation == GMG_P_Prolongation::Injection && (!this->_problem->HHO->FaceBasis->IsHierarchical || !this->_problem->HHO->OrthonormalizeBases))
+				Utils::Warning("The natural injection for p-multigrid is implemented based on the assumption that the face bases are hierarchical and orthonormalized. Degraded convergence may be experienced.");
+			if (P_Restriction == GMG_P_Restriction::RemoveHigherOrders && (!this->_problem->HHO->FaceBasis->IsHierarchical || !this->_problem->HHO->OrthonormalizeBases))
+				Utils::Warning("The restriction for p-multigrid consisting in removing the higher-orders is implemented based on the assumption that the face bases are hierarchical and orthonormalized. Degraded convergence may be experienced.");
+		}
 	}
 
 	Vector Solve(const Vector& b, string initialGuessCode) override
@@ -149,7 +164,7 @@ protected:
 	Level* CreateFineLevel() const override
 	{
 		assert(_problem && "The multigrid has not been initialized with a problem");
-		return new LevelForHHO<Dim>(0, _problem, H_Prolongation, P_Prolongation, UseHigherOrderReconstruction, UseHeterogeneousWeighting);
+		return new LevelForHHO<Dim>(0, _problem, H_Prolongation, P_Prolongation, P_Restriction, UseHigherOrderReconstruction, UseHeterogeneousWeighting);
 	}
 
 	Level* CreateCoarseLevel(Level* fineLevel, CoarseningType coarseningType) override
@@ -166,7 +181,7 @@ protected:
 		else
 			assert(false);
 		
-		LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(fineLevel->Number + 1, coarseProblem, H_Prolongation, P_Prolongation, UseHigherOrderReconstruction, UseHeterogeneousWeighting);
+		LevelForHHO<Dim>* coarseLevel = new LevelForHHO<Dim>(fineLevel->Number + 1, coarseProblem, H_Prolongation, P_Prolongation, P_Restriction, UseHigherOrderReconstruction, UseHeterogeneousWeighting);
 		return coarseLevel;
 	}
 };

@@ -347,6 +347,11 @@ void print_usage() {
 	cout << "              " << (unsigned)GMG_P_Prolongation::Injection << "  - natural injection (default)" << endl;
 	cout << "              " << (unsigned)GMG_P_Prolongation::H_Prolongation << "  - same as prolongation in h" << endl;
 	cout << endl;
+	cout << "-p-restrict NUM" << endl;
+	cout << "      How the p-restriction operator for 'mg' is built." << endl;
+	cout << "              " << (unsigned)GMG_P_Restriction::RemoveHigherOrders << "  - remove higher orders (default), which corresponds to the L2-proj. if the basis is hierarchical and orthonormalized" << endl;
+	cout << "              " << (unsigned)GMG_P_Restriction::P_Transpose << "  - transpose of p-prolongation" << endl;
+	cout << endl;
 	cout << "-disable-hor" << endl;
 	cout << "      In the polongation of 'mg', disables the use of the higher-order reconstruction." << endl;
 	cout << "      The local cell polynomials in the intermediary step are obtained by solving the local problems only." << endl;
@@ -498,6 +503,7 @@ int main(int argc, char* argv[])
 		OPT_DisableHeterogeneousWeighting,
 		OPT_MultigridProlongationCode,
 		OPT_PProlongationCode,
+		OPT_PRestrictionCode,
 		OPT_CoarseningProlongationCode,
 		OPT_FaceProlongationCode,
 		OPT_CoarseMatrixSize,
@@ -553,6 +559,7 @@ int main(int argc, char* argv[])
 		 { "disable-heterog-weight", no_argument, NULL, OPT_DisableHeterogeneousWeighting },
 		 { "prolong", required_argument, NULL, OPT_MultigridProlongationCode },
 		 { "p-prolong", required_argument, NULL, OPT_PProlongationCode },
+		 { "p-restrict", required_argument, NULL, OPT_PRestrictionCode },
 		 { "coarsening-prolong", required_argument, NULL, OPT_CoarseningProlongationCode },
 		 { "face-prolong", required_argument, NULL, OPT_FaceProlongationCode },
 		 { "coarse-size", required_argument, NULL, OPT_CoarseMatrixSize },
@@ -824,6 +831,14 @@ int main(int argc, char* argv[])
 				if (prolongationCode < 1 || prolongationCode > 2)
 					argument_error("unknown p-prolongation code. Check -p-prolong argument.");
 				args.Solver.MG.GMG_P_Prolong = static_cast<GMG_P_Prolongation>(prolongationCode);
+				break;
+			}
+			case OPT_PRestrictionCode:
+			{
+				int restrictionCode = atoi(optarg);
+				if (restrictionCode < 1 || restrictionCode > 2)
+					argument_error("unknown p-restriction code. Check -p-restrict argument.");
+				args.Solver.MG.GMG_P_Restrict = static_cast<GMG_P_Restriction>(restrictionCode);
 				break;
 			}
 			case OPT_CoarseningProlongationCode:

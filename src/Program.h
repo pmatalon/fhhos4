@@ -436,6 +436,7 @@ private:
 				mg->UseHigherOrderReconstruction = args.Solver.MG.UseHigherOrderReconstruction;
 				mg->H_Prolongation = args.Solver.MG.GMG_H_Prolong;
 				mg->P_Prolongation = args.Solver.MG.GMG_P_Prolong;
+				mg->P_Restriction = args.Solver.MG.GMG_P_Restrict;
 				mg->UseHeterogeneousWeighting = args.Solver.MG.UseHeterogeneousWeighting;
 				if (problem)
 				{

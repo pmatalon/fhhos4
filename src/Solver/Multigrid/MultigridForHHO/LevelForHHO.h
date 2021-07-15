@@ -9,17 +9,21 @@ class LevelForHHO : public Level
 private:
 	GMG_H_Prolongation _hProlongation = GMG_H_Prolongation::CellInterp_Trace;
 	GMG_P_Prolongation _pProlongation = GMG_P_Prolongation::Injection;
+	GMG_P_Restriction _pRestriction = GMG_P_Restriction::RemoveHigherOrders;
 	bool _useHigherOrderReconstruction;
 	bool _useHeterogeneousWeighting;
 public:
 	Diffusion_HHO<Dim>* _problem;
 
-	LevelForHHO(int number, Diffusion_HHO<Dim>* problem, GMG_H_Prolongation hProlongation, GMG_P_Prolongation pProlongation, bool useHigherOrderReconstruction, bool useHeterogeneousWeighting)
+	LevelForHHO(int number, Diffusion_HHO<Dim>* problem, 
+		GMG_H_Prolongation hProlongation, GMG_P_Prolongation pProlongation, GMG_P_Restriction pRestriction, 
+		bool useHigherOrderReconstruction, bool useHeterogeneousWeighting)
 		: Level(number)
 	{
 		this->_problem = problem;
 		this->_hProlongation = hProlongation;
 		this->_pProlongation = pProlongation;
+		this->_pRestriction = pRestriction;
 		this->_useHigherOrderReconstruction = useHigherOrderReconstruction;
 		this->_useHeterogeneousWeighting = useHeterogeneousWeighting;
 	}
@@ -83,9 +87,7 @@ public:
 private:
 	void SetupDiscretizedOperator() override 
 	{
-		if (this->ComesFrom == CoarseningType::H || this->ComesFrom == CoarseningType::HP)
-			this->OperatorMatrix = &this->_problem->A;
-		else
+		if (this->ComesFrom == CoarseningType::P && _problem->HHO->FaceBasis->IsHierarchical)
 		{
 			LevelForHHO<Dim>* finerLevel = dynamic_cast<LevelForHHO<Dim>*>(FinerLevel);
 
@@ -108,6 +110,11 @@ private:
 			SparseMatrix* Ac = new SparseMatrix(this->_problem->HHO->nTotalFaceUnknowns, this->_problem->HHO->nTotalFaceUnknowns);
 			parallelLoop.Fill(*Ac);
 			this->OperatorMatrix = Ac;
+		}
+		else
+		{
+			assert(this->_problem->A.rows() > 0 && "The matrix has not been assembled");
+			this->OperatorMatrix = &this->_problem->A;
 		}
 	}
 
@@ -146,7 +153,8 @@ private:
 
 		if (!IsCoarsestLevel())
 		{
-			if (this->ComesFrom == CoarseningType::P && _pProlongation == GMG_P_Prolongation::Injection && // so the problem hasn't been assembled at this level
+			if (this->ComesFrom == CoarseningType::P && 
+				_pProlongation == GMG_P_Prolongation::Injection && _pRestriction == GMG_P_Restriction::RemoveHigherOrders && // so the problem hasn't been assembled at this level
 				(this->CoarserLevel->ComesFrom == CoarseningType::H || this->CoarserLevel->ComesFrom == CoarseningType::HP)) 
 			{
 				this->_problem->InitReferenceShapes();
@@ -545,7 +553,7 @@ private:
 
 	void SetupRestriction() override
 	{
-		if (this->CoarserLevel->ComesFrom == CoarseningType::P && _pProlongation == GMG_P_Prolongation::Injection)
+		if (this->CoarserLevel->ComesFrom == CoarseningType::P && _pRestriction == GMG_P_Restriction::RemoveHigherOrders)
 		{
 			// nothing to do
 		}
@@ -607,9 +615,9 @@ public:
 
 	Vector Restrict(Vector& vectorOnThisLevel) override
 	{
-		if (this->CoarserLevel->ComesFrom == CoarseningType::P && _pProlongation == GMG_P_Prolongation::Injection)
+		if (this->CoarserLevel->ComesFrom == CoarseningType::P && _pRestriction == GMG_P_Restriction::RemoveHigherOrders)
 		{
-			// This is possible only if the basis is hierarchical and orthogonal
+			// This makes sense only if the basis is hierarchical and orthogonal
 			Diffusion_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
 			auto nFaces = _problem->HHO->nInteriorAndNeumannFaces;
 			auto nHigherDegreeUnknowns = _problem->HHO->nFaceUnknowns;
@@ -633,7 +641,7 @@ public:
 
 	double RestrictCost() override
 	{
-		if (this->CoarserLevel->ComesFrom == CoarseningType::P && _pProlongation == GMG_P_Prolongation::Injection)
+		if (this->CoarserLevel->ComesFrom == CoarseningType::P && _pRestriction == GMG_P_Restriction::RemoveHigherOrders)
 			return 0;
 		else
 			return Level::RestrictCost();
