@@ -34,7 +34,7 @@ struct DiscretizationArguments
 
 struct MultigridArguments
 {
-	HP_Strategy HP_Stgy = HP_Strategy::H_only;
+	HP_CoarsStgy HP_CS = HP_CoarsStgy::H_only;
 	int Levels = 0;
 	int ProlongationCode = 0;
 	GMG_H_Prolongation GMG_H_Prolong = GMG_H_Prolongation::Default;

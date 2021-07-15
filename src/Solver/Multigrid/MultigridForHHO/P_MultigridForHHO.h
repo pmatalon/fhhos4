@@ -122,7 +122,7 @@ public:
 	P_MultigridForHHO(Diffusion_HHO<Dim>* problem)
 		: Multigrid(0)
 	{
-		this->HP_Stgy = HP_Strategy::P_only;
+		this->HP_CS = HP_CoarsStgy::P_only;
 		this->_problem = problem;
 		this->BlockSizeForBlockSmoothers = problem->HHO->nFaceUnknowns;
 	}

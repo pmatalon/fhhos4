@@ -26,7 +26,7 @@ public:
 	char CoarseLevelChangeSmoothingOperator = '+';
 	int BlockSizeForBlockSmoothers = -1;
 	double RelaxationParameter = 1;
-	HP_Strategy HP_Stgy = HP_Strategy::H_only;
+	HP_CoarsStgy HP_CS = HP_CoarsStgy::H_only;
 	CoarseningStrategy CoarseningStgy = CoarseningStrategy::StandardCoarsening;
 	FaceCoarseningStrategy FaceCoarseningStgy = FaceCoarseningStrategy::InterfaceCollapsing;
 	double CoarseningFactor = 2;
@@ -109,13 +109,13 @@ public:
 		{
 			// Type of coarsening that must be performed
 			CoarseningType coarseningType = CoarseningType::H;
-			if (this->HP_Stgy == HP_Strategy::P_only)
+			if (this->HP_CS == HP_CoarsStgy::P_only)
 				coarseningType = CoarseningType::P;
-			else if (this->HP_Stgy == HP_Strategy::P_then_H && currentLevel->PolynomialDegree() != this->CoarsePolyDegree)
+			else if (this->HP_CS == HP_CoarsStgy::P_then_H && currentLevel->PolynomialDegree() != this->CoarsePolyDegree)
 				coarseningType = CoarseningType::P;
-			else if (this->HP_Stgy == HP_Strategy::P_then_HP)
+			else if (this->HP_CS == HP_CoarsStgy::P_then_HP)
 				coarseningType = currentLevel->PolynomialDegree() != this->CoarsePolyDegree ? CoarseningType::P : CoarseningType::HP;
-			else if (this->HP_Stgy == HP_Strategy::HP_then_H && currentLevel->PolynomialDegree() != this->CoarsePolyDegree)
+			else if (this->HP_CS == HP_CoarsStgy::HP_then_H && currentLevel->PolynomialDegree() != this->CoarsePolyDegree)
 				coarseningType = CoarseningType::HP;
 			
 			// Mesh coarsening if needed
@@ -154,7 +154,7 @@ public:
 				assert(false);
 
 
-			int blockSize = this->HP_Stgy == HP_Strategy::H_only ? BlockSizeForBlockSmoothers : coarseLevel->BlockSizeForBlockSmoothers();
+			int blockSize = this->HP_CS == HP_CoarsStgy::H_only ? BlockSizeForBlockSmoothers : coarseLevel->BlockSizeForBlockSmoothers();
 			coarseLevel->PreSmoother  = coarseLevel->CreateSmoother( PreSmootherCode,  preSmoothingIterations, blockSize, RelaxationParameter);
 			coarseLevel->PostSmoother = coarseLevel->CreateSmoother(PostSmootherCode, postSmoothingIterations, blockSize, RelaxationParameter);
 
@@ -269,7 +269,7 @@ private:
 		bool stillNeedToCoarsen = (_automaticNumberOfLevels && currentLevel->NUnknowns() > MatrixMaxSizeForCoarsestLevel) || (levelNumber < _nLevels - 1);
 		if (!stillNeedToCoarsen)
 			return false;
-		if (this->HP_Stgy == HP_Strategy::P_only && currentLevel->PolynomialDegree() == CoarsePolyDegree)
+		if (this->HP_CS == HP_CoarsStgy::P_only && currentLevel->PolynomialDegree() == CoarsePolyDegree)
 			return false; // cannot p-coarsen anymore
 		return true;
 	}
@@ -521,7 +521,7 @@ public:
 			os << "," << CoarseLevelChangeSmoothingOperator << CoarseLevelChangeSmoothingCoeff;
 		os << ")" << endl;
 
-		if (this->HP_Stgy != HP_Strategy::P_only)
+		if (this->HP_CS != HP_CoarsStgy::P_only)
 		{
 			os << "\t" << "Levels                  : ";
 			if (_automaticNumberOfLevels && _nLevels == 0)

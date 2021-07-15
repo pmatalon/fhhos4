@@ -225,8 +225,8 @@ void print_usage() {
 	cout << "              rbgs - Reverse Block Gauss-Seidel" << endl;
 	cout << "              sbgs - Symmetric Block Gauss-Seidel" << endl;
 	cout << endl;
-	cout << "-hp-stgy CODE" << endl;
-	cout << "      hp-strategy to build the coarse levels in the case of high-order." << endl;
+	cout << "-hp-cs CODE" << endl;
+	cout << "      hp-coarsening strategy to build the coarse levels in the case of high-order." << endl;
 	cout << "              h    - h only" << endl;
 	cout << "              p    - p only" << endl;
 	cout << "              p_h  - p, then h" << endl;
@@ -497,7 +497,7 @@ int main(int argc, char* argv[])
 		OPT_Relaxation,
 		OPT_BlockSize,
 		// Multigrid
-		OPT_HP_Strategy,
+		OPT_HP_CS,
 		OPT_MGCycle,
 		OPT_DisableHigherOrderReconstruction,
 		OPT_DisableHeterogeneousWeighting,
@@ -553,7 +553,7 @@ int main(int argc, char* argv[])
 		 { "relax", required_argument, NULL, OPT_Relaxation },
 		 { "block-size", required_argument, NULL, OPT_BlockSize },
 		 // Multigrid
-		 { "hp-stgy", required_argument, NULL, OPT_HP_Strategy },
+		 { "hp-cs", required_argument, NULL, OPT_HP_CS },
 		 { "cycle", required_argument, NULL, OPT_MGCycle },
 		 { "disable-hor", no_argument, NULL, OPT_DisableHigherOrderReconstruction },
 		 { "disable-heterog-weight", no_argument, NULL, OPT_DisableHeterogeneousWeighting },
@@ -757,21 +757,21 @@ int main(int argc, char* argv[])
 			//   Multigrid   //
 			//---------------//
 
-			case OPT_HP_Strategy:
+			case OPT_HP_CS:
 			{
 				string code = optarg;
 				if (code.compare("h") == 0)
-					args.Solver.MG.HP_Stgy = HP_Strategy::H_only;
+					args.Solver.MG.HP_CS = HP_CoarsStgy::H_only;
 				else if (code.compare("p") == 0)
-					args.Solver.MG.HP_Stgy = HP_Strategy::P_only;
+					args.Solver.MG.HP_CS = HP_CoarsStgy::P_only;
 				else if (code.compare("p_h") == 0)
-					args.Solver.MG.HP_Stgy = HP_Strategy::P_then_H;
+					args.Solver.MG.HP_CS = HP_CoarsStgy::P_then_H;
 				else if (code.compare("p_hp") == 0)
-					args.Solver.MG.HP_Stgy = HP_Strategy::P_then_HP;
+					args.Solver.MG.HP_CS = HP_CoarsStgy::P_then_HP;
 				else if (code.compare("hp_h") == 0)
-					args.Solver.MG.HP_Stgy = HP_Strategy::HP_then_H;
+					args.Solver.MG.HP_CS = HP_CoarsStgy::HP_then_H;
 				else
-					argument_error("unknown hp-strategy code '" + code + "'. Check -hp-stgy argument.");
+					argument_error("unknown hp-coarsening strategy code '" + code + "'. Check -hp-cs argument.");
 				break;
 			}
 			case OPT_MGCycle:

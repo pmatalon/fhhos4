@@ -41,19 +41,19 @@ public:
 		os << "MultigridForHHO" << endl;
 
 		os << "\t" << "hp-strategy             : ";
-		if (this->HP_Stgy == HP_Strategy::HP_then_H)
-			os << "hp then h [-hp-stgy hp_h]";
-		else if (this->HP_Stgy == HP_Strategy::H_only)
-			os << "h only [-hp-stgy h]";
-		else if (this->HP_Stgy == HP_Strategy::P_only)
-			os << "p only [-hp-stgy p]";
-		else if (this->HP_Stgy == HP_Strategy::P_then_H)
-			os << "p then h [-hp-stgy p_h]";
-		else if (this->HP_Stgy == HP_Strategy::P_then_HP)
-			os << "p then hp [-hp-stgy p_hp]";
+		if (this->HP_CS == HP_CoarsStgy::HP_then_H)
+			os << "hp then h [-hp-cs hp_h]";
+		else if (this->HP_CS == HP_CoarsStgy::H_only)
+			os << "h only [-hp-cs h]";
+		else if (this->HP_CS == HP_CoarsStgy::P_only)
+			os << "p only [-hp-cs p]";
+		else if (this->HP_CS == HP_CoarsStgy::P_then_H)
+			os << "p then h [-hp-cs p_h]";
+		else if (this->HP_CS == HP_CoarsStgy::P_then_HP)
+			os << "p then hp [-hp-cs p_hp]";
 		os << endl;
 
-		if (this->HP_Stgy == HP_Strategy::P_only || this->HP_Stgy == HP_Strategy::P_then_H || this->HP_Stgy == HP_Strategy::P_then_HP)
+		if (this->HP_CS == HP_CoarsStgy::P_only || this->HP_CS == HP_CoarsStgy::P_then_H || this->HP_CS == HP_CoarsStgy::P_then_HP)
 		{
 			os << "\t" << "p-prolongation          : ";
 			if (P_Prolongation == GMG_P_Prolongation::Injection)
@@ -69,9 +69,9 @@ public:
 				os << "transpose of p-prolongation ";
 			os << "[-p-restrict " << (unsigned)P_Restriction << "]" << endl;
 		}
-		if (this->HP_Stgy == HP_Strategy::H_only || this->HP_Stgy == HP_Strategy::HP_then_H || this->HP_Stgy == HP_Strategy::P_then_H || this->HP_Stgy == HP_Strategy::P_then_HP)
+		if (this->HP_CS == HP_CoarsStgy::H_only || this->HP_CS == HP_CoarsStgy::HP_then_H || this->HP_CS == HP_CoarsStgy::P_then_H || this->HP_CS == HP_CoarsStgy::P_then_HP)
 		{
-			if (this->HP_Stgy == HP_Strategy::H_only || this->HP_Stgy == HP_Strategy::P_then_H)
+			if (this->HP_CS == HP_CoarsStgy::H_only || this->HP_CS == HP_CoarsStgy::P_then_H)
 				os << "\t" << "h-prolongation          : ";
 			else
 				os << "\t" << "hp-prolongation         : ";
@@ -113,7 +113,7 @@ public:
 			os << endl;
 			Utils::Warning(os, "The selected coarsening strategy generates non-nested meshes, while the selected prolongation operator is made for nested meshes. Option -prolong " + to_string((unsigned)GMG_H_Prolongation::CellInterp_ExactL2proj_Trace) + ", " + to_string((unsigned)GMG_H_Prolongation::CellInterp_ApproxL2proj_Trace) + " or " + to_string((unsigned)GMG_H_Prolongation::CellInterp_FinerApproxL2proj_Trace) + " recommended.");
 		}
-		if (this->HP_Stgy == HP_Strategy::P_only || this->HP_Stgy == HP_Strategy::P_then_H || this->HP_Stgy == HP_Strategy::P_then_HP)
+		if (this->HP_CS == HP_CoarsStgy::P_only || this->HP_CS == HP_CoarsStgy::P_then_H || this->HP_CS == HP_CoarsStgy::P_then_HP)
 		{
 			if (P_Prolongation == GMG_P_Prolongation::Injection && (!this->_problem->HHO->FaceBasis->IsHierarchical || !this->_problem->HHO->OrthonormalizeBases))
 				Utils::Warning("The natural injection for p-multigrid is implemented based on the assumption that the face bases are hierarchical and orthonormalized. Degraded convergence may be experienced.");

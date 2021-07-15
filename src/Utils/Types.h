@@ -39,7 +39,7 @@ enum class MGType : unsigned
 	p_Multigrid
 };
 
-enum class HP_Strategy : unsigned
+enum class HP_CoarsStgy : unsigned
 {
 	H_only,
 	P_only,
