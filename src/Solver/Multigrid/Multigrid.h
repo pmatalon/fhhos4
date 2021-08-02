@@ -28,7 +28,7 @@ public:
 	double RelaxationParameter = 1;
 	HP_CoarsStgy HP_CS = HP_CoarsStgy::H_only;
 	H_CoarsStgy H_CS = H_CoarsStgy::StandardCoarsening;
-	P_CoarsStgy P_CS = P_CoarsStgy::Minus1;
+	P_CoarsStgy P_CS = P_CoarsStgy::Minus2;
 	FaceCoarseningStrategy FaceCoarseningStgy = FaceCoarseningStrategy::InterfaceCollapsing;
 	double CoarseningFactor = 2;
 	int CoarsePolyDegree = 1; // used in p-Multigrid
@@ -133,12 +133,16 @@ public:
 			{
 				if (this->P_CS == P_CoarsStgy::Minus1)
 					coarseDegree -= 1;
+				else if (this->P_CS == P_CoarsStgy::Minus2)
+					coarseDegree -= 2;
 				else if (this->P_CS == P_CoarsStgy::DivideBy2)
-					coarseDegree = max(coarseDegree / 2, this->CoarsePolyDegree);
+					coarseDegree /= 2;
 				else if (this->P_CS == P_CoarsStgy::DirectToLow)
 					coarseDegree = this->CoarsePolyDegree;
 				else
 					assert(false);
+
+				coarseDegree = max(coarseDegree, this->CoarsePolyDegree);
 			}
 
 			// Build coarse level

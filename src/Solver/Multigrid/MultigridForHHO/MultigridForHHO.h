@@ -57,11 +57,13 @@ public:
 		{
 			os << "\t" << "p-strategy              : ";
 			if (this->P_CS == P_CoarsStgy::Minus1)
-				os << "k := k-1 [-p-cs 1]";
+				os << "k := k-1";
+			else if (this->P_CS == P_CoarsStgy::Minus2)
+				os << "k := k-2";
 			else if (this->P_CS == P_CoarsStgy::DivideBy2)
-				os << "k := k/2 [-p-cs 2]";
+				os << "k := k/2";
 			else if (this->P_CS == P_CoarsStgy::DirectToLow)
-				os << "k := " << this->CoarsePolyDegree << " [-p-cs 3]";
+				os << "k := " << this->CoarsePolyDegree;
 			os << endl;
 
 			os << "\t" << "p-prolongation          : ";

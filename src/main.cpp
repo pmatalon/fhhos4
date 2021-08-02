@@ -255,9 +255,10 @@ void print_usage() {
 	cout << endl;
 	cout << "-p-cs CODE" << endl;
 	cout << "      p-coarsening strategy:" << endl;
-	cout << "              " << (unsigned)P_CoarsStgy::Minus1 <<      "    - decrement the degree by 1" << endl;
-	cout << "              " << (unsigned)P_CoarsStgy::DivideBy2 <<   "    - divide the degree by 2" << endl;
-	cout << "              " << (unsigned)P_CoarsStgy::DirectToLow << "    - go directly to the low order" << endl;
+	cout << "              -1    - decrement the degree by 1" << endl;
+	cout << "              -2    - decrement the degree by 2 (default)" << endl;
+	cout << "              /2    - divide the degree by 2" << endl;
+	cout << "              =0    - go directly to the low order" << endl;
 	cout << endl;
 	cout << "-fcs CODE" << endl;
 	cout << "      Face coarsening (default: c)." << endl;
@@ -968,8 +969,17 @@ int main(int argc, char* argv[])
 			}
 			case OPT_P_CS:
 			{
-				int code = atoi(optarg);
-				args.Solver.MG.P_CS = static_cast<P_CoarsStgy>(code);
+				string code = optarg;
+				if (code.compare("-1") == 0)
+					args.Solver.MG.P_CS = P_CoarsStgy::Minus1;
+				else if (code.compare("-2") == 0)
+					args.Solver.MG.P_CS = P_CoarsStgy::Minus2;
+				else if (code.compare("/2") == 0)
+					args.Solver.MG.P_CS = P_CoarsStgy::DivideBy2;
+				else if (code.compare("=0") == 0)
+					args.Solver.MG.P_CS = P_CoarsStgy::DirectToLow;
+				else
+					argument_error("unknown p-coarsening strategy code '" + code + "'. Check -p-cs argument.");
 				break;
 			}
 			case OPT_FaceCoarseningStrategy:

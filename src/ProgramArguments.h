@@ -58,7 +58,7 @@ struct MultigridArguments
 	char CoarseLevelChangeSmoothingOperator = '+';
 	HP_CoarsStgy HP_CS = HP_CoarsStgy::H_only;
 	H_CoarsStgy H_CS = H_CoarsStgy::None;
-	P_CoarsStgy P_CS = P_CoarsStgy::Minus1;
+	P_CoarsStgy P_CS = P_CoarsStgy::Minus2;
 	FaceCoarseningStrategy FaceCoarseningStgy = FaceCoarseningStrategy::InterfaceCollapsing;
 	double CoarseningFactor = 0;
 	BigNumber CoarseN = 2;

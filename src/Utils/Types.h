@@ -72,7 +72,8 @@ enum class H_CoarsStgy : unsigned
 
 enum class P_CoarsStgy : unsigned
 {
-	Minus1 = 1,
+	Minus1,
+	Minus2,
 	DivideBy2,
 	DirectToLow
 };
