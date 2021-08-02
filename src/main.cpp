@@ -253,6 +253,12 @@ void print_usage() {
 	cout << "              vn   - (Experimental) agglomeration coarsening by vertex neighbours" << endl;
 	cout << "              f    - (Experimental) Face coarsening: the faces are coarsened and all kept on the coarse skeleton. Requires -g 1." << endl;
 	cout << endl;
+	cout << "-p-cs CODE" << endl;
+	cout << "      p-coarsening strategy:" << endl;
+	cout << "              " << (unsigned)P_CoarsStgy::Minus1 <<      "    - decrement the degree by 1" << endl;
+	cout << "              " << (unsigned)P_CoarsStgy::DivideBy2 <<   "    - divide the degree by 2" << endl;
+	cout << "              " << (unsigned)P_CoarsStgy::DirectToLow << "    - go directly to the low order" << endl;
+	cout << endl;
 	cout << "-fcs CODE" << endl;
 	cout << "      Face coarsening (default: c)." << endl;
 	cout << "              c   - Collapse interfaces made of multiple faces" << endl;
@@ -505,7 +511,6 @@ int main(int argc, char* argv[])
 		OPT_Relaxation,
 		OPT_BlockSize,
 		// Multigrid
-		OPT_HP_CS,
 		OPT_MGCycle,
 		OPT_DisableHigherOrderReconstruction,
 		OPT_DisableHeterogeneousWeighting,
@@ -517,7 +522,9 @@ int main(int argc, char* argv[])
 		OPT_FaceProlongationCode,
 		OPT_CoarseMatrixSize,
 		OPT_Smoothers,
-		OPT_CoarseningStrategy,
+		OPT_HP_CS,
+		OPT_H_CS,
+		OPT_P_CS,
 		OPT_FaceCoarseningStrategy,
 		OPT_CoarseSolver,
 		OPT_BoundaryFaceCollapsing,
@@ -562,7 +569,6 @@ int main(int argc, char* argv[])
 		 { "relax", required_argument, NULL, OPT_Relaxation },
 		 { "block-size", required_argument, NULL, OPT_BlockSize },
 		 // Multigrid
-		 { "hp-cs", required_argument, NULL, OPT_HP_CS },
 		 { "cycle", required_argument, NULL, OPT_MGCycle },
 		 { "disable-hor", no_argument, NULL, OPT_DisableHigherOrderReconstruction },
 		 { "disable-heterog-weight", no_argument, NULL, OPT_DisableHeterogeneousWeighting },
@@ -574,7 +580,9 @@ int main(int argc, char* argv[])
 		 { "face-prolong", required_argument, NULL, OPT_FaceProlongationCode },
 		 { "coarse-size", required_argument, NULL, OPT_CoarseMatrixSize },
 		 { "smoothers", required_argument, NULL, OPT_Smoothers },
-		 { "cs", required_argument, NULL, OPT_CoarseningStrategy },
+		 { "hp-cs", required_argument, NULL, OPT_HP_CS },
+		 { "cs", required_argument, NULL, OPT_H_CS },
+		 { "p-cs", required_argument, NULL, OPT_P_CS },
 		 { "fcs", required_argument, NULL, OPT_FaceCoarseningStrategy },
 		 { "bfc", required_argument, NULL, OPT_BoundaryFaceCollapsing },
 		 { "coarse-solver", required_argument, NULL, OPT_CoarseSolver },
@@ -767,23 +775,6 @@ int main(int argc, char* argv[])
 			//   Multigrid   //
 			//---------------//
 
-			case OPT_HP_CS:
-			{
-				string code = optarg;
-				if (code.compare("h") == 0)
-					args.Solver.MG.HP_CS = HP_CoarsStgy::H_only;
-				else if (code.compare("p") == 0)
-					args.Solver.MG.HP_CS = HP_CoarsStgy::P_only;
-				else if (code.compare("p_h") == 0)
-					args.Solver.MG.HP_CS = HP_CoarsStgy::P_then_H;
-				else if (code.compare("p_hp") == 0)
-					args.Solver.MG.HP_CS = HP_CoarsStgy::P_then_HP;
-				else if (code.compare("hp_h") == 0)
-					args.Solver.MG.HP_CS = HP_CoarsStgy::HP_then_H;
-				else
-					argument_error("unknown hp-coarsening strategy code '" + code + "'. Check -hp-cs argument.");
-				break;
-			}
 			case OPT_MGCycle:
 			{
 				defaultCycle = false;
@@ -919,7 +910,24 @@ int main(int argc, char* argv[])
 				args.Solver.MG.PostSmootherCode = s.substr(pos + 1);
 				break;
 			}
-			case OPT_CoarseningStrategy:
+			case OPT_HP_CS:
+			{
+				string code = optarg;
+				if (code.compare("h") == 0)
+					args.Solver.MG.HP_CS = HP_CoarsStgy::H_only;
+				else if (code.compare("p") == 0)
+					args.Solver.MG.HP_CS = HP_CoarsStgy::P_only;
+				else if (code.compare("p_h") == 0)
+					args.Solver.MG.HP_CS = HP_CoarsStgy::P_then_H;
+				else if (code.compare("p_hp") == 0)
+					args.Solver.MG.HP_CS = HP_CoarsStgy::P_then_HP;
+				else if (code.compare("hp_h") == 0)
+					args.Solver.MG.HP_CS = HP_CoarsStgy::HP_then_H;
+				else
+					argument_error("unknown hp-coarsening strategy code '" + code + "'. Check -hp-cs argument.");
+				break;
+			}
+			case OPT_H_CS:
 			{
 				string coarseningStgyCode = optarg;
 				if (coarseningStgyCode.compare("s") == 0)
@@ -956,6 +964,12 @@ int main(int argc, char* argv[])
 					args.Solver.MG.H_CS = H_CoarsStgy::FaceCoarsening;
 				else
 					argument_error("unknown coarsening strategy code '" + coarseningStgyCode + "'. Check -cs argument.");
+				break;
+			}
+			case OPT_P_CS:
+			{
+				int code = atoi(optarg);
+				args.Solver.MG.P_CS = static_cast<P_CoarsStgy>(code);
 				break;
 			}
 			case OPT_FaceCoarseningStrategy:

@@ -55,6 +55,15 @@ public:
 
 		if (this->HP_CS == HP_CoarsStgy::P_only || this->HP_CS == HP_CoarsStgy::P_then_H || this->HP_CS == HP_CoarsStgy::P_then_HP)
 		{
+			os << "\t" << "p-strategy              : ";
+			if (this->P_CS == P_CoarsStgy::Minus1)
+				os << "k := k-1 [-p-cs 1]";
+			else if (this->P_CS == P_CoarsStgy::DivideBy2)
+				os << "k := k/2 [-p-cs 2]";
+			else if (this->P_CS == P_CoarsStgy::DirectToLow)
+				os << "k := " << this->CoarsePolyDegree << " [-p-cs 3]";
+			os << endl;
+
 			os << "\t" << "p-prolongation          : ";
 			if (P_Prolongation == GMG_P_Prolongation::Injection)
 				os << "natural injection ";
@@ -167,7 +176,7 @@ protected:
 		return new LevelForHHO<Dim>(0, _problem, H_Prolongation, P_Prolongation, P_Restriction, UseHigherOrderReconstruction, UseHeterogeneousWeighting);
 	}
 
-	Level* CreateCoarseLevel(Level* fineLevel, CoarseningType coarseningType) override
+	Level* CreateCoarseLevel(Level* fineLevel, CoarseningType coarseningType, int coarseDegree) override
 	{
 		LevelForHHO<Dim>* hhoFineLevel = dynamic_cast<LevelForHHO<Dim>*>(fineLevel);
 
@@ -175,9 +184,9 @@ protected:
 		if (coarseningType == CoarseningType::H)
 			coarseProblem = hhoFineLevel->_problem->GetProblemOnCoarserMesh();
 		else if (coarseningType == CoarseningType::P)
-			coarseProblem = hhoFineLevel->_problem->GetProblemForLowerDegree();
+			coarseProblem = hhoFineLevel->_problem->GetProblemForLowerDegree(coarseDegree);
 		else if (coarseningType == CoarseningType::HP)
-			coarseProblem = hhoFineLevel->_problem->GetProblemOnCoarserMeshAndLowerDegree();
+			coarseProblem = hhoFineLevel->_problem->GetProblemOnCoarserMeshAndLowerDegree(coarseDegree);
 		else
 			assert(false);
 		

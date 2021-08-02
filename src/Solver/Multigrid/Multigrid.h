@@ -128,9 +128,22 @@ public:
 					break;
 			}
 
+			int coarseDegree = currentLevel->PolynomialDegree();
+			if (coarseningType == CoarseningType::P || coarseningType == CoarseningType::HP)
+			{
+				if (this->P_CS == P_CoarsStgy::Minus1)
+					coarseDegree -= 1;
+				else if (this->P_CS == P_CoarsStgy::DivideBy2)
+					coarseDegree = max(coarseDegree / 2, this->CoarsePolyDegree);
+				else if (this->P_CS == P_CoarsStgy::DirectToLow)
+					coarseDegree = this->CoarsePolyDegree;
+				else
+					assert(false);
+			}
+
 			// Build coarse level
 			levelNumber++;
-			Level* coarseLevel = CreateCoarseLevel(currentLevel, coarseningType);
+			Level* coarseLevel = CreateCoarseLevel(currentLevel, coarseningType, coarseDegree);
 			coarseLevel->ComesFrom = coarseningType;
 
 			// Smoothers on coarse level
@@ -241,7 +254,7 @@ protected:
 	{
 		assert(false && "Not implemented. This method must be implemented in the subclass.");
 	}
-	virtual Level* CreateCoarseLevel(Level* fineLevel, CoarseningType coarseningType)
+	virtual Level* CreateCoarseLevel(Level* fineLevel, CoarseningType coarseningType, int coarseDegree)
 	{
 		assert(false && "Not implemented. This method must be implemented in the subclass.");
 	}

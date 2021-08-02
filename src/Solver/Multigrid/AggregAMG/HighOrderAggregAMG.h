@@ -134,7 +134,7 @@ protected:
 		return new HighOrderAggregLevel(0, _blockSize, _omega);
 	}
 
-	Level* CreateCoarseLevel(Level* fineLevel, CoarseningType coarseningType) override
+	Level* CreateCoarseLevel(Level* fineLevel, CoarseningType coarseningType, int coarseDegree) override
 	{
 		//AggregLevel* coarseLevel = new AggregLevel(fineLevel->Number + 1, 1, _strongCouplingThreshold);
 		//return coarseLevel;

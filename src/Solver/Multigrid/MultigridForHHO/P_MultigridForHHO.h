@@ -140,13 +140,13 @@ protected:
 		return new P_LevelForHHO<Dim>(0, _problem);
 	}
 
-	Level* CreateCoarseLevel(Level* fineLevel, CoarseningType coarseningType) override
+	Level* CreateCoarseLevel(Level* fineLevel, CoarseningType coarseningType, int coarseDegree) override
 	{
 		if (coarseningType != CoarseningType::P)
 			Utils::FatalError("Only p-coarsening allowed for this multigrid.");
 
 		P_LevelForHHO<Dim>* hhoFineLevel = dynamic_cast<P_LevelForHHO<Dim>*>(fineLevel);
-		Diffusion_HHO<Dim>* lowerDegreeProblem = hhoFineLevel->_problem->GetProblemForLowerDegree();
+		Diffusion_HHO<Dim>* lowerDegreeProblem = hhoFineLevel->_problem->GetProblemForLowerDegree(coarseDegree);
 		P_LevelForHHO<Dim>* coarseLevel = new P_LevelForHHO<Dim>(fineLevel->Number + 1, lowerDegreeProblem);
 		return coarseLevel;
 	}

@@ -55,23 +55,23 @@ public:
 		return new Diffusion_HHO<Dim>(this->_mesh->CoarseMesh, this->_testCase, coarseHHO, _staticCondensation, _saveMatrixBlocks, this->_outputDirectory);
 	}
 
-	Diffusion_HHO<Dim>* GetProblemForLowerDegree()
+	Diffusion_HHO<Dim>* GetProblemForLowerDegree(int faceDegree)
 	{
 		// Lower the degree of each basis
-		FunctionalBasis<Dim>* reconstructionBasis = HHO->CellBasis;
-		FunctionalBasis<Dim>* cellBasis = new FunctionalBasis<Dim>(HHO->CellBasis->CreateSameBasisForLowerDegree());
-		FunctionalBasis<Dim-1>* faceBasis = new FunctionalBasis<Dim-1>(HHO->FaceBasis->CreateSameBasisForLowerDegree());
+		FunctionalBasis<Dim>* reconstructionBasis = faceDegree == HHO->FaceBasis->GetDegree() - 1 ? HHO->CellBasis : new FunctionalBasis<Dim>(HHO->ReconstructionBasis->CreateSameBasisForDegree(faceDegree+1));
+		FunctionalBasis<Dim>* cellBasis = new FunctionalBasis<Dim>(HHO->CellBasis->CreateSameBasisForDegree(faceDegree));
+		FunctionalBasis<Dim-1>* faceBasis = new FunctionalBasis<Dim-1>(HHO->FaceBasis->CreateSameBasisForDegree(faceDegree));
 
 		HHOParameters<Dim>* lowerDegreeHHO = new HHOParameters<Dim>(this->_mesh, HHO->Stabilization, reconstructionBasis, cellBasis, faceBasis, HHO->OrthonormalizeBases);
 		return new Diffusion_HHO<Dim>(this->_mesh, this->_testCase, lowerDegreeHHO, _staticCondensation, _saveMatrixBlocks, this->_outputDirectory);
 	}
 
-	Diffusion_HHO<Dim>* GetProblemOnCoarserMeshAndLowerDegree()
+	Diffusion_HHO<Dim>* GetProblemOnCoarserMeshAndLowerDegree(int faceDegree)
 	{
 		// Lower the degree of each basis
-		FunctionalBasis<Dim>* reconstructionBasis = HHO->CellBasis;
-		FunctionalBasis<Dim>* cellBasis = new FunctionalBasis<Dim>(HHO->CellBasis->CreateSameBasisForLowerDegree());
-		FunctionalBasis<Dim - 1>* faceBasis = new FunctionalBasis<Dim - 1>(HHO->FaceBasis->CreateSameBasisForLowerDegree());
+		FunctionalBasis<Dim>* reconstructionBasis = faceDegree == HHO->FaceBasis->GetDegree() - 1 ? HHO->CellBasis : new FunctionalBasis<Dim>(HHO->ReconstructionBasis->CreateSameBasisForDegree(faceDegree + 1));
+		FunctionalBasis<Dim>* cellBasis = new FunctionalBasis<Dim>(HHO->CellBasis->CreateSameBasisForDegree(faceDegree));
+		FunctionalBasis<Dim - 1>* faceBasis = new FunctionalBasis<Dim - 1>(HHO->FaceBasis->CreateSameBasisForDegree(faceDegree));
 
 		HHOParameters<Dim>* lowerDegreeCoarseMeshHHO = new HHOParameters<Dim>(this->_mesh->CoarseMesh, HHO->Stabilization, reconstructionBasis, cellBasis, faceBasis, HHO->OrthonormalizeBases);
 		return new Diffusion_HHO<Dim>(this->_mesh->CoarseMesh, this->_testCase, lowerDegreeCoarseMeshHHO, _staticCondensation, _saveMatrixBlocks, this->_outputDirectory);

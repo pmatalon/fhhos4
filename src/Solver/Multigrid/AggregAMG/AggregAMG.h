@@ -329,7 +329,7 @@ protected:
 		return new AggregLevel(0, _blockSize, _strongCouplingThreshold);
 	}
 
-	Level* CreateCoarseLevel(Level* fineLevel, CoarseningType coarseningType) override
+	Level* CreateCoarseLevel(Level* fineLevel, CoarseningType coarseningType, int coarseDegree) override
 	{
 		if (coarseningType != CoarseningType::H)
 			Utils::FatalError("Only h-coarsening allowed for this multigrid.");

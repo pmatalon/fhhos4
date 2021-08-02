@@ -106,7 +106,7 @@ protected:
 		return new UncondensedLevel(0, _cellBlockSize, _faceBlockSize, _strongCouplingThreshold, _faceProlong, _coarseningProlong, _multigridProlong);
 	}
 
-	Level* CreateCoarseLevel(Level* fineLevel, CoarseningType coarseningType) override
+	Level* CreateCoarseLevel(Level* fineLevel, CoarseningType coarseningType, int coarseDegree) override
 	{
 		if (coarseningType != CoarseningType::H)
 			Utils::FatalError("Only h-coarsening allowed for this multigrid.");
