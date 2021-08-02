@@ -27,20 +27,19 @@ public:
 			_weights.push_back(1);
 			return;
 		}
-		else if (degree > 8)
+		else if (degree > MaxDegree())
 		{
-			cout << "Warning: the Keast quadradure rules only compute exact integrals of polynomials up to degree 8." << endl;
-			degree = 8;
+			Utils::Warning("The Keast quadradure rules only compute exact integrals of polynomials up to degree " + to_string(MaxDegree()) + ". Degree " + to_string(degree) + " has been requested.");
+			degree = MaxDegree();
 		}
 
-		int maxRule = keast_rule_num();
 		int rule, degreeRule;
-		for (rule = 1; rule <= maxRule; rule++) {
+		for (rule = 1; rule <= MaxRule(); rule++) {
 			if (keast_degree(rule) >= degree)
 				break;
 		}
 		rule++;
-		rule = min(rule, maxRule);
+		rule = min(rule, MaxRule());
 
 		_nPoints = keast_order_num(rule);
 		vector<double> xyztab(3 * _nPoints), wtab(_nPoints);
@@ -66,5 +65,16 @@ public:
 	inline vector<RefPoint> Points()
 	{
 		return _points;
+	}
+
+private:
+	static constexpr int MaxRule()
+	{
+		return 10; // keast_rule_num();
+	}
+
+	static constexpr int MaxDegree()
+	{
+		return 8; // keast_degree(MaxRule());
 	}
 };

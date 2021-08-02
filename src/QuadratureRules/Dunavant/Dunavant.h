@@ -27,15 +27,19 @@ public:
 			_weights.push_back(1);
 			return;
 		}
+		else if (degree > MaxDegree())
+		{
+			Utils::Warning("The Dunavant quadradure rules only compute exact integrals of polynomials up to degree " + to_string(MaxDegree()) + ". Degree " + to_string(degree) + " has been requested.");
+			degree = MaxDegree();
+		}
 
-		int maxRule = dunavant_rule_num();
 		int rule, degreeRule;
-		for (rule = 1; rule <= maxRule; rule++) {
+		for (rule = 1; rule <= MaxRule(); rule++) {
 			if (dunavant_degree(rule) >= degree)
 				break;
 		}
 		rule++;
-		rule = min(rule, maxRule);
+		rule = min(rule, MaxRule());
 
 		_nPoints = dunavant_order_num(rule);
 		vector<double> xytab(2 * _nPoints), wtab(_nPoints);
@@ -61,5 +65,16 @@ public:
 	inline vector<RefPoint> Points()
 	{
 		return _points;
+	}
+
+private:
+	static constexpr int MaxRule()
+	{
+		return 20; // dunavant_rule_num();
+	}
+
+	static constexpr int MaxDegree()
+	{
+		return 20; // dunavant_degree(MaxRule());
 	}
 };
