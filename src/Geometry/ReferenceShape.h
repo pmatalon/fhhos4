@@ -55,7 +55,7 @@ public:
 		auto it = _massMatrices.find(basis);
 		if (it != _massMatrices.end())
 			return it->second;
-		assert(false && "The mass matrix for this basis should be computed once and stored for this reference element.");
+		Utils::FatalError("The mass matrix for this basis should be computed once and stored for this reference element.");
 	}
 
 	const DenseMatrix& StoredCellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) const
@@ -63,7 +63,7 @@ public:
 		auto it = _cellReconstructMatrices.find(cellBasis);
 		if (it != _cellReconstructMatrices.end())
 			return it->second;
-		assert(false && "The cell-reconstruct mass matrix should be computed once and stored for this reference element.");
+		Utils::FatalError("The cell-reconstruct mass matrix should be computed once and stored for this reference element.");
 	}
 
 	void ComputeAndStoreMassMatrix(FunctionalBasis<Dim>* basis)

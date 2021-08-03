@@ -116,25 +116,9 @@ public:
 		return this->MeshFace->Integral(functionToIntegrate, polynomialDegree);
 	}
 
-	DenseMatrix TraceUsingReconstructBasis(Element<Dim>* element)
-	{
-		return ComputeTraceMatrix(element, HHO->ReconstructionBasis);
-	}
-
-	DenseMatrix TraceUsingCellBasis(Element<Dim>* element)
-	{
-		return ComputeTraceMatrix(element, HHO->CellBasis);
-	}
-
 	DenseMatrix Trace(Element<Dim>* element, FunctionalBasis<Dim>* cellBasis)
 	{
-		/*if (cellBasis == HHO->CellBasis)
-			return TraceUsingCellBasis(element);
-		else if (cellBasis == HHO->ReconstructionBasis)
-			return TraceUsingReconstructBasis(element);
-		//else*/
-			return ComputeTraceMatrix(element, cellBasis);
-		//assert(false);
+		return ComputeTraceMatrix(element, cellBasis);
 	}
 
 	double ProjectOnBasisFunction(BasisFunction<Dim - 1>* phi, DomFunction f)
@@ -147,13 +131,11 @@ public:
 		return this->MeshFace->Integral(functionToIntegrate);
 	}
 
-	Vector ProjectOnBasis(FunctionalBasis<Dim - 1>* faceBasis, DomFunction f)
+	Vector ProjectOnBasis(DomFunction f)
 	{
-		Vector projection(faceBasis->Size());
-		for (BasisFunction<Dim - 1>* phi : faceBasis->LocalFunctions)
-		{
+		Vector projection(this->Basis->Size());
+		for (BasisFunction<Dim - 1>* phi : this->Basis->LocalFunctions)
 			projection(phi->LocalNumber) = ProjectOnBasisFunction(phi, f);
-		}
 		return projection;
 	}
 
@@ -174,5 +156,12 @@ private:
 		assert(_invMassMatrix.rows() > 0);
 		DenseMatrix massCellFace = this->MassMatrix(this->Basis, e, cellBasis);
 		return _invMassMatrix * massCellFace;
+	}
+
+public:
+	~Diff_HHOFace()
+	{
+		if (HHO->OrthonormalizeBases)
+			delete Basis;
 	}
 };

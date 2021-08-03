@@ -879,9 +879,6 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args, TestCase<3>* testCase)
 	{
 		if (mesher.compare("inhouse") == 0)
 		{
-			if (Utils::IsRefinementStrategy(args.Solver.MG.H_CS))
-				Utils::FatalError("Unmanaged refinement strategy.");
-
 			if (meshCode.compare("cart") == 0)
 			{
 				fineMesh = new Cube_CartesianMesh(nx, ny, nz);

@@ -250,6 +250,18 @@ public:
 		return FunctionalBasis<Dim>(this->_basisCode, degree, this->UsePolynomialSpaceQ);
 	}
 
+	FunctionalBasis<Dim> ExtractLowerBasis(int degree)
+	{
+		FunctionalBasis<Dim> lowerBasis(*this);
+		lowerBasis.LocalFunctions.clear();
+		for (BasisFunction<Dim>* phi : this->LocalFunctions)
+		{
+			if (phi->GetDegree() <= degree)
+				lowerBasis.LocalFunctions.push_back(phi);
+		}
+		return lowerBasis;
+	}
+
 	virtual ~FunctionalBasis() 
 	{
 		for (auto phi : LocalFunctions)

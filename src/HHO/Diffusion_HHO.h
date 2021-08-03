@@ -79,7 +79,33 @@ public:
 
 	double L2Error(DomFunction exactSolution) override
 	{
-		return Problem<Dim>::L2Error(HHO->ReconstructionBasis, this->ReconstructedSolution, exactSolution);
+		struct ChunkResult
+		{
+			double absoluteError = 0;
+			double normExactSolution = 0;
+		};
+
+		ParallelLoop<Element<Dim>*, ChunkResult> parallelLoop(this->_mesh->Elements);
+		parallelLoop.Execute([this, exactSolution](Element<Dim>* e, ParallelChunk<ChunkResult>* chunk)
+			{
+				auto approximate = HHOElement(e)->ReconstructionBasis->GetApproximateFunction(this->ReconstructedSolution, e->Number * HHO->nReconstructUnknowns);
+				chunk->Results.absoluteError += e->L2ErrorPow2(approximate, exactSolution);
+				chunk->Results.normExactSolution += e->Integral([exactSolution](const DomPoint& p) { return pow(exactSolution(p), 2); });
+			});
+
+
+		double absoluteError = 0;
+		double normExactSolution = 0;
+
+		parallelLoop.AggregateChunkResults([&absoluteError, &normExactSolution](ChunkResult chunkResult)
+			{
+				absoluteError += chunkResult.absoluteError;
+				normExactSolution += chunkResult.normExactSolution;
+			});
+
+		absoluteError = sqrt(absoluteError);
+		normExactSolution = sqrt(normExactSolution);
+		return normExactSolution != 0 ? absoluteError / normExactSolution : absoluteError;
 	}
 
 	void AssertSchemeConvergence(double l2Error)
@@ -132,8 +158,8 @@ public:
 		cout << "    h         : " << scientific << this->_mesh->H() << defaultfloat << endl;
 		cout << "    Regularity: " << this->_mesh->Regularity() << defaultfloat << endl;
 		cout << "Discretization: Hybrid High-Order (k = " << HHO->FaceBasis->GetDegree() << ")" << endl;
-		cout << "    Reconstruction basis: " << HHO->ReconstructionBasis->Name() << endl;
-		cout << "    Cell basis          : " << HHO->CellBasis->Name() << endl;
+		cout << "    Reconstruction basis: " << (HHO->OrthonormalizeBases ? "orthonormalized_" : "") << HHO->ReconstructionBasis->Name() << endl;
+		cout << "    Cell basis          : " << (HHO->OrthonormalizeBases ? "orthonormalized_" : "") << HHO->CellBasis->Name() << endl;
 		cout << "    Face basis          : " << (HHO->OrthonormalizeBases ? "orthonormalized_" : "") << HHO->FaceBasis->Name() << endl;
 		cout << "Cell unknowns : " << HHO->nTotalCellUnknowns << " (" << HHO->CellBasis->Size() << " per cell)" << endl;
 		cout << "Face unknowns : " << HHO->nTotalFaceUnknowns << " (" << HHO->FaceBasis->Size() << " per interior face)" << endl;
@@ -148,9 +174,6 @@ public:
 	void Assemble(ActionsArguments actions) override
 	{
 		Mesh<Dim>* mesh = this->_mesh;
-		FunctionalBasis<Dim>* reconstructionBasis = HHO->ReconstructionBasis;
-		FunctionalBasis<Dim>* cellBasis = HHO->CellBasis;
-		FunctionalBasis<Dim - 1>* faceBasis = HHO->FaceBasis;
 
 		if (actions.LogAssembly)
 		{
@@ -304,7 +327,7 @@ public:
 				chunk->Results.A_F_F_Coeffs.Reserve(chunk->Size() * nCoeffs_A_F_F);
 			});
 
-		parallelLoop.Execute([this, mesh, cellBasis, faceBasis, reconstructionBasis, actions](Element<Dim>* e, ParallelChunk<AssemblyResult>* chunk)
+		parallelLoop.Execute([this, mesh, actions](Element<Dim>* e, ParallelChunk<AssemblyResult>* chunk)
 			{
 				Diff_HHOElement<Dim>* element = HHOElement(e);
 
@@ -372,7 +395,7 @@ public:
 
 				if (actions.AssembleRightHandSide)
 				{
-					for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions)
+					for (BasisFunction<Dim>* cellPhi : element->CellBasis->LocalFunctions)
 					{
 						BigNumber i = DOFNumber(element, cellPhi);
 						this->B_T(i) = element->SourceTerm(cellPhi, this->_sourceFunction);
@@ -385,13 +408,13 @@ public:
 
 				if (actions.ExportAssemblyTermMatrices)
 				{
-					BigNumber i = element->Number() * reconstructionBasis->Size();
+					BigNumber i = element->Number() * HHO->nReconstructUnknowns;
 					BigNumber j = FirstDOFGlobalNumber(element);
-					chunk->Results.ReconstructionCoeffs.AddBlock(i, j, element->P, 0, 0, reconstructionBasis->Size(), HHO->nCellUnknowns);
+					chunk->Results.ReconstructionCoeffs.AddBlock(i, j, element->P, 0, 0, HHO->nReconstructUnknowns, HHO->nCellUnknowns);
 					for (auto face : element->Faces)
 					{
 						j = FirstDOFGlobalNumber(face);
-						chunk->Results.ReconstructionCoeffs.AddBlock(i, j, element->P, 0, element->FirstDOFNumber(face), reconstructionBasis->Size(), HHO->nFaceUnknowns);
+						chunk->Results.ReconstructionCoeffs.AddBlock(i, j, element->P, 0, element->FirstDOFNumber(face), HHO->nReconstructUnknowns, HHO->nFaceUnknowns);
 					}
 				}
 			});
@@ -505,11 +528,11 @@ public:
 		Vector B_ndF = Vector::Zero(HHO->nTotalFaceUnknowns);
 		if (actions.AssembleRightHandSide)
 		{
-			ParallelLoop<Face<Dim>*>::Execute(this->_mesh->NeumannFaces, [this, faceBasis, &B_ndF](Face<Dim>* f)
+			ParallelLoop<Face<Dim>*>::Execute(this->_mesh->NeumannFaces, [this, &B_ndF](Face<Dim>* f)
 				{
 					Diff_HHOFace<Dim>* face = HHOFace(f);
 					BigNumber i = FirstDOFGlobalNumber(face) - HHO->nTotalCellUnknowns;
-					B_ndF.segment(i, HHO->nFaceUnknowns) = face->ProjectOnBasis(faceBasis, this->_boundaryConditions->NeumannFunction);
+					B_ndF.segment(i, HHO->nFaceUnknowns) = face->ProjectOnBasis(this->_boundaryConditions->NeumannFunction);
 				}
 			);
 		}
@@ -517,11 +540,11 @@ public:
 		// Solution on the Dirichlet faces
 		this->x_dF = Vector(HHO->nDirichletCoeffs);
 		assert(!this->_mesh->DirichletFaces.empty());
-		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->DirichletFaces, [this, faceBasis](Face<Dim>* f)
+		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->DirichletFaces, [this](Face<Dim>* f)
 			{
 				Diff_HHOFace<Dim>* face = HHOFace(f);
 				BigNumber i = FirstDOFGlobalNumber(face) - HHO->nTotalHybridUnknowns;
-				this->x_dF.segment(i, HHO->nFaceUnknowns) = face->InvMassMatrix()*face->ProjectOnBasis(faceBasis, this->_boundaryConditions->DirichletFunction);
+				this->x_dF.segment(i, HHO->nFaceUnknowns) = face->InvMassMatrix()*face->ProjectOnBasis(this->_boundaryConditions->DirichletFunction);
 			}
 		);
 
@@ -613,7 +636,7 @@ public:
 			SparseMatrix Astab = SparseMatrix(HHO->nTotalHybridUnknowns, HHO->nTotalHybridUnknowns);
 			stabilizationCoeffs.Fill(Astab);
 
-			SparseMatrix reconstructionMatrix = SparseMatrix(HHO->nElements * reconstructionBasis->Size(), HHO->nTotalHybridCoeffs);
+			SparseMatrix reconstructionMatrix = SparseMatrix(HHO->nElements * HHO->nReconstructUnknowns, HHO->nTotalHybridCoeffs);
 			reconstructionCoeffs.Fill(reconstructionMatrix);
 
 			Eigen::saveMarket(Acons, consistencyFilePath);
@@ -631,6 +654,9 @@ public:
 	// Compute some useful integrals on reference element and store them
 	void InitReferenceShapes()
 	{
+		if (HHO->OrthonormalizeBases)
+			return;
+
 		FunctionalBasis<Dim>* reconstructionBasis = HHO->ReconstructionBasis;
 		FunctionalBasis<Dim>* cellBasis = HHO->CellBasis;
 		FunctionalBasis<Dim - 1>* faceBasis = HHO->FaceBasis;
@@ -779,11 +805,15 @@ public:
 
 	void ExportSolutionToGMSH() override
 	{
+		if (HHO->OrthonormalizeBases)
+			Utils::Error("The export to GMSH has not been implemented when the bases are orthonormalized against each element.");
 		this->_mesh->ExportToGMSH(this->HHO->ReconstructionBasis, this->ReconstructedSolution, this->GetFilePathPrefix(), "potential");
 	}
 
 	void ExportErrorToGMSH(const Vector& faceCoeffs) override
 	{
+		if (HHO->OrthonormalizeBases)
+			Utils::Error("The export to GMSH has not been implemented when the bases are orthonormalized against each element.");
 		SparseMatrix inverseAtt = Inverse_A_T_T();
 		Vector cellCoeffs = inverseAtt * (B_T - A_T_ndF * faceCoeffs);
 		this->_mesh->ExportToGMSH(this->HHO->CellBasis, cellCoeffs, this->GetFilePathPrefix(), "error");
@@ -806,18 +836,14 @@ public:
 	Vector ProjectOnFaceDiscreteSpace(DomFunction func)
 	{
 		Vector vectorOfDoFs = Vector(HHO->nTotalFaceUnknowns);
-		auto faceBasis = HHO->FaceBasis;
-		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->Faces, [this, faceBasis, &vectorOfDoFs, func](Face<Dim>* f)
+		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->Faces, [this, &vectorOfDoFs, func](Face<Dim>* f)
 			{
 				if (f->HasDirichletBC())
 					return;
 				Diff_HHOFace<Dim>* face = HHOFace(f);
-				BigNumber i = face->Number() * faceBasis->Size();// FirstDOFGlobalNumber(f);
+				BigNumber i = face->Number() * HHO->nFaceUnknowns;// FirstDOFGlobalNumber(f);
 
-				DenseMatrix m = face->InvMassMatrix();
-				Vector v = face->ProjectOnBasis(faceBasis, func);
-
-				vectorOfDoFs.segment(i, HHO->nFaceUnknowns) = face->InvMassMatrix()*face->ProjectOnBasis(faceBasis, func);
+				vectorOfDoFs.segment(i, HHO->nFaceUnknowns) = face->InvMassMatrix()*face->ProjectOnBasis(func);
 			}
 		);
 		return vectorOfDoFs;

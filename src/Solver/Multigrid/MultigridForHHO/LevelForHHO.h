@@ -543,7 +543,7 @@ private:
 				Utils::FatalError("This p-prolongation operator can only be used if the difference between the fine and coarse levels is one degree exactly.");
 
 			SparseMatrix I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
-			SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb, finePb->HHO->CellBasis);
+			SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb, false);
 			P = Pi_f * I_c;
 		}
 		else
@@ -730,8 +730,7 @@ private:
 
 	SparseMatrix GetGlobalInterpolationMatrixFromFacesToCells(Diffusion_HHO<Dim>* problem)
 	{
-		FunctionalBasis<Dim>* cellInterpolationBasis = _useHigherOrderReconstruction ? problem->HHO->ReconstructionBasis : problem->HHO->CellBasis;
-		int nCellUnknowns = cellInterpolationBasis->Size();
+		int nCellUnknowns = _useHigherOrderReconstruction ? problem->HHO->nReconstructUnknowns : problem->HHO->nCellUnknowns;
 		int nFaceUnknowns = problem->HHO->nFaceUnknowns;
 
 		ElementParallelLoop<Dim> parallelLoop(problem->_mesh->Elements);
@@ -803,30 +802,29 @@ private:
 
 	SparseMatrix GetGlobalProjectorMatrixFromCellsToFaces(Diffusion_HHO<Dim>* problem)
 	{
-		FunctionalBasis<Dim>* cellBasis = _useHigherOrderReconstruction ? problem->HHO->ReconstructionBasis : problem->HHO->CellBasis;
-		return GetGlobalProjectorMatrixFromCellsToFaces(problem, cellBasis);
+		return GetGlobalProjectorMatrixFromCellsToFaces(problem, _useHigherOrderReconstruction);
 	}
 
-	SparseMatrix GetGlobalProjectorMatrixFromCellsToFaces(Diffusion_HHO<Dim>* problem, FunctionalBasis<Dim>* cellBasis)
+	SparseMatrix GetGlobalProjectorMatrixFromCellsToFaces(Diffusion_HHO<Dim>* problem, bool useHigherOrderBasis)
 	{
-		int nCellUnknowns = cellBasis->Size();
+		int nCellUnknowns = useHigherOrderBasis ? problem->HHO->nReconstructUnknowns : problem->HHO->nCellUnknowns;
 		int nFaceUnknowns = problem->HHO->nFaceUnknowns;
 
 		ElementParallelLoop<Dim> parallelLoop(problem->_mesh->Elements);
 		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nFaceUnknowns);
 
-		parallelLoop.Execute([this, problem, nCellUnknowns, nFaceUnknowns, cellBasis](Element<Dim>* element, ParallelChunk<CoeffsChunk>* chunk)
+		parallelLoop.Execute([this, problem, nCellUnknowns, nFaceUnknowns, useHigherOrderBasis](Element<Dim>* element, ParallelChunk<CoeffsChunk>* chunk)
 			{
+				BigNumber elemGlobalNumber = element->Number;
+				Diff_HHOElement<Dim>* hhoElem = problem->HHOElement(element);
+				FunctionalBasis<Dim>* cellBasis = useHigherOrderBasis ? hhoElem->ReconstructionBasis : hhoElem->CellBasis;
 				for (auto face : element->Faces)
 				{
 					if (face->HasDirichletBC())
 						continue;
 
-					BigNumber elemGlobalNumber = element->Number;
 					BigNumber faceGlobalNumber = face->Number;
-
 					double weight = Weight(element, face);
-
 					Diff_HHOFace<Dim>* hhoFace = problem->HHOFace(face);
 					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, elemGlobalNumber*nCellUnknowns, weight*hhoFace->Trace(element, cellBasis));
 				}
@@ -843,14 +841,13 @@ private:
 		Diffusion_HHO<Dim>* finePb = this->_problem;
 		Diffusion_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;
 
-		FunctionalBasis<Dim>* cellInterpolationBasis = _useHigherOrderReconstruction ? coarsePb->HHO->ReconstructionBasis : coarsePb->HHO->CellBasis;
-		int nCellUnknowns = cellInterpolationBasis->Size();
+		int nCellUnknowns = _useHigherOrderReconstruction ? coarsePb->HHO->nReconstructUnknowns : coarsePb->HHO->nCellUnknowns;
 		int nFaceUnknowns = finePb->HHO->nFaceUnknowns;
 
 		FaceParallelLoop<Dim> parallelLoop(finePb->_mesh->Faces);
 		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nFaceUnknowns);
 
-		parallelLoop.Execute([this, finePb, nCellUnknowns, nFaceUnknowns, cellInterpolationBasis](Face<Dim>* face, ParallelChunk<CoeffsChunk>* chunk)
+		parallelLoop.Execute([this, finePb, coarsePb, nCellUnknowns, nFaceUnknowns](Face<Dim>* face, ParallelChunk<CoeffsChunk>* chunk)
 			{
 				if (face->HasDirichletBC())
 					return;
@@ -862,6 +859,8 @@ private:
 				{
 					Element<Dim>* coarseElem = face->Element1->CoarserElement;
 					BigNumber coarseElemGlobalNumber = coarseElem->Number;
+					Diff_HHOElement<Dim>* hhoCoarseElem = coarsePb->HHOElement(coarseElem);
+					FunctionalBasis<Dim>* cellInterpolationBasis = _useHigherOrderReconstruction ? hhoCoarseElem->ReconstructionBasis : hhoCoarseElem->CellBasis;
 
 					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, coarseElemGlobalNumber*nCellUnknowns, hhoFace->Trace(coarseElem, cellInterpolationBasis));
 				}
@@ -871,14 +870,18 @@ private:
 					Element<Dim>* coarseElem2 = face->Element2->CoarserElement;
 					BigNumber coarseElem1GlobalNumber = coarseElem1->Number;
 					BigNumber coarseElem2GlobalNumber = coarseElem2->Number;
+					Diff_HHOElement<Dim>* hhoCoarseElem1 = coarsePb->HHOElement(coarseElem1);
+					Diff_HHOElement<Dim>* hhoCoarseElem2 = coarsePb->HHOElement(coarseElem2);
+					FunctionalBasis<Dim>* cellInterpolationBasis1 = _useHigherOrderReconstruction ? hhoCoarseElem1->ReconstructionBasis : hhoCoarseElem1->CellBasis;
+					FunctionalBasis<Dim>* cellInterpolationBasis2 = _useHigherOrderReconstruction ? hhoCoarseElem2->ReconstructionBasis : hhoCoarseElem2->CellBasis;
 
 					//double weight1 = Weight(coarseElem1, face->CoarseFace); // Careful with using face->CoarseFace when the mesh isn't nested...
 					double weight1 = Weight(face->Element1, face);
-					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, coarseElem1GlobalNumber*nCellUnknowns, weight1*hhoFace->Trace(coarseElem1, cellInterpolationBasis));
+					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, coarseElem1GlobalNumber*nCellUnknowns, weight1*hhoFace->Trace(coarseElem1, cellInterpolationBasis1));
 
 					//double weight2 = Weight(coarseElem2, face->CoarseFace);
 					double weight2 = Weight(face->Element2, face);
-					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, coarseElem2GlobalNumber*nCellUnknowns, weight2*hhoFace->Trace(coarseElem2, cellInterpolationBasis));
+					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, coarseElem2GlobalNumber*nCellUnknowns, weight2*hhoFace->Trace(coarseElem2, cellInterpolationBasis2));
 
 					assert(abs(weight1 + weight2 - 1) < 1e-12);
 				}
@@ -986,44 +989,52 @@ private:
 		Mesh<Dim>* coarseMesh = coarsePb->_mesh;
 
 		if (finePb->HHO->FaceBasis->GetDegree() < coarsePb->HHO->FaceBasis->GetDegree())
-			Utils::FatalError("Canonical injection from coarse to fine elements only available if fine degree > coarse degree.");
+			Utils::FatalError("Canonical injection from coarse to fine elements only available if fine degree >= coarse degree.");
 
-		FunctionalBasis<Dim>* coarseBasis = _useHigherOrderReconstruction ? coarsePb->HHO->ReconstructionBasis : coarsePb->HHO->CellBasis;
-		FunctionalBasis<Dim>* fineBasis = _useHigherOrderReconstruction ? finePb->HHO->ReconstructionBasis : finePb->HHO->CellBasis;
+		int nCoarseUnknowns = _useHigherOrderReconstruction ? coarsePb->HHO->nReconstructUnknowns : coarsePb->HHO->nCellUnknowns;
+		int nFineUnknowns = _useHigherOrderReconstruction ? finePb->HHO->nReconstructUnknowns : finePb->HHO->nCellUnknowns;
 
 		ElementParallelLoop<Dim> parallelLoop(coarseMesh->Elements);
-		parallelLoop.ReserveChunkCoeffsSize(coarseBasis->Size() * 4 * fineBasis->Size());
+		parallelLoop.ReserveChunkCoeffsSize(nCoarseUnknowns * 4 * nFineUnknowns);
 
-		parallelLoop.Execute([this, coarseBasis, fineBasis, finePb](Element<Dim>* coarseElement, ParallelChunk<CoeffsChunk>* chunk)
+		parallelLoop.Execute([this, coarsePb, finePb, nCoarseUnknowns, nFineUnknowns](Element<Dim>* coarseElement, ParallelChunk<CoeffsChunk>* chunk)
 			{
-				DenseMatrix local_J_f_c = ComputeCanonicalInjectionMatrixCoarseToFine(coarseElement, coarseBasis, fineBasis, finePb);
+				DenseMatrix local_J_f_c = ComputeCanonicalInjectionMatrixCoarseToFine(coarseElement, coarsePb, finePb);
 				for (auto fineElement : coarseElement->FinerElements)
 				{
 					BigNumber coarseElemGlobalNumber = coarseElement->Number;
 					BigNumber fineElemGlobalNumber = fineElement->Number;
 					BigNumber fineElemLocalNumber = coarseElement->LocalNumberOf(fineElement);
 
-					chunk->Results.Coeffs.Add(fineElemGlobalNumber*fineBasis->Size(), coarseElemGlobalNumber*coarseBasis->Size(), local_J_f_c.block(fineElemLocalNumber*fineBasis->Size(), 0, fineBasis->Size(), coarseBasis->Size()));
+					chunk->Results.Coeffs.Add(fineElemGlobalNumber*nFineUnknowns, coarseElemGlobalNumber*nCoarseUnknowns, local_J_f_c.block(fineElemLocalNumber*nFineUnknowns, 0, nFineUnknowns, nCoarseUnknowns));
 				}
 			});
 
-		SparseMatrix J_f_c(finePb->HHO->nElements * fineBasis->Size(), coarsePb->HHO->nElements * coarseBasis->Size());
+		SparseMatrix J_f_c(finePb->HHO->nElements * nFineUnknowns, coarsePb->HHO->nElements * nCoarseUnknowns);
 		parallelLoop.Fill(J_f_c);
 		return J_f_c;
 	}
 
-	DenseMatrix ComputeCanonicalInjectionMatrixCoarseToFine(Element<Dim>* coarseElement, FunctionalBasis<Dim>* coarseCellBasis, FunctionalBasis<Dim>* fineCellBasis, Diffusion_HHO<Dim>* fineProblem)
+	DenseMatrix ComputeCanonicalInjectionMatrixCoarseToFine(Element<Dim>* coarseElement, Diffusion_HHO<Dim>* coarsePb, Diffusion_HHO<Dim>* finePb)
 	{
-		assert(coarseCellBasis->GetDegree() <= fineCellBasis->GetDegree());
+		Diff_HHOElement<Dim>* hhoCoarseElem = coarsePb->HHOElement(coarseElement);
+		FunctionalBasis<Dim>* coarseBasis = _useHigherOrderReconstruction ? hhoCoarseElem->ReconstructionBasis : hhoCoarseElem->CellBasis;
+		int nCoarseUnknowns = coarseBasis->Size();
+		int nFineUnknowns = _useHigherOrderReconstruction ? finePb->HHO->nReconstructUnknowns : finePb->HHO->nCellUnknowns;
 
-		DenseMatrix J(fineCellBasis->Size() * coarseElement->FinerElements.size(), coarseCellBasis->Size());
+		assert(nCoarseUnknowns <= nFineUnknowns);
+
+		DenseMatrix J(nFineUnknowns * coarseElement->FinerElements.size(), nCoarseUnknowns);
 
 		for (auto fineElement : coarseElement->FinerElements)
 		{
-			DenseMatrix fineCoarseMass(fineCellBasis->Size(), coarseCellBasis->Size());
-			for (BasisFunction<Dim>* finePhi : fineCellBasis->LocalFunctions)
+			Diff_HHOElement<Dim>* hhoFineElem = finePb->HHOElement(fineElement);
+			FunctionalBasis<Dim>* fineBasis = _useHigherOrderReconstruction ? hhoFineElem->ReconstructionBasis : hhoFineElem->CellBasis;
+
+			DenseMatrix fineCoarseMass(fineBasis->Size(), coarseBasis->Size());
+			for (BasisFunction<Dim>* finePhi : fineBasis->LocalFunctions)
 			{
-				for (BasisFunction<Dim>* coarsePhi : coarseCellBasis->LocalFunctions)
+				for (BasisFunction<Dim>* coarsePhi : coarseBasis->LocalFunctions)
 				{
 					RefFunction functionToIntegrate = [coarseElement, fineElement, finePhi, coarsePhi](const RefPoint& fineRefPoint) {
 						DomPoint domPoint = fineElement->ConvertToDomain(fineRefPoint);
@@ -1037,9 +1048,13 @@ private:
 				}
 			}
 
-			DenseMatrix fineMass = fineElement->MassMatrix(fineCellBasis);
-
-			J.block(coarseElement->LocalNumberOf(fineElement)*fineCellBasis->Size(), 0, fineCellBasis->Size(), coarseCellBasis->Size()) = fineMass.inverse() * fineCoarseMass;
+			if (!finePb->HHO->OrthonormalizeBases)
+			{
+				DenseMatrix fineMass = fineElement->MassMatrix(fineBasis);
+				J.block(coarseElement->LocalNumberOf(fineElement)*nFineUnknowns, 0, nFineUnknowns, nCoarseUnknowns) = fineMass.inverse() * fineCoarseMass;
+			}
+			else
+				J.block(coarseElement->LocalNumberOf(fineElement)*nFineUnknowns, 0, nFineUnknowns, nCoarseUnknowns) = fineCoarseMass;
 		}
 
 		return J;
@@ -1059,15 +1074,15 @@ private:
 		if (finePb->HHO->FaceBasis->GetDegree() < coarsePb->HHO->FaceBasis->GetDegree())
 			Utils::FatalError("L2-proj from coarse to fine elements only available if fine degree > coarse degree.");
 
-		FunctionalBasis<Dim>* coarseBasis = _useHigherOrderReconstruction ? coarsePb->HHO->ReconstructionBasis : coarsePb->HHO->CellBasis;
-		FunctionalBasis<Dim>* fineBasis = _useHigherOrderReconstruction ? finePb->HHO->ReconstructionBasis : finePb->HHO->CellBasis;
+		int nCoarseUnknowns = _useHigherOrderReconstruction ? coarsePb->HHO->nReconstructUnknowns : coarsePb->HHO->nCellUnknowns;
+		int nFineUnknowns = _useHigherOrderReconstruction ? finePb->HHO->nReconstructUnknowns : finePb->HHO->nCellUnknowns;
 
 		ElementParallelLoop<Dim> parallelLoop(coarseMesh->Elements);
-		parallelLoop.ReserveChunkCoeffsSize(fineBasis->Size() * 6 * coarseBasis->Size());
+		parallelLoop.ReserveChunkCoeffsSize(nCoarseUnknowns * 6 * nFineUnknowns);
 
-		parallelLoop.Execute([this, coarseBasis, fineBasis, finePb](Element<Dim>* coarseElement, ParallelChunk<CoeffsChunk>* chunk)
+		parallelLoop.Execute([this, coarsePb, finePb, nCoarseUnknowns, nFineUnknowns](Element<Dim>* coarseElement, ParallelChunk<CoeffsChunk>* chunk)
 			{
-				DenseMatrix localL2Proj = ComputeL2ProjectionMatrixCoarseToFine(coarseElement, coarseBasis, fineBasis, finePb);
+				DenseMatrix localL2Proj = ComputeL2ProjectionMatrixCoarseToFine(coarseElement, coarsePb, finePb);
 				for (auto it = coarseElement->OverlappingFineElements.begin(); it != coarseElement->OverlappingFineElements.end(); it++)
 				{
 					Element<Dim>* fineElement = it->first;
@@ -1075,21 +1090,27 @@ private:
 					BigNumber fineElemGlobalNumber = fineElement->Number;
 					BigNumber fineElemLocalNumber = coarseElement->LocalNumberOfOverlapping(fineElement);
 
-					chunk->Results.Coeffs.Add(fineElemGlobalNumber*fineBasis->Size(), coarseElemGlobalNumber*coarseBasis->Size(), localL2Proj.block(fineElemLocalNumber*fineBasis->Size(), 0, fineBasis->Size(), coarseBasis->Size()));
+					chunk->Results.Coeffs.Add(fineElemGlobalNumber*nFineUnknowns, coarseElemGlobalNumber*nCoarseUnknowns, localL2Proj.block(fineElemLocalNumber*nFineUnknowns, 0, nFineUnknowns, nCoarseUnknowns));
 				}
 			});
 
-		SparseMatrix L2Proj(finePb->HHO->nElements * fineBasis->Size(), coarsePb->HHO->nElements * coarseBasis->Size());
+		SparseMatrix L2Proj(finePb->HHO->nElements * nFineUnknowns, coarsePb->HHO->nElements * nCoarseUnknowns);
 		parallelLoop.Fill(L2Proj);
 		return L2Proj;
 	}
 
 
 
-	DenseMatrix ComputeL2ProjectionMatrixCoarseToFine(Element<Dim>* coarseElement, FunctionalBasis<Dim>* coarseCellBasis, FunctionalBasis<Dim>* fineCellBasis, Diffusion_HHO<Dim>* fineProblem)
+	DenseMatrix ComputeL2ProjectionMatrixCoarseToFine(Element<Dim>* coarseElement, Diffusion_HHO<Dim>* coarsePb, Diffusion_HHO<Dim>* finePb)
 	{
 		assert(!coarseElement->OverlappingFineElements.empty());
-		DenseMatrix L2Proj(fineCellBasis->Size() * coarseElement->OverlappingFineElements.size(), coarseCellBasis->Size());
+
+		Diff_HHOElement<Dim>* hhoCoarseElem = coarsePb->HHOElement(coarseElement);
+		FunctionalBasis<Dim>* coarseBasis = _useHigherOrderReconstruction ? hhoCoarseElem->ReconstructionBasis : hhoCoarseElem->CellBasis;
+		int nCoarseUnknowns = coarseBasis->Size();
+		int nFineUnknowns = _useHigherOrderReconstruction ? finePb->HHO->nReconstructUnknowns : finePb->HHO->nCellUnknowns;
+
+		DenseMatrix L2Proj(nFineUnknowns * coarseElement->OverlappingFineElements.size(), nCoarseUnknowns);
 
 		for (auto it = coarseElement->OverlappingFineElements.begin(); it != coarseElement->OverlappingFineElements.end(); it++)
 		{
@@ -1116,13 +1137,17 @@ private:
 				assert(false);
 				Utils::FatalError("This coarse element is declared overlapped by a fine one that is not in the same physical part. The coarsening/refinement strategy must prevent that.");
 			}
-			DenseMatrix fineCoarseMass(fineCellBasis->Size(), coarseCellBasis->Size());
+
+			Diff_HHOElement<Dim>* hhoFineElem = finePb->HHOElement(fineElement);
+			FunctionalBasis<Dim>* fineBasis = _useHigherOrderReconstruction ? hhoFineElem->ReconstructionBasis : hhoFineElem->CellBasis;
+
+			DenseMatrix fineCoarseMass(nFineUnknowns, nCoarseUnknowns);
 
 			vector<PhysicalShape<Dim>*> intersectionCoarseFine = it->second;
 
-			for (BasisFunction<Dim>* finePhi : fineCellBasis->LocalFunctions)
+			for (BasisFunction<Dim>* finePhi : fineBasis->LocalFunctions)
 			{
-				for (BasisFunction<Dim>* coarsePhi : coarseCellBasis->LocalFunctions)
+				for (BasisFunction<Dim>* coarsePhi : coarseBasis->LocalFunctions)
 				{
 					double integral = 0;
 					int degree = finePhi->GetDegree() + coarsePhi->GetDegree();
@@ -1140,9 +1165,13 @@ private:
 				}
 			}
 
-			DenseMatrix fineMass = fineElement->MassMatrix(fineCellBasis);
-
-			L2Proj.block(coarseElement->LocalNumberOfOverlapping(fineElement)*fineCellBasis->Size(), 0, fineCellBasis->Size(), coarseCellBasis->Size()) = fineMass.inverse() * fineCoarseMass;
+			if (!finePb->HHO->OrthonormalizeBases)
+			{
+				DenseMatrix fineMass = fineElement->MassMatrix(fineBasis);
+				L2Proj.block(coarseElement->LocalNumberOfOverlapping(fineElement)*nFineUnknowns, 0, nFineUnknowns, nCoarseUnknowns) = fineMass.inverse() * fineCoarseMass;
+			}
+			else
+				L2Proj.block(coarseElement->LocalNumberOfOverlapping(fineElement)*nFineUnknowns, 0, nFineUnknowns, nCoarseUnknowns) = fineCoarseMass;
 		}
 
 		return L2Proj;
