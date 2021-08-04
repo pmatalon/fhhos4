@@ -36,7 +36,7 @@ public:
 	Vector Solve(const Vector& b) override
 	{
 		Vector x = _solver.solve(b);
-		this->SolvingComputationalWork = Cost::CholeskySolve(*this->Matrix);
+		this->SolvingComputationalWork = Cost::CholeskySolve(_solver.matrixL());
 		return x;
 	}
 };

@@ -33,7 +33,7 @@ public:
 	Vector Solve(const Vector& b) override
 	{
 		Vector x = _solver.solve(b);
-		this->SolvingComputationalWork = Cost::LUSolve(*this->Matrix);
+		this->SolvingComputationalWork = 0;//Cost::LUSolve(_solver.matrixL()., _solver.matrixU()); TODO
 		return x;
 	}
 };

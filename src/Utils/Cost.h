@@ -109,17 +109,17 @@ public:
 	{
 		return 2.0 / 3.0 * pow(A.rows(), 3);
 	}
-	static size_t LUSolve(const SparseMatrix& A)
+	static size_t LUSolve(const SparseMatrix& L, const SparseMatrix& U)
 	{
-		return pow(A.rows(), 2);
+		return SpFWElimination(L) + SpBWSubstitution(U);
 	}
 
 	static size_t CholeskyFactorization(const SparseMatrix& A)
 	{
 		return 1.0 / 3.0 * pow(A.rows(), 3);
 	}
-	static size_t CholeskySolve(const SparseMatrix& A)
+	static size_t CholeskySolve(const SparseMatrix& L)
 	{
-		return pow(A.rows(), 2);
+		return SpFWElimination(L) + SpBWSubstitution(L);
 	}
 };
