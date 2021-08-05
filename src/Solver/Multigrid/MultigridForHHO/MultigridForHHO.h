@@ -53,7 +53,7 @@ public:
 			os << "p then hp [-hp-cs p_hp]";
 		os << endl;
 
-		if (this->HP_CS == HP_CoarsStgy::P_only || this->HP_CS == HP_CoarsStgy::P_then_H || this->HP_CS == HP_CoarsStgy::P_then_HP)
+		if (this->HP_CS != HP_CoarsStgy::H_only)
 		{
 			os << "\t" << "p-strategy              : ";
 			if (this->P_CS == P_CoarsStgy::Minus1)
@@ -65,7 +65,10 @@ public:
 			else if (this->P_CS == P_CoarsStgy::DirectToLow)
 				os << "k := " << this->CoarsePolyDegree;
 			os << endl;
+		}
 
+		if (this->HP_CS == HP_CoarsStgy::P_only || this->HP_CS == HP_CoarsStgy::P_then_H || this->HP_CS == HP_CoarsStgy::P_then_HP)
+		{
 			os << "\t" << "p-prolongation          : ";
 			if (P_Prolongation == GMG_P_Prolongation::Injection)
 				os << "natural injection ";
