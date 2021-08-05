@@ -362,16 +362,16 @@ void print_usage() {
 	cout << "-hp-config NUM" << endl;
 	cout << "      Shortcut for the following set of arguments:" << endl;
 	cout << "              1  -   -hp-cs h" << endl;
-	cout << "              2  -   -hp-cs p_h  -p-prolong 1 -p-restrict 1" << endl;
-	cout << "              3  -   -hp-cs p_h  -p-prolong 2 -p-restrict 1" << endl;
-	cout << "              4  -   -hp-cs p_h  -p-prolong 2 -p-restrict 2" << endl;
-	cout << "              5  -   -hp-cs hp_h" << endl;
+	cout << "              2  -   -hp-cs p_h  -p-cs -2 -p-prolong 1 -p-restrict 1" << endl;
+	cout << "              3  -   -hp-cs p_h  -p-cs -2 -p-prolong 2 -p-restrict 1" << endl;
+	cout << "              4  -   -hp-cs p_h  -p-cs -2 -p-prolong 2 -p-restrict 2" << endl;
+	cout << "              5  -   -hp-cs hp_h -p-cs -1" << endl;
 	cout << endl;
 	cout << "-disable-hor" << endl;
 	cout << "      In the polongation of 'mg', disables the use of the higher-order reconstruction." << endl;
 	cout << "      The local cell polynomials in the intermediary step are obtained by solving the local problems only." << endl;
 	cout << endl;
-	cout << "-disable-heterog-weight CODE" << endl;
+	cout << "-disable-heterog-weight" << endl;
 	cout << "      In the polongation of 'mg', disables the heterogeneous weighting." << endl;
 	cout << "      Homogeneous weighting is used instead, i.e. non-weighted average." << endl;
 	cout << endl;
@@ -869,23 +869,29 @@ int main(int argc, char* argv[])
 				else if (code == 2)
 				{
 					args.Solver.MG.HP_CS = HP_CoarsStgy::P_then_H;
+					args.Solver.MG.P_CS = P_CoarsStgy::Minus2;
 					args.Solver.MG.GMG_P_Prolong = GMG_P_Prolongation::Injection;
 					args.Solver.MG.GMG_P_Restrict = GMG_P_Restriction::RemoveHigherOrders;
 				}
 				else if (code == 3)
 				{
 					args.Solver.MG.HP_CS = HP_CoarsStgy::P_then_H;
+					args.Solver.MG.P_CS = P_CoarsStgy::Minus2;
 					args.Solver.MG.GMG_P_Prolong = GMG_P_Prolongation::H_Prolongation;
 					args.Solver.MG.GMG_P_Restrict = GMG_P_Restriction::RemoveHigherOrders;
 				}
 				else if (code == 4)
 				{
 					args.Solver.MG.HP_CS = HP_CoarsStgy::P_then_H;
+					args.Solver.MG.P_CS = P_CoarsStgy::Minus2;
 					args.Solver.MG.GMG_P_Prolong = GMG_P_Prolongation::H_Prolongation;
 					args.Solver.MG.GMG_P_Restrict = GMG_P_Restriction::P_Transpose;
 				}
 				else if (code == 5)
+				{
 					args.Solver.MG.HP_CS = HP_CoarsStgy::HP_then_H;
+					args.Solver.MG.P_CS = P_CoarsStgy::Minus1;
+				}
 				break;
 			}
 			case 'l': 
