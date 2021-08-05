@@ -24,7 +24,7 @@ struct DiscretizationArguments
 	string MeshCode = "default";
 	double Stretch = 0.5;
 	string Stabilization = "hho";
-	string BasisCode = "legendre";
+	string BasisCode = "";
 	bool OrthonormalizeBases = true;
 	int PolyDegree = 2;
 	bool UsePolynomialSpaceQ = false;

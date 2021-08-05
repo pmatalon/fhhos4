@@ -110,7 +110,7 @@ void print_usage() {
 	cout << "               hdg    - HDG stabilization term" << endl;
 	cout << endl;
 	cout << "-b CODE" << endl;
-	cout << "      Polynomial basis (default: legendre)." << endl;
+	cout << "      Polynomial basis." << endl;
 	cout << "               monomials" << endl;
 	cout << "               legendre" << endl;
 	cout << "               nlegendre (normalized Legendre)" << endl;
@@ -118,7 +118,7 @@ void print_usage() {
 	cout << "               hemker" << endl;
 	cout << endl;
 	cout << "-onb {0|1}" << endl;
-	cout << "      If 1, then the local face bases are orthonormalized. Default: 1." << endl;
+	cout << "      If 1, then the local bases are locally orthonormalized against each element and face. Default: 1." << endl;
 	cout << endl;
 	cout << "-p NUM" << endl;
 	cout << "      Polynomial degree of approximation (default: 1). In HHO, k = p-1." << endl;
@@ -1112,9 +1112,10 @@ int main(int argc, char* argv[])
 	}
 
 	//------------------------------------------//
-	//             Problem dimension            //
+	//                 Problem                  //
 	//------------------------------------------//
 
+	// dimension
 	if (args.Problem.Dimension == -1)
 	{
 		if (args.Problem.GeoCode.compare("segment") == 0)
@@ -1146,27 +1147,10 @@ int main(int argc, char* argv[])
 			args.Problem.TestCaseCode = FileSystem::FileNameWithoutExtension(args.Problem.GeoCode);
 	}
 
-	//------------------------------------------//
-	//               Heterogeneity              //
-	//------------------------------------------//
-
+	// Heterogeneity
 	if (args.Problem.GeoCode.compare("square") == 0 && args.Problem.HeterogeneityRatio != 1)
 		Utils::Warning("The geometry 'square' has only one physical part: -heterog argument is ignored. Use 'square4quadrants' instead to run an heterogeneous problem.");
 	
-	if (args.Problem.Dimension > 1 && args.Discretization.Method.compare("dg") == 0 && args.Discretization.PolyDegree == 0)
-		argument_error("In 2D/3D, DG is not a convergent scheme for p = 0.");
-
-	if (args.Discretization.Method.compare("dg") == 0 && args.Problem.BCCode.compare("d") != 0)
-		argument_error("In DG, only Dirichlet conditions are implemented.");
-
-	if (args.Discretization.Method.compare("dg") == 0 && args.Problem.AnisotropyRatio != 1)
-		argument_error("In DG, anisotropy is not implemented.");
-
-	if (args.Problem.Dimension == 1 && args.Discretization.Method.compare("hho") == 0 && args.Discretization.PolyDegree != 1)
-		argument_error("HHO in 1D only exists for p = 1.");
-
-	if (args.Discretization.Method.compare("hho") == 0 && args.Discretization.PolyDegree == 0)
-		argument_error("HHO does not exist with p = 0. Linear approximation at least (p >= 1).");
 
 	//------------------------------------------//
 	//                   Mesh                   //
@@ -1195,6 +1179,29 @@ int main(int argc, char* argv[])
 
 	if ((args.Discretization.MeshCode.compare("tetra") == 0 || args.Discretization.MeshCode.compare("stetra") == 0) && args.Problem.Dimension != 3)
 		argument_error("Tetrahedral mesh in only available in 3D.");
+
+	//------------------------------------------//
+	//              Discretization              //
+	//------------------------------------------//
+
+	if (args.Problem.Dimension > 1 && args.Discretization.Method.compare("dg") == 0 && args.Discretization.PolyDegree == 0)
+		argument_error("In 2D/3D, DG is not a convergent scheme for p = 0.");
+
+	if (args.Discretization.Method.compare("dg") == 0 && args.Problem.BCCode.compare("d") != 0)
+		argument_error("In DG, only Dirichlet conditions are implemented.");
+
+	if (args.Discretization.Method.compare("dg") == 0 && args.Problem.AnisotropyRatio != 1)
+		argument_error("In DG, anisotropy is not implemented.");
+
+	if (args.Problem.Dimension == 1 && args.Discretization.Method.compare("hho") == 0 && args.Discretization.PolyDegree != 1)
+		argument_error("HHO in 1D only exists for p = 1.");
+
+	if (args.Discretization.Method.compare("hho") == 0 && args.Discretization.PolyDegree == 0)
+		argument_error("HHO does not exist with p = 0. Linear approximation at least (p >= 1).");
+
+	// Polynomial basis
+	if (args.Discretization.BasisCode.empty())
+		args.Discretization.BasisCode = args.Discretization.OrthonormalizeBases ? "monomials" : "legendre";
 
 	//------------------------------------------//
 	//                  Solver                  //
