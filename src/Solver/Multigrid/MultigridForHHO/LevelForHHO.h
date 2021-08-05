@@ -539,11 +539,9 @@ private:
 
 			if (!_useHigherOrderReconstruction)
 				Utils::FatalError("The higher-order reconstruction must be enabled to use this p-prolongation operator.");
-			if (finePb->HHO->FaceBasis->GetDegree() != coarsePb->HHO->FaceBasis->GetDegree() + 1)
-				Utils::FatalError("This p-prolongation operator can only be used if the difference between the fine and coarse levels is one degree exactly.");
 
 			SparseMatrix I_c = GetGlobalInterpolationMatrixFromFacesToCells(coarsePb);
-			SparseMatrix Pi_f = GetGlobalProjectorMatrixFromCellsToFaces(finePb, false);
+			SparseMatrix Pi_f = GetGlobalProjectorMatrixFromHighOrderCellsToFaces(coarsePb, finePb);
 			P = Pi_f * I_c;
 		}
 		else
@@ -802,22 +800,17 @@ private:
 
 	SparseMatrix GetGlobalProjectorMatrixFromCellsToFaces(Diffusion_HHO<Dim>* problem)
 	{
-		return GetGlobalProjectorMatrixFromCellsToFaces(problem, _useHigherOrderReconstruction);
-	}
-
-	SparseMatrix GetGlobalProjectorMatrixFromCellsToFaces(Diffusion_HHO<Dim>* problem, bool useHigherOrderBasis)
-	{
-		int nCellUnknowns = useHigherOrderBasis ? problem->HHO->nReconstructUnknowns : problem->HHO->nCellUnknowns;
+		int nCellUnknowns = _useHigherOrderReconstruction ? problem->HHO->nReconstructUnknowns : problem->HHO->nCellUnknowns;
 		int nFaceUnknowns = problem->HHO->nFaceUnknowns;
 
 		ElementParallelLoop<Dim> parallelLoop(problem->_mesh->Elements);
 		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nFaceUnknowns);
 
-		parallelLoop.Execute([this, problem, nCellUnknowns, nFaceUnknowns, useHigherOrderBasis](Element<Dim>* element, ParallelChunk<CoeffsChunk>* chunk)
+		parallelLoop.Execute([this, problem, nCellUnknowns, nFaceUnknowns](Element<Dim>* element, ParallelChunk<CoeffsChunk>* chunk)
 			{
 				BigNumber elemGlobalNumber = element->Number;
 				Diff_HHOElement<Dim>* hhoElem = problem->HHOElement(element);
-				FunctionalBasis<Dim>* cellBasis = useHigherOrderBasis ? hhoElem->ReconstructionBasis : hhoElem->CellBasis;
+				FunctionalBasis<Dim>* cellBasis = _useHigherOrderReconstruction ? hhoElem->ReconstructionBasis : hhoElem->CellBasis;
 				for (auto face : element->Faces)
 				{
 					if (face->HasDirichletBC())
@@ -831,6 +824,37 @@ private:
 			});
 
 		SparseMatrix Pi(problem->HHO->nTotalFaceUnknowns, problem->HHO->nElements * nCellUnknowns);
+		parallelLoop.Fill(Pi);
+
+		return Pi;
+	}
+
+	SparseMatrix GetGlobalProjectorMatrixFromHighOrderCellsToFaces(Diffusion_HHO<Dim>* cellProblem, Diffusion_HHO<Dim>* faceProblem)
+	{
+		int nCellUnknowns = cellProblem->HHO->nReconstructUnknowns;
+		int nFaceUnknowns = faceProblem->HHO->nFaceUnknowns;
+
+		ElementParallelLoop<Dim> parallelLoop(cellProblem->_mesh->Elements);
+		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nFaceUnknowns);
+
+		parallelLoop.Execute([this, cellProblem, faceProblem, nCellUnknowns, nFaceUnknowns](Element<Dim>* element, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				BigNumber elemGlobalNumber = element->Number;
+				Diff_HHOElement<Dim>* hhoElem = cellProblem->HHOElement(element);
+				FunctionalBasis<Dim>* cellBasis = hhoElem->ReconstructionBasis;
+				for (auto face : element->Faces)
+				{
+					if (face->HasDirichletBC())
+						continue;
+
+					BigNumber faceGlobalNumber = face->Number;
+					double weight = Weight(element, face);
+					Diff_HHOFace<Dim>* hhoFace = faceProblem->HHOFace(face);
+					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, elemGlobalNumber*nCellUnknowns, weight*hhoFace->Trace(element, cellBasis));
+				}
+			});
+
+		SparseMatrix Pi(faceProblem->HHO->nTotalFaceUnknowns, cellProblem->HHO->nElements * nCellUnknowns);
 		parallelLoop.Fill(Pi);
 
 		return Pi;
