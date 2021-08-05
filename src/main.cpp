@@ -123,6 +123,9 @@ void print_usage() {
 	cout << "-p NUM" << endl;
 	cout << "      Polynomial degree of approximation (default: 1). In HHO, k = p-1." << endl;
 	cout << endl;
+	cout << "-k NUM" << endl;
+	cout << "      Polynomial degree on the faces for the HHO scheme. Note that setting this parameter does the same as setting p (p = k+1)." << endl;
+	cout << endl;
 	cout << "-poly-space CODE" << endl;
 	cout << "      Polynomial space." << endl;
 	cout << "               p - space P (default)" << endl;
@@ -500,6 +503,7 @@ int main(int argc, char* argv[])
 		OPT_Stretch,
 		// Discretization
 		OPT_Discretization,
+		OPT_HHO_K,
 		OPT_Stabilization,
 		OPT_OrthonormalizeBases,
 		OPT_NoStaticCondensation,
@@ -558,6 +562,7 @@ int main(int argc, char* argv[])
 		 { "stretch", required_argument, NULL, OPT_Stretch },
 		 // Discretization
 		 { "discr", required_argument, NULL, OPT_Discretization },
+		 { "k", required_argument, NULL, OPT_HHO_K },
 		 { "stab", required_argument, NULL, OPT_Stabilization },
 		 { "onb", required_argument, NULL, OPT_OrthonormalizeBases },
 		 { "no-static-cond", no_argument, NULL, OPT_NoStaticCondensation },
@@ -722,6 +727,9 @@ int main(int argc, char* argv[])
 			}
 			case 'p': 
 				args.Discretization.PolyDegree = atoi(optarg);
+				break;
+			case OPT_HHO_K:
+				args.Discretization.PolyDegree = atoi(optarg) + 1;
 				break;
 			case OPT_PolySpace:
 			{
