@@ -51,21 +51,21 @@ public:
 		mapping <<
 			v2.X - v1.X, v3.X - v1.X,
 			v2.Y - v1.Y, v3.Y - v1.Y;
-		if (abs(mapping.determinant()) > 1e-12)
+		if (abs(mapping.determinant()) > Utils::NumericalZero)
 			_doNotUseZ = true;
 		else
 		{
 			mapping <<
 				v2.X - v1.X, v3.X - v1.X,
 				v2.Z - v1.Z, v3.Z - v1.Z;
-			if (abs(mapping.determinant()) > 1e-12)
+			if (abs(mapping.determinant()) > Utils::NumericalZero)
 				_doNotUseY = true;
 			else
 			{
 				mapping <<
 					v2.Y - v1.Y, v3.Y - v1.Y,
 					v2.Z - v1.Z, v3.Z - v1.Z;
-				if (abs(mapping.determinant()) > 1e-12)
+				if (abs(mapping.determinant()) > Utils::NumericalZero)
 					_doNotUseX = true;
 				else
 					assert(false);

@@ -907,7 +907,7 @@ private:
 					double weight2 = Weight(face->Element2, face);
 					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, coarseElem2GlobalNumber*nCellUnknowns, weight2*hhoFace->Trace(coarseElem2, cellInterpolationBasis2));
 
-					assert(abs(weight1 + weight2 - 1) < 1e-12);
+					assert(abs(weight1 + weight2 - 1) < Utils::NumericalZero);
 				}
 			});
 

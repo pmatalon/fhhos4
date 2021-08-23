@@ -124,7 +124,7 @@ template<int Dim>
 bool AreCollinear(const DimVector<Dim>& v1, const DimVector<Dim>& v2)
 {
 	double v1_norm_v2_norm = v1.norm()*v2.norm();
-	return abs(abs(v1.dot(v2)) - v1_norm_v2_norm) / v1_norm_v2_norm < 1e-12;
+	return abs(abs(v1.dot(v2)) - v1_norm_v2_norm) / v1_norm_v2_norm < Utils::NumericalZero;
 }
 
 template<int Dim>
