@@ -1,6 +1,6 @@
 #pragma once
 #include "../Geometry/Point.h"
-#include "../Utils/Types.h"
+#include "../Utils/Utils.h"
 using namespace std;
 
 class Vertex : public DomPoint
