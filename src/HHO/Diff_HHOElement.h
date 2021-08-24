@@ -26,7 +26,7 @@ public:
 	// Local operator matrix (= Acons + Astab)
 	DenseMatrix A;
 
-	DenseMatrix invAtt;
+	Eigen::LLT<DenseMatrix> AttSolver;
 
 	Diff_HHOElement() {}
 
@@ -99,6 +99,8 @@ public:
 		if (hho->OrthonormalizeBases)
 		{
 			this->ReconstructionBasis = new OrthonormalBasis<Dim>(HHO->ReconstructionBasis, this->MeshElement->Shape());
+			//DenseMatrix massMatrix = this->MeshElement->Shape()->ComputeMassMatrix(this->ReconstructionBasis);
+			//cout << "mass matrix: " << endl << massMatrix << endl;
 			this->CellBasis = new FunctionalBasis<Dim>(this->ReconstructionBasis->ExtractLowerBasis(HHO->CellBasis->GetDegree()));
 		}
 		else
@@ -121,7 +123,7 @@ public:
 		auto Att = A.topLeftCorner(hho->nCellUnknowns, hho->nCellUnknowns);
 		//auto Aff = A.bottomRightCorner(nTotalFaceUnknowns, nTotalFaceUnknowns);
 		//auto Atf = A.topRightCorner(nCellUnknowns, nTotalFaceUnknowns);
-		this->invAtt = Att.inverse();
+		this->AttSolver = Att.llt();
 	}
 	
 	Vector Reconstruct(Vector hybridVector)
@@ -138,7 +140,7 @@ public:
 	{
 		int nTotalFaceUnknowns = this->Faces.size() * HHO->nFaceUnknowns;
 		auto Atf = this->A.topRightCorner(HHO->nCellUnknowns, nTotalFaceUnknowns);
-		DenseMatrix solveCellUnknowns = -this->invAtt * Atf;
+		DenseMatrix solveCellUnknowns = -this->AttSolver.solve(Atf);
 		return solveCellUnknowns;
 	}
 
@@ -147,7 +149,7 @@ public:
 		int nTotalFaceUnknowns = this->Faces.size() * HHO->nFaceUnknowns;
 
 		auto Atf = this->A.topRightCorner(HHO->nCellUnknowns, nTotalFaceUnknowns);
-		DenseMatrix solveCellUnknowns = -this->invAtt * Atf;
+		DenseMatrix solveCellUnknowns = -this->AttSolver.solve(Atf);
 
 		DenseMatrix createHybridVectorFromFacesMatrix(HHO->nCellUnknowns + nTotalFaceUnknowns, nTotalFaceUnknowns);
 		createHybridVectorFromFacesMatrix.topRows(HHO->nCellUnknowns) = solveCellUnknowns;
@@ -411,7 +413,7 @@ public:
 		/*if (!needToReconstructSolutionLater)
 		{
 			Utils::Empty(P);
-			Utils::Empty(invAtt);
+			Utils::Empty(AttSolver);
 		}*/
 	}
 

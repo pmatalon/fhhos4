@@ -826,7 +826,7 @@ public:
 		parallelLoop.Execute([this](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
 			{
 				Diff_HHOElement<Dim>* element = HHOElement(e);
-				chunk->Results.Coeffs.Add(element->Number() * HHO->nCellUnknowns, element->Number() * HHO->nCellUnknowns, element->invAtt);
+				chunk->Results.Coeffs.Add(element->Number() * HHO->nCellUnknowns, element->Number() * HHO->nCellUnknowns, element->AttSolver.solve(DenseMatrix::Identity(HHO->nCellUnknowns, HHO->nCellUnknowns)));
 			});
 		SparseMatrix invA_T_T = SparseMatrix(HHO->nTotalCellUnknowns, HHO->nTotalCellUnknowns);
 		parallelLoop.Fill(invA_T_T);
