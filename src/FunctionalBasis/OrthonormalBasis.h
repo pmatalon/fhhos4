@@ -91,17 +91,21 @@ public:
 	}
 
 private:
-	// Modified Gram-Schmitt algorithm
+	// Modified Gram-Schmitt algorithm with reorthogonalization
+	// (Giraud et al., The loss of orthogonality in the Gram-Schmidt orthogonalization process, 2003)
 	void Orthonormalize(FunctionalBasis<Dim>* basis, PhysicalShape<Dim>* shape)
 	{
 		for (int i = 0; i < basis->LocalFunctions.size(); i++)
 		{
 			OrthonormalBasisFunction<Dim>* phi = new OrthonormalBasisFunction<Dim>(basis->LocalFunctions[i]);
-			for (int j = 0; j < i; j++)
+			for (int nOrthogonalization = 0; nOrthogonalization < 2; nOrthogonalization++) // 2 passes of orthogonalization
 			{
-				OrthonormalBasisFunction<Dim>* previousPhi = dynamic_cast<OrthonormalBasisFunction<Dim>*>(this->LocalFunctions[j]);
-				double innerprod = shape->ComputeMassTerm(phi, previousPhi);
-				phi->Minus(innerprod, previousPhi);
+				for (int j = 0; j < i; j++)
+				{
+					OrthonormalBasisFunction<Dim>* previousPhi = dynamic_cast<OrthonormalBasisFunction<Dim>*>(this->LocalFunctions[j]);
+					double innerprod = shape->ComputeMassTerm(phi, previousPhi);
+					phi->Minus(innerprod, previousPhi);
+				}
 			}
 			double norm = shape->L2Norm(phi);
 			phi->DivideBy(norm);
