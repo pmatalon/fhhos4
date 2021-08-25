@@ -669,7 +669,7 @@ Mesh<2>* ProgramDim<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase)
 	string mesher = args.Discretization.Mesher;
 	BigNumber n = args.Discretization.N;
 	BigNumber nx = args.Discretization.N;
-	BigNumber ny = args.Discretization.Ny == -1 ? args.Discretization.N : args.Discretization.Ny;
+	BigNumber ny = args.Discretization.Ny == 0 ? args.Discretization.N : args.Discretization.Ny;
 	string meshCode = args.Discretization.MeshCode;
 	double stretch = args.Discretization.Stretch;
 
@@ -866,8 +866,8 @@ Mesh<3>* ProgramDim<3>::BuildMesh(ProgramArguments& args, TestCase<3>* testCase)
 	string mesher = args.Discretization.Mesher;
 	BigNumber n = args.Discretization.N;
 	BigNumber nx = args.Discretization.N;
-	BigNumber ny = args.Discretization.Ny == -1 ? args.Discretization.N : args.Discretization.Ny;
-	BigNumber nz = args.Discretization.Nz == -1 ? args.Discretization.N : args.Discretization.Nz;
+	BigNumber ny = args.Discretization.Ny == 0 ? args.Discretization.N : args.Discretization.Ny;
+	BigNumber nz = args.Discretization.Nz == 0 ? args.Discretization.N : args.Discretization.Nz;
 	string meshCode = args.Discretization.MeshCode;
 	H_CoarsStgy refinementStgy = args.Solver.MG.H_CS;
 

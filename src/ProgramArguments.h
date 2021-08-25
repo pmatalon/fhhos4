@@ -17,8 +17,8 @@ struct ProblemArguments
 struct DiscretizationArguments
 {
 	BigNumber N = 16;
-	BigNumber Ny = -1;
-	BigNumber Nz = -1;
+	BigNumber Ny = 0;
+	BigNumber Nz = 0;
 	string Method = "hho";
 	string Mesher = "gmsh";
 	string MeshCode = "default";

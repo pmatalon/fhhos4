@@ -101,6 +101,7 @@ public:
 
 		this->IterationCount = iterations;
 
-		delete f, x;
+		delete f;
+		delete x;
 	}
 };

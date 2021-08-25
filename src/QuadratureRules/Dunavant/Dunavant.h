@@ -33,7 +33,7 @@ public:
 			degree = MaxDegree();
 		}
 
-		int rule, degreeRule;
+		int rule;
 		for (rule = 1; rule <= MaxRule(); rule++) {
 			if (dunavant_degree(rule) >= degree)
 				break;

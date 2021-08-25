@@ -57,6 +57,6 @@ public:
 	{
 		struct stat st;
 		if (stat(dirPath.c_str(), &st) != 0)
-			mkdir(dirPath.c_str(), 0777) != 0;
+			mkdir(dirPath.c_str(), 0777);
 	}
 };

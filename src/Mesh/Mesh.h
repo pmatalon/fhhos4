@@ -924,6 +924,7 @@ public:
 	virtual Mesh<Dim>* Copy()
 	{
 		Utils::FatalError("The method Copy() must be implemented for this type of mesh.");
+		return nullptr;
 	}
 
 	virtual ~Mesh() 

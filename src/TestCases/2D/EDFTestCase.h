@@ -33,9 +33,6 @@ public:
 		{
 			this->SourceFunction = [](const DomPoint& p)
 			{
-				double x = p.X;
-				double y = p.Y;
-
 				double r = 6;
 				double power = 1.0;
 				// left

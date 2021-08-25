@@ -100,7 +100,8 @@ public:
 					this->P = this->P * *auxP;
 				this->Q_F = this->Q_F * *auxQ_F;
 			}
-			delete auxP, auxQ_F;
+			delete auxP;
+			delete auxQ_F;
 
 			// Global coarsening factor
 			double nFine = initialFineMesh.A_T_F->cols();

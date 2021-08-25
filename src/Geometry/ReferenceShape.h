@@ -43,7 +43,7 @@ public:
 	double MassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
 	{
 		assert(_massMatrices.size() == 1);
-		_massMatrices.begin()->second(phi1->LocalNumber, phi2->LocalNumber);
+		return _massMatrices.begin()->second(phi1->LocalNumber, phi2->LocalNumber);
 	}
 
 	//---------//

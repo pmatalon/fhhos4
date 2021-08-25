@@ -49,9 +49,15 @@ public:
 			else if (physicalPart->Name.compare(physicalPartName2) == 0)
 				return k2;
 			else if (physicalPart->Name.size() == 0)
+			{
 				Utils::FatalError("A non-named physical part has been found. Please name all the physical parts of the geometry.");
+				return k1; // just to avoid warning
+			}
 			else
+			{
 				Utils::FatalError("Unknown physical part '" + physicalPart->Name + "'");
+				return k1; // just to avoid warning
+			}
 		};
 	}
 

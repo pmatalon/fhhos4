@@ -453,7 +453,10 @@ private:
 			else if (Utils::ProgramArgs.Solver.MG.BoundaryFaceCollapsing == FaceCollapsing::Max)
 				return TryCollapse(interfaceFaces);
 			else
+			{
 				Utils::FatalError("Unmanaged FaceCollapsing mode");
+				return FaceCollapsingStatus::ElementFullDegeneration;
+			}
 		}
 	}
 
@@ -475,7 +478,10 @@ private:
 		else if (Utils::ProgramArgs.Solver.MG.BoundaryFaceCollapsing == FaceCollapsing::Max)
 			return TryCollapse(boundaryFaces);
 		else
+		{
 			Utils::FatalError("Unmanaged FaceCollapsing mode");
+			return FaceCollapsingStatus::ElementFullDegeneration;
+		}
 	}
 
 	FaceCollapsingStatus TryCollapseCoplanarFaces(const Interface<Dim>& interf)
@@ -1438,10 +1444,10 @@ private:
 		// Check re-entrant corners
 		if (checkNoSharedReEntrantCorner)
 		{
-			for (int i = 0; i < fineElements.size(); i++)
+			for (size_t i = 0; i < fineElements.size(); i++)
 			{
 				vector<Vertex*> reentrantCorners = ReEntrantCorners(fineElements[i]);
-				for (int j = i + 1; j < fineElements.size(); j++)
+				for (size_t j = i + 1; j < fineElements.size(); j++)
 				{
 					if (fineElements[j]->HasAny(reentrantCorners))
 					{

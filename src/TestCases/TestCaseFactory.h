@@ -35,6 +35,7 @@ TestCase<1>* TestCaseFactory<1>::Create(ProblemArguments pb)
 		return new Heterogeneity1DTestCase(pb);
 
 	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 1D. Check -tc argument or use '-tc default'.");
+	return nullptr;
 }
 
 template <>
@@ -68,6 +69,7 @@ TestCase<2>* TestCaseFactory<2>::Create(ProblemArguments pb)
 		return new RoomWithWallTestCase(pb);
 
 	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 2D. Check -tc argument or use '-tc default'.");
+	return nullptr;
 }
 
 template <>
@@ -81,4 +83,5 @@ TestCase<3>* TestCaseFactory<3>::Create(ProblemArguments pb)
 		return new PlateWith4HolesTestCase(pb);
 
 	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 3D. Check -tc argument or use '-tc default'.");
+	return nullptr;
 }

@@ -325,7 +325,7 @@ private:
 			// Pre-smoothing //
 			//---------------//
 
-			auto flopBeforePreSmooth = result.IterationComputationalWork();
+			//auto flopBeforePreSmooth = result.IterationComputationalWork();
 
 			Vector r;
 			if (level->PreSmoother->CanOptimizeResidualComputation())
@@ -347,7 +347,7 @@ private:
 			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPreSmoothing");
 
-			auto flopPreSmoothAndRes = result.IterationComputationalWork() - flopBeforePreSmooth;
+			//auto flopPreSmoothAndRes = result.IterationComputationalWork() - flopBeforePreSmooth;
 			//cout << "- flopPreSmoothAndRes = " << flopPreSmoothAndRes << endl;
 
 			//------------------------------------------------//
@@ -425,7 +425,7 @@ private:
 
 			assert(!xEquals0);
 
-			auto flopBeforePostSmooth = result.IterationComputationalWork();
+			//auto flopBeforePostSmooth = result.IterationComputationalWork();
 
 			if (level->PostSmoother->CanOptimizeResidualComputation() && (computeResidual || computeAx))
 			{
@@ -458,7 +458,7 @@ private:
 			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPostSmoothing");
 
-			auto flopPostSmooth = result.IterationComputationalWork() - flopBeforePostSmooth;
+			//auto flopPostSmooth = result.IterationComputationalWork() - flopBeforePostSmooth;
 			//cout << "- flopPostSmooth = " << flopPostSmooth << endl;
 		}
 	}
@@ -466,7 +466,7 @@ private:
 private:
 	Vector FCGForKCycle(Level* level, Vector& r, IterationResult& result)
 	{
-		const SparseMatrix& A = *level->OperatorMatrix;
+		//const SparseMatrix& A = *level->OperatorMatrix;
 		double t = 0.25;
 		Vector x;
 
