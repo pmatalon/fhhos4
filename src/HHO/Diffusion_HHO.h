@@ -573,14 +573,13 @@ public:
 			if (actions.LogAssembly)
 				cout << "Static condensation..." << endl;
 
-			SparseMatrix inv_A_T_T = Inverse_A_T_T();
-
 			// Schur complement
-			Problem<Dim>::A = (A_ndF_ndF - A_T_ndF.transpose() * inv_A_T_T * A_T_ndF).pruned();
+			SparseMatrix tmp = SparseMatrix(A_T_ndF.transpose()) * Solve_A_T_T(A_T_ndF);
+			Problem<Dim>::A = (A_ndF_ndF - tmp).pruned();
 
 			if (actions.AssembleRightHandSide)
 				// Right-hand side of the condensed system
-				Problem<Dim>::b = B_ndF - A_T_ndF.transpose() * inv_A_T_T * B_T;
+				Problem<Dim>::b = B_ndF - A_T_ndF.transpose() * Solve_A_T_T(B_T);
 		}
 		else
 		{
@@ -753,9 +752,7 @@ public:
 			cout << "Solving cell unknowns..." << endl;
 			Vector facesSolution = this->SystemSolution;
 
-			SparseMatrix inverseAtt = Inverse_A_T_T();
-
-			this->GlobalHybridSolution.head(HHO->nTotalCellUnknowns) = inverseAtt * (B_T - A_T_ndF * facesSolution);
+			this->GlobalHybridSolution.head(HHO->nTotalCellUnknowns) = Solve_A_T_T(B_T - A_T_ndF * facesSolution);
 			this->GlobalHybridSolution.segment(HHO->nTotalCellUnknowns, HHO->nTotalFaceUnknowns) = facesSolution;
 		}
 		else
@@ -814,23 +811,39 @@ public:
 	{
 		if (HHO->OrthonormalizeBases)
 			Utils::Error("The export to GMSH has not been implemented when the bases are orthonormalized against each element.");
-		SparseMatrix inverseAtt = Inverse_A_T_T();
-		Vector cellCoeffs = inverseAtt * (B_T - A_T_ndF * faceCoeffs);
+		Vector cellCoeffs = Solve_A_T_T(B_T - A_T_ndF * faceCoeffs);
 		this->_mesh->ExportToGMSH(this->HHO->CellBasis, cellCoeffs, this->GetFilePathPrefix(), "error");
 	}
 
-	SparseMatrix Inverse_A_T_T()
+	SparseMatrix Solve_A_T_T(const SparseMatrix& A_T_ndF)
 	{
 		ElementParallelLoop<Dim> parallelLoop(this->_mesh->Elements);
 		parallelLoop.ReserveChunkCoeffsSize(HHO->nCellUnknowns * HHO->nCellUnknowns);
-		parallelLoop.Execute([this](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+		parallelLoop.Execute([this, &A_T_ndF](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
 			{
 				Diff_HHOElement<Dim>* element = HHOElement(e);
-				chunk->Results.Coeffs.Add(element->Number() * HHO->nCellUnknowns, element->Number() * HHO->nCellUnknowns, element->AttSolver.solve(DenseMatrix::Identity(HHO->nCellUnknowns, HHO->nCellUnknowns)));
+				for (auto f : element->MeshElement->Faces)
+				{
+					if (f->HasDirichletBC())
+						continue;
+					DenseMatrix block_A_T_ndF = A_T_ndF.block(e->Number * HHO->nCellUnknowns, f->Number * HHO->nFaceUnknowns, HHO->nCellUnknowns, HHO->nFaceUnknowns);
+					chunk->Results.Coeffs.Add(e->Number * HHO->nCellUnknowns, f->Number * HHO->nFaceUnknowns, element->AttSolver.solve(block_A_T_ndF));
+				}
 			});
-		SparseMatrix invA_T_T = SparseMatrix(HHO->nTotalCellUnknowns, HHO->nTotalCellUnknowns);
-		parallelLoop.Fill(invA_T_T);
-		return invA_T_T;
+		SparseMatrix result = SparseMatrix(HHO->nTotalCellUnknowns, HHO->nTotalFaceUnknowns);
+		parallelLoop.Fill(result);
+		return result;
+	}
+	Vector Solve_A_T_T(const Vector& b_T)
+	{
+		Vector result(b_T.rows());
+		ElementParallelLoop<Dim> parallelLoop(this->_mesh->Elements);
+		parallelLoop.Execute([this, &b_T, &result](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				Diff_HHOElement<Dim>* element = HHOElement(e);
+				result.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns) = element->AttSolver.solve(b_T.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns));
+			});
+		return result;
 	}
 
 	Vector ProjectOnFaceDiscreteSpace(DomFunction func)

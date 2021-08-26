@@ -483,7 +483,7 @@ private:
 			solver = mg;
 		}
 		else
-			Utils::FatalError("Unknown solver or not applicable.");
+			Utils::FatalError("Unknown solver '" + args.Solver.SolverCode + "' or not applicable.");
 
 		IterativeSolver* iterativeSolver = dynamic_cast<IterativeSolver*>(solver);
 		if (iterativeSolver)
