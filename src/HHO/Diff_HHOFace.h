@@ -10,11 +10,11 @@ class Diff_HHOFace
 {
 private:
 	DenseMatrix _massMatrix;
-	DenseMatrix _invMassMatrix;
+	Eigen::LLT<DenseMatrix> _massMatrixSolver;
 public:
 	Face<Dim>* MeshFace = nullptr;
 	HHOParameters<Dim>* HHO;
-	FunctionalBasis<Dim - 1>* Basis;
+	FunctionalBasis<Dim - 1>* Basis = nullptr;
 
 	Diff_HHOFace() {}
 
@@ -56,7 +56,7 @@ private:
 public:
 	void InitHHO(HHOParameters<Dim>* hho)
 	{
-		if (this->_massMatrix.rows() > 0)
+		if (this->Basis)
 			return;
 
 		this->HHO = hho;
@@ -69,25 +69,26 @@ public:
 			this->Basis = new OrthonormalBasis<Dim - 1>(HHO->FaceBasis, this->MeshFace->Shape());
 			//this->_massMatrix = this->MeshFace->Shape()->ComputeMassMatrix(this->Basis);
 			//cout << "mass matrix: " << endl << _massMatrix << endl;
-			this->_massMatrix = DenseMatrix::Identity(this->Basis->Size(), this->Basis->Size());
-			this->_invMassMatrix = DenseMatrix::Identity(this->Basis->Size(), this->Basis->Size());
 		}
 		else
 		{
 			this->Basis = hho->FaceBasis;
 			this->_massMatrix = this->MeshFace->Shape()->MassMatrix(this->Basis);
-			this->_invMassMatrix = this->_massMatrix.inverse();
+			this->_massMatrixSolver = this->_massMatrix.llt();
 		}
 	}
 
 	DenseMatrix MassMatrix()
 	{
-		return this->_massMatrix;
+		return HHO->OrthonormalizeBases ? DenseMatrix::Identity(this->Basis->Size(), this->Basis->Size()) : _massMatrix;
 	}
-
-	DenseMatrix InvMassMatrix()
+	DenseMatrix SolveMassMatrix(const DenseMatrix& M)
 	{
-		return this->_invMassMatrix;
+		return HHO->OrthonormalizeBases ? M : _massMatrixSolver.solve(M);
+	}
+	Vector SolveMassMatrix(const Vector& v)
+	{
+		return HHO->OrthonormalizeBases ? v : _massMatrixSolver.solve(v);
 	}
 
 	DenseMatrix MassMatrix(FunctionalBasis<Dim - 1>* basis, Element<Dim>* element, FunctionalBasis<Dim>* cellBasis)
@@ -121,7 +122,8 @@ public:
 		return ComputeTraceMatrix(element, cellBasis);
 	}
 
-	double ProjectOnBasisFunction(BasisFunction<Dim - 1>* phi, DomFunction f)
+private:
+	double InnerProduct(BasisFunction<Dim - 1>* phi, DomFunction f)
 	{
 		RefFunction functionToIntegrate = [this, f, phi](const RefPoint& refElementPoint) {
 			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
@@ -131,31 +133,37 @@ public:
 		return this->MeshFace->Integral(functionToIntegrate);
 	}
 
+public:
+	Vector InnerProductWithBasis(DomFunction f)
+	{
+		Vector innerProducts(this->Basis->Size());
+		for (BasisFunction<Dim - 1>* phi : this->Basis->LocalFunctions)
+			innerProducts(phi->LocalNumber) = InnerProduct(phi, f);
+		return innerProducts;
+	}
 	Vector ProjectOnBasis(DomFunction f)
 	{
-		Vector projection(this->Basis->Size());
-		for (BasisFunction<Dim - 1>* phi : this->Basis->LocalFunctions)
-			projection(phi->LocalNumber) = ProjectOnBasisFunction(phi, f);
-		return projection;
+		return SolveMassMatrix(InnerProductWithBasis(f));
 	}
 
 	void DeleteUselessMatricesAfterAssembly()
 	{
-		Utils::Empty(_massMatrix);
+		if (!HHO->OrthonormalizeBases)
+			Utils::Empty(_massMatrix);
 	}
 
 	void DeleteUselessMatricesAfterMultigridSetup()
 	{
-		Utils::Empty(_invMassMatrix);
+		if (!HHO->OrthonormalizeBases)
+			_massMatrixSolver = Eigen::LLT<DenseMatrix>();
 		this->MeshFace->EmptySavedDomPoints();
 	}
 
 private:
 	DenseMatrix ComputeTraceMatrix(Element<Dim>* e, FunctionalBasis<Dim>* cellBasis)
 	{
-		assert(_invMassMatrix.rows() > 0);
 		DenseMatrix massCellFace = this->MassMatrix(this->Basis, e, cellBasis);
-		return _invMassMatrix * massCellFace;
+		return SolveMassMatrix(massCellFace);
 	}
 
 public:

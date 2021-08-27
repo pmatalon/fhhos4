@@ -100,8 +100,10 @@ public:
 		{
 			this->ReconstructionBasis = new OrthonormalBasis<Dim>(HHO->ReconstructionBasis, this->MeshElement->Shape());
 			//DenseMatrix massMatrix = this->MeshElement->Shape()->ComputeMassMatrix(this->ReconstructionBasis);
-			//cout << "mass matrix: " << endl << massMatrix << endl;
+			//cout << "Reconstruct mass matrix: " << endl << massMatrix << endl;
 			this->CellBasis = new FunctionalBasis<Dim>(this->ReconstructionBasis->ExtractLowerBasis(HHO->CellBasis->GetDegree()));
+			//massMatrix = this->MeshElement->Shape()->ComputeMassMatrix(this->CellBasis);
+			//cout << "Cell mass matrix: " << endl << massMatrix << endl;
 		}
 		else
 		{
@@ -165,24 +167,18 @@ private:
 
 	void AssembleReconstructionAndConsistencyMatrices()
 	{
-		this->P = DenseMatrix(HHO->nReconstructUnknowns, HHO->nCellUnknowns + this->Faces.size() * HHO->nFaceUnknowns);
-
 		DenseMatrix reconstructionMatrixToInvert = this->AssembleReconstructionMatrixToInvert();
 		DenseMatrix rhsMatrix = this->AssembleRHSMatrix();
 
-		Eigen::ColPivHouseholderQR<DenseMatrix> solver = reconstructionMatrixToInvert.colPivHouseholderQr();
-		for (int j = 0; j < rhsMatrix.cols(); j++)
-		{
-			Vector col = solver.solve(rhsMatrix.col(j));
+		DenseMatrix P_and_LagrangeMultipliers = reconstructionMatrixToInvert.colPivHouseholderQr().solve(rhsMatrix);
+		// We don't keep the last row, which stores the values of the Lagrange multipliers
+		this->P = P_and_LagrangeMultipliers.topRows(HHO->nReconstructUnknowns);
 
-			// We don't keep the last element of the column, which is the Lagrange multiplier
-			auto colWithoutLagrangeMultiplier = col.head(HHO->nReconstructUnknowns);
-			this->P.col(j) = colWithoutLagrangeMultiplier;
-		}
+		assert(this->P.cols() == HHO->nCellUnknowns + this->Faces.size() * HHO->nFaceUnknowns);
 
 		DenseMatrix laplacianMatrix = reconstructionMatrixToInvert.topLeftCorner(HHO->nReconstructUnknowns, HHO->nReconstructUnknowns); // Grad-Grad part (block S)
 
-		this->Acons = this->P.transpose() * laplacianMatrix * this->P;
+		this->Acons.noalias() = this->P.transpose() * laplacianMatrix * this->P;
 	}
 
 	DenseMatrix AssembleReconstructionMatrixToInvert()
@@ -328,7 +324,7 @@ private:
 				DenseMatrix cellMassMatrix = this->MassMatrix(this->CellBasis);
 				DenseMatrix Nt = this->CellReconstructMassMatrix(this->CellBasis, this->ReconstructionBasis);
 
-				ProjT = cellMassMatrix.inverse() * Nt;
+				ProjT = cellMassMatrix.llt().solve(Nt);
 			}
 			else
 				ProjT = DenseMatrix::Identity(HHO->nCellUnknowns, HHO->nReconstructUnknowns);

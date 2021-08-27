@@ -532,7 +532,7 @@ public:
 				{
 					Diff_HHOFace<Dim>* face = HHOFace(f);
 					BigNumber i = FirstDOFGlobalNumber(face) - HHO->nTotalCellUnknowns;
-					B_ndF.segment(i, HHO->nFaceUnknowns) = face->ProjectOnBasis(this->_boundaryConditions->NeumannFunction);
+					B_ndF.segment(i, HHO->nFaceUnknowns) = face->InnerProductWithBasis(this->_boundaryConditions->NeumannFunction);
 				}
 			);
 		}
@@ -544,7 +544,7 @@ public:
 			{
 				Diff_HHOFace<Dim>* face = HHOFace(f);
 				BigNumber i = FirstDOFGlobalNumber(face) - HHO->nTotalHybridUnknowns;
-				this->x_dF.segment(i, HHO->nFaceUnknowns) = face->InvMassMatrix()*face->ProjectOnBasis(this->_boundaryConditions->DirichletFunction);
+				this->x_dF.segment(i, HHO->nFaceUnknowns) = face->ProjectOnBasis(this->_boundaryConditions->DirichletFunction);
 			}
 		);
 
@@ -856,7 +856,7 @@ public:
 				Diff_HHOFace<Dim>* face = HHOFace(f);
 				BigNumber i = face->Number() * HHO->nFaceUnknowns;// FirstDOFGlobalNumber(f);
 
-				vectorOfDoFs.segment(i, HHO->nFaceUnknowns) = face->InvMassMatrix()*face->ProjectOnBasis(func);
+				vectorOfDoFs.segment(i, HHO->nFaceUnknowns) = face->ProjectOnBasis(func);
 			}
 		);
 		return vectorOfDoFs;

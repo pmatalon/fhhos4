@@ -1272,10 +1272,7 @@ private:
 					fineCoarseMass(finePhi->LocalNumber, coarsePhi->LocalNumber) = integral;
 				}
 			}
-			if (coarseHHOFace->Basis->IsOrthogonal) // if orthogonal, the mass matrix is Identity, so its inverse is also Identity
-				J.block(coarseFace->LocalNumberOf(fineFace)*fineFaceUnknowns, 0, fineFaceUnknowns, coarseFaceUnknowns) = fineCoarseMass;
-			else
-				J.block(coarseFace->LocalNumberOf(fineFace)*fineFaceUnknowns, 0, fineFaceUnknowns, coarseFaceUnknowns) = fineHHOFace->InvMassMatrix() * fineCoarseMass;
+			J.block(coarseFace->LocalNumberOf(fineFace)*fineFaceUnknowns, 0, fineFaceUnknowns, coarseFaceUnknowns) = fineHHOFace->SolveMassMatrix(fineCoarseMass);
 		}
 
 		return J;
