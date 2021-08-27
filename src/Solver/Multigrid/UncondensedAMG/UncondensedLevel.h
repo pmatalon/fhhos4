@@ -50,6 +50,11 @@ public:
 		return A_F_F->rows();
 	}
 
+	int PolynomialDegree() override
+	{
+		return 0;
+	}
+
 	void ExportVector(const Vector& v, string suffix, int levelNumber) override
 	{ }
 

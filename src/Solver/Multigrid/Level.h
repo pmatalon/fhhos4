@@ -159,10 +159,7 @@ public:
 		assert(false && "Level::NUnknowns() must be overridden to use this level");
 	}
 
-	virtual int PolynomialDegree()
-	{
-		assert(false && "Level::PolynomialDegree() must be overridden to use this level in a p-multigrid");
-	}
+	virtual int PolynomialDegree() = 0;
 
 	virtual int BlockSizeForBlockSmoothers()
 	{

@@ -24,6 +24,11 @@ public:
 		this->_strongCouplingThreshold = strongCouplingThreshold;
 	}
 
+	int PolynomialDegree() override
+	{
+		return 0; // TODO for p-multigrid
+	}
+
 	void ExportVector(const Vector& v, string suffix, int levelNumber) override
 	{ }
 

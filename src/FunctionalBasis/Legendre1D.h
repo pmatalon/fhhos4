@@ -41,13 +41,7 @@ public:
 			return 1;
 		if (n == 1)
 			return x;
-		/*if (n == 2)
-			return 1.5 * pow(x, 2) - 0.5;
-		if (n == 3)
-			return 2.5 * pow(x, 3) - 1.5*x;
-		if (n == 4)
-			return 0.125 * (35 * pow(x, 4) - 30 * pow(x, 2) + 3);*/
-		
+		// Recurrence (Bonnet's formula)
 		return ((2 * n - 1)*x*Legendre(n - 1, x) - (n - 1)*Legendre(n - 2, x))/n;
 	}
 

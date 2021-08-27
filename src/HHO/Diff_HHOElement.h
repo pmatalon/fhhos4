@@ -99,17 +99,17 @@ public:
 		if (hho->OrthonormalizeBases)
 		{
 			this->ReconstructionBasis = new OrthonormalBasis<Dim>(HHO->ReconstructionBasis, this->MeshElement->Shape());
-			//DenseMatrix massMatrix = this->MeshElement->Shape()->ComputeMassMatrix(this->ReconstructionBasis);
-			//cout << "Reconstruct mass matrix: " << endl << massMatrix << endl;
 			this->CellBasis = new FunctionalBasis<Dim>(this->ReconstructionBasis->ExtractLowerBasis(HHO->CellBasis->GetDegree()));
-			//massMatrix = this->MeshElement->Shape()->ComputeMassMatrix(this->CellBasis);
-			//cout << "Cell mass matrix: " << endl << massMatrix << endl;
 		}
 		else
 		{
 			this->ReconstructionBasis = HHO->ReconstructionBasis;
 			this->CellBasis = HHO->CellBasis;
 		}
+		//DenseMatrix massMatrix = this->MeshElement->Shape()->ComputeMassMatrix(this->ReconstructionBasis);
+		//cout << "Reconstruct mass matrix: " << endl << massMatrix << endl;
+		//massMatrix = this->MeshElement->Shape()->ComputeMassMatrix(this->CellBasis);
+		//cout << "Cell mass matrix: " << endl << massMatrix << endl;
 
 
 		//this->ComputeAndSaveQuadraturePoints(hho->CellBasis->GetDegree());

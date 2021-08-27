@@ -89,6 +89,8 @@ public:
 
 		if (Utils::IsRefinementStrategy(this->H_CS))
 			this->H_CS = H_CoarsStgy::MultiplePairwiseAggregation;
+		if (this->H_CS == H_CoarsStgy::MultiplePairwiseAggregation && this->CoarseningFactor == 0)
+			this->CoarseningFactor = 3.8;
 
 		Multigrid::Setup(A);
 	}
