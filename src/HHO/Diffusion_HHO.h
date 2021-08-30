@@ -158,9 +158,9 @@ public:
 		cout << "    h         : " << scientific << this->_mesh->H() << defaultfloat << endl;
 		cout << "    Regularity: " << this->_mesh->Regularity() << defaultfloat << endl;
 		cout << "Discretization: Hybrid High-Order (k = " << HHO->FaceBasis->GetDegree() << ")" << endl;
-		cout << "    Reconstruction basis: " << (HHO->OrthonormalizeBases ? "orthonormalized_" : "") << HHO->ReconstructionBasis->Name() << endl;
-		cout << "    Cell basis          : " << (HHO->OrthonormalizeBases ? "orthonormalized_" : "") << HHO->CellBasis->Name() << endl;
-		cout << "    Face basis          : " << (HHO->OrthonormalizeBases ? "orthonormalized_" : "") << HHO->FaceBasis->Name() << endl;
+		cout << "    Reconstruction basis: " << (HHO->OrthonormalizeBases > 0 ? "orthonormalized_" : "") << HHO->ReconstructionBasis->Name() << endl;
+		cout << "    Cell basis          : " << (HHO->OrthonormalizeBases > 0 ? "orthonormalized_" : "") << HHO->CellBasis->Name() << endl;
+		cout << "    Face basis          : " << (HHO->OrthonormalizeBases > 0 ? "orthonormalized_" : "") << HHO->FaceBasis->Name() << endl;
 		cout << "Cell unknowns : " << HHO->nTotalCellUnknowns << " (" << HHO->CellBasis->Size() << " per cell)" << endl;
 		cout << "Face unknowns : " << HHO->nTotalFaceUnknowns << " (" << HHO->FaceBasis->Size() << " per interior face)" << endl;
 		cout << "Total unknowns: " << HHO->nTotalHybridUnknowns << endl;
@@ -653,7 +653,7 @@ public:
 	// Compute some useful integrals on reference element and store them
 	void InitReferenceShapes()
 	{
-		if (HHO->OrthonormalizeBases)
+		if (HHO->OrthonormalizeBases > 0)
 			return;
 
 		FunctionalBasis<Dim>* reconstructionBasis = HHO->ReconstructionBasis;
@@ -802,14 +802,14 @@ public:
 
 	void ExportSolutionToGMSH() override
 	{
-		if (HHO->OrthonormalizeBases)
+		if (HHO->OrthonormalizeBases > 0)
 			Utils::Error("The export to GMSH has not been implemented when the bases are orthonormalized against each element.");
 		this->_mesh->ExportToGMSH(this->HHO->ReconstructionBasis, this->ReconstructedSolution, this->GetFilePathPrefix(), "potential");
 	}
 
 	void ExportErrorToGMSH(const Vector& faceCoeffs) override
 	{
-		if (HHO->OrthonormalizeBases)
+		if (HHO->OrthonormalizeBases > 0)
 			Utils::Error("The export to GMSH has not been implemented when the bases are orthonormalized against each element.");
 		Vector cellCoeffs = Solve_A_T_T(B_T - A_T_ndF * faceCoeffs);
 		this->_mesh->ExportToGMSH(this->HHO->CellBasis, cellCoeffs, this->GetFilePathPrefix(), "error");

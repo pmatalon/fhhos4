@@ -64,9 +64,9 @@ public:
 		//this->ComputeAndSaveQuadraturePoints(basis->GetDegree());
 		//this->ComputeAndSaveQuadraturePoints();
 
-		if (hho->OrthonormalizeBases)
+		if (hho->OrthonormalizeBases > 0)
 		{
-			this->Basis = new OrthonormalBasis<Dim - 1>(HHO->FaceBasis, this->MeshFace->Shape());
+			this->Basis = new OrthonormalBasis<Dim - 1>(HHO->FaceBasis, this->MeshFace->Shape(), hho->OrthonormalizeBases);
 			//this->_massMatrix = this->MeshFace->Shape()->ComputeMassMatrix(this->Basis);
 			//cout << "mass matrix: " << endl << _massMatrix << endl;
 		}
@@ -80,15 +80,15 @@ public:
 
 	DenseMatrix MassMatrix()
 	{
-		return HHO->OrthonormalizeBases ? DenseMatrix::Identity(this->Basis->Size(), this->Basis->Size()) : _massMatrix;
+		return HHO->OrthonormalizeBases > 0 ? DenseMatrix::Identity(this->Basis->Size(), this->Basis->Size()) : _massMatrix;
 	}
 	DenseMatrix SolveMassMatrix(const DenseMatrix& M)
 	{
-		return HHO->OrthonormalizeBases ? M : _massMatrixSolver.solve(M);
+		return HHO->OrthonormalizeBases > 0 ? M : _massMatrixSolver.solve(M);
 	}
 	Vector SolveMassMatrix(const Vector& v)
 	{
-		return HHO->OrthonormalizeBases ? v : _massMatrixSolver.solve(v);
+		return HHO->OrthonormalizeBases > 0 ? v : _massMatrixSolver.solve(v);
 	}
 
 	DenseMatrix MassMatrix(FunctionalBasis<Dim - 1>* basis, Element<Dim>* element, FunctionalBasis<Dim>* cellBasis)
@@ -148,13 +148,13 @@ public:
 
 	void DeleteUselessMatricesAfterAssembly()
 	{
-		if (!HHO->OrthonormalizeBases)
+		if (HHO->OrthonormalizeBases == 0)
 			Utils::Empty(_massMatrix);
 	}
 
 	void DeleteUselessMatricesAfterMultigridSetup()
 	{
-		if (!HHO->OrthonormalizeBases)
+		if (HHO->OrthonormalizeBases == 0)
 			_massMatrixSolver = Eigen::LLT<DenseMatrix>();
 		this->MeshFace->EmptySavedDomPoints();
 	}
@@ -169,7 +169,7 @@ private:
 public:
 	~Diff_HHOFace()
 	{
-		if (HHO->OrthonormalizeBases)
+		if (HHO->OrthonormalizeBases > 0)
 			delete Basis;
 	}
 };

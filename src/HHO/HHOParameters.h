@@ -7,7 +7,7 @@ struct HHOParameters
 	FunctionalBasis<Dim>* ReconstructionBasis;
 	FunctionalBasis<Dim>* CellBasis;
 	FunctionalBasis<Dim - 1>* FaceBasis;
-	bool OrthonormalizeBases;
+	int OrthonormalizeBases;
 
 	BigNumber nElements;
 	BigNumber nFaces;
@@ -32,7 +32,7 @@ struct HHOParameters
 
 	string Stabilization;
 
-	HHOParameters(Mesh<Dim>* mesh, string stabilization, FunctionalBasis<Dim>* reconstructionBasis, FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim - 1>* faceBasis, bool orthonormalizeBases)
+	HHOParameters(Mesh<Dim>* mesh, string stabilization, FunctionalBasis<Dim>* reconstructionBasis, FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim - 1>* faceBasis, int orthonormalizeBases)
 	{
 		this->ReconstructionBasis = reconstructionBasis;
 		this->CellBasis = cellBasis;

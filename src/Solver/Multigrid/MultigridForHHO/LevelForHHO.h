@@ -528,7 +528,7 @@ private:
 	{
 		if (_pProlongation == GMG_P_Prolongation::Injection)
 		{
-			if (!this->_problem->HHO->FaceBasis->IsHierarchical || !this->_problem->HHO->OrthonormalizeBases)
+			if (!this->_problem->HHO->FaceBasis->IsHierarchical || this->_problem->HHO->OrthonormalizeBases == 0)
 				Utils::Warning("The natural injection and restriction for p-multigrid are implemented based on the assumption that the face bases are hierarchical and orthonormalized. Degraded convergence may be experienced.");
 			// nothing to do
 		}
@@ -1072,10 +1072,10 @@ private:
 				}
 			}
 
-			if (!finePb->HHO->OrthonormalizeBases)
+			if (finePb->HHO->OrthonormalizeBases == 0)
 			{
 				DenseMatrix fineMass = fineElement->MassMatrix(fineBasis);
-				J.block(coarseElement->LocalNumberOf(fineElement)*nFineUnknowns, 0, nFineUnknowns, nCoarseUnknowns) = fineMass.inverse() * fineCoarseMass;
+				J.block(coarseElement->LocalNumberOf(fineElement)*nFineUnknowns, 0, nFineUnknowns, nCoarseUnknowns) = fineMass.llt().solve(fineCoarseMass);
 			}
 			else
 				J.block(coarseElement->LocalNumberOf(fineElement)*nFineUnknowns, 0, nFineUnknowns, nCoarseUnknowns) = fineCoarseMass;
@@ -1189,10 +1189,10 @@ private:
 				}
 			}
 
-			if (!finePb->HHO->OrthonormalizeBases)
+			if (finePb->HHO->OrthonormalizeBases == 0)
 			{
 				DenseMatrix fineMass = fineElement->MassMatrix(fineBasis);
-				L2Proj.block(coarseElement->LocalNumberOfOverlapping(fineElement)*nFineUnknowns, 0, nFineUnknowns, nCoarseUnknowns) = fineMass.inverse() * fineCoarseMass;
+				L2Proj.block(coarseElement->LocalNumberOfOverlapping(fineElement)*nFineUnknowns, 0, nFineUnknowns, nCoarseUnknowns) = fineMass.llt().solve(fineCoarseMass);
 			}
 			else
 				L2Proj.block(coarseElement->LocalNumberOfOverlapping(fineElement)*nFineUnknowns, 0, nFineUnknowns, nCoarseUnknowns) = fineCoarseMass;
@@ -1342,7 +1342,7 @@ private:
 			}
 		}
 
-		DenseMatrix resolveCondensedFinerFacesFromFineBoundary = -Aii.inverse()*Aib;
+		DenseMatrix resolveCondensedFinerFacesFromFineBoundary = -Aii.llt().solve()*Aib;
 		DenseMatrix resolveCondensedFinerFacesFromCoarseBoundary = resolveCondensedFinerFacesFromFineBoundary * J;
 
 		return resolveCondensedFinerFacesFromCoarseBoundary;

@@ -117,8 +117,11 @@ void print_usage() {
 	cout << "               bernstein" << endl;
 	cout << "               hemker" << endl;
 	cout << endl;
-	cout << "-onb {0|1}" << endl;
-	cout << "      If 1, then the local bases are locally orthonormalized against each element and face. Default: 1." << endl;
+	cout << "-onb NUM" << endl;
+	cout << "      Orthonormalization of the local bases are against each element and face. Default: 1." << endl;
+	cout << "               0 - no orthonormalization" << endl;
+	cout << "               1 - orthonormalization by the modified Gram-Schmitt algorithm" << endl;
+	cout << "               2 - orthonormalization by the modified Gram-Schmitt algorithm with reorthogonalization" << endl;
 	cout << endl;
 	cout << "-p NUM" << endl;
 	cout << "      Polynomial degree of approximation (default: 1). In HHO, k = p-1." << endl;
@@ -717,12 +720,10 @@ int main(int argc, char* argv[])
 			case OPT_OrthonormalizeBases:
 			{
 				int i = atoi(optarg);
-				if (i == 1)
-					args.Discretization.OrthonormalizeBases = true;
-				else if (i == 0)
-					args.Discretization.OrthonormalizeBases = false;
+				if (i != 0 && i != 1 && i != 2)
+					argument_error("check -onb argument. Accepted values: 0, 1, 2.");
 				else
-					argument_error("check -onb argument. Accepted values: 0 or 1.");
+					args.Discretization.OrthonormalizeBases = i;
 				break;
 			}
 			case 'p': 
@@ -1201,7 +1202,7 @@ int main(int argc, char* argv[])
 
 	// Polynomial basis
 	if (args.Discretization.BasisCode.empty())
-		args.Discretization.BasisCode = args.Discretization.OrthonormalizeBases ? "monomials" : "legendre";
+		args.Discretization.BasisCode = args.Discretization.OrthonormalizeBases > 0 ? "monomials" : "legendre";
 
 	//------------------------------------------//
 	//                  Solver                  //

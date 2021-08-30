@@ -80,25 +80,25 @@ template <int Dim>
 class OrthonormalBasis : public FunctionalBasis<Dim>
 {
 public:
-	OrthonormalBasis(FunctionalBasis<Dim>* basis, PhysicalShape<Dim>* shape) :
+	OrthonormalBasis(FunctionalBasis<Dim>* basis, PhysicalShape<Dim>* shape, int orthogonalizationSweeps = 1) :
 		FunctionalBasis<Dim>()
 	{
 		this->_maxPolynomialDegree = basis->GetDegree();
 		this->_basisCode = "orthonorm_" + basis->BasisCode();
 		this->IsHierarchical = basis->IsHierarchical;
 		this->IsOrthogonal = true;
-		Orthonormalize(basis, shape);
+		Orthonormalize(basis, shape, orthogonalizationSweeps);
 	}
 
 private:
 	// Modified Gram-Schmitt algorithm with reorthogonalization
 	// (Giraud et al., The loss of orthogonality in the Gram-Schmidt orthogonalization process, 2003)
-	void Orthonormalize(FunctionalBasis<Dim>* basis, PhysicalShape<Dim>* shape)
+	void Orthonormalize(FunctionalBasis<Dim>* basis, PhysicalShape<Dim>* shape, int orthogonalizationSweeps = 1)
 	{
 		for (int i = 0; i < basis->LocalFunctions.size(); i++)
 		{
 			OrthonormalBasisFunction<Dim>* phi = new OrthonormalBasisFunction<Dim>(basis->LocalFunctions[i]);
-			for (int nOrthogonalization = 0; nOrthogonalization < 2; nOrthogonalization++) // 2 passes of orthogonalization
+			for (int nOrthogonalization = 0; nOrthogonalization < orthogonalizationSweeps; nOrthogonalization++) // possibly 2 passes of orthogonalization
 			{
 				for (int j = 0; j < i; j++)
 				{

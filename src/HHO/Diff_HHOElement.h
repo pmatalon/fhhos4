@@ -96,9 +96,9 @@ public:
 	{
 		this->HHO = hho;
 
-		if (hho->OrthonormalizeBases)
+		if (hho->OrthonormalizeBases > 0)
 		{
-			this->ReconstructionBasis = new OrthonormalBasis<Dim>(HHO->ReconstructionBasis, this->MeshElement->Shape());
+			this->ReconstructionBasis = new OrthonormalBasis<Dim>(HHO->ReconstructionBasis, this->MeshElement->Shape(), hho->OrthonormalizeBases);
 			this->CellBasis = new FunctionalBasis<Dim>(this->ReconstructionBasis->ExtractLowerBasis(HHO->CellBasis->GetDegree()));
 		}
 		else
@@ -319,7 +319,7 @@ private:
 		if (HHO->Stabilization.compare("hho") == 0)
 		{
 			DenseMatrix ProjT;
-			if (!HHO->OrthonormalizeBases)
+			if (HHO->OrthonormalizeBases == 0)
 			{
 				DenseMatrix cellMassMatrix = this->MassMatrix(this->CellBasis);
 				DenseMatrix Nt = this->CellReconstructMassMatrix(this->CellBasis, this->ReconstructionBasis);
@@ -416,7 +416,7 @@ public:
 public:
 	~Diff_HHOElement()
 	{
-		if (HHO->OrthonormalizeBases)
+		if (HHO->OrthonormalizeBases > 0)
 		{
 			delete ReconstructionBasis;
 			CellBasis->LocalFunctions.clear();
