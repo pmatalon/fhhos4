@@ -1342,7 +1342,7 @@ private:
 			}
 		}
 
-		DenseMatrix resolveCondensedFinerFacesFromFineBoundary = -Aii.llt().solve()*Aib;
+		DenseMatrix resolveCondensedFinerFacesFromFineBoundary = -Aii.llt().solve(Aib);
 		DenseMatrix resolveCondensedFinerFacesFromCoarseBoundary = resolveCondensedFinerFacesFromFineBoundary * J;
 
 		return resolveCondensedFinerFacesFromCoarseBoundary;
