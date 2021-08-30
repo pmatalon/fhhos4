@@ -18,7 +18,6 @@ public:
 	const SparseMatrix* A_T_T;
 	const SparseMatrix* A_T_F;
 	const SparseMatrix* A_F_F;
-	const SparseMatrix* inv_A_T_T;
 private:
 	//SparseMatrix Q_T;
 	SparseMatrix Q_F;
@@ -26,7 +25,6 @@ private:
 	SparseMatrix A_T_Tc;
 	SparseMatrix A_T_Fc;
 	SparseMatrix A_F_Fc;
-	SparseMatrix* inv_A_T_Tc;
 public:
 	SparseMatrix Ac;
 
@@ -106,7 +104,8 @@ public:
 				this->Q_F = this->Q_F * *auxQ_F;
 			}
 			delete auxP;
-			delete auxQ_F;
+			if (auxQ_F != auxP)
+				delete auxQ_F;
 
 			// Global coarsening factor
 			double nFine = initialFineMesh.A_T_F->cols();
@@ -125,6 +124,16 @@ public:
 					// Update global coarsening
 					UpdateGlobalCoarsening(initialFineMesh, *mesh);
 				}
+
+				// Print aggregates for debugging purposes
+				/*UpdateGlobalCoarsening(initialFineMesh, *mesh);
+				for (HybridElementAggregate& ce : initialFineMesh.CoarseElements)
+				{
+					cout << "Aggregate " << ce.Number << ": ";
+					for (HybridAlgebraicElement* fe : ce.FineElements)
+						cout << fe->Number << " ";
+					cout << endl;
+				}*/
 
 				// Memory release
 				delete mesh->A_T_T;
@@ -320,6 +329,7 @@ public:
 		}
 
 		HybridAlgebraicMesh auxCoarseMesh(A_T_Tc, A_T_Fc_tmp, nullptr, _cellBlockSize, _faceBlockSize, _strongCouplingThreshold);
+		auxCoarseMesh.Build();
 
 		/*ExportMatrix(Q_T, "Q_T", 0);
 		ExportMatrix(*Q_F, "Q_F", 0);
@@ -348,9 +358,8 @@ public:
 		SparseMatrix* P;
 		if (prolong == UAMGProlongation::ReconstructionTrace) // 1
 		{
-			SparseMatrix inv_A_T_Tc = Utils::InvertBlockDiagMatrix(*coarseMesh.A_T_T, _cellBlockSize);
 			// Theta: reconstruction from the coarse faces to the coarse cells
-			SparseMatrix Theta = -inv_A_T_Tc * *coarseMesh.A_T_F;
+			SparseMatrix Theta = coarseMesh.Theta();
 			// Pi: average on both sides of each face
 			SparseMatrix Pi = BuildTrace(mesh);
 
@@ -384,8 +393,7 @@ public:
 		}
 		else if (prolong == UAMGProlongation::ReconstructTraceOrInject) // 5
 		{
-			SparseMatrix inv_A_T_Tc = Utils::InvertBlockDiagMatrix(*coarseMesh.A_T_T, _cellBlockSize);
-			SparseMatrix Theta = -inv_A_T_Tc * *coarseMesh.A_T_F;   // Reconstruct
+			SparseMatrix Theta = coarseMesh.Theta();   // Reconstruct
 			SparseMatrix Pi = BuildCoarseTraceOnFineRemovedFaces(mesh); // Trace
 
 			SparseMatrix ReconstructAndTrace = Pi * Theta;
@@ -405,8 +413,7 @@ public:
 		}
 		else if (prolong == UAMGProlongation::ReconstructSmoothedTraceOrInject) // 6
 		{
-			SparseMatrix inv_A_T_Tc = Utils::InvertBlockDiagMatrix(*coarseMesh.A_T_T, _cellBlockSize);
-			SparseMatrix Theta = -inv_A_T_Tc * *coarseMesh.A_T_F;   // Reconstruct
+			SparseMatrix Theta = coarseMesh.Theta();   // Reconstruct
 			SparseMatrix Pi = BuildCoarseTraceOnFineRemovedFaces(mesh); // Trace
 
 			SparseMatrix ReconstructAndTrace = Pi * Theta;
@@ -448,12 +455,9 @@ public:
 			int cbs = _cellBlockSize;
 			int fbs = _faceBlockSize;
 
-			SparseMatrix inv_A_T_Tc = Utils::InvertBlockDiagMatrix(*coarseMesh.A_T_T, cbs);
-			SparseMatrix inv_A_T_T  = Utils::InvertBlockDiagMatrix(*mesh.A_T_T, cbs);
-
 			NumberParallelLoop<CoeffsChunk> parallelLoop(mesh.CoarseElements.size());
 			//parallelLoop.ReserveChunkCoeffsSize(fbs * 2 * fbs);
-			parallelLoop.Execute([this, cbs, fbs, &Q_F, &Q_T, &inv_A_T_T, &inv_A_T_Tc, &mesh, &coarseMesh](BigNumber ceNumber, ParallelChunk<CoeffsChunk>* chunk)
+			parallelLoop.Execute([this, cbs, fbs, &Q_F, &Q_T, &mesh, &coarseMesh](BigNumber ceNumber, ParallelChunk<CoeffsChunk>* chunk)
 				{
 					const HybridElementAggregate& ce = mesh.CoarseElements[ceNumber];
 
@@ -461,7 +465,7 @@ public:
 						return;
 
 					// Construction of Theta_Tc
-					DenseMatrix invA_Tc_Tc = inv_A_T_Tc.block(ce.Number, ce.Number, cbs, cbs);
+					DenseMatrix A_Tc_Tc = coarseMesh.A_T_T->block(ce.Number, ce.Number, cbs, cbs);
 
 					DenseMatrix A_Tc_F(cbs, ce.CoarseFaces.size()*fbs);
 					for (int cfLocalNumber = 0; cfLocalNumber < ce.CoarseFaces.size(); cfLocalNumber++)
@@ -469,7 +473,7 @@ public:
 						HybridFaceAggregate* cf = ce.CoarseFaces[cfLocalNumber];
 						A_Tc_F.block(0, cfLocalNumber*fbs, cbs, fbs) = coarseMesh.A_T_F->block(ce.Number*cbs, cf->Number*fbs, cbs, fbs);
 					}
-					DenseMatrix Theta_Tc = -invA_Tc_Tc * A_Tc_F;
+					DenseMatrix Theta_Tc = -A_Tc_Tc.llt().solve(A_Tc_F);
 
 					// Matrix for minimization problem
 					DenseMatrix M(ce.FineElements.size()*cbs, ce.RemovedFineFaces.size()*fbs);
@@ -482,14 +486,14 @@ public:
 						HybridAlgebraicElement* fe = ce.FineElements[feLocalNumber];
 
 						// Construction of Theta_Tf
-						DenseMatrix invA_Tf_Tf = inv_A_T_T.block(fe->Number, fe->Number, cbs, cbs);
+						DenseMatrix A_Tf_Tf = mesh.A_T_T->block(fe->Number, fe->Number, cbs, cbs);
 						DenseMatrix A_Tf_F(cbs, fe->Faces.size()*fbs);
 						for (int ffLocalNumber = 0; ffLocalNumber < fe->Faces.size(); ffLocalNumber++)
 						{
 							HybridAlgebraicFace* ff = fe->Faces[ffLocalNumber];
 							A_Tf_F.block(0, ffLocalNumber*fbs, cbs, fbs) = mesh.A_T_F->block(fe->Number*cbs, ff->Number*fbs, cbs, fbs);
 						}
-						DenseMatrix Theta_Tf = -invA_Tf_Tf * A_Tf_F;
+						DenseMatrix Theta_Tf = -A_Tf_Tf.llt().solve(A_Tf_F);
 						//cout << "Theta_Tf = " << endl << Theta_Tf << endl;
 						assert((Theta_Tf.array() > 0).all());
 
@@ -575,8 +579,7 @@ public:
 		}
 		else if (prolong == UAMGProlongation::HighOrder) // 8
 		{
-			SparseMatrix inv_A_T_Tc = Utils::InvertBlockDiagMatrix(*coarseMesh.A_T_T, _cellBlockSize);
-			SparseMatrix Theta = -inv_A_T_Tc * *coarseMesh.A_T_F;   // Reconstruct
+			SparseMatrix Theta = coarseMesh.Theta();
 			SparseMatrix Pi = BuildHighOrderTraceOnRemovedFaces(mesh);
 
 			SparseMatrix ReconstructAndTrace1 = Pi * Q_T * Theta;
@@ -802,7 +805,7 @@ private:
 					DenseMatrix faceMass     = mesh.A_F_F->block(faceNumber * _faceBlockSize, faceNumber * _faceBlockSize, _faceBlockSize, _faceBlockSize);
 					DenseMatrix cellFaceMass = mesh.A_T_F->block(elemNumber * _cellBlockSize, faceNumber * _faceBlockSize, _cellBlockSize, _faceBlockSize);
 					DenseMatrix cellMass     = mesh.A_T_T->block(elemNumber * _cellBlockSize, elemNumber * _cellBlockSize, _cellBlockSize, _cellBlockSize);
-					DenseMatrix trace = -faceMass.inverse() * cellFaceMass.transpose();
+					DenseMatrix trace = -faceMass.llt().solve(cellFaceMass.transpose());
 					//DenseMatrix trace = - cellFaceMass.transpose();
 					chunk->Results.Coeffs.Add(faceNumber*_faceBlockSize, elemNumber*_cellBlockSize, trace);
 				}
@@ -895,7 +898,6 @@ public:
 			coarse->A_T_T = &A_T_Tc;
 			coarse->A_T_F = &A_T_Fc;
 			coarse->A_F_F = &A_F_Fc;
-			coarse->inv_A_T_T = inv_A_T_Tc;
 		}
 	}
 

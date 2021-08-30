@@ -339,7 +339,7 @@ void print_usage() {
 	cout << "              " << (unsigned)UAMGProlongation::FaceProlongation << "  - ";
 	cout <<                    "face injection" << endl;
 	cout << "              " << (unsigned)UAMGProlongation::ReconstructTraceOrInject << "  - ";
-	cout <<                    "cell-reconstruction + injection + trace for interior faces, injection for boundary faces" << endl;
+	cout <<                    "cell-reconstruction + trace for interior faces, injection for boundary faces" << endl;
 	cout << "              " << (unsigned)UAMGProlongation::ReconstructSmoothedTraceOrInject << "  - ";
 	cout <<                    "cell-reconstruction + trace + smoothing for interior faces, injection for boundary faces" << endl;
 	cout << endl;

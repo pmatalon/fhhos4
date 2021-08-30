@@ -373,6 +373,27 @@ public:
 			coarsestPossibleMeshReached = true;
 	}
 
+	// - A_{TT}^{-1} * A_{TF}
+	SparseMatrix Theta()
+	{
+		BigNumber nBlocks = A_T_T->rows() / _cellBlockSize;
+		NumberParallelLoop<> parallelLoop(nBlocks);
+		parallelLoop.ReserveChunkCoeffsSize(_cellBlockSize * _faceBlockSize * 4);
+		parallelLoop.Execute([this](BigNumber i, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				DenseMatrix blockA_T_T = A_T_T->block(i * _cellBlockSize, i * _cellBlockSize, _cellBlockSize, _cellBlockSize);
+				auto solverA_T_T = blockA_T_T.llt();
+				for (HybridAlgebraicFace* f : this->Elements[i].Faces)
+				{
+					DenseMatrix blockA_T_F = A_T_F->block(i * _cellBlockSize, f->Number * _faceBlockSize, _cellBlockSize, _faceBlockSize);
+					chunk->Results.Coeffs.Add(i * _cellBlockSize, f->Number * _faceBlockSize, -solverA_T_T.solve(blockA_T_F));
+				}
+			});
+		SparseMatrix theta(A_T_F->rows(), A_T_F->cols());
+		parallelLoop.Fill(theta);
+		return theta;
+	}
+
 private:
 	static bool CompareNElementsIAmStrongNeighbourOf(HybridAlgebraicElement* e1, HybridAlgebraicElement* e2)
 	{

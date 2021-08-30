@@ -84,8 +84,6 @@ public:
 		fine->A_T_T = &A_T_T;
 		fine->A_T_F = &A_T_F;
 		fine->A_F_F = &A_F_F;
-		SparseMatrix* inv_A_T_T = new SparseMatrix(Utils::InvertBlockDiagMatrix(A_T_T, _cellBlockSize));
-		fine->inv_A_T_T = inv_A_T_T;
 
 		if (Utils::IsRefinementStrategy(this->H_CS))
 			this->H_CS = H_CoarsStgy::MultiplePairwiseAggregation;
