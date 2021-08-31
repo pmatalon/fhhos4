@@ -25,7 +25,7 @@ struct DiscretizationArguments
 	double Stretch = 0.5;
 	string Stabilization = "hho";
 	string BasisCode = "";
-	int OrthonormalizeBases = 1;
+	int OrthogonalizeBasesCode = 1;
 	int PolyDegree = 2;
 	bool UsePolynomialSpaceQ = false;
 	int PenalizationCoefficient = -1;

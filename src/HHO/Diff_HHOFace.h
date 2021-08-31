@@ -64,9 +64,9 @@ public:
 		//this->ComputeAndSaveQuadraturePoints(basis->GetDegree());
 		//this->ComputeAndSaveQuadraturePoints();
 
-		if (hho->OrthonormalizeBases > 0)
+		if (hho->OrthogonalizeBases())
 		{
-			this->Basis = new OrthonormalBasis<Dim - 1>(HHO->FaceBasis, this->MeshFace->Shape(), hho->OrthonormalizeBases);
+			this->Basis = new OrthogonalBasis<Dim - 1>(HHO->FaceBasis, this->MeshFace->Shape(), hho->NOrthogonalizations(), hho->OrthonormalizeBases());
 			//this->_massMatrix = this->MeshFace->Shape()->ComputeMassMatrix(this->Basis);
 			//cout << "mass matrix: " << endl << _massMatrix << endl;
 		}
@@ -80,15 +80,45 @@ public:
 
 	DenseMatrix MassMatrix()
 	{
-		return HHO->OrthonormalizeBases > 0 ? DenseMatrix::Identity(this->Basis->Size(), this->Basis->Size()) : _massMatrix;
+		if (HHO->OrthonormalizeBases())
+			return DenseMatrix::Identity(this->Basis->Size(), this->Basis->Size());
+		else if (HHO->OrthogonalizeBases())
+		{
+			Vector d(this->Basis->Size());
+			for (BasisFunction<Dim-1>* phi : this->Basis->LocalFunctions)
+				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim-1>*>(phi)->NormSquare;
+			return d.asDiagonal();
+		}
+		else
+			return _massMatrix;
 	}
 	DenseMatrix SolveMassMatrix(const DenseMatrix& M)
 	{
-		return HHO->OrthonormalizeBases > 0 ? M : _massMatrixSolver.solve(M);
+		if (HHO->OrthonormalizeBases())
+			return M;
+		else if (HHO->OrthogonalizeBases())
+		{
+			Vector d(this->Basis->Size());
+			for (BasisFunction<Dim-1>* phi : this->Basis->LocalFunctions)
+				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim-1>*>(phi)->NormSquare;
+			return d.asDiagonal().inverse() * M;
+		}
+		else
+			return _massMatrixSolver.solve(M);
 	}
 	Vector SolveMassMatrix(const Vector& v)
 	{
-		return HHO->OrthonormalizeBases > 0 ? v : _massMatrixSolver.solve(v);
+		if (HHO->OrthonormalizeBases())
+			return v;
+		else if (HHO->OrthogonalizeBases())
+		{
+			Vector d(this->Basis->Size());
+			for (BasisFunction<Dim-1>* phi : this->Basis->LocalFunctions)
+				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim-1>*>(phi)->NormSquare;
+			return d.asDiagonal().inverse() * v;
+		}
+		else
+			return _massMatrixSolver.solve(v);
 	}
 
 	DenseMatrix MassMatrix(FunctionalBasis<Dim - 1>* basis, Element<Dim>* element, FunctionalBasis<Dim>* cellBasis)
@@ -148,13 +178,13 @@ public:
 
 	void DeleteUselessMatricesAfterAssembly()
 	{
-		if (HHO->OrthonormalizeBases == 0)
+		if (!HHO->OrthogonalizeBases())
 			Utils::Empty(_massMatrix);
 	}
 
 	void DeleteUselessMatricesAfterMultigridSetup()
 	{
-		if (HHO->OrthonormalizeBases == 0)
+		if (!HHO->OrthogonalizeBases())
 			_massMatrixSolver = Eigen::LLT<DenseMatrix>();
 		this->MeshFace->EmptySavedDomPoints();
 	}
@@ -169,7 +199,7 @@ private:
 public:
 	~Diff_HHOFace()
 	{
-		if (HHO->OrthonormalizeBases > 0)
+		if (HHO->OrthogonalizeBases())
 			delete Basis;
 	}
 };

@@ -7,7 +7,7 @@ struct HHOParameters
 	FunctionalBasis<Dim>* ReconstructionBasis;
 	FunctionalBasis<Dim>* CellBasis;
 	FunctionalBasis<Dim - 1>* FaceBasis;
-	int OrthonormalizeBases;
+	int OrthogonalizeBasesCode;
 
 	BigNumber nElements;
 	BigNumber nFaces;
@@ -32,12 +32,12 @@ struct HHOParameters
 
 	string Stabilization;
 
-	HHOParameters(Mesh<Dim>* mesh, string stabilization, FunctionalBasis<Dim>* reconstructionBasis, FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim - 1>* faceBasis, int orthonormalizeBases)
+	HHOParameters(Mesh<Dim>* mesh, string stabilization, FunctionalBasis<Dim>* reconstructionBasis, FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim - 1>* faceBasis, int orthonormalizeBasesCode)
 	{
 		this->ReconstructionBasis = reconstructionBasis;
 		this->CellBasis = cellBasis;
 		this->FaceBasis = faceBasis;
-		this->OrthonormalizeBases = orthonormalizeBases;
+		this->OrthogonalizeBasesCode = orthonormalizeBasesCode;
 
 		nElements = mesh->Elements.size();
 		nFaces = mesh->Faces.size();
@@ -61,5 +61,22 @@ struct HHOParameters
 		nNeumannUnknowns = nNeumannFaces * nFaceUnknowns;
 
 		Stabilization = stabilization;
+	}
+
+	bool OrthogonalizeBases()
+	{
+		return OrthogonalizeBasesCode > 0;
+	}
+	int NOrthogonalizations()
+	{
+		if (OrthogonalizeBasesCode == 1 || OrthogonalizeBasesCode == 3)
+			return 1;
+		else if (OrthogonalizeBasesCode == 2 || OrthogonalizeBasesCode == 4)
+			return 2;
+		return 0;
+	}
+	bool OrthonormalizeBases()
+	{
+		return OrthogonalizeBasesCode == 3 || OrthogonalizeBasesCode == 4;
 	}
 };

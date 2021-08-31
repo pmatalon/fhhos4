@@ -88,12 +88,17 @@ public:
 		return Integral(functionToIntegrate, polynomialDegree);
 	}
 
-	double L2Norm(BasisFunction<Dim>* phi)
+	double L2NormSquare(BasisFunction<Dim>* phi)
 	{
 		RefFunction func = [phi](const RefPoint& p) {
 			return pow(phi->Eval(p), 2);
 		};
-		return sqrt(this->Integral(func, 2 * phi->GetDegree()));
+		return this->Integral(func, 2 * phi->GetDegree());
+	}
+
+	double L2Norm(BasisFunction<Dim>* phi)
+	{
+		return sqrt(L2NormSquare(phi));
 	}
 
 	//-------------------------------------------------------------------//

@@ -51,7 +51,7 @@ public:
 
 	Diffusion_HHO<Dim>* GetProblemOnCoarserMesh()
 	{
-		HHOParameters<Dim>* coarseHHO = new HHOParameters<Dim>(this->_mesh->CoarseMesh, HHO->Stabilization, HHO->ReconstructionBasis, HHO->CellBasis, HHO->FaceBasis, HHO->OrthonormalizeBases);
+		HHOParameters<Dim>* coarseHHO = new HHOParameters<Dim>(this->_mesh->CoarseMesh, HHO->Stabilization, HHO->ReconstructionBasis, HHO->CellBasis, HHO->FaceBasis, HHO->OrthogonalizeBasesCode);
 		return new Diffusion_HHO<Dim>(this->_mesh->CoarseMesh, this->_testCase, coarseHHO, _staticCondensation, _saveMatrixBlocks, this->_outputDirectory);
 	}
 
@@ -62,7 +62,7 @@ public:
 		FunctionalBasis<Dim>* cellBasis = new FunctionalBasis<Dim>(HHO->CellBasis->CreateSameBasisForDegree(faceDegree));
 		FunctionalBasis<Dim-1>* faceBasis = new FunctionalBasis<Dim-1>(HHO->FaceBasis->CreateSameBasisForDegree(faceDegree));
 
-		HHOParameters<Dim>* lowerDegreeHHO = new HHOParameters<Dim>(this->_mesh, HHO->Stabilization, reconstructionBasis, cellBasis, faceBasis, HHO->OrthonormalizeBases);
+		HHOParameters<Dim>* lowerDegreeHHO = new HHOParameters<Dim>(this->_mesh, HHO->Stabilization, reconstructionBasis, cellBasis, faceBasis, HHO->OrthogonalizeBasesCode);
 		return new Diffusion_HHO<Dim>(this->_mesh, this->_testCase, lowerDegreeHHO, _staticCondensation, _saveMatrixBlocks, this->_outputDirectory);
 	}
 
@@ -73,7 +73,7 @@ public:
 		FunctionalBasis<Dim>* cellBasis = new FunctionalBasis<Dim>(HHO->CellBasis->CreateSameBasisForDegree(faceDegree));
 		FunctionalBasis<Dim - 1>* faceBasis = new FunctionalBasis<Dim - 1>(HHO->FaceBasis->CreateSameBasisForDegree(faceDegree));
 
-		HHOParameters<Dim>* lowerDegreeCoarseMeshHHO = new HHOParameters<Dim>(this->_mesh->CoarseMesh, HHO->Stabilization, reconstructionBasis, cellBasis, faceBasis, HHO->OrthonormalizeBases);
+		HHOParameters<Dim>* lowerDegreeCoarseMeshHHO = new HHOParameters<Dim>(this->_mesh->CoarseMesh, HHO->Stabilization, reconstructionBasis, cellBasis, faceBasis, HHO->OrthogonalizeBasesCode);
 		return new Diffusion_HHO<Dim>(this->_mesh->CoarseMesh, this->_testCase, lowerDegreeCoarseMeshHHO, _staticCondensation, _saveMatrixBlocks, this->_outputDirectory);
 	}
 
@@ -158,9 +158,9 @@ public:
 		cout << "    h         : " << scientific << this->_mesh->H() << defaultfloat << endl;
 		cout << "    Regularity: " << this->_mesh->Regularity() << defaultfloat << endl;
 		cout << "Discretization: Hybrid High-Order (k = " << HHO->FaceBasis->GetDegree() << ")" << endl;
-		cout << "    Reconstruction basis: " << (HHO->OrthonormalizeBases > 0 ? "orthonormalized_" : "") << HHO->ReconstructionBasis->Name() << endl;
-		cout << "    Cell basis          : " << (HHO->OrthonormalizeBases > 0 ? "orthonormalized_" : "") << HHO->CellBasis->Name() << endl;
-		cout << "    Face basis          : " << (HHO->OrthonormalizeBases > 0 ? "orthonormalized_" : "") << HHO->FaceBasis->Name() << endl;
+		cout << "    Reconstruction basis: " << (HHO->OrthogonalizeBases() ? (HHO->OrthonormalizeBases() ? "orthonormalized_" : "orthogonalized_") : "") << HHO->ReconstructionBasis->Name() << endl;
+		cout << "    Cell basis          : " << (HHO->OrthogonalizeBases() ? (HHO->OrthonormalizeBases() ? "orthonormalized_" : "orthogonalized_") : "") << HHO->CellBasis->Name() << endl;
+		cout << "    Face basis          : " << (HHO->OrthogonalizeBases() ? (HHO->OrthonormalizeBases() ? "orthonormalized_" : "orthogonalized_") : "") << HHO->FaceBasis->Name() << endl;
 		cout << "Cell unknowns : " << HHO->nTotalCellUnknowns << " (" << HHO->CellBasis->Size() << " per cell)" << endl;
 		cout << "Face unknowns : " << HHO->nTotalFaceUnknowns << " (" << HHO->FaceBasis->Size() << " per interior face)" << endl;
 		cout << "Total unknowns: " << HHO->nTotalHybridUnknowns << endl;
@@ -653,7 +653,7 @@ public:
 	// Compute some useful integrals on reference element and store them
 	void InitReferenceShapes()
 	{
-		if (HHO->OrthonormalizeBases > 0)
+		if (HHO->OrthogonalizeBases())
 			return;
 
 		FunctionalBasis<Dim>* reconstructionBasis = HHO->ReconstructionBasis;
@@ -802,14 +802,14 @@ public:
 
 	void ExportSolutionToGMSH() override
 	{
-		if (HHO->OrthonormalizeBases > 0)
+		if (HHO->OrthogonalizeBases())
 			Utils::Error("The export to GMSH has not been implemented when the bases are orthonormalized against each element.");
 		this->_mesh->ExportToGMSH(this->HHO->ReconstructionBasis, this->ReconstructedSolution, this->GetFilePathPrefix(), "potential");
 	}
 
 	void ExportErrorToGMSH(const Vector& faceCoeffs) override
 	{
-		if (HHO->OrthonormalizeBases > 0)
+		if (HHO->OrthogonalizeBases())
 			Utils::Error("The export to GMSH has not been implemented when the bases are orthonormalized against each element.");
 		Vector cellCoeffs = Solve_A_T_T(B_T - A_T_ndF * faceCoeffs);
 		this->_mesh->ExportToGMSH(this->HHO->CellBasis, cellCoeffs, this->GetFilePathPrefix(), "error");

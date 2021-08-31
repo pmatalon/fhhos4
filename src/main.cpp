@@ -118,10 +118,12 @@ void print_usage() {
 	cout << "               hemker" << endl;
 	cout << endl;
 	cout << "-onb NUM" << endl;
-	cout << "      Orthonormalization of the local bases are against each element and face. Default: 1." << endl;
-	cout << "               0 - no orthonormalization" << endl;
-	cout << "               1 - orthonormalization by the modified Gram-Schmitt algorithm" << endl;
-	cout << "               2 - orthonormalization by the modified Gram-Schmitt algorithm with reorthogonalization" << endl;
+	cout << "      Orthonormalization of the local bases against each element and face. Default: 1." << endl;
+	cout << "               0 - no orthogonalization" << endl;
+	cout << "               1 - orthogonalization, without normalization" << endl;
+	cout << "               2 - double orthogonalization, without normalization" << endl;
+	cout << "               3 - orthonormalization" << endl;
+	cout << "               4 - orthonormalization with double orthogonalization" << endl;
 	cout << endl;
 	cout << "-p NUM" << endl;
 	cout << "      Polynomial degree of approximation (default: 1). In HHO, k = p-1." << endl;
@@ -720,10 +722,10 @@ int main(int argc, char* argv[])
 			case OPT_OrthonormalizeBases:
 			{
 				int i = atoi(optarg);
-				if (i != 0 && i != 1 && i != 2)
-					argument_error("check -onb argument. Accepted values: 0, 1, 2.");
+				if (i < 0 || i > 4)
+					argument_error("check -onb argument. Accepted values: 0, 1, 2, 3, 4.");
 				else
-					args.Discretization.OrthonormalizeBases = i;
+					args.Discretization.OrthogonalizeBasesCode = i;
 				break;
 			}
 			case 'p': 
@@ -1202,7 +1204,7 @@ int main(int argc, char* argv[])
 
 	// Polynomial basis
 	if (args.Discretization.BasisCode.empty())
-		args.Discretization.BasisCode = args.Discretization.OrthonormalizeBases > 0 ? "monomials" : "legendre";
+		args.Discretization.BasisCode = args.Discretization.OrthogonalizeBasesCode > 0 ? "monomials" : "legendre";
 
 	//------------------------------------------//
 	//                  Solver                  //

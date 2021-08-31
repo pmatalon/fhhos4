@@ -96,9 +96,9 @@ public:
 	{
 		this->HHO = hho;
 
-		if (hho->OrthonormalizeBases > 0)
+		if (hho->OrthogonalizeBases())
 		{
-			this->ReconstructionBasis = new OrthonormalBasis<Dim>(HHO->ReconstructionBasis, this->MeshElement->Shape(), hho->OrthonormalizeBases);
+			this->ReconstructionBasis = new OrthogonalBasis<Dim>(HHO->ReconstructionBasis, this->MeshElement->Shape(), hho->NOrthogonalizations(), hho->OrthonormalizeBases());
 			this->CellBasis = new FunctionalBasis<Dim>(this->ReconstructionBasis->ExtractLowerBasis(HHO->CellBasis->GetDegree()));
 		}
 		else
@@ -127,7 +127,33 @@ public:
 		//auto Atf = A.topRightCorner(nCellUnknowns, nTotalFaceUnknowns);
 		this->AttSolver = Att.llt();
 	}
-	
+
+	DenseMatrix SolveCellMassMatrix(const DenseMatrix& M)
+	{
+		return SolveMassMatrix(this->CellBasis, M);
+	}
+	DenseMatrix SolveReconstructMassMatrix(const DenseMatrix& M)
+	{
+		return SolveMassMatrix(this->ReconstructionBasis, M);
+	}
+
+private:
+	DenseMatrix SolveMassMatrix(FunctionalBasis<Dim>* basis, const DenseMatrix& M)
+	{
+		if (HHO->OrthonormalizeBases())
+			return M;
+		else if (HHO->OrthogonalizeBases())
+		{
+			Vector d(basis->Size());
+			for (BasisFunction<Dim>* phi : basis->LocalFunctions)
+				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim>*>(phi)->NormSquare;
+			return d.asDiagonal().inverse() * M;
+		}
+		else
+			return this->MassMatrix(basis).llt().solve(M);
+	}
+
+public:
 	Vector Reconstruct(Vector hybridVector)
 	{
 		return this->P * hybridVector;
@@ -319,7 +345,7 @@ private:
 		if (HHO->Stabilization.compare("hho") == 0)
 		{
 			DenseMatrix ProjT;
-			if (HHO->OrthonormalizeBases == 0)
+			if (!HHO->OrthogonalizeBases())
 			{
 				DenseMatrix cellMassMatrix = this->MassMatrix(this->CellBasis);
 				DenseMatrix Nt = this->CellReconstructMassMatrix(this->CellBasis, this->ReconstructionBasis);
@@ -416,7 +442,7 @@ public:
 public:
 	~Diff_HHOElement()
 	{
-		if (HHO->OrthonormalizeBases > 0)
+		if (HHO->OrthogonalizeBases())
 		{
 			delete ReconstructionBasis;
 			CellBasis->LocalFunctions.clear();

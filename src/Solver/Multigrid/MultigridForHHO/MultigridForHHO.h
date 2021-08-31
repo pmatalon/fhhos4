@@ -129,10 +129,10 @@ public:
 		}
 		if (this->HP_CS == HP_CoarsStgy::P_only || this->HP_CS == HP_CoarsStgy::P_then_H || this->HP_CS == HP_CoarsStgy::P_then_HP)
 		{
-			if (P_Prolongation == GMG_P_Prolongation::Injection && (!this->_problem->HHO->FaceBasis->IsHierarchical || this->_problem->HHO->OrthonormalizeBases == 0))
-				Utils::Warning("The natural injection for p-multigrid is implemented based on the assumption that the face bases are hierarchical and orthonormalized. Degraded convergence may be experienced.");
-			if (P_Restriction == GMG_P_Restriction::RemoveHigherOrders && (!this->_problem->HHO->FaceBasis->IsHierarchical || this->_problem->HHO->OrthonormalizeBases == 0))
-				Utils::Warning("The restriction for p-multigrid consisting in removing the higher-orders is implemented based on the assumption that the face bases are hierarchical and orthonormalized. Degraded convergence may be experienced.");
+			if (P_Prolongation == GMG_P_Prolongation::Injection && (!this->_problem->HHO->FaceBasis->IsHierarchical || !this->_problem->HHO->OrthogonalizeBases()))
+				Utils::Warning("The natural injection for p-multigrid is implemented based on the assumption that the face bases are hierarchical and orthogonalized. Degraded convergence may be experienced.");
+			if (P_Restriction == GMG_P_Restriction::RemoveHigherOrders && (!this->_problem->HHO->FaceBasis->IsHierarchical || !this->_problem->HHO->OrthogonalizeBases()))
+				Utils::Warning("The restriction for p-multigrid consisting in removing the higher-orders is implemented based on the assumption that the face bases are hierarchical and orthogonalized. Degraded convergence may be experienced.");
 		}
 	}
 

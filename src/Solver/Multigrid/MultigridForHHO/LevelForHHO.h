@@ -528,8 +528,8 @@ private:
 	{
 		if (_pProlongation == GMG_P_Prolongation::Injection)
 		{
-			if (!this->_problem->HHO->FaceBasis->IsHierarchical || this->_problem->HHO->OrthonormalizeBases == 0)
-				Utils::Warning("The natural injection and restriction for p-multigrid are implemented based on the assumption that the face bases are hierarchical and orthonormalized. Degraded convergence may be experienced.");
+			if (!this->_problem->HHO->FaceBasis->IsHierarchical || !this->_problem->HHO->OrthogonalizeBases())
+				Utils::Warning("The natural injection and restriction for p-multigrid are implemented based on the assumption that the face bases are hierarchical and orthogonalized. Degraded convergence may be experienced.");
 			// nothing to do
 		}
 		else if (_pProlongation == GMG_P_Prolongation::H_Prolongation)
@@ -1072,13 +1072,7 @@ private:
 				}
 			}
 
-			if (finePb->HHO->OrthonormalizeBases == 0)
-			{
-				DenseMatrix fineMass = fineElement->MassMatrix(fineBasis);
-				J.block(coarseElement->LocalNumberOf(fineElement)*nFineUnknowns, 0, nFineUnknowns, nCoarseUnknowns) = fineMass.llt().solve(fineCoarseMass);
-			}
-			else
-				J.block(coarseElement->LocalNumberOf(fineElement)*nFineUnknowns, 0, nFineUnknowns, nCoarseUnknowns) = fineCoarseMass;
+			J.block(coarseElement->LocalNumberOf(fineElement)*nFineUnknowns, 0, nFineUnknowns, nCoarseUnknowns) = _useHigherOrderReconstruction ? hhoFineElem->SolveReconstructMassMatrix(fineCoarseMass) : hhoFineElem->SolveCellMassMatrix(fineCoarseMass);
 		}
 
 		return J;
@@ -1189,13 +1183,7 @@ private:
 				}
 			}
 
-			if (finePb->HHO->OrthonormalizeBases == 0)
-			{
-				DenseMatrix fineMass = fineElement->MassMatrix(fineBasis);
-				L2Proj.block(coarseElement->LocalNumberOfOverlapping(fineElement)*nFineUnknowns, 0, nFineUnknowns, nCoarseUnknowns) = fineMass.llt().solve(fineCoarseMass);
-			}
-			else
-				L2Proj.block(coarseElement->LocalNumberOfOverlapping(fineElement)*nFineUnknowns, 0, nFineUnknowns, nCoarseUnknowns) = fineCoarseMass;
+			L2Proj.block(coarseElement->LocalNumberOfOverlapping(fineElement)*nFineUnknowns, 0, nFineUnknowns, nCoarseUnknowns) = _useHigherOrderReconstruction ? hhoFineElem->SolveReconstructMassMatrix(fineCoarseMass) : hhoFineElem->SolveCellMassMatrix(fineCoarseMass);
 		}
 
 		return L2Proj;

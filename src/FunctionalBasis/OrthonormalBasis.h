@@ -4,20 +4,23 @@
 
 
 template <int Dim>
-class OrthonormalBasisFunction : public BasisFunction<Dim>
+class OrthogonalBasisFunction : public BasisFunction<Dim>
 {
+private:
 	vector<BasisFunction<Dim>*> _functions;
 	vector<double> _coeffs;
 
 public:
-	OrthonormalBasisFunction(BasisFunction<Dim>* phi)
+	double NormSquare = -1;
+
+	OrthogonalBasisFunction(BasisFunction<Dim>* phi)
 	{
 		this->LocalNumber = phi->LocalNumber;
 		_functions.push_back(phi);
 		_coeffs.push_back(1.0);
 	}
 
-	void Minus(double coeff, OrthonormalBasisFunction<Dim>* previousPhi)
+	void Minus(double coeff, OrthogonalBasisFunction<Dim>* previousPhi)
 	{
 		for (int i = 0; i < previousPhi->_functions.size(); i++)
 		{
@@ -77,17 +80,26 @@ public:
 
 
 template <int Dim>
-class OrthonormalBasis : public FunctionalBasis<Dim>
+class OrthogonalBasis : public FunctionalBasis<Dim>
 {
 public:
-	OrthonormalBasis(FunctionalBasis<Dim>* basis, PhysicalShape<Dim>* shape, int orthogonalizationSweeps = 1) :
+	OrthogonalBasis(FunctionalBasis<Dim>* basis, PhysicalShape<Dim>* shape, int orthogonalizationSweeps = 1, bool normalize = true) :
 		FunctionalBasis<Dim>()
 	{
 		this->_maxPolynomialDegree = basis->GetDegree();
-		this->_basisCode = "orthonorm_" + basis->BasisCode();
 		this->IsHierarchical = basis->IsHierarchical;
 		this->IsOrthogonal = true;
-		Orthonormalize(basis, shape, orthogonalizationSweeps);
+		assert(orthogonalizationSweeps > 0);
+		if (normalize)
+		{
+			Orthonormalize(basis, shape, orthogonalizationSweeps);
+			this->_basisCode = "orthonorm_" + basis->BasisCode();
+		}
+		else
+		{
+			Orthogonalize(basis, shape, orthogonalizationSweeps);
+			this->_basisCode = "orthogon_" + basis->BasisCode();
+		}
 	}
 
 private:
@@ -97,18 +109,37 @@ private:
 	{
 		for (int i = 0; i < basis->LocalFunctions.size(); i++)
 		{
-			OrthonormalBasisFunction<Dim>* phi = new OrthonormalBasisFunction<Dim>(basis->LocalFunctions[i]);
+			OrthogonalBasisFunction<Dim>* phi = new OrthogonalBasisFunction<Dim>(basis->LocalFunctions[i]);
 			for (int nOrthogonalization = 0; nOrthogonalization < orthogonalizationSweeps; nOrthogonalization++) // possibly 2 passes of orthogonalization
 			{
 				for (int j = 0; j < i; j++)
 				{
-					OrthonormalBasisFunction<Dim>* previousPhi = dynamic_cast<OrthonormalBasisFunction<Dim>*>(this->LocalFunctions[j]);
+					OrthogonalBasisFunction<Dim>* previousPhi = dynamic_cast<OrthogonalBasisFunction<Dim>*>(this->LocalFunctions[j]);
 					double innerprod = shape->ComputeMassTerm(phi, previousPhi);
 					phi->Minus(innerprod, previousPhi);
 				}
 			}
 			double norm = shape->L2Norm(phi);
 			phi->DivideBy(norm);
+			this->LocalFunctions.push_back(phi);
+		}
+	}
+
+	void Orthogonalize(FunctionalBasis<Dim>* basis, PhysicalShape<Dim>* shape, int orthogonalizationSweeps = 1)
+	{
+		for (int i = 0; i < basis->LocalFunctions.size(); i++)
+		{
+			OrthogonalBasisFunction<Dim>* phi = new OrthogonalBasisFunction<Dim>(basis->LocalFunctions[i]);
+			for (int nOrthogonalization = 0; nOrthogonalization < orthogonalizationSweeps; nOrthogonalization++) // possibly 2 passes of orthogonalization
+			{
+				for (int j = 0; j < i; j++)
+				{
+					OrthogonalBasisFunction<Dim>* previousPhi = dynamic_cast<OrthogonalBasisFunction<Dim>*>(this->LocalFunctions[j]);
+					double innerprod = shape->ComputeMassTerm(phi, previousPhi);
+					phi->Minus(innerprod / previousPhi->NormSquare, previousPhi);
+				}
+			}
+			phi->NormSquare = shape->L2NormSquare(phi);
 			this->LocalFunctions.push_back(phi);
 		}
 	}
