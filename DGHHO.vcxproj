@@ -81,7 +81,7 @@
     <ClInclude Include="src/FunctionalBasis/FunctionalBasis.h" />
     <ClInclude Include="src/FunctionalBasis/TensorPolynomial.h" />
     <ClInclude Include="src\FunctionalBasis\Hemker1D.h" />
-    <ClInclude Include="src\FunctionalBasis\OrthonormalBasis.h" />
+    <ClInclude Include="src\FunctionalBasis\OrthogonalBasis.h" />
     <ClInclude Include="src\Geometry\2D\Segment.h" />
     <ClInclude Include="src\Geometry\CGALWrapper.h" />
     <ClInclude Include="src\Geometry\GeometricShape.h" />

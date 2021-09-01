@@ -1,5 +1,5 @@
 #pragma once
-#include "../FunctionalBasis/OrthonormalBasis.h"
+#include "../FunctionalBasis/OrthogonalBasis.h"
 #include "HHOParameters.h"
 
 template <int Dim>

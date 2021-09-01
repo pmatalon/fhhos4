@@ -459,9 +459,6 @@
     <ClInclude Include="src\Solver\Multigrid\UncondensedAMG\HybridAlgebraicMesh.h">
       <Filter>Solver\Multigrid\UncondensedAMG</Filter>
     </ClInclude>
-    <ClInclude Include="src\FunctionalBasis\OrthonormalBasis.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
     <ClInclude Include="src\Solver\Multigrid\UncondensedAMG\UncondensedLevel.h">
       <Filter>Solver\Multigrid\UncondensedAMG</Filter>
     </ClInclude>
@@ -470,6 +467,9 @@
     </ClInclude>
     <ClInclude Include="src\Solver\Multigrid\MultigridForHHO\LevelForHHO.h">
       <Filter>Solver\Multigrid\MultigridForHHO</Filter>
+    </ClInclude>
+    <ClInclude Include="src\FunctionalBasis\OrthogonalBasis.h">
+      <Filter>FunctionalBasis</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

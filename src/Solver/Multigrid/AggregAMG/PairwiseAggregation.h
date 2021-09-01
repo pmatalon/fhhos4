@@ -105,7 +105,8 @@ private:
 		for (E* n : unnumberedNeighbours)
 		{
 			aggregationOrdering[orderNumber++] = n;
-			assert(!isNumbered[n->Number]);
+			if (isNumbered[n->Number])
+				assert(!isNumbered[n->Number]);
 			isNumbered[n->Number] = true;
 		}
 	}
