@@ -1491,6 +1491,7 @@ Face<2>* GMSHMesh<2>::GetBoundaryFaceFromGMSHNodes(int faceType, const vector<si
 			return f;
 	}
 	assert(false && "Face not found");
+	return nullptr;
 }
 
 template<>
@@ -1509,6 +1510,7 @@ Face<3>* GMSHMesh<3>::GetBoundaryFaceFromGMSHNodes(int faceType, const vector<si
 			return f;
 	}
 	assert(false && "Face not found");
+	return nullptr;
 }
 
 template <>

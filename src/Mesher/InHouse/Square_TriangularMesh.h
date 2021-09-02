@@ -19,6 +19,7 @@ public:
 				return e;
 		}
 		assert(false);
+		return nullptr;
 	}
 
 	Edge* SouthEdge() { return GetEdge(this->V1(), this->V2());	}
@@ -40,6 +41,7 @@ public:
 				return e;
 		}
 		assert(false);
+		return nullptr;
 	}
 
 	Edge* ObliqueEdge() { return GetEdge(this->V1(), this->V2()); }

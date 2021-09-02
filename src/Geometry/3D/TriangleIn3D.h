@@ -91,7 +91,8 @@ public:
 
 	bool IsDegenerated() const override
 	{
-		assert(false && "To implement");
+		Utils::FatalError("The function TriangleIn3D::IsDegenerated() is not implemented.");
+		return true;
 	}
 
 	static ReferenceTriangle* InitReferenceShape()
@@ -140,6 +141,7 @@ public:
 	inline DimMatrix<2> InverseJacobianTranspose() const
 	{
 		assert(false);
+		return DimMatrix<2>(); // to avoid warning
 	}
 
 	DomPoint ConvertToDomain(const RefPoint& refPoint) const

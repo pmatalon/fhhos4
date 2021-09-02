@@ -99,7 +99,8 @@ public:
 
 	bool IsDegenerated() const override
 	{
-		assert(false && "To implement");
+		Utils::FatalError("The function Quadrilateral::IsDegenerated() is not implemented.");
+		return true;
 	}
 
 	static ReferenceCartesianShape<2>* InitReferenceShape()

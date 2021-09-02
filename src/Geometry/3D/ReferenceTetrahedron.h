@@ -26,6 +26,7 @@ public:
 	inline double Diameter() const override
 	{
 		assert(false);
+		return 0.0; // to avoid warning
 	}
 	inline double Measure() const override
 	{
@@ -34,6 +35,7 @@ public:
 	inline DomPoint Center() const override
 	{
 		assert(false);
+		return DomPoint(); // to avoid warning
 	}
 
 	vector<RefPoint> QuadraturePoints() const

@@ -101,6 +101,7 @@ public:
 	inline DimMatrix<1> InverseJacobianTranspose() const override
 	{
 		assert(false);
+		return DimMatrix<1>(); // to avoid warning
 	}
 
 	DomPoint ConvertToDomain(const RefPoint& referenceElementPoint) const override

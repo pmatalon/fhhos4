@@ -29,6 +29,7 @@ private:
 		else if (orientation == CartesianShapeOrientation::InYOZ)
 			return v2->Y - origin->Y;
 		assert(false);
+		return 0.0;
 	}
 
 	static double secondWidth(Vertex* origin, Vertex* v3, CartesianShapeOrientation orientation)
@@ -40,5 +41,6 @@ private:
 		else if (orientation == CartesianShapeOrientation::InYOZ)
 			return v3->Z - origin->Z;
 		assert(false);
+		return 0.0;
 	}
 };

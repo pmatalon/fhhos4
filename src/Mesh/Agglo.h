@@ -102,15 +102,18 @@ public:
 	PhysicalShape<Dim>* Shape() override
 	{
 		assert(false);
+		return nullptr;
 	}
 	const PhysicalShape<Dim>* Shape() const override
 	{
 		assert(false);
+		return nullptr;
 	}
 
 	virtual DimVector<Dim> OuterNormalVector(Face<Dim>* face) const override
 	{
 		assert(false);
+		return DimVector<Dim>();
 	}
 
 	void ExportToMatlab(string color = "r") const

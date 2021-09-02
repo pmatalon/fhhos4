@@ -271,7 +271,10 @@ public:
 		if (it != this->_overlappingFineElementsLocalNumbering.end())
 			return it->second;
 		else
+		{
 			assert(false && "_overlappingFineElementsLocalNumbering probably not initialized");
+			return -1;
+		}
 	}
 	inline int LocalNumberOf(Face<Dim>* face)
 	{

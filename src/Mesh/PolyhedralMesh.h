@@ -2170,7 +2170,7 @@ public:
 	Element<Dim>* CreatePolyhedron(vector<Vertex*> vertices) { return nullptr; }
 	Element<Dim>* CreateMacroElement(Element<Dim>* e1, Element<Dim>* e2, const vector<Face<Dim>*>& facesToRemove) { return nullptr; }
 	Face<Dim>* CreateMacroFace(Face<Dim>* f1, Face<Dim>* f2, Vertex* vertexToRemove) { return nullptr; }
-	static vector<PhysicalShape<Dim>*> Intersection(Element<Dim>* e1, Element<Dim>* e2) { assert(false); }
+	static vector<PhysicalShape<Dim>*> Intersection(Element<Dim>* e1, Element<Dim>* e2) { assert(false); return {}; }
 	void FaceCoarsening() { assert(false); };
 };
 
@@ -2190,7 +2190,8 @@ Element<2>* PolyhedralMesh<2>::CreatePolyhedron(vector<Vertex*> vertices)
 template<>
 Element<3>* PolyhedralMesh<3>::CreatePolyhedron(vector<Vertex*> vertices)
 {
-	assert(false && "Not yet implemented");
+	Utils::FatalError("The function PolyhedralMesh<3>::CreatePolyhedron() is not yet implemented.");
+	return nullptr;
 }
 
 template<>

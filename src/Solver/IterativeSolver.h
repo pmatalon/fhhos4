@@ -204,7 +204,11 @@ protected:
 		return result;
 	}
 
-	virtual IterationResult ExecuteOneIteration(const Vector& b, Vector& x, bool& xEquals0, bool computeResidual, bool computeAx, const IterationResult& oldResult) { assert(false); };
+	virtual IterationResult ExecuteOneIteration(const Vector& b, Vector& x, bool& xEquals0, bool computeResidual, bool computeAx, const IterationResult& oldResult) 
+	{ 
+		Utils::FatalError("The function Solve() or ExecuteOneIteration() must be overriden in the subclass.");
+		return IterationResult(); // to avoid warning
+	};
 
 
 	bool StoppingCriteriaReached(const IterationResult& result)

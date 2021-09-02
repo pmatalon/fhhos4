@@ -256,11 +256,13 @@ protected:
 
 	virtual Level* CreateFineLevel() const
 	{
-		assert(false && "Not implemented. This method must be implemented in the subclass.");
+		Utils::FatalError("The method CreateFineLevel() must be implemented in the Level subclass.");
+		return nullptr;
 	}
 	virtual Level* CreateCoarseLevel(Level* fineLevel, CoarseningType coarseningType, int coarseDegree)
 	{
-		assert(false && "Not implemented. This method must be implemented in the subclass.");
+		Utils::FatalError("The method CreateCoarseLevel() must be implemented in the Level subclass.");
+		return nullptr;
 	}
 
 	virtual void InitializeCoarseSolver()

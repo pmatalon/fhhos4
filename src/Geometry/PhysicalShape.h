@@ -61,6 +61,7 @@ public:
 			return true;
 		}
 		assert(false);
+		return false;
 	}
 
 	virtual void ExportToMatlab(string color = "r") const
@@ -77,10 +78,12 @@ public:
 	virtual vector<const PhysicalShape<Dim>*> SubShapes() const
 	{
 		assert(false);
+		return {};
 	}
 	virtual vector<PhysicalShape<Dim>*> SubShapes()
 	{
 		assert(false);
+		return {};
 	}
 
 	virtual void ExportSubShapesToMatlab() const
@@ -91,10 +94,12 @@ public:
 	virtual vector<const PhysicalShape<Dim>*> RefinedShapes() const
 	{
 		assert(false);
+		return {};
 	}
 	virtual vector<PhysicalShape<Dim>*> RefinedShapes()
 	{
 		assert(false);
+		return {};
 	}
 
 	bool IsIn(const vector<PhysicalShape<Dim>*>& list)

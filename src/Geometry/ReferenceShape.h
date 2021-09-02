@@ -14,6 +14,7 @@ public:
 	double InRadius() const override
 	{
 		assert(false);
+		return 0;
 	}
 
 	virtual vector<RefPoint> QuadraturePoints() const = 0;
@@ -25,10 +26,12 @@ public:
 	double Integral(DomFunction globalFunction) const override
 	{
 		assert(false);
+		return 0;
 	}
 	double Integral(DomFunction globalFunction, int polynomialDegree) const override
 	{
 		assert(false);
+		return 0;
 	}
 
 	virtual void Serialize(ostream& os) const
@@ -56,6 +59,7 @@ public:
 		if (it != _massMatrices.end())
 			return it->second;
 		Utils::FatalError("The mass matrix for this basis should be computed once and stored for this reference element.");
+		return it->second; // to avoid warning
 	}
 
 	const DenseMatrix& StoredCellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) const
@@ -64,6 +68,7 @@ public:
 		if (it != _cellReconstructMatrices.end())
 			return it->second;
 		Utils::FatalError("The cell-reconstruct mass matrix should be computed once and stored for this reference element.");
+		return it->second; // to avoid warning
 	}
 
 	void ComputeAndStoreMassMatrix(FunctionalBasis<Dim>* basis)

@@ -49,6 +49,7 @@ struct HybridElementAggregate
 				return i;
 		}
 		assert(false);
+		return -1;
 	}
 
 	int LocalFineFaceNumber(HybridAlgebraicFace* ff) const
@@ -59,6 +60,7 @@ struct HybridElementAggregate
 				return i;
 		}
 		assert(false);
+		return -1;
 	}
 
 	int LocalRemovedFineFaceNumber(HybridAlgebraicFace* ff) const
@@ -69,6 +71,7 @@ struct HybridElementAggregate
 				return i;
 		}
 		assert(false);
+		return -1;
 	}
 
 	int LocalCoarseFaceNumber(HybridFaceAggregate* cf) const
@@ -79,6 +82,7 @@ struct HybridElementAggregate
 				return i;
 		}
 		assert(false);
+		return -1;
 	}
 };
 

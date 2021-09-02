@@ -238,7 +238,11 @@ private:
 			return BarycentricTriangulation(vertices);
 		else if (triangulationMethod == PolygonalTriangulation::OneVertex)
 			return OneVertexTriangulation(vertices, measure, doNotCross);
-		assert(false);
+		else
+		{
+			assert(false);
+			return {};
+		}
 	}
 
 	static vector<Triangle> OneVertexTriangulation(const vector<DomPoint>& vertices, double measure, const vector<PhysicalShape<1>*>& doNotCross)
@@ -450,7 +454,8 @@ public:
 
 	bool IsDegenerated() const override
 	{
-		assert(false && "To implement");
+		Utils::FatalError("The function Polygon::IsDegenerated() is not implemented.");
+		return true;
 	}
 
 	inline double Diameter() const override

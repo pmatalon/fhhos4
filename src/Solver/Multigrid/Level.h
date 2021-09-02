@@ -156,19 +156,21 @@ public:
 			return this->OperatorMatrix->rows();
 		else if (!this->IsFinestLevel())
 			return this->FinerLevel->P.cols();
-		assert(false && "Level::NUnknowns() must be overridden to use this level");
+		Utils::FatalError("Level::NUnknowns() must be overridden to use this level");
+		return 0;
 	}
 
 	virtual int PolynomialDegree() = 0;
 
 	virtual int BlockSizeForBlockSmoothers()
 	{
-		assert(false && "Level::BlockSizeForBlockSmoothers() must be overridden to use this level in a p-multigrid");
+		Utils::FatalError("Level::BlockSizeForBlockSmoothers() must be overridden to use this level in a p-multigrid");
+		return 0;
 	}
 
 	virtual void CoarsenMesh(H_CoarsStgy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached)
 	{
-		assert(false && "Level::CoarsenMesh() must be overridden to use this level in an h-multigrid");
+		Utils::FatalError("Level::CoarsenMesh() must be overridden to use this level in an h-multigrid");
 	}
 
 	virtual void ExportVector(const Vector& v, string suffix, int levelNumber) = 0;

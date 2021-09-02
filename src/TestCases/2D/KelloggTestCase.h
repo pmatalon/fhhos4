@@ -91,5 +91,6 @@ private:
 			return pow(r, eps) * cos((M_PI / 2 - nu)*eps) * cos((t - 3 * M_PI / 2 - ksi)*eps);
 
 		assert(false);
+		return 0.0;
 	}
 };

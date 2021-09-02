@@ -101,7 +101,8 @@ public:
 
 	bool IsDegenerated() const override
 	{
-		assert(false && "To implement");
+		Utils::FatalError("The function Tetrahedron::IsDegenerated() is not implemented.");
+		return true;
 	}
 
 	static ReferenceTetrahedron* InitReferenceShape()

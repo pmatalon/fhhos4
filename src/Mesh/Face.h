@@ -185,7 +185,8 @@ public:
 	
 	virtual bool IntersectsWith(Face<Dim>* other)
 	{
-		assert(false);
+		Utils::FatalError("The function IntersectsWith() must be defined in the subclass.");
+		return false;
 	}
 
 	bool IsIn(const vector<Face<Dim>*>& list)
@@ -258,6 +259,7 @@ public:
 				return i;
 		}
 		assert(false);
+		return -1;
 	}
 
 	bool HasBeenCoarsened()

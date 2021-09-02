@@ -201,7 +201,8 @@ public:
 
 	bool IsDegenerated() const override
 	{
-		assert(false && "To implement");
+		Utils::FatalError("The function CartesianShape::IsDegenerated() is not implemented.");
+		return true;
 	}
 
 	static ReferenceCartesianShape<ShapeDim>* InitReferenceShape()
@@ -242,12 +243,14 @@ public:
 		else if (DomainDim == 3 && ShapeDim == 3)
 			return (Origin->X <= p.X && p.X <= Origin->X + WidthX) && (Origin->Y <= p.Y && p.Y <= Origin->Y + WidthY) && (Origin->Z <= p.Z && p.Z <= Origin->Z + WidthZ);
 		else
-			assert(false && "Not implemented");
+		{
+			Utils::FatalError("Contains() not implemented");
+			return false;
+		}
 	}
 
 	void RefineWithoutCoarseOverlap(const vector<PhysicalShape<ShapeDim - 1>*>& doNotCross) override
 	{
-		assert(false && "Not implemented");
 		Utils::FatalError("TO BE IMPLEMENTED");
 	}
 
@@ -502,7 +505,10 @@ public:
 			return Integral(func, x1, x2, y1, y2, z1, z2);
 		}
 		else
+		{
 			assert(false);
+			return 0.0;
+		}
 	}
 
 	//----------------------------//
