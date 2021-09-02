@@ -1,6 +1,5 @@
 L = 1; // size of the square
-// h is defined in the files that include this one
-// h_center
+// h and h_center are defined in the files that include this one
 
 // Corners
 Point(1) = {0, 0, 0, h};

@@ -8,7 +8,7 @@ public:
 	KelloggTestCase(ProblemArguments pb) :
 		TestCase()
 	{
-		if (pb.GeoCode.compare("square4quadrants") != 0)
+		if (!Utils::Contains(pb.GeoCode, "square4quadrants"))
 			Utils::FatalError("The Kellogg test case is only compatible with the 'square4quadrants' geometry.");
 		
 		// Diffusion field
