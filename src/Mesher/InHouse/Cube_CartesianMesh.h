@@ -7,14 +7,14 @@
 
 using namespace std;
 
-class Cube_CartesianMesh : public Mesh<3>
+class Cube_CartesianMesh : public PolyhedralMesh<3>
 {
 public:
 	BigNumber Nx;
 	BigNumber Ny;
 	BigNumber Nz;
 
-	Cube_CartesianMesh(BigNumber nx, BigNumber ny, BigNumber nz, bool buildMesh = true) : Mesh()
+	Cube_CartesianMesh(BigNumber nx, BigNumber ny, BigNumber nz, bool buildMesh = true) : PolyhedralMesh()
 	{
 		// nx = ny = nz falls down to cubic elements
 		this->Nx = nx;
