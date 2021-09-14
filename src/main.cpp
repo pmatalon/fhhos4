@@ -371,9 +371,8 @@ void print_usage() {
 	cout << "      Shortcut for the following set of arguments:" << endl;
 	cout << "              1  -   -hp-cs h" << endl;
 	cout << "              2  -   -hp-cs p_h  -p-cs -2 -p-prolong 1 -p-restrict 1" << endl;
-	cout << "              3  -   -hp-cs p_h  -p-cs -2 -p-prolong 2 -p-restrict 1" << endl;
-	cout << "              4  -   -hp-cs p_h  -p-cs -2 -p-prolong 2 -p-restrict 2" << endl;
-	cout << "              5  -   -hp-cs hp_h -p-cs -1" << endl;
+	cout << "              3  -   -hp-cs p_h  -p-cs -2 -p-prolong 2 -p-restrict 2" << endl;
+	cout << "              4  -   -hp-cs hp_h -p-cs -1" << endl;
 	cout << endl;
 	cout << "-disable-hor" << endl;
 	cout << "      In the polongation of 'mg', disables the use of the higher-order reconstruction." << endl;
@@ -873,7 +872,7 @@ int main(int argc, char* argv[])
 			case OPT_HPConfig:
 			{
 				int code = atoi(optarg);
-				if (code < 1 || code > 5)
+				if (code < 1 || code > 4)
 					argument_error("unknown hp-configuration code. Check -hp-config argument.");
 				if (code == 1)
 					args.Solver.MG.HP_CS = HP_CoarsStgy::H_only;
@@ -889,16 +888,9 @@ int main(int argc, char* argv[])
 					args.Solver.MG.HP_CS = HP_CoarsStgy::P_then_H;
 					args.Solver.MG.P_CS = P_CoarsStgy::Minus2;
 					args.Solver.MG.GMG_P_Prolong = GMG_P_Prolongation::H_Prolongation;
-					args.Solver.MG.GMG_P_Restrict = GMG_P_Restriction::RemoveHigherOrders;
-				}
-				else if (code == 4)
-				{
-					args.Solver.MG.HP_CS = HP_CoarsStgy::P_then_H;
-					args.Solver.MG.P_CS = P_CoarsStgy::Minus2;
-					args.Solver.MG.GMG_P_Prolong = GMG_P_Prolongation::H_Prolongation;
 					args.Solver.MG.GMG_P_Restrict = GMG_P_Restriction::P_Transpose;
 				}
-				else if (code == 5)
+				else if (code == 4)
 				{
 					args.Solver.MG.HP_CS = HP_CoarsStgy::HP_then_H;
 					args.Solver.MG.P_CS = P_CoarsStgy::Minus1;
