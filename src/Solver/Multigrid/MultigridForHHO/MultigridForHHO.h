@@ -117,6 +117,12 @@ public:
 				if (!UseHeterogeneousWeighting)
 					os << "\t" << "Heterogeneous weighting : disabled" << endl;
 			}
+
+			if (H_Prolongation == GMG_H_Prolongation::CellInterp_FinerApproxL2proj_Trace)
+			{
+				os << "\t" << "Subtriangulations       : " << Utils::ProgramArgs.Solver.MG.NSubtriangulationsForApproxL2Proj;
+				os << " [-subtri " << Utils::ProgramArgs.Solver.MG.NSubtriangulationsForApproxL2Proj << "]" << endl;
+			}
 		}
 	}
 
@@ -133,6 +139,11 @@ public:
 				Utils::Warning("The natural injection for p-multigrid is implemented based on the assumption that the face bases are hierarchical and orthogonalized. Degraded convergence may be experienced.");
 			if (P_Restriction == GMG_P_Restriction::RemoveHigherOrders && (!this->_problem->HHO->FaceBasis->IsHierarchical || !this->_problem->HHO->OrthogonalizeBases()))
 				Utils::Warning("The restriction for p-multigrid consisting in removing the higher-orders is implemented based on the assumption that the face bases are hierarchical and orthogonalized. Degraded convergence may be experienced.");
+		}
+		if (this->HP_CS == HP_CoarsStgy::H_only || this->HP_CS == HP_CoarsStgy::HP_then_H || this->HP_CS == HP_CoarsStgy::P_then_H || this->HP_CS == HP_CoarsStgy::P_then_HP)
+		{
+			if (H_Prolongation == GMG_H_Prolongation::CellInterp_FinerApproxL2proj_Trace && Utils::ProgramArgs.Solver.MG.NSubtriangulationsForApproxL2Proj <= 0)
+				Utils::FatalError("The number of subtriangulations must be >= 1. If 0 is wanted, use -prolong " + to_string((unsigned)GMG_H_Prolongation::CellInterp_ApproxL2proj_Trace));
 		}
 	}
 

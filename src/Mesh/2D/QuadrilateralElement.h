@@ -71,7 +71,7 @@ public:
 		return n;
 	}
 
-	void Refine() override
+	void Refine(int nRefinements) override
 	{
 		Utils::FatalError("Method QuadrilateralElement::Refine() is not implemented!");
 	}

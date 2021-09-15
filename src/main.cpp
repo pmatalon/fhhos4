@@ -374,6 +374,9 @@ void print_usage() {
 	cout << "              3  -   -hp-cs p_h  -p-cs -2 -p-prolong 2 -p-restrict 2" << endl;
 	cout << "              4  -   -hp-cs hp_h -p-cs -1" << endl;
 	cout << endl;
+	cout << "-subtri NUM" << endl;
+	cout << "      If the approximated L2-projection is used in the multigrid, sets the number of subtriangulations of the fine elements." << endl;
+	cout << endl;
 	cout << "-disable-hor" << endl;
 	cout << "      In the polongation of 'mg', disables the use of the higher-order reconstruction." << endl;
 	cout << "      The local cell polynomials in the intermediary step are obtained by solving the local problems only." << endl;
@@ -540,6 +543,7 @@ int main(int argc, char* argv[])
 		OPT_ReEntrantCornerManagement,
 		OPT_CoarseningFactor,
 		OPT_CoarseN,
+		OPT_ApproxL2ProjNSubtriangulations,
 		// Misc
 		OPT_Threads,
 		OPT_Export,
@@ -599,6 +603,7 @@ int main(int argc, char* argv[])
 		 { "rcm", required_argument, NULL, OPT_ReEntrantCornerManagement },
 		 { "coarsening-factor", required_argument, NULL, OPT_CoarseningFactor },
 		 { "coarse-n", required_argument, NULL, OPT_CoarseN },
+		 { "subtri", required_argument, NULL, OPT_ApproxL2ProjNSubtriangulations },
 		 // Misc
 		 { "help", no_argument, NULL, 'h' },
 		 { "threads", required_argument, NULL, OPT_Threads },
@@ -1042,6 +1047,9 @@ int main(int argc, char* argv[])
 				break;
 			case OPT_CoarseN:
 				args.Solver.MG.CoarseN = stoul(optarg, nullptr, 0);
+				break;
+			case OPT_ApproxL2ProjNSubtriangulations:
+				args.Solver.MG.NSubtriangulationsForApproxL2Proj = atoi(optarg);
 				break;
 
 			//----------------//

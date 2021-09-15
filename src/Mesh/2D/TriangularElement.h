@@ -93,9 +93,9 @@ public:
 		return n;
 	}
 
-	void Refine() override
+	void Refine(int nRefinements) override
 	{
-		_shape.RefineByConnectionOfTheMiddleEdges();
+		_shape.RefineByConnectionOfTheMiddleEdges(nRefinements);
 	}
 
 	virtual ~TriangularElement()

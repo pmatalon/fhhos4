@@ -364,8 +364,8 @@ private:
 
 			if (!Utils::BuildsNestedMeshHierarchy(coarsePb->_mesh->ComesFrom.CS) && coarsePb->_mesh->ComesFrom.CS != H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours)
 			{
-				if ((Dim == 2 && this->PolynomialDegree() > 3) || (Dim == 3 && this->PolynomialDegree() > 2))
-					Utils::Warning("The degree k=" + to_string(this->PolynomialDegree()) + " is too high to ensure enough accuracy of the approximate L2-projection. Non-optimal convergence may be observed.");
+				if (((Dim == 2 && this->PolynomialDegree() > 3) || (Dim == 3 && this->PolynomialDegree() > 2)) && Utils::ProgramArgs.Solver.MG.NSubtriangulationsForApproxL2Proj == 1)
+					Utils::Warning("The degree k=" + to_string(this->PolynomialDegree()) + " is too high to ensure enough accuracy of the approximate L2-projection. Non-optimal convergence may be observed. Consider more subtriangulation.");
 			}
 
 			//Timer subdivisionsTimer;

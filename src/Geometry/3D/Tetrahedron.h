@@ -170,12 +170,13 @@ public:
 		Utils::FatalError("RefineWithoutCoarseOverlap() not implemented for the tetrahedron.");
 	}
 
-	void RefineByBey()
+	void RefineByBey(int nRefinements)
 	{
 		if (!_refinement.empty())
 			return;
 
-		_refinement.reserve(8);
+		vector<Tetrahedron> firstRefinement;
+		firstRefinement.reserve(8);
 
 		DomPoint m12 = Middle<3>(v1, v2);
 		DomPoint m13 = Middle<3>(v1, v3);
@@ -185,16 +186,28 @@ public:
 		DomPoint m34 = Middle<3>(v3, v4);
 
 		// Corners of the tetrahedron
-		_refinement.emplace_back(v1, m12, m13, m14);
-		_refinement.emplace_back(m12, v2, m23, m24);
-		_refinement.emplace_back(m13, m23, v3, m34);
-		_refinement.emplace_back(m14, m24, m34, v4);
+		firstRefinement.emplace_back(v1, m12, m13, m14);
+		firstRefinement.emplace_back(m12, v2, m23, m24);
+		firstRefinement.emplace_back(m13, m23, v3, m34);
+		firstRefinement.emplace_back(m14, m24, m34, v4);
 
 		// Remaining octahedron
-		_refinement.emplace_back(m12, m13, m14, m24);
-		_refinement.emplace_back(m12, m13, m23, m24);
-		_refinement.emplace_back(m13, m14, m24, m34);
-		_refinement.emplace_back(m13, m23, m24, m34);
+		firstRefinement.emplace_back(m12, m13, m14, m24);
+		firstRefinement.emplace_back(m12, m13, m23, m24);
+		firstRefinement.emplace_back(m13, m14, m24, m34);
+		firstRefinement.emplace_back(m13, m23, m24, m34);
+
+		if (nRefinements == 1)
+			_refinement = firstRefinement;
+		else
+		{
+			for (Tetrahedron& t1 : firstRefinement)
+			{
+				t1.RefineByBey(nRefinements - 1);
+				for (Tetrahedron& t2 : t1._refinement)
+					_refinement.push_back(t2);
+			}
+		}
 	}
 
 	vector<const PhysicalShape<3>*> RefinedShapes() const override

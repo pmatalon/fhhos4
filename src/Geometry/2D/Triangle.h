@@ -310,18 +310,31 @@ public:
 		}
 	}
 
-	void RefineByConnectionOfTheMiddleEdges()
+	void RefineByConnectionOfTheMiddleEdges(int nRefinements)
 	{
-		_refinement.reserve(4);
+		vector<Triangle> firstRefinement;
+		firstRefinement.reserve(4);
 
 		DomPoint m12 = Middle<2>(v1, v2);
 		DomPoint m23 = Middle<2>(v2, v3);
 		DomPoint m31 = Middle<2>(v3, v1);
 
-		_refinement.emplace_back(v1, m12, m31);
-		_refinement.emplace_back(m12, v2, m23);
-		_refinement.emplace_back(m23, v3, m31);
-		_refinement.emplace_back(m12, m23, m31);
+		firstRefinement.emplace_back(v1, m12, m31);
+		firstRefinement.emplace_back(m12, v2, m23);
+		firstRefinement.emplace_back(m23, v3, m31);
+		firstRefinement.emplace_back(m12, m23, m31);
+
+		if (nRefinements == 1)
+			_refinement = firstRefinement;
+		else
+		{
+			for (Triangle& t1 : firstRefinement)
+			{
+				t1.RefineByConnectionOfTheMiddleEdges(nRefinements - 1);
+				for (Triangle& t2 : t1._refinement)
+					_refinement.push_back(t2);
+			}
+		}
 	}
 
 	vector<const PhysicalShape<2>*> RefinedShapes() const override

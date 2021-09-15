@@ -175,7 +175,7 @@ public:
 		CoarseFacesNotToCross = set<Face<Dim>*>(); // free memory
 	}
 
-	virtual void Refine()
+	virtual void Refine(int nRefinements)
 	{
 		assert(false && "To be implemented");
 	}

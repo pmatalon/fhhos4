@@ -53,7 +53,7 @@ public:
 		return _vertices;
 	}
 
-	void Refine() override
+	void Refine(int nRefinements) override
 	{
 		Utils::FatalError("Method CartesianElement::Refine() is not implemented!");
 	}

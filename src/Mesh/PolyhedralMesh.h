@@ -1977,7 +1977,7 @@ public:
 				if (!Utils::BuildsNestedMeshHierarchy(stgy) && !fe->IsFullyEmbeddedInCoarseElement)
 				{
 					if (stgy == H_CoarsStgy::IndependentRemeshing)
-						fe->Refine();
+						fe->Refine(Utils::ProgramArgs.Solver.MG.NSubtriangulationsForApproxL2Proj);
 					else
 						fe->RefineWithoutCoarseOverlap();
 
