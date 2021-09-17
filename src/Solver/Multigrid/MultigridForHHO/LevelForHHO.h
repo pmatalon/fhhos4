@@ -158,7 +158,10 @@ private:
 				(this->CoarserLevel->ComesFrom == CoarseningType::H || this->CoarserLevel->ComesFrom == CoarseningType::HP)) 
 			{
 				this->_problem->InitReferenceShapes();
-				this->_problem->InitHHO_Faces(); // for the inverses of the mass matrices (to compute the trace on the faces at the end of the prolongation)
+				if (_hProlongation == GMG_H_Prolongation::CellInterp_FinerApproxL2proj_Trace)
+					this->_problem->InitHHO(false);
+				else
+					this->_problem->InitHHO_Faces(); // for the inverses of the face mass matrices (to compute the trace on the faces at the end of the prolongation)
 			}
 
 			Diffusion_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(CoarserLevel)->_problem;

@@ -92,7 +92,7 @@ private:
 
 	//--------------------------------------------------------------------------------//
 public:
-	void InitHHO(HHOParameters<Dim>* hho)
+	void InitHHO(HHOParameters<Dim>* hho, bool assembleLocalMatrix = true)
 	{
 		this->HHO = hho;
 
@@ -116,16 +116,19 @@ public:
 		//this->ComputeAndSaveQuadraturePoints(hho->ReconstructionBasis->GetDegree());
 		//this->ComputeAndSaveQuadraturePoints();
 
-		this->AssembleReconstructionAndConsistencyMatrices();
-		this->AssembleStabilizationMatrix();
+		if (assembleLocalMatrix)
+		{
+			this->AssembleReconstructionAndConsistencyMatrices();
+			this->AssembleStabilizationMatrix();
 
-		//int nTotalFaceUnknowns = this->Faces.size() * hho->nFaceUnknowns;
+			//int nTotalFaceUnknowns = this->Faces.size() * hho->nFaceUnknowns;
 
-		this->A = Acons + Astab;
-		auto Att = A.topLeftCorner(hho->nCellUnknowns, hho->nCellUnknowns);
-		//auto Aff = A.bottomRightCorner(nTotalFaceUnknowns, nTotalFaceUnknowns);
-		//auto Atf = A.topRightCorner(nCellUnknowns, nTotalFaceUnknowns);
-		this->AttSolver = Att.llt();
+			this->A = Acons + Astab;
+			auto Att = A.topLeftCorner(hho->nCellUnknowns, hho->nCellUnknowns);
+			//auto Aff = A.bottomRightCorner(nTotalFaceUnknowns, nTotalFaceUnknowns);
+			//auto Atf = A.topRightCorner(nCellUnknowns, nTotalFaceUnknowns);
+			this->AttSolver = Att.llt();
+		}
 	}
 
 	DenseMatrix SolveCellMassMatrix(const DenseMatrix& M)

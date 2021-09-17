@@ -692,10 +692,10 @@ public:
 	//------------------------------//
 	//           Init HHO           //
 	//------------------------------//
-	void InitHHO()
+	void InitHHO(bool assembleLocalMatrices = true)
 	{
 		InitHHO_Faces();
-		InitHHO_Elements();
+		InitHHO_Elements(assembleLocalMatrices);
 	}
 	void InitHHO_Faces()
 	{
@@ -711,21 +711,21 @@ public:
 			}
 		);
 	}
-	void InitHHO_Elements()
+	void InitHHO_Elements(bool assembleLocalMatrices = true)
 	{
 		if (!_hhoElements.empty())
 			Utils::Warning("The HHO elements of this problem have already been initialized.");
 
 		_hhoElements = vector<Diff_HHOElement<Dim>>(this->_mesh->Elements.size());
 
-		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this](Element<Dim>* e)
+		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, assembleLocalMatrices](Element<Dim>* e)
 			{
 				_hhoElements[e->Number].MeshElement = e;
 
 				for (Face<Dim>* f : e->Faces)
 					_hhoElements[e->Number].Faces.push_back(&this->_hhoFaces[f->Number]);
 
-				_hhoElements[e->Number].InitHHO(HHO);
+				_hhoElements[e->Number].InitHHO(HHO, assembleLocalMatrices);
 			}
 		);
 	}
