@@ -45,6 +45,7 @@ struct MultigridArguments
 	UAMGFaceProlongation UAMGFaceProlong = UAMGFaceProlongation::BoundaryAggregatesInteriorAverage;
 	UAMGProlongation UAMGCoarseningProlong = UAMGProlongation::FaceProlongation;
 	UAMGProlongation UAMGMultigridProlong = UAMGProlongation::ReconstructTraceOrInject;
+	int NumberOfMeshes = 0;
 	int MatrixMaxSizeForCoarsestLevel = 1000;
 	char CycleLetter = 'V';
 	int WLoops = 1;

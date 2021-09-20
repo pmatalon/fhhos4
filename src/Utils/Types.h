@@ -45,8 +45,10 @@ enum class HP_CoarsStgy : unsigned
 	H_only,
 	P_only,
 	P_then_H,
+	H_then_P, // the number of meshes must be fixed
 	HP_then_H,
-	P_then_HP // then the coarse p must be set
+	HP_then_P, // the number of meshes must be fixed
+	P_then_HP // the number of meshes must be fixed
 };
 
 enum class H_CoarsStgy : unsigned

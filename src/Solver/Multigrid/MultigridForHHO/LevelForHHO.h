@@ -585,7 +585,7 @@ private:
 			}
 
 			// On the coarse levels, delete the whole mesh
-			if (!IsFinestLevel())
+			if (!IsFinestLevel() && Utils::ProgramArgs.Solver.MG.HP_CS != HP_CoarsStgy::H_then_P && Utils::ProgramArgs.Solver.MG.HP_CS != HP_CoarsStgy::HP_then_P)
 			{
 				if (_problem->_mesh->FineMesh)
 					_problem->_mesh->FineMesh->CoarseMesh = nullptr;

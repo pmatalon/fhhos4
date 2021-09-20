@@ -41,14 +41,18 @@ public:
 		os << "MultigridForHHO" << endl;
 
 		os << "\t" << "hp-strategy             : ";
-		if (this->HP_CS == HP_CoarsStgy::HP_then_H)
-			os << "hp then h [-hp-cs hp_h]";
-		else if (this->HP_CS == HP_CoarsStgy::H_only)
+		if (this->HP_CS == HP_CoarsStgy::H_only)
 			os << "h only [-hp-cs h]";
 		else if (this->HP_CS == HP_CoarsStgy::P_only)
 			os << "p only [-hp-cs p]";
 		else if (this->HP_CS == HP_CoarsStgy::P_then_H)
 			os << "p then h [-hp-cs p_h]";
+		else if (this->HP_CS == HP_CoarsStgy::H_then_P)
+			os << "h then p [-hp-cs h_p]";
+		else if (this->HP_CS == HP_CoarsStgy::HP_then_H)
+			os << "hp then h [-hp-cs hp_h]";
+		else if (this->HP_CS == HP_CoarsStgy::HP_then_P)
+			os << "hp then p [-hp-cs hp_p]";
 		else if (this->HP_CS == HP_CoarsStgy::P_then_HP)
 			os << "p then hp [-hp-cs p_hp]";
 		os << endl;
@@ -67,7 +71,7 @@ public:
 			os << endl;
 		}
 
-		if (this->HP_CS == HP_CoarsStgy::P_only || this->HP_CS == HP_CoarsStgy::P_then_H || this->HP_CS == HP_CoarsStgy::P_then_HP)
+		if (this->HP_CS == HP_CoarsStgy::P_only || this->HP_CS == HP_CoarsStgy::P_then_H || this->HP_CS == HP_CoarsStgy::H_then_P || this->HP_CS == HP_CoarsStgy::HP_then_P || this->HP_CS == HP_CoarsStgy::P_then_HP)
 		{
 			os << "\t" << "p-prolongation          : ";
 			if (P_Prolongation == GMG_P_Prolongation::Injection)
@@ -83,10 +87,12 @@ public:
 				os << "transpose of p-prolongation ";
 			os << "[-p-restrict " << (unsigned)P_Restriction << "]" << endl;
 		}
-		if (this->HP_CS == HP_CoarsStgy::H_only || this->HP_CS == HP_CoarsStgy::HP_then_H || this->HP_CS == HP_CoarsStgy::P_then_H || this->HP_CS == HP_CoarsStgy::P_then_HP)
+		if (this->HP_CS == HP_CoarsStgy::H_only || this->HP_CS == HP_CoarsStgy::P_then_H || this->HP_CS == HP_CoarsStgy::H_then_P || this->HP_CS == HP_CoarsStgy::HP_then_P || this->HP_CS == HP_CoarsStgy::HP_then_H || this->HP_CS == HP_CoarsStgy::P_then_HP)
 		{
-			if (this->HP_CS == HP_CoarsStgy::H_only || this->HP_CS == HP_CoarsStgy::P_then_H)
+			if (this->HP_CS == HP_CoarsStgy::H_only || this->HP_CS == HP_CoarsStgy::P_then_H || this->HP_CS == HP_CoarsStgy::H_then_P)
 				os << "\t" << "h-prolongation          : ";
+			else if (this->HP_CS == HP_CoarsStgy::HP_then_H)
+				os << "\t" << "h-/hp-prolongation      : ";
 			else
 				os << "\t" << "hp-prolongation         : ";
 

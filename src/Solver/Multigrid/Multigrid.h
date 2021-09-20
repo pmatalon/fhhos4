@@ -32,6 +32,7 @@ public:
 	FaceCoarseningStrategy FaceCoarseningStgy = FaceCoarseningStrategy::InterfaceCollapsing;
 	double CoarseningFactor = 2;
 	int CoarsePolyDegree = 1; // used in p-Multigrid
+	int NumberOfMeshes = 0;
 	bool ExportComponents = false;
 	bool DoNotCreateLevels = false;
 
@@ -101,52 +102,115 @@ public:
 		bool noCoarserMeshProvided = false;
 		bool coarsestPossibleMeshReached = false;
 		int levelNumber = 0;
+		int numberOfMeshes = 1;
 		double operatorComplexity = 0;
 		double fineNNZ = (double)this->_fineLevel->OperatorMatrix->nonZeros();
 		double gridComplexity = 0;
 		double fineNUnknowns = (double)this->_fineLevel->NUnknowns();
 
+		// Type of coarsening that must be performed
+		CoarseningType coarseningType = FirstCoarseningType();
+
+
+		// Creation of the coarse levels
 		while (CoarseLevelNeeded(currentLevel, levelNumber))
 		{
-			// Type of coarsening that must be performed
-			CoarseningType coarseningType = CoarseningType::H;
-			if (this->HP_CS == HP_CoarsStgy::P_only)
-				coarseningType = CoarseningType::P;
-			else if (this->HP_CS == HP_CoarsStgy::P_then_H && currentLevel->PolynomialDegree() != this->CoarsePolyDegree)
-				coarseningType = CoarseningType::P;
-			else if (this->HP_CS == HP_CoarsStgy::P_then_HP)
-				coarseningType = currentLevel->PolynomialDegree() != this->CoarsePolyDegree ? CoarseningType::P : CoarseningType::HP;
-			else if (this->HP_CS == HP_CoarsStgy::HP_then_H && currentLevel->PolynomialDegree() != this->CoarsePolyDegree)
-				coarseningType = CoarseningType::HP;
+			coarseningType = ChangeCoarseningType(currentLevel, coarseningType);
 
 			// Mesh coarsening if needed
 			if (coarseningType == CoarseningType::H || coarseningType == CoarseningType::HP)
 			{
-				// Can we coarsen the mesh?
-				currentLevel->CoarsenMesh(this->H_CS, this->FaceCoarseningStgy, this->CoarseningFactor, noCoarserMeshProvided, coarsestPossibleMeshReached);
-				if (noCoarserMeshProvided || coarsestPossibleMeshReached)
-					break;
+				if (this->NumberOfMeshes == 0 || numberOfMeshes < this->NumberOfMeshes)
+				{
+					// Mesh coarsening
+					currentLevel->CoarsenMesh(this->H_CS, this->FaceCoarseningStgy, this->CoarseningFactor, noCoarserMeshProvided, coarsestPossibleMeshReached);
+
+					if (noCoarserMeshProvided || coarsestPossibleMeshReached)
+					{
+						// If no coarser mesh, then p-coarsening if needed
+						if ((this->HP_CS == HP_CoarsStgy::H_then_P || this->HP_CS == HP_CoarsStgy::HP_then_P) && currentLevel->PolynomialDegree() > this->CoarsePolyDegree)
+						{
+							if (currentLevel->PolynomialDegree() > this->CoarsePolyDegree)
+								coarseningType = CoarseningType::P;
+							else
+							{
+								if (coarsestPossibleMeshReached)
+									Utils::Warning("Cannot define a lower level because the mesh cannot be coarsened any more and the degree cannot be lowered.");
+								if (noCoarserMeshProvided)
+									Utils::Warning("Cannot define a lower level because no coarser mesh has been provided and the degree cannot be lowered.");
+								break; // stop building levels
+							}
+						}
+						else
+						{
+							if (coarsestPossibleMeshReached)
+								Utils::Warning("Cannot define a lower level because the mesh cannot be coarsened any more.");
+							if (noCoarserMeshProvided)
+								Utils::Warning("Cannot define a lower level because no coarser mesh has been provided.");
+							break; // stop building levels
+						}
+					}
+					else
+						numberOfMeshes++;
+				}
+				else if (this->HP_CS == HP_CoarsStgy::H_then_P || this->HP_CS == HP_CoarsStgy::HP_then_P)
+				{
+					if (currentLevel->PolynomialDegree() > this->CoarsePolyDegree)
+						coarseningType = CoarseningType::P;
+					else
+					{
+						Utils::Warning("Cannot define a lower level because the requested number of meshes is reached and the degree cannot be lowered.");
+						break; // stop building levels
+					}
+				}
+				else
+				{
+					Utils::Warning("Cannot define a lower level because the requested number of meshes is reached.");
+					break; // stop building levels
+				}
 			}
 
-			int coarseDegree = currentLevel->PolynomialDegree();
+			if (coarseningType == CoarseningType::P && currentLevel->PolynomialDegree() == this->CoarsePolyDegree)
+			{
+				Utils::Warning("Cannot define a lower level because the degree cannot be lowered.");
+				break; // stop building levels
+			}
+
+			int coarseDegree = -1;
+			int currentDegree = currentLevel->PolynomialDegree();
 			if (coarseningType == CoarseningType::P || coarseningType == CoarseningType::HP)
 			{
-				if (this->P_CS == P_CoarsStgy::Minus1)
-					coarseDegree -= 1;
-				else if (this->P_CS == P_CoarsStgy::Minus2)
-					coarseDegree -= 2;
-				else if (this->P_CS == P_CoarsStgy::DivideBy2)
-					coarseDegree /= 2;
-				else if (this->P_CS == P_CoarsStgy::DirectToLow)
-					coarseDegree = this->CoarsePolyDegree;
+				if (coarseningType == CoarseningType::P)
+				{
+					if (this->P_CS == P_CoarsStgy::Minus1)
+						coarseDegree = currentDegree - 1;
+					else if (this->P_CS == P_CoarsStgy::Minus2)
+						coarseDegree = currentDegree - 2;
+					else if (this->P_CS == P_CoarsStgy::DivideBy2)
+						coarseDegree = currentDegree / 2;
+					else if (this->P_CS == P_CoarsStgy::DirectToLow)
+						coarseDegree = this->CoarsePolyDegree;
+					else
+						assert(false);
+				}
 				else
-					assert(false);
+					coarseDegree = currentDegree - 1;
 
-				coarseDegree = max(coarseDegree, this->CoarsePolyDegree);
+				if (this->HP_CS == HP_CoarsStgy::P_then_HP)
+				{
+					int degreeWhenHPCoarseningMustStart = (this->NumberOfMeshes - 1) + this->CoarsePolyDegree;
+					coarseDegree = max(coarseDegree, degreeWhenHPCoarseningMustStart);
+				}
+				else
+					coarseDegree = max(coarseDegree, this->CoarsePolyDegree);
 			}
+			else
+				coarseDegree = currentDegree;
 
 			// Build coarse level
 			levelNumber++;
+			if (this->HP_CS != HP_CoarsStgy::H_only)
+				cout << "\tCreation of level " << levelNumber << " (" << (coarseningType == CoarseningType::H ? "h" : (coarseningType == CoarseningType::P ? "p" : "hp")) << "-coarsening)" << endl;
 			Level* coarseLevel = CreateCoarseLevel(currentLevel, coarseningType, coarseDegree);
 			coarseLevel->ComesFrom = coarseningType;
 
@@ -218,11 +282,6 @@ public:
 		operatorComplexity += currentLevel->OperatorMatrix->nonZeros() / fineNNZ;
 		gridComplexity += currentLevel->NUnknowns() / fineNUnknowns;
 
-		if (coarsestPossibleMeshReached)
-			Utils::Warning("impossible to coarsen the mesh any more.");
-		if (noCoarserMeshProvided)
-			Utils::Warning("cannot define a lower level because no coarser mesh has been provided.");
-
 		this->InitializeCoarseSolver();
 		this->SetupCoarseSolver();
 
@@ -283,6 +342,64 @@ protected:
 	}
 
 private:
+	CoarseningType FirstCoarseningType()
+	{
+		if (this->HP_CS == HP_CoarsStgy::H_only || this->HP_CS == HP_CoarsStgy::H_then_P)
+			return CoarseningType::H;
+		else if (this->HP_CS == HP_CoarsStgy::P_only)
+		{
+			if (_fineLevel->PolynomialDegree() > this->CoarsePolyDegree)
+				return CoarseningType::P;
+			else
+				Utils::FatalError("p-coarsening cannot be performed because the polynomial degree of the fine level = " + to_string(this->CoarsePolyDegree));
+		}
+		else if (this->HP_CS == HP_CoarsStgy::P_then_H)
+			return _fineLevel->PolynomialDegree() > this->CoarsePolyDegree ? CoarseningType::P : CoarseningType::H;
+		else if (this->HP_CS == HP_CoarsStgy::P_then_HP)
+		{
+			if (_fineLevel->PolynomialDegree() > this->CoarsePolyDegree)
+			{
+				if (this->NumberOfMeshes == 0)
+					Utils::FatalError("With -hp-cs p_hp, the number of meshes must be fixed using -num-meshes.");
+				return CoarseningType::P;
+			}
+			else
+				Utils::FatalError("Neither p- or hp-coarsening can be performed because the polynomial degree of the fine level = " + to_string(this->CoarsePolyDegree));
+		}
+		else if (this->HP_CS == HP_CoarsStgy::HP_then_H)
+			return _fineLevel->PolynomialDegree() > this->CoarsePolyDegree ? CoarseningType::HP : CoarseningType::H;
+		else if (this->HP_CS == HP_CoarsStgy::HP_then_P)
+		{
+			if (_fineLevel->PolynomialDegree() > this->CoarsePolyDegree)
+				return CoarseningType::HP;
+			else
+				Utils::FatalError("Neither hp- or p-coarsening can be performed because the polynomial degree of the fine level = " + to_string(this->CoarsePolyDegree));
+		}
+		else
+			Utils::FatalError("This hp-cs is not implemented.");
+
+		return CoarseningType::H; // just to avoid warning
+	}
+
+	CoarseningType ChangeCoarseningType(Level* currentLevel, CoarseningType currentCoarseningType)
+	{
+		if (this->HP_CS == HP_CoarsStgy::P_then_HP && currentCoarseningType == CoarseningType::P)
+		{
+			if (this->NumberOfMeshes == 0)
+				Utils::FatalError("With -hp-cs p_hp, the number of meshes must be fixed using -num-meshes.");
+
+			int degreeWhenHPCoarseningMustStart = (this->NumberOfMeshes - 1) + this->CoarsePolyDegree;
+			return currentLevel->PolynomialDegree() > degreeWhenHPCoarseningMustStart ? CoarseningType::P : CoarseningType::HP;
+		}
+		else if (this->HP_CS == HP_CoarsStgy::P_then_H && currentCoarseningType == CoarseningType::P && currentLevel->PolynomialDegree() == this->CoarsePolyDegree)
+			return CoarseningType::H;
+		else if (currentCoarseningType == CoarseningType::HP && currentLevel->PolynomialDegree() == this->CoarsePolyDegree)
+		{
+			if (this->HP_CS == HP_CoarsStgy::HP_then_H)
+				return CoarseningType::H;
+		}
+		return currentCoarseningType;
+	}
 
 	bool CoarseLevelNeeded(Level* currentLevel, int levelNumber)
 	{

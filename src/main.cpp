@@ -238,7 +238,9 @@ void print_usage() {
 	cout << "              h    - h only" << endl;
 	cout << "              p    - p only" << endl;
 	cout << "              p_h  - p, then h" << endl;
+	cout << "              h_p  - h, then p" << endl;
 	cout << "              hp_h - simultaneous hp, then h" << endl;
+	cout << "              hp_p - simultaneous hp, then p" << endl;
 	cout << "              p_hp - p, then simultaneous hp" << endl;
 	cout << endl;
 	cout << "-cs CODE" << endl;
@@ -275,6 +277,10 @@ void print_usage() {
 	cout << "              i   - Collapse interfaces made of multiple faces and try to aggregate interior faces to the boundary ones" << endl;
 	//cout << "              z   - Aggregate all faces using A_F_F" << endl;
 	cout << endl;
+	cout << "-num-meshes NUM" << endl;
+	cout << "      Fixes the number of meshes in the mesh hierarchy." << endl;
+	cout << "      By default, the program tries to coarsen the mesh until the linear system reaches the size set by the argument -coarse-size." << endl;
+	cout << endl;
 	cout << "-coarse-solver CODE" << endl;
 	cout << "      Any solver code (see -solver). Only purely algebraic solvers are allowed. Default: 'ch' (Cholesky factorization)." << endl;
 	cout << endl;
@@ -291,7 +297,7 @@ void print_usage() {
 	cout << "              f   - Agglomerate elements at re-entrant corners first" << endl;
 	cout << endl;
 	cout << "-coarse-n NUM" << endl;
-	cout << "      If a refinement strategy is used, sets the mesh size of the starting coarse mesh." << endl;
+	cout << "      If a refinement strategy is used, sets the mesh size of the coarse mesh." << endl;
 	cout << "      The chosen value will set the variable N defined at the beginning of the GMSH .geo file." << endl;
 	cout << endl;
 	cout << "-coarsening-factor NUM" << endl;
@@ -538,6 +544,7 @@ int main(int argc, char* argv[])
 		OPT_H_CS,
 		OPT_P_CS,
 		OPT_FaceCoarseningStrategy,
+		OPT_NumberOfMeshes,
 		OPT_CoarseSolver,
 		OPT_BoundaryFaceCollapsing,
 		OPT_ReEntrantCornerManagement,
@@ -598,6 +605,7 @@ int main(int argc, char* argv[])
 		 { "cs", required_argument, NULL, OPT_H_CS },
 		 { "p-cs", required_argument, NULL, OPT_P_CS },
 		 { "fcs", required_argument, NULL, OPT_FaceCoarseningStrategy },
+		 { "num-meshes", required_argument, NULL, OPT_NumberOfMeshes },
 		 { "bfc", required_argument, NULL, OPT_BoundaryFaceCollapsing },
 		 { "coarse-solver", required_argument, NULL, OPT_CoarseSolver },
 		 { "rcm", required_argument, NULL, OPT_ReEntrantCornerManagement },
@@ -934,10 +942,14 @@ int main(int argc, char* argv[])
 					args.Solver.MG.HP_CS = HP_CoarsStgy::P_only;
 				else if (code.compare("p_h") == 0)
 					args.Solver.MG.HP_CS = HP_CoarsStgy::P_then_H;
+				else if (code.compare("h_p") == 0)
+					args.Solver.MG.HP_CS = HP_CoarsStgy::H_then_P;
 				else if (code.compare("p_hp") == 0)
 					args.Solver.MG.HP_CS = HP_CoarsStgy::P_then_HP;
 				else if (code.compare("hp_h") == 0)
 					args.Solver.MG.HP_CS = HP_CoarsStgy::HP_then_H;
+				else if (code.compare("hp_p") == 0)
+					args.Solver.MG.HP_CS = HP_CoarsStgy::HP_then_P;
 				else
 					argument_error("unknown hp-coarsening strategy code '" + code + "'. Check -hp-cs argument.");
 				break;
@@ -1009,6 +1021,9 @@ int main(int argc, char* argv[])
 					argument_error("unknown face coarsening strategy code '" + fcsCode + "'. Check -fcs argument.");
 				break;
 			}
+			case OPT_NumberOfMeshes:
+				args.Solver.MG.NumberOfMeshes = atoi(optarg);
+				break;
 			case OPT_CoarseSolver:
 			{
 				defaultCoarseSolver = false;
@@ -1237,7 +1252,7 @@ int main(int argc, char* argv[])
 	//                Multigrid                 //
 	//------------------------------------------//
 
-	if (args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("fcgmg") == 0 || args.Solver.SolverCode.compare("p_mg") == 0)
+	if (args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("cgmg") == 0 || args.Solver.SolverCode.compare("fcgmg") == 0 || args.Solver.SolverCode.compare("p_mg") == 0)
 	{
 		if (args.Discretization.Method.compare("dg") == 0)
 			argument_error("Multigrid only applicable on HHO discretization.");
@@ -1299,10 +1314,7 @@ int main(int argc, char* argv[])
 		if (defaultCycle)
 		{
 			args.Solver.MG.PreSmoothingIterations = 0;
-			if (args.Problem.Dimension < 3)
-				args.Solver.MG.PostSmoothingIterations = 3;
-			else
-				args.Solver.MG.PostSmoothingIterations = Utils::IsRefinementStrategy(args.Solver.MG.H_CS) ? 10 : 6;
+			args.Solver.MG.PostSmoothingIterations = args.Problem.Dimension < 3 ? 3 : 6;
 		}
 	}
 
