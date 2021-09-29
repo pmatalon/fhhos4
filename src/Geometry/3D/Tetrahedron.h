@@ -93,6 +93,11 @@ public:
 	{
 		return &RefTetra;
 	}
+
+	bool MapsToACartesianShape() const override
+	{
+		return false;
+	}
 	
 	inline vector<DomPoint> Vertices() const override
 	{

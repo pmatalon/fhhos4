@@ -531,7 +531,7 @@ private:
 	{
 		if (_pProlongation == GMG_P_Prolongation::Injection)
 		{
-			if (!this->_problem->HHO->FaceBasis->IsHierarchical || !this->_problem->HHO->OrthogonalizeBases())
+			if (!this->_problem->HHO->FaceBasis->IsHierarchical || !this->_problem->HHO->OrthogonalizeFaceBases())
 				Utils::Warning("The natural injection and restriction for p-multigrid are implemented based on the assumption that the face bases are hierarchical and orthogonalized. Degraded convergence may be experienced.");
 			// nothing to do
 		}

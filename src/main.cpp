@@ -109,21 +109,27 @@ void print_usage() {
 	cout << "               hho    - HHO stabilization term" << endl;
 	cout << "               hdg    - HDG stabilization term" << endl;
 	cout << endl;
-	cout << "-b CODE" << endl;
-	cout << "      Polynomial basis." << endl;
+	cout << "-e-basis CODE" << endl;
+	cout << "      Polynomial basis for the elements." << endl;
 	cout << "               monomials" << endl;
 	cout << "               legendre" << endl;
 	cout << "               nlegendre (normalized Legendre)" << endl;
 	cout << "               bernstein" << endl;
 	cout << "               hemker" << endl;
 	cout << endl;
-	cout << "-onb NUM" << endl;
-	cout << "      Orthonormalization of the local bases against each element and face. Default: 1." << endl;
+	cout << "-f-basis CODE" << endl;
+	cout << "      Polynomial basis for the faces. Same values as for -e-basis." << endl;
+	cout << endl;
+	cout << "-e-ogb NUM" << endl;
+	cout << "      Orthogonalization of the local bases against each element. Default: 1." << endl;
 	cout << "               0 - no orthogonalization" << endl;
 	cout << "               1 - orthogonalization, without normalization" << endl;
 	cout << "               2 - double orthogonalization, without normalization" << endl;
 	cout << "               3 - orthonormalization" << endl;
 	cout << "               4 - orthonormalization with double orthogonalization" << endl;
+	cout << endl;
+	cout << "-f-ogb NUM" << endl;
+	cout << "      Orthogonalization of the local bases against each face. Same value as -e-ogb." << endl;
 	cout << endl;
 	cout << "-p NUM" << endl;
 	cout << "      Polynomial degree of approximation (default: 1). In HHO, k = p-1." << endl;
@@ -518,7 +524,10 @@ int main(int argc, char* argv[])
 		OPT_Discretization,
 		OPT_HHO_K,
 		OPT_Stabilization,
-		OPT_OrthonormalizeBases,
+		OPT_ElemBasis,
+		OPT_FaceBasis,
+		OPT_OrthogonalizeElemBases,
+		OPT_OrthogonalizeFaceBases,
 		OPT_NoStaticCondensation,
 		OPT_Penalization,
 		OPT_PolySpace,
@@ -579,7 +588,10 @@ int main(int argc, char* argv[])
 		 { "discr", required_argument, NULL, OPT_Discretization },
 		 { "k", required_argument, NULL, OPT_HHO_K },
 		 { "stab", required_argument, NULL, OPT_Stabilization },
-		 { "onb", required_argument, NULL, OPT_OrthonormalizeBases },
+		 { "e-basis", required_argument, NULL, OPT_ElemBasis },
+		 { "f-basis", required_argument, NULL, OPT_FaceBasis },
+		 { "e-ogb", required_argument, NULL, OPT_OrthogonalizeElemBases },
+		 { "f-ogb", required_argument, NULL, OPT_OrthogonalizeFaceBases },
 		 { "no-static-cond", no_argument, NULL, OPT_NoStaticCondensation },
 		 { "pen", required_argument, NULL, OPT_Penalization },
 		 { "poly-space", required_argument, NULL, OPT_PolySpace },
@@ -723,21 +735,38 @@ int main(int argc, char* argv[])
 				args.Discretization.Stabilization = stabilization;
 				break;
 			}
-			case 'b': 
+			case OPT_ElemBasis: 
 			{
 				string basisCode = optarg;
 				if (basisCode.compare("monomials") != 0 && basisCode.compare("legendre") != 0 && basisCode.compare("nlegendre") != 0 && basisCode.compare("bernstein") != 0 && basisCode.compare("hemker") != 0)
-					argument_error("unknown polynomial basis '" + basisCode + "'. Check -b argument.");
-				args.Discretization.BasisCode = basisCode;
+					argument_error("unknown polynomial basis '" + basisCode + "'. Check -e-basis argument.");
+				args.Discretization.ElemBasisCode = basisCode;
 				break;
 			}
-			case OPT_OrthonormalizeBases:
+			case OPT_FaceBasis:
+			{
+				string basisCode = optarg;
+				if (basisCode.compare("monomials") != 0 && basisCode.compare("legendre") != 0 && basisCode.compare("nlegendre") != 0 && basisCode.compare("bernstein") != 0 && basisCode.compare("hemker") != 0)
+					argument_error("unknown polynomial basis '" + basisCode + "'. Check -f-basis argument.");
+				args.Discretization.FaceBasisCode = basisCode;
+				break;
+			}
+			case OPT_OrthogonalizeElemBases:
 			{
 				int i = atoi(optarg);
 				if (i < 0 || i > 4)
-					argument_error("check -onb argument. Accepted values: 0, 1, 2, 3, 4.");
+					argument_error("check -e-ogb argument. Accepted values: 0, 1, 2, 3, 4.");
 				else
-					args.Discretization.OrthogonalizeBasesCode = i;
+					args.Discretization.OrthogonalizeElemBasesCode = i;
+				break;
+			}
+			case OPT_OrthogonalizeFaceBases:
+			{
+				int i = atoi(optarg);
+				if (i < 0 || i > 4)
+					argument_error("check -f-ogb argument. Accepted values: 0, 1, 2, 3, 4.");
+				else
+					args.Discretization.OrthogonalizeFaceBasesCode = i;
 				break;
 			}
 			case 'p': 
@@ -1217,9 +1246,40 @@ int main(int argc, char* argv[])
 	if (args.Discretization.Method.compare("hho") == 0 && args.Discretization.PolyDegree == 0)
 		argument_error("HHO does not exist with p = 0. Linear approximation at least (p >= 1).");
 
-	// Polynomial basis
-	if (args.Discretization.BasisCode.empty())
-		args.Discretization.BasisCode = args.Discretization.OrthogonalizeBasesCode > 0 ? "monomials" : "legendre";
+	// Elem polynomial bases
+	if (args.Discretization.ElemBasisCode.empty())
+	{
+		if (args.Discretization.OrthogonalizeElemBasesCode == -1)
+			args.Discretization.OrthogonalizeElemBasesCode = args.Discretization.MeshCode.compare("cart") == 0 ? 0 : 1;
+		args.Discretization.ElemBasisCode = args.Discretization.OrthogonalizeElemBasesCode > 0 ? "monomials" : "legendre";
+	}
+	else if (args.Discretization.OrthogonalizeElemBasesCode == -1)
+	{
+		if (args.Discretization.ElemBasisCode.compare("legendre") == 0 && args.Discretization.MeshCode.compare("cart") == 0)
+			args.Discretization.OrthogonalizeElemBasesCode = 0;
+		else
+			args.Discretization.OrthogonalizeElemBasesCode = 1;
+	}
+
+	// Face polynomial bases
+	if (args.Discretization.FaceBasisCode.empty())
+	{
+		if (args.Discretization.OrthogonalizeFaceBasesCode == -1)
+		{
+			if (args.Problem.Dimension <= 2 || args.Discretization.MeshCode.compare("cart") == 0)
+				args.Discretization.OrthogonalizeFaceBasesCode = 0;
+			else
+				args.Discretization.OrthogonalizeFaceBasesCode = 1;
+		}
+		args.Discretization.FaceBasisCode = args.Discretization.OrthogonalizeFaceBasesCode > 0 ? "monomials" : "legendre";
+	}
+	else if (args.Discretization.OrthogonalizeFaceBasesCode == -1)
+	{
+		if (args.Discretization.FaceBasisCode.compare("legendre") == 0 && args.Discretization.MeshCode.compare("cart") == 0)
+			args.Discretization.OrthogonalizeFaceBasesCode = 0;
+		else
+			args.Discretization.OrthogonalizeFaceBasesCode = 1;
+	}
 
 	//------------------------------------------//
 	//                  Solver                  //

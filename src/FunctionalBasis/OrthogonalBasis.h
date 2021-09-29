@@ -88,7 +88,6 @@ public:
 	{
 		this->_maxPolynomialDegree = basis->GetDegree();
 		this->IsHierarchical = basis->IsHierarchical;
-		this->IsOrthogonal = true;
 		assert(orthogonalizationSweeps > 0);
 		if (normalize)
 		{

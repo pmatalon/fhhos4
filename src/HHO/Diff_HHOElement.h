@@ -96,9 +96,9 @@ public:
 	{
 		this->HHO = hho;
 
-		if (hho->OrthogonalizeBases())
+		if (hho->OrthogonalizeElemBases())
 		{
-			this->ReconstructionBasis = new OrthogonalBasis<Dim>(HHO->ReconstructionBasis, this->MeshElement->Shape(), hho->NOrthogonalizations(), hho->OrthonormalizeBases());
+			this->ReconstructionBasis = new OrthogonalBasis<Dim>(HHO->ReconstructionBasis, this->MeshElement->Shape(), hho->NElemOrthogonalizations(), hho->OrthonormalizeElemBases());
 			this->CellBasis = new FunctionalBasis<Dim>(this->ReconstructionBasis->ExtractLowerBasis(HHO->CellBasis->GetDegree()));
 		}
 		else
@@ -131,6 +131,11 @@ public:
 		}
 	}
 
+	bool HasOrthogonalBasis() const
+	{
+		return HHO->OrthogonalizeElemBases() || (this->ReconstructionBasis->IsOrthogonalOnCartesianShapes && this->MeshElement->Shape()->MapsToACartesianShape());
+	}
+
 	DenseMatrix SolveCellMassMatrix(const DenseMatrix& M)
 	{
 		return SolveMassMatrix(this->CellBasis, M);
@@ -143,9 +148,9 @@ public:
 private:
 	DenseMatrix SolveMassMatrix(FunctionalBasis<Dim>* basis, const DenseMatrix& M)
 	{
-		if (HHO->OrthonormalizeBases())
+		if (HHO->OrthonormalizeElemBases())
 			return M;
-		else if (HHO->OrthogonalizeBases())
+		else if (HHO->OrthogonalizeElemBases())
 		{
 			Vector d(basis->Size());
 			for (BasisFunction<Dim>* phi : basis->LocalFunctions)
@@ -347,18 +352,18 @@ private:
 
 		if (HHO->Stabilization.compare("hho") == 0)
 		{
-			DenseMatrix ProjT;
-			if (!HHO->OrthogonalizeBases())
+			DenseMatrix Dt;
+			if (!this->HasOrthogonalBasis() || !this->ReconstructionBasis->IsHierarchical)
 			{
 				DenseMatrix cellMassMatrix = this->MassMatrix(this->CellBasis);
 				DenseMatrix Nt = this->CellReconstructMassMatrix(this->CellBasis, this->ReconstructionBasis);
 
-				ProjT = cellMassMatrix.llt().solve(Nt);
+				DenseMatrix ProjT = cellMassMatrix.llt().solve(Nt);
+				Dt = ProjT * this->P;
 			}
 			else
-				ProjT = DenseMatrix::Identity(HHO->nCellUnknowns, HHO->nReconstructUnknowns);
+				Dt = this->P.topRows(HHO->nCellUnknowns);
 
-			DenseMatrix Dt = ProjT * this->P;
 			for (int i = 0; i < Dt.rows(); i++)
 				Dt(i, i) -= 1;
 
@@ -445,7 +450,7 @@ public:
 public:
 	~Diff_HHOElement()
 	{
-		if (HHO->OrthogonalizeBases())
+		if (HHO->OrthogonalizeElemBases())
 		{
 			delete ReconstructionBasis;
 			CellBasis->LocalFunctions.clear();

@@ -187,6 +187,11 @@ public:
 		return &RefCartShape;
 	}
 
+	bool MapsToACartesianShape() const override
+	{
+		return true;
+	}
+
 	// Not a great solution, the vertices should pass by the constructor,
 	// but hey, a little "quick and dirty" can't do no harm bro...!
 	inline void SetVertices(const vector<DomPoint>& vertices)

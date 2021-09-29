@@ -7,7 +7,8 @@ struct HHOParameters
 	FunctionalBasis<Dim>* ReconstructionBasis;
 	FunctionalBasis<Dim>* CellBasis;
 	FunctionalBasis<Dim - 1>* FaceBasis;
-	int OrthogonalizeBasesCode;
+	int OrthogonalizeElemBasesCode;
+	int OrthogonalizeFaceBasesCode;
 
 	BigNumber nElements;
 	BigNumber nFaces;
@@ -32,12 +33,15 @@ struct HHOParameters
 
 	string Stabilization;
 
-	HHOParameters(Mesh<Dim>* mesh, string stabilization, FunctionalBasis<Dim>* reconstructionBasis, FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim - 1>* faceBasis, int orthonormalizeBasesCode)
+	HHOParameters(Mesh<Dim>* mesh, string stabilization, 
+				FunctionalBasis<Dim>* reconstructionBasis, FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim - 1>* faceBasis, 
+				int orthogonalizeElemBasesCode, int orthogonalizeFaceBasesCode)
 	{
 		this->ReconstructionBasis = reconstructionBasis;
 		this->CellBasis = cellBasis;
 		this->FaceBasis = faceBasis;
-		this->OrthogonalizeBasesCode = orthonormalizeBasesCode;
+		this->OrthogonalizeElemBasesCode = orthogonalizeElemBasesCode;
+		this->OrthogonalizeFaceBasesCode = orthogonalizeFaceBasesCode;
 
 		nElements = mesh->Elements.size();
 		nFaces = mesh->Faces.size();
@@ -63,20 +67,37 @@ struct HHOParameters
 		Stabilization = stabilization;
 	}
 
-	bool OrthogonalizeBases()
+	bool OrthogonalizeElemBases()
 	{
-		return OrthogonalizeBasesCode > 0;
+		return OrthogonalizeElemBasesCode > 0;
 	}
-	int NOrthogonalizations()
+	int NElemOrthogonalizations()
 	{
-		if (OrthogonalizeBasesCode == 1 || OrthogonalizeBasesCode == 3)
+		if (OrthogonalizeElemBasesCode == 1 || OrthogonalizeElemBasesCode == 3)
 			return 1;
-		else if (OrthogonalizeBasesCode == 2 || OrthogonalizeBasesCode == 4)
+		else if (OrthogonalizeElemBasesCode == 2 || OrthogonalizeElemBasesCode == 4)
 			return 2;
 		return 0;
 	}
-	bool OrthonormalizeBases()
+	bool OrthonormalizeElemBases()
 	{
-		return OrthogonalizeBasesCode == 3 || OrthogonalizeBasesCode == 4;
+		return OrthogonalizeElemBasesCode == 3 || OrthogonalizeElemBasesCode == 4;
+	}
+
+	bool OrthogonalizeFaceBases()
+	{
+		return OrthogonalizeFaceBasesCode > 0;
+	}
+	int NFaceOrthogonalizations()
+	{
+		if (OrthogonalizeFaceBasesCode == 1 || OrthogonalizeFaceBasesCode == 3)
+			return 1;
+		else if (OrthogonalizeFaceBasesCode == 2 || OrthogonalizeFaceBasesCode == 4)
+			return 2;
+		return 0;
+	}
+	bool OrthonormalizeFaceBases()
+	{
+		return OrthogonalizeFaceBasesCode == 3 || OrthogonalizeFaceBasesCode == 4;
 	}
 };

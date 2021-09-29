@@ -24,8 +24,10 @@ struct DiscretizationArguments
 	string MeshCode = "default";
 	double Stretch = 0.5;
 	string Stabilization = "hho";
-	string BasisCode = "";
-	int OrthogonalizeBasesCode = 1;
+	string ElemBasisCode = "";
+	string FaceBasisCode = "";
+	int OrthogonalizeElemBasesCode = -1;
+	int OrthogonalizeFaceBasesCode = -1;
 	int PolyDegree = 2;
 	bool UsePolynomialSpaceQ = false;
 	int PenalizationCoefficient = -1;

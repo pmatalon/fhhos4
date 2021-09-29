@@ -64,9 +64,9 @@ public:
 		//this->ComputeAndSaveQuadraturePoints(basis->GetDegree());
 		//this->ComputeAndSaveQuadraturePoints();
 
-		if (hho->OrthogonalizeBases())
+		if (hho->OrthogonalizeFaceBases())
 		{
-			this->Basis = new OrthogonalBasis<Dim - 1>(HHO->FaceBasis, this->MeshFace->Shape(), hho->NOrthogonalizations(), hho->OrthonormalizeBases());
+			this->Basis = new OrthogonalBasis<Dim - 1>(HHO->FaceBasis, this->MeshFace->Shape(), hho->NFaceOrthogonalizations(), hho->OrthonormalizeFaceBases());
 			//this->_massMatrix = this->MeshFace->Shape()->ComputeMassMatrix(this->Basis);
 			//cout << "mass matrix: " << endl << _massMatrix << endl;
 		}
@@ -80,9 +80,9 @@ public:
 
 	DenseMatrix MassMatrix()
 	{
-		if (HHO->OrthonormalizeBases())
+		if (HHO->OrthonormalizeFaceBases())
 			return DenseMatrix::Identity(this->Basis->Size(), this->Basis->Size());
-		else if (HHO->OrthogonalizeBases())
+		else if (HHO->OrthogonalizeFaceBases())
 		{
 			Vector d(this->Basis->Size());
 			for (BasisFunction<Dim-1>* phi : this->Basis->LocalFunctions)
@@ -94,9 +94,9 @@ public:
 	}
 	DenseMatrix SolveMassMatrix(const DenseMatrix& M)
 	{
-		if (HHO->OrthonormalizeBases())
+		if (HHO->OrthonormalizeFaceBases())
 			return M;
-		else if (HHO->OrthogonalizeBases())
+		else if (HHO->OrthogonalizeFaceBases())
 		{
 			Vector d(this->Basis->Size());
 			for (BasisFunction<Dim-1>* phi : this->Basis->LocalFunctions)
@@ -108,9 +108,9 @@ public:
 	}
 	Vector SolveMassMatrix(const Vector& v)
 	{
-		if (HHO->OrthonormalizeBases())
+		if (HHO->OrthonormalizeFaceBases())
 			return v;
-		else if (HHO->OrthogonalizeBases())
+		else if (HHO->OrthogonalizeFaceBases())
 		{
 			Vector d(this->Basis->Size());
 			for (BasisFunction<Dim-1>* phi : this->Basis->LocalFunctions)
@@ -178,13 +178,13 @@ public:
 
 	void DeleteUselessMatricesAfterAssembly()
 	{
-		if (!HHO->OrthogonalizeBases())
+		if (!HHO->OrthogonalizeFaceBases())
 			Utils::Empty(_massMatrix);
 	}
 
 	void DeleteUselessMatricesAfterMultigridSetup()
 	{
-		if (!HHO->OrthogonalizeBases())
+		if (!HHO->OrthogonalizeFaceBases())
 			_massMatrixSolver = Eigen::LLT<DenseMatrix>();
 		this->MeshFace->EmptySavedDomPoints();
 	}
@@ -199,7 +199,7 @@ private:
 public:
 	~Diff_HHOFace()
 	{
-		if (HHO->OrthogonalizeBases())
+		if (HHO->OrthogonalizeFaceBases())
 			delete Basis;
 	}
 };

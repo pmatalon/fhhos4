@@ -41,6 +41,11 @@ public:
 		return &CartesianShape<2, 1>::RefCartShape;
 	}
 
+	bool MapsToACartesianShape() const override
+	{
+		return true;
+	}
+
 	inline vector<DomPoint> Vertices() const override
 	{
 		return vector<DomPoint>{ v1, v2 };

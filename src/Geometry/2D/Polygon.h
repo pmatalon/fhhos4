@@ -447,6 +447,11 @@ public:
 		return &RectangleShape::RefCartShape;
 	}
 
+	bool MapsToACartesianShape() const override
+	{
+		return false;
+	}
+
 	inline vector<DomPoint> Vertices() const override
 	{
 		return _vertices;

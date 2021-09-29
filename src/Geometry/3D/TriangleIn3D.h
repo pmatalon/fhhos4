@@ -83,6 +83,11 @@ public:
 	{
 		return &Triangle::RefTriangle;
 	}
+
+	bool MapsToACartesianShape() const override
+	{
+		return false;
+	}
 	
 	inline vector<DomPoint> Vertices() const override
 	{

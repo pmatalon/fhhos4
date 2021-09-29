@@ -41,6 +41,8 @@ public:
 	virtual double DetJacobian(const RefPoint& p) const = 0;
 	virtual int DetJacobianDegree() const = 0;
 
+	virtual bool MapsToACartesianShape() const = 0;
+
 	virtual PhysicalShape<Dim>* CreateCopy() const = 0;
 
 	virtual void RefineWithoutCoarseOverlap(const vector<PhysicalShape<Dim - 1>*>& doNotCross) = 0;

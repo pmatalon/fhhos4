@@ -18,7 +18,7 @@ public:
 	bool UsePolynomialSpaceQ;
 	vector<BasisFunction<Dim>*> LocalFunctions;
 	bool IsHierarchical = true;
-	bool IsOrthogonal = false;
+	bool IsOrthogonalOnCartesianShapes = false;
 
 protected:
 	FunctionalBasis()
@@ -36,6 +36,8 @@ public:
 		this->_basisCode = basisCode;
 		this->UsePolynomialSpaceQ = usePolynomialSpaceQ;
 		this->IsHierarchical = basisCode.compare(Monomial1D::Code()) == 0 || basisCode.compare(Legendre1D::Code()) == 0;
+		if (basisCode.compare(Legendre1D::Code()) == 0)
+			this->IsOrthogonalOnCartesianShapes = true;
 
 		//----------//
 		//    0D    //

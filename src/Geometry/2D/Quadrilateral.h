@@ -108,6 +108,11 @@ public:
 		return &RefSquare;
 	}
 
+	bool MapsToACartesianShape() const override
+	{
+		return true;
+	}
+
 	inline double Diameter() const override
 	{
 		return _diameter;
