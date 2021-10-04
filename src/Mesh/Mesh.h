@@ -69,6 +69,7 @@ protected:
 	set<Vertex*> _geometricVertices;
 	map<PhysicalGroup<Dim>*, vector<Vertex*>> _reEntrantCorners;
 public:
+	int Id = 0;
 	vector<Vertex*> Vertices;
 	vector<Element<Dim>*> Elements;
 	vector<Face<Dim>*> Faces;
@@ -337,6 +338,7 @@ protected:
 	{
 		this->CoarseMesh = coarseMesh;
 		coarseMesh->FineMesh = this;
+		coarseMesh->Id = this->Id + 1;
 
 		coarseMesh->PhysicalParts = this->PhysicalParts;
 		coarseMesh->BoundaryParts = this->BoundaryParts;
@@ -349,6 +351,7 @@ protected:
 	{
 		this->FineMesh = fineMesh;
 		fineMesh->CoarseMesh = this;
+		fineMesh->Id = this->Id + 1;
 
 		fineMesh->PhysicalParts = this->PhysicalParts;
 		fineMesh->BoundaryParts = this->BoundaryParts;

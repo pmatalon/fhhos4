@@ -51,7 +51,7 @@ public:
 			noCoarserMeshProvided = true;
 			return;
 		}
-		cout << "\tCoarsening mesh" << endl;
+		cout << "\tCoarsening mesh " << mesh->Id << endl;
 		mesh->CoarsenMesh(elemCoarseningStgy, faceCoarseningStgy, coarseningFactor);
 		if (!mesh->CoarseMesh || mesh->CoarseMesh->InteriorFaces.size() == 0)
 			coarsestPossibleMeshReached = true;
@@ -128,28 +128,24 @@ private:
 
 	void OnStartSetup() override
 	{
-		if (this->ComesFrom == CoarseningType::P || this->ComesFrom == CoarseningType::HP)
-			cout << "\t\tk = " << this->PolynomialDegree() << endl;
-		if (this->ComesFrom == CoarseningType::H || this->ComesFrom == CoarseningType::HP)
+		cout << "\t\tk = " << this->PolynomialDegree() << endl;
+		if (_hProlongation == GMG_H_Prolongation::FaceInject)
+			cout << "\t\tMesh                : " << this->_problem->_mesh->Faces.size() << " faces" << endl;
+		else
 		{
-			if (_hProlongation == GMG_H_Prolongation::FaceInject)
-				cout << "\t\tMesh                : " << this->_problem->_mesh->Faces.size() << " faces" << endl;
+			cout << "\t\tMesh " << this->_problem->_mesh->Id << "              : " << this->_problem->_mesh->Elements.size() << " elements, regularity = ";
+			double regularity = this->_problem->_mesh->Regularity();
+			if (regularity == 0)
+				cout << "unknown";
 			else
-			{
-				cout << "\t\tMesh                : " << this->_problem->_mesh->Elements.size() << " elements, regularity = ";
-				double regularity = this->_problem->_mesh->Regularity();
-				if (regularity == 0)
-					cout << "unknown";
-				else
-					cout << regularity;
-				if (!this->IsFinestLevel())
-					cout << ", coarsening factor = " << this->_problem->_mesh->CoarseningFactor();
-				cout << endl;
-			}
-
-			if (ExportComponents)
-				this->ExportMeshToMatlab(this->_problem->_mesh, this->Number);
+				cout << regularity;
+			if (!this->IsFinestLevel())
+				cout << ", coarsening factor = " << this->_problem->_mesh->CoarseningFactor();
+			cout << endl;
 		}
+
+		if (ExportComponents)
+			this->ExportMeshToMatlab(this->_problem->_mesh, this->Number);
 
 		if (!IsCoarsestLevel())
 		{
@@ -584,13 +580,15 @@ private:
 					});
 			}
 
-			// On the coarse levels, delete the whole mesh
-			if (!IsFinestLevel() && Utils::ProgramArgs.Solver.MG.HP_CS != HP_CoarsStgy::H_then_P && Utils::ProgramArgs.Solver.MG.HP_CS != HP_CoarsStgy::HP_then_P)
+			// If _problem->_mesh is not the fine mesh, delete it if possible
+			if (_problem->_mesh->FineMesh && _problem->_mesh != _problem->_mesh->CoarseMesh && Utils::ProgramArgs.Solver.MG.HP_CS != HP_CoarsStgy::H_then_P && Utils::ProgramArgs.Solver.MG.HP_CS != HP_CoarsStgy::HP_then_P)
 			{
-				if (_problem->_mesh->FineMesh)
-					_problem->_mesh->FineMesh->CoarseMesh = nullptr;
+				_problem->_mesh->FineMesh->CoarseMesh = nullptr;
 				_problem->_mesh->CoarseMesh = nullptr;
-				delete _problem->_mesh;
+				_problem->DeleteHHOElements();
+				_problem->DeleteHHOFaces();
+				cout << "\tDeleting mesh " << _problem->_mesh->Id << endl;
+				delete _problem->_mesh; // !!!!!!! This delete causes a bug later in the process for large problems, but I can't find out why
 			}
 		}
 	}

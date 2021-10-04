@@ -739,6 +739,15 @@ public:
 		return &this->_hhoFaces[f->Number];
 	}
 
+	void DeleteHHOElements()
+	{
+		this->_hhoElements.clear();
+	}
+	void DeleteHHOFaces()
+	{
+		this->_hhoFaces.clear();
+	}
+
 	//-------------------------------------------------------------------------------------------------//
 	// After solving the faces, construction of the higher-order approximation using the reconstructor //
 	//-------------------------------------------------------------------------------------------------//
