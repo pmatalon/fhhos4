@@ -588,7 +588,7 @@ private:
 				_problem->DeleteHHOElements();
 				_problem->DeleteHHOFaces();
 				cout << "\tDeleting mesh " << _problem->_mesh->Id << endl;
-				delete _problem->_mesh; // !!!!!!! This delete causes a bug later in the process for large problems, but I can't find out why
+				//delete _problem->_mesh; // !!!!!!! This delete causes a bug later in the process for large problems, but I can't find out why
 			}
 		}
 	}
