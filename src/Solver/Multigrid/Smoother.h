@@ -56,7 +56,7 @@ public:
 		return os;
 	}
 
-	BigNumber SolvingComputationalWork()
+	MFlops SolvingComputationalWork()
 	{
 		return _solver->SolvingComputationalWork;
 	}

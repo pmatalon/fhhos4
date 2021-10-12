@@ -68,8 +68,8 @@ public:
 		}
 		else
 		{
-			r = b - A.selfadjointView<Eigen::Lower>() * x;            result.AddCost(Cost::DAXPY(A));
-			result.SetResidualNorm(r.norm());                         result.AddCost(Cost::Norm(r));
+			r = b - A.selfadjointView<Eigen::Lower>() * x;            result.AddWorkInFlops(Cost::DAXPY(A));
+			result.SetResidualNorm(r.norm());                         result.AddWorkInFlops(Cost::Norm(r));
 		}
 
 		this->IterationCount = 0;
@@ -85,11 +85,11 @@ public:
 			Vector z, Az;
 			if (Precond.CanOptimizeResidualComputation())
 			{
-				std::tie(z, Az) = Precond.ApplyAndComputeAe(r);    result.AddCost(Precond.SolvingComputationalWork());
+				std::tie(z, Az) = Precond.ApplyAndComputeAe(r);    result.AddWorkInMFlops(Precond.SolvingComputationalWork());
 			}
 			else
 			{
-				z = Precond.Apply(r);                              result.AddCost(Precond.SolvingComputationalWork());
+				z = Precond.Apply(r);                              result.AddWorkInMFlops(Precond.SolvingComputationalWork());
 			}
 
 			// The final direction of research, d, is found by 
@@ -109,33 +109,33 @@ public:
 				double dk_dot_Adk = directionk.d_dot_Ad;
 
 				// A-orthogonalization
-				double z_dot_Adk = z.dot(Adk);                        result.AddCost(Cost::Dot(z));
-				*d -= (z_dot_Adk / dk_dot_Adk) * dk;                  result.AddCost(Cost::VectorDAXPY(*d));
+				double z_dot_Adk = z.dot(Adk);                        result.AddWorkInFlops(Cost::Dot(z));
+				*d -= (z_dot_Adk / dk_dot_Adk) * dk;                  result.AddWorkInFlops(Cost::VectorDAXPY(*d));
 
 				if (Precond.CanOptimizeResidualComputation())
 				{
-					*Ad -= (z_dot_Adk / dk_dot_Adk) * Adk;            result.AddCost(Cost::VectorDAXPY(*d));
+					*Ad -= (z_dot_Adk / dk_dot_Adk) * Adk;            result.AddWorkInFlops(Cost::VectorDAXPY(*d));
 				}
 			}
 			assert(d->norm() > 0);
 
 			if (!Ad)
 			{
-				Ad = new Vector(A.selfadjointView<Eigen::Lower>() * (*d));  result.AddCost(Cost::MatVec(A));
+				Ad = new Vector(A.selfadjointView<Eigen::Lower>() * (*d));  result.AddWorkInFlops(Cost::MatVec(A));
 			}
 
-			double d_dot_Ad = d->dot(*Ad);                            result.AddCost(Cost::Dot(*d));
+			double d_dot_Ad = d->dot(*Ad);                            result.AddWorkInFlops(Cost::Dot(*d));
 			assert(d_dot_Ad != 0);
 
 			// Step length in the direction of research
-			double alpha = r.dot(*d) / d_dot_Ad;                      result.AddCost(Cost::Dot(r));
+			double alpha = r.dot(*d) / d_dot_Ad;                      result.AddWorkInFlops(Cost::Dot(r));
 
 			// Moving from the current solution to the next
 			// by taking the step in the direction of research
-			x += alpha * (*d);                                        result.AddCost(Cost::VectorDAXPY(x));
+			x += alpha * (*d);                                        result.AddWorkInFlops(Cost::VectorDAXPY(x));
 
 			// New residual
-			r -= alpha * (*Ad);                                       result.AddCost(Cost::VectorDAXPY(r));
+			r -= alpha * (*Ad);                                       result.AddWorkInFlops(Cost::VectorDAXPY(r));
 
 			// Restart?
 			if (previousDirections.size() == this->Truncation)
@@ -155,7 +155,7 @@ public:
 			this->IterationCount++;
 
 			result.SetX(x);
-			result.SetResidualNorm(r.norm());                         result.AddCost(Cost::Norm(r));
+			result.SetResidualNorm(r.norm());                         result.AddWorkInFlops(Cost::Norm(r));
 
 			if (this->PrintIterationResults)
 				cout << result << endl;

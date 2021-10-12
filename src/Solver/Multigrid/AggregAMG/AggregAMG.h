@@ -12,7 +12,7 @@ private:
 	AlgebraicMesh _mesh;
 	vector<ElementAggregate> _aggregates;
 	vector<vector<BigNumber>> _numberAggregates;
-	double _restrictionCost = 0;
+	Flops _restrictionCost = 0;
 public:
 	SparseMatrix Ac;
 
@@ -241,7 +241,7 @@ public:
 		}
 	}
 
-	double ProlongCost() override
+	Flops ProlongCost() override
 	{
 		return 0;
 	}
@@ -282,7 +282,7 @@ public:
 		}
 	}
 
-	double RestrictCost() override
+	Flops RestrictCost() override
 	{
 		return _restrictionCost;
 	}

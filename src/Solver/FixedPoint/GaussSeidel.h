@@ -96,19 +96,19 @@ private:
 		{
 			if (!xEquals0)
 			{
-				Vector v = b - A.triangularView<Eigen::StrictlyUpper>() * x;      result.AddCost(Cost::DAXPY_StrictTri(A));
-				x = A.triangularView<Eigen::Lower>().solve(v);                    result.AddCost(Cost::SpFWElimination(A));
+				Vector v = b - A.triangularView<Eigen::StrictlyUpper>() * x;      result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
+				x = A.triangularView<Eigen::Lower>().solve(v);                    result.AddWorkInFlops(Cost::SpFWElimination(A));
 			}
 			else
 			{
-				x = A.triangularView<Eigen::Lower>().solve(b);                    result.AddCost(Cost::SpFWElimination(A));
+				x = A.triangularView<Eigen::Lower>().solve(b);                    result.AddWorkInFlops(Cost::SpFWElimination(A));
 			}
 		}
 		else
 		{
 			for (BigNumber i = 0; i < A.rows(); ++i)
 				ProcessRow(i, b, x);
-			                                                                      result.AddCost(2 * A.nonZeros() + A.rows());
+			                                                                      result.AddWorkInFlops(2 * A.nonZeros() + A.rows());
 		}
 		xEquals0 = false;
 	}
@@ -120,19 +120,19 @@ private:
 		{
 			if (!xEquals0)
 			{
-				Vector v = b - A.triangularView<Eigen::StrictlyLower>() * x;      result.AddCost(Cost::DAXPY_StrictTri(A));
-				x = A.triangularView<Eigen::Upper>().solve(v);                    result.AddCost(Cost::SpBWSubstitution(A));
+				Vector v = b - A.triangularView<Eigen::StrictlyLower>() * x;      result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
+				x = A.triangularView<Eigen::Upper>().solve(v);                    result.AddWorkInFlops(Cost::SpBWSubstitution(A));
 			}
 			else
 			{
-				x = A.triangularView<Eigen::Upper>().solve(b);                    result.AddCost(Cost::SpBWSubstitution(A));
+				x = A.triangularView<Eigen::Upper>().solve(b);                    result.AddWorkInFlops(Cost::SpBWSubstitution(A));
 			}
 		}
 		else
 		{
 			for (BigNumber i = 0; i < A.rows(); ++i)
 				ProcessRow(A.rows() - i - 1, b, x);
-			                                                                      result.AddCost(2 * A.nonZeros() + A.rows());
+			                                                                      result.AddWorkInFlops(2 * A.nonZeros() + A.rows());
 		}
 		xEquals0 = false;
 	}
@@ -146,22 +146,22 @@ private:
 		if (!xEquals0)
 		{
 			// Sweep: x(new) = (L+D)^{-1} * (b-Ux)
-			Vector Ux = U * x;                                    result.AddCost(Cost::SpMatVec(NNZ::StrictTriPart(A)));
-			x = L_plus_D.solve(b - Ux);                           result.AddCost(Cost::AddVec(b) + Cost::SpFWElimination(A));
+			Vector Ux = U * x;                                    result.AddWorkInFlops(Cost::SpMatVec(NNZ::StrictTriPart(A)));
+			x = L_plus_D.solve(b - Ux);                           result.AddWorkInFlops(Cost::AddVec(b) + Cost::SpFWElimination(A));
 			xEquals0 = false;
 
 			// Residual: Ux(old) - Ux(new)
-			result.Residual = Ux - U * x;                         result.AddCost(Cost::DAXPY_StrictTri(A));
+			result.Residual = Ux - U * x;                         result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
 		}
 		else
 		{
 			// Sweep
-			x = L_plus_D.solve(b);                                result.AddCost(Cost::SpFWElimination(A));
-			//ForwardElimination(x, b);                            result.AddCost(Cost::SpFWElimination(A));
+			x = L_plus_D.solve(b);                                result.AddWorkInFlops(Cost::SpFWElimination(A));
+			//ForwardElimination(x, b);                            result.AddWorkInFlops(Cost::SpFWElimination(A));
 			xEquals0 = false;
 
 			// Residual: r = -Ux
-			result.Residual = -U * x;                                          result.AddCost(Cost::DAXPY_StrictTri(A));
+			result.Residual = -U * x;                                          result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
 		}
 	}
 
@@ -174,38 +174,38 @@ private:
 		if (!xEquals0)
 		{
 			// Sweep: x(new) = (D+U)^{-1} * (b-Lx)
-			Vector b_Lx = b - L*x;                                result.AddCost(Cost::DAXPY_StrictTri(A));
-			x = D_plus_U.solve(b_Lx);                             result.AddCost(Cost::SpBWSubstitution(A));
-			//BackwardSubstitution(x, b_Lx);                        result.AddCost(Cost::SpBWSubstitution(A));
+			Vector b_Lx = b - L*x;                                result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
+			x = D_plus_U.solve(b_Lx);                             result.AddWorkInFlops(Cost::SpBWSubstitution(A));
+			//BackwardSubstitution(x, b_Lx);                        result.AddWorkInFlops(Cost::SpBWSubstitution(A));
 			xEquals0 = false;
 
 			if (computeAx || computeResidual)
 			{
-				result.Ax = b_Lx + L * x;                         result.AddCost(Cost::DAXPY_StrictTri(A));
+				result.Ax = b_Lx + L * x;                         result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
 				if (computeResidual)
 				{
-					result.Residual = b - result.Ax;              result.AddCost(Cost::AddVec(b));
+					result.Residual = b - result.Ax;              result.AddWorkInFlops(Cost::AddVec(b));
 				}
 			}
 		}
 		else
 		{
 			// Sweep: x(new) = (D+U)^{-1} * b
-			x = D_plus_U.solve(b);                                result.AddCost(Cost::SpBWSubstitution(A));
+			x = D_plus_U.solve(b);                                result.AddWorkInFlops(Cost::SpBWSubstitution(A));
 			xEquals0 = false;
 
 			if (computeAx)
 			{
-				result.Ax = b + L * x;                            result.AddCost(Cost::DAXPY_StrictTri(A));
+				result.Ax = b + L * x;                            result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
 				if (computeResidual)
 				{
-					result.Residual = b - result.Ax;              result.AddCost(Cost::AddVec(b));
+					result.Residual = b - result.Ax;              result.AddWorkInFlops(Cost::AddVec(b));
 				}
 			}
 			else if (computeResidual)
 			{
 				// Residual: Lx(old) - Lx(new)
-				result.Residual = -L * x;                         result.AddCost(Cost::DAXPY_StrictTri(A));
+				result.Residual = -L * x;                         result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
 			}
 		}
 	}

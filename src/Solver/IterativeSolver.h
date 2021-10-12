@@ -98,7 +98,7 @@ public:
 					this->Residual = b;
 				else
 				{
-					this->Residual = b - A * x;                              result.AddCost(Cost::DAXPY(A));
+					this->Residual = b - A * x;                              result.AddWorkInFlops(Cost::DAXPY(A));
 				}
 			}
 			else if (computeResidual && computeAx)
@@ -110,8 +110,8 @@ public:
 				}
 				else
 				{
-					this->Ax = A * x;                                        result.AddCost(Cost::MatVec(A));
-					this->Residual = b - this->Ax;                           result.AddCost(Cost::AddVec(b));
+					this->Ax = A * x;                                        result.AddWorkInFlops(Cost::MatVec(A));
+					this->Residual = b - this->Ax;                           result.AddWorkInFlops(Cost::AddVec(b));
 				}
 			}
 			else if (computeAx)
@@ -120,7 +120,7 @@ public:
 					this->Ax = Vector::Zero(b.rows());
 				else
 				{
-					this->Ax = A * x;                                        result.AddCost(Cost::MatVec(A));
+					this->Ax = A * x;                                        result.AddWorkInFlops(Cost::MatVec(A));
 				}
 			}
 			return;
@@ -132,8 +132,8 @@ public:
 				result.SetResidualAsB();
 			else
 			{
-				this->Residual = b - A * x;                                          result.AddCost(Cost::DAXPY(A));
-				result.SetResidualNorm(this->Residual.norm());                       result.AddCost(Cost::Norm(b));
+				this->Residual = b - A * x;                                          result.AddWorkInFlops(Cost::DAXPY(A));
+				result.SetResidualNorm(this->Residual.norm());                       result.AddWorkInFlops(Cost::Norm(b));
 			}
 		}
 
@@ -148,8 +148,8 @@ public:
 				result = ExecuteOneIteration(b, x, xEquals0, false, false, result);
 				if (!result.IsResidualSet() && StoppingCrit == StoppingCriteria::NormalizedResidual)
 				{
-					this->Residual = b - A * x;                                          result.AddCost(Cost::DAXPY(A));
-					result.SetResidualNorm(this->Residual.norm());                       result.AddCost(Cost::Norm(b));
+					this->Residual = b - A * x;                                          result.AddWorkInFlops(Cost::DAXPY(A));
+					result.SetResidualNorm(this->Residual.norm());                       result.AddWorkInFlops(Cost::Norm(b));
 				}                                      
 			}
 			else
@@ -165,7 +165,7 @@ public:
 				{
 					result = ExecuteOneIteration(b, x, xEquals0, true, computeAx, result);
 					assert(result.Residual.rows() > 0);
-					result.SetResidualNorm(result.Residual.norm());                                                result.AddCost(Cost::Norm(b));
+					result.SetResidualNorm(result.Residual.norm());                                                result.AddWorkInFlops(Cost::Norm(b));
 				}
 			}
 			this->IterationCount++;

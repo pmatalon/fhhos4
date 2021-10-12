@@ -587,7 +587,8 @@ private:
 				_problem->_mesh->CoarseMesh = nullptr;
 				_problem->DeleteHHOElements();
 				_problem->DeleteHHOFaces();
-				cout << "\tDeleting mesh " << _problem->_mesh->Id << endl;
+
+				//cout << "\tDeleting mesh " << _problem->_mesh->Id << endl;
 				//delete _problem->_mesh; // !!!!!!! This delete causes a bug later in the process for large problems, but I can't find out why
 			}
 		}
@@ -630,7 +631,7 @@ public:
 			return Level::Restrict(vectorOnThisLevel);
 	}
 
-	double ProlongCost() override
+	Flops ProlongCost() override
 	{
 		if (this->CoarserLevel->ComesFrom == CoarseningType::P && _pProlongation == GMG_P_Prolongation::Injection)
 			return 0;
@@ -638,7 +639,7 @@ public:
 			return Level::ProlongCost();
 	}
 
-	double RestrictCost() override
+	Flops RestrictCost() override
 	{
 		if (this->CoarserLevel->ComesFrom == CoarseningType::P && _pRestriction == GMG_P_Restriction::RemoveHigherOrders)
 			return 0;

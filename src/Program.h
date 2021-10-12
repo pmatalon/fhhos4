@@ -579,12 +579,12 @@ private:
 				int sizeWork = 5;
 
 				double totalTime = solvingTimer.CPU().InMilliseconds;
-				size_t totalWork = iterativeSolver->SolvingComputationalWork;
+				MFlops totalWork = iterativeSolver->SolvingComputationalWork;
 				cout << "\t                             | CPU time |   Work " << endl;
 				cout << "\t-------------------------------------------------" << endl;
-				cout << "\tSmoothing and res. computing | " << setw(sizeTime) << ((totalTime-mg->IntergridTransferTimer.CPU().InMilliseconds-mg->CoarseSolverTimer.CPU().InMilliseconds) / totalTime * 100) << "% | " << setw(sizeWork) << (double(totalWork - mg->IntergridTransferCost - mg->CoarseSolverCost)   / double(totalWork)*100) << "%" << endl;
-				cout << "\tIntergrid transfers          | " << setw(sizeTime) << (mg->IntergridTransferTimer.CPU().InMilliseconds / totalTime * 100) << "% | " << setw(sizeWork) << (double(mg->IntergridTransferCost) / double(totalWork)*100) << "%" << endl;
-				cout << "\tCoarse solver                | " << setw(sizeTime) << (mg->CoarseSolverTimer.CPU().InMilliseconds      / totalTime * 100) << "% | " << setw(sizeWork) << (double(mg->CoarseSolverCost)      / double(totalWork)*100) << "%" << endl;
+				cout << "\tSmoothing and res. computing | " << setw(sizeTime) << (int)round((totalTime-mg->IntergridTransferTimer.CPU().InMilliseconds-mg->CoarseSolverTimer.CPU().InMilliseconds) / totalTime * 100) << "% | " << setw(sizeWork) << (int)round((totalWork - mg->IntergridTransferCost - mg->CoarseSolverCost) / totalWork*100) << "%" << endl;
+				cout << "\tIntergrid transfers          | " << setw(sizeTime) << (int)round(mg->IntergridTransferTimer.CPU().InMilliseconds / totalTime * 100) << "% | " << setw(sizeWork) << (int)round(mg->IntergridTransferCost / totalWork*100) << "%" << endl;
+				cout << "\tCoarse solver                | " << setw(sizeTime) << (int)round(mg->CoarseSolverTimer.CPU().InMilliseconds      / totalTime * 100) << "% | " << setw(sizeWork) << (int)round(mg->CoarseSolverCost      / totalWork*100) << "%" << endl;
 				cout << endl << endl;
 			}
 		}
@@ -606,7 +606,7 @@ private:
 		int sizeWork = 8;
 		int sizeMatVec = 8;
 
-		auto oneFineMatVec = Cost::MatVec(problem->A);
+		MFlops oneFineMatVec = Cost::MatVec(problem->A) * 1e-6;
 
 		cout << "        |   CPU time   | Elapsed time ";
 		if (iterativeSolver != nullptr)
@@ -619,7 +619,7 @@ private:
 
 		cout << "Setup   | " << setw(sizeTime) << setupTimer.CPU()                  << " | " << setw(sizeTime) << setupTimer.Elapsed();
 		if (iterativeSolver != nullptr)
-			cout << " | " << setw(sizeWork) << (iterativeSolver->SetupComputationalWork / (size_t)1e6) << " | " << setw(sizeMatVec) << (iterativeSolver->SetupComputationalWork / oneFineMatVec);
+			cout << " | " << setw(sizeWork) << (int)round(iterativeSolver->SetupComputationalWork) << " | " << setw(sizeMatVec) << (int)round(iterativeSolver->SetupComputationalWork / oneFineMatVec);
 		cout << endl;
 		cout << "        | " << setw(sizeTime-3) << setupTimer.CPU().InMilliseconds   << " ms | " << setw(sizeTime-3) << setupTimer.Elapsed().InMilliseconds << " ms ";
 		if (iterativeSolver != nullptr)
@@ -632,7 +632,7 @@ private:
 
 		cout << "Solving | " << setw(sizeTime) << solvingTimer.CPU()                  <<    " | " << setw(sizeTime) << solvingTimer.Elapsed();
 		if (iterativeSolver != nullptr)
-			cout << " | " << setw(sizeWork) << (iterativeSolver->SolvingComputationalWork / (size_t)1e6) << " | " << setw(sizeMatVec) << (iterativeSolver->SolvingComputationalWork / oneFineMatVec);
+			cout << " | " << setw(sizeWork) << (int)round(iterativeSolver->SolvingComputationalWork) << " | " << setw(sizeMatVec) << (int)round(iterativeSolver->SolvingComputationalWork / oneFineMatVec);
 		cout << endl;
 		cout << "        | " << setw(sizeTime-3) << solvingTimer.CPU().InMilliseconds << " ms | " << setw(sizeTime-3) << solvingTimer.Elapsed().InMilliseconds << " ms ";
 		if (iterativeSolver != nullptr)
@@ -645,7 +645,7 @@ private:
 
 		cout << "Total   | " << setw(sizeTime) << totalTimer.CPU()                  <<    " | " << setw(sizeTime) << totalTimer.Elapsed();
 		if (iterativeSolver != nullptr)
-			cout << " | " << setw(sizeWork) << ((iterativeSolver->SetupComputationalWork + iterativeSolver->SolvingComputationalWork)/(size_t)1e6) << " | " << setw(sizeMatVec) << ((iterativeSolver->SetupComputationalWork + iterativeSolver->SolvingComputationalWork) / oneFineMatVec);
+			cout << " | " << setw(sizeWork) << (int)round((iterativeSolver->SetupComputationalWork + iterativeSolver->SolvingComputationalWork)) << " | " << setw(sizeMatVec) << (int)round((iterativeSolver->SetupComputationalWork + iterativeSolver->SolvingComputationalWork) / oneFineMatVec);
 		cout << endl;
 		cout << "        | " << setw(sizeTime-3) << totalTimer.CPU().InMilliseconds   << " ms | " << setw(sizeTime-3) << totalTimer.Elapsed().InMilliseconds << " ms ";
 		if (iterativeSolver != nullptr)

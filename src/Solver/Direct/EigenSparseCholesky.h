@@ -23,7 +23,7 @@ public:
 			_solver.compute(A.transpose());
 		else
 			_solver.compute(A);
-		this->SetupComputationalWork = Cost::CholeskyFactorization(A);
+		this->SetupComputationalWork = Cost::CholeskyFactorization(A)*1e-6;
 		Eigen::ComputationInfo info = _solver.info();
 		if (info != Eigen::ComputationInfo::Success)
 		{
@@ -36,7 +36,7 @@ public:
 	Vector Solve(const Vector& b) override
 	{
 		Vector x = _solver.solve(b);
-		this->SolvingComputationalWork = Cost::CholeskySolve(_solver.matrixL());
+		this->SolvingComputationalWork = Cost::CholeskySolve(_solver.matrixL())*1e-6;
 		return x;
 	}
 };

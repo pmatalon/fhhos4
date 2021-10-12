@@ -9,15 +9,15 @@ private:
 	double _bNorm = -1;
 	bool _computeError = false;
 	Vector _exactSolution;
-	size_t _oneFineMatVecWork = 0;
+	MFlops _oneFineMatVecWork = 0;
 
 	double _oldResidualNorm = -1;
 	double _iterationConvRate = 0;
 	list<double> _previousItConvRates;
 	double _asymptoticConvRate = 0;
 	double _tolerance = 1e-8;
-	size_t _iterationComputationalWork = 0;
-	size_t _solvingComputationalWork = 0; // total of all iterations
+	MFlops _iterationComputationalWork = 0;
+	MFlops _solvingComputationalWork = 0; // total of all iterations
 	Timer _solvingTimer;
 	Vector e;
 public:
@@ -51,14 +51,14 @@ public:
 	// Move assignment operator
 	IterationResult& operator=(IterationResult&& result) = default;
 
-	size_t SolvingComputationalWork()
+	MFlops SolvingComputationalWork()
 	{
 		return _solvingComputationalWork;
 	}
 
 	void SetA(const SparseMatrix& A)
 	{
-		this->_oneFineMatVecWork = Cost::MatVec(A);
+		this->_oneFineMatVecWork = Cost::MatVec(A) * 1e-6;
 	}
 
 	void SetB(const Vector& b)
@@ -122,13 +122,18 @@ public:
 		this->RelativeErrorNorm = exactSolNorm > 0 ? e.norm() / _exactSolution.norm() : e.norm();
 	}
 
-	void AddCost(size_t cost)
+	void AddWorkInFlops(Flops flops)
 	{
-		_iterationComputationalWork += cost;
-		_solvingComputationalWork += cost;
+		AddWorkInMFlops(flops * 1e-6); // conversion to Mflops
 	}
 
-	size_t IterationComputationalWork()
+	void AddWorkInMFlops(MFlops megaFlops)
+	{
+		_iterationComputationalWork += megaFlops;
+		_solvingComputationalWork += megaFlops;
+	}
+
+	MFlops IterationComputationalWork()
 	{
 		return _iterationComputationalWork;
 	}
@@ -238,13 +243,13 @@ public:
 				os << std::defaultfloat << result._asymptoticConvRate;
 
 			//os << setw(computWorkWidth);
-			//os << result._solvingComputationalWork;
+			//os << round(result._solvingComputationalWork);
 
 			//os << setw(cpuTimeWidth);
 			//os << result._solvingTimer.CPU().InMilliseconds;
 
 			os << setw(nFineMatVecWidth);
-			os << (result._solvingComputationalWork / result._oneFineMatVecWork);
+			os << (int)round(result._solvingComputationalWork / result._oneFineMatVecWork);
 
 			os << setw(remainingTimeWidth);
 			if (result.IterationNumber == 1)

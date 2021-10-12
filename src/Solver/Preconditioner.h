@@ -76,14 +76,14 @@ public:
 		return p;
 	}
 	
-	BigNumber SetupComputationalWork()
+	MFlops SetupComputationalWork()
 	{
 		if (_solver)
 			return _solver->SetupComputationalWork;
 		return 0;
 	}
 
-	BigNumber SolvingComputationalWork()
+	MFlops SolvingComputationalWork()
 	{
 		if (_solver)
 			return _solver->SolvingComputationalWork;

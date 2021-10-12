@@ -57,7 +57,7 @@ public:
 				this->invD[i].compute(Di);
 			});
 
-		this->SetupComputationalWork = nb * 2.0/3.0*pow(_blockSize, 3);
+		this->SetupComputationalWork = nb * 2.0/3.0*pow(_blockSize, 3)*1e-6;
 	}
 
 private:
@@ -90,8 +90,8 @@ private:
 		}
 
 		result.SetX(x);
-		double sweepCost = 2 * A.nonZeros() + nb * pow(_blockSize, 2);
-		result.AddCost(_direction == Direction::Symmetric ? 2*sweepCost : sweepCost);
+		double sweepWork = 2 * A.nonZeros() + nb * pow(_blockSize, 2);
+		result.AddWorkInFlops(_direction == Direction::Symmetric ? 2*sweepWork : sweepWork);
 		return result;
 	}
 

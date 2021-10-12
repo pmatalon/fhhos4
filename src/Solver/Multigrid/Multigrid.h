@@ -38,8 +38,8 @@ public:
 
 	Timer IntergridTransferTimer;
 	Timer CoarseSolverTimer;
-	size_t IntergridTransferCost = 0;
-	size_t CoarseSolverCost = 0;
+	MFlops IntergridTransferCost = 0;
+	MFlops CoarseSolverCost = 0;
 
 	Multigrid(int nLevels) : IterativeSolver()
 	{
@@ -430,7 +430,7 @@ private:
 		if (level->IsCoarsestLevel())
 		{
 			                                                                         CoarseSolverTimer.Start();
-			x = CoarseSolver->Solve(b);                                              result.AddCost(CoarseSolver->SolvingComputationalWork);
+			x = CoarseSolver->Solve(b);                                              result.AddWorkInMFlops(CoarseSolver->SolvingComputationalWork);
 			                                                                         CoarseSolverTimer.Pause();
 																					 CoarseSolverCost += CoarseSolver->SolvingComputationalWork;
 			xEquals0 = false;
@@ -450,7 +450,7 @@ private:
 			if (level->PreSmoother->CanOptimizeResidualComputation())
 			{
 				// Smooth and compute residual
-				level->PreSmoother->SmoothAndComputeResidualOrAx(x, b, xEquals0, true, false);    result.AddCost(level->PreSmoother->SolvingComputationalWork());
+				level->PreSmoother->SmoothAndComputeResidualOrAx(x, b, xEquals0, true, false);    result.AddWorkInMFlops(level->PreSmoother->SolvingComputationalWork());
 				
 				// Move residual vector
 				r = level->PreSmoother->Residual();
@@ -458,9 +458,9 @@ private:
 			else
 			{
 				// Smooth
-				level->PreSmoother->Smooth(x, b, xEquals0);                               result.AddCost(level->PreSmoother->SolvingComputationalWork());
+				level->PreSmoother->Smooth(x, b, xEquals0);                               result.AddWorkInMFlops(level->PreSmoother->SolvingComputationalWork());
 				// Residual computation
-				r = b - A * x;                                                            result.AddCost(Cost::DAXPY(A));
+				r = b - A * x;                                                            result.AddWorkInFlops(Cost::DAXPY(A));
 			}
 			
 			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
@@ -476,11 +476,11 @@ private:
 			auto flopBeforeRestrict = result.IterationComputationalWork();
 			IntergridTransferTimer.Start();
 
-			Vector rc = level->Restrict(r);                                               result.AddCost(level->RestrictCost());
-			                                                                              this->IntergridTransferCost += level->RestrictCost();
+			Vector rc = level->Restrict(r);                                               result.AddWorkInFlops(level->RestrictCost());
+			                                                                              this->IntergridTransferCost += level->RestrictCost()*1e-6;
 			IntergridTransferTimer.Pause();
 			auto flopRestrict = result.IterationComputationalWork() - flopBeforeRestrict;
-			assert(flopRestrict == level->RestrictCost());
+			assert(abs(round(flopRestrict*1e6 - level->RestrictCost())) == 0);
 			//cout << "- flopRestrict = " << flopRestrict << endl;
 
 			//--------------------------------------------------//
@@ -495,7 +495,7 @@ private:
 				for (int i = 0; i < this->WLoops; ++i)
 				{
 					IterationResult coarseResult;
-					MultigridCycle(level->CoarserLevel, rc, ec, ecEquals0, false, false, coarseResult);   result.AddCost(coarseResult.SolvingComputationalWork());
+					MultigridCycle(level->CoarserLevel, rc, ec, ecEquals0, false, false, coarseResult);   result.AddWorkInMFlops(coarseResult.SolvingComputationalWork());
 					if (level->CoarserLevel->IsCoarsestLevel())
 						break;
 				}
@@ -507,12 +507,12 @@ private:
 				{
 					bool ecEquals0 = true;
 					MultigridCycle(level->CoarserLevel, rc, ec, ecEquals0, false, false, coarseResult); // exact solution
-					                                                                               result.AddCost(coarseResult.SolvingComputationalWork());
+					                                                                               result.AddWorkInMFlops(coarseResult.SolvingComputationalWork());
 				}
 				else
 				{
-					//level->CoarserLevel->FCG->Solve(rc, ecEqualZero, ec);                    result.AddCost(level->CoarserLevel->FCG->SolvingComputationalWork);
-					ec = FCGForKCycle(level->CoarserLevel, rc, coarseResult);                      result.AddCost(coarseResult.SolvingComputationalWork());
+					//level->CoarserLevel->FCG->Solve(rc, ecEqualZero, ec);                    result.AddWorkInMFlops(level->CoarserLevel->FCG->SolvingComputationalWork);
+					ec = FCGForKCycle(level->CoarserLevel, rc, coarseResult);                      result.AddWorkInMFlops(coarseResult.SolvingComputationalWork());
 				}
 			}
 
@@ -531,8 +531,8 @@ private:
 			// Prolongation
 			IntergridTransferTimer.Start();
 
-			x += level->Prolong(ec);                                                  result.AddCost(level->ProlongCost() + Cost::AddVec(x));
-			                                                                          this->IntergridTransferCost += level->ProlongCost() + Cost::AddVec(x);
+			x += level->Prolong(ec);                                                  result.AddWorkInFlops(level->ProlongCost() + Cost::AddVec(x));
+			                                                                          this->IntergridTransferCost += (level->ProlongCost() + Cost::AddVec(x))*1e-6;
 			IntergridTransferTimer.Pause();
 
 			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
@@ -549,7 +549,7 @@ private:
 			if (level->PostSmoother->CanOptimizeResidualComputation() && (computeResidual || computeAx))
 			{
 				// Smooth and compute residual
-				level->PostSmoother->SmoothAndComputeResidualOrAx(x, b, xEquals0, computeResidual, computeAx);    result.AddCost(level->PostSmoother->SolvingComputationalWork());
+				level->PostSmoother->SmoothAndComputeResidualOrAx(x, b, xEquals0, computeResidual, computeAx);    result.AddWorkInMFlops(level->PostSmoother->SolvingComputationalWork());
 				if (computeResidual)
 					result.Residual = level->PostSmoother->Residual();
 				if (computeAx)
@@ -558,19 +558,19 @@ private:
 			else
 			{
 				// Smooth
-				level->PostSmoother->Smooth(x, b, xEquals0);                          result.AddCost(level->PostSmoother->SolvingComputationalWork());
+				level->PostSmoother->Smooth(x, b, xEquals0);                          result.AddWorkInMFlops(level->PostSmoother->SolvingComputationalWork());
 				if (computeAx)
 				{
 					// Residual computation
-					result.Ax = A * x;                                                result.AddCost(Cost::MatVec(A));
+					result.Ax = A * x;                                                result.AddWorkInFlops(Cost::MatVec(A));
 					if (computeResidual)
 					{
-						result.Residual = b - result.Ax;                              result.AddCost(Cost::AddVec(b));
+						result.Residual = b - result.Ax;                              result.AddWorkInFlops(Cost::AddVec(b));
 					}
 				}
 				else if (computeResidual)
 				{
-					result.Residual = b - A*x;                                        result.AddCost(Cost::DAXPY(A));
+					result.Residual = b - A*x;                                        result.AddWorkInFlops(Cost::DAXPY(A));
 				}
 			}
 
@@ -594,20 +594,20 @@ private:
 		bool cEquals0 = true;
 		bool computeAc = true;
 		IterationResult precResult1;
-		MultigridCycle(level, r, c, cEquals0, false, computeAc, precResult1);     result.AddCost(precResult1.SolvingComputationalWork());
+		MultigridCycle(level, r, c, cEquals0, false, computeAc, precResult1);     result.AddWorkInMFlops(precResult1.SolvingComputationalWork());
 
 		// 1st iteration of FCG
-		//Vector v = A * c;                                                         result.AddCost(Cost::MatVec(A));
+		//Vector v = A * c;                                                         result.AddWorkInFlops(Cost::MatVec(A));
 		Vector& v = precResult1.Ax; // v = A*c
-		double rho1 = c.dot(v);                                                   result.AddCost(Cost::Dot(c));
-		double alpha1 = c.dot(r);                                                 result.AddCost(Cost::Dot(c));
+		double rho1 = c.dot(v);                                                   result.AddWorkInFlops(Cost::Dot(c));
+		double alpha1 = c.dot(r);                                                 result.AddWorkInFlops(Cost::Dot(c));
 
-		double r_norm_old = r.norm();                                             result.AddCost(Cost::Norm(r));
-		r -= (alpha1 / rho1) * v;                                                 result.AddCost(Cost::VectorDAXPY(r));
-		double r_norm_new = r.norm();                                             result.AddCost(Cost::Norm(r));
+		double r_norm_old = r.norm();                                             result.AddWorkInFlops(Cost::Norm(r));
+		r -= (alpha1 / rho1) * v;                                                 result.AddWorkInFlops(Cost::VectorDAXPY(r));
+		double r_norm_new = r.norm();                                             result.AddWorkInFlops(Cost::Norm(r));
 		if (r_norm_new <= t * r_norm_old)
 		{
-			x = (alpha1 / rho1) * c;                                              result.AddCost(Cost::ConstantVec(x));
+			x = (alpha1 / rho1) * c;                                              result.AddWorkInFlops(Cost::ConstantVec(x));
 		}
 		else
 		{
@@ -616,16 +616,16 @@ private:
 			bool dEquals0 = true;
 			bool computeAd = true;
 			IterationResult precResult2;
-			MultigridCycle(level, r, d, dEquals0, false, computeAd, precResult2);  result.AddCost(precResult2.SolvingComputationalWork());
+			MultigridCycle(level, r, d, dEquals0, false, computeAd, precResult2);  result.AddWorkInMFlops(precResult2.SolvingComputationalWork());
 
 			// 2nd iteration of FCG
-			//Vector w = A * d;                                                     result.AddCost(Cost::MatVec(A));
+			//Vector w = A * d;                                                     result.AddWorkInFlops(Cost::MatVec(A));
 			Vector& w = precResult2.Ax; // w = A*d
-			double gamma = d.dot(v);                                              result.AddCost(Cost::Dot(d));
-			double beta = d.dot(w);                                               result.AddCost(Cost::Dot(d));
-			double alpha2 = d.dot(r);                                             result.AddCost(Cost::Dot(d));
+			double gamma = d.dot(v);                                              result.AddWorkInFlops(Cost::Dot(d));
+			double beta = d.dot(w);                                               result.AddWorkInFlops(Cost::Dot(d));
+			double alpha2 = d.dot(r);                                             result.AddWorkInFlops(Cost::Dot(d));
 			double rho2 = beta - gamma * gamma / rho1;
-			x = (alpha1/rho1 - gamma*alpha2/(rho1*rho2))*c + (alpha2 / rho2) * d; result.AddCost(2*Cost::ConstantVec(x) + Cost::AddVec(x));
+			x = (alpha1/rho1 - gamma*alpha2/(rho1*rho2))*c + (alpha2 / rho2) * d; result.AddWorkInFlops(2*Cost::ConstantVec(x) + Cost::AddVec(x));
 		}
 		return x;
 	}

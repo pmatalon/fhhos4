@@ -8,8 +8,8 @@ class Solver
 public:
 	const SparseMatrix* Matrix;
 
-	size_t SetupComputationalWork = 0;
-	size_t SolvingComputationalWork = 0;
+	MFlops SetupComputationalWork = 0;
+	MFlops SolvingComputationalWork = 0;
 
 	Solver() { }
 

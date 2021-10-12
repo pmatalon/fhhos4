@@ -20,7 +20,7 @@ public:
 		Solver::Setup(A);
 		_solver.isSymmetric(true);
 		_solver.compute(A);
-		this->SetupComputationalWork = Cost::LUFactorization(A);
+		this->SetupComputationalWork = Cost::LUFactorization(A)*1e-6;
 		Eigen::ComputationInfo info = _solver.info();
 		if (info != Eigen::ComputationInfo::Success)
 		{

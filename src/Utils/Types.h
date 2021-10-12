@@ -26,6 +26,10 @@ using DimVector = Eigen::Matrix<double, Dim, 1>;
 template<int Dim>
 using DimMatrix = Eigen::Matrix<double, Dim, Dim>;
 
+using Flops = std::size_t;
+using MFlops = double;
+
+
 enum class BoundaryConditionType : unsigned
 {
 	NotOnBoundary = 0,

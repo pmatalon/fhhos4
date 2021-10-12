@@ -134,7 +134,7 @@ public:
 		return coarseVector;
 	}
 
-	virtual double RestrictCost()
+	virtual Flops RestrictCost()
 	{
 		return 2 * R.nonZeros();
 	}
@@ -145,7 +145,7 @@ public:
 		return vectorOnThisLevel;
 	}
 
-	virtual double ProlongCost()
+	virtual Flops ProlongCost()
 	{
 		return 2 * P.nonZeros();
 	}

@@ -44,14 +44,14 @@ private:
 		}
 		else
 		{
-			r = b - A * x;                                  result.AddCost(Cost::DAXPY(A));
-			result.SetResidualNorm(r.norm());               result.AddCost(Cost::Norm(r));
+			r = b - A * x;                                  result.AddWorkInFlops(Cost::DAXPY(A));
+			result.SetResidualNorm(r.norm());               result.AddWorkInFlops(Cost::Norm(r));
 		}
 
 		double beta = 0;
-		Vector z = Precond.Apply(r);                        result.AddCost(Precond.SolvingComputationalWork());
+		Vector z = Precond.Apply(r);                        result.AddWorkInMFlops(Precond.SolvingComputationalWork());
 		Vector d = z;
-		double r_dot_z = r.dot(z);                          result.AddCost(Cost::Dot(r));
+		double r_dot_z = r.dot(z);                          result.AddWorkInFlops(Cost::Dot(r));
 		this->IterationCount = 0;
 
 		if (this->PrintIterationResults)
@@ -64,22 +64,22 @@ private:
 			if (this->IterationCount > 0)
 				d = z + beta * d;
 
-			Vector Ad = A * d;                                  result.AddCost(Cost::MatVec(A));
-			double alpha = r_dot_z / (d.dot(Ad));               result.AddCost(Cost::Dot(r));
-			x += alpha * d;                                     result.AddCost(Cost::VectorDAXPY(x));
+			Vector Ad = A * d;                                  result.AddWorkInFlops(Cost::MatVec(A));
+			double alpha = r_dot_z / (d.dot(Ad));               result.AddWorkInFlops(Cost::Dot(r));
+			x += alpha * d;                                     result.AddWorkInFlops(Cost::VectorDAXPY(x));
 
 			double old_r_dot_old_z = r_dot_z; // save the dot product before overwriting r and z
 
-			r -= alpha * Ad;                                    result.AddCost(Cost::VectorDAXPY(r));
-			z = Precond.Apply(r);                               result.AddCost(Precond.SolvingComputationalWork());
+			r -= alpha * Ad;                                    result.AddWorkInFlops(Cost::VectorDAXPY(r));
+			z = Precond.Apply(r);                               result.AddWorkInMFlops(Precond.SolvingComputationalWork());
 
-			r_dot_z = r.dot(z);                                 result.AddCost(Cost::Dot(r));
+			r_dot_z = r.dot(z);                                 result.AddWorkInFlops(Cost::Dot(r));
 			beta = r_dot_z / old_r_dot_old_z;
 
 			this->IterationCount++;
 
 			result.SetX(x);
-			result.SetResidualNorm(r.norm());                   result.AddCost(Cost::Norm(r));
+			result.SetResidualNorm(r.norm());                   result.AddWorkInFlops(Cost::Norm(r));
 
 			if (this->PrintIterationResults)
 				cout << result << endl;
