@@ -916,8 +916,6 @@ int main(int argc, char* argv[])
 			case OPT_HPConfig:
 			{
 				int code = atoi(optarg);
-				if (code < 1 || code > 4)
-					argument_error("unknown hp-configuration code. Check -hp-config argument.");
 				if (code == 1)
 					args.Solver.MG.HP_CS = HP_CoarsStgy::H_only;
 				else if (code == 2)
@@ -944,6 +942,8 @@ int main(int argc, char* argv[])
 					args.Solver.MG.HP_CS = HP_CoarsStgy::Alternate;
 					args.Solver.MG.P_CS = P_CoarsStgy::Minus2;
 				}
+				else
+					argument_error("unknown hp-configuration code. Check -hp-config argument.");
 				break;
 			}
 			case 'l': 
