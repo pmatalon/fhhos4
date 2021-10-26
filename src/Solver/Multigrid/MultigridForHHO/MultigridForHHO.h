@@ -55,6 +55,8 @@ public:
 			os << "hp then p [-hp-cs hp_p]";
 		else if (this->HP_CS == HP_CoarsStgy::P_then_HP)
 			os << "p then hp [-hp-cs p_hp]";
+		else if (this->HP_CS == HP_CoarsStgy::Alternate)
+			os << "alternate p and h [-hp-cs alt]";
 		os << endl;
 
 		if (this->HP_CS != HP_CoarsStgy::H_only)

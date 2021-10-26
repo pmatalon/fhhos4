@@ -248,6 +248,7 @@ void print_usage() {
 	cout << "              hp_h - simultaneous hp, then h" << endl;
 	cout << "              hp_p - simultaneous hp, then p" << endl;
 	cout << "              p_hp - p, then simultaneous hp" << endl;
+	cout << "              alt  - alternation of p and h, starting with p" << endl;
 	cout << endl;
 	cout << "-cs CODE" << endl;
 	cout << "      Mesh coarsening strategy." << endl;
@@ -385,6 +386,7 @@ void print_usage() {
 	cout << "              2  -   -hp-cs p_h  -p-cs -2 -p-prolong 1 -p-restrict 1" << endl;
 	cout << "              3  -   -hp-cs p_h  -p-cs -2 -p-prolong 2 -p-restrict 2" << endl;
 	cout << "              4  -   -hp-cs hp_h -p-cs -1" << endl;
+	cout << "              5  -   -hp-cs alt  -p-cs -2" << endl;
 	cout << endl;
 	cout << "-subtri NUM" << endl;
 	cout << "      If the approximated L2-projection is used in the multigrid, sets the number of subtriangulations of the fine elements." << endl;
@@ -937,6 +939,11 @@ int main(int argc, char* argv[])
 					args.Solver.MG.HP_CS = HP_CoarsStgy::HP_then_H;
 					args.Solver.MG.P_CS = P_CoarsStgy::Minus1;
 				}
+				else if (code == 5)
+				{
+					args.Solver.MG.HP_CS = HP_CoarsStgy::Alternate;
+					args.Solver.MG.P_CS = P_CoarsStgy::Minus2;
+				}
 				break;
 			}
 			case 'l': 
@@ -979,6 +986,8 @@ int main(int argc, char* argv[])
 					args.Solver.MG.HP_CS = HP_CoarsStgy::HP_then_H;
 				else if (code.compare("hp_p") == 0)
 					args.Solver.MG.HP_CS = HP_CoarsStgy::HP_then_P;
+				else if (code.compare("alt") == 0)
+					args.Solver.MG.HP_CS = HP_CoarsStgy::Alternate;
 				else
 					argument_error("unknown hp-coarsening strategy code '" + code + "'. Check -hp-cs argument.");
 				break;

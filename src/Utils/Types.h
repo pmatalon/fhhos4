@@ -52,7 +52,8 @@ enum class HP_CoarsStgy : unsigned
 	H_then_P, // the number of meshes must be fixed
 	HP_then_H,
 	HP_then_P, // the number of meshes must be fixed
-	P_then_HP // the number of meshes must be fixed
+	P_then_HP, // the number of meshes must be fixed
+	Alternate
 };
 
 enum class H_CoarsStgy : unsigned

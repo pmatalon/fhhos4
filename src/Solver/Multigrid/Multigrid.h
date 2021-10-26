@@ -375,6 +375,8 @@ private:
 			else
 				Utils::FatalError("Neither hp- or p-coarsening can be performed because the polynomial degree of the fine level = " + to_string(this->CoarsePolyDegree));
 		}
+		else if (this->HP_CS == HP_CoarsStgy::Alternate)
+			return _fineLevel->PolynomialDegree() > this->CoarsePolyDegree ? CoarseningType::H : CoarseningType::P; // return H if we want to start with P, because ChangeCoarseningType() is applied after
 		else
 			Utils::FatalError("This hp-cs is not implemented.");
 
@@ -396,6 +398,13 @@ private:
 		else if (currentCoarseningType == CoarseningType::HP && currentLevel->PolynomialDegree() == this->CoarsePolyDegree)
 		{
 			if (this->HP_CS == HP_CoarsStgy::HP_then_H)
+				return CoarseningType::H;
+		}
+		else if (this->HP_CS == HP_CoarsStgy::Alternate)
+		{
+			if (currentCoarseningType == CoarseningType::H && currentLevel->PolynomialDegree() > this->CoarsePolyDegree)
+				return CoarseningType::P;
+			else
 				return CoarseningType::H;
 		}
 		return currentCoarseningType;
