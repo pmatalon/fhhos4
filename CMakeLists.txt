@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 3.1)
 
-project(dghho)
+project(fhhos4)
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
@@ -55,14 +55,14 @@ else()
 endif()
 
 # Executable file
-add_executable(dghho ${OBJS} ${source_files})
+add_executable(fhhos4 ${OBJS} ${source_files})
 
 # Include CGAL
 if(ENABLE_CGAL)
 	message(STATUS "CGAL enabled")
 	set(CGAL_DIR "${CMAKE_SOURCE_DIR}/dependencies/cgal/CGAL-5.1")
 	find_package(CGAL)
-	target_link_libraries(dghho CGAL::CGAL)
+	target_link_libraries(fhhos4 CGAL::CGAL)
 	add_definitions(-DCGAL_ENABLED)
 else()
 	message(STATUS "CGAL disabled. Add -DENABLE_CGAL=ON to enable it.")
@@ -80,11 +80,11 @@ if (ENABLE_GMSH)
 		message(WARNING "Option -DGMSH_API missing. Set this option if gmsh.h is not found during compilation")
 	endif()
 	if (GMSH_LIB)
-		target_link_libraries(dghho "${GMSH_LIB}") # -lgmsh
+		target_link_libraries(fhhos4 "${GMSH_LIB}") # -lgmsh
 	else()
 		find_library(GMSH_LIB NAMES gmsh)
 		if(GMSH_LIB)
-			target_link_libraries(dghho "${GMSH_LIB}") # -lgmsh
+			target_link_libraries(fhhos4 "${GMSH_LIB}") # -lgmsh
 			message(STATUS "GMSH library found: ${GMSH_LIB}")
 		else()
 			message(FATAL_ERROR "The GMSH dynamic library was not found. Note that GMSH must be compiled with the option -DENABLE_BUILD_DYNAMIC=1. Pass the library path with the option -DGMSH_LIB=<path>/libgmsh.so.")
@@ -98,7 +98,7 @@ endif()
 # Include pthread
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
-target_link_libraries(dghho Threads::Threads)
+target_link_libraries(fhhos4 Threads::Threads)
 
 # Include AGMG (requires Blas and Lapack)
 if(ENABLE_AGMG)
@@ -116,5 +116,5 @@ if(ENABLE_AGMG)
 		message(FATAL_ERROR "LAPACK not found.")
 	endif()
 
-	target_link_libraries(dghho "-lgfortran" "-lm" ${TPL_LAPACK_LIB} ${TPL_BLAS_LIB})
+	target_link_libraries(fhhos4 "-lgfortran" "-lm" ${TPL_LAPACK_LIB} ${TPL_BLAS_LIB})
 endif()

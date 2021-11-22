@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.28010.2016
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DGHHO", "DGHHO.vcxproj", "{71B03999-6987-4FA3-9DDD-26AEB55BA733}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "fhhos4", "fhhos4.vcxproj", "{71B03999-6987-4FA3-9DDD-26AEB55BA733}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

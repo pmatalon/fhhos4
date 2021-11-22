@@ -7,7 +7,7 @@
 
 
 # Options SBATCH
-#SBATCH --job-name=DGHHO
+#SBATCH --job-name=fhhos4
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=36
 
@@ -23,4 +23,4 @@ outfilename=${arguments//[[:blank:]]/}
 outfilename=${outfilename:4}
 
 # Call the program
-/scratch/algo/matalon/dghho "$@" > /home/algo/matalon/dghho/out/${outfilename}.log
+/scratch/algo/matalon/fhhos4 "$@" > /home/algo/matalon/fhhos4/out/${outfilename}.log

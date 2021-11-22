@@ -38,7 +38,7 @@ Finally, build the program following step 4.
 > cd gmsh-4.6.0-source/
 > mkdir build && cd build
 > cmake -DENABLE_BUILD_DYNAMIC=1 -DENABLE_FLTK=0 ..       # if issue with cgns, add option -DENABLE_CGNS=0 
-> make
+> make                       # and go get a coffee
 
 ###############################################################################################
 #### 3. (Optional) Install AGMG version 3.3.5 or later
@@ -51,9 +51,9 @@ Finally, build the program following step 4.
 > make                      # the .o files should be in the SRC/ directory
 
 ###############################################################################################
-#### 4. Use CMake to build dghho
+#### 4. Use CMake to build fhhos4
 
-> cd <path-to-dghho>
+> cd <path-to-fhhos4>
 > mkdir build && cd build
 > cmake -DCMAKE_BUILD_TYPE=Release -DGMSH_API=<path>/gmsh/gmsh-4.6.0-source/api -DGMSH_LIB=<path>/gmsh/gmsh-4.6.0-source/build/libgmsh.so -DENABLE_AGMG=ON -DAGMG_DIR=<path>/agmg/AGMG_3.3.5-aca/SRC ..
 > make
@@ -61,4 +61,46 @@ Finally, build the program following step 4.
 ###############################################################################################
 #### 4. Launch help command to view arguments and examples
 
-> ./bin/dghho -h
+> ./bin/fhhos4 -h
+
+
+
+
+
+###############################################################################################
+#### TROUBLESHOOTING
+
+## 1
+
+CMake Error at /usr/share/cmake-3.10/Modules/FindPackageHandleStandardArgs.cmake:137 (message):
+  Could NOT find GMP (missing: GMP_LIBRARIES GMP_INCLUDE_DIR)
+Call Stack (most recent call first):
+  /usr/share/cmake-3.10/Modules/FindPackageHandleStandardArgs.cmake:378 (_FPHSA_FAILURE_MESSAGE)
+  dependencies/cgal/CGAL-5.1/cmake/modules/FindGMP.cmake:53 (find_package_handle_standard_args)
+  dependencies/cgal/CGAL-5.1/cmake/modules/CGAL_SetupGMP.cmake:24 (find_package)
+  dependencies/cgal/CGAL-5.1/cmake/modules/CGAL_SetupCGALDependencies.cmake:41 (include)
+  dependencies/cgal/CGAL-5.1/lib/cmake/CGAL/CGALConfig.cmake:128 (include)
+  dependencies/cgal/CGAL-5.1/CGALConfig.cmake:6 (include)
+  CMakeLists.txt:64 (find_package)
+
+> sudo apt-get install libgmp-dev
+
+## 2
+
+CMake Error at /usr/share/cmake-3.10/Modules/FindPackageHandleStandardArgs.cmake:137 (message):
+  Could NOT find MPFR (missing: MPFR_LIBRARIES MPFR_INCLUDE_DIR)
+Call Stack (most recent call first):
+  /usr/share/cmake-3.10/Modules/FindPackageHandleStandardArgs.cmake:378 (_FPHSA_FAILURE_MESSAGE)
+  dependencies/cgal/CGAL-5.1/cmake/modules/FindMPFR.cmake:52 (find_package_handle_standard_args)
+  dependencies/cgal/CGAL-5.1/cmake/modules/CGAL_SetupGMP.cmake:25 (find_package)
+  dependencies/cgal/CGAL-5.1/cmake/modules/CGAL_SetupCGALDependencies.cmake:41 (include)
+  dependencies/cgal/CGAL-5.1/lib/cmake/CGAL/CGALConfig.cmake:128 (include)
+  dependencies/cgal/CGAL-5.1/CGALConfig.cmake:6 (include)
+  CMakeLists.txt:64 (find_package)
+
+> sudo apt-get install libmpfr-dev
+
+and probably also needs
+
+> sudo apt-get install libboost-all-dev
+
