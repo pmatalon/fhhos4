@@ -226,6 +226,7 @@
     <ClInclude Include="src\Utils\RotatingList.h" />
     <ClInclude Include="src\Utils\Timer.h" />
     <ClInclude Include="src\Utils\Types.h" />
+    <ClInclude Include="src\version.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="CMakeLists.txt" />

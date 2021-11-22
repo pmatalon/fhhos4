@@ -471,6 +471,7 @@
     <ClInclude Include="src\FunctionalBasis\OrthogonalBasis.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
+    <ClInclude Include="src\version.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

@@ -1,5 +1,6 @@
 #include <getopt.h>
 #include <regex>
+#include "version.h"
 #include "Program.h"
 using namespace std;
 
@@ -492,6 +493,7 @@ void argument_error(string msg)
 int main(int argc, char* argv[])
 {
 	cout << "-------------------------- START --------------------------" << endl;
+	cout << "Version: " << VERSION_MAJOR << "." << VERSION_MINOR << "." << VERSION_BUGFIX << endl;
 	cout << "Option -h for help." << endl;
 	Eigen::initParallel();
 #ifdef CGAL_ENABLED
