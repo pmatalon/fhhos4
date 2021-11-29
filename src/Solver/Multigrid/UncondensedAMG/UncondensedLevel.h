@@ -11,6 +11,7 @@ private:
 	UAMGFaceProlongation _faceProlong = UAMGFaceProlongation::FaceAggregates;
 	UAMGProlongation _coarseningProlong = UAMGProlongation::FaceProlongation;
 	UAMGProlongation _multigridProlong = UAMGProlongation::ReconstructSmoothedTraceOrInject;
+	int _degree;
 	int _cellBlockSize;
 	int _faceBlockSize;
 	double _strongCouplingThreshold;
@@ -29,12 +30,13 @@ public:
 	SparseMatrix Ac;
 
 public:
-	UncondensedLevel(int number, int cellBlockSize, int faceBlockSize, double strongCouplingThreshold, UAMGFaceProlongation faceProlong, UAMGProlongation coarseningProlong, UAMGProlongation mgProlong)
+	UncondensedLevel(int number, int degree, int cellBlockSize, int faceBlockSize, double strongCouplingThreshold, UAMGFaceProlongation faceProlong, UAMGProlongation coarseningProlong, UAMGProlongation mgProlong)
 		: Level(number)
 	{
-		if (cellBlockSize > 1 || faceBlockSize > 1)
-			Utils::Warning("This multigrid is efficient if cellBlockSize = faceBlockSize = 1. It may converge badly.");
+		//if (cellBlockSize > 1 || faceBlockSize > 1)
+			//Utils::Warning("This multigrid is efficient if cellBlockSize = faceBlockSize = 1. It may converge badly.");
 
+		this->_degree = degree;
 		this->_cellBlockSize = cellBlockSize;
 		this->_faceBlockSize = faceBlockSize;
 		this->_strongCouplingThreshold = strongCouplingThreshold;
@@ -50,7 +52,22 @@ public:
 
 	int PolynomialDegree() override
 	{
-		return 0;
+		return _degree;
+	}
+
+	int BlockSizeForBlockSmoothers() override
+	{
+		return _faceBlockSize;
+	}
+
+	int CellBlockSize()
+	{
+		return _cellBlockSize;
+	}
+
+	int FaceBlockSize()
+	{
+		return _faceBlockSize;
 	}
 
 	void ExportVector(const Vector& v, string suffix, int levelNumber) override
@@ -628,7 +645,43 @@ public:
 		this->OperatorMatrix = new SparseMatrix(fine->Q_F.transpose() * *(fine->OperatorMatrix) * fine->Q_F);
 	}
 
+public:
+	void SetupOperatorByBlockExtraction()
+	{
+		UncondensedLevel* fine = dynamic_cast<UncondensedLevel*>(FinerLevel);
+
+		auto nElems = fine->A_T_F->rows() / fine->_cellBlockSize;
+		auto nFaces = fine->A_T_F->cols() / fine->_faceBlockSize;
+
+		this->OperatorMatrix = ExtractCoarseMatrix(*this->FinerLevel->OperatorMatrix, nFaces, nFaces, fine->_faceBlockSize, fine->_faceBlockSize, this->_faceBlockSize, this->_faceBlockSize);
+		this->A_T_T = ExtractCoarseMatrix(*fine->A_T_T, nElems, nElems, fine->_cellBlockSize, fine->_cellBlockSize, this->_cellBlockSize, this->_cellBlockSize);
+		this->A_T_F = ExtractCoarseMatrix(*fine->A_T_F, nElems, nFaces, fine->_cellBlockSize, fine->_faceBlockSize, this->_cellBlockSize, this->_faceBlockSize);
+		this->A_F_F = ExtractCoarseMatrix(*fine->A_F_F, nFaces, nFaces, fine->_faceBlockSize, fine->_faceBlockSize, this->_faceBlockSize, this->_faceBlockSize);
+	}
+
 private:
+	static SparseMatrix* ExtractCoarseMatrix(const SparseMatrix& fineMatrix, BigNumber nBlockRows, BigNumber nBlockCols, int fineBlockRows, int fineBlockCols, int coarseBlockRows, int coarseBlockCols)
+	{
+		NumberParallelLoop<CoeffsChunk> parallelLoop(nBlockRows);
+		parallelLoop.Execute([&fineMatrix, fineBlockRows, fineBlockCols, coarseBlockRows, coarseBlockCols](BigNumber i, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				for (int k = 0; k < coarseBlockRows; k++)
+				{
+					for (RowMajorSparseMatrix::InnerIterator it(fineMatrix, i*fineBlockRows + k); it; ++it)
+					{
+						auto j = it.col() / fineBlockCols;
+						int l = it.col() - j * fineBlockCols;
+						if (l < coarseBlockCols)
+							chunk->Results.Coeffs.Add(i*coarseBlockRows + k, j*coarseBlockCols + l, it.value());
+					}
+				}
+			});
+		SparseMatrix* coarseMatrix = new SparseMatrix(nBlockRows * coarseBlockRows, nBlockCols * coarseBlockCols);
+		parallelLoop.Fill(*coarseMatrix);
+		return coarseMatrix;
+	}
+
+
 	// Cell prolongation Q_T with only one 1 coefficient per row
 	SparseMatrix BuildQ_T(const HybridAlgebraicMesh& mesh)
 	{
@@ -868,6 +921,7 @@ private:
 public:
 	void OnStartSetup() override
 	{
+		cout << "\t\tk = " << this->PolynomialDegree() << endl;
 		cout << "\t\tMesh                : " << this->A_T_T->rows() / _cellBlockSize << " elements, " << this->A_T_F->cols() / _faceBlockSize << " faces";
 		if (!this->IsFinestLevel())
 		{
@@ -884,10 +938,69 @@ public:
 
 	void SetupRestriction() override
 	{
-		double scalingFactor = 1.0;
-		//scalingFactor = 1.0 / 4.0;
-		R = (scalingFactor * P.transpose()).eval();
-		//R = scalingFactor * P.transpose();
+		if (this->CoarserLevel->ComesFrom == CoarseningType::P)
+		{
+			// nothing to do
+		}
+		else
+		{
+			double scalingFactor = 1.0;
+			//scalingFactor = 1.0 / 4.0;
+			R = (scalingFactor * P.transpose()).eval();
+			//R = scalingFactor * P.transpose();
+		}
+	}
+
+	Vector Prolong(Vector& vectorOnTheCoarserLevel) override
+	{
+		if (this->CoarserLevel->ComesFrom == CoarseningType::P)
+		{
+			// This is possible only if the basis is hierarchical
+			UncondensedLevel* coarseLevel = dynamic_cast<UncondensedLevel*>(CoarserLevel);
+			auto nHigherDegreeUnknowns = this->_faceBlockSize;
+			auto nLowerDegreeUnknowns = coarseLevel->_faceBlockSize;
+			auto nFaces = vectorOnTheCoarserLevel.rows() / nLowerDegreeUnknowns;
+			Vector vectorOnThisLevel = Vector::Zero(nFaces * nHigherDegreeUnknowns);
+			for (BigNumber i = 0; i < nFaces; i++)
+				vectorOnThisLevel.segment(i*nHigherDegreeUnknowns, nLowerDegreeUnknowns) = vectorOnTheCoarserLevel.segment(i*nLowerDegreeUnknowns, nLowerDegreeUnknowns);
+			return vectorOnThisLevel;
+		}
+		else
+			return Level::Prolong(vectorOnTheCoarserLevel);
+	}
+
+	Vector Restrict(Vector& vectorOnThisLevel) override
+	{
+		if (this->CoarserLevel->ComesFrom == CoarseningType::P)
+		{
+			// This makes sense only if the basis is hierarchical and orthogonal
+			UncondensedLevel* coarseLevel = dynamic_cast<UncondensedLevel*>(CoarserLevel);
+			auto nHigherDegreeUnknowns = this->_faceBlockSize;
+			auto nLowerDegreeUnknowns = coarseLevel->_faceBlockSize;
+			auto nFaces = vectorOnThisLevel.rows() / nHigherDegreeUnknowns;
+			Vector vectorOnTheCoarserLevel(nFaces * nLowerDegreeUnknowns);
+			for (BigNumber i = 0; i < nFaces; i++)
+				vectorOnTheCoarserLevel.segment(i*nLowerDegreeUnknowns, nLowerDegreeUnknowns) = vectorOnThisLevel.segment(i*nHigherDegreeUnknowns, nLowerDegreeUnknowns);
+			return vectorOnTheCoarserLevel;
+		}
+		else
+			return Level::Restrict(vectorOnThisLevel);
+	}
+
+	Flops ProlongCost() override
+	{
+		if (this->CoarserLevel->ComesFrom == CoarseningType::P)
+			return 0;
+		else
+			return Level::ProlongCost();
+	}
+
+	Flops RestrictCost() override
+	{
+		if (this->CoarserLevel->ComesFrom == CoarseningType::P)
+			return 0;
+		else
+			return Level::RestrictCost();
 	}
 
 	void OnEndSetup() override
@@ -895,9 +1008,15 @@ public:
 		if (this->CoarserLevel)
 		{
 			UncondensedLevel* coarse = dynamic_cast<UncondensedLevel*>(this->CoarserLevel);
-			coarse->A_T_T = &A_T_Tc;
-			coarse->A_T_F = &A_T_Fc;
-			coarse->A_F_F = &A_F_Fc;
+			if (this->CoarserLevel->ComesFrom == CoarseningType::P)
+				coarse->SetupOperatorByBlockExtraction();
+			else
+			{
+				coarse->OperatorMatrix = &Ac;
+				coarse->A_T_T = &A_T_Tc;
+				coarse->A_T_F = &A_T_Fc;
+				coarse->A_F_F = &A_F_Fc;
+			}
 		}
 	}
 
