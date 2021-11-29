@@ -10,14 +10,18 @@ private:
 	UAMGFaceProlongation _faceProlong = UAMGFaceProlongation::FaceAggregates;
 	UAMGProlongation _coarseningProlong = UAMGProlongation::FaceProlongation;
 	UAMGProlongation _multigridProlong = UAMGProlongation::ReconstructSmoothedTraceOrInject;
+	int _dim;
+	int _degree;
 	int _cellBlockSize;
 	int _faceBlockSize;
 	double _strongCouplingThreshold;
 public:
 
-	UncondensedAMG(int cellBlockSize, int faceBlockSize, double strongCouplingThreshold, UAMGFaceProlongation faceProlong, UAMGProlongation coarseningProlong, UAMGProlongation mgProlong, int nLevels = 0)
+	UncondensedAMG(int dim, int degree, int cellBlockSize, int faceBlockSize, double strongCouplingThreshold, UAMGFaceProlongation faceProlong, UAMGProlongation coarseningProlong, UAMGProlongation mgProlong, int nLevels = 0)
 		: Multigrid(nLevels)
 	{
+		this->_dim = dim;
+		this->_degree = degree;
 		this->_cellBlockSize = cellBlockSize;
 		this->_faceBlockSize = faceBlockSize;
 		this->_strongCouplingThreshold = strongCouplingThreshold;
@@ -103,16 +107,27 @@ public:
 protected:
 	Level* CreateFineLevel() const override
 	{
-		return new UncondensedLevel(0, _cellBlockSize, _faceBlockSize, _strongCouplingThreshold, _faceProlong, _coarseningProlong, _multigridProlong);
+		return new UncondensedLevel(0, _degree, _cellBlockSize, _faceBlockSize, _strongCouplingThreshold, _faceProlong, _coarseningProlong, _multigridProlong);
 	}
 
 	Level* CreateCoarseLevel(Level* fineLevel, CoarseningType coarseningType, int coarseDegree) override
 	{
-		if (coarseningType != CoarseningType::H)
-			Utils::FatalError("Only h-coarsening allowed for this multigrid.");
+		if (coarseningType == CoarseningType::HP)
+			Utils::FatalError("hp-coarsening not allowed for this multigrid.");
 
-		UncondensedLevel* coarseLevel = new UncondensedLevel(fineLevel->Number + 1, _cellBlockSize, _faceBlockSize, _strongCouplingThreshold, _faceProlong, _coarseningProlong, _multigridProlong);
-		coarseLevel->OperatorMatrix = &dynamic_cast<UncondensedLevel*>(fineLevel)->Ac;
-		return coarseLevel;
+		UncondensedLevel* fine = dynamic_cast<UncondensedLevel*>(fineLevel);
+
+		if (coarseningType == CoarseningType::P)
+		{
+			int coarseCellBlockSize = Utils::Binomial(coarseDegree + _dim    , coarseDegree);
+			int coarseFaceBlockSize = Utils::Binomial(coarseDegree + _dim - 1, coarseDegree);
+			UncondensedLevel* coarseLevel = new UncondensedLevel(fine->Number + 1, coarseDegree, coarseCellBlockSize, coarseFaceBlockSize, _strongCouplingThreshold, _faceProlong, _coarseningProlong, _multigridProlong);
+			return coarseLevel;
+		}
+		else
+		{
+			UncondensedLevel* coarseLevel = new UncondensedLevel(fine->Number + 1, fine->PolynomialDegree(), fine->CellBlockSize(), fine->FaceBlockSize(), _strongCouplingThreshold, _faceProlong, _coarseningProlong, _multigridProlong);
+			return coarseLevel;
+		}
 	}
 };

@@ -464,8 +464,9 @@ private:
 		else if (args.Solver.SolverCode.compare("uamg") == 0)
 		{
 			Diffusion_HHO<Dim>* hhoProblem = dynamic_cast<Diffusion_HHO<Dim>*>(problem);
-			UncondensedAMG* mg = new UncondensedAMG(hhoProblem->HHO->nCellUnknowns, hhoProblem->HHO->nFaceUnknowns, 0.25, args.Solver.MG.UAMGFaceProlong, args.Solver.MG.UAMGCoarseningProlong, args.Solver.MG.UAMGMultigridProlong, args.Solver.MG.Levels);
+			UncondensedAMG* mg = new UncondensedAMG(Dim, hhoProblem->HHO->FaceBasis->GetDegree(), hhoProblem->HHO->nCellUnknowns, hhoProblem->HHO->nFaceUnknowns, 0.25, args.Solver.MG.UAMGFaceProlong, args.Solver.MG.UAMGCoarseningProlong, args.Solver.MG.UAMGMultigridProlong, args.Solver.MG.Levels);
 			SetMultigridParameters(mg, args, blockSize);
+			mg->CoarsePolyDegree = 0;
 			solver = mg;
 		}
 		else if (args.Solver.SolverCode.compare("aggregamg") == 0)
