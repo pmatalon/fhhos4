@@ -1,8 +1,8 @@
 #pragma once
-#include "../TestCase.h"
+#include "../DiffusionTestCase.h"
 using namespace std;
 
-class MagnetismTestCase : public TestCase<2>
+class MagnetismTestCase : public DiffusionTestCase<2>
 {
 private:
 	Tensor<2> tensorExterior;
@@ -11,7 +11,7 @@ private:
 	Tensor<2> tensorLittlePieces;
 public:
 	MagnetismTestCase(ProblemArguments pb) :
-		TestCase()
+		DiffusionTestCase()
 	{
 		// Diffusion field
 		tensorExterior     = Tensor<2>(pb.HeterogeneityRatio      , pb.AnisotropyRatio, pb.AnisotropyAngle);

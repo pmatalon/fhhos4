@@ -1,15 +1,15 @@
 #pragma once
-#include "../TestCase.h"
+#include "../DiffusionTestCase.h"
 #include "../../Mesher/SegmentGeometry.h"
 using namespace std;
 
-class SegmentTestCase : public TestCase<1>
+class SegmentTestCase : public DiffusionTestCase<1>
 {
 private:
 	ProblemArguments _pb;
 public:
 	SegmentTestCase(ProblemArguments pb) :
-		TestCase(),
+		DiffusionTestCase(),
 		_pb(pb)
 	{
 		// Diffusion field

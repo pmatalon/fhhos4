@@ -1,16 +1,16 @@
 #pragma once
-#include "../TestCase.h"
+#include "../DiffusionTestCase.h"
 #include "../../Mesher/SquareGeometry.h"
 #include "../../Mesher/Square4quadrantsGeometry.h"
 using namespace std;
 
-class SquareTestCase : public TestCase<2>
+class SquareTestCase : public DiffusionTestCase<2>
 {
 private:
 	ProblemArguments _pb;
 public:
 	SquareTestCase(ProblemArguments pb) :
-		TestCase(),
+		DiffusionTestCase(),
 		_pb(pb)
 	{
 		// Diffusion field

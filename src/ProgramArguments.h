@@ -4,6 +4,7 @@ using namespace std;
 
 struct ProblemArguments
 {
+	EquationType Equation = EquationType::Diffusion;
 	int Dimension = -1;
 	string GeoCode = "square";
 	string TestCaseCode = "";

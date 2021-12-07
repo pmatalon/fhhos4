@@ -1,6 +1,8 @@
 #pragma once
 #include "../Problem/DiffusionProblem.h"
 #include "../Geometry/3D/Tetrahedron.h"
+#include "../Geometry/CartesianShape.h"
+#include "../Geometry/2D/Triangle.h"
 #include "Diff_HHOElement.h"
 #include "../Utils/ElementParallelLoop.h"
 #include "Diffusion_HHOMatrix.h"
@@ -30,7 +32,10 @@ public:
 	Vector ReconstructedSolution;
 	Vector GlobalHybridSolution;
 
-	Diffusion_HHO(Mesh<Dim>* mesh, TestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool staticCondensation, bool saveMatrixBlocks, string outputDirectory)
+	Diffusion_HHO()
+	{}
+
+	Diffusion_HHO(Mesh<Dim>* mesh, DiffusionTestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool staticCondensation, bool saveMatrixBlocks, string outputDirectory)
 		: DiffusionProblem<Dim>(mesh, testCase, outputDirectory)
 	{	
 		this->HHO = hho;

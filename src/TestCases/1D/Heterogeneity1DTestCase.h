@@ -1,13 +1,13 @@
 #pragma once
-#include "../TestCase.h"
+#include "../DiffusionTestCase.h"
 #include "../../Mesher/SegmentGeometry.h"
 using namespace std;
 
-class Heterogeneity1DTestCase : public TestCase<1>
+class Heterogeneity1DTestCase : public DiffusionTestCase<1>
 {
 public:
 	Heterogeneity1DTestCase(ProblemArguments pb) :
-		TestCase()
+		DiffusionTestCase()
 	{
 		// Diffusion field
 		this->DiffField = SegmentGeometry::DiffField(pb.HeterogeneityRatio);

@@ -1,8 +1,8 @@
 #pragma once
-#include "../TestCase.h"
+#include "../DiffusionTestCase.h"
 using namespace std;
 
-class EDFTestCase : public TestCase<2>
+class EDFTestCase : public DiffusionTestCase<2>
 {
 private:
 	Tensor<2>* tensorWeirdShapeInTheMiddle;
@@ -11,7 +11,7 @@ private:
 	Tensor<2>* tensorLittlePiece;
 public:
 	EDFTestCase(ProblemArguments pb) :
-		TestCase()
+		DiffusionTestCase()
 	{
 		// Diffusion field
 		tensorWeirdShapeInTheMiddle = new Tensor<2>(                    1, pb.AnisotropyRatio, pb.AnisotropyAngle);

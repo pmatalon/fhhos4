@@ -1,19 +1,20 @@
 #pragma once
 #include "Problem.h"
-#include "../TestCases/TestCase.h"
+#include "../TestCases/DiffusionTestCase.h"
 using namespace std;
 
 template <int Dim>
 class DiffusionProblem : public Problem<Dim>
 {
 protected:
-	TestCase<Dim>* _testCase;
+	DiffusionTestCase<Dim>* _testCase;
 	DiffusionField<Dim>* _diffusionField;
 	DomFunction _sourceFunction;
 	BoundaryConditions* _boundaryConditions;
 public:
+	DiffusionProblem() {}
 
-	DiffusionProblem(Mesh<Dim>* mesh, TestCase<Dim>* testCase, string outputDirectory)
+	DiffusionProblem(Mesh<Dim>* mesh, DiffusionTestCase<Dim>* testCase, string outputDirectory)
 		: Problem<Dim>(mesh, outputDirectory)
 	{
 		this->_testCase = testCase;

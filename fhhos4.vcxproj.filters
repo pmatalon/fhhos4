@@ -240,7 +240,7 @@
     <ClInclude Include="src\QuadratureRules\GaussLegendre\GaussLegendre.h">
       <Filter>QuadratureRules\GaussLegendre</Filter>
     </ClInclude>
-    <ClInclude Include="src\Solver\AllSolvers.h">
+    <ClInclude Include="src\Solver\SolverFactory.h">
       <Filter>Solver</Filter>
     </ClInclude>
     <ClInclude Include="src\Mesh\PhysicalGroup.h">
@@ -249,7 +249,7 @@
     <ClInclude Include="src\TestCases\TestCase.h">
       <Filter>TestCases</Filter>
     </ClInclude>
-    <ClInclude Include="src\TestCases\TestCaseFactory.h">
+    <ClInclude Include="src\TestCases\DiffTestCaseFactory.h">
       <Filter>TestCases</Filter>
     </ClInclude>
     <ClInclude Include="src\TestCases\1D\Heterogeneity1DTestCase.h">
@@ -282,7 +282,7 @@
     <ClInclude Include="src\Utils\FileSystem.h">
       <Filter>Utils</Filter>
     </ClInclude>
-    <ClInclude Include="src\Mesher\AllMeshes.h">
+    <ClInclude Include="src\Mesher\MeshFactory.h">
       <Filter>Mesher</Filter>
     </ClInclude>
     <ClInclude Include="src\Mesher\CubeGeometry.h">
@@ -472,6 +472,36 @@
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
     <ClInclude Include="src\version.h" />
+    <ClInclude Include="src\Problem\BiHarmonicProblem.h">
+      <Filter>Problem</Filter>
+    </ClInclude>
+    <ClInclude Include="src\HHO\SplittedBiHarmonic_HHO.h">
+      <Filter>HHO</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\DiffusionTestCase.h">
+      <Filter>TestCases</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\BiHarmonicTestCase.h">
+      <Filter>TestCases</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\BiHarmonic\2D\SquareBiHarTestCase.h">
+      <Filter>TestCases\BiHarmonic\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\BiHarmonic\BiHarTestCaseFactory.h">
+      <Filter>TestCases\BiHarmonic</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\VirtualDiffusionTestCase.h">
+      <Filter>TestCases</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Program\Program_Diffusion_DG.h">
+      <Filter>Program</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Program\Program_Diffusion_HHO.h">
+      <Filter>Program</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Program\Program_BiHarmonic_HHO.h">
+      <Filter>Program</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
@@ -566,6 +596,15 @@
     </Filter>
     <Filter Include="Solver\Multigrid\UncondensedAMG">
       <UniqueIdentifier>{acc25f76-6138-4312-8787-666852f7a952}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="TestCases\BiHarmonic">
+      <UniqueIdentifier>{37a62d96-e868-443b-aa20-ed4e6440b31a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="TestCases\BiHarmonic\2D">
+      <UniqueIdentifier>{f5e4f82d-09dc-41d9-99e7-b54b6ce74a2e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Program">
+      <UniqueIdentifier>{b6a60e33-8f74-4711-a795-c36e13e3d6f7}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

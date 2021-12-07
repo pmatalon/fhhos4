@@ -1,12 +1,12 @@
 #pragma once
-#include "../TestCase.h"
+#include "../DiffusionTestCase.h"
 using namespace std;
 
-class PlateWith4HolesTestCase : public TestCase<3>
+class PlateWith4HolesTestCase : public DiffusionTestCase<3>
 {
 public:
 	PlateWith4HolesTestCase(ProblemArguments pb) :
-		TestCase()
+		DiffusionTestCase()
 	{
 		// Diffusion field
 		if (pb.HeterogeneityRatio != 1)

@@ -17,12 +17,16 @@ public:
 	Vector b;
 	Vector SystemSolution;
 
+protected:
+	Problem() {}
+
 	Problem(Mesh<Dim>* mesh, string outputDirectory)
 	{
 		this->_mesh = mesh;
 		this->_outputDirectory = outputDirectory;
 	}
 
+public:
 	string GetFilePathPrefix()
 	{
 		return this->_outputDirectory + "/" + this->_fileName;

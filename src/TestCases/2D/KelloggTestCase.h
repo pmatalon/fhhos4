@@ -1,12 +1,12 @@
 #pragma once
-#include "../TestCase.h"
+#include "../DiffusionTestCase.h"
 using namespace std;
 
-class KelloggTestCase : public TestCase<2>
+class KelloggTestCase : public DiffusionTestCase<2>
 {
 public:
 	KelloggTestCase(ProblemArguments pb) :
-		TestCase()
+		DiffusionTestCase()
 	{
 		if (!Utils::Contains(pb.GeoCode, "square4quadrants"))
 			Utils::FatalError("The Kellogg test case is only compatible with the 'square4quadrants' geometry.");

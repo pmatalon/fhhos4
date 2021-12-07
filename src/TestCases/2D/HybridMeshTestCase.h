@@ -1,15 +1,15 @@
 #pragma once
-#include "../TestCase.h"
+#include "../DiffusionTestCase.h"
 using namespace std;
 
-class HybridMeshTestCase : public TestCase<2>
+class HybridMeshTestCase : public DiffusionTestCase<2>
 {
 private:
 	Tensor<2>* tensorInterior;
 	Tensor<2>* tensorExterior;
 public:
 	HybridMeshTestCase(ProblemArguments pb) :
-		TestCase()
+		DiffusionTestCase()
 	{
 		// Diffusion field
 		tensorInterior = new Tensor<2>(                    1, pb.AnisotropyRatio, pb.AnisotropyAngle); // anisotropic

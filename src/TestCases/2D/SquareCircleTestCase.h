@@ -1,15 +1,15 @@
 #pragma once
-#include "../TestCase.h"
+#include "../DiffusionTestCase.h"
 using namespace std;
 
-class SquareCircleTestCase : public TestCase<2>
+class SquareCircleTestCase : public DiffusionTestCase<2>
 {
 private:
 	Tensor<2> diffTensorSquare;
 	Tensor<2> diffTensorCircle;
 public:
 	SquareCircleTestCase(ProblemArguments pb) :
-		TestCase()
+		DiffusionTestCase()
 	{
 		// Diffusion field
 		diffTensorSquare = Tensor<2>(pb.HeterogeneityRatio, pb.AnisotropyRatio, pb.AnisotropyAngle);

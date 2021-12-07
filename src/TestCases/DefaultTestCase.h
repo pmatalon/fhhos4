@@ -1,13 +1,13 @@
 #pragma once
-#include "TestCase.h"
+#include "DiffusionTestCase.h"
 using namespace std;
 
 template <int Dim>
-class DefaultTestCase : public TestCase<Dim>
+class DefaultTestCase : public DiffusionTestCase<Dim>
 {
 public:
 	DefaultTestCase(ProblemArguments pb) :
-		TestCase<Dim>()
+		DiffusionTestCase<Dim>()
 	{
 		// Diffusion field
 		this->DiffField = DiffusionField<Dim>(pb.AnisotropyRatio, pb.AnisotropyAngle);

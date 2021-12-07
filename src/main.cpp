@@ -12,6 +12,11 @@ void print_usage() {
 	cout << "                          Problem definition                          " << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << endl;
+	cout << "-pb CODE" << endl;
+	cout << "      Problem, i.e. to equation to discretize:" << endl;
+	cout << "            diff              - Diffusion" << endl;
+	cout << "            bihar             - Bi-harmonic" << endl;
+	cout << endl;
 	cout << "-geo CODE" << endl;
 	cout << "      Geometry: in-house test cases, or imported from GMSH." << endl;
 	cout << "            segment           - Unit segment (1D)" << endl;
@@ -23,8 +28,8 @@ void print_usage() {
 	cout << endl;
 	cout << "-tc CODE" << endl;
 	cout << "      Test case code. By default, it is defined as the geometry." << endl;
-	cout << "      The test case defines the source function of the problem, the diffusion field, as well as available predefined boundary conditions." << endl;
-	cout << "      By default, the test case is defined as the geometry." << endl;
+	cout << "      The test case defines the parameters of the problem (source function, diffusion field, boundary conditions...)." << endl;
+	cout << "      By default, the test case's code is the same as the geometry." << endl;
 	cout << "      When the geometry given is a GMSH file, a test case with same code as the file name should be defined in the source code. Alternatively, you can use" << endl;
 	cout << "               default - discontinuous source function, homogeneous Dirichlet conditions" << endl;
 	cout << "      Additional specific test cases:" << endl;
@@ -32,7 +37,7 @@ void print_usage() {
 	cout << "               kellogg - ('square4quadrants' geometry only) heterogeneous diffusion-specific analytical solution (known benchmark)" << endl;
 	cout << endl;
 	cout << "-source CODE" << endl;
-	cout << "      Code allowing to change the default source function defined in the test case." << endl;
+	cout << "      Code allowing to change the default source function defined in the diffusion test case." << endl;
 	cout << "      For some, it also determines the analytical solution in the homogeneous isotropic case so that the L2 error can be computed." << endl;
 	cout << "      The following test cases are predefined and available for the simple geometries listed in the -geo argument." << endl;
 	cout << "               sine    - the source function and the analytical solution are a sine functions" << endl;
@@ -48,17 +53,18 @@ void print_usage() {
 	cout << "            <other>    - Test case-specific boundary conditions" << endl;
 	cout << endl;
 	cout << "-heterog NUM" << endl;
-	cout << "      Heterogeneity ratio. Has an effect only if multiple physical parts are defined in the geometry." << endl;
+	cout << "      Heterogeneity ratio for the diffusion problem." << endl;
+	cout << "      Has an effect only if multiple physical parts are defined in the geometry." << endl;
 	cout << "      Ex:       1             - homogeneous diffusion (default)" << endl;
 	cout << "                0 < NUM < 1   - to be used with -tc heterog" << endl;
 	cout << "                1e4           - allows to set the order of magnitude of the ratio" << endl;
 	cout << endl;
 	cout << "-aniso NUM" << endl;
-	cout << "      Anisotropy ratio (valid across the whole domain)." << endl;
+	cout << "      Anisotropy ratio for the diffusion problem (valid across the whole domain)." << endl;
 	cout << "      Example: 1e4" << endl;
 	cout << endl;
 	cout << "-aniso-angle NUM" << endl;
-	cout << "      Anisotropy angle expressed in degrees (valid across the whole domain)." << endl;
+	cout << "      Anisotropy angle for the diffusion problem (valid across the whole domain), expressed in degrees." << endl;
 	cout << "      Example: 45" << endl;
 	cout << endl;
 	cout << "----------------------------------------------------------------------" << endl;
@@ -510,7 +516,8 @@ int main(int argc, char* argv[])
 
 	enum {
 		// Problem
-		OPT_Geometry = 1000,
+		OPT_Problem = 1000,
+		OPT_Geometry,
 		OPT_TestCase,
 		OPT_Source,
 		OPT_BoundaryConditions,
@@ -575,6 +582,7 @@ int main(int argc, char* argv[])
 
 	static struct option long_opts[] = {
 		 // Problem
+		 { "pb", required_argument, NULL, OPT_Problem },
 		 { "geo", required_argument, NULL, OPT_Geometry },
 		 { "tc", required_argument, NULL, OPT_TestCase },
 		 { "source", required_argument, NULL, OPT_Source },
@@ -653,6 +661,17 @@ int main(int argc, char* argv[])
 			//     Problem     //
 			//-----------------//
 
+			case OPT_Problem:
+			{
+				string code = optarg;
+				if (code.compare("diff") == 0)
+					args.Problem.Equation = EquationType::Diffusion;
+				else if (code.compare("bihar") == 0)
+					args.Problem.Equation = EquationType::BiHarmonic;
+				else
+					argument_error("unknown problem. Check -pb argument.");
+				break;
+			}
 			case OPT_Geometry:
 				args.Problem.GeoCode = optarg;
 				if (!Utils::IsPredefinedGeometry(args.Problem.GeoCode))

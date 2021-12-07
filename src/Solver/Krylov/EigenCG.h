@@ -28,6 +28,7 @@ public:
 			exit(EXIT_FAILURE);
 		}
 		_solver.setTolerance(this->Tolerance);
+		_solver.setMaxIterations(this->MaxIterations);
 	}
 
 	void Solve(const Vector& b, Vector& x, bool xEquals0, bool computeResidual, bool computeAx) override

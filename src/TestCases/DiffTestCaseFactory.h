@@ -18,14 +18,14 @@
 using namespace std;
 
 template <int Dim>
-class TestCaseFactory
+class DiffTestCaseFactory
 {
 public:
-	static TestCase<Dim>* Create(ProblemArguments pb) { assert(false); }
+	static DiffusionTestCase<Dim>* Create(ProblemArguments pb) { assert(false); }
 };
 
 template <>
-TestCase<1>* TestCaseFactory<1>::Create(ProblemArguments pb)
+DiffusionTestCase<1>* DiffTestCaseFactory<1>::Create(ProblemArguments pb)
 {
 	if (pb.TestCaseCode.compare("default") == 0)
 		return new DefaultTestCase<1>(pb);
@@ -39,7 +39,7 @@ TestCase<1>* TestCaseFactory<1>::Create(ProblemArguments pb)
 }
 
 template <>
-TestCase<2>* TestCaseFactory<2>::Create(ProblemArguments pb)
+DiffusionTestCase<2>* DiffTestCaseFactory<2>::Create(ProblemArguments pb)
 {
 	if (pb.TestCaseCode.compare("default") == 0)
 		return new DefaultTestCase<2>(pb);
@@ -73,7 +73,7 @@ TestCase<2>* TestCaseFactory<2>::Create(ProblemArguments pb)
 }
 
 template <>
-TestCase<3>* TestCaseFactory<3>::Create(ProblemArguments pb)
+DiffusionTestCase<3>* DiffTestCaseFactory<3>::Create(ProblemArguments pb)
 {
 	if (pb.TestCaseCode.compare("default") == 0)
 		return new DefaultTestCase<3>(pb);

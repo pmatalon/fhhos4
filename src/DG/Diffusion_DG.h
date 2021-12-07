@@ -16,7 +16,7 @@ private:
 	bool _autoPenalization;
 	int _penalizationCoefficient;
 public:
-	Diffusion_DG(Mesh<Dim>* mesh, TestCase<Dim>* testCase, string outputDirectory, FunctionalBasis<Dim>* basis, int penalizationCoefficient)
+	Diffusion_DG(Mesh<Dim>* mesh, DiffusionTestCase<Dim>* testCase, string outputDirectory, FunctionalBasis<Dim>* basis, int penalizationCoefficient)
 		: DiffusionProblem<Dim>(mesh, testCase, outputDirectory)
 	{ 
 		this->Basis = basis;

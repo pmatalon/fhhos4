@@ -1,12 +1,12 @@
 #pragma once
-#include "../TestCase.h"
+#include "../DiffusionTestCase.h"
 using namespace std;
 
-class SquareHolesTestCase : public TestCase<2>
+class SquareHolesTestCase : public DiffusionTestCase<2>
 {
 public:
 	SquareHolesTestCase(ProblemArguments pb) :
-		TestCase()
+		DiffusionTestCase()
 	{
 		// Diffusion field
 		if (pb.HeterogeneityRatio != 1)

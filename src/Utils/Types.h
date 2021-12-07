@@ -29,6 +29,11 @@ using DimMatrix = Eigen::Matrix<double, Dim, Dim>;
 using Flops = std::size_t;
 using MFlops = double;
 
+enum class EquationType : unsigned
+{
+	Diffusion,
+	BiHarmonic
+};
 
 enum class BoundaryConditionType : unsigned
 {
