@@ -9,20 +9,32 @@ class SplittedBiHarmonic_HHO : public BiHarmonicProblem<Dim>
 {
 private:
 	bool _saveMatrixBlocks = true;
+	DiffusionField<Dim> _diffField;
 	VirtualDiffusionTestCase<Dim> _diffPb1TestCase;
 	VirtualDiffusionTestCase<Dim> _diffPb2TestCase;
+	Diffusion_HHO<Dim> _diffPb1;
 public:
 	HHOParameters<Dim>* HHO;
-	Diffusion_HHO<Dim> DiffPb1;
-	Diffusion_HHO<Dim> DiffPb2;
 
 	SplittedBiHarmonic_HHO(Mesh<Dim>* mesh, BiHarmonicTestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool saveMatrixBlocks, string outputDirectory)
 		: BiHarmonicProblem<Dim>(mesh, testCase, outputDirectory)
 	{
 		HHO = hho;
-		this->_diffPb1TestCase = VirtualDiffusionTestCase<Dim>(this->_sourceFunction, DiffusionField<Dim>());
-		this->DiffPb1 = Diffusion_HHO<Dim>(this->_mesh, &_diffPb1TestCase, HHO, true, saveMatrixBlocks, "");
+		this->_diffField = DiffusionField<Dim>(new Tensor<Dim>());
+		mesh->SetDiffusionField(&this->_diffField);
+		this->_diffPb1TestCase = VirtualDiffusionTestCase<Dim>(this->_sourceFunction, this->_diffField);
+		this->_diffPb1 = Diffusion_HHO<Dim>(this->_mesh, &_diffPb1TestCase, HHO, true, saveMatrixBlocks, outputDirectory);
 		_saveMatrixBlocks = saveMatrixBlocks;
+	}
+
+	Diffusion_HHO<Dim>& DiffPb1()
+	{
+		return _diffPb1;
+	}
+
+	Diffusion_HHO<Dim>& DiffPb2()
+	{
+		return _diffPb1;
 	}
 
 	void Assemble(ActionsArguments actions) override
@@ -33,41 +45,30 @@ public:
 	{
 		ActionsArguments diffActions;
 		//diffActions.LogAssembly = true;
-		this->DiffPb1.Assemble(diffActions);
+		DiffPb1().Assemble(diffActions);
 	}
 
-	void AssembleDiffPb2()
+	void AssembleDiffPb2(const Vector& solutionDiffPb1, bool isOfHigherDegree)
 	{
-		DiffPb1.ReconstructHigherOrderApproximation();
-
-		AssembleRHSForDiffPb2(DiffPb1.ReconstructedSolution);
-
-		this->_diffPb2TestCase = VirtualDiffusionTestCase<Dim>(this->_sourceFunction, DiffusionField<Dim>());
-		this->DiffPb2 = Diffusion_HHO<Dim>(this->_mesh, &_diffPb1TestCase, HHO, true, _saveMatrixBlocks, "");
-	}
-
-private:
-	void AssembleRHSForDiffPb2(const Vector& reconstructedSolutionDiff1)
-	{
-		ElementParallelLoop<Dim> parallelLoop(this->_mesh.Elements);
-		Vector b_T = Vector(HHO->nTotalCellUnknowns);
-
-		/*if (HHO->OrthogonalizeElemBases())
+		if (isOfHigherDegree)
 		{
-			DenseMatrix Nt = this->CellReconstructMassMatrix(this->CellBasis, this->ReconstructionBasis);
+			ElementParallelLoop<Dim> parallelLoop(this->_mesh->Elements);
+			DiffPb2().B_T = Vector(HHO->nTotalCellUnknowns);
+
+			parallelLoop.Execute([this, &solutionDiffPb1](Element<Dim>* e)
+				{
+					Diff_HHOElement<Dim>* element = this->DiffPb2().HHOElement(e);
+					DiffPb2().B_T.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns) = element->ApplyCellReconstructMassMatrix(solutionDiffPb1.segment(e->Number * HHO->nReconstructUnknowns, HHO->nReconstructUnknowns));
+				}
+			);
+
+			// Static condensation
+			DiffPb2().b = /*B_ndF*/ -DiffPb2().A_T_ndF.transpose() * DiffPb2().Solve_A_T_T(DiffPb2().B_T);
 		}
 		else
-		{
-
-		}
-
-		parallelLoop.Execute([this](Element<Dim>* e)
-			{
-				Diff_HHOElement<Dim>* element = this->DiffPb1.HHOElement(e);
-				element->
-			}
-		):*/
+			Utils::FatalError("RHS without the reconstruction non implemented");
 	}
+
 
 public:
 	double L2Error(DomFunction exactSolution) override

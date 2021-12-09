@@ -8,7 +8,7 @@ class VirtualDiffusionTestCase : public DiffusionTestCase<Dim>
 public:
 	VirtualDiffusionTestCase() {}
 
-	VirtualDiffusionTestCase(DomFunction sourceFunction, DiffusionField<Dim> diffField)
+	VirtualDiffusionTestCase(DomFunction sourceFunction, DiffusionField<Dim>& diffField)
 	{
 		this->SourceFunction = sourceFunction;
 		this->DiffField = diffField;

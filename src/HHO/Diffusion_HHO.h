@@ -22,9 +22,11 @@ public:
 	SparseMatrix A_T_T;
 	SparseMatrix A_T_ndF; // used to reconstruct the the higher-order approximation after solving the linear system
 	SparseMatrix A_ndF_ndF;
-private:
+
+
 	// Cell part of the right-hand side, used to reconstruct the the higher-order approximation after solving the linear system
-	Vector B_T; 
+	Vector B_T;
+private:
 	// Solution on the Dirichlet faces
 	Vector x_dF;
 public:

@@ -426,6 +426,7 @@ void print_usage() {
 	cout << "              mesh       - mesh to be used in Matlab" << endl;
 	cout << "              solvect    - solution vector(s)" << endl;
 	cout << "              solgmsh    - solution files (.pos and .msh) to be used in GMSH for visualization" << endl;
+	cout << "              exsolgmsh  - solution files (.pos) of the exact solution to be used in GMSH for visualization" << endl;
 	cout << "              errgmsh    - error computed against the solution of an exact solver to be used in GMSH for visualization" << endl;
 	cout << "              sourcegmsh - solution files (.pos and .msh) to be used in GMSH for visualization" << endl;
 	cout << "              mg         - Multigrid components (intergrid operator matrices, coarse meshes, etc.)" << endl;
@@ -1152,6 +1153,8 @@ int main(int argc, char* argv[])
 						args.Actions.ExportSolutionVectors = true;
 					else if (code.compare("solgmsh") == 0)
 						args.Actions.ExportSolutionToGMSH = true;
+					else if (code.compare("exsolgmsh") == 0)
+						args.Actions.ExportExactSolutionToGMSH = true;
 					else if (code.compare("errgmsh") == 0)
 						args.Actions.ExportErrorToGMSH = true;
 					else if (code.compare("sourcegmsh") == 0)

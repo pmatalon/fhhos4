@@ -69,6 +69,8 @@ public:
 		if (phi1->GetDegree() == 0 || phi2->GetDegree() == 0)
 			return 0;
 
+		assert(K);
+
 		DimMatrix<Dim> invJ = InverseJacobianTranspose();
 
 		RefFunction functionToIntegrate = [K, phi1, phi2, invJ](const RefPoint& p) {

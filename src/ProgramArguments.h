@@ -96,6 +96,7 @@ struct ActionsArguments
 	bool ExportMultigridIterationVectors = false;
 	bool ExportSolutionVectors = false;
 	bool ExportSolutionToGMSH = false;
+	bool ExportExactSolutionToGMSH = false;
 	bool ExportErrorToGMSH = false;
 	bool ExportSourceToGMSH = false;
 	bool LogAssembly = true;

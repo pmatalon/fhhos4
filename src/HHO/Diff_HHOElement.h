@@ -161,6 +161,21 @@ private:
 			return this->MassMatrix(basis).llt().solve(M);
 	}
 
+	Vector ApplyMassMatrix(FunctionalBasis<Dim>* basis, const Vector& v)
+	{
+		if (HHO->OrthonormalizeElemBases())
+			return v;
+		else if (HHO->OrthogonalizeElemBases())
+		{
+			Vector d(basis->Size());
+			for (BasisFunction<Dim>* phi : basis->LocalFunctions)
+				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim>*>(phi)->NormSquare;
+			return d.asDiagonal() * v;
+		}
+		else
+			return this->MassMatrix(basis) * v;
+	}
+
 public:
 	Vector Reconstruct(Vector hybridVector)
 	{
@@ -191,6 +206,29 @@ public:
 		createHybridVectorFromFacesMatrix.topRows(HHO->nCellUnknowns) = solveCellUnknowns;
 		createHybridVectorFromFacesMatrix.bottomRows(nTotalFaceUnknowns) = DenseMatrix::Identity(nTotalFaceUnknowns, nTotalFaceUnknowns);
 		return this->P * createHybridVectorFromFacesMatrix;
+	}
+
+	Vector ApplyCellReconstructMassMatrix(const Vector& v)
+	{
+		if (HHO->OrthonormalizeElemBases())
+			return v;
+		else if (HHO->OrthogonalizeElemBases())
+		{
+			Vector d(this->CellBasis->Size());
+			for (BasisFunction<Dim>* phi : this->CellBasis->LocalFunctions)
+				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim>*>(phi)->NormSquare;
+			return d.asDiagonal() * v.head(HHO->nCellUnknowns);
+		}
+		else
+		{
+			DenseMatrix Nt = this->CellReconstructMassMatrix(this->CellBasis, this->ReconstructionBasis);
+			return Nt * v;
+		}
+	}
+
+	Vector ApplyCellMassMatrix(const Vector& v)
+	{
+		return this->ApplyMassMatrix(this->CellBasis, v);
 	}
 
 private:

@@ -20,6 +20,8 @@ public:
 		}
 		if (pb.SourceCode.compare("sine") == 0)
 			this->SourceFunction = this->SineSource2D;
+		else if (pb.SourceCode.compare("poly") == 0)
+			this->SourceFunction = this->PolySource2D;
 		else
 			Utils::FatalError("Unmanaged source code");
 
@@ -35,7 +37,12 @@ public:
 		if (pb.GeoCode.compare("square") == 0 && pb.BCCode.compare("d") == 0)
 		{
 			if (pb.SourceCode.compare("sine") == 0)
+			{
+				this->MinusLaplacianOfSolution = this->SineMinusLaplacianOfSolution2D;
 				this->ExactSolution = this->SineSolution2D;
+			}
+			else if (pb.SourceCode.compare("poly") == 0)
+				this->ExactSolution = this->PolySolution2D;
 		}
 	}
 
@@ -43,6 +50,8 @@ public:
 	{
 		if (_pb.SourceCode.compare("sine") == 0)
 			return "sine";
+		else if (_pb.SourceCode.compare("poly") == 0)
+			return "poly";
 		else
 			return _pb.SourceCode;
 	}
@@ -50,6 +59,8 @@ public:
 	{
 		if (_pb.SourceCode.compare("sine") == 0)
 			return "sine solution";
+		else if (_pb.SourceCode.compare("poly") == 0)
+			return "polynomial solution";
 		else
 			return _pb.SourceCode;
 	}

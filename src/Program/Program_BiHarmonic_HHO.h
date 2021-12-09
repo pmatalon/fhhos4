@@ -40,6 +40,10 @@ public:
 		if (args.Actions.ExportSourceToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
 			dynamic_cast<GMSHMesh<Dim>*>(mesh)->ExportToGMSH(testCase->SourceFunction, args.OutputDirectory + "/source", "source");
 
+		// Export exact solution
+		if (args.Actions.ExportExactSolutionToGMSH && testCase->ExactSolution && args.Discretization.Mesher.compare("gmsh") == 0)
+			dynamic_cast<GMSHMesh<Dim>*>(mesh)->ExportToGMSH(testCase->ExactSolution, args.OutputDirectory + "/exsol", "exact solution");
+
 		//----------------------//
 		//       Assembly       //
 		//----------------------//
@@ -53,6 +57,7 @@ public:
 		bool saveMatrixBlocks = args.Solver.SolverCode.compare("uamg") == 0 || args.Solver.SolverCode.compare("fcguamg") == 0;
 		SplittedBiHarmonic_HHO<Dim>* biHarPb = new SplittedBiHarmonic_HHO<Dim>(mesh, testCase, hho, saveMatrixBlocks, args.OutputDirectory);
 
+		biHarPb->PrintPhysicalProblem();
 
 		cout << endl;
 		cout << "----------------------------------------------------------" << endl;
@@ -62,7 +67,7 @@ public:
 		assemblyTimer.Start();
 
 		biHarPb->AssembleDiffPb1();
-		cout << "System storage: " << Utils::MemoryString(Utils::MemoryUsage(biHarPb->DiffPb1.A) + Utils::MemoryUsage(biHarPb->DiffPb1.b)) << endl;
+		cout << "System storage: " << Utils::MemoryString(Utils::MemoryUsage(biHarPb->DiffPb1().A) + Utils::MemoryUsage(biHarPb->DiffPb1().b)) << endl;
 
 		assemblyTimer.Stop();
 		cout << endl << "Assembly time: CPU = " << assemblyTimer.CPU() << ", elapsed = " << assemblyTimer.Elapsed() << endl;
@@ -81,7 +86,7 @@ public:
 			int blockSizeForBlockSolver = args.Solver.BlockSize != -1 ? args.Solver.BlockSize : faceBasis->Size();
 
 			// Solve 1st diffusion biHarPb
-			Solver* solver = SolverFactory<Dim>::CreateSolver(args, &biHarPb->DiffPb1, blockSizeForBlockSolver);
+			Solver* solver = SolverFactory<Dim>::CreateSolver(args, &biHarPb->DiffPb1(), blockSizeForBlockSolver);
 
 			Timer setupTimer;
 			Timer solvingTimer1;
@@ -95,41 +100,55 @@ public:
 			{
 				setupTimer.Start();
 				if (Utils::ProgramArgs.Solver.SolverCode.compare("uamg") == 0 || Utils::ProgramArgs.Solver.SolverCode.compare("fcguamg") == 0)
-					iterativeSolver->Setup(biHarPb->DiffPb1.A, biHarPb->DiffPb1.A_T_T, biHarPb->DiffPb1.A_T_ndF, biHarPb->DiffPb1.A_ndF_ndF);
+					iterativeSolver->Setup(biHarPb->DiffPb1().A, biHarPb->DiffPb1().A_T_T, biHarPb->DiffPb1().A_T_ndF, biHarPb->DiffPb1().A_ndF_ndF);
 				else
-					solver->Setup(biHarPb->DiffPb1.A);
+					solver->Setup(biHarPb->DiffPb1().A);
 				setupTimer.Stop();
 
 				cout << "Solving first problem..." << endl;
 				solvingTimer1.Start();
-				biHarPb->DiffPb1.SystemSolution = iterativeSolver->Solve(biHarPb->DiffPb1.b, args.Solver.InitialGuessCode);
+				biHarPb->DiffPb1().SystemSolution = iterativeSolver->Solve(biHarPb->DiffPb1().b, args.Solver.InitialGuessCode);
 				solvingTimer1.Stop();
 			}
 			else
 			{
 				setupTimer.Start();
-				solver->Setup(biHarPb->DiffPb1.A);
+				solver->Setup(biHarPb->DiffPb1().A);
 				setupTimer.Stop();
 
 				cout << "Solving first problem..." << endl;
 				solvingTimer1.Start();
-				biHarPb->DiffPb1.SystemSolution = solver->Solve(biHarPb->DiffPb1.b);
+				biHarPb->DiffPb1().SystemSolution = solver->Solve(biHarPb->DiffPb1().b);
 				solvingTimer1.Stop();
 				cout << endl;
 			}
 
+			biHarPb->DiffPb1().ReconstructHigherOrderApproximation();
 
-			// Solve 2nd diffusion biHarPb
-			//Vector solution = Solve(solver, biHarmPb->DiffPb2, args.Solver.InitialGuessCode);
+			//----------------------//
+			//       L2 error       //
+			//----------------------//
+
+			if (testCase->MinusLaplacianOfSolution)
+			{
+				double error = biHarPb->DiffPb1().L2Error(testCase->MinusLaplacianOfSolution);
+				cout << endl << "L2 Error = " << std::scientific << error << endl;
+				//biHarPb->AssertSchemeConvergence(error);
+			}
+
+			cout << "----------------------------------------------------------" << endl;
+			cout << "-                  2nd diffusion problem                 -" << endl;
+			cout << "----------------------------------------------------------" << endl;
+
+			biHarPb->AssembleDiffPb2(biHarPb->DiffPb1().ReconstructedSolution, true);
 
 			cout << "Solving second problem..." << endl;
 			solvingTimer2.Start();
-			biHarPb->SystemSolution = solver->Solve(biHarPb->DiffPb1.SystemSolution);
+			biHarPb->DiffPb2().SystemSolution = solver->Solve(biHarPb->DiffPb2().b);
 			solvingTimer2.Stop();
 			cout << endl;
 
 			totalTimer.Stop();
-
 
 			delete solver;
 
@@ -143,14 +162,9 @@ public:
 				cout << "-                     Post-processing                    -" << endl;
 				cout << "----------------------------------------------------------" << endl;
 
-				/*biHarPb->ReconstructHigherOrderApproximation();
+				biHarPb->DiffPb2().ReconstructHigherOrderApproximation();
 				if (args.Actions.ExportSolutionVectors)
-				{
-					if (args.Discretization.StaticCondensation)
-						biHarPb->ExtractTraceSystemSolution();
-					biHarPb->ExtractHybridSolution();
-					biHarPb->ExportSolutionVector();
-				}*/
+					biHarPb->DiffPb2().ExportSolutionVector();
 			}
 
 			if (args.Actions.ExportMeshToMatlab)
@@ -159,8 +173,10 @@ public:
 				mesh->ExportToMatlab2(args.OutputDirectory + "/mesh.m");
 			}
 
-			//if (args.Actions.ExportSolutionToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
-				//biHarPb->ExportSolutionToGMSH();
+			if (args.Actions.ExportSolutionToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
+				biHarPb->DiffPb2().ExportSolutionToGMSH();
+
+
 
 			//----------------------//
 			//       L2 error       //
@@ -168,9 +184,9 @@ public:
 
 			if (testCase->ExactSolution)
 			{
-				/*double error = biHarPb->L2Error(testCase->ExactSolution);
+				double error = biHarPb->DiffPb2().L2Error(testCase->ExactSolution);
 				cout << endl << "L2 Error = " << std::scientific << error << endl;
-				biHarPb->AssertSchemeConvergence(error);*/
+				//biHarPb->AssertSchemeConvergence(error);
 			}
 		}
 
