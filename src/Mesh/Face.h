@@ -1,6 +1,6 @@
 #pragma once
 #include "Element.h"
-#include "../Problem/BoundaryConditions.h"
+#include "../TestCases/Diffusion/BoundaryConditions.h"
 using namespace std;
 
 template <int Dim>

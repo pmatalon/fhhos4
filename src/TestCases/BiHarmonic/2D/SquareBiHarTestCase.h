@@ -1,5 +1,5 @@
 #pragma once
-#include "../../BiHarmonicTestCase.h"
+#include "../BiHarmonicTestCase.h"
 #include "../../../Mesher/SquareGeometry.h"
 using namespace std;
 

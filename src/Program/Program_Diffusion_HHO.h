@@ -2,7 +2,7 @@
 #include <iomanip>
 #include "../ProgramArguments.h"
 #include "../HHO/Diffusion_HHO.h"
-#include "../TestCases/DiffTestCaseFactory.h"
+#include "../TestCases/Diffusion/DiffTestCaseFactory.h"
 #include "../Mesher/MeshFactory.h"
 #include "../Solver/SolverFactory.h"
 #include "../Utils/ExportModule.h"

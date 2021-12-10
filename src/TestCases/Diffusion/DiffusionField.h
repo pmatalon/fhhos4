@@ -1,8 +1,8 @@
 #pragma once
 #include <functional>
-#include "../Geometry/Point.h"
+#include "../../Geometry/Point.h"
 #include "Tensor.h"
-#include "../Mesh/PhysicalGroup.h"
+#include "../../Mesh/PhysicalGroup.h"
 using namespace std;
 
 template <int Dim>

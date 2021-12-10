@@ -1,6 +1,5 @@
 #pragma once
 #include "../Utils/Timer.h"
-#include "../Problem/DiffusionProblem.h"
 
 #include "Krylov/ConjugateGradient.h"
 #include "Krylov/FlexibleConjugateGradient.h"

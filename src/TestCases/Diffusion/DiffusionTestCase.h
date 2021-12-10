@@ -1,6 +1,6 @@
 #pragma once
-#include "TestCase.h"
-#include "../Problem/DiffusionField.h"
+#include "../TestCase.h"
+#include "DiffusionField.h"
 using namespace std;
 
 template <int Dim>

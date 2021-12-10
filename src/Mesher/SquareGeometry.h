@@ -1,5 +1,5 @@
 #pragma once
-#include "../Problem/DiffusionField.h"
+#include "../TestCases/Diffusion/DiffusionField.h"
 using namespace std;
 
 class SquareGeometry

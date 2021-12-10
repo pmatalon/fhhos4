@@ -101,12 +101,6 @@
     <ClInclude Include="src\Mesh\Vertex.h">
       <Filter>Mesh</Filter>
     </ClInclude>
-    <ClInclude Include="src\Problem\Tensor.h">
-      <Filter>Problem</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Problem\BoundaryConditions.h">
-      <Filter>Problem</Filter>
-    </ClInclude>
     <ClInclude Include="src\Mesh\2D\CartesianEdge.h">
       <Filter>Mesh\2D</Filter>
     </ClInclude>
@@ -243,33 +237,6 @@
     <ClInclude Include="src\TestCases\TestCase.h">
       <Filter>TestCases</Filter>
     </ClInclude>
-    <ClInclude Include="src\TestCases\DiffTestCaseFactory.h">
-      <Filter>TestCases</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TestCases\1D\Heterogeneity1DTestCase.h">
-      <Filter>TestCases\1D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TestCases\2D\KelloggTestCase.h">
-      <Filter>TestCases\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Problem\DiffusionField.h">
-      <Filter>Problem</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TestCases\2D\BarWith4HolesTestCase.h">
-      <Filter>TestCases\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TestCases\2D\SquareCircleTestCase.h">
-      <Filter>TestCases\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TestCases\2D\SquareHolesTestCase.h">
-      <Filter>TestCases\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TestCases\DefaultTestCase.h">
-      <Filter>TestCases</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TestCases\2D\EDFTestCase.h">
-      <Filter>TestCases\2D</Filter>
-    </ClInclude>
     <ClInclude Include="src\Geometry\CGALWrapper.h">
       <Filter>Geometry</Filter>
     </ClInclude>
@@ -351,41 +318,14 @@
     <ClInclude Include="src\Mesher\GMSH\GMSHMesh.h">
       <Filter>Mesher\GMSH</Filter>
     </ClInclude>
-    <ClInclude Include="src\TestCases\3D\PlateWith4HolesTestCase.h">
-      <Filter>TestCases\3D</Filter>
-    </ClInclude>
     <ClInclude Include="src\HHO\Diffusion_HHOMatrix.h">
       <Filter>HHO</Filter>
     </ClInclude>
     <ClInclude Include="src\Mesh\AgglomerationException.h">
       <Filter>Mesh</Filter>
     </ClInclude>
-    <ClInclude Include="src\TestCases\2D\SquareTestCase.h">
-      <Filter>TestCases\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TestCases\1D\SegmentTestCase.h">
-      <Filter>TestCases\1D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TestCases\3D\CubeTestCase.h">
-      <Filter>TestCases\3D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TestCases\2D\MagnetismTestCase.h">
-      <Filter>TestCases\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TestCases\2D\SquareCornerSquareTestCase.h">
-      <Filter>TestCases\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TestCases\2D\SquareCenterSquareTestCase.h">
-      <Filter>TestCases\2D</Filter>
-    </ClInclude>
     <ClInclude Include="src\Utils\Cost.h">
       <Filter>Utils</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TestCases\2D\RoomWithWallTestCase.h">
-      <Filter>TestCases\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TestCases\2D\HybridMeshTestCase.h">
-      <Filter>TestCases\2D</Filter>
     </ClInclude>
     <ClInclude Include="src\Solver\Direct\EigenSparseCholesky.h">
       <Filter>Solver\Direct</Filter>
@@ -469,20 +409,11 @@
     <ClInclude Include="src\HHO\SplittedBiHarmonic_HHO.h">
       <Filter>HHO</Filter>
     </ClInclude>
-    <ClInclude Include="src\TestCases\DiffusionTestCase.h">
-      <Filter>TestCases</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TestCases\BiHarmonicTestCase.h">
-      <Filter>TestCases</Filter>
-    </ClInclude>
     <ClInclude Include="src\TestCases\BiHarmonic\2D\SquareBiHarTestCase.h">
       <Filter>TestCases\BiHarmonic\2D</Filter>
     </ClInclude>
     <ClInclude Include="src\TestCases\BiHarmonic\BiHarTestCaseFactory.h">
       <Filter>TestCases\BiHarmonic</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TestCases\VirtualDiffusionTestCase.h">
-      <Filter>TestCases</Filter>
     </ClInclude>
     <ClInclude Include="src\Program\Program_Diffusion_DG.h">
       <Filter>Program</Filter>
@@ -495,6 +426,75 @@
     </ClInclude>
     <ClInclude Include="src\Utils\ExportModule.h">
       <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\BiHarmonic\BiHarmonicTestCase.h">
+      <Filter>TestCases\BiHarmonic</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\Diffusion\DefaultTestCase.h">
+      <Filter>TestCases\Diffusion</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\Diffusion\DiffTestCaseFactory.h">
+      <Filter>TestCases\Diffusion</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\Diffusion\DiffusionTestCase.h">
+      <Filter>TestCases\Diffusion</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\Diffusion\VirtualDiffusionTestCase.h">
+      <Filter>TestCases\Diffusion</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\Diffusion\1D\Heterogeneity1DTestCase.h">
+      <Filter>TestCases\Diffusion\1D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\Diffusion\1D\SegmentTestCase.h">
+      <Filter>TestCases\Diffusion\1D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\Diffusion\2D\BarWith4HolesTestCase.h">
+      <Filter>TestCases\Diffusion\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\Diffusion\2D\EDFTestCase.h">
+      <Filter>TestCases\Diffusion\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\Diffusion\2D\HybridMeshTestCase.h">
+      <Filter>TestCases\Diffusion\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\Diffusion\2D\KelloggTestCase.h">
+      <Filter>TestCases\Diffusion\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\Diffusion\2D\MagnetismTestCase.h">
+      <Filter>TestCases\Diffusion\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\Diffusion\2D\RoomWithWallTestCase.h">
+      <Filter>TestCases\Diffusion\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\Diffusion\2D\SquareCenterSquareTestCase.h">
+      <Filter>TestCases\Diffusion\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\Diffusion\2D\SquareCircleTestCase.h">
+      <Filter>TestCases\Diffusion\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\Diffusion\2D\SquareCornerSquareTestCase.h">
+      <Filter>TestCases\Diffusion\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\Diffusion\2D\SquareHolesTestCase.h">
+      <Filter>TestCases\Diffusion\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\Diffusion\2D\SquareTestCase.h">
+      <Filter>TestCases\Diffusion\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\Diffusion\3D\CubeTestCase.h">
+      <Filter>TestCases\Diffusion\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\Diffusion\3D\PlateWith4HolesTestCase.h">
+      <Filter>TestCases\Diffusion\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\Diffusion\Tensor.h">
+      <Filter>TestCases\Diffusion</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\Diffusion\DiffusionField.h">
+      <Filter>TestCases\Diffusion</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\Diffusion\BoundaryConditions.h">
+      <Filter>TestCases\Diffusion</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -522,9 +522,6 @@
     <Filter Include="Mesh\3D">
       <UniqueIdentifier>{300cd2ef-6bb5-4fc7-88f5-e9bd50d91391}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Problem">
-      <UniqueIdentifier>{3544142f-e11c-4d90-972d-2935e996d616}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Geometry">
       <UniqueIdentifier>{ca3f71f6-ee5e-4863-8c02-a856f6b59c0f}</UniqueIdentifier>
     </Filter>
@@ -551,15 +548,6 @@
     </Filter>
     <Filter Include="TestCases">
       <UniqueIdentifier>{bded7988-9cca-4a9d-90fa-b6170175c815}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="TestCases\1D">
-      <UniqueIdentifier>{1b093572-0888-4866-8ec9-5f4d612bd50c}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="TestCases\2D">
-      <UniqueIdentifier>{9e5f2d2e-7840-45a8-a1af-cd6998bcda65}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="TestCases\3D">
-      <UniqueIdentifier>{6eab9b73-ff39-406e-888d-cff70fdbbd5b}</UniqueIdentifier>
     </Filter>
     <Filter Include="Mesher">
       <UniqueIdentifier>{af6c1030-5562-4914-8ff7-21c9456cd080}</UniqueIdentifier>
@@ -599,6 +587,18 @@
     </Filter>
     <Filter Include="Program">
       <UniqueIdentifier>{b6a60e33-8f74-4711-a795-c36e13e3d6f7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="TestCases\Diffusion">
+      <UniqueIdentifier>{fdbe6122-0604-4581-98d3-c416587497eb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="TestCases\Diffusion\1D">
+      <UniqueIdentifier>{1b093572-0888-4866-8ec9-5f4d612bd50c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="TestCases\Diffusion\2D">
+      <UniqueIdentifier>{9e5f2d2e-7840-45a8-a1af-cd6998bcda65}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="TestCases\Diffusion\3D">
+      <UniqueIdentifier>{6eab9b73-ff39-406e-888d-cff70fdbbd5b}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

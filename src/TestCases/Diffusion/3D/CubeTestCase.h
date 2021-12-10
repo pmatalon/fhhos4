@@ -1,6 +1,6 @@
 #pragma once
 #include "../DiffusionTestCase.h"
-#include "../../Mesher/CubeGeometry.h"
+#include "../../../Mesher/CubeGeometry.h"
 using namespace std;
 
 class CubeTestCase : public DiffusionTestCase<3>

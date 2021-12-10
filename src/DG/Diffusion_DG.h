@@ -1,7 +1,7 @@
 #pragma once
 #include "../Mesh/Mesh.h"
 #include "../Utils/Utils.h"
-#include "../TestCases/DiffusionTestCase.h"
+#include "../TestCases/Diffusion/DiffusionTestCase.h"
 #include "../Geometry/CartesianShape.h"
 #include "../Geometry/2D/Triangle.h"
 #include "../Utils/ParallelLoop.h"

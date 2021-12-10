@@ -1,6 +1,6 @@
 #pragma once
-#include "../Utils/Utils.h"
-#include "../Mesh/PhysicalGroup.h"
+#include "../../Utils/Utils.h"
+#include "../../Mesh/PhysicalGroup.h"
 using namespace std;
 
 class BoundaryConditions

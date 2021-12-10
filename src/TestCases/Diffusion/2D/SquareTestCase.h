@@ -1,7 +1,7 @@
 #pragma once
 #include "../DiffusionTestCase.h"
-#include "../../Mesher/SquareGeometry.h"
-#include "../../Mesher/Square4quadrantsGeometry.h"
+#include "../../../Mesher/SquareGeometry.h"
+#include "../../../Mesher/Square4quadrantsGeometry.h"
 using namespace std;
 
 class SquareTestCase : public DiffusionTestCase<2>

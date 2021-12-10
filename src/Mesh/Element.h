@@ -4,7 +4,7 @@
 #include <mutex>
 #include "Vertex.h"
 #include "../Geometry/PhysicalShape.h"
-#include "../Problem/DiffusionField.h"
+#include "../TestCases/Diffusion/DiffusionField.h"
 #include "PhysicalGroup.h"
 #include "../Utils/MatlabScript.h"
 using namespace std;

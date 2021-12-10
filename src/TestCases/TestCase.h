@@ -1,5 +1,5 @@
 #pragma once
-#include "../Problem/BoundaryConditions.h"
+#include "Diffusion/BoundaryConditions.h"
 #include "../ProgramArguments.h"
 using namespace std;
 

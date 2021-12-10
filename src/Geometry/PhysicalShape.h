@@ -1,6 +1,6 @@
 #pragma once
 #include "ReferenceShape.h"
-#include "../Problem/Tensor.h"
+#include "../TestCases/Diffusion/Tensor.h"
 #include <mutex>
 using namespace std;
 
