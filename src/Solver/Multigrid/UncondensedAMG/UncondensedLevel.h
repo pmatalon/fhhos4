@@ -1,5 +1,6 @@
 #pragma once
 #include <mutex>
+#include <unsupported/Eigen/SparseExtra>
 #include "HybridAlgebraicMesh.h"
 #include "../AggregAMG/AlgebraicMesh.h"
 #include "../Level.h"
@@ -68,14 +69,6 @@ public:
 	int FaceBlockSize()
 	{
 		return _faceBlockSize;
-	}
-
-	void ExportVector(const Vector& v, string suffix, int levelNumber) override
-	{ }
-
-	void ExportMatrix(const SparseMatrix& M, string suffix, int levelNumber) override
-	{ 
-		Eigen::saveMarket(M, Utils::ProgramArgs.OutputDirectory + "/" + suffix + ".dat");
 	}
 
 	void CoarsenMesh(H_CoarsStgy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double requestedCoarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override

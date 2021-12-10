@@ -1,29 +1,29 @@
 #pragma once
-#include "../Problem/BiHarmonicProblem.h"
+#include "../TestCases/BiHarmonicTestCase.h"
 #include "Diffusion_HHO.h"
 #include "../TestCases/VirtualDiffusionTestCase.h"
 using namespace std;
 
 template<int Dim>
-class SplittedBiHarmonic_HHO : public BiHarmonicProblem<Dim>
+class SplittedBiHarmonic_HHO
 {
 private:
+	Mesh<Dim>* _mesh;
 	bool _saveMatrixBlocks = true;
 	DiffusionField<Dim> _diffField;
 	VirtualDiffusionTestCase<Dim> _diffPb1TestCase;
-	VirtualDiffusionTestCase<Dim> _diffPb2TestCase;
 	Diffusion_HHO<Dim> _diffPb1;
 public:
 	HHOParameters<Dim>* HHO;
 
-	SplittedBiHarmonic_HHO(Mesh<Dim>* mesh, BiHarmonicTestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool saveMatrixBlocks, string outputDirectory)
-		: BiHarmonicProblem<Dim>(mesh, testCase, outputDirectory)
+	SplittedBiHarmonic_HHO(Mesh<Dim>* mesh, BiHarmonicTestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool saveMatrixBlocks)
 	{
+		_mesh = mesh;
 		HHO = hho;
-		this->_diffField = DiffusionField<Dim>(new Tensor<Dim>());
-		mesh->SetDiffusionField(&this->_diffField);
-		this->_diffPb1TestCase = VirtualDiffusionTestCase<Dim>(this->_sourceFunction, this->_diffField);
-		this->_diffPb1 = Diffusion_HHO<Dim>(this->_mesh, &_diffPb1TestCase, HHO, true, saveMatrixBlocks, outputDirectory);
+		_diffField = DiffusionField<Dim>(new Tensor<Dim>());
+		mesh->SetDiffusionField(&_diffField);
+		_diffPb1TestCase = VirtualDiffusionTestCase<Dim>(testCase->SourceFunction, _diffField);
+		_diffPb1 = Diffusion_HHO<Dim>(mesh, &_diffPb1TestCase, HHO, true, saveMatrixBlocks);
 		_saveMatrixBlocks = saveMatrixBlocks;
 	}
 
@@ -35,10 +35,6 @@ public:
 	Diffusion_HHO<Dim>& DiffPb2()
 	{
 		return _diffPb1;
-	}
-
-	void Assemble(ActionsArguments actions) override
-	{
 	}
 
 	void AssembleDiffPb1()
@@ -69,25 +65,7 @@ public:
 			Utils::FatalError("RHS without the reconstruction non implemented");
 	}
 
-
-public:
-	double L2Error(DomFunction exactSolution) override
-	{
-
-	}
-
-	void ExportSolutionToGMSH() override
-	{
-
-	}
-
-	void ExportErrorToGMSH(const Vector& coeffs) override
-	{
-
-	}
-
 	~SplittedBiHarmonic_HHO()
 	{
 	}
-
 };

@@ -13,6 +13,47 @@ public:
 	DiffusionTestCase()
 	{}
 
+	void PrintPhysicalProblem()
+	{
+		cout << "Problem: Diffusion " << Dim << "D";
+		if (DiffField.IsHomogeneous && DiffField.IsIsotropic)
+			cout << " (homogeneous and isotropic)" << endl;
+		else
+		{
+			cout << endl;
+			if (DiffField.IsHomogeneous)
+			{
+				cout << "    Homogeneous coefficient" << endl;
+				cout << "    Anisotropic: ratio = " << DiffField.K1->AnisotropyRatio << endl;
+			}
+			else
+			{
+				cout << "    Heterogeneous coefficient: ratio = " << scientific << DiffField.HeterogeneityRatio << fixed << endl;
+				if (DiffField.IsIsotropic)
+					cout << "    Isotropic" << endl;
+				else
+					cout << "    Anisotropic: ratio = " << DiffField.K1->AnisotropyRatio << endl;
+			}
+		}
+
+		//cout << "    Geometry           : " << this->_mesh->GeometryDescription() << endl;
+
+		cout << "    Test case          : " << this->Description() << endl;
+		cout << "    Boundary conditions: " << this->BC.Description << endl;
+	}
+
+	string FilePrefix()
+	{
+		string heterogeneityString = "";
+		if (this->Code().compare("kellogg") != 0 && !DiffField.IsHomogeneous)
+		{
+			char res[32];
+			sprintf(res, "_heterog%g", DiffField.HeterogeneityRatio);
+			heterogeneityString = res;
+		}
+		return "Diff" + to_string(Dim) + "D_" + this->Code() + heterogeneityString;
+	}
+
 protected:
 	static double SineSource2D(const DomPoint& p)
 	{

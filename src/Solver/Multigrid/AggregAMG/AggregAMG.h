@@ -29,18 +29,6 @@ public:
 		return 0; // TODO for p-multigrid
 	}
 
-	void ExportVector(const Vector& v, string suffix, int levelNumber) override
-	{ }
-
-	void ExportMatrix(const SparseMatrix& M, string suffix, int levelNumber) override
-	{
-		string file = Utils::ProgramArgs.OutputDirectory + "/" + suffix;
-		if (levelNumber > 0)
-			file += "_" + to_string(levelNumber);
-		file += ".dat";
-		Eigen::saveMarket(M, file);
-	}
-
 	void CoarsenMesh(H_CoarsStgy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override
 	{
 		cout << "\tBuild algebraic mesh" << endl;

@@ -14,6 +14,19 @@ public:
 	BiHarmonicTestCase()
 	{}
 
+	void PrintPhysicalProblem() override
+	{
+		cout << "Problem: BiHarmonic " << Dim << "D" << endl;
+		//cout << "    Geometry           : " << this->_mesh->GeometryDescription() << endl;
+		cout << "    Test case          : " << this->Description() << endl;
+		cout << "    Boundary conditions: " << this->BC.Description << endl;
+	}
+
+	string FilePrefix()
+	{
+		return "BiHar" + to_string(Dim) + "D_" + this->Code();
+	}
+
 protected:
 	// With homogeneous Dirichlet B.C. for both diffusion problems
 	static double SineSource2D(const DomPoint& p)

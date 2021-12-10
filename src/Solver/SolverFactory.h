@@ -17,7 +17,7 @@ template <int Dim>
 class SolverFactory
 {
 public:
-	static Solver* CreateSolver(const ProgramArguments& args, int blockSize)
+	static Solver* CreateSolver(const ProgramArguments& args, int blockSize, const ExportModule& out)
 	{
 		Solver* solver = nullptr;
 		string GaussSeidelRelaxation1 = "The relaxation parameter of Gauss-Seidel is 1. Delete -relax arg to remove this warning, or use -s sor.";
@@ -89,99 +89,17 @@ public:
 		else if (args.Solver.SolverCode.compare("aggregamg") == 0)
 		{
 			AggregAMG* mg = new AggregAMG(blockSize, 0.25, args.Solver.MG.Levels);
-			SetMultigridParameters(mg, args, blockSize);
+			SetMultigridParameters(mg, args, blockSize, out);
 			mg->UseGalerkinOperator = 1;
 			solver = mg;
 		}
 		else if (args.Solver.SolverCode.compare("hoaggregamg") == 0)
 		{
 			HighOrderAggregAMG* mg = new HighOrderAggregAMG(blockSize, 0.25, 2.0 / 3.0, 2);
-			SetMultigridParameters(mg, args, blockSize);
+			SetMultigridParameters(mg, args, blockSize, out);
 			mg->UseGalerkinOperator = 1;
 			solver = mg;
 		}
-		/*else if (args.Solver.SolverCode.rfind("cg", 0) == 0) // if SolverCode starts with "cg"
-		{
-			ConjugateGradient* cg = new ConjugateGradient();
-			string preconditionerCode = args.Solver.SolverCode.substr(2, args.Solver.SolverCode.length() - 2);
-			if (!preconditionerCode.empty())
-			{
-				ProgramArguments precondArgs = args;
-				precondArgs.Solver.SolverCode = preconditionerCode;
-				Solver* precondSolver = CreateSolver(precondArgs, problem, blockSize);
-				cg->Precond = Preconditioner(dynamic_cast<IterativeSolver*>(precondSolver));
-			}
-			solver = cg;
-		}
-		else if (args.Solver.SolverCode.rfind("fcg", 0) == 0) // if SolverCode starts with "fcg"
-		{
-			FlexibleConjugateGradient* fcg = new FlexibleConjugateGradient(1);
-			string preconditionerCode = args.Solver.SolverCode.substr(3, args.Solver.SolverCode.length() - 3);
-			if (!preconditionerCode.empty())
-			{
-				ProgramArguments precondArgs = args;
-				precondArgs.Solver.SolverCode = preconditionerCode;
-				Solver* precondSolver = CreateSolver(precondArgs, problem, blockSize);
-				fcg->Precond = Preconditioner(dynamic_cast<IterativeSolver*>(precondSolver));
-			}
-			solver = fcg;
-		}
-		else if (args.Solver.SolverCode.compare("mg") == 0)
-		{
-			if (args.Discretization.StaticCondensation)
-			{
-				MultigridForHHO<Dim>* mg = new MultigridForHHO<Dim>(args.Solver.MG.Levels);
-				mg->UseHigherOrderReconstruction = args.Solver.MG.UseHigherOrderReconstruction;
-				mg->H_Prolongation = args.Solver.MG.GMG_H_Prolong;
-				mg->P_Prolongation = args.Solver.MG.GMG_P_Prolong;
-				mg->P_Restriction = args.Solver.MG.GMG_P_Restrict;
-				mg->UseHeterogeneousWeighting = args.Solver.MG.UseHeterogeneousWeighting;
-				if (problem)
-				{
-					Diffusion_HHO<Dim>* hhoProblem = dynamic_cast<Diffusion_HHO<Dim>*>(problem);
-					mg->InitializeWithProblem(hhoProblem);
-				}
-				SetMultigridParameters(mg, args, blockSize);
-				solver = mg;
-			}
-			else
-				Utils::FatalError("The Multigrid for HHO (-s mg) only applicable on HHO discretization with static condensation.");
-		}
-		else if (args.Solver.SolverCode.compare("p_mg") == 0)
-		{
-			if (args.Discretization.StaticCondensation)
-			{
-				Diffusion_HHO<Dim>* hhoProblem = dynamic_cast<Diffusion_HHO<Dim>*>(problem);
-
-				P_MultigridForHHO<Dim>* mg = new P_MultigridForHHO<Dim>(hhoProblem);
-				SetMultigridParameters(mg, args, blockSize);
-				solver = mg;
-			}
-			else
-				Utils::FatalError("The Multigrid for HHO only applicable on HHO discretization with static condensation.");
-		}
-		else if (args.Solver.SolverCode.compare("uamg") == 0)
-		{
-			Diffusion_HHO<Dim>* hhoProblem = dynamic_cast<Diffusion_HHO<Dim>*>(problem);
-			UncondensedAMG* mg = new UncondensedAMG(Dim, hhoProblem->HHO->FaceBasis->GetDegree(), hhoProblem->HHO->nCellUnknowns, hhoProblem->HHO->nFaceUnknowns, 0.25, args.Solver.MG.UAMGFaceProlong, args.Solver.MG.UAMGCoarseningProlong, args.Solver.MG.UAMGMultigridProlong, args.Solver.MG.Levels);
-			SetMultigridParameters(mg, args, blockSize);
-			mg->CoarsePolyDegree = 0;
-			solver = mg;
-		}
-		else if (args.Solver.SolverCode.compare("aggregamg") == 0)
-		{
-			AggregAMG* mg = new AggregAMG(blockSize, 0.25, args.Solver.MG.Levels);
-			SetMultigridParameters(mg, args, blockSize);
-			mg->UseGalerkinOperator = 1;
-			solver = mg;
-		}
-		else if (args.Solver.SolverCode.compare("hoaggregamg") == 0)
-		{
-			HighOrderAggregAMG* mg = new HighOrderAggregAMG(blockSize, 0.25, 2.0 / 3.0, 2);
-			SetMultigridParameters(mg, args, blockSize);
-			mg->UseGalerkinOperator = 1;
-			solver = mg;
-		}*/
 		else
 			Utils::FatalError("Unknown solver '" + args.Solver.SolverCode + "' or not applicable.");
 
@@ -199,7 +117,7 @@ public:
 
 
 
-	static Solver* CreateSolver(const ProgramArguments& args, Diffusion_HHO<Dim>* problem, int blockSize)
+	static Solver* CreateSolver(const ProgramArguments& args, Diffusion_HHO<Dim>* problem, int blockSize, const ExportModule& out)
 	{
 		Solver* solver = nullptr;
 		if (args.Solver.SolverCode.rfind("cg", 0) == 0) // if SolverCode starts with "cg"
@@ -210,7 +128,7 @@ public:
 			{
 				ProgramArguments precondArgs = args;
 				precondArgs.Solver.SolverCode = preconditionerCode;
-				Solver* precondSolver = CreateSolver(precondArgs, problem, blockSize);
+				Solver* precondSolver = CreateSolver(precondArgs, problem, blockSize, out);
 				cg->Precond = Preconditioner(dynamic_cast<IterativeSolver*>(precondSolver));
 			}
 			solver = cg;
@@ -223,7 +141,7 @@ public:
 			{
 				ProgramArguments precondArgs = args;
 				precondArgs.Solver.SolverCode = preconditionerCode;
-				Solver* precondSolver = CreateSolver(precondArgs, problem, blockSize);
+				Solver* precondSolver = CreateSolver(precondArgs, problem, blockSize, out);
 				fcg->Precond = Preconditioner(dynamic_cast<IterativeSolver*>(precondSolver));
 			}
 			solver = fcg;
@@ -239,7 +157,7 @@ public:
 				mg->P_Restriction = args.Solver.MG.GMG_P_Restrict;
 				mg->UseHeterogeneousWeighting = args.Solver.MG.UseHeterogeneousWeighting;
 				mg->InitializeWithProblem(problem);
-				SetMultigridParameters(mg, args, blockSize);
+				SetMultigridParameters(mg, args, blockSize, out);
 				solver = mg;
 			}
 			else
@@ -250,7 +168,7 @@ public:
 			if (args.Discretization.StaticCondensation)
 			{
 				P_MultigridForHHO<Dim>* mg = new P_MultigridForHHO<Dim>(problem);
-				SetMultigridParameters(mg, args, blockSize);
+				SetMultigridParameters(mg, args, blockSize, out);
 				solver = mg;
 			}
 			else
@@ -259,12 +177,12 @@ public:
 		else if (args.Solver.SolverCode.compare("uamg") == 0)
 		{
 			UncondensedAMG* mg = new UncondensedAMG(Dim, problem->HHO->FaceBasis->GetDegree(), problem->HHO->nCellUnknowns, problem->HHO->nFaceUnknowns, 0.25, args.Solver.MG.UAMGFaceProlong, args.Solver.MG.UAMGCoarseningProlong, args.Solver.MG.UAMGMultigridProlong, args.Solver.MG.Levels);
-			SetMultigridParameters(mg, args, blockSize);
+			SetMultigridParameters(mg, args, blockSize, out);
 			mg->CoarsePolyDegree = 0;
 			solver = mg;
 		}
 		else
-			solver = CreateSolver(args, blockSize);
+			solver = CreateSolver(args, blockSize, out);
 
 
 		IterativeSolver* iterativeSolver = dynamic_cast<IterativeSolver*>(solver);
@@ -279,8 +197,9 @@ public:
 	}
 
 private:
-	static void SetMultigridParameters(Multigrid* mg, const ProgramArguments& args, int blockSize)
+	static void SetMultigridParameters(Multigrid* mg, const ProgramArguments& args, int blockSize, const ExportModule& out)
 	{
+		mg->Out = ExportModule(out);
 		mg->MatrixMaxSizeForCoarsestLevel = args.Solver.MG.MatrixMaxSizeForCoarsestLevel;
 		mg->Cycle = args.Solver.MG.CycleLetter;
 		mg->WLoops = args.Solver.MG.WLoops;
@@ -321,7 +240,7 @@ private:
 			argsCoarseSolver.Solver.MG.PreSmoothingIterations = 0;
 			argsCoarseSolver.Solver.MG.PostSmoothingIterations = Dim == 2 ? 3 : 6;
 		}
-		mg->CoarseSolver = CreateSolver(argsCoarseSolver, nullptr, 1);
+		mg->CoarseSolver = CreateSolver(argsCoarseSolver, nullptr, 1, out);
 	}
 
 public:

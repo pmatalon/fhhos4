@@ -25,22 +25,6 @@ public:
 		return _problem->HHO->nFaceUnknowns;
 	}
 
-	void ExportVector(const Vector& v, string suffix, int levelNumber) override
-	{
-		if (!this->IsFinestLevel())
-			this->FinerLevel->ExportVector(v, suffix, levelNumber);
-		else
-			this->_problem->ExportVector(v, "level" + to_string(levelNumber) + "_" + suffix);
-	}
-
-	void ExportMatrix(const SparseMatrix& M, string suffix, int levelNumber) override
-	{
-		if (!this->IsFinestLevel())
-			this->FinerLevel->ExportMatrix(M, suffix, levelNumber);
-		else
-			this->_problem->ExportMatrix(M, "level" + to_string(levelNumber) + "_" + suffix);
-	}
-
 	void SetupDiscretizedOperator() override
 	{
 		this->OperatorMatrix = &this->_problem->A;

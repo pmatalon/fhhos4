@@ -31,6 +31,7 @@ public:
 		cout << "Index type: size_t" << endl;
 #endif
 		cout << "Shared memory parallelism: " << (BaseParallelLoop::GetDefaultNThreads() == 1 ? "sequential execution" : to_string(BaseParallelLoop::GetDefaultNThreads()) + " threads") << endl;
+		cout << endl;
 
 		Mesh<Dim>::SetDirectories();
 		GMSHMesh<Dim>::GMSHLogEnabled = args.Actions.GMSHLogEnabled;

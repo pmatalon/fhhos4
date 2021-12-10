@@ -158,12 +158,9 @@
     <ClInclude Include="src\HHO\Diff_HHOFace.h" />
     <ClInclude Include="src/Utils/NonZeroCoefficients.h" />
     <ClInclude Include="src/Utils/Utils.h" />
-    <ClInclude Include="src\Problem\BiHarmonicProblem.h" />
     <ClInclude Include="src\Problem\DiffusionField.h" />
-    <ClInclude Include="src/Problem/Problem.h" />
     <ClInclude Include="src\Problem\BoundaryConditions.h" />
     <ClInclude Include="src\Problem\Tensor.h" />
-    <ClInclude Include="src\Problem\DiffusionProblem.h" />
     <ClInclude Include="src\Program\Program_BiHarmonic_HHO.h" />
     <ClInclude Include="src\Program\Program_Diffusion_DG.h" />
     <ClInclude Include="src\Program\Program_Diffusion_HHO.h" />
@@ -230,6 +227,7 @@
     <ClInclude Include="src\TestCases\VirtualDiffusionTestCase.h" />
     <ClInclude Include="src\Utils\Cost.h" />
     <ClInclude Include="src\Utils\ElementParallelLoop.h" />
+    <ClInclude Include="src\Utils\ExportModule.h" />
     <ClInclude Include="src\Utils\FileSystem.h" />
     <ClInclude Include="src\Utils\MatlabScript.h" />
     <ClInclude Include="src\Utils\ParallelLoop.h" />

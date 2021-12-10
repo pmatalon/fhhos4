@@ -14,11 +14,18 @@ public:
 	{
 		GaussLegendre::Init();
 
+		cout << "-----------------------------------------------------------" << endl;
+		cout << "-                         Problem                         -" << endl;
+		cout << "-----------------------------------------------------------" << endl;
+
 		//-------------------------------------------------------------------------------------------//
 		//   Test case defining the source function, boundary conditions and diffusion coefficient   //
 		//-------------------------------------------------------------------------------------------//
 
 		DiffusionTestCase<Dim>* testCase = DiffTestCaseFactory<Dim>::Create(args.Problem);
+		testCase->PrintPhysicalProblem();
+
+		cout << endl;
 
 		//----------//
 		//   Mesh   //
@@ -38,6 +45,7 @@ public:
 
 		mesh->SetBoundaryConditions(&testCase->BC);
 
+		ExportModule out(args.OutputDirectory);
 
 		// Export source
 		if (args.Actions.ExportSourceToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
@@ -57,7 +65,7 @@ public:
 		Timer assemblyTimer;
 		assemblyTimer.Start();
 
-		problem->Assemble(args.Actions);
+		problem->Assemble(args.Actions, out);
 		cout << "System storage: " << Utils::MemoryString(Utils::MemoryUsage(problem->A) + Utils::MemoryUsage(problem->b)) << endl;
 
 		assemblyTimer.Stop();
@@ -76,7 +84,7 @@ public:
 
 			// Solver creation
 			int blockSizeForBlockSolver = args.Solver.BlockSize != -1 ? args.Solver.BlockSize : problem->Basis->Size();
-			Solver* solver = SolverFactory<Dim>::CreateSolver(args, blockSizeForBlockSolver);
+			Solver* solver = SolverFactory<Dim>::CreateSolver(args, blockSizeForBlockSolver, out);
 
 			cout << "Solver: " << *solver << endl << endl;
 
@@ -116,7 +124,7 @@ public:
 
 			// Export algebraic error
 			if (args.Actions.ExportErrorToGMSH && iterativeSolver)
-				problem->ExportErrorToGMSH(iterativeSolver->ExactSolution - problem->SystemSolution);
+				mesh->ExportToGMSH(problem->Basis, iterativeSolver->ExactSolution - problem->SystemSolution, out.GetFilePathPrefix(), "error");
 
 			delete solver;
 
@@ -125,10 +133,10 @@ public:
 			//-----------------------------//
 
 			if (args.Actions.ExportSolutionVectors)
-				problem->ExportSolutionVector();
+				out.ExportVector(problem->SystemSolution, "solution");
 			
 			if (args.Actions.ExportSolutionToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
-				problem->ExportSolutionToGMSH();
+				mesh->ExportToGMSH(problem->Basis, problem->SystemSolution, out.GetFilePathPrefix(), "potential");
 
 			//----------------------//
 			//       L2 error       //

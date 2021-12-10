@@ -57,31 +57,10 @@ public:
 			coarsestPossibleMeshReached = true;
 	}
 
-	void ExportVector(const Vector& v, string suffix, int levelNumber) override
+	void ExportMeshToMatlab(Mesh<Dim>* levelMesh)
 	{
-		if (!this->IsFinestLevel())
-			this->FinerLevel->ExportVector(v, suffix, levelNumber);
-		else
-			this->_problem->ExportVector(v, "level" + to_string(levelNumber) + "_" + suffix);
-	}
-
-	void ExportMatrix(const SparseMatrix& M, string suffix, int levelNumber) override
-	{
-		if (!this->IsFinestLevel())
-			this->FinerLevel->ExportMatrix(M, suffix, levelNumber);
-		else
-			this->_problem->ExportMatrix(M, "level" + to_string(levelNumber) + "_" + suffix);
-	}
-
-	void ExportMeshToMatlab(Mesh<Dim>* levelMesh, int levelNumber)
-	{
-		if (!this->IsFinestLevel())
-			dynamic_cast<LevelForHHO<Dim>*>(this->FinerLevel)->ExportMeshToMatlab(levelMesh, levelNumber);
-		else
-		{
-			string filePath = this->_problem->GetFilePath("level" + to_string(levelNumber) + "_mesh", ".m");
-			levelMesh->ExportToMatlab2(filePath);
-		}
+		string filePath = this->Out.GetFilePath("mesh", ".m");
+		levelMesh->ExportToMatlab2(filePath);
 	}
 
 private:
@@ -145,7 +124,7 @@ private:
 		}
 
 		if (ExportComponents)
-			this->ExportMeshToMatlab(this->_problem->_mesh, this->Number);
+			this->ExportMeshToMatlab(this->_problem->_mesh);
 
 		if (!IsCoarsestLevel())
 		{

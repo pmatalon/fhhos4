@@ -1,5 +1,6 @@
 #pragma once
-#include "../Problem/DiffusionProblem.h"
+#include "../Mesh/Mesh.h"
+#include "../Utils/Utils.h"
 #include "../Geometry/3D/Tetrahedron.h"
 #include "../Geometry/CartesianShape.h"
 #include "../Geometry/2D/Triangle.h"
@@ -9,15 +10,22 @@
 using namespace std;
 
 template <int Dim>
-class Diffusion_HHO : public DiffusionProblem<Dim>
+class Diffusion_HHO
 {
 private:
+	DiffusionTestCase<Dim>* _testCase;
+	string _filePrefix;
 	bool _staticCondensation = true;
 	bool _saveMatrixBlocks = false;
 
 	vector<Diff_HHOElement<Dim>> _hhoElements;
 	vector<Diff_HHOFace<Dim>> _hhoFaces;
 public:
+	Mesh<Dim>* _mesh;
+	SparseMatrix A;
+	Vector b;
+	Vector SystemSolution;
+
 	// Matrix parts
 	SparseMatrix A_T_T;
 	SparseMatrix A_T_ndF; // used to reconstruct the the higher-order approximation after solving the linear system
@@ -37,14 +45,15 @@ public:
 	Diffusion_HHO()
 	{}
 
-	Diffusion_HHO(Mesh<Dim>* mesh, DiffusionTestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool staticCondensation, bool saveMatrixBlocks, string outputDirectory)
-		: DiffusionProblem<Dim>(mesh, testCase, outputDirectory)
+	Diffusion_HHO(Mesh<Dim>* mesh, DiffusionTestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool staticCondensation, bool saveMatrixBlocks)
 	{	
+		this->_mesh = mesh;
+		this->_testCase = testCase;
 		this->HHO = hho;
 		this->_staticCondensation = staticCondensation;
 		this->_saveMatrixBlocks = saveMatrixBlocks;
 
-		this->_fileName = this->_fileName + "_HHO_" + HHO->ReconstructionBasis->Name() + (_staticCondensation ? "" : "_nostaticcond");
+		//Problem<Dim>::AddFilePrefix("_HHO_" + HHO->ReconstructionBasis->Name() + (_staticCondensation ? "" : "_nostaticcond"));
 
 		// Re-numbering of the faces: interior first, then Neumann, and Dirichlet at the end (because they will be eliminated from the system)
 		BigNumber faceNumber = 0;
@@ -59,7 +68,7 @@ public:
 	Diffusion_HHO<Dim>* GetProblemOnCoarserMesh()
 	{
 		HHOParameters<Dim>* coarseHHO = new HHOParameters<Dim>(this->_mesh->CoarseMesh, HHO->Stabilization, HHO->ReconstructionBasis, HHO->CellBasis, HHO->FaceBasis, HHO->OrthogonalizeElemBasesCode, HHO->OrthogonalizeFaceBasesCode);
-		return new Diffusion_HHO<Dim>(this->_mesh->CoarseMesh, this->_testCase, coarseHHO, _staticCondensation, _saveMatrixBlocks, this->_outputDirectory);
+		return new Diffusion_HHO<Dim>(this->_mesh->CoarseMesh, this->_testCase, coarseHHO, _staticCondensation, _saveMatrixBlocks);
 	}
 
 	Diffusion_HHO<Dim>* GetProblemForLowerDegree(int faceDegree)
@@ -70,7 +79,7 @@ public:
 		FunctionalBasis<Dim-1>* faceBasis = new FunctionalBasis<Dim-1>(HHO->FaceBasis->CreateSameBasisForDegree(faceDegree));
 
 		HHOParameters<Dim>* lowerDegreeHHO = new HHOParameters<Dim>(this->_mesh, HHO->Stabilization, reconstructionBasis, cellBasis, faceBasis, HHO->OrthogonalizeElemBasesCode, HHO->OrthogonalizeFaceBasesCode);
-		return new Diffusion_HHO<Dim>(this->_mesh, this->_testCase, lowerDegreeHHO, _staticCondensation, _saveMatrixBlocks, this->_outputDirectory);
+		return new Diffusion_HHO<Dim>(this->_mesh, this->_testCase, lowerDegreeHHO, _staticCondensation, _saveMatrixBlocks);
 	}
 
 	Diffusion_HHO<Dim>* GetProblemOnCoarserMeshAndLowerDegree(int faceDegree)
@@ -81,10 +90,10 @@ public:
 		FunctionalBasis<Dim - 1>* faceBasis = new FunctionalBasis<Dim - 1>(HHO->FaceBasis->CreateSameBasisForDegree(faceDegree));
 
 		HHOParameters<Dim>* lowerDegreeCoarseMeshHHO = new HHOParameters<Dim>(this->_mesh->CoarseMesh, HHO->Stabilization, reconstructionBasis, cellBasis, faceBasis, HHO->OrthogonalizeElemBasesCode, HHO->OrthogonalizeFaceBasesCode);
-		return new Diffusion_HHO<Dim>(this->_mesh->CoarseMesh, this->_testCase, lowerDegreeCoarseMeshHHO, _staticCondensation, _saveMatrixBlocks, this->_outputDirectory);
+		return new Diffusion_HHO<Dim>(this->_mesh->CoarseMesh, this->_testCase, lowerDegreeCoarseMeshHHO, _staticCondensation, _saveMatrixBlocks);
 	}
 
-	double L2Error(DomFunction exactSolution) override
+	double L2Error(DomFunction exactSolution)
 	{
 		struct ChunkResult
 		{
@@ -125,9 +134,9 @@ public:
 
 		double constant = ConvergenceHiddenConstant(k);
 		double upperBound;
-		if ((  this->_testCase->Code().compare("sine") == 0
-			|| this->_testCase->Code().compare("poly") == 0
-			|| this->_testCase->Code().compare("zero") == 0) && this->_diffusionField->IsHomogeneous) // solution is H^{r+2} with r in <= k
+		if ((  _testCase->Code().compare("sine") == 0
+			|| _testCase->Code().compare("poly") == 0
+			|| _testCase->Code().compare("zero") == 0) && _testCase->DiffField.IsHomogeneous) // solution is H^{r+2} with r in <= k
 		{
 			double r = k;
 			if (k == 0)
@@ -178,21 +187,18 @@ public:
 	// Performs the assembly of the linear system //
 	//--------------------------------------------//
 
-	void Assemble(ActionsArguments actions) override
+	void Assemble(const ActionsArguments& actions)
+	{
+		assert(!actions.ExportLinearSystem && !actions.ExportAssemblyTermMatrices);
+		Assemble(actions, ExportModule(""));
+	}
+
+	void Assemble(const ActionsArguments& actions, const ExportModule& out)
 	{
 		Mesh<Dim>* mesh = this->_mesh;
 
 		if (actions.LogAssembly)
-		{
-			this->PrintPhysicalProblem();
 			this->PrintDiscretization();
-		}
-
-		string matrixFilePath				= this->GetFilePath("A");
-		string consistencyFilePath			= this->GetFilePath("A_cons");
-		string stabilizationFilePath		= this->GetFilePath("A_stab");
-		string reconstructionMatrixFilePath	= this->GetFilePath("Reconstruct");
-		string rhsFilePath					= this->GetFilePath("b");
 
 		if (actions.LogAssembly)
 			cout << endl << "Assembly..." << endl;
@@ -405,7 +411,7 @@ public:
 					for (BasisFunction<Dim>* cellPhi : element->CellBasis->LocalFunctions)
 					{
 						BigNumber i = DOFNumber(element, cellPhi);
-						this->B_T(i) = element->SourceTerm(cellPhi, this->_sourceFunction);
+						this->B_T(i) = element->SourceTerm(cellPhi, _testCase->SourceFunction);
 					}
 				}
 
@@ -539,7 +545,7 @@ public:
 				{
 					Diff_HHOFace<Dim>* face = HHOFace(f);
 					BigNumber i = FirstDOFGlobalNumber(face) - HHO->nTotalCellUnknowns;
-					B_ndF.segment(i, HHO->nFaceUnknowns) = face->InnerProductWithBasis(this->_boundaryConditions->NeumannFunction);
+					B_ndF.segment(i, HHO->nFaceUnknowns) = face->InnerProductWithBasis(_testCase->BC.NeumannFunction);
 				}
 			);
 		}
@@ -551,7 +557,7 @@ public:
 			{
 				Diff_HHOFace<Dim>* face = HHOFace(f);
 				BigNumber i = FirstDOFGlobalNumber(face) - HHO->nTotalHybridUnknowns;
-				this->x_dF.segment(i, HHO->nFaceUnknowns) = face->ProjectOnBasis(this->_boundaryConditions->DirichletFunction);
+				this->x_dF.segment(i, HHO->nFaceUnknowns) = face->ProjectOnBasis(_testCase->BC.DirichletFunction);
 			}
 		);
 
@@ -582,25 +588,25 @@ public:
 
 			// Schur complement
 			SparseMatrix tmp = SparseMatrix(A_T_ndF.transpose()) * Solve_A_T_T(A_T_ndF);
-			Problem<Dim>::A = (A_ndF_ndF - tmp).pruned();
+			this->A = (A_ndF_ndF - tmp).pruned();
 
 			if (actions.AssembleRightHandSide)
 				// Right-hand side of the condensed system
-				Problem<Dim>::b = B_ndF - A_T_ndF.transpose() * Solve_A_T_T(B_T);
+				this->b = B_ndF - A_T_ndF.transpose() * Solve_A_T_T(B_T);
 		}
 		else
 		{
-			Problem<Dim>::A = SparseMatrix(HHO->nTotalHybridUnknowns, HHO->nTotalHybridUnknowns);
+			this->A = SparseMatrix(HHO->nTotalHybridUnknowns, HHO->nTotalHybridUnknowns);
 			NonZeroCoefficients Acoeffs(A_T_T.nonZeros() + 2 * A_T_ndF.nonZeros() + A_ndF_ndF.nonZeros());
 			Acoeffs.Add(           0,            0, A_T_T);    // topLeftCorner
 			Acoeffs.Add(           0, A_T_T.cols(), A_T_ndF);  // topRightCorner
 			Acoeffs.Add(A_T_T.rows(),            0, A_T_ndF.transpose().eval()); // bottomLeftCorner
 			Acoeffs.Add(A_T_T.rows(), A_T_T.cols(), A_ndF_ndF); // bottomRightCorner
-			Acoeffs.Fill(Problem<Dim>::A);
+			Acoeffs.Fill(this->A);
 
-			Problem<Dim>::b = Vector(HHO->nTotalHybridUnknowns);
-			Problem<Dim>::b.head(B_T.rows()) = B_T;
-			Problem<Dim>::b.tail(B_ndF.rows()) = B_ndF;
+			this->b = Vector(HHO->nTotalHybridUnknowns);
+			this->b.head(B_T.rows()) = B_T;
+			this->b.tail(B_ndF.rows()) = B_ndF;
 		}
 
 		if (actions.LogAssembly)
@@ -626,12 +632,9 @@ public:
 
 		if (actions.ExportLinearSystem)
 		{
-			cout << "Export:" << endl;
-			Eigen::saveMarket(this->A, matrixFilePath);
-			cout << "Matrix exported to                " << matrixFilePath << endl;
-
-			Eigen::saveMarketVector(this->b, rhsFilePath);
-			cout << "RHS exported to                   " << rhsFilePath << endl;
+			cout << "Export linear system..." << endl;
+			out.ExportMatrix(this->A, "A");
+			out.ExportVector(this->b, "b");
 		}
 
 		if (actions.ExportAssemblyTermMatrices)
@@ -645,14 +648,9 @@ public:
 			SparseMatrix reconstructionMatrix = SparseMatrix(HHO->nElements * HHO->nReconstructUnknowns, HHO->nTotalHybridCoeffs);
 			reconstructionCoeffs.Fill(reconstructionMatrix);
 
-			Eigen::saveMarket(Acons, consistencyFilePath);
-			cout << "Consistency part exported to      " << consistencyFilePath << endl;
-
-			Eigen::saveMarket(Astab, stabilizationFilePath);
-			cout << "Stabilization part exported to    " << stabilizationFilePath << endl;
-
-			Eigen::saveMarket(reconstructionMatrix, reconstructionMatrixFilePath);
-			cout << "Reconstruction matrix exported to " << reconstructionMatrixFilePath << endl;
+			out.ExportMatrix(Acons, "Acons");
+			out.ExportMatrix(Astab, "Astab");
+			out.ExportMatrix(reconstructionMatrix, "Reconstruct");
 		}
 	}
 
@@ -670,10 +668,10 @@ public:
 		// - Cartesian element
 		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreMassMatrix(cellBasis);
 		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreMassMatrix(reconstructionBasis);
-		if (this->_diffusionField->K1)
-			CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreReconstructK1StiffnessMatrix(this->_diffusionField->K1, reconstructionBasis);
-		if (this->_diffusionField->K2)
-			CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreReconstructK2StiffnessMatrix(this->_diffusionField->K2, reconstructionBasis);
+		if (this->_testCase->DiffField.K1)
+			CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreReconstructK1StiffnessMatrix(this->_testCase->DiffField.K1, reconstructionBasis);
+		if (this->_testCase->DiffField.K2)
+			CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreReconstructK2StiffnessMatrix(this->_testCase->DiffField.K2, reconstructionBasis);
 		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix(cellBasis, reconstructionBasis);
 		// - Cartesian face
 		CartesianShape<Dim, Dim - 1>::InitReferenceShape()->ComputeAndStoreMassMatrix(faceBasis);
@@ -800,35 +798,21 @@ public:
 	//---------------------------------------//
 	//                Exports                //
 	//---------------------------------------//
-	void ExtractTraceSystemSolution()
-	{
-		if (this->_staticCondensation)
-			Problem<Dim>::ExportSolutionVector(this->SystemSolution, "Faces");
-	}
 
-	void ExtractHybridSolution()
-	{
-		Problem<Dim>::ExportSolutionVector(this->GlobalHybridSolution, "Hybrid");
-	}
-
-	void ExportSolutionVector() override
-	{
-		Problem<Dim>::ExportSolutionVector(this->ReconstructedSolution);
-	}
-
-	void ExportSolutionToGMSH() override
+public:
+	void ExportSolutionToGMSH(const ExportModule& out)
 	{
 		if (HHO->OrthogonalizeElemBases())
 			Utils::Error("The export to GMSH has not been implemented when the bases are orthonormalized against each element.");
-		this->_mesh->ExportToGMSH(this->HHO->ReconstructionBasis, this->ReconstructedSolution, this->GetFilePathPrefix(), "potential");
+		this->_mesh->ExportToGMSH(this->HHO->ReconstructionBasis, this->ReconstructedSolution, out.GetFilePathPrefix(), "potential");
 	}
 
-	void ExportErrorToGMSH(const Vector& faceCoeffs) override
+	void ExportErrorToGMSH(const Vector& faceCoeffs, const ExportModule& out)
 	{
 		if (HHO->OrthogonalizeElemBases())
 			Utils::Error("The export to GMSH has not been implemented when the bases are orthonormalized against each element.");
 		Vector cellCoeffs = Solve_A_T_T(B_T - A_T_ndF * faceCoeffs);
-		this->_mesh->ExportToGMSH(this->HHO->CellBasis, cellCoeffs, this->GetFilePathPrefix(), "error");
+		this->_mesh->ExportToGMSH(this->HHO->CellBasis, cellCoeffs, out.GetFilePathPrefix(), "error");
 	}
 
 	SparseMatrix Solve_A_T_T(const SparseMatrix& A_T_ndF)

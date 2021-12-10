@@ -19,8 +19,10 @@ public:
 	TestCase()
 	{}
 
+	virtual string FilePrefix() = 0;
 	virtual string Code() = 0;
 	virtual string Description() = 0;
+	virtual void PrintPhysicalProblem() = 0;
 
 protected:
 	static double Zero(const DomPoint& p)

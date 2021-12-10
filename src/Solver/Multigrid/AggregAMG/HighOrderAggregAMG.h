@@ -24,14 +24,6 @@ public:
 		return 0; // TODO for p-multigrid
 	}
 
-	void ExportVector(const Vector& v, string suffix, int levelNumber) override
-	{ }
-
-	void ExportMatrix(const SparseMatrix& M, string suffix, int levelNumber) override
-	{ 
-		Eigen::saveMarket(M, Utils::ProgramArgs.OutputDirectory + "/" + suffix + ".dat");
-	}
-
 	void CoarsenMesh(H_CoarsStgy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override
 	{
 		const SparseMatrix& A = *this->OperatorMatrix;

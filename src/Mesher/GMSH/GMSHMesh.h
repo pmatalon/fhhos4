@@ -1082,8 +1082,8 @@ public:
 		}
 		gmsh::view::addModelData(viewId, 0, modelName, "ElementData", elementTags, values);
 
-		string meshFilePath = outputFilePathPrefix + "_" + suffix + ".msh";
-		string dataFilePath = outputFilePathPrefix + "_" + suffix + ".pos";
+		string meshFilePath = outputFilePathPrefix + (outputFilePathPrefix.back() == '/' ? "" : "_") + suffix + ".msh";
+		string dataFilePath = outputFilePathPrefix + (outputFilePathPrefix.back() == '/' ? "" : "_") + suffix + ".pos";
 
 		gmsh::write(meshFilePath);
 		gmsh::view::write(viewId, dataFilePath);

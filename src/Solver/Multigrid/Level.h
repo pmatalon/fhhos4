@@ -1,6 +1,7 @@
 #pragma once
 #include "Smoother.h"
 #include "../Krylov/FlexibleConjugateGradient.h"
+#include "../../Utils/ExportModule.h"
 using namespace std;
 
 class Level
@@ -26,6 +27,7 @@ public:
 	//FlexibleConjugateGradient* FCG = nullptr; // used in K-cycle
 
 protected:
+	ExportModule Out;
 	SparseMatrix R;
 	SparseMatrix P;
 
@@ -43,6 +45,12 @@ public:
 	bool IsCoarsestLevel()
 	{
 		return this->CoarserLevel == nullptr;
+	}
+
+	void SetExportModule(const ExportModule& out)
+	{
+		this->Out = ExportModule(out);
+		this->Out.AddFilePrefix("level" + to_string(this->Number));
 	}
 
 	void Setup()
@@ -173,16 +181,13 @@ public:
 		Utils::FatalError("Level::CoarsenMesh() must be overridden to use this level in an h-multigrid");
 	}
 
-	virtual void ExportVector(const Vector& v, string suffix, int levelNumber) = 0;
-	virtual void ExportMatrix(const SparseMatrix& M, string suffix, int levelNumber) = 0;
-
 	void ExportVector(const Vector& v, string suffix)
 	{
-		this->ExportVector(v, suffix, this->Number);
+		Out.ExportVector(v, suffix);
 	}
 	void ExportMatrix(const SparseMatrix& M, string suffix)
 	{
-		this->ExportMatrix(M, suffix, this->Number);
+		Out.ExportMatrix(M, suffix);
 	}
 
 	virtual Smoother* CreateSmoother(string smootherCode, int nSmootherIterations, int blockSize, double omega)

@@ -5,6 +5,7 @@
 #include "../TestCases/DiffTestCaseFactory.h"
 #include "../Mesher/MeshFactory.h"
 #include "../Solver/SolverFactory.h"
+#include "../Utils/ExportModule.h"
 
 template <int Dim>
 class Program_Diffusion_HHO
@@ -14,11 +15,19 @@ public:
 	{
 		GaussLegendre::Init();
 
+		cout << "-----------------------------------------------------------" << endl;
+		cout << "-                         Problem                         -" << endl;
+		cout << "-----------------------------------------------------------" << endl;
+
 		//-------------------------------------------------------------------------------------------//
 		//   Test case defining the source function, boundary conditions and diffusion coefficient   //
 		//-------------------------------------------------------------------------------------------//
 
 		DiffusionTestCase<Dim>* testCase = DiffTestCaseFactory<Dim>::Create(args.Problem);
+
+		testCase->PrintPhysicalProblem();
+
+		cout << endl;
 
 		//----------//
 		//   Mesh   //
@@ -36,6 +45,9 @@ public:
 
 		mesh->SetDiffusionField(&testCase->DiffField);
 		mesh->SetBoundaryConditions(&testCase->BC);
+
+
+		ExportModule out(args.OutputDirectory);
 
 		//------------------------//
 		//       Unit tests       //
@@ -139,9 +151,7 @@ public:
 
 		// Export source
 		if (args.Actions.ExportSourceToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
-		{
 			dynamic_cast<GMSHMesh<Dim>*>(mesh)->ExportToGMSH(testCase->SourceFunction, args.OutputDirectory + "/source", "source");
-		}
 
 		//----------------------//
 		//       Assembly       //
@@ -154,7 +164,7 @@ public:
 		HHOParameters<Dim>* hho = new HHOParameters<Dim>(mesh, args.Discretization.Stabilization, reconstructionBasis, cellBasis, faceBasis, args.Discretization.OrthogonalizeElemBasesCode, args.Discretization.OrthogonalizeFaceBasesCode);
 
 		bool saveMatrixBlocks = args.Solver.SolverCode.compare("uamg") == 0 || args.Solver.SolverCode.compare("fcguamg") == 0;
-		Diffusion_HHO<Dim>* problem = new Diffusion_HHO<Dim>(mesh, testCase, hho, args.Discretization.StaticCondensation, saveMatrixBlocks, args.OutputDirectory);
+		Diffusion_HHO<Dim>* problem = new Diffusion_HHO<Dim>(mesh, testCase, hho, args.Discretization.StaticCondensation, saveMatrixBlocks);
 
 		cout << endl;
 		cout << "----------------------------------------------------------" << endl;
@@ -163,7 +173,7 @@ public:
 		Timer assemblyTimer;
 		assemblyTimer.Start();
 
-		problem->Assemble(args.Actions);
+		problem->Assemble(args.Actions, out);
 		cout << "System storage: " << Utils::MemoryString(Utils::MemoryUsage(problem->A) + Utils::MemoryUsage(problem->b)) << endl;
 
 		assemblyTimer.Stop();
@@ -183,7 +193,7 @@ public:
 			// Solver creation
 			int blockSizeForBlockSolver = args.Solver.BlockSize != -1 ? args.Solver.BlockSize : faceBasis->Size();
 
-			Solver* solver = SolverFactory<Dim>::CreateSolver(args, problem, blockSizeForBlockSolver);
+			Solver* solver = SolverFactory<Dim>::CreateSolver(args, problem, blockSizeForBlockSolver, out);
 
 			Timer setupTimer;
 			Timer solvingTimer;
@@ -243,7 +253,7 @@ public:
 			SolverFactory<Dim>::PrintStats(solver, setupTimer, solvingTimer, totalTimer);
 
 			if (args.Actions.ExportErrorToGMSH && iterativeSolver)
-				problem->ExportErrorToGMSH(iterativeSolver->ExactSolution - problem->SystemSolution);
+				problem->ExportErrorToGMSH(iterativeSolver->ExactSolution - problem->SystemSolution, out);
 
 			delete solver;
 
@@ -261,9 +271,10 @@ public:
 				if (args.Actions.ExportSolutionVectors)
 				{
 					if (args.Discretization.StaticCondensation)
-						problem->ExtractTraceSystemSolution();
-					problem->ExtractHybridSolution();
-					problem->ExportSolutionVector();
+						out.ExportVector(problem->SystemSolution, "solutionFaces");
+					out.ExportVector(problem->GlobalHybridSolution, "solutionHybrid");
+					out.ExportVector(problem->ReconstructedSolution, "solutionHigherOrder");
+
 				}
 			}
 
@@ -274,7 +285,7 @@ public:
 			}
 
 			if (args.Actions.ExportSolutionToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
-				problem->ExportSolutionToGMSH();
+				problem->ExportSolutionToGMSH(out);
 
 			//----------------------//
 			//       L2 error       //

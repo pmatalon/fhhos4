@@ -1,24 +1,33 @@
 #pragma once
-#include "../Problem/DiffusionProblem.h"
+#include "../Mesh/Mesh.h"
+#include "../Utils/Utils.h"
+#include "../TestCases/DiffusionTestCase.h"
 #include "../Geometry/CartesianShape.h"
 #include "../Geometry/2D/Triangle.h"
 #include "../Utils/ParallelLoop.h"
+#include "../Utils/ExportModule.h"
 #include "Diff_DGElement.h"
 #include "Diff_DGFace.h"
 using namespace std;
 
 template <int Dim>
-class Diffusion_DG : public DiffusionProblem<Dim>
+class Diffusion_DG
 {
 public:
+	Mesh<Dim>* _mesh;
 	FunctionalBasis<Dim>* Basis;
+	SparseMatrix A;
+	Vector b;
+	Vector SystemSolution;
 private:
+	DiffusionTestCase<Dim>* _testCase;
 	bool _autoPenalization;
 	int _penalizationCoefficient;
 public:
 	Diffusion_DG(Mesh<Dim>* mesh, DiffusionTestCase<Dim>* testCase, string outputDirectory, FunctionalBasis<Dim>* basis, int penalizationCoefficient)
-		: DiffusionProblem<Dim>(mesh, testCase, outputDirectory)
 	{ 
+		this->_mesh = mesh;
+		this->_testCase = testCase;
 		this->Basis = basis;
 		this->_autoPenalization = penalizationCoefficient == -1;
 		if (_autoPenalization)
@@ -26,7 +35,7 @@ public:
 		else
 			this->_penalizationCoefficient = penalizationCoefficient;
 
-		this->_fileName = this->_fileName + "_DG_SIPG_" + basis->Name() + "_pen" + to_string(penalizationCoefficient);
+		//Problem<Dim>::AddFilePrefix("_DG_SIPG_" + basis->Name() + "_pen" + to_string(penalizationCoefficient));
 	}
 
 	void PrintDiscretization()
@@ -43,30 +52,46 @@ public:
 		cout << "Unknowns   : " << nUnknowns << endl;
 	}
 
-	double L2Error(DomFunction exactSolution) override
+	double L2Error(DomFunction exactSolution)
 	{
-		return Problem<Dim>::L2Error(Basis, this->SystemSolution, exactSolution);
+		struct ChunkResult
+		{
+			double absoluteError = 0;
+			double normExactSolution = 0;
+		};
+
+		ParallelLoop<Element<Dim>*, ChunkResult> parallelLoop(_mesh->Elements);
+		parallelLoop.Execute([this, exactSolution](Element<Dim>* element, ParallelChunk<ChunkResult>* chunk)
+			{
+				auto approximate = Basis->GetApproximateFunction(SystemSolution, element->Number * Basis->NumberOfLocalFunctionsInElement(element));
+				chunk->Results.absoluteError += element->L2ErrorPow2(approximate, exactSolution);
+				chunk->Results.normExactSolution += element->Integral([exactSolution](const DomPoint& p) { return pow(exactSolution(p), 2); });
+			});
+
+
+		double absoluteError = 0;
+		double normExactSolution = 0;
+
+		parallelLoop.AggregateChunkResults([&absoluteError, &normExactSolution](ChunkResult chunkResult)
+			{
+				absoluteError += chunkResult.absoluteError;
+				normExactSolution += chunkResult.normExactSolution;
+			});
+
+		absoluteError = sqrt(absoluteError);
+		normExactSolution = sqrt(normExactSolution);
+		return normExactSolution != 0 ? absoluteError / normExactSolution : absoluteError;
 	}
 
-	void Assemble(ActionsArguments actions) override
+	void Assemble(const ActionsArguments& actions, const ExportModule& out) //override
 	{
 		auto mesh = this->_mesh;
 		auto basis = this->Basis;
 		auto penalizationCoefficient = this->_penalizationCoefficient;
 
 		if (actions.LogAssembly)
-		{
-			this->PrintPhysicalProblem();
 			this->PrintDiscretization();
-			cout << "Parallelism: " << (BaseParallelLoop::GetDefaultNThreads() == 1 ? "sequential execution" : to_string(BaseParallelLoop::GetDefaultNThreads()) + " threads") << endl;
-		}
 
-		string matrixFilePath			= this->GetFilePath("A");
-		string matrixVolumicFilePath	= this->GetFilePath("A_volumic");
-		string matrixCouplingFilePath	= this->GetFilePath("A_coupling");
-		string matrixPenFilePath		= this->GetFilePath("A_pen");
-		string massMatrixFilePath		= this->GetFilePath("Mass");
-		string rhsFilePath				= this->GetFilePath("b");
 
 		BigNumber nUnknowns = static_cast<int>(mesh->Elements.size()) * basis->NumberOfLocalFunctionsInElement(NULL);
 		this->b = Vector(nUnknowns);
@@ -155,7 +180,7 @@ public:
 							}
 						}
 
-						double rhs = element->SourceTerm(phi1, this->_sourceFunction);
+						double rhs = element->SourceTerm(phi1, _testCase->SourceFunction);
 						this->b(basisFunction1) = rhs;
 					}
 				}
@@ -276,47 +301,31 @@ public:
 
 		if (actions.ExportLinearSystem)
 		{
-			cout << "Export..." << endl;
-			Eigen::saveMarket(this->A, matrixFilePath);
-			cout << "Matrix exported to \t" << matrixFilePath << endl;
+			cout << "Export of the linear system..." << endl;
+			out.ExportMatrix(this->A, "A");
 
-			Eigen::saveMarketVector(this->b, rhsFilePath);
-			cout << "RHS exported to \t" << rhsFilePath << endl;
+			out.ExportVector(this->b, "b");
 		}
 
 		if (actions.ExportAssemblyTermMatrices)
 		{
 			SparseMatrix M(nUnknowns, nUnknowns);
 			massMatrixCoeffs.Fill(M);
-			Eigen::saveMarket(M, massMatrixFilePath);
-			cout << "Mass matrix exported to \t" << massMatrixFilePath << endl;
+			out.ExportMatrix(M, "Mass");
 
 			SparseMatrix V(nUnknowns, nUnknowns);
 			volumicCoeffs.Fill(V);
-			Eigen::saveMarket(V, matrixVolumicFilePath);
-			cout << "Volumic part exported to \t" << matrixVolumicFilePath << endl;
+			out.ExportMatrix(V, "A_volumic");
 
 			SparseMatrix C(nUnknowns, nUnknowns);
 			couplingCoeffs.Fill(C);
-			Eigen::saveMarket(C, matrixCouplingFilePath);
-			cout << "Coupling part exported to \t" << matrixCouplingFilePath << endl;
+			out.ExportMatrix(C, "A_coupling");
 
 			SparseMatrix P(nUnknowns, nUnknowns);
 			penCoeffs.Fill(P);
-			Eigen::saveMarket(P, matrixPenFilePath);
-			cout << "Penalization part exported to \t" << matrixPenFilePath << endl;
+			out.ExportMatrix(P, "A_pen");
 		}
 
-	}
-
-	void ExportSolutionToGMSH() override
-	{
-		this->_mesh->ExportToGMSH(this->Basis, this->SystemSolution, this->GetFilePathPrefix(), "potential");
-	}
-
-	void ExportErrorToGMSH(const Vector& coeffs) override
-	{
-		this->_mesh->ExportToGMSH(this->Basis, coeffs, this->GetFilePathPrefix(), "error");
 	}
 };
 

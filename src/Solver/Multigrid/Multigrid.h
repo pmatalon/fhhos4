@@ -13,6 +13,7 @@ private:
 	int _nLevels;
 	NonZeroCoefficients _cycleSchema; // used only for drawing the cycle in the console
 public:
+	ExportModule Out;
 	Solver* CoarseSolver = nullptr;
 	char Cycle = 'V';
 	int WLoops = 1; // 1 --> V-cycle, >= 2 --> W-cycle 
@@ -97,6 +98,7 @@ public:
 		this->_fineLevel->PreSmoother = this->_fineLevel->CreateSmoother(PreSmootherCode, PreSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
 		this->_fineLevel->PostSmoother = this->_fineLevel->CreateSmoother(PostSmootherCode, PostSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
 		this->_fineLevel->ExportComponents = ExportComponents;
+		this->_fineLevel->SetExportModule(this->Out);
 
 		Level* currentLevel = this->_fineLevel;
 		bool noCoarserMeshProvided = false;
@@ -213,6 +215,7 @@ public:
 				cout << "\tCreation of level " << levelNumber << " (" << (coarseningType == CoarseningType::H ? "h" : (coarseningType == CoarseningType::P ? "p" : "hp")) << "-coarsening)" << endl;
 			Level* coarseLevel = CreateCoarseLevel(currentLevel, coarseningType, coarseDegree);
 			coarseLevel->ComesFrom = coarseningType;
+			coarseLevel->SetExportModule(this->Out);
 
 			// Smoothers on coarse level
 			int preSmoothingIterations = currentLevel->PreSmoother->Iterations();

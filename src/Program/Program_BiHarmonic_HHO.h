@@ -5,6 +5,7 @@
 #include "../TestCases/BiHarmonic/BiHarTestCaseFactory.h"
 #include "../Mesher/MeshFactory.h"
 #include "../Solver/SolverFactory.h"
+#include "../Utils/ExportModule.h"
 
 template <int Dim>
 class Program_BiHarmonic_HHO
@@ -14,11 +15,21 @@ public:
 	{
 		GaussLegendre::Init();
 
+		cout << "-----------------------------------------------------------" << endl;
+		cout << "-                         Problem                         -" << endl;
+		cout << "-----------------------------------------------------------" << endl;
+
 		//-------------------------------------------------------------------------------------------//
 		//   Test case defining the source function, boundary conditions and diffusion coefficient   //
 		//-------------------------------------------------------------------------------------------//
 
 		BiHarmonicTestCase<Dim>* testCase = BiHarTestCaseFactory<Dim>::Create(args.Problem);
+
+		testCase->PrintPhysicalProblem();
+
+		cout << endl;
+
+		ExportModule out(args.OutputDirectory);
 
 		//----------//
 		//   Mesh   //
@@ -55,9 +66,7 @@ public:
 		HHOParameters<Dim>* hho = new HHOParameters<Dim>(mesh, args.Discretization.Stabilization, reconstructionBasis, cellBasis, faceBasis, args.Discretization.OrthogonalizeElemBasesCode, args.Discretization.OrthogonalizeFaceBasesCode);
 
 		bool saveMatrixBlocks = args.Solver.SolverCode.compare("uamg") == 0 || args.Solver.SolverCode.compare("fcguamg") == 0;
-		SplittedBiHarmonic_HHO<Dim>* biHarPb = new SplittedBiHarmonic_HHO<Dim>(mesh, testCase, hho, saveMatrixBlocks, args.OutputDirectory);
-
-		biHarPb->PrintPhysicalProblem();
+		SplittedBiHarmonic_HHO<Dim>* biHarPb = new SplittedBiHarmonic_HHO<Dim>(mesh, testCase, hho, saveMatrixBlocks);
 
 		cout << endl;
 		cout << "----------------------------------------------------------" << endl;
@@ -86,7 +95,7 @@ public:
 			int blockSizeForBlockSolver = args.Solver.BlockSize != -1 ? args.Solver.BlockSize : faceBasis->Size();
 
 			// Solve 1st diffusion biHarPb
-			Solver* solver = SolverFactory<Dim>::CreateSolver(args, &biHarPb->DiffPb1(), blockSizeForBlockSolver);
+			Solver* solver = SolverFactory<Dim>::CreateSolver(args, &biHarPb->DiffPb1(), blockSizeForBlockSolver, out);
 
 			Timer setupTimer;
 			Timer solvingTimer1;
@@ -133,7 +142,6 @@ public:
 			{
 				double error = biHarPb->DiffPb1().L2Error(testCase->MinusLaplacianOfSolution);
 				cout << endl << "L2 Error = " << std::scientific << error << endl;
-				//biHarPb->AssertSchemeConvergence(error);
 			}
 
 			cout << "----------------------------------------------------------" << endl;
@@ -164,7 +172,7 @@ public:
 
 				biHarPb->DiffPb2().ReconstructHigherOrderApproximation();
 				if (args.Actions.ExportSolutionVectors)
-					biHarPb->DiffPb2().ExportSolutionVector();
+					out.ExportVector(biHarPb->DiffPb2().ReconstructedSolution, "solution");
 			}
 
 			if (args.Actions.ExportMeshToMatlab)
@@ -174,7 +182,7 @@ public:
 			}
 
 			if (args.Actions.ExportSolutionToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
-				biHarPb->DiffPb2().ExportSolutionToGMSH();
+				biHarPb->DiffPb2().ExportSolutionToGMSH(out);
 
 
 
