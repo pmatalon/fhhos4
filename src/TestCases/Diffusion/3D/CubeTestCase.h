@@ -38,7 +38,7 @@ public:
 
 		if (pb.BCCode.compare("m") == 0)
 		{
-			this->BC.GetBoundaryConditionType = BoundaryConditions::MixedConditionsExample;
+			this->BC.BoundaryConditionPartition = BoundaryConditions::MixedConditionsExample;
 			this->BC.Description = "Mixed Neumann-Dirichlet";
 		}
 

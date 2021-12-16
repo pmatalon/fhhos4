@@ -7,21 +7,21 @@ class BoundaryConditions
 {
 public:
 	string Description;
-	function<BoundaryConditionType(BoundaryGroup*)> GetBoundaryConditionType = nullptr;
+	function<BoundaryConditionType(BoundaryGroup*)> BoundaryConditionPartition = nullptr;
 	DomFunction DirichletFunction = nullptr;
 	DomFunction NeumannFunction = nullptr;
 
 	BoundaryConditions()
 	{
 		Description = "Dirichlet";
-		GetBoundaryConditionType = DirichletEverywhere;
+		BoundaryConditionPartition = DirichletEverywhere;
 		DirichletFunction = Homogeneous;
 		NeumannFunction = Homogeneous;
 	}
 
 	BoundaryConditions(function<BoundaryConditionType(BoundaryGroup*)> getBoundaryConditionType, DomFunction dirichletFunction, DomFunction neumannFunction)
 	{
-		this->GetBoundaryConditionType = getBoundaryConditionType;
+		this->BoundaryConditionPartition = getBoundaryConditionType;
 		this->DirichletFunction = dirichletFunction;
 		this->NeumannFunction = neumannFunction;
 	}
@@ -29,6 +29,11 @@ public:
 	static BoundaryConditionType DirichletEverywhere(BoundaryGroup* boundaryPart)
 	{
 		return BoundaryConditionType::Dirichlet;
+	}
+
+	static BoundaryConditionType NeumannEverywhere(BoundaryGroup* boundaryPart)
+	{
+		return BoundaryConditionType::Neumann;
 	}
 
 	static BoundaryConditionType MixedConditionsExample(BoundaryGroup* boundaryPart)

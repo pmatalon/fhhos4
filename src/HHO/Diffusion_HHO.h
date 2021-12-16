@@ -552,7 +552,6 @@ public:
 
 		// Solution on the Dirichlet faces
 		this->x_dF = Vector(HHO->nDirichletCoeffs);
-		assert(!this->_mesh->DirichletFaces.empty());
 		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->DirichletFaces, [this](Face<Dim>* f)
 			{
 				Diff_HHOFace<Dim>* face = HHOFace(f);

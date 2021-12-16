@@ -269,7 +269,7 @@ public:
 	{
 		for (BoundaryGroup* boundary : BoundaryParts)
 		{
-			boundary->Condition = bc->GetBoundaryConditionType(boundary);
+			boundary->Condition = bc->BoundaryConditionPartition(boundary);
 			boundary->ConditionFunction = boundary->Condition == BoundaryConditionType::Neumann ? bc->NeumannFunction : bc->DirichletFunction;
 		}
 		

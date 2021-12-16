@@ -72,13 +72,13 @@ public:
 		// Boundary conditions
 		if (pb.BCCode.compare("d") == 0)
 		{
-			this->BC.GetBoundaryConditionType = BoundaryConditions::DirichletEverywhere;
+			this->BC.BoundaryConditionPartition = BoundaryConditions::DirichletEverywhere;
 			this->BC.DirichletFunction = BoundaryConditions::Homogeneous;//this->SineSolution2D; //BoundaryConditions::Homogeneous;
 			this->BC.Description = "Homogeneous Dirichlet";
 		}
 		else if (pb.BCCode.compare("m") == 0)
 		{
-			this->BC.GetBoundaryConditionType = BoundaryConditions::MixedConditionsExample;
+			this->BC.BoundaryConditionPartition = BoundaryConditions::MixedConditionsExample;
 			this->BC.DirichletFunction = BoundaryConditions::Homogeneous;
 			this->BC.NeumannFunction = BoundaryConditions::Homogeneous;
 			this->BC.Description = "Mixed Neumann-Dirichlet";

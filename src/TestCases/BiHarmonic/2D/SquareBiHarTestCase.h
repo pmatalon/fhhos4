@@ -28,7 +28,11 @@ public:
 		// Boundary conditions
 		if (pb.BCCode.compare("d") == 0)
 		{
-			this->BC.GetBoundaryConditionType = BoundaryConditions::DirichletEverywhere;
+			this->BC.BoundaryConditionPartition = BoundaryConditions::DirichletEverywhere;
+		}
+		else if (pb.BCCode.compare("n") == 0)
+		{
+
 		}
 		else
 			Utils::FatalError("The requested boundary conditions are not defined in this test case.");
