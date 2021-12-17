@@ -41,28 +41,12 @@ public:
 	{
 		ActionsArguments diffActions;
 		//diffActions.LogAssembly = true;
-		DiffPb1().Assemble(diffActions);
+		_diffPb1.Assemble(diffActions);
 	}
 
-	void AssembleDiffPb2(const Vector& solutionDiffPb1, bool isOfHigherDegree)
+	void AssembleDiffPb2(const Vector& solutionDiffPb1)
 	{
-		if (isOfHigherDegree)
-		{
-			ElementParallelLoop<Dim> parallelLoop(this->_mesh->Elements);
-			DiffPb2().B_T = Vector(HHO->nTotalCellUnknowns);
-
-			parallelLoop.Execute([this, &solutionDiffPb1](Element<Dim>* e)
-				{
-					Diff_HHOElement<Dim>* element = this->DiffPb2().HHOElement(e);
-					DiffPb2().B_T.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns) = element->ApplyCellReconstructMassMatrix(solutionDiffPb1.segment(e->Number * HHO->nReconstructUnknowns, HHO->nReconstructUnknowns));
-				}
-			);
-
-			// Static condensation
-			DiffPb2().b = /*B_ndF*/ -DiffPb2().A_T_ndF.transpose() * DiffPb2().Solve_A_T_T(DiffPb2().B_T);
-		}
-		else
-			Utils::FatalError("RHS without the reconstruction non implemented");
+		_diffPb1.ChangeSourceFunction(solutionDiffPb1);
 	}
 
 	~BiHarmonicMixedForm_HHO()

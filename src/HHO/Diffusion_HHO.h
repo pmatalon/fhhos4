@@ -794,6 +794,38 @@ public:
 		this->ReconstructedSolution = globalReconstructedSolution;
 	}
 
+	// Reassembles a new RHS corresponding to a discrete source function
+	void ChangeSourceFunction(const Vector& sourceFuncCoeffs)
+	{
+		ElementParallelLoop<Dim> parallelLoop(this->_mesh->Elements);
+		this->B_T = Vector(HHO->nTotalCellUnknowns);
+
+		if (sourceFuncCoeffs.rows() == HHO->nTotalCellUnknowns) // degree k
+		{
+			parallelLoop.Execute([this, &sourceFuncCoeffs](Element<Dim>* e)
+				{
+					Diff_HHOElement<Dim>* element = this->HHOElement(e);
+					this->B_T.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns) = element->ApplyCellMassMatrix(sourceFuncCoeffs.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns));
+				}
+			);
+		}
+		else if (sourceFuncCoeffs.rows() == this->_mesh->Elements.size() * HHO->nReconstructUnknowns) // degree k+1
+		{
+			parallelLoop.Execute([this, &sourceFuncCoeffs](Element<Dim>* e)
+				{
+					Diff_HHOElement<Dim>* element = this->HHOElement(e);
+					this->B_T.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns) = element->ApplyCellReconstructMassMatrix(sourceFuncCoeffs.segment(e->Number * HHO->nReconstructUnknowns, HHO->nReconstructUnknowns));
+				}
+			);
+
+		}
+		else
+			Utils::FatalError("the argument sourceFuncCoeffs does not have a correct size");
+
+		// Static condensation
+		this->b = /*B_ndF*/ -this->A_T_ndF.transpose() * Solve_A_T_T(this->B_T);
+	}
+
 	//---------------------------------------//
 	//                Exports                //
 	//---------------------------------------//

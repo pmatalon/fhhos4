@@ -148,7 +148,11 @@ public:
 			cout << "-                  2nd diffusion problem                 -" << endl;
 			cout << "----------------------------------------------------------" << endl;
 
-			biHarPb->AssembleDiffPb2(biHarPb->DiffPb1().ReconstructedSolution, true);
+			bool higherDegree = true;
+			if (higherDegree)
+				biHarPb->AssembleDiffPb2(biHarPb->DiffPb1().ReconstructedSolution);
+			else
+				biHarPb->AssembleDiffPb2(biHarPb->DiffPb1().GlobalHybridSolution.head(biHarPb->DiffPb1().HHO->nTotalCellUnknowns));
 
 			cout << "Solving second problem..." << endl;
 			solvingTimer2.Start();
