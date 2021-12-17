@@ -9,6 +9,7 @@ class DiffusionTestCase : public TestCase<Dim>
 public:
 	DomFunction SourceFunction = nullptr;
 	DiffusionField<Dim> DiffField;
+	BoundaryConditions BC;
 
 	DiffusionTestCase()
 	{}

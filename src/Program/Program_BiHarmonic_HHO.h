@@ -1,7 +1,7 @@
 #pragma once
 #include <iomanip>
 #include "../ProgramArguments.h"
-#include "../HHO/SplittedBiHarmonic_HHO.h"
+#include "../HHO/BiHarmonicMixedForm_HHO.h"
 #include "../TestCases/BiHarmonic/BiHarTestCaseFactory.h"
 #include "../Mesher/MeshFactory.h"
 #include "../Solver/SolverFactory.h"
@@ -45,7 +45,7 @@ public:
 
 		cout << "Mesh storage > " << Utils::MemoryString(mesh->MemoryUsage()) << endl;
 
-		mesh->SetBoundaryConditions(&testCase->BC);
+		mesh->SetBoundaryConditions(&testCase->DirichletBC);
 
 		// Export source
 		if (args.Actions.ExportSourceToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
@@ -66,7 +66,7 @@ public:
 		HHOParameters<Dim>* hho = new HHOParameters<Dim>(mesh, args.Discretization.Stabilization, reconstructionBasis, cellBasis, faceBasis, args.Discretization.OrthogonalizeElemBasesCode, args.Discretization.OrthogonalizeFaceBasesCode);
 
 		bool saveMatrixBlocks = args.Solver.SolverCode.compare("uamg") == 0 || args.Solver.SolverCode.compare("fcguamg") == 0;
-		SplittedBiHarmonic_HHO<Dim>* biHarPb = new SplittedBiHarmonic_HHO<Dim>(mesh, testCase, hho, saveMatrixBlocks);
+		BiHarmonicMixedForm_HHO<Dim>* biHarPb = new BiHarmonicMixedForm_HHO<Dim>(mesh, testCase, hho, saveMatrixBlocks);
 
 		cout << endl;
 		cout << "----------------------------------------------------------" << endl;

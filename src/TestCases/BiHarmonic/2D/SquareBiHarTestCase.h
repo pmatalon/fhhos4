@@ -1,6 +1,5 @@
 #pragma once
 #include "../BiHarmonicTestCase.h"
-#include "../../../Mesher/SquareGeometry.h"
 using namespace std;
 
 class SquareBiHarTestCase : public BiHarmonicTestCase<2>
@@ -12,11 +11,28 @@ public:
 		BiHarmonicTestCase(),
 		_pb(pb)
 	{
+		// Boundary conditions
+		this->DirichletBC = BoundaryConditions::HomogeneousDirichletEverywhere();
+		if (pb.BCCode.compare("dd") == 0)
+			this->LaplacianDirichletBC = new BoundaryConditions(BoundaryConditions::HomogeneousDirichletEverywhere());
+		else if (pb.BCCode.compare("dn") == 0)
+			this->NeumannBC = new BoundaryConditions(BoundaryConditions::HomogeneousNeumannEverywhere());
+		else
+			Utils::FatalError("The requested boundary conditions (-bc " + pb.BCCode + ") are not defined for this test case.");
+
 		// Source function
 		if (pb.SourceCode.compare("") == 0)
 		{
-			pb.SourceCode = "sine";
-			_pb.SourceCode = "sine";
+			if (pb.BCCode.compare("dd") == 0)
+			{
+				pb.SourceCode = "sine";
+				_pb.SourceCode = "sine";
+			}
+			else
+			{
+				pb.SourceCode = "poly";
+				_pb.SourceCode = "poly";
+			}
 		}
 		if (pb.SourceCode.compare("sine") == 0)
 			this->SourceFunction = this->SineSource2D;
@@ -25,29 +41,14 @@ public:
 		else
 			Utils::FatalError("Unmanaged source code");
 
-		// Boundary conditions
-		if (pb.BCCode.compare("d") == 0)
-		{
-			this->BC.BoundaryConditionPartition = BoundaryConditions::DirichletEverywhere;
-		}
-		else if (pb.BCCode.compare("n") == 0)
-		{
-
-		}
-		else
-			Utils::FatalError("The requested boundary conditions are not defined in this test case.");
-
 		// Exact solution
-		if (pb.GeoCode.compare("square") == 0 && pb.BCCode.compare("d") == 0)
+		if (pb.GeoCode.compare("square") == 0 && pb.BCCode.compare("dd") == 0 && pb.SourceCode.compare("sine") == 0)
 		{
-			if (pb.SourceCode.compare("sine") == 0)
-			{
-				this->MinusLaplacianOfSolution = this->SineMinusLaplacianOfSolution2D;
-				this->ExactSolution = this->SineSolution2D;
-			}
-			else if (pb.SourceCode.compare("poly") == 0)
-				this->ExactSolution = this->PolySolution2D;
+			this->MinusLaplacianOfSolution = this->SineMinusLaplacianOfSolution2D;
+			this->ExactSolution = this->SineSolution2D;
 		}
+		else if (pb.GeoCode.compare("square") == 0 && pb.BCCode.compare("dn") == 0 && pb.SourceCode.compare("poly") == 0)
+			this->ExactSolution = this->PolySolution2D;
 	}
 
 	string Code() override

@@ -406,7 +406,7 @@
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
     <ClInclude Include="src\version.h" />
-    <ClInclude Include="src\HHO\SplittedBiHarmonic_HHO.h">
+    <ClInclude Include="src\HHO\BiHarmonicMixedForm_HHO.h">
       <Filter>HHO</Filter>
     </ClInclude>
     <ClInclude Include="src\TestCases\BiHarmonic\2D\SquareBiHarTestCase.h">

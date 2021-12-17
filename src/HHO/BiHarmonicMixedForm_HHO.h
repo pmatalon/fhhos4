@@ -5,7 +5,7 @@
 using namespace std;
 
 template<int Dim>
-class SplittedBiHarmonic_HHO
+class BiHarmonicMixedForm_HHO
 {
 private:
 	Mesh<Dim>* _mesh;
@@ -16,7 +16,7 @@ private:
 public:
 	HHOParameters<Dim>* HHO;
 
-	SplittedBiHarmonic_HHO(Mesh<Dim>* mesh, BiHarmonicTestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool saveMatrixBlocks)
+	BiHarmonicMixedForm_HHO(Mesh<Dim>* mesh, BiHarmonicTestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool saveMatrixBlocks)
 	{
 		_mesh = mesh;
 		HHO = hho;
@@ -65,7 +65,7 @@ public:
 			Utils::FatalError("RHS without the reconstruction non implemented");
 	}
 
-	~SplittedBiHarmonic_HHO()
+	~BiHarmonicMixedForm_HHO()
 	{
 	}
 };

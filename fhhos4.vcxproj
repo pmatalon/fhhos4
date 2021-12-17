@@ -100,7 +100,7 @@
     <ClInclude Include="src\Geometry\3D\ReferenceTetrahedron.h" />
     <ClInclude Include="src\HHO\Diffusion_HHOMatrix.h" />
     <ClInclude Include="src\HHO\HHOParameters.h" />
-    <ClInclude Include="src\HHO\SplittedBiHarmonic_HHO.h" />
+    <ClInclude Include="src\HHO\BiHarmonicMixedForm_HHO.h" />
     <ClInclude Include="src\Mesher\MeshFactory.h" />
     <ClInclude Include="src\Mesher\CubeGeometry.h" />
     <ClInclude Include="src\Mesher\GMSH\Cube_GMSHCartesianMesh.h" />

@@ -8,7 +8,6 @@ class TestCase
 {
 public:
 	DomFunction ExactSolution = nullptr;
-	BoundaryConditions BC;
 
 	// GMSH Point ids
 	vector<int> GeometricPointExclusionList;

@@ -8,8 +8,11 @@ class BiHarmonicTestCase : public TestCase<Dim>
 {
 public:
 	DomFunction SourceFunction = nullptr;
+	BoundaryConditions DirichletBC;
+	BoundaryConditions* NeumannBC = nullptr;
+	BoundaryConditions* LaplacianDirichletBC = nullptr;
+
 	DomFunction MinusLaplacianOfSolution = nullptr;
-	//DiffusionField<Dim> DiffField;
 
 	BiHarmonicTestCase()
 	{}
@@ -19,7 +22,12 @@ public:
 		cout << "Problem: BiHarmonic " << Dim << "D" << endl;
 		//cout << "    Geometry           : " << this->_mesh->GeometryDescription() << endl;
 		cout << "    Test case          : " << this->Description() << endl;
-		cout << "    Boundary conditions: " << this->BC.Description << endl;
+		cout << "    Boundary conditions: Dirichlet + ";
+		if (NeumannBC)
+			cout << "Neumann";
+		else
+			cout << "Dirichlet on laplacian";
+		cout << endl;
 	}
 
 	string FilePrefix()

@@ -26,6 +26,25 @@ public:
 		this->NeumannFunction = neumannFunction;
 	}
 
+	static BoundaryConditions HomogeneousDirichletEverywhere()
+	{
+		BoundaryConditions bc;
+		bc.BoundaryConditionPartition = DirichletEverywhere;
+		bc.DirichletFunction = Homogeneous;
+		bc.NeumannFunction = nullptr;
+		return bc;
+	}
+
+	static BoundaryConditions HomogeneousNeumannEverywhere()
+	{
+		BoundaryConditions bc;
+		bc.BoundaryConditionPartition = NeumannEverywhere;
+		bc.DirichletFunction = nullptr;
+		bc.NeumannFunction = Homogeneous;
+		return bc;
+	}
+
+
 	static BoundaryConditionType DirichletEverywhere(BoundaryGroup* boundaryPart)
 	{
 		return BoundaryConditionType::Dirichlet;
