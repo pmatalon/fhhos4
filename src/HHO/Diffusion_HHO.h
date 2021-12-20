@@ -30,13 +30,15 @@ public:
 	SparseMatrix A_T_T;
 	SparseMatrix A_T_ndF; // used to reconstruct the the higher-order approximation after solving the linear system
 	SparseMatrix A_ndF_ndF;
-
-
-	// Cell part of the right-hand side, used to reconstruct the the higher-order approximation after solving the linear system
-	Vector B_T;
 private:
 	// Solution on the Dirichlet faces
 	Vector x_dF;
+	// Part of the right-hand side corresponding to the cells (must be saved because used to reconstruct the the higher-order approximation after solving the linear system)
+	Vector B_T;
+	// Part of the right-hand side corresponding to the faces
+	Vector B_ndF;
+	// Part of the right-hand side corresponding to Neumann faces
+	//Vector B_neumF;
 public:
 	HHOParameters<Dim>* HHO;
 	Vector ReconstructedSolution;
@@ -279,25 +281,22 @@ public:
 		//
 		//                       <=>             (the faces are split into non-Dirichlet faces (ndF) and Dirichlet faces (dF))
 		//
-		//  [  A_T_T  |  A_T_ndF   |  A_T_dF    ] [ x_T   ]     [ B_T ]
-		//  [ --------|------------|----------- ] [-------]     [-----]
-		//  [  <sym>  |  A_ndF_ndF |  A_ndF_dF  ] [ x_ndF ]  =  [  0  ]
-		//  [ --------|------------|----------- ] [-------]     [-----]
-		//  [  <sym>  |   <sym>    |  A_dF_dF   ] [ x_dF  ]     [  0  ]
+		//  [  A_T_T  |  A_T_ndF   |  A_T_dF    ] [ x_T   ]     [ B_T   ]
+		//  [ --------|------------|----------- ] [-------]     [-------]
+		//  [  <sym>  |  A_ndF_ndF |  A_ndF_dF  ] [ x_ndF ]  =  [ B_ndF ]
+		//  [ --------|------------|----------- ] [-------]     [-------]
+		//  [  <sym>  |   <sym>    |  A_dF_dF   ] [ x_dF  ]     [   0   ]
+		// 
+		//                                                               [    0    ]   <---- interior faces
+		//                                                 where B_ndF = [---------]
+		//                                                               [ B_neumF ]   <---- Neumann faces
 		//
 		// As x_dF is known, it can be passed to the right-hand side (method by elimination of the Dirichlet conditions):
 		//
-		//               [  A_T_T  |  A_T_ndF   ] [ x_T   ]     [ B_T        ]          [ A_T_dF   * x_dF ]
-		//               [ --------|----------- ] [-------]  =  [------------]     -    [-----------------]
-		//               [   sym   |  A_ndF_ndF ] [ x_ndF ]     [ 0; B_neumF ]          [ A_ndF_dF * x_dF ]
-		//                                                         ^
-		//                                                         |
-		//                                                      (interior faces; Neumann faces)
+		//               [  A_T_T  |  A_T_ndF   ] [ x_T   ]     [ B_T   ]       [ A_T_dF   * x_dF ]
+		//               [ --------|----------- ] [-------]  =  [-------]   -   [-----------------]
+		//               [   sym   |  A_ndF_ndF ] [ x_ndF ]     [ B_ndF ]       [ A_ndF_dF * x_dF ]
 
-
-		// Allocation of the cell part of the right-hand side
-		if (actions.AssembleRightHandSide)
-			this->B_T = Vector(HHO->nTotalCellUnknowns);
 
 		//-------------------------------//
 		// Parallel loop on the elements //
@@ -399,19 +398,6 @@ public:
 							chunk->Results.ConsistencyCoeffs.AddBlock(i, j, element->Acons, element->FirstDOFNumber(face1), element->FirstDOFNumber(face2), HHO->nFaceUnknowns, HHO->nFaceUnknowns);
 							chunk->Results.StabilizationCoeffs.AddBlock(i, j, element->Astab, element->FirstDOFNumber(face1), element->FirstDOFNumber(face2), HHO->nFaceUnknowns, HHO->nFaceUnknowns);
 						}
-					}
-				}
-
-				//--------------------------//
-				// Right-hand side part B_T //
-				//--------------------------//
-
-				if (actions.AssembleRightHandSide)
-				{
-					for (BasisFunction<Dim>* cellPhi : element->CellBasis->LocalFunctions)
-					{
-						BigNumber i = DOFNumber(element, cellPhi);
-						this->B_T(i) = element->SourceTerm(cellPhi, _testCase->SourceFunction);
 					}
 				}
 
@@ -533,45 +519,26 @@ public:
 			cout << "\tFree vector of non-zero coefficients (" + Utils::MemoryString(Utils::SparseMatrixMemoryUsage(A_F_F_Coeffs.Size())) + ")" << endl;
 		A_F_F_Coeffs = A_F_F_Block<Dim>();
 
-		//---------------------------------//
-		// Boundary conditions enforcement //
-		//---------------------------------//
 
-		// 0 on the interior faces, computation for Neumann faces
-		Vector B_ndF = Vector::Zero(HHO->nTotalFaceUnknowns);
+		//-----------------//
+		// Right-hand side //
+		//-----------------//
+
 		if (actions.AssembleRightHandSide)
 		{
-			ParallelLoop<Face<Dim>*>::Execute(this->_mesh->NeumannFaces, [this, &B_ndF](Face<Dim>* f)
-				{
-					Diff_HHOFace<Dim>* face = HHOFace(f);
-					BigNumber i = FirstDOFGlobalNumber(face) - HHO->nTotalCellUnknowns;
-					B_ndF.segment(i, HHO->nFaceUnknowns) = face->InnerProductWithBasis(_testCase->BC.NeumannFunction);
-				}
-			);
-		}
+			this->B_T   = std::move(AssembleSourceTerm(_testCase->SourceFunction));
+			this->x_dF  = std::move(AssembleDirichletUnknowns(_testCase->BC.DirichletFunction));
+			this->B_ndF = std::move(AssembleNeumannTerm(_testCase->BC.NeumannFunction));
 
-		// Solution on the Dirichlet faces
-		this->x_dF = Vector(HHO->nDirichletCoeffs);
-		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->DirichletFaces, [this](Face<Dim>* f)
-			{
-				Diff_HHOFace<Dim>* face = HHOFace(f);
-				BigNumber i = FirstDOFGlobalNumber(face) - HHO->nTotalHybridUnknowns;
-				this->x_dF.segment(i, HHO->nFaceUnknowns) = face->ProjectOnBasis(_testCase->BC.DirichletFunction);
-			}
-		);
 
-		// Update the right-hand side
-		if (actions.AssembleRightHandSide)
-		{
+			// Update the right-hand side (elimination of the Dirichlet unknowns x_dF from the system)
 			SparseMatrix A_ndF_dF = A_F_F.topRightCorner(HHO->nTotalFaceUnknowns, HHO->nDirichletCoeffs);
 			SparseMatrix A_T_dF   = A_T_F.topRightCorner(HHO->nTotalCellUnknowns, HHO->nDirichletCoeffs);
 			Utils::Empty(A_T_F);
 
 			this->B_T   -= A_T_dF   * this->x_dF; // save for reconstruction
-			      B_ndF -= A_ndF_dF * this->x_dF; // not used in the reconstruction, no need to save it
-		}
-
-		
+			this->B_ndF -= A_ndF_dF * this->x_dF; // not used in the reconstruction, no need to save it
+		}		
 
 		//---------------------//
 		// Static condensation //
@@ -622,6 +589,7 @@ public:
 			// We won't be reconstructing the solution, so no need to keep those
 			Utils::Empty(this->A_T_ndF);
 			Utils::Empty(this->B_T);
+			Utils::Empty(this->B_ndF);
 			Utils::Empty(this->x_dF);
 		}
 
@@ -692,7 +660,6 @@ public:
 		}
 	}
 
-
 	//------------------------------//
 	//           Init HHO           //
 	//------------------------------//
@@ -752,6 +719,84 @@ public:
 		this->_hhoFaces.clear();
 	}
 
+
+	Vector AssembleSourceTerm(DomFunction sourceFunction)
+	{
+		Vector b_T = Vector(HHO->nTotalCellUnknowns);
+		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, &b_T, &sourceFunction](Element<Dim>* e)
+			{
+				Diff_HHOElement<Dim>* element = HHOElement(e);
+				for (BasisFunction<Dim>* cellPhi : element->CellBasis->LocalFunctions)
+				{
+					BigNumber i = DOFNumber(element, cellPhi);
+					b_T(i) = element->SourceTerm(cellPhi, sourceFunction);
+				}
+			}
+		);
+		return b_T;
+	}
+
+	Vector AssembleSourceTerm(const Vector& sourceFuncCoeffs)
+	{
+		ElementParallelLoop<Dim> parallelLoop(this->_mesh->Elements);
+		Vector b_T = Vector(HHO->nTotalCellUnknowns);
+
+		if (sourceFuncCoeffs.rows() == HHO->nTotalCellUnknowns) // degree k
+		{
+			parallelLoop.Execute([this, &sourceFuncCoeffs, &b_T](Element<Dim>* e)
+				{
+					Diff_HHOElement<Dim>* element = this->HHOElement(e);
+					b_T.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns) = element->ApplyCellMassMatrix(sourceFuncCoeffs.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns));
+				}
+			);
+		}
+		else if (sourceFuncCoeffs.rows() == this->_mesh->Elements.size() * HHO->nReconstructUnknowns) // degree k+1
+		{
+			parallelLoop.Execute([this, &sourceFuncCoeffs, &b_T](Element<Dim>* e)
+				{
+					Diff_HHOElement<Dim>* element = this->HHOElement(e);
+					b_T.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns) = element->ApplyCellReconstructMassMatrix(sourceFuncCoeffs.segment(e->Number * HHO->nReconstructUnknowns, HHO->nReconstructUnknowns));
+				}
+			);
+
+		}
+		else
+			Utils::FatalError("the argument sourceFuncCoeffs does not have a correct size");
+
+		return b_T;
+	}
+
+	// Solution on the Dirichlet faces
+	Vector AssembleDirichletUnknowns(DomFunction dirichletFunction)
+	{
+		Vector x_dF = Vector(HHO->nDirichletCoeffs);
+		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->DirichletFaces, [this, &x_dF, &dirichletFunction](Face<Dim>* f)
+			{
+				Diff_HHOFace<Dim>* face = HHOFace(f);
+				BigNumber i = FirstDOFGlobalNumber(face) - HHO->nTotalHybridUnknowns;
+				x_dF.segment(i, HHO->nFaceUnknowns) = face->ProjectOnBasis(dirichletFunction);
+			}
+		);
+		return x_dF;
+	}
+
+	// 0 on the interior faces, computation for Neumann faces
+	Vector AssembleNeumannTerm(DomFunction neumannFunction)
+	{
+		Vector b_ndF = Vector::Zero(HHO->nTotalFaceUnknowns);
+		//this->B_neumF = Vector(HHO->nNeumannUnknowns);
+		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->NeumannFaces, [this, &b_ndF, &neumannFunction](Face<Dim>* f)
+			{
+				Diff_HHOFace<Dim>* face = HHOFace(f);
+				BigNumber i = FirstDOFGlobalNumber(face) - HHO->nTotalCellUnknowns;
+				b_ndF.segment(i, HHO->nFaceUnknowns) = face->InnerProductWithBasis(neumannFunction);
+				//BigNumber i = FirstDOFGlobalNumber(face) - HHO->nTotalCellUnknowns - HHO->nInteriorFaces*HHO->nFaceUnknowns;
+				//this->B_neumF.segment(i, HHO->nFaceUnknowns) = face->InnerProductWithBasis(neumannFunction);
+			}
+		);
+		return b_ndF;
+	}
+
 	//-------------------------------------------------------------------------------------------------//
 	// After solving the faces, construction of the higher-order approximation using the reconstructor //
 	//-------------------------------------------------------------------------------------------------//
@@ -797,33 +842,19 @@ public:
 	// Reassembles a new RHS corresponding to a discrete source function
 	void ChangeSourceFunction(const Vector& sourceFuncCoeffs)
 	{
-		ElementParallelLoop<Dim> parallelLoop(this->_mesh->Elements);
-		this->B_T = Vector(HHO->nTotalCellUnknowns);
+		this->B_T = std::move(AssembleSourceTerm(sourceFuncCoeffs));
+		
+		// Elimination of Dirichlet unknowns (here 0 (so far), but non-homogeneous Dirichlet BC must be managed!)
+		/*
+		SparseMatrix A_ndF_dF = A_F_F.topRightCorner(HHO->nTotalFaceUnknowns, HHO->nDirichletCoeffs);
+		SparseMatrix A_T_dF   = A_T_F.topRightCorner(HHO->nTotalCellUnknowns, HHO->nDirichletCoeffs);
 
-		if (sourceFuncCoeffs.rows() == HHO->nTotalCellUnknowns) // degree k
-		{
-			parallelLoop.Execute([this, &sourceFuncCoeffs](Element<Dim>* e)
-				{
-					Diff_HHOElement<Dim>* element = this->HHOElement(e);
-					this->B_T.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns) = element->ApplyCellMassMatrix(sourceFuncCoeffs.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns));
-				}
-			);
-		}
-		else if (sourceFuncCoeffs.rows() == this->_mesh->Elements.size() * HHO->nReconstructUnknowns) // degree k+1
-		{
-			parallelLoop.Execute([this, &sourceFuncCoeffs](Element<Dim>* e)
-				{
-					Diff_HHOElement<Dim>* element = this->HHOElement(e);
-					this->B_T.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns) = element->ApplyCellReconstructMassMatrix(sourceFuncCoeffs.segment(e->Number * HHO->nReconstructUnknowns, HHO->nReconstructUnknowns));
-				}
-			);
-
-		}
-		else
-			Utils::FatalError("the argument sourceFuncCoeffs does not have a correct size");
+		this->B_T   -= A_T_dF   * this->x_dF;
+		this->B_ndF -= A_ndF_dF * this->x_dF;
+		*/
 
 		// Static condensation
-		this->b = /*B_ndF*/ -this->A_T_ndF.transpose() * Solve_A_T_T(this->B_T);
+		this->b = this->B_ndF -this->A_T_ndF.transpose() * Solve_A_T_T(this->B_T);
 	}
 
 	//---------------------------------------//
