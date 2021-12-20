@@ -52,7 +52,7 @@ public:
 			this->BC.BoundaryConditionPartition = BoundaryConditions::DirichletEverywhere;
 			if (pb.SourceCode.compare("exp") == 0)
 			{
-				this->BC.DirichletFunction = this->One;
+				this->BC.DirichletFunction = this->ExpSolution2D;
 				this->BC.Description = "Dirichlet (exponential everywhere)";
 			}
 			else if (pb.SourceCode.compare("one") == 0)
