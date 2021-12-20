@@ -11,7 +11,7 @@ private:
 	Mesh<Dim>* _mesh;
 	bool _saveMatrixBlocks = true;
 	DiffusionField<Dim> _diffField;
-	VirtualDiffusionTestCase<Dim> _diffPb1TestCase;
+	VirtualDiffusionTestCase<Dim> _diffPbTestCase;
 	Diffusion_HHO<Dim> _diffPb1;
 public:
 	HHOParameters<Dim>* HHO;
@@ -22,8 +22,8 @@ public:
 		HHO = hho;
 		_diffField = DiffusionField<Dim>(new Tensor<Dim>());
 		mesh->SetDiffusionField(&_diffField);
-		_diffPb1TestCase = VirtualDiffusionTestCase<Dim>(testCase->SourceFunction, _diffField);
-		_diffPb1 = Diffusion_HHO<Dim>(mesh, &_diffPb1TestCase, HHO, true, saveMatrixBlocks);
+		_diffPbTestCase = VirtualDiffusionTestCase<Dim>(testCase->SourceFunction, _diffField);
+		_diffPb1 = Diffusion_HHO<Dim>(mesh, &_diffPbTestCase, HHO, true, saveMatrixBlocks);
 		_saveMatrixBlocks = saveMatrixBlocks;
 	}
 

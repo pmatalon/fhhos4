@@ -1,6 +1,7 @@
 #pragma once
 #include "Program/Program_Diffusion_DG.h"
 #include "Program/Program_Diffusion_HHO.h"
+#include "Program/Program_BiHarmonic_HHO.h"
 #include "Program/Program_BiHarmonicDD_HHO.h"
 using namespace std;
 
@@ -47,6 +48,13 @@ public:
 				Utils::FatalError("Unknown or unmanaged discretization for diffusion problem. Check arguments -pb and -discr.");
 		}
 		else if (args.Problem.Equation == EquationType::BiHarmonic)
+		{
+			if (args.Discretization.Method.compare("hho") == 0)
+				Program_BiHarmonic_HHO<Dim>::Execute(args);
+			else
+				Utils::FatalError("Unknown or unmanaged discretization for bi-harmonic problem. Check arguments -pb and -discr.");
+		}
+		else if (args.Problem.Equation == EquationType::BiHarmonicDD)
 		{
 			if (args.Discretization.Method.compare("hho") == 0)
 				Program_BiHarmonicDD_HHO<Dim>::Execute(args);

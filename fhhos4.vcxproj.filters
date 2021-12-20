@@ -496,6 +496,21 @@
     <ClInclude Include="src\TestCases\BiHarmonicDD\BiHarDDTestCaseFactory.h">
       <Filter>TestCases\BiHarmonicDD</Filter>
     </ClInclude>
+    <ClInclude Include="src\Program\Program_BiHarmonic_HHO.h">
+      <Filter>Program</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\BiHarmonic\BiHarmonicTestCase.h">
+      <Filter>TestCases\BiHarmonic</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\BiHarmonic\BiHarTestCaseFactory.h">
+      <Filter>TestCases\BiHarmonic</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\BiHarmonic\2D\SquareBiHarTestCase.h">
+      <Filter>TestCases\BiHarmonic\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\HHO\BiHarmonicMixedForm_HHO.h">
+      <Filter>HHO</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
@@ -599,6 +614,12 @@
     </Filter>
     <Filter Include="TestCases\BiHarmonicDD\2D">
       <UniqueIdentifier>{f5e4f82d-09dc-41d9-99e7-b54b6ce74a2e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="TestCases\BiHarmonic">
+      <UniqueIdentifier>{2a75a3a4-0037-4044-92cf-b2be5b5a78f7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="TestCases\BiHarmonic\2D">
+      <UniqueIdentifier>{15cbc252-283a-406d-bc04-7ce4ce3759e7}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

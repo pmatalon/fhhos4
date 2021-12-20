@@ -15,7 +15,8 @@ void print_usage() {
 	cout << "-pb CODE" << endl;
 	cout << "      Problem, i.e. to equation to discretize:" << endl;
 	cout << "            diff              - Diffusion" << endl;
-	cout << "            bihar             - Bi-harmonic" << endl;
+	cout << "            bihar             - Bi-harmonic (mixed BC)" << endl;
+	cout << "            bihardd           - Bi-harmonic (Dirichlet BC on both Laplacian problems)" << endl;
 	cout << endl;
 	cout << "-geo CODE" << endl;
 	cout << "      Geometry: in-house test cases, or imported from GMSH." << endl;
@@ -669,6 +670,8 @@ int main(int argc, char* argv[])
 					args.Problem.Equation = EquationType::Diffusion;
 				else if (code.compare("bihar") == 0)
 					args.Problem.Equation = EquationType::BiHarmonic;
+				else if (code.compare("bihardd") == 0)
+					args.Problem.Equation = EquationType::BiHarmonicDD;
 				else
 					argument_error("unknown problem. Check -pb argument.");
 				break;

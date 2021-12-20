@@ -32,7 +32,8 @@ using MFlops = double;
 enum class EquationType : unsigned
 {
 	Diffusion,
-	BiHarmonic
+	BiHarmonic,
+	BiHarmonicDD
 };
 
 enum class BoundaryConditionType : unsigned

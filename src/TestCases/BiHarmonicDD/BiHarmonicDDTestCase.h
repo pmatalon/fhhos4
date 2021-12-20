@@ -19,7 +19,7 @@ public:
 
 	void PrintPhysicalProblem() override
 	{
-		cout << "Problem: BiHarmonic " << Dim << "D" << endl;
+		cout << "Problem: BiHarmonicDD " << Dim << "D" << endl;
 		//cout << "    Geometry           : " << this->_mesh->GeometryDescription() << endl;
 		cout << "    Test case          : " << this->Description() << endl;
 		cout << "    Boundary conditions: Dirichlet + ";

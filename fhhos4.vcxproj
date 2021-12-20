@@ -98,6 +98,7 @@
     <ClInclude Include="src\Geometry\3D\Tetrahedron.h" />
     <ClInclude Include="src\Geometry\3D\TriangleIn3D.h" />
     <ClInclude Include="src\Geometry\3D\ReferenceTetrahedron.h" />
+    <ClInclude Include="src\HHO\BiHarmonicMixedForm_HHO.h" />
     <ClInclude Include="src\HHO\Diffusion_HHOMatrix.h" />
     <ClInclude Include="src\HHO\HHOParameters.h" />
     <ClInclude Include="src\HHO\BiHarmonicDDMixedForm_HHO.h" />
@@ -159,6 +160,7 @@
     <ClInclude Include="src/Utils/NonZeroCoefficients.h" />
     <ClInclude Include="src/Utils/Utils.h" />
     <ClInclude Include="src\Program\Program_BiHarmonicDD_HHO.h" />
+    <ClInclude Include="src\Program\Program_BiHarmonic_HHO.h" />
     <ClInclude Include="src\Program\Program_Diffusion_DG.h" />
     <ClInclude Include="src\Program\Program_Diffusion_HHO.h" />
     <ClInclude Include="src\QuadratureRules\Dunavant\Dunavant.h" />
@@ -202,6 +204,9 @@
     <ClInclude Include="src\TestCases\BiHarmonicDD\2D\SquareBiHarDDTestCase.h" />
     <ClInclude Include="src\TestCases\BiHarmonicDD\BiHarmonicDDTestCase.h" />
     <ClInclude Include="src\TestCases\BiHarmonicDD\BiHarDDTestCaseFactory.h" />
+    <ClInclude Include="src\TestCases\BiHarmonic\2D\SquareBiHarTestCase.h" />
+    <ClInclude Include="src\TestCases\BiHarmonic\BiHarmonicTestCase.h" />
+    <ClInclude Include="src\TestCases\BiHarmonic\BiHarTestCaseFactory.h" />
     <ClInclude Include="src\TestCases\Diffusion\1D\Heterogeneity1DTestCase.h" />
     <ClInclude Include="src\TestCases\Diffusion\1D\SegmentTestCase.h" />
     <ClInclude Include="src\TestCases\Diffusion\2D\BarWith4HolesTestCase.h" />
