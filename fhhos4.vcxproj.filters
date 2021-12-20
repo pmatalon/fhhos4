@@ -406,14 +406,8 @@
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
     <ClInclude Include="src\version.h" />
-    <ClInclude Include="src\HHO\BiHarmonicMixedForm_HHO.h">
+    <ClInclude Include="src\HHO\BiHarmonicDDMixedForm_HHO.h">
       <Filter>HHO</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TestCases\BiHarmonic\2D\SquareBiHarTestCase.h">
-      <Filter>TestCases\BiHarmonic\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TestCases\BiHarmonic\BiHarTestCaseFactory.h">
-      <Filter>TestCases\BiHarmonic</Filter>
     </ClInclude>
     <ClInclude Include="src\Program\Program_Diffusion_DG.h">
       <Filter>Program</Filter>
@@ -421,14 +415,11 @@
     <ClInclude Include="src\Program\Program_Diffusion_HHO.h">
       <Filter>Program</Filter>
     </ClInclude>
-    <ClInclude Include="src\Program\Program_BiHarmonic_HHO.h">
+    <ClInclude Include="src\Program\Program_BiHarmonicDD_HHO.h">
       <Filter>Program</Filter>
     </ClInclude>
     <ClInclude Include="src\Utils\ExportModule.h">
       <Filter>Utils</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TestCases\BiHarmonic\BiHarmonicTestCase.h">
-      <Filter>TestCases\BiHarmonic</Filter>
     </ClInclude>
     <ClInclude Include="src\TestCases\Diffusion\DefaultTestCase.h">
       <Filter>TestCases\Diffusion</Filter>
@@ -495,6 +486,15 @@
     </ClInclude>
     <ClInclude Include="src\TestCases\Diffusion\BoundaryConditions.h">
       <Filter>TestCases\Diffusion</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\BiHarmonicDD\BiHarmonicDDTestCase.h">
+      <Filter>TestCases\BiHarmonicDD</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\BiHarmonicDD\2D\SquareBiHarDDTestCase.h">
+      <Filter>TestCases\BiHarmonicDD\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TestCases\BiHarmonicDD\BiHarDDTestCaseFactory.h">
+      <Filter>TestCases\BiHarmonicDD</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -579,12 +579,6 @@
     <Filter Include="Solver\Multigrid\UncondensedAMG">
       <UniqueIdentifier>{acc25f76-6138-4312-8787-666852f7a952}</UniqueIdentifier>
     </Filter>
-    <Filter Include="TestCases\BiHarmonic">
-      <UniqueIdentifier>{37a62d96-e868-443b-aa20-ed4e6440b31a}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="TestCases\BiHarmonic\2D">
-      <UniqueIdentifier>{f5e4f82d-09dc-41d9-99e7-b54b6ce74a2e}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Program">
       <UniqueIdentifier>{b6a60e33-8f74-4711-a795-c36e13e3d6f7}</UniqueIdentifier>
     </Filter>
@@ -599,6 +593,12 @@
     </Filter>
     <Filter Include="TestCases\Diffusion\3D">
       <UniqueIdentifier>{6eab9b73-ff39-406e-888d-cff70fdbbd5b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="TestCases\BiHarmonicDD">
+      <UniqueIdentifier>{37a62d96-e868-443b-aa20-ed4e6440b31a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="TestCases\BiHarmonicDD\2D">
+      <UniqueIdentifier>{f5e4f82d-09dc-41d9-99e7-b54b6ce74a2e}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

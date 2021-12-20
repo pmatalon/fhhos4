@@ -1,11 +1,11 @@
 #pragma once
-#include "../TestCases/BiHarmonic/BiHarmonicTestCase.h"
+#include "../TestCases/BiHarmonicDD/BiHarmonicDDTestCase.h"
 #include "Diffusion_HHO.h"
 #include "../TestCases/Diffusion/VirtualDiffusionTestCase.h"
 using namespace std;
 
 template<int Dim>
-class BiHarmonicMixedForm_HHO
+class BiHarmonicDDMixedForm_HHO
 {
 private:
 	Mesh<Dim>* _mesh;
@@ -16,7 +16,7 @@ private:
 public:
 	HHOParameters<Dim>* HHO;
 
-	BiHarmonicMixedForm_HHO(Mesh<Dim>* mesh, BiHarmonicTestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool saveMatrixBlocks)
+	BiHarmonicDDMixedForm_HHO(Mesh<Dim>* mesh, BiHarmonicDDTestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool saveMatrixBlocks)
 	{
 		_mesh = mesh;
 		HHO = hho;
@@ -49,7 +49,7 @@ public:
 		_diffPb1.ChangeSourceFunction(solutionDiffPb1);
 	}
 
-	~BiHarmonicMixedForm_HHO()
+	~BiHarmonicDDMixedForm_HHO()
 	{
 	}
 };

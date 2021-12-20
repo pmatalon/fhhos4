@@ -1,14 +1,14 @@
 #pragma once
-#include "../BiHarmonicTestCase.h"
+#include "../BiHarmonicDDTestCase.h"
 using namespace std;
 
-class SquareBiHarTestCase : public BiHarmonicTestCase<2>
+class SquareBiHarDDTestCase : public BiHarmonicDDTestCase<2>
 {
 private:
 	ProblemArguments _pb;
 public:
-	SquareBiHarTestCase(ProblemArguments pb) :
-		BiHarmonicTestCase(),
+	SquareBiHarDDTestCase(ProblemArguments pb) :
+		BiHarmonicDDTestCase(),
 		_pb(pb)
 	{
 		// Boundary conditions

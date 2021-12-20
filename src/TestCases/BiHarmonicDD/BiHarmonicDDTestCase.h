@@ -4,7 +4,7 @@
 using namespace std;
 
 template <int Dim>
-class BiHarmonicTestCase : public TestCase<Dim>
+class BiHarmonicDDTestCase : public TestCase<Dim>
 {
 public:
 	DomFunction SourceFunction = nullptr;
@@ -14,7 +14,7 @@ public:
 
 	DomFunction MinusLaplacianOfSolution = nullptr;
 
-	BiHarmonicTestCase()
+	BiHarmonicDDTestCase()
 	{}
 
 	void PrintPhysicalProblem() override
@@ -71,6 +71,6 @@ protected:
 	}
 
 public:
-	virtual ~BiHarmonicTestCase()
+	virtual ~BiHarmonicDDTestCase()
 	{}
 };

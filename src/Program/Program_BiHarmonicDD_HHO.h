@@ -1,14 +1,16 @@
 #pragma once
 #include <iomanip>
 #include "../ProgramArguments.h"
-#include "../HHO/BiHarmonicMixedForm_HHO.h"
-#include "../TestCases/BiHarmonic/BiHarTestCaseFactory.h"
+#include "../HHO/BiHarmonicDDMixedForm_HHO.h"
+#include "../TestCases/BiHarmonicDD/BiHarDDTestCaseFactory.h"
 #include "../Mesher/MeshFactory.h"
 #include "../Solver/SolverFactory.h"
 #include "../Utils/ExportModule.h"
 
+// Bi-harmonic equation in mixed form with Dirichlet BC enforced on both Laplacian problems (hence the suffix DD)
+
 template <int Dim>
-class Program_BiHarmonic_HHO
+class Program_BiHarmonicDD_HHO
 {
 public:
 	static void Execute(ProgramArguments& args)
@@ -23,7 +25,7 @@ public:
 		//   Test case defining the source function, boundary conditions and diffusion coefficient   //
 		//-------------------------------------------------------------------------------------------//
 
-		BiHarmonicTestCase<Dim>* testCase = BiHarTestCaseFactory<Dim>::Create(args.Problem);
+		BiHarmonicDDTestCase<Dim>* testCase = BiHarDDTestCaseFactory<Dim>::Create(args.Problem);
 
 		testCase->PrintPhysicalProblem();
 
@@ -66,7 +68,7 @@ public:
 		HHOParameters<Dim>* hho = new HHOParameters<Dim>(mesh, args.Discretization.Stabilization, reconstructionBasis, cellBasis, faceBasis, args.Discretization.OrthogonalizeElemBasesCode, args.Discretization.OrthogonalizeFaceBasesCode);
 
 		bool saveMatrixBlocks = args.Solver.SolverCode.compare("uamg") == 0 || args.Solver.SolverCode.compare("fcguamg") == 0;
-		BiHarmonicMixedForm_HHO<Dim>* biHarPb = new BiHarmonicMixedForm_HHO<Dim>(mesh, testCase, hho, saveMatrixBlocks);
+		BiHarmonicDDMixedForm_HHO<Dim>* biHarPb = new BiHarmonicDDMixedForm_HHO<Dim>(mesh, testCase, hho, saveMatrixBlocks);
 
 		cout << endl;
 		cout << "----------------------------------------------------------" << endl;
