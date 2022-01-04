@@ -539,6 +539,10 @@ private:
 
 	void OnEndSetup() override
 	{
+		if (_problem->TestCase->BC.Type == PbBoundaryConditions::FullNeumann)
+			ComputeVectorsForOrthogonalityWithConstantOne();
+
+		// Delete now useless stuff
 		if (this->ComesFrom == CoarseningType::H || this->ComesFrom == CoarseningType::HP)
 		{
 			// If finest level, delete everything you don't need to reconstruct the solution at the end
@@ -624,6 +628,81 @@ public:
 			return 0;
 		else
 			return Level::RestrictCost();
+	}
+
+	//----------------------------------//
+	// Full Neumann boundary conditions //
+	//----------------------------------//
+
+	// Let v be a function represented by the vector of coefficients x.
+	// Applying the zero mean condition is equivalent to orthogonalizing v to 1 (the constant function 1):
+	// v <- v - (v|1)/(1|1)*1
+	// Then, 
+	//              x <- x - x^T*M*one / one^T*M*one * one         (eq.1), 
+	// where one is the vector of coefficients corresponding to the constant function 1.
+	// In this function, we compute and store the vectors one and 
+	//                  gamma := M*one / one^T*M*one.
+	// (eq.1) then gives 
+	//              x <- x - x^T*gamma * one                       (eq.2)
+
+private:
+	Vector _one;
+	Vector _gamma;
+
+	void ComputeVectorsForOrthogonalityWithConstantOne()
+	{
+		_one = _problem->ProjectTraceOnFaceBases(Utils::ConstantFunctionOne);
+
+		_gamma = Vector(_problem->HHO->nTotalFaceCoeffs);
+
+		FaceParallelLoop<Dim> parallelLoopF(_problem->_mesh->Faces);
+		parallelLoopF.Execute([this](Face<Dim>* f)
+			{
+				Diff_HHOFace<Dim>* hhoFace = _problem->HHOFace(f);
+				int nUnknowns = _problem->HHO->nFaceUnknowns;
+				//Vector one = _one.segment(f->Number * nUnknowns, nUnknowns);
+				//Vector M_one = hhoFace->ApplyMassMatrix(one);
+				//double oneT_M_one = one.dot(M_one);
+				//_gamma.segment(f->Number * nUnknowns, nUnknowns) = M_one;
+				_gamma.segment(f->Number * nUnknowns, nUnknowns) = hhoFace->ApplyMassMatrix(_one.segment(f->Number * nUnknowns, nUnknowns));
+			});
+		double oneT_M_one = _problem->_mesh->SkeletonMeasure();
+		_gamma /= oneT_M_one;
+	}
+
+public:
+	// Fixes the constant in order to have a well-posed problem.
+	// Implements (eq.2) above.
+	void ApplyZeroMeanCondition(Vector& x) override
+	{
+		if (_problem->TestCase->BC.Type == PbBoundaryConditions::FullNeumann)
+		{
+			assert(_gamma.rows() > 0 && _one.rows() > 0 && "ComputeVectorsForOrthogonalityWithConstantOne() has not been called!");
+
+			/*FaceParallelLoop<Dim> parallelLoopF(_problem->_mesh->Faces);
+			parallelLoopF.Execute([this, &x](Face<Dim>* f)
+				{
+					int nUnknowns = _problem->HHO->nFaceUnknowns;
+					x.segment(f->Number * nUnknowns, nUnknowns) -= x.segment(f->Number * nUnknowns, nUnknowns).transpose() * _gamma.segment(f->Number * nUnknowns, nUnknowns) * _one.segment(f->Number * nUnknowns, nUnknowns);
+				});*/
+			x -= x.dot(_gamma) * _one;
+		}
+	}
+	Flops ApplyZeroMeanConditionCost(Vector& x) override 
+	{ 
+		return Cost::Dot(x) + Cost::VectorDAXPY(x);
+	}
+
+	void EnforceCompatibilityCondition(Vector& b) override
+	{
+		if (_problem->TestCase->BC.Type == PbBoundaryConditions::FullNeumann)
+		{
+
+		}
+	}
+	Flops EnforceCompatibilityConditionCost(Vector& b) override
+	{ 
+		return 0; 
 	}
 
 private:

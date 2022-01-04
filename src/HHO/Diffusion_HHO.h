@@ -13,7 +13,6 @@ template <int Dim>
 class Diffusion_HHO
 {
 private:
-	DiffusionTestCase<Dim>* _testCase;
 	string _filePrefix;
 	bool _staticCondensation = true;
 	bool _saveMatrixBlocks = false;
@@ -22,6 +21,7 @@ private:
 	vector<Diff_HHOFace<Dim>> _hhoFaces;
 public:
 	Mesh<Dim>* _mesh;
+	DiffusionTestCase<Dim>* TestCase;
 	SparseMatrix A;
 	Vector b;
 	Vector SystemSolution;
@@ -50,7 +50,7 @@ public:
 	Diffusion_HHO(Mesh<Dim>* mesh, DiffusionTestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool staticCondensation, bool saveMatrixBlocks)
 	{	
 		this->_mesh = mesh;
-		this->_testCase = testCase;
+		this->TestCase = testCase;
 		this->HHO = hho;
 		this->_staticCondensation = staticCondensation;
 		this->_saveMatrixBlocks = saveMatrixBlocks;
@@ -70,7 +70,7 @@ public:
 	Diffusion_HHO<Dim>* GetProblemOnCoarserMesh()
 	{
 		HHOParameters<Dim>* coarseHHO = new HHOParameters<Dim>(this->_mesh->CoarseMesh, HHO->Stabilization, HHO->ReconstructionBasis, HHO->CellBasis, HHO->FaceBasis, HHO->OrthogonalizeElemBasesCode, HHO->OrthogonalizeFaceBasesCode);
-		return new Diffusion_HHO<Dim>(this->_mesh->CoarseMesh, this->_testCase, coarseHHO, _staticCondensation, _saveMatrixBlocks);
+		return new Diffusion_HHO<Dim>(this->_mesh->CoarseMesh, this->TestCase, coarseHHO, _staticCondensation, _saveMatrixBlocks);
 	}
 
 	Diffusion_HHO<Dim>* GetProblemForLowerDegree(int faceDegree)
@@ -81,7 +81,7 @@ public:
 		FunctionalBasis<Dim-1>* faceBasis = new FunctionalBasis<Dim-1>(HHO->FaceBasis->CreateSameBasisForDegree(faceDegree));
 
 		HHOParameters<Dim>* lowerDegreeHHO = new HHOParameters<Dim>(this->_mesh, HHO->Stabilization, reconstructionBasis, cellBasis, faceBasis, HHO->OrthogonalizeElemBasesCode, HHO->OrthogonalizeFaceBasesCode);
-		return new Diffusion_HHO<Dim>(this->_mesh, this->_testCase, lowerDegreeHHO, _staticCondensation, _saveMatrixBlocks);
+		return new Diffusion_HHO<Dim>(this->_mesh, this->TestCase, lowerDegreeHHO, _staticCondensation, _saveMatrixBlocks);
 	}
 
 	Diffusion_HHO<Dim>* GetProblemOnCoarserMeshAndLowerDegree(int faceDegree)
@@ -92,7 +92,7 @@ public:
 		FunctionalBasis<Dim - 1>* faceBasis = new FunctionalBasis<Dim - 1>(HHO->FaceBasis->CreateSameBasisForDegree(faceDegree));
 
 		HHOParameters<Dim>* lowerDegreeCoarseMeshHHO = new HHOParameters<Dim>(this->_mesh->CoarseMesh, HHO->Stabilization, reconstructionBasis, cellBasis, faceBasis, HHO->OrthogonalizeElemBasesCode, HHO->OrthogonalizeFaceBasesCode);
-		return new Diffusion_HHO<Dim>(this->_mesh->CoarseMesh, this->_testCase, lowerDegreeCoarseMeshHHO, _staticCondensation, _saveMatrixBlocks);
+		return new Diffusion_HHO<Dim>(this->_mesh->CoarseMesh, this->TestCase, lowerDegreeCoarseMeshHHO, _staticCondensation, _saveMatrixBlocks);
 	}
 
 	double L2Error(DomFunction exactSolution)
@@ -136,9 +136,9 @@ public:
 
 		double constant = ConvergenceHiddenConstant(k);
 		double upperBound;
-		if ((  _testCase->Code().compare("sine") == 0
-			|| _testCase->Code().compare("poly") == 0
-			|| _testCase->Code().compare("zero") == 0) && _testCase->DiffField.IsHomogeneous) // solution is H^{r+2} with r in <= k
+		if ((  TestCase->Code().compare("sine") == 0
+			|| TestCase->Code().compare("poly") == 0
+			|| TestCase->Code().compare("zero") == 0) && TestCase->DiffField.IsHomogeneous) // solution is H^{r+2} with r in <= k
 		{
 			double r = k;
 			if (k == 0)
@@ -146,7 +146,7 @@ public:
 			else
 				upperBound = constant * pow(h, r + 2);
 		}
-		else if (this->_testCase->Code().compare("kellogg") == 0) // solution is H^{1+eps}
+		else if (this->TestCase->Code().compare("kellogg") == 0) // solution is H^{1+eps}
 		{
 			double eps = 0.1;
 			upperBound = constant * pow(h, 2 * eps); // source: Di Pietro's mail, but he's not totally sure...
@@ -432,12 +432,15 @@ public:
 				e->DeleteUselessMatricesAfterAssembly();
 			});
 
-		FaceParallelLoop<Dim> parallelLoopF(mesh->Faces);
-		parallelLoopF.Execute([this](Face<Dim>* face)
-			{
-				Diff_HHOFace<Dim>* f = HHOFace(face);
-				f->DeleteUselessMatricesAfterAssembly();
-			});
+		if (this->TestCase->BC.Type != PbBoundaryConditions::FullNeumann)
+		{
+			FaceParallelLoop<Dim> parallelLoopF(mesh->Faces);
+			parallelLoopF.Execute([this](Face<Dim>* face)
+				{
+					Diff_HHOFace<Dim>* f = HHOFace(face);
+					f->DeleteUselessMatricesAfterAssembly();
+				});
+		}
 
 		//------------------------------------//
 		// Aggregation of the parallel chunks //
@@ -526,9 +529,9 @@ public:
 
 		if (actions.AssembleRightHandSide)
 		{
-			this->B_T   = std::move(AssembleSourceTerm(_testCase->SourceFunction));
-			this->x_dF  = std::move(AssembleDirichletUnknowns(_testCase->BC.DirichletFunction));
-			this->B_ndF = std::move(AssembleNeumannTerm(_testCase->BC.NeumannFunction));
+			this->B_T   = std::move(AssembleSourceTerm(TestCase->SourceFunction));
+			this->x_dF  = std::move(AssembleDirichletUnknowns(TestCase->BC.DirichletFunction));
+			this->B_ndF = std::move(AssembleNeumannTerm(TestCase->BC.NeumannFunction));
 
 
 			// Update the right-hand side (elimination of the Dirichlet unknowns x_dF from the system)
@@ -635,10 +638,10 @@ public:
 		// - Cartesian element
 		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreMassMatrix(cellBasis);
 		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreMassMatrix(reconstructionBasis);
-		if (this->_testCase->DiffField.K1)
-			CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreReconstructK1StiffnessMatrix(this->_testCase->DiffField.K1, reconstructionBasis);
-		if (this->_testCase->DiffField.K2)
-			CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreReconstructK2StiffnessMatrix(this->_testCase->DiffField.K2, reconstructionBasis);
+		if (this->TestCase->DiffField.K1)
+			CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreReconstructK1StiffnessMatrix(this->TestCase->DiffField.K1, reconstructionBasis);
+		if (this->TestCase->DiffField.K2)
+			CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreReconstructK2StiffnessMatrix(this->TestCase->DiffField.K2, reconstructionBasis);
 		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix(cellBasis, reconstructionBasis);
 		// - Cartesian face
 		CartesianShape<Dim, Dim - 1>::InitReferenceShape()->ComputeAndStoreMassMatrix(faceBasis);
@@ -778,6 +781,21 @@ public:
 			}
 		);
 		return x_dF;
+	}
+
+	// Returns the vector of coefficients corresponding to the representation (or rather, the L2-orthogonal projection)
+	// of the trace of a (volumic) continuous function on the face bases
+	Vector ProjectTraceOnFaceBases(DomFunction continuousFunction)
+	{
+		Vector x_F = Vector(HHO->nTotalFaceCoeffs);
+		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->Faces, [this, &x_F, &continuousFunction](Face<Dim>* f)
+			{
+				Diff_HHOFace<Dim>* face = HHOFace(f);
+				BigNumber i = f->Number * HHO->nFaceUnknowns;
+				x_F.segment(i, HHO->nFaceUnknowns) = face->ProjectOnBasis(continuousFunction);
+			}
+		);
+		return x_F;
 	}
 
 	// 0 on the interior faces, computation for Neumann faces

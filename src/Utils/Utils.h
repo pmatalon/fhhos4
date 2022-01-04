@@ -16,6 +16,15 @@ public:
 
 	static ProgramArguments ProgramArgs;
 
+	//-------------------//
+	// Util DomFunctions //
+	//-------------------//
+
+	static double ConstantFunctionOne(const DomPoint& p)
+	{
+		return 1.0;
+	}
+
 	//-------------//
 	// Computation //
 	//-------------//

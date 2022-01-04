@@ -158,6 +158,14 @@ public:
 		return 2 * P.nonZeros();
 	}
 
+	// Used for full Neumann boundary conditions. Fixes the constant in order to have a well-posed problem.
+	virtual void ApplyZeroMeanCondition(Vector& x) {}
+	virtual Flops ApplyZeroMeanConditionCost(Vector& x) { return 0; }
+
+	// Used for full Neumann boundary conditions. Ensures solvability (existence of a solution)
+	virtual void EnforceCompatibilityCondition(Vector& b) {}
+	virtual Flops EnforceCompatibilityConditionCost(Vector& b) { return 0; }
+
 	virtual BigNumber NUnknowns()
 	{
 		if (this->OperatorMatrix)

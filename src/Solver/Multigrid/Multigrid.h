@@ -499,6 +499,8 @@ private:
 			// Residual equation Ae=r solved on the coarse grid //
 			//--------------------------------------------------//
 
+			level->CoarserLevel->EnforceCompatibilityCondition(rc);                       result.AddWorkInFlops(level->EnforceCompatibilityConditionCost(rc));
+
 			Vector ec;
 			if (this->Cycle == 'V' || this->Cycle == 'W')
 			{
@@ -591,6 +593,8 @@ private:
 
 			//auto flopPostSmooth = result.IterationComputationalWork() - flopBeforePostSmooth;
 			//cout << "- flopPostSmooth = " << flopPostSmooth << endl;
+
+			level->ApplyZeroMeanCondition(x);                                         result.AddWorkInFlops(level->ApplyZeroMeanConditionCost(x));
 		}
 	}
 

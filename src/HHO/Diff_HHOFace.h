@@ -92,6 +92,20 @@ public:
 		else
 			return _massMatrix;
 	}
+	Vector ApplyMassMatrix(const Vector& v)
+	{
+		if (HHO->OrthonormalizeFaceBases())
+			return v;
+		else if (HHO->OrthogonalizeFaceBases())
+		{
+			Vector d(this->Basis->Size());
+			for (BasisFunction<Dim-1>* phi : this->Basis->LocalFunctions)
+				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim-1>*>(phi)->NormSquare;
+			return d.asDiagonal() * v;
+		}
+		else
+			return _massMatrix * v;
+	}
 	DenseMatrix SolveMassMatrix(const DenseMatrix& M)
 	{
 		if (HHO->OrthonormalizeFaceBases())
