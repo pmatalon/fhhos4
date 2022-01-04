@@ -24,12 +24,14 @@ public:
 		if (pb.BCCode.compare("d") == 0)
 		{
 			// These are already the default value, but I reset them as an example of how to apply boundary conditions.
+			this->BC.Type = PbBoundaryConditions::FullDirichlet;
 			this->BC.BoundaryConditionPartition = BoundaryConditions::DirichletEverywhere;
 			this->BC.DirichletFunction = BoundaryConditions::Homogeneous;
 			this->BC.Description = "Homogeneous Dirichlet";
 		}
 		else if (pb.BCCode.compare("m") == 0)
 		{
+			this->BC.Type = PbBoundaryConditions::MixedDirichletNeumann;
 			this->BC.BoundaryConditionPartition = BoundaryConditions::NeumannOnHoles;
 			this->BC.DirichletFunction = BoundaryConditions::Homogeneous;
 			this->BC.NeumannFunction = BoundaryConditions::Homogeneous;

@@ -49,6 +49,7 @@ public:
 		// Boundary conditions
 		if (pb.BCCode.compare("d") == 0)
 		{
+			this->BC.Type = PbBoundaryConditions::FullDirichlet;
 			this->BC.BoundaryConditionPartition = BoundaryConditions::DirichletEverywhere;
 			if (pb.SourceCode.compare("exp") == 0)
 			{
@@ -73,6 +74,7 @@ public:
 		}
 		else if (pb.BCCode.compare("m") == 0)
 		{
+			this->BC.Type = PbBoundaryConditions::MixedDirichletNeumann;
 			this->BC.BoundaryConditionPartition = BoundaryConditions::MixedConditionsExample;
 			this->BC.DirichletFunction = BoundaryConditions::Homogeneous;
 			this->BC.NeumannFunction = BoundaryConditions::Homogeneous;
@@ -81,6 +83,7 @@ public:
 		else if (pb.BCCode.compare("n") == 0)
 		{
 			Utils::Warning("Full Neumann conditions do not yield a well-posed problem!");
+			this->BC.Type = PbBoundaryConditions::FullNeumann;
 			this->BC.BoundaryConditionPartition = BoundaryConditions::NeumannEverywhere;
 			this->BC.NeumannFunction = BoundaryConditions::Homogeneous;
 			this->BC.Description = "Homogeneous Neumann";

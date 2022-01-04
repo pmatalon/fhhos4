@@ -36,6 +36,13 @@ enum class EquationType : unsigned
 	BiHarmonicDD
 };
 
+enum class PbBoundaryConditions : unsigned
+{
+	FullDirichlet,
+	MixedDirichletNeumann,
+	FullNeumann
+};
+
 enum class BoundaryConditionType : unsigned
 {
 	NotOnBoundary = 0,

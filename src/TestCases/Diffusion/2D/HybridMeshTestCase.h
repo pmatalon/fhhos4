@@ -38,12 +38,7 @@ public:
 
 		// Boundary conditions
 		if (pb.BCCode.compare("d") == 0)
-		{
-			// These are already the default value, but I reset them as an example of how to apply boundary conditions.
-			this->BC.BoundaryConditionPartition = BoundaryConditions::DirichletEverywhere;
-			this->BC.DirichletFunction = BoundaryConditions::Homogeneous;
-			this->BC.Description = "Homogeneous Dirichlet";
-		}
+			this->BC = BoundaryConditions::HomogeneousDirichletEverywhere();
 		else
 			Utils::FatalError("The requested boundary conditions are not defined in this test case.");
 	}

@@ -6,6 +6,7 @@ using namespace std;
 class BoundaryConditions
 {
 public:
+	PbBoundaryConditions Type = PbBoundaryConditions::FullDirichlet;
 	string Description;
 	function<BoundaryConditionType(BoundaryGroup*)> BoundaryConditionPartition = nullptr;
 	DomFunction DirichletFunction = nullptr;
@@ -13,14 +14,16 @@ public:
 
 	BoundaryConditions()
 	{
+		Type = PbBoundaryConditions::FullDirichlet;
 		Description = "Dirichlet";
 		BoundaryConditionPartition = DirichletEverywhere;
 		DirichletFunction = Homogeneous;
-		NeumannFunction = Homogeneous;
+		NeumannFunction = nullptr;
 	}
 
-	BoundaryConditions(function<BoundaryConditionType(BoundaryGroup*)> getBoundaryConditionType, DomFunction dirichletFunction, DomFunction neumannFunction)
+	BoundaryConditions(PbBoundaryConditions type, function<BoundaryConditionType(BoundaryGroup*)> getBoundaryConditionType, DomFunction dirichletFunction, DomFunction neumannFunction)
 	{
+		this->Type = type;
 		this->BoundaryConditionPartition = getBoundaryConditionType;
 		this->DirichletFunction = dirichletFunction;
 		this->NeumannFunction = neumannFunction;
@@ -29,6 +32,7 @@ public:
 	static BoundaryConditions HomogeneousDirichletEverywhere()
 	{
 		BoundaryConditions bc;
+		bc.Type = PbBoundaryConditions::FullDirichlet;
 		bc.BoundaryConditionPartition = DirichletEverywhere;
 		bc.DirichletFunction = Homogeneous;
 		bc.NeumannFunction = nullptr;
@@ -38,6 +42,7 @@ public:
 	static BoundaryConditions HomogeneousNeumannEverywhere()
 	{
 		BoundaryConditions bc;
+		bc.Type = PbBoundaryConditions::FullNeumann;
 		bc.BoundaryConditionPartition = NeumannEverywhere;
 		bc.DirichletFunction = nullptr;
 		bc.NeumannFunction = Homogeneous;
