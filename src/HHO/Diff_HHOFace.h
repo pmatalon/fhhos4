@@ -106,7 +106,7 @@ public:
 		else
 			return _massMatrix * v;
 	}
-	DenseMatrix SolveMassMatrix(const DenseMatrix& M)
+	DenseMatrix SolveMassMatrix(const DenseMatrix& M) // also works for vectors
 	{
 		if (HHO->OrthonormalizeFaceBases())
 			return M;
@@ -120,7 +120,8 @@ public:
 		else
 			return _massMatrixSolver.solve(M);
 	}
-	Vector SolveMassMatrix(const Vector& v)
+	// Included in the preceding function!
+	/*Vector SolveMassMatrix(const Vector& v)
 	{
 		if (HHO->OrthonormalizeFaceBases())
 			return v;
@@ -133,7 +134,7 @@ public:
 		}
 		else
 			return _massMatrixSolver.solve(v);
-	}
+	}*/
 
 	DenseMatrix MassMatrix(FunctionalBasis<Dim - 1>* basis, Element<Dim>* element, FunctionalBasis<Dim>* cellBasis)
 	{

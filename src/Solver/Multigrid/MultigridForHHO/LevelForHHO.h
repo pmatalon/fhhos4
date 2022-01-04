@@ -636,14 +636,18 @@ public:
 
 	// Let v be a function represented by the vector of coefficients x.
 	// Applying the zero mean condition is equivalent to orthogonalizing v to 1 (the constant function 1):
-	// v <- v - (v|1)/(1|1)*1
-	// Then, 
-	//              x <- x - x^T*M*one / one^T*M*one * one         (eq.1), 
-	// where one is the vector of coefficients corresponding to the constant function 1.
-	// In this function, we compute and store the vectors one and 
-	//                  gamma := M*one / one^T*M*one.
-	// (eq.1) then gives 
+	//              v <- v - (v|1)/(1|1)*1
+	// Let 'one' be the vector of coefficients corresponding to the constant function 1. 
+	// Then the discrete conterpart gives
+	//              x <- x - [(phi_i|1)]_i / (1|1) * one           (eq.1)
+	// Let gamma0 := [(phi_i|1)]_i. 
+	// In a setup function, we compute and store the vectors
+	//              one   := M^-1 * gamma0,
+	//              gamma := gamma0 / (1|1),
+	// where M^-1 is the face mass matrix and (1|1) = |F_h| (= measure of the skeleton).
+	// (eq.1) becomes 
 	//              x <- x - x^T*gamma * one                       (eq.2)
+	// which is implemented in the ApplyZeroMeanCondition() function, called during multigrid execution.
 
 private:
 	Vector _one;
@@ -651,23 +655,10 @@ private:
 
 	void ComputeVectorsForOrthogonalityWithConstantOne()
 	{
-		_one = _problem->ProjectTraceOnFaceBases(Utils::ConstantFunctionOne);
-
-		_gamma = Vector(_problem->HHO->nTotalFaceCoeffs);
-
-		FaceParallelLoop<Dim> parallelLoopF(_problem->_mesh->Faces);
-		parallelLoopF.Execute([this](Face<Dim>* f)
-			{
-				Diff_HHOFace<Dim>* hhoFace = _problem->HHOFace(f);
-				int nUnknowns = _problem->HHO->nFaceUnknowns;
-				//Vector one = _one.segment(f->Number * nUnknowns, nUnknowns);
-				//Vector M_one = hhoFace->ApplyMassMatrix(one);
-				//double oneT_M_one = one.dot(M_one);
-				//_gamma.segment(f->Number * nUnknowns, nUnknowns) = M_one;
-				_gamma.segment(f->Number * nUnknowns, nUnknowns) = hhoFace->ApplyMassMatrix(_one.segment(f->Number * nUnknowns, nUnknowns));
-			});
-		double oneT_M_one = _problem->_mesh->SkeletonMeasure();
-		_gamma /= oneT_M_one;
+		_gamma = _problem->InnerProdWithFaceBasis(Utils::ConstantFunctionOne);
+		_one = _problem->SolveFaceMassMatrix(_gamma);
+		double normOneSquare = _problem->_mesh->SkeletonMeasure();
+		_gamma /= normOneSquare;
 	}
 
 public:

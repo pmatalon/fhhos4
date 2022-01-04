@@ -783,21 +783,6 @@ public:
 		return x_dF;
 	}
 
-	// Returns the vector of coefficients corresponding to the representation (or rather, the L2-orthogonal projection)
-	// of the trace of a (volumic) continuous function on the face bases
-	Vector ProjectTraceOnFaceBases(DomFunction continuousFunction)
-	{
-		Vector x_F = Vector(HHO->nTotalFaceCoeffs);
-		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->Faces, [this, &x_F, &continuousFunction](Face<Dim>* f)
-			{
-				Diff_HHOFace<Dim>* face = HHOFace(f);
-				BigNumber i = f->Number * HHO->nFaceUnknowns;
-				x_F.segment(i, HHO->nFaceUnknowns) = face->ProjectOnBasis(continuousFunction);
-			}
-		);
-		return x_F;
-	}
-
 	// 0 on the interior faces, computation for Neumann faces
 	Vector AssembleNeumannTerm(DomFunction neumannFunction)
 	{
@@ -934,12 +919,39 @@ public:
 				if (f->HasDirichletBC())
 					return;
 				Diff_HHOFace<Dim>* face = HHOFace(f);
-				BigNumber i = face->Number() * HHO->nFaceUnknowns;// FirstDOFGlobalNumber(f);
+				BigNumber i = face->Number() * HHO->nFaceUnknowns;
 
 				vectorOfDoFs.segment(i, HHO->nFaceUnknowns) = face->ProjectOnBasis(func);
 			}
 		);
 		return vectorOfDoFs;
+	}
+
+	Vector InnerProdWithFaceBasis(DomFunction func)
+	{
+		Vector innerProds = Vector(HHO->nTotalFaceUnknowns);
+		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->Faces, [this, &innerProds, func](Face<Dim>* f)
+			{
+				Diff_HHOFace<Dim>* face = HHOFace(f);
+				BigNumber i = f->Number * HHO->nFaceUnknowns;
+
+				innerProds.segment(i, HHO->nFaceUnknowns) = face->InnerProductWithBasis(func);
+			}
+		);
+		return innerProds;
+	}
+
+	Vector SolveFaceMassMatrix(Vector v)
+	{
+		Vector res(v.rows());
+		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->Faces, [this, &v, &res](Face<Dim>* f)
+			{
+				Diff_HHOFace<Dim>* face = HHOFace(f);
+				BigNumber i = f->Number * HHO->nFaceUnknowns;
+
+				res.segment(i, HHO->nFaceUnknowns) = face->SolveMassMatrix(v.segment(i, HHO->nFaceUnknowns));
+			});
+		return res;
 	}
 
 	double IntegralFromFaceDoFs(Vector dofs, int polyDegree)
