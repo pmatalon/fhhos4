@@ -65,7 +65,7 @@ public:
 		else if (pb.SourceCode.compare("exp") == 0)
 			this->SourceFunction = this->ExpSource2D;
 		else if (pb.SourceCode.compare("zero") == 0)
-			this->SourceFunction = this->Zero;
+			this->SourceFunction = Utils::ConstantFunctionZero;
 		else
 			Utils::FatalError("Unmanaged source code");
 

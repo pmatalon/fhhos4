@@ -47,6 +47,7 @@ public:
 	void AssembleDiffPb2(const Vector& solutionDiffPb1)
 	{
 		_diffPb1.ChangeSourceFunction(solutionDiffPb1);
+		_diffPb1.SetCondensedRHS();
 	}
 
 	~BiHarmonicDDMixedForm_HHO()

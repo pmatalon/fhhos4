@@ -63,6 +63,14 @@ private:
 	{
 		return this->MeshElement->GradPhiOnFace(face->MeshFace, phi);
 	}
+	inline DomPoint ConvertToDomain(const RefPoint& refPoint) const
+	{
+		return this->MeshElement->ConvertToDomain(refPoint);
+	}
+	inline RefPoint ConvertToReference(const DomPoint& domainPoint) const
+	{
+		return this->MeshElement->ConvertToReference(domainPoint);
+	}
 
 	//----------------------------//
 	//   HHO-specific integrals   //
@@ -229,6 +237,34 @@ public:
 	Vector ApplyCellMassMatrix(const Vector& v)
 	{
 		return this->ApplyMassMatrix(this->CellBasis, v);
+	}
+
+	double IntegralReconstruct(const Vector& reconstructCoeffs)
+	{
+		double integral = 0;
+		for (int i=0; i< this->ReconstructionBasis->Size(); i++)
+			integral += reconstructCoeffs[i] * this->MeshElement->Integral(this->ReconstructionBasis->LocalFunctions[i]); // TODO: this can be computed only once on the reference element
+		return integral;
+	}
+
+private:
+	double InnerProduct(BasisFunction<Dim>* phi, DomFunction f)
+	{
+		RefFunction functionToIntegrate = [this, f, phi](const RefPoint& refElementPoint) {
+			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
+			return f(domainPoint) * phi->Eval(refElementPoint);
+		};
+
+		return this->MeshElement->Integral(functionToIntegrate);
+	}
+
+public:
+	Vector InnerProductWithReconstructBasis(DomFunction f)
+	{
+		Vector innerProducts(this->ReconstructionBasis->Size());
+		for (BasisFunction<Dim>*phi : this->ReconstructionBasis->LocalFunctions)
+			innerProducts(phi->LocalNumber) = InnerProduct(phi, f);
+		return innerProducts;
 	}
 
 private:

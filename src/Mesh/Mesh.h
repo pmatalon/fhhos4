@@ -230,10 +230,26 @@ public:
 		return 0;
 	}
 
+	double Measure()
+	{
+		double measure = 0;
+		for (Element<Dim>* e : this->Elements)
+			measure += e->Measure();
+		return measure;
+	}
+
 	double SkeletonMeasure()
 	{
 		double measure = 0;
 		for (Face<Dim>* face : this->Faces)
+			measure += face->Measure();
+		return measure;
+	}
+
+	double BoundaryMeasure()
+	{
+		double measure = 0;
+		for (Face<Dim>* face : this->BoundaryFaces)
 			measure += face->Measure();
 		return measure;
 	}

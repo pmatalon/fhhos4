@@ -20,9 +20,13 @@ public:
 	// Util DomFunctions //
 	//-------------------//
 
+	static double ConstantFunctionZero(const DomPoint& p)
+	{
+		return 0;
+	}
 	static double ConstantFunctionOne(const DomPoint& p)
 	{
-		return 1.0;
+		return 1;
 	}
 
 	//-------------//

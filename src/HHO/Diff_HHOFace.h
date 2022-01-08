@@ -167,6 +167,14 @@ public:
 		return ComputeTraceMatrix(element, cellBasis);
 	}
 
+	double Integral(const Vector& coeffs)
+	{
+		double integral = 0;
+		for (int i = 0; i < this->Basis->Size(); i++)
+			integral += coeffs[i] * this->MeshFace->Integral(this->Basis->LocalFunctions[i]); // TODO: this can be computed only once on the reference element
+		return integral;
+	}
+
 private:
 	double InnerProduct(BasisFunction<Dim - 1>* phi, DomFunction f)
 	{

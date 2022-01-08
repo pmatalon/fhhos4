@@ -28,7 +28,7 @@ public:
 		else if (pb.SourceCode.compare("exp") == 0)
 			this->SourceFunction = this->ExpSource3D;
 		else if (pb.SourceCode.compare("zero") == 0)
-			this->SourceFunction = this->Zero;
+			this->SourceFunction = Utils::ConstantFunctionZero;
 		else
 			Utils::FatalError("Unmanaged source code");
 
@@ -52,7 +52,7 @@ public:
 			else if (pb.SourceCode.compare("exp") == 0)
 				this->ExactSolution = this->ExpSolution3D;
 			else if (pb.SourceCode.compare("zero") == 0)
-				this->ExactSolution = this->Zero;
+				this->ExactSolution = Utils::ConstantFunctionZero;
 		}
 	}
 

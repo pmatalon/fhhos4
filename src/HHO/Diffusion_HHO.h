@@ -115,7 +115,7 @@ public:
 		double absoluteError = 0;
 		double normExactSolution = 0;
 
-		parallelLoop.AggregateChunkResults([&absoluteError, &normExactSolution](ChunkResult chunkResult)
+		parallelLoop.AggregateChunkResults([&absoluteError, &normExactSolution](ChunkResult& chunkResult)
 			{
 				absoluteError += chunkResult.absoluteError;
 				normExactSolution += chunkResult.normExactSolution;
@@ -296,6 +296,15 @@ public:
 		//               [  A_T_T  |  A_T_ndF   ] [ x_T   ]     [ B_T   ]       [ A_T_dF   * x_dF ]
 		//               [ --------|----------- ] [-------]  =  [-------]   -   [-----------------]
 		//               [   sym   |  A_ndF_ndF ] [ x_ndF ]     [ B_ndF ]       [ A_ndF_dF * x_dF ]
+		//                                                     |___________________________________|
+		//                                                                       |
+		//                                                                   [ B_T   ]
+		//                                                              new  [-------]
+		//                                                                   [ B_ndF ]
+		//
+		// Static condensation:
+		// 
+		//       A_ndF_ndF - A_T_ndF^T * A_T_T^-1 * A_T_ndF  =  B_ndF - A_T_ndF^T * A_T_T^-1 * B_T
 
 
 		//-------------------------------//
@@ -783,7 +792,11 @@ public:
 		return x_dF;
 	}
 
-	// 0 on the interior faces, computation for Neumann faces
+	//         [    0    ]   <---- interior faces
+	// b_ndF = [---------]
+	//         [ b_neumF ]   <---- Neumann faces
+	// 
+	// where b_neumF = [ (neumannFunc|phi_i)_F ]
 	Vector AssembleNeumannTerm(DomFunction neumannFunction)
 	{
 		Vector b_ndF = Vector::Zero(HHO->nTotalFaceUnknowns);
@@ -800,9 +813,34 @@ public:
 		return b_ndF;
 	}
 
+	//         [    0    ]   <---- interior faces
+	// b_ndF = [---------]
+	//         [ b_neumF ]   <---- Neumann faces
+	// 
+	// where b_neumF = [ M * coeffs ]
+	Vector AssembleNeumannTerm(const Vector& neumannFuncCoeffs)
+	{
+		assert(neumannFuncCoeffs.rows() == HHO->nNeumannUnknowns);
+		assert(neumannFuncCoeffs.rows() == this->_mesh->NeumannFaces.size() * HHO->nFaceUnknowns);
+
+		Vector b_ndF = Vector::Zero(HHO->nTotalFaceUnknowns);
+		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->NeumannFaces, [this, &b_ndF, &neumannFuncCoeffs](Face<Dim>* f)
+			{
+				Diff_HHOFace<Dim>* face = HHOFace(f);
+				//BigNumber i = FirstDOFGlobalNumber(face) - HHO->nTotalCellUnknowns;
+				BigNumber i = face->Number() * HHO->nFaceUnknowns;
+				assert(i >= HHO->nInteriorFaces * HHO->nFaceUnknowns);
+				BigNumber j = (face->Number() - HHO->nInteriorFaces) * HHO->nFaceUnknowns;
+				b_ndF.segment(i, HHO->nFaceUnknowns) = face->ApplyMassMatrix(neumannFuncCoeffs.segment(j, HHO->nFaceUnknowns));
+			}
+		);
+		return b_ndF;
+	}
+
 	//-------------------------------------------------------------------------------------------------//
 	// After solving the faces, construction of the higher-order approximation using the reconstructor //
 	//-------------------------------------------------------------------------------------------------//
+
 	void ReconstructHigherOrderApproximation()
 	{
 		Vector globalReconstructedSolution(HHO->nElements * HHO->nReconstructUnknowns);
@@ -855,9 +893,40 @@ public:
 		this->B_T   -= A_T_dF   * this->x_dF;
 		this->B_ndF -= A_ndF_dF * this->x_dF;
 		*/
+	}
+	void ChangeSourceFunction(DomFunction sourceFunction)
+	{
+		this->B_T = std::move(AssembleSourceTerm(sourceFunction));
+	}
+	void ChangeSourceFunctionToZero()
+	{
+		this->B_T = Vector::Zero(HHO->nTotalCellUnknowns);
+	}
 
-		// Static condensation
+	void ChangeNeumannFunction(DomFunction neumannFunction)
+	{
+		this->B_ndF = std::move(AssembleNeumannTerm(neumannFunction));
+	}
+	void ChangeNeumannFunction(const Vector& neumannFuncCoeffs)
+	{
+		this->B_ndF = std::move(AssembleNeumannTerm(neumannFuncCoeffs));
+	}
+	void ChangeNeumannFunctionToZero()
+	{
+		this->B_ndF = Vector::Zero(HHO->nTotalFaceUnknowns);
+	}
+
+	// Requires that the Dirichlet unknowns have already be eliminated (or that the Dirichlet BC is homogeneous)
+	Vector& SetCondensedRHS()
+	{
 		this->b = this->B_ndF -this->A_T_ndF.transpose() * Solve_A_T_T(this->B_T);
+		return this->b;
+	}
+
+	// Requires that the Dirichlet unknowns have already be eliminated (or that the Dirichlet BC is homogeneous)
+	Vector ComputeCondensedRHS(const Vector& b_ndF, const Vector& b_T)
+	{
+		return b_ndF - this->A_T_ndF.transpose() * Solve_A_T_T(b_T);
 	}
 
 	//---------------------------------------//
@@ -927,6 +996,20 @@ public:
 		return vectorOfDoFs;
 	}
 
+	Vector ProjectOnBoundaryDiscreteSpace(DomFunction func)
+	{
+		Vector vectorOfDoFs = Vector(HHO->nBoundaryFaces * HHO->nFaceUnknowns);
+		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->BoundaryFaces, [this, &vectorOfDoFs, func](Face<Dim>* f)
+			{
+				Diff_HHOFace<Dim>* face = HHOFace(f);
+				BigNumber i = (face->Number() - HHO->nInteriorFaces) * HHO->nFaceUnknowns;
+
+				vectorOfDoFs.segment(i, HHO->nFaceUnknowns) = face->ProjectOnBasis(func);
+			}
+		);
+		return vectorOfDoFs;
+	}
+
 	Vector InnerProdWithFaceBasis(DomFunction func)
 	{
 		Vector innerProds = Vector(HHO->nTotalFaceUnknowns);
@@ -941,7 +1024,21 @@ public:
 		return innerProds;
 	}
 
-	Vector SolveFaceMassMatrix(Vector v)
+	Vector InnerProdWithReconstructBasis(DomFunction func)
+	{
+		Vector innerProds = Vector(HHO->nTotalReconstructUnknowns);
+		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, &innerProds, func](Element<Dim>* e)
+			{
+				Diff_HHOElement<Dim>* elem = HHOElement(e);
+				BigNumber i = e->Number * HHO->nReconstructUnknowns;
+
+				innerProds.segment(i, HHO->nReconstructUnknowns) = elem->InnerProductWithReconstructBasis(func);
+			}
+		);
+		return innerProds;
+	}
+
+	Vector SolveFaceMassMatrix(const Vector& v)
 	{
 		Vector res(v.rows());
 		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->Faces, [this, &v, &res](Face<Dim>* f)
@@ -954,7 +1051,20 @@ public:
 		return res;
 	}
 
-	double IntegralFromFaceDoFs(Vector dofs, int polyDegree)
+	Vector SolveReconstructMassMatrix(const Vector& v)
+	{
+		Vector res(v.rows());
+		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, &v, &res](Element<Dim>* e)
+			{
+				Diff_HHOElement<Dim>* elem = HHOElement(e);
+				BigNumber i = e->Number * HHO->nReconstructUnknowns;
+
+				res.segment(i, HHO->nReconstructUnknowns) = elem->SolveReconstructMassMatrix(v.segment(i, HHO->nReconstructUnknowns));
+			});
+		return res;
+	}
+
+	/*double IntegralFromFaceDoFs(Vector dofs, int polyDegree)
 	{
 		auto faceBasis = HHO->FaceBasis;
 
@@ -979,6 +1089,106 @@ public:
 				integral += chunkResult.integral;
 			});
 		return integral;
+	}*/
+
+	double IntegralOverDomain(DomFunction func)
+	{
+		struct ChunkResult { double total = 0; };
+
+		ParallelLoop<Element<Dim>*, ChunkResult> parallelLoop(_mesh->Elements);
+		parallelLoop.Execute([this, func](Element<Dim>* e, ParallelChunk<ChunkResult>* chunk)
+			{
+				chunk->Results.total += e->Integral(func);
+			});
+
+		double total = 0;
+		parallelLoop.AggregateChunkResults([&total](ChunkResult chunkResult)
+			{
+				total += chunkResult.total;
+			});
+		return total;
+	}
+
+	double IntegralOverBoundary(DomFunction func)
+	{
+		struct ChunkResult { double total = 0; };
+
+		ParallelLoop<Face<Dim>*, ChunkResult> parallelLoop(_mesh->BoundaryFaces);
+		parallelLoop.Execute([this, func](Face<Dim>* f, ParallelChunk<ChunkResult>* chunk)
+			{
+				chunk->Results.total += f->Integral(func);
+			});
+
+		double total = 0;
+		parallelLoop.AggregateChunkResults([&total](ChunkResult chunkResult)
+			{
+				total += chunkResult.total;
+			});
+		return total;
+	}
+
+	double IntegralOverSkeletonFromFaceCoeffs(const Vector& faceCoeffs)
+	{
+		assert(faceCoeffs.rows() == HHO->nFaces * HHO->nFaceUnknowns);
+
+		struct ChunkResult { double total = 0; };
+
+		ParallelLoop<Face<Dim>*, ChunkResult> parallelLoop(_mesh->Faces);
+		parallelLoop.Execute([this, &faceCoeffs](Face<Dim>* f, ParallelChunk<ChunkResult>* chunk)
+			{
+				Diff_HHOFace<Dim>* hhoFace = HHOFace(f);
+				auto i = f->Number * HHO->nFaceUnknowns;
+				chunk->Results.total += hhoFace->Integral(faceCoeffs.segment(i, HHO->nFaceUnknowns));
+			});
+
+		double total = 0;
+		parallelLoop.AggregateChunkResults([&total](ChunkResult chunkResult)
+			{
+				total += chunkResult.total;
+			});
+		return total;
+	}
+
+	double IntegralOverBoundaryFromFaceCoeffs(const Vector& boundaryFaceCoeffs)
+	{
+		assert(boundaryFaceCoeffs.rows() == HHO->nBoundaryFaces * HHO->nFaceUnknowns);
+
+		struct ChunkResult { double total = 0; };
+
+		ParallelLoop<Face<Dim>*, ChunkResult> parallelLoop(_mesh->BoundaryFaces);
+		parallelLoop.Execute([this, &boundaryFaceCoeffs](Face<Dim>* f, ParallelChunk<ChunkResult>* chunk)
+			{
+				Diff_HHOFace<Dim>* hhoFace = HHOFace(f);
+				auto i = (f->Number - HHO->nInteriorFaces) * HHO->nFaceUnknowns;
+				chunk->Results.total += hhoFace->Integral(boundaryFaceCoeffs.segment(i, HHO->nFaceUnknowns));
+			});
+
+		double total = 0;
+		parallelLoop.AggregateChunkResults([&total](ChunkResult chunkResult)
+			{
+				total += chunkResult.total;
+			});
+		return total;
+	}
+
+	double MeanValueFromReconstructedCoeffs(const Vector& reconstructedCoeffs)
+	{
+		struct ChunkResult { double total = 0; };
+
+		ParallelLoop<Element<Dim>*, ChunkResult> parallelLoop(_mesh->Elements);
+		parallelLoop.Execute([this, &reconstructedCoeffs](Element<Dim>* e, ParallelChunk<ChunkResult>* chunk)
+			{
+				Diff_HHOElement<Dim>* hhoElem = HHOElement(e);
+				auto i = e->Number * HHO->nReconstructUnknowns;
+				chunk->Results.total += hhoElem->IntegralReconstruct(reconstructedCoeffs.segment(i, HHO->nReconstructUnknowns));
+			});
+
+		double total = 0;
+		parallelLoop.AggregateChunkResults([&total](ChunkResult chunkResult)
+			{
+				total += chunkResult.total;
+			});
+		return total / _mesh->Measure();
 	}
 
 private:

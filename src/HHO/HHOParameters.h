@@ -27,6 +27,7 @@ struct HHOParameters
 	BigNumber nTotalFaceCoeffs;
 	BigNumber nTotalHybridUnknowns;
 	BigNumber nTotalHybridCoeffs;
+	BigNumber nTotalReconstructUnknowns;
 
 	BigNumber nDirichletCoeffs;
 	BigNumber nNeumannUnknowns;
@@ -60,6 +61,7 @@ struct HHOParameters
 		nTotalFaceCoeffs = nFaces * nFaceUnknowns;
 		nTotalHybridUnknowns = nTotalCellUnknowns + nTotalFaceUnknowns;
 		nTotalHybridCoeffs = nTotalCellUnknowns + nTotalFaceCoeffs;
+		nTotalReconstructUnknowns = nElements * nReconstructUnknowns;
 
 		nDirichletCoeffs = nDirichletFaces * nFaceUnknowns;
 		nNeumannUnknowns = nNeumannFaces * nFaceUnknowns;

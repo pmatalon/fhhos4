@@ -28,7 +28,7 @@ public:
 		this->DiffField = Square4quadrantsGeometry::DiffField(heterogeneityRatio, anisotropyRatio, anisotropyAngle);
 
 		// Source function
-		this->SourceFunction = this->Zero;
+		this->SourceFunction = Utils::ConstantFunctionZero;
 
 		// Boundary conditions
 		if (pb.BCCode.compare("d") != 0)

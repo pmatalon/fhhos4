@@ -62,18 +62,29 @@ private:
 			result = IterationResult(result);
 
 			if (this->IterationCount > 0)
-				d = z + beta * d;
+			{
+				// Update direction of research
+				d = z + beta * d;                               // TODO AddWork
+			}
 
 			Vector Ad = A * d;                                  result.AddWorkInFlops(Cost::MatVec(A));
+
+			// Step length in the direction of research
 			double alpha = r_dot_z / (d.dot(Ad));               result.AddWorkInFlops(Cost::Dot(r));
+
+			// Moving from the current solution to the next
+			// by taking the step in the direction of research
 			x += alpha * d;                                     result.AddWorkInFlops(Cost::VectorDAXPY(x));
 
 			double old_r_dot_old_z = r_dot_z; // save the dot product before overwriting r and z
 
+			// New residual
 			r -= alpha * Ad;                                    result.AddWorkInFlops(Cost::VectorDAXPY(r));
 			z = Precond.Apply(r);                               result.AddWorkInMFlops(Precond.SolvingComputationalWork());
 
+			// New dot product
 			r_dot_z = r.dot(z);                                 result.AddWorkInFlops(Cost::Dot(r));
+			// New step for the research direction
 			beta = r_dot_z / old_r_dot_old_z;
 
 			this->IterationCount++;

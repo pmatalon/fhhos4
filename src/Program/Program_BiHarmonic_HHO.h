@@ -5,6 +5,7 @@
 #include "../TestCases/BiHarmonic/BiHarTestCaseFactory.h"
 #include "../Mesher/MeshFactory.h"
 #include "../Solver/SolverFactory.h"
+#include "../Solver/Krylov/BiHarmonicCG.h"
 #include "../Utils/ExportModule.h"
 
 // Bi-harmonic equation in mixed form with mixed (homogeneous) Dirichel-Neumann BC
@@ -47,8 +48,6 @@ public:
 
 		cout << "Mesh storage > " << Utils::MemoryString(mesh->MemoryUsage()) << endl;
 
-		mesh->SetBoundaryConditions(&testCase->DirichletBC);
-
 		// Export source
 		if (args.Actions.ExportSourceToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
 			dynamic_cast<GMSHMesh<Dim>*>(mesh)->ExportToGMSH(testCase->SourceFunction, args.OutputDirectory + "/source", "source");
@@ -61,6 +60,9 @@ public:
 		//       Assembly       //
 		//----------------------//
 
+		auto FullNeumann = BoundaryConditions::HomogeneousNeumannEverywhere();
+		mesh->SetBoundaryConditions(&FullNeumann);
+
 		FunctionalBasis<Dim>* reconstructionBasis = new FunctionalBasis<Dim>(args.Discretization.ElemBasisCode, args.Discretization.PolyDegree, args.Discretization.UsePolynomialSpaceQ);
 		FunctionalBasis<Dim>* cellBasis = new FunctionalBasis<Dim>(args.Discretization.ElemBasisCode, args.Discretization.PolyDegree - 1, args.Discretization.UsePolynomialSpaceQ);
 		FunctionalBasis<Dim - 1>* faceBasis = new FunctionalBasis<Dim - 1>(args.Discretization.FaceBasisCode, args.Discretization.PolyDegree - 1, args.Discretization.UsePolynomialSpaceQ);
@@ -71,9 +73,9 @@ public:
 		BiHarmonicMixedForm_HHO<Dim>* biHarPb = new BiHarmonicMixedForm_HHO<Dim>(mesh, testCase, hho, saveMatrixBlocks);
 
 		cout << endl;
-		cout << "----------------------------------------------------------" << endl;
-		cout << "-          Assembly of 1st diffusion problem             -" << endl;
-		cout << "----------------------------------------------------------" << endl;
+		cout << "------------------------------------------------------" << endl;
+		cout << "-          Assembly of diffusion problem             -" << endl;
+		cout << "------------------------------------------------------" << endl;
 		Timer assemblyTimer;
 		assemblyTimer.Start();
 
@@ -97,7 +99,7 @@ public:
 			int blockSizeForBlockSolver = args.Solver.BlockSize != -1 ? args.Solver.BlockSize : faceBasis->Size();
 
 			// Solve 1st diffusion biHarPb
-			Solver* solver = SolverFactory<Dim>::CreateSolver(args, &biHarPb->DiffPb(), blockSizeForBlockSolver, out);
+			Solver* diffSolver = SolverFactory<Dim>::CreateSolver(args, &biHarPb->DiffPb(), blockSizeForBlockSolver, out);
 
 			Timer setupTimer;
 			Timer solvingTimer1;
@@ -105,27 +107,31 @@ public:
 			Timer totalTimer;
 			totalTimer.Start();
 
-			cout << "Solver: " << *solver << endl << endl;
-			IterativeSolver* iterativeSolver = dynamic_cast<IterativeSolver*>(solver);
+			cout << "Solver: " << *diffSolver << endl << endl;
+			IterativeSolver* iterativeSolver = dynamic_cast<IterativeSolver*>(diffSolver);
 			if (iterativeSolver)
 			{
 				setupTimer.Start();
 				if (Utils::ProgramArgs.Solver.SolverCode.compare("uamg") == 0 || Utils::ProgramArgs.Solver.SolverCode.compare("fcguamg") == 0)
 					iterativeSolver->Setup(biHarPb->DiffPb().A, biHarPb->DiffPb().A_T_T, biHarPb->DiffPb().A_T_ndF, biHarPb->DiffPb().A_ndF_ndF);
 				else
-					solver->Setup(biHarPb->DiffPb().A);
+					diffSolver->Setup(biHarPb->DiffPb().A);
 				setupTimer.Stop();
 			}
 			else
 			{
 				setupTimer.Start();
-				solver->Setup(biHarPb->DiffPb().A);
+				diffSolver->Setup(biHarPb->DiffPb().A);
 				setupTimer.Stop();
 			}
 
-			biHarPb->SetLaplacianSolver(solver);
+			cout << "Solve with Conjugate Gradient" << endl;
 
-			biHarPb->Solve();
+			BiHarmonicCG<Dim> cg(testCase, biHarPb->DiffPb(), diffSolver);
+			cg.Tolerance = args.Solver.Tolerance;
+			cg.MaxIterations = args.Solver.MaxIterations;
+			Vector theta = cg.Solve();
+
 		}
 
 		//--------------------------//

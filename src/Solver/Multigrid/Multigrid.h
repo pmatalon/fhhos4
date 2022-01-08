@@ -34,6 +34,8 @@ public:
 	double CoarseningFactor = 2;
 	int CoarsePolyDegree = 1; // used in p-Multigrid
 	int NumberOfMeshes = 0;
+	bool ApplyZeroMeanCondition = false;
+	bool EnforceCompatibilityCondition = false;
 	bool ExportComponents = false;
 	bool DoNotCreateLevels = false;
 
@@ -499,7 +501,10 @@ private:
 			// Residual equation Ae=r solved on the coarse grid //
 			//--------------------------------------------------//
 
-			level->CoarserLevel->EnforceCompatibilityCondition(rc);                       result.AddWorkInFlops(level->EnforceCompatibilityConditionCost(rc));
+			if (this->EnforceCompatibilityCondition)
+			{
+				level->CoarserLevel->EnforceCompatibilityCondition(rc);                   result.AddWorkInFlops(level->EnforceCompatibilityConditionCost(rc));
+			}
 
 			Vector ec;
 			if (this->Cycle == 'V' || this->Cycle == 'W')
@@ -594,7 +599,10 @@ private:
 			//auto flopPostSmooth = result.IterationComputationalWork() - flopBeforePostSmooth;
 			//cout << "- flopPostSmooth = " << flopPostSmooth << endl;
 
-			level->ApplyZeroMeanCondition(x);                                         result.AddWorkInFlops(level->ApplyZeroMeanConditionCost(x));
+			if (this->ApplyZeroMeanCondition)
+			{
+				level->ApplyZeroMeanCondition(x);                                     result.AddWorkInFlops(level->ApplyZeroMeanConditionCost(x));
+			}
 		}
 	}
 

@@ -290,6 +290,10 @@ public:
 	//        Integral        //
 	//------------------------//
 
+	virtual double Integral(BasisFunction<Dim-1>* phi) const
+	{
+		return Shape()->Integral(phi);
+	}
 	virtual double Integral(RefFunction func) const
 	{
 		return Shape()->Integral(func);
@@ -297,6 +301,10 @@ public:
 	virtual double Integral(RefFunction func, int polynomialDegree) const
 	{
 		return Shape()->Integral(func, polynomialDegree);
+	}
+	virtual double Integral(DomFunction globalFunction) const
+	{
+		return Shape()->Integral(globalFunction);
 	}
 
 	//-----------------------------//

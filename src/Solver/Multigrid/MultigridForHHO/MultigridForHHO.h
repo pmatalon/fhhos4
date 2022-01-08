@@ -34,6 +34,12 @@ public:
 
 		if (problem->HHO->FaceBasis->GetDegree() == 0)
 			Utils::Warning("k=0 is a special case for this multigrid method. Non-optimal convergence may be observed, especially in 3D.");
+
+		if (problem->TestCase->BC.Type == PbBoundaryConditions::FullNeumann)
+		{
+			this->ApplyZeroMeanCondition = true;
+			this->EnforceCompatibilityCondition = true;
+		}
 	}
 
 	void BeginSerialize(ostream& os) const override

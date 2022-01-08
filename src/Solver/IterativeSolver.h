@@ -195,7 +195,8 @@ protected:
 		IterationResult result;
 		if (this->MaxIterations == 0 || this->StoppingCrit == StoppingCriteria::MaxIterations)
 			return result;
-		result.SetA(*this->Matrix);
+		if (this->Matrix)
+			result.SetA(*this->Matrix);
 		result.SetB(b);
 		if (this->ComputeExactSolution)
 			result.SetExactSolution(this->ExactSolution);

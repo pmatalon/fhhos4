@@ -34,11 +34,11 @@ public:
 		else if (pb.SourceCode.compare("exp") == 0)
 			this->SourceFunction = this->ExpSource2D;
 		else if (pb.SourceCode.compare("one") == 0)
-			this->SourceFunction = this->Zero;
+			this->SourceFunction = Utils::ConstantFunctionZero;
 		else if (pb.SourceCode.compare("x") == 0)
-			this->SourceFunction = this->Zero;
+			this->SourceFunction = Utils::ConstantFunctionZero;
 		else if (pb.SourceCode.compare("zero") == 0)
-			this->SourceFunction = this->Zero;
+			this->SourceFunction = Utils::ConstantFunctionZero;
 		else if (pb.SourceCode.compare("radiator") == 0)
 			this->SourceFunction = RadiatorSource;
 		else if (pb.SourceCode.compare("tworadiators") == 0)
@@ -58,7 +58,7 @@ public:
 			}
 			else if (pb.SourceCode.compare("one") == 0)
 			{
-				this->BC.DirichletFunction = this->One;
+				this->BC.DirichletFunction = Utils::ConstantFunctionOne;
 				this->BC.Description = "Dirichlet (1 everywhere)";
 			}
 			else if (pb.SourceCode.compare("x") == 0)
@@ -86,26 +86,46 @@ public:
 			this->BC.Type = PbBoundaryConditions::FullNeumann;
 			this->BC.BoundaryConditionPartition = BoundaryConditions::NeumannEverywhere;
 			this->BC.NeumannFunction = BoundaryConditions::Homogeneous;
-			this->BC.Description = "Homogeneous Neumann";
+			this->BC.Description = "Full Neumann (homogeneous)";
+		}
+		else if (pb.BCCode.compare("n2") == 0)
+		{
+			Utils::Warning("Full Neumann conditions do not yield a well-posed problem!");
+			this->BC.Type = PbBoundaryConditions::FullNeumann;
+			this->BC.BoundaryConditionPartition = BoundaryConditions::NeumannEverywhere;
+			this->BC.NeumannFunction = [](const DomPoint& p)
+			{
+				if (abs(p.X) < Utils::Eps) // x == 0
+					return 1.0;
+				if (abs(p.X - 1) < Utils::Eps) // x == 1
+					return -1.0;
+				return 0.0;
+			};
+			this->BC.Description = "Full Neumann (non homogeneous)";
 		}
 		else
 			Utils::FatalError("The requested boundary conditions are not defined in this test case.");
 
 		// Exact solution
-		if ((pb.GeoCode.compare("square") == 0 || pb.GeoCode.compare("square4quadrants") == 0) && this->DiffField.IsHomogeneous && this->DiffField.IsIsotropic && pb.BCCode.compare("d") == 0)
+		if ((pb.GeoCode.compare("square") == 0 || pb.GeoCode.compare("square4quadrants") == 0) && this->DiffField.IsHomogeneous && this->DiffField.IsIsotropic)
 		{
-			if (pb.SourceCode.compare("sine") == 0)
-				this->ExactSolution = this->SineSolution2D;
-			else if (pb.SourceCode.compare("poly") == 0)
-				this->ExactSolution = this->PolySolution2D;
-			else if (pb.SourceCode.compare("exp") == 0)
-				this->ExactSolution = this->ExpSolution2D;
-			else if (pb.SourceCode.compare("one") == 0)
-				this->ExactSolution = this->One;
-			else if (pb.SourceCode.compare("x") == 0)
-				this->ExactSolution = this->X;
-			else if (pb.SourceCode.compare("zero") == 0)
-				this->ExactSolution = this->Zero;
+			if (pb.BCCode.compare("d") == 0)
+			{
+				if (pb.SourceCode.compare("sine") == 0)
+					this->ExactSolution = this->SineSolution2D;
+				else if (pb.SourceCode.compare("poly") == 0)
+					this->ExactSolution = this->PolySolution2D;
+				else if (pb.SourceCode.compare("exp") == 0)
+					this->ExactSolution = this->ExpSolution2D;
+				else if (pb.SourceCode.compare("one") == 0)
+					this->ExactSolution = Utils::ConstantFunctionOne;
+				else if (pb.SourceCode.compare("x") == 0)
+					this->ExactSolution = this->X;
+				else if (pb.SourceCode.compare("zero") == 0)
+					this->ExactSolution = Utils::ConstantFunctionZero;
+			}
+			else if (pb.BCCode.compare("n2") == 0 && pb.SourceCode.compare("zero") == 0)
+				this->ExactSolution = MinusXPlusOneHalf;
 		}
 	}
 
@@ -144,14 +164,19 @@ public:
 			return _pb.SourceCode;
 	}
 
-	static double RadiatorSource(DomPoint p)
+	static double MinusXPlusOneHalf(const DomPoint& p)
+	{
+		return -p.X + 0.5;
+	}
+
+	static double RadiatorSource(const DomPoint& p)
 	{
 		if (p.X >= 0.6 && p.X <= 0.9 && p.Y >= 0.2 && p.Y <= 0.3)
 			return 20;
 		return 0;
 	}
 
-	static double TwoRadiatorSource(DomPoint p)
+	static double TwoRadiatorSource(const DomPoint& p)
 	{
 		if (p.X >= 0.6 && p.X <= 0.9 && p.Y >= 0.2 && p.Y <= 0.3)
 			return 10;

@@ -24,14 +24,6 @@ public:
 	virtual void PrintPhysicalProblem() = 0;
 
 protected:
-	static double Zero(const DomPoint& p)
-	{
-		return 0;
-	}
-	static double One(const DomPoint& p)
-	{
-		return 1;
-	}
 	static double X(const DomPoint& p)
 	{
 		return p.X;

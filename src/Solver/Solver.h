@@ -6,7 +6,7 @@ using namespace std;
 class Solver
 {
 public:
-	const SparseMatrix* Matrix;
+	const SparseMatrix* Matrix = nullptr;
 
 	MFlops SetupComputationalWork = 0;
 	MFlops SolvingComputationalWork = 0;

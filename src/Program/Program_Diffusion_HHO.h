@@ -170,6 +170,17 @@ public:
 		bool saveMatrixBlocks = args.Solver.SolverCode.compare("uamg") == 0 || args.Solver.SolverCode.compare("fcguamg") == 0;
 		Diffusion_HHO<Dim>* problem = new Diffusion_HHO<Dim>(mesh, testCase, hho, args.Discretization.StaticCondensation, saveMatrixBlocks);
 
+
+		// If full Neumann, check compatibility condition
+		if (testCase->BC.Type == PbBoundaryConditions::FullNeumann)
+		{
+			// Compatibility condition: (f|1) + <neumann|1> = 0
+			double integralF = problem->IntegralOverDomain(testCase->SourceFunction);
+			double integralN = problem->IntegralOverBoundary(testCase->BC.NeumannFunction);
+			if (abs(integralF + integralN) >= Utils::Eps)
+				Utils::Error("Compatibility condition not respected: (f|1) + <neumann|1> = " + to_string(integralF + integralN));
+		}
+
 		cout << endl;
 		cout << "----------------------------------------------------------" << endl;
 		cout << "-                       Assembly                         -" << endl;
@@ -261,25 +272,26 @@ public:
 
 			delete solver;
 
-			//-----------------------------//
-			//       Solution export       //
-			//-----------------------------//
 
-			if (args.Actions.ExportSolutionVectors || args.Actions.ExportSolutionToGMSH || testCase->ExactSolution)
+			if (args.Actions.ExportSolutionVectors || args.Actions.ExportSolutionToGMSH || testCase->ExactSolution || testCase->BC.Type == PbBoundaryConditions::FullNeumann)
 			{
 				cout << "----------------------------------------------------------" << endl;
 				cout << "-                     Post-processing                    -" << endl;
 				cout << "----------------------------------------------------------" << endl;
 
 				problem->ReconstructHigherOrderApproximation();
-				if (args.Actions.ExportSolutionVectors)
-				{
-					if (args.Discretization.StaticCondensation)
-						out.ExportVector(problem->SystemSolution, "solutionFaces");
-					out.ExportVector(problem->GlobalHybridSolution, "solutionHybrid");
-					out.ExportVector(problem->ReconstructedSolution, "solutionHigherOrder");
+			}
 
-				}
+			//-----------------------------//
+			//       Solution export       //
+			//-----------------------------//
+
+			if (args.Actions.ExportSolutionVectors)
+			{
+				if (args.Discretization.StaticCondensation)
+					out.ExportVector(problem->SystemSolution, "solutionFaces");
+				out.ExportVector(problem->GlobalHybridSolution, "solutionHybrid");
+				out.ExportVector(problem->ReconstructedSolution, "solutionHigherOrder");
 			}
 
 			if (args.Actions.ExportMeshToMatlab)
@@ -300,6 +312,13 @@ public:
 				double error = problem->L2Error(testCase->ExactSolution);
 				cout << endl << "L2 Error = " << std::scientific << error << endl;
 				problem->AssertSchemeConvergence(error);
+			}
+
+			// Check mean value if full Neumann conditions
+			if (testCase->BC.Type == PbBoundaryConditions::FullNeumann)
+			{
+				double meanValue = problem->MeanValueFromReconstructedCoeffs(problem->ReconstructedSolution);
+				cout << "Mean value = " << meanValue << endl;
 			}
 		}
 
