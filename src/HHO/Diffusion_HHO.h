@@ -846,14 +846,15 @@ public:
 	// After solving the faces, construction of the higher-order approximation using the reconstructor //
 	//-------------------------------------------------------------------------------------------------//
 
-	void ReconstructHigherOrderApproximation()
+	void ReconstructHigherOrderApproximation(bool log = true)
 	{
 		Vector globalReconstructedSolution(HHO->nElements * HHO->nReconstructUnknowns);
 		this->GlobalHybridSolution = Vector(HHO->nTotalHybridCoeffs);
 
 		if (this->_staticCondensation)
 		{
-			cout << "Solving cell unknowns..." << endl;
+			if (log)
+				cout << "Solving cell unknowns..." << endl;
 			Vector facesSolution = this->SystemSolution;
 
 			this->GlobalHybridSolution.head(HHO->nTotalCellUnknowns) = Solve_A_T_T(B_T - A_T_ndF * facesSolution);
@@ -866,8 +867,8 @@ public:
 		this->GlobalHybridSolution.tail(HHO->nDirichletCoeffs) = this->x_dF;
 
 
-
-		cout << "Reconstruction of higher order approximation..." << endl;
+		if (log)
+			cout << "Reconstruction of higher order approximation..." << endl;
 		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, &globalReconstructedSolution](Element<Dim>* e)
 			{
 				HHOParameters<Dim>* HHO = this->HHO;
@@ -939,11 +940,15 @@ public:
 	//---------------------------------------//
 
 public:
-	void ExportSolutionToGMSH(const ExportModule& out)
+	void ExportSolutionToGMSH(const Vector& reconstructedSolution, const ExportModule& out)
 	{
 		if (HHO->OrthogonalizeElemBases())
 			Utils::Error("The export to GMSH has not been implemented when the bases are orthonormalized against each element.");
-		this->_mesh->ExportToGMSH(this->HHO->ReconstructionBasis, this->ReconstructedSolution, out.GetFilePathPrefix(), "potential");
+		this->_mesh->ExportToGMSH(this->HHO->ReconstructionBasis, reconstructedSolution, out.GetFilePathPrefix(), "potential");
+	}
+	void ExportSolutionToGMSH(const ExportModule& out)
+	{
+		ExportSolutionToGMSH(this->ReconstructedSolution, out);
 	}
 
 	void ExportErrorToGMSH(const Vector& faceCoeffs, const ExportModule& out)

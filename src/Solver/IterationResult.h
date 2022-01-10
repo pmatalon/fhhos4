@@ -249,7 +249,10 @@ public:
 			//os << result._solvingTimer.CPU().InMilliseconds;
 
 			os << setw(nFineMatVecWidth);
-			os << (int)round(result._solvingComputationalWork / result._oneFineMatVecWork);
+			if (result._oneFineMatVecWork > 0)
+				os << (int)round(result._solvingComputationalWork / result._oneFineMatVecWork);
+			else
+				os << 0;
 
 			os << setw(remainingTimeWidth);
 			if (result.IterationNumber == 1)

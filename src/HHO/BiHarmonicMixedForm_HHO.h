@@ -60,7 +60,10 @@ public:
 		_diffSolver = solver;
 		IterativeSolver* iter = dynamic_cast<IterativeSolver*>(_diffSolver);
 		if (iter)
+		{
 			iter->PrintIterationResults = false;
+			iter->MaxIterations = 50;
+		}
 	}
 
 	// Find theta verifying the compatibility condition
@@ -89,7 +92,7 @@ public:
 
 		// Solve
 		_diffPb.SystemSolution = _diffSolver->Solve(rhs);
-		assert(dynamic_cast<IterativeSolver*>(_diffSolver)->IterationCount < 100);
+		assert(dynamic_cast<IterativeSolver*>(_diffSolver)->IterationCount < dynamic_cast<IterativeSolver*>(_diffSolver)->MaxIterations);
 
 #ifndef NDEBUG
 		// Check that mean value = 0 (on the faces)
@@ -97,7 +100,7 @@ public:
 		assert(abs(integralSkeleton) < Utils::Eps);
 #endif
 		// Reconstruct the higher-order polynomial
-		_diffPb.ReconstructHigherOrderApproximation();
+		_diffPb.ReconstructHigherOrderApproximation(false);
 		Vector lambda = std::move(_diffPb.ReconstructedSolution);
 
 		// Even if the mean value is 0 on the faces, the mean value of the reconstructed polynomial is not necessarily 0,
@@ -120,10 +123,10 @@ public:
 
 		// Solve
 		_diffPb.SystemSolution = _diffSolver->Solve(rhs);
-		assert(dynamic_cast<IterativeSolver*>(_diffSolver)->IterationCount < 100);
+		assert(dynamic_cast<IterativeSolver*>(_diffSolver)->IterationCount < dynamic_cast<IterativeSolver*>(_diffSolver)->MaxIterations);
 
 		// Reconstruct the higher-order polynomial
-		_diffPb.ReconstructHigherOrderApproximation();
+		_diffPb.ReconstructHigherOrderApproximation(false);
 		Vector lambda = std::move(_diffPb.ReconstructedSolution);
 
 		// Enforce (lambda|1) = 0
@@ -145,7 +148,7 @@ public:
 
 		// Solve
 		_diffPb.SystemSolution = _diffSolver->Solve(rhs);
-		assert(dynamic_cast<IterativeSolver*>(_diffSolver)->IterationCount < 100);
+		assert(dynamic_cast<IterativeSolver*>(_diffSolver)->IterationCount < dynamic_cast<IterativeSolver*>(_diffSolver)->MaxIterations);
 
 		if (boundaryUnknownsOnly)
 		{
@@ -156,7 +159,7 @@ public:
 		else
 		{
 			/*_integralOnBoundary.Enforce(_diffPb.SystemSolution);
-			_diffPb.ReconstructHigherOrderApproximation();
+			_diffPb.ReconstructHigherOrderApproximation(false);
 			return _diffPb.ReconstructedSolution;*/
 			_diffPb.ReconstructHigherOrderApproximation();
 			return std::move(_diffPb.ReconstructedSolution);

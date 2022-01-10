@@ -142,6 +142,22 @@ public:
 			// Solve problem 2
 			Vector reconstructedSolution = biHarPb->Solve2ndDiffProblem(lambda);
 
+			//-----------------------------//
+			//       Solution export       //
+			//-----------------------------//
+
+			if (args.Actions.ExportSolutionVectors)
+				out.ExportVector(reconstructedSolution, "solutionHigherOrder");
+
+			if (args.Actions.ExportMeshToMatlab)
+			{
+				mesh->ExportToMatlab(args.OutputDirectory);
+				mesh->ExportToMatlab2(args.OutputDirectory + "/mesh.m");
+			}
+
+			if (args.Actions.ExportSolutionToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
+				biHarPb->DiffPb().ExportSolutionToGMSH(reconstructedSolution, out);
+
 			//----------------------//
 			//       L2 error       //
 			//----------------------//
