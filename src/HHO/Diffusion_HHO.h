@@ -95,7 +95,7 @@ public:
 		return new Diffusion_HHO<Dim>(this->_mesh->CoarseMesh, this->TestCase, lowerDegreeCoarseMeshHHO, _staticCondensation, _saveMatrixBlocks);
 	}
 
-	double L2Error(DomFunction exactSolution)
+	double L2Error(DomFunction exactSolution, const Vector& reconstructedSolution)
 	{
 		struct ChunkResult
 		{
@@ -104,9 +104,9 @@ public:
 		};
 
 		ParallelLoop<Element<Dim>*, ChunkResult> parallelLoop(this->_mesh->Elements);
-		parallelLoop.Execute([this, exactSolution](Element<Dim>* e, ParallelChunk<ChunkResult>* chunk)
+		parallelLoop.Execute([this, exactSolution, &reconstructedSolution](Element<Dim>* e, ParallelChunk<ChunkResult>* chunk)
 			{
-				auto approximate = HHOElement(e)->ReconstructionBasis->GetApproximateFunction(this->ReconstructedSolution, e->Number * HHO->nReconstructUnknowns);
+				auto approximate = HHOElement(e)->ReconstructionBasis->GetApproximateFunction(reconstructedSolution, e->Number * HHO->nReconstructUnknowns);
 				chunk->Results.absoluteError += e->L2ErrorPow2(approximate, exactSolution);
 				chunk->Results.normExactSolution += e->Integral([exactSolution](const DomPoint& p) { return pow(exactSolution(p), 2); });
 			});
@@ -124,6 +124,11 @@ public:
 		absoluteError = sqrt(absoluteError);
 		normExactSolution = sqrt(normExactSolution);
 		return normExactSolution != 0 ? absoluteError / normExactSolution : absoluteError;
+	}
+
+	double L2Error(DomFunction exactSolution)
+	{
+		return L2Error(exactSolution, this->ReconstructedSolution);
 	}
 
 	void AssertSchemeConvergence(double l2Error)
@@ -1024,6 +1029,20 @@ public:
 		return innerProds;
 	}
 
+	Vector InnerProdWithBoundaryFaceBasis(DomFunction func)
+	{
+		Vector innerProds = Vector(HHO->nBoundaryFaces * HHO->nFaceUnknowns);
+		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->BoundaryFaces, [this, &innerProds, func](Face<Dim>* f)
+			{
+				Diff_HHOFace<Dim>* face = HHOFace(f);
+				BigNumber i = (face->Number() - HHO->nInteriorFaces) * HHO->nFaceUnknowns;
+
+				innerProds.segment(i, HHO->nFaceUnknowns) = face->InnerProductWithBasis(func);
+			}
+		);
+		return innerProds;
+	}
+
 	Vector InnerProdWithReconstructBasis(DomFunction func)
 	{
 		Vector innerProds = Vector(HHO->nTotalReconstructUnknowns);
@@ -1045,6 +1064,19 @@ public:
 			{
 				Diff_HHOFace<Dim>* face = HHOFace(f);
 				BigNumber i = f->Number * HHO->nFaceUnknowns;
+
+				res.segment(i, HHO->nFaceUnknowns) = face->SolveMassMatrix(v.segment(i, HHO->nFaceUnknowns));
+			});
+		return res;
+	}
+
+	Vector SolveBoundaryFaceMassMatrix(const Vector& v)
+	{
+		Vector res(v.rows());
+		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->BoundaryFaces, [this, &v, &res](Face<Dim>* f)
+			{
+				Diff_HHOFace<Dim>* face = HHOFace(f);
+				BigNumber i = (face->Number() - HHO->nInteriorFaces) * HHO->nFaceUnknowns;
 
 				res.segment(i, HHO->nFaceUnknowns) = face->SolveMassMatrix(v.segment(i, HHO->nFaceUnknowns));
 			});
@@ -1171,7 +1203,7 @@ public:
 		return total;
 	}
 
-	double MeanValueFromReconstructedCoeffs(const Vector& reconstructedCoeffs)
+	double IntegralOverDomainFromReconstructedCoeffs(const Vector& reconstructedCoeffs)
 	{
 		struct ChunkResult { double total = 0; };
 
@@ -1188,7 +1220,12 @@ public:
 			{
 				total += chunkResult.total;
 			});
-		return total / _mesh->Measure();
+		return total;
+	}
+
+	double MeanValueFromReconstructedCoeffs(const Vector& reconstructedCoeffs)
+	{
+		return IntegralOverDomainFromReconstructedCoeffs(reconstructedCoeffs) / _mesh->Measure();
 	}
 
 private:

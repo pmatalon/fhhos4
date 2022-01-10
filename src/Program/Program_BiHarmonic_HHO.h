@@ -125,13 +125,32 @@ public:
 				setupTimer.Stop();
 			}
 
-			cout << "Solve with Conjugate Gradient" << endl;
+			biHarPb->SetDiffSolver(diffSolver);
 
-			BiHarmonicCG<Dim> cg(testCase, biHarPb->DiffPb(), diffSolver);
+			cout << "--------------------------------------" << endl;
+			cout << "-   Solve with Conjugate Gradient    -" << endl;
+			cout << "--------------------------------------" << endl;
+
+			BiHarmonicCG<Dim> cg(*biHarPb);
 			cg.Tolerance = args.Solver.Tolerance;
 			cg.MaxIterations = args.Solver.MaxIterations;
 			Vector theta = cg.Solve();
 
+			// Solve problem 1
+			Vector lambda = biHarPb->Solve1stDiffProblem(theta);
+
+			// Solve problem 2
+			Vector reconstructedSolution = biHarPb->Solve2ndDiffProblem(lambda);
+
+			//----------------------//
+			//       L2 error       //
+			//----------------------//
+
+			if (testCase->ExactSolution)
+			{
+				double error = biHarPb->DiffPb().L2Error(testCase->ExactSolution, reconstructedSolution);
+				cout << endl << "L2 Error = " << std::scientific << error << endl;
+			}
 		}
 
 		//--------------------------//

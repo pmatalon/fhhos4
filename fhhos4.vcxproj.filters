@@ -514,6 +514,9 @@
     <ClInclude Include="src\Solver\Krylov\BiHarmonicCG.h">
       <Filter>Solver\Krylov</Filter>
     </ClInclude>
+    <ClInclude Include="src\HHO\ZeroMeanEnforcer.h">
+      <Filter>HHO</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

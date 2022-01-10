@@ -1,6 +1,7 @@
 #pragma once
 #include "../Level.h"
 #include "../../../HHO/Diffusion_HHO.h"
+#include "../../../HHO/ZeroMeanEnforcer.h"
 using namespace std;
 
 template <int Dim>
@@ -12,13 +13,16 @@ private:
 	GMG_P_Restriction _pRestriction = GMG_P_Restriction::RemoveHigherOrders;
 	bool _useHigherOrderReconstruction;
 	bool _useHeterogeneousWeighting;
+	ZeroMeanEnforcerFromFaceCoeffs<Dim> _zeroMean;
 public:
 	Diffusion_HHO<Dim>* _problem;
 
-	LevelForHHO(int number, Diffusion_HHO<Dim>* problem, 
-		GMG_H_Prolongation hProlongation, GMG_P_Prolongation pProlongation, GMG_P_Restriction pRestriction, 
+	LevelForHHO(int number, Diffusion_HHO<Dim>* problem,
+		GMG_H_Prolongation hProlongation, GMG_P_Prolongation pProlongation, GMG_P_Restriction pRestriction,
 		bool useHigherOrderReconstruction, bool useHeterogeneousWeighting)
-		: Level(number)
+		:
+		Level(number),
+		_zeroMean(problem)
 	{
 		this->_problem = problem;
 		this->_hProlongation = hProlongation;
@@ -636,23 +640,6 @@ public:
 
 	// --- Zero-mean condition (to enforce unicity of the solution)
 	// 
-	// 
-	// Let v be a function represented by the vector of coefficients x.
-	// Applying the zero mean condition is equivalent to orthogonalizing v to 1 (the constant function 1):
-	//              v <- v - (v|1)/(1|1)*1
-	// Let 'one' be the vector of coefficients corresponding to the constant function 1. 
-	// Then the discrete conterpart gives
-	//              x <- x - x^T*[(phi_i|1)]_i / (1|1) * one       (eq.1)
-	// Let gamma0 := [(phi_i|1)]_i. 
-	// In a setup function, we compute and store the vectors
-	//              one   := M^-1 * gamma0,
-	//              gamma := gamma0 / (1|1),
-	// where M^-1 is the face mass matrix and (1|1) = |F_h| (= measure of the skeleton).
-	// (eq.1) becomes 
-	//              x <- x - x^T*gamma * one                       (eq.2)
-	// which is implemented in the ApplyZeroMeanCondition() function, called during multigrid execution.
-	//
-	//
 	// --- Compatibility condition (to ensure existence of a solution)
 	//
 	// Considering Ax=b with A singular, a solution exists iff b \in Im(A).
@@ -663,15 +650,9 @@ public:
 	// Consequently, if 
 
 private:
-	Vector _one;
-	Vector _gamma;
-
 	void ComputeVectorsForOrthogonalityConditions()
 	{
-		_gamma = _problem->InnerProdWithFaceBasis(Utils::ConstantFunctionOne);
-		_one = _problem->SolveFaceMassMatrix(_gamma);
-		double normOneSquare = _problem->_mesh->SkeletonMeasure();
-		_gamma /= normOneSquare;
+		_zeroMean.Setup();
 	}
 
 public:
@@ -679,15 +660,7 @@ public:
 	// Implements (eq.2) above.
 	void ApplyZeroMeanCondition(Vector& x) override
 	{
-		assert(_gamma.rows() > 0 && _one.rows() > 0 && "ComputeVectorsForOrthogonalityConditions() has not been called!");
-
-		/*FaceParallelLoop<Dim> parallelLoopF(_problem->_mesh->Faces);
-		parallelLoopF.Execute([this, &x](Face<Dim>* f)
-			{
-				int nUnknowns = _problem->HHO->nFaceUnknowns;
-				x.segment(f->Number * nUnknowns, nUnknowns) -= x.segment(f->Number * nUnknowns, nUnknowns).transpose() * _gamma.segment(f->Number * nUnknowns, nUnknowns) * _one.segment(f->Number * nUnknowns, nUnknowns);
-			});*/
-		x -= x.dot(_gamma) * _one;
+		_zeroMean.Enforce(x);
 	}
 	Flops ApplyZeroMeanConditionCost(Vector& x) override
 	{
