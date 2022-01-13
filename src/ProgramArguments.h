@@ -104,7 +104,7 @@ struct ActionsArguments
 	bool InitReferenceShapes = true;
 	bool UnitTests = false;
 	bool GMSHLogEnabled = false;
-	bool EnforceDirichletBC = false;
+	bool EnforceDirichletBC = true;
 };
 
 struct ProgramArguments

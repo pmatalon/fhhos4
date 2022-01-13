@@ -150,16 +150,13 @@ public:
 				DiffusionField<Dim> diffField(new Tensor<Dim>());
 				VirtualDiffusionTestCase<Dim> diffTestCase(Utils::ConstantFunctionZero, diffField);
 
-				Mesh<Dim>* meshLast = MeshFactory<Dim>::BuildMesh(args, &diffTestCase);
-				if (args.Discretization.Mesher.compare("gmsh") == 0)
-					GMSHMesh<Dim>::CloseGMSH();
 				auto FullDirichlet = BoundaryConditions::HomogeneousDirichletEverywhere();
-				meshLast->SetBoundaryConditions(&FullDirichlet);
-				meshLast->SetDiffusionField(&diffField);
+				mesh->SetBoundaryConditions(&FullDirichlet, true);
+				mesh->SetDiffusionField(&diffField);
 
-				HHOParameters<Dim> hhoLast(meshLast, args.Discretization.Stabilization, reconstructionBasis, cellBasis, faceBasis, args.Discretization.OrthogonalizeElemBasesCode, args.Discretization.OrthogonalizeFaceBasesCode);
+				HHOParameters<Dim> hhoLast(mesh, args.Discretization.Stabilization, reconstructionBasis, cellBasis, faceBasis, args.Discretization.OrthogonalizeElemBasesCode, args.Discretization.OrthogonalizeFaceBasesCode);
 
-				Diffusion_HHO<Dim> lastPb(meshLast, &diffTestCase, &hhoLast, true, false);
+				Diffusion_HHO<Dim> lastPb(mesh, &diffTestCase, &hhoLast, true, false);
 				ActionsArguments diffActions;
 				diffActions.AssembleRightHandSide = true;
 				lastPb.Assemble(diffActions);

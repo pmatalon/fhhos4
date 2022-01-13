@@ -281,7 +281,7 @@ public:
 		}
 	}
 
-	void SetBoundaryConditions(BoundaryConditions* bc)
+	void SetBoundaryConditions(BoundaryConditions* bc, bool forceRefillLists = false)
 	{
 		for (BoundaryGroup* boundary : BoundaryParts)
 		{
@@ -289,7 +289,7 @@ public:
 			boundary->ConditionFunction = boundary->Condition == BoundaryConditionType::Neumann ? bc->NeumannFunction : bc->DirichletFunction;
 		}
 		
-		FillDirichletAndNeumannFaceLists();
+		FillDirichletAndNeumannFaceLists(forceRefillLists);
 	}
 
 	void ExportToMatlab(string outputDirectory)
@@ -410,13 +410,16 @@ protected:
 		}
 	}
 
-	void FillDirichletAndNeumannFaceLists()
+	void FillDirichletAndNeumannFaceLists(bool forceRefillLists = false)
 	{
-		if (!this->DirichletFaces.empty() || !this->NeumannFaces.empty())
+		if ((!this->DirichletFaces.empty() || !this->NeumannFaces.empty()) && !forceRefillLists)
 			return;
 
 		if (this->BoundaryFaces.empty())
 			Utils::FatalError("No boundary faces!");
+
+		this->DirichletFaces.clear();
+		this->NeumannFaces.clear();
 
 		for (Face<Dim>* f : this->BoundaryFaces)
 		{
@@ -429,7 +432,7 @@ protected:
 		}
 
 		if (CoarseMesh)
-			CoarseMesh->FillDirichletAndNeumannFaceLists();
+			CoarseMesh->FillDirichletAndNeumannFaceLists(forceRefillLists);
 	}
 
 	PhysicalGroup<Dim>* GetPhysicalGroup(int id)
