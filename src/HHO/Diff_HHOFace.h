@@ -199,6 +199,12 @@ public:
 		return SolveMassMatrix(InnerProductWithBasis(f));
 	}
 
+	double InnerProd(const Vector& coeffs1, const Vector& coeffs2)
+	{
+		assert(coeffs1.rows() == HHO->nFaceUnknowns);
+		return coeffs1.dot(ApplyMassMatrix(coeffs2));
+	}
+
 	void DeleteUselessMatricesAfterAssembly()
 	{
 		if (!HHO->OrthogonalizeFaceBases())
@@ -207,8 +213,8 @@ public:
 
 	void DeleteUselessMatricesAfterMultigridSetup()
 	{
-		if (!HHO->OrthogonalizeFaceBases())
-			_massMatrixSolver = Eigen::LLT<DenseMatrix>();
+		//if (!HHO->OrthogonalizeFaceBases())   // I comment it quick and dirty because I need this massMatrixSolver for the bi-harmonic problem
+			//_massMatrixSolver = Eigen::LLT<DenseMatrix>();
 		this->MeshFace->EmptySavedDomPoints();
 	}
 

@@ -604,7 +604,8 @@ public:
 		if (!actions.AssembleRightHandSide)
 		{
 			// We won't be reconstructing the solution, so no need to keep those
-			Utils::Empty(this->A_T_ndF);
+			if (Utils::ProgramArgs.Problem.Equation != EquationType::BiHarmonic)
+				Utils::Empty(this->A_T_ndF); // this is needed to build the right-hand side separately
 			Utils::Empty(this->B_T);
 			Utils::Empty(this->B_ndF);
 			Utils::Empty(this->x_dF);
@@ -767,7 +768,7 @@ public:
 				}
 			);
 		}
-		else if (sourceFuncCoeffs.rows() == this->_mesh->Elements.size() * HHO->nReconstructUnknowns) // degree k+1
+		else if (sourceFuncCoeffs.rows() == HHO->nTotalReconstructUnknowns) // degree k+1
 		{
 			parallelLoop.Execute([this, &sourceFuncCoeffs, &b_T](Element<Dim>* e)
 				{
@@ -775,7 +776,6 @@ public:
 					b_T.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns) = element->ApplyCellReconstructMassMatrix(sourceFuncCoeffs.segment(e->Number * HHO->nReconstructUnknowns, HHO->nReconstructUnknowns));
 				}
 			);
-
 		}
 		else
 			Utils::FatalError("the argument sourceFuncCoeffs does not have a correct size");
@@ -959,6 +959,10 @@ public:
 		this->_mesh->ExportToGMSH(this->HHO->CellBasis, cellCoeffs, out.GetFilePathPrefix(), "error");
 	}
 
+	//---------------------------------------//
+	//              Solve_A_T_T              //
+	//---------------------------------------//
+
 	SparseMatrix Solve_A_T_T(const SparseMatrix& A_T_ndF)
 	{
 		ElementParallelLoop<Dim> parallelLoop(this->_mesh->Elements);
@@ -989,6 +993,10 @@ public:
 			});
 		return result;
 	}
+
+	//--------------------------------------//
+	//    Projections and inner products    //
+	//--------------------------------------//
 
 	Vector ProjectOnFaceDiscreteSpace(DomFunction func)
 	{
@@ -1062,6 +1070,30 @@ public:
 		return innerProds;
 	}
 
+	double L2InnerProdOnBoundary(const Vector& v1, const Vector& v2)
+	{
+		assert(v1.rows() == HHO->nBoundaryFaces * HHO->nFaceUnknowns);
+		assert(v2.rows() == HHO->nBoundaryFaces * HHO->nFaceUnknowns);
+
+		struct ChunkResult { double total = 0; };
+
+		ParallelLoop<Face<Dim>*, ChunkResult> parallelLoop(_mesh->BoundaryFaces);
+		parallelLoop.Execute([this, &v1, &v2](Face<Dim>* f, ParallelChunk<ChunkResult>* chunk)
+			{
+				Diff_HHOFace<Dim>* face = HHOFace(f);
+				BigNumber i = (face->Number() - HHO->nInteriorFaces) * HHO->nFaceUnknowns;
+
+				chunk->Results.total += face->InnerProd(v1.segment(i, HHO->nFaceUnknowns), v2.segment(i, HHO->nFaceUnknowns));
+			});
+
+		double total = 0;
+		parallelLoop.AggregateChunkResults([&total](ChunkResult chunkResult)
+			{
+				total += chunkResult.total;
+			});
+		return total;
+	}
+
 	Vector SolveFaceMassMatrix(const Vector& v)
 	{
 		Vector res(v.rows());
@@ -1100,6 +1132,11 @@ public:
 			});
 		return res;
 	}
+
+
+	//--------------------------------------------//
+	//              Global integrals              //
+	//--------------------------------------------//
 
 	/*double IntegralFromFaceDoFs(Vector dofs, int polyDegree)
 	{
