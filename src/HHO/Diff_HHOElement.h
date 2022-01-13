@@ -219,7 +219,7 @@ public:
 	Vector ApplyCellReconstructMassMatrix(const Vector& v)
 	{
 		if (HHO->OrthonormalizeElemBases())
-			return v;
+			return v.head(HHO->nCellUnknowns);
 		else if (HHO->OrthogonalizeElemBases())
 		{
 			Vector d(this->CellBasis->Size());
