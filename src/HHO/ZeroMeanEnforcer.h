@@ -34,12 +34,16 @@ public:
 		_nipw1 = std::move(ipw1);
 		_nipw1 /= OneScalOne();
 	}
-	virtual void Enforce(Vector& x)
+	void Enforce(Vector& x)
 	{
 		assert(_nipw1.rows() > 0 && "Setup() must be called before using Enforce()");
 		assert(x.rows() == _nipw1.rows());
 		x -= x.dot(_nipw1) * _one;
 	};
+	bool Check(const Vector& x)
+	{
+		return abs(x.dot(_nipw1)) < Utils::Eps;
+	}
 protected:
 	// returns [(phi_i|1)]_i
 	virtual Vector BasisInnerProdWith1() = 0;

@@ -17,11 +17,11 @@ private:
 	VirtualDiffusionTestCase<Dim> _diffPbTestCase;
 	Diffusion_HHO<Dim> _diffPb;
 	Solver* _diffSolver;
-	ZeroMeanEnforcerFromReconstructCoeffs<Dim> _integralZeroOverDomain;
-	ZeroMeanEnforcerFromBoundaryFaceCoeffs<Dim> _integralOnBoundary;
+	ZeroMeanEnforcerFromReconstructCoeffs<Dim> _integralZeroOnDomain;
+	ZeroMeanEnforcerFromBoundaryFaceCoeffs<Dim> _integralZeroOnBoundary;
+	double _integralSource = 0;
 public:
 	HHOParameters<Dim>* HHO;
-	double IntegralSource = 0;
 
 	BiHarmonicMixedForm_HHO(Mesh<Dim>* mesh, BiHarmonicTestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool saveMatrixBlocks)
 	{
@@ -34,8 +34,8 @@ public:
 		_diffPbTestCase.BC = BoundaryConditions::HomogeneousNeumannEverywhere();
 		_diffPb = Diffusion_HHO<Dim>(mesh, &_diffPbTestCase, HHO, true, saveMatrixBlocks);
 		_saveMatrixBlocks = saveMatrixBlocks;
-		_integralZeroOverDomain = ZeroMeanEnforcerFromReconstructCoeffs<Dim>(&_diffPb);
-		_integralOnBoundary = ZeroMeanEnforcerFromBoundaryFaceCoeffs<Dim>(&_diffPb);
+		_integralZeroOnDomain = ZeroMeanEnforcerFromReconstructCoeffs<Dim>(&_diffPb);
+		_integralZeroOnBoundary = ZeroMeanEnforcerFromBoundaryFaceCoeffs<Dim>(&_diffPb);
 	}
 
 	Diffusion_HHO<Dim>& DiffPb()
@@ -46,13 +46,13 @@ public:
 	void AssembleDiffPb()
 	{
 		ActionsArguments diffActions;
-		//diffActions.LogAssembly = true;
+		diffActions.AssembleRightHandSide = false;
 		_diffPb.Assemble(diffActions);
 
-		IntegralSource = _diffPb.IntegralOverDomain(_testCase->SourceFunction);
+		_integralSource = _diffPb.IntegralOverDomain(_testCase->SourceFunction);
 
-		_integralZeroOverDomain.Setup();
-		_integralOnBoundary.Setup();
+		_integralZeroOnDomain.Setup();
+		_integralZeroOnBoundary.Setup();
 	}
 
 	void SetDiffSolver(Solver* solver)
@@ -74,7 +74,7 @@ public:
 		//       theta := -(source|1) / |\partial \Omega| * 1
 		// where |\partial \Omega| is the measure of the boundary.
 		double boundaryMeasure = _diffPb._mesh->BoundaryMeasure();
-		Vector theta = -IntegralSource / boundaryMeasure * _diffPb.ProjectOnBoundaryDiscreteSpace(Utils::ConstantFunctionOne);
+		Vector theta = -_integralSource / boundaryMeasure * _diffPb.ProjectOnBoundaryDiscreteSpace(Utils::ConstantFunctionOne);
 		return theta;
 	}
 
@@ -83,7 +83,7 @@ public:
 #ifndef NDEBUG
 		// Check compatibility condition
 		double integralNeumann = _diffPb.IntegralOverBoundaryFromFaceCoeffs(neumann);
-		assert(abs(IntegralSource + integralNeumann) < Utils::Eps);
+		assert(abs(_integralSource + integralNeumann) < Utils::Eps);
 #endif
 		// Define problem
 		_diffPb.ChangeSourceFunction(_testCase->SourceFunction);
@@ -92,7 +92,7 @@ public:
 
 		// Solve
 		_diffPb.SystemSolution = _diffSolver->Solve(rhs);
-		assert(dynamic_cast<IterativeSolver*>(_diffSolver)->IterationCount < dynamic_cast<IterativeSolver*>(_diffSolver)->MaxIterations);
+		CheckDiffSolverConvergence();
 
 #ifndef NDEBUG
 		// Check that mean value = 0 (on the faces)
@@ -105,7 +105,7 @@ public:
 
 		// Even if the mean value is 0 on the faces, the mean value of the reconstructed polynomial is not necessarily 0,
 		// so we enforce it:
-		_integralZeroOverDomain.Enforce(lambda);
+		_integralZeroOnDomain.Enforce(lambda);
 		return lambda;
 	}
 
@@ -115,6 +115,8 @@ public:
 		// Check compatibility condition
 		double integralNeumann = _diffPb.IntegralOverBoundaryFromFaceCoeffs(neumann);
 		assert(abs(integralNeumann) < Utils::Eps);
+		// Probably the same thing:
+		assert(_integralZeroOnBoundary.Check(neumann));
 #endif
 		// Define problem
 		_diffPb.ChangeSourceFunctionToZero();
@@ -123,14 +125,14 @@ public:
 
 		// Solve
 		_diffPb.SystemSolution = _diffSolver->Solve(rhs);
-		assert(dynamic_cast<IterativeSolver*>(_diffSolver)->IterationCount < dynamic_cast<IterativeSolver*>(_diffSolver)->MaxIterations);
+		CheckDiffSolverConvergence();
 
 		// Reconstruct the higher-order polynomial
 		_diffPb.ReconstructHigherOrderApproximation(false);
 		Vector lambda = std::move(_diffPb.ReconstructedSolution);
 
 		// Enforce (lambda|1) = 0
-		_integralZeroOverDomain.Enforce(lambda);
+		_integralZeroOnDomain.Enforce(lambda);
 		return lambda;
 	}
 
@@ -140,6 +142,8 @@ public:
 		// Check compatibility condition: (source|1) = 0
 		double integralSource = _diffPb.IntegralOverDomainFromReconstructedCoeffs(source);
 		assert(abs(integralSource) < Utils::Eps);
+		// Probably the same thing:
+		assert(_integralZeroOnDomain.Check(source));
 #endif
 		// Define problem
 		_diffPb.ChangeSourceFunction(source);
@@ -148,17 +152,17 @@ public:
 
 		// Solve
 		_diffPb.SystemSolution = _diffSolver->Solve(rhs);
-		assert(dynamic_cast<IterativeSolver*>(_diffSolver)->IterationCount < dynamic_cast<IterativeSolver*>(_diffSolver)->MaxIterations);
+		CheckDiffSolverConvergence();
 
 		if (boundaryUnknownsOnly)
 		{
-			Vector boundary = _diffPb.SystemSolution.tail(_diffPb.HHO->nBoundaryFaces * _diffPb.HHO->nFaceUnknowns); // keep only the boundary unknowns
-			_integralOnBoundary.Enforce(boundary);
+			Vector boundary = _diffPb.SystemSolution.tail(HHO->nBoundaryFaces * HHO->nFaceUnknowns); // keep only the boundary unknowns
+			_integralZeroOnBoundary.Enforce(boundary);
 			return boundary;
 		}
 		else
 		{
-			/*_integralOnBoundary.Enforce(_diffPb.SystemSolution);
+			/*_integralZeroOnBoundary.Enforce(_diffPb.SystemSolution);
 			_diffPb.ReconstructHigherOrderApproximation(false);
 			return _diffPb.ReconstructedSolution;*/
 			_diffPb.ReconstructHigherOrderApproximation();
@@ -166,6 +170,19 @@ public:
 		}
 	}
 
+private:
+	void CheckDiffSolverConvergence()
+	{
+		IterativeSolver* iterSolver = dynamic_cast<IterativeSolver*>(_diffSolver);
+		if (iterSolver)
+		{
+			if (iterSolver->IterationCount == iterSolver->MaxIterations)
+				Utils::Warning("The diffusion solver has reached the max number of iterations (" + to_string(dynamic_cast<IterativeSolver*>(_diffSolver)->MaxIterations) + ")");
+			//assert(dynamic_cast<IterativeSolver*>(_diffSolver)->IterationCount < dynamic_cast<IterativeSolver*>(_diffSolver)->MaxIterations);
+		}
+	}
+
+public:
 	~BiHarmonicMixedForm_HHO()
 	{
 	}
