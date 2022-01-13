@@ -107,7 +107,7 @@ public:
 			Utils::FatalError("The requested boundary conditions are not defined in this test case.");
 
 		// Exact solution
-		if ((pb.GeoCode.compare("square") == 0 || pb.GeoCode.compare("square4quadrants") == 0) && this->DiffField.IsHomogeneous && this->DiffField.IsIsotropic)
+		if ((pb.GeoCode.compare("square") == 0 || Utils::StartsWith(pb.GeoCode, "square4quadrants")) && this->DiffField.IsHomogeneous && this->DiffField.IsIsotropic)
 		{
 			if (pb.BCCode.compare("d") == 0)
 			{

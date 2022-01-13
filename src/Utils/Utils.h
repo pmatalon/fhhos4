@@ -268,6 +268,10 @@ public:
 	{
 		return str1.find(str2) != std::string::npos;
 	}
+	static bool StartsWith(const std::string& str, const std::string& prefix)
+	{
+		return str.rfind(prefix, 0) == 0;
+	}
 	static bool EndsWith(const std::string& str, const std::string& suffix)
 	{
 		return str.size() >= suffix.size() && 0 == str.compare(str.size() - suffix.size(), suffix.size(), suffix);
