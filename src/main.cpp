@@ -579,7 +579,8 @@ int main(int argc, char* argv[])
 		OPT_DoNotSolve,
 		OPT_NoCache,
 		OPT_UnitTests,
-		OPT_GMSHLog
+		OPT_GMSHLog,
+		OPT_EnforceDirichletBC
 	};
 
 	static struct option long_opts[] = {
@@ -646,6 +647,7 @@ int main(int argc, char* argv[])
 		 { "no-cache", no_argument, NULL, OPT_NoCache },
 		 { "ut", no_argument, NULL, OPT_UnitTests },
 		 { "gmsh-log", no_argument, NULL, OPT_GMSHLog },
+		 { "enforce-d-bc", required_argument, NULL, OPT_EnforceDirichletBC },
 		 { NULL, 0, NULL, 0 }
 	};
 
@@ -1185,6 +1187,9 @@ int main(int argc, char* argv[])
 				break;
 			case 'o': 
 				args.OutputDirectory = optarg;
+				break;
+			case OPT_EnforceDirichletBC:
+				args.Actions.EnforceDirichletBC = atoi(optarg);
 				break;
 			default:
 			{

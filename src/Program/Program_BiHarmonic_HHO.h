@@ -136,11 +136,42 @@ public:
 			cg.MaxIterations = args.Solver.MaxIterations;
 			Vector theta = cg.Solve();
 
-			// Solve problem 1
+			// Solve problem 1 (f=source, Neum=<theta>)
 			Vector lambda = biHarPb->Solve1stDiffProblem(theta);
 
-			// Solve problem 2
-			Vector reconstructedSolution = biHarPb->Solve2ndDiffProblem(lambda);
+			// Solve problem 2 (f=<lambda>, Neum=0)
+			Vector reconstructedSolution;
+			if (!args.Actions.EnforceDirichletBC)
+				reconstructedSolution = biHarPb->Solve2ndDiffProblem(lambda);
+			else
+			{
+				cout << "Enforce Dirichlet BC to the solution..." << endl;
+
+				DiffusionField<Dim> diffField(new Tensor<Dim>());
+				VirtualDiffusionTestCase<Dim> diffTestCase(Utils::ConstantFunctionZero, diffField);
+
+				Mesh<Dim>* meshLast = MeshFactory<Dim>::BuildMesh(args, &diffTestCase);
+				if (args.Discretization.Mesher.compare("gmsh") == 0)
+					GMSHMesh<Dim>::CloseGMSH();
+				auto FullDirichlet = BoundaryConditions::HomogeneousDirichletEverywhere();
+				meshLast->SetBoundaryConditions(&FullDirichlet);
+				meshLast->SetDiffusionField(&diffField);
+
+				HHOParameters<Dim> hhoLast(meshLast, args.Discretization.Stabilization, reconstructionBasis, cellBasis, faceBasis, args.Discretization.OrthogonalizeElemBasesCode, args.Discretization.OrthogonalizeFaceBasesCode);
+
+				Diffusion_HHO<Dim> lastPb(meshLast, &diffTestCase, &hhoLast, true, false);
+				ActionsArguments diffActions;
+				diffActions.AssembleRightHandSide = true;
+				lastPb.Assemble(diffActions);
+				lastPb.ChangeSourceFunction(lambda);
+				lastPb.SetCondensedRHS();
+
+				IterativeSolver* lastSolver = dynamic_cast<IterativeSolver*>(SolverFactory<Dim>::CreateSolver(args, &lastPb, blockSizeForBlockSolver, out));
+				lastSolver->Setup(lastPb.A);
+				lastPb.SystemSolution = lastSolver->Solve(lastPb.b);
+				lastPb.ReconstructHigherOrderApproximation(false);
+				reconstructedSolution = std::move(lastPb.ReconstructedSolution);
+			}
 
 			//-----------------------------//
 			//       Solution export       //
