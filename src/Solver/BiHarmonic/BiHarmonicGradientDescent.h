@@ -44,16 +44,22 @@ public:
 
 		Vector r_old = r;
 
-		result.SetResidualNorm(r.norm());
+		result.SetResidualNorm(sqrt(L2InnerProdOnBoundary(r, r)));
 
 		this->IterationCount = 0;
 
 		if (this->PrintIterationResults)
 			cout << result << endl;
 
+		double step = 1;
+
+
 		while (!StoppingCriteriaReached(result))
 		{
 			result = IterationResult(result);
+
+			// Update theta in the opposite direction of the gradient (= r)
+			theta -= step * r;
 
 			// Solve 1st problem (f=source, Neum=theta --> lambda s.t. (lambda|1)=0)
 			lambda = _biHarPb.Solve1stDiffProblem(theta);
@@ -62,17 +68,17 @@ public:
 			r = _biHarPb.Solve2ndDiffProblem(lambda, true);
 
 			// Compute the step
-			//step = abs((theta - theta_old).dot(r - r_old))
+			Vector r_minus_r_old = r - r_old;
+			step = abs(step * L2InnerProdOnBoundary(r_old, r_minus_r_old)) / L2InnerProdOnBoundary(r_minus_r_old, r_minus_r_old);
 
-			// Update theta in the opposite direction of the gradient (= r)
-			theta -= _step * r;
+			r_old = r;
 			
 			//------------------------------------
 
 			this->IterationCount++;
 
 			result.SetX(theta);
-			result.SetResidualNorm(r.norm());
+			result.SetResidualNorm(sqrt(L2InnerProdOnBoundary(r, r)));
 
 			if (this->PrintIterationResults)
 				cout << result << endl;
@@ -86,4 +92,10 @@ public:
 		return theta;
 	}
 
+private:
+	double L2InnerProdOnBoundary(const Vector& v1, const Vector& v2)
+	{
+		return _biHarPb.DiffPb().L2InnerProdOnBoundary(v1, v2);
+		//return v1.dot(v2);
+	}
 };
