@@ -850,18 +850,15 @@ public:
 	// After solving the faces, construction of the higher-order approximation using the reconstructor //
 	//-------------------------------------------------------------------------------------------------//
 
-	void ReconstructHigherOrderApproximation(bool log = true)
+	void ReconstructHigherOrderApproximation()
 	{
-		Vector globalReconstructedSolution(HHO->nElements * HHO->nReconstructUnknowns);
 		this->GlobalHybridSolution = Vector(HHO->nTotalHybridCoeffs);
 
 		if (this->_staticCondensation)
 		{
-			if (log)
-				cout << "Solving cell unknowns..." << endl;
 			Vector& facesSolution = this->SystemSolution;
 
-			this->GlobalHybridSolution.head(HHO->nTotalCellUnknowns) = Solve_A_T_T(B_T - A_T_ndF * facesSolution);
+			this->GlobalHybridSolution.head(HHO->nTotalCellUnknowns) = SolveCellUnknowns(facesSolution);
 			this->GlobalHybridSolution.segment(HHO->nTotalCellUnknowns, HHO->nTotalFaceUnknowns) = facesSolution;
 		}
 		else
@@ -870,25 +867,45 @@ public:
 		// Dirichlet boundary conditions
 		this->GlobalHybridSolution.tail(HHO->nDirichletCoeffs) = this->x_dF;
 
+		this->ReconstructedSolution = ReconstructHigherOrderApproximationFromHybridCoeffs(this->GlobalHybridSolution);
+	}
 
-		if (log)
-			cout << "Reconstruction of higher order approximation..." << endl;
-		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, &globalReconstructedSolution](Element<Dim>* e)
+	Vector ReconstructHigherOrderApproximationFromFaceCoeffs(const Vector& faceCoeffs)
+	{
+		Vector hybridCoeffs = Vector(HHO->nTotalHybridCoeffs);
+		hybridCoeffs.head(HHO->nTotalCellUnknowns) = SolveCellUnknowns(faceCoeffs);
+		hybridCoeffs.segment(HHO->nTotalCellUnknowns, HHO->nTotalFaceUnknowns) = faceCoeffs;
+		hybridCoeffs.tail(HHO->nDirichletCoeffs) = this->x_dF; // Dirichlet boundary conditions
+
+		return ReconstructHigherOrderApproximationFromHybridCoeffs(hybridCoeffs);
+	}
+
+	Vector ReconstructHigherOrderApproximationFromHybridCoeffs(const Vector& hybridCoeffs)
+	{
+		assert(hybridCoeffs.rows() == HHO->nTotalHybridCoeffs);
+		Vector reconstruction(HHO->nElements * HHO->nReconstructUnknowns);
+		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, &reconstruction, &hybridCoeffs](Element<Dim>* e)
 			{
 				HHOParameters<Dim>* HHO = this->HHO;
 				Diff_HHOElement<Dim>* element = HHOElement(e);
 
-				Vector localHybridSolution(HHO->nCellUnknowns + HHO->nFaceUnknowns * element->Faces.size());
-				localHybridSolution.head(HHO->nCellUnknowns) = this->GlobalHybridSolution.segment(FirstDOFGlobalNumber(element), HHO->nCellUnknowns);
+				Vector localHybrid(HHO->nCellUnknowns + HHO->nFaceUnknowns * element->Faces.size());
+				localHybrid.head(HHO->nCellUnknowns) = hybridCoeffs.segment(FirstDOFGlobalNumber(element), HHO->nCellUnknowns);
 				for (auto face : element->Faces)
-					localHybridSolution.segment(element->FirstDOFNumber(face), HHO->nFaceUnknowns) = this->GlobalHybridSolution.segment(FirstDOFGlobalNumber(face), HHO->nFaceUnknowns);
+					localHybrid.segment(element->FirstDOFNumber(face), HHO->nFaceUnknowns) = hybridCoeffs.segment(FirstDOFGlobalNumber(face), HHO->nFaceUnknowns);
 
-				Vector localReconstructedSolution = element->Reconstruct(localHybridSolution);
-				globalReconstructedSolution.segment(element->Number() * HHO->nReconstructUnknowns, HHO->nReconstructUnknowns) = localReconstructedSolution;
+				Vector localReconstruction = element->Reconstruct(localHybrid);
+				reconstruction.segment(element->Number() * HHO->nReconstructUnknowns, HHO->nReconstructUnknowns) = localReconstruction;
 			});
-
-		this->ReconstructedSolution = globalReconstructedSolution;
+		return reconstruction;
 	}
+
+	Vector SolveCellUnknowns(const Vector& faceCoeffs)
+	{
+		assert(faceCoeffs.rows() == HHO->nTotalFaceUnknowns);
+		return Solve_A_T_T(B_T - A_T_ndF * faceCoeffs);
+	}
+
 
 	// Reassembles a new RHS corresponding to a discrete source function
 	void ChangeSourceFunction(const Vector& sourceFuncCoeffs)

@@ -64,13 +64,13 @@ public:
 			// Solve 2nd diffusion problem (f=delta, Neum=0)
 			// compatibility condition: (delta|1) = 0
 			//_zeroMeanForReconstruct.Enforce(delta);
-			Vector gamma = _biHarPb.Solve2ndDiffProblem(delta, true);
+			Vector gamma_boundary = _biHarPb.Solve2ndDiffProblem(delta, true);
 
 
 			// Step for theta in the direction of research
-			//double rho = L2InnerProdOnBoundary(p, r) / L2InnerProdOnBoundary(gamma, p);
-			//double rho = r_dot_r / gamma.dot(p);
-			double rho = r_dot_r / L2InnerProdOnBoundary(gamma, p);
+			//double rho = L2InnerProdOnBoundary(p, r) / L2InnerProdOnBoundary(gamma_boundary, p);
+			//double rho = r_dot_r / gamma_boundary.dot(p);
+			double rho = r_dot_r / L2InnerProdOnBoundary(gamma_boundary, p);
 
 			// Move theta in the direction of research
 			theta += rho * p;
@@ -78,7 +78,7 @@ public:
 			double r_dot_r_old = r_dot_r; // save the dot product before overwriting r
 
 			// Update residual
-			r -= rho * gamma;
+			r -= rho * gamma_boundary;
 
 			r_dot_r = L2InnerProdOnBoundary(r, r);
 
@@ -94,9 +94,9 @@ public:
 			Vector u_boundary = _biHarPb.Solve2ndDiffProblem(lambda, true);
 
 			Vector r_u_boundary = r - u_boundary;
-			cout << "r = " << endl << r << endl;
-			cout << "u_boundary = " << endl << u_boundary << endl;
-			cout << "r - u_boundary = " << endl << r_u_boundary << endl;
+			//cout << "r = " << endl << r << endl;
+			//cout << "u_boundary = " << endl << u_boundary << endl;
+			//cout << "r - u_boundary = " << endl << r_u_boundary << endl;
 			cout << "||u_boundary|| = " << sqrt(L2InnerProdOnBoundary(u_boundary, u_boundary)) << "   ";
 			cout << "||r - u_boundary|| = " << sqrt(L2InnerProdOnBoundary(r_u_boundary, r_u_boundary)) << "   ";
 			cout << "||r|| = " << sqrt(r_dot_r_old) << endl;

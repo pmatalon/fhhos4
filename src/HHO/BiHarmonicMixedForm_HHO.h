@@ -91,17 +91,16 @@ public:
 		Vector& rhs = _diffPb.SetCondensedRHS();
 
 		// Solve
-		_diffPb.SystemSolution = _diffSolver->Solve(rhs);
+		Vector faceSolution = _diffSolver->Solve(rhs);
 		CheckDiffSolverConvergence();
 
 #ifndef NDEBUG
 		// Check that mean value = 0 (on the faces)
-		double integralSkeleton = _diffPb.IntegralOverSkeletonFromFaceCoeffs(_diffPb.SystemSolution);
+		double integralSkeleton = _diffPb.IntegralOverSkeletonFromFaceCoeffs(faceSolution);
 		assert(abs(integralSkeleton) < Utils::Eps);
 #endif
 		// Reconstruct the higher-order polynomial
-		_diffPb.ReconstructHigherOrderApproximation(false);
-		Vector lambda = std::move(_diffPb.ReconstructedSolution);
+		Vector lambda = _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution);
 
 		// Even if the mean value is 0 on the faces, the mean value of the reconstructed polynomial is not necessarily 0,
 		// so we enforce it:
@@ -124,12 +123,11 @@ public:
 		Vector& rhs = _diffPb.SetCondensedRHS();
 
 		// Solve
-		_diffPb.SystemSolution = _diffSolver->Solve(rhs);
+		Vector faceSolution = _diffSolver->Solve(rhs);
 		CheckDiffSolverConvergence();
 
 		// Reconstruct the higher-order polynomial
-		_diffPb.ReconstructHigherOrderApproximation(false);
-		Vector lambda = std::move(_diffPb.ReconstructedSolution);
+		Vector lambda = _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution);
 
 		// Enforce (lambda|1) = 0
 		_integralZeroOnDomain.Enforce(lambda);
@@ -151,22 +149,20 @@ public:
 		Vector& rhs = _diffPb.SetCondensedRHS();
 
 		// Solve
-		_diffPb.SystemSolution = _diffSolver->Solve(rhs);
+		Vector faceSolution = _diffSolver->Solve(rhs);
 		CheckDiffSolverConvergence();
 
 		if (boundaryUnknownsOnly)
 		{
-			Vector boundary = _diffPb.SystemSolution.tail(HHO->nBoundaryFaces * HHO->nFaceUnknowns); // keep only the boundary unknowns
+			Vector boundary = faceSolution.tail(HHO->nBoundaryFaces * HHO->nFaceUnknowns); // keep only the boundary unknowns
 			_integralZeroOnBoundary.Enforce(boundary);
 			return boundary;
 		}
 		else
 		{
-			/*_integralZeroOnBoundary.Enforce(_diffPb.SystemSolution);
-			_diffPb.ReconstructHigherOrderApproximation(false);
-			return _diffPb.ReconstructedSolution;*/
-			_diffPb.ReconstructHigherOrderApproximation(false);
-			return std::move(_diffPb.ReconstructedSolution);
+			/*_integralZeroOnBoundary.Enforce(faceSolution);
+			return _diffPb.ReconstructHigherOrderApproximationFaceCoeffs(faceSolution);*/
+			return _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution);
 		}
 	}
 

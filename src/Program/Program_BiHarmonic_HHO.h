@@ -174,9 +174,8 @@ public:
 
 				IterativeSolver* lastSolver = dynamic_cast<IterativeSolver*>(SolverFactory<Dim>::CreateSolver(args, &lastPb, blockSizeForBlockSolver, out));
 				lastSolver->Setup(lastPb.A);
-				lastPb.SystemSolution = lastSolver->Solve(lastPb.b);
-				lastPb.ReconstructHigherOrderApproximation(false);
-				reconstructedSolution = std::move(lastPb.ReconstructedSolution);
+				Vector faceSolution = lastSolver->Solve(lastPb.b);
+				reconstructedSolution = lastPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution);
 			}
 
 			//-----------------------------//

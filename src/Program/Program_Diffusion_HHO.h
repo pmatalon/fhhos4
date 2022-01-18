@@ -279,6 +279,7 @@ public:
 				cout << "-                     Post-processing                    -" << endl;
 				cout << "----------------------------------------------------------" << endl;
 
+				cout << "Reconstruction of higher order approximation..." << endl;
 				problem->ReconstructHigherOrderApproximation();
 			}
 
