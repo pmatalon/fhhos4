@@ -24,7 +24,6 @@ public:
 	DiffusionTestCase<Dim>* TestCase;
 	SparseMatrix A;
 	Vector b;
-	Vector SystemSolution;
 
 	// Matrix parts
 	SparseMatrix A_T_T;
@@ -41,8 +40,6 @@ private:
 	//Vector B_neumF;
 public:
 	HHOParameters<Dim>* HHO;
-	Vector ReconstructedSolution;
-	Vector GlobalHybridSolution;
 
 	Diffusion_HHO()
 	{}
@@ -124,11 +121,6 @@ public:
 		absoluteError = sqrt(absoluteError);
 		normExactSolution = sqrt(normExactSolution);
 		return normExactSolution != 0 ? absoluteError / normExactSolution : absoluteError;
-	}
-
-	double L2Error(DomFunction exactSolution)
-	{
-		return L2Error(exactSolution, this->ReconstructedSolution);
 	}
 
 	void AssertSchemeConvergence(double l2Error)
@@ -850,33 +842,32 @@ public:
 	// After solving the faces, construction of the higher-order approximation using the reconstructor //
 	//-------------------------------------------------------------------------------------------------//
 
-	void ReconstructHigherOrderApproximation()
+	Vector HybridCoeffsBySolvingCellUnknowns(const Vector& faceUnknowns)
 	{
-		this->GlobalHybridSolution = Vector(HHO->nTotalHybridCoeffs);
+		assert(faceUnknowns.rows() == HHO->nTotalFaceUnknowns);
 
-		if (this->_staticCondensation)
-		{
-			Vector& facesSolution = this->SystemSolution;
-
-			this->GlobalHybridSolution.head(HHO->nTotalCellUnknowns) = SolveCellUnknowns(facesSolution);
-			this->GlobalHybridSolution.segment(HHO->nTotalCellUnknowns, HHO->nTotalFaceUnknowns) = facesSolution;
-		}
-		else
-			this->GlobalHybridSolution.head(HHO->nTotalHybridUnknowns) = this->SystemSolution;
-
-		// Dirichlet boundary conditions
-		this->GlobalHybridSolution.tail(HHO->nDirichletCoeffs) = this->x_dF;
-
-		this->ReconstructedSolution = ReconstructHigherOrderApproximationFromHybridCoeffs(this->GlobalHybridSolution);
-	}
-
-	Vector ReconstructHigherOrderApproximationFromFaceCoeffs(const Vector& faceCoeffs)
-	{
 		Vector hybridCoeffs = Vector(HHO->nTotalHybridCoeffs);
-		hybridCoeffs.head(HHO->nTotalCellUnknowns) = SolveCellUnknowns(faceCoeffs);
-		hybridCoeffs.segment(HHO->nTotalCellUnknowns, HHO->nTotalFaceUnknowns) = faceCoeffs;
+		hybridCoeffs.head(HHO->nTotalCellUnknowns) = SolveCellUnknowns(faceUnknowns);
+		hybridCoeffs.segment(HHO->nTotalCellUnknowns, HHO->nTotalFaceUnknowns) = faceUnknowns;
 		hybridCoeffs.tail(HHO->nDirichletCoeffs) = this->x_dF; // Dirichlet boundary conditions
 
+		return hybridCoeffs;
+	}
+
+	Vector HybridCoeffsByAddingDirichletCoeffs(const Vector& hybridUnknowns)
+	{
+		assert(hybridUnknowns.rows() == HHO->nTotalHybridUnknowns);
+
+		Vector hybridCoeffs = Vector(HHO->nTotalHybridCoeffs);
+		hybridCoeffs.head(HHO->nTotalHybridUnknowns) = hybridUnknowns;
+		hybridCoeffs.tail(HHO->nDirichletCoeffs) = this->x_dF; // Dirichlet boundary conditions
+
+		return hybridCoeffs;
+	}
+
+	Vector ReconstructHigherOrderApproximationFromFaceCoeffs(const Vector& faceUnknowns)
+	{
+		Vector hybridCoeffs = HybridCoeffsBySolvingCellUnknowns(faceUnknowns);
 		return ReconstructHigherOrderApproximationFromHybridCoeffs(hybridCoeffs);
 	}
 
@@ -966,10 +957,6 @@ public:
 		if (HHO->OrthogonalizeElemBases())
 			Utils::Error("The export to GMSH has not been implemented when the bases are orthonormalized against each element.");
 		this->_mesh->ExportToGMSH(this->HHO->ReconstructionBasis, reconstructedSolution, out.GetFilePathPrefix(), "potential");
-	}
-	void ExportSolutionToGMSH(const ExportModule& out)
-	{
-		ExportSolutionToGMSH(this->ReconstructedSolution, out);
 	}
 
 	void ExportErrorToGMSH(const Vector& faceCoeffs, const ExportModule& out)

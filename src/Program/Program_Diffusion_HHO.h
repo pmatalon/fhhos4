@@ -205,6 +205,8 @@ public:
 			cout << "-                 Linear system solution                 -" << endl;
 			cout << "----------------------------------------------------------" << endl;
 
+			Vector systemSolution;
+
 			// Solver creation
 			int blockSizeForBlockSolver = args.Solver.BlockSize != -1 ? args.Solver.BlockSize : faceBasis->Size();
 
@@ -231,7 +233,7 @@ public:
 
 				cout << "Solving..." << endl;
 				solvingTimer.Start();
-				problem->SystemSolution = iterativeSolver->Solve(problem->b, args.Solver.InitialGuessCode);
+				systemSolution = iterativeSolver->Solve(problem->b, args.Solver.InitialGuessCode);
 				solvingTimer.Stop();
 				cout << iterativeSolver->IterationCount << " iterations." << endl << endl;
 
@@ -259,7 +261,7 @@ public:
 
 				cout << "Solving..." << endl;
 				solvingTimer.Start();
-				problem->SystemSolution = solver->Solve(problem->b);
+				systemSolution = solver->Solve(problem->b);
 				solvingTimer.Stop();
 				cout << endl;
 			}
@@ -268,19 +270,28 @@ public:
 			SolverFactory<Dim>::PrintStats(solver, setupTimer, solvingTimer, totalTimer);
 
 			if (args.Actions.ExportErrorToGMSH && iterativeSolver)
-				problem->ExportErrorToGMSH(iterativeSolver->ExactSolution - problem->SystemSolution, out);
+				problem->ExportErrorToGMSH(iterativeSolver->ExactSolution - systemSolution, out);
 
 			delete solver;
 
-
+			Vector hybridSolution;
+			Vector reconstructedSolution;
 			if (args.Actions.ExportSolutionVectors || args.Actions.ExportSolutionToGMSH || testCase->ExactSolution || testCase->BC.Type == PbBoundaryConditions::FullNeumann)
 			{
 				cout << "----------------------------------------------------------" << endl;
 				cout << "-                     Post-processing                    -" << endl;
 				cout << "----------------------------------------------------------" << endl;
 
+				if (args.Discretization.StaticCondensation)
+				{
+					cout << "Solving cell unknowns..." << endl;
+					hybridSolution = problem->HybridCoeffsBySolvingCellUnknowns(systemSolution);
+				}
+				else
+					hybridSolution = problem->HybridCoeffsByAddingDirichletCoeffs(systemSolution);
+				
 				cout << "Reconstruction of higher order approximation..." << endl;
-				problem->ReconstructHigherOrderApproximation();
+				reconstructedSolution = problem->ReconstructHigherOrderApproximationFromHybridCoeffs(hybridSolution);
 			}
 
 			//-----------------------------//
@@ -290,9 +301,9 @@ public:
 			if (args.Actions.ExportSolutionVectors)
 			{
 				if (args.Discretization.StaticCondensation)
-					out.ExportVector(problem->SystemSolution, "solutionFaces");
-				out.ExportVector(problem->GlobalHybridSolution, "solutionHybrid");
-				out.ExportVector(problem->ReconstructedSolution, "solutionHigherOrder");
+					out.ExportVector(systemSolution, "solutionFaces");
+				out.ExportVector(hybridSolution, "solutionHybrid");
+				out.ExportVector(reconstructedSolution, "solutionHigherOrder");
 			}
 
 			if (args.Actions.ExportMeshToMatlab)
@@ -302,7 +313,7 @@ public:
 			}
 
 			if (args.Actions.ExportSolutionToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
-				problem->ExportSolutionToGMSH(out);
+				problem->ExportSolutionToGMSH(reconstructedSolution, out);
 
 			//----------------------//
 			//       L2 error       //
@@ -310,7 +321,7 @@ public:
 
 			if (testCase->ExactSolution)
 			{
-				double error = problem->L2Error(testCase->ExactSolution);
+				double error = problem->L2Error(testCase->ExactSolution, reconstructedSolution);
 				cout << endl << "L2 Error = " << std::scientific << error << endl;
 				problem->AssertSchemeConvergence(error);
 			}
@@ -318,7 +329,7 @@ public:
 			// Check mean value if full Neumann conditions
 			if (testCase->BC.Type == PbBoundaryConditions::FullNeumann)
 			{
-				double meanValue = problem->MeanValueFromReconstructedCoeffs(problem->ReconstructedSolution);
+				double meanValue = problem->MeanValueFromReconstructedCoeffs(reconstructedSolution);
 				cout << "Mean value = " << meanValue << endl;
 			}
 		}

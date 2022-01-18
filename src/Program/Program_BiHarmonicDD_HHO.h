@@ -89,6 +89,8 @@ public:
 
 		if (args.Actions.SolveLinearSystem)
 		{
+			Vector faceSolution;
+
 			cout << endl;
 			cout << "----------------------------------------------------------" << endl;
 			cout << "-                   Solve linear system                  -" << endl;
@@ -118,7 +120,7 @@ public:
 
 				cout << "Solving first problem..." << endl;
 				solvingTimer1.Start();
-				biHarPb->DiffPb1().SystemSolution = iterativeSolver->Solve(biHarPb->DiffPb1().b, args.Solver.InitialGuessCode);
+				faceSolution = iterativeSolver->Solve(biHarPb->DiffPb1().b, args.Solver.InitialGuessCode);
 				solvingTimer1.Stop();
 			}
 			else
@@ -129,12 +131,12 @@ public:
 
 				cout << "Solving first problem..." << endl;
 				solvingTimer1.Start();
-				biHarPb->DiffPb1().SystemSolution = solver->Solve(biHarPb->DiffPb1().b);
+				faceSolution = solver->Solve(biHarPb->DiffPb1().b);
 				solvingTimer1.Stop();
 				cout << endl;
 			}
 
-			biHarPb->DiffPb1().ReconstructHigherOrderApproximation();
+			Vector reconstructedSolution = biHarPb->DiffPb1().ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution);
 
 			//----------------------//
 			//       L2 error       //
@@ -142,7 +144,7 @@ public:
 
 			if (testCase->MinusLaplacianOfSolution)
 			{
-				double error = biHarPb->DiffPb1().L2Error(testCase->MinusLaplacianOfSolution);
+				double error = biHarPb->DiffPb1().L2Error(testCase->MinusLaplacianOfSolution, reconstructedSolution);
 				cout << endl << "L2 Error = " << std::scientific << error << endl;
 			}
 
@@ -150,15 +152,15 @@ public:
 			cout << "-                  2nd diffusion problem                 -" << endl;
 			cout << "----------------------------------------------------------" << endl;
 
-			bool higherDegree = true;
-			if (higherDegree)
-				biHarPb->AssembleDiffPb2(biHarPb->DiffPb1().ReconstructedSolution);
-			else
-				biHarPb->AssembleDiffPb2(biHarPb->DiffPb1().GlobalHybridSolution.head(biHarPb->DiffPb1().HHO->nTotalCellUnknowns));
+			//bool higherDegree = true;
+			//if (higherDegree)
+				biHarPb->AssembleDiffPb2(reconstructedSolution);
+			//else
+				//biHarPb->AssembleDiffPb2(biHarPb->DiffPb1().GlobalHybridSolution.head(biHarPb->DiffPb1().HHO->nTotalCellUnknowns));
 
 			cout << "Solving second problem..." << endl;
 			solvingTimer2.Start();
-			biHarPb->DiffPb2().SystemSolution = solver->Solve(biHarPb->DiffPb2().b);
+			faceSolution = solver->Solve(biHarPb->DiffPb2().b);
 			solvingTimer2.Stop();
 			cout << endl;
 
@@ -176,9 +178,9 @@ public:
 				cout << "-                     Post-processing                    -" << endl;
 				cout << "----------------------------------------------------------" << endl;
 
-				biHarPb->DiffPb2().ReconstructHigherOrderApproximation();
+				reconstructedSolution = biHarPb->DiffPb2().ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution);
 				if (args.Actions.ExportSolutionVectors)
-					out.ExportVector(biHarPb->DiffPb2().ReconstructedSolution, "solution");
+					out.ExportVector(reconstructedSolution, "solution");
 			}
 
 			if (args.Actions.ExportMeshToMatlab)
@@ -188,7 +190,7 @@ public:
 			}
 
 			if (args.Actions.ExportSolutionToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
-				biHarPb->DiffPb2().ExportSolutionToGMSH(out);
+				biHarPb->DiffPb2().ExportSolutionToGMSH(reconstructedSolution, out);
 
 
 
@@ -198,7 +200,7 @@ public:
 
 			if (testCase->ExactSolution)
 			{
-				double error = biHarPb->DiffPb2().L2Error(testCase->ExactSolution);
+				double error = biHarPb->DiffPb2().L2Error(testCase->ExactSolution, reconstructedSolution);
 				cout << endl << "L2 Error = " << std::scientific << error << endl;
 				//biHarPb->AssertSchemeConvergence(error);
 			}
