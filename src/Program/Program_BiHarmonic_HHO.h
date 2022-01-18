@@ -6,6 +6,7 @@
 #include "../Mesher/MeshFactory.h"
 #include "../Solver/SolverFactory.h"
 #include "../Solver/Krylov/BiHarmonicCG.h"
+#include "../Solver/BiHarmonic/BiHarmonicGradientDescent.h"
 #include "../Utils/ExportModule.h"
 
 // Bi-harmonic equation in mixed form with mixed (homogeneous) Dirichel-Neumann BC
@@ -80,7 +81,6 @@ public:
 		assemblyTimer.Start();
 
 		biHarPb->AssembleDiffPb();
-		cout << "System storage: " << Utils::MemoryString(Utils::MemoryUsage(biHarPb->DiffPb().A) + Utils::MemoryUsage(biHarPb->DiffPb().b)) << endl;
 
 		assemblyTimer.Stop();
 		cout << endl << "Assembly time: CPU = " << assemblyTimer.CPU() << ", elapsed = " << assemblyTimer.Elapsed() << endl;
@@ -92,9 +92,9 @@ public:
 		if (args.Actions.SolveLinearSystem)
 		{
 			cout << endl;
-			cout << "----------------------------------------------------------" << endl;
-			cout << "-                   Solve linear system                  -" << endl;
-			cout << "----------------------------------------------------------" << endl;
+			cout << "----------------------------------------------" << endl;
+			cout << "-           Setup Laplacian solver           -" << endl;
+			cout << "----------------------------------------------" << endl;
 
 			int blockSizeForBlockSolver = args.Solver.BlockSize != -1 ? args.Solver.BlockSize : faceBasis->Size();
 
@@ -127,14 +127,23 @@ public:
 
 			biHarPb->SetDiffSolver(diffSolver);
 
-			cout << "--------------------------------------" << endl;
-			cout << "-   Solve with Conjugate Gradient    -" << endl;
-			cout << "--------------------------------------" << endl;
+			cout << "-------------------------------------" << endl;
+			cout << "-     Solve bi-harmonic problem     -" << endl;
+			cout << "-------------------------------------" << endl;
 
-			BiHarmonicCG<Dim> cg(*biHarPb);
-			cg.Tolerance = args.Solver.Tolerance;
-			cg.MaxIterations = args.Solver.MaxIterations;
-			Vector theta = cg.Solve();
+			IterativeSolver* biHarSolver = nullptr;
+			if (args.Solver.BiHarmonicSolverCode.compare("cg") == 0)
+				biHarSolver = new BiHarmonicCG<Dim>(*biHarPb);
+			else if (args.Solver.BiHarmonicSolverCode.compare("gd") == 0)
+				biHarSolver = new BiHarmonicGradientDescent<Dim>(*biHarPb, args.Solver.Step);
+			else
+				Utils::FatalError("Unknown bi-harmonic solver '" + args.Solver.BiHarmonicSolverCode + "'");
+
+			biHarSolver->Tolerance = args.Solver.Tolerance;
+			biHarSolver->MaxIterations = args.Solver.MaxIterations;
+			Vector theta = biHarSolver->Solve();
+
+			delete biHarSolver;
 
 			// Solve problem 1 (f=source, Neum=<theta>)
 			Vector lambda = biHarPb->Solve1stDiffProblem(theta);

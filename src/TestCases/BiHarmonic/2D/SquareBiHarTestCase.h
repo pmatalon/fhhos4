@@ -52,8 +52,8 @@ public:
 	{
 		double x = p.X;
 		double y = p.Y;
-		//return 56400 * (1 - 10 * x + 15 * x * x) * pow(1 - y, 2) * pow(y, 4) + 18800 * x * x * (6 - 20 * x + 15 * x * x) * y * y * (6 - 20 * y + 15 * y * y) + 56400 * pow(1 - x, 2) * pow(x, 4) * (1 - 10 * y + 15 * y * y);
-		return 18800 * pow(x,4) * pow(y,4) + 75200 * pow(x,3) * pow(y,4) * (2 * x - 2) + 112800 * pow(x,2) * pow(y,4) * pow(x - 1, 2) + 338400 * pow(x,4) * pow(y,2) * pow(x - 1, 2) + 75200 * pow(x,4) * pow(y,3) * (2 * y - 2) + 338400 * pow(x,2) * pow(y,4) * pow(y - 1, 2) + 112800 * pow(x,4) * pow(y,2) * pow(y - 1, 2) + 56400 * pow(x,4) * pow(x - 1, 2) * pow(y - 1, 2) + 56400 * pow(y,4) * pow(x - 1, 2) * pow(y - 1, 2) + 225600 * x * pow(y,4) * (2 * x - 2) * pow(y - 1, 2) + 225600 * pow(x,4) * y * (2 * y - 2) * pow(x - 1, 2) + 300800 * pow(x,3) * pow(y,3) * (2 * x - 2) * (2 * y - 2) + 451200 * pow(x,2) * pow(y,3) * (2 * y - 2) * pow(x - 1, 2) + 451200 * pow(x,3) * pow(y,2) * (2 * x - 2) * pow(y - 1, 2) + 676800 * pow(x,2) * pow(y,2) * pow(x - 1, 2) * pow(y - 1, 2);
+		return 56400 * (1 - 10 * x + 15 * x * x) * pow(1 - y, 2) * pow(y, 4) + 18800 * x * x * (6 - 20 * x + 15 * x * x) * y * y * (6 - 20 * y + 15 * y * y) + 56400 * pow(1 - x, 2) * pow(x, 4) * (1 - 10 * y + 15 * y * y);
+		//return 18800 * pow(x,4) * pow(y,4) + 75200 * pow(x,3) * pow(y,4) * (2 * x - 2) + 112800 * pow(x,2) * pow(y,4) * pow(x - 1, 2) + 338400 * pow(x,4) * pow(y,2) * pow(x - 1, 2) + 75200 * pow(x,4) * pow(y,3) * (2 * y - 2) + 338400 * pow(x,2) * pow(y,4) * pow(y - 1, 2) + 112800 * pow(x,4) * pow(y,2) * pow(y - 1, 2) + 56400 * pow(x,4) * pow(x - 1, 2) * pow(y - 1, 2) + 56400 * pow(y,4) * pow(x - 1, 2) * pow(y - 1, 2) + 225600 * x * pow(y,4) * (2 * x - 2) * pow(y - 1, 2) + 225600 * pow(x,4) * y * (2 * y - 2) * pow(x - 1, 2) + 300800 * pow(x,3) * pow(y,3) * (2 * x - 2) * (2 * y - 2) + 451200 * pow(x,2) * pow(y,3) * (2 * y - 2) * pow(x - 1, 2) + 451200 * pow(x,3) * pow(y,2) * (2 * x - 2) * pow(y - 1, 2) + 676800 * pow(x,2) * pow(y,2) * pow(x - 1, 2) * pow(y - 1, 2);
 	}
 	static double PolySolution(const DomPoint& p)
 	{

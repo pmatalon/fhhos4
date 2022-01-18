@@ -28,5 +28,11 @@ public:
 
 	virtual Vector Solve(const Vector& b) = 0;
 
+	virtual Vector Solve()
+	{
+		Utils::FatalError("Solve() not implemented in this solver.");
+		return Vector::Zero(0);
+	}
+
 	virtual ~Solver() {}
 };

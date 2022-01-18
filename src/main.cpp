@@ -160,7 +160,7 @@ void print_usage() {
 	cout << "                             Linear solver                            " << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << endl;
-	cout << "-s SOLVER" << endl;
+	cout << "-s CODE" << endl;
 	cout << "      Linear solver for the solution of the system." << endl;
 	cout << "      - Direct methods:" << endl;
 	cout << "              lu           - LU factorization (Eigen library)" << endl;
@@ -203,6 +203,14 @@ void print_usage() {
 	cout << "-block-size NUM" << endl;
 	cout << "      Forces a block size for the block verions of Jacobi, Gauss-Seidel, SOR." << endl;
 	cout << "      By default, the value is adapted to the space dimension and the polynomial order of the discretization." << endl;
+	cout << endl;
+	cout << "-bihar-solver CODE" << endl;
+	cout << "      Iterative solver for the bi-harmonic problem." << endl;
+	cout << "              cg       - conjugate gradient" << endl;
+	cout << "              gd       - gradient descent" << endl;
+	cout << endl;
+	cout << "-step NUM" << endl;
+	cout << "      Step for the gradient descent." << endl;
 	cout << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << "                                 Multigrid                            " << endl;
@@ -550,6 +558,8 @@ int main(int argc, char* argv[])
 		OPT_MaxIterations,
 		OPT_Relaxation,
 		OPT_BlockSize,
+		OPT_BiHarmonicSolver,
+		OPT_Step,
 		// Multigrid
 		OPT_MGCycle,
 		OPT_DisableHigherOrderReconstruction,
@@ -616,6 +626,8 @@ int main(int argc, char* argv[])
 		 { "max-iter", required_argument, NULL, OPT_MaxIterations },
 		 { "relax", required_argument, NULL, OPT_Relaxation },
 		 { "block-size", required_argument, NULL, OPT_BlockSize },
+		 { "bihar-solver", required_argument, NULL, OPT_BiHarmonicSolver },
+		 { "step", required_argument, NULL, OPT_Step },
 		 // Multigrid
 		 { "cycle", required_argument, NULL, OPT_MGCycle },
 		 { "disable-hor", no_argument, NULL, OPT_DisableHigherOrderReconstruction },
@@ -851,6 +863,12 @@ int main(int argc, char* argv[])
 				break;
 			case OPT_BlockSize:
 				args.Solver.BlockSize = atoi(optarg);
+				break;
+			case OPT_BiHarmonicSolver:
+				args.Solver.BiHarmonicSolverCode = optarg;
+				break;
+			case OPT_Step:
+				args.Solver.Step = atof(optarg);
 				break;
 
 			//---------------//

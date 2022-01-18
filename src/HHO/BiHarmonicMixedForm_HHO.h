@@ -148,7 +148,7 @@ public:
 		// Define problem
 		_diffPb.ChangeSourceFunction(source);
 		_diffPb.ChangeNeumannFunctionToZero();
-		Vector rhs = _diffPb.SetCondensedRHS();
+		Vector& rhs = _diffPb.SetCondensedRHS();
 
 		// Solve
 		_diffPb.SystemSolution = _diffSolver->Solve(rhs);
@@ -165,7 +165,7 @@ public:
 			/*_integralZeroOnBoundary.Enforce(_diffPb.SystemSolution);
 			_diffPb.ReconstructHigherOrderApproximation(false);
 			return _diffPb.ReconstructedSolution;*/
-			_diffPb.ReconstructHigherOrderApproximation();
+			_diffPb.ReconstructHigherOrderApproximation(false);
 			return std::move(_diffPb.ReconstructedSolution);
 		}
 	}

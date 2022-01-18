@@ -43,6 +43,12 @@ public:
 		return false;
 	}
 
+	Vector Solve() override
+	{
+		Utils::FatalError("Solve() not implemented in this solver.");
+		return Vector::Zero(0);
+	}
+
 	Vector Solve(const Vector& b) override
 	{
 		return Solve(b, "0");

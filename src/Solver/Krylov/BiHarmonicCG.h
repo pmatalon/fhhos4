@@ -19,7 +19,7 @@ public:
 		os << "Conjugate Gradient for the bi-harmonic problem";
 	}
 
-	Vector Solve()
+	Vector Solve() override
 	{
 		this->SolvingComputationalWork = 0;
 
@@ -86,6 +86,20 @@ public:
 			double q = r_dot_r / r_dot_r_old;
 			// Update the direction of research
 			p = r + q * p;
+
+
+			//------------------------------------
+			// Recompute explicitly the residual, by computing the solution u
+			Vector lambda = _biHarPb.Solve1stDiffProblem(theta);
+			Vector u_boundary = _biHarPb.Solve2ndDiffProblem(lambda, true);
+
+			Vector r_u_boundary = r - u_boundary;
+			cout << "r = " << endl << r << endl;
+			cout << "u_boundary = " << endl << u_boundary << endl;
+			cout << "r - u_boundary = " << endl << r_u_boundary << endl;
+			cout << "||u_boundary|| = " << sqrt(L2InnerProdOnBoundary(u_boundary, u_boundary)) << "   ";
+			cout << "||r - u_boundary|| = " << sqrt(L2InnerProdOnBoundary(r_u_boundary, r_u_boundary)) << "   ";
+			cout << "||r|| = " << sqrt(r_dot_r_old) << endl;
 
 			//------------------------------------
 

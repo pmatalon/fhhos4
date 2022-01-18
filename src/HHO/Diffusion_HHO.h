@@ -309,7 +309,11 @@ public:
 		//
 		// Static condensation:
 		// 
-		//       A_ndF_ndF - A_T_ndF^T * A_T_T^-1 * A_T_ndF  =  B_ndF - A_T_ndF^T * A_T_T^-1 * B_T
+		//       (A_ndF_ndF - A_T_ndF^T * A_T_T^-1 * A_T_ndF) x_ndF  =  B_ndF - A_T_ndF^T * A_T_T^-1 * B_T
+		// 
+		// Recover cell unknowns:
+		// 
+		//        x_T = A_T_T^-1 (B_T - A_T_ndF*x_ndF)
 
 
 		//-------------------------------//
@@ -855,7 +859,7 @@ public:
 		{
 			if (log)
 				cout << "Solving cell unknowns..." << endl;
-			Vector facesSolution = this->SystemSolution;
+			Vector& facesSolution = this->SystemSolution;
 
 			this->GlobalHybridSolution.head(HHO->nTotalCellUnknowns) = Solve_A_T_T(B_T - A_T_ndF * facesSolution);
 			this->GlobalHybridSolution.segment(HHO->nTotalCellUnknowns, HHO->nTotalFaceUnknowns) = facesSolution;
@@ -1096,6 +1100,7 @@ public:
 
 	Vector SolveFaceMassMatrix(const Vector& v)
 	{
+		assert(v.rows() == HHO->nFaces * HHO->nFaceUnknowns);
 		Vector res(v.rows());
 		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->Faces, [this, &v, &res](Face<Dim>* f)
 			{
@@ -1109,6 +1114,7 @@ public:
 
 	Vector SolveBoundaryFaceMassMatrix(const Vector& v)
 	{
+		assert(v.rows() == HHO->nBoundaryFaces * HHO->nFaceUnknowns);
 		Vector res(v.rows());
 		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->BoundaryFaces, [this, &v, &res](Face<Dim>* f)
 			{
@@ -1122,6 +1128,7 @@ public:
 
 	Vector SolveReconstructMassMatrix(const Vector& v)
 	{
+		assert(v.rows() == HHO->nTotalReconstructUnknowns);
 		Vector res(v.rows());
 		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, &v, &res](Element<Dim>* e)
 			{
@@ -1247,6 +1254,8 @@ public:
 
 	double IntegralOverDomainFromReconstructedCoeffs(const Vector& reconstructedCoeffs)
 	{
+		assert(reconstructedCoeffs.rows() == HHO->nTotalReconstructUnknowns);
+
 		struct ChunkResult { double total = 0; };
 
 		ParallelLoop<Element<Dim>*, ChunkResult> parallelLoop(_mesh->Elements);
