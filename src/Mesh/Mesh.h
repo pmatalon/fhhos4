@@ -43,7 +43,7 @@ public:
 
 	bool IsVertexOf(Element<Dim>* e)
 	{
-		for (Element<3>* e2 : this->Elements)
+		for (Element<Dim>* e2 : this->Elements)
 		{
 			if (e2 == e)
 				return true;
