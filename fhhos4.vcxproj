@@ -99,6 +99,7 @@
     <ClInclude Include="src\Geometry\3D\TriangleIn3D.h" />
     <ClInclude Include="src\Geometry\3D\ReferenceTetrahedron.h" />
     <ClInclude Include="src\HHO\BiHarmonicMixedForm_HHO.h" />
+    <ClInclude Include="src\HHO\HigherOrderBoundary.h" />
     <ClInclude Include="src\HHO\Diffusion_HHOMatrix.h" />
     <ClInclude Include="src\HHO\HHOParameters.h" />
     <ClInclude Include="src\HHO\BiHarmonicDDMixedForm_HHO.h" />
@@ -257,7 +258,7 @@
       <AdditionalOptions>
       </AdditionalOptions>
       <Verbose>true</Verbose>
-      <PreprocessorDefinitions>GMSH_ENABLED;CGAL_ENABLED;SMALL_INDEX;ROOT_PATH="/mnt/c/Users/pierr/Documents/Source/Repos/fhhos4"</PreprocessorDefinitions>
+      <PreprocessorDefinitions>ONLY_2D;GMSH_ENABLED;CGAL_ENABLED;SMALL_INDEX;ROOT_PATH="/mnt/c/Users/pierr/Documents/Source/Repos/fhhos4"</PreprocessorDefinitions>
       <CppLanguageStandard>c++17</CppLanguageStandard>
       <Optimization>Disabled</Optimization>
     </ClCompile>

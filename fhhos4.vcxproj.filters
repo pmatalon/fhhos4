@@ -520,6 +520,9 @@
     <ClInclude Include="src\Solver\BiHarmonic\BiHarmonicGradientDescent.h">
       <Filter>Solver\BiHarmonic</Filter>
     </ClInclude>
+    <ClInclude Include="src\HHO\HigherOrderBoundary.h">
+      <Filter>HHO</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

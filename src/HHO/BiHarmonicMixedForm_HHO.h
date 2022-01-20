@@ -3,6 +3,7 @@
 #include "Diffusion_HHO.h"
 #include "../TestCases/Diffusion/VirtualDiffusionTestCase.h"
 #include "../Solver/Solver.h"
+#include "HigherOrderBoundary.h"
 #include "ZeroMeanEnforcer.h"
 using namespace std;
 
@@ -19,7 +20,10 @@ private:
 	Solver* _diffSolver;
 	ZeroMeanEnforcerFromReconstructCoeffs<Dim> _integralZeroOnDomain;
 	ZeroMeanEnforcerFromBoundaryFaceCoeffs<Dim> _integralZeroOnBoundary;
+	ZeroMeanEnforcerFromHigherOrderBoundary<Dim> _integralZeroOnHigherOrderBoundary;
+	HigherOrderBoundary<Dim> _higherOrderBoundary;
 	double _integralSource = 0;
+	bool _reconstructHigherOrderBoundary = true;
 public:
 	HHOParameters<Dim>* HHO;
 
@@ -34,8 +38,6 @@ public:
 		_diffPbTestCase.BC = BoundaryConditions::HomogeneousNeumannEverywhere();
 		_diffPb = Diffusion_HHO<Dim>(mesh, &_diffPbTestCase, HHO, true, saveMatrixBlocks);
 		_saveMatrixBlocks = saveMatrixBlocks;
-		_integralZeroOnDomain = ZeroMeanEnforcerFromReconstructCoeffs<Dim>(&_diffPb);
-		_integralZeroOnBoundary = ZeroMeanEnforcerFromBoundaryFaceCoeffs<Dim>(&_diffPb);
 	}
 
 	Diffusion_HHO<Dim>& DiffPb()
@@ -51,8 +53,18 @@ public:
 
 		_integralSource = _diffPb.IntegralOverDomain(_testCase->SourceFunction);
 
+		_higherOrderBoundary = HigherOrderBoundary<Dim>(&_diffPb);
+		_higherOrderBoundary.Setup();
+
+		_integralZeroOnDomain = ZeroMeanEnforcerFromReconstructCoeffs<Dim>(&_diffPb);
+		_integralZeroOnBoundary = ZeroMeanEnforcerFromBoundaryFaceCoeffs<Dim>(&_diffPb);
+		_integralZeroOnHigherOrderBoundary = ZeroMeanEnforcerFromHigherOrderBoundary<Dim>(&_higherOrderBoundary);
+
 		_integralZeroOnDomain.Setup();
-		_integralZeroOnBoundary.Setup();
+		if (_reconstructHigherOrderBoundary)
+			_integralZeroOnHigherOrderBoundary.Setup();
+		else
+			_integralZeroOnBoundary.Setup();
 	}
 
 	void SetDiffSolver(Solver* solver)
@@ -74,7 +86,11 @@ public:
 		//       theta := -(source|1) / |\partial \Omega| * 1
 		// where |\partial \Omega| is the measure of the boundary.
 		double boundaryMeasure = _diffPb._mesh->BoundaryMeasure();
-		Vector theta = -_integralSource / boundaryMeasure * _diffPb.ProjectOnBoundaryDiscreteSpace(Utils::ConstantFunctionOne);
+		Vector theta;
+		if (_reconstructHigherOrderBoundary)
+			theta = -_integralSource / boundaryMeasure * _higherOrderBoundary.ProjectOnBoundaryDiscreteSpace(Utils::ConstantFunctionOne);
+		else
+			theta = -_integralSource / boundaryMeasure * _diffPb.ProjectOnBoundaryDiscreteSpace(Utils::ConstantFunctionOne);
 		return theta;
 	}
 
@@ -82,12 +98,23 @@ public:
 	{
 #ifndef NDEBUG
 		// Check compatibility condition
-		double integralNeumann = _diffPb.IntegralOverBoundaryFromFaceCoeffs(neumann);
+		double integralNeumann = 0;
+		if (_reconstructHigherOrderBoundary)
+			integralNeumann = _higherOrderBoundary.IntegralOverBoundaryFromFaceCoeffs(neumann);
+		else
+			integralNeumann = _diffPb.IntegralOverBoundaryFromFaceCoeffs(neumann);
+
 		assert(abs(_integralSource + integralNeumann) < Utils::Eps);
 #endif
 		// Define problem
 		_diffPb.ChangeSourceFunction(_testCase->SourceFunction);
-		_diffPb.ChangeNeumannFunction(neumann);
+		if (_reconstructHigherOrderBoundary)
+		{
+			Vector b_ndF = _higherOrderBoundary.AssembleNeumannTerm(neumann);
+			_diffPb.SetNeumannTerm(b_ndF);
+		}
+		else
+			_diffPb.ChangeNeumannFunction(neumann);
 		Vector& rhs = _diffPb.SetCondensedRHS();
 
 		// Solve
@@ -111,15 +138,26 @@ public:
 	Vector Solve1stDiffProblemWithZeroSource(const Vector& neumann)
 	{
 #ifndef NDEBUG
+		/*
 		// Check compatibility condition
 		double integralNeumann = _diffPb.IntegralOverBoundaryFromFaceCoeffs(neumann);
 		assert(abs(integralNeumann) < Utils::Eps);
 		// Probably the same thing:
-		assert(_integralZeroOnBoundary.Check(neumann));
+		*/
+		if (_reconstructHigherOrderBoundary)
+			assert(_integralZeroOnHigherOrderBoundary.Check(neumann));
+		else
+			assert(_integralZeroOnBoundary.Check(neumann));
 #endif
 		// Define problem
 		_diffPb.ChangeSourceFunctionToZero();
-		_diffPb.ChangeNeumannFunction(neumann);
+		if (_reconstructHigherOrderBoundary)
+		{
+			Vector b_ndF = _higherOrderBoundary.AssembleNeumannTerm(neumann);
+			_diffPb.SetNeumannTerm(b_ndF);
+		}
+		else
+			_diffPb.ChangeNeumannFunction(neumann);
 		Vector& rhs = _diffPb.SetCondensedRHS();
 
 		// Solve
@@ -134,7 +172,7 @@ public:
 		return lambda;
 	}
 
-	Vector Solve2ndDiffProblem(const Vector& source, bool boundaryUnknownsOnly = false)
+	Vector Solve2ndDiffProblem(const Vector& source, bool boundaryOnly = false)
 	{
 #ifndef NDEBUG
 		// Check compatibility condition: (source|1) = 0
@@ -152,11 +190,21 @@ public:
 		Vector faceSolution = _diffSolver->Solve(rhs);
 		CheckDiffSolverConvergence();
 
-		if (boundaryUnknownsOnly)
+		if (boundaryOnly)
 		{
-			Vector boundary = faceSolution.tail(HHO->nBoundaryFaces * HHO->nFaceUnknowns); // keep only the boundary unknowns
-			_integralZeroOnBoundary.Enforce(boundary);
-			return boundary;
+			if (_reconstructHigherOrderBoundary)
+			{
+				Vector reconstructedElemBoundary = _diffPb.ReconstructHigherOrderOnBoundaryOnly(faceSolution);
+				Vector boundary = _higherOrderBoundary.Trace(reconstructedElemBoundary);
+				_integralZeroOnHigherOrderBoundary.Enforce(boundary);
+				return boundary;
+			}
+			else
+			{
+				Vector boundary = faceSolution.tail(HHO->nBoundaryFaces * HHO->nFaceUnknowns); // keep only the boundary unknowns
+				_integralZeroOnBoundary.Enforce(boundary);
+				return boundary;
+			}
 		}
 		else
 		{
@@ -164,6 +212,15 @@ public:
 			return _diffPb.ReconstructHigherOrderApproximationFaceCoeffs(faceSolution);*/
 			return _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution);
 		}
+	}
+
+	double L2InnerProdOnBoundary(const Vector& v1, const Vector& v2)
+	{
+		if (_reconstructHigherOrderBoundary)
+			return _higherOrderBoundary.L2InnerProdOnBoundary(v1, v2);
+		else
+			return _diffPb.L2InnerProdOnBoundary(v1, v2);
+		//return v1.dot(v2);
 	}
 
 private:

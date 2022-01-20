@@ -635,24 +635,28 @@ public:
 		}
 	}
 
-
-	// Compute some useful integrals on reference element and store them
 	void InitReferenceShapes()
 	{
-		if (HHO->OrthogonalizeElemBases() && HHO->OrthogonalizeFaceBases())
+		InitReferenceShapes(this->HHO, this->TestCase->DiffField.K1, this->TestCase->DiffField.K2);
+	}
+
+	// Compute some useful integrals on reference element and store them
+	static void InitReferenceShapes(HHOParameters<Dim>* hho, Tensor<Dim>* K1, Tensor<Dim>* K2)
+	{
+		if (hho->OrthogonalizeElemBases() && hho->OrthogonalizeFaceBases())
 			return;
 
-		FunctionalBasis<Dim>* reconstructionBasis = HHO->ReconstructionBasis;
-		FunctionalBasis<Dim>* cellBasis = HHO->CellBasis;
-		FunctionalBasis<Dim - 1>* faceBasis = HHO->FaceBasis;
+		FunctionalBasis<Dim>* reconstructionBasis = hho->ReconstructionBasis;
+		FunctionalBasis<Dim>* cellBasis = hho->CellBasis;
+		FunctionalBasis<Dim - 1>* faceBasis = hho->FaceBasis;
 
 		// - Cartesian element
 		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreMassMatrix(cellBasis);
 		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreMassMatrix(reconstructionBasis);
-		if (this->TestCase->DiffField.K1)
-			CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreReconstructK1StiffnessMatrix(this->TestCase->DiffField.K1, reconstructionBasis);
-		if (this->TestCase->DiffField.K2)
-			CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreReconstructK2StiffnessMatrix(this->TestCase->DiffField.K2, reconstructionBasis);
+		if (K1)
+			CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreReconstructK1StiffnessMatrix(K1, reconstructionBasis);
+		if (K2)
+			CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreReconstructK2StiffnessMatrix(K2, reconstructionBasis);
 		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix(cellBasis, reconstructionBasis);
 		// - Cartesian face
 		CartesianShape<Dim, Dim - 1>::InitReferenceShape()->ComputeAndStoreMassMatrix(faceBasis);
@@ -891,6 +895,31 @@ public:
 		return reconstruction;
 	}
 
+	Vector ReconstructHigherOrderOnBoundaryOnly(const Vector& faceUnknowns)
+	{
+		Vector b_T = B_T - A_T_ndF * faceUnknowns;
+
+		Vector reconstruction(_mesh->NBoundaryElements() * HHO->nReconstructUnknowns);
+
+		ElementParallelLoop<Dim> parallelLoop(this->_mesh->Elements);
+		parallelLoop.Execute([this, &faceUnknowns , &b_T, &reconstruction](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				if (e->IsOnBoundary())
+				{
+					Diff_HHOElement<Dim>* element = HHOElement(e);
+
+					Vector localHybrid(HHO->nCellUnknowns + HHO->nFaceUnknowns * e->Faces.size());
+					localHybrid.head(HHO->nCellUnknowns) = element->AttSolver.solve(b_T.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns));
+					for (auto face : element->Faces)
+						localHybrid.segment(element->FirstDOFNumber(face), HHO->nFaceUnknowns) = faceUnknowns.segment(face->Number() * HHO->nFaceUnknowns, HHO->nFaceUnknowns);
+
+					int boundaryElemNumber = _mesh->BoundaryElementNumber(e);
+					reconstruction.segment(boundaryElemNumber * HHO->nReconstructUnknowns, HHO->nReconstructUnknowns) = element->Reconstruct(localHybrid);
+				}
+			});
+		return reconstruction;
+	}
+
 	Vector SolveCellUnknowns(const Vector& faceCoeffs)
 	{
 		assert(faceCoeffs.rows() == HHO->nTotalFaceUnknowns);
@@ -932,6 +961,10 @@ public:
 	void ChangeNeumannFunctionToZero()
 	{
 		this->B_ndF = Vector::Zero(HHO->nTotalFaceUnknowns);
+	}
+	void SetNeumannTerm(Vector& b_ndF)
+	{
+		this->B_ndF = std::move(b_ndF);
 	}
 
 	// Requires that the Dirichlet unknowns have already be eliminated (or that the Dirichlet BC is homogeneous)
@@ -990,6 +1023,7 @@ public:
 		parallelLoop.Fill(result);
 		return result;
 	}
+
 	Vector Solve_A_T_T(const Vector& b_T)
 	{
 		Vector result(b_T.rows());

@@ -1,5 +1,6 @@
 #pragma once
 #include "Diffusion_HHO.h"
+#include "HigherOrderBoundary.h"
 
 
 // --- Zero-mean condition (to enforce unicity of the solution)
@@ -108,9 +109,9 @@ private:
 	}
 };
 
-//------------------------------//
-// Polynomial over the boundary //
-//------------------------------//
+//----------------------------------------------//
+// Polynomial over the boundary (face unknowns) //
+//----------------------------------------------//
 
 template<int Dim>
 class ZeroMeanEnforcerFromBoundaryFaceCoeffs : public ZeroMeanEnforcer
@@ -120,6 +121,33 @@ private:
 public:
 	ZeroMeanEnforcerFromBoundaryFaceCoeffs() {}
 	ZeroMeanEnforcerFromBoundaryFaceCoeffs(Diffusion_HHO<Dim>* discretePb) : _discretePb(discretePb) {}
+private:
+	Vector BasisInnerProdWith1() override
+	{
+		return _discretePb->InnerProdWithBoundaryFaceBasis(Utils::ConstantFunctionOne);
+	}
+	Vector SolveMassMatrix(const Vector& x) override
+	{
+		return _discretePb->SolveBoundaryFaceMassMatrix(x);
+	}
+	double OneScalOne() override
+	{
+		return _discretePb->_mesh->BoundaryMeasure();
+	}
+};
+
+//---------------------------------------------------//
+// Trace on the boundary of reconstructed polynomial //
+//---------------------------------------------------//
+
+template<int Dim>
+class ZeroMeanEnforcerFromHigherOrderBoundary : public ZeroMeanEnforcer
+{
+private:
+	HigherOrderBoundary<Dim>* _discretePb;
+public:
+	ZeroMeanEnforcerFromHigherOrderBoundary() {}
+	ZeroMeanEnforcerFromHigherOrderBoundary(HigherOrderBoundary<Dim>* discretePb) : _discretePb(discretePb) {}
 private:
 	Vector BasisInnerProdWith1() override
 	{

@@ -254,6 +254,43 @@ public:
 		return measure;
 	}
 
+
+
+
+private:
+	map<BigNumber, int> _boundaryElemNumbers;
+public:
+	void AssignNumberToBoundaryElements()
+	{
+		if (!_boundaryElemNumbers.empty())
+			return;
+
+		int nBoundaryElements = 0;
+		for (Element<Dim>* e : this->Elements)
+		{
+			if (e->IsOnBoundary())
+			{
+				_boundaryElemNumbers.insert(pair<BigNumber, int>(e->Number, nBoundaryElements));
+				nBoundaryElements++;
+			}
+		}
+	}
+
+	int BoundaryElementNumber(Element<Dim>* e)
+	{
+		assert(!_boundaryElemNumbers.empty());
+		return _boundaryElemNumbers[e->Number];
+	}
+
+	BigNumber NBoundaryElements()
+	{
+		assert(!_boundaryElemNumbers.empty());
+		return _boundaryElemNumbers.size();
+	}
+
+
+
+
 	Face<Dim>* ExistingFaceWithVertices(const vector<MeshVertex<Dim>*>& vertices)
 	{
 		for (Face<Dim>* f : vertices[0]->Faces)

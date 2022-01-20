@@ -136,20 +136,6 @@ public:
 			return _massMatrixSolver.solve(v);
 	}*/
 
-	DenseMatrix MassMatrix(FunctionalBasis<Dim - 1>* basis, Element<Dim>* element, FunctionalBasis<Dim>* cellBasis)
-	{
-		DenseMatrix M(basis->LocalFunctions.size(), cellBasis->LocalFunctions.size());
-		for (BasisFunction<Dim - 1>* phi1 : basis->LocalFunctions)
-		{
-			for (BasisFunction<Dim>* phi2 : cellBasis->LocalFunctions)
-			{
-				double term = this->ComputeMassTerm(phi1, element, phi2);
-				M(phi1->LocalNumber, phi2->LocalNumber) = term;
-			}
-		}
-		return M;
-	}
-
 	double ComputeMassTerm(BasisFunction<Dim - 1>* facePhi, Element<Dim>* element, BasisFunction<Dim>* reconstructPhi)
 	{
 		auto reconstructPhiOnFace = element->EvalPhiOnFace(this->MeshFace, reconstructPhi);
@@ -160,6 +146,20 @@ public:
 
 		int polynomialDegree = facePhi->GetDegree() + reconstructPhi->GetDegree();
 		return this->MeshFace->Integral(functionToIntegrate, polynomialDegree);
+	}
+
+	DenseMatrix MassMatrix(FunctionalBasis<Dim - 1>* other)
+	{
+		DenseMatrix M(this->Basis->LocalFunctions.size(), other->LocalFunctions.size());
+		for (BasisFunction<Dim - 1>* phi1 : this->Basis->LocalFunctions)
+		{
+			for (BasisFunction<Dim - 1>* phi2 : other->LocalFunctions)
+			{
+				double term = this->MeshFace->Shape()->ComputeMassTerm(phi1, phi2);
+				M(phi1->LocalNumber, phi2->LocalNumber) = term;
+			}
+		}
+		return M;
 	}
 
 	DenseMatrix Trace(Element<Dim>* element, FunctionalBasis<Dim>* cellBasis)
@@ -221,8 +221,22 @@ public:
 private:
 	DenseMatrix ComputeTraceMatrix(Element<Dim>* e, FunctionalBasis<Dim>* cellBasis)
 	{
-		DenseMatrix massCellFace = this->MassMatrix(this->Basis, e, cellBasis);
-		return SolveMassMatrix(massCellFace);
+		DenseMatrix massFaceCell = this->MassMatrix(this->Basis, e, cellBasis);
+		return SolveMassMatrix(massFaceCell);
+	}
+
+	DenseMatrix MassMatrix(FunctionalBasis<Dim - 1>* basis, Element<Dim>* element, FunctionalBasis<Dim>* cellBasis)
+	{
+		DenseMatrix M(basis->LocalFunctions.size(), cellBasis->LocalFunctions.size());
+		for (BasisFunction<Dim - 1>*phi1 : basis->LocalFunctions)
+		{
+			for (BasisFunction<Dim>* phi2 : cellBasis->LocalFunctions)
+			{
+				double term = this->ComputeMassTerm(phi1, element, phi2);
+				M(phi1->LocalNumber, phi2->LocalNumber) = term;
+			}
+		}
+		return M;
 	}
 
 public:
