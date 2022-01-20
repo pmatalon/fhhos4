@@ -1,7 +1,9 @@
 #pragma once
 #include "../Mesh/Mesh.h"
 #include "../Utils/Utils.h"
+#ifdef ENABLE_3D
 #include "../Geometry/3D/Tetrahedron.h"
+#endif // ENABLE_3D
 #include "../Geometry/CartesianShape.h"
 #include "../Geometry/2D/Triangle.h"
 #include "Diff_HHOElement.h"
@@ -669,12 +671,14 @@ public:
 		}
 		else if (Dim == 3)
 		{
+#ifdef ENABLE_3D
 			// - Tetrahedral element
 			Tetrahedron::InitReferenceShape()->ComputeAndStoreMassMatrix((FunctionalBasis<3>*)cellBasis);
 			Tetrahedron::InitReferenceShape()->ComputeAndStoreMassMatrix((FunctionalBasis<3>*)reconstructionBasis);
 			Tetrahedron::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix((FunctionalBasis<3>*)cellBasis, (FunctionalBasis<3>*)reconstructionBasis);
 			// - Triangular face
 			Triangle::InitReferenceShape()->ComputeAndStoreMassMatrix((FunctionalBasis<2>*)faceBasis);
+#endif // ENABLE_3D
 		}
 	}
 

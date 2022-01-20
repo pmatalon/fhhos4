@@ -1242,7 +1242,7 @@ int main(int argc, char* argv[])
 #endif
 	}
 
-	GMSHMesh<3>::GMSHLogEnabled = true;
+	//GMSHMesh<3>::GMSHLogEnabled = true;
 
 	// Test case
 	if (args.Problem.TestCaseCode.compare("") == 0)
@@ -1488,11 +1488,19 @@ int main(int argc, char* argv[])
 
 	Program* program = nullptr;
 	if (args.Problem.Dimension == 1)
+#ifdef ENABLE_1D
 		program = new ProgramDim<1>();
+#else
+		Utils::FatalError("To use 1D, recompile with the option ENABLE_1D");
+#endif
 	else if (args.Problem.Dimension == 2)
 		program = new ProgramDim<2>();
 	else if (args.Problem.Dimension == 3)
+#ifdef ENABLE_3D
 		program = new ProgramDim<3>();
+#else
+		Utils::FatalError("To use 3D, recompile with the option ENABLE_3D");
+#endif
 
 	try
 	{

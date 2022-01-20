@@ -8,8 +8,10 @@
 #ifdef CGAL_ENABLED
 #include "2D/PolygonalElement.h"
 #endif // CGAL_ENABLED
+#ifdef ENABLE_3D
 #include "3D/TetrahedralElement.h"
 #include "3D/ParallelepipedElement.h"
+#endif // ENABLE_3D
 #include "Agglo.h"
 using namespace std;
 
@@ -19,11 +21,15 @@ class PolyhedralMesh : public Mesh<Dim>
 protected:
 	vector<QuadrilateralElement> _quadrilateralElements;
 	vector<TriangularElement> _triangularElements;
+#ifdef ENABLE_3D
 	vector<TetrahedralElement> _tetrahedralElements;
 	vector<ParallelepipedElement> _parallelepipedElements;
+#endif // ENABLE_3D
 
 	vector<Edge> _edgeFaces;
+#ifdef ENABLE_3D
 	vector<TriangularFace> _triangularFaces;
+#endif // ENABLE_3D
 private:
 	double _h = 0;
 	double _regularity = 0;
@@ -79,20 +85,24 @@ public:
 		size_t verticesPointers = this->Vertices.size() * sizeof(Vertex*);
 
 		size_t elementsUsage = _quadrilateralElements.size() * sizeof(QuadrilateralElement)
-			+ _triangularElements.size() * sizeof(TriangularElement)
-			+ _tetrahedralElements.size() * sizeof(TetrahedralElement)
+			+ _triangularElements.size() * sizeof(TriangularElement);
+#ifdef ENABLE_3D
+		elementsUsage += _tetrahedralElements.size() * sizeof(TetrahedralElement)
 			+ _parallelepipedElements.size() * sizeof(ParallelepipedElement);
+#endif // ENABLE_3D
 		if (Dim == 2)
 			elementsUsage += this->Elements.size() * 3 * sizeof(Face<Dim>*); // at least 3 faces
-		else if (Dim == 2)
+		else if (Dim == 3)
 			elementsUsage += this->Elements.size() * 4 * sizeof(Face<Dim>*); // at least 4 faces
 		size_t elementsPointers = this->Elements.size() * sizeof(Element<Dim>*);
 
 		size_t oneFaceUsage = 0;
 		if (Dim == 2)
 			oneFaceUsage = sizeof(Edge);
-		else if (Dim == 2)
+#ifdef ENABLE_3D
+		else if (Dim == 3)
 			oneFaceUsage = sizeof(TriangleIn3D);
+#endif // ENABLE_3D
 		size_t facesUsage = this->Faces.size() * oneFaceUsage;
 		size_t facesPointers = this->Faces.size() * sizeof(Face<Dim>*);
 
@@ -2149,14 +2159,22 @@ public:
 
 	virtual ~PolyhedralMesh()
 	{
-		if (_quadrilateralElements.empty() && _triangularElements.empty() && _tetrahedralElements.empty() && _parallelepipedElements.empty())
+		if (_quadrilateralElements.empty() && _triangularElements.empty()
+#ifdef ENABLE_3D
+			&& _tetrahedralElements.empty() && _parallelepipedElements.empty()
+#endif
+			)
 		{
 			for (size_t i = 0; i < this->Elements.size(); ++i)
 				delete this->Elements[i];
 			this->Elements.clear();
 		}
 
-		if (_edgeFaces.empty() && _triangularFaces.empty())
+		if (_edgeFaces.empty() 
+#ifdef ENABLE_3D
+			&& _triangularFaces.empty()
+#endif
+			)
 		{
 			for (size_t i = 0; i < this->Faces.size(); ++i)
 				delete this->Faces[i];
@@ -2187,12 +2205,14 @@ Element<2>* PolyhedralMesh<2>::CreatePolyhedron(vector<Vertex*> vertices)
 #endif
 }
 
+#ifdef ENABLE_3D
 template<>
 Element<3>* PolyhedralMesh<3>::CreatePolyhedron(vector<Vertex*> vertices)
 {
 	Utils::FatalError("The function PolyhedralMesh<3>::CreatePolyhedron() is not yet implemented.");
 	return nullptr;
 }
+#endif // ENABLE_3D
 
 template<>
 Element<2>* PolyhedralMesh<2>::CreateMacroElement(Element<2>* e1, Element<2>* e2, const vector<Face<2>*>& facesToRemove)
@@ -2205,12 +2225,14 @@ Element<2>* PolyhedralMesh<2>::CreateMacroElement(Element<2>* e1, Element<2>* e2
 #endif
 }
 
+#ifdef ENABLE_3D
 template<>
 Element<3>* PolyhedralMesh<3>::CreateMacroElement(Element<3>* e1, Element<3>* e2, const vector<Face<3>*>& facesToRemove)
 {
 	Utils::FatalError("Not implemented in 3D.");
 	return nullptr;
 }
+#endif // ENABLE_3D
 
 template<>
 Face<2>* PolyhedralMesh<2>::CreateMacroFace(Face<2>* f1, Face<2>* f2, Vertex* vertexToRemove)
@@ -2221,12 +2243,14 @@ Face<2>* PolyhedralMesh<2>::CreateMacroFace(Face<2>* f1, Face<2>* f2, Vertex* ve
 	return macroFace;
 }
 
+#ifdef ENABLE_3D
 template<>
 Face<3>* PolyhedralMesh<3>::CreateMacroFace(Face<3>* f1, Face<3>* f2, Vertex* vertexToRemove)
 {
 	Utils::FatalError("Not implemented in 3D.");
 	return nullptr;
 }
+#endif // ENABLE_3D
 
 template<>
 vector<PhysicalShape<2>*> PolyhedralMesh<2>::Intersection(Element<2>* e1, Element<2>* e2)

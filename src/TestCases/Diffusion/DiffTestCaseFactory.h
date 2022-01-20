@@ -1,7 +1,9 @@
 #pragma once
 #include "DefaultTestCase.h"
-#include "1D/SegmentTestCase.h"
-#include "1D/Heterogeneity1DTestCase.h"
+#ifdef ENABLE_1D
+	#include "1D/SegmentTestCase.h"
+	#include "1D/Heterogeneity1DTestCase.h"
+#endif
 #include "2D/SquareTestCase.h"
 #include "2D/KelloggTestCase.h"
 #include "2D/BarWith4HolesTestCase.h"
@@ -13,8 +15,10 @@
 #include "2D/EDFTestCase.h"
 #include "2D/HybridMeshTestCase.h"
 #include "2D/MagnetismTestCase.h"
-#include "3D/CubeTestCase.h"
-#include "3D/PlateWith4HolesTestCase.h"
+#ifdef ENABLE_3D
+	#include "3D/CubeTestCase.h"
+	#include "3D/PlateWith4HolesTestCase.h"
+#endif
 using namespace std;
 
 template <int Dim>
@@ -24,6 +28,7 @@ public:
 	static DiffusionTestCase<Dim>* Create(ProblemArguments pb) { assert(false); }
 };
 
+#ifdef ENABLE_1D
 template <>
 DiffusionTestCase<1>* DiffTestCaseFactory<1>::Create(ProblemArguments pb)
 {
@@ -37,6 +42,7 @@ DiffusionTestCase<1>* DiffTestCaseFactory<1>::Create(ProblemArguments pb)
 	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 1D. Check -tc argument or use '-tc default'.");
 	return nullptr;
 }
+#endif
 
 template <>
 DiffusionTestCase<2>* DiffTestCaseFactory<2>::Create(ProblemArguments pb)
@@ -72,6 +78,7 @@ DiffusionTestCase<2>* DiffTestCaseFactory<2>::Create(ProblemArguments pb)
 	return nullptr;
 }
 
+#ifdef ENABLE_3D
 template <>
 DiffusionTestCase<3>* DiffTestCaseFactory<3>::Create(ProblemArguments pb)
 {
@@ -85,3 +92,4 @@ DiffusionTestCase<3>* DiffTestCaseFactory<3>::Create(ProblemArguments pb)
 	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 3D. Check -tc argument or use '-tc default'.");
 	return nullptr;
 }
+#endif

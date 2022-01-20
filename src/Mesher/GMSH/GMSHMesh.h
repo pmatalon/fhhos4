@@ -674,10 +674,12 @@ protected:
 			this->_quadrilateralElements = vector<QuadrilateralElement>(numberOfElements);
 		else if (elemType == GMSH_Triangle)
 			this->_triangularElements = vector<TriangularElement>(numberOfElements);
+#ifdef ENABLE_3D
 		else if (elemType == GMSH_Tetrahedron)
 			this->_tetrahedralElements = vector<TetrahedralElement>(numberOfElements);
 		else if (elemType == GMSH_Hexahedron)
 			this->_parallelepipedElements = vector<ParallelepipedElement>(numberOfElements);
+#endif // ENABLE_3D
 		else
 			Utils::FatalError("GMSH element type not managed.");
 	}
@@ -688,8 +690,10 @@ protected:
 
 		if (Dim == 2)
 			this->_edgeFaces.reserve(numberOfFaces);
+#ifdef ENABLE_3D
 		else if (faceType == GMSHFaceTypes::GMSH_TriangleFace)
 			this->_triangularFaces.reserve(numberOfFaces);
+#endif // ENABLE_3D
 		else
 			Utils::FatalError("GMSH element type not managed.");
 	}
@@ -759,12 +763,14 @@ public:
 		GMSHMesh<Dim>* fineMesh = CreateNewGMSHMesh();
 		this->InitializeRefinement(fineMesh);
 		fineMesh->ComesFrom.CS = H_CoarsStgy::GMSHSplittingRefinement;
+#ifdef ENABLE_3D
 		if (dynamic_cast<TetrahedralElement*>(this->Elements[0]))
 		{
 			fineMesh->ComesFrom.nFineElementsByCoarseElement = 8;
 			fineMesh->ComesFrom.nFineFacesAddedByCoarseElement = 8;
 			fineMesh->ComesFrom.nFineFacesByKeptCoarseFace = 4;
 		}
+#endif // ENABLE_3D
 		fineMesh->Build();
 
 		// Save the fine mesh in a temporary file because we're going to reload the coarse one
@@ -1166,6 +1172,8 @@ Element<2>* GMSHMesh<2>::CreateElement(int elemType, const vector<size_t>& eleme
 // 3D elements //
 //-------------//
 
+#ifdef ENABLE_3D
+
 template <>
 Element<3>* GMSHMesh<3>::CreateElement(int elemType, const vector<size_t>& elementNodes, size_t start, size_t elemIndex)
 {
@@ -1209,6 +1217,7 @@ Element<3>* GMSHMesh<3>::CreateElement(int elemType, const vector<size_t>& eleme
 		assert(false && "GMSH element type not managed.");
 	return e;
 }
+#endif // ENABLE_3D
 
 //--------------//
 //   2D faces   //
@@ -1284,6 +1293,8 @@ void GMSHMesh<2>::CreateFaces(int elemType, BigNumber& faceNumber)
 //--------------//
 //   3D faces   //
 //--------------//
+
+#ifdef ENABLE_3D
 
 template <>
 void GMSHMesh<3>::CreateFaces(int elemType, BigNumber& faceNumber)
@@ -1472,7 +1483,7 @@ void GMSHMesh<3>::CreateFaces(int elemType, BigNumber& faceNumber)
 			v->Faces.push_back(face);
 	}
 }
-
+#endif // ENABLE_3D
 
 
 
@@ -1494,6 +1505,7 @@ Face<2>* GMSHMesh<2>::GetBoundaryFaceFromGMSHNodes(int faceType, const vector<si
 	return nullptr;
 }
 
+#ifdef ENABLE_3D
 template<>
 Face<3>* GMSHMesh<3>::GetBoundaryFaceFromGMSHNodes(int faceType, const vector<size_t>& faceNodes, size_t& faceNodeIndex)
 {
@@ -1512,17 +1524,26 @@ Face<3>* GMSHMesh<3>::GetBoundaryFaceFromGMSHNodes(int faceType, const vector<si
 	assert(false && "Face not found");
 	return nullptr;
 }
+#endif // ENABLE_3D
 
+#ifdef ENABLE_1D
 template <>
 bool GMSHMesh<1>::GMSHLogEnabled = false;
+#endif // ENABLE_1D
 template <>
 bool GMSHMesh<2>::GMSHLogEnabled = false;
+#ifdef ENABLE_3D
 template <>
 bool GMSHMesh<3>::GMSHLogEnabled = false;
+#endif // ENABLE_3D
 
+#ifdef ENABLE_1D
 template <>
 bool GMSHMesh<1>::UseCache = true;
+#endif // ENABLE_1D
 template <>
 bool GMSHMesh<2>::UseCache = true;
+#ifdef ENABLE_3D
 template <>
 bool GMSHMesh<3>::UseCache = true;
+#endif // ENABLE_3D

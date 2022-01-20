@@ -61,8 +61,10 @@ public:
 #ifdef CGAL_ENABLED
 			Polygon::Test();
 #endif
+#ifdef ENABLE_3D
 			Tetrahedron::Test();
 			TriangleIn3D::Test();
+#endif
 
 			cout << "Sanity check..." << endl;
 			mesh->SanityCheck();

@@ -9,12 +9,15 @@ public:
 	static BiHarmonicDDTestCase<Dim>* Create(ProblemArguments pb) { assert(false); }
 };
 
+
+#ifdef ENABLE_1D
 template <>
 BiHarmonicDDTestCase<1>* BiHarDDTestCaseFactory<1>::Create(ProblemArguments pb)
 {
 	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 1D. Check -tc argument.");
 	return nullptr;
 }
+#endif // ENABLE_1D
 
 template <>
 BiHarmonicDDTestCase<2>* BiHarDDTestCaseFactory<2>::Create(ProblemArguments pb)
@@ -26,9 +29,11 @@ BiHarmonicDDTestCase<2>* BiHarDDTestCaseFactory<2>::Create(ProblemArguments pb)
 	return nullptr;
 }
 
+#ifdef ENABLE_3D
 template <>
 BiHarmonicDDTestCase<3>* BiHarDDTestCaseFactory<3>::Create(ProblemArguments pb)
 {
 	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 3D. Check -tc argument.");
 	return nullptr;
 }
+#endif // ENABLE_3D

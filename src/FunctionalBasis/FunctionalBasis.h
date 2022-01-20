@@ -3,7 +3,9 @@
 #include "BasisFunction.h"
 #include "TensorPolynomial.h"
 #include "Bernstein2D.h"
-#include "Bernstein3D.h"
+#ifdef ENABLE_3D
+	#include "Bernstein3D.h"
+#endif
 template <int Dim>
 class Element;
 
@@ -135,6 +137,7 @@ public:
 		//----------//
 		//    3D    //
 		//----------//
+#ifdef ENABLE_3D
 		else if (Dim == 3)
 		{
 			int functionNumber = 0;
@@ -198,6 +201,7 @@ public:
 				}
 			}
 		}
+#endif // ENABLE_3D
 	}
 
 	string BasisCode() const

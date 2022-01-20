@@ -2,33 +2,39 @@
 #include "../ProgramArguments.h"
 #include "../TestCases/TestCase.h"
 
-#include "InHouse/UniformMesh1D.h"
+#ifdef ENABLE_1D
+	#include "InHouse/UniformMesh1D.h"
+#endif // ENABLE_1D
 
 #include "InHouse/Square_CartesianMesh.h"
 #include "InHouse/Square_CartesianPolygonalMesh.h"
 #include "InHouse/Square_TriangularMesh.h"
 #include "InHouse/Square_QuadrilateralMesh.h"
 #ifdef CGAL_ENABLED
-#include "InHouse/Square_QuadrilateralAsPolygonalMesh.h"
+	#include "InHouse/Square_QuadrilateralAsPolygonalMesh.h"
 #endif // CGAL_ENABLED
 
-#include "InHouse/Cube_CartesianMesh.h"
-#include "InHouse/Cube_CartesianTetrahedralMesh.h"
+#ifdef ENABLE_3D
+	#include "InHouse/Cube_CartesianMesh.h"
+	#include "InHouse/Cube_CartesianTetrahedralMesh.h"
+#endif // ENABLE_3D
 
 #ifdef GMSH_ENABLED
-#include "GMSH/Square_GMSHCartesianMesh.h"
-#include "GMSH/Square_GMSHTriangularMesh.h"
-#include "GMSH/Square_GMSHUnstructTriangularMesh.h"
-#include "GMSH/Square_GMSHQuadrilateralMesh.h"
+	#include "GMSH/Square_GMSHCartesianMesh.h"
+	#include "GMSH/Square_GMSHTriangularMesh.h"
+	#include "GMSH/Square_GMSHUnstructTriangularMesh.h"
+	#include "GMSH/Square_GMSHQuadrilateralMesh.h"
 
-#include "GMSH/Square4quadrants_GMSHCartesianMesh.h"
-#include "GMSH/Square4quadrants_GMSHTriangularMesh.h"
-#include "GMSH/Square4quadrants_GMSHUnstructTriangularMesh.h"
-#include "GMSH/Square4quadrants_GMSHQuadrilateralMesh.h"
+	#include "GMSH/Square4quadrants_GMSHCartesianMesh.h"
+	#include "GMSH/Square4quadrants_GMSHTriangularMesh.h"
+	#include "GMSH/Square4quadrants_GMSHUnstructTriangularMesh.h"
+	#include "GMSH/Square4quadrants_GMSHQuadrilateralMesh.h"
 
-#include "GMSH/Cube_GMSHTetrahedralMesh.h"
-#include "GMSH/Cube_GMSHCartesianMesh.h"
-#endif
+#ifdef ENABLE_3D
+	#include "GMSH/Cube_GMSHTetrahedralMesh.h"
+	#include "GMSH/Cube_GMSHCartesianMesh.h"
+#endif // ENABLE_3D
+#endif // GMSH_ENABLED
 
 using namespace std;
 
@@ -39,11 +45,13 @@ public:
 	static Mesh<Dim>* BuildMesh(ProgramArguments& args, TestCase<Dim>* testCase) { return nullptr; }
 };
 
+#ifdef ENABLE_1D
 template <>
 Mesh<1>* MeshFactory<1>::BuildMesh(ProgramArguments& args, TestCase<1>* testCase)
 {
 	return new UniformMesh1D(args.Discretization.N);
 }
+#endif // ENABLE_1D
 
 template <>
 Mesh<2>* MeshFactory<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase)
@@ -240,7 +248,7 @@ Mesh<2>* MeshFactory<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase
 
 
 
-
+#ifdef ENABLE_3D
 
 template <>
 Mesh<3>* MeshFactory<3>::BuildMesh(ProgramArguments& args, TestCase<3>* testCase)
@@ -366,3 +374,4 @@ Mesh<3>* MeshFactory<3>::BuildMesh(ProgramArguments& args, TestCase<3>* testCase
 
 	return fineMesh;
 }
+#endif // ENABLE_3D
