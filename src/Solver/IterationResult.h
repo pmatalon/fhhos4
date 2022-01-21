@@ -21,10 +21,12 @@ private:
 	Timer _solvingTimer;
 	Vector e;
 public:
+	function<void(IterationResult&, const Vector&)> OnNewSolution = nullptr;
 	int IterationNumber = 0;
 	double ResidualNorm = -1;
 	double NormalizedResidualNorm = -1;
 	double RelativeErrorNorm = -1;
+	double L2Error = -1;
 
 	Vector Residual;
 	Vector Ax;
@@ -46,6 +48,7 @@ public:
 		this->_oldResidualNorm = oldResult.NormalizedResidualNorm;
 		this->_previousItConvRates = oldResult._previousItConvRates;
 		this->_tolerance = oldResult._tolerance;
+		this->OnNewSolution = oldResult.OnNewSolution;
 	}
 
 	// Move assignment operator
@@ -70,6 +73,8 @@ public:
 	{
 		if (_computeError)
 			ComputeError(x);
+		if (OnNewSolution)
+			OnNewSolution(*this, x);
 		this->_solvingTimer.Stop();
 	}
 
@@ -90,7 +95,7 @@ public:
 		assert(_bNorm >= 0);
 		this->NormalizedResidualNorm = _bNorm > 0 ? ResidualNorm / _bNorm : ResidualNorm;
 
-		if (IterationNumber > 1 && _oldResidualNorm != -1)
+		if (_oldResidualNorm != -1)
 		{
 			this->_iterationConvRate = this->NormalizedResidualNorm / _oldResidualNorm;
 
@@ -144,6 +149,7 @@ public:
 		int predictedIterationsWidth = 6;
 		int normalizedResWidth = 12;
 		int relativeErrorWidth = 12;
+		int l2ErrorWidth = 12;
 		int iterationConvRateWidth = 11;
 		int asymptoticConvRateWidth = 12;
 		int computWorkWidth = 15;
@@ -163,6 +169,11 @@ public:
 			{
 				os << setw(relativeErrorWidth);
 				os << "Relative";
+			}
+			if (result.L2Error != -1)
+			{
+				os << setw(l2ErrorWidth);
+				os << "L2-error";
 			}
 			os << setw(iterationConvRateWidth);
 			os << "Iteration";
@@ -188,6 +199,11 @@ public:
 				os << setw(relativeErrorWidth);
 				os << "error";
 			}
+			if (result.L2Error != -1)
+			{
+				os << setw(l2ErrorWidth);
+				os << "";
+			}
 			os << setw(iterationConvRateWidth);
 			os << "cv rate";
 			os << setw(asymptoticConvRateWidth);
@@ -200,72 +216,78 @@ public:
 			os << "MatVec";
 			os << setw(remainingTimeWidth);
 			os << "time";
+
+			os << endl;
 		}
+
+		os << setw(IterWidth);
+		os << result.IterationNumber;
+
+		os << setw(predictedIterationsWidth);
+		int remainingIterations = -1;
+		if (result.IterationNumber == 0)
+			os << "";
 		else
 		{
-			os << setw(IterWidth);
-			os << result.IterationNumber;
-
-			os << setw(predictedIterationsWidth);
-			int remainingIterations = -1;
-			if (result.IterationNumber == 1)
-				os << "";
-			else
+			if (result._asymptoticConvRate < 1)
 			{
-				if (result._asymptoticConvRate < 1)
-				{
-					remainingIterations = abs(ceil(log(result._tolerance / result.NormalizedResidualNorm) / log(result._asymptoticConvRate)));
-					os << "/ " + to_string(result.IterationNumber + remainingIterations);
-				}
-				else
-					os << "/ -";
+				remainingIterations = abs(ceil(log(result._tolerance / result.NormalizedResidualNorm) / log(result._asymptoticConvRate)));
+				os << "/ " + to_string(result.IterationNumber + remainingIterations);
 			}
-
-			os << setw(normalizedResWidth);
-			os << std::scientific << result.NormalizedResidualNorm;
-			
-			if (result.RelativeErrorNorm != -1)
-			{
-				os << setw(relativeErrorWidth);
-				os << result.RelativeErrorNorm;
-			}
-
-			os << setw(iterationConvRateWidth);
-			if (result.IterationNumber == 1)
-				os << " ";
 			else
-				os << std::defaultfloat << result._iterationConvRate;
+				os << "/ -";
+		}
 
-			os << setw(asymptoticConvRateWidth);
-			if (result.IterationNumber == 1)
-				os << " ";
-			else
-				os << std::defaultfloat << result._asymptoticConvRate;
+		os << setw(normalizedResWidth);
+		os << std::scientific << result.NormalizedResidualNorm;
 
-			//os << setw(computWorkWidth);
-			//os << round(result._solvingComputationalWork);
+		if (result.RelativeErrorNorm != -1)
+		{
+			os << setw(relativeErrorWidth);
+			os << result.RelativeErrorNorm;
+		}
 
-			//os << setw(cpuTimeWidth);
-			//os << result._solvingTimer.CPU().InMilliseconds;
+		if (result.L2Error != -1)
+		{
+			os << setw(l2ErrorWidth);
+			os << std::scientific << result.L2Error;
+		}
 
-			os << setw(nFineMatVecWidth);
-			if (result._oneFineMatVecWork > 0)
-				os << (int)round(result._solvingComputationalWork / result._oneFineMatVecWork);
-			else
-				os << 0;
+		os << setw(iterationConvRateWidth);
+		if (result.IterationNumber == 0)
+			os << " ";
+		else
+			os << std::defaultfloat << result._iterationConvRate;
 
-			os << setw(remainingTimeWidth);
-			if (result.IterationNumber == 1)
-				os << " ";
-			else if (remainingIterations == -1)
-				os << "-";
-			else
-			{
-				Duration d(result._solvingTimer.CPU().InMilliseconds / result.IterationNumber * remainingIterations);
-				stringstream ss;
-				ss << d;
-				os << ss.str().substr(0, 8);
-			}
+		os << setw(asymptoticConvRateWidth);
+		if (result.IterationNumber == 0)
+			os << " ";
+		else
+			os << std::defaultfloat << result._asymptoticConvRate;
+
+		//os << setw(computWorkWidth);
+		//os << round(result._solvingComputationalWork);
+
+		//os << setw(cpuTimeWidth);
+		//os << result._solvingTimer.CPU().InMilliseconds;
+
+		os << setw(nFineMatVecWidth);
+		if (result._oneFineMatVecWork > 0)
+			os << (int)round(result._solvingComputationalWork / result._oneFineMatVecWork);
+		else
+			os << 0;
+
+		os << setw(remainingTimeWidth);
+		if (result.IterationNumber == 0)
+			os << " ";
+		else if (remainingIterations == -1)
+			os << "-";
+		else
+		{
+			Duration d(result._solvingTimer.CPU().InMilliseconds / result.IterationNumber * remainingIterations);
+			stringstream ss;
+			ss << d;
+			os << ss.str().substr(0, 8);
 		}
 		return os;
 	}

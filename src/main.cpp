@@ -209,8 +209,8 @@ void print_usage() {
 	cout << "              cg       - conjugate gradient" << endl;
 	cout << "              gd       - gradient descent" << endl;
 	cout << endl;
-	cout << "-step NUM" << endl;
-	cout << "      Step for the gradient descent." << endl;
+	cout << "-iter-l2" << endl;
+	cout << "      Computes the L2-error at each iteration of the solver (when the solution is known)." << endl;
 	cout << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << "                                 Multigrid                            " << endl;
@@ -559,7 +559,7 @@ int main(int argc, char* argv[])
 		OPT_Relaxation,
 		OPT_BlockSize,
 		OPT_BiHarmonicSolver,
-		OPT_Step,
+		OPT_IterL2Error,
 		// Multigrid
 		OPT_MGCycle,
 		OPT_DisableHigherOrderReconstruction,
@@ -627,7 +627,7 @@ int main(int argc, char* argv[])
 		 { "relax", required_argument, NULL, OPT_Relaxation },
 		 { "block-size", required_argument, NULL, OPT_BlockSize },
 		 { "bihar-solver", required_argument, NULL, OPT_BiHarmonicSolver },
-		 { "step", required_argument, NULL, OPT_Step },
+		 { "iter-l2", no_argument, NULL, OPT_IterL2Error },
 		 // Multigrid
 		 { "cycle", required_argument, NULL, OPT_MGCycle },
 		 { "disable-hor", no_argument, NULL, OPT_DisableHigherOrderReconstruction },
@@ -867,8 +867,8 @@ int main(int argc, char* argv[])
 			case OPT_BiHarmonicSolver:
 				args.Solver.BiHarmonicSolverCode = optarg;
 				break;
-			case OPT_Step:
-				args.Solver.Step = atof(optarg);
+			case OPT_IterL2Error:
+				args.Solver.ComputeIterL2Error = true;
 				break;
 
 			//---------------//

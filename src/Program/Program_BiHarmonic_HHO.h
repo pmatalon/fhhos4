@@ -71,7 +71,7 @@ public:
 		HHOParameters<Dim>* hho = new HHOParameters<Dim>(mesh, args.Discretization.Stabilization, reconstructionBasis, cellBasis, faceBasis, args.Discretization.OrthogonalizeElemBasesCode, args.Discretization.OrthogonalizeFaceBasesCode);
 
 		bool saveMatrixBlocks = args.Solver.SolverCode.compare("uamg") == 0 || args.Solver.SolverCode.compare("fcguamg") == 0;
-		BiHarmonicMixedForm_HHO<Dim>* biHarPb = new BiHarmonicMixedForm_HHO<Dim>(mesh, testCase, hho, saveMatrixBlocks);
+		BiHarmonicMixedForm_HHO<Dim>* biHarPb = new BiHarmonicMixedForm_HHO<Dim>(mesh, testCase, hho, args.Actions.EnforceDirichletBC, saveMatrixBlocks);
 
 		cout << endl;
 		cout << "------------------------------------------------------" << endl;
@@ -81,6 +81,14 @@ public:
 		assemblyTimer.Start();
 
 		biHarPb->AssembleDiffPb();
+
+		if (args.Actions.EnforceDirichletBC)
+		{
+			Mesh<Dim>* meshLast = MeshFactory<Dim>::BuildMesh(args, testCase);
+			if (args.Discretization.Mesher.compare("gmsh") == 0)
+				GMSHMesh<Dim>::CloseGMSH();
+			biHarPb->SetupLastPb(meshLast);
+		}
 
 		assemblyTimer.Stop();
 		cout << endl << "Assembly time: CPU = " << assemblyTimer.CPU() << ", elapsed = " << assemblyTimer.Elapsed() << endl;
@@ -127,6 +135,17 @@ public:
 
 			biHarPb->SetDiffSolver(diffSolver);
 
+
+			if (args.Actions.EnforceDirichletBC)
+			{
+				cout << "Enforce Dirichlet BC to the solution, so setup of last solver..." << endl << endl;
+
+				IterativeSolver* lastSolver = dynamic_cast<IterativeSolver*>(SolverFactory<Dim>::CreateSolver(args, biHarPb->LastPb(), blockSizeForBlockSolver, out));
+				lastSolver->Setup(biHarPb->LastPb()->A);
+				biHarPb->SetLastPbSolver(lastSolver);
+			}
+
+
 			cout << "-------------------------------------" << endl;
 			cout << "-     Solve bi-harmonic problem     -" << endl;
 			cout << "-------------------------------------" << endl;
@@ -135,48 +154,26 @@ public:
 			if (args.Solver.BiHarmonicSolverCode.compare("cg") == 0)
 				biHarSolver = new BiHarmonicCG<Dim>(*biHarPb);
 			else if (args.Solver.BiHarmonicSolverCode.compare("gd") == 0)
-				biHarSolver = new BiHarmonicGradientDescent<Dim>(*biHarPb, args.Solver.Step);
+				biHarSolver = new BiHarmonicGradientDescent<Dim>(*biHarPb);
 			else
 				Utils::FatalError("Unknown bi-harmonic solver '" + args.Solver.BiHarmonicSolverCode + "'");
 
 			biHarSolver->Tolerance = args.Solver.Tolerance;
 			biHarSolver->MaxIterations = args.Solver.MaxIterations;
+			if (args.Solver.ComputeIterL2Error && testCase->ExactSolution)
+			{
+				biHarSolver->OnNewSolution = [&biHarPb, &testCase](IterationResult& result, const Vector& theta)
+				{
+					Vector reconstructedSolution = biHarPb->ComputeSolution(theta);
+					result.L2Error = biHarPb->DiffPb().L2Error(testCase->ExactSolution, reconstructedSolution);
+				};
+			}
+
 			Vector theta = biHarSolver->Solve();
 
 			delete biHarSolver;
 
-			// Solve problem 1 (f=source, Neum=<theta>)
-			Vector lambda = biHarPb->Solve1stDiffProblem(theta);
-
-			// Solve problem 2 (f=<lambda>, Neum=0)
-			Vector reconstructedSolution;
-			if (!args.Actions.EnforceDirichletBC)
-				reconstructedSolution = biHarPb->Solve2ndDiffProblem(lambda);
-			else
-			{
-				cout << "Enforce Dirichlet BC to the solution..." << endl;
-
-				DiffusionField<Dim> diffField(new Tensor<Dim>());
-				VirtualDiffusionTestCase<Dim> diffTestCase(Utils::ConstantFunctionZero, diffField);
-
-				auto FullDirichlet = BoundaryConditions::HomogeneousDirichletEverywhere();
-				mesh->SetBoundaryConditions(&FullDirichlet, true);
-				mesh->SetDiffusionField(&diffField);
-
-				HHOParameters<Dim> hhoLast(mesh, args.Discretization.Stabilization, reconstructionBasis, cellBasis, faceBasis, args.Discretization.OrthogonalizeElemBasesCode, args.Discretization.OrthogonalizeFaceBasesCode);
-
-				Diffusion_HHO<Dim> lastPb(mesh, &diffTestCase, &hhoLast, true, false);
-				ActionsArguments diffActions;
-				diffActions.AssembleRightHandSide = true;
-				lastPb.Assemble(diffActions);
-				lastPb.ChangeSourceFunction(lambda);
-				lastPb.SetCondensedRHS();
-
-				IterativeSolver* lastSolver = dynamic_cast<IterativeSolver*>(SolverFactory<Dim>::CreateSolver(args, &lastPb, blockSizeForBlockSolver, out));
-				lastSolver->Setup(lastPb.A);
-				Vector faceSolution = lastSolver->Solve(lastPb.b);
-				reconstructedSolution = lastPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution);
-			}
+			Vector reconstructedSolution = biHarPb->ComputeSolution(theta);
 
 			//-----------------------------//
 			//       Solution export       //

@@ -8,14 +8,11 @@ class BiHarmonicGradientDescent : public IterativeSolver
 {
 private:
 	BiHarmonicMixedForm_HHO<Dim>& _biHarPb;
-	double _step;
 
 public:
-	BiHarmonicGradientDescent(BiHarmonicMixedForm_HHO<Dim>& biHarPb, double step) :
+	BiHarmonicGradientDescent(BiHarmonicMixedForm_HHO<Dim>& biHarPb) :
 		_biHarPb(biHarPb)
-	{
-		_step = step;
-	}
+	{}
 
 	virtual void Serialize(ostream& os) const override
 	{

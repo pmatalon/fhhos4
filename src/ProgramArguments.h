@@ -83,7 +83,7 @@ struct SolverArguments
 	double RelaxationParameter = 1;
 	int BlockSize = -1;
 	string BiHarmonicSolverCode = "cg";
-	double Step = 0.1;
+	bool ComputeIterL2Error = false;
 	MultigridArguments MG;
 };
 

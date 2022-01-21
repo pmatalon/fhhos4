@@ -14,10 +14,11 @@ private:
 	Mesh<Dim>* _mesh;
 	BiHarmonicTestCase<Dim>* _testCase;
 	bool _saveMatrixBlocks = true;
+	bool _enforceDirichletBCInLastPb = true;
 	DiffusionField<Dim> _diffField;
 	VirtualDiffusionTestCase<Dim> _diffPbTestCase;
 	Diffusion_HHO<Dim> _diffPb;
-	Solver* _diffSolver;
+	Solver* _diffSolver = nullptr;
 	ZeroMeanEnforcerFromReconstructCoeffs<Dim> _integralZeroOnDomain;
 	ZeroMeanEnforcerFromBoundaryFaceCoeffs<Dim> _integralZeroOnBoundary;
 	ZeroMeanEnforcerFromHigherOrderBoundary<Dim> _integralZeroOnHigherOrderBoundary;
@@ -27,7 +28,7 @@ private:
 public:
 	HHOParameters<Dim>* HHO;
 
-	BiHarmonicMixedForm_HHO(Mesh<Dim>* mesh, BiHarmonicTestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool saveMatrixBlocks)
+	BiHarmonicMixedForm_HHO(Mesh<Dim>* mesh, BiHarmonicTestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool enforceDirichletBCInLastPb, bool saveMatrixBlocks)
 	{
 		_mesh = mesh;
 		_testCase = testCase;
@@ -38,6 +39,7 @@ public:
 		_diffPbTestCase.BC = BoundaryConditions::HomogeneousNeumannEverywhere();
 		_diffPb = Diffusion_HHO<Dim>(mesh, &_diffPbTestCase, HHO, true, saveMatrixBlocks);
 		_saveMatrixBlocks = saveMatrixBlocks;
+		_enforceDirichletBCInLastPb = enforceDirichletBCInLastPb;
 	}
 
 	Diffusion_HHO<Dim>& DiffPb()
@@ -94,6 +96,7 @@ public:
 		return theta;
 	}
 
+	// Solve problem 1 (f=source, Neum=<neumann>)
 	Vector Solve1stDiffProblem(const Vector& neumann)
 	{
 #ifndef NDEBUG
@@ -135,6 +138,7 @@ public:
 		return lambda;
 	}
 
+	// Solve problem 1 (f=0, Neum=<neumann>)
 	Vector Solve1stDiffProblemWithZeroSource(const Vector& neumann)
 	{
 #ifndef NDEBUG
@@ -172,6 +176,7 @@ public:
 		return lambda;
 	}
 
+	// Solve problem 2 (f=<source>, Neum=0)
 	Vector Solve2ndDiffProblem(const Vector& source, bool boundaryOnly = false)
 	{
 #ifndef NDEBUG
@@ -221,6 +226,69 @@ public:
 		else
 			return _diffPb.L2InnerProdOnBoundary(v1, v2);
 		//return v1.dot(v2);
+	}
+
+	//------------------------//
+	//      Last problem      //
+	//------------------------//
+
+private:
+	VirtualDiffusionTestCase<Dim>* _diffLastPbTestCase = nullptr;
+	Diffusion_HHO<Dim>* _lastPb = nullptr;
+	Solver* _lastPbSolver = nullptr;
+public:
+	Diffusion_HHO<Dim>* LastPb()
+	{
+		return _lastPb;
+	}
+
+	void SetLastPbSolver(Solver* solver)
+	{
+		_lastPbSolver = solver;
+		IterativeSolver* iter = dynamic_cast<IterativeSolver*>(_lastPbSolver);
+		if (iter)
+		{
+			iter->PrintIterationResults = false;
+			iter->MaxIterations = 50;
+		}
+	}
+
+	void SetupLastPb(Mesh<Dim>* mesh)
+	{
+		if (_enforceDirichletBCInLastPb)
+		{
+			_diffLastPbTestCase = new VirtualDiffusionTestCase<Dim>(Utils::ConstantFunctionZero, _diffField);
+
+			auto FullDirichlet = BoundaryConditions::HomogeneousDirichletEverywhere();
+			mesh->SetBoundaryConditions(&FullDirichlet, true);
+			mesh->SetDiffusionField(&_diffField);
+
+			HHOParameters<Dim>* hhoLast = new HHOParameters<Dim>(mesh, HHO->Stabilization, HHO->ReconstructionBasis, HHO->CellBasis, HHO->FaceBasis, HHO->OrthogonalizeElemBasesCode, HHO->OrthogonalizeFaceBasesCode);
+
+			_lastPb = new Diffusion_HHO<Dim>(mesh, _diffLastPbTestCase, hhoLast, true, false);
+			ActionsArguments diffActions;
+			diffActions.AssembleRightHandSide = true;
+			_lastPb->Assemble(diffActions);
+		}
+	}
+
+	Vector ComputeSolution(const Vector& theta)
+	{
+		// Solve problem 1 (f=source, Neum=<theta>)
+		Vector lambda = Solve1stDiffProblem(theta);
+
+		// Solve problem 2 (f=<lambda>, Neum=0)
+		Vector reconstructedSolution;
+		if (!_enforceDirichletBCInLastPb)
+			reconstructedSolution = Solve2ndDiffProblem(lambda);
+		else
+		{
+			_lastPb->ChangeSourceFunction(lambda);
+			Vector& rhs = _lastPb->SetCondensedRHS();
+			Vector faceSolution = _lastPbSolver->Solve(rhs);
+			reconstructedSolution = _lastPb->ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution);
+		}
+		return reconstructedSolution;
 	}
 
 private:

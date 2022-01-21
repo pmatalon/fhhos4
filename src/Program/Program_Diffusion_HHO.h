@@ -225,6 +225,14 @@ public:
 			if (iterativeSolver)
 			{
 				iterativeSolver->ComputeExactSolution = Utils::ProgramArgs.Actions.ExportErrorToGMSH || problem->A.rows() <= 2000;
+				if (args.Solver.ComputeIterL2Error && testCase->ExactSolution && args.Discretization.StaticCondensation)
+				{
+					iterativeSolver->OnNewSolution = [&problem, &testCase](IterationResult& result, const Vector& faceSolution)
+					{
+						Vector reconstructedSolution = problem->ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution);
+						result.L2Error = problem->L2Error(testCase->ExactSolution, reconstructedSolution);
+					};
+				}
 
 				setupTimer.Start();
 				if (Utils::ProgramArgs.Solver.SolverCode.compare("uamg") == 0 || Utils::ProgramArgs.Solver.SolverCode.compare("fcguamg") == 0)

@@ -20,6 +20,7 @@ public:
 	int IterationCount = 0;
 	bool PrintIterationResults = true;
 	bool ComputeExactSolution = false;
+	function<void(IterationResult&, const Vector&)> OnNewSolution = nullptr;
 	StoppingCriteria StoppingCrit = StoppingCriteria::NormalizedResidual;
 	Vector Residual;
 	Vector Ax;
@@ -206,6 +207,8 @@ protected:
 		result.SetB(b);
 		if (this->ComputeExactSolution)
 			result.SetExactSolution(this->ExactSolution);
+		if (this->OnNewSolution)
+			result.OnNewSolution = this->OnNewSolution;
 		result.SetX(x);
 		result.SetTolerance(this->Tolerance);
 		return result;
