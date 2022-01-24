@@ -101,6 +101,8 @@ struct ActionsArguments
 	bool ExportExactSolutionToGMSH = false;
 	bool ExportErrorToGMSH = false;
 	bool ExportSourceToGMSH = false;
+	bool ExportIterationResiduals = false;
+	bool ExportIterationL2Errors = false;
 	bool LogAssembly = true;
 	bool AssembleRightHandSide = true;
 	bool InitReferenceShapes = true;

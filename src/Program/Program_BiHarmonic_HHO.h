@@ -160,12 +160,29 @@ public:
 
 			biHarSolver->Tolerance = args.Solver.Tolerance;
 			biHarSolver->MaxIterations = args.Solver.MaxIterations;
-			if (args.Solver.ComputeIterL2Error && testCase->ExactSolution)
+			// Compute L2-error at each iteration
+			if ((args.Solver.ComputeIterL2Error || args.Actions.ExportIterationL2Errors) && testCase->ExactSolution)
 			{
 				biHarSolver->OnNewSolution = [&biHarPb, &testCase](IterationResult& result, const Vector& theta)
 				{
 					Vector reconstructedSolution = biHarPb->ComputeSolution(theta);
 					result.L2Error = biHarPb->DiffPb().L2Error(testCase->ExactSolution, reconstructedSolution);
+				};
+			}
+			// Export iteration results
+			if (args.Actions.ExportIterationResiduals || args.Actions.ExportIterationL2Errors)
+			{
+				if (args.Actions.ExportIterationResiduals)
+					out.CleanFile("iteration_residuals");
+				if (args.Actions.ExportIterationL2Errors)
+					out.CleanFile("iteration_l2errors");
+
+				biHarSolver->OnIterationEnd = [&args, &out](const IterationResult& result)
+				{
+					if (args.Actions.ExportIterationResiduals)
+						out.ExportNewVectorValue(result.NormalizedResidualNorm, "iteration_residuals");
+					if (args.Actions.ExportIterationL2Errors && result.L2Error != -1)
+						out.ExportNewVectorValue(result.L2Error, "iteration_l2errors");
 				};
 			}
 

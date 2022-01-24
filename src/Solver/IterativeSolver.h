@@ -21,6 +21,7 @@ public:
 	bool PrintIterationResults = true;
 	bool ComputeExactSolution = false;
 	function<void(IterationResult&, const Vector&)> OnNewSolution = nullptr;
+	function<void(const IterationResult&)> OnIterationEnd = nullptr;
 	StoppingCriteria StoppingCrit = StoppingCriteria::NormalizedResidual;
 	Vector Residual;
 	Vector Ax;
@@ -223,6 +224,9 @@ protected:
 
 	bool StoppingCriteriaReached(const IterationResult& result)
 	{
+		if (this->OnIterationEnd)
+			this->OnIterationEnd(result);
+
 		if (MaxIterations == 0)
 			return true;
 		if (IterationCount == 0)

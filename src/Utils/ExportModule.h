@@ -1,5 +1,7 @@
 #pragma once
 #include <string>
+#include <ios>
+#include <fstream>
 #include <unsupported/Eigen/SparseExtra>
 #include "Utils.h"
 using namespace std;
@@ -66,5 +68,18 @@ public:
 		cout << "Vector exported: " << filePath << endl;
 	}
 
+	void CleanFile(string suffix)
+	{
+		string filePath = GetDatFilePath(suffix);
+		remove(filePath.c_str());
+	}
 
+	void ExportNewVectorValue(double value, string suffix) const
+	{
+		string filePath = GetDatFilePath(suffix);
+		ofstream file(filePath, ios_base::app | ios_base::out);
+
+		file << std::scientific << value << endl;
+		file.close();
+	}
 };
