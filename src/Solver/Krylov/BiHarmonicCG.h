@@ -33,11 +33,13 @@ public:
 		Vector lambda = _biHarPb.Solve1stDiffProblem(theta);
 
 		// Solve 2nd problem (f=lamda, Neum=0 --> r s.t. <r|1>=0)
-		Vector r = _biHarPb.Solve2ndDiffProblem(lambda, true);
+		Vector u_boundary = _biHarPb.Solve2ndDiffProblem(lambda, true);
 
 		//--------------------//
 		// Conjugate Gradient //
 		//--------------------//
+
+		Vector r = -u_boundary;
 		
 		double r_dot_r = L2InnerProdOnBoundary(r, r);
 
@@ -89,18 +91,19 @@ public:
 
 
 			//------------------------------------
+			/*
 			// Recompute explicitly the residual, by computing the solution u
-			Vector lambda = _biHarPb.Solve1stDiffProblem(theta);
-			Vector u_boundary = _biHarPb.Solve2ndDiffProblem(lambda, true);
+			Vector lambda_final = _biHarPb.Solve1stDiffProblem(theta);
+			Vector u_boundary_real = _biHarPb.Solve2ndDiffProblem(lambda_final, true);
 
-			Vector r_u_boundary = r - u_boundary;
+			Vector r_u_boundary = r - u_boundary_real;
 			//cout << "r = " << endl << r << endl;
 			//cout << "u_boundary = " << endl << u_boundary << endl;
 			//cout << "r - u_boundary = " << endl << r_u_boundary << endl;
-			cout << "||u_boundary|| = " << sqrt(L2InnerProdOnBoundary(u_boundary, u_boundary)) << "   ";
+			cout << "||u_boundary|| = " << sqrt(L2InnerProdOnBoundary(u_boundary_real, u_boundary_real)) << "   ";
 			cout << "||r - u_boundary|| = " << sqrt(L2InnerProdOnBoundary(r_u_boundary, r_u_boundary)) << "   ";
 			cout << "||r|| = " << sqrt(r_dot_r_old) << endl;
-
+			*/
 			//------------------------------------
 
 			this->IterationCount++;
