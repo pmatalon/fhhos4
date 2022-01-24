@@ -24,11 +24,11 @@ private:
 	ZeroMeanEnforcerFromHigherOrderBoundary<Dim> _integralZeroOnHigherOrderBoundary;
 	HigherOrderBoundary<Dim> _higherOrderBoundary;
 	double _integralSource = 0;
-	bool _reconstructHigherOrderBoundary = true;
+	bool _reconstructHigherOrderBoundary = false;
 public:
 	HHOParameters<Dim>* HHO;
 
-	BiHarmonicMixedForm_HHO(Mesh<Dim>* mesh, BiHarmonicTestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool enforceDirichletBCInLastPb, bool saveMatrixBlocks)
+	BiHarmonicMixedForm_HHO(Mesh<Dim>* mesh, BiHarmonicTestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool reconstructHigherOrderBoundary, bool enforceDirichletBCInLastPb, bool saveMatrixBlocks)
 	{
 		_mesh = mesh;
 		_testCase = testCase;
@@ -39,6 +39,7 @@ public:
 		_diffPbTestCase.BC = BoundaryConditions::HomogeneousNeumannEverywhere();
 		_diffPb = Diffusion_HHO<Dim>(mesh, &_diffPbTestCase, HHO, true, saveMatrixBlocks);
 		_saveMatrixBlocks = saveMatrixBlocks;
+		_reconstructHigherOrderBoundary = reconstructHigherOrderBoundary;
 		_enforceDirichletBCInLastPb = enforceDirichletBCInLastPb;
 	}
 

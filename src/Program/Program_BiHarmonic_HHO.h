@@ -71,7 +71,7 @@ public:
 		HHOParameters<Dim>* hho = new HHOParameters<Dim>(mesh, args.Discretization.Stabilization, reconstructionBasis, cellBasis, faceBasis, args.Discretization.OrthogonalizeElemBasesCode, args.Discretization.OrthogonalizeFaceBasesCode);
 
 		bool saveMatrixBlocks = args.Solver.SolverCode.compare("uamg") == 0 || args.Solver.SolverCode.compare("fcguamg") == 0;
-		BiHarmonicMixedForm_HHO<Dim>* biHarPb = new BiHarmonicMixedForm_HHO<Dim>(mesh, testCase, hho, args.Actions.EnforceDirichletBC, saveMatrixBlocks);
+		BiHarmonicMixedForm_HHO<Dim>* biHarPb = new BiHarmonicMixedForm_HHO<Dim>(mesh, testCase, hho, args.Solver.BiHarReconstructBoundary, args.Actions.EnforceDirichletBC, saveMatrixBlocks);
 
 		cout << endl;
 		cout << "------------------------------------------------------" << endl;

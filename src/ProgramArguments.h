@@ -85,6 +85,7 @@ struct SolverArguments
 	string BiHarmonicSolverCode = "cg";
 	bool ComputeIterL2Error = false;
 	MultigridArguments MG;
+	bool BiHarReconstructBoundary = false;
 };
 
 struct ActionsArguments

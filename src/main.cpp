@@ -212,6 +212,9 @@ void print_usage() {
 	cout << "-iter-l2" << endl;
 	cout << "      Computes the L2-error at each iteration of the solver (when the solution is known)." << endl;
 	cout << endl;
+	cout << "-bihar-reconstruct-bry" << endl;
+	cout << "      Reconstruct higher-order boundary during the iterative process of the bi-harmonic problem." << endl;
+	cout << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << "                                 Multigrid                            " << endl;
 	cout << "----------------------------------------------------------------------" << endl;
@@ -562,6 +565,7 @@ int main(int argc, char* argv[])
 		OPT_BlockSize,
 		OPT_BiHarmonicSolver,
 		OPT_IterL2Error,
+		OPT_BiHarReconstructBoundary,
 		// Multigrid
 		OPT_MGCycle,
 		OPT_DisableHigherOrderReconstruction,
@@ -630,6 +634,7 @@ int main(int argc, char* argv[])
 		 { "block-size", required_argument, NULL, OPT_BlockSize },
 		 { "bihar-solver", required_argument, NULL, OPT_BiHarmonicSolver },
 		 { "iter-l2", no_argument, NULL, OPT_IterL2Error },
+		 { "bihar-reconstruct-bry", required_argument, NULL, OPT_BiHarReconstructBoundary },
 		 // Multigrid
 		 { "cycle", required_argument, NULL, OPT_MGCycle },
 		 { "disable-hor", no_argument, NULL, OPT_DisableHigherOrderReconstruction },
@@ -871,6 +876,9 @@ int main(int argc, char* argv[])
 				break;
 			case OPT_IterL2Error:
 				args.Solver.ComputeIterL2Error = true;
+				break;
+			case OPT_BiHarReconstructBoundary:
+				args.Solver.BiHarReconstructBoundary = atoi(optarg);
 				break;
 
 			//---------------//
