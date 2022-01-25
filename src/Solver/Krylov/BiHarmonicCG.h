@@ -79,15 +79,29 @@ public:
 
 			double r_dot_r_old = r_dot_r; // save the dot product before overwriting r
 
-			// Update residual
-			r -= rho * gamma_boundary;
+			if (this->IterationCount % 10 == 0)
+			{
+				// Recompute the residual explicitely
+				lambda = _biHarPb.Solve1stDiffProblem(theta);
+				u_boundary = _biHarPb.Solve2ndDiffProblem(lambda, true);
+				r = -u_boundary;
 
-			r_dot_r = L2InnerProdOnBoundary(r, r);
+				r_dot_r = L2InnerProdOnBoundary(r, r);
 
-			// Step for the direction of research
-			double q = r_dot_r / r_dot_r_old;
-			// Update the direction of research
-			p = r + q * p;
+				p = r;
+			}
+			else
+			{
+				// Update residual
+				r -= rho * gamma_boundary;
+
+				r_dot_r = L2InnerProdOnBoundary(r, r);
+
+				// Step for the direction of research
+				double q = r_dot_r / r_dot_r_old;
+				// Update the direction of research
+				p = r + q * p;
+			}
 
 
 			//------------------------------------
