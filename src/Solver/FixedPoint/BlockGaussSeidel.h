@@ -7,18 +7,22 @@ class BlockGaussSeidel : public IterativeSolver
 protected:
 	int _blockSize;
 	Direction _direction;
+	bool _hybrid = false;
 
 	vector<Eigen::FullPivLU<DenseMatrix>> invD;
 	RowMajorSparseMatrix _rowMajorA;
 public:
-	BlockGaussSeidel(int blockSize, Direction direction)
+	BlockGaussSeidel(int blockSize, Direction direction, bool hybrid)
 	{
 		this->_blockSize = blockSize;
 		this->_direction = direction;
+		this->_hybrid = hybrid;
 	}
 
 	virtual void Serialize(ostream& os) const override
 	{
+		if (_hybrid)
+			os << "Hybrid ";
 		if (_direction == Direction::Symmetric)
 			os << "Symmetric ";
 		os << "Block Gauss-Seidel";
@@ -69,24 +73,65 @@ private:
 		const SparseMatrix& A = *this->Matrix;
 
 		auto nb = A.rows() / _blockSize;
-		if (_direction == Direction::Forward)
+
+		if (!_hybrid)
 		{
-			for (BigNumber i = 0; i < nb; ++i)
-				ProcessBlockRow(i, b, x);
+			if (_direction == Direction::Forward)
+			{
+				for (BigNumber i = 0; i < nb; ++i)
+					ProcessBlockRow(i, b, x);
+			}
+			else if (_direction == Direction::Backward)
+			{
+				for (BigNumber i = 0; i < nb; ++i)
+					ProcessBlockRow(nb - i - 1, b, x);
+			}
+			else // Symmetric
+			{
+				// Forward
+				for (BigNumber i = 0; i < nb; ++i)
+					ProcessBlockRow(i, b, x);
+				// Backward
+				for (BigNumber i = 0; i < nb; ++i)
+					ProcessBlockRow(nb - i - 1, b, x);
+			}
 		}
-		else if (_direction == Direction::Backward)
+		else // Hybrid
 		{
-			for (BigNumber i = 0; i < nb; ++i)
-				ProcessBlockRow(nb - i - 1, b, x);
-		}
-		else // Symmetric
-		{
-			// Forward
-			for (BigNumber i = 0; i < nb; ++i)
-				ProcessBlockRow(i, b, x);
-			// Backward
-			for (BigNumber i = 0; i < nb; ++i)
-				ProcessBlockRow(nb - i - 1, b, x);
+			if (_direction == Direction::Forward)
+			{
+				NumberParallelLoop<EmptyResultChunk> parallelLoop(nb);
+				parallelLoop.ExecuteChunk([this, &b, &x](ParallelChunk<EmptyResultChunk>* chunk)
+					{
+						for (BigNumber i = chunk->Start; i < chunk->End; i++)
+							ProcessBlockRow(i, b, x);
+					});
+			}
+			else if (_direction == Direction::Backward)
+			{
+				NumberParallelLoop<EmptyResultChunk> parallelLoop(nb);
+				parallelLoop.ExecuteChunk([this, &b, &x, &nb](ParallelChunk<EmptyResultChunk>* chunk)
+					{
+						for (BigNumber i = chunk->Start; i < chunk->End; i++)
+							ProcessBlockRow(nb - i - 1, b, x);
+					});
+			}
+			else // Symmetric
+			{
+				// Forward
+				NumberParallelLoop<EmptyResultChunk> parallelLoop(nb);
+				parallelLoop.ExecuteChunk([this, &b, &x](ParallelChunk<EmptyResultChunk>* chunk)
+					{
+						for (BigNumber i = chunk->Start; i < chunk->End; i++)
+							ProcessBlockRow(i, b, x);
+					});
+				// Backward
+				parallelLoop.ExecuteChunk([this, &b, &x, &nb](ParallelChunk<EmptyResultChunk>* chunk)
+					{
+						for (BigNumber i = chunk->Start; i < chunk->End; i++)
+							ProcessBlockRow(nb - i - 1, b, x);
+					});
+			}
 		}
 
 		result.SetX(x);

@@ -109,6 +109,25 @@ public:
 			this->Chunks[threadNumber]->ThreadFuture.wait();
 	}
 
+	void ExecuteChunk(function<void(ParallelChunk<ResultT>*)> functionChunk)
+	{
+		if (NThreads == 1)
+			functionChunk(this->Chunks[0]);
+		else
+		{
+			for (unsigned int threadNumber = 0; threadNumber < NThreads; threadNumber++)
+			{
+				ParallelChunk<ResultT>* chunk = this->Chunks[threadNumber];
+				chunk->ThreadFuture = std::async(std::launch::async, [chunk, functionChunk]()
+					{
+						functionChunk(chunk);
+					}
+				);
+			}
+			this->Wait();
+		}
+	}
+
 	virtual ~BaseChunksParallelLoop()
 	{
 		for (unsigned int threadNumber = 0; threadNumber < NThreads; threadNumber++)

@@ -93,7 +93,7 @@ public:
 class BlockGaussSeidelSmoother : public Smoother
 {
 public:
-	BlockGaussSeidelSmoother(int blockSize, Direction direction, int nSmoothingIterations) : Smoother(new BlockGaussSeidel(blockSize, direction), nSmoothingIterations) {}
+	BlockGaussSeidelSmoother(int blockSize, Direction direction, bool hybrid, int nSmoothingIterations) : Smoother(new BlockGaussSeidel(blockSize, direction, hybrid), nSmoothingIterations) {}
 };
 
 class GaussSeidelSmoother : public Smoother
