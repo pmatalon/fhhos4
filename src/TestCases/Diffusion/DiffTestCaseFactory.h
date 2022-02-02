@@ -15,6 +15,7 @@
 #include "2D/EDFTestCase.h"
 #include "2D/HybridMeshTestCase.h"
 #include "2D/MagnetismTestCase.h"
+#include "2D/SquareFullNeumannTestCase.h"
 #ifdef ENABLE_3D
 	#include "3D/CubeTestCase.h"
 	#include "3D/PlateWith4HolesTestCase.h"
@@ -65,6 +66,8 @@ DiffusionTestCase<2>* DiffTestCaseFactory<2>::Create(ProblemArguments pb)
 		return new SquareCenterSquareTestCase(pb);
 	if (pb.TestCaseCode.compare("squareholes") == 0)
 		return new SquareHolesTestCase(pb);
+	if (pb.TestCaseCode.compare("fullneumann") == 0)
+		return new SquareFullNeumannTestCase(pb);
 	if (pb.TestCaseCode.compare("edf") == 0)
 		return new EDFTestCase(pb);
 	if (pb.TestCaseCode.compare("hybridmesh") == 0)

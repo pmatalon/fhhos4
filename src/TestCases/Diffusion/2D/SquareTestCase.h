@@ -88,21 +88,6 @@ public:
 			this->BC.NeumannFunction = BoundaryConditions::Homogeneous;
 			this->BC.Description = "Full Neumann (homogeneous)";
 		}
-		else if (pb.BCCode.compare("n2") == 0)
-		{
-			Utils::Warning("Full Neumann conditions do not yield a well-posed problem!");
-			this->BC.Type = PbBoundaryConditions::FullNeumann;
-			this->BC.BoundaryConditionPartition = BoundaryConditions::NeumannEverywhere;
-			this->BC.NeumannFunction = [](const DomPoint& p)
-			{
-				if (abs(p.X) < Utils::Eps) // x == 0
-					return 1.0;
-				if (abs(p.X - 1) < Utils::Eps) // x == 1
-					return -1.0;
-				return 0.0;
-			};
-			this->BC.Description = "Full Neumann (non homogeneous)";
-		}
 		else
 			Utils::FatalError("The requested boundary conditions are not defined in this test case.");
 
@@ -124,8 +109,6 @@ public:
 				else if (pb.SourceCode.compare("zero") == 0)
 					this->ExactSolution = Utils::ConstantFunctionZero;
 			}
-			else if (pb.BCCode.compare("n2") == 0 && pb.SourceCode.compare("zero") == 0)
-				this->ExactSolution = MinusXPlusOneHalf;
 		}
 	}
 
@@ -162,11 +145,6 @@ public:
 			return "zero solution";
 		else
 			return _pb.SourceCode;
-	}
-
-	static double MinusXPlusOneHalf(const DomPoint& p)
-	{
-		return -p.X + 0.5;
 	}
 
 	static double RadiatorSource(const DomPoint& p)

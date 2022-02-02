@@ -222,6 +222,7 @@
     <ClInclude Include="src\TestCases\Diffusion\2D\SquareCenterSquareTestCase.h" />
     <ClInclude Include="src\TestCases\Diffusion\2D\SquareCircleTestCase.h" />
     <ClInclude Include="src\TestCases\Diffusion\2D\SquareCornerSquareTestCase.h" />
+    <ClInclude Include="src\TestCases\Diffusion\2D\SquareFullNeumannTestCase.h" />
     <ClInclude Include="src\TestCases\Diffusion\2D\SquareHolesTestCase.h" />
     <ClInclude Include="src\TestCases\Diffusion\2D\SquareTestCase.h" />
     <ClInclude Include="src\TestCases\Diffusion\3D\CubeTestCase.h" />

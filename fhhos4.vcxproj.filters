@@ -523,6 +523,9 @@
     <ClInclude Include="src\HHO\HigherOrderBoundary.h">
       <Filter>HHO</Filter>
     </ClInclude>
+    <ClInclude Include="src\TestCases\Diffusion\2D\SquareFullNeumannTestCase.h">
+      <Filter>TestCases\Diffusion\2D</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
