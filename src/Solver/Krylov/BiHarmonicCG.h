@@ -79,7 +79,7 @@ public:
 
 			double r_dot_r_old = r_dot_r; // save the dot product before overwriting r
 
-			if (this->IterationCount % 10 == 0)
+			if (this->IterationCount > 0 && this->IterationCount % 10 == 0)
 			{
 				// Recompute the residual explicitely
 				lambda = _biHarPb.Solve1stDiffProblem(theta);

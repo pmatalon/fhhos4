@@ -207,6 +207,17 @@ public:
 			cout << "-                 Linear system solution                 -" << endl;
 			cout << "----------------------------------------------------------" << endl;
 
+
+			if (testCase->BC.Type == PbBoundaryConditions::FullNeumann)
+			{
+				ZeroMeanEnforcerFromFaceCoeffs<Dim> integralZeroOnSkeleton(problem);
+				integralZeroOnSkeleton.Setup();
+				cout << "Kernel coefficient = " << integralZeroOnSkeleton.CheckKernel(problem->A) << endl;
+				cout << "Orthogonality factor of rhs = " << integralZeroOnSkeleton.OrthogonalityFactor(problem->b) << endl;
+				integralZeroOnSkeleton.Enforce(problem->b);
+				cout << "Orthogonality factor of rhs = " << integralZeroOnSkeleton.OrthogonalityFactor(problem->b) << " (after projection onto Im(A)) " << endl;
+			}
+
 			Vector systemSolution;
 
 			// Solver creation
@@ -329,18 +340,30 @@ public:
 			//       L2 error       //
 			//----------------------//
 
+			// Check mean value if full Neumann conditions
+			if (testCase->BC.Type == PbBoundaryConditions::FullNeumann)
+			{
+				if (testCase->ExactSolution)
+					cout << "Mean value of exact solution = " << problem->IntegralOverDomain(testCase->ExactSolution) << endl;
+				double meanValue = problem->MeanValueFromReconstructedCoeffs(reconstructedSolution);
+				cout << "Mean value = " << meanValue << endl;
+
+				if (abs(meanValue) > Utils::NumericalZero)
+				{
+					ZeroMeanEnforcerFromReconstructCoeffs<Dim> integralZeroOnDomain(problem);
+					integralZeroOnDomain.Setup();
+					integralZeroOnDomain.Enforce(reconstructedSolution);
+					meanValue = problem->MeanValueFromReconstructedCoeffs(reconstructedSolution);
+					cout << "Mean value = " << meanValue << " (after correction)" << endl;
+				}
+			}
+
+
 			if (testCase->ExactSolution)
 			{
 				double error = problem->L2Error(testCase->ExactSolution, reconstructedSolution);
 				cout << endl << "L2 Error = " << std::scientific << error << endl;
 				problem->AssertSchemeConvergence(error);
-			}
-
-			// Check mean value if full Neumann conditions
-			if (testCase->BC.Type == PbBoundaryConditions::FullNeumann)
-			{
-				double meanValue = problem->MeanValueFromReconstructedCoeffs(reconstructedSolution);
-				cout << "Mean value = " << meanValue << endl;
 			}
 		}
 

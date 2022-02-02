@@ -22,6 +22,7 @@ private:
 	ZeroMeanEnforcerFromReconstructCoeffs<Dim> _integralZeroOnDomain;
 	ZeroMeanEnforcerFromBoundaryFaceCoeffs<Dim> _integralZeroOnBoundary;
 	ZeroMeanEnforcerFromHigherOrderBoundary<Dim> _integralZeroOnHigherOrderBoundary;
+	ZeroMeanEnforcerFromFaceCoeffs<Dim> _integralZeroOnSkeleton;
 	HigherOrderBoundary<Dim> _higherOrderBoundary;
 	double _integralSource = 0;
 	bool _reconstructHigherOrderBoundary = false;
@@ -62,8 +63,10 @@ public:
 		_integralZeroOnDomain = ZeroMeanEnforcerFromReconstructCoeffs<Dim>(&_diffPb);
 		_integralZeroOnBoundary = ZeroMeanEnforcerFromBoundaryFaceCoeffs<Dim>(&_diffPb);
 		_integralZeroOnHigherOrderBoundary = ZeroMeanEnforcerFromHigherOrderBoundary<Dim>(&_higherOrderBoundary);
+		_integralZeroOnSkeleton = ZeroMeanEnforcerFromFaceCoeffs<Dim>(&_diffPb);
 
 		_integralZeroOnDomain.Setup();
+		_integralZeroOnSkeleton.Setup();
 		if (_reconstructHigherOrderBoundary)
 			_integralZeroOnHigherOrderBoundary.Setup();
 		else
@@ -122,14 +125,10 @@ public:
 		Vector& rhs = _diffPb.SetCondensedRHS();
 
 		// Solve
+		_integralZeroOnSkeleton.Enforce(rhs); // enforce numerical compatibility
 		Vector faceSolution = _diffSolver->Solve(rhs);
 		CheckDiffSolverConvergence();
 
-#ifndef NDEBUG
-		// Check that mean value = 0 (on the faces)
-		double integralSkeleton = _diffPb.IntegralOverSkeletonFromFaceCoeffs(faceSolution);
-		assert(abs(integralSkeleton) < Utils::Eps);
-#endif
 		// Reconstruct the higher-order polynomial
 		Vector lambda = _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution);
 
@@ -166,6 +165,7 @@ public:
 		Vector& rhs = _diffPb.SetCondensedRHS();
 
 		// Solve
+		_integralZeroOnSkeleton.Enforce(rhs); // enforce numerical compatibility
 		Vector faceSolution = _diffSolver->Solve(rhs);
 		CheckDiffSolverConvergence();
 
@@ -193,6 +193,7 @@ public:
 		Vector& rhs = _diffPb.SetCondensedRHS();
 
 		// Solve
+		_integralZeroOnSkeleton.Enforce(rhs); // enforce numerical compatibility
 		Vector faceSolution = _diffSolver->Solve(rhs);
 		CheckDiffSolverConvergence();
 
@@ -299,8 +300,7 @@ private:
 		if (iterSolver)
 		{
 			if (iterSolver->IterationCount == iterSolver->MaxIterations)
-				Utils::Warning("The diffusion solver has reached the max number of iterations (" + to_string(dynamic_cast<IterativeSolver*>(_diffSolver)->MaxIterations) + ")");
-			//assert(dynamic_cast<IterativeSolver*>(_diffSolver)->IterationCount < dynamic_cast<IterativeSolver*>(_diffSolver)->MaxIterations);
+				Utils::Warning("The diffusion solver has reached the max number of iterations (" + to_string(iterSolver->MaxIterations) + ")");
 		}
 	}
 

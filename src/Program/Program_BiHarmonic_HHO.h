@@ -140,7 +140,7 @@ public:
 			{
 				cout << "Enforce Dirichlet BC to the solution, so setup of last solver..." << endl << endl;
 
-				IterativeSolver* lastSolver = dynamic_cast<IterativeSolver*>(SolverFactory<Dim>::CreateSolver(args, biHarPb->LastPb(), blockSizeForBlockSolver, out));
+				Solver* lastSolver = SolverFactory<Dim>::CreateSolver(args, biHarPb->LastPb(), blockSizeForBlockSolver, out);
 				lastSolver->Setup(biHarPb->LastPb()->A);
 				biHarPb->SetLastPbSolver(lastSolver);
 			}

@@ -54,7 +54,7 @@ public:
 		while (!StoppingCriteriaReached(result))
 		{
 			result = IterationResult(result);
-
+			
 			// Update theta in the opposite direction of the gradient (= r)
 			theta -= step * r;
 
@@ -70,6 +70,24 @@ public:
 
 			r_old = r;
 			
+
+			/*
+			// Update theta in the opposite direction of the gradient (= r)
+			theta += step * r;
+
+			// Solve 1st problem (f=source, Neum=theta --> lambda s.t. (lambda|1)=0)
+			Vector gamma = _biHarPb.Solve1stDiffProblemWithZeroSource(r);
+
+			// Solve 2nd problem (f=lamda, Neum=0 --> r s.t. <r|1>=0) //
+			Vector Ar = _biHarPb.Solve2ndDiffProblem(gamma+lambda, true);
+
+			// Compute the step
+			step = L2InnerProdOnBoundary(r, r) / L2InnerProdOnBoundary(r, Ar);
+
+			r -= step * Ar;
+			*/
+
+
 			//------------------------------------
 
 			this->IterationCount++;

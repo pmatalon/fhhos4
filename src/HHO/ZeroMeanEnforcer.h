@@ -41,9 +41,17 @@ public:
 		assert(x.rows() == _nipw1.rows());
 		x -= x.dot(_nipw1) * _one;
 	};
+	double OrthogonalityFactor(const Vector& x)
+	{
+		return abs(x.dot(_nipw1));
+	}
 	bool Check(const Vector& x)
 	{
-		return abs(x.dot(_nipw1)) < Utils::Eps;
+		return OrthogonalityFactor(x) < Utils::Eps;
+	}
+	double CheckKernel(const SparseMatrix& A)
+	{
+		return (A * _nipw1).norm();
 	}
 protected:
 	// returns [(phi_i|1)]_i
