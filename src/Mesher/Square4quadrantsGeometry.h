@@ -19,10 +19,10 @@ public:
 	{
 		double kappa1 = heterogeneityRatio;
 		double kappa2 = 1;
-		Tensor<2>* diffTensor1 = new Tensor<2>(kappa1, anisotropyRatio, anisotropyAngle);
-		Tensor<2>* diffTensor2 = new Tensor<2>(kappa2, anisotropyRatio, anisotropyAngle);
+		Tensor<2> diffTensor1(kappa1, anisotropyRatio, anisotropyAngle);
+		Tensor<2> diffTensor2(kappa2, anisotropyRatio, anisotropyAngle);
 
-		map<string, Tensor<2>*> tensors;
+		map<string, Tensor<2>> tensors;
 		tensors.insert({ "quadrantTopLeft", diffTensor1 });
 		tensors.insert({ "quadrantTopRight", diffTensor2 });
 		tensors.insert({ "quadrantBottomLeft", diffTensor2 });

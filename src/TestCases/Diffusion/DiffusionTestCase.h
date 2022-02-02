@@ -25,15 +25,15 @@ public:
 			if (DiffField.IsHomogeneous)
 			{
 				cout << "    Homogeneous coefficient" << endl;
-				cout << "    Anisotropic: ratio = " << DiffField.K1->AnisotropyRatio << endl;
+				cout << "    Anisotropic: ratio = " << DiffField.LargestAnisotropyRatio() << endl;
 			}
 			else
 			{
-				cout << "    Heterogeneous coefficient: ratio = " << scientific << DiffField.HeterogeneityRatio << fixed << endl;
+				cout << "    Heterogeneous coefficient: ratio = " << scientific << DiffField.LargestHeterogeneityRatio() << fixed << endl;
 				if (DiffField.IsIsotropic)
 					cout << "    Isotropic" << endl;
 				else
-					cout << "    Anisotropic: ratio = " << DiffField.K1->AnisotropyRatio << endl;
+					cout << "    Anisotropic: ratio = " << DiffField.LargestAnisotropyRatio() << endl;
 			}
 		}
 
@@ -49,7 +49,7 @@ public:
 		if (this->Code().compare("kellogg") != 0 && !DiffField.IsHomogeneous)
 		{
 			char res[32];
-			sprintf(res, "_heterog%g", DiffField.HeterogeneityRatio);
+			sprintf(res, "_heterog%g", DiffField.LargestHeterogeneityRatio());
 			heterogeneityString = res;
 		}
 		return "Diff" + to_string(Dim) + "D_" + this->Code() + heterogeneityString;

@@ -20,7 +20,7 @@ public:
 	{
 		_mesh = mesh;
 		HHO = hho;
-		_diffField = DiffusionField<Dim>(new Tensor<Dim>());
+		_diffField = DiffusionField<Dim>();
 		mesh->SetDiffusionField(&_diffField);
 		_diffPbTestCase = VirtualDiffusionTestCase<Dim>(testCase->SourceFunction, _diffField);
 		_diffPb1 = Diffusion_HHO<Dim>(mesh, &_diffPbTestCase, HHO, true, saveMatrixBlocks);

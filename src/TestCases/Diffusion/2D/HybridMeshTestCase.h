@@ -4,16 +4,13 @@ using namespace std;
 
 class HybridMeshTestCase : public DiffusionTestCase<2>
 {
-private:
-	Tensor<2>* tensorInterior;
-	Tensor<2>* tensorExterior;
 public:
 	HybridMeshTestCase(ProblemArguments pb) :
 		DiffusionTestCase()
 	{
 		// Diffusion field
-		tensorInterior = new Tensor<2>(                    1, pb.AnisotropyRatio, pb.AnisotropyAngle); // anisotropic
-		tensorExterior = new Tensor<2>(pb.HeterogeneityRatio,                  1,                  0); // isotropic
+		Tensor<2> tensorInterior(                    1, pb.AnisotropyRatio, pb.AnisotropyAngle); // anisotropic
+		Tensor<2> tensorExterior(pb.HeterogeneityRatio,                  1,                  0); // isotropic
 
 		this->DiffField = DiffusionField<2>("interior", tensorInterior, "exterior", tensorExterior);
 
@@ -50,11 +47,5 @@ public:
 	string Description() override
 	{
 		return "Hybrid mesh";
-	}
-
-	~HybridMeshTestCase()
-	{
-		delete tensorInterior;
-		delete tensorExterior;
 	}
 };

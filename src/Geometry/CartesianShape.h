@@ -535,12 +535,12 @@ public:
 	//             HHO             //
 	//-----------------------------//
 	
-	double IntegralKGradGradReconstruct(Tensor<ShapeDim>* K, BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2) const override
+	double IntegralKGradGradReconstruct(const Tensor<ShapeDim>& K, BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2) const override
 	{
 		if (this->IsRegular)
 		{
 			DimMatrix<ShapeDim> invJ = InverseJacobianTranspose();
-			return DetJacobian() * pow(invJ(0, 0), 2) * RefCartShape.ReconstructKStiffnessTerm(K, phi1, phi2);
+			return DetJacobian() * pow(invJ(0, 0), 2) * RefCartShape.ReconstructStiffnessTerm(K, phi1, phi2);
 		}
 		else
 			return PhysicalShape<ShapeDim>::ComputeIntegralKGradGrad(K, phi1, phi2);

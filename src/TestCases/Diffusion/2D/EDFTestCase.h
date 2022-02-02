@@ -4,22 +4,17 @@ using namespace std;
 
 class EDFTestCase : public DiffusionTestCase<2>
 {
-private:
-	Tensor<2>* tensorWeirdShapeInTheMiddle;
-	Tensor<2>* tensorBottomStripe;
-	Tensor<2>* tensorTopRectangle;
-	Tensor<2>* tensorLittlePiece;
 public:
 	EDFTestCase(ProblemArguments pb) :
 		DiffusionTestCase()
 	{
 		// Diffusion field
-		tensorWeirdShapeInTheMiddle = new Tensor<2>(                    1, pb.AnisotropyRatio, pb.AnisotropyAngle);
-		tensorBottomStripe          = new Tensor<2>(                   30, pb.AnisotropyRatio, pb.AnisotropyAngle);
-		tensorTopRectangle          = new Tensor<2>(pb.HeterogeneityRatio, pb.AnisotropyRatio, pb.AnisotropyAngle);
-		tensorLittlePiece           = new Tensor<2>(                  100, pb.AnisotropyRatio, pb.AnisotropyAngle);
+		Tensor<2> tensorWeirdShapeInTheMiddle(                    1, pb.AnisotropyRatio, pb.AnisotropyAngle);
+		Tensor<2> tensorBottomStripe         (                   30, pb.AnisotropyRatio, pb.AnisotropyAngle);
+		Tensor<2> tensorTopRectangle         (pb.HeterogeneityRatio, pb.AnisotropyRatio, pb.AnisotropyAngle);
+		Tensor<2> tensorLittlePiece          (                  100, pb.AnisotropyRatio, pb.AnisotropyAngle);
 
-		map<string, Tensor<2>*> tensors;
+		map<string, Tensor<2>> tensors;
 		tensors.insert({ "bottomStripe", tensorBottomStripe });
 		tensors.insert({ "topRectangle", tensorTopRectangle });
 		tensors.insert({ "leftLittlePiece", tensorLittlePiece });
@@ -73,13 +68,5 @@ public:
 	string Description() override
 	{
 		return "EDF";
-	}
-
-	~EDFTestCase()
-	{
-		delete tensorWeirdShapeInTheMiddle;
-		delete tensorBottomStripe;
-		delete tensorTopRectangle;
-		delete tensorLittlePiece;
 	}
 };

@@ -4,26 +4,21 @@ using namespace std;
 
 class MagnetismTestCase : public DiffusionTestCase<2>
 {
-private:
-	Tensor<2> tensorExterior;
-	Tensor<2> tensorMiddle;
-	Tensor<2> tensorInterior;
-	Tensor<2> tensorLittlePieces;
 public:
 	MagnetismTestCase(ProblemArguments pb) :
 		DiffusionTestCase()
 	{
 		// Diffusion field
-		tensorExterior     = Tensor<2>(pb.HeterogeneityRatio      , pb.AnisotropyRatio, pb.AnisotropyAngle);
-		tensorMiddle       = Tensor<2>(                          1, pb.AnisotropyRatio, pb.AnisotropyAngle);
-		tensorInterior     = Tensor<2>(pb.HeterogeneityRatio      , pb.AnisotropyRatio, pb.AnisotropyAngle);
-		tensorLittlePieces = Tensor<2>(sqrt(pb.HeterogeneityRatio), pb.AnisotropyRatio, pb.AnisotropyAngle);
+		Tensor<2> tensorExterior    (pb.HeterogeneityRatio      , pb.AnisotropyRatio, pb.AnisotropyAngle);
+		Tensor<2> tensorMiddle      (                          1, pb.AnisotropyRatio, pb.AnisotropyAngle);
+		Tensor<2> tensorInterior    (pb.HeterogeneityRatio      , pb.AnisotropyRatio, pb.AnisotropyAngle);
+		Tensor<2> tensorLittlePieces(sqrt(pb.HeterogeneityRatio), pb.AnisotropyRatio, pb.AnisotropyAngle);
 
-		map<string, Tensor<2>*> tensors;
-		tensors.insert({ "Exterior", &tensorExterior });
-		tensors.insert({ "Middle", &tensorMiddle });
-		tensors.insert({ "Interior", &tensorInterior });
-		tensors.insert({ "LittlePieces", &tensorLittlePieces });
+		map<string, Tensor<2>> tensors;
+		tensors.insert({ "Exterior", tensorExterior });
+		tensors.insert({ "Middle", tensorMiddle });
+		tensors.insert({ "Interior", tensorInterior });
+		tensors.insert({ "LittlePieces", tensorLittlePieces });
 
 		this->DiffField = DiffusionField<2>(tensors);
 

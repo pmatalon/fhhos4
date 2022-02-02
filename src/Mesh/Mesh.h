@@ -314,7 +314,7 @@ public:
 	{
 		for (PhysicalGroup<Dim>* phyPart : PhysicalParts)
 		{
-			phyPart->ConstantDiffTensor = diffusionField->ConstantDiffTensor(phyPart);
+			phyPart->ConstantDiffTensor = &diffusionField->ConstantDiffTensor(phyPart);
 		}
 	}
 

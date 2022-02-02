@@ -639,11 +639,11 @@ public:
 
 	void InitReferenceShapes()
 	{
-		InitReferenceShapes(this->HHO, this->TestCase->DiffField.K1, this->TestCase->DiffField.K2);
+		InitReferenceShapes(this->HHO, &this->TestCase->DiffField);
 	}
 
 	// Compute some useful integrals on reference element and store them
-	static void InitReferenceShapes(HHOParameters<Dim>* hho, Tensor<Dim>* K1, Tensor<Dim>* K2)
+	static void InitReferenceShapes(HHOParameters<Dim>* hho, DiffusionField<Dim>* diffField)
 	{
 		if (hho->OrthogonalizeElemBases() && hho->OrthogonalizeFaceBases())
 			return;
@@ -655,10 +655,11 @@ public:
 		// - Cartesian element
 		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreMassMatrix(cellBasis);
 		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreMassMatrix(reconstructionBasis);
-		if (K1)
-			CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreReconstructK1StiffnessMatrix(K1, reconstructionBasis);
-		if (K2)
-			CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreReconstructK2StiffnessMatrix(K2, reconstructionBasis);
+		if (diffField)
+		{
+			for (auto K : diffField->Tensors())
+				CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreReconstructStiffnessMatrix(*K, reconstructionBasis);
+		}
 		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix(cellBasis, reconstructionBasis);
 		// - Cartesian face
 		CartesianShape<Dim, Dim - 1>::InitReferenceShape()->ComputeAndStoreMassMatrix(faceBasis);

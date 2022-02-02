@@ -34,7 +34,7 @@ public:
 		_mesh = mesh;
 		_testCase = testCase;
 		HHO = hho;
-		_diffField = DiffusionField<Dim>(new Tensor<Dim>());
+		_diffField = DiffusionField<Dim>();
 		mesh->SetDiffusionField(&_diffField);
 		_diffPbTestCase = VirtualDiffusionTestCase<Dim>(testCase->SourceFunction, _diffField);
 		_diffPbTestCase.BC = BoundaryConditions::HomogeneousNeumannEverywhere();

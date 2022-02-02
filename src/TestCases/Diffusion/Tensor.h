@@ -66,9 +66,14 @@ private:
 	}
 
 public:
-	bool operator==(Tensor<Dim>& other)
+	friend bool operator==(const Tensor<Dim>& k1, const Tensor<Dim>& k2)
 	{
-		return (this->TensorMatrix - other.TensorMatrix).isZero(0);
+		return (k1.TensorMatrix - k2.TensorMatrix).isZero(0);
+	}
+
+	friend bool operator!=(const Tensor<Dim>& k1, const Tensor<Dim>& k2)
+	{
+		return !(k1 == k2);
 	}
 };
 

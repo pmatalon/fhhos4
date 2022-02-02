@@ -586,7 +586,7 @@ public:
 		return this->Shape()->CellReconstructMassMatrix(cellBasis, reconstructBasis);
 	}
 
-	double IntegralKGradGradReconstruct(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
+	double IntegralKGradGradReconstruct(const Tensor<Dim>& K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
 	{
 		return this->Shape()->IntegralKGradGradReconstruct(K, phi1, phi2);
 	}
@@ -596,16 +596,17 @@ public:
 	//--------------//
 
 	// Constant diffusion tensor
-	Tensor<Dim>* DiffTensor() const
+	const Tensor<Dim>& DiffTensor() const
 	{
 		assert(PhysicalPart && "This element has no physical part.");
-		return PhysicalPart->ConstantDiffTensor;
+		assert(PhysicalPart->ConstantDiffTensor && "This element has no tensor.");
+		return *PhysicalPart->ConstantDiffTensor;
 	}
 
 	// Constant isotropic diffusion coefficient (deprecated but still used in DG)
 	double Kappa() const
 	{
-		return DiffTensor()->LargestEigenValue;
+		return DiffTensor().LargestEigenValue;
 	}
 
 	virtual void Serialize(ostream& os) const
@@ -625,10 +626,10 @@ public:
 		}
 		os << ", ";
 		Shape()->Serialize(os);
-		if (this->DiffTensor() && this->DiffTensor()->LargestEigenValue > 1)
+		if (this->DiffTensor().LargestEigenValue > 1)
 		{
 			os << ", k=";
-			os << this->DiffTensor()->LargestEigenValue;
+			os << this->DiffTensor().LargestEigenValue;
 		}
 	}
 

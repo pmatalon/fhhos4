@@ -238,12 +238,12 @@ public:
 		return Integral(functionToIntegrate, polynomialDegree);
 	}
 
-	virtual double ComputeIntegralKGradGrad(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
+	virtual double ComputeIntegralKGradGrad(const Tensor<Dim>& K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
 	{
 		if (phi1->GetDegree() == 0 || phi2->GetDegree() == 0)
 			return 0;
 
-		RefFunction functionToIntegrate = [this, K, phi1, phi2](const RefPoint& p) {
+		RefFunction functionToIntegrate = [this, &K, phi1, phi2](const RefPoint& p) {
 			DimMatrix<Dim> invJ = InverseJacobianTranspose(p);
 			DimVector<Dim> gradPhi1 = invJ * phi1->Grad(p);
 			DimVector<Dim> gradPhi2 = invJ * phi2->Grad(p);
@@ -287,7 +287,7 @@ public:
 		return this->ComputeAndReturnMassMatrix(cellBasis, reconstructBasis);
 	}
 
-	virtual double IntegralKGradGradReconstruct(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
+	virtual double IntegralKGradGradReconstruct(const Tensor<Dim>& K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
 	{
 		return this->ComputeIntegralKGradGrad(K, phi1, phi2);
 	}

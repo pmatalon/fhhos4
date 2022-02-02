@@ -47,7 +47,7 @@ public:
 		return this->MeshElement->SourceTerm(phi, f);
 	}
 private:
-	inline Tensor<Dim>* DiffTensor() const
+	inline const Tensor<Dim>& DiffTensor() const
 	{
 		return this->MeshElement->DiffTensor();
 	}
@@ -83,7 +83,7 @@ public:
 	}
 
 private:
-	double IntegralKGradGradReconstruct(Tensor<Dim>* K, BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2) const
+	double IntegralKGradGradReconstruct(const Tensor<Dim>& K, BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2) const
 	{
 		return this->MeshElement->IntegralKGradGradReconstruct(K, reconstructPhi1, reconstructPhi2);
 	}
@@ -93,7 +93,7 @@ private:
 		return this->MeshElement->CellReconstructMassMatrix(cellBasis, reconstructBasis);
 	}
 
-	double ComputeIntegralKGradGrad(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
+	double ComputeIntegralKGradGrad(const Tensor<Dim>& K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
 	{
 		return this->MeshElement->Shape()->ComputeIntegralKGradGrad(K, phi1, phi2);
 	}

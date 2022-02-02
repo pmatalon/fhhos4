@@ -11,10 +11,7 @@ private:
 	DenseMatrix _stiffnessMatrix;
 
 	// For HHO
-	DenseMatrix _reconstructK1StiffnessMatrix;
-	Tensor<Dim>* _K1;
-	DenseMatrix _reconstructK2StiffnessMatrix;
-	Tensor<Dim>* _K2;
+	map<const Tensor<Dim>*, DenseMatrix> _reconstructStiffnessMatrices;
 
 public:
 	ReferenceCartesianShape() : ReferenceShape<Dim>() {}
@@ -82,33 +79,19 @@ public:
 	//   HHO   //
 	//---------//
 
-	double ReconstructKStiffnessTerm(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
+	double ReconstructStiffnessTerm(const Tensor<Dim>& K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{
-		if (K == _K1)
-			return this->_reconstructK1StiffnessMatrix(phi1->LocalNumber, phi2->LocalNumber);
-		else if (K == _K2)
-			return this->_reconstructK2StiffnessMatrix(phi1->LocalNumber, phi2->LocalNumber);
+		auto it = _reconstructStiffnessMatrices.find(&K);
+		if (it != _reconstructStiffnessMatrices.end())
+			return it->second(phi1->LocalNumber, phi2->LocalNumber);
 		else
 			return this->ComputeIntegralKGradGrad(K, phi1, phi2);
 	}
 
-	void ComputeAndStoreReconstructK1StiffnessMatrix(Tensor<Dim>* K, FunctionalBasis<Dim>* basis)
+	void ComputeAndStoreReconstructStiffnessMatrix(const Tensor<Dim>& K, FunctionalBasis<Dim>* basis)
 	{
-		assert(K);
-		if (_reconstructK1StiffnessMatrix.rows() == 0)
-		{
-			_reconstructK1StiffnessMatrix = ComputeAndReturnKStiffnessMatrix(K, basis);
-			_K1 = K;
-		}
-	}
-	void ComputeAndStoreReconstructK2StiffnessMatrix(Tensor<Dim>* K, FunctionalBasis<Dim>* basis)
-	{
-		assert(K);
-		if (_reconstructK2StiffnessMatrix.rows() == 0)
-		{
-			_reconstructK2StiffnessMatrix = ComputeAndReturnKStiffnessMatrix(K, basis);
-			_K2 = K;
-		}
+		if (_reconstructStiffnessMatrices.find(&K) == _reconstructStiffnessMatrices.end())
+			_reconstructStiffnessMatrices[&K] = ComputeAndReturnKStiffnessMatrix(K, basis);
 	}
 
 private:
@@ -123,9 +106,8 @@ private:
 		return stiffnessMatrix;
 	}
 
-	DenseMatrix ComputeAndReturnKStiffnessMatrix(Tensor<Dim>* K, FunctionalBasis<Dim>* basis)
+	DenseMatrix ComputeAndReturnKStiffnessMatrix(const Tensor<Dim>& K, FunctionalBasis<Dim>* basis)
 	{
-		assert(K);
 		DenseMatrix stiffnessMatrix = DenseMatrix(basis->Size(), basis->Size());
 		for (BasisFunction<Dim>* phi1 : basis->LocalFunctions)
 		{
@@ -150,13 +132,12 @@ public:
 		return Integral(functionToIntegrate, polynomialDegree);
 	}
 
-	double ComputeIntegralKGradGrad(Tensor<Dim>* K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
+	double ComputeIntegralKGradGrad(const Tensor<Dim>& K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{
-		assert(K);
 		if (phi1->GetDegree() == 0 || phi2->GetDegree() == 0)
 			return 0;
 
-		RefFunction functionToIntegrate = [K, phi1, phi2](const RefPoint& p) {
+		RefFunction functionToIntegrate = [&K, phi1, phi2](const RefPoint& p) {
 			return (K * phi1->Grad(p)).dot(phi2->Grad(p));
 		};
 

@@ -4,18 +4,15 @@ using namespace std;
 
 class SquareCenterSquareTestCase : public DiffusionTestCase<2>
 {
-private:
-	Tensor<2> diffTensorBig;
-	Tensor<2> diffTensorSmall;
 public:
 	SquareCenterSquareTestCase(ProblemArguments pb) :
 		DiffusionTestCase()
 	{
 		// Diffusion field
-		diffTensorBig   = Tensor<2>(pb.HeterogeneityRatio, pb.AnisotropyRatio, pb.AnisotropyAngle);
-		diffTensorSmall = Tensor<2>(1                    , pb.AnisotropyRatio, pb.AnisotropyAngle);
+		Tensor<2> diffTensorBig  (pb.HeterogeneityRatio, pb.AnisotropyRatio, pb.AnisotropyAngle);
+		Tensor<2> diffTensorSmall(1                    , pb.AnisotropyRatio, pb.AnisotropyAngle);
 
-		this->DiffField = DiffusionField<2>("big", &diffTensorBig, "small", &diffTensorSmall);
+		this->DiffField = DiffusionField<2>("big", diffTensorBig, "small", diffTensorSmall);
 
 		// Source function
 		if (pb.SourceCode.compare("") == 0)

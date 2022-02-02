@@ -27,7 +27,7 @@ public:
 	{
 		_hhoFaces = vector<Diff_HHOFace<Dim>>(this->_mesh->BoundaryFaces.size());
 
-		Diffusion_HHO<Dim>::InitReferenceShapes(HHO, nullptr, nullptr);
+		Diffusion_HHO<Dim>::InitReferenceShapes(HHO, nullptr);
 
 		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->BoundaryFaces, [this](Face<Dim>* f)
 			{
