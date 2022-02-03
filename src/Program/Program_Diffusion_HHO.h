@@ -172,6 +172,10 @@ public:
 		bool saveMatrixBlocks = args.Solver.SolverCode.compare("uamg") == 0 || args.Solver.SolverCode.compare("fcguamg") == 0;
 		Diffusion_HHO<Dim>* problem = new Diffusion_HHO<Dim>(mesh, testCase, hho, args.Discretization.StaticCondensation, saveMatrixBlocks);
 
+		cout << endl;
+		cout << "----------------------------------------------------------" << endl;
+		cout << "-                       Assembly                         -" << endl;
+		cout << "----------------------------------------------------------" << endl;
 
 		// If full Neumann, check compatibility condition
 		if (testCase->BC.Type == PbBoundaryConditions::FullNeumann)
@@ -179,14 +183,13 @@ public:
 			// Compatibility condition: (f|1) + <neumann|1> = 0
 			double integralF = problem->IntegralOverDomain(testCase->SourceFunction);
 			double integralN = problem->IntegralOverBoundary(testCase->BC.NeumannFunction);
-			if (abs(integralF + integralN) >= Utils::Eps)
+			if (abs(integralF + integralN) < Utils::NumericalZero)
+				cout << "Compatibility condition: (f|1) + <neumann|1> = " << (integralF + integralN) << endl;
+			else
 				Utils::Error("Compatibility condition not respected: (f|1) + <neumann|1> = " + to_string(integralF + integralN));
+			cout << endl;
 		}
 
-		cout << endl;
-		cout << "----------------------------------------------------------" << endl;
-		cout << "-                       Assembly                         -" << endl;
-		cout << "----------------------------------------------------------" << endl;
 		Timer assemblyTimer;
 		assemblyTimer.Start();
 
@@ -214,8 +217,9 @@ public:
 				integralZeroOnSkeleton.Setup();
 				cout << "Kernel coefficient = " << integralZeroOnSkeleton.CheckKernel(problem->A) << endl;
 				cout << "Orthogonality factor of rhs = " << integralZeroOnSkeleton.OrthogonalityFactor(problem->b) << endl;
-				integralZeroOnSkeleton.Enforce(problem->b);
+				integralZeroOnSkeleton.ProjectOntoImage(problem->b);
 				cout << "Orthogonality factor of rhs = " << integralZeroOnSkeleton.OrthogonalityFactor(problem->b) << " (after projection onto Im(A)) " << endl;
+				cout << endl;
 			}
 
 			Vector systemSolution;

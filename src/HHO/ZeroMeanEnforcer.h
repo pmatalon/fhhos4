@@ -39,19 +39,23 @@ public:
 	{
 		assert(_nipw1.rows() > 0 && "Setup() must be called before using Enforce()");
 		assert(x.rows() == _nipw1.rows());
-		x -= x.dot(_nipw1) * _one;
-	};
+		x -= OrthogonalityFactor(x) * _one;
+	}
 	double OrthogonalityFactor(const Vector& x)
 	{
-		return abs(x.dot(_nipw1));
+		return x.dot(_nipw1);
 	}
 	bool Check(const Vector& x)
 	{
-		return OrthogonalityFactor(x) < Utils::Eps;
+		return abs(OrthogonalityFactor(x)) < Utils::Eps;
 	}
 	double CheckKernel(const SparseMatrix& A)
 	{
-		return (A * _nipw1).norm();
+		return (A * _one).norm();
+	}
+	void ProjectOntoImage(Vector& x)
+	{
+		x -= x.dot(_one) / (_one.dot(_one)) * _one;
 	}
 protected:
 	// returns [(phi_i|1)]_i

@@ -133,7 +133,7 @@ public:
 		Vector& rhs = _diffPb.SetCondensedRHS();
 
 		// Solve
-		_integralZeroOnSkeleton.Enforce(rhs); // enforce numerical compatibility
+		_integralZeroOnSkeleton.ProjectOntoImage(rhs); // enforce numerical compatibility
 		Vector faceSolution = _diffSolver->Solve(rhs);
 		CheckDiffSolverConvergence();
 
@@ -168,7 +168,7 @@ public:
 		Vector& rhs = _diffPb.SetCondensedRHS();
 
 		// Solve
-		_integralZeroOnSkeleton.Enforce(rhs); // enforce numerical compatibility
+		_integralZeroOnSkeleton.ProjectOntoImage(rhs); // enforce numerical compatibility
 		Vector faceSolution = _diffSolver->Solve(rhs);
 		CheckDiffSolverConvergence();
 
@@ -196,7 +196,7 @@ public:
 		Vector& rhs = _diffPb.SetCondensedRHS();
 
 		// Solve
-		_integralZeroOnSkeleton.Enforce(rhs); // enforce numerical compatibility
+		_integralZeroOnSkeleton.ProjectOntoImage(rhs); // enforce numerical compatibility
 		Vector faceSolution = _diffSolver->Solve(rhs);
 		CheckDiffSolverConvergence();
 
