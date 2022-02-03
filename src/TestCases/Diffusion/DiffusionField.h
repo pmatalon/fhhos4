@@ -14,7 +14,8 @@ public:
 	bool IsHomogeneous = true;
 	bool IsIsotropic = true;
 
-	DiffusionField()
+	DiffusionField() :
+		DiffusionField(Tensor<Dim>())
 	{}
 
 	// This constructor is used when the domain is not partitioned into different physical parts.
@@ -68,7 +69,7 @@ public:
 			Utils::FatalError("A nameless physical part has been found. Please name all the physical parts of the geometry.");
 		auto found = _tensorsByPhysicalPartName.find(physicalPart->Name);
 		if (found == _tensorsByPhysicalPartName.end())
-			Utils::FatalError("Unknown physical part '" + physicalPart->Name + "'");
+			Utils::FatalError("No diffusion tensor has been declared for the physical part '" + physicalPart->Name + "'.");
 		return found->second;
 	}
 
