@@ -19,11 +19,14 @@ private:
 	VirtualDiffusionTestCase<Dim> _diffPbTestCase;
 	Diffusion_HHO<Dim> _diffPb;
 	Solver* _diffSolver = nullptr;
+
 	ZeroMeanEnforcerFromReconstructCoeffs<Dim> _integralZeroOnDomain;
 	ZeroMeanEnforcerFromBoundaryFaceCoeffs<Dim> _integralZeroOnBoundary;
 	ZeroMeanEnforcerFromHigherOrderBoundary<Dim> _integralZeroOnHigherOrderBoundary;
 	ZeroMeanEnforcerFromFaceCoeffs<Dim> _integralZeroOnSkeleton;
+
 	HigherOrderBoundary<Dim> _higherOrderBoundary;
+
 	double _integralSource = 0;
 	bool _reconstructHigherOrderBoundary = false;
 public:
@@ -57,20 +60,25 @@ public:
 
 		_integralSource = _diffPb.IntegralOverDomain(_testCase->SourceFunction);
 
-		_higherOrderBoundary = HigherOrderBoundary<Dim>(&_diffPb);
-		_higherOrderBoundary.Setup();
+		if (_reconstructHigherOrderBoundary)
+		{
+			_higherOrderBoundary = HigherOrderBoundary<Dim>(&_diffPb);
+			_higherOrderBoundary.Setup();
+
+			_integralZeroOnHigherOrderBoundary = ZeroMeanEnforcerFromHigherOrderBoundary<Dim>(&_higherOrderBoundary);
+			_integralZeroOnHigherOrderBoundary.Setup();
+		}
+		else
+		{
+			_integralZeroOnBoundary = ZeroMeanEnforcerFromBoundaryFaceCoeffs<Dim>(&_diffPb);
+			_integralZeroOnBoundary.Setup();
+		}
 
 		_integralZeroOnDomain = ZeroMeanEnforcerFromReconstructCoeffs<Dim>(&_diffPb);
-		_integralZeroOnBoundary = ZeroMeanEnforcerFromBoundaryFaceCoeffs<Dim>(&_diffPb);
-		_integralZeroOnHigherOrderBoundary = ZeroMeanEnforcerFromHigherOrderBoundary<Dim>(&_higherOrderBoundary);
-		_integralZeroOnSkeleton = ZeroMeanEnforcerFromFaceCoeffs<Dim>(&_diffPb);
-
 		_integralZeroOnDomain.Setup();
+
+		_integralZeroOnSkeleton = ZeroMeanEnforcerFromFaceCoeffs<Dim>(&_diffPb);
 		_integralZeroOnSkeleton.Setup();
-		if (_reconstructHigherOrderBoundary)
-			_integralZeroOnHigherOrderBoundary.Setup();
-		else
-			_integralZeroOnBoundary.Setup();
 	}
 
 	void SetDiffSolver(Solver* solver)
@@ -142,12 +150,7 @@ public:
 	Vector Solve1stDiffProblemWithZeroSource(const Vector& neumann)
 	{
 #ifndef NDEBUG
-		/*
 		// Check compatibility condition
-		double integralNeumann = _diffPb.IntegralOverBoundaryFromFaceCoeffs(neumann);
-		assert(abs(integralNeumann) < Utils::Eps);
-		// Probably the same thing:
-		*/
 		if (_reconstructHigherOrderBoundary)
 			assert(_integralZeroOnHigherOrderBoundary.Check(neumann));
 		else
@@ -215,9 +218,9 @@ public:
 		}
 		else
 		{
-			/*_integralZeroOnBoundary.Enforce(faceSolution);
-			return _diffPb.ReconstructHigherOrderApproximationFaceCoeffs(faceSolution);*/
-			return _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution);
+			Vector reconstructedSolution = _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution);
+			_integralZeroOnDomain.Enforce(reconstructedSolution);
+			return reconstructedSolution;
 		}
 	}
 
@@ -302,10 +305,5 @@ private:
 			if (iterSolver->IterationCount == iterSolver->MaxIterations)
 				Utils::Warning("The diffusion solver has reached the max number of iterations (" + to_string(iterSolver->MaxIterations) + ")");
 		}
-	}
-
-public:
-	~BiHarmonicMixedForm_HHO()
-	{
 	}
 };

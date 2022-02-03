@@ -9,7 +9,7 @@
 #include "../Solver/BiHarmonic/BiHarmonicGradientDescent.h"
 #include "../Utils/ExportModule.h"
 
-// Bi-harmonic equation in mixed form with mixed (homogeneous) Dirichel-Neumann BC
+// Bi-harmonic equation in mixed form with mixed (homogeneous) Dirichlet-Neumann BC
 
 template <int Dim>
 class Program_BiHarmonic_HHO
