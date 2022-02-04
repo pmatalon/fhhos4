@@ -5,7 +5,7 @@
 
 // --- Zero-mean condition (to enforce unicity of the solution)
 // 
-// 
+// Let (.|.) denote the L2-inner product.
 // Let v be a function represented by the vector of coefficients x.
 // Applying the zero mean condition is equivalent to orthogonalizing v to 1 (the constant function 1):
 //              v <- v - (v|1)/(1|1)*1
@@ -35,27 +35,22 @@ public:
 		_nipw1 = std::move(ipw1);
 		_nipw1 /= OneScalOne();
 	}
+
+	double OrthogonalityFactor(const Vector& x)
+	{
+		return x.dot(_nipw1);
+	}
+
 	void Enforce(Vector& x)
 	{
 		assert(_nipw1.rows() > 0 && "Setup() must be called before using Enforce()");
 		assert(x.rows() == _nipw1.rows());
 		x -= OrthogonalityFactor(x) * _one;
 	}
-	double OrthogonalityFactor(const Vector& x)
-	{
-		return x.dot(_nipw1);
-	}
+
 	bool Check(const Vector& x)
 	{
 		return abs(OrthogonalityFactor(x)) < Utils::Eps;
-	}
-	double CheckKernel(const SparseMatrix& A)
-	{
-		return (A * _one).norm();
-	}
-	void ProjectOntoImage(Vector& x)
-	{
-		x -= x.dot(_one) / (_one.dot(_one)) * _one;
 	}
 protected:
 	// returns [(phi_i|1)]_i

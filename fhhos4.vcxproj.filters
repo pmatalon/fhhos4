@@ -526,6 +526,9 @@
     <ClInclude Include="src\TestCases\Diffusion\2D\SquareFullNeumannTestCase.h">
       <Filter>TestCases\Diffusion\2D</Filter>
     </ClInclude>
+    <ClInclude Include="src\HHO\NumericImageEnforcer.h">
+      <Filter>HHO</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

@@ -213,12 +213,12 @@ public:
 
 			if (testCase->BC.Type == PbBoundaryConditions::FullNeumann)
 			{
-				ZeroMeanEnforcerFromFaceCoeffs<Dim> integralZeroOnSkeleton(problem);
-				integralZeroOnSkeleton.Setup();
-				cout << "Kernel coefficient = " << integralZeroOnSkeleton.CheckKernel(problem->A) << endl;
-				cout << "Orthogonality factor of rhs = " << integralZeroOnSkeleton.OrthogonalityFactor(problem->b) << endl;
-				integralZeroOnSkeleton.ProjectOntoImage(problem->b);
-				cout << "Orthogonality factor of rhs = " << integralZeroOnSkeleton.OrthogonalityFactor(problem->b) << " (after projection onto Im(A)) " << endl;
+				NumericImageEnforcerFromFaceCoeffs<Dim> imageEnforcer(problem);
+				imageEnforcer.Setup();
+				cout << "Kernel coefficient = " << imageEnforcer.CheckKernel(problem->A) << endl;
+				cout << "Orthogonality factor of rhs = " << imageEnforcer.OrthogonalityFactor(problem->b) << endl;
+				imageEnforcer.ProjectOntoImage(problem->b);
+				cout << "Orthogonality factor of rhs = " << imageEnforcer.OrthogonalityFactor(problem->b) << " (after projection onto Im(A)) " << endl;
 				cout << endl;
 			}
 

@@ -12,7 +12,7 @@ struct ProblemArguments
 	double HeterogeneityRatio = 1;
 	double AnisotropyRatio = 1;
 	double AnisotropyAngle = 0; // in radians
-	string BCCode = "d";
+	string BCCode = "";
 };
 
 struct DiscretizationArguments

@@ -5,6 +5,7 @@
 #include "../Solver/Solver.h"
 #include "HigherOrderBoundary.h"
 #include "ZeroMeanEnforcer.h"
+#include "NumericImageEnforcer.h"
 using namespace std;
 
 template<int Dim>
@@ -23,7 +24,7 @@ private:
 	ZeroMeanEnforcerFromReconstructCoeffs<Dim> _integralZeroOnDomain;
 	ZeroMeanEnforcerFromBoundaryFaceCoeffs<Dim> _integralZeroOnBoundary;
 	ZeroMeanEnforcerFromHigherOrderBoundary<Dim> _integralZeroOnHigherOrderBoundary;
-	ZeroMeanEnforcerFromFaceCoeffs<Dim> _integralZeroOnSkeleton;
+	NumericImageEnforcerFromFaceCoeffs<Dim> _imageEnforcer;
 
 	HigherOrderBoundary<Dim> _higherOrderBoundary;
 
@@ -77,8 +78,8 @@ public:
 		_integralZeroOnDomain = ZeroMeanEnforcerFromReconstructCoeffs<Dim>(&_diffPb);
 		_integralZeroOnDomain.Setup();
 
-		_integralZeroOnSkeleton = ZeroMeanEnforcerFromFaceCoeffs<Dim>(&_diffPb);
-		_integralZeroOnSkeleton.Setup();
+		_imageEnforcer = NumericImageEnforcerFromFaceCoeffs<Dim>(&_diffPb);
+		_imageEnforcer.Setup();
 	}
 
 	void SetDiffSolver(Solver* solver)
@@ -133,7 +134,7 @@ public:
 		Vector& rhs = _diffPb.SetCondensedRHS();
 
 		// Solve
-		_integralZeroOnSkeleton.ProjectOntoImage(rhs); // enforce numerical compatibility
+		_imageEnforcer.ProjectOntoImage(rhs); // enforce numerical compatibility
 		Vector faceSolution = _diffSolver->Solve(rhs);
 		CheckDiffSolverConvergence();
 
@@ -168,7 +169,7 @@ public:
 		Vector& rhs = _diffPb.SetCondensedRHS();
 
 		// Solve
-		_integralZeroOnSkeleton.ProjectOntoImage(rhs); // enforce numerical compatibility
+		_imageEnforcer.ProjectOntoImage(rhs); // enforce numerical compatibility
 		Vector faceSolution = _diffSolver->Solve(rhs);
 		CheckDiffSolverConvergence();
 
@@ -196,7 +197,7 @@ public:
 		Vector& rhs = _diffPb.SetCondensedRHS();
 
 		// Solve
-		_integralZeroOnSkeleton.ProjectOntoImage(rhs); // enforce numerical compatibility
+		_imageEnforcer.ProjectOntoImage(rhs); // enforce numerical compatibility
 		Vector faceSolution = _diffSolver->Solve(rhs);
 		CheckDiffSolverConvergence();
 

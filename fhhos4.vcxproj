@@ -103,6 +103,7 @@
     <ClInclude Include="src\HHO\Diffusion_HHOMatrix.h" />
     <ClInclude Include="src\HHO\HHOParameters.h" />
     <ClInclude Include="src\HHO\BiHarmonicDDMixedForm_HHO.h" />
+    <ClInclude Include="src\HHO\NumericImageEnforcer.h" />
     <ClInclude Include="src\HHO\ZeroMeanEnforcer.h" />
     <ClInclude Include="src\Mesher\MeshFactory.h" />
     <ClInclude Include="src\Mesher\CubeGeometry.h" />

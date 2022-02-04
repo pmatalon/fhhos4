@@ -1258,8 +1258,6 @@ int main(int argc, char* argv[])
 #endif
 	}
 
-	//GMSHMesh<3>::GMSHLogEnabled = true;
-
 	// Test case
 	if (args.Problem.TestCaseCode.compare("") == 0)
 	{
@@ -1273,6 +1271,14 @@ int main(int argc, char* argv[])
 	if (args.Problem.GeoCode.compare("square") == 0 && args.Problem.HeterogeneityRatio != 1)
 		Utils::Warning("The geometry 'square' has only one physical part: -heterog argument is ignored. Use 'square4quadrants' instead to run an heterogeneous problem.");
 	
+	// Boundary conditions
+	if (args.Problem.BCCode.compare("") == 0)
+	{
+		if (args.Problem.TestCaseCode.compare("fullneumann") == 0)
+			args.Problem.BCCode = "n2";
+		else
+			args.Problem.BCCode = "d";
+	}
 
 	//------------------------------------------//
 	//                   Mesh                   //

@@ -2,6 +2,7 @@
 #include "../Level.h"
 #include "../../../HHO/Diffusion_HHO.h"
 #include "../../../HHO/ZeroMeanEnforcer.h"
+#include "../../../HHO/NumericImageEnforcer.h"
 using namespace std;
 
 template <int Dim>
@@ -671,10 +672,8 @@ public:
 	// Compatibility condition (to enforce the existence of a solution)
 	void EnforceCompatibilityCondition(Vector& b) override
 	{
-		//assert(_gamma.rows() > 0 && _one.rows() > 0 && "ComputeVectorsForOrthogonalityConditions() has not been called!");
-		//b -= b.dot(_gamma) * _one;
-		_zeroMean.ProjectOntoImage(b);
-		assert(_zeroMean.Check(b));
+		//_zeroMean.ProjectOntoImage(b);
+		//assert(_zeroMean.Check(b));
 	}
 	Flops EnforceCompatibilityConditionCost(Vector& b) override
 	{

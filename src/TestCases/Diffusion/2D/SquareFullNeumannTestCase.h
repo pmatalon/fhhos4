@@ -16,7 +16,7 @@ public:
 
 		// Source function
 		if (pb.SourceCode.compare("") == 0)
-			pb.SourceCode = "zero";
+			pb.SourceCode = "exp";
 
 		if (pb.SourceCode.compare("zero") == 0)
 			this->SourceFunction = Utils::ConstantFunctionZero;
