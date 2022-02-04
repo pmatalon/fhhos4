@@ -14,7 +14,7 @@ private:
 	GMG_P_Restriction _pRestriction = GMG_P_Restriction::RemoveHigherOrders;
 	bool _useHigherOrderReconstruction;
 	bool _useHeterogeneousWeighting;
-	ZeroMeanEnforcerFromFaceCoeffs<Dim> _zeroMean;
+	ZeroMeanEnforcer _zeroMean;
 public:
 	Diffusion_HHO<Dim>* _problem;
 
@@ -23,7 +23,7 @@ public:
 		bool useHigherOrderReconstruction, bool useHeterogeneousWeighting)
 		:
 		Level(number),
-		_zeroMean(problem)
+		_zeroMean(&problem->SkeletonSpace)
 	{
 		this->_problem = problem;
 		this->_hProlongation = hProlongation;

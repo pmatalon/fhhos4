@@ -212,8 +212,11 @@ void print_usage() {
 	cout << "-iter-l2" << endl;
 	cout << "      Computes the L2-error at each iteration of the solver (when the solution is known)." << endl;
 	cout << endl;
-	cout << "-bihar-reconstruct-bry" << endl;
+	cout << "-bihar-reconstruct-bry {0|1}" << endl;
 	cout << "      Reconstruct higher-order boundary during the iterative process of the bi-harmonic problem." << endl;
+	cout << endl;
+	cout << "-enforce-d-bc {0|1}" << endl;
+	cout << "      Enforce Dirichlet b.c. at the end of the iterative process of the bi-harmonic problem." << endl;
 	cout << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << "                                 Multigrid                            " << endl;

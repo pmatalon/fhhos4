@@ -354,7 +354,7 @@ public:
 
 				if (abs(meanValue) > Utils::NumericalZero)
 				{
-					ZeroMeanEnforcerFromReconstructCoeffs<Dim> integralZeroOnDomain(problem);
+					ZeroMeanEnforcer integralZeroOnDomain(&problem->ReconstructSpace);
 					integralZeroOnDomain.Setup();
 					integralZeroOnDomain.Enforce(reconstructedSolution);
 					meanValue = problem->MeanValueFromReconstructedCoeffs(reconstructedSolution);

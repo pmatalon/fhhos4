@@ -6,8 +6,9 @@
 #endif // ENABLE_3D
 #include "../Geometry/CartesianShape.h"
 #include "../Geometry/2D/Triangle.h"
-#include "Diff_HHOElement.h"
-#include "../Utils/ElementParallelLoop.h"
+#include "DiscreteSpaces/HHOSkeletonSpace.h"
+#include "DiscreteSpaces/HHOReconstructSpace.h"
+#include "DiscreteSpaces/HHOBoundarySpace.h"
 #include "Diffusion_HHOMatrix.h"
 using namespace std;
 
@@ -26,6 +27,10 @@ public:
 	DiffusionTestCase<Dim>* TestCase;
 	SparseMatrix A;
 	Vector b;
+
+	HHOSkeletonSpace<Dim> SkeletonSpace;
+	HHOReconstructSpace<Dim> ReconstructSpace;
+	HHOBoundarySpace<Dim> BoundarySpace;
 
 	// Matrix parts
 	SparseMatrix A_T_T;
@@ -690,6 +695,10 @@ public:
 	{
 		InitHHO_Faces();
 		InitHHO_Elements(assembleLocalMatrices);
+
+		SkeletonSpace    = HHOSkeletonSpace   (_mesh, HHO, _hhoFaces);
+		ReconstructSpace = HHOReconstructSpace(_mesh, HHO, _hhoElements);
+		BoundarySpace    = HHOBoundarySpace   (_mesh, HHO, _hhoFaces);
 	}
 	void InitHHO_Faces()
 	{
@@ -1075,48 +1084,6 @@ public:
 		return vectorOfDoFs;
 	}
 
-	Vector InnerProdWithFaceBasis(DomFunction func)
-	{
-		Vector innerProds = Vector(HHO->nTotalFaceUnknowns);
-		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->Faces, [this, &innerProds, func](Face<Dim>* f)
-			{
-				Diff_HHOFace<Dim>* face = HHOFace(f);
-				BigNumber i = f->Number * HHO->nFaceUnknowns;
-
-				innerProds.segment(i, HHO->nFaceUnknowns) = face->InnerProductWithBasis(func);
-			}
-		);
-		return innerProds;
-	}
-
-	Vector InnerProdWithBoundaryFaceBasis(DomFunction func)
-	{
-		Vector innerProds = Vector(HHO->nBoundaryFaces * HHO->nFaceUnknowns);
-		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->BoundaryFaces, [this, &innerProds, func](Face<Dim>* f)
-			{
-				Diff_HHOFace<Dim>* face = HHOFace(f);
-				BigNumber i = (face->Number() - HHO->nInteriorFaces) * HHO->nFaceUnknowns;
-
-				innerProds.segment(i, HHO->nFaceUnknowns) = face->InnerProductWithBasis(func);
-			}
-		);
-		return innerProds;
-	}
-
-	Vector InnerProdWithReconstructBasis(DomFunction func)
-	{
-		Vector innerProds = Vector(HHO->nTotalReconstructUnknowns);
-		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, &innerProds, func](Element<Dim>* e)
-			{
-				Diff_HHOElement<Dim>* elem = HHOElement(e);
-				BigNumber i = e->Number * HHO->nReconstructUnknowns;
-
-				innerProds.segment(i, HHO->nReconstructUnknowns) = elem->InnerProductWithReconstructBasis(func);
-			}
-		);
-		return innerProds;
-	}
-
 	double L2InnerProdOnBoundary(const Vector& v1, const Vector& v2)
 	{
 		assert(v1.rows() == HHO->nBoundaryFaces * HHO->nFaceUnknowns);
@@ -1140,49 +1107,6 @@ public:
 			});
 		return total;
 	}
-
-	Vector SolveFaceMassMatrix(const Vector& v)
-	{
-		assert(v.rows() == HHO->nFaces * HHO->nFaceUnknowns);
-		Vector res(v.rows());
-		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->Faces, [this, &v, &res](Face<Dim>* f)
-			{
-				Diff_HHOFace<Dim>* face = HHOFace(f);
-				BigNumber i = f->Number * HHO->nFaceUnknowns;
-
-				res.segment(i, HHO->nFaceUnknowns) = face->SolveMassMatrix(v.segment(i, HHO->nFaceUnknowns));
-			});
-		return res;
-	}
-
-	Vector SolveBoundaryFaceMassMatrix(const Vector& v)
-	{
-		assert(v.rows() == HHO->nBoundaryFaces * HHO->nFaceUnknowns);
-		Vector res(v.rows());
-		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->BoundaryFaces, [this, &v, &res](Face<Dim>* f)
-			{
-				Diff_HHOFace<Dim>* face = HHOFace(f);
-				BigNumber i = (face->Number() - HHO->nInteriorFaces) * HHO->nFaceUnknowns;
-
-				res.segment(i, HHO->nFaceUnknowns) = face->SolveMassMatrix(v.segment(i, HHO->nFaceUnknowns));
-			});
-		return res;
-	}
-
-	Vector SolveReconstructMassMatrix(const Vector& v)
-	{
-		assert(v.rows() == HHO->nTotalReconstructUnknowns);
-		Vector res(v.rows());
-		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, &v, &res](Element<Dim>* e)
-			{
-				Diff_HHOElement<Dim>* elem = HHOElement(e);
-				BigNumber i = e->Number * HHO->nReconstructUnknowns;
-
-				res.segment(i, HHO->nReconstructUnknowns) = elem->SolveReconstructMassMatrix(v.segment(i, HHO->nReconstructUnknowns));
-			});
-		return res;
-	}
-
 
 	//--------------------------------------------//
 	//              Global integrals              //

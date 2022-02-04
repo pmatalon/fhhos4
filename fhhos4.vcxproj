@@ -99,6 +99,10 @@
     <ClInclude Include="src\Geometry\3D\TriangleIn3D.h" />
     <ClInclude Include="src\Geometry\3D\ReferenceTetrahedron.h" />
     <ClInclude Include="src\HHO\BiHarmonicMixedForm_HHO.h" />
+    <ClInclude Include="src\HHO\DiscreteSpaces\HHOBoundarySpace.h" />
+    <ClInclude Include="src\HHO\DiscreteSpaces\HHOReconstructSpace.h" />
+    <ClInclude Include="src\HHO\DiscreteSpaces\HHOSkeletonSpace.h" />
+    <ClInclude Include="src\HHO\DiscreteSpaces\IDiscreteSpace.h" />
     <ClInclude Include="src\HHO\HigherOrderBoundary.h" />
     <ClInclude Include="src\HHO\Diffusion_HHOMatrix.h" />
     <ClInclude Include="src\HHO\HHOParameters.h" />

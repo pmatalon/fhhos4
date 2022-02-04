@@ -21,9 +21,9 @@ private:
 	Diffusion_HHO<Dim> _diffPb;
 	Solver* _diffSolver = nullptr;
 
-	ZeroMeanEnforcerFromReconstructCoeffs<Dim> _integralZeroOnDomain;
-	ZeroMeanEnforcerFromBoundaryFaceCoeffs<Dim> _integralZeroOnBoundary;
-	ZeroMeanEnforcerFromHigherOrderBoundary<Dim> _integralZeroOnHigherOrderBoundary;
+	ZeroMeanEnforcer _integralZeroOnDomain;
+	ZeroMeanEnforcer _integralZeroOnBoundary;
+	ZeroMeanEnforcer _integralZeroOnHigherOrderBoundary;
 	NumericImageEnforcerFromFaceCoeffs<Dim> _imageEnforcer;
 
 	HigherOrderBoundary<Dim> _higherOrderBoundary;
@@ -66,16 +66,16 @@ public:
 			_higherOrderBoundary = HigherOrderBoundary<Dim>(&_diffPb);
 			_higherOrderBoundary.Setup();
 
-			_integralZeroOnHigherOrderBoundary = ZeroMeanEnforcerFromHigherOrderBoundary<Dim>(&_higherOrderBoundary);
+			_integralZeroOnHigherOrderBoundary = ZeroMeanEnforcer(&_higherOrderBoundary.BoundarySpace);
 			_integralZeroOnHigherOrderBoundary.Setup();
 		}
 		else
 		{
-			_integralZeroOnBoundary = ZeroMeanEnforcerFromBoundaryFaceCoeffs<Dim>(&_diffPb);
+			_integralZeroOnBoundary = ZeroMeanEnforcer(&_diffPb.BoundarySpace);
 			_integralZeroOnBoundary.Setup();
 		}
 
-		_integralZeroOnDomain = ZeroMeanEnforcerFromReconstructCoeffs<Dim>(&_diffPb);
+		_integralZeroOnDomain = ZeroMeanEnforcer(&_diffPb.ReconstructSpace);
 		_integralZeroOnDomain.Setup();
 
 		_imageEnforcer = NumericImageEnforcerFromFaceCoeffs<Dim>(&_diffPb);

@@ -529,6 +529,18 @@
     <ClInclude Include="src\HHO\NumericImageEnforcer.h">
       <Filter>HHO</Filter>
     </ClInclude>
+    <ClInclude Include="src\HHO\DiscreteSpaces\IDiscreteSpace.h">
+      <Filter>HHO\DiscreteSpaces</Filter>
+    </ClInclude>
+    <ClInclude Include="src\HHO\DiscreteSpaces\HHOSkeletonSpace.h">
+      <Filter>HHO\DiscreteSpaces</Filter>
+    </ClInclude>
+    <ClInclude Include="src\HHO\DiscreteSpaces\HHOReconstructSpace.h">
+      <Filter>HHO\DiscreteSpaces</Filter>
+    </ClInclude>
+    <ClInclude Include="src\HHO\DiscreteSpaces\HHOBoundarySpace.h">
+      <Filter>HHO\DiscreteSpaces</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
@@ -641,6 +653,9 @@
     </Filter>
     <Filter Include="Solver\BiHarmonic">
       <UniqueIdentifier>{e1d04cfe-8de0-405c-ac8c-6526b9bdb73c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="HHO\DiscreteSpaces">
+      <UniqueIdentifier>{e0159cf0-0fea-46b8-91aa-a20c5e13fe17}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

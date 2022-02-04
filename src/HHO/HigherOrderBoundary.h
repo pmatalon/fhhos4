@@ -12,6 +12,7 @@ private:
 public:
 	HHOParameters<Dim>* HHO;
 	Mesh<Dim>* _mesh;
+	HHOBoundarySpace<Dim> BoundarySpace;
 
 	HigherOrderBoundary() {}
 
@@ -36,6 +37,8 @@ public:
 				_hhoFaces[i].InitHHO(HHO);
 			}
 		);
+
+		BoundarySpace = HHOBoundarySpace(_mesh, HHO, _hhoFaces);
 
 		_mesh->AssignNumberToBoundaryElements();
 		SetupTraceMatrix();
@@ -74,20 +77,6 @@ public:
 		return _trace * v;
 	}
 
-	Vector InnerProdWithBoundaryFaceBasis(DomFunction func)
-	{
-		Vector innerProds = Vector(HHO->nBoundaryFaces * HHO->nFaceUnknowns);
-		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->BoundaryFaces, [this, &innerProds, func](Face<Dim>* f)
-			{
-				Diff_HHOFace<Dim>* face = HHOFace(f);
-				BigNumber i = (f->Number - HHO->nInteriorFaces) * HHO->nFaceUnknowns;
-
-				innerProds.segment(i, HHO->nFaceUnknowns) = face->InnerProductWithBasis(func);
-			}
-		);
-		return innerProds;
-	}
-
 	Vector ProjectOnBoundaryDiscreteSpace(DomFunction func)
 	{
 		Vector vectorOfDoFs = Vector(HHO->nBoundaryFaces * HHO->nFaceUnknowns);
@@ -100,20 +89,6 @@ public:
 			}
 		);
 		return vectorOfDoFs;
-	}
-
-	Vector SolveBoundaryFaceMassMatrix(const Vector& v)
-	{
-		assert(v.rows() == HHO->nBoundaryFaces * HHO->nFaceUnknowns);
-		Vector res(v.rows());
-		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->BoundaryFaces, [this, &v, &res](Face<Dim>* f)
-			{
-				Diff_HHOFace<Dim>* face = HHOFace(f);
-				BigNumber i = (f->Number - HHO->nInteriorFaces) * HHO->nFaceUnknowns;
-
-				res.segment(i, HHO->nFaceUnknowns) = face->SolveMassMatrix(v.segment(i, HHO->nFaceUnknowns));
-			});
-		return res;
 	}
 
 	double IntegralOverBoundaryFromFaceCoeffs(const Vector& boundaryFaceCoeffs)

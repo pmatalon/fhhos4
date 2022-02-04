@@ -1,6 +1,7 @@
 #pragma once
 #include "Diffusion_HHO.h"
 #include "HigherOrderBoundary.h"
+#include "DiscreteSpaces/IDiscreteSpace.h"
 
 
 // --- Zero-mean condition (to enforce unicity of the solution)
@@ -24,16 +25,25 @@
 
 class ZeroMeanEnforcer
 {
-protected:
+private:
+	IDiscreteSpace* _discreteSpace = nullptr;
 	Vector _nipw1;
 	Vector _one;
+
 public:
+	ZeroMeanEnforcer() {}
+
+	ZeroMeanEnforcer(IDiscreteSpace* discreteSpace)
+	{
+		_discreteSpace = discreteSpace;
+	}
+
 	void Setup()
 	{
-		Vector ipw1 = BasisInnerProdWith1();
-		_one = SolveMassMatrix(ipw1);
+		Vector ipw1 = _discreteSpace->InnerProdWithBasis(Utils::ConstantFunctionOne);
+		_one = _discreteSpace->SolveMassMatrix(ipw1);
 		_nipw1 = std::move(ipw1);
-		_nipw1 /= OneScalOne();
+		_nipw1 /= _discreteSpace->Measure(); // (1|1) = measure
 	}
 
 	double OrthogonalityFactor(const Vector& x)
@@ -51,121 +61,5 @@ public:
 	bool Check(const Vector& x)
 	{
 		return abs(OrthogonalityFactor(x)) < Utils::Eps;
-	}
-protected:
-	// returns [(phi_i|1)]_i
-	virtual Vector BasisInnerProdWith1() = 0;
-	// returns M^-1 * x
-	virtual Vector SolveMassMatrix(const Vector& x) = 0;
-	// returns (1|1)
-	virtual double OneScalOne() = 0;
-};
-
-//------------------------------------------//
-// Reconstructed polynomial over the domain //
-//------------------------------------------//
-
-template<int Dim>
-class ZeroMeanEnforcerFromReconstructCoeffs : public ZeroMeanEnforcer
-{
-private:
-	Diffusion_HHO<Dim>* _discretePb;
-public:
-	ZeroMeanEnforcerFromReconstructCoeffs() {}
-	ZeroMeanEnforcerFromReconstructCoeffs(Diffusion_HHO<Dim>* discretePb) : _discretePb(discretePb) {}
-private:
-	Vector BasisInnerProdWith1() override
-	{
-		return _discretePb->InnerProdWithReconstructBasis(Utils::ConstantFunctionOne);
-	}
-	Vector SolveMassMatrix(const Vector& x) override
-	{
-		return _discretePb->SolveReconstructMassMatrix(x);
-	}
-	double OneScalOne() override
-	{
-		return _discretePb->_mesh->Measure();
-	}
-};
-
-
-//------------------------------//
-// Polynomial over the skeleton //
-//------------------------------//
-
-template<int Dim>
-class ZeroMeanEnforcerFromFaceCoeffs : public ZeroMeanEnforcer
-{
-private:
-	Diffusion_HHO<Dim>* _discretePb;
-public:
-	ZeroMeanEnforcerFromFaceCoeffs() {}
-	ZeroMeanEnforcerFromFaceCoeffs(Diffusion_HHO<Dim>* discretePb) : _discretePb(discretePb) {}
-private:
-	Vector BasisInnerProdWith1() override
-	{
-		return _discretePb->InnerProdWithFaceBasis(Utils::ConstantFunctionOne);
-	}
-	Vector SolveMassMatrix(const Vector& x) override
-	{
-		return _discretePb->SolveFaceMassMatrix(x);
-	}
-	double OneScalOne() override
-	{
-		return _discretePb->_mesh->SkeletonMeasure();
-	}
-};
-
-//----------------------------------------------//
-// Polynomial over the boundary (face unknowns) //
-//----------------------------------------------//
-
-template<int Dim>
-class ZeroMeanEnforcerFromBoundaryFaceCoeffs : public ZeroMeanEnforcer
-{
-private:
-	Diffusion_HHO<Dim>* _discretePb;
-public:
-	ZeroMeanEnforcerFromBoundaryFaceCoeffs() {}
-	ZeroMeanEnforcerFromBoundaryFaceCoeffs(Diffusion_HHO<Dim>* discretePb) : _discretePb(discretePb) {}
-private:
-	Vector BasisInnerProdWith1() override
-	{
-		return _discretePb->InnerProdWithBoundaryFaceBasis(Utils::ConstantFunctionOne);
-	}
-	Vector SolveMassMatrix(const Vector& x) override
-	{
-		return _discretePb->SolveBoundaryFaceMassMatrix(x);
-	}
-	double OneScalOne() override
-	{
-		return _discretePb->_mesh->BoundaryMeasure();
-	}
-};
-
-//---------------------------------------------------//
-// Trace on the boundary of reconstructed polynomial //
-//---------------------------------------------------//
-
-template<int Dim>
-class ZeroMeanEnforcerFromHigherOrderBoundary : public ZeroMeanEnforcer
-{
-private:
-	HigherOrderBoundary<Dim>* _discretePb;
-public:
-	ZeroMeanEnforcerFromHigherOrderBoundary() {}
-	ZeroMeanEnforcerFromHigherOrderBoundary(HigherOrderBoundary<Dim>* discretePb) : _discretePb(discretePb) {}
-private:
-	Vector BasisInnerProdWith1() override
-	{
-		return _discretePb->InnerProdWithBoundaryFaceBasis(Utils::ConstantFunctionOne);
-	}
-	Vector SolveMassMatrix(const Vector& x) override
-	{
-		return _discretePb->SolveBoundaryFaceMassMatrix(x);
-	}
-	double OneScalOne() override
-	{
-		return _discretePb->_mesh->BoundaryMeasure();
 	}
 };
