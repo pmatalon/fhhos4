@@ -72,18 +72,6 @@ public:
 private:
 	Vector CoefficientsOfFunctionOne() override
 	{
-		return _discretePb->ProjectOnFaceDiscreteSpace(Utils::ConstantFunctionOne);
+		return _discretePb->SkeletonSpace.Project(Utils::ConstantFunctionOne);
 	}
-	/*Vector BasisInnerProdWith1() override
-	{
-		return _discretePb->InnerProdWithFaceBasis(Utils::ConstantFunctionOne);
-	}
-	Vector SolveMassMatrix(const Vector& x) override
-	{
-		return _discretePb->SolveFaceMassMatrix(x);
-	}
-	double OneScalOne() override
-	{
-		return _discretePb->_mesh->SkeletonMeasure();
-	}*/
 };

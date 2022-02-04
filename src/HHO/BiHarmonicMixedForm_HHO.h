@@ -103,9 +103,9 @@ public:
 		double boundaryMeasure = _diffPb._mesh->BoundaryMeasure();
 		Vector theta;
 		if (_reconstructHigherOrderBoundary)
-			theta = -_integralSource / boundaryMeasure * _higherOrderBoundary.ProjectOnBoundaryDiscreteSpace(Utils::ConstantFunctionOne);
+			theta = -_integralSource / boundaryMeasure * _higherOrderBoundary.BoundarySpace.Project(Utils::ConstantFunctionOne);
 		else
-			theta = -_integralSource / boundaryMeasure * _diffPb.ProjectOnBoundaryDiscreteSpace(Utils::ConstantFunctionOne);
+			theta = -_integralSource / boundaryMeasure *              _diffPb.BoundarySpace.Project(Utils::ConstantFunctionOne);
 		return theta;
 	}
 
@@ -116,9 +116,9 @@ public:
 		// Check compatibility condition
 		double integralNeumann = 0;
 		if (_reconstructHigherOrderBoundary)
-			integralNeumann = _higherOrderBoundary.IntegralOverBoundaryFromFaceCoeffs(neumann);
+			integralNeumann = _higherOrderBoundary.BoundarySpace.Integral(neumann);
 		else
-			integralNeumann = _diffPb.IntegralOverBoundaryFromFaceCoeffs(neumann);
+			integralNeumann =              _diffPb.BoundarySpace.Integral(neumann);
 
 		assert(abs(_integralSource + integralNeumann) < Utils::Eps);
 #endif
@@ -186,7 +186,7 @@ public:
 	{
 #ifndef NDEBUG
 		// Check compatibility condition: (source|1) = 0
-		double integralSource = _diffPb.IntegralOverDomainFromReconstructedCoeffs(source);
+		double integralSource = _diffPb.ReconstructSpace.Integral(source);
 		assert(abs(integralSource) < Utils::Eps);
 		// Probably the same thing:
 		assert(_integralZeroOnDomain.Check(source));
@@ -228,9 +228,9 @@ public:
 	double L2InnerProdOnBoundary(const Vector& v1, const Vector& v2)
 	{
 		if (_reconstructHigherOrderBoundary)
-			return _higherOrderBoundary.L2InnerProdOnBoundary(v1, v2);
+			return _higherOrderBoundary.BoundarySpace.L2InnerProd(v1, v2);
 		else
-			return _diffPb.L2InnerProdOnBoundary(v1, v2);
+			return              _diffPb.BoundarySpace.L2InnerProd(v1, v2);
 		//return v1.dot(v2);
 	}
 

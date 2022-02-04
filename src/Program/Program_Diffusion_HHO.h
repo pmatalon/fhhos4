@@ -349,7 +349,7 @@ public:
 			{
 				if (testCase->ExactSolution)
 					cout << "Mean value of exact solution = " << problem->IntegralOverDomain(testCase->ExactSolution) << endl;
-				double meanValue = problem->MeanValueFromReconstructedCoeffs(reconstructedSolution);
+				double meanValue = problem->ReconstructSpace.MeanValue(reconstructedSolution);
 				cout << "Mean value = " << meanValue << endl;
 
 				if (abs(meanValue) > Utils::NumericalZero)
@@ -357,7 +357,7 @@ public:
 					ZeroMeanEnforcer integralZeroOnDomain(&problem->ReconstructSpace);
 					integralZeroOnDomain.Setup();
 					integralZeroOnDomain.Enforce(reconstructedSolution);
-					meanValue = problem->MeanValueFromReconstructedCoeffs(reconstructedSolution);
+					meanValue = problem->ReconstructSpace.MeanValue(reconstructedSolution);
 					cout << "Mean value = " << meanValue << " (after correction)" << endl;
 				}
 			}

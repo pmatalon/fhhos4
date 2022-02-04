@@ -37,6 +37,11 @@ public:
 	// Implementation of interface IDiscreteSpace //
 	//--------------------------------------------//
 
+	double Measure() override
+	{
+		return _mesh->BoundaryMeasure();
+	}
+
 	Vector InnerProdWithBasis(DomFunction func) override
 	{
 		Vector innerProds = Vector(HHO->nBoundaryFaces * HHO->nFaceUnknowns);
@@ -65,8 +70,63 @@ public:
 		return res;
 	}
 
-	double Measure() override
+	Vector Project(DomFunction func) override
 	{
-		return _mesh->BoundaryMeasure();
+		Vector vectorOfDoFs = Vector(HHO->nBoundaryFaces * HHO->nFaceUnknowns);
+		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->BoundaryFaces, [this, &vectorOfDoFs, func](Face<Dim>* f)
+			{
+				Diff_HHOFace<Dim>* face = HHOFace(f);
+				BigNumber i = (face->Number() - HHO->nInteriorFaces) * HHO->nFaceUnknowns;
+
+				vectorOfDoFs.segment(i, HHO->nFaceUnknowns) = face->ProjectOnBasis(func);
+			}
+		);
+		return vectorOfDoFs;
+	}
+
+	double L2InnerProd(const Vector& v1, const Vector& v2) override
+	{
+		assert(v1.rows() == HHO->nBoundaryFaces * HHO->nFaceUnknowns);
+		assert(v2.rows() == HHO->nBoundaryFaces * HHO->nFaceUnknowns);
+
+		struct ChunkResult { double total = 0; };
+
+		ParallelLoop<Face<Dim>*, ChunkResult> parallelLoop(_mesh->BoundaryFaces);
+		parallelLoop.Execute([this, &v1, &v2](Face<Dim>* f, ParallelChunk<ChunkResult>* chunk)
+			{
+				Diff_HHOFace<Dim>* face = HHOFace(f);
+				BigNumber i = (face->Number() - HHO->nInteriorFaces) * HHO->nFaceUnknowns;
+
+				chunk->Results.total += face->InnerProd(v1.segment(i, HHO->nFaceUnknowns), v2.segment(i, HHO->nFaceUnknowns));
+			});
+
+		double total = 0;
+		parallelLoop.AggregateChunkResults([&total](ChunkResult chunkResult)
+			{
+				total += chunkResult.total;
+			});
+		return total;
+	}
+
+	double Integral(const Vector& boundaryFaceCoeffs) override
+	{
+		assert(boundaryFaceCoeffs.rows() == HHO->nBoundaryFaces * HHO->nFaceUnknowns);
+
+		struct ChunkResult { double total = 0; };
+
+		ParallelLoop<Face<Dim>*, ChunkResult> parallelLoop(_mesh->BoundaryFaces);
+		parallelLoop.Execute([this, &boundaryFaceCoeffs](Face<Dim>* f, ParallelChunk<ChunkResult>* chunk)
+			{
+				Diff_HHOFace<Dim>* hhoFace = HHOFace(f);
+				auto i = (f->Number - HHO->nInteriorFaces) * HHO->nFaceUnknowns;
+				chunk->Results.total += hhoFace->Integral(boundaryFaceCoeffs.segment(i, HHO->nFaceUnknowns));
+			});
+
+		double total = 0;
+		parallelLoop.AggregateChunkResults([&total](ChunkResult chunkResult)
+			{
+				total += chunkResult.total;
+			});
+		return total;
 	}
 };

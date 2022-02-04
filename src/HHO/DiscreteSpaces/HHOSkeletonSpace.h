@@ -32,6 +32,11 @@ public:
 	// Implementation of interface IDiscreteSpace //
 	//--------------------------------------------//
 
+	double Measure() override
+	{
+		return _mesh->SkeletonMeasure();
+	}
+
 	Vector InnerProdWithBasis(DomFunction func) override
 	{
 		Vector innerProds = Vector(HHO->nTotalFaceUnknowns);
@@ -60,8 +65,46 @@ public:
 		return res;
 	}
 
-	double Measure() override
+	Vector Project(DomFunction func) override
 	{
-		return _mesh->SkeletonMeasure();
+		Vector vectorOfDoFs = Vector(HHO->nTotalFaceUnknowns);
+		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->Faces, [this, &vectorOfDoFs, func](Face<Dim>* f)
+			{
+				if (f->HasDirichletBC()) // CAREFUL: just the non-Dirichlet faces
+					return;
+				Diff_HHOFace<Dim>* face = HHOFace(f);
+				BigNumber i = face->Number() * HHO->nFaceUnknowns;
+
+				vectorOfDoFs.segment(i, HHO->nFaceUnknowns) = face->ProjectOnBasis(func);
+			}
+		);
+		return vectorOfDoFs;
+	}
+	
+	double L2InnerProd(const Vector& v1, const Vector& v2) override
+	{
+		Utils::FatalError("To be implemented");
+	}
+
+	double Integral(const Vector& faceCoeffs) override
+	{
+		assert(faceCoeffs.rows() == HHO->nFaces * HHO->nFaceUnknowns);
+
+		struct ChunkResult { double total = 0; };
+
+		ParallelLoop<Face<Dim>*, ChunkResult> parallelLoop(_mesh->Faces);
+		parallelLoop.Execute([this, &faceCoeffs](Face<Dim>* f, ParallelChunk<ChunkResult>* chunk)
+			{
+				Diff_HHOFace<Dim>* hhoFace = HHOFace(f);
+				auto i = f->Number * HHO->nFaceUnknowns;
+				chunk->Results.total += hhoFace->Integral(faceCoeffs.segment(i, HHO->nFaceUnknowns));
+			});
+
+		double total = 0;
+		parallelLoop.AggregateChunkResults([&total](ChunkResult chunkResult)
+			{
+				total += chunkResult.total;
+			});
+		return total;
 	}
 };

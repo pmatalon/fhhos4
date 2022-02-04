@@ -32,6 +32,11 @@ public:
 	// Implementation of interface IDiscreteSpace //
 	//--------------------------------------------//
 
+	double Measure() override
+	{
+		return _mesh->Measure();
+	}
+
 	Vector InnerProdWithBasis(DomFunction func) override
 	{
 		Vector innerProds = Vector(HHO->nTotalReconstructUnknowns);
@@ -59,9 +64,36 @@ public:
 			});
 		return res;
 	}
-
-	double Measure() override
+	
+	Vector Project(DomFunction func) override
 	{
-		return _mesh->Measure();
+		Utils::FatalError("To be implemented");
+	}
+
+	double L2InnerProd(const Vector& v1, const Vector& v2) override
+	{
+		Utils::FatalError("To be implemented");
+	}
+
+	double Integral(const Vector& reconstructedCoeffs) override
+	{
+		assert(reconstructedCoeffs.rows() == HHO->nTotalReconstructUnknowns);
+
+		struct ChunkResult { double total = 0; };
+
+		ParallelLoop<Element<Dim>*, ChunkResult> parallelLoop(_mesh->Elements);
+		parallelLoop.Execute([this, &reconstructedCoeffs](Element<Dim>* e, ParallelChunk<ChunkResult>* chunk)
+			{
+				Diff_HHOElement<Dim>* hhoElem = HHOElement(e);
+				auto i = e->Number * HHO->nReconstructUnknowns;
+				chunk->Results.total += hhoElem->IntegralReconstruct(reconstructedCoeffs.segment(i, HHO->nReconstructUnknowns));
+			});
+
+		double total = 0;
+		parallelLoop.AggregateChunkResults([&total](ChunkResult chunkResult)
+			{
+				total += chunkResult.total;
+			});
+		return total;
 	}
 };
