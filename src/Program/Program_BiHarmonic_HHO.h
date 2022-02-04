@@ -80,7 +80,7 @@ public:
 		Timer assemblyTimer;
 		assemblyTimer.Start();
 
-		biHarPb->AssembleDiffPb();
+		biHarPb->Setup();
 
 		if (args.Actions.EnforceDirichletBC)
 		{

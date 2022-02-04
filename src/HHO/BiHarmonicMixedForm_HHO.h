@@ -14,22 +14,24 @@ class BiHarmonicMixedForm_HHO
 private:
 	Mesh<Dim>* _mesh;
 	BiHarmonicTestCase<Dim>* _testCase;
+
 	bool _saveMatrixBlocks = true;
+	bool _reconstructHigherOrderBoundary = false;
 	bool _enforceDirichletBCInLastPb = true;
+
 	DiffusionField<Dim> _diffField;
 	VirtualDiffusionTestCase<Dim> _diffPbTestCase;
 	Diffusion_HHO<Dim> _diffPb;
 	Solver* _diffSolver = nullptr;
 
+	HigherOrderBoundary<Dim> _higherOrderBoundary;
+	HHOBoundarySpace<Dim>* _boundarySpace = nullptr;
+
 	ZeroMeanEnforcer _integralZeroOnDomain;
 	ZeroMeanEnforcer _integralZeroOnBoundary;
-	ZeroMeanEnforcer _integralZeroOnHigherOrderBoundary;
 	NumericImageEnforcerFromFaceCoeffs<Dim> _imageEnforcer;
 
-	HigherOrderBoundary<Dim> _higherOrderBoundary;
-
 	double _integralSource = 0;
-	bool _reconstructHigherOrderBoundary = false;
 public:
 	HHOParameters<Dim>* HHO;
 
@@ -53,7 +55,7 @@ public:
 		return _diffPb;
 	}
 
-	void AssembleDiffPb()
+	void Setup()
 	{
 		ActionsArguments diffActions;
 		diffActions.AssembleRightHandSide = false;
@@ -65,15 +67,13 @@ public:
 		{
 			_higherOrderBoundary = HigherOrderBoundary<Dim>(&_diffPb);
 			_higherOrderBoundary.Setup();
-
-			_integralZeroOnHigherOrderBoundary = ZeroMeanEnforcer(&_higherOrderBoundary.BoundarySpace);
-			_integralZeroOnHigherOrderBoundary.Setup();
+			_boundarySpace = &_higherOrderBoundary.BoundarySpace;
 		}
 		else
-		{
-			_integralZeroOnBoundary = ZeroMeanEnforcer(&_diffPb.BoundarySpace);
-			_integralZeroOnBoundary.Setup();
-		}
+			_boundarySpace = &_diffPb.BoundarySpace;
+
+		_integralZeroOnBoundary = ZeroMeanEnforcer(_boundarySpace);
+		_integralZeroOnBoundary.Setup();
 
 		_integralZeroOnDomain = ZeroMeanEnforcer(&_diffPb.ReconstructSpace);
 		_integralZeroOnDomain.Setup();
@@ -100,12 +100,7 @@ public:
 		// We define 
 		//       theta := -(source|1) / |\partial \Omega| * 1
 		// where |\partial \Omega| is the measure of the boundary.
-		double boundaryMeasure = _diffPb._mesh->BoundaryMeasure();
-		Vector theta;
-		if (_reconstructHigherOrderBoundary)
-			theta = -_integralSource / boundaryMeasure * _higherOrderBoundary.BoundarySpace.Project(Utils::ConstantFunctionOne);
-		else
-			theta = -_integralSource / boundaryMeasure *              _diffPb.BoundarySpace.Project(Utils::ConstantFunctionOne);
+		Vector theta = -_integralSource / _boundarySpace->Measure() * _boundarySpace->Project(Utils::ConstantFunctionOne);
 		return theta;
 	}
 
@@ -114,12 +109,7 @@ public:
 	{
 #ifndef NDEBUG
 		// Check compatibility condition
-		double integralNeumann = 0;
-		if (_reconstructHigherOrderBoundary)
-			integralNeumann = _higherOrderBoundary.BoundarySpace.Integral(neumann);
-		else
-			integralNeumann =              _diffPb.BoundarySpace.Integral(neumann);
-
+		double integralNeumann = _boundarySpace->Integral(neumann);
 		assert(abs(_integralSource + integralNeumann) < Utils::Eps);
 #endif
 		// Define problem
@@ -152,10 +142,7 @@ public:
 	{
 #ifndef NDEBUG
 		// Check compatibility condition
-		if (_reconstructHigherOrderBoundary)
-			assert(_integralZeroOnHigherOrderBoundary.Check(neumann));
-		else
-			assert(_integralZeroOnBoundary.Check(neumann));
+		assert(_integralZeroOnBoundary.Check(neumann));
 #endif
 		// Define problem
 		_diffPb.ChangeSourceFunctionToZero();
@@ -182,7 +169,7 @@ public:
 	}
 
 	// Solve problem 2 (f=<source>, Neum=0)
-	Vector Solve2ndDiffProblem(const Vector& source, bool boundaryOnly = false)
+	Vector Solve2ndDiffProblem(const Vector& source, bool returnBoundaryOnly = false)
 	{
 #ifndef NDEBUG
 		// Check compatibility condition: (source|1) = 0
@@ -201,21 +188,18 @@ public:
 		Vector faceSolution = _diffSolver->Solve(rhs);
 		CheckDiffSolverConvergence();
 
-		if (boundaryOnly)
+		if (returnBoundaryOnly)
 		{
+			Vector boundary;
 			if (_reconstructHigherOrderBoundary)
 			{
 				Vector reconstructedElemBoundary = _diffPb.ReconstructHigherOrderOnBoundaryOnly(faceSolution);
-				Vector boundary = _higherOrderBoundary.Trace(reconstructedElemBoundary);
-				_integralZeroOnHigherOrderBoundary.Enforce(boundary);
-				return boundary;
+				boundary = _higherOrderBoundary.Trace(reconstructedElemBoundary);
 			}
 			else
-			{
-				Vector boundary = faceSolution.tail(HHO->nBoundaryFaces * HHO->nFaceUnknowns); // keep only the boundary unknowns
-				_integralZeroOnBoundary.Enforce(boundary);
-				return boundary;
-			}
+				boundary = faceSolution.tail(HHO->nBoundaryFaces * HHO->nFaceUnknowns); // keep only the boundary unknowns
+			_integralZeroOnBoundary.Enforce(boundary);
+			return boundary;
 		}
 		else
 		{
@@ -227,10 +211,7 @@ public:
 
 	double L2InnerProdOnBoundary(const Vector& v1, const Vector& v2)
 	{
-		if (_reconstructHigherOrderBoundary)
-			return _higherOrderBoundary.BoundarySpace.L2InnerProd(v1, v2);
-		else
-			return              _diffPb.BoundarySpace.L2InnerProd(v1, v2);
+		return _boundarySpace->L2InnerProd(v1, v2);
 		//return v1.dot(v2);
 	}
 
