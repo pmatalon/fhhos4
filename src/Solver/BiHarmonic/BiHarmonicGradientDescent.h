@@ -7,12 +7,13 @@ template <int Dim>
 class BiHarmonicGradientDescent : public IterativeSolver
 {
 private:
-	BiHarmonicMixedForm_HHO<Dim>& _biHarPb;
+	BiHarmonicMixedForm_HHO<Dim>* _biHarPb;
 
 public:
-	BiHarmonicGradientDescent(BiHarmonicMixedForm_HHO<Dim>& biHarPb) :
-		_biHarPb(biHarPb)
-	{}
+	BiHarmonicGradientDescent(BiHarmonicMixedForm_HHO<Dim>* biHarPb)
+	{
+		_biHarPb = biHarPb;
+	}
 
 	virtual void Serialize(ostream& os) const override
 	{
@@ -25,15 +26,15 @@ public:
 
 		// Find initial theta verifying the compatibility condition
 		//               (source|1) + <theta|1> = 0
-		Vector theta = _biHarPb.FindCompatibleTheta();
+		Vector theta = _biHarPb->FindCompatibleTheta();
 
 		IterationResult result = CreateFirstIterationResult(Vector::Zero(theta.rows()), theta);
 
 		// Solve 1st problem (f=source, Neum=theta --> lambda s.t. (lambda|1)=0)
-		Vector lambda = _biHarPb.Solve1stDiffProblem(theta);
+		Vector lambda = _biHarPb->Solve1stDiffProblem(theta);
 
 		// Solve 2nd problem (f=lamda, Neum=0 --> r s.t. <r|1>=0) //
-		Vector r = _biHarPb.Solve2ndDiffProblem(lambda, true);
+		Vector r = _biHarPb->Solve2ndDiffProblem(lambda, true);
 
 		//--------------------//
 		//  Gradient descent  //
@@ -59,10 +60,10 @@ public:
 			theta -= step * r;
 
 			// Solve 1st problem (f=source, Neum=theta --> lambda s.t. (lambda|1)=0)
-			lambda = _biHarPb.Solve1stDiffProblem(theta);
+			lambda = _biHarPb->Solve1stDiffProblem(theta);
 
 			// Solve 2nd problem (f=lamda, Neum=0 --> r s.t. <r|1>=0) //
-			r = _biHarPb.Solve2ndDiffProblem(lambda, true);
+			r = _biHarPb->Solve2ndDiffProblem(lambda, true);
 
 			// Compute the step
 			Vector r_minus_r_old = r - r_old;
@@ -76,10 +77,10 @@ public:
 			theta += step * r;
 
 			// Solve 1st problem (f=source, Neum=theta --> lambda s.t. (lambda|1)=0)
-			Vector gamma = _biHarPb.Solve1stDiffProblemWithZeroSource(r);
+			Vector gamma = _biHarPb->Solve1stDiffProblemWithZeroSource(r);
 
 			// Solve 2nd problem (f=lamda, Neum=0 --> r s.t. <r|1>=0) //
-			Vector Ar = _biHarPb.Solve2ndDiffProblem(gamma+lambda, true);
+			Vector Ar = _biHarPb->Solve2ndDiffProblem(gamma+lambda, true);
 
 			// Compute the step
 			step = L2InnerProdOnBoundary(r, r) / L2InnerProdOnBoundary(r, Ar);
@@ -110,6 +111,6 @@ public:
 private:
 	double L2InnerProdOnBoundary(const Vector& v1, const Vector& v2)
 	{
-		return _biHarPb.L2InnerProdOnBoundary(v1, v2);
+		return _biHarPb->L2InnerProdOnBoundary(v1, v2);
 	}
 };

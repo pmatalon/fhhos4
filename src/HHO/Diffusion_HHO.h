@@ -940,6 +940,9 @@ public:
 		return Solve_A_T_T(B_T - A_T_ndF * faceCoeffs);
 	}
 
+	//-------------------------//
+	//     Source function     //
+	//-------------------------//
 
 	// Reassembles a new RHS corresponding to a discrete source function
 	void ChangeSourceFunction(const Vector& sourceFuncCoeffs)
@@ -964,6 +967,10 @@ public:
 		this->B_T = Vector::Zero(HHO->nTotalCellUnknowns);
 	}
 
+	//--------------------------//
+	//     Neumann function     //
+	//--------------------------//
+
 	void ChangeNeumannFunction(DomFunction neumannFunction)
 	{
 		this->B_ndF = std::move(AssembleNeumannTerm(neumannFunction));
@@ -980,6 +987,10 @@ public:
 	{
 		this->B_ndF = std::move(b_ndF);
 	}
+
+	//-------------------------//
+	//     Right-hand side     //
+	//-------------------------//
 
 	// Requires that the Dirichlet unknowns have already be eliminated (or that the Dirichlet BC is homogeneous)
 	Vector& SetCondensedRHS()

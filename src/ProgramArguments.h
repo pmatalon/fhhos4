@@ -13,6 +13,7 @@ struct ProblemArguments
 	double AnisotropyRatio = 1;
 	double AnisotropyAngle = 0; // in radians
 	string BCCode = "";
+	string Scheme = "g";
 };
 
 struct DiscretizationArguments

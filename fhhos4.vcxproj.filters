@@ -508,7 +508,7 @@
     <ClInclude Include="src\TestCases\BiHarmonic\2D\SquareBiHarTestCase.h">
       <Filter>TestCases\BiHarmonic\2D</Filter>
     </ClInclude>
-    <ClInclude Include="src\HHO\BiHarmonicMixedForm_HHO.h">
+    <ClInclude Include="src\HHO\BiHarmonicMixedFormFalk_HHO.h">
       <Filter>HHO</Filter>
     </ClInclude>
     <ClInclude Include="src\Solver\Krylov\BiHarmonicCG.h">
@@ -540,6 +540,12 @@
     </ClInclude>
     <ClInclude Include="src\HHO\DiscreteSpaces\HHOBoundarySpace.h">
       <Filter>HHO\DiscreteSpaces</Filter>
+    </ClInclude>
+    <ClInclude Include="src\HHO\BiHarmonicMixedFormGlowinski_HHO.h">
+      <Filter>HHO</Filter>
+    </ClInclude>
+    <ClInclude Include="src\HHO\BiHarmonicMixedForm_HHO.h">
+      <Filter>HHO</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

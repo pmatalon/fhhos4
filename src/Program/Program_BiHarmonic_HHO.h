@@ -1,7 +1,8 @@
 #pragma once
 #include <iomanip>
 #include "../ProgramArguments.h"
-#include "../HHO/BiHarmonicMixedForm_HHO.h"
+#include "../HHO/BiHarmonicMixedFormFalk_HHO.h"
+#include "../HHO/BiHarmonicMixedFormGlowinski_HHO.h"
 #include "../TestCases/BiHarmonic/BiHarTestCaseFactory.h"
 #include "../Mesher/MeshFactory.h"
 #include "../Solver/SolverFactory.h"
@@ -61,8 +62,18 @@ public:
 		//       Assembly       //
 		//----------------------//
 
-		auto FullNeumann = BoundaryConditions::HomogeneousNeumannEverywhere();
-		mesh->SetBoundaryConditions(&FullNeumann);
+		if (args.Problem.Scheme.compare("f") == 0)
+		{
+			auto FullNeumann = BoundaryConditions::HomogeneousNeumannEverywhere();
+			mesh->SetBoundaryConditions(&FullNeumann);
+		}
+		else if (args.Problem.Scheme.compare("g") == 0)
+		{
+			auto Dirichlet = BoundaryConditions::HomogeneousDirichletEverywhere();
+			mesh->SetBoundaryConditions(&Dirichlet);
+		}
+		else
+			Utils::FatalError("Unknown scheme '" + args.Problem.Scheme + "'. Check -sch parameter. Possible values are 'f' and 'g'.");
 
 		FunctionalBasis<Dim>* reconstructionBasis = new FunctionalBasis<Dim>(args.Discretization.ElemBasisCode, args.Discretization.PolyDegree, args.Discretization.UsePolynomialSpaceQ);
 		FunctionalBasis<Dim>* cellBasis = new FunctionalBasis<Dim>(args.Discretization.ElemBasisCode, args.Discretization.PolyDegree - 1, args.Discretization.UsePolynomialSpaceQ);
@@ -71,7 +82,13 @@ public:
 		HHOParameters<Dim>* hho = new HHOParameters<Dim>(mesh, args.Discretization.Stabilization, reconstructionBasis, cellBasis, faceBasis, args.Discretization.OrthogonalizeElemBasesCode, args.Discretization.OrthogonalizeFaceBasesCode);
 
 		bool saveMatrixBlocks = args.Solver.SolverCode.compare("uamg") == 0 || args.Solver.SolverCode.compare("fcguamg") == 0;
-		BiHarmonicMixedForm_HHO<Dim>* biHarPb = new BiHarmonicMixedForm_HHO<Dim>(mesh, testCase, hho, args.Solver.BiHarReconstructBoundary, args.Actions.EnforceDirichletBC, saveMatrixBlocks);
+		BiHarmonicMixedForm_HHO<Dim>* biHarPb;
+		if (args.Problem.Scheme.compare("f") == 0)
+			biHarPb = new BiHarmonicMixedFormFalk_HHO<Dim>(mesh, testCase, hho, args.Solver.BiHarReconstructBoundary, args.Actions.EnforceDirichletBC, saveMatrixBlocks);
+		else if (args.Problem.Scheme.compare("g") == 0)
+			biHarPb = new BiHarmonicMixedFormGlowinski_HHO<Dim>(mesh, testCase, hho, args.Solver.BiHarReconstructBoundary, saveMatrixBlocks);
+		else
+			Utils::FatalError("Unknown scheme '" + args.Problem.Scheme + "'. Check -sch parameter. Possible values are 'f' and 'g'.");
 
 		cout << endl;
 		cout << "------------------------------------------------------" << endl;
@@ -82,12 +99,14 @@ public:
 
 		biHarPb->Setup();
 
-		if (args.Actions.EnforceDirichletBC)
+		if (args.Problem.Scheme.compare("f") == 0 && args.Actions.EnforceDirichletBC)
 		{
 			Mesh<Dim>* meshLast = MeshFactory<Dim>::BuildMesh(args, testCase);
 			if (args.Discretization.Mesher.compare("gmsh") == 0)
 				GMSHMesh<Dim>::CloseGMSH();
-			biHarPb->SetupLastPb(meshLast);
+
+			BiHarmonicMixedFormFalk_HHO<Dim>* falkScheme = static_cast<BiHarmonicMixedFormFalk_HHO<Dim>*>(biHarPb);
+			falkScheme->SetupLastPb(meshLast);
 		}
 
 		assemblyTimer.Stop();
@@ -136,13 +155,16 @@ public:
 			biHarPb->SetDiffSolver(diffSolver);
 
 
-			if (args.Actions.EnforceDirichletBC)
+			if (args.Problem.Scheme.compare("f") == 0 && args.Actions.EnforceDirichletBC)
 			{
 				cout << "Enforce Dirichlet BC to the solution, so setup of last solver..." << endl << endl;
 
-				Solver* lastSolver = SolverFactory<Dim>::CreateSolver(args, biHarPb->LastPb(), blockSizeForBlockSolver, out);
-				lastSolver->Setup(biHarPb->LastPb()->A);
-				biHarPb->SetLastPbSolver(lastSolver);
+				BiHarmonicMixedFormFalk_HHO<Dim>* falkScheme = static_cast<BiHarmonicMixedFormFalk_HHO<Dim>*>(biHarPb);
+
+				Solver* lastSolver = SolverFactory<Dim>::CreateSolver(args, falkScheme->LastPb(), blockSizeForBlockSolver, out);
+				lastSolver->Setup(falkScheme->LastPb()->A);
+
+				falkScheme->SetLastPbSolver(lastSolver);
 			}
 
 
@@ -152,9 +174,9 @@ public:
 
 			IterativeSolver* biHarSolver = nullptr;
 			if (args.Solver.BiHarmonicSolverCode.compare("cg") == 0)
-				biHarSolver = new BiHarmonicCG<Dim>(*biHarPb);
+				biHarSolver = new BiHarmonicCG<Dim>(biHarPb);
 			else if (args.Solver.BiHarmonicSolverCode.compare("gd") == 0)
-				biHarSolver = new BiHarmonicGradientDescent<Dim>(*biHarPb);
+				biHarSolver = new BiHarmonicGradientDescent<Dim>(biHarPb);
 			else
 				Utils::FatalError("Unknown bi-harmonic solver '" + args.Solver.BiHarmonicSolverCode + "'");
 
