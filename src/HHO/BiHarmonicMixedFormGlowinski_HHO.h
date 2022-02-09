@@ -129,7 +129,7 @@ public:
 			Vector boundary;
 			if (_reconstructHigherOrderBoundary)
 			{
-				Vector reconstructedElemBoundary = _diffPb.ReconstructHigherOrderOnBoundaryOnly(faceSolution);
+				Vector reconstructedElemBoundary;// = _diffPb.ReconstructHigherOrderOnBoundaryOnly(faceSolution);
 				boundary = _higherOrderBoundary.Trace(reconstructedElemBoundary);
 			}
 			else

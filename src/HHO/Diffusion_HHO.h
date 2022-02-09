@@ -32,10 +32,11 @@ public:
 	HHOReconstructSpace<Dim> ReconstructSpace;
 	HHOBoundarySpace<Dim> BoundarySpace;
 
-	// Matrix parts
-	SparseMatrix A_T_T;
-	SparseMatrix A_T_ndF; // used to reconstruct the the higher-order approximation after solving the linear system
-	SparseMatrix A_ndF_ndF;
+	// Matrix parts:
+	// Used in reconstruction: A_T_ndF
+	// Used in right-hand side: A_T_dF, A_ndF_dF
+	SparseMatrix A_T_T, A_T_ndF,   A_T_dF;
+	SparseMatrix        A_ndF_ndF, A_ndF_dF;
 private:
 	// Solution on the Dirichlet faces
 	Vector x_dF;
@@ -276,34 +277,34 @@ public:
 		}
 
 		// Notations:
-		//
-		//  [  A_T_T  |          A_T_F          ] [ x_T ]       [ B_T ]
-		//  [ --------|------------------------ ] [-----]       [-----]
-		//  [         |                         ] [     ]    =  [     ]
-		//  [  <sym>  |          A_F_F          ] [ x_F ]       [  0  ]
-		//  [         |                         ] [     ]       [     ]
+		// 
+		//  [  A_T_T  |          A_T_F          ] [ x_T ]       [ b_source ]
+		//  [ --------|------------------------ ] [-----]       [----------]
+		//  [         |                         ] [     ]    =  [          ]
+		//  [  <sym>  |          A_F_F          ] [ x_F ]       [ b_F      ]
+		//  [         |                         ] [     ]       [          ]
 		//
 		//                       <=>             (the faces are split into non-Dirichlet faces (ndF) and Dirichlet faces (dF))
 		//
-		//  [  A_T_T  |  A_T_ndF   |  A_T_dF    ] [ x_T   ]     [ B_T   ]
-		//  [ --------|------------|----------- ] [-------]     [-------]
-		//  [  <sym>  |  A_ndF_ndF |  A_ndF_dF  ] [ x_ndF ]  =  [ B_ndF ]
-		//  [ --------|------------|----------- ] [-------]     [-------]
-		//  [  <sym>  |   <sym>    |  A_dF_dF   ] [ x_dF  ]     [   0   ]
+		//  [  A_T_T  |  A_T_ndF   |  A_T_dF    ] [ x_T   ]     [ b_source  ]
+		//  [ --------|------------|----------- ] [-------]     [-----------]
+		//  [  <sym>  |  A_ndF_ndF |  A_ndF_dF  ] [ x_ndF ]  =  [ b_neumann ]
+		//  [ --------|------------|----------- ] [-------]     [-----------]
+		//  [  <sym>  |   <sym>    |  A_dF_dF   ] [ x_dF  ]     [     0     ]
 		// 
-		//                                                               [    0    ]   <---- interior faces
-		//                                                 where B_ndF = [---------]
-		//                                                               [ B_neumF ]   <---- Neumann faces
+		//                                                                   [  0   ]   <---- interior faces
+		//                                                 where b_neumann = [------]
+		//                                                                   [ neum ]   <---- Neumann faces
 		//
 		// As x_dF is known, it can be passed to the right-hand side (method by elimination of the Dirichlet conditions):
 		//
-		//               [  A_T_T  |  A_T_ndF   ] [ x_T   ]     [ B_T   ]       [ A_T_dF   * x_dF ]
-		//               [ --------|----------- ] [-------]  =  [-------]   -   [-----------------]
-		//               [   sym   |  A_ndF_ndF ] [ x_ndF ]     [ B_ndF ]       [ A_ndF_dF * x_dF ]
-		//                                                     |___________________________________|
-		//                                                                       |
+		//               [  A_T_T  |  A_T_ndF   ] [ x_T   ]     [ b_source  ]       [ A_T_dF   * x_dF ]
+		//               [ --------|----------- ] [-------]  =  [-----------]   -   [-----------------]
+		//               [   sym   |  A_ndF_ndF ] [ x_ndF ]     [ b_neumann ]       [ A_ndF_dF * x_dF ]
+		//                                                     |_____________________________________|
+		//                                                                       =
 		//                                                                   [ B_T   ]
-		//                                                              new  [-------]
+		//                                                                   [-------]
 		//                                                                   [ B_ndF ]
 		//
 		// Static condensation:
@@ -499,7 +500,6 @@ public:
 					reconstructionCoeffs.Add(chunkResult.ReconstructionCoeffs);
 				}
 			});
-		//std::this_thread::sleep_for(std::chrono::seconds(5));
 
 		//-------------------------------------//
 		//    Assembly of the sparse matrix    //
@@ -525,6 +525,8 @@ public:
 		A_T_F_Coeffs = A_T_F_Block<Dim>();
 
 		this->A_T_ndF = A_T_F.topLeftCorner(HHO->nTotalCellUnknowns, HHO->nTotalFaceUnknowns); // save this part for the reconstruction
+		this->A_T_dF  = A_T_F.topRightCorner(HHO->nTotalCellUnknowns, HHO->nDirichletCoeffs);
+		Utils::Empty(A_T_F);
 		
 		if (actions.LogAssembly)
 			cout << "\tReserve memory for the block A_F_F (allocation of " + Utils::MemoryString(Utils::SparseMatrixMemoryUsage(A_F_F_Coeffs.Size())) + " for " + to_string(A_F_F_Coeffs.Size()) + " non-zeroes)" << endl;
@@ -539,6 +541,7 @@ public:
 			cout << "\tFree vector of non-zero coefficients (" + Utils::MemoryString(Utils::SparseMatrixMemoryUsage(A_F_F_Coeffs.Size())) + ")" << endl;
 		A_F_F_Coeffs = A_F_F_Block<Dim>();
 
+		this->A_ndF_dF = A_F_F.topRightCorner(HHO->nTotalFaceUnknowns, HHO->nDirichletCoeffs);
 
 		//-----------------//
 		// Right-hand side //
@@ -546,18 +549,13 @@ public:
 
 		if (actions.AssembleRightHandSide)
 		{
-			this->B_T   = std::move(AssembleSourceTerm(TestCase->SourceFunction));
-			this->x_dF  = std::move(AssembleDirichletUnknowns(TestCase->BC.DirichletFunction));
-			this->B_ndF = std::move(AssembleNeumannTerm(TestCase->BC.NeumannFunction));
+			Vector b_source = AssembleSourceTerm(TestCase->SourceFunction);
+			this->x_dF  = std::move(AssembleDirichletTerm(TestCase->BC.DirichletFunction));
+			Vector b_neumann = AssembleNeumannTerm(TestCase->BC.NeumannFunction);
 
-
-			// Update the right-hand side (elimination of the Dirichlet unknowns x_dF from the system)
-			SparseMatrix A_ndF_dF = A_F_F.topRightCorner(HHO->nTotalFaceUnknowns, HHO->nDirichletCoeffs);
-			SparseMatrix A_T_dF   = A_T_F.topRightCorner(HHO->nTotalCellUnknowns, HHO->nDirichletCoeffs);
-			Utils::Empty(A_T_F);
-
-			this->B_T   -= A_T_dF   * this->x_dF; // save for reconstruction
-			this->B_ndF -= A_ndF_dF * this->x_dF; // not used in the reconstruction, no need to save it
+			// Elimination of the Dirichlet unknowns x_dF from the system
+			this->B_T   = ComputeB_T  (b_source,  this->x_dF); // b_source  - A_T_dF   * this->x_dF; // save for reconstruction
+			this->B_ndF = ComputeB_ndF(b_neumann, this->x_dF); // b_neumann - A_ndF_dF * this->x_dF;
 		}		
 
 		//---------------------//
@@ -577,8 +575,7 @@ public:
 			this->A = (A_ndF_ndF - tmp).pruned();
 
 			if (actions.AssembleRightHandSide)
-				// Right-hand side of the condensed system
-				this->b = B_ndF - A_T_ndF.transpose() * Solve_A_T_T(B_T);
+				this->b = CondensedRHS(B_T, B_ndF); // B_ndF - A_T_ndF.transpose() * Solve_A_T_T(B_T);
 		}
 		else
 		{
@@ -608,7 +605,11 @@ public:
 		{
 			// We won't be reconstructing the solution, so no need to keep those
 			if (Utils::ProgramArgs.Problem.Equation != EquationType::BiHarmonic)
-				Utils::Empty(this->A_T_ndF); // this is needed to build the right-hand side separately
+			{
+				// Needed to build the right-hand side separately
+				Utils::Empty(this->A_T_dF);
+				Utils::Empty(this->A_ndF_dF);
+			}
 			Utils::Empty(this->B_T);
 			Utils::Empty(this->B_ndF);
 			Utils::Empty(this->x_dF);
@@ -751,54 +752,57 @@ public:
 		this->_hhoFaces.clear();
 	}
 
+	//------------------------------//
+	//   Assemble right-hand side   //
+	//------------------------------//
 
 	Vector AssembleSourceTerm(DomFunction sourceFunction)
 	{
-		Vector b_T = Vector(HHO->nTotalCellUnknowns);
-		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, &b_T, &sourceFunction](Element<Dim>* e)
+		Vector b_source = Vector(HHO->nTotalCellUnknowns);
+		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, &b_source, &sourceFunction](Element<Dim>* e)
 			{
 				Diff_HHOElement<Dim>* element = HHOElement(e);
 				for (BasisFunction<Dim>* cellPhi : element->CellBasis->LocalFunctions)
 				{
 					BigNumber i = DOFNumber(element, cellPhi);
-					b_T(i) = element->SourceTerm(cellPhi, sourceFunction);
+					b_source(i) = element->SourceTerm(cellPhi, sourceFunction);
 				}
 			}
 		);
-		return b_T;
+		return b_source;
 	}
 
 	Vector AssembleSourceTerm(const Vector& sourceFuncCoeffs)
 	{
 		ElementParallelLoop<Dim> parallelLoop(this->_mesh->Elements);
-		Vector b_T = Vector(HHO->nTotalCellUnknowns);
+		Vector b_source = Vector(HHO->nTotalCellUnknowns);
 
 		if (sourceFuncCoeffs.rows() == HHO->nTotalCellUnknowns) // degree k
 		{
-			parallelLoop.Execute([this, &sourceFuncCoeffs, &b_T](Element<Dim>* e)
+			parallelLoop.Execute([this, &sourceFuncCoeffs, &b_source](Element<Dim>* e)
 				{
 					Diff_HHOElement<Dim>* element = this->HHOElement(e);
-					b_T.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns) = element->ApplyCellMassMatrix(sourceFuncCoeffs.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns));
+					b_source.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns) = element->ApplyCellMassMatrix(sourceFuncCoeffs.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns));
 				}
 			);
 		}
 		else if (sourceFuncCoeffs.rows() == HHO->nTotalReconstructUnknowns) // degree k+1
 		{
-			parallelLoop.Execute([this, &sourceFuncCoeffs, &b_T](Element<Dim>* e)
+			parallelLoop.Execute([this, &sourceFuncCoeffs, &b_source](Element<Dim>* e)
 				{
 					Diff_HHOElement<Dim>* element = this->HHOElement(e);
-					b_T.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns) = element->ApplyCellReconstructMassMatrix(sourceFuncCoeffs.segment(e->Number * HHO->nReconstructUnknowns, HHO->nReconstructUnknowns));
+					b_source.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns) = element->ApplyCellReconstructMassMatrix(sourceFuncCoeffs.segment(e->Number * HHO->nReconstructUnknowns, HHO->nReconstructUnknowns));
 				}
 			);
 		}
 		else
 			Utils::FatalError("the argument sourceFuncCoeffs does not have a correct size");
 
-		return b_T;
+		return b_source;
 	}
 
 	// Solution on the Dirichlet faces
-	Vector AssembleDirichletUnknowns(DomFunction dirichletFunction)
+	Vector AssembleDirichletTerm(DomFunction dirichletFunction)
 	{
 		Vector x_dF = Vector(HHO->nDirichletCoeffs);
 		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->DirichletFaces, [this, &x_dF, &dirichletFunction](Face<Dim>* f)
@@ -812,28 +816,28 @@ public:
 	}
 
 	//         [    0    ]   <---- interior faces
-	// b_ndF = [---------]
+	// returns [---------]
 	//         [ b_neumF ]   <---- Neumann faces
 	// 
 	// where b_neumF = [ (neumannFunc|phi_i)_F ]
 	Vector AssembleNeumannTerm(DomFunction neumannFunction)
 	{
-		Vector b_ndF = Vector::Zero(HHO->nTotalFaceUnknowns);
+		Vector b_neumann = Vector::Zero(HHO->nTotalFaceUnknowns);
 		//this->B_neumF = Vector(HHO->nNeumannUnknowns);
-		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->NeumannFaces, [this, &b_ndF, &neumannFunction](Face<Dim>* f)
+		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->NeumannFaces, [this, &b_neumann, &neumannFunction](Face<Dim>* f)
 			{
 				Diff_HHOFace<Dim>* face = HHOFace(f);
 				BigNumber i = FirstDOFGlobalNumber(face) - HHO->nTotalCellUnknowns;
-				b_ndF.segment(i, HHO->nFaceUnknowns) = face->InnerProductWithBasis(neumannFunction);
+				b_neumann.segment(i, HHO->nFaceUnknowns) = face->InnerProductWithBasis(neumannFunction);
 				//BigNumber i = FirstDOFGlobalNumber(face) - HHO->nTotalCellUnknowns - HHO->nInteriorFaces*HHO->nFaceUnknowns;
 				//this->B_neumF.segment(i, HHO->nFaceUnknowns) = face->InnerProductWithBasis(neumannFunction);
 			}
 		);
-		return b_ndF;
+		return b_neumann;
 	}
 
 	//         [    0    ]   <---- interior faces
-	// b_ndF = [---------]
+	// returns [---------]
 	//         [ b_neumF ]   <---- Neumann faces
 	// 
 	// where b_neumF = [ M * coeffs ]
@@ -842,18 +846,18 @@ public:
 		assert(neumannFuncCoeffs.rows() == HHO->nNeumannUnknowns);
 		assert(neumannFuncCoeffs.rows() == this->_mesh->NeumannFaces.size() * HHO->nFaceUnknowns);
 
-		Vector b_ndF = Vector::Zero(HHO->nTotalFaceUnknowns);
-		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->NeumannFaces, [this, &b_ndF, &neumannFuncCoeffs](Face<Dim>* f)
+		Vector b_neumann = Vector::Zero(HHO->nTotalFaceUnknowns);
+		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->NeumannFaces, [this, &b_neumann, &neumannFuncCoeffs](Face<Dim>* f)
 			{
 				Diff_HHOFace<Dim>* face = HHOFace(f);
 				//BigNumber i = FirstDOFGlobalNumber(face) - HHO->nTotalCellUnknowns;
 				BigNumber i = face->Number() * HHO->nFaceUnknowns;
 				assert(i >= HHO->nInteriorFaces * HHO->nFaceUnknowns);
 				BigNumber j = (face->Number() - HHO->nInteriorFaces) * HHO->nFaceUnknowns;
-				b_ndF.segment(i, HHO->nFaceUnknowns) = face->ApplyMassMatrix(neumannFuncCoeffs.segment(j, HHO->nFaceUnknowns));
+				b_neumann.segment(i, HHO->nFaceUnknowns) = face->ApplyMassMatrix(neumannFuncCoeffs.segment(j, HHO->nFaceUnknowns));
 			}
 		);
-		return b_ndF;
+		return b_neumann;
 	}
 
 	//-------------------------------------------------------------------------------------------------//
@@ -862,12 +866,18 @@ public:
 
 	Vector HybridCoeffsBySolvingCellUnknowns(const Vector& faceUnknowns)
 	{
+		return HybridCoeffsBySolvingCellUnknowns(faceUnknowns, this->x_dF, this->B_T);
+	}
+
+	Vector HybridCoeffsBySolvingCellUnknowns(const Vector& faceUnknowns, const Vector& dirichletCoeffs, const Vector& b_T)
+	{
 		assert(faceUnknowns.rows() == HHO->nTotalFaceUnknowns);
+		assert(dirichletCoeffs.rows() == HHO->nDirichletCoeffs);
 
 		Vector hybridCoeffs = Vector(HHO->nTotalHybridCoeffs);
-		hybridCoeffs.head(HHO->nTotalCellUnknowns) = SolveCellUnknowns(faceUnknowns);
+		hybridCoeffs.head(HHO->nTotalCellUnknowns) = SolveCellUnknowns(faceUnknowns, b_T);
 		hybridCoeffs.segment(HHO->nTotalCellUnknowns, HHO->nTotalFaceUnknowns) = faceUnknowns;
-		hybridCoeffs.tail(HHO->nDirichletCoeffs) = this->x_dF; // Dirichlet boundary conditions
+		hybridCoeffs.tail(HHO->nDirichletCoeffs) = dirichletCoeffs; // Dirichlet boundary conditions
 
 		return hybridCoeffs;
 	}
@@ -886,6 +896,12 @@ public:
 	Vector ReconstructHigherOrderApproximationFromFaceCoeffs(const Vector& faceUnknowns)
 	{
 		Vector hybridCoeffs = HybridCoeffsBySolvingCellUnknowns(faceUnknowns);
+		return ReconstructHigherOrderApproximationFromHybridCoeffs(hybridCoeffs);
+	}
+
+	Vector ReconstructHigherOrderApproximationFromFaceCoeffs(const Vector& faceUnknowns, const Vector& dirichletCoeffs, const Vector& b_T)
+	{
+		Vector hybridCoeffs = HybridCoeffsBySolvingCellUnknowns(faceUnknowns, dirichletCoeffs, b_T);
 		return ReconstructHigherOrderApproximationFromHybridCoeffs(hybridCoeffs);
 	}
 
@@ -909,21 +925,22 @@ public:
 		return reconstruction;
 	}
 
-	Vector ReconstructHigherOrderOnBoundaryOnly(const Vector& faceUnknowns)
+	// TODO add dirichletCoeffs
+	Vector ReconstructHigherOrderOnBoundaryOnly(const Vector& faceUnknowns, const Vector& b_T)
 	{
-		Vector b_T = B_T - A_T_ndF * faceUnknowns;
+		Vector v = b_T - A_T_ndF * faceUnknowns;
 
 		Vector reconstruction(_mesh->NBoundaryElements() * HHO->nReconstructUnknowns);
 
 		ElementParallelLoop<Dim> parallelLoop(this->_mesh->Elements);
-		parallelLoop.Execute([this, &faceUnknowns , &b_T, &reconstruction](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+		parallelLoop.Execute([this, &faceUnknowns , &v, &reconstruction](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
 			{
 				if (e->IsOnBoundary())
 				{
 					Diff_HHOElement<Dim>* element = HHOElement(e);
 
 					Vector localHybrid(HHO->nCellUnknowns + HHO->nFaceUnknowns * e->Faces.size());
-					localHybrid.head(HHO->nCellUnknowns) = element->AttSolver.solve(b_T.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns));
+					localHybrid.head(HHO->nCellUnknowns) = element->AttSolver.solve(v.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns));
 					for (auto face : element->Faces)
 						localHybrid.segment(element->FirstDOFNumber(face), HHO->nFaceUnknowns) = faceUnknowns.segment(face->Number() * HHO->nFaceUnknowns, HHO->nFaceUnknowns);
 
@@ -934,19 +951,23 @@ public:
 		return reconstruction;
 	}
 
-	Vector SolveCellUnknowns(const Vector& faceCoeffs)
+	Vector SolveCellUnknowns(const Vector& faceUnknowns, const Vector& b_T)
 	{
-		assert(faceCoeffs.rows() == HHO->nTotalFaceUnknowns);
-		return Solve_A_T_T(B_T - A_T_ndF * faceCoeffs);
+		assert(faceUnknowns.rows() == HHO->nTotalFaceUnknowns);
+		assert(b_T.rows() == HHO->nTotalCellUnknowns);
+
+		return Solve_A_T_T(b_T - A_T_ndF * faceUnknowns);
 	}
 
 	//-------------------------//
 	//     Source function     //
 	//-------------------------//
 
-	// Reassembles a new RHS corresponding to a discrete source function
+	// Reassembles B_T w.r.t. to a discrete source function
 	void ChangeSourceFunction(const Vector& sourceFuncCoeffs)
 	{
+		assert(this->x_dF.rows() == 0 || this->x_dF.isZero(0));
+
 		this->B_T = std::move(AssembleSourceTerm(sourceFuncCoeffs));
 		
 		// Elimination of Dirichlet unknowns (here 0 (so far), but non-homogeneous Dirichlet BC must be managed!)
@@ -958,12 +979,18 @@ public:
 		this->B_ndF -= A_ndF_dF * this->x_dF;
 		*/
 	}
+
+	// Reassembles B_T w.r.t. to a continuous source function
 	void ChangeSourceFunction(DomFunction sourceFunction)
 	{
+		assert(this->x_dF.rows() == 0 || this->x_dF.isZero(0));
+
 		this->B_T = std::move(AssembleSourceTerm(sourceFunction));
 	}
 	void ChangeSourceFunctionToZero()
 	{
+		assert(this->x_dF.rows() == 0 || this->x_dF.isZero(0));
+
 		this->B_T = Vector::Zero(HHO->nTotalCellUnknowns);
 	}
 
@@ -973,17 +1000,23 @@ public:
 
 	void ChangeNeumannFunction(DomFunction neumannFunction)
 	{
+		assert(this->x_dF.rows() == 0 || this->x_dF.isZero(0));
+
 		this->B_ndF = std::move(AssembleNeumannTerm(neumannFunction));
 	}
 	void ChangeNeumannFunction(const Vector& neumannFuncCoeffs)
 	{
+		assert(this->x_dF.rows() == 0 || this->x_dF.isZero(0));
+
 		this->B_ndF = std::move(AssembleNeumannTerm(neumannFuncCoeffs));
 	}
 	void ChangeNeumannFunctionToZero()
 	{
+		assert(this->x_dF.rows() == 0 || this->x_dF.isZero(0));
+
 		this->B_ndF = Vector::Zero(HHO->nTotalFaceUnknowns);
 	}
-	void SetNeumannTerm(Vector& b_ndF)
+	void SetB_ndF(Vector& b_ndF)
 	{
 		this->B_ndF = std::move(b_ndF);
 	}
@@ -991,6 +1024,16 @@ public:
 	//-------------------------//
 	//     Right-hand side     //
 	//-------------------------//
+
+	Vector ComputeB_T(const Vector& b_source, const Vector& x_dF)
+	{
+		return b_source - A_T_dF * x_dF;
+	}
+
+	Vector ComputeB_ndF(const Vector& b_neumann, const Vector& x_dF)
+	{
+		return b_neumann - A_ndF_dF * x_dF;
+	}
 
 	// Requires that the Dirichlet unknowns have already be eliminated (or that the Dirichlet BC is homogeneous)
 	Vector& SetCondensedRHS()
@@ -1000,8 +1043,11 @@ public:
 	}
 
 	// Requires that the Dirichlet unknowns have already be eliminated (or that the Dirichlet BC is homogeneous)
-	Vector ComputeCondensedRHS(const Vector& b_ndF, const Vector& b_T)
+	Vector CondensedRHS(const Vector& b_T, const Vector& b_ndF)
 	{
+		assert(b_T.rows() == HHO->nTotalCellUnknowns);
+		assert(b_ndF.rows() == HHO->nTotalFaceUnknowns);
+
 		return b_ndF - this->A_T_ndF.transpose() * Solve_A_T_T(b_T);
 	}
 

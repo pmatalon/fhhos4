@@ -102,15 +102,9 @@ public:
 		assert(abs(_integralSource + integralNeumann) < Utils::Eps);
 #endif
 		// Define problem
-		_diffPb.ChangeSourceFunction(_testCase->SourceFunction);
-		if (_reconstructHigherOrderBoundary)
-		{
-			Vector b_ndF = _higherOrderBoundary.AssembleNeumannTerm(neumann);
-			_diffPb.SetNeumannTerm(b_ndF);
-		}
-		else
-			_diffPb.ChangeNeumannFunction(neumann);
-		Vector& rhs = _diffPb.SetCondensedRHS();
+		Vector b_source = _diffPb.AssembleSourceTerm(_testCase->SourceFunction);
+		Vector b_neumann = _reconstructHigherOrderBoundary ? _higherOrderBoundary.AssembleNeumannTerm(neumann) : _diffPb.AssembleNeumannTerm(neumann);
+		Vector rhs = _diffPb.CondensedRHS(b_source, b_neumann);
 
 		// Solve
 		_imageEnforcer.ProjectOntoImage(rhs); // enforce numerical compatibility
@@ -118,7 +112,7 @@ public:
 		this->CheckDiffSolverConvergence();
 
 		// Reconstruct the higher-order polynomial
-		Vector lambda = _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution);
+		Vector lambda = _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, Vector(), b_source);
 
 		// Even if the mean value is 0 on the faces, the mean value of the reconstructed polynomial is not necessarily 0,
 		// so we enforce it:
@@ -134,15 +128,9 @@ public:
 		assert(_integralZeroOnBoundary.Check(neumann));
 #endif
 		// Define problem
-		_diffPb.ChangeSourceFunctionToZero();
-		if (_reconstructHigherOrderBoundary)
-		{
-			Vector b_ndF = _higherOrderBoundary.AssembleNeumannTerm(neumann);
-			_diffPb.SetNeumannTerm(b_ndF);
-		}
-		else
-			_diffPb.ChangeNeumannFunction(neumann);
-		Vector& rhs = _diffPb.SetCondensedRHS();
+		Vector b_source = Vector::Zero(HHO->nTotalCellUnknowns);
+		Vector b_neumann = _reconstructHigherOrderBoundary ? _higherOrderBoundary.AssembleNeumannTerm(neumann) : _diffPb.AssembleNeumannTerm(neumann);
+		Vector& rhs = b_neumann;
 
 		// Solve
 		_imageEnforcer.ProjectOntoImage(rhs); // enforce numerical compatibility
@@ -150,7 +138,7 @@ public:
 		this->CheckDiffSolverConvergence();
 
 		// Reconstruct the higher-order polynomial
-		Vector lambda = _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution);
+		Vector lambda = _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, Vector(), b_source);
 
 		// Enforce (lambda|1) = 0
 		_integralZeroOnDomain.Enforce(lambda);
@@ -168,9 +156,9 @@ public:
 		assert(_integralZeroOnDomain.Check(source));
 #endif
 		// Define problem
-		_diffPb.ChangeSourceFunction(source);
-		_diffPb.ChangeNeumannFunctionToZero();
-		Vector& rhs = _diffPb.SetCondensedRHS();
+		Vector b_source = _diffPb.AssembleSourceTerm(source);
+		Vector b_neumann = Vector::Zero(HHO->nTotalFaceUnknowns);
+		Vector rhs = _diffPb.CondensedRHS(b_source, b_neumann);
 
 		// Solve
 		_imageEnforcer.ProjectOntoImage(rhs); // enforce numerical compatibility
@@ -182,7 +170,7 @@ public:
 			Vector boundary;
 			if (_reconstructHigherOrderBoundary)
 			{
-				Vector reconstructedElemBoundary = _diffPb.ReconstructHigherOrderOnBoundaryOnly(faceSolution);
+				Vector reconstructedElemBoundary = _diffPb.ReconstructHigherOrderOnBoundaryOnly(faceSolution, b_source);
 				boundary = _higherOrderBoundary.Trace(reconstructedElemBoundary);
 			}
 			else
@@ -192,7 +180,7 @@ public:
 		}
 		else
 		{
-			Vector reconstructedSolution = _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution);
+			Vector reconstructedSolution = _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, Vector(), b_source);
 			_integralZeroOnDomain.Enforce(reconstructedSolution);
 			return reconstructedSolution;
 		}
@@ -259,10 +247,13 @@ public:
 			reconstructedSolution = Solve2ndDiffProblem(lambda);
 		else
 		{
-			_lastPb->ChangeSourceFunction(lambda);
-			Vector& rhs = _lastPb->SetCondensedRHS();
+			Vector dirichletCoeffs = Vector::Zero(_lastPb->HHO->nDirichletCoeffs);
+			Vector b_lambdaSource = _lastPb->AssembleSourceTerm(lambda);
+			Vector b_noNeumann = Vector::Zero(_lastPb->HHO->nTotalFaceUnknowns);
+			Vector rhs = _lastPb->CondensedRHS(b_lambdaSource, b_noNeumann);
+
 			Vector faceSolution = _lastPbSolver->Solve(rhs);
-			reconstructedSolution = _lastPb->ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution);
+			reconstructedSolution = _lastPb->ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, dirichletCoeffs, b_lambdaSource);
 		}
 		return reconstructedSolution;
 	}
