@@ -148,6 +148,23 @@ public:
 		return this->MeshFace->Integral(functionToIntegrate, polynomialDegree);
 	}
 
+private:
+	double NormalDerivativeTerm(BasisFunction<Dim - 1>* facePhi, Element<Dim>* element, BasisFunction<Dim>* phi, const DimVector<Dim>& n)
+	{
+		if (phi->GetDegree() == 0)
+			return 0;
+
+		auto gradPhiOnFace = element->GradPhiOnFace(this->MeshFace, phi);
+
+		RefFunction functionToIntegrate = [facePhi, gradPhiOnFace, &n](const RefPoint& p) {
+			return facePhi->Eval(p) * gradPhiOnFace(p).dot(n);
+		};
+
+		int polynomialDegree = facePhi->GetDegree() + phi->GetDegree() - 1;
+		return this->MeshFace->Integral(functionToIntegrate, polynomialDegree);
+	}
+
+public:
 	DenseMatrix MassMatrix(FunctionalBasis<Dim - 1>* other)
 	{
 		DenseMatrix M(this->Basis->LocalFunctions.size(), other->LocalFunctions.size());
@@ -164,7 +181,24 @@ public:
 
 	DenseMatrix Trace(Element<Dim>* element, FunctionalBasis<Dim>* cellBasis)
 	{
-		return ComputeTraceMatrix(element, cellBasis);
+		DenseMatrix massFaceCell = this->MassMatrix(this->Basis, element, cellBasis);
+		return SolveMassMatrix(massFaceCell);
+	}
+
+	DenseMatrix NormalDerivative(Element<Dim>* element, FunctionalBasis<Dim>* cellBasis)
+	{
+		DenseMatrix M(this->Basis->LocalFunctions.size(), cellBasis->LocalFunctions.size());
+
+		DimVector<Dim> n = element->OuterNormalVector(this->MeshFace);
+		for (BasisFunction<Dim-1>* facePhi : this->Basis->LocalFunctions)
+		{
+			for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions)
+			{
+				double term = this->NormalDerivativeTerm(facePhi, element, cellPhi, n);
+				M(facePhi->LocalNumber, cellPhi->LocalNumber) = term;
+			}
+		}
+		return SolveMassMatrix(M);
 	}
 
 	double Integral(const Vector& coeffs)
@@ -219,12 +253,6 @@ public:
 	}
 
 private:
-	DenseMatrix ComputeTraceMatrix(Element<Dim>* e, FunctionalBasis<Dim>* cellBasis)
-	{
-		DenseMatrix massFaceCell = this->MassMatrix(this->Basis, e, cellBasis);
-		return SolveMassMatrix(massFaceCell);
-	}
-
 	DenseMatrix MassMatrix(FunctionalBasis<Dim - 1>* basis, Element<Dim>* element, FunctionalBasis<Dim>* cellBasis)
 	{
 		DenseMatrix M(basis->LocalFunctions.size(), cellBasis->LocalFunctions.size());

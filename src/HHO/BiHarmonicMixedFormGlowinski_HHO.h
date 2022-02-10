@@ -54,7 +54,7 @@ public:
 		if (_reconstructHigherOrderBoundary)
 		{
 			_higherOrderBoundary = HigherOrderBoundary<Dim>(&_diffPb);
-			_higherOrderBoundary.Setup();
+			_higherOrderBoundary.Setup(false, true);
 			_boundarySpace = &_higherOrderBoundary.BoundarySpace;
 		}
 		else
@@ -63,84 +63,77 @@ public:
 
 	Vector FindCompatibleTheta() override
 	{
-		
+		if (_reconstructHigherOrderBoundary)
+			return Vector::Zero(_higherOrderBoundary.HHO->nDirichletCoeffs);
+		else
+			return Vector::Zero(HHO->nDirichletCoeffs);
 	}
 
 	// Solve problem 1 (f=source, Dirich=<dirichlet>)
 	Vector Solve1stDiffProblem(const Vector& dirichlet) override
 	{
 		// Define problem
-		_diffPb.ChangeSourceFunction(_testCase->SourceFunction);
-		/*if (_reconstructHigherOrderBoundary)
-		{
-			Vector b_ndF = _higherOrderBoundary.AssembleNeumannTerm(neumann);
-			_diffPb.SetNeumannTerm(b_ndF);
-		}
-		else
-			_diffPb.ChangeNeumannFunction(neumann);*/
-		Vector& rhs = _diffPb.SetCondensedRHS();
+		Vector b_source = _diffPb.AssembleSourceTerm(_testCase->SourceFunction);
+		Vector dirichletCoeffs = _reconstructHigherOrderBoundary ? _higherOrderBoundary.AssembleDirichletTerm(dirichlet) : dirichlet;
+		Vector b_noNeumann = Vector::Zero(HHO->nTotalFaceUnknowns);
+		Vector b_T   = _diffPb.ComputeB_T(b_source, dirichletCoeffs);
+		Vector b_ndF = _diffPb.ComputeB_ndF(b_noNeumann, dirichletCoeffs);
+		Vector rhs = _diffPb.CondensedRHS(b_T, b_ndF);
 
 		// Solve
 		Vector faceSolution = this->_diffSolver->Solve(rhs);
 		this->CheckDiffSolverConvergence();
 
 		// Reconstruct the higher-order polynomial
-		Vector lambda = _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution);
-
-		return lambda;
+		return _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, dirichletCoeffs, b_T);
 	}
 
 	// Solve problem 1 (f=0, Dirich=<dirichlet>)
 	Vector Solve1stDiffProblemWithZeroSource(const Vector& dirichlet) override
 	{
 		// Define problem
-		_diffPb.ChangeSourceFunctionToZero();
-		/*if (_reconstructHigherOrderBoundary)
-		{
-			Vector b_ndF = _higherOrderBoundary.AssembleNeumannTerm(neumann);
-			_diffPb.SetNeumannTerm(b_ndF);
-		}
-		else
-			_diffPb.ChangeNeumannFunction(neumann);*/
-		Vector& rhs = _diffPb.SetCondensedRHS();
+		Vector b_source = Vector::Zero(HHO->nTotalCellUnknowns);
+		Vector dirichletCoeffs = _reconstructHigherOrderBoundary ? _higherOrderBoundary.AssembleDirichletTerm(dirichlet) : dirichlet;
+		Vector b_noNeumann = Vector::Zero(HHO->nTotalFaceUnknowns);
+		Vector b_T = _diffPb.ComputeB_T(b_source, dirichletCoeffs);
+		Vector b_ndF = _diffPb.ComputeB_ndF(b_noNeumann, dirichletCoeffs);
+		Vector rhs = _diffPb.CondensedRHS(b_T, b_ndF);
 
 		// Solve
 		Vector faceSolution = this->_diffSolver->Solve(rhs);
 		this->CheckDiffSolverConvergence();
 
 		// Reconstruct the higher-order polynomial
-		return _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution);
+		return _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, dirichletCoeffs, b_T);
 	}
 
 	// Solve problem 2 (f=<source>, Dirich=0)
-	Vector Solve2ndDiffProblem(const Vector& source, bool returnBoundaryOnly = false) override
+	Vector Solve2ndDiffProblem(const Vector& source, bool returnBoundaryNormalDerivative = false) override
 	{
 		// Define problem
-		_diffPb.ChangeSourceFunction(source);
-		_diffPb.ChangeNeumannFunctionToZero();
-		Vector& rhs = _diffPb.SetCondensedRHS();
+		Vector dirichletCoeffs = Vector::Zero(HHO->nDirichletCoeffs);
+		Vector b_source = _diffPb.AssembleSourceTerm(source);
+		Vector b_noNeumann = Vector::Zero(HHO->nTotalFaceUnknowns);
+		Vector rhs = _diffPb.CondensedRHS(b_source, b_noNeumann);
 
 		// Solve
 		Vector faceSolution = this->_diffSolver->Solve(rhs);
 		this->CheckDiffSolverConvergence();
 
-		if (returnBoundaryOnly)
+		if (returnBoundaryNormalDerivative)
 		{
-			Vector boundary;
+			Vector normalDerivative;
 			if (_reconstructHigherOrderBoundary)
 			{
-				Vector reconstructedElemBoundary;// = _diffPb.ReconstructHigherOrderOnBoundaryOnly(faceSolution);
-				boundary = _higherOrderBoundary.Trace(reconstructedElemBoundary);
+				Vector reconstructedElemBoundary = _diffPb.ReconstructHigherOrderOnBoundaryOnly(faceSolution, dirichletCoeffs, b_source);
+				normalDerivative = _higherOrderBoundary.NormalDerivative(reconstructedElemBoundary);
 			}
 			else
-				boundary = faceSolution.tail(HHO->nBoundaryFaces * HHO->nFaceUnknowns); // keep only the boundary unknowns
-			return boundary;
+				normalDerivative = faceSolution.tail(HHO->nBoundaryFaces * HHO->nFaceUnknowns); // keep only the boundary unknowns
+			return normalDerivative;
 		}
 		else
-		{
-			Vector reconstructedSolution = _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution);
-			return reconstructedSolution;
-		}
+			return _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, dirichletCoeffs, b_source);
 	}
 
 	double L2InnerProdOnBoundary(const Vector& v1, const Vector& v2) override
@@ -151,10 +144,10 @@ public:
 
 	Vector ComputeSolution(const Vector& theta) override
 	{
-		// Solve problem 1 (f=source, Neum=<theta>)
+		// Solve problem 1 (f=source, Dirich=<theta>)
 		Vector lambda = Solve1stDiffProblem(theta);
 
-		// Solve problem 2 (f=<lambda>, Neum=0)
+		// Solve problem 2 (f=<lambda>, Dirich=0)
 		return Solve2ndDiffProblem(lambda);
 	}
 };

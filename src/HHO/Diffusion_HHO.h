@@ -925,15 +925,18 @@ public:
 		return reconstruction;
 	}
 
-	// TODO add dirichletCoeffs
-	Vector ReconstructHigherOrderOnBoundaryOnly(const Vector& faceUnknowns, const Vector& b_T)
+	Vector ReconstructHigherOrderOnBoundaryOnly(const Vector& faceUnknowns, const Vector& dirichletCoeffs, const Vector& b_T)
 	{
 		Vector v = b_T - A_T_ndF * faceUnknowns;
+
+		Vector faceCoeffs(HHO->nTotalFaceUnknowns + HHO->nDirichletCoeffs);
+		faceCoeffs.head(HHO->nTotalFaceUnknowns) = faceUnknowns;
+		faceCoeffs.tail(HHO->nDirichletCoeffs)   = dirichletCoeffs;
 
 		Vector reconstruction(_mesh->NBoundaryElements() * HHO->nReconstructUnknowns);
 
 		ElementParallelLoop<Dim> parallelLoop(this->_mesh->Elements);
-		parallelLoop.Execute([this, &faceUnknowns , &v, &reconstruction](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+		parallelLoop.Execute([this, &faceCoeffs, &v, &reconstruction](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
 			{
 				if (e->IsOnBoundary())
 				{
@@ -942,7 +945,7 @@ public:
 					Vector localHybrid(HHO->nCellUnknowns + HHO->nFaceUnknowns * e->Faces.size());
 					localHybrid.head(HHO->nCellUnknowns) = element->AttSolver.solve(v.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns));
 					for (auto face : element->Faces)
-						localHybrid.segment(element->FirstDOFNumber(face), HHO->nFaceUnknowns) = faceUnknowns.segment(face->Number() * HHO->nFaceUnknowns, HHO->nFaceUnknowns);
+						localHybrid.segment(element->FirstDOFNumber(face), HHO->nFaceUnknowns) = faceCoeffs.segment(face->Number() * HHO->nFaceUnknowns, HHO->nFaceUnknowns);
 
 					int boundaryElemNumber = _mesh->BoundaryElementNumber(e);
 					reconstruction.segment(boundaryElemNumber * HHO->nReconstructUnknowns, HHO->nReconstructUnknowns) = element->Reconstruct(localHybrid);
@@ -1027,11 +1030,16 @@ public:
 
 	Vector ComputeB_T(const Vector& b_source, const Vector& x_dF)
 	{
+		assert(b_source.rows() == HHO->nTotalCellUnknowns);
+		assert(x_dF.rows() == HHO->nDirichletCoeffs);
+
 		return b_source - A_T_dF * x_dF;
 	}
 
 	Vector ComputeB_ndF(const Vector& b_neumann, const Vector& x_dF)
 	{
+		assert(x_dF.rows() == HHO->nDirichletCoeffs);
+
 		return b_neumann - A_ndF_dF * x_dF;
 	}
 

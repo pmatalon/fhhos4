@@ -66,7 +66,7 @@ public:
 		if (_reconstructHigherOrderBoundary)
 		{
 			_higherOrderBoundary = HigherOrderBoundary<Dim>(&_diffPb);
-			_higherOrderBoundary.Setup();
+			_higherOrderBoundary.Setup(true, false);
 			_boundarySpace = &_higherOrderBoundary.BoundarySpace;
 		}
 		else
@@ -170,7 +170,7 @@ public:
 			Vector boundary;
 			if (_reconstructHigherOrderBoundary)
 			{
-				Vector reconstructedElemBoundary = _diffPb.ReconstructHigherOrderOnBoundaryOnly(faceSolution, b_source);
+				Vector reconstructedElemBoundary = _diffPb.ReconstructHigherOrderOnBoundaryOnly(faceSolution, Vector(), b_source);
 				boundary = _higherOrderBoundary.Trace(reconstructedElemBoundary);
 			}
 			else
