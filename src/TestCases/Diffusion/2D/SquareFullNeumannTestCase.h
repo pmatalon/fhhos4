@@ -84,6 +84,7 @@ public:
 					if (abs(y - 1) < Utils::NumericalZero) // y == 1
 						return x * exp(x);
 					Utils::FatalError("Not supposed to arrive.");
+					return 0.0;
 				};
 				this->BC.Description = "Full Neumann (non-homogeneous)";
 			}

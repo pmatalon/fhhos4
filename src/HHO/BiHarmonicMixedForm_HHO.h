@@ -53,4 +53,7 @@ protected:
 				Utils::Warning("The diffusion solver has reached the max number of iterations (" + to_string(iterSolver->MaxIterations) + ")");
 		}
 	}
+
+public:
+	virtual ~BiHarmonicMixedForm_HHO() {}
 };

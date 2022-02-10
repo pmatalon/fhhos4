@@ -111,6 +111,7 @@ public:
 private:
 	double L2InnerProdOnBoundary(const Vector& v1, const Vector& v2)
 	{
-		return _biHarPb->L2InnerProdOnBoundary(v1, v2);
+		//return _biHarPb->L2InnerProdOnBoundary(v1, v2);
+		return v1.dot(v2);
 	}
 };

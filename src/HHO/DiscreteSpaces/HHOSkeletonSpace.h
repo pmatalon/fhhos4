@@ -84,6 +84,7 @@ public:
 	double L2InnerProd(const Vector& v1, const Vector& v2) override
 	{
 		Utils::FatalError("To be implemented");
+		return 0;
 	}
 
 	double Integral(const Vector& faceCoeffs) override

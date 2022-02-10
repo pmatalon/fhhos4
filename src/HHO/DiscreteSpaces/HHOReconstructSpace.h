@@ -68,11 +68,13 @@ public:
 	Vector Project(DomFunction func) override
 	{
 		Utils::FatalError("To be implemented");
+		return Vector();
 	}
 
 	double L2InnerProd(const Vector& v1, const Vector& v2) override
 	{
 		Utils::FatalError("To be implemented");
+		return 0.0;
 	}
 
 	double Integral(const Vector& reconstructedCoeffs) override

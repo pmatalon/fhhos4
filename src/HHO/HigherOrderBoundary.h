@@ -62,11 +62,11 @@ private:
 
 		parallelLoop.Execute([this](Face<Dim>* f, ParallelChunk<CoeffsChunk>* chunk)
 			{
-				int i = f->Number - HHO->nInteriorFaces;
 				Diff_HHOFace<Dim>* face = HHOFace(f);
+				int i = f->Number - HHO->nInteriorFaces;
 
-				int j = _mesh->BoundaryElementNumber(f->Element1);
 				Diff_HHOElement<Dim>* elem = _diffPb->HHOElement(f->Element1);
+				int j = _mesh->BoundaryElementNumber(f->Element1);
 				
 				chunk->Results.Coeffs.Add(i * HHO->nFaceUnknowns, j * HHO->nReconstructUnknowns, face->Trace(elem->MeshElement, elem->ReconstructionBasis));
 			});
@@ -140,13 +140,13 @@ public:
 			{
 				Diff_HHOFace<Dim>* loFace = _diffPb->HHOFace(f);
 				int loUnknowns = _diffPb->HHO->nFaceUnknowns;
-				BigNumber i = (f->Number - HHO->nInteriorFaces - HHO->nNeumannFaces) * loUnknowns;
 
 				Diff_HHOFace<Dim>* hoFace = this->HHOFace(f);
 				int hoUnknowns = this->HHO->nFaceUnknowns;
-				BigNumber j = (f->Number - HHO->nInteriorFaces - HHO->nNeumannFaces) * hoUnknowns;
 
-				x_dF.segment(i, loUnknowns) = loFace->SolveMassMatrix(loFace->MassMatrix(hoFace->Basis) * dirichletHigherOrderCoeffs.segment(j, hoUnknowns));
+				BigNumber i = f->Number - HHO->nInteriorFaces - HHO->nNeumannFaces;
+
+				x_dF.segment(i * loUnknowns, loUnknowns) = loFace->ProjectOnBasis(hoFace->Basis) * dirichletHigherOrderCoeffs.segment(i * hoUnknowns, hoUnknowns);
 			}
 		);
 		return x_dF;

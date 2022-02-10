@@ -850,7 +850,6 @@ public:
 		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->NeumannFaces, [this, &b_neumann, &neumannFuncCoeffs](Face<Dim>* f)
 			{
 				Diff_HHOFace<Dim>* face = HHOFace(f);
-				//BigNumber i = FirstDOFGlobalNumber(face) - HHO->nTotalCellUnknowns;
 				BigNumber i = face->Number() * HHO->nFaceUnknowns;
 				assert(i >= HHO->nInteriorFaces * HHO->nFaceUnknowns);
 				BigNumber j = (face->Number() - HHO->nInteriorFaces) * HHO->nFaceUnknowns;
@@ -911,7 +910,6 @@ public:
 		Vector reconstruction(HHO->nElements * HHO->nReconstructUnknowns);
 		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, &reconstruction, &hybridCoeffs](Element<Dim>* e)
 			{
-				HHOParameters<Dim>* HHO = this->HHO;
 				Diff_HHOElement<Dim>* element = HHOElement(e);
 
 				Vector localHybrid(HHO->nCellUnknowns + HHO->nFaceUnknowns * element->Faces.size());
@@ -962,10 +960,7 @@ public:
 		return Solve_A_T_T(b_T - A_T_ndF * faceUnknowns);
 	}
 
-	//-------------------------//
-	//     Source function     //
-	//-------------------------//
-
+	// Deprecated!
 	// Reassembles B_T w.r.t. to a discrete source function
 	void ChangeSourceFunction(const Vector& sourceFuncCoeffs)
 	{
@@ -981,47 +976,6 @@ public:
 		this->B_T   -= A_T_dF   * this->x_dF;
 		this->B_ndF -= A_ndF_dF * this->x_dF;
 		*/
-	}
-
-	// Reassembles B_T w.r.t. to a continuous source function
-	void ChangeSourceFunction(DomFunction sourceFunction)
-	{
-		assert(this->x_dF.rows() == 0 || this->x_dF.isZero(0));
-
-		this->B_T = std::move(AssembleSourceTerm(sourceFunction));
-	}
-	void ChangeSourceFunctionToZero()
-	{
-		assert(this->x_dF.rows() == 0 || this->x_dF.isZero(0));
-
-		this->B_T = Vector::Zero(HHO->nTotalCellUnknowns);
-	}
-
-	//--------------------------//
-	//     Neumann function     //
-	//--------------------------//
-
-	void ChangeNeumannFunction(DomFunction neumannFunction)
-	{
-		assert(this->x_dF.rows() == 0 || this->x_dF.isZero(0));
-
-		this->B_ndF = std::move(AssembleNeumannTerm(neumannFunction));
-	}
-	void ChangeNeumannFunction(const Vector& neumannFuncCoeffs)
-	{
-		assert(this->x_dF.rows() == 0 || this->x_dF.isZero(0));
-
-		this->B_ndF = std::move(AssembleNeumannTerm(neumannFuncCoeffs));
-	}
-	void ChangeNeumannFunctionToZero()
-	{
-		assert(this->x_dF.rows() == 0 || this->x_dF.isZero(0));
-
-		this->B_ndF = Vector::Zero(HHO->nTotalFaceUnknowns);
-	}
-	void SetB_ndF(Vector& b_ndF)
-	{
-		this->B_ndF = std::move(b_ndF);
 	}
 
 	//-------------------------//
@@ -1043,14 +997,13 @@ public:
 		return b_neumann - A_ndF_dF * x_dF;
 	}
 
-	// Requires that the Dirichlet unknowns have already be eliminated (or that the Dirichlet BC is homogeneous)
+	// Deprecated
 	Vector& SetCondensedRHS()
 	{
 		this->b = this->B_ndF -this->A_T_ndF.transpose() * Solve_A_T_T(this->B_T);
 		return this->b;
 	}
 
-	// Requires that the Dirichlet unknowns have already be eliminated (or that the Dirichlet BC is homogeneous)
 	Vector CondensedRHS(const Vector& b_T, const Vector& b_ndF)
 	{
 		assert(b_T.rows() == HHO->nTotalCellUnknowns);

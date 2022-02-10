@@ -233,6 +233,11 @@ public:
 		return SolveMassMatrix(InnerProductWithBasis(f));
 	}
 
+	DenseMatrix ProjectOnBasis(FunctionalBasis<Dim - 1>* other)
+	{
+		return SolveMassMatrix(MassMatrix(other));
+	}
+
 	double InnerProd(const Vector& coeffs1, const Vector& coeffs2)
 	{
 		assert(coeffs1.rows() == HHO->nFaceUnknowns);

@@ -129,7 +129,10 @@ public:
 				normalDerivative = _higherOrderBoundary.NormalDerivative(reconstructedElemBoundary);
 			}
 			else
+			{
+				Utils::FatalError("Non implemented");
 				normalDerivative = faceSolution.tail(HHO->nBoundaryFaces * HHO->nFaceUnknowns); // keep only the boundary unknowns
+			}
 			return normalDerivative;
 		}
 		else
