@@ -24,17 +24,12 @@ public:
 	{
 		this->SolvingComputationalWork = 0;
 
-		// Find initial theta verifying the compatibility condition
-		//               (source|1) + <theta|1> = 0
 		Vector theta = _biHarPb->FindCompatibleTheta();
 
 		IterationResult result = CreateFirstIterationResult(Vector::Zero(theta.rows()), theta);
 
-		// Solve 1st problem (f=source, Neum=theta --> lambda s.t. (lambda|1)=0)
-		Vector lambda = _biHarPb->Solve1stDiffProblem(theta);
-
-		// Solve 2nd problem (f=lamda, Neum=0 --> r s.t. <r|1>=0)
-		Vector u_boundary = _biHarPb->Solve2ndDiffProblem(lambda, true);
+		Vector lambda     =  _biHarPb->Solve1stDiffProblem(theta);
+		Vector u_boundary = -_biHarPb->Solve2ndDiffProblem(lambda, true);
 
 		//--------------------//
 		// Conjugate Gradient //
@@ -58,21 +53,10 @@ public:
 		{
 			result = IterationResult(result);
 
-			// Solve 1st diffusion problem (f=0, Neum=p)
-			// compatibility condition: <p|1> = 0
-			//if (this->IterationCount % 10 == 0)
-				//_integralZeroOnBoundary.Enforce(p);
-			Vector delta = _biHarPb->Solve1stDiffProblemWithZeroSource(p);
-
-			// Solve 2nd diffusion problem (f=delta, Neum=0)
-			// compatibility condition: (delta|1) = 0
-			//_zeroMeanForReconstruct.Enforce(delta);
-			Vector gamma_boundary = _biHarPb->Solve2ndDiffProblem(delta, true);
-
+			Vector delta          =  _biHarPb->Solve1stDiffProblemWithZeroSource(p);
+			Vector gamma_boundary = -_biHarPb->Solve2ndDiffProblem(delta, true);
 
 			// Step for theta in the direction of research
-			//double rho = L2InnerProdOnBoundary(p, r) / L2InnerProdOnBoundary(gamma_boundary, p);
-			//double rho = r_dot_r / gamma_boundary.dot(p);
 			double rho = r_dot_r / L2InnerProdOnBoundary(gamma_boundary, p);
 
 			// Move theta in the direction of research
@@ -83,8 +67,8 @@ public:
 			if (this->IterationCount > 0 && this->IterationCount % 10 == 0)
 			{
 				// Recompute the residual explicitely
-				lambda = _biHarPb->Solve1stDiffProblem(theta);
-				u_boundary = _biHarPb->Solve2ndDiffProblem(lambda, true);
+				lambda     =  _biHarPb->Solve1stDiffProblem(theta);
+				u_boundary = -_biHarPb->Solve2ndDiffProblem(lambda, true);
 				r = -u_boundary;
 
 				r_dot_r = L2InnerProdOnBoundary(r, r);
@@ -141,7 +125,8 @@ public:
 private:
 	double L2InnerProdOnBoundary(const Vector& v1, const Vector& v2)
 	{
-		return _biHarPb->L2InnerProdOnBoundary(v1, v2);
+		//return _biHarPb->L2InnerProdOnBoundary(v1, v2);
+		return v1.dot(v2);
 	}
 
 };
