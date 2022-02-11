@@ -267,6 +267,11 @@ public:
 		return innerProducts;
 	}
 
+	Vector ProjectOnReconstructBasis(DomFunction f)
+	{
+		return SolveReconstructMassMatrix(InnerProductWithReconstructBasis(f));
+	}
+
 private:
 
 	//------------------------------------------------------------------------------------//

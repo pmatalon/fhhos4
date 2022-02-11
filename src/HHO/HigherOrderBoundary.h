@@ -134,6 +134,7 @@ public:
 	Vector AssembleDirichletTerm(const Vector& dirichletHigherOrderCoeffs)
 	{
 		assert(dirichletHigherOrderCoeffs.rows() == HHO->nDirichletCoeffs);
+		assert(_mesh->DirichletFaces.size() == _mesh->BoundaryFaces.size());
 
 		Vector x_dF = Vector::Zero(_diffPb->HHO->nDirichletCoeffs);
 		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->DirichletFaces, [this, &x_dF, &dirichletHigherOrderCoeffs](Face<Dim>* f)
@@ -150,6 +151,22 @@ public:
 			}
 		);
 		return x_dF;
+	}
+
+	Vector ExtractBoundaryElements(const Vector& v)
+	{
+		assert(v.rows() == _mesh->Elements.size() * HHO->nReconstructUnknowns);
+
+		Vector boundary(_mesh->NBoundaryElements() * HHO->nReconstructUnknowns);
+		ParallelLoop<Element<Dim>*>::Execute(_mesh->Elements, [this, &boundary, &v](Element<Dim>* e)
+			{
+				if (e->IsOnBoundary())
+				{
+					int boundaryElemNumber = _mesh->BoundaryElementNumber(e);
+					boundary.segment(boundaryElemNumber * HHO->nReconstructUnknowns, HHO->nReconstructUnknowns) = v.segment(e->Number * HHO->nReconstructUnknowns, HHO->nReconstructUnknowns);
+				}
+			});
+		return boundary;
 	}
 
 	~HigherOrderBoundary()

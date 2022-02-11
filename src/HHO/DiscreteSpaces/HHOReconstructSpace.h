@@ -67,8 +67,14 @@ public:
 	
 	Vector Project(DomFunction func) override
 	{
-		Utils::FatalError("To be implemented");
-		return Vector();
+		Vector vectorOfDoFs = Vector(HHO->nTotalReconstructUnknowns);
+		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, &vectorOfDoFs, func](Element<Dim>* e)
+			{
+				Diff_HHOElement<Dim>* elem = HHOElement(e);
+				vectorOfDoFs.segment(e->Number * HHO->nReconstructUnknowns, HHO->nReconstructUnknowns) = elem->ProjectOnReconstructBasis(func);
+			}
+		);
+		return vectorOfDoFs;
 	}
 
 	double L2InnerProd(const Vector& v1, const Vector& v2) override
