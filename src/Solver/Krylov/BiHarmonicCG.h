@@ -20,22 +20,19 @@ public:
 		os << "Conjugate Gradient for the bi-harmonic problem";
 	}
 
-	Vector Solve() override
+	void Solve(const Vector& b, Vector& theta, bool xEquals0) override
 	{
 		this->SolvingComputationalWork = 0;
-
-		Vector theta = _biHarPb->FindCompatibleTheta();
-
-		IterationResult result = CreateFirstIterationResult(Vector::Zero(theta.rows()), theta);
-
-		Vector lambda     =  _biHarPb->Solve1stDiffProblem(theta);
-		Vector u_boundary = -_biHarPb->Solve2ndDiffProblem(lambda, true);
 
 		//--------------------//
 		// Conjugate Gradient //
 		//--------------------//
 
-		Vector r = -u_boundary;
+		// Initial guess = 0
+		IterationResult result = CreateFirstIterationResult(b, theta);
+
+		// r = b - Ax = b
+		Vector r = xEquals0 ? b : b-A(theta);
 		
 		double r_dot_r = L2InnerProdOnBoundary(r, r);
 
@@ -53,24 +50,19 @@ public:
 		{
 			result = IterationResult(result);
 
-			Vector delta          =  _biHarPb->Solve1stDiffProblemWithZeroSource(p);
-			Vector gamma_boundary = -_biHarPb->Solve2ndDiffProblem(delta, true);
+			Vector Ap = A(p);
 
 			// Step for theta in the direction of research
-			double rho = r_dot_r / L2InnerProdOnBoundary(gamma_boundary, p);
+			double alpha = r_dot_r / L2InnerProdOnBoundary(p, Ap);
 
 			// Move theta in the direction of research
-			theta += rho * p;
+			theta += alpha * p;
 
 			double r_dot_r_old = r_dot_r; // save the dot product before overwriting r
 
 			if (this->IterationCount > 0 && this->IterationCount % 10 == 0)
 			{
-				// Recompute the residual explicitely
-				lambda     =  _biHarPb->Solve1stDiffProblem(theta);
-				u_boundary = -_biHarPb->Solve2ndDiffProblem(lambda, true);
-				r = -u_boundary;
-
+				r = b - A(theta);
 				r_dot_r = L2InnerProdOnBoundary(r, r);
 
 				p = r;
@@ -78,14 +70,13 @@ public:
 			else
 			{
 				// Update residual
-				r -= rho * gamma_boundary;
-
+				r -= alpha * Ap;
 				r_dot_r = L2InnerProdOnBoundary(r, r);
 
 				// Step for the direction of research
-				double q = r_dot_r / r_dot_r_old;
+				double beta = r_dot_r / r_dot_r_old;
 				// Update the direction of research
-				p = r + q * p;
+				p = r + beta * p;
 			}
 
 
@@ -118,8 +109,6 @@ public:
 			cout << endl;
 
 		this->SolvingComputationalWork = result.SolvingComputationalWork();
-
-		return theta;
 	}
 
 private:
@@ -127,6 +116,20 @@ private:
 	{
 		//return _biHarPb->L2InnerProdOnBoundary(v1, v2);
 		return v1.dot(v2);
+	}
+
+	/*Vector A0(const Vector& x)
+	{
+		Vector delta = _biHarPb->Solve1stDiffProblem(x);
+		return -_biHarPb->Solve2ndDiffProblem(delta, true);
+		//return _biHarPb->DiffPb().A * x;
+	}*/
+
+	Vector A(const Vector& x)
+	{
+		Vector delta = _biHarPb->Solve1stDiffProblemWithZeroSource(x);
+		return -_biHarPb->Solve2ndDiffProblem(delta, true);
+		//return _biHarPb->DiffPb().A * x;
 	}
 
 };

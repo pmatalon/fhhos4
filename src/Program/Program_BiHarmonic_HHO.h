@@ -172,6 +172,18 @@ public:
 			cout << "-     Solve bi-harmonic problem     -" << endl;
 			cout << "-------------------------------------" << endl;
 
+			Vector theta0 = biHarPb->FindCompatibleTheta();
+			Vector delta = biHarPb->Solve1stDiffProblem(theta0);
+			Vector u_boundary0 = biHarPb->Solve2ndDiffProblem(delta, true);
+
+			// A(theta) -> -boundary(u) is s.p.d.
+			// Note that because of the minus sign, u_boundary0 = -A0(theta0)
+			// We want to solve A(theta1) = u_boundary0, in order to have
+			// thetaFinal = theta0+theta1 with
+			//         A(thetaFinal) = A0(theta0) + A(theta1) = -u_boundary0 + u_boundary0 = 0.
+			Vector b = u_boundary0;
+
+
 			IterativeSolver* biHarSolver = nullptr;
 			if (args.Solver.BiHarmonicSolverCode.compare("cg") == 0)
 				biHarSolver = new BiHarmonicCG<Dim>(biHarPb);
@@ -185,10 +197,14 @@ public:
 			// Compute L2-error at each iteration
 			if ((args.Solver.ComputeIterL2Error || args.Actions.ExportIterationL2Errors) && testCase->ExactSolution)
 			{
-				biHarSolver->OnNewSolution = [&biHarPb, &testCase](IterationResult& result, const Vector& theta)
+				biHarSolver->OnNewSolution = [&biHarPb, &testCase, &theta0, &b](IterationResult& result, const Vector& theta)
 				{
-					Vector reconstructedSolution = biHarPb->ComputeSolution(theta);
+					Vector reconstructedSolution = biHarPb->ComputeSolution(theta0 + theta);
 					result.L2Error = biHarPb->DiffPb().L2Error(testCase->ExactSolution, reconstructedSolution);
+
+					Vector lambda =  biHarPb->Solve1stDiffProblemWithZeroSource(theta);
+					Vector Atheta = -biHarPb->Solve2ndDiffProblem(lambda, true);
+					cout << "                                                                                " << std::setprecision(8) << 0.5*theta.dot(Atheta)-b.dot(theta) << endl;
 				};
 			}
 			// Export iteration results
@@ -208,11 +224,52 @@ public:
 				};
 			}
 
-			Vector theta = biHarSolver->Solve();
+
+			//--------------------------------------------------------------------------//
+			/*ProblemArguments pbDiff;
+			pbDiff.TestCaseCode = "fullneumann";
+			pbDiff.SourceCode = "exp";
+			pbDiff.BCCode = "n2";
+			DiffusionTestCase<Dim>* diffTestCase = DiffTestCaseFactory<Dim>::Create(pbDiff);
+
+			Diffusion_HHO<Dim>* diffPb = new Diffusion_HHO<Dim>(mesh, diffTestCase, hho, true, false);
+			diffPb->InitHHO();
+
+			HigherOrderBoundary<Dim> higherOrderBoundary(diffPb);
+			higherOrderBoundary.Setup(false, true);
+
+			Vector projectedSolution = diffPb->ReconstructSpace.Project(diffTestCase->ExactSolution);
+			Vector projectedSolutionBoundary = higherOrderBoundary.ExtractBoundaryElements(projectedSolution);
+			Vector normalDeriv = higherOrderBoundary.NormalDerivative(projectedSolutionBoundary);
+
+			Vector projectedNeumann = higherOrderBoundary.BoundarySpace.Project(diffTestCase->BC.NeumannFunction);
+
+			double error = (normalDeriv - projectedNeumann).norm() / normalDeriv.norm();
+
+
+
+
+			DomFunction source = [](const DomPoint& p)
+			{
+				return p.X * p.Y;
+			};
+			Vector projectedSource = diffPb->ReconstructSpace.Project(source);
+
+			Vector b_sourceFromContinuous = diffPb->AssembleSourceTerm(source);
+			Vector b_sourceFromProjection = diffPb->AssembleSourceTerm(projectedSource);
+
+			error = (b_sourceFromContinuous - b_sourceFromProjection).norm() / b_sourceFromContinuous.norm();
+			cout << error << endl;*/
+
+			//biHarPb->Matrix(out);
+			//--------------------------------------------------------------------------//
+
+			Vector theta = Vector::Zero(theta0.rows());
+			biHarSolver->Solve(b, theta, true);
 
 			delete biHarSolver;
 
-			Vector reconstructedSolution = biHarPb->ComputeSolution(theta);
+			Vector reconstructedSolution = biHarPb->ComputeSolution(theta0 + theta);
 
 			//-----------------------------//
 			//       Solution export       //

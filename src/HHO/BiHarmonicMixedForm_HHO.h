@@ -55,5 +55,23 @@ protected:
 	}
 
 public:
+	void Matrix(ExportModule& out)
+	{
+		Vector theta0 = FindCompatibleTheta();
+		int n = theta0.rows();
+		DenseMatrix M(n, n);
+		DenseMatrix I = DenseMatrix::Identity(n, n);
+		for (int i = 0; i < n; i++)
+		{
+			Vector lambda = Solve1stDiffProblemWithZeroSource(I.col(i));
+			M.col(i) = -Solve2ndDiffProblem(lambda, true);
+		}
+		//EigenSolver<MatrixXd> es;
+		double det = M.determinant();
+		auto v = M.eigenvalues();
+		//cout << v << endl;
+		out.ExportMatrix(M, "matrix");
+	}
+
 	virtual ~BiHarmonicMixedForm_HHO() {}
 };
