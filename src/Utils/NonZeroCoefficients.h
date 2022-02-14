@@ -95,6 +95,22 @@ public:
 	inline void Fill(SparseMatrix &m)
 	{
 		m.setFromTriplets(this->coefficients.begin(), this->coefficients.end());
+
+		/*for (BigNumber i = 0; i < m.rows(); ++i)
+		{
+			bool ok = false;
+			// RowMajor --> the following line iterates over the non-zeros of the i-th row.
+			for (RowMajorSparseMatrix::InnerIterator it(m, i); it; ++it)
+			{
+				if (it.value() != 0)
+				{
+					ok = true;
+					break;
+				}
+			}
+			if (!ok)
+				cout << "row " << i << " empty" << endl;
+		}*/
 	}
 
 	friend ostream& operator<<(ostream& os, const NonZeroCoefficients& nnzCoeffs)

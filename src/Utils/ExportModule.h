@@ -61,6 +61,13 @@ public:
 		cout << "Matrix exported: " << filePath << endl;
 	}
 
+	void ExportMatrix(const DenseMatrix& M, string suffix) const
+	{
+		string filePath = GetDatFilePath(suffix);
+		Eigen::saveMarket(M, filePath);
+		cout << "Matrix exported: " << filePath << endl;
+	}
+
 	void ExportVector(const Vector& v, string suffix) const
 	{
 		string filePath = GetDatFilePath(suffix);
