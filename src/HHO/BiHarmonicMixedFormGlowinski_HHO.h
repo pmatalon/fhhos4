@@ -51,10 +51,13 @@ public:
 		diffActions.AssembleRightHandSide = false;
 		_diffPb.Assemble(diffActions);
 
+
+		_higherOrderBoundary = HigherOrderBoundary<Dim>(&_diffPb);
+		_higherOrderBoundary.Setup(false, true);
 		if (_reconstructHigherOrderBoundary)
 		{
-			_higherOrderBoundary = HigherOrderBoundary<Dim>(&_diffPb);
-			_higherOrderBoundary.Setup(false, true);
+			//_higherOrderBoundary = HigherOrderBoundary<Dim>(&_diffPb);
+			//_higherOrderBoundary.Setup(false, true);
 			_boundarySpace = &_higherOrderBoundary.BoundarySpace;
 		}
 		else
@@ -130,8 +133,10 @@ public:
 			}
 			else
 			{
-				Utils::FatalError("Non implemented");
-				normalDerivative = faceSolution.tail(HHO->nBoundaryFaces * HHO->nFaceUnknowns); // keep only the boundary unknowns
+				//Utils::FatalError("Non implemented");
+				Vector reconstructedElemBoundary = _diffPb.ReconstructHigherOrderOnBoundaryOnly(faceSolution, dirichletCoeffs, b_source);
+				normalDerivative = _higherOrderBoundary.NormalDerivative(reconstructedElemBoundary);
+				normalDerivative = _higherOrderBoundary.AssembleDirichletTerm(normalDerivative);
 			}
 			return normalDerivative;
 		}
