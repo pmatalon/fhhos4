@@ -25,6 +25,8 @@ public:
 			this->SourceFunction = this->SineSource;
 		else if (pb.SourceCode.compare("poly") == 0)
 			this->SourceFunction = this->PolySource;
+		else if (pb.SourceCode.compare("one") == 0)
+			this->SourceFunction = Utils::ConstantFunctionOne;
 		else
 			Utils::FatalError("Unmanaged source code");
 
@@ -68,6 +70,8 @@ public:
 			return "sine";
 		else if (_pb.SourceCode.compare("poly") == 0)
 			return "poly";
+		else if (_pb.SourceCode.compare("poly") == 0)
+			return "one";
 		else
 			return _pb.SourceCode;
 	}
@@ -77,6 +81,8 @@ public:
 			return "sine solution";
 		else if (_pb.SourceCode.compare("poly") == 0)
 			return "polynomial solution";
+		else if (_pb.SourceCode.compare("one") == 0)
+			return "one";
 		else
 			return _pb.SourceCode;
 	}
