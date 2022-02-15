@@ -4,6 +4,7 @@
 #include "../TestCases/Diffusion/VirtualDiffusionTestCase.h"
 #include "../Solver/Solver.h"
 #include "HigherOrderBoundary.h"
+#include <Eigen/Eigenvalues>
 using namespace std;
 
 template<int Dim>
@@ -66,10 +67,30 @@ public:
 			Vector lambda = Solve1stDiffProblemWithZeroSource(I.col(i));
 			M.col(i) = -Solve2ndDiffProblem(lambda, true);
 		}
-		//EigenSolver<MatrixXd> es;
+
+		M = (M + M.transpose()) / 2.0;
+
+		Eigen::EigenSolver<DenseMatrix> es(M);
 		double det = M.determinant();
-		auto v = M.eigenvalues();
+		//auto v = M.eigenvalues();
 		//cout << v << endl;
+		Eigen::VectorXcd eigenvalues = es.eigenvalues();
+		cout << eigenvalues << endl;
+		Eigen::MatrixXcd eigenvectors = es.eigenvectors();
+		Eigen::VectorXcd kernelVector = eigenvectors.col(n-1);
+		//cout << kernelVector << endl;
+
+		Vector lambda = Solve1stDiffProblemWithZeroSource(kernelVector.real());
+		//cout << lambda.norm() << endl;
+
+		//DiffPb().ExportReconstructedVectorToGMSH(lambda, out, "lambda");
+		Vector solPb2 = Solve2ndDiffProblem(lambda, false);
+		DiffPb().ExportReconstructedVectorToGMSH(solPb2, out, "solPb2");
+
+
+		Vector zero = -Solve2ndDiffProblem(lambda, true);
+		cout << zero.norm() << endl;
+
 		out.ExportMatrix(M, "matrix");
 	}
 

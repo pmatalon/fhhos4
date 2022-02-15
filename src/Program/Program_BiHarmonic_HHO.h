@@ -261,7 +261,8 @@ public:
 			error = (b_sourceFromContinuous - b_sourceFromProjection).norm() / b_sourceFromContinuous.norm();
 			cout << error << endl;*/
 
-			//biHarPb->Matrix(out);
+			if (args.Actions.UnitTests)
+				biHarPb->Matrix(out);
 			//--------------------------------------------------------------------------//
 
 			Vector theta = Vector::Zero(theta0.rows());
