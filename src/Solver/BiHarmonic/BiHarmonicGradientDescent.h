@@ -20,21 +20,13 @@ public:
 		os << "Conjugate Gradient for the bi-harmonic problem";
 	}
 
-	Vector Solve() override
+	void Solve(const Vector& b, Vector& theta, bool xEquals0) override
 	{
 		this->SolvingComputationalWork = 0;
 
-		// Find initial theta verifying the compatibility condition
-		//               (source|1) + <theta|1> = 0
-		Vector theta = _biHarPb->FindCompatibleTheta();
+		IterationResult result = CreateFirstIterationResult(b, theta);
 
-		IterationResult result = CreateFirstIterationResult(Vector::Zero(theta.rows()), theta);
-
-		// Solve 1st problem (f=source, Neum=theta --> lambda s.t. (lambda|1)=0)
-		Vector lambda = _biHarPb->Solve1stDiffProblem(theta);
-
-		// Solve 2nd problem (f=lamda, Neum=0 --> r s.t. <r|1>=0) //
-		Vector r = _biHarPb->Solve2ndDiffProblem(lambda, true);
+		Vector r = xEquals0 ? b : b - A(theta);
 
 		//--------------------//
 		//  Gradient descent  //
@@ -57,13 +49,9 @@ public:
 			result = IterationResult(result);
 			
 			// Update theta in the opposite direction of the gradient (= r)
-			theta -= step * r;
+			theta += step * r;
 
-			// Solve 1st problem (f=source, Neum=theta --> lambda s.t. (lambda|1)=0)
-			lambda = _biHarPb->Solve1stDiffProblem(theta);
-
-			// Solve 2nd problem (f=lamda, Neum=0 --> r s.t. <r|1>=0) //
-			r = _biHarPb->Solve2ndDiffProblem(lambda, true);
+			r = b - A(theta);
 
 			// Compute the step
 			Vector r_minus_r_old = r - r_old;
@@ -71,24 +59,6 @@ public:
 
 			r_old = r;
 			
-
-			/*
-			// Update theta in the opposite direction of the gradient (= r)
-			theta += step * r;
-
-			// Solve 1st problem (f=source, Neum=theta --> lambda s.t. (lambda|1)=0)
-			Vector gamma = _biHarPb->Solve1stDiffProblemWithZeroSource(r);
-
-			// Solve 2nd problem (f=lamda, Neum=0 --> r s.t. <r|1>=0) //
-			Vector Ar = _biHarPb->Solve2ndDiffProblem(gamma+lambda, true);
-
-			// Compute the step
-			step = L2InnerProdOnBoundary(r, r) / L2InnerProdOnBoundary(r, Ar);
-
-			r -= step * Ar;
-			*/
-
-
 			//------------------------------------
 
 			this->IterationCount++;
@@ -104,8 +74,6 @@ public:
 			cout << endl;
 
 		this->SolvingComputationalWork = result.SolvingComputationalWork();
-
-		return theta;
 	}
 
 private:
@@ -113,5 +81,12 @@ private:
 	{
 		//return _biHarPb->L2InnerProdOnBoundary(v1, v2);
 		return v1.dot(v2);
+	}
+
+	Vector A(const Vector& x)
+	{
+		Vector delta = _biHarPb->Solve1stDiffProblemWithZeroSource(x);
+		return -_biHarPb->Solve2ndDiffProblem(delta, true);
+		//return _biHarPb->DiffPb().A * x;
 	}
 };

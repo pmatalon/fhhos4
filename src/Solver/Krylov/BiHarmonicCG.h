@@ -28,10 +28,8 @@ public:
 		// Conjugate Gradient //
 		//--------------------//
 
-		// Initial guess = 0
 		IterationResult result = CreateFirstIterationResult(b, theta);
 
-		// r = b - Ax = b
 		Vector r = xEquals0 ? b : b-A(theta);
 		
 		double r_dot_r = L2InnerProdOnBoundary(r, r);
