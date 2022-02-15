@@ -1017,11 +1017,16 @@ public:
 	//---------------------------------------//
 
 public:
-	void ExportSolutionToGMSH(const Vector& reconstructedSolution, const ExportModule& out)
+	void ExportReconstructedVectorToGMSH(const Vector& reconstructedVector, const ExportModule& out, string name)
 	{
 		if (HHO->OrthogonalizeElemBases())
 			Utils::Error("The export to GMSH has not been implemented when the bases are orthonormalized against each element.");
-		this->_mesh->ExportToGMSH(this->HHO->ReconstructionBasis, reconstructedSolution, out.GetFilePathPrefix(), "potential");
+		this->_mesh->ExportToGMSH(this->HHO->ReconstructionBasis, reconstructedVector, out.GetFilePathPrefix(), name);
+	}
+
+	void ExportSolutionToGMSH(const Vector& reconstructedSolution, const ExportModule& out)
+	{
+		ExportReconstructedVectorToGMSH(reconstructedSolution, out, "potential");
 	}
 
 	void ExportErrorToGMSH(const Vector& faceCoeffs, const ExportModule& out)
