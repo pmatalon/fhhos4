@@ -78,7 +78,9 @@ struct SolverArguments
 {
 	string SolverCode = "default";
 	string InitialGuessCode = "0";
+	StoppingCriteria StoppingCrit = StoppingCriteria::NormalizedResidual;
 	double Tolerance = 1e-8;
+	double StagnationConvRate = 0.90;
 	int MaxIterations = 200;
 	bool PrintIterationResults = true;
 	double RelaxationParameter = 1;

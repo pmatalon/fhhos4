@@ -11,11 +11,9 @@ private:
 	Vector _exactSolution;
 	MFlops _oneFineMatVecWork = 0;
 
-	double _oldResidualNorm = -1;
 	double _iterationConvRate = 0;
 	list<double> _previousItConvRates;
-	double _asymptoticConvRate = 0;
-	double _tolerance = 1e-8;
+	double _tolerance = 0;
 	MFlops _iterationComputationalWork = 0;
 	MFlops _solvingComputationalWork = 0; // total of all iterations
 	Timer _solvingTimer;
@@ -25,8 +23,10 @@ public:
 	int IterationNumber = 0;
 	double ResidualNorm = -1;
 	double NormalizedResidualNorm = -1;
+	double PreviousNormalizedResidualNorm = -1;
 	double RelativeErrorNorm = -1;
 	double L2Error = -1;
+	double AsymptoticConvRate = 0;
 
 	Vector Residual;
 	Vector Ax;
@@ -45,7 +45,7 @@ public:
 		this->_computeError = oldResult._computeError;
 		this->_exactSolution = oldResult._exactSolution;
 		this->_oneFineMatVecWork = oldResult._oneFineMatVecWork;
-		this->_oldResidualNorm = oldResult.NormalizedResidualNorm;
+		this->PreviousNormalizedResidualNorm = oldResult.NormalizedResidualNorm;
 		this->_previousItConvRates = oldResult._previousItConvRates;
 		this->_tolerance = oldResult._tolerance;
 		this->OnNewSolution = oldResult.OnNewSolution;
@@ -95,17 +95,17 @@ public:
 		assert(_bNorm >= 0);
 		this->NormalizedResidualNorm = _bNorm > 0 ? ResidualNorm / _bNorm : ResidualNorm;
 
-		if (_oldResidualNorm != -1)
+		if (PreviousNormalizedResidualNorm != -1)
 		{
-			this->_iterationConvRate = this->NormalizedResidualNorm / _oldResidualNorm;
+			this->_iterationConvRate = this->NormalizedResidualNorm / PreviousNormalizedResidualNorm;
 
 			if (this->_previousItConvRates.size() == 5)
 				this->_previousItConvRates.pop_front();
 			this->_previousItConvRates.push_back(this->_iterationConvRate);
-			this->_asymptoticConvRate = 1;
+			this->AsymptoticConvRate = 1;
 			for (double cr : _previousItConvRates)
-				this->_asymptoticConvRate *= cr;
-			this->_asymptoticConvRate = pow(this->_asymptoticConvRate, 1.0 / _previousItConvRates.size());
+				this->AsymptoticConvRate *= cr;
+			this->AsymptoticConvRate = pow(this->AsymptoticConvRate, 1.0 / _previousItConvRates.size());
 		}
 	}
 
@@ -185,8 +185,11 @@ public:
 			//os << "";
 			os << setw(nFineMatVecWidth);
 			os << "Fine";
-			os << setw(remainingTimeWidth);
-			os << "Remaining";
+			if (result._tolerance > 0)
+			{
+				os << setw(remainingTimeWidth);
+				os << "Remaining";
+			}
 			os << endl;
 
 			// Label row 2
@@ -214,8 +217,11 @@ public:
 			//os << "CPU time";
 			os << setw(nFineMatVecWidth);
 			os << "MatVec";
-			os << setw(remainingTimeWidth);
-			os << "time";
+			if (result._tolerance > 0)
+			{
+				os << setw(remainingTimeWidth);
+				os << "time";
+			}
 
 			os << endl;
 		}
@@ -223,20 +229,25 @@ public:
 		os << setw(IterWidth);
 		os << result.IterationNumber;
 
-		os << setw(predictedIterationsWidth);
 		int remainingIterations = -1;
-		if (result.IterationNumber == 0)
-			os << "";
-		else
+		os << setw(predictedIterationsWidth);
+		if (result._tolerance > 0)
 		{
-			if (result._asymptoticConvRate < 1)
-			{
-				remainingIterations = abs(ceil(log(result._tolerance / result.NormalizedResidualNorm) / log(result._asymptoticConvRate)));
-				os << "/ " + to_string(result.IterationNumber + remainingIterations);
-			}
+			if (result.IterationNumber == 0)
+				os << "";
 			else
-				os << "/ -";
+			{
+				if (result.AsymptoticConvRate < 1)
+				{
+					remainingIterations = abs(ceil(log(result._tolerance / result.NormalizedResidualNorm) / log(result.AsymptoticConvRate)));
+					os << "/ " + to_string(result.IterationNumber + remainingIterations);
+				}
+				else
+					os << "/ -";
+			}
 		}
+		else
+			os << "";
 
 		os << setw(normalizedResWidth);
 		os << std::scientific << result.NormalizedResidualNorm;
@@ -263,7 +274,7 @@ public:
 		if (result.IterationNumber == 0)
 			os << " ";
 		else
-			os << std::defaultfloat << result._asymptoticConvRate;
+			os << std::defaultfloat << result.AsymptoticConvRate;
 
 		//os << setw(computWorkWidth);
 		//os << round(result._solvingComputationalWork);
@@ -277,17 +288,20 @@ public:
 		else
 			os << 0;
 
-		os << setw(remainingTimeWidth);
-		if (result.IterationNumber == 0)
-			os << " ";
-		else if (remainingIterations == -1)
-			os << "-";
-		else
+		if (result._tolerance > 0)
 		{
-			Duration d(result._solvingTimer.CPU().InMilliseconds / result.IterationNumber * remainingIterations);
-			stringstream ss;
-			ss << d;
-			os << ss.str().substr(0, 8);
+			os << setw(remainingTimeWidth);
+			if (result.IterationNumber == 0)
+				os << " ";
+			else if (remainingIterations == -1)
+				os << "-";
+			else
+			{
+				Duration d(result._solvingTimer.CPU().InMilliseconds / result.IterationNumber * remainingIterations);
+				stringstream ss;
+				ss << d;
+				os << ss.str().substr(0, 8);
+			}
 		}
 		return os;
 	}

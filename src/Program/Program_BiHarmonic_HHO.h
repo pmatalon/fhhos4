@@ -192,7 +192,9 @@ public:
 			else
 				Utils::FatalError("Unknown bi-harmonic solver '" + args.Solver.BiHarmonicSolverCode + "'");
 
+			biHarSolver->StoppingCrit = args.Solver.StoppingCrit;
 			biHarSolver->Tolerance = args.Solver.Tolerance;
+			biHarSolver->StagnationConvRate = args.Solver.StagnationConvRate;
 			biHarSolver->MaxIterations = args.Solver.MaxIterations;
 			// Compute L2-error at each iteration
 			if ((args.Solver.ComputeIterL2Error || args.Actions.ExportIterationL2Errors) && testCase->ExactSolution)

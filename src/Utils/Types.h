@@ -50,6 +50,13 @@ enum class BoundaryConditionType : unsigned
 	Neumann = 2
 };
 
+enum class StoppingCriteria : unsigned
+{
+	NormalizedResidual,
+	Stagnation,
+	MaxIterations,
+};
+
 enum class CoarseningType : unsigned
 {
 	H,

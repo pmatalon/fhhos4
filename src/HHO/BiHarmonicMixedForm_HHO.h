@@ -28,6 +28,7 @@ public:
 		if (iter)
 		{
 			iter->PrintIterationResults = false;
+			iter->StoppingCrit = StoppingCriteria::NormalizedResidual;
 			iter->MaxIterations = 50;
 		}
 	}
@@ -78,7 +79,9 @@ public:
 		cout << eigenvalues << endl;
 		Eigen::MatrixXcd eigenvectors = es.eigenvectors();
 		Eigen::VectorXcd kernelVector = eigenvectors.col(n-1);
-		//cout << kernelVector << endl;
+		cout << "---------------------" << endl << kernelVector << endl;
+		cout << "---------------------" << endl << eigenvectors.col(n - 2) << endl;
+		cout << "---------------------" << endl << eigenvectors.col(n - 3) << endl;
 
 		Vector lambda = Solve1stDiffProblemWithZeroSource(kernelVector.real());
 		//cout << lambda.norm() << endl;

@@ -105,7 +105,9 @@ public:
 		IterativeSolver* iterativeSolver = dynamic_cast<IterativeSolver*>(solver);
 		if (iterativeSolver)
 		{
+			iterativeSolver->StoppingCrit = args.Solver.StoppingCrit;
 			iterativeSolver->Tolerance = args.Solver.Tolerance;
+			iterativeSolver->StagnationConvRate = args.Solver.StagnationConvRate;
 			iterativeSolver->MaxIterations = args.Solver.MaxIterations;
 			iterativeSolver->PrintIterationResults = args.Solver.PrintIterationResults;
 		}

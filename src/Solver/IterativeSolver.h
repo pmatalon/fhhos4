@@ -3,12 +3,6 @@
 #include "IterationResult.h"
 using namespace std;
 
-enum class StoppingCriteria : unsigned
-{
-	NormalizedResidual = 0,
-	MaxIterations = 1
-};
-
 class IterativeSolver : public Solver
 {
 protected:
@@ -16,6 +10,7 @@ protected:
 public:
 	Vector ExactSolution;
 	double Tolerance = 1e-3;
+	double StagnationConvRate = 0.90;
 	int MaxIterations = 200;
 	int IterationCount = 0;
 	bool PrintIterationResults = true;
@@ -134,7 +129,7 @@ public:
 			return;
 		}
 
-		if (StoppingCrit == StoppingCriteria::NormalizedResidual)
+		if (StoppingCrit == StoppingCriteria::NormalizedResidual || StoppingCrit == StoppingCriteria::Stagnation)
 		{
 			if (xEquals0)
 				result.SetResidualAsB();
@@ -154,7 +149,7 @@ public:
 			if (!CanOptimizeResidualComputation())
 			{
 				result = ExecuteOneIteration(b, x, xEquals0, false, false, result);
-				if (!result.IsResidualSet() && StoppingCrit == StoppingCriteria::NormalizedResidual)
+				if (!result.IsResidualSet() && (StoppingCrit == StoppingCriteria::NormalizedResidual || StoppingCrit == StoppingCriteria::Stagnation))
 				{
 					this->Residual = b - A * x;                                          result.AddWorkInFlops(Cost::DAXPY(A));
 					result.SetResidualNorm(this->Residual.norm());                       result.AddWorkInFlops(Cost::Norm(b));
@@ -211,7 +206,8 @@ protected:
 		if (this->OnNewSolution)
 			result.OnNewSolution = this->OnNewSolution;
 		result.SetX(x);
-		result.SetTolerance(this->Tolerance);
+		if (this->StoppingCrit == StoppingCriteria::NormalizedResidual)
+			result.SetTolerance(this->Tolerance);
 		return result;
 	}
 
@@ -233,13 +229,15 @@ protected:
 			return false;
 		if (IterationCount >= MaxIterations)
 			return true;
-		if (StoppingCrit == StoppingCriteria::NormalizedResidual)
+		if (StoppingCrit == StoppingCriteria::NormalizedResidual || StoppingCrit == StoppingCriteria::Stagnation)
 		{
 			if (std::isinf(result.NormalizedResidualNorm)) // do not remove the prefix std:: or it can become ambiguous according to the compiler
 				Utils::FatalError("divergence of the solver");
 			if (std::isnan(result.NormalizedResidualNorm))
 				Utils::FatalError("the residual is NaN.");
-			if (result.NormalizedResidualNorm < this->Tolerance)
+			if (StoppingCrit == StoppingCriteria::NormalizedResidual && result.NormalizedResidualNorm < this->Tolerance)
+				return true;
+			if (StoppingCrit == StoppingCriteria::Stagnation && result.AsymptoticConvRate >= this->StagnationConvRate && result.NormalizedResidualNorm <= result.PreviousNormalizedResidualNorm)
 				return true;
 		}
 		return false;

@@ -196,8 +196,16 @@ void print_usage() {
 	cout << "              rand     - random" << endl;
 	cout << "              smooth   - initial guess which generates a smooth error w.r.t. the multigrid prolongation" << endl;
 	cout << endl;
+	cout << "-stop CODE" << endl;
+	cout << "      Stopping criterion (if the solver is iterative)." << endl;
+	cout << "              tol      - tolerance on the residual norm (see -tol to set the value)" << endl;
+	cout << "              stag     - stagnation of the residual (see -stag to set the value)" << endl;
+	cout << endl;
 	cout << "-tol NUM" << endl;
-	cout << "      Tolerance of the iterative solver (default: 1e-8)." << endl;
+	cout << "      Tolerance for the normalized residual (default: 1e-8)." << endl;
+	cout << endl;
+	cout << "-stag NUM" << endl;
+	cout << "      Stagnation coefficent for the asymptotic convergence rate (default: 0.90)." << endl;
 	cout << endl;
 	cout << "-max-iter NUM" << endl;
 	cout << "      Maximum number of iterations for the iterative solver (default: 200)." << endl;
@@ -570,7 +578,9 @@ int main(int argc, char* argv[])
 		OPT_PolySpace,
 		// Solver
 		OPT_InitialGuess,
+		OPT_StoppingCriterion,
 		OPT_Tolerance,
+		OPT_StagnationConvRate,
 		OPT_MaxIterations,
 		OPT_Relaxation,
 		OPT_BlockSize,
@@ -640,7 +650,9 @@ int main(int argc, char* argv[])
 		 { "poly-space", required_argument, NULL, OPT_PolySpace },
 		 // Solver
 		 { "initial-guess", required_argument, NULL, OPT_InitialGuess },
+		 { "stop", required_argument, NULL, OPT_StoppingCriterion },
 		 { "tol", required_argument, NULL, OPT_Tolerance },
+		 { "stag", required_argument, NULL, OPT_StagnationConvRate },
 		 { "max-iter", required_argument, NULL, OPT_MaxIterations },
 		 { "relax", required_argument, NULL, OPT_Relaxation },
 		 { "block-size", required_argument, NULL, OPT_BlockSize },
@@ -872,9 +884,27 @@ int main(int argc, char* argv[])
 				args.Solver.InitialGuessCode = initialGuessCode;
 				break;
 			}
+			case OPT_StoppingCriterion:
+			{
+				string stoppingCode = optarg;
+				if (stoppingCode.compare("tol") == 0)
+					args.Solver.StoppingCrit = StoppingCriteria::NormalizedResidual;
+				else if (stoppingCode.compare("stag") == 0)
+					args.Solver.StoppingCrit = StoppingCriteria::Stagnation;
+				else
+					argument_error("unknown stopping criterion '" + stoppingCode + "'. Check -stop argument.");
+				break;
+			}
 			case OPT_Tolerance:
 				args.Solver.Tolerance = atof(optarg);
 				break;
+			case OPT_StagnationConvRate:
+			{
+				args.Solver.StagnationConvRate = atof(optarg);
+				if (args.Solver.StagnationConvRate >= 1)
+					argument_error("the stagnation convergence rate must be < 1. Check -stag argument.");
+				break;
+			}
 			case OPT_MaxIterations:
 				args.Solver.MaxIterations = atoi(optarg);
 				if (args.Solver.MaxIterations < 1)
