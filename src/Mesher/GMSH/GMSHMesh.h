@@ -315,7 +315,10 @@ private:
 			gmsh::model::mesh::getNodes(nodeTags, coord, parametricCoord, 0, pointTag, true, false);
 			if (nodeTags.size() == 0)
 			{
-				Utils::Warning("No mesh vertex has been found for the geometric point " + to_string(pointTag) + ". If it corresponds to the center of a circle, you can ignore this warning.");
+				// TODO - I'm commmenting this warning because it always occurs and it's annoying.
+				// Find out why and uncomment.
+				
+				//Utils::Warning("No mesh vertex has been found for the geometric point " + to_string(pointTag) + ". If it corresponds to the center of a circle, you can ignore this warning.");
 				continue;
 			}
 			else if (nodeTags.size() > 1)
