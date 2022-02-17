@@ -34,7 +34,7 @@ public:
 
 		cout << endl;
 
-		ExportModule out(args.OutputDirectory);
+		ExportModule out(args.OutputDirectory, "", args.Actions.Export.ValueSeparator);
 
 		//----------//
 		//   Mesh   //
@@ -51,11 +51,11 @@ public:
 		cout << "Mesh storage > " << Utils::MemoryString(mesh->MemoryUsage()) << endl;
 
 		// Export source
-		if (args.Actions.ExportSourceToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
+		if (args.Actions.Export.SourceToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
 			dynamic_cast<GMSHMesh<Dim>*>(mesh)->ExportToGMSH(testCase->SourceFunction, args.OutputDirectory + "/source", "source");
 
 		// Export exact solution
-		if (args.Actions.ExportExactSolutionToGMSH && testCase->ExactSolution && args.Discretization.Mesher.compare("gmsh") == 0)
+		if (args.Actions.Export.ExactSolutionToGMSH && testCase->ExactSolution && args.Discretization.Mesher.compare("gmsh") == 0)
 			dynamic_cast<GMSHMesh<Dim>*>(mesh)->ExportToGMSH(testCase->ExactSolution, args.OutputDirectory + "/exsol", "exact solution");
 
 		//----------------------//
@@ -200,7 +200,7 @@ public:
 			else
 				Utils::FatalError("Unknown bi-harmonic solver '" + args.Solver.BiHarmonicSolverCode + "'");
 
-			cout << "Solver: " << *biHarSolver << endl;
+			cout << "Solver: " << *biHarSolver << endl << endl;
 
 			DenseMatrix A; // computed explicitly only if direct solver
 
@@ -212,7 +212,7 @@ public:
 				biHarIterSolver->StagnationConvRate = args.Solver.StagnationConvRate;
 				biHarIterSolver->MaxIterations = args.Solver.MaxIterations;
 				// Compute L2-error at each iteration
-				if ((args.Solver.ComputeIterL2Error || args.Actions.ExportIterationL2Errors) && testCase->ExactSolution)
+				if ((args.Solver.ComputeIterL2Error || args.Actions.Export.IterationL2Errors) && testCase->ExactSolution)
 				{
 					biHarIterSolver->OnNewSolution = [&biHarPb, &testCase, &theta0, &b](IterationResult& result, const Vector& theta)
 					{
@@ -225,21 +225,24 @@ public:
 					};
 				}
 				// Export iteration results
-				if (args.Actions.ExportIterationResiduals || args.Actions.ExportIterationL2Errors)
+				if (args.Actions.Export.IterationResiduals || args.Actions.Export.IterationL2Errors)
 				{
-					if (args.Actions.ExportIterationResiduals)
+					if (args.Actions.Export.IterationResiduals)
 						out.CleanFile("iteration_residuals");
-					if (args.Actions.ExportIterationL2Errors)
+					if (args.Actions.Export.IterationL2Errors)
 						out.CleanFile("iteration_l2errors");
 
 					biHarIterSolver->OnIterationEnd = [&args, &out](const IterationResult& result)
 					{
-						if (args.Actions.ExportIterationResiduals)
+						if (args.Actions.Export.IterationResiduals)
 							out.ExportNewVectorValue(result.NormalizedResidualNorm, "iteration_residuals");
-						if (args.Actions.ExportIterationL2Errors && result.L2Error != -1)
+						if (args.Actions.Export.IterationL2Errors && result.L2Error != -1)
 							out.ExportNewVectorValue(result.L2Error, "iteration_l2errors");
 					};
 				}
+
+				// Give the Laplacian matrix so that the Work Units are computed with respect to it
+				biHarIterSolver->Setup(biHarPb->DiffPb().A);
 			}
 			else // direct solver
 			{
@@ -335,16 +338,16 @@ public:
 			//       Solution export       //
 			//-----------------------------//
 
-			if (args.Actions.ExportSolutionVectors)
+			if (args.Actions.Export.SolutionVectors)
 				out.ExportVector(reconstructedSolution, "solutionHigherOrder");
 
-			if (args.Actions.ExportMeshToMatlab)
+			if (args.Actions.Export.MeshToMatlab)
 			{
 				mesh->ExportToMatlab(args.OutputDirectory);
 				mesh->ExportToMatlab2(args.OutputDirectory + "/mesh.m");
 			}
 
-			if (args.Actions.ExportSolutionToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
+			if (args.Actions.Export.SolutionToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
 				biHarPb->DiffPb().ExportSolutionToGMSH(reconstructedSolution, out);
 
 			//----------------------//

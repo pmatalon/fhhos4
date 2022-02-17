@@ -127,10 +127,10 @@ public:
 			{
 				BigNumber nnzApproximate = chunk->Size() * basis->Size() * (2 * Dim + 1);
 				NonZeroCoefficients matrixCoeffs(nnzApproximate);
-				NonZeroCoefficients massMatrixCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
-				NonZeroCoefficients volumicCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
-				NonZeroCoefficients couplingCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
-				NonZeroCoefficients penCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
+				NonZeroCoefficients massMatrixCoeffs(actions.Export.AssemblyTermMatrices ? nnzApproximate : 0);
+				NonZeroCoefficients volumicCoeffs(actions.Export.AssemblyTermMatrices ? nnzApproximate : 0);
+				NonZeroCoefficients couplingCoeffs(actions.Export.AssemblyTermMatrices ? nnzApproximate : 0);
+				NonZeroCoefficients penCoeffs(actions.Export.AssemblyTermMatrices ? nnzApproximate : 0);
 
 				for (BigNumber iElem = chunk->Start; iElem < chunk->End; iElem++)
 				{
@@ -166,14 +166,14 @@ public:
 
 							//cout << "\t\t TOTAL = " << volumicTerm + coupling + penalization << endl;
 
-							if (actions.ExportAssemblyTermMatrices)
+							if (actions.Export.AssemblyTermMatrices)
 							{
 								volumicCoeffs.Add(basisFunction1, basisFunction2, volumicTerm);
 								couplingCoeffs.Add(basisFunction1, basisFunction2, coupling);
 								penCoeffs.Add(basisFunction1, basisFunction2, penalization);
 							}
 							matrixCoeffs.Add(basisFunction1, basisFunction2, volumicTerm + coupling + penalization);
-							if (actions.ExportAssemblyTermMatrices)
+							if (actions.Export.AssemblyTermMatrices)
 							{
 								double massTerm = element->MassTerm(phi1, phi2);
 								massMatrixCoeffs.Add(basisFunction1, basisFunction2, massTerm);
@@ -196,10 +196,10 @@ public:
 
 		BigNumber nnzApproximate = mesh->Elements.size() * basis->Size() * (2 * Dim + 1);
 		NonZeroCoefficients matrixCoeffs(nnzApproximate);
-		NonZeroCoefficients massMatrixCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
-		NonZeroCoefficients volumicCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
-		NonZeroCoefficients couplingCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
-		NonZeroCoefficients penCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
+		NonZeroCoefficients massMatrixCoeffs(actions.Export.AssemblyTermMatrices ? nnzApproximate : 0);
+		NonZeroCoefficients volumicCoeffs(actions.Export.AssemblyTermMatrices ? nnzApproximate : 0);
+		NonZeroCoefficients couplingCoeffs(actions.Export.AssemblyTermMatrices ? nnzApproximate : 0);
+		NonZeroCoefficients penCoeffs(actions.Export.AssemblyTermMatrices ? nnzApproximate : 0);
 
 		parallelLoop.Wait();
 
@@ -237,8 +237,8 @@ public:
 			{
 				BigNumber nnzApproximate = chunk->Size() * basis->Size() * (2 * Dim + 1);
 				NonZeroCoefficients matrixCoeffs(nnzApproximate);
-				NonZeroCoefficients couplingCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
-				NonZeroCoefficients penCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
+				NonZeroCoefficients couplingCoeffs(actions.Export.AssemblyTermMatrices ? nnzApproximate : 0);
+				NonZeroCoefficients penCoeffs(actions.Export.AssemblyTermMatrices ? nnzApproximate : 0);
 
 				for (BigNumber iElem = chunk->Start; iElem < chunk->End; ++iElem)
 				{
@@ -261,7 +261,7 @@ public:
 
 							//cout << "\t\t\t c=" << coupling << "\tp=" << penalization << endl;
 
-							if (actions.ExportAssemblyTermMatrices)
+							if (actions.Export.AssemblyTermMatrices)
 							{
 								couplingCoeffs.Add(basisFunction1, basisFunction2, coupling);
 								couplingCoeffs.Add(basisFunction2, basisFunction1, coupling);
@@ -299,7 +299,7 @@ public:
 		matrixCoeffs.Fill(this->A);
 		cout << "nnz(A) = " << this->A.nonZeros() << endl;
 
-		if (actions.ExportLinearSystem)
+		if (actions.Export.LinearSystem)
 		{
 			cout << "Export of the linear system..." << endl;
 			out.ExportMatrix(this->A, "A");
@@ -307,7 +307,7 @@ public:
 			out.ExportVector(this->b, "b");
 		}
 
-		if (actions.ExportAssemblyTermMatrices)
+		if (actions.Export.AssemblyTermMatrices)
 		{
 			SparseMatrix M(nUnknowns, nUnknowns);
 			massMatrixCoeffs.Fill(M);

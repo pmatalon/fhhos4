@@ -11,6 +11,7 @@ class ExportModule
 private:
 	string _outputDirectory;
 	string _filePrefix;
+	string _valueSeparator;
 
 public:
 	ExportModule() :
@@ -22,8 +23,13 @@ public:
 	{}
 
 	ExportModule(string outputDirectory, string filePrefix) :
+		ExportModule(outputDirectory, filePrefix, ",")
+	{}
+
+	ExportModule(string outputDirectory, string filePrefix, string valueSeparator) :
 		_outputDirectory(outputDirectory),
-		_filePrefix(filePrefix)
+		_filePrefix(filePrefix),
+		_valueSeparator(valueSeparator)
 	{}
 
 	string OutputDirectory() const
@@ -86,7 +92,7 @@ public:
 		string filePath = GetDatFilePath(suffix);
 		ofstream file(filePath, ios_base::app | ios_base::out);
 
-		file << std::scientific << value << endl;
+		file << std::scientific << value << _valueSeparator; // << endl;
 		file.close();
 	}
 };

@@ -152,11 +152,11 @@ public:
 		}
 
 		// Export source
-		if (args.Actions.ExportSourceToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
+		if (args.Actions.Export.SourceToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
 			dynamic_cast<GMSHMesh<Dim>*>(mesh)->ExportToGMSH(testCase->SourceFunction, args.OutputDirectory + "/source", "source");
 
 		// Export exact solution
-		if (args.Actions.ExportExactSolutionToGMSH && testCase->ExactSolution && args.Discretization.Mesher.compare("gmsh") == 0)
+		if (args.Actions.Export.ExactSolutionToGMSH && testCase->ExactSolution && args.Discretization.Mesher.compare("gmsh") == 0)
 			dynamic_cast<GMSHMesh<Dim>*>(mesh)->ExportToGMSH(testCase->ExactSolution, args.OutputDirectory + "/exsol", "exact solution");
 
 		//----------------------//
@@ -239,13 +239,15 @@ public:
 			IterativeSolver* iterativeSolver = dynamic_cast<IterativeSolver*>(solver);
 			if (iterativeSolver)
 			{
-				iterativeSolver->ComputeExactSolution = Utils::ProgramArgs.Actions.ExportErrorToGMSH || problem->A.rows() <= 2000;
+				iterativeSolver->ComputeExactSolution = Utils::ProgramArgs.Actions.Export.ErrorToGMSH || problem->A.rows() <= 2000;
 				if (args.Solver.ComputeIterL2Error && testCase->ExactSolution && args.Discretization.StaticCondensation)
 				{
 					iterativeSolver->OnNewSolution = [&problem, &testCase](IterationResult& result, const Vector& faceSolution)
 					{
 						Vector reconstructedSolution = problem->ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution);
 						result.L2Error = problem->L2Error(testCase->ExactSolution, reconstructedSolution);
+
+						//cout << "                                                                                           " << std::setprecision(8) << (0.5*faceSolution.dot(problem->A * faceSolution) - problem->b.dot(faceSolution)) << endl;
 					};
 				}
 
@@ -294,14 +296,14 @@ public:
 
 			SolverFactory<Dim>::PrintStats(solver, setupTimer, solvingTimer, totalTimer);
 
-			if (args.Actions.ExportErrorToGMSH && iterativeSolver)
+			if (args.Actions.Export.ErrorToGMSH && iterativeSolver)
 				problem->ExportErrorToGMSH(iterativeSolver->ExactSolution - systemSolution, out);
 
 			delete solver;
 
 			Vector hybridSolution;
 			Vector reconstructedSolution;
-			if (args.Actions.ExportSolutionVectors || args.Actions.ExportSolutionToGMSH || testCase->ExactSolution || testCase->BC.Type == PbBoundaryConditions::FullNeumann)
+			if (args.Actions.Export.SolutionVectors || args.Actions.Export.SolutionToGMSH || testCase->ExactSolution || testCase->BC.Type == PbBoundaryConditions::FullNeumann)
 			{
 				cout << "----------------------------------------------------------" << endl;
 				cout << "-                     Post-processing                    -" << endl;
@@ -323,7 +325,7 @@ public:
 			//       Solution export       //
 			//-----------------------------//
 
-			if (args.Actions.ExportSolutionVectors)
+			if (args.Actions.Export.SolutionVectors)
 			{
 				if (args.Discretization.StaticCondensation)
 					out.ExportVector(systemSolution, "solutionFaces");
@@ -331,13 +333,13 @@ public:
 				out.ExportVector(reconstructedSolution, "solutionHigherOrder");
 			}
 
-			if (args.Actions.ExportMeshToMatlab)
+			if (args.Actions.Export.MeshToMatlab)
 			{
 				mesh->ExportToMatlab(args.OutputDirectory);
 				mesh->ExportToMatlab2(args.OutputDirectory + "/mesh.m");
 			}
 
-			if (args.Actions.ExportSolutionToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
+			if (args.Actions.Export.SolutionToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
 				problem->ExportSolutionToGMSH(reconstructedSolution, out);
 
 			//----------------------//

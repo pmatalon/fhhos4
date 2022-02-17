@@ -232,6 +232,7 @@ public:
 
 			_lastPb = new Diffusion_HHO<Dim>(mesh, _diffLastPbTestCase, hhoLast, true, false);
 			ActionsArguments diffActions;
+			diffActions.LogAssembly = false;
 			diffActions.AssembleRightHandSide = true;
 			_lastPb->Assemble(diffActions);
 		}

@@ -438,7 +438,7 @@ private:
 	{
 		const SparseMatrix& A = *level->OperatorMatrix;
 
-		if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
+		if (Utils::ProgramArgs.Actions.Export.MultigridIterationVectors)
 			level->ExportVector(b, "it" + to_string(this->IterationCount) + "_b");
 
 		if (level->IsCoarsestLevel())
@@ -451,7 +451,7 @@ private:
 		}
 		else
 		{
-			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
+			if (Utils::ProgramArgs.Actions.Export.MultigridIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_beforePreSmoothing");
 
 			//---------------//
@@ -477,7 +477,7 @@ private:
 				r = b - A * x;                                                            result.AddWorkInFlops(Cost::DAXPY(A));
 			}
 			
-			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
+			if (Utils::ProgramArgs.Actions.Export.MultigridIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPreSmoothing");
 
 			//auto flopPreSmoothAndRes = result.IterationComputationalWork() - flopBeforePreSmooth;
@@ -539,7 +539,7 @@ private:
 			// Coarse-grid correction //
 			//------------------------//
 
-			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
+			if (Utils::ProgramArgs.Actions.Export.MultigridIterationVectors)
 			{
 				level->ExportVector(ec, "it" + to_string(this->IterationCount) + "_ce");
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol");
@@ -554,7 +554,7 @@ private:
 			                                                                          this->IntergridTransferCost += (level->ProlongCost() + Cost::AddVec(x))*1e-6;
 			IntergridTransferTimer.Pause();
 
-			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
+			if (Utils::ProgramArgs.Actions.Export.MultigridIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_cgc");
 
 			//----------------//
@@ -593,7 +593,7 @@ private:
 				}
 			}
 
-			if (Utils::ProgramArgs.Actions.ExportMultigridIterationVectors)
+			if (Utils::ProgramArgs.Actions.Export.MultigridIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPostSmoothing");
 
 			//auto flopPostSmooth = result.IterationComputationalWork() - flopBeforePostSmooth;

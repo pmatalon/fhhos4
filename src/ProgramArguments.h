@@ -91,28 +91,34 @@ struct SolverArguments
 	bool BiHarReconstructBoundary = false;
 };
 
+struct ExportArguments
+{
+	bool LinearSystem = false;
+	bool AssemblyTermMatrices = false;
+	bool MeshToMatlab = false;
+	bool MultigridComponents = false;
+	bool MultigridIterationVectors = false;
+	bool SolutionVectors = false;
+	bool SolutionToGMSH = false;
+	bool ExactSolutionToGMSH = false;
+	bool ErrorToGMSH = false;
+	bool SourceToGMSH = false;
+	bool IterationResiduals = false;
+	bool IterationL2Errors = false;
+	string ValueSeparator = ","; // ",\n";
+};
+
 struct ActionsArguments
 {
 	bool SolveLinearSystem = true;
 	bool UseCache = true;
-	bool ExportLinearSystem = false;
-	bool ExportAssemblyTermMatrices = false;
-	bool ExportMeshToMatlab = false;
-	bool ExportMultigridComponents = false;
-	bool ExportMultigridIterationVectors = false;
-	bool ExportSolutionVectors = false;
-	bool ExportSolutionToGMSH = false;
-	bool ExportExactSolutionToGMSH = false;
-	bool ExportErrorToGMSH = false;
-	bool ExportSourceToGMSH = false;
-	bool ExportIterationResiduals = false;
-	bool ExportIterationL2Errors = false;
 	bool LogAssembly = true;
 	bool AssembleRightHandSide = true;
 	bool InitReferenceShapes = true;
 	bool UnitTests = false;
 	bool GMSHLogEnabled = false;
 	bool EnforceDirichletBC = true;
+	ExportArguments Export;
 };
 
 struct ProgramArguments

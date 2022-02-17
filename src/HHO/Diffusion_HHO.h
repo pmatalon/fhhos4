@@ -196,7 +196,7 @@ public:
 
 	void Assemble(const ActionsArguments& actions)
 	{
-		assert(!actions.ExportLinearSystem && !actions.ExportAssemblyTermMatrices);
+		assert(!actions.Export.LinearSystem && !actions.Export.AssemblyTermMatrices);
 		Assemble(actions, ExportModule(""));
 	}
 
@@ -266,7 +266,7 @@ public:
 			cout << "\tCompute local matrices (allocation of " + Utils::MemoryString(totalElemLocalMatricesMemory) + ")" << endl;
 		this->InitHHO();
 
-		if (!actions.ExportAssemblyTermMatrices)
+		if (!actions.Export.AssemblyTermMatrices)
 		{
 			ElementParallelLoop<Dim> parallelLoopE(mesh->Elements);
 			parallelLoopE.Execute([this](Element<Dim>* element)
@@ -338,7 +338,7 @@ public:
 
 		parallelLoop.InitChunks([this, nCoeffs_A_T, nCoeffs_A_T_T, nCoeffs_A_T_F, nCoeffs_A_F_F, actions](ParallelChunk<AssemblyResult>* chunk)
 			{
-				if (actions.ExportAssemblyTermMatrices)
+				if (actions.Export.AssemblyTermMatrices)
 				{
 					BigNumber nnzApproximate = chunk->Size() * nCoeffs_A_T;
 					chunk->Results.ConsistencyCoeffs = NonZeroCoefficients(nnzApproximate);
@@ -371,7 +371,7 @@ public:
 
 					BigNumber i = A_T_T.FirstRow(element);
 					A_T_T.AddBlock(i, i, element->A, 0, 0, HHO->nCellUnknowns, HHO->nCellUnknowns);
-					if (actions.ExportAssemblyTermMatrices)
+					if (actions.Export.AssemblyTermMatrices)
 					{
 						chunk->Results.ConsistencyCoeffs.AddBlock(i, i, element->Acons, 0, 0, HHO->nCellUnknowns, HHO->nCellUnknowns);
 						chunk->Results.StabilizationCoeffs.AddBlock(i, i, element->Astab, 0, 0, HHO->nCellUnknowns, HHO->nCellUnknowns);
@@ -391,7 +391,7 @@ public:
 					BigNumber j = A_T_F.FirstCol(face);
 					A_T_F.AddBlock(i, j, element->A, 0, element->FirstDOFNumber(face), HHO->nCellUnknowns, HHO->nFaceUnknowns);
 
-					if (actions.ExportAssemblyTermMatrices && !face->HasDirichletBC())
+					if (actions.Export.AssemblyTermMatrices && !face->HasDirichletBC())
 					{
 						chunk->Results.ConsistencyCoeffs.AddBlock(i, j, element->Acons, 0, element->FirstDOFNumber(face), HHO->nCellUnknowns, HHO->nFaceUnknowns);
 						chunk->Results.StabilizationCoeffs.AddBlock(i, j, element->Astab, 0, element->FirstDOFNumber(face), HHO->nCellUnknowns, HHO->nFaceUnknowns);
@@ -411,7 +411,7 @@ public:
 					{
 						BigNumber j = A_F_F.FirstCol(face2);
 						A_F_F.AddBlock(i, j, element->A, element->FirstDOFNumber(face1), element->FirstDOFNumber(face2), HHO->nFaceUnknowns, HHO->nFaceUnknowns);
-						if (actions.ExportAssemblyTermMatrices && !face1->HasDirichletBC() && !face2->HasDirichletBC())
+						if (actions.Export.AssemblyTermMatrices && !face1->HasDirichletBC() && !face2->HasDirichletBC())
 						{
 							chunk->Results.ConsistencyCoeffs.AddBlock(i, j, element->Acons, element->FirstDOFNumber(face1), element->FirstDOFNumber(face2), HHO->nFaceUnknowns, HHO->nFaceUnknowns);
 							chunk->Results.StabilizationCoeffs.AddBlock(i, j, element->Astab, element->FirstDOFNumber(face1), element->FirstDOFNumber(face2), HHO->nFaceUnknowns, HHO->nFaceUnknowns);
@@ -423,7 +423,7 @@ public:
 				// Global reconstruction matrix (only for export) //
 				//------------------------------------------------//
 
-				if (actions.ExportAssemblyTermMatrices)
+				if (actions.Export.AssemblyTermMatrices)
 				{
 					BigNumber i = element->Number() * HHO->nReconstructUnknowns;
 					BigNumber j = FirstDOFGlobalNumber(element);
@@ -476,9 +476,9 @@ public:
 		A_F_F_Coeffs.Reserve(mesh->Faces.size() * nCoeffs_A_F_F);
 
 		BigNumber nnzApproximate = mesh->Elements.size() * nCoeffs_A_T;
-		NonZeroCoefficients consistencyCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
-		NonZeroCoefficients stabilizationCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
-		NonZeroCoefficients reconstructionCoeffs(actions.ExportAssemblyTermMatrices ? nnzApproximate : 0);
+		NonZeroCoefficients consistencyCoeffs(actions.Export.AssemblyTermMatrices ? nnzApproximate : 0);
+		NonZeroCoefficients stabilizationCoeffs(actions.Export.AssemblyTermMatrices ? nnzApproximate : 0);
+		NonZeroCoefficients reconstructionCoeffs(actions.Export.AssemblyTermMatrices ? nnzApproximate : 0);
 
 		parallelLoop.AggregateChunkResults([this, &A_T_T_Coeffs, &A_T_F_Coeffs, &A_F_F_Coeffs, &consistencyCoeffs, &stabilizationCoeffs, &reconstructionCoeffs, actions](AssemblyResult& chunkResult)
 			{
@@ -493,7 +493,7 @@ public:
 				A_F_F_Coeffs.Add(chunkResult.A_F_F_Coeffs);
 				chunkResult.A_F_F_Coeffs = A_F_F_Block<Dim>();
 
-				if (actions.ExportAssemblyTermMatrices)
+				if (actions.Export.AssemblyTermMatrices)
 				{
 					consistencyCoeffs.Add(chunkResult.ConsistencyCoeffs);
 					stabilizationCoeffs.Add(chunkResult.StabilizationCoeffs);
@@ -619,14 +619,14 @@ public:
 		//      Export      //
 		//------------------//
 
-		if (actions.ExportLinearSystem)
+		if (actions.Export.LinearSystem)
 		{
 			cout << "Export linear system..." << endl;
 			out.ExportMatrix(this->A, "A");
 			out.ExportVector(this->b, "b");
 		}
 
-		if (actions.ExportAssemblyTermMatrices)
+		if (actions.Export.AssemblyTermMatrices)
 		{
 			SparseMatrix Acons = SparseMatrix(HHO->nTotalHybridUnknowns, HHO->nTotalHybridUnknowns);
 			consistencyCoeffs.Fill(Acons);

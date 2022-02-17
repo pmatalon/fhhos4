@@ -220,7 +220,7 @@ private:
 		mg->FaceCoarseningStgy = args.Solver.MG.FaceCoarseningStgy;
 		mg->NumberOfMeshes = args.Solver.MG.NumberOfMeshes;
 		mg->CoarseningFactor = args.Solver.MG.CoarseningFactor;
-		mg->ExportComponents = args.Actions.ExportMultigridComponents;
+		mg->ExportComponents = args.Actions.Export.MultigridComponents;
 
 		// Coarse solver
 		ProgramArguments argsCoarseSolver;

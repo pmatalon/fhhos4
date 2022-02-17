@@ -50,11 +50,11 @@ public:
 		mesh->SetBoundaryConditions(&testCase->DirichletBC);
 
 		// Export source
-		if (args.Actions.ExportSourceToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
+		if (args.Actions.Export.SourceToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
 			dynamic_cast<GMSHMesh<Dim>*>(mesh)->ExportToGMSH(testCase->SourceFunction, args.OutputDirectory + "/source", "source");
 
 		// Export exact solution
-		if (args.Actions.ExportExactSolutionToGMSH && testCase->ExactSolution && args.Discretization.Mesher.compare("gmsh") == 0)
+		if (args.Actions.Export.ExactSolutionToGMSH && testCase->ExactSolution && args.Discretization.Mesher.compare("gmsh") == 0)
 			dynamic_cast<GMSHMesh<Dim>*>(mesh)->ExportToGMSH(testCase->ExactSolution, args.OutputDirectory + "/exsol", "exact solution");
 
 		//----------------------//
@@ -172,24 +172,24 @@ public:
 			//       Solution export       //
 			//-----------------------------//
 
-			if (args.Actions.ExportSolutionVectors || args.Actions.ExportSolutionToGMSH || testCase->ExactSolution)
+			if (args.Actions.Export.SolutionVectors || args.Actions.Export.SolutionToGMSH || testCase->ExactSolution)
 			{
 				cout << "----------------------------------------------------------" << endl;
 				cout << "-                     Post-processing                    -" << endl;
 				cout << "----------------------------------------------------------" << endl;
 
 				reconstructedSolution = biHarPb->DiffPb2().ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution);
-				if (args.Actions.ExportSolutionVectors)
+				if (args.Actions.Export.SolutionVectors)
 					out.ExportVector(reconstructedSolution, "solution");
 			}
 
-			if (args.Actions.ExportMeshToMatlab)
+			if (args.Actions.Export.MeshToMatlab)
 			{
 				mesh->ExportToMatlab(args.OutputDirectory);
 				mesh->ExportToMatlab2(args.OutputDirectory + "/mesh.m");
 			}
 
-			if (args.Actions.ExportSolutionToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
+			if (args.Actions.Export.SolutionToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
 				biHarPb->DiffPb2().ExportSolutionToGMSH(reconstructedSolution, out);
 
 

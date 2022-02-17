@@ -48,7 +48,7 @@ public:
 		ExportModule out(args.OutputDirectory);
 
 		// Export source
-		if (args.Actions.ExportSourceToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
+		if (args.Actions.Export.SourceToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
 			dynamic_cast<GMSHMesh<Dim>*>(mesh)->ExportToGMSH(testCase->SourceFunction, args.OutputDirectory + "/source", "source");
 
 		//----------------------//
@@ -95,7 +95,7 @@ public:
 			// Setup
 			IterativeSolver* iterativeSolver = dynamic_cast<IterativeSolver*>(solver);
 			if (iterativeSolver)
-				iterativeSolver->ComputeExactSolution = Utils::ProgramArgs.Actions.ExportErrorToGMSH || problem->A.rows() <= 2000;
+				iterativeSolver->ComputeExactSolution = Utils::ProgramArgs.Actions.Export.ErrorToGMSH || problem->A.rows() <= 2000;
 
 			totalTimer.Start();
 
@@ -123,7 +123,7 @@ public:
 			SolverFactory<Dim>::PrintStats(solver, setupTimer, solvingTimer, totalTimer);
 
 			// Export algebraic error
-			if (args.Actions.ExportErrorToGMSH && iterativeSolver)
+			if (args.Actions.Export.ErrorToGMSH && iterativeSolver)
 				mesh->ExportToGMSH(problem->Basis, iterativeSolver->ExactSolution - problem->SystemSolution, out.GetFilePathPrefix(), "error");
 
 			delete solver;
@@ -132,10 +132,10 @@ public:
 			//       Solution export       //
 			//-----------------------------//
 
-			if (args.Actions.ExportSolutionVectors)
+			if (args.Actions.Export.SolutionVectors)
 				out.ExportVector(problem->SystemSolution, "solution");
 			
-			if (args.Actions.ExportSolutionToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
+			if (args.Actions.Export.SolutionToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
 				mesh->ExportToGMSH(problem->Basis, problem->SystemSolution, out.GetFilePathPrefix(), "potential");
 
 			//----------------------//

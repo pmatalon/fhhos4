@@ -1222,29 +1222,29 @@ int main(int argc, char* argv[])
 				for (string code : exports)
 				{
 					if (code.compare("lsys") == 0)
-						args.Actions.ExportLinearSystem = true;
+						args.Actions.Export.LinearSystem = true;
 					else if (code.compare("amat") == 0)
-						args.Actions.ExportAssemblyTermMatrices = true;
+						args.Actions.Export.AssemblyTermMatrices = true;
 					else if (code.compare("mesh") == 0)
-						args.Actions.ExportMeshToMatlab = true;
+						args.Actions.Export.MeshToMatlab = true;
 					else if (code.compare("solvect") == 0)
-						args.Actions.ExportSolutionVectors = true;
+						args.Actions.Export.SolutionVectors = true;
 					else if (code.compare("solgmsh") == 0)
-						args.Actions.ExportSolutionToGMSH = true;
+						args.Actions.Export.SolutionToGMSH = true;
 					else if (code.compare("exsolgmsh") == 0)
-						args.Actions.ExportExactSolutionToGMSH = true;
+						args.Actions.Export.ExactSolutionToGMSH = true;
 					else if (code.compare("errgmsh") == 0)
-						args.Actions.ExportErrorToGMSH = true;
+						args.Actions.Export.ErrorToGMSH = true;
 					else if (code.compare("sourcegmsh") == 0)
-						args.Actions.ExportSourceToGMSH = true;
+						args.Actions.Export.SourceToGMSH = true;
 					else if (code.compare("iterres") == 0)
-						args.Actions.ExportIterationResiduals = true;
+						args.Actions.Export.IterationResiduals = true;
 					else if (code.compare("iterl2err") == 0)
-						args.Actions.ExportIterationL2Errors = true;
+						args.Actions.Export.IterationL2Errors = true;
 					else if (code.compare("mg") == 0)
-						args.Actions.ExportMultigridComponents = true;
+						args.Actions.Export.MultigridComponents = true;
 					else if (code.compare("mgit") == 0)
-						args.Actions.ExportMultigridIterationVectors = true;
+						args.Actions.Export.MultigridIterationVectors = true;
 					else
 						argument_error("unknown export option '" + code + "'.");
 				}
