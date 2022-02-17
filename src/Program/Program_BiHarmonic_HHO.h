@@ -172,8 +172,10 @@ public:
 			cout << "-     Solve bi-harmonic problem     -" << endl;
 			cout << "-------------------------------------" << endl;
 
+			// Solve 1st problem with f as source
 			Vector theta0 = biHarPb->FindCompatibleTheta();
 			Vector delta = biHarPb->Solve1stDiffProblem(theta0);
+			// Solve 2nd problem and extract the boundary (or normal derivative)
 			Vector u_boundary0 = biHarPb->Solve2ndDiffProblem(delta, true);
 
 			// A(theta) -> -boundary(u) is s.p.d.
@@ -184,46 +186,67 @@ public:
 			Vector b = u_boundary0;
 
 
-			IterativeSolver* biHarSolver = nullptr;
+			//-------------------------------------//
+			//            Create solver            //
+			//-------------------------------------//
+
+			Solver* biHarSolver = nullptr;
 			if (args.Solver.BiHarmonicSolverCode.compare("cg") == 0)
 				biHarSolver = new BiHarmonicCG<Dim>(biHarPb);
 			else if (args.Solver.BiHarmonicSolverCode.compare("gd") == 0)
 				biHarSolver = new BiHarmonicGradientDescent<Dim>(biHarPb);
+			else if (args.Solver.BiHarmonicSolverCode.compare("lu") == 0)
+				biHarSolver = new EigenLU();
 			else
 				Utils::FatalError("Unknown bi-harmonic solver '" + args.Solver.BiHarmonicSolverCode + "'");
 
-			biHarSolver->StoppingCrit = args.Solver.StoppingCrit;
-			biHarSolver->Tolerance = args.Solver.Tolerance;
-			biHarSolver->StagnationConvRate = args.Solver.StagnationConvRate;
-			biHarSolver->MaxIterations = args.Solver.MaxIterations;
-			// Compute L2-error at each iteration
-			if ((args.Solver.ComputeIterL2Error || args.Actions.ExportIterationL2Errors) && testCase->ExactSolution)
+			cout << "Solver: " << *biHarSolver << endl;
+
+			DenseMatrix A; // computed explicitly only if direct solver
+
+			IterativeSolver* biHarIterSolver = dynamic_cast<IterativeSolver*>(biHarSolver);
+			if (biHarIterSolver)
 			{
-				biHarSolver->OnNewSolution = [&biHarPb, &testCase, &theta0, &b](IterationResult& result, const Vector& theta)
+				biHarIterSolver->StoppingCrit = args.Solver.StoppingCrit;
+				biHarIterSolver->Tolerance = args.Solver.Tolerance;
+				biHarIterSolver->StagnationConvRate = args.Solver.StagnationConvRate;
+				biHarIterSolver->MaxIterations = args.Solver.MaxIterations;
+				// Compute L2-error at each iteration
+				if ((args.Solver.ComputeIterL2Error || args.Actions.ExportIterationL2Errors) && testCase->ExactSolution)
 				{
-					Vector reconstructedSolution = biHarPb->ComputeSolution(theta0 + theta);
-					result.L2Error = biHarPb->DiffPb().L2Error(testCase->ExactSolution, reconstructedSolution);
+					biHarIterSolver->OnNewSolution = [&biHarPb, &testCase, &theta0, &b](IterationResult& result, const Vector& theta)
+					{
+						Vector reconstructedSolution = biHarPb->ComputeSolution(theta0 + theta);
+						result.L2Error = biHarPb->DiffPb().L2Error(testCase->ExactSolution, reconstructedSolution);
 
-					Vector lambda =  biHarPb->Solve1stDiffProblemWithZeroSource(theta);
-					Vector Atheta = -biHarPb->Solve2ndDiffProblem(lambda, true);
-					cout << "                                                                                " << std::setprecision(8) << 0.5*theta.dot(Atheta)-b.dot(theta) << endl;
-				};
-			}
-			// Export iteration results
-			if (args.Actions.ExportIterationResiduals || args.Actions.ExportIterationL2Errors)
-			{
-				if (args.Actions.ExportIterationResiduals)
-					out.CleanFile("iteration_residuals");
-				if (args.Actions.ExportIterationL2Errors)
-					out.CleanFile("iteration_l2errors");
-
-				biHarSolver->OnIterationEnd = [&args, &out](const IterationResult& result)
+						Vector lambda = biHarPb->Solve1stDiffProblemWithZeroSource(theta);
+						Vector Atheta = -biHarPb->Solve2ndDiffProblem(lambda, true);
+						cout << "                                                                                " << std::setprecision(8) << 0.5 * theta.dot(Atheta) - b.dot(theta) << endl;
+					};
+				}
+				// Export iteration results
+				if (args.Actions.ExportIterationResiduals || args.Actions.ExportIterationL2Errors)
 				{
 					if (args.Actions.ExportIterationResiduals)
-						out.ExportNewVectorValue(result.NormalizedResidualNorm, "iteration_residuals");
-					if (args.Actions.ExportIterationL2Errors && result.L2Error != -1)
-						out.ExportNewVectorValue(result.L2Error, "iteration_l2errors");
-				};
+						out.CleanFile("iteration_residuals");
+					if (args.Actions.ExportIterationL2Errors)
+						out.CleanFile("iteration_l2errors");
+
+					biHarIterSolver->OnIterationEnd = [&args, &out](const IterationResult& result)
+					{
+						if (args.Actions.ExportIterationResiduals)
+							out.ExportNewVectorValue(result.NormalizedResidualNorm, "iteration_residuals");
+						if (args.Actions.ExportIterationL2Errors && result.L2Error != -1)
+							out.ExportNewVectorValue(result.L2Error, "iteration_l2errors");
+					};
+				}
+			}
+			else // direct solver
+			{
+				cout << "Computation of the matrix..." << endl;
+				A = biHarPb->Matrix();
+				cout << "Factorization..." << endl;
+				biHarSolver->Setup(A);
 			}
 
 
@@ -264,14 +287,48 @@ public:
 			cout << error << endl;*/
 
 			if (args.Actions.UnitTests)
-				biHarPb->Matrix(out);
+			{
+				auto n = A.rows();
+				A = (A + A.transpose()) / 2.0;
+
+				Eigen::EigenSolver<DenseMatrix> es(A);
+				double det = A.determinant();
+				//auto v = A.eigenvalues();
+				//cout << v << endl;
+				Eigen::VectorXcd eigenvalues = es.eigenvalues();
+				cout << eigenvalues << endl;
+				Eigen::MatrixXcd eigenvectors = es.eigenvectors();
+				Eigen::VectorXcd kernelVector = eigenvectors.col(n - 1);
+				cout << "---------------------" << endl << kernelVector << endl;
+				cout << "---------------------" << endl << eigenvectors.col(n - 2) << endl;
+				cout << "---------------------" << endl << eigenvectors.col(n - 3) << endl;
+
+				Vector lambda = biHarPb->Solve1stDiffProblemWithZeroSource(kernelVector.real());
+				//cout << lambda.norm() << endl;
+
+				//DiffPb().ExportReconstructedVectorToGMSH(lambda, out, "lambda");
+				Vector solPb2 = biHarPb->Solve2ndDiffProblem(lambda, false);
+				biHarPb->DiffPb().ExportReconstructedVectorToGMSH(solPb2, out, "solPb2");
+
+
+				Vector zero = -biHarPb->Solve2ndDiffProblem(lambda, true);
+				cout << zero.norm() << endl;
+
+				out.ExportMatrix(A, "matrix");
+			}
 			//--------------------------------------------------------------------------//
 
-			Vector theta = Vector::Zero(theta0.rows());
-			biHarSolver->Solve(b, theta, true);
+			if (!biHarIterSolver)
+			{
+				Utils::Empty(A);
+				cout << "Solve linear system..." << endl;
+			}
+
+			Vector theta = biHarSolver->Solve(b);
 
 			delete biHarSolver;
 
+			cout << "Compute solution..." << endl;
 			Vector reconstructedSolution = biHarPb->ComputeSolution(theta0 + theta);
 
 			//-----------------------------//

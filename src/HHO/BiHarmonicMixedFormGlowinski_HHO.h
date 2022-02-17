@@ -49,6 +49,7 @@ public:
 	{
 		ActionsArguments diffActions;
 		diffActions.AssembleRightHandSide = false;
+		diffActions.LogAssembly = false;
 		_diffPb.Assemble(diffActions);
 
 

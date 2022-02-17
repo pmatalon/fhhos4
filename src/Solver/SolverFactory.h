@@ -1,6 +1,7 @@
 #pragma once
 #include "../Utils/Timer.h"
 
+#include "Direct/EigenLU.h"
 #include "Krylov/ConjugateGradient.h"
 #include "Krylov/FlexibleConjugateGradient.h"
 #include "Multigrid/MultigridForHHO/MultigridForHHO.h"

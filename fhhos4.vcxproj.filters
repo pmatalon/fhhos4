@@ -547,6 +547,9 @@
     <ClInclude Include="src\HHO\BiHarmonicMixedForm_HHO.h">
       <Filter>HHO</Filter>
     </ClInclude>
+    <ClInclude Include="src\Solver\Direct\EigenLU.h">
+      <Filter>Solver\Direct</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

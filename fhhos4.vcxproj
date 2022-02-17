@@ -181,6 +181,7 @@
     <ClInclude Include="src\Program.h" />
     <ClInclude Include="src\ProgramArguments.h" />
     <ClInclude Include="src\Solver\BiHarmonic\BiHarmonicGradientDescent.h" />
+    <ClInclude Include="src\Solver\Direct\EigenLU.h" />
     <ClInclude Include="src\Solver\Direct\EigenSparseCholesky.h" />
     <ClInclude Include="src\Solver\Direct\EigenSparseLU.h" />
     <ClInclude Include="src\Solver\FixedPoint\BlockGaussSeidel.h" />

@@ -59,6 +59,7 @@ public:
 	{
 		ActionsArguments diffActions;
 		diffActions.AssembleRightHandSide = false;
+		diffActions.LogAssembly = false;
 		_diffPb.Assemble(diffActions);
 
 		_integralSource = _diffPb.IntegralOverDomain(_testCase->SourceFunction);

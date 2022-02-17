@@ -7,6 +7,7 @@ class Solver
 {
 public:
 	const SparseMatrix* Matrix = nullptr;
+	const DenseMatrix* DenseMat = nullptr;
 
 	MFlops SetupComputationalWork = 0;
 	MFlops SolvingComputationalWork = 0;
@@ -24,6 +25,11 @@ public:
 	virtual void Setup(const SparseMatrix& A)
 	{
 		this->Matrix = &A;
+	}
+
+	virtual void Setup(const DenseMatrix& A)
+	{
+		this->DenseMat = &A;
 	}
 
 	virtual Vector Solve(const Vector& b) = 0;
