@@ -17,7 +17,7 @@
 // In a setup function, we compute and store the vectors
 //              _one   := M^-1 * ipw1,
 //              _nipw1 := ipw1 / (1|1),
-// where M^-1 is the face mass matrix and (1|1).
+// where M is the mass matrix and (1|1) corresponds to the measure of the space.
 // (eq.1) becomes 
 //              x <- x - x^T*_nipw1 * _one                      (eq.2)
 // which is implemented in the Enforce() function.

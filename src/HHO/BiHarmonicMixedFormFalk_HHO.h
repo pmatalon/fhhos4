@@ -18,7 +18,7 @@ private:
 
 	bool _saveMatrixBlocks = true;
 	bool _reconstructHigherOrderBoundary = false;
-	bool _enforceDirichletBCInLastPb = true;
+	//bool _enforceDirichletBCInLastPb = true;
 
 	DiffusionField<Dim> _diffField;
 	VirtualDiffusionTestCase<Dim> _diffPbTestCase;
@@ -35,7 +35,7 @@ private:
 	HHOParameters<Dim>* HHO;
 public:
 
-	BiHarmonicMixedFormFalk_HHO(Mesh<Dim>* mesh, BiHarmonicTestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool reconstructHigherOrderBoundary, bool enforceDirichletBCInLastPb, bool saveMatrixBlocks)
+	BiHarmonicMixedFormFalk_HHO(Mesh<Dim>* mesh, BiHarmonicTestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool reconstructHigherOrderBoundary, /*bool enforceDirichletBCInLastPb,*/ bool saveMatrixBlocks)
 	{
 		_mesh = mesh;
 		_testCase = testCase;
@@ -47,7 +47,7 @@ public:
 		_diffPb = Diffusion_HHO<Dim>(mesh, &_diffPbTestCase, HHO, true, saveMatrixBlocks);
 		_saveMatrixBlocks = saveMatrixBlocks;
 		_reconstructHigherOrderBoundary = reconstructHigherOrderBoundary;
-		_enforceDirichletBCInLastPb = enforceDirichletBCInLastPb;
+		//_enforceDirichletBCInLastPb = enforceDirichletBCInLastPb;
 	}
 
 	Diffusion_HHO<Dim>& DiffPb() override
@@ -166,23 +166,28 @@ public:
 		Vector faceSolution = this->_diffSolver->Solve(rhs);
 		this->CheckDiffSolverConvergence();
 
+		Vector boundary;
+		if (_reconstructHigherOrderBoundary)
+		{
+			Vector reconstructedElemBoundary = _diffPb.ReconstructHigherOrderOnBoundaryOnly(faceSolution, Vector(), b_source);
+			boundary = _higherOrderBoundary.Trace(reconstructedElemBoundary);
+		}
+		else
+			boundary = faceSolution.tail(HHO->nBoundaryFaces * HHO->nFaceUnknowns); // keep only the boundary unknowns
+
 		if (returnBoundaryOnly)
 		{
-			Vector boundary;
-			if (_reconstructHigherOrderBoundary)
-			{
-				Vector reconstructedElemBoundary = _diffPb.ReconstructHigherOrderOnBoundaryOnly(faceSolution, Vector(), b_source);
-				boundary = _higherOrderBoundary.Trace(reconstructedElemBoundary);
-			}
-			else
-				boundary = faceSolution.tail(HHO->nBoundaryFaces * HHO->nFaceUnknowns); // keep only the boundary unknowns
 			_integralZeroOnBoundary.Enforce(boundary);
 			return boundary;
 		}
 		else
 		{
+			double orthogonalityFactor = _integralZeroOnBoundary.OrthogonalityFactor(boundary);
+
+			Vector one_skeleton = _diffPb.SkeletonSpace.Project(Utils::ConstantFunctionOne);
+			faceSolution -= orthogonalityFactor * one_skeleton;
+
 			Vector reconstructedSolution = _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, Vector(), b_source);
-			_integralZeroOnDomain.Enforce(reconstructedSolution);
 			return reconstructedSolution;
 		}
 	}
@@ -192,7 +197,7 @@ public:
 		return _boundarySpace->L2InnerProd(v1, v2);
 		//return v1.dot(v2);
 	}
-
+	/*
 	//------------------------//
 	//      Last problem      //
 	//------------------------//
@@ -236,7 +241,7 @@ public:
 			diffActions.AssembleRightHandSide = true;
 			_lastPb->Assemble(diffActions);
 		}
-	}
+	}*/
 
 	Vector ComputeSolution(const Vector& theta)
 	{
@@ -245,9 +250,9 @@ public:
 
 		// Solve problem 2 (f=<lambda>, Neum=0)
 		Vector reconstructedSolution;
-		if (!_enforceDirichletBCInLastPb)
+		//if (!_enforceDirichletBCInLastPb)
 			reconstructedSolution = Solve2ndDiffProblem(lambda);
-		else
+		/*else
 		{
 			Vector dirichletCoeffs = Vector::Zero(_lastPb->HHO->nDirichletCoeffs);
 			Vector b_lambdaSource = _lastPb->AssembleSourceTerm(lambda);
@@ -256,7 +261,7 @@ public:
 
 			Vector faceSolution = _lastPbSolver->Solve(rhs);
 			reconstructedSolution = _lastPb->ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, dirichletCoeffs, b_lambdaSource);
-		}
+		}*/
 		return reconstructedSolution;
 	}
 };

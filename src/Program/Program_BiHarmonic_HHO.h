@@ -84,7 +84,7 @@ public:
 		bool saveMatrixBlocks = args.Solver.SolverCode.compare("uamg") == 0 || args.Solver.SolverCode.compare("fcguamg") == 0;
 		BiHarmonicMixedForm_HHO<Dim>* biHarPb;
 		if (args.Problem.Scheme.compare("f") == 0)
-			biHarPb = new BiHarmonicMixedFormFalk_HHO<Dim>(mesh, testCase, hho, args.Solver.BiHarReconstructBoundary, args.Actions.EnforceDirichletBC, saveMatrixBlocks);
+			biHarPb = new BiHarmonicMixedFormFalk_HHO<Dim>(mesh, testCase, hho, args.Solver.BiHarReconstructBoundary, /*args.Actions.EnforceDirichletBC,*/ saveMatrixBlocks);
 		else if (args.Problem.Scheme.compare("g") == 0)
 			biHarPb = new BiHarmonicMixedFormGlowinski_HHO<Dim>(mesh, testCase, hho, args.Solver.BiHarReconstructBoundary, saveMatrixBlocks);
 		else
@@ -99,7 +99,7 @@ public:
 
 		biHarPb->Setup();
 
-		if (args.Problem.Scheme.compare("f") == 0 && args.Actions.EnforceDirichletBC)
+		/*if (args.Problem.Scheme.compare("f") == 0 && args.Actions.EnforceDirichletBC)
 		{
 			Mesh<Dim>* meshLast = MeshFactory<Dim>::BuildMesh(args, testCase);
 			if (args.Discretization.Mesher.compare("gmsh") == 0)
@@ -107,7 +107,7 @@ public:
 
 			BiHarmonicMixedFormFalk_HHO<Dim>* falkScheme = static_cast<BiHarmonicMixedFormFalk_HHO<Dim>*>(biHarPb);
 			falkScheme->SetupLastPb(meshLast);
-		}
+		}*/
 
 		assemblyTimer.Stop();
 		cout << endl << "Assembly time: CPU = " << assemblyTimer.CPU() << ", elapsed = " << assemblyTimer.Elapsed() << endl;
@@ -155,7 +155,7 @@ public:
 			biHarPb->SetDiffSolver(diffSolver);
 
 
-			if (args.Problem.Scheme.compare("f") == 0 && args.Actions.EnforceDirichletBC)
+			/*if (args.Problem.Scheme.compare("f") == 0 && args.Actions.EnforceDirichletBC)
 			{
 				cout << "Enforce Dirichlet BC to the solution, so setup of last solver..." << endl << endl;
 
@@ -165,7 +165,7 @@ public:
 				lastSolver->Setup(falkScheme->LastPb()->A);
 
 				falkScheme->SetLastPbSolver(lastSolver);
-			}
+			}*/
 
 
 			cout << "-------------------------------------" << endl;
@@ -214,9 +214,14 @@ public:
 				// Compute L2-error at each iteration
 				if ((args.Solver.ComputeIterL2Error || args.Actions.Export.IterationL2Errors) && testCase->ExactSolution)
 				{
-					biHarIterSolver->OnNewSolution = [&biHarPb, &testCase, &theta0, &b](IterationResult& result, const Vector& theta)
+					biHarIterSolver->OnNewSolution = [&biHarPb, &testCase, &theta0, /*&u_f,*/ &b](IterationResult& result, const Vector& theta)
 					{
 						Vector reconstructedSolution = biHarPb->ComputeSolution(theta0 + theta);
+						//Vector reconstructedSolution = biHarPb->ComputeSolution(theta0+theta) + u_f;
+						/*Vector delta = biHarPb->Solve1stDiffProblemWithZeroSource(theta);
+						Vector u_0 = biHarPb->Solve2ndDiffProblem(delta, false);
+						Vector reconstructedSolution = u_f + u_0;*/
+
 						result.L2Error = biHarPb->DiffPb().L2Error(testCase->ExactSolution, reconstructedSolution);
 
 						Vector lambda = biHarPb->Solve1stDiffProblemWithZeroSource(theta);
