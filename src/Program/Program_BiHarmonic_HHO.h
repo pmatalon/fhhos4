@@ -173,17 +173,17 @@ public:
 			cout << "-------------------------------------" << endl;
 
 			// Solve 1st problem with f as source
-			Vector theta0 = biHarPb->FindCompatibleTheta();
-			Vector delta = biHarPb->Solve1stDiffProblem(theta0);
+			Vector theta_f = biHarPb->FindCompatibleTheta();
+			Vector lambda_f = biHarPb->Solve1stDiffProblem(theta_f);
 			// Solve 2nd problem and extract the boundary (or normal derivative)
-			Vector u_boundary0 = biHarPb->Solve2ndDiffProblem(delta, true);
+			Vector u_boundary_f = biHarPb->Solve2ndDiffProblem(lambda_f, true);
 
 			// A(theta) -> -boundary(u) is s.p.d.
-			// Note that because of the minus sign, u_boundary0 = -A0(theta0)
-			// We want to solve A(theta1) = u_boundary0, in order to have
-			// thetaFinal = theta0+theta1 with
-			//         A(thetaFinal) = A0(theta0) + A(theta1) = -u_boundary0 + u_boundary0 = 0.
-			Vector b = u_boundary0;
+			// Note that because of the minus sign, u_boundary0 = -Af(theta_f)
+			// We want to solve A(theta0) = u_boundary_f, in order to have
+			// theta = theta_f+theta0 with
+			//         A(theta) = Af(theta_f) + A(theta0) = -u_boundary_f + u_boundary_f = 0.
+			Vector b = u_boundary_f;
 
 
 			//-------------------------------------//
@@ -214,19 +214,24 @@ public:
 				// Compute L2-error at each iteration
 				if ((args.Solver.ComputeIterL2Error || args.Actions.Export.IterationL2Errors) && testCase->ExactSolution)
 				{
-					biHarIterSolver->OnNewSolution = [&biHarPb, &testCase, &theta0, /*&u_f,*/ &b](IterationResult& result, const Vector& theta)
+					biHarIterSolver->OnNewSolution = [&biHarPb, &testCase, &theta_f, &u_boundary_f, &b](IterationResult& result, const Vector& theta_0)
 					{
-						Vector reconstructedSolution = biHarPb->ComputeSolution(theta0 + theta);
-						//Vector reconstructedSolution = biHarPb->ComputeSolution(theta0+theta) + u_f;
-						/*Vector delta = biHarPb->Solve1stDiffProblemWithZeroSource(theta);
-						Vector u_0 = biHarPb->Solve2ndDiffProblem(delta, false);
-						Vector reconstructedSolution = u_f + u_0;*/
-
+						Vector reconstructedSolution = biHarPb->ComputeSolution(theta_f + theta_0);
 						result.L2Error = biHarPb->DiffPb().L2Error(testCase->ExactSolution, reconstructedSolution);
 
-						Vector lambda = biHarPb->Solve1stDiffProblemWithZeroSource(theta);
-						Vector Atheta = -biHarPb->Solve2ndDiffProblem(lambda, true);
-						cout << "                                                                                " << std::setprecision(8) << 0.5 * theta.dot(Atheta) - b.dot(theta) << endl;
+						Vector lambda2 = biHarPb->Solve1stDiffProblem(theta_f + theta_0);
+						Vector u_boundary = biHarPb->Solve2ndDiffProblem(lambda2, true);
+						/* // same thing
+						Vector lambda0 = biHarPb->Solve1stDiffProblemWithZeroSource(theta);
+						Vector u_boundary_0 = biHarPb->Solve2ndDiffProblem(lambda0, true);
+						Vector u_boundary_b = u_boundary_f + u_boundary_0;*/
+						//cout << "                                                                ||u_boundary|| = " << std::scientific << sqrt(biHarPb->L2InnerProdOnBoundary(u_boundary_b, u_boundary_b)) << endl;
+						result.BoundaryL2Norm = sqrt(biHarPb->L2InnerProdOnBoundary(u_boundary, u_boundary));
+
+						// Energy functional
+						//Vector lambda = biHarPb->Solve1stDiffProblemWithZeroSource(theta);
+						//Vector Atheta = -biHarPb->Solve2ndDiffProblem(lambda, true);
+						//cout << "                                                                                " << std::setprecision(8) << 0.5 * theta.dot(Atheta) - b.dot(theta) << endl;
 					};
 				}
 				// Export iteration results
@@ -332,12 +337,12 @@ public:
 				cout << "Solve linear system..." << endl;
 			}
 
-			Vector theta = biHarSolver->Solve(b);
+			Vector theta_0 = biHarSolver->Solve(b);
 
 			delete biHarSolver;
 
 			cout << "Compute solution..." << endl;
-			Vector reconstructedSolution = biHarPb->ComputeSolution(theta0 + theta);
+			Vector reconstructedSolution = biHarPb->ComputeSolution(theta_f + theta_0);
 
 			//-----------------------------//
 			//       Solution export       //

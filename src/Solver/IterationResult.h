@@ -27,6 +27,7 @@ public:
 	double RelativeErrorNorm = -1;
 	double L2Error = -1;
 	double AsymptoticConvRate = 0;
+	double BoundaryL2Norm = -1;
 
 	Vector Residual;
 	Vector Ax;
@@ -150,6 +151,7 @@ public:
 		int normalizedResWidth = 12;
 		int relativeErrorWidth = 12;
 		int l2ErrorWidth = 12;
+		int boundaryL2NormWidth = 12;
 		int iterationConvRateWidth = 11;
 		int asymptoticConvRateWidth = 12;
 		int computWorkWidth = 15;
@@ -174,6 +176,11 @@ public:
 			{
 				os << setw(l2ErrorWidth);
 				os << "L2-error";
+			}
+			if (result.BoundaryL2Norm != -1)
+			{
+				os << setw(boundaryL2NormWidth);
+				os << "Boundary";
 			}
 			os << setw(iterationConvRateWidth);
 			os << "Iteration";
@@ -206,6 +213,11 @@ public:
 			{
 				os << setw(l2ErrorWidth);
 				os << "";
+			}
+			if (result.BoundaryL2Norm != -1)
+			{
+				os << setw(boundaryL2NormWidth);
+				os << "L2-norm";
 			}
 			os << setw(iterationConvRateWidth);
 			os << "cv rate";
@@ -262,6 +274,12 @@ public:
 		{
 			os << setw(l2ErrorWidth);
 			os << std::scientific << result.L2Error;
+		}
+
+		if (result.BoundaryL2Norm != -1)
+		{
+			os << setw(boundaryL2NormWidth);
+			os << std::scientific << result.BoundaryL2Norm;
 		}
 
 		os << setw(iterationConvRateWidth);
