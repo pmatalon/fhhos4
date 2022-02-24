@@ -235,15 +235,19 @@ public:
 					};
 				}
 				// Export iteration results
-				if (args.Actions.Export.IterationResiduals || args.Actions.Export.IterationL2Errors)
+				if (args.Actions.Export.Iterations || args.Actions.Export.IterationResiduals || args.Actions.Export.IterationL2Errors)
 				{
+					if (args.Actions.Export.Iterations)
+						out.CleanFile("iterations.csv");
 					if (args.Actions.Export.IterationResiduals)
-						out.CleanFile("iteration_residuals");
+						out.CleanFile("iteration_residuals.dat");
 					if (args.Actions.Export.IterationL2Errors)
-						out.CleanFile("iteration_l2errors");
+						out.CleanFile("iteration_l2errors.dat");
 
 					biHarIterSolver->OnIterationEnd = [&args, &out](const IterationResult& result)
 					{
+						if (args.Actions.Export.Iterations)
+							out.Export(result, "iterations");
 						if (args.Actions.Export.IterationResiduals)
 							out.ExportNewVectorValue(result.NormalizedResidualNorm, "iteration_residuals");
 						if (args.Actions.Export.IterationL2Errors && result.L2Error != -1)

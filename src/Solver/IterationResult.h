@@ -9,13 +9,12 @@ private:
 	double _bNorm = -1;
 	bool _computeError = false;
 	Vector _exactSolution;
-	MFlops _oneFineMatVecWork = 0;
 
-	double _iterationConvRate = 0;
-	list<double> _previousItConvRates;
-	double _tolerance = 0;
+	MFlops _oneFineMatVecWork = 0;
 	MFlops _iterationComputationalWork = 0;
 	MFlops _solvingComputationalWork = 0; // total of all iterations
+	list<double> _previousItConvRates;
+	double _tolerance = 0;
 	Timer _solvingTimer;
 	Vector e;
 public:
@@ -26,6 +25,7 @@ public:
 	double PreviousNormalizedResidualNorm = -1;
 	double RelativeErrorNorm = -1;
 	double L2Error = -1;
+	double IterationConvRate = 0;
 	double AsymptoticConvRate = 0;
 	double BoundaryL2Norm = -1;
 
@@ -98,11 +98,11 @@ public:
 
 		if (PreviousNormalizedResidualNorm != -1)
 		{
-			this->_iterationConvRate = this->NormalizedResidualNorm / PreviousNormalizedResidualNorm;
+			this->IterationConvRate = this->NormalizedResidualNorm / PreviousNormalizedResidualNorm;
 
 			if (this->_previousItConvRates.size() == 5)
 				this->_previousItConvRates.pop_front();
-			this->_previousItConvRates.push_back(this->_iterationConvRate);
+			this->_previousItConvRates.push_back(this->IterationConvRate);
 			this->AsymptoticConvRate = 1;
 			for (double cr : _previousItConvRates)
 				this->AsymptoticConvRate *= cr;
@@ -142,6 +142,18 @@ public:
 	MFlops IterationComputationalWork()
 	{
 		return _iterationComputationalWork;
+	}
+
+	bool IsFineMatVecSet() const
+	{
+		return _oneFineMatVecWork > 0;
+	}
+
+	int NumberOfFineMatVec() const
+	{
+		if (IsFineMatVecSet())
+			return (int)round(_solvingComputationalWork / _oneFineMatVecWork);
+		return 0;
 	}
 
 	friend ostream& operator<<(ostream& os, const IterationResult& result)
@@ -286,7 +298,7 @@ public:
 		if (result.IterationNumber == 0)
 			os << " ";
 		else
-			os << std::defaultfloat << result._iterationConvRate;
+			os << std::defaultfloat << result.IterationConvRate;
 
 		os << setw(asymptoticConvRateWidth);
 		if (result.IterationNumber == 0)
@@ -301,10 +313,7 @@ public:
 		//os << result._solvingTimer.CPU().InMilliseconds;
 
 		os << setw(nFineMatVecWidth);
-		if (result._oneFineMatVecWork > 0)
-			os << (int)round(result._solvingComputationalWork / result._oneFineMatVecWork);
-		else
-			os << 0;
+		os << result.NumberOfFineMatVec();
 
 		if (result._tolerance > 0)
 		{

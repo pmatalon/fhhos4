@@ -103,6 +103,7 @@ struct ExportArguments
 	bool ExactSolutionToGMSH = false;
 	bool ErrorToGMSH = false;
 	bool SourceToGMSH = false;
+	bool Iterations = false;
 	bool IterationResiduals = false;
 	bool IterationL2Errors = false;
 	string ValueSeparator = ","; // ",\n";

@@ -4,6 +4,7 @@
 #include <fstream>
 #include <unsupported/Eigen/SparseExtra>
 #include "Utils.h"
+#include "../Solver/IterationResult.h"
 using namespace std;
 
 class ExportModule
@@ -11,7 +12,8 @@ class ExportModule
 private:
 	string _outputDirectory;
 	string _filePrefix;
-	string _valueSeparator;
+	string _vectorValueSeparator;
+	string _iterValueSeparator = ",";
 
 public:
 	ExportModule() :
@@ -26,10 +28,10 @@ public:
 		ExportModule(outputDirectory, filePrefix, ",")
 	{}
 
-	ExportModule(string outputDirectory, string filePrefix, string valueSeparator) :
+	ExportModule(string outputDirectory, string filePrefix, string vectorValueSeparator) :
 		_outputDirectory(outputDirectory),
 		_filePrefix(filePrefix),
-		_valueSeparator(valueSeparator)
+		_vectorValueSeparator(vectorValueSeparator)
 	{}
 
 	string OutputDirectory() const
@@ -50,10 +52,14 @@ public:
 	}
 	string GetFilePath(string suffix, string extension) const
 	{
+		return GetFilePath(suffix + extension);
+	}
+	string GetFilePath(string suffix_with_extension) const
+	{
 		if (_filePrefix.empty())
-			return GetFilePathPrefix() + suffix + extension;
+			return GetFilePathPrefix() + suffix_with_extension;
 		else
-			return GetFilePathPrefix() + "_" + suffix + extension;
+			return GetFilePathPrefix() + "_" + suffix_with_extension;
 	}
 	string GetDatFilePath(string suffix) const
 	{
@@ -81,9 +87,13 @@ public:
 		cout << "Vector exported: " << filePath << endl;
 	}
 
-	void CleanFile(string suffix)
+	void CleanFile(string suffix, string extension)
 	{
-		string filePath = GetDatFilePath(suffix);
+		CleanFile(suffix + extension);
+	}
+	void CleanFile(string suffix_with_extension)
+	{
+		string filePath = GetFilePath(suffix_with_extension);
 		remove(filePath.c_str());
 	}
 
@@ -92,7 +102,52 @@ public:
 		string filePath = GetDatFilePath(suffix);
 		ofstream file(filePath, ios_base::app | ios_base::out);
 
-		file << std::scientific << value << _valueSeparator; // << endl;
+		file << std::scientific << value << _vectorValueSeparator; // << endl;
+		file.close();
+	}
+
+	void Export(const IterationResult& result, string suffix)
+	{
+		string filePath = GetFilePath(suffix, ".csv");
+		ofstream file(filePath, ios_base::app | ios_base::out);
+		file.precision(2);
+		string sep = _iterValueSeparator;
+
+		if (result.IterationNumber == 0)
+		{
+			// Label row
+			file << "Iter" << sep;
+			file << "NormalizedRes" << sep;
+			if (result.L2Error != -1)
+				file << "L2Error" << sep;
+			if (result.BoundaryL2Norm != -1)
+				file << "BoundaryL2Norm" << sep;
+			file << "IterConvRate" << sep;
+			file << "AsympConvRate" << sep;
+			file << "MatVec";
+			file << endl;
+		}
+
+		file << result.IterationNumber << sep;
+		file << "\t" << std::scientific << result.NormalizedResidualNorm << sep;
+		if (result.L2Error != -1)
+			file << "\t" << std::scientific << result.L2Error << sep;
+		if (result.BoundaryL2Norm != -1)
+			file << "\t" << std::scientific << result.BoundaryL2Norm << sep;
+		
+		if (result.IterationNumber == 0)
+			file << "\t\t" << " " << sep;
+		else
+			file << "\t" << std::defaultfloat << result.IterationConvRate << sep;
+		
+		if (result.IterationNumber == 0)
+			file << "\t\t" << " " << sep;
+		else
+			file << "\t" << std::defaultfloat << result.AsymptoticConvRate << sep;
+		
+		file << "\t" << result.NumberOfFineMatVec();
+
+		file << endl;
 		file.close();
 	}
 };

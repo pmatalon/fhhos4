@@ -459,6 +459,7 @@ void print_usage() {
 	cout << "              exsolgmsh  - solution files (.pos) of the exact solution to be used in GMSH for visualization" << endl;
 	cout << "              errgmsh    - error computed against the solution of an exact solver to be used in GMSH for visualization" << endl;
 	cout << "              sourcegmsh - solution files (.pos and .msh) to be used in GMSH for visualization" << endl;
+	cout << "              iter       - iteration data (residuals, errors, etc.)" << endl;
 	cout << "              iterres    - iteration residuals" << endl;
 	cout << "              iterl2err  - iteration L2-errors" << endl;
 	cout << "              mg         - Multigrid components (intergrid operator matrices, coarse meshes, etc.)" << endl;
@@ -1237,6 +1238,8 @@ int main(int argc, char* argv[])
 						args.Actions.Export.ErrorToGMSH = true;
 					else if (code.compare("sourcegmsh") == 0)
 						args.Actions.Export.SourceToGMSH = true;
+					else if (code.compare("iter") == 0)
+						args.Actions.Export.Iterations = true;
 					else if (code.compare("iterres") == 0)
 						args.Actions.Export.IterationResiduals = true;
 					else if (code.compare("iterl2err") == 0)
