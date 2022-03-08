@@ -104,7 +104,10 @@ public:
 			return d.asDiagonal() * v;
 		}
 		else
+		{
+			assert(_massMatrix.rows() > 0 && "The face mass matrix has not been initialized or was deleted.");
 			return _massMatrix * v;
+		}
 	}
 	DenseMatrix SolveMassMatrix(const DenseMatrix& M) // also works for vectors
 	{

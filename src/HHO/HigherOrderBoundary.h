@@ -9,7 +9,7 @@ private:
 	vector<Diff_HHOFace<Dim>> _hhoFaces;
 	Diffusion_HHO<Dim>* _diffPb;
 	SparseMatrix _trace;
-	SparseMatrix _normalDerivative;
+	//SparseMatrix _normalDerivative;
 public:
 	HHOParameters<Dim>* HHO;
 	Mesh<Dim>* _mesh;
@@ -45,8 +45,8 @@ public:
 
 		if (setupTraceMatrix)
 			SetupTraceMatrix();
-		if (setupNormalDerivativeMatrix)
-			SetupNormalDerivativeMatrix();
+		//if (setupNormalDerivativeMatrix)
+			//SetupNormalDerivativeMatrix();
 	}
 
 private:
@@ -75,7 +75,7 @@ private:
 		parallelLoop.Fill(_trace);
 	}
 
-	void SetupNormalDerivativeMatrix()
+	/*void SetupNormalDerivativeMatrix()
 	{
 		FaceParallelLoop<Dim> parallelLoop(_mesh->BoundaryFaces);
 		parallelLoop.ReserveChunkCoeffsSize(HHO->nReconstructUnknowns * HHO->nFaceUnknowns);
@@ -93,7 +93,7 @@ private:
 
 		_normalDerivative = SparseMatrix(HHO->nBoundaryFaces * HHO->nFaceUnknowns, _mesh->NBoundaryElements() * HHO->nReconstructUnknowns);
 		parallelLoop.Fill(_normalDerivative);
-	}
+	}*/
 
 public:
 	Vector Trace(const Vector& v)
@@ -102,11 +102,11 @@ public:
 		return _trace * v;
 	}
 
-	Vector NormalDerivative(const Vector& v)
+	/*Vector NormalDerivative(const Vector& v)
 	{
 		assert(v.rows() == _mesh->NBoundaryElements() * HHO->nReconstructUnknowns);
 		return _normalDerivative * v;
-	}
+	}*/
 
 	Vector AssembleNeumannTerm(const Vector& neumannHigherOrderCoeffs)
 	{
@@ -131,7 +131,7 @@ public:
 		return b_ndF;
 	}
 
-	Vector AssembleDirichletTerm(const Vector& dirichletHigherOrderCoeffs)
+	/*Vector AssembleDirichletTerm(const Vector& dirichletHigherOrderCoeffs)
 	{
 		assert(dirichletHigherOrderCoeffs.rows() == HHO->nDirichletCoeffs);
 		assert(_mesh->DirichletFaces.size() == _mesh->BoundaryFaces.size());
@@ -151,7 +151,7 @@ public:
 			}
 		);
 		return x_dF;
-	}
+	}*/
 
 	Vector ExtractBoundaryElements(const Vector& v)
 	{

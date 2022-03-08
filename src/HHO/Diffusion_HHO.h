@@ -450,8 +450,9 @@ public:
 				e->DeleteUselessMatricesAfterAssembly();
 			});
 
-		if (this->TestCase->BC.Type != PbBoundaryConditions::FullNeumann)
+		if (this->TestCase->BC.Type != PbBoundaryConditions::FullNeumann && Utils::ProgramArgs.Problem.Equation == EquationType::Diffusion)
 		{
+			// TODO: in the coarse level of multigrid, this should be executed as well
 			FaceParallelLoop<Dim> parallelLoopF(mesh->Faces);
 			parallelLoopF.Execute([this](Face<Dim>* face)
 				{
@@ -1010,6 +1011,30 @@ public:
 		assert(b_ndF.rows() == HHO->nTotalFaceUnknowns);
 
 		return b_ndF - this->A_T_ndF.transpose() * Solve_A_T_T(b_T);
+	}
+
+	// Returns the matrix that extract the normal derivative on the boundary from a reconstructed vector restricted to the boundary elements.
+	// The result is expressed w.r.t. the face unknowns. 
+	// It is possible because the derivative a reconstructed polynomial is (k+1)-1, i.e. the degree of the face unknowns.
+	SparseMatrix NormalDerivativeMatrix()
+	{
+		FaceParallelLoop<Dim> parallelLoop(_mesh->BoundaryFaces);
+		parallelLoop.ReserveChunkCoeffsSize(HHO->nReconstructUnknowns * HHO->nFaceUnknowns);
+
+		parallelLoop.Execute([this](Face<Dim>* f, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				int i = f->Number - HHO->nInteriorFaces;
+				Diff_HHOFace<Dim>* face = HHOFace(f);
+
+				int j = _mesh->BoundaryElementNumber(f->Element1);
+				Diff_HHOElement<Dim>* elem = this->HHOElement(f->Element1);
+
+				chunk->Results.Coeffs.Add(i * HHO->nFaceUnknowns, j * HHO->nReconstructUnknowns, face->NormalDerivative(elem->MeshElement, elem->ReconstructionBasis));
+			});
+
+		SparseMatrix normalDerivative(HHO->nBoundaryFaces * HHO->nFaceUnknowns, _mesh->NBoundaryElements() * HHO->nReconstructUnknowns);
+		parallelLoop.Fill(normalDerivative);
+		return normalDerivative;
 	}
 
 	//---------------------------------------//

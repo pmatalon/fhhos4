@@ -15,13 +15,14 @@ private:
 	BiHarmonicTestCase<Dim>* _testCase;
 
 	bool _saveMatrixBlocks = true;
-	bool _reconstructHigherOrderBoundary = false;
+	//bool _reconstructHigherOrderBoundary = false;
 
 	DiffusionField<Dim> _diffField;
 	VirtualDiffusionTestCase<Dim> _diffPbTestCase;
 	Diffusion_HHO<Dim> _diffPb;
 
 	HigherOrderBoundary<Dim> _higherOrderBoundary;
+	SparseMatrix _normalDerivativeMatrix;
 	HHOBoundarySpace<Dim>* _boundarySpace = nullptr;
 	HHOParameters<Dim>* HHO;
 public:
@@ -37,7 +38,7 @@ public:
 		_diffPbTestCase.BC = BoundaryConditions::HomogeneousDirichletEverywhere();
 		_diffPb = Diffusion_HHO<Dim>(mesh, &_diffPbTestCase, HHO, true, saveMatrixBlocks);
 		_saveMatrixBlocks = saveMatrixBlocks;
-		_reconstructHigherOrderBoundary = reconstructHigherOrderBoundary;
+		//_reconstructHigherOrderBoundary = reconstructHigherOrderBoundary;
 	}
 
 	Diffusion_HHO<Dim>& DiffPb() override
@@ -55,21 +56,24 @@ public:
 
 		_higherOrderBoundary = HigherOrderBoundary<Dim>(&_diffPb);
 		_higherOrderBoundary.Setup(false, true);
-		if (_reconstructHigherOrderBoundary)
+
+		_normalDerivativeMatrix = _diffPb.NormalDerivativeMatrix();
+
+		/*if (_reconstructHigherOrderBoundary)
 		{
 			//_higherOrderBoundary = HigherOrderBoundary<Dim>(&_diffPb);
 			//_higherOrderBoundary.Setup(false, true);
 			_boundarySpace = &_higherOrderBoundary.BoundarySpace;
 		}
-		else
+		else*/
 			_boundarySpace = &_diffPb.BoundarySpace;
 	}
 
 	Vector FindCompatibleTheta() override
 	{
-		if (_reconstructHigherOrderBoundary)
+		/*if (_reconstructHigherOrderBoundary)
 			return Vector::Zero(_higherOrderBoundary.HHO->nDirichletCoeffs);
-		else
+		else*/
 			return Vector::Zero(HHO->nDirichletCoeffs);
 	}
 
@@ -78,7 +82,8 @@ public:
 	{
 		// Define problem
 		Vector b_source = _diffPb.AssembleSourceTerm(_testCase->SourceFunction);
-		Vector dirichletCoeffs = _reconstructHigherOrderBoundary ? _higherOrderBoundary.AssembleDirichletTerm(dirichlet) : dirichlet;
+		//Vector dirichletCoeffs = _reconstructHigherOrderBoundary ? _higherOrderBoundary.AssembleDirichletTerm(dirichlet) : dirichlet;
+		Vector dirichletCoeffs = dirichlet;
 		Vector b_noNeumann = Vector::Zero(HHO->nTotalFaceUnknowns);
 		Vector b_T   = _diffPb.ComputeB_T(b_source, dirichletCoeffs);
 		Vector b_ndF = _diffPb.ComputeB_ndF(b_noNeumann, dirichletCoeffs);
@@ -97,7 +102,8 @@ public:
 	{
 		// Define problem
 		Vector b_source = Vector::Zero(HHO->nTotalCellUnknowns);
-		Vector dirichletCoeffs = _reconstructHigherOrderBoundary ? _higherOrderBoundary.AssembleDirichletTerm(dirichlet) : dirichlet;
+		//Vector dirichletCoeffs = _reconstructHigherOrderBoundary ? _higherOrderBoundary.AssembleDirichletTerm(dirichlet) : dirichlet;
+		Vector dirichletCoeffs = dirichlet;
 		Vector b_noNeumann = Vector::Zero(HHO->nTotalFaceUnknowns);
 		Vector b_T = _diffPb.ComputeB_T(b_source, dirichletCoeffs);
 		Vector b_ndF = _diffPb.ComputeB_ndF(b_noNeumann, dirichletCoeffs);
@@ -126,19 +132,11 @@ public:
 
 		if (returnBoundaryNormalDerivative)
 		{
-			Vector normalDerivative;
-			if (_reconstructHigherOrderBoundary)
-			{
-				Vector reconstructedElemBoundary = _diffPb.ReconstructHigherOrderOnBoundaryOnly(faceSolution, dirichletCoeffs, b_source);
-				normalDerivative = _higherOrderBoundary.NormalDerivative(reconstructedElemBoundary);
-			}
-			else
-			{
-				//Utils::FatalError("Non implemented");
-				Vector reconstructedElemBoundary = _diffPb.ReconstructHigherOrderOnBoundaryOnly(faceSolution, dirichletCoeffs, b_source);
-				normalDerivative = _higherOrderBoundary.NormalDerivative(reconstructedElemBoundary);
-				normalDerivative = _higherOrderBoundary.AssembleDirichletTerm(normalDerivative);
-			}
+			Vector reconstructedElemBoundary = _diffPb.ReconstructHigherOrderOnBoundaryOnly(faceSolution, dirichletCoeffs, b_source);
+			//normalDerivative = _higherOrderBoundary.NormalDerivative(reconstructedElemBoundary);
+			Vector normalDerivative = _normalDerivativeMatrix * reconstructedElemBoundary;
+			//if (!_reconstructHigherOrderBoundary)
+				//normalDerivative = _higherOrderBoundary.AssembleDirichletTerm(normalDerivative);
 			return normalDerivative;
 		}
 		else
