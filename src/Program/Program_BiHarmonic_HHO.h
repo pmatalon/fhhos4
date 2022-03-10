@@ -186,6 +186,21 @@ public:
 			Vector b = u_boundary_f;
 
 
+			DenseMatrix A; // computed explicitly only if explicit solver or export requested
+			if (args.Solver.BiHarmonicSolverCode.compare("lu") == 0 || args.Actions.Export.LinearSystem)
+			{
+				cout << "Computation of the matrix..." << endl;
+				A = biHarPb->Matrix();
+
+				if (args.Actions.Export.LinearSystem)
+				{
+					cout << "Export linear system..." << endl;
+					out.ExportMatrix(A, "matrix");
+					out.ExportVector(b, "b");
+				}
+			}
+
+
 			//-------------------------------------//
 			//            Create solver            //
 			//-------------------------------------//
@@ -201,8 +216,6 @@ public:
 				Utils::FatalError("Unknown bi-harmonic solver '" + args.Solver.BiHarmonicSolverCode + "'");
 
 			cout << "Solver: " << *biHarSolver << endl << endl;
-
-			DenseMatrix A; // computed explicitly only if direct solver
 
 			IterativeSolver* biHarIterSolver = dynamic_cast<IterativeSolver*>(biHarSolver);
 			if (biHarIterSolver)
@@ -260,8 +273,6 @@ public:
 			}
 			else // direct solver
 			{
-				cout << "Computation of the matrix..." << endl;
-				A = biHarPb->Matrix();
 				cout << "Factorization..." << endl;
 				biHarSolver->Setup(A);
 			}
@@ -331,7 +342,7 @@ public:
 				Vector zero = -biHarPb->Solve2ndDiffProblem(lambda, true);
 				cout << zero.norm() << endl;
 
-				out.ExportMatrix(A, "matrix");
+				//out.ExportMatrix(A, "matrix");
 			}
 			//--------------------------------------------------------------------------//
 
