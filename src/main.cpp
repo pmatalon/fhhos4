@@ -217,6 +217,9 @@ void print_usage() {
 	cout << "      Forces a block size for the block verions of Jacobi, Gauss-Seidel, SOR." << endl;
 	cout << "      By default, the value is adapted to the space dimension and the polynomial order of the discretization." << endl;
 	cout << endl;
+	cout << "-restart NUM" << endl;
+	cout << "      Iteration period to restart the algorithm (so far, used in bihar-cg only). Use 0 to disable." << endl;
+	cout << endl;
 	cout << "-bihar-solver CODE" << endl;
 	cout << "      Iterative solver for the bi-harmonic problem." << endl;
 	cout << "              cg       - conjugate gradient" << endl;
@@ -585,6 +588,7 @@ int main(int argc, char* argv[])
 		OPT_MaxIterations,
 		OPT_Relaxation,
 		OPT_BlockSize,
+		OPT_Restart,
 		OPT_BiHarmonicSolver,
 		OPT_IterL2Error,
 		OPT_BiHarReconstructBoundary,
@@ -657,6 +661,7 @@ int main(int argc, char* argv[])
 		 { "max-iter", required_argument, NULL, OPT_MaxIterations },
 		 { "relax", required_argument, NULL, OPT_Relaxation },
 		 { "block-size", required_argument, NULL, OPT_BlockSize },
+		 { "restart", required_argument, NULL, OPT_Restart },
 		 { "bihar-solver", required_argument, NULL, OPT_BiHarmonicSolver },
 		 { "iter-l2", no_argument, NULL, OPT_IterL2Error },
 		 { "bihar-reconstruct-bry", required_argument, NULL, OPT_BiHarReconstructBoundary },
@@ -916,6 +921,9 @@ int main(int argc, char* argv[])
 				break;
 			case OPT_BlockSize:
 				args.Solver.BlockSize = atoi(optarg);
+				break;
+			case OPT_Restart:
+				args.Solver.Restart = atoi(optarg);
 				break;
 			case OPT_BiHarmonicSolver:
 				args.Solver.BiHarmonicSolverCode = optarg;

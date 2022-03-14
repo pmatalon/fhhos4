@@ -207,7 +207,7 @@ public:
 
 			Solver* biHarSolver = nullptr;
 			if (args.Solver.BiHarmonicSolverCode.compare("cg") == 0)
-				biHarSolver = new BiHarmonicCG<Dim>(biHarPb);
+				biHarSolver = new BiHarmonicCG<Dim>(biHarPb, args.Solver.Restart);
 			else if (args.Solver.BiHarmonicSolverCode.compare("gd") == 0)
 				biHarSolver = new BiHarmonicGradientDescent<Dim>(biHarPb);
 			else if (args.Solver.BiHarmonicSolverCode.compare("lu") == 0)

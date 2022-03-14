@@ -10,14 +10,19 @@ private:
 	BiHarmonicMixedForm_HHO<Dim>* _biHarPb;
 
 public:
-	BiHarmonicCG(BiHarmonicMixedForm_HHO<Dim>* biHarPb)
+	int Restart = 0;
+
+	BiHarmonicCG(BiHarmonicMixedForm_HHO<Dim>* biHarPb, int restart = 0)
 	{
 		_biHarPb = biHarPb;
+		Restart = restart;
 	}
 
 	virtual void Serialize(ostream& os) const override
 	{
 		os << "Conjugate Gradient for the bi-harmonic problem";
+		if (Restart > 0)
+			os << " (restart = " << Restart << ")";
 	}
 
 	void Solve(const Vector& b, Vector& theta, bool xEquals0) override
@@ -58,8 +63,10 @@ public:
 
 			double r_dot_r_old = r_dot_r; // save the dot product before overwriting r
 
-			if (this->IterationCount > 0 && this->IterationCount % 10 == 0)
+			// Restart?
+			if (this->IterationCount > 0 && this->Restart > 0 && this->IterationCount % this->Restart == 0)
 			{
+				// Restart algorithm
 				r = b - A(theta);
 				r_dot_r = L2InnerProdOnBoundary(r, r);
 
