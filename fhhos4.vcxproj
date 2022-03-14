@@ -53,7 +53,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ProjectPublicIncludePath>
     </ProjectPublicIncludePath>
-    <IncludePath>C:\Users\pierr\Documents\Source\Repos\fhhos4\dependencies\eigen\eigen-eigen-b3f3d4950030;C:\Users\pierr\Documents\Source\gmsh\gmsh-4.6.0-source\api;$(ProjectDir)dependencies\cgal\CGAL-5.1\include;$(IncludePath)</IncludePath>
+    <IncludePath>C:\Users\pierr\Documents\Source\Repos\fhhos4\dependencies\eigen\eigen-eigen-b3f3d4950030;C:\Users\pierr\Documents\Source\gmsh\gmsh-4.9.5-source\api;$(ProjectDir)dependencies\cgal\CGAL-5.1\include;$(IncludePath)</IncludePath>
     <LibraryPath>
     </LibraryPath>
     <SourcePath>$(ProjectDir)src\;$(ProjectDir)src\Mesh;$(ProjectDir)src\DG;$(ProjectDir)src\FunctionalBasis;$(ProjectDir)src\HHO;$(ProjectDir)src\Utils;$(ProjectDir)src\Problem;$(ProjectDir)src\Geometry;$(ProjectDir)src\TestCases;$(SourcePath)</SourcePath>
@@ -263,7 +263,7 @@
   </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>/mnt/c/Users/pierr/Documents/Source/Repos/fhhos4/dependencies/eigen/eigen-eigen-b3f3d4950030;/mnt/c/Users/pierr/Documents/Source/gmsh/gmsh-4.6.0-source/api;/mnt/c/Users/pierr/Documents/Source/Repos/fhhos4/dependencies/cgal/CGAL-5.1/include;$(ProjectPublicIncludePath);%(ClCompile.AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>/mnt/c/Users/pierr/Documents/Source/Repos/fhhos4/dependencies/eigen/eigen-eigen-b3f3d4950030;/mnt/c/Users/pierr/Documents/Source/gmsh/gmsh-4.9.5-source/api;/mnt/c/Users/pierr/Documents/Source/Repos/fhhos4/dependencies/cgal/CGAL-5.1/include;$(ProjectPublicIncludePath);%(ClCompile.AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>
       </AdditionalOptions>
       <Verbose>true</Verbose>
@@ -274,7 +274,7 @@
     <Link>
       <AdditionalOptions>-fopenmp %(AdditionalOptions)</AdditionalOptions>
       <LibraryDependencies>gmsh;gmp;gmpxx;mpfr;boost_thread;boost_system;boost_chrono;boost_date_time;boost_atomic</LibraryDependencies>
-      <AdditionalLibraryDirectories>/mnt/c/Users/pierr/Documents/Source/gmsh/gmsh-4.6.0-source/build;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>/mnt/c/Users/pierr/Documents/Source/gmsh/gmsh-4.9.5-source/build;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <ShowProgress>false</ShowProgress>
       <VerboseOutput>false</VerboseOutput>
       <Trace>false</Trace>

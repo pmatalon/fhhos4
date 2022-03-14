@@ -1,7 +1,7 @@
 This program depends on the following third-party softwares:
 - Eigen
 - CGAL (version 5.0 or later)
-- GMSH (version 4.6 or later)
+- GMSH (version 4.9.5 or later)
 Optional:
 - AGMG (version 3.3.5 or later)
 
@@ -30,12 +30,12 @@ Finally, build the program following step 4.
 > tar xf CGAL-5.1.tar.xz     # the path to CGAL must then be added to the cmake command via -DCGAL_DIR=<path>/cgal/CGAL-5.1
 
 ###############################################################################################
-#### 2. Install GMSH version 4.6 or later (see http://gmsh.info/#Download)
+#### 2. Install GMSH version 4.9.5 or later (see http://gmsh.info/#Download)
 
 > mkdir gmsh && cd gmsh      # create it wherever you want
-> wget gmsh.info/src/gmsh-4.6.0-source.tgz
-> tar zxvf gmsh-4.6.0-source.tgz
-> cd gmsh-4.6.0-source/
+> wget gmsh.info/src/gmsh-4.9.5-source.tgz
+> tar zxvf gmsh-4.9.5-source.tgz
+> cd gmsh-4.9.5-source/
 > mkdir build && cd build
 > cmake -DENABLE_BUILD_DYNAMIC=1 -DENABLE_FLTK=0 ..       # if issue with cgns, add option -DENABLE_CGNS=0 
 > make                       # and go get a coffee
@@ -55,7 +55,7 @@ Finally, build the program following step 4.
 
 > cd <path-to-fhhos4>
 > mkdir build && cd build
-> cmake -DCMAKE_BUILD_TYPE=Release -DGMSH_API=<path>/gmsh/gmsh-4.6.0-source/api -DGMSH_LIB=<path>/gmsh/gmsh-4.6.0-source/build/libgmsh.so -DENABLE_AGMG=ON -DAGMG_DIR=<path>/agmg/AGMG_3.3.5-aca/SRC ..
+> cmake -DCMAKE_BUILD_TYPE=Release -DGMSH_API=<path>/gmsh/gmsh-9.5.0-source/api -DGMSH_LIB=<path>/gmsh/gmsh-4.9.5-source/build/libgmsh.so -DENABLE_AGMG=ON -DAGMG_DIR=<path>/agmg/AGMG_3.3.5-aca/SRC ..
 > make
 
 ###############################################################################################

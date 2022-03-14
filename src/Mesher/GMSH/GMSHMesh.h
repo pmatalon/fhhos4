@@ -447,6 +447,9 @@ private:
 			vector<vector<size_t>> elemNodeTags;
 			gmsh::model::mesh::getElements(entityElementTypes, elementTags, elemNodeTags, Dim, entityTag);
 
+			if (entityElementTypes.empty())
+				Utils::FatalError("No element type returned by GMSH for entity " + to_string(entityTag) + "!");
+
 			for (int elemType : entityElementTypes)
 				meshElementTypes.insert(elemType);
 
