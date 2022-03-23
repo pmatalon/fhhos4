@@ -41,24 +41,32 @@ public:
 
 	void Init()
 	{
-		double lengthEdge12 = sqrt(pow(v2.X - v1.X, 2) + pow(v2.Y - v1.Y, 2));
-		double lengthEdge23 = sqrt(pow(v3.X - v2.X, 2) + pow(v3.Y - v2.Y, 2));
-		double lengthEdge13 = sqrt(pow(v3.X - v1.X, 2) + pow(v3.Y - v1.Y, 2));
+		double x21 = v2.X - v1.X;
+		double y21 = v2.Y - v1.Y;
+		double x31 = v3.X - v1.X;
+		double y31 = v3.Y - v1.Y;
+		double x32 = v3.X - v2.X;
+		double y32 = v3.Y - v2.Y;
+
+		double lengthEdge12 = sqrt(pow(x21, 2) + pow(y21, 2));
+		double lengthEdge23 = sqrt(pow(x32, 2) + pow(y32, 2));
+		double lengthEdge13 = sqrt(pow(x31, 2) + pow(y31, 2));
 		_diameter = max(lengthEdge12, max(lengthEdge23, lengthEdge13));
 
-		_measure = 0.5 * abs(v1.X * (v2.Y - v3.Y) + v2.X * (v3.Y - v1.Y) + v3.X * (v1.Y - v2.Y));
+		//_measure = 0.5 * abs(v1.X * (v2.Y - v3.Y) + v2.X * y31 + v3.X * (v1.Y - v2.Y));
+		_measure = 0.5*(y31*x21 - x31*y21);
 
 		_inRadius = 2 * _measure / (lengthEdge12 + lengthEdge23 + lengthEdge13);
 
 		_center = DomPoint((v1.X + v2.X + v3.X) / 3, (v1.Y + v2.Y + v3.Y) / 3);
 
-		_detJacobian = _measure / RefTriangle.Measure();
+		_detJacobian = _measure / RefTriangle.Measure(); // = 2*_measure
 
 		DimMatrix<2> inverseJacobian;
-		inverseJacobian(0, 0) = (v3.Y - v1.Y) / ((v3.Y - v1.Y)*(v2.X - v1.X) - (v3.X - v1.X)*(v2.Y - v1.Y));
-		inverseJacobian(0, 1) = -(v3.X - v1.X) / ((v3.Y - v1.Y)*(v2.X - v1.X) - (v3.X - v1.X)*(v2.Y - v1.Y));
-		inverseJacobian(1, 0) = (v2.Y - v1.Y) / ((v2.Y - v1.Y)*(v3.X - v1.X) - (v2.X - v1.X)*(v3.Y - v1.Y));
-		inverseJacobian(1, 1) = -(v2.X - v1.X) / ((v2.Y - v1.Y)*(v3.X - v1.X) - (v2.X - v1.X)*(v3.Y - v1.Y));
+		inverseJacobian(0, 0) =  y31 / _detJacobian;
+		inverseJacobian(0, 1) = -x31 / _detJacobian;
+		inverseJacobian(1, 0) = -y21 / _detJacobian;
+		inverseJacobian(1, 1) =  x21 / _detJacobian;
 		_inverseJacobianTranspose = inverseJacobian.transpose();
 	}
 
@@ -373,7 +381,13 @@ public:
 	{
 		return _inverseJacobianTranspose;
 	}
+private:
+	inline DimMatrix<2> InverseJacobian() const
+	{
+		return _inverseJacobianTranspose.transpose();
+	}
 
+public:
 	DomPoint ConvertToDomain(const RefPoint& refPoint) const
 	{
 		double t = refPoint.X;
@@ -387,16 +401,8 @@ public:
 
 	RefPoint ConvertToReference(const DomPoint& domainPoint) const
 	{
-		/*Vertex* V1 = _vertices[0];
-		Vertex* V2 = _vertices[1];
-		Vertex* V3 = _vertices[2];*/
-
-		double x = domainPoint.X;
-		double y = domainPoint.Y;
-
-		double t = ((v3.Y - v1.Y)*(x - v1.X) - (v3.X - v1.X)*(y - v1.Y)) / ((v3.Y - v1.Y)*(v2.X - v1.X) - (v3.X - v1.X)*(v2.Y - v1.Y));
-		double u = ((v2.Y - v1.Y)*(x - v1.X) - (v2.X - v1.X)*(y - v1.Y)) / ((v2.Y - v1.Y)*(v3.X - v1.X) - (v2.X - v1.X)*(v3.Y - v1.Y));
-		RefPoint p(t, u);
+		DimVector<2> tu = InverseJacobian() * Vect<2>(v1, domainPoint);
+		RefPoint p(tu[0], tu[1]);
 		return p;
 	}
 

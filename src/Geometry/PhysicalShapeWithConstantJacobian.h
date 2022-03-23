@@ -18,20 +18,21 @@ public:
 
 	inline DimMatrix<Dim> InverseJacobianTranspose(const RefPoint& p) const override
 	{
-		return InverseJacobianTranspose();
+		return InverseJacobianTranspose(); // does not depend on p
 	}
 	inline double DetJacobian(const RefPoint& p) const override
 	{
-		return DetJacobian();
+		return DetJacobian(); // does not depend on p
 	}
 	inline int DetJacobianDegree() const override
 	{
-		return 0;
+		return 0; // DetJacobian is a constant, so degree 0
 	}
 
 	//-------------------//
 	//     Integrals     //
 	//-------------------//
+	// As the Jacobian is constant, DetJacobian() can be put out of the integral.
 
 	inline double Integral(RefFunction func) const override
 	{
@@ -46,6 +47,8 @@ public:
 	//----------------------------//
 	//     Specific integrals     //
 	//----------------------------//
+	// As the Jacobian is independent of p, InverseJacobianTranspose() can be retrieved once out of the integral.
+	// But that's a very small optimization, not sure it fastens anything...
 
 	double ComputeIntegralGradGrad(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const override
 	{
@@ -54,7 +57,7 @@ public:
 
 		DimMatrix<Dim> invJ = InverseJacobianTranspose();
 
-		RefFunction functionToIntegrate = [phi1, phi2, invJ](const RefPoint& p) {
+		RefFunction functionToIntegrate = [phi1, phi2, &invJ](const RefPoint& p) {
 			DimVector<Dim> gradPhi1 = invJ * phi1->Grad(p);
 			DimVector<Dim> gradPhi2 = invJ * phi2->Grad(p);
 			return gradPhi1.dot(gradPhi2);
@@ -71,7 +74,7 @@ public:
 
 		DimMatrix<Dim> invJ = InverseJacobianTranspose();
 
-		RefFunction functionToIntegrate = [&K, phi1, phi2, invJ](const RefPoint& p) {
+		RefFunction functionToIntegrate = [&K, phi1, phi2, &invJ](const RefPoint& p) {
 			DimVector<Dim> gradPhi1 = invJ * phi1->Grad(p);
 			DimVector<Dim> gradPhi2 = invJ * phi2->Grad(p);
 			return (K * gradPhi1).dot(gradPhi2);
