@@ -520,7 +520,7 @@ public:
 	//             DG             //
 	//----------------------------//
 
-	double StiffnessTerm(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2) const override
+	double IntegralGradGrad(BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2) const override
 	{
 		if (this->IsRegular)
 		{
@@ -528,14 +528,14 @@ public:
 			return DetJacobian() * pow(invJ(0, 0), 2) * RefCartShape.StiffnessTerm(phi1, phi2);
 		}
 		else
-			return PhysicalShape<ShapeDim>::ComputeIntegralGradGrad(phi1, phi2);
+			return PhysicalShape<ShapeDim>::IntegralGradGrad(phi1, phi2);
 	}
 
 	//-----------------------------//
 	//             HHO             //
 	//-----------------------------//
 	
-	double IntegralKGradGradReconstruct(const Tensor<ShapeDim>& K, BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2) const override
+	double IntegralKGradGrad(const Tensor<ShapeDim>& K, BasisFunction<ShapeDim>* phi1, BasisFunction<ShapeDim>* phi2) const override
 	{
 		if (this->IsRegular)
 		{
@@ -543,7 +543,7 @@ public:
 			return DetJacobian() * pow(invJ(0, 0), 2) * RefCartShape.ReconstructStiffnessTerm(K, phi1, phi2);
 		}
 		else
-			return PhysicalShape<ShapeDim>::ComputeIntegralKGradGrad(K, phi1, phi2);
+			return PhysicalShape<ShapeDim>::IntegralKGradGrad(K, phi1, phi2);
 	}
 
 private:

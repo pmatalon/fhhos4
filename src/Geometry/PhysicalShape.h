@@ -222,6 +222,7 @@ public:
 	//     Specific integrals     //
 	//----------------------------//
 
+private:
 	virtual double ComputeIntegralGradGrad(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
 	{
 		if (phi1->GetDegree() == 0 || phi2->GetDegree() == 0)
@@ -254,6 +255,22 @@ public:
 		return Integral(functionToIntegrate, polynomialDegree);
 	}
 
+public:
+	virtual double IntegralGradGrad(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
+	{
+		return this->ComputeIntegralGradGrad(phi1, phi2);
+	}
+
+	virtual double IntegralKGradGrad(const Tensor<Dim>& K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
+	{
+		return this->ComputeIntegralKGradGrad(K, phi1, phi2);
+	}
+
+	virtual DenseMatrix MassMatrix(FunctionalBasis<Dim>* basis) const
+	{
+		return this->ComputeAndReturnMassMatrix(basis);
+	}
+
 	//----------------------------//
 	//             DG             //
 	//----------------------------//
@@ -263,33 +280,13 @@ public:
 		return this->ComputeMassTerm(phi1, phi2);
 	}
 
-	virtual double StiffnessTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
-	{
-		return this->ComputeIntegralGradGrad(phi1, phi2);
-	}
-
 	//-----------------------------//
 	//             HHO             //
 	//-----------------------------//
 
-	DenseMatrix ComputeMassMatrix(FunctionalBasis<Dim>* basis) const
-	{
-		return this->ComputeAndReturnMassMatrix(basis);
-	}
-
-	virtual DenseMatrix MassMatrix(FunctionalBasis<Dim>* basis) const
-	{
-		return this->ComputeAndReturnMassMatrix(basis);
-	}
-
 	virtual DenseMatrix CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) const
 	{
 		return this->ComputeAndReturnMassMatrix(cellBasis, reconstructBasis);
-	}
-
-	virtual double IntegralKGradGradReconstruct(const Tensor<Dim>& K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
-	{
-		return this->ComputeIntegralKGradGrad(K, phi1, phi2);
 	}
 
 	virtual ~PhysicalShape()

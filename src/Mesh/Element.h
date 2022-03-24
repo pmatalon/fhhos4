@@ -571,24 +571,23 @@ public:
 		return Integral(sourceTimesBasisFunction);
 	}
 
-	//-----------------------------//
-	//             HHO             //
-	//-----------------------------//
-
-public:
 	inline DenseMatrix MassMatrix(FunctionalBasis<Dim>* basis) const
 	{
 		return this->Shape()->MassMatrix(basis);
 	}
 
+	double IntegralKGradGrad(const Tensor<Dim>& K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
+	{
+		return this->Shape()->IntegralKGradGrad(K, phi1, phi2);
+	}
+
+	//-----------------------------//
+	//             HHO             //
+	//-----------------------------//
+
 	DenseMatrix CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) const
 	{
 		return this->Shape()->CellReconstructMassMatrix(cellBasis, reconstructBasis);
-	}
-
-	double IntegralKGradGradReconstruct(const Tensor<Dim>& K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
-	{
-		return this->Shape()->IntegralKGradGradReconstruct(K, phi1, phi2);
 	}
 
 	//--------------//

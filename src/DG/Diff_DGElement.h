@@ -11,12 +11,12 @@ public:
 
 	double VolumicTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
 	{
-		return this->Kappa() * this->StiffnessTerm(phi1, phi2);
+		return this->Kappa() * this->IntegralGradGrad(phi1, phi2);
 	}
 
-	double StiffnessTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
+	double IntegralGradGrad(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
 	{
-		return this->Shape()->StiffnessTerm(phi1, phi2);
+		return this->Shape()->IntegralGradGrad(phi1, phi2);
 	}
 
 	double MassTerm(BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const

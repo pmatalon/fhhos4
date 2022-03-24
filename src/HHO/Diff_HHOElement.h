@@ -83,19 +83,14 @@ public:
 	}
 
 private:
-	double IntegralKGradGradReconstruct(const Tensor<Dim>& K, BasisFunction<Dim>* reconstructPhi1, BasisFunction<Dim>* reconstructPhi2) const
+	double IntegralKGradGrad(const Tensor<Dim>& K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
 	{
-		return this->MeshElement->IntegralKGradGradReconstruct(K, reconstructPhi1, reconstructPhi2);
+		return this->MeshElement->IntegralKGradGrad(K, phi1, phi2);
 	}
 
 	DenseMatrix CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) const
 	{
 		return this->MeshElement->CellReconstructMassMatrix(cellBasis, reconstructBasis);
-	}
-
-	double ComputeIntegralKGradGrad(const Tensor<Dim>& K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
-	{
-		return this->MeshElement->Shape()->ComputeIntegralKGradGrad(K, phi1, phi2);
 	}
 
 	//--------------------------------------------------------------------------------//
@@ -114,9 +109,9 @@ public:
 			this->ReconstructionBasis = HHO->ReconstructionBasis;
 			this->CellBasis = HHO->CellBasis;
 		}
-		//DenseMatrix massMatrix = this->MeshElement->Shape()->ComputeMassMatrix(this->ReconstructionBasis);
+		//DenseMatrix massMatrix = this->MeshElement->Shape()->MassMatrix(this->ReconstructionBasis);
 		//cout << "Reconstruct mass matrix: " << endl << massMatrix << endl;
-		//massMatrix = this->MeshElement->Shape()->ComputeMassMatrix(this->CellBasis);
+		//massMatrix = this->MeshElement->Shape()->MassMatrix(this->CellBasis);
 		//cout << "Cell mass matrix: " << endl << massMatrix << endl;
 
 
@@ -311,7 +306,7 @@ private:
 			{
 				if (phi2->LocalNumber > phi1->LocalNumber)
 					break;
-				double value = this->IntegralKGradGradReconstruct(this->DiffTensor(), phi1, phi2);
+				double value = this->IntegralKGradGrad(this->DiffTensor(), phi1, phi2);
 				reconstructionMatrixToInvert(phi1->LocalNumber, phi2->LocalNumber) = value;
 				reconstructionMatrixToInvert(phi2->LocalNumber, phi1->LocalNumber) = value;
 			}
@@ -381,7 +376,7 @@ private:
 		if (reconstructPhi->GetDegree() == 0)
 			return 0;
 
-		double integralGradGrad = this->ComputeIntegralKGradGrad(this->DiffTensor(), reconstructPhi, cellPhi);
+		double integralGradGrad = this->IntegralKGradGrad(this->DiffTensor(), reconstructPhi, cellPhi);
 
 		double sumFaces = 0;
 		for (auto face : this->Faces)

@@ -67,7 +67,7 @@ public:
 		if (hho->OrthogonalizeFaceBases())
 		{
 			this->Basis = new OrthogonalBasis<Dim - 1>(HHO->FaceBasis, this->MeshFace->Shape(), hho->NFaceOrthogonalizations(), hho->OrthonormalizeFaceBases());
-			//this->_massMatrix = this->MeshFace->Shape()->ComputeMassMatrix(this->Basis);
+			//this->_massMatrix = this->MeshFace->Shape()->MassMatrix(this->Basis);
 			//cout << "mass matrix: " << endl << _massMatrix << endl;
 		}
 		else
