@@ -1,6 +1,7 @@
 #pragma once
 #include "Program/Program_Diffusion_DG.h"
 #include "Program/Program_Diffusion_HHO.h"
+#include "Program/Program_Diffusion_FEM.h"
 #include "Program/Program_BiHarmonic_HHO.h"
 #include "Program/Program_BiHarmonicDD_HHO.h"
 using namespace std;
@@ -43,7 +44,9 @@ public:
 			if (args.Discretization.Method.compare("dg") == 0)
 				Program_Diffusion_DG<Dim>::Execute(args);
 			else if (args.Discretization.Method.compare("hho") == 0)
-				Program_Diffusion_HHO<Dim>::Execute(args);
+				Program_Diffusion_HHO<Dim>::Execute(args); 
+			else if (args.Discretization.Method.compare("fem") == 0)
+				Program_Diffusion_FEM<Dim>::Execute(args);
 			else
 				Utils::FatalError("Unknown or unmanaged discretization for diffusion problem. Check arguments -pb and -discr.");
 		}

@@ -550,6 +550,15 @@
     <ClInclude Include="src\Solver\Direct\EigenLU.h">
       <Filter>Solver\Direct</Filter>
     </ClInclude>
+    <ClInclude Include="src\FunctionalBasis\LagrangeP1.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Program\Program_Diffusion_FEM.h">
+      <Filter>Program</Filter>
+    </ClInclude>
+    <ClInclude Include="src\FEM\Diffusion_FEM.h">
+      <Filter>FEM</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
@@ -665,6 +674,9 @@
     </Filter>
     <Filter Include="HHO\DiscreteSpaces">
       <UniqueIdentifier>{e0159cf0-0fea-46b8-91aa-a20c5e13fe17}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="FEM">
+      <UniqueIdentifier>{6af31b5a-b6e1-4bd3-a929-dd7813cb211b}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

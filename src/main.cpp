@@ -114,8 +114,9 @@ void print_usage() {
 	cout << endl;
 	cout << "-discr CODE" << endl;
 	cout << "      Discretization method (default: hho)." << endl;
-	cout << "               dg     - Discontinuous Galerkin (Symmetric Interior Penalty)" << endl;
 	cout << "               hho    - Hybrid High-Order" << endl;
+	cout << "               dg     - Discontinuous Galerkin (Symmetric Interior Penalty)" << endl;
+	cout << "               fem    - continuous piecewise linear Finite Element Method" << endl;
 	cout << endl;
 	cout << "-stab CODE" << endl;
 	cout << "      Stabilization term (only used in HHO)." << endl;
@@ -129,6 +130,7 @@ void print_usage() {
 	cout << "               nlegendre (normalized Legendre)" << endl;
 	cout << "               bernstein" << endl;
 	cout << "               hemker" << endl;
+	cout << "               lagrange (nodal basis)" << endl;
 	cout << endl;
 	cout << "-f-basis CODE" << endl;
 	cout << "      Polynomial basis for the faces. Same values as for -e-basis." << endl;
@@ -803,7 +805,7 @@ int main(int argc, char* argv[])
 			case OPT_Discretization:
 			{
 				string discretization = optarg;
-				if (discretization.compare("dg") != 0 && discretization.compare("hho") != 0)
+				if (discretization.compare("dg") != 0 && discretization.compare("hho") != 0 && discretization.compare("fem") != 0)
 					argument_error("unknown discretization '" + discretization + "'. Check -discr argument.");
 				args.Discretization.Method = discretization;
 				break;
@@ -819,7 +821,7 @@ int main(int argc, char* argv[])
 			case OPT_ElemBasis: 
 			{
 				string basisCode = optarg;
-				if (basisCode.compare("monomials") != 0 && basisCode.compare("legendre") != 0 && basisCode.compare("nlegendre") != 0 && basisCode.compare("bernstein") != 0 && basisCode.compare("hemker") != 0)
+				if (basisCode.compare("monomials") != 0 && basisCode.compare("legendre") != 0 && basisCode.compare("nlegendre") != 0 && basisCode.compare("bernstein") != 0 && basisCode.compare("hemker") != 0 && basisCode.compare("lagrange") != 0)
 					argument_error("unknown polynomial basis '" + basisCode + "'. Check -e-basis argument.");
 				args.Discretization.ElemBasisCode = basisCode;
 				break;
@@ -1382,7 +1384,17 @@ int main(int argc, char* argv[])
 		argument_error("HHO does not exist with p = 0. Linear approximation at least (p >= 1).");
 
 	// Elem polynomial bases
-	if (args.Discretization.ElemBasisCode.empty())
+	if (args.Discretization.Method.compare("fem") == 0)
+	{
+		if (!args.Discretization.ElemBasisCode.empty() && args.Discretization.ElemBasisCode.compare("lagrange") != 0)
+			argument_error("In FEM, only Lagrange basis is implemented.");
+		if (args.Discretization.PolyDegree != 1)
+			argument_error("In FEM, only p=1 is implemented.");
+		args.Discretization.ElemBasisCode = "lagrange";
+		args.Discretization.OrthogonalizeElemBasesCode = 0;
+		args.Discretization.PolyDegree = 1;
+	}
+	else if (args.Discretization.ElemBasisCode.empty())
 	{
 		if (args.Discretization.OrthogonalizeElemBasesCode == -1)
 			args.Discretization.OrthogonalizeElemBasesCode = args.Discretization.MeshCode.compare("cart") == 0 ? 0 : 1;

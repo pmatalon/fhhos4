@@ -3,6 +3,7 @@
 #include "BasisFunction.h"
 #include "TensorPolynomial.h"
 #include "Bernstein2D.h"
+#include "LagrangeP1.h"
 #ifdef ENABLE_3D
 	#include "Bernstein3D.h"
 #endif
@@ -86,7 +87,19 @@ public:
 			}
 			else
 			{
-				if (basisCode.compare(Bernstein2D::Code()) == 0)
+				if (basisCode.compare("lagrange") == 0)
+				{
+					if (maxPolynomialDegree != 1)
+						Utils::FatalError("Only piecewise linear approximation is implemented with the Lagrange basis.");
+
+					BasisFunction<Dim>* lagrangeNode1 = dynamic_cast<BasisFunction<Dim>*>(new LagrangeP1_Node1());
+					BasisFunction<Dim>* lagrangeNode2 = dynamic_cast<BasisFunction<Dim>*>(new LagrangeP1_Node2());
+					BasisFunction<Dim>* lagrangeNode3 = dynamic_cast<BasisFunction<Dim>*>(new LagrangeP1_Node3());
+					this->LocalFunctions.push_back(lagrangeNode1);
+					this->LocalFunctions.push_back(lagrangeNode2);
+					this->LocalFunctions.push_back(lagrangeNode3);
+				}
+				else if (basisCode.compare(Bernstein2D::Code()) == 0)
 				{
 					for (int j = 0; j <= maxPolynomialDegree; j++)
 					{

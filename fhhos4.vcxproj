@@ -80,7 +80,9 @@
     <ClInclude Include="src/FunctionalBasis/Monomial1D.h" />
     <ClInclude Include="src/FunctionalBasis/FunctionalBasis.h" />
     <ClInclude Include="src/FunctionalBasis/TensorPolynomial.h" />
+    <ClInclude Include="src\FEM\Diffusion_FEM.h" />
     <ClInclude Include="src\FunctionalBasis\Hemker1D.h" />
+    <ClInclude Include="src\FunctionalBasis\LagrangeP1.h" />
     <ClInclude Include="src\FunctionalBasis\OrthogonalBasis.h" />
     <ClInclude Include="src\Geometry\2D\Segment.h" />
     <ClInclude Include="src\Geometry\CGALWrapper.h" />
@@ -171,6 +173,7 @@
     <ClInclude Include="src\Program\Program_BiHarmonicDD_HHO.h" />
     <ClInclude Include="src\Program\Program_BiHarmonic_HHO.h" />
     <ClInclude Include="src\Program\Program_Diffusion_DG.h" />
+    <ClInclude Include="src\Program\Program_Diffusion_FEM.h" />
     <ClInclude Include="src\Program\Program_Diffusion_HHO.h" />
     <ClInclude Include="src\QuadratureRules\Dunavant\Dunavant.h" />
     <ClInclude Include="src\QuadratureRules\Dunavant\triangle_dunavant_rule.hpp" />

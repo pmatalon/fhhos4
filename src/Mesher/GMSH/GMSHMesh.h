@@ -1104,6 +1104,78 @@ public:
 		gmsh::finalize();
 	}
 
+	void ExportToGMSH_Nodes(const Vector& nodeValues, const string& outputFilePathPrefix, const string& suffix) override
+	{
+		assert(!_mshFilePath.empty());
+		gmsh::initialize();
+		gmsh::open(_mshFilePath);
+		if (_mshFileIsTmp)
+			remove(_mshFilePath.c_str());
+
+		int viewId = gmsh::view::add(suffix);
+
+		vector<std::string> modelNames;
+		gmsh::model::list(modelNames);
+		string modelName = modelNames[modelNames.size() - 1];
+
+		vector<size_t> nodeTags;
+		vector<vector<double>> values;
+		nodeTags.reserve(this->Vertices.size());
+		values.reserve(this->Vertices.size());
+
+		for (auto const& [nodeTag, v] : _vertexExternalNumbers)
+		{
+			nodeTags.push_back(nodeTag);
+			values.push_back({ nodeValues[v->Number] });
+		}
+		gmsh::view::addModelData(viewId, 0, modelName, "NodeData", nodeTags, values);
+
+		string meshFilePath = outputFilePathPrefix + (outputFilePathPrefix.back() == '/' ? "" : "_") + suffix + ".msh";
+		string dataFilePath = outputFilePathPrefix + (outputFilePathPrefix.back() == '/' ? "" : "_") + suffix + ".pos";
+
+		gmsh::write(meshFilePath);
+		gmsh::view::write(viewId, dataFilePath);
+
+		cout << suffix << " exported for GMSH to " << dataFilePath << endl;
+		gmsh::finalize();
+	}
+
+	void ExportToGMSH_Nodes(DomFunction f, const string& outputFilePathPrefix, const string& suffix)
+	{
+		assert(!_mshFilePath.empty());
+		gmsh::initialize();
+		gmsh::open(_mshFilePath);
+		if (_mshFileIsTmp)
+			remove(_mshFilePath.c_str());
+
+		int viewId = gmsh::view::add(suffix);
+
+		vector<std::string> modelNames;
+		gmsh::model::list(modelNames);
+		string modelName = modelNames[modelNames.size() - 1];
+
+		vector<size_t> nodeTags;
+		vector<vector<double>> values;
+		nodeTags.reserve(this->Vertices.size());
+		values.reserve(this->Vertices.size());
+
+		for (auto const& [nodeTag, v] : _vertexExternalNumbers)
+		{
+			nodeTags.push_back(nodeTag);
+			values.push_back({ f(*v) });
+		}
+		gmsh::view::addModelData(viewId, 0, modelName, "NodeData", nodeTags, values);
+
+		string meshFilePath = outputFilePathPrefix + (outputFilePathPrefix.back() == '/' ? "" : "_") + suffix + ".msh";
+		string dataFilePath = outputFilePathPrefix + (outputFilePathPrefix.back() == '/' ? "" : "_") + suffix + ".pos";
+
+		gmsh::write(meshFilePath);
+		gmsh::view::write(viewId, dataFilePath);
+
+		cout << suffix << " exported for GMSH to " << dataFilePath << endl;
+		gmsh::finalize();
+	}
+
 	void ExportToGMSH(DomFunction f, const string& outputFilePath, const string& dataName)
 	{
 		assert(!_mshFilePath.empty());

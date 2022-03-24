@@ -77,6 +77,10 @@ public:
 	vector<Face<Dim>*> InteriorFaces;
 	vector<Face<Dim>*> DirichletFaces;
 	vector<Face<Dim>*> NeumannFaces;
+	vector<Vertex*> BoundaryVertices;
+	vector<Vertex*> InteriorVertices;
+	vector<Vertex*> DirichletVertices;
+	vector<Vertex*> NeumannVertices;
 
 	vector<PhysicalGroup<Dim>*> PhysicalParts;
 	vector<BoundaryGroup*> BoundaryParts;
@@ -357,6 +361,11 @@ public:
 		Utils::Warning("Impossible to export the solution to GMSH because this mesh does not come from GMSH.");
 	}
 
+	virtual void ExportToGMSH_Nodes(const Vector& nodeValues, const string& outputFilePathPrefix, const string& suffix)
+	{
+		Utils::Warning("Impossible to export the solution to GMSH because this mesh does not come from GMSH.");
+	}
+
 	virtual void CoarsenMesh(H_CoarsStgy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor)
 	{
 		if (Utils::IsRefinementStrategy(elemCoarseningStgy))
@@ -447,6 +456,49 @@ protected:
 		}
 	}
 
+public:
+	void FillBoundaryAndInteriorVertexLists()
+	{
+		bool fillBoundaryVertices = this->BoundaryVertices.empty();
+		bool fillInteriorVertices = this->InteriorVertices.empty();
+		if (!fillBoundaryVertices && !fillInteriorVertices)
+			return;
+
+		if (fillInteriorVertices)
+			this->InteriorVertices.reserve(this->Vertices.size());
+
+		set<Vertex*> boundary;
+
+		if (fillBoundaryVertices)
+		{
+			for (Face<Dim>* f : this->BoundaryFaces)
+			{
+				for (Vertex* v : f->Vertices())
+					boundary.insert(v);
+			}
+
+			this->BoundaryVertices = vector<Vertex*>(boundary.begin(), boundary.end());
+
+			if (fillInteriorVertices)
+			{
+				for (Vertex* v : this->Vertices)
+				{
+					if (find(boundary.begin(), boundary.end(), v) == boundary.end())
+						this->InteriorVertices.push_back(v);
+				}
+			}
+		}
+		else if (fillInteriorVertices)
+		{
+			for (Vertex* v : this->Vertices)
+			{
+				if (find(BoundaryVertices.begin(), BoundaryVertices.end(), v) == BoundaryVertices.end())
+					this->InteriorVertices.push_back(v);
+			}
+		}
+	}
+
+protected:
 	void FillDirichletAndNeumannFaceLists(bool forceRefillLists = false)
 	{
 		if ((!this->DirichletFaces.empty() || !this->NeumannFaces.empty()) && !forceRefillLists)
@@ -472,6 +524,45 @@ protected:
 			CoarseMesh->FillDirichletAndNeumannFaceLists(forceRefillLists);
 	}
 
+public:
+	void FillDirichletAndNeumannVertexLists(bool forceRefillLists = false)
+	{
+		if ((!this->DirichletVertices.empty() || !this->NeumannVertices.empty()) && !forceRefillLists)
+			return;
+
+		if (this->BoundaryFaces.empty())
+			Utils::FatalError("No boundary faces!");
+
+		this->DirichletVertices.clear();
+		this->NeumannVertices.clear();
+
+		set<Vertex*> dirichlet;
+		set<Vertex*> neumann;
+
+		for (Face<Dim>* f : this->BoundaryFaces)
+		{
+			if (f->HasDirichletBC())
+			{
+				for (Vertex* v : f->Vertices())
+					dirichlet.insert(v);
+			}
+			else if (f->HasNeumannBC())
+			{
+				for (Vertex* v : f->Vertices())
+					neumann.insert(v);
+			}
+			else
+				assert(false);
+		}
+
+		this->DirichletVertices = vector<Vertex*>(dirichlet.begin(), dirichlet.end());
+		this->NeumannVertices = vector<Vertex*>(neumann.begin(), neumann.end());
+
+		if (CoarseMesh)
+			CoarseMesh->FillDirichletAndNeumannVertexLists(forceRefillLists);
+	}
+
+protected:
 	PhysicalGroup<Dim>* GetPhysicalGroup(int id)
 	{
 		for (PhysicalGroup<Dim>* pp : this->PhysicalParts)
