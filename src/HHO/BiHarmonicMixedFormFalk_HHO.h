@@ -95,7 +95,7 @@ public:
 	}
 
 	// Solve problem 1 (f=source, Neum=<neumann>)
-	Vector Solve1stDiffProblem(const Vector& neumann) override
+	Vector Solve1stDiffProblemWithFSource(const Vector& neumann) override
 	{
 #ifndef NDEBUG
 		// Check compatibility condition
@@ -246,7 +246,7 @@ public:
 	Vector ComputeSolution(const Vector& theta)
 	{
 		// Solve problem 1 (f=source, Neum=<theta>)
-		Vector lambda = Solve1stDiffProblem(theta);
+		Vector lambda = Solve1stDiffProblemWithFSource(theta);
 
 		// Solve problem 2 (f=<lambda>, Neum=0)
 		Vector reconstructedSolution;

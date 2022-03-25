@@ -35,7 +35,7 @@ public:
 
 	virtual Vector FindCompatibleTheta() = 0;
 
-	virtual Vector Solve1stDiffProblem(const Vector& neumann) = 0;
+	virtual Vector Solve1stDiffProblemWithFSource(const Vector& neumann) = 0;
 
 	virtual Vector Solve1stDiffProblemWithZeroSource(const Vector& neumann) = 0;
 

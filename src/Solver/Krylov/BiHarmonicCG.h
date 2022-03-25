@@ -88,7 +88,7 @@ public:
 			//------------------------------------
 			/*
 			// Recompute explicitly the residual, by computing the solution u
-			Vector lambda_final = _biHarPb->Solve1stDiffProblem(theta);
+			Vector lambda_final = _biHarPb->Solve1stDiffProblemWithFSource(theta);
 			Vector u_boundary_real = _biHarPb->Solve2ndDiffProblem(lambda_final, true);
 
 			Vector r_u_boundary = r - u_boundary_real;

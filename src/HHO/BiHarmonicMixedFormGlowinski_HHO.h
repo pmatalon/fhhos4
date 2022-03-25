@@ -78,7 +78,7 @@ public:
 	}
 
 	// Solve problem 1 (f=source, Dirich=<dirichlet>)
-	Vector Solve1stDiffProblem(const Vector& dirichlet) override
+	Vector Solve1stDiffProblemWithFSource(const Vector& dirichlet) override
 	{
 		// Define problem
 		Vector b_source = _diffPb.AssembleSourceTerm(_testCase->SourceFunction);
@@ -152,7 +152,7 @@ public:
 	Vector ComputeSolution(const Vector& theta) override
 	{
 		// Solve problem 1 (f=source, Dirich=<theta>)
-		Vector lambda = Solve1stDiffProblem(theta);
+		Vector lambda = Solve1stDiffProblemWithFSource(theta);
 
 		// Solve problem 2 (f=<lambda>, Dirich=0)
 		return Solve2ndDiffProblem(lambda);

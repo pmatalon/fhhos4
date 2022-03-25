@@ -174,7 +174,7 @@ public:
 
 			// Solve 1st problem with f as source
 			Vector theta_f = biHarPb->FindCompatibleTheta();
-			Vector lambda_f = biHarPb->Solve1stDiffProblem(theta_f);
+			Vector lambda_f = biHarPb->Solve1stDiffProblemWithFSource(theta_f);
 			// Solve 2nd problem and extract the boundary (or normal derivative)
 			Vector u_boundary_f = biHarPb->Solve2ndDiffProblem(lambda_f, true);
 
@@ -232,7 +232,7 @@ public:
 						Vector reconstructedSolution = biHarPb->ComputeSolution(theta_f + theta_0);
 						result.L2Error = biHarPb->DiffPb().L2Error(testCase->ExactSolution, reconstructedSolution);
 
-						Vector lambda2 = biHarPb->Solve1stDiffProblem(theta_f + theta_0);
+						Vector lambda2 = biHarPb->Solve1stDiffProblemWithFSource(theta_f + theta_0);
 						Vector u_boundary = biHarPb->Solve2ndDiffProblem(lambda2, true);
 						/* // same thing
 						Vector lambda0 = biHarPb->Solve1stDiffProblemWithZeroSource(theta);

@@ -88,7 +88,7 @@ public:
 		{
 			cout << endl;
 			cout << "----------------------------------------------------------" << endl;
-			cout << "-                 Linear system systemSolution                 -" << endl;
+			cout << "-                 Linear system solution                 -" << endl;
 			cout << "----------------------------------------------------------" << endl;
 
 			// Solver creation
