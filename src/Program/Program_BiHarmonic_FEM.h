@@ -1,8 +1,7 @@
 #pragma once
 #include <iomanip>
 #include "../ProgramArguments.h"
-#include "../HHO/BiHarmonicMixedFormFalk_HHO.h"
-#include "../HHO/BiHarmonicMixedFormGlowinski_HHO.h"
+#include "../FEM/BiHarmonicMixedFormGlowinski_FEM.h"
 #include "../TestCases/BiHarmonic/BiHarTestCaseFactory.h"
 #include "../Mesher/MeshFactory.h"
 #include "../Solver/SolverFactory.h"
@@ -13,7 +12,7 @@
 // Biharmonic equation in mixed form with mixed (homogeneous) Dirichlet-Neumann BC
 
 template <int Dim>
-class Program_BiHarmonic_HHO
+class Program_BiHarmonic_FEM
 {
 public:
 	static void Execute(ProgramArguments& args)
@@ -52,11 +51,11 @@ public:
 
 		// Export source
 		if (args.Actions.Export.SourceToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
-			dynamic_cast<GMSHMesh<Dim>*>(mesh)->ExportToGMSH(testCase->SourceFunction, args.OutputDirectory + "/source", "source");
+			dynamic_cast<GMSHMesh<Dim>*>(mesh)->ExportToGMSH_Nodes(testCase->SourceFunction, args.OutputDirectory + "/source", "source");
 
 		// Export exact solution
 		if (args.Actions.Export.ExactSolutionToGMSH && testCase->ExactSolution && args.Discretization.Mesher.compare("gmsh") == 0)
-			dynamic_cast<GMSHMesh<Dim>*>(mesh)->ExportToGMSH(testCase->ExactSolution, args.OutputDirectory + "/exsol", "exact solution");
+			dynamic_cast<GMSHMesh<Dim>*>(mesh)->ExportToGMSH_Nodes(testCase->ExactSolution, args.OutputDirectory + "/exsol", "exact solution");
 
 		cout << endl;
 
@@ -65,34 +64,21 @@ public:
 		//----------------------//
 
 		if (args.Problem.Scheme.compare("f") == 0)
-		{
-			auto FullNeumann = BoundaryConditions::HomogeneousNeumannEverywhere();
-			mesh->SetBoundaryConditions(&FullNeumann);
-			cout << "Scheme: Falk" << endl;
-		}
+			Utils::FatalError("Falk's scheme is not implemented in FEM.");
 		else if (args.Problem.Scheme.compare("g") == 0)
 		{
 			auto Dirichlet = BoundaryConditions::HomogeneousDirichletEverywhere();
 			mesh->SetBoundaryConditions(&Dirichlet);
+			mesh->FillBoundaryAndInteriorVertexLists();
+			mesh->FillDirichletAndNeumannVertexLists();
 			cout << "Scheme: Glowinski" << endl;
 		}
 		else
 			Utils::FatalError("Unknown scheme '" + args.Problem.Scheme + "'. Check -sch parameter. Possible values are 'f' and 'g'.");
 
-		FunctionalBasis<Dim>* reconstructionBasis = new FunctionalBasis<Dim>(args.Discretization.ElemBasisCode, args.Discretization.PolyDegree, args.Discretization.UsePolynomialSpaceQ);
-		FunctionalBasis<Dim>* cellBasis = new FunctionalBasis<Dim>(args.Discretization.ElemBasisCode, args.Discretization.PolyDegree - 1, args.Discretization.UsePolynomialSpaceQ);
-		FunctionalBasis<Dim - 1>* faceBasis = new FunctionalBasis<Dim - 1>(args.Discretization.FaceBasisCode, args.Discretization.PolyDegree - 1, args.Discretization.UsePolynomialSpaceQ);
+		FunctionalBasis<Dim>* basis = new FunctionalBasis<Dim>(args.Discretization.ElemBasisCode, args.Discretization.PolyDegree, args.Discretization.UsePolynomialSpaceQ);
 
-		HHOParameters<Dim>* hho = new HHOParameters<Dim>(mesh, args.Discretization.Stabilization, reconstructionBasis, cellBasis, faceBasis, args.Discretization.OrthogonalizeElemBasesCode, args.Discretization.OrthogonalizeFaceBasesCode);
-
-		bool saveMatrixBlocks = args.Solver.SolverCode.compare("uamg") == 0 || args.Solver.SolverCode.compare("fcguamg") == 0;
-		BiHarmonicMixedForm_HHO<Dim>* biHarPb;
-		if (args.Problem.Scheme.compare("f") == 0)
-			biHarPb = new BiHarmonicMixedFormFalk_HHO<Dim>(mesh, testCase, hho, args.Solver.BiHarReconstructBoundary, /*args.Actions.EnforceDirichletBC,*/ saveMatrixBlocks);
-		else if (args.Problem.Scheme.compare("g") == 0)
-			biHarPb = new BiHarmonicMixedFormGlowinski_HHO<Dim>(mesh, testCase, hho, args.Solver.BiHarReconstructBoundary, saveMatrixBlocks);
-		else
-			Utils::FatalError("Unknown scheme '" + args.Problem.Scheme + "'. Check -sch parameter. Possible values are 'f' and 'g'.");
+		BiHarmonicMixedForm_FEM<Dim>* biHarPb = new BiHarmonicMixedFormGlowinski_FEM<Dim>(mesh, testCase, basis);
 
 		cout << endl;
 		cout << "------------------------------------------------------" << endl;
@@ -117,8 +103,8 @@ public:
 			cout << "-           Setup Laplacian solver           -" << endl;
 			cout << "----------------------------------------------" << endl;
 
-			int blockSizeForBlockSolver = args.Solver.BlockSize != -1 ? args.Solver.BlockSize : faceBasis->Size();
-			Solver* diffSolver = SolverFactory<Dim>::CreateSolver(args, &biHarPb->DiffPb(), blockSizeForBlockSolver, out);
+			int blockSizeForBlockSolver = args.Solver.BlockSize != -1 ? args.Solver.BlockSize : 1;
+			Solver* diffSolver = SolverFactory<Dim>::CreateSolver(args, nullptr, blockSizeForBlockSolver, out);
 
 			Timer setupTimer;
 			Timer solvingTimer1;
@@ -127,22 +113,10 @@ public:
 			totalTimer.Start();
 
 			cout << "Solver: " << *diffSolver << endl << endl;
-			IterativeSolver* iterativeSolver = dynamic_cast<IterativeSolver*>(diffSolver);
-			if (iterativeSolver)
-			{
-				setupTimer.Start();
-				if (Utils::ProgramArgs.Solver.SolverCode.compare("uamg") == 0 || Utils::ProgramArgs.Solver.SolverCode.compare("fcguamg") == 0)
-					iterativeSolver->Setup(biHarPb->DiffPb().A, biHarPb->DiffPb().A_T_T, biHarPb->DiffPb().A_T_ndF, biHarPb->DiffPb().A_ndF_ndF);
-				else
-					diffSolver->Setup(biHarPb->DiffPb().A);
-				setupTimer.Stop();
-			}
-			else
-			{
-				setupTimer.Start();
-				diffSolver->Setup(biHarPb->DiffPb().A);
-				setupTimer.Stop();
-			}
+
+			setupTimer.Start();
+			diffSolver->Setup(biHarPb->DiffPb().A);
+			setupTimer.Stop();
 
 			biHarPb->SetDiffSolver(diffSolver);
 
@@ -315,7 +289,7 @@ public:
 
 				//DiffPb().ExportReconstructedVectorToGMSH(lambda, out, "lambda");
 				Vector solPb2 = biHarPb->Solve2ndDiffProblem(lambda, false);
-				biHarPb->DiffPb().ExportReconstructedVectorToGMSH(solPb2, out, "solPb2");
+				//biHarPb->DiffPb().ExportReconstructedVectorToGMSH(solPb2, out, "solPb2");
 
 
 				Vector zero = -biHarPb->Solve2ndDiffProblem(lambda, true);
@@ -336,14 +310,14 @@ public:
 			delete biHarSolver;
 
 			cout << "Compute solution..." << endl;
-			Vector reconstructedSolution = biHarPb->ComputeSolution(theta_f + theta_0);
+			Vector solution = biHarPb->ComputeSolution(theta_f + theta_0);
 
 			//-----------------------------//
 			//       Solution export       //
 			//-----------------------------//
 
 			if (args.Actions.Export.SolutionVectors)
-				out.ExportVector(reconstructedSolution, "solutionHigherOrder");
+				out.ExportVector(solution, "solution");
 
 			if (args.Actions.Export.MeshToMatlab)
 			{
@@ -352,7 +326,7 @@ public:
 			}
 
 			if (args.Actions.Export.SolutionToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
-				biHarPb->DiffPb().ExportSolutionToGMSH(reconstructedSolution, out);
+				mesh->ExportToGMSH_Nodes(solution, out.GetFilePathPrefix(), "solution");
 
 			//----------------------//
 			//       L2 error       //
@@ -360,7 +334,7 @@ public:
 
 			if (testCase->ExactSolution)
 			{
-				double error = biHarPb->DiffPb().L2Error(testCase->ExactSolution, reconstructedSolution);
+				double error = biHarPb->DiffPb().L2Error(testCase->ExactSolution, solution);
 				cout << endl << "L2 Error = " << std::scientific << error << endl;
 			}
 		}
@@ -370,10 +344,7 @@ public:
 		//--------------------------//
 
 		delete mesh;
-		delete cellBasis;
-		delete faceBasis;
-		delete reconstructionBasis;
-		delete hho;
+		delete basis;
 		delete biHarPb;
 		delete testCase;
 		GaussLegendre::Free();

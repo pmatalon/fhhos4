@@ -92,7 +92,7 @@ public:
 			cout << "----------------------------------------------------------" << endl;
 
 			// Solver creation
-			int blockSizeForBlockSolver = args.Solver.BlockSize != -1 ? args.Solver.BlockSize : basis->Size();
+			int blockSizeForBlockSolver = args.Solver.BlockSize != -1 ? args.Solver.BlockSize : 1;
 			Solver* solver = SolverFactory<Dim>::CreateSolver(args, blockSizeForBlockSolver, out);
 
 			cout << "Solver: " << *solver << endl << endl;

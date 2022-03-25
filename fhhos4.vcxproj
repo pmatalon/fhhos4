@@ -80,6 +80,8 @@
     <ClInclude Include="src/FunctionalBasis/Monomial1D.h" />
     <ClInclude Include="src/FunctionalBasis/FunctionalBasis.h" />
     <ClInclude Include="src/FunctionalBasis/TensorPolynomial.h" />
+    <ClInclude Include="src\FEM\BiHarmonicMixedFormGlowinski_FEM.h" />
+    <ClInclude Include="src\FEM\BiHarmonicMixedForm_FEM.h" />
     <ClInclude Include="src\FEM\Diffusion_FEM.h" />
     <ClInclude Include="src\FunctionalBasis\Hemker1D.h" />
     <ClInclude Include="src\FunctionalBasis\LagrangeP1.h" />
@@ -172,6 +174,7 @@
     <ClInclude Include="src/Utils/NonZeroCoefficients.h" />
     <ClInclude Include="src/Utils/Utils.h" />
     <ClInclude Include="src\Program\Program_BiHarmonicDD_HHO.h" />
+    <ClInclude Include="src\Program\Program_BiHarmonic_FEM.h" />
     <ClInclude Include="src\Program\Program_BiHarmonic_HHO.h" />
     <ClInclude Include="src\Program\Program_Diffusion_DG.h" />
     <ClInclude Include="src\Program\Program_Diffusion_FEM.h" />

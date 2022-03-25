@@ -562,6 +562,15 @@
     <ClInclude Include="src\HHO\BiHarmonicMixedForm.h">
       <Filter>HHO</Filter>
     </ClInclude>
+    <ClInclude Include="src\FEM\BiHarmonicMixedForm_FEM.h">
+      <Filter>FEM</Filter>
+    </ClInclude>
+    <ClInclude Include="src\FEM\BiHarmonicMixedFormGlowinski_FEM.h">
+      <Filter>FEM</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Program\Program_BiHarmonic_FEM.h">
+      <Filter>Program</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

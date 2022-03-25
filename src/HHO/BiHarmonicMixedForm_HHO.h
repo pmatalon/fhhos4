@@ -1,8 +1,6 @@
 #pragma once
 #include "BiHarmonicMixedForm.h"
 #include "Diffusion_HHO.h"
-#include "../TestCases/Diffusion/VirtualDiffusionTestCase.h"
-#include "HigherOrderBoundary.h"
 using namespace std;
 
 template<int Dim>

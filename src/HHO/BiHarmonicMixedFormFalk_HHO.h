@@ -3,7 +3,6 @@
 #include "../TestCases/BiHarmonic/BiHarmonicTestCase.h"
 #include "Diffusion_HHO.h"
 #include "../TestCases/Diffusion/VirtualDiffusionTestCase.h"
-#include "../Solver/Solver.h"
 #include "HigherOrderBoundary.h"
 #include "ZeroMeanEnforcer.h"
 #include "NumericImageEnforcer.h"
