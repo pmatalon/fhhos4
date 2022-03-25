@@ -559,6 +559,9 @@
     <ClInclude Include="src\FEM\Diffusion_FEM.h">
       <Filter>FEM</Filter>
     </ClInclude>
+    <ClInclude Include="src\HHO\BiHarmonicMixedForm.h">
+      <Filter>HHO</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

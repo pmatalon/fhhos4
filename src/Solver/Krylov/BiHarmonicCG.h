@@ -1,18 +1,17 @@
 #pragma once
 #include "../IterativeSolver.h"
-#include "../../HHO/BiHarmonicMixedForm_HHO.h"
+#include "../../HHO/BiHarmonicMixedForm.h"
 using namespace std;
 
-template <int Dim>
 class BiHarmonicCG : public IterativeSolver
 {
 private:
-	BiHarmonicMixedForm_HHO<Dim>* _biHarPb;
+	BiHarmonicMixedForm* _biHarPb;
 
 public:
 	int Restart = 0;
 
-	BiHarmonicCG(BiHarmonicMixedForm_HHO<Dim>* biHarPb, int restart = 0)
+	BiHarmonicCG(BiHarmonicMixedForm* biHarPb, int restart = 0)
 	{
 		_biHarPb = biHarPb;
 		Restart = restart;
@@ -20,7 +19,7 @@ public:
 
 	virtual void Serialize(ostream& os) const override
 	{
-		os << "Conjugate Gradient for the bi-harmonic problem";
+		os << "Conjugate Gradient for the biharmonic problem";
 		if (Restart > 0)
 			os << " (restart = " << Restart << ")";
 	}

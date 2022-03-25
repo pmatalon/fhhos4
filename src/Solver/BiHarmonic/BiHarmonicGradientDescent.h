@@ -1,23 +1,22 @@
 #pragma once
 #include "../IterativeSolver.h"
-#include "../../HHO/BiHarmonicMixedForm_HHO.h"
+#include "../../HHO/BiHarmonicMixedForm.h"
 using namespace std;
 
-template <int Dim>
 class BiHarmonicGradientDescent : public IterativeSolver
 {
 private:
-	BiHarmonicMixedForm_HHO<Dim>* _biHarPb;
+	BiHarmonicMixedForm* _biHarPb;
 
 public:
-	BiHarmonicGradientDescent(BiHarmonicMixedForm_HHO<Dim>* biHarPb)
+	BiHarmonicGradientDescent(BiHarmonicMixedForm* biHarPb)
 	{
 		_biHarPb = biHarPb;
 	}
 
 	virtual void Serialize(ostream& os) const override
 	{
-		os << "Conjugate Gradient for the bi-harmonic problem";
+		os << "Gradient descent for the biharmonic problem";
 	}
 
 	void Solve(const Vector& b, Vector& theta, bool xEquals0) override

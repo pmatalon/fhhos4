@@ -10,7 +10,7 @@
 #include "../Solver/BiHarmonic/BiHarmonicGradientDescent.h"
 #include "../Utils/ExportModule.h"
 
-// Bi-harmonic equation in mixed form with mixed (homogeneous) Dirichlet-Neumann BC
+// Biharmonic equation in mixed form with mixed (homogeneous) Dirichlet-Neumann BC
 
 template <int Dim>
 class Program_BiHarmonic_HHO
@@ -66,11 +66,13 @@ public:
 		{
 			auto FullNeumann = BoundaryConditions::HomogeneousNeumannEverywhere();
 			mesh->SetBoundaryConditions(&FullNeumann);
+			cout << "Scheme: Falk" << endl;
 		}
 		else if (args.Problem.Scheme.compare("g") == 0)
 		{
 			auto Dirichlet = BoundaryConditions::HomogeneousDirichletEverywhere();
 			mesh->SetBoundaryConditions(&Dirichlet);
+			cout << "Scheme: Glowinski" << endl;
 		}
 		else
 			Utils::FatalError("Unknown scheme '" + args.Problem.Scheme + "'. Check -sch parameter. Possible values are 'f' and 'g'.");
@@ -98,16 +100,6 @@ public:
 		assemblyTimer.Start();
 
 		biHarPb->Setup();
-
-		/*if (args.Problem.Scheme.compare("f") == 0 && args.Actions.EnforceDirichletBC)
-		{
-			Mesh<Dim>* meshLast = MeshFactory<Dim>::BuildMesh(args, testCase);
-			if (args.Discretization.Mesher.compare("gmsh") == 0)
-				GMSHMesh<Dim>::CloseGMSH();
-
-			BiHarmonicMixedFormFalk_HHO<Dim>* falkScheme = static_cast<BiHarmonicMixedFormFalk_HHO<Dim>*>(biHarPb);
-			falkScheme->SetupLastPb(meshLast);
-		}*/
 
 		assemblyTimer.Stop();
 		cout << endl << "Assembly time: CPU = " << assemblyTimer.CPU() << ", elapsed = " << assemblyTimer.Elapsed() << endl;
@@ -155,21 +147,8 @@ public:
 			biHarPb->SetDiffSolver(diffSolver);
 
 
-			/*if (args.Problem.Scheme.compare("f") == 0 && args.Actions.EnforceDirichletBC)
-			{
-				cout << "Enforce Dirichlet BC to the solution, so setup of last solver..." << endl << endl;
-
-				BiHarmonicMixedFormFalk_HHO<Dim>* falkScheme = static_cast<BiHarmonicMixedFormFalk_HHO<Dim>*>(biHarPb);
-
-				Solver* lastSolver = SolverFactory<Dim>::CreateSolver(args, falkScheme->LastPb(), blockSizeForBlockSolver, out);
-				lastSolver->Setup(falkScheme->LastPb()->A);
-
-				falkScheme->SetLastPbSolver(lastSolver);
-			}*/
-
-
 			cout << "-------------------------------------" << endl;
-			cout << "-     Solve bi-harmonic problem     -" << endl;
+			cout << "-     Solve biharmonic problem     -" << endl;
 			cout << "-------------------------------------" << endl;
 
 			// Solve 1st problem with f as source
@@ -207,13 +186,13 @@ public:
 
 			Solver* biHarSolver = nullptr;
 			if (args.Solver.BiHarmonicSolverCode.compare("cg") == 0)
-				biHarSolver = new BiHarmonicCG<Dim>(biHarPb, args.Solver.Restart);
+				biHarSolver = new BiHarmonicCG(biHarPb, args.Solver.Restart);
 			else if (args.Solver.BiHarmonicSolverCode.compare("gd") == 0)
-				biHarSolver = new BiHarmonicGradientDescent<Dim>(biHarPb);
+				biHarSolver = new BiHarmonicGradientDescent(biHarPb);
 			else if (args.Solver.BiHarmonicSolverCode.compare("lu") == 0)
 				biHarSolver = new EigenLU();
 			else
-				Utils::FatalError("Unknown bi-harmonic solver '" + args.Solver.BiHarmonicSolverCode + "'");
+				Utils::FatalError("Unknown biharmonic solver '" + args.Solver.BiHarmonicSolverCode + "'");
 
 			cout << "Solver: " << *biHarSolver << endl << endl;
 
