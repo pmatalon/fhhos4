@@ -24,8 +24,6 @@ private:
 	HHOParameters<Dim>* HHO;
 
 	Vector _b_fSource;
-	Vector _b_zeroSource;
-	Vector _b_noNeumann;
 	Vector _zeroDirichlet;
 public:
 
@@ -61,8 +59,6 @@ public:
 			_normalDerivativeMatrix = _diffPb.NormalDerivativeMatrix();
 
 		_b_fSource = _diffPb.AssembleSourceTerm(_testCase->SourceFunction);
-		_b_zeroSource = Vector::Zero(HHO->nTotalCellUnknowns);
-		_b_noNeumann = Vector::Zero(HHO->nTotalFaceUnknowns);
 		_zeroDirichlet = Vector::Zero(HHO->nDirichletCoeffs);
 	}
 
@@ -76,7 +72,7 @@ public:
 	{
 		// Define problem
 		Vector b_T   = _diffPb.ComputeB_T(_b_fSource, dirichlet);
-		Vector b_ndF = _diffPb.ComputeB_ndF(_b_noNeumann, dirichlet);
+		Vector b_ndF = _diffPb.ComputeB_ndF_noNeumann(dirichlet);
 		Vector rhs = _diffPb.CondensedRHS(b_T, b_ndF);
 
 		// Solve
@@ -91,8 +87,8 @@ public:
 	Vector Solve1stDiffProblemWithZeroSource(const Vector& dirichlet) override
 	{
 		// Define problem
-		Vector b_T = _diffPb.ComputeB_T(_b_zeroSource, dirichlet);
-		Vector b_ndF = _diffPb.ComputeB_ndF(_b_noNeumann, dirichlet);
+		Vector b_T = _diffPb.ComputeB_T_zeroSource(dirichlet);
+		Vector b_ndF = _diffPb.ComputeB_ndF_noNeumann(dirichlet);
 		Vector rhs = _diffPb.CondensedRHS(b_T, b_ndF);
 
 		// Solve
@@ -108,7 +104,7 @@ public:
 	{
 		// Define problem
 		Vector b_source = _diffPb.AssembleSourceTerm(source);
-		Vector rhs = _diffPb.CondensedRHS(b_source, _b_noNeumann);
+		Vector rhs = _diffPb.CondensedRHS_noNeumannZeroDirichlet(b_source);
 
 		// Solve
 		Vector faceSolution = this->_diffSolver->Solve(rhs);

@@ -34,7 +34,6 @@ private:
 
 	Vector _b_fSource;
 	Vector _b_zeroSource;
-	Vector _b_zeroNeumann;
 	Vector _noDirichlet;
 	Vector _one_skeleton;
 public:
@@ -87,7 +86,6 @@ public:
 
 		_b_fSource = _diffPb.AssembleSourceTerm(_testCase->SourceFunction);
 		_b_zeroSource = Vector::Zero(HHO->nTotalCellUnknowns);
-		_b_zeroNeumann = Vector::Zero(HHO->nTotalFaceUnknowns);
 		_noDirichlet = Vector();
 		_one_skeleton = _diffPb.SkeletonSpace.Project(Utils::ConstantFunctionOne);
 	}
@@ -165,7 +163,7 @@ public:
 #endif
 		// Define problem
 		Vector b_source = _diffPb.AssembleSourceTerm(source);
-		Vector rhs = _diffPb.CondensedRHS(b_source, _b_zeroNeumann);
+		Vector rhs = _diffPb.CondensedRHS_noDirichletZeroNeumann(b_source);
 
 		// Solve
 		_imageEnforcer.ProjectOntoImage(rhs); // enforce numerical compatibility

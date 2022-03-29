@@ -991,11 +991,25 @@ public:
 		return b_source - A_T_dF * x_dF;
 	}
 
+	Vector ComputeB_T_zeroSource(const Vector& x_dF)
+	{
+		assert(x_dF.rows() == HHO->nDirichletCoeffs);
+
+		return -A_T_dF * x_dF;
+	}
+
 	Vector ComputeB_ndF(const Vector& b_neumann, const Vector& x_dF)
 	{
 		assert(x_dF.rows() == HHO->nDirichletCoeffs);
 
 		return b_neumann - A_ndF_dF * x_dF;
+	}
+
+	Vector ComputeB_ndF_noNeumann(const Vector& x_dF)
+	{
+		assert(x_dF.rows() == HHO->nDirichletCoeffs);
+
+		return -A_ndF_dF * x_dF;
 	}
 
 	// Deprecated
@@ -1011,6 +1025,20 @@ public:
 		assert(b_ndF.rows() == HHO->nTotalFaceUnknowns);
 
 		return b_ndF - this->A_T_ndF.transpose() * Solve_A_T_T(b_T);
+	}
+
+	Vector CondensedRHS_noNeumannZeroDirichlet(const Vector& b_T)
+	{
+		assert(b_T.rows() == HHO->nTotalCellUnknowns);
+
+		return -this->A_T_ndF.transpose() * Solve_A_T_T(b_T);
+	}
+
+	Vector CondensedRHS_noDirichletZeroNeumann(const Vector& b_T)
+	{
+		assert(b_T.rows() == HHO->nTotalCellUnknowns);
+
+		return -this->A_T_ndF.transpose() * Solve_A_T_T(b_T);
 	}
 
 	// Returns the matrix that extract the normal derivative on the boundary from a reconstructed vector restricted to the boundary elements.
