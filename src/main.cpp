@@ -233,8 +233,8 @@ void print_usage() {
 	cout << "-bihar-reconstruct-bry {0|1}" << endl;
 	cout << "      Reconstruct higher-order boundary during the iterative process of the bi-harmonic problem." << endl;
 	cout << endl;
-	cout << "-enforce-d-bc {0|1}" << endl;
-	cout << "      Enforce Dirichlet b.c. at the end of the iterative process of the bi-harmonic problem." << endl;
+	cout << "-ibp {0|1}" << endl;
+	cout << "      Use integration by parts to compute the normal derivative in the Glowinski scheme of the bi-harmonic problem (default: 1)." << endl;
 	cout << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << "                                 Multigrid                            " << endl;
@@ -624,7 +624,7 @@ int main(int argc, char* argv[])
 		OPT_NoCache,
 		OPT_UnitTests,
 		OPT_GMSHLog,
-		OPT_EnforceDirichletBC
+		OPT_IntegrationByParts,
 	};
 
 	static struct option long_opts[] = {
@@ -698,7 +698,7 @@ int main(int argc, char* argv[])
 		 { "no-cache", no_argument, NULL, OPT_NoCache },
 		 { "ut", no_argument, NULL, OPT_UnitTests },
 		 { "gmsh-log", no_argument, NULL, OPT_GMSHLog },
-		 { "enforce-d-bc", required_argument, NULL, OPT_EnforceDirichletBC },
+		 { "ibp", required_argument, NULL, OPT_IntegrationByParts },
 		 { NULL, 0, NULL, 0 }
 	};
 
@@ -1278,8 +1278,8 @@ int main(int argc, char* argv[])
 			case 'o': 
 				args.OutputDirectory = optarg;
 				break;
-			case OPT_EnforceDirichletBC:
-				args.Actions.EnforceDirichletBC = atoi(optarg);
+			case OPT_IntegrationByParts:
+				args.Actions.IntegrationByParts = atoi(optarg);
 				break;
 			default:
 			{

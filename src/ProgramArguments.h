@@ -119,7 +119,7 @@ struct ActionsArguments
 	bool InitReferenceShapes = true;
 	bool UnitTests = false;
 	bool GMSHLogEnabled = false;
-	bool EnforceDirichletBC = true;
+	bool IntegrationByParts = true;
 	ExportArguments Export;
 };
 

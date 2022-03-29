@@ -15,6 +15,7 @@ private:
 
 	bool _saveMatrixBlocks = true;
 	//bool _reconstructHigherOrderBoundary = false;
+	bool _useIntegrationByParts = true;
 
 	DiffusionField<Dim> _diffField;
 	VirtualDiffusionTestCase<Dim> _diffPbTestCase;
@@ -26,7 +27,7 @@ private:
 	HHOParameters<Dim>* HHO;
 public:
 
-	BiHarmonicMixedFormGlowinski_HHO(Mesh<Dim>* mesh, BiHarmonicTestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool reconstructHigherOrderBoundary, bool saveMatrixBlocks)
+	BiHarmonicMixedFormGlowinski_HHO(Mesh<Dim>* mesh, BiHarmonicTestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool useIntegrationByParts, bool saveMatrixBlocks)
 	{
 		_mesh = mesh;
 		_testCase = testCase;
@@ -38,6 +39,7 @@ public:
 		_diffPb = Diffusion_HHO<Dim>(mesh, &_diffPbTestCase, HHO, true, saveMatrixBlocks);
 		_saveMatrixBlocks = saveMatrixBlocks;
 		//_reconstructHigherOrderBoundary = reconstructHigherOrderBoundary;
+		_useIntegrationByParts = useIntegrationByParts;
 	}
 
 	Diffusion_HHO<Dim>& DiffPb() override
@@ -56,7 +58,10 @@ public:
 		_higherOrderBoundary = HigherOrderBoundary<Dim>(&_diffPb);
 		_higherOrderBoundary.Setup(false, true);
 
-		_normalDerivativeMatrix = _diffPb.NormalDerivativeMatrix();
+		if (_useIntegrationByParts)
+			_normalDerivativeMatrix = _diffPb.PTrans_Mass();
+		else
+			_normalDerivativeMatrix = _diffPb.NormalDerivativeMatrix();
 
 		/*if (_reconstructHigherOrderBoundary)
 		{
@@ -131,12 +136,22 @@ public:
 
 		if (returnBoundaryNormalDerivative)
 		{
-			Vector reconstructedElemBoundary = _diffPb.ReconstructHigherOrderOnBoundaryOnly(faceSolution, dirichletCoeffs, b_source);
-			//normalDerivative = _higherOrderBoundary.NormalDerivative(reconstructedElemBoundary);
-			Vector normalDerivative = _normalDerivativeMatrix * reconstructedElemBoundary;
-			//if (!_reconstructHigherOrderBoundary)
-				//normalDerivative = _higherOrderBoundary.AssembleDirichletTerm(normalDerivative);
-			return normalDerivative;
+			if (_useIntegrationByParts)
+			{
+				Vector cellSolution = _diffPb.SolveCellUnknowns(faceSolution, b_source);
+				Vector normalDerivative = _diffPb.A_T_dF.transpose() * cellSolution + _diffPb.A_ndF_dF.transpose() * faceSolution;
+				normalDerivative -= _normalDerivativeMatrix * source;
+				return normalDerivative;
+			}
+			else
+			{
+				Vector reconstructedElemBoundary = _diffPb.ReconstructHigherOrderOnBoundaryOnly(faceSolution, dirichletCoeffs, b_source);
+				//normalDerivative = _higherOrderBoundary.NormalDerivative(reconstructedElemBoundary);
+				Vector normalDerivative = _normalDerivativeMatrix * reconstructedElemBoundary;
+				//if (!_reconstructHigherOrderBoundary)
+					//normalDerivative = _higherOrderBoundary.AssembleDirichletTerm(normalDerivative);
+				return normalDerivative;
+			}
 		}
 		else
 			return _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, dirichletCoeffs, b_source);
