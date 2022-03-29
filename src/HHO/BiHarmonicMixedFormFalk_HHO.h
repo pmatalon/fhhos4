@@ -17,7 +17,6 @@ private:
 
 	bool _saveMatrixBlocks = true;
 	bool _reconstructHigherOrderBoundary = false;
-	//bool _enforceDirichletBCInLastPb = true;
 
 	DiffusionField<Dim> _diffField;
 	VirtualDiffusionTestCase<Dim> _diffPbTestCase;
@@ -32,9 +31,15 @@ private:
 
 	double _integralSource = 0;
 	HHOParameters<Dim>* HHO;
+
+	Vector _b_fSource;
+	Vector _b_zeroSource;
+	Vector _b_zeroNeumann;
+	Vector _noDirichlet;
+	Vector _one_skeleton;
 public:
 
-	BiHarmonicMixedFormFalk_HHO(Mesh<Dim>* mesh, BiHarmonicTestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool reconstructHigherOrderBoundary, /*bool enforceDirichletBCInLastPb,*/ bool saveMatrixBlocks)
+	BiHarmonicMixedFormFalk_HHO(Mesh<Dim>* mesh, BiHarmonicTestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool reconstructHigherOrderBoundary, bool saveMatrixBlocks)
 	{
 		_mesh = mesh;
 		_testCase = testCase;
@@ -46,7 +51,6 @@ public:
 		_diffPb = Diffusion_HHO<Dim>(mesh, &_diffPbTestCase, HHO, true, saveMatrixBlocks);
 		_saveMatrixBlocks = saveMatrixBlocks;
 		_reconstructHigherOrderBoundary = reconstructHigherOrderBoundary;
-		//_enforceDirichletBCInLastPb = enforceDirichletBCInLastPb;
 	}
 
 	Diffusion_HHO<Dim>& DiffPb() override
@@ -66,7 +70,7 @@ public:
 		if (_reconstructHigherOrderBoundary)
 		{
 			_higherOrderBoundary = HigherOrderBoundary<Dim>(&_diffPb);
-			_higherOrderBoundary.Setup(true, false);
+			_higherOrderBoundary.Setup();
 			_boundarySpace = &_higherOrderBoundary.BoundarySpace;
 		}
 		else
@@ -80,6 +84,12 @@ public:
 
 		_imageEnforcer = NumericImageEnforcerFromFaceCoeffs<Dim>(&_diffPb);
 		_imageEnforcer.Setup();
+
+		_b_fSource = _diffPb.AssembleSourceTerm(_testCase->SourceFunction);
+		_b_zeroSource = Vector::Zero(HHO->nTotalCellUnknowns);
+		_b_zeroNeumann = Vector::Zero(HHO->nTotalFaceUnknowns);
+		_noDirichlet = Vector();
+		_one_skeleton = _diffPb.SkeletonSpace.Project(Utils::ConstantFunctionOne);
 	}
 
 	// Find theta verifying the compatibility condition
@@ -102,9 +112,8 @@ public:
 		assert(abs(_integralSource + integralNeumann) < Utils::Eps);
 #endif
 		// Define problem
-		Vector b_source = _diffPb.AssembleSourceTerm(_testCase->SourceFunction);
 		Vector b_neumann = _reconstructHigherOrderBoundary ? _higherOrderBoundary.AssembleNeumannTerm(neumann) : _diffPb.AssembleNeumannTerm(neumann);
-		Vector rhs = _diffPb.CondensedRHS(b_source, b_neumann);
+		Vector rhs = _diffPb.CondensedRHS(_b_fSource, b_neumann);
 
 		// Solve
 		_imageEnforcer.ProjectOntoImage(rhs); // enforce numerical compatibility
@@ -112,7 +121,7 @@ public:
 		this->CheckDiffSolverConvergence();
 
 		// Reconstruct the higher-order polynomial
-		Vector lambda = _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, Vector(), b_source);
+		Vector lambda = _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, _noDirichlet, _b_fSource);
 
 		// Even if the mean value is 0 on the faces, the mean value of the reconstructed polynomial is not necessarily 0,
 		// so we enforce it:
@@ -128,7 +137,6 @@ public:
 		assert(_integralZeroOnBoundary.Check(neumann));
 #endif
 		// Define problem
-		Vector b_source = Vector::Zero(HHO->nTotalCellUnknowns);
 		Vector b_neumann = _reconstructHigherOrderBoundary ? _higherOrderBoundary.AssembleNeumannTerm(neumann) : _diffPb.AssembleNeumannTerm(neumann);
 		Vector& rhs = b_neumann;
 
@@ -138,7 +146,7 @@ public:
 		this->CheckDiffSolverConvergence();
 
 		// Reconstruct the higher-order polynomial
-		Vector lambda = _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, Vector(), b_source);
+		Vector lambda = _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, _noDirichlet, _b_zeroSource);
 
 		// Enforce (lambda|1) = 0
 		_integralZeroOnDomain.Enforce(lambda);
@@ -157,8 +165,7 @@ public:
 #endif
 		// Define problem
 		Vector b_source = _diffPb.AssembleSourceTerm(source);
-		Vector b_neumann = Vector::Zero(HHO->nTotalFaceUnknowns);
-		Vector rhs = _diffPb.CondensedRHS(b_source, b_neumann);
+		Vector rhs = _diffPb.CondensedRHS(b_source, _b_zeroNeumann);
 
 		// Solve
 		_imageEnforcer.ProjectOntoImage(rhs); // enforce numerical compatibility
@@ -168,7 +175,7 @@ public:
 		Vector boundary;
 		if (_reconstructHigherOrderBoundary)
 		{
-			Vector reconstructedElemBoundary = _diffPb.ReconstructHigherOrderOnBoundaryOnly(faceSolution, Vector(), b_source);
+			Vector reconstructedElemBoundary = _diffPb.ReconstructHigherOrderOnBoundaryOnly(faceSolution, _noDirichlet, b_source);
 			boundary = _higherOrderBoundary.Trace(reconstructedElemBoundary);
 		}
 		else
@@ -182,65 +189,15 @@ public:
 		else
 		{
 			double orthogonalityFactor = _integralZeroOnBoundary.OrthogonalityFactor(boundary);
-
-			Vector one_skeleton = _diffPb.SkeletonSpace.Project(Utils::ConstantFunctionOne);
-			faceSolution -= orthogonalityFactor * one_skeleton;
-
-			Vector reconstructedSolution = _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, Vector(), b_source);
-			return reconstructedSolution;
+			faceSolution -= orthogonalityFactor * _one_skeleton;
+			return _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, _noDirichlet, b_source);
 		}
 	}
 
 	double L2InnerProdOnBoundary(const Vector& v1, const Vector& v2) override
 	{
 		return _boundarySpace->L2InnerProd(v1, v2);
-		//return v1.dot(v2);
 	}
-	/*
-	//------------------------//
-	//      Last problem      //
-	//------------------------//
-
-private:
-	VirtualDiffusionTestCase<Dim>* _diffLastPbTestCase = nullptr;
-	Diffusion_HHO<Dim>* _lastPb = nullptr;
-	Solver* _lastPbSolver = nullptr;
-public:
-	Diffusion_HHO<Dim>* LastPb()
-	{
-		return _lastPb;
-	}
-
-	void SetLastPbSolver(Solver* solver)
-	{
-		_lastPbSolver = solver;
-		IterativeSolver* iter = dynamic_cast<IterativeSolver*>(_lastPbSolver);
-		if (iter)
-		{
-			iter->PrintIterationResults = false;
-			iter->MaxIterations = 50;
-		}
-	}
-
-	void SetupLastPb(Mesh<Dim>* mesh)
-	{
-		if (_enforceDirichletBCInLastPb)
-		{
-			_diffLastPbTestCase = new VirtualDiffusionTestCase<Dim>(Utils::ConstantFunctionZero, _diffField);
-
-			auto FullDirichlet = BoundaryConditions::HomogeneousDirichletEverywhere();
-			mesh->SetBoundaryConditions(&FullDirichlet, true);
-			mesh->SetDiffusionField(&_diffField);
-
-			HHOParameters<Dim>* hhoLast = new HHOParameters<Dim>(mesh, HHO->Stabilization, HHO->ReconstructionBasis, HHO->CellBasis, HHO->FaceBasis, HHO->OrthogonalizeElemBasesCode, HHO->OrthogonalizeFaceBasesCode);
-
-			_lastPb = new Diffusion_HHO<Dim>(mesh, _diffLastPbTestCase, hhoLast, true, false);
-			ActionsArguments diffActions;
-			diffActions.LogAssembly = false;
-			diffActions.AssembleRightHandSide = true;
-			_lastPb->Assemble(diffActions);
-		}
-	}*/
 
 	Vector ComputeSolution(const Vector& theta)
 	{
@@ -248,19 +205,6 @@ public:
 		Vector lambda = Solve1stDiffProblemWithFSource(theta);
 
 		// Solve problem 2 (f=<lambda>, Neum=0)
-		Vector reconstructedSolution;
-		//if (!_enforceDirichletBCInLastPb)
-			reconstructedSolution = Solve2ndDiffProblem(lambda);
-		/*else
-		{
-			Vector dirichletCoeffs = Vector::Zero(_lastPb->HHO->nDirichletCoeffs);
-			Vector b_lambdaSource = _lastPb->AssembleSourceTerm(lambda);
-			Vector b_noNeumann = Vector::Zero(_lastPb->HHO->nTotalFaceUnknowns);
-			Vector rhs = _lastPb->CondensedRHS(b_lambdaSource, b_noNeumann);
-
-			Vector faceSolution = _lastPbSolver->Solve(rhs);
-			reconstructedSolution = _lastPb->ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, dirichletCoeffs, b_lambdaSource);
-		}*/
-		return reconstructedSolution;
+		return Solve2ndDiffProblem(lambda);
 	}
 };

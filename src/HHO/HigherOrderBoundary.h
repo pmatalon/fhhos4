@@ -25,7 +25,7 @@ public:
 		_mesh = diffPb->_mesh;
 	}
 
-	void Setup(bool setupTraceMatrix, bool setupNormalDerivativeMatrix)
+	void Setup()
 	{
 		_hhoFaces = vector<Diff_HHOFace<Dim>>(this->_mesh->BoundaryFaces.size());
 
@@ -41,12 +41,7 @@ public:
 
 		BoundarySpace = HHOBoundarySpace(_mesh, HHO, _hhoFaces);
 
-		_mesh->AssignNumberToBoundaryElements();
-
-		if (setupTraceMatrix)
-			SetupTraceMatrix();
-		//if (setupNormalDerivativeMatrix)
-			//SetupNormalDerivativeMatrix();
+		SetupTraceMatrix();
 	}
 
 private:
