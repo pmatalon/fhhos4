@@ -259,7 +259,7 @@ public:
 				mg->DoNotCreateLevels = true;
 				mg->Cycle = this->Cycle;
 				mg->WLoops = this->WLoops;
-				fcg->Precond = Preconditioner(mg);
+				fcg->Precond = SolverPreconditioner(mg);
 
 				fcg->ComputeExactSolution = false;
 				fcg->PrintIterationResults = false;

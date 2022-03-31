@@ -9,6 +9,7 @@ private:
 	BiHarmonicMixedForm* _biHarPb;
 
 public:
+	Preconditioner* Precond;
 	int Restart = 0;
 
 	BiHarmonicCG(BiHarmonicMixedForm* biHarPb, int restart = 0)
@@ -40,8 +41,12 @@ public:
 
 		result.SetResidualNorm(sqrt(r_dot_r));
 
+		Vector z = Precond->Apply(r);
+
 		// Direction of research
-		Vector p = r;
+		Vector p = z;
+
+		double r_dot_z = r.dot(z);
 
 		this->IterationCount = 0;
 
@@ -55,19 +60,20 @@ public:
 			Vector Ap = A(p);
 
 			// Step for theta in the direction of research
-			double alpha = r_dot_r / L2InnerProdOnBoundary(p, Ap);
+			double alpha = r_dot_z / L2InnerProdOnBoundary(p, Ap);
 
 			// Move theta in the direction of research
 			theta += alpha * p;
 
-			double r_dot_r_old = r_dot_r; // save the dot product before overwriting r
+			double r_dot_z_old = r_dot_z; // save the dot product before overwriting r
 
 			// Restart?
 			if (this->IterationCount > 0 && this->Restart > 0 && this->IterationCount % this->Restart == 0)
 			{
 				// Restart algorithm
 				r = b - A(theta);
-				r_dot_r = L2InnerProdOnBoundary(r, r);
+				z = Precond->Apply(r);
+				r_dot_z = L2InnerProdOnBoundary(r, z);
 
 				p = r;
 			}
@@ -75,12 +81,14 @@ public:
 			{
 				// Update residual
 				r -= alpha * Ap;
-				r_dot_r = L2InnerProdOnBoundary(r, r);
+				z = Precond->Apply(r);
+
+				r_dot_z = L2InnerProdOnBoundary(r, z);
 
 				// Step for the direction of research
-				double beta = r_dot_r / r_dot_r_old;
+				double beta = r_dot_z / r_dot_z_old;
 				// Update the direction of research
-				p = r + beta * p;
+				p = z + beta * p;
 			}
 
 
@@ -101,6 +109,8 @@ public:
 			//------------------------------------
 
 			this->IterationCount++;
+
+			r_dot_r = L2InnerProdOnBoundary(r, r);
 
 			result.SetX(theta);
 			result.SetResidualNorm(sqrt(r_dot_r));

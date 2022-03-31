@@ -54,11 +54,13 @@ public:
 		Vector theta0 = FindCompatibleTheta();
 		int n = theta0.rows();
 		DenseMatrix A(n, n);
-		DenseMatrix I = DenseMatrix::Identity(n, n);
+		Vector e_i = Vector::Zero(n);
 		for (int i = 0; i < n; i++)
 		{
-			Vector lambda = Solve1stDiffProblemWithZeroSource(I.col(i));
+			e_i[i] = 1;
+			Vector lambda = Solve1stDiffProblemWithZeroSource(e_i);
 			A.col(i) = -Solve2ndDiffProblem(lambda, true);
+			e_i[i] = 0;
 		}
 		return A;
 	}

@@ -43,6 +43,9 @@ public:
 		cout << "-                   Mesh construction                     -" << endl;
 		cout << "-----------------------------------------------------------" << endl;
 
+		if (args.Discretization.MeshCode.compare("tri") != 0 && args.Discretization.MeshCode.compare("stri") != 0)
+			Utils::FatalError("In FEM, only triangular elements are implemented.");
+
 		Mesh<Dim>* mesh = MeshFactory<Dim>::BuildMesh(args, testCase);
 		if (args.Discretization.Mesher.compare("gmsh") == 0)
 			GMSHMesh<Dim>::CloseGMSH();
@@ -140,7 +143,7 @@ public:
 
 
 			DenseMatrix A; // computed explicitly only if explicit solver or export requested
-			if (args.Solver.BiHarmonicSolverCode.compare("lu") == 0 || args.Actions.Export.LinearSystem)
+			if (args.Solver.BiHarmonicSolverCode.compare("lu") == 0 || args.Solver.BiHarmonicSolverCode.compare("jcg") == 0 || args.Actions.Export.LinearSystem)
 			{
 				cout << "Computation of the matrix..." << endl;
 				A = biHarPb->Matrix();
@@ -159,7 +162,7 @@ public:
 			//-------------------------------------//
 
 			Solver* biHarSolver = nullptr;
-			if (args.Solver.BiHarmonicSolverCode.compare("cg") == 0)
+			if (Utils::EndsWith(args.Solver.BiHarmonicSolverCode, "cg"))
 				biHarSolver = new BiHarmonicCG(biHarPb, args.Solver.Restart);
 			else if (args.Solver.BiHarmonicSolverCode.compare("gd") == 0)
 				biHarSolver = new BiHarmonicGradientDescent(biHarPb);
@@ -219,6 +222,24 @@ public:
 						if (args.Actions.Export.IterationL2Errors && result.L2Error != -1)
 							out.ExportNewVectorValue(result.L2Error, "iteration_l2errors");
 					};
+				}
+
+				if (Utils::EndsWith(args.Solver.BiHarmonicSolverCode, "cg"))
+				{
+					BiHarmonicCG* cg = static_cast<BiHarmonicCG*>(biHarIterSolver);
+					if (args.Solver.BiHarmonicSolverCode.compare("jcg") == 0)
+					{
+						DenseBlockJacobiPreconditioner* jp = new DenseBlockJacobiPreconditioner(1);
+						jp->Setup(A);
+						cg->Precond = jp;
+					}
+					else if (args.Solver.BiHarmonicSolverCode.compare("cg") == 0)
+					{
+						IdentityPreconditioner* jp = new IdentityPreconditioner();
+						cg->Precond = jp;
+					}
+					else
+						Utils::FatalError("Unknown preconditioner. Check -bihar-solver " + args.Solver.BiHarmonicSolverCode + ".");
 				}
 
 				// Give the Laplacian matrix so that the Work Units are computed with respect to it

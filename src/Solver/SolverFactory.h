@@ -131,7 +131,7 @@ public:
 				ProgramArguments precondArgs = args;
 				precondArgs.Solver.SolverCode = preconditionerCode;
 				Solver* precondSolver = CreateSolver(precondArgs, problem, blockSize, out);
-				cg->Precond = Preconditioner(dynamic_cast<IterativeSolver*>(precondSolver));
+				cg->Precond = SolverPreconditioner(dynamic_cast<IterativeSolver*>(precondSolver));
 			}
 			solver = cg;
 		}
@@ -144,7 +144,7 @@ public:
 				ProgramArguments precondArgs = args;
 				precondArgs.Solver.SolverCode = preconditionerCode;
 				Solver* precondSolver = CreateSolver(precondArgs, problem, blockSize, out);
-				fcg->Precond = Preconditioner(dynamic_cast<IterativeSolver*>(precondSolver));
+				fcg->Precond = SolverPreconditioner(dynamic_cast<IterativeSolver*>(precondSolver));
 			}
 			solver = fcg;
 		}

@@ -23,7 +23,7 @@ public:
 
 	IterativeSolver() : Solver() {}
 
-	virtual void Setup(const SparseMatrix& A) override
+	void Setup(const SparseMatrix& A) override
 	{
 		Solver::Setup(A);
 		if (this->ComputeExactSolution)

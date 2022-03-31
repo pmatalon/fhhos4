@@ -571,6 +571,9 @@
     <ClInclude Include="src\Program\Program_BiHarmonic_FEM.h">
       <Filter>Program</Filter>
     </ClInclude>
+    <ClInclude Include="src\Solver\BiHarmonic\BiHarmonicPreconditioner.h">
+      <Filter>Solver</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

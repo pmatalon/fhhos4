@@ -211,6 +211,19 @@ public:
 		return this->P * createHybridVectorFromFacesMatrix;
 	}
 
+	Vector ReconstructFromFaces(const Vector& faceCoeffs)
+	{
+		assert(faceCoeffs.rows() == this->Faces.size() * HHO->nFaceUnknowns);
+
+		int nTotalFaceUnknowns = faceCoeffs.rows();
+		auto Atf = this->A.topRightCorner(HHO->nCellUnknowns, nTotalFaceUnknowns);
+
+		Vector hybrid(HHO->nCellUnknowns + nTotalFaceUnknowns);
+		hybrid.head(HHO->nCellUnknowns) = -this->AttSolver.solve(Atf * faceCoeffs);
+		hybrid.tail(nTotalFaceUnknowns) = faceCoeffs;
+		return this->P * hybrid;
+	}
+
 	Vector ApplyCellReconstructMassMatrix(const Vector& v)
 	{
 		if (HHO->OrthonormalizeElemBases())

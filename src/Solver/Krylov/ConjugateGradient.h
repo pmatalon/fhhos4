@@ -6,7 +6,7 @@ using namespace std;
 class ConjugateGradient : public IterativeSolver
 {
 public:
-	Preconditioner Precond;
+	SolverPreconditioner Precond;
 
 	ConjugateGradient()
 	{ }

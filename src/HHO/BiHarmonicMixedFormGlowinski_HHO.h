@@ -50,7 +50,7 @@ public:
 	{
 		ActionsArguments diffActions;
 		diffActions.AssembleRightHandSide = false;
-		diffActions.LogAssembly = false;
+		diffActions.LogAssembly = true;
 		_diffPb.Assemble(diffActions);
 
 		if (_useIntegrationByParts)

@@ -14,7 +14,7 @@ private:
 		double d_dot_Ad;
 	};
 public:
-	Preconditioner Precond;
+	SolverPreconditioner Precond;
 	int Truncation; // max number of previous search direction to use for A-orthogonalization
 	bool Restart = false;
 
