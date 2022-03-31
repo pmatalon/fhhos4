@@ -544,17 +544,8 @@
     <ClInclude Include="src\Program\Program_Diffusion_FEM.h">
       <Filter>Program</Filter>
     </ClInclude>
-    <ClInclude Include="src\FEM\Diffusion_FEM.h">
-      <Filter>FEM</Filter>
-    </ClInclude>
     <ClInclude Include="src\HHO\BiHarmonicMixedForm.h">
       <Filter>HHO</Filter>
-    </ClInclude>
-    <ClInclude Include="src\FEM\BiHarmonicMixedForm_FEM.h">
-      <Filter>FEM</Filter>
-    </ClInclude>
-    <ClInclude Include="src\FEM\BiHarmonicMixedFormGlowinski_FEM.h">
-      <Filter>FEM</Filter>
     </ClInclude>
     <ClInclude Include="src\Program\Program_BiHarmonic_FEM.h">
       <Filter>Program</Filter>
@@ -573,6 +564,15 @@
     </ClInclude>
     <ClInclude Include="src\Discretizations\DG\Diffusion_DG.h">
       <Filter>Discretizations\DG</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Discretizations\FEM\BiHarmonicMixedForm_FEM.h">
+      <Filter>Discretizations\FEM</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Discretizations\FEM\BiHarmonicMixedFormGlowinski_FEM.h">
+      <Filter>Discretizations\FEM</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Discretizations\FEM\Diffusion_FEM.h">
+      <Filter>Discretizations\FEM</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -687,14 +687,14 @@
     <Filter Include="HHO\DiscreteSpaces">
       <UniqueIdentifier>{e0159cf0-0fea-46b8-91aa-a20c5e13fe17}</UniqueIdentifier>
     </Filter>
-    <Filter Include="FEM">
-      <UniqueIdentifier>{6af31b5a-b6e1-4bd3-a929-dd7813cb211b}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Discretizations">
       <UniqueIdentifier>{c15ba6b5-86ab-4f54-b34a-39d30a95b49e}</UniqueIdentifier>
     </Filter>
     <Filter Include="Discretizations\DG">
       <UniqueIdentifier>{7cd70dab-3d97-4983-bc8d-6c981af51b1d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Discretizations\FEM">
+      <UniqueIdentifier>{6af31b5a-b6e1-4bd3-a929-dd7813cb211b}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

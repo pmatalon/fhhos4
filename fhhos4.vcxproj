@@ -83,9 +83,9 @@
     <ClInclude Include="src\Discretizations\DG\Diffusion_DG.h" />
     <ClInclude Include="src\Discretizations\DG\Diff_DGElement.h" />
     <ClInclude Include="src\Discretizations\DG\Diff_DGFace.h" />
-    <ClInclude Include="src\FEM\BiHarmonicMixedFormGlowinski_FEM.h" />
-    <ClInclude Include="src\FEM\BiHarmonicMixedForm_FEM.h" />
-    <ClInclude Include="src\FEM\Diffusion_FEM.h" />
+    <ClInclude Include="src\Discretizations\FEM\BiHarmonicMixedFormGlowinski_FEM.h" />
+    <ClInclude Include="src\Discretizations\FEM\BiHarmonicMixedForm_FEM.h" />
+    <ClInclude Include="src\Discretizations\FEM\Diffusion_FEM.h" />
     <ClInclude Include="src\FunctionalBasis\Hemker1D.h" />
     <ClInclude Include="src\FunctionalBasis\LagrangeP1.h" />
     <ClInclude Include="src\FunctionalBasis\OrthogonalBasis.h" />
