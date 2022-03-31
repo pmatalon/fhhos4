@@ -1,7 +1,7 @@
 #pragma once
 #include <iomanip>
 #include "../ProgramArguments.h"
-#include "../HHO/Diffusion_HHO.h"
+#include "../Discretizations/HHO/Diffusion_HHO.h"
 #include "../TestCases/Diffusion/DiffTestCaseFactory.h"
 #include "../Mesher/MeshFactory.h"
 #include "../Solver/SolverFactory.h"

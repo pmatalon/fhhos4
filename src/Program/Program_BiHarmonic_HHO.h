@@ -1,8 +1,8 @@
 #pragma once
 #include <iomanip>
 #include "../ProgramArguments.h"
-#include "../HHO/BiHarmonicMixedFormFalk_HHO.h"
-#include "../HHO/BiHarmonicMixedFormGlowinski_HHO.h"
+#include "../Discretizations/HHO/BiHarmonicMixedFormFalk_HHO.h"
+#include "../Discretizations/HHO/BiHarmonicMixedFormGlowinski_HHO.h"
 #include "../TestCases/BiHarmonic/BiHarTestCaseFactory.h"
 #include "../Mesher/MeshFactory.h"
 #include "../Solver/SolverFactory.h"

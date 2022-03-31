@@ -1,7 +1,7 @@
 #pragma once
 #include <iomanip>
 #include "../ProgramArguments.h"
-#include "../HHO/BiHarmonicDDMixedForm_HHO.h"
+#include "../Discretizations/HHO/BiHarmonicDDMixedForm_HHO.h"
 #include "../TestCases/BiHarmonicDD/BiHarDDTestCaseFactory.h"
 #include "../Mesher/MeshFactory.h"
 #include "../Solver/SolverFactory.h"

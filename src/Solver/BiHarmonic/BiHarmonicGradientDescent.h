@@ -1,6 +1,6 @@
 #pragma once
 #include "../IterativeSolver.h"
-#include "../../HHO/BiHarmonicMixedForm.h"
+#include "../../Discretizations/HHO/BiHarmonicMixedForm.h"
 using namespace std;
 
 class BiHarmonicGradientDescent : public IterativeSolver

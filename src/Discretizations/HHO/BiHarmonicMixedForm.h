@@ -1,6 +1,6 @@
 #pragma once
-#include "../TestCases/BiHarmonic/BiHarmonicTestCase.h"
-#include "../Solver/Solver.h"
+#include "../../TestCases/BiHarmonic/BiHarmonicTestCase.h"
+#include "../../Solver/Solver.h"
 using namespace std;
 
 class BiHarmonicMixedForm

@@ -1,7 +1,7 @@
 #pragma once
-#include "../FunctionalBasis/FunctionalBasis.h"
+#include "../../FunctionalBasis/FunctionalBasis.h"
 #include "Diff_HHOElement.h"
-#include "../Utils/NonZeroCoefficients.h"
+#include "../../Utils/NonZeroCoefficients.h"
 
 template <int Dim>
 class A_T_T_Block : public NonZeroCoefficients

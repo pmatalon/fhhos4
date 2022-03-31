@@ -1,8 +1,7 @@
 #pragma once
 #include "BiHarmonicMixedForm_HHO.h"
-#include "../TestCases/BiHarmonic/BiHarmonicTestCase.h"
-#include "Diffusion_HHO.h"
-#include "../TestCases/Diffusion/VirtualDiffusionTestCase.h"
+#include "../../TestCases/BiHarmonic/BiHarmonicTestCase.h"
+#include "../../TestCases/Diffusion/VirtualDiffusionTestCase.h"
 #include "HigherOrderBoundary.h"
 using namespace std;
 

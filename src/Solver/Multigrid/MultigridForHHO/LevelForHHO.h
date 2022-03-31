@@ -1,8 +1,8 @@
 #pragma once
 #include "../Level.h"
-#include "../../../HHO/Diffusion_HHO.h"
-#include "../../../HHO/ZeroMeanEnforcer.h"
-#include "../../../HHO/NumericImageEnforcer.h"
+#include "../../../Discretizations/HHO/Diffusion_HHO.h"
+#include "../../../Discretizations/HHO/ZeroMeanEnforcer.h"
+#include "../../../Discretizations/HHO/NumericImageEnforcer.h"
 using namespace std;
 
 template <int Dim>

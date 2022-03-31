@@ -1,6 +1,6 @@
 #pragma once
 #include "../Preconditioner.h"
-#include "../../HHO/BiHarmonicMixedForm_HHO.h"
+#include "../../Discretizations/HHO/BiHarmonicMixedForm_HHO.h"
 using namespace std;
 
 template <int Dim>

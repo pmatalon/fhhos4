@@ -1,5 +1,5 @@
 #pragma once
-#include "../FunctionalBasis/FunctionalBasis.h"
+#include "../../FunctionalBasis/FunctionalBasis.h"
 
 template <int Dim>
 struct HHOParameters

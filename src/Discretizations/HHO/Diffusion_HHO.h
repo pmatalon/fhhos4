@@ -1,11 +1,11 @@
 #pragma once
-#include "../Mesh/Mesh.h"
-#include "../Utils/Utils.h"
+#include "../../Mesh/Mesh.h"
+#include "../../Utils/Utils.h"
 #ifdef ENABLE_3D
-#include "../Geometry/3D/Tetrahedron.h"
+#include "../../Geometry/3D/Tetrahedron.h"
 #endif // ENABLE_3D
-#include "../Geometry/CartesianShape.h"
-#include "../Geometry/2D/Triangle.h"
+#include "../../Geometry/CartesianShape.h"
+#include "../../Geometry/2D/Triangle.h"
 #include "DiscreteSpaces/HHOSkeletonSpace.h"
 #include "DiscreteSpaces/HHOReconstructSpace.h"
 #include "DiscreteSpaces/HHOBoundarySpace.h"

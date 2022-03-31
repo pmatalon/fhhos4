@@ -1,7 +1,7 @@
 #pragma once
-#include "../TestCases/BiHarmonicDD/BiHarmonicDDTestCase.h"
+#include "../../TestCases/BiHarmonicDD/BiHarmonicDDTestCase.h"
 #include "Diffusion_HHO.h"
-#include "../TestCases/Diffusion/VirtualDiffusionTestCase.h"
+#include "../../TestCases/Diffusion/VirtualDiffusionTestCase.h"
 using namespace std;
 
 template<int Dim>
