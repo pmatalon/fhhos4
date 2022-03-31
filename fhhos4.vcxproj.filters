@@ -117,9 +117,6 @@
     <ClInclude Include="src\Mesh\3D\TetrahedralMesh.h">
       <Filter>Mesh\3D</Filter>
     </ClInclude>
-    <ClInclude Include="src\DG\Diffusion_DG.h">
-      <Filter>DG</Filter>
-    </ClInclude>
     <ClInclude Include="src\HHO\Diffusion_HHO.h">
       <Filter>HHO</Filter>
     </ClInclude>
@@ -128,12 +125,6 @@
     </ClInclude>
     <ClInclude Include="src\HHO\Diff_HHOFace.h">
       <Filter>HHO</Filter>
-    </ClInclude>
-    <ClInclude Include="src\DG\Diff_DGElement.h">
-      <Filter>DG</Filter>
-    </ClInclude>
-    <ClInclude Include="src\DG\Diff_DGFace.h">
-      <Filter>DG</Filter>
     </ClInclude>
     <ClInclude Include="src\Utils\RotatingList.h">
       <Filter>Utils</Filter>
@@ -574,6 +565,15 @@
     <ClInclude Include="src\Solver\BiHarmonic\BiHarmonicCG.h">
       <Filter>Solver\BiHarmonic</Filter>
     </ClInclude>
+    <ClInclude Include="src\Discretizations\DG\Diff_DGElement.h">
+      <Filter>Discretizations\DG</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Discretizations\DG\Diff_DGFace.h">
+      <Filter>Discretizations\DG</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Discretizations\DG\Diffusion_DG.h">
+      <Filter>Discretizations\DG</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
@@ -581,9 +581,6 @@
     </Filter>
     <Filter Include="Mesh">
       <UniqueIdentifier>{089b5862-0021-4e98-a5ab-bd18df16a8d9}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="DG">
-      <UniqueIdentifier>{7cd70dab-3d97-4983-bc8d-6c981af51b1d}</UniqueIdentifier>
     </Filter>
     <Filter Include="HHO">
       <UniqueIdentifier>{5baa2ae8-8ff4-4937-bd5a-17cf25a395a1}</UniqueIdentifier>
@@ -692,6 +689,12 @@
     </Filter>
     <Filter Include="FEM">
       <UniqueIdentifier>{6af31b5a-b6e1-4bd3-a929-dd7813cb211b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Discretizations">
+      <UniqueIdentifier>{c15ba6b5-86ab-4f54-b34a-39d30a95b49e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Discretizations\DG">
+      <UniqueIdentifier>{7cd70dab-3d97-4983-bc8d-6c981af51b1d}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

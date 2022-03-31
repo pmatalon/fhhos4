@@ -1,6 +1,6 @@
 #pragma once
-#include "../Mesh/Element.h"
-#include "../FunctionalBasis/BasisFunction.h"
+#include "../../Mesh/Element.h"
+#include "../../FunctionalBasis/BasisFunction.h"
 
 template <int Dim>
 class Diff_DGFace : virtual public Face<Dim>

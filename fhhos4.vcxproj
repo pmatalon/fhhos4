@@ -80,6 +80,9 @@
     <ClInclude Include="src/FunctionalBasis/Monomial1D.h" />
     <ClInclude Include="src/FunctionalBasis/FunctionalBasis.h" />
     <ClInclude Include="src/FunctionalBasis/TensorPolynomial.h" />
+    <ClInclude Include="src\Discretizations\DG\Diffusion_DG.h" />
+    <ClInclude Include="src\Discretizations\DG\Diff_DGElement.h" />
+    <ClInclude Include="src\Discretizations\DG\Diff_DGFace.h" />
     <ClInclude Include="src\FEM\BiHarmonicMixedFormGlowinski_FEM.h" />
     <ClInclude Include="src\FEM\BiHarmonicMixedForm_FEM.h" />
     <ClInclude Include="src\FEM\Diffusion_FEM.h" />
@@ -165,9 +168,6 @@
     <ClInclude Include="src/Mesh/3D/RectangularFace.h" />
     <ClInclude Include="src/Mesh/Face.h" />
     <ClInclude Include="src/Mesh/1D/Interval.h" />
-    <ClInclude Include="src\DG\Diffusion_DG.h" />
-    <ClInclude Include="src\DG\Diff_DGElement.h" />
-    <ClInclude Include="src\DG\Diff_DGFace.h" />
     <ClInclude Include="src\HHO\Diffusion_HHO.h" />
     <ClInclude Include="src\HHO\Diff_HHOElement.h" />
     <ClInclude Include="src\HHO\Diff_HHOFace.h" />

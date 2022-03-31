@@ -1,5 +1,5 @@
 #pragma once
-#include "../../DG/Diff_DGFace.h"
+#include "../../Discretizations/DG/Diff_DGFace.h"
 #include "../../Geometry/2D/Segment.h"
 
 class Edge : public Diff_DGFace<2>

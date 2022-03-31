@@ -1,11 +1,11 @@
 #pragma once
-#include "../Mesh/Mesh.h"
-#include "../Utils/Utils.h"
-#include "../TestCases/Diffusion/DiffusionTestCase.h"
-#include "../Geometry/CartesianShape.h"
-#include "../Geometry/2D/Triangle.h"
-#include "../Utils/ParallelLoop.h"
-#include "../Utils/ExportModule.h"
+#include "../../Mesh/Mesh.h"
+#include "../../Utils/Utils.h"
+#include "../../TestCases/Diffusion/DiffusionTestCase.h"
+#include "../../Geometry/CartesianShape.h"
+#include "../../Geometry/2D/Triangle.h"
+#include "../../Utils/ParallelLoop.h"
+#include "../../Utils/ExportModule.h"
 #include "Diff_DGElement.h"
 #include "Diff_DGFace.h"
 using namespace std;

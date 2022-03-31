@@ -1,5 +1,5 @@
 #pragma once
-#include "../../DG/Diff_DGElement.h"
+#include "../../Discretizations/DG/Diff_DGElement.h"
 #include "../../Geometry/2D/Polygon.h"
 #include "../../Utils/RotatingList.h"
 #include "../AgglomerationException.h"
