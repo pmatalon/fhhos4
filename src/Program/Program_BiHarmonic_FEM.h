@@ -5,7 +5,7 @@
 #include "../TestCases/BiHarmonic/BiHarTestCaseFactory.h"
 #include "../Mesher/MeshFactory.h"
 #include "../Solver/SolverFactory.h"
-#include "../Solver/Krylov/BiHarmonicCG.h"
+#include "../Solver/BiHarmonic/BiHarmonicCG.h"
 #include "../Solver/BiHarmonic/BiHarmonicGradientDescent.h"
 #include "../Utils/ExportModule.h"
 

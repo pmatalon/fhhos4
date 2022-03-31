@@ -187,6 +187,7 @@
     <ClInclude Include="src\Mesh\Vertex.h" />
     <ClInclude Include="src\Program.h" />
     <ClInclude Include="src\ProgramArguments.h" />
+    <ClInclude Include="src\Solver\BiHarmonic\BiHarmonicCG.h" />
     <ClInclude Include="src\Solver\BiHarmonic\BiHarmonicGradientDescent.h" />
     <ClInclude Include="src\Solver\BiHarmonic\BiHarmonicPreconditioner.h" />
     <ClInclude Include="src\Solver\Direct\EigenLU.h" />
@@ -196,7 +197,6 @@
     <ClInclude Include="src\Solver\FixedPoint\BlockJacobi.h" />
     <ClInclude Include="src\Solver\FixedPoint\BlockSOR.h" />
     <ClInclude Include="src\Solver\FixedPoint\GaussSeidel.h" />
-    <ClInclude Include="src\Solver\Krylov\BiHarmonicCG.h" />
     <ClInclude Include="src\Solver\Krylov\ConjugateGradient.h" />
     <ClInclude Include="src\Solver\Krylov\EigenCG.h" />
     <ClInclude Include="src\Solver\Krylov\FlexibleConjugateGradient.h" />

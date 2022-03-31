@@ -511,9 +511,6 @@
     <ClInclude Include="src\HHO\BiHarmonicMixedFormFalk_HHO.h">
       <Filter>HHO</Filter>
     </ClInclude>
-    <ClInclude Include="src\Solver\Krylov\BiHarmonicCG.h">
-      <Filter>Solver\Krylov</Filter>
-    </ClInclude>
     <ClInclude Include="src\HHO\ZeroMeanEnforcer.h">
       <Filter>HHO</Filter>
     </ClInclude>
@@ -572,7 +569,10 @@
       <Filter>Program</Filter>
     </ClInclude>
     <ClInclude Include="src\Solver\BiHarmonic\BiHarmonicPreconditioner.h">
-      <Filter>Solver</Filter>
+      <Filter>Solver\BiHarmonic</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Solver\BiHarmonic\BiHarmonicCG.h">
+      <Filter>Solver\BiHarmonic</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
