@@ -1066,7 +1066,7 @@ public:
 	}
 
 	// Computes P^T*M*P*x where the argument is P*x
-	SparseMatrix PTrans_Mass()
+	SparseMatrix PTranspose_Mass()
 	{
 		FaceParallelLoop<Dim> parallelLoop(_mesh->BoundaryFaces);
 		parallelLoop.ReserveChunkCoeffsSize(HHO->nReconstructUnknowns * HHO->nFaceUnknowns);

@@ -14,7 +14,7 @@ private:
 	Mesh<Dim>* _mesh;
 	BiHarmonicTestCase<Dim>* _testCase;
 
-	bool _saveMatrixBlocks = true;
+	//bool _saveMatrixBlocks = true;
 	bool _reconstructHigherOrderBoundary = false;
 
 	DiffusionField<Dim> _diffField;
@@ -46,8 +46,8 @@ public:
 		mesh->SetDiffusionField(&_diffField);
 		_diffPbTestCase = VirtualDiffusionTestCase<Dim>(testCase->SourceFunction, _diffField);
 		_diffPbTestCase.BC = BoundaryConditions::HomogeneousNeumannEverywhere();
-		_diffPb = Diffusion_HHO<Dim>(mesh, &_diffPbTestCase, HHO, true, saveMatrixBlocks);
-		_saveMatrixBlocks = saveMatrixBlocks;
+		_diffPb = Diffusion_HHO<Dim>(mesh, &_diffPbTestCase, HHO, true, true);
+		//_saveMatrixBlocks = saveMatrixBlocks;
 		_reconstructHigherOrderBoundary = reconstructHigherOrderBoundary;
 	}
 

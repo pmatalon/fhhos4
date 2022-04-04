@@ -8,7 +8,8 @@
 #include "../Solver/SolverFactory.h"
 #include "../Solver/BiHarmonic/BiHarmonicCG.h"
 #include "../Solver/BiHarmonic/BiHarmonicGradientDescent.h"
-#include "../Solver/BiHarmonic/BiHarmonicPreconditioner.h"
+#include "../Solver/BiHarmonic/OneCellBiHarmonicPreconditioner.h"
+#include "../Solver/BiHarmonic/NeighbourhoodBiHarmonicPreconditioner.h"
 #include "../Utils/ExportModule.h"
 
 // Biharmonic equation in mixed form with mixed (homogeneous) Dirichlet-Neumann BC
@@ -255,20 +256,26 @@ public:
 					BiHarmonicCG* cg = static_cast<BiHarmonicCG*>(biHarIterSolver);
 					if (args.Solver.BiHarmonicSolverCode.compare("jcg") == 0)
 					{
-						DenseBlockJacobiPreconditioner* jp = new DenseBlockJacobiPreconditioner(hho->nFaceUnknowns);
-						jp->Setup(A);
-						cg->Precond = jp;
+						DenseBlockJacobiPreconditioner* p = new DenseBlockJacobiPreconditioner(hho->nFaceUnknowns);
+						p->Setup(A);
+						cg->Precond = p;
 					}
-					else if (args.Solver.BiHarmonicSolverCode.compare("pcg") == 0)
+					else if (args.Solver.BiHarmonicSolverCode.compare("ocg") == 0)
 					{
-						BiHarmonicPreconditioner<Dim>* p = new BiHarmonicPreconditioner<Dim>(*biHarPb);
+						OneCellBiHarmonicPreconditioner<Dim>* p = new OneCellBiHarmonicPreconditioner<Dim>(*biHarPb);
+						p->Setup();
+						cg->Precond = p;
+					}
+					else if (args.Solver.BiHarmonicSolverCode.compare("ncg") == 0)
+					{
+						NeighbourhoodBiHarmonicPreconditioner<Dim>* p = new NeighbourhoodBiHarmonicPreconditioner<Dim>(*biHarPb);
 						p->Setup();
 						cg->Precond = p;
 					}
 					else if (args.Solver.BiHarmonicSolverCode.compare("cg") == 0)
 					{
-						IdentityPreconditioner* jp = new IdentityPreconditioner();
-						cg->Precond = jp;
+						IdentityPreconditioner* p = new IdentityPreconditioner();
+						cg->Precond = p;
 					}
 					else
 						Utils::FatalError("Unknown preconditioner. Check -bihar-solver " + args.Solver.BiHarmonicSolverCode + ".");

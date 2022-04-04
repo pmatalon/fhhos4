@@ -4,13 +4,13 @@
 using namespace std;
 
 template <int Dim>
-class BiHarmonicPreconditioner : public Preconditioner
+class OneCellBiHarmonicPreconditioner : public Preconditioner
 {
 private:
 	Diffusion_HHO<Dim>& _diffPb;
 	vector<Eigen::FullPivLU<DenseMatrix>> _invD;
 public:
-	BiHarmonicPreconditioner(BiHarmonicMixedForm_HHO<Dim>& biHarPb) :
+	OneCellBiHarmonicPreconditioner(BiHarmonicMixedForm_HHO<Dim>& biHarPb) :
 		_diffPb(biHarPb.DiffPb())
 	{}
 

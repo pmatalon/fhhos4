@@ -166,6 +166,7 @@
     <ClInclude Include="src\Mesh\1D\InterfacePoint.h" />
     <ClInclude Include="src\Mesh\2D\CartesianEdge.h" />
     <ClInclude Include="src\Mesh\2D\RectangularElement.h" />
+    <ClInclude Include="src\Mesh\Neighbourhood.h" />
     <ClInclude Include="src\Mesh\PhysicalGroup.h" />
     <ClInclude Include="src\Mesh\PolyhedralMesh.h" />
     <ClInclude Include="src/Mesh/3D/RectangularFace.h" />
@@ -189,7 +190,9 @@
     <ClInclude Include="src\ProgramArguments.h" />
     <ClInclude Include="src\Solver\BiHarmonic\BiHarmonicCG.h" />
     <ClInclude Include="src\Solver\BiHarmonic\BiHarmonicGradientDescent.h" />
-    <ClInclude Include="src\Solver\BiHarmonic\BiHarmonicPreconditioner.h" />
+    <ClInclude Include="src\Solver\BiHarmonic\NeighbourhoodBiHarmonicPreconditioner.h" />
+    <ClInclude Include="src\Solver\BiHarmonic\NeighbourhoodDiffusion_HHO.h" />
+    <ClInclude Include="src\Solver\BiHarmonic\OneCellBiHarmonicPreconditioner.h" />
     <ClInclude Include="src\Solver\Direct\EigenLU.h" />
     <ClInclude Include="src\Solver\Direct\EigenSparseCholesky.h" />
     <ClInclude Include="src\Solver\Direct\EigenSparseLU.h" />
