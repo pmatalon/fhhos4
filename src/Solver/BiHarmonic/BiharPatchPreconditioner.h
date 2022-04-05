@@ -10,13 +10,15 @@ class BiharPatchPreconditioner : public Preconditioner
 private:
 	Diffusion_HHO<Dim>& _diffPb;
 
+	int _neighbourhoodDepth = 1;
 	bool _blockDiagPrec = false;
 	vector<Eigen::FullPivLU<DenseMatrix>> _invD;
 	EigenSparseLU _solver;
 public:
-	BiharPatchPreconditioner(BiHarmonicMixedForm_HHO<Dim>& biHarPb, bool blockDiagPrec = false) :
+	BiharPatchPreconditioner(BiHarmonicMixedForm_HHO<Dim>& biHarPb, int neighbourhoodDepth, bool blockDiagPrec = false) :
 		_diffPb(biHarPb.DiffPb())
 	{
+		_neighbourhoodDepth = neighbourhoodDepth;
 		_blockDiagPrec = blockDiagPrec;
 	}
 
@@ -33,7 +35,7 @@ public:
 				int nFaceUnknowns = _diffPb.HHO->nFaceUnknowns;
 				int nCellUnknowns = _diffPb.HHO->nCellUnknowns;
 
-				Neighbourhood<Dim> nbh(e);
+				Neighbourhood<Dim> nbh(e, _neighbourhoodDepth);
 				NeighbourhoodDiffusion_HHO<Dim> nbhDiff(nbh, _diffPb);
 				
 				for (int k = 0; k < nFaceUnknowns; k++)
@@ -68,8 +70,8 @@ public:
 							int j = f2->Number - _diffPb.HHO->nInteriorFaces;
 							// Add minus sign
 							chunk->Results.Coeffs.Add(j * nFaceUnknowns, i * nFaceUnknowns + k, -normalDerivative.segment(i2 * nFaceUnknowns, nFaceUnknowns));
-							if (f2 != f)
-								chunk->Results.Coeffs.Add(i * nFaceUnknowns + k, j * nFaceUnknowns, -normalDerivative.segment(i2 * nFaceUnknowns, nFaceUnknowns).transpose());
+							//if (f2 != f)
+								//chunk->Results.Coeffs.Add(i * nFaceUnknowns + k, j * nFaceUnknowns, -normalDerivative.segment(i2 * nFaceUnknowns, nFaceUnknowns).transpose());
 						}
 					}
 				}

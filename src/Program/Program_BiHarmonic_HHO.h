@@ -280,14 +280,14 @@ public:
 					else if (args.Solver.BiHarmonicPreconditionerCode.compare("p") == 0)
 					{
 						cout << "Preconditioner: patch" << endl << endl;
-						BiharPatchPreconditioner<Dim>* p = new BiharPatchPreconditioner<Dim>(*biHarPb);
+						BiharPatchPreconditioner<Dim>* p = new BiharPatchPreconditioner<Dim>(*biHarPb, args.Solver.NeighbourhoodDepth);
 						p->Setup();
 						cg->Precond = p;
 					}
 					else if (args.Solver.BiHarmonicPreconditionerCode.compare("dp") == 0)
 					{
 						cout << "Preconditioner: diagonal patch" << endl << endl;
-						BiharPatchPreconditioner<Dim>* p = new BiharPatchPreconditioner<Dim>(*biHarPb, true);
+						BiharPatchPreconditioner<Dim>* p = new BiharPatchPreconditioner<Dim>(*biHarPb, args.Solver.NeighbourhoodDepth, true);
 						p->Setup();
 						cg->Precond = p;
 					}

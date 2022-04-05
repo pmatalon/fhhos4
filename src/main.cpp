@@ -252,6 +252,9 @@ void print_usage() {
 	cout << "-ibp {0|1}" << endl;
 	cout << "      Use integration by parts to compute the normal derivative in the Glowinski scheme of the bi-harmonic problem (default: 1)." << endl;
 	cout << endl;
+	cout << "-nbh-depth NUM" << endl;
+	cout << "      Depth of the neighbourhood for the preconditioners '-bihar-prec p' and 'dp'." << endl;
+	cout << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << "                                 Multigrid                            " << endl;
 	cout << "----------------------------------------------------------------------" << endl;
@@ -643,6 +646,7 @@ int main(int argc, char* argv[])
 		OPT_UnitTests,
 		OPT_GMSHLog,
 		OPT_IntegrationByParts,
+		OPT_NeighbourhoodDepth,
 	};
 
 	static struct option long_opts[] = {
@@ -719,6 +723,7 @@ int main(int argc, char* argv[])
 		 { "ut", no_argument, NULL, OPT_UnitTests },
 		 { "gmsh-log", no_argument, NULL, OPT_GMSHLog },
 		 { "ibp", required_argument, NULL, OPT_IntegrationByParts },
+		 { "nbh-depth", required_argument, NULL, OPT_NeighbourhoodDepth },
 		 { NULL, 0, NULL, 0 }
 	};
 
@@ -961,6 +966,9 @@ int main(int argc, char* argv[])
 				break;
 			case OPT_BiHarReconstructBoundary:
 				args.Solver.BiHarReconstructBoundary = atoi(optarg);
+				break;
+			case OPT_NeighbourhoodDepth:
+				args.Solver.NeighbourhoodDepth = atoi(optarg);
 				break;
 
 			//---------------//

@@ -92,6 +92,7 @@ struct SolverArguments
 	bool ComputeIterL2Error = false;
 	MultigridArguments MG;
 	bool BiHarReconstructBoundary = false;
+	int NeighbourhoodDepth = 1;
 };
 
 struct ExportArguments
