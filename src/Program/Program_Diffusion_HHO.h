@@ -84,7 +84,7 @@ public:
 
 		if (args.Actions.UnitTests && Dim == 2)
 		{
-			if (args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("cgmg") == 0 || args.Solver.SolverCode.compare("fcgmg") == 0)
+			if (args.Solver.SolverCode.compare("mg") == 0 || args.Solver.PreconditionerCode.compare("mg") == 0)
 			{
 				if (!Utils::IsRefinementStrategy(args.Solver.MG.H_CS))
 				{
@@ -169,7 +169,7 @@ public:
 
 		HHOParameters<Dim>* hho = new HHOParameters<Dim>(mesh, args.Discretization.Stabilization, reconstructionBasis, cellBasis, faceBasis, args.Discretization.OrthogonalizeElemBasesCode, args.Discretization.OrthogonalizeFaceBasesCode);
 
-		bool saveMatrixBlocks = args.Solver.SolverCode.compare("uamg") == 0 || args.Solver.SolverCode.compare("fcguamg") == 0;
+		bool saveMatrixBlocks = args.Solver.SolverCode.compare("uamg") == 0 || args.Solver.PreconditionerCode.compare("uamg") == 0;
 		Diffusion_HHO<Dim>* problem = new Diffusion_HHO<Dim>(mesh, testCase, hho, args.Discretization.StaticCondensation, saveMatrixBlocks);
 
 		cout << endl;
@@ -252,7 +252,7 @@ public:
 				}
 
 				setupTimer.Start();
-				if (Utils::ProgramArgs.Solver.SolverCode.compare("uamg") == 0 || Utils::ProgramArgs.Solver.SolverCode.compare("fcguamg") == 0)
+				if (Utils::ProgramArgs.Solver.SolverCode.compare("uamg") == 0 || Utils::ProgramArgs.Solver.PreconditionerCode.compare("uamg") == 0)
 					iterativeSolver->Setup(problem->A, problem->A_T_T, problem->A_T_ndF, problem->A_ndF_ndF);
 				else
 					solver->Setup(problem->A);

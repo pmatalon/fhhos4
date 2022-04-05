@@ -169,6 +169,8 @@ void print_usage() {
 	cout << endl;
 	cout << "-s CODE" << endl;
 	cout << "      Linear solver for the solution of the system." << endl;
+	cout << "      If a preconditioner is used, this corresponds to the outer iteration (CG for instance)." << endl;
+	cout << "      The preconditioner is defined using argument -prec." << endl;
 	cout << "      - Direct methods:" << endl;
 	cout << "              lu           - LU factorization (Eigen library)" << endl;
 	cout << "              ch           - Cholesky factorization (Eigen library)" << endl;
@@ -190,6 +192,11 @@ void print_usage() {
 	cout << "              uamg         - Uncondensed AMG (for hybrid discretizations with static condensation)" << endl;
 	cout << "              aggregamg    - In-house implementation of AGMG, without the outer Krylov iteration. Meant to be used with K-cycle and with FCG." << endl;
 	cout << "              hoaggregamg  - Algebraic p-multigrid on top of aggregamg" << endl;
+	cout << endl; 
+	cout << "-prec CODE" << endl;
+	cout << "      Preconditioner." << endl;
+	cout << "      Must be used in conjonction with an outer solver defined by the argument -s ('-s cg' or '-s fcg' only)." << endl;
+	cout << "      The possible preconditioners are the same as for -s." << endl;
 	cout << endl;
 	cout << "-initial-guess CODE" << endl;
 	cout << "      Initial guess for the iterative solvers." << endl;
@@ -583,6 +590,7 @@ int main(int argc, char* argv[])
 		OPT_Penalization,
 		OPT_PolySpace,
 		// Solver
+		OPT_Preconditioner,
 		OPT_InitialGuess,
 		OPT_StoppingCriterion,
 		OPT_Tolerance,
@@ -656,6 +664,7 @@ int main(int argc, char* argv[])
 		 { "pen", required_argument, NULL, OPT_Penalization },
 		 { "poly-space", required_argument, NULL, OPT_PolySpace },
 		 // Solver
+		 { "preconditioner", required_argument, NULL, OPT_Preconditioner },
 		 { "initial-guess", required_argument, NULL, OPT_InitialGuess },
 		 { "stop", required_argument, NULL, OPT_StoppingCriterion },
 		 { "tol", required_argument, NULL, OPT_Tolerance },
@@ -880,6 +889,9 @@ int main(int argc, char* argv[])
 
 			case 's': 
 				args.Solver.SolverCode = optarg;
+				break;
+			case OPT_Preconditioner:
+				args.Solver.PreconditionerCode = optarg;
 				break;
 			case OPT_InitialGuess:
 			{
@@ -1432,7 +1444,6 @@ int main(int argc, char* argv[])
 	//                  Solver                  //
 	//------------------------------------------//
 
-
 	if (args.Solver.SolverCode.compare("default") == 0)
 	{
 		if (args.Discretization.Method.compare("hho") == 0 && args.Discretization.StaticCondensation && args.Problem.Dimension > 1)
@@ -1449,6 +1460,17 @@ int main(int argc, char* argv[])
 		else
 			args.Solver.SolverCode = "eigencg";
 	}
+	// Retrocompatibility
+	else if (Utils::StartsWith(args.Solver.SolverCode, "cg") && args.Solver.SolverCode.length() > 2)
+	{
+		args.Solver.PreconditionerCode = args.Solver.SolverCode.substr(2, args.Solver.SolverCode.length() - 2);
+		args.Solver.SolverCode = "cg";
+	}
+	else if (Utils::StartsWith(args.Solver.SolverCode, "fcg") && args.Solver.SolverCode.length() > 3)
+	{
+		args.Solver.PreconditionerCode = args.Solver.SolverCode.substr(3, args.Solver.SolverCode.length() - 3);
+		args.Solver.SolverCode = "fcg";
+	}
 
 #ifndef AGMG_ENABLED
 	if (args.Solver.SolverCode.compare("agmg") == 0)
@@ -1459,7 +1481,7 @@ int main(int argc, char* argv[])
 	//                Multigrid                 //
 	//------------------------------------------//
 
-	if (args.Solver.SolverCode.compare("mg") == 0 || args.Solver.SolverCode.compare("cgmg") == 0 || args.Solver.SolverCode.compare("fcgmg") == 0 || args.Solver.SolverCode.compare("p_mg") == 0)
+	if (args.Solver.SolverCode.compare("mg") == 0 || args.Solver.PreconditionerCode.compare("mg") == 0 || args.Solver.SolverCode.compare("p_mg") == 0 || args.Solver.PreconditionerCode.compare("p_mg") == 0)
 	{
 		if (args.Discretization.Method.compare("dg") == 0)
 			argument_error("Multigrid only applicable on HHO discretization.");
@@ -1525,7 +1547,7 @@ int main(int argc, char* argv[])
 		}
 	}
 
-	if (args.Solver.SolverCode.compare("uamg") == 0 || args.Solver.SolverCode.compare("fcguamg") == 0)
+	if (args.Solver.SolverCode.compare("uamg") == 0 || args.Solver.PreconditionerCode.compare("uamg") == 0)
 	{
 		if (args.Discretization.Method.compare("dg") == 0)
 			argument_error("Multigrid only applicable on HHO discretization.");
@@ -1552,7 +1574,7 @@ int main(int argc, char* argv[])
 			args.Solver.MG.CycleLetter = 'K';
 	}
 
-	if (args.Solver.SolverCode.compare("aggregamg") == 0 || args.Solver.SolverCode.compare("fcgaggregamg") == 0)
+	if (args.Solver.SolverCode.compare("aggregamg") == 0 || args.Solver.PreconditionerCode.compare("aggregamg") == 0)
 	{
 		if (!defaultCoarseOperator && !args.Solver.MG.UseGalerkinOperator)
 			Utils::Warning("AggregAMG uses the Galerkin operator. Argument -g 0 ignored.");

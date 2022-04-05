@@ -77,6 +77,7 @@ struct MultigridArguments
 struct SolverArguments
 {
 	string SolverCode = "default";
+	string PreconditionerCode = "default";
 	string InitialGuessCode = "0";
 	StoppingCriteria StoppingCrit = StoppingCriteria::NormalizedResidual;
 	double Tolerance = 1e-8;

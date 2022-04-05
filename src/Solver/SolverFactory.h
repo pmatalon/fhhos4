@@ -122,7 +122,20 @@ public:
 	static Solver* CreateSolver(const ProgramArguments& args, Diffusion_HHO<Dim>* problem, int blockSize, const ExportModule& out)
 	{
 		Solver* solver = nullptr;
-		if (args.Solver.SolverCode.rfind("cg", 0) == 0) // if SolverCode starts with "cg"
+		if (args.Solver.SolverCode.compare("cg") == 0)
+		{
+			ConjugateGradient* cg = new ConjugateGradient();
+			if (!args.Solver.PreconditionerCode.empty() && args.Solver.PreconditionerCode.compare("default") != 0)
+			{
+				ProgramArguments precondArgs = args;
+				precondArgs.Solver.SolverCode = args.Solver.PreconditionerCode;
+				precondArgs.Solver.PreconditionerCode = "";
+				Solver* precondSolver = CreateSolver(precondArgs, problem, blockSize, out);
+				cg->Precond = SolverPreconditioner(precondSolver);
+			}
+			solver = cg;
+		}
+		else if (args.Solver.SolverCode.rfind("cg", 0) == 0) // if SolverCode starts with "cg"
 		{
 			ConjugateGradient* cg = new ConjugateGradient();
 			string preconditionerCode = args.Solver.SolverCode.substr(2, args.Solver.SolverCode.length() - 2);
@@ -130,10 +143,24 @@ public:
 			{
 				ProgramArguments precondArgs = args;
 				precondArgs.Solver.SolverCode = preconditionerCode;
+				precondArgs.Solver.PreconditionerCode = "";
 				Solver* precondSolver = CreateSolver(precondArgs, problem, blockSize, out);
-				cg->Precond = SolverPreconditioner(dynamic_cast<IterativeSolver*>(precondSolver));
+				cg->Precond = SolverPreconditioner(precondSolver);
 			}
 			solver = cg;
+		}
+		else if (args.Solver.SolverCode.compare("fcg") == 0)
+		{
+			FlexibleConjugateGradient* fcg = new FlexibleConjugateGradient(1);
+			if (!args.Solver.PreconditionerCode.empty() && args.Solver.PreconditionerCode.compare("default") != 0)
+			{
+				ProgramArguments precondArgs = args;
+				precondArgs.Solver.SolverCode = args.Solver.PreconditionerCode;
+				precondArgs.Solver.PreconditionerCode = "";
+				Solver* precondSolver = CreateSolver(precondArgs, problem, blockSize, out);
+				fcg->Precond = SolverPreconditioner(precondSolver);
+			}
+			solver = fcg;
 		}
 		else if (args.Solver.SolverCode.rfind("fcg", 0) == 0) // if SolverCode starts with "fcg"
 		{
@@ -143,8 +170,9 @@ public:
 			{
 				ProgramArguments precondArgs = args;
 				precondArgs.Solver.SolverCode = preconditionerCode;
+				precondArgs.Solver.PreconditionerCode = "";
 				Solver* precondSolver = CreateSolver(precondArgs, problem, blockSize, out);
-				fcg->Precond = SolverPreconditioner(dynamic_cast<IterativeSolver*>(precondSolver));
+				fcg->Precond = SolverPreconditioner(precondSolver);
 			}
 			solver = fcg;
 		}
@@ -158,7 +186,8 @@ public:
 				mg->P_Prolongation = args.Solver.MG.GMG_P_Prolong;
 				mg->P_Restriction = args.Solver.MG.GMG_P_Restrict;
 				mg->UseHeterogeneousWeighting = args.Solver.MG.UseHeterogeneousWeighting;
-				mg->InitializeWithProblem(problem);
+				if (problem)
+					mg->InitializeWithProblem(problem);
 				SetMultigridParameters(mg, args, blockSize, out);
 				solver = mg;
 			}
@@ -171,6 +200,7 @@ public:
 			{
 				P_MultigridForHHO<Dim>* mg = new P_MultigridForHHO<Dim>(problem);
 				SetMultigridParameters(mg, args, blockSize, out);
+				mg->HP_CS = HP_CoarsStgy::P_only;
 				solver = mg;
 			}
 			else
