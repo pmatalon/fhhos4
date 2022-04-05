@@ -152,7 +152,7 @@ public:
 
 
 			cout << "-------------------------------------" << endl;
-			cout << "-     Solve biharmonic problem     -" << endl;
+			cout << "-     Solve biharmonic problem      -" << endl;
 			cout << "-------------------------------------" << endl;
 
 			// Solve 1st problem with f as source
@@ -170,7 +170,9 @@ public:
 
 
 			DenseMatrix A; // computed explicitly only if explicit solver or export requested
-			if (args.Solver.BiHarmonicSolverCode.compare("lu") == 0 || args.Solver.BiHarmonicSolverCode.compare("jcg") == 0 || args.Actions.Export.LinearSystem)
+			if (args.Solver.BiHarmonicSolverCode.compare("lu") == 0  || 
+				(args.Solver.BiHarmonicSolverCode.compare("cg") == 0 && (args.Solver.BiHarmonicPreconditionerCode.compare("j") == 0 || args.Solver.BiHarmonicPreconditionerCode.compare("bj") == 0)) ||
+				args.Actions.Export.LinearSystem)
 			{
 				cout << "Computation of the matrix..." << endl;
 				A = biHarPb->Matrix();
@@ -189,7 +191,7 @@ public:
 			//-------------------------------------//
 
 			Solver* biHarSolver = nullptr;
-			if (Utils::EndsWith(args.Solver.BiHarmonicSolverCode, "cg"))
+			if (args.Solver.BiHarmonicSolverCode.compare("cg") == 0)
 				biHarSolver = new BiHarmonicCG(biHarPb, args.Solver.Restart);
 			else if (args.Solver.BiHarmonicSolverCode.compare("gd") == 0)
 				biHarSolver = new BiHarmonicGradientDescent(biHarPb);
@@ -198,7 +200,7 @@ public:
 			else
 				Utils::FatalError("Unknown biharmonic solver '" + args.Solver.BiHarmonicSolverCode + "'");
 
-			cout << "Solver: " << *biHarSolver << endl << endl;
+			cout << "Solver: " << *biHarSolver << endl;
 
 			IterativeSolver* biHarIterSolver = dynamic_cast<IterativeSolver*>(biHarSolver);
 			if (biHarIterSolver)
@@ -251,34 +253,52 @@ public:
 					};
 				}
 
-				if (Utils::EndsWith(args.Solver.BiHarmonicSolverCode, "cg"))
+				if (args.Solver.BiHarmonicSolverCode.compare("cg") == 0)
 				{
 					BiHarmonicCG* cg = static_cast<BiHarmonicCG*>(biHarIterSolver);
-					if (args.Solver.BiHarmonicSolverCode.compare("jcg") == 0)
+					if (args.Solver.BiHarmonicPreconditionerCode.compare("j") == 0)
 					{
+						cout << "Preconditioner: Jacobi" << endl << endl;
+						DenseBlockJacobiPreconditioner* p = new DenseBlockJacobiPreconditioner(1);
+						p->Setup(A);
+						cg->Precond = p;
+					}
+					else if (args.Solver.BiHarmonicPreconditionerCode.compare("bj") == 0)
+					{
+						cout << "Preconditioner: block Jacobi" << endl << endl;
 						DenseBlockJacobiPreconditioner* p = new DenseBlockJacobiPreconditioner(hho->nFaceUnknowns);
 						p->Setup(A);
 						cg->Precond = p;
 					}
-					else if (args.Solver.BiHarmonicSolverCode.compare("ocg") == 0)
+					else if (args.Solver.BiHarmonicPreconditionerCode.compare("oc") == 0)
 					{
+						cout << "Preconditioner: one-cell" << endl << endl;
 						OneCellBiHarmonicPreconditioner<Dim>* p = new OneCellBiHarmonicPreconditioner<Dim>(*biHarPb);
 						p->Setup();
 						cg->Precond = p;
 					}
-					else if (args.Solver.BiHarmonicSolverCode.compare("ncg") == 0)
+					else if (args.Solver.BiHarmonicPreconditionerCode.compare("p") == 0)
 					{
+						cout << "Preconditioner: patch" << endl << endl;
 						NeighbourhoodBiHarmonicPreconditioner<Dim>* p = new NeighbourhoodBiHarmonicPreconditioner<Dim>(*biHarPb);
 						p->Setup();
 						cg->Precond = p;
 					}
-					else if (args.Solver.BiHarmonicSolverCode.compare("cg") == 0)
+					else if (args.Solver.BiHarmonicPreconditionerCode.compare("dp") == 0)
 					{
+						cout << "Preconditioner: diagonal patch" << endl << endl;
+						NeighbourhoodBiHarmonicPreconditioner<Dim>* p = new NeighbourhoodBiHarmonicPreconditioner<Dim>(*biHarPb, true);
+						p->Setup();
+						cg->Precond = p;
+					}
+					else if (args.Solver.BiHarmonicPreconditionerCode.compare("no") == 0)
+					{
+						cout << "Preconditioner: none" << endl << endl;
 						IdentityPreconditioner* p = new IdentityPreconditioner();
 						cg->Precond = p;
 					}
 					else
-						Utils::FatalError("Unknown preconditioner. Check -bihar-solver " + args.Solver.BiHarmonicSolverCode + ".");
+						Utils::FatalError("Unknown preconditioner. Check -bihar-prec " + args.Solver.BiHarmonicPreconditionerCode + ".");
 				}
 
 				// Give the Laplacian matrix so that the Work Units are computed with respect to it

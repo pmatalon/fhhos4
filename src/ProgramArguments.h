@@ -88,6 +88,7 @@ struct SolverArguments
 	int BlockSize = -1;
 	int Restart = 0;
 	string BiHarmonicSolverCode = "cg";
+	string BiHarmonicPreconditionerCode = "p";
 	bool ComputeIterL2Error = false;
 	MultigridArguments MG;
 	bool BiHarReconstructBoundary = false;

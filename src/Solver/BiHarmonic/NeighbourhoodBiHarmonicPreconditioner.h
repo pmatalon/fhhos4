@@ -14,9 +14,11 @@ private:
 	vector<Eigen::FullPivLU<DenseMatrix>> _invD;
 	EigenSparseLU _solver;
 public:
-	NeighbourhoodBiHarmonicPreconditioner(BiHarmonicMixedForm_HHO<Dim>& biHarPb) :
+	NeighbourhoodBiHarmonicPreconditioner(BiHarmonicMixedForm_HHO<Dim>& biHarPb, bool blockDiagPrec = false) :
 		_diffPb(biHarPb.DiffPb())
-	{}
+	{
+		_blockDiagPrec = blockDiagPrec;
+	}
 
 	void Setup()
 	{

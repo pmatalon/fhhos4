@@ -234,6 +234,15 @@ void print_usage() {
 	cout << "              cg       - conjugate gradient" << endl;
 	cout << "              gd       - gradient descent" << endl;
 	cout << endl;
+	cout << "-bihar-prec CODE" << endl;
+	cout << "      Preconditioner for the CG of the bi-harmonic problem." << endl;
+	cout << "              no       - no preconditioner" << endl;
+	cout << "              j        - Jacobi (explicitly computes the matrix)" << endl;
+	cout << "              bj       - block Jacobi (explicitly computes the matrix)" << endl;
+	cout << "              oc       - one-cell" << endl;
+	cout << "              p        - patch" << endl;
+	cout << "              dp       - diagonal patch" << endl;
+	cout << endl;
 	cout << "-iter-l2" << endl;
 	cout << "      Computes the L2-error at each iteration of the solver (when the solution is known)." << endl;
 	cout << endl;
@@ -600,6 +609,7 @@ int main(int argc, char* argv[])
 		OPT_BlockSize,
 		OPT_Restart,
 		OPT_BiHarmonicSolver,
+		OPT_BiHarmonicPreconditioner,
 		OPT_IterL2Error,
 		OPT_BiHarReconstructBoundary,
 		// Multigrid
@@ -674,6 +684,7 @@ int main(int argc, char* argv[])
 		 { "block-size", required_argument, NULL, OPT_BlockSize },
 		 { "restart", required_argument, NULL, OPT_Restart },
 		 { "bihar-solver", required_argument, NULL, OPT_BiHarmonicSolver },
+		 { "bihar-prec", required_argument, NULL, OPT_BiHarmonicPreconditioner },
 		 { "iter-l2", no_argument, NULL, OPT_IterL2Error },
 		 { "bihar-reconstruct-bry", required_argument, NULL, OPT_BiHarReconstructBoundary },
 		 // Multigrid
@@ -941,6 +952,9 @@ int main(int argc, char* argv[])
 				break;
 			case OPT_BiHarmonicSolver:
 				args.Solver.BiHarmonicSolverCode = optarg;
+				break;
+			case OPT_BiHarmonicPreconditioner:
+				args.Solver.BiHarmonicPreconditionerCode = optarg;
 				break;
 			case OPT_IterL2Error:
 				args.Solver.ComputeIterL2Error = true;
