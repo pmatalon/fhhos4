@@ -8,8 +8,8 @@
 #include "../Solver/SolverFactory.h"
 #include "../Solver/BiHarmonic/BiHarmonicCG.h"
 #include "../Solver/BiHarmonic/BiHarmonicGradientDescent.h"
-#include "../Solver/BiHarmonic/OneCellBiHarmonicPreconditioner.h"
-#include "../Solver/BiHarmonic/NeighbourhoodBiHarmonicPreconditioner.h"
+#include "../Solver/BiHarmonic/BiharOneCellPreconditioner.h"
+#include "../Solver/BiHarmonic/BiharPatchPreconditioner.h"
 #include "../Utils/ExportModule.h"
 
 // Biharmonic equation in mixed form with mixed (homogeneous) Dirichlet-Neumann BC
@@ -273,21 +273,21 @@ public:
 					else if (args.Solver.BiHarmonicPreconditionerCode.compare("oc") == 0)
 					{
 						cout << "Preconditioner: one-cell" << endl << endl;
-						OneCellBiHarmonicPreconditioner<Dim>* p = new OneCellBiHarmonicPreconditioner<Dim>(*biHarPb);
+						BiharOneCellPreconditioner<Dim>* p = new BiharOneCellPreconditioner<Dim>(*biHarPb);
 						p->Setup();
 						cg->Precond = p;
 					}
 					else if (args.Solver.BiHarmonicPreconditionerCode.compare("p") == 0)
 					{
 						cout << "Preconditioner: patch" << endl << endl;
-						NeighbourhoodBiHarmonicPreconditioner<Dim>* p = new NeighbourhoodBiHarmonicPreconditioner<Dim>(*biHarPb);
+						BiharPatchPreconditioner<Dim>* p = new BiharPatchPreconditioner<Dim>(*biHarPb);
 						p->Setup();
 						cg->Precond = p;
 					}
 					else if (args.Solver.BiHarmonicPreconditionerCode.compare("dp") == 0)
 					{
 						cout << "Preconditioner: diagonal patch" << endl << endl;
-						NeighbourhoodBiHarmonicPreconditioner<Dim>* p = new NeighbourhoodBiHarmonicPreconditioner<Dim>(*biHarPb, true);
+						BiharPatchPreconditioner<Dim>* p = new BiharPatchPreconditioner<Dim>(*biHarPb, true);
 						p->Setup();
 						cg->Precond = p;
 					}

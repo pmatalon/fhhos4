@@ -499,7 +499,7 @@
     <ClInclude Include="src\Program\Program_BiHarmonic_FEM.h">
       <Filter>Program</Filter>
     </ClInclude>
-    <ClInclude Include="src\Solver\BiHarmonic\OneCellBiHarmonicPreconditioner.h">
+    <ClInclude Include="src\Solver\BiHarmonic\BiharOneCellPreconditioner.h">
       <Filter>Solver\BiHarmonic</Filter>
     </ClInclude>
     <ClInclude Include="src\Solver\BiHarmonic\BiHarmonicCG.h">
@@ -574,7 +574,7 @@
     <ClInclude Include="src\Discretizations\HHO\ZeroMeanEnforcer.h">
       <Filter>Discretizations\HHO</Filter>
     </ClInclude>
-    <ClInclude Include="src\Solver\BiHarmonic\NeighbourhoodBiHarmonicPreconditioner.h">
+    <ClInclude Include="src\Solver\BiHarmonic\BiharPatchPreconditioner.h">
       <Filter>Solver\BiHarmonic</Filter>
     </ClInclude>
     <ClInclude Include="src\Mesh\Neighbourhood.h">

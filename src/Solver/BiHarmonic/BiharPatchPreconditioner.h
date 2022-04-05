@@ -5,7 +5,7 @@
 using namespace std;
 
 template <int Dim>
-class NeighbourhoodBiHarmonicPreconditioner : public Preconditioner
+class BiharPatchPreconditioner : public Preconditioner
 {
 private:
 	Diffusion_HHO<Dim>& _diffPb;
@@ -14,7 +14,7 @@ private:
 	vector<Eigen::FullPivLU<DenseMatrix>> _invD;
 	EigenSparseLU _solver;
 public:
-	NeighbourhoodBiHarmonicPreconditioner(BiHarmonicMixedForm_HHO<Dim>& biHarPb, bool blockDiagPrec = false) :
+	BiharPatchPreconditioner(BiHarmonicMixedForm_HHO<Dim>& biHarPb, bool blockDiagPrec = false) :
 		_diffPb(biHarPb.DiffPb())
 	{
 		_blockDiagPrec = blockDiagPrec;
