@@ -239,7 +239,6 @@ void print_usage() {
 	cout << "              no       - no preconditioner" << endl;
 	cout << "              j        - Jacobi (explicitly computes the matrix)" << endl;
 	cout << "              bj       - block Jacobi (explicitly computes the matrix)" << endl;
-	cout << "              oc       - one-cell" << endl;
 	cout << "              p        - patch" << endl;
 	cout << "              dp       - diagonal patch" << endl;
 	cout << endl;

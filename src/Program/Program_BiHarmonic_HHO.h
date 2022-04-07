@@ -8,7 +8,6 @@
 #include "../Solver/SolverFactory.h"
 #include "../Solver/BiHarmonic/BiHarmonicCG.h"
 #include "../Solver/BiHarmonic/BiHarmonicGradientDescent.h"
-#include "../Solver/BiHarmonic/BiharOneCellPreconditioner.h"
 #include "../Solver/BiHarmonic/BiharPatchPreconditioner.h"
 #include "../Utils/ExportModule.h"
 
@@ -268,13 +267,6 @@ public:
 						cout << "Preconditioner: block Jacobi" << endl << endl;
 						DenseBlockJacobiPreconditioner* p = new DenseBlockJacobiPreconditioner(hho->nFaceUnknowns);
 						p->Setup(A);
-						cg->Precond = p;
-					}
-					else if (args.Solver.BiHarmonicPreconditionerCode.compare("oc") == 0)
-					{
-						cout << "Preconditioner: one-cell" << endl << endl;
-						BiharOneCellPreconditioner<Dim>* p = new BiharOneCellPreconditioner<Dim>(*biHarPb);
-						p->Setup();
 						cg->Precond = p;
 					}
 					else if (args.Solver.BiHarmonicPreconditionerCode.compare("p") == 0)

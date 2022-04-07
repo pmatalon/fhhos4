@@ -15,32 +15,6 @@ public:
 	// If depth = 2, + all its neighbours' neighbours. Etc.
 	Neighbourhood(Element<Dim>* e, int depth = 1)
 	{
-		/*set<Element<Dim>*> neighbours;
-		neighbours.insert(e);
-		for (Face<Dim>* f : e->Faces)
-		{
-			if (f->IsDomainBoundary)
-			{
-				BoundaryFaces.push_back(f);
-				continue;
-			}
-			neighbours.insert(f->GetNeighbour(e));
-			InteriorFaces.push_back(f);
-		}
-
-		Elements = vector<Element<Dim>*>(neighbours.begin(), neighbours.end());
-
-		for (Element<Dim>* n : Elements)
-		{
-			if (n == e)
-				continue;
-			for (Face<Dim>* f : n->Faces)
-			{
-				if (!f->IsIn(InteriorFaces))
-					BoundaryFaces.push_back(f);
-			}
-		}*/
-
 		set<Element<Dim>*> patch;
 		set<Face<Dim>*> boundaryFaces;
 		set<Face<Dim>*> interiorFaces;
