@@ -9,15 +9,17 @@ class BiharPatchPreconditioner : public Preconditioner
 {
 private:
 	Diffusion_HHO<Dim>& _diffPb;
+	bool _useIntegrationByParts = true;
 
 	int _neighbourhoodDepth = 1;
 	bool _blockDiagPrec = false;
 	vector<Eigen::FullPivLU<DenseMatrix>> _invD;
 	EigenSparseLU _solver;
 public:
-	BiharPatchPreconditioner(BiHarmonicMixedForm_HHO<Dim>& biHarPb, int neighbourhoodDepth, bool blockDiagPrec = false) :
+	BiharPatchPreconditioner(BiHarmonicMixedFormGlowinski_HHO<Dim>& biHarPb, int neighbourhoodDepth, bool blockDiagPrec = false) :
 		_diffPb(biHarPb.DiffPb())
 	{
+		_useIntegrationByParts = biHarPb.UseIntegrationByParts;
 		_neighbourhoodDepth = neighbourhoodDepth;
 		_blockDiagPrec = blockDiagPrec;
 	}
@@ -36,7 +38,7 @@ public:
 				int nCellUnknowns = _diffPb.HHO->nCellUnknowns;
 
 				Neighbourhood<Dim> nbh(e, _neighbourhoodDepth);
-				NeighbourhoodDiffusion_HHO<Dim> nbhDiff(nbh, _diffPb);
+				NeighbourhoodDiffusion_HHO<Dim> nbhDiff(nbh, _diffPb, _useIntegrationByParts);
 				
 				for (int k = 0; k < nFaceUnknowns; k++)
 				{
@@ -57,11 +59,25 @@ public:
 
 					faceSolution = nbhDiff.FaceUnknownSolver.Solve(rhs);
 
-					Vector cellSolution = nbhDiff.SolveCellUnknowns(faceSolution, b_source);
-
 					// Normal derivative
-					Vector normalDerivative = nbhDiff.A_T_dF.transpose() * cellSolution + nbhDiff.A_ndF_dF.transpose() * faceSolution;
-					normalDerivative -= nbhDiff.PTranspose_Mass * lambda;
+					Vector normalDerivative;
+					if (_useIntegrationByParts)
+					{
+						// Marche
+						/*Vector cellSolution = nbhDiff.SolveCellUnknowns(faceSolution, b_source);
+
+						normalDerivative = nbhDiff.A_T_dF.transpose() * cellSolution + nbhDiff.A_ndF_dF.transpose() * faceSolution;
+						normalDerivative -= nbhDiff.PTranspose_Mass * lambda;*/
+						// Marche pas
+						Vector reconstruction = nbhDiff.ReconstructHigherOrder(faceSolution, Vector::Zero(nbh.BoundaryFaces.size() * nFaceUnknowns), b_source);
+						normalDerivative = nbhDiff.PTranspose_Stiff * reconstruction - nbhDiff.PTranspose_Mass * lambda;
+					}
+					else
+					{
+						Vector reconstruction = nbhDiff.ReconstructHigherOrder(faceSolution, Vector::Zero(nbh.BoundaryFaces.size() * nFaceUnknowns), b_source);
+						normalDerivative = nbhDiff.NormalDerivative * reconstruction;
+					}
+
 					for (int i2 = 0; i2 < nbh.BoundaryFaces.size(); i2++)
 					{
 						Face<Dim>* f2 = nbh.BoundaryFaces[i2];
@@ -70,8 +86,6 @@ public:
 							int j = f2->Number - _diffPb.HHO->nInteriorFaces;
 							// Add minus sign
 							chunk->Results.Coeffs.Add(j * nFaceUnknowns, i * nFaceUnknowns + k, -normalDerivative.segment(i2 * nFaceUnknowns, nFaceUnknowns));
-							//if (f2 != f)
-								//chunk->Results.Coeffs.Add(i * nFaceUnknowns + k, j * nFaceUnknowns, -normalDerivative.segment(i2 * nFaceUnknowns, nFaceUnknowns).transpose());
 						}
 					}
 				}
@@ -79,6 +93,8 @@ public:
 
 		SparseMatrix mat(_diffPb.HHO->nBoundaryFaces * _diffPb.HHO->nFaceUnknowns, _diffPb.HHO->nBoundaryFaces * _diffPb.HHO->nFaceUnknowns);
 		parallelLoop.Fill(mat);
+
+		//cout << "Preconditioner matrix:" << endl << DenseMatrix(mat) << endl << endl;
 
 		if (_blockDiagPrec)
 		{

@@ -1065,6 +1065,31 @@ public:
 		return normalDerivative;
 	}
 
+	// Computes P^T*A*P*x where A is the stiffness matrix and the argument is P*x
+	SparseMatrix PTranspose_Stiff()
+	{
+		FaceParallelLoop<Dim> parallelLoop(_mesh->BoundaryFaces);
+		parallelLoop.ReserveChunkCoeffsSize(HHO->nReconstructUnknowns * HHO->nFaceUnknowns);
+
+		parallelLoop.Execute([this](Face<Dim>* f, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				int i = f->Number - HHO->nInteriorFaces;
+				Diff_HHOFace<Dim>* face = HHOFace(f);
+
+				int j = _mesh->BoundaryElementNumber(f->Element1);
+				Diff_HHOElement<Dim>* elem = this->HHOElement(f->Element1);
+
+				DenseMatrix P = elem->P.middleCols(HHO->nCellUnknowns + elem->LocalNumberOf(face) * HHO->nFaceUnknowns, HHO->nFaceUnknowns);
+				DenseMatrix m = P.transpose() * elem->MeshElement->IntegralGradGradMatrix(elem->ReconstructionBasis);
+
+				chunk->Results.Coeffs.Add(i * HHO->nFaceUnknowns, j * HHO->nReconstructUnknowns, m);
+			});
+
+		SparseMatrix mat(HHO->nBoundaryFaces * HHO->nFaceUnknowns, _mesh->NBoundaryElements() * HHO->nReconstructUnknowns);
+		parallelLoop.Fill(mat);
+		return mat;
+	}
+
 	// Computes P^T*M*P*x where the argument is P*x
 	SparseMatrix PTranspose_Mass()
 	{

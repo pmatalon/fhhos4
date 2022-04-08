@@ -16,17 +16,19 @@ public:
 	SparseMatrix A_T_ndF;
 	SparseMatrix A_ndF_dF;
 	EigenSparseCholesky FaceUnknownSolver;
+	SparseMatrix PTranspose_Stiff;
 	SparseMatrix PTranspose_Mass;
+	SparseMatrix NormalDerivative;
 
-	NeighbourhoodDiffusion_HHO(const Neighbourhood<Dim>& nbh, Diffusion_HHO<Dim>& diffPb) :
+	NeighbourhoodDiffusion_HHO(const Neighbourhood<Dim>& nbh, Diffusion_HHO<Dim>& diffPb, bool computePTranspose_Mass) :
 		_nbh(nbh),
 		_diffPb(diffPb)
 	{
-		Init();
+		Init(computePTranspose_Mass);
 	}
 
 private:
-	void Init()
+	void Init(bool computePTranspose_Mass)
 	{
 		int nFaceUnknowns = _diffPb.HHO->nFaceUnknowns;
 		int nCellUnknowns = _diffPb.HHO->nCellUnknowns;
@@ -117,24 +119,63 @@ private:
 		}
 		coeffs.Fill(A_ndF_dF);
 
-		// PTranspose_Mass
-		// Computes P^T*M*P*x where the argument is P*x
-		PTranspose_Mass = SparseMatrix(_nbh.BoundaryFaces.size() * nFaceUnknowns, _nbh.Elements.size() * nReconstructUnknowns);
-		coeffs.Clear();
-		for (int i = 0; i < _nbh.BoundaryFaces.size(); i++)
+		if (computePTranspose_Mass)
 		{
-			Face<Dim>* f = _nbh.BoundaryFaces[i];
-			if (f->IsDomainBoundary)
+			// PTranspose_Siff
+			// Computes P^T*A*P*x where the argument is P*x
+			PTranspose_Stiff = SparseMatrix(_nbh.BoundaryFaces.size() * nFaceUnknowns, _nbh.Elements.size() * nReconstructUnknowns);
+			coeffs.Clear();
+			for (int i = 0; i < _nbh.BoundaryFaces.size(); i++)
 			{
-				Diff_HHOElement<Dim>* e = _diffPb.HHOElement(f->Element1);
+				Face<Dim>* f = _nbh.BoundaryFaces[i];
+				if (f->IsDomainBoundary)
+				{
+					Diff_HHOElement<Dim>* e = _diffPb.HHOElement(f->Element1);
 
-				DenseMatrix P = e->P.middleCols(nCellUnknowns + e->MeshElement->LocalNumberOf(f) * nFaceUnknowns, nFaceUnknowns);
-				DenseMatrix m = P.transpose() * e->MassMatrix(e->ReconstructionBasis);
+					DenseMatrix P = e->P.middleCols(nCellUnknowns + e->MeshElement->LocalNumberOf(f) * nFaceUnknowns, nFaceUnknowns);
+					DenseMatrix m = P.transpose() * e->MeshElement->IntegralGradGradMatrix(e->ReconstructionBasis);
 
-				coeffs.Add(i * nFaceUnknowns, _nbh.ElementNumber(e->MeshElement) * nReconstructUnknowns, m);
+					coeffs.Add(i * nFaceUnknowns, _nbh.ElementNumber(e->MeshElement) * nReconstructUnknowns, m);
+				}
 			}
+			coeffs.Fill(PTranspose_Stiff);
+
+			// PTranspose_Mass
+			// Computes P^T*M*P*x where the argument is P*x
+			PTranspose_Mass = SparseMatrix(_nbh.BoundaryFaces.size() * nFaceUnknowns, _nbh.Elements.size() * nReconstructUnknowns);
+			coeffs.Clear();
+			for (int i = 0; i < _nbh.BoundaryFaces.size(); i++)
+			{
+				Face<Dim>* f = _nbh.BoundaryFaces[i];
+				if (f->IsDomainBoundary)
+				{
+					Diff_HHOElement<Dim>* e = _diffPb.HHOElement(f->Element1);
+
+					DenseMatrix P = e->P.middleCols(nCellUnknowns + e->MeshElement->LocalNumberOf(f) * nFaceUnknowns, nFaceUnknowns);
+					DenseMatrix m = P.transpose() * e->MassMatrix(e->ReconstructionBasis);
+
+					coeffs.Add(i * nFaceUnknowns, _nbh.ElementNumber(e->MeshElement) * nReconstructUnknowns, m);
+				}
+			}
+			coeffs.Fill(PTranspose_Mass);
 		}
-		coeffs.Fill(PTranspose_Mass);
+		else
+		{
+			// Normal derivative
+			NormalDerivative = SparseMatrix(_nbh.BoundaryFaces.size() * nFaceUnknowns, _nbh.Elements.size() * nReconstructUnknowns);
+			coeffs.Clear();
+			for (int i = 0; i < _nbh.BoundaryFaces.size(); i++)
+			{
+				Face<Dim>* face = _nbh.BoundaryFaces[i];
+				if (face->IsDomainBoundary)
+				{
+					Diff_HHOFace<Dim>* f = _diffPb.HHOFace(face);
+					Diff_HHOElement<Dim>* e = _diffPb.HHOElement(face->Element1);
+					coeffs.Add(i * nFaceUnknowns, _nbh.ElementNumber(e->MeshElement) * nReconstructUnknowns, f->NormalDerivative(e->MeshElement, e->ReconstructionBasis));
+				}
+			}
+			coeffs.Fill(NormalDerivative);
+		}
 	}
 
 public:

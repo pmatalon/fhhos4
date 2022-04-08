@@ -581,6 +581,11 @@ public:
 		return this->Shape()->IntegralKGradGrad(K, phi1, phi2);
 	}
 
+	DenseMatrix IntegralGradGradMatrix(FunctionalBasis<Dim>* basis) const
+	{
+		return this->Shape()->IntegralGradGradMatrix(basis);
+	}
+
 	//-----------------------------//
 	//             HHO             //
 	//-----------------------------//

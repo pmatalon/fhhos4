@@ -175,6 +175,7 @@ public:
 			{
 				cout << "Computation of the matrix..." << endl;
 				A = biHarPb->Matrix();
+				//cout << "Matrix: " << endl << A << endl << endl;
 
 				if (args.Actions.Export.LinearSystem)
 				{
@@ -255,42 +256,52 @@ public:
 				if (args.Solver.BiHarmonicSolverCode.compare("cg") == 0)
 				{
 					BiHarmonicCG* cg = static_cast<BiHarmonicCG*>(biHarIterSolver);
-					if (args.Solver.BiHarmonicPreconditionerCode.compare("j") == 0)
+					if (args.Problem.Scheme.compare("g") == 0)
 					{
-						cout << "Preconditioner: Jacobi" << endl << endl;
-						DenseBlockJacobiPreconditioner* p = new DenseBlockJacobiPreconditioner(1);
-						p->Setup(A);
-						cg->Precond = p;
+						BiHarmonicMixedFormGlowinski_HHO<Dim>* gloScheme = static_cast<BiHarmonicMixedFormGlowinski_HHO<Dim>*>(biHarPb);
+						if (args.Solver.BiHarmonicPreconditionerCode.compare("j") == 0)
+						{
+							cout << "Preconditioner: Jacobi" << endl << endl;
+							DenseBlockJacobiPreconditioner* p = new DenseBlockJacobiPreconditioner(1);
+							p->Setup(A);
+							cg->Precond = p;
+						}
+						else if (args.Solver.BiHarmonicPreconditionerCode.compare("bj") == 0)
+						{
+							cout << "Preconditioner: block Jacobi" << endl << endl;
+							DenseBlockJacobiPreconditioner* p = new DenseBlockJacobiPreconditioner(hho->nFaceUnknowns);
+							p->Setup(A);
+							cg->Precond = p;
+						}
+						else if (args.Solver.BiHarmonicPreconditionerCode.compare("p") == 0)
+						{
+							cout << "Preconditioner: patch" << endl << endl;
+							BiharPatchPreconditioner<Dim>* p = new BiharPatchPreconditioner<Dim>(*gloScheme, args.Solver.NeighbourhoodDepth);
+							p->Setup();
+							cg->Precond = p;
+						}
+						else if (args.Solver.BiHarmonicPreconditionerCode.compare("dp") == 0)
+						{
+							cout << "Preconditioner: diagonal patch" << endl << endl;
+							BiharPatchPreconditioner<Dim>* p = new BiharPatchPreconditioner<Dim>(*gloScheme, args.Solver.NeighbourhoodDepth, true);
+							p->Setup();
+							cg->Precond = p;
+						}
+						else if (args.Solver.BiHarmonicPreconditionerCode.compare("no") == 0)
+						{
+							cout << "Preconditioner: none" << endl << endl;
+							IdentityPreconditioner* p = new IdentityPreconditioner();
+							cg->Precond = p;
+						}
+						else
+							Utils::FatalError("Unknown preconditioner. Check -bihar-prec " + args.Solver.BiHarmonicPreconditionerCode + ".");
 					}
-					else if (args.Solver.BiHarmonicPreconditionerCode.compare("bj") == 0)
-					{
-						cout << "Preconditioner: block Jacobi" << endl << endl;
-						DenseBlockJacobiPreconditioner* p = new DenseBlockJacobiPreconditioner(hho->nFaceUnknowns);
-						p->Setup(A);
-						cg->Precond = p;
-					}
-					else if (args.Solver.BiHarmonicPreconditionerCode.compare("p") == 0)
-					{
-						cout << "Preconditioner: patch" << endl << endl;
-						BiharPatchPreconditioner<Dim>* p = new BiharPatchPreconditioner<Dim>(*biHarPb, args.Solver.NeighbourhoodDepth);
-						p->Setup();
-						cg->Precond = p;
-					}
-					else if (args.Solver.BiHarmonicPreconditionerCode.compare("dp") == 0)
-					{
-						cout << "Preconditioner: diagonal patch" << endl << endl;
-						BiharPatchPreconditioner<Dim>* p = new BiharPatchPreconditioner<Dim>(*biHarPb, args.Solver.NeighbourhoodDepth, true);
-						p->Setup();
-						cg->Precond = p;
-					}
-					else if (args.Solver.BiHarmonicPreconditionerCode.compare("no") == 0)
+					else if (args.Problem.Scheme.compare("f") == 0)
 					{
 						cout << "Preconditioner: none" << endl << endl;
 						IdentityPreconditioner* p = new IdentityPreconditioner();
 						cg->Precond = p;
 					}
-					else
-						Utils::FatalError("Unknown preconditioner. Check -bihar-prec " + args.Solver.BiHarmonicPreconditionerCode + ".");
 				}
 
 				// Give the Laplacian matrix so that the Work Units are computed with respect to it

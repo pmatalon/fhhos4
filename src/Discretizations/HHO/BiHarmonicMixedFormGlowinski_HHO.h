@@ -13,18 +13,20 @@ private:
 	BiHarmonicTestCase<Dim>* _testCase;
 
 	//bool _saveMatrixBlocks = true;
-	bool _useIntegrationByParts = true;
 
 	DiffusionField<Dim> _diffField;
 	VirtualDiffusionTestCase<Dim> _diffPbTestCase;
 	Diffusion_HHO<Dim> _diffPb;
 
+	SparseMatrix _PTranspose_Stiff;
+	SparseMatrix _PTranspose_Mass;
 	SparseMatrix _normalDerivativeMatrix;
 	HHOParameters<Dim>* HHO;
 
 	Vector _b_fSource;
 	Vector _zeroDirichlet;
 public:
+	bool UseIntegrationByParts = true;
 
 	BiHarmonicMixedFormGlowinski_HHO(Mesh<Dim>* mesh, BiHarmonicTestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool useIntegrationByParts, bool saveMatrixBlocks)
 	{
@@ -37,7 +39,7 @@ public:
 		_diffPbTestCase.BC = BoundaryConditions::HomogeneousDirichletEverywhere();
 		_diffPb = Diffusion_HHO<Dim>(mesh, &_diffPbTestCase, HHO, true, true);
 		//_saveMatrixBlocks = saveMatrixBlocks;
-		_useIntegrationByParts = useIntegrationByParts;
+		UseIntegrationByParts = useIntegrationByParts;
 	}
 
 	Diffusion_HHO<Dim>& DiffPb() override
@@ -52,8 +54,11 @@ public:
 		diffActions.LogAssembly = true;
 		_diffPb.Assemble(diffActions);
 
-		if (_useIntegrationByParts)
-			_normalDerivativeMatrix = _diffPb.PTranspose_Mass();
+		if (UseIntegrationByParts)
+		{
+			_PTranspose_Stiff = _diffPb.PTranspose_Stiff();
+			_PTranspose_Mass = _diffPb.PTranspose_Mass();
+		}
 		else
 			_normalDerivativeMatrix = _diffPb.NormalDerivativeMatrix();
 
@@ -111,12 +116,14 @@ public:
 
 		if (returnBoundaryNormalDerivative)
 		{
-			if (_useIntegrationByParts)
+			if (UseIntegrationByParts)
 			{
-				Vector cellSolution = _diffPb.SolveCellUnknowns(faceSolution, b_source);
+				/*Vector cellSolution = _diffPb.SolveCellUnknowns(faceSolution, b_source);
 				Vector normalDerivative = _diffPb.A_T_dF.transpose() * cellSolution + _diffPb.A_ndF_dF.transpose() * faceSolution;
-				normalDerivative -= _normalDerivativeMatrix * source;
-				return normalDerivative;
+				normalDerivative -= _PTranspose_Mass * source;
+				return normalDerivative;*/
+				Vector reconstructedElemBoundary = _diffPb.ReconstructHigherOrderOnBoundaryOnly(faceSolution, _zeroDirichlet, b_source);
+				return _PTranspose_Stiff * reconstructedElemBoundary - _PTranspose_Mass * source;
 			}
 			else
 			{

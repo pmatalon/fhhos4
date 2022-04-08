@@ -271,6 +271,23 @@ public:
 		return this->ComputeAndReturnMassMatrix(basis);
 	}
 
+	DenseMatrix IntegralGradGradMatrix(FunctionalBasis<Dim>* basis) const
+	{
+		DenseMatrix m(basis->LocalFunctions.size(), basis->LocalFunctions.size());
+		for (BasisFunction<Dim>* phi1 : basis->LocalFunctions)
+		{
+			for (BasisFunction<Dim>* phi2 : basis->LocalFunctions)
+			{
+				if (phi2->LocalNumber > phi1->LocalNumber)
+					break;
+				double value = this->IntegralGradGrad(phi1, phi2);
+				m(phi1->LocalNumber, phi2->LocalNumber) = value;
+				m(phi2->LocalNumber, phi1->LocalNumber) = value;
+			}
+		}
+		return m;
+	}
+
 	//----------------------------//
 	//             DG             //
 	//----------------------------//
