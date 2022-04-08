@@ -63,14 +63,20 @@ public:
 					Vector normalDerivative;
 					if (_useIntegrationByParts)
 					{
-						// Marche
-						/*Vector cellSolution = nbhDiff.SolveCellUnknowns(faceSolution, b_source);
+						if (Utils::ProgramArgs.Actions.Work)
+						{
+							// Marche
+							Vector cellSolution = nbhDiff.SolveCellUnknowns(faceSolution, b_source);
 
-						normalDerivative = nbhDiff.A_T_dF.transpose() * cellSolution + nbhDiff.A_ndF_dF.transpose() * faceSolution;
-						normalDerivative -= nbhDiff.PTranspose_Mass * lambda;*/
-						// Marche pas
-						Vector reconstruction = nbhDiff.ReconstructHigherOrder(faceSolution, Vector::Zero(nbh.BoundaryFaces.size() * nFaceUnknowns), b_source);
-						normalDerivative = nbhDiff.PTranspose_Stiff * reconstruction - nbhDiff.PTranspose_Mass * lambda;
+							normalDerivative = nbhDiff.A_T_dF.transpose() * cellSolution + nbhDiff.A_ndF_dF.transpose() * faceSolution;
+							normalDerivative -= nbhDiff.PTranspose_Mass * lambda;
+						}
+						else
+						{
+							// Marche pas
+							Vector reconstruction = nbhDiff.ReconstructHigherOrder(faceSolution, Vector::Zero(nbh.BoundaryFaces.size() * nFaceUnknowns), b_source);
+							normalDerivative = nbhDiff.PTranspose_Stiff * reconstruction - nbhDiff.PTranspose_Mass * lambda;
+						}
 					}
 					else
 					{
