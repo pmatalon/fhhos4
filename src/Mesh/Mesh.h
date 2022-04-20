@@ -356,7 +356,7 @@ public:
 			script.PlotText(e->Center(), to_string(e->Number), "r");
 	}
 
-	virtual void ExportToGMSH(FunctionalBasis<Dim>* basis, const Vector &coeffs, const string& outputFilePathPrefix, const string& suffix)
+	virtual void ExportToGMSH_Elements(FunctionalBasis<Dim>* basis, const Vector &coeffs, const string& outputFilePathPrefix, const string& suffix)
 	{
 		Utils::Warning("Impossible to export the solution to GMSH because this mesh does not come from GMSH.");
 	}

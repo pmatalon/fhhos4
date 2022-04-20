@@ -1068,7 +1068,7 @@ public:
 			assert(false);
 	}
 
-	void ExportToGMSH(FunctionalBasis<Dim>* basis, const Vector &coeffs, const string& outputFilePathPrefix, const string& suffix) override
+	void ExportToGMSH_Elements(FunctionalBasis<Dim>* basis, const Vector &coeffs, const string& outputFilePathPrefix, const string& suffix) override
 	{
 		assert(!_mshFilePath.empty());
 		gmsh::initialize();
@@ -1176,7 +1176,7 @@ public:
 		gmsh::finalize();
 	}
 
-	void ExportToGMSH(DomFunction f, const string& outputFilePath, const string& dataName)
+	void ExportToGMSH_Elements(DomFunction f, const string& outputFilePath, const string& dataName)
 	{
 		assert(!_mshFilePath.empty());
 		gmsh::initialize();

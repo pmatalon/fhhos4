@@ -1448,7 +1448,7 @@ public:
 	{
 		if (HHO->OrthogonalizeElemBases())
 			Utils::Error("The export to GMSH has not been implemented when the bases are orthonormalized against each element.");
-		this->_mesh->ExportToGMSH(this->HHO->ReconstructionBasis, reconstructedVector, out.GetFilePathPrefix(), name);
+		this->_mesh->ExportToGMSH_Elements(this->HHO->ReconstructionBasis, reconstructedVector, out.GetFilePathPrefix(), name);
 	}
 
 	void ExportSolutionToGMSH(const Vector& reconstructedSolution, const ExportModule& out)
@@ -1461,7 +1461,7 @@ public:
 		if (HHO->OrthogonalizeElemBases())
 			Utils::Error("The export to GMSH has not been implemented when the bases are orthonormalized against each element.");
 		Vector cellCoeffs = Solve_A_T_T(B_T - A_T_ndF * faceCoeffs);
-		this->_mesh->ExportToGMSH(this->HHO->CellBasis, cellCoeffs, out.GetFilePathPrefix(), "error");
+		this->_mesh->ExportToGMSH_Elements(this->HHO->CellBasis, cellCoeffs, out.GetFilePathPrefix(), "error");
 	}
 
 	//---------------------------------------//

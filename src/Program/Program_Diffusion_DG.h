@@ -49,7 +49,7 @@ public:
 
 		// Export source
 		if (args.Actions.Export.SourceToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
-			dynamic_cast<GMSHMesh<Dim>*>(mesh)->ExportToGMSH(testCase->SourceFunction, args.OutputDirectory + "/source", "source");
+			dynamic_cast<GMSHMesh<Dim>*>(mesh)->ExportToGMSH_Elements(testCase->SourceFunction, args.OutputDirectory + "/source", "source");
 
 		//----------------------//
 		//       Assembly       //
@@ -124,7 +124,7 @@ public:
 
 			// Export algebraic error
 			if (args.Actions.Export.ErrorToGMSH && iterativeSolver)
-				mesh->ExportToGMSH(problem->Basis, iterativeSolver->ExactSolution - problem->SystemSolution, out.GetFilePathPrefix(), "error");
+				mesh->ExportToGMSH_Elements(problem->Basis, iterativeSolver->ExactSolution - problem->SystemSolution, out.GetFilePathPrefix(), "error");
 
 			delete solver;
 
@@ -136,7 +136,7 @@ public:
 				out.ExportVector(problem->SystemSolution, "solution");
 			
 			if (args.Actions.Export.SolutionToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
-				mesh->ExportToGMSH(problem->Basis, problem->SystemSolution, out.GetFilePathPrefix(), "potential");
+				mesh->ExportToGMSH_Elements(problem->Basis, problem->SystemSolution, out.GetFilePathPrefix(), "potential");
 
 			//----------------------//
 			//       L2 error       //
