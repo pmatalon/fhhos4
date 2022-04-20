@@ -9,42 +9,41 @@ using namespace std;
 
 class TensorPolynomial2D : public IBasisFunction2D
 {
-private:
-	IBasisFunction1D* _funcX;
-	IBasisFunction1D* _funcY;
 public:
+	IBasisFunction1D* FuncX;
+	IBasisFunction1D* FuncY;
 
 	TensorPolynomial2D(int localNumber, IBasisFunction1D* funcX, IBasisFunction1D* funcY)
 	{
 		this->LocalNumber = localNumber;
-		this->_funcX = funcX;
-		this->_funcY = funcY;
+		this->FuncX = funcX;
+		this->FuncY = funcY;
 	}
 
 	int GetDegree()
 	{
-		return this->_funcX->GetDegree() + this->_funcY->GetDegree();
+		return this->FuncX->GetDegree() + this->FuncY->GetDegree();
 	}
 
 	double Eval(double x, double y)
 	{
-		return this->_funcX->Eval(x) * this->_funcY->Eval(y);
+		return this->FuncX->Eval(x) * this->FuncY->Eval(y);
 	}
 
 	double EvalGradX(double x, double y)
 	{
-		return this->_funcX->EvalDerivative(x) * this->_funcY->Eval(y);
+		return this->FuncX->EvalDerivative(x) * this->FuncY->Eval(y);
 	}
 
 	double EvalGradY(double x, double y)
 	{
-		return this->_funcX->Eval(x) * this->_funcY->EvalDerivative(y);
+		return this->FuncX->Eval(x) * this->FuncY->EvalDerivative(y);
 	}
 
 	string ToString()
 	{
-		string polyX = this->_funcX->ToString("X");
-		string polyY = this->_funcY->ToString("Y");
+		string polyX = this->FuncX->ToString("X");
+		string polyY = this->FuncY->ToString("Y");
 		if (polyX.compare("1") == 0)
 			return to_string(this->LocalNumber) + "\tdegree " + to_string(this->GetDegree()) + "\t" + polyY;
 		if (polyY.compare("1") == 0)
@@ -54,10 +53,10 @@ public:
 
 	~TensorPolynomial2D()
 	{
-		if (_funcX)
-			delete _funcX;
-		if (_funcY)
-			delete _funcY;
+		if (FuncX)
+			delete FuncX;
+		if (FuncY)
+			delete FuncY;
 	}
 };
 
@@ -68,48 +67,48 @@ public:
 class TensorPolynomial3D : public IBasisFunction3D
 {
 private:
-	IBasisFunction1D* _funcX;
-	IBasisFunction1D* _funcY;
+	IBasisFunction1D* FuncX;
+	IBasisFunction1D* FuncY;
 	IBasisFunction1D* _funcZ;
 public:
 
 	TensorPolynomial3D(int localNumber, IBasisFunction1D* funcX, IBasisFunction1D* funcY, IBasisFunction1D* funcZ)
 	{
 		this->LocalNumber = localNumber;
-		this->_funcX = funcX;
-		this->_funcY = funcY;
+		this->FuncX = funcX;
+		this->FuncY = funcY;
 		this->_funcZ = funcZ;
 	}
 
 	int GetDegree()
 	{
-		return this->_funcX->GetDegree() + this->_funcY->GetDegree() + this->_funcZ->GetDegree();
+		return this->FuncX->GetDegree() + this->FuncY->GetDegree() + this->_funcZ->GetDegree();
 	}
 
 	double Eval(double x, double y, double z)
 	{
-		return this->_funcX->Eval(x) * this->_funcY->Eval(y) * this->_funcZ->Eval(z);
+		return this->FuncX->Eval(x) * this->FuncY->Eval(y) * this->_funcZ->Eval(z);
 	}
 
 	double EvalGradX(double x, double y, double z)
 	{
-		return this->_funcX->EvalDerivative(x) * this->_funcY->Eval(y) * this->_funcZ->Eval(z);
+		return this->FuncX->EvalDerivative(x) * this->FuncY->Eval(y) * this->_funcZ->Eval(z);
 	}
 
 	double EvalGradY(double x, double y, double z)
 	{
-		return this->_funcX->Eval(x) * this->_funcY->EvalDerivative(y) * this->_funcZ->Eval(z);
+		return this->FuncX->Eval(x) * this->FuncY->EvalDerivative(y) * this->_funcZ->Eval(z);
 	}
 
 	double EvalGradZ(double x, double y, double z)
 	{
-		return this->_funcX->Eval(x) * this->_funcY->Eval(y) * this->_funcZ->EvalDerivative(z);
+		return this->FuncX->Eval(x) * this->FuncY->Eval(y) * this->_funcZ->EvalDerivative(z);
 	}
 
 	string ToString()
 	{
-		string polyX = this->_funcX->ToString("X");
-		string polyY = this->_funcY->ToString("Y");
+		string polyX = this->FuncX->ToString("X");
+		string polyY = this->FuncY->ToString("Y");
 		string polyZ = this->_funcZ->ToString("Z");
 		if (polyX.compare("1") == 0 && polyY.compare("1") == 0)
 			return polyZ;
@@ -128,8 +127,8 @@ public:
 
 	~TensorPolynomial3D()
 	{
-		delete _funcX;
-		delete _funcY;
+		delete FuncX;
+		delete FuncY;
 		delete _funcZ;
 	}
 };

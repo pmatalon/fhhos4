@@ -37,6 +37,8 @@ public:
 	virtual DomPoint ConvertToDomain(const RefPoint& refPoint) const = 0; // Mapping
 	virtual RefPoint ConvertToReference(const DomPoint& domainPoint) const = 0; // Inverse mapping
 
+	virtual vector<double> MappingCoefficients() const { Utils::FatalError("MappingCoefficients() not implemented for this element"); }
+
 	virtual DimMatrix<Dim> InverseJacobianTranspose(const RefPoint& p) const = 0;
 	virtual double DetJacobian(const RefPoint& p) const = 0;
 	virtual int DetJacobianDegree() const = 0;

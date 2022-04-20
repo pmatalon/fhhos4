@@ -257,6 +257,11 @@ public:
 		return RefPoint(t, u);
 	}
 
+	vector<double> MappingCoefficients() const override
+	{
+		return { a0, a1, a2, a3, b0, b1, b2, b3, 0, 0, 0, 0 }; // add 4 zeros for 3D
+	}
+
 public:
 
 	void Serialize(ostream& os) const override

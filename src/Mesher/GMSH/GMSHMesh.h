@@ -1082,17 +1082,100 @@ public:
 		gmsh::model::list(modelNames);
 		string modelName = modelNames[modelNames.size() - 1];
 
-		vector<size_t> elementTags;
-		vector<vector<double>> values;
-		elementTags.reserve(this->Elements.size());
-		values.reserve(this->Elements.size());
-		for (Element<Dim>* e : this->Elements)
+		int basisSize = basis->Size();
+
+		if (Dim == 2 && basis->BasisCode().compare(Monomial1D::Code()) == 0 && Utils::ProgramArgs.Discretization.OrthogonalizeElemBasesCode == 0)
 		{
-			elementTags.push_back(e->Id);
-			double value = e->EvalApproximateSolution(basis, coeffs, e->Center());
-			values.push_back({ value });
+			// Refer to:
+			// http://www.manpagez.com/info/gmsh/gmsh-2.4.0/gmsh_52.php
+			// https://gitlab.onelab.info/gmsh/gmsh/-/blob/7cc02aa46e8fec38eac639f11952b7f68dea2c7c/tutorial/c++/x3.cpp
+			// http://ww1.metal.agh.edu.pl/~banas/MMNT/gmsh.pdf (p. 76)
+
+			// Geometric mapping: (x, y, z) = sum_i a_i * phi_i(u, v, w)
+			//     4 basis functions (phi_i)_i: phi_1 = u^0*v^0 (and w^0)
+			//                                  phi_2 = u^1*v^0 (and w^0)
+			//                                  phi_3 = u^0*v^1 (and w^0)
+			//                                  phi_4 = u^1*v^1 (and w^0)
+			//     So coefMapping = Id(4,4)
+			//     and expMapping = [0 0 0]
+			//						[1 0 0]
+			//						[0 1 0]
+			//						[1 1 0].
+			//     The coefficients (a_i) are given separately (it is element-dependent).
+
+			int nMappingFunctions = 4;
+			vector<double> coefMapping(nMappingFunctions * nMappingFunctions);
+			for (int i = 0; i < nMappingFunctions; i++)
+				coefMapping[i * nMappingFunctions + i] = 1; // Identity
+
+			vector<double> expMapping = { 0,0,0,
+										  1,0,0,
+										  0,1,0,
+										  1,1,0 };
+
+			// Basis
+			vector<double> coefMonomials(basisSize * basisSize); // Identity
+			for (int i = 0; i < basisSize; i++)
+				coefMonomials[i * basisSize + i] = 1; // because this is the monomial basis! If Legendre function, it would be the coefficients in front of its monomial decomposition.
+
+			vector<double> expMonomials(basisSize * 3); // 3 = 3D
+			for (int i = 0; i < basisSize; i++)
+			{
+				TensorPolynomial2D* phi = dynamic_cast<TensorPolynomial2D*>(basis->LocalFunctions[i]);
+				expMonomials[i * 3 + 0] = phi->FuncX->GetDegree(); // u
+				expMonomials[i * 3 + 1] = phi->FuncY->GetDegree(); // v
+				expMonomials[i * 3 + 2] = 0;                       // w
+			}
+
+			gmsh::view::setInterpolationMatrices(viewId, "Quadrangle",
+				basisSize, coefMonomials, expMonomials,
+				nMappingFunctions, coefMapping, expMapping);
+
+			// Values of the coefficients in the linear combination
+
+			vector<double> data;
+			data.reserve(this->Elements.size() * (4*3 + basisSize));
+			for (Element<Dim>* e : this->Elements)
+			{
+				// Instead of adding the coordinates of the vertices, add the mapping coefficients.
+				// The actual coordinates are retrieved using the mapping interpolation matrices (coefMapping, expMapping).
+				vector<double> mappingCoeffs = e->Shape()->MappingCoefficients();
+				std::copy(mappingCoeffs.begin(), mappingCoeffs.end(), std::back_inserter(data));
+
+				// Add the coefficient of the linear combination in the basis functions.
+				Vector elemCoeffs = coeffs.segment(e->Number * basisSize, basisSize);
+				for (int i = 0; i < basisSize; i++)
+					data.push_back(elemCoeffs[i]);
+			}
+			gmsh::view::addListData(viewId, "SQ", this->Elements.size(), data);
+
+
+			// Options for the high-order:
+			// 
+			// In order to visualize the high-order field, one must activate adaptive visualization, 
+			gmsh::view::option::setNumber(viewId, "AdaptVisualizationGrid", 1);
+			// set a visualization error threshold,
+			gmsh::view::option::setNumber(viewId, "TargetError", 1e-3);
+			// and set a maximum subdivision level
+			// (Gmsh does automatic mesh refinement to visualize the high-order field with the requested accuracy).
+			gmsh::view::option::setNumber(viewId, "MaxRecursionLevel", 6);
 		}
-		gmsh::view::addModelData(viewId, 0, modelName, "ElementData", elementTags, values);
+		else
+		{
+			// Set a single value in the element
+			vector<size_t> elementTags;
+			vector<vector<double>> values;
+			elementTags.reserve(this->Elements.size());
+			values.reserve(this->Elements.size());
+			for (Element<Dim>* e : this->Elements)
+			{
+				elementTags.push_back(e->Id);
+				double value = e->EvalApproximateSolution(basis, coeffs, e->Center());
+				values.push_back({ value });
+			}
+			gmsh::view::addModelData(viewId, 0, modelName, "ElementData", elementTags, values);
+		}
+
 
 		string meshFilePath = outputFilePathPrefix + (outputFilePathPrefix.back() == '/' ? "" : "_") + suffix + ".msh";
 		string dataFilePath = outputFilePathPrefix + (outputFilePathPrefix.back() == '/' ? "" : "_") + suffix + ".pos";
