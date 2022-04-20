@@ -38,20 +38,56 @@ public:
 				int nCellUnknowns = _diffPb.HHO->nCellUnknowns;
 
 				Neighbourhood<Dim> nbh(e, _neighbourhoodDepth);
-				NeighbourhoodDiffusion_HHO<Dim> nbhDiff(nbh, _diffPb, _useIntegrationByParts);
+				NeighbourhoodDiffusion_HHO<Dim> nbhDiff(nbh, _diffPb);
+
+
+				SparseMatrix PTranspose;
+				SparseMatrix ReconstructStiff;
+				SparseMatrix ReconstructMass;
+				SparseMatrix SolveCellUknTranspose;
+				SparseMatrix CellStiff;
+				SparseMatrix CellMass;
+				SparseMatrix NormalDerivative;
+				if (_useIntegrationByParts)
+				{
+					if (Utils::ProgramArgs.Actions.Option == 0)
+					{
+						PTranspose = nbhDiff.PTranspose();
+						ReconstructStiff = nbhDiff.ReconstructStiffnessMatrix();
+						ReconstructMass = nbhDiff.ReconstructMassMatrix();
+					}
+					else if (Utils::ProgramArgs.Actions.Option == 4)
+					{
+						PTranspose = nbhDiff.PTranspose();
+						ReconstructMass = nbhDiff.ReconstructMassMatrix();
+					}
+					else if (Utils::ProgramArgs.Actions.Option == 5)
+					{
+						SolveCellUknTranspose = nbhDiff.SolveCellUknTranspose();
+						CellStiff = nbhDiff.CellStiffnessMatrix();
+						CellMass = nbhDiff.CellMassMatrix();
+					}
+				}
+				else
+					NormalDerivative = nbhDiff.NormalDerivative();
 				
 				for (int k = 0; k < nFaceUnknowns; k++)
 				{
 					// Problem 1 (Dirichlet 1 at the current unknown, zero source)
 					Vector dirichlet = Vector::Zero(nbh.BoundaryFaces.size() * nFaceUnknowns);
 					dirichlet[nbh.BoundaryFaceNumber(f) * nFaceUnknowns + k] = 1;
+					// Reconstruct higher-order like in the Glowinski scheme?
 					Vector b_T = nbhDiff.ComputeB_T_zeroSource(dirichlet); // TODO don't compute the whole matrix vector product, there is only one 1 in the vector
 					Vector b_ndF = nbhDiff.ComputeB_ndF_noNeumann(dirichlet);
 					Vector rhs = nbhDiff.CondensedRHS(b_T, b_ndF);
 
 					Vector faceSolution = nbhDiff.FaceUnknownSolver.Solve(rhs);
 
-					Vector lambda = nbhDiff.ReconstructHigherOrder(faceSolution, dirichlet, b_T);
+					Vector lambda;
+					if (Utils::ProgramArgs.Actions.Option == 5)
+						lambda = nbhDiff.SolveCellUnknowns(faceSolution, b_T);
+					else
+						lambda = nbhDiff.ReconstructHigherOrder(faceSolution, dirichlet, b_T);
 
 					// Problem 2 (Dirichlet 0, source)
 					Vector b_source = nbhDiff.AssembleSourceTerm(lambda);
@@ -63,25 +99,30 @@ public:
 					Vector normalDerivative;
 					if (_useIntegrationByParts)
 					{
-						if (Utils::ProgramArgs.Actions.Work)
+						if (Utils::ProgramArgs.Actions.Option == 0)
 						{
-							// Marche
+							Vector reconstruction = nbhDiff.ReconstructHigherOrder(faceSolution, Vector::Zero(nbh.BoundaryFaces.size() * nFaceUnknowns), b_source);
+							normalDerivative = nbhDiff.SolveFaceMassMatrixOnBoundary(PTranspose * (ReconstructStiff * reconstruction - ReconstructMass * lambda));
+						}
+						else if (Utils::ProgramArgs.Actions.Option == 4)
+						{
 							Vector cellSolution = nbhDiff.SolveCellUnknowns(faceSolution, b_source);
 
 							normalDerivative = nbhDiff.A_T_dF.transpose() * cellSolution + nbhDiff.A_ndF_dF.transpose() * faceSolution;
-							normalDerivative -= nbhDiff.PTranspose_Mass * lambda;
+							normalDerivative -= PTranspose * ReconstructMass * lambda;
+						}
+						else if (Utils::ProgramArgs.Actions.Option == 5)
+						{
+							Vector cellSolution = nbhDiff.SolveCellUnknowns(faceSolution, b_source);
+							normalDerivative = nbhDiff.SolveFaceMassMatrixOnBoundary(SolveCellUknTranspose * (CellStiff * cellSolution - CellMass * lambda));
 						}
 						else
-						{
-							// Marche pas
-							Vector reconstruction = nbhDiff.ReconstructHigherOrder(faceSolution, Vector::Zero(nbh.BoundaryFaces.size() * nFaceUnknowns), b_source);
-							normalDerivative = nbhDiff.PTranspose_Stiff * reconstruction - nbhDiff.PTranspose_Mass * lambda;
-						}
+							Utils::FatalError("Preconditioner not managed for -opt " + to_string(Utils::ProgramArgs.Actions.Option));
 					}
 					else
 					{
 						Vector reconstruction = nbhDiff.ReconstructHigherOrder(faceSolution, Vector::Zero(nbh.BoundaryFaces.size() * nFaceUnknowns), b_source);
-						normalDerivative = nbhDiff.NormalDerivative * reconstruction;
+						normalDerivative = NormalDerivative * reconstruction;
 					}
 
 					for (int i2 = 0; i2 < nbh.BoundaryFaces.size(); i2++)

@@ -9,6 +9,7 @@ private:
 	vector<Diff_HHOFace<Dim>> _hhoFaces;
 	Diffusion_HHO<Dim>* _diffPb;
 	SparseMatrix _trace;
+	SparseMatrix _boundaryFaceMass;
 	//SparseMatrix _normalDerivative;
 public:
 	HHOParameters<Dim>* HHO;
@@ -42,6 +43,7 @@ public:
 		BoundarySpace = HHOBoundarySpace(_mesh, HHO, _hhoFaces);
 
 		SetupTraceMatrix();
+		SetupBoundaryFaceMassMatrix();
 	}
 
 private:
@@ -70,6 +72,23 @@ private:
 		parallelLoop.Fill(_trace);
 	}
 
+	void SetupBoundaryFaceMassMatrix()
+	{
+		FaceParallelLoop<Dim> parallelLoop(_mesh->BoundaryFaces);
+		parallelLoop.ReserveChunkCoeffsSize(HHO->nFaceUnknowns * HHO->nFaceUnknowns);
+
+		parallelLoop.Execute([this](Face<Dim>* f, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				Diff_HHOFace<Dim>* face = HHOFace(f);
+				int i = f->Number - HHO->nInteriorFaces;
+
+				chunk->Results.Coeffs.Add(i * HHO->nFaceUnknowns, i * HHO->nFaceUnknowns, face->MassMatrix());
+			});
+
+		_boundaryFaceMass = SparseMatrix(HHO->nBoundaryFaces * HHO->nFaceUnknowns, HHO->nBoundaryFaces * HHO->nFaceUnknowns);
+		parallelLoop.Fill(_boundaryFaceMass);
+	}
+
 	/*void SetupNormalDerivativeMatrix()
 	{
 		FaceParallelLoop<Dim> parallelLoop(_mesh->BoundaryFaces);
@@ -95,6 +114,16 @@ public:
 	{
 		assert(v.rows() == _mesh->NBoundaryElements() * HHO->nReconstructUnknowns);
 		return _trace * v;
+	}
+
+	SparseMatrix& TraceMatrix()
+	{
+		return _trace;
+	}
+
+	SparseMatrix& BoundaryFaceMassMatrix()
+	{
+		return _boundaryFaceMass;
 	}
 
 	/*Vector NormalDerivative(const Vector& v)

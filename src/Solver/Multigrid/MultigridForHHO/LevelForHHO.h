@@ -551,7 +551,7 @@ private:
 		if (this->ComesFrom == CoarseningType::H || this->ComesFrom == CoarseningType::HP)
 		{
 			// If finest level, delete everything you don't need to reconstruct the solution at the end
-			if (IsFinestLevel())
+			if (IsFinestLevel() && Utils::ProgramArgs.Problem.Equation != EquationType::BiHarmonic)
 			{
 				ElementParallelLoop<Dim> parallelLoopE(_problem->_mesh->Elements);
 				parallelLoopE.Execute([this](Element<Dim>* element)

@@ -123,7 +123,7 @@ struct ActionsArguments
 	bool UnitTests = false;
 	bool GMSHLogEnabled = false;
 	bool IntegrationByParts = true;
-	bool Work = false;
+	int Option = 0;
 	ExportArguments Export;
 };
 

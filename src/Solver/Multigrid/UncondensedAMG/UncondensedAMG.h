@@ -78,7 +78,7 @@ public:
 
 	void Setup(const SparseMatrix& A) override
 	{
-		assert(false && "This Setup method cannot be used in this solver.");
+		Utils::FatalError("The method Setup(const SparseMatrix& A) cannot be used for this solver.");
 	}
 
 	void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F) override

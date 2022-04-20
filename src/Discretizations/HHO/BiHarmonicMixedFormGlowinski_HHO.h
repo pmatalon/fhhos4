@@ -18,9 +18,24 @@ private:
 	VirtualDiffusionTestCase<Dim> _diffPbTestCase;
 	Diffusion_HHO<Dim> _diffPb;
 
+	HigherOrderBoundary<Dim> _higherOrderBoundary;
+
+	SparseMatrix _ReconstructStiff;
+	SparseMatrix _ReconstructMass;
+	SparseMatrix _PTranspose;
+
+	SparseMatrix _CellStiff;
+	SparseMatrix _CellMass;
+	SparseMatrix _SolveCellUknTranspose;
+
 	SparseMatrix _PTranspose_Stiff;
 	SparseMatrix _PTranspose_Mass;
+	
+	SparseMatrix _Trace;
 	SparseMatrix _normalDerivativeMatrix;
+
+	EigenSparseCholesky _PT_M_P_solver;
+
 	HHOParameters<Dim>* HHO;
 
 	Vector _b_fSource;
@@ -56,8 +71,33 @@ public:
 
 		if (UseIntegrationByParts)
 		{
-			_PTranspose_Stiff = _diffPb.PTranspose_Stiff();
-			_PTranspose_Mass = _diffPb.PTranspose_Mass();
+			_ReconstructStiff = _diffPb.ReconstructStiffnessMatrixOnBoundaryElements();
+			_ReconstructMass = _diffPb.ReconstructMassMatrixOnBoundaryElements();
+			_PTranspose = _diffPb.PTransposeOnBoundary();
+			
+			if (Utils::ProgramArgs.Actions.Option == 3)
+				_Trace = _diffPb.LowerOrderTraceMatrixOnBoundary();
+
+			if (Utils::ProgramArgs.Actions.Option == 1)
+			{
+				_higherOrderBoundary = HigherOrderBoundary<Dim>(&_diffPb);
+				_higherOrderBoundary.Setup();
+
+				SparseMatrix& hoTrace = _higherOrderBoundary.TraceMatrix();
+				SparseMatrix M = _PTranspose * hoTrace.transpose() * _higherOrderBoundary.BoundaryFaceMassMatrix() * hoTrace * _PTranspose.transpose();
+				_PT_M_P_solver.Setup(M);
+			}
+			if (Utils::ProgramArgs.Actions.Option == 4)
+			{
+				_PTranspose_Stiff = _diffPb.PTranspose_Stiff_boundary();
+				_PTranspose_Mass = _diffPb.PTranspose_Mass_boundary();
+			}
+			if (Utils::ProgramArgs.Actions.Option == 5)
+			{
+				_CellStiff = _diffPb.CellStiffnessMatrixOnBoundaryElements();
+				_CellMass = _diffPb.CellMassMatrixOnBoundaryElements();
+				_SolveCellUknTranspose = _diffPb.SolveCellUknTransposeOnBoundary();
+			}
 		}
 		else
 			_normalDerivativeMatrix = _diffPb.NormalDerivativeMatrix();
@@ -68,13 +108,26 @@ public:
 
 	Vector FindCompatibleTheta() override
 	{
-		return _zeroDirichlet;
+		if (Utils::ProgramArgs.Actions.Option == 2)
+			return Vector::Zero(_mesh->NBoundaryElements() * HHO->nReconstructUnknowns);
+		else
+			return _zeroDirichlet;
 	}
 
 	// Solve problem 1 (f=source, Dirich=<dirichlet>)
-	Vector Solve1stDiffProblemWithFSource(const Vector& dirichlet) override
+	Vector Solve1stDiffProblemWithFSource(const Vector& dirichletArg) override
 	{
 		// Define problem
+		Vector dirichlet;
+		if (Utils::ProgramArgs.Actions.Option == 0)
+			dirichlet = dirichletArg;
+		else if (Utils::ProgramArgs.Actions.Option == 1)
+			dirichlet = _diffPb.ReconstructAndAssembleDirichletTerm(dirichletArg);
+		else if (Utils::ProgramArgs.Actions.Option == 2)
+			dirichlet = _diffPb.AssembleDirichletTermFromReconstructedBoundaryElem(dirichletArg);
+		else
+			dirichlet = dirichletArg;
+
 		Vector b_T   = _diffPb.ComputeB_T(_b_fSource, dirichlet);
 		Vector b_ndF = _diffPb.ComputeB_ndF_noNeumann(dirichlet);
 		Vector rhs = _diffPb.CondensedRHS(b_T, b_ndF);
@@ -83,14 +136,27 @@ public:
 		Vector faceSolution = this->_diffSolver->Solve(rhs);
 		this->CheckDiffSolverConvergence();
 
-		// Reconstruct the higher-order polynomial
-		return _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, dirichlet, b_T);
+		if (Utils::ProgramArgs.Actions.Option == 5)
+			return _diffPb.SolveCellUnknowns(faceSolution, b_T);
+		else
+			// Reconstruct the higher-order polynomial
+			return _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, dirichlet, b_T);
 	}
 
 	// Solve problem 1 (f=0, Dirich=<dirichlet>)
-	Vector Solve1stDiffProblemWithZeroSource(const Vector& dirichlet) override
+	Vector Solve1stDiffProblemWithZeroSource(const Vector& dirichletArg) override
 	{
 		// Define problem
+		Vector dirichlet;
+		if (Utils::ProgramArgs.Actions.Option == 0)
+			dirichlet = dirichletArg;
+		else if (Utils::ProgramArgs.Actions.Option == 1)
+			dirichlet = _diffPb.ReconstructAndAssembleDirichletTerm(dirichletArg);
+		else if (Utils::ProgramArgs.Actions.Option == 2)
+			dirichlet = _diffPb.AssembleDirichletTermFromReconstructedBoundaryElem(dirichletArg);
+		else
+			dirichlet = dirichletArg;
+
 		Vector b_T = _diffPb.ComputeB_T_zeroSource(dirichlet);
 		Vector b_ndF = _diffPb.ComputeB_ndF_noNeumann(dirichlet);
 		Vector rhs = _diffPb.CondensedRHS(b_T, b_ndF);
@@ -99,8 +165,11 @@ public:
 		Vector faceSolution = this->_diffSolver->Solve(rhs);
 		this->CheckDiffSolverConvergence();
 
-		// Reconstruct the higher-order polynomial
-		return _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, dirichlet, b_T);
+		if (Utils::ProgramArgs.Actions.Option == 5)
+			return _diffPb.SolveCellUnknowns(faceSolution, b_T);
+		else
+			// Reconstruct the higher-order polynomial
+			return _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, dirichlet, b_T);
 	}
 
 	// Solve problem 2 (f=<source>, Dirich=0)
@@ -118,12 +187,36 @@ public:
 		{
 			if (UseIntegrationByParts)
 			{
-				/*Vector cellSolution = _diffPb.SolveCellUnknowns(faceSolution, b_source);
-				Vector normalDerivative = _diffPb.A_T_dF.transpose() * cellSolution + _diffPb.A_ndF_dF.transpose() * faceSolution;
-				normalDerivative -= _PTranspose_Mass * source;
-				return normalDerivative;*/
+				//Vector reconstructedSolution = _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, _zeroDirichlet, b_source);
+				//return _diffPb.SolveFaceMassMatrixOnBoundary(_PTranspose * (_Stiff * reconstructedSolution - _Mass * source));
+
 				Vector reconstructedElemBoundary = _diffPb.ReconstructHigherOrderOnBoundaryOnly(faceSolution, _zeroDirichlet, b_source);
-				return _PTranspose_Stiff * reconstructedElemBoundary - _PTranspose_Mass * source;
+				Vector sourceElemBoundary = _diffPb.ExtractElemBoundary(source);
+				if (Utils::ProgramArgs.Actions.Option == 0)
+					return _diffPb.SolveFaceMassMatrixOnBoundary(_PTranspose * (_ReconstructStiff * reconstructedElemBoundary - _ReconstructMass * sourceElemBoundary));
+				else if (Utils::ProgramArgs.Actions.Option == 1)
+					return _PT_M_P_solver.Solve(_PTranspose * (_ReconstructStiff * reconstructedElemBoundary - _ReconstructMass * sourceElemBoundary));
+				else if (Utils::ProgramArgs.Actions.Option == 2)
+					return _ReconstructStiff * reconstructedElemBoundary - _ReconstructMass * sourceElemBoundary;
+				else if (Utils::ProgramArgs.Actions.Option == 3)
+					return _diffPb.SolveFaceMassMatrixOnBoundary(_Trace * (_ReconstructStiff * reconstructedElemBoundary - _ReconstructMass * sourceElemBoundary));
+				else if (Utils::ProgramArgs.Actions.Option == 4)
+				{
+					Vector cellSolution = _diffPb.SolveCellUnknowns(faceSolution, b_source);
+					Vector normalDerivative = _diffPb.A_T_dF.transpose() * cellSolution + _diffPb.A_ndF_dF.transpose() * faceSolution;
+					normalDerivative -= _PTranspose_Mass * source;
+					return normalDerivative;
+				}
+				else if (Utils::ProgramArgs.Actions.Option == 5)
+				{
+					Vector cellSolution = _diffPb.SolveCellUnknownsOnBoundaryOnly(faceSolution, b_source);
+					return _diffPb.SolveFaceMassMatrixOnBoundary(_SolveCellUknTranspose * (_CellStiff * cellSolution - _CellMass * sourceElemBoundary));
+				}
+				else
+				{
+					Utils::FatalError("Unmanaged -opt " + to_string(Utils::ProgramArgs.Actions.Option));
+					return Vector();
+				}
 			}
 			else
 			{

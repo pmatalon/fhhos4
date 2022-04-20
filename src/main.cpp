@@ -503,8 +503,8 @@ void print_usage() {
 	cout << "-ut" << endl;
 	cout << "      Run unit tests." << endl;
 	cout << endl;
-	cout << "-work {0|1}" << endl;
-	cout << "      Developer option to go back and forth between variants of code." << endl;
+	cout << "-opt NUM" << endl;
+	cout << "      Developer option to choose variants of code." << endl;
 	cout << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << "                      Examples and typical use cases                  " << endl;
@@ -649,7 +649,7 @@ int main(int argc, char* argv[])
 		OPT_GMSHLog,
 		OPT_IntegrationByParts,
 		OPT_NeighbourhoodDepth,
-		OPT_Work,
+		OPT_Option,
 	};
 
 	static struct option long_opts[] = {
@@ -727,7 +727,7 @@ int main(int argc, char* argv[])
 		 { "gmsh-log", no_argument, NULL, OPT_GMSHLog },
 		 { "ibp", required_argument, NULL, OPT_IntegrationByParts },
 		 { "nbh-depth", required_argument, NULL, OPT_NeighbourhoodDepth },
-		 { "work", required_argument, NULL, OPT_Work },
+		 { "opt", required_argument, NULL, OPT_Option },
 		 { NULL, 0, NULL, 0 }
 	};
 
@@ -1319,8 +1319,8 @@ int main(int argc, char* argv[])
 			case OPT_IntegrationByParts:
 				args.Actions.IntegrationByParts = atoi(optarg);
 				break;
-			case OPT_Work:
-				args.Actions.Work = atoi(optarg);
+			case OPT_Option:
+				args.Actions.Option = atoi(optarg);
 				break;
 			default:
 			{
