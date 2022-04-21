@@ -4,6 +4,13 @@
 #include <mutex>
 using namespace std;
 
+struct GeometricMapping
+{
+	int NFunctions;
+	vector<double> Coeffs;
+	vector<double> Exponents;
+};
+
 template <int Dim>
 class PhysicalShape : public GeometricShape<Dim>
 {

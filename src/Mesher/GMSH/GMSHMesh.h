@@ -1068,7 +1068,7 @@ public:
 			assert(false);
 	}
 
-	void ExportToGMSH_Elements(FunctionalBasis<Dim>* basis, const Vector &coeffs, const string& outputFilePathPrefix, const string& suffix) override
+	void ExportToGMSH_Elements(FunctionalBasis<Dim>* basis, const Vector &coeffs, const string& outputFilePathPrefix, const string& viewName) override
 	{
 		assert(!_mshFilePath.empty());
 		gmsh::initialize();
@@ -1076,13 +1076,7 @@ public:
 		if (_mshFileIsTmp)
 			remove(_mshFilePath.c_str());
 
-		int viewId = gmsh::view::add(suffix);
-
-		vector<std::string> modelNames;
-		gmsh::model::list(modelNames);
-		string modelName = modelNames[modelNames.size() - 1];
-
-		int basisSize = basis->Size();
+		int viewId = gmsh::view::add(viewName);
 
 		if (Dim == 2 && basis->BasisCode().compare(Monomial1D::Code()) == 0 && Utils::ProgramArgs.Discretization.OrthogonalizeElemBasesCode == 0)
 		{
@@ -1091,6 +1085,7 @@ public:
 			// https://gitlab.onelab.info/gmsh/gmsh/-/blob/7cc02aa46e8fec38eac639f11952b7f68dea2c7c/tutorial/c++/x3.cpp
 			// http://ww1.metal.agh.edu.pl/~banas/MMNT/gmsh.pdf (p. 76)
 
+			// Example of quadrilateral element
 			// Geometric mapping: (x, y, z) = sum_i a_i * phi_i(u, v, w)
 			//     4 basis functions (phi_i)_i: phi_1 = u^0*v^0 (and w^0)
 			//                                  phi_2 = u^1*v^0 (and w^0)
@@ -1102,18 +1097,9 @@ public:
 			//						[0 1 0]
 			//						[1 1 0].
 			//     The coefficients (a_i) are given separately (it is element-dependent).
-
-			int nMappingFunctions = 4;
-			vector<double> coefMapping(nMappingFunctions * nMappingFunctions);
-			for (int i = 0; i < nMappingFunctions; i++)
-				coefMapping[i * nMappingFunctions + i] = 1; // Identity
-
-			vector<double> expMapping = { 0,0,0,
-										  1,0,0,
-										  0,1,0,
-										  1,1,0 };
-
-			// Basis
+			
+			// Definition of the basis functions
+			int basisSize = basis->Size();
 			vector<double> coefMonomials(basisSize * basisSize); // Identity
 			for (int i = 0; i < basisSize; i++)
 				coefMonomials[i * basisSize + i] = 1; // because this is the monomial basis! If Legendre function, it would be the coefficients in front of its monomial decomposition.
@@ -1122,47 +1108,47 @@ public:
 			for (int i = 0; i < basisSize; i++)
 			{
 				TensorPolynomial2D* phi = dynamic_cast<TensorPolynomial2D*>(basis->LocalFunctions[i]);
-				expMonomials[i * 3 + 0] = phi->FuncX->GetDegree(); // u
-				expMonomials[i * 3 + 1] = phi->FuncY->GetDegree(); // v
-				expMonomials[i * 3 + 2] = 0;                       // w
+				expMonomials[i * 3 + 0] = phi->FuncX->GetDegree(); // exponent of u
+				expMonomials[i * 3 + 1] = phi->FuncY->GetDegree(); // exponent of v
+				expMonomials[i * 3 + 2] = 0;                       // exponent of w
 			}
 
-			gmsh::view::setInterpolationMatrices(viewId, "Quadrangle",
-				basisSize, coefMonomials, expMonomials,
-				nMappingFunctions, coefMapping, expMapping);
-
-			// Values of the coefficients in the linear combination
-
-			vector<double> data;
-			data.reserve(this->Elements.size() * (4*3 + basisSize));
-			for (Element<Dim>* e : this->Elements)
+			// Geometric mapping and high-order data
+			if (!this->_quadrilateralElements.empty())
 			{
-				// Instead of adding the coordinates of the vertices, add the mapping coefficients.
-				// The actual coordinates are retrieved using the mapping interpolation matrices (coefMapping, expMapping).
-				vector<double> mappingCoeffs = e->Shape()->MappingCoefficients();
-				std::copy(mappingCoeffs.begin(), mappingCoeffs.end(), std::back_inserter(data));
+				GeometricMapping quadMapping = Quadrilateral::MappingInfo();
+				gmsh::view::setInterpolationMatrices(viewId, "Quadrangle", basisSize, coefMonomials, expMonomials,
+					quadMapping.NFunctions, quadMapping.Coeffs, quadMapping.Exponents);
 
-				// Add the coefficient of the linear combination in the basis functions.
-				Vector elemCoeffs = coeffs.segment(e->Number * basisSize, basisSize);
-				for (int i = 0; i < basisSize; i++)
-					data.push_back(elemCoeffs[i]);
+				vector<double> data = GeoMappingAndHighOrderData(this->_quadrilateralElements, coeffs, quadMapping.NFunctions, basisSize);
+				gmsh::view::addListData(viewId, "SQ", this->_quadrilateralElements.size(), data);
 			}
-			gmsh::view::addListData(viewId, "SQ", this->Elements.size(), data);
+			if (!this->_triangularElements.empty())
+			{
+				GeometricMapping triMapping = Triangle::MappingInfo();
+				gmsh::view::setInterpolationMatrices(viewId, "Triangle", basisSize, coefMonomials, expMonomials,
+					triMapping.NFunctions, triMapping.Coeffs, triMapping.Exponents);
 
+				vector<double> data = GeoMappingAndHighOrderData(this->_triangularElements, coeffs, triMapping.NFunctions, basisSize);
+				gmsh::view::addListData(viewId, "ST", this->_triangularElements.size(), data);
+			}
 
 			// Options for the high-order:
 			// 
-			// In order to visualize the high-order field, one must activate adaptive visualization, 
+			// In order to visualize the high-order field, one must activate adaptive visualization
 			gmsh::view::option::setNumber(viewId, "AdaptVisualizationGrid", 1);
-			// set a visualization error threshold,
+			// set a visualization error threshold
 			gmsh::view::option::setNumber(viewId, "TargetError", 1e-3);
-			// and set a maximum subdivision level
-			// (Gmsh does automatic mesh refinement to visualize the high-order field with the requested accuracy).
+			// set a maximum subdivision level (GMSH does automatic mesh refinement to visualize the high-order field with the requested accuracy)
 			gmsh::view::option::setNumber(viewId, "MaxRecursionLevel", 6);
 		}
 		else
 		{
 			// Set a single value in the element
+			vector<std::string> modelNames;
+			gmsh::model::list(modelNames);
+			string modelName = modelNames[modelNames.size() - 1];
+
 			vector<size_t> elementTags;
 			vector<vector<double>> values;
 			elementTags.reserve(this->Elements.size());
@@ -1177,16 +1163,42 @@ public:
 		}
 
 
-		string meshFilePath = outputFilePathPrefix + (outputFilePathPrefix.back() == '/' ? "" : "_") + suffix + ".msh";
-		string dataFilePath = outputFilePathPrefix + (outputFilePathPrefix.back() == '/' ? "" : "_") + suffix + ".pos";
+		string meshFilePath = outputFilePathPrefix + (outputFilePathPrefix.back() == '/' ? "" : "_") + viewName + ".msh";
+		string dataFilePath = outputFilePathPrefix + (outputFilePathPrefix.back() == '/' ? "" : "_") + viewName + ".pos";
 
 		gmsh::write(meshFilePath);
 		gmsh::view::write(viewId, dataFilePath);
 
-		cout << suffix << " exported for GMSH to " << dataFilePath << endl;
+		cout << viewName << " exported for GMSH to " << dataFilePath << endl;
 		gmsh::finalize();
 	}
 
+private:
+	template<class ElementType>
+	vector<double> GeoMappingAndHighOrderData(const vector<ElementType>& elements, const Vector& coeffs, int nbMappingFunctions, int basisSize)
+	{
+		vector<double> data;
+		data.reserve(elements.size() * (nbMappingFunctions * 3 + basisSize));
+		for (const ElementType& e : elements)
+		{
+			// 1. Geometric mapping of the element w.r.t. the reference element
+			// 
+			// Instead of adding the coordinates of the vertices, we add the mapping coefficients.
+			// The actual coordinates are retrieved using the mapping interpolation matrices given in gmsh::view::setInterpolationMatrices().
+			vector<double> mappingCoeffs = e.Shape()->MappingCoefficients();
+			std::copy(mappingCoeffs.begin(), mappingCoeffs.end(), std::back_inserter(data));
+
+			// 2. High-order data
+			// 
+			// Add the coefficient of the linear combination in the basis functions.
+			Vector elemCoeffs = coeffs.segment(e.Number * basisSize, basisSize);
+			for (int i = 0; i < basisSize; i++)
+				data.push_back(elemCoeffs[i]);
+		}
+		return data;
+	}
+
+public:
 	void ExportToGMSH_Nodes(const Vector& nodeValues, const string& outputFilePathPrefix, const string& suffix) override
 	{
 		assert(!_mshFilePath.empty());

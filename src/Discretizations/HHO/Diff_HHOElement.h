@@ -398,7 +398,7 @@ private:
 			auto gradPhi = this->GradPhiOnFace(face, reconstructPhi);
 			auto normal = this->OuterNormalVector(face);
 
-			RefFunction functionToIntegrate = [this, phi, gradPhi, normal](const RefPoint& p) {
+			RefFunction functionToIntegrate = [this, phi, gradPhi, &normal](const RefPoint& p) {
 				return (this->DiffTensor() * gradPhi(p)).dot(normal) * phi(p);
 			};
 
@@ -419,7 +419,7 @@ private:
 		auto gradPhi = this->GradPhiOnFace(face, reconstructPhi);
 		auto normal = this->OuterNormalVector(face);
 
-		RefFunction functionToIntegrate = [this, facePhi, gradPhi, normal](const RefPoint& p) {
+		RefFunction functionToIntegrate = [this, facePhi, gradPhi, &normal](const RefPoint& p) {
 			return (this->DiffTensor() * gradPhi(p)).dot(normal) * facePhi->Eval(p);
 		};
 

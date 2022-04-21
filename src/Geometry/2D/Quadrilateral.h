@@ -257,9 +257,31 @@ public:
 		return RefPoint(t, u);
 	}
 
+	static GeometricMapping MappingInfo()
+	{
+		GeometricMapping mapping;
+		mapping.NFunctions = 4; // 1, t, u, t*u
+
+		mapping.Coeffs = vector<double>(mapping.NFunctions * mapping.NFunctions);
+		for (int i = 0; i < mapping.NFunctions; i++)
+			mapping.Coeffs[i * mapping.NFunctions + i] = 1; // Identity
+
+		//                    t,u,v
+		mapping.Exponents = { 0,0,0,   // 1   = t^0 * u^0 * v^0
+							  1,0,0,   // t   = t^1 * u^0 * v^0
+							  0,1,0,   // u   = t^0 * u^1 * v^0
+							  1,1,0 }; // t*u = t^1 * u^1 * v^0
+		return mapping;
+	}
+
 	vector<double> MappingCoefficients() const override
 	{
-		return { a0, a1, a2, a3, b0, b1, b2, b3, 0, 0, 0, 0 }; // add 4 zeros for 3D
+		// refer to ConvertToDomain(). The basis functions are 1, t, u, t*u.
+		// 
+		//        1,  t,  u, t*u
+		return { a0, a1, a2, a3,   // X
+				 b0, b1, b2, b3,   // Y
+			      0,  0,  0,  0 }; // Z
 	}
 
 public:
