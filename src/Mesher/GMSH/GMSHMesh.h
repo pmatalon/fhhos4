@@ -60,14 +60,7 @@ public:
 		// Initialize GMSH
 		gmsh::initialize();
 
-		// Enable the logs from GMSH to be printed in the console
-		if (GMSHLogEnabled)
-		{
-			gmsh::option::setNumber("General.Terminal", 1);
-			gmsh::option::setNumber("General.Verbosity", 99);
-		}
-		else
-			gmsh::option::setNumber("General.Terminal", 0);
+		ManageGMSHLog();
 
 		bool tmpGeoFileCreated = false;
 		string mshFile;
@@ -234,6 +227,18 @@ private:
 		}
 
 		return geoFileWithN;
+	}
+
+	void ManageGMSHLog()
+	{
+		// Enable the logs from GMSH to be printed in the console
+		if (GMSHLogEnabled)
+		{
+			gmsh::option::setNumber("General.Terminal", 1);
+			gmsh::option::setNumber("General.Verbosity", 99);
+		}
+		else
+			gmsh::option::setNumber("General.Terminal", 0);
 	}
 
 	void Build()
@@ -1068,10 +1073,12 @@ public:
 			assert(false);
 	}
 
-	void ExportToGMSH_Elements(FunctionalBasis<Dim>* basis, const Vector &coeffs, const string& outputFilePathPrefix, const string& viewName) override
+	void ExportToGMSH_Elements(FunctionalBasis<Dim>* basis, const Vector &coeffs, const string& outputFilePathPrefix, const string& viewName, double tolerance=1e-3, int maxRefinements=6) override
 	{
 		assert(!_mshFilePath.empty());
 		gmsh::initialize();
+		ManageGMSHLog();
+
 		gmsh::open(_mshFilePath);
 		if (_mshFileIsTmp)
 			remove(_mshFilePath.c_str());
@@ -1138,12 +1145,15 @@ public:
 			// In order to visualize the high-order field, one must activate adaptive visualization
 			gmsh::view::option::setNumber(viewId, "AdaptVisualizationGrid", 1);
 			// set a visualization error threshold
-			gmsh::view::option::setNumber(viewId, "TargetError", 1e-3);
+			gmsh::view::option::setNumber(viewId, "TargetError", tolerance);
 			// set a maximum subdivision level (GMSH does automatic mesh refinement to visualize the high-order field with the requested accuracy)
-			gmsh::view::option::setNumber(viewId, "MaxRecursionLevel", 6);
+			gmsh::view::option::setNumber(viewId, "MaxRecursionLevel", maxRefinements);
 		}
 		else
 		{
+			if (basis->BasisCode().compare(Monomial1D::Code()) != 0 || Utils::ProgramArgs.Discretization.OrthogonalizeElemBasesCode > 0)
+				Utils::Warning("A piecewise-constant function will be exported. For a high-order visualization, use non-orthogonalized monomial bases for the elements (-e-basis monomials -e-ogb 0).");
+
 			// Set a single value in the element
 			vector<std::string> modelNames;
 			gmsh::model::list(modelNames);
@@ -1203,6 +1213,8 @@ public:
 	{
 		assert(!_mshFilePath.empty());
 		gmsh::initialize();
+		ManageGMSHLog();
+
 		gmsh::open(_mshFilePath);
 		if (_mshFileIsTmp)
 			remove(_mshFilePath.c_str());
@@ -1239,6 +1251,8 @@ public:
 	{
 		assert(!_mshFilePath.empty());
 		gmsh::initialize();
+		ManageGMSHLog();
+
 		gmsh::open(_mshFilePath);
 		if (_mshFileIsTmp)
 			remove(_mshFilePath.c_str());
@@ -1275,6 +1289,8 @@ public:
 	{
 		assert(!_mshFilePath.empty());
 		gmsh::initialize();
+		ManageGMSHLog();
+
 		gmsh::open(_mshFilePath);
 		if (_mshFileIsTmp)
 			remove(_mshFilePath.c_str());

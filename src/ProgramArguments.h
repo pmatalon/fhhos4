@@ -111,6 +111,8 @@ struct ExportArguments
 	bool IterationResiduals = false;
 	bool IterationL2Errors = false;
 	string ValueSeparator = ","; // ",\n";
+	double VisuTolerance = 1e-3;
+	int VisuMaxRefinements = 6;
 };
 
 struct ActionsArguments

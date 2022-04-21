@@ -409,7 +409,7 @@ public:
 			}
 
 			if (args.Actions.Export.SolutionToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
-				biHarPb->DiffPb().ExportSolutionToGMSH(reconstructedSolution, out);
+				biHarPb->DiffPb().ExportReconstructedVectorToGMSH(reconstructedSolution, out, "solution", args.Actions.Export.VisuTolerance, args.Actions.Export.VisuMaxRefinements);
 
 			//----------------------//
 			//       L2 error       //

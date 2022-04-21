@@ -340,7 +340,7 @@ public:
 			}
 
 			if (args.Actions.Export.SolutionToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
-				problem->ExportSolutionToGMSH(reconstructedSolution, out);
+				problem->ExportSolutionToGMSH(reconstructedSolution, out, args.Actions.Export.VisuTolerance, args.Actions.Export.VisuMaxRefinements);
 
 			//----------------------//
 			//       L2 error       //

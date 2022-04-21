@@ -491,6 +491,12 @@ void print_usage() {
 	cout << "-o PATH" << endl;
 	cout << "      Output directory to export files." << endl;
 	cout << endl;
+	cout << "-visu-tol NUM" << endl;
+	cout << "      Visualization tolerance when the solution is exported to GMSH (default: 1e-3)." << endl;
+	cout << endl;
+	cout << "-visu-max-refin NUM" << endl;
+	cout << "      Maximum refinement number performed by GMSH to visualize the high-order solution at the requested tolerance (default: 6)." << endl;
+	cout << endl;
 	cout << "-not-solve" << endl;
 	cout << "      Do not solve the linear system." << endl;
 	cout << endl;
@@ -643,6 +649,8 @@ int main(int argc, char* argv[])
 		// Misc
 		OPT_Threads,
 		OPT_Export,
+		OPT_VisuTolerance,
+		OPT_VisuMaxRefinements,
 		OPT_DoNotSolve,
 		OPT_NoCache,
 		OPT_UnitTests,
@@ -721,6 +729,8 @@ int main(int argc, char* argv[])
 		 { "help", no_argument, NULL, 'h' },
 		 { "threads", required_argument, NULL, OPT_Threads },
 		 { "export", required_argument, NULL, OPT_Export },
+		 { "visu-tol", required_argument, NULL, OPT_VisuTolerance },
+		 { "visu-max-refin", required_argument, NULL, OPT_VisuMaxRefinements },
 		 { "not-solve", no_argument, NULL, OPT_DoNotSolve },
 		 { "no-cache", no_argument, NULL, OPT_NoCache },
 		 { "ut", no_argument, NULL, OPT_UnitTests },
@@ -1315,6 +1325,12 @@ int main(int argc, char* argv[])
 				break;
 			case 'o': 
 				args.OutputDirectory = optarg;
+				break;
+			case OPT_VisuTolerance:
+				args.Actions.Export.VisuTolerance = atof(optarg);
+				break;
+			case OPT_VisuMaxRefinements:
+				args.Actions.Export.VisuMaxRefinements = atoi(optarg);
 				break;
 			case OPT_IntegrationByParts:
 				args.Actions.IntegrationByParts = atoi(optarg);

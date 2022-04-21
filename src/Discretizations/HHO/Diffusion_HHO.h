@@ -1444,16 +1444,16 @@ public:
 	//---------------------------------------//
 
 public:
-	void ExportReconstructedVectorToGMSH(const Vector& reconstructedVector, const ExportModule& out, string name)
+	void ExportReconstructedVectorToGMSH(const Vector& reconstructedVector, const ExportModule& out, string name, double tolerance = 1e-3, int maxRefinements = 6)
 	{
 		if (HHO->OrthogonalizeElemBases())
 			Utils::Error("The export to GMSH has not been implemented when the bases are orthonormalized against each element.");
-		this->_mesh->ExportToGMSH_Elements(this->HHO->ReconstructionBasis, reconstructedVector, out.GetFilePathPrefix(), name);
+		this->_mesh->ExportToGMSH_Elements(this->HHO->ReconstructionBasis, reconstructedVector, out.GetFilePathPrefix(), name, tolerance, maxRefinements);
 	}
 
-	void ExportSolutionToGMSH(const Vector& reconstructedSolution, const ExportModule& out)
+	void ExportSolutionToGMSH(const Vector& reconstructedSolution, const ExportModule& out, double tolerance = 1e-3, int maxRefinements = 6)
 	{
-		ExportReconstructedVectorToGMSH(reconstructedSolution, out, "potential");
+		ExportReconstructedVectorToGMSH(reconstructedSolution, out, "potential", tolerance, maxRefinements);
 	}
 
 	void ExportErrorToGMSH(const Vector& faceCoeffs, const ExportModule& out)
