@@ -79,7 +79,17 @@ private:
 public:
 	DenseMatrix MassMatrix(FunctionalBasis<Dim>* basis) const
 	{
-		return this->MeshElement->MassMatrix(basis);
+		if (HHO->OrthonormalizeElemBases())
+			return DenseMatrix::Identity(basis->Size(), basis->Size());
+		else if (HHO->OrthogonalizeElemBases())
+		{
+			Vector d(basis->Size());
+			for (BasisFunction<Dim>* phi : basis->LocalFunctions)
+				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim>*>(phi)->NormSquare;
+			return d.asDiagonal();
+		}
+		else
+			return this->MeshElement->MassMatrix(basis);
 	}
 
 private:
@@ -161,7 +171,7 @@ private:
 			return d.asDiagonal().inverse() * M;
 		}
 		else
-			return this->MassMatrix(basis).llt().solve(M);
+			return this->MeshElement->MassMatrix(basis).llt().solve(M);
 	}
 
 	Vector ApplyMassMatrix(FunctionalBasis<Dim>* basis, const Vector& v)
@@ -176,7 +186,7 @@ private:
 			return d.asDiagonal() * v;
 		}
 		else
-			return this->MassMatrix(basis) * v;
+			return this->MeshElement->MassMatrix(basis) * v;
 	}
 
 public:

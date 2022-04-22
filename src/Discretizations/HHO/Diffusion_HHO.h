@@ -1335,61 +1335,75 @@ public:
 	// Mass matrix of degree k+1
 	SparseMatrix ReconstructMassMatrix()
 	{
-		ElementParallelLoop<Dim> parallelLoop(_mesh->Elements);
-		parallelLoop.ReserveChunkCoeffsSize(HHO->nReconstructUnknowns * HHO->nReconstructUnknowns);
+		SparseMatrix mass(HHO->nTotalReconstructUnknowns, HHO->nTotalReconstructUnknowns);
+		if (HHO->OrthonormalizeElemBases())
+			mass.setIdentity();
+		else
+		{
+			ElementParallelLoop<Dim> parallelLoop(_mesh->Elements);
+			parallelLoop.ReserveChunkCoeffsSize(HHO->nReconstructUnknowns * HHO->nReconstructUnknowns);
 
-		parallelLoop.Execute([this](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
-			{
+			parallelLoop.Execute([this](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+				{
 					Diff_HHOElement<Dim>* elem = this->HHOElement(e);
 					chunk->Results.Coeffs.Add(e->Number * HHO->nReconstructUnknowns, e->Number * HHO->nReconstructUnknowns, elem->MassMatrix(elem->ReconstructionBasis));
-			});
+				});
 
-		SparseMatrix mass(HHO->nTotalReconstructUnknowns, HHO->nTotalReconstructUnknowns);
-		parallelLoop.Fill(mass);
+			parallelLoop.Fill(mass);
+		}
 		return mass;
 	}
 
 	// Mass matrix of degree k+1, on boundary elements only
 	SparseMatrix ReconstructMassMatrixOnBoundaryElements()
 	{
-		ElementParallelLoop<Dim> parallelLoop(_mesh->Elements);
-		parallelLoop.ReserveChunkCoeffsSize(HHO->nReconstructUnknowns * HHO->nReconstructUnknowns);
-
-		parallelLoop.Execute([this](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
-			{
-				if (e->IsOnBoundary())
-				{
-					int i = _mesh->BoundaryElementNumber(e);
-					Diff_HHOElement<Dim>* elem = this->HHOElement(e);
-
-					chunk->Results.Coeffs.Add(i * HHO->nReconstructUnknowns, i * HHO->nReconstructUnknowns, elem->MassMatrix(elem->ReconstructionBasis));
-				}
-			});
-
 		SparseMatrix mass(_mesh->NBoundaryElements() * HHO->nReconstructUnknowns, _mesh->NBoundaryElements() * HHO->nReconstructUnknowns);
-		parallelLoop.Fill(mass);
+		if (HHO->OrthonormalizeElemBases())
+			mass.setIdentity();
+		else
+		{
+			ElementParallelLoop<Dim> parallelLoop(_mesh->Elements);
+			parallelLoop.ReserveChunkCoeffsSize(HHO->nReconstructUnknowns * HHO->nReconstructUnknowns);
+
+			parallelLoop.Execute([this](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+				{
+					if (e->IsOnBoundary())
+					{
+						int i = _mesh->BoundaryElementNumber(e);
+						Diff_HHOElement<Dim>* elem = this->HHOElement(e);
+
+						chunk->Results.Coeffs.Add(i * HHO->nReconstructUnknowns, i * HHO->nReconstructUnknowns, elem->MassMatrix(elem->ReconstructionBasis));
+					}
+				});
+			parallelLoop.Fill(mass);
+		}
 		return mass;
 	}
 
 	// Mass matrix of degree k, on boundary elements only
 	SparseMatrix CellMassMatrixOnBoundaryElements()
 	{
-		ElementParallelLoop<Dim> parallelLoop(_mesh->Elements);
-		parallelLoop.ReserveChunkCoeffsSize(HHO->nCellUnknowns * HHO->nCellUnknowns);
-
-		parallelLoop.Execute([this](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
-			{
-				if (e->IsOnBoundary())
-				{
-					int i = _mesh->BoundaryElementNumber(e);
-					Diff_HHOElement<Dim>* elem = this->HHOElement(e);
-
-					chunk->Results.Coeffs.Add(i * HHO->nCellUnknowns, i * HHO->nCellUnknowns, elem->MassMatrix(elem->CellBasis));
-				}
-			});
-
 		SparseMatrix mass(_mesh->NBoundaryElements() * HHO->nCellUnknowns, _mesh->NBoundaryElements() * HHO->nCellUnknowns);
-		parallelLoop.Fill(mass);
+		if (HHO->OrthonormalizeElemBases())
+			mass.setIdentity();
+		else
+		{
+			ElementParallelLoop<Dim> parallelLoop(_mesh->Elements);
+			parallelLoop.ReserveChunkCoeffsSize(HHO->nCellUnknowns * HHO->nCellUnknowns);
+
+			parallelLoop.Execute([this](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+				{
+					if (e->IsOnBoundary())
+					{
+						int i = _mesh->BoundaryElementNumber(e);
+						Diff_HHOElement<Dim>* elem = this->HHOElement(e);
+
+						chunk->Results.Coeffs.Add(i * HHO->nCellUnknowns, i * HHO->nCellUnknowns, elem->MassMatrix(elem->CellBasis));
+					}
+				});
+
+			parallelLoop.Fill(mass);
+		}
 		return mass;
 	}
 
