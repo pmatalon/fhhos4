@@ -2202,6 +2202,7 @@ Element<2>* PolyhedralMesh<2>::CreatePolyhedron(vector<Vertex*> vertices)
 	return macroElement;
 #else
 	Utils::FatalError("CGAL is disabled. To use polygonal elements, recompile with the option -DENABLE_CGAL=ON");
+	return nullptr;
 #endif
 }
 
@@ -2222,6 +2223,7 @@ Element<2>* PolyhedralMesh<2>::CreateMacroElement(Element<2>* e1, Element<2>* e2
 	return macroElement;
 #else
 	Utils::FatalError("CGAL is disabled. To use polygonal elements, recompile with the option -DENABLE_CGAL=ON");
+	return nullptr;
 #endif
 }
 
@@ -2267,6 +2269,7 @@ vector<PhysicalShape<2>*> PolyhedralMesh<2>::Intersection(Element<2>* e1, Elemen
 	return intersectionPolygons;
 #else
 	Utils::FatalError("CGAL is disabled. To use polygonal elements, recompile with the option -DENABLE_CGAL=ON");
+	return {};
 #endif
 }
 

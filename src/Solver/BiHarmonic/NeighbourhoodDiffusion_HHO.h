@@ -226,60 +226,6 @@ public:
 		coeffs.Fill(mat);
 		return mat;
 	}
-	
-	// PTranspose_Stiff
-	// Computes P^T*A*P*x where the argument is P*x
-	SparseMatrix PTranspose_Stiff()
-	{
-		int nFaceUnknowns = _diffPb.HHO->nFaceUnknowns;
-		int nReconstructUnknowns = _diffPb.HHO->nReconstructUnknowns;
-
-		SparseMatrix mat(_nbh.BoundaryFaces.size() * nFaceUnknowns, _nbh.Elements.size() * nReconstructUnknowns);
-		NonZeroCoefficients coeffs;
-		for (int i = 0; i < _nbh.BoundaryFaces.size(); i++)
-		{
-			Face<Dim>* f = _nbh.BoundaryFaces[i];
-			if (f->IsDomainBoundary)
-			{
-				Diff_HHOElement<Dim>* e = _diffPb.HHOElement(f->Element1);
-
-				//DenseMatrix P = e->P.middleCols(nCellUnknowns + e->MeshElement->LocalNumberOf(f) * nFaceUnknowns, nFaceUnknowns);
-				DenseMatrix P = e->ReconstructionFromFacesMatrix().middleCols(e->MeshElement->LocalNumberOf(f) * nFaceUnknowns, nFaceUnknowns);
-				DenseMatrix m = P.transpose() * e->MeshElement->IntegralGradGradMatrix(e->ReconstructionBasis);
-
-				coeffs.Add(i * nFaceUnknowns, _nbh.ElementNumber(e->MeshElement) * nReconstructUnknowns, m);
-			}
-		}
-		coeffs.Fill(mat);
-		return mat;
-	}
-
-	// PTranspose_Mass
-	// Computes P^T*M*P*x where the argument is P*x
-	SparseMatrix PTranspose_Mass()
-	{
-		int nFaceUnknowns = _diffPb.HHO->nFaceUnknowns;
-		int nReconstructUnknowns = _diffPb.HHO->nReconstructUnknowns;
-
-		SparseMatrix mat(_nbh.BoundaryFaces.size() * nFaceUnknowns, _nbh.Elements.size() * nReconstructUnknowns);
-		NonZeroCoefficients coeffs;
-		for (int i = 0; i < _nbh.BoundaryFaces.size(); i++)
-		{
-			Face<Dim>* f = _nbh.BoundaryFaces[i];
-			if (f->IsDomainBoundary)
-			{
-				Diff_HHOElement<Dim>* e = _diffPb.HHOElement(f->Element1);
-
-				//DenseMatrix P = e->P.middleCols(nCellUnknowns + e->MeshElement->LocalNumberOf(f) * nFaceUnknowns, nFaceUnknowns);
-				DenseMatrix P = e->ReconstructionFromFacesMatrix().middleCols(e->MeshElement->LocalNumberOf(f) * nFaceUnknowns, nFaceUnknowns);
-				DenseMatrix m = P.transpose() * e->MassMatrix(e->ReconstructionBasis);
-
-				coeffs.Add(i * nFaceUnknowns, _nbh.ElementNumber(e->MeshElement) * nReconstructUnknowns, m);
-			}
-		}
-		coeffs.Fill(mat);
-		return mat;
-	}
 
 	// Normal derivative
 	SparseMatrix NormalDerivative()

@@ -26,16 +26,17 @@ public:
 
 	void Setup()
 	{
+		ExportModule out(Utils::ProgramArgs.OutputDirectory, "", Utils::ProgramArgs.Actions.Export.ValueSeparator);
+
 		FaceParallelLoop<Dim> parallelLoop(_diffPb._mesh->BoundaryFaces);
 		parallelLoop.ReserveChunkCoeffsSize(_diffPb.HHO->nFaceUnknowns * _diffPb.HHO->nFaceUnknowns);
 
-		parallelLoop.Execute([this](Face<Dim>* f, ParallelChunk<CoeffsChunk>* chunk)
+		parallelLoop.Execute([this, &out](Face<Dim>* f, ParallelChunk<CoeffsChunk>* chunk)
 			{
 				int i = f->Number - _diffPb.HHO->nInteriorFaces;
 				Element<Dim>* e = f->Element1;
 
 				int nFaceUnknowns = _diffPb.HHO->nFaceUnknowns;
-				int nCellUnknowns = _diffPb.HHO->nCellUnknowns;
 
 				Neighbourhood<Dim> nbh(e, _neighbourhoodDepth);
 				NeighbourhoodDiffusion_HHO<Dim> nbhDiff(nbh, _diffPb);
@@ -50,7 +51,7 @@ public:
 				SparseMatrix NormalDerivative;
 				if (_useIntegrationByParts)
 				{
-					if (Utils::ProgramArgs.Actions.Option == 0)
+					if (Utils::ProgramArgs.Actions.Option == 0 || Utils::ProgramArgs.Actions.Option == 6)
 					{
 						PTranspose = nbhDiff.PTranspose();
 						ReconstructStiff = nbhDiff.ReconstructStiffnessMatrix();
@@ -103,6 +104,9 @@ public:
 						{
 							Vector reconstruction = nbhDiff.ReconstructHigherOrder(faceSolution, Vector::Zero(nbh.BoundaryFaces.size() * nFaceUnknowns), b_source);
 							normalDerivative = nbhDiff.SolveFaceMassMatrixOnBoundary(PTranspose * (ReconstructStiff * reconstruction - ReconstructMass * lambda));
+
+							//_diffPb.ExportReconstructedVectorToGMSH(NeighbourhoodToDomain(nbh, lambda), out, "lambda_prec");
+							//_diffPb.ExportReconstructedVectorToGMSH(NeighbourhoodToDomain(nbh, reconstruction), out, "u_prec");
 						}
 						else if (Utils::ProgramArgs.Actions.Option == 4)
 						{
@@ -115,6 +119,11 @@ public:
 						{
 							Vector cellSolution = nbhDiff.SolveCellUnknowns(faceSolution, b_source);
 							normalDerivative = nbhDiff.SolveFaceMassMatrixOnBoundary(SolveCellUknTranspose * (CellStiff * cellSolution - CellMass * lambda));
+						}
+						else if (Utils::ProgramArgs.Actions.Option == 6)
+						{
+							Vector reconstruction = nbhDiff.ReconstructHigherOrder(faceSolution, Vector::Zero(nbh.BoundaryFaces.size() * nFaceUnknowns), b_source);
+							normalDerivative = PTranspose * (ReconstructStiff * reconstruction - ReconstructMass * lambda);
 						}
 						else
 							Utils::FatalError("Preconditioner not managed for -opt " + to_string(Utils::ProgramArgs.Actions.Option));
@@ -160,7 +169,7 @@ public:
 
 	MFlops SetupComputationalWork() override
 	{
-		
+		return 0;
 	}
 
 	Vector Apply(const Vector& r) override
@@ -184,5 +193,18 @@ public:
 	{
 		Utils::FatalError("TODO: SolvingComputationalWork() not implemented");
 		return 0;
+	}
+
+private:
+	Vector NeighbourhoodToDomain(const Neighbourhood<Dim>& nbh, const Vector& v_nbh)
+	{
+		Vector v_domain = Vector::Zero(_diffPb.HHO->nTotalReconstructUnknowns);
+		int nReconstructUnknowns = _diffPb.HHO->nReconstructUnknowns;
+		for (int i = 0; i < nbh.Elements.size(); i++)
+		{
+			Element<Dim>* e = nbh.Elements[i];
+			v_domain.segment(e->Number * nReconstructUnknowns, nReconstructUnknowns) = v_nbh.segment(i * nReconstructUnknowns, nReconstructUnknowns);
+		}
+		return v_domain;
 	}
 };

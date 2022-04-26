@@ -153,11 +153,11 @@ public:
 				for (int i = 0; i < vertices.size(); i++)
 				{
 					Vertex* vi = vertices[i];
-					auto phi_i = _basis->LocalFunctions[i];
+					//auto phi_i = _basis->LocalFunctions[i];
 					for (int j = i; j < vertices.size(); j++)
 					{
 						Vertex* vj = vertices[j];
-						auto phi_j = _basis->LocalFunctions[j];
+						//auto phi_j = _basis->LocalFunctions[j];
 
 						double coeff = mass(i, j);
 						chunk->Results.Coeffs.Add(vi->Number, vj->Number, coeff);

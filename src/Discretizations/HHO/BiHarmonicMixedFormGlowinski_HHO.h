@@ -27,9 +27,6 @@ private:
 	SparseMatrix _CellStiff;
 	SparseMatrix _CellMass;
 	SparseMatrix _SolveCellUknTranspose;
-
-	SparseMatrix _PTranspose_Stiff;
-	SparseMatrix _PTranspose_Mass;
 	
 	SparseMatrix _Trace;
 	SparseMatrix _normalDerivativeMatrix;
@@ -87,11 +84,6 @@ public:
 				SparseMatrix M = _PTranspose * hoTrace.transpose() * _higherOrderBoundary.BoundaryFaceMassMatrix() * hoTrace * _PTranspose.transpose();
 				_PT_M_P_solver.Setup(M);
 			}
-			if (Utils::ProgramArgs.Actions.Option == 4)
-			{
-				_PTranspose_Stiff = _diffPb.PTranspose_Stiff_boundary();
-				_PTranspose_Mass = _diffPb.PTranspose_Mass_boundary();
-			}
 			if (Utils::ProgramArgs.Actions.Option == 5)
 			{
 				_CellStiff = _diffPb.CellStiffnessMatrixOnBoundaryElements();
@@ -125,6 +117,8 @@ public:
 			dirichlet = _diffPb.ReconstructAndAssembleDirichletTerm(dirichletArg);
 		else if (Utils::ProgramArgs.Actions.Option == 2)
 			dirichlet = _diffPb.AssembleDirichletTermFromReconstructedBoundaryElem(dirichletArg);
+		else if (Utils::ProgramArgs.Actions.Option == 6)
+			dirichlet = _diffPb.SolveFaceMassMatrixOnBoundary(dirichletArg);
 		else
 			dirichlet = dirichletArg;
 
@@ -139,8 +133,15 @@ public:
 		if (Utils::ProgramArgs.Actions.Option == 5)
 			return _diffPb.SolveCellUnknowns(faceSolution, b_T);
 		else
+		{
 			// Reconstruct the higher-order polynomial
-			return _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, dirichlet, b_T);
+			Vector lambda = _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, dirichlet, b_T);
+
+			//ExportModule out(Utils::ProgramArgs.OutputDirectory, "", Utils::ProgramArgs.Actions.Export.ValueSeparator);
+			//_diffPb.ExportReconstructedVectorToGMSH(lambda, out, "lambda_f");
+			
+			return lambda;
+		}
 	}
 
 	// Solve problem 1 (f=0, Dirich=<dirichlet>)
@@ -154,6 +155,8 @@ public:
 			dirichlet = _diffPb.ReconstructAndAssembleDirichletTerm(dirichletArg);
 		else if (Utils::ProgramArgs.Actions.Option == 2)
 			dirichlet = _diffPb.AssembleDirichletTermFromReconstructedBoundaryElem(dirichletArg);
+		else if (Utils::ProgramArgs.Actions.Option == 6 || Utils::ProgramArgs.Actions.Option == 4)
+			dirichlet = _diffPb.SolveFaceMassMatrixOnBoundary(dirichletArg);
 		else
 			dirichlet = dirichletArg;
 
@@ -168,8 +171,15 @@ public:
 		if (Utils::ProgramArgs.Actions.Option == 5)
 			return _diffPb.SolveCellUnknowns(faceSolution, b_T);
 		else
+		{
 			// Reconstruct the higher-order polynomial
-			return _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, dirichlet, b_T);
+			Vector lambda = _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, dirichlet, b_T);
+
+			//ExportModule out(Utils::ProgramArgs.OutputDirectory, "", Utils::ProgramArgs.Actions.Export.ValueSeparator);
+			//_diffPb.ExportReconstructedVectorToGMSH(lambda, out, "lambda_0");
+
+			return lambda;
+		}
 	}
 
 	// Solve problem 2 (f=<source>, Dirich=0)
@@ -204,7 +214,7 @@ public:
 				{
 					Vector cellSolution = _diffPb.SolveCellUnknowns(faceSolution, b_source);
 					Vector normalDerivative = _diffPb.A_T_dF.transpose() * cellSolution + _diffPb.A_ndF_dF.transpose() * faceSolution;
-					normalDerivative -= _PTranspose_Mass * source;
+					normalDerivative -= _PTranspose * _ReconstructMass * sourceElemBoundary;
 					return normalDerivative;
 				}
 				else if (Utils::ProgramArgs.Actions.Option == 5)
@@ -212,6 +222,8 @@ public:
 					Vector cellSolution = _diffPb.SolveCellUnknownsOnBoundaryOnly(faceSolution, b_source);
 					return _diffPb.SolveFaceMassMatrixOnBoundary(_SolveCellUknTranspose * (_CellStiff * cellSolution - _CellMass * sourceElemBoundary));
 				}
+				else if (Utils::ProgramArgs.Actions.Option == 6)
+					return _PTranspose * (_ReconstructStiff * reconstructedElemBoundary - _ReconstructMass * sourceElemBoundary);
 				else
 				{
 					Utils::FatalError("Unmanaged -opt " + to_string(Utils::ProgramArgs.Actions.Option));
