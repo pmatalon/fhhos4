@@ -8,8 +8,8 @@ template <int Dim>
 class NeighbourhoodDiffusion_HHO
 {
 private:
-	Diffusion_HHO<Dim>& _diffPb;
 	const Neighbourhood<Dim>& _nbh;
+	Diffusion_HHO<Dim>& _diffPb;
 public:
 	SparseMatrix A;
 	SparseMatrix A_T_dF;
@@ -30,7 +30,6 @@ private:
 	{
 		int nFaceUnknowns = _diffPb.HHO->nFaceUnknowns;
 		int nCellUnknowns = _diffPb.HHO->nCellUnknowns;
-		int nReconstructUnknowns = _diffPb.HHO->nReconstructUnknowns;
 
 		// A
 
@@ -46,7 +45,7 @@ private:
 				Face<Dim>* fj = _nbh.InteriorFaces[j];
 				block = _diffPb.A.block(fi->Number * nFaceUnknowns, fj->Number * nFaceUnknowns, nFaceUnknowns, nFaceUnknowns);
 				coeffs.Add(i * nFaceUnknowns, j * nFaceUnknowns, block);
-				coeffs.Add(j * nFaceUnknowns, i * nFaceUnknowns, block);
+				coeffs.Add(j * nFaceUnknowns, i * nFaceUnknowns, block.transpose());
 			}
 		}
 		coeffs.Fill(A);
@@ -170,7 +169,6 @@ public:
 
 	SparseMatrix ReconstructStiffnessMatrix()
 	{
-		int nFaceUnknowns = _diffPb.HHO->nFaceUnknowns;
 		int nReconstructUnknowns = _diffPb.HHO->nReconstructUnknowns;
 
 		SparseMatrix mat(_nbh.Elements.size() * nReconstructUnknowns, _nbh.Elements.size() * nReconstructUnknowns);
@@ -186,7 +184,6 @@ public:
 
 	SparseMatrix CellStiffnessMatrix()
 	{
-		int nFaceUnknowns = _diffPb.HHO->nFaceUnknowns;
 		int nCellUnknowns = _diffPb.HHO->nCellUnknowns;
 
 		SparseMatrix mat(_nbh.Elements.size() * nCellUnknowns, _nbh.Elements.size() * nCellUnknowns);
@@ -202,7 +199,6 @@ public:
 
 	SparseMatrix ReconstructMassMatrix()
 	{
-		int nFaceUnknowns = _diffPb.HHO->nFaceUnknowns;
 		int nReconstructUnknowns = _diffPb.HHO->nReconstructUnknowns;
 
 		SparseMatrix mat(_nbh.Elements.size() * nReconstructUnknowns, _nbh.Elements.size() * nReconstructUnknowns);
@@ -218,7 +214,6 @@ public:
 
 	SparseMatrix CellMassMatrix()
 	{
-		int nFaceUnknowns = _diffPb.HHO->nFaceUnknowns;
 		int nCellUnknowns = _diffPb.HHO->nCellUnknowns;
 
 		SparseMatrix mat(_nbh.Elements.size() * nCellUnknowns, _nbh.Elements.size() * nCellUnknowns);
@@ -231,7 +226,7 @@ public:
 		coeffs.Fill(mat);
 		return mat;
 	}
-
+	
 	// PTranspose_Stiff
 	// Computes P^T*A*P*x where the argument is P*x
 	SparseMatrix PTranspose_Stiff()
