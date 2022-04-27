@@ -15,7 +15,6 @@ private:
 	BiHarmonicTestCase<Dim>* _testCase;
 
 	//bool _saveMatrixBlocks = true;
-	bool _reconstructHigherOrderBoundary = false;
 
 	DiffusionField<Dim> _diffField;
 	VirtualDiffusionTestCase<Dim> _diffPbTestCase;
@@ -26,7 +25,7 @@ private:
 
 	ZeroMeanEnforcer _integralZeroOnDomain;
 	ZeroMeanEnforcer _integralZeroOnBoundary;
-	NumericImageEnforcerFromFaceCoeffs<Dim> _imageEnforcer;
+	NumericImageEnforcer _imageEnforcer;
 
 	double _integralSource = 0;
 	HHOParameters<Dim>* HHO;
@@ -36,6 +35,7 @@ private:
 	Vector _noDirichlet;
 	Vector _one_skeleton;
 public:
+	bool ReconstructHigherOrderBoundary = false;
 
 	BiHarmonicMixedFormFalk_HHO(Mesh<Dim>* mesh, BiHarmonicTestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool reconstructHigherOrderBoundary, bool saveMatrixBlocks)
 	{
@@ -48,7 +48,7 @@ public:
 		_diffPbTestCase.BC = BoundaryConditions::HomogeneousNeumannEverywhere();
 		_diffPb = Diffusion_HHO<Dim>(mesh, &_diffPbTestCase, HHO, true, true);
 		//_saveMatrixBlocks = saveMatrixBlocks;
-		_reconstructHigherOrderBoundary = reconstructHigherOrderBoundary;
+		ReconstructHigherOrderBoundary = reconstructHigherOrderBoundary;
 	}
 
 	Diffusion_HHO<Dim>& DiffPb() override
@@ -65,7 +65,7 @@ public:
 
 		_integralSource = _diffPb.IntegralOverDomain(_testCase->SourceFunction);
 
-		if (_reconstructHigherOrderBoundary)
+		if (ReconstructHigherOrderBoundary)
 		{
 			_higherOrderBoundary = HigherOrderBoundary<Dim>(&_diffPb);
 			_higherOrderBoundary.Setup();
@@ -80,7 +80,7 @@ public:
 		_integralZeroOnDomain = ZeroMeanEnforcer(&_diffPb.ReconstructSpace);
 		_integralZeroOnDomain.Setup();
 
-		_imageEnforcer = NumericImageEnforcerFromFaceCoeffs<Dim>(&_diffPb);
+		_imageEnforcer = NumericImageEnforcer(&_diffPb.SkeletonSpace);
 		_imageEnforcer.Setup();
 
 		_b_fSource = _diffPb.AssembleSourceTerm(_testCase->SourceFunction);
@@ -109,7 +109,7 @@ public:
 		assert(abs(_integralSource + integralNeumann) < Utils::Eps);
 #endif
 		// Define problem
-		Vector b_neumann = _reconstructHigherOrderBoundary ? _higherOrderBoundary.AssembleNeumannTerm(neumann) : _diffPb.AssembleNeumannTerm(neumann);
+		Vector b_neumann = ReconstructHigherOrderBoundary ? _higherOrderBoundary.AssembleNeumannTerm(neumann) : _diffPb.AssembleNeumannTerm(neumann);
 		Vector rhs = _diffPb.CondensedRHS(_b_fSource, b_neumann);
 
 		// Solve
@@ -134,7 +134,7 @@ public:
 		assert(_integralZeroOnBoundary.Check(neumann));
 #endif
 		// Define problem
-		Vector b_neumann = _reconstructHigherOrderBoundary ? _higherOrderBoundary.AssembleNeumannTerm(neumann) : _diffPb.AssembleNeumannTerm(neumann);
+		Vector b_neumann = ReconstructHigherOrderBoundary ? _higherOrderBoundary.AssembleNeumannTerm(neumann) : _diffPb.AssembleNeumannTerm(neumann);
 		Vector& rhs = b_neumann;
 
 		// Solve
@@ -170,7 +170,7 @@ public:
 		this->CheckDiffSolverConvergence();
 
 		Vector boundary;
-		if (_reconstructHigherOrderBoundary)
+		if (ReconstructHigherOrderBoundary)
 		{
 			Vector reconstructedElemBoundary = _diffPb.ReconstructHigherOrderOnBoundaryOnly(faceSolution, _noDirichlet, b_source);
 			boundary = _higherOrderBoundary.Trace(reconstructedElemBoundary);

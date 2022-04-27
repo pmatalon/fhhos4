@@ -26,8 +26,16 @@
 class NumericImageEnforcer
 {
 protected:
+	IDiscreteSpace* _discreteSpace = nullptr;
 	Vector _nOne;
 public:
+	NumericImageEnforcer() {}
+
+	NumericImageEnforcer(IDiscreteSpace* discreteSpace)
+	{
+		_discreteSpace = discreteSpace;
+	}
+
 	void Setup()
 	{
 		Vector one = CoefficientsOfFunctionOne();
@@ -51,27 +59,9 @@ public:
 	{
 		b -= OrthogonalityFactor(b) * _nOne;
 	}
-protected:
-	virtual Vector CoefficientsOfFunctionOne() = 0;
-};
-
-
-
-//------------------------------//
-// Polynomial over the skeleton //
-//------------------------------//
-
-template<int Dim>
-class NumericImageEnforcerFromFaceCoeffs : public NumericImageEnforcer
-{
 private:
-	Diffusion_HHO<Dim>* _discretePb;
-public:
-	NumericImageEnforcerFromFaceCoeffs() {}
-	NumericImageEnforcerFromFaceCoeffs(Diffusion_HHO<Dim>* discretePb) : _discretePb(discretePb) {}
-private:
-	Vector CoefficientsOfFunctionOne() override
+	Vector CoefficientsOfFunctionOne()
 	{
-		return _discretePb->SkeletonSpace.Project(Utils::ConstantFunctionOne);
+		return _discreteSpace->Project(Utils::ConstantFunctionOne);
 	}
 };
