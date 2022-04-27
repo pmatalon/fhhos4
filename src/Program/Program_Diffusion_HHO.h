@@ -218,7 +218,7 @@ public:
 
 			if (testCase->BC.Type == PbBoundaryConditions::FullNeumann)
 			{
-				NumericImageEnforcerFromFaceCoeffs<Dim> imageEnforcer(problem);
+				NumericImageEnforcer imageEnforcer(&problem->SkeletonSpace);
 				imageEnforcer.Setup();
 				cout << "Kernel coefficient = " << imageEnforcer.CheckKernel(problem->A) << endl;
 				cout << "Orthogonality factor of rhs = " << imageEnforcer.OrthogonalityFactor(problem->b) << endl;
