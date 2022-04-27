@@ -82,9 +82,14 @@ public:
 		else
 			Utils::FatalError("Unknown scheme '" + args.Problem.Scheme + "'. Check -sch parameter. Possible values are 'f' and 'g'.");
 
-		FunctionalBasis<Dim>* reconstructionBasis = new FunctionalBasis<Dim>(args.Discretization.ElemBasisCode, args.Discretization.PolyDegree, args.Discretization.UsePolynomialSpaceQ);
-		FunctionalBasis<Dim>* cellBasis = new FunctionalBasis<Dim>(args.Discretization.ElemBasisCode, args.Discretization.PolyDegree - 1, args.Discretization.UsePolynomialSpaceQ);
-		FunctionalBasis<Dim - 1>* faceBasis = new FunctionalBasis<Dim - 1>(args.Discretization.FaceBasisCode, args.Discretization.PolyDegree - 1, args.Discretization.UsePolynomialSpaceQ);
+		int k = args.Discretization.PolyDegree - 1;
+		int reconstructDegree = k + 1;
+		int faceDegree = k;
+		int cellDegree = k + args.Discretization.RelativeCellPolyDegree;
+
+		FunctionalBasis<Dim>* reconstructionBasis = new FunctionalBasis<Dim>(args.Discretization.ElemBasisCode, reconstructDegree, args.Discretization.UsePolynomialSpaceQ);
+		FunctionalBasis<Dim>* cellBasis = new FunctionalBasis<Dim>(args.Discretization.ElemBasisCode, cellDegree, args.Discretization.UsePolynomialSpaceQ);
+		FunctionalBasis<Dim - 1>* faceBasis = new FunctionalBasis<Dim - 1>(args.Discretization.FaceBasisCode, faceDegree, args.Discretization.UsePolynomialSpaceQ);
 
 		HHOParameters<Dim>* hho = new HHOParameters<Dim>(mesh, args.Discretization.Stabilization, reconstructionBasis, cellBasis, faceBasis, args.Discretization.OrthogonalizeElemBasesCode, args.Discretization.OrthogonalizeFaceBasesCode);
 
@@ -166,6 +171,9 @@ public:
 			// theta = theta_f+theta0 with
 			//         A(theta) = Af(theta_f) + A(theta0) = -u_boundary_f + u_boundary_f = 0.
 			Vector b = u_boundary_f;
+
+			//biHarPb->DiffPb().ExportReconstructedVectorToGMSH(biHarPb->Solve2ndDiffProblem(lambda_f, false), out, "u_f", args.Actions.Export.VisuTolerance, args.Actions.Export.VisuMaxRefinements);
+			//biHarPb->DiffPb().ExportReconstructedVectorToGMSH(biHarPb->Solve1stDiffProblemWithZeroSource(u_boundary_f), out, "lambda_f", args.Actions.Export.VisuTolerance, args.Actions.Export.VisuMaxRefinements);
 
 
 			DenseMatrix A; // computed explicitly only if explicit solver or export requested
@@ -417,6 +425,13 @@ public:
 
 			if (testCase->ExactSolution)
 			{
+				if (args.Actions.Export.ErrorToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
+				{
+					Vector discreteExactSolution = biHarPb->DiffPb().ReconstructSpace.Project(testCase->ExactSolution);
+					Vector error = discreteExactSolution - reconstructedSolution;
+					biHarPb->DiffPb().ExportReconstructedVectorToGMSH(error, out, "error", args.Actions.Export.VisuTolerance, args.Actions.Export.VisuMaxRefinements);
+				}
+
 				double error = biHarPb->DiffPb().L2Error(testCase->ExactSolution, reconstructedSolution);
 				cout << endl << "L2 Error = " << std::scientific << error << endl;
 			}

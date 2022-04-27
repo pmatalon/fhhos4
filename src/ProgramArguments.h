@@ -31,6 +31,7 @@ struct DiscretizationArguments
 	int OrthogonalizeElemBasesCode = -1;
 	int OrthogonalizeFaceBasesCode = -1;
 	int PolyDegree = 2;
+	int RelativeCellPolyDegree = 0;
 	bool UsePolynomialSpaceQ = false;
 	int PenalizationCoefficient = -1;
 	bool StaticCondensation = true;

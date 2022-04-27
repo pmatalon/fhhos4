@@ -81,8 +81,12 @@ public:
 	Diffusion_HHO<Dim>* GetProblemForLowerDegree(int faceDegree)
 	{
 		// Lower the degree of each basis
-		FunctionalBasis<Dim>* reconstructionBasis = faceDegree == HHO->FaceBasis->GetDegree() - 1 ? HHO->CellBasis : new FunctionalBasis<Dim>(HHO->ReconstructionBasis->CreateSameBasisForDegree(faceDegree+1));
-		FunctionalBasis<Dim>* cellBasis = new FunctionalBasis<Dim>(HHO->CellBasis->CreateSameBasisForDegree(faceDegree));
+		int k = HHO->FaceBasis->GetDegree();
+		int reduction = k - faceDegree;
+		int newReconstructDegree = HHO->ReconstructionBasis->GetDegree() - reduction;
+		int newCellDegree = HHO->CellBasis->GetDegree() - reduction;
+		FunctionalBasis<Dim>* reconstructionBasis = new FunctionalBasis<Dim>(HHO->ReconstructionBasis->CreateSameBasisForDegree(newReconstructDegree));
+		FunctionalBasis<Dim>* cellBasis = new FunctionalBasis<Dim>(HHO->CellBasis->CreateSameBasisForDegree(newCellDegree));
 		FunctionalBasis<Dim-1>* faceBasis = new FunctionalBasis<Dim-1>(HHO->FaceBasis->CreateSameBasisForDegree(faceDegree));
 
 		HHOParameters<Dim>* lowerDegreeHHO = new HHOParameters<Dim>(this->_mesh, HHO->Stabilization, reconstructionBasis, cellBasis, faceBasis, HHO->OrthogonalizeElemBasesCode, HHO->OrthogonalizeFaceBasesCode);
@@ -92,8 +96,12 @@ public:
 	Diffusion_HHO<Dim>* GetProblemOnCoarserMeshAndLowerDegree(int faceDegree)
 	{
 		// Lower the degree of each basis
-		FunctionalBasis<Dim>* reconstructionBasis = faceDegree == HHO->FaceBasis->GetDegree() - 1 ? HHO->CellBasis : new FunctionalBasis<Dim>(HHO->ReconstructionBasis->CreateSameBasisForDegree(faceDegree + 1));
-		FunctionalBasis<Dim>* cellBasis = new FunctionalBasis<Dim>(HHO->CellBasis->CreateSameBasisForDegree(faceDegree));
+		int k = HHO->FaceBasis->GetDegree();
+		int reduction = k - faceDegree;
+		int newReconstructDegree = HHO->ReconstructionBasis->GetDegree() - reduction;
+		int newCellDegree = HHO->CellBasis->GetDegree() - reduction;
+		FunctionalBasis<Dim>* reconstructionBasis = new FunctionalBasis<Dim>(HHO->ReconstructionBasis->CreateSameBasisForDegree(newReconstructDegree));
+		FunctionalBasis<Dim>* cellBasis = new FunctionalBasis<Dim>(HHO->CellBasis->CreateSameBasisForDegree(newCellDegree));
 		FunctionalBasis<Dim - 1>* faceBasis = new FunctionalBasis<Dim - 1>(HHO->FaceBasis->CreateSameBasisForDegree(faceDegree));
 
 		HHOParameters<Dim>* lowerDegreeCoarseMeshHHO = new HHOParameters<Dim>(this->_mesh->CoarseMesh, HHO->Stabilization, reconstructionBasis, cellBasis, faceBasis, HHO->OrthogonalizeElemBasesCode, HHO->OrthogonalizeFaceBasesCode);
@@ -816,6 +824,13 @@ public:
 		return x_dF;
 	}
 
+	/*Vector AssembleDirichletTerm(const Vector& x_dF)
+	{
+		if (x_dF.rows() == HHO->nDirichletFaces * HHO->nFaceUnknowns)
+			return x_dF;
+		else if ()
+	}*/
+
 	Vector AssembleDirichletTermFromReconstructedBoundaryElem(const Vector& reconstructedElem)
 	{
 		assert(reconstructedElem.rows() == _mesh->NBoundaryElements() * HHO->nReconstructUnknowns);
@@ -1307,6 +1322,9 @@ public:
 
 		SparseMatrix stiff(_mesh->NBoundaryElements() * HHO->nReconstructUnknowns, _mesh->NBoundaryElements() * HHO->nReconstructUnknowns);
 		parallelLoop.Fill(stiff);
+
+		//cout << DenseMatrix(stiff) << endl;
+
 		return stiff;
 	}
 
@@ -1377,6 +1395,7 @@ public:
 				});
 			parallelLoop.Fill(mass);
 		}
+		//cout << DenseMatrix(mass) << endl;
 		return mass;
 	}
 

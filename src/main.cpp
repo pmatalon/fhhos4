@@ -152,6 +152,10 @@ void print_usage() {
 	cout << "-k NUM" << endl;
 	cout << "      Polynomial degree on the faces for the HHO scheme. Note that setting this parameter does the same as setting p (p = k+1)." << endl;
 	cout << endl;
+	cout << "-kc {-1,0,1}" << endl;
+	cout << "      Polynomial degree in the cells for the HHO scheme, compared to the degree in the faces." << endl;
+	cout << "      The degree in the cells is k + kc, kc in {-1,0,1} (default: 0)." << endl;
+	cout << endl;
 	cout << "-poly-space CODE" << endl;
 	cout << "      Polynomial space." << endl;
 	cout << "               p - space P (default)" << endl;
@@ -601,6 +605,7 @@ int main(int argc, char* argv[])
 		// Discretization
 		OPT_Discretization,
 		OPT_HHO_K,
+		OPT_HHO_K_Cells,
 		OPT_Stabilization,
 		OPT_ElemBasis,
 		OPT_FaceBasis,
@@ -680,6 +685,7 @@ int main(int argc, char* argv[])
 		 // Discretization
 		 { "discr", required_argument, NULL, OPT_Discretization },
 		 { "k", required_argument, NULL, OPT_HHO_K },
+		 { "kc", required_argument, NULL, OPT_HHO_K_Cells },
 		 { "stab", required_argument, NULL, OPT_Stabilization },
 		 { "e-basis", required_argument, NULL, OPT_ElemBasis },
 		 { "f-basis", required_argument, NULL, OPT_FaceBasis },
@@ -896,6 +902,9 @@ int main(int argc, char* argv[])
 				break;
 			case OPT_HHO_K:
 				args.Discretization.PolyDegree = atoi(optarg) + 1;
+				break;
+			case OPT_HHO_K_Cells:
+				args.Discretization.RelativeCellPolyDegree = atoi(optarg);
 				break;
 			case OPT_PolySpace:
 			{
