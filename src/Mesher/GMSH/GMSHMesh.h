@@ -256,7 +256,7 @@ private:
 			if (this->PhysicalParts.empty())
 			{
 				cout << "Default physical part created." << endl;
-				PhysicalGroup<Dim>* defaultPhyPart = new PhysicalGroup<Dim>(DefaultPhyGroup, "Default");
+				PhysicalGroup<Dim>* defaultPhyPart = new PhysicalGroup<Dim>(DefaultPhyGroup, "domain");
 				this->PhysicalParts.push_back(defaultPhyPart);
 			}
 		}
