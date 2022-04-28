@@ -1,5 +1,5 @@
 #pragma once
-#include "../../DG/Diff_DGElement.h"
+#include "../../Discretizations/DG/Diff_DGElement.h"
 #include "../../Geometry/3D/Tetrahedron.h"
 #include "TriangularFace.h"
 using namespace std;

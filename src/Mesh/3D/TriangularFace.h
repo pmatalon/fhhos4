@@ -1,5 +1,5 @@
 #pragma once
-#include "../../DG/Diff_DGFace.h"
+#include "../../Discretizations/DG/Diff_DGFace.h"
 #include "../../Geometry/3D/TriangleIn3D.h"
 
 class TriangularFace : public Diff_DGFace<3>

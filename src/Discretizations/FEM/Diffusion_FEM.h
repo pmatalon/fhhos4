@@ -137,7 +137,7 @@ public:
 		{
 #ifdef ENABLE_3D
 			// - Tetrahedral element
-			Tetrahedron::InitReferenceShape()->ComputeAndStoreMassMatrix(&(FunctionalBasis<3>)_basis);
+			Tetrahedron::InitReferenceShape()->ComputeAndStoreMassMatrix((FunctionalBasis<3>*)_basis);
 #endif // ENABLE_3D
 		}
 	}
