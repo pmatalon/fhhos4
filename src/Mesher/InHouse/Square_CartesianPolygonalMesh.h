@@ -228,6 +228,11 @@ public:
 		return min((double)this->Nx, (double)this->Ny) / max((double)this->Nx, (double)this->Ny);
 	}
 
+	double AverageH() override
+	{
+		return H();
+	}
+
 	void CoarsenMesh(H_CoarsStgy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor) override
 	{
 		if (elemCoarseningStgy == H_CoarsStgy::StandardCoarsening)

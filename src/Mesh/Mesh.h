@@ -102,6 +102,15 @@ public:
 	virtual string GeometryDescription() = 0;
 	virtual double H() = 0;
 	virtual double Regularity() = 0;
+	
+	virtual double AverageH()
+	{
+		double avg = 0;
+		for (Element<Dim>* e : Elements)
+			avg += e->Diameter();
+		avg /= Elements.size();
+		return avg;
+	}
 
 	static void SetDirectories()
 	{
@@ -234,7 +243,7 @@ public:
 		return 0;
 	}
 
-	double Measure()
+	double Measure() const
 	{
 		double measure = 0;
 		for (Element<Dim>* e : this->Elements)
@@ -242,7 +251,7 @@ public:
 		return measure;
 	}
 
-	double SkeletonMeasure()
+	double SkeletonMeasure() const
 	{
 		double measure = 0;
 		for (Face<Dim>* face : this->Faces)
@@ -250,7 +259,7 @@ public:
 		return measure;
 	}
 
-	double BoundaryMeasure()
+	double BoundaryMeasure() const
 	{
 		double measure = 0;
 		for (Face<Dim>* face : this->BoundaryFaces)

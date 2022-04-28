@@ -166,6 +166,11 @@ public:
 		return this->Elements[1]->Regularity();
 	}
 
+	double AverageH() override
+	{
+		return H();
+	}
+
 	Mesh<2>* Copy() override
 	{
 		return new Square_QuadrilateralMesh(this->Nx, this->Ny, this->XShift);

@@ -343,6 +343,11 @@ public:
 		return this->Elements[0]->Regularity();
 	}
 
+	double AverageH() override
+	{
+		return H();
+	}
+
 	void CoarsenMesh(H_CoarsStgy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor) override
 	{
 		if (elemCoarseningStgy == H_CoarsStgy::StandardCoarsening)

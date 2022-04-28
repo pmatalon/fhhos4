@@ -78,7 +78,7 @@ public:
 		return "1D unit segment";
 	}
 
-	double H()
+	double H() override
 	{
 		return (double)1 / this->N;
 	}
@@ -86,6 +86,11 @@ public:
 	double Regularity() override
 	{
 		return -1;
+	}
+
+	double AverageH() override
+	{
+		return H();
 	}
 
 	Mesh<1>* Copy() override

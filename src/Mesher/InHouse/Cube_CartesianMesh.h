@@ -211,7 +211,7 @@ public:
 		return "Cube";
 	}
 
-	double H()
+	double H() override
 	{
 		return 1.0 / this->Nx;
 	}
@@ -219,6 +219,11 @@ public:
 	double Regularity() override
 	{
 		return 1;
+	}
+
+	double AverageH() override
+	{
+		return H();
 	}
 
 	void CoarsenMesh(H_CoarsStgy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor)

@@ -35,6 +35,7 @@ protected:
 	map<size_t, Element<Dim>*> _elementExternalNumbers;
 	map<size_t, MeshVertex<Dim>*> _vertexExternalNumbers;
 	double _h = -1;
+	double _average_h = -1;
 	double _regularity = 1;
 	BigNumber _N;
 private:
@@ -410,6 +411,7 @@ private:
 		set<int> meshElementTypes;
 
 		map<int, size_t> elementsAlreadyInMemory; // the key (int) is the GMSH elemType
+		_average_h = 0;
 
 		for (int k = 0; k < entitiesDimTags.size(); k++)
 		{
@@ -463,6 +465,7 @@ private:
 				vector<Element<Dim>*> Elements;
 				double h = -1;
 				double regularity = 2;
+				double sum_h = 0;
 			};
 
 			for (size_t i = 0; i < entityElementTypes.size(); i++)
@@ -499,6 +502,7 @@ private:
 
 						chunk->Results.h          = max(chunk->Results.h,          e->Diameter());
 						chunk->Results.regularity = min(chunk->Results.regularity, e->Regularity());
+						chunk->Results.sum_h     += e->Diameter();
 					});
 
 				parallelLoop.AggregateChunkResults([this](ChunkResult& chunk)
@@ -511,11 +515,14 @@ private:
 
 						_h          = max(_h,          chunk.h);
 						_regularity = min(_regularity, chunk.regularity);
+						_average_h += chunk.sum_h;
 					});
 
 				elementsAlreadyInMemory[elemType] += elements.size();
 			}
 		}
+
+		_average_h /= this->Elements.size();
 
 		//-----------//
 		//   Faces   //
@@ -729,6 +736,11 @@ public:
 	double H() override
 	{
 		return _h;
+	}
+
+	double AverageH() override
+	{
+		return _average_h;
 	}
 
 	double Regularity() override
@@ -1180,6 +1192,10 @@ public:
 		gmsh::view::write(viewId, dataFilePath);
 
 		cout << viewName << " exported for GMSH to " << dataFilePath << endl;
+
+		// To open the GMSH window
+		//gmsh::fltk::run();
+
 		gmsh::finalize();
 	}
 

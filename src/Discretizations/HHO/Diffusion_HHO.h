@@ -186,7 +186,7 @@ public:
 		cout << "Mesh: " << this->_mesh->Description() << endl;
 		cout << "    Elements  : " << HHO->nElements << endl;
 		cout << "    Faces     : " << HHO->nFaces << " (" << HHO->nInteriorFaces << " interior + " << HHO->nBoundaryFaces << " boundary)" << endl;
-		cout << "    h         : " << scientific << this->_mesh->H() << defaultfloat << endl;
+		cout << "    h         : " << scientific << this->_mesh->H() << " (average = " << this->_mesh->AverageH() << ")" << defaultfloat << endl;
 		cout << "    Regularity: " << this->_mesh->Regularity() << defaultfloat << endl;
 		cout << "Discretization: Hybrid High-Order (k = " << HHO->FaceBasis->GetDegree() << ")" << endl;
 		cout << "    Reconstruction basis: " << (HHO->OrthogonalizeElemBases() ? (HHO->OrthonormalizeElemBases() ? "orthonormalized_" : "orthogonalized_") : "") << HHO->ReconstructionBasis->Name() << endl;

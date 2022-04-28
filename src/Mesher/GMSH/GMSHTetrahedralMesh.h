@@ -32,6 +32,11 @@ public:
 	{
 		return GMSHMesh<3>::Regularity();
 	}
+
+	double AverageH() override
+	{
+		return GMSHMesh<3>::AverageH();
+	}
 protected:
 	GMSHTetrahedralMesh(string description, string fileNamePart, string geometryDescription) 
 		: GMSHMesh(description, fileNamePart)

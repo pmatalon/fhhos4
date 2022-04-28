@@ -164,4 +164,9 @@ public:
 		return this->Elements[1]->Regularity();
 	}
 
+	double AverageH() override
+	{
+		return H();
+	}
+
 };

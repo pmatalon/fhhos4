@@ -9,6 +9,7 @@ protected:
 	map<size_t, MeshVertex<3>*> _verticesByNumber;
 	double _h = -1;
 	double _regularity = 1;
+	double _average_h = -1;
 public:
 	TetrahedralMesh() : PolyhedralMesh()
 	{}
@@ -33,6 +34,11 @@ public:
 	double Regularity() override
 	{
 		return _regularity;
+	}
+
+	double AverageH() override
+	{
+		return _average_h;
 	}
 
 	virtual void RefineMesh(H_CoarsStgy strategy) override
@@ -73,6 +79,7 @@ protected:
 		//    Create new vertices, elements and faces    //
 		//-----------------------------------------------//
 
+		fineMesh->_average_h = 0;
 		map<DomPoint, MeshVertex<3>*> newVertices;
 		BigNumber vertexNumber = fineMesh->Vertices.size();
 		BigNumber elemNumber = 0;
@@ -197,6 +204,8 @@ protected:
 			fineMesh->CreateInteriorFace(octaTetra2, octaTetra4, faceNumber, V02, V12, V13);
 			fineMesh->CreateInteriorFace(octaTetra3, octaTetra4, faceNumber, V13, V23, V02);
 		}
+
+		fineMesh->_average_h /= this->Elements.size();
 		
 		newVertices.clear();
 
@@ -245,6 +254,8 @@ protected:
 
 		if (tetra->Regularity() < this->_regularity)
 			this->_regularity = tetra->Regularity();
+
+		this->_average_h += tetra->Diameter();
 
 		return tetra;
 	}
