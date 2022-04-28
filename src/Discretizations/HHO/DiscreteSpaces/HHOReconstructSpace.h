@@ -8,7 +8,7 @@ template<int Dim>
 class HHOReconstructSpace : public IDiscreteSpace
 {
 private:
-	Mesh<Dim>* _mesh = nullptr;
+	const Mesh<Dim>* _mesh = nullptr;
 	vector<Diff_HHOElement<Dim>>* _hhoElements = nullptr;
 	HHOParameters<Dim>* HHO = nullptr;
 
@@ -16,7 +16,7 @@ public:
 	HHOReconstructSpace()
 	{}
 
-	HHOReconstructSpace(Mesh<Dim>* mesh, HHOParameters<Dim>* hho, vector<Diff_HHOElement<Dim>>& hhoElements)
+	HHOReconstructSpace(const Mesh<Dim>* mesh, HHOParameters<Dim>* hho, vector<Diff_HHOElement<Dim>>& hhoElements)
 	{
 		HHO = hho;
 		_mesh = mesh;
@@ -31,6 +31,11 @@ public:
 	//--------------------------------------------//
 	// Implementation of interface IDiscreteSpace //
 	//--------------------------------------------//
+	
+	BigNumber Dimension() override
+	{
+		return _mesh->Elements.size() * HHO->nReconstructUnknowns;
+	}
 
 	double Measure() override
 	{

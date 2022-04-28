@@ -5,6 +5,9 @@
 class IDiscreteSpace
 {
 public:
+	// Returns the number of DoFs in the space
+	virtual BigNumber Dimension() = 0;
+
 	// Returns the measure of the support, which equals to (1|1)
 	virtual double Measure() = 0;
 

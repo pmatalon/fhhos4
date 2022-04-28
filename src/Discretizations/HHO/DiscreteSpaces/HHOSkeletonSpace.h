@@ -8,7 +8,7 @@ template<int Dim>
 class HHOSkeletonSpace : public IDiscreteSpace
 {
 private:
-	Mesh<Dim>* _mesh = nullptr;
+	const Mesh<Dim>* _mesh = nullptr;
 	vector<Diff_HHOFace<Dim>>* _hhoFaces = nullptr;
 	HHOParameters<Dim>* HHO = nullptr;
 
@@ -16,7 +16,7 @@ public:
 	HHOSkeletonSpace()
 	{}
 
-	HHOSkeletonSpace(Mesh<Dim>* mesh, HHOParameters<Dim>* hho, vector<Diff_HHOFace<Dim>>& hhoFaces)
+	HHOSkeletonSpace(const Mesh<Dim>* mesh, HHOParameters<Dim>* hho, vector<Diff_HHOFace<Dim>>& hhoFaces)
 	{
 		HHO = hho;
 		_mesh = mesh;
@@ -31,6 +31,11 @@ public:
 	//--------------------------------------------//
 	// Implementation of interface IDiscreteSpace //
 	//--------------------------------------------//
+
+	BigNumber Dimension() override
+	{
+		return _mesh->Faces.size() * HHO->nFaceUnknowns;
+	}
 
 	double Measure() override
 	{
