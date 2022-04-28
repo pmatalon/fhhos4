@@ -46,12 +46,12 @@ public:
 		SetupBoundaryFaceMassMatrix();
 	}
 
-private:
 	Diff_HHOFace<Dim>* HHOFace(Face<Dim>* f)
 	{
 		return &this->_hhoFaces[f->Number - HHO->nInteriorFaces];
 	}
 
+private:
 	void SetupTraceMatrix()
 	{
 		FaceParallelLoop<Dim> parallelLoop(_mesh->BoundaryFaces);
@@ -155,7 +155,7 @@ public:
 		return b_ndF;
 	}
 
-	/*Vector AssembleDirichletTerm(const Vector& dirichletHigherOrderCoeffs)
+	Vector AssembleDirichletTerm(const Vector& dirichletHigherOrderCoeffs)
 	{
 		assert(dirichletHigherOrderCoeffs.rows() == HHO->nDirichletCoeffs);
 		assert(_mesh->DirichletFaces.size() == _mesh->BoundaryFaces.size());
@@ -175,7 +175,7 @@ public:
 			}
 		);
 		return x_dF;
-	}*/
+	}
 
 	Vector ExtractBoundaryElements(const Vector& v)
 	{

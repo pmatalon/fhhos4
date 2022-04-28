@@ -31,6 +31,8 @@ private:
 	SparseMatrix _Trace;
 	SparseMatrix _normalDerivativeMatrix;
 
+	SparseMatrix _Proj_HO_LO_Bndry;
+
 	EigenSparseCholesky _PT_M_P_solver;
 
 	HHOParameters<Dim>* HHO;
@@ -90,6 +92,20 @@ public:
 				_CellMass = _diffPb.CellMassMatrixOnBoundaryElements();
 				_SolveCellUknTranspose = _diffPb.SolveCellUknTransposeOnBoundary();
 			}
+			if (Utils::ProgramArgs.Actions.Option == 7)
+			{
+				_higherOrderBoundary = HigherOrderBoundary<Dim>(&_diffPb);
+				_higherOrderBoundary.Setup();
+
+				_Proj_HO_LO_Bndry = LowerOrderProjectionOnBoundary(_higherOrderBoundary);
+			}
+			if (Utils::ProgramArgs.Actions.Option == 8)
+			{
+				_higherOrderBoundary = HigherOrderBoundary<Dim>(&_diffPb);
+				_higherOrderBoundary.Setup();
+
+				_Trace = _higherOrderBoundary.TraceMatrix();
+			}
 		}
 		else
 			_normalDerivativeMatrix = _diffPb.NormalDerivativeMatrix();
@@ -100,28 +116,49 @@ public:
 
 	Vector FindCompatibleTheta() override
 	{
-		if (Utils::ProgramArgs.Actions.Option == 2)
-			return Vector::Zero(_mesh->NBoundaryElements() * HHO->nReconstructUnknowns);
+		if (UseIntegrationByParts)
+		{
+			if (Utils::ProgramArgs.Actions.Option == 2)
+				return Vector::Zero(_mesh->NBoundaryElements() * HHO->nReconstructUnknowns);
+			else if (Utils::ProgramArgs.Actions.Option == 7 || Utils::ProgramArgs.Actions.Option == 8)
+				return Vector::Zero(HHO->nBoundaryFaces * _higherOrderBoundary.HHO->nFaceUnknowns);
+			else
+				return _zeroDirichlet;
+		}
 		else
 			return _zeroDirichlet;
 	}
 
+private:
+	Vector BuildDirichlet(const Vector& dirichletArg)
+	{
+		if (UseIntegrationByParts)
+		{
+			if (Utils::ProgramArgs.Actions.Option == 0)
+				return dirichletArg;
+			else if (Utils::ProgramArgs.Actions.Option == 1)
+				return _diffPb.ReconstructAndAssembleDirichletTerm(dirichletArg);
+			else if (Utils::ProgramArgs.Actions.Option == 2)
+				return _diffPb.AssembleDirichletTermFromReconstructedBoundaryElem(dirichletArg);
+			else if (Utils::ProgramArgs.Actions.Option == 6 || Utils::ProgramArgs.Actions.Option == 4)
+				return _diffPb.SolveFaceMassMatrixOnBoundary(dirichletArg);
+			else if (Utils::ProgramArgs.Actions.Option == 7)
+				return _higherOrderBoundary.AssembleDirichletTerm(dirichletArg);
+			else if (Utils::ProgramArgs.Actions.Option == 8)
+				return _higherOrderBoundary.AssembleDirichletTerm(dirichletArg);
+			else
+				return dirichletArg;
+		}
+		else
+			return dirichletArg;
+	}
+
+public:
 	// Solve problem 1 (f=source, Dirich=<dirichlet>)
 	Vector Solve1stDiffProblemWithFSource(const Vector& dirichletArg) override
 	{
 		// Define problem
-		Vector dirichlet;
-		if (Utils::ProgramArgs.Actions.Option == 0)
-			dirichlet = dirichletArg;
-		else if (Utils::ProgramArgs.Actions.Option == 1)
-			dirichlet = _diffPb.ReconstructAndAssembleDirichletTerm(dirichletArg);
-		else if (Utils::ProgramArgs.Actions.Option == 2)
-			dirichlet = _diffPb.AssembleDirichletTermFromReconstructedBoundaryElem(dirichletArg);
-		else if (Utils::ProgramArgs.Actions.Option == 6)
-			dirichlet = _diffPb.SolveFaceMassMatrixOnBoundary(dirichletArg);
-		else
-			dirichlet = dirichletArg;
-
+		Vector dirichlet = BuildDirichlet(dirichletArg);
 		Vector b_T   = _diffPb.ComputeB_T(_b_fSource, dirichlet);
 		Vector b_ndF = _diffPb.ComputeB_ndF_noNeumann(dirichlet);
 		Vector rhs = _diffPb.CondensedRHS(b_T, b_ndF);
@@ -148,18 +185,7 @@ public:
 	Vector Solve1stDiffProblemWithZeroSource(const Vector& dirichletArg) override
 	{
 		// Define problem
-		Vector dirichlet;
-		if (Utils::ProgramArgs.Actions.Option == 0)
-			dirichlet = dirichletArg;
-		else if (Utils::ProgramArgs.Actions.Option == 1)
-			dirichlet = _diffPb.ReconstructAndAssembleDirichletTerm(dirichletArg);
-		else if (Utils::ProgramArgs.Actions.Option == 2)
-			dirichlet = _diffPb.AssembleDirichletTermFromReconstructedBoundaryElem(dirichletArg);
-		else if (Utils::ProgramArgs.Actions.Option == 6 || Utils::ProgramArgs.Actions.Option == 4)
-			dirichlet = _diffPb.SolveFaceMassMatrixOnBoundary(dirichletArg);
-		else
-			dirichlet = dirichletArg;
-
+		Vector dirichlet = BuildDirichlet(dirichletArg);
 		Vector b_T = _diffPb.ComputeB_T_zeroSource(dirichlet);
 		Vector b_ndF = _diffPb.ComputeB_ndF_noNeumann(dirichlet);
 		Vector rhs = _diffPb.CondensedRHS(b_T, b_ndF);
@@ -224,6 +250,10 @@ public:
 				}
 				else if (Utils::ProgramArgs.Actions.Option == 6)
 					return _PTranspose * (_ReconstructStiff * reconstructedElemBoundary - _ReconstructMass * sourceElemBoundary);
+				else if (Utils::ProgramArgs.Actions.Option == 7)
+					return _higherOrderBoundary.BoundarySpace.SolveMassMatrix(_Proj_HO_LO_Bndry.transpose() * _PTranspose * (_ReconstructStiff * reconstructedElemBoundary - _ReconstructMass * sourceElemBoundary));
+				else if (Utils::ProgramArgs.Actions.Option == 8)
+					return _higherOrderBoundary.BoundarySpace.SolveMassMatrix(_Trace * (_ReconstructStiff * reconstructedElemBoundary - _ReconstructMass * sourceElemBoundary));
 				else
 				{
 					Utils::FatalError("Unmanaged -opt " + to_string(Utils::ProgramArgs.Actions.Option));
@@ -252,5 +282,35 @@ public:
 
 		// Solve problem 2 (f=<lambda>, Dirich=0)
 		return Solve2ndDiffProblem(lambda);
+	}
+
+private:
+	SparseMatrix LowerOrderProjectionOnBoundary(HigherOrderBoundary<Dim>& hoBoundary)
+	{
+		int hoUnknowns = hoBoundary.HHO->nFaceUnknowns;
+		int loUnknowns = _diffPb.HHO->nFaceUnknowns;
+
+		FaceParallelLoop<Dim> parallelLoop(_mesh->BoundaryFaces);
+		parallelLoop.ReserveChunkCoeffsSize(hoUnknowns * loUnknowns);
+
+		parallelLoop.Execute([this, &hoBoundary](Face<Dim>* f, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				Diff_HHOFace<Dim>* hoFace = hoBoundary.HHOFace(f);
+				int hoUnknowns = hoBoundary.HHO->nFaceUnknowns;
+				BigNumber j = f->Number - HHO->nInteriorFaces;
+
+				Diff_HHOFace<Dim>* loFace = _diffPb.HHOFace(f);
+				int loUnknowns = _diffPb.HHO->nFaceUnknowns;
+				BigNumber i = f->Number - HHO->nInteriorFaces;
+
+				DenseMatrix proj = loFace->ProjectOnBasis(hoFace->Basis);
+
+				chunk->Results.Coeffs.Add(i * loUnknowns, j * hoUnknowns, proj);
+				
+			});
+
+		SparseMatrix mat(HHO->nBoundaryFaces * loUnknowns, HHO->nBoundaryFaces * hoUnknowns);
+		parallelLoop.Fill(mat);
+		return mat;
 	}
 };

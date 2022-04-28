@@ -204,4 +204,35 @@ public:
 		// Solve problem 2 (f=<lambda>, Neum=0)
 		return Solve2ndDiffProblem(lambda);
 	}
+
+	/*DenseMatrix BasisChangeMatrix()
+	{
+		auto n = _boundarySpace->Dimension();
+		DenseMatrix Change(n, n);
+		NonZeroCoefficients coeffs;
+		for (int i = 0; i < n; i++)
+		{
+			Vector e_i = Vector::Zero(n);
+			e_i[i] = 1;
+			_integralZeroOnBoundary.Enforce(e_i);
+			Vector lambda = Solve1stDiffProblemWithZeroSource(e_i);
+			Change.col(i) = -Solve2ndDiffProblem(lambda, true);
+		}
+		return Change;
+	}*/
+
+	DenseMatrix Matrix() override
+	{
+		int n = _boundarySpace->Dimension();
+		DenseMatrix A(n, n);
+		for (int i = 0; i < n; i++)
+		{
+			Vector e_i = Vector::Zero(n);
+			e_i[i] = 1;
+			_integralZeroOnBoundary.Enforce(e_i);
+			Vector lambda = Solve1stDiffProblemWithZeroSource(e_i);
+			A.col(i) = -Solve2ndDiffProblem(lambda, true);
+		}
+		return A;
+	}
 };

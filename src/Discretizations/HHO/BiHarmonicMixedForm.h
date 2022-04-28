@@ -49,7 +49,7 @@ protected:
 	}
 
 public:
-	DenseMatrix Matrix()
+	virtual DenseMatrix Matrix()
 	{
 		Vector theta0 = FindCompatibleTheta();
 		int n = theta0.rows();
