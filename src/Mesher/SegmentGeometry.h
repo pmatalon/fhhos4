@@ -15,8 +15,8 @@ public:
 
 	static DiffusionField<1> DiffField(double heterogeneityRatio)
 	{
-		Tensor<1>* tensorLeft = new Tensor<1>(heterogeneityRatio);
-		Tensor<1>* tensorRight = new Tensor<1>(1);
+		Tensor<1> tensorLeft(heterogeneityRatio);
+		Tensor<1> tensorRight(1);
 		return DiffusionField<1>("left", tensorLeft, "right", tensorRight);
 	}
 };

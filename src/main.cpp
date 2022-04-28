@@ -1444,7 +1444,7 @@ int main(int argc, char* argv[])
 		argument_error("In DG, anisotropy is not implemented.");
 
 	if (args.Problem.Dimension == 1 && args.Discretization.Method.compare("hho") == 0 && args.Discretization.PolyDegree != 1)
-		argument_error("HHO in 1D only exists for p = 1.");
+		argument_error("HHO in 1D only exists for k = 0.");
 
 	if (args.Discretization.Method.compare("hho") == 0 && args.Discretization.PolyDegree == 0)
 		argument_error("HHO does not exist with p = 0. Linear approximation at least (p >= 1).");

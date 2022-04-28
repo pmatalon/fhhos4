@@ -25,7 +25,7 @@ public:
 		this->ExactSolution = [this](const DomPoint& p)
 		{
 			double x = p.X;
-			double alpha = this->DiffField.K1->LargestEigenValue;
+			double alpha = this->DiffField.Tensors()[0]->LargestEigenValue;
 			double a1 = -1 / (2 * alpha);
 			double a2 = -0.5;
 			double b1 = (1 + 3 * alpha) / (2 * alpha*(1 + alpha));
