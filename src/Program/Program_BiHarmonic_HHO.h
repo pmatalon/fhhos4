@@ -403,10 +403,10 @@ public:
 
 			cout << "Compute solution..." << endl;
 
-			Vector theta = theta_f + theta_0;
+			theta_f += theta_0;
 
 			Vector reconstructedLap, reconstructedSolution;
-			std::tie(reconstructedLap, reconstructedSolution) = biHarPb->ComputeSolution(theta);
+			std::tie(reconstructedLap, reconstructedSolution) = biHarPb->ComputeSolution(theta_f);
 
 			//-----------------------------//
 			//       Solution export       //
@@ -427,6 +427,8 @@ public:
 			//----------------------//
 			//       L2 error       //
 			//----------------------//
+
+			cout.precision(2);
 
 			if (testCase->ExactSolution)
 			{
@@ -451,7 +453,7 @@ public:
 			if (testCase->MinusLaplacianOfSolution_Dirichlet)
 			{
 				Vector discreteExact = biHarPb->DiffPb().BoundarySpace.Project(testCase->MinusLaplacianOfSolution_Dirichlet);
-				double error = biHarPb->DiffPb().BoundarySpace.RelativeL2Error(theta, discreteExact);
+				double error = biHarPb->DiffPb().BoundarySpace.RelativeL2Error(theta_f, discreteExact);
 				cout << "L2 Error (theta) = " << std::scientific << error << endl;
 			}
 		}

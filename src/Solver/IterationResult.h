@@ -298,13 +298,13 @@ public:
 		if (result.IterationNumber == 0)
 			os << " ";
 		else
-			os << std::defaultfloat << result.IterationConvRate;
+			os << std::fixed << result.IterationConvRate;
 
 		os << setw(asymptoticConvRateWidth);
 		if (result.IterationNumber == 0)
 			os << " ";
 		else
-			os << std::defaultfloat << result.AsymptoticConvRate;
+			os << std::fixed << result.AsymptoticConvRate;
 
 		//os << setw(computWorkWidth);
 		//os << round(result._solvingComputationalWork);
