@@ -580,6 +580,9 @@
     <ClInclude Include="src\Solver\BiHarmonic\NeighbourhoodDiffusion_HHO.h">
       <Filter>Solver\BiHarmonic</Filter>
     </ClInclude>
+    <ClInclude Include="src\Solver\BiHarmonic\BiharPatchPreconditionerFalk.h">
+      <Filter>Solver\BiHarmonic</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

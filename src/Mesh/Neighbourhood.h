@@ -1,14 +1,16 @@
 #pragma once
 #include "Element.h"
+#include "Mesh.h"
 using namespace std;
 
 template <int Dim>
-class Neighbourhood
+class Neighbourhood : public Mesh<Dim>
 {
 public:
-	vector<Element<Dim>*> Elements;
+	/*vector<Element<Dim>*> Elements;
+	vector<Face<Dim>*> Faces;
 	vector<Face<Dim>*> BoundaryFaces;
-	vector<Face<Dim>*> InteriorFaces;
+	vector<Face<Dim>*> InteriorFaces;*/
 
 	// Builds the neighbourhood of an element with respect to shared vertices.
 	// If depth = 0, just the element e. If depth = 1, e + all its neighbours.
@@ -25,9 +27,12 @@ public:
 		for (int i = 0; i < depth; i++)
 			AddOneLayer(patch, boundaryVertices, boundaryFaces, interiorFaces);
 
-		Elements = vector<Element<Dim>*>(patch.begin(), patch.end());
-		BoundaryFaces = vector<Face<Dim>*>(boundaryFaces.begin(), boundaryFaces.end());
-		InteriorFaces = vector<Face<Dim>*>(interiorFaces.begin(), interiorFaces.end());
+		this->Elements = vector<Element<Dim>*>(patch.begin(), patch.end());
+		this->BoundaryFaces = vector<Face<Dim>*>(boundaryFaces.begin(), boundaryFaces.end());
+		this->InteriorFaces = vector<Face<Dim>*>(interiorFaces.begin(), interiorFaces.end());
+
+		std::copy(interiorFaces.begin(), interiorFaces.end(), std::back_inserter(this->Faces));
+		std::copy(boundaryFaces.begin(), boundaryFaces.end(), std::back_inserter(this->Faces));
 	}
 
 private:
@@ -91,10 +96,10 @@ private:
 public:
 	int ElementNumber(Element<Dim>* e) const
 	{
-		auto it = find(Elements.begin(), Elements.end(), e);
-		if (it != Elements.end())
+		auto it = find(this->Elements.begin(), this->Elements.end(), e);
+		if (it != this->Elements.end())
 		{
-			int index = it - Elements.begin();
+			int index = it - this->Elements.begin();
 			return index;
 		}
 		assert(false);
@@ -103,28 +108,34 @@ public:
 
 	int FaceNumber(Face<Dim>* f) const
 	{
-		auto it = find(InteriorFaces.begin(), InteriorFaces.end(), f);
-		if (it != InteriorFaces.end())
+		auto it = find(this->InteriorFaces.begin(), this->InteriorFaces.end(), f);
+		if (it != this->InteriorFaces.end())
 		{
-			int index = it - InteriorFaces.begin();
+			int index = it - this->InteriorFaces.begin();
 			return index;
 		}
 		int boundaryNumber = BoundaryFaceNumber(f);
 		if (boundaryNumber != -1)
-			return InteriorFaces.size() + boundaryNumber;
+			return this->InteriorFaces.size() + boundaryNumber;
 		assert(false);
 		return -1;
 	}
 
 	int BoundaryFaceNumber(Face<Dim>* f) const
 	{
-		auto it = find(BoundaryFaces.begin(), BoundaryFaces.end(), f);
-		if (it != BoundaryFaces.end())
+		auto it = find(this->BoundaryFaces.begin(), this->BoundaryFaces.end(), f);
+		if (it != this->BoundaryFaces.end())
 		{
-			int index = it - BoundaryFaces.begin();
+			int index = it - this->BoundaryFaces.begin();
 			return index;
 		}
 		assert(false);
 		return -1;
 	}
+
+	string Description() override { Utils::FatalError("Not implemented"); return ""; } 
+	string FileNamePart() override { Utils::FatalError("Not implemented"); return ""; }
+	string GeometryDescription() override { Utils::FatalError("Not implemented"); return ""; }
+	double H() override { Utils::FatalError("Not implemented"); return 0; }
+	double Regularity() override { Utils::FatalError("Not implemented"); return 0; }
 };
