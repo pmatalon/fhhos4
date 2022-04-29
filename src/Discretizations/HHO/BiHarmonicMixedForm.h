@@ -35,7 +35,7 @@ public:
 
 	virtual double L2InnerProdOnBoundary(const Vector& v1, const Vector& v2) = 0;
 
-	virtual Vector ComputeSolution(const Vector& theta) = 0;
+	virtual pair<Vector, Vector> ComputeSolution(const Vector& theta) = 0;
 
 protected:
 	void CheckDiffSolverConvergence()

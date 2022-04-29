@@ -11,6 +11,9 @@ public:
 	BoundaryConditions DirichletBC;
 	BoundaryConditions NeumannBC;
 
+	DomFunction MinusLaplacianOfSolution = nullptr;
+	DomFunction MinusLaplacianOfSolution_Dirichlet = nullptr;
+
 	BiHarmonicTestCase()
 	{}
 

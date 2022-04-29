@@ -185,7 +185,8 @@ public:
 				{
 					biHarIterSolver->OnNewSolution = [&biHarPb, &testCase, &theta_f, &u_boundary_f, &b](IterationResult& result, const Vector& theta_0)
 					{
-						Vector reconstructedSolution = biHarPb->ComputeSolution(theta_f + theta_0);
+						Vector reconstructedLap, reconstructedSolution;
+						std::tie(reconstructedLap, reconstructedSolution) = biHarPb->ComputeSolution(theta_f + theta_0);
 						result.L2Error = biHarPb->DiffPb().L2Error(testCase->ExactSolution, reconstructedSolution);
 
 						Vector lambda2 = biHarPb->Solve1stDiffProblemWithFSource(theta_f + theta_0);
@@ -331,7 +332,8 @@ public:
 			delete biHarSolver;
 
 			cout << "Compute solution..." << endl;
-			Vector solution = biHarPb->ComputeSolution(theta_f + theta_0);
+			Vector lap, solution;
+			std::tie(lap, solution) = biHarPb->ComputeSolution(theta_f + theta_0);
 
 			//-----------------------------//
 			//       Solution export       //

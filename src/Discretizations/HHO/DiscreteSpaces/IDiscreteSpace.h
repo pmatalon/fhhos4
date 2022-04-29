@@ -30,4 +30,19 @@ public:
 	{
 		return Integral(coeffs) / Measure();
 	}
+
+	double L2Norm(const Vector& v)
+	{
+		return sqrt(L2InnerProd(v, v));
+	}
+
+	double RelativeL2Norm(const Vector& error, const Vector& discreteExactSolution)
+	{
+		return L2Norm(error) / L2Norm(discreteExactSolution);
+	}
+
+	double RelativeL2Error(const Vector& approximation, const Vector& discreteExactSolution)
+	{
+		return L2Norm(discreteExactSolution - approximation) / L2Norm(discreteExactSolution);
+	}
 };

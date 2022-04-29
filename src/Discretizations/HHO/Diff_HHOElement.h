@@ -257,6 +257,11 @@ public:
 		return this->ApplyMassMatrix(this->CellBasis, v);
 	}
 
+	Vector ApplyReconstructMassMatrix(const Vector& v)
+	{
+		return this->ApplyMassMatrix(this->ReconstructionBasis, v);
+	}
+
 	double IntegralReconstruct(const Vector& reconstructCoeffs)
 	{
 		double integral = 0;

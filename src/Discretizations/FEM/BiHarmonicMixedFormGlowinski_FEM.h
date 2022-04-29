@@ -105,12 +105,17 @@ public:
 		return v1.dot(v2);
 	}
 
-	Vector ComputeSolution(const Vector& theta) override
+	pair<Vector, Vector> ComputeSolution(const Vector& theta) override
 	{
+		pair<Vector, Vector> p;
+		auto& [lambda, solution] = p;
+
 		// Solve problem 1 (f=source, Dirich=<theta>)
-		Vector lambda = Solve1stDiffProblemWithFSource(theta);
+		lambda = Solve1stDiffProblemWithFSource(theta);
 
 		// Solve problem 2 (f=<lambda>, Dirich=0)
-		return Solve2ndDiffProblem(lambda);
+		solution = Solve2ndDiffProblem(lambda);
+
+		return p;
 	}
 };

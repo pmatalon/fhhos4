@@ -196,13 +196,18 @@ public:
 		return _boundarySpace->L2InnerProd(v1, v2);
 	}
 
-	Vector ComputeSolution(const Vector& theta)
+	pair<Vector, Vector> ComputeSolution(const Vector& theta)
 	{
+		pair<Vector, Vector> p;
+		auto& [lambda, solution] = p;
+
 		// Solve problem 1 (f=source, Neum=<theta>)
-		Vector lambda = Solve1stDiffProblemWithFSource(theta);
+		lambda = Solve1stDiffProblemWithFSource(theta);
 
 		// Solve problem 2 (f=<lambda>, Neum=0)
-		return Solve2ndDiffProblem(lambda);
+		solution = Solve2ndDiffProblem(lambda);
+		
+		return p;
 	}
 
 	/*DenseMatrix BasisChangeMatrix()

@@ -84,8 +84,26 @@ public:
 
 	double L2InnerProd(const Vector& v1, const Vector& v2) override
 	{
-		Utils::FatalError("To be implemented");
-		return 0.0;
+		assert(v1.rows() == _mesh->Elements.size() * HHO->nReconstructUnknowns);
+		assert(v2.rows() == _mesh->Elements.size() * HHO->nReconstructUnknowns);
+
+		struct ChunkResult { double total = 0; };
+
+		ParallelLoop<Element<Dim>*, ChunkResult> parallelLoop(_mesh->Elements);
+		parallelLoop.Execute([this, &v1, &v2](Element<Dim>* e, ParallelChunk<ChunkResult>* chunk)
+			{
+				Diff_HHOElement<Dim>* elem = HHOElement(e);
+				BigNumber i = elem->Number() * HHO->nReconstructUnknowns;
+
+				chunk->Results.total += v1.segment(i, HHO->nReconstructUnknowns).dot(elem->ApplyReconstructMassMatrix(v2.segment(i, HHO->nReconstructUnknowns)));
+			});
+
+		double total = 0;
+		parallelLoop.AggregateChunkResults([&total](ChunkResult chunkResult)
+			{
+				total += chunkResult.total;
+			});
+		return total;
 	}
 
 	double Integral(const Vector& reconstructedCoeffs) override
