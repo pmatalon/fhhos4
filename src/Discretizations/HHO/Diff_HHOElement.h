@@ -208,17 +208,18 @@ public:
 		return solveCellUnknowns;
 	}
 
-	DenseMatrix ReconstructionFromFacesMatrix()
+	DenseMatrix CreateHybridVectorFromFacesMatrix()
 	{
 		int nTotalFaceUnknowns = this->Faces.size() * HHO->nFaceUnknowns;
-
-		auto Atf = this->A.topRightCorner(HHO->nCellUnknowns, nTotalFaceUnknowns);
-		DenseMatrix solveCellUnknowns = -this->AttSolver.solve(Atf);
-
 		DenseMatrix createHybridVectorFromFacesMatrix(HHO->nCellUnknowns + nTotalFaceUnknowns, nTotalFaceUnknowns);
-		createHybridVectorFromFacesMatrix.topRows(HHO->nCellUnknowns) = solveCellUnknowns;
+		createHybridVectorFromFacesMatrix.topRows(HHO->nCellUnknowns) = SolveCellUnknownsMatrix();
 		createHybridVectorFromFacesMatrix.bottomRows(nTotalFaceUnknowns) = DenseMatrix::Identity(nTotalFaceUnknowns, nTotalFaceUnknowns);
-		return this->P * createHybridVectorFromFacesMatrix;
+		return createHybridVectorFromFacesMatrix;
+	}
+
+	DenseMatrix ReconstructionFromFacesMatrix()
+	{
+		return this->P * CreateHybridVectorFromFacesMatrix();
 	}
 
 	Vector ReconstructFromFaces(const Vector& faceCoeffs)
@@ -535,7 +536,7 @@ public:
 	void DeleteUselessMatricesAfterAssembly()
 	{
 		Utils::Empty(Acons);
-		Utils::Empty(Astab);
+		//Utils::Empty(Astab);
 	}
 
 	void DeleteUselessMatricesAfterMultigridSetup()

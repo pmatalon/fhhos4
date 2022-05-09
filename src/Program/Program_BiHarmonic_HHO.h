@@ -438,6 +438,9 @@ public:
 				if (args.Actions.Export.ErrorToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
 					biHarPb->DiffPb().ExportReconstructedVectorToGMSH(error, out, "error", args.Actions.Export.VisuTolerance, args.Actions.Export.VisuMaxRefinements);
 
+				if (args.Actions.Export.AbsErrorToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
+					biHarPb->DiffPb().ExportReconstructedVectorToGMSH(error, out, "abs_error", args.Actions.Export.VisuTolerance, args.Actions.Export.VisuMaxRefinements, true);
+
 				double solutionError = biHarPb->DiffPb().ReconstructSpace.RelativeL2Norm(error, discreteExactSolution);
 				//double solutionError = biHarPb->DiffPb().L2Error(testCase->ExactSolution, reconstructedSolution);
 				cout << endl << "L2 Error (solution) = " << std::scientific << solutionError << endl;

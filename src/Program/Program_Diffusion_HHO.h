@@ -198,7 +198,7 @@ public:
 		Timer assemblyTimer;
 		assemblyTimer.Start();
 
-		problem->Assemble(args.Actions, out);
+		problem->Assemble(args.Actions, false, out);
 		cout << "System storage: " << Utils::MemoryString(Utils::MemoryUsage(problem->A) + Utils::MemoryUsage(problem->b)) << endl;
 
 		assemblyTimer.Stop();

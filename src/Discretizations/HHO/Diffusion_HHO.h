@@ -15,6 +15,9 @@ using namespace std;
 template <int Dim>
 class Diffusion_HHO
 {
+	template <int Dim2>
+	friend class NeighbourhoodDiffusion_HHO;
+
 private:
 	string _filePrefix;
 	bool _staticCondensation = true;
@@ -37,6 +40,9 @@ public:
 	// Used in right-hand side: A_T_dF, A_ndF_dF
 	SparseMatrix A_T_T, A_T_ndF,   A_T_dF;
 	SparseMatrix        A_ndF_ndF, A_ndF_dF;
+
+	SparseMatrix A_Stab_T_ndF, A_Stab_T_dF;
+	SparseMatrix        A_Stab_ndF_ndF, A_Stab_ndF_dF;
 private:
 	// Solution on the Dirichlet faces
 	Vector x_dF;
@@ -202,13 +208,13 @@ public:
 	// Performs the assembly of the linear system //
 	//--------------------------------------------//
 
-	void Assemble(const ActionsArguments& actions)
+	void Assemble(const ActionsArguments& actions, bool keepStabMatrix = false)
 	{
 		assert(!actions.Export.LinearSystem && !actions.Export.AssemblyTermMatrices);
-		Assemble(actions, ExportModule(""));
+		Assemble(actions, keepStabMatrix, ExportModule(""));
 	}
 
-	void Assemble(const ActionsArguments& actions, const ExportModule& out)
+	void Assemble(const ActionsArguments& actions, bool keepStabMatrix, const ExportModule& out)
 	{
 		Mesh<Dim>* mesh = this->_mesh;
 
@@ -334,6 +340,10 @@ public:
 			A_T_F_Block<Dim> A_T_F_Coeffs;
 			A_F_F_Block<Dim> A_F_F_Coeffs;
 
+			A_T_T_Block<Dim> A_T_T_Stab_Coeffs;
+			A_T_F_Block<Dim> A_T_F_Stab_Coeffs;
+			A_F_F_Block<Dim> A_F_F_Stab_Coeffs;
+
 			NonZeroCoefficients ConsistencyCoeffs;
 			NonZeroCoefficients StabilizationCoeffs;
 			NonZeroCoefficients ReconstructionCoeffs;
@@ -344,7 +354,7 @@ public:
 		if (actions.LogAssembly)
 			cout << "\tParallel recovery of the non-zero coefficients in chunks (allocation of " + to_string(parallelLoop.NThreads) + "x" + Utils::MemoryString((mesh->Elements.size() / parallelLoop.NThreads) * localNonZeroVectorMemory) + " = " + Utils::MemoryString(globalNonZeroVectorMemory) + ")" << endl;
 
-		parallelLoop.InitChunks([this, nCoeffs_A_T, nCoeffs_A_T_T, nCoeffs_A_T_F, nCoeffs_A_F_F, actions](ParallelChunk<AssemblyResult>* chunk)
+		parallelLoop.InitChunks([this, actions, keepStabMatrix, nCoeffs_A_T, nCoeffs_A_T_T, nCoeffs_A_T_F, nCoeffs_A_F_F](ParallelChunk<AssemblyResult>* chunk)
 			{
 				if (actions.Export.AssemblyTermMatrices)
 				{
@@ -363,9 +373,18 @@ public:
 
 				chunk->Results.A_F_F_Coeffs = A_F_F_Block<Dim>(HHO->nFaceUnknowns);
 				chunk->Results.A_F_F_Coeffs.Reserve(chunk->Size() * nCoeffs_A_F_F);
+
+				if (keepStabMatrix)
+				{
+					chunk->Results.A_T_F_Stab_Coeffs = A_T_F_Block<Dim>(HHO->nCellUnknowns, HHO->nFaceUnknowns);
+					chunk->Results.A_T_F_Stab_Coeffs.Reserve(chunk->Size()* nCoeffs_A_T_F);
+
+					chunk->Results.A_F_F_Stab_Coeffs = A_F_F_Block<Dim>(HHO->nFaceUnknowns);
+					chunk->Results.A_F_F_Stab_Coeffs.Reserve(chunk->Size()* nCoeffs_A_F_F);
+				}
 			});
 
-		parallelLoop.Execute([this, mesh, actions](Element<Dim>* e, ParallelChunk<AssemblyResult>* chunk)
+		parallelLoop.Execute([this, mesh, actions, keepStabMatrix](Element<Dim>* e, ParallelChunk<AssemblyResult>* chunk)
 			{
 				Diff_HHOElement<Dim>* element = HHOElement(e);
 
@@ -379,6 +398,8 @@ public:
 
 					BigNumber i = A_T_T.FirstRow(element);
 					A_T_T.AddBlock(i, i, element->A, 0, 0, HHO->nCellUnknowns, HHO->nCellUnknowns);
+					if (keepStabMatrix)
+						chunk->Results.A_T_T_Stab_Coeffs.AddBlock(i, i, element->Astab, 0, 0, HHO->nCellUnknowns, HHO->nCellUnknowns);
 					if (actions.Export.AssemblyTermMatrices)
 					{
 						chunk->Results.ConsistencyCoeffs.AddBlock(i, i, element->Acons, 0, 0, HHO->nCellUnknowns, HHO->nCellUnknowns);
@@ -399,6 +420,8 @@ public:
 					BigNumber j = A_T_F.FirstCol(face);
 					A_T_F.AddBlock(i, j, element->A, 0, element->FirstDOFNumber(face), HHO->nCellUnknowns, HHO->nFaceUnknowns);
 
+					if (keepStabMatrix)
+						chunk->Results.A_T_F_Stab_Coeffs.AddBlock(i, j, element->Astab, 0, element->FirstDOFNumber(face), HHO->nCellUnknowns, HHO->nFaceUnknowns);
 					if (actions.Export.AssemblyTermMatrices && !face->HasDirichletBC())
 					{
 						chunk->Results.ConsistencyCoeffs.AddBlock(i, j, element->Acons, 0, element->FirstDOFNumber(face), HHO->nCellUnknowns, HHO->nFaceUnknowns);
@@ -419,6 +442,9 @@ public:
 					{
 						BigNumber j = A_F_F.FirstCol(face2);
 						A_F_F.AddBlock(i, j, element->A, element->FirstDOFNumber(face1), element->FirstDOFNumber(face2), HHO->nFaceUnknowns, HHO->nFaceUnknowns);
+						
+						if (keepStabMatrix)
+							chunk->Results.A_F_F_Stab_Coeffs.AddBlock(i, j, element->Astab, element->FirstDOFNumber(face1), element->FirstDOFNumber(face2), HHO->nFaceUnknowns, HHO->nFaceUnknowns);
 						if (actions.Export.AssemblyTermMatrices && !face1->HasDirichletBC() && !face2->HasDirichletBC())
 						{
 							chunk->Results.ConsistencyCoeffs.AddBlock(i, j, element->Acons, element->FirstDOFNumber(face1), element->FirstDOFNumber(face2), HHO->nFaceUnknowns, HHO->nFaceUnknowns);
@@ -484,12 +510,25 @@ public:
 		A_T_F_Coeffs.Reserve(mesh->Elements.size() * nCoeffs_A_T_F);
 		A_F_F_Coeffs.Reserve(mesh->Faces.size() * nCoeffs_A_F_F);
 
+		A_T_T_Block<Dim> A_T_T_Stab_Coeffs(HHO->nCellUnknowns);
+		A_T_F_Block<Dim> A_T_F_Stab_Coeffs(HHO->nCellUnknowns, HHO->nFaceUnknowns);
+		A_F_F_Block<Dim> A_F_F_Stab_Coeffs(HHO->nFaceUnknowns);
+		if (keepStabMatrix)
+		{
+			A_T_T_Stab_Coeffs.Reserve(mesh->Elements.size() * nCoeffs_A_T_T);
+			A_T_F_Stab_Coeffs.Reserve(mesh->Elements.size() * nCoeffs_A_T_F);
+			A_F_F_Stab_Coeffs.Reserve(mesh->Faces.size() * nCoeffs_A_F_F);
+		}
+
 		BigNumber nnzApproximate = mesh->Elements.size() * nCoeffs_A_T;
 		NonZeroCoefficients consistencyCoeffs(actions.Export.AssemblyTermMatrices ? nnzApproximate : 0);
 		NonZeroCoefficients stabilizationCoeffs(actions.Export.AssemblyTermMatrices ? nnzApproximate : 0);
 		NonZeroCoefficients reconstructionCoeffs(actions.Export.AssemblyTermMatrices ? nnzApproximate : 0);
 
-		parallelLoop.AggregateChunkResults([this, &A_T_T_Coeffs, &A_T_F_Coeffs, &A_F_F_Coeffs, &consistencyCoeffs, &stabilizationCoeffs, &reconstructionCoeffs, actions](AssemblyResult& chunkResult)
+		parallelLoop.AggregateChunkResults([this, actions, keepStabMatrix, 
+											&A_T_T_Coeffs, &A_T_F_Coeffs, &A_F_F_Coeffs,
+											&A_T_T_Stab_Coeffs, &A_T_F_Stab_Coeffs, &A_F_F_Stab_Coeffs,
+											&consistencyCoeffs, &stabilizationCoeffs, &reconstructionCoeffs](AssemblyResult& chunkResult)
 			{
 				if (!this->_staticCondensation || this->_saveMatrixBlocks)
 				{
@@ -501,6 +540,18 @@ public:
 
 				A_F_F_Coeffs.Add(chunkResult.A_F_F_Coeffs);
 				chunkResult.A_F_F_Coeffs = A_F_F_Block<Dim>();
+
+				if (keepStabMatrix)
+				{
+					A_T_T_Stab_Coeffs.Add(chunkResult.A_T_T_Stab_Coeffs);
+					chunkResult.A_T_T_Stab_Coeffs = A_T_T_Block<Dim>();
+
+					A_T_F_Stab_Coeffs.Add(chunkResult.A_T_F_Stab_Coeffs);
+					chunkResult.A_T_F_Stab_Coeffs = A_T_F_Block<Dim>();
+
+					A_F_F_Stab_Coeffs.Add(chunkResult.A_F_F_Stab_Coeffs);
+					chunkResult.A_F_F_Stab_Coeffs = A_F_F_Block<Dim>();
+				}
 
 				if (actions.Export.AssemblyTermMatrices)
 				{
@@ -526,31 +577,56 @@ public:
 			cout << "\tReserve memory for the block A_T_F (allocation of " + Utils::MemoryString(Utils::SparseMatrixMemoryUsage(A_T_F_Coeffs.Size())) + ")" << endl;
 		SparseMatrix A_T_F(HHO->nTotalCellUnknowns, HHO->nTotalFaceCoeffs);
 		A_T_F.reserve(A_T_F_Coeffs.Size());
+
+		SparseMatrix A_T_F_Stab(HHO->nTotalCellUnknowns, HHO->nTotalFaceCoeffs);
+		if (keepStabMatrix)
+			A_T_F_Stab.reserve(A_T_F_Stab_Coeffs.Size());
+		
 		if (actions.LogAssembly)
 			cout << "\tFill A_T_F with non-zero coefficients" << endl;
 		A_T_F_Coeffs.Fill(A_T_F);
+		if (keepStabMatrix)
+			A_T_F_Stab_Coeffs.Fill(A_T_F_Stab);
+		
 		if (actions.LogAssembly)
 			cout << "\tFree vector of non-zero coefficients (" + Utils::MemoryString(Utils::SparseMatrixMemoryUsage(A_T_F_Coeffs.Size())) + ")" << endl;
 		A_T_F_Coeffs = A_T_F_Block<Dim>();
+		A_T_F_Stab_Coeffs = A_T_F_Block<Dim>();
 
 		this->A_T_ndF = A_T_F.topLeftCorner(HHO->nTotalCellUnknowns, HHO->nTotalFaceUnknowns); // save this part for the reconstruction
 		this->A_T_dF  = A_T_F.topRightCorner(HHO->nTotalCellUnknowns, HHO->nDirichletCoeffs);
 		Utils::Empty(A_T_F);
+		if (keepStabMatrix)
+		{
+			this->A_Stab_T_ndF = A_T_F_Stab.topLeftCorner(HHO->nTotalCellUnknowns, HHO->nTotalFaceUnknowns); // save this part for the reconstruction
+			this->A_Stab_T_dF = A_T_F_Stab.topRightCorner(HHO->nTotalCellUnknowns, HHO->nDirichletCoeffs);
+			Utils::Empty(A_T_F);
+		}
 		
 		if (actions.LogAssembly)
 			cout << "\tReserve memory for the block A_F_F (allocation of " + Utils::MemoryString(Utils::SparseMatrixMemoryUsage(A_F_F_Coeffs.Size())) + " for " + to_string(A_F_F_Coeffs.Size()) + " non-zeroes)" << endl;
 		if (actions.LogAssembly)
 			cout << "\tA_F_F(" + to_string(HHO->nTotalFaceCoeffs) + ", " + to_string(HHO->nTotalFaceCoeffs) + ")" << endl;
 		SparseMatrix A_F_F(HHO->nTotalFaceCoeffs, HHO->nTotalFaceCoeffs);
+		SparseMatrix A_F_F_Stab(HHO->nTotalFaceCoeffs, HHO->nTotalFaceCoeffs);
 		A_F_F.reserve(A_F_F_Coeffs.Size());
+		if (keepStabMatrix)
+			A_F_F_Stab.reserve(A_F_F_Stab_Coeffs.Size());
+
 		if (actions.LogAssembly)
 			cout << "\tFill A_F_F with non-zero coefficients" << endl;
 		A_F_F_Coeffs.Fill(A_F_F);
+		if (keepStabMatrix)
+			A_F_F_Stab_Coeffs.Fill(A_F_F_Stab);
 		if (actions.LogAssembly)
 			cout << "\tFree vector of non-zero coefficients (" + Utils::MemoryString(Utils::SparseMatrixMemoryUsage(A_F_F_Coeffs.Size())) + ")" << endl;
 		A_F_F_Coeffs = A_F_F_Block<Dim>();
+		if (keepStabMatrix)
+			A_F_F_Stab_Coeffs = A_F_F_Block<Dim>();
 
 		this->A_ndF_dF = A_F_F.topRightCorner(HHO->nTotalFaceUnknowns, HHO->nDirichletCoeffs);
+		if (keepStabMatrix)
+			this->A_Stab_ndF_dF = A_F_F_Stab.topRightCorner(HHO->nTotalFaceUnknowns, HHO->nDirichletCoeffs);
 
 		//-----------------//
 		// Right-hand side //
@@ -573,6 +649,11 @@ public:
 
 		this->A_ndF_ndF = A_F_F.topLeftCorner(HHO->nTotalFaceUnknowns, HHO->nTotalFaceUnknowns);
 		Utils::Empty(A_F_F);
+		if (keepStabMatrix)
+		{
+			this->A_Stab_ndF_ndF = A_F_F_Stab.topLeftCorner(HHO->nTotalFaceUnknowns, HHO->nTotalFaceUnknowns);
+			Utils::Empty(A_F_F_Stab);
+		}
 
 		if (this->_staticCondensation)
 		{
@@ -1143,8 +1224,7 @@ public:
 		return normalDerivative;
 	}
 
-	// Computes P^T*A*P*x where A is the stiffness matrix and the argument is P*x
-	SparseMatrix PTranspose_Stiff_boundary()
+	SparseMatrix HPTransposeOnBoundary()
 	{
 		FaceParallelLoop<Dim> parallelLoop(_mesh->BoundaryFaces);
 		parallelLoop.ReserveChunkCoeffsSize(HHO->nReconstructUnknowns * HHO->nFaceUnknowns);
@@ -1158,79 +1238,6 @@ public:
 				Diff_HHOElement<Dim>* elem = this->HHOElement(f->Element1);
 
 				//DenseMatrix P = elem->P.middleCols(HHO->nCellUnknowns + elem->LocalNumberOf(face) * HHO->nFaceUnknowns, HHO->nFaceUnknowns);
-				DenseMatrix P = elem->ReconstructionFromFacesMatrix().middleCols(elem->LocalNumberOf(face) * HHO->nFaceUnknowns, HHO->nFaceUnknowns);
-				DenseMatrix m = P.transpose() * elem->MeshElement->IntegralGradGradMatrix(elem->ReconstructionBasis);
-
-				chunk->Results.Coeffs.Add(i * HHO->nFaceUnknowns, j * HHO->nReconstructUnknowns, m);
-			});
-
-		SparseMatrix mat(HHO->nBoundaryFaces * HHO->nFaceUnknowns, _mesh->NBoundaryElements() * HHO->nReconstructUnknowns);
-		parallelLoop.Fill(mat);
-		return mat;
-	}
-
-	// Computes P^T*M*P*x where the argument is P*x
-	SparseMatrix PTranspose_Mass_boundary()
-	{
-		FaceParallelLoop<Dim> parallelLoop(_mesh->BoundaryFaces);
-		parallelLoop.ReserveChunkCoeffsSize(HHO->nReconstructUnknowns * HHO->nFaceUnknowns);
-
-		parallelLoop.Execute([this](Face<Dim>* f, ParallelChunk<CoeffsChunk>* chunk)
-			{
-				int i = f->Number - HHO->nInteriorFaces;
-				Diff_HHOFace<Dim>* face = HHOFace(f);
-
-				int j = f->Element1->Number;
-				Diff_HHOElement<Dim>* elem = this->HHOElement(f->Element1);
-
-				//DenseMatrix P = elem->P.middleCols(HHO->nCellUnknowns + elem->LocalNumberOf(face) * HHO->nFaceUnknowns, HHO->nFaceUnknowns);
-				DenseMatrix P = elem->ReconstructionFromFacesMatrix().middleCols(elem->LocalNumberOf(face) * HHO->nFaceUnknowns, HHO->nFaceUnknowns);
-				DenseMatrix m = P.transpose() * elem->MassMatrix(elem->ReconstructionBasis);
-
-				chunk->Results.Coeffs.Add(i * HHO->nFaceUnknowns, j * HHO->nReconstructUnknowns, m);
-			});
-
-		SparseMatrix mat(HHO->nBoundaryFaces * HHO->nFaceUnknowns, HHO->nTotalReconstructUnknowns);
-		parallelLoop.Fill(mat);
-		return mat;
-	}
-
-	SparseMatrix PTranspose()
-	{
-		FaceParallelLoop<Dim> parallelLoop(_mesh->BoundaryFaces);
-		parallelLoop.ReserveChunkCoeffsSize(HHO->nReconstructUnknowns * HHO->nFaceUnknowns);
-
-		parallelLoop.Execute([this](Face<Dim>* f, ParallelChunk<CoeffsChunk>* chunk)
-			{
-				int i = f->Number - HHO->nInteriorFaces;
-				Diff_HHOFace<Dim>* face = HHOFace(f);
-
-				//int j = _mesh->BoundaryElementNumber(f->Element1);
-				Diff_HHOElement<Dim>* elem = this->HHOElement(f->Element1);
-
-				DenseMatrix P = elem->ReconstructionFromFacesMatrix().middleCols(elem->LocalNumberOf(face) * HHO->nFaceUnknowns, HHO->nFaceUnknowns);
-
-				chunk->Results.Coeffs.Add(i * HHO->nFaceUnknowns, elem->Number() * HHO->nReconstructUnknowns, P.transpose());
-			});
-
-		SparseMatrix mat(HHO->nBoundaryFaces * HHO->nFaceUnknowns, HHO->nTotalReconstructUnknowns);
-		parallelLoop.Fill(mat);
-		return mat;
-	}
-
-	SparseMatrix PTransposeOnBoundary()
-	{
-		FaceParallelLoop<Dim> parallelLoop(_mesh->BoundaryFaces);
-		parallelLoop.ReserveChunkCoeffsSize(HHO->nReconstructUnknowns * HHO->nFaceUnknowns);
-
-		parallelLoop.Execute([this](Face<Dim>* f, ParallelChunk<CoeffsChunk>* chunk)
-			{
-				int i = f->Number - HHO->nInteriorFaces;
-				Diff_HHOFace<Dim>* face = HHOFace(f);
-
-				int j = _mesh->BoundaryElementNumber(f->Element1);
-				Diff_HHOElement<Dim>* elem = this->HHOElement(f->Element1);
-
 				DenseMatrix P = elem->ReconstructionFromFacesMatrix().middleCols(elem->LocalNumberOf(face) * HHO->nFaceUnknowns, HHO->nFaceUnknowns);
 
 				chunk->Results.Coeffs.Add(i * HHO->nFaceUnknowns, j * HHO->nReconstructUnknowns, P.transpose());
@@ -1240,6 +1247,30 @@ public:
 		parallelLoop.Fill(mat);
 		return mat;
 	}
+
+	SparseMatrix H0PTransposeOnBoundary()
+	{
+		FaceParallelLoop<Dim> parallelLoop(_mesh->BoundaryFaces);
+		parallelLoop.ReserveChunkCoeffsSize(HHO->nReconstructUnknowns * HHO->nFaceUnknowns);
+
+		parallelLoop.Execute([this](Face<Dim>* f, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				int i = f->Number - HHO->nInteriorFaces;
+				Diff_HHOFace<Dim>* face = HHOFace(f);
+
+				int j = _mesh->BoundaryElementNumber(f->Element1);
+				Diff_HHOElement<Dim>* elem = this->HHOElement(f->Element1);
+
+				DenseMatrix P = elem->P.middleCols(HHO->nCellUnknowns + elem->LocalNumberOf(face) * HHO->nFaceUnknowns, HHO->nFaceUnknowns);
+
+				chunk->Results.Coeffs.Add(i * HHO->nFaceUnknowns, j * HHO->nReconstructUnknowns, P.transpose());
+			});
+
+		SparseMatrix mat(HHO->nBoundaryFaces * HHO->nFaceUnknowns, _mesh->NBoundaryElements() * HHO->nReconstructUnknowns);
+		parallelLoop.Fill(mat);
+		return mat;
+	}
+
 
 	SparseMatrix SolveCellUknTransposeOnBoundary()
 	{
@@ -1264,6 +1295,30 @@ public:
 		return mat;
 	}
 
+	SparseMatrix DomainSolveCellUknTransposeOnBoundary()
+	{
+		FaceParallelLoop<Dim> parallelLoop(_mesh->BoundaryFaces);
+		parallelLoop.ReserveChunkCoeffsSize(HHO->nCellUnknowns * HHO->nFaceUnknowns);
+
+		parallelLoop.Execute([this](Face<Dim>* f, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				int i = f->Number - HHO->nInteriorFaces;
+				Diff_HHOFace<Dim>* face = HHOFace(f);
+
+				//int j = _mesh->BoundaryElementNumber(f->Element1);
+				int j = f->Element1->Number;
+				Diff_HHOElement<Dim>* elem = this->HHOElement(f->Element1);
+
+				DenseMatrix S = elem->SolveCellUnknownsMatrix().middleCols(elem->LocalNumberOf(face) * HHO->nFaceUnknowns, HHO->nFaceUnknowns);
+
+				chunk->Results.Coeffs.Add(i * HHO->nFaceUnknowns, j * HHO->nCellUnknowns, S.transpose());
+			});
+
+		SparseMatrix mat(HHO->nBoundaryFaces * HHO->nFaceUnknowns, HHO->nTotalCellUnknowns);
+		parallelLoop.Fill(mat);
+		return mat;
+	}
+
 	SparseMatrix LowerOrderTraceMatrixOnBoundary()
 	{
 		FaceParallelLoop<Dim> parallelLoop(_mesh->BoundaryFaces);
@@ -1284,7 +1339,7 @@ public:
 		parallelLoop.Fill(mat);
 		return mat;
 	}
-
+	/*
 	// Stiffness matrix (grad, grad) of degree k+1
 	SparseMatrix ReconstructStiffnessMatrix()
 	{
@@ -1301,7 +1356,7 @@ public:
 		SparseMatrix stiff(HHO->nTotalReconstructUnknowns, HHO->nTotalReconstructUnknowns);
 		parallelLoop.Fill(stiff);
 		return stiff;
-	}
+	}*/
 
 	// Stiffness matrix (grad, grad) of degree k+1, on boundary elements only
 	SparseMatrix ReconstructStiffnessMatrixOnBoundaryElements()
@@ -1349,7 +1404,7 @@ public:
 		parallelLoop.Fill(stiff);
 		return stiff;
 	}
-
+	/*
 	// Mass matrix of degree k+1
 	SparseMatrix ReconstructMassMatrix()
 	{
@@ -1370,7 +1425,7 @@ public:
 			parallelLoop.Fill(mass);
 		}
 		return mass;
-	}
+	}*/
 
 	// Mass matrix of degree k+1, on boundary elements only
 	SparseMatrix ReconstructMassMatrixOnBoundaryElements()
@@ -1458,7 +1513,7 @@ public:
 		return Vector();
 	}
 
-	Vector SolveFaceMassMatrixOnBoundary(const Vector& v)
+	/*Vector SolveFaceMassMatrixOnBoundary(const Vector& v)
 	{
 		Vector res(v.rows());
 		FaceParallelLoop<Dim> parallelLoop(_mesh->BoundaryFaces);
@@ -1470,18 +1525,18 @@ public:
 				res.segment(i * HHO->nFaceUnknowns, HHO->nFaceUnknowns) = face->SolveMassMatrix(v.segment(i * HHO->nFaceUnknowns, HHO->nFaceUnknowns));
 			});
 		return res;
-	}
+	}*/
 
 	//---------------------------------------//
 	//                Exports                //
 	//---------------------------------------//
 
 public:
-	void ExportReconstructedVectorToGMSH(const Vector& reconstructedVector, const ExportModule& out, string name, double tolerance = 1e-3, int maxRefinements = 6)
+	void ExportReconstructedVectorToGMSH(const Vector& reconstructedVector, const ExportModule& out, string name, double tolerance = 1e-3, int maxRefinements = 6, bool takeAbsoluteValue = false)
 	{
 		if (HHO->OrthogonalizeElemBases())
 			Utils::Error("The export to GMSH has not been implemented when the bases are orthonormalized against each element.");
-		this->_mesh->ExportToGMSH_Elements(this->HHO->ReconstructionBasis, reconstructedVector, out.GetFilePathPrefix(), name, tolerance, maxRefinements);
+		this->_mesh->ExportToGMSH_Elements(this->HHO->ReconstructionBasis, reconstructedVector, out.GetFilePathPrefix(), name, tolerance, maxRefinements, takeAbsoluteValue);
 	}
 
 	void ExportSolutionToGMSH(const Vector& reconstructedSolution, const ExportModule& out, double tolerance = 1e-3, int maxRefinements = 6)
@@ -1531,6 +1586,34 @@ public:
 				result.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns) = element->AttSolver.solve(b_T.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns));
 			});
 		return result;
+	}
+
+	SparseMatrix A_T_T_Matrix()
+	{
+		ElementParallelLoop<Dim> parallelLoop(this->_mesh->Elements);
+		parallelLoop.ReserveChunkCoeffsSize(HHO->nCellUnknowns * HHO->nCellUnknowns);
+		parallelLoop.Execute([this](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				Diff_HHOElement<Dim>* elem = HHOElement(e);
+				chunk->Results.Coeffs.Add(e->Number * HHO->nCellUnknowns, e->Number * HHO->nCellUnknowns, elem->A.topLeftCorner(HHO->nCellUnknowns, HHO->nCellUnknowns));
+			});
+		SparseMatrix mat = SparseMatrix(HHO->nTotalCellUnknowns, HHO->nTotalCellUnknowns);
+		parallelLoop.Fill(mat);
+		return mat;
+	}
+
+	SparseMatrix A_T_T_Stab_Matrix()
+	{
+		ElementParallelLoop<Dim> parallelLoop(this->_mesh->Elements);
+		parallelLoop.ReserveChunkCoeffsSize(HHO->nCellUnknowns * HHO->nCellUnknowns);
+		parallelLoop.Execute([this](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				Diff_HHOElement<Dim>* elem = HHOElement(e);
+				chunk->Results.Coeffs.Add(e->Number * HHO->nCellUnknowns, e->Number * HHO->nCellUnknowns, elem->Astab.topLeftCorner(HHO->nCellUnknowns, HHO->nCellUnknowns));
+			});
+		SparseMatrix mat = SparseMatrix(HHO->nTotalCellUnknowns, HHO->nTotalCellUnknowns);
+		parallelLoop.Fill(mat);
+		return mat;
 	}
 
 	//--------------------------------------------//

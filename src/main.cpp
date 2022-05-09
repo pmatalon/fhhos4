@@ -484,7 +484,8 @@ void print_usage() {
 	cout << "              solvect    - solution vector(s)" << endl;
 	cout << "              solgmsh    - solution files (.pos and .msh) to be used in GMSH for visualization" << endl;
 	cout << "              exsolgmsh  - solution files (.pos) of the exact solution to be used in GMSH for visualization" << endl;
-	cout << "              errgmsh    - error computed against the solution of an exact solver to be used in GMSH for visualization" << endl;
+	cout << "              errgmsh    - error computed against the exact solution to be used in GMSH for visualization" << endl;
+	cout << "              abserrgmsh - absolute value of 'errgmsh'" << endl;
 	cout << "              sourcegmsh - solution files (.pos and .msh) to be used in GMSH for visualization" << endl;
 	cout << "              iter       - iteration data (residuals, errors, etc.)" << endl;
 	cout << "              iterres    - iteration residuals" << endl;
@@ -1303,6 +1304,8 @@ int main(int argc, char* argv[])
 						args.Actions.Export.ExactSolutionToGMSH = true;
 					else if (code.compare("errgmsh") == 0)
 						args.Actions.Export.ErrorToGMSH = true;
+					else if (code.compare("abserrgmsh") == 0)
+						args.Actions.Export.AbsErrorToGMSH = true;
 					else if (code.compare("sourcegmsh") == 0)
 						args.Actions.Export.SourceToGMSH = true;
 					else if (code.compare("iter") == 0)

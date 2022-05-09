@@ -127,4 +127,21 @@ public:
 			});
 		return total;
 	}
+	/*
+	SparseMatrix StiffnessMatrix()
+	{
+		ElementParallelLoop<Dim> parallelLoop(_mesh->Elements);
+		parallelLoop.ReserveChunkCoeffsSize(HHO->nReconstructUnknowns * HHO->nReconstructUnknowns);
+
+		parallelLoop.Execute([this](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				Diff_HHOElement<Dim>* elem = this->HHOElement(e);
+
+				chunk->Results.Coeffs.Add(e->Number * HHO->nReconstructUnknowns, e->Number * HHO->nReconstructUnknowns, e->IntegralGradGradMatrix(elem->ReconstructionBasis));
+			});
+
+		SparseMatrix stiff(HHO->nTotalReconstructUnknowns, HHO->nTotalReconstructUnknowns);
+		parallelLoop.Fill(stiff);
+		return stiff;
+	}*/
 };

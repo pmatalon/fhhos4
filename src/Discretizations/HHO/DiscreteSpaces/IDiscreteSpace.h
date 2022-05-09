@@ -45,4 +45,14 @@ public:
 	{
 		return L2Norm(discreteExactSolution - approximation) / L2Norm(discreteExactSolution);
 	}
+
+	bool Contains(const Vector& v)
+	{
+		return v.rows() == Dimension();
+	}
+
+	Vector ZeroVector()
+	{
+		return Vector::Zero(Dimension());
+	}
 };

@@ -1085,7 +1085,7 @@ public:
 			assert(false);
 	}
 
-	void ExportToGMSH_Elements(FunctionalBasis<Dim>* basis, const Vector &coeffs, const string& outputFilePathPrefix, const string& viewName, double tolerance=1e-3, int maxRefinements=6) override
+	void ExportToGMSH_Elements(FunctionalBasis<Dim>* basis, const Vector &coeffs, const string& outputFilePathPrefix, const string& viewName, double tolerance=1e-3, int maxRefinements=6, bool takeAbsoluteValue=false) override
 	{
 		assert(!_mshFilePath.empty());
 		gmsh::initialize();
@@ -1097,7 +1097,7 @@ public:
 
 		int viewId = gmsh::view::add(viewName);
 
-		if (Dim == 2 && basis->BasisCode().compare(Monomial1D::Code()) == 0 && Utils::ProgramArgs.Discretization.OrthogonalizeElemBasesCode == 0)
+		if (Dim == 2 && !takeAbsoluteValue && basis->BasisCode().compare(Monomial1D::Code()) == 0 && Utils::ProgramArgs.Discretization.OrthogonalizeElemBasesCode == 0)
 		{
 			// Refer to:
 			// http://www.manpagez.com/info/gmsh/gmsh-2.4.0/gmsh_52.php
@@ -1179,7 +1179,10 @@ public:
 			{
 				elementTags.push_back(e->Id);
 				double value = e->EvalApproximateSolution(basis, coeffs, e->Center());
-				values.push_back({ value });
+				if (takeAbsoluteValue)
+					values.push_back({ abs(value) });
+				else
+					values.push_back({ value });
 			}
 			gmsh::view::addModelData(viewId, 0, modelName, "ElementData", elementTags, values);
 		}
@@ -1225,6 +1228,50 @@ private:
 	}
 
 public:
+	/*void ExportAbsoluteValueToGMSH_Elements(FunctionalBasis<Dim>* basis, const Vector& coeffs, const string& outputFilePathPrefix, const string& viewName) override
+	{
+		assert(!_mshFilePath.empty());
+		gmsh::initialize();
+		ManageGMSHLog();
+
+		gmsh::open(_mshFilePath);
+		if (_mshFileIsTmp)
+			remove(_mshFilePath.c_str());
+
+		int viewId = gmsh::view::add(viewName);
+
+		// Set a single value in the element
+		vector<std::string> modelNames;
+		gmsh::model::list(modelNames);
+		string modelName = modelNames[modelNames.size() - 1];
+
+		vector<size_t> elementTags;
+		vector<vector<double>> values;
+		elementTags.reserve(this->Elements.size());
+		values.reserve(this->Elements.size());
+		for (Element<Dim>* e : this->Elements)
+		{
+			elementTags.push_back(e->Id);
+			double value = e->EvalApproximateSolution(basis, coeffs, e->Center());
+			values.push_back({ abs(value) });
+		}
+		gmsh::view::addModelData(viewId, 0, modelName, "ElementData", elementTags, values);
+
+
+		string meshFilePath = outputFilePathPrefix + (outputFilePathPrefix.back() == '/' ? "" : "_") + viewName + ".msh";
+		string dataFilePath = outputFilePathPrefix + (outputFilePathPrefix.back() == '/' ? "" : "_") + viewName + ".pos";
+
+		gmsh::write(meshFilePath);
+		gmsh::view::write(viewId, dataFilePath);
+
+		cout << viewName << " exported for GMSH to " << dataFilePath << endl;
+
+		// To open the GMSH window
+		//gmsh::fltk::run();
+
+		gmsh::finalize();
+	}*/
+
 	void ExportToGMSH_Nodes(const Vector& nodeValues, const string& outputFilePathPrefix, const string& suffix) override
 	{
 		assert(!_mshFilePath.empty());

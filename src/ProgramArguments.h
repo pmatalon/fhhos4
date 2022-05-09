@@ -107,6 +107,7 @@ struct ExportArguments
 	bool SolutionToGMSH = false;
 	bool ExactSolutionToGMSH = false;
 	bool ErrorToGMSH = false;
+	bool AbsErrorToGMSH = false;
 	bool SourceToGMSH = false;
 	bool Iterations = false;
 	bool IterationResiduals = false;

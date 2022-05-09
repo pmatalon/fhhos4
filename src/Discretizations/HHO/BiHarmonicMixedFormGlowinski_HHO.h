@@ -22,11 +22,15 @@ private:
 
 	SparseMatrix _ReconstructStiff;
 	SparseMatrix _ReconstructMass;
-	SparseMatrix _PTranspose;
+	SparseMatrix _HPTranspose;
 
 	SparseMatrix _CellStiff;
 	SparseMatrix _CellMass;
+	SparseMatrix _DomainSolveCellUknTranspose;
 	SparseMatrix _SolveCellUknTranspose;
+
+	SparseMatrix _A_T_T;
+	SparseMatrix _A_T_T_Stab;
 	
 	SparseMatrix _Trace;
 	SparseMatrix _normalDerivativeMatrix;
@@ -39,8 +43,12 @@ private:
 
 	Vector _b_fSource;
 	Vector _zeroDirichlet;
+
+	int _option = 0;
 public:
 	bool UseIntegrationByParts = true;
+
+	HHOBoundarySpace<Dim>* ThetaSpace = nullptr;
 
 	BiHarmonicMixedFormGlowinski_HHO(Mesh<Dim>* mesh, BiHarmonicTestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool useIntegrationByParts, bool saveMatrixBlocks)
 	{
@@ -66,43 +74,58 @@ public:
 		ActionsArguments diffActions;
 		diffActions.AssembleRightHandSide = false;
 		diffActions.LogAssembly = true;
-		_diffPb.Assemble(diffActions);
+		_diffPb.Assemble(diffActions, true);
+
+		ThetaSpace = &_diffPb.BoundarySpace;
+
+		_option = Utils::ProgramArgs.Actions.Option;
 
 		if (UseIntegrationByParts)
 		{
 			_ReconstructStiff = _diffPb.ReconstructStiffnessMatrixOnBoundaryElements();
 			_ReconstructMass = _diffPb.ReconstructMassMatrixOnBoundaryElements();
-			_PTranspose = _diffPb.PTransposeOnBoundary();
-			
-			if (Utils::ProgramArgs.Actions.Option == 3)
+			if (_option == 4 || _option == 9)
+				_HPTranspose = _diffPb.H0PTransposeOnBoundary();
+			else
+				_HPTranspose = _diffPb.HPTransposeOnBoundary();
+			_DomainSolveCellUknTranspose = _diffPb.DomainSolveCellUknTransposeOnBoundary();
+			_SolveCellUknTranspose = _diffPb.SolveCellUknTransposeOnBoundary();
+
+			_A_T_T = _diffPb.A_T_T_Matrix();
+			_A_T_T_Stab = _diffPb.A_T_T_Stab_Matrix();
+
+			if (_option == 3)
 				_Trace = _diffPb.LowerOrderTraceMatrixOnBoundary();
 
-			if (Utils::ProgramArgs.Actions.Option == 1)
+			if (_option == 1)
 			{
 				_higherOrderBoundary = HigherOrderBoundary<Dim>(&_diffPb);
 				_higherOrderBoundary.Setup();
 
 				SparseMatrix& hoTrace = _higherOrderBoundary.TraceMatrix();
-				SparseMatrix M = _PTranspose * hoTrace.transpose() * _higherOrderBoundary.BoundaryFaceMassMatrix() * hoTrace * _PTranspose.transpose();
+				SparseMatrix M = _HPTranspose * hoTrace.transpose() * _higherOrderBoundary.BoundaryFaceMassMatrix() * hoTrace * _HPTranspose.transpose();
 				_PT_M_P_solver.Setup(M);
 			}
-			if (Utils::ProgramArgs.Actions.Option == 5)
+			if (_option == 5 || _option == 11 || _option == 13)
 			{
 				_CellStiff = _diffPb.CellStiffnessMatrixOnBoundaryElements();
 				_CellMass = _diffPb.CellMassMatrixOnBoundaryElements();
-				_SolveCellUknTranspose = _diffPb.SolveCellUknTransposeOnBoundary();
 			}
-			if (Utils::ProgramArgs.Actions.Option == 7)
+			if (_option == 7)
 			{
 				_higherOrderBoundary = HigherOrderBoundary<Dim>(&_diffPb);
 				_higherOrderBoundary.Setup();
 
+				ThetaSpace = &_higherOrderBoundary.BoundarySpace;
+
 				_Proj_HO_LO_Bndry = LowerOrderProjectionOnBoundary(_higherOrderBoundary);
 			}
-			if (Utils::ProgramArgs.Actions.Option == 8)
+			if (_option == 8)
 			{
 				_higherOrderBoundary = HigherOrderBoundary<Dim>(&_diffPb);
 				_higherOrderBoundary.Setup();
+
+				ThetaSpace = &_higherOrderBoundary.BoundarySpace;
 
 				_Trace = _higherOrderBoundary.TraceMatrix();
 			}
@@ -118,15 +141,13 @@ public:
 	{
 		if (UseIntegrationByParts)
 		{
-			if (Utils::ProgramArgs.Actions.Option == 2)
+			if (_option == 2)
 				return Vector::Zero(_mesh->NBoundaryElements() * HHO->nReconstructUnknowns);
-			else if (Utils::ProgramArgs.Actions.Option == 7 || Utils::ProgramArgs.Actions.Option == 8)
-				return Vector::Zero(HHO->nBoundaryFaces * _higherOrderBoundary.HHO->nFaceUnknowns);
 			else
-				return _zeroDirichlet;
+				return ThetaSpace->ZeroVector();
 		}
 		else
-			return _zeroDirichlet;
+			return ThetaSpace->ZeroVector();
 	}
 
 private:
@@ -134,17 +155,17 @@ private:
 	{
 		if (UseIntegrationByParts)
 		{
-			if (Utils::ProgramArgs.Actions.Option == 0)
+			if (_option == 0)
 				return dirichletArg;
-			else if (Utils::ProgramArgs.Actions.Option == 1)
+			else if (_option == 1)
 				return _diffPb.ReconstructAndAssembleDirichletTerm(dirichletArg);
-			else if (Utils::ProgramArgs.Actions.Option == 2)
+			else if (_option == 2)
 				return _diffPb.AssembleDirichletTermFromReconstructedBoundaryElem(dirichletArg);
-			else if (Utils::ProgramArgs.Actions.Option == 6 || Utils::ProgramArgs.Actions.Option == 4)
-				return _diffPb.SolveFaceMassMatrixOnBoundary(dirichletArg);
-			else if (Utils::ProgramArgs.Actions.Option == 7)
+			else if (_option == 6 || _option == 4)
+				return ThetaSpace->SolveMassMatrix(dirichletArg);
+			else if (_option == 7)
 				return _higherOrderBoundary.AssembleDirichletTerm(dirichletArg);
-			else if (Utils::ProgramArgs.Actions.Option == 8)
+			else if (_option == 8)
 				return _higherOrderBoundary.AssembleDirichletTerm(dirichletArg);
 			else
 				return dirichletArg;
@@ -167,7 +188,7 @@ public:
 		Vector faceSolution = this->_diffSolver->Solve(rhs);
 		this->CheckDiffSolverConvergence();
 
-		if (Utils::ProgramArgs.Actions.Option == 5)
+		if (_option == 5 || _option == 11 || _option == 13 || _option == 14)
 			return _diffPb.SolveCellUnknowns(faceSolution, b_T);
 		else
 		{
@@ -194,7 +215,7 @@ public:
 		Vector faceSolution = this->_diffSolver->Solve(rhs);
 		this->CheckDiffSolverConvergence();
 
-		if (Utils::ProgramArgs.Actions.Option == 5)
+		if (_option == 5 || _option == 11 || _option == 13 || _option == 14)
 			return _diffPb.SolveCellUnknowns(faceSolution, b_T);
 		else
 		{
@@ -228,35 +249,100 @@ public:
 
 				Vector reconstructedElemBoundary = _diffPb.ReconstructHigherOrderOnBoundaryOnly(faceSolution, _zeroDirichlet, b_source);
 				Vector sourceElemBoundary = _diffPb.ExtractElemBoundary(source);
-				if (Utils::ProgramArgs.Actions.Option == 0)
-					return _diffPb.SolveFaceMassMatrixOnBoundary(_PTranspose * (_ReconstructStiff * reconstructedElemBoundary - _ReconstructMass * sourceElemBoundary));
-				else if (Utils::ProgramArgs.Actions.Option == 1)
-					return _PT_M_P_solver.Solve(_PTranspose * (_ReconstructStiff * reconstructedElemBoundary - _ReconstructMass * sourceElemBoundary));
-				else if (Utils::ProgramArgs.Actions.Option == 2)
+				if (_option == 0)
+					return ThetaSpace->SolveMassMatrix(_HPTranspose * (_ReconstructStiff * reconstructedElemBoundary - _ReconstructMass * sourceElemBoundary));
+				else if (_option == 1)
+					return _PT_M_P_solver.Solve(_HPTranspose * (_ReconstructStiff * reconstructedElemBoundary - _ReconstructMass * sourceElemBoundary));
+				else if (_option == 2)
 					return _ReconstructStiff * reconstructedElemBoundary - _ReconstructMass * sourceElemBoundary;
-				else if (Utils::ProgramArgs.Actions.Option == 3)
-					return _diffPb.SolveFaceMassMatrixOnBoundary(_Trace * (_ReconstructStiff * reconstructedElemBoundary - _ReconstructMass * sourceElemBoundary));
-				else if (Utils::ProgramArgs.Actions.Option == 4)
+				else if (_option == 3)
+					return ThetaSpace->SolveMassMatrix(_Trace * (_ReconstructStiff * reconstructedElemBoundary - _ReconstructMass * sourceElemBoundary));
+				else if (_option == 4)
 				{
+					// Second best
 					Vector cellSolution = _diffPb.SolveCellUnknowns(faceSolution, b_source);
 					Vector normalDerivative = _diffPb.A_T_dF.transpose() * cellSolution + _diffPb.A_ndF_dF.transpose() * faceSolution;
-					normalDerivative -= _PTranspose * _ReconstructMass * sourceElemBoundary;
+					normalDerivative -= _HPTranspose * _ReconstructMass * sourceElemBoundary;
 					return normalDerivative;
 				}
-				else if (Utils::ProgramArgs.Actions.Option == 5)
+				else if (_option == 5)
 				{
 					Vector cellSolution = _diffPb.SolveCellUnknownsOnBoundaryOnly(faceSolution, b_source);
-					return _diffPb.SolveFaceMassMatrixOnBoundary(_SolveCellUknTranspose * (_CellStiff * cellSolution - _CellMass * sourceElemBoundary));
+					return ThetaSpace->SolveMassMatrix(_SolveCellUknTranspose * (_CellStiff * cellSolution - _CellMass * sourceElemBoundary));
 				}
-				else if (Utils::ProgramArgs.Actions.Option == 6)
-					return _PTranspose * (_ReconstructStiff * reconstructedElemBoundary - _ReconstructMass * sourceElemBoundary);
-				else if (Utils::ProgramArgs.Actions.Option == 7)
-					return _higherOrderBoundary.BoundarySpace.SolveMassMatrix(_Proj_HO_LO_Bndry.transpose() * _PTranspose * (_ReconstructStiff * reconstructedElemBoundary - _ReconstructMass * sourceElemBoundary));
-				else if (Utils::ProgramArgs.Actions.Option == 8)
-					return _higherOrderBoundary.BoundarySpace.SolveMassMatrix(_Trace * (_ReconstructStiff * reconstructedElemBoundary - _ReconstructMass * sourceElemBoundary));
+				else if (_option == 6)
+					return _HPTranspose * (_ReconstructStiff * reconstructedElemBoundary - _ReconstructMass * sourceElemBoundary);
+				else if (_option == 7)
+					return ThetaSpace->SolveMassMatrix(_Proj_HO_LO_Bndry.transpose() * _HPTranspose * (_ReconstructStiff * reconstructedElemBoundary - _ReconstructMass * sourceElemBoundary));
+				else if (_option == 8)
+					return ThetaSpace->SolveMassMatrix(_Trace * (_ReconstructStiff * reconstructedElemBoundary - _ReconstructMass * sourceElemBoundary));
+				else if (_option == 9) // close to 4
+				{
+					//Vector cellSolution = _diffPb.SolveCellUnknownsOnBoundaryOnly(faceSolution, b_source);
+					//_diffPb.StabilizationMatrixOnBoundaryFaces();
+
+					Vector cellSolution = _diffPb.SolveCellUnknowns(faceSolution, b_source);
+					Vector normalDerivative = _diffPb.A_T_dF.transpose()      * cellSolution + _diffPb.A_ndF_dF.transpose()      * faceSolution;
+					normalDerivative       -= _diffPb.A_Stab_T_dF.transpose() * cellSolution + _diffPb.A_Stab_ndF_dF.transpose() * faceSolution;
+					normalDerivative -= _HPTranspose * _ReconstructMass * sourceElemBoundary;
+					return normalDerivative;
+				}
+				else if (_option == 10) // close to 0
+				{
+					Vector cellSolution = _diffPb.SolveCellUnknowns(faceSolution, b_source);
+					return ThetaSpace->SolveMassMatrix(_HPTranspose * (_ReconstructStiff * reconstructedElemBoundary - _ReconstructMass * sourceElemBoundary) - _diffPb.A_Stab_T_dF.transpose() * cellSolution - _diffPb.A_Stab_ndF_dF.transpose() * faceSolution);
+				}
+				else if (_option == 11) // close to 5
+				{
+					Vector cellSolution = _diffPb.SolveCellUnknownsOnBoundaryOnly(faceSolution, b_source);
+					Vector normalDerivative = _SolveCellUknTranspose * (_CellStiff * cellSolution - _CellMass * sourceElemBoundary);
+
+					cellSolution = _diffPb.SolveCellUnknowns(faceSolution, b_source);
+					normalDerivative -= _diffPb.A_Stab_T_dF.transpose() * cellSolution + _diffPb.A_Stab_ndF_dF.transpose() * faceSolution;
+					return ThetaSpace->SolveMassMatrix(normalDerivative);
+				}
+				else if (_option == 12) // close to 9
+				{
+					Vector cellSolution = _diffPb.SolveCellUnknowns(faceSolution, b_source);
+
+					Vector normalDerivative = _diffPb.A_T_dF.transpose() * cellSolution + _diffPb.A_ndF_dF.transpose() * faceSolution;
+					normalDerivative += _DomainSolveCellUknTranspose * (_A_T_T * cellSolution + _diffPb.A_T_ndF * faceSolution);
+
+					normalDerivative       -= _diffPb.A_Stab_T_dF.transpose() * cellSolution + _diffPb.A_Stab_ndF_dF.transpose() * faceSolution;
+					normalDerivative -= _DomainSolveCellUknTranspose * (_A_T_T_Stab * cellSolution + _diffPb.A_Stab_T_ndF * faceSolution);
+					
+					normalDerivative -= _HPTranspose * _ReconstructMass * sourceElemBoundary;
+					return ThetaSpace->SolveMassMatrix(normalDerivative);
+				}
+				else if (_option == 13) // close to 12
+				{
+					// Best (with -kc 1)
+
+					Vector cellSolution = _diffPb.SolveCellUnknowns(faceSolution, b_source);
+
+					Vector normalDerivative = _diffPb.A_T_dF.transpose() * cellSolution + _diffPb.A_ndF_dF.transpose() * faceSolution;
+					normalDerivative += _DomainSolveCellUknTranspose * (_A_T_T * cellSolution + _diffPb.A_T_ndF * faceSolution);
+
+					normalDerivative -= _SolveCellUknTranspose * _CellMass * sourceElemBoundary;
+
+					//normalDerivative += _diffPb.A_Stab_T_dF.transpose() * cellSolution + _diffPb.A_Stab_ndF_dF.transpose() * faceSolution;
+					//normalDerivative += _DomainSolveCellUknTranspose * (_A_T_T_Stab * cellSolution + _diffPb.A_Stab_T_ndF * faceSolution);
+					return ThetaSpace->SolveMassMatrix(normalDerivative);
+				}
+				else if (_option == 14) // close to 13
+				{
+					//Vector cellSolution = _diffPb.SolveCellUnknowns(faceSolution, b_source);
+
+					//Vector normalDerivative = _diffPb.A_T_dF.transpose() * cellSolution + _diffPb.A_ndF_dF.transpose() * faceSolution;
+					//normalDerivative += _DomainSolveCellUknTranspose * (_A_T_T * cellSolution + _diffPb.A_T_ndF * faceSolution);
+					Vector normalDerivative = (_diffPb.A * faceSolution).tail(HHO->nBoundaryFaces * HHO->nFaceUnknowns);
+
+					normalDerivative -= _SolveCellUknTranspose * _CellMass * sourceElemBoundary;
+					return ThetaSpace->SolveMassMatrix(normalDerivative);
+				}
 				else
 				{
-					Utils::FatalError("Unmanaged -opt " + to_string(Utils::ProgramArgs.Actions.Option));
+					Utils::FatalError("Unmanaged -opt " + to_string(_option));
 					return Vector();
 				}
 			}

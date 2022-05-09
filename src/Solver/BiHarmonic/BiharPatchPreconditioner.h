@@ -41,6 +41,7 @@ public:
 				Neighbourhood<Dim> nbh(e, _neighbourhoodDepth);
 				NeighbourhoodDiffusion_HHO<Dim> nbhDiff(nbh, _diffPb);
 
+				int option = Utils::ProgramArgs.Actions.Option;
 
 				SparseMatrix PTranspose;
 				SparseMatrix ReconstructStiff;
@@ -49,23 +50,51 @@ public:
 				SparseMatrix CellStiff;
 				SparseMatrix CellMass;
 				SparseMatrix NormalDerivative;
+
+				SparseMatrix A_T_T;
+				SparseMatrix A_T_dF;
+				SparseMatrix A_T_ndF;
+				SparseMatrix A_ndF_dF;
+
+				SparseMatrix A_T_T_Stab;
+				SparseMatrix A_Stab_T_dF;
+				SparseMatrix A_Stab_T_ndF;
+				SparseMatrix A_Stab_ndF_dF;
+
 				if (_useIntegrationByParts)
 				{
-					if (Utils::ProgramArgs.Actions.Option == 0 || Utils::ProgramArgs.Actions.Option == 6)
+					if (option == 0 || option == 6)
 					{
 						PTranspose = nbhDiff.PTranspose();
 						ReconstructStiff = nbhDiff.ReconstructStiffnessMatrix();
 						ReconstructMass = nbhDiff.ReconstructMassMatrix();
 					}
-					else if (Utils::ProgramArgs.Actions.Option == 4)
+					else if (option == 4)
 					{
+						A_T_dF = nbhDiff.A_T_dF;
+						A_ndF_dF = nbhDiff.A_ndF_dF;
 						PTranspose = nbhDiff.PTranspose();
 						ReconstructMass = nbhDiff.ReconstructMassMatrix();
 					}
-					else if (Utils::ProgramArgs.Actions.Option == 5)
+					else if (option == 5)
 					{
 						SolveCellUknTranspose = nbhDiff.SolveCellUknTranspose();
 						CellStiff = nbhDiff.CellStiffnessMatrix();
+						CellMass = nbhDiff.CellMassMatrix();
+					}
+					else if (option == 13)
+					{
+						A_T_T = nbhDiff.A_T_T();
+						A_T_dF = nbhDiff.A_T_dF;
+						A_T_ndF = nbhDiff.A_T_ndF;
+						A_ndF_dF = nbhDiff.A_ndF_dF;
+
+						A_T_T_Stab = nbhDiff.A_T_T_Stab();
+						A_Stab_T_dF = nbhDiff.A_Stab_T_dF();
+						A_Stab_T_ndF = nbhDiff.A_Stab_T_ndF();
+						A_Stab_ndF_dF = nbhDiff.A_Stab_ndF_dF();
+
+						SolveCellUknTranspose = nbhDiff.SolveCellUknTranspose();
 						CellMass = nbhDiff.CellMassMatrix();
 					}
 				}
@@ -85,7 +114,7 @@ public:
 					Vector faceSolution = nbhDiff.FaceUnknownSolver.Solve(rhs);
 
 					Vector lambda;
-					if (Utils::ProgramArgs.Actions.Option == 5)
+					if (option == 5 || option == 13 || option == 14)
 						lambda = nbhDiff.SolveCellUnknowns(faceSolution, b_T);
 					else
 						lambda = nbhDiff.ReconstructHigherOrder(faceSolution, dirichlet, b_T);
@@ -100,7 +129,7 @@ public:
 					Vector normalDerivative;
 					if (_useIntegrationByParts)
 					{
-						if (Utils::ProgramArgs.Actions.Option == 0)
+						if (option == 0)
 						{
 							Vector reconstruction = nbhDiff.ReconstructHigherOrder(faceSolution, Vector::Zero(nbh.BoundaryFaces.size() * nFaceUnknowns), b_source);
 							normalDerivative = nbhDiff.SolveFaceMassMatrixOnBoundary(PTranspose * (ReconstructStiff * reconstruction - ReconstructMass * lambda));
@@ -108,25 +137,50 @@ public:
 							//_diffPb.ExportReconstructedVectorToGMSH(NeighbourhoodToDomain(nbh, lambda), out, "lambda_prec");
 							//_diffPb.ExportReconstructedVectorToGMSH(NeighbourhoodToDomain(nbh, reconstruction), out, "u_prec");
 						}
-						else if (Utils::ProgramArgs.Actions.Option == 4)
+						else if (option == 4)
 						{
 							Vector cellSolution = nbhDiff.SolveCellUnknowns(faceSolution, b_source);
 
-							normalDerivative = nbhDiff.A_T_dF.transpose() * cellSolution + nbhDiff.A_ndF_dF.transpose() * faceSolution;
+							normalDerivative = A_T_dF.transpose() * cellSolution + A_ndF_dF.transpose() * faceSolution;
 							normalDerivative -= PTranspose * ReconstructMass * lambda;
 						}
-						else if (Utils::ProgramArgs.Actions.Option == 5)
+						else if (option == 5)
 						{
 							Vector cellSolution = nbhDiff.SolveCellUnknowns(faceSolution, b_source);
 							normalDerivative = nbhDiff.SolveFaceMassMatrixOnBoundary(SolveCellUknTranspose * (CellStiff * cellSolution - CellMass * lambda));
 						}
-						else if (Utils::ProgramArgs.Actions.Option == 6)
+						else if (option == 6)
 						{
 							Vector reconstruction = nbhDiff.ReconstructHigherOrder(faceSolution, Vector::Zero(nbh.BoundaryFaces.size() * nFaceUnknowns), b_source);
 							normalDerivative = PTranspose * (ReconstructStiff * reconstruction - ReconstructMass * lambda);
 						}
+						else if (option == 13 || option == 14)
+						{
+							Vector cellSolution = nbhDiff.SolveCellUnknowns(faceSolution, b_source);
+
+							normalDerivative = A_T_dF.transpose() * cellSolution + A_ndF_dF.transpose() * faceSolution;
+							normalDerivative += SolveCellUknTranspose * (A_T_T * cellSolution + A_T_ndF * faceSolution);
+
+							normalDerivative -= SolveCellUknTranspose * CellMass * lambda;
+
+							//normalDerivative += A_Stab_T_dF.transpose() * cellSolution + A_Stab_ndF_dF.transpose() * faceSolution;
+							//normalDerivative += SolveCellUknTranspose * (A_T_T_Stab * cellSolution + A_Stab_T_ndF * faceSolution);
+
+							normalDerivative = nbhDiff.SolveFaceMassMatrixOnBoundary(normalDerivative);
+						}
+						/*else if (option == 14)
+						{
+							Vector cellSolution = nbhDiff.SolveCellUnknowns(faceSolution, b_source);
+
+							normalDerivative = (nbhDiff.A * faceSolution).tail();
+							normalDerivative += SolveCellUknTranspose * (A_T_T * cellSolution + A_T_ndF * faceSolution);
+
+							normalDerivative -= SolveCellUknTranspose * CellMass * lambda;
+
+							normalDerivative = nbhDiff.SolveFaceMassMatrixOnBoundary(normalDerivative);
+						}*/
 						else
-							Utils::FatalError("Preconditioner not managed for -opt " + to_string(Utils::ProgramArgs.Actions.Option));
+							Utils::FatalError("Preconditioner not managed for -opt " + to_string(option));
 					}
 					else
 					{
