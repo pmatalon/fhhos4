@@ -111,34 +111,6 @@ public:
 		return A_T_dF;
 	}
 
-	SparseMatrix A_Stab_T_dF()
-	{
-		int nCellUnknowns = _diffPb.HHO->nCellUnknowns;
-		int nFaceUnknowns = _diffPb.HHO->nFaceUnknowns;
-
-		SparseMatrix A_Stab_T_dF(_nbh.Elements.size() * nCellUnknowns, _nbh.BoundaryFaces.size() * nFaceUnknowns);
-		NonZeroCoefficients coeffs;
-		for (int i = 0; i < _nbh.Elements.size(); i++)
-		{
-			Element<Dim>* e = _nbh.Elements[i];
-			for (int j = 0; j < _nbh.BoundaryFaces.size(); j++)
-			{
-				Face<Dim>* f = _nbh.BoundaryFaces[j];
-				if (f->IsIn(e->Faces))
-				{
-					DenseMatrix block;
-					if (f->IsDomainBoundary)
-						block = _diffPb.A_Stab_T_dF.block(e->Number * nCellUnknowns, (f->Number - _diffPb.HHO->nInteriorFaces) * nFaceUnknowns, nCellUnknowns, nFaceUnknowns);
-					else
-						block = _diffPb.A_Stab_T_ndF.block(e->Number * nCellUnknowns, f->Number * nFaceUnknowns, nCellUnknowns, nFaceUnknowns);
-					coeffs.Add(i * nCellUnknowns, j * nFaceUnknowns, block);
-				}
-			}
-		}
-		coeffs.Fill(A_Stab_T_dF);
-		return A_Stab_T_dF;
-	}
-
 	SparseMatrix A_T_ndF_Matrix()
 	{
 		int nCellUnknowns = _diffPb.HHO->nCellUnknowns;
@@ -163,32 +135,6 @@ public:
 		}
 		coeffs.Fill(A_T_ndF);
 		return A_T_ndF;
-	}
-
-	SparseMatrix A_Stab_T_ndF()
-	{
-		int nCellUnknowns = _diffPb.HHO->nCellUnknowns;
-		int nFaceUnknowns = _diffPb.HHO->nFaceUnknowns;
-
-		const vector<Face<Dim>*>& nDFaces = dirichlet ? _nbh.InteriorFaces : _nbh.Faces;
-
-		SparseMatrix A_Stab_T_ndF(_nbh.Elements.size() * nCellUnknowns, nDFaces.size() * nFaceUnknowns);
-		NonZeroCoefficients coeffs;
-		for (int i = 0; i < _nbh.Elements.size(); i++)
-		{
-			Element<Dim>* e = _nbh.Elements[i];
-			for (int j = 0; j < nDFaces.size(); j++)
-			{
-				Face<Dim>* f = nDFaces[j];
-				if (f->IsIn(e->Faces))
-				{
-					DenseMatrix block = _diffPb.A_Stab_T_ndF.block(e->Number * nCellUnknowns, f->Number * nFaceUnknowns, nCellUnknowns, nFaceUnknowns);
-					coeffs.Add(i * nCellUnknowns, j * nFaceUnknowns, block);
-				}
-			}
-		}
-		coeffs.Fill(A_Stab_T_ndF);
-		return A_Stab_T_ndF;
 	}
 
 	SparseMatrix A_ndF_dF_Matrix()
@@ -216,32 +162,6 @@ public:
 		return A_ndF_dF;
 	}
 
-	SparseMatrix A_Stab_ndF_dF()
-	{
-		int nFaceUnknowns = _diffPb.HHO->nFaceUnknowns;
-
-		SparseMatrix A_Stab_ndF_dF(_nbh.InteriorFaces.size() * nFaceUnknowns, _nbh.BoundaryFaces.size() * nFaceUnknowns);
-		NonZeroCoefficients coeffs;
-		for (int i = 0; i < _nbh.InteriorFaces.size(); i++)
-		{
-			Face<Dim>* fi = _nbh.InteriorFaces[i];
-			for (int j = 0; j < _nbh.BoundaryFaces.size(); j++)
-			{
-				Face<Dim>* fj = _nbh.BoundaryFaces[j];
-
-				DenseMatrix block;
-				if (fj->IsDomainBoundary)
-					block = _diffPb.A_Stab_ndF_dF.block(fi->Number * nFaceUnknowns, (fj->Number - _diffPb.HHO->nInteriorFaces) * nFaceUnknowns, nFaceUnknowns, nFaceUnknowns);
-				else
-					block = _diffPb.A_Stab_ndF_ndF.block(fi->Number * nFaceUnknowns, fj->Number * nFaceUnknowns, nFaceUnknowns, nFaceUnknowns);
-				coeffs.Add(i * nFaceUnknowns, j * nFaceUnknowns, block);
-			}
-		}
-		coeffs.Fill(A_Stab_ndF_dF);
-		return A_Stab_ndF_dF;
-	}
-
-
 	//         [    0    ]   <---- interior faces
 	// returns [---------]
 	//         [ b_neumF ]   <---- Neumann faces
@@ -264,30 +184,6 @@ public:
 		}
 		return b_neumann;
 	}*/
-
-	SparseMatrix PTranspose()
-	{
-		int nFaceUnknowns = _diffPb.HHO->nFaceUnknowns;
-		int nReconstructUnknowns = _diffPb.HHO->nReconstructUnknowns;
-
-		SparseMatrix mat(_nbh.BoundaryFaces.size() * nFaceUnknowns, _nbh.Elements.size() * nReconstructUnknowns);
-		NonZeroCoefficients coeffs;
-		for (int i = 0; i < _nbh.BoundaryFaces.size(); i++)
-		{
-			Face<Dim>* f = _nbh.BoundaryFaces[i];
-			if (f->IsDomainBoundary)
-			{
-				Diff_HHOElement<Dim>* e = _diffPb.HHOElement(f->Element1);
-
-				//DenseMatrix P = e->P.middleCols(nCellUnknowns + e->MeshElement->LocalNumberOf(f) * nFaceUnknowns, nFaceUnknowns);
-				DenseMatrix P = e->ReconstructionFromFacesMatrix().middleCols(e->MeshElement->LocalNumberOf(f) * nFaceUnknowns, nFaceUnknowns);
-
-				coeffs.Add(i * nFaceUnknowns, _nbh.ElementNumber(e->MeshElement) * nReconstructUnknowns, P.transpose());
-			}
-		}
-		coeffs.Fill(mat);
-		return mat;
-	}
 
 	SparseMatrix SolveCellUknTranspose()
 	{
@@ -313,51 +209,6 @@ public:
 		return mat;
 	}
 
-	SparseMatrix ReconstructStiffnessMatrix()
-	{
-		int nReconstructUnknowns = _diffPb.HHO->nReconstructUnknowns;
-
-		SparseMatrix mat(_nbh.Elements.size() * nReconstructUnknowns, _nbh.Elements.size() * nReconstructUnknowns);
-		NonZeroCoefficients coeffs;
-		for (int i = 0; i < _nbh.Elements.size(); i++)
-		{
-			Diff_HHOElement<Dim>* e = _diffPb.HHOElement(_nbh.Elements[i]);
-			coeffs.Add(i * nReconstructUnknowns, i * nReconstructUnknowns, e->MeshElement->IntegralGradGradMatrix(e->ReconstructionBasis));
-		}
-		coeffs.Fill(mat);
-		return mat;
-	}
-
-	SparseMatrix CellStiffnessMatrix()
-	{
-		int nCellUnknowns = _diffPb.HHO->nCellUnknowns;
-
-		SparseMatrix mat(_nbh.Elements.size() * nCellUnknowns, _nbh.Elements.size() * nCellUnknowns);
-		NonZeroCoefficients coeffs;
-		for (int i = 0; i < _nbh.Elements.size(); i++)
-		{
-			Diff_HHOElement<Dim>* e = _diffPb.HHOElement(_nbh.Elements[i]);
-			coeffs.Add(i * nCellUnknowns, i * nCellUnknowns, e->MeshElement->IntegralGradGradMatrix(e->CellBasis));
-		}
-		coeffs.Fill(mat);
-		return mat;
-	}
-
-	SparseMatrix ReconstructMassMatrix()
-	{
-		int nReconstructUnknowns = _diffPb.HHO->nReconstructUnknowns;
-
-		SparseMatrix mat(_nbh.Elements.size() * nReconstructUnknowns, _nbh.Elements.size() * nReconstructUnknowns);
-		NonZeroCoefficients coeffs;
-		for (int i = 0; i < _nbh.Elements.size(); i++)
-		{
-			Diff_HHOElement<Dim>* e = _diffPb.HHOElement(_nbh.Elements[i]);
-			coeffs.Add(i * nReconstructUnknowns, i * nReconstructUnknowns, e->MassMatrix(e->ReconstructionBasis));
-		}
-		coeffs.Fill(mat);
-		return mat;
-	}
-
 	SparseMatrix CellMassMatrix()
 	{
 		int nCellUnknowns = _diffPb.HHO->nCellUnknowns;
@@ -373,27 +224,6 @@ public:
 		return mat;
 	}
 
-	// Normal derivative
-	SparseMatrix NormalDerivative()
-	{
-		int nFaceUnknowns = _diffPb.HHO->nFaceUnknowns;
-		int nReconstructUnknowns = _diffPb.HHO->nReconstructUnknowns;
-
-		SparseMatrix mat(_nbh.BoundaryFaces.size() * nFaceUnknowns, _nbh.Elements.size() * nReconstructUnknowns);
-		NonZeroCoefficients coeffs;
-		for (int i = 0; i < _nbh.BoundaryFaces.size(); i++)
-		{
-			Face<Dim>* face = _nbh.BoundaryFaces[i];
-			if (face->IsDomainBoundary)
-			{
-				Diff_HHOFace<Dim>* f = _diffPb.HHOFace(face);
-				Diff_HHOElement<Dim>* e = _diffPb.HHOElement(face->Element1);
-				coeffs.Add(i * nFaceUnknowns, _nbh.ElementNumber(e->MeshElement) * nReconstructUnknowns, f->NormalDerivative(e->MeshElement, e->ReconstructionBasis));
-			}
-		}
-		coeffs.Fill(mat);
-		return mat;
-	}
 
 	Vector AssembleSourceTerm(const Vector& sourceFuncCoeffs)
 	{
@@ -484,21 +314,6 @@ public:
 		{
 			Diff_HHOElement<Dim>* e = _diffPb.HHOElement(_nbh.Elements[i]);
 			coeffs.Add(i * nCellUnknowns, i * nCellUnknowns, e->A.topLeftCorner(nCellUnknowns, nCellUnknowns));
-		}
-		coeffs.Fill(mat);
-		return mat;
-	}
-
-	SparseMatrix A_T_T_Stab()
-	{
-		int nCellUnknowns = _diffPb.HHO->nCellUnknowns;
-
-		SparseMatrix mat(_nbh.Elements.size() * nCellUnknowns, _nbh.Elements.size() * nCellUnknowns);
-		NonZeroCoefficients coeffs;
-		for (int i = 0; i < _nbh.Elements.size(); i++)
-		{
-			Diff_HHOElement<Dim>* e = _diffPb.HHOElement(_nbh.Elements[i]);
-			coeffs.Add(i * nCellUnknowns, i * nCellUnknowns, e->Astab.topLeftCorner(nCellUnknowns, nCellUnknowns));
 		}
 		coeffs.Fill(mat);
 		return mat;

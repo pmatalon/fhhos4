@@ -98,7 +98,7 @@ public:
 		if (args.Problem.Scheme.compare("f") == 0)
 			biHarPb = new BiHarmonicMixedFormFalk_HHO<Dim>(mesh, testCase, hho, args.Solver.BiHarReconstructBoundary, saveMatrixBlocks);
 		else if (args.Problem.Scheme.compare("g") == 0)
-			biHarPb = new BiHarmonicMixedFormGlowinski_HHO<Dim>(mesh, testCase, hho, args.Actions.IntegrationByParts, saveMatrixBlocks);
+			biHarPb = new BiHarmonicMixedFormGlowinski_HHO<Dim>(mesh, testCase, hho, saveMatrixBlocks);
 		else
 			Utils::FatalError("Unknown scheme '" + args.Problem.Scheme + "'. Check -sch parameter. Possible values are 'f' and 'g'.");
 

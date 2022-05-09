@@ -252,9 +252,6 @@ void print_usage() {
 	cout << "-bihar-reconstruct-bry {0|1}" << endl;
 	cout << "      Reconstruct higher-order boundary during the iterative process of the bi-harmonic problem." << endl;
 	cout << endl;
-	cout << "-ibp {0|1}" << endl;
-	cout << "      Use integration by parts to compute the normal derivative in the Glowinski scheme of the bi-harmonic problem (default: 1)." << endl;
-	cout << endl;
 	cout << "-nbh-depth NUM" << endl;
 	cout << "      Depth of the neighbourhood for the preconditioners '-bihar-prec p' and 'dp'." << endl;
 	cout << endl;
@@ -742,7 +739,6 @@ int main(int argc, char* argv[])
 		 { "no-cache", no_argument, NULL, OPT_NoCache },
 		 { "ut", no_argument, NULL, OPT_UnitTests },
 		 { "gmsh-log", no_argument, NULL, OPT_GMSHLog },
-		 { "ibp", required_argument, NULL, OPT_IntegrationByParts },
 		 { "nbh-depth", required_argument, NULL, OPT_NeighbourhoodDepth },
 		 { "opt", required_argument, NULL, OPT_Option },
 		 { NULL, 0, NULL, 0 }
@@ -1343,9 +1339,6 @@ int main(int argc, char* argv[])
 				break;
 			case OPT_VisuMaxRefinements:
 				args.Actions.Export.VisuMaxRefinements = atoi(optarg);
-				break;
-			case OPT_IntegrationByParts:
-				args.Actions.IntegrationByParts = atoi(optarg);
 				break;
 			case OPT_Option:
 				args.Actions.Option = atoi(optarg);

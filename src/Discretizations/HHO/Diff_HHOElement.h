@@ -536,7 +536,7 @@ public:
 	void DeleteUselessMatricesAfterAssembly()
 	{
 		Utils::Empty(Acons);
-		//Utils::Empty(Astab);
+		Utils::Empty(Astab);
 	}
 
 	void DeleteUselessMatricesAfterMultigridSetup()
