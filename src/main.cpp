@@ -511,8 +511,8 @@ void print_usage() {
 	cout << "-ut" << endl;
 	cout << "      Run unit tests." << endl;
 	cout << endl;
-	cout << "-opt NUM" << endl;
-	cout << "      Developer option to choose variants of code." << endl;
+	cout << "-opt1 NUM" << endl;
+	cout << "      Developer option to choose variants of code. -opt2 also available." << endl;
 	cout << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << "                      Examples and typical use cases                  " << endl;
@@ -660,7 +660,8 @@ int main(int argc, char* argv[])
 		OPT_GMSHLog,
 		OPT_IntegrationByParts,
 		OPT_NeighbourhoodDepth,
-		OPT_Option,
+		OPT_Option1,
+		OPT_Option2,
 	};
 
 	static struct option long_opts[] = {
@@ -740,7 +741,8 @@ int main(int argc, char* argv[])
 		 { "ut", no_argument, NULL, OPT_UnitTests },
 		 { "gmsh-log", no_argument, NULL, OPT_GMSHLog },
 		 { "nbh-depth", required_argument, NULL, OPT_NeighbourhoodDepth },
-		 { "opt", required_argument, NULL, OPT_Option },
+		 { "opt1", required_argument, NULL, OPT_Option1 },
+		 { "opt2", required_argument, NULL, OPT_Option2 },
 		 { NULL, 0, NULL, 0 }
 	};
 
@@ -1340,8 +1342,11 @@ int main(int argc, char* argv[])
 			case OPT_VisuMaxRefinements:
 				args.Actions.Export.VisuMaxRefinements = atoi(optarg);
 				break;
-			case OPT_Option:
-				args.Actions.Option = atoi(optarg);
+			case OPT_Option1:
+				args.Actions.Option1 = atoi(optarg);
+				break;
+			case OPT_Option2:
+				args.Actions.Option2 = atoi(optarg);
 				break;
 			default:
 			{

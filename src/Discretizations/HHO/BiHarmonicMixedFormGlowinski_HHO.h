@@ -61,7 +61,7 @@ public:
 
 		ThetaSpace = &_diffPb.BoundarySpace;
 
-		_option = Utils::ProgramArgs.Actions.Option;
+		_option = Utils::ProgramArgs.Actions.Option1;
 
 		_DomainSolveCellUknTranspose = _diffPb.DomainSolveCellUknTransposeOnBoundary();
 		_SolveCellUknTranspose = _diffPb.SolveCellUknTransposeOnBoundary();

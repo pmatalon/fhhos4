@@ -159,6 +159,15 @@ public:
 			cout << "-     Solve biharmonic problem      -" << endl;
 			cout << "-------------------------------------" << endl;
 
+
+			Vector discreteExactSolution;
+			double exactSolutionL2Norm = 0;
+			if (testCase->ExactSolution)
+			{
+				discreteExactSolution = biHarPb->DiffPb().ReconstructSpace.Project(testCase->ExactSolution);
+				exactSolutionL2Norm = biHarPb->DiffPb().ReconstructSpace.L2Norm(discreteExactSolution);
+			}
+
 			// Solve 1st problem with f as source
 			Vector theta_f = biHarPb->FindCompatibleTheta();
 			Vector lambda_f = biHarPb->Solve1stDiffProblemWithFSource(theta_f);
@@ -220,20 +229,20 @@ public:
 				// Compute L2-error at each iteration
 				if ((args.Solver.ComputeIterL2Error || args.Actions.Export.IterationL2Errors) && testCase->ExactSolution)
 				{
-					biHarIterSolver->OnNewSolution = [&biHarPb, &testCase, &theta_f, &u_boundary_f, &b](IterationResult& result, const Vector& theta_0)
+					biHarIterSolver->OnNewSolution = [&biHarPb, &testCase, &theta_f, &u_boundary_f, &b, &discreteExactSolution , &exactSolutionL2Norm](IterationResult& result, const Vector& theta_0)
 					{
 						Vector reconstructedLap, reconstructedSolution;
 						std::tie(reconstructedLap, reconstructedSolution) = biHarPb->ComputeSolution(theta_f + theta_0);
-						result.L2Error = biHarPb->DiffPb().L2Error(testCase->ExactSolution, reconstructedSolution);
+						result.L2Error = biHarPb->DiffPb().ReconstructSpace.L2Norm(reconstructedSolution - discreteExactSolution) / exactSolutionL2Norm;
 
-						Vector lambda2 = biHarPb->Solve1stDiffProblemWithFSource(theta_f + theta_0);
-						Vector u_boundary = biHarPb->Solve2ndDiffProblem(lambda2, true);
+						//Vector lambda2 = biHarPb->Solve1stDiffProblemWithFSource(theta_f + theta_0);
+						//Vector u_boundary = biHarPb->Solve2ndDiffProblem(lambda2, true);
 						/* // same thing
 						Vector lambda0 = biHarPb->Solve1stDiffProblemWithZeroSource(theta);
 						Vector u_boundary_0 = biHarPb->Solve2ndDiffProblem(lambda0, true);
 						Vector u_boundary_b = u_boundary_f + u_boundary_0;*/
 						//cout << "                                                                ||u_boundary|| = " << std::scientific << sqrt(biHarPb->L2InnerProdOnBoundary(u_boundary_b, u_boundary_b)) << endl;
-						result.BoundaryL2Norm = sqrt(biHarPb->L2InnerProdOnBoundary(u_boundary, u_boundary));
+						//result.BoundaryL2Norm = sqrt(biHarPb->L2InnerProdOnBoundary(u_boundary, u_boundary));
 
 						// Energy functional
 						//Vector lambda = biHarPb->Solve1stDiffProblemWithZeroSource(theta);
@@ -432,7 +441,6 @@ public:
 
 			if (testCase->ExactSolution)
 			{
-				Vector discreteExactSolution = biHarPb->DiffPb().ReconstructSpace.Project(testCase->ExactSolution);
 				Vector error = discreteExactSolution - reconstructedSolution;
 
 				if (args.Actions.Export.ErrorToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
@@ -441,8 +449,7 @@ public:
 				if (args.Actions.Export.AbsErrorToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
 					biHarPb->DiffPb().ExportReconstructedVectorToGMSH(error, out, "abs_error", args.Actions.Export.VisuTolerance, args.Actions.Export.VisuMaxRefinements, true);
 
-				double solutionError = biHarPb->DiffPb().ReconstructSpace.RelativeL2Norm(error, discreteExactSolution);
-				//double solutionError = biHarPb->DiffPb().L2Error(testCase->ExactSolution, reconstructedSolution);
+				double solutionError = biHarPb->DiffPb().ReconstructSpace.L2Norm(error) / exactSolutionL2Norm;
 				cout << endl << "L2 Error (solution) = " << std::scientific << solutionError << endl;
 			}
 

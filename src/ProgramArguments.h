@@ -126,7 +126,8 @@ struct ActionsArguments
 	bool InitReferenceShapes = true;
 	bool UnitTests = false;
 	bool GMSHLogEnabled = false;
-	int Option = 0;
+	int Option1 = 0;
+	int Option2 = 0;
 	ExportArguments Export;
 };
 

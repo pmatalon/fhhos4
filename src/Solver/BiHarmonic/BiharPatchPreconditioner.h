@@ -39,7 +39,7 @@ public:
 				Neighbourhood<Dim> nbh(e, _neighbourhoodDepth);
 				NeighbourhoodDiffusion_HHO<Dim> nbhDiff(nbh, _diffPb);
 
-				int option = Utils::ProgramArgs.Actions.Option;
+				int option = Utils::ProgramArgs.Actions.Option1;
 
 				SparseMatrix SolveCellUknTranspose;
 				SparseMatrix CellMass;
