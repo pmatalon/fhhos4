@@ -75,7 +75,7 @@ public:
 				z = Precond->Apply(r);
 				r_dot_z = L2InnerProdOnBoundary(r, z);
 
-				p = r;
+				p = z;
 			}
 			else
 			{
