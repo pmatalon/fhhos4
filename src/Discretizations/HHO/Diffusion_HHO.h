@@ -972,20 +972,16 @@ public:
 
 	Vector SolveCellUnknownsOnBoundaryOnly(const Vector& faceUnknowns, const Vector& b_T)
 	{
-		Vector v = b_T - A_T_ndF * faceUnknowns;
+		BigNumber nBdryCellUnknowns = _mesh->NBoundaryElements() * HHO->nCellUnknowns;
+		Vector v = b_T.head(nBdryCellUnknowns) - A_T_ndF.topRows(nBdryCellUnknowns) * faceUnknowns;
 
-		Vector cellUnknowns(_mesh->NBoundaryElements() * HHO->nCellUnknowns);
+		Vector cellUnknowns(nBdryCellUnknowns);
 
-		ElementParallelLoop<Dim> parallelLoop(this->_mesh->Elements);
+		ElementParallelLoop<Dim> parallelLoop(this->_mesh->BoundaryElements);
 		parallelLoop.Execute([this, &v, &cellUnknowns](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
 			{
-				if (e->IsOnBoundary())
-				{
 					Diff_HHOElement<Dim>* elem = HHOElement(e);
-
-					int boundaryElemNumber = _mesh->BoundaryElementNumber(e);
-					cellUnknowns.segment(boundaryElemNumber * HHO->nCellUnknowns, HHO->nCellUnknowns) = elem->AttSolver.solve(v.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns));
-				}
+					cellUnknowns.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns) = elem->AttSolver.solve(v.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns));
 			});
 		return cellUnknowns;
 	}
@@ -1102,30 +1098,6 @@ public:
 		parallelLoop.Fill(mat);
 		return mat;
 	}
-
-	SparseMatrix DomainSolveCellUknTransposeOnBoundary()
-	{
-		FaceParallelLoop<Dim> parallelLoop(_mesh->BoundaryFaces);
-		parallelLoop.ReserveChunkCoeffsSize(HHO->nCellUnknowns * HHO->nFaceUnknowns);
-
-		parallelLoop.Execute([this](Face<Dim>* f, ParallelChunk<CoeffsChunk>* chunk)
-			{
-				int i = f->Number - HHO->nInteriorFaces;
-				Diff_HHOFace<Dim>* face = HHOFace(f);
-
-				//int j = _mesh->BoundaryElementNumber(f->Element1);
-				int j = f->Element1->Number;
-				Diff_HHOElement<Dim>* elem = this->HHOElement(f->Element1);
-
-				DenseMatrix S = elem->SolveCellUnknownsMatrix().middleCols(elem->LocalNumberOf(face) * HHO->nFaceUnknowns, HHO->nFaceUnknowns);
-
-				chunk->Results.Coeffs.Add(i * HHO->nFaceUnknowns, j * HHO->nCellUnknowns, S.transpose());
-			});
-
-		SparseMatrix mat(HHO->nBoundaryFaces * HHO->nFaceUnknowns, HHO->nTotalCellUnknowns);
-		parallelLoop.Fill(mat);
-		return mat;
-	}
 	
 	// Mass matrix of degree k, on boundary elements only
 	SparseMatrix CellMassMatrixOnBoundaryElements()
@@ -1156,32 +1128,11 @@ public:
 
 	Vector ExtractElemBoundary(const Vector v)
 	{
+		assert(_mesh->BoundaryElementsNumberedFirst());
 		if (v.rows() == HHO->nTotalReconstructUnknowns)
-		{
-			Vector boundary(_mesh->NBoundaryElements() * HHO->nReconstructUnknowns);
-			for (Element<Dim>* e : _mesh->Elements)
-			{
-				if (e->IsOnBoundary())
-				{
-					int i = _mesh->BoundaryElementNumber(e);
-					boundary.segment(i * HHO->nReconstructUnknowns, HHO->nReconstructUnknowns) = v.segment(e->Number * HHO->nReconstructUnknowns, HHO->nReconstructUnknowns);
-				}
-			}
-			return boundary;
-		}
+			return v.head(_mesh->BoundaryElements.size() * HHO->nReconstructUnknowns);
 		else if (v.rows() == HHO->nTotalCellUnknowns)
-		{
-			Vector boundary(_mesh->NBoundaryElements() * HHO->nCellUnknowns);
-			for (Element<Dim>* e : _mesh->Elements)
-			{
-				if (e->IsOnBoundary())
-				{
-					int i = _mesh->BoundaryElementNumber(e);
-					boundary.segment(i * HHO->nCellUnknowns, HHO->nCellUnknowns) = v.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns);
-				}
-			}
-			return boundary;
-		}
+			return v.head(_mesh->BoundaryElements.size() * HHO->nCellUnknowns);
 		Utils::FatalError("Not implemented");
 		return Vector();
 	}
@@ -1247,16 +1198,18 @@ public:
 		return result;
 	}
 
-	SparseMatrix A_T_T_Matrix()
+	SparseMatrix A_bT_bT_Matrix()
 	{
-		ElementParallelLoop<Dim> parallelLoop(this->_mesh->Elements);
+		assert(_mesh->BoundaryElementsNumberedFirst());
+
+		ElementParallelLoop<Dim> parallelLoop(_mesh->BoundaryElements);
 		parallelLoop.ReserveChunkCoeffsSize(HHO->nCellUnknowns * HHO->nCellUnknowns);
 		parallelLoop.Execute([this](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
 			{
 				Diff_HHOElement<Dim>* elem = HHOElement(e);
 				chunk->Results.Coeffs.Add(e->Number * HHO->nCellUnknowns, e->Number * HHO->nCellUnknowns, elem->A.topLeftCorner(HHO->nCellUnknowns, HHO->nCellUnknowns));
 			});
-		SparseMatrix mat = SparseMatrix(HHO->nTotalCellUnknowns, HHO->nTotalCellUnknowns);
+		SparseMatrix mat = SparseMatrix(_mesh->BoundaryElements.size() * HHO->nCellUnknowns, _mesh->BoundaryElements.size() * HHO->nCellUnknowns);
 		parallelLoop.Fill(mat);
 		return mat;
 	}

@@ -49,7 +49,7 @@ public:
 		if (args.Discretization.Mesher.compare("gmsh") == 0)
 			GMSHMesh<Dim>::CloseGMSH();
 
-		mesh->AssignNumberToBoundaryElements();
+		mesh->RenumberBoundaryElementsFirst();
 
 		cout << "Mesh storage > " << Utils::MemoryString(mesh->MemoryUsage()) << endl;
 

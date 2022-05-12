@@ -20,9 +20,8 @@ private:
 
 
 	SparseMatrix _CellMass;
-	SparseMatrix _DomainSolveCellUknTranspose;
 	SparseMatrix _SolveCellUknTranspose;
-	SparseMatrix _A_T_T;
+	SparseMatrix _A_bT_bT;
 
 	HHOParameters<Dim>* HHO;
 
@@ -63,9 +62,8 @@ public:
 
 		_option = Utils::ProgramArgs.Actions.Option1;
 
-		_DomainSolveCellUknTranspose = _diffPb.DomainSolveCellUknTransposeOnBoundary();
 		_SolveCellUknTranspose = _diffPb.SolveCellUknTransposeOnBoundary();
-		_A_T_T = _diffPb.A_T_T_Matrix();
+		_A_bT_bT = _diffPb.A_bT_bT_Matrix();
 		_CellMass = _diffPb.CellMassMatrixOnBoundaryElements();
 
 		_b_fSource = _diffPb.AssembleSourceTerm(_testCase->SourceFunction);
@@ -154,13 +152,14 @@ private:
 
 		if (returnBoundaryNormalDerivative)
 		{
+			BigNumber nBdryCellUnknowns = _mesh->BoundaryElements.size() * HHO->nCellUnknowns;
 			Vector sourceElemBoundary = _diffPb.ExtractElemBoundary(source);
 			if (_option == 0)
 			{
-				Vector cellSolution = _diffPb.SolveCellUnknowns(faceSolution, b_source);
+				Vector bdryCellSolution = _diffPb.SolveCellUnknownsOnBoundaryOnly(faceSolution, b_source);
 
-				Vector normalDerivative = _diffPb.A_T_dF.transpose() * cellSolution + _diffPb.A_ndF_dF.transpose() * faceSolution;
-				normalDerivative += _DomainSolveCellUknTranspose * (_A_T_T * cellSolution + _diffPb.A_T_ndF * faceSolution);
+				Vector normalDerivative = _diffPb.A_T_dF.topRows(nBdryCellUnknowns).transpose() * bdryCellSolution + _diffPb.A_ndF_dF.transpose() * faceSolution;
+				normalDerivative += _SolveCellUknTranspose * (_A_bT_bT * bdryCellSolution + _diffPb.A_T_ndF.topRows(nBdryCellUnknowns) * faceSolution);
 
 				normalDerivative -= _SolveCellUknTranspose * _CellMass * sourceElemBoundary;
 

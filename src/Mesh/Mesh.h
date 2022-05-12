@@ -73,6 +73,7 @@ public:
 	vector<Vertex*> Vertices;
 	vector<Element<Dim>*> Elements;
 	vector<Face<Dim>*> Faces;
+	vector<Element<Dim>*> BoundaryElements;
 	vector<Face<Dim>*> BoundaryFaces;
 	vector<Face<Dim>*> InteriorFaces;
 	vector<Face<Dim>*> DirichletFaces;
@@ -268,40 +269,39 @@ public:
 	}
 
 
-
-
 private:
-	map<BigNumber, int> _boundaryElemNumbers;
+	bool _boundaryElementsNumberedFirst = false;
 public:
-	void AssignNumberToBoundaryElements()
+	BigNumber NBoundaryElements()
 	{
-		if (!_boundaryElemNumbers.empty())
-			return;
-
-		int nBoundaryElements = 0;
+		return BoundaryElements.size();
+	}
+	void RenumberBoundaryElementsFirst()
+	{
+		int number = 0;
 		for (Element<Dim>* e : this->Elements)
 		{
 			if (e->IsOnBoundary())
-			{
-				_boundaryElemNumbers.insert(pair<BigNumber, int>(e->Number, nBoundaryElements));
-				nBoundaryElements++;
-			}
+				e->Number = number++;
 		}
+		BoundaryElements.reserve(number);
+		for (Element<Dim>* e : this->Elements)
+		{
+			if (e->IsOnBoundary())
+				BoundaryElements.push_back(e);
+			else
+				e->Number = number++;
+		}
+		_boundaryElementsNumberedFirst = true;
 	}
-
 	int BoundaryElementNumber(Element<Dim>* e)
 	{
-		assert(!_boundaryElemNumbers.empty());
-		return _boundaryElemNumbers[e->Number];
+		return e->Number;
 	}
-
-	BigNumber NBoundaryElements()
+	bool BoundaryElementsNumberedFirst()
 	{
-		assert(!_boundaryElemNumbers.empty());
-		return _boundaryElemNumbers.size();
+		return _boundaryElementsNumberedFirst;
 	}
-
-
 
 
 	Face<Dim>* ExistingFaceWithVertices(const vector<MeshVertex<Dim>*>& vertices)
