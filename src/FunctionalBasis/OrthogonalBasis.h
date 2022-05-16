@@ -1,6 +1,6 @@
 #pragma once
 #include "FunctionalBasis.h"
-#include "../Geometry/PhysicalShape.h"
+#include "../Geometry/GeometricShape.h"
 
 
 template <int Dim>
@@ -83,7 +83,9 @@ template <int Dim>
 class OrthogonalBasis : public FunctionalBasis<Dim>
 {
 public:
-	OrthogonalBasis(FunctionalBasis<Dim>* basis, PhysicalShape<Dim>* shape, int orthogonalizationSweeps = 1, bool normalize = true) :
+	OrthogonalBasis() {}
+
+	OrthogonalBasis(FunctionalBasis<Dim>* basis, GeometricShape<Dim>* shape, int orthogonalizationSweeps = 1, bool normalize = true) :
 		FunctionalBasis<Dim>()
 	{
 		this->_maxPolynomialDegree = basis->GetDegree();
@@ -101,10 +103,35 @@ public:
 		}
 	}
 
+	OrthogonalBasis(const OrthogonalBasis<Dim>& refShapeBasis, double detJacobian, bool normalize)
+	{
+		this->_maxPolynomialDegree = refShapeBasis.GetDegree();
+		this->IsHierarchical = refShapeBasis.IsHierarchical;
+		this->_basisCode = refShapeBasis.BasisCode();
+		this->UsePolynomialSpaceQ = refShapeBasis.UsePolynomialSpaceQ;
+		this->LocalFunctions.insert(this->LocalFunctions.end(), refShapeBasis.LocalFunctions.begin(), refShapeBasis.LocalFunctions.end());
+		if (normalize)
+		{
+			for (BasisFunction<Dim>* phi : this->LocalFunctions)
+			{
+				OrthogonalBasisFunction<Dim>* refphi = dynamic_cast<OrthogonalBasisFunction<Dim>*>(phi);
+				refphi->DivideBy(sqrt(detJacobian));
+			}
+		}
+		else
+		{
+			for (BasisFunction<Dim>* phi : this->LocalFunctions)
+			{
+				OrthogonalBasisFunction<Dim>* refphi = dynamic_cast<OrthogonalBasisFunction<Dim>*>(phi);
+				refphi->NormSquare *= detJacobian;
+			}
+		}
+	}
+
 private:
 	// Modified Gram-Schmitt algorithm with reorthogonalization
 	// (Giraud et al., The loss of orthogonality in the Gram-Schmidt orthogonalization process, 2003)
-	void Orthonormalize(FunctionalBasis<Dim>* basis, PhysicalShape<Dim>* shape, int orthogonalizationSweeps = 1)
+	void Orthonormalize(FunctionalBasis<Dim>* basis, GeometricShape<Dim>* shape, int orthogonalizationSweeps = 1)
 	{
 		for (int i = 0; i < basis->LocalFunctions.size(); i++)
 		{
@@ -120,11 +147,12 @@ private:
 			}
 			double norm = shape->L2Norm(phi);
 			phi->DivideBy(norm);
+			phi->NormSquare = 1;
 			this->LocalFunctions.push_back(phi);
 		}
 	}
 
-	void Orthogonalize(FunctionalBasis<Dim>* basis, PhysicalShape<Dim>* shape, int orthogonalizationSweeps = 1)
+	void Orthogonalize(FunctionalBasis<Dim>* basis, GeometricShape<Dim>* shape, int orthogonalizationSweeps = 1)
 	{
 		for (int i = 0; i < basis->LocalFunctions.size(); i++)
 		{

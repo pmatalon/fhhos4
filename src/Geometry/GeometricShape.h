@@ -43,7 +43,7 @@ public:
 		return Integral(func, phi->GetDegree());
 	}
 
-protected:
+public:
 	DenseMatrix ComputeAndReturnMassMatrix(FunctionalBasis<Dim>* basis) const
 	{
 		DenseMatrix M = DenseMatrix(basis->Size(), basis->Size());

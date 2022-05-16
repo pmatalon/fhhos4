@@ -111,7 +111,15 @@ public:
 
 		if (hho->OrthogonalizeElemBases())
 		{
-			this->ReconstructionBasis = new OrthogonalBasis<Dim>(HHO->ReconstructionBasis, this->MeshElement->Shape(), hho->NElemOrthogonalizations(), hho->OrthonormalizeElemBases());
+			PhysicalShapeWithConstantJacobian<Dim>* shapeCstJac = dynamic_cast<PhysicalShapeWithConstantJacobian<Dim>*>(this->MeshElement->Shape());
+			const OrthogonalBasis<Dim>* refShapeOrthogBasis = nullptr;
+			if (shapeCstJac)
+				refShapeOrthogBasis = shapeCstJac->RefShape()->OrthogonalizedBasis(HHO->ReconstructionBasis);
+
+			if (shapeCstJac && refShapeOrthogBasis)
+				this->ReconstructionBasis = new OrthogonalBasis<Dim>(*refShapeOrthogBasis, shapeCstJac->DetJacobian(), hho->OrthonormalizeElemBases());
+			else
+				this->ReconstructionBasis = new OrthogonalBasis<Dim>(HHO->ReconstructionBasis, this->MeshElement->Shape(), hho->NElemOrthogonalizations(), hho->OrthonormalizeElemBases());
 			this->CellBasis = new FunctionalBasis<Dim>(this->ReconstructionBasis->ExtractLowerBasis(HHO->CellBasis->GetDegree()));
 		}
 		else
@@ -119,10 +127,11 @@ public:
 			this->ReconstructionBasis = HHO->ReconstructionBasis;
 			this->CellBasis = HHO->CellBasis;
 		}
-		//DenseMatrix massMatrix = this->MeshElement->Shape()->MassMatrix(this->ReconstructionBasis);
-		//cout << "Reconstruct mass matrix: " << endl << massMatrix << endl;
-		//massMatrix = this->MeshElement->Shape()->MassMatrix(this->CellBasis);
-		//cout << "Cell mass matrix: " << endl << massMatrix << endl;
+
+		/*cout << "Reconstruct mass matrix (computed): " << endl << this->MeshElement->Shape()->ComputeAndReturnMassMatrix(this->ReconstructionBasis) << endl;
+		cout << "Reconstruct mass matrix (applied): " << endl << this->MassMatrix(this->ReconstructionBasis) << endl;
+		cout << "Cell mass matrix (computed): " << endl << this->MeshElement->Shape()->ComputeAndReturnMassMatrix(this->CellBasis) << endl;
+		cout << "Cell mass matrix (applied): " << endl << this->MassMatrix(this->CellBasis) << endl;*/
 
 
 		//this->ComputeAndSaveQuadraturePoints(hho->CellBasis->GetDegree());

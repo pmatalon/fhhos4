@@ -668,12 +668,15 @@ public:
 	// Compute some useful integrals on reference element and store them
 	static void InitReferenceShapes(HHOParameters<Dim>* hho, DiffusionField<Dim>* diffField)
 	{
-		if (hho->OrthogonalizeElemBases() && hho->OrthogonalizeFaceBases())
-			return;
-
 		FunctionalBasis<Dim>* reconstructionBasis = hho->ReconstructionBasis;
 		FunctionalBasis<Dim>* cellBasis = hho->CellBasis;
 		FunctionalBasis<Dim - 1>* faceBasis = hho->FaceBasis;
+
+		if (hho->OrthogonalizeElemBases())// && hho->OrthogonalizeFaceBases())
+		{
+			Triangle::InitReferenceShape()->Orthogonalize(reconstructionBasis, hho->NElemOrthogonalizations(), hho->OrthonormalizeElemBases());
+			//return;
+		}
 
 		// - Cartesian element
 		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreMassMatrix(cellBasis);

@@ -1,5 +1,6 @@
 #pragma once
 #include "GeometricShape.h"
+#include "../FunctionalBasis/OrthogonalBasis.h"
 
 template <int Dim>
 class ReferenceShape : public GeometricShape<Dim>
@@ -8,6 +9,7 @@ private:
 	map<FunctionalBasis<Dim>*, DenseMatrix> _massMatrices;
 	map<FunctionalBasis<Dim>*, DenseMatrix> _cellReconstructMatrices;
 
+	map<FunctionalBasis<Dim>*, OrthogonalBasis<Dim>*> _orthogBases;
 public:
 	ReferenceShape() {}
 
@@ -81,6 +83,20 @@ public:
 	{
 		if (_cellReconstructMatrices.find(cellBasis) == _cellReconstructMatrices.end())
 			_cellReconstructMatrices[cellBasis] = this->ComputeAndReturnMassMatrix(cellBasis, reconstructBasis);
+	}
+
+	void Orthogonalize(FunctionalBasis<Dim>* basis, int orthogonalizationSweeps = 1, bool normalize = true)
+	{
+		_orthogBases[basis] = new OrthogonalBasis<Dim>(basis, this, orthogonalizationSweeps, normalize);
+	}
+
+	const OrthogonalBasis<Dim>* OrthogonalizedBasis(FunctionalBasis<Dim>* basis) const
+	{
+		auto it = _orthogBases.find(basis);
+		if (it != _orthogBases.end())
+			return it->second;
+		else
+			return nullptr;
 	}
 
 };
