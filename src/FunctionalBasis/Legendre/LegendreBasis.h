@@ -1,38 +1,39 @@
 #pragma once
-#include "FunctionalBasis.h"
-#include "TensorPolynomial.h"
-#include "Hemker1D.h"
+#include "../FunctionalBasis.h"
+#include "../TensorPolynomial.h"
+#include "Legendre1D.h"
 
 template <int Dim>
-class HemkerBasis : public FunctionalBasis<Dim>
+class LegendreBasis : public FunctionalBasis<Dim>
 {
 public:
-	bool   IsHierarchical()                const override { return false; }
-	string BasisCode()                     const override { return "hemker"; }
-	static string Code()                                  { return "hemker"; };
+	bool   IsHierarchical()                const override { return true; }
+	bool   IsOrthogonalOnCartesianShapes() const override { return true; }
+	string BasisCode()                     const override { return "legendre"; }
+	static string Code()                                  { return "legendre"; };
 };
 
-class HemkerBasis1D : public HemkerBasis<1>
+class LegendreBasis1D : public LegendreBasis<1>
 {
 private:
-	vector<Hemker1D> _localFunctions;
+	vector<Legendre1D> _localFunctions;
 private:
-	HemkerBasis1D() {}
+	LegendreBasis1D() {}
 public:
-	HemkerBasis1D(int maxPolynomialDegree)
+	LegendreBasis1D(int maxPolynomialDegree)
 	{
 		maxPolynomialDegree = max(0, maxPolynomialDegree);
 
 		_localFunctions.reserve(maxPolynomialDegree + 1);
 		for (int i = 0; i <= maxPolynomialDegree; i++)
-			_localFunctions.emplace_back(maxPolynomialDegree, i);
+			_localFunctions.emplace_back(i);
 
 	}
 	vector<BasisFunction<1>*> LocalFunctions() override
 	{
 		vector<BasisFunction<1>*> list;
 		list.reserve(_localFunctions.size());
-		for (Hemker1D& m : _localFunctions)
+		for (Legendre1D& m : _localFunctions)
 			list.push_back(&m);
 		return list;
 	}
@@ -54,30 +55,36 @@ public:
 
 	FunctionalBasis<1>* CreateSameBasisForDegree(int degree) override
 	{
-		return new HemkerBasis1D(degree);
+		return new LegendreBasis1D(degree);
 	}
 
 	FunctionalBasis<1>* CreateLowerDegreeBasis(int degree) override
 	{
-		return new HemkerBasis1D(degree);
+		LegendreBasis1D* lowerBasis = new LegendreBasis1D();
+		for (Legendre1D& phi : _localFunctions)
+		{
+			if (phi.GetDegree() <= degree)
+				lowerBasis->_localFunctions.push_back(phi);
+		}
+		return lowerBasis;
 	}
 };
 
-class HemkerBasis2D : public HemkerBasis<2>
+class LegendreBasis2D : public LegendreBasis<2>
 {
 private:
-	vector<Hemker1D> _hemker1D;
+	vector<Legendre1D> _legendre1D;
 	vector<TensorPolynomial2D> _localFunctions;
 private:
-	HemkerBasis2D() {}
+	LegendreBasis2D() {}
 public:
-	HemkerBasis2D(int maxPolynomialDegree, bool usePolynomialSpaceQ)
+	LegendreBasis2D(int maxPolynomialDegree, bool usePolynomialSpaceQ)
 	{
 		maxPolynomialDegree = max(0, maxPolynomialDegree);
 
-		_hemker1D.reserve(maxPolynomialDegree + 1);
+		_legendre1D.reserve(maxPolynomialDegree + 1);
 		for (int i = 0; i <= maxPolynomialDegree; i++)
-			_hemker1D.emplace_back(maxPolynomialDegree, i);
+			_legendre1D.emplace_back(i);
 
 		if (usePolynomialSpaceQ)
 		{
@@ -87,8 +94,8 @@ public:
 			{
 				for (int i = 0; i <= maxPolynomialDegree; i++)
 				{
-					Hemker1D& polyX = _hemker1D[i];
-					Hemker1D& polyY = _hemker1D[j];
+					Legendre1D& polyX = _legendre1D[i];
+					Legendre1D& polyY = _legendre1D[j];
 					_localFunctions.emplace_back(functionNumber, &polyX, &polyY);
 					functionNumber++;
 				}
@@ -104,9 +111,9 @@ public:
 				for (int j = 0; j <= degree; j++)
 				{
 					int i = degree - j;
-					Hemker1D* polyX = new Hemker1D(i, i); // TODO: free
-					Hemker1D* polyY = new Hemker1D(j, j); // TODO: free
-					_localFunctions.emplace_back(functionNumber, polyX, polyY);
+					Legendre1D& polyX = _legendre1D[i];
+					Legendre1D& polyY = _legendre1D[j];
+					_localFunctions.emplace_back(functionNumber, &polyX, &polyY);
 					functionNumber++;
 				}
 			}
@@ -125,7 +132,7 @@ public:
 
 	int GetDegree() const override
 	{
-		return (int)_hemker1D.size() - 1;
+		return (int)_legendre1D.size() - 1;
 	}
 
 	int Size() const override
@@ -135,32 +142,43 @@ public:
 
 	FunctionalBasis<2>* CreateSameBasisForDegree(int degree) override
 	{
-		return new HemkerBasis2D(degree, UsePolynomialSpaceQ());
+		return new LegendreBasis2D(degree, UsePolynomialSpaceQ());
 	}
 
 	FunctionalBasis<2>* CreateLowerDegreeBasis(int degree) override
 	{
-		return new HemkerBasis2D(degree, UsePolynomialSpaceQ());
+		LegendreBasis2D* lowerBasis = new LegendreBasis2D();
+		for (Legendre1D& phi : _legendre1D)
+		{
+			if (phi.GetDegree() <= degree)
+				lowerBasis->_legendre1D.push_back(phi);
+		}
+		for (TensorPolynomial2D& tp : _localFunctions)
+		{
+			if (tp.GetDegree() <= degree)
+				lowerBasis->_localFunctions.push_back(tp);
+		}
+		return lowerBasis;
 	}
 };
 
 #ifdef ENABLE_3D
 
-class HemkerBasis3D : public HemkerBasis<3>
+class LegendreBasis3D : public LegendreBasis<3>
 {
 private:
-	vector<Hemker1D> _hemker1D;
+	vector<Legendre1D> _legendre1D;
 	vector<TensorPolynomial3D> _localFunctions;
 private:
-	HemkerBasis3D() {}
+	LegendreBasis3D() {}
 public:
-	HemkerBasis3D(int maxPolynomialDegree, bool usePolynomialSpaceQ)
+	LegendreBasis3D(int maxPolynomialDegree, bool usePolynomialSpaceQ)
 	{
 		maxPolynomialDegree = max(0, maxPolynomialDegree);
 
-		_hemker1D.reserve(maxPolynomialDegree + 1);
+		_legendre1D.reserve(maxPolynomialDegree + 1);
 		for (int i = 0; i <= maxPolynomialDegree; i++)
-			_hemker1D.emplace_back(maxPolynomialDegree, i);
+			_legendre1D.emplace_back(i);
 
 		if (usePolynomialSpaceQ)
 		{
@@ -172,9 +190,9 @@ public:
 				{
 					for (int i = 0; i <= maxPolynomialDegree; i++)
 					{
-						Hemker1D& polyX = _hemker1D[i];
-						Hemker1D& polyY = _hemker1D[j];
-						Hemker1D& polyZ = _hemker1D[k];
+						Legendre1D& polyX = _legendre1D[i];
+						Legendre1D& polyY = _legendre1D[j];
+						Legendre1D& polyZ = _legendre1D[k];
 						_localFunctions.emplace_back(functionNumber, &polyX, &polyY, &polyZ);
 						functionNumber++;
 					}
@@ -188,15 +206,15 @@ public:
 			int functionNumber = 0;
 			for (int degree = 0; degree <= maxPolynomialDegree; degree++)
 			{
-				for (int k = 0; k <= degree; k++)
+				for (int degZ = 0; degZ <= degree; degZ++)
 				{
-					for (int j = 0; j <= degree - k; j++)
+					for (int degY = 0; degY <= degree - degZ; degY++)
 					{
-						int i = degree - k - j;
-						Hemker1D* polyX = new Hemker1D(i, i); // TODO: free
-						Hemker1D* polyY = new Hemker1D(j, j); // TODO: free
-						Hemker1D* polyZ = new Hemker1D(k, k); // TODO: free
-						_localFunctions.emplace_back(functionNumber, polyX, polyY, polyZ);
+						int degX = degree - degZ - degY;
+						Legendre1D& polyX = _legendre1D[degX];
+						Legendre1D& polyY = _legendre1D[degY];
+						Legendre1D& polyZ = _legendre1D[degZ];
+						_localFunctions.emplace_back(functionNumber, &polyX, &polyY, &polyZ);
 						functionNumber++;
 					}
 				}
@@ -216,7 +234,7 @@ public:
 
 	int GetDegree() const
 	{
-		return (int)_hemker1D.size() - 1;
+		return (int)_legendre1D.size() - 1;
 	}
 
 	int Size() const override
@@ -226,12 +244,23 @@ public:
 
 	FunctionalBasis<3>* CreateSameBasisForDegree(int degree) override
 	{
-		return new HemkerBasis3D(degree, UsePolynomialSpaceQ());
+		return new LegendreBasis3D(degree, UsePolynomialSpaceQ());
 	}
 
 	FunctionalBasis<3>* CreateLowerDegreeBasis(int degree) override
 	{
-		return new HemkerBasis3D(degree, UsePolynomialSpaceQ());
+		LegendreBasis3D* lowerBasis = new LegendreBasis3D();
+		for (Legendre1D& phi : _legendre1D)
+		{
+			if (phi.GetDegree() <= degree)
+				lowerBasis->_legendre1D.push_back(phi);
+		}
+		for (TensorPolynomial3D& tp : _localFunctions)
+		{
+			if (tp.GetDegree() <= degree)
+				lowerBasis->_localFunctions.push_back(tp);
+		}
+		return lowerBasis;
 	}
 };
 #endif // ENABLE_3D

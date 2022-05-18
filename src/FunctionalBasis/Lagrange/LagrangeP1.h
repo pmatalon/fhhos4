@@ -1,5 +1,5 @@
 #pragma once
-#include "BasisFunction.h"
+#include "../BasisFunction.h"
 using namespace std;
 
 class LagrangeP1 : public IBasisFunction2D

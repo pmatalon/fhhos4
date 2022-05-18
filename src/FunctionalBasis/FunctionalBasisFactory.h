@@ -1,10 +1,10 @@
 #pragma once
 #include <cstdio>
-#include "MonomialBasis.h"
-#include "LegendreBasis.h"
-#include "BernsteinBasis.h"
-#include "HemkerBasis.h"
-#include "LagrangeBasis.h"
+#include "Monomials/MonomialBasis.h"
+#include "Legendre/LegendreBasis.h"
+#include "Bernstein/BernsteinBasis.h"
+#include "Hemker/HemkerBasis.h"
+#include "Lagrange/LagrangeBasis.h"
 using namespace std;
 
 template <int Dim>

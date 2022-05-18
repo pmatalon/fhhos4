@@ -1,7 +1,6 @@
 #pragma once
-#include "BasisFunction.h"
-#include "../Utils/Utils.h"
-#include <string>
+#include "../BasisFunction.h"
+#include "../../Utils/Utils.h"
 #include <math.h>
 #include <assert.h>
 using namespace std;

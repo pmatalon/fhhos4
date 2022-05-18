@@ -2,7 +2,7 @@
 #include <gmsh.h>
 #include "../../Mesh/PolyhedralMesh.h"
 #include "../InHouse/Square_TriangularMesh.h"
-#include "../../FunctionalBasis/MonomialBasis.h"
+#include "../../FunctionalBasis/Monomials/MonomialBasis.h"
 using namespace std;
 
 enum GMSHElementTypes

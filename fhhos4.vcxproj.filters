@@ -13,15 +13,6 @@
     <ClInclude Include="src/FunctionalBasis/BasisFunction.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
-    <ClInclude Include="src/FunctionalBasis/Bernstein1D.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
-    <ClInclude Include="src/FunctionalBasis/Bernstein2D.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
-    <ClInclude Include="src/FunctionalBasis/Bernstein3D.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
     <ClInclude Include="src/Mesh/Element.h">
       <Filter>Mesh</Filter>
     </ClInclude>
@@ -29,12 +20,6 @@
       <Filter>Mesh</Filter>
     </ClInclude>
     <ClInclude Include="src/FunctionalBasis/FunctionalBasis.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
-    <ClInclude Include="src/FunctionalBasis/Legendre1D.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
-    <ClInclude Include="src/FunctionalBasis/Monomial1D.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
     <ClInclude Include="src/Utils/NonZeroCoefficients.h">
@@ -48,9 +33,6 @@
     </ClInclude>
     <ClInclude Include="src\Mesh\Mesh.h">
       <Filter>Mesh</Filter>
-    </ClInclude>
-    <ClInclude Include="src\FunctionalBasis\Hemker1D.h">
-      <Filter>FunctionalBasis</Filter>
     </ClInclude>
     <ClInclude Include="src\Mesh\CartesianElement.h">
       <Filter>Mesh</Filter>
@@ -487,9 +469,6 @@
     <ClInclude Include="src\Solver\Direct\EigenLU.h">
       <Filter>Solver\Direct</Filter>
     </ClInclude>
-    <ClInclude Include="src\FunctionalBasis\LagrangeP1.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
     <ClInclude Include="src\Program\Program_Diffusion_FEM.h">
       <Filter>Program</Filter>
     </ClInclude>
@@ -580,23 +559,44 @@
     <ClInclude Include="src\Solver\BiHarmonic\BiharPatchPreconditionerFalk.h">
       <Filter>Solver\BiHarmonic</Filter>
     </ClInclude>
-    <ClInclude Include="src\FunctionalBasis\MonomialBasis.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
     <ClInclude Include="src\FunctionalBasis\FunctionalBasisFactory.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
-    <ClInclude Include="src\FunctionalBasis\LegendreBasis.h">
-      <Filter>FunctionalBasis</Filter>
+    <ClInclude Include="src\FunctionalBasis\Bernstein\Bernstein1D.h">
+      <Filter>FunctionalBasis\Bernstein</Filter>
     </ClInclude>
-    <ClInclude Include="src\FunctionalBasis\HemkerBasis.h">
-      <Filter>FunctionalBasis</Filter>
+    <ClInclude Include="src\FunctionalBasis\Bernstein\Bernstein2D.h">
+      <Filter>FunctionalBasis\Bernstein</Filter>
     </ClInclude>
-    <ClInclude Include="src\FunctionalBasis\BernsteinBasis.h">
-      <Filter>FunctionalBasis</Filter>
+    <ClInclude Include="src\FunctionalBasis\Bernstein\Bernstein3D.h">
+      <Filter>FunctionalBasis\Bernstein</Filter>
     </ClInclude>
-    <ClInclude Include="src\FunctionalBasis\LagrangeBasis.h">
-      <Filter>FunctionalBasis</Filter>
+    <ClInclude Include="src\FunctionalBasis\Hemker\Hemker1D.h">
+      <Filter>FunctionalBasis\Hemker</Filter>
+    </ClInclude>
+    <ClInclude Include="src\FunctionalBasis\Lagrange\LagrangeBasis.h">
+      <Filter>FunctionalBasis\Lagrange</Filter>
+    </ClInclude>
+    <ClInclude Include="src\FunctionalBasis\Legendre\Legendre1D.h">
+      <Filter>FunctionalBasis\Legendre</Filter>
+    </ClInclude>
+    <ClInclude Include="src\FunctionalBasis\Monomials\MonomialBasis.h">
+      <Filter>FunctionalBasis\Monomials</Filter>
+    </ClInclude>
+    <ClInclude Include="src\FunctionalBasis\Monomials\Monomial1D.h">
+      <Filter>FunctionalBasis\Monomials</Filter>
+    </ClInclude>
+    <ClInclude Include="src\FunctionalBasis\Legendre\LegendreBasis.h">
+      <Filter>FunctionalBasis\Legendre</Filter>
+    </ClInclude>
+    <ClInclude Include="src\FunctionalBasis\Lagrange\LagrangeP1.h">
+      <Filter>FunctionalBasis\Lagrange</Filter>
+    </ClInclude>
+    <ClInclude Include="src\FunctionalBasis\Bernstein\BernsteinBasis.h">
+      <Filter>FunctionalBasis\Bernstein</Filter>
+    </ClInclude>
+    <ClInclude Include="src\FunctionalBasis\Hemker\HemkerBasis.h">
+      <Filter>FunctionalBasis\Hemker</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -719,6 +719,21 @@
     </Filter>
     <Filter Include="Discretizations\HHO\DiscreteSpaces">
       <UniqueIdentifier>{e0159cf0-0fea-46b8-91aa-a20c5e13fe17}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="FunctionalBasis\Bernstein">
+      <UniqueIdentifier>{898a162f-267d-4e2e-a871-134ddd30453a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="FunctionalBasis\Monomials">
+      <UniqueIdentifier>{74aa6242-c7dd-4f1a-a871-7f38efd6bfd2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="FunctionalBasis\Legendre">
+      <UniqueIdentifier>{53f5fa96-c104-415b-918b-7e8be7ed1167}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="FunctionalBasis\Lagrange">
+      <UniqueIdentifier>{1687667c-efc5-47c0-98f5-96ec3efa2a88}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="FunctionalBasis\Hemker">
+      <UniqueIdentifier>{34dee0c3-c840-4057-a775-38ac176095d5}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

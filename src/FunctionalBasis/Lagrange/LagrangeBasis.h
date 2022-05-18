@@ -1,7 +1,7 @@
 #pragma once
-#include "FunctionalBasis.h"
+#include "../FunctionalBasis.h"
 #include "LagrangeP1.h"
-#include "../Utils/Utils.h"
+#include "../../Utils/Utils.h"
 
 template <int Dim>
 class LagrangeBasis : public FunctionalBasis<Dim>

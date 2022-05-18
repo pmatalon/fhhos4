@@ -1,40 +1,38 @@
 #pragma once
-#include "FunctionalBasis.h"
-#include "TensorPolynomial.h"
-#include "Monomial1D.h"
+#include "../FunctionalBasis.h"
+#include "../TensorPolynomial.h"
+#include "Hemker1D.h"
 
 template <int Dim>
-class MonomialBasis : public FunctionalBasis<Dim>
+class HemkerBasis : public FunctionalBasis<Dim>
 {
 public:
-	bool   IsHierarchical()                const override { return true; }
-	bool   IsOrthogonalOnCartesianShapes() const override { return false; }
-	string BasisCode()                     const override { return "monomials"; }
-	static string Code()                                  { return "monomials"; };
+	bool   IsHierarchical()                const override { return false; }
+	string BasisCode()                     const override { return "hemker"; }
+	static string Code()                                  { return "hemker"; };
 };
 
-class MonomialBasis1D : public MonomialBasis<1>
+class HemkerBasis1D : public HemkerBasis<1>
 {
 private:
-	vector<Monomial1D> _localMonomials;
+	vector<Hemker1D> _localFunctions;
 private:
-	MonomialBasis1D() {}
+	HemkerBasis1D() {}
 public:
-	MonomialBasis1D(int maxPolynomialDegree)
+	HemkerBasis1D(int maxPolynomialDegree)
 	{
 		maxPolynomialDegree = max(0, maxPolynomialDegree);
 
-		_localMonomials.reserve(maxPolynomialDegree + 1);
+		_localFunctions.reserve(maxPolynomialDegree + 1);
 		for (int i = 0; i <= maxPolynomialDegree; i++)
-			_localMonomials.emplace_back(i);
+			_localFunctions.emplace_back(maxPolynomialDegree, i);
 
 	}
-
 	vector<BasisFunction<1>*> LocalFunctions() override
 	{
 		vector<BasisFunction<1>*> list;
-		list.reserve(_localMonomials.size());
-		for (Monomial1D& m : _localMonomials)
+		list.reserve(_localFunctions.size());
+		for (Hemker1D& m : _localFunctions)
 			list.push_back(&m);
 		return list;
 	}
@@ -46,7 +44,7 @@ public:
 
 	int Size() const override
 	{
-		return (int)_localMonomials.size();
+		return (int)_localFunctions.size();
 	}
 
 	bool UsePolynomialSpaceQ() const override
@@ -56,36 +54,30 @@ public:
 
 	FunctionalBasis<1>* CreateSameBasisForDegree(int degree) override
 	{
-		return new MonomialBasis1D(degree);
+		return new HemkerBasis1D(degree);
 	}
 
 	FunctionalBasis<1>* CreateLowerDegreeBasis(int degree) override
 	{
-		MonomialBasis1D* lowerBasis = new MonomialBasis1D();
-		for (Monomial1D& phi : _localMonomials)
-		{
-			if (phi.GetDegree() <= degree)
-				lowerBasis->_localMonomials.push_back(phi);
-		}
-		return lowerBasis;
+		return new HemkerBasis1D(degree);
 	}
 };
 
-class MonomialBasis2D : public MonomialBasis<2>
+class HemkerBasis2D : public HemkerBasis<2>
 {
 private:
-	vector<Monomial1D> _monomials1D;
+	vector<Hemker1D> _hemker1D;
 	vector<TensorPolynomial2D> _localFunctions;
 private:
-	MonomialBasis2D() {}
+	HemkerBasis2D() {}
 public:
-	MonomialBasis2D(int maxPolynomialDegree, bool usePolynomialSpaceQ)
+	HemkerBasis2D(int maxPolynomialDegree, bool usePolynomialSpaceQ)
 	{
 		maxPolynomialDegree = max(0, maxPolynomialDegree);
 
-		_monomials1D.reserve(maxPolynomialDegree + 1);
+		_hemker1D.reserve(maxPolynomialDegree + 1);
 		for (int i = 0; i <= maxPolynomialDegree; i++)
-			_monomials1D.emplace_back(i);
+			_hemker1D.emplace_back(maxPolynomialDegree, i);
 
 		if (usePolynomialSpaceQ)
 		{
@@ -95,8 +87,8 @@ public:
 			{
 				for (int i = 0; i <= maxPolynomialDegree; i++)
 				{
-					Monomial1D& polyX = _monomials1D[i];
-					Monomial1D& polyY = _monomials1D[j];
+					Hemker1D& polyX = _hemker1D[i];
+					Hemker1D& polyY = _hemker1D[j];
 					_localFunctions.emplace_back(functionNumber, &polyX, &polyY);
 					functionNumber++;
 				}
@@ -112,9 +104,9 @@ public:
 				for (int j = 0; j <= degree; j++)
 				{
 					int i = degree - j;
-					Monomial1D& polyX = _monomials1D[i];
-					Monomial1D& polyY = _monomials1D[j];
-					_localFunctions.emplace_back(functionNumber, &polyX, &polyY);
+					Hemker1D* polyX = new Hemker1D(i, i); // TODO: free
+					Hemker1D* polyY = new Hemker1D(j, j); // TODO: free
+					_localFunctions.emplace_back(functionNumber, polyX, polyY);
 					functionNumber++;
 				}
 			}
@@ -133,7 +125,7 @@ public:
 
 	int GetDegree() const override
 	{
-		return (int)_monomials1D.size() - 1;
+		return (int)_hemker1D.size() - 1;
 	}
 
 	int Size() const override
@@ -143,43 +135,32 @@ public:
 
 	FunctionalBasis<2>* CreateSameBasisForDegree(int degree) override
 	{
-		return new MonomialBasis2D(degree, UsePolynomialSpaceQ());
+		return new HemkerBasis2D(degree, UsePolynomialSpaceQ());
 	}
 
 	FunctionalBasis<2>* CreateLowerDegreeBasis(int degree) override
 	{
-		MonomialBasis2D* lowerBasis = new MonomialBasis2D();
-		for (Monomial1D& phi : _monomials1D)
-		{
-			if (phi.GetDegree() <= degree)
-				lowerBasis->_monomials1D.push_back(phi);
-		}
-		for (TensorPolynomial2D& tp : _localFunctions)
-		{
-			if (tp.GetDegree() <= degree)
-				lowerBasis->_localFunctions.push_back(tp);
-		}
-		return lowerBasis;
+		return new HemkerBasis2D(degree, UsePolynomialSpaceQ());
 	}
 };
 
 #ifdef ENABLE_3D
 
-class MonomialBasis3D : public MonomialBasis<3>
+class HemkerBasis3D : public HemkerBasis<3>
 {
 private:
-	vector<Monomial1D> _monomials1D;
+	vector<Hemker1D> _hemker1D;
 	vector<TensorPolynomial3D> _localFunctions;
 private:
-	MonomialBasis3D() {}
+	HemkerBasis3D() {}
 public:
-	MonomialBasis3D(int maxPolynomialDegree, bool usePolynomialSpaceQ)
+	HemkerBasis3D(int maxPolynomialDegree, bool usePolynomialSpaceQ)
 	{
 		maxPolynomialDegree = max(0, maxPolynomialDegree);
 
-		_monomials1D.reserve(maxPolynomialDegree + 1);
+		_hemker1D.reserve(maxPolynomialDegree + 1);
 		for (int i = 0; i <= maxPolynomialDegree; i++)
-			_monomials1D.emplace_back(i);
+			_hemker1D.emplace_back(maxPolynomialDegree, i);
 
 		if (usePolynomialSpaceQ)
 		{
@@ -191,9 +172,9 @@ public:
 				{
 					for (int i = 0; i <= maxPolynomialDegree; i++)
 					{
-						Monomial1D& polyX = _monomials1D[i];
-						Monomial1D& polyY = _monomials1D[j];
-						Monomial1D& polyZ = _monomials1D[k];
+						Hemker1D& polyX = _hemker1D[i];
+						Hemker1D& polyY = _hemker1D[j];
+						Hemker1D& polyZ = _hemker1D[k];
 						_localFunctions.emplace_back(functionNumber, &polyX, &polyY, &polyZ);
 						functionNumber++;
 					}
@@ -207,15 +188,15 @@ public:
 			int functionNumber = 0;
 			for (int degree = 0; degree <= maxPolynomialDegree; degree++)
 			{
-				for (int degZ = 0; degZ <= degree; degZ++)
+				for (int k = 0; k <= degree; k++)
 				{
-					for (int degY = 0; degY <= degree - degZ; degY++)
+					for (int j = 0; j <= degree - k; j++)
 					{
-						int degX = degree - degZ - degY;
-						Monomial1D& polyX = _monomials1D[degX];
-						Monomial1D& polyY = _monomials1D[degY];
-						Monomial1D& polyZ = _monomials1D[degZ];
-						_localFunctions.emplace_back(functionNumber, &polyX, &polyY, &polyZ);
+						int i = degree - k - j;
+						Hemker1D* polyX = new Hemker1D(i, i); // TODO: free
+						Hemker1D* polyY = new Hemker1D(j, j); // TODO: free
+						Hemker1D* polyZ = new Hemker1D(k, k); // TODO: free
+						_localFunctions.emplace_back(functionNumber, polyX, polyY, polyZ);
 						functionNumber++;
 					}
 				}
@@ -235,7 +216,7 @@ public:
 
 	int GetDegree() const
 	{
-		return (int)_monomials1D.size() - 1;
+		return (int)_hemker1D.size() - 1;
 	}
 
 	int Size() const override
@@ -245,23 +226,12 @@ public:
 
 	FunctionalBasis<3>* CreateSameBasisForDegree(int degree) override
 	{
-		return new MonomialBasis3D(degree, UsePolynomialSpaceQ());
+		return new HemkerBasis3D(degree, UsePolynomialSpaceQ());
 	}
 
 	FunctionalBasis<3>* CreateLowerDegreeBasis(int degree) override
 	{
-		MonomialBasis3D* lowerBasis = new MonomialBasis3D();
-		for (Monomial1D& phi : _monomials1D)
-		{
-			if (phi.GetDegree() <= degree)
-				lowerBasis->_monomials1D.push_back(phi);
-		}
-		for (TensorPolynomial3D& tp : _localFunctions)
-		{
-			if (tp.GetDegree() <= degree)
-				lowerBasis->_localFunctions.push_back(tp);
-		}
-		return lowerBasis;
+		return new HemkerBasis3D(degree, UsePolynomialSpaceQ());
 	}
 };
 #endif // ENABLE_3D

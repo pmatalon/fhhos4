@@ -1,39 +1,40 @@
 #pragma once
-#include "FunctionalBasis.h"
-#include "TensorPolynomial.h"
-#include "Legendre1D.h"
+#include "../FunctionalBasis.h"
+#include "../TensorPolynomial.h"
+#include "Monomial1D.h"
 
 template <int Dim>
-class LegendreBasis : public FunctionalBasis<Dim>
+class MonomialBasis : public FunctionalBasis<Dim>
 {
 public:
 	bool   IsHierarchical()                const override { return true; }
-	bool   IsOrthogonalOnCartesianShapes() const override { return true; }
-	string BasisCode()                     const override { return "legendre"; }
-	static string Code()                                  { return "legendre"; };
+	bool   IsOrthogonalOnCartesianShapes() const override { return false; }
+	string BasisCode()                     const override { return "monomials"; }
+	static string Code()                                  { return "monomials"; };
 };
 
-class LegendreBasis1D : public LegendreBasis<1>
+class MonomialBasis1D : public MonomialBasis<1>
 {
 private:
-	vector<Legendre1D> _localFunctions;
+	vector<Monomial1D> _localMonomials;
 private:
-	LegendreBasis1D() {}
+	MonomialBasis1D() {}
 public:
-	LegendreBasis1D(int maxPolynomialDegree)
+	MonomialBasis1D(int maxPolynomialDegree)
 	{
 		maxPolynomialDegree = max(0, maxPolynomialDegree);
 
-		_localFunctions.reserve(maxPolynomialDegree + 1);
+		_localMonomials.reserve(maxPolynomialDegree + 1);
 		for (int i = 0; i <= maxPolynomialDegree; i++)
-			_localFunctions.emplace_back(i);
+			_localMonomials.emplace_back(i);
 
 	}
+
 	vector<BasisFunction<1>*> LocalFunctions() override
 	{
 		vector<BasisFunction<1>*> list;
-		list.reserve(_localFunctions.size());
-		for (Legendre1D& m : _localFunctions)
+		list.reserve(_localMonomials.size());
+		for (Monomial1D& m : _localMonomials)
 			list.push_back(&m);
 		return list;
 	}
@@ -45,7 +46,7 @@ public:
 
 	int Size() const override
 	{
-		return (int)_localFunctions.size();
+		return (int)_localMonomials.size();
 	}
 
 	bool UsePolynomialSpaceQ() const override
@@ -55,36 +56,36 @@ public:
 
 	FunctionalBasis<1>* CreateSameBasisForDegree(int degree) override
 	{
-		return new LegendreBasis1D(degree);
+		return new MonomialBasis1D(degree);
 	}
 
 	FunctionalBasis<1>* CreateLowerDegreeBasis(int degree) override
 	{
-		LegendreBasis1D* lowerBasis = new LegendreBasis1D();
-		for (Legendre1D& phi : _localFunctions)
+		MonomialBasis1D* lowerBasis = new MonomialBasis1D();
+		for (Monomial1D& phi : _localMonomials)
 		{
 			if (phi.GetDegree() <= degree)
-				lowerBasis->_localFunctions.push_back(phi);
+				lowerBasis->_localMonomials.push_back(phi);
 		}
 		return lowerBasis;
 	}
 };
 
-class LegendreBasis2D : public LegendreBasis<2>
+class MonomialBasis2D : public MonomialBasis<2>
 {
 private:
-	vector<Legendre1D> _legendre1D;
+	vector<Monomial1D> _monomials1D;
 	vector<TensorPolynomial2D> _localFunctions;
 private:
-	LegendreBasis2D() {}
+	MonomialBasis2D() {}
 public:
-	LegendreBasis2D(int maxPolynomialDegree, bool usePolynomialSpaceQ)
+	MonomialBasis2D(int maxPolynomialDegree, bool usePolynomialSpaceQ)
 	{
 		maxPolynomialDegree = max(0, maxPolynomialDegree);
 
-		_legendre1D.reserve(maxPolynomialDegree + 1);
+		_monomials1D.reserve(maxPolynomialDegree + 1);
 		for (int i = 0; i <= maxPolynomialDegree; i++)
-			_legendre1D.emplace_back(i);
+			_monomials1D.emplace_back(i);
 
 		if (usePolynomialSpaceQ)
 		{
@@ -94,8 +95,8 @@ public:
 			{
 				for (int i = 0; i <= maxPolynomialDegree; i++)
 				{
-					Legendre1D& polyX = _legendre1D[i];
-					Legendre1D& polyY = _legendre1D[j];
+					Monomial1D& polyX = _monomials1D[i];
+					Monomial1D& polyY = _monomials1D[j];
 					_localFunctions.emplace_back(functionNumber, &polyX, &polyY);
 					functionNumber++;
 				}
@@ -111,8 +112,8 @@ public:
 				for (int j = 0; j <= degree; j++)
 				{
 					int i = degree - j;
-					Legendre1D& polyX = _legendre1D[i];
-					Legendre1D& polyY = _legendre1D[j];
+					Monomial1D& polyX = _monomials1D[i];
+					Monomial1D& polyY = _monomials1D[j];
 					_localFunctions.emplace_back(functionNumber, &polyX, &polyY);
 					functionNumber++;
 				}
@@ -132,7 +133,7 @@ public:
 
 	int GetDegree() const override
 	{
-		return (int)_legendre1D.size() - 1;
+		return (int)_monomials1D.size() - 1;
 	}
 
 	int Size() const override
@@ -142,16 +143,16 @@ public:
 
 	FunctionalBasis<2>* CreateSameBasisForDegree(int degree) override
 	{
-		return new LegendreBasis2D(degree, UsePolynomialSpaceQ());
+		return new MonomialBasis2D(degree, UsePolynomialSpaceQ());
 	}
 
 	FunctionalBasis<2>* CreateLowerDegreeBasis(int degree) override
 	{
-		LegendreBasis2D* lowerBasis = new LegendreBasis2D();
-		for (Legendre1D& phi : _legendre1D)
+		MonomialBasis2D* lowerBasis = new MonomialBasis2D();
+		for (Monomial1D& phi : _monomials1D)
 		{
 			if (phi.GetDegree() <= degree)
-				lowerBasis->_legendre1D.push_back(phi);
+				lowerBasis->_monomials1D.push_back(phi);
 		}
 		for (TensorPolynomial2D& tp : _localFunctions)
 		{
@@ -164,21 +165,21 @@ public:
 
 #ifdef ENABLE_3D
 
-class LegendreBasis3D : public LegendreBasis<3>
+class MonomialBasis3D : public MonomialBasis<3>
 {
 private:
-	vector<Legendre1D> _legendre1D;
+	vector<Monomial1D> _monomials1D;
 	vector<TensorPolynomial3D> _localFunctions;
 private:
-	LegendreBasis3D() {}
+	MonomialBasis3D() {}
 public:
-	LegendreBasis3D(int maxPolynomialDegree, bool usePolynomialSpaceQ)
+	MonomialBasis3D(int maxPolynomialDegree, bool usePolynomialSpaceQ)
 	{
 		maxPolynomialDegree = max(0, maxPolynomialDegree);
 
-		_legendre1D.reserve(maxPolynomialDegree + 1);
+		_monomials1D.reserve(maxPolynomialDegree + 1);
 		for (int i = 0; i <= maxPolynomialDegree; i++)
-			_legendre1D.emplace_back(i);
+			_monomials1D.emplace_back(i);
 
 		if (usePolynomialSpaceQ)
 		{
@@ -190,9 +191,9 @@ public:
 				{
 					for (int i = 0; i <= maxPolynomialDegree; i++)
 					{
-						Legendre1D& polyX = _legendre1D[i];
-						Legendre1D& polyY = _legendre1D[j];
-						Legendre1D& polyZ = _legendre1D[k];
+						Monomial1D& polyX = _monomials1D[i];
+						Monomial1D& polyY = _monomials1D[j];
+						Monomial1D& polyZ = _monomials1D[k];
 						_localFunctions.emplace_back(functionNumber, &polyX, &polyY, &polyZ);
 						functionNumber++;
 					}
@@ -211,9 +212,9 @@ public:
 					for (int degY = 0; degY <= degree - degZ; degY++)
 					{
 						int degX = degree - degZ - degY;
-						Legendre1D& polyX = _legendre1D[degX];
-						Legendre1D& polyY = _legendre1D[degY];
-						Legendre1D& polyZ = _legendre1D[degZ];
+						Monomial1D& polyX = _monomials1D[degX];
+						Monomial1D& polyY = _monomials1D[degY];
+						Monomial1D& polyZ = _monomials1D[degZ];
 						_localFunctions.emplace_back(functionNumber, &polyX, &polyY, &polyZ);
 						functionNumber++;
 					}
@@ -234,7 +235,7 @@ public:
 
 	int GetDegree() const
 	{
-		return (int)_legendre1D.size() - 1;
+		return (int)_monomials1D.size() - 1;
 	}
 
 	int Size() const override
@@ -244,16 +245,16 @@ public:
 
 	FunctionalBasis<3>* CreateSameBasisForDegree(int degree) override
 	{
-		return new LegendreBasis3D(degree, UsePolynomialSpaceQ());
+		return new MonomialBasis3D(degree, UsePolynomialSpaceQ());
 	}
 
 	FunctionalBasis<3>* CreateLowerDegreeBasis(int degree) override
 	{
-		LegendreBasis3D* lowerBasis = new LegendreBasis3D();
-		for (Legendre1D& phi : _legendre1D)
+		MonomialBasis3D* lowerBasis = new MonomialBasis3D();
+		for (Monomial1D& phi : _monomials1D)
 		{
 			if (phi.GetDegree() <= degree)
-				lowerBasis->_legendre1D.push_back(phi);
+				lowerBasis->_monomials1D.push_back(phi);
 		}
 		for (TensorPolynomial3D& tp : _localFunctions)
 		{

@@ -1,6 +1,6 @@
 #pragma once
-#include "FunctionalBasis.h"
-#include "TensorPolynomial.h"
+#include "../FunctionalBasis.h"
+#include "../TensorPolynomial.h"
 #include "Bernstein1D.h"
 #include "Bernstein2D.h"
 #ifdef ENABLE_3D

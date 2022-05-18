@@ -1,6 +1,5 @@
 #pragma once
-#include "BasisFunction.h"
-#include <string>
+#include "../BasisFunction.h"
 #include <math.h>
 #include <assert.h>
 using namespace std;
