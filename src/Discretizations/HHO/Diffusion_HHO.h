@@ -88,9 +88,9 @@ public:
 		int reduction = k - faceDegree;
 		int newReconstructDegree = HHO->ReconstructionBasis->GetDegree() - reduction;
 		int newCellDegree = HHO->CellBasis->GetDegree() - reduction;
-		FunctionalBasis<Dim>* reconstructionBasis = new FunctionalBasis<Dim>(HHO->ReconstructionBasis->CreateSameBasisForDegree(newReconstructDegree));
-		FunctionalBasis<Dim>* cellBasis = new FunctionalBasis<Dim>(HHO->CellBasis->CreateSameBasisForDegree(newCellDegree));
-		FunctionalBasis<Dim-1>* faceBasis = new FunctionalBasis<Dim-1>(HHO->FaceBasis->CreateSameBasisForDegree(faceDegree));
+		FunctionalBasis<Dim>* reconstructionBasis = HHO->ReconstructionBasis->CreateLowerDegreeBasis(newReconstructDegree);
+		FunctionalBasis<Dim>* cellBasis = HHO->CellBasis->CreateLowerDegreeBasis(newCellDegree);
+		FunctionalBasis<Dim-1>* faceBasis = HHO->FaceBasis->CreateLowerDegreeBasis(faceDegree);
 
 		HHOParameters<Dim>* lowerDegreeHHO = new HHOParameters<Dim>(this->_mesh, HHO->Stabilization, reconstructionBasis, cellBasis, faceBasis, HHO->OrthogonalizeElemBasesCode, HHO->OrthogonalizeFaceBasesCode);
 		return new Diffusion_HHO<Dim>(this->_mesh, this->TestCase, lowerDegreeHHO, _staticCondensation, _saveMatrixBlocks);
@@ -103,9 +103,9 @@ public:
 		int reduction = k - faceDegree;
 		int newReconstructDegree = HHO->ReconstructionBasis->GetDegree() - reduction;
 		int newCellDegree = HHO->CellBasis->GetDegree() - reduction;
-		FunctionalBasis<Dim>* reconstructionBasis = new FunctionalBasis<Dim>(HHO->ReconstructionBasis->CreateSameBasisForDegree(newReconstructDegree));
-		FunctionalBasis<Dim>* cellBasis = new FunctionalBasis<Dim>(HHO->CellBasis->CreateSameBasisForDegree(newCellDegree));
-		FunctionalBasis<Dim - 1>* faceBasis = new FunctionalBasis<Dim - 1>(HHO->FaceBasis->CreateSameBasisForDegree(faceDegree));
+		FunctionalBasis<Dim>* reconstructionBasis = HHO->ReconstructionBasis->CreateLowerDegreeBasis(newReconstructDegree);
+		FunctionalBasis<Dim>* cellBasis = HHO->CellBasis->CreateLowerDegreeBasis(newCellDegree);
+		FunctionalBasis<Dim - 1>* faceBasis = HHO->FaceBasis->CreateLowerDegreeBasis(faceDegree);
 
 		HHOParameters<Dim>* lowerDegreeCoarseMeshHHO = new HHOParameters<Dim>(this->_mesh->CoarseMesh, HHO->Stabilization, reconstructionBasis, cellBasis, faceBasis, HHO->OrthogonalizeElemBasesCode, HHO->OrthogonalizeFaceBasesCode);
 		return new Diffusion_HHO<Dim>(this->_mesh->CoarseMesh, this->TestCase, lowerDegreeCoarseMeshHHO, _staticCondensation, _saveMatrixBlocks);
@@ -782,7 +782,7 @@ public:
 		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, &b_source, &sourceFunction](Element<Dim>* e)
 			{
 				Diff_HHOElement<Dim>* element = HHOElement(e);
-				for (BasisFunction<Dim>* cellPhi : element->CellBasis->LocalFunctions)
+				for (BasisFunction<Dim>* cellPhi : element->CellBasis->LocalFunctions())
 				{
 					BigNumber i = DOFNumber(element, cellPhi);
 					b_source(i) = element->SourceTerm(cellPhi, sourceFunction);

@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include "../Utils/Types.h"
+#include "../Geometry/Point.h"
 using namespace std;
 
 template <int Dim>
@@ -10,7 +11,7 @@ public:
 	int LocalNumber = -1;
 	virtual double Eval(const RefPoint& p) = 0;
 	virtual DimVector<Dim> Grad(const RefPoint& p) = 0;
-	virtual int GetDegree() = 0;
+	virtual int GetDegree() const = 0;
 	virtual string ToString() = 0;
 	virtual ~BasisFunction() {}
 };
@@ -30,7 +31,7 @@ public:
 	{
 		return DimVector<0>();
 	}
-	virtual int GetDegree() override
+	virtual int GetDegree() const override
 	{
 		return 0;
 	}

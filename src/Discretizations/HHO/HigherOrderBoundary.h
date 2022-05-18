@@ -21,7 +21,7 @@ public:
 	HigherOrderBoundary(Diffusion_HHO<Dim>* diffPb)
 	{
 		_diffPb = diffPb;
-		FunctionalBasis<Dim - 1>* higherOrderFaceBasis = new FunctionalBasis<Dim - 1>(diffPb->HHO->FaceBasis->CreateSameBasisForDegree(diffPb->HHO->FaceBasis->GetDegree()+1));
+		FunctionalBasis<Dim - 1>* higherOrderFaceBasis = diffPb->HHO->FaceBasis->CreateSameBasisForDegree(diffPb->HHO->FaceBasis->GetDegree()+1);
 		this->HHO = new HHOParameters<Dim>(diffPb->_mesh, "", diffPb->HHO->ReconstructionBasis, diffPb->HHO->CellBasis, higherOrderFaceBasis, diffPb->HHO->OrthogonalizeElemBasesCode, diffPb->HHO->OrthogonalizeFaceBasesCode);
 		_mesh = diffPb->_mesh;
 	}

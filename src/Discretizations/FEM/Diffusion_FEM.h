@@ -78,19 +78,19 @@ public:
 
 		// Parallel loop on the elements //
 		ElementParallelLoop<Dim> parallelLoop(_mesh->Elements);
-
-		parallelLoop.Execute([this](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+		auto basisFunctions = _basis->LocalFunctions();
+		parallelLoop.Execute([this, &basisFunctions](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
 			{
 				vector<Vertex*> vertices = e->Vertices();
 
 				for (int i = 0; i< vertices.size(); i++)
 				{
 					Vertex* vi = vertices[i];
-					auto phi_i = _basis->LocalFunctions[i];
+					auto phi_i = basisFunctions[i];
 					for (int j = i; j < vertices.size(); j++)
 					{
 						Vertex* vj = vertices[j];
-						auto phi_j = _basis->LocalFunctions[j];
+						auto phi_j = basisFunctions[j];
 
 						double coeff = e->IntegralKGradGrad(e->DiffTensor(), phi_i, phi_j);
 						chunk->Results.Coeffs.Add(vi->Number, vj->Number, coeff);
@@ -181,15 +181,15 @@ public:
 	{
 		ElementParallelLoop<Dim> parallelLoop(this->_mesh->Elements);
 		Vector b_i = Vector::Zero(_mesh->InteriorVertices.size());
-
-		parallelLoop.Execute([this, &sourceFunction, &b_i](Element<Dim>* e)
+		auto localFunctions = _basis->LocalFunctions();
+		parallelLoop.Execute([this, &sourceFunction, &b_i, &localFunctions](Element<Dim>* e)
 			{
 				vector<Vertex*> vertices = e->Vertices();
 				for (int i = 0; i < vertices.size(); i++)
 				{
 					Vertex* v = vertices[i];
 					if (v->Number < _mesh->InteriorVertices.size())
-						b_i[v->Number] += e->SourceTerm(_basis->LocalFunctions[i], sourceFunction);
+						b_i[v->Number] += e->SourceTerm(localFunctions[i], sourceFunction);
 				}
 			}
 		);
@@ -250,15 +250,16 @@ public:
 		};
 
 		ParallelLoop<Element<Dim>*, ChunkResult> parallelLoop(this->_mesh->Elements);
-		parallelLoop.Execute([this, exactSolution, &solution](Element<Dim>* e, ParallelChunk<ChunkResult>* chunk)
+		auto localFunctions = _basis->LocalFunctions();
+		parallelLoop.Execute([this, exactSolution, &solution, &localFunctions](Element<Dim>* e, ParallelChunk<ChunkResult>* chunk)
 			{
-				RefFunction approximate = [this, &solution, e](const RefPoint& p) {
+				RefFunction approximate = [this, &solution, &localFunctions, e](const RefPoint& p) {
 					double total = 0;
 					vector<Vertex*> vertices = e->Vertices();
 					for (int i = 0; i < vertices.size(); i++)
 					{
 						Vertex* v = vertices[i];
-						total += solution(v->Number) * _basis->LocalFunctions[i]->Eval(p);
+						total += solution(v->Number) * localFunctions[i]->Eval(p);
 					}
 					return total;
 				};

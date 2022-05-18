@@ -1,7 +1,5 @@
 #pragma once
 #include "BasisFunction.h"
-#include <string>
-#include <math.h>
 using namespace std;
 
 class LagrangeP1 : public IBasisFunction2D
@@ -12,21 +10,19 @@ public:
 		this->LocalNumber = node;
 	}
 
-	static string Code() { return "lagrange"; };
-
-	int GetDegree()
+	int GetDegree() const
 	{
 		return 1;
 	}
 
 	string ToString()
 	{
-		return this->ToString("Lagrange_1");
+		return this->ToString("");
 	}
 
 	string ToString(string var)
 	{
-		return "";
+		return "Lagrange_1";
 	}
 };
 

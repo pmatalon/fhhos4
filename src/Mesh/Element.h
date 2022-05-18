@@ -557,7 +557,7 @@ public:
 
 	double EvalApproximateSolution(FunctionalBasis<Dim>* basis, const Vector &globalCoeffs, const DomPoint& evaluationPoint)
 	{
-		RefFunction localApproximate = basis->GetApproximateFunction(globalCoeffs, this->Number * basis->NumberOfLocalFunctionsInElement(this));
+		RefFunction localApproximate = basis->GetApproximateFunction(globalCoeffs, this->Number * basis->Size());
 		return localApproximate(this->ConvertToReference(evaluationPoint));
 	}
 

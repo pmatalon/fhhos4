@@ -4,6 +4,7 @@
 #include "../Discretizations/FEM/BiHarmonicMixedFormGlowinski_FEM.h"
 #include "../TestCases/BiHarmonic/BiHarTestCaseFactory.h"
 #include "../Mesher/MeshFactory.h"
+#include "../FunctionalBasis/FunctionalBasisFactory.h"
 #include "../Solver/SolverFactory.h"
 #include "../Solver/BiHarmonic/BiHarmonicCG.h"
 #include "../Solver/BiHarmonic/BiHarmonicGradientDescent.h"
@@ -79,7 +80,7 @@ public:
 		else
 			Utils::FatalError("Unknown scheme '" + args.Problem.Scheme + "'. Check -sch parameter. Possible values are 'f' and 'g'.");
 
-		FunctionalBasis<Dim>* basis = new FunctionalBasis<Dim>(args.Discretization.ElemBasisCode, args.Discretization.PolyDegree, args.Discretization.UsePolynomialSpaceQ);
+		FunctionalBasis<Dim>* basis = FunctionalBasisFactory<Dim>::Create(args.Discretization.ElemBasisCode, args.Discretization.PolyDegree, args.Discretization.UsePolynomialSpaceQ);
 
 		BiHarmonicMixedForm_FEM<Dim>* biHarPb = new BiHarmonicMixedFormGlowinski_FEM<Dim>(mesh, testCase, basis);
 

@@ -1,7 +1,6 @@
 #pragma once
 #include "BasisFunction.h"
 #include "../Utils/Utils.h"
-#include <math.h>
 
 class Bernstein2D : public IBasisFunction2D
 {
@@ -13,8 +12,6 @@ private:
 	int _degree;
 	int _binomial;
 public:
-	static string Code() { return Bernstein1D::Code(); };
-
 	Bernstein2D(int localNumber, int totalDegree, int degX, int degY)
 	{
 		this->LocalNumber = localNumber;
@@ -27,7 +24,7 @@ public:
 		this->_binomial = Utils::Factorial(this->_degree) / (Utils::Factorial(this->_degX) * Utils::Factorial(this->_degY) * Utils::Factorial(this->_degMixed));
 	}
 
-	int GetDegree()
+	int GetDegree() const
 	{
 		return this->_degree;
 	}

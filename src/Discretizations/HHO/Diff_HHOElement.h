@@ -84,7 +84,7 @@ public:
 		else if (HHO->OrthogonalizeElemBases())
 		{
 			Vector d(basis->Size());
-			for (BasisFunction<Dim>* phi : basis->LocalFunctions)
+			for (BasisFunction<Dim>* phi : basis->LocalFunctions())
 				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim>*>(phi)->NormSquare;
 			return d.asDiagonal();
 		}
@@ -116,11 +116,11 @@ public:
 			if (shapeCstJac)
 				refShapeOrthogBasis = shapeCstJac->RefShape()->OrthogonalizedBasis(HHO->ReconstructionBasis);
 
-			if (shapeCstJac && refShapeOrthogBasis)
+			/*if (shapeCstJac && refShapeOrthogBasis)
 				this->ReconstructionBasis = new OrthogonalBasis<Dim>(*refShapeOrthogBasis, shapeCstJac->DetJacobian(), hho->OrthonormalizeElemBases());
-			else
+			else*/
 				this->ReconstructionBasis = new OrthogonalBasis<Dim>(HHO->ReconstructionBasis, this->MeshElement->Shape(), hho->NElemOrthogonalizations(), hho->OrthonormalizeElemBases());
-			this->CellBasis = new FunctionalBasis<Dim>(this->ReconstructionBasis->ExtractLowerBasis(HHO->CellBasis->GetDegree()));
+			this->CellBasis = this->ReconstructionBasis->CreateLowerDegreeBasis(HHO->CellBasis->GetDegree());
 		}
 		else
 		{
@@ -155,7 +155,7 @@ public:
 
 	bool HasOrthogonalBasis() const
 	{
-		return HHO->OrthogonalizeElemBases() || (this->ReconstructionBasis->IsOrthogonalOnCartesianShapes && this->MeshElement->Shape()->MapsToACartesianShape());
+		return HHO->OrthogonalizeElemBases() || (this->ReconstructionBasis->IsOrthogonalOnCartesianShapes() && this->MeshElement->Shape()->MapsToACartesianShape());
 	}
 
 	DenseMatrix SolveCellMassMatrix(const DenseMatrix& M)
@@ -175,7 +175,7 @@ private:
 		else if (HHO->OrthogonalizeElemBases())
 		{
 			Vector d(basis->Size());
-			for (BasisFunction<Dim>* phi : basis->LocalFunctions)
+			for (BasisFunction<Dim>* phi : basis->LocalFunctions())
 				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim>*>(phi)->NormSquare;
 			return d.asDiagonal().inverse() * M;
 		}
@@ -190,7 +190,7 @@ private:
 		else if (HHO->OrthogonalizeElemBases())
 		{
 			Vector d(basis->Size());
-			for (BasisFunction<Dim>* phi : basis->LocalFunctions)
+			for (BasisFunction<Dim>* phi : basis->LocalFunctions())
 				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim>*>(phi)->NormSquare;
 			return d.asDiagonal() * v;
 		}
@@ -251,7 +251,7 @@ public:
 		else if (HHO->OrthogonalizeElemBases())
 		{
 			Vector d(this->CellBasis->Size());
-			for (BasisFunction<Dim>* phi : this->CellBasis->LocalFunctions)
+			for (BasisFunction<Dim>* phi : this->CellBasis->LocalFunctions())
 				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim>*>(phi)->NormSquare;
 			return d.asDiagonal() * v.head(HHO->nCellUnknowns);
 		}
@@ -275,8 +275,8 @@ public:
 	double IntegralReconstruct(const Vector& reconstructCoeffs)
 	{
 		double integral = 0;
-		for (int i=0; i< this->ReconstructionBasis->Size(); i++)
-			integral += reconstructCoeffs[i] * this->MeshElement->Integral(this->ReconstructionBasis->LocalFunctions[i]); // TODO: this can be computed only once on the reference element
+		for (BasisFunction<Dim>* phi : this->ReconstructionBasis->LocalFunctions())
+			integral += reconstructCoeffs[phi->LocalNumber] * this->MeshElement->Integral(phi); // TODO: this can be computed only once on the reference element
 		return integral;
 	}
 
@@ -295,7 +295,7 @@ public:
 	Vector InnerProductWithReconstructBasis(DomFunction f)
 	{
 		Vector innerProducts(this->ReconstructionBasis->Size());
-		for (BasisFunction<Dim>*phi : this->ReconstructionBasis->LocalFunctions)
+		for (BasisFunction<Dim>*phi : this->ReconstructionBasis->LocalFunctions())
 			innerProducts(phi->LocalNumber) = InnerProduct(phi, f);
 		return innerProducts;
 	}
@@ -338,9 +338,9 @@ private:
 
 	void AssembleGradientReconstructionMatrix(DenseMatrix & reconstructionMatrixToInvert)
 	{
-		for (BasisFunction<Dim>* phi1 : this->ReconstructionBasis->LocalFunctions)
+		for (BasisFunction<Dim>* phi1 : this->ReconstructionBasis->LocalFunctions())
 		{
-			for (BasisFunction<Dim>* phi2 : this->ReconstructionBasis->LocalFunctions)
+			for (BasisFunction<Dim>* phi2 : this->ReconstructionBasis->LocalFunctions())
 			{
 				if (phi2->LocalNumber > phi1->LocalNumber)
 					break;
@@ -354,7 +354,7 @@ private:
 	void AssembleMeanValueCondition(DenseMatrix & reconstructionMatrixToInvert)
 	{
 		int last = this->ReconstructionBasis->Size();
-		for (BasisFunction<Dim>* phi : this->ReconstructionBasis->LocalFunctions)
+		for (BasisFunction<Dim>* phi : this->ReconstructionBasis->LocalFunctions())
 		{
 			double meanValue = this->MeshElement->Integral(phi); // TODO: this can be computed only once on the reference element
 			reconstructionMatrixToInvert(last, phi->LocalNumber) = meanValue;
@@ -365,7 +365,7 @@ private:
 	void AssembleMeanValueConditionRHS(DenseMatrix & rhsMatrix)
 	{
 		int last = this->ReconstructionBasis->Size();
-		for (BasisFunction<Dim>* phi : this->CellBasis->LocalFunctions)
+		for (BasisFunction<Dim>* phi : this->CellBasis->LocalFunctions())
 			rhsMatrix(last, phi->LocalNumber) = this->MeshElement->Integral(phi); // TODO: this can be computed only once on the reference element
 	}
 
@@ -393,18 +393,18 @@ private:
 
 	void AssembleIntegrationByPartsRHS_cell(DenseMatrix & rhsMatrix)
 	{
-		for (BasisFunction<Dim>* reconstructPhi : this->ReconstructionBasis->LocalFunctions)
+		for (BasisFunction<Dim>* reconstructPhi : this->ReconstructionBasis->LocalFunctions())
 		{
-			for (BasisFunction<Dim>* cellPhi : this->CellBasis->LocalFunctions)
+			for (BasisFunction<Dim>* cellPhi : this->CellBasis->LocalFunctions())
 				rhsMatrix(reconstructPhi->LocalNumber, DOFNumber(cellPhi)) = this->IntegrationByPartsRHS_cell(reconstructPhi, cellPhi);
 		}
 	}
 
 	void AssembleIntegrationByPartsRHS_face(DenseMatrix & rhsMatrix, Diff_HHOFace<Dim> * face)
 	{
-		for (BasisFunction<Dim>* reconstructPhi : this->ReconstructionBasis->LocalFunctions)
+		for (BasisFunction<Dim>* reconstructPhi : this->ReconstructionBasis->LocalFunctions())
 		{
-			for (BasisFunction<Dim - 1> * facePhi : face->Basis->LocalFunctions)
+			for (BasisFunction<Dim - 1> * facePhi : face->Basis->LocalFunctions())
 				rhsMatrix(reconstructPhi->LocalNumber, DOFNumber(face, facePhi)) = this->IntegrationByPartsRHS_face(face, reconstructPhi, facePhi);
 		}
 	}
@@ -465,7 +465,7 @@ private:
 		if (HHO->Stabilization.compare("hho") == 0)
 		{
 			DenseMatrix Dt;
-			if (!this->HasOrthogonalBasis() || !this->ReconstructionBasis->IsHierarchical)
+			if (!this->HasOrthogonalBasis() || !this->ReconstructionBasis->IsHierarchical())
 			{
 				DenseMatrix cellMassMatrix = this->MassMatrix(this->CellBasis);
 				DenseMatrix Nt = this->CellReconstructMassMatrix(this->CellBasis, this->ReconstructionBasis);
@@ -565,7 +565,6 @@ public:
 		if (HHO->OrthogonalizeElemBases())
 		{
 			delete ReconstructionBasis;
-			CellBasis->LocalFunctions.clear();
 			delete CellBasis;
 		}
 	}

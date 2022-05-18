@@ -13,9 +13,6 @@
     <ClInclude Include="src/FunctionalBasis/BasisFunction.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
-    <ClInclude Include="src/FunctionalBasis/BasisFunctionFactory.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
     <ClInclude Include="src/FunctionalBasis/Bernstein1D.h">
       <Filter>FunctionalBasis</Filter>
     </ClInclude>
@@ -582,6 +579,24 @@
     </ClInclude>
     <ClInclude Include="src\Solver\BiHarmonic\BiharPatchPreconditionerFalk.h">
       <Filter>Solver\BiHarmonic</Filter>
+    </ClInclude>
+    <ClInclude Include="src\FunctionalBasis\MonomialBasis.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="src\FunctionalBasis\FunctionalBasisFactory.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="src\FunctionalBasis\LegendreBasis.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="src\FunctionalBasis\HemkerBasis.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="src\FunctionalBasis\BernsteinBasis.h">
+      <Filter>FunctionalBasis</Filter>
+    </ClInclude>
+    <ClInclude Include="src\FunctionalBasis\LagrangeBasis.h">
+      <Filter>FunctionalBasis</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

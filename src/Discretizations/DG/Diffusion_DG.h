@@ -42,13 +42,13 @@ public:
 	{
 		cout << "Mesh: " << this->_mesh->Description() << endl;
 		cout << "Discretization: Discontinuous Galerkin SIPG" << endl;
-		cout << "\tPolynomial space: " << (Basis->UsePolynomialSpaceQ ? "Q" : "P") << endl;
+		cout << "\tPolynomial space: " << (Basis->UsePolynomialSpaceQ() ? "Q" : "P") << endl;
 		cout << "\tPolynomial basis: " << Basis->Name() << endl;
 		cout << "\tPenalization coefficient: " << _penalizationCoefficient << (_autoPenalization ? " (automatic)" : "") << endl;
-		cout << "Local functions: " << Basis->NumberOfLocalFunctionsInElement(NULL) << endl;
-		for (BasisFunction<Dim>* phi : Basis->LocalFunctions)
+		cout << "Local functions: " << Basis->Size() << endl;
+		for (BasisFunction<Dim>* phi : Basis->LocalFunctions())
 			cout << "\t " << phi->ToString() << endl;
-		BigNumber nUnknowns = static_cast<int>(this->_mesh->Elements.size()) * Basis->NumberOfLocalFunctionsInElement(NULL);
+		BigNumber nUnknowns = static_cast<int>(this->_mesh->Elements.size()) * Basis->Size();
 		cout << "Unknowns   : " << nUnknowns << endl;
 	}
 
@@ -63,7 +63,7 @@ public:
 		ParallelLoop<Element<Dim>*, ChunkResult> parallelLoop(_mesh->Elements);
 		parallelLoop.Execute([this, exactSolution](Element<Dim>* element, ParallelChunk<ChunkResult>* chunk)
 			{
-				auto approximate = Basis->GetApproximateFunction(SystemSolution, element->Number * Basis->NumberOfLocalFunctionsInElement(element));
+				auto approximate = Basis->GetApproximateFunction(SystemSolution, element->Number * Basis->Size());
 				chunk->Results.absoluteError += element->L2ErrorPow2(approximate, exactSolution);
 				chunk->Results.normExactSolution += element->Integral([exactSolution](const DomPoint& p) { return pow(exactSolution(p), 2); });
 			});
@@ -93,7 +93,7 @@ public:
 			this->PrintDiscretization();
 
 
-		BigNumber nUnknowns = static_cast<int>(mesh->Elements.size()) * basis->NumberOfLocalFunctionsInElement(NULL);
+		BigNumber nUnknowns = static_cast<int>(mesh->Elements.size()) * basis->Size();
 		this->b = Vector(nUnknowns);
 
 		if (actions.LogAssembly)
@@ -137,14 +137,14 @@ public:
 					Diff_DGElement<Dim>* element = dynamic_cast<Diff_DGElement<Dim>*>(mesh->Elements[iElem]);
 					//cout << "Element " << element->Number << endl;
 
-					for (BasisFunction<Dim>* phi1 : basis->LocalFunctions)
+					for (BasisFunction<Dim>* phi1 : basis->LocalFunctions())
 					{
-						BigNumber basisFunction1 = basis->GlobalFunctionNumber(element, phi1);
+						BigNumber basisFunction1 = element->Number * basis->Size() + phi1->LocalNumber;
 
 						// Current element (block diagonal)
-						for (BasisFunction<Dim>* phi2 : basis->LocalFunctions)
+						for (BasisFunction<Dim>* phi2 : basis->LocalFunctions())
 						{
-							BigNumber basisFunction2 = basis->GlobalFunctionNumber(element, phi2);
+							BigNumber basisFunction2 = element->Number * basis->Size() + phi2->LocalNumber;
 
 							//cout << "\t phi" << phi1->LocalNumber << " = " << phi1->ToString() << " phi" << phi2->LocalNumber << " = " << phi2->ToString() << endl;
 
@@ -248,14 +248,14 @@ public:
 
 					//cout << "Face " << face->Number << endl;
 
-					for (BasisFunction<Dim>* phi1 : basis->LocalFunctions)
+					for (BasisFunction<Dim>* phi1 : basis->LocalFunctions())
 					{
-						BigNumber basisFunction1 = basis->GlobalFunctionNumber(face->Element1, phi1);
-						for (BasisFunction<Dim>* phi2 : basis->LocalFunctions)
+						BigNumber basisFunction1 = face->Element1->Number * basis->Size() + phi1->LocalNumber;
+						for (BasisFunction<Dim>* phi2 : basis->LocalFunctions())
 						{
 							//cout << "\t phi" << phi1->LocalNumber << " = " << phi1->ToString() << " phi" << phi2->LocalNumber << " = " << phi2->ToString() << endl;
 
-							BigNumber basisFunction2 = basis->GlobalFunctionNumber(face->Element2, phi2);
+							BigNumber basisFunction2 = face->Element2->Number * basis->Size() + phi2->LocalNumber;
 							double coupling = face->CouplingTerm(face->Element1, phi1, face->Element2, phi2);
 							double penalization = face->PenalizationTerm(face->Element1, phi1, face->Element2, phi2, penalizationCoefficient);
 

@@ -13,8 +13,6 @@ private:
 	int _i;
 	double _binomial;
 public:
-	static string Code() { return "bernstein"; };
-
 	Bernstein1D(int degree, int i)
 	{
 		this->LocalNumber = i;
@@ -23,7 +21,7 @@ public:
 		this->_binomial = Utils::Binomial(degree, i);
 	}
 
-	int GetDegree()
+	int GetDegree() const
 	{
 		return this->_degree;
 	}

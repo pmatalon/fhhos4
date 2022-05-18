@@ -9,15 +9,13 @@ class Monomial1D : public IBasisFunction1D
 public:
 	int Degree;
 
-	static string Code() { return "monomials"; };
-
 	Monomial1D(int degree)
 	{
 		this->LocalNumber = degree;
 		this->Degree = degree;
 	}
 
-	int GetDegree()
+	int GetDegree() const
 	{
 		return this->Degree;
 	}

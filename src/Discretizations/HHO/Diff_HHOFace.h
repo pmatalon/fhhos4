@@ -85,7 +85,7 @@ public:
 		else if (HHO->OrthogonalizeFaceBases())
 		{
 			Vector d(this->Basis->Size());
-			for (BasisFunction<Dim-1>* phi : this->Basis->LocalFunctions)
+			for (BasisFunction<Dim-1>* phi : this->Basis->LocalFunctions())
 				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim-1>*>(phi)->NormSquare;
 			return d.asDiagonal();
 		}
@@ -99,7 +99,7 @@ public:
 		else if (HHO->OrthogonalizeFaceBases())
 		{
 			Vector d(this->Basis->Size());
-			for (BasisFunction<Dim-1>* phi : this->Basis->LocalFunctions)
+			for (BasisFunction<Dim-1>* phi : this->Basis->LocalFunctions())
 				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim-1>*>(phi)->NormSquare;
 			return d.asDiagonal() * v;
 		}
@@ -116,7 +116,7 @@ public:
 		else if (HHO->OrthogonalizeFaceBases())
 		{
 			Vector d(this->Basis->Size());
-			for (BasisFunction<Dim-1>* phi : this->Basis->LocalFunctions)
+			for (BasisFunction<Dim-1>* phi : this->Basis->LocalFunctions())
 				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim-1>*>(phi)->NormSquare;
 			return d.asDiagonal().inverse() * M;
 		}
@@ -170,10 +170,10 @@ private:
 public:
 	DenseMatrix MassMatrix(FunctionalBasis<Dim - 1>* other)
 	{
-		DenseMatrix M(this->Basis->LocalFunctions.size(), other->LocalFunctions.size());
-		for (BasisFunction<Dim - 1>* phi1 : this->Basis->LocalFunctions)
+		DenseMatrix M(this->Basis->Size(), other->Size());
+		for (BasisFunction<Dim - 1>* phi1 : this->Basis->LocalFunctions())
 		{
-			for (BasisFunction<Dim - 1>* phi2 : other->LocalFunctions)
+			for (BasisFunction<Dim - 1>* phi2 : other->LocalFunctions())
 			{
 				double term = this->MeshFace->Shape()->ComputeMassTerm(phi1, phi2);
 				M(phi1->LocalNumber, phi2->LocalNumber) = term;
@@ -190,12 +190,12 @@ public:
 
 	DenseMatrix NormalDerivative(Element<Dim>* element, FunctionalBasis<Dim>* cellBasis)
 	{
-		DenseMatrix M(this->Basis->LocalFunctions.size(), cellBasis->LocalFunctions.size());
+		DenseMatrix M(this->Basis->Size(), cellBasis->Size());
 
 		DimVector<Dim> n = element->OuterNormalVector(this->MeshFace);
-		for (BasisFunction<Dim-1>* facePhi : this->Basis->LocalFunctions)
+		for (BasisFunction<Dim-1>* facePhi : this->Basis->LocalFunctions())
 		{
-			for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions)
+			for (BasisFunction<Dim>* cellPhi : cellBasis->LocalFunctions())
 			{
 				double term = this->NormalDerivativeTerm(facePhi, element, cellPhi, n);
 				M(facePhi->LocalNumber, cellPhi->LocalNumber) = term;
@@ -207,8 +207,8 @@ public:
 	double Integral(const Vector& coeffs)
 	{
 		double integral = 0;
-		for (int i = 0; i < this->Basis->Size(); i++)
-			integral += coeffs[i] * this->MeshFace->Integral(this->Basis->LocalFunctions[i]); // TODO: this can be computed only once on the reference element
+		for (BasisFunction<Dim-1>* phi : this->Basis->LocalFunctions())
+			integral += coeffs[phi->LocalNumber] * this->MeshFace->Integral(phi); // TODO: this can be computed only once on the reference element
 		return integral;
 	}
 
@@ -227,7 +227,7 @@ public:
 	Vector InnerProductWithBasis(DomFunction f)
 	{
 		Vector innerProducts(this->Basis->Size());
-		for (BasisFunction<Dim - 1>* phi : this->Basis->LocalFunctions)
+		for (BasisFunction<Dim - 1>* phi : this->Basis->LocalFunctions())
 			innerProducts(phi->LocalNumber) = InnerProduct(phi, f);
 		return innerProducts;
 	}
@@ -263,10 +263,10 @@ public:
 private:
 	DenseMatrix MassMatrix(FunctionalBasis<Dim - 1>* basis, Element<Dim>* element, FunctionalBasis<Dim>* cellBasis)
 	{
-		DenseMatrix M(basis->LocalFunctions.size(), cellBasis->LocalFunctions.size());
-		for (BasisFunction<Dim - 1>*phi1 : basis->LocalFunctions)
+		DenseMatrix M(basis->Size(), cellBasis->Size());
+		for (BasisFunction<Dim - 1>* phi1 : basis->LocalFunctions())
 		{
-			for (BasisFunction<Dim>* phi2 : cellBasis->LocalFunctions)
+			for (BasisFunction<Dim>* phi2 : cellBasis->LocalFunctions())
 			{
 				double term = this->ComputeMassTerm(phi1, element, phi2);
 				M(phi1->LocalNumber, phi2->LocalNumber) = term;

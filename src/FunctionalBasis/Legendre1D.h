@@ -18,7 +18,7 @@ public:
 		this->Degree = degree;
 	}
 
-	int GetDegree()
+	int GetDegree() const
 	{
 		return this->Degree;
 	}

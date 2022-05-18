@@ -4,6 +4,7 @@
 #include "../Discretizations/DG/Diffusion_DG.h"
 #include "../TestCases/Diffusion/DiffTestCaseFactory.h"
 #include "../Mesher/MeshFactory.h"
+#include "../FunctionalBasis/FunctionalBasisFactory.h"
 #include "../Solver/SolverFactory.h"
 
 template <int Dim>
@@ -55,7 +56,7 @@ public:
 		//       Assembly       //
 		//----------------------//
 
-		FunctionalBasis<Dim>* basis = new FunctionalBasis<Dim>(args.Discretization.ElemBasisCode, args.Discretization.PolyDegree, args.Discretization.UsePolynomialSpaceQ);
+		FunctionalBasis<Dim>* basis = FunctionalBasisFactory<Dim>::Create(args.Discretization.ElemBasisCode, args.Discretization.PolyDegree, args.Discretization.UsePolynomialSpaceQ);
 		Diffusion_DG<Dim>* problem = new Diffusion_DG<Dim>(mesh, testCase, args.OutputDirectory, basis, args.Discretization.PenalizationCoefficient);
 
 		cout << endl;

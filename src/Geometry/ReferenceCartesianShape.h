@@ -98,9 +98,9 @@ private:
 	DenseMatrix ComputeAndReturnStiffnessMatrix(FunctionalBasis<Dim>* basis)
 	{
 		DenseMatrix stiffnessMatrix = DenseMatrix(basis->Size(), basis->Size());
-		for (BasisFunction<Dim>* phi1 : basis->LocalFunctions)
+		for (BasisFunction<Dim>* phi1 : basis->LocalFunctions())
 		{
-			for (BasisFunction<Dim>* phi2 : basis->LocalFunctions)
+			for (BasisFunction<Dim>* phi2 : basis->LocalFunctions())
 				stiffnessMatrix(phi1->LocalNumber, phi2->LocalNumber) = ComputeIntegralGradGrad(phi1, phi2);
 		}
 		return stiffnessMatrix;
@@ -109,9 +109,9 @@ private:
 	DenseMatrix ComputeAndReturnKStiffnessMatrix(const Tensor<Dim>& K, FunctionalBasis<Dim>* basis)
 	{
 		DenseMatrix stiffnessMatrix = DenseMatrix(basis->Size(), basis->Size());
-		for (BasisFunction<Dim>* phi1 : basis->LocalFunctions)
+		for (BasisFunction<Dim>* phi1 : basis->LocalFunctions())
 		{
-			for (BasisFunction<Dim>* phi2 : basis->LocalFunctions)
+			for (BasisFunction<Dim>* phi2 : basis->LocalFunctions())
 				stiffnessMatrix(phi1->LocalNumber, phi2->LocalNumber) = ComputeIntegralKGradGrad(K, phi1, phi2);
 		}
 		return stiffnessMatrix;

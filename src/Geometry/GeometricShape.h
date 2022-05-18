@@ -47,9 +47,9 @@ public:
 	DenseMatrix ComputeAndReturnMassMatrix(FunctionalBasis<Dim>* basis) const
 	{
 		DenseMatrix M = DenseMatrix(basis->Size(), basis->Size());
-		for (BasisFunction<Dim>* phi1 : basis->LocalFunctions)
+		for (BasisFunction<Dim>* phi1 : basis->LocalFunctions())
 		{
-			for (BasisFunction<Dim>* phi2 : basis->LocalFunctions)
+			for (BasisFunction<Dim>* phi2 : basis->LocalFunctions())
 			{
 				if (phi2->LocalNumber > phi1->LocalNumber)
 					break;
@@ -65,10 +65,10 @@ public:
 
 	DenseMatrix ComputeAndReturnMassMatrix(FunctionalBasis<Dim>* basis1, FunctionalBasis<Dim>* basis2) const
 	{
-		DenseMatrix M(basis1->LocalFunctions.size(), basis2->LocalFunctions.size());
-		for (BasisFunction<Dim>* phi1 : basis1->LocalFunctions)
+		DenseMatrix M(basis1->Size(), basis2->Size());
+		for (BasisFunction<Dim>* phi1 : basis1->LocalFunctions())
 		{
-			for (BasisFunction<Dim>* phi2 : basis2->LocalFunctions)
+			for (BasisFunction<Dim>* phi2 : basis2->LocalFunctions())
 			{
 				double term = ComputeMassTerm(phi1, phi2);
 				M(phi1->LocalNumber, phi2->LocalNumber) = term;

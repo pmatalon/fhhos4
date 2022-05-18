@@ -1,46 +1,20 @@
 #pragma once
-#include "BasisFunctionFactory.h"
 #include "BasisFunction.h"
-#include "TensorPolynomial.h"
-#include "Bernstein2D.h"
-#include "LagrangeP1.h"
-#ifdef ENABLE_3D
-	#include "Bernstein3D.h"
-#endif
-template <int Dim>
-class Element;
 
 template <int Dim>
 class FunctionalBasis
 {
 protected:
-	int _maxPolynomialDegree;
-	string _basisCode;
-
+	FunctionalBasis() {}
 public:
-	bool UsePolynomialSpaceQ;
-	vector<BasisFunction<Dim>*> LocalFunctions;
-	bool IsHierarchical = true;
-	bool IsOrthogonalOnCartesianShapes = false;
-
-protected:
-	FunctionalBasis()
-	{}
-
-public:
-	FunctionalBasis(string basisCode, int maxPolynomialDegree) 
-		: FunctionalBasis(basisCode, maxPolynomialDegree, false)
-	{}
-
-	FunctionalBasis(string basisCode, int maxPolynomialDegree, bool usePolynomialSpaceQ)
+	/*FunctionalBasis(int maxPolynomialDegree, bool usePolynomialSpaceQ)
 	{
 		maxPolynomialDegree = max(0, maxPolynomialDegree);
 		this->_maxPolynomialDegree = maxPolynomialDegree;
-		this->_basisCode = basisCode;
 		this->UsePolynomialSpaceQ = usePolynomialSpaceQ;
-		this->IsHierarchical = basisCode.compare(Monomial1D::Code()) == 0 || basisCode.compare(Legendre1D::Code()) == 0;
-		if (basisCode.compare(Legendre1D::Code()) == 0)
-			this->IsOrthogonalOnCartesianShapes = true;
+		//this->IsHierarchical = basisCode.compare(Monomial1D::Code()) == 0 || basisCode.compare(Legendre1D::Code()) == 0;
+		//if (basisCode.compare(Legendre1D::Code()) == 0)
+			//this->IsOrthogonalOnCartesianShapes = true;
 
 		//----------//
 		//    0D    //
@@ -215,75 +189,53 @@ public:
 			}
 		}
 #endif // ENABLE_3D
-	}
+	}*/
 
-	string BasisCode() const
-	{
-		return this->_basisCode;
-	}
+	virtual vector<BasisFunction<Dim>*> LocalFunctions() = 0;
+	virtual string BasisCode()      const = 0;
+	virtual int    GetDegree()      const = 0;
+	virtual bool   IsHierarchical() const = 0;
+	virtual int    Size()           const = 0;
+	virtual FunctionalBasis<Dim>* CreateSameBasisForDegree(int degree) = 0;
+	virtual FunctionalBasis<Dim>* CreateLowerDegreeBasis  (int degree) = 0;
+
+	virtual bool UsePolynomialSpaceQ()           const { return pow(GetDegree() + 1, Dim) == Size(); }
+	virtual bool IsOrthogonalOnCartesianShapes() const { return false; }
 
 	string Name() const
 	{
-		string name = this->_basisCode + "_p" + std::to_string(this->_maxPolynomialDegree);
-		if (this->UsePolynomialSpaceQ)
+		string name = BasisCode() + "_p" + std::to_string(GetDegree());
+		if (UsePolynomialSpaceQ())
 			name += "_Q";
 		return name;
 	}
 
-	int GetDegree() const
-	{
-		return this->_maxPolynomialDegree;
-	}
-
-	int NumberOfLocalFunctionsInElement(Element<Dim>* element) const
-	{
-		return static_cast<int>(this->LocalFunctions.size());
-	}
-
-	int Size() const
-	{
-		return NumberOfLocalFunctionsInElement(NULL);
-	}
-
-	BigNumber GlobalFunctionNumber(Element<Dim>* element, BasisFunction<Dim>* phi) const
-	{
-		return element->Number * static_cast<int>(this->LocalFunctions.size()) + phi->LocalNumber; // the numbers start at 0
-	}
-
-	RefFunction GetApproximateFunction(const Vector &solution, BigNumber startIndex) const
+	RefFunction GetApproximateFunction(const Vector& solution, BigNumber startIndex)
 	{
 		RefFunction approximate = [this, &solution, startIndex](const RefPoint& p) {
 			double result = 0;
-			for (unsigned int i = 0; i < this->LocalFunctions.size(); i++)
-			{
-				BasisFunction<Dim>* phi = this->LocalFunctions[i];
-				result += solution(startIndex + i) * phi->Eval(p);
-			}
+			for (BasisFunction<Dim>* phi : this->LocalFunctions())
+				result += solution(startIndex + phi->LocalNumber) * phi->Eval(p);
 			return result;
 		};
 		return approximate;
 	}
 
-	FunctionalBasis<Dim> CreateSameBasisForDegree(int degree)
-	{
-		return FunctionalBasis<Dim>(this->_basisCode, degree, this->UsePolynomialSpaceQ);
-	}
-
-	FunctionalBasis<Dim> ExtractLowerBasis(int degree)
-	{
-		FunctionalBasis<Dim> lowerBasis(*this);
-		lowerBasis.LocalFunctions.clear();
-		for (BasisFunction<Dim>* phi : this->LocalFunctions)
-		{
-			if (phi->GetDegree() <= degree)
-				lowerBasis.LocalFunctions.push_back(phi);
-		}
-		return lowerBasis;
-	}
-
 	virtual ~FunctionalBasis() 
-	{
-		for (auto phi : LocalFunctions)
-			delete phi;
-	}
+	{}
+};
+
+class FunctionalBasis0D : public FunctionalBasis<0>
+{
+private:
+	BasisFunction0D _localFunction;
+public:
+	vector<BasisFunction<0>*> LocalFunctions() override { return { &_localFunction }; }
+	string BasisCode()           const override { return "basis0D"; }
+	int    GetDegree()           const override { return 0; }
+	bool   IsHierarchical()      const override { return true; }
+	int    Size()                const override { return 1; }
+	bool   UsePolynomialSpaceQ() const override { return false; }
+	FunctionalBasis<0>* CreateSameBasisForDegree(int degree) { assert(false); return nullptr; }
+	FunctionalBasis<0>* CreateLowerDegreeBasis  (int degree) { assert(false); return nullptr; }
 };

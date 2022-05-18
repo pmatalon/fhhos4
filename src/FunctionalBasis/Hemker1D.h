@@ -14,8 +14,6 @@ private:
 	int _i;
 	double _coeff;
 public:
-	static string Code() { return "hemker"; };
-
 	Hemker1D(int maxDegree, int i)
 	{
 		assert(maxDegree >= 0 && i <= maxDegree);
@@ -43,7 +41,7 @@ public:
 		return i;
 	}
 
-	int GetDegree()
+	int GetDegree() const
 	{
 		return this->_degree;
 	}

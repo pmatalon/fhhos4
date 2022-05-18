@@ -20,7 +20,7 @@ public:
 		this->FuncY = funcY;
 	}
 
-	int GetDegree()
+	int GetDegree() const
 	{
 		return this->FuncX->GetDegree() + this->FuncY->GetDegree();
 	}
@@ -50,19 +50,13 @@ public:
 			return to_string(this->LocalNumber) + "\tdegree " + to_string(this->GetDegree()) + "\t" + polyX;
 		return to_string(this->LocalNumber) + "\tdegree " + to_string(this->GetDegree()) + "\t" + polyX + " * " + polyY;
 	}
-
-	~TensorPolynomial2D()
-	{
-		if (FuncX)
-			delete FuncX;
-		if (FuncY)
-			delete FuncY;
-	}
 };
 
 //----------//
 //    3D    //
 //----------//
+
+#ifdef ENABLE_3D
 
 class TensorPolynomial3D : public IBasisFunction3D
 {
@@ -80,7 +74,7 @@ public:
 		this->_funcZ = funcZ;
 	}
 
-	int GetDegree()
+	int GetDegree() const
 	{
 		return this->FuncX->GetDegree() + this->FuncY->GetDegree() + this->_funcZ->GetDegree();
 	}
@@ -124,11 +118,6 @@ public:
 			return polyX + " * " + polyY;
 		return polyX + " * " + polyY + " * " + polyZ;
 	}
-
-	~TensorPolynomial3D()
-	{
-		delete FuncX;
-		delete FuncY;
-		delete _funcZ;
-	}
 };
+
+#endif // ENABLE_3D

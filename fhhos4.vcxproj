@@ -71,7 +71,6 @@
     <ClCompile Include="src\QuadratureRules\Keast\tetrahedron_keast_rule.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src/FunctionalBasis/BasisFunctionFactory.h" />
     <ClInclude Include="src/FunctionalBasis/BasisFunction.h" />
     <ClInclude Include="src/FunctionalBasis/Bernstein1D.h" />
     <ClInclude Include="src/FunctionalBasis/Bernstein2D.h" />
@@ -103,8 +102,14 @@
     <ClInclude Include="src\Discretizations\HHO\HigherOrderBoundary.h" />
     <ClInclude Include="src\Discretizations\HHO\NumericImageEnforcer.h" />
     <ClInclude Include="src\Discretizations\HHO\ZeroMeanEnforcer.h" />
+    <ClInclude Include="src\FunctionalBasis\BernsteinBasis.h" />
+    <ClInclude Include="src\FunctionalBasis\FunctionalBasisFactory.h" />
     <ClInclude Include="src\FunctionalBasis\Hemker1D.h" />
+    <ClInclude Include="src\FunctionalBasis\HemkerBasis.h" />
+    <ClInclude Include="src\FunctionalBasis\LagrangeBasis.h" />
     <ClInclude Include="src\FunctionalBasis\LagrangeP1.h" />
+    <ClInclude Include="src\FunctionalBasis\LegendreBasis.h" />
+    <ClInclude Include="src\FunctionalBasis\MonomialBasis.h" />
     <ClInclude Include="src\FunctionalBasis\OrthogonalBasis.h" />
     <ClInclude Include="src\Geometry\2D\Segment.h" />
     <ClInclude Include="src\Geometry\CGALWrapper.h" />

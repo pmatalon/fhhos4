@@ -71,7 +71,7 @@ public:
 private:
 	void SetupDiscretizedOperator() override 
 	{
-		if (this->ComesFrom == CoarseningType::P && _problem->HHO->FaceBasis->IsHierarchical)
+		if (this->ComesFrom == CoarseningType::P && _problem->HHO->FaceBasis->IsHierarchical())
 		{
 			LevelForHHO<Dim>* finerLevel = dynamic_cast<LevelForHHO<Dim>*>(FinerLevel);
 
@@ -511,7 +511,7 @@ private:
 	{
 		if (_pProlongation == GMG_P_Prolongation::Injection)
 		{
-			if (!this->_problem->HHO->FaceBasis->IsHierarchical || !this->_problem->HHO->OrthogonalizeFaceBases())
+			if (!this->_problem->HHO->FaceBasis->IsHierarchical() || !this->_problem->HHO->OrthogonalizeFaceBases())
 				Utils::Warning("The natural injection and restriction for p-multigrid are implemented based on the assumption that the face bases are hierarchical and orthogonalized. Degraded convergence may be experienced.");
 			// nothing to do
 		}
@@ -1092,9 +1092,9 @@ private:
 			FunctionalBasis<Dim>* fineBasis = _useHigherOrderReconstruction ? hhoFineElem->ReconstructionBasis : hhoFineElem->CellBasis;
 
 			DenseMatrix fineCoarseMass(fineBasis->Size(), coarseBasis->Size());
-			for (BasisFunction<Dim>* finePhi : fineBasis->LocalFunctions)
+			for (BasisFunction<Dim>* finePhi : fineBasis->LocalFunctions())
 			{
-				for (BasisFunction<Dim>* coarsePhi : coarseBasis->LocalFunctions)
+				for (BasisFunction<Dim>* coarsePhi : coarseBasis->LocalFunctions())
 				{
 					RefFunction functionToIntegrate = [coarseElement, fineElement, finePhi, coarsePhi](const RefPoint& fineRefPoint) {
 						DomPoint domPoint = fineElement->ConvertToDomain(fineRefPoint);
@@ -1199,9 +1199,9 @@ private:
 
 			vector<PhysicalShape<Dim>*> intersectionCoarseFine = it->second;
 
-			for (BasisFunction<Dim>* finePhi : fineBasis->LocalFunctions)
+			for (BasisFunction<Dim>* finePhi : fineBasis->LocalFunctions())
 			{
-				for (BasisFunction<Dim>* coarsePhi : coarseBasis->LocalFunctions)
+				for (BasisFunction<Dim>* coarsePhi : coarseBasis->LocalFunctions())
 				{
 					double integral = 0;
 					int degree = finePhi->GetDegree() + coarsePhi->GetDegree();
@@ -1281,9 +1281,9 @@ private:
 			Diff_HHOFace<Dim>* fineHHOFace = fineProblem->HHOFace(fineFace);
 
 			DenseMatrix fineCoarseMass(fineFaceUnknowns, coarseFaceUnknowns);
-			for (BasisFunction<Dim - 1>* finePhi : fineHHOFace->Basis->LocalFunctions)
+			for (BasisFunction<Dim - 1>* finePhi : fineHHOFace->Basis->LocalFunctions())
 			{
-				for (BasisFunction<Dim - 1>* coarsePhi : coarseHHOFace->Basis->LocalFunctions)
+				for (BasisFunction<Dim - 1>* coarsePhi : coarseHHOFace->Basis->LocalFunctions())
 				{
 					RefFunction functionToIntegrate = [coarseFace, fineFace, finePhi, coarsePhi](const RefPoint& fineRefPoint) {
 						DomPoint domPoint = fineFace->ConvertToDomain(fineRefPoint);

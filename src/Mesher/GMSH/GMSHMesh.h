@@ -2,6 +2,7 @@
 #include <gmsh.h>
 #include "../../Mesh/PolyhedralMesh.h"
 #include "../InHouse/Square_TriangularMesh.h"
+#include "../../FunctionalBasis/MonomialBasis.h"
 using namespace std;
 
 enum GMSHElementTypes
@@ -1097,7 +1098,7 @@ public:
 
 		int viewId = gmsh::view::add(viewName);
 
-		if (Dim == 2 && !takeAbsoluteValue && basis->BasisCode().compare(Monomial1D::Code()) == 0 && Utils::ProgramArgs.Discretization.OrthogonalizeElemBasesCode == 0)
+		if (Dim == 2 && !takeAbsoluteValue && basis->BasisCode().compare(MonomialBasis<2>::Code()) == 0 && Utils::ProgramArgs.Discretization.OrthogonalizeElemBasesCode == 0)
 		{
 			// Refer to:
 			// http://www.manpagez.com/info/gmsh/gmsh-2.4.0/gmsh_52.php
@@ -1124,9 +1125,10 @@ public:
 				coefMonomials[i * basisSize + i] = 1; // because this is the monomial basis! If Legendre function, it would be the coefficients in front of its monomial decomposition.
 
 			vector<double> expMonomials(basisSize * 3); // 3 = 3D
+			auto localFunctions = basis->LocalFunctions();
 			for (int i = 0; i < basisSize; i++)
 			{
-				TensorPolynomial2D* phi = dynamic_cast<TensorPolynomial2D*>(basis->LocalFunctions[i]);
+				TensorPolynomial2D* phi = dynamic_cast<TensorPolynomial2D*>(localFunctions[i]);
 				expMonomials[i * 3 + 0] = phi->FuncX->GetDegree(); // exponent of u
 				expMonomials[i * 3 + 1] = phi->FuncY->GetDegree(); // exponent of v
 				expMonomials[i * 3 + 2] = 0;                       // exponent of w
@@ -1163,7 +1165,7 @@ public:
 		}
 		else
 		{
-			if (basis->BasisCode().compare(Monomial1D::Code()) != 0 || Utils::ProgramArgs.Discretization.OrthogonalizeElemBasesCode > 0)
+			if (basis->BasisCode().compare(MonomialBasis<Dim>::Code()) != 0 || Utils::ProgramArgs.Discretization.OrthogonalizeElemBasesCode > 0)
 				Utils::Warning("A piecewise-constant function will be exported. For a high-order visualization, use non-orthogonalized monomial bases for the elements (-e-basis monomials -e-ogb 0).");
 
 			// Set a single value in the element
