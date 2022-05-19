@@ -42,10 +42,6 @@ public:
 	{
 		return this->MeshElement->LocalNumberOf(face->MeshFace);
 	}
-	inline double SourceTerm(BasisFunction<Dim>* phi, DomFunction f)
-	{
-		return this->MeshElement->SourceTerm(phi, f);
-	}
 private:
 	inline const Tensor<Dim>& DiffTensor() const
 	{
@@ -280,29 +276,15 @@ public:
 		return integral;
 	}
 
-private:
-	double InnerProduct(BasisFunction<Dim>* phi, DomFunction f)
-	{
-		RefFunction functionToIntegrate = [this, f, phi](const RefPoint& refElementPoint) {
-			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
-			return f(domainPoint) * phi->Eval(refElementPoint);
-		};
-
-		return this->MeshElement->Integral(functionToIntegrate);
-	}
 
 public:
-	Vector InnerProductWithReconstructBasis(DomFunction f)
+	Vector InnerProductWithBasis(FunctionalBasis<Dim>* basis, DomFunction f)
 	{
-		Vector innerProducts(this->ReconstructionBasis->Size());
-		for (BasisFunction<Dim>*phi : this->ReconstructionBasis->LocalFunctions())
-			innerProducts(phi->LocalNumber) = InnerProduct(phi, f);
-		return innerProducts;
+		return MeshElement->Shape()->InnerProductWithBasis(basis, f);
 	}
-
 	Vector ProjectOnReconstructBasis(DomFunction f)
 	{
-		return SolveReconstructMassMatrix(InnerProductWithReconstructBasis(f));
+		return SolveReconstructMassMatrix(InnerProductWithBasis(ReconstructionBasis, f));
 	}
 
 private:

@@ -782,11 +782,7 @@ public:
 		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, &b_source, &sourceFunction](Element<Dim>* e)
 			{
 				Diff_HHOElement<Dim>* element = HHOElement(e);
-				for (BasisFunction<Dim>* cellPhi : element->CellBasis->LocalFunctions())
-				{
-					BigNumber i = DOFNumber(element, cellPhi);
-					b_source(i) = element->SourceTerm(cellPhi, sourceFunction);
-				}
+				b_source.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns) = e->InnerProductWithBasis(element->CellBasis, sourceFunction);
 			}
 		);
 		return b_source;
@@ -1285,10 +1281,10 @@ public:
 	}
 
 private:
-	BigNumber DOFNumber(Diff_HHOElement<Dim>* element, BasisFunction<Dim>* cellPhi)
+	/*BigNumber DOFNumber(Diff_HHOElement<Dim>* element, BasisFunction<Dim>* cellPhi)
 	{
 		return FirstDOFGlobalNumber(element) + cellPhi->LocalNumber;
-	}
+	}*/
 	BigNumber FirstDOFGlobalNumber(Diff_HHOElement<Dim>* element)
 	{
 		return element->Number() * HHO->CellBasis->Size();

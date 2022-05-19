@@ -605,6 +605,11 @@ public:
 		return this->Shape()->IntegralGradGradMatrix(basis);
 	}
 
+	Vector InnerProductWithBasis(FunctionalBasis<Dim>* basis, DomFunction f) const
+	{
+		return this->Shape()->InnerProductWithBasis(basis, f);
+	}
+
 	//-----------------------------//
 	//             HHO             //
 	//-----------------------------//

@@ -324,6 +324,20 @@ public:
 		return m;
 	}
 
+	Vector InnerProductWithBasis(FunctionalBasis<Dim>* basis, DomFunction f) const
+	{
+		Vector innerProducts(basis->Size());
+		for (BasisFunction<Dim>* phi : basis->LocalFunctions())
+		{
+			RefFunction functionToIntegrate = [this, f, phi](const RefPoint& refElementPoint) {
+				DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
+				return f(domainPoint) * phi->Eval(refElementPoint);
+			};
+			innerProducts(phi->LocalNumber) = Integral(functionToIntegrate);
+		}
+		return innerProducts;
+	}
+
 	//----------------------------//
 	//             DG             //
 	//----------------------------//

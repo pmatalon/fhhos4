@@ -50,7 +50,7 @@ public:
 				Diff_HHOElement<Dim>* elem = HHOElement(e);
 				BigNumber i = e->Number * HHO->nReconstructUnknowns;
 
-				innerProds.segment(i, HHO->nReconstructUnknowns) = elem->InnerProductWithReconstructBasis(func);
+				innerProds.segment(i, HHO->nReconstructUnknowns) = elem->InnerProductWithBasis(elem->ReconstructionBasis, func);
 			}
 		);
 		return innerProds;
