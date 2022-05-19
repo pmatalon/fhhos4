@@ -30,11 +30,11 @@ public:
 			weight2 = elementOnTheOtherSide2->Kappa() / (l1 + l2);
 		}
 
-		auto phi1 = element1->EvalPhiOnFace(this, p_phi1);
-		auto gradPhi1 = element1->GradPhiOnFace(this, p_phi1);
+		auto phi1 = element1->Trace(this, p_phi1);
+		auto gradPhi1 = element1->GradOnFace(this, p_phi1);
 
-		auto phi2 = element2->EvalPhiOnFace(this, p_phi2);
-		auto gradPhi2 = element2->GradPhiOnFace(this, p_phi2);
+		auto phi2 = element2->Trace(this, p_phi2);
+		auto gradPhi2 = element2->GradOnFace(this, p_phi2);
 
 		RefFunction functionToIntegrate = [n1, n2, phi1, phi2, gradPhi1, gradPhi2, weight1, weight2, k1, k2](const RefPoint& p) {
 			double meanGradPhi1_scal_jumpPhi2 = weight1 * k1 * gradPhi1(p).dot(n2) * phi2(p);
@@ -52,8 +52,8 @@ public:
 		auto n1 = element1->OuterNormalVector(this);
 		auto n2 = element2->OuterNormalVector(this);
 
-		auto phi1 = element1->EvalPhiOnFace(this, p_phi1);
-		auto phi2 = element2->EvalPhiOnFace(this, p_phi2);
+		auto phi1 = element1->Trace(this, p_phi1);
+		auto phi2 = element2->Trace(this, p_phi2);
 
 		RefFunction functionToIntegrate = [phi1, phi2, n1, n2](const RefPoint& p) {
 			return n1.dot(n2) * phi1(p) * phi2(p);

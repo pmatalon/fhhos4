@@ -191,6 +191,14 @@ public:
 		return GeometricShape<Dim>::Integral(phi);
 	}
 
+	Vector Integral(FunctionalBasis<Dim>* basis) const
+	{
+		Vector v(basis->Size());
+		for (BasisFunction<Dim>* phi : basis->LocalFunctions())
+			v[phi->LocalNumber] = Integral(phi);
+		return v;
+	}
+
 	virtual double Integral(RefFunction f) const override
 	{
 		RefFunction func = [this, f](const RefPoint& p) {
@@ -280,12 +288,31 @@ public:
 		return this->ComputeAndReturnMassMatrix(basis);
 	}
 
+	DenseMatrix IntegralKGradGradMatrix(const Tensor<Dim>& K, FunctionalBasis<Dim>* basis) const
+	{
+		auto localFunctions = basis->LocalFunctions();
+		DenseMatrix m(localFunctions.size(), localFunctions.size());
+		for (BasisFunction<Dim>* phi1 : localFunctions)
+		{
+			for (BasisFunction<Dim>* phi2 : localFunctions)
+			{
+				if (phi2->LocalNumber > phi1->LocalNumber)
+					break;
+				double value = this->IntegralKGradGrad(K, phi1, phi2);
+				m(phi1->LocalNumber, phi2->LocalNumber) = value;
+				m(phi2->LocalNumber, phi1->LocalNumber) = value;
+			}
+		}
+		return m;
+	}
+
 	DenseMatrix IntegralGradGradMatrix(FunctionalBasis<Dim>* basis) const
 	{
-		DenseMatrix m(basis->LocalFunctions.size(), basis->LocalFunctions.size());
-		for (BasisFunction<Dim>* phi1 : basis->LocalFunctions)
+		auto localFunctions = basis->LocalFunctions();
+		DenseMatrix m(localFunctions.size(), localFunctions.size());
+		for (BasisFunction<Dim>* phi1 : localFunctions)
 		{
-			for (BasisFunction<Dim>* phi2 : basis->LocalFunctions)
+			for (BasisFunction<Dim>* phi2 : localFunctions)
 			{
 				if (phi2->LocalNumber > phi1->LocalNumber)
 					break;

@@ -139,31 +139,27 @@ public:
 			return _massMatrixSolver.solve(v);
 	}*/
 
-	double ComputeMassTerm(BasisFunction<Dim - 1>* facePhi, Element<Dim>* element, BasisFunction<Dim>* reconstructPhi)
+	double ComputeMassTerm(BasisFunction<Dim - 1>* facePhi, Element<Dim>* element, BasisFunction<Dim>* cellPhi)
 	{
-		auto reconstructPhiOnFace = element->EvalPhiOnFace(this->MeshFace, reconstructPhi);
-
-		RefFunction functionToIntegrate = [facePhi, reconstructPhiOnFace](const RefPoint& p) {
-			return facePhi->Eval(p) * reconstructPhiOnFace(p);
+		RefFunction functionToIntegrate = [this, element, facePhi, cellPhi](const RefPoint& p) {
+			return facePhi->Eval(p) * element->EvalTrace(this->MeshFace, cellPhi, p);
 		};
 
-		int polynomialDegree = facePhi->GetDegree() + reconstructPhi->GetDegree();
+		int polynomialDegree = facePhi->GetDegree() + cellPhi->GetDegree();
 		return this->MeshFace->Integral(functionToIntegrate, polynomialDegree);
 	}
 
 private:
-	double NormalDerivativeTerm(BasisFunction<Dim - 1>* facePhi, Element<Dim>* element, BasisFunction<Dim>* phi, const DimVector<Dim>& n)
+	double NormalDerivativeTerm(BasisFunction<Dim - 1>* facePhi, Element<Dim>* element, BasisFunction<Dim>* cellPhi, const DimVector<Dim>& n)
 	{
-		if (phi->GetDegree() == 0)
+		if (cellPhi->GetDegree() == 0)
 			return 0;
 
-		auto gradPhiOnFace = element->GradPhiOnFace(this->MeshFace, phi);
-
-		RefFunction functionToIntegrate = [facePhi, gradPhiOnFace, &n](const RefPoint& p) {
-			return facePhi->Eval(p) * gradPhiOnFace(p).dot(n);
+		RefFunction functionToIntegrate = [this, element, facePhi, cellPhi, &n](const RefPoint& p) {
+			return facePhi->Eval(p) * element->EvalGradOnFace(this->MeshFace, cellPhi, p).dot(n);
 		};
 
-		int polynomialDegree = facePhi->GetDegree() + phi->GetDegree() - 1;
+		int polynomialDegree = facePhi->GetDegree() + cellPhi->GetDegree() - 1;
 		return this->MeshFace->Integral(functionToIntegrate, polynomialDegree);
 	}
 

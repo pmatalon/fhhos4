@@ -501,48 +501,62 @@ public:
 		return Shape()->QuadraturePoints();
 	}
 
-	virtual double Integral(BasisFunction<Dim>* phi) const
+	double Integral(BasisFunction<Dim>* phi) const
 	{
 		return Shape()->Integral(phi);
 	}
-	virtual double Integral(RefFunction func) const
+	Vector Integral(FunctionalBasis<Dim>* basis) const
+	{
+		return Shape()->Integral(basis);
+	}
+	double Integral(RefFunction func) const
 	{
 		return Shape()->Integral(func);
 	}
-	virtual double Integral(RefFunction func, int polynomialDegree) const
+	double Integral(RefFunction func, int polynomialDegree) const
 	{
 		return Shape()->Integral(func, polynomialDegree);
 	}
-	virtual double Integral(DomFunction globalFunction) const
+	double Integral(DomFunction globalFunction) const
 	{
 		return Shape()->Integral(globalFunction);
 	}
-	virtual double Integral(DomFunction globalFunction, int polynomialDegree) const
+	double Integral(DomFunction globalFunction, int polynomialDegree) const
 	{
 		return Shape()->Integral(globalFunction, polynomialDegree);
 	}
 
-	virtual RefFunction EvalPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* phi)
+	// Deprecated. Use EvalTrace() directly in the integral function.
+	RefFunction Trace(Face<Dim>* face, BasisFunction<Dim>* phi)
 	{
 		RefFunction evalOnFace = [this, face, phi](const RefPoint& refPoint1D) {
-			DomPoint domainPoint2D = face->ConvertToDomain(refPoint1D);
-			RefPoint refPoint2D = this->ConvertToReference(domainPoint2D);
-			return phi->Eval(refPoint2D);
+			return EvalTrace(face, phi, refPoint1D);
 		};
 		return evalOnFace;
 	}
+	double EvalTrace(Face<Dim>* face, BasisFunction<Dim>* phi, const RefPoint& refPoint1D)
+	{
+		DomPoint domainPoint2D = face->ConvertToDomain(refPoint1D);
+		RefPoint refPoint2D = this->ConvertToReference(domainPoint2D);
+		return phi->Eval(refPoint2D);
+	}
 
-	virtual function<DimVector<Dim>(RefPoint)> GradPhiOnFace(Face<Dim>* face, BasisFunction<Dim>* phi)
+	// Deprecated. Use EvalGradOnFace() directly in the integral function.
+	function<DimVector<Dim>(RefPoint)> GradOnFace(Face<Dim>* face, BasisFunction<Dim>* phi)
 	{
 		function<DimVector<Dim>(RefPoint)> gradOnFace = [this, face, phi](const RefPoint& refPoint1D) {
-			DomPoint domainPoint2D = face->ConvertToDomain(refPoint1D);
-			RefPoint refPoint2D = this->ConvertToReference(domainPoint2D);
-			DimVector<Dim> gradPhi = phi->Grad(refPoint2D);
-			DimMatrix<Dim> invJ = this->InverseJacobianTranspose(refPoint2D);
-			DimVector<Dim> result = invJ * gradPhi;
-			return result;
+			return EvalGradOnFace(face, phi, refPoint1D);
 		};
 		return gradOnFace;
+	}
+	DimVector<Dim> EvalGradOnFace(Face<Dim>* face, BasisFunction<Dim>* phi, const RefPoint& refPoint1D)
+	{
+		DomPoint domainPoint2D = face->ConvertToDomain(refPoint1D);
+		RefPoint refPoint2D = this->ConvertToReference(domainPoint2D);
+		DimVector<Dim> gradPhi = phi->Grad(refPoint2D);
+		DimMatrix<Dim> invJ = this->InverseJacobianTranspose(refPoint2D);
+		DimVector<Dim> result = invJ * gradPhi;
+		return result;
 	}
 
 	double L2ErrorPow2(RefFunction approximate, DomFunction exactSolution) const
@@ -579,6 +593,11 @@ public:
 	double IntegralKGradGrad(const Tensor<Dim>& K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2) const
 	{
 		return this->Shape()->IntegralKGradGrad(K, phi1, phi2);
+	}
+
+	DenseMatrix IntegralKGradGradMatrix(const Tensor<Dim>& K, FunctionalBasis<Dim>* basis) const
+	{
+		return this->Shape()->IntegralKGradGradMatrix(K, basis);
 	}
 
 	DenseMatrix IntegralGradGradMatrix(FunctionalBasis<Dim>* basis) const

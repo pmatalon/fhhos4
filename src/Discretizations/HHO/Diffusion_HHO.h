@@ -674,7 +674,7 @@ public:
 
 		if (hho->OrthogonalizeElemBases())// && hho->OrthogonalizeFaceBases())
 		{
-			Triangle::InitReferenceShape()->Orthogonalize(reconstructionBasis, hho->NElemOrthogonalizations(), hho->OrthonormalizeElemBases());
+			Triangle::InitReferenceShape()->Orthogonalize((FunctionalBasis<2>*)reconstructionBasis, hho->NElemOrthogonalizations(), hho->OrthonormalizeElemBases());
 			//return;
 		}
 

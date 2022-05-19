@@ -55,13 +55,13 @@ private:
 	{
 		return this->MeshElement->OuterNormalVector(face->MeshFace);
 	}
-	inline RefFunction EvalPhiOnFace(Diff_HHOFace<Dim>* face, BasisFunction<Dim>* phi)
+	inline double EvalTrace(Diff_HHOFace<Dim>* face, BasisFunction<Dim>* phi, const RefPoint& refPointOnFace)
 	{
-		return this->MeshElement->EvalPhiOnFace(face->MeshFace, phi);
+		return this->MeshElement->EvalTrace(face->MeshFace, phi, refPointOnFace);
 	}
-	inline function<DimVector<Dim>(RefPoint)> GradPhiOnFace(Diff_HHOFace<Dim>* face, BasisFunction<Dim>* phi)
+	inline DimVector<Dim> EvalGradOnFace(Diff_HHOFace<Dim>* face, BasisFunction<Dim>* phi, const RefPoint& refPointOnFace)
 	{
-		return this->MeshElement->GradPhiOnFace(face->MeshFace, phi);
+		return this->MeshElement->EvalGradOnFace(face->MeshFace, phi, refPointOnFace);
 	}
 	inline DomPoint ConvertToDomain(const RefPoint& refPoint) const
 	{
@@ -313,8 +313,8 @@ private:
 
 	void AssembleReconstructionAndConsistencyMatrices()
 	{
-		DenseMatrix reconstructionMatrixToInvert = this->AssembleReconstructionMatrixToInvert();
-		DenseMatrix rhsMatrix = this->AssembleRHSMatrix();
+		DenseMatrix reconstructionMatrixToInvert = AssembleReconstructionMatrixToInvert();
+		DenseMatrix rhsMatrix = AssembleRHSMatrix(reconstructionMatrixToInvert);
 
 		DenseMatrix P_and_LagrangeMultipliers = reconstructionMatrixToInvert.colPivHouseholderQr().solve(rhsMatrix);
 		// We don't keep the last row, which stores the values of the Lagrange multipliers
@@ -330,60 +330,34 @@ private:
 	DenseMatrix AssembleReconstructionMatrixToInvert()
 	{
 		DenseMatrix matrixToInvert(HHO->nReconstructUnknowns + 1, HHO->nReconstructUnknowns + 1);
-		this->AssembleGradientReconstructionMatrix(matrixToInvert); // Block S
-		this->AssembleMeanValueCondition(matrixToInvert); // Blocks L and L_transpose
+		// Block S (stiffness)
+		matrixToInvert.topLeftCorner(HHO->nReconstructUnknowns, HHO->nReconstructUnknowns) << MeshElement->IntegralKGradGradMatrix(DiffTensor(), ReconstructionBasis);
+		// Blocks L and L_transpose (mean values)
+		Vector meanValues = MeshElement->Integral(ReconstructionBasis);
+		matrixToInvert.topRightCorner(meanValues.rows(), 1) = meanValues;
+		matrixToInvert.bottomLeftCorner(1, meanValues.rows()) = meanValues.transpose();
+		// 0
 		matrixToInvert.bottomRightCorner<1, 1>() << 0;
 		return matrixToInvert;
 	}
 
-	void AssembleGradientReconstructionMatrix(DenseMatrix & reconstructionMatrixToInvert)
-	{
-		for (BasisFunction<Dim>* phi1 : this->ReconstructionBasis->LocalFunctions())
-		{
-			for (BasisFunction<Dim>* phi2 : this->ReconstructionBasis->LocalFunctions())
-			{
-				if (phi2->LocalNumber > phi1->LocalNumber)
-					break;
-				double value = this->IntegralKGradGrad(this->DiffTensor(), phi1, phi2);
-				reconstructionMatrixToInvert(phi1->LocalNumber, phi2->LocalNumber) = value;
-				reconstructionMatrixToInvert(phi2->LocalNumber, phi1->LocalNumber) = value;
-			}
-		}
-	}
-
-	void AssembleMeanValueCondition(DenseMatrix & reconstructionMatrixToInvert)
-	{
-		int last = this->ReconstructionBasis->Size();
-		for (BasisFunction<Dim>* phi : this->ReconstructionBasis->LocalFunctions())
-		{
-			double meanValue = this->MeshElement->Integral(phi); // TODO: this can be computed only once on the reference element
-			reconstructionMatrixToInvert(last, phi->LocalNumber) = meanValue;
-			reconstructionMatrixToInvert(phi->LocalNumber, last) = meanValue;
-		}
-	}
-
-	void AssembleMeanValueConditionRHS(DenseMatrix & rhsMatrix)
-	{
-		int last = this->ReconstructionBasis->Size();
-		for (BasisFunction<Dim>* phi : this->CellBasis->LocalFunctions())
-			rhsMatrix(last, phi->LocalNumber) = this->MeshElement->Integral(phi); // TODO: this can be computed only once on the reference element
-	}
-
-	DenseMatrix AssembleRHSMatrix()
+	DenseMatrix AssembleRHSMatrix(DenseMatrix& reconstructionMatrixToInvert)
 	{
 		auto nTotalFaceUnknowns = this->Faces.size() * HHO->nFaceUnknowns;
-		auto nColumns = HHO->nCellUnknowns + nTotalFaceUnknowns;
-		DenseMatrix rhsMatrix(HHO->nReconstructUnknowns + 1, nColumns);
+		DenseMatrix rhsMatrix(HHO->nReconstructUnknowns + 1, HHO->nCellUnknowns + nTotalFaceUnknowns);
 
 		// Top-left corner (Block Bt)
-		this->AssembleIntegrationByPartsRHS_cell(rhsMatrix);
+		AssembleIntegrationByPartsRHS_cell(rhsMatrix, reconstructionMatrixToInvert);
 
 		// Top-right corner (Block B_frontier)
 		for (auto face : this->Faces)
-			this->AssembleIntegrationByPartsRHS_face(rhsMatrix, face);
+			AssembleIntegrationByPartsRHS_face(rhsMatrix, face);
 
-		// Bottom-left corner (Block Lt)
-		this->AssembleMeanValueConditionRHS(rhsMatrix);
+		// Bottom-left corner (Block Lt) Mean value condition
+		if (ReconstructionBasis->IsHierarchical())
+			rhsMatrix.bottomLeftCorner(1, CellBasis->Size()) = reconstructionMatrixToInvert.bottomLeftCorner(1, CellBasis->Size());
+		else
+			rhsMatrix.bottomLeftCorner(1, CellBasis->Size()) = MeshElement->Integral(CellBasis).transpose();
 
 		// Bottom-right corner (0)
 		rhsMatrix.bottomRightCorner(1, nTotalFaceUnknowns) << Eigen::ArrayXXd::Zero(1, nTotalFaceUnknowns);
@@ -391,40 +365,42 @@ private:
 		return rhsMatrix;
 	}
 
-	void AssembleIntegrationByPartsRHS_cell(DenseMatrix & rhsMatrix)
+	void AssembleIntegrationByPartsRHS_cell(DenseMatrix& rhsMatrix, DenseMatrix& reconstructionMatrixToInvert)
 	{
 		for (BasisFunction<Dim>* reconstructPhi : this->ReconstructionBasis->LocalFunctions())
 		{
 			for (BasisFunction<Dim>* cellPhi : this->CellBasis->LocalFunctions())
-				rhsMatrix(reconstructPhi->LocalNumber, DOFNumber(cellPhi)) = this->IntegrationByPartsRHS_cell(reconstructPhi, cellPhi);
+				rhsMatrix(reconstructPhi->LocalNumber, cellPhi->LocalNumber) = IntegrationByPartsRHS_cell(reconstructPhi, cellPhi, reconstructionMatrixToInvert);
 		}
 	}
 
-	void AssembleIntegrationByPartsRHS_face(DenseMatrix & rhsMatrix, Diff_HHOFace<Dim> * face)
+	void AssembleIntegrationByPartsRHS_face(DenseMatrix& rhsMatrix, Diff_HHOFace<Dim>* face)
 	{
 		for (BasisFunction<Dim>* reconstructPhi : this->ReconstructionBasis->LocalFunctions())
 		{
 			for (BasisFunction<Dim - 1> * facePhi : face->Basis->LocalFunctions())
-				rhsMatrix(reconstructPhi->LocalNumber, DOFNumber(face, facePhi)) = this->IntegrationByPartsRHS_face(face, reconstructPhi, facePhi);
+				rhsMatrix(reconstructPhi->LocalNumber, DOFNumber(face, facePhi)) = IntegrationByPartsRHS_face(face, reconstructPhi, facePhi);
 		}
 	}
 
-	double IntegrationByPartsRHS_cell(BasisFunction<Dim>* reconstructPhi, BasisFunction<Dim>* cellPhi)
+	double IntegrationByPartsRHS_cell(BasisFunction<Dim>* reconstructPhi, BasisFunction<Dim>* cellPhi, DenseMatrix& reconstructionMatrixToInvert)
 	{
 		if (reconstructPhi->GetDegree() == 0)
 			return 0;
 
-		double integralGradGrad = this->IntegralKGradGrad(this->DiffTensor(), reconstructPhi, cellPhi);
+		double integralGradGrad;
+		if (ReconstructionBasis->IsHierarchical())
+			integralGradGrad = reconstructionMatrixToInvert(reconstructPhi->LocalNumber, cellPhi->LocalNumber);
+		else
+			integralGradGrad = this->IntegralKGradGrad(this->DiffTensor(), reconstructPhi, cellPhi);
 
 		double sumFaces = 0;
 		for (auto face : this->Faces)
 		{
-			auto phi = this->EvalPhiOnFace(face, cellPhi);
-			auto gradPhi = this->GradPhiOnFace(face, reconstructPhi);
 			auto normal = this->OuterNormalVector(face);
 
-			RefFunction functionToIntegrate = [this, phi, gradPhi, &normal](const RefPoint& p) {
-				return (this->DiffTensor() * gradPhi(p)).dot(normal) * phi(p);
+			RefFunction functionToIntegrate = [this, face, cellPhi, reconstructPhi, &normal](const RefPoint& p) {
+				return (this->DiffTensor() * this->EvalGradOnFace(face, reconstructPhi, p)).dot(normal) * this->EvalTrace(face, cellPhi, p);
 			};
 
 			int polynomialDegree = reconstructPhi->GetDegree() - 1 + cellPhi->GetDegree();
@@ -441,11 +417,10 @@ private:
 		if (reconstructPhi->GetDegree() == 0)
 			return 0;
 
-		auto gradPhi = this->GradPhiOnFace(face, reconstructPhi);
 		auto normal = this->OuterNormalVector(face);
 
-		RefFunction functionToIntegrate = [this, facePhi, gradPhi, &normal](const RefPoint& p) {
-			return (this->DiffTensor() * gradPhi(p)).dot(normal) * facePhi->Eval(p);
+		RefFunction functionToIntegrate = [this, face, facePhi, reconstructPhi, &normal](const RefPoint& p) {
+			return (this->DiffTensor() * this->EvalGradOnFace(face, reconstructPhi, p)).dot(normal) * facePhi->Eval(p);
 		};
 
 		int polynomialDegree = reconstructPhi->GetDegree() - 1 + facePhi->GetDegree();
@@ -484,7 +459,11 @@ private:
 				auto normal = this->OuterNormalVector(face);
 				DenseMatrix Mf = face->MassMatrix();
 				DenseMatrix ProjF = face->Trace(this->MeshElement, this->ReconstructionBasis);
-				DenseMatrix ProjFT = face->Trace(this->MeshElement, this->CellBasis);
+				DenseMatrix ProjFT;
+				if (ReconstructionBasis->IsHierarchical())
+					ProjFT = ProjF.leftCols(CellBasis->Size());
+				else
+					ProjFT = face->Trace(this->MeshElement, this->CellBasis);
 
 				DenseMatrix Df = ProjF * this->P;
 				for (int i = 0; i < Df.rows(); i++)
@@ -523,10 +502,6 @@ private:
 	//-----------------------------------------//
 
 private:
-	int DOFNumber(BasisFunction<Dim> * cellPhi)
-	{
-		return cellPhi->LocalNumber;
-	}
 	int DOFNumber(Diff_HHOFace<Dim> * face, BasisFunction<Dim - 1> * facePhi)
 	{
 		return FirstDOFNumber(face) + facePhi->LocalNumber;
