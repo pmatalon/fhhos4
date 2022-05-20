@@ -6,7 +6,10 @@ template <int Dim>
 class OrthogonalBasis : public FunctionalBasis<Dim>
 {
 private:
-	vector<OrthogonalBasisFunction<Dim>> _localFunctions;
+	template <int Dim2>
+	friend class OrthogonalBasisOnCstJacShape;
+
+	vector<OrthogBasisFunctionOnGeoShape<Dim>> _localFunctions;
 	FunctionalBasis<Dim>* _originalBasis;
 public:
 	OrthogonalBasis() {}
@@ -26,7 +29,7 @@ public:
 	{
 		vector<BasisFunction<Dim>*> list;
 		list.reserve(_localFunctions.size());
-		for (OrthogonalBasisFunction<Dim>& phi : _localFunctions)
+		for (OrthogBasisFunctionOnGeoShape<Dim>& phi : _localFunctions)
 			list.push_back(&phi);
 		return list;
 	}
@@ -34,9 +37,9 @@ public:
 	string BasisCode() const override
 	{
 		bool normalized = true;
-		for (const OrthogonalBasisFunction<Dim>& phi : _localFunctions)
+		for (const OrthogBasisFunctionOnGeoShape<Dim>& phi : _localFunctions)
 		{
-			if (phi.NormSquare != 1)
+			if (phi.NormSquare() != 1)
 			{
 				normalized = false;
 				break;
@@ -81,19 +84,19 @@ private:
 		for (int i = 0; i < originalFunctions.size(); i++)
 		{
 			_localFunctions.emplace_back(originalFunctions[i]);
-			OrthogonalBasisFunction<Dim>& phi = _localFunctions.back();
+			OrthogBasisFunctionOnGeoShape<Dim>& phi = _localFunctions.back();
 			for (int nOrthogonalization = 0; nOrthogonalization < orthogonalizationSweeps; nOrthogonalization++) // possibly 2 passes of orthogonalization
 			{
 				for (int j = 0; j < i; j++)
 				{
-					OrthogonalBasisFunction<Dim>& previousPhi = _localFunctions[j];
+					OrthogBasisFunctionOnGeoShape<Dim>& previousPhi = _localFunctions[j];
 					double innerprod = shape->ComputeMassTerm(&phi, &previousPhi);
 					phi.Minus(innerprod, &previousPhi);
 				}
 			}
 			double norm = shape->L2Norm(&phi);
 			phi.DivideBy(norm);
-			phi.NormSquare = 1;
+			phi.SetNormSquare(1);
 		}
 	}
 
@@ -104,49 +107,17 @@ private:
 		for (int i = 0; i < originalFunctions.size(); i++)
 		{
 			_localFunctions.emplace_back(originalFunctions[i]);
-			OrthogonalBasisFunction<Dim>& phi = _localFunctions.back();
+			OrthogBasisFunctionOnGeoShape<Dim>& phi = _localFunctions.back();
 			for (int nOrthogonalization = 0; nOrthogonalization < orthogonalizationSweeps; nOrthogonalization++) // possibly 2 passes of orthogonalization
 			{
 				for (int j = 0; j < i; j++)
 				{
-					OrthogonalBasisFunction<Dim>& previousPhi = _localFunctions[j];
+					OrthogBasisFunctionOnGeoShape<Dim>& previousPhi = _localFunctions[j];
 					double innerprod = shape->ComputeMassTerm(&phi, &previousPhi);
-					phi.Minus(innerprod / previousPhi.NormSquare, &previousPhi);
+					phi.Minus(innerprod / previousPhi.NormSquare(), &previousPhi);
 				}
 			}
-			phi.NormSquare = shape->L2NormSquare(&phi);
+			phi.SetNormSquare(shape->L2NormSquare(&phi));
 		}
 	}
 };
-
-/*
-template <int Dim>
-class ShapeWithConstantJacobianOrthogonalBasis : public FunctionalBasis<Dim>
-{
-private:
-	vector<OrthogonalBasisFunction<Dim>> _localFunctions;
-
-public:
-	ShapeWithConstantJacobianOrthogonalBasis(const OrthogonalBasis<Dim>& refShapeBasis, double detJacobian, bool normalize)
-	{
-		_originalBasis = refShapeBasis->_originalBasis;
-		this->_basisCode = refShapeBasis.BasisCode();
-		_localFunctions.insert(this->LocalFunctions.end(), refShapeBasis.LocalFunctions.begin(), refShapeBasis.LocalFunctions.end());
-		if (normalize)
-		{
-			for (BasisFunction<Dim>* phi : this->LocalFunctions)
-			{
-				OrthogonalBasisFunction<Dim>* refphi = dynamic_cast<OrthogonalBasisFunction<Dim>*>(phi);
-				refphi->DivideBy(sqrt(detJacobian));
-			}
-		}
-		else
-		{
-			for (BasisFunction<Dim>* phi : this->LocalFunctions)
-			{
-				OrthogonalBasisFunction<Dim>* refphi = dynamic_cast<OrthogonalBasisFunction<Dim>*>(phi);
-				refphi->NormSquare *= detJacobian;
-			}
-		}
-	}
-};*/

@@ -19,13 +19,13 @@ public:
 		return this->Degree;
 	}
 
-	double Eval(double x)
+	double Eval(double x) const
 	{
 		this->TestIsInReferenceInterval(x);
 		return pow(x, this->Degree);
 	}
 
-	double EvalDerivative(double x)
+	double EvalDerivative(double x) const
 	{
 		this->TestIsInReferenceInterval(x);
 		if (this->Degree == 0)

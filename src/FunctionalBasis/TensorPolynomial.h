@@ -25,17 +25,17 @@ public:
 		return this->FuncX->GetDegree() + this->FuncY->GetDegree();
 	}
 
-	double Eval(double x, double y)
+	double Eval(double x, double y) const
 	{
 		return this->FuncX->Eval(x) * this->FuncY->Eval(y);
 	}
 
-	double EvalGradX(double x, double y)
+	double EvalGradX(double x, double y) const
 	{
 		return this->FuncX->EvalDerivative(x) * this->FuncY->Eval(y);
 	}
 
-	double EvalGradY(double x, double y)
+	double EvalGradY(double x, double y) const
 	{
 		return this->FuncX->Eval(x) * this->FuncY->EvalDerivative(y);
 	}
@@ -79,22 +79,22 @@ public:
 		return this->FuncX->GetDegree() + this->FuncY->GetDegree() + this->_funcZ->GetDegree();
 	}
 
-	double Eval(double x, double y, double z)
+	double Eval(double x, double y, double z) const
 	{
 		return this->FuncX->Eval(x) * this->FuncY->Eval(y) * this->_funcZ->Eval(z);
 	}
 
-	double EvalGradX(double x, double y, double z)
+	double EvalGradX(double x, double y, double z) const
 	{
 		return this->FuncX->EvalDerivative(x) * this->FuncY->Eval(y) * this->_funcZ->Eval(z);
 	}
 
-	double EvalGradY(double x, double y, double z)
+	double EvalGradY(double x, double y, double z) const
 	{
 		return this->FuncX->Eval(x) * this->FuncY->EvalDerivative(y) * this->_funcZ->Eval(z);
 	}
 
-	double EvalGradZ(double x, double y, double z)
+	double EvalGradZ(double x, double y, double z) const
 	{
 		return this->FuncX->Eval(x) * this->FuncY->Eval(y) * this->_funcZ->EvalDerivative(z);
 	}

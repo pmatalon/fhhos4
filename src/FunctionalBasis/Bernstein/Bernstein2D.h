@@ -29,18 +29,18 @@ public:
 		return this->_degree;
 	}
 
-	double Eval(double x, double y)
+	double Eval(double x, double y) const
 	{
 		// Bernstein on [-1,1]: change of variable
 		return BivariateBernstein(0.5*x + 0.5, 0.5*y + 0.5);
 	}
 
-	double EvalGradX(double x, double y)
+	double EvalGradX(double x, double y) const
 	{
 		return 0.5 * GradBivariateBernsteinX(0.5*x + 0.5, 0.5*y + 0.5);
 	}
 
-	double EvalGradY(double x, double y)
+	double EvalGradY(double x, double y) const
 	{
 		return 0.5 * GradBivariateBernsteinY(0.5*x + 0.5, 0.5*y + 0.5);
 	}
@@ -86,12 +86,12 @@ public:
 
 private:
 	// Bernstein polynomial on [0,1]
-	double BivariateBernstein(double x, double y)
+	double BivariateBernstein(double x, double y) const
 	{
 		return this->_binomial * pow(x, this->_degX) * pow(y, this->_degY) * pow(1 - x - y, this->_degMixed);
 	}
 
-	double GradBivariateBernsteinX(double x, double y)
+	double GradBivariateBernsteinX(double x, double y) const
 	{
 		if (this->_degX == 0 && this->_degMixed == 0)
 			return 0;
@@ -105,7 +105,7 @@ private:
 		return this->_binomial * pow(y, this->_degY) * (this->_degX * pow(x, this->_degX - 1) * pow(1 - x - y, this->_degMixed) - this->_degMixed * pow(1 - x - y, this->_degMixed - 1) * pow(x, this->_degX));
 	}
 
-	double GradBivariateBernsteinY(double x, double y)
+	double GradBivariateBernsteinY(double x, double y) const
 	{
 		if (this->_degY == 0 && this->_degMixed == 0)
 			return 0;

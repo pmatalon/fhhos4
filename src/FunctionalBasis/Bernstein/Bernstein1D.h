@@ -25,14 +25,14 @@ public:
 		return this->_degree;
 	}
 
-	double Eval(double x)
+	double Eval(double x) const
 	{
 		this->TestIsInReferenceInterval(x);
 		// Bernstein on [-1,1]: change of variable
 		return Bernstein(0.5*x + 0.5);
 	}
 
-	double EvalDerivative(double x)
+	double EvalDerivative(double x) const
 	{
 		this->TestIsInReferenceInterval(x);
 		return 0.5 * DBernstein(0.5*x + 0.5);
@@ -63,14 +63,14 @@ public:
 
 private:
 	// Bernstein polynomial on [0,1]
-	double Bernstein(double x)
+	double Bernstein(double x) const
 	{
 		int n = this->_degree;
 		int i = this->_i;
 		return this->_binomial * pow(x, i) * pow(1 - x, n - i);
 	}
 
-	double DBernstein(double x)
+	double DBernstein(double x) const
 	{
 		int n = this->_degree;
 		int i = this->_i;

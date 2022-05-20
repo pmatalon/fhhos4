@@ -32,23 +32,23 @@ public:
 		return this->_degree;
 	}
 
-	double Eval(double x, double y, double z)
+	double Eval(double x, double y, double z) const
 	{
 		// Bernstein on [-1,1]: change of variable
 		return TrivariateBernstein(0.5*x + 0.5, 0.5*y + 0.5, 0.5*z + 0.5);
 	}
 
-	double EvalGradX(double x, double y, double z)
+	double EvalGradX(double x, double y, double z) const
 	{
 		return 0.5 * GradTrivariateBernsteinX(0.5*x + 0.5, 0.5*y + 0.5, 0.5*z + 0.5);
 	}
 
-	double EvalGradY(double x, double y, double z)
+	double EvalGradY(double x, double y, double z) const
 	{
 		return 0.5 * GradTrivariateBernsteinY(0.5*x + 0.5, 0.5*y + 0.5, 0.5*z + 0.5);
 	}
 
-	double EvalGradZ(double x, double y, double z)
+	double EvalGradZ(double x, double y, double z) const
 	{
 		return 0.5 * GradTrivariateBernsteinZ(0.5*x + 0.5, 0.5*y + 0.5, 0.5*z + 0.5);
 	}
@@ -100,12 +100,12 @@ public:
 
 private:
 	// Bernstein polynomial on [0,1]
-	double TrivariateBernstein(double x, double y, double z)
+	double TrivariateBernstein(double x, double y, double z) const
 	{
 		return this->_binomial * pow(x, this->_degX) * pow(y, this->_degY) * pow(z, this->_degZ) * pow(1 - x - y - z, this->_degMixed);
 	}
 
-	double GradTrivariateBernsteinX(double x, double y, double z)
+	double GradTrivariateBernsteinX(double x, double y, double z) const
 	{
 		if (this->_degX == 0 && this->_degMixed == 0)
 			return 0;
@@ -119,7 +119,7 @@ private:
 		return this->_binomial * pow(y, this->_degY) * pow(z, this->_degZ) * (this->_degX * pow(x, this->_degX - 1) * pow(1 - x - y - z, this->_degMixed) - this->_degMixed * pow(1 - x - y - z, this->_degMixed - 1) * pow(x, this->_degX));
 	}
 
-	double GradTrivariateBernsteinY(double x, double y, double z)
+	double GradTrivariateBernsteinY(double x, double y, double z) const
 	{
 		if (this->_degY == 0 && this->_degMixed == 0)
 			return 0;
@@ -133,7 +133,7 @@ private:
 		return this->_binomial * pow(x, this->_degX) * pow(z, this->_degZ) * (this->_degY * pow(y, this->_degY - 1) * pow(1 - x - y - z, this->_degMixed) - this->_degMixed * pow(1 - x - y - z, this->_degMixed - 1) * pow(y, this->_degY));
 	}
 
-	double GradTrivariateBernsteinZ(double x, double y, double z)
+	double GradTrivariateBernsteinZ(double x, double y, double z) const
 	{
 		if (this->_degZ == 0 && this->_degMixed == 0)
 			return 0;

@@ -81,7 +81,7 @@ public:
 		{
 			Vector d(basis->Size());
 			for (BasisFunction<Dim>* phi : basis->LocalFunctions())
-				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim>*>(phi)->NormSquare;
+				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim>*>(phi)->NormSquare();
 			return d.asDiagonal();
 		}
 		else
@@ -112,9 +112,9 @@ public:
 			if (shapeCstJac)
 				refShapeOrthogBasis = shapeCstJac->RefShape()->OrthogonalizedBasis(HHO->ReconstructionBasis);
 
-			/*if (shapeCstJac && refShapeOrthogBasis)
-				this->ReconstructionBasis = new OrthogonalBasis<Dim>(*refShapeOrthogBasis, shapeCstJac->DetJacobian(), hho->OrthonormalizeElemBases());
-			else*/
+			if (shapeCstJac && refShapeOrthogBasis)
+				this->ReconstructionBasis = new OrthogonalBasisOnCstJacShape<Dim>(refShapeOrthogBasis, shapeCstJac->DetJacobian(), hho->OrthonormalizeElemBases());
+			else
 				this->ReconstructionBasis = new OrthogonalBasis<Dim>(HHO->ReconstructionBasis, this->MeshElement->Shape(), hho->NElemOrthogonalizations(), hho->OrthonormalizeElemBases());
 			this->CellBasis = this->ReconstructionBasis->CreateLowerDegreeBasis(HHO->CellBasis->GetDegree());
 		}
@@ -164,6 +164,10 @@ public:
 	}
 
 private:
+	bool HasHierarchichalBasis() const
+	{
+		return HHO->ReconstructionBasis->IsHierarchical();
+	}
 	DenseMatrix SolveMassMatrix(FunctionalBasis<Dim>* basis, const DenseMatrix& M)
 	{
 		if (HHO->OrthonormalizeElemBases())
@@ -172,7 +176,7 @@ private:
 		{
 			Vector d(basis->Size());
 			for (BasisFunction<Dim>* phi : basis->LocalFunctions())
-				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim>*>(phi)->NormSquare;
+				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim>*>(phi)->NormSquare();
 			return d.asDiagonal().inverse() * M;
 		}
 		else
@@ -187,7 +191,7 @@ private:
 		{
 			Vector d(basis->Size());
 			for (BasisFunction<Dim>* phi : basis->LocalFunctions())
-				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim>*>(phi)->NormSquare;
+				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim>*>(phi)->NormSquare();
 			return d.asDiagonal() * v;
 		}
 		else
@@ -248,7 +252,7 @@ public:
 		{
 			Vector d(this->CellBasis->Size());
 			for (BasisFunction<Dim>* phi : this->CellBasis->LocalFunctions())
-				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim>*>(phi)->NormSquare;
+				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim>*>(phi)->NormSquare();
 			return d.asDiagonal() * v.head(HHO->nCellUnknowns);
 		}
 		else
@@ -336,7 +340,7 @@ private:
 			AssembleIntegrationByPartsRHS_face(rhsMatrix, face);
 
 		// Bottom-left corner (Block Lt) Mean value condition
-		if (ReconstructionBasis->IsHierarchical())
+		if (HasHierarchichalBasis())
 			rhsMatrix.bottomLeftCorner(1, CellBasis->Size()) = reconstructionMatrixToInvert.bottomLeftCorner(1, CellBasis->Size());
 		else
 			rhsMatrix.bottomLeftCorner(1, CellBasis->Size()) = MeshElement->Integral(CellBasis).transpose();
@@ -371,7 +375,7 @@ private:
 			return 0;
 
 		double integralGradGrad;
-		if (ReconstructionBasis->IsHierarchical())
+		if (HasHierarchichalBasis())
 			integralGradGrad = reconstructionMatrixToInvert(reconstructPhi->LocalNumber, cellPhi->LocalNumber);
 		else
 			integralGradGrad = this->IntegralKGradGrad(this->DiffTensor(), reconstructPhi, cellPhi);
@@ -422,7 +426,7 @@ private:
 		if (HHO->Stabilization.compare("hho") == 0)
 		{
 			DenseMatrix Dt;
-			if (!this->HasOrthogonalBasis() || !this->ReconstructionBasis->IsHierarchical())
+			if (!this->HasOrthogonalBasis() || !HasHierarchichalBasis())
 			{
 				DenseMatrix cellMassMatrix = this->MassMatrix(this->CellBasis);
 				DenseMatrix Nt = this->CellReconstructMassMatrix(this->CellBasis, this->ReconstructionBasis);
@@ -442,7 +446,7 @@ private:
 				DenseMatrix Mf = face->MassMatrix();
 				DenseMatrix ProjF = face->Trace(this->MeshElement, this->ReconstructionBasis);
 				DenseMatrix ProjFT;
-				if (ReconstructionBasis->IsHierarchical())
+				if (HasHierarchichalBasis())
 					ProjFT = ProjF.leftCols(CellBasis->Size());
 				else
 					ProjFT = face->Trace(this->MeshElement, this->CellBasis);

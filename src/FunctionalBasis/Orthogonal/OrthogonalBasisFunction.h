@@ -1,25 +1,36 @@
 #pragma once
 #include "../BasisFunction.h"
 
-
 template <int Dim>
 class OrthogonalBasisFunction : public BasisFunction<Dim>
+{
+public:
+	virtual double NormSquare() const = 0;
+};
+
+
+
+
+template <int Dim>
+class OrthogBasisFunctionOnGeoShape : public OrthogonalBasisFunction<Dim>
 {
 private:
 	vector<BasisFunction<Dim>*> _functions;
 	vector<double> _coeffs;
+	double _normSquare = -1;
 
 public:
-	double NormSquare = -1;
-
-	OrthogonalBasisFunction(BasisFunction<Dim>* phi)
+	OrthogBasisFunctionOnGeoShape(BasisFunction<Dim>* phi)
 	{
 		this->LocalNumber = phi->LocalNumber;
 		_functions.push_back(phi);
 		_coeffs.push_back(1.0);
 	}
 
-	void Minus(double coeff, OrthogonalBasisFunction<Dim>* previousPhi)
+	double NormSquare() const override { return _normSquare; }
+	void SetNormSquare(double normSquare) { _normSquare = normSquare; }
+
+	void Minus(double coeff, OrthogBasisFunctionOnGeoShape<Dim>* previousPhi)
 	{
 		for (int i = 0; i < previousPhi->_functions.size(); i++)
 		{
@@ -49,7 +60,7 @@ public:
 			_coeffs[i] = _coeffs[i] / coeff;
 	}
 
-	double Eval(const RefPoint& p) override
+	double Eval(const RefPoint& p) const override
 	{
 		double res = 0;
 		for (int i = 0; i < _functions.size(); i++)
@@ -57,7 +68,7 @@ public:
 		return res;
 	}
 
-	virtual DimVector<Dim> Grad(const RefPoint& p) override
+	DimVector<Dim> Grad(const RefPoint& p) const override
 	{
 		DimVector<Dim> res = DimVector<Dim>::Zero();
 		for (int i = 0; i < _functions.size(); i++)
@@ -65,12 +76,12 @@ public:
 		return res;
 	}
 
-	virtual int GetDegree() const override
+	int GetDegree() const override
 	{
 		return _functions[0]->GetDegree();
 	}
 
-	virtual string ToString() override
+	string ToString() override
 	{
 		return "orthonormalized " + _functions[0]->ToString();
 	}

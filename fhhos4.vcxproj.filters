@@ -601,6 +601,12 @@
     <ClInclude Include="src\FunctionalBasis\Orthogonal\OrthogonalBasisFunction.h">
       <Filter>FunctionalBasis\Orthogonal</Filter>
     </ClInclude>
+    <ClInclude Include="src\FunctionalBasis\Orthogonal\OrthogBasisFunctionOnCstJacShape.h">
+      <Filter>FunctionalBasis\Orthogonal</Filter>
+    </ClInclude>
+    <ClInclude Include="src\FunctionalBasis\Orthogonal\OrthogonalBasisOnCstJacShape.h">
+      <Filter>FunctionalBasis\Orthogonal</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

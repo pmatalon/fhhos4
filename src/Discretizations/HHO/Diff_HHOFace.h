@@ -1,5 +1,5 @@
 #pragma once
-#include "../../FunctionalBasis/Orthogonal/OrthogonalBasis.h"
+#include "../../FunctionalBasis/Orthogonal/OrthogonalBasisOnCstJacShape.h"
 #include "HHOParameters.h"
 
 template <int Dim>
@@ -86,7 +86,7 @@ public:
 		{
 			Vector d(this->Basis->Size());
 			for (BasisFunction<Dim-1>* phi : this->Basis->LocalFunctions())
-				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim-1>*>(phi)->NormSquare;
+				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim-1>*>(phi)->NormSquare();
 			return d.asDiagonal();
 		}
 		else
@@ -100,7 +100,7 @@ public:
 		{
 			Vector d(this->Basis->Size());
 			for (BasisFunction<Dim-1>* phi : this->Basis->LocalFunctions())
-				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim-1>*>(phi)->NormSquare;
+				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim-1>*>(phi)->NormSquare();
 			return d.asDiagonal() * v;
 		}
 		else
@@ -117,7 +117,7 @@ public:
 		{
 			Vector d(this->Basis->Size());
 			for (BasisFunction<Dim-1>* phi : this->Basis->LocalFunctions())
-				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim-1>*>(phi)->NormSquare;
+				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim-1>*>(phi)->NormSquare();
 			return d.asDiagonal().inverse() * M;
 		}
 		else
@@ -132,7 +132,7 @@ public:
 		{
 			Vector d(this->Basis->Size());
 			for (BasisFunction<Dim-1>* phi : this->Basis->LocalFunctions)
-				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim-1>*>(phi)->NormSquare;
+				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim-1>*>(phi)->NormSquare();
 			return d.asDiagonal().inverse() * v;
 		}
 		else

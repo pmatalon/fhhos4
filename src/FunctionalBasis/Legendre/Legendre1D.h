@@ -22,13 +22,13 @@ public:
 		return this->Degree;
 	}
 
-	virtual double Eval(double x) override
+	virtual double Eval(double x) const override
 	{
 		this->TestIsInReferenceInterval(x);
 		return Legendre(this->Degree, x);
 	}
 
-	virtual double EvalDerivative(double x) override
+	virtual double EvalDerivative(double x) const override
 	{
 		this->TestIsInReferenceInterval(x);
 		return DLegendre(this->Degree, x);
@@ -89,12 +89,12 @@ public:
 		_inverseNorm = sqrt(this->Degree + 0.5);
 	}
 
-	virtual double Eval(double x) override
+	double Eval(double x) const override
 	{
 		return _inverseNorm * Legendre1D::Eval(x);
 	}
 
-	virtual double EvalDerivative(double x) override
+	double EvalDerivative(double x) const override
 	{
 		return _inverseNorm * Legendre1D::EvalDerivative(x);
 	}

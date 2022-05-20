@@ -45,7 +45,7 @@ public:
 		return this->_degree;
 	}
 
-	double Eval(double x)
+	double Eval(double x) const
 	{
 		if (_maxDegree == 0)
 			return 1;
@@ -64,7 +64,7 @@ public:
 		return Hemker(x);
 	}
 
-	double EvalDerivative(double x)
+	double EvalDerivative(double x) const
 	{
 		if (_maxDegree == 0)
 			return 0;
@@ -117,7 +117,7 @@ private:
 		return 1;
 	}
 
-	double Hemker(double x)
+	double Hemker(double x) const
 	{
 		const int n = _degree - 4;
 		assert(n >= 0);
@@ -130,7 +130,7 @@ private:
 		return jac;
 	}
 
-	double DHemker(double x)
+	double DHemker(double x) const
 	{
 		const int n = _degree - 4;
 		assert(n >= 0);
