@@ -357,9 +357,6 @@
     <ClInclude Include="src\Solver\Multigrid\MultigridForHHO\LevelForHHO.h">
       <Filter>Solver\Multigrid\MultigridForHHO</Filter>
     </ClInclude>
-    <ClInclude Include="src\FunctionalBasis\OrthogonalBasis.h">
-      <Filter>FunctionalBasis</Filter>
-    </ClInclude>
     <ClInclude Include="src\version.h" />
     <ClInclude Include="src\Program\Program_Diffusion_DG.h">
       <Filter>Program</Filter>
@@ -598,6 +595,12 @@
     <ClInclude Include="src\FunctionalBasis\Hemker\HemkerBasis.h">
       <Filter>FunctionalBasis\Hemker</Filter>
     </ClInclude>
+    <ClInclude Include="src\FunctionalBasis\Orthogonal\OrthogonalBasis.h">
+      <Filter>FunctionalBasis\Orthogonal</Filter>
+    </ClInclude>
+    <ClInclude Include="src\FunctionalBasis\Orthogonal\OrthogonalBasisFunction.h">
+      <Filter>FunctionalBasis\Orthogonal</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
@@ -734,6 +737,9 @@
     </Filter>
     <Filter Include="FunctionalBasis\Hemker">
       <UniqueIdentifier>{34dee0c3-c840-4057-a775-38ac176095d5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="FunctionalBasis\Orthogonal">
+      <UniqueIdentifier>{052720ba-3ef2-444a-922d-0e9e39d151a5}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

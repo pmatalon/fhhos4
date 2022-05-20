@@ -110,7 +110,8 @@
     <ClInclude Include="src\FunctionalBasis\Legendre\LegendreBasis.h" />
     <ClInclude Include="src\FunctionalBasis\Monomials\Monomial1D.h" />
     <ClInclude Include="src\FunctionalBasis\Monomials\MonomialBasis.h" />
-    <ClInclude Include="src\FunctionalBasis\OrthogonalBasis.h" />
+    <ClInclude Include="src\FunctionalBasis\Orthogonal\OrthogonalBasis.h" />
+    <ClInclude Include="src\FunctionalBasis\Orthogonal\OrthogonalBasisFunction.h" />
     <ClInclude Include="src\Geometry\2D\Segment.h" />
     <ClInclude Include="src\Geometry\CGALWrapper.h" />
     <ClInclude Include="src\Geometry\GeometricShape.h" />

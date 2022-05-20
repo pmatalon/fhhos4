@@ -1,6 +1,6 @@
 #pragma once
 #include "GeometricShape.h"
-#include "../FunctionalBasis/OrthogonalBasis.h"
+#include "../FunctionalBasis/Orthogonal/OrthogonalBasis.h"
 
 template <int Dim>
 class ReferenceShape : public GeometricShape<Dim>
