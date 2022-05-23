@@ -199,7 +199,11 @@ public:
 	virtual FunctionalBasis<Dim>* CreateSameBasisForDegree(int degree) = 0;
 	virtual FunctionalBasis<Dim>* CreateLowerDegreeBasis  (int degree) = 0;
 
-	virtual bool UsePolynomialSpaceQ()           const { return pow(GetDegree() + 1, Dim) == Size(); }
+	virtual bool UsePolynomialSpaceQ() const 
+	{
+		if (GetDegree() == 0) return false;
+		return pow(GetDegree() + 1, Dim) == Size(); 
+	}
 	virtual bool IsOrthogonalOnCartesianShapes() const { return false; }
 
 	string Name() const

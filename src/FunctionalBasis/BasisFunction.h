@@ -49,24 +49,20 @@ public:
 
 	DimVector<1> Grad(const RefPoint& p) const override
 	{
-		return this->Grad(p.X);
-	}
-	DimVector<1> Grad(double x)
-	{
 		DimVector<1> g;
-		g << EvalDerivative(x);
+		g << EvalDerivative(p.X);
 		return g;
 	}
 	double Eval(const RefPoint& p) const override
 	{
 		return Eval(p.X);
 	}
-
+protected:
 	void TestIsInReferenceInterval(double x) const
 	{
 		//assert(abs(x) < 1.5); // x should be in [-1, 1], but apparently we need a big margin...
 	}
-
+public:
 	virtual string ToString() = 0;
 	virtual string ToString(string var) = 0;
 };

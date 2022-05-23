@@ -1,5 +1,6 @@
 #pragma once
 #include "PhysicalShape.h"
+#include "../FunctionalBasis/Orthogonal/OrthogonalBasisOnCstJacShape.h"
 
 template <int Dim>
 class PhysicalShapeWithConstantJacobian : public PhysicalShape<Dim>
@@ -83,6 +84,29 @@ public:
 		int polynomialDegree = max(0, phi1->GetDegree() + phi2->GetDegree() - 2);
 		return Integral(functionToIntegrate, polynomialDegree);
 	}
+
+	DenseMatrix IntegralKGradGradMatrix(const Tensor<Dim>& K, FunctionalBasis<Dim>* basis) const override
+	{
+		DimMatrix<Dim> C = DetJacobian() * InverseJacobianTranspose().transpose() * K.TensorMatrix * InverseJacobianTranspose();
+
+		FunctionalBasis<Dim>* refShapeBasis = basis;
+		OrthogonalBasisOnCstJacShape<Dim>* orthogBasis = dynamic_cast<OrthogonalBasisOnCstJacShape<Dim>*>(basis);
+		if (orthogBasis)
+			refShapeBasis = orthogBasis->RefShapeBasis;
+		const StiffnessMatrices& refStiff = this->RefShape()->StoredStiffnessMatrices(refShapeBasis);
+		int t = 0;
+		int u = 1;
+		int v = 2;
+		if (Dim == 1)
+			return C(t, t)*refStiff.tt;
+		else if (Dim == 2)
+			return C(t, t)*refStiff.tt + C(u, u)*refStiff.uu + C(t, u)*(refStiff.tu + refStiff.tu.transpose());
+		else if (Dim == 3)
+			return C(t, t)*refStiff.tt + C(u, u)*refStiff.uu + C(v, v)*refStiff.vv + C(t, u)*(refStiff.tu + refStiff.tu.transpose()) + C(t, v)*(refStiff.tv + refStiff.tv.transpose()) + C(u, v)*(refStiff.uv + refStiff.uv.transpose());
+		assert(false);
+		return DenseMatrix();
+	}
+
 
 	//----------------------------//
 	//             DG             //

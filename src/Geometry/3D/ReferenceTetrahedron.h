@@ -23,6 +23,8 @@ public:
 		_measure = abs(m.determinant()) / 6;
 	}
 
+	string Name() const override { return "Reference Tetrahedron"; }
+
 	inline double Diameter() const override
 	{
 		assert(false);

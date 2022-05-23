@@ -38,7 +38,12 @@ public:
 
 	inline ReferenceShape<1>* RefShape() const override
 	{
-		return &CartesianShape<2, 1>::RefCartShape;
+		return &CartesianShape<1, 1>::RefCartShape;
+	}
+
+	static ReferenceCartesianShape<1>* InitReferenceShape()
+	{
+		return &CartesianShape<1, 1>::RefCartShape;
 	}
 
 	bool MapsToACartesianShape() const override

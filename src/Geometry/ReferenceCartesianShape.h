@@ -16,6 +16,8 @@ private:
 public:
 	ReferenceCartesianShape() : ReferenceShape<Dim>() {}
 
+	string Name() const override { return "Reference CartesianShape<" + to_string(Dim) + ">"; }
+
 	virtual double Diameter() const override
 	{
 		return 2;

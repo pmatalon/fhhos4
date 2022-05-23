@@ -18,6 +18,8 @@ public:
 		_measure = 0.5 * abs(A.X * (B.Y - C.Y) + B.X * (C.Y - A.Y) + C.X * (A.Y - B.Y));
 	}
 
+	string Name() const override { return "Reference Triangle"; }
+
 	inline double Diameter() const override
 	{
 		assert(false);

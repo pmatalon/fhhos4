@@ -288,7 +288,7 @@ public:
 		return this->ComputeAndReturnMassMatrix(basis);
 	}
 
-	DenseMatrix IntegralKGradGradMatrix(const Tensor<Dim>& K, FunctionalBasis<Dim>* basis) const
+	DenseMatrix ComputeIntegralKGradGradMatrix(const Tensor<Dim>& K, FunctionalBasis<Dim>* basis) const
 	{
 		auto localFunctions = basis->LocalFunctions();
 		DenseMatrix m(localFunctions.size(), localFunctions.size());
@@ -304,6 +304,11 @@ public:
 			}
 		}
 		return m;
+	}
+
+	virtual DenseMatrix IntegralKGradGradMatrix(const Tensor<Dim>& K, FunctionalBasis<Dim>* basis) const
+	{
+		return ComputeIntegralKGradGradMatrix(K, basis);
 	}
 
 	DenseMatrix IntegralGradGradMatrix(FunctionalBasis<Dim>* basis) const

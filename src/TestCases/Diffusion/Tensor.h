@@ -80,13 +80,17 @@ public:
 template <int Dim>
 DimVector<Dim> operator*(Tensor<Dim> const& K, DimVector<Dim> const& b)
 {
-	DimVector<Dim> result = K.TensorMatrix * b;
-	return result;
+	return K.TensorMatrix * b;
+}
+
+template <int Dim>
+DimMatrix<Dim> operator*(double scalar, Tensor<Dim> const& K)
+{
+	return scalar * K.TensorMatrix;
 }
 
 template <int Dim>
 DimVector<Dim> operator*(Tensor<Dim>* const K, DimVector<Dim> const& b)
 {
-	DimVector<Dim> result = K->TensorMatrix * b;
-	return result;
+	return K->TensorMatrix * b;
 }

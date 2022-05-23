@@ -108,7 +108,7 @@ public:
 		if (hho->OrthogonalizeElemBases())
 		{
 			PhysicalShapeWithConstantJacobian<Dim>* shapeCstJac = dynamic_cast<PhysicalShapeWithConstantJacobian<Dim>*>(this->MeshElement->Shape());
-			const OrthogonalBasis<Dim>* refShapeOrthogBasis = nullptr;
+			OrthogonalBasis<Dim>* refShapeOrthogBasis = nullptr;
 			if (shapeCstJac)
 				refShapeOrthogBasis = shapeCstJac->RefShape()->OrthogonalizedBasis(HHO->ReconstructionBasis);
 

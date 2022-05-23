@@ -7,12 +7,15 @@ class OrthogonalBasisOnCstJacShape : public FunctionalBasis<Dim>
 {
 private:
 	vector<OrthogBasisFunctionOnCstJacShape<Dim>> _localFunctions;
+public:
+	OrthogonalBasis<Dim>* RefShapeBasis;
 
 private:
 	OrthogonalBasisOnCstJacShape() {}
 public:
-	OrthogonalBasisOnCstJacShape(const OrthogonalBasis<Dim>* refShapeBasis, double detJacobian, bool normalize)
+	OrthogonalBasisOnCstJacShape(OrthogonalBasis<Dim>* refShapeBasis, double detJacobian, bool normalize)
 	{
+		RefShapeBasis = refShapeBasis;
 		_localFunctions.reserve(refShapeBasis->Size());
 		for (const auto& phi : refShapeBasis->_localFunctions)
 			_localFunctions.emplace_back(&phi, detJacobian, normalize);

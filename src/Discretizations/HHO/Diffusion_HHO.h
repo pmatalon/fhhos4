@@ -6,6 +6,7 @@
 #endif // ENABLE_3D
 #include "../../Geometry/CartesianShape.h"
 #include "../../Geometry/2D/Triangle.h"
+#include "../../Geometry/2D/Quadrilateral.h"
 #include "DiscreteSpaces/HHOSkeletonSpace.h"
 #include "DiscreteSpaces/HHOReconstructSpace.h"
 #include "DiscreteSpaces/HHOBoundarySpace.h"
@@ -665,49 +666,9 @@ public:
 		InitReferenceShapes(this->HHO, &this->TestCase->DiffField);
 	}
 
-	// Compute some useful integrals on reference element and store them
-	static void InitReferenceShapes(HHOParameters<Dim>* hho, DiffusionField<Dim>* diffField)
-	{
-		FunctionalBasis<Dim>* reconstructionBasis = hho->ReconstructionBasis;
-		FunctionalBasis<Dim>* cellBasis = hho->CellBasis;
-		FunctionalBasis<Dim - 1>* faceBasis = hho->FaceBasis;
-
-		if (hho->OrthogonalizeElemBases())// && hho->OrthogonalizeFaceBases())
-		{
-			Triangle::InitReferenceShape()->Orthogonalize((FunctionalBasis<2>*)reconstructionBasis, hho->NElemOrthogonalizations(), hho->OrthonormalizeElemBases());
-			//return;
-		}
-
-		// - Cartesian element
-		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreMassMatrix(cellBasis);
-		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreMassMatrix(reconstructionBasis);
-		if (diffField)
-		{
-			for (auto K : diffField->Tensors())
-				CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreReconstructStiffnessMatrix(*K, reconstructionBasis);
-		}
-		CartesianShape<Dim, Dim>::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix(cellBasis, reconstructionBasis);
-		// - Cartesian face
-		CartesianShape<Dim, Dim - 1>::InitReferenceShape()->ComputeAndStoreMassMatrix(faceBasis);
-		if (Dim == 2)
-		{
-			// - Triangular element
-			Triangle::InitReferenceShape()->ComputeAndStoreMassMatrix((FunctionalBasis<2>*)cellBasis);
-			Triangle::InitReferenceShape()->ComputeAndStoreMassMatrix((FunctionalBasis<2>*)reconstructionBasis);
-			Triangle::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix((FunctionalBasis<2>*)cellBasis, (FunctionalBasis<2>*)reconstructionBasis);
-		}
-		else if (Dim == 3)
-		{
-#ifdef ENABLE_3D
-			// - Tetrahedral element
-			Tetrahedron::InitReferenceShape()->ComputeAndStoreMassMatrix((FunctionalBasis<3>*)cellBasis);
-			Tetrahedron::InitReferenceShape()->ComputeAndStoreMassMatrix((FunctionalBasis<3>*)reconstructionBasis);
-			Tetrahedron::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix((FunctionalBasis<3>*)cellBasis, (FunctionalBasis<3>*)reconstructionBasis);
-			// - Triangular face
-			Triangle::InitReferenceShape()->ComputeAndStoreMassMatrix((FunctionalBasis<2>*)faceBasis);
-#endif // ENABLE_3D
-		}
-	}
+	// Compute some useful integrals on reference element and store them.
+	// Defined for each Dim at the end of the file.
+	static void InitReferenceShapes(HHOParameters<Dim>* hho, DiffusionField<Dim>* diffField) { assert(false); }
 
 	//------------------------------//
 	//           Init HHO           //
@@ -1281,10 +1242,6 @@ public:
 	}
 
 private:
-	/*BigNumber DOFNumber(Diff_HHOElement<Dim>* element, BasisFunction<Dim>* cellPhi)
-	{
-		return FirstDOFGlobalNumber(element) + cellPhi->LocalNumber;
-	}*/
 	BigNumber FirstDOFGlobalNumber(Diff_HHOElement<Dim>* element)
 	{
 		return element->Number() * HHO->CellBasis->Size();
@@ -1295,3 +1252,149 @@ private:
 	}
 };
 
+#ifdef ENABLE_1D
+template <>
+void Diffusion_HHO<1>::InitReferenceShapes(HHOParameters<1>* hho, DiffusionField<1>* diffField)
+{
+	FunctionalBasis<1>* reconstructionBasis = hho->ReconstructionBasis;
+	FunctionalBasis<1>* cellBasis = hho->CellBasis;
+	FunctionalBasis<0>* faceBasis = hho->FaceBasis;
+
+	// Elements
+	if (hho->OrthogonalizeElemBases())
+	{
+		OrthogonalBasis<1>* orthoBasis = Segment::InitReferenceShape()->Orthogonalize(reconstructionBasis, hho->NElemOrthogonalizations(), hho->OrthonormalizeElemBases());
+		Segment::InitReferenceShape()->ComputeAndStoreStiffnessMatrices(orthoBasis);
+	}
+	else
+	{
+		// Store mass matrices
+		Segment::InitReferenceShape()->ComputeAndStoreMassMatrix(cellBasis);
+		Segment::InitReferenceShape()->ComputeAndStoreMassMatrix(reconstructionBasis);
+		Segment::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix(cellBasis, reconstructionBasis);
+		// Store stiffness matrices
+		Segment::InitReferenceShape()->ComputeAndStoreStiffnessMatrices(reconstructionBasis);
+	}
+
+	// Faces
+	if (hho->OrthogonalizeFaceBases())
+		CartesianShape<1, 0>::InitReferenceShape()->Orthogonalize(faceBasis, hho->NElemOrthogonalizations(), hho->OrthonormalizeElemBases());
+	else
+		CartesianShape<1, 0>::InitReferenceShape()->ComputeAndStoreMassMatrix(faceBasis);
+}
+#endif // ENABLE_1D
+
+#ifdef ENABLE_2D
+template <>
+void Diffusion_HHO<2>::InitReferenceShapes(HHOParameters<2>* hho, DiffusionField<2>* diffField)
+{
+	FunctionalBasis<2>* reconstructionBasis = hho->ReconstructionBasis;
+	FunctionalBasis<2>* cellBasis = hho->CellBasis;
+	FunctionalBasis<1>* faceBasis = hho->FaceBasis;
+
+	// Elements
+	if (hho->OrthogonalizeElemBases())
+	{
+		// No need to store mass matrices.
+		// 
+		// Store stiffness matrices
+		OrthogonalBasis<2>* orthoBasis;
+		orthoBasis = Triangle::InitReferenceShape()->Orthogonalize(reconstructionBasis, hho->NElemOrthogonalizations(), hho->OrthonormalizeElemBases());
+		Triangle::InitReferenceShape()->ComputeAndStoreStiffnessMatrices(orthoBasis);
+
+		orthoBasis = Quadrilateral::InitReferenceShape()->Orthogonalize(reconstructionBasis, hho->NElemOrthogonalizations(), hho->OrthonormalizeElemBases());
+		Quadrilateral::InitReferenceShape()->ComputeAndStoreStiffnessMatrices(orthoBasis);
+
+		orthoBasis = CartesianShape<2>::InitReferenceShape()->Orthogonalize(reconstructionBasis, hho->NElemOrthogonalizations(), hho->OrthonormalizeElemBases());
+		CartesianShape<2>::InitReferenceShape()->ComputeAndStoreStiffnessMatrices(orthoBasis);
+	}
+	else
+	{
+		// Store mass matrices
+		Triangle::InitReferenceShape()->ComputeAndStoreMassMatrix(cellBasis);
+		Triangle::InitReferenceShape()->ComputeAndStoreMassMatrix(reconstructionBasis);
+		Triangle::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix(cellBasis, reconstructionBasis);
+		Quadrilateral::InitReferenceShape()->ComputeAndStoreMassMatrix(cellBasis);
+		Quadrilateral::InitReferenceShape()->ComputeAndStoreMassMatrix(reconstructionBasis);
+		Quadrilateral::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix(cellBasis, reconstructionBasis);
+		// Stiffness matrices
+		Triangle::InitReferenceShape()->ComputeAndStoreStiffnessMatrices(reconstructionBasis);
+		Quadrilateral::InitReferenceShape()->ComputeAndStoreStiffnessMatrices(reconstructionBasis);
+		if (diffField)
+		{
+			for (auto K : diffField->Tensors())
+				Quadrilateral::InitReferenceShape()->ComputeAndStoreReconstructStiffnessMatrix(*K, reconstructionBasis);
+		}
+	}
+
+	// Faces
+	if (hho->OrthogonalizeFaceBases())
+	{
+		Segment::InitReferenceShape()->Orthogonalize(faceBasis, hho->NElemOrthogonalizations(), hho->OrthonormalizeElemBases());
+		CartesianShape<2, 1>::InitReferenceShape()->Orthogonalize(faceBasis, hho->NElemOrthogonalizations(), hho->OrthonormalizeElemBases());
+	}
+	else
+	{
+		// Mass matrices
+		Segment::InitReferenceShape()->ComputeAndStoreMassMatrix(faceBasis);
+		CartesianShape<2, 1>::InitReferenceShape()->ComputeAndStoreMassMatrix(faceBasis);
+	}
+}
+#endif // ENABLE_2D
+
+#ifdef ENABLE_3D
+template <>
+void Diffusion_HHO<3>::InitReferenceShapes(HHOParameters<3>* hho, DiffusionField<3>* diffField)
+{
+	FunctionalBasis<3>* reconstructionBasis = hho->ReconstructionBasis;
+	FunctionalBasis<3>* cellBasis = hho->CellBasis;
+	FunctionalBasis<2>* faceBasis = hho->FaceBasis;
+
+	// Elements
+	if (hho->OrthogonalizeElemBases())
+	{
+		// No need to store mass matrices.
+		// 
+		// Store stiffness matrices
+		OrthogonalBasis<3>* orthoBasis;
+		orthoBasis = Tetrahedron::InitReferenceShape()->Orthogonalize(reconstructionBasis, hho->NElemOrthogonalizations(), hho->OrthonormalizeElemBases());
+		Tetrahedron::InitReferenceShape()->ComputeAndStoreStiffnessMatrices(orthoBasis);
+
+		orthoBasis = CartesianShape<3>::InitReferenceShape()->Orthogonalize(reconstructionBasis, hho->NElemOrthogonalizations(), hho->OrthonormalizeElemBases());
+		CartesianShape<3>::InitReferenceShape()->ComputeAndStoreStiffnessMatrices(orthoBasis);
+	}
+	else
+	{
+		// Store mass matrices
+		Tetrahedron::InitReferenceShape()->ComputeAndStoreMassMatrix(cellBasis);
+		Tetrahedron::InitReferenceShape()->ComputeAndStoreMassMatrix(reconstructionBasis);
+		Tetrahedron::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix(cellBasis, reconstructionBasis);
+		CartesianShape<3, 3>::InitReferenceShape()->ComputeAndStoreMassMatrix(cellBasis);
+		CartesianShape<3, 3>::InitReferenceShape()->ComputeAndStoreMassMatrix(reconstructionBasis);
+		CartesianShape<3, 3>::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix(cellBasis, reconstructionBasis);
+		// Stiffness matrices
+		Tetrahedron::InitReferenceShape()->ComputeAndStoreStiffnessMatrices(reconstructionBasis);
+		CartesianShape<3, 3>::InitReferenceShape()->ComputeAndStoreStiffnessMatrices(reconstructionBasis);
+		if (diffField)
+		{
+			for (auto K : diffField->Tensors())
+				CartesianShape<3, 3>::InitReferenceShape()->ComputeAndStoreReconstructStiffnessMatrix(*K, reconstructionBasis);
+		}
+	}
+
+	// Faces
+	if (hho->OrthogonalizeFaceBases())
+	{
+		Triangle::InitReferenceShape()->Orthogonalize(faceBasis, hho->NElemOrthogonalizations(), hho->OrthonormalizeElemBases());
+		Quadrilateral::InitReferenceShape()->Orthogonalize(faceBasis, hho->NElemOrthogonalizations(), hho->OrthonormalizeElemBases());
+		CartesianShape<3, 2>::InitReferenceShape()->Orthogonalize(faceBasis, hho->NElemOrthogonalizations(), hho->OrthonormalizeElemBases());
+	}
+	else
+	{
+		// Mass matrices
+		Triangle::InitReferenceShape()->ComputeAndStoreMassMatrix(faceBasis);
+		Quadrilateral::InitReferenceShape()->ComputeAndStoreMassMatrix(faceBasis);
+		CartesianShape<3, 2>::InitReferenceShape()->ComputeAndStoreMassMatrix(faceBasis);
+	}
+}
+#endif // ENABLE_3D
