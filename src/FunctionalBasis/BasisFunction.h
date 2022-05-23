@@ -27,11 +27,11 @@ public:
 	{
 		return 1;
 	}
-	virtual DimVector<0> Grad(const RefPoint& p) const override
+	DimVector<0> Grad(const RefPoint& p) const override
 	{
 		return DimVector<0>();
 	}
-	virtual int GetDegree() const override
+	int GetDegree() const override
 	{
 		return 0;
 	}
@@ -77,15 +77,11 @@ public:
 	{
 		return Eval(p.X, p.Y);
 	}
-	DimVector<2> Grad(double x, double y) const
-	{
-		DimVector<2> g;
-		g << EvalGradX(x, y), EvalGradY(x, y);
-		return g;
-	}
 	DimVector<2> Grad(const RefPoint& p) const override
 	{
-		return this->Grad(p.X, p.Y);
+		DimVector<2> g;
+		g << EvalGradX(p.X, p.Y), EvalGradY(p.X, p.Y);
+		return g;
 	}
 };
 
@@ -100,14 +96,10 @@ public:
 	{
 		return Eval(p.X, p.Y, p.Z);
 	}
-	DimVector<3> Grad(double x, double y, double z) const
-	{
-		DimVector<3> g;
-		g << EvalGradX(x, y, z), EvalGradY(x, y, z), EvalGradZ(x, y, z);
-		return g;
-	}
 	DimVector<3> Grad(const RefPoint& p) const override
 	{
-		return this->Grad(p.X, p.Y, p.Z);
+		DimVector<3> g;
+		g << EvalGradX(p.X, p.Y, p.Z), EvalGradY(p.X, p.Y, p.Z), EvalGradZ(p.X, p.Y, p.Z);
+		return g;
 	}
 };

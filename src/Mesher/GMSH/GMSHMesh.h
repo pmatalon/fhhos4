@@ -685,37 +685,11 @@ protected:
 		return physicalGroups;
 	}
 
-	void AllocateContiguousMemoryForElements(int elemType, BigNumber numberOfElements)
-	{
-		this->Elements.reserve(numberOfElements);
+	// Defined at the end of the file for each Dim
+	void AllocateContiguousMemoryForElements(int elemType, BigNumber numberOfElements) { assert(false); }
 
-		if (elemType == GMSH_Quadrilateral)
-			this->_quadrilateralElements = vector<QuadrilateralElement>(numberOfElements);
-		else if (elemType == GMSH_Triangle)
-			this->_triangularElements = vector<TriangularElement>(numberOfElements);
-#ifdef ENABLE_3D
-		else if (elemType == GMSH_Tetrahedron)
-			this->_tetrahedralElements = vector<TetrahedralElement>(numberOfElements);
-		else if (elemType == GMSH_Hexahedron)
-			this->_parallelepipedElements = vector<ParallelepipedElement>(numberOfElements);
-#endif // ENABLE_3D
-		else
-			Utils::FatalError("GMSH element type not managed.");
-	}
-
-	void AllocateContiguousMemoryForFaces(GMSHFaceTypes faceType, BigNumber numberOfFaces)
-	{
-		this->Faces.reserve(numberOfFaces);
-
-		if (Dim == 2)
-			this->_edgeFaces.reserve(numberOfFaces);
-#ifdef ENABLE_3D
-		else if (faceType == GMSHFaceTypes::GMSH_TriangleFace)
-			this->_triangularFaces.reserve(numberOfFaces);
-#endif // ENABLE_3D
-		else
-			Utils::FatalError("GMSH element type not managed.");
-	}
+	// Defined at the end of the file for each Dim
+	void AllocateContiguousMemoryForFaces(GMSHFaceTypes faceType, BigNumber numberOfFaces) { assert(false); }
 
 public:
 	virtual ~GMSHMesh()
@@ -1100,6 +1074,7 @@ public:
 
 		if (Dim == 2 && !takeAbsoluteValue && basis->BasisCode().compare(MonomialBasis<2>::Code()) == 0 && Utils::ProgramArgs.Discretization.OrthogonalizeElemBasesCode == 0)
 		{
+#ifdef ENABLE_2D
 			// Refer to:
 			// http://www.manpagez.com/info/gmsh/gmsh-2.4.0/gmsh_52.php
 			// https://gitlab.onelab.info/gmsh/gmsh/-/blob/7cc02aa46e8fec38eac639f11952b7f68dea2c7c/tutorial/c++/x3.cpp
@@ -1162,6 +1137,7 @@ public:
 			gmsh::view::option::setNumber(viewId, "TargetError", tolerance);
 			// set a maximum subdivision level (GMSH does automatic mesh refinement to visualize the high-order field with the requested accuracy)
 			gmsh::view::option::setNumber(viewId, "MaxRecursionLevel", maxRefinements);
+#endif // ENABLE_2D
 		}
 		else
 		{
@@ -1392,6 +1368,8 @@ public:
 // 2D elements //
 //-------------//
 
+#ifdef ENABLE_2D
+
 template <>
 Element<2>* GMSHMesh<2>::CreateElement(int elemType, const vector<size_t>& elementNodes, size_t start, size_t elemIndex)
 { 
@@ -1421,6 +1399,7 @@ Element<2>* GMSHMesh<2>::CreateElement(int elemType, const vector<size_t>& eleme
 		Utils::FatalError("GMSH element type not managed.");
 	return e;
 }
+#endif // ENABLE_2D
 
 //-------------//
 // 3D elements //
@@ -1476,6 +1455,28 @@ Element<3>* GMSHMesh<3>::CreateElement(int elemType, const vector<size_t>& eleme
 //--------------//
 //   2D faces   //
 //--------------//
+
+#ifdef ENABLE_2D
+
+template<>
+void GMSHMesh<2>::AllocateContiguousMemoryForElements(int elemType, BigNumber numberOfElements)
+{
+	this->Elements.reserve(numberOfElements);
+
+	if (elemType == GMSH_Quadrilateral)
+		this->_quadrilateralElements = vector<QuadrilateralElement>(numberOfElements);
+	else if (elemType == GMSH_Triangle)
+		this->_triangularElements = vector<TriangularElement>(numberOfElements);
+	else
+		Utils::FatalError("GMSH element type not managed.");
+}
+
+template<>
+void GMSHMesh<2>::AllocateContiguousMemoryForFaces(GMSHFaceTypes faceType, BigNumber numberOfFaces)
+{
+	this->Faces.reserve(numberOfFaces);
+	this->_edgeFaces.reserve(numberOfFaces);
+}
 
 template <>
 void GMSHMesh<2>::CreateFaces(int elemType, BigNumber& faceNumber)
@@ -1543,12 +1544,37 @@ void GMSHMesh<2>::CreateFaces(int elemType, BigNumber& faceNumber)
 		v2->Faces.push_back(edge);
 	}
 }
+#endif // ENABLE_2D
 
 //--------------//
 //   3D faces   //
 //--------------//
 
 #ifdef ENABLE_3D
+
+template<>
+void GMSHMesh<3>::AllocateContiguousMemoryForElements(int elemType, BigNumber numberOfElements)
+{
+	this->Elements.reserve(numberOfElements);
+
+	if (elemType == GMSH_Tetrahedron)
+		this->_tetrahedralElements = vector<TetrahedralElement>(numberOfElements);
+	else if (elemType == GMSH_Hexahedron)
+		this->_parallelepipedElements = vector<ParallelepipedElement>(numberOfElements);
+	else
+		Utils::FatalError("GMSH element type not managed.");
+}
+
+template<>
+void GMSHMesh<3>::AllocateContiguousMemoryForFaces(GMSHFaceTypes faceType, BigNumber numberOfFaces)
+{
+	this->Faces.reserve(numberOfFaces);
+
+	if (faceType == GMSHFaceTypes::GMSH_TriangleFace)
+		this->_triangularFaces.reserve(numberOfFaces);
+	else
+		Utils::FatalError("GMSH element type not managed.");
+}
 
 template <>
 void GMSHMesh<3>::CreateFaces(int elemType, BigNumber& faceNumber)
@@ -1740,7 +1766,7 @@ void GMSHMesh<3>::CreateFaces(int elemType, BigNumber& faceNumber)
 #endif // ENABLE_3D
 
 
-
+#ifdef ENABLE_2D
 template<>
 Face<2>* GMSHMesh<2>::GetBoundaryFaceFromGMSHNodes(int faceType, const vector<size_t>& faceNodes, size_t& faceNodeIndex)
 {
@@ -1758,6 +1784,7 @@ Face<2>* GMSHMesh<2>::GetBoundaryFaceFromGMSHNodes(int faceType, const vector<si
 	assert(false && "Face not found");
 	return nullptr;
 }
+#endif // ENABLE_2D
 
 #ifdef ENABLE_3D
 template<>
@@ -1783,21 +1810,25 @@ Face<3>* GMSHMesh<3>::GetBoundaryFaceFromGMSHNodes(int faceType, const vector<si
 #ifdef ENABLE_1D
 template <>
 bool GMSHMesh<1>::GMSHLogEnabled = false;
-#endif // ENABLE_1D
+#endif
+#ifdef ENABLE_2D
 template <>
 bool GMSHMesh<2>::GMSHLogEnabled = false;
+#endif
 #ifdef ENABLE_3D
 template <>
 bool GMSHMesh<3>::GMSHLogEnabled = false;
-#endif // ENABLE_3D
+#endif
 
 #ifdef ENABLE_1D
 template <>
 bool GMSHMesh<1>::UseCache = true;
-#endif // ENABLE_1D
+#endif
+#ifdef ENABLE_2D
 template <>
 bool GMSHMesh<2>::UseCache = true;
+#endif
 #ifdef ENABLE_3D
 template <>
 bool GMSHMesh<3>::UseCache = true;
-#endif // ENABLE_3D
+#endif

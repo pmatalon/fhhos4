@@ -4,18 +4,20 @@
 	#include "1D/SegmentTestCase.h"
 	#include "1D/Heterogeneity1DTestCase.h"
 #endif
-#include "2D/SquareTestCase.h"
-#include "2D/KelloggTestCase.h"
-#include "2D/BarWith4HolesTestCase.h"
-#include "2D/SquareCircleTestCase.h"
-#include "2D/SquareCornerSquareTestCase.h"
-#include "2D/SquareCenterSquareTestCase.h"
-#include "2D/SquareHolesTestCase.h"
-#include "2D/RoomWithWallTestCase.h"
-#include "2D/EDFTestCase.h"
-#include "2D/HybridMeshTestCase.h"
-#include "2D/MagnetismTestCase.h"
-#include "2D/SquareFullNeumannTestCase.h"
+#ifdef ENABLE_2D
+	#include "2D/SquareTestCase.h"
+	#include "2D/KelloggTestCase.h"
+	#include "2D/BarWith4HolesTestCase.h"
+	#include "2D/SquareCircleTestCase.h"
+	#include "2D/SquareCornerSquareTestCase.h"
+	#include "2D/SquareCenterSquareTestCase.h"
+	#include "2D/SquareHolesTestCase.h"
+	#include "2D/RoomWithWallTestCase.h"
+	#include "2D/EDFTestCase.h"
+	#include "2D/HybridMeshTestCase.h"
+	#include "2D/MagnetismTestCase.h"
+	#include "2D/SquareFullNeumannTestCase.h"
+#endif
 #ifdef ENABLE_3D
 	#include "3D/CubeTestCase.h"
 	#include "3D/PlateWith4HolesTestCase.h"
@@ -45,6 +47,7 @@ DiffusionTestCase<1>* DiffTestCaseFactory<1>::Create(ProblemArguments pb)
 }
 #endif
 
+#ifdef ENABLE_2D
 template <>
 DiffusionTestCase<2>* DiffTestCaseFactory<2>::Create(ProblemArguments pb)
 {
@@ -80,6 +83,7 @@ DiffusionTestCase<2>* DiffTestCaseFactory<2>::Create(ProblemArguments pb)
 	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 2D. Check -tc argument or use '-tc default'.");
 	return nullptr;
 }
+#endif
 
 #ifdef ENABLE_3D
 template <>

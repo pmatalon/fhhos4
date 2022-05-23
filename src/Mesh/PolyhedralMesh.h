@@ -3,14 +3,16 @@
 #include <list>
 #include <algorithm>
 #include "Mesh.h"
-#include "2D/TriangularElement.h"
-#include "2D/QuadrilateralElement.h"
-#ifdef CGAL_ENABLED
-#include "2D/PolygonalElement.h"
-#endif // CGAL_ENABLED
+#ifdef ENABLE_2D
+	#include "2D/TriangularElement.h"
+	#include "2D/QuadrilateralElement.h"
+	#ifdef CGAL_ENABLED
+		#include "2D/PolygonalElement.h"
+	#endif // CGAL_ENABLED
+#endif // ENABLE_2D
 #ifdef ENABLE_3D
-#include "3D/TetrahedralElement.h"
-#include "3D/ParallelepipedElement.h"
+	#include "3D/TetrahedralElement.h"
+	#include "3D/ParallelepipedElement.h"
 #endif // ENABLE_3D
 #include "Agglo.h"
 using namespace std;
@@ -19,15 +21,14 @@ template <int Dim>
 class PolyhedralMesh : public Mesh<Dim>
 {
 protected:
+#ifdef ENABLE_2D
 	vector<QuadrilateralElement> _quadrilateralElements;
 	vector<TriangularElement> _triangularElements;
+	vector<Edge> _edgeFaces;
+#endif // ENABLE_2D
 #ifdef ENABLE_3D
 	vector<TetrahedralElement> _tetrahedralElements;
 	vector<ParallelepipedElement> _parallelepipedElements;
-#endif // ENABLE_3D
-
-	vector<Edge> _edgeFaces;
-#ifdef ENABLE_3D
 	vector<TriangularFace> _triangularFaces;
 #endif // ENABLE_3D
 private:
@@ -84,25 +85,34 @@ public:
 		size_t verticesUsage = this->Vertices.size() * sizeof(Vertex);
 		size_t verticesPointers = this->Vertices.size() * sizeof(Vertex*);
 
-		size_t elementsUsage = _quadrilateralElements.size() * sizeof(QuadrilateralElement)
-			+ _triangularElements.size() * sizeof(TriangularElement);
-#ifdef ENABLE_3D
-		elementsUsage += _tetrahedralElements.size() * sizeof(TetrahedralElement)
-			+ _parallelepipedElements.size() * sizeof(ParallelepipedElement);
-#endif // ENABLE_3D
+		size_t elementsUsage = 0;
+#ifdef ENABLE_2D
 		if (Dim == 2)
+		{
+			elementsUsage = _quadrilateralElements.size() * sizeof(QuadrilateralElement)
+				+ _triangularElements.size() * sizeof(TriangularElement);
 			elementsUsage += this->Elements.size() * 3 * sizeof(Face<Dim>*); // at least 3 faces
-		else if (Dim == 3)
+		}
+#endif
+#ifdef ENABLE_3D
+		if (Dim == 3)
+		{
+			elementsUsage = _tetrahedralElements.size() * sizeof(TetrahedralElement)
+				+ _parallelepipedElements.size() * sizeof(ParallelepipedElement);
 			elementsUsage += this->Elements.size() * 4 * sizeof(Face<Dim>*); // at least 4 faces
+		}
+#endif
 		size_t elementsPointers = this->Elements.size() * sizeof(Element<Dim>*);
 
 		size_t oneFaceUsage = 0;
+#ifdef ENABLE_2D
 		if (Dim == 2)
 			oneFaceUsage = sizeof(Edge);
+#endif
 #ifdef ENABLE_3D
-		else if (Dim == 3)
+		if (Dim == 3)
 			oneFaceUsage = sizeof(TriangleIn3D);
-#endif // ENABLE_3D
+#endif
 		size_t facesUsage = this->Faces.size() * oneFaceUsage;
 		size_t facesPointers = this->Faces.size() * sizeof(Face<Dim>*);
 
@@ -151,7 +161,6 @@ protected:
 				}
 			});
 #endif
-
 		Mesh<Dim>::FinalizeCoarsening();
 	}
 
@@ -2159,27 +2168,40 @@ public:
 
 	virtual ~PolyhedralMesh()
 	{
-		if (_quadrilateralElements.empty() && _triangularElements.empty()
-#ifdef ENABLE_3D
-			&& _tetrahedralElements.empty() && _parallelepipedElements.empty()
-#endif
-			)
+#ifdef ENABLE_2D
+		if (Dim == 2)
 		{
-			for (size_t i = 0; i < this->Elements.size(); ++i)
-				delete this->Elements[i];
-			this->Elements.clear();
+			if (_quadrilateralElements.empty() && _triangularElements.empty())
+			{
+				for (size_t i = 0; i < this->Elements.size(); ++i)
+					delete this->Elements[i];
+				this->Elements.clear();
+			}
+			if (_edgeFaces.empty())
+			{
+				for (size_t i = 0; i < this->Faces.size(); ++i)
+					delete this->Faces[i];
+				this->Faces.clear();
+			}
 		}
-
-		if (_edgeFaces.empty() 
-#ifdef ENABLE_3D
-			&& _triangularFaces.empty()
 #endif
-			)
+#ifdef ENABLE_3D
+		if (Dim == 3)
 		{
-			for (size_t i = 0; i < this->Faces.size(); ++i)
-				delete this->Faces[i];
-			this->Faces.clear();
+			if (_tetrahedralElements.empty() && _parallelepipedElements.empty())
+			{
+				for (size_t i = 0; i < this->Elements.size(); ++i)
+					delete this->Elements[i];
+				this->Elements.clear();
+			}
+			if (_triangularFaces.empty())
+			{
+				for (size_t i = 0; i < this->Faces.size(); ++i)
+					delete this->Faces[i];
+				this->Faces.clear();
+			}
 		}
+#endif
 	}
 
 	//-----------------------------------------------//
@@ -2192,7 +2214,7 @@ public:
 	void FaceCoarsening() { assert(false); };
 };
 
-
+#ifdef ENABLE_2D
 template<>
 Element<2>* PolyhedralMesh<2>::CreatePolyhedron(vector<Vertex*> vertices)
 {
@@ -2205,6 +2227,7 @@ Element<2>* PolyhedralMesh<2>::CreatePolyhedron(vector<Vertex*> vertices)
 	return nullptr;
 #endif
 }
+#endif // ENABLE_2D
 
 #ifdef ENABLE_3D
 template<>
@@ -2215,6 +2238,8 @@ Element<3>* PolyhedralMesh<3>::CreatePolyhedron(vector<Vertex*> vertices)
 }
 #endif // ENABLE_3D
 
+
+#ifdef ENABLE_2D
 template<>
 Element<2>* PolyhedralMesh<2>::CreateMacroElement(Element<2>* e1, Element<2>* e2, const vector<Face<2>*>& facesToRemove)
 {
@@ -2226,6 +2251,7 @@ Element<2>* PolyhedralMesh<2>::CreateMacroElement(Element<2>* e1, Element<2>* e2
 	return nullptr;
 #endif
 }
+#endif // ENABLE_2D
 
 #ifdef ENABLE_3D
 template<>
@@ -2236,6 +2262,8 @@ Element<3>* PolyhedralMesh<3>::CreateMacroElement(Element<3>* e1, Element<3>* e2
 }
 #endif // ENABLE_3D
 
+
+#ifdef ENABLE_2D
 template<>
 Face<2>* PolyhedralMesh<2>::CreateMacroFace(Face<2>* f1, Face<2>* f2, Vertex* vertexToRemove)
 {
@@ -2244,6 +2272,7 @@ Face<2>* PolyhedralMesh<2>::CreateMacroFace(Face<2>* f1, Face<2>* f2, Vertex* ve
 	Edge* macroFace = new Edge(0, v1, v2);
 	return macroFace;
 }
+#endif // ENABLE_2D
 
 #ifdef ENABLE_3D
 template<>
@@ -2254,6 +2283,7 @@ Face<3>* PolyhedralMesh<3>::CreateMacroFace(Face<3>* f1, Face<3>* f2, Vertex* ve
 }
 #endif // ENABLE_3D
 
+#ifdef ENABLE_2D
 template<>
 vector<PhysicalShape<2>*> PolyhedralMesh<2>::Intersection(Element<2>* e1, Element<2>* e2)
 {
@@ -2272,7 +2302,9 @@ vector<PhysicalShape<2>*> PolyhedralMesh<2>::Intersection(Element<2>* e1, Elemen
 	return {};
 #endif
 }
+#endif // ENABLE_2D
 
+#ifdef ENABLE_2D
 template <>
 void PolyhedralMesh<2>::FaceCoarsening()
 {
@@ -2367,3 +2399,4 @@ void PolyhedralMesh<2>::FaceCoarsening()
 	}
 	this->FinalizeCoarsening();
 }
+#endif // ENABLE_2D

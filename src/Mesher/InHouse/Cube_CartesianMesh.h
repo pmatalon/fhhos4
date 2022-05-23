@@ -1,8 +1,6 @@
 #pragma once
-#include <vector>
-#include "../../Mesh/3D/ParallelepipedElement.h"
 #include "../../Mesh/3D/RectangularFace.h"
-#include "../../Mesh/Mesh.h"
+#include "../../Mesh/PolyhedralMesh.h"
 #include "../CubeGeometry.h"
 
 using namespace std;
