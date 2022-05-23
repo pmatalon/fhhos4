@@ -24,7 +24,8 @@ option(ENABLE_AGMG "Build with AGMG" OFF)
 option(ENABLE_CGAL "Build with CGAL" ON)
 option(SMALL_INDEX "Use type 'int' for the indexes" OFF)
 option(ENABLE_1D "Enable 1D" OFF)
-option(ENABLE_3D "Enable 1D" ON)
+option(ENABLE_2D "Enable 2D" ON)
+option(ENABLE_3D "Enable 3D" ON)
 
 add_definitions(-DROOT_PATH="${CMAKE_SOURCE_DIR}")
 
@@ -40,6 +41,13 @@ if(ENABLE_1D)
 	message(STATUS "ENABLE_1D: ON")
 else()
 	message(STATUS "ENABLE_1D: OFF")
+endif()
+
+if(ENABLE_2D)
+	add_definitions(-DENABLE_2D)
+	message(STATUS "ENABLE_2D: ON")
+else()
+	message(STATUS "ENABLE_2D: OFF")
 endif()
 
 if(ENABLE_3D)

@@ -1372,13 +1372,18 @@ int main(int argc, char* argv[])
 #ifdef GMSH_ENABLED
 		else
 		{
+#ifdef ENABLE_2D
 			Mesh<2>::SetDirectories();
 			args.Problem.Dimension = GMSHMesh<2>::GetDimension(args.Problem.GeoCode);
+#elif defined ENABLE_3D
+			Mesh<3>::SetDirectories();
+			args.Problem.Dimension = GMSHMesh<3>::GetDimension(args.Problem.GeoCode);
+#endif // ENABLE_2D
 		}
 #else
 		else
 			argument_error("Unknown geometry.");
-#endif
+#endif // GMSH_ENABLED
 	}
 
 	// Test case
@@ -1659,7 +1664,11 @@ int main(int argc, char* argv[])
 		Utils::FatalError("To use 1D, recompile with the option ENABLE_1D");
 #endif
 	else if (args.Problem.Dimension == 2)
+#ifdef ENABLE_2D
 		program = new ProgramDim<2>();
+#else
+		Utils::FatalError("To use 2D, recompile with the option ENABLE_2D");
+#endif
 	else if (args.Problem.Dimension == 3)
 #ifdef ENABLE_3D
 		program = new ProgramDim<3>();

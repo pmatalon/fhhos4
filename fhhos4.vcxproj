@@ -286,7 +286,7 @@
       <AdditionalOptions>
       </AdditionalOptions>
       <Verbose>true</Verbose>
-      <PreprocessorDefinitions>GMSH_ENABLED;SMALL_INDEX;ROOT_PATH="/mnt/c/Users/pierr/Documents/Source/Repos/fhhos4"</PreprocessorDefinitions>
+      <PreprocessorDefinitions>ENABLE_2D;GMSH_ENABLED;SMALL_INDEX;ROOT_PATH="/mnt/c/Users/pierr/Documents/Source/Repos/fhhos4"</PreprocessorDefinitions>
       <CppLanguageStandard>c++17</CppLanguageStandard>
       <Optimization>Disabled</Optimization>
     </ClCompile>
