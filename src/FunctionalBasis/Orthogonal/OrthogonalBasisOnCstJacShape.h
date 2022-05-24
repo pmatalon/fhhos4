@@ -30,6 +30,11 @@ public:
 		return list;
 	}
 
+	bool IsNormalized() const
+	{
+		return _localFunctions[0].IsNormalized();
+	}
+
 	FunctionalBasis<Dim>* CreateSameBasisForDegree(int degree) override
 	{
 		assert(false && "TO IMPLEMENT");

@@ -85,6 +85,7 @@ public:
 		return Integral(functionToIntegrate, polynomialDegree);
 	}
 
+	// See http://arturo.imati.cnr.it/~marini/didattica/Metodi-engl/Intro2FEM.pdf (page 30)
 	DenseMatrix IntegralKGradGradMatrix(const Tensor<Dim>& K, FunctionalBasis<Dim>* basis) const override
 	{
 		DimMatrix<Dim> C = DetJacobian() * InverseJacobianTranspose().transpose() * K.TensorMatrix * InverseJacobianTranspose();
@@ -92,7 +93,11 @@ public:
 		FunctionalBasis<Dim>* refShapeBasis = basis;
 		OrthogonalBasisOnCstJacShape<Dim>* orthogBasis = dynamic_cast<OrthogonalBasisOnCstJacShape<Dim>*>(basis);
 		if (orthogBasis)
+		{
 			refShapeBasis = orthogBasis->RefShapeBasis;
+			if (orthogBasis->IsNormalized())
+				C /= DetJacobian();
+		}
 		const StiffnessMatrices& refStiff = this->RefShape()->StoredStiffnessMatrices(refShapeBasis);
 		int t = 0;
 		int u = 1;

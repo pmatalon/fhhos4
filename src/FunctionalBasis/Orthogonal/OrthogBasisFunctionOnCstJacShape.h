@@ -19,6 +19,11 @@ public:
 		_normalize = normalize;
 	}
 
+	bool IsNormalized() const
+	{
+		return _normalize;
+	}
+
 	double NormSquare() const override 
 	{ 
 		return _normalize ? 1 : _refShapeFunction->NormSquare() * _detJacobian;

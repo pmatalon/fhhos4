@@ -318,10 +318,14 @@ private:
 		DenseMatrix matrixToInvert(HHO->nReconstructUnknowns + 1, HHO->nReconstructUnknowns + 1);
 		// Block S (stiffness)
 		matrixToInvert.topLeftCorner(HHO->nReconstructUnknowns, HHO->nReconstructUnknowns) << MeshElement->IntegralKGradGradMatrix(DiffTensor(), ReconstructionBasis);
+		//cout << "S (computed):" << endl << MeshElement->Shape()->ComputeIntegralKGradGradMatrix(DiffTensor(), ReconstructionBasis) << endl;
+		//cout << "S (applied):" << endl << MeshElement->IntegralKGradGradMatrix(DiffTensor(), ReconstructionBasis) << endl << endl;
+
 		// Blocks L and L_transpose (mean values)
 		Vector meanValues = MeshElement->Integral(ReconstructionBasis);
 		matrixToInvert.topRightCorner(meanValues.rows(), 1) = meanValues;
 		matrixToInvert.bottomLeftCorner(1, meanValues.rows()) = meanValues.transpose();
+
 		// 0
 		matrixToInvert.bottomRightCorner<1, 1>() << 0;
 		return matrixToInvert;
