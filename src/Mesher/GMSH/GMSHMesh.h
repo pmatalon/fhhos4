@@ -1,7 +1,12 @@
 #pragma once
 #include <gmsh.h>
 #include "../../Mesh/PolyhedralMesh.h"
-#include "../InHouse/Square_TriangularMesh.h"
+#ifdef ENABLE_2D
+	#include "../InHouse/Square_TriangularMesh.h"
+#endif
+#ifdef ENABLE_3D
+	#include "../../Mesh/3D/RectangularFace.h"
+#endif
 #include "../../FunctionalBasis/Monomials/MonomialBasis.h"
 using namespace std;
 
@@ -1048,6 +1053,7 @@ protected:
 public:
 	virtual void RenumberLikeMe()
 	{
+#ifdef ENABLE_2D
 		if (this->_fileNamePart.compare("gmsh_tri") == 0)
 		{
 			BigNumber n = sqrt(this->Elements.size() / 2);
@@ -1058,6 +1064,7 @@ public:
 		}
 		else
 			assert(false);
+#endif // ENABLE_2D
 	}
 
 	void ExportToGMSH_Elements(FunctionalBasis<Dim>* basis, const Vector &coeffs, const string& outputFilePathPrefix, const string& viewName, double tolerance=1e-3, int maxRefinements=6, bool takeAbsoluteValue=false) override
