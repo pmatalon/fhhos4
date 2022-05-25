@@ -23,6 +23,8 @@ private:
 	map<FunctionalBasis<Dim>*, StiffnessMatrices> _stiffMatrices;
 
 	map<FunctionalBasis<Dim>*, OrthogonalBasis<Dim>*> _orthogBases;
+
+	map<FunctionalBasis<Dim>*, Vector> _integralVectors;
 public:
 	ReferenceShape() {}
 
@@ -97,6 +99,15 @@ public:
 		return it->second; // to avoid warning
 	}
 
+	const Vector& StoredIntegralVector(FunctionalBasis<Dim>* basis) const
+	{
+		auto it = _integralVectors.find(basis);
+		if (it != _integralVectors.end())
+			return it->second;
+		Utils::FatalError("The vector of integrals for this basis should be computed once and stored for this reference element ('" + Name() + "').");
+		return it->second; // to avoid warning
+	}
+
 	void ComputeAndStoreMassMatrix(FunctionalBasis<Dim>* basis)
 	{
 		if (_massMatrices.find(basis) == _massMatrices.end())
@@ -134,6 +145,12 @@ public:
 			}
 			_stiffMatrices[basis] = stiff;
 		}
+	}
+
+	void ComputeAndStoreIntegralVector(FunctionalBasis<Dim>* basis)
+	{
+		if (_integralVectors.find(basis) == _integralVectors.end())
+			_integralVectors[basis] = this->ComputeIntegral(basis);
 	}
 
 private:

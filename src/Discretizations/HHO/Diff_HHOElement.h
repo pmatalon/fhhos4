@@ -124,10 +124,10 @@ public:
 			this->CellBasis = HHO->CellBasis;
 		}
 
-		/*cout << "Reconstruct mass matrix (computed): " << endl << this->MeshElement->Shape()->ComputeAndReturnMassMatrix(this->ReconstructionBasis) << endl;
-		cout << "Reconstruct mass matrix (applied): " << endl << this->MassMatrix(this->ReconstructionBasis) << endl;
-		cout << "Cell mass matrix (computed): " << endl << this->MeshElement->Shape()->ComputeAndReturnMassMatrix(this->CellBasis) << endl;
-		cout << "Cell mass matrix (applied): " << endl << this->MassMatrix(this->CellBasis) << endl;*/
+		//cout << "Reconstruct mass matrix (computed): " << endl << this->MeshElement->Shape()->ComputeAndReturnMassMatrix(this->ReconstructionBasis) << endl;
+		//cout << "Reconstruct mass matrix (applied): " << endl << this->MassMatrix(this->ReconstructionBasis) << endl;
+		//cout << "Cell mass matrix (computed): " << endl << this->MeshElement->Shape()->ComputeAndReturnMassMatrix(this->CellBasis) << endl;
+		//cout << "Cell mass matrix (applied): " << endl << this->MassMatrix(this->CellBasis) << endl;
 
 
 		//this->ComputeAndSaveQuadraturePoints(hho->CellBasis->GetDegree());
@@ -323,6 +323,8 @@ private:
 
 		// Blocks L and L_transpose (mean values)
 		Vector meanValues = MeshElement->Integral(ReconstructionBasis);
+		//cout << "I (computed):" << endl << MeshElement->Shape()->ComputeIntegral(ReconstructionBasis).transpose() << endl;
+		//cout << "I (applied):" << endl << MeshElement->Integral(ReconstructionBasis).transpose() << endl;
 		matrixToInvert.topRightCorner(meanValues.rows(), 1) = meanValues;
 		matrixToInvert.bottomLeftCorner(1, meanValues.rows()) = meanValues.transpose();
 

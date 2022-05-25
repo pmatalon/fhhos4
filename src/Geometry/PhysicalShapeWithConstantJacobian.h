@@ -88,16 +88,16 @@ public:
 	// See http://arturo.imati.cnr.it/~marini/didattica/Metodi-engl/Intro2FEM.pdf (page 30)
 	DenseMatrix IntegralKGradGradMatrix(const Tensor<Dim>& K, FunctionalBasis<Dim>* basis) const override
 	{
-		DimMatrix<Dim> C = DetJacobian() * InverseJacobianTranspose().transpose() * K.TensorMatrix * InverseJacobianTranspose();
-
 		FunctionalBasis<Dim>* refShapeBasis = basis;
 		OrthogonalBasisOnCstJacShape<Dim>* orthogBasis = dynamic_cast<OrthogonalBasisOnCstJacShape<Dim>*>(basis);
 		if (orthogBasis)
-		{
 			refShapeBasis = orthogBasis->RefShapeBasis;
-			if (orthogBasis->IsNormalized())
-				C /= DetJacobian();
-		}
+
+		double coeff = DetJacobian();
+		if (orthogBasis && orthogBasis->IsNormalized())
+			coeff = 1; // = coeff / sqrt(DetJacobian())^2
+
+		DimMatrix<Dim> C = coeff * InverseJacobianTranspose().transpose() * K.TensorMatrix * InverseJacobianTranspose();
 		const StiffnessMatrices& refStiff = this->RefShape()->StoredStiffnessMatrices(refShapeBasis);
 		int t = 0;
 		int u = 1;
@@ -134,6 +134,19 @@ public:
 	DenseMatrix CellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) const override
 	{
 		return DetJacobian() * this->RefShape()->StoredCellReconstructMassMatrix(cellBasis, reconstructBasis);
+	}
+
+	Vector Integral(FunctionalBasis<Dim>* basis) const override
+	{
+		FunctionalBasis<Dim>* refShapeBasis = basis;
+		OrthogonalBasisOnCstJacShape<Dim>* orthogBasis = dynamic_cast<OrthogonalBasisOnCstJacShape<Dim>*>(basis);
+		if (orthogBasis)
+			refShapeBasis = orthogBasis->RefShapeBasis;
+
+		double coeff = DetJacobian();
+		if (orthogBasis && orthogBasis->IsNormalized())
+			coeff = sqrt(DetJacobian()); // coeff / sqrt(DetJacobian())
+		return coeff * this->RefShape()->StoredIntegralVector(refShapeBasis);
 	}
 
 	//---------------------------------------------------------------------//

@@ -46,7 +46,7 @@ public:
 public:
 	DenseMatrix ComputeAndReturnMassMatrix(FunctionalBasis<Dim>* basis) const
 	{
-		DenseMatrix M = DenseMatrix(basis->Size(), basis->Size());
+		DenseMatrix M(basis->Size(), basis->Size());
 		for (BasisFunction<Dim>* phi1 : basis->LocalFunctions())
 		{
 			for (BasisFunction<Dim>* phi2 : basis->LocalFunctions())
@@ -75,6 +75,14 @@ public:
 			}
 		}
 		return M;
+	}
+
+	Vector ComputeIntegral(FunctionalBasis<Dim>* basis) const
+	{
+		Vector v(basis->Size());
+		for (BasisFunction<Dim>* phi : basis->LocalFunctions())
+			v(phi->LocalNumber) = Integral(phi);
+		return v;
 	}
 
 public:

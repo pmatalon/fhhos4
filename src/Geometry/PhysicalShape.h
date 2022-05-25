@@ -191,14 +191,6 @@ public:
 		return GeometricShape<Dim>::Integral(phi);
 	}
 
-	Vector Integral(FunctionalBasis<Dim>* basis) const
-	{
-		Vector v(basis->Size());
-		for (BasisFunction<Dim>* phi : basis->LocalFunctions())
-			v[phi->LocalNumber] = Integral(phi);
-		return v;
-	}
-
 	virtual double Integral(RefFunction f) const override
 	{
 		RefFunction func = [this, f](const RefPoint& p) {
@@ -327,6 +319,11 @@ public:
 			}
 		}
 		return m;
+	}
+
+	virtual Vector Integral(FunctionalBasis<Dim>* basis) const
+	{
+		return GeometricShape<Dim>::ComputeIntegral(basis);
 	}
 
 	Vector InnerProductWithBasis(FunctionalBasis<Dim>* basis, DomFunction f) const
