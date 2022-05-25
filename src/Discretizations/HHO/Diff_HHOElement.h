@@ -176,8 +176,8 @@ private:
 		{
 			Vector d(basis->Size());
 			for (BasisFunction<Dim>* phi : basis->LocalFunctions())
-				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim>*>(phi)->NormSquare();
-			return d.asDiagonal().inverse() * M;
+				d[phi->LocalNumber] = 1 / dynamic_cast<OrthogonalBasisFunction<Dim>*>(phi)->NormSquare();
+			return d.asDiagonal() * M;
 		}
 		else
 			return this->MeshElement->MassMatrix(basis).llt().solve(M);

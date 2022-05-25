@@ -117,8 +117,8 @@ public:
 		{
 			Vector d(this->Basis->Size());
 			for (BasisFunction<Dim-1>* phi : this->Basis->LocalFunctions())
-				d[phi->LocalNumber] = dynamic_cast<OrthogonalBasisFunction<Dim-1>*>(phi)->NormSquare();
-			return d.asDiagonal().inverse() * M;
+				d[phi->LocalNumber] = 1 / dynamic_cast<OrthogonalBasisFunction<Dim - 1>*>(phi)->NormSquare();
+			return d.asDiagonal() * M;
 		}
 		else
 			return _massMatrixSolver.solve(M);
