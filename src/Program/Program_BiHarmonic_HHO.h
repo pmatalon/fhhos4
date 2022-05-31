@@ -129,28 +129,24 @@ public:
 			int blockSizeForBlockSolver = args.Solver.BlockSize != -1 ? args.Solver.BlockSize : faceBasis->Size();
 			Solver* diffSolver = SolverFactory<Dim>::CreateSolver(args, &biHarPb->DiffPb(), blockSizeForBlockSolver, out);
 
-			Timer setupTimer;
-			Timer solvingTimer1;
-			Timer solvingTimer2;
-			Timer totalTimer;
-			totalTimer.Start();
+			Timer lapSolverSetupTimer;
 
 			cout << "Solver: " << *diffSolver << endl << endl;
 			IterativeSolver* iterativeSolver = dynamic_cast<IterativeSolver*>(diffSolver);
 			if (iterativeSolver)
 			{
-				setupTimer.Start();
+				lapSolverSetupTimer.Start();
 				if (Utils::ProgramArgs.Solver.SolverCode.compare("uamg") == 0 || Utils::ProgramArgs.Solver.PreconditionerCode.compare("uamg") == 0)
 					iterativeSolver->Setup(biHarPb->DiffPb().A, biHarPb->DiffPb().A_T_T, biHarPb->DiffPb().A_T_ndF, biHarPb->DiffPb().A_ndF_ndF);
 				else
 					diffSolver->Setup(biHarPb->DiffPb().A);
-				setupTimer.Stop();
+				lapSolverSetupTimer.Stop();
 			}
 			else
 			{
-				setupTimer.Start();
+				lapSolverSetupTimer.Start();
 				diffSolver->Setup(biHarPb->DiffPb().A);
-				setupTimer.Stop();
+				lapSolverSetupTimer.Stop();
 			}
 
 			biHarPb->SetDiffSolver(diffSolver);
@@ -218,7 +214,14 @@ public:
 			else
 				Utils::FatalError("Unknown biharmonic solver '" + args.Solver.BiHarmonicSolverCode + "'");
 
+			Timer setupTimer;
+			Timer solvingTimer;
+			Timer totalTimer;
+			totalTimer.Start();
+
 			cout << "Solver: " << *biHarSolver << endl;
+
+			setupTimer.Start();
 
 			IterativeSolver* biHarIterSolver = dynamic_cast<IterativeSolver*>(biHarSolver);
 			if (biHarIterSolver)
@@ -332,6 +335,8 @@ public:
 				biHarSolver->Setup(A);
 			}
 
+			setupTimer.Stop();
+
 
 			//--------------------------------------------------------------------------//
 			/*ProblemArguments pbDiff;
@@ -407,7 +412,13 @@ public:
 				cout << "Solve linear system..." << endl;
 			}
 
+			solvingTimer.Start();
 			Vector theta_0 = biHarSolver->Solve(b);
+			solvingTimer.Stop();
+
+			totalTimer.Stop();
+
+			SolverFactory<Dim>::PrintStats(biHarSolver, setupTimer, solvingTimer, totalTimer);
 
 			delete biHarSolver;
 
