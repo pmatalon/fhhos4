@@ -70,11 +70,11 @@ public:
 					Vector b_ndF = nbhDiff.ComputeB_ndF_noNeumann(dirichlet);
 					Vector rhs = nbhDiff.CondensedRHS(b_T, b_ndF);
 
-					Vector faceSolution = nbhDiff.FaceUnknownSolver.Solve(rhs);
+					Vector faceSolutionLambda = nbhDiff.FaceUnknownSolver.Solve(rhs);
 
 					Vector lambda;
 					//if (option == 0)
-						lambda = nbhDiff.SolveCellUnknowns(faceSolution, b_T);
+						lambda = nbhDiff.SolveCellUnknowns(faceSolutionLambda, b_T);
 					//else
 						//lambda = nbhDiff.ReconstructHigherOrder(faceSolution, dirichlet, b_T);
 
@@ -82,7 +82,7 @@ public:
 					Vector b_source = nbhDiff.AssembleSourceTerm(lambda);
 					rhs = nbhDiff.CondensedRHS_noNeumannZeroDirichlet(b_source);
 
-					faceSolution = nbhDiff.FaceUnknownSolver.Solve(rhs);
+					Vector faceSolution = nbhDiff.FaceUnknownSolver.Solve(rhs);
 
 					// Normal derivative
 					Vector normalDerivative;
@@ -100,10 +100,28 @@ public:
 					else
 						Utils::FatalError("Preconditioner not managed for -opt " + to_string(option));
 
-					/*lambda = nbhDiff.ReconstructHigherOrder(faceSolution, dirichlet, b_T);
-					Vector u = nbhDiff.ReconstructHigherOrder(faceSolution, Vector::Zero(nbh.BoundaryFaces.size() * nFaceUnknowns), b_source);
-					_diffPb.ExportReconstructedVectorToGMSH(NeighbourhoodToDomain(nbh, lambda), out, "lambda_prec");
-					_diffPb.ExportReconstructedVectorToGMSH(NeighbourhoodToDomain(nbh, u), out, "u_prec");*/
+					// To generate the figures:
+					// Neighbouhood (nbh): -pb bihar -geo square -source poly -mesh tri -n 8 -k 3 -nbh-depth 3 
+					// Domain       (dom): idem with -nbh-depth 30 
+					//
+					// In GMSH, 
+					// Open the square Geometry, go to Tools->Options->Geometry
+					// - Visibility tab: untick Points
+					// - Aspect tab: set 1.0 for curve width
+					// - Color tab: set Curves to black
+					// Open all 4 .pos file, go to Tools->Options. For each view, one by one:
+					// - General tab: choose the "Filled iso-values" interval type
+					// - Map tab: type 9 to select the B/W color map, then type i to inverse the colors
+					// - In order to get the same scale for u_nbh and u_dom, select the view of u_nbh, tab General,
+					//   select the "Custom" range mode, and enter -4.85e-5 (Min) and 0.00394 (Max)
+					// - Visibility tab, untick "show value scale"
+					/*if (k == 0 && f->Center().X == 0)
+					{
+						lambda = nbhDiff.ReconstructHigherOrder(faceSolutionLambda, dirichlet, b_T);
+						Vector u = nbhDiff.ReconstructHigherOrder(faceSolution, Vector::Zero(nbh.BoundaryFaces.size() * nFaceUnknowns), b_source);
+						_diffPb.ExportReconstructedVectorToGMSH(NeighbourhoodToDomain(nbh, lambda), out, "lambda_prec");
+						_diffPb.ExportReconstructedVectorToGMSH(NeighbourhoodToDomain(nbh, u), out, "u_prec");
+					}*/
 
 					for (int i2 = 0; i2 < nbh.BoundaryFaces.size(); i2++)
 					{
