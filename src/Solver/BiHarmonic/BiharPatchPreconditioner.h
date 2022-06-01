@@ -22,6 +22,21 @@ public:
 		_blockDiagPrec = blockDiagPrec;
 	}
 
+	void Serialize(ostream& os) const override
+	{
+		if (_blockDiagPrec)
+			os << "diagonal patch ";
+		else
+			os << "patch ";
+		os << "(neighbourhood depth = " << _neighbourhoodDepth << ")";
+	}
+
+	void Setup(const DenseMatrix& A) override
+	{
+		Setup();
+	}
+
+private:
 	void Setup()
 	{
 		ExportModule out(Utils::ProgramArgs.OutputDirectory, "", Utils::ProgramArgs.Actions.Export.ValueSeparator);
@@ -156,6 +171,7 @@ public:
 			_solver.Setup(mat);
 	}
 
+public:
 	MFlops SetupComputationalWork() override
 	{
 		return 0;

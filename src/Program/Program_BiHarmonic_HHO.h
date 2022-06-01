@@ -156,14 +156,20 @@ public:
 			cout << "-     Solve biharmonic problem      -" << endl;
 			cout << "-------------------------------------" << endl;
 
+			cout << endl;
 
 			Vector discreteExactSolution;
 			double exactSolutionL2Norm = 0;
 			if (testCase->ExactSolution)
 			{
+				cout << "Projection of the exact solution on the discrete space..." << endl;
 				discreteExactSolution = biHarPb->DiffPb().ReconstructSpace.Project(testCase->ExactSolution);
 				exactSolutionL2Norm = biHarPb->DiffPb().ReconstructSpace.L2Norm(discreteExactSolution);
 			}
+
+			cout << "Computation of the right-hand side of the system..." << endl;
+
+			biHarPb->SetDiffSolverTolerance(args.Solver.Tolerance);
 
 			// Solve 1st problem with f as source
 			Vector theta_f = biHarPb->FindCompatibleTheta();
@@ -187,7 +193,7 @@ public:
 				(args.Solver.BiHarmonicSolverCode.compare("cg") == 0 && (args.Solver.BiHarmonicPreconditionerCode.compare("j") == 0 || args.Solver.BiHarmonicPreconditionerCode.compare("bj") == 0)) ||
 				args.Actions.Export.LinearSystem)
 			{
-				cout << "Computation of the matrix..." << endl;
+				cout << "Explicit computation of the matrix..." << endl;
 				A = biHarPb->Matrix();
 				//cout << "Matrix: " << endl << A << endl << endl;
 
@@ -199,29 +205,21 @@ public:
 				}
 			}
 
-
 			//-------------------------------------//
 			//            Create solver            //
 			//-------------------------------------//
 
+			cout << endl;
+
 			Solver* biHarSolver = nullptr;
 			if (args.Solver.BiHarmonicSolverCode.compare("cg") == 0)
-				biHarSolver = new BiHarmonicCG(biHarPb, args.Solver.Restart);
+				biHarSolver = new BiHarmonicCG(biHarPb, Utils::ProgramArgs.Actions.Option2 == 1 ? 1e-3 : 0, args.Solver.Restart);
 			else if (args.Solver.BiHarmonicSolverCode.compare("gd") == 0)
 				biHarSolver = new BiHarmonicGradientDescent(biHarPb);
 			else if (args.Solver.BiHarmonicSolverCode.compare("lu") == 0)
 				biHarSolver = new EigenLU();
 			else
 				Utils::FatalError("Unknown biharmonic solver '" + args.Solver.BiHarmonicSolverCode + "'");
-
-			Timer setupTimer;
-			Timer solvingTimer;
-			Timer totalTimer;
-			totalTimer.Start();
-
-			cout << "Solver: " << *biHarSolver << endl;
-
-			setupTimer.Start();
 
 			IterativeSolver* biHarIterSolver = dynamic_cast<IterativeSolver*>(biHarSolver);
 			if (biHarIterSolver)
@@ -230,6 +228,7 @@ public:
 				biHarIterSolver->Tolerance = args.Solver.Tolerance;
 				biHarIterSolver->StagnationConvRate = args.Solver.StagnationConvRate;
 				biHarIterSolver->MaxIterations = args.Solver.MaxIterations;
+
 				// Compute L2-error at each iteration
 				if ((args.Solver.ComputeIterL2Error || args.Actions.Export.IterationL2Errors) && testCase->ExactSolution)
 				{
@@ -238,20 +237,6 @@ public:
 						Vector reconstructedLap, reconstructedSolution;
 						std::tie(reconstructedLap, reconstructedSolution) = biHarPb->ComputeSolution(theta_f + theta_0);
 						result.L2Error = biHarPb->DiffPb().ReconstructSpace.L2Norm(reconstructedSolution - discreteExactSolution) / exactSolutionL2Norm;
-
-						//Vector lambda2 = biHarPb->Solve1stDiffProblemWithFSource(theta_f + theta_0);
-						//Vector u_boundary = biHarPb->Solve2ndDiffProblem(lambda2, true);
-						/* // same thing
-						Vector lambda0 = biHarPb->Solve1stDiffProblemWithZeroSource(theta);
-						Vector u_boundary_0 = biHarPb->Solve2ndDiffProblem(lambda0, true);
-						Vector u_boundary_b = u_boundary_f + u_boundary_0;*/
-						//cout << "                                                                ||u_boundary|| = " << std::scientific << sqrt(biHarPb->L2InnerProdOnBoundary(u_boundary_b, u_boundary_b)) << endl;
-						//result.BoundaryL2Norm = sqrt(biHarPb->L2InnerProdOnBoundary(u_boundary, u_boundary));
-
-						// Energy functional
-						//Vector lambda = biHarPb->Solve1stDiffProblemWithZeroSource(theta);
-						//Vector Atheta = -biHarPb->Solve2ndDiffProblem(lambda, true);
-						//cout << "                                                                                " << std::setprecision(8) << 0.5 * theta.dot(Atheta) - b.dot(theta) << endl;
 					};
 				}
 				// Export iteration results
@@ -275,6 +260,7 @@ public:
 					};
 				}
 
+				// Preconditioner
 				if (args.Solver.BiHarmonicSolverCode.compare("cg") == 0)
 				{
 					BiHarmonicCG* cg = static_cast<BiHarmonicCG*>(biHarIterSolver);
@@ -282,50 +268,46 @@ public:
 					{
 						BiHarmonicMixedFormGlowinski_HHO<Dim>* gloScheme = static_cast<BiHarmonicMixedFormGlowinski_HHO<Dim>*>(biHarPb);
 						if (args.Solver.BiHarmonicPreconditionerCode.compare("j") == 0)
-						{
-							cout << "Preconditioner: Jacobi" << endl << endl;
-							DenseBlockJacobiPreconditioner* p = new DenseBlockJacobiPreconditioner(1);
-							p->Setup(A);
-							cg->Precond = p;
-						}
+							cg->Precond = new DenseBlockJacobiPreconditioner(1);
 						else if (args.Solver.BiHarmonicPreconditionerCode.compare("bj") == 0)
-						{
-							cout << "Preconditioner: block Jacobi" << endl << endl;
-							DenseBlockJacobiPreconditioner* p = new DenseBlockJacobiPreconditioner(hho->nFaceUnknowns);
-							p->Setup(A);
-							cg->Precond = p;
-						}
+							cg->Precond = new DenseBlockJacobiPreconditioner(hho->nFaceUnknowns);
 						else if (args.Solver.BiHarmonicPreconditionerCode.compare("p") == 0)
-						{
-							cout << "Preconditioner: patch" << endl << endl;
-							BiharPatchPreconditioner<Dim>* p = new BiharPatchPreconditioner<Dim>(*gloScheme, args.Solver.NeighbourhoodDepth);
-							p->Setup();
-							cg->Precond = p;
-						}
+							cg->Precond = new BiharPatchPreconditioner<Dim>(*gloScheme, args.Solver.NeighbourhoodDepth);
 						else if (args.Solver.BiHarmonicPreconditionerCode.compare("dp") == 0)
-						{
-							cout << "Preconditioner: diagonal patch" << endl << endl;
-							BiharPatchPreconditioner<Dim>* p = new BiharPatchPreconditioner<Dim>(*gloScheme, args.Solver.NeighbourhoodDepth, true);
-							p->Setup();
-							cg->Precond = p;
-						}
+							cg->Precond = new BiharPatchPreconditioner<Dim>(*gloScheme, args.Solver.NeighbourhoodDepth, true);
 						else if (args.Solver.BiHarmonicPreconditionerCode.compare("no") == 0)
-						{
-							cout << "Preconditioner: none" << endl << endl;
-							IdentityPreconditioner* p = new IdentityPreconditioner();
-							cg->Precond = p;
-						}
+							cg->Precond = new IdentityPreconditioner();
 						else
 							Utils::FatalError("Unknown preconditioner. Check -bihar-prec " + args.Solver.BiHarmonicPreconditionerCode + ".");
 					}
 					else if (args.Problem.Scheme.compare("f") == 0)
-					{
-						cout << "Preconditioner: none" << endl << endl;
-						IdentityPreconditioner* p = new IdentityPreconditioner();
-						cg->Precond = p;
-					}
+						cg->Precond = new IdentityPreconditioner();
+				}
+			}
+
+			cout << "Solver: " << *biHarSolver << endl << endl;
+
+			Timer setupTimer;
+			Timer solvingTimer;
+			Timer totalTimer;
+			totalTimer.Start();
+
+			//------------------------------------//
+			//            Setup solver            //
+			//------------------------------------//
+
+			setupTimer.Start();
+
+			if (biHarIterSolver)
+			{
+				if (args.Solver.BiHarmonicSolverCode.compare("cg") == 0)
+				{
+					BiHarmonicCG* cg = static_cast<BiHarmonicCG*>(biHarIterSolver);
+					cout << "Setup preconditioner..." << endl;
+					cg->Precond->Setup(A);
 				}
 
+				cout << "Setup solver..." << endl;
 				// Give the Laplacian matrix so that the Work Units are computed with respect to it
 				biHarIterSolver->Setup(biHarPb->DiffPb().A);
 			}
@@ -337,6 +319,7 @@ public:
 
 			setupTimer.Stop();
 
+			cout << endl;
 
 			//--------------------------------------------------------------------------//
 			/*ProblemArguments pbDiff;

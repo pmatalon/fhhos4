@@ -15,6 +15,14 @@ public:
 	virtual MFlops SetupComputationalWork() { return 0; }
 
 	virtual MFlops SolvingComputationalWork() = 0;
+
+	virtual void Serialize(ostream& os) const = 0;
+
+	friend ostream& operator<<(ostream& os, const Preconditioner& s)
+	{
+		s.Serialize(os);
+		return os;
+	}
 };
 
 class IdentityPreconditioner : public Preconditioner
@@ -27,6 +35,10 @@ public:
 	MFlops SolvingComputationalWork() override
 	{
 		return 0;
+	}
+	void Serialize(ostream& os) const override
+	{
+		os << "none";
 	}
 };
 
@@ -75,6 +87,14 @@ public:
 		Utils::FatalError("TODO: SolvingComputationalWork() not implemented");
 		return 0;
 	}
+
+	void Serialize(ostream& os) const override
+	{
+		if (_blockSize == 1)
+			os << "Jacobi";
+		else
+			os << "block Jacobi";
+	}
 };
 
 class SolverPreconditioner : public Preconditioner
@@ -116,13 +136,12 @@ public:
 		return false;
 	}
 
-	friend ostream& operator<<(ostream& os, const SolverPreconditioner& p)
+	void Serialize(ostream& os) const override
 	{
-		if (p._solver)
-			os << *(p._solver);
+		if (_solver)
+			os << (*_solver);
 		else
 			os << "none";
-		return os;
 	}
 
 	void Setup(const SparseMatrix& A) override

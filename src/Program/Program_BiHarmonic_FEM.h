@@ -164,7 +164,7 @@ public:
 
 			Solver* biHarSolver = nullptr;
 			if (Utils::EndsWith(args.Solver.BiHarmonicSolverCode, "cg"))
-				biHarSolver = new BiHarmonicCG(biHarPb, args.Solver.Restart);
+				biHarSolver = new BiHarmonicCG(biHarPb, 0.0, args.Solver.Restart);
 			else if (args.Solver.BiHarmonicSolverCode.compare("gd") == 0)
 				biHarSolver = new BiHarmonicGradientDescent(biHarPb);
 			else if (args.Solver.BiHarmonicSolverCode.compare("lu") == 0)

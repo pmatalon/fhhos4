@@ -25,6 +25,19 @@ public:
 		}
 	}
 
+	void SetDiffSolverTolerance(double tol)
+	{
+		IterativeSolver* iter = dynamic_cast<IterativeSolver*>(_diffSolver);
+		if (iter)
+			iter->Tolerance = tol;
+	}
+
+	double DiffSolverTolerance()
+	{
+		IterativeSolver* iter = dynamic_cast<IterativeSolver*>(_diffSolver);
+		return iter ? iter->Tolerance : 0;
+	}
+
 	virtual Vector FindCompatibleTheta() = 0;
 
 	virtual Vector Solve1stDiffProblemWithFSource(const Vector& bc) = 0;

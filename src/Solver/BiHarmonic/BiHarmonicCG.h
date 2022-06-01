@@ -7,22 +7,41 @@ class BiHarmonicCG : public IterativeSolver
 {
 private:
 	BiHarmonicMixedForm* _biHarPb;
+	double _diffSolverToleranceStep = 1e-3;
+	int _restartPeriod = 0;
 
 public:
-	Preconditioner* Precond;
-	int Restart = 0;
+	Preconditioner* Precond = nullptr;
 
-	BiHarmonicCG(BiHarmonicMixedForm* biHarPb, int restart = 0)
+	BiHarmonicCG(BiHarmonicMixedForm* biHarPb, double diffSolverToleranceStep = 1e-3, int restartPeriod = 0)
 	{
 		_biHarPb = biHarPb;
-		Restart = restart;
+		_diffSolverToleranceStep = diffSolverToleranceStep;
+		_restartPeriod = restartPeriod;
 	}
 
-	virtual void Serialize(ostream& os) const override
+	void Serialize(ostream& os) const override
 	{
-		os << "Conjugate Gradient for the biharmonic problem";
-		if (Restart > 0)
-			os << " (restart = " << Restart << ")";
+		os << "Conjugate Gradient" << endl;
+		os << "        Laplacian solver tolerance: ";
+		if (_diffSolverToleranceStep > 0)
+			os << "dynamic (step = " << std::scientific << std::setprecision(1) << _diffSolverToleranceStep << ")";
+		else
+			os << "constant (" << std::scientific << std::setprecision(1) << this->Tolerance << ")";
+		if (_restartPeriod > 0)
+			os << endl << "        Restart period = " << _restartPeriod;
+
+		if (Precond)
+			os << endl << "Preconditioner: " << *Precond;
+	}
+
+	void Setup(const SparseMatrix& A) override
+	{
+		IterativeSolver::Setup(A);
+		if (_diffSolverToleranceStep > 0)
+			_biHarPb->SetDiffSolverTolerance(max(_diffSolverToleranceStep, this->Tolerance));
+		else
+			_biHarPb->SetDiffSolverTolerance(this->Tolerance);
 	}
 
 	void Solve(const Vector& b, Vector& theta, bool xEquals0) override
@@ -67,29 +86,17 @@ public:
 
 			double r_dot_z_old = r_dot_z; // save the dot product before overwriting r
 
-			// Restart?
-			if (this->IterationCount > 0 && this->Restart > 0 && this->IterationCount % this->Restart == 0)
-			{
-				// Restart algorithm
-				r = b - A(theta);
-				z = Precond->Apply(r);
-				r_dot_z = L2InnerProdOnBoundary(r, z);
+			// Update residual
+			r -= alpha * Ap;
+			z = Precond->Apply(r);
 
-				p = z;
-			}
-			else
-			{
-				// Update residual
-				r -= alpha * Ap;
-				z = Precond->Apply(r);
+			r_dot_z = L2InnerProdOnBoundary(r, z);
 
-				r_dot_z = L2InnerProdOnBoundary(r, z);
+			// Step for the direction of research
+			double beta = r_dot_z / r_dot_z_old;
+			// Update the direction of research
+			p = z + beta * p;
 
-				// Step for the direction of research
-				double beta = r_dot_z / r_dot_z_old;
-				// Update the direction of research
-				p = z + beta * p;
-			}
 
 
 			//------------------------------------
@@ -114,6 +121,27 @@ public:
 
 			result.SetX(theta);
 			result.SetResidualNorm(sqrt(r_dot_r));
+
+			// Update dynamic tolerance for the diffusion solver
+			bool restartNow = false;
+			if (_diffSolverToleranceStep > 0 && result.NormalizedResidualNorm < _biHarPb->DiffSolverTolerance())
+			{
+				double newTolerance = max(_biHarPb->DiffSolverTolerance() * _diffSolverToleranceStep, this->Tolerance);
+				_biHarPb->SetDiffSolverTolerance(newTolerance);
+				restartNow = true;
+			}
+
+			// Restart?
+			if (restartNow || (this->_restartPeriod > 0 && this->IterationCount % this->_restartPeriod == 0))
+			{
+				cout << "restart with tol = " << std::scientific << _biHarPb->DiffSolverTolerance() << endl;
+				// Restart algorithm
+				r = b - A(theta);
+				z = Precond->Apply(r);
+				r_dot_z = L2InnerProdOnBoundary(r, z);
+
+				p = z;
+			}
 
 			if (this->PrintIterationResults)
 				cout << result << endl;

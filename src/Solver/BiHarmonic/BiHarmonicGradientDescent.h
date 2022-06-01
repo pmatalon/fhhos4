@@ -16,7 +16,7 @@ public:
 
 	virtual void Serialize(ostream& os) const override
 	{
-		os << "Gradient descent for the biharmonic problem";
+		os << "Gradient descent";
 	}
 
 	void Solve(const Vector& b, Vector& theta, bool xEquals0) override
