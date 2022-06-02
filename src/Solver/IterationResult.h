@@ -17,6 +17,7 @@ private:
 	double _tolerance = 0;
 	Timer _solvingTimer;
 	Vector e;
+	string _textAtTheEnd;
 public:
 	function<void(IterationResult&, const Vector&)> OnNewSolution = nullptr;
 	int IterationNumber = 0;
@@ -156,18 +157,26 @@ public:
 		return 0;
 	}
 
+	void AddAtTheEndOfTheLine(const string& text)
+	{
+		if (_textAtTheEnd.length() == 0)
+			_textAtTheEnd = text;
+		else
+			_textAtTheEnd += " " + text;
+	}
+
 	friend ostream& operator<<(ostream& os, const IterationResult& result)
 	{
 		int IterWidth = 3;
 		int predictedIterationsWidth = 6;
-		int normalizedResWidth = 12;
-		int relativeErrorWidth = 12;
+		int normalizedResWidth = 10;
+		int relativeErrorWidth = 10;
 		int l2ErrorWidth = 12;
 		int boundaryL2NormWidth = 12;
-		int iterationConvRateWidth = 11;
-		int asymptoticConvRateWidth = 12;
+		int iterationConvRateWidth = 9;
+		int asymptoticConvRateWidth = 9;
 		int computWorkWidth = 15;
-		int nFineMatVecWidth = 8;
+		int nWorkUnitsWidth = 6;
 		int cpuTimeWidth = 10;
 		int remainingTimeWidth = 11;
 
@@ -195,15 +204,15 @@ public:
 				os << "Boundary";
 			}
 			os << setw(iterationConvRateWidth);
-			os << "Iteration";
+			os << "Iter.";
 			os << setw(asymptoticConvRateWidth);
-			os << "Asymptotic";
+			os << "Asymp.";
 			//os << setw(computWorkWidth);
 			//os << "Computational";
 			//os << setw(cpuTimeWidth);
 			//os << "";
-			os << setw(nFineMatVecWidth);
-			os << "Fine";
+			os << setw(nWorkUnitsWidth);
+			os << "WUs";
 			if (result._tolerance > 0)
 			{
 				os << setw(remainingTimeWidth);
@@ -239,8 +248,8 @@ public:
 			//os << "work";
 			//os << setw(cpuTimeWidth);
 			//os << "CPU time";
-			os << setw(nFineMatVecWidth);
-			os << "MatVec";
+			os << setw(nWorkUnitsWidth);
+			os << "";
 			if (result._tolerance > 0)
 			{
 				os << setw(remainingTimeWidth);
@@ -312,7 +321,7 @@ public:
 		//os << setw(cpuTimeWidth);
 		//os << result._solvingTimer.CPU().InMilliseconds;
 
-		os << setw(nFineMatVecWidth);
+		os << setw(nWorkUnitsWidth);
 		os << result.NumberOfFineMatVec();
 
 		if (result._tolerance > 0)
@@ -330,6 +339,10 @@ public:
 				os << ss.str().substr(0, 8);
 			}
 		}
+
+		if (result._textAtTheEnd.length() > 0)
+			os << "  " << result._textAtTheEnd;
+
 		return os;
 	}
 };

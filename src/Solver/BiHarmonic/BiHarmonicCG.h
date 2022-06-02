@@ -97,23 +97,7 @@ public:
 			// Update the direction of research
 			p = z + beta * p;
 
-
-
-			//------------------------------------
-			/*
-			// Recompute explicitly the residual, by computing the solution u
-			Vector lambda_final = _biHarPb->Solve1stDiffProblemWithFSource(theta);
-			Vector u_boundary_real = _biHarPb->Solve2ndDiffProblem(lambda_final, true);
-
-			Vector r_u_boundary = r - u_boundary_real;
-			//cout << "r = " << endl << r << endl;
-			//cout << "u_boundary = " << endl << u_boundary << endl;
-			//cout << "r - u_boundary = " << endl << r_u_boundary << endl;
-			cout << "||u_boundary|| = " << sqrt(L2InnerProdOnBoundary(u_boundary_real, u_boundary_real)) << "   ";
-			cout << "||r - u_boundary|| = " << sqrt(L2InnerProdOnBoundary(r_u_boundary, r_u_boundary)) << "   ";
-			cout << "||r|| = " << sqrt(r_dot_r_old) << endl;
-			*/
-			//------------------------------------
+			//-------------------------------------------
 
 			this->IterationCount++;
 
@@ -123,18 +107,25 @@ public:
 			result.SetResidualNorm(sqrt(r_dot_r));
 
 			// Update dynamic tolerance for the diffusion solver
-			bool restartNow = false;
-			if (_diffSolverToleranceStep > 0 && result.NormalizedResidualNorm < _biHarPb->DiffSolverTolerance())
+			bool toleranceUpdated = false;
+			if (_diffSolverToleranceStep > 0 && result.NormalizedResidualNorm < _biHarPb->DiffSolverTolerance() && result.NormalizedResidualNorm > this->Tolerance)
 			{
 				double newTolerance = max(_biHarPb->DiffSolverTolerance() * _diffSolverToleranceStep, this->Tolerance);
 				_biHarPb->SetDiffSolverTolerance(newTolerance);
-				restartNow = true;
+				toleranceUpdated = true;
 			}
 
 			// Restart?
-			if (restartNow || (this->_restartPeriod > 0 && this->IterationCount % this->_restartPeriod == 0))
+			if (toleranceUpdated || (this->_restartPeriod > 0 && this->IterationCount % this->_restartPeriod == 0))
 			{
-				cout << "restart with tol = " << std::scientific << _biHarPb->DiffSolverTolerance() << endl;
+				result.AddAtTheEndOfTheLine("R");
+				if (toleranceUpdated)
+				{
+					stringstream ss;
+					ss << "(new tol = " << std::setprecision(1) << std::scientific << _biHarPb->DiffSolverTolerance() << ")";
+					result.AddAtTheEndOfTheLine(ss.str());
+				}
+
 				// Restart algorithm
 				r = b - A(theta);
 				z = Precond->Apply(r);
