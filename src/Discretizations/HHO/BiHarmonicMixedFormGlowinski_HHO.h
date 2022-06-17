@@ -18,6 +18,9 @@ private:
 	VirtualDiffusionTestCase<Dim> _diffPbTestCase;
 	Diffusion_HHO<Dim> _diffPb;
 
+	SparseMatrix _NormalDerStiff;
+	SparseMatrix _NormalDerMass;
+
 
 	SparseMatrix _CellMass;
 	SparseMatrix _SolveCellUknTranspose;
@@ -65,6 +68,19 @@ public:
 		_SolveCellUknTranspose = _diffPb.SolveCellUknTransposeOnBoundary();
 		_A_bT_bT = _diffPb.A_bT_bT_Matrix();
 		_CellMass = _diffPb.CellMassMatrixOnBoundaryElements();
+
+		if (_option == 0)
+		{
+			_NormalDerStiff = _SolveCellUknTranspose * _diffPb.A_T_ndF + _diffPb.A_ndF_dF.transpose();
+			_NormalDerMass = _SolveCellUknTranspose * _CellMass;
+
+			_SolveCellUknTranspose = SparseMatrix();
+			_CellMass = SparseMatrix();
+		}
+		else
+		{
+			_A_bT_bT = _diffPb.A_bT_bT_Matrix();
+		}
 
 		_b_fSource = _diffPb.AssembleSourceTerm(_testCase->SourceFunction);
 		_zeroDirichlet = Vector::Zero(HHO->nDirichletCoeffs);
@@ -156,6 +172,14 @@ private:
 			Vector sourceElemBoundary = _diffPb.ExtractElemBoundary(source);
 			if (_option == 0)
 			{
+				Vector normalDerivative = _NormalDerStiff * faceSolution;
+				//normalDerivative += _diffPb.A_T_dF.transpose() * _SolveCellUknTranspose + _diffPb.A_ndF_ndF * boundaryFaces; // non-homogeneous b.c.
+				normalDerivative -= _NormalDerMass * sourceElemBoundary;
+
+				return ThetaSpace->SolveMassMatrix(normalDerivative);
+			}
+			else if (_option == 1) // same as 0, old code
+			{
 				Vector bdryCellSolution = _diffPb.SolveCellUnknownsOnBoundaryOnly(faceSolution, b_source);
 
 				Vector normalDerivative = _diffPb.A_T_dF.topRows(nBdryCellUnknowns).transpose() * bdryCellSolution + _diffPb.A_ndF_dF.transpose() * faceSolution;
@@ -163,17 +187,6 @@ private:
 
 				normalDerivative -= _SolveCellUknTranspose * _CellMass * sourceElemBoundary;
 
-				return ThetaSpace->SolveMassMatrix(normalDerivative);
-			}
-			else if (_option == 1) // close to 0
-			{
-				//Vector cellSolution = _diffPb.SolveCellUnknowns(faceSolution, b_source);
-
-				//Vector normalDerivative = _diffPb.A_T_dF.transpose() * cellSolution + _diffPb.A_ndF_dF.transpose() * faceSolution;
-				//normalDerivative += _DomainSolveCellUknTranspose * (_A_T_T * cellSolution + _diffPb.A_T_ndF * faceSolution);
-				Vector normalDerivative = (_diffPb.A * faceSolution).tail(HHO->nBoundaryFaces * HHO->nFaceUnknowns);
-
-				normalDerivative -= _SolveCellUknTranspose * _CellMass * sourceElemBoundary;
 				return ThetaSpace->SolveMassMatrix(normalDerivative);
 			}
 			else

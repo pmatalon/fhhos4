@@ -64,7 +64,20 @@ private:
 				SparseMatrix A_T_ndF;
 				SparseMatrix A_ndF_dF;
 
+				SparseMatrix normalDerStiff;
+				SparseMatrix normalDerMass;
+
 				if (option == 0)
+				{
+					A_T_ndF = nbhDiff.A_T_ndF;
+					A_ndF_dF = nbhDiff.A_ndF_dF;
+					SolveCellUknTranspose = nbhDiff.SolveCellUknTranspose();
+					CellMass = nbhDiff.CellMassMatrix();
+
+					normalDerStiff = SolveCellUknTranspose * A_T_ndF + A_ndF_dF.transpose();
+					normalDerMass = SolveCellUknTranspose * CellMass;
+				}
+				else if (option == 1)
 				{
 					A_T_T = nbhDiff.A_T_T();
 					A_T_dF = nbhDiff.A_T_dF;
@@ -102,6 +115,11 @@ private:
 					// Normal derivative
 					Vector normalDerivative;
 					if (option == 0)
+					{
+						normalDerivative = normalDerStiff * faceSolution - normalDerMass * lambda;
+						normalDerivative = nbhDiff.SolveFaceMassMatrixOnBoundary(normalDerivative);
+					}
+					else if (option == 1)
 					{
 						Vector cellSolution = nbhDiff.SolveCellUnknowns(faceSolution, b_source);
 
