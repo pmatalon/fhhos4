@@ -66,12 +66,12 @@ public:
 		_option = Utils::ProgramArgs.Actions.Option1;
 
 		_SolveCellUknTranspose = _diffPb.SolveCellUknTransposeOnBoundary();
-		_A_bT_bT = _diffPb.A_bT_bT_Matrix();
 		_CellMass = _diffPb.CellMassMatrixOnBoundaryElements();
 
 		if (_option == 0)
 		{
-			_NormalDerStiff = _SolveCellUknTranspose * _diffPb.A_T_ndF + _diffPb.A_ndF_dF.transpose();
+			auto nBoundaryElemUnknowns = _SolveCellUknTranspose.cols();
+			_NormalDerStiff = _SolveCellUknTranspose * _diffPb.A_T_ndF.topRows(nBoundaryElemUnknowns) + _diffPb.A_ndF_dF.transpose();
 			_NormalDerMass = _SolveCellUknTranspose * _CellMass;
 
 			_SolveCellUknTranspose = SparseMatrix();
