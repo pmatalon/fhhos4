@@ -514,6 +514,9 @@ void print_usage() {
 	cout << "-opt1 NUM" << endl;
 	cout << "      Developer option to choose variants of code. -opt2 also available." << endl;
 	cout << endl;
+	cout << "-dparam1 NUM" << endl;
+	cout << "      Developer option pass a parameter as a double value." << endl;
+	cout << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << "                      Examples and typical use cases                  " << endl;
 	cout << "----------------------------------------------------------------------" << endl;
@@ -662,6 +665,7 @@ int main(int argc, char* argv[])
 		OPT_NeighbourhoodDepth,
 		OPT_Option1,
 		OPT_Option2,
+		OPT_DoubleParam1,
 	};
 
 	static struct option long_opts[] = {
@@ -743,6 +747,7 @@ int main(int argc, char* argv[])
 		 { "nbh-depth", required_argument, NULL, OPT_NeighbourhoodDepth },
 		 { "opt1", required_argument, NULL, OPT_Option1 },
 		 { "opt2", required_argument, NULL, OPT_Option2 },
+		 { "dparam1", required_argument, NULL, OPT_DoubleParam1 },
 		 { NULL, 0, NULL, 0 }
 	};
 
@@ -1347,6 +1352,9 @@ int main(int argc, char* argv[])
 				break;
 			case OPT_Option2:
 				args.Actions.Option2 = atoi(optarg);
+				break;
+			case OPT_DoubleParam1:
+				args.Actions.DoubleParam1 = atof(optarg);
 				break;
 			default:
 			{

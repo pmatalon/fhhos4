@@ -128,6 +128,7 @@ struct ActionsArguments
 	bool GMSHLogEnabled = false;
 	int Option1 = 0;
 	int Option2 = 0;
+	double DoubleParam1 = 0.0;
 	ExportArguments Export;
 };
 

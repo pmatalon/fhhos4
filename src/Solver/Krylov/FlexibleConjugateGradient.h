@@ -166,6 +166,7 @@ public:
 		if (this->PrintIterationResults)
 			cout << endl;
 
+		result.CopyInfoInto(this->LastIterationResult);
 		this->SolvingComputationalWork = result.SolvingComputationalWork();
 	}
 

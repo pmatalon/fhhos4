@@ -164,7 +164,14 @@ public:
 
 			Solver* biHarSolver = nullptr;
 			if (Utils::EndsWith(args.Solver.BiHarmonicSolverCode, "cg"))
-				biHarSolver = new BiHarmonicCG(biHarPb, 0.0, args.Solver.Restart);
+			{
+				ToleranceStrategy stgy = ToleranceStrategy::Fixed;
+				if (Utils::ProgramArgs.Actions.Option2 == 1)
+					stgy = ToleranceStrategy::DynamicFixedStep;
+				else if (Utils::ProgramArgs.Actions.Option2 == 2)
+					stgy = ToleranceStrategy::DynamicVariableStep;
+				biHarSolver = new BiHarmonicCG(biHarPb, stgy, 1e-3, args.Solver.Restart);
+			}
 			else if (args.Solver.BiHarmonicSolverCode.compare("gd") == 0)
 				biHarSolver = new BiHarmonicGradientDescent(biHarPb);
 			else if (args.Solver.BiHarmonicSolverCode.compare("lu") == 0)

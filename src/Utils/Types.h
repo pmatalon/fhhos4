@@ -183,3 +183,12 @@ enum class ReEntrantCornerMgmt : unsigned
 	Disabled,
 	AgglomerateFirst
 };
+
+
+
+enum class ToleranceStrategy : unsigned
+{
+	Fixed,
+	DynamicFixedStep,
+	DynamicVariableStep
+};

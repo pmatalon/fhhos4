@@ -25,6 +25,11 @@ public:
 		}
 	}
 
+	IterativeSolver* IterativeDiffSolver()
+	{
+		return dynamic_cast<IterativeSolver*>(_diffSolver);
+	}
+
 	void SetDiffSolverTolerance(double tol)
 	{
 		IterativeSolver* iter = dynamic_cast<IterativeSolver*>(_diffSolver);

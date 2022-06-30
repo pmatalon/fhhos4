@@ -15,7 +15,8 @@ private:
 	MFlops _solvingComputationalWork = 0; // total of all iterations
 	list<double> _previousItConvRates;
 	double _tolerance = 0;
-	Timer _solvingTimer;
+	Timer _iterationTimer;
+	Timer _solvingTimer; // total of all iterations
 	Vector e;
 	string _textAtTheEnd;
 public:
@@ -35,26 +36,46 @@ public:
 
 	IterationResult()
 	{
-		this->_solvingTimer.Start();
+		_solvingTimer.Start();
+		_iterationTimer.Start();
 	}
 
 	IterationResult(const IterationResult& oldResult)
 		: _solvingTimer(oldResult._solvingTimer)
 	{
-		this->IterationNumber = oldResult.IterationNumber + 1;
-		this->_solvingComputationalWork = oldResult._solvingComputationalWork;
-		this->_bNorm = oldResult._bNorm;
-		this->_computeError = oldResult._computeError;
-		this->_exactSolution = oldResult._exactSolution;
-		this->_oneFineMatVecWork = oldResult._oneFineMatVecWork;
-		this->PreviousNormalizedResidualNorm = oldResult.NormalizedResidualNorm;
-		this->_previousItConvRates = oldResult._previousItConvRates;
-		this->_tolerance = oldResult._tolerance;
-		this->OnNewSolution = oldResult.OnNewSolution;
+		_iterationTimer.Start();
+		IterationNumber = oldResult.IterationNumber + 1;
+		_solvingComputationalWork = oldResult._solvingComputationalWork;
+		_bNorm = oldResult._bNorm;
+		_computeError = oldResult._computeError;
+		_exactSolution = oldResult._exactSolution;
+		_oneFineMatVecWork = oldResult._oneFineMatVecWork;
+		PreviousNormalizedResidualNorm = oldResult.NormalizedResidualNorm;
+		_previousItConvRates = oldResult._previousItConvRates;
+		_tolerance = oldResult._tolerance;
+		OnNewSolution = oldResult.OnNewSolution;
 	}
 
 	// Move assignment operator
 	IterationResult& operator=(IterationResult&& result) = default;
+
+	void CopyInfoInto(IterationResult& other)
+	{
+		other.IterationNumber = this->IterationNumber;
+		other._solvingComputationalWork = this->_solvingComputationalWork;
+		other._iterationComputationalWork = this->_iterationComputationalWork;
+		other._previousItConvRates = list<double>(other._previousItConvRates.begin(), other._previousItConvRates.end());
+		other._solvingTimer = this->_solvingTimer;
+		other._iterationTimer = this->_iterationTimer;
+		other.ResidualNorm = this->ResidualNorm;
+		other.NormalizedResidualNorm = this->NormalizedResidualNorm;
+		other.PreviousNormalizedResidualNorm = this->PreviousNormalizedResidualNorm;
+		other.RelativeErrorNorm = this->RelativeErrorNorm;
+		other.L2Error = this->L2Error;
+		other.IterationConvRate = this->IterationConvRate;
+		other.AsymptoticConvRate = this->AsymptoticConvRate;
+		other.BoundaryL2Norm = this->BoundaryL2Norm;
+	}
 
 	MFlops SolvingComputationalWork()
 	{
@@ -78,6 +99,7 @@ public:
 		if (OnNewSolution)
 			OnNewSolution(*this, x);
 		this->_solvingTimer.Stop();
+		this->_iterationTimer.Stop();
 	}
 
 	void SetExactSolution(const Vector& exactSolution)
@@ -140,9 +162,14 @@ public:
 		_solvingComputationalWork += megaFlops;
 	}
 
-	MFlops IterationComputationalWork()
+	MFlops IterationComputationalWork() const
 	{
 		return _iterationComputationalWork;
+	}
+
+	const Timer& IterationTimer() const
+	{
+		return _iterationTimer;
 	}
 
 	bool IsFineMatVecSet() const

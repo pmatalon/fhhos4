@@ -20,6 +20,7 @@ public:
 	StoppingCriteria StoppingCrit = StoppingCriteria::NormalizedResidual;
 	Vector Residual;
 	Vector Ax;
+	IterationResult LastIterationResult;
 
 	IterativeSolver() : Solver() {}
 
@@ -176,6 +177,8 @@ public:
 			if (this->PrintIterationResults)
 				cout << result << endl;
 		}
+
+		result.CopyInfoInto(LastIterationResult);
 
 		if (this->PrintIterationResults)
 			cout << endl;
