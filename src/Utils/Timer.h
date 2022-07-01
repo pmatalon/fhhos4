@@ -6,16 +6,15 @@ using namespace std;
 class Duration
 {
 private:
+	int _inMilliseconds;
 	int _hh;
 	int _mm;
 	int _ss;
 	int _ms;
 public:
-	int InMilliseconds;
-
 	Duration(int durationInMilliseconds)
 	{
-		InMilliseconds = durationInMilliseconds;
+		_inMilliseconds = durationInMilliseconds;
 
 		int rest = durationInMilliseconds;
 		_hh = rest / (3600 * 1000);
@@ -24,6 +23,16 @@ public:
 		rest = rest - _mm * 60 * 1000;
 		_ss = rest / 1000;
 		_ms = rest - _ss * 1000;
+	}
+
+	int InMilliseconds()
+	{
+		return _inMilliseconds;
+	}
+
+	double InSeconds()
+	{
+		return (double)_inMilliseconds / 1000.0;
 	}
 
 	friend ostream& operator<<(ostream& os, const Duration& d)

@@ -82,6 +82,11 @@ public:
 		return _solvingComputationalWork;
 	}
 
+	Duration SolvingCPUTime() const
+	{
+		return _solvingTimer.CPU();
+	}
+
 	void SetA(const SparseMatrix& A)
 	{
 		this->_oneFineMatVecWork = Cost::MatVec(A) * 1e-6;
@@ -236,8 +241,8 @@ public:
 			os << "Asymp.";
 			//os << setw(computWorkWidth);
 			//os << "Computational";
-			//os << setw(cpuTimeWidth);
-			//os << "";
+			os << setw(cpuTimeWidth);
+			os << "CPU time";
 			os << setw(nWorkUnitsWidth);
 			os << "WUs";
 			if (result._tolerance > 0)
@@ -273,8 +278,8 @@ public:
 			os << "cv rate";
 			//os << setw(computWorkWidth);
 			//os << "work";
-			//os << setw(cpuTimeWidth);
-			//os << "CPU time";
+			os << setw(cpuTimeWidth);
+			os << "";
 			os << setw(nWorkUnitsWidth);
 			os << "";
 			if (result._tolerance > 0)
@@ -334,19 +339,22 @@ public:
 		if (result.IterationNumber == 0)
 			os << " ";
 		else
-			os << std::fixed << result.IterationConvRate;
+			os << std::fixed << std::setprecision(2) << result.IterationConvRate;
 
 		os << setw(asymptoticConvRateWidth);
 		if (result.IterationNumber == 0)
 			os << " ";
 		else
-			os << std::fixed << result.AsymptoticConvRate;
+			os << std::fixed << std::setprecision(2) << result.AsymptoticConvRate;
 
 		//os << setw(computWorkWidth);
 		//os << round(result._solvingComputationalWork);
 
-		//os << setw(cpuTimeWidth);
-		//os << result._solvingTimer.CPU().InMilliseconds;
+		os << setw(cpuTimeWidth);
+		if (result.IterationNumber == 0)
+			os << " ";
+		else
+			os << std::setprecision(1) << result._solvingTimer.CPU().InSeconds();
 
 		os << setw(nWorkUnitsWidth);
 		os << result.NumberOfFineMatVec();
@@ -360,7 +368,7 @@ public:
 				os << "-";
 			else
 			{
-				Duration d(result._solvingTimer.CPU().InMilliseconds / result.IterationNumber * remainingIterations);
+				Duration d(result._solvingTimer.CPU().InMilliseconds() / result.IterationNumber * remainingIterations);
 				stringstream ss;
 				ss << d;
 				os << ss.str().substr(0, 8);

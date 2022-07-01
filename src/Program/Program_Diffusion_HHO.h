@@ -276,13 +276,13 @@ public:
 					int sizeTime = 7;
 					int sizeWork = 5;
 
-					double totalTime = solvingTimer.CPU().InMilliseconds;
+					double totalTime = solvingTimer.CPU().InMilliseconds();
 					MFlops totalWork = iterativeSolver->SolvingComputationalWork;
 					cout << "\t                             | CPU time |   Work " << endl;
 					cout << "\t-------------------------------------------------" << endl;
-					cout << "\tSmoothing and res. computing | " << setw(sizeTime) << (int)round((totalTime - mg->IntergridTransferTimer.CPU().InMilliseconds - mg->CoarseSolverTimer.CPU().InMilliseconds) / totalTime * 100) << "% | " << setw(sizeWork) << (int)round((totalWork - mg->IntergridTransferCost - mg->CoarseSolverCost) / totalWork * 100) << "%" << endl;
-					cout << "\tIntergrid transfers          | " << setw(sizeTime) << (int)round(mg->IntergridTransferTimer.CPU().InMilliseconds / totalTime * 100) << "% | " << setw(sizeWork) << (int)round(mg->IntergridTransferCost / totalWork * 100) << "%" << endl;
-					cout << "\tCoarse solver                | " << setw(sizeTime) << (int)round(mg->CoarseSolverTimer.CPU().InMilliseconds / totalTime * 100) << "% | " << setw(sizeWork) << (int)round(mg->CoarseSolverCost / totalWork * 100) << "%" << endl;
+					cout << "\tSmoothing and res. computing | " << setw(sizeTime) << (int)round((totalTime - mg->IntergridTransferTimer.CPU().InMilliseconds() - mg->CoarseSolverTimer.CPU().InMilliseconds()) / totalTime * 100) << "% | " << setw(sizeWork) << (int)round((totalWork - mg->IntergridTransferCost - mg->CoarseSolverCost) / totalWork * 100) << "%" << endl;
+					cout << "\tIntergrid transfers          | " << setw(sizeTime) << (int)round(mg->IntergridTransferTimer.CPU().InMilliseconds() / totalTime * 100) << "% | " << setw(sizeWork) << (int)round(mg->IntergridTransferCost / totalWork * 100) << "%" << endl;
+					cout << "\tCoarse solver                | " << setw(sizeTime) << (int)round(mg->CoarseSolverTimer.CPU().InMilliseconds() / totalTime * 100) << "% | " << setw(sizeWork) << (int)round(mg->CoarseSolverCost / totalWork * 100) << "%" << endl;
 					cout << endl << endl;
 				}
 			}

@@ -299,7 +299,7 @@ public:
 		if (iterativeSolver != nullptr)
 			cout << " | " << setw(sizeWork) << (int)round(iterativeSolver->SetupComputationalWork) << " | " << setw(sizeMatVec) << (int)round(iterativeSolver->SetupComputationalWork / oneFineMatVec);
 		cout << endl;
-		cout << "        | " << setw(sizeTime - 3) << setupTimer.CPU().InMilliseconds << " ms | " << setw(sizeTime - 3) << setupTimer.Elapsed().InMilliseconds << " ms ";
+		cout << "        | " << setw(sizeTime - 2) << setupTimer.CPU().InSeconds() << " s | " << setw(sizeTime - 2) << setupTimer.Elapsed().InSeconds() << " s ";
 		if (iterativeSolver != nullptr)
 			cout << "| " << setw(sizeWork) << " " << " | " << setw(sizeMatVec);
 		cout << endl;
@@ -312,7 +312,7 @@ public:
 		if (iterativeSolver != nullptr)
 			cout << " | " << setw(sizeWork) << (int)round(iterativeSolver->SolvingComputationalWork) << " | " << setw(sizeMatVec) << (int)round(iterativeSolver->SolvingComputationalWork / oneFineMatVec);
 		cout << endl;
-		cout << "        | " << setw(sizeTime - 3) << solvingTimer.CPU().InMilliseconds << " ms | " << setw(sizeTime - 3) << solvingTimer.Elapsed().InMilliseconds << " ms ";
+		cout << "        | " << setw(sizeTime - 2) << solvingTimer.CPU().InSeconds() << " s | " << setw(sizeTime - 2) << solvingTimer.Elapsed().InSeconds() << " s ";
 		if (iterativeSolver != nullptr)
 			cout << "| " << setw(sizeWork) << " " << " | " << setw(sizeMatVec);
 		cout << endl;
@@ -325,7 +325,7 @@ public:
 		if (iterativeSolver != nullptr)
 			cout << " | " << setw(sizeWork) << (int)round((iterativeSolver->SetupComputationalWork + iterativeSolver->SolvingComputationalWork)) << " | " << setw(sizeMatVec) << (int)round((iterativeSolver->SetupComputationalWork + iterativeSolver->SolvingComputationalWork) / oneFineMatVec);
 		cout << endl;
-		cout << "        | " << setw(sizeTime - 3) << totalTimer.CPU().InMilliseconds << " ms | " << setw(sizeTime - 3) << totalTimer.Elapsed().InMilliseconds << " ms ";
+		cout << "        | " << setw(sizeTime - 2) << totalTimer.CPU().InSeconds() << " s | " << setw(sizeTime - 2) << totalTimer.Elapsed().InSeconds() << " s ";
 		if (iterativeSolver != nullptr)
 			cout << "| " << setw(sizeWork) << " " << " | " << setw(sizeMatVec);
 		cout << endl;

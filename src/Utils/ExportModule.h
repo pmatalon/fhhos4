@@ -124,7 +124,8 @@ public:
 				file << "BoundaryL2Norm" << sep;
 			file << "IterConvRate" << sep;
 			file << "AsympConvRate" << sep;
-			file << "MatVec";
+			file << "MatVec" << sep;
+			file << "CPUTime";
 			file << endl;
 		}
 
@@ -145,7 +146,12 @@ public:
 		else
 			file << "\t" << std::defaultfloat << result.AsymptoticConvRate << sep;
 		
-		file << "\t" << result.NumberOfFineMatVec();
+		file << "\t" << result.NumberOfFineMatVec() << sep;
+
+		if (result.IterationNumber == 0)
+			file << "\t" << "0";
+		else
+			file << "\t" << std::fixed << std::setprecision(1) << result.SolvingCPUTime().InSeconds();
 
 		file << endl;
 		file.close();

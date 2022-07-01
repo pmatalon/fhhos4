@@ -176,8 +176,8 @@ private:
 		else if (_toleranceStgy == ToleranceStrategy::DynamicVariableStep)
 		{
 			IterationResult& diffResult = _biHarPb->IterativeDiffSolver()->LastIterationResult;
-			int cost1IterDiff = diffResult.IterationTimer().CPU().InMilliseconds;
-			int cost1IterCGNoDiff = cgWithoutDiffTimer.CPU().InMilliseconds;
+			int cost1IterDiff = diffResult.IterationTimer().CPU().InMilliseconds();
+			int cost1IterCGNoDiff = cgWithoutDiffTimer.CPU().InMilliseconds();
 			double rhoCG = cgResult.AsymptoticConvRate;
 			double coeff = 1;//Utils::ProgramArgs.Actions.DoubleParam1;
 			double worsenRhoCG = log(1 + pow(rhoCG, coeff) * (exp(1) - 1));
