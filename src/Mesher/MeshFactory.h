@@ -141,6 +141,23 @@ Mesh<2>* MeshFactory<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase
 				else
 					fineMesh = new Square_GMSHQuadrilateralMesh(n);
 			}
+			else if (meshCode.compare("poly") == 0)
+			{
+#ifdef CGAL_ENABLED
+				Mesh<2>* triMesh = new Square_GMSHUnstructTriangularMesh(n);
+				cout << "Agglomeration..." << endl;
+				triMesh->CoarsenMesh(H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours, FaceCoarseningStrategy::InterfaceCollapsing, 0);
+				Mesh<2>* polyMesh = triMesh->CoarseMesh;
+				triMesh->CoarseMesh = nullptr;
+				polyMesh->FineMesh = nullptr;
+				polyMesh->Vertices = std::move(triMesh->Vertices);
+				polyMesh->ClearMeshVertexConnections();
+				polyMesh->UpdateMeshVertexConnections();
+				fineMesh = polyMesh;
+#else
+				Utils::FatalError("CGAL must be enabled to use polygonal meshes. Recompile the program with cmake option -DENABLE_CGAL=On.");
+#endif // CGAL_ENABLED
+			}
 			else
 				Utils::FatalError("The requested mesh is not managed with this geometry.");
 		}

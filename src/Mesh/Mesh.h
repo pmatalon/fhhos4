@@ -41,16 +41,6 @@ public:
 	MeshVertex(BigNumber number, const DomPoint& p) : Vertex(number, p) {}
 	MeshVertex(const Vertex v) : Vertex(v) {}
 
-	bool IsVertexOf(Element<Dim>* e)
-	{
-		for (Element<Dim>* e2 : this->Elements)
-		{
-			if (e2 == e)
-				return true;
-		}
-		return false;
-	}
-
 	~MeshVertex() override
 	{
 		Elements.clear();
@@ -525,8 +515,6 @@ protected:
 				this->DirichletFaces.push_back(f);
 			else if (f->HasNeumannBC())
 				this->NeumannFaces.push_back(f);
-			else
-				assert(false);
 		}
 
 		if (CoarseMesh)
@@ -569,6 +557,46 @@ public:
 
 		if (CoarseMesh)
 			CoarseMesh->FillDirichletAndNeumannVertexLists(forceRefillLists);
+	}
+
+	void ClearMeshVertexConnections()
+	{
+		if (!dynamic_cast<MeshVertex<Dim>*>(this->Vertices[0]))
+			return;
+
+		for (Vertex* v : this->Vertices)
+		{
+			MeshVertex<Dim>* mv = static_cast<MeshVertex<Dim>*>(v);
+			mv->Elements.clear();
+			mv->Faces.clear();
+		}
+	}
+
+	void UpdateMeshVertexConnections()
+	{
+		MeshVertex<Dim>* meshVertex = dynamic_cast<MeshVertex<Dim>*>(this->Vertices[0]);
+		if (!meshVertex)
+			return;
+
+		assert(meshVertex->Elements.empty() && meshVertex->Faces.empty());
+
+		for (Element<Dim>* e : this->Elements)
+		{
+			for (Vertex* v : e->Vertices())
+			{
+				MeshVertex<Dim>* mv = static_cast<MeshVertex<Dim>*>(v);
+				mv->Elements.push_back(e);
+			}
+		}
+
+		for (Face<Dim>* f : this->Faces)
+		{
+			for (Vertex* v : f->Vertices())
+			{
+				MeshVertex<Dim>* mv = static_cast<MeshVertex<Dim>*>(v);
+				mv->Faces.push_back(f);
+			}
+		}
 	}
 
 protected:

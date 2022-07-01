@@ -85,6 +85,7 @@ void print_usage() {
 	cout << "            quad      - Unstructured quadrilateral (see also argument -stretch)" << endl;
 	cout << "            stetra    - Structured tetrahedral (embedded in a Cartesian mesh)" << endl;
 	cout << "            tetra     - Unstructured tetrahedral" << endl;
+	cout << "            poly      - Polygonal (by aggregation of triangles)" << endl;
 	cout << endl;
 	cout << "-mesher CODE" << endl;
 	cout << "      Mesher used: in-house or imported file from GMSH." << endl;
@@ -823,7 +824,8 @@ int main(int argc, char* argv[])
 					&& meshCode.compare("tetra") != 0
 					&& meshCode.compare("stetra") != 0
 					&& meshCode.compare("quad") != 0
-					&& meshCode.compare("quad-poly") != 0)
+					&& meshCode.compare("quad-poly") != 0
+					&& meshCode.compare("poly") != 0)
 					argument_error("unknown mesh code '" + meshCode + "'. Check -mesh argument.");
 				args.Discretization.MeshCode = meshCode;
 				break;
