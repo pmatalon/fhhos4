@@ -50,7 +50,7 @@ public:
 	}
 
 	// Solve problem 1 (f=source, Dirich=<dirichlet>)
-	Vector Solve1stDiffProblemWithFSource(const Vector& dirichlet) override
+	Vector Solve1stDiffProblem(const Vector& dirichlet) override
 	{
 		// Define problem
 		Vector b_source = _diffPb.AssembleSourceTerm(_testCase->SourceFunction);
@@ -65,7 +65,7 @@ public:
 	}
 
 	// Solve problem 1 (f=0, Dirich=<dirichlet>)
-	Vector Solve1stDiffProblemWithZeroSource(const Vector& dirichlet) override
+	Vector Solve1stDiffProblem_Homogeneous(const Vector& dirichlet) override
 	{
 		// Define problem
 		Vector b_source = Vector::Zero(_mesh->InteriorVertices.size());
@@ -83,7 +83,7 @@ public:
 	Vector Solve2ndDiffProblem(const Vector& sourceNodeValues, bool returnBoundaryNormalDerivative = false) override
 	{
 		// Define problem
-		Vector dirichlet = Vector::Zero(_mesh->BoundaryVertices.size());
+		Vector dirichlet = Vector::Zero(_mesh->BoundaryVertices.size()); // TODO: Update for non-homogeneous Dirichlet BC
 		Vector b_source = _diffPb.AssembleSourceTerm(sourceNodeValues, _massMatrix);
 		Vector rhs = _diffPb.RHS(b_source, dirichlet);
 
@@ -99,6 +99,20 @@ public:
 			return _diffPb.BuildCompleteSolution(solution, dirichlet);
 	}
 
+	Vector Solve2ndDiffProblem_Homogeneous(const Vector& sourceNodeValues) override
+	{
+		// Define problem
+		Vector dirichlet = Vector::Zero(_mesh->BoundaryVertices.size());
+		Vector b_source = _diffPb.AssembleSourceTerm(sourceNodeValues, _massMatrix);
+		Vector rhs = _diffPb.RHS(b_source, dirichlet);
+
+		// Solve
+		Vector solution = this->_diffSolver->Solve(rhs);
+		this->CheckDiffSolverConvergence();
+
+		return _diffPb.A_id.transpose() * solution - _massMatrix.bottomRightCorner(_mesh->BoundaryVertices.size(), _mesh->BoundaryVertices.size()) * sourceNodeValues.tail(_mesh->BoundaryVertices.size());
+	}
+
 	double L2InnerProdOnBoundary(const Vector& v1, const Vector& v2) override
 	{
 		//assert(false);
@@ -111,7 +125,7 @@ public:
 		auto& [lambda, solution] = p;
 
 		// Solve problem 1 (f=source, Dirich=<theta>)
-		lambda = Solve1stDiffProblemWithFSource(theta);
+		lambda = Solve1stDiffProblem(theta);
 
 		// Solve problem 2 (f=<lambda>, Dirich=0)
 		solution = Solve2ndDiffProblem(lambda);

@@ -101,7 +101,7 @@ public:
 	}
 
 	// Solve problem 1 (f=source, Neum=<neumann>)
-	Vector Solve1stDiffProblemWithFSource(const Vector& neumann) override
+	Vector Solve1stDiffProblem(const Vector& neumann) override
 	{
 #ifndef NDEBUG
 		// Check compatibility condition
@@ -127,7 +127,7 @@ public:
 	}
 
 	// Solve problem 1 (f=0, Neum=<neumann>)
-	Vector Solve1stDiffProblemWithZeroSource(const Vector& neumann) override
+	Vector Solve1stDiffProblem_Homogeneous(const Vector& neumann) override
 	{
 #ifndef NDEBUG
 		// Check compatibility condition
@@ -162,7 +162,7 @@ public:
 #endif
 		// Define problem
 		Vector b_source = _diffPb.AssembleSourceTerm(source);
-		Vector rhs = _diffPb.CondensedRHS_noDirichletZeroNeumann(b_source);
+		Vector rhs = _diffPb.CondensedRHS_noDirichletZeroNeumann(b_source); // TODO: Update for non-homogeneous Dirichlet BC
 
 		// Solve
 		_imageEnforcer.ProjectOntoImage(rhs); // enforce numerical compatibility
@@ -191,6 +191,37 @@ public:
 		}
 	}
 
+	Vector Solve2ndDiffProblem_Homogeneous(const Vector& source) override
+	{
+#ifndef NDEBUG
+		// Check compatibility condition: (source|1) = 0
+		double integralSource = _diffPb.ReconstructSpace.Integral(source);
+		assert(abs(integralSource) < Utils::Eps);
+		// Probably the same thing:
+		assert(_integralZeroOnDomain.Check(source));
+#endif
+		// Define problem
+		Vector b_source = _diffPb.AssembleSourceTerm(source);
+		Vector rhs = _diffPb.CondensedRHS_noDirichletZeroNeumann(b_source);
+
+		// Solve
+		_imageEnforcer.ProjectOntoImage(rhs); // enforce numerical compatibility
+		Vector faceSolution = this->_diffSolver->Solve(rhs);
+		this->CheckDiffSolverConvergence();
+
+		Vector boundary;
+		if (ReconstructHigherOrderBoundary)
+		{
+			Vector reconstructedElemBoundary = _diffPb.ReconstructHigherOrderOnBoundaryOnly(faceSolution, _noDirichlet, b_source);
+			boundary = _higherOrderBoundary.Trace(reconstructedElemBoundary);
+		}
+		else
+			boundary = faceSolution.tail(HHO->nBoundaryFaces * HHO->nFaceUnknowns); // keep only the boundary unknowns
+
+		_integralZeroOnBoundary.Enforce(boundary);
+		return boundary;
+	}
+
 	double L2InnerProdOnBoundary(const Vector& v1, const Vector& v2) override
 	{
 		return _boundarySpace->L2InnerProd(v1, v2);
@@ -202,7 +233,7 @@ public:
 		auto& [lambda, solution] = p;
 
 		// Solve problem 1 (f=source, Neum=<theta>)
-		lambda = Solve1stDiffProblemWithFSource(theta);
+		lambda = Solve1stDiffProblem(theta);
 
 		// Solve problem 2 (f=<lambda>, Neum=0)
 		solution = Solve2ndDiffProblem(lambda);
@@ -235,8 +266,8 @@ public:
 			Vector e_i = Vector::Zero(n);
 			e_i[i] = 1;
 			_integralZeroOnBoundary.Enforce(e_i);
-			Vector lambda = Solve1stDiffProblemWithZeroSource(e_i);
-			A.col(i) = -Solve2ndDiffProblem(lambda, true);
+			Vector lambda = Solve1stDiffProblem_Homogeneous(e_i);
+			A.col(i) = -Solve2ndDiffProblem_Homogeneous(lambda);
 		}
 		return A;
 	}

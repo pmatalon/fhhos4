@@ -173,7 +173,7 @@ public:
 
 			// Solve 1st problem with f as source
 			Vector theta_f = biHarPb->FindCompatibleTheta();
-			Vector lambda_f = biHarPb->Solve1stDiffProblemWithFSource(theta_f);
+			Vector lambda_f = biHarPb->Solve1stDiffProblem(theta_f);
 			// Solve 2nd problem and extract the boundary (or normal derivative)
 			Vector u_boundary_f = biHarPb->Solve2ndDiffProblem(lambda_f, true);
 
@@ -182,7 +182,8 @@ public:
 			// We want to solve A(theta0) = u_boundary_f, in order to have
 			// theta = theta_f+theta0 with
 			//         A(theta) = Af(theta_f) + A(theta0) = -u_boundary_f + u_boundary_f = 0.
-			Vector b = u_boundary_f;
+			Vector g_N = biHarPb->DiffPb().BoundarySpace.Project(testCase->NeumannBC.NeumannFunction);
+			Vector b = u_boundary_f - g_N;
 
 			//biHarPb->DiffPb().ExportReconstructedVectorToGMSH(biHarPb->Solve2ndDiffProblem(lambda_f, false), out, "u_f", args.Actions.Export.VisuTolerance, args.Actions.Export.VisuMaxRefinements);
 			//biHarPb->DiffPb().ExportReconstructedVectorToGMSH(biHarPb->Solve1stDiffProblemWithZeroSource(u_boundary_f), out, "lambda_f", args.Actions.Export.VisuTolerance, args.Actions.Export.VisuMaxRefinements);
@@ -381,7 +382,7 @@ public:
 				cout << "---------------------" << endl << eigenvectors.col(n - 2) << endl;
 				cout << "---------------------" << endl << eigenvectors.col(n - 3) << endl;
 
-				Vector lambda = biHarPb->Solve1stDiffProblemWithZeroSource(kernelVector.real());
+				Vector lambda = biHarPb->Solve1stDiffProblem_Homogeneous(kernelVector.real());
 				//cout << lambda.norm() << endl;
 
 				//DiffPb().ExportReconstructedVectorToGMSH(lambda, out, "lambda");
@@ -389,7 +390,7 @@ public:
 				biHarPb->DiffPb().ExportReconstructedVectorToGMSH(solPb2, out, "solPb2");
 
 
-				Vector zero = -biHarPb->Solve2ndDiffProblem(lambda, true);
+				Vector zero = -biHarPb->Solve2ndDiffProblem_Homogeneous(lambda);
 				cout << zero.norm() << endl;
 
 				//out.ExportMatrix(A, "matrix");

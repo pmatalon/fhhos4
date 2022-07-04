@@ -11,20 +11,38 @@ public:
 		BiHarmonicTestCase(),
 		_pb(pb)
 	{
-		// Boundary conditions
-		this->DirichletBC = BoundaryConditions::HomogeneousDirichletEverywhere();
-		this->NeumannBC = BoundaryConditions::HomogeneousNeumannEverywhere();
-
-		// Source function
 		if (pb.SourceCode.compare("") == 0)
 		{
 			pb.SourceCode = "sine";
 			_pb.SourceCode = "sine";
 		}
+
+		// Boundary conditions
+		if (pb.SourceCode.compare("exp") == 0)
+		{
+			this->DirichletBC.Type = PbBoundaryConditions::FullDirichlet;
+			this->DirichletBC.BoundaryConditionPartition = BoundaryConditions::DirichletEverywhere;
+			this->DirichletBC.DirichletFunction = this->ExpSolution_Dirichlet;
+			this->DirichletBC.NeumannFunction = nullptr;
+
+			this->NeumannBC.Type = PbBoundaryConditions::FullNeumann;
+			this->NeumannBC.BoundaryConditionPartition = BoundaryConditions::NeumannEverywhere;
+			this->NeumannBC.NeumannFunction = this->ExpSolution_Neumann;
+			this->NeumannBC.DirichletFunction = nullptr;
+		}
+		else
+		{
+			this->DirichletBC = BoundaryConditions::HomogeneousDirichletEverywhere();
+			this->NeumannBC = BoundaryConditions::HomogeneousNeumannEverywhere();
+		}
+
+		// Source function
 		if (pb.SourceCode.compare("sine") == 0)
 			this->SourceFunction = this->SineSource;
 		else if (pb.SourceCode.compare("poly") == 0)
 			this->SourceFunction = this->PolySource;
+		else if (pb.SourceCode.compare("exp") == 0)
+			this->SourceFunction = this->ExpSource;
 		else if (pb.SourceCode.compare("one") == 0)
 			this->SourceFunction = Utils::ConstantFunctionOne;
 		else
@@ -43,8 +61,17 @@ public:
 			this->MinusLaplacianOfSolution = this->PolyMinusLaplacianOfSolution;
 			this->MinusLaplacianOfSolution_Dirichlet = this->PolyMinusLaplacianOfSolution_Dirichlet;
 		}
+		else if (pb.SourceCode.compare("exp") == 0)
+		{
+			this->ExactSolution = this->ExpSolution;
+			this->MinusLaplacianOfSolution = this->ExpMinusLaplacianOfSolution;
+			this->MinusLaplacianOfSolution_Dirichlet = this->ExpMinusLaplacianOfSolution_Dirichlet;
+		}
 	}
 
+	//--------------//
+	//     Sine     //
+	//--------------//
 	static double SineSolution(const DomPoint& p)
 	{
 		double x = p.X;
@@ -76,7 +103,9 @@ public:
 	}
 
 
-
+	//--------------//
+	//     Poly     //
+	//--------------//
 	static double PolySolution(const DomPoint& p)
 	{
 		double x = p.X;
@@ -113,6 +142,75 @@ public:
 	}
 
 
+	//-------------//
+	//     Exp     //
+	//-------------//
+	static double ExpSolution(const DomPoint& p)
+	{
+		double x = p.X;
+		double y = p.Y;
+		return x * sin(M_PI * y) * exp(-x * y);
+	}
+	static double ExpSolution_Dirichlet(const DomPoint& p)
+	{
+		double x = p.X;
+		double y = p.Y;
+		if (abs(x) < Utils::NumericalZero) // x = 0
+			return 0;
+		else if (abs(x - 1) < Utils::NumericalZero) // x = 1
+			return exp(-y) * sin(M_PI * y);
+		else if (abs(y) < Utils::NumericalZero) // y = 0
+			return 0;
+		else if (abs(y - 1) < Utils::NumericalZero) // y = 1
+			return 0;
+		Utils::FatalError("Should never happen");
+		return 0;
+	}
+	static double ExpSolution_Neumann(const DomPoint& p)
+	{
+		double x = p.X;
+		double y = p.Y;
+		if (abs(x) < Utils::NumericalZero) // x = 0
+			return -sin(M_PI * y);
+		else if (abs(x - 1) < Utils::NumericalZero) // x = 1
+			return exp(-y) * sin(M_PI * y) - exp(-y) * y * sin(M_PI * y);
+		else if (abs(y) < Utils::NumericalZero) // y = 0
+			return -M_PI * x;
+		else if (abs(y - 1) < Utils::NumericalZero) // y = 1
+			return -M_PI * exp(-x) * x;
+		Utils::FatalError("Should never happen");
+		return 0;
+	}
+	static double ExpMinusLaplacianOfSolution(const DomPoint& p)
+	{
+		double x = p.X;
+		double y = p.Y;
+		return 2 * y * exp(-x * y) * sin(M_PI * y) - pow(x,3) * exp(-x * y) * sin(M_PI * y) - x * pow(y,2) * exp(-x * y) * sin(M_PI * y) + 2 * pow(x,2) * M_PI * exp(-x * y) * cos(M_PI * y) + x * pow(M_PI,2) * exp(-x * y) * sin(M_PI * y);
+	}
+	static double ExpMinusLaplacianOfSolution_Dirichlet(const DomPoint& p)
+	{
+		double x = p.X;
+		double y = p.Y;
+		if (abs(x) < Utils::NumericalZero) // x = 0
+			return 2 * y * sin(M_PI * y);
+		else if (abs(x - 1) < Utils::NumericalZero) // x = 1
+			return 2 * M_PI * exp(-y) * cos(M_PI * y) - pow(y,2) * exp(-y) * sin(M_PI * y) - exp(-y) * sin(M_PI * y) + 2 * y * exp(-y) * sin(M_PI * y) + pow(M_PI,2) * exp(-y) * sin(M_PI * y);
+		else if (abs(y) < Utils::NumericalZero) // y = 0
+			return 2 * M_PI * pow(x,2);
+		else if (abs(y - 1) < Utils::NumericalZero) // y = 1
+			return -2 * pow(x,2) * M_PI * exp(-x);
+		Utils::FatalError("Should never happen");
+		return 0;
+	}
+	static double ExpSource(const DomPoint& p)
+	{
+		double x = p.X;
+		double y = p.Y;
+		return 12 * x * exp(-x * y) * sin(M_PI * y) + pow(x,5) * exp(-x * y) * sin(M_PI * y) - 4 * pow(y,3) * exp(-x * y) * sin(M_PI * y) - 8 * M_PI * exp(-x * y) * cos(M_PI * y) - 12 * pow(x,2) * y * exp(-x * y) * sin(M_PI * y) + x * pow(y,4) * exp(-x * y) * sin(M_PI * y) + 4 * pow(x,2) * pow(M_PI,3) * exp(-x * y) * cos(M_PI * y) - 6 * pow(x,3) * pow(M_PI,2) * exp(-x * y) * sin(M_PI * y) + 2 * pow(x,3) * pow(y,2) * exp(-x * y) * sin(M_PI * y) - 4 * pow(x,4) * M_PI * exp(-x * y) * cos(M_PI * y) + x * pow(M_PI,4) * exp(-x * y) * sin(M_PI * y) + 4 * y * pow(M_PI,2) * exp(-x * y) * sin(M_PI * y) - 4 * pow(x,2) * pow(y,2) * M_PI * exp(-x * y) * cos(M_PI * y) - 2 * x * pow(y,2) * pow(M_PI,2) * exp(-x * y) * sin(M_PI * y) + 16 * x * y * M_PI * exp(-x * y) * cos(M_PI * y);
+	}
+
+
+
 
 	string Code() override
 	{
@@ -120,7 +218,9 @@ public:
 			return "sine";
 		else if (_pb.SourceCode.compare("poly") == 0)
 			return "poly";
-		else if (_pb.SourceCode.compare("poly") == 0)
+		else if (_pb.SourceCode.compare("exp") == 0)
+			return "exp";
+		else if (_pb.SourceCode.compare("one") == 0)
 			return "one";
 		else
 			return _pb.SourceCode;
@@ -131,6 +231,8 @@ public:
 			return "sine solution";
 		else if (_pb.SourceCode.compare("poly") == 0)
 			return "polynomial solution";
+		else if (_pb.SourceCode.compare("exp") == 0)
+			return "exponential solution";
 		else if (_pb.SourceCode.compare("one") == 0)
 			return "one";
 		else

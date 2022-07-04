@@ -12,29 +12,19 @@ private:
 	Mesh<Dim>* _mesh;
 	BiHarmonicTestCase<Dim>* _testCase;
 
-	//bool _saveMatrixBlocks = true;
-
 	DiffusionField<Dim> _diffField;
 	VirtualDiffusionTestCase<Dim> _diffPbTestCase;
 	Diffusion_HHO<Dim> _diffPb;
 
-	SparseMatrix _NormalDerStiff;
+	SparseMatrix _NormalDerStiff_interior;
+	SparseMatrix _NormalDerStiff_boundary;
 	SparseMatrix _NormalDerMass;
-
-
-	SparseMatrix _CellMass;
-	SparseMatrix _SolveCellUknTranspose;
-	SparseMatrix _A_bT_bT;
 
 	HHOParameters<Dim>* HHO;
 
+	Vector _g_D;
 	Vector _b_fSource;
-	Vector _zeroDirichlet;
-
-	int _option = 0;
 public:
-
-	HHOBoundarySpace<Dim>* ThetaSpace = nullptr;
 
 	BiHarmonicMixedFormGlowinski_HHO(Mesh<Dim>* mesh, BiHarmonicTestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool saveMatrixBlocks)
 	{
@@ -46,7 +36,6 @@ public:
 		_diffPbTestCase = VirtualDiffusionTestCase<Dim>(testCase->SourceFunction, _diffField);
 		_diffPbTestCase.BC = BoundaryConditions::HomogeneousDirichletEverywhere();
 		_diffPb = Diffusion_HHO<Dim>(mesh, &_diffPbTestCase, HHO, true, true);
-		//_saveMatrixBlocks = saveMatrixBlocks;
 	}
 
 	Diffusion_HHO<Dim>& DiffPb() override
@@ -61,34 +50,21 @@ public:
 		diffActions.LogAssembly = true;
 		_diffPb.Assemble(diffActions);
 
-		ThetaSpace = &_diffPb.BoundarySpace;
-
-		_option = Utils::ProgramArgs.Actions.Option1;
-
-		_SolveCellUknTranspose = _diffPb.SolveCellUknTransposeOnBoundary();
-		_CellMass = _diffPb.CellMassMatrixOnBoundaryElements();
-
-		if (_option == 0)
-		{
-			auto nBoundaryElemUnknowns = _SolveCellUknTranspose.cols();
-			_NormalDerStiff = _SolveCellUknTranspose * _diffPb.A_T_ndF.topRows(nBoundaryElemUnknowns) + _diffPb.A_ndF_dF.transpose();
-			_NormalDerMass = _SolveCellUknTranspose * _CellMass;
-
-			_SolveCellUknTranspose = SparseMatrix();
-			_CellMass = SparseMatrix();
-		}
-		else
-		{
-			_A_bT_bT = _diffPb.A_bT_bT_Matrix();
-		}
+		SparseMatrix SolveCellUknTranspose = _diffPb.SolveCellUknTransposeOnBoundary();
+		SparseMatrix CellMass = _diffPb.CellMassMatrixOnBoundaryElements();
+		auto nBoundaryElemUnknowns = SolveCellUknTranspose.cols();
+		_NormalDerStiff_interior = SolveCellUknTranspose * _diffPb.A_T_ndF.topRows(nBoundaryElemUnknowns) + _diffPb.A_ndF_dF.transpose();
+		SparseMatrix tmp = _diffPb.A_T_dF.topRows(nBoundaryElemUnknowns).transpose() * SolveCellUknTranspose.transpose();
+		_NormalDerStiff_boundary = tmp + _diffPb.A_dF_dF;
+		_NormalDerMass = SolveCellUknTranspose * CellMass;
 
 		_b_fSource = _diffPb.AssembleSourceTerm(_testCase->SourceFunction);
-		_zeroDirichlet = Vector::Zero(HHO->nDirichletCoeffs);
+		_g_D = _diffPb.AssembleDirichletTerm(_testCase->DirichletBC.DirichletFunction);
 	}
 
 	Vector FindCompatibleTheta() override
 	{
-		return ThetaSpace->ZeroVector();
+		return _diffPb.BoundarySpace.ZeroVector();
 	}
 
 private:
@@ -99,15 +75,15 @@ private:
 
 public:
 	// Solve problem 1 (source=f, Dirich=<dirichlet>)
-	Vector Solve1stDiffProblemWithFSource(const Vector& dirichletArg) override
+	Vector Solve1stDiffProblem(const Vector& dirichletArg) override
 	{
 		Vector dummy;
-		return Solve1stDiffProblemWithFSource(dirichletArg, false, dummy);
+		return Solve1stDiffProblem(dirichletArg, false, dummy);
 	}
 
 private:
 	// Solve problem 1 (source=f, Dirich=<dirichlet>)
-	Vector Solve1stDiffProblemWithFSource(const Vector& dirichletArg, bool reconstruct, Vector& reconstruction)
+	Vector Solve1stDiffProblem(const Vector& dirichletArg, bool reconstruct, Vector& reconstruction)
 	{
 		// Define problem
 		Vector dirichlet = BuildDirichlet(dirichletArg);
@@ -133,8 +109,9 @@ private:
 		return cellSolution;
 	}
 
+public:
 	// Solve problem 1 (source=0, Dirich=<dirichlet>)
-	Vector Solve1stDiffProblemWithZeroSource(const Vector& dirichletArg) override
+	Vector Solve1stDiffProblem_Homogeneous(const Vector& dirichletArg) override
 	{
 		// Define problem
 		Vector dirichlet = BuildDirichlet(dirichletArg);
@@ -155,12 +132,14 @@ private:
 		return cellSolution;
 	}
 
-	// Solve problem 2 (source=<source>, Dirich=0)
+	// Solve problem 2 (source=<source>, Dirich=g_D)
 	Vector Solve2ndDiffProblem(const Vector& source, bool returnBoundaryNormalDerivative = false) override
 	{
 		// Define problem
 		Vector b_source = _diffPb.AssembleSourceTerm(source);
-		Vector rhs = _diffPb.CondensedRHS_noNeumannZeroDirichlet(b_source);
+		Vector b_T = _diffPb.ComputeB_T(b_source, _g_D);
+		Vector b_ndF = _diffPb.ComputeB_ndF_noNeumann(_g_D);
+		Vector rhs = _diffPb.CondensedRHS(b_T, b_ndF);
 
 		// Solve
 		Vector faceSolution = this->_diffSolver->Solve(rhs);
@@ -170,33 +149,29 @@ private:
 		{
 			BigNumber nBdryCellUnknowns = _mesh->BoundaryElements.size() * HHO->nCellUnknowns;
 			Vector sourceElemBoundary = _diffPb.ExtractElemBoundary(source);
-			if (_option == 0)
-			{
-				Vector normalDerivative = _NormalDerStiff * faceSolution;
-				//normalDerivative += _diffPb.A_T_dF.transpose() * _SolveCellUknTranspose + _diffPb.A_ndF_ndF * boundaryFaces; // non-homogeneous b.c.
-				normalDerivative -= _NormalDerMass * sourceElemBoundary;
-
-				return ThetaSpace->SolveMassMatrix(normalDerivative);
-			}
-			else if (_option == 1) // same as 0, old code
-			{
-				Vector bdryCellSolution = _diffPb.SolveCellUnknownsOnBoundaryOnly(faceSolution, b_source);
-
-				Vector normalDerivative = _diffPb.A_T_dF.topRows(nBdryCellUnknowns).transpose() * bdryCellSolution + _diffPb.A_ndF_dF.transpose() * faceSolution;
-				normalDerivative += _SolveCellUknTranspose * (_A_bT_bT * bdryCellSolution + _diffPb.A_T_ndF.topRows(nBdryCellUnknowns) * faceSolution);
-
-				normalDerivative -= _SolveCellUknTranspose * _CellMass * sourceElemBoundary;
-
-				return ThetaSpace->SolveMassMatrix(normalDerivative);
-			}
-			else
-			{
-				Utils::FatalError("Unmanaged -opt " + to_string(_option));
-				return Vector();
-			}
+			Vector normalDerivative = _NormalDerStiff_interior * faceSolution + _NormalDerStiff_boundary * _g_D - _NormalDerMass * sourceElemBoundary;
+			return _diffPb.BoundarySpace.SolveMassMatrix(normalDerivative);
 		}
 		else
-			return _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, _zeroDirichlet, b_source);
+			return _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, _g_D, b_T);
+	}
+
+	// Solve problem 2 (source=<source>, Dirich=0)
+	Vector Solve2ndDiffProblem_Homogeneous(const Vector& source) override
+	{
+		// Define problem
+		Vector b_source = _diffPb.AssembleSourceTerm(source);
+		Vector rhs = _diffPb.CondensedRHS_noNeumannZeroDirichlet(b_source);
+
+		// Solve
+		Vector faceSolution = this->_diffSolver->Solve(rhs);
+		this->CheckDiffSolverConvergence();
+
+		// Normal derivative
+		BigNumber nBdryCellUnknowns = _mesh->BoundaryElements.size() * HHO->nCellUnknowns;
+		Vector sourceElemBoundary = _diffPb.ExtractElemBoundary(source);
+		Vector normalDerivative = _NormalDerStiff_interior * faceSolution - _NormalDerMass * sourceElemBoundary;
+		return _diffPb.BoundarySpace.SolveMassMatrix(normalDerivative);
 	}
 
 	double L2InnerProdOnBoundary(const Vector& v1, const Vector& v2) override
@@ -210,7 +185,7 @@ private:
 		auto& [lambda, solution] = p;
 
 		// Solve problem 1 (source=f, Dirich=<theta>)
-		Vector lambdaCells = Solve1stDiffProblemWithFSource(theta, true, lambda);
+		Vector lambdaCells = Solve1stDiffProblem(theta, true, lambda);
 
 		// Solve problem 2 (source=<lambda>, Dirich=0)
 		solution = Solve2ndDiffProblem(lambdaCells);

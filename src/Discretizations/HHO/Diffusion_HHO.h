@@ -41,6 +41,7 @@ public:
 	// Used in right-hand side: A_T_dF, A_ndF_dF
 	SparseMatrix A_T_T, A_T_ndF,   A_T_dF;
 	SparseMatrix        A_ndF_ndF, A_ndF_dF;
+	SparseMatrix                   A_dF_dF;
 private:
 	// Solution on the Dirichlet faces
 	Vector x_dF;
@@ -561,6 +562,8 @@ public:
 
 		this->A_ndF_dF = A_F_F.topRightCorner(HHO->nTotalFaceUnknowns, HHO->nDirichletCoeffs);
 
+		this->A_dF_dF = A_F_F.bottomRightCorner(HHO->nDirichletCoeffs, HHO->nDirichletCoeffs);
+
 		//-----------------//
 		// Right-hand side //
 		//-----------------//
@@ -617,6 +620,7 @@ public:
 		{
 			Utils::Empty(this->A_T_T);
 			Utils::Empty(this->A_ndF_ndF);
+			Utils::Empty(this->A_dF_dF);
 		}
 
 		if (!actions.AssembleRightHandSide)

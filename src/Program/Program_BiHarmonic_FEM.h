@@ -34,6 +34,19 @@ public:
 
 		cout << endl;
 
+		try
+		{
+			DomPoint pTest(0.5, 0.5);
+			if (testCase->DirichletBC.DirichletFunction(pTest) != 0.0)
+				Utils::FatalError("Non-homogeneous Dirichlet BC not implemented.");
+			if (testCase->NeumannBC.NeumannFunction(pTest) != 0.0)
+				Utils::FatalError("Non-homogeneous Neumann BC not implemented.");
+		}
+		catch (exception* e)
+		{
+			Utils::FatalError("Non-homogeneous BC not implemented.");
+		}
+
 		ExportModule out(args.OutputDirectory, "", args.Actions.Export.ValueSeparator);
 
 		//----------//
@@ -131,7 +144,7 @@ public:
 
 			// Solve 1st problem with f as source
 			Vector theta_f = biHarPb->FindCompatibleTheta();
-			Vector lambda_f = biHarPb->Solve1stDiffProblemWithFSource(theta_f);
+			Vector lambda_f = biHarPb->Solve1stDiffProblem(theta_f);
 			// Solve 2nd problem and extract the boundary (or normal derivative)
 			Vector u_boundary_f = biHarPb->Solve2ndDiffProblem(lambda_f, true);
 
@@ -197,7 +210,7 @@ public:
 						std::tie(reconstructedLap, reconstructedSolution) = biHarPb->ComputeSolution(theta_f + theta_0);
 						result.L2Error = biHarPb->DiffPb().L2Error(testCase->ExactSolution, reconstructedSolution);
 
-						Vector lambda2 = biHarPb->Solve1stDiffProblemWithFSource(theta_f + theta_0);
+						Vector lambda2 = biHarPb->Solve1stDiffProblem(theta_f + theta_0);
 						Vector u_boundary = biHarPb->Solve2ndDiffProblem(lambda2, true);
 						/* // same thing
 						Vector lambda0 = biHarPb->Solve1stDiffProblemWithZeroSource(theta);
@@ -314,7 +327,7 @@ public:
 				cout << "---------------------" << endl << eigenvectors.col(n - 2) << endl;
 				cout << "---------------------" << endl << eigenvectors.col(n - 3) << endl;
 
-				Vector lambda = biHarPb->Solve1stDiffProblemWithZeroSource(kernelVector.real());
+				Vector lambda = biHarPb->Solve1stDiffProblem_Homogeneous(kernelVector.real());
 				//cout << lambda.norm() << endl;
 
 				//DiffPb().ExportReconstructedVectorToGMSH(lambda, out, "lambda");
@@ -322,7 +335,7 @@ public:
 				//biHarPb->DiffPb().ExportReconstructedVectorToGMSH(solPb2, out, "solPb2");
 
 
-				Vector zero = -biHarPb->Solve2ndDiffProblem(lambda, true);
+				Vector zero = -biHarPb->Solve2ndDiffProblem_Homogeneous(lambda);
 				cout << zero.norm() << endl;
 
 				//out.ExportMatrix(A, "matrix");

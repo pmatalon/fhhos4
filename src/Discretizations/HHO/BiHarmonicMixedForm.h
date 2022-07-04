@@ -45,11 +45,11 @@ public:
 
 	virtual Vector FindCompatibleTheta() = 0;
 
-	virtual Vector Solve1stDiffProblemWithFSource(const Vector& bc) = 0;
-
-	virtual Vector Solve1stDiffProblemWithZeroSource(const Vector& bc) = 0;
-
+	virtual Vector Solve1stDiffProblem(const Vector& bc) = 0;
 	virtual Vector Solve2ndDiffProblem(const Vector& source, bool returnBoundaryOnly = false) = 0;
+
+	virtual Vector Solve1stDiffProblem_Homogeneous(const Vector& bc) = 0;
+	virtual Vector Solve2ndDiffProblem_Homogeneous(const Vector& source) = 0;
 
 	virtual double L2InnerProdOnBoundary(const Vector& v1, const Vector& v2) = 0;
 
@@ -76,8 +76,8 @@ public:
 		for (int i = 0; i < n; i++)
 		{
 			e_i[i] = 1;
-			Vector lambda = Solve1stDiffProblemWithZeroSource(e_i);
-			A.col(i) = -Solve2ndDiffProblem(lambda, true);
+			Vector lambda = Solve1stDiffProblem_Homogeneous(e_i);
+			A.col(i) = -Solve2ndDiffProblem_Homogeneous(lambda);
 			e_i[i] = 0;
 		}
 		return A;
