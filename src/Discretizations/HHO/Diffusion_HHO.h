@@ -11,6 +11,8 @@
 #include "DiscreteSpaces/HHOReconstructSpace.h"
 #include "DiscreteSpaces/HHOBoundarySpace.h"
 #include "Diffusion_HHOMatrix.h"
+#include "../../TestCases/Diffusion/DiffusionTestCase.h"
+#include "../../Utils/ExportModule.h"
 using namespace std;
 
 template <int Dim>

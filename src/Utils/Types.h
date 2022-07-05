@@ -1,4 +1,10 @@
 #pragma once
+#include <iomanip>
+#include <cstdio>
+#include <iostream>
+#include <vector>
+#include <iomanip>
+#include <string>
 #include <Eigen/Sparse>
 #include <Eigen/Dense>
 

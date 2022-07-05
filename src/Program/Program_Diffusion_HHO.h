@@ -1,5 +1,4 @@
 #pragma once
-#include <iomanip>
 #include "../ProgramArguments.h"
 #include "../Discretizations/HHO/Diffusion_HHO.h"
 #include "../TestCases/Diffusion/DiffTestCaseFactory.h"

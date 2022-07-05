@@ -1,5 +1,4 @@
 #pragma once
-#include <string>
 #include <ios>
 #include <fstream>
 #include <unsupported/Eigen/SparseExtra>

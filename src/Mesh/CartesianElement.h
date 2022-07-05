@@ -1,6 +1,7 @@
 #pragma once
 #include "Element.h"
 #include "../Geometry/CartesianShape.h"
+#include "../Discretizations/DG/Diff_DGElement.h"
 
 template <int Dim>
 class CartesianElement : public Diff_DGElement<Dim>

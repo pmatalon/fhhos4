@@ -1,7 +1,5 @@
 #pragma once
-#include <string>
-#include <vector>
-#include "../Utils/Types.h"
+#include "../TestCases/Diffusion/Tensor.h"
 using namespace std;
 
 template <int Dim>

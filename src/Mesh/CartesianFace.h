@@ -1,7 +1,7 @@
 #pragma once
-#include "Vertex.h"
 #include "Face.h"
 #include "../Geometry/CartesianShape.h"
+#include "../Discretizations/DG/Diff_DGFace.h"
 
 template <int Dim>
 class CartesianFace : public Diff_DGFace<Dim>
