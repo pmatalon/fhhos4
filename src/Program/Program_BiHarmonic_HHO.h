@@ -8,6 +8,7 @@
 #include "../FunctionalBasis/FunctionalBasisFactory.h"
 #include "../Solver/SolverFactory.h"
 #include "../Solver/BiHarmonic/BiHarmonicCG.h"
+#include "../Solver/BiHarmonic/BiHarmonicFCG.h"
 #include "../Solver/BiHarmonic/BiHarmonicGradientDescent.h"
 #include "../Solver/BiHarmonic/BiharPatchPreconditioner.h"
 #include "../Utils/ExportModule.h"
@@ -222,6 +223,15 @@ public:
 					stgy = ToleranceStrategy::DynamicVariableStep;
 				biHarSolver = new BiHarmonicCG(biHarPb, stgy, 1e-3, args.Solver.Restart);
 			}
+			else if (args.Solver.BiHarmonicSolverCode.compare("fcg") == 0)
+			{
+				ToleranceStrategy stgy = ToleranceStrategy::Fixed;
+				if (Utils::ProgramArgs.Actions.Option2 == 1)
+					stgy = ToleranceStrategy::DynamicFixedStep;
+				else if (Utils::ProgramArgs.Actions.Option2 == 2)
+					stgy = ToleranceStrategy::DynamicVariableStep;
+				biHarSolver = new BiHarmonicFCG(biHarPb, stgy, 1e-3, 4, args.Solver.Restart);
+			}
 			else if (args.Solver.BiHarmonicSolverCode.compare("gd") == 0)
 				biHarSolver = new BiHarmonicGradientDescent(biHarPb);
 			else if (args.Solver.BiHarmonicSolverCode.compare("lu") == 0)
@@ -269,7 +279,7 @@ public:
 				}
 
 				// Preconditioner
-				if (args.Solver.BiHarmonicSolverCode.compare("cg") == 0)
+				if (args.Solver.BiHarmonicSolverCode.compare("cg") == 0 || args.Solver.BiHarmonicSolverCode.compare("fcg") == 0)
 				{
 					BiHarmonicCG* cg = static_cast<BiHarmonicCG*>(biHarIterSolver);
 					if (args.Problem.Scheme.compare("g") == 0)
@@ -313,6 +323,12 @@ public:
 					BiHarmonicCG* cg = static_cast<BiHarmonicCG*>(biHarIterSolver);
 					cout << "Setup preconditioner..." << endl;
 					cg->Precond->Setup(A);
+				}
+				else if (args.Solver.BiHarmonicSolverCode.compare("fcg") == 0)
+				{
+					BiHarmonicFCG* fcg = static_cast<BiHarmonicFCG*>(biHarIterSolver);
+					cout << "Setup preconditioner..." << endl;
+					fcg->Precond->Setup(A);
 				}
 
 				cout << "Setup solver..." << endl;

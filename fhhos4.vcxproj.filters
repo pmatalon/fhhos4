@@ -610,6 +610,9 @@
     <ClInclude Include="src\TestCases\BiHarmonic\3D\CubeBiHarTestCase.h">
       <Filter>TestCases\BiHarmonic\3D</Filter>
     </ClInclude>
+    <ClInclude Include="src\Solver\BiHarmonic\BiHarmonicFCG.h">
+      <Filter>Solver\BiHarmonic</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
