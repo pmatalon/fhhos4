@@ -607,6 +607,9 @@
     <ClInclude Include="src\FunctionalBasis\Orthogonal\OrthogonalBasisOnCstJacShape.h">
       <Filter>FunctionalBasis\Orthogonal</Filter>
     </ClInclude>
+    <ClInclude Include="src\TestCases\BiHarmonic\3D\CubeBiHarTestCase.h">
+      <Filter>TestCases\BiHarmonic\3D</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
@@ -746,6 +749,9 @@
     </Filter>
     <Filter Include="FunctionalBasis\Orthogonal">
       <UniqueIdentifier>{052720ba-3ef2-444a-922d-0e9e39d151a5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="TestCases\BiHarmonic\3D">
+      <UniqueIdentifier>{5a064cc9-0981-4ebe-8ff8-0f90a7eb3c02}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

@@ -236,6 +236,7 @@
     <ClInclude Include="src\TestCases\BiHarmonicDD\BiHarmonicDDTestCase.h" />
     <ClInclude Include="src\TestCases\BiHarmonicDD\BiHarDDTestCaseFactory.h" />
     <ClInclude Include="src\TestCases\BiHarmonic\2D\SquareBiHarTestCase.h" />
+    <ClInclude Include="src\TestCases\BiHarmonic\3D\CubeBiHarTestCase.h" />
     <ClInclude Include="src\TestCases\BiHarmonic\BiHarmonicTestCase.h" />
     <ClInclude Include="src\TestCases\BiHarmonic\BiHarTestCaseFactory.h" />
     <ClInclude Include="src\TestCases\Diffusion\1D\Heterogeneity1DTestCase.h" />
@@ -286,7 +287,7 @@
       <AdditionalOptions>
       </AdditionalOptions>
       <Verbose>true</Verbose>
-      <PreprocessorDefinitions>ENABLE_2D;GMSH_ENABLED;SMALL_INDEX;ROOT_PATH="/mnt/c/Users/pierr/Documents/Source/Repos/fhhos4"</PreprocessorDefinitions>
+      <PreprocessorDefinitions>ENABLE_3D;GMSH_ENABLED;SMALL_INDEX;ROOT_PATH="/mnt/c/Users/pierr/Documents/Source/Repos/fhhos4"</PreprocessorDefinitions>
       <CppLanguageStandard>c++17</CppLanguageStandard>
       <Optimization>Disabled</Optimization>
     </ClCompile>

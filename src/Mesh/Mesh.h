@@ -40,6 +40,16 @@ public:
 	MeshVertex(BigNumber number, double x, double y, double z) : Vertex(number, x, y, z) {}
 	MeshVertex(BigNumber number, const DomPoint& p) : Vertex(number, p) {}
 	MeshVertex(const Vertex v) : Vertex(v) {}
+	
+	bool IsVertexOf(Element<Dim>* e)
+	{
+		for (Element<Dim>* e2 : this->Elements)
+		{
+			if (e2 == e)
+				return true;
+		}
+		return false;
+	}
 
 	~MeshVertex() override
 	{
