@@ -297,14 +297,14 @@ public:
 							cg->Precond = new DenseBlockJacobiPreconditioner(1);
 						else if (args.Solver.BiHarmonicPreconditionerCode.compare("bj") == 0)
 							cg->Precond = new DenseBlockJacobiPreconditioner(hho->nFaceUnknowns);
-						else if (args.Solver.BiHarmonicPreconditionerCode.compare("p1") == 0)
-							cg->Precond = new BiharPatchPreconditioner<Dim>(*gloScheme, BiharPatchPreconditioner<Dim>::Type::OneNeighbourhoodPerFace, 0, args.Solver.NeighbourhoodDepth, false);
-						else if (args.Solver.BiHarmonicPreconditionerCode.compare("dp1") == 0)
-							cg->Precond = new BiharPatchPreconditioner<Dim>(*gloScheme, BiharPatchPreconditioner<Dim>::Type::OneNeighbourhoodPerFace, 0, args.Solver.NeighbourhoodDepth, true);
-						else if (args.Solver.BiHarmonicPreconditionerCode.compare("p2") == 0)
-							cg->Precond = new BiharPatchPreconditioner<Dim>(*gloScheme, BiharPatchPreconditioner<Dim>::Type::OneNeighbourhoodPerFacePatch, 6, args.Solver.NeighbourhoodDepth, false);
-						else if (args.Solver.BiHarmonicPreconditionerCode.compare("dp2") == 0)
-							cg->Precond = new BiharPatchPreconditioner<Dim>(*gloScheme, BiharPatchPreconditioner<Dim>::Type::OneNeighbourhoodPerFacePatch, 6, args.Solver.NeighbourhoodDepth, true);
+						else if (args.Solver.BiHarmonicPreconditionerCode.compare("s") == 0)
+							cg->Precond = new BiharPatchPreconditioner<Dim>(*gloScheme, BiharPatchPreconditioner<Dim>::Type::SingleFaceNeighbourhood, 0, args.Solver.NeighbourhoodDepth, false);
+						else if (args.Solver.BiHarmonicPreconditionerCode.compare("ds") == 0)
+							cg->Precond = new BiharPatchPreconditioner<Dim>(*gloScheme, BiharPatchPreconditioner<Dim>::Type::SingleFaceNeighbourhood, 0, args.Solver.NeighbourhoodDepth, true);
+						else if (args.Solver.BiHarmonicPreconditionerCode.compare("p") == 0)
+							cg->Precond = new BiharPatchPreconditioner<Dim>(*gloScheme, BiharPatchPreconditioner<Dim>::Type::FacePatchNeighbourhood, args.Solver.PatchSize, args.Solver.NeighbourhoodDepth, false);
+						else if (args.Solver.BiHarmonicPreconditionerCode.compare("dp") == 0)
+							cg->Precond = new BiharPatchPreconditioner<Dim>(*gloScheme, BiharPatchPreconditioner<Dim>::Type::FacePatchNeighbourhood, args.Solver.PatchSize, args.Solver.NeighbourhoodDepth, true);
 						else if (args.Solver.BiHarmonicPreconditionerCode.compare("no") == 0)
 							cg->Precond = new IdentityPreconditioner();
 						else

@@ -94,6 +94,7 @@ struct SolverArguments
 	MultigridArguments MG;
 	bool BiHarReconstructBoundary = false;
 	int NeighbourhoodDepth = 1;
+	int PatchSize = 3;
 };
 
 struct ExportArguments

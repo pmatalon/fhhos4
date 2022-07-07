@@ -234,27 +234,33 @@ void print_usage() {
 	cout << "-restart NUM" << endl;
 	cout << "      Iteration period to restart the algorithm (so far, used in bihar-cg only). Use 0 to disable." << endl;
 	cout << endl;
+	cout << "-iter-l2" << endl;
+	cout << "      Computes the L2-error at each iteration of the solver (when the solution is known)." << endl;
+	cout << endl;
 	cout << "-bihar-solver CODE" << endl;
 	cout << "      Iterative solver for the bi-harmonic problem." << endl;
-	cout << "              cg       - conjugate gradient" << endl;
-	cout << "              gd       - gradient descent" << endl;
+	cout << "              cg       - Conjugate Gradient" << endl;
+	cout << "              fcg      - Flexible Conjugate Gradient" << endl;
+	cout << "              gd       - Gradient Descent" << endl;
 	cout << endl;
 	cout << "-bihar-prec CODE" << endl;
 	cout << "      Preconditioner for the CG of the bi-harmonic problem." << endl;
-	cout << "              no       - no preconditioner" << endl;
+	cout << "              no       - NO preconditioner" << endl;
 	cout << "              j        - Jacobi (explicitly computes the matrix)" << endl;
-	cout << "              bj       - block Jacobi (explicitly computes the matrix)" << endl;
-	cout << "              p        - patch" << endl;
-	cout << "              dp       - diagonal patch" << endl;
-	cout << endl;
-	cout << "-iter-l2" << endl;
-	cout << "      Computes the L2-error at each iteration of the solver (when the solution is known)." << endl;
+	cout << "              bj       - Block Jacobi (explicitly computes the matrix)" << endl;
+	cout << "              s        - Single face neighbourhood (see also -nbh-depth)" << endl;
+	cout << "              ds       - Diagonal part of 's'" << endl;
+	cout << "              p        - face Patch neighbourhood (see also -patch-size and -nbh-depth)" << endl;
+	cout << "              dp       - Diagonal part of 'p'" << endl;
 	cout << endl;
 	cout << "-bihar-reconstruct-bry {0|1}" << endl;
 	cout << "      Reconstruct higher-order boundary during the iterative process of the bi-harmonic problem." << endl;
 	cout << endl;
 	cout << "-nbh-depth NUM" << endl;
-	cout << "      Depth of the neighbourhood for the preconditioners '-bihar-prec p' and 'dp'." << endl;
+	cout << "      Depth of the neighbourhood for the preconditioners '-bihar-prec [s|p]' and 'd[s|p]'." << endl;
+	cout << endl;
+	cout << "-patch-size NUM" << endl;
+	cout << "      Controls the size of the boundary face patch for the preconditioners '-bihar-prec p' and 'dp'." << endl;
 	cout << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << "                                 Multigrid                            " << endl;
@@ -671,6 +677,7 @@ int main(int argc, char* argv[])
 		OPT_GMSHLog,
 		OPT_IntegrationByParts,
 		OPT_NeighbourhoodDepth,
+		OPT_PatchSize,
 		// Developer options
 		OPT_Option1,
 		OPT_Option2,
@@ -752,9 +759,11 @@ int main(int argc, char* argv[])
 		 { "visu-max-refin", required_argument, NULL, OPT_VisuMaxRefinements },
 		 { "not-solve", no_argument, NULL, OPT_DoNotSolve },
 		 { "no-cache", no_argument, NULL, OPT_NoCache },
-		 { "ut", no_argument, NULL, OPT_UnitTests },
 		 { "gmsh-log", no_argument, NULL, OPT_GMSHLog },
 		 { "nbh-depth", required_argument, NULL, OPT_NeighbourhoodDepth },
+		 { "patch-size", required_argument, NULL, OPT_PatchSize },
+		 // Developer options
+		 { "ut", no_argument, NULL, OPT_UnitTests },
 		 { "opt1", required_argument, NULL, OPT_Option1 },
 		 { "opt2", required_argument, NULL, OPT_Option2 },
 		 { "dparam1", required_argument, NULL, OPT_DoubleParam1 },
@@ -1008,6 +1017,9 @@ int main(int argc, char* argv[])
 				break;
 			case OPT_NeighbourhoodDepth:
 				args.Solver.NeighbourhoodDepth = atoi(optarg);
+				break;
+			case OPT_PatchSize:
+				args.Solver.PatchSize = atoi(optarg);
 				break;
 
 			//---------------//

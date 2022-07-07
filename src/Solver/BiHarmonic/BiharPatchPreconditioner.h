@@ -11,8 +11,8 @@ class BiharPatchPreconditioner : public Preconditioner
 public:
 	enum class Type : unsigned
 	{
-		OneNeighbourhoodPerFace,
-		OneNeighbourhoodPerFacePatch
+		SingleFaceNeighbourhood,
+		FacePatchNeighbourhood
 	};
 private:
 	Diffusion_HHO<Dim>& _diffPb;
@@ -35,18 +35,25 @@ public:
 
 	void Serialize(ostream& os) const override
 	{
-		if (_blockDiagPrec)
-			os << "diagonal patch ";
-		else
-			os << "patch ";
-		os << "(neighbourhood depth = " << _neighbourhoodDepth << ")";
+		if (_type == Type::SingleFaceNeighbourhood)
+		{
+			if (_blockDiagPrec)
+				os << "diagonal ";
+			os << "single face neighbourhood (neighbourhood depth = " << _neighbourhoodDepth << ")";
+		}
+		else if (_type == Type::FacePatchNeighbourhood)
+		{
+			if (_blockDiagPrec)
+				os << "diagonal ";
+			os << "face patch neighbourhood (patch size = " << _facePatchSize << ", neighbourhood depth = " << _neighbourhoodDepth << ")";
+		}
 	}
 
 	void Setup(const DenseMatrix& A) override
 	{
-		if (_type == Type::OneNeighbourhoodPerFace)
+		if (_type == Type::SingleFaceNeighbourhood)
 			Setup1();
-		else if (_type == Type::OneNeighbourhoodPerFacePatch)
+		else if (_type == Type::FacePatchNeighbourhood)
 			Setup2();
 	}
 
@@ -135,11 +142,15 @@ private:
 				patches.emplace_back(f, isFaceInAPatch, nInteriorFaces, _facePatchSize);
 		}
 
-		for (auto p : patches)
+		if (Utils::ProgramArgs.Actions.PrintDebug)
 		{
-			for (auto f : p.Faces)
-				cout << f->Number - _diffPb.HHO->nInteriorFaces << " ";
-			cout << endl;
+			for (auto p : patches)
+			{
+				cout << "["
+				for (auto f : p.Faces)
+					cout << f->Number - _diffPb.HHO->nInteriorFaces << " ";
+				cout << "]" << endl;
+			}
 		}
 
 		ParallelLoop<BoundaryFacePatch<Dim>, CoeffsChunk> parallelLoop(patches);
