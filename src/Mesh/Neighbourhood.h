@@ -7,23 +7,23 @@ template <int Dim>
 class Neighbourhood : public Mesh<Dim>
 {
 public:
-	/*vector<Element<Dim>*> Elements;
-	vector<Face<Dim>*> Faces;
-	vector<Face<Dim>*> BoundaryFaces;
-	vector<Face<Dim>*> InteriorFaces;*/
-
 	// Builds the neighbourhood of an element with respect to shared vertices.
 	// If depth = 0, just the element e. If depth = 1, e + all its neighbours.
 	// If depth = 2, + all its neighbours' neighbours. Etc.
-	Neighbourhood(Element<Dim>* e, int depth = 1)
+	Neighbourhood(Element<Dim>* e, int depth) 
+		: Neighbourhood(vector<Element<Dim>*>{ e }, depth)
+	{}
+
+	Neighbourhood(vector<Element<Dim>*> elements, int depth)
 	{
 		set<Element<Dim>*> patch;
 		set<MeshVertex<Dim>*> boundaryVertices;
 		set<Face<Dim>*> boundaryFaces;
 		set<Face<Dim>*> interiorFaces;
 
-		AddToPatch(e, patch, boundaryVertices, boundaryFaces, interiorFaces);
-		
+		for (Element<Dim>* e : elements)
+			AddToPatch(e, patch, boundaryVertices, boundaryFaces, interiorFaces);
+
 		for (int i = 0; i < depth; i++)
 			AddOneLayer(patch, boundaryVertices, boundaryFaces, interiorFaces);
 

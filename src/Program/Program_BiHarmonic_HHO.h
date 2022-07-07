@@ -55,6 +55,13 @@ public:
 
 		cout << "Mesh storage > " << Utils::MemoryString(mesh->MemoryUsage()) << endl;
 
+		// Export mesh
+		if (args.Actions.Export.MeshToMatlab)
+		{
+			mesh->ExportToMatlab(args.OutputDirectory);
+			mesh->ExportToMatlab2(args.OutputDirectory + "/mesh.m");
+		}
+
 		// Export source
 		if (args.Actions.Export.SourceToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
 			dynamic_cast<GMSHMesh<Dim>*>(mesh)->ExportToGMSH_Elements(testCase->SourceFunction, args.OutputDirectory + "/source", "source");
@@ -197,7 +204,8 @@ public:
 			{
 				cout << "Explicit computation of the matrix..." << endl;
 				A = biHarPb->Matrix();
-				//cout << "Matrix: " << endl << A << endl << endl;
+				if (Utils::ProgramArgs.Actions.Option1 == 1)
+					cout << "Matrix: " << std::scientific << std::setprecision(1) << endl << A << endl << endl;
 
 				if (args.Actions.Export.LinearSystem)
 				{
@@ -289,10 +297,14 @@ public:
 							cg->Precond = new DenseBlockJacobiPreconditioner(1);
 						else if (args.Solver.BiHarmonicPreconditionerCode.compare("bj") == 0)
 							cg->Precond = new DenseBlockJacobiPreconditioner(hho->nFaceUnknowns);
-						else if (args.Solver.BiHarmonicPreconditionerCode.compare("p") == 0)
-							cg->Precond = new BiharPatchPreconditioner<Dim>(*gloScheme, args.Solver.NeighbourhoodDepth);
-						else if (args.Solver.BiHarmonicPreconditionerCode.compare("dp") == 0)
-							cg->Precond = new BiharPatchPreconditioner<Dim>(*gloScheme, args.Solver.NeighbourhoodDepth, true);
+						else if (args.Solver.BiHarmonicPreconditionerCode.compare("p1") == 0)
+							cg->Precond = new BiharPatchPreconditioner<Dim>(*gloScheme, BiharPatchPreconditioner<Dim>::Type::OneNeighbourhoodPerFace, 0, args.Solver.NeighbourhoodDepth, false);
+						else if (args.Solver.BiHarmonicPreconditionerCode.compare("dp1") == 0)
+							cg->Precond = new BiharPatchPreconditioner<Dim>(*gloScheme, BiharPatchPreconditioner<Dim>::Type::OneNeighbourhoodPerFace, 0, args.Solver.NeighbourhoodDepth, true);
+						else if (args.Solver.BiHarmonicPreconditionerCode.compare("p2") == 0)
+							cg->Precond = new BiharPatchPreconditioner<Dim>(*gloScheme, BiharPatchPreconditioner<Dim>::Type::OneNeighbourhoodPerFacePatch, 6, args.Solver.NeighbourhoodDepth, false);
+						else if (args.Solver.BiHarmonicPreconditionerCode.compare("dp2") == 0)
+							cg->Precond = new BiharPatchPreconditioner<Dim>(*gloScheme, BiharPatchPreconditioner<Dim>::Type::OneNeighbourhoodPerFacePatch, 6, args.Solver.NeighbourhoodDepth, true);
 						else if (args.Solver.BiHarmonicPreconditionerCode.compare("no") == 0)
 							cg->Precond = new IdentityPreconditioner();
 						else
@@ -442,12 +454,6 @@ public:
 
 			if (args.Actions.Export.SolutionVectors)
 				out.ExportVector(reconstructedSolution, "solutionHigherOrder");
-
-			if (args.Actions.Export.MeshToMatlab)
-			{
-				mesh->ExportToMatlab(args.OutputDirectory);
-				mesh->ExportToMatlab2(args.OutputDirectory + "/mesh.m");
-			}
 
 			if (args.Actions.Export.SolutionToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
 				biHarPb->DiffPb().ExportReconstructedVectorToGMSH(reconstructedSolution, out, "solution", args.Actions.Export.VisuTolerance, args.Actions.Export.VisuMaxRefinements);

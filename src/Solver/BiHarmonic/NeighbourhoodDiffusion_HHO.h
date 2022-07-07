@@ -253,21 +253,21 @@ public:
 
 	// Right-hand side
 
-	Vector ComputeB_T_zeroSource(const Vector& x_dF)
+	Vector ComputeB_T_zeroSource(const Vector& x_dF) const
 	{
 		assert(x_dF.rows() == _nbh.BoundaryFaces.size() * _diffPb.HHO->nFaceUnknowns);
 
 		return -A_T_dF * x_dF;
 	}
 
-	Vector ComputeB_ndF_noNeumann(const Vector& x_dF)
+	Vector ComputeB_ndF_noNeumann(const Vector& x_dF) const
 	{
 		assert(x_dF.rows() == _nbh.BoundaryFaces.size() * _diffPb.HHO->nFaceUnknowns);
 
 		return -A_ndF_dF * x_dF;
 	}
 
-	Vector CondensedRHS(const Vector& b_T, const Vector& b_ndF)
+	Vector CondensedRHS(const Vector& b_T, const Vector& b_ndF) const
 	{
 		return b_ndF - A_T_ndF.transpose() * Solve_A_T_T(b_T);
 	}
@@ -281,7 +281,7 @@ public:
 
 
 
-	Vector SolveCellUnknowns(const Vector& faceUnknowns, const Vector& b_T)
+	Vector SolveCellUnknowns(const Vector& faceUnknowns, const Vector& b_T) const
 	{
 		int nCellUnknowns = _diffPb.HHO->nCellUnknowns;
 
@@ -291,7 +291,7 @@ public:
 		return Solve_A_T_T(b_T - A_T_ndF * faceUnknowns);
 	}
 
-	Vector Solve_A_T_T(const Vector& v)
+	Vector Solve_A_T_T(const Vector& v) const
 	{
 		int nCellUnknowns = _diffPb.HHO->nCellUnknowns;
 
