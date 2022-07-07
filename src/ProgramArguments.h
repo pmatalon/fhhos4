@@ -126,6 +126,7 @@ struct ActionsArguments
 	bool InitReferenceShapes = true;
 	bool UnitTests = false;
 	bool GMSHLogEnabled = false;
+	bool PrintDebug = false;
 	int Option1 = 0;
 	int Option2 = 0;
 	double DoubleParam1 = 0.0;

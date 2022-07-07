@@ -100,7 +100,7 @@ private:
 		//SparseMatrix matT = mat.triangularView<Eigen::StrictlyLower>().transpose();
 		//mat = mat.triangularView<Eigen::Lower>() + matT;
 
-		if (Utils::ProgramArgs.Actions.Option1 == 1)
+		if (Utils::ProgramArgs.Actions.PrintDebug)
 			cout << "Preconditioner matrix:" << endl << DenseMatrix(mat) << endl << endl;
 
 		if (_blockDiagPrec)
@@ -211,7 +211,7 @@ private:
 		SparseMatrix mat(_diffPb.HHO->nBoundaryFaces * _diffPb.HHO->nFaceUnknowns, _diffPb.HHO->nBoundaryFaces * _diffPb.HHO->nFaceUnknowns);
 		parallelLoop.Fill(mat);
 
-		if (Utils::ProgramArgs.Actions.Option1 == 1)
+		if (Utils::ProgramArgs.Actions.PrintDebug)
 			cout << "Preconditioner matrix:" << endl << DenseMatrix(mat) << endl << endl;
 
 		if (_blockDiagPrec)

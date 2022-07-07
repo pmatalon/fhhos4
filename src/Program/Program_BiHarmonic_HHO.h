@@ -204,7 +204,7 @@ public:
 			{
 				cout << "Explicit computation of the matrix..." << endl;
 				A = biHarPb->Matrix();
-				if (Utils::ProgramArgs.Actions.Option1 == 1)
+				if (Utils::ProgramArgs.Actions.PrintDebug)
 					cout << "Matrix: " << std::scientific << std::setprecision(1) << endl << A << endl << endl;
 
 				if (args.Actions.Export.LinearSystem)

@@ -509,8 +509,15 @@ void print_usage() {
 	cout << "-gmsh-log" << endl;
 	cout << "      Enable GMSH to log in the console." << endl;
 	cout << endl;
+	cout << "----------------------------------------------------------------------" << endl;
+	cout << "                           Developer options                          " << endl;
+	cout << "----------------------------------------------------------------------" << endl;
+	cout << endl;
 	cout << "-ut" << endl;
 	cout << "      Run unit tests." << endl;
+	cout << endl;
+	cout << "-print-debug" << endl;
+	cout << "      Enables additional printing." << endl;
 	cout << endl;
 	cout << "-opt1 NUM" << endl;
 	cout << "      Developer option to choose variants of code. -opt2 also available." << endl;
@@ -664,9 +671,11 @@ int main(int argc, char* argv[])
 		OPT_GMSHLog,
 		OPT_IntegrationByParts,
 		OPT_NeighbourhoodDepth,
+		// Developer options
 		OPT_Option1,
 		OPT_Option2,
 		OPT_DoubleParam1,
+		OPT_PrintDebug,
 	};
 
 	static struct option long_opts[] = {
@@ -749,6 +758,7 @@ int main(int argc, char* argv[])
 		 { "opt1", required_argument, NULL, OPT_Option1 },
 		 { "opt2", required_argument, NULL, OPT_Option2 },
 		 { "dparam1", required_argument, NULL, OPT_DoubleParam1 },
+		 { "print-debug", no_argument, NULL, OPT_PrintDebug },
 		 { NULL, 0, NULL, 0 }
 	};
 
@@ -1334,9 +1344,6 @@ int main(int argc, char* argv[])
 			case OPT_NoCache:
 				args.Actions.UseCache = false;
 				break;
-			case OPT_UnitTests:
-				args.Actions.UnitTests = true;
-				break;
 			case OPT_GMSHLog:
 				args.Actions.GMSHLogEnabled = true;
 				break;
@@ -1349,6 +1356,14 @@ int main(int argc, char* argv[])
 			case OPT_VisuMaxRefinements:
 				args.Actions.Export.VisuMaxRefinements = atoi(optarg);
 				break;
+
+			//-----------------------------//
+			//      Developer options      //
+			//-----------------------------//
+
+			case OPT_UnitTests:
+				args.Actions.UnitTests = true;
+				break;
 			case OPT_Option1:
 				args.Actions.Option1 = atoi(optarg);
 				break;
@@ -1357,6 +1372,9 @@ int main(int argc, char* argv[])
 				break;
 			case OPT_DoubleParam1:
 				args.Actions.DoubleParam1 = atof(optarg);
+				break;
+			case OPT_PrintDebug:
+				args.Actions.PrintDebug = true;
 				break;
 			default:
 			{
