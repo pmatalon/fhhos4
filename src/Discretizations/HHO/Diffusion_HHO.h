@@ -1287,7 +1287,7 @@ void Diffusion_HHO<1>::InitReferenceShapes(HHOParameters<1>* hho, DiffusionField
 
 	// Faces
 	if (hho->OrthogonalizeFaceBases())
-		CartesianShape<1, 0>::InitReferenceShape()->Orthogonalize(faceBasis, hho->NElemOrthogonalizations(), hho->OrthonormalizeElemBases());
+		CartesianShape<1, 0>::InitReferenceShape()->Orthogonalize(faceBasis, hho->NFaceOrthogonalizations(), hho->OrthonormalizeFaceBases());
 	else
 		CartesianShape<1, 0>::InitReferenceShape()->ComputeAndStoreMassMatrix(faceBasis);
 }
@@ -1345,8 +1345,8 @@ void Diffusion_HHO<2>::InitReferenceShapes(HHOParameters<2>* hho, DiffusionField
 	// Faces
 	if (hho->OrthogonalizeFaceBases())
 	{
-		Segment::InitReferenceShape()->Orthogonalize(faceBasis, hho->NElemOrthogonalizations(), hho->OrthonormalizeElemBases());
-		CartesianShape<2, 1>::InitReferenceShape()->Orthogonalize(faceBasis, hho->NElemOrthogonalizations(), hho->OrthonormalizeElemBases());
+		Segment::InitReferenceShape()->Orthogonalize(faceBasis, hho->NFaceOrthogonalizations(), hho->OrthonormalizeFaceBases());
+		CartesianShape<2, 1>::InitReferenceShape()->Orthogonalize(faceBasis, hho->NFaceOrthogonalizations(), hho->OrthonormalizeFaceBases());
 	}
 	else
 	{
@@ -1405,9 +1405,9 @@ void Diffusion_HHO<3>::InitReferenceShapes(HHOParameters<3>* hho, DiffusionField
 	// Faces
 	if (hho->OrthogonalizeFaceBases())
 	{
-		Triangle::InitReferenceShape()->Orthogonalize(faceBasis, hho->NElemOrthogonalizations(), hho->OrthonormalizeElemBases());
-		Quadrilateral::InitReferenceShape()->Orthogonalize(faceBasis, hho->NElemOrthogonalizations(), hho->OrthonormalizeElemBases());
-		CartesianShape<3, 2>::InitReferenceShape()->Orthogonalize(faceBasis, hho->NElemOrthogonalizations(), hho->OrthonormalizeElemBases());
+		Triangle::InitReferenceShape()->Orthogonalize(faceBasis, hho->NFaceOrthogonalizations(), hho->OrthonormalizeFaceBases());
+		Quadrilateral::InitReferenceShape()->Orthogonalize(faceBasis, hho->NFaceOrthogonalizations(), hho->OrthonormalizeFaceBases());
+		CartesianShape<3, 2>::InitReferenceShape()->Orthogonalize(faceBasis, hho->NFaceOrthogonalizations(), hho->OrthonormalizeFaceBases());
 	}
 	else
 	{
