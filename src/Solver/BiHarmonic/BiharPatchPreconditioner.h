@@ -146,7 +146,7 @@ private:
 		{
 			for (auto p : patches)
 			{
-				cout << "["
+				cout << "[";
 				for (auto f : p.Faces)
 					cout << f->Number - _diffPb.HHO->nInteriorFaces << " ";
 				cout << "]" << endl;
