@@ -190,7 +190,7 @@ public:
 			// We want to solve A(theta0) = u_boundary_f, in order to have
 			// theta = theta_f+theta0 with
 			//         A(theta) = Af(theta_f) + A(theta0) = -u_boundary_f + u_boundary_f = 0.
-			Vector g_N = biHarPb->DiffPb().BoundarySpace.Project(testCase->NeumannBC.NeumannFunction);
+			Vector g_N = biHarPb->DiffPb().BoundarySpace.InnerProdWithBasis(testCase->NeumannBC.NeumannFunction);
 			Vector b = u_boundary_f - g_N;
 
 			//biHarPb->DiffPb().ExportReconstructedVectorToGMSH(biHarPb->Solve2ndDiffProblem(lambda_f, false), out, "u_f", args.Actions.Export.VisuTolerance, args.Actions.Export.VisuMaxRefinements);

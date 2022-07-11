@@ -65,17 +65,16 @@ public:
 		//this->ComputeAndSaveQuadraturePoints();
 
 		if (hho->OrthogonalizeFaceBases())
-		{
 			this->Basis = new OrthogonalBasis<Dim - 1>(HHO->FaceBasis, this->MeshFace->Shape(), hho->NFaceOrthogonalizations(), hho->OrthonormalizeFaceBases());
-			//this->_massMatrix = this->MeshFace->Shape()->MassMatrix(this->Basis);
-			//cout << "mass matrix: " << endl << _massMatrix << endl;
-		}
 		else
 		{
 			this->Basis = hho->FaceBasis;
 			this->_massMatrix = this->MeshFace->Shape()->MassMatrix(this->Basis);
 			this->_massMatrixSolver = this->_massMatrix.llt();
 		}
+
+		//cout << "Mass matrix (computed): " << endl << this->MeshFace->Shape()->ComputeAndReturnMassMatrix(this->Basis) << endl;
+		//cout << "Mass matrix (applied): " << endl << this->MassMatrix(this->Basis) << endl;
 	}
 
 	DenseMatrix MassMatrix()
@@ -149,7 +148,7 @@ public:
 		return this->MeshFace->Integral(functionToIntegrate, polynomialDegree);
 	}
 
-private:
+/*private:
 	double NormalDerivativeTerm(BasisFunction<Dim - 1>* facePhi, Element<Dim>* element, BasisFunction<Dim>* cellPhi, const DimVector<Dim>& n)
 	{
 		if (cellPhi->GetDegree() == 0)
@@ -161,7 +160,7 @@ private:
 
 		int polynomialDegree = facePhi->GetDegree() + cellPhi->GetDegree() - 1;
 		return this->MeshFace->Integral(functionToIntegrate, polynomialDegree);
-	}
+	}*/
 
 public:
 	DenseMatrix MassMatrix(FunctionalBasis<Dim - 1>* other)
@@ -184,7 +183,7 @@ public:
 		return SolveMassMatrix(massFaceCell);
 	}
 
-	DenseMatrix NormalDerivative(Element<Dim>* element, FunctionalBasis<Dim>* cellBasis)
+	/*DenseMatrix NormalDerivative(Element<Dim>* element, FunctionalBasis<Dim>* cellBasis)
 	{
 		DenseMatrix M(this->Basis->Size(), cellBasis->Size());
 
@@ -198,7 +197,7 @@ public:
 			}
 		}
 		return SolveMassMatrix(M);
-	}
+	}*/
 
 	double Integral(const Vector& coeffs)
 	{

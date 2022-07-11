@@ -150,7 +150,8 @@ public:
 			BigNumber nBdryCellUnknowns = _mesh->BoundaryElements.size() * HHO->nCellUnknowns;
 			Vector sourceElemBoundary = _diffPb.ExtractElemBoundary(source);
 			Vector normalDerivative = _NormalDerStiff_interior * faceSolution + _NormalDerStiff_boundary * _g_D - _NormalDerMass * sourceElemBoundary;
-			return _diffPb.BoundarySpace.SolveMassMatrix(normalDerivative);
+			//return _diffPb.BoundarySpace.SolveMassMatrix(normalDerivative);
+			return normalDerivative;
 		}
 		else
 			return _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, _g_D, b_T);
@@ -171,7 +172,8 @@ public:
 		BigNumber nBdryCellUnknowns = _mesh->BoundaryElements.size() * HHO->nCellUnknowns;
 		Vector sourceElemBoundary = _diffPb.ExtractElemBoundary(source);
 		Vector normalDerivative = _NormalDerStiff_interior * faceSolution - _NormalDerMass * sourceElemBoundary;
-		return _diffPb.BoundarySpace.SolveMassMatrix(normalDerivative);
+		//return _diffPb.BoundarySpace.SolveMassMatrix(normalDerivative);
+		return normalDerivative;
 	}
 
 	double L2InnerProdOnBoundary(const Vector& v1, const Vector& v2) override

@@ -283,7 +283,8 @@ private:
 
 		// Normal derivative
 		Vector normalDerivative = normalDerStiff * faceSolution - normalDerMass * lambda;
-		return -nbhDiff.SolveFaceMassMatrixOnBoundary(normalDerivative);
+		//return -nbhDiff.SolveFaceMassMatrixOnBoundary(normalDerivative);
+		return -normalDerivative;
 	}
 
 public:

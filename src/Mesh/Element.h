@@ -279,6 +279,9 @@ public:
 	inline int LocalNumberOf(Face<Dim>* face)
 	{
 		return this->_facesLocalNumbering[face];
+		/*auto it = find(Faces.begin(), Faces.end(), face);
+		assert(it != Faces.end());
+		return it - Faces.begin();*/
 	}
 
 	Element<Dim>* ElementOnTheOtherSideOf(Face<Dim>* face)
