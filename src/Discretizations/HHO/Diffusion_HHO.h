@@ -1329,17 +1329,25 @@ void Diffusion_HHO<2>::InitReferenceShapes(HHOParameters<2>* hho, DiffusionField
 		Quadrilateral::InitReferenceShape()->ComputeAndStoreMassMatrix(cellBasis);
 		Quadrilateral::InitReferenceShape()->ComputeAndStoreMassMatrix(reconstructionBasis);
 		Quadrilateral::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix(cellBasis, reconstructionBasis);
+		CartesianShape<2>::InitReferenceShape()->ComputeAndStoreMassMatrix(cellBasis);
+		CartesianShape<2>::InitReferenceShape()->ComputeAndStoreMassMatrix(reconstructionBasis);
+		CartesianShape<2>::InitReferenceShape()->ComputeAndStoreCellReconstructMassMatrix(cellBasis, reconstructionBasis);
 		// Stiffness matrices
 		Triangle::InitReferenceShape()->ComputeAndStoreStiffnessMatrices(reconstructionBasis);
 		Quadrilateral::InitReferenceShape()->ComputeAndStoreStiffnessMatrices(reconstructionBasis);
+		CartesianShape<2>::InitReferenceShape()->ComputeAndStoreStiffnessMatrices(reconstructionBasis);
 		if (diffField)
 		{
 			for (auto K : diffField->Tensors())
+			{
 				Quadrilateral::InitReferenceShape()->ComputeAndStoreReconstructStiffnessMatrix(*K, reconstructionBasis);
+				CartesianShape<2>::InitReferenceShape()->ComputeAndStoreReconstructStiffnessMatrix(*K, reconstructionBasis);
+			}
 		}
 		// Integrals
 		Triangle::InitReferenceShape()->ComputeAndStoreIntegralVector(reconstructionBasis);
 		Quadrilateral::InitReferenceShape()->ComputeAndStoreIntegralVector(reconstructionBasis);
+		CartesianShape<2>::InitReferenceShape()->ComputeAndStoreIntegralVector(reconstructionBasis);
 	}
 
 	// Faces
