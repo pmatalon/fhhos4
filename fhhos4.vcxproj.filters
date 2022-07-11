@@ -616,6 +616,9 @@
     <ClInclude Include="src\Solver\BiHarmonic\BoundaryFacePatch.h">
       <Filter>Solver\BiHarmonic</Filter>
     </ClInclude>
+    <ClInclude Include="src\TestCases\BiHarmonic\BiHarDefaultTestCase.h">
+      <Filter>TestCases\BiHarmonic</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

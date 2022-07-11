@@ -1,4 +1,5 @@
 #pragma once
+#include "BiHarDefaultTestCase.h"
 #ifdef ENABLE_2D
 	#include "2D/SquareBiHarTestCase.h"
 #endif
@@ -29,10 +30,12 @@ BiHarmonicTestCase<1>* BiHarTestCaseFactory<1>::Create(ProblemArguments pb)
 template <>
 BiHarmonicTestCase<2>* BiHarTestCaseFactory<2>::Create(ProblemArguments pb)
 {
+	if (pb.TestCaseCode.compare("default") == 0)
+		return new BiHarDefaultTestCase<2>(pb);
 	if (pb.TestCaseCode.compare("square") == 0)
 		return new SquareBiHarTestCase(pb);
 
-	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 2D. Check -tc argument.");
+	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 2D. Check -tc argument or use '-tc default'.");
 	return nullptr;
 }
 #endif // ENABLE_2D
@@ -42,10 +45,12 @@ BiHarmonicTestCase<2>* BiHarTestCaseFactory<2>::Create(ProblemArguments pb)
 template <>
 BiHarmonicTestCase<3>* BiHarTestCaseFactory<3>::Create(ProblemArguments pb)
 {
+	if (pb.TestCaseCode.compare("default") == 0)
+		return new BiHarDefaultTestCase<3>(pb);
 	if (pb.TestCaseCode.compare("cube") == 0)
 		return new CubeBiHarTestCase(pb);
 
-	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 3D. Check -tc argument.");
+	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 3D. Check -tc argument or use '-tc default'.");
 	return nullptr;
 }
 #endif // ENABLE_3D
