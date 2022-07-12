@@ -52,13 +52,13 @@ public:
 	void Setup(const DenseMatrix& A) override
 	{
 		if (_type == Type::SingleFaceNeighbourhood)
-			Setup1();
+			Setup1(A);
 		else if (_type == Type::FacePatchNeighbourhood)
-			Setup2();
+			Setup2(A);
 	}
 
 private:
-	void Setup1()
+	void Setup1(const DenseMatrix& A)
 	{
 		ExportModule out(Utils::ProgramArgs.OutputDirectory, "", Utils::ProgramArgs.Actions.Export.ValueSeparator);
 
@@ -108,7 +108,13 @@ private:
 		//mat = mat.triangularView<Eigen::Lower>() + matT;
 
 		if (Utils::ProgramArgs.Actions.PrintDebug)
-			cout << "Preconditioner matrix:" << endl << DenseMatrix(mat) << endl << endl;
+		{
+			if (Dim <= 2)
+				cout << "Preconditioner matrix:" << endl << DenseMatrix(mat) << endl << endl;
+			else
+				cout << "Preconditioner matrix:" << endl << DenseMatrix(mat.topLeftCorner(3 * _diffPb.HHO->nFaceUnknowns, 3 * _diffPb.HHO->nFaceUnknowns)) << endl << endl;
+			cout << "||A-mat|| = " << (A - DenseMatrix(mat)).norm() << endl;
+		}
 
 		if (_blockDiagPrec)
 		{
@@ -125,7 +131,7 @@ private:
 			_solver.Setup(mat);
 	}
 
-	void Setup2()
+	void Setup2(const DenseMatrix& A)
 	{
 		vector<BoundaryFacePatch<Dim>> patches;
 		patches.reserve(_diffPb._mesh->BoundaryFaces.size() / _facePatchSize);
@@ -223,7 +229,14 @@ private:
 		parallelLoop.Fill(mat);
 
 		if (Utils::ProgramArgs.Actions.PrintDebug)
-			cout << "Preconditioner matrix:" << endl << DenseMatrix(mat) << endl << endl;
+		{
+			if (Dim <= 2)
+				cout << "Preconditioner matrix:" << endl << DenseMatrix(mat) << endl << endl;
+			else
+				cout << "Preconditioner matrix:" << endl << DenseMatrix(mat.topLeftCorner(3 * _diffPb.HHO->nFaceUnknowns, 3 * _diffPb.HHO->nFaceUnknowns)) << endl << endl;
+			cout << "Condition number = " << Utils::Cond(DenseMatrix(mat)) << endl;
+			cout << "||A-mat|| = " << (A - DenseMatrix(mat)).norm() << endl;
+		}
 
 		if (_blockDiagPrec)
 		{

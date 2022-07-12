@@ -5,18 +5,18 @@ class RectangularFace : public CartesianFace<3>
 {
 public:
 
-	RectangularFace(BigNumber number, Vertex* origin, Vertex* v2, Vertex* v3, Element<3>* element1, Element<3>* element2, CartesianShapeOrientation orientation) :
+	RectangularFace(BigNumber number, Vertex* origin, Vertex* v2, Vertex* v3, Vertex* v4, Element<3>* element1, Element<3>* element2, CartesianShapeOrientation orientation) :
 		Face(number, element1, element2), 
 		CartesianFace(number, origin, firstWidth(origin, v2, orientation), secondWidth(origin, v3, orientation), element1, element2, orientation)
 	{
-		// TODO: add vertices to the shape
+		this->SetVertices({ origin, v2, v3, v4 });
 	}
 
-	RectangularFace(BigNumber number, Vertex* origin, Vertex* v2, Vertex* v3, Element<3>* element1, CartesianShapeOrientation orientation) :
+	RectangularFace(BigNumber number, Vertex* origin, Vertex* v2, Vertex* v3, Vertex* v4, Element<3>* element1, CartesianShapeOrientation orientation) :
 		Face(number, element1), 
 		CartesianFace(number, origin, firstWidth(origin, v2, orientation), secondWidth(origin, v3, orientation), element1, NULL, orientation)
 	{
-		// TODO: add vertices to the shape
+		this->SetVertices({ origin, v2, v3, v4 });
 	}
 
 private:

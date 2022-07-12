@@ -100,6 +100,14 @@ public:
 		v = Vector(0);
 	}
 
+	static double Cond(const DenseMatrix& A)
+	{
+		Eigen::EigenSolver<DenseMatrix> es(A);
+		Eigen::VectorXcd eigenvalues = es.eigenvalues();
+		auto realEigenvalues = eigenvalues.real();
+		return realEigenvalues.maxCoeff() / realEigenvalues.minCoeff();
+	}
+
 	//------------//
 	//   Memory   //
 	//------------//

@@ -205,7 +205,12 @@ public:
 				cout << "Explicit computation of the matrix..." << endl;
 				A = biHarPb->Matrix();
 				if (Utils::ProgramArgs.Actions.PrintDebug)
-					cout << "Matrix: " << std::scientific << std::setprecision(1) << endl << A << endl << endl;
+				{
+					if (Dim <= 2)
+						cout << "Matrix: " << std::scientific << std::setprecision(1) << endl << A << endl << endl;
+					else
+						cout << "Matrix: " << std::scientific << std::setprecision(1) << endl << A.topLeftCorner(3 * hho->nFaceUnknowns, 3 * hho->nFaceUnknowns) << endl << endl;
+				}
 
 				if (args.Actions.Export.LinearSystem)
 				{

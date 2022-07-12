@@ -30,6 +30,8 @@ private:
 		patch.insert(f);
 		isFaceInAPatch[f->Number - nInteriorFaces] = true;
 
+		assert(!f->Vertices().empty());
+
 		// Manage vertices
 		for (Vertex* v : f->Vertices())
 		{

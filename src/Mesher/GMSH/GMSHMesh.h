@@ -1684,6 +1684,7 @@ void GMSHMesh<3>::CreateFaces(int elemType, BigNumber& faceNumber)
 			Vertex* origin;
 			Vertex* vertex1;
 			Vertex* vertex2;
+			Vertex* vertex3;
 
 			DimVector<3> v12 = Vect<3>(v1, v2);
 			DimVector<3> v13 = Vect<3>(v1, v3);
@@ -1701,6 +1702,7 @@ void GMSHMesh<3>::CreateFaces(int elemType, BigNumber& faceNumber)
 				origin = v4;
 				vertex1 = v3;
 				vertex2 = v1;
+				vertex3 = v2;
 			}
 			else if (abs(v12.dot(unitZ)) < 1e-14 && abs(v13.dot(unitZ)) < 1e-14)
 			{
@@ -1720,32 +1722,36 @@ void GMSHMesh<3>::CreateFaces(int elemType, BigNumber& faceNumber)
 				origin = v1;
 				vertex1 = v4;
 				vertex2 = v2;
+				vertex3 = v3;
 			}
 			else if (minNorm == OV2.norm())
 			{
 				origin = v2;
 				vertex1 = v3;
 				vertex2 = v1;
+				vertex3 = v4;
 			}
 			else if (minNorm == OV3.norm())
 			{
 				origin = v3;
 				vertex1 = v2;
 				vertex2 = v4;
+				vertex3 = v1;
 			}
 			else if (minNorm == OV4.norm())
 			{
 				origin = v4;
 				vertex1 = v1;
 				vertex2 = v3;
+				vertex3 = v2;
 			}
 			else
 				assert(false);
 
 			if (neighbours.size() == 1)
-				face = new RectangularFace(faceNumber++, origin, vertex1, vertex2, neighbours[0], orientation);
+				face = new RectangularFace(faceNumber++, origin, vertex1, vertex2, vertex3, neighbours[0], orientation);
 			else if (neighbours.size() == 2)
-				face = new RectangularFace(faceNumber++, origin, vertex1, vertex2, neighbours[0], neighbours[1], orientation);
+				face = new RectangularFace(faceNumber++, origin, vertex1, vertex2, vertex3, neighbours[0], neighbours[1], orientation);
 		}
 		else
 			assert(false);

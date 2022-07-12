@@ -284,7 +284,9 @@ public:
 		int sizeWork = 8;
 		int sizeMatVec = 8;
 
-		MFlops oneFineMatVec = Cost::MatVec(*solver->Matrix) * 1e-6;
+		MFlops oneFineMatVec = 1;
+		if (solver->Matrix)
+			oneFineMatVec = Cost::MatVec(*solver->Matrix) * 1e-6;
 
 		cout << "        |   CPU time   | Elapsed time ";
 		if (iterativeSolver != nullptr)
