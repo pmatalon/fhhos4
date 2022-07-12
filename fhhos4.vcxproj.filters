@@ -619,6 +619,9 @@
     <ClInclude Include="src\TestCases\BiHarmonic\BiHarDefaultTestCase.h">
       <Filter>TestCases\BiHarmonic</Filter>
     </ClInclude>
+    <ClInclude Include="src\Solver\Direct\EigenCholesky.h">
+      <Filter>Solver\Direct</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

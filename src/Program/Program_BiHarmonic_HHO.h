@@ -198,7 +198,7 @@ public:
 
 
 			DenseMatrix A; // computed explicitly only if explicit solver or export requested
-			if (args.Solver.BiHarmonicSolverCode.compare("lu") == 0  || 
+			if (args.Solver.BiHarmonicSolverCode.compare("lu") == 0  || args.Solver.BiHarmonicSolverCode.compare("ch") == 0 ||
 				(args.Solver.BiHarmonicSolverCode.compare("cg") == 0 && (args.Solver.BiHarmonicPreconditionerCode.compare("j") == 0 || args.Solver.BiHarmonicPreconditionerCode.compare("bj") == 0)) ||
 				args.Actions.Export.LinearSystem)
 			{
@@ -249,6 +249,8 @@ public:
 				biHarSolver = new BiHarmonicGradientDescent(biHarPb);
 			else if (args.Solver.BiHarmonicSolverCode.compare("lu") == 0)
 				biHarSolver = new EigenLU();
+			else if (args.Solver.BiHarmonicSolverCode.compare("ch") == 0)
+				biHarSolver = new EigenCholesky();
 			else
 				Utils::FatalError("Unknown biharmonic solver '" + args.Solver.BiHarmonicSolverCode + "'");
 

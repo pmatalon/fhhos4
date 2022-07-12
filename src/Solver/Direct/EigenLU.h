@@ -28,13 +28,8 @@ public:
 		_solver.compute(A);
 		//this->SetupComputationalWork = Cost::LUFactorization(A)*1e-6;
 
-		/*Eigen::ComputationInfo info = _solver.info();
-		if (info != Eigen::ComputationInfo::Success)
-		{
-			//cout << "----------------- A -------------------" << A << endl;
-			cout << "Error: FullPivLU failed to execute with the code " << info << ": " << _solver.lastErrorMessage() << endl;
-			exit(EXIT_FAILURE);
-		}*/
+		if (_solver.isInvertible())
+			Utils::FatalError("Error Eigen::FullPivLU: the matrix is not invertible");
 	}
 
 	Vector Solve(const Vector& b) override
