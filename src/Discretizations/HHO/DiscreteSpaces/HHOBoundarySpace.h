@@ -49,7 +49,7 @@ public:
 
 	Vector InnerProdWithBasis(DomFunction func) override
 	{
-		Vector innerProds = Vector(HHO->nBoundaryFaces * HHO->nFaceUnknowns);
+		Vector innerProds = Vector(Dimension());
 		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->BoundaryFaces, [this, &innerProds, func](Face<Dim>* f)
 			{
 				Diff_HHOFace<Dim>* face = HHOFace(f);
@@ -61,9 +61,23 @@ public:
 		return innerProds;
 	}
 
+	Vector ApplyMassMatrix(const Vector& v) override
+	{
+		assert(v.rows() == Dimension());
+		Vector res(v.rows());
+		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->BoundaryFaces, [this, &v, &res](Face<Dim>* f)
+			{
+				Diff_HHOFace<Dim>* face = HHOFace(f);
+				BigNumber i = (face->Number() - HHO->nInteriorFaces) * HHO->nFaceUnknowns;
+
+				res.segment(i, HHO->nFaceUnknowns) = face->ApplyMassMatrix(v.segment(i, HHO->nFaceUnknowns));
+			});
+		return res;
+	}
+
 	Vector SolveMassMatrix(const Vector& v) override
 	{
-		assert(v.rows() == HHO->nBoundaryFaces * HHO->nFaceUnknowns);
+		assert(v.rows() == Dimension());
 		Vector res(v.rows());
 		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->BoundaryFaces, [this, &v, &res](Face<Dim>* f)
 			{
@@ -77,7 +91,7 @@ public:
 
 	Vector Project(DomFunction func) override
 	{
-		Vector vectorOfDoFs = Vector(HHO->nBoundaryFaces * HHO->nFaceUnknowns);
+		Vector vectorOfDoFs = Vector(Dimension());
 		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->BoundaryFaces, [this, &vectorOfDoFs, func](Face<Dim>* f)
 			{
 				Diff_HHOFace<Dim>* face = HHOFace(f);
@@ -91,8 +105,8 @@ public:
 
 	double L2InnerProd(const Vector& v1, const Vector& v2) override
 	{
-		assert(v1.rows() == HHO->nBoundaryFaces * HHO->nFaceUnknowns);
-		assert(v2.rows() == HHO->nBoundaryFaces * HHO->nFaceUnknowns);
+		assert(v1.rows() == Dimension());
+		assert(v2.rows() == Dimension());
 
 		struct ChunkResult { double total = 0; };
 
@@ -115,7 +129,7 @@ public:
 
 	double Integral(const Vector& boundaryFaceCoeffs) override
 	{
-		assert(boundaryFaceCoeffs.rows() == HHO->nBoundaryFaces * HHO->nFaceUnknowns);
+		assert(boundaryFaceCoeffs.rows() == Dimension());
 
 		struct ChunkResult { double total = 0; };
 

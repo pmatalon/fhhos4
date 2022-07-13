@@ -97,7 +97,10 @@ public:
 			if (pb.BCCode.compare("d") == 0)
 			{
 				if (pb.SourceCode.compare("sine") == 0)
+				{
 					this->ExactSolution = this->SineSolution2D;
+					this->ExactSolution_Neumann = this->SineSolution2D_Neumann;
+				}
 				else if (pb.SourceCode.compare("poly") == 0)
 					this->ExactSolution = this->PolySolution2D;
 				else if (pb.SourceCode.compare("exp") == 0)

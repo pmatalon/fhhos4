@@ -90,6 +90,7 @@
     <ClInclude Include="src\Discretizations\HHO\Diff_HHOElement.h" />
     <ClInclude Include="src\Discretizations\HHO\Diff_HHOFace.h" />
     <ClInclude Include="src\Discretizations\HHO\DiscreteSpaces\HHOBoundarySpace.h" />
+    <ClInclude Include="src\Discretizations\HHO\DiscreteSpaces\HHOCellSpace.h" />
     <ClInclude Include="src\Discretizations\HHO\DiscreteSpaces\HHOReconstructSpace.h" />
     <ClInclude Include="src\Discretizations\HHO\DiscreteSpaces\HHOSkeletonSpace.h" />
     <ClInclude Include="src\Discretizations\HHO\DiscreteSpaces\IDiscreteSpace.h" />
@@ -291,7 +292,7 @@
       <AdditionalOptions>
       </AdditionalOptions>
       <Verbose>true</Verbose>
-      <PreprocessorDefinitions>ENABLE_3D;GMSH_ENABLED;SMALL_INDEX;ROOT_PATH="/mnt/c/Users/pierr/Documents/Source/Repos/fhhos4"</PreprocessorDefinitions>
+      <PreprocessorDefinitions>ENABLE_2D;GMSH_ENABLED;SMALL_INDEX;ROOT_PATH="/mnt/c/Users/pierr/Documents/Source/Repos/fhhos4"</PreprocessorDefinitions>
       <CppLanguageStandard>c++17</CppLanguageStandard>
       <Optimization>Disabled</Optimization>
     </ClCompile>

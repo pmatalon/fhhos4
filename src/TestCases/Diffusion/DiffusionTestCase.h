@@ -11,6 +11,9 @@ public:
 	DiffusionField<Dim> DiffField;
 	BoundaryConditions BC;
 
+	// Normal derivative on the boundary
+	DomFunction ExactSolution_Neumann = nullptr;
+
 	DiffusionTestCase()
 	{}
 
@@ -69,6 +72,21 @@ protected:
 		double a = 1;//anisotropyCoefficients1[0];
 		double b = 1;//anisotropyCoefficients1[1];
 		return 2 / (a + b) * sin(4 * M_PI * x)*sin(4 * M_PI * y);
+	}
+	static double SineSolution2D_Neumann(const DomPoint& p)
+	{
+		double x = p.X;
+		double y = p.Y;
+		if (abs(x) < Utils::NumericalZero) // x = 0
+			return -4 * M_PI * sin(4 * M_PI * y);
+		else if (abs(x - 1) < Utils::NumericalZero) // x = 1
+			return 4 * M_PI * sin(4 * M_PI * y);
+		else if (abs(y) < Utils::NumericalZero) // y = 0
+			return -4 * M_PI * sin(4 * M_PI * x);
+		else if (abs(y - 1) < Utils::NumericalZero) // y = 1
+			return 4 * M_PI * sin(4 * M_PI * x);
+		Utils::FatalError("Should never happen");
+		return 0;
 	}
 
 	static double PolySource2D(const DomPoint& p)

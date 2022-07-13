@@ -41,6 +41,9 @@ public:
 		if (args.Discretization.Mesher.compare("gmsh") == 0)
 			GMSHMesh<Dim>::CloseGMSH();
 
+		if (args.Problem.ComputeNormalDerivative && testCase->ExactSolution_Neumann)
+			mesh->RenumberBoundaryElementsFirst();
+
 		cout << "Mesh storage > " << Utils::MemoryString(mesh->MemoryUsage()) << endl;
 
 		mesh->SetDiffusionField(&testCase->DiffField);
@@ -174,7 +177,12 @@ public:
 
 		HHOParameters<Dim>* hho = new HHOParameters<Dim>(mesh, args.Discretization.Stabilization, reconstructionBasis, cellBasis, faceBasis, args.Discretization.OrthogonalizeElemBasesCode, args.Discretization.OrthogonalizeFaceBasesCode);
 
-		bool saveMatrixBlocks = args.Solver.SolverCode.compare("uamg") == 0 || args.Solver.PreconditionerCode.compare("uamg") == 0;
+		bool saveMatrixBlocks = false;
+		if (args.Solver.SolverCode.compare("uamg") == 0 || args.Solver.PreconditionerCode.compare("uamg") == 0)
+			saveMatrixBlocks = true;
+		else if (args.Problem.ComputeNormalDerivative && testCase->ExactSolution_Neumann)
+			saveMatrixBlocks = true;
+
 		Diffusion_HHO<Dim>* problem = new Diffusion_HHO<Dim>(mesh, testCase, hho, args.Discretization.StaticCondensation, saveMatrixBlocks);
 
 		cout << endl;
@@ -375,6 +383,33 @@ public:
 				double error = problem->L2Error(testCase->ExactSolution, reconstructedSolution);
 				cout << endl << "L2 Error = " << std::scientific << error << endl;
 				problem->AssertSchemeConvergence(error);
+			}
+
+			if (args.Problem.ComputeNormalDerivative && testCase->ExactSolution_Neumann)
+			{
+				if (args.Problem.BCCode.compare("d") == 0)
+				{
+					SparseMatrix SolveCellUknTranspose = problem->SolveCellUknTransposeOnBoundary();
+					//SparseMatrix CellMass = problem->CellMassMatrixOnBoundaryElements();
+					auto nBoundaryElemUnknowns = SolveCellUknTranspose.cols();
+					SparseMatrix NormalDerStiff_interior = SolveCellUknTranspose * problem->A_T_ndF.topRows(nBoundaryElemUnknowns) + problem->A_ndF_dF.transpose();
+					SparseMatrix tmp = problem->A_T_dF.topRows(nBoundaryElemUnknowns).transpose() * SolveCellUknTranspose.transpose();
+					SparseMatrix NormalDerStiff_boundary = tmp + problem->A_dF_dF;
+					SparseMatrix NormalDerMass = SolveCellUknTranspose;// *CellMass;
+
+					Vector g_D = problem->AssembleDirichletTerm(testCase->BC.DirichletFunction);
+					Vector source = problem->AssembleSourceTerm(testCase->SourceFunction);
+					Vector sourceElemBoundary = problem->ExtractElemBoundary(source);
+
+					Vector normalDerivativeRHS = NormalDerStiff_interior * systemSolution + NormalDerStiff_boundary * g_D - NormalDerMass * sourceElemBoundary;
+					Vector normalDerivative = problem->BoundarySpace.SolveMassMatrix(normalDerivativeRHS);
+
+					Vector exact = problem->BoundarySpace.Project(testCase->ExactSolution_Neumann);
+					double error = problem->BoundarySpace.RelativeL2Error(normalDerivative, exact);
+					cout << endl << "L2 Error (normal derivative) = " << std::scientific << error << endl;
+				}
+				else
+					Utils::Warning("The normal derivative is computed only for Dirichlet problems.");
 			}
 		}
 

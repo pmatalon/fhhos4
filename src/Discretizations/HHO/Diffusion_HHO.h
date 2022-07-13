@@ -7,6 +7,7 @@
 #include "../../Geometry/CartesianShape.h"
 #include "../../Geometry/2D/Triangle.h"
 #include "../../Geometry/2D/Quadrilateral.h"
+#include "DiscreteSpaces/HHOCellSpace.h"
 #include "DiscreteSpaces/HHOSkeletonSpace.h"
 #include "DiscreteSpaces/HHOReconstructSpace.h"
 #include "DiscreteSpaces/HHOBoundarySpace.h"
@@ -34,6 +35,7 @@ public:
 	SparseMatrix A;
 	Vector b;
 
+	HHOCellSpace<Dim> CellSpace;
 	HHOSkeletonSpace<Dim> SkeletonSpace;
 	HHOReconstructSpace<Dim> ReconstructSpace;
 	HHOBoundarySpace<Dim> BoundarySpace;
@@ -465,7 +467,9 @@ public:
 				e->DeleteUselessMatricesAfterAssembly();
 			});
 
-		if (this->TestCase->BC.Type != PbBoundaryConditions::FullNeumann && Utils::ProgramArgs.Problem.Equation == EquationType::Diffusion)
+		if (this->TestCase->BC.Type != PbBoundaryConditions::FullNeumann && 
+			Utils::ProgramArgs.Problem.Equation == EquationType::Diffusion && 
+			!Utils::ProgramArgs.Problem.ComputeNormalDerivative)
 		{
 			// TODO: in the coarse level of multigrid, this should be executed as well
 			FaceParallelLoop<Dim> parallelLoopF(mesh->Faces);
@@ -684,6 +688,7 @@ public:
 		InitHHO_Faces();
 		InitHHO_Elements(assembleLocalMatrices);
 
+		CellSpace        = HHOCellSpace       (_mesh, HHO, _hhoElements);
 		SkeletonSpace    = HHOSkeletonSpace   (_mesh, HHO, _hhoFaces);
 		ReconstructSpace = HHOReconstructSpace(_mesh, HHO, _hhoElements);
 		BoundarySpace    = HHOBoundarySpace   (_mesh, HHO, _hhoFaces);
@@ -745,43 +750,27 @@ public:
 
 	Vector AssembleSourceTerm(DomFunction sourceFunction)
 	{
-		Vector b_source = Vector(HHO->nTotalCellUnknowns);
-		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, &b_source, &sourceFunction](Element<Dim>* e)
-			{
-				Diff_HHOElement<Dim>* element = HHOElement(e);
-				b_source.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns) = e->InnerProductWithBasis(element->CellBasis, sourceFunction);
-			}
-		);
-		return b_source;
+		return CellSpace.InnerProdWithBasis(sourceFunction);
 	}
 
 	Vector AssembleSourceTerm(const Vector& sourceFuncCoeffs)
 	{
-		ElementParallelLoop<Dim> parallelLoop(this->_mesh->Elements);
-		Vector b_source = Vector(HHO->nTotalCellUnknowns);
-
 		if (sourceFuncCoeffs.rows() == HHO->nTotalCellUnknowns) // degree k
+			return CellSpace.ApplyMassMatrix(sourceFuncCoeffs);
+		if (sourceFuncCoeffs.rows() == HHO->nTotalReconstructUnknowns) // degree k+1
 		{
-			parallelLoop.Execute([this, &sourceFuncCoeffs, &b_source](Element<Dim>* e)
-				{
-					Diff_HHOElement<Dim>* element = this->HHOElement(e);
-					b_source.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns) = element->ApplyCellMassMatrix(sourceFuncCoeffs.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns));
-				}
-			);
-		}
-		else if (sourceFuncCoeffs.rows() == HHO->nTotalReconstructUnknowns) // degree k+1
-		{
+			Vector b_source = Vector(HHO->nTotalCellUnknowns);
+			ElementParallelLoop<Dim> parallelLoop(this->_mesh->Elements);
 			parallelLoop.Execute([this, &sourceFuncCoeffs, &b_source](Element<Dim>* e)
 				{
 					Diff_HHOElement<Dim>* element = this->HHOElement(e);
 					b_source.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns) = element->ApplyCellReconstructMassMatrix(sourceFuncCoeffs.segment(e->Number * HHO->nReconstructUnknowns, HHO->nReconstructUnknowns));
 				}
 			);
+			return b_source;
 		}
-		else
-			Utils::FatalError("the argument sourceFuncCoeffs does not have a correct size");
-
-		return b_source;
+		Utils::FatalError("the argument sourceFuncCoeffs does not have a correct size");
+		return Vector();
 	}
 
 	// Solution on the Dirichlet faces

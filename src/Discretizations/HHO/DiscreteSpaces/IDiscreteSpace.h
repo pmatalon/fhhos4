@@ -14,6 +14,9 @@ public:
 	// Returns [(phi_i|func)]_i
 	virtual Vector InnerProdWithBasis(DomFunction func) = 0;
 
+	// Returns M * x
+	virtual Vector ApplyMassMatrix(const Vector& x) = 0;
+
 	// Returns M^-1 * x
 	virtual Vector SolveMassMatrix(const Vector& x) = 0;
 

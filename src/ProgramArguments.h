@@ -12,6 +12,7 @@ struct ProblemArguments
 	double HeterogeneityRatio = 1;
 	double AnisotropyRatio = 1;
 	double AnisotropyAngle = 0; // in radians
+	bool ComputeNormalDerivative = false;
 	string BCCode = "";
 	string Scheme = "g";
 };

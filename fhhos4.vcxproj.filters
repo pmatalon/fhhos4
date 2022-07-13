@@ -622,6 +622,9 @@
     <ClInclude Include="src\Solver\Direct\EigenCholesky.h">
       <Filter>Solver\Direct</Filter>
     </ClInclude>
+    <ClInclude Include="src\Discretizations\HHO\DiscreteSpaces\HHOCellSpace.h">
+      <Filter>Discretizations\HHO\DiscreteSpaces</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

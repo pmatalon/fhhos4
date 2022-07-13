@@ -44,7 +44,7 @@ public:
 
 	Vector InnerProdWithBasis(DomFunction func) override
 	{
-		Vector innerProds = Vector(HHO->nTotalFaceUnknowns);
+		Vector innerProds = Vector(Dimension());
 		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->Faces, [this, &innerProds, func](Face<Dim>* f)
 			{
 				Diff_HHOFace<Dim>* face = HHOFace(f);
@@ -54,6 +54,20 @@ public:
 			}
 		);
 		return innerProds;
+	}
+
+	Vector ApplyMassMatrix(const Vector& v) override
+	{
+		assert(v.rows() == Dimension());
+		Vector res(v.rows());
+		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->Faces, [this, &v, &res](Face<Dim>* f)
+			{
+				Diff_HHOFace<Dim>* face = HHOFace(f);
+				BigNumber i = f->Number * HHO->nFaceUnknowns;
+
+				res.segment(i, HHO->nFaceUnknowns) = face->ApplyMassMatrix(v.segment(i, HHO->nFaceUnknowns));
+			});
+		return res;
 	}
 
 	Vector SolveMassMatrix(const Vector& v) override

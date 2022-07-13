@@ -280,6 +280,14 @@ public:
 		return integral;
 	}
 
+	double IntegralCell(const Vector& cellCoeffs)
+	{
+		double integral = 0;
+		for (BasisFunction<Dim>* phi : this->CellBasis->LocalFunctions())
+			integral += cellCoeffs[phi->LocalNumber] * this->MeshElement->Integral(phi); // TODO: this can be computed only once on the reference element
+		return integral;
+	}
+
 
 public:
 	Vector InnerProductWithBasis(FunctionalBasis<Dim>* basis, DomFunction f)
@@ -289,6 +297,10 @@ public:
 	Vector ProjectOnReconstructBasis(DomFunction f)
 	{
 		return SolveReconstructMassMatrix(InnerProductWithBasis(ReconstructionBasis, f));
+	}
+	Vector ProjectOnCellBasis(DomFunction f)
+	{
+		return SolveCellMassMatrix(InnerProductWithBasis(CellBasis, f));
 	}
 
 private:

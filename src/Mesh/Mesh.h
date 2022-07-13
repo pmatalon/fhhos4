@@ -296,6 +296,7 @@ public:
 	}
 	int BoundaryElementNumber(Element<Dim>* e)
 	{
+		assert(_boundaryElementsNumberedFirst);
 		return e->Number;
 	}
 	bool BoundaryElementsNumberedFirst()

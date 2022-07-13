@@ -68,6 +68,9 @@ void print_usage() {
 	cout << "      Anisotropy angle for the diffusion problem (valid across the whole domain), expressed in degrees." << endl;
 	cout << "      Example: 45" << endl;
 	cout << endl;
+	cout << "-normalder" << endl;
+	cout << "      Computes the L^2-error of the normal derivative on the boundary." << endl;
+	cout << endl;
 	cout << "-sch CODE" << endl;
 	cout << "      Solution scheme for the bi-harmonic problem." << endl;
 	cout << "            f   - Falk (1978)" << endl;
@@ -609,6 +612,7 @@ int main(int argc, char* argv[])
 		OPT_HeterogeneityRatio,
 		OPT_AnisotropyRatio,
 		OPT_AnisotropyAngle,
+		OPT_NormalDerivative,
 		OPT_Scheme,
 		// Mesh
 		OPT_Mesh,
@@ -695,6 +699,7 @@ int main(int argc, char* argv[])
 		 { "heterog", required_argument, NULL, OPT_HeterogeneityRatio },
 		 { "aniso", required_argument, NULL, OPT_AnisotropyRatio },
 		 { "aniso-angle", required_argument, NULL, OPT_AnisotropyAngle },
+		 { "normalder", no_argument, NULL, OPT_NormalDerivative },
 		 { "scheme", required_argument, NULL, OPT_Scheme },
 		 // Mesh
 		 { "mesh", required_argument, NULL, OPT_Mesh },
@@ -824,6 +829,9 @@ int main(int argc, char* argv[])
 				break;
 			case OPT_AnisotropyAngle:
 				args.Problem.AnisotropyAngle = atof(optarg) * M_PI / 180; // conversion degrees to radians
+				break;
+			case OPT_NormalDerivative:
+				args.Problem.ComputeNormalDerivative = true;
 				break;
 			case OPT_Scheme:
 				args.Problem.Scheme = optarg;
