@@ -60,50 +60,49 @@ public:
 
 class TensorPolynomial3D : public IBasisFunction3D
 {
-private:
+public:
 	IBasisFunction1D* FuncX;
 	IBasisFunction1D* FuncY;
-	IBasisFunction1D* _funcZ;
-public:
+	IBasisFunction1D* FuncZ;
 
 	TensorPolynomial3D(int localNumber, IBasisFunction1D* funcX, IBasisFunction1D* funcY, IBasisFunction1D* funcZ)
 	{
 		this->LocalNumber = localNumber;
 		this->FuncX = funcX;
 		this->FuncY = funcY;
-		this->_funcZ = funcZ;
+		this->FuncZ = funcZ;
 	}
 
 	int GetDegree() const
 	{
-		return this->FuncX->GetDegree() + this->FuncY->GetDegree() + this->_funcZ->GetDegree();
+		return this->FuncX->GetDegree() + this->FuncY->GetDegree() + this->FuncZ->GetDegree();
 	}
 
 	double Eval(double x, double y, double z) const
 	{
-		return this->FuncX->Eval(x) * this->FuncY->Eval(y) * this->_funcZ->Eval(z);
+		return this->FuncX->Eval(x) * this->FuncY->Eval(y) * this->FuncZ->Eval(z);
 	}
 
 	double EvalGradX(double x, double y, double z) const
 	{
-		return this->FuncX->EvalDerivative(x) * this->FuncY->Eval(y) * this->_funcZ->Eval(z);
+		return this->FuncX->EvalDerivative(x) * this->FuncY->Eval(y) * this->FuncZ->Eval(z);
 	}
 
 	double EvalGradY(double x, double y, double z) const
 	{
-		return this->FuncX->Eval(x) * this->FuncY->EvalDerivative(y) * this->_funcZ->Eval(z);
+		return this->FuncX->Eval(x) * this->FuncY->EvalDerivative(y) * this->FuncZ->Eval(z);
 	}
 
 	double EvalGradZ(double x, double y, double z) const
 	{
-		return this->FuncX->Eval(x) * this->FuncY->Eval(y) * this->_funcZ->EvalDerivative(z);
+		return this->FuncX->Eval(x) * this->FuncY->Eval(y) * this->FuncZ->EvalDerivative(z);
 	}
 
 	string ToString()
 	{
 		string polyX = this->FuncX->ToString("X");
 		string polyY = this->FuncY->ToString("Y");
-		string polyZ = this->_funcZ->ToString("Z");
+		string polyZ = this->FuncZ->ToString("Z");
 		if (polyX.compare("1") == 0 && polyY.compare("1") == 0)
 			return polyZ;
 		if (polyY.compare("1") == 0 && polyZ.compare("1") == 0)

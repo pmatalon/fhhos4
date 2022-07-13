@@ -1079,9 +1079,8 @@ public:
 
 		int viewId = gmsh::view::add(viewName);
 
-		if (Dim == 2 && !takeAbsoluteValue && basis->BasisCode().compare(MonomialBasis<2>::Code()) == 0 && Utils::ProgramArgs.Discretization.OrthogonalizeElemBasesCode == 0)
+		if (!takeAbsoluteValue && basis->BasisCode().compare(MonomialBasis<2>::Code()) == 0 && Utils::ProgramArgs.Discretization.OrthogonalizeElemBasesCode == 0)
 		{
-#ifdef ENABLE_2D
 			// Refer to:
 			// http://www.manpagez.com/info/gmsh/gmsh-2.4.0/gmsh_52.php
 			// https://gitlab.onelab.info/gmsh/gmsh/-/blob/7cc02aa46e8fec38eac639f11952b7f68dea2c7c/tutorial/c++/x3.cpp
@@ -1110,31 +1109,64 @@ public:
 			auto localFunctions = basis->LocalFunctions();
 			for (int i = 0; i < basisSize; i++)
 			{
-				TensorPolynomial2D* phi = dynamic_cast<TensorPolynomial2D*>(localFunctions[i]);
-				expMonomials[i * 3 + 0] = phi->FuncX->GetDegree(); // exponent of u
-				expMonomials[i * 3 + 1] = phi->FuncY->GetDegree(); // exponent of v
-				expMonomials[i * 3 + 2] = 0;                       // exponent of w
+#ifdef ENABLE_2D
+				if (Dim == 2)
+				{
+					TensorPolynomial2D* phi = dynamic_cast<TensorPolynomial2D*>(localFunctions[i]);
+					expMonomials[i * 3 + 0] = phi->FuncX->GetDegree(); // exponent of u
+					expMonomials[i * 3 + 1] = phi->FuncY->GetDegree(); // exponent of v
+					expMonomials[i * 3 + 2] = 0;                       // exponent of w
+				}
+#endif // ENABLE_2D
+#ifdef ENABLE_3D
+				if (Dim == 3)
+				{
+					TensorPolynomial3D* phi = dynamic_cast<TensorPolynomial3D*>(localFunctions[i]);
+					expMonomials[i * 3 + 0] = phi->FuncX->GetDegree(); // exponent of u
+					expMonomials[i * 3 + 1] = phi->FuncY->GetDegree(); // exponent of v
+					expMonomials[i * 3 + 2] = phi->FuncZ->GetDegree(); // exponent of w
+				}
+#endif // ENABLE_3D
 			}
 
 			// Geometric mapping and high-order data
-			if (!this->_quadrilateralElements.empty())
+#ifdef ENABLE_2D
+			if (Dim == 2)
 			{
-				GeometricMapping quadMapping = Quadrilateral::MappingInfo();
-				gmsh::view::setInterpolationMatrices(viewId, "Quadrangle", basisSize, coefMonomials, expMonomials,
-					quadMapping.NFunctions, quadMapping.Coeffs, quadMapping.Exponents);
+				if (!this->_quadrilateralElements.empty())
+				{
+					GeometricMapping quadMapping = Quadrilateral::MappingInfo();
+					gmsh::view::setInterpolationMatrices(viewId, "Quadrangle", basisSize, coefMonomials, expMonomials,
+						quadMapping.NFunctions, quadMapping.Coeffs, quadMapping.Exponents);
 
-				vector<double> data = GeoMappingAndHighOrderData(this->_quadrilateralElements, coeffs, quadMapping.NFunctions, basisSize);
-				gmsh::view::addListData(viewId, "SQ", this->_quadrilateralElements.size(), data);
+					vector<double> data = GeoMappingAndHighOrderData(this->_quadrilateralElements, coeffs, quadMapping.NFunctions, basisSize);
+					gmsh::view::addListData(viewId, "SQ", this->_quadrilateralElements.size(), data);
+				}
+				if (!this->_triangularElements.empty())
+				{
+					GeometricMapping triMapping = Triangle::MappingInfo();
+					gmsh::view::setInterpolationMatrices(viewId, "Triangle", basisSize, coefMonomials, expMonomials,
+						triMapping.NFunctions, triMapping.Coeffs, triMapping.Exponents);
+
+					vector<double> data = GeoMappingAndHighOrderData(this->_triangularElements, coeffs, triMapping.NFunctions, basisSize);
+					gmsh::view::addListData(viewId, "ST", this->_triangularElements.size(), data);
+				}
 			}
-			if (!this->_triangularElements.empty())
+#endif // ENABLE_2D
+#ifdef ENABLE_3D
+			if (Dim == 3)
 			{
-				GeometricMapping triMapping = Triangle::MappingInfo();
-				gmsh::view::setInterpolationMatrices(viewId, "Triangle", basisSize, coefMonomials, expMonomials,
-					triMapping.NFunctions, triMapping.Coeffs, triMapping.Exponents);
+				if (!this->_tetrahedralElements.empty())
+				{
+					GeometricMapping tetMapping = Tetrahedron::MappingInfo();
+					gmsh::view::setInterpolationMatrices(viewId, "Tetrahedron", basisSize, coefMonomials, expMonomials,
+						tetMapping.NFunctions, tetMapping.Coeffs, tetMapping.Exponents);
 
-				vector<double> data = GeoMappingAndHighOrderData(this->_triangularElements, coeffs, triMapping.NFunctions, basisSize);
-				gmsh::view::addListData(viewId, "ST", this->_triangularElements.size(), data);
+					vector<double> data = GeoMappingAndHighOrderData(this->_tetrahedralElements, coeffs, tetMapping.NFunctions, basisSize);
+					gmsh::view::addListData(viewId, "SS", this->_tetrahedralElements.size(), data);
+				}
 			}
+#endif // ENABLE_3D
 
 			// Options for the high-order:
 			// 
@@ -1144,7 +1176,6 @@ public:
 			gmsh::view::option::setNumber(viewId, "TargetError", tolerance);
 			// set a maximum subdivision level (GMSH does automatic mesh refinement to visualize the high-order field with the requested accuracy)
 			gmsh::view::option::setNumber(viewId, "MaxRecursionLevel", maxRefinements);
-#endif // ENABLE_2D
 		}
 		else
 		{
