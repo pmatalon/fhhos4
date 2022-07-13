@@ -73,13 +73,15 @@ public:
 		int n = theta0.rows();
 		DenseMatrix A(n, n);
 		Vector e_i = Vector::Zero(n);
-		for (int i = 0; i < n; i++)
-		{
-			e_i[i] = 1;
-			Vector lambda = Solve1stDiffProblem_Homogeneous(e_i);
-			A.col(i) = -Solve2ndDiffProblem_Homogeneous(lambda);
-			e_i[i] = 0;
-		}
+
+		NumberParallelLoop<EmptyResultChunk> parallelLoop(n);
+		parallelLoop.Execute([this, n, &A](BigNumber i, ParallelChunk<EmptyResultChunk>* chunk)
+			{
+				Vector e_i = Vector::Zero(n);
+				e_i[i] = 1;
+				Vector lambda = Solve1stDiffProblem_Homogeneous(e_i);
+				A.col(i) = -Solve2ndDiffProblem_Homogeneous(lambda);
+			});
 		return A;
 	}
 
