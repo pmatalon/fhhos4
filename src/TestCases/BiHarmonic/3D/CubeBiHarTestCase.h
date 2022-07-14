@@ -13,8 +13,8 @@ public:
 	{
 		if (pb.SourceCode.compare("") == 0)
 		{
-			pb.SourceCode = "exp";
-			_pb.SourceCode = "exp";
+			pb.SourceCode = "poly";
+			_pb.SourceCode = "poly";
 		}
 
 		// Boundary conditions
@@ -37,15 +37,23 @@ public:
 		}
 
 		// Source function
-		if (pb.SourceCode.compare("exp") == 0)
+		if (pb.SourceCode.compare("poly") == 0)
+			this->SourceFunction = this->PolySource;
+		else if (pb.SourceCode.compare("exp") == 0)
 			this->SourceFunction = this->ExpSource;
 		else if (pb.SourceCode.compare("one") == 0)
 			this->SourceFunction = Utils::ConstantFunctionOne;
 		else
-			Utils::FatalError("Unmanaged source code (use 'exp' or 'one')");
+			Utils::FatalError("Unmanaged source code (use 'poly', 'exp' or 'one')");
 
 		// Exact solution
-		if (pb.SourceCode.compare("exp") == 0)
+		if (pb.SourceCode.compare("poly") == 0)
+		{
+			this->ExactSolution = this->PolySolution;
+			this->MinusLaplacianOfSolution = this->PolyMinusLaplacianOfSolution;
+			this->MinusLaplacianOfSolution_Dirichlet = this->PolyMinusLaplacianOfSolution_Dirichlet;
+		}
+		else if (pb.SourceCode.compare("exp") == 0)
 		{
 			this->ExactSolution = this->ExpSolution;
 			this->MinusLaplacianOfSolution = this->ExpMinusLaplacianOfSolution;
@@ -84,7 +92,7 @@ public:
 		double x = p.X;
 		double y = p.Y;
 		return 24 * pow(M_PI, 4) * pow(sin(M_PI * x), 2) * pow(sin(M_PI * y),2) + 8 * pow(M_PI, 4) * pow(cos(M_PI * x),2) * pow(cos(M_PI * y),2) - 16 * pow(M_PI, 4) * pow(cos(M_PI * x),2) * pow(sin(M_PI * y),2) - 16 * pow(M_PI, 4) * pow(cos(M_PI * y),2) * pow(sin(M_PI * x),2);
-	}
+	}*/
 
 	//--------------//
 	//     Poly     //
@@ -93,26 +101,33 @@ public:
 	{
 		double x = p.X;
 		double y = p.Y;
-		return pow(x, 4) * pow(x - 1, 2) * pow(y, 4) * pow(y - 1, 2);
+		double z = p.Z;
+		return pow(x, 4) * pow(x - 1, 2) * pow(y, 4) * pow(y - 1, 2) * pow(z, 4) * pow(z - 1, 2);
 	}
 	static double PolyMinusLaplacianOfSolution(const DomPoint& p)
 	{
 		double x = p.X;
 		double y = p.Y;
-		return -4700 * pow(x, 4) * pow(y, 4) * pow(x - 1, 2) - 4700 * pow(x, 4) * pow(y, 4) * pow(y - 1, 2) - 18800 * pow(x, 3) * pow(y, 4) * (2 * x - 2) * pow(y - 1, 2) - 18800 * pow(x, 4) * pow(y, 3) * (2 * y - 2) * pow(x - 1, 2) - 28200 * pow(x, 2) * pow(y, 4) * pow(x - 1, 2) * pow(y - 1, 2) - 28200 * pow(x, 4) * pow(y, 2) * pow(x - 1, 2) * pow(y - 1, 2);
+		double z = p.Z;
+		return -2 * pow(x,4) * pow(y,4) * pow(z,4) * pow(x - 1, 2) * pow(y - 1, 2) - 2 * pow(x,4) * pow(y,4) * pow(z,4) * pow(x - 1, 2) * pow(z - 1, 2) - 2 * pow(x,4) * pow(y,4) * pow(z,4) * pow(y - 1, 2) * pow(z - 1, 2) - 8 * pow(x,3) * pow(y,4) * pow(z,4) * (2 * x - 2) * pow(y - 1, 2) * pow(z - 1, 2) - 8 * pow(x,4) * pow(y,3) * pow(z,4) * (2 * y - 2) * pow(x - 1, 2) * pow(z - 1, 2) - 8 * pow(x,4) * pow(y,4) * pow(z,3) * (2 * z - 2) * pow(x - 1, 2) * pow(y - 1, 2) - 12 * pow(x,2) * pow(y,4) * pow(z,4) * pow(x - 1, 2) * pow(y - 1, 2) * pow(z - 1, 2) - 12 * pow(x,4) * pow(y,2) * pow(z,4) * pow(x - 1, 2) * pow(y - 1, 2) * pow(z - 1, 2) - 12 * pow(x,4) * pow(y,4) * pow(z,2) * pow(x - 1, 2) * pow(y - 1, 2) * pow(z - 1, 2);
 	}
 	static double PolyMinusLaplacianOfSolution_Dirichlet(const DomPoint& p)
 	{
 		double x = p.X;
 		double y = p.Y;
-		if (abs(x) < Utils::NumericalZero) // x = 0
+		double z = p.Z;
+		if (     abs(x)     < Utils::NumericalZero) // x = 0 (left)
 			return 0;
-		else if (abs(x - 1) < Utils::NumericalZero) // x = 1
-			return -4700 * pow(y, 4) * pow(y - 1, 2);
-		else if (abs(y) < Utils::NumericalZero) // y = 0
+		else if (abs(x - 1) < Utils::NumericalZero) // x = 1 (right)
+			return (y * y * y * y) * (z * z * z * z) * pow(y - 1.0, 2.0) * pow(z - 1.0, 2.0) * -2.0;
+		else if (abs(y)     < Utils::NumericalZero) // y = 0 (front)
 			return 0;
-		else if (abs(y - 1) < Utils::NumericalZero) // y = 1
-			return -4700 * pow(x, 4) * pow(x - 1, 2);
+		else if (abs(y - 1) < Utils::NumericalZero) // y = 1 (back)
+			return (x * x * x * x) * (z * z * z * z) * pow(x - 1.0, 2.0) * pow(z - 1.0, 2.0) * -2.0;
+		else if (abs(z)     < Utils::NumericalZero) // z = 0 (bottom)
+			return 0;
+		else if (abs(z - 1) < Utils::NumericalZero) // z = 1 (top)
+			return (x * x * x * x) * (y * y * y * y) * pow(x - 1.0, 2.0) * pow(y - 1.0, 2.0) * -2.0;
 		Utils::FatalError("Should never happen");
 		return 0;
 	}
@@ -120,9 +135,9 @@ public:
 	{
 		double x = p.X;
 		double y = p.Y;
-		return 56400 * (1 - 10 * x + 15 * x * x) * pow(1 - y, 2) * pow(y, 4) + 18800 * x * x * (6 - 20 * x + 15 * x * x) * y * y * (6 - 20 * y + 15 * y * y) + 56400 * pow(1 - x, 2) * pow(x, 4) * (1 - 10 * y + 15 * y * y);
-		//return 18800 * pow(x,4) * pow(y,4) + 75200 * pow(x,3) * pow(y,4) * (2 * x - 2) + 112800 * pow(x,2) * pow(y,4) * pow(x - 1, 2) + 338400 * pow(x,4) * pow(y,2) * pow(x - 1, 2) + 75200 * pow(x,4) * pow(y,3) * (2 * y - 2) + 338400 * pow(x,2) * pow(y,4) * pow(y - 1, 2) + 112800 * pow(x,4) * pow(y,2) * pow(y - 1, 2) + 56400 * pow(x,4) * pow(x - 1, 2) * pow(y - 1, 2) + 56400 * pow(y,4) * pow(x - 1, 2) * pow(y - 1, 2) + 225600 * x * pow(y,4) * (2 * x - 2) * pow(y - 1, 2) + 225600 * pow(x,4) * y * (2 * y - 2) * pow(x - 1, 2) + 300800 * pow(x,3) * pow(y,3) * (2 * x - 2) * (2 * y - 2) + 451200 * pow(x,2) * pow(y,3) * (2 * y - 2) * pow(x - 1, 2) + 451200 * pow(x,3) * pow(y,2) * (2 * x - 2) * pow(y - 1, 2) + 676800 * pow(x,2) * pow(y,2) * pow(x - 1, 2) * pow(y - 1, 2);
-	}*/
+		double z = p.Z;
+		return (x * x * x * x) * (y * y * y * y) * (z * z * z * z) * pow(x - 1.0, 2.0) * 8.0 + (x * x * x * x) * (y * y * y * y) * (z * z * z * z) * pow(y - 1.0, 2.0) * 8.0 + (x * x * x * x) * (y * y * y * y) * (z * z * z * z) * pow(z - 1.0, 2.0) * 8.0 + (x * x * x) * (y * y * y * y) * (z * z * z * z) * (x * 2.0 - 2.0) * pow(y - 1.0, 2.0) * 3.2E1 + (x * x * x * x) * (y * y * y) * (z * z * z * z) * (y * 2.0 - 2.0) * pow(x - 1.0, 2.0) * 3.2E1 + (x * x) * (y * y * y * y) * (z * z * z * z) * pow(x - 1.0, 2.0) * pow(y - 1.0, 2.0) * 4.8E1 + (x * x * x * x) * (y * y) * (z * z * z * z) * pow(x - 1.0, 2.0) * pow(y - 1.0, 2.0) * 4.8E1 + (x * x * x * x) * (y * y * y * y) * (z * z) * pow(x - 1.0, 2.0) * pow(y - 1.0, 2.0) * 1.44E2 + (x * x * x) * (y * y * y * y) * (z * z * z * z) * (x * 2.0 - 2.0) * pow(z - 1.0, 2.0) * 3.2E1 + (x * x * x * x) * (y * y * y * y) * (z * z * z) * (z * 2.0 - 2.0) * pow(x - 1.0, 2.0) * 3.2E1 + (x * x) * (y * y * y * y) * (z * z * z * z) * pow(x - 1.0, 2.0) * pow(z - 1.0, 2.0) * 4.8E1 + (x * x * x * x) * (y * y) * (z * z * z * z) * pow(x - 1.0, 2.0) * pow(z - 1.0, 2.0) * 1.44E2 + (x * x * x * x) * (y * y * y * y) * (z * z) * pow(x - 1.0, 2.0) * pow(z - 1.0, 2.0) * 4.8E1 + (x * x * x * x) * (y * y * y) * (z * z * z * z) * (y * 2.0 - 2.0) * pow(z - 1.0, 2.0) * 3.2E1 + (x * x * x * x) * (y * y * y * y) * (z * z * z) * (z * 2.0 - 2.0) * pow(y - 1.0, 2.0) * 3.2E1 + (x * x) * (y * y * y * y) * (z * z * z * z) * pow(y - 1.0, 2.0) * pow(z - 1.0, 2.0) * 1.44E2 + (x * x * x * x) * (y * y) * (z * z * z * z) * pow(y - 1.0, 2.0) * pow(z - 1.0, 2.0) * 4.8E1 + (x * x * x * x) * (y * y * y * y) * (z * z) * pow(y - 1.0, 2.0) * pow(z - 1.0, 2.0) * 4.8E1 + (x * x * x * x) * (y * y * y * y) * pow(x - 1.0, 2.0) * pow(y - 1.0, 2.0) * pow(z - 1.0, 2.0) * 2.4E1 + (x * x * x * x) * (z * z * z * z) * pow(x - 1.0, 2.0) * pow(y - 1.0, 2.0) * pow(z - 1.0, 2.0) * 2.4E1 + (y * y * y * y) * (z * z * z * z) * pow(x - 1.0, 2.0) * pow(y - 1.0, 2.0) * pow(z - 1.0, 2.0) * 2.4E1 + x * (y * y * y * y) * (z * z * z * z) * (x * 2.0 - 2.0) * pow(y - 1.0, 2.0) * pow(z - 1.0, 2.0) * 9.6E1 + (x * x * x * x) * y * (z * z * z * z) * (y * 2.0 - 2.0) * pow(x - 1.0, 2.0) * pow(z - 1.0, 2.0) * 9.6E1 + (x * x * x * x) * (y * y * y * y) * z * (z * 2.0 - 2.0) * pow(x - 1.0, 2.0) * pow(y - 1.0, 2.0) * 9.6E1 + (x * x * x) * (y * y * y) * (z * z * z * z) * (x * 2.0 - 2.0) * (y * 2.0 - 2.0) * pow(z - 1.0, 2.0) * 1.28E2 + (x * x * x) * (y * y * y * y) * (z * z * z) * (x * 2.0 - 2.0) * (z * 2.0 - 2.0) * pow(y - 1.0, 2.0) * 1.28E2 + (x * x * x * x) * (y * y * y) * (z * z * z) * (y * 2.0 - 2.0) * (z * 2.0 - 2.0) * pow(x - 1.0, 2.0) * 1.28E2 + (x * x) * (y * y * y) * (z * z * z * z) * (y * 2.0 - 2.0) * pow(x - 1.0, 2.0) * pow(z - 1.0, 2.0) * 1.92E2 + (x * x) * (y * y * y * y) * (z * z * z) * (z * 2.0 - 2.0) * pow(x - 1.0, 2.0) * pow(y - 1.0, 2.0) * 1.92E2 + (x * x * x) * (y * y) * (z * z * z * z) * (x * 2.0 - 2.0) * pow(y - 1.0, 2.0) * pow(z - 1.0, 2.0) * 1.92E2 + (x * x * x) * (y * y * y * y) * (z * z) * (x * 2.0 - 2.0) * pow(y - 1.0, 2.0) * pow(z - 1.0, 2.0) * 1.92E2 + (x * x * x * x) * (y * y) * (z * z * z) * (z * 2.0 - 2.0) * pow(x - 1.0, 2.0) * pow(y - 1.0, 2.0) * 1.92E2 + (x * x * x * x) * (y * y * y) * (z * z) * (y * 2.0 - 2.0) * pow(x - 1.0, 2.0) * pow(z - 1.0, 2.0) * 1.92E2 + (x * x) * (y * y) * (z * z * z * z) * pow(x - 1.0, 2.0) * pow(y - 1.0, 2.0) * pow(z - 1.0, 2.0) * 2.88E2 + (x * x) * (y * y * y * y) * (z * z) * pow(x - 1.0, 2.0) * pow(y - 1.0, 2.0) * pow(z - 1.0, 2.0) * 2.88E2 + (x * x * x * x) * (y * y) * (z * z) * pow(x - 1.0, 2.0) * pow(y - 1.0, 2.0) * pow(z - 1.0, 2.0) * 2.88E2;
+	}
 
 	//-------------//
 	//     Exp     //
