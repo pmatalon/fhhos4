@@ -72,9 +72,10 @@ public:
 		Vector theta0 = FindCompatibleTheta();
 		int n = theta0.rows();
 		DenseMatrix A(n, n);
-		Vector e_i = Vector::Zero(n);
 
-		NumberParallelLoop<EmptyResultChunk> parallelLoop(n);
+		int nThreads = 1;
+
+		NumberParallelLoop<EmptyResultChunk> parallelLoop(n, nThreads);
 		parallelLoop.Execute([this, n, &A](BigNumber i, ParallelChunk<EmptyResultChunk>* chunk)
 			{
 				Vector e_i = Vector::Zero(n);
