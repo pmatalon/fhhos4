@@ -221,6 +221,9 @@ void print_usage() {
 	cout << "-tol NUM" << endl;
 	cout << "      Tolerance for the normalized residual (default: 1e-8)." << endl;
 	cout << endl;
+	cout << "-tol2 NUM" << endl;
+	cout << "      Tolerance for the second solver (default: same as -tol)." << endl;
+	cout << endl;
 	cout << "-stag NUM" << endl;
 	cout << "      Stagnation coefficent for the asymptotic convergence rate (default: 0.90)." << endl;
 	cout << endl;
@@ -597,6 +600,7 @@ int main(int argc, char* argv[])
 	bool defaultCycle = true;
 	bool defaultCoarseOperator = true;
 	bool defaultCoarseSolver = true;
+	bool defaultTol2 = true;
 
 	ProgramArguments args;
 	args.OutputDirectory = FileSystem::RootPath() + "/out";
@@ -638,6 +642,7 @@ int main(int argc, char* argv[])
 		OPT_InitialGuess,
 		OPT_StoppingCriterion,
 		OPT_Tolerance,
+		OPT_Tolerance2,
 		OPT_StagnationConvRate,
 		OPT_MaxIterations,
 		OPT_Relaxation,
@@ -724,6 +729,7 @@ int main(int argc, char* argv[])
 		 { "initial-guess", required_argument, NULL, OPT_InitialGuess },
 		 { "stop", required_argument, NULL, OPT_StoppingCriterion },
 		 { "tol", required_argument, NULL, OPT_Tolerance },
+		 { "tol2", required_argument, NULL, OPT_Tolerance2 },
 		 { "stag", required_argument, NULL, OPT_StagnationConvRate },
 		 { "max-iter", required_argument, NULL, OPT_MaxIterations },
 		 { "relax", required_argument, NULL, OPT_Relaxation },
@@ -989,6 +995,10 @@ int main(int argc, char* argv[])
 			}
 			case OPT_Tolerance:
 				args.Solver.Tolerance = atof(optarg);
+				break;
+			case OPT_Tolerance2:
+				args.Solver.Tolerance2 = atof(optarg);
+				defaultTol2 = false;
 				break;
 			case OPT_StagnationConvRate:
 			{
@@ -1584,6 +1594,9 @@ int main(int argc, char* argv[])
 	if (args.Solver.SolverCode.compare("agmg") == 0)
 		argument_error("AGMG is disabled. Recompile with the cmake option -DENABLE_AGMG=ON, or choose another solver.");
 #endif // AGMG_ENABLED
+
+	if (defaultTol2)
+		args.Solver.Tolerance2 = args.Solver.Tolerance;
 
 	//------------------------------------------//
 	//                Multigrid                 //

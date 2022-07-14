@@ -234,7 +234,7 @@ public:
 					stgy = ToleranceStrategy::DynamicFixedStep;
 				else if (Utils::ProgramArgs.Actions.Option2 == 2)
 					stgy = ToleranceStrategy::DynamicVariableStep;
-				biHarSolver = new BiHarmonicCG(biHarPb, stgy, 1e-3, args.Solver.Restart);
+				biHarSolver = new BiHarmonicCG(biHarPb, stgy, args.Solver.Tolerance2, 1e-3, args.Solver.Restart);
 			}
 			else if (args.Solver.BiHarmonicSolverCode.compare("fcg") == 0)
 			{
@@ -409,13 +409,14 @@ public:
 				double det = A.determinant();
 				//auto v = A.eigenvalues();
 				//cout << v << endl;
+				cout << "Eigenvalues:" << endl;
 				Eigen::VectorXcd eigenvalues = es.eigenvalues();
 				cout << eigenvalues << endl;
 				Eigen::MatrixXcd eigenvectors = es.eigenvectors();
 				Eigen::VectorXcd kernelVector = eigenvectors.col(n - 1);
-				cout << "---------------------" << endl << kernelVector << endl;
-				cout << "---------------------" << endl << eigenvectors.col(n - 2) << endl;
-				cout << "---------------------" << endl << eigenvectors.col(n - 3) << endl;
+				cout << "---------------------" << endl << "Last eigenvector"      << endl << kernelVector << endl;
+				cout << "---------------------" << endl << "Preceding eigenvector" << endl << eigenvectors.col(n - 2) << endl;
+				cout << "---------------------" << endl << "Preceding eigenvector" << endl << eigenvectors.col(n - 3) << endl;
 
 				Vector lambda = biHarPb->Solve1stDiffProblem_Homogeneous(kernelVector.real());
 				//cout << lambda.norm() << endl;

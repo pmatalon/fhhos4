@@ -8,18 +8,19 @@ class BiHarmonicCG : public IterativeSolver
 private:
 	BiHarmonicMixedForm* _biHarPb;
 	ToleranceStrategy _toleranceStgy = ToleranceStrategy::DynamicVariableStep;
-	double _diffSolverStartingTol = 1e-3;
-	double _diffSolverToleranceStep = 1e-3;
+	double _diffSolverStartingTol;
+	double _diffSolverToleranceStep;
 
 	int _restartPeriod = 0;
 
 public:
 	Preconditioner* Precond = nullptr;
 
-	BiHarmonicCG(BiHarmonicMixedForm* biHarPb, ToleranceStrategy toleranceStgy, double diffSolverToleranceStep = 1e-3, int restartPeriod = 0)
+	BiHarmonicCG(BiHarmonicMixedForm* biHarPb, ToleranceStrategy toleranceStgy, double diffSolverStartingTol, double diffSolverToleranceStep, int restartPeriod = 0)
 	{
 		_biHarPb = biHarPb;
 		_toleranceStgy = toleranceStgy;
+		_diffSolverStartingTol = diffSolverStartingTol;
 		_diffSolverToleranceStep = diffSolverToleranceStep;
 		_restartPeriod = restartPeriod;
 	}
@@ -27,11 +28,14 @@ public:
 	void Serialize(ostream& os) const override
 	{
 		os << "Conjugate Gradient" << endl;
-		os << "        Laplacian solver tolerance: ";
-		if (_diffSolverToleranceStep > 0)
-			os << "dynamic (step = " << std::scientific << std::setprecision(1) << _diffSolverToleranceStep << ")";
-		else
-			os << "constant (" << std::scientific << std::setprecision(1) << this->Tolerance << ")";
+		os << "        Laplacian solver tolerance: " << std::scientific << std::setprecision(1);
+		if (_toleranceStgy == ToleranceStrategy::Fixed)
+			os << "fixed (" << _diffSolverStartingTol << ")";
+		else if (_toleranceStgy == ToleranceStrategy::DynamicFixedStep)
+			os << "dynamic fixed step (starting tol = " << _diffSolverStartingTol << ", step = " << _diffSolverToleranceStep << ")";
+		else if (_toleranceStgy == ToleranceStrategy::DynamicVariableStep)
+			os << "dynamic variable step (starting tol = " << _diffSolverStartingTol << ")";
+
 		if (_restartPeriod > 0)
 			os << endl << "        Restart period = " << _restartPeriod;
 
@@ -43,7 +47,7 @@ public:
 	{
 		IterativeSolver::Setup(A);
 		if (_toleranceStgy == ToleranceStrategy::Fixed)
-			_biHarPb->SetDiffSolverTolerance(this->Tolerance);
+			_biHarPb->SetDiffSolverTolerance(_diffSolverStartingTol);
 		else
 			_biHarPb->SetDiffSolverTolerance(max(_diffSolverStartingTol, this->Tolerance));
 	}
