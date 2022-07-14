@@ -129,6 +129,26 @@ protected:
 		double z = p.Z;
 		return sin(4 * M_PI * x)*sin(4 * M_PI * y)*sin(4 * M_PI * z);
 	}
+	static double SineSolution3D_Neumann(const DomPoint& p)
+	{
+		double x = p.X;
+		double y = p.Y;
+		double z = p.Z;
+		if (     abs(x)     < Utils::NumericalZero) // x = 0 (left)
+			return -4 * M_PI * sin(4 * M_PI * z) * sin(4 * M_PI * y);
+		else if (abs(x - 1) < Utils::NumericalZero) // x = 1 (right)
+			return  4 * M_PI * sin(4 * M_PI * z) * sin(4 * M_PI * y);
+		else if (abs(y)     < Utils::NumericalZero) // y = 0 (front)
+			return -4 * M_PI * sin(4 * M_PI * z) * sin(4 * M_PI * x);
+		else if (abs(y - 1) < Utils::NumericalZero) // y = 1 (back)
+			return  4 * M_PI * sin(4 * M_PI * z) * sin(4 * M_PI * x);
+		else if (abs(z)     < Utils::NumericalZero) // z = 0 (bottom)
+			return -4 * M_PI * sin(4 * M_PI * x) * sin(4 * M_PI * y);
+		else if (abs(z - 1) < Utils::NumericalZero) // z = 1 (top)
+			return  4 * M_PI * sin(4 * M_PI * x) * sin(4 * M_PI * y);
+		Utils::FatalError("Should never happen");
+		return 0;
+	}
 
 	static double PolySource3D(const DomPoint& p)
 	{

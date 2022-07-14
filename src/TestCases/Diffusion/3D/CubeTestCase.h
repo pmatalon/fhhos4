@@ -46,7 +46,10 @@ public:
 		if (pb.GeoCode.compare("cube") == 0 && this->DiffField.IsHomogeneous && this->DiffField.IsIsotropic && pb.BCCode.compare("d") == 0)
 		{
 			if (pb.SourceCode.compare("sine") == 0)
+			{
 				this->ExactSolution = this->SineSolution3D;
+				this->ExactSolution_Neumann = this->SineSolution3D_Neumann;
+			}
 			else if (pb.SourceCode.compare("poly") == 0)
 				this->ExactSolution = this->PolySolution3D;
 			else if (pb.SourceCode.compare("exp") == 0)
