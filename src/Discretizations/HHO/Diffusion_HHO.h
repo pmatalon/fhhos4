@@ -11,6 +11,8 @@
 #include "DiscreteSpaces/HHOSkeletonSpace.h"
 #include "DiscreteSpaces/HHOReconstructSpace.h"
 #include "DiscreteSpaces/HHOBoundarySpace.h"
+#include "DiscreteSpaces/HHODirichletSpace.h"
+#include "DiscreteSpaces/HHONeumannSpace.h"
 #include "Diffusion_HHOMatrix.h"
 #include "../../TestCases/Diffusion/DiffusionTestCase.h"
 #include "../../Utils/ExportModule.h"
@@ -39,6 +41,8 @@ public:
 	HHOSkeletonSpace<Dim> SkeletonSpace;
 	HHOReconstructSpace<Dim> ReconstructSpace;
 	HHOBoundarySpace<Dim> BoundarySpace;
+	HHODirichletSpace<Dim> DirichletSpace;
+	HHONeumannSpace<Dim> NeumannSpace;
 
 	// Matrix parts:
 	// Used in reconstruction: A_T_ndF
@@ -692,6 +696,8 @@ public:
 		SkeletonSpace    = HHOSkeletonSpace   (_mesh, HHO, _hhoFaces);
 		ReconstructSpace = HHOReconstructSpace(_mesh, HHO, _hhoElements);
 		BoundarySpace    = HHOBoundarySpace   (_mesh, HHO, _hhoFaces);
+		DirichletSpace   = HHODirichletSpace  (_mesh, HHO, _hhoFaces);
+		NeumannSpace     = HHONeumannSpace    (_mesh, HHO, _hhoFaces);
 	}
 	void InitHHO_Faces()
 	{
@@ -757,6 +763,7 @@ public:
 	{
 		if (sourceFuncCoeffs.rows() == HHO->nTotalCellUnknowns) // degree k
 			return CellSpace.ApplyMassMatrix(sourceFuncCoeffs);
+
 		if (sourceFuncCoeffs.rows() == HHO->nTotalReconstructUnknowns) // degree k+1
 		{
 			Vector b_source = Vector(HHO->nTotalCellUnknowns);
@@ -776,15 +783,7 @@ public:
 	// Solution on the Dirichlet faces
 	Vector AssembleDirichletTerm(DomFunction dirichletFunction)
 	{
-		Vector x_dF = Vector(HHO->nDirichletCoeffs);
-		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->DirichletFaces, [this, &x_dF, &dirichletFunction](Face<Dim>* f)
-			{
-				Diff_HHOFace<Dim>* face = HHOFace(f);
-				BigNumber i = FirstDOFGlobalNumber(face) - HHO->nTotalHybridUnknowns;
-				x_dF.segment(i, HHO->nFaceUnknowns) = face->ProjectOnBasis(dirichletFunction);
-			}
-		);
-		return x_dF;
+		return DirichletSpace.Project(dirichletFunction);
 	}
 
 
@@ -796,16 +795,7 @@ public:
 	Vector AssembleNeumannTerm(DomFunction neumannFunction)
 	{
 		Vector b_neumann = Vector::Zero(HHO->nTotalFaceUnknowns);
-		//this->B_neumF = Vector(HHO->nNeumannUnknowns);
-		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->NeumannFaces, [this, &b_neumann, &neumannFunction](Face<Dim>* f)
-			{
-				Diff_HHOFace<Dim>* face = HHOFace(f);
-				BigNumber i = FirstDOFGlobalNumber(face) - HHO->nTotalCellUnknowns;
-				b_neumann.segment(i, HHO->nFaceUnknowns) = face->InnerProductWithBasis(neumannFunction);
-				//BigNumber i = FirstDOFGlobalNumber(face) - HHO->nTotalCellUnknowns - HHO->nInteriorFaces*HHO->nFaceUnknowns;
-				//this->B_neumF.segment(i, HHO->nFaceUnknowns) = face->InnerProductWithBasis(neumannFunction);
-			}
-		);
+		b_neumann.tail(HHO->nNeumannUnknowns) = NeumannSpace.InnerProdWithBasis(neumannFunction);
 		return b_neumann;
 	}
 
@@ -816,19 +806,8 @@ public:
 	// where b_neumF = [ M * coeffs ]
 	Vector AssembleNeumannTerm(const Vector& neumannFuncCoeffs)
 	{
-		assert(neumannFuncCoeffs.rows() == HHO->nNeumannUnknowns);
-		assert(neumannFuncCoeffs.rows() == this->_mesh->NeumannFaces.size() * HHO->nFaceUnknowns);
-
 		Vector b_neumann = Vector::Zero(HHO->nTotalFaceUnknowns);
-		ParallelLoop<Face<Dim>*>::Execute(this->_mesh->NeumannFaces, [this, &b_neumann, &neumannFuncCoeffs](Face<Dim>* f)
-			{
-				Diff_HHOFace<Dim>* face = HHOFace(f);
-				BigNumber i = face->Number() * HHO->nFaceUnknowns;
-				assert(i >= HHO->nInteriorFaces * HHO->nFaceUnknowns);
-				BigNumber j = (face->Number() - HHO->nInteriorFaces) * HHO->nFaceUnknowns;
-				b_neumann.segment(i, HHO->nFaceUnknowns) = face->ApplyMassMatrix(neumannFuncCoeffs.segment(j, HHO->nFaceUnknowns));
-			}
-		);
+		b_neumann.tail(HHO->nNeumannUnknowns) = NeumannSpace.ApplyMassMatrix(neumannFuncCoeffs);
 		return b_neumann;
 	}
 

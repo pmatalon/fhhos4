@@ -625,6 +625,15 @@
     <ClInclude Include="src\Discretizations\HHO\DiscreteSpaces\HHOCellSpace.h">
       <Filter>Discretizations\HHO\DiscreteSpaces</Filter>
     </ClInclude>
+    <ClInclude Include="src\Discretizations\HHO\DiscreteSpaces\HHOFaceListSpace.h">
+      <Filter>Discretizations\HHO\DiscreteSpaces</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Discretizations\HHO\DiscreteSpaces\HHODirichletSpace.h">
+      <Filter>Discretizations\HHO\DiscreteSpaces</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Discretizations\HHO\DiscreteSpaces\HHONeumannSpace.h">
+      <Filter>Discretizations\HHO\DiscreteSpaces</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">
