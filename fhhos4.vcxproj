@@ -94,6 +94,7 @@
     <ClInclude Include="src\Discretizations\HHO\DiscreteSpaces\HHODirichletSpace.h" />
     <ClInclude Include="src\Discretizations\HHO\DiscreteSpaces\HHOFaceListSpace.h" />
     <ClInclude Include="src\Discretizations\HHO\DiscreteSpaces\HHONeumannSpace.h" />
+    <ClInclude Include="src\Discretizations\HHO\DiscreteSpaces\HHONonDirichletFaceSpace.h" />
     <ClInclude Include="src\Discretizations\HHO\DiscreteSpaces\HHOReconstructSpace.h" />
     <ClInclude Include="src\Discretizations\HHO\DiscreteSpaces\HHOSkeletonSpace.h" />
     <ClInclude Include="src\Discretizations\HHO\DiscreteSpaces\IDiscreteSpace.h" />

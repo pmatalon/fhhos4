@@ -38,10 +38,8 @@ public:
 		Vector innerProds = Vector(Dimension());
 		ParallelLoop<Face<Dim>*>::Execute(ListFaces(), [this, &innerProds, func](Face<Dim>* f)
 			{
-				Diff_HHOFace<Dim>* face = HHOFace(f);
 				BigNumber i = Number(f) * _nUnknowns;
-
-				innerProds.segment(i, _nUnknowns) = face->InnerProductWithBasis(func);
+				innerProds.segment(i, _nUnknowns) = HHOFace(f)->InnerProductWithBasis(func);
 			}
 		);
 		return innerProds;
@@ -53,10 +51,8 @@ public:
 		Vector res(v.rows());
 		ParallelLoop<Face<Dim>*>::Execute(ListFaces(), [this, &v, &res](Face<Dim>* f)
 			{
-				Diff_HHOFace<Dim>* face = HHOFace(f);
 				BigNumber i = Number(f) * _nUnknowns;
-
-				res.segment(i, _nUnknowns) = face->ApplyMassMatrix(v.segment(i, _nUnknowns));
+				res.segment(i, _nUnknowns) = HHOFace(f)->ApplyMassMatrix(v.segment(i, _nUnknowns));
 			});
 		return res;
 	}
@@ -67,10 +63,8 @@ public:
 		Vector res(v.rows());
 		ParallelLoop<Face<Dim>*>::Execute(ListFaces(), [this, &v, &res](Face<Dim>* f)
 			{
-				Diff_HHOFace<Dim>* face = HHOFace(f);
 				BigNumber i = Number(f) * _nUnknowns;
-
-				res.segment(i, _nUnknowns) = face->SolveMassMatrix(v.segment(i, _nUnknowns));
+				res.segment(i, _nUnknowns) = HHOFace(f)->SolveMassMatrix(v.segment(i, _nUnknowns));
 			});
 		return res;
 	}
@@ -80,10 +74,8 @@ public:
 		Vector vectorOfDoFs = Vector(Dimension());
 		ParallelLoop<Face<Dim>*>::Execute(ListFaces(), [this, &vectorOfDoFs, func](Face<Dim>* f)
 			{
-				Diff_HHOFace<Dim>* face = HHOFace(f);
 				BigNumber i = Number(f) * _nUnknowns;
-
-				vectorOfDoFs.segment(i, _nUnknowns) = face->ProjectOnBasis(func);
+				vectorOfDoFs.segment(i, _nUnknowns) = HHOFace(f)->ProjectOnBasis(func);
 			}
 		);
 		return vectorOfDoFs;
@@ -99,10 +91,8 @@ public:
 		ParallelLoop<Face<Dim>*, ChunkResult> parallelLoop(ListFaces());
 		parallelLoop.Execute([this, &v1, &v2](Face<Dim>* f, ParallelChunk<ChunkResult>* chunk)
 			{
-				Diff_HHOFace<Dim>* face = HHOFace(f);
 				BigNumber i = Number(f) * _nUnknowns;
-
-				chunk->Results.total += face->InnerProd(v1.segment(i, _nUnknowns), v2.segment(i, _nUnknowns));
+				chunk->Results.total += HHOFace(f)->InnerProd(v1.segment(i, _nUnknowns), v2.segment(i, _nUnknowns));
 			});
 
 		double total = 0;
@@ -122,9 +112,8 @@ public:
 		ParallelLoop<Face<Dim>*, ChunkResult> parallelLoop(ListFaces());
 		parallelLoop.Execute([this, &v](Face<Dim>* f, ParallelChunk<ChunkResult>* chunk)
 			{
-				Diff_HHOFace<Dim>* hhoFace = HHOFace(f);
 				auto i = Number(f) * _nUnknowns;
-				chunk->Results.total += hhoFace->Integral(v.segment(i, _nUnknowns));
+				chunk->Results.total += HHOFace(f)->Integral(v.segment(i, _nUnknowns));
 			});
 
 		double total = 0;

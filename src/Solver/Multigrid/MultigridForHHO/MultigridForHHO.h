@@ -181,7 +181,7 @@ public:
 
 			Diffusion_HHO<Dim>* coarsePb = dynamic_cast<LevelForHHO<Dim>*>(coarseLevel)->_problem;
 
-			Vector coarseError = coarsePb->SkeletonSpace.Project(coarseErrorFunction);
+			Vector coarseError = coarsePb->NonDirichletFaceSpace.Project(coarseErrorFunction);
 
 			Level* fineLevel = coarseLevel;
 			Vector prolongatedError = coarseError;

@@ -634,6 +634,9 @@
     <ClInclude Include="src\Discretizations\HHO\DiscreteSpaces\HHONeumannSpace.h">
       <Filter>Discretizations\HHO\DiscreteSpaces</Filter>
     </ClInclude>
+    <ClInclude Include="src\Discretizations\HHO\DiscreteSpaces\HHONonDirichletFaceSpace.h">
+      <Filter>Discretizations\HHO\DiscreteSpaces</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utils">

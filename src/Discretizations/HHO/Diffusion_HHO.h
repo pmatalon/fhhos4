@@ -13,6 +13,7 @@
 #include "DiscreteSpaces/HHOBoundarySpace.h"
 #include "DiscreteSpaces/HHODirichletSpace.h"
 #include "DiscreteSpaces/HHONeumannSpace.h"
+#include "DiscreteSpaces/HHONonDirichletFaceSpace.h"
 #include "Diffusion_HHOMatrix.h"
 #include "../../TestCases/Diffusion/DiffusionTestCase.h"
 #include "../../Utils/ExportModule.h"
@@ -37,12 +38,13 @@ public:
 	SparseMatrix A;
 	Vector b;
 
-	HHOCellSpace<Dim> CellSpace;
-	HHOSkeletonSpace<Dim> SkeletonSpace;
-	HHOReconstructSpace<Dim> ReconstructSpace;
-	HHOBoundarySpace<Dim> BoundarySpace;
-	HHODirichletSpace<Dim> DirichletSpace;
-	HHONeumannSpace<Dim> NeumannSpace;
+	HHOCellSpace<Dim>             CellSpace;
+	HHOReconstructSpace<Dim>      ReconstructSpace;
+	HHOSkeletonSpace<Dim>		  SkeletonSpace;
+	HHOBoundarySpace<Dim>         BoundarySpace;
+	HHODirichletSpace<Dim>        DirichletSpace;
+	HHONeumannSpace<Dim>          NeumannSpace;
+	HHONonDirichletFaceSpace<Dim> NonDirichletFaceSpace;
 
 	// Matrix parts:
 	// Used in reconstruction: A_T_ndF
@@ -692,12 +694,13 @@ public:
 		InitHHO_Faces();
 		InitHHO_Elements(assembleLocalMatrices);
 
-		CellSpace        = HHOCellSpace       (_mesh, HHO, _hhoElements);
-		SkeletonSpace    = HHOSkeletonSpace   (_mesh, HHO, _hhoFaces);
-		ReconstructSpace = HHOReconstructSpace(_mesh, HHO, _hhoElements);
-		BoundarySpace    = HHOBoundarySpace   (_mesh, HHO, _hhoFaces);
-		DirichletSpace   = HHODirichletSpace  (_mesh, HHO, _hhoFaces);
-		NeumannSpace     = HHONeumannSpace    (_mesh, HHO, _hhoFaces);
+		CellSpace             = HHOCellSpace            (_mesh, HHO, _hhoElements);
+		ReconstructSpace      = HHOReconstructSpace     (_mesh, HHO, _hhoElements);
+		SkeletonSpace         = HHOSkeletonSpace        (_mesh, HHO, _hhoFaces);
+		BoundarySpace         = HHOBoundarySpace        (_mesh, HHO, _hhoFaces);
+		DirichletSpace        = HHODirichletSpace       (_mesh, HHO, _hhoFaces);
+		NeumannSpace          = HHONeumannSpace         (_mesh, HHO, _hhoFaces);
+		NonDirichletFaceSpace = HHONonDirichletFaceSpace(_mesh, HHO, _hhoFaces);
 	}
 	void InitHHO_Faces()
 	{
@@ -1132,7 +1135,7 @@ public:
 		return result;
 	}
 
-	SparseMatrix A_bT_bT_Matrix()
+	/*SparseMatrix A_bT_bT_Matrix()
 	{
 		assert(_mesh->BoundaryElementsNumberedFirst());
 
@@ -1146,7 +1149,7 @@ public:
 		SparseMatrix mat = SparseMatrix(_mesh->BoundaryElements.size() * HHO->nCellUnknowns, _mesh->BoundaryElements.size() * HHO->nCellUnknowns);
 		parallelLoop.Fill(mat);
 		return mat;
-	}
+	}*/
 
 	//--------------------------------------------//
 	//              Global integrals              //
