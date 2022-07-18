@@ -139,4 +139,24 @@ public:
 			});
 		return total;
 	}
+
+	double Integral(DomFunction func) override
+	{
+		struct ChunkResult { double total = 0; };
+
+		ParallelLoop<Face<Dim>*, ChunkResult> parallelLoop(this->ListFaces());
+		parallelLoop.Execute([this, func](Face<Dim>* f, ParallelChunk<ChunkResult>* chunk)
+			{
+				if (f->HasDirichletBC())
+					return;
+				chunk->Results.total += f->Integral(func);
+			});
+
+		double total = 0;
+		parallelLoop.AggregateChunkResults([&total](ChunkResult chunkResult)
+			{
+				total += chunkResult.total;
+			});
+		return total;
+	}
 };

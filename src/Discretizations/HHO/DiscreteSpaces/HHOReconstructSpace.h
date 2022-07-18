@@ -62,10 +62,8 @@ public:
 		Vector res(v.rows());
 		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, &v, &res](Element<Dim>* e)
 			{
-				Diff_HHOElement<Dim>* elem = HHOElement(e);
 				BigNumber i = e->Number * HHO->nReconstructUnknowns;
-
-				res.segment(i, HHO->nReconstructUnknowns) = elem->ApplyReconstructMassMatrix(v.segment(i, HHO->nReconstructUnknowns));
+				res.segment(i, HHO->nReconstructUnknowns) = HHOElement(e)->ApplyReconstructMassMatrix(v.segment(i, HHO->nReconstructUnknowns));
 			});
 		return res;
 	}
@@ -76,10 +74,8 @@ public:
 		Vector res(v.rows());
 		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, &v, &res](Element<Dim>* e)
 			{
-				Diff_HHOElement<Dim>* elem = HHOElement(e);
 				BigNumber i = e->Number * HHO->nReconstructUnknowns;
-
-				res.segment(i, HHO->nReconstructUnknowns) = elem->SolveReconstructMassMatrix(v.segment(i, HHO->nReconstructUnknowns));
+				res.segment(i, HHO->nReconstructUnknowns) = HHOElement(e)->SolveReconstructMassMatrix(v.segment(i, HHO->nReconstructUnknowns));
 			});
 		return res;
 	}
@@ -89,8 +85,8 @@ public:
 		Vector vectorOfDoFs = Vector(Dimension());
 		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, &vectorOfDoFs, func](Element<Dim>* e)
 			{
-				Diff_HHOElement<Dim>* elem = HHOElement(e);
-				vectorOfDoFs.segment(e->Number * HHO->nReconstructUnknowns, HHO->nReconstructUnknowns) = elem->ProjectOnReconstructBasis(func);
+				BigNumber i = e->Number * HHO->nReconstructUnknowns;
+				vectorOfDoFs.segment(i, HHO->nReconstructUnknowns) = HHOElement(e)->ProjectOnReconstructBasis(func);
 			}
 		);
 		return vectorOfDoFs;
@@ -106,10 +102,8 @@ public:
 		ParallelLoop<Element<Dim>*, ChunkResult> parallelLoop(_mesh->Elements);
 		parallelLoop.Execute([this, &v1, &v2](Element<Dim>* e, ParallelChunk<ChunkResult>* chunk)
 			{
-				Diff_HHOElement<Dim>* elem = HHOElement(e);
-				BigNumber i = elem->Number() * HHO->nReconstructUnknowns;
-
-				chunk->Results.total += v1.segment(i, HHO->nReconstructUnknowns).dot(elem->ApplyReconstructMassMatrix(v2.segment(i, HHO->nReconstructUnknowns)));
+				BigNumber i = e->Number * HHO->nReconstructUnknowns;
+				chunk->Results.total += v1.segment(i, HHO->nReconstructUnknowns).dot(HHOElement(e)->ApplyReconstructMassMatrix(v2.segment(i, HHO->nReconstructUnknowns)));
 			});
 
 		double total = 0;
@@ -129,9 +123,8 @@ public:
 		ParallelLoop<Element<Dim>*, ChunkResult> parallelLoop(_mesh->Elements);
 		parallelLoop.Execute([this, &reconstructedCoeffs](Element<Dim>* e, ParallelChunk<ChunkResult>* chunk)
 			{
-				Diff_HHOElement<Dim>* hhoElem = HHOElement(e);
 				auto i = e->Number * HHO->nReconstructUnknowns;
-				chunk->Results.total += hhoElem->IntegralReconstruct(reconstructedCoeffs.segment(i, HHO->nReconstructUnknowns));
+				chunk->Results.total += HHOElement(e)->IntegralReconstruct(reconstructedCoeffs.segment(i, HHO->nReconstructUnknowns));
 			});
 
 		double total = 0;
@@ -141,6 +134,25 @@ public:
 			});
 		return total;
 	}
+
+	double Integral(DomFunction func) override
+	{
+		struct ChunkResult { double total = 0; };
+
+		ParallelLoop<Element<Dim>*, ChunkResult> parallelLoop(_mesh->Elements);
+		parallelLoop.Execute([this, func](Element<Dim>* e, ParallelChunk<ChunkResult>* chunk)
+			{
+				chunk->Results.total += e->Integral(func);
+			});
+
+		double total = 0;
+		parallelLoop.AggregateChunkResults([&total](ChunkResult chunkResult)
+			{
+				total += chunkResult.total;
+			});
+		return total;
+	}
+
 	/*
 	SparseMatrix StiffnessMatrix()
 	{

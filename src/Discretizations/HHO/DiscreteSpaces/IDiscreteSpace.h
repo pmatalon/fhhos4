@@ -29,9 +29,16 @@ public:
 
 	virtual double Integral(const Vector& coeffs) = 0;
 
+	virtual double Integral(DomFunction func) = 0;
+
 	double MeanValue(const Vector& coeffs)
 	{
 		return Integral(coeffs) / Measure();
+	}
+
+	double MeanValue(DomFunction func)
+	{
+		return Integral(func) / Measure();
 	}
 
 	double L2Norm(const Vector& v)

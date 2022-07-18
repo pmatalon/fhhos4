@@ -67,26 +67,18 @@ public:
 		return _diffPb.BoundarySpace.ZeroVector();
 	}
 
-private:
-	Vector BuildDirichlet(const Vector& dirichletArg)
-	{
-		return dirichletArg;
-	}
-
-public:
 	// Solve problem 1 (source=f, Dirich=<dirichlet>)
-	Vector Solve1stDiffProblem(const Vector& dirichletArg) override
+	Vector Solve1stDiffProblem(const Vector& dirichlet) override
 	{
 		Vector dummy;
-		return Solve1stDiffProblem(dirichletArg, false, dummy);
+		return Solve1stDiffProblem(dirichlet, false, dummy);
 	}
 
 private:
 	// Solve problem 1 (source=f, Dirich=<dirichlet>)
-	Vector Solve1stDiffProblem(const Vector& dirichletArg, bool reconstruct, Vector& reconstruction)
+	Vector Solve1stDiffProblem(const Vector& dirichlet, bool reconstruct, Vector& reconstruction)
 	{
 		// Define problem
-		Vector dirichlet = BuildDirichlet(dirichletArg);
 		Vector b_T   = _diffPb.ComputeB_T(_b_fSource, dirichlet);
 		Vector b_ndF = _diffPb.ComputeB_ndF_noNeumann(dirichlet);
 		Vector rhs = _diffPb.CondensedRHS(b_T, b_ndF);
@@ -111,10 +103,9 @@ private:
 
 public:
 	// Solve problem 1 (source=0, Dirich=<dirichlet>)
-	Vector Solve1stDiffProblem_Homogeneous(const Vector& dirichletArg) override
+	Vector Solve1stDiffProblem_Homogeneous(const Vector& dirichlet) override
 	{
 		// Define problem
-		Vector dirichlet = BuildDirichlet(dirichletArg);
 		Vector b_T = _diffPb.ComputeB_T_zeroSource(dirichlet);
 		Vector b_ndF = _diffPb.ComputeB_ndF_noNeumann(dirichlet);
 		Vector rhs = _diffPb.CondensedRHS(b_T, b_ndF);
@@ -147,7 +138,6 @@ public:
 
 		if (returnBoundaryNormalDerivative)
 		{
-			BigNumber nBdryCellUnknowns = _mesh->BoundaryElements.size() * HHO->nCellUnknowns;
 			Vector sourceElemBoundary = _diffPb.ExtractElemBoundary(source);
 			Vector normalDerivative = _NormalDerStiff_interior * faceSolution + _NormalDerStiff_boundary * _g_D - _NormalDerMass * sourceElemBoundary;
 			//return _diffPb.BoundarySpace.SolveMassMatrix(normalDerivative);
@@ -169,7 +159,6 @@ public:
 		this->CheckDiffSolverConvergence();
 
 		// Normal derivative
-		BigNumber nBdryCellUnknowns = _mesh->BoundaryElements.size() * HHO->nCellUnknowns;
 		Vector sourceElemBoundary = _diffPb.ExtractElemBoundary(source);
 		Vector normalDerivative = _NormalDerStiff_interior * faceSolution - _NormalDerMass * sourceElemBoundary;
 		//return _diffPb.BoundarySpace.SolveMassMatrix(normalDerivative);

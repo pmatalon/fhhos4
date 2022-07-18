@@ -63,7 +63,7 @@ public:
 		diffActions.LogAssembly = true;
 		_diffPb.Assemble(diffActions);
 
-		_integralSource = _diffPb.IntegralOverDomain(_testCase->SourceFunction);
+		_integralSource = _diffPb.CellSpace.Integral(_testCase->SourceFunction);
 
 		if (ReconstructHigherOrderBoundary)
 		{

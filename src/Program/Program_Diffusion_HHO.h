@@ -194,8 +194,8 @@ public:
 		if (testCase->BC.Type == PbBoundaryConditions::FullNeumann)
 		{
 			// Compatibility condition: (f|1) + <neumann|1> = 0
-			double integralF = problem->IntegralOverDomain(testCase->SourceFunction);
-			double integralN = problem->IntegralOverBoundary(testCase->BC.NeumannFunction);
+			double integralF = problem->CellSpace.Integral(testCase->SourceFunction);
+			double integralN = problem->BoundarySpace.Integral(testCase->BC.NeumannFunction);
 			if (abs(integralF + integralN) < Utils::NumericalZero)
 				cout << "Compatibility condition: (f|1) + <neumann|1> = " << (integralF + integralN) << endl;
 			else
@@ -363,7 +363,7 @@ public:
 			if (testCase->BC.Type == PbBoundaryConditions::FullNeumann)
 			{
 				if (testCase->ExactSolution)
-					cout << "Mean value of exact solution = " << problem->IntegralOverDomain(testCase->ExactSolution) << endl;
+					cout << "Mean value of exact solution = " << problem->ReconstructSpace.MeanValue(testCase->ExactSolution) << endl;
 				double meanValue = problem->ReconstructSpace.MeanValue(reconstructedSolution);
 				cout << "Mean value = " << meanValue << endl;
 

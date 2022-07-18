@@ -50,7 +50,7 @@ public:
 				Diff_HHOElement<Dim>* elem = HHOElement(e);
 				BigNumber i = e->Number * HHO->nCellUnknowns;
 
-				innerProds.segment(i, HHO->nCellUnknowns) = elem->InnerProductWithBasis(elem->CellBasis, func);
+				innerProds.segment(i, HHO->nCellUnknowns) = HHOElement(e)->InnerProductWithBasis(elem->CellBasis, func);
 			}
 		);
 		return innerProds;
@@ -62,10 +62,8 @@ public:
 		Vector res(v.rows());
 		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, &v, &res](Element<Dim>* e)
 			{
-				Diff_HHOElement<Dim>* elem = HHOElement(e);
 				BigNumber i = e->Number * HHO->nCellUnknowns;
-
-				res.segment(i, HHO->nCellUnknowns) = elem->ApplyCellMassMatrix(v.segment(i, HHO->nCellUnknowns));
+				res.segment(i, HHO->nCellUnknowns) = HHOElement(e)->ApplyCellMassMatrix(v.segment(i, HHO->nCellUnknowns));
 			});
 		return res;
 	}
@@ -76,10 +74,8 @@ public:
 		Vector res(v.rows());
 		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, &v, &res](Element<Dim>* e)
 			{
-				Diff_HHOElement<Dim>* elem = HHOElement(e);
 				BigNumber i = e->Number * HHO->nCellUnknowns;
-
-				res.segment(i, HHO->nCellUnknowns) = elem->SolveCellMassMatrix(v.segment(i, HHO->nCellUnknowns));
+				res.segment(i, HHO->nCellUnknowns) = HHOElement(e)->SolveCellMassMatrix(v.segment(i, HHO->nCellUnknowns));
 			});
 		return res;
 	}
@@ -89,8 +85,7 @@ public:
 		Vector vectorOfDoFs = Vector(Dimension());
 		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, &vectorOfDoFs, func](Element<Dim>* e)
 			{
-				Diff_HHOElement<Dim>* elem = HHOElement(e);
-				vectorOfDoFs.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns) = elem->ProjectOnCellBasis(func);
+				vectorOfDoFs.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns) = HHOElement(e)->ProjectOnCellBasis(func);
 			}
 		);
 		return vectorOfDoFs;
@@ -106,10 +101,8 @@ public:
 		ParallelLoop<Element<Dim>*, ChunkResult> parallelLoop(_mesh->Elements);
 		parallelLoop.Execute([this, &v1, &v2](Element<Dim>* e, ParallelChunk<ChunkResult>* chunk)
 			{
-				Diff_HHOElement<Dim>* elem = HHOElement(e);
-				BigNumber i = elem->Number() * HHO->nCellUnknowns;
-
-				chunk->Results.total += v1.segment(i, HHO->nCellUnknowns).dot(elem->ApplyCellMassMatrix(v2.segment(i, HHO->nCellUnknowns)));
+				BigNumber i = e->Number * HHO->nCellUnknowns;
+				chunk->Results.total += v1.segment(i, HHO->nCellUnknowns).dot(HHOElement(e)->ApplyCellMassMatrix(v2.segment(i, HHO->nCellUnknowns)));
 			});
 
 		double total = 0;
@@ -129,9 +122,8 @@ public:
 		ParallelLoop<Element<Dim>*, ChunkResult> parallelLoop(_mesh->Elements);
 		parallelLoop.Execute([this, &cellCoeffs](Element<Dim>* e, ParallelChunk<ChunkResult>* chunk)
 			{
-				Diff_HHOElement<Dim>* hhoElem = HHOElement(e);
 				auto i = e->Number * HHO->nCellUnknowns;
-				chunk->Results.total += hhoElem->IntegralCell(cellCoeffs.segment(i, HHO->nCellUnknowns));
+				chunk->Results.total += HHOElement(e)->IntegralCell(cellCoeffs.segment(i, HHO->nCellUnknowns));
 			});
 
 		double total = 0;
@@ -140,5 +132,62 @@ public:
 				total += chunkResult.total;
 			});
 		return total;
+	}
+
+	double Integral(DomFunction func) override
+	{
+		struct ChunkResult { double total = 0; };
+
+		ParallelLoop<Element<Dim>*, ChunkResult> parallelLoop(_mesh->Elements);
+		parallelLoop.Execute([this, func](Element<Dim>* e, ParallelChunk<ChunkResult>* chunk)
+			{
+				chunk->Results.total += e->Integral(func);
+			});
+
+		double total = 0;
+		parallelLoop.AggregateChunkResults([&total](ChunkResult chunkResult)
+			{
+				total += chunkResult.total;
+			});
+		return total;
+	}
+
+	//----------------------------------//
+	// Functions specific to this space //
+	//----------------------------------//
+
+	Vector Solve_A_T_T(const Vector& b_T)
+	{
+		assert(b_T.rows() == Dimension());
+
+		Vector result(b_T.rows());
+		ElementParallelLoop<Dim> parallelLoop(this->_mesh->Elements);
+		parallelLoop.Execute([this, &b_T, &result](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				auto i = e->Number * HHO->nCellUnknowns;
+				result.segment(i, HHO->nCellUnknowns) = HHOElement(e)->AttSolver.solve(b_T.segment(i, HHO->nCellUnknowns));
+			});
+		return result;
+	}
+
+	SparseMatrix Solve_A_T_T(const SparseMatrix& A_T_ndF)
+	{
+		ElementParallelLoop<Dim> parallelLoop(this->_mesh->Elements);
+		parallelLoop.ReserveChunkCoeffsSize(HHO->nCellUnknowns * HHO->nCellUnknowns);
+		parallelLoop.Execute([this, &A_T_ndF](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				auto i = e->Number * HHO->nCellUnknowns;
+				for (auto f : e->Faces)
+				{
+					if (f->HasDirichletBC())
+						continue;
+					auto j = f->Number * HHO->nFaceUnknowns;
+					DenseMatrix block_A_T_ndF = A_T_ndF.block(i, j, HHO->nCellUnknowns, HHO->nFaceUnknowns);
+					chunk->Results.Coeffs.Add(i, j, HHOElement(e)->AttSolver.solve(block_A_T_ndF));
+				}
+			});
+		SparseMatrix result = SparseMatrix(HHO->nTotalCellUnknowns, HHO->nTotalFaceUnknowns);
+		parallelLoop.Fill(result);
+		return result;
 	}
 };

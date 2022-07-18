@@ -604,7 +604,7 @@ public:
 				cout << "Static condensation..." << endl;
 
 			// Schur complement
-			SparseMatrix tmp = SparseMatrix(A_T_ndF.transpose()) * Solve_A_T_T(A_T_ndF);
+			SparseMatrix tmp = SparseMatrix(A_T_ndF.transpose()) * CellSpace.Solve_A_T_T(A_T_ndF);
 			this->A = (A_ndF_ndF - tmp).pruned();
 
 			if (actions.AssembleRightHandSide)
@@ -907,7 +907,7 @@ public:
 		return reconstruction;
 	}
 
-	Vector SolveCellUnknownsOnBoundaryOnly(const Vector& faceUnknowns, const Vector& b_T)
+	/*Vector SolveCellUnknownsOnBoundaryOnly(const Vector& faceUnknowns, const Vector& b_T)
 	{
 		BigNumber nBdryCellUnknowns = _mesh->NBoundaryElements() * HHO->nCellUnknowns;
 		Vector v = b_T.head(nBdryCellUnknowns) - A_T_ndF.topRows(nBdryCellUnknowns) * faceUnknowns;
@@ -921,14 +921,14 @@ public:
 					cellUnknowns.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns) = elem->AttSolver.solve(v.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns));
 			});
 		return cellUnknowns;
-	}
+	}*/
 
 	Vector SolveCellUnknowns(const Vector& faceUnknowns, const Vector& b_T)
 	{
 		assert(faceUnknowns.rows() == HHO->nTotalFaceUnknowns);
 		assert(b_T.rows() == HHO->nTotalCellUnknowns);
 
-		return Solve_A_T_T(b_T - A_T_ndF * faceUnknowns);
+		return CellSpace.Solve_A_T_T(b_T - A_T_ndF * faceUnknowns);
 	}
 
 	// Deprecated!
@@ -985,7 +985,7 @@ public:
 	// Deprecated
 	Vector& SetCondensedRHS()
 	{
-		this->b = this->B_ndF -this->A_T_ndF.transpose() * Solve_A_T_T(this->B_T);
+		this->b = this->B_ndF -this->A_T_ndF.transpose() * CellSpace.Solve_A_T_T(this->B_T);
 		return this->b;
 	}
 
@@ -994,24 +994,26 @@ public:
 		assert(b_T.rows() == HHO->nTotalCellUnknowns);
 		assert(b_ndF.rows() == HHO->nTotalFaceUnknowns);
 
-		return b_ndF - this->A_T_ndF.transpose() * Solve_A_T_T(b_T);
+		return b_ndF - this->A_T_ndF.transpose() * CellSpace.Solve_A_T_T(b_T);
 	}
 
 	Vector CondensedRHS_noNeumannZeroDirichlet(const Vector& b_T)
 	{
 		assert(b_T.rows() == HHO->nTotalCellUnknowns);
 
-		return -this->A_T_ndF.transpose() * Solve_A_T_T(b_T);
+		return -this->A_T_ndF.transpose() * CellSpace.Solve_A_T_T(b_T);
 	}
 
 	Vector CondensedRHS_noDirichletZeroNeumann(const Vector& b_T)
 	{
 		assert(b_T.rows() == HHO->nTotalCellUnknowns);
 
-		return -this->A_T_ndF.transpose() * Solve_A_T_T(b_T);
+		return -this->A_T_ndF.transpose() * CellSpace.Solve_A_T_T(b_T);
 	}
 
-
+	//------------------------//
+	// For biharmonic problem //
+	//------------------------//
 
 	SparseMatrix SolveCellUknTransposeOnBoundary()
 	{
@@ -1074,6 +1076,23 @@ public:
 		return Vector();
 	}
 
+	/*SparseMatrix A_bT_bT_Matrix()
+	{
+		assert(_mesh->BoundaryElementsNumberedFirst());
+
+		ElementParallelLoop<Dim> parallelLoop(_mesh->BoundaryElements);
+		parallelLoop.ReserveChunkCoeffsSize(HHO->nCellUnknowns * HHO->nCellUnknowns);
+		parallelLoop.Execute([this](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				Diff_HHOElement<Dim>* elem = HHOElement(e);
+				chunk->Results.Coeffs.Add(e->Number * HHO->nCellUnknowns, e->Number * HHO->nCellUnknowns, elem->A.topLeftCorner(HHO->nCellUnknowns, HHO->nCellUnknowns));
+			});
+		SparseMatrix mat = SparseMatrix(_mesh->BoundaryElements.size() * HHO->nCellUnknowns, _mesh->BoundaryElements.size() * HHO->nCellUnknowns);
+		parallelLoop.Fill(mat);
+		return mat;
+	}*/
+
+
 	//---------------------------------------//
 	//                Exports                //
 	//---------------------------------------//
@@ -1095,127 +1114,8 @@ public:
 	{
 		if (HHO->OrthogonalizeElemBases())
 			Utils::Error("The export to GMSH has not been implemented when the bases are orthonormalized against each element.");
-		Vector cellCoeffs = Solve_A_T_T(B_T - A_T_ndF * faceCoeffs);
+		Vector cellCoeffs = CellSpace.Solve_A_T_T(B_T - A_T_ndF * faceCoeffs);
 		this->_mesh->ExportToGMSH_Elements(this->HHO->CellBasis, cellCoeffs, out.GetFilePathPrefix(), "error");
-	}
-
-	//---------------------------------------//
-	//              Solve_A_T_T              //
-	//---------------------------------------//
-
-	SparseMatrix Solve_A_T_T(const SparseMatrix& A_T_ndF)
-	{
-		ElementParallelLoop<Dim> parallelLoop(this->_mesh->Elements);
-		parallelLoop.ReserveChunkCoeffsSize(HHO->nCellUnknowns * HHO->nCellUnknowns);
-		parallelLoop.Execute([this, &A_T_ndF](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
-			{
-				Diff_HHOElement<Dim>* element = HHOElement(e);
-				for (auto f : element->MeshElement->Faces)
-				{
-					if (f->HasDirichletBC())
-						continue;
-					DenseMatrix block_A_T_ndF = A_T_ndF.block(e->Number * HHO->nCellUnknowns, f->Number * HHO->nFaceUnknowns, HHO->nCellUnknowns, HHO->nFaceUnknowns);
-					chunk->Results.Coeffs.Add(e->Number * HHO->nCellUnknowns, f->Number * HHO->nFaceUnknowns, element->AttSolver.solve(block_A_T_ndF));
-				}
-			});
-		SparseMatrix result = SparseMatrix(HHO->nTotalCellUnknowns, HHO->nTotalFaceUnknowns);
-		parallelLoop.Fill(result);
-		return result;
-	}
-
-	Vector Solve_A_T_T(const Vector& b_T)
-	{
-		Vector result(b_T.rows());
-		ElementParallelLoop<Dim> parallelLoop(this->_mesh->Elements);
-		parallelLoop.Execute([this, &b_T, &result](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
-			{
-				Diff_HHOElement<Dim>* element = HHOElement(e);
-				result.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns) = element->AttSolver.solve(b_T.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns));
-			});
-		return result;
-	}
-
-	/*SparseMatrix A_bT_bT_Matrix()
-	{
-		assert(_mesh->BoundaryElementsNumberedFirst());
-
-		ElementParallelLoop<Dim> parallelLoop(_mesh->BoundaryElements);
-		parallelLoop.ReserveChunkCoeffsSize(HHO->nCellUnknowns * HHO->nCellUnknowns);
-		parallelLoop.Execute([this](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
-			{
-				Diff_HHOElement<Dim>* elem = HHOElement(e);
-				chunk->Results.Coeffs.Add(e->Number * HHO->nCellUnknowns, e->Number * HHO->nCellUnknowns, elem->A.topLeftCorner(HHO->nCellUnknowns, HHO->nCellUnknowns));
-			});
-		SparseMatrix mat = SparseMatrix(_mesh->BoundaryElements.size() * HHO->nCellUnknowns, _mesh->BoundaryElements.size() * HHO->nCellUnknowns);
-		parallelLoop.Fill(mat);
-		return mat;
-	}*/
-
-	//--------------------------------------------//
-	//              Global integrals              //
-	//--------------------------------------------//
-
-	/*double IntegralFromFaceDoFs(Vector dofs, int polyDegree)
-	{
-		auto faceBasis = HHO->FaceBasis;
-
-		struct ChunkResult
-		{
-			double integral = 0;
-		};
-
-		ParallelLoop<Face<Dim>*, ChunkResult> parallelLoop(this->_mesh->Faces);
-		parallelLoop.Execute([this, dofs, faceBasis, &polyDegree](Face<Dim>* f, ParallelChunk<ChunkResult>* chunk)
-			{
-				if (f->HasDirichletBC())
-					return;
-				auto approximate = faceBasis->GetApproximateFunction(dofs, f->Number * faceBasis->Size());
-				chunk->Results.integral += f->Integral(approximate, polyDegree);
-			});
-
-		double integral = 0;
-
-		parallelLoop.AggregateChunkResults([&integral](ChunkResult chunkResult)
-			{
-				integral += chunkResult.integral;
-			});
-		return integral;
-	}*/
-
-	double IntegralOverDomain(DomFunction func)
-	{
-		struct ChunkResult { double total = 0; };
-
-		ParallelLoop<Element<Dim>*, ChunkResult> parallelLoop(_mesh->Elements);
-		parallelLoop.Execute([this, func](Element<Dim>* e, ParallelChunk<ChunkResult>* chunk)
-			{
-				chunk->Results.total += e->Integral(func);
-			});
-
-		double total = 0;
-		parallelLoop.AggregateChunkResults([&total](ChunkResult chunkResult)
-			{
-				total += chunkResult.total;
-			});
-		return total;
-	}
-
-	double IntegralOverBoundary(DomFunction func)
-	{
-		struct ChunkResult { double total = 0; };
-
-		ParallelLoop<Face<Dim>*, ChunkResult> parallelLoop(_mesh->BoundaryFaces);
-		parallelLoop.Execute([this, func](Face<Dim>* f, ParallelChunk<ChunkResult>* chunk)
-			{
-				chunk->Results.total += f->Integral(func);
-			});
-
-		double total = 0;
-		parallelLoop.AggregateChunkResults([&total](ChunkResult chunkResult)
-			{
-				total += chunkResult.total;
-			});
-		return total;
 	}
 
 private:
