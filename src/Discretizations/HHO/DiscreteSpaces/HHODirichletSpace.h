@@ -8,19 +8,17 @@ class HHODirichletSpace : public HHOFaceListSpace<Dim>
 private:
 	const Mesh<Dim>* _mesh = nullptr;
 	vector<Diff_HHOFace<Dim>>* _hhoFaces = nullptr;
-	HHOParameters<Dim>* HHO = nullptr;
 
 public:
 	HHODirichletSpace() {}
 
 	HHODirichletSpace(const Mesh<Dim>* mesh, HHOParameters<Dim>* hho, vector<Diff_HHOFace<Dim>>& hhoFaces)
-		: HHOFaceListSpace<Dim>(hho->nFaceUnknowns)
+		: HHOFaceListSpace<Dim>(hho)
 	{
 		_mesh = mesh;
-		HHO = hho;
 		_hhoFaces = &hhoFaces;
-		assert(HHO->nDirichletFaces == _mesh->DirichletFaces.size());
-		assert(HHO->nDirichletFaces * HHO->nFaceUnknowns == HHO->nDirichletCoeffs);
+		assert(hho->nDirichletFaces == _mesh->DirichletFaces.size());
+		assert(hho->nDirichletFaces * hho->nFaceUnknowns == hho->nDirichletCoeffs);
 	}
 
 private:
@@ -36,7 +34,7 @@ private:
 
 	BigNumber Number(Face<Dim>* f) override
 	{
-		return f->Number - HHO->nInteriorAndNeumannFaces;
+		return f->Number - this->HHO->nInteriorAndNeumannFaces;
 	}
 
 public:

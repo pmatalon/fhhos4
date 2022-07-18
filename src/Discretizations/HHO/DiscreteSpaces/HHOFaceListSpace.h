@@ -9,12 +9,14 @@ class HHOFaceListSpace : public IDiscreteSpace
 {
 protected:
 	int _nUnknowns;
+	HHOParameters<Dim>* HHO = nullptr;
 
 	HHOFaceListSpace() {}
 
-	HHOFaceListSpace(int nUnknowns)
+	HHOFaceListSpace(HHOParameters<Dim>* hho)
 	{
-		_nUnknowns = nUnknowns;
+		_nUnknowns = hho->nFaceUnknowns;
+		HHO = hho;
 	}
 private:
 	virtual const vector<Face<Dim>*>& ListFaces() = 0;
@@ -48,6 +50,10 @@ public:
 	Vector ApplyMassMatrix(const Vector& v) override
 	{
 		assert(v.rows() == Dimension());
+
+		if (HHO->OrthonormalizeFaceBases())
+			return v;
+
 		Vector res(v.rows());
 		ParallelLoop<Face<Dim>*>::Execute(ListFaces(), [this, &v, &res](Face<Dim>* f)
 			{
@@ -60,6 +66,10 @@ public:
 	Vector SolveMassMatrix(const Vector& v) override
 	{
 		assert(v.rows() == Dimension());
+
+		if (HHO->OrthonormalizeFaceBases())
+			return v;
+
 		Vector res(v.rows());
 		ParallelLoop<Face<Dim>*>::Execute(ListFaces(), [this, &v, &res](Face<Dim>* f)
 			{
@@ -85,6 +95,9 @@ public:
 	{
 		assert(v1.rows() == Dimension());
 		assert(v2.rows() == Dimension());
+
+		if (HHO->OrthonormalizeFaceBases())
+			return v1.dot(v2);
 
 		struct ChunkResult { double total = 0; };
 

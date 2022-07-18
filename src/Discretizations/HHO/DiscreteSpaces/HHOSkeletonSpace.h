@@ -8,16 +8,14 @@ class HHOSkeletonSpace : public HHOFaceListSpace<Dim>
 protected:
 	const Mesh<Dim>* _mesh = nullptr;
 	vector<Diff_HHOFace<Dim>>* _hhoFaces = nullptr;
-	HHOParameters<Dim>* HHO = nullptr;
 
 public:
 	HHOSkeletonSpace()
 	{}
 
 	HHOSkeletonSpace(const Mesh<Dim>* mesh, HHOParameters<Dim>* hho, vector<Diff_HHOFace<Dim>>& hhoFaces)
-		: HHOFaceListSpace<Dim>(hho->nFaceUnknowns)
+		: HHOFaceListSpace<Dim>(hho)
 	{
-		HHO = hho;
 		_mesh = mesh;
 		_hhoFaces = &hhoFaces;
 	}

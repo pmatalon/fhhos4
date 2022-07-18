@@ -8,7 +8,6 @@ class HHOBoundarySpace : public HHOFaceListSpace<Dim>
 private:
 	const Mesh<Dim>* _mesh = nullptr;
 	vector<Diff_HHOFace<Dim>>* _hhoFaces = nullptr;
-	HHOParameters<Dim>* HHO = nullptr;
 	bool _onlyBoundaryHHOFacesProvided = false;
 
 public:
@@ -16,10 +15,9 @@ public:
 	{}
 
 	HHOBoundarySpace(const Mesh<Dim>* mesh, HHOParameters<Dim>* hho, vector<Diff_HHOFace<Dim>>& hhoFaces)
-		: HHOFaceListSpace<Dim>(hho->nFaceUnknowns)
+		: HHOFaceListSpace<Dim>(hho)
 	{
 		_mesh = mesh;
-		HHO = hho;
 		_hhoFaces = &hhoFaces;
 		_onlyBoundaryHHOFacesProvided = hhoFaces.size() == hho->nBoundaryFaces;
 	}
@@ -33,14 +31,14 @@ private:
 	Diff_HHOFace<Dim>* HHOFace(Face<Dim>* f) override
 	{
 		if (_onlyBoundaryHHOFacesProvided)
-			return &(*_hhoFaces)[f->Number - HHO->nInteriorFaces];
+			return &(*_hhoFaces)[f->Number - this->HHO->nInteriorFaces];
 		else
 			return &(*_hhoFaces)[f->Number];
 	}
 
 	BigNumber Number(Face<Dim>* f) override
 	{
-		return f->Number - HHO->nInteriorFaces;
+		return f->Number - this->HHO->nInteriorFaces;
 	}
 
 public:

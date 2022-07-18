@@ -59,6 +59,10 @@ public:
 	Vector ApplyMassMatrix(const Vector& v) override
 	{
 		assert(v.rows() == Dimension());
+
+		if (HHO->OrthonormalizeElemBases())
+			return v;
+
 		Vector res(v.rows());
 		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, &v, &res](Element<Dim>* e)
 			{
@@ -71,6 +75,10 @@ public:
 	Vector SolveMassMatrix(const Vector& v) override
 	{
 		assert(v.rows() == Dimension());
+
+		if (HHO->OrthonormalizeElemBases())
+			return v;
+
 		Vector res(v.rows());
 		ParallelLoop<Element<Dim>*>::Execute(this->_mesh->Elements, [this, &v, &res](Element<Dim>* e)
 			{
@@ -96,6 +104,9 @@ public:
 	{
 		assert(v1.rows() == Dimension());
 		assert(v2.rows() == Dimension());
+
+		if (HHO->OrthonormalizeElemBases())
+			return v1.dot(v2);
 
 		struct ChunkResult { double total = 0; };
 
