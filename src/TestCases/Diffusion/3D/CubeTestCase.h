@@ -36,13 +36,29 @@ public:
 		if (pb.BCCode.compare("d") != 0 && pb.BCCode.compare("m") != 0)
 			Utils::FatalError("The requested boundary conditions are not defined in this test case.");
 
-		if (pb.BCCode.compare("m") == 0)
+		if (pb.BCCode.compare("d") == 0)
+		{
+			this->BC.Type = PbBoundaryConditions::FullDirichlet;
+			this->BC.BoundaryConditionPartition = BoundaryConditions::DirichletEverywhere;
+			if (pb.SourceCode.compare("exp") == 0)
+			{
+				this->BC.DirichletFunction = this->ExpSolution3D;
+				this->BC.Description = "Dirichlet (exponential everywhere)";
+			}
+			else
+			{
+				this->BC.DirichletFunction = BoundaryConditions::Homogeneous;
+				this->BC.Description = "Homogeneous Dirichlet";
+			}
+		}
+		else if (pb.BCCode.compare("m") == 0)
 		{
 			this->BC.Type = PbBoundaryConditions::MixedDirichletNeumann;
 			this->BC.BoundaryConditionPartition = BoundaryConditions::MixedConditionsExample;
 			this->BC.Description = "Mixed Neumann-Dirichlet";
 		}
 
+		// Exact solution
 		if (pb.GeoCode.compare("cube") == 0 && this->DiffField.IsHomogeneous && this->DiffField.IsIsotropic && pb.BCCode.compare("d") == 0)
 		{
 			if (pb.SourceCode.compare("sine") == 0)
