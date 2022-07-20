@@ -476,6 +476,61 @@ public:
 		return refPoint;
 	}
 
+	static GeometricMapping MappingInfo()
+	{
+		GeometricMapping mapping;
+		mapping.NFunctions = 3; // 1, t, u
+
+		mapping.Coeffs = vector<double>(mapping.NFunctions * mapping.NFunctions);
+		for (int i = 0; i < mapping.NFunctions; i++)
+			mapping.Coeffs[i * mapping.NFunctions + i] = 1; // Identity
+
+		//                    t,u,v
+		mapping.Exponents = { 0,0,0,   // 1   = t^0 * u^0 * v^0
+							  1,0,0,   // t   = t^1 * u^0 * v^0
+							  0,1,0 }; // u   = t^0 * u^1 * v^0
+		return mapping;
+	}
+
+	vector<double> MappingCoefficients() const override
+	{
+		// refer to ConvertToDomain(). The basis functions are 1, t, u.
+		double x1 = this->Origin->X;
+		double y1 = this->Origin->Y;
+		double z1 = this->Origin->Z;
+
+		double x2 = x1 + this->WidthX;
+		double y2 = y1 + this->WidthY;
+		double z2 = z1 + this->WidthZ;
+
+		if (ShapeDim == 2 && DomainDim == 3)
+		{
+			if (this->Orientation == CartesianShapeOrientation::InXOY)
+			{
+				//                   1,             t,             u
+				return { (x2 + x1) / 2, (x2 - x1) / 2,             0,   // X
+						 (y2 + y1) / 2,             0, (y2 - y1) / 2,   // Y
+						            z1,             0,             0 }; // Z
+			}
+			else if (this->Orientation == CartesianShapeOrientation::InXOZ)
+			{
+				//                   1,             t,             u
+				return { (x2 + x1) / 2, (x2 - x1) / 2,             0,   // X
+						            y1,             0,             0,   // Y
+						 (z2 + z1) / 2,             0, (z2 - z1) / 2 }; // Z
+			}
+			else if (this->Orientation == CartesianShapeOrientation::InYOZ)
+			{
+				//                   1,             t,             u
+				return {            x1,             0,             0,   // X
+					  	 (y2 + y1) / 2, (y2 - y1) / 2,             0,   // Y
+						 (z2 + z1) / 2,             0, (z2 - z1) / 2 }; // Z
+			}
+		}
+		Utils::FatalError("MappingCoefficients() not implemented for CartesianShape<" + to_string(DomainDim) + "," + to_string(ShapeDim) + ">.");
+		return vector<double>();
+	}
+
 	//-------------------------------------//
 	//              Integrals              //
 	//-------------------------------------//

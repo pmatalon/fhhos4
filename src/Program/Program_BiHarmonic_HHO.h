@@ -246,7 +246,7 @@ public:
 						Vector allFacesValues = biHarPb->DiffPb().SkeletonSpace.ZeroVector();
 						kernelVector = eigenvectors.col(i);
 						allFacesValues.tail(kernelVector.rows()) = kernelVector.real();
-						dynamic_cast<GMSHMesh<Dim>*>(mesh)->ExportToGMSH_Faces(hho->FaceBasis, allFacesValues, out.GetFilePathPrefix(), "kernelFaces_" + to_string(i));
+						GMSHMesh<Dim>::ExportToGMSH_Faces(static_cast<PolyhedralMesh<Dim>*>(mesh), hho->FaceBasis, allFacesValues, out.GetFilePathPrefix(), "kernelFaces_" + to_string(i));
 					}
 					/*
 					Vector lambdaKernel = biHarPb->Solve1stDiffProblem_Homogeneous(kernelVector.real());

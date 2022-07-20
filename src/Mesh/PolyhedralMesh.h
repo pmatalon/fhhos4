@@ -13,6 +13,7 @@
 #ifdef ENABLE_3D
 	#include "3D/TetrahedralElement.h"
 	#include "3D/ParallelepipedElement.h"
+	#include "3D/RectangularFace.h"
 #endif // ENABLE_3D
 #include "Agglo.h"
 using namespace std;
@@ -20,6 +21,9 @@ using namespace std;
 template <int Dim>
 class PolyhedralMesh : public Mesh<Dim>
 {
+	template <int Dim2>
+	friend class GMSHMesh;
+
 protected:
 #ifdef ENABLE_2D
 	vector<QuadrilateralElement> _quadrilateralElements;
@@ -30,6 +34,7 @@ protected:
 	vector<TetrahedralElement> _tetrahedralElements;
 	vector<ParallelepipedElement> _parallelepipedElements;
 	vector<TriangularFace> _triangularFaces;
+	vector<RectangularFace> _rectangularFaces;
 #endif // ENABLE_3D
 private:
 	double _h = 0;

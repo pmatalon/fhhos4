@@ -236,7 +236,7 @@ private:
 		return geoFileWithN;
 	}
 
-	void ManageGMSHLog()
+	static void ManageGMSHLog()
 	{
 		// Enable the logs from GMSH to be printed in the console
 		if (GMSHLogEnabled)
@@ -1218,7 +1218,7 @@ public:
 		gmsh::finalize();
 	}
 
-	void ExportToGMSH_Faces(FunctionalBasis<Dim-1>* basis, const Vector& coeffs, const string& outputFilePathPrefix, const string& viewName, double tolerance = 1e-3, int maxRefinements = 6)
+	static void ExportToGMSH_Faces(PolyhedralMesh<Dim>* mesh, FunctionalBasis<Dim-1>* basis, const Vector& coeffs, const string& outputFilePathPrefix, const string& viewName, double tolerance = 1e-3, int maxRefinements = 6)
 	{
 		if (basis->BasisCode().compare(MonomialBasis<2>::Code()) != 0 || Utils::ProgramArgs.Discretization.OrthogonalizeFaceBasesCode > 0)
 		{
@@ -1226,13 +1226,8 @@ public:
 			return;
 		}
 
-		assert(!_mshFilePath.empty());
 		gmsh::initialize();
 		ManageGMSHLog();
-
-		gmsh::open(_mshFilePath);
-		if (_mshFileIsTmp)
-			remove(_mshFilePath.c_str());
 
 		int viewId = gmsh::view::add(viewName);
 
@@ -1274,31 +1269,31 @@ public:
 			gmsh::view::setInterpolationMatrices(viewId, "Line", basisSize, coefMonomials, expMonomials,
 				segmentMapping.NFunctions, segmentMapping.Coeffs, segmentMapping.Exponents);
 
-			vector<double> data = GeoMappingAndHighOrderData(this->_edgeFaces, coeffs, segmentMapping.NFunctions, basisSize);
-			gmsh::view::addListData(viewId, "SL", this->_edgeFaces.size(), data); // SL = Scalar Line
+			vector<double> data = GeoMappingAndHighOrderData(mesh->_edgeFaces, coeffs, segmentMapping.NFunctions, basisSize);
+			gmsh::view::addListData(viewId, "SL", mesh->_edgeFaces.size(), data); // SL = Scalar Line
 		}
 #endif // ENABLE_2D
 #ifdef ENABLE_3D
 		if (Dim == 3)
 		{
-			if (!this->_triangularFaces.empty())
+			if (!mesh->_triangularFaces.empty())
 			{
 				GeometricMapping triMapping = TriangleIn3D::MappingInfo();
 				gmsh::view::setInterpolationMatrices(viewId, "Triangle", basisSize, coefMonomials, expMonomials,
 					triMapping.NFunctions, triMapping.Coeffs, triMapping.Exponents);
 
-				vector<double> data = GeoMappingAndHighOrderData(this->_triangularFaces, coeffs, triMapping.NFunctions, basisSize);
-				gmsh::view::addListData(viewId, "ST", this->_triangularFaces.size(), data); // SL = Scalar Triangle
+				vector<double> data = GeoMappingAndHighOrderData(mesh->_triangularFaces, coeffs, triMapping.NFunctions, basisSize);
+				gmsh::view::addListData(viewId, "ST", mesh->_triangularFaces.size(), data); // SL = Scalar Triangle
 			}
-			/*if (!this->_rectangularFaces.empty())
+			if (!mesh->_rectangularFaces.empty())
 			{
-				GeometricMapping cartMapping = CartesianShape<3,2>::MappingInfo();
+				GeometricMapping cartMapping = CartesianShape<3, 2>::MappingInfo();
 				gmsh::view::setInterpolationMatrices(viewId, "Quadrangle", basisSize, coefMonomials, expMonomials,
 					cartMapping.NFunctions, cartMapping.Coeffs, cartMapping.Exponents);
 
-				vector<double> data = GeoMappingAndHighOrderData(this->_rectangularFaces, coeffs, cartMapping.NFunctions, basisSize);
-				gmsh::view::addListData(viewId, "SQ", this->_rectangularFaces.size(), data); // SQ = Scalar Quadrangle
-			}*/
+				vector<double> data = GeoMappingAndHighOrderData(mesh->_rectangularFaces, coeffs, cartMapping.NFunctions, basisSize);
+				gmsh::view::addListData(viewId, "SQ", mesh->_rectangularFaces.size(), data); // SQ = Scalar Quadrangle
+			}
 		}
 #endif // ENABLE_3D
 
@@ -1324,7 +1319,7 @@ public:
 
 private:
 	template<class ElementType>
-	vector<double> GeoMappingAndHighOrderData(const vector<ElementType>& elements, const Vector& coeffs, int nbMappingFunctions, int basisSize)
+	static vector<double> GeoMappingAndHighOrderData(const vector<ElementType>& elements, const Vector& coeffs, int nbMappingFunctions, int basisSize)
 	{
 		assert(elements.size() * basisSize == coeffs.rows());
 
