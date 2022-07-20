@@ -2199,7 +2199,7 @@ public:
 					delete this->Elements[i];
 				this->Elements.clear();
 			}
-			if (_triangularFaces.empty())
+			if (_triangularFaces.empty() && _rectangularFaces.empty())
 			{
 				for (size_t i = 0; i < this->Faces.size(); ++i)
 					delete this->Faces[i];
