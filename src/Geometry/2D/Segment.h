@@ -149,6 +149,31 @@ public:
 		}
 	}
 
+	static GeometricMapping MappingInfo()
+	{
+		GeometricMapping mapping;
+		mapping.NFunctions = 2; // 1, t
+
+		mapping.Coeffs = vector<double>(mapping.NFunctions * mapping.NFunctions);
+		for (int i = 0; i < mapping.NFunctions; i++)
+			mapping.Coeffs[i * mapping.NFunctions + i] = 1; // Identity
+
+		//                    t,u,v
+		mapping.Exponents = { 0,0,0,   // 1   = t^0 * u^0 * v^0
+							  1,0,0 }; // t   = t^1 * u^0 * v^0
+		return mapping;
+	}
+
+	vector<double> MappingCoefficients() const override
+	{
+		// Refer to ConvertToDomain(). The basis functions are 1, t.
+		//
+		//                       1,                 t
+		return { (v2.X + v1.X) / 2, (v2.X - v1.X) / 2,   // X
+				 (v2.Y + v1.Y) / 2, (v2.Y - v1.Y) / 2,   // Y
+					             0,                 0 }; // Z
+	}
+
 	void ExportToMatlab(string color = "r") const override
 	{
 		MatlabScript script;

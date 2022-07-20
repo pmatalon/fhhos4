@@ -186,6 +186,33 @@ public:
 		return p;
 	}
 
+	static GeometricMapping MappingInfo()
+	{
+		// Refer to ConvertToDomain(). The basis functions are 1, t, u.
+		GeometricMapping mapping;
+		mapping.NFunctions = 3; // 1, t, u
+
+		mapping.Coeffs = vector<double>(mapping.NFunctions * mapping.NFunctions);
+		for (int i = 0; i < mapping.NFunctions; i++)
+			mapping.Coeffs[i * mapping.NFunctions + i] = 1; // Identity
+
+		//                    t,u,v
+		mapping.Exponents = { 0,0,0,   // 1   = t^0 * u^0 * v^0
+							  1,0,0,   // t   = t^1 * u^0 * v^0
+							  0,1,0 }; // u   = t^0 * u^1 * v^0
+		return mapping;
+	}
+
+	vector<double> MappingCoefficients() const override
+	{
+		// Refer to ConvertToDomain(). The basis functions are 1, t, u.
+		//
+		//          1,             t,            u
+		return { v1.X, (v2.X - v1.X), (v3.X - v1.X),   // X
+				 v1.Y, (v2.Y - v1.Y), (v3.Y - v1.Y),   // Y
+				 v1.Z, (v2.Z - v1.Z), (v3.Z - v1.Z) }; // Z
+	}
+
 	void Serialize(ostream& os) const override
 	{
 		os << "Triangle";

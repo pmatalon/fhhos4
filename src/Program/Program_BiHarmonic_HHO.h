@@ -196,11 +196,15 @@ public:
 			//biHarPb->DiffPb().ExportReconstructedVectorToGMSH(biHarPb->Solve2ndDiffProblem(lambda_f, false), out, "u_f", args.Actions.Export.VisuTolerance, args.Actions.Export.VisuMaxRefinements);
 			//biHarPb->DiffPb().ExportReconstructedVectorToGMSH(biHarPb->Solve1stDiffProblemWithZeroSource(u_boundary_f), out, "lambda_f", args.Actions.Export.VisuTolerance, args.Actions.Export.VisuMaxRefinements);
 
+			//---------------------------//
+			//     Explicit matrix A     //
+			//---------------------------//
 
 			DenseMatrix A; // computed explicitly only if explicit solver or export requested
 			if (args.Solver.BiHarmonicSolverCode.compare("lu") == 0  || args.Solver.BiHarmonicSolverCode.compare("ch") == 0 ||
 				(args.Solver.BiHarmonicSolverCode.compare("cg") == 0 && (args.Solver.BiHarmonicPreconditionerCode.compare("j") == 0 || args.Solver.BiHarmonicPreconditionerCode.compare("bj") == 0)) ||
-				args.Actions.Export.LinearSystem)
+				args.Actions.Export.LinearSystem || 
+				args.Actions.UnitTests)
 			{
 				cout << "Explicit computation of the matrix..." << endl;
 				A = biHarPb->Matrix();
@@ -217,6 +221,45 @@ public:
 					cout << "Export linear system..." << endl;
 					out.ExportMatrix(A, "matrix");
 					out.ExportVector(b, "b");
+				}
+
+				if (args.Actions.UnitTests)
+				{
+					auto n = A.rows();
+					//A = (A + A.transpose()) / 2.0;
+
+					//double det = A.determinant();
+
+					Eigen::EigenSolver<DenseMatrix> es(A);
+					Eigen::VectorXcd eigenvalues = es.eigenvalues();
+					Eigen::MatrixXcd eigenvectors = es.eigenvectors();
+					//cout << "Eigenvalues:" << endl << eigenvalues << endl;
+					Eigen::VectorXcd kernelVector = eigenvectors.col(n - 1);
+					//cout << "---------------------" << endl << "Last eigenvector" << endl << kernelVector << endl;
+					//cout << "---------------------" << endl << "Preceding eigenvector" << endl << eigenvectors.col(n - 2) << endl;
+					//cout << "---------------------" << endl << "Preceding eigenvector" << endl << eigenvectors.col(n - 3) << endl;
+
+					for (int i = n - 1; i >= 0; i--)
+					{
+						if (eigenvalues(i).real() > Utils::NumericalZero)
+							break;
+						Vector allFacesValues = biHarPb->DiffPb().SkeletonSpace.ZeroVector();
+						kernelVector = eigenvectors.col(i);
+						allFacesValues.tail(kernelVector.rows()) = kernelVector.real();
+						dynamic_cast<GMSHMesh<Dim>*>(mesh)->ExportToGMSH_Faces(hho->FaceBasis, allFacesValues, out.GetFilePathPrefix(), "kernelFaces_" + to_string(i));
+					}
+					/*
+					Vector lambdaKernel = biHarPb->Solve1stDiffProblem_Homogeneous(kernelVector.real());
+					//cout << lambda.norm() << endl;
+
+					//DiffPb().ExportReconstructedVectorToGMSH(lambda, out, "lambda");
+					Vector solKernel = biHarPb->Solve2ndDiffProblem(lambdaKernel, false);
+					biHarPb->DiffPb().ExportReconstructedVectorToGMSH(solKernel, out, "solKernel");
+
+
+					Vector zero = -biHarPb->Solve2ndDiffProblem_Homogeneous(lambdaKernel);
+					cout << "Supposed to be 0: " << zero.norm() << endl;
+					*/
 				}
 			}
 
@@ -400,37 +443,7 @@ public:
 			error = (b_sourceFromContinuous - b_sourceFromProjection).norm() / b_sourceFromContinuous.norm();
 			cout << error << endl;*/
 
-			if (args.Actions.UnitTests)
-			{
-				auto n = A.rows();
-				A = (A + A.transpose()) / 2.0;
-
-				Eigen::EigenSolver<DenseMatrix> es(A);
-				double det = A.determinant();
-				//auto v = A.eigenvalues();
-				//cout << v << endl;
-				cout << "Eigenvalues:" << endl;
-				Eigen::VectorXcd eigenvalues = es.eigenvalues();
-				cout << eigenvalues << endl;
-				Eigen::MatrixXcd eigenvectors = es.eigenvectors();
-				Eigen::VectorXcd kernelVector = eigenvectors.col(n - 1);
-				cout << "---------------------" << endl << "Last eigenvector"      << endl << kernelVector << endl;
-				cout << "---------------------" << endl << "Preceding eigenvector" << endl << eigenvectors.col(n - 2) << endl;
-				cout << "---------------------" << endl << "Preceding eigenvector" << endl << eigenvectors.col(n - 3) << endl;
-
-				Vector lambda = biHarPb->Solve1stDiffProblem_Homogeneous(kernelVector.real());
-				//cout << lambda.norm() << endl;
-
-				//DiffPb().ExportReconstructedVectorToGMSH(lambda, out, "lambda");
-				Vector solPb2 = biHarPb->Solve2ndDiffProblem(lambda, false);
-				biHarPb->DiffPb().ExportReconstructedVectorToGMSH(solPb2, out, "solPb2");
-
-
-				Vector zero = -biHarPb->Solve2ndDiffProblem_Homogeneous(lambda);
-				cout << zero.norm() << endl;
-
-				//out.ExportMatrix(A, "matrix");
-			}
+			
 			//--------------------------------------------------------------------------//
 
 			if (!biHarIterSolver)

@@ -408,6 +408,7 @@ public:
 
 	static GeometricMapping MappingInfo()
 	{
+		// Refer to ConvertToDomain(). The basis functions are 1, t, u.
 		GeometricMapping mapping;
 		mapping.NFunctions = 3; // 1, t, u
 

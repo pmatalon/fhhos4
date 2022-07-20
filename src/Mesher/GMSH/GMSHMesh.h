@@ -1218,10 +1218,116 @@ public:
 		gmsh::finalize();
 	}
 
+	void ExportToGMSH_Faces(FunctionalBasis<Dim-1>* basis, const Vector& coeffs, const string& outputFilePathPrefix, const string& viewName, double tolerance = 1e-3, int maxRefinements = 6)
+	{
+		if (basis->BasisCode().compare(MonomialBasis<2>::Code()) != 0 || Utils::ProgramArgs.Discretization.OrthogonalizeFaceBasesCode > 0)
+		{
+			Utils::Error("For face visualization, use non-orthogonalized monomial bases (-f-basis monomials -f-ogb 0).");
+			return;
+		}
+
+		assert(!_mshFilePath.empty());
+		gmsh::initialize();
+		ManageGMSHLog();
+
+		gmsh::open(_mshFilePath);
+		if (_mshFileIsTmp)
+			remove(_mshFilePath.c_str());
+
+		int viewId = gmsh::view::add(viewName);
+
+		// Definition of the basis functions
+		int basisSize = basis->Size();
+		vector<double> coefMonomials(basisSize * basisSize); // Identity
+		for (int i = 0; i < basisSize; i++)
+			coefMonomials[i * basisSize + i] = 1; // because this is the monomial basis! If Legendre function, it would be the coefficients in front of its monomial decomposition.
+
+		vector<double> expMonomials(basisSize * 3); // 3 = 3D
+		auto localFunctions = basis->LocalFunctions();
+		for (int i = 0; i < basisSize; i++)
+		{
+#ifdef ENABLE_2D
+			if (Dim == 2)
+			{
+				BasisFunction<1>* phi = dynamic_cast<BasisFunction<1>*>(localFunctions[i]);
+				expMonomials[i * 3 + 0] = phi->GetDegree(); // exponent of u
+				expMonomials[i * 3 + 1] = 0;                // exponent of v
+				expMonomials[i * 3 + 2] = 0;                // exponent of w
+			}
+#endif // ENABLE_2D
+#ifdef ENABLE_3D
+			if (Dim == 3)
+			{
+				TensorPolynomial2D* phi = dynamic_cast<TensorPolynomial2D*>(localFunctions[i]);
+				expMonomials[i * 3 + 0] = phi->FuncX->GetDegree(); // exponent of u
+				expMonomials[i * 3 + 1] = phi->FuncY->GetDegree(); // exponent of v
+				expMonomials[i * 3 + 2] = 0;                       // exponent of w
+			}
+#endif // ENABLE_3D
+		}
+
+		// Geometric mapping and high-order data
+#ifdef ENABLE_2D
+		if (Dim == 2)
+		{
+			GeometricMapping segmentMapping = Segment::MappingInfo();
+			gmsh::view::setInterpolationMatrices(viewId, "Line", basisSize, coefMonomials, expMonomials,
+				segmentMapping.NFunctions, segmentMapping.Coeffs, segmentMapping.Exponents);
+
+			vector<double> data = GeoMappingAndHighOrderData(this->_edgeFaces, coeffs, segmentMapping.NFunctions, basisSize);
+			gmsh::view::addListData(viewId, "SL", this->_edgeFaces.size(), data); // SL = Scalar Line
+		}
+#endif // ENABLE_2D
+#ifdef ENABLE_3D
+		if (Dim == 3)
+		{
+			if (!this->_triangularFaces.empty())
+			{
+				GeometricMapping triMapping = TriangleIn3D::MappingInfo();
+				gmsh::view::setInterpolationMatrices(viewId, "Triangle", basisSize, coefMonomials, expMonomials,
+					triMapping.NFunctions, triMapping.Coeffs, triMapping.Exponents);
+
+				vector<double> data = GeoMappingAndHighOrderData(this->_triangularFaces, coeffs, triMapping.NFunctions, basisSize);
+				gmsh::view::addListData(viewId, "ST", this->_triangularFaces.size(), data); // SL = Scalar Triangle
+			}
+			/*if (!this->_rectangularFaces.empty())
+			{
+				GeometricMapping cartMapping = CartesianShape<3,2>::MappingInfo();
+				gmsh::view::setInterpolationMatrices(viewId, "Quadrangle", basisSize, coefMonomials, expMonomials,
+					cartMapping.NFunctions, cartMapping.Coeffs, cartMapping.Exponents);
+
+				vector<double> data = GeoMappingAndHighOrderData(this->_rectangularFaces, coeffs, cartMapping.NFunctions, basisSize);
+				gmsh::view::addListData(viewId, "SQ", this->_rectangularFaces.size(), data); // SQ = Scalar Quadrangle
+			}*/
+		}
+#endif // ENABLE_3D
+
+		// Options for the high-order:
+		// 
+		// In order to visualize the high-order field, one must activate adaptive visualization
+		gmsh::view::option::setNumber(viewId, "AdaptVisualizationGrid", 1);
+		// set a visualization error threshold
+		gmsh::view::option::setNumber(viewId, "TargetError", tolerance);
+		// set a maximum subdivision level (GMSH does automatic mesh refinement to visualize the high-order field with the requested accuracy)
+		gmsh::view::option::setNumber(viewId, "MaxRecursionLevel", maxRefinements);
+
+
+		string dataFilePath = outputFilePathPrefix + (outputFilePathPrefix.back() == '/' ? "" : "_") + viewName + ".pos";
+		gmsh::view::write(viewId, dataFilePath);
+		cout << viewName << " exported for GMSH to " << dataFilePath << endl;
+
+		// To open the GMSH window
+		//gmsh::fltk::run();
+
+		gmsh::finalize();
+	}
+
 private:
 	template<class ElementType>
 	vector<double> GeoMappingAndHighOrderData(const vector<ElementType>& elements, const Vector& coeffs, int nbMappingFunctions, int basisSize)
 	{
+		assert(elements.size() * basisSize == coeffs.rows());
+
 		vector<double> data;
 		data.reserve(elements.size() * (nbMappingFunctions * 3 + basisSize));
 		for (const ElementType& e : elements)
