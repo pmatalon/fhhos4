@@ -197,19 +197,17 @@ public:
 			Face<Dim>* f = _nbh.BoundaryFaces[i];
 			if (f->IsDomainBoundary)
 			{
-				Diff_HHOElement<Dim>* e = _diffPb.HHOElement(f->Element1);
+				Element<Dim>* e = f->Element1;
+				DenseMatrix P = _diffPb.HHOElement(e)->SolveCellUnknownsMatrix().middleCols(e->LocalNumberOf(f) * nFaceUnknowns, nFaceUnknowns);
 
-				//DenseMatrix P = e->P.middleCols(nCellUnknowns + e->MeshElement->LocalNumberOf(f) * nFaceUnknowns, nFaceUnknowns);
-				DenseMatrix P = e->SolveCellUnknownsMatrix().middleCols(e->MeshElement->LocalNumberOf(f) * nFaceUnknowns, nFaceUnknowns);
-
-				coeffs.Add(i * nFaceUnknowns, _nbh.ElementNumber(e->MeshElement) * nCellUnknowns, P.transpose());
+				coeffs.Add(i * nFaceUnknowns, _nbh.ElementNumber(e) * nCellUnknowns, P.transpose());
 			}
 		}
 		coeffs.Fill(mat);
 		return mat;
 	}
 
-	SparseMatrix CellMassMatrix()
+	/*SparseMatrix CellMassMatrix()
 	{
 		int nCellUnknowns = _diffPb.HHO->nCellUnknowns;
 
@@ -222,7 +220,7 @@ public:
 		}
 		coeffs.Fill(mat);
 		return mat;
-	}
+	}*/
 
 
 	Vector AssembleSourceTerm(const Vector& sourceFuncCoeffs)
@@ -304,7 +302,7 @@ public:
 		return result;
 	}
 
-	SparseMatrix A_T_T()
+	/*SparseMatrix A_T_T()
 	{
 		int nCellUnknowns = _diffPb.HHO->nCellUnknowns;
 
@@ -317,7 +315,7 @@ public:
 		}
 		coeffs.Fill(mat);
 		return mat;
-	}
+	}*/
 
 	// Reconstruction
 
@@ -350,7 +348,7 @@ public:
 		return reconstruction;
 	}
 
-	Vector SolveFaceMassMatrixOnBoundary(const Vector& v)
+	/*Vector SolveFaceMassMatrixOnBoundary(const Vector& v)
 	{
 		int nFaceUnknowns = _diffPb.HHO->nFaceUnknowns;
 		Vector res(v.rows());
@@ -362,5 +360,5 @@ public:
 			res.segment(i * nFaceUnknowns, nFaceUnknowns) = face->SolveMassMatrix(v.segment(i * nFaceUnknowns, nFaceUnknowns));
 		}
 		return res;
-	}
+	}*/
 };

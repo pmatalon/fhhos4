@@ -1037,7 +1037,7 @@ public:
 	}
 	
 	// Mass matrix of degree k, on boundary elements only
-	SparseMatrix CellMassMatrixOnBoundaryElements()
+	/*SparseMatrix CellMassMatrixOnBoundaryElements()
 	{
 		SparseMatrix mass(_mesh->NBoundaryElements() * HHO->nCellUnknowns, _mesh->NBoundaryElements() * HHO->nCellUnknowns);
 		if (HHO->OrthonormalizeElemBases())
@@ -1061,7 +1061,7 @@ public:
 			parallelLoop.Fill(mass);
 		}
 		return mass;
-	}
+	}*/
 
 	Vector ExtractElemBoundary(const Vector v)
 	{

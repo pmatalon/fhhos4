@@ -16,9 +16,9 @@ private:
 	VirtualDiffusionTestCase<Dim> _diffPbTestCase;
 	Diffusion_HHO<Dim> _diffPb;
 
+	SparseMatrix _Theta_T_bF_transpose;
 	SparseMatrix _S_iF_bF_transpose;
 	SparseMatrix _S_bF_bF;
-	SparseMatrix _M;
 
 	HHOParameters<Dim>* HHO;
 
@@ -50,29 +50,18 @@ public:
 		diffActions.LogAssembly = true;
 		_diffPb.Assemble(diffActions);
 
-		SparseMatrix Theta_T_bF_transpose = _diffPb.Theta_T_bF_transpose();
+		_Theta_T_bF_transpose = _diffPb.Theta_T_bF_transpose();
 		auto nBoundaryElemUnknowns = _mesh->NBoundaryElements() * HHO->nCellUnknowns;
 		
-		_S_iF_bF_transpose = Theta_T_bF_transpose * _diffPb.A_T_ndF.topRows(nBoundaryElemUnknowns) + _diffPb.A_ndF_dF.transpose();
+		_S_iF_bF_transpose = _Theta_T_bF_transpose * _diffPb.A_T_ndF.topRows(nBoundaryElemUnknowns) + _diffPb.A_ndF_dF.transpose();
 
-		SparseMatrix tmp = _diffPb.A_T_dF.topRows(nBoundaryElemUnknowns).transpose() * Theta_T_bF_transpose.transpose();
+		SparseMatrix tmp = _diffPb.A_T_dF.topRows(nBoundaryElemUnknowns).transpose() * _Theta_T_bF_transpose.transpose();
 		_S_bF_bF = tmp + _diffPb.A_dF_dF;
-
-		//if (HHO->OrthonormalizeElemBases())
-			_M = Theta_T_bF_transpose;
-		/*else
-		{
-			SparseMatrix CellMass = _diffPb.CellMassMatrixOnBoundaryElements();
-			_M = Theta_T_bF_transpose * CellMass;
-		}*/
 
 		/*ExportModule out(Utils::ProgramArgs.OutputDirectory, "", Utils::ProgramArgs.Actions.Export.ValueSeparator);
 
 		cout << Utils::MatrixInfo(Theta_T_bF_transpose, "Theta_T_bF_transpose") << endl;
-		out.ExportMatrix(Theta_T_bF_transpose, "Theta_T_bF_transpose");
-
-		//cout << Utils::MatrixInfo(CellMass, "CellMass") << endl;
-		//out.ExportMatrix(CellMass, "CellMass");
+		out.ExportMatrix(_Theta_T_bF_transpose, "Theta_T_bF_transpose");
 
 		cout << Utils::MatrixInfo(_diffPb.A_T_ndF, "A_T_ndF") << endl;
 		out.ExportMatrix(_diffPb.A_T_ndF, "A_T_ndF");
@@ -170,7 +159,7 @@ public:
 		if (returnBoundaryNormalDerivative)
 		{
 			Vector sourceElemBoundary = _diffPb.ExtractElemBoundary(b_source);
-			Vector normalDerivative = _S_iF_bF_transpose * faceSolution + _S_bF_bF * _g_D - _M * sourceElemBoundary;
+			Vector normalDerivative = _S_iF_bF_transpose * faceSolution + _S_bF_bF * _g_D - _Theta_T_bF_transpose * sourceElemBoundary;
 			//return _diffPb.BoundarySpace.SolveMassMatrix(normalDerivative);
 			return normalDerivative;
 		}
@@ -191,7 +180,7 @@ public:
 
 		// Normal derivative
 		Vector sourceElemBoundary = _diffPb.ExtractElemBoundary(b_source);
-		Vector normalDerivative = _S_iF_bF_transpose * faceSolution - _M * sourceElemBoundary;
+		Vector normalDerivative = _S_iF_bF_transpose * faceSolution - _Theta_T_bF_transpose * sourceElemBoundary;
 		//return _diffPb.BoundarySpace.SolveMassMatrix(normalDerivative);
 		return normalDerivative;
 	}
