@@ -359,6 +359,8 @@ public:
 			//       L2 error       //
 			//----------------------//
 
+			cout << std::scientific << std::setprecision(2);
+
 			// Check mean value if full Neumann conditions
 			if (testCase->BC.Type == PbBoundaryConditions::FullNeumann)
 			{
@@ -389,19 +391,19 @@ public:
 			{
 				if (args.Problem.BCCode.compare("d") == 0)
 				{
-					SparseMatrix SolveCellUknTranspose = problem->SolveCellUknTransposeOnBoundary();
-					//SparseMatrix CellMass = problem->CellMassMatrixOnBoundaryElements();
-					auto nBoundaryElemUnknowns = SolveCellUknTranspose.cols();
-					SparseMatrix NormalDerStiff_interior = SolveCellUknTranspose * problem->A_T_ndF.topRows(nBoundaryElemUnknowns) + problem->A_ndF_dF.transpose();
-					SparseMatrix tmp = problem->A_T_dF.topRows(nBoundaryElemUnknowns).transpose() * SolveCellUknTranspose.transpose();
-					SparseMatrix NormalDerStiff_boundary = tmp + problem->A_dF_dF;
-					SparseMatrix NormalDerMass = SolveCellUknTranspose;// *CellMass;
+					SparseMatrix Theta_T_bF_transpose = problem->Theta_T_bF_transpose();
+					auto nBoundaryElemUnknowns = Theta_T_bF_transpose.cols();
+					
+					SparseMatrix S_iF_bF_transpose = Theta_T_bF_transpose * problem->A_T_ndF.topRows(nBoundaryElemUnknowns) + problem->A_ndF_dF.transpose();
+					
+					SparseMatrix tmp = problem->A_T_dF.topRows(nBoundaryElemUnknowns).transpose() * Theta_T_bF_transpose.transpose();
+					SparseMatrix S_bF_bF = tmp + problem->A_dF_dF;
 
-					Vector g_D = problem->AssembleDirichletTerm(testCase->BC.DirichletFunction);
-					Vector source = problem->AssembleSourceTerm(testCase->SourceFunction);
+					Vector g_D = problem->DirichletSpace.Project(testCase->BC.DirichletFunction);
+					Vector source = problem->CellSpace.InnerProdWithBasis(testCase->SourceFunction);
 					Vector sourceElemBoundary = problem->ExtractElemBoundary(source);
 
-					Vector normalDerivativeRHS = NormalDerStiff_interior * systemSolution + NormalDerStiff_boundary * g_D - NormalDerMass * sourceElemBoundary;
+					Vector normalDerivativeRHS = S_iF_bF_transpose * systemSolution + S_bF_bF * g_D - Theta_T_bF_transpose * sourceElemBoundary;
 					Vector normalDerivative = problem->BoundarySpace.SolveMassMatrix(normalDerivativeRHS);
 
 					Vector exact = problem->BoundarySpace.Project(testCase->ExactSolution_Neumann);

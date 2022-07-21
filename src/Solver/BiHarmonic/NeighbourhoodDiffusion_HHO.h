@@ -185,7 +185,7 @@ public:
 		return b_neumann;
 	}*/
 
-	SparseMatrix SolveCellUknTranspose()
+	SparseMatrix Theta_T_bF_transpose()
 	{
 		int nFaceUnknowns = _diffPb.HHO->nFaceUnknowns;
 		int nCellUnknowns = _diffPb.HHO->nCellUnknowns;

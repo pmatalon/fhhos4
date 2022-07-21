@@ -233,7 +233,7 @@ public:
 					Eigen::EigenSolver<DenseMatrix> es(A);
 					Eigen::VectorXcd eigenvalues = es.eigenvalues();
 					Eigen::MatrixXcd eigenvectors = es.eigenvectors();
-					//cout << "Eigenvalues:" << endl << eigenvalues << endl;
+					cout << "Eigenvalues:" << endl << eigenvalues << endl;
 					Eigen::VectorXcd kernelVector = eigenvectors.col(n - 1);
 					//cout << "---------------------" << endl << "Last eigenvector" << endl << kernelVector << endl;
 					//cout << "---------------------" << endl << "Preceding eigenvector" << endl << eigenvectors.col(n - 2) << endl;

@@ -1015,20 +1015,18 @@ public:
 	// For biharmonic problem //
 	//------------------------//
 
-	SparseMatrix SolveCellUknTransposeOnBoundary()
+	SparseMatrix Theta_T_bF_transpose()
 	{
 		FaceParallelLoop<Dim> parallelLoop(_mesh->BoundaryFaces);
 		parallelLoop.ReserveChunkCoeffsSize(HHO->nCellUnknowns * HHO->nFaceUnknowns);
 
 		parallelLoop.Execute([this](Face<Dim>* f, ParallelChunk<CoeffsChunk>* chunk)
 			{
+				Element<Dim>* e = f->Element1;
 				int i = f->Number - HHO->nInteriorFaces;
-				Diff_HHOFace<Dim>* face = HHOFace(f);
+				int j = _mesh->BoundaryElementNumber(e);
 
-				int j = _mesh->BoundaryElementNumber(f->Element1);
-				Diff_HHOElement<Dim>* elem = this->HHOElement(f->Element1);
-
-				DenseMatrix S = elem->SolveCellUnknownsMatrix().middleCols(elem->LocalNumberOf(face) * HHO->nFaceUnknowns, HHO->nFaceUnknowns);
+				DenseMatrix S = HHOElement(e)->SolveCellUnknownsMatrix().middleCols(e->LocalNumberOf(f) * HHO->nFaceUnknowns, HHO->nFaceUnknowns);
 
 				chunk->Results.Coeffs.Add(i * HHO->nFaceUnknowns, j * HHO->nCellUnknowns, S.transpose());
 			});

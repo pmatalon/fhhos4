@@ -75,11 +75,11 @@ private:
 				Neighbourhood<Dim> nbh(e, _neighbourhoodDepth);
 				NeighbourhoodDiffusion_HHO<Dim> nbhDiff(nbh, _diffPb);
 
-				SparseMatrix SolveCellUknTranspose = nbhDiff.SolveCellUknTranspose();
-				SparseMatrix CellMass = nbhDiff.CellMassMatrix();
+				SparseMatrix Theta_T_bF_transpose = nbhDiff.Theta_T_bF_transpose();
+				//SparseMatrix CellMass = nbhDiff.CellMassMatrix();
 
-				SparseMatrix normalDerStiff = SolveCellUknTranspose * nbhDiff.A_T_ndF + nbhDiff.A_ndF_dF.transpose();
-				SparseMatrix normalDerMass = SolveCellUknTranspose * CellMass;
+				SparseMatrix S_iF_bF_transpose = Theta_T_bF_transpose * nbhDiff.A_T_ndF + nbhDiff.A_ndF_dF.transpose();
+				SparseMatrix normalDerMass = Theta_T_bF_transpose;// *CellMass;
 				
 				for (int k = 0; k < nFaceUnknowns; k++)
 				{
@@ -87,7 +87,7 @@ private:
 					Vector dirichlet = Vector::Zero(nbh.BoundaryFaces.size() * nFaceUnknowns);
 					dirichlet[nbh.BoundaryFaceNumber(f) * nFaceUnknowns + k] = 1;
 
-					Vector approxColumn = BiharOperator(dirichlet, nbhDiff, normalDerStiff, normalDerMass);
+					Vector approxColumn = BiharOperator(dirichlet, nbhDiff, S_iF_bF_transpose, normalDerMass);
 
 					for (int i2 = 0; i2 < nbh.BoundaryFaces.size(); i2++)
 					{
@@ -174,11 +174,11 @@ private:
 				Neighbourhood<Dim> nbh(boundaryElements, _neighbourhoodDepth);
 				NeighbourhoodDiffusion_HHO<Dim> nbhDiff(nbh, _diffPb);
 
-				SparseMatrix SolveCellUknTranspose = nbhDiff.SolveCellUknTranspose();
-				SparseMatrix CellMass = nbhDiff.CellMassMatrix();
+				SparseMatrix Theta_T_bF_transpose = nbhDiff.Theta_T_bF_transpose();
+				//SparseMatrix CellMass = nbhDiff.CellMassMatrix();
 
-				SparseMatrix normalDerStiff = SolveCellUknTranspose * nbhDiff.A_T_ndF + nbhDiff.A_ndF_dF.transpose();
-				SparseMatrix normalDerMass = SolveCellUknTranspose * CellMass;
+				SparseMatrix S_iF_bF_transpose = Theta_T_bF_transpose * nbhDiff.A_T_ndF + nbhDiff.A_ndF_dF.transpose();
+				SparseMatrix normalDerMass = Theta_T_bF_transpose;// *CellMass;
 
 				for (int i1 = 0; i1 < patch.Faces.size(); ++i1)
 				{
@@ -192,7 +192,7 @@ private:
 						Vector dirichlet = Vector::Zero(nbh.BoundaryFaces.size() * nFaceUnknowns);
 						dirichlet[locNum1 * nFaceUnknowns + k] = 1;
 
-						Vector approxColumn = BiharOperator(dirichlet, nbhDiff, normalDerStiff, normalDerMass);
+						Vector approxColumn = BiharOperator(dirichlet, nbhDiff, S_iF_bF_transpose, normalDerMass);
 
 						//cout << approxColumn.segment(locNum1 * nFaceUnknowns, nFaceUnknowns) << endl << endl;
 
@@ -254,7 +254,7 @@ private:
 			_solver.Setup(mat);
 	}
 
-	Vector BiharOperator(const Vector& dirichlet, NeighbourhoodDiffusion_HHO<Dim>& nbhDiff, const SparseMatrix& normalDerStiff, const SparseMatrix& normalDerMass)
+	Vector BiharOperator(const Vector& dirichlet, NeighbourhoodDiffusion_HHO<Dim>& nbhDiff, const SparseMatrix& S_iF_bF_transpose, const SparseMatrix& normalDerMass)
 	{
 		// Problem 1 (Dirichlet, zero source)
 		Vector b_T = nbhDiff.ComputeB_T_zeroSource(dirichlet); // TODO don't compute the whole matrix vector product, there is only one 1 in the vector
@@ -296,7 +296,7 @@ private:
 		}*/
 
 		// Normal derivative
-		Vector normalDerivative = normalDerStiff * faceSolution - normalDerMass * lambda;
+		Vector normalDerivative = S_iF_bF_transpose * faceSolution - normalDerMass * b_source;
 		//return -nbhDiff.SolveFaceMassMatrixOnBoundary(normalDerivative);
 		return -normalDerivative;
 	}

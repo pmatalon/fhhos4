@@ -16,9 +16,9 @@ private:
 	VirtualDiffusionTestCase<Dim> _diffPbTestCase;
 	Diffusion_HHO<Dim> _diffPb;
 
-	SparseMatrix _NormalDerStiff_interior;
-	SparseMatrix _NormalDerStiff_boundary;
-	SparseMatrix _NormalDerMass;
+	SparseMatrix _S_iF_bF_transpose;
+	SparseMatrix _S_bF_bF;
+	SparseMatrix _M;
 
 	HHOParameters<Dim>* HHO;
 
@@ -50,13 +50,44 @@ public:
 		diffActions.LogAssembly = true;
 		_diffPb.Assemble(diffActions);
 
-		SparseMatrix SolveCellUknTranspose = _diffPb.SolveCellUknTransposeOnBoundary();
-		SparseMatrix CellMass = _diffPb.CellMassMatrixOnBoundaryElements();
-		auto nBoundaryElemUnknowns = SolveCellUknTranspose.cols();
-		_NormalDerStiff_interior = SolveCellUknTranspose * _diffPb.A_T_ndF.topRows(nBoundaryElemUnknowns) + _diffPb.A_ndF_dF.transpose();
-		SparseMatrix tmp = _diffPb.A_T_dF.topRows(nBoundaryElemUnknowns).transpose() * SolveCellUknTranspose.transpose();
-		_NormalDerStiff_boundary = tmp + _diffPb.A_dF_dF;
-		_NormalDerMass = SolveCellUknTranspose * CellMass;
+		SparseMatrix Theta_T_bF_transpose = _diffPb.Theta_T_bF_transpose();
+		auto nBoundaryElemUnknowns = _mesh->NBoundaryElements() * HHO->nCellUnknowns;
+		
+		_S_iF_bF_transpose = Theta_T_bF_transpose * _diffPb.A_T_ndF.topRows(nBoundaryElemUnknowns) + _diffPb.A_ndF_dF.transpose();
+
+		SparseMatrix tmp = _diffPb.A_T_dF.topRows(nBoundaryElemUnknowns).transpose() * Theta_T_bF_transpose.transpose();
+		_S_bF_bF = tmp + _diffPb.A_dF_dF;
+
+		//if (HHO->OrthonormalizeElemBases())
+			_M = Theta_T_bF_transpose;
+		/*else
+		{
+			SparseMatrix CellMass = _diffPb.CellMassMatrixOnBoundaryElements();
+			_M = Theta_T_bF_transpose * CellMass;
+		}*/
+
+		/*ExportModule out(Utils::ProgramArgs.OutputDirectory, "", Utils::ProgramArgs.Actions.Export.ValueSeparator);
+
+		cout << Utils::MatrixInfo(Theta_T_bF_transpose, "Theta_T_bF_transpose") << endl;
+		out.ExportMatrix(Theta_T_bF_transpose, "Theta_T_bF_transpose");
+
+		//cout << Utils::MatrixInfo(CellMass, "CellMass") << endl;
+		//out.ExportMatrix(CellMass, "CellMass");
+
+		cout << Utils::MatrixInfo(_diffPb.A_T_ndF, "A_T_ndF") << endl;
+		out.ExportMatrix(_diffPb.A_T_ndF, "A_T_ndF");
+
+		cout << Utils::MatrixInfo(_diffPb.A_ndF_dF, "A_ndF_dF") << endl;
+		out.ExportMatrix(_diffPb.A_ndF_dF, "A_ndF_dF");
+
+		cout << Utils::MatrixInfo(_diffPb.A_dF_dF, "A_dF_dF") << endl;
+		out.ExportMatrix(_diffPb.A_dF_dF, "A_dF_dF");
+
+		cout << Utils::MatrixInfo(_S_iF_bF_transpose, "NormalDerStiff_interior") << endl;
+		out.ExportMatrix(_S_iF_bF_transpose, "NormalDerStiff_interior");
+
+		cout << Utils::MatrixInfo(_S_bF_bF, "NormalDerStiff_boundary") << endl;
+		out.ExportMatrix(_S_bF_bF, "NormalDerStiff_boundary");*/
 
 		_b_fSource = _diffPb.AssembleSourceTerm(_testCase->SourceFunction);
 		_g_D = _diffPb.AssembleDirichletTerm(_testCase->DirichletBC.DirichletFunction);
@@ -138,8 +169,8 @@ public:
 
 		if (returnBoundaryNormalDerivative)
 		{
-			Vector sourceElemBoundary = _diffPb.ExtractElemBoundary(source);
-			Vector normalDerivative = _NormalDerStiff_interior * faceSolution + _NormalDerStiff_boundary * _g_D - _NormalDerMass * sourceElemBoundary;
+			Vector sourceElemBoundary = _diffPb.ExtractElemBoundary(b_source);
+			Vector normalDerivative = _S_iF_bF_transpose * faceSolution + _S_bF_bF * _g_D - _M * sourceElemBoundary;
 			//return _diffPb.BoundarySpace.SolveMassMatrix(normalDerivative);
 			return normalDerivative;
 		}
@@ -159,8 +190,8 @@ public:
 		this->CheckDiffSolverConvergence();
 
 		// Normal derivative
-		Vector sourceElemBoundary = _diffPb.ExtractElemBoundary(source);
-		Vector normalDerivative = _NormalDerStiff_interior * faceSolution - _NormalDerMass * sourceElemBoundary;
+		Vector sourceElemBoundary = _diffPb.ExtractElemBoundary(b_source);
+		Vector normalDerivative = _S_iF_bF_transpose * faceSolution - _M * sourceElemBoundary;
 		//return _diffPb.BoundarySpace.SolveMassMatrix(normalDerivative);
 		return normalDerivative;
 	}
