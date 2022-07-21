@@ -359,59 +359,62 @@ public:
 			//       L2 error       //
 			//----------------------//
 
-			cout << std::scientific << std::setprecision(2);
-
-			// Check mean value if full Neumann conditions
-			if (testCase->BC.Type == PbBoundaryConditions::FullNeumann)
+			if (args.Actions.ComputeErrors)
 			{
+				cout << std::scientific << std::setprecision(2);
+
+				// Check mean value if full Neumann conditions
+				if (testCase->BC.Type == PbBoundaryConditions::FullNeumann)
+				{
+					if (testCase->ExactSolution)
+						cout << "Mean value of exact solution = " << problem->ReconstructSpace.MeanValue(testCase->ExactSolution) << endl;
+					double meanValue = problem->ReconstructSpace.MeanValue(reconstructedSolution);
+					cout << "Mean value = " << meanValue << endl;
+
+					if (abs(meanValue) > Utils::NumericalZero)
+					{
+						ZeroMeanEnforcer integralZeroOnDomain(&problem->ReconstructSpace);
+						integralZeroOnDomain.Setup();
+						integralZeroOnDomain.Enforce(reconstructedSolution);
+						meanValue = problem->ReconstructSpace.MeanValue(reconstructedSolution);
+						cout << "Mean value = " << meanValue << " (after correction)" << endl;
+					}
+				}
+
+
 				if (testCase->ExactSolution)
-					cout << "Mean value of exact solution = " << problem->ReconstructSpace.MeanValue(testCase->ExactSolution) << endl;
-				double meanValue = problem->ReconstructSpace.MeanValue(reconstructedSolution);
-				cout << "Mean value = " << meanValue << endl;
-
-				if (abs(meanValue) > Utils::NumericalZero)
 				{
-					ZeroMeanEnforcer integralZeroOnDomain(&problem->ReconstructSpace);
-					integralZeroOnDomain.Setup();
-					integralZeroOnDomain.Enforce(reconstructedSolution);
-					meanValue = problem->ReconstructSpace.MeanValue(reconstructedSolution);
-					cout << "Mean value = " << meanValue << " (after correction)" << endl;
+					double error = problem->L2Error(testCase->ExactSolution, reconstructedSolution);
+					cout << endl << "L2 Error = " << std::scientific << error << endl;
+					problem->AssertSchemeConvergence(error);
 				}
-			}
 
-
-			if (testCase->ExactSolution)
-			{
-				double error = problem->L2Error(testCase->ExactSolution, reconstructedSolution);
-				cout << endl << "L2 Error = " << std::scientific << error << endl;
-				problem->AssertSchemeConvergence(error);
-			}
-
-			if (args.Problem.ComputeNormalDerivative && testCase->ExactSolution_Neumann)
-			{
-				if (args.Problem.BCCode.compare("d") == 0)
+				if (args.Problem.ComputeNormalDerivative && testCase->ExactSolution_Neumann)
 				{
-					SparseMatrix Theta_T_bF_transpose = problem->Theta_T_bF_transpose();
-					auto nBoundaryElemUnknowns = Theta_T_bF_transpose.cols();
-					
-					SparseMatrix S_iF_bF_transpose = Theta_T_bF_transpose * problem->A_T_ndF.topRows(nBoundaryElemUnknowns) + problem->A_ndF_dF.transpose();
-					
-					SparseMatrix tmp = problem->A_T_dF.topRows(nBoundaryElemUnknowns).transpose() * Theta_T_bF_transpose.transpose();
-					SparseMatrix S_bF_bF = tmp + problem->A_dF_dF;
+					if (args.Problem.BCCode.compare("d") == 0)
+					{
+						SparseMatrix Theta_T_bF_transpose = problem->Theta_T_bF_transpose();
+						auto nBoundaryElemUnknowns = Theta_T_bF_transpose.cols();
 
-					Vector g_D = problem->DirichletSpace.Project(testCase->BC.DirichletFunction);
-					Vector source = problem->CellSpace.InnerProdWithBasis(testCase->SourceFunction);
-					Vector sourceElemBoundary = problem->ExtractElemBoundary(source);
+						SparseMatrix S_iF_bF_transpose = Theta_T_bF_transpose * problem->A_T_ndF.topRows(nBoundaryElemUnknowns) + problem->A_ndF_dF.transpose();
 
-					Vector normalDerivativeRHS = S_iF_bF_transpose * systemSolution + S_bF_bF * g_D - Theta_T_bF_transpose * sourceElemBoundary;
-					Vector normalDerivative = problem->BoundarySpace.SolveMassMatrix(normalDerivativeRHS);
+						SparseMatrix tmp = problem->A_T_dF.topRows(nBoundaryElemUnknowns).transpose() * Theta_T_bF_transpose.transpose();
+						SparseMatrix S_bF_bF = tmp + problem->A_dF_dF;
 
-					Vector exact = problem->BoundarySpace.Project(testCase->ExactSolution_Neumann);
-					double error = problem->BoundarySpace.RelativeL2Error(normalDerivative, exact);
-					cout << endl << "L2 Error (normal derivative) = " << std::scientific << error << endl;
+						Vector g_D = problem->DirichletSpace.Project(testCase->BC.DirichletFunction);
+						Vector source = problem->CellSpace.InnerProdWithBasis(testCase->SourceFunction);
+						Vector sourceElemBoundary = problem->ExtractElemBoundary(source);
+
+						Vector normalDerivativeRHS = S_iF_bF_transpose * systemSolution + S_bF_bF * g_D - Theta_T_bF_transpose * sourceElemBoundary;
+						Vector normalDerivative = problem->BoundarySpace.SolveMassMatrix(normalDerivativeRHS);
+
+						Vector exact = problem->BoundarySpace.Project(testCase->ExactSolution_Neumann);
+						double error = problem->BoundarySpace.RelativeL2Error(normalDerivative, exact);
+						cout << endl << "L2 Error (normal derivative) = " << std::scientific << error << endl;
+					}
+					else
+						Utils::Warning("The normal derivative is computed only for Dirichlet problems.");
 				}
-				else
-					Utils::Warning("The normal derivative is computed only for Dirichlet problems.");
 			}
 		}
 

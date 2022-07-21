@@ -521,6 +521,9 @@ void print_usage() {
 	cout << "-gmsh-log" << endl;
 	cout << "      Enable GMSH to log in the console." << endl;
 	cout << endl;
+	cout << "-not-compute-errors" << endl;
+	cout << "      Do not compute L2-errors at the end." << endl;
+	cout << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << "                           Developer options                          " << endl;
 	cout << "----------------------------------------------------------------------" << endl;
@@ -681,6 +684,7 @@ int main(int argc, char* argv[])
 		OPT_VisuTolerance,
 		OPT_VisuMaxRefinements,
 		OPT_DoNotSolve,
+		OPT_DoNotComputeErrors,
 		OPT_NoCache,
 		OPT_UnitTests,
 		OPT_GMSHLog,
@@ -769,6 +773,7 @@ int main(int argc, char* argv[])
 		 { "visu-tol", required_argument, NULL, OPT_VisuTolerance },
 		 { "visu-max-refin", required_argument, NULL, OPT_VisuMaxRefinements },
 		 { "not-solve", no_argument, NULL, OPT_DoNotSolve },
+		 { "not-compute-errors", no_argument, NULL, OPT_DoNotComputeErrors },
 		 { "no-cache", no_argument, NULL, OPT_NoCache },
 		 { "gmsh-log", no_argument, NULL, OPT_GMSHLog },
 		 { "nbh-depth", required_argument, NULL, OPT_NeighbourhoodDepth },
@@ -1370,6 +1375,9 @@ int main(int argc, char* argv[])
 			}
 			case OPT_DoNotSolve:
 				args.Actions.SolveLinearSystem = false;
+				break;
+			case OPT_DoNotComputeErrors:
+				args.Actions.ComputeErrors = false;
 				break;
 			case OPT_NoCache:
 				args.Actions.UseCache = false;

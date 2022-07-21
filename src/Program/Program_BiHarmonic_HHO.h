@@ -168,7 +168,7 @@ public:
 
 			Vector discreteExactSolution;
 			double exactSolutionL2Norm = 0;
-			if (testCase->ExactSolution)
+			if ((args.Actions.ComputeErrors || args.Solver.ComputeIterL2Error || args.Actions.Export.IterationL2Errors) && testCase->ExactSolution)
 			{
 				cout << "Projection of the exact solution on the discrete space..." << endl;
 				discreteExactSolution = biHarPb->DiffPb().ReconstructSpace.Project(testCase->ExactSolution);
@@ -483,34 +483,37 @@ public:
 			//       L2 error       //
 			//----------------------//
 
-			cout.precision(2);
-
-			if (testCase->ExactSolution)
+			if (args.Actions.ComputeErrors)
 			{
-				Vector error = discreteExactSolution - reconstructedSolution;
+				cout.precision(2);
 
-				if (args.Actions.Export.ErrorToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
-					biHarPb->DiffPb().ExportReconstructedVectorToGMSH(error, out, "error", args.Actions.Export.VisuTolerance, args.Actions.Export.VisuMaxRefinements);
+				if (testCase->ExactSolution)
+				{
+					Vector error = discreteExactSolution - reconstructedSolution;
 
-				if (args.Actions.Export.AbsErrorToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
-					biHarPb->DiffPb().ExportReconstructedVectorToGMSH(error, out, "abs_error", args.Actions.Export.VisuTolerance, args.Actions.Export.VisuMaxRefinements, true);
+					if (args.Actions.Export.ErrorToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
+						biHarPb->DiffPb().ExportReconstructedVectorToGMSH(error, out, "error", args.Actions.Export.VisuTolerance, args.Actions.Export.VisuMaxRefinements);
 
-				double solutionError = biHarPb->DiffPb().ReconstructSpace.L2Norm(error) / exactSolutionL2Norm;
-				cout << endl << "L2 Error (solution) = " << std::scientific << solutionError << endl;
-			}
+					if (args.Actions.Export.AbsErrorToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
+						biHarPb->DiffPb().ExportReconstructedVectorToGMSH(error, out, "abs_error", args.Actions.Export.VisuTolerance, args.Actions.Export.VisuMaxRefinements, true);
 
-			if (testCase->MinusLaplacianOfSolution)
-			{
-				Vector discreteExact = biHarPb->DiffPb().ReconstructSpace.Project(testCase->MinusLaplacianOfSolution);
-				double error = biHarPb->DiffPb().ReconstructSpace.RelativeL2Error(reconstructedLap, discreteExact);
-				cout << "L2 Error (laplacian) = " << std::scientific << error << endl;
-			}
+					double solutionError = biHarPb->DiffPb().ReconstructSpace.L2Norm(error) / exactSolutionL2Norm;
+					cout << endl << "L2 Error (solution) = " << std::scientific << solutionError << endl;
+				}
 
-			if (testCase->MinusLaplacianOfSolution_Dirichlet)
-			{
-				Vector discreteExact = biHarPb->DiffPb().BoundarySpace.Project(testCase->MinusLaplacianOfSolution_Dirichlet);
-				double error = biHarPb->DiffPb().BoundarySpace.RelativeL2Error(theta_f, discreteExact);
-				cout << "L2 Error (theta) = " << std::scientific << error << endl;
+				if (testCase->MinusLaplacianOfSolution)
+				{
+					Vector discreteExact = biHarPb->DiffPb().ReconstructSpace.Project(testCase->MinusLaplacianOfSolution);
+					double error = biHarPb->DiffPb().ReconstructSpace.RelativeL2Error(reconstructedLap, discreteExact);
+					cout << "L2 Error (laplacian) = " << std::scientific << error << endl;
+				}
+
+				if (testCase->MinusLaplacianOfSolution_Dirichlet)
+				{
+					Vector discreteExact = biHarPb->DiffPb().BoundarySpace.Project(testCase->MinusLaplacianOfSolution_Dirichlet);
+					double error = biHarPb->DiffPb().BoundarySpace.RelativeL2Error(theta_f, discreteExact);
+					cout << "L2 Error (theta) = " << std::scientific << error << endl;
+				}
 			}
 		}
 

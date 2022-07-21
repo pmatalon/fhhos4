@@ -123,6 +123,7 @@ struct ExportArguments
 struct ActionsArguments
 {
 	bool SolveLinearSystem = true;
+	bool ComputeErrors = true;
 	bool UseCache = true;
 	bool LogAssembly = true;
 	bool AssembleRightHandSide = true;
