@@ -230,7 +230,7 @@ private:
 				cout << "Preconditioner matrix:" << endl << DenseMatrix(mat.topLeftCorner(3 * _diffPb.HHO->nFaceUnknowns, 3 * _diffPb.HHO->nFaceUnknowns)) << endl << endl;
 			cout << "Condition number = " << Utils::Cond(DenseMatrix(mat)) << endl;
 			cout << "||A-mat|| = " << (A - DenseMatrix(mat)).norm() << endl;
-			cout << "A-mat: " << endl << (A - DenseMatrix(mat)) << endl << endl;
+			//cout << "A-mat: " << endl << (A - DenseMatrix(mat)) << endl << endl;
 		}
 
 		if (_blockDiagPrec)

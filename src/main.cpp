@@ -604,6 +604,7 @@ int main(int argc, char* argv[])
 	bool defaultCoarseOperator = true;
 	bool defaultCoarseSolver = true;
 	bool defaultTol2 = true;
+	bool defaultRelativeCellPolyDegree = true;
 
 	ProgramArguments args;
 	args.OutputDirectory = FileSystem::RootPath() + "/out";
@@ -949,6 +950,9 @@ int main(int argc, char* argv[])
 				break;
 			case OPT_HHO_K_Cells:
 				args.Discretization.RelativeCellPolyDegree = atoi(optarg);
+				if (args.Discretization.RelativeCellPolyDegree < -1 || args.Discretization.RelativeCellPolyDegree > 1)
+					argument_error("admissible values for -kc are -1,0,1.");
+				defaultRelativeCellPolyDegree = false;
 				break;
 			case OPT_PolySpace:
 			{
@@ -1426,7 +1430,10 @@ int main(int argc, char* argv[])
 	//                 Problem                  //
 	//------------------------------------------//
 
-	// dimension
+	if (args.Problem.Equation == EquationType::BiHarmonic && defaultRelativeCellPolyDegree)
+		args.Discretization.RelativeCellPolyDegree = 1;
+
+	// Dimension
 	if (args.Problem.Dimension == -1)
 	{
 		if (args.Problem.GeoCode.compare("segment") == 0)

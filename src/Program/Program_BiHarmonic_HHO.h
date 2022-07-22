@@ -95,6 +95,8 @@ public:
 		int reconstructDegree = k + 1;
 		int faceDegree = k;
 		int cellDegree = k + args.Discretization.RelativeCellPolyDegree;
+		if (args.Discretization.RelativeCellPolyDegree != 1)
+			Utils::Warning("The polynomial degree in the cells should be k+1 (argument -kc 1). Otherwise the problem might not be invertible.");
 
 		FunctionalBasis<Dim>* reconstructionBasis = FunctionalBasisFactory<Dim>::Create(args.Discretization.ElemBasisCode, reconstructDegree, args.Discretization.UsePolynomialSpaceQ);
 		FunctionalBasis<Dim>* cellBasis = FunctionalBasisFactory<Dim>::Create(args.Discretization.ElemBasisCode, cellDegree, args.Discretization.UsePolynomialSpaceQ);
@@ -247,19 +249,21 @@ public:
 						kernelVector = eigenvectors.col(i);
 						allFacesValues.tail(kernelVector.rows()) = kernelVector.real();
 						GMSHMesh<Dim>::ExportToGMSH_Faces(static_cast<PolyhedralMesh<Dim>*>(mesh), hho->FaceBasis, allFacesValues, out.GetFilePathPrefix(), "kernelFaces_" + to_string(i));
+						/*
+						cout << "kernelVector: " << endl << kernelVector.transpose() << endl;
+						
+						Vector lambdaKernel = biHarPb->Solve1stDiffProblem_Homogeneous(kernelVector.real());
+						cout << "lambdaKernel: " << endl << lambdaKernel.transpose() << endl;
+						cout << lambdaKernel.norm() << endl;
+
+						//DiffPb().ExportReconstructedVectorToGMSH(lambda, out, "lambda");
+						//Vector solKernel = biHarPb->Solve2ndDiffProblem(lambdaKernel, false);
+						//biHarPb->DiffPb().ExportReconstructedVectorToGMSH(solKernel, out, "solKernel");
+
+
+						Vector zero = -biHarPb->Solve2ndDiffProblem_Homogeneous(lambdaKernel);
+						cout << "Supposed to be 0: " << zero.norm() << endl;*/
 					}
-					/*
-					Vector lambdaKernel = biHarPb->Solve1stDiffProblem_Homogeneous(kernelVector.real());
-					//cout << lambda.norm() << endl;
-
-					//DiffPb().ExportReconstructedVectorToGMSH(lambda, out, "lambda");
-					Vector solKernel = biHarPb->Solve2ndDiffProblem(lambdaKernel, false);
-					biHarPb->DiffPb().ExportReconstructedVectorToGMSH(solKernel, out, "solKernel");
-
-
-					Vector zero = -biHarPb->Solve2ndDiffProblem_Homogeneous(lambdaKernel);
-					cout << "Supposed to be 0: " << zero.norm() << endl;
-					*/
 				}
 			}
 
