@@ -1482,13 +1482,30 @@ int main(int argc, char* argv[])
 	}
 
 	//------------------------------------------//
-	//                   Mesh                   //
+	//                  Mesher                  //
 	//------------------------------------------//
+
+	if (args.Discretization.Mesher.compare("default") == 0)
+	{
+		if (args.Problem.GeoCode.compare("cube") == 0 && args.Discretization.MeshCode.compare("cart") == 0)
+			args.Discretization.Mesher = "inhouse";
+		else
+#ifdef GMSH_ENABLED
+			args.Discretization.Mesher = "gmsh";
+#else
+			args.Discretization.Mesher = "inhouse";
+#endif
+	}
+
 
 #ifndef GMSH_ENABLED
 	if (args.Discretization.Mesher.compare("gmsh") == 0)
 		argument_error("GMSH is disabled. Recompile with the cmake option -DENABLE_GMSH=ON to use GMSH meshes, or choose another argument for -mesh.");
 #endif // GMSH_ENABLED
+
+	//------------------------------------------//
+	//                   Mesh                   //
+	//------------------------------------------//
 
 	if (args.Discretization.MeshCode.compare("default") == 0)
 	{
