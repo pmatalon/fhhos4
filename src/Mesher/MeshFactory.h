@@ -43,6 +43,8 @@ class MeshFactory
 {
 public:
 	static Mesh<Dim>* BuildMesh(ProgramArguments& args, TestCase<Dim>* testCase) { return nullptr; }
+private:
+	static PolyhedralMesh<Dim>* BuildPolyhedralMesh(PolyhedralMesh<Dim>* meshToAggregate, FaceCoarseningStrategy faceCoarseningStgy, FaceCollapsing bdryFaceCollapsing) { return nullptr; }
 };
 
 #ifdef ENABLE_1D
@@ -54,6 +56,45 @@ Mesh<1>* MeshFactory<1>::BuildMesh(ProgramArguments& args, TestCase<1>* testCase
 #endif // ENABLE_1D
 
 #ifdef ENABLE_2D
+
+template <>
+PolyhedralMesh<2>* MeshFactory<2>::BuildPolyhedralMesh(PolyhedralMesh<2>* mesh, FaceCoarseningStrategy faceCoarseningStgy, FaceCollapsing bdryFaceCollapsing)
+{
+	cout << "Building polygonal mesh by agglomeration:" << endl;
+	cout << "\t" << "Coarsening strategy     : agglomeration by face neighbours" << endl;
+
+	cout << "\t" << "Face coarsening strategy: ";
+	if (faceCoarseningStgy == FaceCoarseningStrategy::None)
+		cout << "no coarsening" << endl;
+	else if (faceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsing)
+		cout << "interface collapsing [-fcs c]" << endl;
+	else
+		cout << "unknown" << endl;
+
+	cout << "\t" << "Boundary face collapsing: ";
+	if (bdryFaceCollapsing == FaceCollapsing::Disabled)
+		cout << "disabled [-bfc d]" << endl;
+	else if (bdryFaceCollapsing == FaceCollapsing::OnlyCollinear)
+		cout << "collinear only [-bfc c]" << endl;
+	else if (bdryFaceCollapsing == FaceCollapsing::ByPairs)
+		cout << "by pairs [-bfc p]" << endl;
+	else if (bdryFaceCollapsing == FaceCollapsing::Max)
+		cout << "maximum [-bfc m]" << endl;
+	else
+		cout << "unknown" << endl;
+
+	mesh->CoarsenMesh(H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours, faceCoarseningStgy, bdryFaceCollapsing, 0);
+	PolyhedralMesh<2>* polyMesh = static_cast<PolyhedralMesh<2>*>(mesh->CoarseMesh);
+	mesh->CoarseMesh = nullptr;
+	polyMesh->FineMesh = nullptr;
+	polyMesh->Vertices = std::move(mesh->Vertices);
+	polyMesh->ClearMeshVertexConnections();
+	polyMesh->UpdateMeshVertexConnections();
+	return polyMesh;
+}
+
+
+
 template <>
 Mesh<2>* MeshFactory<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase)
 {
@@ -143,20 +184,8 @@ Mesh<2>* MeshFactory<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase
 			}
 			else if (meshCode.compare("poly") == 0)
 			{
-#ifdef CGAL_ENABLED
-				Mesh<2>* triMesh = new Square_GMSHUnstructTriangularMesh(n);
-				cout << "Agglomeration..." << endl;
-				triMesh->CoarsenMesh(H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours, FaceCoarseningStrategy::InterfaceCollapsing, 0);
-				Mesh<2>* polyMesh = triMesh->CoarseMesh;
-				triMesh->CoarseMesh = nullptr;
-				polyMesh->FineMesh = nullptr;
-				polyMesh->Vertices = std::move(triMesh->Vertices);
-				polyMesh->ClearMeshVertexConnections();
-				polyMesh->UpdateMeshVertexConnections();
-				fineMesh = polyMesh;
-#else
-				Utils::FatalError("CGAL must be enabled to use polygonal meshes. Recompile the program with cmake option -DENABLE_CGAL=On.");
-#endif // CGAL_ENABLED
+				Square_GMSHUnstructTriangularMesh* triMesh = new Square_GMSHUnstructTriangularMesh(n);
+				fineMesh = BuildPolyhedralMesh(triMesh, args.Discretization.PolyMeshFaceCoarseningStgy, args.Discretization.PolyMeshBoundaryFaceCollapsing);
 			}
 			else
 				Utils::FatalError("The requested mesh is not managed with this geometry.");
@@ -247,7 +276,13 @@ Mesh<2>* MeshFactory<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase
 
 #ifdef GMSH_ENABLED
 		string filePath = geoCode;
-		if (args.Solver.MG.H_CS == H_CoarsStgy::GMSHSplittingRefinement)
+
+		if (meshCode.compare("poly") == 0)
+		{
+			GMSHMesh<2>* mesh = new GMSHMesh<2>(testCase, filePath, n);
+			fineMesh = BuildPolyhedralMesh(mesh, args.Discretization.PolyMeshFaceCoarseningStgy, args.Discretization.PolyMeshBoundaryFaceCollapsing);
+		}
+		else if (args.Solver.MG.H_CS == H_CoarsStgy::GMSHSplittingRefinement)
 		{
 			Mesh<2>* coarseMesh = new GMSHMesh<2>(testCase, filePath, args.Solver.MG.CoarseN);
 			fineMesh = coarseMesh->RefineUntilNElements(2 * nx * ny, refinementStgy);

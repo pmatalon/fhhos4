@@ -677,6 +677,14 @@ public:
 		}
 	}
 
+	double a(const Vector& u_T, const Vector& u_ndF, const Vector& u_dF, const Vector& v_T, const Vector& v_ndF, const Vector& v_dF)
+	{
+		Vector Au_T   = A_T_T               * u_T + A_T_ndF              * u_ndF + A_T_dF   * u_dF;
+		Vector Au_ndF = A_T_ndF.transpose() * u_T + A_ndF_ndF            * u_ndF + A_ndF_dF * u_dF;
+		Vector Au_dF  = A_T_dF.transpose()  * u_T + A_ndF_dF.transpose() * u_ndF + A_dF_dF  * u_dF;
+		return Au_T.dot(v_T) + Au_ndF.dot(v_ndF) + Au_dF.dot(v_dF);
+	}
+
 	void InitReferenceShapes()
 	{
 		InitReferenceShapes(this->HHO, &this->TestCase->DiffField);

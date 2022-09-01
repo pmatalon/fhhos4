@@ -22,10 +22,13 @@ struct DiscretizationArguments
 	BigNumber N = 16;
 	BigNumber Ny = 0;
 	BigNumber Nz = 0;
-	string Method = "hho";
-	string Mesher = "gmsh";
+	string Mesher = "default";
 	string MeshCode = "default";
 	double Stretch = 0.5;
+	FaceCoarseningStrategy PolyMeshFaceCoarseningStgy = FaceCoarseningStrategy::InterfaceCollapsing;
+	FaceCollapsing PolyMeshBoundaryFaceCollapsing = FaceCollapsing::OnlyCollinear;
+
+	string Method = "hho";
 	string Stabilization = "hho";
 	string ElemBasisCode = "";
 	string FaceBasisCode = "";
@@ -71,7 +74,7 @@ struct MultigridArguments
 	double CoarseningFactor = 0;
 	BigNumber CoarseN = 2;
 	string CoarseSolverCode = "ch";
-	FaceCollapsing BoundaryFaceCollapsing = FaceCollapsing::Max;
+	FaceCollapsing BoundaryFaceCollapsing = FaceCollapsing::OnlyCollinear;
 	ReEntrantCornerMgmt ReEntrantCornerManagement = ReEntrantCornerMgmt::Disabled;
 	bool ManageAnisotropy = true; // used only in UAMG
 };

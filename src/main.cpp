@@ -88,7 +88,8 @@ void print_usage() {
 	cout << "            quad      - Unstructured quadrilateral (see also argument -stretch)" << endl;
 	cout << "            stetra    - Structured tetrahedral (embedded in a Cartesian mesh)" << endl;
 	cout << "            tetra     - Unstructured tetrahedral" << endl;
-	cout << "            poly      - Polygonal (by aggregation of triangles)" << endl;
+	cout << "            poly      - Polygonal (by aggregation of an initial mesh)." << endl;
+	cout << "                        See also -polymesh-fcs and -polymesh-bfc." << endl;
 	cout << endl;
 	cout << "-mesher CODE" << endl;
 	cout << "      Mesher used: in-house or imported file from GMSH." << endl;
@@ -111,6 +112,18 @@ void print_usage() {
 	cout << "-stretch NUM" << endl;
 	cout << "      0 <= NUM < 1   stretching factor of the quadrilateral element used in the 'quad' mesh of the 'inhouse' mesher." << endl;
 	cout << "      0 yields square elements. Default is 0.5: the top right corner is moved to the right 0.5 times the element's width." << endl;
+	cout << endl;
+	cout << "-polymesh-fcs CODE" << endl;
+	cout << "      Face coarsening for the construction of the polygonal mesh (default: c)." << endl;
+	cout << "              c   - Collapse interfaces made of multiple faces" << endl;
+	cout << "              n   - None (fine faces are kept unchanged)" << endl;
+	cout << endl;
+	cout << "-polymesh-bfc CODE" << endl;
+	cout << "      Face collapsing method used at the domain boundaries or physical parts boundaries, for the construction of the polygonal mesh." << endl;
+	cout << "              d   - Disabled" << endl;
+	cout << "              c   - Collinear only" << endl;
+	cout << "              p   - By pairs" << endl;
+	cout << "              m   - Maximum" << endl;
 	cout << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << "                             Discretization                           " << endl;
@@ -629,6 +642,8 @@ int main(int argc, char* argv[])
 		OPT_Ny,
 		OPT_Nz,
 		OPT_Stretch,
+		OPT_PolyMeshFaceCoarseningStrategy,
+		OPT_PolyMeshBoundaryFaceCollapsing,
 		// Discretization
 		OPT_Discretization,
 		OPT_HHO_K,
@@ -717,6 +732,8 @@ int main(int argc, char* argv[])
 		 { "nx", required_argument, NULL, OPT_Nx },
 		 { "ny", required_argument, NULL, OPT_Ny },
 		 { "stretch", required_argument, NULL, OPT_Stretch },
+		 { "polymesh-fcs", required_argument, NULL, OPT_PolyMeshFaceCoarseningStrategy },
+		 { "polymesh-bfc", required_argument, NULL, OPT_PolyMeshBoundaryFaceCollapsing },
 		 // Discretization
 		 { "discr", required_argument, NULL, OPT_Discretization },
 		 { "k", required_argument, NULL, OPT_HHO_K },
@@ -887,6 +904,32 @@ int main(int argc, char* argv[])
 			case OPT_Stretch:
 				args.Discretization.Stretch = atof(optarg);
 				break;
+			case OPT_PolyMeshFaceCoarseningStrategy:
+			{
+				string fcsCode = optarg;
+				if (fcsCode.compare("c") == 0)
+					args.Discretization.PolyMeshFaceCoarseningStgy = FaceCoarseningStrategy::InterfaceCollapsing;
+				else if (fcsCode.compare("n") == 0)
+					args.Discretization.PolyMeshFaceCoarseningStgy = FaceCoarseningStrategy::None;
+				else
+					argument_error("unknown or unmanaged face coarsening strategy code '" + fcsCode + "'. Check -polymesh-fcs argument.");
+				break;
+			}
+			case OPT_PolyMeshBoundaryFaceCollapsing:
+			{
+				string code = optarg;
+				if (code.compare("d") == 0)
+					args.Discretization.PolyMeshBoundaryFaceCollapsing = FaceCollapsing::Disabled;
+				else if (code.compare("c") == 0)
+					args.Discretization.PolyMeshBoundaryFaceCollapsing = FaceCollapsing::OnlyCollinear;
+				else if (code.compare("p") == 0)
+					args.Discretization.PolyMeshBoundaryFaceCollapsing = FaceCollapsing::ByPairs;
+				else if (code.compare("m") == 0)
+					args.Discretization.PolyMeshBoundaryFaceCollapsing = FaceCollapsing::Max;
+				else
+					argument_error("unknown boundary face collapsing code '" + code + "'. Check -polymesh-bfc argument.");
+				break;
+			}
 
 			//--------------------//
 			//   Discretization   //
@@ -1525,6 +1568,11 @@ int main(int argc, char* argv[])
 
 	if ((args.Discretization.MeshCode.compare("tetra") == 0 || args.Discretization.MeshCode.compare("stetra") == 0) && args.Problem.Dimension != 3)
 		argument_error("Tetrahedral mesh in only available in 3D.");
+
+#ifndef CGAL_ENABLED
+	if (args.Discretization.MeshCode.compare("poly") == 0)
+		Utils::FatalError("CGAL must be enabled to use polygonal meshes. Recompile the program with cmake option -DENABLE_CGAL=On.");
+#endif
 
 	//------------------------------------------//
 	//              Discretization              //

@@ -117,15 +117,15 @@ public:
 		return "Cube";
 	}
 
-	void CoarsenMesh(H_CoarsStgy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor) override
+	void CoarsenMesh(H_CoarsStgy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, FaceCollapsing bdryFaceCollapsing, double coarseningFactor) override
 	{
 		if (elemCoarseningStgy != H_CoarsStgy::StandardCoarsening)
-			TetrahedralMesh::CoarsenMesh(elemCoarseningStgy, faceCoarseningStgy, coarseningFactor);
+			TetrahedralMesh::CoarsenMesh(elemCoarseningStgy, faceCoarseningStgy, bdryFaceCollapsing, coarseningFactor);
 
 		if (faceCoarseningStgy != FaceCoarseningStrategy::InterfaceCollapsing)
 			Utils::FatalError("Unmanaged face coarsening strategy");
 
-		_cartMesh->CoarsenMesh(elemCoarseningStgy, faceCoarseningStgy, coarseningFactor);
+		_cartMesh->CoarsenMesh(elemCoarseningStgy, faceCoarseningStgy, bdryFaceCollapsing, coarseningFactor);
 		Cube_CartesianTetrahedralMesh* coarseMesh = new Cube_CartesianTetrahedralMesh(dynamic_cast<Cube_CartesianMesh*>(_cartMesh->CoarseMesh), false);
 		this->InitializeCoarsening(coarseMesh);
 		coarseMesh->ComesFrom.CS = H_CoarsStgy::StandardCoarsening;

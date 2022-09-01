@@ -249,6 +249,7 @@ private:
 		mg->H_CS = args.Solver.MG.H_CS;
 		mg->P_CS = args.Solver.MG.P_CS;
 		mg->FaceCoarseningStgy = args.Solver.MG.FaceCoarseningStgy;
+		mg->BdryFaceCollapsing = args.Solver.MG.BoundaryFaceCollapsing;
 		mg->NumberOfMeshes = args.Solver.MG.NumberOfMeshes;
 		mg->CoarseningFactor = args.Solver.MG.CoarseningFactor;
 		mg->ExportComponents = args.Actions.Export.MultigridComponents;

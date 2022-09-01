@@ -304,6 +304,25 @@ public:
 		return _boundaryElementsNumberedFirst;
 	}
 
+	virtual int LargestNumberOfBoundaryFacesInOneElement()
+	{
+		if (BoundaryElements.empty())
+			Utils::FatalError("BoundaryElements should be initialized before using LargestNumberOfBoundaryFacesInOneElement().");
+		int maxNFaces = 0;
+		for (Element<Dim>* e : BoundaryElements)
+		{
+			int nBoundaryFaces = 0;
+			for (Face<Dim>* f : e->Faces)
+			{
+				if (f->IsDomainBoundary)
+					nBoundaryFaces++;
+			}
+			if (nBoundaryFaces > maxNFaces)
+				maxNFaces = nBoundaryFaces;
+		}
+		return maxNFaces;
+	}
+
 
 	Face<Dim>* ExistingFaceWithVertices(const vector<MeshVertex<Dim>*>& vertices)
 	{
@@ -376,7 +395,7 @@ public:
 		Utils::Warning("Impossible to export the solution to GMSH because this mesh does not come from GMSH.");
 	}
 
-	virtual void CoarsenMesh(H_CoarsStgy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor)
+	virtual void CoarsenMesh(H_CoarsStgy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, FaceCollapsing boundaryFaceCollapsing, double coarseningFactor)
 	{
 		if (Utils::IsRefinementStrategy(elemCoarseningStgy))
 			return;

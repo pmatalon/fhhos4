@@ -124,7 +124,7 @@ public:
 		return verticesUsage + verticesPointers + elementsUsage + elementsPointers + facesUsage + facesPointers;
 	}
 
-	virtual void CoarsenMesh(H_CoarsStgy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor) override
+	void CoarsenMesh(H_CoarsStgy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, FaceCollapsing bdryFaceCollapsing, double coarseningFactor) override
 	{
 		if (this->CoarseMesh)
 			return;
@@ -132,21 +132,21 @@ public:
 		if (elemCoarseningStgy == H_CoarsStgy::AgglomerationCoarseningByVertexRemoval)
 			CoarsenByAgglomerationByVertexRemoval();
 		else if (elemCoarseningStgy == H_CoarsStgy::AgglomerationCoarseningByMostCoplanarFaces)
-			CoarsenByAgglomerationByMostCoplanarFaces();
+			CoarsenByAgglomerationByMostCoplanarFaces(bdryFaceCollapsing);
 		else if (elemCoarseningStgy == H_CoarsStgy::AgglomerationCoarseningByClosestCenter
 			  || elemCoarseningStgy == H_CoarsStgy::AgglomerationCoarseningByClosestFace
 			  || elemCoarseningStgy == H_CoarsStgy::AgglomerationCoarseningByLargestInterface)
-			CoarsenByAgglomerationByPairs(elemCoarseningStgy);
+			CoarsenByAgglomerationByPairs(elemCoarseningStgy, bdryFaceCollapsing);
 		else if (elemCoarseningStgy == H_CoarsStgy::AgglomerationCoarseningBySeedPoints)
 			CoarsenByAgglomerationBySeedPoints();
 		else if (elemCoarseningStgy == H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours)
-			CoarsenByAgglomerationByFaceNeighbours(faceCoarseningStgy);
+			CoarsenByAgglomerationByFaceNeighbours(faceCoarseningStgy, bdryFaceCollapsing);
 		else if (elemCoarseningStgy == H_CoarsStgy::AgglomerationCoarseningByVertexNeighbours)
-			CoarsenByAgglomerationByVertexNeighbours();
+			CoarsenByAgglomerationByVertexNeighbours(bdryFaceCollapsing);
 		else if (elemCoarseningStgy == H_CoarsStgy::FaceCoarsening)
 			FaceCoarsening();
 		else
-			Mesh<Dim>::CoarsenMesh(elemCoarseningStgy, faceCoarseningStgy, coarseningFactor);
+			Mesh<Dim>::CoarsenMesh(elemCoarseningStgy, faceCoarseningStgy, bdryFaceCollapsing, coarseningFactor);
 	}
 
 protected:
@@ -176,7 +176,7 @@ private:
 	//                                                 //
 	//-------------------------------------------------//
 
-	void CoarsenByAgglomerationByMostCoplanarFaces()
+	void CoarsenByAgglomerationByMostCoplanarFaces(FaceCollapsing bdryFaceCollapsing)
 	{
 		PolyhedralMesh<Dim>* coarseMesh = new PolyhedralMesh<Dim>();
 		this->InitializeCoarsening(coarseMesh);
@@ -333,7 +333,7 @@ private:
 			FaceCollapsingStatus status = coarseMesh->AgglomerateFineFaces(f1, f2);
 			assert(status == FaceCollapsingStatus::Ok);
 
-			coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(coarseElement1);
+			coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(coarseElement1, bdryFaceCollapsing);
 		}
 
 		vertexFaceMap.clear();
@@ -384,7 +384,7 @@ private:
 		// We merge the faces which are part of the same interface between two elements //
 		//------------------------------------------------------------------------------//
 		for (Element<Dim>* ce : coarseMesh->Elements)
-			coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(ce);
+			coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(ce, bdryFaceCollapsing);
 
 		// Set the coarse vertex list
 		set<Vertex*> vertices;
@@ -401,7 +401,7 @@ private:
 	//-------------------------------------------------------------------------------------------------------------------------//
 	// Browse the neighbours: if the interface with one of them is made of multiple faces, they're collapsed into a single one //
 	//-------------------------------------------------------------------------------------------------------------------------//
-	void TryCollapseInterfacesMadeOfMultipleFaces(Element<Dim>* e, bool makeItThreadSafe = false)
+	void TryCollapseInterfacesMadeOfMultipleFaces(Element<Dim>* e, FaceCollapsing bdryFaceCollapsing, bool makeItThreadSafe = false)
 	{
 		if (makeItThreadSafe && !e->Mutex.try_lock())
 			return;
@@ -413,7 +413,7 @@ private:
 			if (makeItThreadSafe && !n->Mutex.try_lock())
 				continue;
 
-			FaceCollapsingStatus status = TryCollapseInterfaceBetween(e, n);
+			FaceCollapsingStatus status = TryCollapseInterfaceBetween(e, n, bdryFaceCollapsing);
 			if (status == FaceCollapsingStatus::Ok && retryIfElementChanges)
 			{
 				if (makeItThreadSafe)
@@ -421,7 +421,7 @@ private:
 					e->Mutex.unlock();
 					n->Mutex.unlock();
 				}
-				TryCollapseInterfacesMadeOfMultipleFaces(e, makeItThreadSafe);
+				TryCollapseInterfacesMadeOfMultipleFaces(e, bdryFaceCollapsing, makeItThreadSafe);
 				return;
 			}
 			else if (status == FaceCollapsingStatus::ElementFullDegeneration || status == FaceCollapsingStatus::OneElementEmbeddedInConvexHullOfTheOther)
@@ -433,7 +433,7 @@ private:
 					e->Mutex.unlock();
 					n->Mutex.unlock();
 				}
-				TryCollapseInterfacesMadeOfMultipleFaces(newE, makeItThreadSafe);
+				TryCollapseInterfacesMadeOfMultipleFaces(newE, bdryFaceCollapsing, makeItThreadSafe);
 				return;
 			}
 			else if (status == FaceCollapsingStatus::CrossedPolygon || status == FaceCollapsingStatus::ElementPartialDegeneration)
@@ -447,13 +447,13 @@ private:
 		}
 
 		if (e->IsOnBoundary())
-			TryCollapseBoundaryFaces(e);
+			TryCollapseBoundaryFaces(e, bdryFaceCollapsing);
 
 		if (makeItThreadSafe)
 			e->Mutex.unlock();
 	}
 
-	FaceCollapsingStatus TryCollapseInterfaceBetween(Element<Dim>* e1, Element<Dim>* e2)
+	FaceCollapsingStatus TryCollapseInterfaceBetween(Element<Dim>* e1, Element<Dim>* e2, FaceCollapsing bdryFaceCollapsing)
 	{
 		vector<Face<Dim>*> interfaceFaces = e1->InterfaceWith(e2);
 		assert(!interfaceFaces.empty());
@@ -465,16 +465,16 @@ private:
 			return TryCollapse(interfaceFaces);
 		else
 		{
-			if (Utils::ProgramArgs.Solver.MG.BoundaryFaceCollapsing == FaceCollapsing::Disabled)
+			if (bdryFaceCollapsing == FaceCollapsing::Disabled)
 				return FaceCollapsingStatus::NotEnoughFaces;
-			else if (Utils::ProgramArgs.Solver.MG.BoundaryFaceCollapsing == FaceCollapsing::OnlyCollinear)
+			else if (bdryFaceCollapsing == FaceCollapsing::OnlyCollinear)
 			{
 				Interface<Dim> interf(interfaceFaces);
 				return TryCollapseCoplanarFaces(interf);
 			}
-			else if (Utils::ProgramArgs.Solver.MG.BoundaryFaceCollapsing == FaceCollapsing::ByPairs)
+			else if (bdryFaceCollapsing == FaceCollapsing::ByPairs)
 				return TryCollapseByPairs(interfaceFaces);
-			else if (Utils::ProgramArgs.Solver.MG.BoundaryFaceCollapsing == FaceCollapsing::Max)
+			else if (bdryFaceCollapsing == FaceCollapsing::Max)
 				return TryCollapse(interfaceFaces);
 			else
 			{
@@ -484,22 +484,22 @@ private:
 		}
 	}
 
-	FaceCollapsingStatus TryCollapseBoundaryFaces(Element<Dim>* e)
+	FaceCollapsingStatus TryCollapseBoundaryFaces(Element<Dim>* e, FaceCollapsing bdryFaceCollapsing)
 	{
 		vector<Face<Dim>*> boundaryFaces = e->BoundaryFaces();
 		if (boundaryFaces.size() < 2)
 			return FaceCollapsingStatus::NotEnoughFaces;
 
-		if (Utils::ProgramArgs.Solver.MG.BoundaryFaceCollapsing == FaceCollapsing::Disabled)
+		if (bdryFaceCollapsing == FaceCollapsing::Disabled)
 			return FaceCollapsingStatus::NotEnoughFaces;
-		else if (Utils::ProgramArgs.Solver.MG.BoundaryFaceCollapsing == FaceCollapsing::OnlyCollinear)
+		else if (bdryFaceCollapsing == FaceCollapsing::OnlyCollinear)
 		{
 			Interface<Dim> interf(boundaryFaces);
 			return TryCollapseCoplanarFaces(interf);
 		}
-		else if (Utils::ProgramArgs.Solver.MG.BoundaryFaceCollapsing == FaceCollapsing::ByPairs)
+		else if (bdryFaceCollapsing == FaceCollapsing::ByPairs)
 			return TryCollapseByPairs(boundaryFaces);
-		else if (Utils::ProgramArgs.Solver.MG.BoundaryFaceCollapsing == FaceCollapsing::Max)
+		else if (bdryFaceCollapsing == FaceCollapsing::Max)
 			return TryCollapse(boundaryFaces);
 		else
 		{
@@ -660,7 +660,7 @@ private:
 	//                                             //
 	//---------------------------------------------//
 
-	void CoarsenByAgglomerationByFaceNeighbours(FaceCoarseningStrategy faceCoarseningStgy)
+	void CoarsenByAgglomerationByFaceNeighbours(FaceCoarseningStrategy faceCoarseningStgy, FaceCollapsing bdryFaceCollapsing)
 	{
 		PolyhedralMesh<Dim>* coarseMesh = new PolyhedralMesh<Dim>();
 		this->InitializeCoarsening(coarseMesh);
@@ -813,16 +813,16 @@ private:
 		else if (faceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsing)
 		{
 			ElementParallelLoop<Dim> parallelLoopCollapseFaces(coarseMesh->Elements);
-			parallelLoopCollapseFaces.Execute([coarseMesh](Element<Dim>* coarseElement)
+			parallelLoopCollapseFaces.Execute([coarseMesh, bdryFaceCollapsing](Element<Dim>* coarseElement)
 				{
 					if (!coarseElement->IsDeleted)
-						coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(coarseElement, true);
+						coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(coarseElement, bdryFaceCollapsing, true);
 				});
 
 			for (Face<Dim>* f : coarseMesh->Faces)
 			{
 				if (!f->IsDeleted && !f->IsDomainBoundary && !f->FinerFaces[0]->HasBeenCoarsened())
-					coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(f->Element1, false);
+					coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(f->Element1, bdryFaceCollapsing, false);
 			}
 
 			/*list<Face<Dim>*> uncoarsenedFaces;
@@ -861,7 +861,7 @@ private:
 	//                                               //
 	//-----------------------------------------------//
 
-	void CoarsenByAgglomerationByVertexNeighbours()
+	void CoarsenByAgglomerationByVertexNeighbours(FaceCollapsing bdryFaceCollapsing)
 	{
 		PolyhedralMesh<Dim>* coarseMesh = new PolyhedralMesh<Dim>();
 		this->InitializeCoarsening(coarseMesh);
@@ -881,7 +881,7 @@ private:
 			{
 				availableNeighbours.push_back(currentElem);
 				Element<Dim>* coarseElement = coarseMesh->AgglomerateFineElements(availableNeighbours);
-				coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(coarseElement);
+				coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(coarseElement, bdryFaceCollapsing);
 			}
 			else
 			{
@@ -890,7 +890,7 @@ private:
 					Utils::FatalError("Element cannot be aggregated. Weird...");
 
 				Element<Dim>* macroElement = coarseMesh->AgglomerateFineElementToCoarse(currentElem, coarseNeighbourForAggreg);
-				coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(macroElement);
+				coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(macroElement, bdryFaceCollapsing);
 			}
 
 		}
@@ -1082,13 +1082,13 @@ private:
 	//                                                               //
 	//---------------------------------------------------------------//
 
-	void CoarsenByAgglomerationByPairs(H_CoarsStgy strategy)
+	void CoarsenByAgglomerationByPairs(H_CoarsStgy strategy, FaceCollapsing bdryFaceCollapsing)
 	{
 		// Intermediary coarsenings by pairs of elements //
 		PolyhedralMesh<Dim>* coarseMesh = this;
 		for (int i = 0; i < Dim; i++)
 		{
-			coarseMesh->AggregatePairsOfElements(strategy);
+			coarseMesh->AggregatePairsOfElements(strategy, bdryFaceCollapsing);
 			coarseMesh = dynamic_cast<PolyhedralMesh<Dim>*>(coarseMesh->CoarseMesh);
 		}
 
@@ -1150,7 +1150,7 @@ private:
 	//-------------------------------------------------------------------------------------------------------------------------//
 	// Creates a coarse mesh by aggregates of pairs of elements according to a criterion (closest center or largest interface) //
 	//-------------------------------------------------------------------------------------------------------------------------//
-	void AggregatePairsOfElements(H_CoarsStgy strategy)
+	void AggregatePairsOfElements(H_CoarsStgy strategy, FaceCollapsing bdryFaceCollapsing)
 	{
 		PolyhedralMesh<Dim>* coarseMesh = new PolyhedralMesh<Dim>();
 		this->InitializeCoarsening(coarseMesh);
@@ -1169,7 +1169,7 @@ private:
 				//           Agglomeration with another fine element           //
 				//-------------------------------------------------------------//
 				Element<Dim>* macroElement = coarseMesh->AgglomerateFineElements(e, neighbourForAggreg);
-				coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(macroElement);
+				coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(macroElement, bdryFaceCollapsing);
 			}
 			else
 			{
@@ -1183,12 +1183,12 @@ private:
 				//           Agglomeration with a coarse element          //
 				//--------------------------------------------------------//
 				Element<Dim>* macroElement = coarseMesh->AgglomerateFineElementToCoarse(e, coarseNeighbourForAggreg);
-				coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(macroElement);
+				coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(macroElement, bdryFaceCollapsing);
 			}
 		}
 
 		for (Element<Dim>* ce : coarseMesh->Elements)
-			coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(ce);
+			coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(ce, bdryFaceCollapsing);
 	}
 
 

@@ -110,7 +110,7 @@ public:
 
 					// 1st coarsening
 					cout << "Coarsening..." << endl;
-					mesh->CoarsenMesh(args.Solver.MG.H_CS, args.Solver.MG.FaceCoarseningStgy, args.Solver.MG.CoarseningFactor);
+					mesh->CoarsenMesh(args.Solver.MG.H_CS, args.Solver.MG.FaceCoarseningStgy, args.Solver.MG.BoundaryFaceCollapsing, args.Solver.MG.CoarseningFactor);
 					/*cout << "Export..." << endl;
 					mesh->CoarseMesh->ExportFacesToMatlab(args.OutputDirectory + "/coarse1.dat");
 					mesh->CoarseMesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_coarse1.m");*/
@@ -118,7 +118,7 @@ public:
 					mesh->SanityCheck();
 					// 2nd coarsening
 					cout << "Coarsening..." << endl;
-					mesh->CoarseMesh->CoarsenMesh(args.Solver.MG.H_CS, args.Solver.MG.FaceCoarseningStgy, args.Solver.MG.CoarseningFactor);
+					mesh->CoarseMesh->CoarsenMesh(args.Solver.MG.H_CS, args.Solver.MG.FaceCoarseningStgy, args.Solver.MG.BoundaryFaceCollapsing, args.Solver.MG.CoarseningFactor);
 					/*cout << "Export..." << endl;
 					mesh->CoarseMesh->CoarseMesh->ExportFacesToMatlab(args.OutputDirectory + "/coarse2.dat");
 					mesh->CoarseMesh->CoarseMesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_coarse2.m");*/
@@ -126,7 +126,7 @@ public:
 					mesh->CoarseMesh->SanityCheck();
 					// 3rd coarsening
 					cout << "Coarsening..." << endl;
-					mesh->CoarseMesh->CoarseMesh->CoarsenMesh(args.Solver.MG.H_CS, args.Solver.MG.FaceCoarseningStgy, args.Solver.MG.CoarseningFactor);
+					mesh->CoarseMesh->CoarseMesh->CoarsenMesh(args.Solver.MG.H_CS, args.Solver.MG.FaceCoarseningStgy, args.Solver.MG.BoundaryFaceCollapsing, args.Solver.MG.CoarseningFactor);
 					/*cout << "Export..." << endl;
 					mesh->CoarseMesh->CoarseMesh->CoarseMesh->ExportFacesToMatlab(args.OutputDirectory + "/coarse3.dat");
 					mesh->CoarseMesh->CoarseMesh->CoarseMesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_coarse3.m");*/

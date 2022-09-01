@@ -31,6 +31,7 @@ public:
 	H_CoarsStgy H_CS = H_CoarsStgy::StandardCoarsening;
 	P_CoarsStgy P_CS = P_CoarsStgy::Minus2;
 	FaceCoarseningStrategy FaceCoarseningStgy = FaceCoarseningStrategy::InterfaceCollapsing;
+	FaceCollapsing BdryFaceCollapsing = FaceCollapsing::OnlyCollinear;
 	double CoarseningFactor = 2;
 	int CoarsePolyDegree = 1; // used in p-Multigrid
 	int NumberOfMeshes = 0;
@@ -127,7 +128,7 @@ public:
 				if (this->NumberOfMeshes == 0 || numberOfMeshes < this->NumberOfMeshes)
 				{
 					// Mesh coarsening
-					currentLevel->CoarsenMesh(this->H_CS, this->FaceCoarseningStgy, this->CoarseningFactor, noCoarserMeshProvided, coarsestPossibleMeshReached);
+					currentLevel->CoarsenMesh(this->H_CS, this->FaceCoarseningStgy, this->BdryFaceCollapsing, this->CoarseningFactor, noCoarserMeshProvided, coarsestPossibleMeshReached);
 
 					if (noCoarserMeshProvided || coarsestPossibleMeshReached)
 					{
@@ -722,17 +723,30 @@ public:
 			else
 				os << "unknown" << endl;
 
-			os << "\t" << "Face coarsening strategy: ";
-			if (Utils::IsRefinementStrategy(H_CS) || H_CS == H_CoarsStgy::IndependentRemeshing)
-				os << "NA" << endl;
-			else if (FaceCoarseningStgy == FaceCoarseningStrategy::None)
-				os << "none" << endl;
-			else if (FaceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsing)
-				os << "interface collapsing [-fcs c]" << endl;
-			else if (FaceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsingAndTryAggregInteriorToInterfaces)
-				os << "interface collapsing and try aggregate interior faces too [-fcs i]" << endl;
-			else
-				os << "unknown" << endl;
+			if (!Utils::IsRefinementStrategy(H_CS) && H_CS != H_CoarsStgy::IndependentRemeshing)
+			{
+				os << "\t" << "Face coarsening strategy: ";
+				if (FaceCoarseningStgy == FaceCoarseningStrategy::None)
+					os << "none [-fcs c]" << endl;
+				else if (FaceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsing)
+					os << "interface collapsing [-fcs c]" << endl;
+				else if (FaceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsingAndTryAggregInteriorToInterfaces)
+					os << "interface collapsing and try aggregate interior faces too [-fcs i]" << endl;
+				else
+					os << "unknown" << endl;
+
+				os << "\t" << "Boundary face collapsing: ";
+				if (BdryFaceCollapsing == FaceCollapsing::Disabled)
+					os << "disabled [-bfc d]" << endl;
+				else if (BdryFaceCollapsing == FaceCollapsing::OnlyCollinear)
+					os << "collinear only [-bfc c]" << endl;
+				else if (BdryFaceCollapsing == FaceCollapsing::ByPairs)
+					os << "by pairs [-bfc p]" << endl;
+				else if (BdryFaceCollapsing == FaceCollapsing::Max)
+					os << "maximum [-bfc m]" << endl;
+				else
+					os << "unknown" << endl;
+			}
 		}
 
 		//Level* level = this->CreateFineLevel();

@@ -95,12 +95,23 @@ public:
 		int reconstructDegree = k + 1;
 		int faceDegree = k;
 		int cellDegree = k + args.Discretization.RelativeCellPolyDegree;
-		if (args.Discretization.RelativeCellPolyDegree != 1)
-			Utils::Warning("The polynomial degree in the cells should be k+1 (argument -kc 1). Otherwise the problem might not be invertible.");
 
 		FunctionalBasis<Dim>* reconstructionBasis = FunctionalBasisFactory<Dim>::Create(args.Discretization.ElemBasisCode, reconstructDegree, args.Discretization.UsePolynomialSpaceQ);
 		FunctionalBasis<Dim>* cellBasis = FunctionalBasisFactory<Dim>::Create(args.Discretization.ElemBasisCode, cellDegree, args.Discretization.UsePolynomialSpaceQ);
 		FunctionalBasis<Dim - 1>* faceBasis = FunctionalBasisFactory<Dim-1>::Create(args.Discretization.FaceBasisCode, faceDegree, args.Discretization.UsePolynomialSpaceQ);
+
+		double maxNBoundaryFacesAsDouble = (double)cellBasis->Size() / (double)faceBasis->Size();
+		int maxNBoundaryFaces = cellBasis->Size() / faceBasis->Size();
+		cout << "Number of boundary faces per element: " << endl;
+		cout << "\ttheoretical maximum = " << maxNBoundaryFaces << " (" << maxNBoundaryFacesAsDouble << ")" << endl;
+		int largestNBoundaryFaces = mesh->LargestNumberOfBoundaryFacesInOneElement();
+		cout << "\tfound in the mesh   = " << largestNBoundaryFaces << endl;
+		if (cellBasis->Size() < largestNBoundaryFaces * faceBasis->Size())
+		{
+			Utils::Warning("The largest number of boundary faces in one element is greater than the maximum value authorized to ensure a well-posed problem.");
+			if (args.Discretization.RelativeCellPolyDegree == 0)
+				Utils::Warning("A solution might be to increase the polynomial degree in the cells to k+1 (argument -kc 1).");
+		}
 
 		HHOParameters<Dim>* hho = new HHOParameters<Dim>(mesh, args.Discretization.Stabilization, reconstructionBasis, cellBasis, faceBasis, args.Discretization.OrthogonalizeElemBasesCode, args.Discretization.OrthogonalizeFaceBasesCode);
 
@@ -241,6 +252,9 @@ public:
 					//cout << "---------------------" << endl << "Preceding eigenvector" << endl << eigenvectors.col(n - 2) << endl;
 					//cout << "---------------------" << endl << "Preceding eigenvector" << endl << eigenvectors.col(n - 3) << endl;
 
+					BiHarmonicMixedFormGlowinski_HHO<Dim>* biHarPb2 = static_cast<BiHarmonicMixedFormGlowinski_HHO<Dim>*>(biHarPb);
+					biHarPb2->print = true;
+
 					for (int i = n - 1; i >= 0; i--)
 					{
 						if (eigenvalues(i).real() > Utils::NumericalZero)
@@ -249,7 +263,7 @@ public:
 						kernelVector = eigenvectors.col(i);
 						allFacesValues.tail(kernelVector.rows()) = kernelVector.real();
 						GMSHMesh<Dim>::ExportToGMSH_Faces(static_cast<PolyhedralMesh<Dim>*>(mesh), hho->FaceBasis, allFacesValues, out.GetFilePathPrefix(), "kernelFaces_" + to_string(i));
-						/*
+						
 						cout << "kernelVector: " << endl << kernelVector.transpose() << endl;
 						
 						Vector lambdaKernel = biHarPb->Solve1stDiffProblem_Homogeneous(kernelVector.real());
@@ -262,8 +276,10 @@ public:
 
 
 						Vector zero = -biHarPb->Solve2ndDiffProblem_Homogeneous(lambdaKernel);
-						cout << "Supposed to be 0: " << zero.norm() << endl;*/
+						cout << "Supposed to be 0: " << zero.norm() << endl;
+						break;
 					}
+					biHarPb2->print = false;
 				}
 			}
 

@@ -25,6 +25,7 @@ private:
 	Vector _g_D;
 	Vector _b_fSource;
 public:
+	bool print = false;
 
 	BiHarmonicMixedFormGlowinski_HHO(Mesh<Dim>* mesh, BiHarmonicTestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool saveMatrixBlocks)
 	{
@@ -118,6 +119,8 @@ private:
 			//_diffPb.ExportReconstructedVectorToGMSH(reconstruction, out, "lambda_f");
 		}
 
+		if (Utils::ProgramArgs.Actions.Option1 == 1)
+			return _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, dirichlet, b_T);
 		return cellSolution;
 	}
 
@@ -130,16 +133,59 @@ public:
 		Vector b_ndF = _diffPb.ComputeB_ndF_noNeumann(dirichlet);
 		Vector rhs = _diffPb.CondensedRHS(b_T, b_ndF);
 
+		if (print)
+		{
+			Vector v1 = _Theta_T_bF_transpose.transpose()* dirichlet;
+			Vector v2 = _diffPb.A_ndF_dF * dirichlet;
+			Vector v3 = _S_iF_bF_transpose.transpose() * dirichlet;
+			cout << "v1.norm(): " << v1.norm() << endl;
+			cout << "v2.norm(): " << v2.norm() << endl;
+			cout << "v3.norm(): " << v3.norm() << endl;
+
+			ExportModule out(Utils::ProgramArgs.OutputDirectory, "", Utils::ProgramArgs.Actions.Export.ValueSeparator);
+
+			cout << Utils::MatrixInfo(_diffPb.A_T_dF, "A_T_dF") << endl;
+			out.ExportMatrix(_diffPb.A_T_dF, "A_T_dF");
+
+			cout << Utils::MatrixInfo(_diffPb.A_ndF_dF, "A_ndF_dF") << endl;
+			out.ExportMatrix(_diffPb.A_ndF_dF, "A_ndF_dF");
+			
+
+			cout << "dirichlet.norm(): " << dirichlet.norm() << endl;
+			cout << "b_T.norm(): " << b_T.norm() << endl;
+			cout << "b_ndF.norm(): " << b_ndF.norm() << endl;
+			cout << "rhs.norm(): " << rhs.norm() << endl;
+		}
+
 		// Solve
 		Vector faceSolution = this->_diffSolver->Solve(rhs);
 		this->CheckDiffSolverConvergence();
 
 		Vector cellSolution = _diffPb.SolveCellUnknowns(faceSolution, b_T);
 
-		/*Vector reconstruction = _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, dirichlet, b_T);
-		ExportModule out(Utils::ProgramArgs.OutputDirectory, "", Utils::ProgramArgs.Actions.Export.ValueSeparator);
-		_diffPb.ExportReconstructedVectorToGMSH(reconstruction, out, "lambda_0");*/
+		if (print)
+		{
+			//cout << "faceSolution: " << endl << faceSolution.transpose() << endl;
+			cout << "faceSolution.norm(): " << _diffPb.NonDirichletFaceSpace.L2Norm(faceSolution) << endl;
 
+			//cout << "cellSolution: " << endl << cellSolution.transpose() << endl;
+			cout << "cellSolution.norm(): " << _diffPb.CellSpace.L2Norm(cellSolution) << endl;
+
+			//Vector reconstruct = _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, dirichlet, b_T);
+			//cout << "reconstruct: " << endl << reconstruct.transpose() << endl;
+
+			double a = _diffPb.a(cellSolution, faceSolution, dirichlet, cellSolution, faceSolution, dirichlet);
+			cout << "a = " << a << endl;
+
+			Vector reconstruction = _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, dirichlet, b_T);
+			//cout << "reconstruction: " << endl << reconstruction.transpose() << endl;
+			cout << "L2 norm = " << _diffPb.ReconstructSpace.L2Norm(reconstruction) << endl;
+			//ExportModule out(Utils::ProgramArgs.OutputDirectory, "", Utils::ProgramArgs.Actions.Export.ValueSeparator);
+			//_diffPb.ExportReconstructedVectorToGMSH(reconstruction, out, "lambda_0");
+		}
+
+		if (Utils::ProgramArgs.Actions.Option1 == 1)
+			return _diffPb.ReconstructHigherOrderApproximationFromFaceCoeffs(faceSolution, dirichlet, b_T);
 		return cellSolution;
 	}
 
@@ -180,6 +226,8 @@ public:
 
 		// Normal derivative
 		Vector sourceElemBoundary = _diffPb.ExtractElemBoundary(b_source);
+		//cout << "_S_iF_bF_transpose * faceSolution: " << endl << (_S_iF_bF_transpose * faceSolution).transpose() << endl;
+		//cout << "_Theta_T_bF_transpose * sourceElemBoundary: " << endl << (_Theta_T_bF_transpose * sourceElemBoundary).transpose() << endl;
 		Vector normalDerivative = _S_iF_bF_transpose * faceSolution - _Theta_T_bF_transpose * sourceElemBoundary;
 		//return _diffPb.BoundarySpace.SolveMassMatrix(normalDerivative);
 		return normalDerivative;
