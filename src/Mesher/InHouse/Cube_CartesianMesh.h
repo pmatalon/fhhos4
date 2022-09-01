@@ -293,7 +293,7 @@ public:
 		return H();
 	}
 
-	void CoarsenMesh(H_CoarsStgy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double coarseningFactor)
+	void CoarsenMesh(H_CoarsStgy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, FaceCollapsing bdryFaceCollapsing, double coarseningFactor) override
 	{
 		if (elemCoarseningStgy == H_CoarsStgy::StandardCoarsening)
 		{
@@ -303,7 +303,7 @@ public:
 				Utils::FatalError("Unmanaged face coarsening strategy");
 		}
 		else
-			Mesh<3>::CoarsenMesh(elemCoarseningStgy, faceCoarseningStgy, coarseningFactor);
+			Mesh<3>::CoarsenMesh(elemCoarseningStgy, faceCoarseningStgy, bdryFaceCollapsing, coarseningFactor);
 	}
 
 private:
