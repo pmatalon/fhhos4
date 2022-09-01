@@ -125,6 +125,9 @@ void print_usage() {
 	cout << "              p   - By pairs" << endl;
 	cout << "              m   - Maximum" << endl;
 	cout << endl;
+	cout << "-polymesh-n-pass NUM" << endl;
+	cout << "      Number of aggregation passes to perform to build the polygonal mesh (default: 1)." << endl;
+	cout << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << "                             Discretization                           " << endl;
 	cout << "----------------------------------------------------------------------" << endl;
@@ -644,6 +647,7 @@ int main(int argc, char* argv[])
 		OPT_Stretch,
 		OPT_PolyMeshFaceCoarseningStrategy,
 		OPT_PolyMeshBoundaryFaceCollapsing,
+		OPT_PolyMeshNPasses,
 		// Discretization
 		OPT_Discretization,
 		OPT_HHO_K,
@@ -734,6 +738,7 @@ int main(int argc, char* argv[])
 		 { "stretch", required_argument, NULL, OPT_Stretch },
 		 { "polymesh-fcs", required_argument, NULL, OPT_PolyMeshFaceCoarseningStrategy },
 		 { "polymesh-bfc", required_argument, NULL, OPT_PolyMeshBoundaryFaceCollapsing },
+		 { "polymesh-n-pass", required_argument, NULL, OPT_PolyMeshNPasses },
 		 // Discretization
 		 { "discr", required_argument, NULL, OPT_Discretization },
 		 { "k", required_argument, NULL, OPT_HHO_K },
@@ -930,6 +935,9 @@ int main(int argc, char* argv[])
 					argument_error("unknown boundary face collapsing code '" + code + "'. Check -polymesh-bfc argument.");
 				break;
 			}
+			case OPT_PolyMeshNPasses:
+				args.Discretization.PolyMeshNAggregPasses = atoi(optarg);
+				break;
 
 			//--------------------//
 			//   Discretization   //

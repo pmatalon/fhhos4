@@ -27,6 +27,7 @@ struct DiscretizationArguments
 	double Stretch = 0.5;
 	FaceCoarseningStrategy PolyMeshFaceCoarseningStgy = FaceCoarseningStrategy::InterfaceCollapsing;
 	FaceCollapsing PolyMeshBoundaryFaceCollapsing = FaceCollapsing::OnlyCollinear;
+	int PolyMeshNAggregPasses = 1;
 
 	string Method = "hho";
 	string Stabilization = "hho";

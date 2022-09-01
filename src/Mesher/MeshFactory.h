@@ -44,7 +44,7 @@ class MeshFactory
 public:
 	static Mesh<Dim>* BuildMesh(ProgramArguments& args, TestCase<Dim>* testCase) { return nullptr; }
 private:
-	static PolyhedralMesh<Dim>* BuildPolyhedralMesh(PolyhedralMesh<Dim>* meshToAggregate, FaceCoarseningStrategy faceCoarseningStgy, FaceCollapsing bdryFaceCollapsing) { return nullptr; }
+	static PolyhedralMesh<Dim>* BuildPolyhedralMesh(PolyhedralMesh<Dim>* meshToAggregate, FaceCoarseningStrategy faceCoarseningStgy, FaceCollapsing bdryFaceCollapsing, int nAggreg) { return nullptr; }
 };
 
 #ifdef ENABLE_1D
@@ -58,7 +58,7 @@ Mesh<1>* MeshFactory<1>::BuildMesh(ProgramArguments& args, TestCase<1>* testCase
 #ifdef ENABLE_2D
 
 template <>
-PolyhedralMesh<2>* MeshFactory<2>::BuildPolyhedralMesh(PolyhedralMesh<2>* mesh, FaceCoarseningStrategy faceCoarseningStgy, FaceCollapsing bdryFaceCollapsing)
+PolyhedralMesh<2>* MeshFactory<2>::BuildPolyhedralMesh(PolyhedralMesh<2>* mesh, FaceCoarseningStrategy faceCoarseningStgy, FaceCollapsing bdryFaceCollapsing, int nAggreg)
 {
 	cout << "Building polygonal mesh by agglomeration:" << endl;
 	cout << "\t" << "Coarsening strategy     : agglomeration by face neighbours" << endl;
@@ -83,14 +83,21 @@ PolyhedralMesh<2>* MeshFactory<2>::BuildPolyhedralMesh(PolyhedralMesh<2>* mesh, 
 	else
 		cout << "unknown" << endl;
 
-	mesh->CoarsenMesh(H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours, faceCoarseningStgy, bdryFaceCollapsing, 0);
-	PolyhedralMesh<2>* polyMesh = static_cast<PolyhedralMesh<2>*>(mesh->CoarseMesh);
-	mesh->CoarseMesh = nullptr;
-	polyMesh->FineMesh = nullptr;
-	polyMesh->Vertices = std::move(mesh->Vertices);
-	polyMesh->ClearMeshVertexConnections();
-	polyMesh->UpdateMeshVertexConnections();
-	return polyMesh;
+	cout << "\t" << "Number of aggreg passes : " << nAggreg;
+	
+	PolyhedralMesh<2>* aggregMesh;
+	for (int i = 0; i < nAggreg; i++)
+	{
+		mesh->CoarsenMesh(H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours, faceCoarseningStgy, bdryFaceCollapsing, 0);
+		aggregMesh = static_cast<PolyhedralMesh<2>*>(mesh->CoarseMesh);
+		mesh->CoarseMesh = nullptr;
+		aggregMesh->FineMesh = nullptr;
+		aggregMesh->Vertices = std::move(mesh->Vertices);
+		aggregMesh->ClearMeshVertexConnections();
+		aggregMesh->UpdateMeshVertexConnections();
+		mesh = aggregMesh;
+	}
+	return aggregMesh;
 }
 
 
@@ -185,7 +192,7 @@ Mesh<2>* MeshFactory<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase
 			else if (meshCode.compare("poly") == 0)
 			{
 				Square_GMSHUnstructTriangularMesh* triMesh = new Square_GMSHUnstructTriangularMesh(n);
-				fineMesh = BuildPolyhedralMesh(triMesh, args.Discretization.PolyMeshFaceCoarseningStgy, args.Discretization.PolyMeshBoundaryFaceCollapsing);
+				fineMesh = BuildPolyhedralMesh(triMesh, args.Discretization.PolyMeshFaceCoarseningStgy, args.Discretization.PolyMeshBoundaryFaceCollapsing, args.Discretization.PolyMeshNAggregPasses);
 			}
 			else
 				Utils::FatalError("The requested mesh is not managed with this geometry.");
@@ -280,7 +287,7 @@ Mesh<2>* MeshFactory<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase
 		if (meshCode.compare("poly") == 0)
 		{
 			GMSHMesh<2>* mesh = new GMSHMesh<2>(testCase, filePath, n);
-			fineMesh = BuildPolyhedralMesh(mesh, args.Discretization.PolyMeshFaceCoarseningStgy, args.Discretization.PolyMeshBoundaryFaceCollapsing);
+			fineMesh = BuildPolyhedralMesh(mesh, args.Discretization.PolyMeshFaceCoarseningStgy, args.Discretization.PolyMeshBoundaryFaceCollapsing, args.Discretization.PolyMeshNAggregPasses);
 		}
 		else if (args.Solver.MG.H_CS == H_CoarsStgy::GMSHSplittingRefinement)
 		{
