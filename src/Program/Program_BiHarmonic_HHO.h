@@ -243,22 +243,33 @@ public:
 
 					//double det = A.determinant();
 
+					cout << "Computing eigenvalues..." << endl;
 					Eigen::EigenSolver<DenseMatrix> es(A);
 					Eigen::VectorXcd eigenvalues = es.eigenvalues();
 					Eigen::MatrixXcd eigenvectors = es.eigenvectors();
-					cout << "Eigenvalues:" << endl << eigenvalues << endl;
+					//cout << "Eigenvalues:" << endl << eigenvalues << endl;
 					Eigen::VectorXcd kernelVector = eigenvectors.col(n - 1);
 					//cout << "---------------------" << endl << "Last eigenvector" << endl << kernelVector << endl;
 					//cout << "---------------------" << endl << "Preceding eigenvector" << endl << eigenvectors.col(n - 2) << endl;
 					//cout << "---------------------" << endl << "Preceding eigenvector" << endl << eigenvectors.col(n - 3) << endl;
 
 					BiHarmonicMixedFormGlowinski_HHO<Dim>* biHarPb2 = static_cast<BiHarmonicMixedFormGlowinski_HHO<Dim>*>(biHarPb);
-					biHarPb2->print = true;
 
+					int nZeroEigenvalues = 0;
+					for (int i = 0; i < n; i++)
+					{
+						if (eigenvalues(i).real() < Utils::NumericalZero)
+							nZeroEigenvalues++;
+					}
+
+					if (nZeroEigenvalues > 0)
+						Utils::Error(to_string(nZeroEigenvalues) + " zero eigenvalues found. The problem is not well-posed!");
+
+					/*biHarPb2->print = true;
 					for (int i = n - 1; i >= 0; i--)
 					{
 						if (eigenvalues(i).real() > Utils::NumericalZero)
-							break;
+							continue;
 						Vector allFacesValues = biHarPb->DiffPb().SkeletonSpace.ZeroVector();
 						kernelVector = eigenvectors.col(i);
 						allFacesValues.tail(kernelVector.rows()) = kernelVector.real();
@@ -279,7 +290,7 @@ public:
 						cout << "Supposed to be 0: " << zero.norm() << endl;
 						break;
 					}
-					biHarPb2->print = false;
+					biHarPb2->print = false;*/
 				}
 			}
 
