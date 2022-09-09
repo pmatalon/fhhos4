@@ -65,25 +65,25 @@ PolyhedralMesh<2>* MeshFactory<2>::BuildPolyhedralMesh(PolyhedralMesh<2>* mesh, 
 
 	cout << "\t" << "Face coarsening strategy: ";
 	if (faceCoarseningStgy == FaceCoarseningStrategy::None)
-		cout << "no coarsening" << endl;
+		cout << "no coarsening [-polymesh-fcs n]" << endl;
 	else if (faceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsing)
-		cout << "interface collapsing [-fcs c]" << endl;
+		cout << "interface collapsing [-polymesh-fcs c]" << endl;
 	else
 		cout << "unknown" << endl;
 
 	cout << "\t" << "Boundary face collapsing: ";
 	if (bdryFaceCollapsing == FaceCollapsing::Disabled)
-		cout << "disabled [-bfc d]" << endl;
+		cout << "disabled [-polymesh-bfc d]" << endl;
 	else if (bdryFaceCollapsing == FaceCollapsing::OnlyCollinear)
-		cout << "collinear only [-bfc c]" << endl;
+		cout << "collinear only [-polymesh-bfc c]" << endl;
 	else if (bdryFaceCollapsing == FaceCollapsing::ByPairs)
-		cout << "by pairs [-bfc p]" << endl;
+		cout << "by pairs [-polymesh-bfc p]" << endl;
 	else if (bdryFaceCollapsing == FaceCollapsing::Max)
-		cout << "maximum [-bfc m]" << endl;
+		cout << "maximum [-polymesh-bfc m]" << endl;
 	else
 		cout << "unknown" << endl;
 
-	cout << "\t" << "Number of aggreg passes : " << nAggreg;
+	cout << "\t" << "Number of aggreg passes : " << nAggreg << " [-polymesh-n-pass " << nAggreg << "]" << endl;
 	
 	PolyhedralMesh<2>* aggregMesh;
 	for (int i = 0; i < nAggreg; i++)
