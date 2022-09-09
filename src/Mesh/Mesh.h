@@ -304,11 +304,12 @@ public:
 		return _boundaryElementsNumberedFirst;
 	}
 
-	virtual int LargestNumberOfBoundaryFacesInOneElement()
+	Element<Dim>* ElementWithTheMostBoundaryFaces(int& maxNFaces)
 	{
 		if (BoundaryElements.empty())
-			Utils::FatalError("BoundaryElements should be initialized before using LargestNumberOfBoundaryFacesInOneElement().");
-		int maxNFaces = 0;
+			Utils::FatalError("BoundaryElements should be initialized before using ElementWithTheMostBoundaryFaces().");
+		Element<Dim>* largestBdryElem = nullptr;
+		maxNFaces = 0;
 		for (Element<Dim>* e : BoundaryElements)
 		{
 			int nBoundaryFaces = 0;
@@ -318,9 +319,12 @@ public:
 					nBoundaryFaces++;
 			}
 			if (nBoundaryFaces > maxNFaces)
+			{
 				maxNFaces = nBoundaryFaces;
+				largestBdryElem = e;
+			}
 		}
-		return maxNFaces;
+		return largestBdryElem;
 	}
 
 
@@ -364,10 +368,12 @@ public:
 
 	void ExportToMatlab(string outputDirectory)
 	{
-		string faceFilePath = outputDirectory + "/mesh_faces_" + to_string(Dim) + "D_" + FileNamePart() + ".dat";
+		string faceFilePath = outputDirectory + "/mesh_faces_" + FileNamePart() + ".dat";
 		ExportFacesToMatlab(faceFilePath);
-		string elemFilePath = outputDirectory + "/mesh_elements_" + to_string(Dim) + "D_" + FileNamePart() + ".dat";
-		ExportElementCentersToMatlab(elemFilePath);
+		string elemNumbersFilePath = outputDirectory + "/mesh_elem_numbers_" + FileNamePart() + ".m";
+		ExportElementNumbersToMatlab(elemNumbersFilePath);
+		string faceNumbersFilePath = outputDirectory + "/mesh_face_numbers_" + FileNamePart() + ".m";
+		ExportFaceNumbersToMatlab(faceNumbersFilePath);
 	}
 	virtual void ExportFacesToMatlab(string filePath)
 	{
@@ -378,11 +384,17 @@ public:
 		fclose(file);
 		cout << "Faces exported to         " << filePath << endl;
 	}
-	void ExportElementCentersToMatlab(string filePath)
+	void ExportElementNumbersToMatlab(string filePath)
 	{
 		MatlabScript script(filePath);
 		for (auto e : this->Elements)
 			script.PlotText(e->Center(), to_string(e->Number), "r");
+	}
+	void ExportFaceNumbersToMatlab(string filePath)
+	{
+		MatlabScript script(filePath);
+		for (auto f : this->Faces)
+			script.PlotText(f->Center(), to_string(f->Number), "b");
 	}
 
 	virtual void ExportToGMSH_Elements(FunctionalBasis<Dim>* basis, const Vector &coeffs, const string& outputFilePathPrefix, const string& suffix, double tolerance = 1e-3, int maxRefinements = 6, bool takeAbsoluteValue = false)

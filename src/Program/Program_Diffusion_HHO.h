@@ -106,14 +106,14 @@ public:
 
 					cout << "Export..." << endl;
 					mesh->ExportFacesToMatlab(args.OutputDirectory + "/fine.dat");
-					mesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_fine.m");
+					mesh->ExportElementNumbersToMatlab(args.OutputDirectory + "/elem_fine.m");
 
 					// 1st coarsening
 					cout << "Coarsening..." << endl;
 					mesh->CoarsenMesh(args.Solver.MG.H_CS, args.Solver.MG.FaceCoarseningStgy, args.Solver.MG.BoundaryFaceCollapsing, args.Solver.MG.CoarseningFactor);
 					/*cout << "Export..." << endl;
 					mesh->CoarseMesh->ExportFacesToMatlab(args.OutputDirectory + "/coarse1.dat");
-					mesh->CoarseMesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_coarse1.m");*/
+					mesh->CoarseMesh->ExportElementNumbersToMatlab(args.OutputDirectory + "/elem_coarse1.m");*/
 					cout << "Sanity check..." << endl;
 					mesh->SanityCheck();
 					// 2nd coarsening
@@ -121,7 +121,7 @@ public:
 					mesh->CoarseMesh->CoarsenMesh(args.Solver.MG.H_CS, args.Solver.MG.FaceCoarseningStgy, args.Solver.MG.BoundaryFaceCollapsing, args.Solver.MG.CoarseningFactor);
 					/*cout << "Export..." << endl;
 					mesh->CoarseMesh->CoarseMesh->ExportFacesToMatlab(args.OutputDirectory + "/coarse2.dat");
-					mesh->CoarseMesh->CoarseMesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_coarse2.m");*/
+					mesh->CoarseMesh->CoarseMesh->ExportElementNumbersToMatlab(args.OutputDirectory + "/elem_coarse2.m");*/
 					cout << "Sanity check..." << endl;
 					mesh->CoarseMesh->SanityCheck();
 					// 3rd coarsening
@@ -129,7 +129,7 @@ public:
 					mesh->CoarseMesh->CoarseMesh->CoarsenMesh(args.Solver.MG.H_CS, args.Solver.MG.FaceCoarseningStgy, args.Solver.MG.BoundaryFaceCollapsing, args.Solver.MG.CoarseningFactor);
 					/*cout << "Export..." << endl;
 					mesh->CoarseMesh->CoarseMesh->CoarseMesh->ExportFacesToMatlab(args.OutputDirectory + "/coarse3.dat");
-					mesh->CoarseMesh->CoarseMesh->CoarseMesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_coarse3.m");*/
+					mesh->CoarseMesh->CoarseMesh->CoarseMesh->ExportElementNumbersToMatlab(args.OutputDirectory + "/elem_coarse3.m");*/
 					cout << "Sanity check..." << endl;
 					mesh->CoarseMesh->CoarseMesh->SanityCheck();
 					//cout << *mesh << endl << endl;
@@ -138,16 +138,16 @@ public:
 				else
 				{
 					mesh->ExportFacesToMatlab(args.OutputDirectory + "/fine.dat");
-					mesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_fine.m");
+					mesh->ExportElementNumbersToMatlab(args.OutputDirectory + "/elem_fine.m");
 
 					if (mesh->CoarseMesh)
 					{
 						mesh->CoarseMesh->ExportFacesToMatlab(args.OutputDirectory + "/coarse1.dat");
-						mesh->CoarseMesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_coarse1.m");
+						mesh->CoarseMesh->ExportElementNumbersToMatlab(args.OutputDirectory + "/elem_coarse1.m");
 						if (mesh->CoarseMesh->CoarseMesh)
 						{
 							mesh->CoarseMesh->CoarseMesh->ExportFacesToMatlab(args.OutputDirectory + "/coarse2.dat");
-							mesh->CoarseMesh->CoarseMesh->ExportElementCentersToMatlab(args.OutputDirectory + "/elem_coarse2.m");
+							mesh->CoarseMesh->CoarseMesh->ExportElementNumbersToMatlab(args.OutputDirectory + "/elem_coarse2.m");
 						}
 					}
 				}

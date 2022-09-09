@@ -104,7 +104,8 @@ public:
 		int maxNBoundaryFaces = cellBasis->Size() / faceBasis->Size();
 		cout << "Number of boundary faces per element: " << endl;
 		cout << "\ttheoretical maximum = " << maxNBoundaryFaces << " (" << maxNBoundaryFacesAsDouble << ")" << endl;
-		int largestNBoundaryFaces = mesh->LargestNumberOfBoundaryFacesInOneElement();
+		int largestNBoundaryFaces;
+		Element<Dim>* largestBdryElem = mesh->ElementWithTheMostBoundaryFaces(largestNBoundaryFaces);
 		cout << "\tfound in the mesh   = " << largestNBoundaryFaces << endl;
 		if (cellBasis->Size() < largestNBoundaryFaces * faceBasis->Size())
 		{
@@ -248,7 +249,7 @@ public:
 					Eigen::VectorXcd eigenvalues = es.eigenvalues();
 					Eigen::MatrixXcd eigenvectors = es.eigenvectors();
 					//cout << "Eigenvalues:" << endl << eigenvalues << endl;
-					Eigen::VectorXcd kernelVector = eigenvectors.col(n - 1);
+					Eigen::VectorXcd kernelVectorC = eigenvectors.col(n - 1);
 					//cout << "---------------------" << endl << "Last eigenvector" << endl << kernelVector << endl;
 					//cout << "---------------------" << endl << "Preceding eigenvector" << endl << eigenvectors.col(n - 2) << endl;
 					//cout << "---------------------" << endl << "Preceding eigenvector" << endl << eigenvectors.col(n - 3) << endl;
@@ -263,21 +264,52 @@ public:
 					}
 
 					if (nZeroEigenvalues > 0)
-						Utils::Error(to_string(nZeroEigenvalues) + " zero eigenvalues found. The problem is not well-posed!");
+						Utils::Error(to_string(nZeroEigenvalues) + " zero eigenvalues found (amongst " + to_string(n) + "). The problem is not well-posed!");
 
-					/*biHarPb2->print = true;
+					DenseMatrix theta = biHarPb2->DiffPb().HHOElement(largestBdryElem)->SolveCellUnknownsMatrix();
+					cout << "theta: " << endl << theta << endl;
+					
+					int nFaceUnknowns = hho->FaceBasis->Size();
+					DenseMatrix theta_bF(theta.rows(), largestNBoundaryFaces* nFaceUnknowns);
+					int i = 0;
+					vector<Face<Dim>*> boundaryFaces = largestBdryElem->BoundaryFaces();
+					for (int i=0; i< boundaryFaces.size(); i++)
+					{
+						Face<Dim>* f = boundaryFaces[i];
+						theta_bF.middleCols(i * nFaceUnknowns, nFaceUnknowns) = theta.middleCols(largestBdryElem->LocalNumberOf(f) * nFaceUnknowns, nFaceUnknowns);
+					}
+					cout << "theta_bF: " << endl << theta_bF << endl;
+					cout << endl;
+
+					Interface<Dim> interf(boundaryFaces);
+					list<set<Face<Dim>*>> coplanarSubsets = interf.CoplanarSubsets();
+					for (set<Face<Dim>*> subset : coplanarSubsets)
+					{
+						Vector kernelTheta = Vector::Zero(largestBdryElem->Faces.size() * nFaceUnknowns);
+						auto iter = subset.begin();
+						Face<Dim>* f1 = *iter;
+						iter++;
+						Face<Dim>* f2 = *iter;
+						kernelTheta[largestBdryElem->LocalNumberOf(f1) * nFaceUnknowns] = 1;
+						kernelTheta[largestBdryElem->LocalNumberOf(f2) * nFaceUnknowns] = -f1->Measure() / f2->Measure();
+						cout << "kernelTheta: " << endl << kernelTheta.transpose() << endl;
+						cout << "theta * kernelTheta: " << endl << (theta * kernelTheta).transpose() << endl;
+					}
+					//FaceCollapsingStatus status = static_cast<PolyhedralMesh<Dim>*>.TryCollapseCoplanarFaces(interf);
+
+					biHarPb2->print = true;
 					for (int i = n - 1; i >= 0; i--)
 					{
 						if (eigenvalues(i).real() > Utils::NumericalZero)
 							continue;
 						Vector allFacesValues = biHarPb->DiffPb().SkeletonSpace.ZeroVector();
-						kernelVector = eigenvectors.col(i);
-						allFacesValues.tail(kernelVector.rows()) = kernelVector.real();
+						Vector kernelVector = eigenvectors.col(i).real();
+						allFacesValues.tail(kernelVector.rows()) = kernelVector;
 						GMSHMesh<Dim>::ExportToGMSH_Faces(static_cast<PolyhedralMesh<Dim>*>(mesh), hho->FaceBasis, allFacesValues, out.GetFilePathPrefix(), "kernelFaces_" + to_string(i));
 						
 						cout << "kernelVector: " << endl << kernelVector.transpose() << endl;
 						
-						Vector lambdaKernel = biHarPb->Solve1stDiffProblem_Homogeneous(kernelVector.real());
+						Vector lambdaKernel = biHarPb->Solve1stDiffProblem_Homogeneous(kernelVector);
 						cout << "lambdaKernel: " << endl << lambdaKernel.transpose() << endl;
 						cout << lambdaKernel.norm() << endl;
 
@@ -290,7 +322,7 @@ public:
 						cout << "Supposed to be 0: " << zero.norm() << endl;
 						break;
 					}
-					biHarPb2->print = false;*/
+					biHarPb2->print = false;
 				}
 			}
 
