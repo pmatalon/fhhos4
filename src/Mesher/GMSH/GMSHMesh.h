@@ -1225,6 +1225,13 @@ public:
 			Utils::Error("For face visualization, use non-orthogonalized monomial bases (-f-basis monomials -f-ogb 0).");
 			return;
 		}
+#ifdef ENABLE_2D
+		if (Dim == 2 && mesh->_edgeFaces.empty())
+		{
+			Utils::Error("Face export to GMSH aborted, because mesh->_edgeFaces is empty. If it is a polygonal mesh, mesh->_edgeFaces is not filled (TODO).");
+			return;
+		}
+#endif // ENABLE_2D
 
 		gmsh::initialize();
 		ManageGMSHLog();
