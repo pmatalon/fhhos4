@@ -1225,13 +1225,13 @@ public:
 			Utils::Error("For face visualization, use non-orthogonalized monomial bases (-f-basis monomials -f-ogb 0).");
 			return;
 		}
-#ifdef ENABLE_2D
+/*#ifdef ENABLE_2D
 		if (Dim == 2 && mesh->_edgeFaces.empty())
 		{
 			Utils::Error("Face export to GMSH aborted, because mesh->_edgeFaces is empty. If it is a polygonal mesh, mesh->_edgeFaces is not filled (TODO).");
 			return;
 		}
-#endif // ENABLE_2D
+#endif // ENABLE_2D*/
 
 		gmsh::initialize();
 		ManageGMSHLog();
@@ -1276,8 +1276,23 @@ public:
 			gmsh::view::setInterpolationMatrices(viewId, "Line", basisSize, coefMonomials, expMonomials,
 				segmentMapping.NFunctions, segmentMapping.Coeffs, segmentMapping.Exponents);
 
-			vector<double> data = GeoMappingAndHighOrderData(mesh->_edgeFaces, coeffs, segmentMapping.NFunctions, basisSize);
-			gmsh::view::addListData(viewId, "SL", mesh->_edgeFaces.size(), data); // SL = Scalar Line
+			if (!mesh->_edgeFaces.empty())
+			{
+				vector<double> data = GeoMappingAndHighOrderData(mesh->_edgeFaces, coeffs, segmentMapping.NFunctions, basisSize);
+				gmsh::view::addListData(viewId, "SL", mesh->_edgeFaces.size(), data); // SL = Scalar Line
+			}
+			else
+			{
+				vector<Edge> edges;
+				edges.reserve(mesh->Faces.size());
+				for (Face<Dim>* f : mesh->Faces)
+				{
+					Edge* e = dynamic_cast<Edge*>(f);
+					edges.push_back(*e);
+				}
+				vector<double> data = GeoMappingAndHighOrderData(edges, coeffs, segmentMapping.NFunctions, basisSize);
+				gmsh::view::addListData(viewId, "SL", edges.size(), data); // SL = Scalar Line
+			}
 		}
 #endif // ENABLE_2D
 #ifdef ENABLE_3D

@@ -327,6 +327,18 @@ public:
 		return largestBdryElem;
 	}
 
+	// Re-numbering of the faces: interior first, then Neumann, and Dirichlet at the end (because they will be eliminated from the system)
+	void RenumberFacesInOrder_IntNeumDirich()
+	{
+		BigNumber faceNumber = 0;
+		for (auto face : this->InteriorFaces)
+			face->Number = faceNumber++;
+		for (auto face : this->NeumannFaces)
+			face->Number = faceNumber++;
+		for (auto face : this->DirichletFaces)
+			face->Number = faceNumber++;
+	}
+
 
 	Face<Dim>* ExistingFaceWithVertices(const vector<MeshVertex<Dim>*>& vertices)
 	{
