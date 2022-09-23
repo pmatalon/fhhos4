@@ -55,13 +55,6 @@ public:
 
 		cout << "Mesh storage > " << Utils::MemoryString(mesh->MemoryUsage()) << endl;
 
-		// Export mesh
-		if (args.Actions.Export.MeshToMatlab)
-		{
-			mesh->ExportToMatlab(args.OutputDirectory);
-			mesh->ExportToMatlab2(args.OutputDirectory + "/mesh.m");
-		}
-
 		// Export source
 		if (args.Actions.Export.SourceToGMSH && args.Discretization.Mesher.compare("gmsh") == 0)
 			dynamic_cast<GMSHMesh<Dim>*>(mesh)->ExportToGMSH_Elements(testCase->SourceFunction, args.OutputDirectory + "/source", "source");
@@ -90,6 +83,16 @@ public:
 		}
 		else
 			Utils::FatalError("Unknown scheme '" + args.Problem.Scheme + "'. Check -sch parameter. Possible values are 'f' and 'g'.");
+
+
+		mesh->RenumberFacesInOrder_IntNeumDirich();
+
+		// Export mesh
+		if (args.Actions.Export.MeshToMatlab)
+		{
+			mesh->ExportToMatlab(args.OutputDirectory);
+			mesh->ExportToMatlab2(args.OutputDirectory + "/mesh.m");
+		}
 
 		int k = args.Discretization.PolyDegree - 1;
 		int reconstructDegree = k + 1;
@@ -266,9 +269,10 @@ public:
 					if (nZeroEigenvalues > 0)
 						Utils::Error(to_string(nZeroEigenvalues) + " zero eigenvalues found (amongst " + to_string(n) + "). The problem is not well-posed!");
 
+					// Theta for the problematic element
 					DenseMatrix theta = biHarPb2->DiffPb().HHOElement(largestBdryElem)->SolveCellUnknownsMatrix();
 					cout << "theta: " << endl << theta << endl;
-					
+					// Theta_bF
 					int nFaceUnknowns = hho->FaceBasis->Size();
 					DenseMatrix theta_bF(theta.rows(), largestNBoundaryFaces* nFaceUnknowns);
 					int i = 0;
@@ -290,8 +294,10 @@ public:
 						Face<Dim>* f1 = *iter;
 						iter++;
 						Face<Dim>* f2 = *iter;
-						kernelTheta[largestBdryElem->LocalNumberOf(f1) * nFaceUnknowns] = 1;
-						kernelTheta[largestBdryElem->LocalNumberOf(f2) * nFaceUnknowns] = -f1->Measure() / f2->Measure();
+						for (int i=0; i< nFaceUnknowns; i++)
+							kernelTheta[largestBdryElem->LocalNumberOf(f1) * nFaceUnknowns + i] = 1;
+						for (int i = 0; i < nFaceUnknowns; i++)
+							kernelTheta[largestBdryElem->LocalNumberOf(f2) * nFaceUnknowns + i] = -f1->Measure() / f2->Measure();
 						cout << "kernelTheta: " << endl << kernelTheta.transpose() << endl;
 						cout << "theta * kernelTheta: " << endl << (theta * kernelTheta).transpose() << endl;
 					}
@@ -318,9 +324,9 @@ public:
 						//biHarPb->DiffPb().ExportReconstructedVectorToGMSH(solKernel, out, "solKernel");
 
 
-						Vector zero = -biHarPb->Solve2ndDiffProblem_Homogeneous(lambdaKernel);
-						cout << "Supposed to be 0: " << zero.norm() << endl;
-						break;
+						//Vector zero = -biHarPb->Solve2ndDiffProblem_Homogeneous(lambdaKernel);
+						//cout << "Supposed to be 0: " << zero.norm() << endl;
+						//break;
 					}
 					biHarPb2->print = false;
 				}
