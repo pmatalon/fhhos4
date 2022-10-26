@@ -587,25 +587,25 @@ public:
 
 
 
-	inline double DetJacobian(const RefPoint& pointInReferenceSquare) const
+	inline double DetJacobian(const RefPoint& pointInReferenceSquare) const override
 	{
 		return _boundingBox.DetJacobian(pointInReferenceSquare);
 	}
-	inline DimMatrix<2> InverseJacobianTranspose(const RefPoint& pointInReferenceSquare) const
+	inline DimMatrix<2> InverseJacobianTranspose(const RefPoint& pointInReferenceSquare) const override
 	{
 		return _boundingBox.InverseJacobianTranspose(pointInReferenceSquare);
 	}
-	inline int DetJacobianDegree() const
+	int DetJacobianDegree() const override
 	{
 		return _boundingBox.DetJacobianDegree();
 	}
 
-	DomPoint ConvertToDomain(const RefPoint& pointInReferenceSquare) const
+	DomPoint ConvertToDomain(const RefPoint& pointInReferenceSquare) const override
 	{
 		return _boundingBox.ConvertToDomain(pointInReferenceSquare);
 	}
 
-	RefPoint ConvertToReference(const DomPoint& domainPoint) const
+	RefPoint ConvertToReference(const DomPoint& domainPoint) const override
 	{
 		return _boundingBox.ConvertToReference(domainPoint);
 	}

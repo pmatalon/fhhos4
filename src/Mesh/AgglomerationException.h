@@ -8,12 +8,13 @@ class AgglomerationException : public exception
 private:
 	string _error;
 public:
-	AgglomerationException(string error) : _error(error)
-	{}
+	AgglomerationException(string error)
+	{
+		_error = "AgglomerationException: " + error;
+	}
 
 	virtual const char* what() const throw()
 	{
-		string s = "AgglomerationException: " + _error;
-		return s.c_str();
+		return _error.c_str();
 	}
 };

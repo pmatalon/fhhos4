@@ -240,6 +240,6 @@ public:
 	bool   IsHierarchical()      const override { return true; }
 	int    Size()                const override { return 1; }
 	bool   UsePolynomialSpaceQ() const override { return false; }
-	FunctionalBasis<0>* CreateSameBasisForDegree(int degree) { assert(false); return nullptr; }
-	FunctionalBasis<0>* CreateLowerDegreeBasis  (int degree) { assert(false); return nullptr; }
+	FunctionalBasis<0>* CreateSameBasisForDegree(int degree) override { assert(false); return nullptr; }
+	FunctionalBasis<0>* CreateLowerDegreeBasis  (int degree) override { assert(false); return nullptr; }
 };

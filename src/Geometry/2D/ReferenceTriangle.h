@@ -35,13 +35,13 @@ public:
 		return DomPoint(); // to avoid warning
 	}
 
-	vector<RefPoint> QuadraturePoints() const
+	vector<RefPoint> QuadraturePoints() const override
 	{
 		Dunavant dunavant;
 		return dunavant.Points();
 	}
 
-	vector<RefPoint> QuadraturePoints(int polynomialDegree) const
+	vector<RefPoint> QuadraturePoints(int polynomialDegree) const override
 	{
 		Dunavant dunavant(polynomialDegree);
 		return dunavant.Points();

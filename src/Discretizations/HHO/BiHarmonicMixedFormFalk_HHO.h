@@ -227,7 +227,7 @@ public:
 		return _boundarySpace->L2InnerProd(v1, v2);
 	}
 
-	pair<Vector, Vector> ComputeSolution(const Vector& theta)
+	pair<Vector, Vector> ComputeSolution(const Vector& theta) override
 	{
 		pair<Vector, Vector> p;
 		auto& [lambda, solution] = p;

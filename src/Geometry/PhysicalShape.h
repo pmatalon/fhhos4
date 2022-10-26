@@ -186,12 +186,12 @@ public:
 		return domPoints;
 	}
 
-	double Integral(BasisFunction<Dim>* phi) const
+	double Integral(BasisFunction<Dim>* phi) const override
 	{
 		return GeometricShape<Dim>::Integral(phi);
 	}
 
-	virtual double Integral(RefFunction f) const override
+	double Integral(RefFunction f) const override
 	{
 		RefFunction func = [this, f](const RefPoint& p) {
 			return DetJacobian(p) * f(p);
@@ -199,7 +199,7 @@ public:
 		return RefShape()->Integral(func);
 	}
 
-	virtual double Integral(RefFunction f, int polynomialDegree) const override
+	double Integral(RefFunction f, int polynomialDegree) const override
 	{
 		RefFunction func = [this, f](const RefPoint& p) {
 			return DetJacobian(p) * f(p);
@@ -207,7 +207,7 @@ public:
 		return RefShape()->Integral(func, polynomialDegree + DetJacobianDegree());
 	}
 
-	virtual double Integral(DomFunction globalFunction) const
+	double Integral(DomFunction globalFunction) const override
 	{
 		RefFunction refFunction = [this, globalFunction](const RefPoint& refElementPoint) {
 			DomPoint domainPoint = this->ConvertToDomain(refElementPoint, true);
@@ -217,7 +217,7 @@ public:
 		return Integral(refFunction);
 	}
 
-	virtual double Integral(DomFunction globalFunction, int polynomialDegree) const
+	double Integral(DomFunction globalFunction, int polynomialDegree) const override
 	{
 		RefFunction refFunction = [this, globalFunction](const RefPoint& refElementPoint) {
 			DomPoint domainPoint = this->ConvertToDomain(refElementPoint, true);

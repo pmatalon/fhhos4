@@ -55,7 +55,7 @@ public:
 		return { _v1, _v2 };
 	}
 
-	Face<2>* CreateSameGeometricFace(BigNumber number, Element<2>* element1)
+	Face<2>* CreateSameGeometricFace(BigNumber number, Element<2>* element1) override
 	{
 		Face<2>* copy = new Edge(number, _v1, _v2, element1);
 		copy->IsDomainBoundary = this->IsDomainBoundary;
@@ -63,13 +63,13 @@ public:
 		return copy;
 	}
 
-	void ExportFaceToMatlab(FILE* file)
+	void ExportFaceToMatlab(FILE* file) override
 	{
 		//             Number  x1    y1    x2    y2 IsDomainBoundary IsRemovedOnCoarserGrid
 		fprintf(file, "%d %.17g %.17g %.17g %.17g %d %d\n", static_cast<int>(this->Number), _v1->X, _v1->Y, _v2->X, _v2->Y, this->IsDomainBoundary, this->IsRemovedOnCoarserGrid);
 	}
 
-	virtual bool IntersectsWith(Face<2>* other)
+	bool IntersectsWith(Face<2>* other) override
 	{
 		Edge* otherEdge = dynamic_cast<Edge*>(other);
 

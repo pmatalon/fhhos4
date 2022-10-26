@@ -51,7 +51,7 @@ public:
 		return { _v1, _v2, _v3, _v4 };
 	}
 
-	DimVector<2> OuterNormalVector(Face<2>* face) const
+	DimVector<2> OuterNormalVector(Face<2>* face) const override
 	{
 		DimVector<2> n;
 		Edge* edge = dynamic_cast<Edge*>(face);

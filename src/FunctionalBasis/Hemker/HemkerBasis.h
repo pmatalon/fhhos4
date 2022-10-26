@@ -214,7 +214,7 @@ public:
 		return list;
 	}
 
-	int GetDegree() const
+	int GetDegree() const override
 	{
 		return (int)_hemker1D.size() - 1;
 	}

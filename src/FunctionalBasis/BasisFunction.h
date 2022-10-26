@@ -63,7 +63,7 @@ protected:
 		//assert(abs(x) < 1.5); // x should be in [-1, 1], but apparently we need a big margin...
 	}
 public:
-	virtual string ToString() = 0;
+	//virtual string ToString() = 0;
 	virtual string ToString(string var) = 0;
 };
 

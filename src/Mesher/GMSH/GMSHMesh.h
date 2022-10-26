@@ -738,7 +738,7 @@ public:
 			PolyhedralMesh<Dim>::CoarsenMesh(elemCoarseningStgy, faceCoarseningStgy, boundaryFaceCollapsing, coarseningFactor);
 	}
 
-	virtual void RefineMesh(H_CoarsStgy strategy)
+	void RefineMesh(H_CoarsStgy strategy) override
 	{
 		if (this->FineMesh)
 			assert(false && "Mesh already refined!");

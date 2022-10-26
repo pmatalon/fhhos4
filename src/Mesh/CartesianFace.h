@@ -56,7 +56,7 @@ public:
 		return _vertices;
 	}
 
-	Face<Dim>* CreateSameGeometricFace(BigNumber number, Element<Dim>* element1)
+	Face<Dim>* CreateSameGeometricFace(BigNumber number, Element<Dim>* element1) override
 	{
 		Face<Dim>* copy = new CartesianFace<Dim>(number, element1, nullptr, _shape);
 		copy->IsDomainBoundary = this->IsDomainBoundary;
@@ -64,7 +64,7 @@ public:
 		return copy;
 	}
 
-	inline void ExportFaceToMatlab(FILE* file)
+	void ExportFaceToMatlab(FILE* file) override
 	{
 		if (Dim == 2)
 		{

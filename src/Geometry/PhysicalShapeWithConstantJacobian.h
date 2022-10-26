@@ -154,11 +154,11 @@ public:
 	// But without that it doesn't compile for some reason :-(             //
 	//---------------------------------------------------------------------//
 
-	virtual double Integral(DomFunction globalFunction) const
+	double Integral(DomFunction globalFunction) const override
 	{
 		return PhysicalShape<Dim>::Integral(globalFunction);
 	}
-	virtual double Integral(DomFunction globalFunction, int polynomialDegree) const
+	double Integral(DomFunction globalFunction, int polynomialDegree) const override
 	{
 		return PhysicalShape<Dim>::Integral(globalFunction, polynomialDegree);
 	}

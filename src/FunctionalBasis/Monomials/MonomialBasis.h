@@ -233,7 +233,7 @@ public:
 		return list;
 	}
 
-	int GetDegree() const
+	int GetDegree() const override
 	{
 		return (int)_monomials1D.size() - 1;
 	}

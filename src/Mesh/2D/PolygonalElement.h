@@ -51,7 +51,7 @@ public:
 		return _vertices;
 	}
 
-	DimVector<2> OuterNormalVector(Face<2>* face) const
+	DimVector<2> OuterNormalVector(Face<2>* face) const override
 	{
 		DimVector<2> n;
 		Vertex* A = face->Vertices()[0];
@@ -275,7 +275,7 @@ private:
 	}
 
 public:
-	void RemoveIntersections(const vector<Vertex*>& verticesToRemove)//const vector<Face<2>*>& oldFaces, Face<2>* newFace)
+	void RemoveIntersections(const vector<Vertex*>& verticesToRemove) override//const vector<Face<2>*>& oldFaces, Face<2>* newFace)
 	{
 		// Adds all the vertices in the same order, except the intersection vertices
 		vector<Vertex*> newVertices;

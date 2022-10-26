@@ -48,7 +48,7 @@ public:
 		return { _v1, _v2, _v3 };
 	}
 
-	Face<3>* CreateSameGeometricFace(BigNumber number, Element<3>* element1)
+	Face<3>* CreateSameGeometricFace(BigNumber number, Element<3>* element1) override
 	{
 		Face<3>* copy = new TriangularFace(number, _v1, _v2, _v3, element1);
 		copy->IsDomainBoundary = this->IsDomainBoundary;
@@ -56,7 +56,7 @@ public:
 		return copy;
 	}
 
-	void ExportFaceToMatlab(FILE* file)
+	void ExportFaceToMatlab(FILE* file) override
 	{
 		assert(false && "Not implemented.");
 	}

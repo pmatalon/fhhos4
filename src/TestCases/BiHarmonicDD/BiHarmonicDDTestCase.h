@@ -25,7 +25,7 @@ public:
 		cout << endl;
 	}
 
-	string FilePrefix()
+	string FilePrefix() override
 	{
 		return "BiHar" + to_string(Dim) + "D_" + this->Code();
 	}

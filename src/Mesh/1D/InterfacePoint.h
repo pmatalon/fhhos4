@@ -33,12 +33,12 @@ public:
 		return 0;
 	}
 
-	Face<1>* CreateSameGeometricFace(BigNumber number, Element<1>* element1)
+	Face<1>* CreateSameGeometricFace(BigNumber number, Element<1>* element1) override
 	{
 		return new InterfacePoint(number, this->V);
 	}
 
-	void ExportFaceToMatlab(FILE* file)
+	void ExportFaceToMatlab(FILE* file) override
 	{
 		fprintf(file, "%d %.17g 0 0 0 %d\n", static_cast<int>(this->Number), this->V->X, this->IsDomainBoundary);
 	}

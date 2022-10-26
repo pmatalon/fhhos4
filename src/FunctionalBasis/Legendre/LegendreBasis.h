@@ -232,7 +232,7 @@ public:
 		return list;
 	}
 
-	int GetDegree() const
+	int GetDegree() const override
 	{
 		return (int)_legendre1D.size() - 1;
 	}

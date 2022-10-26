@@ -17,7 +17,7 @@ public:
 		this->Degree = degree;
 	}
 
-	int GetDegree() const
+	int GetDegree() const override
 	{
 		return this->Degree;
 	}
@@ -62,12 +62,12 @@ public:
 		return ((2 * n - 1)*Legendre(n - 1, x) + (2 * n - 1)*x*DLegendre(n - 1, x) - (n-1) * DLegendre(n - 2, x)) / n;
 	}
 
-	string ToString()
+	string ToString() override
 	{
 		return this->ToString("X");
 	}
 
-	string ToString(string var)
+	string ToString(string var) override
 	{
 		if (this->Degree == 0)
 			return "1";

@@ -177,12 +177,12 @@ public:
 	//       Geometric information         //
 	//-------------------------------------//
 
-	PhysicalShape<ShapeDim>* CreateCopy() const
+	PhysicalShape<ShapeDim>* CreateCopy() const override
 	{
 		return new CartesianShape<DomainDim,ShapeDim>(*this);
 	}
 
-	ReferenceShape<ShapeDim>* RefShape() const
+	ReferenceShape<ShapeDim>* RefShape() const override
 	{
 		return &RefCartShape;
 	}
@@ -259,7 +259,7 @@ public:
 		Utils::FatalError("TO BE IMPLEMENTED");
 	}
 
-	void Serialize(ostream& os) const
+	void Serialize(ostream& os) const override
 	{
 		if (ShapeDim == 2)
 			os << (IsRegular ? "square" : "rectangle") << ", ";
@@ -342,7 +342,7 @@ public:
 		return invJ;
 	}
 
-	DomPoint ConvertToDomain(const RefPoint& referenceElementPoint) const
+	DomPoint ConvertToDomain(const RefPoint& referenceElementPoint) const override
 	{
 		DomPoint p;
 		if (ShapeDim == DomainDim)
@@ -425,7 +425,7 @@ public:
 		return p;
 	}
 
-	RefPoint ConvertToReference(const DomPoint& domainPoint) const
+	RefPoint ConvertToReference(const DomPoint& domainPoint) const override
 	{
 		RefPoint refPoint;
 		if (ShapeDim == DomainDim)
@@ -535,7 +535,7 @@ public:
 	//              Integrals              //
 	//-------------------------------------//
 
-	double Integral(DomFunction func) const
+	double Integral(DomFunction func) const override
 	{
 		if (ShapeDim == 1)
 		{

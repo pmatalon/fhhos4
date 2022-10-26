@@ -82,12 +82,12 @@ public:
 			b2 = 0;
 	}
 
-	PhysicalShape<2>* CreateCopy() const
+	PhysicalShape<2>* CreateCopy() const override
 	{
 		return new Quadrilateral(*this);
 	}
 
-	ReferenceShape<2>* RefShape() const
+	ReferenceShape<2>* RefShape() const override
 	{
 		return &RefSquare;
 	}
@@ -156,7 +156,7 @@ public:
 	{
 		return 2;
 	}
-	DimMatrix<2> InverseJacobianTranspose(const RefPoint& p) const
+	DimMatrix<2> InverseJacobianTranspose(const RefPoint& p) const override
 	{
 		DimMatrix<2> jacobianMatrix = JacobianMatrix(p);
 		return jacobianMatrix.inverse().transpose();
@@ -177,7 +177,7 @@ public:
 
 	// Formulas in Silva et al. "Exact and efficient interpolation using finite elements shape functions" (2009)
 	// where ksi = t, eta = u
-	DomPoint ConvertToDomain(const RefPoint& refPoint) const
+	DomPoint ConvertToDomain(const RefPoint& refPoint) const override
 	{
 		double t = refPoint.X;
 		double u = refPoint.Y;
@@ -188,7 +188,7 @@ public:
 		return p;
 	}
 
-	RefPoint ConvertToReference(const DomPoint& domainPoint) const
+	RefPoint ConvertToReference(const DomPoint& domainPoint) const override
 	{
 		double t, u;
 

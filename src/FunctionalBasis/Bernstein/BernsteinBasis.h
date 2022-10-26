@@ -171,7 +171,7 @@ public:
 		return list;
 	}
 
-	int GetDegree() const
+	int GetDegree() const override
 	{
 		return _localFunctions[0].GetDegree();
 	}

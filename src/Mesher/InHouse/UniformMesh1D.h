@@ -65,15 +65,15 @@ public:
 		}
 	}
 
-	string Description()
+	string Description() override
 	{
 		return "Uniform, " + to_string(this->N) + " subdivisions";
 	}
-	string FileNamePart()
+	string FileNamePart() override
 	{
 		return "segment-inhouse-cart-n" + to_string(this->N);
 	}
-	string GeometryDescription()
+	string GeometryDescription() override
 	{
 		return "1D unit segment";
 	}

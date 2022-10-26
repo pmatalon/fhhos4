@@ -84,12 +84,12 @@ public:
 		//assert(abs(_detJacobian - 1 / inverseJacobian.determinant()) < 1e-14);
 	}
 
-	PhysicalShape<3>* CreateCopy() const
+	PhysicalShape<3>* CreateCopy() const override
 	{
 		return new Tetrahedron(*this);
 	}
 
-	ReferenceShape<3>* RefShape() const
+	ReferenceShape<3>* RefShape() const override
 	{
 		return &RefTetra;
 	}
@@ -238,17 +238,17 @@ public:
 		return refinedShapes;
 	}
 
-	inline double DetJacobian() const
+	inline double DetJacobian() const override
 	{
 		return _detJacobian;
 	}
-	inline DimMatrix<3> InverseJacobianTranspose() const
+	DimMatrix<3> InverseJacobianTranspose() const override
 	{
 		return _inverseJacobianTranspose;
 	}
 
 	// Mapping
-	DomPoint ConvertToDomain(const RefPoint& refPoint) const
+	DomPoint ConvertToDomain(const RefPoint& refPoint) const override
 	{
 		double t = refPoint.X;
 		double u = refPoint.Y;
@@ -262,7 +262,7 @@ public:
 	}
 
 	// Inverse mapping
-	RefPoint ConvertToReference(const DomPoint& domainPoint) const
+	RefPoint ConvertToReference(const DomPoint& domainPoint) const override
 	{
 		DimVector<3> tuv = _inverseMapping * Vect<3>(v1, domainPoint);
 		RefPoint p(tuv(0), tuv(1), tuv(2));
@@ -314,11 +314,11 @@ public:
 	// But without that it doesn't compile for some reason :-(             //
 	//---------------------------------------------------------------------//
 
-	virtual double Integral(DomFunction globalFunction) const
+	double Integral(DomFunction globalFunction) const override
 	{
 		return PhysicalShapeWithConstantJacobian<3>::Integral(globalFunction);
 	}
-	virtual double Integral(DomFunction globalFunction, int polynomialDegree) const
+	double Integral(DomFunction globalFunction, int polynomialDegree) const override
 	{
 		return PhysicalShapeWithConstantJacobian<3>::Integral(globalFunction, polynomialDegree);
 	}

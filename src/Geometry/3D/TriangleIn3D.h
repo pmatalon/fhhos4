@@ -74,12 +74,12 @@ public:
 		_inverseMapping = mapping.inverse();
 	}
 
-	PhysicalShape<2>* CreateCopy() const
+	PhysicalShape<2>* CreateCopy() const override
 	{
 		return new TriangleIn3D(*this);
 	}
 
-	ReferenceShape<2>* RefShape() const
+	ReferenceShape<2>* RefShape() const override
 	{
 		return &Triangle::RefTriangle;
 	}
@@ -139,17 +139,17 @@ public:
 		Utils::FatalError("NOT SUPPOSED TO BE CALLED");
 	}
 
-	inline double DetJacobian() const
+	double DetJacobian() const override
 	{
 		return _detJacobian;
 	}
-	inline DimMatrix<2> InverseJacobianTranspose() const
+	DimMatrix<2> InverseJacobianTranspose() const override
 	{
 		assert(false);
 		return DimMatrix<2>(); // to avoid warning
 	}
 
-	DomPoint ConvertToDomain(const RefPoint& refPoint) const
+	DomPoint ConvertToDomain(const RefPoint& refPoint) const override
 	{
 		double t = refPoint.X;
 		double u = refPoint.Y;
@@ -161,7 +161,7 @@ public:
 		return p;
 	}
 
-	RefPoint ConvertToReference(const DomPoint& domainPoint) const
+	RefPoint ConvertToReference(const DomPoint& domainPoint) const override
 	{
 		double x = domainPoint.X;
 		double y = domainPoint.Y;
@@ -229,11 +229,11 @@ public:
 	// But without that it doesn't compile for some reason :-(             //
 	//---------------------------------------------------------------------//
 
-	virtual double Integral(DomFunction globalFunction) const
+	double Integral(DomFunction globalFunction) const override
 	{
 		return PhysicalShapeWithConstantJacobian<2>::Integral(globalFunction);
 	}
-	virtual double Integral(DomFunction globalFunction, int polynomialDegree) const
+	double Integral(DomFunction globalFunction, int polynomialDegree) const override
 	{
 		return PhysicalShapeWithConstantJacobian<2>::Integral(globalFunction, polynomialDegree);
 	}

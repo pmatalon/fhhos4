@@ -31,13 +31,13 @@ public:
 		return DomPoint(0);
 	}
 
-	vector<RefPoint> QuadraturePoints() const
+	vector<RefPoint> QuadraturePoints() const override
 	{
 		GaussLegendre* gs = GaussLegendre::Get(GaussLegendre::MAX_POINTS);
 		return gs->QuadraturePoints<Dim>();
 	}
 
-	vector<RefPoint> QuadraturePoints(int polynomialDegree) const
+	vector<RefPoint> QuadraturePoints(int polynomialDegree) const override
 	{
 		GaussLegendre* gs = GaussLegendre::Get(polynomialDegree);
 		return gs->QuadraturePoints<Dim>();

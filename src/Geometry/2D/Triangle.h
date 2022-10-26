@@ -70,12 +70,12 @@ public:
 		_inverseJacobianTranspose = inverseJacobian.transpose();
 	}
 
-	PhysicalShape<2>* CreateCopy() const
+	PhysicalShape<2>* CreateCopy() const override
 	{
 		return new Triangle(*this);
 	}
 
-	ReferenceShape<2>* RefShape() const
+	ReferenceShape<2>* RefShape() const override
 	{
 		return &RefTriangle;
 	}
@@ -373,11 +373,11 @@ public:
 		return refinedShapes;
 	}
 
-	inline double DetJacobian() const
+	inline double DetJacobian() const override
 	{
 		return _detJacobian;
 	}
-	inline DimMatrix<2> InverseJacobianTranspose() const
+	inline DimMatrix<2> InverseJacobianTranspose() const override
 	{
 		return _inverseJacobianTranspose;
 	}
@@ -388,7 +388,7 @@ private:
 	}
 
 public:
-	DomPoint ConvertToDomain(const RefPoint& refPoint) const
+	DomPoint ConvertToDomain(const RefPoint& refPoint) const override
 	{
 		double t = refPoint.X;
 		double u = refPoint.Y;
@@ -399,7 +399,7 @@ public:
 		return p;
 	}
 
-	RefPoint ConvertToReference(const DomPoint& domainPoint) const
+	RefPoint ConvertToReference(const DomPoint& domainPoint) const override
 	{
 		DimVector<2> tu = InverseJacobian() * Vect<2>(v1, domainPoint);
 		RefPoint p(tu[0], tu[1]);
@@ -455,11 +455,11 @@ public:
 	// But without that it doesn't compile for some reason :-(             //
 	//---------------------------------------------------------------------//
 
-	virtual double Integral(DomFunction globalFunction) const
+	double Integral(DomFunction globalFunction) const override
 	{
 		return PhysicalShapeWithConstantJacobian<2>::Integral(globalFunction);
 	}
-	virtual double Integral(DomFunction globalFunction, int polynomialDegree) const
+	double Integral(DomFunction globalFunction, int polynomialDegree) const override
 	{
 		return PhysicalShapeWithConstantJacobian<2>::Integral(globalFunction, polynomialDegree);
 	}

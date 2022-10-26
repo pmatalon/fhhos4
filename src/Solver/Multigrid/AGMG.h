@@ -64,7 +64,9 @@ public:
 #ifdef AGMG_ENABLED
 		dagmg_(&n, a, ja, ia, nullptr, nullptr, &job, &iprint, &nrest, &iterations, &tolerance);
 #endif
-		delete ia, ja, a;
+		delete ia;
+		delete ja;
+		delete a;
 	}
 
 	void Solve(const Vector& b, Vector& initialGuess, bool zeroInitialGuess) override

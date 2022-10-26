@@ -31,7 +31,7 @@ public:
 		_center = DomPoint((v1.X + v2.X) / 2, (v1.Y + v2.Y) / 2);
 	}
 
-	PhysicalShape<1>* CreateCopy() const
+	PhysicalShape<1>* CreateCopy() const override
 	{
 		return new Segment(*this);
 	}

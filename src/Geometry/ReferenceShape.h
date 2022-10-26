@@ -53,7 +53,7 @@ public:
 		return 0;
 	}
 
-	virtual void Serialize(ostream& os) const
+	void Serialize(ostream& os) const override
 	{
 		assert(false);
 	}

@@ -40,13 +40,13 @@ public:
 		return DomPoint(); // to avoid warning
 	}
 
-	vector<RefPoint> QuadraturePoints() const
+	vector<RefPoint> QuadraturePoints() const override
 	{
 		Keast keast;
 		return keast.Points();
 	}
 
-	vector<RefPoint> QuadraturePoints(int polynomialDegree) const
+	vector<RefPoint> QuadraturePoints(int polynomialDegree) const override
 	{
 		Keast keast(polynomialDegree);
 		return keast.Points();
