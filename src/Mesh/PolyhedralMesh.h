@@ -2,6 +2,7 @@
 #include <set>
 #include <list>
 #include <algorithm>
+#include <random>
 #include "Mesh.h"
 #ifdef ENABLE_2D
 	#include "2D/TriangularElement.h"
@@ -711,7 +712,10 @@ private:
 
 
 		vector<Element<Dim>*> remainingFineElements = this->Elements;
-		random_shuffle(remainingFineElements.begin(), remainingFineElements.end());
+
+		std::random_device rd;
+        std::mt19937 g(rd());
+        std::shuffle(remainingFineElements.begin(), remainingFineElements.end(), g);
 		//cout << "\t" << remainingFineElements.size() << " fine elements to coarsen" << endl;
 
 		bool elementsAreAgglomerated = true;
