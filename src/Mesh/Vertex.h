@@ -121,10 +121,11 @@ bool AreColinear(const DomPoint& p1, const DomPoint& p2, const DomPoint& p3)
 }
 
 template<int Dim>
-bool AreCollinear(const DimVector<Dim>& v1, const DimVector<Dim>& v2)
+bool AreCollinear(const DimVector<Dim>& v1, const DimVector<Dim>& v2, double tol=Utils::NumericalZero)
 {
 	double v1_norm_v2_norm = v1.norm()*v2.norm();
-	return abs(abs(v1.dot(v2)) - v1_norm_v2_norm) / v1_norm_v2_norm < Utils::NumericalZero;
+	double collinearityFactor = abs(abs(v1.dot(v2)) - v1_norm_v2_norm) / v1_norm_v2_norm;
+	return collinearityFactor < tol;
 }
 
 template<int Dim>

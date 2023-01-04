@@ -180,7 +180,7 @@ private:
 	}
 
 public:
-	list<set<Face<Dim>*>> CoplanarSubsets() const
+	list<set<Face<Dim>*>> CoplanarSubsets(double coplanarityTolerance) const
 	{
 		assert(Dim == 2);
 
@@ -197,7 +197,7 @@ public:
 
 			DimVector<2> v1 = Vect<2>(f1Vertices[0], f1Vertices[1]);
 			DimVector<2> v2 = Vect<2>(f2Vertices[0], f2Vertices[1]);
-			if (AreCollinear(v1, v2))
+			if (AreCollinear(v1, v2, coplanarityTolerance))
 				subsets.push_back({ f1, f2 });
 		}
 

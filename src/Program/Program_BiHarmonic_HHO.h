@@ -267,7 +267,7 @@ public:
 					}
 
 					if (nZeroEigenvalues > 0)
-						Utils::Error(to_string(nZeroEigenvalues) + " zero eigenvalues found (amongst " + to_string(n) + "). The problem is not well-posed!");
+						Utils::FatalError(to_string(nZeroEigenvalues) + " zero eigenvalues found (amongst " + to_string(n) + "). The problem is not well-posed!");
 
 					// Theta for the problematic element
 					DenseMatrix theta = biHarPb2->DiffPb().HHOElement(largestBdryElem)->SolveCellUnknownsMatrix();
@@ -286,7 +286,7 @@ public:
 					cout << endl;
 
 					Interface<Dim> interf(boundaryFaces);
-					list<set<Face<Dim>*>> coplanarSubsets = interf.CoplanarSubsets();
+					list<set<Face<Dim>*>> coplanarSubsets = interf.CoplanarSubsets(Utils::NumericalZero);
 					for (set<Face<Dim>*> subset : coplanarSubsets)
 					{
 						Vector kernelTheta = Vector::Zero(largestBdryElem->Faces.size() * nFaceUnknowns);

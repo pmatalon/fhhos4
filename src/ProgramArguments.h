@@ -76,6 +76,7 @@ struct MultigridArguments
 	BigNumber CoarseN = 2;
 	string CoarseSolverCode = "ch";
 	FaceCollapsing BoundaryFaceCollapsing = FaceCollapsing::OnlyCollinear;
+	double FaceCollapsingCoplanarityTolerance = 1e-12;
 	ReEntrantCornerMgmt ReEntrantCornerManagement = ReEntrantCornerMgmt::Disabled;
 	bool ManageAnisotropy = true; // used only in UAMG
 };

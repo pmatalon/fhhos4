@@ -128,6 +128,9 @@ void print_usage() {
 	cout << "-polymesh-n-pass NUM" << endl;
 	cout << "      Number of aggregation passes to perform to build the polygonal mesh (default: 1)." << endl;
 	cout << endl;
+	cout << "-fc-coplanar-tol NUM" << endl;
+	cout << "      Tolerance to consider that two faces are coplanar during the face collapsing process (default: 1e-12)." << endl;
+	cout << endl;
 	cout << "----------------------------------------------------------------------" << endl;
 	cout << "                             Discretization                           " << endl;
 	cout << "----------------------------------------------------------------------" << endl;
@@ -648,6 +651,7 @@ int main(int argc, char* argv[])
 		OPT_PolyMeshFaceCoarseningStrategy,
 		OPT_PolyMeshBoundaryFaceCollapsing,
 		OPT_PolyMeshNPasses,
+		OPT_FaceCollapsingCoplanarTol,
 		// Discretization
 		OPT_Discretization,
 		OPT_HHO_K,
@@ -739,6 +743,7 @@ int main(int argc, char* argv[])
 		 { "polymesh-fcs", required_argument, NULL, OPT_PolyMeshFaceCoarseningStrategy },
 		 { "polymesh-bfc", required_argument, NULL, OPT_PolyMeshBoundaryFaceCollapsing },
 		 { "polymesh-n-pass", required_argument, NULL, OPT_PolyMeshNPasses },
+		 { "fc-coplanar-tol", required_argument, NULL, OPT_FaceCollapsingCoplanarTol },
 		 // Discretization
 		 { "discr", required_argument, NULL, OPT_Discretization },
 		 { "k", required_argument, NULL, OPT_HHO_K },
@@ -937,6 +942,9 @@ int main(int argc, char* argv[])
 			}
 			case OPT_PolyMeshNPasses:
 				args.Discretization.PolyMeshNAggregPasses = atoi(optarg);
+				break;
+			case OPT_FaceCollapsingCoplanarTol:
+				args.Solver.MG.FaceCollapsingCoplanarityTolerance = atof(optarg);
 				break;
 
 			//--------------------//

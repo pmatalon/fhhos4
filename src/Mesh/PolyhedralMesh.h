@@ -511,7 +511,7 @@ private:
 
 	FaceCollapsingStatus TryCollapseCoplanarFaces(const Interface<Dim>& interf)
 	{
-		list<set<Face<Dim>*>> coplanarSubsets = interf.CoplanarSubsets();
+		list<set<Face<Dim>*>> coplanarSubsets = interf.CoplanarSubsets(Utils::ProgramArgs.Solver.MG.FaceCollapsingCoplanarityTolerance);
 		if (coplanarSubsets.empty())
 			return FaceCollapsingStatus::NotEnoughFaces;
 		for (set<Face<Dim>*> subset : coplanarSubsets)
