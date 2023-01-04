@@ -41,5 +41,6 @@ public:
 	double Measure() override
 	{
 		Utils::FatalError("HHODirichletSpace::Measure() not implemented");
+		return 0.0;
 	}
 };
