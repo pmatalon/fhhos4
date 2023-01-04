@@ -302,7 +302,7 @@ public:
 				os << "";
 			else
 			{
-				if (result.AsymptoticConvRate < 1)
+				if (result.AsymptoticConvRate < 0.9999)
 				{
 					remainingIterations = abs(ceil(log(result._tolerance / result.NormalizedResidualNorm) / log(result.AsymptoticConvRate)));
 					os << "/ " + to_string(result.IterationNumber + remainingIterations);

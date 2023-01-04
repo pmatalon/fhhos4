@@ -95,6 +95,13 @@ PolyhedralMesh<2>* MeshFactory<2>::BuildPolyhedralMesh(PolyhedralMesh<2>* mesh, 
 		aggregMesh->Vertices = std::move(mesh->Vertices);
 		aggregMesh->ClearMeshVertexConnections();
 		aggregMesh->UpdateMeshVertexConnections();
+		aggregMesh->DirichletFaces.clear();
+		aggregMesh->NeumannFaces.clear();
+
+		mesh->PhysicalParts.clear();
+		mesh->BoundaryParts.clear();
+		delete mesh;
+
 		mesh = aggregMesh;
 	}
 	return aggregMesh;

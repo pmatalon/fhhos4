@@ -50,6 +50,8 @@ struct HHOParameters
 		nBoundaryFaces = mesh->BoundaryFaces.size();
 		nDirichletFaces = mesh->DirichletFaces.size();
 		nNeumannFaces = mesh->NeumannFaces.size();
+		assert(nDirichletFaces + nNeumannFaces == nBoundaryFaces);
+		assert(nBoundaryFaces + nInteriorFaces == nFaces);
 		nInteriorAndNeumannFaces = nInteriorFaces + nNeumannFaces;
 
 		nFaceUnknowns = faceBasis->Size();
