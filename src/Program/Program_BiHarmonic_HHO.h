@@ -117,6 +117,12 @@ public:
 				Utils::Warning("A solution might be to increase the polynomial degree in the cells to k+1 (argument -kc 1).");
 		}
 
+		for (Element<Dim>* e : mesh->BoundaryElements)
+		{
+			if (e->HasCoplanarBoundaryFaces())
+				Utils::Error("Coplanar boundary faces found in element " + to_string(e->Number) + ", which prevents the problem to be well-posed.");
+		}
+
 		HHOParameters<Dim>* hho = new HHOParameters<Dim>(mesh, args.Discretization.Stabilization, reconstructionBasis, cellBasis, faceBasis, args.Discretization.OrthogonalizeElemBasesCode, args.Discretization.OrthogonalizeFaceBasesCode);
 
 		bool saveMatrixBlocks = args.Solver.SolverCode.compare("uamg") == 0 || args.Solver.PreconditionerCode.compare("uamg") == 0;
@@ -244,6 +250,8 @@ public:
 				{
 					auto n = A.rows();
 					//A = (A + A.transpose()) / 2.0;
+					
+					cout << "symmetry = " << (A-A.transpose()).norm() << endl;
 
 					//double det = A.determinant();
 
@@ -252,7 +260,7 @@ public:
 					Eigen::VectorXcd eigenvalues = es.eigenvalues();
 					Eigen::MatrixXcd eigenvectors = es.eigenvectors();
 					//cout << "Eigenvalues:" << endl << eigenvalues << endl;
-					Eigen::VectorXcd kernelVectorC = eigenvectors.col(n - 1);
+					//Eigen::VectorXcd kernelVectorC = eigenvectors.col(n - 1);
 					//cout << "---------------------" << endl << "Last eigenvector" << endl << kernelVector << endl;
 					//cout << "---------------------" << endl << "Preceding eigenvector" << endl << eigenvectors.col(n - 2) << endl;
 					//cout << "---------------------" << endl << "Preceding eigenvector" << endl << eigenvectors.col(n - 3) << endl;
@@ -262,15 +270,15 @@ public:
 					int nZeroEigenvalues = 0;
 					for (int i = 0; i < n; i++)
 					{
-						if (eigenvalues(i).real() < Utils::NumericalZero)
+						if (eigenvalues(i).real() < 1e-10)
 							nZeroEigenvalues++;
 					}
 
 					if (nZeroEigenvalues > 0)
-						Utils::FatalError(to_string(nZeroEigenvalues) + " zero eigenvalues found (amongst " + to_string(n) + "). The problem is not well-posed!");
+						Utils::Error(to_string(nZeroEigenvalues) + " zero eigenvalues found (amongst " + to_string(n) + "). The problem is not well-posed!");
 
 					// Theta for the problematic element
-					DenseMatrix theta = biHarPb2->DiffPb().HHOElement(largestBdryElem)->SolveCellUnknownsMatrix();
+					/*DenseMatrix theta = biHarPb2->DiffPb().HHOElement(largestBdryElem)->SolveCellUnknownsMatrix();
 					cout << "theta: " << endl << theta << endl;
 					// Theta_bF
 					int nFaceUnknowns = hho->FaceBasis->Size();
@@ -301,23 +309,48 @@ public:
 						cout << "kernelTheta: " << endl << kernelTheta.transpose() << endl;
 						cout << "theta * kernelTheta: " << endl << (theta * kernelTheta).transpose() << endl;
 					}
-					//FaceCollapsingStatus status = static_cast<PolyhedralMesh<Dim>*>.TryCollapseCoplanarFaces(interf);
+					//FaceCollapsingStatus status = static_cast<PolyhedralMesh<Dim>*>.TryCollapseCoplanarFaces(interf);*/
 
 					biHarPb2->print = true;
 					for (int i = n - 1; i >= 0; i--)
 					{
-						if (eigenvalues(i).real() > Utils::NumericalZero)
+						if (eigenvalues(i).real() > 1e-10)
 							continue;
-						Vector allFacesValues = biHarPb->DiffPb().SkeletonSpace.ZeroVector();
+
 						Vector kernelVector = eigenvectors.col(i).real();
+
+						// Find the problematic element
+						Element<Dim>* problematicElem = nullptr;
+						for (int k=0; k<kernelVector.size(); ++k)
+						{
+							if (kernelVector(k) > 1e-5)
+							{
+								int boundaryFaceNumber = k / hho->nFaceUnknowns;
+								int faceNumber = hho->nInteriorFaces + boundaryFaceNumber;
+								auto it = std::find_if(mesh->Faces.begin(), mesh->Faces.end(), [&](Face<Dim>* f) { return f->Number == faceNumber; });
+								Face<Dim>* f = *it;
+								problematicElem = f->Element1;
+								cout << "faceNumber: " << faceNumber << endl;
+								cout << "problematic element: " << problematicElem->Number << endl;
+								break;
+							}
+						}
+
+
+
+						Vector allFacesValues = biHarPb->DiffPb().SkeletonSpace.ZeroVector();
 						allFacesValues.tail(kernelVector.rows()) = kernelVector;
 						GMSHMesh<Dim>::ExportToGMSH_Faces(static_cast<PolyhedralMesh<Dim>*>(mesh), hho->FaceBasis, allFacesValues, out.GetFilePathPrefix(), "kernelFaces_" + to_string(i));
+
+
 						
-						cout << "kernelVector: " << endl << kernelVector.transpose() << endl;
+						
+						
+						//cout << "kernelVector: " << endl << kernelVector.transpose() << endl;
 						
 						Vector lambdaKernel = biHarPb->Solve1stDiffProblem_Homogeneous(kernelVector);
-						cout << "lambdaKernel: " << endl << lambdaKernel.transpose() << endl;
-						cout << lambdaKernel.norm() << endl;
+						//cout << "lambdaKernel: " << endl << lambdaKernel.transpose() << endl;
+						//cout << lambdaKernel.norm() << endl;
 
 						//DiffPb().ExportReconstructedVectorToGMSH(lambda, out, "lambda");
 						//Vector solKernel = biHarPb->Solve2ndDiffProblem(lambdaKernel, false);

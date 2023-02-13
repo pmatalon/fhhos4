@@ -394,6 +394,24 @@ public:
 		return it != list.end();
 	}
 
+	bool HasCoplanarBoundaryFaces()
+	{
+		auto boundaryFaces = this->BoundaryFaces();
+		for (Face<Dim>* f1 : boundaryFaces)
+		{
+			auto n1 = this->OuterNormalVector(f1);
+			for (Face<Dim>* f2 : boundaryFaces)
+			{
+				if (f1 == f2)
+					continue;
+				auto n2 = this->OuterNormalVector(f2);
+				if (AreCollinear(n1, n2))
+					return true;
+			}
+		}
+		return false;
+	}
+
 	
 
 public:
