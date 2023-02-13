@@ -32,8 +32,15 @@ public:
 		_mesh = mesh;
 		_testCase = testCase;
 		HHO = hho;
-		_diffField = DiffusionField<Dim>();
+
+		map<string, Tensor<Dim>> tensors;
+		for (PhysicalGroup<Dim>* phyPart : mesh->PhysicalParts)
+		{
+			tensors.insert({ phyPart->Name, Tensor<Dim>() });
+		}
+		_diffField = DiffusionField<Dim>(tensors);
 		mesh->SetDiffusionField(&_diffField);
+
 		_diffPbTestCase = VirtualDiffusionTestCase<Dim>(testCase->SourceFunction, _diffField);
 		_diffPbTestCase.BC = BoundaryConditions::HomogeneousDirichletEverywhere();
 		_diffPb = Diffusion_HHO<Dim>(mesh, &_diffPbTestCase, HHO, true, true);
