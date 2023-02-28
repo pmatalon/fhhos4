@@ -84,7 +84,6 @@ private:
 
 	Vector A(const Vector& x)
 	{
-		Vector delta = _biHarPb->Solve1stDiffProblem_Homogeneous(x);
-		return -_biHarPb->Solve2ndDiffProblem_Homogeneous(delta);
+		return _biHarPb->ProblemOperator(x);
 	}
 };

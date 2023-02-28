@@ -127,7 +127,7 @@ public:
 	}
 
 	// Solve problem 1 (f=0, Neum=<neumann>)
-	Vector Solve1stDiffProblem_Homogeneous(const Vector& neumann) override
+	Vector Solve1stDiffProblem_Homogeneous(const Vector& neumann)
 	{
 #ifndef NDEBUG
 		// Check compatibility condition
@@ -191,7 +191,7 @@ public:
 		}
 	}
 
-	Vector Solve2ndDiffProblem_Homogeneous(const Vector& source) override
+	Vector Solve2ndDiffProblem_Homogeneous(const Vector& source)
 	{
 #ifndef NDEBUG
 		// Check compatibility condition: (source|1) = 0
@@ -256,6 +256,12 @@ public:
 		}
 		return Change;
 	}*/
+
+	Vector ProblemOperator(const Vector& x) override
+	{
+		auto delta = Solve1stDiffProblem_Homogeneous(x);
+		return -Solve2ndDiffProblem_Homogeneous(delta);
+	}
 
 	DenseMatrix Matrix() override
 	{

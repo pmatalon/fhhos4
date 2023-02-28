@@ -348,7 +348,7 @@ public:
 						
 						//cout << "kernelVector: " << endl << kernelVector.transpose() << endl;
 						
-						Vector lambdaKernel = biHarPb->Solve1stDiffProblem_Homogeneous(kernelVector);
+						//Vector lambdaKernel = biHarPb->Solve1stDiffProblem_Homogeneous(kernelVector);
 						//cout << "lambdaKernel: " << endl << lambdaKernel.transpose() << endl;
 						//cout << lambdaKernel.norm() << endl;
 

@@ -435,7 +435,8 @@ private:
 	//                Stabilization                //
 	//---------------------------------------------//
 
-	void AssembleStabilizationMatrix()
+public:
+	void AssembleStabilizationMatrix(bool for_diffusion = true)
 	{
 		int nHybridUnknowns = HHO->nCellUnknowns + this->Faces.size() * HHO->nFaceUnknowns;
 
@@ -475,7 +476,10 @@ private:
 
 				DenseMatrix DiffTF = Df - ProjFT * Dt;
 				double h = face->Diameter();
-				this->Astab += DiffTF.transpose() * Mf * DiffTF * (this->DiffTensor() * normal).dot(normal) / h;
+				if (for_diffusion)
+					this->Astab += DiffTF.transpose() * Mf * DiffTF * (this->DiffTensor() * normal).dot(normal) / h;
+				else // for biharmonic
+					this->Astab += DiffTF.transpose() * Mf * DiffTF * (this->DiffTensor() * normal).dot(normal) * h;
 			}
 		}
 		else if (HHO->Stabilization.compare("hdg") == 0)
@@ -494,7 +498,10 @@ private:
 
 				DenseMatrix DiffTF = Fpart - ProjFT * Tpart;
 				double h = face->Diameter();
-				this->Astab += DiffTF.transpose() * Mf * DiffTF * (this->DiffTensor() * normal).dot(normal) / h;
+				if (for_diffusion)
+					this->Astab += DiffTF.transpose() * Mf * DiffTF * (this->DiffTensor() * normal).dot(normal) / h;
+				else // for biharmonic
+					this->Astab += DiffTF.transpose() * Mf * DiffTF * (this->DiffTensor() * normal).dot(normal) * h;
 			}
 		}
 		else

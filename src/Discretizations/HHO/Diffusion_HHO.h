@@ -1037,6 +1037,93 @@ public:
 		parallelLoop.Fill(mat);
 		return mat;
 	}
+
+	SparseMatrix Theta_T_F_transpose()
+	{
+		ElementParallelLoop<Dim> parallelLoop(_mesh->BoundaryElements);
+		parallelLoop.ReserveChunkCoeffsSize(HHO->nCellUnknowns * HHO->nFaceUnknowns);
+
+		parallelLoop.Execute([this](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				int j = _mesh->BoundaryElementNumber(e);
+
+				DenseMatrix Theta = HHOElement(e)->SolveCellUnknownsMatrix();
+				for (auto f : e->Faces)
+				{
+					DenseMatrix Theta_Tf = Theta.middleCols(e->LocalNumberOf(f) * HHO->nFaceUnknowns, HHO->nFaceUnknowns);
+					chunk->Results.Coeffs.Add(f->Number * HHO->nFaceUnknowns, j * HHO->nCellUnknowns, Theta_Tf.transpose());
+				}
+			});
+
+		SparseMatrix mat(HHO->nFaces * HHO->nFaceUnknowns, _mesh->NBoundaryElements() * HHO->nCellUnknowns);
+		parallelLoop.Fill(mat);
+		return mat;
+	}
+
+	SparseMatrix BiharStab_T_T()
+	{
+		ElementParallelLoop<Dim> parallelLoop(_mesh->BoundaryElements);
+		parallelLoop.ReserveChunkCoeffsSize(HHO->nCellUnknowns * HHO->nCellUnknowns);
+
+		parallelLoop.Execute([this](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				auto hhoElem = HHOElement(e);
+				hhoElem->AssembleStabilizationMatrix(false);
+				int i = _mesh->BoundaryElementNumber(e);
+
+				DenseMatrix Stab_T_T = hhoElem->Astab.topLeftCorner(HHO->nCellUnknowns, HHO->nCellUnknowns);
+
+				chunk->Results.Coeffs.Add(i * HHO->nCellUnknowns, i * HHO->nCellUnknowns, Stab_T_T);
+			});
+
+		SparseMatrix mat(_mesh->NBoundaryElements() * HHO->nCellUnknowns, _mesh->NBoundaryElements() * HHO->nCellUnknowns);
+		parallelLoop.Fill(mat);
+		return mat;
+	}
+
+	SparseMatrix BiharStab_T_F()
+	{
+		ElementParallelLoop<Dim> parallelLoop(_mesh->BoundaryElements);
+		parallelLoop.ReserveChunkCoeffsSize(HHO->nCellUnknowns * 4 * HHO->nFaceUnknowns);
+
+		parallelLoop.Execute([this](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				auto hhoElem = HHOElement(e);
+				int i = _mesh->BoundaryElementNumber(e);
+
+				for (auto f : hhoElem->Faces)
+				{
+					chunk->Results.Coeffs.AddBlock(i * HHO->nCellUnknowns, f->Number() * HHO->nFaceUnknowns, hhoElem->Astab, 0, hhoElem->FirstDOFNumber(f), HHO->nCellUnknowns, HHO->nFaceUnknowns);
+				}
+			});
+
+		SparseMatrix mat(_mesh->NBoundaryElements() * HHO->nCellUnknowns, HHO->nFaces * HHO->nFaceUnknowns);
+		parallelLoop.Fill(mat);
+		return mat;
+	}
+
+	SparseMatrix BiharStab_F_F()
+	{
+		ElementParallelLoop<Dim> parallelLoop(_mesh->BoundaryElements);
+		parallelLoop.ReserveChunkCoeffsSize(HHO->nFaceUnknowns * 4 * HHO->nFaceUnknowns);
+
+		parallelLoop.Execute([this](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+			{
+				auto hhoElem = HHOElement(e);
+
+				for (auto f1 : hhoElem->Faces)
+				{
+					for (auto f2 : hhoElem->Faces)
+					{
+						chunk->Results.Coeffs.AddBlock(f1->Number() * HHO->nFaceUnknowns, f2->Number() * HHO->nFaceUnknowns, hhoElem->Astab, hhoElem->FirstDOFNumber(f1), hhoElem->FirstDOFNumber(f2), HHO->nFaceUnknowns, HHO->nFaceUnknowns);
+					}
+				}
+			});
+
+		SparseMatrix mat(HHO->nFaces * HHO->nFaceUnknowns, HHO->nFaces * HHO->nFaceUnknowns);
+		parallelLoop.Fill(mat);
+		return mat;
+	}
 	
 	// Mass matrix of degree k, on boundary elements only
 	/*SparseMatrix CellMassMatrixOnBoundaryElements()
@@ -1065,15 +1152,15 @@ public:
 		return mass;
 	}*/
 
-	Vector ExtractElemBoundary(const Vector v)
+	auto ExtractElemBoundary(const Vector& v)
 	{
 		assert(_mesh->BoundaryElementsNumberedFirst());
 		if (v.rows() == HHO->nTotalReconstructUnknowns)
 			return v.head(_mesh->BoundaryElements.size() * HHO->nReconstructUnknowns);
-		else if (v.rows() == HHO->nTotalCellUnknowns)
+		else //if (v.rows() == HHO->nTotalCellUnknowns)
 			return v.head(_mesh->BoundaryElements.size() * HHO->nCellUnknowns);
-		Utils::FatalError("Not implemented");
-		return Vector();
+		//Utils::FatalError("Not implemented");
+		//return Vector();
 	}
 
 	/*SparseMatrix A_bT_bT_Matrix()

@@ -77,6 +77,21 @@ private:
 
 				SparseMatrix Theta_T_bF_transpose = nbhDiff.Theta_T_bF_transpose();
 				SparseMatrix S_iF_bF_transpose = Theta_T_bF_transpose * nbhDiff.A_T_ndF + nbhDiff.A_ndF_dF.transpose();
+
+				SparseMatrix Theta_T_F_transpose = nbhDiff.Theta_T_F_transpose();
+				SparseMatrix Theta_T_iF_transpose = Theta_T_F_transpose.topRows(nbh.InteriorFaces.size() * nFaceUnknowns);
+				SparseMatrix B_T_T = nbhDiff.BiharStab_T_T();
+				SparseMatrix B_T_F = nbhDiff.BiharStab_T_F();
+				SparseMatrix B_F_F = nbhDiff.BiharStab_F_F();
+				auto B_F_bF = B_F_F.rightCols(nbh.BoundaryFaces.size() * nFaceUnknowns);
+				auto B_iF_F = B_F_F.topRows(nbh.InteriorFaces.size() * nFaceUnknowns);
+				auto B_T_iF = B_T_F.leftCols(nbh.InteriorFaces.size() * nFaceUnknowns);
+				auto B_T_bF = B_T_F.rightCols(nbh.BoundaryFaces.size() * nFaceUnknowns);
+				SparseMatrix Stab_bF_T = Theta_T_bF_transpose * B_T_T + B_T_bF.transpose();
+				SparseMatrix Stab_bF_F = Theta_T_bF_transpose * B_T_F + B_F_bF.transpose();
+				SparseMatrix Stab_iF_T = Theta_T_iF_transpose * B_T_T + B_T_iF.transpose();
+				SparseMatrix Stab_iF_F = Theta_T_iF_transpose * B_T_F;
+				Stab_iF_F += B_iF_F;
 				
 				for (int k = 0; k < nFaceUnknowns; k++)
 				{
@@ -84,7 +99,7 @@ private:
 					Vector dirichlet = Vector::Zero(nbh.BoundaryFaces.size() * nFaceUnknowns);
 					dirichlet[nbh.BoundaryFaceNumber(f) * nFaceUnknowns + k] = 1;
 
-					Vector approxColumn = BiharOperator(dirichlet, nbhDiff, S_iF_bF_transpose, Theta_T_bF_transpose);
+					Vector approxColumn = BiharOperator(dirichlet, nbhDiff, S_iF_bF_transpose, Theta_T_bF_transpose, Stab_iF_T, Stab_iF_F, Stab_bF_T, Stab_bF_F);
 
 					for (int i2 = 0; i2 < nbh.BoundaryFaces.size(); i2++)
 					{
@@ -174,6 +189,21 @@ private:
 				SparseMatrix Theta_T_bF_transpose = nbhDiff.Theta_T_bF_transpose();
 				SparseMatrix S_iF_bF_transpose = Theta_T_bF_transpose * nbhDiff.A_T_ndF + nbhDiff.A_ndF_dF.transpose();
 
+				SparseMatrix Theta_T_F_transpose = nbhDiff.Theta_T_F_transpose();
+				SparseMatrix Theta_T_iF_transpose = Theta_T_F_transpose.topRows(nbh.InteriorFaces.size() * nFaceUnknowns);
+				SparseMatrix B_T_T = nbhDiff.BiharStab_T_T();
+				SparseMatrix B_T_F = nbhDiff.BiharStab_T_F();
+				SparseMatrix B_F_F = nbhDiff.BiharStab_F_F();
+				auto B_F_bF = B_F_F.rightCols(nbh.BoundaryFaces.size() * nFaceUnknowns);
+				auto B_iF_F = B_F_F.topRows(nbh.InteriorFaces.size() * nFaceUnknowns);
+				auto B_T_iF = B_T_F.leftCols(nbh.InteriorFaces.size() * nFaceUnknowns);
+				auto B_T_bF = B_T_F.rightCols(nbh.BoundaryFaces.size() * nFaceUnknowns);
+				SparseMatrix Stab_bF_T = Theta_T_bF_transpose * B_T_T + B_T_bF.transpose();
+				SparseMatrix Stab_bF_F = Theta_T_bF_transpose * B_T_F + B_F_bF.transpose();
+				SparseMatrix Stab_iF_T = Theta_T_iF_transpose * B_T_T + B_T_iF.transpose();
+				SparseMatrix Stab_iF_F = Theta_T_iF_transpose * B_T_F;
+				Stab_iF_F += B_iF_F;
+
 				for (int i1 = 0; i1 < patch.Faces.size(); ++i1)
 				{
 					Face<Dim>* f1 = patch.Faces[i1];
@@ -186,7 +216,7 @@ private:
 						Vector dirichlet = Vector::Zero(nbh.BoundaryFaces.size() * nFaceUnknowns);
 						dirichlet[locNum1 * nFaceUnknowns + k] = 1;
 
-						Vector approxColumn = BiharOperator(dirichlet, nbhDiff, S_iF_bF_transpose, Theta_T_bF_transpose);
+						Vector approxColumn = BiharOperator(dirichlet, nbhDiff, S_iF_bF_transpose, Theta_T_bF_transpose, Stab_iF_T, Stab_iF_F, Stab_bF_T, Stab_bF_F);
 
 						//cout << approxColumn.segment(locNum1 * nFaceUnknowns, nFaceUnknowns) << endl << endl;
 
@@ -248,9 +278,10 @@ private:
 			_solver.Setup(mat);
 	}
 
-	Vector BiharOperator(const Vector& dirichlet, NeighbourhoodDiffusion_HHO<Dim>& nbhDiff, const SparseMatrix& S_iF_bF_transpose, const SparseMatrix& Theta_T_bF_transpose)
+	Vector BiharOperator(const Vector& dirichlet, NeighbourhoodDiffusion_HHO<Dim>& nbhDiff, const SparseMatrix& S_iF_bF_transpose, const SparseMatrix& Theta_T_bF_transpose,
+						 const SparseMatrix& Stab_iF_T, const SparseMatrix& Stab_iF_F, const SparseMatrix& Stab_bF_T, const SparseMatrix& Stab_bF_F)
 	{
-		// Problem 1 (Dirichlet, zero source)
+		// --- Problem 1 (Dirichlet, zero source)
 		Vector b_T = nbhDiff.ComputeB_T_zeroSource(dirichlet); // TODO don't compute the whole matrix vector product, there is only one 1 in the vector
 		Vector b_ndF = nbhDiff.ComputeB_ndF_noNeumann(dirichlet);
 		Vector rhs = nbhDiff.CondensedRHS(b_T, b_ndF);
@@ -259,9 +290,13 @@ private:
 
 		Vector lambda = nbhDiff.SolveCellUnknowns(faceSolutionLambda, b_T);
 
-		// Problem 2 (Dirichlet 0, source)
+		// --- Problem 2 (Dirichlet 0, source=lambda)
 		Vector b_source = nbhDiff.AssembleSourceTerm(lambda);
 		rhs = nbhDiff.CondensedRHS_noNeumannZeroDirichlet(b_source);
+		// Stabilization
+		rhs += Stab_iF_T * lambda;
+		rhs += Stab_iF_F.leftCols(nbhDiff.Nbh().InteriorFaces.size() * _diffPb.HHO->nFaceUnknowns) * faceSolutionLambda;
+		rhs += Stab_iF_F.rightCols(nbhDiff.Nbh().BoundaryFaces.size() * _diffPb.HHO->nFaceUnknowns) * dirichlet;
 
 		Vector faceSolution = nbhDiff.FaceUnknownSolver.Solve(rhs);
 
@@ -291,6 +326,10 @@ private:
 
 		// Normal derivative
 		Vector normalDerivative = S_iF_bF_transpose * faceSolution - Theta_T_bF_transpose * b_source;
+		// Stabilization
+		normalDerivative -= Stab_bF_T * lambda;
+		normalDerivative -= Stab_bF_F.leftCols(nbhDiff.Nbh().InteriorFaces.size() * _diffPb.HHO->nFaceUnknowns) * faceSolutionLambda;
+		normalDerivative -= Stab_bF_F.rightCols(nbhDiff.Nbh().BoundaryFaces.size() * _diffPb.HHO->nFaceUnknowns) * dirichlet;
 		//return -nbhDiff.SolveFaceMassMatrixOnBoundary(normalDerivative);
 		return -normalDerivative;
 	}

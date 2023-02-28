@@ -45,11 +45,7 @@ public:
 
 	virtual Vector FindCompatibleTheta() = 0;
 
-	virtual Vector Solve1stDiffProblem(const Vector& bc) = 0;
-	virtual Vector Solve2ndDiffProblem(const Vector& source, bool returnBoundaryOnly = false) = 0;
-
-	virtual Vector Solve1stDiffProblem_Homogeneous(const Vector& bc) = 0;
-	virtual Vector Solve2ndDiffProblem_Homogeneous(const Vector& source) = 0;
+	virtual Vector ProblemOperator(const Vector& bc) = 0;
 
 	virtual double L2InnerProdOnBoundary(const Vector& v1, const Vector& v2) = 0;
 
@@ -67,24 +63,6 @@ protected:
 	}
 
 public:
-	virtual DenseMatrix Matrix()
-	{
-		Vector theta0 = FindCompatibleTheta();
-		int n = theta0.rows();
-		DenseMatrix A(n, n);
-
-		int nThreads = 1;
-
-		NumberParallelLoop<EmptyResultChunk> parallelLoop(n, nThreads);
-		parallelLoop.Execute([this, n, &A](BigNumber i, ParallelChunk<EmptyResultChunk>* chunk)
-			{
-				Vector e_i = Vector::Zero(n);
-				e_i[i] = 1;
-				Vector lambda = Solve1stDiffProblem_Homogeneous(e_i);
-				A.col(i) = -Solve2ndDiffProblem_Homogeneous(lambda);
-			});
-		return A;
-	}
 
 	virtual ~BiHarmonicMixedForm() {}
 };
