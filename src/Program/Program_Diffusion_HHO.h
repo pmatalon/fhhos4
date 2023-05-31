@@ -410,7 +410,11 @@ public:
 
 						Vector exact = problem->BoundarySpace.Project(testCase->ExactSolution_Neumann);
 						double error = problem->BoundarySpace.RelativeL2Error(normalDerivative, exact);
-						cout << endl << "L2 Error (normal derivative) = " << std::scientific << error << endl;
+						cout << endl << "L2 Error (normal derivative) (old) = " << std::scientific << error << endl;
+
+						error = problem->L2ErrorNormalDerivative(testCase->ExactSolution_Neumann, normalDerivative);
+						cout << endl << "L2 Error (normal derivative) (new) = " << std::scientific << error << endl;
+
 					}
 					else
 						Utils::Warning("The normal derivative is computed only for Dirichlet problems.");

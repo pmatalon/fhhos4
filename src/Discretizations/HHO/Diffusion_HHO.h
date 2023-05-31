@@ -148,6 +148,38 @@ public:
 		return normExactSolution != 0 ? absoluteError / normExactSolution : absoluteError;
 	}
 
+	double L2ErrorNormalDerivative(DomFunction exactSolution, const Vector& solution)
+	{
+		struct ChunkResult
+		{
+			double absoluteError = 0;
+			double normExactSolution = 0;
+		};
+
+		ParallelLoop<Face<Dim>*, ChunkResult> parallelLoop(this->_mesh->BoundaryFaces);
+		parallelLoop.Execute([&](Face<Dim>* f, ParallelChunk<ChunkResult>* chunk)
+			{
+				auto bdryFaceNumber = f->Number - HHO->nInteriorFaces;
+				auto approximate = HHOFace(f)->Basis->GetApproximateFunction(solution, bdryFaceNumber * HHO->nFaceUnknowns);
+				chunk->Results.absoluteError += f->L2ErrorPow2(approximate, exactSolution);
+				chunk->Results.normExactSolution += f->Integral([&](const DomPoint& p) { return pow(exactSolution(p), 2); });
+			});
+
+
+		double absoluteError = 0;
+		double normExactSolution = 0;
+
+		parallelLoop.AggregateChunkResults([&absoluteError, &normExactSolution](ChunkResult& chunkResult)
+			{
+				absoluteError += chunkResult.absoluteError;
+				normExactSolution += chunkResult.normExactSolution;
+			});
+
+		absoluteError = sqrt(absoluteError);
+		normExactSolution = sqrt(normExactSolution);
+		return normExactSolution != 0 ? absoluteError / normExactSolution : absoluteError;
+	}
+
 	void AssertSchemeConvergence(double l2Error)
 	{
 		if (Dim == 1)

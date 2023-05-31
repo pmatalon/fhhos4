@@ -307,6 +307,16 @@ public:
 		return Shape()->Integral(globalFunction);
 	}
 
+	double L2ErrorPow2(RefFunction approximate, DomFunction exactSolution) const
+	{
+		RefFunction errorFunction = [this, exactSolution, approximate](const RefPoint& refElementPoint) {
+			DomPoint domainPoint = this->ConvertToDomain(refElementPoint);
+			return pow(exactSolution(domainPoint) - approximate(refElementPoint), 2);
+		};
+
+		return Integral(errorFunction);
+	}
+
 	//-----------------------------//
 	//     Problem information     //
 	//-----------------------------//
