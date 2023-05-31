@@ -30,11 +30,11 @@ public:
 		os << "Conjugate Gradient" << endl;
 		os << "        Laplacian solver tolerance: " << std::scientific << std::setprecision(1);
 		if (_toleranceStgy == ToleranceStrategy::Fixed)
-			os << "fixed (" << _diffSolverStartingTol << ")";
+			os << "fixed (" << this->Tolerance << ")";
 		else if (_toleranceStgy == ToleranceStrategy::DynamicFixedStep)
-			os << "dynamic fixed step (starting tol = " << _diffSolverStartingTol << ", step = " << _diffSolverToleranceStep << ")";
+			os << "dynamic fixed step (starting tol = " << std::scientific << std::setprecision(1) << _diffSolverStartingTol << ", step = " << _diffSolverToleranceStep << ")";
 		else if (_toleranceStgy == ToleranceStrategy::DynamicVariableStep)
-			os << "dynamic variable step (starting tol = " << _diffSolverStartingTol << ")";
+			os << "dynamic variable step (starting tol = " << std::scientific << std::setprecision(1) << _diffSolverStartingTol << ")";
 
 		if (_restartPeriod > 0)
 			os << endl << "        Restart period = " << _restartPeriod;
@@ -47,7 +47,7 @@ public:
 	{
 		IterativeSolver::Setup(A);
 		if (_toleranceStgy == ToleranceStrategy::Fixed)
-			_biHarPb->SetDiffSolverTolerance(_diffSolverStartingTol);
+			_biHarPb->SetDiffSolverTolerance(this->Tolerance);
 		else
 			_biHarPb->SetDiffSolverTolerance(max(_diffSolverStartingTol, this->Tolerance));
 	}

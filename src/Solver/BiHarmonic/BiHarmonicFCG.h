@@ -37,10 +37,13 @@ public:
 	{
 		os << "Flexible Conjugate Gradient" << endl;
 		os << "        Laplacian solver tolerance: ";
-		if (_diffSolverToleranceStep > 0)
-			os << "dynamic (step = " << std::scientific << std::setprecision(1) << _diffSolverToleranceStep << ")";
-		else
-			os << "constant (" << std::scientific << std::setprecision(1) << this->Tolerance << ")";
+		if (_toleranceStgy == ToleranceStrategy::Fixed)
+			os << "fixed (" << this->Tolerance << ")";
+		else if (_toleranceStgy == ToleranceStrategy::DynamicFixedStep)
+			os << "dynamic fixed step (starting tol = " << std::scientific << std::setprecision(1) << _diffSolverStartingTol << ", step = " << _diffSolverToleranceStep << ")";
+		else if (_toleranceStgy == ToleranceStrategy::DynamicVariableStep)
+			os << "dynamic variable step (starting tol = " << std::scientific << std::setprecision(1) << _diffSolverStartingTol << ")";
+
 		if (_restartPeriod > 0)
 			os << endl << "        Restart period = " << _restartPeriod;
 
