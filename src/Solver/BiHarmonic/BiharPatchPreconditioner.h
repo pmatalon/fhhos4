@@ -21,16 +21,19 @@ private:
 	int _facePatchSize = 3;
 	int _neighbourhoodDepth = 1;
 	bool _blockDiagPrec = false;
+	SparseMatrix _precondMatrix;
 	vector<Eigen::FullPivLU<DenseMatrix>> _invD;
-	EigenSparseLU _solver;
+	Solver* _solver;
+	
 public:
-	BiharPatchPreconditioner(BiHarmonicMixedFormGlowinski_HHO<Dim>& biHarPb, Type type, int facePatchSize, int neighbourhoodDepth, bool blockDiagPrec = false) :
+	BiharPatchPreconditioner(BiHarmonicMixedFormGlowinski_HHO<Dim>& biHarPb, Type type, int facePatchSize, int neighbourhoodDepth, Solver* solver, bool blockDiagPrec = false) :
 		_diffPb(biHarPb.DiffPb())
 	{
 		_type = type;
 		_facePatchSize = facePatchSize;
 		_neighbourhoodDepth = neighbourhoodDepth;
 		_blockDiagPrec = blockDiagPrec;
+		_solver = solver;
 	}
 
 	void Serialize(ostream& os) const override
@@ -47,18 +50,28 @@ public:
 				os << "diagonal ";
 			os << "face patch neighbourhood (patch size = " << _facePatchSize << ", neighbourhood depth = " << _neighbourhoodDepth << ")";
 		}
+		if (!_blockDiagPrec)
+		{
+			os << std::endl;
+			os << "                solver: " << (*_solver);
+			IterativeSolver* iterSolver = dynamic_cast<IterativeSolver*>(_solver);
+			if (iterSolver)
+			{
+				os << ", tol=" << iterSolver->Tolerance << ", maxIter=" << iterSolver->MaxIterations;
+			}
+		}
 	}
 
 	void Setup(const DenseMatrix& A) override
 	{
 		if (_type == Type::SingleFaceNeighbourhood)
-			Setup1(A);
+			Setup_SingleFaceNeighbourhood(A);
 		else if (_type == Type::FacePatchNeighbourhood)
-			Setup2(A);
+			Setup_FacePatchNeighbourhood(A);
 	}
 
 private:
-	void Setup1(const DenseMatrix& A)
+	void Setup_SingleFaceNeighbourhood(const DenseMatrix& A)
 	{
 		ExportModule out(Utils::ProgramArgs.OutputDirectory, "", Utils::ProgramArgs.Actions.Export.ValueSeparator);
 
@@ -113,8 +126,9 @@ private:
 				}
 			});
 
-		SparseMatrix mat(_diffPb.HHO->nBoundaryFaces * _diffPb.HHO->nFaceUnknowns, _diffPb.HHO->nBoundaryFaces * _diffPb.HHO->nFaceUnknowns);
-		parallelLoop.Fill(mat);
+		//SparseMatrix mat(_diffPb.HHO->nBoundaryFaces * _diffPb.HHO->nFaceUnknowns, _diffPb.HHO->nBoundaryFaces * _diffPb.HHO->nFaceUnknowns);
+		_precondMatrix = SparseMatrix(_diffPb.HHO->nBoundaryFaces * _diffPb.HHO->nFaceUnknowns, _diffPb.HHO->nBoundaryFaces * _diffPb.HHO->nFaceUnknowns);
+		parallelLoop.Fill(_precondMatrix);
 
 		//SparseMatrix matT = mat.triangularView<Eigen::StrictlyLower>().transpose();
 		//mat = mat.triangularView<Eigen::Lower>() + matT;
@@ -122,10 +136,10 @@ private:
 		if (Utils::ProgramArgs.Actions.PrintDebug)
 		{
 			if (Dim <= 2)
-				cout << "Preconditioner matrix:" << endl << DenseMatrix(mat) << endl << endl;
+				cout << "Preconditioner matrix:" << endl << DenseMatrix(_precondMatrix) << endl << endl;
 			else
-				cout << "Preconditioner matrix:" << endl << DenseMatrix(mat.topLeftCorner(3 * _diffPb.HHO->nFaceUnknowns, 3 * _diffPb.HHO->nFaceUnknowns)) << endl << endl;
-			cout << "||A-mat|| = " << (A - DenseMatrix(mat)).norm() << endl;
+				cout << "Preconditioner matrix:" << endl << DenseMatrix(_precondMatrix.topLeftCorner(3 * _diffPb.HHO->nFaceUnknowns, 3 * _diffPb.HHO->nFaceUnknowns)) << endl << endl;
+			cout << "||A-mat|| = " << (A - DenseMatrix(_precondMatrix)).norm() << endl;
 		}
 
 		if (_blockDiagPrec)
@@ -133,17 +147,17 @@ private:
 			int blockSize = _diffPb.HHO->nFaceUnknowns;
 			_invD = vector<Eigen::FullPivLU<DenseMatrix>>(_diffPb.HHO->nBoundaryFaces);
 			NumberParallelLoop<EmptyResultChunk> parallelLoop2(_diffPb.HHO->nBoundaryFaces);
-			parallelLoop2.Execute([this, &mat, blockSize](BigNumber i, ParallelChunk<EmptyResultChunk>* chunk)
+			parallelLoop2.Execute([this, blockSize](BigNumber i, ParallelChunk<EmptyResultChunk>* chunk)
 				{
-					DenseMatrix Di = mat.block(i * blockSize, i * blockSize, blockSize, blockSize);
+					DenseMatrix Di = _precondMatrix.block(i * blockSize, i * blockSize, blockSize, blockSize);
 					_invD[i].compute(Di);
 				});
 		}
 		else
-			_solver.Setup(mat);
+			_solver->Setup(_precondMatrix);
 	}
 
-	void Setup2(const DenseMatrix& A)
+	void Setup_FacePatchNeighbourhood(const DenseMatrix& A)
 	{
 		vector<BoundaryFacePatch<Dim>> patches;
 		patches.reserve(_diffPb._mesh->BoundaryFaces.size() / _facePatchSize);
@@ -249,17 +263,18 @@ private:
 				}
 			});
 
-		SparseMatrix mat(_diffPb.HHO->nBoundaryFaces * _diffPb.HHO->nFaceUnknowns, _diffPb.HHO->nBoundaryFaces * _diffPb.HHO->nFaceUnknowns);
-		parallelLoop.Fill(mat);
+		//SparseMatrix mat(_diffPb.HHO->nBoundaryFaces * _diffPb.HHO->nFaceUnknowns, _diffPb.HHO->nBoundaryFaces * _diffPb.HHO->nFaceUnknowns);
+		_precondMatrix = SparseMatrix(_diffPb.HHO->nBoundaryFaces * _diffPb.HHO->nFaceUnknowns, _diffPb.HHO->nBoundaryFaces * _diffPb.HHO->nFaceUnknowns);
+		parallelLoop.Fill(_precondMatrix);
 
 		if (Utils::ProgramArgs.Actions.PrintDebug)
 		{
 			if (Dim <= 2)
-				cout << "Preconditioner matrix:" << endl << DenseMatrix(mat) << endl << endl;
+				cout << "Preconditioner matrix:" << endl << DenseMatrix(_precondMatrix) << endl << endl;
 			else
-				cout << "Preconditioner matrix:" << endl << DenseMatrix(mat.topLeftCorner(3 * _diffPb.HHO->nFaceUnknowns, 3 * _diffPb.HHO->nFaceUnknowns)) << endl << endl;
-			cout << "Condition number = " << Utils::Cond(DenseMatrix(mat)) << endl;
-			cout << "||A-mat|| = " << (A - DenseMatrix(mat)).norm() << endl;
+				cout << "Preconditioner matrix:" << endl << DenseMatrix(_precondMatrix.topLeftCorner(3 * _diffPb.HHO->nFaceUnknowns, 3 * _diffPb.HHO->nFaceUnknowns)) << endl << endl;
+			cout << "Condition number = " << Utils::Cond(DenseMatrix(_precondMatrix)) << endl;
+			cout << "||A-mat|| = " << (A - DenseMatrix(_precondMatrix)).norm() << endl;
 			//cout << "A-mat: " << endl << (A - DenseMatrix(mat)) << endl << endl;
 		}
 
@@ -268,14 +283,14 @@ private:
 			int blockSize = _diffPb.HHO->nFaceUnknowns;
 			_invD = vector<Eigen::FullPivLU<DenseMatrix>>(_diffPb.HHO->nBoundaryFaces);
 			NumberParallelLoop<EmptyResultChunk> parallelLoop2(_diffPb.HHO->nBoundaryFaces);
-			parallelLoop2.Execute([this, &mat, blockSize](BigNumber i, ParallelChunk<EmptyResultChunk>* chunk)
+			parallelLoop2.Execute([this, blockSize](BigNumber i, ParallelChunk<EmptyResultChunk>* chunk)
 				{
-					DenseMatrix Di = mat.block(i * blockSize, i * blockSize, blockSize, blockSize);
+					DenseMatrix Di = _precondMatrix.block(i * blockSize, i * blockSize, blockSize, blockSize);
 					_invD[i].compute(Di);
 				});
 		}
 		else
-			_solver.Setup(mat);
+			_solver->Setup(_precondMatrix);
 	}
 
 	Vector BiharOperator(const Vector& dirichlet, NeighbourhoodDiffusion_HHO<Dim>& nbhDiff, const SparseMatrix& S_iF_bF_transpose, const SparseMatrix& Theta_T_bF_transpose,
@@ -354,7 +369,7 @@ public:
 			return res;
 		}
 		else
-			return _solver.Solve(r);
+			return _solver->Solve(r);
 	}
 
 	MFlops SolvingComputationalWork() override

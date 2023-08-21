@@ -25,6 +25,7 @@ struct DiscretizationArguments
 	string Mesher = "default";
 	string MeshCode = "default";
 	double Stretch = 0.5;
+	string PolyMeshInitialMesh = "cart";
 	FaceCoarseningStrategy PolyMeshFaceCoarseningStgy = FaceCoarseningStrategy::InterfaceCollapsing;
 	FaceCollapsing PolyMeshBoundaryFaceCollapsing = FaceCollapsing::OnlyCollinear;
 	int PolyMeshNAggregPasses = 1;
@@ -95,8 +96,12 @@ struct SolverArguments
 	double RelaxationParameter = 1;
 	int BlockSize = -1;
 	int Restart = 0;
+
 	string BiHarmonicSolverCode = "fcg";
 	string BiHarmonicPreconditionerCode = "s";
+	string BiHarmonicPrecSolverCode = "bicgstab";
+	double BiHarmonicPrecSolverTol = 0;
+	double BiHarmonicPrecSolverMaxIter = 1000;
 	bool ComputeIterL2Error = false;
 	MultigridArguments MG;
 	bool BiHarReconstructBoundary = false;

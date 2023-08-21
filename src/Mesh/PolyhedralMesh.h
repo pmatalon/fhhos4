@@ -812,7 +812,15 @@ private:
 
 		if (faceCoarseningStgy == FaceCoarseningStrategy::None)
 		{
-			// do nothing
+			if (bdryFaceCollapsing != FaceCollapsing::Disabled)
+			{
+				ElementParallelLoop<Dim> parallelLoopCollapseFaces(coarseMesh->Elements);
+				parallelLoopCollapseFaces.Execute([coarseMesh, bdryFaceCollapsing](Element<Dim>* coarseElement)
+				{
+					if (!coarseElement->IsDeleted && coarseElement->IsOnBoundary())
+						coarseMesh->TryCollapseBoundaryFaces(coarseElement, bdryFaceCollapsing);
+				});
+			}
 		}
 		else if (faceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsing)
 		{

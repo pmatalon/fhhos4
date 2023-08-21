@@ -162,7 +162,7 @@ public:
 
 			Timer lapSolverSetupTimer;
 
-			cout << "Solver: " << *diffSolver << endl << endl;
+			cout << "Solver: " << *diffSolver << endl;
 			IterativeSolver* iterativeSolver = dynamic_cast<IterativeSolver*>(diffSolver);
 			if (iterativeSolver)
 			{
@@ -179,6 +179,7 @@ public:
 				diffSolver->Setup(biHarPb->DiffPb().A);
 				lapSolverSetupTimer.Stop();
 			}
+			cout << "Setup time: CPU = " << lapSolverSetupTimer.CPU() << ", elapsed = " << lapSolverSetupTimer.Elapsed() << endl << endl;
 
 			biHarPb->SetDiffSolver(diffSolver);
 
@@ -445,18 +446,27 @@ public:
 					if (args.Problem.Scheme.compare("g") == 0)
 					{
 						BiHarmonicMixedFormGlowinski_HHO<Dim>* gloScheme = static_cast<BiHarmonicMixedFormGlowinski_HHO<Dim>*>(biHarPb);
+
+						ProgramArguments precSolverArgs;
+						precSolverArgs.Solver.SolverCode = args.Solver.BiHarmonicPrecSolverCode;
+						precSolverArgs.Solver.Tolerance = args.Solver.Tolerance;
+						if (args.Solver.BiHarmonicPrecSolverTol > 0)
+							precSolverArgs.Solver.Tolerance = args.Solver.BiHarmonicPrecSolverTol;
+						precSolverArgs.Solver.MaxIterations = args.Solver.BiHarmonicPrecSolverMaxIter;
+						Solver* precSolver = SolverFactory<Dim>::CreateSolver(precSolverArgs, blockSizeForBlockSolver, out);
+
 						if (args.Solver.BiHarmonicPreconditionerCode.compare("j") == 0)
 							cg->Precond = new DenseBlockJacobiPreconditioner(1);
 						else if (args.Solver.BiHarmonicPreconditionerCode.compare("bj") == 0)
 							cg->Precond = new DenseBlockJacobiPreconditioner(hho->nFaceUnknowns);
 						else if (args.Solver.BiHarmonicPreconditionerCode.compare("s") == 0)
-							cg->Precond = new BiharPatchPreconditioner<Dim>(*gloScheme, BiharPatchPreconditioner<Dim>::Type::SingleFaceNeighbourhood, 0, args.Solver.NeighbourhoodDepth, false);
+							cg->Precond = new BiharPatchPreconditioner<Dim>(*gloScheme, BiharPatchPreconditioner<Dim>::Type::SingleFaceNeighbourhood, 0, args.Solver.NeighbourhoodDepth, precSolver, false);
 						else if (args.Solver.BiHarmonicPreconditionerCode.compare("ds") == 0)
-							cg->Precond = new BiharPatchPreconditioner<Dim>(*gloScheme, BiharPatchPreconditioner<Dim>::Type::SingleFaceNeighbourhood, 0, args.Solver.NeighbourhoodDepth, true);
+							cg->Precond = new BiharPatchPreconditioner<Dim>(*gloScheme, BiharPatchPreconditioner<Dim>::Type::SingleFaceNeighbourhood, 0, args.Solver.NeighbourhoodDepth, precSolver, true);
 						else if (args.Solver.BiHarmonicPreconditionerCode.compare("p") == 0)
-							cg->Precond = new BiharPatchPreconditioner<Dim>(*gloScheme, BiharPatchPreconditioner<Dim>::Type::FacePatchNeighbourhood, args.Solver.PatchSize, args.Solver.NeighbourhoodDepth, false);
+							cg->Precond = new BiharPatchPreconditioner<Dim>(*gloScheme, BiharPatchPreconditioner<Dim>::Type::FacePatchNeighbourhood, args.Solver.PatchSize, args.Solver.NeighbourhoodDepth, precSolver, false);
 						else if (args.Solver.BiHarmonicPreconditionerCode.compare("dp") == 0)
-							cg->Precond = new BiharPatchPreconditioner<Dim>(*gloScheme, BiharPatchPreconditioner<Dim>::Type::FacePatchNeighbourhood, args.Solver.PatchSize, args.Solver.NeighbourhoodDepth, true);
+							cg->Precond = new BiharPatchPreconditioner<Dim>(*gloScheme, BiharPatchPreconditioner<Dim>::Type::FacePatchNeighbourhood, args.Solver.PatchSize, args.Solver.NeighbourhoodDepth, precSolver, true);
 						else if (args.Solver.BiHarmonicPreconditionerCode.compare("no") == 0)
 							cg->Precond = new IdentityPreconditioner();
 						else
@@ -616,6 +626,9 @@ public:
 					double error = biHarPb->DiffPb().BoundarySpace.RelativeL2Error(theta_f, discreteExact);
 					cout << "L2 Error (theta) = " << std::scientific << error << endl;
 				}
+
+				if (testCase->ExactSolution)
+					cout << "h = " << mesh->H() << endl;
 			}
 		}
 

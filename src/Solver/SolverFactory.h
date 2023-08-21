@@ -11,6 +11,7 @@
 #include "Multigrid/AggregAMG/AggregAMG.h"
 #include "FixedPoint/BlockJacobi.h"
 #include "Krylov/EigenCG.h"
+#include "Krylov/EigenBiCGSTAB.h"
 #include "Multigrid/AggregAMG/HighOrderAggregAMG.h"
 #include "Multigrid/AGMG.h"
 
@@ -85,6 +86,8 @@ public:
 			solver = new ConjugateGradient();
 		else if (args.Solver.SolverCode.compare("eigencg") == 0)
 			solver = new EigenCG();
+		else if (args.Solver.SolverCode.compare("bicgstab") == 0)
+			solver = new EigenBiCGSTAB();
 		else if (args.Solver.SolverCode.compare("agmg") == 0)
 			solver = new AGMG();
 		else if (args.Solver.SolverCode.compare("aggregamg") == 0)

@@ -18,7 +18,7 @@ public:
 	void Setup(const SparseMatrix& A) override
 	{
 		Solver::Setup(A);
-		_solver.isSymmetric(true);
+		//_solver.isSymmetric(true);
 		_solver.compute(A);
 		this->SetupComputationalWork = Cost::LUFactorization(A)*1e-6;
 		Eigen::ComputationInfo info = _solver.info();

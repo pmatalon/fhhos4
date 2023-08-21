@@ -88,7 +88,7 @@ void print_usage() {
 	cout << "            quad      - Unstructured quadrilateral (see also argument -stretch)" << endl;
 	cout << "            stetra    - Structured tetrahedral (embedded in a Cartesian mesh)" << endl;
 	cout << "            tetra     - Unstructured tetrahedral" << endl;
-	cout << "            poly      - Polygonal (by aggregation of an initial mesh)." << endl;
+	cout << "            poly      - Polygonal (by aggregation of an initial mesh, see -polymesh-init)." << endl;
 	cout << "                        See also -polymesh-fcs and -polymesh-bfc." << endl;
 	cout << endl;
 	cout << "-mesher CODE" << endl;
@@ -113,6 +113,8 @@ void print_usage() {
 	cout << "      0 <= NUM < 1   stretching factor of the quadrilateral element used in the 'quad' mesh of the 'inhouse' mesher." << endl;
 	cout << "      0 yields square elements. Default is 0.5: the top right corner is moved to the right 0.5 times the element's width." << endl;
 	cout << endl;
+	cout << "-polymesh-init CODE" << endl;
+	cout << "      Initial mesh for the construction of the polygonal mesh (default: cart)." << endl;
 	cout << "-polymesh-fcs CODE" << endl;
 	cout << "      Face coarsening for the construction of the polygonal mesh (default: c)." << endl;
 	cout << "              c   - Collapse interfaces made of multiple faces" << endl;
@@ -199,26 +201,27 @@ void print_usage() {
 	cout << "      If a preconditioner is used, this corresponds to the outer iteration (CG for instance)." << endl;
 	cout << "      The preconditioner is defined using argument -prec." << endl;
 	cout << "      - Direct methods:" << endl;
-	cout << "              lu           - LU factorization (Eigen library)" << endl;
-	cout << "              ch           - Cholesky factorization (Eigen library)" << endl;
+	cout << "              lu            - LU factorization (Eigen library)" << endl;
+	cout << "              ch            - Cholesky factorization (Eigen library)" << endl;
 	cout << "      - Fixed-point iterative methods:" << endl;
-	cout << "              [b]j         - [Block] Jacobi. Use argument -relax to change the relaxation parameter." << endl;
-	cout << "              [b]j23       - [Block] Jacobi with 2/3 as relaxation parameter." << endl;
-	cout << "              [r|s][b]gs   - [Reverse|Symmetric][Block] Gauss-Seidel" << endl;
-	cout << "              [r|s][b]sor  - [Reverse|Symmetric][Block] SOR. Use argument -relax to change the relaxation parameter." << endl;
+	cout << "              [b]j          - [Block] Jacobi. Use argument -relax to change the relaxation parameter." << endl;
+	cout << "              [b]j23        - [Block] Jacobi with 2/3 as relaxation parameter." << endl;
+	cout << "              [r|s][b]gs    - [Reverse|Symmetric][Block] Gauss-Seidel" << endl;
+	cout << "              [r|s][b]sor   - [Reverse|Symmetric][Block] SOR. Use argument -relax to change the relaxation parameter." << endl;
 	cout << "        For the block solvers, the block size is set to the number of DOFs per cell (DG) or face (HHO)." << endl;
 	cout << "      - Krylov methods:" << endl;
-	cout << "              cg           - Conjugate Gradient" << endl;
-	cout << "              eigencg      - Conjugate Gradient (Eigen library) with diagonal preconditioner" << endl;
-	cout << "              fcg          - Flexible Conjugate Gradient (truncation-restart: FCG(1))" << endl;
+	cout << "              cg            - Conjugate Gradient" << endl;
+	cout << "              eigencg       - Conjugate Gradient (Eigen library) with diagonal preconditioner" << endl;
+	cout << "              fcg           - Flexible Conjugate Gradient (truncation-restart: FCG(1))" << endl;
+	cout << "              bicgstab      - BiCGSTAB (Eigen library) with diagonal preconditioner" << endl;
 	cout << "        'cg' and 'fcg' can be suffixed with another solver to use it as a preconditioner. Ex: fcgmg" << endl;
 	cout << "      - Multigrid methods:" << endl;
-	cout << "              agmg         - Yvan Notay's AGMG solver" << endl;
-	cout << "              mg           - Custom multigrid for HHO" << endl;
-	cout << "              p_mg         - p-Multigrid to be used on top of mg" << endl;
-	cout << "              uamg         - Uncondensed AMG (for hybrid discretizations with static condensation)" << endl;
-	cout << "              aggregamg    - In-house implementation of AGMG, without the outer Krylov iteration. Meant to be used with K-cycle and with FCG." << endl;
-	cout << "              hoaggregamg  - Algebraic p-multigrid on top of aggregamg" << endl;
+	cout << "              agmg          - Yvan Notay's AGMG solver" << endl;
+	cout << "              mg            - Custom multigrid for HHO" << endl;
+	cout << "              p_mg          - p-Multigrid to be used on top of mg" << endl;
+	cout << "              uamg          - Uncondensed AMG (for hybrid discretizations with static condensation)" << endl;
+	cout << "              aggregamg     - In-house implementation of AGMG, without the outer Krylov iteration. Meant to be used with K-cycle and with FCG." << endl;
+	cout << "              hoaggregamg   - Algebraic p-multigrid on top of aggregamg" << endl;
 	cout << endl; 
 	cout << "-prec CODE" << endl;
 	cout << "      Preconditioner." << endl;
@@ -277,6 +280,16 @@ void print_usage() {
 	cout << "              ds       - Diagonal part of 's'" << endl;
 	cout << "              p        - face Patch neighbourhood (see also -patch-size and -nbh-depth)" << endl;
 	cout << "              dp       - Diagonal part of 'p'" << endl;
+	cout << endl;
+	cout << endl;
+	cout << "-bihar-prec-solver CODE" << endl;
+	cout << "      Linear solver for the preconditioning matrix given by '-bihar-prec [s|p]'. Default: bicgstab." << endl;
+	cout << endl;
+	cout << "-bihar-prec-solver-tol NUM" << endl;
+	cout << "      Tolerance for the the -bihar-prec-solver. Set to 0 to use the tolerance of the solver." << endl;
+	cout << endl;
+	cout << "-bihar-prec-solver-max-iter NUM" << endl;
+	cout << "      Max iterations for the the -bihar-prec-solver (default: 1000)." << endl;
 	cout << endl;
 	cout << "-bihar-reconstruct-bry {0|1}" << endl;
 	cout << "      Reconstruct higher-order boundary during the iterative process of the bi-harmonic problem." << endl;
@@ -648,6 +661,7 @@ int main(int argc, char* argv[])
 		OPT_Ny,
 		OPT_Nz,
 		OPT_Stretch,
+		OPT_PolyMeshInitialMesh,
 		OPT_PolyMeshFaceCoarseningStrategy,
 		OPT_PolyMeshBoundaryFaceCollapsing,
 		OPT_PolyMeshNPasses,
@@ -677,6 +691,9 @@ int main(int argc, char* argv[])
 		OPT_Restart,
 		OPT_BiHarmonicSolver,
 		OPT_BiHarmonicPreconditioner,
+		OPT_BiHarmonicPrecondSolver,
+		OPT_BiHarmonicPrecSolverTol,
+		OPT_BiHarmonicPrecSolverMaxIter,
 		OPT_IterL2Error,
 		OPT_BiHarReconstructBoundary,
 		// Multigrid
@@ -740,6 +757,7 @@ int main(int argc, char* argv[])
 		 { "nx", required_argument, NULL, OPT_Nx },
 		 { "ny", required_argument, NULL, OPT_Ny },
 		 { "stretch", required_argument, NULL, OPT_Stretch },
+		 { "polymesh-init", required_argument, NULL, OPT_PolyMeshInitialMesh },
 		 { "polymesh-fcs", required_argument, NULL, OPT_PolyMeshFaceCoarseningStrategy },
 		 { "polymesh-bfc", required_argument, NULL, OPT_PolyMeshBoundaryFaceCollapsing },
 		 { "polymesh-n-pass", required_argument, NULL, OPT_PolyMeshNPasses },
@@ -769,6 +787,9 @@ int main(int argc, char* argv[])
 		 { "restart", required_argument, NULL, OPT_Restart },
 		 { "bihar-solver", required_argument, NULL, OPT_BiHarmonicSolver },
 		 { "bihar-prec", required_argument, NULL, OPT_BiHarmonicPreconditioner },
+		 { "bihar-prec-solver", required_argument, NULL, OPT_BiHarmonicPrecondSolver },
+		 { "bihar-prec-solver-tol", required_argument, NULL, OPT_BiHarmonicPrecSolverTol },
+		 { "bihar-prec-solver-max-iter", required_argument, NULL, OPT_BiHarmonicPrecSolverMaxIter },
 		 { "iter-l2", no_argument, NULL, OPT_IterL2Error },
 		 { "bihar-reconstruct-bry", required_argument, NULL, OPT_BiHarReconstructBoundary },
 		 // Multigrid
@@ -914,6 +935,16 @@ int main(int argc, char* argv[])
 			case OPT_Stretch:
 				args.Discretization.Stretch = atof(optarg);
 				break;
+			case OPT_PolyMeshInitialMesh:
+			{
+				string meshCode = optarg;
+				if (   meshCode.compare("cart") != 0
+					&& meshCode.compare("stri") != 0
+					&& meshCode.compare("tri") != 0)
+					argument_error("unmanaged mesh code '" + meshCode + "' for the construction of a polyhedral mesh. Check -polymesh-init argument.");
+				args.Discretization.PolyMeshInitialMesh = meshCode;
+				break;
+			}
 			case OPT_PolyMeshFaceCoarseningStrategy:
 			{
 				string fcsCode = optarg;
@@ -1094,6 +1125,17 @@ int main(int argc, char* argv[])
 				break;
 			case OPT_BiHarmonicPreconditioner:
 				args.Solver.BiHarmonicPreconditionerCode = optarg;
+				break;
+			case OPT_BiHarmonicPrecondSolver:
+				args.Solver.BiHarmonicPrecSolverCode = optarg;
+				break;
+			case OPT_BiHarmonicPrecSolverTol:
+				args.Solver.BiHarmonicPrecSolverTol = atof(optarg);
+				break;
+			case OPT_BiHarmonicPrecSolverMaxIter:
+				args.Solver.BiHarmonicPrecSolverMaxIter = atoi(optarg);
+				if (args.Solver.BiHarmonicPrecSolverMaxIter < 1)
+					argument_error("-bihar-prec-solver-max-iter argument must be > 0.");
 				break;
 			case OPT_IterL2Error:
 				args.Solver.ComputeIterL2Error = true;

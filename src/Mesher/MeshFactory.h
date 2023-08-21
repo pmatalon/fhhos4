@@ -198,8 +198,14 @@ Mesh<2>* MeshFactory<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase
 			}
 			else if (meshCode.compare("poly") == 0)
 			{
-				Square_GMSHUnstructTriangularMesh* triMesh = new Square_GMSHUnstructTriangularMesh(n);
-				fineMesh = BuildPolyhedralMesh(triMesh, args.Discretization.PolyMeshFaceCoarseningStgy, args.Discretization.PolyMeshBoundaryFaceCollapsing, args.Discretization.PolyMeshNAggregPasses);
+				PolyhedralMesh<2>* initMesh;
+				if (args.Discretization.PolyMeshInitialMesh.compare("cart") == 0)
+					initMesh = new Square_GMSHCartesianMesh(n);
+				else if (args.Discretization.PolyMeshInitialMesh.compare("stri") == 0)
+					initMesh = new Square_GMSHTriangularMesh(n);
+				else if (args.Discretization.PolyMeshInitialMesh.compare("tri") == 0)
+					initMesh = new Square_GMSHUnstructTriangularMesh(n);
+				fineMesh = BuildPolyhedralMesh(initMesh, args.Discretization.PolyMeshFaceCoarseningStgy, args.Discretization.PolyMeshBoundaryFaceCollapsing, args.Discretization.PolyMeshNAggregPasses);
 			}
 			else
 				Utils::FatalError("The requested mesh is not managed with this geometry.");
