@@ -12,6 +12,8 @@ public:
 			return new GaussSeidelSmoother(Direction::Forward, nSmootherIterations);
 		if (smootherCode.compare("rgs") == 0)
 			return new GaussSeidelSmoother(Direction::Backward, nSmootherIterations);
+		if (smootherCode.compare("sgs") == 0)
+			return new GaussSeidelSmoother(Direction::Symmetric, nSmootherIterations);
 
 		if (smootherCode.compare("sor") == 0)
 		{
