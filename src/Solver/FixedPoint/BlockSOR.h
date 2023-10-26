@@ -8,7 +8,9 @@ enum class Direction : unsigned
 {
 	Forward = 0,
 	Backward = 1,
-	Symmetric
+	Symmetric,
+	AlternatingForwardFirst,
+	AlternatingBackwardFirst
 };
 
 class BlockSOR : public IterativeSolver
@@ -40,6 +42,7 @@ public:
 
 		if (_direction != Direction::Symmetric || _blockSize != 1 || _omega != 1)
 			os << " (";
+		
 		if (_blockSize != 1)
 		{
 			os << "blockSize=" << _blockSize;
@@ -52,8 +55,16 @@ public:
 			if (_direction != Direction::Symmetric)
 				os << ", ";
 		}
-		if (_direction != Direction::Symmetric)
-			os << "direction=" << (_direction == Direction::Forward ? "forward" : "backward");
+		if (_direction == Direction::Forward)
+			os << "direction=forward";
+		else if (_direction == Direction::Backward)
+			os << "direction=backward";
+		else if (_direction == Direction::AlternatingForwardFirst)
+			os << "alternating directions, forward first";
+		else if (_direction == Direction::AlternatingBackwardFirst)
+			os << "alternating directions, backward first";
+
+		
 		if (_direction != Direction::Symmetric || _blockSize != 1 || _omega != 1)
 			os << ")";
 	}
@@ -119,7 +130,7 @@ private:
 					ProcessBlockRow(nb - i - 1, b, x);
 			}
 		}
-		else // Symmetric
+		else if (_direction == Direction::Symmetric)
 		{
 			if (_blockSize == 1)
 			{
@@ -140,6 +151,40 @@ private:
 					ProcessBlockRow(nb - i - 1, b, x);
 			}
 		}
+		else if (_direction == Direction::AlternatingForwardFirst || _direction == Direction::AlternatingBackwardFirst)
+		{
+			int modulo = _direction == Direction::AlternatingForwardFirst ? 0 : 1;
+			if (this->IterationCount % 2 == modulo) 
+			{
+				// Forward
+				if (_blockSize == 1)
+				{
+					for (BigNumber i = 0; i < nb; ++i)
+						ProcessRow(i, b, x);
+				}
+				else
+				{
+					for (BigNumber i = 0; i < nb; ++i)
+						ProcessBlockRow(i, b, x);
+				}
+			}
+			else
+			{
+				// Backward
+				if (_blockSize == 1)
+				{
+					for (BigNumber i = 0; i < nb; ++i)
+						ProcessRow(nb - i - 1, b, x);
+				}
+				else
+				{
+					for (BigNumber i = 0; i < nb; ++i)
+						ProcessBlockRow(nb - i - 1, b, x);
+				}
+			}
+		}
+		else
+			Utils::FatalError("direction not managed");
 
 		result.SetX(x);
 		double sweepWork = 2 * A.nonZeros() + nb * pow(_blockSize, 2);

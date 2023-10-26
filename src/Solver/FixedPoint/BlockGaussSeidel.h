@@ -35,8 +35,15 @@ public:
 			if (_direction != Direction::Symmetric)
 				os << ", ";
 		}
-		if (_direction != Direction::Symmetric)
-			os << "direction=" << (_direction == Direction::Forward ? "forward" : "backward");
+		if (_direction == Direction::Forward)
+			os << "direction=forward";
+		else if (_direction == Direction::Backward)
+			os << "direction=backward";
+		else if (_direction == Direction::AlternatingForwardFirst)
+			os << "alternating directions, forward first";
+		else if (_direction == Direction::AlternatingBackwardFirst)
+			os << "alternating directions, backward first";
+
 		if (_direction != Direction::Symmetric || _blockSize != 1)
 			os << ")";
 	}
@@ -86,7 +93,7 @@ private:
 				for (BigNumber i = 0; i < nb; ++i)
 					ProcessBlockRow(nb - i - 1, b, x);
 			}
-			else // Symmetric
+			else if (_direction == Direction::Symmetric)
 			{
 				// Forward
 				for (BigNumber i = 0; i < nb; ++i)
@@ -95,6 +102,24 @@ private:
 				for (BigNumber i = 0; i < nb; ++i)
 					ProcessBlockRow(nb - i - 1, b, x);
 			}
+			else if (_direction == Direction::AlternatingForwardFirst || _direction == Direction::AlternatingBackwardFirst)
+			{
+				int modulo = _direction == Direction::AlternatingForwardFirst ? 0 : 1;
+				if (this->IterationCount % 2 == modulo)
+				{
+					// Forward
+					for (BigNumber i = 0; i < nb; ++i)
+						ProcessBlockRow(i, b, x);
+				}
+				else
+				{
+					// Backward
+					for (BigNumber i = 0; i < nb; ++i)
+						ProcessBlockRow(nb - i - 1, b, x);
+				}
+			}
+			else
+				Utils::FatalError("direction not managed");
 		}
 		else // Hybrid
 		{
@@ -116,7 +141,7 @@ private:
 							ProcessBlockRow(nb - i - 1, b, x);
 					});
 			}
-			else // Symmetric
+			else if (_direction == Direction::Symmetric)
 			{
 				// Forward
 				NumberParallelLoop<EmptyResultChunk> parallelLoop(nb);
@@ -132,6 +157,31 @@ private:
 							ProcessBlockRow(nb - i - 1, b, x);
 					});
 			}
+			else if (_direction == Direction::AlternatingForwardFirst || _direction == Direction::AlternatingBackwardFirst)
+			{
+				NumberParallelLoop<EmptyResultChunk> parallelLoop(nb);
+				int modulo = _direction == Direction::AlternatingForwardFirst ? 0 : 1;
+				if (this->IterationCount % 2 == modulo)
+				{
+					// Forward
+					parallelLoop.ExecuteChunk([this, &b, &x](ParallelChunk<EmptyResultChunk>* chunk)
+						{
+							for (BigNumber i = chunk->Start; i < chunk->End; i++)
+								ProcessBlockRow(i, b, x);
+						});
+				}
+				else
+				{
+					// Backward
+					parallelLoop.ExecuteChunk([this, &b, &x, &nb](ParallelChunk<EmptyResultChunk>* chunk)
+					{
+						for (BigNumber i = chunk->Start; i < chunk->End; i++)
+							ProcessBlockRow(nb - i - 1, b, x);
+					});
+				}
+			}
+			else
+				Utils::FatalError("direction not managed");
 		}
 
 		result.SetX(x);

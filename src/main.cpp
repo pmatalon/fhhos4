@@ -336,12 +336,16 @@ void print_usage() {
 	cout << "              j     - Jacobi" << endl;
 	cout << "              gs    - Gauss-Seidel" << endl;
 	cout << "              rgs   - Reverse Gauss-Seidel" << endl;
-	cout << "              sgs   - Symmetric Gauss-Seidel" << endl;
+	cout << "              sgs   - Symmetric Gauss-Seidel (forward then backward)" << endl;
+	cout << "              ags   - Alternating Gauss-Seidel (starting with forward)" << endl;
+	cout << "              rags  - Reverse Alternating Gauss-Seidel (starting with backward)" << endl;
 	cout << "              bj    - Block Jacobi: the block size is set to the number of DOFs per face" << endl;
 	cout << "              bj23  - Block Jacobi with a damping factor of 2/3" << endl;
 	cout << "              bgs   - Block Gauss-Seidel: the block size is set to the number of DOFs per face" << endl;
 	cout << "              rbgs  - Reverse Block Gauss-Seidel" << endl;
-	cout << "              sbgs  - Symmetric Block Gauss-Seidel" << endl;
+	cout << "              sbgs  - Symmetric Block Gauss-Seidel (forward then backward)" << endl;
+	cout << "              abgs  - Alternating Block Gauss-Seidel (starting with forward)" << endl;
+	cout << "              rabgs - Reverse Alternating Block Gauss-Seidel (starting with backward)" << endl;
 	cout << "              hbgs  - Hybrid Block Gauss-Seidel (parallelization of 'bgs')" << endl;
 	cout << "              hrbgs - Hybrid Reverse Block Gauss-Seidel (parallelization of 'rbgs')" << endl;
 	cout << endl;

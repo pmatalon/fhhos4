@@ -19,12 +19,18 @@ public:
 
 	virtual void Serialize(ostream& os) const override
 	{
-		if (_direction == Direction::Symmetric)
-			os << "Symmetric ";
-		os << "Gauss-Seidel";
-
-		if (_direction != Direction::Symmetric)
-			os << " (direction=" << (_direction == Direction::Forward ? "forward" : "backward") << ")";
+		if (_direction == Direction::Forward)
+			os << "Gauss-Seidel (forward)";
+		else if (_direction == Direction::Backward)
+			os << "Gauss-Seidel (backward)";
+		else if (_direction == Direction::Symmetric)
+			os << "Symmetric Gauss-Seidel";
+		else if (_direction == Direction::AlternatingForwardFirst)
+			os << "Gauss-Seidel (alternating, forward first)";
+		else if (_direction == Direction::AlternatingBackwardFirst)
+			os << "Gauss-Seidel (alternating, backward first)";
+		else
+			os << "Gauss-Seidel (UNDEFINED)";
 	}
 
 	//------------------------------------------------//
@@ -67,6 +73,14 @@ private:
 				ForwardSweep(b, x, xEquals0, result);
 				BackwardSweep(b, x, xEquals0, result);
 			}
+			else if (_direction == Direction::AlternatingForwardFirst || _direction == Direction::AlternatingBackwardFirst)
+			{
+				int modulo = _direction == Direction::AlternatingForwardFirst ? 0 : 1;
+				if (this->IterationCount % 2 == modulo)
+					ForwardSweep(b, x, xEquals0, result);
+				else
+					BackwardSweep(b, x, xEquals0, result);
+			}
 			else
 				Utils::FatalError("direction not managed");
 		}
@@ -80,6 +94,14 @@ private:
 			{
 				ForwardSweep(b, x, xEquals0, result);
 				BackwardSweepAndComputeResidualOrAx(b, x, xEquals0, computeResidual, computeAx, result);
+			}
+			else if (_direction == Direction::AlternatingForwardFirst || _direction == Direction::AlternatingBackwardFirst)
+			{
+				int modulo = _direction == Direction::AlternatingForwardFirst ? 0 : 1;
+				if (this->IterationCount % 2 == modulo)
+					ForwardSweepAndComputeResidual(b, x, xEquals0, result);
+				else
+					BackwardSweepAndComputeResidualOrAx(b, x, xEquals0, computeResidual, computeAx, result);
 			}
 			else
 				Utils::FatalError("direction not managed");

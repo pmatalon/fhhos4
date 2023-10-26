@@ -14,6 +14,10 @@ public:
 			return new GaussSeidelSmoother(Direction::Backward, nSmootherIterations);
 		if (smootherCode.compare("sgs") == 0)
 			return new GaussSeidelSmoother(Direction::Symmetric, nSmootherIterations);
+		if (smootherCode.compare("ags") == 0)
+			return new GaussSeidelSmoother(Direction::AlternatingForwardFirst, nSmootherIterations);
+		if (smootherCode.compare("rags") == 0)
+			return new GaussSeidelSmoother(Direction::AlternatingBackwardFirst, nSmootherIterations);
 
 		if (smootherCode.compare("sor") == 0)
 		{
@@ -47,6 +51,24 @@ public:
 				return new BlockGaussSeidelSmoother(blockSize, Direction::Backward, false, nSmootherIterations);
 			else
 				return new BlockSORSmoother(blockSize, omega, Direction::Backward, nSmootherIterations);
+		}
+		if (smootherCode.compare("absor") == 0 || smootherCode.compare("abgs") == 0)
+		{
+			if (blockSize == 1 && omega == 1)
+				return new GaussSeidelSmoother(Direction::AlternatingForwardFirst, nSmootherIterations);
+			else if (omega == 1)
+				return new BlockGaussSeidelSmoother(blockSize, Direction::AlternatingForwardFirst, false, nSmootherIterations);
+			else
+				return new BlockSORSmoother(blockSize, omega, Direction::AlternatingForwardFirst, nSmootherIterations);
+		}
+		if (smootherCode.compare("rabsor") == 0 || smootherCode.compare("rabgs") == 0)
+		{
+			if (blockSize == 1 && omega == 1)
+				return new GaussSeidelSmoother(Direction::AlternatingBackwardFirst, nSmootherIterations);
+			else if (omega == 1)
+				return new BlockGaussSeidelSmoother(blockSize, Direction::AlternatingBackwardFirst, false, nSmootherIterations);
+			else
+				return new BlockSORSmoother(blockSize, omega, Direction::AlternatingBackwardFirst, nSmootherIterations);
 		}
 		if (smootherCode.compare("hbgs") == 0)
 		{
