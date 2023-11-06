@@ -257,6 +257,35 @@ private:
 		mg->CoarseningFactor = args.Solver.MG.CoarseningFactor;
 		mg->ExportComponents = args.Actions.Export.MultigridComponents;
 
+		// Symmetric post-smoother
+		if (mg->PostSmootherCode == "<symmetric smoother>")
+		{
+			if (mg->PreSmootherCode == "bj23" || mg->PreSmootherCode == "bj" || mg->PreSmootherCode == "sgs" || mg->PreSmootherCode == "sbgs") // symmetric smoothers
+				mg->PostSmootherCode = mg->PreSmootherCode;
+			else if (mg->PreSmootherCode == "gs")
+				mg->PostSmootherCode = "rgs";
+			else if (mg->PreSmootherCode == "bgs")
+				mg->PostSmootherCode = "rbgs";
+			else if (mg->PreSmootherCode == "hbgs")
+				mg->PostSmootherCode = "hrbgs";
+			else if (mg->PreSmootherCode == "ags" || mg->PreSmootherCode == "abgs" || mg->PreSmootherCode == "asor") // alternating smoothers
+			{
+				if (mg->CoarseLevelChangeSmoothingCoeff != 0)
+					Utils::FatalError("The automatic determination of the symmetric version of the smoother '" + mg->PreSmootherCode + "' is not implemented when the cycle is variable.");
+
+				if (mg->PreSmoothingIterations % 2 == 0) // even number of iterations
+				{
+					mg->PostSmootherCode = mg->PreSmootherCode;
+				}
+				else // odd number of iterations
+				{
+					mg->PostSmootherCode = "r" + mg->PreSmootherCode;
+				}
+			}
+			else
+				Utils::FatalError("The automatic determination of the symmetric version of the smoother '" + mg->PreSmootherCode + "' is not implemented. Please complete the post-smoother in the argument '-smoothers " + mg->PreSmootherCode + ",<post>'.");
+		}
+
 		// Coarse solver
 		ProgramArguments argsCoarseSolver;
 		argsCoarseSolver.Solver.SolverCode = args.Solver.MG.CoarseSolverCode;

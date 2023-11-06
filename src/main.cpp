@@ -331,8 +331,10 @@ void print_usage() {
 	cout << "              0    - discretized operator (default)" << endl;
 	cout << "              1    - Galerkin operator" << endl;
 	cout << endl;
-	cout << "-smoothers CODE,CODE" << endl;
+	cout << "-smoothers CODE[,CODE]" << endl;
 	cout << "      Pre-smoother,post-smoother: \"bgs,rbgs\" for example." << endl;
+	cout << "      If only the pre-smoother is chosen, the post-smoother will be determined according the number of smoothing steps in the cycle" << endl;
+	cout << "      in order to ensure symmetry: if the pre-smoother is \"ags\", the post-smoother will also be \"ags\" if the number of smoothing steps is even, or \"rags\" if odd." << endl;
 	cout << "              j     - Jacobi" << endl;
 	cout << "              gs    - Gauss-Seidel" << endl;
 	cout << "              rgs   - Reverse Gauss-Seidel" << endl;
@@ -1293,8 +1295,16 @@ int main(int argc, char* argv[])
 			{
 				string s(optarg);
 				auto pos = s.find(",");
-				args.Solver.MG.PreSmootherCode = s.substr(0, s.find(","));
-				args.Solver.MG.PostSmootherCode = s.substr(pos + 1);
+				if (pos != string::npos) // "," found
+				{
+					args.Solver.MG.PreSmootherCode = s.substr(0, s.find(","));
+					args.Solver.MG.PostSmootherCode = s.substr(pos + 1);
+				}
+				else // "," not found
+				{
+					args.Solver.MG.PreSmootherCode = s;
+					args.Solver.MG.PostSmootherCode = "<symmetric smoother>";
+				}
 				break;
 			}
 			case OPT_HP_CS:
