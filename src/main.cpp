@@ -23,6 +23,7 @@ void print_usage() {
 	cout << "            segment           - Unit segment (1D)" << endl;
 	cout << "            square            - Unit square" << endl;
 	cout << "            square4quadrants  - Unit square divided into 4 quadrants" << endl;
+	cout << "            L_shape           - L-shape" << endl;
 	cout << "            cube              - Unit cube" << endl;
 	cout << "            <file>            - GMSH .geo or .msh file" << endl;
 	cout << "                                Use relative or absolute path, or simply the file name if the file is stored in the folder data/mesh/" << endl;
@@ -526,7 +527,7 @@ void print_usage() {
 	cout << endl;
 	cout << "-export CODES" << endl;
 	cout << "      Data export. The CODES must be comma-separated." << endl;
-	cout << "              lsys       - linear system" << endl;
+	cout << "              lsys       - linear system (.dat files, readable by Matlab)" << endl;
 	cout << "              amat       - matrices decomposed by assembly terms in separate files (consistency, stabilization, mass, etc.)" << endl;
 	cout << "              mesh       - mesh to be used in Matlab" << endl;
 	cout << "              solvect    - solution vector(s)" << endl;
@@ -1553,7 +1554,7 @@ int main(int argc, char* argv[])
 	{
 		if (args.Problem.GeoCode.compare("segment") == 0)
 			args.Problem.Dimension = 1;
-		else if (args.Problem.GeoCode.compare("square") == 0 || args.Problem.GeoCode.compare("square4quadrants") == 0)
+		else if (args.Problem.GeoCode.compare("square") == 0 || args.Problem.GeoCode.compare("square4quadrants") == 0 || args.Problem.GeoCode.compare("L_shape") == 0)
 			args.Problem.Dimension = 2;
 		else if (args.Problem.GeoCode.compare("cube") == 0)
 			args.Problem.Dimension = 3;

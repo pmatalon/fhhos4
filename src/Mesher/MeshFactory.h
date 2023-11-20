@@ -24,6 +24,9 @@
 		#include "GMSH/Square4quadrants_GMSHTriangularMesh.h"
 		#include "GMSH/Square4quadrants_GMSHUnstructTriangularMesh.h"
 		#include "GMSH/Square4quadrants_GMSHQuadrilateralMesh.h"
+
+		#include "GMSH/LShape_GMSHTriangularMesh.h"
+		#include "GMSH/LShape_GMSHUnstructuredTriangularMesh.h"
 	#endif // GMSH_ENABLED
 #endif // ENABLE_2D
 
@@ -278,6 +281,38 @@ Mesh<2>* MeshFactory<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase
 				}
 				else
 					fineMesh = new Square4quadrants_GMSHQuadrilateralMesh(n);
+			}
+			else
+				Utils::FatalError("The requested mesh is not managed with this geometry.");
+		}
+#endif // GMSH_ENABLED
+		else
+			Utils::FatalError("Unknown mesher.");
+	}
+	else if (geoCode.compare("L_shape") == 0)
+	{
+#ifdef GMSH_ENABLED
+		if (mesher.compare("gmsh") == 0)
+		{
+			if (meshCode.compare("tri") == 0)
+			{
+				if (args.Solver.MG.H_CS == H_CoarsStgy::GMSHSplittingRefinement)
+				{
+					Mesh<2>* coarseMesh = new LShape_GMSHUnstructuredTriangularMesh(n <= 16 ? 4 : 16);
+					fineMesh = coarseMesh->RefineUntilNElements(2 * nx * ny, refinementStgy);
+				}
+				else
+					fineMesh = new LShape_GMSHUnstructuredTriangularMesh(n);
+			}
+			else if (meshCode.compare("stri") == 0)
+			{
+				if (args.Solver.MG.H_CS == H_CoarsStgy::GMSHSplittingRefinement)
+				{
+					Mesh<2>* coarseMesh = new LShape_GMSHTriangularMesh(n <= 16 ? 4 : 16);
+					fineMesh = coarseMesh->RefineUntilNElements(2 * nx * ny, refinementStgy);
+				}
+				else
+					fineMesh = new LShape_GMSHTriangularMesh(n);
 			}
 			else
 				Utils::FatalError("The requested mesh is not managed with this geometry.");

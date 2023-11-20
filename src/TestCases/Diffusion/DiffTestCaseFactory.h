@@ -17,6 +17,7 @@
 	#include "2D/HybridMeshTestCase.h"
 	#include "2D/MagnetismTestCase.h"
 	#include "2D/SquareFullNeumannTestCase.h"
+	#include "2D/LShapeTestCase.h"
 #endif
 #ifdef ENABLE_3D
 	#include "3D/CubeTestCase.h"
@@ -79,6 +80,8 @@ DiffusionTestCase<2>* DiffTestCaseFactory<2>::Create(ProblemArguments pb)
 		return new MagnetismTestCase(pb);
 	if (pb.TestCaseCode.compare("roomwithwall") == 0)
 		return new RoomWithWallTestCase(pb);
+	if (pb.TestCaseCode.compare("L_shape") == 0)
+		return new LShapeTestCase(pb);
 
 	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 2D. Check -tc argument or use '-tc default'.");
 	return nullptr;

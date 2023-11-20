@@ -1,15 +1,15 @@
-L = 1; // size of the square
+L = 1; // length of a quadrant
 // h and h_center are defined in the files that include this one
 
 // Corners
-Point(1) = {0, 0, 0, h};
-Point(2) = {0, L, 0, h};
+Point(1) = {-L, -L, 0, h};
+Point(2) = {-L, L, 0, h};
 Point(3) = {L, L, 0, h};
-Point(4) = {L/2, L/2, 0, h_center}; // Center
-Point(5) = {L/2, 0, 0, h};
-Point(6) = {0, L/2, 0, h};
-Point(7) = {L, L/2, 0, h};
-Point(8) = {L/2, L, 0, h};
+Point(4) = {0, 0, 0, h_center}; // Center
+Point(5) = {0, -L, 0, h};
+Point(6) = {-L, 0, 0, h};
+Point(7) = {L, 0, 0, h};
+Point(8) = {0, L, 0, h};
 
 // Lines
 Line(1) = {1, 5};
