@@ -150,6 +150,8 @@ public:
 		//       Linear system solution       //
 		//------------------------------------//
 
+		Timer lapSolverSetupTimer;
+
 		if (args.Actions.SolveLinearSystem)
 		{
 			cout << endl;
@@ -160,7 +162,6 @@ public:
 			int blockSizeForBlockSolver = args.Solver.BlockSize != -1 ? args.Solver.BlockSize : faceBasis->Size();
 			Solver* diffSolver = SolverFactory<Dim>::CreateSolver(args, &biHarPb->DiffPb(), blockSizeForBlockSolver, out);
 
-			Timer lapSolverSetupTimer;
 
 			cout << "Solver: " << *diffSolver << endl;
 			IterativeSolver* iterativeSolver = dynamic_cast<IterativeSolver*>(diffSolver);
@@ -179,7 +180,7 @@ public:
 				diffSolver->Setup(biHarPb->DiffPb().A);
 				lapSolverSetupTimer.Stop();
 			}
-			cout << "Setup time: CPU = " << lapSolverSetupTimer.CPU() << ", elapsed = " << lapSolverSetupTimer.Elapsed() << endl << endl;
+			cout << "Laplacian solver setup time: CPU = " << lapSolverSetupTimer.CPU() << ", elapsed = " << lapSolverSetupTimer.Elapsed() << endl << endl;
 
 			biHarPb->SetDiffSolver(diffSolver);
 
@@ -570,6 +571,15 @@ public:
 
 			totalTimer.Stop();
 
+			cout << "Laplacian solver:" << endl << endl;
+			int sizeTime = 12;
+			cout << "        |   CPU time   | Elapsed time " << endl;
+			cout << "---------------------------------------" << endl;
+			cout << "Setup   | " << setw(sizeTime) << lapSolverSetupTimer.CPU() << " | " << setw(sizeTime) << lapSolverSetupTimer.Elapsed() << endl;
+			cout << "        | " << setw(sizeTime - 2) << lapSolverSetupTimer.CPU().InSeconds() << " s | " << setw(sizeTime - 2) << lapSolverSetupTimer.Elapsed().InSeconds() << " s " << endl;
+			cout << "---------------------------------------" << endl << endl;
+
+			cout << "Biharmonic solver:" << endl << endl;
 			SolverFactory<Dim>::PrintStats(biHarSolver, setupTimer, solvingTimer, totalTimer);
 
 			delete biHarSolver;
