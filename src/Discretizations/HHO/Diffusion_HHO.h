@@ -1092,15 +1092,15 @@ public:
 		return mat;
 	}
 
-	SparseMatrix BiharStab_T_T()
+	SparseMatrix BiharStab_T_T(const string& biharStabilization)
 	{
 		ElementParallelLoop<Dim> parallelLoop(_mesh->BoundaryElements);
 		parallelLoop.ReserveChunkCoeffsSize(HHO->nCellUnknowns * HHO->nCellUnknowns);
 
-		parallelLoop.Execute([this](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+		parallelLoop.Execute([&](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
 			{
 				auto hhoElem = HHOElement(e);
-				hhoElem->AssembleStabilizationMatrix(false);
+				hhoElem->AssembleStabilizationMatrix(false, biharStabilization);
 				int i = _mesh->BoundaryElementNumber(e);
 
 				DenseMatrix Stab_T_T = hhoElem->Astab.topLeftCorner(HHO->nCellUnknowns, HHO->nCellUnknowns);

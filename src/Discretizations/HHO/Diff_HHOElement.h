@@ -137,7 +137,7 @@ public:
 		if (assembleLocalMatrix)
 		{
 			this->AssembleReconstructionAndConsistencyMatrices();
-			this->AssembleStabilizationMatrix();
+			this->AssembleStabilizationMatrix(true, hho->Stabilization);
 
 			//int nTotalFaceUnknowns = this->Faces.size() * hho->nFaceUnknowns;
 
@@ -436,13 +436,13 @@ private:
 	//---------------------------------------------//
 
 public:
-	void AssembleStabilizationMatrix(bool for_diffusion = true)
+	void AssembleStabilizationMatrix(bool for_diffusion, const string& stabilization)
 	{
 		int nHybridUnknowns = HHO->nCellUnknowns + this->Faces.size() * HHO->nFaceUnknowns;
 
 		this->Astab = DenseMatrix::Zero(nHybridUnknowns, nHybridUnknowns);
 
-		if (HHO->Stabilization.compare("hho") == 0)
+		if (stabilization.compare("hho") == 0)
 		{
 			DenseMatrix Dt;
 			if (!this->HasOrthogonalBasis() || !HasHierarchichalBasis())
@@ -482,7 +482,7 @@ public:
 					this->Astab += DiffTF.transpose() * Mf * DiffTF * (this->DiffTensor() * normal).dot(normal) * h;
 			}
 		}
-		else if (HHO->Stabilization.compare("hdg") == 0)
+		else if (stabilization.compare("hdg") == 0)
 		{
 			for (auto face : this->Faces)
 			{

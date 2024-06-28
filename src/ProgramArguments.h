@@ -32,6 +32,7 @@ struct DiscretizationArguments
 
 	string Method = "hho";
 	string Stabilization = "hho";
+	string BiharStabilization = "hdg";
 	string ElemBasisCode = "";
 	string FaceBasisCode = "";
 	int OrthogonalizeElemBasesCode = -1;

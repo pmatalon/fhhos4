@@ -149,6 +149,11 @@ void print_usage() {
 	cout << "               hho    - HHO stabilization term" << endl;
 	cout << "               hdg    - HDG stabilization term" << endl;
 	cout << endl;
+	cout << "-bihar-stab CODE" << endl;
+	cout << "      Stabilization term for the biharmonic problem (only used in HHO)." << endl;
+	cout << "               hho    - HHO stabilization term" << endl;
+	cout << "               hdg    - HDG stabilization term (default)" << endl;
+	cout << endl;
 	cout << "-e-basis CODE" << endl;
 	cout << "      Polynomial basis for the elements." << endl;
 	cout << "               monomials" << endl;
@@ -678,6 +683,7 @@ int main(int argc, char* argv[])
 		OPT_HHO_K,
 		OPT_HHO_K_Cells,
 		OPT_Stabilization,
+		OPT_BiharStabilization,
 		OPT_ElemBasis,
 		OPT_FaceBasis,
 		OPT_OrthogonalizeElemBases,
@@ -774,6 +780,7 @@ int main(int argc, char* argv[])
 		 { "k", required_argument, NULL, OPT_HHO_K },
 		 { "kc", required_argument, NULL, OPT_HHO_K_Cells },
 		 { "stab", required_argument, NULL, OPT_Stabilization },
+		 { "bihar-stab", required_argument, NULL, OPT_BiharStabilization },
 		 { "e-basis", required_argument, NULL, OPT_ElemBasis },
 		 { "f-basis", required_argument, NULL, OPT_FaceBasis },
 		 { "e-ogb", required_argument, NULL, OPT_OrthogonalizeElemBases },
@@ -1003,6 +1010,14 @@ int main(int argc, char* argv[])
 				if (stabilization.compare("hdg") != 0 && stabilization.compare("hho") != 0)
 					argument_error("unknown stabilization code '" + stabilization + "'. Check -stab argument.");
 				args.Discretization.Stabilization = stabilization;
+				break;
+			}
+			case OPT_BiharStabilization:
+			{
+				string stabilization = optarg;
+				if (stabilization.compare("hdg") != 0 && stabilization.compare("hho") != 0)
+					argument_error("unknown stabilization code '" + stabilization + "'. Check -bihar-stab argument.");
+				args.Discretization.BiharStabilization = stabilization;
 				break;
 			}
 			case OPT_ElemBasis: 
@@ -1665,6 +1680,14 @@ int main(int argc, char* argv[])
 
 	if (args.Discretization.Method.compare("hho") == 0 && args.Discretization.PolyDegree == 0)
 		argument_error("HHO does not exist with p = 0. Linear approximation at least (p >= 1).");
+
+	if (args.Discretization.Method.compare("hho") == 0 && args.Discretization.Stabilization.compare("hdg") == 0 && args.Discretization.RelativeCellPolyDegree < 1)
+	{
+		if (args.Discretization.PolyDegree == 1)
+			Utils::Warning("HHO(k=0) is not convergent with the 'hdg' stabilization. With '-stab hdg', you should use '-kc 1'.");
+		else
+			Utils::Warning("HHO loses one degree of approximation with the 'hdg' stabilization. With '-stab hdg', you should use '-kc 1'.");
+	}
 
 	// Elem polynomial bases
 	if (args.Discretization.Method.compare("fem") == 0)

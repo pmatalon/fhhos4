@@ -84,6 +84,8 @@ public:
 		else
 			Utils::FatalError("Unknown scheme '" + args.Problem.Scheme + "'. Check -sch parameter. Possible values are 'f' and 'g'.");
 
+		cout << "Bihar. stabilization: " << args.Discretization.BiharStabilization << endl;
+
 
 		mesh->RenumberFacesInOrder_IntNeumDirich();
 
@@ -103,25 +105,25 @@ public:
 		FunctionalBasis<Dim>* cellBasis = FunctionalBasisFactory<Dim>::Create(args.Discretization.ElemBasisCode, cellDegree, args.Discretization.UsePolynomialSpaceQ);
 		FunctionalBasis<Dim - 1>* faceBasis = FunctionalBasisFactory<Dim-1>::Create(args.Discretization.FaceBasisCode, faceDegree, args.Discretization.UsePolynomialSpaceQ);
 
-		double maxNBoundaryFacesAsDouble = (double)cellBasis->Size() / (double)faceBasis->Size();
-		int maxNBoundaryFaces = cellBasis->Size() / faceBasis->Size();
-		cout << "Number of boundary faces per element: " << endl;
-		cout << "\ttheoretical maximum = " << maxNBoundaryFaces << " (" << maxNBoundaryFacesAsDouble << ")" << endl;
-		int largestNBoundaryFaces;
-		Element<Dim>* largestBdryElem = mesh->ElementWithTheMostBoundaryFaces(largestNBoundaryFaces);
-		cout << "\tfound in the mesh   = " << largestNBoundaryFaces << endl;
-		if (cellBasis->Size() < largestNBoundaryFaces * faceBasis->Size())
-		{
-			Utils::Warning("The largest number of boundary faces in one element is greater than the maximum value authorized to ensure a well-posed problem.");
-			if (args.Discretization.RelativeCellPolyDegree == 0)
-				Utils::Warning("A solution might be to increase the polynomial degree in the cells to k+1 (argument -kc 1).");
-		}
+		// double maxNBoundaryFacesAsDouble = (double)cellBasis->Size() / (double)faceBasis->Size();
+		// int maxNBoundaryFaces = cellBasis->Size() / faceBasis->Size();
+		// cout << "Number of boundary faces per element: " << endl;
+		// cout << "\ttheoretical maximum = " << maxNBoundaryFaces << " (" << maxNBoundaryFacesAsDouble << ")" << endl;
+		// int largestNBoundaryFaces;
+		// Element<Dim>* largestBdryElem = mesh->ElementWithTheMostBoundaryFaces(largestNBoundaryFaces);
+		// cout << "\tfound in the mesh   = " << largestNBoundaryFaces << endl;
+		// if (cellBasis->Size() < largestNBoundaryFaces * faceBasis->Size())
+		// {
+		// 	Utils::Warning("The largest number of boundary faces in one element is greater than the maximum value authorized to ensure a well-posed problem.");
+		// 	if (args.Discretization.RelativeCellPolyDegree == 0)
+		// 		Utils::Warning("A solution might be to increase the polynomial degree in the cells to k+1 (argument -kc 1).");
+		// }
 
-		for (Element<Dim>* e : mesh->BoundaryElements)
-		{
-			if (e->HasCoplanarBoundaryFaces())
-				Utils::Error("Coplanar boundary faces found in element " + to_string(e->Number) + ", which prevents the problem to be well-posed.");
-		}
+		// for (Element<Dim>* e : mesh->BoundaryElements)
+		// {
+		// 	if (e->HasCoplanarBoundaryFaces())
+		// 		Utils::Error("Coplanar boundary faces found in element " + to_string(e->Number) + ", which prevents the problem to be well-posed.");
+		// }
 
 		HHOParameters<Dim>* hho = new HHOParameters<Dim>(mesh, args.Discretization.Stabilization, reconstructionBasis, cellBasis, faceBasis, args.Discretization.OrthogonalizeElemBasesCode, args.Discretization.OrthogonalizeFaceBasesCode);
 
@@ -130,7 +132,7 @@ public:
 		if (args.Problem.Scheme.compare("f") == 0)
 			biHarPb = new BiHarmonicMixedFormFalk_HHO<Dim>(mesh, testCase, hho, args.Solver.BiHarReconstructBoundary, saveMatrixBlocks);
 		else if (args.Problem.Scheme.compare("g") == 0)
-			biHarPb = new BiHarmonicMixedFormGlowinski_HHO<Dim>(mesh, testCase, hho, saveMatrixBlocks);
+			biHarPb = new BiHarmonicMixedFormGlowinski_HHO<Dim>(mesh, testCase, hho, args.Discretization.BiharStabilization, saveMatrixBlocks);
 		else
 			Utils::FatalError("Unknown scheme '" + args.Problem.Scheme + "'. Check -sch parameter. Possible values are 'f' and 'g'.");
 

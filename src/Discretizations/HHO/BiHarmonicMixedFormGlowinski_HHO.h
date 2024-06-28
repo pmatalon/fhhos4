@@ -25,13 +25,15 @@ private:
 	SparseMatrix _Stab_bF_F;
 
 	HHOParameters<Dim>* HHO;
+	string _biharStabilization;
 
 	Vector _g_D;
 	Vector _b_fSource;
 public:
 	bool print = false;
 
-	BiHarmonicMixedFormGlowinski_HHO(Mesh<Dim>* mesh, BiHarmonicTestCase<Dim>* testCase, HHOParameters<Dim>* hho, bool saveMatrixBlocks)
+	BiHarmonicMixedFormGlowinski_HHO(Mesh<Dim>* mesh, BiHarmonicTestCase<Dim>* testCase, HHOParameters<Dim>* hho, const string& biharStabilization, bool saveMatrixBlocks) :
+		_biharStabilization(biharStabilization)
 	{
 		_mesh = mesh;
 		_testCase = testCase;
@@ -72,7 +74,7 @@ public:
 		SparseMatrix tmp = _diffPb.A_T_dF.topRows(nBoundaryElemUnknowns).transpose() * _Theta_T_bF_transpose.transpose();
 		_S_bF_bF = tmp + _diffPb.A_dF_dF;
 
-		SparseMatrix B_T_T = _diffPb.BiharStab_T_T();
+		SparseMatrix B_T_T = _diffPb.BiharStab_T_T(_biharStabilization);
 		SparseMatrix B_T_F = _diffPb.BiharStab_T_F();
 		SparseMatrix B_F_F = _diffPb.BiharStab_F_F();
 		auto B_F_bF = B_F_F.rightCols(HHO->nBoundaryFaces * HHO->nFaceUnknowns);
