@@ -1,11 +1,6 @@
 
-## An h-multigrid method for Hybrid High-Order discretizations, 2021
-D. A. Di Pietro
-F. Hülsemann
-P. Matalon
-P. Mycek
-U. Rüde
-D. Ruiz
+# An $h$-multigrid method for Hybrid High-Order discretizations
+D. A. Di Pietro, F. Hülsemann, P. Matalon, P. Mycek, U. Rüde, D. Ruiz, *SIAM Journal on Scientific Computing*, 2021
 
 The experiments can be reproduced with release 1.0.
 ### Figure 4.1
