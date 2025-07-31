@@ -1,4 +1,21 @@
-# fhhos4 - Fast HHO Solver 4 Research
+# fhhos4
+
+fhhos4 (pronounce 'phosphore') stands for Fast HHO Solver for Research. It is an open-source code that solves diffusion problems with the Hybrid High-Order (HHO) discretizations. 
+
+Features:
+- solves diffusion problems with piecewise constant tensors
+- HHO and DG discretizations
+- high-order solutions
+- handles unstructured meshes
+- binded to the GMSH mesher
+- implements geometric and algebraic multigrid methods
+- exports linear systems
+- shared-memory parallelism
+- many parameters (various choices of polynomial bases, multigrid cycles, smoothers, coarsening strategies...)
+
+The numerical experiments of related papers can be reproduced following the instructions in the `reproducibility` folder.
+
+# Install
 
 This program depends on the following third-party software packages:
 - Eigen
