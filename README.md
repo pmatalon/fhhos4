@@ -30,6 +30,11 @@ So without the need for a specific version of those libraries, you have nothing 
 Only GMSH is to be installed. To do so, follow step 2.
 Finally, build the program following step 4.
 
+With conda, you can simply install the following packages in your environment:
+```bash
+conda install boost gmsh cgal cmake make
+```
+
 
 ## 1. Install CGAL version 5.0 or later 
 (See https://doc.cgal.org/latest/Manual/usage.html)
