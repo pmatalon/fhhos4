@@ -2012,7 +2012,7 @@ public:
 			{
 				if (!Utils::BuildsNestedMeshHierarchy(stgy) && !fe->IsFullyEmbeddedInCoarseElement)
 				{
-					if (stgy == H_CoarsStgy::IndependentRemeshing)
+					if (stgy == H_CoarsStgy::IndependentRemeshing || Utils::ProgramArgs.Solver.MG.SubtriangulationMethodForApproxL2Proj == PolygonalTriangulation::Barycentric)
 						fe->Refine(Utils::ProgramArgs.Solver.MG.NSubtriangulationsForApproxL2Proj);
 					else
 						fe->RefineWithoutCoarseOverlap();

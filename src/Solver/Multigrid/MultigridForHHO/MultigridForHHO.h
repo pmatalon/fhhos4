@@ -134,8 +134,25 @@ public:
 
 			if (H_Prolongation == GMG_H_Prolongation::CellInterp_FinerApproxL2proj_Trace)
 			{
-				os << "\t" << "Subtriangulations       : " << Utils::ProgramArgs.Solver.MG.NSubtriangulationsForApproxL2Proj;
-				os << " [-subtri " << Utils::ProgramArgs.Solver.MG.NSubtriangulationsForApproxL2Proj << "]" << endl;
+				if (this->H_CS == H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours)
+				{
+					os << "\t" << "Subtriangulation method : ";
+					if (Utils::ProgramArgs.Solver.MG.SubtriangulationMethodForApproxL2Proj == PolygonalTriangulation::Barycentric)
+						os << "barycentric [-subtri-meth bary]" << endl;
+					else if (Utils::ProgramArgs.Solver.MG.SubtriangulationMethodForApproxL2Proj == PolygonalTriangulation::OneVertex)
+						os << "without coarse overlap [-subtri-meth wco]" << endl;
+
+					if (Utils::ProgramArgs.Solver.MG.SubtriangulationMethodForApproxL2Proj == PolygonalTriangulation::Barycentric)
+					{
+						os << "\t" << "Subtriangulations       : " << Utils::ProgramArgs.Solver.MG.NSubtriangulationsForApproxL2Proj;
+						os << " [-subtri " << Utils::ProgramArgs.Solver.MG.NSubtriangulationsForApproxL2Proj << "]" << endl;
+					}
+				}
+				if (this->H_CS == H_CoarsStgy::IndependentRemeshing)
+				{
+					os << "\t" << "Subtriangulations       : " << Utils::ProgramArgs.Solver.MG.NSubtriangulationsForApproxL2Proj;
+					os << " [-subtri " << Utils::ProgramArgs.Solver.MG.NSubtriangulationsForApproxL2Proj << "]" << endl;
+				}
 			}
 		}
 	}

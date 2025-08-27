@@ -53,6 +53,7 @@ struct MultigridArguments
 	GMG_P_Restriction GMG_P_Restrict = GMG_P_Restriction::RemoveHigherOrders;
 	int FaceProlongationCode = 0;
 	int CoarseningProlongationCode = 0;
+	PolygonalTriangulation SubtriangulationMethodForApproxL2Proj = PolygonalTriangulation::OneVertex;
 	int NSubtriangulationsForApproxL2Proj = 1;
 	UAMGFaceProlongation UAMGFaceProlong = UAMGFaceProlongation::BoundaryAggregatesInteriorAverage;
 	UAMGProlongation UAMGCoarseningProlong = UAMGProlongation::FaceProlongation;

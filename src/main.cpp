@@ -427,7 +427,7 @@ void print_usage() {
 	cout << endl;
 	cout << "-coarsening-factor NUM" << endl;
 	cout << "      Requested coarsening factor for the coarsening strategies compatible." << endl;
-	cout << "              Independent remeshing         (-cs r  ): coarsening factor H/h, default 2" << endl;
+	cout << "              Independent remeshing         (-cs m  ): coarsening factor H/h, default 2" << endl;
 	cout << "              Multiple pairwise aggregation (-cs mpa): coarsening factor #FineVariables/#CoarseVariables, default 3.5" << endl;
 	cout << endl;
 	cout << "-prolong NUM" << endl;
@@ -461,7 +461,7 @@ void print_usage() {
 	cout << "                   Step 2: Exact L2-projection onto the fine cells" << endl;
 	cout << "                   Step 3: Trace on the fine faces" << endl;
 	cout << "              " << (unsigned)GMG_H_Prolongation::CellInterp_ApproxL2proj_Trace << "  - ";
-	cout <<                    "Variant of " << (unsigned)GMG_H_Prolongation::CellInterp_ExactL2proj_Trace << " where the L2-projection is not computed exactly but has the same approximation properties." << endl;
+	cout <<                    "Variant of " << (unsigned)GMG_H_Prolongation::CellInterp_ExactL2proj_Trace << " where the L2-projection is not computed exactly (rough approx. w/o subtriangulation)." << endl;
 	cout << "              " << (unsigned)GMG_H_Prolongation::CellInterp_FinerApproxL2proj_Trace << "  - ";
 	cout <<                    "Variant of " << (unsigned)GMG_H_Prolongation::CellInterp_ApproxL2proj_Trace << " where the L2-projection is better approximated (by subtriangulation of the elements)." << endl;
 	cout << "      Values for UncondensedAMG:" << endl;
@@ -506,8 +506,14 @@ void print_usage() {
 	cout << "              4  -   -hp-cs hp_h -p-cs -1" << endl;
 	cout << "              5  -   -hp-cs alt  -p-cs -2" << endl;
 	cout << endl;
+	cout << "-subtri-meth CODE" << endl;
+	cout << "      If the approximated L2-projection is used in the multigrid (-prolong 9), sets triangulation method used to subtriangulate the fine elements." << endl;
+	cout << "      Requires -cs n." << endl;
+	cout << "              bary - barycentric triangulation" << endl;
+	cout << "              wco  - without coarse overlap (ensure no overlap with the coarse elements)" << endl;
+	cout << endl;
 	cout << "-subtri NUM" << endl;
-	cout << "      If the approximated L2-projection is used in the multigrid, sets the number of subtriangulations of the fine elements." << endl;
+	cout << "      If the approximated L2-projection is used in the multigrid (-prolong 9), sets the number of subtriangulations of the fine elements. Requires -cs m (independent remeshing)." << endl;
 	cout << endl;
 	cout << "-disable-hor" << endl;
 	cout << "      In the polongation of 'mg', disables the use of the higher-order reconstruction." << endl;
@@ -731,6 +737,7 @@ int main(int argc, char* argv[])
 		OPT_ReEntrantCornerManagement,
 		OPT_CoarseningFactor,
 		OPT_CoarseN,
+		OPT_ApproxL2ProjSubtriangulationMethod,
 		OPT_ApproxL2ProjNSubtriangulations,
 		// Misc
 		OPT_Threads,
@@ -828,6 +835,7 @@ int main(int argc, char* argv[])
 		 { "rcm", required_argument, NULL, OPT_ReEntrantCornerManagement },
 		 { "coarsening-factor", required_argument, NULL, OPT_CoarseningFactor },
 		 { "coarse-n", required_argument, NULL, OPT_CoarseN },
+		 { "subtri-meth", required_argument, NULL, OPT_ApproxL2ProjSubtriangulationMethod },
 		 { "subtri", required_argument, NULL, OPT_ApproxL2ProjNSubtriangulations },
 		 // Misc
 		 { "help", no_argument, NULL, 'h' },
@@ -1455,6 +1463,17 @@ int main(int argc, char* argv[])
 			case OPT_CoarseN:
 				args.Solver.MG.CoarseN = stoul(optarg, nullptr, 0);
 				break;
+			case OPT_ApproxL2ProjSubtriangulationMethod:
+			{
+				string code = optarg;
+				if (code.compare("bary") == 0)
+					args.Solver.MG.SubtriangulationMethodForApproxL2Proj = PolygonalTriangulation::Barycentric;
+				else if (code.compare("wco") == 0)
+					args.Solver.MG.SubtriangulationMethodForApproxL2Proj = PolygonalTriangulation::OneVertex;
+				else
+					argument_error("unknown subtriangulation method '" + code + "'. Check -subtri-meth argument.");
+				break;
+			}
 			case OPT_ApproxL2ProjNSubtriangulations:
 				args.Solver.MG.NSubtriangulationsForApproxL2Proj = atoi(optarg);
 				break;

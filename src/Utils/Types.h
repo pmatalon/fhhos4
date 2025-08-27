@@ -190,6 +190,12 @@ enum class ReEntrantCornerMgmt : unsigned
 	AgglomerateFirst
 };
 
+enum PolygonalTriangulation
+{
+	Barycentric,
+	OneVertex
+};
+
 
 
 enum class ToleranceStrategy : unsigned

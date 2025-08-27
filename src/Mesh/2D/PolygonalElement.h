@@ -115,11 +115,21 @@ public:
 
 		return n;
 	}
+
+	void Refine(int nRefinements) override
+	{
+		assert(nRefinements == 1 && "PolygonalElement::Refine() is not implemented for nRefinements > 1.");
+		ComputeTriangulation(PolygonalTriangulation::Barycentric);
+		_shape.CopyTriangulationIntoRefinement();
+	}
 	
 	//-------------------------------------------------------//
 	//                    Polygon-specific                   //
 	//-------------------------------------------------------//
-
+	void ComputeTriangulation(PolygonalTriangulation triangulationMethod)
+	{
+		_shape.ComputeTriangulation(triangulationMethod);
+	}
 	void ComputeMinimalTriangulation()
 	{
 		_shape.ComputeMinimalTriangulation();

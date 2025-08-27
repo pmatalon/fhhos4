@@ -25,12 +25,6 @@ public:
 	}
 };
 
-enum PolygonalTriangulation
-{
-	Barycentric,
-	OneVertex
-};
-
 class Polygon : public PhysicalShape<2>
 {
 private:
@@ -48,9 +42,6 @@ private:
 	Quadrilateral _boundingBox;
 	vector<DomPoint> _quadraturePoints;
 	vector<Triangle> _refinement;
-
-	const static PolygonalTriangulation MinimalTriangulationMethod        = PolygonalTriangulation::OneVertex;
-	const static PolygonalTriangulation MinimalOverlapTriangulationMethod = PolygonalTriangulation::OneVertex;
 
 public:
 	Polygon() {}
@@ -155,13 +146,18 @@ private:
 public:
 	void ComputeMinimalTriangulation()
 	{
+		ComputeTriangulation(PolygonalTriangulation::Barycentric);
+	}
+
+	void ComputeTriangulation(PolygonalTriangulation triangulationMethod)
+	{
 		if (!_triangulation.empty())
 			return;
 
 		if (_vertices.size() <= 3 || this->IsConvex())
-			_triangulation = ConvexTriangulation(_vertices, _measure, MinimalTriangulationMethod, {});
+			_triangulation = ConvexTriangulation(_vertices, _measure, triangulationMethod, {});
 		else
-			_triangulation = NonConvexTriangulation(MinimalTriangulationMethod, {});
+			_triangulation = NonConvexTriangulation(triangulationMethod, {});
 
 		auto it = _triangulation.begin();
 		while (it != _triangulation.end())
@@ -214,9 +210,9 @@ public:
 	void RefineWithoutCoarseOverlap(const vector<PhysicalShape<1>*>& doNotCross) override
 	{
 		if (this->IsConvex())
-			_refinement = ConvexTriangulation(_vertices, _measure, MinimalOverlapTriangulationMethod, doNotCross);
+			_refinement = ConvexTriangulation(_vertices, _measure, PolygonalTriangulation::OneVertex, doNotCross);
 		else
-			_refinement = NonConvexTriangulation(MinimalOverlapTriangulationMethod, doNotCross);
+			_refinement = NonConvexTriangulation(PolygonalTriangulation::OneVertex, doNotCross);
 
 		auto it = _refinement.begin();
 		while (it != _refinement.end())
@@ -440,6 +436,11 @@ public:
 	const vector<Triangle>& Triangulation() const
 	{
 		return _triangulation;
+	}
+
+	void CopyTriangulationIntoRefinement()
+	{
+		_refinement = _triangulation;
 	}
 
 	virtual ReferenceShape<2>* RefShape() const override
