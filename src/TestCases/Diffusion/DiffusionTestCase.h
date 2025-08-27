@@ -51,9 +51,9 @@ public:
 		string heterogeneityString = "";
 		if (this->Code().compare("kellogg") != 0 && !DiffField.IsHomogeneous)
 		{
-			char res[32];
-			sprintf(res, "_heterog%g", DiffField.LargestHeterogeneityRatio());
-			heterogeneityString = res;
+			ostringstream oss;
+			oss << "_heterog" << DiffField.LargestHeterogeneityRatio();
+			heterogeneityString = oss.str();
 		}
 		return "Diff" + to_string(Dim) + "D_" + this->Code() + heterogeneityString;
 	}
