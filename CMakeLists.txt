@@ -93,7 +93,7 @@ else()
 endif()
 
 # Include Eigen
-include_directories(dependencies/eigen/eigen-eigen-b3f3d4950030)
+include_directories(dependencies/eigen/eigen-3.4.0)
 
 # Include GMSH
 if (ENABLE_GMSH)
