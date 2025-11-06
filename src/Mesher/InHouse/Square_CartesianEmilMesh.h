@@ -14,7 +14,7 @@ class Square_CartesianEmilMesh : public PolyhedralMesh<2>
 public:
 	BigNumber Nx_l; //left half stat
 	BigNumber Ny_l; //left half stat
-	int k = 4; // factor relating right half stats
+	int k = 16; // factor relating right half stats
 
 	BigNumber Nx_r; //right half stat
 	BigNumber Ny_r; //right half stat
@@ -252,34 +252,14 @@ public:
 			static_cast<MeshVertex<2>*>(rectangle->BottomLeftCorner)->Faces.push_back(westBoundary);
 			static_cast<MeshVertex<2>*>(rectangle->TopLeftCorner)->Faces.push_back(westBoundary);
 			westBoundary->BoundaryPart = squareLeftBoundary;
-
-			// East boundary
-			rectangle = dynamic_cast<RectangularElement*>(this->Elements[indexE_l(nx_l - 1, iy)]);
-			CartesianEdge* eastBoundary = new CartesianEdge(numberInterface++, rectangle->BottomRightCorner, rectangle->TopRightCorner, rectangle, CartesianShapeOrientation::Vertical);
-			this->Faces.push_back(eastBoundary);
-			this->BoundaryFaces.push_back(eastBoundary);
-			rectangle->SetEastInterface(eastBoundary);
-			static_cast<MeshVertex<2>*>(rectangle->BottomRightCorner)->Faces.push_back(eastBoundary);
-			static_cast<MeshVertex<2>*>(rectangle->TopRightCorner)->Faces.push_back(eastBoundary);
-			eastBoundary->BoundaryPart = squareRightBoundary;
 		}
 
 		// right half vertical boundary
 		for (BigNumber iy = 0; iy < ny_r; ++iy)
 		{
-			// West boundary
-			RectangularElement* rectangle = dynamic_cast<RectangularElement*>(this->Elements[indexE_r(0, iy)]);
-			CartesianEdge* westBoundary = new CartesianEdge(numberInterface++, rectangle->BottomLeftCorner, rectangle->TopLeftCorner, rectangle, CartesianShapeOrientation::Vertical);
-			this->Faces.push_back(westBoundary);
-			this->BoundaryFaces.push_back(westBoundary);
-			rectangle->SetWestInterface(westBoundary);
-			static_cast<MeshVertex<2>*>(rectangle->BottomLeftCorner)->Faces.push_back(westBoundary);
-			static_cast<MeshVertex<2>*>(rectangle->TopLeftCorner)->Faces.push_back(westBoundary);
-			westBoundary->BoundaryPart = squareLeftBoundary;
-
 			// East boundary
-			rectangle = dynamic_cast<RectangularElement*>(this->Elements[indexE_r(nx_r - 1, iy)]);
-			CartesianEdge* eastBoundary = new CartesianEdge(numberInterface++, rectangle->BottomRightCorner, rectangle->TopRightCorner, rectangle, CartesianShapeOrientation::Vertical);
+			auto* rectangle = dynamic_cast<RectangularElement*>(this->Elements[indexE_r(nx_r - 1, iy)]);
+			auto* eastBoundary = new CartesianEdge(numberInterface++, rectangle->BottomRightCorner, rectangle->TopRightCorner, rectangle, CartesianShapeOrientation::Vertical);
 			this->Faces.push_back(eastBoundary);
 			this->BoundaryFaces.push_back(eastBoundary);
 			rectangle->SetEastInterface(eastBoundary);
@@ -338,7 +318,7 @@ public:
 		{
 			RectangularElement* element = dynamic_cast<RectangularElement*>(this->Elements[indexE_r(0, iy)]);
 			RectangularPolygonalElement* westNeighbour = dynamic_cast<RectangularPolygonalElement*>(this->Elements[indexE_l(nx_l - 1, iy / k)]);
-			CartesianEdge* interface = new CartesianEdge(numberInterface++, element->BottomLeftCorner, element->TopLeftCorner, element, westNeighbour, CartesianShapeOrientation::Vertical);
+			CartesianEdge* interface = new CartesianEdge(numberInterface++, element->BottomLeftCorner, element->TopLeftCorner, westNeighbour, element, CartesianShapeOrientation::Vertical);
 			this->Faces.push_back(interface);
 			this->InteriorFaces.push_back(interface);
 			element->SetWestInterface(interface);
@@ -430,7 +410,7 @@ private:
 public:
 	string Description() override
 	{
-		return "CartesianPolyMesh: " + to_string(this->Nx_l + Nx_r) + " x " + to_string(this->Ny_l + Ny_r);
+		return "CartesianEmilMesh: " + to_string(this->Nx_l + Nx_r) + " x " + to_string(this->Ny_l + Ny_r);
 	}
 
 	string FileNamePart() override

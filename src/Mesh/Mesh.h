@@ -1185,6 +1185,58 @@ public:
 				delete this->BoundaryParts[i];
 		}
 	}
+
+	double calculateMean(const std::vector<double>& data) {
+		if (data.empty()) return 0.0;
+		double sum(0.0);
+		for (double value : data) {
+			sum += value;
+		}
+		return sum / data.size();
+	}
+
+	double calculateVariance(const std::vector<double>& data) {
+		if (data.size() < 2) return 0.0; // Not enough data
+		double mean = calculateMean(data);
+		double variance = 0.0;
+		for (double value : data) {
+			variance += std::pow(value - mean, 2);
+		}
+		return variance / (data.size() - 1); // Sample variance
+	}
+
+	void printFaceStats() {
+		std::vector<double> n_faces_per_cell{};
+
+		for (auto cell : this->Elements)
+		{
+			n_faces_per_cell.push_back(static_cast<double>(cell->Faces.size()));
+		}
+
+		cout << "Number of cells: " << this->Elements.size() << endl;
+		cout << "Mean number of faces per cell: " << calculateMean(n_faces_per_cell) << endl;
+		cout << "Variance of number of faces per cell: " << calculateVariance(n_faces_per_cell) << endl;
+
+		std::unordered_map<int, int> counts;
+
+		for (auto cell : this->Elements)
+		{
+			int n_faces = cell->Faces.size();
+			if (counts.find(n_faces) != counts.end())
+			{
+				counts[n_faces]++;
+			}
+			else
+			{
+				counts[n_faces] = 1;
+			}
+		}
+
+		for (const auto& [key, value] : counts)
+		{
+			cout << "n_faces: " << key << " count: " << value << '\n';
+		}
+	}
 };
 
 template <int Dim>

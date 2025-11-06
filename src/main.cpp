@@ -920,6 +920,7 @@ int main(int argc, char* argv[])
 				string meshCode = optarg;
 				if (   meshCode.compare("cart") != 0
 					&& meshCode.compare("cart-poly") != 0
+					&& meshCode.compare("cart-emil") != 0
 					&& meshCode.compare("stri") != 0
 					&& meshCode.compare("tri") != 0
 					&& meshCode.compare("tetra") != 0

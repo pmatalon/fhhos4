@@ -7,6 +7,22 @@
 #include "../Solver/SolverFactory.h"
 #include "../Utils/ExportModule.h"
 
+inline double calculateMean(const std::vector<double>& data) {
+	if (data.empty()) return 0.0;
+	double sum = std::accumulate(data.begin(), data.end(), 0.0);
+	return sum / data.size();
+}
+
+inline double calculateVariance(const std::vector<double>& data) {
+	if (data.size() < 2) return 0.0; // Not enough data
+	double mean = calculateMean(data);
+	double variance = 0.0;
+	for (double value : data) {
+		variance += std::pow(value - mean, 2);
+	}
+	return variance / (data.size() - 1); // Sample variance
+}
+
 template <int Dim>
 class Program_Diffusion_HHO
 {
@@ -38,6 +54,9 @@ public:
 		cout << "-----------------------------------------------------------" << endl;
 
 		Mesh<Dim>* mesh = MeshFactory<Dim>::BuildMesh(args, testCase);
+
+		mesh->printFaceStats();
+
 		if (args.Discretization.Mesher.compare("gmsh") == 0)
 			GMSHMesh<Dim>::CloseGMSH();
 
