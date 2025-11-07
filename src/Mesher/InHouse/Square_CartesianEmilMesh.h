@@ -14,20 +14,20 @@ class Square_CartesianEmilMesh : public PolyhedralMesh<2>
 public:
 	BigNumber Nx_l; //left half stat
 	BigNumber Ny_l; //left half stat
-	int k = 16; // factor relating right half stats
+	int ky = 16; // factor relating right half stats
+	double midline = 0.9;
 
 	BigNumber Nx_r; //right half stat
 	BigNumber Ny_r; //right half stat
 	bool With4Quadrants;
-
 
 	Square_CartesianEmilMesh(BigNumber nx, BigNumber ny, bool with4Quadrants = false, bool buildMesh = true) : PolyhedralMesh()
 	{
 		// nx = ny falls down to square elements
 		this->Nx_l = nx;
 		this->Ny_l = ny;
-		this->Nx_r = k*nx;
-		this->Ny_r = k*ny;
+		this->Nx_r = Nx_l;
+		this->Ny_r = ky*ny;
 		this->With4Quadrants = with4Quadrants;
 
 		if (with4Quadrants && (nx % 2 == 1 || ny % 2 == 1))
@@ -40,14 +40,13 @@ public:
 	void Build() {
 		BigNumber nx_l = this->Nx_l;
 		BigNumber ny_l = this->Ny_l;
-
 		BigNumber nx_r = this->Nx_r;
 		BigNumber ny_r = this->Ny_r;
 
-		double hx_l = 0.5 / nx_l;
-		double hy_l = 0.5 / ny_l;
-		double hx_r = 0.5 / nx_r;
-		double hy_r = 0.5 / ny_r;
+		double hx_l = this->midline / nx_l;
+		double hy_l = 1.0 / ny_l;
+		double hx_r = (1.0 - this->midline) / nx_r;
+		double hy_r = 1.0 / ny_r;
 
 		// Physical parts
 		PhysicalGroup<2>* domain = nullptr;
@@ -57,6 +56,7 @@ public:
 		PhysicalGroup<2>* quadrantTopLeft = nullptr;
 		if (this->With4Quadrants)
 		{
+			Utils::FatalError("Hetereogenity for Emil-mesh not yet implemented");
 			if (this->PhysicalParts.empty())
 				this->PhysicalParts = Square4quadrantsGeometry::PhysicalParts();
 			quadrantBottomLeft = this->PhysicalParts[0];
@@ -98,7 +98,7 @@ public:
 		{
 			for (BigNumber ix = 0; ix < nx_r + 1; ++ix)
 			{
-				auto* vertex = new MeshVertex<2>(indexV_r(ix, iy), 0.5 + ix * hx_r, iy * hy_r);
+				auto* vertex = new MeshVertex<2>(indexV_r(ix, iy), midline + ix * hx_r, iy * hy_r);
 				this->Vertices.push_back(vertex);
 			}
 		}
@@ -135,8 +135,8 @@ public:
 				BigNumber number = indexE_l(ix, iy);
 				Vertex* bottomLeftCorner  = Vertices[indexV_l(ix,     iy    )];
 				Vertex* topLeftCorner     = Vertices[indexV_l(ix,     iy + 1)];
-				Vertex* topRightCorner    = Vertices[indexV_r(0, k * (iy + 1))];
-				Vertex* bottomRightCorner = Vertices[indexV_r(0, k * iy    )];
+				Vertex* topRightCorner    = Vertices[indexV_r(0, ky * (iy + 1))];
+				Vertex* bottomRightCorner = Vertices[indexV_r(0, ky * iy    )];
 				auto* rectangle = new RectangularPolygonalElement(number, bottomLeftCorner, topLeftCorner, topRightCorner, bottomRightCorner);
 				this->Elements.push_back(rectangle);
 
@@ -317,7 +317,7 @@ public:
 		for (BigNumber iy = 0; iy < ny_r; iy++)
 		{
 			RectangularElement* element = dynamic_cast<RectangularElement*>(this->Elements[indexE_r(0, iy)]);
-			RectangularPolygonalElement* westNeighbour = dynamic_cast<RectangularPolygonalElement*>(this->Elements[indexE_l(nx_l - 1, iy / k)]);
+			RectangularPolygonalElement* westNeighbour = dynamic_cast<RectangularPolygonalElement*>(this->Elements[indexE_l(nx_l - 1, iy / ky)]);
 			CartesianEdge* interface = new CartesianEdge(numberInterface++, element->BottomLeftCorner, element->TopLeftCorner, westNeighbour, element, CartesianShapeOrientation::Vertical);
 			this->Faces.push_back(interface);
 			this->InteriorFaces.push_back(interface);
@@ -426,7 +426,7 @@ public:
 
 	double H() override
 	{
-		return 0.5 / this->Nx_l;
+		return this->midline / this->Nx_l;
 	}
 
 	double Regularity() override
@@ -443,9 +443,8 @@ public:
 	{
 		if (elemCoarseningStgy == H_CoarsStgy::StandardCoarsening)
 		{
-			if (faceCoarseningStgy == FaceCoarseningStrategy::None)
-				//CoarsenByAgglomerationAndKeepFineFaces();
-				Utils::FatalError("Not imp yet");
+			if (faceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsing)
+				StandardCoarsening();
 			else
 				Utils::FatalError("Unmanaged face coarsening strategy");
 		}
@@ -453,168 +452,149 @@ public:
 			PolyhedralMesh<2>::CoarsenMesh(elemCoarseningStgy, faceCoarseningStgy, bdryFaceCollapsing, coarseningFactor);
 	}
 
-
-	/*
-	void CoarsenByAgglomerationAndKeepFineFaces()
+	void StandardCoarsening()
 	{
-		BigNumber nx = this->Nx;
-		BigNumber ny = this->Ny;
+		BigNumber nx_l = this->Nx_l;
+		BigNumber ny_l = this->Ny_l;
+		BigNumber nx_r = this->Nx_r;
+		BigNumber ny_r = this->Ny_r;
 
-		if (nx % 2 != 0 || ny % 2 != 0)
+		if (nx_l % 2 != 0 || ny_l % 2 != 0)
 		{
-			cout << "Error: impossible to build coarse mesh. Nx and Ny must be even: Nx = " << nx << ", Ny = " << ny << "." << endl;
+			cout << "Error: impossible to build coarse mesh. Nx and Ny must be even: Nx = " << nx_l << ", Ny = " << ny_l << "." << endl;
 			return;
 		}
 
-		Square_CartesianPolygonalMesh* coarseMesh = new Square_CartesianPolygonalMesh(this->With4Quadrants);
+		auto* coarseMesh = new Square_CartesianEmilMesh(nx_l / 2, ny_l / 2, this->With4Quadrants, false);
 		this->InitializeCoarsening(coarseMesh);
-		coarseMesh->Nx = nx / 2;
-		coarseMesh->Ny = ny / 2;
 		coarseMesh->ComesFrom.CS = H_CoarsStgy::StandardCoarsening;
 		//coarseMesh->ComesFrom.nFineElementsByCoarseElement = 4;
 		//coarseMesh->ComesFrom.nFineFacesAddedByCoarseElement = 4;
-		//coarseMesh->ComesFrom.nFineFacesByKeptCoarseFace = 1;
+		//coarseMesh->ComesFrom.nFineFacesByKeptCoarseFace = 2;
+		coarseMesh->Build();
 
-		BigNumber faceNumber = 0;
-		for (BigNumber i = 0; i < ny / 2; ++i)
+		// left side excluding midline
+		for (BigNumber iy = 0; iy < ny_l; ++iy)
 		{
-			for (BigNumber j = 0; j < nx / 2; ++j)
+			for (BigNumber ix = 0; ix < nx_l - 2; ++ix)
 			{
-				RectangularPolygonalElement* bottomLeftElement = dynamic_cast<RectangularPolygonalElement*>(this->Elements[2 * i * nx + 2 * j]);
-				RectangularPolygonalElement* bottomRightElement = dynamic_cast<RectangularPolygonalElement*>(this->Elements[2 * i * nx + 2 * j + 1]);
-				RectangularPolygonalElement* topLeftElement = dynamic_cast<RectangularPolygonalElement*>(this->Elements[(2 * i + 1) * nx + 2 * j]);
-				RectangularPolygonalElement* topRightElement = dynamic_cast<RectangularPolygonalElement*>(this->Elements[(2 * i + 1) * nx + 2 * j + 1]);
+				RectangularElement* fineElement = dynamic_cast<RectangularElement*>(this->Elements[indexE_l(ix, iy)]);
+				RectangularElement* coarseElement = dynamic_cast<RectangularElement*>(coarseMesh->Elements[coarseMesh->indexE_l(ix / 2, iy / 2)]);
 
-				// Coarse element
-				RectangularPolygonalElement* coarseElement = new RectangularPolygonalElement(i*nx / 2 + j, bottomLeftElement->BottomLeftCorner, topLeftElement->TopLeftCorner, topRightElement->TopRightCorner, bottomRightElement->BottomRightCorner);
-				coarseMesh->Elements.push_back(coarseElement);
-
-				coarseElement->PhysicalPart = bottomLeftElement->PhysicalPart;
-
-				coarseElement->FinerElements.push_back(bottomLeftElement);
-				coarseElement->FinerElements.push_back(bottomRightElement);
-				coarseElement->FinerElements.push_back(topLeftElement);
-				coarseElement->FinerElements.push_back(topRightElement);
-
-				bottomLeftElement->CoarserElement = coarseElement;
-				bottomRightElement->CoarserElement = coarseElement;
-				topLeftElement->CoarserElement = coarseElement;
-				topRightElement->CoarserElement = coarseElement;
-
-				// West faces
-				if (j == 0)
+				coarseElement->FinerElements.push_back(fineElement);
+				fineElement->CoarserElement = coarseElement;
+				if (iy % 2 == 0 && !fineElement->NorthFace->IsDomainBoundary)
 				{
-					for (Face<2>* f : bottomLeftElement->WestFaces)
-					{
-						Face<2>* newFace = f->CreateSameGeometricFace(faceNumber++, coarseElement);
-						f->CoarseFace = newFace;
-						newFace->FinerFaces.push_back(f);
-						coarseElement->AddWestFace(newFace);
-						coarseMesh->AddFace(newFace);
-					}
-					for (Face<2>* f : topLeftElement->WestFaces)
-					{
-						Face<2>* newFace = f->CreateSameGeometricFace(faceNumber++, coarseElement);
-						f->CoarseFace = newFace;
-						newFace->FinerFaces.push_back(f);
-						coarseElement->AddWestFace(newFace);
-						coarseMesh->AddFace(newFace);
-					}
+					fineElement->NorthFace->IsRemovedOnCoarserGrid = true;
+					coarseElement->FinerFacesRemoved.push_back(fineElement->NorthFace);
+					coarseElement->SouthFace->FinerFaces.push_back(fineElement->SouthFace);
+					fineElement->SouthFace->CoarseFace = coarseElement->SouthFace;
 				}
-				else
+				if (iy == ny_l - 1)
 				{
-					RectangularPolygonalElement* leftNeighbour = dynamic_cast<RectangularPolygonalElement*>(coarseMesh->Elements[i * nx / 2 + j - 1]);
-					coarseElement->SetWestFacesFromNeighbour(leftNeighbour);
+					coarseElement->NorthFace->FinerFaces.push_back(fineElement->NorthFace);
+					fineElement->NorthFace->CoarseFace = coarseElement->NorthFace;
 				}
 
-				// North faces
-				for (Face<2>* f : topLeftElement->NorthFaces)
+				if (ix % 2 == 0 && !fineElement->EastFace->IsDomainBoundary)
 				{
-					Face<2>* newFace = f->CreateSameGeometricFace(faceNumber++, coarseElement);
-					f->CoarseFace = newFace;
-					newFace->FinerFaces.push_back(f);
-					coarseElement->AddNorthFace(newFace);
-					coarseMesh->AddFace(newFace);
-				}
-				for (Face<2>* f : topRightElement->NorthFaces)
-				{
-					Face<2>* newFace = f->CreateSameGeometricFace(faceNumber++, coarseElement);
-					f->CoarseFace = newFace;
-					newFace->FinerFaces.push_back(f);
-					coarseElement->AddNorthFace(newFace);
-					coarseMesh->AddFace(newFace);
-				}
-
-				// East faces
-				for (Face<2>* f : topRightElement->EastFaces)
-				{
-					Face<2>* newFace = f->CreateSameGeometricFace(faceNumber++, coarseElement);
-					f->CoarseFace = newFace;
-					newFace->FinerFaces.push_back(f);
-					coarseElement->AddEastFace(newFace);
-					coarseMesh->AddFace(newFace);
-				}
-				for (Face<2>* f : bottomRightElement->EastFaces)
-				{
-					Face<2>* newFace = f->CreateSameGeometricFace(faceNumber++, coarseElement);
-					f->CoarseFace = newFace;
-					newFace->FinerFaces.push_back(f);
-					coarseElement->AddEastFace(newFace);
-					coarseMesh->AddFace(newFace);
-				}
-
-				// South faces
-				if (i == 0)
-				{
-					for (Face<2>* f : bottomRightElement->SouthFaces)
-					{
-						Face<2>* newFace = f->CreateSameGeometricFace(faceNumber++, coarseElement);
-						f->CoarseFace = newFace;
-						newFace->FinerFaces.push_back(f);
-						coarseElement->AddSouthFace(newFace);
-						coarseMesh->AddFace(newFace);
-					}
-					for (Face<2>* f : bottomLeftElement->SouthFaces)
-					{
-						Face<2>* newFace = f->CreateSameGeometricFace(faceNumber++, coarseElement);
-						f->CoarseFace = newFace;
-						newFace->FinerFaces.push_back(f);
-						coarseElement->AddSouthFace(newFace);
-						coarseMesh->AddFace(newFace);
-					}
-				}
-				else
-				{
-					RectangularPolygonalElement* bottomNeighbour = dynamic_cast<RectangularPolygonalElement*>(coarseMesh->Elements[(i - 1) * nx / 2 + j]);
-					coarseElement->SetSouthFacesFromNeighbour(bottomNeighbour);
-				}
-
-				// Finer faces removed
-				for (Face<2>* f : bottomLeftElement->NorthFaces)
-				{
-					f->IsRemovedOnCoarserGrid = true;
-					coarseElement->FinerFacesRemoved.push_back(f);
-				}
-				for (Face<2>* f : topLeftElement->EastFaces)
-				{
-					f->IsRemovedOnCoarserGrid = true;
-					coarseElement->FinerFacesRemoved.push_back(f);
-				}
-				for (Face<2>* f : topRightElement->SouthFaces)
-				{
-					f->IsRemovedOnCoarserGrid = true;
-					coarseElement->FinerFacesRemoved.push_back(f);
-				}
-				for (Face<2>* f : bottomRightElement->WestFaces)
-				{
-					f->IsRemovedOnCoarserGrid = true;
-					coarseElement->FinerFacesRemoved.push_back(f);
+					fineElement->EastFace->IsRemovedOnCoarserGrid = true;
+					coarseElement->FinerFacesRemoved.push_back(fineElement->EastFace);
+					coarseElement->WestFace->FinerFaces.push_back(fineElement->WestFace);
+					fineElement->WestFace->CoarseFace = coarseElement->WestFace;
 				}
 			}
 		}
+
+		// midline
+		for (BigNumber iy = 0; iy < ny_l; ++iy)
+		{
+			auto* coarseElement = dynamic_cast<RectangularPolygonalElement*>(coarseMesh->Elements[coarseMesh->indexE_l((nx_l - 1) / 2, iy / 2)]);
+
+			{
+				auto* fineElement = dynamic_cast<RectangularElement*>(this->Elements[indexE_l(nx_l - 2, iy)]);
+
+				coarseElement->FinerElements.push_back(fineElement);
+				fineElement->CoarserElement = coarseElement;
+				//if (iy % 2 == 0 && !fineElement->NorthFace->IsDomainBoundary)
+				if (iy % 2 == 0)
+				{
+					fineElement->NorthFace->IsRemovedOnCoarserGrid = true;
+					coarseElement->FinerFacesRemoved.push_back(fineElement->NorthFace);
+					coarseElement->SouthFaces[0]->FinerFaces.push_back(fineElement->SouthFace);
+					fineElement->SouthFace->CoarseFace = coarseElement->SouthFaces[0];
+				}
+				if (iy == ny_l - 1)
+				{
+					coarseElement->NorthFaces[0]->FinerFaces.push_back(fineElement->NorthFace);
+					fineElement->NorthFace->CoarseFace = coarseElement->NorthFaces[0];
+				}
+
+				fineElement->EastFace->IsRemovedOnCoarserGrid = true;
+				coarseElement->FinerFacesRemoved.push_back(fineElement->EastFace);
+			}
+			{
+				auto* fineElement = dynamic_cast<RectangularPolygonalElement*>(this->Elements[indexE_l(nx_l - 1, iy)]);
+
+				coarseElement->FinerElements.push_back(fineElement);
+				fineElement->CoarserElement = coarseElement;
+				//if (iy % 2 == 0 && !fineElement->NorthFace->IsDomainBoundary)
+				if (iy % 2 == 0)
+				{
+					// there is only one south/north/west face
+					fineElement->NorthFaces[0]->IsRemovedOnCoarserGrid = true;
+					coarseElement->FinerFacesRemoved.push_back(fineElement->NorthFaces[0]);
+					coarseElement->SouthFaces[0]->FinerFaces.push_back(fineElement->SouthFaces[0]);
+					fineElement->SouthFaces[0]->CoarseFace = coarseElement->SouthFaces[0];
+				}
+				if (iy == ny_l - 1)
+				{
+					coarseElement->NorthFaces[0]->FinerFaces.push_back(fineElement->NorthFaces[0]);
+					fineElement->NorthFaces[0]->CoarseFace = coarseElement->NorthFaces[0];
+				}
+			}
+		}
+
+		// right side
+		for (BigNumber iy = 0; iy < ny_r; ++iy)
+		{
+			for (BigNumber ix = 0; ix < nx_r; ++ix)
+			{
+				RectangularElement* fineElement = dynamic_cast<RectangularElement*>(this->Elements[indexE_r(ix, iy)]);
+				RectangularElement* coarseElement = dynamic_cast<RectangularElement*>(coarseMesh->Elements[coarseMesh->indexE_r(ix / 2, iy / 2)]);
+
+				coarseElement->FinerElements.push_back(fineElement);
+				fineElement->CoarserElement = coarseElement;
+				if (iy % 2 == 0 && !fineElement->NorthFace->IsDomainBoundary)
+				{
+					fineElement->NorthFace->IsRemovedOnCoarserGrid = true;
+					coarseElement->FinerFacesRemoved.push_back(fineElement->NorthFace);
+					coarseElement->SouthFace->FinerFaces.push_back(fineElement->SouthFace);
+					fineElement->SouthFace->CoarseFace = coarseElement->SouthFace;
+				}
+				if (iy == ny_l - 1)
+				{
+					coarseElement->NorthFace->FinerFaces.push_back(fineElement->NorthFace);
+					fineElement->NorthFace->CoarseFace = coarseElement->NorthFace;
+				}
+
+				if (ix % 2 == 0 && !fineElement->EastFace->IsDomainBoundary)
+				{
+					fineElement->EastFace->IsRemovedOnCoarserGrid = true;
+					coarseElement->FinerFacesRemoved.push_back(fineElement->EastFace);
+					coarseElement->WestFace->FinerFaces.push_back(fineElement->WestFace);
+					fineElement->WestFace->CoarseFace = coarseElement->WestFace;
+				}
+				if (ix == nx_l - 1)
+				{
+					coarseElement->EastFace->FinerFaces.push_back(fineElement->EastFace);
+					fineElement->EastFace->CoarseFace = coarseElement->EastFace;
+				}
+			}
+		}
+
 		this->FinalizeCoarsening();
 	}
-	*/
 
 	Mesh<2>* Copy() override
 	{
