@@ -9,26 +9,60 @@
 #include "../Square4quadrantsGeometry.h"
 using namespace std;
 
-class Square_CartesianEmilMesh : public PolyhedralMesh<2>
+class Square_CartesianPolyStripeMesh : public PolyhedralMesh<2>
 {
 public:
 	BigNumber Nx_l; //left half stat
 	BigNumber Ny_l; //left half stat
-	int ky = 16; // factor relating right half stats
-	double midline = 0.9;
 
 	BigNumber Nx_r; //right half stat
 	BigNumber Ny_r; //right half stat
 	bool With4Quadrants;
 
-	Square_CartesianEmilMesh(BigNumber nx, BigNumber ny, bool with4Quadrants = false, bool buildMesh = true) : PolyhedralMesh()
+	double midline = 0.9;
+	int ky = 16; // factor relating right half stats
+	vector<double> breaks = {0.1, 0.9};
+	int n_stripes = breaks.size() + 1;
+	vector<int> r_indices = {0, 2};
+	vector<int> l_indices = {1};
+
+	vector<BigNumber> stripe_vertex_breaks = {0};
+	vector<BigNumber> stripe_element_breaks = {0};
+
+	Square_CartesianPolyStripeMesh(BigNumber nx, BigNumber ny, bool with4Quadrants = false, bool buildMesh = true) : PolyhedralMesh()
 	{
 		// nx = ny falls down to square elements
 		this->Nx_l = nx;
 		this->Ny_l = ny;
+
 		this->Nx_r = Nx_l;
-		this->Ny_r = ky*ny;
+		this->Ny_r = ky * ny;
 		this->With4Quadrants = with4Quadrants;
+
+		for (int stripe_counter = 0; stripe_counter < n_stripes; stripe_counter++)
+		{
+			if (stripe_counter % 2 == 0)
+			{
+				// r-stripe
+				stripe_vertex_breaks.push_back(stripe_vertex_breaks.back() + Nx_r * (Ny_r + 1));
+				stripe_element_breaks.push_back(stripe_element_breaks.back() + Nx_r * Ny_r);
+			}
+			else
+			{
+				// l-stripe
+				if (stripe_counter == n_stripes - 1)
+				{
+					// include vertices on east boundary
+					stripe_vertex_breaks.push_back(stripe_vertex_breaks.back() + Ny_r + 1 + Nx_l * (Ny_l + 1));
+				}
+				else
+				{
+					stripe_vertex_breaks.push_back(stripe_vertex_breaks.back() + Ny_r + 1 + (Nx_l - 1) * (Ny_l + 1));
+				}
+
+				stripe_element_breaks.push_back(stripe_element_breaks.back() + Nx_l * Ny_l);
+			}
+		}
 
 		if (with4Quadrants && (nx % 2 == 1 || ny % 2 == 1))
 			Utils::FatalError("Building the mesh for a square with 4 quadrants requires the number of subdivisions in each direction to be even.");
@@ -43,6 +77,7 @@ public:
 		BigNumber nx_r = this->Nx_r;
 		BigNumber ny_r = this->Ny_r;
 
+		// todo
 		double hx_l = this->midline / nx_l;
 		double hy_l = 1.0 / ny_l;
 		double hx_r = (1.0 - this->midline) / nx_r;
@@ -83,23 +118,37 @@ public:
 		// Vertices //
 		//----------//
 
-		this->Vertices.reserve(nx_l * (ny_l + 1) + (nx_r + 1) * (ny_r + 1));
-		// left half vertices
-		for (BigNumber iy = 0; iy < ny_l + 1; ++iy)
+		this->Vertices.reserve(stripe_vertex_breaks.back());
+
+		for (int r_index : r_indices)
 		{
-			for (BigNumber ix = 0; ix < nx_l; ++ix)
+			for (BigNumber iy = 0; iy < ny_r + 1; ++iy)
 			{
-				auto* vertex = new MeshVertex<2>(indexV_l(ix, iy), ix * hx_l, iy * hy_l);
-				this->Vertices.push_back(vertex);
+				for (BigNumber ix = 0; ix < nx_r + 1; ++ix)
+				{
+					auto* vertex = new Vertex(indexV(ix, iy, r_index), midline + ix * hx_r, iy * hy_r);
+					this->Vertices.push_back(vertex);
+				}
 			}
 		}
-		// right half vertices
-		for (BigNumber iy = 0; iy < ny_r + 1; ++iy)
+
+		for (int l_index : l_indices)
 		{
-			for (BigNumber ix = 0; ix < nx_r + 1; ++ix)
+			for (BigNumber iy = 0; iy < ny_l + 1; ++iy)
 			{
-				auto* vertex = new MeshVertex<2>(indexV_r(ix, iy), midline + ix * hx_r, iy * hy_r);
-				this->Vertices.push_back(vertex);
+				for (BigNumber ix = 1; ix < nx_l; ++ix)
+				{
+					auto* vertex = new Vertex(indexV(ix, iy, l_index), midline + ix * hx_l, iy * hy_l);
+					this->Vertices.push_back(vertex);
+				}
+
+				if (l_index == n_stripes - 1)
+				{
+					// include vertices on left boundary
+					BigNumber ix = nx_l;
+					auto* vertex = new Vertex(indexV(ix, iy, l_index), midline + ix * hx_l, iy * hy_l);
+					this->Vertices.push_back(vertex);
+				}
 			}
 		}
 
@@ -107,62 +156,40 @@ public:
 		// Elements //
 		//----------//
 
-		this->Elements.reserve(nx_l * ny_l + nx_r * ny_r);
-		// left half elements
-		for (BigNumber iy = 0; iy < ny_l; ++iy)
+		//this->Elements.reserve( r_indices.size() * nx_r * ny_r + l_indices.size() * nx_l * ny_l);
+		this->Elements.reserve( stripe_element_breaks.back());
+
+		for (int r_index : r_indices)
 		{
-			for (BigNumber ix = 0; ix < nx_l - 1; ++ix)
+			for (BigNumber iy = 0; iy < ny_r; ++iy)
 			{
-				BigNumber number = indexE_l(ix, iy);
-				auto* bottomLeftCorner  = static_cast<MeshVertex<2>*>(Vertices[indexV_l(ix,     iy    )]);
-				auto* topLeftCorner     = static_cast<MeshVertex<2>*>(Vertices[indexV_l(ix,     iy + 1)]);
-				auto* topRightCorner    = static_cast<MeshVertex<2>*>(Vertices[indexV_l(ix + 1, iy + 1)]);
-				auto* bottomRightCorner = static_cast<MeshVertex<2>*>(Vertices[indexV_l(ix + 1, iy    )]);
-				auto* rectangle = new RectangularElement(number, bottomLeftCorner, topLeftCorner, topRightCorner, bottomRightCorner);
-				this->Elements.push_back(rectangle);
-
-				bottomLeftCorner->Elements.push_back(rectangle);
-				topLeftCorner->Elements.push_back(rectangle);
-				topRightCorner->Elements.push_back(rectangle);
-				bottomRightCorner->Elements.push_back(rectangle);
-
-				rectangle->PhysicalPart = domain;
-			}
-
-			// elements with boundary on midline
-			{
-				BigNumber ix = nx_l - 1;
-				BigNumber number = indexE_l(ix, iy);
-				Vertex* bottomLeftCorner  = Vertices[indexV_l(ix,     iy    )];
-				Vertex* topLeftCorner     = Vertices[indexV_l(ix,     iy + 1)];
-				Vertex* topRightCorner    = Vertices[indexV_r(0, ky * (iy + 1))];
-				Vertex* bottomRightCorner = Vertices[indexV_r(0, ky * iy    )];
-				auto* rectangle = new RectangularPolygonalElement(number, bottomLeftCorner, topLeftCorner, topRightCorner, bottomRightCorner);
-				this->Elements.push_back(rectangle);
-
-				rectangle->PhysicalPart = domain;
+				for (BigNumber ix = 0; ix < nx_r; ++ix)
+				{
+					Vertex* bottomLeftCorner  = Vertices[indexV(ix,     iy    )];
+					Vertex* topLeftCorner     = Vertices[indexV(ix,     iy + 1)];
+					Vertex* topRightCorner    = Vertices[indexV(ix + 1, iy + 1)];
+					Vertex* bottomRightCorner = Vertices[indexV(ix + 1, iy    )];
+					auto* rectangle = new RectangularPolygonalElement(indexE(ix, iy, r_index), bottomLeftCorner, topLeftCorner, topRightCorner, bottomRightCorner);
+					this->Elements.push_back(rectangle);
+					rectangle->PhysicalPart = domain;
+				}
 			}
 		}
 
-		// right half elements
-		for (BigNumber iy = 0; iy < ny_r; ++iy)
+		for (int l_index : l_indices)
 		{
-			for (BigNumber ix = 0; ix < nx_r; ++ix)
+			for (BigNumber iy = 0; iy < ny_l; ++iy)
 			{
-				BigNumber number = indexE_r(ix, iy);
-				auto* bottomLeftCorner  = static_cast<MeshVertex<2>*>(Vertices[indexV_r(ix,     iy    )]);
-				auto* topLeftCorner     = static_cast<MeshVertex<2>*>(Vertices[indexV_r(ix,     iy + 1)]);
-				auto* topRightCorner    = static_cast<MeshVertex<2>*>(Vertices[indexV_r(ix + 1, iy + 1)]);
-				auto* bottomRightCorner = static_cast<MeshVertex<2>*>(Vertices[indexV_r(ix + 1, iy    )]);
-				auto* rectangle = new RectangularElement(number, bottomLeftCorner, topLeftCorner, topRightCorner, bottomRightCorner);
-				this->Elements.push_back(rectangle);
-
-				bottomLeftCorner->Elements.push_back(rectangle);
-				topLeftCorner->Elements.push_back(rectangle);
-				topRightCorner->Elements.push_back(rectangle);
-				bottomRightCorner->Elements.push_back(rectangle);
-
-				rectangle->PhysicalPart = domain;
+				for (BigNumber ix = 0; ix < nx_l; ++ix)
+				{
+					Vertex* bottomLeftCorner  = Vertices[indexV(ix,     iy    )];
+					Vertex* topLeftCorner     = Vertices[indexV(ix,     iy + 1)];
+					Vertex* topRightCorner    = Vertices[indexV(ix + 1, iy + 1)];
+					Vertex* bottomRightCorner = Vertices[indexV(ix + 1, iy    )];
+					auto* rectangle = new RectangularPolygonalElement(indexE(ix, iy, l_index), bottomLeftCorner, topLeftCorner, topRightCorner, bottomRightCorner);
+					this->Elements.push_back(rectangle);
+					rectangle->PhysicalPart = domain;
+				}
 			}
 		}
 
@@ -174,6 +201,88 @@ public:
 							  nx_r * (ny_r + 1) + ny_r * (nx_r + 1));
 		BigNumber numberInterface = 0;
 
+		for (int r_index : r_indices)
+		{
+			for (BigNumber ix = 0; ix < Nx_r; ++ix)
+			{
+				// South boundary
+				auto* rectangle = dynamic_cast<RectangularPolygonalElement*>(this->Elements[indexE(ix, 0, r_index)]);
+				auto* southBoundary = new CartesianEdge(numberInterface++, rectangle->BottomLeftCorner, rectangle->BottomRightCorner, rectangle, CartesianShapeOrientation::Horizontal);
+				this->Faces.push_back(southBoundary);
+				this->BoundaryFaces.push_back(southBoundary);
+				rectangle->AddSouthFace(southBoundary);
+				southBoundary->BoundaryPart = squareBottomBoundary;
+
+				// North boundary
+				rectangle = dynamic_cast<RectangularPolygonalElement*>(this->Elements[indexE(ix, ny_r - 1, r_index)]);
+				auto* northBoundary = new CartesianEdge(numberInterface++, rectangle->TopLeftCorner, rectangle->TopRightCorner, rectangle, CartesianShapeOrientation::Horizontal);
+				this->Faces.push_back(northBoundary);
+				this->BoundaryFaces.push_back(northBoundary);
+				rectangle->AddNorthFace(northBoundary);
+				northBoundary->BoundaryPart = squareTopBoundary;
+			}
+		}
+
+		for (int l_index : l_indices)
+		{
+			for (BigNumber ix = 0; ix < Nx_l; ++ix)
+			{
+				// South boundary
+				auto* rectangle = dynamic_cast<RectangularPolygonalElement*>(this->Elements[indexE(ix, 0, l_index)]);
+				auto* southBoundary = new CartesianEdge(numberInterface++, rectangle->BottomLeftCorner, rectangle->BottomRightCorner, rectangle, CartesianShapeOrientation::Horizontal);
+				this->Faces.push_back(southBoundary);
+				this->BoundaryFaces.push_back(southBoundary);
+				rectangle->AddSouthFace(southBoundary);
+				southBoundary->BoundaryPart = squareBottomBoundary;
+
+				// North boundary
+				rectangle = dynamic_cast<RectangularPolygonalElement*>(this->Elements[indexE(ix, ny_l - 1, l_index)]);
+				auto* northBoundary = new CartesianEdge(numberInterface++, rectangle->TopLeftCorner, rectangle->TopRightCorner, rectangle, CartesianShapeOrientation::Horizontal);
+				this->Faces.push_back(northBoundary);
+				this->BoundaryFaces.push_back(northBoundary);
+				rectangle->AddNorthFace(northBoundary);
+				northBoundary->BoundaryPart = squareTopBoundary;
+			}
+		}
+
+		// West boundary
+		for (BigNumber iy = 0; iy < ny_r; ++iy)
+		{
+			auto* rectangle = dynamic_cast<RectangularPolygonalElement*>(this->Elements[indexE(0, iy, 0)]);
+			auto* westBoundary = new CartesianEdge(numberInterface++, rectangle->BottomLeftCorner, rectangle->TopLeftCorner, rectangle, CartesianShapeOrientation::Vertical);
+			this->Faces.push_back(westBoundary);
+			this->BoundaryFaces.push_back(westBoundary);
+			rectangle->AddWestFace(westBoundary);
+			westBoundary->BoundaryPart = squareLeftBoundary;
+		}
+
+		// East boundary
+		if (l_indices.back() == n_stripes - 1)
+		{
+			for (BigNumber iy = 0; iy < ny_l; ++iy)
+			{
+				auto* rectangle = dynamic_cast<RectangularPolygonalElement*>(this->Elements[indexE(nx_l - 1, iy, l_indices.back())]);
+				auto* eastBoundary = new CartesianEdge(numberInterface++, rectangle->BottomRightCorner, rectangle->TopRightCorner, rectangle, CartesianShapeOrientation::Vertical);
+				this->Faces.push_back(eastBoundary);
+				this->BoundaryFaces.push_back(eastBoundary);
+				rectangle->AddEastFace(eastBoundary);
+				eastBoundary->BoundaryPart = squareRightBoundary;
+			}
+		}
+		else
+		{
+			for (BigNumber iy = 0; iy < ny_r; ++iy)
+			{
+				auto* rectangle = dynamic_cast<RectangularPolygonalElement*>(this->Elements[indexE(nx_r - 1, iy, r_indices.back())]);
+				auto* eastBoundary = new CartesianEdge(numberInterface++, rectangle->BottomRightCorner, rectangle->TopRightCorner, rectangle, CartesianShapeOrientation::Vertical);
+				this->Faces.push_back(eastBoundary);
+				this->BoundaryFaces.push_back(eastBoundary);
+				rectangle->AddEastFace(eastBoundary);
+				eastBoundary->BoundaryPart = squareRightBoundary;
+			}
+		}
+
+		// todo: continue here
 		// left half horizontal boundary
 		for (BigNumber ix = 0; ix < nx_l - 1; ++ix)
 		{
@@ -374,10 +483,56 @@ public:
 	}
 
 private:
-	//inline BigNumber indexV(BigNumber x, BigNumber y)
-	//{
-//		return y * (Nx + 1) + x;
-	//}
+	inline BigNumber indexV(BigNumber x, BigNumber y, int stripe=0)
+	{
+		if (stripe % 2 == 0)
+		{
+			// r-stripe
+			BigNumber offset = stripe == 0 ? 0 : stripe_vertex_breaks[stripe - 1];
+			return offset + y * (Nx_r + 1) + x;
+		}
+
+		// l-stripe
+
+		if (x == 0)
+		{
+			// return rightmost vertex of western r-stripe
+			return indexV(Nx_r, ky * y, stripe - 1);
+		}
+
+		if (x == Nx_l && stripe != n_stripes - 1)
+		{
+			// return leftmost vertex of eastern r-stripe
+			return indexV(0, ky * y, stripe + 1);
+		}
+
+		BigNumber offset = stripe_vertex_breaks[stripe - 1];
+		return offset + y * (2 * ky + Nx_l - 1) + x;
+	}
+
+	inline BigNumber indexE(BigNumber x, BigNumber y, int stripe=0)
+	{
+		BigNumber offset = stripe == 0 ? 0 : stripe_element_breaks[stripe - 1];
+
+		if (stripe % 2 == 0)
+		{
+			// r-stripe
+			return offset + y * Nx_r + x;
+		}
+
+		// l-stripe
+		return offset + y * Nx_l + x;
+	}
+
+	inline BigNumber fetch_rIndexE(BigNumber x, BigNumber y, int stripe=0)
+	{
+		if (x == -1)
+			return indexE(Nx_l - 1, y / ky, stripe - 1);
+		else if (x == Nx_r)
+			return indexE(0, y / ky, stripe + 1);
+
+		return indexE(x, y, stripe);
+	}
 
 	inline BigNumber indexV_l(BigNumber x, BigNumber y)
 	{
@@ -465,7 +620,7 @@ public:
 			return;
 		}
 
-		auto* coarseMesh = new Square_CartesianEmilMesh(nx_l / 2, ny_l / 2, this->With4Quadrants, false);
+		auto* coarseMesh = new Square_CartesianPolyStripeMesh(nx_l / 2, ny_l / 2, this->With4Quadrants, false);
 		this->InitializeCoarsening(coarseMesh);
 		coarseMesh->ComesFrom.CS = H_CoarsStgy::StandardCoarsening;
 		//coarseMesh->ComesFrom.nFineElementsByCoarseElement = 4;
@@ -598,6 +753,6 @@ public:
 
 	Mesh<2>* Copy() override
 	{
-		return new Square_CartesianEmilMesh(this->Nx_l, this->Ny_l, this->With4Quadrants);
+		return new Square_CartesianPolyStripeMesh(this->Nx_l, this->Ny_l, this->With4Quadrants);
 	}
 };
