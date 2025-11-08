@@ -12,30 +12,51 @@ using namespace std;
 class Square_CartesianPolyStripeMesh : public PolyhedralMesh<2>
 {
 public:
-	BigNumber Nx_l; //left half stat
-	BigNumber Ny_l; //left half stat
+	BigNumber Nx_l; //high reso stat
+	BigNumber Ny_l; //low reso stat
 
-	BigNumber Nx_r; //right half stat
-	BigNumber Ny_r; //right half stat
+	BigNumber Nx_r; //high reso stat
+	BigNumber Ny_r; //low reso stat
 	bool With4Quadrants;
 
-	//double midline = 0.9;
-	int ky = 16; // factor relating right half stats
-	//vector<double> breaks = {0.1, 0.9};
+	// changeable parameters
+	int ky = 16; // factor relating high and low reso along y-axis
 	int n_breaks = 1;
 	double r_length = 0.1;
-	vector<double> breaks = {0.1};
-	int n_stripes = breaks.size() + 1;
-	//vector<int> r_indices = {0, 2};
-	vector<int> r_indices = {0};
-	vector<int> l_indices = {1};
+
+	// derived quantities
+	int n_r_stripes = 1 + n_breaks / 2;
+	int n_l_stripes = (n_breaks + 1) / 2;
+	double l_length = (1.0 - n_r_stripes * r_length) / n_l_stripes;
+	int n_stripes = n_breaks + 1;
+
+	vector<double> h_breaks = {0.0};
+	vector<int> r_indices = {};
+	vector<int> l_indices = {};
 
 	vector<BigNumber> stripe_vertex_breaks = {0};
 	vector<BigNumber> stripe_element_breaks = {0};
 
 	Square_CartesianPolyStripeMesh(BigNumber nx, BigNumber ny, bool with4Quadrants = false, bool buildMesh = true) : PolyhedralMesh()
 	{
-		// nx = ny falls down to square elements
+		assert(l_length > 0.0);
+
+		for (int i = 0; i < n_stripes; i++)
+		{
+			if (i % 2 == 0)
+			{
+				// r-stripe
+				h_breaks.push_back(h_breaks.back() + r_length);
+				r_indices.push_back(i);
+			}
+			else
+			{
+				// l-stripe
+				h_breaks.push_back(h_breaks.back() + l_length);
+				l_indices.push_back(i);
+			}
+		}
+
 		this->Nx_l = nx;
 		this->Ny_l = ny;
 
@@ -82,11 +103,10 @@ public:
 		BigNumber nx_r = this->Nx_r;
 		BigNumber ny_r = this->Ny_r;
 
-		// todo
-		double hx_l = (1 - r_length) / nx_l;
 		double hy_l = 1.0 / ny_l;
-		double hx_r = r_length / nx_r;
+		double hx_l = l_length / nx_l;
 		double hy_r = 1.0 / ny_r;
+		double hx_r = r_length / nx_r;
 
 		// Physical parts
 		PhysicalGroup<2>* domain = nullptr;
@@ -133,7 +153,7 @@ public:
 			{
 				for (BigNumber ix = 0; ix < nx_r + 1; ++ix)
 				{
-					auto* vertex = new Vertex(indexV(ix, iy, r_index), 0.0 + ix * hx_r, iy * hy_r);
+					auto* vertex = new Vertex(indexV(ix, iy, r_index), h_breaks[r_index] + ix * hx_r, iy * hy_r);
 					this->Vertices.push_back(vertex);
 				}
 			}
@@ -145,7 +165,7 @@ public:
 			{
 				for (BigNumber ix = 1; ix < nx_l; ++ix)
 				{
-					auto* vertex = new Vertex(indexV(ix, iy, l_index), r_length + ix * hx_l, iy * hy_l);
+					auto* vertex = new Vertex(indexV(ix, iy, l_index), h_breaks[l_index] + ix * hx_l, iy * hy_l);
 					this->Vertices.push_back(vertex);
 				}
 
@@ -205,7 +225,7 @@ public:
 		}
 
 		if (Elements.size()!=stripe_element_breaks.back())
-			cout << "Elements size vs what should be: " << Elements.size() << "/" << stripe_element_breaks.size() << endl;
+			cout << "Elements size vs what should be: " << Elements.size() << "/" << stripe_element_breaks.back() << endl;
 
 		//-------//
 		// Faces //
