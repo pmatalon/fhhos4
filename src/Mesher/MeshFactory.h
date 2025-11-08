@@ -9,8 +9,8 @@
 #ifdef ENABLE_2D
 	#include "InHouse/Square_CartesianMesh.h"
 	#include "InHouse/Square_CartesianPolygonalMesh.h"
-	#include "InHouse/Square_CartesianEmilMesh.h"
-	#include "InHouse/Square_TriangularMesh.h"
+	#include "InHouse/Square_CartesianPolyStripeMesh.h"
+#include "InHouse/Square_TriangularMesh.h"
 	#include "InHouse/Square_QuadrilateralMesh.h"
 	#ifdef CGAL_ENABLED
 		#include "InHouse/Square_QuadrilateralAsPolygonalMesh.h"
@@ -145,7 +145,7 @@ Mesh<2>* MeshFactory<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase
 			else if (meshCode.compare("cart-poly") == 0)
 				fineMesh = new Square_CartesianPolygonalMesh(nx, ny);
 			else if (meshCode.compare("cart-emil") == 0)
-				fineMesh = new Square_CartesianEmilMesh(nx, ny);
+				fineMesh = new Square_CartesianPolyStripeMesh(nx, ny);
 			else if (meshCode.compare("stri") == 0)
 				fineMesh = new Square_TriangularMesh(nx, ny);
 			else if (meshCode.compare("quad") == 0)

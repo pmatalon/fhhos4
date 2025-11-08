@@ -19,11 +19,15 @@ public:
 	BigNumber Ny_r; //right half stat
 	bool With4Quadrants;
 
-	double midline = 0.9;
+	//double midline = 0.9;
 	int ky = 16; // factor relating right half stats
-	vector<double> breaks = {0.1, 0.9};
+	//vector<double> breaks = {0.1, 0.9};
+	int n_breaks = 1;
+	double r_length = 0.1;
+	vector<double> breaks = {0.1};
 	int n_stripes = breaks.size() + 1;
-	vector<int> r_indices = {0, 2};
+	//vector<int> r_indices = {0, 2};
+	vector<int> r_indices = {0};
 	vector<int> l_indices = {1};
 
 	vector<BigNumber> stripe_vertex_breaks = {0};
@@ -44,7 +48,7 @@ public:
 			if (stripe_counter % 2 == 0)
 			{
 				// r-stripe
-				stripe_vertex_breaks.push_back(stripe_vertex_breaks.back() + Nx_r * (Ny_r + 1));
+				stripe_vertex_breaks.push_back(stripe_vertex_breaks.back() + (Nx_r + 1) * (Ny_r + 1));
 				stripe_element_breaks.push_back(stripe_element_breaks.back() + Nx_r * Ny_r);
 			}
 			else
@@ -53,11 +57,11 @@ public:
 				if (stripe_counter == n_stripes - 1)
 				{
 					// include vertices on east boundary
-					stripe_vertex_breaks.push_back(stripe_vertex_breaks.back() + Ny_r + 1 + Nx_l * (Ny_l + 1));
+					stripe_vertex_breaks.push_back(stripe_vertex_breaks.back() + Nx_l * (Ny_l + 1));
 				}
 				else
 				{
-					stripe_vertex_breaks.push_back(stripe_vertex_breaks.back() + Ny_r + 1 + (Nx_l - 1) * (Ny_l + 1));
+					stripe_vertex_breaks.push_back(stripe_vertex_breaks.back() + (Nx_l - 1) * (Ny_l + 1));
 				}
 
 				stripe_element_breaks.push_back(stripe_element_breaks.back() + Nx_l * Ny_l);
@@ -71,16 +75,17 @@ public:
 			Build();
 	}
 
-	void Build() {
+	void Build()
+	{
 		BigNumber nx_l = this->Nx_l;
 		BigNumber ny_l = this->Ny_l;
 		BigNumber nx_r = this->Nx_r;
 		BigNumber ny_r = this->Ny_r;
 
 		// todo
-		double hx_l = this->midline / nx_l;
+		double hx_l = (1 - r_length) / nx_l;
 		double hy_l = 1.0 / ny_l;
-		double hx_r = (1.0 - this->midline) / nx_r;
+		double hx_r = r_length / nx_r;
 		double hy_r = 1.0 / ny_r;
 
 		// Physical parts
@@ -120,13 +125,15 @@ public:
 
 		this->Vertices.reserve(stripe_vertex_breaks.back());
 
+		cout << "vertices before adding them: " << Vertices.size() << endl;
+
 		for (int r_index : r_indices)
 		{
 			for (BigNumber iy = 0; iy < ny_r + 1; ++iy)
 			{
 				for (BigNumber ix = 0; ix < nx_r + 1; ++ix)
 				{
-					auto* vertex = new Vertex(indexV(ix, iy, r_index), midline + ix * hx_r, iy * hy_r);
+					auto* vertex = new Vertex(indexV(ix, iy, r_index), 0.0 + ix * hx_r, iy * hy_r);
 					this->Vertices.push_back(vertex);
 				}
 			}
@@ -138,7 +145,7 @@ public:
 			{
 				for (BigNumber ix = 1; ix < nx_l; ++ix)
 				{
-					auto* vertex = new Vertex(indexV(ix, iy, l_index), midline + ix * hx_l, iy * hy_l);
+					auto* vertex = new Vertex(indexV(ix, iy, l_index), r_length + ix * hx_l, iy * hy_l);
 					this->Vertices.push_back(vertex);
 				}
 
@@ -146,11 +153,15 @@ public:
 				{
 					// include vertices on left boundary
 					BigNumber ix = nx_l;
-					auto* vertex = new Vertex(indexV(ix, iy, l_index), midline + ix * hx_l, iy * hy_l);
+					auto* vertex = new Vertex(indexV(ix, iy, l_index), r_length + ix * hx_l, iy * hy_l);
 					this->Vertices.push_back(vertex);
 				}
 			}
 		}
+
+		if (Vertices.size()!=stripe_vertex_breaks.back())
+			cout << "Vertices size vs what should be: " << Vertices.size() << "/" << stripe_vertex_breaks.back() << endl;
+
 
 		//----------//
 		// Elements //
@@ -165,10 +176,10 @@ public:
 			{
 				for (BigNumber ix = 0; ix < nx_r; ++ix)
 				{
-					Vertex* bottomLeftCorner  = Vertices[indexV(ix,     iy    )];
-					Vertex* topLeftCorner     = Vertices[indexV(ix,     iy + 1)];
-					Vertex* topRightCorner    = Vertices[indexV(ix + 1, iy + 1)];
-					Vertex* bottomRightCorner = Vertices[indexV(ix + 1, iy    )];
+					Vertex* bottomLeftCorner  = Vertices[indexV(ix, iy, r_index)];
+					Vertex* topLeftCorner     = Vertices[indexV(ix, iy + 1, r_index)];
+					Vertex* topRightCorner    = Vertices[indexV(ix + 1, iy + 1, r_index)];
+					Vertex* bottomRightCorner = Vertices[indexV(ix + 1, iy, r_index)];
 					auto* rectangle = new RectangularPolygonalElement(indexE(ix, iy, r_index), bottomLeftCorner, topLeftCorner, topRightCorner, bottomRightCorner);
 					this->Elements.push_back(rectangle);
 					rectangle->PhysicalPart = domain;
@@ -182,16 +193,19 @@ public:
 			{
 				for (BigNumber ix = 0; ix < nx_l; ++ix)
 				{
-					Vertex* bottomLeftCorner  = Vertices[indexV(ix,     iy    )];
-					Vertex* topLeftCorner     = Vertices[indexV(ix,     iy + 1)];
-					Vertex* topRightCorner    = Vertices[indexV(ix + 1, iy + 1)];
-					Vertex* bottomRightCorner = Vertices[indexV(ix + 1, iy    )];
+					Vertex* bottomLeftCorner  = Vertices[indexV(ix, iy, l_index)];
+					Vertex* topLeftCorner     = Vertices[indexV(ix, iy + 1, l_index)];
+					Vertex* topRightCorner    = Vertices[indexV(ix + 1, iy + 1, l_index)];
+					Vertex* bottomRightCorner = Vertices[indexV(ix + 1, iy, l_index)];
 					auto* rectangle = new RectangularPolygonalElement(indexE(ix, iy, l_index), bottomLeftCorner, topLeftCorner, topRightCorner, bottomRightCorner);
 					this->Elements.push_back(rectangle);
 					rectangle->PhysicalPart = domain;
 				}
 			}
 		}
+
+		if (Elements.size()!=stripe_element_breaks.back())
+			cout << "Elements size vs what should be: " << Elements.size() << "/" << stripe_element_breaks.size() << endl;
 
 		//-------//
 		// Faces //
@@ -282,213 +296,107 @@ public:
 			}
 		}
 
-		// todo: continue here
-		// left half horizontal boundary
-		for (BigNumber ix = 0; ix < nx_l - 1; ++ix)
+		for (int r_index : r_indices)
 		{
-			// South boundary
-			auto* rectangle = dynamic_cast<RectangularElement*>(this->Elements[indexE_l(ix, 0)]);
-			CartesianEdge* southBoundary = new CartesianEdge(numberInterface++, rectangle->BottomLeftCorner, rectangle->BottomRightCorner, rectangle, CartesianShapeOrientation::Horizontal);
-			this->Faces.push_back(southBoundary);
-			this->BoundaryFaces.push_back(southBoundary);
-			rectangle->SetSouthInterface(southBoundary);
-			static_cast<MeshVertex<2>*>(rectangle->BottomLeftCorner)->Faces.push_back(southBoundary);
-			static_cast<MeshVertex<2>*>(rectangle->BottomRightCorner)->Faces.push_back(southBoundary);
-			southBoundary->BoundaryPart = squareBottomBoundary;
-
-			// North boundary
-			rectangle = dynamic_cast<RectangularElement*>(this->Elements[indexE_l(ix, ny_l - 1)]);
-			CartesianEdge* northBoundary = new CartesianEdge(numberInterface++, rectangle->TopLeftCorner, rectangle->TopRightCorner, rectangle, CartesianShapeOrientation::Horizontal);
-			this->Faces.push_back(northBoundary);
-			this->BoundaryFaces.push_back(northBoundary);
-			rectangle->SetNorthInterface(northBoundary);
-			static_cast<MeshVertex<2>*>(rectangle->TopLeftCorner)->Faces.push_back(northBoundary);
-			static_cast<MeshVertex<2>*>(rectangle->TopRightCorner)->Faces.push_back(northBoundary);
-			northBoundary->BoundaryPart = squareTopBoundary;
-		}
-
-		{
-			// South boundary
-			RectangularPolygonalElement* rectangle = dynamic_cast<RectangularPolygonalElement*>(this->Elements[indexE_l(nx_l - 1, 0)]);
-			CartesianEdge* southBoundary = new CartesianEdge(numberInterface++, rectangle->BottomLeftCorner, rectangle->BottomRightCorner, rectangle, CartesianShapeOrientation::Horizontal);
-			this->Faces.push_back(southBoundary);
-			this->BoundaryFaces.push_back(southBoundary);
-			rectangle->AddSouthFace(southBoundary);
-			southBoundary->BoundaryPart = squareBottomBoundary;
-
-			// North boundary
-			rectangle = dynamic_cast<RectangularPolygonalElement*>(this->Elements[indexE_l(nx_l - 1, ny_l - 1)]);
-			CartesianEdge* northBoundary = new CartesianEdge(numberInterface++, rectangle->TopLeftCorner, rectangle->TopRightCorner, rectangle, CartesianShapeOrientation::Horizontal);
-			this->Faces.push_back(northBoundary);
-			this->BoundaryFaces.push_back(northBoundary);
-			rectangle->AddNorthFace(northBoundary);
-			northBoundary->BoundaryPart = squareTopBoundary;
-		}
-
-		// right half horizontal boundary
-		for (BigNumber ix = 0; ix < nx_r; ++ix)
-		{
-			// South boundary
-			auto* rectangle = dynamic_cast<RectangularElement*>(this->Elements[indexE_r(ix, 0)]);
-			CartesianEdge* southBoundary = new CartesianEdge(numberInterface++, rectangle->BottomLeftCorner, rectangle->BottomRightCorner, rectangle, CartesianShapeOrientation::Horizontal);
-			this->Faces.push_back(southBoundary);
-			this->BoundaryFaces.push_back(southBoundary);
-			rectangle->SetSouthInterface(southBoundary);
-			static_cast<MeshVertex<2>*>(rectangle->BottomLeftCorner)->Faces.push_back(southBoundary);
-			static_cast<MeshVertex<2>*>(rectangle->BottomRightCorner)->Faces.push_back(southBoundary);
-			southBoundary->BoundaryPart = squareBottomBoundary;
-
-			// North boundary
-			rectangle = dynamic_cast<RectangularElement*>(this->Elements[indexE_r(ix, ny_r - 1)]);
-			CartesianEdge* northBoundary = new CartesianEdge(numberInterface++, rectangle->TopLeftCorner, rectangle->TopRightCorner, rectangle, CartesianShapeOrientation::Horizontal);
-			this->Faces.push_back(northBoundary);
-			this->BoundaryFaces.push_back(northBoundary);
-			rectangle->SetNorthInterface(northBoundary);
-			static_cast<MeshVertex<2>*>(rectangle->TopLeftCorner)->Faces.push_back(northBoundary);
-			static_cast<MeshVertex<2>*>(rectangle->TopRightCorner)->Faces.push_back(northBoundary);
-			northBoundary->BoundaryPart = squareTopBoundary;
-		}
-
-		// left half vertical boundary
-		for (BigNumber iy = 0; iy < ny_l; ++iy)
-		{
-			// West boundary
-			RectangularElement* rectangle = dynamic_cast<RectangularElement*>(this->Elements[indexE_l(0, iy)]);
-			CartesianEdge* westBoundary = new CartesianEdge(numberInterface++, rectangle->BottomLeftCorner, rectangle->TopLeftCorner, rectangle, CartesianShapeOrientation::Vertical);
-			this->Faces.push_back(westBoundary);
-			this->BoundaryFaces.push_back(westBoundary);
-			rectangle->SetWestInterface(westBoundary);
-			static_cast<MeshVertex<2>*>(rectangle->BottomLeftCorner)->Faces.push_back(westBoundary);
-			static_cast<MeshVertex<2>*>(rectangle->TopLeftCorner)->Faces.push_back(westBoundary);
-			westBoundary->BoundaryPart = squareLeftBoundary;
-		}
-
-		// right half vertical boundary
-		for (BigNumber iy = 0; iy < ny_r; ++iy)
-		{
-			// East boundary
-			auto* rectangle = dynamic_cast<RectangularElement*>(this->Elements[indexE_r(nx_r - 1, iy)]);
-			auto* eastBoundary = new CartesianEdge(numberInterface++, rectangle->BottomRightCorner, rectangle->TopRightCorner, rectangle, CartesianShapeOrientation::Vertical);
-			this->Faces.push_back(eastBoundary);
-			this->BoundaryFaces.push_back(eastBoundary);
-			rectangle->SetEastInterface(eastBoundary);
-			static_cast<MeshVertex<2>*>(rectangle->BottomRightCorner)->Faces.push_back(eastBoundary);
-			static_cast<MeshVertex<2>*>(rectangle->TopRightCorner)->Faces.push_back(eastBoundary);
-			eastBoundary->BoundaryPart = squareRightBoundary;
-		}
-
-		// left side internal faces
-		for (BigNumber iy = 0; iy < ny_l; iy++)
-		{
-			for (BigNumber ix = 0; ix < nx_l - 1; ix++)
+			for (BigNumber iy = 0; iy < ny_r; iy++)
 			{
-				RectangularElement* element = dynamic_cast<RectangularElement*>(this->Elements[indexE_l(ix, iy)]);
+				for (BigNumber ix = 0; ix < nx_r; ix++)
+				{
+					auto* element = dynamic_cast<RectangularPolygonalElement*>(this->Elements[indexE(ix, iy, r_index)]);
+					RectangularPolygonalElement* eastNeighbour;
+					// If not on east boundary create east face
+					if (!(ix == nx_r - 1 && r_index == n_stripes - 1))
+					{
+						if (ix == nx_r - 1)
+						{
+							// fetch cell on l-stripe to the east
+							eastNeighbour = dynamic_cast<RectangularPolygonalElement*>(this->Elements[indexE(0, iy / ky, r_index + 1)]);
+						}
+						else
+						{
+							eastNeighbour = dynamic_cast<RectangularPolygonalElement*>(this->Elements[indexE(ix + 1, iy, r_index)]);
+						}
 
-				// East
-				if (ix != nx_l - 2)
-				{
-					RectangularElement* eastNeighbour = dynamic_cast<RectangularElement*>(this->Elements[indexE_l(ix + 1, iy)]);
-					CartesianEdge* interface = new CartesianEdge(numberInterface++, eastNeighbour->BottomLeftCorner, eastNeighbour->TopLeftCorner, element, eastNeighbour, CartesianShapeOrientation::Vertical);
-					this->Faces.push_back(interface);
-					this->InteriorFaces.push_back(interface);
-					element->SetEastInterface(interface);
-					eastNeighbour->SetWestInterface(interface);
-					static_cast<MeshVertex<2>*>(eastNeighbour->BottomLeftCorner)->Faces.push_back(interface);
-					static_cast<MeshVertex<2>*>(eastNeighbour->TopLeftCorner)->Faces.push_back(interface);
-				}
-				else
-				{
-					RectangularPolygonalElement* eastNeighbour = dynamic_cast<RectangularPolygonalElement*>(this->Elements[indexE_l(ix + 1, iy)]);
-					CartesianEdge* interface = new CartesianEdge(numberInterface++, eastNeighbour->BottomLeftCorner, eastNeighbour->TopLeftCorner, element, eastNeighbour, CartesianShapeOrientation::Vertical);
-					this->Faces.push_back(interface);
-					this->InteriorFaces.push_back(interface);
-					element->SetEastInterface(interface);
-					eastNeighbour->AddWestFace(interface);
-					// why not link face to vertices here?
+						//auto* interface = new CartesianEdge(numberInterface++, eastNeighbour->BottomLeftCorner, eastNeighbour->TopLeftCorner, element, eastNeighbour, CartesianShapeOrientation::Vertical);
+						auto* interface = new CartesianEdge(numberInterface++, element->BottomRightCorner, element->TopRightCorner, element, eastNeighbour, CartesianShapeOrientation::Vertical);
+						this->Faces.push_back(interface);
+						this->InteriorFaces.push_back(interface);
+						element->AddEastFace(interface);
+						eastNeighbour->AddWestFace(interface);
+					}
+					if (iy != ny_r - 1)
+					{
+						// North
+						auto* northNeighbour = dynamic_cast<RectangularPolygonalElement*>(this->Elements[indexE(ix, iy + 1, r_index)]);
+						auto* interface = new CartesianEdge(numberInterface++, northNeighbour->BottomLeftCorner, northNeighbour->BottomRightCorner, element, northNeighbour, CartesianShapeOrientation::Horizontal);
+						this->Faces.push_back(interface);
+						this->InteriorFaces.push_back(interface);
+						element->AddNorthFace(interface);
+						northNeighbour->AddSouthFace(interface);
+					}
 				}
 
-				// North
-				if (iy != ny_l - 1)
+				// If not on west boundary create west boundary of the stripe
+				if (r_index != 0)
 				{
-					RectangularElement* northNeighbour = dynamic_cast<RectangularElement*>(this->Elements[indexE_l(ix, iy + 1)]);
-					CartesianEdge* interface = new CartesianEdge(numberInterface++, northNeighbour->BottomLeftCorner, northNeighbour->BottomRightCorner, element, northNeighbour, CartesianShapeOrientation::Horizontal);
+					auto* element = dynamic_cast<RectangularPolygonalElement*>(this->Elements[indexE(0, iy, r_index)]);
+					auto* westNeighbour = dynamic_cast<RectangularPolygonalElement*>(this->Elements[indexE(nx_l - 1, iy / ky, r_index - 1)]);
+					auto* interface = new CartesianEdge(numberInterface++, element->BottomLeftCorner, element->TopLeftCorner, westNeighbour, element, CartesianShapeOrientation::Vertical);
 					this->Faces.push_back(interface);
 					this->InteriorFaces.push_back(interface);
-					element->SetNorthInterface(interface);
-					northNeighbour->SetSouthInterface(interface);
-					static_cast<MeshVertex<2>*>(northNeighbour->BottomLeftCorner)->Faces.push_back(interface);
-					static_cast<MeshVertex<2>*>(northNeighbour->BottomRightCorner)->Faces.push_back(interface);
+					element->AddWestFace(interface);
+					westNeighbour->AddEastFace(interface);
 				}
 			}
 		}
 
-		// midline vertical faces
-		for (BigNumber iy = 0; iy < ny_r; iy++)
+		for (int l_index : l_indices)
 		{
-			RectangularElement* element = dynamic_cast<RectangularElement*>(this->Elements[indexE_r(0, iy)]);
-			RectangularPolygonalElement* westNeighbour = dynamic_cast<RectangularPolygonalElement*>(this->Elements[indexE_l(nx_l - 1, iy / ky)]);
-			CartesianEdge* interface = new CartesianEdge(numberInterface++, element->BottomLeftCorner, element->TopLeftCorner, westNeighbour, element, CartesianShapeOrientation::Vertical);
-			this->Faces.push_back(interface);
-			this->InteriorFaces.push_back(interface);
-			element->SetWestInterface(interface);
-			westNeighbour->AddEastFace(interface);
-			static_cast<MeshVertex<2>*>(element->BottomLeftCorner)->Faces.push_back(interface);
-			static_cast<MeshVertex<2>*>(element->TopLeftCorner)->Faces.push_back(interface);
-		}
-
-		// midline horizontal faces
-		for (BigNumber iy = 0; iy < ny_l - 1; iy++)
-		{
-			RectangularPolygonalElement* element = dynamic_cast<RectangularPolygonalElement*>(this->Elements[indexE_l(nx_l - 1, iy)]);
-			RectangularPolygonalElement* northNeighbour = dynamic_cast<RectangularPolygonalElement*>(this->Elements[indexE_l(nx_l - 1, iy + 1)]);
-			CartesianEdge* interface = new CartesianEdge(numberInterface++, northNeighbour->BottomLeftCorner, northNeighbour->BottomRightCorner, element, northNeighbour, CartesianShapeOrientation::Horizontal);
-			this->Faces.push_back(interface);
-			this->InteriorFaces.push_back(interface);
-			element->AddNorthFace(interface);
-			northNeighbour->AddSouthFace(interface);
-		}
-
-		// right side internal faces
-		for (BigNumber iy = 0; iy < ny_r; iy++)
-		{
-			for (BigNumber ix = 0; ix < nx_r; ix++)
+			for (BigNumber iy = 0; iy < ny_l; iy++)
 			{
-				RectangularElement* element = dynamic_cast<RectangularElement*>(this->Elements[indexE_r(ix, iy)]);
-				if (ix != nx_r - 1)
+				for (BigNumber ix = 0; ix < nx_l; ix++)
 				{
-					// East
-					RectangularElement* eastNeighbour = dynamic_cast<RectangularElement*>(this->Elements[indexE_r(ix + 1, iy)]);
-					CartesianEdge* interface = new CartesianEdge(numberInterface++, eastNeighbour->BottomLeftCorner, eastNeighbour->TopLeftCorner, element, eastNeighbour, CartesianShapeOrientation::Vertical);
-					this->Faces.push_back(interface);
-					this->InteriorFaces.push_back(interface);
-					element->SetEastInterface(interface);
-					eastNeighbour->SetWestInterface(interface);
-					static_cast<MeshVertex<2>*>(eastNeighbour->BottomLeftCorner)->Faces.push_back(interface);
-					static_cast<MeshVertex<2>*>(eastNeighbour->TopLeftCorner)->Faces.push_back(interface);
-				}
-				if (iy != ny_r - 1)
-				{
-					// North
-					RectangularElement* northNeighbour = dynamic_cast<RectangularElement*>(this->Elements[indexE_r(ix, iy + 1)]);
-					CartesianEdge* interface = new CartesianEdge(numberInterface++, northNeighbour->BottomLeftCorner, northNeighbour->BottomRightCorner, element, northNeighbour, CartesianShapeOrientation::Horizontal);
-					this->Faces.push_back(interface);
-					this->InteriorFaces.push_back(interface);
-					element->SetNorthInterface(interface);
-					northNeighbour->SetSouthInterface(interface);
-					static_cast<MeshVertex<2>*>(northNeighbour->BottomLeftCorner)->Faces.push_back(interface);
-					static_cast<MeshVertex<2>*>(northNeighbour->BottomRightCorner)->Faces.push_back(interface);
+					auto* element = dynamic_cast<RectangularPolygonalElement*>(this->Elements[indexE(ix, iy, l_index)]);
+
+					if (ix != nx_l - 1)
+					{
+						// East
+						auto* eastNeighbour = dynamic_cast<RectangularPolygonalElement*>(this->Elements[indexE(ix + 1, iy, l_index)]);
+						auto* interface = new CartesianEdge(numberInterface++, eastNeighbour->BottomLeftCorner, eastNeighbour->TopLeftCorner, element, eastNeighbour, CartesianShapeOrientation::Vertical);
+						this->Faces.push_back(interface);
+						this->InteriorFaces.push_back(interface);
+						element->AddEastFace(interface);
+						eastNeighbour->AddWestFace(interface);
+					}
+
+					if (iy != ny_l - 1)
+					{
+						// North
+						auto* northNeighbour = dynamic_cast<RectangularPolygonalElement*>(this->Elements[indexE(ix, iy + 1, l_index)]);
+						auto* interface = new CartesianEdge(numberInterface++, northNeighbour->BottomLeftCorner, northNeighbour->BottomRightCorner, element, northNeighbour, CartesianShapeOrientation::Horizontal);
+						this->Faces.push_back(interface);
+						this->InteriorFaces.push_back(interface);
+						element->AddNorthFace(interface);
+						northNeighbour->AddSouthFace(interface);
+					}
 				}
 			}
 		}
 	}
 
 private:
-	inline BigNumber indexV(BigNumber x, BigNumber y, int stripe=0)
+	static bool isHighResolutionStripe(const int index)
+	{
+		return index % 2 == 0;
+	}
+
+	inline BigNumber indexV(BigNumber x, BigNumber y, int stripe)
 	{
 		if (stripe % 2 == 0)
 		{
 			// r-stripe
-			BigNumber offset = stripe == 0 ? 0 : stripe_vertex_breaks[stripe - 1];
+			//BigNumber offset = stripe == 0 ? 0 : stripe_vertex_breaks[stripe - 1];
+			BigNumber offset = stripe_vertex_breaks[stripe];
 			return offset + y * (Nx_r + 1) + x;
 		}
 
@@ -500,19 +408,26 @@ private:
 			return indexV(Nx_r, ky * y, stripe - 1);
 		}
 
-		if (x == Nx_l && stripe != n_stripes - 1)
+		BigNumber offset = stripe_vertex_breaks[stripe];
+
+		if (stripe != n_stripes - 1)
 		{
-			// return leftmost vertex of eastern r-stripe
-			return indexV(0, ky * y, stripe + 1);
+			if (x == Nx_l)
+			{
+				// return leftmost vertex of eastern r-stripe
+				return indexV(0, ky * y, stripe + 1);
+			}
+
+			return offset + y * (Nx_l - 1) + x - 1;
 		}
 
-		BigNumber offset = stripe_vertex_breaks[stripe - 1];
-		return offset + y * (2 * ky + Nx_l - 1) + x;
+		return offset + y * Nx_l + x - 1;
 	}
 
-	inline BigNumber indexE(BigNumber x, BigNumber y, int stripe=0)
+	inline BigNumber indexE(BigNumber x, BigNumber y, int stripe)
 	{
-		BigNumber offset = stripe == 0 ? 0 : stripe_element_breaks[stripe - 1];
+		//BigNumber offset = stripe == 0 ? 0 : stripe_element_breaks[stripe - 1];
+		BigNumber offset = stripe_element_breaks[stripe];
 
 		if (stripe % 2 == 0)
 		{
@@ -524,6 +439,7 @@ private:
 		return offset + y * Nx_l + x;
 	}
 
+	/*
 	inline BigNumber fetch_rIndexE(BigNumber x, BigNumber y, int stripe=0)
 	{
 		if (x == -1)
@@ -561,6 +477,7 @@ private:
 	{
 		return Nx_l * Ny_l + y * Nx_r + x;
 	}
+	*/
 
 public:
 	string Description() override
@@ -581,7 +498,7 @@ public:
 
 	double H() override
 	{
-		return this->midline / this->Nx_l;
+		return (1.0 - this->r_length) / this->Nx_l;
 	}
 
 	double Regularity() override
@@ -599,14 +516,15 @@ public:
 		if (elemCoarseningStgy == H_CoarsStgy::StandardCoarsening)
 		{
 			if (faceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsing)
-				StandardCoarsening();
+				//StandardCoarsening();
+				Utils::FatalError("Unmanaged face coarsening strategy");
 			else
 				Utils::FatalError("Unmanaged face coarsening strategy");
 		}
 		else
 			PolyhedralMesh<2>::CoarsenMesh(elemCoarseningStgy, faceCoarseningStgy, bdryFaceCollapsing, coarseningFactor);
 	}
-
+	/*
 	void StandardCoarsening()
 	{
 		BigNumber nx_l = this->Nx_l;
@@ -750,6 +668,7 @@ public:
 
 		this->FinalizeCoarsening();
 	}
+	*/
 
 	Mesh<2>* Copy() override
 	{
