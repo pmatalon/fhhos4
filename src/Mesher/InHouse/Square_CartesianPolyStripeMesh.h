@@ -544,7 +544,7 @@ public:
 			return;
 		}
 
-		auto* coarseMesh = new Square_CartesianPolyStripeMesh(nx_l / 2, ny_l / 2, this->With4Quadrants, false);
+		auto* coarseMesh = new Square_CartesianPolyStripeMesh(nx_l / 2, ny_l / 2, this->n_stripes, this->With4Quadrants, false);
 		this->InitializeCoarsening(coarseMesh);
 		coarseMesh->ComesFrom.CS = H_CoarsStgy::StandardCoarsening;
 		//coarseMesh->ComesFrom.nFineElementsByCoarseElement = 4;
