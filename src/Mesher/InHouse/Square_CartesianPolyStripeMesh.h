@@ -21,14 +21,15 @@ public:
 
 	// changeable parameters
 	int ky = 16; // factor relating high and low reso along y-axis
-	int n_breaks = 2;
+	int n_breaks; //= 2;
 	double r_length = 0.1;
 
 	// derived quantities
-	int n_r_stripes = 1 + n_breaks / 2;
-	int n_l_stripes = (n_breaks + 1) / 2;
-	double l_length = (1.0 - n_r_stripes * r_length) / n_l_stripes;
-	int n_stripes = n_breaks + 1;
+
+	int n_r_stripes; //= 1 + n_breaks / 2;
+	int n_l_stripes; //= (n_breaks + 1) / 2;
+	double l_length; //= (1.0 - n_r_stripes * r_length) / n_l_stripes;
+	int n_stripes; //= n_breaks + 1;
 
 	vector<double> h_breaks = {0.0};
 	vector<int> r_indices = {};
@@ -37,8 +38,15 @@ public:
 	vector<BigNumber> stripe_vertex_breaks = {0};
 	vector<BigNumber> stripe_element_breaks = {0};
 
-	Square_CartesianPolyStripeMesh(BigNumber nx, BigNumber ny, bool with4Quadrants = false, bool buildMesh = true) : PolyhedralMesh()
+	Square_CartesianPolyStripeMesh(BigNumber nx, BigNumber ny, const int nb_stripes, bool with4Quadrants = false, bool buildMesh = true) : PolyhedralMesh()
 	{
+		this->n_stripes = nb_stripes;
+		this->n_breaks = nb_stripes - 1;
+		this->n_r_stripes = 1 + n_breaks / 2;
+		this->n_l_stripes = (n_breaks + 1) / 2;
+		this->l_length = (1.0 - n_r_stripes * r_length) / n_l_stripes;
+
+		assert(nb_stripes > 0);
 		assert(l_length > 0.0);
 
 		for (int i = 0; i < n_stripes; i++)
@@ -114,6 +122,7 @@ public:
 		PhysicalGroup<2>* quadrantBottomRight = nullptr;
 		PhysicalGroup<2>* quadrantTopRight = nullptr;
 		PhysicalGroup<2>* quadrantTopLeft = nullptr;
+
 		if (this->With4Quadrants)
 		{
 			Utils::FatalError("Hetereogenity for Emil-mesh not yet implemented");
@@ -143,7 +152,8 @@ public:
 		// Vertices //
 		//----------//
 
-		this->Vertices.reserve(stripe_vertex_breaks.back());
+		//this->Vertices.reserve(stripe_vertex_breaks.back());
+		this->Vertices.resize(stripe_vertex_breaks.back());
 
 		cout << "vertices before adding them: " << Vertices.size() << endl;
 
@@ -153,8 +163,10 @@ public:
 			{
 				for (BigNumber ix = 0; ix < nx_r + 1; ++ix)
 				{
-					auto* vertex = new Vertex(indexV(ix, iy, r_index), h_breaks[r_index] + ix * hx_r, iy * hy_r);
-					this->Vertices.push_back(vertex);
+					auto vertexIndex = indexV(ix, iy, r_index);
+					auto* vertex = new Vertex(vertexIndex, h_breaks[r_index] + ix * hx_r, iy * hy_r);
+					//this->Vertices.push_back(vertex);
+					this->Vertices[vertexIndex] = vertex;
 				}
 			}
 		}
@@ -165,16 +177,20 @@ public:
 			{
 				for (BigNumber ix = 1; ix < nx_l; ++ix)
 				{
-					auto* vertex = new Vertex(indexV(ix, iy, l_index), h_breaks[l_index] + ix * hx_l, iy * hy_l);
-					this->Vertices.push_back(vertex);
+					auto vertexIndex = indexV(ix, iy, l_index);
+					auto* vertex = new Vertex(vertexIndex, h_breaks[l_index] + ix * hx_l, iy * hy_l);
+					//this->Vertices.push_back(vertex);
+					this->Vertices[vertexIndex] = vertex;
 				}
 
 				if (l_index == n_stripes - 1)
 				{
 					// include vertices on left boundary
 					BigNumber ix = nx_l;
-					auto* vertex = new Vertex(indexV(ix, iy, l_index), r_length + ix * hx_l, iy * hy_l);
-					this->Vertices.push_back(vertex);
+					auto vertexIndex = indexV(ix, iy, l_index);
+					auto* vertex = new Vertex(vertexIndex, r_length + ix * hx_l, iy * hy_l);
+					//this->Vertices.push_back(vertex);
+					this->Vertices[vertexIndex] = vertex;
 				}
 			}
 		}
@@ -187,8 +203,8 @@ public:
 		// Elements //
 		//----------//
 
-		//this->Elements.reserve( r_indices.size() * nx_r * ny_r + l_indices.size() * nx_l * ny_l);
-		this->Elements.reserve( stripe_element_breaks.back());
+		//this->Elements.reserve( stripe_element_breaks.back());
+		this->Elements.resize(stripe_element_breaks.back());
 
 		for (int r_index : r_indices)
 		{
@@ -200,8 +216,10 @@ public:
 					Vertex* topLeftCorner     = Vertices[indexV(ix, iy + 1, r_index)];
 					Vertex* topRightCorner    = Vertices[indexV(ix + 1, iy + 1, r_index)];
 					Vertex* bottomRightCorner = Vertices[indexV(ix + 1, iy, r_index)];
-					auto* rectangle = new RectangularPolygonalElement(indexE(ix, iy, r_index), bottomLeftCorner, topLeftCorner, topRightCorner, bottomRightCorner);
-					this->Elements.push_back(rectangle);
+					auto eleIndex = indexE(ix, iy, r_index);
+					auto* rectangle = new RectangularPolygonalElement(eleIndex, bottomLeftCorner, topLeftCorner, topRightCorner, bottomRightCorner);
+					//this->Elements.push_back(rectangle);
+					this->Elements[eleIndex] = rectangle;
 					rectangle->PhysicalPart = domain;
 				}
 			}
@@ -217,8 +235,10 @@ public:
 					Vertex* topLeftCorner     = Vertices[indexV(ix, iy + 1, l_index)];
 					Vertex* topRightCorner    = Vertices[indexV(ix + 1, iy + 1, l_index)];
 					Vertex* bottomRightCorner = Vertices[indexV(ix + 1, iy, l_index)];
-					auto* rectangle = new RectangularPolygonalElement(indexE(ix, iy, l_index), bottomLeftCorner, topLeftCorner, topRightCorner, bottomRightCorner);
-					this->Elements.push_back(rectangle);
+					auto eleIndex = indexE(ix, iy, l_index);
+					auto* rectangle = new RectangularPolygonalElement(eleIndex, bottomLeftCorner, topLeftCorner, topRightCorner, bottomRightCorner);
+					//this->Elements.push_back(rectangle);
+					this->Elements[eleIndex] = rectangle;
 					rectangle->PhysicalPart = domain;
 				}
 			}
@@ -417,6 +437,7 @@ private:
 			// r-stripe
 			//BigNumber offset = stripe == 0 ? 0 : stripe_vertex_breaks[stripe - 1];
 			BigNumber offset = stripe_vertex_breaks[stripe];
+			auto xxxx = offset + y * (Nx_r + 1) + x;;
 			return offset + y * (Nx_r + 1) + x;
 		}
 

@@ -672,6 +672,7 @@ int main(int argc, char* argv[])
 		OPT_Nx,
 		OPT_Ny,
 		OPT_Nz,
+		OPT_N_stripes,
 		OPT_Stretch,
 		OPT_PolyMeshInitialMesh,
 		OPT_PolyMeshFaceCoarseningStrategy,
@@ -769,6 +770,7 @@ int main(int argc, char* argv[])
 		 { "mesher", required_argument, NULL, OPT_Mesher },
 		 { "nx", required_argument, NULL, OPT_Nx },
 		 { "ny", required_argument, NULL, OPT_Ny },
+		{ "n-stripes", required_argument, NULL, OPT_N_stripes },
 		 { "stretch", required_argument, NULL, OPT_Stretch },
 		 { "polymesh-init", required_argument, NULL, OPT_PolyMeshInitialMesh },
 		 { "polymesh-fcs", required_argument, NULL, OPT_PolyMeshFaceCoarseningStrategy },
@@ -946,6 +948,9 @@ int main(int argc, char* argv[])
 				break;
 			case OPT_Nz:
 				args.Discretization.Nz = stoul(optarg, nullptr, 0);
+				break;
+			case OPT_N_stripes:
+				args.Discretization.N_stripes = stoul(optarg, nullptr, 0);
 				break;
 			case OPT_Stretch:
 				args.Discretization.Stretch = atof(optarg);

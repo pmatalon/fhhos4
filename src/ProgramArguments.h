@@ -22,6 +22,7 @@ struct DiscretizationArguments
 	BigNumber N = 16;
 	BigNumber Ny = 0;
 	BigNumber Nz = 0;
+	int N_stripes = 0;
 	string Mesher = "default";
 	string MeshCode = "default";
 	double Stretch = 0.5;
