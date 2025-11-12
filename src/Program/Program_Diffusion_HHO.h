@@ -100,6 +100,9 @@ public:
 			}*/
 		}
 
+		// Test Emil's stripe mesh
+		test_StripeMesh();
+
 		//---------------------------//
 		//   Coarsening unit tests   //
 		//---------------------------//
@@ -453,5 +456,44 @@ public:
 		delete problem;
 		delete testCase;
 		GaussLegendre::Free();
+	}
+
+	static void test_StripeMesh()
+	{
+		{
+			int nx = 2;
+			int ny = nx;
+			int n_stripes = 2;
+			int k = 4;
+
+			auto* mesh = new Square_CartesianPolyStripeMesh(nx, ny, n_stripes, k);
+
+			assert(mesh->indexV(0,0,0) == 0);
+			assert(mesh->indexV(nx,0,0) == nx);
+			assert(mesh->indexV(0,0,1) == nx);
+			assert(mesh->indexV(nx,1,0) == nx * 2 + 1);
+			assert(mesh->indexV(0,1,1) == (nx + 1) * (k + 1) - 1);
+			assert(mesh->indexV(1,0,1) == (nx + 1) * (k * nx + 1));
+		}
+
+		{
+			int nx = 2;
+			int ny = nx;
+			int n_stripes = 3;
+			int k = 4;
+
+			auto* mesh = new Square_CartesianPolyStripeMesh(nx, ny, n_stripes, k);
+
+			// same assumptions as 2-stripe case
+			assert(mesh->indexV(0,0,0) == 0);
+			assert(mesh->indexV(nx,0,0) == nx);
+			assert(mesh->indexV(0,0,1) == nx);
+			assert(mesh->indexV(nx,1,0) == nx * 2 + 1);
+			assert(mesh->indexV(0,1,1) == (nx + 1) * (k + 1) - 1);
+			assert(mesh->indexV(1,0,1) == (nx + 1) * (k * nx + 1));
+			// check also third stripe
+			assert(mesh->indexV(0,1,2) == (nx + 1) * (k * nx + 1) + (nx - 1) * (nx + 1) + (nx + 1));
+			assert(mesh->indexV(nx,2,1) == (nx + 1) * (k * nx + 1) + (nx - 1) * (nx + 1) + (nx + 1) * 2 * k);
+		}
 	}
 };
