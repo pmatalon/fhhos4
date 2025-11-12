@@ -20,7 +20,7 @@ public:
 	bool With4Quadrants;
 
 	// changeable parameters
-	int ky = 16; // factor relating high and low reso along y-axis
+	int ky; //= 16; // factor relating high and low reso along y-axis
 	int n_breaks; //= 2;
 	double r_length = 0.1;
 
@@ -38,13 +38,14 @@ public:
 	vector<BigNumber> stripe_vertex_breaks = {0};
 	vector<BigNumber> stripe_element_breaks = {0};
 
-	Square_CartesianPolyStripeMesh(BigNumber nx, BigNumber ny, const int nb_stripes, bool with4Quadrants = false, bool buildMesh = true) : PolyhedralMesh()
+	Square_CartesianPolyStripeMesh(BigNumber nx, BigNumber ny, const int nb_stripes, const int reso_factor = 16, bool with4Quadrants = false, bool buildMesh = true) : PolyhedralMesh()
 	{
 		this->n_stripes = nb_stripes;
 		this->n_breaks = nb_stripes - 1;
 		this->n_r_stripes = 1 + n_breaks / 2;
 		this->n_l_stripes = (n_breaks + 1) / 2;
 		this->l_length = (1.0 - n_r_stripes * r_length) / n_l_stripes;
+		this->ky = reso_factor;
 
 		assert(nb_stripes > 0);
 		assert(l_length > 0.0);
@@ -424,12 +425,6 @@ public:
 		}
 	}
 
-private:
-	static bool isHighResolutionStripe(const int index)
-	{
-		return index % 2 == 0;
-	}
-
 	inline BigNumber indexV(BigNumber x, BigNumber y, int stripe)
 	{
 		if (stripe % 2 == 0)
@@ -478,6 +473,12 @@ private:
 
 		// l-stripe
 		return offset + y * Nx_l + x;
+	}
+
+private:
+	static bool isHighResolutionStripe(const int index)
+	{
+		return index % 2 == 0;
 	}
 
 	inline bool isFinalStripe(const int index) const
