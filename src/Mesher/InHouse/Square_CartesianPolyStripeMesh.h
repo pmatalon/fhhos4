@@ -156,6 +156,13 @@ public:
 		//this->Vertices.reserve(stripe_vertex_breaks.back());
 		this->Vertices.resize(stripe_vertex_breaks.back());
 
+		bool all_non_null = std::all_of(Vertices.begin(), Vertices.end(), [](auto ptr) { return ptr != nullptr; });
+
+		if (all_non_null)
+			std::cout << "All pointers are non-null before create vertices.\n";
+		else
+			std::cout << "Found at least one nullptr in vertices before creation.\n";
+
 		cout << "vertices before adding them: " << Vertices.size() << endl;
 
 		for (int r_index : r_indices)
@@ -196,9 +203,17 @@ public:
 			}
 		}
 
+		// tests
 		if (Vertices.size()!=stripe_vertex_breaks.back())
 			cout << "Vertices size vs what should be: " << Vertices.size() << "/" << stripe_vertex_breaks.back() << endl;
 
+		all_non_null = std::all_of(Vertices.begin(), Vertices.end(),
+								[](auto ptr) { return ptr != nullptr; });
+
+		if (all_non_null)
+			std::cout << "All vertex-pointers are non-null after build.\n";
+		else
+			std::cout << "ERROR::::::::::::::::::::::::::::  Found at least one vertex-nullptr.\n";
 
 		//----------//
 		// Elements //
@@ -245,8 +260,17 @@ public:
 			}
 		}
 
+		// tests
 		if (Elements.size()!=stripe_element_breaks.back())
 			cout << "Elements size vs what should be: " << Elements.size() << "/" << stripe_element_breaks.back() << endl;
+
+		all_non_null = std::all_of(Elements.begin(), Elements.end(),
+						[](auto ptr) { return ptr != nullptr; });
+
+		if (all_non_null)
+			std::cout << "All Element-pointers are non-null after build.\n";
+		else
+			std::cout << "ERROR::::::::::::::::::::::::::::  Found at least one element-nullptr.\n";
 
 		//-------//
 		// Faces //
@@ -423,6 +447,14 @@ public:
 				}
 			}
 		}
+
+		all_non_null = std::all_of(Faces.begin(), Faces.end(),
+						[](auto ptr) { return ptr != nullptr; });
+
+		if (all_non_null)
+			std::cout << "All face-pointers are non-null after build.\n";
+		else
+			std::cout << "ERROR::::::::::::::::::::::::::::  Found at least one face-nullptr.\n";
 	}
 
 	inline BigNumber indexV(BigNumber x, BigNumber y, int stripe)
@@ -545,7 +577,7 @@ public:
 			return;
 		}
 
-		auto* coarseMesh = new Square_CartesianPolyStripeMesh(nx_l / 2, ny_l / 2, this->n_stripes, this->With4Quadrants, false);
+		auto* coarseMesh = new Square_CartesianPolyStripeMesh(nx_l / 2, ny_l / 2, this->n_stripes, this->ky, this->With4Quadrants, false);
 		this->InitializeCoarsening(coarseMesh);
 		coarseMesh->ComesFrom.CS = H_CoarsStgy::StandardCoarsening;
 		//coarseMesh->ComesFrom.nFineElementsByCoarseElement = 4;
@@ -650,6 +682,6 @@ public:
 
 	Mesh<2>* Copy() override
 	{
-		return new Square_CartesianPolyStripeMesh(this->Nx_l, this->Ny_l, this->With4Quadrants);
+		return new Square_CartesianPolyStripeMesh(this->Nx_l, this->Ny_l, this->n_stripes, this->ky, this->With4Quadrants);
 	}
 };

@@ -468,12 +468,27 @@ public:
 
 			auto* mesh = new Square_CartesianPolyStripeMesh(nx, ny, n_stripes, k);
 
-			assert(mesh->indexV(0,0,0) == 0);
-			assert(mesh->indexV(nx,0,0) == nx);
-			assert(mesh->indexV(0,0,1) == nx);
-			assert(mesh->indexV(nx,1,0) == nx * 2 + 1);
-			assert(mesh->indexV(0,1,1) == (nx + 1) * (k + 1) - 1);
-			assert(mesh->indexV(1,0,1) == (nx + 1) * (k * nx + 1));
+			// vertices
+			assert(mesh->indexV(2,8,0) == 26);
+			assert(mesh->indexV(0,0,1) == 2);
+			assert(mesh->indexV(0,1,1) == 14);
+			assert(mesh->indexV(2,0,1) == 28);
+			assert(mesh->indexV(2,2,1) == 32);
+
+			// elements
+			assert(mesh->indexE(1,7,0) == 15);
+			assert(mesh->indexE(0,0,1) == 16);
+			assert(mesh->indexE(1,1,1) == 19);
+
+			int n_boundaryCells = 0;
+			for (auto* cell : mesh->Elements)
+			{
+				if (!cell->BoundaryFaces().empty())
+				{
+					n_boundaryCells++;
+				}
+			}
+			assert(n_boundaryCells == 14);
 		}
 
 		{
@@ -484,16 +499,29 @@ public:
 
 			auto* mesh = new Square_CartesianPolyStripeMesh(nx, ny, n_stripes, k);
 
-			// same assumptions as 2-stripe case
-			assert(mesh->indexV(0,0,0) == 0);
-			assert(mesh->indexV(nx,0,0) == nx);
-			assert(mesh->indexV(0,0,1) == nx);
-			assert(mesh->indexV(nx,1,0) == nx * 2 + 1);
-			assert(mesh->indexV(0,1,1) == (nx + 1) * (k + 1) - 1);
-			assert(mesh->indexV(1,0,1) == (nx + 1) * (k * nx + 1));
-			// check also third stripe
-			assert(mesh->indexV(0,1,2) == (nx + 1) * (k * nx + 1) + (nx - 1) * (nx + 1) + (nx + 1));
-			assert(mesh->indexV(nx,2,1) == (nx + 1) * (k * nx + 1) + (nx - 1) * (nx + 1) + (nx + 1) * 2 * k);
+			// vertices
+			assert(mesh->indexV(2,8,0) == 26);
+			assert(mesh->indexV(0,0,1) == 2);
+			assert(mesh->indexV(0,1,1) == 14);
+			assert(mesh->indexV(1,1,1) == 28);
+			assert(mesh->indexV(2,0,1) == 30);
+			assert(mesh->indexV(2,8,2) == 56);
+
+			// elements
+			assert(mesh->indexE(1,7,0) == 15);
+			assert(mesh->indexE(0,0,1) == 16);
+			assert(mesh->indexE(1,1,1) == 19);
+			assert(mesh->indexE(1,7,2) == 35);
+
+			int n_boundaryCells = 0;
+			for (auto* cell : mesh->Elements)
+			{
+				if (!cell->BoundaryFaces().empty())
+				{
+					n_boundaryCells++;
+				}
+			}
+			assert(n_boundaryCells == 24);
 		}
 	}
 };
