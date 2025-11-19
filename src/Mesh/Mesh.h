@@ -1214,8 +1214,8 @@ public:
 		}
 
 		cout << "Number of cells: " << this->Elements.size() << endl;
-		cout << "Mean number of faces per cell: " << calculateMean(n_faces_per_cell) << endl;
-		cout << "Variance of number of faces per cell: " << calculateVariance(n_faces_per_cell) << endl;
+		//cout << "Mean number of faces per cell: " << calculateMean(n_faces_per_cell) << endl;
+		//cout << "Variance of number of faces per cell: " << calculateVariance(n_faces_per_cell) << endl;
 
 		std::unordered_map<int, int> counts;
 
@@ -1234,7 +1234,7 @@ public:
 
 		for (const auto& [key, value] : counts)
 		{
-			cout << "n_faces: " << key << " count: " << value << '\n';
+			cout << "Number of cells with " << key << " faces: " << value << '\n';
 		}
 	}
 };

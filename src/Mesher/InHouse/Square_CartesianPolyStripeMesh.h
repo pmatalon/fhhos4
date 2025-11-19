@@ -12,24 +12,23 @@ using namespace std;
 class Square_CartesianPolyStripeMesh : public PolyhedralMesh<2>
 {
 public:
-	BigNumber Nx_l; //high reso stat
-	BigNumber Ny_l; //low reso stat
+	BigNumber Nx_l; //low reso nx
+	BigNumber Ny_l; //low reso ny
 
-	BigNumber Nx_r; //high reso stat
-	BigNumber Ny_r; //low reso stat
-	bool With4Quadrants;
+	BigNumber Nx_r; //high reso nx
+	BigNumber Ny_r; //high reso ny
+	bool With4Quadrants; // not implemented for this mesh
 
-	// changeable parameters
-	int ky; //= 16; // factor relating high and low reso along y-axis
-	int n_breaks; //= 2;
-	double r_length = 0.1;
+	// adjustable parameters
+	int ky; // resolution factor relating high and low reso along y-axis
+	int n_stripes; // number high- vs low resolution stripes
+	double r_length = 0.1; // length in x of high-reso stripe
 
-	// derived quantities
-
-	int n_r_stripes; //= 1 + n_breaks / 2;
-	int n_l_stripes; //= (n_breaks + 1) / 2;
-	double l_length; //= (1.0 - n_r_stripes * r_length) / n_l_stripes;
-	int n_stripes; //= n_breaks + 1;
+	// derived parameters
+	int n_breaks;
+	int n_r_stripes;
+	int n_l_stripes;
+	double l_length;
 
 	vector<double> h_breaks = {0.0};
 	vector<int> r_indices = {};
@@ -119,20 +118,12 @@ public:
 
 		// Physical parts
 		PhysicalGroup<2>* domain = nullptr;
-		PhysicalGroup<2>* quadrantBottomLeft = nullptr;
-		PhysicalGroup<2>* quadrantBottomRight = nullptr;
-		PhysicalGroup<2>* quadrantTopRight = nullptr;
-		PhysicalGroup<2>* quadrantTopLeft = nullptr;
 
 		if (this->With4Quadrants)
 		{
 			Utils::FatalError("Hetereogenity for Emil-mesh not yet implemented");
 			if (this->PhysicalParts.empty())
 				this->PhysicalParts = Square4quadrantsGeometry::PhysicalParts();
-			quadrantBottomLeft = this->PhysicalParts[0];
-			quadrantBottomRight = this->PhysicalParts[1];
-			quadrantTopRight = this->PhysicalParts[2];
-			quadrantTopLeft = this->PhysicalParts[3];
 		}
 		else
 		{
@@ -153,17 +144,7 @@ public:
 		// Vertices //
 		//----------//
 
-		//this->Vertices.reserve(stripe_vertex_breaks.back());
 		this->Vertices.resize(stripe_vertex_breaks.back());
-
-		bool all_non_null = std::all_of(Vertices.begin(), Vertices.end(), [](auto ptr) { return ptr != nullptr; });
-
-		if (all_non_null)
-			std::cout << "All pointers are non-null before create vertices.\n";
-		else
-			std::cout << "Found at least one nullptr in vertices before creation.\n";
-
-		cout << "vertices before adding them: " << Vertices.size() << endl;
 
 		for (int r_index : r_indices)
 		{
@@ -173,7 +154,6 @@ public:
 				{
 					auto vertexIndex = indexV(ix, iy, r_index);
 					auto* vertex = new Vertex(vertexIndex, h_breaks[r_index] + ix * hx_r, iy * hy_r);
-					//this->Vertices.push_back(vertex);
 					this->Vertices[vertexIndex] = vertex;
 				}
 			}
@@ -187,7 +167,6 @@ public:
 				{
 					auto vertexIndex = indexV(ix, iy, l_index);
 					auto* vertex = new Vertex(vertexIndex, h_breaks[l_index] + ix * hx_l, iy * hy_l);
-					//this->Vertices.push_back(vertex);
 					this->Vertices[vertexIndex] = vertex;
 				}
 
@@ -197,29 +176,22 @@ public:
 					BigNumber ix = nx_l;
 					auto vertexIndex = indexV(ix, iy, l_index);
 					auto* vertex = new Vertex(vertexIndex, r_length + ix * hx_l, iy * hy_l);
-					//this->Vertices.push_back(vertex);
 					this->Vertices[vertexIndex] = vertex;
 				}
 			}
 		}
 
-		// tests
-		if (Vertices.size()!=stripe_vertex_breaks.back())
-			cout << "Vertices size vs what should be: " << Vertices.size() << "/" << stripe_vertex_breaks.back() << endl;
-
-		all_non_null = std::all_of(Vertices.begin(), Vertices.end(),
+		// test
+		bool all_non_null = std::all_of(Vertices.begin(), Vertices.end(),
 								[](auto ptr) { return ptr != nullptr; });
 
-		if (all_non_null)
-			std::cout << "All vertex-pointers are non-null after build.\n";
-		else
+		if (!all_non_null)
 			std::cout << "ERROR::::::::::::::::::::::::::::  Found at least one vertex-nullptr.\n";
 
 		//----------//
 		// Elements //
 		//----------//
 
-		//this->Elements.reserve( stripe_element_breaks.back());
 		this->Elements.resize(stripe_element_breaks.back());
 
 		for (int r_index : r_indices)
@@ -234,7 +206,6 @@ public:
 					Vertex* bottomRightCorner = Vertices[indexV(ix + 1, iy, r_index)];
 					auto eleIndex = indexE(ix, iy, r_index);
 					auto* rectangle = new RectangularPolygonalElement(eleIndex, bottomLeftCorner, topLeftCorner, topRightCorner, bottomRightCorner);
-					//this->Elements.push_back(rectangle);
 					this->Elements[eleIndex] = rectangle;
 					rectangle->PhysicalPart = domain;
 				}
@@ -253,23 +224,17 @@ public:
 					Vertex* bottomRightCorner = Vertices[indexV(ix + 1, iy, l_index)];
 					auto eleIndex = indexE(ix, iy, l_index);
 					auto* rectangle = new RectangularPolygonalElement(eleIndex, bottomLeftCorner, topLeftCorner, topRightCorner, bottomRightCorner);
-					//this->Elements.push_back(rectangle);
 					this->Elements[eleIndex] = rectangle;
 					rectangle->PhysicalPart = domain;
 				}
 			}
 		}
 
-		// tests
-		if (Elements.size()!=stripe_element_breaks.back())
-			cout << "Elements size vs what should be: " << Elements.size() << "/" << stripe_element_breaks.back() << endl;
-
+		// test
 		all_non_null = std::all_of(Elements.begin(), Elements.end(),
 						[](auto ptr) { return ptr != nullptr; });
 
-		if (all_non_null)
-			std::cout << "All Element-pointers are non-null after build.\n";
-		else
+		if (!all_non_null)
 			std::cout << "ERROR::::::::::::::::::::::::::::  Found at least one element-nullptr.\n";
 
 		//-------//
@@ -382,7 +347,6 @@ public:
 							eastNeighbour = dynamic_cast<RectangularPolygonalElement*>(this->Elements[indexE(ix + 1, iy, r_index)]);
 						}
 
-						//auto* interface = new CartesianEdge(numberInterface++, eastNeighbour->BottomLeftCorner, eastNeighbour->TopLeftCorner, element, eastNeighbour, CartesianShapeOrientation::Vertical);
 						auto* interface = new CartesianEdge(numberInterface++, element->BottomRightCorner, element->TopRightCorner, element, eastNeighbour, CartesianShapeOrientation::Vertical);
 						this->Faces.push_back(interface);
 						this->InteriorFaces.push_back(interface);
@@ -451,9 +415,7 @@ public:
 		all_non_null = std::all_of(Faces.begin(), Faces.end(),
 						[](auto ptr) { return ptr != nullptr; });
 
-		if (all_non_null)
-			std::cout << "All face-pointers are non-null after build.\n";
-		else
+		if (!all_non_null)
 			std::cout << "ERROR::::::::::::::::::::::::::::  Found at least one face-nullptr.\n";
 	}
 
@@ -462,9 +424,7 @@ public:
 		if (stripe % 2 == 0)
 		{
 			// r-stripe
-			//BigNumber offset = stripe == 0 ? 0 : stripe_vertex_breaks[stripe - 1];
 			BigNumber offset = stripe_vertex_breaks[stripe];
-			auto xxxx = offset + y * (Nx_r + 1) + x;;
 			return offset + y * (Nx_r + 1) + x;
 		}
 
@@ -494,7 +454,6 @@ public:
 
 	inline BigNumber indexE(BigNumber x, BigNumber y, int stripe)
 	{
-		//BigNumber offset = stripe == 0 ? 0 : stripe_element_breaks[stripe - 1];
 		BigNumber offset = stripe_element_breaks[stripe];
 
 		if (stripe % 2 == 0)
@@ -521,13 +480,26 @@ private:
 public:
 	string Description() override
 	{
-		return "CartesianEmilMesh: " + to_string(this->Nx_l + Nx_r) + " x " + to_string(this->Ny_l + Ny_r);
+		string stringBuilder = "CartesianPolyStripeMesh: ";
+
+		for (int i = 0; i < this->n_stripes; i++)
+		{
+			if (i % 2 == 0)
+				stringBuilder += to_string(this->Nx_r) + "x" + to_string(this->Ny_r);
+			else
+				stringBuilder += to_string(this->Nx_l) + "x" + to_string(this->Ny_l);
+
+			if (!isFinalStripe(i))
+				stringBuilder += " + ";
+		}
+
+		return stringBuilder;
 	}
 
 	string FileNamePart() override
 	{
 		string geo = this->With4Quadrants ? "square4quadrants" : "square";
-		return geo + "-inhouse-cartpoly-n" + to_string(this->Nx_l + Nx_r);
+		return geo + "-inhouse-cartpolystripe-n" + to_string(this->Nx_l + Nx_r);
 	}
 
 	string GeometryDescription() override

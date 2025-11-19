@@ -460,6 +460,7 @@ public:
 
 	static void test_StripeMesh()
 	{
+		cout << endl << "Running unit-tests for poly-stripe-mesh." << endl;
 		{
 			int nx = 2;
 			int ny = nx;

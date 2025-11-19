@@ -122,6 +122,7 @@ Mesh<2>* MeshFactory<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase
 	BigNumber nx = args.Discretization.N;
 	BigNumber ny = args.Discretization.Ny == 0 ? args.Discretization.N : args.Discretization.Ny;
 	int n_stripes = args.Discretization.N_stripes;
+	int reso_factor = args.Discretization.Stripe_reso_factor;
 	string meshCode = args.Discretization.MeshCode;
 	double stretch = args.Discretization.Stretch;
 
@@ -146,7 +147,7 @@ Mesh<2>* MeshFactory<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase
 			else if (meshCode.compare("cart-poly") == 0)
 				fineMesh = new Square_CartesianPolygonalMesh(nx, ny);
 			else if (meshCode.compare("cart-emil") == 0)
-				fineMesh = new Square_CartesianPolyStripeMesh(nx, ny, n_stripes);
+				fineMesh = new Square_CartesianPolyStripeMesh(nx, ny, n_stripes, reso_factor);
 			else if (meshCode.compare("stri") == 0)
 				fineMesh = new Square_TriangularMesh(nx, ny);
 			else if (meshCode.compare("quad") == 0)
