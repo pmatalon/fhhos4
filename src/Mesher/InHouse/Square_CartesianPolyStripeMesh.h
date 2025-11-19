@@ -181,12 +181,15 @@ public:
 			}
 		}
 
-		// test
+		// tests
+		if (this->Vertices.size() != stripe_vertex_breaks.back())
+			cout << "ERROR:::::::::::::::::::::::::::: Number of vertices: " << this->Vertices.size() << " vs how many should be: " << stripe_vertex_breaks.back() << endl;
+
 		bool all_non_null = std::all_of(Vertices.begin(), Vertices.end(),
 								[](auto ptr) { return ptr != nullptr; });
 
 		if (!all_non_null)
-			std::cout << "ERROR::::::::::::::::::::::::::::  Found at least one vertex-nullptr.\n";
+			std::cout << "ERROR::::::::::::::::::::::::::::  Found at least one vertex-nullptr" << endl;
 
 		//----------//
 		// Elements //
@@ -230,19 +233,29 @@ public:
 			}
 		}
 
-		// test
+		// tests
+		if (this->Elements.size() != stripe_element_breaks.back())
+			cout << "ERROR:::::::::::::::::::::::::::: Number of elements: " << this->Elements.size() << " vs how many should be: " << stripe_element_breaks.back() << endl;
+
 		all_non_null = std::all_of(Elements.begin(), Elements.end(),
 						[](auto ptr) { return ptr != nullptr; });
 
 		if (!all_non_null)
-			std::cout << "ERROR::::::::::::::::::::::::::::  Found at least one element-nullptr.\n";
+			std::cout << "ERROR::::::::::::::::::::::::::::  Found at least one element-nullptr" << endl;
 
 		//-------//
 		// Faces //
 		//-------//
 
-		this->Faces.reserve(nx_l * (ny_l + 1) + ny_l * nx_l +
-							  nx_r * (ny_r + 1) + ny_r * (nx_r + 1));
+		int n_faces = n_r_stripes * (nx_r * (ny_r + 1) + ny_r * (nx_r + 1)) + n_l_stripes * (nx_l * (ny_l + 1) + ny_l * (nx_l - 1));
+
+		if (isFinalStripe(l_indices.back()))
+		{
+			// account for east boundary faces
+			n_faces += ny_l;
+		}
+
+		this->Faces.reserve(n_faces);
 		BigNumber numberInterface = 0;
 
 		for (int r_index : r_indices)
@@ -301,7 +314,7 @@ public:
 		}
 
 		// East boundary
-		if (l_indices.back() == n_stripes - 1)
+		if (isFinalStripe(l_indices.back()))
 		{
 			for (BigNumber iy = 0; iy < ny_l; ++iy)
 			{
@@ -412,11 +425,15 @@ public:
 			}
 		}
 
+		// tests
+		if (this->Faces.size() != n_faces)
+			cout << "ERROR:::::::::::::::::::::::::::: Number of faces: " << this->Faces.size() << " vs how many should be: " << n_faces << endl;
+
 		all_non_null = std::all_of(Faces.begin(), Faces.end(),
 						[](auto ptr) { return ptr != nullptr; });
 
 		if (!all_non_null)
-			std::cout << "ERROR::::::::::::::::::::::::::::  Found at least one face-nullptr.\n";
+			cout << "ERROR::::::::::::::::::::::::::::  Found at least one face-nullptr" << endl;
 	}
 
 	inline BigNumber indexV(BigNumber x, BigNumber y, int stripe)
