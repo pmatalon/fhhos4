@@ -22,7 +22,7 @@ public:
 	// adjustable parameters
 	int ky; // resolution factor relating high and low reso along y-axis
 	int n_stripes; // number high- vs low resolution stripes
-	double r_length = 0.1; // length in x of high-reso stripe
+	double r_length; // length in x of high-reso stripe
 
 	// derived parameters
 	int n_breaks;
@@ -37,12 +37,13 @@ public:
 	vector<BigNumber> stripe_vertex_breaks = {0};
 	vector<BigNumber> stripe_element_breaks = {0};
 
-	Square_CartesianPolyStripeMesh(BigNumber nx, BigNumber ny, const int nb_stripes, const int reso_factor = 16, bool with4Quadrants = false, bool buildMesh = true) : PolyhedralMesh()
+	Square_CartesianPolyStripeMesh(BigNumber nx, BigNumber ny, const int nb_stripes, const int reso_factor = 16, const double high_reso_length=0.1, bool with4Quadrants = false, bool buildMesh = true) : PolyhedralMesh()
 	{
 		this->n_stripes = nb_stripes;
 		this->n_breaks = nb_stripes - 1;
 		this->n_r_stripes = 1 + n_breaks / 2;
 		this->n_l_stripes = (n_breaks + 1) / 2;
+		this->r_length = high_reso_length;
 		this->l_length = (1.0 - n_r_stripes * r_length) / n_l_stripes;
 		this->ky = reso_factor;
 
@@ -170,12 +171,13 @@ public:
 					this->Vertices[vertexIndex] = vertex;
 				}
 
-				if (l_index == n_stripes - 1)
+				//if (l_index == n_stripes - 1)
+				if (isFinalStripe(l_index))
 				{
-					// include vertices on left boundary
+					// include vertices on east domain boundary
 					BigNumber ix = nx_l;
 					auto vertexIndex = indexV(ix, iy, l_index);
-					auto* vertex = new Vertex(vertexIndex, r_length + ix * hx_l, iy * hy_l);
+					auto* vertex = new Vertex(vertexIndex, h_breaks[l_index] + ix * hx_l, iy * hy_l);
 					this->Vertices[vertexIndex] = vertex;
 				}
 			}
@@ -347,8 +349,9 @@ public:
 				{
 					auto* element = dynamic_cast<RectangularPolygonalElement*>(this->Elements[indexE(ix, iy, r_index)]);
 					RectangularPolygonalElement* eastNeighbour;
+
 					// If not on east boundary create east face
-					if (!(ix == nx_r - 1 && r_index == n_stripes - 1))
+					if (!(ix == nx_r - 1 && isFinalStripe(r_index)))
 					{
 						if (ix == nx_r - 1)
 						{
@@ -455,7 +458,8 @@ public:
 
 		BigNumber offset = stripe_vertex_breaks[stripe];
 
-		if (stripe != n_stripes - 1)
+		//if (stripe != n_stripes - 1)
+		if (!isFinalStripe(stripe))
 		{
 			if (x == Nx_l)
 			{
@@ -566,7 +570,7 @@ public:
 			return;
 		}
 
-		auto* coarseMesh = new Square_CartesianPolyStripeMesh(nx_l / 2, ny_l / 2, this->n_stripes, this->ky, this->With4Quadrants, false);
+		auto* coarseMesh = new Square_CartesianPolyStripeMesh(nx_l / 2, ny_l / 2, this->n_stripes, this->ky, this->r_length, this->With4Quadrants, false);
 		this->InitializeCoarsening(coarseMesh);
 		coarseMesh->ComesFrom.CS = H_CoarsStgy::StandardCoarsening;
 		//coarseMesh->ComesFrom.nFineElementsByCoarseElement = 4;
@@ -671,6 +675,6 @@ public:
 
 	Mesh<2>* Copy() override
 	{
-		return new Square_CartesianPolyStripeMesh(this->Nx_l, this->Ny_l, this->n_stripes, this->ky, this->With4Quadrants);
+		return new Square_CartesianPolyStripeMesh(this->Nx_l, this->Ny_l, this->n_stripes, this->ky, this->r_length, this->With4Quadrants);
 	}
 };

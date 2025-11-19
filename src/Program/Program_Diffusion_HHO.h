@@ -460,14 +460,15 @@ public:
 
 	static void test_StripeMesh()
 	{
-		cout << endl << "Running unit-tests for poly-stripe-mesh." << endl;
+		cout << endl << "Running unit-tests for poly-stripe-mesh -----";
 		{
 			int nx = 2;
 			int ny = nx;
 			int n_stripes = 2;
 			int k = 4;
+			double r_length = 0.1;
 
-			auto* mesh = new Square_CartesianPolyStripeMesh(nx, ny, n_stripes, k);
+			auto* mesh = new Square_CartesianPolyStripeMesh(nx, ny, n_stripes, k, r_length);
 
 			// vertices
 			assert(mesh->indexV(2,8,0) == 26);
@@ -490,6 +491,18 @@ public:
 				}
 			}
 			assert(n_boundaryCells == 14);
+
+			assert(mesh->BoundaryFaces.size() == 18);
+
+			// coordinates
+			assert(mesh->Vertices[2]->X == 0.1);
+			assert(mesh->Vertices[2]->Y == 0.0);
+
+			assert(mesh->Vertices[13]->X == 0.05);
+			assert(mesh->Vertices[13]->Y == 0.5);
+
+			assert(mesh->Vertices[31]->X == 0.55);
+			assert(mesh->Vertices[31]->Y == 1.0);
 		}
 
 		{
@@ -497,8 +510,9 @@ public:
 			int ny = nx;
 			int n_stripes = 3;
 			int k = 4;
+			double r_length = 0.1;
 
-			auto* mesh = new Square_CartesianPolyStripeMesh(nx, ny, n_stripes, k);
+			auto* mesh = new Square_CartesianPolyStripeMesh(nx, ny, n_stripes, k, r_length);
 
 			// vertices
 			assert(mesh->indexV(2,8,0) == 26);
@@ -523,6 +537,23 @@ public:
 				}
 			}
 			assert(n_boundaryCells == 24);
+
+			assert(mesh->BoundaryFaces.size() == 28);
+
+			// coordinates
+			assert(mesh->Vertices[2]->X == 0.1);
+			assert(mesh->Vertices[2]->Y == 0.0);
+
+			assert(mesh->Vertices[13]->X == 0.05);
+			assert(mesh->Vertices[13]->Y == 0.5);
+
+			assert(mesh->Vertices[29]->X == 0.5);
+			assert(mesh->Vertices[29]->Y == 1.0);
+
+			assert(mesh->Vertices[47]->X == 1.0);
+			assert(mesh->Vertices[47]->Y == 0.625);
 		}
+
+		cout << " Passed!" << endl;
 	}
 };
