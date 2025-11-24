@@ -482,17 +482,31 @@ public:
 			assert(mesh->indexE(0,0,1) == 16);
 			assert(mesh->indexE(1,1,1) == 19);
 
+			// count per cell
 			int n_boundaryCells = 0;
+			int n_eastFaces = 0;
+			int n_westFaces = 0;
+			int n_northFaces = 0;
+			int n_southFaces = 0;
 			for (auto* cell : mesh->Elements)
 			{
 				if (!cell->BoundaryFaces().empty())
 				{
 					n_boundaryCells++;
 				}
+
+				auto* polyCell = dynamic_cast<RectangularPolygonalElement*>(cell);
+				n_eastFaces += polyCell->EastFaces.size();
+				n_westFaces += polyCell->WestFaces.size();
+				n_northFaces += polyCell->NorthFaces.size();
+				n_southFaces += polyCell->SouthFaces.size();
 			}
 			assert(n_boundaryCells == 14);
-
 			assert(mesh->BoundaryFaces.size() == 18);
+			assert(n_eastFaces == 20);
+			assert(n_westFaces == 26);
+			assert(n_northFaces == 20);
+			assert(n_southFaces == 20);
 
 			// coordinates
 			assert(mesh->Vertices[2]->X == 0.1);
@@ -503,6 +517,17 @@ public:
 
 			assert(mesh->Vertices[31]->X == 0.55);
 			assert(mesh->Vertices[31]->Y == 1.0);
+
+			// detailed test
+			auto* rectangle = dynamic_cast<RectangularPolygonalElement*>(mesh->Elements[mesh->indexE(0, 0, 1)]);
+			assert(rectangle->TopLeftCorner->Number == 14);
+			assert(rectangle->TopLeftCorner->X == 0.1);
+			assert(rectangle->TopLeftCorner->Y == 0.5);
+			assert(rectangle->TopRightCorner->Number == 29);
+			assert(rectangle->SouthFaces.size() == 1);
+			assert(rectangle->WestFaces.size() == 4);
+			assert(rectangle->EastFaces.size() == 1);
+			assert(rectangle->NorthFaces.size() == 1);
 		}
 
 		{
@@ -528,6 +553,7 @@ public:
 			assert(mesh->indexE(1,1,1) == 19);
 			assert(mesh->indexE(1,7,2) == 35);
 
+			// boundary
 			int n_boundaryCells = 0;
 			for (auto* cell : mesh->Elements)
 			{
@@ -537,7 +563,6 @@ public:
 				}
 			}
 			assert(n_boundaryCells == 24);
-
 			assert(mesh->BoundaryFaces.size() == 28);
 
 			// coordinates

@@ -37,7 +37,7 @@ public:
 	vector<BigNumber> stripe_vertex_breaks = {0};
 	vector<BigNumber> stripe_element_breaks = {0};
 
-	Square_CartesianPolyStripeMesh(BigNumber nx, BigNumber ny, const int nb_stripes, const int reso_factor = 16, const double high_reso_length=0.1, bool with4Quadrants = false, bool buildMesh = true) : PolyhedralMesh()
+	Square_CartesianPolyStripeMesh(BigNumber nx, BigNumber ny, const int nb_stripes, const int reso_factor = 16, const double high_reso_length=0.5, bool with4Quadrants = false, bool buildMesh = true) : PolyhedralMesh()
 	{
 		this->n_stripes = nb_stripes;
 		this->n_breaks = nb_stripes - 1;
