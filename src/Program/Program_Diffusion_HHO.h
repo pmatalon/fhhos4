@@ -528,6 +528,23 @@ public:
 			assert(rectangle->WestFaces.size() == 4);
 			assert(rectangle->EastFaces.size() == 1);
 			assert(rectangle->NorthFaces.size() == 1);
+
+			// coarsened mesh
+			mesh->StandardCoarsening();
+			auto* coarseMesh = mesh->CoarseMesh;
+			assert(coarseMesh->Elements.size() == 5);
+			assert(mesh->Elements[3]->CoarserElement == coarseMesh->Elements[0]);
+			assert(mesh->Elements[5]->CoarserElement == coarseMesh->Elements[1]);
+			assert(mesh->Elements[15]->CoarserElement == coarseMesh->Elements[3]);
+			assert(mesh->Elements[18]->CoarserElement == coarseMesh->Elements[4]);
+
+			int n_removed_faces(0);
+			for (auto* cell : coarseMesh->Elements)
+			{
+				n_removed_faces += cell->FinerFacesRemoved.size();
+			}
+
+			assert(n_removed_faces == 20);
 		}
 
 		{

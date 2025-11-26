@@ -37,7 +37,7 @@ public:
 	vector<BigNumber> stripe_vertex_breaks = {0};
 	vector<BigNumber> stripe_element_breaks = {0};
 
-	Square_CartesianPolyStripeMesh(BigNumber nx, BigNumber ny, const int nb_stripes, const int reso_factor = 16, const double high_reso_length=0.5, bool with4Quadrants = false, bool buildMesh = true) : PolyhedralMesh()
+	Square_CartesianPolyStripeMesh(BigNumber nx, BigNumber ny, const int nb_stripes, const int reso_factor = 16, const double high_reso_length=0.1, bool with4Quadrants = false, bool buildMesh = true) : PolyhedralMesh()
 	{
 		this->n_stripes = nb_stripes;
 		this->n_breaks = nb_stripes - 1;
@@ -644,12 +644,16 @@ public:
 						fineElement->NorthFaces[0]->CoarseFace = coarseElement->NorthFaces[0];
 					}
 
-					if (ix % 2 == 0 && ix > 0)
+					if (ix % 2 == 0)
 					{
 						fineElement->EastFaces[0]->IsRemovedOnCoarserGrid = true;
 						coarseElement->FinerFacesRemoved.push_back(fineElement->EastFaces[0]);
-						coarseElement->WestFaces[0]->FinerFaces.push_back(fineElement->WestFaces[0]);
-						fineElement->WestFaces[0]->CoarseFace = coarseElement->WestFaces[0];
+
+						if (ix > 0)
+						{
+							coarseElement->WestFaces[0]->FinerFaces.push_back(fineElement->WestFaces[0]);
+							fineElement->WestFaces[0]->CoarseFace = coarseElement->WestFaces[0];
+						}
 					}
 				}
 			}
