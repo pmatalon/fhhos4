@@ -19,12 +19,12 @@ public:
 	BigNumber Ny_r; //high reso ny
 	bool With4Quadrants; // not implemented for this mesh
 
-	// adjustable parameters
+	// adjustable variables
 	int ky; // resolution factor relating high and low reso along y-axis
-	int n_stripes; // number high- vs low resolution stripes
+	int n_stripes; // number high- and low resolution stripes
 	double r_length; // length in x of high-reso stripe
 
-	// derived parameters
+	// derived variables
 	int n_breaks;
 	int n_r_stripes;
 	int n_l_stripes;
@@ -171,7 +171,6 @@ public:
 					this->Vertices[vertexIndex] = vertex;
 				}
 
-				//if (l_index == n_stripes - 1)
 				if (isFinalStripe(l_index))
 				{
 					// include vertices on east domain boundary
@@ -458,7 +457,6 @@ public:
 
 		BigNumber offset = stripe_vertex_breaks[stripe];
 
-		//if (stripe != n_stripes - 1)
 		if (!isFinalStripe(stripe))
 		{
 			if (x == Nx_l)
