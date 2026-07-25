@@ -1,4 +1,5 @@
 #pragma once
+#include <cassert>
 #include <thread>
 #include <future>
 #include <math.h>

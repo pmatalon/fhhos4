@@ -261,10 +261,6 @@ paket-files/
 __pycache__/
 *.pyc
 
-# Eigen
-/eigen-eigen-b3f3d4950030.zip
-/Eigen
-
 # GMSH
 /gmsh-4.4.1-Linux64-sdk/include/gmsh.h_cwrap
 /gmsh-4.4.1-Linux64-sdk/include/gmshc.h

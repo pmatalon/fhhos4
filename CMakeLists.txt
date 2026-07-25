@@ -1,17 +1,11 @@
-cmake_minimum_required (VERSION 3.5)
+cmake_minimum_required(VERSION 3.20)
 
-project(fhhos4)
+project(fhhos4 LANGUAGES CXX)
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 message(STATUS "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
-
-# c++ flags
-#set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Ofast") # comment this line to have exact same results than in Debug
-
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g") # uncomment this line and comment the one above to use Valgrind
 
 # enable C++17
 set(CMAKE_CXX_STANDARD 17)
@@ -27,53 +21,22 @@ option(ENABLE_1D "Enable 1D" OFF)
 option(ENABLE_2D "Enable 2D" ON)
 option(ENABLE_3D "Enable 3D" ON)
 
-add_definitions(-DROOT_PATH="${CMAKE_SOURCE_DIR}")
-
-if(SMALL_INDEX)
-	add_definitions(-DSMALL_INDEX)
-	message(STATUS "SMALL_INDEX: ON (int)")
-else()
-	message(STATUS "SMALL_INDEX: OFF (size_t)")
-endif()
-
-if(ENABLE_1D)
-	add_definitions(-DENABLE_1D)
-	message(STATUS "ENABLE_1D: ON")
-else()
-	message(STATUS "ENABLE_1D: OFF")
-endif()
-
-if(ENABLE_2D)
-	add_definitions(-DENABLE_2D)
-	message(STATUS "ENABLE_2D: ON")
-else()
-	message(STATUS "ENABLE_2D: OFF")
-endif()
-
-if(ENABLE_3D)
-	add_definitions(-DENABLE_3D)
-	message(STATUS "ENABLE_3D: ON")
-else()
-	message(STATUS "ENABLE_3D: OFF")
-endif()
-
 set(EXECUTABLE_OUTPUT_PATH bin/)
 
-# show compiler commands
-set(CMAKE_VERBOSE_MAKEFILE ON)
+# Pass -DCMAKE_VERBOSE_MAKEFILE=ON (or `cmake --build build -- VERBOSE=1`) to see full compiler commands
 
 # Files to compile
 file(
 	GLOB_RECURSE
 	source_files
+	CONFIGURE_DEPENDS
 	src/*
 )
 
 # Include AGMG compiled files
 if(ENABLE_AGMG)
 	message(STATUS "AGMG enabled")
-	SET(OBJS ${AGMG_DIR}/dagmg.o ${AGMG_DIR}/dagmg_mumps.o)
-	add_definitions(-DAGMG_ENABLED)
+	set(OBJS ${AGMG_DIR}/dagmg.o ${AGMG_DIR}/dagmg_mumps.o)
 else()
 	message(STATUS "AGMG disabled. Add -DENABLE_AGMG=ON and -DAGMG_DIR=<path/to/.o/files> to enable it.")
 endif()
@@ -81,40 +44,87 @@ endif()
 # Executable file
 add_executable(fhhos4 ${OBJS} ${source_files})
 
+target_compile_definitions(fhhos4 PRIVATE ROOT_PATH="${CMAKE_SOURCE_DIR}")
+
+if(SMALL_INDEX)
+	target_compile_definitions(fhhos4 PRIVATE SMALL_INDEX)
+	message(STATUS "SMALL_INDEX: ON (int)")
+else()
+	message(STATUS "SMALL_INDEX: OFF (size_t)")
+endif()
+
+if(ENABLE_1D)
+	target_compile_definitions(fhhos4 PRIVATE ENABLE_1D)
+	message(STATUS "ENABLE_1D: ON")
+else()
+	message(STATUS "ENABLE_1D: OFF")
+endif()
+
+if(ENABLE_2D)
+	target_compile_definitions(fhhos4 PRIVATE ENABLE_2D)
+	message(STATUS "ENABLE_2D: ON")
+else()
+	message(STATUS "ENABLE_2D: OFF")
+endif()
+
+if(ENABLE_3D)
+	target_compile_definitions(fhhos4 PRIVATE ENABLE_3D)
+	message(STATUS "ENABLE_3D: ON")
+else()
+	message(STATUS "ENABLE_3D: OFF")
+endif()
+
+if(ENABLE_AGMG)
+	target_compile_definitions(fhhos4 PRIVATE AGMG_ENABLED)
+endif()
+
+# Include Eigen
+find_package(Eigen3 REQUIRED NO_MODULE)
+target_link_libraries(fhhos4 PRIVATE Eigen3::Eigen)
+
 # Include CGAL
 if(ENABLE_CGAL)
 	message(STATUS "CGAL enabled")
-	set(CGAL_DIR "${CMAKE_SOURCE_DIR}/dependencies/cgal/CGAL-5.1")
-	find_package(CGAL)
-	target_link_libraries(fhhos4 CGAL::CGAL)
-	add_definitions(-DCGAL_ENABLED)
+	# CGAL's own exported CMake files call cmake_minimum_required() internally, which resets
+	# CMP0167 right before their own find_package(Boost) call and triggers a policy warning.
+	# A plain cmake_policy(SET ...) gets clobbered by that nested call, so pin the default here
+	# instead - it's rechecked on every cmake_minimum_required()/cmake_policy(VERSION) call.
+	if(POLICY CMP0167)
+		set(CMAKE_POLICY_DEFAULT_CMP0167 NEW)
+	endif()
+	find_package(CGAL REQUIRED)
+	target_link_libraries(fhhos4 PRIVATE CGAL::CGAL)
+	target_compile_definitions(fhhos4 PRIVATE CGAL_ENABLED)
 else()
 	message(STATUS "CGAL disabled. Add -DENABLE_CGAL=ON to enable it.")
 endif()
 
-# Include Eigen
-include_directories(dependencies/eigen/eigen-3.4.0)
-
 # Include GMSH
-if (ENABLE_GMSH)
+if(ENABLE_GMSH)
 	message(STATUS "GMSH enabled")
-	if (GMSH_API)
-		include_directories(${GMSH_API})
+	if(GMSH_API)
+		target_include_directories(fhhos4 PRIVATE ${GMSH_API})
 	else()
-		message(WARNING "Option -DGMSH_API missing. Set this option if gmsh.h is not found during compilation")
+		find_path(GMSH_API NAMES gmsh.h)
+		if(GMSH_API)
+			target_include_directories(fhhos4 PRIVATE ${GMSH_API})
+			message(STATUS "GMSH header found: ${GMSH_API}/gmsh.h")
+		else()
+			message(WARNING "Option -DGMSH_API missing, and gmsh.h could not be found automatically. Set this option if gmsh.h is not found during compilation")
+		endif()
 	endif()
-	if (GMSH_LIB)
-		target_link_libraries(fhhos4 "${GMSH_LIB}") # -lgmsh
+	if(GMSH_LIB)
+		target_link_libraries(fhhos4 PRIVATE "${GMSH_LIB}") # -lgmsh
 	else()
 		find_library(GMSH_LIB NAMES gmsh)
 		if(GMSH_LIB)
-			target_link_libraries(fhhos4 "${GMSH_LIB}") # -lgmsh
+			target_link_libraries(fhhos4 PRIVATE "${GMSH_LIB}") # -lgmsh
 			message(STATUS "GMSH library found: ${GMSH_LIB}")
 		else()
 			message(FATAL_ERROR "The GMSH dynamic library was not found. Note that GMSH must be compiled with the option -DENABLE_BUILD_DYNAMIC=1. Pass the library path with the option -DGMSH_LIB=<path>/libgmsh.so.")
 		endif()
 	endif()
-	add_definitions(-DGMSH_ENABLED)
+	target_compile_definitions(fhhos4 PRIVATE GMSH_ENABLED)
 else()
 	message(STATUS "GMSH disabled. Add -DENABLE_GMSH=ON to enable it.")
 endif()
@@ -122,7 +132,7 @@ endif()
 # Include pthread
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
-target_link_libraries(fhhos4 Threads::Threads)
+target_link_libraries(fhhos4 PRIVATE Threads::Threads)
 
 # Include AGMG (requires Blas and Lapack)
 if(ENABLE_AGMG)
@@ -140,5 +150,5 @@ if(ENABLE_AGMG)
 		message(FATAL_ERROR "LAPACK not found.")
 	endif()
 
-	target_link_libraries(fhhos4 "-lgfortran" "-lm" ${TPL_LAPACK_LIB} ${TPL_BLAS_LIB})
+	target_link_libraries(fhhos4 PRIVATE "-lgfortran" "-lm" ${TPL_LAPACK_LIB} ${TPL_BLAS_LIB})
 endif()

@@ -75,7 +75,7 @@ public:
 	void ExportMatrix(const DenseMatrix& M, string suffix) const
 	{
 		string filePath = GetDatFilePath(suffix);
-		Eigen::saveMarket(M, filePath);
+		Eigen::saveMarketDense(M, filePath);
 		cout << "Matrix exported: " << filePath << endl;
 	}
 

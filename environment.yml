@@ -1,0 +1,11 @@
+name: fhhos4
+channels:
+  - conda-forge
+dependencies:
+  - eigen
+  - cgal
+  - boost
+  - gmsh
+  - cxx-compiler
+  - cmake
+  - make
