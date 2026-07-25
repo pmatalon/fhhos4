@@ -4,7 +4,6 @@ channels:
 dependencies:
   - eigen
   - cgal
-  - boost
   - gmsh
   - cxx-compiler
   - cmake

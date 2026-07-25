@@ -30,9 +30,9 @@ So without the need for a specific version of those libraries, you have nothing 
 Only GMSH is to be installed. To do so, follow step 2.
 Finally, build the program following step 4.
 
-With conda, you can simply install the following packages in your environment:
+Or you can simply create the following conda environment:
 ```bash
-conda install boost gmsh cgal cmake make
+conda create --name fhhos4 boost gmsh cgal cxx-compiler cmake make
 ```
 
 

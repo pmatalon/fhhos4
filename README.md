@@ -25,16 +25,16 @@ This program depends on the following third-party software packages:
 and optionally
 - AGMG (version 3.3.5 or later).
 
-Eigen and CGAL are provided through a conda environment (`environment.yml`, at the root of the repository). GMSH is also available in that environment, but can alternatively be built from source if you need a specific version.
+Eigen and CGAL are provided through a conda environment (`conda/environment.yml`). GMSH is also available in that environment, but can alternatively be built from source if you need a specific version.
 
 ## 1. Create and activate the conda environment
 
 ```bash
-conda env create -f environment.yml
+conda env create -f conda/environment.yml
 conda activate fhhos4
 ```
 
-This installs Eigen, CGAL, Boost, GMSH, a C++ compiler, CMake and Make into an environment named `fhhos4`. Keep this environment activated whenever you configure or build the project, so that CMake can find Eigen and CGAL automatically.
+Keep this environment activated whenever you configure or build the project, so that CMake can find Eigen and CGAL automatically.
 
 ## 2. (Optional) Build GMSH from source
 
@@ -52,7 +52,7 @@ cmake -DENABLE_BUILD_DYNAMIC=1 -DENABLE_FLTK=0 .. # if issue with cgns, add opti
 make                       # and go get a coffee
 ```
 
-## 3. Install AGMG version 3.3.5 or later (optional) 
+## 3. (Optional) Install AGMG version 3.3.5 or later
 AGMG must be compiled to get the .o files
 
 ```bash
