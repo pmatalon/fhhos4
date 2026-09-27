@@ -262,7 +262,7 @@ private:
 };
 
 template<>
-void Interface<2>::CreateCollapsedFace()
+inline void Interface<2>::CreateCollapsedFace()
 {
 	_collapsedFace = new Edge(0, _boundaryVertices[0], _boundaryVertices[1]);
 }

@@ -62,7 +62,7 @@ public:
 	virtual ~Vertex() {}
 };
 
-DimVector<2> operator-(Point const& A, Point const& B)
+inline DimVector<2> operator-(Point const& A, Point const& B)
 {
 	DimVector<2> v;
 	v << A.X - B.X, A.Y - B.Y;

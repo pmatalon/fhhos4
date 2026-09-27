@@ -5,6 +5,7 @@ dependencies:
   - eigen
   - cgal
   - gmsh
+  - gtest
   - cxx-compiler
   - cmake
   - make

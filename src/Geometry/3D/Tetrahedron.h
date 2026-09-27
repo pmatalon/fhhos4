@@ -24,7 +24,7 @@ private:
 	vector<Tetrahedron> _refinement;
 
 public:
-	static ReferenceTetrahedron RefTetra;
+	inline static ReferenceTetrahedron RefTetra = ReferenceTetrahedron();
 
 	Tetrahedron() {}
 
@@ -361,5 +361,3 @@ public:
 		assert(abs(t.Measure() - pow(3, 3)/6.0) < 1e-14); // Tetra's volume is 1/6 of the cube's
 	}
 };
-
-ReferenceTetrahedron Tetrahedron::RefTetra = ReferenceTetrahedron();

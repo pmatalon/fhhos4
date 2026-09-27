@@ -29,7 +29,7 @@ private:
 	double b3;
 
 public:
-	static ReferenceCartesianShape<2> RefSquare;
+	inline static ReferenceCartesianShape<2> RefSquare = ReferenceCartesianShape<2>();
 
 	Quadrilateral() {}
 
@@ -332,5 +332,3 @@ public:
 		DomPoint dom = q.ConvertToDomain(RefPoint(-0.069222, 0.534611));
 	}
 };
-
-ReferenceCartesianShape<2> Quadrilateral::RefSquare = ReferenceCartesianShape<2>();

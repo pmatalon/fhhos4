@@ -2233,7 +2233,7 @@ public:
 
 #ifdef ENABLE_2D
 template<>
-Element<2>* PolyhedralMesh<2>::CreatePolyhedron(vector<Vertex*> vertices)
+inline Element<2>* PolyhedralMesh<2>::CreatePolyhedron(vector<Vertex*> vertices)
 {
 #ifdef CGAL_ENABLED
 	BigNumber elementNumber = this->Elements.size();
@@ -2248,7 +2248,7 @@ Element<2>* PolyhedralMesh<2>::CreatePolyhedron(vector<Vertex*> vertices)
 
 #ifdef ENABLE_3D
 template<>
-Element<3>* PolyhedralMesh<3>::CreatePolyhedron(vector<Vertex*> vertices)
+inline Element<3>* PolyhedralMesh<3>::CreatePolyhedron(vector<Vertex*> vertices)
 {
 	Utils::FatalError("The function PolyhedralMesh<3>::CreatePolyhedron() is not yet implemented.");
 	return nullptr;
@@ -2258,7 +2258,7 @@ Element<3>* PolyhedralMesh<3>::CreatePolyhedron(vector<Vertex*> vertices)
 
 #ifdef ENABLE_2D
 template<>
-Element<2>* PolyhedralMesh<2>::CreateMacroElement(Element<2>* e1, Element<2>* e2, const vector<Face<2>*>& facesToRemove)
+inline Element<2>* PolyhedralMesh<2>::CreateMacroElement(Element<2>* e1, Element<2>* e2, const vector<Face<2>*>& facesToRemove)
 {
 #ifdef CGAL_ENABLED
 	PolygonalElement* macroElement = new PolygonalElement(0, e1, e2, facesToRemove, false);
@@ -2272,7 +2272,7 @@ Element<2>* PolyhedralMesh<2>::CreateMacroElement(Element<2>* e1, Element<2>* e2
 
 #ifdef ENABLE_3D
 template<>
-Element<3>* PolyhedralMesh<3>::CreateMacroElement(Element<3>* e1, Element<3>* e2, const vector<Face<3>*>& facesToRemove)
+inline Element<3>* PolyhedralMesh<3>::CreateMacroElement(Element<3>* e1, Element<3>* e2, const vector<Face<3>*>& facesToRemove)
 {
 	Utils::FatalError("Not implemented in 3D.");
 	return nullptr;
@@ -2282,7 +2282,7 @@ Element<3>* PolyhedralMesh<3>::CreateMacroElement(Element<3>* e1, Element<3>* e2
 
 #ifdef ENABLE_2D
 template<>
-Face<2>* PolyhedralMesh<2>::CreateMacroFace(Face<2>* f1, Face<2>* f2, Vertex* vertexToRemove)
+inline Face<2>* PolyhedralMesh<2>::CreateMacroFace(Face<2>* f1, Face<2>* f2, Vertex* vertexToRemove)
 {
 	Vertex* v1 = f1->Vertices()[0] == vertexToRemove ? f1->Vertices()[1] : f1->Vertices()[0];
 	Vertex* v2 = f2->Vertices()[0] == vertexToRemove ? f2->Vertices()[1] : f2->Vertices()[0];
@@ -2293,7 +2293,7 @@ Face<2>* PolyhedralMesh<2>::CreateMacroFace(Face<2>* f1, Face<2>* f2, Vertex* ve
 
 #ifdef ENABLE_3D
 template<>
-Face<3>* PolyhedralMesh<3>::CreateMacroFace(Face<3>* f1, Face<3>* f2, Vertex* vertexToRemove)
+inline Face<3>* PolyhedralMesh<3>::CreateMacroFace(Face<3>* f1, Face<3>* f2, Vertex* vertexToRemove)
 {
 	Utils::FatalError("Not implemented in 3D.");
 	return nullptr;
@@ -2302,7 +2302,7 @@ Face<3>* PolyhedralMesh<3>::CreateMacroFace(Face<3>* f1, Face<3>* f2, Vertex* ve
 
 #ifdef ENABLE_2D
 template<>
-vector<PhysicalShape<2>*> PolyhedralMesh<2>::Intersection(Element<2>* e1, Element<2>* e2)
+inline vector<PhysicalShape<2>*> PolyhedralMesh<2>::Intersection(Element<2>* e1, Element<2>* e2)
 {
 #ifdef CGAL_ENABLED
 	CGAL::Polygon_2<exactKernel> cgalPoly1 = ConvertToCGALPolygon(e1);
@@ -2323,7 +2323,7 @@ vector<PhysicalShape<2>*> PolyhedralMesh<2>::Intersection(Element<2>* e1, Elemen
 
 #ifdef ENABLE_2D
 template <>
-void PolyhedralMesh<2>::FaceCoarsening()
+inline void PolyhedralMesh<2>::FaceCoarsening()
 {
 	PolyhedralMesh<2>* coarseSkeleton = new PolyhedralMesh<2>();
 	this->InitializeCoarsening(coarseSkeleton);

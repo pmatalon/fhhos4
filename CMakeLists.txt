@@ -32,6 +32,7 @@ file(
 	CONFIGURE_DEPENDS
 	src/*
 )
+list(REMOVE_ITEM source_files ${CMAKE_SOURCE_DIR}/src/main.cpp)
 
 # Include AGMG compiled files
 if(ENABLE_AGMG)
@@ -41,46 +42,54 @@ else()
 	message(STATUS "AGMG disabled. Add -DENABLE_AGMG=ON and -DAGMG_DIR=<path/to/.o/files> to enable it.")
 endif()
 
-# Executable file
-add_executable(fhhos4 ${OBJS} ${source_files})
+# Core library: everything except main.cpp, shared by the fhhos4 executable and the test executable.
+# Compile definitions/link libraries are set PUBLIC so both consumers see the exact same
+# preprocessor configuration (critical since most of the code is header-only and gets
+# recompiled per translation unit).
+add_library(fhhos4_core STATIC ${OBJS} ${source_files})
+target_include_directories(fhhos4_core PUBLIC ${CMAKE_SOURCE_DIR}/src)
 
-target_compile_definitions(fhhos4 PRIVATE ROOT_PATH="${CMAKE_SOURCE_DIR}")
+# Executable file
+add_executable(fhhos4 src/main.cpp)
+target_link_libraries(fhhos4 PRIVATE fhhos4_core)
+
+target_compile_definitions(fhhos4_core PUBLIC ROOT_PATH="${CMAKE_SOURCE_DIR}")
 
 if(SMALL_INDEX)
-	target_compile_definitions(fhhos4 PRIVATE SMALL_INDEX)
+	target_compile_definitions(fhhos4_core PUBLIC SMALL_INDEX)
 	message(STATUS "SMALL_INDEX: ON (int)")
 else()
 	message(STATUS "SMALL_INDEX: OFF (size_t)")
 endif()
 
 if(ENABLE_1D)
-	target_compile_definitions(fhhos4 PRIVATE ENABLE_1D)
+	target_compile_definitions(fhhos4_core PUBLIC ENABLE_1D)
 	message(STATUS "ENABLE_1D: ON")
 else()
 	message(STATUS "ENABLE_1D: OFF")
 endif()
 
 if(ENABLE_2D)
-	target_compile_definitions(fhhos4 PRIVATE ENABLE_2D)
+	target_compile_definitions(fhhos4_core PUBLIC ENABLE_2D)
 	message(STATUS "ENABLE_2D: ON")
 else()
 	message(STATUS "ENABLE_2D: OFF")
 endif()
 
 if(ENABLE_3D)
-	target_compile_definitions(fhhos4 PRIVATE ENABLE_3D)
+	target_compile_definitions(fhhos4_core PUBLIC ENABLE_3D)
 	message(STATUS "ENABLE_3D: ON")
 else()
 	message(STATUS "ENABLE_3D: OFF")
 endif()
 
 if(ENABLE_AGMG)
-	target_compile_definitions(fhhos4 PRIVATE AGMG_ENABLED)
+	target_compile_definitions(fhhos4_core PUBLIC AGMG_ENABLED)
 endif()
 
 # Include Eigen
 find_package(Eigen3 REQUIRED NO_MODULE)
-target_link_libraries(fhhos4 PRIVATE Eigen3::Eigen)
+target_link_libraries(fhhos4_core PUBLIC Eigen3::Eigen)
 
 # Include CGAL
 if(ENABLE_CGAL)
@@ -93,8 +102,8 @@ if(ENABLE_CGAL)
 		set(CMAKE_POLICY_DEFAULT_CMP0167 NEW)
 	endif()
 	find_package(CGAL REQUIRED)
-	target_link_libraries(fhhos4 PRIVATE CGAL::CGAL)
-	target_compile_definitions(fhhos4 PRIVATE CGAL_ENABLED)
+	target_link_libraries(fhhos4_core PUBLIC CGAL::CGAL)
+	target_compile_definitions(fhhos4_core PUBLIC CGAL_ENABLED)
 else()
 	message(STATUS "CGAL disabled. Add -DENABLE_CGAL=ON to enable it.")
 endif()
@@ -103,28 +112,28 @@ endif()
 if(ENABLE_GMSH)
 	message(STATUS "GMSH enabled")
 	if(GMSH_API)
-		target_include_directories(fhhos4 PRIVATE ${GMSH_API})
+		target_include_directories(fhhos4_core PUBLIC ${GMSH_API})
 	else()
 		find_path(GMSH_API NAMES gmsh.h)
 		if(GMSH_API)
-			target_include_directories(fhhos4 PRIVATE ${GMSH_API})
+			target_include_directories(fhhos4_core PUBLIC ${GMSH_API})
 			message(STATUS "GMSH header found: ${GMSH_API}/gmsh.h")
 		else()
 			message(WARNING "Option -DGMSH_API missing, and gmsh.h could not be found automatically. Set this option if gmsh.h is not found during compilation")
 		endif()
 	endif()
 	if(GMSH_LIB)
-		target_link_libraries(fhhos4 PRIVATE "${GMSH_LIB}") # -lgmsh
+		target_link_libraries(fhhos4_core PUBLIC "${GMSH_LIB}") # -lgmsh
 	else()
 		find_library(GMSH_LIB NAMES gmsh)
 		if(GMSH_LIB)
-			target_link_libraries(fhhos4 PRIVATE "${GMSH_LIB}") # -lgmsh
+			target_link_libraries(fhhos4_core PUBLIC "${GMSH_LIB}") # -lgmsh
 			message(STATUS "GMSH library found: ${GMSH_LIB}")
 		else()
 			message(FATAL_ERROR "The GMSH dynamic library was not found. Note that GMSH must be compiled with the option -DENABLE_BUILD_DYNAMIC=1. Pass the library path with the option -DGMSH_LIB=<path>/libgmsh.so.")
 		endif()
 	endif()
-	target_compile_definitions(fhhos4 PRIVATE GMSH_ENABLED)
+	target_compile_definitions(fhhos4_core PUBLIC GMSH_ENABLED)
 else()
 	message(STATUS "GMSH disabled. Add -DENABLE_GMSH=ON to enable it.")
 endif()
@@ -132,7 +141,7 @@ endif()
 # Include pthread
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
-target_link_libraries(fhhos4 PRIVATE Threads::Threads)
+target_link_libraries(fhhos4_core PUBLIC Threads::Threads)
 
 # Include AGMG (requires Blas and Lapack)
 if(ENABLE_AGMG)
@@ -150,5 +159,21 @@ if(ENABLE_AGMG)
 		message(FATAL_ERROR "LAPACK not found.")
 	endif()
 
-	target_link_libraries(fhhos4 PRIVATE "-lgfortran" "-lm" ${TPL_LAPACK_LIB} ${TPL_BLAS_LIB})
+	target_link_libraries(fhhos4_core PUBLIC "-lgfortran" "-lm" ${TPL_LAPACK_LIB} ${TPL_BLAS_LIB})
 endif()
+
+# Validation test suite (GoogleTest)
+enable_testing()
+find_package(GTest REQUIRED)
+include(GoogleTest)
+
+file(
+	GLOB_RECURSE
+	test_source_files
+	CONFIGURE_DEPENDS
+	tests/*.cpp
+)
+add_executable(fhhos4_tests ${test_source_files})
+target_include_directories(fhhos4_tests PRIVATE ${CMAKE_SOURCE_DIR}/tests)
+target_link_libraries(fhhos4_tests PRIVATE fhhos4_core GTest::gtest_main)
+gtest_discover_tests(fhhos4_tests)

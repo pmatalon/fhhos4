@@ -34,7 +34,7 @@ public:
 
 #ifdef ENABLE_1D
 template <>
-DiffusionTestCase<1>* DiffTestCaseFactory<1>::Create(ProblemArguments pb)
+inline DiffusionTestCase<1>* DiffTestCaseFactory<1>::Create(ProblemArguments pb)
 {
 	if (pb.TestCaseCode.compare("default") == 0)
 		return new DefaultTestCase<1>(pb);
@@ -50,7 +50,7 @@ DiffusionTestCase<1>* DiffTestCaseFactory<1>::Create(ProblemArguments pb)
 
 #ifdef ENABLE_2D
 template <>
-DiffusionTestCase<2>* DiffTestCaseFactory<2>::Create(ProblemArguments pb)
+inline DiffusionTestCase<2>* DiffTestCaseFactory<2>::Create(ProblemArguments pb)
 {
 	if (pb.TestCaseCode.compare("default") == 0)
 		return new DefaultTestCase<2>(pb);
@@ -90,7 +90,7 @@ DiffusionTestCase<2>* DiffTestCaseFactory<2>::Create(ProblemArguments pb)
 
 #ifdef ENABLE_3D
 template <>
-DiffusionTestCase<3>* DiffTestCaseFactory<3>::Create(ProblemArguments pb)
+inline DiffusionTestCase<3>* DiffTestCaseFactory<3>::Create(ProblemArguments pb)
 {
 	if (pb.TestCaseCode.compare("default") == 0)
 		return new DefaultTestCase<3>(pb);

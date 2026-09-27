@@ -48,8 +48,8 @@ private:
 	string _mshFilePath;
 	bool _mshFileIsTmp = false;
 public:
-	static bool GMSHLogEnabled;
-	static bool UseCache;
+	inline static bool GMSHLogEnabled = false;
+	inline static bool UseCache = true;
 
 	GMSHMesh(TestCase<Dim>* testCase, string gmshFile, string description, string fileNamePart, BigNumber n = 0, bool buildMesh = true)
 		: PolyhedralMesh<Dim>()
@@ -1532,7 +1532,7 @@ public:
 #ifdef ENABLE_2D
 
 template <>
-Element<2>* GMSHMesh<2>::CreateElement(int elemType, const vector<size_t>& elementNodes, size_t start, size_t elemIndex)
+inline Element<2>* GMSHMesh<2>::CreateElement(int elemType, const vector<size_t>& elementNodes, size_t start, size_t elemIndex)
 { 
 	Element<2>* e = nullptr;
 	if (elemType == GMSH_Quadrilateral)
@@ -1569,7 +1569,7 @@ Element<2>* GMSHMesh<2>::CreateElement(int elemType, const vector<size_t>& eleme
 #ifdef ENABLE_3D
 
 template <>
-Element<3>* GMSHMesh<3>::CreateElement(int elemType, const vector<size_t>& elementNodes, size_t start, size_t elemIndex)
+inline Element<3>* GMSHMesh<3>::CreateElement(int elemType, const vector<size_t>& elementNodes, size_t start, size_t elemIndex)
 {
 	Element<3>* e = nullptr;
 	if (elemType == GMSH_Tetrahedron)
@@ -1620,7 +1620,7 @@ Element<3>* GMSHMesh<3>::CreateElement(int elemType, const vector<size_t>& eleme
 #ifdef ENABLE_2D
 
 template<>
-void GMSHMesh<2>::AllocateContiguousMemoryForElements(int elemType, BigNumber numberOfElements)
+inline void GMSHMesh<2>::AllocateContiguousMemoryForElements(int elemType, BigNumber numberOfElements)
 {
 	this->Elements.reserve(numberOfElements);
 
@@ -1633,14 +1633,14 @@ void GMSHMesh<2>::AllocateContiguousMemoryForElements(int elemType, BigNumber nu
 }
 
 template<>
-void GMSHMesh<2>::AllocateContiguousMemoryForFaces(GMSHFaceTypes faceType, BigNumber numberOfFaces)
+inline void GMSHMesh<2>::AllocateContiguousMemoryForFaces(GMSHFaceTypes faceType, BigNumber numberOfFaces)
 {
 	this->Faces.reserve(numberOfFaces);
 	this->_edgeFaces.reserve(numberOfFaces);
 }
 
 template <>
-void GMSHMesh<2>::CreateFaces(int elemType, BigNumber& faceNumber)
+inline void GMSHMesh<2>::CreateFaces(int elemType, BigNumber& faceNumber)
 {
 	vector<size_t> edgeNodes;
 	bool onlyPrimaryNodes = true;
@@ -1714,7 +1714,7 @@ void GMSHMesh<2>::CreateFaces(int elemType, BigNumber& faceNumber)
 #ifdef ENABLE_3D
 
 template<>
-void GMSHMesh<3>::AllocateContiguousMemoryForElements(int elemType, BigNumber numberOfElements)
+inline void GMSHMesh<3>::AllocateContiguousMemoryForElements(int elemType, BigNumber numberOfElements)
 {
 	this->Elements.reserve(numberOfElements);
 
@@ -1727,7 +1727,7 @@ void GMSHMesh<3>::AllocateContiguousMemoryForElements(int elemType, BigNumber nu
 }
 
 template<>
-void GMSHMesh<3>::AllocateContiguousMemoryForFaces(GMSHFaceTypes faceType, BigNumber numberOfFaces)
+inline void GMSHMesh<3>::AllocateContiguousMemoryForFaces(GMSHFaceTypes faceType, BigNumber numberOfFaces)
 {
 	this->Faces.reserve(numberOfFaces);
 
@@ -1738,7 +1738,7 @@ void GMSHMesh<3>::AllocateContiguousMemoryForFaces(GMSHFaceTypes faceType, BigNu
 }
 
 template <>
-void GMSHMesh<3>::CreateFaces(int elemType, BigNumber& faceNumber)
+inline void GMSHMesh<3>::CreateFaces(int elemType, BigNumber& faceNumber)
 {
 	GMSHFaceTypes faceType;
 	int nFaceVertices = -1;
@@ -1935,7 +1935,7 @@ void GMSHMesh<3>::CreateFaces(int elemType, BigNumber& faceNumber)
 
 #ifdef ENABLE_2D
 template<>
-Face<2>* GMSHMesh<2>::GetBoundaryFaceFromGMSHNodes(int faceType, const vector<size_t>& faceNodes, size_t& faceNodeIndex)
+inline Face<2>* GMSHMesh<2>::GetBoundaryFaceFromGMSHNodes(int faceType, const vector<size_t>& faceNodes, size_t& faceNodeIndex)
 {
 	assert(faceType == GMSHElementTypes::GMSH_Segment);
 
@@ -1955,7 +1955,7 @@ Face<2>* GMSHMesh<2>::GetBoundaryFaceFromGMSHNodes(int faceType, const vector<si
 
 #ifdef ENABLE_3D
 template<>
-Face<3>* GMSHMesh<3>::GetBoundaryFaceFromGMSHNodes(int faceType, const vector<size_t>& faceNodes, size_t& faceNodeIndex)
+inline Face<3>* GMSHMesh<3>::GetBoundaryFaceFromGMSHNodes(int faceType, const vector<size_t>& faceNodes, size_t& faceNodeIndex)
 {
 	assert(faceType == GMSHElementTypes::GMSH_Triangle);
 
@@ -1973,29 +1973,3 @@ Face<3>* GMSHMesh<3>::GetBoundaryFaceFromGMSHNodes(int faceType, const vector<si
 	return nullptr;
 }
 #endif // ENABLE_3D
-
-#ifdef ENABLE_1D
-template <>
-bool GMSHMesh<1>::GMSHLogEnabled = false;
-#endif
-#ifdef ENABLE_2D
-template <>
-bool GMSHMesh<2>::GMSHLogEnabled = false;
-#endif
-#ifdef ENABLE_3D
-template <>
-bool GMSHMesh<3>::GMSHLogEnabled = false;
-#endif
-
-#ifdef ENABLE_1D
-template <>
-bool GMSHMesh<1>::UseCache = true;
-#endif
-#ifdef ENABLE_2D
-template <>
-bool GMSHMesh<2>::UseCache = true;
-#endif
-#ifdef ENABLE_3D
-template <>
-bool GMSHMesh<3>::UseCache = true;
-#endif

@@ -52,7 +52,7 @@ private:
 
 #ifdef ENABLE_1D
 template <>
-Mesh<1>* MeshFactory<1>::BuildMesh(ProgramArguments& args, TestCase<1>* testCase)
+inline Mesh<1>* MeshFactory<1>::BuildMesh(ProgramArguments& args, TestCase<1>* testCase)
 {
 	return new UniformMesh1D(args.Discretization.N);
 }
@@ -61,7 +61,7 @@ Mesh<1>* MeshFactory<1>::BuildMesh(ProgramArguments& args, TestCase<1>* testCase
 #ifdef ENABLE_2D
 
 template <>
-PolyhedralMesh<2>* MeshFactory<2>::BuildPolyhedralMesh(PolyhedralMesh<2>* mesh, FaceCoarseningStrategy faceCoarseningStgy, FaceCollapsing bdryFaceCollapsing, int nAggreg)
+inline PolyhedralMesh<2>* MeshFactory<2>::BuildPolyhedralMesh(PolyhedralMesh<2>* mesh, FaceCoarseningStrategy faceCoarseningStgy, FaceCollapsing bdryFaceCollapsing, int nAggreg)
 {
 	cout << "Building polygonal mesh by agglomeration:" << endl;
 	cout << "\t" << "Coarsening strategy     : agglomeration by face neighbours" << endl;
@@ -113,7 +113,7 @@ PolyhedralMesh<2>* MeshFactory<2>::BuildPolyhedralMesh(PolyhedralMesh<2>* mesh, 
 
 
 template <>
-Mesh<2>* MeshFactory<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase)
+inline Mesh<2>* MeshFactory<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase)
 {
 	string geoCode = args.Problem.GeoCode;
 	string mesher = args.Discretization.Mesher;
@@ -359,7 +359,7 @@ Mesh<2>* MeshFactory<2>::BuildMesh(ProgramArguments& args, TestCase<2>* testCase
 #ifdef ENABLE_3D
 
 template <>
-Mesh<3>* MeshFactory<3>::BuildMesh(ProgramArguments& args, TestCase<3>* testCase)
+inline Mesh<3>* MeshFactory<3>::BuildMesh(ProgramArguments& args, TestCase<3>* testCase)
 {
 	string geoCode = args.Problem.GeoCode;
 	string mesher = args.Discretization.Mesher;

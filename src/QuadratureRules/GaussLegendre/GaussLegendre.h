@@ -13,7 +13,7 @@ private:
 	vector<double> points;
 	vector<double> weights;
 
-	static vector<GaussLegendre*> _saved;
+	inline static vector<GaussLegendre*> _saved;
 
 public:
 	GaussLegendre() : GaussLegendre(MAX_POINTS)
@@ -711,6 +711,7 @@ public:
 	{
 		for (int i = 1; i <= MAX_POINTS; i++)
 			delete _saved[i - 1];
+		_saved.clear();
 	}
 
 	static GaussLegendre* Get(int nPoints)
@@ -719,5 +720,3 @@ public:
 		return _saved[nPoints - 1];
 	}
 };
-
-vector<GaussLegendre*> GaussLegendre::_saved;

@@ -6,12 +6,13 @@
 #include "../FunctionalBasis/FunctionalBasisFactory.h"
 #include "../Solver/SolverFactory.h"
 #include "../Utils/ExportModule.h"
+#include "ProgramResults.h"
 
 template <int Dim>
 class Program_Diffusion_HHO
 {
 public:
-	static void Execute(ProgramArguments& args)
+	static void Execute(ProgramArguments& args, ProgramResults* results = nullptr)
 	{
 		GaussLegendre::Init();
 
@@ -276,6 +277,8 @@ public:
 				systemSolution = iterativeSolver->Solve(problem->b, args.Solver.InitialGuessCode);
 				solvingTimer.Stop();
 				cout << iterativeSolver->IterationCount << " iterations." << endl << endl;
+				if (results)
+					results->IterationCount = iterativeSolver->IterationCount;
 
 				Multigrid* mg = dynamic_cast<Multigrid*>(iterativeSolver);
 				if (mg)
@@ -387,6 +390,8 @@ public:
 					double error = problem->L2Error(testCase->ExactSolution, reconstructedSolution);
 					cout << endl << "L2 Error = " << std::scientific << error << endl;
 					problem->AssertSchemeConvergence(error);
+					if (results)
+						results->L2Error = error;
 				}
 
 				if (args.Problem.ComputeNormalDerivative && testCase->ExactSolution_Neumann)

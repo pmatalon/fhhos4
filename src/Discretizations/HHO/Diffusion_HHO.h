@@ -1250,7 +1250,7 @@ private:
 
 #ifdef ENABLE_1D
 template <>
-void Diffusion_HHO<1>::InitReferenceShapes(HHOParameters<1>* hho, DiffusionField<1>* diffField)
+inline void Diffusion_HHO<1>::InitReferenceShapes(HHOParameters<1>* hho, DiffusionField<1>* diffField)
 {
 	FunctionalBasis<1>* reconstructionBasis = hho->ReconstructionBasis;
 	FunctionalBasis<1>* cellBasis = hho->CellBasis;
@@ -1285,7 +1285,7 @@ void Diffusion_HHO<1>::InitReferenceShapes(HHOParameters<1>* hho, DiffusionField
 
 #ifdef ENABLE_2D
 template <>
-void Diffusion_HHO<2>::InitReferenceShapes(HHOParameters<2>* hho, DiffusionField<2>* diffField)
+inline void Diffusion_HHO<2>::InitReferenceShapes(HHOParameters<2>* hho, DiffusionField<2>* diffField)
 {
 	FunctionalBasis<2>* reconstructionBasis = hho->ReconstructionBasis;
 	FunctionalBasis<2>* cellBasis = hho->CellBasis;
@@ -1357,7 +1357,7 @@ void Diffusion_HHO<2>::InitReferenceShapes(HHOParameters<2>* hho, DiffusionField
 
 #ifdef ENABLE_3D
 template <>
-void Diffusion_HHO<3>::InitReferenceShapes(HHOParameters<3>* hho, DiffusionField<3>* diffField)
+inline void Diffusion_HHO<3>::InitReferenceShapes(HHOParameters<3>* hho, DiffusionField<3>* diffField)
 {
 	FunctionalBasis<3>* reconstructionBasis = hho->ReconstructionBasis;
 	FunctionalBasis<3>* cellBasis = hho->CellBasis;

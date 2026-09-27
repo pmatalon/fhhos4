@@ -124,7 +124,7 @@ public:
 };
 
 template<>
-void Agglo<2>::Agglomerate(Element<2>* e, const vector<Face<2>*>& interfaceFaces)
+inline void Agglo<2>::Agglomerate(Element<2>* e, const vector<Face<2>*>& interfaceFaces)
 {
 #ifdef CGAL_ENABLED
 	_vertices = PolygonalElement::MacroPolygonVertices(this, e, interfaceFaces);

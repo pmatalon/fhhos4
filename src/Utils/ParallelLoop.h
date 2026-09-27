@@ -35,7 +35,7 @@ public:
 class BaseParallelLoop
 {
 protected:
-	static unsigned int DefaultNThreads;
+	inline static unsigned int DefaultNThreads = std::thread::hardware_concurrency();
 
 public:
 	static void SetDefaultNThreads(unsigned int nThreads)
@@ -303,6 +303,3 @@ public:
 		parallelLoop.Execute(functionToExecute);
 	}
 };
-
-
-unsigned int BaseParallelLoop::DefaultNThreads = std::thread::hardware_concurrency();

@@ -23,7 +23,7 @@ private:
 	vector<Triangle> _refinement;
 
 public:
-	static ReferenceTriangle RefTriangle;
+	inline static ReferenceTriangle RefTriangle = ReferenceTriangle();
 
 	Triangle() {}
 
@@ -487,5 +487,3 @@ public:
 		assert(ulRef == RefPoint(0, 1));
 	}
 };
-
-ReferenceTriangle Triangle::RefTriangle = ReferenceTriangle();

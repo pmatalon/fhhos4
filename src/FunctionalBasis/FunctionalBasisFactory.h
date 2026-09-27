@@ -16,13 +16,13 @@ public:
 
 
 template <>
-FunctionalBasis<0>* FunctionalBasisFactory<0>::Create(string basisCode, int maxPolynomialDegree, bool usePolynomialSpaceQ)
+inline FunctionalBasis<0>* FunctionalBasisFactory<0>::Create(string basisCode, int maxPolynomialDegree, bool usePolynomialSpaceQ)
 {
 	return new FunctionalBasis0D();
 }
 
 template <>
-FunctionalBasis<1>* FunctionalBasisFactory<1>::Create(string basisCode, int maxPolynomialDegree, bool usePolynomialSpaceQ)
+inline FunctionalBasis<1>* FunctionalBasisFactory<1>::Create(string basisCode, int maxPolynomialDegree, bool usePolynomialSpaceQ)
 {
 	if (basisCode.compare(MonomialBasis<1>::Code()) == 0)
 		return new MonomialBasis1D(maxPolynomialDegree);
@@ -38,7 +38,7 @@ FunctionalBasis<1>* FunctionalBasisFactory<1>::Create(string basisCode, int maxP
 }
 
 template <>
-FunctionalBasis<2>* FunctionalBasisFactory<2>::Create(string basisCode, int maxPolynomialDegree, bool usePolynomialSpaceQ)
+inline FunctionalBasis<2>* FunctionalBasisFactory<2>::Create(string basisCode, int maxPolynomialDegree, bool usePolynomialSpaceQ)
 {
 	if (basisCode.compare(MonomialBasis<2>::Code()) == 0)
 		return new MonomialBasis2D(maxPolynomialDegree, usePolynomialSpaceQ);
@@ -58,7 +58,7 @@ FunctionalBasis<2>* FunctionalBasisFactory<2>::Create(string basisCode, int maxP
 #ifdef ENABLE_3D
 
 template <>
-FunctionalBasis<3>* FunctionalBasisFactory<3>::Create(string basisCode, int maxPolynomialDegree, bool usePolynomialSpaceQ)
+inline FunctionalBasis<3>* FunctionalBasisFactory<3>::Create(string basisCode, int maxPolynomialDegree, bool usePolynomialSpaceQ)
 {
 	if (basisCode.compare(MonomialBasis<3>::Code()) == 0)
 		return new MonomialBasis3D(maxPolynomialDegree, usePolynomialSpaceQ);

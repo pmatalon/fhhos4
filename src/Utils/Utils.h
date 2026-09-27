@@ -14,7 +14,7 @@ class Utils
 {
 public:
 
-	static ProgramArguments ProgramArgs;
+	inline static ProgramArguments ProgramArgs;
 
 	//-------------------//
 	// Util DomFunctions //
@@ -239,17 +239,17 @@ public:
 		return p != GMG_H_Prolongation::CellInterp_ExactL2proj_Trace && p != GMG_H_Prolongation::CellInterp_ApproxL2proj_Trace && p != GMG_H_Prolongation::CellInterp_FinerApproxL2proj_Trace;
 	}
 
-	static double Eps;
-	static double NumericalZero;
+	inline static double Eps = 1e-4;
+	inline static double NumericalZero = 1e-12;
 
 	//-------------//
 	//   Logging   //
 	//-------------//
 
-	static string BeginRed;
-	static string BeginGreen;
-	static string BeginYellow;
-	static string EndColor;
+	inline static string BeginRed    = "\033[1;31m";
+	inline static string BeginGreen  = "\033[1;32m";
+	inline static string BeginYellow = "\033[1;33m";
+	inline static string EndColor    = "\033[0m";
 
 	static void Error(string msg)
 	{
@@ -286,13 +286,3 @@ public:
 	}
 
 };
-
-ProgramArguments Utils::ProgramArgs;
-
-double Utils::Eps = 1e-4;
-double Utils::NumericalZero = 1e-12;
-
-string Utils::BeginRed    = "\033[1;31m";
-string Utils::BeginGreen  = "\033[1;32m";
-string Utils::BeginYellow = "\033[1;33m";
-string Utils::EndColor    = "\033[0m";

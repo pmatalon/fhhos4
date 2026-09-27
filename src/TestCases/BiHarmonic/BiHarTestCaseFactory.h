@@ -18,7 +18,7 @@ public:
 
 #ifdef ENABLE_1D
 template <>
-BiHarmonicTestCase<1>* BiHarTestCaseFactory<1>::Create(ProblemArguments pb)
+inline BiHarmonicTestCase<1>* BiHarTestCaseFactory<1>::Create(ProblemArguments pb)
 {
 	Utils::FatalError("Test case '" + pb.TestCaseCode + "' is unknown or not implemented in 1D. Check -tc argument.");
 	return nullptr;
@@ -28,7 +28,7 @@ BiHarmonicTestCase<1>* BiHarTestCaseFactory<1>::Create(ProblemArguments pb)
 
 #ifdef ENABLE_2D
 template <>
-BiHarmonicTestCase<2>* BiHarTestCaseFactory<2>::Create(ProblemArguments pb)
+inline BiHarmonicTestCase<2>* BiHarTestCaseFactory<2>::Create(ProblemArguments pb)
 {
 	if (pb.TestCaseCode.compare("default") == 0)
 		return new BiHarDefaultTestCase<2>(pb);
@@ -43,7 +43,7 @@ BiHarmonicTestCase<2>* BiHarTestCaseFactory<2>::Create(ProblemArguments pb)
 
 #ifdef ENABLE_3D
 template <>
-BiHarmonicTestCase<3>* BiHarTestCaseFactory<3>::Create(ProblemArguments pb)
+inline BiHarmonicTestCase<3>* BiHarTestCaseFactory<3>::Create(ProblemArguments pb)
 {
 	if (pb.TestCaseCode.compare("default") == 0)
 		return new BiHarDefaultTestCase<3>(pb);
