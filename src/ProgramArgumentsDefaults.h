@@ -284,7 +284,12 @@ inline void ApplyProgramArgumentDefaults(ProgramArguments& args,
 						args.Solver.MG.H_CS = H_CoarsStgy::IndependentRemeshing;
 				}
 				else if (Utils::RequiresNestedHierarchy(args.Solver.MG.GMG_H_Prolong))
-					args.Solver.MG.H_CS = H_CoarsStgy::GMSHSplittingRefinement;
+				{
+					if (args.Discretization.Mesher.compare("inhouse") == 0)
+						args.Solver.MG.H_CS = H_CoarsStgy::StandardCoarsening;
+					else
+						args.Solver.MG.H_CS = H_CoarsStgy::GMSHSplittingRefinement;
+				}
 				else
 					args.Solver.MG.H_CS = H_CoarsStgy::IndependentRemeshing;
 			}
