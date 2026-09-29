@@ -10,6 +10,9 @@ class DiffusionField
 {
 private:
 	map<string, Tensor<Dim>> _tensorsByPhysicalPartName;
+	// Set by the single-tensor constructor: the tensor applies to every physical part,
+	// whatever its name (imported geometries may have nameless or arbitrarily named parts).
+	bool _singleDomain = false;
 public:
 	bool IsHomogeneous = true;
 	bool IsIsotropic = true;
@@ -22,6 +25,7 @@ public:
 	DiffusionField(const Tensor<Dim>& k)
 	{
 		this->_tensorsByPhysicalPartName.insert({ "domain", k });
+		this->_singleDomain = true;
 		this->IsHomogeneous = true;
 		this->IsIsotropic = k.IsIsotropic;
 	}
@@ -65,6 +69,8 @@ public:
 
 	Tensor<Dim>& ConstantDiffTensor(PhysicalGroup<Dim>* physicalPart)
 	{
+		if (this->_singleDomain)
+			return this->_tensorsByPhysicalPartName.begin()->second;
 		if (physicalPart->Name.size() == 0)
 			Utils::FatalError("A nameless physical part has been found. Please name all the physical parts of the geometry.");
 		auto found = _tensorsByPhysicalPartName.find(physicalPart->Name);

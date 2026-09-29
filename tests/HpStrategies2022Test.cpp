@@ -70,22 +70,22 @@ namespace
 	}
 }
 
-// Section 3.4.1 (basis normalization): the paper's own reproduction command
-//   fhhos4 -geo square4quadrants_tri_localref -no-cache -tc square -cs r -k 1 -n 32 -e-ogb 3
-// currently fails during mesh construction - independently of -e-ogb - with
-// "No diffusion tensor has been declared for the physical part 'quadrantBottomLeft'".
-// square4quadrants_tri_localref.geo defines 4 named physical parts (inherited from
-// square4quadrants.inc.geo), but SquareTestCase's fallback path (used for any geometry code
-// other than literally "square"/"square4quadrants") registers its homogeneous diffusion tensor
-// under the fixed key "domain" (DiffusionField(const Tensor<Dim>&), DiffusionField.h) - a mismatch
-// unrelated to basis normalization. This predates the orthonormal-vs-orthogonal MG behavior the
-// paper is actually about, so that experiment can't currently be exercised end-to-end. Regression-
-// documents the current failure; a fix to this geometry/test-case mismatch should update this test
-// to actually exercise the divergence/convergence behavior instead.
-TEST(HpStrategies2022, BasisNormalization_FailsAsDocumented_PhysicalPartMismatch)
+// Section 3.4.1 (basis normalization): with local refinement, orthonormalized element bases
+// (-e-ogb 3) make the multigrid diverge, while orthogonalization without normalization
+// (-e-ogb 1) converges. Observed at n=32: divergence vs. 13 iterations.
+//   fhhos4 -geo square4quadrants_tri_localref -no-cache -tc square -cs r -k 1 -n 32 -e-ogb {3|1}
+TEST(HpStrategies2022, BasisNormalization_OrthonormalDiverges)
 {
 	ProgramArguments args = LocalRefArgs(/*elemBasisOrthogonalizeCode*/ 3, /*n*/ 32, "mg");
 	EXPECT_EXIT(RunDiffusionHHO(args), ::testing::ExitedWithCode(EXIT_FAILURE), "");
+}
+
+TEST(HpStrategies2022, BasisNormalization_OrthogonalConverges)
+{
+	ProgramArguments args = LocalRefArgs(/*elemBasisOrthogonalizeCode*/ 1, /*n*/ 32, "mg");
+	ProgramResults results = RunDiffusionHHO(args);
+	EXPECT_GT(results.IterationCount, 0);
+	EXPECT_LE(results.IterationCount, 30);
 }
 
 // Figures 7-18 (a representative slice): every hp-multigrid strategy (1-4), used both as a

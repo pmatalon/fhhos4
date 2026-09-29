@@ -29,7 +29,7 @@ ctest -R Kellogg                           # run a subset by name (regex)
 ./bin/fhhos4_tests --gtest_filter=*Kellogg*  # or filter the binary directly
 ```
 
-The full suite is 38 CTest cases and runs in about 2 minutes serially (the slowest single case, `MeshIndependenceTest/("stri", 3)`, takes ~19s).
+The full suite is 39 CTest cases and runs in about 2 minutes serially (the slowest single case, `MeshIndependenceTest/("stri", 3)`, takes ~19s).
 
 ## `HMultigrid2020Test.cpp`
 
@@ -59,8 +59,8 @@ Validates *"An h-multigrid method for Hybrid High-Order discretizations"* (Di Pi
 
 Validates *"High-order multigrid strategies for HHO discretizations of elliptic equations"* (Di Pietro, Matalon, Mycek, Rude, Numer. Linear Algebra Appl. 2022) — see `reproducibility/2022_high_order_strategies.md`.
 
-- **`HpStrategies2022.BasisNormalization_FailsAsDocumented_PhysicalPartMismatch`** (1 case, death test) — the paper's own reproduction command for the basis-normalization experiment (§3.4.1) currently fails during mesh construction, independently of the basis-orthogonalization option under test, because the `square4quadrants_tri_localref` geometry's physical parts don't match what `SquareTestCase`'s fallback path registers diffusion tensors under. This predates the orthonormal-vs-orthogonal MG behavior the paper is actually about, so that experiment can't currently be exercised end-to-end; regression-documented until the geometry/test-case mismatch is fixed.
-  CLI: `fhhos4 -geo square4quadrants_tri_localref -no-cache -tc square -cs r -k 1 -n 32 -e-ogb 3`
+- **`HpStrategies2022.BasisNormalization_OrthonormalDiverges`** / **`BasisNormalization_OrthogonalConverges`** (2 cases) — §3.4.1: with local refinement, orthonormalized element bases (`-e-ogb 3`) make the multigrid diverge (death test, `EXIT_FAILURE`), while orthogonal bases (`-e-ogb 1`) converge (observed: 13 iterations; assertion ≤ 30).
+  CLI: `fhhos4 -geo square4quadrants_tri_localref -no-cache -tc square -cs r -k 1 -n 32 -e-ogb {3|1}`
 
 - **`SquareCart/HPConfigTest.AllConverge`** (8 cases: `{mg, fcgmg} × hp-config{1,2,3,4}`) — every hp-multigrid coarsening strategy (h-only, p→h, p→h with h-prolongation, hp→h) should converge at high order (k=5, n=32), both as a stand-alone solver and as an FCG preconditioner. Assertion: 0 < iterations ≤ 100.
   Observed iteration counts: `mg` → hp1=15, hp2=7, hp3=10, hp4=15; `fcgmg` → hp1=11, hp2=6, hp3=9, hp4=11. hp-config 2 (p→h, injection/remove-higher-orders) is consistently the fastest of the four.
@@ -70,7 +70,7 @@ Validates *"High-order multigrid strategies for HHO discretizations of elliptic 
 
 ## Coverage summary
 
-- 38 CTest cases total across the 2 files above, all exercising `Program_Diffusion_HHO` — i.e. **diffusion (Poisson-type) problems, HHO discretization, static condensation**.
+- 39 CTest cases total across the 2 files above, all exercising `Program_Diffusion_HHO` — i.e. **diffusion (Poisson-type) problems, HHO discretization, static condensation**.
 - Dimensions: 2D (37 cases) plus one 3D death test that doesn't even reach the solver. No 1D coverage (and `RunDiffusionHHO` throws for it, consistent with `ENABLE_1D=OFF` by default).
 - Meshes: in-house `cart`, `stri`, `stetra` and GMSH `cart` (the 2022 tests leave the mesher at its default, which resolves to GMSH). No `poly`/agglomerated (CGAL) coverage.
 - Solvers: `mg` and `fcgmg` only. No coverage of `lu`, `ch`, `cg`, `eigencg`, `uamg`, `aggregamg`, `agmg`, or `p_mg`.

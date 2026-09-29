@@ -35,7 +35,7 @@ From `build/`:
 ctest --output-on-failure
 ```
 
-38 tests, ~2 min. Covers `Program_Diffusion_HHO` with `mg`/`fcgmg` solvers on
+39 tests, ~2 min. Covers `Program_Diffusion_HHO` with `mg`/`fcgmg` solvers on
 `cart`/`stri`/`stetra` (in-house) and GMSH `cart` meshes — see `tests/README.md`.
 Not covered: biharmonic, DG/FEM programs, other solvers (`lu`, `cg`, `uamg`,
 `agmg`, ...), 1D, anisotropic cases.
