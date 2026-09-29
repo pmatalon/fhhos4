@@ -34,6 +34,13 @@ public:
 
 	void Solve(const Vector& b, Vector& x, bool xEquals0, bool computeResidual, bool computeAx) override
 	{
+#if EIGEN_VERSION_AT_LEAST(3, 5, 0) // Eigen 5 reports itself as 3.5 in these macros
+		// Eigen 5's BiCGSTAB compares the tolerance to the absolute residual norm (Eigen 3.x used
+		// ||r|| <= tol * ||b||). Scale it to keep a relative criterion: otherwise, a right-hand side
+		// already smaller than tol makes it return x = 0 immediately (e.g. when used as an inner
+		// preconditioner solver near convergence, which then breaks the outer Krylov method).
+		_solver.setTolerance(this->Tolerance * b.norm());
+#endif
 		if (xEquals0)
 			x = _solver.solve(b);
 		else
