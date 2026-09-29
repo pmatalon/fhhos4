@@ -727,7 +727,7 @@ public:
 			{
 				os << "\t" << "Face coarsening strategy: ";
 				if (FaceCoarseningStgy == FaceCoarseningStrategy::None)
-					os << "none [-fcs c]" << endl;
+					os << "none [-fcs n]" << endl;
 				else if (FaceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsing)
 					os << "interface collapsing [-fcs c]" << endl;
 				else if (FaceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsingAndTryAggregInteriorToInterfaces)
