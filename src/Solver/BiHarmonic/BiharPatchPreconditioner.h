@@ -195,7 +195,7 @@ private:
 					boundaryElements.push_back(f->Element1);
 
 				std::sort(boundaryElements.begin(), boundaryElements.end());
-				std::unique(boundaryElements.begin(), boundaryElements.end());
+				boundaryElements.erase(std::unique(boundaryElements.begin(), boundaryElements.end()), boundaryElements.end());
 
 				Neighbourhood<Dim> nbh(boundaryElements, _neighbourhoodDepth);
 				NeighbourhoodDiffusion_HHO<Dim> nbhDiff(nbh, _diffPb);
