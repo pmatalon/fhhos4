@@ -34,7 +34,7 @@ Replace the \* characters with numerical values in
 ### Figure 4.3
 Replace the \* characters with numerical values in
 ```bash
-> fhhos4 -geo square -mesh stetra -mesher inhouse -k 1 -n 32 -s mg -cycle V,*,* 
+> fhhos4 -geo cube -mesh stetra -mesher inhouse -k 1 -n 32 -s mg -cycle V,*,* 
 ```
 ### Figure 4.4
 Important parameter: ``-smoothers bj23,bj23``.
@@ -115,39 +115,39 @@ Important parameter: ``-disable-heterog-weight``.
 > fhhos4 -geo square4quadrants -mesh cart -mesher inhouse -n 64 -s mg -g 1 -cycle V,0,3 -disable-heterog-weight -k 3 -heterog {1e0-1e8}
 ```
 ### Figure 4.10
-Important parameter: ``-fcs {0|1}``.
+Important parameter: ``-fcs {c|n}``.
 #### (a) With face coarsening
 ```bash
-> fhhos4 -geo square -mesh cart -mesher inhouse -s mg -cycle V,0,3 -cs s -fcs 1 -k 0 -n {32|64|128|256|512}
-> fhhos4 -geo square -mesh cart -mesher inhouse -s mg -cycle V,0,3 -cs s -fcs 1 -k 1 -n {32|64|128|256|512}
-> fhhos4 -geo square -mesh cart -mesher inhouse -s mg -cycle V,0,3 -cs s -fcs 1 -k 2 -n {32|64|128|256|512}
-> fhhos4 -geo square -mesh cart -mesher inhouse -s mg -cycle V,0,3 -cs s -fcs 1 -k 3 -n {32|64|128|256|512}
+> fhhos4 -geo square -mesh cart -mesher inhouse -s mg -cycle V,0,3 -cs s -fcs c -k 0 -n {32|64|128|256|512}
+> fhhos4 -geo square -mesh cart -mesher inhouse -s mg -cycle V,0,3 -cs s -fcs c -k 1 -n {32|64|128|256|512}
+> fhhos4 -geo square -mesh cart -mesher inhouse -s mg -cycle V,0,3 -cs s -fcs c -k 2 -n {32|64|128|256|512}
+> fhhos4 -geo square -mesh cart -mesher inhouse -s mg -cycle V,0,3 -cs s -fcs c -k 3 -n {32|64|128|256|512}
 ```
 #### (b) Without face coarsening
 ```bash
-> fhhos4 -geo square -mesh cart -mesher inhouse -s mg -cycle V,0,3 -cs s -fcs 0 -k 0 -n {32|64|128|256|512}
-> fhhos4 -geo square -mesh cart -mesher inhouse -s mg -cycle V,0,3 -cs s -fcs 0 -k 1 -n {32|64|128|256|512}
-> fhhos4 -geo square -mesh cart -mesher inhouse -s mg -cycle V,0,3 -cs s -fcs 0 -k 2 -n {32|64|128|256|512}
-> fhhos4 -geo square -mesh cart -mesher inhouse -s mg -cycle V,0,3 -cs s -fcs 0 -k 3 -n {32|64|128|256|512}
+> fhhos4 -geo square -mesh cart -mesher inhouse -s mg -cycle V,0,3 -cs s -fcs n -k 0 -n {32|64|128|256|512}
+> fhhos4 -geo square -mesh cart -mesher inhouse -s mg -cycle V,0,3 -cs s -fcs n -k 1 -n {32|64|128|256|512}
+> fhhos4 -geo square -mesh cart -mesher inhouse -s mg -cycle V,0,3 -cs s -fcs n -k 2 -n {32|64|128|256|512}
+> fhhos4 -geo square -mesh cart -mesher inhouse -s mg -cycle V,0,3 -cs s -fcs n -k 3 -n {32|64|128|256|512}
 ```
 ### Figure 4.11
 Important parameter: ``-cs b``.
 ```bash
 # Custom Bey's refinement, V(0,6)
-> fhhos4 -geo cube -mesh tetra -mesher inhouse -k 1 -s mg -cs b -cycle V,0,6 -n {8|16|32|64}
+> fhhos4 -geo cube -mesh stetra -mesher inhouse -k 1 -s mg -cs b -cycle V,0,6 -n {8|16|32|64}
 # Custom Bey's refinement, V(0,8)
-> fhhos4 -geo cube -mesh tetra -mesher inhouse -k 1 -s mg -cs b -cycle V,0,8 -n {8|16|32|64}
+> fhhos4 -geo cube -mesh stetra -mesher inhouse -k 1 -s mg -cs b -cycle V,0,8 -n {8|16|32|64}
 # Custom Bey's refinement, V(0,10)
-> fhhos4 -geo cube -mesh tetra -mesher inhouse -k 1 -s mg -cs b -cycle V,0,10 -n {8|16|32|64}
+> fhhos4 -geo cube -mesh stetra -mesher inhouse -k 1 -s mg -cs b -cycle V,0,10 -n {8|16|32|64}
 # Cartesian tet. refinement, V(0,6)
 > fhhos4 -geo cube -mesh stetra -mesher inhouse -k 1 -s mg -cs s -cycle V,0,6 -n {8|16|32|64}
 ```
 ### Figure 4.12
 ```bash
-> fhhos4 -geo platewith4holes -s mg -cs b -cycle V,0,10 -k 0 -n {8|16|32} # diverges at n=32
-> fhhos4 -geo platewith4holes -s mg -cs b -cycle V,0,10 -k 1 -n {8|16|32}
-> fhhos4 -geo platewith4holes -s mg -cs b -cycle V,0,10 -k 2 -n {8|16|32}
-> fhhos4 -geo platewith4holes -s mg -cs b -cycle V,0,10 -k 3 -n {8|16|32}
+> fhhos4 -geo platewith4holes -s mg -cs b -cycle V,0,10 -k 0 -n {16|32|64} # diverges at n=64
+> fhhos4 -geo platewith4holes -s mg -cs b -cycle V,0,10 -k 1 -n {16|32|64}
+> fhhos4 -geo platewith4holes -s mg -cs b -cycle V,0,10 -k 2 -n {16|32|64}
+> fhhos4 -geo platewith4holes -s mg -cs b -cycle V,0,10 -k 3 -n {16|32|64}
 ```
 ### Figure 4.15
 Important parameter: ``-cs r``.
