@@ -25,9 +25,11 @@ namespace fhhos4_tests
 	// diffusion HHO problem in-process and returns the iteration count / L2 error.
 	// A documented divergence (Utils::FatalError) terminates the process (exit(EXIT_FAILURE));
 	// callers that expect that must wrap the call in GTest's ASSERT_EXIT/EXPECT_EXIT.
-	inline ProgramResults RunDiffusionHHO(ProgramArguments args)
+	// Pass defaultCycle = false when the test sets the MG cycle itself (the CLI equivalent of
+	// -cycle); otherwise the defaults overwrite the pre/post-smoothing iterations.
+	inline ProgramResults RunDiffusionHHO(ProgramArguments args, bool defaultCycle = true)
 	{
-		ApplyProgramArgumentDefaults(args);
+		ApplyProgramArgumentDefaults(args, true, true, defaultCycle);
 
 		ProgramResults results;
 		switch (args.Problem.Dimension)

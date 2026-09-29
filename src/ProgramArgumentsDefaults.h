@@ -295,8 +295,11 @@ inline void ApplyProgramArgumentDefaults(ProgramArguments& args,
 			}
 			else
 			{
-				if (args.Discretization.Mesher.compare("inhouse") == 0 && args.Discretization.MeshCode.compare("tetra") == 0)
-					args.Solver.MG.H_CS = H_CoarsStgy::BeyRefinement;
+				if (args.Discretization.Mesher.compare("inhouse") == 0 && args.Discretization.MeshCode.compare("stetra") == 0)
+				{
+					args.Solver.MG.H_CS = H_CoarsStgy::StandardCoarsening;
+					Utils::Warning("Standard coarsening on a structured tetrahedral mesh (-mesh stetra) is known to diverge for some configurations (e.g. k=0). Use -cs to select a different strategy if convergence issues arise.");
+				}
 				else if (args.Discretization.Mesher.compare("inhouse") == 0 && args.Discretization.MeshCode.compare("cart") == 0)
 					args.Solver.MG.H_CS = H_CoarsStgy::StandardCoarsening;
 				else

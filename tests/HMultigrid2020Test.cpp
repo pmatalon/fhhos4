@@ -49,7 +49,7 @@ TEST_P(ConvergenceOrderTest, MatchesTheoreticalOrder)
 	std::vector<double> errors;
 	for (int n : QuickMeshSizes)
 	{
-		ProgramResults results = RunDiffusionHHO(SquareVCycleArgs(meshCode, k, n));
+		ProgramResults results = RunDiffusionHHO(SquareVCycleArgs(meshCode, k, n), false);
 		ASSERT_GT(results.L2Error, 0);
 		h.push_back(1.0 / n);
 		errors.push_back(results.L2Error);
@@ -75,7 +75,7 @@ TEST_P(MeshIndependenceTest, IterationCountStaysBounded)
 	std::vector<int> iterationCounts;
 	for (int n : MeshIndependenceSizes)
 	{
-		ProgramResults results = RunDiffusionHHO(SquareVCycleArgs(meshCode, k, n));
+		ProgramResults results = RunDiffusionHHO(SquareVCycleArgs(meshCode, k, n), false);
 		ASSERT_GT(results.IterationCount, 0);
 		iterationCounts.push_back(results.IterationCount);
 	}
@@ -92,12 +92,11 @@ TEST_P(MeshIndependenceTest, IterationCountStaysBounded)
 INSTANTIATE_TEST_SUITE_P(Square, MeshIndependenceTest,
 	::testing::Combine(::testing::Values(std::string("cart"), std::string("stri")), ::testing::Values(0, 1, 2, 3)));
 
-// Figure 4.1 explicitly documents this configuration as diverging (as of release 1.0). On the
-// current code it still fails, though the failure mode has drifted: mesh construction now hits
-// "Unmanaged refinement strategy" before the solver even runs, rather than iterative divergence.
-// Either way this is a known-broken configuration; regression-documents it so a future fix must
-// touch this test deliberately rather than silently change behavior unnoticed.
-TEST(HMultigrid2020, FailsAsDocumented_StructuredTetra_K0)
+// Figure 4.1 documents this configuration as diverging: with the standard coarsening, the
+// multigrid convergence rate degrades toward 1 at k=0 on structured tetrahedral meshes.
+// Observed: 122 iterations at n=16 (vs. 24 for k=1). The run still terminates, so check the
+// degradation through the iteration count rather than the exit code.
+TEST(HMultigrid2020, DegradesAsDocumented_StructuredTetra_K0)
 {
 	ProgramArguments args;
 	args.Problem.GeoCode = "cube";
@@ -110,9 +109,8 @@ TEST(HMultigrid2020, FailsAsDocumented_StructuredTetra_K0)
 	args.Solver.MG.PreSmoothingIterations = 2;
 	args.Solver.MG.PostSmoothingIterations = 2;
 
-	// Utils::FatalError prints to stdout (not stderr), so GTest's death-test output-matching
-	// (which checks stderr) can't see the message; just check the exit code.
-	EXPECT_EXIT(RunDiffusionHHO(args), ::testing::ExitedWithCode(EXIT_FAILURE), "");
+	ProgramResults results = RunDiffusionHHO(args, false);
+	EXPECT_GT(results.IterationCount, 60) << "k=0 on stetra is documented as (nearly) diverging";
 }
 
 // Figure 4.7: robustness on the heterogeneous Kellogg benchmark.
@@ -136,7 +134,7 @@ TEST_P(KelloggTest, ConvergesWithinBound)
 	args.Solver.MG.PreSmoothingIterations = 1;
 	args.Solver.MG.PostSmoothingIterations = 1;
 
-	ProgramResults results = RunDiffusionHHO(args);
+	ProgramResults results = RunDiffusionHHO(args, false);
 	EXPECT_GT(results.IterationCount, 0);
 	EXPECT_LE(results.IterationCount, 30);
 }
@@ -170,7 +168,7 @@ TEST_P(HeterogeneityRatioSweepTest, IterationCountRatioBounded)
 		args.Solver.MG.PreSmoothingIterations = 0;
 		args.Solver.MG.PostSmoothingIterations = 3;
 
-		ProgramResults results = RunDiffusionHHO(args);
+		ProgramResults results = RunDiffusionHHO(args, false);
 		ASSERT_GT(results.IterationCount, 0);
 		iterationCounts.push_back(results.IterationCount);
 	}

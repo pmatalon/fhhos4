@@ -45,7 +45,7 @@ Validates *"An h-multigrid method for Hybrid High-Order discretizations"* (Di Pi
   Observed: cart: k=0 → 6,7,7 · k=1 → 8,8,8 · k=2 → 10,10,10 · k=3 → 11,11,11; stri: k=0 → 10,10,10 · k=1 → 12,12,12 · k=2 → 10,10,9 · k=3 → 10,10,10.
   Note: the in-code comment justifying the generous bound cites an older observation of "19 → 24 → 27 for the unstructured mesh at k=0", but the current numbers above (stri k=0: 10,10,10) are flat — the bound still holds comfortably either way.
 
-- **`HMultigrid2020.FailsAsDocumented_StructuredTetra_K0`** (1 case, death test) — the paper's Figure 4.1 documents this configuration (`cube`/`stetra`, k=0, V(2,2)) as diverging. It still fails today, though the failure mode has drifted: mesh construction now hits "Unmanaged refinement strategy" before the solver even runs, rather than iterative divergence. This is a known-broken configuration, regression-documented so a future fix must touch this test deliberately.
+- **`HMultigrid2020.DegradesAsDocumented_StructuredTetra_K0`** (1 case) — the paper's Figure 4.1 documents this configuration (`cube`/`stetra`, k=0, V(2,2)) as diverging: with the standard coarsening, the convergence rate degrades toward 1. Assertion: more than 60 iterations (observed: 122 at n=16, vs. 24 for k=1).
   CLI: `fhhos4 -geo cube -mesh stetra -mesher inhouse -s mg -cycle V,2,2 -k 0 -n 16`
 
 - **`SquareFourQuadrants/KelloggTest.ConvergesWithinBound`** (4 cases: k=0..3) — the heterogeneous Kellogg benchmark (Figure 4.7) should converge within 30 iterations at n=256.
