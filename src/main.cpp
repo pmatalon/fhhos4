@@ -266,6 +266,12 @@ void print_usage() {
 	cout << "      Forces a block size for the block verions of Jacobi, Gauss-Seidel, SOR." << endl;
 	cout << "      By default, the value is adapted to the space dimension and the polynomial order of the discretization." << endl;
 	cout << endl;
+	cout << "-diag-block-solve CODE" << endl;
+	cout << "      How the block versions of Jacobi, Gauss-Seidel, SOR solve the systems with the diagonal blocks." << endl;
+	cout << "              lu  - solve with the LU factorizations of the blocks, computed in the setup (default)." << endl;
+	cout << "              inv - multiplication by the inverses of the blocks, computed in the setup." << endl;
+	cout << "                    Slightly faster, but less accurate if the blocks are ill-conditioned." << endl;
+	cout << endl;
 	cout << "-restart NUM" << endl;
 	cout << "      Iteration period to restart the algorithm (so far, used in bihar-cg only). Use 0 to disable." << endl;
 	cout << endl;
@@ -702,6 +708,7 @@ int main(int argc, char* argv[])
 		OPT_MaxIterations,
 		OPT_Relaxation,
 		OPT_BlockSize,
+		OPT_DiagBlockSolve,
 		OPT_Restart,
 		OPT_BiHarmonicSolver,
 		OPT_BiHarmonicPreconditioner,
@@ -801,6 +808,7 @@ int main(int argc, char* argv[])
 		 { "max-iter", required_argument, NULL, OPT_MaxIterations },
 		 { "relax", required_argument, NULL, OPT_Relaxation },
 		 { "block-size", required_argument, NULL, OPT_BlockSize },
+		 { "diag-block-solve", required_argument, NULL, OPT_DiagBlockSolve },
 		 { "restart", required_argument, NULL, OPT_Restart },
 		 { "bihar-solver", required_argument, NULL, OPT_BiHarmonicSolver },
 		 { "bihar-prec", required_argument, NULL, OPT_BiHarmonicPreconditioner },
@@ -1143,6 +1151,17 @@ int main(int argc, char* argv[])
 			case OPT_BlockSize:
 				args.Solver.BlockSize = atoi(optarg);
 				break;
+			case OPT_DiagBlockSolve:
+			{
+				string code = optarg;
+				if (code.compare("inv") == 0)
+					BlockDiagonalSolver::DefaultMethod = DiagBlockSolveMethod::Inverse;
+				else if (code.compare("lu") == 0)
+					BlockDiagonalSolver::DefaultMethod = DiagBlockSolveMethod::LU;
+				else
+					argument_error("unknown -diag-block-solve code '" + code + "'. Check -diag-block-solve argument.");
+				break;
+			}
 			case OPT_Restart:
 				args.Solver.Restart = atoi(optarg);
 				break;

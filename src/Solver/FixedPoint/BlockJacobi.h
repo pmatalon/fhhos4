@@ -1,6 +1,7 @@
 #pragma once
 #include "../IterativeSolver.h"
 #include "../../Utils/ParallelLoop.h"
+#include "BlockDiagonalSolver.h"
 using namespace std;
 
 class BlockJacobi : public IterativeSolver
@@ -9,7 +10,7 @@ protected:
 	int _blockSize;
 	double _omega;
 
-	vector<Eigen::FullPivLU<DenseMatrix>> invD;
+	BlockDiagonalSolver diagBlockSolver; // solves the systems with the diagonal blocks
 	RowMajorSparseMatrix _rowMajorA;
 public:
 
@@ -61,14 +62,7 @@ public:
 			this->_rowMajorA = A;
 
 		auto nb = A.rows() / _blockSize;
-		this->invD = vector<Eigen::FullPivLU<DenseMatrix>>(nb);
-
-		NumberParallelLoop<EmptyResultChunk> parallelLoop(nb);
-		parallelLoop.Execute([this, &A](BigNumber i, ParallelChunk<EmptyResultChunk>* chunk)
-			{
-				DenseMatrix Di = A.block(i * _blockSize, i * _blockSize, _blockSize, _blockSize);
-				this->invD[i].compute(Di);
-			});
+		this->diagBlockSolver.Setup(A, _blockSize);
 
 		this->SetupComputationalWork = nb * 2.0/3.0*pow(_blockSize, 3)*1e-6;
 	}
@@ -86,25 +80,27 @@ private:
 		Vector xNew(xOld.rows());
 
 		NumberParallelLoop<EmptyResultChunk> parallelLoop(nb);
-		parallelLoop.Execute([this, b, xOld, &xNew](BigNumber i, ParallelChunk<EmptyResultChunk>* chunk)
+		parallelLoop.ExecuteChunk([this, &b, &xOld, &xNew](ParallelChunk<EmptyResultChunk>* chunk)
 			{
-				ProcessBlockRow(i, b, xOld, xNew);
+				Vector tmp_x(_blockSize); // work vector, allocated once per chunk
+				for (BigNumber i = chunk->Start; i < chunk->End; i++)
+					ProcessBlockRow(i, b, xOld, xNew, tmp_x);
 			});
 
-		result.SetX(xNew);
-		xOld = xNew;
+		xOld.swap(xNew);
+		result.SetX(xOld);
 		result.AddWorkInFlops(2 * A.nonZeros() + nb * pow(_blockSize, 2));
 		return result;
 	}
 
 protected:
-	inline void ProcessBlockRow(BigNumber currentBlockRow, const Vector& b, const Vector& xOld, Vector& xNew)
+	inline void ProcessBlockRow(BigNumber currentBlockRow, const Vector& b, const Vector& xOld, Vector& xNew, Vector& tmp_x)
 	{
 		const SparseMatrix& A = *this->Matrix;
 
 		// BlockRow i: [ --- Li --- | Di | --- Ui --- ]
 
-		Vector tmp_x = _omega * b.segment(currentBlockRow * _blockSize, _blockSize);
+		tmp_x = _omega * b.segment(currentBlockRow * _blockSize, _blockSize);
 
 		for (int k = 0; k < _blockSize; k++)
 		{
@@ -123,7 +119,8 @@ protected:
 			}
 		}
 
-		xNew.segment(currentBlockRow * _blockSize, _blockSize) = this->invD[currentBlockRow].solve(tmp_x);
+		auto xNew_i = xNew.segment(currentBlockRow * _blockSize, _blockSize);
+		this->diagBlockSolver.Solve(currentBlockRow, tmp_x, xNew_i);
 	}
 
 public:
@@ -157,7 +154,9 @@ public:
 					{
 						BigNumber colBlock = jBlock * _blockSize;
 						DenseMatrix A_ij = A.block(rowBlock, colBlock, _blockSize, _blockSize);
-						DenseMatrix jacobiBlock = -_omega * this->invD[iBlock].solve(A_ij);
+						DenseMatrix jacobiBlock(_blockSize, _blockSize);
+						this->diagBlockSolver.Solve(iBlock, A_ij, jacobiBlock);
+						jacobiBlock *= -_omega;
 						coeffs.Add(rowBlock, colBlock, jacobiBlock);
 					}
 

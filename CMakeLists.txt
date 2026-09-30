@@ -20,6 +20,8 @@ option(SMALL_INDEX "Use type 'int' for the indexes" ON)
 option(ENABLE_1D "Enable 1D" OFF)
 option(ENABLE_2D "Enable 2D" ON)
 option(ENABLE_3D "Enable 3D" ON)
+option(ENABLE_OPENMP "Use OpenMP for the parallel loops (and Eigen's internal parallelism)" ON)
+option(ENABLE_NATIVE_ARCH "Optimize for the CPU of the build machine (-march=native: AVX2, FMA...). The binary may not run on other CPUs." OFF)
 
 set(EXECUTABLE_OUTPUT_PATH bin/)
 
@@ -142,6 +144,20 @@ endif()
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 target_link_libraries(fhhos4_core PUBLIC Threads::Threads)
+
+# Include OpenMP
+if(ENABLE_OPENMP)
+	find_package(OpenMP REQUIRED)
+	target_link_libraries(fhhos4_core PUBLIC OpenMP::OpenMP_CXX)
+	message(STATUS "OpenMP enabled")
+else()
+	message(STATUS "OpenMP disabled: the parallel loops use std::async (one thread created per chunk at each loop).")
+endif()
+
+if(ENABLE_NATIVE_ARCH)
+	target_compile_options(fhhos4_core PUBLIC -march=native)
+	message(STATUS "ENABLE_NATIVE_ARCH: ON (-march=native)")
+endif()
 
 # Include AGMG (requires Blas and Lapack)
 if(ENABLE_AGMG)

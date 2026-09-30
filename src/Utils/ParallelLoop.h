@@ -4,6 +4,9 @@
 #include <future>
 #include <math.h>
 #include <type_traits>
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 #include "NonZeroCoefficients.h"
 using namespace std;
 
@@ -50,6 +53,10 @@ public:
 				DefaultNThreads = 1;
 			}
 		}
+#ifdef _OPENMP
+		// Also used by Eigen's internal parallelism (sparse matrix-vector products, dense products)
+		omp_set_num_threads(DefaultNThreads);
+#endif
 	}
 	static unsigned int GetDefaultNThreads()
 	{
@@ -115,22 +122,33 @@ public:
 			this->Chunks[threadNumber]->ThreadFuture.wait();
 	}
 
-	void ExecuteChunk(function<void(ParallelChunk<ResultT>*)> functionChunk)
+	// Runs functionChunk on each chunk, one chunk per thread.
+	// The chunk decomposition is static, so the results do not depend on the thread scheduling.
+	template <class F>
+	void ExecuteChunk(F&& functionChunk)
 	{
 		if (NThreads == 1)
 			functionChunk(this->Chunks[0]);
 		else
 		{
+#ifdef _OPENMP
+			// The OpenMP threads are pooled: no thread creation cost at each call.
+			// Nested calls (from inside a parallel loop) are executed sequentially by the calling thread.
+			#pragma omp parallel for num_threads(NThreads) schedule(static, 1)
+			for (int threadNumber = 0; threadNumber < (int)NThreads; threadNumber++)
+				functionChunk(this->Chunks[threadNumber]);
+#else
 			for (unsigned int threadNumber = 0; threadNumber < NThreads; threadNumber++)
 			{
 				ParallelChunk<ResultT>* chunk = this->Chunks[threadNumber];
-				chunk->ThreadFuture = std::async(std::launch::async, [chunk, functionChunk]()
+				chunk->ThreadFuture = std::async(std::launch::async, [chunk, &functionChunk]()
 					{
 						functionChunk(chunk);
 					}
 				);
 			}
 			this->Wait();
+#endif
 		}
 	}
 
@@ -186,52 +204,20 @@ public:
 		_list(list)
 	{}
 
-	void Execute(function<void(T)> functionToExecute)
+	// functionToExecute: void(T) or void(T, ParallelChunk<ResultT>*)
+	template <class F>
+	void Execute(F&& functionToExecute)
 	{
-		if (this->NThreads == 1)
-		{
-			ParallelChunk<ResultT>* chunk = this->Chunks[0];
-			for (BigNumber i = chunk->Start; i < chunk->End; ++i)
-				functionToExecute(this->_list[i]);
-		}
-		else
-		{
-			for (unsigned int threadNumber = 0; threadNumber < this->NThreads; threadNumber++)
+		this->ExecuteChunk([this, &functionToExecute](ParallelChunk<ResultT>* chunk)
 			{
-				ParallelChunk<ResultT>* chunk = this->Chunks[threadNumber];
-				chunk->ThreadFuture = std::async(std::launch::async, [chunk, this, functionToExecute]()
-					{
-						for (BigNumber i = chunk->Start; i < chunk->End; ++i)
-							functionToExecute(this->_list[i]);
-					}
-				);
-			}
-			this->Wait();
-		}
-	}
-
-	void Execute(function<void(T, ParallelChunk<ResultT>*)> functionToExecute)
-	{
-		if (this->NThreads == 1)
-		{
-			ParallelChunk<ResultT>* chunk = this->Chunks[0];
-			for (BigNumber i = chunk->Start; i < chunk->End; ++i)
-				functionToExecute(this->_list[i], chunk);
-		}
-		else
-		{
-			for (unsigned int threadNumber = 0; threadNumber < this->NThreads; threadNumber++)
-			{
-				ParallelChunk<ResultT>* chunk = this->Chunks[threadNumber];
-				chunk->ThreadFuture = std::async(std::launch::async, [chunk, this, functionToExecute]()
-					{
-						for (BigNumber i = chunk->Start; i < chunk->End; ++i)
-							functionToExecute(this->_list[i], chunk);
-					}
-				);
-			}
-			this->Wait();
-		}
+				for (BigNumber i = chunk->Start; i < chunk->End; ++i)
+				{
+					if constexpr (std::is_invocable_v<F&, T, ParallelChunk<ResultT>*>)
+						functionToExecute(this->_list[i], chunk);
+					else
+						functionToExecute(this->_list[i]);
+				}
+			});
 	}
 
 	static void Execute(const vector<T>& list, function<void(T)> functionToExecute)
@@ -255,52 +241,20 @@ public:
 		BaseChunksParallelLoop<ResultT>(endLoop, nThreads)
 	{}
 
-	void Execute(function<void(BigNumber)> functionToExecute)
+	// functionToExecute: void(BigNumber) or void(BigNumber, ParallelChunk<ResultT>*)
+	template <class F>
+	void Execute(F&& functionToExecute)
 	{
-		if (this->NThreads == 1)
-		{
-			ParallelChunk<ResultT>* chunk = this->Chunks[0];
-			for (BigNumber i = chunk->Start; i < chunk->End; ++i)
-				functionToExecute(i);
-		}
-		else
-		{
-			for (unsigned int threadNumber = 0; threadNumber < this->NThreads; threadNumber++)
+		this->ExecuteChunk([&functionToExecute](ParallelChunk<ResultT>* chunk)
 			{
-				ParallelChunk<ResultT>* chunk = this->Chunks[threadNumber];
-				chunk->ThreadFuture = std::async(std::launch::async, [chunk, this, functionToExecute]()
-					{
-						for (BigNumber i = chunk->Start; i < chunk->End; ++i)
-							functionToExecute(i);
-					}
-				);
-			}
-			this->Wait();
-		}
-	}
-
-	void Execute(function<void(BigNumber, ParallelChunk<ResultT>*)> functionToExecute)
-	{
-		if (this->NThreads == 1)
-		{
-			ParallelChunk<ResultT>* chunk = this->Chunks[0];
-			for (BigNumber i = chunk->Start; i < chunk->End; ++i)
-				functionToExecute(i, chunk);
-		}
-		else
-		{
-			for (unsigned int threadNumber = 0; threadNumber < this->NThreads; threadNumber++)
-			{
-				ParallelChunk<ResultT>* chunk = this->Chunks[threadNumber];
-				chunk->ThreadFuture = std::async(std::launch::async, [chunk, this, functionToExecute]()
-					{
-						for (BigNumber i = chunk->Start; i < chunk->End; ++i)
-							functionToExecute(i, chunk);
-					}
-				);
-			}
-			this->Wait();
-		}
+				for (BigNumber i = chunk->Start; i < chunk->End; ++i)
+				{
+					if constexpr (std::is_invocable_v<F&, BigNumber, ParallelChunk<ResultT>*>)
+						functionToExecute(i, chunk);
+					else
+						functionToExecute(i);
+				}
+			});
 	}
 
 	static void Execute(BigNumber endLoop, function<void(BigNumber)> functionToExecute)

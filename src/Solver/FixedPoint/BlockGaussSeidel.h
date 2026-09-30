@@ -1,5 +1,6 @@
 #pragma once
 #include "BlockSOR.h"
+#include "BlockDiagonalSolver.h"
 using namespace std;
 
 class BlockGaussSeidel : public IterativeSolver
@@ -9,7 +10,7 @@ protected:
 	Direction _direction;
 	bool _hybrid = false;
 
-	vector<Eigen::FullPivLU<DenseMatrix>> invD;
+	BlockDiagonalSolver diagBlockSolver; // solves the systems with the diagonal blocks
 	RowMajorSparseMatrix _rowMajorA;
 public:
 	BlockGaussSeidel(int blockSize, Direction direction, bool hybrid)
@@ -59,14 +60,7 @@ public:
 			this->_rowMajorA = A;
 
 		auto nb = A.rows() / _blockSize;
-		this->invD = vector<Eigen::FullPivLU<DenseMatrix>>(nb);
-
-		NumberParallelLoop<EmptyResultChunk> parallelLoop(nb);
-		parallelLoop.Execute([this, &A](BigNumber i, ParallelChunk<EmptyResultChunk>* chunk)
-			{
-				DenseMatrix Di = A.block(i * _blockSize, i * _blockSize, _blockSize, _blockSize);
-				this->invD[i].compute(Di);
-			});
+		this->diagBlockSolver.Setup(A, _blockSize);
 
 		this->SetupComputationalWork = nb * 2.0/3.0*pow(_blockSize, 3)*1e-6;
 	}
@@ -80,27 +74,28 @@ private:
 		const SparseMatrix& A = *this->Matrix;
 
 		auto nb = A.rows() / _blockSize;
+		Vector tmp_x(_blockSize), tmp_xi(_blockSize); // work vectors for ProcessBlockRow()
 
 		if (!_hybrid)
 		{
 			if (_direction == Direction::Forward)
 			{
 				for (BigNumber i = 0; i < nb; ++i)
-					ProcessBlockRow(i, b, x);
+					ProcessBlockRow(i, b, x, tmp_x, tmp_xi);
 			}
 			else if (_direction == Direction::Backward)
 			{
 				for (BigNumber i = 0; i < nb; ++i)
-					ProcessBlockRow(nb - i - 1, b, x);
+					ProcessBlockRow(nb - i - 1, b, x, tmp_x, tmp_xi);
 			}
 			else if (_direction == Direction::Symmetric)
 			{
 				// Forward
 				for (BigNumber i = 0; i < nb; ++i)
-					ProcessBlockRow(i, b, x);
+					ProcessBlockRow(i, b, x, tmp_x, tmp_xi);
 				// Backward
 				for (BigNumber i = 0; i < nb; ++i)
-					ProcessBlockRow(nb - i - 1, b, x);
+					ProcessBlockRow(nb - i - 1, b, x, tmp_x, tmp_xi);
 			}
 			else if (_direction == Direction::AlternatingForwardFirst || _direction == Direction::AlternatingBackwardFirst)
 			{
@@ -109,13 +104,13 @@ private:
 				{
 					// Forward
 					for (BigNumber i = 0; i < nb; ++i)
-						ProcessBlockRow(i, b, x);
+						ProcessBlockRow(i, b, x, tmp_x, tmp_xi);
 				}
 				else
 				{
 					// Backward
 					for (BigNumber i = 0; i < nb; ++i)
-						ProcessBlockRow(nb - i - 1, b, x);
+						ProcessBlockRow(nb - i - 1, b, x, tmp_x, tmp_xi);
 				}
 			}
 			else
@@ -128,8 +123,9 @@ private:
 				NumberParallelLoop<EmptyResultChunk> parallelLoop(nb);
 				parallelLoop.ExecuteChunk([this, &b, &x](ParallelChunk<EmptyResultChunk>* chunk)
 					{
+						Vector tmp_x(_blockSize), tmp_xi(_blockSize);
 						for (BigNumber i = chunk->Start; i < chunk->End; i++)
-							ProcessBlockRow(i, b, x);
+							ProcessBlockRow(i, b, x, tmp_x, tmp_xi);
 					});
 			}
 			else if (_direction == Direction::Backward)
@@ -137,8 +133,9 @@ private:
 				NumberParallelLoop<EmptyResultChunk> parallelLoop(nb);
 				parallelLoop.ExecuteChunk([this, &b, &x, &nb](ParallelChunk<EmptyResultChunk>* chunk)
 					{
+						Vector tmp_x(_blockSize), tmp_xi(_blockSize);
 						for (BigNumber i = chunk->Start; i < chunk->End; i++)
-							ProcessBlockRow(nb - i - 1, b, x);
+							ProcessBlockRow(nb - i - 1, b, x, tmp_x, tmp_xi);
 					});
 			}
 			else if (_direction == Direction::Symmetric)
@@ -147,14 +144,16 @@ private:
 				NumberParallelLoop<EmptyResultChunk> parallelLoop(nb);
 				parallelLoop.ExecuteChunk([this, &b, &x](ParallelChunk<EmptyResultChunk>* chunk)
 					{
+						Vector tmp_x(_blockSize), tmp_xi(_blockSize);
 						for (BigNumber i = chunk->Start; i < chunk->End; i++)
-							ProcessBlockRow(i, b, x);
+							ProcessBlockRow(i, b, x, tmp_x, tmp_xi);
 					});
 				// Backward
 				parallelLoop.ExecuteChunk([this, &b, &x, &nb](ParallelChunk<EmptyResultChunk>* chunk)
 					{
+						Vector tmp_x(_blockSize), tmp_xi(_blockSize);
 						for (BigNumber i = chunk->Start; i < chunk->End; i++)
-							ProcessBlockRow(nb - i - 1, b, x);
+							ProcessBlockRow(nb - i - 1, b, x, tmp_x, tmp_xi);
 					});
 			}
 			else if (_direction == Direction::AlternatingForwardFirst || _direction == Direction::AlternatingBackwardFirst)
@@ -166,8 +165,9 @@ private:
 					// Forward
 					parallelLoop.ExecuteChunk([this, &b, &x](ParallelChunk<EmptyResultChunk>* chunk)
 						{
+							Vector tmp_x(_blockSize), tmp_xi(_blockSize);
 							for (BigNumber i = chunk->Start; i < chunk->End; i++)
-								ProcessBlockRow(i, b, x);
+								ProcessBlockRow(i, b, x, tmp_x, tmp_xi);
 						});
 				}
 				else
@@ -175,8 +175,9 @@ private:
 					// Backward
 					parallelLoop.ExecuteChunk([this, &b, &x, &nb](ParallelChunk<EmptyResultChunk>* chunk)
 					{
+						Vector tmp_x(_blockSize), tmp_xi(_blockSize);
 						for (BigNumber i = chunk->Start; i < chunk->End; i++)
-							ProcessBlockRow(nb - i - 1, b, x);
+							ProcessBlockRow(nb - i - 1, b, x, tmp_x, tmp_xi);
 					});
 				}
 			}
@@ -190,7 +191,7 @@ private:
 		return result;
 	}
 
-	void ProcessBlockRow(BigNumber currentBlockRow, const Vector& b, Vector& x)
+	void ProcessBlockRow(BigNumber currentBlockRow, const Vector& b, Vector& x, Vector& tmp_x, Vector& tmp_xi)
 	{
 		const SparseMatrix& A = *this->Matrix;
 
@@ -202,7 +203,7 @@ private:
 		x.segment(i * _blockSize, _blockSize) = -_omega * Li * x.head(i * _blockSize) - _omega * Ui * x.tail((nb - i - 1) * _blockSize) + (1 - _omega)*Di*x.segment(i * _blockSize, _blockSize) + _omega * bi;
 		x.segment(i * _blockSize, _blockSize) = this->invD.block(i * _blockSize, 0, _blockSize, _blockSize) * x.segment(i * _blockSize, _blockSize);*/
 
-		Vector tmp_x = b.segment(currentBlockRow * _blockSize, _blockSize);
+		tmp_x = b.segment(currentBlockRow * _blockSize, _blockSize);
 
 		for (int k = 0; k < _blockSize; k++)
 		{
@@ -219,6 +220,9 @@ private:
 			}
 		}
 
-		x.segment(currentBlockRow * _blockSize, _blockSize) = this->invD[currentBlockRow].solve(tmp_x);
+		// Solved in a work vector: solved directly in x, its intermediate values (e.g. Eigen zeroes the destination
+		// of a product, then accumulates) would be read by the other threads in the hybrid version.
+		this->diagBlockSolver.Solve(currentBlockRow, tmp_x, tmp_xi);
+		x.segment(currentBlockRow * _blockSize, _blockSize) = tmp_xi;
 	}
 };

@@ -2,6 +2,7 @@
 #include "../IterativeSolver.h"
 #include "../Direct/EigenSparseLU.h"
 #include "../Direct/EigenSparseCholesky.h"
+#include "BlockDiagonalSolver.h"
 using namespace std;
 
 enum class Direction : unsigned
@@ -20,7 +21,7 @@ protected:
 	double _omega;
 	Direction _direction;
 
-	vector<Eigen::FullPivLU<DenseMatrix>> invD;
+	BlockDiagonalSolver diagBlockSolver; // solves the systems with the diagonal blocks
 	RowMajorSparseMatrix _rowMajorA;
 public:
 	BlockSOR(int blockSize, double omega) : BlockSOR(blockSize, omega, Direction::Forward) {}
@@ -82,14 +83,7 @@ public:
 		if (_blockSize != 1)
 		{
 			auto nb = A.rows() / _blockSize;
-			this->invD = vector<Eigen::FullPivLU<DenseMatrix>>(nb);
-
-			NumberParallelLoop<EmptyResultChunk> parallelLoop(nb);
-			parallelLoop.Execute([this, &A](BigNumber i, ParallelChunk<EmptyResultChunk>* chunk)
-				{
-					DenseMatrix Di = A.block(i * _blockSize, i * _blockSize, _blockSize, _blockSize);
-					this->invD[i].compute(Di);
-				});
+			this->diagBlockSolver.Setup(A, _blockSize);
 
 			this->SetupComputationalWork = nb * 2.0/3.0*pow(_blockSize, 3)*1e-6;
 		}
@@ -104,6 +98,7 @@ private:
 		const SparseMatrix& A = *this->Matrix;
 
 		auto nb = A.rows() / _blockSize;
+		Vector tmp_x(_blockSize); // work vector for ProcessBlockRow()
 		if (_direction == Direction::Forward)
 		{
 			if (_blockSize == 1)
@@ -114,7 +109,7 @@ private:
 			else
 			{
 				for (BigNumber i = 0; i < nb; ++i)
-					ProcessBlockRow(i, b, x);
+					ProcessBlockRow(i, b, x, tmp_x);
 			}
 		}
 		else if (_direction == Direction::Backward)
@@ -127,7 +122,7 @@ private:
 			else
 			{
 				for (BigNumber i = 0; i < nb; ++i)
-					ProcessBlockRow(nb - i - 1, b, x);
+					ProcessBlockRow(nb - i - 1, b, x, tmp_x);
 			}
 		}
 		else if (_direction == Direction::Symmetric)
@@ -145,10 +140,10 @@ private:
 			{
 				// Forward
 				for (BigNumber i = 0; i < nb; ++i)
-					ProcessBlockRow(i, b, x);
+					ProcessBlockRow(i, b, x, tmp_x);
 				// Backward
 				for (BigNumber i = 0; i < nb; ++i)
-					ProcessBlockRow(nb - i - 1, b, x);
+					ProcessBlockRow(nb - i - 1, b, x, tmp_x);
 			}
 		}
 		else if (_direction == Direction::AlternatingForwardFirst || _direction == Direction::AlternatingBackwardFirst)
@@ -165,7 +160,7 @@ private:
 				else
 				{
 					for (BigNumber i = 0; i < nb; ++i)
-						ProcessBlockRow(i, b, x);
+						ProcessBlockRow(i, b, x, tmp_x);
 				}
 			}
 			else
@@ -179,7 +174,7 @@ private:
 				else
 				{
 					for (BigNumber i = 0; i < nb; ++i)
-						ProcessBlockRow(nb - i - 1, b, x);
+						ProcessBlockRow(nb - i - 1, b, x, tmp_x);
 				}
 			}
 		}
@@ -192,7 +187,7 @@ private:
 		return result;
 	}
 
-	void ProcessBlockRow(BigNumber currentBlockRow, const Vector& b, Vector& x)
+	void ProcessBlockRow(BigNumber currentBlockRow, const Vector& b, Vector& x, Vector& tmp_x)
 	{
 		const SparseMatrix& A = *this->Matrix;
 
@@ -204,7 +199,7 @@ private:
 		x.segment(i * _blockSize, _blockSize) = -_omega * Li * x.head(i * _blockSize) - _omega * Ui * x.tail((nb - i - 1) * _blockSize) + (1 - _omega)*Di*x.segment(i * _blockSize, _blockSize) + _omega * bi;
 		x.segment(i * _blockSize, _blockSize) = this->invD.block(i * _blockSize, 0, _blockSize, _blockSize) * x.segment(i * _blockSize, _blockSize);*/
 
-		Vector tmp_x = _omega * b.segment(currentBlockRow * _blockSize, _blockSize);
+		tmp_x = _omega * b.segment(currentBlockRow * _blockSize, _blockSize);
 
 		for (int k = 0; k < _blockSize; k++)
 		{
@@ -223,7 +218,8 @@ private:
 			}
 		}
 
-		x.segment(currentBlockRow * _blockSize, _blockSize) = this->invD[currentBlockRow].solve(tmp_x);
+		auto x_i = x.segment(currentBlockRow * _blockSize, _blockSize);
+		this->diagBlockSolver.Solve(currentBlockRow, tmp_x, x_i);
 	}
 
 	// Same as ProcessBlockRow, but optimized for blockSize = 1
