@@ -19,6 +19,9 @@ using SparseMatrixIndex = intmax_t; // in Eigen, default value is int, but it is
 using RowMajorSparseMatrix = Eigen::SparseMatrix<double, Eigen::RowMajor, SparseMatrixIndex>;
 using ColMajorSparseMatrix = Eigen::SparseMatrix<double, Eigen::ColMajor, SparseMatrixIndex>;
 
+// Row-major because the smoothers (Gauss-Seidel, SOR, block Jacobi) and the AMG setups iterate over rows.
+// Eigen's sparse direct solvers only support column-major matrices: they must be given a column-major
+// copy (see EigenSparseLU, EigenSparseCholesky and IterativeSolver).
 using SparseMatrix = RowMajorSparseMatrix;
 
 

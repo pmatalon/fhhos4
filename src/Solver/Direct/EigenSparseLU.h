@@ -5,7 +5,10 @@ using namespace std;
 class EigenSparseLU : public Solver
 {
 private:
-	Eigen::SparseLU<SparseMatrix> _solver;
+	// Eigen's SparseLU requires a column-major matrix type. With a row-major one, it reads the row pointers
+	// as column pointers and silently factorizes a wrong matrix when the sparsity pattern is not symmetric.
+	// Memory: besides the L and U factors, SparseLU keeps its own (column-permuted) copy of the matrix.
+	Eigen::SparseLU<ColMajorSparseMatrix> _solver;
 
 public:
 	EigenSparseLU() : Solver() {}
@@ -19,7 +22,9 @@ public:
 	{
 		Solver::Setup(A);
 		//_solver.isSymmetric(true);
-		_solver.compute(A);
+		// Copy: A is row-major, SparseLU needs column-major (see above). Freed at the end of this function.
+		ColMajorSparseMatrix colMajorA = A;
+		_solver.compute(colMajorA);
 		this->SetupComputationalWork = Cost::LUFactorization(A)*1e-6;
 		Eigen::ComputationInfo info = _solver.info();
 		if (info != Eigen::ComputationInfo::Success)

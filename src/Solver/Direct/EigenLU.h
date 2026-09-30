@@ -28,7 +28,7 @@ public:
 		_solver.compute(A);
 		//this->SetupComputationalWork = Cost::LUFactorization(A)*1e-6;
 
-		if (_solver.isInvertible())
+		if (!_solver.isInvertible())
 			Utils::FatalError("Error Eigen::FullPivLU: the matrix is not invertible");
 	}
 

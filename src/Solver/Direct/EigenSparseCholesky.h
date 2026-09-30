@@ -6,7 +6,9 @@ using namespace std;
 class EigenSparseCholesky : public Solver
 {
 private:
-	Eigen::SimplicialLDLT<ColMajorSparseMatrix> _solver; // Eigen only supports ColMajor so far...
+	// Eigen's sparse Cholesky requires a column-major matrix type.
+	// Memory: SimplicialLDLT only keeps the factors (it makes a temporary permuted copy of the matrix in compute()).
+	Eigen::SimplicialLDLT<ColMajorSparseMatrix> _solver;
 
 public:
 	EigenSparseCholesky() : Solver() {}
@@ -19,10 +21,11 @@ public:
 	void Setup(const SparseMatrix& A) override
 	{
 		Solver::Setup(A);
-		if (A.IsRowMajor)
-			_solver.compute(A.transpose());
-		else
-			_solver.compute(A);
+		// Copy: A is row-major, SimplicialLDLT needs column-major. Freed at the end of this function.
+		// Since A is symmetric, we copy its transpose: it is the same matrix, and the transpose of
+		// a row-major matrix is column-major, so the entries are copied in order.
+		ColMajorSparseMatrix colMajorA = A.transpose();
+		_solver.compute(colMajorA);
 		this->SetupComputationalWork = Cost::CholeskyFactorization(A)*1e-6;
 		Eigen::ComputationInfo info = _solver.info();
 		if (info != Eigen::ComputationInfo::Success)

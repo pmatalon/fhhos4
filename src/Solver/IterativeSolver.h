@@ -6,7 +6,10 @@ using namespace std;
 class IterativeSolver : public Solver
 {
 protected:
-	Eigen::SparseLU<SparseMatrix> _directSolver;
+	// Computes ExactSolution, the exact solution of the linear system, against which the algebraic
+	// error of the iterates is computed (see ComputeExactSolution).
+	// Column-major type: see EigenSparseLU.
+	Eigen::SparseLU<ColMajorSparseMatrix> _directSolver;
 public:
 	Vector ExactSolution;
 	double Tolerance = 1e-3;
@@ -28,7 +31,11 @@ public:
 	{
 		Solver::Setup(A);
 		if (this->ComputeExactSolution)
-			this->_directSolver.compute(A);
+		{
+			// Copy: A is row-major, SparseLU needs column-major. Freed at the end of this block.
+			ColMajorSparseMatrix colMajorA = A;
+			this->_directSolver.compute(colMajorA);
+		}
 	}
 
 	virtual void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F)
