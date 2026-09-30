@@ -73,13 +73,14 @@ namespace
 // Section 3.4.1 (basis normalization): with local refinement, orthonormalized element bases
 // (-e-ogb 3) make the multigrid diverge, while orthogonalization without normalization
 // (-e-ogb 1) converges. Observed at n=32: divergence vs. 13 iterations.
-//   fhhos4 -geo square4quadrants_tri_localref -no-cache -tc square -cs r -k 1 -n 32 -e-ogb {3|1}
+//   ./bin/fhhos4 -geo square4quadrants_tri_localref -no-cache -tc square -cs r -k 1 -n 32 -e-ogb 3
 TEST(HpStrategies2022, BasisNormalization_OrthonormalDiverges)
 {
 	ProgramArguments args = LocalRefArgs(/*elemBasisOrthogonalizeCode*/ 3, /*n*/ 32, "mg");
 	EXPECT_EXIT(RunDiffusionHHO(args), ::testing::ExitedWithCode(EXIT_FAILURE), "");
 }
 
+//   ./bin/fhhos4 -geo square4quadrants_tri_localref -no-cache -tc square -cs r -k 1 -n 32 -e-ogb 1
 TEST(HpStrategies2022, BasisNormalization_OrthogonalConverges)
 {
 	ProgramArguments args = LocalRefArgs(/*elemBasisOrthogonalizeCode*/ 1, /*n*/ 32, "mg");
@@ -94,6 +95,7 @@ class HPConfigTest : public ::testing::TestWithParam<std::tuple<std::string, int
 {
 };
 
+//   ./bin/fhhos4 -geo square -mesh cart -cs r -k 5 -n 32 -s {mg|fcgmg} -tol 1e-10 -hp-config {1|2|3|4}
 TEST_P(HPConfigTest, AllConverge)
 {
 	auto [solverCode, hpConfig] = GetParam();
@@ -115,6 +117,7 @@ class ConvergenceOrderHighOrderTest : public ::testing::TestWithParam<int>
 {
 };
 
+//   ./bin/fhhos4 -geo square -mesh cart -cs r -k {2|3|4|5} -n {16|32} -s fcgmg -tol 1e-12 -hp-config 2
 TEST_P(ConvergenceOrderHighOrderTest, MatchesTheoreticalOrder)
 {
 	int k = GetParam();

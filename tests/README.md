@@ -16,9 +16,9 @@ gtest_discover_tests(fhhos4_tests)
 
 Any new `tests/*.cpp` file is picked up automatically (`CONFIGURE_DEPENDS`) — no CMake edit needed to add a test.
 
-Tests don't go through the CLI as a subprocess. Instead, `tests/support/RunHelper.h` builds a `ProgramArguments` struct directly, applies the same argument-defaulting cascade as `main.cpp` (`ApplyProgramArgumentDefaults`), and calls `Program_Diffusion_HHO<Dim>::Execute()` in-process. So every test case below is annotated with its CLI-equivalent `fhhos4 ...` command for readability, even though the test itself never spawns `fhhos4`.
+Tests don't go through the CLI as a subprocess. Instead, `tests/support/RunHelper.h` builds a `ProgramArguments` struct directly, applies the same argument-defaulting cascade as `main.cpp` (`ApplyProgramArgumentDefaults`), and calls `Program_Diffusion_HHO<Dim>::Execute()` in-process. So every test case (here, and in a comment above each test in the source) is annotated with its CLI-equivalent `./bin/fhhos4 ...` command, to run it manually from `build/`, even though the test itself never spawns `fhhos4`.
 
-There is no golden/reference-file comparison anywhere in the suite — every assertion is computed in-code: a least-squares convergence-order slope, a generous iteration-count bound, or (for two intentionally-broken configurations) a death-test exit code.
+Assertions are of three kinds: a least-squares convergence-order slope; an iteration count, either exact (the 2020 paper's published values) or bounded (the 2022 paper); or (for two intentionally-broken configurations) a degradation or a death-test exit code.
 
 ## How to run
 
@@ -29,54 +29,61 @@ ctest -R Kellogg                           # run a subset by name (regex)
 ./bin/fhhos4_tests --gtest_filter=*Kellogg*  # or filter the binary directly
 ```
 
-The full suite is 39 CTest cases and runs in about 2 minutes serially (the slowest single case, `MeshIndependenceTest/("stri", 3)`, takes ~19s).
+The full suite is 31 CTest cases and runs in under 30 seconds serially (no single case takes more than ~2s). Tests are deliberately kept small (N ≤ 64, k ≤ 1 for the multigrid tests).
+
+## `HHOConvergenceTest.cpp`
+
+A-priori convergence of the HHO discretization, independent of any solver study: the linear system is solved directly (sparse Cholesky, `-s ch`), so the L2 error is the discretization error.
+
+- **`Square/ConvergenceOrderTest.MatchesTheoreticalOrder`** (8 cases: `{cart, stri} × k=0..3`) — the L2 error should converge at the theoretical rate (h² for k=0, h^(k+2) for k≥1) as the mesh is refined n=8,16,32. Assertion: least-squares slope within ±0.3.
+  CLI: `./bin/fhhos4 -geo square -mesh {cart|stri} -mesher inhouse -s ch -k {0..3} -n {8|16|32}`
 
 ## `HMultigrid2020Test.cpp`
 
 Validates *"An h-multigrid method for Hybrid High-Order discretizations"* (Di Pietro, Hulsemann, Matalon, Mycek, Rude, Ruiz, SIAM J. Sci. Comput. 2021) — see `reproducibility/2020_MG_for_HHO.md`.
 
-- **`Square/ConvergenceOrderTest.MatchesTheoreticalOrder`** (8 cases: `{cart, stri} × k=0..3`) — the L2 error should converge at the theoretical rate (h² for k=0, h^(k+2) for k≥1) as the mesh is refined n=8,16,32,64.
-  CLI: `fhhos4 -geo square -mesh {cart|stri} -mesher inhouse -s mg -cycle V,1,1 -k {0..3} -n {8,16,32,64}`
-  MG iteration counts observed per n=8/16/32/64 (n=8/16 sit in a degenerate pre-asymptotic regime where the multigrid hierarchy barely has any levels, hence the 1's):
-  - cart: k=0 → 1,1,6,7 · k=1 → 1,1,8,8 · k=2 → 1,9,10,10 · k=3 → 1,10,11,11
-  - stri: k=0 → 1,1,10,10 · k=1 → 1,11,12,12 · k=2 → 1,10,10,10 · k=3 → 1,10,10,10
+The expected iteration counts are **exactly** the paper's, taken from the CSV files of the accepted version (`Multigrid_for_HHO_SISC.zip`, `Results/`; in the file names, `p` = k+1). Only the smallest mesh sizes and k=0,1 are tested, to keep the suite fast.
 
-- **`Square/MeshIndependenceTest.IterationCountStaysBounded`** (8 cases: `{cart, stri} × k=0..3`) — the V(1,1)-cycle iteration count should stay essentially mesh-independent as n=32→64→128. Assertion: largest ≤ 2×smallest and largest ≤ 40 (a generous bound rather than exact constancy).
-  Observed: cart: k=0 → 6,7,7 · k=1 → 8,8,8 · k=2 → 10,10,10 · k=3 → 11,11,11; stri: k=0 → 10,10,10 · k=1 → 12,12,12 · k=2 → 10,10,9 · k=3 → 10,10,10.
-  Note: the in-code comment justifying the generous bound cites an older observation of "19 → 24 → 27 for the unstructured mesh at k=0", but the current numbers above (stri k=0: 10,10,10) are flat — the bound still holds comfortably either way.
+- **`Square/IterationCountTest.MatchesPaper`** (4 cases: `{cart, stri} × k=0,1`) — Figure 4.1, V(1,1) cycle, n=32,64. Reference: `2D_scalability_homogeneous_V11_g0_p{1|2}_{cart|tri}.csv`.
+  CLI: `./bin/fhhos4 -geo square -mesh {cart|stri} -mesher inhouse -s mg -cycle V,1,1 -k {0|1} -n {32|64}`
+  Expected: cart: k=0 → 13,14 · k=1 → 16,18; stri: k=0 → 19,24 · k=1 → 24,24.
+  All other points of the CSVs checked up to n=128 (cart/stri, k=0..3) match, except stri, k=1, n=128 (not tested): the code gives 25 iterations, the CSV reports 24. The CSV value is most likely wrong: every code version from the introduction of standard coarsening for triangles (Oct 2019) through the paper's submission (the CSVs are unchanged since the June 2020 submission) up to today gives 25, with the exact same residual history (1.44e-8 at iteration 24, far from the 1e-8 tolerance). The rest of the curve matches (n=256, 512 → 26, 26).
 
-- **`HMultigrid2020.DegradesAsDocumented_StructuredTetra_K0`** (1 case) — the paper's Figure 4.1 documents this configuration (`cube`/`stetra`, k=0, V(2,2)) as diverging: with the standard coarsening, the convergence rate degrades toward 1. Assertion: more than 60 iterations (observed: 122 at n=16, vs. 24 for k=1).
-  CLI: `fhhos4 -geo cube -mesh stetra -mesher inhouse -s mg -cycle V,2,2 -k 0 -n 16`
+- **`HMultigrid2020.DegradesAsDocumented_StructuredTetra_K0`** (1 case) — Figure 4.1 documents this configuration (`cube`/`stetra`, k=0, V(2,2)) as diverging (its CSV has no iteration count): with the standard coarsening, the convergence rate degrades toward 1. Assertion: more than 60 iterations (observed: 122 at n=16, vs. 24 for k=1).
+  CLI: `./bin/fhhos4 -geo cube -mesh stetra -mesher inhouse -s mg -cycle V,2,2 -k 0 -n 16`
 
-- **`SquareFourQuadrants/KelloggTest.ConvergesWithinBound`** (4 cases: k=0..3) — the heterogeneous Kellogg benchmark (Figure 4.7) should converge within 30 iterations at n=256.
-  CLI: `fhhos4 -geo square4quadrants -tc kellogg -mesh cart -mesher inhouse -s mg -cycle V,1,1 -k {0..3} -n 256`
-  Observed iteration counts: k=0 → 10 · k=1 → 9 · k=2 → 10 · k=3 → 10.
+- **`SquareFourQuadrants/KelloggTest.MatchesPaper`** (2 cases: k=0,1) — Figure 4.7, heterogeneous Kellogg benchmark, V(1,1) cycle, n=32,64. Reference: `Kellogg_scalability_V11_g0_p{1|2}_cart.csv`.
+  CLI: `./bin/fhhos4 -geo square4quadrants -tc kellogg -mesh cart -mesher inhouse -s mg -cycle V,1,1 -k {0|1} -n {32|64}`
+  Expected: k=0 → 13,13 · k=1 → 15,17.
 
-- **`SquareFourQuadrants/HeterogeneityRatioSweepTest.IterationCountRatioBounded`** (4 cases: k=0..3) — iteration count should stay bounded as the `-heterog` diffusion-coefficient ratio sweeps 1e0/1e2/1e4/1e6/1e8, with the Galerkin operator enabled (Figure 4.9(a)). n=64, V(0,3). Assertion: max ≤ 3×min.
-  Observed: k=0 → 7,7,7,7,7 · k=1 → 9,9,9,9,9 · k=2 → 10,10,10,10,10 · k=3 → 11,11,11,11,11 — completely flat at these settings; the ratio has essentially no effect.
+- **`SquareFourQuadrants/HeterogeneityRatioSweepTest.MatchesPaper`** (2 cases: k=0,1) — Figure 4.9(a): with the Galerkin operator and the heterogeneous weighting, the V(0,3) iteration count doesn't depend on the `-heterog` ratio (1e0/1e2/1e4/1e6/1e8), n=64. Reference: `2D_heterogeneity_chiasmus_n64_V03_g1_cart.csv`.
+  CLI: `./bin/fhhos4 -geo square4quadrants -mesh cart -mesher inhouse -n 64 -s mg -g 1 -cycle V,0,3 -k {0|1} -heterog {1e0|1e2|1e4|1e6|1e8}`
+  Expected: k=0 → 7 · k=1 → 9, for every ratio.
 
 ## `HpStrategies2022Test.cpp`
 
 Validates *"High-order multigrid strategies for HHO discretizations of elliptic equations"* (Di Pietro, Matalon, Mycek, Rude, Numer. Linear Algebra Appl. 2022) — see `reproducibility/2022_high_order_strategies.md`.
 
 - **`HpStrategies2022.BasisNormalization_OrthonormalDiverges`** / **`BasisNormalization_OrthogonalConverges`** (2 cases) — §3.4.1: with local refinement, orthonormalized element bases (`-e-ogb 3`) make the multigrid diverge (death test, `EXIT_FAILURE`), while orthogonal bases (`-e-ogb 1`) converge (observed: 13 iterations; assertion ≤ 30).
-  CLI: `fhhos4 -geo square4quadrants_tri_localref -no-cache -tc square -cs r -k 1 -n 32 -e-ogb {3|1}`
+  CLI: `./bin/fhhos4 -geo square4quadrants_tri_localref -no-cache -tc square -cs r -k 1 -n 32 -e-ogb {3|1}`
 
 - **`SquareCart/HPConfigTest.AllConverge`** (8 cases: `{mg, fcgmg} × hp-config{1,2,3,4}`) — every hp-multigrid coarsening strategy (h-only, p→h, p→h with h-prolongation, hp→h) should converge at high order (k=5, n=32), both as a stand-alone solver and as an FCG preconditioner. Assertion: 0 < iterations ≤ 100.
+  CLI: `./bin/fhhos4 -geo square -mesh cart -cs r -k 5 -n 32 -s {mg|fcgmg} -tol 1e-10 -hp-config {1|2|3|4}`
   Observed iteration counts: `mg` → hp1=15, hp2=7, hp3=10, hp4=15; `fcgmg` → hp1=11, hp2=6, hp3=9, hp4=11. hp-config 2 (p→h, injection/remove-higher-orders) is consistently the fastest of the four.
 
 - **`SquareCart/ConvergenceOrderHighOrderTest.MatchesTheoreticalOrder`** (4 cases: k=2..5) — at high order, with hp-config 2 and a tight tolerance (1e-12), the L2 error should still follow the theoretical h^(k+2) order as n=16→32.
+  CLI: `./bin/fhhos4 -geo square -mesh cart -cs r -k {2..5} -n {16|32} -s fcgmg -tol 1e-12 -hp-config 2`
   Observed MG iteration counts: k=2 → 5,7 · k=3 → 9,9 · k=4 → 7,7 · k=5 → 7,7.
 
 ## Coverage summary
 
-- 39 CTest cases total across the 2 files above, all exercising `Program_Diffusion_HHO` — i.e. **diffusion (Poisson-type) problems, HHO discretization, static condensation**.
-- Dimensions: 2D (37 cases) plus one 3D death test that doesn't even reach the solver. No 1D coverage (and `RunDiffusionHHO` throws for it, consistent with `ENABLE_1D=OFF` by default).
+- 31 CTest cases total across the 3 files above, all exercising `Program_Diffusion_HHO` — i.e. **diffusion (Poisson-type) problems, HHO discretization, static condensation**.
+- Dimensions: 2D (30 cases) plus one 3D case (`stetra`, k=0). No 1D coverage (and `RunDiffusionHHO` throws for it, consistent with `ENABLE_1D=OFF` by default).
 - Meshes: in-house `cart`, `stri`, `stetra` and GMSH `cart` (the 2022 tests leave the mesher at its default, which resolves to GMSH). No `poly`/agglomerated (CGAL) coverage.
-- Solvers: `mg` and `fcgmg` only. No coverage of `lu`, `ch`, `cg`, `eigencg`, `uamg`, `aggregamg`, `agmg`, or `p_mg`.
+- Solvers: `mg`, `fcgmg` and `ch` only. No coverage of `lu`, `cg`, `eigencg`, `uamg`, `aggregamg`, `agmg`, or `p_mg`.
 - Test cases (`-tc`): the default `sine` test case on `square`, `kellogg` on `square4quadrants`, a homogeneous `-heterog` ratio sweep on `square4quadrants`, and one locally-refined-mesh case.
 - **Not covered**: biharmonic (`-pb bihar` / `bihardd`), DG/FEM discretizations, full-Neumann BCs, anisotropy, non-condensed systems, and most solver/mesh codes listed above.
-- Two tests are *intentionally* death tests that regression-document known, currently-failing configurations drawn straight from the papers' own reproduction recipes — they are not bugs to silently "fix"; changing their behavior should be a deliberate, separate change.
+- Two tests *intentionally* document known, failing configurations (a death test in the 2022 file, a near-divergence in the 2020 file) drawn straight from the papers' own reproduction recipes — they are not bugs to silently "fix"; changing their behavior should be a deliberate, separate change.
 - Papers with reproducibility docs but no corresponding tests yet: `2021_non_nested_MG_for_HHO.md`, `2023_AMG_for_hybrid_methods.md`, `2023_biharmonic_problem.md`, `2024_HHO_HDG_demo_framework.md`.
 
 ## Adding a test
