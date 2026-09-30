@@ -35,10 +35,11 @@ From `build/`:
 ctest --output-on-failure
 ```
 
-31 tests, <30 s. Covers `Program_Diffusion_HHO` with `mg`/`fcgmg`/`ch` solvers on
-`cart`/`stri`/`stetra` (in-house) and GMSH `cart` meshes — see `tests/README.md`.
-Not covered: biharmonic, DG/FEM programs, other solvers (`lu`, `cg`, `uamg`,
-`agmg`, ...), 1D, anisotropic cases.
+49 tests, ~3.5 min (`ctest -E HPConfig` skips the 8 slowest, ~2 min). Most check the
+iteration counts of the papers in `reproducibility/` — see `tests/README.md`. Covers
+`Program_Diffusion_HHO` and `Program_BiHarmonic_HHO` (HHO, static condensation), 2D/3D,
+in-house and GMSH meshes. Not covered: DG/FEM programs, `lu`/`cg`/`agmg`/`p_mg` solvers,
+1D, anisotropic cases.
 
 ## Run
 

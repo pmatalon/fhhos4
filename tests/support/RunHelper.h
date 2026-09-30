@@ -1,12 +1,29 @@
 #pragma once
 #include "Program/Program_Diffusion_HHO.h"
+#include "Program/Program_BiHarmonic_HHO.h"
 #include "ProgramArgumentsDefaults.h"
 #include <cmath>
+#include <ostream>
 #include <stdexcept>
 #include <vector>
 
 namespace fhhos4_tests
 {
+	// Expected iteration count for the mesh size N: the current code's, and the paper's for
+	// comparison (they can differ a little, e.g. when the meshes are built by GMSH).
+	struct ExpectedIterations
+	{
+		int N;
+		int Iterations;
+		int PaperIterations;
+	};
+
+	// Readable parameter values in the test names
+	inline std::ostream& operator<<(std::ostream& os, const ExpectedIterations& e)
+	{
+		return os << "N" << e.N << ":" << e.Iterations;
+	}
+
 	// Mirrors the side effects of ProgramDim<Dim>::Start() (src/Program.h) that the CLI relies
 	// on before dispatching to a Program_*::Execute(): a lot of mesh-construction code (the GMSH
 	// mesher, polyhedral coarsening) reads the global Utils::ProgramArgs directly instead of the
@@ -47,6 +64,39 @@ namespace fhhos4_tests
 		}
 		return results;
 	}
+
+	// Same as RunDiffusionHHO, for the biharmonic problem (-pb bihar): returns the iteration
+	// count of the biharmonic solver and the L2 error of the solution.
+	inline ProgramResults RunBiHarmonicHHO(ProgramArguments args)
+	{
+		args.Problem.Equation = EquationType::BiHarmonic;
+		ApplyProgramArgumentDefaults(args);
+
+		ProgramResults results;
+		switch (args.Problem.Dimension)
+		{
+		case 2:
+			SyncGlobalProgramState<2>(args);
+			Program_BiHarmonic_HHO<2>::Execute(args, &results);
+			break;
+		case 3:
+			SyncGlobalProgramState<3>(args);
+			Program_BiHarmonic_HHO<3>::Execute(args, &results);
+			break;
+		default:
+			throw std::runtime_error("RunBiHarmonicHHO: unsupported dimension " + std::to_string(args.Problem.Dimension));
+		}
+		return results;
+	}
+
+	// Sequential execution (the CLI's -threads 1) while in scope. Needed where the result depends
+	// on the thread scheduling, e.g. the agglomeration coarsening (-cs n).
+	class SequentialExecution
+	{
+	public:
+		SequentialExecution() { BaseParallelLoop::SetDefaultNThreads(1); }
+		~SequentialExecution() { BaseParallelLoop::SetDefaultNThreads(0); } // 0: back to the automatic default
+	};
 
 	// Least-squares slope of log(errors) vs. log(h): the empirical convergence order.
 	inline double EstimateConvergenceOrder(const std::vector<double>& h, const std::vector<double>& errors)

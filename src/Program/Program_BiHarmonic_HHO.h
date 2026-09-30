@@ -1,6 +1,7 @@
 #pragma once
 #include <iomanip>
 #include "../ProgramArguments.h"
+#include "ProgramResults.h"
 #include "../Discretizations/HHO/BiHarmonicMixedFormFalk_HHO.h"
 #include "../Discretizations/HHO/BiHarmonicMixedFormGlowinski_HHO.h"
 #include "../TestCases/BiHarmonic/BiHarTestCaseFactory.h"
@@ -19,7 +20,7 @@ template <int Dim>
 class Program_BiHarmonic_HHO
 {
 public:
-	static void Execute(ProgramArguments& args)
+	static void Execute(ProgramArguments& args, ProgramResults* results = nullptr)
 	{
 		GaussLegendre::Init();
 
@@ -571,6 +572,9 @@ public:
 			Vector theta_0 = biHarSolver->Solve(b);
 			solvingTimer.Stop();
 
+			if (results && biHarIterSolver)
+				results->IterationCount = biHarIterSolver->IterationCount;
+
 			totalTimer.Stop();
 
 			cout << "Laplacian solver:" << endl << endl;
@@ -623,6 +627,8 @@ public:
 
 					double solutionError = biHarPb->DiffPb().ReconstructSpace.L2Norm(error) / exactSolutionL2Norm;
 					cout << endl << "L2 Error (solution) = " << std::scientific << solutionError << endl;
+					if (results)
+						results->L2Error = solutionError;
 				}
 
 				if (testCase->MinusLaplacianOfSolution)

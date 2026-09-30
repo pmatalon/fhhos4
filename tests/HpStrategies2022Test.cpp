@@ -3,6 +3,7 @@
 // reproducibility/2022_high_order_strategies.md.
 #include <gtest/gtest.h>
 #include <string>
+#include <tuple>
 #include <vector>
 #include "support/RunHelper.h"
 
@@ -89,27 +90,38 @@ TEST(HpStrategies2022, BasisNormalization_OrthogonalConverges)
 	EXPECT_LE(results.IterationCount, 30);
 }
 
-// Figures 7-18 (a representative slice): every hp-multigrid strategy (1-4), used both as a
-// stand-alone solver and as an FCG preconditioner, should converge.
-class HPConfigTest : public ::testing::TestWithParam<std::tuple<std::string, int>>
+// Figures 7 and 8: square, Cartesian mesh, k=5, N=128, tolerance 1e-12. Number of iterations of
+// each hp-multigrid strategy (hp-config 1-4), used as a solver (-s mg, Fig. 7) and as a
+// preconditioner of FCG (-s fcgmg, Fig. 8). The meshes are built by GMSH; the code reproduces
+// the paper's values, except for fcgmg with hp-config 4 (14 iterations instead of 16).
+// These are the most expensive tests of the suite (~15 s each), but N=128 is the smallest size
+// of the paper at this degree.
+class HPConfigTest : public ::testing::TestWithParam<std::tuple<std::string, int, ExpectedIterations>>
 {
 };
 
-//   ./bin/fhhos4 -geo square -mesh cart -cs r -k 5 -n 32 -s {mg|fcgmg} -tol 1e-10 -hp-config {1|2|3|4}
-TEST_P(HPConfigTest, AllConverge)
+//   ./bin/fhhos4 -geo square -mesh cart -cs r -k 5 -n 128 -tol 1e-12 -s {mg|fcgmg} -hp-config {1|2|3|4} -no-cache
+TEST_P(HPConfigTest, IterationCounts)
 {
-	auto [solverCode, hpConfig] = GetParam();
+	auto [solverCode, hpConfig, e] = GetParam();
 
-	ProgramArguments args = SquareCartArgs(/*k*/ 5, /*n*/ 32, solverCode, /*tolerance*/ 1e-10);
+	ProgramArguments args = SquareCartArgs(/*k*/ 5, e.N, solverCode, /*tolerance*/ 1e-12);
+	args.Actions.UseCache = false; // -no-cache
 	ApplyHPConfig(args, hpConfig);
 
 	ProgramResults results = RunDiffusionHHO(args);
-	EXPECT_GT(results.IterationCount, 0);
-	EXPECT_LE(results.IterationCount, 100);
+	EXPECT_EQ(results.IterationCount, e.Iterations) << "N=" << e.N << " (paper: " << e.PaperIterations << ")";
 }
 
-INSTANTIATE_TEST_SUITE_P(SquareCart, HPConfigTest,
-	::testing::Combine(::testing::Values(std::string("mg"), std::string("fcgmg")), ::testing::Values(1, 2, 3, 4)));
+INSTANTIATE_TEST_SUITE_P(SquareCart, HPConfigTest, ::testing::Values(
+	std::make_tuple(std::string("mg"),    1, ExpectedIterations{ 128, 19, 19 }),
+	std::make_tuple(std::string("mg"),    2, ExpectedIterations{ 128, 11, 11 }),
+	std::make_tuple(std::string("mg"),    3, ExpectedIterations{ 128, 13, 13 }),
+	std::make_tuple(std::string("mg"),    4, ExpectedIterations{ 128, 19, 19 }),
+	std::make_tuple(std::string("fcgmg"), 1, ExpectedIterations{ 128, 14, 14 }),
+	std::make_tuple(std::string("fcgmg"), 2, ExpectedIterations{ 128,  8,  8 }),
+	std::make_tuple(std::string("fcgmg"), 3, ExpectedIterations{ 128, 11, 11 }),
+	std::make_tuple(std::string("fcgmg"), 4, ExpectedIterations{ 128, 14, 16 })));
 
 // Figure 3: at high order (hp-config 2, tight tolerance), the L2 error should still follow the
 // theoretical h^(k+2) convergence order.
