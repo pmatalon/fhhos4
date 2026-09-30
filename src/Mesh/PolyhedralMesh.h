@@ -713,9 +713,10 @@ private:
 
 		vector<Element<Dim>*> remainingFineElements = this->Elements;
 
-		std::random_device rd;
-        std::mt19937 g(rd());
-        std::shuffle(remainingFineElements.begin(), remainingFineElements.end(), g);
+		// Fixed seed, so that the agglomeration (hence the multigrid convergence) is reproducible.
+		// Only in sequential execution, though: the parallel loop below depends on the thread scheduling.
+		std::mt19937 g(0);
+		std::shuffle(remainingFineElements.begin(), remainingFineElements.end(), g);
 		//cout << "\t" << remainingFineElements.size() << " fine elements to coarsen" << endl;
 
 		bool elementsAreAgglomerated = true;
