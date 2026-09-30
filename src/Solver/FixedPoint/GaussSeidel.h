@@ -87,7 +87,7 @@ private:
 		else
 		{
 			if (_direction == Direction::Forward)
-				ForwardSweepAndComputeResidual(b, x, xEquals0, result);
+				ForwardSweepAndComputeResidualOrAx(b, x, xEquals0, computeAx, result);
 			else if (_direction == Direction::Backward)
 				BackwardSweepAndComputeResidualOrAx(b, x, xEquals0, computeResidual, computeAx, result);
 			else if (_direction == Direction::Symmetric)
@@ -99,7 +99,7 @@ private:
 			{
 				int modulo = _direction == Direction::AlternatingForwardFirst ? 0 : 1;
 				if (this->IterationCount % 2 == modulo)
-					ForwardSweepAndComputeResidual(b, x, xEquals0, result);
+					ForwardSweepAndComputeResidualOrAx(b, x, xEquals0, computeAx, result);
 				else
 					BackwardSweepAndComputeResidualOrAx(b, x, xEquals0, computeResidual, computeAx, result);
 			}
@@ -159,7 +159,8 @@ private:
 		xEquals0 = false;
 	}
 
-	void ForwardSweepAndComputeResidual(const Vector& b, Vector& x, bool& xEquals0, IterationResult& result)
+	// The residual is always computed (it is cheaper than Ax), and Ax is deduced from it if requested.
+	void ForwardSweepAndComputeResidualOrAx(const Vector& b, Vector& x, bool& xEquals0, bool computeAx, IterationResult& result)
 	{
 		const SparseMatrix& A = *this->Matrix;
 		auto U = A.triangularView<Eigen::StrictlyUpper>();
@@ -184,6 +185,11 @@ private:
 
 			// Residual: r = -Ux
 			result.Residual = -U * x;                                          result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
+		}
+
+		if (computeAx)
+		{
+			result.Ax = b - result.Residual;                      result.AddWorkInFlops(Cost::AddVec(b));
 		}
 	}
 

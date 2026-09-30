@@ -34,7 +34,7 @@ ctest -E HPConfig                          # skip the slowest tests
 ./bin/fhhos4_tests --gtest_filter=*Kellogg*  # or filter the binary directly
 ```
 
-The full suite is 49 CTest cases and runs in about 3.5 minutes serially. The 8 `HPConfigTest` cases take about 2 minutes of it (~15 s each: N=128 with k=5 is the smallest size of the high-order paper); the other cases take less than 20 s each.
+The full suite is 77 CTest cases and runs in about 3.5 minutes serially. The 8 `HPConfigTest` cases take about 2 minutes of it (~15 s each: N=128 with k=5 is the smallest size of the high-order paper); the other cases take less than 20 s each.
 
 ## GMSH meshes: reproducibility
 
@@ -126,13 +126,30 @@ Validates *"Iterative solution to the biharmonic equation in mixed form discreti
   CLI: `./bin/fhhos4 -pb bihar -geo cube -source exp -mesh tetra -not-compute-errors -s fcguamg -hp-cs p_h -nbh-depth 2 -bihar-prec-solver bicgstab -tol 1e-8 -k 0 -bihar-prec {s|no} -n 8 -no-cache`
   Expected: 14 preconditioned, 29 not preconditioned (paper: identical).
 
+## `SolverRegressionTest.cpp`
+
+Regression tests for configurations that used to crash, and for the argument defaulting. They don't check reference iteration counts, only that the runs complete and converge (in-house meshes).
+
+- **`SquareCart/ForwardPostSmootherTest.Converges`** (4 cases: `mg` with K-cycle, `fcgmg`, `uamg`, `aggregamg`) — a forward Gauss-Seidel post-smoother (`gs`, or `bgs` when the block size is 1) with a solver that needs the post-smoother to return `Ax` (K-cycle, FCG preconditioned by a multigrid). It used to return an empty `Ax` and FCG segfaulted. `-coarse-size 10` gives 6 levels, so that the K-cycle's FCG is actually used. Assertion: converges in ≤ 50 iterations.
+  CLI: `./bin/fhhos4 -geo square -mesh cart -mesher inhouse -k 0 -n 64 -coarse-size 10 -smoothers gs,gs -s {mg -cycle K,1,1|fcgmg|uamg|aggregamg}`
+
+- **`SolverRegression.WCycleWithManyLevels`** (1 case) — W-cycle with 7 levels. The drawing of the cycle in the console had a fixed width and corrupted the heap. Assertion: converges in ≤ 20 iterations.
+  CLI: `./bin/fhhos4 -geo square -mesh cart -mesher inhouse -s mg -cycle W,1,1 -k 0 -n 128 -coarse-size 10`
+
+- **`SquareCart/DirectPreconditionerTest.ConvergesInOneIteration`** (4 cases: `{cg, fcg} × {ch, lu}`) — a direct solver as preconditioner. FCG used to segfault (the direct solver was cast into an iterative solver). Assertion: exactly 1 iteration.
+  CLI: `./bin/fhhos4 -geo square -mesh cart -mesher inhouse -k 1 -n 16 -s {cg|fcg} -preconditioner {ch|lu}`
+
+- **`Prolongation/GalerkinProlongationDefaultsTest`** (4 cases: `-prolong {4|5}` × 2 tests) — no solve, only `ApplyProgramArgumentDefaults`. With the default solver, the prolongations that require the Galerkin operator enable it; with an explicit `-s mg` and no `-g 1`, they are rejected (death test, `EXIT_FAILURE`).
+
+- **`Sizes/ParallelLoopChunksTest.CoverEachIndexOnce`** (15 cases: loop sizes {0, 1, 3, 17, 1000} × {1, 4, 16} threads) — unit test of `NumberParallelLoop`: one chunk per thread, contiguous, and every index visited exactly once.
+
 ## Coverage summary
 
-- 49 CTest cases total across the 6 files above, exercising `Program_Diffusion_HHO` (diffusion problems) and `Program_BiHarmonic_HHO` (biharmonic problem in mixed form), with the HHO discretization and static condensation.
+- 77 CTest cases total across the 7 files above, exercising `Program_Diffusion_HHO` (diffusion problems) and `Program_BiHarmonic_HHO` (biharmonic problem in mixed form), with the HHO discretization and static condensation.
 - Dimensions: 2D and 3D. No 1D coverage (the run helpers throw for it, consistent with `ENABLE_1D=OFF` by default).
 - Meshes: in-house `cart`, `stri`, `stetra`; GMSH `cart`, `tri`, `tetra`, and a locally refined mesh. No `poly` (CGAL) meshes.
 - Coarsening strategies: standard, refinement (`-cs r`), independent remeshing (`-cs m`), agglomeration (`-cs n`).
-- Solvers: `mg`, `fcgmg`, `fcguamg`, `fcgaggregamg`, `ch`, and the biharmonic FCG with or without the patch preconditioner. No coverage of `lu`, `cg`, `eigencg`, `agmg` (external library), or `p_mg`.
+- Solvers: `mg` (V-, W- and K-cycles), `fcgmg`, `uamg`, `aggregamg`, `fcguamg`, `fcgaggregamg`, `cg`/`fcg` preconditioned by `ch`/`lu`, `ch`, and the biharmonic FCG with or without the patch preconditioner. No coverage of `lu` or `cg` as main solvers, `eigencg`, `agmg` (external library), or `p_mg`.
 - Test cases (`-tc`/`-source`): the default `sine` test case, `kellogg`, a `-heterog` ratio sweep, `exp` (biharmonic), and one locally-refined-mesh case.
 - **Not covered**: DG/FEM discretizations, `-pb bihardd`, full-Neumann BCs, anisotropy, non-condensed systems.
 - Two tests *intentionally* document known, failing configurations (a death test in the 2022 file, a near-divergence in the 2020 file) drawn straight from the papers' own reproduction recipes — they are not bugs to silently "fix"; changing their behavior should be a deliberate, separate change.

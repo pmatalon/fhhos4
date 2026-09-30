@@ -649,6 +649,7 @@ int main(int argc, char* argv[])
 	bool defaultCoarseSolver = true;
 	bool defaultTol2 = true;
 	bool defaultRelativeCellPolyDegree = true;
+	int wLoops = -1; // -w, applied after the parsing so that -cycle does not override it
 
 	ProgramArguments args;
 	args.OutputDirectory = FileSystem::RootPath() + "/out";
@@ -770,6 +771,7 @@ int main(int argc, char* argv[])
 		 { "mesher", required_argument, NULL, OPT_Mesher },
 		 { "nx", required_argument, NULL, OPT_Nx },
 		 { "ny", required_argument, NULL, OPT_Ny },
+		 { "nz", required_argument, NULL, OPT_Nz },
 		 { "stretch", required_argument, NULL, OPT_Stretch },
 		 { "polymesh-init", required_argument, NULL, OPT_PolyMeshInitialMesh },
 		 { "polymesh-fcs", required_argument, NULL, OPT_PolyMeshFaceCoarseningStrategy },
@@ -858,7 +860,7 @@ int main(int argc, char* argv[])
 
 	int long_index = 0;
 	int option = 0;
-	while ((option = getopt_long_only(argc, argv, "s:n:b:p:l:o:w:g:h", long_opts, &long_index)) != -1)
+	while ((option = getopt_long_only(argc, argv, "s:n:p:l:o:w:g:h", long_opts, &long_index)) != -1)
 	{
 		switch (option) 
 		{
@@ -1301,8 +1303,8 @@ int main(int argc, char* argv[])
 				args.Solver.MG.MatrixMaxSizeForCoarsestLevel = atoi(optarg);
 				break;
 			case 'w': 
-				args.Solver.MG.WLoops = atoi(optarg);
-				if (args.Solver.MG.WLoops < 1)
+				wLoops = atoi(optarg);
+				if (wLoops < 1)
 					argument_error("the number of loops in the W-cycle must be >= 1. Check -w argument.");
 				break;
 			case 'g': 
@@ -1570,6 +1572,9 @@ int main(int argc, char* argv[])
 		}
 	}
 
+	if (wLoops != -1)
+		args.Solver.MG.WLoops = wLoops;
+
 	ApplyProgramArgumentDefaults(args, defaultRelativeCellPolyDegree, defaultTol2, defaultCycle, defaultCoarseOperator, defaultCoarseSolver);
 
 	//------------------------------------------//
@@ -1600,9 +1605,14 @@ int main(int argc, char* argv[])
 	{
 		program->Start(args);
 	}
-	catch (exception* e)
+	catch (exception* e) // some exceptions of the code are thrown as pointers
 	{
 		string error(e->what());
+		Utils::FatalError("Unhandled exception: " + error);
+	}
+	catch (const exception& e)
+	{
+		string error(e.what());
 		Utils::FatalError("Unhandled exception: " + error);
 	}
 

@@ -71,12 +71,14 @@ public:
 		NThreads = nThreads;
 		if (NThreads == 0)
 			NThreads = std::thread::hardware_concurrency();
+		if (NThreads == 0) // hardware_concurrency() can return 0
+			NThreads = 1;
 
 		// Each thread must have at least 2 elements to process
 		while (loopSize / NThreads < 2 && NThreads > 1)
 			NThreads--;
 
-		Chunks.reserve(NThreads);
+		Chunks.resize(NThreads);
 		ChunkMinSize = loopSize / NThreads;
 		int rest = loopSize - NThreads * ChunkMinSize;
 
@@ -90,6 +92,10 @@ public:
 		}
 		assert(start == loopSize);
 	}
+
+	// The chunks are owned (deleted by the destructor): a copy would delete them twice.
+	BaseChunksParallelLoop(const BaseChunksParallelLoop&) = delete;
+	BaseChunksParallelLoop& operator=(const BaseChunksParallelLoop&) = delete;
 
 	void InitChunks(function<void(ParallelChunk<ResultT>*)> functionInitChunks)
 	{

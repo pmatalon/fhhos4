@@ -64,7 +64,7 @@ public:
 		other.IterationNumber = this->IterationNumber;
 		other._solvingComputationalWork = this->_solvingComputationalWork;
 		other._iterationComputationalWork = this->_iterationComputationalWork;
-		other._previousItConvRates = list<double>(other._previousItConvRates.begin(), other._previousItConvRates.end());
+		other._previousItConvRates = this->_previousItConvRates;
 		other._solvingTimer = this->_solvingTimer;
 		other._iterationTimer = this->_iterationTimer;
 		other.ResidualNorm = this->ResidualNorm;

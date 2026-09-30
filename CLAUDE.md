@@ -35,7 +35,7 @@ From `build/`:
 ctest --output-on-failure
 ```
 
-49 tests, ~3.5 min (`ctest -E HPConfig` skips the 8 slowest, ~2 min). Most check the
+77 tests, ~3.5 min (`ctest -E HPConfig` skips the 8 slowest, ~2 min). Most check the
 iteration counts of the papers in `reproducibility/` — see `tests/README.md`. Covers
 `Program_Diffusion_HHO` and `Program_BiHarmonic_HHO` (HHO, static condensation), 2D/3D,
 in-house and GMSH meshes. Not covered: DG/FEM programs, `lu`/`cg`/`agmg`/`p_mg` solvers,

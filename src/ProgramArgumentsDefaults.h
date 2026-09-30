@@ -213,9 +213,11 @@ inline void ApplyProgramArgumentDefaults(ProgramArguments& args,
 		if (args.Discretization.Method.compare("hho") == 0 && args.Discretization.StaticCondensation && args.Problem.Dimension > 1)
 		{
 			args.Solver.SolverCode = "mg";
-			if ((args.Solver.MG.GMG_H_Prolong == GMG_H_Prolongation::Wildey || args.Solver.MG.GMG_H_Prolong == GMG_H_Prolongation::FaceInject) && !args.Solver.MG.UseGalerkinOperator)
+			// GMG_H_Prolong is only set from ProlongationCode in the Multigrid section below
+			GMG_H_Prolongation hProlong = static_cast<GMG_H_Prolongation>(args.Solver.MG.ProlongationCode);
+			if ((hProlong == GMG_H_Prolongation::Wildey || hProlong == GMG_H_Prolongation::FaceInject) && !args.Solver.MG.UseGalerkinOperator)
 			{
-				Utils::Warning("The multigrid with prolongation code " + to_string((unsigned)args.Solver.MG.GMG_H_Prolong) + " requires the Galerkin operator. Option -g 0 ignored.");
+				Utils::Warning("The multigrid with prolongation code " + to_string((unsigned)hProlong) + " requires the Galerkin operator. Option -g 0 ignored.");
 				args.Solver.MG.UseGalerkinOperator = true;
 			}
 		}
@@ -258,8 +260,8 @@ inline void ApplyProgramArgumentDefaults(ProgramArguments& args,
 
 		args.Solver.MG.GMG_H_Prolong = static_cast<GMG_H_Prolongation>(args.Solver.MG.ProlongationCode);
 
-		if (args.Solver.MG.GMG_H_Prolong == GMG_H_Prolongation::Wildey && !args.Solver.MG.UseGalerkinOperator)
-			argument_error("To use the prolongationCode " + to_string((unsigned)GMG_H_Prolongation::Wildey) + ", you must also use the Galerkin operator. To do so, add option -g 1.");
+		if ((args.Solver.MG.GMG_H_Prolong == GMG_H_Prolongation::Wildey || args.Solver.MG.GMG_H_Prolong == GMG_H_Prolongation::FaceInject) && !args.Solver.MG.UseGalerkinOperator)
+			argument_error("To use the prolongationCode " + to_string((unsigned)args.Solver.MG.GMG_H_Prolong) + ", you must also use the Galerkin operator. To do so, add option -g 1.");
 
 		if (args.Solver.MG.H_CS == H_CoarsStgy::FaceCoarsening && !args.Solver.MG.UseGalerkinOperator)
 			argument_error("To use the face coarsening, you must also use the Galerkin operator. To do so, add option -g 1.");

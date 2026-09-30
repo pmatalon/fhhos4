@@ -11,7 +11,6 @@ protected:
 private:
 	bool _automaticNumberOfLevels;
 	int _nLevels;
-	NonZeroCoefficients _cycleSchema; // used only for drawing the cycle in the console
 public:
 	ExportModule Out;
 	Solver* CoarseSolver = nullptr;
@@ -357,7 +356,7 @@ private:
 			if (_fineLevel->PolynomialDegree() > this->CoarsePolyDegree)
 				return CoarseningType::P;
 			else
-				Utils::FatalError("p-coarsening cannot be performed because the polynomial degree of the fine level = " + to_string(this->CoarsePolyDegree));
+				Utils::FatalError("p-coarsening cannot be performed because the polynomial degree of the fine level = " + to_string(_fineLevel->PolynomialDegree()));
 		}
 		else if (this->HP_CS == HP_CoarsStgy::P_then_H)
 			return _fineLevel->PolynomialDegree() > this->CoarsePolyDegree ? CoarseningType::P : CoarseningType::H;
@@ -370,7 +369,7 @@ private:
 				return CoarseningType::P;
 			}
 			else
-				Utils::FatalError("Neither p- or hp-coarsening can be performed because the polynomial degree of the fine level = " + to_string(this->CoarsePolyDegree));
+				Utils::FatalError("Neither p- or hp-coarsening can be performed because the polynomial degree of the fine level = " + to_string(_fineLevel->PolynomialDegree()));
 		}
 		else if (this->HP_CS == HP_CoarsStgy::HP_then_H)
 			return _fineLevel->PolynomialDegree() > this->CoarsePolyDegree ? CoarseningType::HP : CoarseningType::H;
@@ -379,7 +378,7 @@ private:
 			if (_fineLevel->PolynomialDegree() > this->CoarsePolyDegree)
 				return CoarseningType::HP;
 			else
-				Utils::FatalError("Neither hp- or p-coarsening can be performed because the polynomial degree of the fine level = " + to_string(this->CoarsePolyDegree));
+				Utils::FatalError("Neither hp- or p-coarsening can be performed because the polynomial degree of the fine level = " + to_string(_fineLevel->PolynomialDegree()));
 		}
 		else if (this->HP_CS == HP_CoarsStgy::Alternate)
 			return _fineLevel->PolynomialDegree() > this->CoarsePolyDegree ? CoarseningType::H : CoarseningType::P; // return H if we want to start with P, because ChangeCoarseningType() is applied after
@@ -665,7 +664,7 @@ protected:
 public:
 	virtual void Serialize(ostream& os) const override
 	{
-		BeginSerialize(cout);
+		BeginSerialize(os);
 
 		os << "\t" << "Cycle                   : ";
 		if (this->Cycle == 'K')
@@ -773,64 +772,47 @@ public:
 			os << (*this->CoarseSolver);
 		}
 
-		EndSerialize(cout);
+		EndSerialize(os);
 	}
 
 	void PrintCycleSchema()
 	{
-		StoreCycleSchema(this->_fineLevel);
-		int nLevels = this->NumberOfLevels();
-		SparseMatrix schema2(nLevels, 50);
-		_cycleSchema.Fill(schema2);
-		DenseMatrix schema = schema2;
-		for (int row = 0; row < schema.rows(); row++)
+		// Level number of each successive step of the cycle
+		vector<int> schema;
+		Level* lastStoredLevel = nullptr;
+		StoreCycleSchema(this->_fineLevel, schema, lastStoredLevel);
+
+		for (int levelNumber = 0; levelNumber < this->NumberOfLevels(); levelNumber++)
 		{
-			for (int col = 0; col < schema.cols(); col++)
-			{
-				if (schema(row, col) == 0)
-					cout << "  ";
-				else
-					cout << " o";
-			}
+			for (int stepLevel : schema)
+				cout << (stepLevel == levelNumber ? " o" : "  ");
 			cout << endl;
 		}
 		cout << endl;
 	}
 
 private:
-	inline void PrintLevel(Level* level)
+	void StoreCycleSchema(Level* level, vector<int>& schema, Level*& lastStoredLevel)
 	{
-		for (int i = 0; i < level->Number; i++)
-			cout << "   ";
-		cout << "o" << endl;
-	}
-	inline void StoreLevelInSchema(Level* level)
-	{
-		static int col = 0;
-		_cycleSchema.Add(level->Number, col++, 1);
-	}
-	void StoreCycleSchema(Level* level)
-	{
-		static Level* currentLevel = nullptr;
-		if (currentLevel != level)
+		if (lastStoredLevel != level)
 		{
-			StoreLevelInSchema(level);
-			currentLevel = level;
+			schema.push_back(level->Number);
+			lastStoredLevel = level;
 		}
 
 		if (!level->IsCoarsestLevel())
 		{
 			for (int i = 0; i < this->WLoops; ++i)
 			{
-				StoreCycleSchema(level->CoarserLevel);
+				StoreCycleSchema(level->CoarserLevel, schema, lastStoredLevel);
 				if (level->CoarserLevel->IsCoarsestLevel())
 					break;
 			}
 
-			if (currentLevel != level)
+			if (lastStoredLevel != level)
 			{
-				StoreLevelInSchema(level);
-				currentLevel = level;
+				schema.push_back(level->Number);
+				lastStoredLevel = level;
 			}
 		}
 	}

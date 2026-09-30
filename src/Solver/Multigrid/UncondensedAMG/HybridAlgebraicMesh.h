@@ -197,8 +197,8 @@ public:
 		// Element neighbours //
 		//--------------------//
 
-		parallelLoopElem = NumberParallelLoop<EmptyResultChunk>(Elements.size());
-		parallelLoopElem.Execute([this](BigNumber elemNumber)
+		NumberParallelLoop<EmptyResultChunk> parallelLoopNeighbours(Elements.size());
+		parallelLoopNeighbours.Execute([this](BigNumber elemNumber)
 			{
 				HybridAlgebraicElement& elem = Elements[elemNumber];
 				for (HybridAlgebraicFace* face : elem.Faces)
@@ -295,8 +295,8 @@ public:
 			});
 
 		// Computation of the aggregates' neighbours
-		parallelLoopCE = NumberParallelLoop<EmptyResultChunk>(CoarseElements.size());
-		parallelLoopCE.Execute([this](BigNumber coarseElemNumber)
+		NumberParallelLoop<EmptyResultChunk> parallelLoopCENeighbours(CoarseElements.size());
+		parallelLoopCENeighbours.Execute([this](BigNumber coarseElemNumber)
 			{
 				HybridElementAggregate* coarseElem = &CoarseElements[coarseElemNumber];
 				set<HybridElementAggregate*> neighbours;

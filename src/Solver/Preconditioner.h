@@ -107,7 +107,7 @@ public:
 	SolverPreconditioner(Solver* solver)
 	{
 		_solver = solver;
-		IterativeSolver* iterSolver = static_cast<IterativeSolver*>(solver);
+		IterativeSolver* iterSolver = dynamic_cast<IterativeSolver*>(solver);
 		if (iterSolver)
 		{
 			iterSolver->ComputeExactSolution = false;
@@ -130,7 +130,7 @@ public:
 	bool CanOptimizeResidualComputation()
 	{
 		if (!_solver) return false;
-		IterativeSolver* iterSolver = static_cast<IterativeSolver*>(_solver);
+		IterativeSolver* iterSolver = dynamic_cast<IterativeSolver*>(_solver);
 		if (iterSolver)
 			return iterSolver->CanOptimizeResidualComputation();
 		return false;
@@ -154,9 +154,11 @@ public:
 	{
 		if (!_solver)
 			return;
-		IterativeSolver* iterSolver = static_cast<IterativeSolver*>(_solver);
+		IterativeSolver* iterSolver = dynamic_cast<IterativeSolver*>(_solver);
 		if (iterSolver)
 			iterSolver->Setup(A, A_T_T, A_T_F, A_F_F);
+		else
+			_solver->Setup(A); // the matrix blocks are only used by iterative solvers
 	}
 
 	Vector Apply(const Vector& r) override
@@ -169,7 +171,7 @@ public:
 	pair<Vector, Vector> ApplyAndComputeAe(const Vector& r)
 	{
 		assert(_solver);
-		IterativeSolver* iterSolver = static_cast<IterativeSolver*>(_solver);
+		IterativeSolver* iterSolver = dynamic_cast<IterativeSolver*>(_solver);
 		assert(iterSolver);
 
 		pair<Vector, Vector> p;
