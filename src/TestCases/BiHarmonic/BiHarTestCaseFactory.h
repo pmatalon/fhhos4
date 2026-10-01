@@ -12,7 +12,7 @@ template <int Dim>
 class BiHarTestCaseFactory
 {
 public:
-	static BiHarmonicTestCase<Dim>* Create(ProblemArguments pb) { assert(false); }
+	static BiHarmonicTestCase<Dim>* Create(ProblemArguments pb) { assert(false); return nullptr; }
 };
 
 

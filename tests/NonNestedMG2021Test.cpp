@@ -48,6 +48,7 @@ namespace
 	}
 }
 
+#ifdef ENABLE_2D
 //----------------------------------------------------------------------------------//
 // Figure 6: square, independent remeshing of the coarse levels (-cs m), V(0,3)     //
 //----------------------------------------------------------------------------------//
@@ -96,7 +97,9 @@ INSTANTIATE_TEST_SUITE_P(Square, NonNestedSquareAgglomerationTest, ::testing::Va
 	std::make_tuple(false, 1, std::vector<ExpectedIterations>{ { 32, 13, 12 }, { 64, 13, 13 } }),
 	std::make_tuple(true,  0, std::vector<ExpectedIterations>{ { 32,  9,  8 }, { 64, 10,  9 } }),
 	std::make_tuple(true,  1, std::vector<ExpectedIterations>{ { 32, 13, 12 }, { 64, 13, 14 } })));
+#endif // ENABLE_2D
 
+#ifdef ENABLE_3D
 //----------------------------------------------------------------------------------//
 // Figure 8: cube, independent remeshing (-cs m), approx. L2-projection, V(0,6)     //
 //----------------------------------------------------------------------------------//
@@ -119,3 +122,4 @@ TEST_P(NonNestedCubeRemeshingTest, IterationCounts)
 INSTANTIATE_TEST_SUITE_P(Cube, NonNestedCubeRemeshingTest, ::testing::Values(
 	std::make_tuple(0, std::vector<ExpectedIterations>{ { 8, 12, 11 } }),
 	std::make_tuple(1, std::vector<ExpectedIterations>{ { 8, 16, 13 } })));
+#endif // ENABLE_3D

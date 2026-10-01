@@ -13,6 +13,7 @@
 
 using namespace fhhos4_tests;
 
+#ifdef ENABLE_2D
 namespace
 {
 	ProgramArguments SquareVCycleArgs(const std::string& meshCode, int k, int n)
@@ -56,7 +57,9 @@ INSTANTIATE_TEST_SUITE_P(Square, IterationCountTest, ::testing::Values(
 	std::make_tuple(std::string("cart"), 1, std::vector<int>{ 16, 18 }),
 	std::make_tuple(std::string("stri"), 0, std::vector<int>{ 19, 24 }),
 	std::make_tuple(std::string("stri"), 1, std::vector<int>{ 24, 24 })));
+#endif // ENABLE_2D
 
+#ifdef ENABLE_3D
 // Figure 4.1 documents this configuration as diverging (its CSV has no iteration count): with
 // the standard coarsening, the multigrid convergence rate degrades toward 1 at k=0 on
 // structured tetrahedral meshes. Observed: 122 iterations at n=16 (vs. 24 for k=1). The run
@@ -78,7 +81,9 @@ TEST(HMultigrid2020, DegradesAsDocumented_StructuredTetra_K0)
 	ProgramResults results = RunDiffusionHHO(args, false);
 	EXPECT_GT(results.IterationCount, 60) << "k=0 on stetra is documented as (nearly) diverging";
 }
+#endif // ENABLE_3D
 
+#ifdef ENABLE_2D
 // Figure 4.7: V(1,1)-cycle iteration counts on the heterogeneous Kellogg benchmark.
 // Reference: Kellogg_scalability_V11_g0_p{1|2}_cart.csv.
 class KelloggTest : public ::testing::TestWithParam<std::tuple<int, std::vector<int>>>
@@ -148,3 +153,4 @@ TEST_P(HeterogeneityRatioSweepTest, MatchesPaper)
 INSTANTIATE_TEST_SUITE_P(SquareFourQuadrants, HeterogeneityRatioSweepTest, ::testing::Values(
 	std::make_tuple(0, 7),
 	std::make_tuple(1, 9)));
+#endif // ENABLE_2D

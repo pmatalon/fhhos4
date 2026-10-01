@@ -13,6 +13,7 @@
 #include <vector>
 #include "support/RunHelper.h"
 
+#ifdef ENABLE_3D
 using namespace fhhos4_tests;
 
 // Figure 4.4 (Cube-tet, k=0): FCG preconditioned by U-AMG (-s fcguamg) or C-AMG (-s fcgaggregamg).
@@ -44,3 +45,4 @@ TEST_P(AMGCubeTetTest, IterationCounts)
 INSTANTIATE_TEST_SUITE_P(Cube, AMGCubeTetTest, ::testing::Values(
 	std::make_tuple(std::string("fcguamg"),      std::vector<ExpectedIterations>{ { 16, 26, 26 }, { 32, 28, 28 } }),
 	std::make_tuple(std::string("fcgaggregamg"), std::vector<ExpectedIterations>{ { 16, 23, 22 }, { 32, 25, 25 } })));
+#endif // ENABLE_3D

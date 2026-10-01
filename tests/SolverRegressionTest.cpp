@@ -10,6 +10,7 @@
 
 using namespace fhhos4_tests;
 
+#ifdef ENABLE_2D
 namespace
 {
 	ProgramArguments SquareCartArgs(int k, int n)
@@ -132,6 +133,7 @@ TEST_P(GalerkinProlongationDefaultsTest, ExplicitMultigridRequiresGalerkinOperat
 }
 
 INSTANTIATE_TEST_SUITE_P(Prolongation, GalerkinProlongationDefaultsTest, ::testing::Values(4, 5));
+#endif // ENABLE_2D
 
 // The parallel loops must split [0, loopSize) into contiguous chunks, one per thread, that
 // cover every index exactly once (the chunk vector used to be written past its size).

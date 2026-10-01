@@ -51,16 +51,20 @@ namespace fhhos4_tests
 		ProgramResults results;
 		switch (args.Problem.Dimension)
 		{
+#ifdef ENABLE_2D
 		case 2:
 			SyncGlobalProgramState<2>(args);
 			Program_Diffusion_HHO<2>::Execute(args, &results);
 			break;
+#endif // ENABLE_2D
+#ifdef ENABLE_3D
 		case 3:
 			SyncGlobalProgramState<3>(args);
 			Program_Diffusion_HHO<3>::Execute(args, &results);
 			break;
+#endif // ENABLE_3D
 		default:
-			throw std::runtime_error("RunDiffusionHHO: unsupported dimension " + std::to_string(args.Problem.Dimension));
+			throw std::runtime_error("RunDiffusionHHO: unsupported (or disabled at compile time) dimension " + std::to_string(args.Problem.Dimension));
 		}
 		return results;
 	}
@@ -75,16 +79,20 @@ namespace fhhos4_tests
 		ProgramResults results;
 		switch (args.Problem.Dimension)
 		{
+#ifdef ENABLE_2D
 		case 2:
 			SyncGlobalProgramState<2>(args);
 			Program_BiHarmonic_HHO<2>::Execute(args, &results);
 			break;
+#endif // ENABLE_2D
+#ifdef ENABLE_3D
 		case 3:
 			SyncGlobalProgramState<3>(args);
 			Program_BiHarmonic_HHO<3>::Execute(args, &results);
 			break;
+#endif // ENABLE_3D
 		default:
-			throw std::runtime_error("RunBiHarmonicHHO: unsupported dimension " + std::to_string(args.Problem.Dimension));
+			throw std::runtime_error("RunBiHarmonicHHO: unsupported (or disabled at compile time) dimension " + std::to_string(args.Problem.Dimension));
 		}
 		return results;
 	}

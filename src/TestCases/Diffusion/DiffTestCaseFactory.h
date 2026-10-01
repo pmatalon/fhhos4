@@ -29,7 +29,7 @@ template <int Dim>
 class DiffTestCaseFactory
 {
 public:
-	static DiffusionTestCase<Dim>* Create(ProblemArguments pb) { assert(false); }
+	static DiffusionTestCase<Dim>* Create(ProblemArguments pb) { assert(false); return nullptr; }
 };
 
 #ifdef ENABLE_1D

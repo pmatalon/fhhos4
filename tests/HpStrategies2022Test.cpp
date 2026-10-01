@@ -7,6 +7,7 @@
 #include <vector>
 #include "support/RunHelper.h"
 
+#ifdef ENABLE_2D
 using namespace fhhos4_tests;
 
 namespace
@@ -153,3 +154,4 @@ TEST_P(ConvergenceOrderHighOrderTest, MatchesTheoreticalOrder)
 }
 
 INSTANTIATE_TEST_SUITE_P(SquareCart, ConvergenceOrderHighOrderTest, ::testing::Values(2, 3, 4, 5));
+#endif // ENABLE_2D

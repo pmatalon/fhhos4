@@ -93,8 +93,10 @@ endif()
 find_package(Eigen3 REQUIRED NO_MODULE)
 target_link_libraries(fhhos4_core PUBLIC Eigen3::Eigen)
 
-# Include CGAL
-if(ENABLE_CGAL)
+# Include CGAL (only used for the 2D polygonal elements)
+if(ENABLE_CGAL AND NOT ENABLE_2D)
+	message(STATUS "CGAL disabled because 2D is disabled (CGAL is only used for the 2D polygonal elements)")
+elseif(ENABLE_CGAL)
 	message(STATUS "CGAL enabled")
 	# CGAL's own exported CMake files call cmake_minimum_required() internally, which resets
 	# CMP0167 right before their own find_package(Boost) call and triggers a policy warning.

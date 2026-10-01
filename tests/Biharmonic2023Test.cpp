@@ -13,6 +13,7 @@
 
 using namespace fhhos4_tests;
 
+#ifdef ENABLE_2D
 // Table 1: square, Cartesian mesh. Number of FCG iterations preconditioned by the patch
 // preconditioner with neighbourhood depth 8 (-bihar-prec s), or not preconditioned (-bihar-prec no).
 class BiharSquareCartTest : public ::testing::TestWithParam<std::tuple<std::string, int, std::vector<ExpectedIterations>>>
@@ -51,7 +52,9 @@ INSTANTIATE_TEST_SUITE_P(Square, BiharSquareCartTest, ::testing::Values(
 	// N=32: 30 iterations, as in the paper, when the mesh is loaded from the GMSH cache, whose vertex
 	// coordinates differ by ~1e-14 (see tests/README.md): the unpreconditioned FCG is sensitive to it.
 	std::make_tuple(std::string("no"), 1, std::vector<ExpectedIterations>{ { 32, 28, 30 }, { 64, 36, 36 } })));
+#endif // ENABLE_2D
 
+#ifdef ENABLE_3D
 // Table 3: cube, unstructured tetrahedral mesh, k=0, first mesh size (h_0, 3373 elements in the
 // paper, 3411 with the current GMSH). Neighbourhood depth 2, and the Laplacian problems solved by
 // FCG preconditioned by U-AMG.
@@ -86,3 +89,4 @@ TEST_P(BiharCubeTetTest, IterationCounts)
 INSTANTIATE_TEST_SUITE_P(Cube, BiharCubeTetTest, ::testing::Values(
 	std::make_tuple(std::string("s"),  ExpectedIterations{ 8, 14, 14 }),
 	std::make_tuple(std::string("no"), ExpectedIterations{ 8, 29, 29 })));
+#endif // ENABLE_3D
