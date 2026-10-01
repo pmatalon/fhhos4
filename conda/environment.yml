@@ -9,3 +9,4 @@ dependencies:
   - cxx-compiler
   - cmake
   - make
+  - ninja

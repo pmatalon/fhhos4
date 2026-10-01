@@ -70,9 +70,24 @@ With the `fhhos4` conda environment activated:
 ```bash
 cd <path-to-fhhos4>
 mkdir build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release ..
-make
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Release ..
+ninja
 ```
+
+Ninja compiles at most 2 files in parallel by default (`-DMAX_COMPILE_JOBS=<n>` to change
+it), as the compilation of `Program.cpp` takes ~4 GB of RAM. With Make (`cmake` without
+`-G Ninja`), run `make -j2`.
+
+Build options (`cmake -D<OPTION>=ON|OFF ..`):
+
+| Option | Default | |
+|---|---|---|
+| `ENABLE_2D`, `ENABLE_3D` | ON | Dimensions to compile (`ENABLE_1D`: OFF) |
+| `ENABLE_DG` | OFF | DG programs (`-discr dg`) |
+| `ENABLE_FEM` | OFF | FEM programs (`-discr fem`) |
+| `ENABLE_TESTS` | ON | Test suite (`fhhos4_tests`, run with `ctest`). Turning it off saves little time with Ninja, more with Make. |
+| `ENABLE_GMSH` | ON | GMSH interface |
+| `ENABLE_CGAL` | ON | Polygonal meshes (2D only) |
 
 If you built GMSH from source instead of using the conda package, pass its location explicitly:
 

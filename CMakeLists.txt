@@ -20,10 +20,20 @@ option(SMALL_INDEX "Use type 'int' for the indexes" ON)
 option(ENABLE_1D "Enable 1D" OFF)
 option(ENABLE_2D "Enable 2D" ON)
 option(ENABLE_3D "Enable 3D" ON)
+option(ENABLE_DG "Build the DG programs (-discr dg)" OFF)
+option(ENABLE_FEM "Build the FEM programs (-discr fem)" OFF)
+option(ENABLE_TESTS "Build the test suite (fhhos4_tests). Turn off to save its compilation time during development." ON)
 option(ENABLE_OPENMP "Use OpenMP for the parallel loops (and Eigen's internal parallelism)" ON)
 option(ENABLE_NATIVE_ARCH "Optimize for the CPU of the build machine (-march=native: AVX2, FMA...). The binary may not run on other CPUs." OFF)
 
 set(EXECUTABLE_OUTPUT_PATH bin/)
+
+# With Ninja, limit the number of parallel compilations (ninja runs nproc+2 by default): the
+# compilation of Program.cpp takes ~4 GB of RAM, and the build time is set by this single file
+# anyway, so more parallel jobs don't make the build faster.
+set(MAX_COMPILE_JOBS 2 CACHE STRING "Maximum number of parallel compilations with the Ninja generator")
+set_property(GLOBAL PROPERTY JOB_POOLS compile_pool=${MAX_COMPILE_JOBS})
+set(CMAKE_JOB_POOL_COMPILE compile_pool)
 
 # Pass -DCMAKE_VERBOSE_MAKEFILE=ON (or `cmake --build build -- VERBOSE=1`) to see full compiler commands
 
@@ -83,6 +93,20 @@ if(ENABLE_3D)
 	message(STATUS "ENABLE_3D: ON")
 else()
 	message(STATUS "ENABLE_3D: OFF")
+endif()
+
+if(ENABLE_DG)
+	target_compile_definitions(fhhos4_core PUBLIC DG_ENABLED)
+	message(STATUS "ENABLE_DG: ON")
+else()
+	message(STATUS "ENABLE_DG: OFF")
+endif()
+
+if(ENABLE_FEM)
+	target_compile_definitions(fhhos4_core PUBLIC FEM_ENABLED)
+	message(STATUS "ENABLE_FEM: ON")
+else()
+	message(STATUS "ENABLE_FEM: OFF")
 endif()
 
 if(ENABLE_AGMG)
@@ -181,17 +205,22 @@ if(ENABLE_AGMG)
 endif()
 
 # Validation test suite (GoogleTest)
-enable_testing()
-find_package(GTest REQUIRED)
-include(GoogleTest)
+if(ENABLE_TESTS)
+	enable_testing()
+	find_package(GTest REQUIRED)
+	include(GoogleTest)
 
-file(
-	GLOB_RECURSE
-	test_source_files
-	CONFIGURE_DEPENDS
-	tests/*.cpp
-)
-add_executable(fhhos4_tests ${test_source_files})
-target_include_directories(fhhos4_tests PRIVATE ${CMAKE_SOURCE_DIR}/tests)
-target_link_libraries(fhhos4_tests PRIVATE fhhos4_core GTest::gtest_main)
-gtest_discover_tests(fhhos4_tests)
+	file(
+		GLOB_RECURSE
+		test_source_files
+		CONFIGURE_DEPENDS
+		tests/*.cpp
+	)
+	add_executable(fhhos4_tests ${test_source_files})
+	target_include_directories(fhhos4_tests PRIVATE ${CMAKE_SOURCE_DIR}/tests)
+	target_link_libraries(fhhos4_tests PRIVATE fhhos4_core GTest::gtest_main)
+	gtest_discover_tests(fhhos4_tests)
+	message(STATUS "ENABLE_TESTS: ON")
+else()
+	message(STATUS "ENABLE_TESTS: OFF")
+endif()

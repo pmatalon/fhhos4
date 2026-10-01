@@ -21,11 +21,21 @@ If the env doesn't exist yet: `conda env create -f conda/environment.yml`.
 ```bash
 conda activate fhhos4
 cd build          # or: mkdir build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release ..
-make -j$(nproc)
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Release ..
+ninja
 ```
 
 Produces `build/bin/fhhos4` (main solver) and `build/bin/fhhos4_tests` (GTest suite).
+Clean build ~2.5 min. Ninja runs at most `MAX_COMPILE_JOBS` (default 2) compilations in
+parallel: `Program.cpp` alone takes ~4 GB of RAM and ~2.5 min, and sets the build time.
+With Make (`cmake ..` without `-G Ninja`), use `make -j2`.
+
+CMake options (`-D<OPTION>=ON/OFF`):
+- `ENABLE_2D`, `ENABLE_3D` (ON), `ENABLE_1D` (OFF): dimensions to compile.
+- `ENABLE_DG`, `ENABLE_FEM` (OFF): DG and FEM programs (`-discr dg|fem`).
+- `ENABLE_TESTS` (ON): build `fhhos4_tests`. Turning it off saves little time with Ninja
+  (the tests compile in parallel with `Program.cpp`), more with Make.
+- `ENABLE_GMSH`, `ENABLE_CGAL` (ON, CGAL is only used in 2D), `ENABLE_AGMG` (OFF).
 
 ## Test
 
@@ -38,7 +48,7 @@ ctest --output-on-failure
 77 tests, ~3.5 min (`ctest -E HPConfig` skips the 8 slowest, ~2 min). Most check the
 iteration counts of the papers in `reproducibility/` — see `tests/README.md`. Covers
 `Program_Diffusion_HHO` and `Program_BiHarmonic_HHO` (HHO, static condensation), 2D/3D,
-in-house and GMSH meshes. Not covered: DG/FEM programs, `lu`/`cg`/`agmg`/`p_mg` solvers,
+in-house and GMSH meshes. Not covered: DG/FEM programs (disabled by default), `lu`/`cg`/`agmg`/`p_mg` solvers,
 1D, anisotropic cases.
 
 ## Run

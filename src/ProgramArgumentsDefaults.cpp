@@ -110,6 +110,14 @@ void ApplyProgramArgumentDefaults(ProgramArguments& args,
 	if ((args.Discretization.MeshCode.compare("tetra") == 0 || args.Discretization.MeshCode.compare("stetra") == 0) && args.Problem.Dimension != 3)
 		argument_error("Tetrahedral mesh in only available in 3D.");
 
+#ifndef DG_ENABLED
+	if (args.Discretization.Method.compare("dg") == 0)
+		Utils::FatalError("DG is disabled. Recompile the program with the cmake option -DENABLE_DG=ON.");
+#endif
+#ifndef FEM_ENABLED
+	if (args.Discretization.Method.compare("fem") == 0)
+		Utils::FatalError("FEM is disabled. Recompile the program with the cmake option -DENABLE_FEM=ON.");
+#endif
 #ifndef CGAL_ENABLED
 	if (args.Discretization.MeshCode.compare("poly") == 0)
 		Utils::FatalError("CGAL must be enabled to use polygonal meshes. Recompile the program with cmake option -DENABLE_CGAL=On.");

@@ -1,10 +1,14 @@
 #include "Program.h"
-#include "Program/Program_Diffusion_DG_Impl.h"
 #include "Program/Program_Diffusion_HHO_Impl.h"
-#include "Program/Program_Diffusion_FEM_Impl.h"
 #include "Program/Program_BiHarmonic_HHO_Impl.h"
-#include "Program/Program_BiHarmonic_FEM_Impl.h"
 #include "Program/Program_BiHarmonicDD_HHO_Impl.h"
+#ifdef DG_ENABLED
+#include "Program/Program_Diffusion_DG_Impl.h"
+#endif
+#ifdef FEM_ENABLED
+#include "Program/Program_Diffusion_FEM_Impl.h"
+#include "Program/Program_BiHarmonic_FEM_Impl.h"
+#endif
 #include "Mesher/GMSH/GMSHMesh.h"
 #include "Utils/Timer.h"
 #ifdef CGAL_ENABLED
@@ -42,11 +46,23 @@ void ProgramDim<Dim>::Start(ProgramArguments& args)
 	if (args.Problem.Equation == EquationType::Diffusion)
 	{
 		if (args.Discretization.Method.compare("dg") == 0)
+		{
+#ifdef DG_ENABLED
 			Program_Diffusion_DG<Dim>::Execute(args);
+#else
+			Utils::FatalError("DG is disabled. Recompile with the cmake option -DENABLE_DG=ON.");
+#endif
+		}
 		else if (args.Discretization.Method.compare("hho") == 0)
 			Program_Diffusion_HHO<Dim>::Execute(args); 
 		else if (args.Discretization.Method.compare("fem") == 0)
+		{
+#ifdef FEM_ENABLED
 			Program_Diffusion_FEM<Dim>::Execute(args);
+#else
+			Utils::FatalError("FEM is disabled. Recompile with the cmake option -DENABLE_FEM=ON.");
+#endif
+		}
 		else
 			Utils::FatalError("Unknown or unmanaged discretization for diffusion problem. Check arguments -pb and -discr.");
 	}
@@ -55,7 +71,13 @@ void ProgramDim<Dim>::Start(ProgramArguments& args)
 		if (args.Discretization.Method.compare("hho") == 0)
 			Program_BiHarmonic_HHO<Dim>::Execute(args);
 		else if (args.Discretization.Method.compare("fem") == 0)
+		{
+#ifdef FEM_ENABLED
 			Program_BiHarmonic_FEM<Dim>::Execute(args);
+#else
+			Utils::FatalError("FEM is disabled. Recompile with the cmake option -DENABLE_FEM=ON.");
+#endif
+		}
 		else
 			Utils::FatalError("Unknown or unmanaged discretization for bi-harmonic problem. Check arguments -pb and -discr.");
 	}
@@ -79,29 +101,41 @@ void ProgramDim<Dim>::Start(ProgramArguments& args)
 #ifdef ENABLE_1D
 template class ProgramDim<1>;
 template class Program_BiHarmonicDD_HHO<1>;
-template class Program_BiHarmonic_FEM<1>;
 template class Program_BiHarmonic_HHO<1>;
+#ifdef DG_ENABLED
 template class Program_Diffusion_DG<1>;
+#endif
+#ifdef FEM_ENABLED
 template class Program_Diffusion_FEM<1>;
+template class Program_BiHarmonic_FEM<1>;
+#endif
 template class Program_Diffusion_HHO<1>;
 #endif // ENABLE_1D
 
 #ifdef ENABLE_2D
 template class ProgramDim<2>;
 template class Program_BiHarmonicDD_HHO<2>;
-template class Program_BiHarmonic_FEM<2>;
 template class Program_BiHarmonic_HHO<2>;
+#ifdef DG_ENABLED
 template class Program_Diffusion_DG<2>;
+#endif
+#ifdef FEM_ENABLED
 template class Program_Diffusion_FEM<2>;
+template class Program_BiHarmonic_FEM<2>;
+#endif
 template class Program_Diffusion_HHO<2>;
 #endif // ENABLE_2D
 
 #ifdef ENABLE_3D
 template class ProgramDim<3>;
 template class Program_BiHarmonicDD_HHO<3>;
-template class Program_BiHarmonic_FEM<3>;
 template class Program_BiHarmonic_HHO<3>;
+#ifdef DG_ENABLED
 template class Program_Diffusion_DG<3>;
+#endif
+#ifdef FEM_ENABLED
 template class Program_Diffusion_FEM<3>;
+template class Program_BiHarmonic_FEM<3>;
+#endif
 template class Program_Diffusion_HHO<3>;
 #endif // ENABLE_3D
