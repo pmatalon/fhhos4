@@ -7,6 +7,7 @@
 #ifdef ENABLE_2D
 	#include "2D/TriangularElement.h"
 	#include "2D/QuadrilateralElement.h"
+	#include "2D/CartesianEdge.h"
 	#ifdef CGAL_ENABLED
 		#include "2D/PolygonalElement.h"
 	#endif // CGAL_ENABLED

@@ -56,6 +56,10 @@ Example invocations for specific experiments/figures live in `reproducibility/*.
 - `Program/` — top-level drivers per problem type (`Program_Diffusion_HHO/DG/FEM`,
   `Program_BiHarmonic_*`); `main.cpp` and `ProgramArguments*.h` are the CLI entry
   point and argument parsing/defaulting.
+  `Program/Program_*.h` and `Program.h` only declare the programs: their definitions
+  (`Program/Program_*_Impl.h`) are compiled once, in `Program.cpp`, with explicit
+  instantiations per enabled dimension. Only include the light headers elsewhere (main,
+  tests): including an `_Impl.h` recompiles the whole solver in that translation unit.
 - `Mesher/` — mesh generation: `InHouse/` (structured meshes) and `GMSH/` binding,
   plus built-in geometries (Square, Cube, Square4quadrants).
 - `Mesh/` — mesh data structures (Element, Face, Vertex, agglomeration).

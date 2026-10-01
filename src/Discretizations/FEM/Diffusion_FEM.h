@@ -3,6 +3,7 @@
 #include "../../Utils/Utils.h"
 #include "../../TestCases/Diffusion/DiffusionTestCase.h"
 #include "../../Utils/ElementParallelLoop.h"
+#include "../../Utils/ExportModule.h"
 #ifdef ENABLE_3D
 #include "../../Geometry/3D/Tetrahedron.h"
 #endif // ENABLE_3D

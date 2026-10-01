@@ -1,10 +1,5 @@
 #pragma once
-#include "Program/Program_Diffusion_DG.h"
-#include "Program/Program_Diffusion_HHO.h"
-#include "Program/Program_Diffusion_FEM.h"
-#include "Program/Program_BiHarmonic_HHO.h"
-#include "Program/Program_BiHarmonic_FEM.h"
-#include "Program/Program_BiHarmonicDD_HHO.h"
+#include "ProgramArguments.h"
 using namespace std;
 
 class Program
@@ -15,63 +10,17 @@ public:
 	virtual ~Program() {}
 };
 
+// The members are defined in Program.cpp and explicitly instantiated there for the enabled
+// dimensions, so that the heavy headers they need are compiled only once.
 template <int Dim>
 class ProgramDim : public Program
 {
 public:
 	ProgramDim() : Program() {}
 
-	void Start(ProgramArguments& args)
-	{
-		Utils::ProgramArgs = args;
+	void Start(ProgramArguments& args) override;
 
-		Timer totalTimer;
-		totalTimer.Start();
-
-#ifdef SMALL_INDEX
-		cout << "Index type: int" << endl;
-#else
-		cout << "Index type: size_t" << endl;
-#endif
-		cout << "Shared memory parallelism: " << (BaseParallelLoop::GetDefaultNThreads() == 1 ? "sequential execution" : to_string(BaseParallelLoop::GetDefaultNThreads()) + " threads") << endl;
-		cout << endl;
-
-		Mesh<Dim>::SetDirectories();
-		GMSHMesh<Dim>::GMSHLogEnabled = args.Actions.GMSHLogEnabled;
-		GMSHMesh<Dim>::UseCache = args.Actions.UseCache;
-
-		if (args.Problem.Equation == EquationType::Diffusion)
-		{
-			if (args.Discretization.Method.compare("dg") == 0)
-				Program_Diffusion_DG<Dim>::Execute(args);
-			else if (args.Discretization.Method.compare("hho") == 0)
-				Program_Diffusion_HHO<Dim>::Execute(args); 
-			else if (args.Discretization.Method.compare("fem") == 0)
-				Program_Diffusion_FEM<Dim>::Execute(args);
-			else
-				Utils::FatalError("Unknown or unmanaged discretization for diffusion problem. Check arguments -pb and -discr.");
-		}
-		else if (args.Problem.Equation == EquationType::BiHarmonic)
-		{
-			if (args.Discretization.Method.compare("hho") == 0)
-				Program_BiHarmonic_HHO<Dim>::Execute(args);
-			else if (args.Discretization.Method.compare("fem") == 0)
-				Program_BiHarmonic_FEM<Dim>::Execute(args);
-			else
-				Utils::FatalError("Unknown or unmanaged discretization for bi-harmonic problem. Check arguments -pb and -discr.");
-		}
-		else if (args.Problem.Equation == EquationType::BiHarmonicDD)
-		{
-			if (args.Discretization.Method.compare("hho") == 0)
-				Program_BiHarmonicDD_HHO<Dim>::Execute(args);
-			else
-				Utils::FatalError("Unknown or unmanaged discretization for bi-harmonic problem. Check arguments -pb and -discr.");
-		}
-		else
-			Utils::FatalError("Unknown problem. Check argument -pb.");
-
-		totalTimer.Stop();
-		cout << endl << "Total time: CPU = " << totalTimer.CPU() << ", elapsed = " << totalTimer.Elapsed() << endl;
-	}
-
+	// Sets the global state read by the program (Utils::ProgramArgs, mesh directories, GMSH
+	// settings) from the arguments. Called by Start().
+	static void InitGlobalState(const ProgramArguments& args);
 };

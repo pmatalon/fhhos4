@@ -1,4 +1,5 @@
 #pragma once
+#include "Program.h"
 #include "Program/Program_Diffusion_HHO.h"
 #include "Program/Program_BiHarmonic_HHO.h"
 #include "ProgramArgumentsDefaults.h"
@@ -24,18 +25,15 @@ namespace fhhos4_tests
 		return os << "N" << e.N << ":" << e.Iterations;
 	}
 
-	// Mirrors the side effects of ProgramDim<Dim>::Start() (src/Program.h) that the CLI relies
-	// on before dispatching to a Program_*::Execute(): a lot of mesh-construction code (the GMSH
-	// mesher, polyhedral coarsening) reads the global Utils::ProgramArgs directly instead of the
-	// args reference passed around, so skipping this would silently run with stale/leftover
-	// settings from whatever test happened to run previously in this process.
+	// Sets the global state that ProgramDim<Dim>::Start() (src/Program.cpp) sets before dispatching
+	// to a Program_*::Execute(): a lot of mesh-construction code (the GMSH mesher, polyhedral
+	// coarsening) reads the global Utils::ProgramArgs directly instead of the args reference
+	// passed around, so skipping this would silently run with stale/leftover settings from
+	// whatever test happened to run previously in this process.
 	template <int Dim>
 	inline void SyncGlobalProgramState(const ProgramArguments& args)
 	{
-		Utils::ProgramArgs = args;
-		Mesh<Dim>::SetDirectories();
-		GMSHMesh<Dim>::GMSHLogEnabled = args.Actions.GMSHLogEnabled;
-		GMSHMesh<Dim>::UseCache = args.Actions.UseCache;
+		ProgramDim<Dim>::InitGlobalState(args);
 	}
 
 	// Applies the same argument-defaulting cascade as the CLI (main.cpp), then runs the

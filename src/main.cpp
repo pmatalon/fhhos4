@@ -3,6 +3,8 @@
 #include "version.h"
 #include "Program.h"
 #include "ProgramArgumentsDefaults.h"
+#include "Solver/FixedPoint/BlockDiagonalSolver.h"
+#include "Utils/FileSystem.h"
 using namespace std;
 
 
@@ -646,9 +648,6 @@ int main(int argc, char* argv[])
 	cout << "Version: " << VERSION_MAJOR << "." << VERSION_MINOR << "." << VERSION_BUGFIX << endl;
 	cout << "Option -h for help." << endl;
 	Eigen::initParallel();
-#ifdef CGAL_ENABLED
-	CGALWrapper::Configure();
-#endif
 
 	bool defaultCycle = true;
 	bool defaultCoarseOperator = true;
