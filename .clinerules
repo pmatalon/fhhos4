@@ -1,0 +1,30 @@
+# Cline rules — fhhos4
+
+Project documentation lives in `CLAUDE.md` at the repository root: environment,
+build, test, run, source layout and troubleshooting. Read it before building,
+testing or running anything, and keep it as the single source of truth — add new
+project knowledge there, not here.
+
+## Essentials
+
+- Activate the conda env first, in every new shell: `conda activate fhhos4`.
+  It provides Eigen, CGAL, GMSH, GTest, the compiler, cmake, make, ninja.
+  Missing `cmake`/`make`/CGAL/Eigen almost always means the env is not activated.
+- Build from `build/`: `cmake -G Ninja -DCMAKE_BUILD_TYPE=Release .. && ninja`.
+  `Program.cpp` alone needs ~4 GB of RAM and ~2.5 min, and sets the build time:
+  respect `MAX_COMPILE_JOBS` (default 2) and do not raise the parallelism blindly.
+- Never include `Program/Program_*_Impl.h` outside `Program.cpp`. The programs are
+  declared in the light `Program/Program_*.h` headers and compiled once, with
+  explicit instantiations per enabled dimension; including an `_Impl.h` elsewhere
+  recompiles the whole solver in that translation unit.
+- Test from `build/`: `ctest --output-on-failure` (~3.5 min).
+  `ctest -E HPConfig` skips the 8 slowest tests (~2 min) for a quick check.
+  Most tests assert the iteration counts of the papers in `reproducibility/`, so a
+  changed iteration count is a real regression, not a test to relax.
+
+## Git
+
+- Commit subjects: short, imperative, no prefix tags — e.g.
+  "Fix the 2D-only and 3D-only builds (ENABLE_2D/ENABLE_3D)".
+- Do not add AI or co-author trailers to commits.
+- Never commit build artefacts (`build/`, `bin/`) or local tooling credentials.
