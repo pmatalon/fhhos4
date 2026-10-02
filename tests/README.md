@@ -34,7 +34,7 @@ ctest -E HPConfig                          # skip the slowest tests
 ./bin/fhhos4_tests --gtest_filter=*Kellogg*  # or filter the binary directly
 ```
 
-The full suite is 81 CTest cases and runs in about 3.5 minutes serially. The 8 `HPConfigTest` cases take about 2 minutes of it (~15 s each: N=128 with k=5 is the smallest size of the high-order paper); the other cases take less than 20 s each.
+The full suite is 85 CTest cases and runs in about 3.5 minutes serially. The 8 `HPConfigTest` cases take about 2 minutes of it (~15 s each: N=128 with k=5 is the smallest size of the high-order paper); the other cases take less than 20 s each.
 
 ## GMSH meshes: reproducibility
 
@@ -143,9 +143,18 @@ Regression tests for configurations that used to crash, and for the argument def
 
 - **`Sizes/ThreadLocalTest`** (18 cases: `ResultsFollowIterationOrder` and `CoeffsFillMatrix` × loop sizes {0, 3, 1000} × {1, 4, 16} threads) and **`ThreadLocalNestedTest.CoeffsFillMatrix`** (1 case) — unit tests of `ThreadLocal`/`ThreadLocalCoeffs` (`src/Utils/Parallelism.h`): with `schedule(static)`, the thread-local results taken in thread order follow the iteration order; every coefficient added in a parallel loop ends up in the matrix, including in a loop nested in another parallel loop (executed by the calling thread only).
 
+## `SparseMatrixOpsTest.cpp`
+
+Unit tests of the parallel sparse matrix operations used in the setup of U-AMG (`src/Utils/SparseMatrixOps.h`), on random matrices (with explicit zeros and empty rows), with 1, 3 and 8 threads. They must give exactly the same matrices as the Eigen operations they replace (same structure, same values bit for bit), so that the setup, hence the iteration counts, don't change.
+
+- **`SparseMatrixOpsTest.MultiplyGivesEigenProduct`** (1 case) — `Multiply(A, B)` vs. Eigen's `A * B`.
+- **`SparseMatrixOpsTest.TripleProductGivesEigenProduct`** (1 case) — the Galerkin product as computed in the U-AMG setup, vs. Eigen's `P.transpose() * S.selfadjointView<Eigen::Lower>() * P`.
+- **`SparseMatrixOpsTest.FullFromLowerGivesSelfAdjointView`** (1 case) — `FullFromLower(S)` vs. Eigen's `S.selfadjointView<Eigen::Lower>()`.
+- **`SparseMatrixOpsTest.SelectRowsGivesCopiedRows`** (1 case) — `SelectRows` vs. the rows copied by `NonZeroCoefficients::CopyRows`.
+
 ## Coverage summary
 
-- 81 CTest cases total across the 7 files above, exercising `Program_Diffusion_HHO` (diffusion problems) and `Program_BiHarmonic_HHO` (biharmonic problem in mixed form), with the HHO discretization and static condensation.
+- 85 CTest cases total across the 8 files above, exercising `Program_Diffusion_HHO` (diffusion problems) and `Program_BiHarmonic_HHO` (biharmonic problem in mixed form), with the HHO discretization and static condensation.
 - Dimensions: 2D and 3D. No 1D coverage (the run helpers throw for it, consistent with `ENABLE_1D=OFF` by default).
 - Meshes: in-house `cart`, `stri`, `stetra`; GMSH `cart`, `tri`, `tetra`, and a locally refined mesh. No `poly` (CGAL) meshes.
 - Coarsening strategies: standard, refinement (`-cs r`), independent remeshing (`-cs m`), agglomeration (`-cs n`).

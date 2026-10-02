@@ -1,11 +1,15 @@
 #pragma once
 #include "Types.h"
+using namespace std;
 
 class NonZeroCoefficients
 {
 protected:
 	vector<Eigen::Triplet<double, SparseMatrixIndex>> coefficients;
 public:
+	// The coefficients of absolute value <= ZeroThreshold are not added
+	static constexpr double ZeroThreshold = 1e-15;
+
 	NonZeroCoefficients(BigNumber nnzApproximate)
 	{
 		this->coefficients.reserve(nnzApproximate);
@@ -35,7 +39,7 @@ public:
 
 	void Add(BigNumber i, BigNumber j, double value)
 	{
-		if (abs(value) > 1e-15)
+		if (abs(value) > ZeroThreshold)
 			this->coefficients.push_back(Eigen::Triplet<double, SparseMatrixIndex>(i, j, value));
 	}
 

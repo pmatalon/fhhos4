@@ -1,5 +1,6 @@
 #pragma once
 #include "../IterativeSolver.h"
+#include "../../Utils/SparseMatrixOps.h"
 #include "BlockDiagonalSolver.h"
 using namespace std;
 
@@ -123,48 +124,82 @@ protected:
 	}
 
 public:
+	// J = I - omega * D^-1 * A
 	SparseMatrix IterationMatrix()
 	{
+		return IterationMatrix(vector<bool>(this->Matrix->rows() / _blockSize, true));
+	}
+
+	// Rows of J of the block rows i such that blockRows[i] (the other rows are empty).
+	// The coefficients of absolute value <= NonZeroCoefficients::ZeroThreshold are dropped.
+	SparseMatrix IterationMatrix(const vector<bool>& blockRows)
+	{
 		const SparseMatrix& A = *this->Matrix;
-		// J = I - omega * D^-1 * A
-		NonZeroCoefficients coeffs(A.nonZeros());
+		int bs = _blockSize;
+		assert((BigNumber)blockRows.size() * bs == (BigNumber)A.rows());
 
-		DenseMatrix oneMinusOmegaIdentity = (1 - _omega)*DenseMatrix::Identity(_blockSize, _blockSize);
+		DenseMatrix oneMinusOmegaIdentity = (1 - _omega)*DenseMatrix::Identity(bs, bs);
 
-		for (int iBlock = 0; iBlock < A.rows() / _blockSize; iBlock++)
+		return SparseMatrixOps::BuildByRows(A.rows(), A.cols(), bs, [&](BigNumber firstRow, BigNumber lastRow, SparseMatrixOps::RowChunk& chunk)
 		{
-			vector<BigNumber> jBlocksTreated;
-			BigNumber rowBlock = iBlock * _blockSize;
+			vector<BigNumber> jBlocks; // block columns of the block row
+			DenseMatrix blockRow;      // A_i, then J_i, stored densely by blocks
+			DenseMatrix A_ij(bs, bs);
+			DenseMatrix jacobiBlock(bs, bs);
 
-			for (int k = 0; k < _blockSize; k++)
+			for (BigNumber iBlock = firstRow / bs; iBlock < lastRow / bs; ++iBlock)
 			{
-				BigNumber row = iBlock * _blockSize + k;
-				for (RowMajorSparseMatrix::InnerIterator it(A, row); it; ++it)
+				if (!blockRows[iBlock])
 				{
-					auto j = it.col();
-					auto jBlock = j / this->_blockSize;
+					for (int k = 0; k < bs; k++)
+						chunk.EndRow();
+					continue;
+				}
 
-					if (find(jBlocksTreated.begin(), jBlocksTreated.end(), jBlock) != jBlocksTreated.end())
-						continue;
+				// Block row A_i: [ --- Li --- | Di | --- Ui --- ]
+				jBlocks.clear();
+				for (int k = 0; k < bs; k++)
+				{
+					for (RowMajorSparseMatrix::InnerIterator it(A, iBlock * bs + k); it; ++it)
+						jBlocks.push_back(it.col() / bs);
+				}
+				sort(jBlocks.begin(), jBlocks.end());
+				jBlocks.erase(unique(jBlocks.begin(), jBlocks.end()), jBlocks.end());
 
-					if (iBlock == jBlock) // Di
-						coeffs.Add(rowBlock, rowBlock, oneMinusOmegaIdentity);
+				blockRow.setZero(bs, jBlocks.size() * bs);
+				for (int k = 0; k < bs; k++)
+				{
+					for (RowMajorSparseMatrix::InnerIterator it(A, iBlock * bs + k); it; ++it)
+					{
+						BigNumber b = lower_bound(jBlocks.begin(), jBlocks.end(), (BigNumber)it.col() / bs) - jBlocks.begin();
+						blockRow(k, b * bs + it.col() % bs) = it.value();
+					}
+				}
+
+				// J_i = [ --- -omega*Di^-1*Li --- | (1-omega)*I | --- -omega*Di^-1*Ui --- ]
+				for (BigNumber b = 0; b < jBlocks.size(); b++)
+				{
+					if (jBlocks[b] == iBlock) // Di
+						blockRow.middleCols(b * bs, bs) = oneMinusOmegaIdentity;
 					else
 					{
-						BigNumber colBlock = jBlock * _blockSize;
-						DenseMatrix A_ij = A.block(rowBlock, colBlock, _blockSize, _blockSize);
-						DenseMatrix jacobiBlock(_blockSize, _blockSize);
+						A_ij = blockRow.middleCols(b * bs, bs);
 						this->diagBlockSolver.Solve(iBlock, A_ij, jacobiBlock);
 						jacobiBlock *= -_omega;
-						coeffs.Add(rowBlock, colBlock, jacobiBlock);
+						blockRow.middleCols(b * bs, bs) = jacobiBlock;
 					}
+				}
 
-					jBlocksTreated.push_back(jBlock);
+				for (int k = 0; k < bs; k++)
+				{
+					for (BigNumber c = 0; c < blockRow.cols(); c++)
+					{
+						if (abs(blockRow(k, c)) > NonZeroCoefficients::ZeroThreshold)
+							chunk.Add(jBlocks[c / bs] * bs + c % bs, blockRow(k, c));
+					}
+					chunk.EndRow();
 				}
 			}
-		}
-		SparseMatrix J(A.rows(), A.cols());
-		coeffs.Fill(J);
-		return J;
+		});
 	}
 };

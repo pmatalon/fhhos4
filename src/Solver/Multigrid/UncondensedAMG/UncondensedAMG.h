@@ -104,10 +104,35 @@ public:
 		return Multigrid::Solve(b, initialGuessCode);
 	}
 	
+private:
+	// The coarse blocks A_F_F are not used by the algorithm of the paper (only A_T_T and A_T_F are), but by some options
+	bool CoarseA_F_FNeeded() const
+	{
+		bool pLevelAfterHLevel = this->HP_CS == HP_CoarsStgy::H_then_P || this->HP_CS == HP_CoarsStgy::HP_then_P || this->HP_CS == HP_CoarsStgy::Alternate;
+		return pLevelAfterHLevel // the p-coarsening extracts its blocks from those of the finer level
+			|| this->FaceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsingAndTryAggregInteriorToInterfaces // face couplings
+			|| _coarseningProlong == UAMGProlongation::HighOrder || _multigridProlong == UAMGProlongation::HighOrder; // trace on the removed faces
+	}
+
+	// Q_F chained over the coarsening steps is used by the multigrid prolongation if it is not the chained coarsening prolongations,
+	// and by the coarse operator if it is not the Galerkin one
+	bool ChainedQ_FNeeded() const
+	{
+		return _multigridProlong != UAMGProlongation::ChainedCoarseningProlongations || !this->UseGalerkinOperator;
+	}
+
+	UncondensedLevel* CreateLevel(int number, int degree, int cellBlockSize, int faceBlockSize) const
+	{
+		UncondensedLevel* level = new UncondensedLevel(number, degree, cellBlockSize, faceBlockSize, _strongCouplingThreshold, _faceProlong, _coarseningProlong, _multigridProlong);
+		level->ComputeCoarseA_F_F = CoarseA_F_FNeeded();
+		level->ComputeQ_F = ChainedQ_FNeeded();
+		return level;
+	}
+
 protected:
 	Level* CreateFineLevel() const override
 	{
-		return new UncondensedLevel(0, _degree, _cellBlockSize, _faceBlockSize, _strongCouplingThreshold, _faceProlong, _coarseningProlong, _multigridProlong);
+		return CreateLevel(0, _degree, _cellBlockSize, _faceBlockSize);
 	}
 
 	Level* CreateCoarseLevel(Level* fineLevel, CoarseningType coarseningType, int coarseDegree) override
@@ -121,13 +146,9 @@ protected:
 		{
 			int coarseCellBlockSize = Utils::Binomial(coarseDegree + _dim    , coarseDegree);
 			int coarseFaceBlockSize = Utils::Binomial(coarseDegree + _dim - 1, coarseDegree);
-			UncondensedLevel* coarseLevel = new UncondensedLevel(fine->Number + 1, coarseDegree, coarseCellBlockSize, coarseFaceBlockSize, _strongCouplingThreshold, _faceProlong, _coarseningProlong, _multigridProlong);
-			return coarseLevel;
+			return CreateLevel(fine->Number + 1, coarseDegree, coarseCellBlockSize, coarseFaceBlockSize);
 		}
 		else
-		{
-			UncondensedLevel* coarseLevel = new UncondensedLevel(fine->Number + 1, fine->PolynomialDegree(), fine->CellBlockSize(), fine->FaceBlockSize(), _strongCouplingThreshold, _faceProlong, _coarseningProlong, _multigridProlong);
-			return coarseLevel;
-		}
+			return CreateLevel(fine->Number + 1, fine->PolynomialDegree(), fine->CellBlockSize(), fine->FaceBlockSize());
 	}
 };

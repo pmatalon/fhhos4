@@ -4,6 +4,7 @@
 #include "HybridAlgebraicMesh.h"
 #include "../AggregAMG/AlgebraicMesh.h"
 #include "../Level.h"
+#include "../../../Utils/SparseMatrixOps.h"
 using namespace std;
 
 class UncondensedLevel : public Level
@@ -30,6 +31,13 @@ private:
 public:
 	SparseMatrix Ac;
 
+	// Set by UncondensedAMG, to skip the computations that the chosen options don't use:
+	// - the coarse blocks A_F_F, computed at each coarsening step;
+	// - the face prolongation Q_F chained over the coarsening steps.
+	// If not computed, the coarse level's A_F_F is null.
+	bool ComputeCoarseA_F_F = true;
+	bool ComputeQ_F = true;
+
 public:
 	UncondensedLevel(int number, int degree, int cellBlockSize, int faceBlockSize, double strongCouplingThreshold, UAMGFaceProlongation faceProlong, UAMGProlongation coarseningProlong, UAMGProlongation mgProlong)
 		: Level(number)
@@ -48,7 +56,7 @@ public:
 
 	BigNumber NUnknowns() override
 	{
-		return A_F_F->rows();
+		return A_T_F->cols();
 	}
 
 	int PolynomialDegree() override
@@ -105,13 +113,15 @@ public:
 			{
 				if (_multigridProlong == UAMGProlongation::ChainedCoarseningProlongations)
 					this->P = *auxP;
-				this->Q_F = *auxQ_F;
+				if (ComputeQ_F)
+					this->Q_F = *auxQ_F;
 			}
 			else
 			{
 				if (_multigridProlong == UAMGProlongation::ChainedCoarseningProlongations)
-					this->P = this->P * *auxP;
-				this->Q_F = this->Q_F * *auxQ_F;
+					this->P = SparseMatrixOps::Multiply(this->P, *auxP);
+				if (ComputeQ_F)
+					this->Q_F = SparseMatrixOps::Multiply(this->Q_F, *auxQ_F);
 			}
 			delete auxP;
 			if (auxQ_F != auxP)
@@ -164,7 +174,8 @@ public:
 		{
 			this->A_T_Tc = std::move(*coarseMesh->A_T_T);
 			this->A_T_Fc = std::move(*coarseMesh->A_T_F);
-			this->A_F_Fc = std::move(*coarseMesh->A_F_F);
+			if (coarseMesh->A_F_F)
+				this->A_F_Fc = std::move(*coarseMesh->A_F_F);
 			this->Ac     = std::move(*schur);
 		}
 		else
@@ -177,9 +188,11 @@ public:
 			delete P;
 
 			this->A_T_Tc = std::move(*coarseMesh->A_T_T);
-			this->A_T_Fc =     Q_T.transpose() * (*this->A_T_F) * this->P;
-			this->A_F_Fc = this->P.transpose() * (*this->A_F_F) * this->P;
-			this->Ac     = this->P.transpose() * (*this->OperatorMatrix) * this->P;
+			SparseMatrix Pt = SparseMatrixOps::Transpose(this->P);
+			this->A_T_Fc = SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(SparseMatrixOps::Transpose(Q_T), *this->A_T_F), this->P);
+			if (ComputeCoarseA_F_F)
+				this->A_F_Fc = SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(Pt, *this->A_F_F), this->P);
+			this->Ac     = SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(Pt, *this->OperatorMatrix), this->P);
 		}
 		delete coarseMesh;
 		delete schur;
@@ -331,12 +344,15 @@ public:
 			Utils::FatalError("Unmanaged -face-prolong");
 
 		// Intermediate coarse operators
+		// The products are evaluated from left to right, and the symmetric matrices are given by their lower triangular part
+		SparseMatrix Q_Tt = SparseMatrixOps::Transpose(Q_T);
+		SparseMatrix Q_Tt_A_T_F = SparseMatrixOps::Multiply(Q_Tt, *mesh.A_T_F);
 		SparseMatrix* A_T_Tc = nullptr;
 		SparseMatrix* A_T_Fc_tmp = nullptr;
 		if (!onlyFacesUsed)
 		{
-			A_T_Tc     = new SparseMatrix(Q_T.transpose() * mesh.A_T_T->selfadjointView<Eigen::Lower>() * Q_T);
-			A_T_Fc_tmp = new SparseMatrix(Q_T.transpose() * *mesh.A_T_F * *Q_F);
+			A_T_Tc     = new SparseMatrix(SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(Q_Tt, SparseMatrixOps::FullFromLower(*mesh.A_T_T)), Q_T));
+			A_T_Fc_tmp = new SparseMatrix(SparseMatrixOps::Multiply(Q_Tt_A_T_F, *Q_F));
 		}
 
 		HybridAlgebraicMesh auxCoarseMesh(A_T_Tc, A_T_Fc_tmp, nullptr, _cellBlockSize, _faceBlockSize, _strongCouplingThreshold);
@@ -350,11 +366,14 @@ public:
 		// Multigrid prolongation
 		SparseMatrix* P = BuildProlongation(this->_coarseningProlong, mesh, schur, auxCoarseMesh, Q_T, Q_F);
 
-		SparseMatrix* A_T_Fc = new SparseMatrix(Q_T.transpose() * (*mesh.A_T_F) * (*P)); // Kills -prolong 1 or 2 because P is then very dense
+		SparseMatrix* A_T_Fc = new SparseMatrix(SparseMatrixOps::Multiply(Q_Tt_A_T_F, *P)); // Kills -prolong 1 or 2 because P is then very dense
 		//SparseMatrix* A_T_Fc = A_T_Fc_tmp;
 
-		SparseMatrix* A_F_Fc = new SparseMatrix(P->transpose() * mesh.A_F_F->selfadjointView<Eigen::Lower>() * *P);
-		SparseMatrix* schurc = new SparseMatrix(P->transpose() * schur.selfadjointView<Eigen::Lower>() * *P);
+		SparseMatrix Pt = SparseMatrixOps::Transpose(*P);
+		SparseMatrix* A_F_Fc = nullptr;
+		if (ComputeCoarseA_F_F)
+			A_F_Fc = new SparseMatrix(SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(Pt, SparseMatrixOps::FullFromLower(*mesh.A_F_F)), *P));
+		SparseMatrix* schurc = new SparseMatrix(SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(Pt, SparseMatrixOps::FullFromLower(schur)), *P));
 
 		HybridAlgebraicMesh* coarseMesh = new HybridAlgebraicMesh(A_T_Tc, A_T_Fc, A_F_Fc, _cellBlockSize, _faceBlockSize, _strongCouplingThreshold);
 		
@@ -374,7 +393,7 @@ public:
 			// Pi: average on both sides of each face
 			SparseMatrix Pi = BuildTrace(mesh);
 
-			P = new SparseMatrix(Pi * Q_T * Theta);
+			P = new SparseMatrix(SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(Pi, Q_T), Theta));
 		}
 		else if (prolong == UAMGProlongation::FaceProlongation) // 3
 		{
@@ -383,83 +402,45 @@ public:
 		}
 		else if (prolong == UAMGProlongation::FaceProlongationAndInteriorSmoothing) // 4
 		{
+			vector<bool> isRemoved = RemovedFaces(mesh);
+
+			// Smoothing (only the rows of the removed faces are kept)
 			BlockJacobi blockJacobi(_faceBlockSize, 2.0 / 3.0);
 			blockJacobi.Setup(schur);
-			SparseMatrix J = blockJacobi.IterationMatrix(); // Smoothing
+			SparseMatrix J = blockJacobi.IterationMatrix(isRemoved);
 
-			SparseMatrix smoothedQ_F = J * (*Q_F);
+			SparseMatrix smoothedQ_F = SparseMatrixOps::Multiply(J, *Q_F);
 
-			ThreadLocalCoeffs coeffs(mesh.Faces.size(), _faceBlockSize * 2 * _faceBlockSize);
-			#pragma omp parallel for
-			for (BigNumber faceNumber = 0; faceNumber < mesh.Faces.size(); ++faceNumber)
-			{
-				const HybridAlgebraicFace* face = &mesh.Faces[faceNumber];
-				if (face->IsRemovedOnCoarseMesh)
-					coeffs.Local().CopyRows(faceNumber*_faceBlockSize, _faceBlockSize, smoothedQ_F);
-				else
-					coeffs.Local().CopyRows(faceNumber*_faceBlockSize, _faceBlockSize, *Q_F);
-			}
-			P = new SparseMatrix(Q_F->rows(), Q_F->cols());
-			coeffs.Fill(*P);
+			P = new SparseMatrix(RemovedOrKeptFaceRows(isRemoved, smoothedQ_F, *Q_F));
 		}
 		else if (prolong == UAMGProlongation::ReconstructTraceOrInject) // 5
 		{
 			SparseMatrix Theta = coarseMesh.Theta();   // Reconstruct
 			SparseMatrix Pi = BuildCoarseTraceOnFineRemovedFaces(mesh); // Trace
 
-			SparseMatrix ReconstructAndTrace = Pi * Theta;
+			SparseMatrix ReconstructAndTrace = SparseMatrixOps::Multiply(Pi, Theta);
 
-			ThreadLocalCoeffs coeffs(mesh.Faces.size(), _faceBlockSize * 2 * _faceBlockSize);
-			#pragma omp parallel for
-			for (BigNumber faceNumber = 0; faceNumber < mesh.Faces.size(); ++faceNumber)
-			{
-				const HybridAlgebraicFace* face = &mesh.Faces[faceNumber];
-				if (face->IsRemovedOnCoarseMesh)
-					coeffs.Local().CopyRows(faceNumber*_faceBlockSize, _faceBlockSize, ReconstructAndTrace);
-				else
-					coeffs.Local().CopyRows(faceNumber*_faceBlockSize, _faceBlockSize, *Q_F);
-			}
-			P = new SparseMatrix(Q_F->rows(), Q_F->cols());
-			coeffs.Fill(*P);
+			P = new SparseMatrix(RemovedOrKeptFaceRows(RemovedFaces(mesh), ReconstructAndTrace, *Q_F));
 		}
 		else if (prolong == UAMGProlongation::ReconstructSmoothedTraceOrInject) // 6
 		{
+			vector<bool> isRemoved = RemovedFaces(mesh);
+
 			SparseMatrix Theta = coarseMesh.Theta();   // Reconstruct
 			SparseMatrix Pi = BuildCoarseTraceOnFineRemovedFaces(mesh); // Trace
 
-			SparseMatrix ReconstructAndTrace = Pi * Theta;
+			SparseMatrix ReconstructAndTrace = SparseMatrixOps::Multiply(Pi, Theta);
 
-			ThreadLocalCoeffs coeffs(mesh.Faces.size(), _faceBlockSize * 2 * _faceBlockSize);
-			#pragma omp parallel for
-			for (BigNumber faceNumber = 0; faceNumber < mesh.Faces.size(); ++faceNumber)
-			{
-				const HybridAlgebraicFace* face = &mesh.Faces[faceNumber];
-				if (face->IsRemovedOnCoarseMesh)
-					coeffs.Local().CopyRows(faceNumber*_faceBlockSize, _faceBlockSize, ReconstructAndTrace);
-				else
-					coeffs.Local().CopyRows(faceNumber*_faceBlockSize, _faceBlockSize, *Q_F);
-			}
-			SparseMatrix ReconstructTraceOrInject(Q_F->rows(), Q_F->cols());
-			coeffs.Fill(ReconstructTraceOrInject);
+			SparseMatrix ReconstructTraceOrInject = RemovedOrKeptFaceRows(isRemoved, ReconstructAndTrace, *Q_F);
 
+			// Smoothing (only the rows of the removed faces are kept: the matrix J is not assembled for the others)
 			BlockJacobi blockJacobi(_faceBlockSize, 2.0/3.0);
 			blockJacobi.Setup(schur);
-			SparseMatrix J = blockJacobi.IterationMatrix(); // Smoothing
+			SparseMatrix J = blockJacobi.IterationMatrix(isRemoved);
 
-			SparseMatrix ReconstructAndSmoothedTrace = J * ReconstructTraceOrInject;
+			SparseMatrix ReconstructAndSmoothedTrace = SparseMatrixOps::Multiply(J, ReconstructTraceOrInject);
 
-			ThreadLocalCoeffs coeffs2(mesh.Faces.size(), _faceBlockSize * 2 * _faceBlockSize);
-			#pragma omp parallel for
-			for (BigNumber faceNumber = 0; faceNumber < mesh.Faces.size(); ++faceNumber)
-			{
-				const HybridAlgebraicFace* face = &mesh.Faces[faceNumber];
-				if (face->IsRemovedOnCoarseMesh)
-					coeffs2.Local().CopyRows(faceNumber*_faceBlockSize, _faceBlockSize, ReconstructAndSmoothedTrace);
-				else
-					coeffs2.Local().CopyRows(faceNumber*_faceBlockSize, _faceBlockSize, *Q_F);
-			}
-			P = new SparseMatrix(Q_F->rows(), Q_F->cols());
-			coeffs2.Fill(*P);
+			P = new SparseMatrix(RemovedOrKeptFaceRows(isRemoved, ReconstructAndSmoothedTrace, *Q_F));
 		}
 		else if (prolong == UAMGProlongation::FindInteriorThatReconstructs) // 7
 		{
@@ -573,40 +554,16 @@ public:
 			SparseMatrix InteriorThatReconstruct(Q_F->rows(), Q_F->cols());
 			coeffs.Fill(InteriorThatReconstruct);
 
-
-			ThreadLocalCoeffs coeffs2(mesh.Faces.size(), fbs * 2 * fbs);
-			#pragma omp parallel for
-			for (BigNumber faceNumber = 0; faceNumber < mesh.Faces.size(); ++faceNumber)
-			{
-				const HybridAlgebraicFace* face = &mesh.Faces[faceNumber];
-				if (face->IsRemovedOnCoarseMesh)
-					coeffs2.Local().CopyRows(faceNumber*fbs, fbs, InteriorThatReconstruct);
-				else
-					coeffs2.Local().CopyRows(faceNumber*fbs, fbs, *Q_F);
-			}
-			P = new SparseMatrix(Q_F->rows(), Q_F->cols());
-			coeffs2.Fill(*P);
-
+			P = new SparseMatrix(RemovedOrKeptFaceRows(RemovedFaces(mesh), InteriorThatReconstruct, *Q_F));
 		}
 		else if (prolong == UAMGProlongation::HighOrder) // 8
 		{
 			SparseMatrix Theta = coarseMesh.Theta();
 			SparseMatrix Pi = BuildHighOrderTraceOnRemovedFaces(mesh);
 
-			SparseMatrix ReconstructAndTrace1 = Pi * Q_T * Theta;
+			SparseMatrix ReconstructAndTrace1 = SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(Pi, Q_T), Theta);
 
-			ThreadLocalCoeffs coeffs(mesh.Faces.size(), _faceBlockSize * 2 * _faceBlockSize);
-			#pragma omp parallel for
-			for (BigNumber faceNumber = 0; faceNumber < mesh.Faces.size(); ++faceNumber)
-			{
-				const HybridAlgebraicFace* face = &mesh.Faces[faceNumber];
-				if (face->IsRemovedOnCoarseMesh)
-					coeffs.Local().CopyRows(faceNumber*_faceBlockSize, _faceBlockSize, ReconstructAndTrace1);
-				else
-					coeffs.Local().CopyRows(faceNumber*_faceBlockSize, _faceBlockSize, *Q_F);
-			}
-			P = new SparseMatrix(Q_F->rows(), Q_F->cols());
-			coeffs.Fill(*P);
+			P = new SparseMatrix(RemovedOrKeptFaceRows(RemovedFaces(mesh), ReconstructAndTrace1, *Q_F));
 		}
 		else if (prolong == UAMGProlongation::ReconstructionTranspose2Steps) // 9
 		{
@@ -636,13 +593,15 @@ public:
 		this->OperatorMatrix = schur;*/
 
 		UncondensedLevel* fine = dynamic_cast<UncondensedLevel*>(this->FinerLevel);
-		this->OperatorMatrix = new SparseMatrix(fine->Q_F.transpose() * *(fine->OperatorMatrix) * fine->Q_F);
+		this->OperatorMatrix = new SparseMatrix(SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(SparseMatrixOps::Transpose(fine->Q_F), *(fine->OperatorMatrix)), fine->Q_F));
 	}
 
 public:
 	void SetupOperatorByBlockExtraction()
 	{
 		UncondensedLevel* fine = dynamic_cast<UncondensedLevel*>(FinerLevel);
+		if (!fine->A_F_F)
+			Utils::FatalError("UncondensedAMG: the p-coarsening requires the block A_F_F, which has not been computed on the finer level (see UncondensedAMG::CoarseA_F_FNeeded()).");
 
 		auto nElems = fine->A_T_F->rows() / fine->_cellBlockSize;
 		auto nFaces = fine->A_T_F->cols() / fine->_faceBlockSize;
@@ -676,6 +635,22 @@ private:
 		return coarseMatrix;
 	}
 
+
+	// For each face of the mesh, whether it is removed on the coarse mesh (i.e. interior to an aggregate)
+	static vector<bool> RemovedFaces(const HybridAlgebraicMesh& mesh)
+	{
+		vector<bool> isRemoved(mesh.Faces.size());
+		for (BigNumber faceNumber = 0; faceNumber < mesh.Faces.size(); ++faceNumber)
+			isRemoved[faceNumber] = mesh.Faces[faceNumber].IsRemovedOnCoarseMesh;
+		return isRemoved;
+	}
+
+	// Prolongation made of the rows of removedFaceRows for the removed faces, and of keptFaceRows for the others.
+	// The coefficients of absolute value <= NonZeroCoefficients::ZeroThreshold are dropped.
+	SparseMatrix RemovedOrKeptFaceRows(const vector<bool>& isRemoved, const SparseMatrix& removedFaceRows, const SparseMatrix& keptFaceRows)
+	{
+		return SparseMatrixOps::SelectRows(isRemoved, removedFaceRows, keptFaceRows, _faceBlockSize, NonZeroCoefficients::ZeroThreshold);
+	}
 
 	// Cell prolongation Q_T with only one 1 coefficient per row
 	SparseMatrix BuildQ_T(const HybridAlgebraicMesh& mesh)
@@ -1019,7 +994,7 @@ public:
 				coarse->OperatorMatrix = &Ac;
 				coarse->A_T_T = &A_T_Tc;
 				coarse->A_T_F = &A_T_Fc;
-				coarse->A_F_F = &A_F_Fc;
+				coarse->A_F_F = ComputeCoarseA_F_F ? &A_F_Fc : nullptr;
 			}
 		}
 	}
