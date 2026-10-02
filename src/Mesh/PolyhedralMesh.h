@@ -156,17 +156,17 @@ protected:
 	{
 #ifdef CGAL_ENABLED
 		// Compute triangulation and bounding box of the polygons
-		ElementParallelLoop<Dim> parallelLoop(this->CoarseMesh->Elements);
-		parallelLoop.Execute([](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+		#pragma omp parallel for
+		for (Element<Dim>* e : this->CoarseMesh->Elements)
+		{
+			// TODO: Make Init() available for all element classes
+			PolygonalElement* p = dynamic_cast<PolygonalElement*>(e);
+			if (p)
 			{
-				// TODO: Make Init() available for all element classes
-				PolygonalElement* p = dynamic_cast<PolygonalElement*>(e);
-				if (p)
-				{
-					p->ComputeMinimalTriangulation();
-					p->ComputeBoundingBox();
-				}
-			});
+				p->ComputeMinimalTriangulation();
+				p->ComputeBoundingBox();
+			}
+		}
 #endif
 		Mesh<Dim>::FinalizeCoarsening();
 	}
@@ -724,32 +724,32 @@ private:
 		while (elementsAreAgglomerated)
 		{
 			elementsAreAgglomerated = false;
-			ElementParallelLoop<Dim> parallelLoop(remainingFineElements);
-			parallelLoop.Execute([this, coarseMesh, &elementsAreAgglomerated](Element<Dim>* currentElem)
+			#pragma omp parallel for
+			for (Element<Dim>* currentElem : remainingFineElements)
+			{
+				if (currentElem->CoarserElement)
+					continue;
+
+				if (!currentElem->Mutex.try_lock())
+					continue;
+
+				// Lock neighbours
+				vector<Element<Dim>*> availableNeighbours = LockAvailableFaceNeighbours(currentElem);
+				if (availableNeighbours.empty())
 				{
-					if (currentElem->CoarserElement)
-						return;
+					currentElem->Mutex.unlock();
+					continue;
+				}
 
-					if (!currentElem->Mutex.try_lock())
-						return;
+				// Agglomeration
+				availableNeighbours.push_back(currentElem);
+				Element<Dim>* coarseElement = coarseMesh->AgglomerateFineElements(availableNeighbours);
+				if (coarseElement)
+					elementsAreAgglomerated = true;
 
-					// Lock neighbours
-					vector<Element<Dim>*> availableNeighbours = LockAvailableFaceNeighbours(currentElem);
-					if (availableNeighbours.empty())
-					{
-						currentElem->Mutex.unlock();
-						return;
-					}
-
-					// Agglomeration
-					availableNeighbours.push_back(currentElem);
-					Element<Dim>* coarseElement = coarseMesh->AgglomerateFineElements(availableNeighbours);
-					if (coarseElement)
-						elementsAreAgglomerated = true;
-
-					for (Element<Dim>* neighbour : availableNeighbours)
-						neighbour->Mutex.unlock();
-				});
+				for (Element<Dim>* neighbour : availableNeighbours)
+					neighbour->Mutex.unlock();
+			}
 
 			if (elementsAreAgglomerated)
 			{
@@ -767,35 +767,35 @@ private:
 
 		while (!remainingFineElements.empty())
 		{
-			ElementParallelLoop<Dim> parallelLoop(remainingFineElements);
-			parallelLoop.Execute([this, coarseMesh, &cancelCoarsening](Element<Dim>* currentElem)
+			#pragma omp parallel for
+			for (Element<Dim>* currentElem : remainingFineElements)
+			{
+				if (cancelCoarsening)
+					continue;
+				assert(!currentElem->CoarserElement);
+				Element<Dim>* coarseNeighbourForAggreg = this->FittestCoarseNeighbour(currentElem, H_CoarsStgy::AgglomerationCoarseningByClosestCenter);
+				if (!coarseNeighbourForAggreg)
 				{
-					if (cancelCoarsening)
-						return;
-					assert(!currentElem->CoarserElement);
-					Element<Dim>* coarseNeighbourForAggreg = this->FittestCoarseNeighbour(currentElem, H_CoarsStgy::AgglomerationCoarseningByClosestCenter);
-					if (!coarseNeighbourForAggreg)
+					if (!cancelCoarsening)
 					{
-						if (!cancelCoarsening)
-						{
-							cancelCoarsening = true;
-							//coarseMesh->ExportToMatlab2("/mnt/c/Users/pierr/Desktop/mesh_in_construct.m");
-							//currentElem->ExportToMatlab("k");
-							Utils::Warning("No more agglomeration possible in this mesh or this physical region. Coarsening aborted.");
-						}
-						return;
+						cancelCoarsening = true;
+						//coarseMesh->ExportToMatlab2("/mnt/c/Users/pierr/Desktop/mesh_in_construct.m");
+						//currentElem->ExportToMatlab("k");
+						Utils::Warning("No more agglomeration possible in this mesh or this physical region. Coarsening aborted.");
 					}
+					continue;
+				}
 
-					if (coarseNeighbourForAggreg->Mutex.try_lock())
+				if (coarseNeighbourForAggreg->Mutex.try_lock())
+				{
+					if (!coarseNeighbourForAggreg->IsDeleted)
 					{
-						if (!coarseNeighbourForAggreg->IsDeleted)
-						{
-							assert(!coarseNeighbourForAggreg->IsDeleted);
-							Element<Dim>* coarseElement = coarseMesh->AgglomerateFineElementToCoarse(currentElem, coarseNeighbourForAggreg);
-						}
-						coarseNeighbourForAggreg->Mutex.unlock();
+						assert(!coarseNeighbourForAggreg->IsDeleted);
+						Element<Dim>* coarseElement = coarseMesh->AgglomerateFineElementToCoarse(currentElem, coarseNeighbourForAggreg);
 					}
-				});
+					coarseNeighbourForAggreg->Mutex.unlock();
+				}
+			}
 
 			if (cancelCoarsening)
 			{
@@ -816,22 +816,22 @@ private:
 		{
 			if (bdryFaceCollapsing != FaceCollapsing::Disabled)
 			{
-				ElementParallelLoop<Dim> parallelLoopCollapseFaces(coarseMesh->Elements);
-				parallelLoopCollapseFaces.Execute([coarseMesh, bdryFaceCollapsing](Element<Dim>* coarseElement)
+				#pragma omp parallel for
+				for (Element<Dim>* coarseElement : coarseMesh->Elements)
 				{
 					if (!coarseElement->IsDeleted && coarseElement->IsOnBoundary())
 						coarseMesh->TryCollapseBoundaryFaces(coarseElement, bdryFaceCollapsing);
-				});
+				}
 			}
 		}
 		else if (faceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsing)
 		{
-			ElementParallelLoop<Dim> parallelLoopCollapseFaces(coarseMesh->Elements);
-			parallelLoopCollapseFaces.Execute([coarseMesh, bdryFaceCollapsing](Element<Dim>* coarseElement)
-				{
-					if (!coarseElement->IsDeleted)
-						coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(coarseElement, bdryFaceCollapsing, true);
-				});
+			#pragma omp parallel for
+			for (Element<Dim>* coarseElement : coarseMesh->Elements)
+			{
+				if (!coarseElement->IsDeleted)
+					coarseMesh->TryCollapseInterfacesMadeOfMultipleFaces(coarseElement, bdryFaceCollapsing, true);
+			}
 
 			for (Face<Dim>* f : coarseMesh->Faces)
 			{
@@ -1933,12 +1933,12 @@ public:
 		if (stgy == H_CoarsStgy::None)
 			stgy = this->FineMesh->ComesFrom.CS;
 
-		ElementParallelLoop<Dim> parallelLoop(this->Elements);
-		parallelLoop.Execute([this, stgy](Element<Dim>* ce)
-			{
-				SetOverlappingFineElementsViaExactIntersection(ce, stgy);
-				ce->InitOverlappingElementsLocalNumbering();
-			});
+		#pragma omp parallel for
+		for (Element<Dim>* ce : this->Elements)
+		{
+			SetOverlappingFineElementsViaExactIntersection(ce, stgy);
+			ce->InitOverlappingElementsLocalNumbering();
+		}
 	}
 
 private:
@@ -2009,37 +2009,35 @@ public:
 		if (stgy == H_CoarsStgy::None)
 			stgy = this->FineMesh->ComesFrom.CS;
 
-		ElementParallelLoop<Dim> parallelLoopFine(this->FineMesh->Elements);
-		parallelLoopFine.Execute([this, stgy](Element<Dim>* fe)
+		#pragma omp parallel for
+		for (Element<Dim>* fe : this->FineMesh->Elements)
+		{
+			if (!Utils::BuildsNestedMeshHierarchy(stgy) && !fe->IsFullyEmbeddedInCoarseElement)
 			{
-				if (!Utils::BuildsNestedMeshHierarchy(stgy) && !fe->IsFullyEmbeddedInCoarseElement)
+				if (stgy == H_CoarsStgy::IndependentRemeshing || Utils::ProgramArgs.Solver.MG.SubtriangulationMethodForApproxL2Proj == PolygonalTriangulation::Barycentric)
+					fe->Refine(Utils::ProgramArgs.Solver.MG.NSubtriangulationsForApproxL2Proj);
+				else
+					fe->RefineWithoutCoarseOverlap();
+
+				/*if (fe->CoarserElement->Number == 16 && fe->Number == 164) // (16,164) (38, 152) (38, 40)
 				{
-					if (stgy == H_CoarsStgy::IndependentRemeshing || Utils::ProgramArgs.Solver.MG.SubtriangulationMethodForApproxL2Proj == PolygonalTriangulation::Barycentric)
-						fe->Refine(Utils::ProgramArgs.Solver.MG.NSubtriangulationsForApproxL2Proj);
-					else
-						fe->RefineWithoutCoarseOverlap();
+					MatlabScript s;
+					s.Comment("--------------------COARSE-------------------");
+					s.PlotPolygonEdges(fe->CoarserElement->Shape()->Vertices(), "k", 3);
+					s.Comment("FINE " + to_string(fe->Number));
+					for (auto ss : fe->Shape()->RefinedShapes())
+						s.PlotPolygon(ss->Vertices(), "r", "-");
 
-					/*if (fe->CoarserElement->Number == 16 && fe->Number == 164) // (16,164) (38, 152) (38, 40)
-					{
-						MatlabScript s;
-						s.Comment("--------------------COARSE-------------------");
-						s.PlotPolygonEdges(fe->CoarserElement->Shape()->Vertices(), "k", 3);
-						s.Comment("FINE " + to_string(fe->Number));
-						for (auto ss : fe->Shape()->RefinedShapes())
-							s.PlotPolygon(ss->Vertices(), "r", "-");
+					fe->RefineWithoutCoarseOverlap();
+				}*/
+			}
 
-						fe->RefineWithoutCoarseOverlap();
-					}*/
-				}
+			SetOverlappingFineElementsSubTriangles(fe, stgy);
+		}
 
-				SetOverlappingFineElementsSubTriangles(fe, stgy);
-			});
-
-		ElementParallelLoop<Dim> parallelLoop(this->Elements);
-		parallelLoop.Execute([](Element<Dim>* ce)
-			{
-				ce->InitOverlappingElementsLocalNumbering();
-			});
+		#pragma omp parallel for
+		for (Element<Dim>* ce : this->Elements)
+			ce->InitOverlappingElementsLocalNumbering();
 	}
 
 private:

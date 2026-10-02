@@ -135,35 +135,73 @@ TEST_P(GalerkinProlongationDefaultsTest, ExplicitMultigridRequiresGalerkinOperat
 INSTANTIATE_TEST_SUITE_P(Prolongation, GalerkinProlongationDefaultsTest, ::testing::Values(4, 5));
 #endif // ENABLE_2D
 
-// The parallel loops must split [0, loopSize) into contiguous chunks, one per thread, that
-// cover every index exactly once (the chunk vector used to be written past its size).
-class ParallelLoopChunksTest : public ::testing::TestWithParam<std::tuple<BigNumber, unsigned int>>
+// ThreadLocal: with schedule(static), the thread-local results taken in thread order follow the
+// iteration order (the GMSH mesh import and the matrix assemblies rely on the static schedule).
+// ThreadLocalCoeffs: each coefficient added in the loop is in the matrix.
+class ThreadLocalTest : public ::testing::TestWithParam<std::tuple<BigNumber, int>>
 {
+protected:
+	void TearDown() override { Parallelism::SetNThreads(0); }
 };
 
-TEST_P(ParallelLoopChunksTest, CoverEachIndexOnce)
+TEST_P(ThreadLocalTest, ResultsFollowIterationOrder)
 {
 	auto [loopSize, nThreads] = GetParam();
+	Parallelism::SetNThreads(nThreads);
 
-	NumberParallelLoop<EmptyResultChunk> loop(loopSize, nThreads);
-	ASSERT_EQ(loop.Chunks.size(), loop.NThreads);
-	ASSERT_GE(loop.NThreads, 1u);
-
-	BigNumber expectedStart = 0;
-	for (ParallelChunk<EmptyResultChunk>* chunk : loop.Chunks)
-	{
-		EXPECT_EQ(chunk->Start, expectedStart);
-		EXPECT_GE(chunk->End, chunk->Start);
-		expectedStart = chunk->End;
-	}
-	EXPECT_EQ(expectedStart, loopSize);
-
-	std::vector<int> visits(loopSize, 0);
-	loop.Execute([&visits](BigNumber i) { visits[i]++; }); // distinct indices: no data race
+	ThreadLocal<std::vector<BigNumber>> lists;
+	#pragma omp parallel for schedule(static)
 	for (BigNumber i = 0; i < loopSize; i++)
-		EXPECT_EQ(visits[i], 1) << "i=" << i;
+		lists.Local().push_back(i);
+
+	std::vector<BigNumber> all;
+	for (std::vector<BigNumber>& list : lists)
+		all.insert(all.end(), list.begin(), list.end());
+	ASSERT_EQ(all.size(), loopSize);
+	for (BigNumber i = 0; i < loopSize; i++)
+		EXPECT_EQ(all[i], i);
 }
 
-INSTANTIATE_TEST_SUITE_P(Sizes, ParallelLoopChunksTest, ::testing::Combine(
-	::testing::Values<BigNumber>(0, 1, 3, 17, 1000),
-	::testing::Values(1u, 4u, 16u)));
+TEST_P(ThreadLocalTest, CoeffsFillMatrix)
+{
+	auto [n, nThreads] = GetParam();
+	Parallelism::SetNThreads(nThreads);
+
+	ThreadLocalCoeffs coeffs(n, 1);
+	#pragma omp parallel for
+	for (BigNumber i = 0; i < n; i++)
+		coeffs.Local().Add(i, i, i + 1);
+
+	SparseMatrix M(n, n);
+	coeffs.Fill(M);
+	EXPECT_EQ(M.nonZeros(), n);
+	for (BigNumber i = 0; i < n; i++)
+		EXPECT_DOUBLE_EQ(M.coeff(i, i), i + 1);
+}
+
+INSTANTIATE_TEST_SUITE_P(Sizes, ThreadLocalTest, ::testing::Combine(
+	::testing::Values<BigNumber>(0, 3, 1000),
+	::testing::Values(1, 4, 16)));
+
+// A parallel loop nested in another one runs on the calling thread only: a ThreadLocal created
+// inside the outer loop must have a value for it.
+TEST(ThreadLocalNestedTest, CoeffsFillMatrix)
+{
+	const int nOuter = 32;
+	const BigNumber n = 100;
+	std::vector<double> traces(nOuter, 0);
+	#pragma omp parallel for
+	for (int k = 0; k < nOuter; k++)
+	{
+		ThreadLocalCoeffs coeffs(n, 1);
+		#pragma omp parallel for
+		for (BigNumber i = 0; i < n; i++)
+			coeffs.Local().Add(i, i, k + 1);
+
+		SparseMatrix M(n, n);
+		coeffs.Fill(M);
+		traces[k] = M.sum();
+	}
+	for (int k = 0; k < nOuter; k++)
+		EXPECT_DOUBLE_EQ(traces[k], n * (k + 1)) << "k=" << k;
+}

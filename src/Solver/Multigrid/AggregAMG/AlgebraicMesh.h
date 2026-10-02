@@ -59,57 +59,57 @@ public:
 		this->Elements = vector<AlgebraicElement>(nElements);
 
 		// Numbering
-		NumberParallelLoop<EmptyResultChunk> parallelLoop(Elements.size());
-		parallelLoop.Execute([this](BigNumber elemNumber, ParallelChunk<EmptyResultChunk>* chunk)
-			{
-				AlgebraicElement& elem = Elements[elemNumber];
-				elem.Number = elemNumber;
-			});
+		#pragma omp parallel for
+		for (BigNumber elemNumber = 0; elemNumber < Elements.size(); ++elemNumber)
+		{
+			AlgebraicElement& elem = Elements[elemNumber];
+			elem.Number = elemNumber;
+		}
 
 		// Neighbours and coupling
-		NumberParallelLoop<EmptyResultChunk> parallelLoop2(Elements.size());
-		parallelLoop2.Execute([this, &A](BigNumber elemNumber, ParallelChunk<EmptyResultChunk>* chunk)
+		#pragma omp parallel for
+		for (BigNumber elemNumber = 0; elemNumber < Elements.size(); ++elemNumber)
+		{
+			AlgebraicElement& elem = Elements[elemNumber];
+			for (int k = 0; k < _blockSize; k++)
 			{
-				AlgebraicElement& elem = Elements[elemNumber];
-				for (int k = 0; k < _blockSize; k++)
+				// RowMajor --> the following line iterates over the non-zeros of the elemNumber-th row.
+				for (SparseMatrix::InnerIterator it(A, elemNumber*_blockSize + k); it; ++it)
 				{
-					// RowMajor --> the following line iterates over the non-zeros of the elemNumber-th row.
-					for (SparseMatrix::InnerIterator it(A, elemNumber*_blockSize + k); it; ++it)
+					BigNumber neighbourNumber = it.col() / _blockSize;
+					if (neighbourNumber != elemNumber)
 					{
-						BigNumber neighbourNumber = it.col() / _blockSize;
-						if (neighbourNumber != elemNumber)
+						AlgebraicElement* neighbour = &Elements[neighbourNumber];
+						if (find_if(elem.Neighbours.begin(), elem.Neighbours.end(), [neighbour](const pair<AlgebraicElement*, double>& n) { return n.first == neighbour; }) == elem.Neighbours.end())
 						{
-							AlgebraicElement* neighbour = &Elements[neighbourNumber];
-							if (find_if(elem.Neighbours.begin(), elem.Neighbours.end(), [neighbour](const pair<AlgebraicElement*, double>& n) { return n.first == neighbour; }) == elem.Neighbours.end())
-							{
-								double coupling = this->CouplingValue(elem, *neighbour);
-								elem.Neighbours.push_back({ neighbour, coupling });
-							}
+							double coupling = this->CouplingValue(elem, *neighbour);
+							elem.Neighbours.push_back({ neighbour, coupling });
 						}
 					}
 				}
+			}
 
-				sort(elem.Neighbours.begin(), elem.Neighbours.end(),
-					[](const pair<AlgebraicElement*, double>& n1, const pair<AlgebraicElement*, double>& n2)
-					{
-						return n1.second < n2.second; // Sort by ascending coupling
-					});
-
-				for (auto it = elem.Neighbours.begin(); it != elem.Neighbours.end(); ++it)
+			sort(elem.Neighbours.begin(), elem.Neighbours.end(),
+				[](const pair<AlgebraicElement*, double>& n1, const pair<AlgebraicElement*, double>& n2)
 				{
-					AlgebraicElement* neighbour = it->first;
-					double coupling = it->second;
-					if (IsStronglyCoupled(elem, coupling))
-					{
-						elem.StrongNeighbours.push_back(neighbour);
-						neighbour->Mutex.lock();
-						neighbour->NElementsIAmStrongNeighbourOf++;
-						neighbour->Mutex.unlock();
-					}
-					else
-						break;
+					return n1.second < n2.second; // Sort by ascending coupling
+				});
+
+			for (auto it = elem.Neighbours.begin(); it != elem.Neighbours.end(); ++it)
+			{
+				AlgebraicElement* neighbour = it->first;
+				double coupling = it->second;
+				if (IsStronglyCoupled(elem, coupling))
+				{
+					elem.StrongNeighbours.push_back(neighbour);
+					neighbour->Mutex.lock();
+					neighbour->NElementsIAmStrongNeighbourOf++;
+					neighbour->Mutex.unlock();
 				}
-			});
+				else
+					break;
+			}
+		}
 	}
 
 	void PairWiseAggregate(bool& coarsestPossibleMeshReached)

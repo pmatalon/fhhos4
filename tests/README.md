@@ -34,7 +34,7 @@ ctest -E HPConfig                          # skip the slowest tests
 ./bin/fhhos4_tests --gtest_filter=*Kellogg*  # or filter the binary directly
 ```
 
-The full suite is 77 CTest cases and runs in about 3.5 minutes serially. The 8 `HPConfigTest` cases take about 2 minutes of it (~15 s each: N=128 with k=5 is the smallest size of the high-order paper); the other cases take less than 20 s each.
+The full suite is 81 CTest cases and runs in about 3.5 minutes serially. The 8 `HPConfigTest` cases take about 2 minutes of it (~15 s each: N=128 with k=5 is the smallest size of the high-order paper); the other cases take less than 20 s each.
 
 ## GMSH meshes: reproducibility
 
@@ -141,11 +141,11 @@ Regression tests for configurations that used to crash, and for the argument def
 
 - **`Prolongation/GalerkinProlongationDefaultsTest`** (4 cases: `-prolong {4|5}` × 2 tests) — no solve, only `ApplyProgramArgumentDefaults`. With the default solver, the prolongations that require the Galerkin operator enable it; with an explicit `-s mg` and no `-g 1`, they are rejected (death test, `EXIT_FAILURE`).
 
-- **`Sizes/ParallelLoopChunksTest.CoverEachIndexOnce`** (15 cases: loop sizes {0, 1, 3, 17, 1000} × {1, 4, 16} threads) — unit test of `NumberParallelLoop`: one chunk per thread, contiguous, and every index visited exactly once.
+- **`Sizes/ThreadLocalTest`** (18 cases: `ResultsFollowIterationOrder` and `CoeffsFillMatrix` × loop sizes {0, 3, 1000} × {1, 4, 16} threads) and **`ThreadLocalNestedTest.CoeffsFillMatrix`** (1 case) — unit tests of `ThreadLocal`/`ThreadLocalCoeffs` (`src/Utils/Parallelism.h`): with `schedule(static)`, the thread-local results taken in thread order follow the iteration order; every coefficient added in a parallel loop ends up in the matrix, including in a loop nested in another parallel loop (executed by the calling thread only).
 
 ## Coverage summary
 
-- 77 CTest cases total across the 7 files above, exercising `Program_Diffusion_HHO` (diffusion problems) and `Program_BiHarmonic_HHO` (biharmonic problem in mixed form), with the HHO discretization and static condensation.
+- 81 CTest cases total across the 7 files above, exercising `Program_Diffusion_HHO` (diffusion problems) and `Program_BiHarmonic_HHO` (biharmonic problem in mixed form), with the HHO discretization and static condensation.
 - Dimensions: 2D and 3D. No 1D coverage (the run helpers throw for it, consistent with `ENABLE_1D=OFF` by default).
 - Meshes: in-house `cart`, `stri`, `stetra`; GMSH `cart`, `tri`, `tetra`, and a locally refined mesh. No `poly` (CGAL) meshes.
 - Coarsening strategies: standard, refinement (`-cs r`), independent remeshing (`-cs m`), agglomeration (`-cs n`).

@@ -1,7 +1,7 @@
 #pragma once
 #include "IDiscreteSpace.h"
 #include "../Diff_HHOElement.h"
-#include "../../../Utils/ElementParallelLoop.h"
+#include "../../../Utils/Parallelism.h"
 
 
 template<int Dim>
@@ -38,12 +38,12 @@ public:
 	Vector InnerProdWithBasis(DomFunction func) override
 	{
 		Vector innerProds = Vector(Dimension());
-		ParallelLoop<Face<Dim>*>::Execute(ListFaces(), [this, &innerProds, func](Face<Dim>* f)
-			{
-				BigNumber i = Number(f) * _nUnknowns;
-				innerProds.segment(i, _nUnknowns) = HHOFace(f)->InnerProductWithBasis(func);
-			}
-		);
+		#pragma omp parallel for
+		for (Face<Dim>* f : ListFaces())
+		{
+			BigNumber i = Number(f) * _nUnknowns;
+			innerProds.segment(i, _nUnknowns) = HHOFace(f)->InnerProductWithBasis(func);
+		}
 		return innerProds;
 	}
 
@@ -55,11 +55,12 @@ public:
 			return v;
 
 		Vector res(v.rows());
-		ParallelLoop<Face<Dim>*>::Execute(ListFaces(), [this, &v, &res](Face<Dim>* f)
-			{
-				BigNumber i = Number(f) * _nUnknowns;
-				res.segment(i, _nUnknowns) = HHOFace(f)->ApplyMassMatrix(v.segment(i, _nUnknowns));
-			});
+		#pragma omp parallel for
+		for (Face<Dim>* f : ListFaces())
+		{
+			BigNumber i = Number(f) * _nUnknowns;
+			res.segment(i, _nUnknowns) = HHOFace(f)->ApplyMassMatrix(v.segment(i, _nUnknowns));
+		}
 		return res;
 	}
 
@@ -71,23 +72,24 @@ public:
 			return v;
 
 		Vector res(v.rows());
-		ParallelLoop<Face<Dim>*>::Execute(ListFaces(), [this, &v, &res](Face<Dim>* f)
-			{
-				BigNumber i = Number(f) * _nUnknowns;
-				res.segment(i, _nUnknowns) = HHOFace(f)->SolveMassMatrix(v.segment(i, _nUnknowns));
-			});
+		#pragma omp parallel for
+		for (Face<Dim>* f : ListFaces())
+		{
+			BigNumber i = Number(f) * _nUnknowns;
+			res.segment(i, _nUnknowns) = HHOFace(f)->SolveMassMatrix(v.segment(i, _nUnknowns));
+		}
 		return res;
 	}
 
 	Vector Project(DomFunction func) override
 	{
 		Vector vectorOfDoFs = Vector(Dimension());
-		ParallelLoop<Face<Dim>*>::Execute(ListFaces(), [this, &vectorOfDoFs, func](Face<Dim>* f)
-			{
-				BigNumber i = Number(f) * _nUnknowns;
-				vectorOfDoFs.segment(i, _nUnknowns) = HHOFace(f)->ProjectOnBasis(func);
-			}
-		);
+		#pragma omp parallel for
+		for (Face<Dim>* f : ListFaces())
+		{
+			BigNumber i = Number(f) * _nUnknowns;
+			vectorOfDoFs.segment(i, _nUnknowns) = HHOFace(f)->ProjectOnBasis(func);
+		}
 		return vectorOfDoFs;
 	}
 
@@ -99,20 +101,13 @@ public:
 		if (HHO->OrthonormalizeFaceBases())
 			return v1.dot(v2);
 
-		struct ChunkResult { double total = 0; };
-
-		ParallelLoop<Face<Dim>*, ChunkResult> parallelLoop(ListFaces());
-		parallelLoop.Execute([this, &v1, &v2](Face<Dim>* f, ParallelChunk<ChunkResult>* chunk)
-			{
-				BigNumber i = Number(f) * _nUnknowns;
-				chunk->Results.total += HHOFace(f)->InnerProd(v1.segment(i, _nUnknowns), v2.segment(i, _nUnknowns));
-			});
-
 		double total = 0;
-		parallelLoop.AggregateChunkResults([&total](ChunkResult chunkResult)
-			{
-				total += chunkResult.total;
-			});
+		#pragma omp parallel for reduction(+:total)
+		for (Face<Dim>* f : ListFaces())
+		{
+			BigNumber i = Number(f) * _nUnknowns;
+			total += HHOFace(f)->InnerProd(v1.segment(i, _nUnknowns), v2.segment(i, _nUnknowns));
+		}
 		return total;
 	}
 
@@ -120,38 +115,22 @@ public:
 	{
 		assert(v.rows() == Dimension());
 
-		struct ChunkResult { double total = 0; };
-
-		ParallelLoop<Face<Dim>*, ChunkResult> parallelLoop(ListFaces());
-		parallelLoop.Execute([this, &v](Face<Dim>* f, ParallelChunk<ChunkResult>* chunk)
-			{
-				auto i = Number(f) * _nUnknowns;
-				chunk->Results.total += HHOFace(f)->Integral(v.segment(i, _nUnknowns));
-			});
-
 		double total = 0;
-		parallelLoop.AggregateChunkResults([&total](ChunkResult chunkResult)
-			{
-				total += chunkResult.total;
-			});
+		#pragma omp parallel for reduction(+:total)
+		for (Face<Dim>* f : ListFaces())
+		{
+			auto i = Number(f) * _nUnknowns;
+			total += HHOFace(f)->Integral(v.segment(i, _nUnknowns));
+		}
 		return total;
 	}
 
 	double Integral(DomFunction func) override
 	{
-		struct ChunkResult { double total = 0; };
-
-		ParallelLoop<Face<Dim>*, ChunkResult> parallelLoop(ListFaces());
-		parallelLoop.Execute([this, func](Face<Dim>* f, ParallelChunk<ChunkResult>* chunk)
-			{
-				chunk->Results.total += f->Integral(func);
-			});
-
 		double total = 0;
-		parallelLoop.AggregateChunkResults([&total](ChunkResult chunkResult)
-			{
-				total += chunkResult.total;
-			});
+		#pragma omp parallel for reduction(+:total)
+		for (Face<Dim>* f : ListFaces())
+			total += f->Integral(func);
 		return total;
 	}
 };

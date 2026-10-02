@@ -541,7 +541,7 @@ void print_usage() {
 	cout << endl;
 	cout << "-threads NUM" << endl;
 	cout << "      Max number of threads used for parallelism (default: 0)." << endl;
-	cout << "              0     - automatic: usually number of cores x 2 (because of hyper-threading)" << endl;
+	cout << "              0     - automatic: OMP_NUM_THREADS if set, otherwise the number of logical cores" << endl;
 	cout << "              1     - sequential execution" << endl;
 	cout << "              other - requested number of threads" << endl;
 	cout << endl;
@@ -1501,7 +1501,7 @@ int main(int argc, char* argv[])
 				exit(EXIT_SUCCESS);
 				break;
 			case OPT_Threads:
-				BaseParallelLoop::SetDefaultNThreads(atoi(optarg));
+				Parallelism::SetNThreads(atoi(optarg));
 				break;
 			case OPT_Export:
 			{

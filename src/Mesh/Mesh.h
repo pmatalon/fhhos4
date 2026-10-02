@@ -1,7 +1,8 @@
 #pragma once
+#include <atomic>
 #include "Element.h"
 #include "Face.h"
-#include "../Utils/ElementParallelLoop.h"
+#include "../Utils/Parallelism.h"
 #include "../Utils/MatlabScript.h"
 #include "../Utils/FileSystem.h"
 #include "../TestCases/TestCase.h"
@@ -433,20 +434,16 @@ public:
 protected:
 	void InitFaceLocalNumbering()
 	{
-		ElementParallelLoop<Dim> parallelLoop(this->Elements);
-		parallelLoop.Execute([](Element<Dim>* e)
-			{
-				e->InitFaceLocalNumbering();
-			});
+		#pragma omp parallel for
+		for (Element<Dim>* e : this->Elements)
+			e->InitFaceLocalNumbering();
 	}
 
 	void InitFinerElementsLocalNumbering()
 	{
-		ElementParallelLoop<Dim> parallelLoop(this->Elements);
-		parallelLoop.Execute([](Element<Dim>* e)
-			{
-				e->InitFinerElementsLocalNumbering();
-			});
+		#pragma omp parallel for
+		for (Element<Dim>* e : this->Elements)
+			e->InitFinerElementsLocalNumbering();
 	}
 
 	virtual void InitializeCoarsening(Mesh<Dim>* coarseMesh)
@@ -939,28 +936,15 @@ public:
 			}
 
 
-			struct ChunkResult { double total = 0; };
-			ParallelLoop<Element<Dim>*, ChunkResult> parallelLoopFine(this->Elements);
-			parallelLoopFine.Execute([](Element<Dim>* e, ParallelChunk<ChunkResult>* chunk)
-				{
-					chunk->Results.total += e->Measure();
-				});
 			double fineMeshTotalMeasure = 0;
-			parallelLoopFine.AggregateChunkResults([&fineMeshTotalMeasure](ChunkResult& chunk)
-				{
-					fineMeshTotalMeasure += chunk.total;
-				});
+			#pragma omp parallel for reduction(+:fineMeshTotalMeasure)
+			for (Element<Dim>* e : this->Elements)
+				fineMeshTotalMeasure += e->Measure();
 			
-			ParallelLoop<Element<Dim>*, ChunkResult> parallelLoopCoarse(CoarseMesh->Elements);
-			parallelLoopCoarse.Execute([](Element<Dim>* e, ParallelChunk<ChunkResult>* chunk)
-				{
-					chunk->Results.total += e->Measure();
-				});
 			double coarseMeshTotalMeasure = 0;
-			parallelLoopCoarse.AggregateChunkResults([&coarseMeshTotalMeasure](ChunkResult& chunk)
-				{
-					coarseMeshTotalMeasure += chunk.total;
-				});
+			#pragma omp parallel for reduction(+:coarseMeshTotalMeasure)
+			for (Element<Dim>* e : CoarseMesh->Elements)
+				coarseMeshTotalMeasure += e->Measure();
 
 			if (abs(coarseMeshTotalMeasure - fineMeshTotalMeasure) > Utils::NumericalZero)
 				Utils::Error("Fine and coarse meshes should have the same total measure.");
@@ -1041,18 +1025,18 @@ public:
 
 	void DeleteOverlappingFineElementsInformation()
 	{
-		ElementParallelLoop<Dim> parallelLoop(this->Elements);
-		parallelLoop.Execute([](Element<Dim>* e)
+		#pragma omp parallel for
+		for (Element<Dim>* e : this->Elements)
+		{
+			// Deletion of the intersections
+			for (auto it = e->OverlappingFineElements.begin(); it != e->OverlappingFineElements.end(); it++)
 			{
-				// Deletion of the intersections
-				for (auto it = e->OverlappingFineElements.begin(); it != e->OverlappingFineElements.end(); it++)
-				{
-					vector<PhysicalShape<Dim>*> intersectionCoarseFine = it->second;
-					for (PhysicalShape<Dim>* intersection : intersectionCoarseFine)
-						delete intersection;
-				}
-				e->OverlappingFineElements.clear();
-			});
+				vector<PhysicalShape<Dim>*> intersectionCoarseFine = it->second;
+				for (PhysicalShape<Dim>* intersection : intersectionCoarseFine)
+					delete intersection;
+			}
+			e->OverlappingFineElements.clear();
+		}
 	}
 
 	void ExportToMatlab2(string filePath = "")

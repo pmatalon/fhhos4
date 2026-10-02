@@ -58,12 +58,12 @@ public:
 		auto nb = A.rows() / _blockSize;
 		_invD = vector<Eigen::FullPivLU<DenseMatrix>>(nb);
 
-		NumberParallelLoop<EmptyResultChunk> parallelLoop(nb);
-		parallelLoop.Execute([this, &A](BigNumber i, ParallelChunk<EmptyResultChunk>* chunk)
-			{
-				DenseMatrix Di = A.block(i * _blockSize, i * _blockSize, _blockSize, _blockSize);
-				_invD[i].compute(Di);
-			});
+		#pragma omp parallel for
+		for (BigNumber i = 0; i < nb; ++i)
+		{
+			DenseMatrix Di = A.block(i * _blockSize, i * _blockSize, _blockSize, _blockSize);
+			_invD[i].compute(Di);
+		}
 	}
 
 	MFlops SetupComputationalWork() override

@@ -177,7 +177,7 @@ if(ENABLE_OPENMP)
 	target_link_libraries(fhhos4_core PUBLIC OpenMP::OpenMP_CXX)
 	message(STATUS "OpenMP enabled")
 else()
-	message(STATUS "OpenMP disabled: the parallel loops use std::async (one thread created per chunk at each loop).")
+	message(STATUS "OpenMP disabled: sequential execution.")
 endif()
 
 if(ENABLE_NATIVE_ARCH)

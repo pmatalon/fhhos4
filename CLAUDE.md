@@ -45,7 +45,7 @@ From `build/`:
 ctest --output-on-failure
 ```
 
-77 tests, ~3.5 min (`ctest -E HPConfig` skips the 8 slowest, ~2 min). Most check the
+81 tests, ~3.5 min (`ctest -E HPConfig` skips the 8 slowest, ~2 min). Most check the
 iteration counts of the papers in `reproducibility/` — see `tests/README.md`. Covers
 `Program_Diffusion_HHO` and `Program_BiHarmonic_HHO` (HHO, static condensation), 2D/3D,
 in-house and GMSH meshes. Not covered: DG/FEM programs (disabled by default), `lu`/`cg`/`agmg`/`p_mg` solvers,
@@ -78,7 +78,9 @@ Example invocations for specific experiments/figures live in `reproducibility/*.
   plus `SolverFactory.h`.
 - `FunctionalBasis/`, `QuadratureRules/`, `Geometry/` — numerics building blocks.
 - `TestCases/` — analytic/benchmark problem definitions.
-- `Utils/` — cross-cutting helpers (parallel loops, timers, export, types).
+- `Utils/` — cross-cutting helpers (timers, export, types). Parallel loops are plain OpenMP
+  (`#pragma omp parallel for`); `Parallelism.h` has the thread count and `ThreadLocal`/
+  `ThreadLocalCoeffs` for per-thread results (e.g. the non-zeros of a matrix being assembled).
 
 ## Troubleshooting
 

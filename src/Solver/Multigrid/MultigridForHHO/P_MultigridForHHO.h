@@ -72,19 +72,19 @@ public:
 		if (!higherBasis->IsHierarchical())
 			Utils::FatalError("The natural injection is not implemented for non-hierarchical bases.");
 
-		FaceParallelLoop<Dim> parallelLoop(mesh->Faces);
-		parallelLoop.ReserveChunkCoeffsSize(lowerBasis->Size());
-		parallelLoop.Execute([this, nHigherUnknowns, nLowerUnknowns](Face<Dim>* f, ParallelChunk<CoeffsChunk>* chunk)
-			{
-				if (f->HasDirichletBC())
-					return;
+		ThreadLocalCoeffs coeffs(mesh->Faces.size(), lowerBasis->Size());
+		#pragma omp parallel for
+		for (Face<Dim>* f : mesh->Faces)
+		{
+			if (f->HasDirichletBC())
+				continue;
 
-				for (int i = 0; i < nLowerUnknowns; i++)
-					chunk->Results.Coeffs.Add(f->Number*nHigherUnknowns + i, f->Number*nLowerUnknowns + i, 1);
-			});
+			for (int i = 0; i < nLowerUnknowns; i++)
+				coeffs.Local().Add(f->Number*nHigherUnknowns + i, f->Number*nLowerUnknowns + i, 1);
+		}
 
 		P = SparseMatrix(higherPb->HHO->nInteriorAndNeumannFaces * nHigherUnknowns, lowerPb->HHO->nInteriorAndNeumannFaces * nLowerUnknowns);
-		parallelLoop.Fill(P);
+		coeffs.Fill(P);
 	}
 
 public:

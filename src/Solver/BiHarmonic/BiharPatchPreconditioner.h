@@ -75,60 +75,59 @@ private:
 	{
 		ExportModule out(Utils::ProgramArgs.OutputDirectory, "", Utils::ProgramArgs.Actions.Export.ValueSeparator);
 
-		FaceParallelLoop<Dim> parallelLoop(_diffPb._mesh->BoundaryFaces);
-		parallelLoop.ReserveChunkCoeffsSize(_diffPb.HHO->nFaceUnknowns * _diffPb.HHO->nFaceUnknowns);
+		ThreadLocalCoeffs coeffs(_diffPb._mesh->BoundaryFaces.size(), _diffPb.HHO->nFaceUnknowns * _diffPb.HHO->nFaceUnknowns);
+		#pragma omp parallel for
+		for (Face<Dim>* f : _diffPb._mesh->BoundaryFaces)
+		{
+			int i = f->Number - _diffPb.HHO->nInteriorFaces;
+			Element<Dim>* e = f->Element1;
 
-		parallelLoop.Execute([this, &out](Face<Dim>* f, ParallelChunk<CoeffsChunk>* chunk)
+			int nFaceUnknowns = _diffPb.HHO->nFaceUnknowns;
+
+			Neighbourhood<Dim> nbh(e, _neighbourhoodDepth);
+			NeighbourhoodDiffusion_HHO<Dim> nbhDiff(nbh, _diffPb);
+
+			SparseMatrix Theta_T_bF_transpose = nbhDiff.Theta_T_bF_transpose();
+			SparseMatrix S_iF_bF_transpose = Theta_T_bF_transpose * nbhDiff.A_T_ndF + nbhDiff.A_ndF_dF.transpose();
+
+			SparseMatrix Theta_T_F_transpose = nbhDiff.Theta_T_F_transpose();
+			SparseMatrix Theta_T_iF_transpose = Theta_T_F_transpose.topRows(nbh.InteriorFaces.size() * nFaceUnknowns);
+			SparseMatrix B_T_T = nbhDiff.BiharStab_T_T();
+			SparseMatrix B_T_F = nbhDiff.BiharStab_T_F();
+			SparseMatrix B_F_F = nbhDiff.BiharStab_F_F();
+			auto B_F_bF = B_F_F.rightCols(nbh.BoundaryFaces.size() * nFaceUnknowns);
+			auto B_iF_F = B_F_F.topRows(nbh.InteriorFaces.size() * nFaceUnknowns);
+			auto B_T_iF = B_T_F.leftCols(nbh.InteriorFaces.size() * nFaceUnknowns);
+			auto B_T_bF = B_T_F.rightCols(nbh.BoundaryFaces.size() * nFaceUnknowns);
+			SparseMatrix Stab_bF_T = Theta_T_bF_transpose * B_T_T + B_T_bF.transpose();
+			SparseMatrix Stab_bF_F = Theta_T_bF_transpose * B_T_F + B_F_bF.transpose();
+			SparseMatrix Stab_iF_T = Theta_T_iF_transpose * B_T_T + B_T_iF.transpose();
+			SparseMatrix Stab_iF_F = Theta_T_iF_transpose * B_T_F;
+			Stab_iF_F += B_iF_F;
+			
+			for (int k = 0; k < nFaceUnknowns; k++)
 			{
-				int i = f->Number - _diffPb.HHO->nInteriorFaces;
-				Element<Dim>* e = f->Element1;
+				// Dirichlet 1 at the current unknown
+				Vector dirichlet = Vector::Zero(nbh.BoundaryFaces.size() * nFaceUnknowns);
+				dirichlet[nbh.BoundaryFaceNumber(f) * nFaceUnknowns + k] = 1;
 
-				int nFaceUnknowns = _diffPb.HHO->nFaceUnknowns;
+				Vector approxColumn = BiharOperator(dirichlet, nbhDiff, S_iF_bF_transpose, Theta_T_bF_transpose, Stab_iF_T, Stab_iF_F, Stab_bF_T, Stab_bF_F);
 
-				Neighbourhood<Dim> nbh(e, _neighbourhoodDepth);
-				NeighbourhoodDiffusion_HHO<Dim> nbhDiff(nbh, _diffPb);
-
-				SparseMatrix Theta_T_bF_transpose = nbhDiff.Theta_T_bF_transpose();
-				SparseMatrix S_iF_bF_transpose = Theta_T_bF_transpose * nbhDiff.A_T_ndF + nbhDiff.A_ndF_dF.transpose();
-
-				SparseMatrix Theta_T_F_transpose = nbhDiff.Theta_T_F_transpose();
-				SparseMatrix Theta_T_iF_transpose = Theta_T_F_transpose.topRows(nbh.InteriorFaces.size() * nFaceUnknowns);
-				SparseMatrix B_T_T = nbhDiff.BiharStab_T_T();
-				SparseMatrix B_T_F = nbhDiff.BiharStab_T_F();
-				SparseMatrix B_F_F = nbhDiff.BiharStab_F_F();
-				auto B_F_bF = B_F_F.rightCols(nbh.BoundaryFaces.size() * nFaceUnknowns);
-				auto B_iF_F = B_F_F.topRows(nbh.InteriorFaces.size() * nFaceUnknowns);
-				auto B_T_iF = B_T_F.leftCols(nbh.InteriorFaces.size() * nFaceUnknowns);
-				auto B_T_bF = B_T_F.rightCols(nbh.BoundaryFaces.size() * nFaceUnknowns);
-				SparseMatrix Stab_bF_T = Theta_T_bF_transpose * B_T_T + B_T_bF.transpose();
-				SparseMatrix Stab_bF_F = Theta_T_bF_transpose * B_T_F + B_F_bF.transpose();
-				SparseMatrix Stab_iF_T = Theta_T_iF_transpose * B_T_T + B_T_iF.transpose();
-				SparseMatrix Stab_iF_F = Theta_T_iF_transpose * B_T_F;
-				Stab_iF_F += B_iF_F;
-				
-				for (int k = 0; k < nFaceUnknowns; k++)
+				for (int i2 = 0; i2 < nbh.BoundaryFaces.size(); i2++)
 				{
-					// Dirichlet 1 at the current unknown
-					Vector dirichlet = Vector::Zero(nbh.BoundaryFaces.size() * nFaceUnknowns);
-					dirichlet[nbh.BoundaryFaceNumber(f) * nFaceUnknowns + k] = 1;
-
-					Vector approxColumn = BiharOperator(dirichlet, nbhDiff, S_iF_bF_transpose, Theta_T_bF_transpose, Stab_iF_T, Stab_iF_F, Stab_bF_T, Stab_bF_F);
-
-					for (int i2 = 0; i2 < nbh.BoundaryFaces.size(); i2++)
+					Face<Dim>* f2 = nbh.BoundaryFaces[i2];
+					if (f2->IsDomainBoundary)
 					{
-						Face<Dim>* f2 = nbh.BoundaryFaces[i2];
-						if (f2->IsDomainBoundary)
-						{
-							int j = f2->Number - _diffPb.HHO->nInteriorFaces;
-							chunk->Results.Coeffs.Add(j * nFaceUnknowns, i * nFaceUnknowns + k, approxColumn.segment(i2 * nFaceUnknowns, nFaceUnknowns));
-						}
+						int j = f2->Number - _diffPb.HHO->nInteriorFaces;
+						coeffs.Local().Add(j * nFaceUnknowns, i * nFaceUnknowns + k, approxColumn.segment(i2 * nFaceUnknowns, nFaceUnknowns));
 					}
 				}
-			});
+			}
+		}
 
 		//SparseMatrix mat(_diffPb.HHO->nBoundaryFaces * _diffPb.HHO->nFaceUnknowns, _diffPb.HHO->nBoundaryFaces * _diffPb.HHO->nFaceUnknowns);
 		_precondMatrix = SparseMatrix(_diffPb.HHO->nBoundaryFaces * _diffPb.HHO->nFaceUnknowns, _diffPb.HHO->nBoundaryFaces * _diffPb.HHO->nFaceUnknowns);
-		parallelLoop.Fill(_precondMatrix);
+		coeffs.Fill(_precondMatrix);
 
 		//SparseMatrix matT = mat.triangularView<Eigen::StrictlyLower>().transpose();
 		//mat = mat.triangularView<Eigen::Lower>() + matT;
@@ -146,12 +145,12 @@ private:
 		{
 			int blockSize = _diffPb.HHO->nFaceUnknowns;
 			_invD = vector<Eigen::FullPivLU<DenseMatrix>>(_diffPb.HHO->nBoundaryFaces);
-			NumberParallelLoop<EmptyResultChunk> parallelLoop2(_diffPb.HHO->nBoundaryFaces);
-			parallelLoop2.Execute([this, blockSize](BigNumber i, ParallelChunk<EmptyResultChunk>* chunk)
-				{
-					DenseMatrix Di = _precondMatrix.block(i * blockSize, i * blockSize, blockSize, blockSize);
-					_invD[i].compute(Di);
-				});
+			#pragma omp parallel for
+			for (BigNumber i = 0; i < _diffPb.HHO->nBoundaryFaces; ++i)
+			{
+				DenseMatrix Di = _precondMatrix.block(i * blockSize, i * blockSize, blockSize, blockSize);
+				_invD[i].compute(Di);
+			}
 		}
 		else
 			_solver->Setup(_precondMatrix);
@@ -185,87 +184,88 @@ private:
 			}
 		}
 
-		ParallelLoop<BoundaryFacePatch<Dim>, CoeffsChunk> parallelLoop(patches);
-		parallelLoop.Execute([this](BoundaryFacePatch<Dim> patch, ParallelChunk<CoeffsChunk>* chunk)
+		ThreadLocalCoeffs coeffs;
+		#pragma omp parallel for
+		for (const BoundaryFacePatch<Dim>& patch : patches)
+		{
+			int nFaceUnknowns = _diffPb.HHO->nFaceUnknowns;
+
+			vector<Element<Dim>*> boundaryElements;
+			for (Face<Dim>* f : patch.Faces)
+				boundaryElements.push_back(f->Element1);
+
+			std::sort(boundaryElements.begin(), boundaryElements.end());
+			boundaryElements.erase(std::unique(boundaryElements.begin(), boundaryElements.end()), boundaryElements.end());
+
+			Neighbourhood<Dim> nbh(boundaryElements, _neighbourhoodDepth);
+			NeighbourhoodDiffusion_HHO<Dim> nbhDiff(nbh, _diffPb);
+
+			SparseMatrix Theta_T_bF_transpose = nbhDiff.Theta_T_bF_transpose();
+			SparseMatrix S_iF_bF_transpose = Theta_T_bF_transpose * nbhDiff.A_T_ndF + nbhDiff.A_ndF_dF.transpose();
+
+			SparseMatrix Theta_T_F_transpose = nbhDiff.Theta_T_F_transpose();
+			SparseMatrix Theta_T_iF_transpose = Theta_T_F_transpose.topRows(nbh.InteriorFaces.size() * nFaceUnknowns);
+			SparseMatrix B_T_T = nbhDiff.BiharStab_T_T();
+			SparseMatrix B_T_F = nbhDiff.BiharStab_T_F();
+			SparseMatrix B_F_F = nbhDiff.BiharStab_F_F();
+			auto B_F_bF = B_F_F.rightCols(nbh.BoundaryFaces.size() * nFaceUnknowns);
+			auto B_iF_F = B_F_F.topRows(nbh.InteriorFaces.size() * nFaceUnknowns);
+			auto B_T_iF = B_T_F.leftCols(nbh.InteriorFaces.size() * nFaceUnknowns);
+			auto B_T_bF = B_T_F.rightCols(nbh.BoundaryFaces.size() * nFaceUnknowns);
+			SparseMatrix Stab_bF_T = Theta_T_bF_transpose * B_T_T + B_T_bF.transpose();
+			SparseMatrix Stab_bF_F = Theta_T_bF_transpose * B_T_F + B_F_bF.transpose();
+			SparseMatrix Stab_iF_T = Theta_T_iF_transpose * B_T_T + B_T_iF.transpose();
+			SparseMatrix Stab_iF_F = Theta_T_iF_transpose * B_T_F;
+			Stab_iF_F += B_iF_F;
+
+			for (int i1 = 0; i1 < patch.Faces.size(); ++i1)
 			{
-				int nFaceUnknowns = _diffPb.HHO->nFaceUnknowns;
+				Face<Dim>* f1 = patch.Faces[i1];
+				int globNum1 = f1->Number - _diffPb.HHO->nInteriorFaces;
+				int locNum1 = nbh.BoundaryFaceNumber(f1);
 
-				vector<Element<Dim>*> boundaryElements;
-				for (Face<Dim>* f : patch.Faces)
-					boundaryElements.push_back(f->Element1);
-
-				std::sort(boundaryElements.begin(), boundaryElements.end());
-				boundaryElements.erase(std::unique(boundaryElements.begin(), boundaryElements.end()), boundaryElements.end());
-
-				Neighbourhood<Dim> nbh(boundaryElements, _neighbourhoodDepth);
-				NeighbourhoodDiffusion_HHO<Dim> nbhDiff(nbh, _diffPb);
-
-				SparseMatrix Theta_T_bF_transpose = nbhDiff.Theta_T_bF_transpose();
-				SparseMatrix S_iF_bF_transpose = Theta_T_bF_transpose * nbhDiff.A_T_ndF + nbhDiff.A_ndF_dF.transpose();
-
-				SparseMatrix Theta_T_F_transpose = nbhDiff.Theta_T_F_transpose();
-				SparseMatrix Theta_T_iF_transpose = Theta_T_F_transpose.topRows(nbh.InteriorFaces.size() * nFaceUnknowns);
-				SparseMatrix B_T_T = nbhDiff.BiharStab_T_T();
-				SparseMatrix B_T_F = nbhDiff.BiharStab_T_F();
-				SparseMatrix B_F_F = nbhDiff.BiharStab_F_F();
-				auto B_F_bF = B_F_F.rightCols(nbh.BoundaryFaces.size() * nFaceUnknowns);
-				auto B_iF_F = B_F_F.topRows(nbh.InteriorFaces.size() * nFaceUnknowns);
-				auto B_T_iF = B_T_F.leftCols(nbh.InteriorFaces.size() * nFaceUnknowns);
-				auto B_T_bF = B_T_F.rightCols(nbh.BoundaryFaces.size() * nFaceUnknowns);
-				SparseMatrix Stab_bF_T = Theta_T_bF_transpose * B_T_T + B_T_bF.transpose();
-				SparseMatrix Stab_bF_F = Theta_T_bF_transpose * B_T_F + B_F_bF.transpose();
-				SparseMatrix Stab_iF_T = Theta_T_iF_transpose * B_T_T + B_T_iF.transpose();
-				SparseMatrix Stab_iF_F = Theta_T_iF_transpose * B_T_F;
-				Stab_iF_F += B_iF_F;
-
-				for (int i1 = 0; i1 < patch.Faces.size(); ++i1)
+				for (int k = 0; k < nFaceUnknowns; k++)
 				{
-					Face<Dim>* f1 = patch.Faces[i1];
-					int globNum1 = f1->Number - _diffPb.HHO->nInteriorFaces;
-					int locNum1 = nbh.BoundaryFaceNumber(f1);
+					// Dirichlet 1 at the current unknown
+					Vector dirichlet = Vector::Zero(nbh.BoundaryFaces.size() * nFaceUnknowns);
+					dirichlet[locNum1 * nFaceUnknowns + k] = 1;
 
-					for (int k = 0; k < nFaceUnknowns; k++)
+					Vector approxColumn = BiharOperator(dirichlet, nbhDiff, S_iF_bF_transpose, Theta_T_bF_transpose, Stab_iF_T, Stab_iF_F, Stab_bF_T, Stab_bF_F);
+
+					//cout << approxColumn.segment(locNum1 * nFaceUnknowns, nFaceUnknowns) << endl << endl;
+
+					coeffs.Local().Add(globNum1 * nFaceUnknowns, globNum1 * nFaceUnknowns + k, approxColumn.segment(locNum1 * nFaceUnknowns, nFaceUnknowns));
+
+					/*for (int i2 = i1 + 1; i2 < patch.Faces.size(); ++i2)
 					{
-						// Dirichlet 1 at the current unknown
-						Vector dirichlet = Vector::Zero(nbh.BoundaryFaces.size() * nFaceUnknowns);
-						dirichlet[locNum1 * nFaceUnknowns + k] = 1;
+						Face<Dim>* f2 = patch.Faces[i2];
+						int globNum2 = f2->Number - _diffPb.HHO->nInteriorFaces;
+						int locNum2 = nbh.BoundaryFaceNumber(f2);
 
-						Vector approxColumn = BiharOperator(dirichlet, nbhDiff, S_iF_bF_transpose, Theta_T_bF_transpose, Stab_iF_T, Stab_iF_F, Stab_bF_T, Stab_bF_F);
+						coeffs.Local().Add(globNum2 * nFaceUnknowns, globNum1 * nFaceUnknowns + k, approxColumn.segment(locNum2 * nFaceUnknowns, nFaceUnknowns));
+						//coeffs.Local().Add(globNum1 * nFaceUnknowns + k, globNum2 * nFaceUnknowns, approxColumn.segment(locNum2 * nFaceUnknowns, nFaceUnknowns).transpose());
+						coeffs.Local().Add(globNum1 * nFaceUnknowns, globNum2 * nFaceUnknowns + k, approxColumn.segment(locNum2 * nFaceUnknowns, nFaceUnknowns));
+					}*/
+					for (int i2 = 0; i2 < patch.Faces.size(); ++i2)
+					{
+						if (i1 == i2)
+							continue;
 
-						//cout << approxColumn.segment(locNum1 * nFaceUnknowns, nFaceUnknowns) << endl << endl;
+						Face<Dim>* f2 = patch.Faces[i2];
+						int globNum2 = f2->Number - _diffPb.HHO->nInteriorFaces;
+						int locNum2 = nbh.BoundaryFaceNumber(f2);
 
-						chunk->Results.Coeffs.Add(globNum1 * nFaceUnknowns, globNum1 * nFaceUnknowns + k, approxColumn.segment(locNum1 * nFaceUnknowns, nFaceUnknowns));
-
-						/*for (int i2 = i1 + 1; i2 < patch.Faces.size(); ++i2)
-						{
-							Face<Dim>* f2 = patch.Faces[i2];
-							int globNum2 = f2->Number - _diffPb.HHO->nInteriorFaces;
-							int locNum2 = nbh.BoundaryFaceNumber(f2);
-
-							chunk->Results.Coeffs.Add(globNum2 * nFaceUnknowns, globNum1 * nFaceUnknowns + k, approxColumn.segment(locNum2 * nFaceUnknowns, nFaceUnknowns));
-							//chunk->Results.Coeffs.Add(globNum1 * nFaceUnknowns + k, globNum2 * nFaceUnknowns, approxColumn.segment(locNum2 * nFaceUnknowns, nFaceUnknowns).transpose());
-							chunk->Results.Coeffs.Add(globNum1 * nFaceUnknowns, globNum2 * nFaceUnknowns + k, approxColumn.segment(locNum2 * nFaceUnknowns, nFaceUnknowns));
-						}*/
-						for (int i2 = 0; i2 < patch.Faces.size(); ++i2)
-						{
-							if (i1 == i2)
-								continue;
-
-							Face<Dim>* f2 = patch.Faces[i2];
-							int globNum2 = f2->Number - _diffPb.HHO->nInteriorFaces;
-							int locNum2 = nbh.BoundaryFaceNumber(f2);
-
-							chunk->Results.Coeffs.Add(globNum2 * nFaceUnknowns, globNum1 * nFaceUnknowns + k, approxColumn.segment(locNum2 * nFaceUnknowns, nFaceUnknowns));
-							//chunk->Results.Coeffs.Add(globNum1 * nFaceUnknowns + k, globNum2 * nFaceUnknowns, approxColumn.segment(locNum2 * nFaceUnknowns, nFaceUnknowns).transpose());
-							//chunk->Results.Coeffs.Add(globNum1 * nFaceUnknowns, globNum2 * nFaceUnknowns + k, approxColumn.segment(locNum2 * nFaceUnknowns, nFaceUnknowns));
-						}
+						coeffs.Local().Add(globNum2 * nFaceUnknowns, globNum1 * nFaceUnknowns + k, approxColumn.segment(locNum2 * nFaceUnknowns, nFaceUnknowns));
+						//coeffs.Local().Add(globNum1 * nFaceUnknowns + k, globNum2 * nFaceUnknowns, approxColumn.segment(locNum2 * nFaceUnknowns, nFaceUnknowns).transpose());
+						//coeffs.Local().Add(globNum1 * nFaceUnknowns, globNum2 * nFaceUnknowns + k, approxColumn.segment(locNum2 * nFaceUnknowns, nFaceUnknowns));
 					}
 				}
-			});
+			}
+		}
 
 		//SparseMatrix mat(_diffPb.HHO->nBoundaryFaces * _diffPb.HHO->nFaceUnknowns, _diffPb.HHO->nBoundaryFaces * _diffPb.HHO->nFaceUnknowns);
 		_precondMatrix = SparseMatrix(_diffPb.HHO->nBoundaryFaces * _diffPb.HHO->nFaceUnknowns, _diffPb.HHO->nBoundaryFaces * _diffPb.HHO->nFaceUnknowns);
-		parallelLoop.Fill(_precondMatrix);
+		coeffs.Fill(_precondMatrix);
 
 		if (Utils::ProgramArgs.Actions.PrintDebug)
 		{
@@ -282,12 +282,12 @@ private:
 		{
 			int blockSize = _diffPb.HHO->nFaceUnknowns;
 			_invD = vector<Eigen::FullPivLU<DenseMatrix>>(_diffPb.HHO->nBoundaryFaces);
-			NumberParallelLoop<EmptyResultChunk> parallelLoop2(_diffPb.HHO->nBoundaryFaces);
-			parallelLoop2.Execute([this, blockSize](BigNumber i, ParallelChunk<EmptyResultChunk>* chunk)
-				{
-					DenseMatrix Di = _precondMatrix.block(i * blockSize, i * blockSize, blockSize, blockSize);
-					_invD[i].compute(Di);
-				});
+			#pragma omp parallel for
+			for (BigNumber i = 0; i < _diffPb.HHO->nBoundaryFaces; ++i)
+			{
+				DenseMatrix Di = _precondMatrix.block(i * blockSize, i * blockSize, blockSize, blockSize);
+				_invD[i].compute(Di);
+			}
 		}
 		else
 			_solver->Setup(_precondMatrix);

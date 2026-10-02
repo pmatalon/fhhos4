@@ -77,22 +77,23 @@ private:
 
 			int nHigherDegreeUnknowns = finerLevel->_problem->HHO->nFaceUnknowns;
 			int nLowerDegreeUnknowns = this->_problem->HHO->nFaceUnknowns;
-			NumberParallelLoop<CoeffsChunk> parallelLoop(finerLevel->OperatorMatrix->rows() / nHigherDegreeUnknowns);
-			parallelLoop.Execute([this, nHigherDegreeUnknowns, nLowerDegreeUnknowns](BigNumber i, ParallelChunk<CoeffsChunk>* chunk)
+			ThreadLocalCoeffs coeffs;
+			#pragma omp parallel for
+			for (BigNumber i = 0; i < finerLevel->OperatorMatrix->rows() / nHigherDegreeUnknowns; ++i)
+			{
+				for (int k = 0; k < nLowerDegreeUnknowns; k++)
 				{
-					for (int k = 0; k < nLowerDegreeUnknowns; k++)
+					for (RowMajorSparseMatrix::InnerIterator it(*this->FinerLevel->OperatorMatrix, i*nHigherDegreeUnknowns + k); it; ++it)
 					{
-						for (RowMajorSparseMatrix::InnerIterator it(*this->FinerLevel->OperatorMatrix, i*nHigherDegreeUnknowns + k); it; ++it)
-						{
-							auto j = it.col() / nHigherDegreeUnknowns;
-							int l = it.col() - j * nHigherDegreeUnknowns;
-							if (l < nLowerDegreeUnknowns)
-								chunk->Results.Coeffs.Add(i*nLowerDegreeUnknowns + k, j*nLowerDegreeUnknowns + l, it.value());
-						}
+						auto j = it.col() / nHigherDegreeUnknowns;
+						int l = it.col() - j * nHigherDegreeUnknowns;
+						if (l < nLowerDegreeUnknowns)
+							coeffs.Local().Add(i*nLowerDegreeUnknowns + k, j*nLowerDegreeUnknowns + l, it.value());
 					}
-				});
+				}
+			}
 			SparseMatrix* Ac = new SparseMatrix(this->_problem->HHO->nTotalFaceUnknowns, this->_problem->HHO->nTotalFaceUnknowns);
-			parallelLoop.Fill(*Ac);
+			coeffs.Fill(*Ac);
 			this->OperatorMatrix = Ac;
 		}
 		else
@@ -404,22 +405,21 @@ private:
 			
 			int nFaceUnknowns = finePb->HHO->nFaceUnknowns;
 
-			FaceParallelLoop<Dim> parallelLoop(finePb->_mesh->Faces);
-			parallelLoop.ReserveChunkCoeffsSize(nFaceUnknowns * 2 * nFaceUnknowns);
+			ThreadLocalCoeffs coeffs(finePb->_mesh->Faces.size(), nFaceUnknowns * 2 * nFaceUnknowns);
+			#pragma omp parallel for
+			for (Face<Dim>* fineFace : finePb->_mesh->Faces)
+			{
+				if (fineFace->HasDirichletBC())
+					continue;
 
-			parallelLoop.Execute([this, P_algo1, J_faces, nFaceUnknowns](Face<Dim>* fineFace, ParallelChunk<CoeffsChunk>* chunk)
-				{
-					if (fineFace->HasDirichletBC())
-						return;
-
-					if (fineFace->IsRemovedOnCoarserGrid)
-						chunk->Results.Coeffs.CopyRows(fineFace->Number*nFaceUnknowns, nFaceUnknowns, P_algo1);
-					else
-						chunk->Results.Coeffs.CopyRows(fineFace->Number*nFaceUnknowns, nFaceUnknowns, J_faces);
-				});
+				if (fineFace->IsRemovedOnCoarserGrid)
+					coeffs.Local().CopyRows(fineFace->Number*nFaceUnknowns, nFaceUnknowns, P_algo1);
+				else
+					coeffs.Local().CopyRows(fineFace->Number*nFaceUnknowns, nFaceUnknowns, J_faces);
+			}
 
 			P = SparseMatrix(finePb->HHO->nInteriorAndNeumannFaces * nFaceUnknowns, coarsePb->HHO->nInteriorAndNeumannFaces * nFaceUnknowns);
-			parallelLoop.Fill(P);
+			coeffs.Fill(P);
 		}
 		else if (_hProlongation == GMG_H_Prolongation::CellInterp_Inject_Adjoint)
 		{
@@ -453,41 +453,41 @@ private:
 
 			int nFaceUnknowns = finePb->HHO->nFaceUnknowns;
 
-			ElementParallelLoop<Dim> parallelLoop(coarsePb->_mesh->Elements);
+			ThreadLocalCoeffs coeffs;
+			#pragma omp parallel for
+			for (Element<Dim>* coarseElem : coarsePb->_mesh->Elements)
+			{
+				DenseMatrix resolveCondensedFinerFacesFromCoarseBoundary = StaticallyCondenseInteriorFinerFaces(coarseElem, *this->OperatorMatrix, coarsePb, finePb);
 
-			parallelLoop.Execute([this, finePb, coarsePb, nFaceUnknowns](Element<Dim>* coarseElem, ParallelChunk<CoeffsChunk>* chunk)
+				for (int i = 0; i < coarseElem->FinerFacesRemoved.size(); i++)
 				{
-					DenseMatrix resolveCondensedFinerFacesFromCoarseBoundary = StaticallyCondenseInteriorFinerFaces(coarseElem, *this->OperatorMatrix, coarsePb, finePb);
-
-					for (int i = 0; i < coarseElem->FinerFacesRemoved.size(); i++)
-					{
-						Face<Dim>* condensedFineFace = coarseElem->FinerFacesRemoved[i];
-						for (Face<Dim>* coarseFace : coarseElem->Faces)
-						{
-							if (coarseFace->HasDirichletBC())
-								continue;
-
-							BigNumber coarseFaceLocalNumberInCoarseElem = coarseElem->LocalNumberOf(coarseFace);
-							chunk->Results.Coeffs.Add(condensedFineFace->Number*nFaceUnknowns, coarseFace->Number*nFaceUnknowns, resolveCondensedFinerFacesFromCoarseBoundary.block(i*nFaceUnknowns, coarseFaceLocalNumberInCoarseElem*nFaceUnknowns, nFaceUnknowns, nFaceUnknowns));
-						}
-					}
-
+					Face<Dim>* condensedFineFace = coarseElem->FinerFacesRemoved[i];
 					for (Face<Dim>* coarseFace : coarseElem->Faces)
 					{
 						if (coarseFace->HasDirichletBC())
 							continue;
 
-						DenseMatrix local_J_f_c = this->ComputeCanonicalInjectionMatrixCoarseToFine(coarseFace, coarsePb, finePb);
-						for (auto fineFace : coarseFace->FinerFaces)
-						{
-							BigNumber fineFaceLocalNumberInCoarseFace = coarseFace->LocalNumberOf(fineFace);
-							chunk->Results.Coeffs.Add(fineFace->Number*nFaceUnknowns, coarseFace->Number*nFaceUnknowns, local_J_f_c.block(fineFaceLocalNumberInCoarseFace*nFaceUnknowns, 0, nFaceUnknowns, nFaceUnknowns));
-						}
+						BigNumber coarseFaceLocalNumberInCoarseElem = coarseElem->LocalNumberOf(coarseFace);
+						coeffs.Local().Add(condensedFineFace->Number*nFaceUnknowns, coarseFace->Number*nFaceUnknowns, resolveCondensedFinerFacesFromCoarseBoundary.block(i*nFaceUnknowns, coarseFaceLocalNumberInCoarseElem*nFaceUnknowns, nFaceUnknowns, nFaceUnknowns));
 					}
-				});
+				}
+
+				for (Face<Dim>* coarseFace : coarseElem->Faces)
+				{
+					if (coarseFace->HasDirichletBC())
+						continue;
+
+					DenseMatrix local_J_f_c = this->ComputeCanonicalInjectionMatrixCoarseToFine(coarseFace, coarsePb, finePb);
+					for (auto fineFace : coarseFace->FinerFaces)
+					{
+						BigNumber fineFaceLocalNumberInCoarseFace = coarseFace->LocalNumberOf(fineFace);
+						coeffs.Local().Add(fineFace->Number*nFaceUnknowns, coarseFace->Number*nFaceUnknowns, local_J_f_c.block(fineFaceLocalNumberInCoarseFace*nFaceUnknowns, 0, nFaceUnknowns, nFaceUnknowns));
+					}
+				}
+			}
 
 			P = SparseMatrix(finePb->HHO->nInteriorAndNeumannFaces * nFaceUnknowns, coarsePb->HHO->nInteriorAndNeumannFaces * nFaceUnknowns);
-			parallelLoop.Fill(P);
+			coeffs.Fill(P);
 		}
 		else if (_hProlongation == GMG_H_Prolongation::FaceInject)
 		{
@@ -553,19 +553,19 @@ private:
 			// If finest level, delete everything you don't need to reconstruct the solution at the end
 			if (IsFinestLevel() && Utils::ProgramArgs.Problem.Equation != EquationType::BiHarmonic && !Utils::ProgramArgs.Problem.ComputeNormalDerivative)
 			{
-				ElementParallelLoop<Dim> parallelLoopE(_problem->_mesh->Elements);
-				parallelLoopE.Execute([this](Element<Dim>* element)
-					{
-						Diff_HHOElement<Dim>* hhoElement = _problem->HHOElement(element);
-						hhoElement->DeleteUselessMatricesAfterMultigridSetup();
-					});
+				#pragma omp parallel for
+				for (Element<Dim>* element : _problem->_mesh->Elements)
+				{
+					Diff_HHOElement<Dim>* hhoElement = _problem->HHOElement(element);
+					hhoElement->DeleteUselessMatricesAfterMultigridSetup();
+				}
 
-				FaceParallelLoop<Dim> parallelLoopF(_problem->_mesh->Faces);
-				parallelLoopF.Execute([this](Face<Dim>* face)
-					{
-						Diff_HHOFace<Dim>* hhoFace = _problem->HHOFace(face);
-						hhoFace->DeleteUselessMatricesAfterMultigridSetup();
-					});
+				#pragma omp parallel for
+				for (Face<Dim>* face : _problem->_mesh->Faces)
+				{
+					Diff_HHOFace<Dim>* hhoFace = _problem->HHOFace(face);
+					hhoFace->DeleteUselessMatricesAfterMultigridSetup();
+				}
 			}
 
 			// If _problem->_mesh is not the fine mesh, delete it if possible
@@ -767,34 +767,33 @@ private:
 		int nCellUnknowns = _useHigherOrderReconstruction ? problem->HHO->nReconstructUnknowns : problem->HHO->nCellUnknowns;
 		int nFaceUnknowns = problem->HHO->nFaceUnknowns;
 
-		ElementParallelLoop<Dim> parallelLoop(problem->_mesh->Elements);
-		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nFaceUnknowns);
+		ThreadLocalCoeffs coeffs(problem->_mesh->Elements.size(), nCellUnknowns * 4 * nFaceUnknowns);
+		#pragma omp parallel for
+		for (Element<Dim>* element : problem->_mesh->Elements)
+		{
+			Diff_HHOElement<Dim>* hhoElement = problem->HHOElement(element);
 
-		parallelLoop.Execute([this, problem, nFaceUnknowns, nCellUnknowns](Element<Dim>* element, ParallelChunk<CoeffsChunk>* chunk)
+			DenseMatrix cellInterpMatrix;
+			if (_useHigherOrderReconstruction)
+				cellInterpMatrix = hhoElement->ReconstructionFromFacesMatrix();
+			else
+				cellInterpMatrix = hhoElement->SolveCellUnknownsMatrix();
+
+			for (auto face : element->Faces)
 			{
-				Diff_HHOElement<Dim>* hhoElement = problem->HHOElement(element);
+				if (face->HasDirichletBC())
+					continue;
 
-				DenseMatrix cellInterpMatrix;
-				if (_useHigherOrderReconstruction)
-					cellInterpMatrix = hhoElement->ReconstructionFromFacesMatrix();
-				else
-					cellInterpMatrix = hhoElement->SolveCellUnknownsMatrix();
+				BigNumber elemGlobalNumber = element->Number;
+				BigNumber faceGlobalNumber = face->Number;
+				BigNumber faceLocalNumber = element->LocalNumberOf(face);
 
-				for (auto face : element->Faces)
-				{
-					if (face->HasDirichletBC())
-						continue;
-
-					BigNumber elemGlobalNumber = element->Number;
-					BigNumber faceGlobalNumber = face->Number;
-					BigNumber faceLocalNumber = element->LocalNumberOf(face);
-
-					chunk->Results.Coeffs.Add(elemGlobalNumber * nCellUnknowns, faceGlobalNumber * nFaceUnknowns, cellInterpMatrix.block(0, faceLocalNumber*nFaceUnknowns, nCellUnknowns, nFaceUnknowns));
-				}
-			});
+				coeffs.Local().Add(elemGlobalNumber * nCellUnknowns, faceGlobalNumber * nFaceUnknowns, cellInterpMatrix.block(0, faceLocalNumber*nFaceUnknowns, nCellUnknowns, nFaceUnknowns));
+			}
+		}
 
 		SparseMatrix M(problem->HHO->nElements * nCellUnknowns, problem->HHO->nTotalFaceUnknowns);
-		parallelLoop.Fill(M);
+		coeffs.Fill(M);
 
 		return M;
 	}
@@ -807,29 +806,28 @@ private:
 		//FunctionalBasis<Dim - 1>* faceBasis = problem->HHO->FaceBasis;
 		//FunctionalBasis<Dim>* cellInterpolationBasis = _problem->HHO->CellBasis;
 
-		ElementParallelLoop<Dim> parallelLoop(problem->_mesh->Elements);
-		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nFaceUnknowns);
+		ThreadLocalCoeffs coeffs(problem->_mesh->Elements.size(), nCellUnknowns * 4 * nFaceUnknowns);
+		#pragma omp parallel for
+		for (Element<Dim>* element : problem->_mesh->Elements)
+		{
+			Diff_HHOElement<Dim>* hhoElement = problem->HHOElement(element);
+			DenseMatrix reconstructMatrix = hhoElement->SolveCellUnknownsMatrix();
 
-		parallelLoop.Execute([this, problem, nFaceUnknowns, nCellUnknowns](Element<Dim>* element, ParallelChunk<CoeffsChunk>* chunk)
+			for (auto face : element->Faces)
 			{
-				Diff_HHOElement<Dim>* hhoElement = problem->HHOElement(element);
-				DenseMatrix reconstructMatrix = hhoElement->SolveCellUnknownsMatrix();
+				if (face->HasDirichletBC())
+					continue;
 
-				for (auto face : element->Faces)
-				{
-					if (face->HasDirichletBC())
-						continue;
+				BigNumber elemGlobalNumber = element->Number;
+				BigNumber faceGlobalNumber = face->Number;
+				BigNumber faceLocalNumber = element->LocalNumberOf(face);
 
-					BigNumber elemGlobalNumber = element->Number;
-					BigNumber faceGlobalNumber = face->Number;
-					BigNumber faceLocalNumber = element->LocalNumberOf(face);
-
-					chunk->Results.Coeffs.Add(elemGlobalNumber * nCellUnknowns, faceGlobalNumber * nFaceUnknowns, reconstructMatrix.block(0, faceLocalNumber*nFaceUnknowns, nCellUnknowns, nFaceUnknowns));
-				}
-			});
+				coeffs.Local().Add(elemGlobalNumber * nCellUnknowns, faceGlobalNumber * nFaceUnknowns, reconstructMatrix.block(0, faceLocalNumber*nFaceUnknowns, nCellUnknowns, nFaceUnknowns));
+			}
+		}
 
 		SparseMatrix M(problem->HHO->nElements * nCellUnknowns, problem->HHO->nTotalFaceUnknowns);
-		parallelLoop.Fill(M);
+		coeffs.Fill(M);
 
 		return M;
 	}
@@ -839,28 +837,27 @@ private:
 		int nCellUnknowns = _useHigherOrderReconstruction ? problem->HHO->nReconstructUnknowns : problem->HHO->nCellUnknowns;
 		int nFaceUnknowns = problem->HHO->nFaceUnknowns;
 
-		ElementParallelLoop<Dim> parallelLoop(problem->_mesh->Elements);
-		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nFaceUnknowns);
-
-		parallelLoop.Execute([this, problem, nCellUnknowns, nFaceUnknowns](Element<Dim>* element, ParallelChunk<CoeffsChunk>* chunk)
+		ThreadLocalCoeffs coeffs(problem->_mesh->Elements.size(), nCellUnknowns * 4 * nFaceUnknowns);
+		#pragma omp parallel for
+		for (Element<Dim>* element : problem->_mesh->Elements)
+		{
+			BigNumber elemGlobalNumber = element->Number;
+			Diff_HHOElement<Dim>* hhoElem = problem->HHOElement(element);
+			FunctionalBasis<Dim>* cellBasis = _useHigherOrderReconstruction ? hhoElem->ReconstructionBasis : hhoElem->CellBasis;
+			for (auto face : element->Faces)
 			{
-				BigNumber elemGlobalNumber = element->Number;
-				Diff_HHOElement<Dim>* hhoElem = problem->HHOElement(element);
-				FunctionalBasis<Dim>* cellBasis = _useHigherOrderReconstruction ? hhoElem->ReconstructionBasis : hhoElem->CellBasis;
-				for (auto face : element->Faces)
-				{
-					if (face->HasDirichletBC())
-						continue;
+				if (face->HasDirichletBC())
+					continue;
 
-					BigNumber faceGlobalNumber = face->Number;
-					double weight = Weight(element, face);
-					Diff_HHOFace<Dim>* hhoFace = problem->HHOFace(face);
-					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, elemGlobalNumber*nCellUnknowns, weight*hhoFace->Trace(element, cellBasis));
-				}
-			});
+				BigNumber faceGlobalNumber = face->Number;
+				double weight = Weight(element, face);
+				Diff_HHOFace<Dim>* hhoFace = problem->HHOFace(face);
+				coeffs.Local().Add(faceGlobalNumber*nFaceUnknowns, elemGlobalNumber*nCellUnknowns, weight*hhoFace->Trace(element, cellBasis));
+			}
+		}
 
 		SparseMatrix Pi(problem->HHO->nTotalFaceUnknowns, problem->HHO->nElements * nCellUnknowns);
-		parallelLoop.Fill(Pi);
+		coeffs.Fill(Pi);
 
 		return Pi;
 	}
@@ -870,28 +867,27 @@ private:
 		int nCellUnknowns = cellProblem->HHO->nReconstructUnknowns;
 		int nFaceUnknowns = faceProblem->HHO->nFaceUnknowns;
 
-		ElementParallelLoop<Dim> parallelLoop(cellProblem->_mesh->Elements);
-		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nFaceUnknowns);
-
-		parallelLoop.Execute([this, cellProblem, faceProblem, nCellUnknowns, nFaceUnknowns](Element<Dim>* element, ParallelChunk<CoeffsChunk>* chunk)
+		ThreadLocalCoeffs coeffs(cellProblem->_mesh->Elements.size(), nCellUnknowns * 4 * nFaceUnknowns);
+		#pragma omp parallel for
+		for (Element<Dim>* element : cellProblem->_mesh->Elements)
+		{
+			BigNumber elemGlobalNumber = element->Number;
+			Diff_HHOElement<Dim>* hhoElem = cellProblem->HHOElement(element);
+			FunctionalBasis<Dim>* cellBasis = hhoElem->ReconstructionBasis;
+			for (auto face : element->Faces)
 			{
-				BigNumber elemGlobalNumber = element->Number;
-				Diff_HHOElement<Dim>* hhoElem = cellProblem->HHOElement(element);
-				FunctionalBasis<Dim>* cellBasis = hhoElem->ReconstructionBasis;
-				for (auto face : element->Faces)
-				{
-					if (face->HasDirichletBC())
-						continue;
+				if (face->HasDirichletBC())
+					continue;
 
-					BigNumber faceGlobalNumber = face->Number;
-					double weight = Weight(element, face);
-					Diff_HHOFace<Dim>* hhoFace = faceProblem->HHOFace(face);
-					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, elemGlobalNumber*nCellUnknowns, weight*hhoFace->Trace(element, cellBasis));
-				}
-			});
+				BigNumber faceGlobalNumber = face->Number;
+				double weight = Weight(element, face);
+				Diff_HHOFace<Dim>* hhoFace = faceProblem->HHOFace(face);
+				coeffs.Local().Add(faceGlobalNumber*nFaceUnknowns, elemGlobalNumber*nCellUnknowns, weight*hhoFace->Trace(element, cellBasis));
+			}
+		}
 
 		SparseMatrix Pi(faceProblem->HHO->nTotalFaceUnknowns, cellProblem->HHO->nElements * nCellUnknowns);
-		parallelLoop.Fill(Pi);
+		coeffs.Fill(Pi);
 
 		return Pi;
 	}
@@ -904,51 +900,50 @@ private:
 		int nCellUnknowns = _useHigherOrderReconstruction ? coarsePb->HHO->nReconstructUnknowns : coarsePb->HHO->nCellUnknowns;
 		int nFaceUnknowns = finePb->HHO->nFaceUnknowns;
 
-		FaceParallelLoop<Dim> parallelLoop(finePb->_mesh->Faces);
-		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nFaceUnknowns);
+		ThreadLocalCoeffs coeffs(finePb->_mesh->Faces.size(), nCellUnknowns * 4 * nFaceUnknowns);
+		#pragma omp parallel for
+		for (Face<Dim>* face : finePb->_mesh->Faces)
+		{
+			if (face->HasDirichletBC())
+				continue;
 
-		parallelLoop.Execute([this, finePb, coarsePb, nCellUnknowns, nFaceUnknowns](Face<Dim>* face, ParallelChunk<CoeffsChunk>* chunk)
+			Diff_HHOFace<Dim>* hhoFace = finePb->HHOFace(face);
+
+			BigNumber faceGlobalNumber = face->Number;
+			if (face->IsDomainBoundary || face->IsRemovedOnCoarserGrid)
 			{
-				if (face->HasDirichletBC())
-					return;
+				Element<Dim>* coarseElem = face->Element1->CoarserElement;
+				BigNumber coarseElemGlobalNumber = coarseElem->Number;
+				Diff_HHOElement<Dim>* hhoCoarseElem = coarsePb->HHOElement(coarseElem);
+				FunctionalBasis<Dim>* cellInterpolationBasis = _useHigherOrderReconstruction ? hhoCoarseElem->ReconstructionBasis : hhoCoarseElem->CellBasis;
 
-				Diff_HHOFace<Dim>* hhoFace = finePb->HHOFace(face);
+				coeffs.Local().Add(faceGlobalNumber*nFaceUnknowns, coarseElemGlobalNumber*nCellUnknowns, hhoFace->Trace(coarseElem, cellInterpolationBasis));
+			}
+			else
+			{
+				Element<Dim>* coarseElem1 = face->Element1->CoarserElement;
+				Element<Dim>* coarseElem2 = face->Element2->CoarserElement;
+				BigNumber coarseElem1GlobalNumber = coarseElem1->Number;
+				BigNumber coarseElem2GlobalNumber = coarseElem2->Number;
+				Diff_HHOElement<Dim>* hhoCoarseElem1 = coarsePb->HHOElement(coarseElem1);
+				Diff_HHOElement<Dim>* hhoCoarseElem2 = coarsePb->HHOElement(coarseElem2);
+				FunctionalBasis<Dim>* cellInterpolationBasis1 = _useHigherOrderReconstruction ? hhoCoarseElem1->ReconstructionBasis : hhoCoarseElem1->CellBasis;
+				FunctionalBasis<Dim>* cellInterpolationBasis2 = _useHigherOrderReconstruction ? hhoCoarseElem2->ReconstructionBasis : hhoCoarseElem2->CellBasis;
 
-				BigNumber faceGlobalNumber = face->Number;
-				if (face->IsDomainBoundary || face->IsRemovedOnCoarserGrid)
-				{
-					Element<Dim>* coarseElem = face->Element1->CoarserElement;
-					BigNumber coarseElemGlobalNumber = coarseElem->Number;
-					Diff_HHOElement<Dim>* hhoCoarseElem = coarsePb->HHOElement(coarseElem);
-					FunctionalBasis<Dim>* cellInterpolationBasis = _useHigherOrderReconstruction ? hhoCoarseElem->ReconstructionBasis : hhoCoarseElem->CellBasis;
+				//double weight1 = Weight(coarseElem1, face->CoarseFace); // Careful with using face->CoarseFace when the mesh isn't nested...
+				double weight1 = Weight(face->Element1, face);
+				coeffs.Local().Add(faceGlobalNumber*nFaceUnknowns, coarseElem1GlobalNumber*nCellUnknowns, weight1*hhoFace->Trace(coarseElem1, cellInterpolationBasis1));
 
-					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, coarseElemGlobalNumber*nCellUnknowns, hhoFace->Trace(coarseElem, cellInterpolationBasis));
-				}
-				else
-				{
-					Element<Dim>* coarseElem1 = face->Element1->CoarserElement;
-					Element<Dim>* coarseElem2 = face->Element2->CoarserElement;
-					BigNumber coarseElem1GlobalNumber = coarseElem1->Number;
-					BigNumber coarseElem2GlobalNumber = coarseElem2->Number;
-					Diff_HHOElement<Dim>* hhoCoarseElem1 = coarsePb->HHOElement(coarseElem1);
-					Diff_HHOElement<Dim>* hhoCoarseElem2 = coarsePb->HHOElement(coarseElem2);
-					FunctionalBasis<Dim>* cellInterpolationBasis1 = _useHigherOrderReconstruction ? hhoCoarseElem1->ReconstructionBasis : hhoCoarseElem1->CellBasis;
-					FunctionalBasis<Dim>* cellInterpolationBasis2 = _useHigherOrderReconstruction ? hhoCoarseElem2->ReconstructionBasis : hhoCoarseElem2->CellBasis;
+				//double weight2 = Weight(coarseElem2, face->CoarseFace);
+				double weight2 = Weight(face->Element2, face);
+				coeffs.Local().Add(faceGlobalNumber*nFaceUnknowns, coarseElem2GlobalNumber*nCellUnknowns, weight2*hhoFace->Trace(coarseElem2, cellInterpolationBasis2));
 
-					//double weight1 = Weight(coarseElem1, face->CoarseFace); // Careful with using face->CoarseFace when the mesh isn't nested...
-					double weight1 = Weight(face->Element1, face);
-					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, coarseElem1GlobalNumber*nCellUnknowns, weight1*hhoFace->Trace(coarseElem1, cellInterpolationBasis1));
-
-					//double weight2 = Weight(coarseElem2, face->CoarseFace);
-					double weight2 = Weight(face->Element2, face);
-					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, coarseElem2GlobalNumber*nCellUnknowns, weight2*hhoFace->Trace(coarseElem2, cellInterpolationBasis2));
-
-					assert(abs(weight1 + weight2 - 1) < Utils::NumericalZero);
-				}
-			});
+				assert(abs(weight1 + weight2 - 1) < Utils::NumericalZero);
+			}
+		}
 
 		SparseMatrix Pi(finePb->HHO->nTotalFaceUnknowns, coarsePb->HHO->nElements * nCellUnknowns);
-		parallelLoop.Fill(Pi);
+		coeffs.Fill(Pi);
 
 		return Pi;
 	}
@@ -973,30 +968,29 @@ private:
 		int nFaceUnknowns = problem->HHO->nFaceUnknowns;
 		int nCellUnknowns = problem->HHO->nReconstructUnknowns;
 
-		ElementParallelLoop<Dim> parallelLoop(problem->_mesh->Elements);
-		parallelLoop.ReserveChunkCoeffsSize(nCellUnknowns * 4 * nFaceUnknowns);
+		ThreadLocalCoeffs coeffs(problem->_mesh->Elements.size(), nCellUnknowns * 4 * nFaceUnknowns);
+		#pragma omp parallel for
+		for (Element<Dim>* element : problem->_mesh->Elements)
+		{
+			Diff_HHOElement<Dim>* hhoElement = problem->HHOElement(element);
+			DenseMatrix findFacesMatrix = FindFacesPolyWhichReconstructOnTheCell(hhoElement);
 
-		parallelLoop.Execute([this, problem, nCellUnknowns, nFaceUnknowns](Element<Dim>* element, ParallelChunk<CoeffsChunk>* chunk)
+			for (auto face : element->Faces)
 			{
-				Diff_HHOElement<Dim>* hhoElement = problem->HHOElement(element);
-				DenseMatrix findFacesMatrix = FindFacesPolyWhichReconstructOnTheCell(hhoElement);
+				if (face->HasDirichletBC())
+					continue;
 
-				for (auto face : element->Faces)
-				{
-					if (face->HasDirichletBC())
-						continue;
+				BigNumber elemGlobalNumber = element->Number;
+				BigNumber faceGlobalNumber = face->Number;
+				BigNumber faceLocalNumber = element->LocalNumberOf(face);
 
-					BigNumber elemGlobalNumber = element->Number;
-					BigNumber faceGlobalNumber = face->Number;
-					BigNumber faceLocalNumber = element->LocalNumberOf(face);
-
-					double weight = Weight(element, face);
-					chunk->Results.Coeffs.Add(faceGlobalNumber*nFaceUnknowns, elemGlobalNumber*nCellUnknowns, weight*findFacesMatrix.block(faceLocalNumber*nFaceUnknowns, 0, nFaceUnknowns, nCellUnknowns));
-				}
-			});
+				double weight = Weight(element, face);
+				coeffs.Local().Add(faceGlobalNumber*nFaceUnknowns, elemGlobalNumber*nCellUnknowns, weight*findFacesMatrix.block(faceLocalNumber*nFaceUnknowns, 0, nFaceUnknowns, nCellUnknowns));
+			}
+		}
 
 		SparseMatrix M(problem->HHO->nTotalFaceUnknowns, problem->HHO->nElements * nCellUnknowns);
-		parallelLoop.Fill(M);
+		coeffs.Fill(M);
 
 		return M;
 	}
@@ -1054,24 +1048,23 @@ private:
 		int nCoarseUnknowns = _useHigherOrderReconstruction ? coarsePb->HHO->nReconstructUnknowns : coarsePb->HHO->nCellUnknowns;
 		int nFineUnknowns = _useHigherOrderReconstruction ? finePb->HHO->nReconstructUnknowns : finePb->HHO->nCellUnknowns;
 
-		ElementParallelLoop<Dim> parallelLoop(coarseMesh->Elements);
-		parallelLoop.ReserveChunkCoeffsSize(nCoarseUnknowns * 4 * nFineUnknowns);
-
-		parallelLoop.Execute([this, coarsePb, finePb, nCoarseUnknowns, nFineUnknowns](Element<Dim>* coarseElement, ParallelChunk<CoeffsChunk>* chunk)
+		ThreadLocalCoeffs coeffs(coarseMesh->Elements.size(), nCoarseUnknowns * 4 * nFineUnknowns);
+		#pragma omp parallel for
+		for (Element<Dim>* coarseElement : coarseMesh->Elements)
+		{
+			DenseMatrix local_J_f_c = ComputeCanonicalInjectionMatrixCoarseToFine(coarseElement, coarsePb, finePb);
+			for (auto fineElement : coarseElement->FinerElements)
 			{
-				DenseMatrix local_J_f_c = ComputeCanonicalInjectionMatrixCoarseToFine(coarseElement, coarsePb, finePb);
-				for (auto fineElement : coarseElement->FinerElements)
-				{
-					BigNumber coarseElemGlobalNumber = coarseElement->Number;
-					BigNumber fineElemGlobalNumber = fineElement->Number;
-					BigNumber fineElemLocalNumber = coarseElement->LocalNumberOf(fineElement);
+				BigNumber coarseElemGlobalNumber = coarseElement->Number;
+				BigNumber fineElemGlobalNumber = fineElement->Number;
+				BigNumber fineElemLocalNumber = coarseElement->LocalNumberOf(fineElement);
 
-					chunk->Results.Coeffs.Add(fineElemGlobalNumber*nFineUnknowns, coarseElemGlobalNumber*nCoarseUnknowns, local_J_f_c.block(fineElemLocalNumber*nFineUnknowns, 0, nFineUnknowns, nCoarseUnknowns));
-				}
-			});
+				coeffs.Local().Add(fineElemGlobalNumber*nFineUnknowns, coarseElemGlobalNumber*nCoarseUnknowns, local_J_f_c.block(fineElemLocalNumber*nFineUnknowns, 0, nFineUnknowns, nCoarseUnknowns));
+			}
+		}
 
 		SparseMatrix J_f_c(finePb->HHO->nElements * nFineUnknowns, coarsePb->HHO->nElements * nCoarseUnknowns);
-		parallelLoop.Fill(J_f_c);
+		coeffs.Fill(J_f_c);
 		return J_f_c;
 	}
 
@@ -1131,25 +1124,24 @@ private:
 		int nCoarseUnknowns = _useHigherOrderReconstruction ? coarsePb->HHO->nReconstructUnknowns : coarsePb->HHO->nCellUnknowns;
 		int nFineUnknowns = _useHigherOrderReconstruction ? finePb->HHO->nReconstructUnknowns : finePb->HHO->nCellUnknowns;
 
-		ElementParallelLoop<Dim> parallelLoop(coarseMesh->Elements);
-		parallelLoop.ReserveChunkCoeffsSize(nCoarseUnknowns * 6 * nFineUnknowns);
-
-		parallelLoop.Execute([this, coarsePb, finePb, nCoarseUnknowns, nFineUnknowns](Element<Dim>* coarseElement, ParallelChunk<CoeffsChunk>* chunk)
+		ThreadLocalCoeffs coeffs(coarseMesh->Elements.size(), nCoarseUnknowns * 6 * nFineUnknowns);
+		#pragma omp parallel for
+		for (Element<Dim>* coarseElement : coarseMesh->Elements)
+		{
+			DenseMatrix localL2Proj = ComputeL2ProjectionMatrixCoarseToFine(coarseElement, coarsePb, finePb);
+			for (auto it = coarseElement->OverlappingFineElements.begin(); it != coarseElement->OverlappingFineElements.end(); it++)
 			{
-				DenseMatrix localL2Proj = ComputeL2ProjectionMatrixCoarseToFine(coarseElement, coarsePb, finePb);
-				for (auto it = coarseElement->OverlappingFineElements.begin(); it != coarseElement->OverlappingFineElements.end(); it++)
-				{
-					Element<Dim>* fineElement = it->first;
-					BigNumber coarseElemGlobalNumber = coarseElement->Number;
-					BigNumber fineElemGlobalNumber = fineElement->Number;
-					BigNumber fineElemLocalNumber = coarseElement->LocalNumberOfOverlapping(fineElement);
+				Element<Dim>* fineElement = it->first;
+				BigNumber coarseElemGlobalNumber = coarseElement->Number;
+				BigNumber fineElemGlobalNumber = fineElement->Number;
+				BigNumber fineElemLocalNumber = coarseElement->LocalNumberOfOverlapping(fineElement);
 
-					chunk->Results.Coeffs.Add(fineElemGlobalNumber*nFineUnknowns, coarseElemGlobalNumber*nCoarseUnknowns, localL2Proj.block(fineElemLocalNumber*nFineUnknowns, 0, nFineUnknowns, nCoarseUnknowns));
-				}
-			});
+				coeffs.Local().Add(fineElemGlobalNumber*nFineUnknowns, coarseElemGlobalNumber*nCoarseUnknowns, localL2Proj.block(fineElemLocalNumber*nFineUnknowns, 0, nFineUnknowns, nCoarseUnknowns));
+			}
+		}
 
 		SparseMatrix L2Proj(finePb->HHO->nElements * nFineUnknowns, coarsePb->HHO->nElements * nCoarseUnknowns);
-		parallelLoop.Fill(L2Proj);
+		coeffs.Fill(L2Proj);
 		return L2Proj;
 	}
 
@@ -1240,27 +1232,26 @@ private:
 
 		int nFaceUnknowns = finePb->HHO->FaceBasis->Size();
 
-		FaceParallelLoop<Dim> parallelLoop(coarseMesh->Faces);
-		parallelLoop.ReserveChunkCoeffsSize(nFaceUnknowns * 2 * nFaceUnknowns);
+		ThreadLocalCoeffs coeffs(coarseMesh->Faces.size(), nFaceUnknowns * 2 * nFaceUnknowns);
+		#pragma omp parallel for
+		for (Face<Dim>* coarseFace : coarseMesh->Faces)
+		{
+			if (coarseFace->HasDirichletBC())
+				continue;
 
-		parallelLoop.Execute([this, nFaceUnknowns, coarsePb, finePb](Face<Dim>* coarseFace, ParallelChunk<CoeffsChunk>* chunk)
+			DenseMatrix local_J_f_c = this->ComputeCanonicalInjectionMatrixCoarseToFine(coarseFace, coarsePb, finePb);
+			for (auto fineFace : coarseFace->FinerFaces)
 			{
-				if (coarseFace->HasDirichletBC())
-					return;
+				BigNumber coarseFaceGlobalNumber = coarseFace->Number;
+				BigNumber fineFaceGlobalNumber = fineFace->Number;
+				BigNumber fineFaceLocalNumber = coarseFace->LocalNumberOf(fineFace);
 
-				DenseMatrix local_J_f_c = this->ComputeCanonicalInjectionMatrixCoarseToFine(coarseFace, coarsePb, finePb);
-				for (auto fineFace : coarseFace->FinerFaces)
-				{
-					BigNumber coarseFaceGlobalNumber = coarseFace->Number;
-					BigNumber fineFaceGlobalNumber = fineFace->Number;
-					BigNumber fineFaceLocalNumber = coarseFace->LocalNumberOf(fineFace);
-
-					chunk->Results.Coeffs.Add(fineFaceGlobalNumber*nFaceUnknowns, coarseFaceGlobalNumber*nFaceUnknowns, local_J_f_c.block(fineFaceLocalNumber*nFaceUnknowns, 0, nFaceUnknowns, nFaceUnknowns));
-				}
-			});
+				coeffs.Local().Add(fineFaceGlobalNumber*nFaceUnknowns, coarseFaceGlobalNumber*nFaceUnknowns, local_J_f_c.block(fineFaceLocalNumber*nFaceUnknowns, 0, nFaceUnknowns, nFaceUnknowns));
+			}
+		}
 
 		SparseMatrix J_f_c(finePb->HHO->nInteriorAndNeumannFaces * nFaceUnknowns, coarsePb->HHO->nInteriorAndNeumannFaces * nFaceUnknowns);
-		parallelLoop.Fill(J_f_c);
+		coeffs.Fill(J_f_c);
 		return J_f_c;
 	}
 

@@ -100,8 +100,8 @@ namespace fhhos4_tests
 	class SequentialExecution
 	{
 	public:
-		SequentialExecution() { BaseParallelLoop::SetDefaultNThreads(1); }
-		~SequentialExecution() { BaseParallelLoop::SetDefaultNThreads(0); } // 0: back to the automatic default
+		SequentialExecution() { Parallelism::SetNThreads(1); }
+		~SequentialExecution() { Parallelism::SetNThreads(0); } // 0: back to the automatic default
 	};
 
 	// Least-squares slope of log(errors) vs. log(h): the empirical convergence order.

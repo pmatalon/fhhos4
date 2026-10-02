@@ -466,14 +466,6 @@ private:
 			for (int elemType : entityElementTypes)
 				meshElementTypes.insert(elemType);
 
-			struct ChunkResult
-			{
-				vector<Element<Dim>*> Elements;
-				double h = -1;
-				double regularity = 2;
-				double sum_h = 0;
-			};
-
 			for (size_t i = 0; i < entityElementTypes.size(); i++)
 			{
 				int elemType = entityElementTypes[i];
@@ -487,42 +479,44 @@ private:
 					elementsAlreadyInMemory.insert({ elemType, 0 });
 				size_t nElementsAlreadyInMemory = elementsAlreadyInMemory[elemType];
 
-				NumberParallelLoop<ChunkResult> parallelLoop(elements.size());
-				parallelLoop.Execute([this, elemType, nElementsAlreadyInMemory, &elements, &elementNodes, &physicalPart](BigNumber j, ParallelChunk<ChunkResult>* chunk)
+				vector<Element<Dim>*> createdElements(elements.size());
+				double h = -1;
+				double regularity = 2;
+				double sum_h = 0;
+
+				#pragma omp parallel for reduction(max:h) reduction(min:regularity) reduction(+:sum_h)
+				for (BigNumber j = 0; j < elements.size(); ++j)
+				{
+					size_t elementTag = elements[j];
+					Element<Dim>* e = CreateElement(elemType, elementNodes, nElementsAlreadyInMemory, j);
+
+					e->Id = elementTag;
+					e->PhysicalPart = physicalPart;
+
+					for (Vertex* v : e->Vertices())
 					{
-						size_t elementTag = elements[j];
-						Element<Dim>* e = CreateElement(elemType, elementNodes, nElementsAlreadyInMemory, j);
+						MeshVertex<Dim>* mv = (MeshVertex<Dim>*)v;
+						mv->Mutex.lock();
+						mv->Elements.push_back(e);
+						mv->Mutex.unlock();
+					}
 
-						e->Id = elementTag;
-						e->PhysicalPart = physicalPart;
+					createdElements[j] = e;
 
-						for (Vertex* v : e->Vertices())
-						{
-							MeshVertex<Dim>* mv = (MeshVertex<Dim>*)v;
-							mv->Mutex.lock();
-							mv->Elements.push_back(e);
-							mv->Mutex.unlock();
-						}
+					h          = max(h,          e->Diameter());
+					regularity = min(regularity, e->Regularity());
+					sum_h     += e->Diameter();
+				}
 
-						chunk->Results.Elements.push_back(e);
+				for (Element<Dim>* e : createdElements)
+				{
+					this->AddElement(e, false);
+					_elementExternalNumbers.insert({ e->Id, e });
+				}
 
-						chunk->Results.h          = max(chunk->Results.h,          e->Diameter());
-						chunk->Results.regularity = min(chunk->Results.regularity, e->Regularity());
-						chunk->Results.sum_h     += e->Diameter();
-					});
-
-				parallelLoop.AggregateChunkResults([this](ChunkResult& chunk)
-					{
-						for (Element<Dim>* e : chunk.Elements)
-						{
-							this->AddElement(e, false);
-							_elementExternalNumbers.insert({ e->Id, e });
-						}
-
-						_h          = max(_h,          chunk.h);
-						_regularity = min(_regularity, chunk.regularity);
-						_average_h += chunk.sum_h;
-					});
+				_h          = max(_h,          h);
+				_regularity = min(_regularity, regularity);
+				_average_h += sum_h;
 
 				elementsAlreadyInMemory[elemType] += elements.size();
 			}

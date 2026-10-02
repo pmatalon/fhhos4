@@ -119,67 +119,21 @@ private:
 		else // Hybrid
 		{
 			if (_direction == Direction::Forward)
-			{
-				NumberParallelLoop<EmptyResultChunk> parallelLoop(nb);
-				parallelLoop.ExecuteChunk([this, &b, &x](ParallelChunk<EmptyResultChunk>* chunk)
-					{
-						Vector tmp_x(_blockSize), tmp_xi(_blockSize);
-						for (BigNumber i = chunk->Start; i < chunk->End; i++)
-							ProcessBlockRow(i, b, x, tmp_x, tmp_xi);
-					});
-			}
+				HybridSweep(b, x, false);
 			else if (_direction == Direction::Backward)
-			{
-				NumberParallelLoop<EmptyResultChunk> parallelLoop(nb);
-				parallelLoop.ExecuteChunk([this, &b, &x, &nb](ParallelChunk<EmptyResultChunk>* chunk)
-					{
-						Vector tmp_x(_blockSize), tmp_xi(_blockSize);
-						for (BigNumber i = chunk->Start; i < chunk->End; i++)
-							ProcessBlockRow(nb - i - 1, b, x, tmp_x, tmp_xi);
-					});
-			}
+				HybridSweep(b, x, true);
 			else if (_direction == Direction::Symmetric)
 			{
-				// Forward
-				NumberParallelLoop<EmptyResultChunk> parallelLoop(nb);
-				parallelLoop.ExecuteChunk([this, &b, &x](ParallelChunk<EmptyResultChunk>* chunk)
-					{
-						Vector tmp_x(_blockSize), tmp_xi(_blockSize);
-						for (BigNumber i = chunk->Start; i < chunk->End; i++)
-							ProcessBlockRow(i, b, x, tmp_x, tmp_xi);
-					});
-				// Backward
-				parallelLoop.ExecuteChunk([this, &b, &x, &nb](ParallelChunk<EmptyResultChunk>* chunk)
-					{
-						Vector tmp_x(_blockSize), tmp_xi(_blockSize);
-						for (BigNumber i = chunk->Start; i < chunk->End; i++)
-							ProcessBlockRow(nb - i - 1, b, x, tmp_x, tmp_xi);
-					});
+				HybridSweep(b, x, false); // Forward
+				HybridSweep(b, x, true);  // Backward
 			}
 			else if (_direction == Direction::AlternatingForwardFirst || _direction == Direction::AlternatingBackwardFirst)
 			{
-				NumberParallelLoop<EmptyResultChunk> parallelLoop(nb);
 				int modulo = _direction == Direction::AlternatingForwardFirst ? 0 : 1;
 				if (this->IterationCount % 2 == modulo)
-				{
-					// Forward
-					parallelLoop.ExecuteChunk([this, &b, &x](ParallelChunk<EmptyResultChunk>* chunk)
-						{
-							Vector tmp_x(_blockSize), tmp_xi(_blockSize);
-							for (BigNumber i = chunk->Start; i < chunk->End; i++)
-								ProcessBlockRow(i, b, x, tmp_x, tmp_xi);
-						});
-				}
+					HybridSweep(b, x, false); // Forward
 				else
-				{
-					// Backward
-					parallelLoop.ExecuteChunk([this, &b, &x, &nb](ParallelChunk<EmptyResultChunk>* chunk)
-					{
-						Vector tmp_x(_blockSize), tmp_xi(_blockSize);
-						for (BigNumber i = chunk->Start; i < chunk->End; i++)
-							ProcessBlockRow(nb - i - 1, b, x, tmp_x, tmp_xi);
-					});
-				}
+					HybridSweep(b, x, true);  // Backward
 			}
 			else
 				Utils::FatalError("direction not managed");
@@ -189,6 +143,20 @@ private:
 		double sweepWork = 2 * A.nonZeros() + nb * pow(_blockSize, 2);
 		result.AddWorkInFlops(_direction == Direction::Symmetric ? 2*sweepWork : sweepWork);
 		return result;
+	}
+
+	// Each thread runs a Gauss-Seidel sweep on its own contiguous chunk of block rows.
+	// The result depends on the chunks: schedule(static) makes them depend only on the number of threads.
+	void HybridSweep(const Vector& b, Vector& x, bool backward)
+	{
+		BigNumber nb = this->Matrix->rows() / _blockSize;
+		#pragma omp parallel
+		{
+			Vector tmp_x(_blockSize), tmp_xi(_blockSize); // work vectors, allocated once per thread
+			#pragma omp for schedule(static)
+			for (BigNumber i = 0; i < nb; i++)
+				ProcessBlockRow(backward ? nb - i - 1 : i, b, x, tmp_x, tmp_xi);
+		}
 	}
 
 	void ProcessBlockRow(BigNumber currentBlockRow, const Vector& b, Vector& x, Vector& tmp_x, Vector& tmp_xi)

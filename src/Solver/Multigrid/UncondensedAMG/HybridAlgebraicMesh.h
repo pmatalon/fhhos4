@@ -148,27 +148,27 @@ public:
 		// Filling elements' faces //
 		//-------------------------//
 
-		NumberParallelLoop<EmptyResultChunk> parallelLoopElem(Elements.size());
-		parallelLoopElem.Execute([this, &A_T_F](BigNumber elemNumber, ParallelChunk<EmptyResultChunk>* chunk)
+		#pragma omp parallel for
+		for (BigNumber elemNumber = 0; elemNumber < Elements.size(); ++elemNumber)
+		{
+			HybridAlgebraicElement& elem = Elements[elemNumber];
+			elem.Number = elemNumber;
+
+			for (int k = 0; k < _cellBlockSize; k++)
 			{
-				HybridAlgebraicElement& elem = Elements[elemNumber];
-				elem.Number = elemNumber;
-
-				for (int k = 0; k < _cellBlockSize; k++)
+				// RowMajor --> the following line iterates over the non-zeros of the elemNumber-th row.
+				for (SparseMatrix::InnerIterator it(A_T_F, elemNumber*_cellBlockSize + k); it; ++it)
 				{
-					// RowMajor --> the following line iterates over the non-zeros of the elemNumber-th row.
-					for (SparseMatrix::InnerIterator it(A_T_F, elemNumber*_cellBlockSize + k); it; ++it)
-					{
-						BigNumber faceNumber = it.col() / _faceBlockSize;
-						HybridAlgebraicFace* face = &Faces[faceNumber];
-						if (find(elem.Faces.begin(), elem.Faces.end(), face) == elem.Faces.end())
-							elem.Faces.push_back(face);
-					}
+					BigNumber faceNumber = it.col() / _faceBlockSize;
+					HybridAlgebraicFace* face = &Faces[faceNumber];
+					if (find(elem.Faces.begin(), elem.Faces.end(), face) == elem.Faces.end())
+						elem.Faces.push_back(face);
 				}
+			}
 
-				if (elem.Faces.empty())
-					Utils::Error("Element " + to_string(elemNumber) + " has no face (no non-zero coefficient in row " + to_string(elemNumber) + " of A_TF)");
-			});
+			if (elem.Faces.empty())
+				Utils::Error("Element " + to_string(elemNumber) + " has no face (no non-zero coefficient in row " + to_string(elemNumber) + " of A_TF)");
+		}
 
 		//-------------------------//
 		// Filling faces' elements //
@@ -176,64 +176,64 @@ public:
 
 		ColMajorSparseMatrix A_T_F_ColMajor = A_T_F;
 
-		NumberParallelLoop<EmptyResultChunk> parallelLoopFace(Faces.size());
-		parallelLoopFace.Execute([this, &A_T_F_ColMajor](BigNumber faceNumber)
-			{
-				HybridAlgebraicFace& face = Faces[faceNumber];
-				face.Number = faceNumber;
+		#pragma omp parallel for
+		for (BigNumber faceNumber = 0; faceNumber < Faces.size(); ++faceNumber)
+		{
+			HybridAlgebraicFace& face = Faces[faceNumber];
+			face.Number = faceNumber;
 
-				// ColMajor --> the following line iterates over the non-zeros of the faceNumber-th col.
-				for (ColMajorSparseMatrix::InnerIterator it(A_T_F_ColMajor, faceNumber*_faceBlockSize); it; ++it)
-				{
-					assert(it.col() / _faceBlockSize == faceNumber);
-					BigNumber elemNumber = it.row() / _cellBlockSize;
-					HybridAlgebraicElement* elem = &Elements[elemNumber];
-					if (find(face.Elements.begin(), face.Elements.end(), elem) == face.Elements.end())
-						face.Elements.push_back(elem);
-				}
-			});
+			// ColMajor --> the following line iterates over the non-zeros of the faceNumber-th col.
+			for (ColMajorSparseMatrix::InnerIterator it(A_T_F_ColMajor, faceNumber*_faceBlockSize); it; ++it)
+			{
+				assert(it.col() / _faceBlockSize == faceNumber);
+				BigNumber elemNumber = it.row() / _cellBlockSize;
+				HybridAlgebraicElement* elem = &Elements[elemNumber];
+				if (find(face.Elements.begin(), face.Elements.end(), elem) == face.Elements.end())
+					face.Elements.push_back(elem);
+			}
+		}
 
 		//--------------------//
 		// Element neighbours //
 		//--------------------//
 
-		NumberParallelLoop<EmptyResultChunk> parallelLoopNeighbours(Elements.size());
-		parallelLoopNeighbours.Execute([this](BigNumber elemNumber)
+		#pragma omp parallel for
+		for (BigNumber elemNumber = 0; elemNumber < Elements.size(); ++elemNumber)
+		{
+			HybridAlgebraicElement& elem = Elements[elemNumber];
+			for (HybridAlgebraicFace* face : elem.Faces)
 			{
-				HybridAlgebraicElement& elem = Elements[elemNumber];
-				for (HybridAlgebraicFace* face : elem.Faces)
+				for (HybridAlgebraicElement* neighbour : face->Elements)
 				{
-					for (HybridAlgebraicElement* neighbour : face->Elements)
+					if (neighbour->Number != elem.Number)
 					{
-						if (neighbour->Number != elem.Number)
-						{
-							double coupling = this->CouplingValue(elem, *neighbour, *face);
-							elem.Neighbours.push_back({ neighbour, coupling });
-						}
+						double coupling = this->CouplingValue(elem, *neighbour, *face);
+						elem.Neighbours.push_back({ neighbour, coupling });
 					}
 				}
+			}
 
-				sort(elem.Neighbours.begin(), elem.Neighbours.end(),
-					[](const pair<HybridAlgebraicElement*, double>& n1, const pair<HybridAlgebraicElement*, double>& n2)
-					{
-						return n1.second < n2.second; // Sort by ascending coupling
-					});
-
-				for (auto it = elem.Neighbours.begin(); it != elem.Neighbours.end(); ++it)
+			sort(elem.Neighbours.begin(), elem.Neighbours.end(),
+				[](const pair<HybridAlgebraicElement*, double>& n1, const pair<HybridAlgebraicElement*, double>& n2)
 				{
-					HybridAlgebraicElement* neighbour = it->first;
-					double coupling = it->second;
-					if (IsStronglyCoupled(elem, coupling))
-					{
-						elem.StrongNeighbours.push_back(neighbour);
-						neighbour->Mutex.lock();
-						neighbour->NElementsIAmStrongNeighbourOf++;
-						neighbour->Mutex.unlock();
-					}
-					else
-						break;
+					return n1.second < n2.second; // Sort by ascending coupling
+				});
+
+			for (auto it = elem.Neighbours.begin(); it != elem.Neighbours.end(); ++it)
+			{
+				HybridAlgebraicElement* neighbour = it->first;
+				double coupling = it->second;
+				if (IsStronglyCoupled(elem, coupling))
+				{
+					elem.StrongNeighbours.push_back(neighbour);
+					neighbour->Mutex.lock();
+					neighbour->NElementsIAmStrongNeighbourOf++;
+					neighbour->Mutex.unlock();
 				}
-			});
+				else
+					break;
+			}
+		}
 	}
 
 	void Coarsen(H_CoarsStgy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, bool& coarsestPossibleMeshReached)
@@ -260,61 +260,61 @@ public:
 		
 		// Removal of faces shared by elements in the same aggregate.
 		// Determination of the faces of the aggregates.
-		NumberParallelLoop<EmptyResultChunk> parallelLoopCE(CoarseElements.size());
-		parallelLoopCE.Execute([this](BigNumber coarseElemNumber)
+		#pragma omp parallel for
+		for (BigNumber coarseElemNumber = 0; coarseElemNumber < CoarseElements.size(); ++coarseElemNumber)
+		{
+			HybridElementAggregate& coarseElem = CoarseElements[coarseElemNumber];
+			for (int i = 0; i < coarseElem.FineElements.size(); i++)
 			{
-				HybridElementAggregate& coarseElem = CoarseElements[coarseElemNumber];
-				for (int i = 0; i < coarseElem.FineElements.size(); i++)
+				HybridAlgebraicElement* elem1 = coarseElem.FineElements[i];
+				for (HybridAlgebraicFace* face : elem1->Faces)
 				{
-					HybridAlgebraicElement* elem1 = coarseElem.FineElements[i];
-					for (HybridAlgebraicFace* face : elem1->Faces)
+					for (int j = i + 1; j < coarseElem.FineElements.size(); j++)
 					{
-						for (int j = i + 1; j < coarseElem.FineElements.size(); j++)
+						HybridAlgebraicElement* elem2 = coarseElem.FineElements[j];
+						if (find(elem2->Faces.begin(), elem2->Faces.end(), face) != elem2->Faces.end())
 						{
-							HybridAlgebraicElement* elem2 = coarseElem.FineElements[j];
-							if (find(elem2->Faces.begin(), elem2->Faces.end(), face) != elem2->Faces.end())
-							{
-								// This face is shared by elem1 and elem2, so we remove it on the coarse grid
-								face->IsRemovedOnCoarseMesh = true;
-								coarseElem.RemovedFineFaces.push_back(face);
-								face->CoarseElements.push_back(&coarseElem);
-								break;
-							}
-						}
-
-						if (!face->IsRemovedOnCoarseMesh)
-						{
-							// If it is not an inner face, then it's a face of the aggregate
-							face->Mutex.lock();
+							// This face is shared by elem1 and elem2, so we remove it on the coarse grid
+							face->IsRemovedOnCoarseMesh = true;
+							coarseElem.RemovedFineFaces.push_back(face);
 							face->CoarseElements.push_back(&coarseElem);
-							face->Mutex.unlock();
-							coarseElem.FineFaces.push_back(face);
+							break;
 						}
 					}
+
+					if (!face->IsRemovedOnCoarseMesh)
+					{
+						// If it is not an inner face, then it's a face of the aggregate
+						face->Mutex.lock();
+						face->CoarseElements.push_back(&coarseElem);
+						face->Mutex.unlock();
+						coarseElem.FineFaces.push_back(face);
+					}
 				}
-			});
+			}
+		}
 
 		// Computation of the aggregates' neighbours
-		NumberParallelLoop<EmptyResultChunk> parallelLoopCENeighbours(CoarseElements.size());
-		parallelLoopCENeighbours.Execute([this](BigNumber coarseElemNumber)
+		#pragma omp parallel for
+		for (BigNumber coarseElemNumber = 0; coarseElemNumber < CoarseElements.size(); ++coarseElemNumber)
+		{
+			HybridElementAggregate* coarseElem = &CoarseElements[coarseElemNumber];
+			set<HybridElementAggregate*> neighbours;
+			for (HybridAlgebraicFace* face : coarseElem->FineFaces)
 			{
-				HybridElementAggregate* coarseElem = &CoarseElements[coarseElemNumber];
-				set<HybridElementAggregate*> neighbours;
-				for (HybridAlgebraicFace* face : coarseElem->FineFaces)
+				for (HybridElementAggregate* neighbour : face->CoarseElements)
 				{
-					for (HybridElementAggregate* neighbour : face->CoarseElements)
+					if (neighbour != coarseElem)
 					{
-						if (neighbour != coarseElem)
-						{
-							auto it = coarseElem->Neighbours.find(neighbour);
-							if (it == coarseElem->Neighbours.end())
-								coarseElem->Neighbours.insert({ neighbour, {face} });
-							else
-								it->second.push_back(face);
-						}
+						auto it = coarseElem->Neighbours.find(neighbour);
+						if (it == coarseElem->Neighbours.end())
+							coarseElem->Neighbours.insert({ neighbour, {face} });
+						else
+							it->second.push_back(face);
 					}
 				}
-			});
+			}
+		}
 
 		// Face aggregation by collapsing multiple interfaces
 		this->CoarseFaces.reserve(Faces.size()); // must reserve sufficient space
@@ -381,20 +381,20 @@ public:
 	SparseMatrix Theta()
 	{
 		BigNumber nBlocks = A_T_T->rows() / _cellBlockSize;
-		NumberParallelLoop<> parallelLoop(nBlocks);
-		parallelLoop.ReserveChunkCoeffsSize(_cellBlockSize * _faceBlockSize * 4);
-		parallelLoop.Execute([this](BigNumber i, ParallelChunk<CoeffsChunk>* chunk)
+		ThreadLocalCoeffs coeffs(nBlocks, _cellBlockSize * _faceBlockSize * 4);
+		#pragma omp parallel for
+		for (BigNumber i = 0; i < nBlocks; ++i)
+		{
+			DenseMatrix blockA_T_T = A_T_T->block(i * _cellBlockSize, i * _cellBlockSize, _cellBlockSize, _cellBlockSize);
+			auto solverA_T_T = blockA_T_T.llt();
+			for (HybridAlgebraicFace* f : this->Elements[i].Faces)
 			{
-				DenseMatrix blockA_T_T = A_T_T->block(i * _cellBlockSize, i * _cellBlockSize, _cellBlockSize, _cellBlockSize);
-				auto solverA_T_T = blockA_T_T.llt();
-				for (HybridAlgebraicFace* f : this->Elements[i].Faces)
-				{
-					DenseMatrix blockA_T_F = A_T_F->block(i * _cellBlockSize, f->Number * _faceBlockSize, _cellBlockSize, _faceBlockSize);
-					chunk->Results.Coeffs.Add(i * _cellBlockSize, f->Number * _faceBlockSize, -solverA_T_T.solve(blockA_T_F));
-				}
-			});
+				DenseMatrix blockA_T_F = A_T_F->block(i * _cellBlockSize, f->Number * _faceBlockSize, _cellBlockSize, _faceBlockSize);
+				coeffs.Local().Add(i * _cellBlockSize, f->Number * _faceBlockSize, -solverA_T_T.solve(blockA_T_F));
+			}
+		}
 		SparseMatrix theta(A_T_F->rows(), A_T_F->cols());
-		parallelLoop.Fill(theta);
+		coeffs.Fill(theta);
 		return theta;
 	}
 

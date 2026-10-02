@@ -4,7 +4,7 @@
 #include "../../TestCases/Diffusion/DiffusionTestCase.h"
 #include "../../Geometry/CartesianShape.h"
 #include "../../Geometry/2D/Triangle.h"
-#include "../../Utils/ParallelLoop.h"
+#include "../../Utils/Parallelism.h"
 #include "../../Utils/ExportModule.h"
 #include "Diff_DGElement.h"
 #include "Diff_DGFace.h"
@@ -54,29 +54,16 @@ public:
 
 	double L2Error(DomFunction exactSolution)
 	{
-		struct ChunkResult
-		{
-			double absoluteError = 0;
-			double normExactSolution = 0;
-		};
-
-		ParallelLoop<Element<Dim>*, ChunkResult> parallelLoop(_mesh->Elements);
-		parallelLoop.Execute([this, exactSolution](Element<Dim>* element, ParallelChunk<ChunkResult>* chunk)
-			{
-				auto approximate = Basis->GetApproximateFunction(SystemSolution, element->Number * Basis->Size());
-				chunk->Results.absoluteError += element->L2ErrorPow2(approximate, exactSolution);
-				chunk->Results.normExactSolution += element->Integral([exactSolution](const DomPoint& p) { return pow(exactSolution(p), 2); });
-			});
-
-
 		double absoluteError = 0;
 		double normExactSolution = 0;
 
-		parallelLoop.AggregateChunkResults([&absoluteError, &normExactSolution](ChunkResult chunkResult)
-			{
-				absoluteError += chunkResult.absoluteError;
-				normExactSolution += chunkResult.normExactSolution;
-			});
+		#pragma omp parallel for reduction(+:absoluteError, normExactSolution)
+		for (Element<Dim>* element : _mesh->Elements)
+		{
+			auto approximate = Basis->GetApproximateFunction(SystemSolution, element->Number * Basis->Size());
+			absoluteError += element->L2ErrorPow2(approximate, exactSolution);
+			normExactSolution += element->Integral([exactSolution](const DomPoint& p) { return pow(exactSolution(p), 2); });
+		}
 
 		absoluteError = sqrt(absoluteError);
 		normExactSolution = sqrt(normExactSolution);
@@ -111,184 +98,106 @@ public:
 		// Iteration on the elements: diagonal blocks //
 		//--------------------------------------------//
 
-		ParallelLoop<Element<Dim>*, EmptyResultChunk> parallelLoop(mesh->Elements);
+		BigNumber nnzPerElement = basis->Size() * (2 * Dim + 1);
+		BigNumber nnzPerElementForExport = actions.Export.AssemblyTermMatrices ? nnzPerElement : 0;
+		ThreadLocalCoeffs matrixCoeffs(mesh->Elements.size(), nnzPerElement);
+		ThreadLocalCoeffs massMatrixCoeffs(mesh->Elements.size(), nnzPerElementForExport);
+		ThreadLocalCoeffs volumicCoeffs(mesh->Elements.size(), nnzPerElementForExport);
+		ThreadLocalCoeffs couplingCoeffs(mesh->Elements.size(), nnzPerElementForExport);
+		ThreadLocalCoeffs penCoeffs(mesh->Elements.size(), nnzPerElementForExport);
 
-		vector<NonZeroCoefficients> chunksMatrixCoeffs(parallelLoop.NThreads);
-		vector<NonZeroCoefficients> chunksMassMatrixCoeffs(parallelLoop.NThreads);
-		vector<NonZeroCoefficients> chunksVolumicCoeffs(parallelLoop.NThreads);
-		vector<NonZeroCoefficients> chunksCouplingCoeffs(parallelLoop.NThreads);
-		vector<NonZeroCoefficients> chunksPenCoeffs(parallelLoop.NThreads);
-		
-		for (unsigned int threadNumber = 0; threadNumber < parallelLoop.NThreads; threadNumber++)
+		#pragma omp parallel for
+		for (Element<Dim>* e : mesh->Elements)
 		{
-			ParallelChunk<EmptyResultChunk>* chunk = parallelLoop.Chunks[threadNumber];
+			Diff_DGElement<Dim>* element = dynamic_cast<Diff_DGElement<Dim>*>(e);
+			//cout << "Element " << element->Number << endl;
 
-			chunk->ThreadFuture = std::async([this, mesh, basis, &actions, penalizationCoefficient, chunk, &chunksMatrixCoeffs, &chunksMassMatrixCoeffs, &chunksVolumicCoeffs, &chunksCouplingCoeffs, &chunksPenCoeffs]()
+			for (BasisFunction<Dim>* phi1 : basis->LocalFunctions())
 			{
-				BigNumber nnzApproximate = chunk->Size() * basis->Size() * (2 * Dim + 1);
-				NonZeroCoefficients matrixCoeffs(nnzApproximate);
-				NonZeroCoefficients massMatrixCoeffs(actions.Export.AssemblyTermMatrices ? nnzApproximate : 0);
-				NonZeroCoefficients volumicCoeffs(actions.Export.AssemblyTermMatrices ? nnzApproximate : 0);
-				NonZeroCoefficients couplingCoeffs(actions.Export.AssemblyTermMatrices ? nnzApproximate : 0);
-				NonZeroCoefficients penCoeffs(actions.Export.AssemblyTermMatrices ? nnzApproximate : 0);
+				BigNumber basisFunction1 = element->Number * basis->Size() + phi1->LocalNumber;
 
-				for (BigNumber iElem = chunk->Start; iElem < chunk->End; iElem++)
+				// Current element (block diagonal)
+				for (BasisFunction<Dim>* phi2 : basis->LocalFunctions())
 				{
-					Diff_DGElement<Dim>* element = dynamic_cast<Diff_DGElement<Dim>*>(mesh->Elements[iElem]);
-					//cout << "Element " << element->Number << endl;
+					BigNumber basisFunction2 = element->Number * basis->Size() + phi2->LocalNumber;
 
-					for (BasisFunction<Dim>* phi1 : basis->LocalFunctions())
+					//cout << "\t phi" << phi1->LocalNumber << " = " << phi1->ToString() << " phi" << phi2->LocalNumber << " = " << phi2->ToString() << endl;
+
+					double volumicTerm = element->VolumicTerm(phi1, phi2);
+					//cout << "\t\t volumic = " << volumicTerm << endl;
+
+					double coupling = 0;
+					double penalization = 0;
+					for (Face<Dim>* f : element->Faces)
 					{
-						BigNumber basisFunction1 = element->Number * basis->Size() + phi1->LocalNumber;
+						Diff_DGFace<Dim>* face = dynamic_cast<Diff_DGFace<Dim>*>(f);
 
-						// Current element (block diagonal)
-						for (BasisFunction<Dim>* phi2 : basis->LocalFunctions())
-						{
-							BigNumber basisFunction2 = element->Number * basis->Size() + phi2->LocalNumber;
+						double c = face->CouplingTerm(element, phi1, element, phi2);
+						double p = face->PenalizationTerm(element, phi1, element, phi2, penalizationCoefficient);
+						coupling += c;
+						penalization += p;
+						//cout << "\t\t " << face->ToString() << ":\t c=" << c << "\tp=" << p << endl;
+					}
 
-							//cout << "\t phi" << phi1->LocalNumber << " = " << phi1->ToString() << " phi" << phi2->LocalNumber << " = " << phi2->ToString() << endl;
+					//cout << "\t\t TOTAL = " << volumicTerm + coupling + penalization << endl;
 
-							double volumicTerm = element->VolumicTerm(phi1, phi2);
-							//cout << "\t\t volumic = " << volumicTerm << endl;
-
-							double coupling = 0;
-							double penalization = 0;
-							for (Face<Dim>* f : element->Faces)
-							{
-								Diff_DGFace<Dim>* face = dynamic_cast<Diff_DGFace<Dim>*>(f);
-
-								double c = face->CouplingTerm(element, phi1, element, phi2);
-								double p = face->PenalizationTerm(element, phi1, element, phi2, penalizationCoefficient);
-								coupling += c;
-								penalization += p;
-								//cout << "\t\t " << face->ToString() << ":\t c=" << c << "\tp=" << p << endl;
-							}
-
-							//cout << "\t\t TOTAL = " << volumicTerm + coupling + penalization << endl;
-
-							if (actions.Export.AssemblyTermMatrices)
-							{
-								volumicCoeffs.Add(basisFunction1, basisFunction2, volumicTerm);
-								couplingCoeffs.Add(basisFunction1, basisFunction2, coupling);
-								penCoeffs.Add(basisFunction1, basisFunction2, penalization);
-							}
-							matrixCoeffs.Add(basisFunction1, basisFunction2, volumicTerm + coupling + penalization);
-							if (actions.Export.AssemblyTermMatrices)
-							{
-								double massTerm = element->MassTerm(phi1, phi2);
-								massMatrixCoeffs.Add(basisFunction1, basisFunction2, massTerm);
-							}
-						}
-
-						double rhs = element->SourceTerm(phi1, _testCase->SourceFunction);
-						this->b(basisFunction1) = rhs;
+					if (actions.Export.AssemblyTermMatrices)
+					{
+						volumicCoeffs.Local().Add(basisFunction1, basisFunction2, volumicTerm);
+						couplingCoeffs.Local().Add(basisFunction1, basisFunction2, coupling);
+						penCoeffs.Local().Add(basisFunction1, basisFunction2, penalization);
+					}
+					matrixCoeffs.Local().Add(basisFunction1, basisFunction2, volumicTerm + coupling + penalization);
+					if (actions.Export.AssemblyTermMatrices)
+					{
+						double massTerm = element->MassTerm(phi1, phi2);
+						massMatrixCoeffs.Local().Add(basisFunction1, basisFunction2, massTerm);
 					}
 				}
 
-				chunksMatrixCoeffs[chunk->ThreadNumber] = matrixCoeffs;
-				chunksMassMatrixCoeffs[chunk->ThreadNumber] = massMatrixCoeffs;
-				chunksVolumicCoeffs[chunk->ThreadNumber] = volumicCoeffs;
-				chunksCouplingCoeffs[chunk->ThreadNumber] = couplingCoeffs;
-				chunksPenCoeffs[chunk->ThreadNumber] = penCoeffs;
+				double rhs = element->SourceTerm(phi1, _testCase->SourceFunction);
+				this->b(basisFunction1) = rhs;
 			}
-			);
 		}
-
-		BigNumber nnzApproximate = mesh->Elements.size() * basis->Size() * (2 * Dim + 1);
-		NonZeroCoefficients matrixCoeffs(nnzApproximate);
-		NonZeroCoefficients massMatrixCoeffs(actions.Export.AssemblyTermMatrices ? nnzApproximate : 0);
-		NonZeroCoefficients volumicCoeffs(actions.Export.AssemblyTermMatrices ? nnzApproximate : 0);
-		NonZeroCoefficients couplingCoeffs(actions.Export.AssemblyTermMatrices ? nnzApproximate : 0);
-		NonZeroCoefficients penCoeffs(actions.Export.AssemblyTermMatrices ? nnzApproximate : 0);
-
-		parallelLoop.Wait();
-
-		for (unsigned int threadNumber = 0; threadNumber < parallelLoop.NThreads; threadNumber++)
-		{
-			matrixCoeffs.Add(chunksMatrixCoeffs[threadNumber]);
-			massMatrixCoeffs.Add(chunksMassMatrixCoeffs[threadNumber]);
-			volumicCoeffs.Add(chunksVolumicCoeffs[threadNumber]);
-			couplingCoeffs.Add(chunksCouplingCoeffs[threadNumber]);
-			penCoeffs.Add(chunksPenCoeffs[threadNumber]);
-		}
-
-		chunksMatrixCoeffs.clear();
-		chunksMassMatrixCoeffs.clear();
-		chunksVolumicCoeffs.clear();
-		chunksCouplingCoeffs.clear();
-		chunksPenCoeffs.clear();
 
 		//---------------------------------------------//
 		// Iteration on the faces: off-diagonal blocks //
 		//---------------------------------------------//
 
-		ParallelLoop<Face<Dim>*, EmptyResultChunk> parallelLoopFaces(mesh->Faces);
-
-		chunksMatrixCoeffs = vector<NonZeroCoefficients>(parallelLoopFaces.NThreads);
-		chunksCouplingCoeffs = vector<NonZeroCoefficients>(parallelLoopFaces.NThreads);
-		chunksPenCoeffs = vector<NonZeroCoefficients>(parallelLoopFaces.NThreads);
-
-
-		for (unsigned int threadNumber = 0; threadNumber < parallelLoopFaces.NThreads; threadNumber++)
+		#pragma omp parallel for
+		for (Face<Dim>* f : mesh->Faces)
 		{
-			ParallelChunk<EmptyResultChunk>* chunk = parallelLoopFaces.Chunks[threadNumber];
+			Diff_DGFace<Dim>* face = dynamic_cast<Diff_DGFace<Dim>*>(f);
+			if (face->IsDomainBoundary)
+				continue;
 
-			chunk->ThreadFuture = std::async([this, mesh, basis, &actions, penalizationCoefficient, chunk, &chunksMatrixCoeffs, &chunksCouplingCoeffs, &chunksPenCoeffs]()
+			//cout << "Face " << face->Number << endl;
+
+			for (BasisFunction<Dim>* phi1 : basis->LocalFunctions())
 			{
-				BigNumber nnzApproximate = chunk->Size() * basis->Size() * (2 * Dim + 1);
-				NonZeroCoefficients matrixCoeffs(nnzApproximate);
-				NonZeroCoefficients couplingCoeffs(actions.Export.AssemblyTermMatrices ? nnzApproximate : 0);
-				NonZeroCoefficients penCoeffs(actions.Export.AssemblyTermMatrices ? nnzApproximate : 0);
-
-				for (BigNumber iElem = chunk->Start; iElem < chunk->End; ++iElem)
+				BigNumber basisFunction1 = face->Element1->Number * basis->Size() + phi1->LocalNumber;
+				for (BasisFunction<Dim>* phi2 : basis->LocalFunctions())
 				{
-					Diff_DGFace<Dim>* face = dynamic_cast<Diff_DGFace<Dim>*>(mesh->Faces[iElem]);
-					if (face->IsDomainBoundary)
-						continue;
+					//cout << "\t phi" << phi1->LocalNumber << " = " << phi1->ToString() << " phi" << phi2->LocalNumber << " = " << phi2->ToString() << endl;
 
-					//cout << "Face " << face->Number << endl;
+					BigNumber basisFunction2 = face->Element2->Number * basis->Size() + phi2->LocalNumber;
+					double coupling = face->CouplingTerm(face->Element1, phi1, face->Element2, phi2);
+					double penalization = face->PenalizationTerm(face->Element1, phi1, face->Element2, phi2, penalizationCoefficient);
 
-					for (BasisFunction<Dim>* phi1 : basis->LocalFunctions())
+					//cout << "\t\t\t c=" << coupling << "\tp=" << penalization << endl;
+
+					if (actions.Export.AssemblyTermMatrices)
 					{
-						BigNumber basisFunction1 = face->Element1->Number * basis->Size() + phi1->LocalNumber;
-						for (BasisFunction<Dim>* phi2 : basis->LocalFunctions())
-						{
-							//cout << "\t phi" << phi1->LocalNumber << " = " << phi1->ToString() << " phi" << phi2->LocalNumber << " = " << phi2->ToString() << endl;
+						couplingCoeffs.Local().Add(basisFunction1, basisFunction2, coupling);
+						couplingCoeffs.Local().Add(basisFunction2, basisFunction1, coupling);
 
-							BigNumber basisFunction2 = face->Element2->Number * basis->Size() + phi2->LocalNumber;
-							double coupling = face->CouplingTerm(face->Element1, phi1, face->Element2, phi2);
-							double penalization = face->PenalizationTerm(face->Element1, phi1, face->Element2, phi2, penalizationCoefficient);
-
-							//cout << "\t\t\t c=" << coupling << "\tp=" << penalization << endl;
-
-							if (actions.Export.AssemblyTermMatrices)
-							{
-								couplingCoeffs.Add(basisFunction1, basisFunction2, coupling);
-								couplingCoeffs.Add(basisFunction2, basisFunction1, coupling);
-
-								penCoeffs.Add(basisFunction1, basisFunction2, penalization);
-								penCoeffs.Add(basisFunction2, basisFunction1, penalization);
-							}
-							matrixCoeffs.Add(basisFunction1, basisFunction2, coupling + penalization);
-							matrixCoeffs.Add(basisFunction2, basisFunction1, coupling + penalization);
-						}
+						penCoeffs.Local().Add(basisFunction1, basisFunction2, penalization);
+						penCoeffs.Local().Add(basisFunction2, basisFunction1, penalization);
 					}
+					matrixCoeffs.Local().Add(basisFunction1, basisFunction2, coupling + penalization);
+					matrixCoeffs.Local().Add(basisFunction2, basisFunction1, coupling + penalization);
 				}
-
-				chunksMatrixCoeffs[chunk->ThreadNumber] = matrixCoeffs;
-				chunksCouplingCoeffs[chunk->ThreadNumber] = couplingCoeffs;
-				chunksPenCoeffs[chunk->ThreadNumber] = penCoeffs;
 			}
-			);
-		}
-
-		parallelLoopFaces.Wait();
-
-		for (unsigned int threadNumber = 0; threadNumber < parallelLoopFaces.NThreads; threadNumber++)
-		{
-			matrixCoeffs.Add(chunksMatrixCoeffs[threadNumber]);
-			couplingCoeffs.Add(chunksCouplingCoeffs[threadNumber]);
-			penCoeffs.Add(chunksPenCoeffs[threadNumber]);
 		}
 
 		//---------------//

@@ -2,7 +2,7 @@
 #include "../../Mesh/Mesh.h"
 #include "../../Utils/Utils.h"
 #include "../../TestCases/Diffusion/DiffusionTestCase.h"
-#include "../../Utils/ElementParallelLoop.h"
+#include "../../Utils/Parallelism.h"
 #include "../../Utils/ExportModule.h"
 #ifdef ENABLE_3D
 #include "../../Geometry/3D/Tetrahedron.h"
@@ -78,31 +78,32 @@ public:
 			InitReferenceShapes();
 
 		// Parallel loop on the elements //
-		ElementParallelLoop<Dim> parallelLoop(_mesh->Elements);
+		ThreadLocalCoeffs coeffs;
 		auto basisFunctions = _basis->LocalFunctions();
-		parallelLoop.Execute([this, &basisFunctions](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+		#pragma omp parallel for
+		for (Element<Dim>* e : _mesh->Elements)
+		{
+			vector<Vertex*> vertices = e->Vertices();
+
+			for (int i = 0; i< vertices.size(); i++)
 			{
-				vector<Vertex*> vertices = e->Vertices();
-
-				for (int i = 0; i< vertices.size(); i++)
+				Vertex* vi = vertices[i];
+				auto phi_i = basisFunctions[i];
+				for (int j = i; j < vertices.size(); j++)
 				{
-					Vertex* vi = vertices[i];
-					auto phi_i = basisFunctions[i];
-					for (int j = i; j < vertices.size(); j++)
-					{
-						Vertex* vj = vertices[j];
-						auto phi_j = basisFunctions[j];
+					Vertex* vj = vertices[j];
+					auto phi_j = basisFunctions[j];
 
-						double coeff = e->IntegralKGradGrad(e->DiffTensor(), phi_i, phi_j);
-						chunk->Results.Coeffs.Add(vi->Number, vj->Number, coeff);
-						if (j != i)
-							chunk->Results.Coeffs.Add(vj->Number, vi->Number, coeff);
-					}
+					double coeff = e->IntegralKGradGrad(e->DiffTensor(), phi_i, phi_j);
+					coeffs.Local().Add(vi->Number, vj->Number, coeff);
+					if (j != i)
+						coeffs.Local().Add(vj->Number, vi->Number, coeff);
 				}
-			});
+			}
+		}
 
 		SparseMatrix globalA(_mesh->Vertices.size(), _mesh->Vertices.size());
-		parallelLoop.Fill(globalA);
+		coeffs.Fill(globalA);
 
 		// A = A_ii
 		this->A    = globalA.topLeftCorner(_mesh->InteriorVertices.size(), _mesh->InteriorVertices.size());
@@ -145,32 +146,32 @@ public:
 
 	SparseMatrix MassMatrix()
 	{
-		ElementParallelLoop<Dim> parallelLoop(_mesh->Elements);
-		parallelLoop.Execute([this](Element<Dim>* e, ParallelChunk<CoeffsChunk>* chunk)
+		ThreadLocalCoeffs coeffs;
+		#pragma omp parallel for
+		for (Element<Dim>* e : _mesh->Elements)
+		{
+			DenseMatrix mass = e->MassMatrix(_basis);
+			vector<Vertex*> vertices = e->Vertices();
+
+			for (int i = 0; i < vertices.size(); i++)
 			{
-				DenseMatrix mass = e->MassMatrix(_basis);
-				vector<Vertex*> vertices = e->Vertices();
-
-				for (int i = 0; i < vertices.size(); i++)
+				Vertex* vi = vertices[i];
+				//auto phi_i = _basis->LocalFunctions[i];
+				for (int j = i; j < vertices.size(); j++)
 				{
-					Vertex* vi = vertices[i];
-					//auto phi_i = _basis->LocalFunctions[i];
-					for (int j = i; j < vertices.size(); j++)
-					{
-						Vertex* vj = vertices[j];
-						//auto phi_j = _basis->LocalFunctions[j];
+					Vertex* vj = vertices[j];
+					//auto phi_j = _basis->LocalFunctions[j];
 
-						double coeff = mass(i, j);
-						chunk->Results.Coeffs.Add(vi->Number, vj->Number, coeff);
-						if (j != i)
-							chunk->Results.Coeffs.Add(vj->Number, vi->Number, coeff);
-					}
+					double coeff = mass(i, j);
+					coeffs.Local().Add(vi->Number, vj->Number, coeff);
+					if (j != i)
+						coeffs.Local().Add(vj->Number, vi->Number, coeff);
 				}
-
-			});
+			}
+		}
 
 		SparseMatrix mass(_mesh->Vertices.size(), _mesh->Vertices.size());
-		parallelLoop.Fill(mass);
+		coeffs.Fill(mass);
 		return mass;
 	}
 
@@ -180,20 +181,23 @@ public:
 
 	Vector AssembleSourceTerm(DomFunction sourceFunction)
 	{
-		ElementParallelLoop<Dim> parallelLoop(this->_mesh->Elements);
 		Vector b_i = Vector::Zero(_mesh->InteriorVertices.size());
 		auto localFunctions = _basis->LocalFunctions();
-		parallelLoop.Execute([this, &sourceFunction, &b_i, &localFunctions](Element<Dim>* e)
+		#pragma omp parallel for
+		for (Element<Dim>* e : this->_mesh->Elements)
+		{
+			vector<Vertex*> vertices = e->Vertices();
+			for (int i = 0; i < vertices.size(); i++)
 			{
-				vector<Vertex*> vertices = e->Vertices();
-				for (int i = 0; i < vertices.size(); i++)
+				Vertex* v = vertices[i];
+				if (v->Number < _mesh->InteriorVertices.size())
 				{
-					Vertex* v = vertices[i];
-					if (v->Number < _mesh->InteriorVertices.size())
-						b_i[v->Number] += e->SourceTerm(localFunctions[i], sourceFunction);
+					double value = e->SourceTerm(localFunctions[i], sourceFunction);
+					#pragma omp atomic // the vertices are shared by several elements
+					b_i[v->Number] += value;
 				}
 			}
-		);
+		}
 
 		return b_i;
 	}
@@ -207,11 +211,9 @@ public:
 	Vector AssembleDirichletTerm(DomFunction dirichletFunction)
 	{
 		Vector x_d = Vector(_mesh->DirichletVertices.size());
-		ParallelLoop<Vertex*>::Execute(this->_mesh->DirichletVertices, [this, &x_d, &dirichletFunction](Vertex* v)
-			{
-				x_d[v->Number - _mesh->InteriorVertices.size()] = dirichletFunction(*v);
-			}
-		);
+		#pragma omp parallel for
+		for (Vertex* v : this->_mesh->DirichletVertices)
+			x_d[v->Number - _mesh->InteriorVertices.size()] = dirichletFunction(*v);
 		return x_d;
 	}
 
@@ -244,40 +246,27 @@ public:
 	{
 		assert(solution.rows() == _mesh->Vertices.size());
 
-		struct ChunkResult
-		{
-			double absoluteError = 0;
-			double normExactSolution = 0;
-		};
-
-		ParallelLoop<Element<Dim>*, ChunkResult> parallelLoop(this->_mesh->Elements);
-		auto localFunctions = _basis->LocalFunctions();
-		parallelLoop.Execute([this, exactSolution, &solution, &localFunctions](Element<Dim>* e, ParallelChunk<ChunkResult>* chunk)
-			{
-				RefFunction approximate = [this, &solution, &localFunctions, e](const RefPoint& p) {
-					double total = 0;
-					vector<Vertex*> vertices = e->Vertices();
-					for (int i = 0; i < vertices.size(); i++)
-					{
-						Vertex* v = vertices[i];
-						total += solution(v->Number) * localFunctions[i]->Eval(p);
-					}
-					return total;
-				};
-
-				chunk->Results.absoluteError += e->L2ErrorPow2(approximate, exactSolution);
-				chunk->Results.normExactSolution += e->Integral([exactSolution](const DomPoint& p) { return pow(exactSolution(p), 2); });
-			});
-
-
 		double absoluteError = 0;
 		double normExactSolution = 0;
 
-		parallelLoop.AggregateChunkResults([&absoluteError, &normExactSolution](ChunkResult& chunkResult)
-			{
-				absoluteError += chunkResult.absoluteError;
-				normExactSolution += chunkResult.normExactSolution;
-			});
+		auto localFunctions = _basis->LocalFunctions();
+		#pragma omp parallel for reduction(+:absoluteError, normExactSolution)
+		for (Element<Dim>* e : this->_mesh->Elements)
+		{
+			RefFunction approximate = [this, &solution, &localFunctions, e](const RefPoint& p) {
+				double total = 0;
+				vector<Vertex*> vertices = e->Vertices();
+				for (int i = 0; i < vertices.size(); i++)
+				{
+					Vertex* v = vertices[i];
+					total += solution(v->Number) * localFunctions[i]->Eval(p);
+				}
+				return total;
+			};
+
+			absoluteError += e->L2ErrorPow2(approximate, exactSolution);
+			normExactSolution += e->Integral([exactSolution](const DomPoint& p) { return pow(exactSolution(p), 2); });
+		}
 
 		absoluteError = sqrt(absoluteError);
 		normExactSolution = sqrt(normExactSolution);
@@ -310,37 +299,19 @@ public:
 
 	double IntegralOverDomain(DomFunction func)
 	{
-		struct ChunkResult { double total = 0; };
-
-		ParallelLoop<Element<Dim>*, ChunkResult> parallelLoop(_mesh->Elements);
-		parallelLoop.Execute([this, func](Element<Dim>* e, ParallelChunk<ChunkResult>* chunk)
-			{
-				chunk->Results.total += e->Integral(func);
-			});
-
 		double total = 0;
-		parallelLoop.AggregateChunkResults([&total](ChunkResult chunkResult)
-			{
-				total += chunkResult.total;
-			});
+		#pragma omp parallel for reduction(+:total)
+		for (Element<Dim>* e : _mesh->Elements)
+			total += e->Integral(func);
 		return total;
 	}
 
 	double IntegralOverBoundary(DomFunction func)
 	{
-		struct ChunkResult { double total = 0; };
-
-		ParallelLoop<Face<Dim>*, ChunkResult> parallelLoop(_mesh->BoundaryFaces);
-		parallelLoop.Execute([this, func](Face<Dim>* f, ParallelChunk<ChunkResult>* chunk)
-			{
-				chunk->Results.total += f->Integral(func);
-			});
-
 		double total = 0;
-		parallelLoop.AggregateChunkResults([&total](ChunkResult chunkResult)
-			{
-				total += chunkResult.total;
-			});
+		#pragma omp parallel for reduction(+:total)
+		for (Face<Dim>* f : _mesh->BoundaryFaces)
+			total += f->Integral(func);
 		return total;
 	}*/
 };

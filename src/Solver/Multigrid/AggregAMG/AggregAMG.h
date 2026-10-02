@@ -83,20 +83,20 @@ public:
 
 			_aggregates = vector<ElementAggregate>(coarseMesh.CoarseElements.size());
 			_numberAggregates = vector<vector<BigNumber>>(coarseMesh.CoarseElements.size());
-			NumberParallelLoop<EmptyResultChunk> parallelLoop(coarseMesh.CoarseElements.size());
-			parallelLoop.Execute([this, &coarseMesh](BigNumber finalAggregNumber)
+			#pragma omp parallel for
+			for (BigNumber finalAggregNumber = 0; finalAggregNumber < coarseMesh.CoarseElements.size(); ++finalAggregNumber)
+			{
+				ElementAggregate& finalAggreg = _aggregates[finalAggregNumber];
+				vector<BigNumber>& finalNumberAggreg = _numberAggregates[finalAggregNumber];
+				finalAggreg.Number = finalAggregNumber;
+				finalAggreg.FineElements = GetFineElements(coarseMesh.CoarseElements[finalAggregNumber], coarseMesh);
+				for (AlgebraicElement* e : finalAggreg.FineElements)
 				{
-					ElementAggregate& finalAggreg = _aggregates[finalAggregNumber];
-					vector<BigNumber>& finalNumberAggreg = _numberAggregates[finalAggregNumber];
-					finalAggreg.Number = finalAggregNumber;
-					finalAggreg.FineElements = GetFineElements(coarseMesh.CoarseElements[finalAggregNumber], coarseMesh);
-					for (AlgebraicElement* e : finalAggreg.FineElements)
-					{
-						e->FinalAggregate = &finalAggreg;
-						e->FinalAggregateNumber = finalAggreg.Number;
-						finalNumberAggreg.push_back(e->Number);
-					}
-				});
+					e->FinalAggregate = &finalAggreg;
+					e->FinalAggregateNumber = finalAggreg.Number;
+					finalNumberAggreg.push_back(e->Number);
+				}
+			}
 		}
 		else if (coarseningStgy == H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours)
 		{
@@ -113,20 +113,20 @@ public:
 
 			_aggregates = vector<ElementAggregate>(_mesh.CoarseElements.size());
 			_numberAggregates = vector<vector<BigNumber>>(_mesh.CoarseElements.size());
-			NumberParallelLoop<EmptyResultChunk> parallelLoop(_mesh.CoarseElements.size());
-			parallelLoop.Execute([this](BigNumber finalAggregNumber)
+			#pragma omp parallel for
+			for (BigNumber finalAggregNumber = 0; finalAggregNumber < _mesh.CoarseElements.size(); ++finalAggregNumber)
+			{
+				ElementAggregate& finalAggreg = _aggregates[finalAggregNumber];
+				vector<BigNumber>& finalNumberAggreg = _numberAggregates[finalAggregNumber];
+				finalAggreg.Number = finalAggregNumber;
+				finalAggreg.FineElements = GetFineElements(_mesh.CoarseElements[finalAggregNumber], _mesh);
+				for (AlgebraicElement* e : finalAggreg.FineElements)
 				{
-					ElementAggregate& finalAggreg = _aggregates[finalAggregNumber];
-					vector<BigNumber>& finalNumberAggreg = _numberAggregates[finalAggregNumber];
-					finalAggreg.Number = finalAggregNumber;
-					finalAggreg.FineElements = GetFineElements(_mesh.CoarseElements[finalAggregNumber], _mesh);
-					for (AlgebraicElement* e : finalAggreg.FineElements)
-					{
-						e->FinalAggregate = &finalAggreg;
-						e->FinalAggregateNumber = finalAggreg.Number;
-						finalNumberAggreg.push_back(e->Number);
-					}
-				});
+					e->FinalAggregate = &finalAggreg;
+					e->FinalAggregateNumber = finalAggreg.Number;
+					finalNumberAggreg.push_back(e->Number);
+				}
+			}
 		}
 		else
 			Utils::FatalError("Unmanaged element coarsening strategy");
@@ -184,14 +184,15 @@ private:
 	SparseMatrix BuildQ_T(const AlgebraicMesh& mesh)
 	{
 		DenseMatrix Id = DenseMatrix::Identity(_blockSize, _blockSize);
-		NumberParallelLoop<CoeffsChunk> parallelLoopQ_T(mesh.Elements.size());
-		parallelLoopQ_T.Execute([this, &mesh, &Id](BigNumber elemNumber, ParallelChunk<CoeffsChunk>* chunk)
-			{
-				const AlgebraicElement& elem = mesh.Elements[elemNumber];
-				chunk->Results.Coeffs.Add(elem.Number*_blockSize, elem.CoarseElement->Number*_blockSize, Id);
-			});
+		ThreadLocalCoeffs coeffsQ_T;
+		#pragma omp parallel for
+		for (BigNumber elemNumber = 0; elemNumber < mesh.Elements.size(); ++elemNumber)
+		{
+			const AlgebraicElement& elem = mesh.Elements[elemNumber];
+			coeffsQ_T.Local().Add(elem.Number*_blockSize, elem.CoarseElement->Number*_blockSize, Id);
+		}
 		SparseMatrix Q_T = SparseMatrix(mesh.Elements.size()*_blockSize, mesh.CoarseElements.size()*_blockSize);
-		parallelLoopQ_T.Fill(Q_T);
+		coeffsQ_T.Fill(Q_T);
 		return Q_T;
 	}
 

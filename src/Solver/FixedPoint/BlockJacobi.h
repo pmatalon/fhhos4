@@ -1,6 +1,5 @@
 #pragma once
 #include "../IterativeSolver.h"
-#include "../../Utils/ParallelLoop.h"
 #include "BlockDiagonalSolver.h"
 using namespace std;
 
@@ -79,13 +78,13 @@ private:
 
 		Vector xNew(xOld.rows());
 
-		NumberParallelLoop<EmptyResultChunk> parallelLoop(nb);
-		parallelLoop.ExecuteChunk([this, &b, &xOld, &xNew](ParallelChunk<EmptyResultChunk>* chunk)
-			{
-				Vector tmp_x(_blockSize); // work vector, allocated once per chunk
-				for (BigNumber i = chunk->Start; i < chunk->End; i++)
-					ProcessBlockRow(i, b, xOld, xNew, tmp_x);
-			});
+		#pragma omp parallel
+		{
+			Vector tmp_x(_blockSize); // work vector, allocated once per thread
+			#pragma omp for
+			for (BigNumber i = 0; i < nb; i++)
+				ProcessBlockRow(i, b, xOld, xNew, tmp_x);
+		}
 
 		xOld.swap(xNew);
 		result.SetX(xOld);

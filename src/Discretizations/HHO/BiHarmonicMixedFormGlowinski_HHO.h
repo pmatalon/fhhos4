@@ -309,16 +309,13 @@ public:
 		int n = theta0.rows();
 		DenseMatrix A(n, n);
 
-		int nThreads = 1;
-
-		NumberParallelLoop<EmptyResultChunk> parallelLoop(n, nThreads);
-		parallelLoop.Execute([this, n, &A](BigNumber i, ParallelChunk<EmptyResultChunk>* chunk)
-			{
-				Vector e_i = Vector::Zero(n);
-				e_i[i] = 1;
-				auto lambda = Solve1stDiffProblem_Homogeneous(e_i);
-				A.col(i) = -Solve2ndDiffProblem_Homogeneous(lambda, e_i);
-			});
+		for (BigNumber i = 0; i < n; ++i)
+		{
+			Vector e_i = Vector::Zero(n);
+			e_i[i] = 1;
+			auto lambda = Solve1stDiffProblem_Homogeneous(e_i);
+			A.col(i) = -Solve2ndDiffProblem_Homogeneous(lambda, e_i);
+		}
 		return A;
 	}
 };

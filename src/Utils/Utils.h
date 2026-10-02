@@ -2,7 +2,7 @@
 #include <fstream>
 #include <functional>
 #include "Types.h"
-#include "ParallelLoop.h"
+#include "Parallelism.h"
 #include "../Geometry/Point.h"
 #include "../ProgramArguments.h"
 using namespace std;
@@ -75,15 +75,15 @@ public:
 	static SparseMatrix InvertBlockDiagMatrix(const SparseMatrix& M, int blockSize)
 	{
 		BigNumber nElements = M.rows() / blockSize;
-		NumberParallelLoop<> parallelLoop(nElements);
-		parallelLoop.ReserveChunkCoeffsSize(blockSize * blockSize);
-		parallelLoop.Execute([&M, blockSize](BigNumber i, ParallelChunk<CoeffsChunk>* chunk)
-			{
-				DenseMatrix block = M.block(i * blockSize, i * blockSize, blockSize, blockSize);
-				chunk->Results.Coeffs.Add(i * blockSize, i * blockSize, block.inverse());
-			});
+		ThreadLocalCoeffs coeffs(nElements, blockSize * blockSize);
+		#pragma omp parallel for
+		for (BigNumber i = 0; i < nElements; ++i)
+		{
+			DenseMatrix block = M.block(i * blockSize, i * blockSize, blockSize, blockSize);
+			coeffs.Local().Add(i * blockSize, i * blockSize, block.inverse());
+		}
 		SparseMatrix invM(M.rows(), M.cols());
-		parallelLoop.Fill(invM);
+		coeffs.Fill(invM);
 		return invM;
 	}
 

@@ -40,7 +40,7 @@ void ProgramDim<Dim>::Start(ProgramArguments& args)
 #else
 	cout << "Index type: size_t" << endl;
 #endif
-	cout << "Shared memory parallelism: " << (BaseParallelLoop::GetDefaultNThreads() == 1 ? "sequential execution" : to_string(BaseParallelLoop::GetDefaultNThreads()) + " threads") << endl;
+	cout << "Shared memory parallelism: " << (Parallelism::NThreads() == 1 ? "sequential execution" : to_string(Parallelism::NThreads()) + " threads") << endl;
 	cout << endl;
 
 	if (args.Problem.Equation == EquationType::Diffusion)

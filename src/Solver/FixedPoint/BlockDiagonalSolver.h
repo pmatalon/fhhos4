@@ -1,6 +1,6 @@
 #pragma once
 #include "../../Utils/Types.h"
-#include "../../Utils/ParallelLoop.h"
+#include "../../Utils/Parallelism.h"
 using namespace std;
 
 enum class DiagBlockSolveMethod : unsigned
@@ -43,25 +43,25 @@ public:
 			_rank = vector<int>(nb);
 		}
 
-		NumberParallelLoop<EmptyResultChunk> parallelLoop(nb);
-		parallelLoop.Execute([this, &A](BigNumber i)
+		#pragma omp parallel for
+		for (BigNumber i = 0; i < nb; ++i)
+		{
+			DenseMatrix Di = A.block(i * _blockSize, i * _blockSize, _blockSize, _blockSize);
+			Eigen::FullPivLU<DenseMatrix> lu(Di);
+			auto block = _blocks.middleCols(i * _blockSize, _blockSize);
+			if (_method == DiagBlockSolveMethod::Inverse)
+				block = lu.inverse();
+			else
 			{
-				DenseMatrix Di = A.block(i * _blockSize, i * _blockSize, _blockSize, _blockSize);
-				Eigen::FullPivLU<DenseMatrix> lu(Di);
-				auto block = _blocks.middleCols(i * _blockSize, _blockSize);
-				if (_method == DiagBlockSolveMethod::Inverse)
-					block = lu.inverse();
-				else
+				block = lu.matrixLU();
+				for (int k = 0; k < _blockSize; k++)
 				{
-					block = lu.matrixLU();
-					for (int k = 0; k < _blockSize; k++)
-					{
-						_permP[i * _blockSize + k] = lu.permutationP().indices()(k);
-						_permQ[i * _blockSize + k] = lu.permutationQ().indices()(k);
-					}
-					_rank[i] = lu.nonzeroPivots();
+					_permP[i * _blockSize + k] = lu.permutationP().indices()(k);
+					_permQ[i * _blockSize + k] = lu.permutationQ().indices()(k);
 				}
-			});
+				_rank[i] = lu.nonzeroPivots();
+			}
+		}
 	}
 
 	// x = D_i^{-1} b (b can have several columns).
