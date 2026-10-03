@@ -1,14 +1,13 @@
 #pragma once
 #include "BlockSOR.h"
+#include "DiagonalBlockPositions.h"
 using namespace std;
 
 class GaussSeidel : public IterativeSolver
 {
 protected:
 	Direction _direction;
-	RowMajorSparseMatrix _rowMajorA;
-	bool _useEigen = true;
-	Vector invD; // inverses of the diagonal elements
+	vector<SparseMatrixIndex> _diagPos; // position of the diagonal coefficient of each row in the arrays of the matrix
 public:
 	GaussSeidel() : GaussSeidel(Direction::Forward) {}
 
@@ -40,12 +39,16 @@ public:
 	void Setup(const SparseMatrix& A) override
 	{
 		IterativeSolver::Setup(A);
-		if (!A.IsRowMajor)
-			this->_rowMajorA = A;
 
-		/*this->invD = Vector(A.rows());
+		// The rows are sorted by column index: the diagonal coefficient separates the strictly lower and upper parts
+		DiagonalBlockPositions diagonal;
+		diagonal.Setup(A, 1);
 		for (BigNumber i = 0; i < A.rows(); ++i)
-			this->invD[i] = 1.0 / A.coeff(i, i);*/
+		{
+			if (diagonal.End[i] != diagonal.Begin[i] + 1)
+				Utils::FatalError("Gauss-Seidel: no diagonal coefficient in row " + to_string(i) + ".");
+		}
+		_diagPos = std::move(diagonal.Begin);
 
 		this->SetupComputationalWork = 0;
 	}
@@ -114,48 +117,20 @@ private:
 	void ForwardSweep(const Vector& b, Vector& x, bool& xEquals0, IterationResult& result)
 	{
 		const SparseMatrix& A = *this->Matrix;
-		if (_useEigen)
-		{
-			if (!xEquals0)
-			{
-				Vector v = b - A.triangularView<Eigen::StrictlyUpper>() * x;      result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
-				x = A.triangularView<Eigen::Lower>().solve(v);                    result.AddWorkInFlops(Cost::SpFWElimination(A));
-			}
-			else
-			{
-				x = A.triangularView<Eigen::Lower>().solve(b);                    result.AddWorkInFlops(Cost::SpFWElimination(A));
-			}
-		}
-		else
-		{
-			for (BigNumber i = 0; i < A.rows(); ++i)
-				ProcessRow(i, b, x);
-			                                                                      result.AddWorkInFlops(2 * A.nonZeros() + A.rows());
-		}
+		// x(new) = (L+D)^{-1} * (b-Ux)
+		if (!xEquals0)
+			result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
+		ForwardSweepKernel(b, x, xEquals0, nullptr);                              result.AddWorkInFlops(Cost::SpFWElimination(A));
 		xEquals0 = false;
 	}
 
 	void BackwardSweep(const Vector& b, Vector& x, bool& xEquals0, IterationResult& result)
 	{
 		const SparseMatrix& A = *this->Matrix;
-		if (_useEigen)
-		{
-			if (!xEquals0)
-			{
-				Vector v = b - A.triangularView<Eigen::StrictlyLower>() * x;      result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
-				x = A.triangularView<Eigen::Upper>().solve(v);                    result.AddWorkInFlops(Cost::SpBWSubstitution(A));
-			}
-			else
-			{
-				x = A.triangularView<Eigen::Upper>().solve(b);                    result.AddWorkInFlops(Cost::SpBWSubstitution(A));
-			}
-		}
-		else
-		{
-			for (BigNumber i = 0; i < A.rows(); ++i)
-				ProcessRow(A.rows() - i - 1, b, x);
-			                                                                      result.AddWorkInFlops(2 * A.nonZeros() + A.rows());
-		}
+		// x(new) = (D+U)^{-1} * (b-Lx)
+		if (!xEquals0)
+			result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
+		BackwardSweepKernel(b, x, xEquals0, nullptr);                             result.AddWorkInFlops(Cost::SpBWSubstitution(A));
 		xEquals0 = false;
 	}
 
@@ -163,28 +138,28 @@ private:
 	void ForwardSweepAndComputeResidualOrAx(const Vector& b, Vector& x, bool& xEquals0, bool computeAx, IterationResult& result)
 	{
 		const SparseMatrix& A = *this->Matrix;
-		auto U = A.triangularView<Eigen::StrictlyUpper>();
-		auto L_plus_D = A.triangularView<Eigen::Lower>();
 
 		if (!xEquals0)
 		{
 			// Sweep: x(new) = (L+D)^{-1} * (b-Ux)
-			Vector Ux = U * x;                                    result.AddWorkInFlops(Cost::SpMatVec(NNZ::StrictTriPart(A)));
-			x = L_plus_D.solve(b - Ux);                           result.AddWorkInFlops(Cost::AddVec(b) + Cost::SpFWElimination(A));
+			Vector Ux(A.rows());
+			ForwardSweepKernel(b, x, false, &Ux);                 result.AddWorkInFlops(Cost::SpMatVec(NNZ::StrictTriPart(A)));
+			                                                      result.AddWorkInFlops(Cost::AddVec(b) + Cost::SpFWElimination(A));
 			xEquals0 = false;
 
 			// Residual: Ux(old) - Ux(new)
-			result.Residual = Ux - U * x;                         result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
+			result.Residual = Vector(A.rows());
+			StrictUpperProduct(x, &Ux, result.Residual);         result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
 		}
 		else
 		{
 			// Sweep
-			x = L_plus_D.solve(b);                                result.AddWorkInFlops(Cost::SpFWElimination(A));
-			//ForwardElimination(x, b);                            result.AddWorkInFlops(Cost::SpFWElimination(A));
+			ForwardSweepKernel(b, x, true, nullptr);              result.AddWorkInFlops(Cost::SpFWElimination(A));
 			xEquals0 = false;
 
 			// Residual: r = -Ux
-			result.Residual = -U * x;                                          result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
+			result.Residual = Vector(A.rows());
+			StrictUpperProduct(x, nullptr, result.Residual);      result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
 		}
 
 		if (computeAx)
@@ -196,20 +171,19 @@ private:
 	void BackwardSweepAndComputeResidualOrAx(const Vector& b, Vector& x, bool& xEquals0, bool computeResidual, bool computeAx, IterationResult& result)
 	{
 		const SparseMatrix& A = *this->Matrix;
-		auto L = A.triangularView<Eigen::StrictlyLower>();
-		auto D_plus_U = A.triangularView<Eigen::Upper>();
 
 		if (!xEquals0)
 		{
 			// Sweep: x(new) = (D+U)^{-1} * (b-Lx)
-			Vector b_Lx = b - L*x;                                result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
-			x = D_plus_U.solve(b_Lx);                             result.AddWorkInFlops(Cost::SpBWSubstitution(A));
-			//BackwardSubstitution(x, b_Lx);                        result.AddWorkInFlops(Cost::SpBWSubstitution(A));
+			Vector b_Lx(A.rows());
+			BackwardSweepKernel(b, x, false, &b_Lx);              result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
+			                                                      result.AddWorkInFlops(Cost::SpBWSubstitution(A));
 			xEquals0 = false;
 
 			if (computeAx || computeResidual)
 			{
-				result.Ax = b_Lx + L * x;                         result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
+				result.Ax = Vector(A.rows());
+				StrictLowerProduct(x, &b_Lx, result.Ax);          result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
 				if (computeResidual)
 				{
 					result.Residual = b - result.Ax;              result.AddWorkInFlops(Cost::AddVec(b));
@@ -219,12 +193,14 @@ private:
 		else
 		{
 			// Sweep: x(new) = (D+U)^{-1} * b
-			x = D_plus_U.solve(b);                                result.AddWorkInFlops(Cost::SpBWSubstitution(A));
+			BackwardSweepKernel(b, x, true, nullptr);             result.AddWorkInFlops(Cost::SpBWSubstitution(A));
 			xEquals0 = false;
 
 			if (computeAx)
 			{
-				result.Ax = b + L * x;                            result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
+				// Ax = b + Lx
+				result.Ax = Vector(A.rows());
+				StrictLowerProduct(x, &b, result.Ax);             result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
 				if (computeResidual)
 				{
 					result.Residual = b - result.Ax;              result.AddWorkInFlops(Cost::AddVec(b));
@@ -232,84 +208,140 @@ private:
 			}
 			else if (computeResidual)
 			{
-				// Residual: Lx(old) - Lx(new)
-				result.Residual = -L * x;                         result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
+				// Residual: Lx(old) - Lx(new) = -Lx
+				result.Residual = Vector(A.rows());
+				StrictLowerProduct(x, nullptr, result.Residual);  result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
 			}
 		}
 	}
 
-	// Solves (L+D)x=b, where L is the strictly lower triangular part of A and D the diagonal
-	void ForwardElimination(Vector& x, const Vector& b)
+	// The kernels below compute the same operations, in the same order, as the Eigen expressions they replace
+	// (A.triangularView<...>().solve(b), A.triangularView<...>() * x): same results (up to the sign of zeros). But a
+	// sweep reads the rows of the matrix once (Eigen's b - U*x followed by the solve reads them twice), and finds their
+	// diagonal directly.
+	// - triangular solve: x_i = (b_i - sum_j a_ij x_j) / a_ii, the products subtracted one by one, in the order of the row;
+	// - sparse matrix-vector product: for each row, two partial sums (even and odd positions) added at the end.
+
+	// Sum of the a_ij*x_j over the positions [begin, end) of the arrays of the matrix, as computed by Eigen's sparse
+	// matrix-vector product
+	static double RowProduct(const double* val, const SparseMatrixIndex* col, const double* x, SparseMatrixIndex begin, SparseMatrixIndex end)
+	{
+		double sumEven = 0;
+		double sumOdd = 0;
+		SparseMatrixIndex p = begin;
+		for (; p + 1 < end; p += 2)
+		{
+			sumEven += val[p] * x[col[p]];
+			sumOdd += val[p + 1] * x[col[p + 1]];
+		}
+		if (p < end)
+			sumEven += val[p] * x[col[p]];
+		return sumEven + sumOdd;
+	}
+
+	// x = (L+D)^{-1} * (b - Ux): Eigen's L_plus_D.solve(b - U*x), or L_plus_D.solve(b) if xEquals0.
+	// If Ux is given (and !xEquals0), Ux = U*x (old x).
+	void ForwardSweepKernel(const Vector& b, Vector& x, bool xEquals0, Vector* Ux)
 	{
 		const SparseMatrix& A = *this->Matrix;
-		//Vector x(A.rows());
+		const SparseMatrixIndex* outer = A.outerIndexPtr();
+		const SparseMatrixIndex* col = A.innerIndexPtr();
+		const double* val = A.valuePtr();
+		BigNumber n = A.rows();
+		if (xEquals0)
+			x.resize(n);
+		double* xp = x.data();
 
-		for (BigNumber i = 0; i < A.rows(); ++i)
+		for (BigNumber i = 0; i < n; ++i)
 		{
-			double tmp_x = b(i);
-
-			// RowMajor --> the following line iterates over the non-zeros of the i-th row.
-			for (RowMajorSparseMatrix::InnerIterator it(A, i); it; ++it)
+			SparseMatrixIndex d = _diagPos[i];
+			double tmp = b[i];
+			if (!xEquals0)
 			{
-				BigNumber j = it.col(); 
-				if (i == j) // Ui or Di
-					break;
-				assert(i > j);
-				// Li
-				double a_ij = it.value();
-				tmp_x -= a_ij * x(j);
+				double Ux_i = RowProduct(val, col, xp, d + 1, outer[i + 1]); // x_j, j > i: old values
+				if (Ux)
+					(*Ux)[i] = Ux_i;
+				tmp -= Ux_i;
 			}
-
-			x(i) = tmp_x * this->invD[i];
+			for (SparseMatrixIndex p = outer[i]; p < d; ++p) // x_j, j < i: new values
+				tmp -= val[p] * xp[col[p]];
+			xp[i] = tmp / val[d];
 		}
-		//return x;
 	}
 
-	// Solves (D+U)x=b, where U is the strictly upper triangular part of A and D the diagonal
-	void BackwardSubstitution(Vector& x, const Vector& b)
+	// x = (D+U)^{-1} * (b - Lx): Eigen's D_plus_U.solve(b - L*x), or D_plus_U.solve(b) if xEquals0.
+	// If b_Lx is given (and !xEquals0), b_Lx = b - L*x (old x).
+	void BackwardSweepKernel(const Vector& b, Vector& x, bool xEquals0, Vector* b_Lx)
 	{
 		const SparseMatrix& A = *this->Matrix;
-		//Vector x(A.rows());
+		const SparseMatrixIndex* outer = A.outerIndexPtr();
+		const SparseMatrixIndex* col = A.innerIndexPtr();
+		const double* val = A.valuePtr();
+		BigNumber n = A.rows();
+		if (xEquals0)
+			x.resize(n);
+		double* xp = x.data();
 
-		for (BigNumber i = A.rows()-1; i >= 0; --i)
+		for (BigNumber i = n; i-- > 0; )
 		{
-			double tmp_x = b(i);
-
-			// RowMajor --> the following line iterates over the non-zeros of the i-th row.
-			for (RowMajorSparseMatrix::InnerIterator it(A, i); it; ++it)
+			SparseMatrixIndex d = _diagPos[i];
+			double tmp = b[i];
+			if (!xEquals0)
 			{
-				BigNumber j = it.col();
-				if (i < j) // U
-				{
-					double a_ij = it.value();
-					tmp_x -= a_ij * x(j);
-				}
+				tmp -= RowProduct(val, col, xp, outer[i], d); // x_j, j < i: old values
+				if (b_Lx)
+					(*b_Lx)[i] = tmp;
 			}
-
-			x(i) = tmp_x * this->invD[i];
+			for (SparseMatrixIndex p = d + 1; p < outer[i + 1]; ++p) // x_j, j > i: new values
+				tmp -= val[p] * xp[col[p]];
+			xp[i] = tmp / val[d];
 		}
-		//return x;
 	}
 
-	
-	void ProcessRow(BigNumber currentRow, const Vector& b, Vector& x)
+	// result = v - U*x, or result = -U*x if v is null.
+	// The rows are independent: parallel like Eigen's product, with the same result.
+	void StrictUpperProduct(const Vector& x, const Vector* v, Vector& result) const
 	{
-		BigNumber i = currentRow;
 		const SparseMatrix& A = *this->Matrix;
-		double tmp_x = b(i);
-		double a_ii = 0;
-
-		// RowMajor --> the following line iterates over the non-zeros of the i-th row.
-		for (RowMajorSparseMatrix::InnerIterator it(A, i); it; ++it)
+		const SparseMatrixIndex* outer = A.outerIndexPtr();
+		const SparseMatrixIndex* col = A.innerIndexPtr();
+		const double* val = A.valuePtr();
+		const double* xp = x.data();
+		BigNumber n = A.rows();
+		if (v)
 		{
-			BigNumber j = it.col();
-			double a_ij = it.value();
-			if (i == j) // Di
-				a_ii = a_ij;
-			else // Li and Ui
-				tmp_x -= a_ij * x(j);
+			#pragma omp parallel for if (A.nonZeros() > 20000)
+			for (BigNumber i = 0; i < n; ++i)
+				result[i] = (*v)[i] - RowProduct(val, col, xp, _diagPos[i] + 1, outer[i + 1]);
 		}
+		else
+		{
+			#pragma omp parallel for if (A.nonZeros() > 20000)
+			for (BigNumber i = 0; i < n; ++i)
+				result[i] = -RowProduct(val, col, xp, _diagPos[i] + 1, outer[i + 1]);
+		}
+	}
 
-		x(i) = tmp_x / a_ii;
+	// result = v + L*x, or result = -L*x if v is null.
+	void StrictLowerProduct(const Vector& x, const Vector* v, Vector& result) const
+	{
+		const SparseMatrix& A = *this->Matrix;
+		const SparseMatrixIndex* outer = A.outerIndexPtr();
+		const SparseMatrixIndex* col = A.innerIndexPtr();
+		const double* val = A.valuePtr();
+		const double* xp = x.data();
+		BigNumber n = A.rows();
+		if (v)
+		{
+			#pragma omp parallel for if (A.nonZeros() > 20000)
+			for (BigNumber i = 0; i < n; ++i)
+				result[i] = (*v)[i] + RowProduct(val, col, xp, outer[i], _diagPos[i]);
+		}
+		else
+		{
+			#pragma omp parallel for if (A.nonZeros() > 20000)
+			for (BigNumber i = 0; i < n; ++i)
+				result[i] = -RowProduct(val, col, xp, outer[i], _diagPos[i]);
+		}
 	}
 };

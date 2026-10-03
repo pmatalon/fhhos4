@@ -54,8 +54,9 @@ in-house and GMSH meshes. Not covered: DG/FEM programs (disabled by default), `l
 ## Performance
 
 Performance is key for this project. Before optimizing, read `PERFORMANCE.md`: current profile, how to measure and
-validate a change (default results must stay bit-identical, the papers' iteration counts unchanged), and the ranked
-list of next ideas with their expected gains. Update it after measuring or optimizing.
+validate a change (the papers' iteration counts must stay unchanged; reordering arithmetic operations is allowed if it
+helps performance, changing the numerical method must be opt-in), and the ranked list of next ideas with their
+expected gains. Update it after measuring or optimizing.
 
 ## Run
 

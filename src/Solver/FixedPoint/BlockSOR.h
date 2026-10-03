@@ -3,6 +3,7 @@
 #include "../Direct/EigenSparseLU.h"
 #include "../Direct/EigenSparseCholesky.h"
 #include "BlockDiagonalSolver.h"
+#include "DiagonalBlockPositions.h"
 using namespace std;
 
 enum class Direction : unsigned
@@ -22,6 +23,7 @@ protected:
 	Direction _direction;
 
 	BlockDiagonalSolver diagBlockSolver; // solves the systems with the diagonal blocks
+	DiagonalBlockPositions _diagBlock;   // positions of the diagonal block in each row
 	RowMajorSparseMatrix _rowMajorA;
 public:
 	BlockSOR(int blockSize, double omega) : BlockSOR(blockSize, omega, Direction::Forward) {}
@@ -84,6 +86,7 @@ public:
 		{
 			auto nb = A.rows() / _blockSize;
 			this->diagBlockSolver.Setup(A, _blockSize);
+			_diagBlock.Setup(A, _blockSize);
 
 			this->SetupComputationalWork = nb * 2.0/3.0*pow(_blockSize, 3)*1e-6;
 		}
@@ -199,23 +202,25 @@ private:
 		x.segment(i * _blockSize, _blockSize) = -_omega * Li * x.head(i * _blockSize) - _omega * Ui * x.tail((nb - i - 1) * _blockSize) + (1 - _omega)*Di*x.segment(i * _blockSize, _blockSize) + _omega * bi;
 		x.segment(i * _blockSize, _blockSize) = this->invD.block(i * _blockSize, 0, _blockSize, _blockSize) * x.segment(i * _blockSize, _blockSize);*/
 
-		tmp_x = _omega * b.segment(currentBlockRow * _blockSize, _blockSize);
-
+		// For each row, omega * b_k + (-omega) * a_kj*x_j + ... ((1 - omega) for the coefficients of Di), the products added
+		// one by one in the order of the row. The sum of a row is a chain of dependent operations: it is kept in a register.
+		const SparseMatrixIndex* outer = A.outerIndexPtr();
+		const SparseMatrixIndex* col = A.innerIndexPtr();
+		const double* val = A.valuePtr();
+		const double* xp = x.data();
+		double offDiagCoeff = -_omega;
+		double diagCoeff = 1 - _omega;
 		for (int k = 0; k < _blockSize; k++)
 		{
-			BigNumber iBlock = currentBlockRow;
-			BigNumber i = iBlock * _blockSize + k;
-			// RowMajor --> the following line iterates over the non-zeros of the i-th row.
-			for (RowMajorSparseMatrix::InnerIterator it(A.IsRowMajor ? A : _rowMajorA, i); it; ++it)
-			{
-				auto j = it.col();
-				auto jBlock = j / this->_blockSize;
-				auto a_ij = it.value();
-				if (iBlock == jBlock) // Di
-					tmp_x(k) += (1 - _omega) * a_ij * x(j);
-				else // Li and Ui
-					tmp_x(k) += -_omega * a_ij * x(j);
-			}
+			BigNumber i = currentBlockRow * _blockSize + k;
+			double s = _omega * b[i];
+			for (SparseMatrixIndex p = outer[i]; p < _diagBlock.Begin[i]; p++) // Li
+				s += offDiagCoeff * val[p] * xp[col[p]];
+			for (SparseMatrixIndex p = _diagBlock.Begin[i]; p < _diagBlock.End[i]; p++) // Di
+				s += diagCoeff * val[p] * xp[col[p]];
+			for (SparseMatrixIndex p = _diagBlock.End[i]; p < outer[i + 1]; p++) // Ui
+				s += offDiagCoeff * val[p] * xp[col[p]];
+			tmp_x[k] = s;
 		}
 
 		auto x_i = x.segment(currentBlockRow * _blockSize, _blockSize);

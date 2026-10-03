@@ -7,7 +7,7 @@
 fingerprint() {
 	for f in "$1"/*.log; do
 		echo "## $(basename "$f")"
-		grep -E '^ *[0-9]+ +(/ *[0-9]+ +)?[0-9.]+e[+-][0-9]+' "$f" | awk '{ if ($2 == "/") print $1, $3, $4; else print $1, "-", $2 }'
+		grep -E '^ *[0-9]+ +(/ *[0-9-]+ +)?[0-9.]+e[+-][0-9]+' "$f" | awk '{ if ($2 == "/") print $1, $3, $4; else print $1, "-", $2 }'
 	done
 }
 
