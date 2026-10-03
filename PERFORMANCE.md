@@ -81,7 +81,12 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   the row, then divide by the diagonal. The build targets `-march=nocona` (no FMA): `a*b + c` is a multiplication then
   an addition, so hand-written loops reproduce these exactly (`GaussSeidel`'s kernels do).
 - **Products by zero**: `s - a*0 = s` (exactly, up to the sign of a zero `s`): the products by an initial guess x = 0
-  can be skipped (`BlockGaussSeidel` does).
+  can be skipped (`BlockGaussSeidel` does). The flag `xEquals0`, passed down the cycle, says when x = 0: in the first
+  sweep of the pre-smoother of every coarse level (the coarse correction starts from 0, `Multigrid.h`), and of the
+  fine level when the multigrid is the preconditioner of FCG (`fcguamg` etc.: each application solves A e = r from
+  e = 0, `Preconditioner.h`). Not on the fine level of a standalone multigrid (`-s uamg`, `mg`...) after its first
+  iteration, nor in the later sweeps of a pre-smoother with several iterations, the second visit of a coarse level
+  in a W-cycle, or the post-smoother.
 - **The hybrid smoothers** (`hbgs`, `hrbgs`: Gauss-Seidel inside the chunk of rows of each thread, Jacobi between
   the chunks) give results that depend on the number of threads, and vary from one parallel run to the next: a
   thread reads x while another one writes it.
@@ -112,7 +117,7 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
     store/load chain per coefficient), no integer division per coefficient (`j / blockSize`: the diagonal block is
     located in the setup), in backward sweeps the rows of a block row processed together (independent chains, and
     their memory accesses start together; in forward sweeps, row by row is faster: one sequential stream), and the
-    products by the zero initial guess skipped (the pre-smoother always starts from 0). Fine level, k=2 n=16:
+    products by the zero initial guess skipped (when `xEquals0`, see the exactness facts). Fine level, k=2 n=16:
     micro-benchmark, forward sweep 28 -> 11 ms, backward sweep 37 -> 18 ms; in the solve (35 iterations, sequential),
     pre-smoother (forward sweep from 0 + residual) 1.49 -> 0.75 s, post-smoother (backward sweep + `Ax`) 1.49 -> 0.80 s.
     The hybrid smoother (`hbgs,hrbgs`, k=2 n=16, 16 threads): solve 3.2-3.6 -> 2.6 s.
@@ -144,7 +149,13 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
 | Cube-tet k=2 n=16 | 8.5 / 3.7 s | 3.7 / 3.6 s |
 
 - **The solve barely benefits from the threads.** The sweeps of the default smoother (lexicographic Gauss-Seidel, as
-  in the paper) are sequential; only the residual/`Ax` products and the intergrid transfers are parallel.
+  in the paper) are sequential; only the residual/`Ax` products and the intergrid transfers are parallel. Those are
+  Eigen's: its row-major sparse matrix x vector product is already parallel (OpenMP, from 20000 non-zeros, dynamic
+  schedule), so rewriting it adds no parallelism. And it is memory-bound: one thread already reads ~17.5 GB/s of the
+  machine's ~35 GB/s, so the threads give at most ~2x on it (k=2, fine A: 7.4 -> 4.1 ms). Eigen's sequential
+  operations are the sparse x sparse products and the transposes (in the setup: replaced by `SparseMatrixOps`), the
+  products by a transposed matrix or a `selfadjointView` (scatters; not in the default solve path), and the
+  triangular solves (sequential by nature).
 - **Solve, k=0, sequential (0.8-0.9 s)**: the fine level is 2/3 of it: smoothing 0.42 s (post-smoother, backward
   sweep + `Ax`: 0.24 s; pre-smoother, forward sweep from 0 + residual: 0.18 s), prolongation 0.11 s, restriction
   0.10 s; level 1: 0.15 s. The fine kernels are limited by their scattered accesses to x: the numbering of the fine
@@ -160,6 +171,17 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
 - **Setup, k=2, 16 threads (3.7 s)**: sequential transposes 1.2 s (`FullFromLower(S)` 0.81 s, `R = P^T` 0.24 s,
   column-major copy of `A_T_F` in `HybridAlgebraicMesh::Build()` 0.20 s); products 1.2 s (including `P^T*S` 0.52 s
   and `(P^T*S)*P` 0.43 s); `Theta()` 0.28 s; P chaining 0.20 s; hybrid meshes 0.4 s.
+- **Eigen's own kernels are at the hardware limit: neither rewriting them nor BLAS/LAPACK would help** (micro-benchmark,
+  2026-10-03, exported matrices of Cube-tet k=0 n=32 and k=2 n=16, flags of the build). Sparse matrix-vector product
+  (`A`, `P`, `R` of levels 0-1): hand-written CSR loops (1 or 4 accumulators) take the same time as Eigen's, within the
+  noise. At k=2, Eigen's reaches 18 GB/s sequential and 32 GB/s on 16 threads, for a read bandwidth of 17.5 / 35 GB/s.
+  At k=0, the fine `A` (12 GB/s) and `R` stay below it because of their scattered accesses to x (see above), which no
+  SpMV implementation avoids. OpenBLAS (in the conda env; it selects AVX2 kernels at runtime): `ddot`/`daxpy` take the
+  same time as Eigen (n ~300k, ~0.05-0.1 ms). On the 6x6 diagonal blocks (k=2), LAPACK `dgetrs` is 1.8x slower than
+  Eigen's `PartialPivLU::solve` (126 vs 70 ns per block) and BLAS `dgemv` 2.1x slower than Eigen's product (43 vs
+  20 ns): the call overhead dominates at this size. The rewritten smoothers are faster because they read the matrix
+  fewer times, skip work and run in parallel (see Done), not because their primitives are faster than Eigen's. The
+  remaining gains are in fewer bytes per non-zero (block CSR), locality, and fused passes.
 
 ## Next ideas, by expected gain
 
@@ -216,11 +238,32 @@ Other candidates:
   kernels only (micro-benchmark, RCM): k=0 n=32, mean |i-j| 38000 -> 1900, fine SpMV 2.7 -> 2.0 ms, Gauss-Seidel
   sweeps -5 to -15%; k=2 n=16: ~-10%. Changes the order of the Gauss-Seidel sweeps, hence the iteration counts:
   opt-in only, and the gain is modest. Not worth it on its own.
-- **Restriction without R** — estimated. `rc = P^T r` computed from the rows of P (scatter): R (= P^T, as many
-  non-zeros as P) needs neither to be stored (25 MB at k=0 n=32, 115 MB at k=2 n=16) nor transposed in the setup
-  (`R = P^T`: 0.24 s at k=2, see idea 2). The scatter sums in another order than `R * r` (allowed); to be
-  bit-identical, it would have to reproduce the two partial sums of Eigen's product (parity of the position of each
-  coefficient in its row of R). The speed of the restriction itself: to measure.
+- **Restriction without R** — measured (micro-benchmark, 2026-10-03): slower, saves memory only. `rc = P^T r` computed
+  from the rows of P (row i adds `r_i P(i,:)` into rc, a scatter): R (= P^T, as many non-zeros as P) is then neither
+  stored (25 MB at k=0 n=32, 115 MB at k=2 n=16) nor transposed in the setup (`R = P^T`: 0.24 s at k=2, see idea 2).
+  But the scatter is slower than Eigen's `R * r`: k=0, 2.9 vs 2.0 ms sequential, 2.0 vs 0.9 ms on 16 threads
+  (per-thread coarse vectors, then summed); k=2, 6.6 vs 6.3 ms and 4.9 vs 3.4 ms. Consecutive fine faces add into the
+  same coarse entries (a dependency through memory), and the parallel version pays for its buffers and their sum.
+  Keep R, unless memory runs short. This is not matrix-free: P is still stored (see the next item).
+- **Matrix-free prolongation** (P not stored, applied from its factors) — estimated, medium effort, small gain.
+  Structure of P_F (`-prolong 6`, `BuildProlongation`): P = E_K Q_F + E_R J Y, with Y = E_R Π Θ + E_K Q_F. E_K and
+  E_R select the rows of the kept faces (41-43% of the fine faces; Q_F injects the coarse face: 1 non-zero per row)
+  and of the removed faces (interior to an aggregate). Θ = -A_TcTc^-1 A_TcFc is the reconstruction in the coarse
+  cells, and Π copies the constant mode of the coarse cell to the first coefficient of the removed face (only row 0
+  of Θ is used). J = I - (2/3) D^-1 S is block Jacobi, used on the removed rows only. The product J Y fills in: a
+  removed row of P has 11 non-zeros at k=0 and 62 at k=2, against 7 and 40 in the same row of S. Applying P e from
+  the factors: Y (row 0 of Θ per coarse cell, injection on the kept faces), then `Y - (2/3) D^-1 (S Y)` on the
+  removed rows. That reads ~25-35% fewer bytes than P (S's removed rows + the D^-1 blocks: 7 MB at k=2), but gathers
+  in the fine vector Y, with the poor locality of the fine numbering, whereas `P * e` gathers in the coarse vector,
+  which stays in cache. Estimate: prolongation -20-30% at k=2, perhaps more at k=0, where `P * e` (3.0 ms, 10 GB/s)
+  is slowed by its many 1-non-zero rows. That is 2-4% of the solve. Applying P^T matrix-free is worse: a full product
+  by S, plus scatters into the coarse vector (slower, see above). So restriction would keep `R * r`, and R is as
+  large as P. Drawbacks: one implementation per prolongation option; the coarse mesh data (aggregates, Θ, D^-1) must
+  survive the setup in compact arrays; the setup still builds P for the Galerkin product P^T S P (the peak memory
+  doesn't drop). Rounding-level differences (the factors are applied in another order, and the coefficients <= 1e-15
+  of P are no longer dropped): check the iteration counts. A cheaper first step, with the same gain on the 1-non-zero
+  rows: store the kept faces of P as an index array (coarse face of each kept face: a copy, bit-identical) and only
+  the removed rows in CSR.
 - **Prolongation in place**: `x.noalias() += P*e` instead of `x += P*e` (a temporary): bit-identical, -5..10% of the
   prolongation (micro-benchmark), ~1% of the solve; needs a `Level::AddProlongation()` (U-AMG overrides `Prolong()`).
 

@@ -58,6 +58,12 @@ validate a change (the papers' iteration counts must stay unchanged; reordering 
 helps performance, changing the numerical method must be opt-in), and the ranked list of next ideas with their
 expected gains. Update it after measuring or optimizing.
 
+Measured, so don't re-litigate without new data: Eigen's kernels (sparse matrix x vector, vector operations, small
+dense block solves) run at the hardware limit, and its row-major sparse matrix x vector product is already parallel
+(OpenMP). Hand-written copies or BLAS/LAPACK don't make them faster. The gains come from reading the matrices fewer
+times (fused passes), skipping work, storing fewer bytes, and parallelizing what Eigen does sequentially (sparse x
+sparse products, transposes).
+
 ## Run
 
 ```bash
