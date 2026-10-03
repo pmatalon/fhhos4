@@ -51,6 +51,12 @@ iteration counts of the papers in `reproducibility/` — see `tests/README.md`. 
 in-house and GMSH meshes. Not covered: DG/FEM programs (disabled by default), `lu`/`cg`/`agmg`/`p_mg` solvers,
 1D, anisotropic cases.
 
+## Performance
+
+Performance is key for this project. Before optimizing, read `PERFORMANCE.md`: current profile, how to measure and
+validate a change (default results must stay bit-identical, the papers' iteration counts unchanged), and the ranked
+list of next ideas with their expected gains. Update it after measuring or optimizing.
+
 ## Run
 
 ```bash
