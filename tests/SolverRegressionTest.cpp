@@ -133,6 +133,70 @@ TEST_P(GalerkinProlongationDefaultsTest, ExplicitMultigridRequiresGalerkinOperat
 }
 
 INSTANTIATE_TEST_SUITE_P(Prolongation, GalerkinProlongationDefaultsTest, ::testing::Values(4, 5));
+
+#ifdef CGAL_ENABLED
+namespace
+{
+	// Polygonal mesh built by agglomeration of a GMSH Cartesian mesh. The agglomeration depends on the
+	// thread scheduling: run it under SequentialExecution for reproducible results.
+	ProgramArguments SquarePolyArgs(FaceCoarseningStrategy faceCoarsening, int k, int n)
+	{
+		ProgramArguments args;
+		args.Problem.GeoCode = "square";
+		args.Discretization.MeshCode = "poly";
+		args.Discretization.PolyMeshFaceCoarseningStgy = faceCoarsening;
+		args.Discretization.N = n;
+		args.Discretization.PolyDegree = k + 1;
+		return args;
+	}
+}
+
+// With -polymesh-fcs n (the fine faces are kept), neighbouring polygons can share several faces.
+// U-AMG listed such a neighbour once per shared face, and the ordering of the cells for the
+// pairwise aggregation then wrote past the end of its array (heap corruption, crash).
+//   ./bin/fhhos4 -geo square -mesh poly -polymesh-fcs n -k {0|1} -n 64 -s fcguamg -threads 1
+class PolygonalMeshUAMGTest : public ::testing::TestWithParam<int>
+{
+};
+
+TEST_P(PolygonalMeshUAMGTest, Converges)
+{
+	SequentialExecution sequential;
+	ProgramArguments args = SquarePolyArgs(FaceCoarseningStrategy::None, GetParam(), 64);
+	args.Solver.SolverCode = "fcguamg";
+
+	ProgramResults results = RunDiffusionHHO(args);
+	EXPECT_GT(results.IterationCount, 0);
+	EXPECT_LE(results.IterationCount, 30);
+}
+
+INSTANTIATE_TEST_SUITE_P(SquarePoly, PolygonalMeshUAMGTest, ::testing::Values(0, 1));
+
+// The default coarsening strategy of the geometric multigrid on polygonal meshes was the independent
+// remeshing by GMSH (-cs m), which these meshes, built by agglomeration, don't support: the default
+// is now the agglomeration coarsening (-cs n).
+//   ./bin/fhhos4 -geo square -mesh poly -k {0|1} -n 64 -s mg -threads 1
+class PolygonalMeshMultigridDefaultsTest : public ::testing::TestWithParam<int>
+{
+};
+
+TEST_P(PolygonalMeshMultigridDefaultsTest, Converges)
+{
+	SequentialExecution sequential;
+	ProgramArguments args = SquarePolyArgs(FaceCoarseningStrategy::InterfaceCollapsing, GetParam(), 64);
+	args.Solver.SolverCode = "mg";
+
+	ProgramArguments defaults = args;
+	ApplyProgramArgumentDefaults(defaults);
+	EXPECT_TRUE(defaults.Solver.MG.H_CS == H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours);
+
+	ProgramResults results = RunDiffusionHHO(args);
+	EXPECT_GT(results.IterationCount, 0);
+	EXPECT_LE(results.IterationCount, 30);
+}
+
+INSTANTIATE_TEST_SUITE_P(SquarePoly, PolygonalMeshMultigridDefaultsTest, ::testing::Values(0, 1));
+#endif // CGAL_ENABLED
 #endif // ENABLE_2D
 
 // ThreadLocal: with schedule(static), the thread-local results taken in thread order follow the

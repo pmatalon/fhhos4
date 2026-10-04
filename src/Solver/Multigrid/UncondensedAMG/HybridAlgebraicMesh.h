@@ -186,7 +186,13 @@ public:
 					if (neighbour->Number != elem.Number)
 					{
 						double coupling = this->CouplingValue(elem.FaceTraces[i], neighbour->FaceTrace(face));
-						elem.Neighbours.push_back({ neighbour, coupling });
+						// A neighbour sharing several faces with elem (polygonal meshes built with -polymesh-fcs n) is
+						// listed once, with the sum of the couplings through these faces
+						auto it = find_if(elem.Neighbours.begin(), elem.Neighbours.end(), [neighbour](const pair<HybridAlgebraicElement*, double>& n) { return n.first == neighbour; });
+						if (it == elem.Neighbours.end())
+							elem.Neighbours.push_back({ neighbour, coupling });
+						else
+							it->second += coupling;
 					}
 				}
 			}

@@ -4,10 +4,12 @@
 //
 // The meshes are built by GMSH. The tests check the current iteration counts; the paper's values
 // (Tables 1 and 3 of revision 2) are given for comparison, and are all reproduced except one.
+// On the polygonal meshes (Figs. 3-5), they check the convergence order of the L2 error.
 // To keep the suite fast, only the smallest mesh sizes and k = 0, 1 are tested.
 #include <gtest/gtest.h>
 #include <string>
 #include <tuple>
+#include <utility>
 #include <vector>
 #include "support/RunHelper.h"
 
@@ -52,6 +54,57 @@ INSTANTIATE_TEST_SUITE_P(Square, BiharSquareCartTest, ::testing::Values(
 	// N=32: 30 iterations, as in the paper, when the mesh is loaded from the GMSH cache, whose vertex
 	// coordinates differ by ~1e-14 (see tests/README.md): the unpreconditioned FCG is sensitive to it.
 	std::make_tuple(std::string("no"), 1, std::vector<ExpectedIterations>{ { 32, 28, 30 }, { 64, 36, 36 } })));
+
+#ifdef CGAL_ENABLED
+// Figs. 3-5: square, polygonal mesh (agglomeration of a GMSH Cartesian mesh). The paper plots the
+// errors: the test checks the convergence order of the L2 error (h^2 for k=0, h^(k+2) for k>=1, as on
+// the Cartesian mesh), and the current iteration counts (not reported in the paper). The polygonal
+// mesh depends on the thread scheduling of the agglomeration: the runs are sequential.
+class BiharSquarePolyTest : public ::testing::TestWithParam<std::tuple<int, std::vector<std::pair<int, int>>>> // k, (N, iterations)
+{
+};
+
+//   ./bin/fhhos4 -pb bihar -geo square -source exp -s ch -bihar-prec s -nbh-depth 8 -bihar-prec-solver bicgstab -mesh poly -polymesh-init cart -polymesh-n-pass 1 -polymesh-fcs c -k {0|1} -n {16|32} -tol 1e-10 -threads 1 -no-cache
+TEST_P(BiharSquarePolyTest, ConvergenceOrderAndIterationCounts)
+{
+	auto [k, expected] = GetParam();
+	SequentialExecution sequential;
+
+	std::vector<double> h;
+	std::vector<double> errors;
+	for (auto [N, iterations] : expected)
+	{
+		ProgramArguments args;
+		args.Problem.GeoCode = "square";
+		args.Problem.SourceCode = "exp";
+		args.Discretization.MeshCode = "poly";
+		args.Discretization.PolyMeshInitialMesh = "cart";
+		args.Discretization.PolyMeshNAggregPasses = 1;
+		args.Discretization.PolyMeshFaceCoarseningStgy = FaceCoarseningStrategy::InterfaceCollapsing; // -polymesh-fcs c
+		args.Discretization.N = N;
+		args.Discretization.PolyDegree = k + 1;
+		args.Solver.SolverCode = "ch";
+		args.Solver.NeighbourhoodDepth = 8;
+		args.Solver.BiHarmonicPrecSolverCode = "bicgstab";
+		args.Solver.Tolerance = 1e-10;
+		args.Solver.BiHarmonicPreconditionerCode = "s";
+		args.Actions.UseCache = false; // -no-cache
+
+		ProgramResults results = RunBiHarmonicHHO(args);
+		EXPECT_EQ(results.IterationCount, iterations) << "N=" << N;
+		ASSERT_GT(results.L2Error, 0);
+		h.push_back(1.0 / N);
+		errors.push_back(results.L2Error);
+	}
+
+	double expectedOrder = (k == 0) ? 2.0 : static_cast<double>(k + 2);
+	EXPECT_NEAR(EstimateConvergenceOrder(h, errors), expectedOrder, 0.3);
+}
+
+INSTANTIATE_TEST_SUITE_P(Square, BiharSquarePolyTest, ::testing::Values(
+	std::make_tuple(0, std::vector<std::pair<int, int>>{ { 16, 6 }, { 32, 13 } }),
+	std::make_tuple(1, std::vector<std::pair<int, int>>{ { 16, 6 }, { 32, 13 } })));
+#endif // CGAL_ENABLED
 #endif // ENABLE_2D
 
 #ifdef ENABLE_3D

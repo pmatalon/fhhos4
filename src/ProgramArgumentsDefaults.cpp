@@ -267,7 +267,9 @@ void ApplyProgramArgumentDefaults(ProgramArguments& args,
 
 		if (args.Solver.MG.H_CS == H_CoarsStgy::None)
 		{
-			if (args.Problem.Dimension < 3)
+			if (args.Discretization.MeshCode.compare("poly") == 0)
+				args.Solver.MG.H_CS = H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours; // built by agglomeration: neither remeshed nor refined
+			else if (args.Problem.Dimension < 3)
 			{
 				if (args.Solver.MG.GMG_H_Prolong == GMG_H_Prolongation::Default)
 				{

@@ -54,4 +54,12 @@ TEST_P(ConvergenceOrderTest, MatchesTheoreticalOrder)
 
 INSTANTIATE_TEST_SUITE_P(Square, ConvergenceOrderTest,
 	::testing::Combine(::testing::Values(std::string("cart"), std::string("stri")), ::testing::Values(0, 1, 2, 3)));
+
+// In-house quadrilateral mesh (trapezoids: -stretch 0.5 by default). Its elements had no physical
+// part, and the assembly crashed. Only k=0: the quadrilateral elements use the polynomials of the
+// reference square mapped by the bilinear map, which are not polynomials on a trapezoid, and the
+// orders k>=1 don't converge at their theoretical rates.
+//   ./bin/fhhos4 -geo square -mesh quad -mesher inhouse -s ch -k 0 -n {8|16|32}
+INSTANTIATE_TEST_SUITE_P(SquareQuad, ConvergenceOrderTest,
+	::testing::Combine(::testing::Values(std::string("quad")), ::testing::Values(0)));
 #endif // ENABLE_2D

@@ -1,5 +1,6 @@
 #pragma once
 #include "../../Mesh/PolyhedralMesh.h"
+#include "../SquareGeometry.h"
 using namespace std;
 
 class Square_QuadrilateralAsPolygonalMesh : public PolyhedralMesh<2>
@@ -19,6 +20,17 @@ public:
 
 		assert(xShiftAsFraction >= 0 && xShiftAsFraction < 1);
 		double xShift = xShiftAsFraction * hx;
+
+		// Physical and boundary parts
+		if (this->PhysicalParts.empty())
+			this->PhysicalParts = SquareGeometry::PhysicalParts();
+		PhysicalGroup<2>* domain = this->PhysicalParts[0];
+		if (this->BoundaryParts.empty())
+			this->BoundaryParts = SquareGeometry::BoundaryParts();
+		BoundaryGroup* squareBottomBoundary = this->BoundaryParts[0];
+		BoundaryGroup* squareRightBoundary = this->BoundaryParts[1];
+		BoundaryGroup* squareTopBoundary = this->BoundaryParts[2];
+		BoundaryGroup* squareLeftBoundary = this->BoundaryParts[3];
 
 		//----------//
 		// Vertices //
@@ -55,6 +67,7 @@ public:
 				Vertex* bottomRightCorner = Vertices[indexV(ix + 1, iy    )];
 				vector<Vertex*> vertices = { bottomLeftCorner, bottomRightCorner, topRightCorner, topLeftCorner };
 				PolygonalElement* p = new PolygonalElement(number, vertices);
+				p->PhysicalPart = domain;
 				this->Elements.push_back(p);
 			}
 		}
@@ -74,6 +87,7 @@ public:
 			this->Faces.push_back(southBoundary);
 			this->BoundaryFaces.push_back(southBoundary);
 			p->AddFace(southBoundary);
+			southBoundary->BoundaryPart = squareBottomBoundary;
 
 			// North boundary
 			p = dynamic_cast<PolygonalElement*>(this->Elements[index(ix, ny - 1)]);
@@ -81,6 +95,7 @@ public:
 			this->Faces.push_back(northBoundary);
 			this->BoundaryFaces.push_back(northBoundary);
 			p->AddFace(northBoundary);
+			northBoundary->BoundaryPart = squareTopBoundary;
 		}
 
 		for (BigNumber iy = 0; iy < ny; ++iy)
@@ -91,6 +106,7 @@ public:
 			this->Faces.push_back(westBoundary);
 			this->BoundaryFaces.push_back(westBoundary);
 			p->AddFace(westBoundary);
+			westBoundary->BoundaryPart = squareLeftBoundary;
 
 			// East boundary
 			p = dynamic_cast<PolygonalElement*>(this->Elements[index(nx-1, iy)]);
@@ -98,6 +114,7 @@ public:
 			this->Faces.push_back(eastBoundary);
 			this->BoundaryFaces.push_back(eastBoundary);
 			p->AddFace(eastBoundary);
+			eastBoundary->BoundaryPart = squareRightBoundary;
 		}
 
 		for (BigNumber iy = 0; iy < ny; iy++)

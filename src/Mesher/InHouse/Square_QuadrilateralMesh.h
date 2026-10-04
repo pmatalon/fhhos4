@@ -1,6 +1,7 @@
 #pragma once
 #include "../../Mesh/2D/QuadrilateralElement.h"
 #include "../../Mesh/PolyhedralMesh.h"
+#include "../SquareGeometry.h"
 using namespace std;
 
 class Square_QuadrilateralMesh : public PolyhedralMesh<2>
@@ -22,6 +23,17 @@ public:
 
 		assert(xShiftAsFraction >= 0 && xShiftAsFraction < 1);
 		double xShift = xShiftAsFraction * hx;
+
+		// Physical and boundary parts
+		if (this->PhysicalParts.empty())
+			this->PhysicalParts = SquareGeometry::PhysicalParts();
+		PhysicalGroup<2>* domain = this->PhysicalParts[0];
+		if (this->BoundaryParts.empty())
+			this->BoundaryParts = SquareGeometry::BoundaryParts();
+		BoundaryGroup* squareBottomBoundary = this->BoundaryParts[0];
+		BoundaryGroup* squareRightBoundary = this->BoundaryParts[1];
+		BoundaryGroup* squareTopBoundary = this->BoundaryParts[2];
+		BoundaryGroup* squareLeftBoundary = this->BoundaryParts[3];
 
 		//----------//
 		// Vertices //
@@ -57,6 +69,7 @@ public:
 				Vertex* topRightCorner    = Vertices[indexV(ix + 1, iy + 1)];
 				Vertex* bottomRightCorner = Vertices[indexV(ix + 1, iy    )];
 				QuadrilateralElement* quad = new QuadrilateralElement(number, bottomLeftCorner, bottomRightCorner, topRightCorner, topLeftCorner);
+				quad->PhysicalPart = domain;
 				this->Elements.push_back(quad);
 			}
 		}
@@ -76,6 +89,7 @@ public:
 			this->Faces.push_back(southBoundary);
 			this->BoundaryFaces.push_back(southBoundary);
 			quad->AddFace(southBoundary);
+			southBoundary->BoundaryPart = squareBottomBoundary;
 
 			// North boundary
 			quad = dynamic_cast<QuadrilateralElement*>(this->Elements[index(ix, ny - 1)]);
@@ -83,6 +97,7 @@ public:
 			this->Faces.push_back(northBoundary);
 			this->BoundaryFaces.push_back(northBoundary);
 			quad->AddFace(northBoundary);
+			northBoundary->BoundaryPart = squareTopBoundary;
 		}
 
 		for (BigNumber iy = 0; iy < ny; ++iy)
@@ -93,6 +108,7 @@ public:
 			this->Faces.push_back(westBoundary);
 			this->BoundaryFaces.push_back(westBoundary);
 			quad->AddFace(westBoundary);
+			westBoundary->BoundaryPart = squareLeftBoundary;
 
 			// East boundary
 			quad = dynamic_cast<QuadrilateralElement*>(this->Elements[index(nx-1, iy)]);
@@ -100,6 +116,7 @@ public:
 			this->Faces.push_back(eastBoundary);
 			this->BoundaryFaces.push_back(eastBoundary);
 			quad->AddFace(eastBoundary);
+			eastBoundary->BoundaryPart = squareRightBoundary;
 		}
 
 		for (BigNumber iy = 0; iy < ny; iy++)
