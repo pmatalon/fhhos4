@@ -2,6 +2,7 @@
 #include <mutex>
 #include <unsupported/Eigen/SparseExtra>
 #include "HybridAlgebraicMesh.h"
+#include "LocalMatrices.h"
 #include "../AggregAMG/AlgebraicMesh.h"
 #include "../Level.h"
 #include "../../../Utils/SparseMatrixOps.h"
@@ -37,6 +38,10 @@ public:
 	// If not computed, the coarse level's A_F_F is null.
 	bool ComputeCoarseA_F_F = true;
 	bool ComputeQ_F = true;
+
+	// Local matrices of the operator, shared by the levels (set by UncondensedAMG). If null, the Galerkin products
+	// of the coarsening passes are global sparse products.
+	LocalOperator* LocalOp = nullptr;
 
 public:
 	UncondensedLevel(int number, int degree, int cellBlockSize, int faceBlockSize, double strongCouplingThreshold, UAMGFaceProlongation faceProlong, UAMGProlongation coarseningProlong, UAMGProlongation mgProlong)
@@ -104,7 +109,7 @@ public:
 		while (!CoarseningCriteriaReached(coarseningStgy, requestedCoarseningFactor, nCoarsenings, actualCoarseningFactor))
 		{
 			// Coarsening
-			std::tie(coarseMesh, auxP, auxQ_F, auxSchur, coarsestPossibleMeshReached) = Coarsen(*mesh, *schur, coarseningStgy, faceCoarseningStgy);
+			std::tie(coarseMesh, auxP, auxQ_F, auxSchur, coarsestPossibleMeshReached) = Coarsen(*mesh, schur, coarseningStgy, faceCoarseningStgy);
 			if (coarsestPossibleMeshReached)
 				return;
 
@@ -176,14 +181,21 @@ public:
 			this->A_T_Fc = std::move(*coarseMesh->A_T_F);
 			if (coarseMesh->A_F_F)
 				this->A_F_Fc = std::move(*coarseMesh->A_F_F);
-			this->Ac     = std::move(*schur);
+			if (LocalGalerkinProducts())
+			{
+				// The operator of the level is only assembled here (for the smoothers and the coarse solver)
+				this->Ac = LocalOp->Current.Assemble(this->A_T_Fc.cols() / _faceBlockSize);
+				LocalOp->Assembled = &this->Ac;
+			}
+			else
+				this->Ac = std::move(*schur);
 		}
 		else
 		{
 			// Multigrid prolongation
 			SparseMatrix Q_T = BuildQ_T(initialFineMesh);
 			coarseMesh->BuildElementFaces(); // the coarse cells and faces are used by the reconstruction (Theta)
-			SparseMatrix* P = BuildProlongation(_multigridProlong, initialFineMesh, *this->OperatorMatrix, *coarseMesh, Q_T, &Q_F);
+			SparseMatrix* P = BuildProlongation(_multigridProlong, initialFineMesh, this->OperatorMatrix, *coarseMesh, Q_T, &Q_F);
 			this->P = std::move(*P);
 			delete P;
 
@@ -297,9 +309,24 @@ public:
 
 
 
-	// Returns <coarseMesh, P, Q_F, schurc, coarsestPossibleMeshReached>
-	tuple<HybridAlgebraicMesh*, SparseMatrix*, SparseMatrix*, SparseMatrix*, bool> Coarsen(HybridAlgebraicMesh& mesh, const SparseMatrix& schur, H_CoarsStgy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy)
+	// The Galerkin products of the coarsening passes are computed locally (see LocalMatrices) if the coarsening
+	// prolongation sends the faces of a cell only to the coarse faces of its aggregate: with the face prolongations
+	// with interface collapsing, and the coarsening prolongations made of the face prolongation on the kept faces.
+	bool LocalGalerkinProducts() const
 	{
+		bool interfaceCollapsing = _faceProlong == UAMGFaceProlongation::BoundaryAggregatesInteriorAverage || _faceProlong == UAMGFaceProlongation::BoundaryAggregatesInteriorZero;
+		bool localProlongation = _coarseningProlong == UAMGProlongation::FaceProlongation || _coarseningProlong == UAMGProlongation::FaceProlongationAndInteriorSmoothing
+			|| _coarseningProlong == UAMGProlongation::ReconstructTraceOrInject || _coarseningProlong == UAMGProlongation::ReconstructSmoothedTraceOrInject;
+		return LocalOp && interfaceCollapsing && localProlongation;
+	}
+
+	// Returns <coarseMesh, P, Q_F, schurc, coarsestPossibleMeshReached>.
+	// With the local Galerkin products, schur is null after the first coarsening pass of the level, and schurc is
+	// not assembled (null): the local matrices of the operators are in LocalOp.
+	tuple<HybridAlgebraicMesh*, SparseMatrix*, SparseMatrix*, SparseMatrix*, bool> Coarsen(HybridAlgebraicMesh& mesh, const SparseMatrix* schur, H_CoarsStgy elemCoarseningStgy, FaceCoarseningStrategy faceCoarseningStgy)
+	{
+		bool local = LocalGalerkinProducts();
+
 		//ExportMatrix(A_T_T, "A_T_T", 0);
 		//ExportMatrix(A_T_F, "A_T_F", 0);
 		//ExportMatrix(A_F_F, "A_F_F", 0);
@@ -314,6 +341,13 @@ public:
 			mesh.Coarsen(elemCoarseningStgy, faceCoarseningStgy, coarsestPossibleMeshReached);
 			if (coarsestPossibleMeshReached)
 				return { nullptr, nullptr, nullptr, nullptr, coarsestPossibleMeshReached };
+		}
+
+		// Local matrices of the operator, if they don't come from the previous coarsening pass
+		if (local && schur && LocalOp->Assembled != schur)
+		{
+			LocalOp->Current.Decompose(*schur, mesh, _faceBlockSize);
+			LocalOp->Assembled = schur;
 		}
 
 		// Cell-prolongation operator with only one 1 coefficient per row
@@ -334,7 +368,7 @@ public:
 		{
 			AlgebraicMesh skeleton(_faceBlockSize, 0);
 			//skeleton.Build(*A_F_F);
-			skeleton.Build(schur);
+			skeleton.Build(*schur);
 			skeleton.PairWiseAggregate(coarsestPossibleMeshReached);
 			if (coarsestPossibleMeshReached)
 				return { nullptr, nullptr, nullptr, nullptr, coarsestPossibleMeshReached };
@@ -365,16 +399,26 @@ public:
 		ExportMatrix(*A_T_Fc_tmp, "A_T_Fc", 0);*/
 
 		// Multigrid prolongation
-		SparseMatrix* P = BuildProlongation(this->_coarseningProlong, mesh, schur, auxCoarseMesh, Q_T, Q_F);
+		SparseMatrix* P = BuildProlongation(this->_coarseningProlong, mesh, schur, auxCoarseMesh, Q_T, Q_F, local ? &LocalOp->Current : nullptr);
 
 		SparseMatrix* A_T_Fc = new SparseMatrix(SparseMatrixOps::Multiply(Q_Tt_A_T_F, *P)); // Kills -prolong 1 or 2 because P is then very dense
 		//SparseMatrix* A_T_Fc = A_T_Fc_tmp;
 
-		SparseMatrix Pt = SparseMatrixOps::Transpose(*P);
+		SparseMatrix Pt;
+		if (ComputeCoarseA_F_F || !local)
+			Pt = SparseMatrixOps::Transpose(*P);
 		SparseMatrix* A_F_Fc = nullptr;
 		if (ComputeCoarseA_F_F)
 			A_F_Fc = new SparseMatrix(SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(Pt, SparseMatrixOps::FullFromLower(*mesh.A_F_F)), *P));
-		SparseMatrix* schurc = new SparseMatrix(SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(Pt, SparseMatrixOps::FullFromLower(schur)), *P));
+		SparseMatrix* schurc = nullptr;
+		if (local)
+		{
+			LocalOp->Next.GalerkinProduct(LocalOp->Current, mesh, *P);
+			LocalOp->Current.Swap(LocalOp->Next);
+			LocalOp->Assembled = nullptr;
+		}
+		else
+			schurc = new SparseMatrix(SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(Pt, SparseMatrixOps::FullFromLower(*schur)), *P));
 
 		HybridAlgebraicMesh* coarseMesh = new HybridAlgebraicMesh(A_T_Tc, A_T_Fc, A_F_Fc, _cellBlockSize, _faceBlockSize, _strongCouplingThreshold);
 		
@@ -383,8 +427,10 @@ public:
 
 
 
-	SparseMatrix* BuildProlongation(UAMGProlongation prolong, HybridAlgebraicMesh& mesh, const SparseMatrix& schur, HybridAlgebraicMesh& coarseMesh,
-									const SparseMatrix& Q_T, SparseMatrix* Q_F)
+	// The block Jacobi smoothing of the prolongations 4 and 6 uses the rows of the removed faces of the operator, schur,
+	// or, if they are given, the local matrices of the operator (schur is then not used).
+	SparseMatrix* BuildProlongation(UAMGProlongation prolong, HybridAlgebraicMesh& mesh, const SparseMatrix* schur, HybridAlgebraicMesh& coarseMesh,
+									const SparseMatrix& Q_T, SparseMatrix* Q_F, const LocalMatrices* localSchur = nullptr)
 	{
 		SparseMatrix* P;
 		if (prolong == UAMGProlongation::ReconstructionTrace) // 1
@@ -407,7 +453,8 @@ public:
 
 			// Smoothing (only the rows of the removed faces are kept)
 			BlockJacobi blockJacobi(_faceBlockSize, 2.0 / 3.0);
-			blockJacobi.Setup(schur);
+			SparseMatrix removedRows;
+			SetupBlockJacobiOnRemovedFaces(blockJacobi, isRemoved, schur, localSchur, removedRows);
 			SparseMatrix J = blockJacobi.IterationMatrix(isRemoved);
 
 			SparseMatrix smoothedQ_F = SparseMatrixOps::Multiply(J, *Q_F);
@@ -436,7 +483,8 @@ public:
 
 			// Smoothing (only the rows of the removed faces are kept: the matrix J is not assembled for the others)
 			BlockJacobi blockJacobi(_faceBlockSize, 2.0/3.0);
-			blockJacobi.Setup(schur);
+			SparseMatrix removedRows;
+			SetupBlockJacobiOnRemovedFaces(blockJacobi, isRemoved, schur, localSchur, removedRows);
 			SparseMatrix J = blockJacobi.IterationMatrix(isRemoved);
 
 			SparseMatrix ReconstructAndSmoothedTrace = SparseMatrixOps::Multiply(J, ReconstructTraceOrInject);
@@ -585,6 +633,19 @@ public:
 			Utils::FatalError("Unmanaged prolongation");
 
 		return P;
+	}
+
+	// Block Jacobi for the rows of the removed faces only: from the operator schur, or from its local matrices, whose
+	// rows of the removed faces are assembled in removedRows (which must live as long as blockJacobi is used)
+	void SetupBlockJacobiOnRemovedFaces(BlockJacobi& blockJacobi, const vector<bool>& isRemoved, const SparseMatrix* schur, const LocalMatrices* localSchur, SparseMatrix& removedRows)
+	{
+		if (localSchur)
+		{
+			removedRows = localSchur->Assemble(isRemoved.size(), &isRemoved);
+			blockJacobi.SetupForIterationMatrix(removedRows, isRemoved);
+		}
+		else
+			blockJacobi.SetupForIterationMatrix(*schur, isRemoved);
 	}
 
 	void SetupDiscretizedOperator() override

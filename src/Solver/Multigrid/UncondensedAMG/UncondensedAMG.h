@@ -15,6 +15,7 @@ private:
 	int _cellBlockSize;
 	int _faceBlockSize;
 	double _strongCouplingThreshold;
+	LocalOperator _localOperator; // local matrices of the operators of the coarsening passes, during the setup
 public:
 
 	UncondensedAMG(int dim, int degree, int cellBlockSize, int faceBlockSize, double strongCouplingThreshold, UAMGFaceProlongation faceProlong, UAMGProlongation coarseningProlong, UAMGProlongation mgProlong, int nLevels = 0)
@@ -88,6 +89,7 @@ public:
 		fine->A_T_T = &A_T_T;
 		fine->A_T_F = &A_T_F;
 		fine->A_F_F = &A_F_F;
+		fine->LocalOp = &_localOperator;
 
 		if (Utils::IsRefinementStrategy(this->H_CS))
 			this->H_CS = H_CoarsStgy::MultiplePairwiseAggregation;
@@ -95,6 +97,10 @@ public:
 			this->CoarseningFactor = 3.8;
 
 		Multigrid::Setup(A);
+
+		_localOperator.Current.Free();
+		_localOperator.Next.Free();
+		_localOperator.Assembled = nullptr;
 	}
 
 	Vector Solve(const Vector& b, string initialGuessCode) override
@@ -142,13 +148,16 @@ protected:
 
 		UncondensedLevel* fine = dynamic_cast<UncondensedLevel*>(fineLevel);
 
+		UncondensedLevel* coarse;
 		if (coarseningType == CoarseningType::P)
 		{
 			int coarseCellBlockSize = Utils::Binomial(coarseDegree + _dim    , coarseDegree);
 			int coarseFaceBlockSize = Utils::Binomial(coarseDegree + _dim - 1, coarseDegree);
-			return CreateLevel(fine->Number + 1, coarseDegree, coarseCellBlockSize, coarseFaceBlockSize);
+			coarse = CreateLevel(fine->Number + 1, coarseDegree, coarseCellBlockSize, coarseFaceBlockSize);
 		}
 		else
-			return CreateLevel(fine->Number + 1, fine->PolynomialDegree(), fine->CellBlockSize(), fine->FaceBlockSize());
+			coarse = CreateLevel(fine->Number + 1, fine->PolynomialDegree(), fine->CellBlockSize(), fine->FaceBlockSize());
+		coarse->LocalOp = fine->LocalOp;
+		return coarse;
 	}
 };

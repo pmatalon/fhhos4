@@ -30,6 +30,11 @@ alone peaks at ~3.5-4 GB). The measurement was then redone with `ninja -j1` and 
 or the run if `MemAvailable` drops below 2.5 GB: the minimum was 7.4 GB (runs of `timing.sh`: at most 2.5 GB each),
 no crash. `/tmp` is a tmpfs (in RAM): put no build tree there.
 
+Fresh memory is slow (page faults): the first write to newly allocated memory runs at ~1.3 GB/s, against ~12 GB/s
+once mapped, and ~2.5 GB/s with `madvise(MADV_HUGEPAGE)` (transparent huge pages are in `madvise` mode). glibc maps
+the large allocations afresh each time (and unmaps them when freed): a large array allocated at each step (e.g. each
+coarsening pass) pays it each time. Reuse such buffers (`LocalMatrices` does).
+
 ## How to measure
 
 The scripts and headers are in `scripts/perf/` (run the scripts from `build/`, with the conda env activated; keep a
@@ -65,6 +70,13 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
      cases covering the code paths of the smoothers, sequential and parallel, in ~10 minutes. A bit-identical change
      gives `OK` everywhere, except the known differences listed in the script. A change that reorders operations gives
      `DIFF` and `RESIDUALS-DIFF` (expected), but never `ITERATIONS-DIFF`.
+- **Setup only (U-AMG)**: `scripts/perf/UAMGDump.h` dumps the inputs of `UncondensedAMG::Setup()` (the condensed
+  operator, A_TT, A_TF, A_FF and the parameters of the multigrid; temporary instrumentation, see the header), and
+  `scripts/perf/uamg_harness.cpp` runs the setup alone on them (`build_uamg_harness.sh`: ~30 s to compile with the
+  flags of the build, against a ~2.5-minute rebuild of `Program.cpp`, and no assembly: 178 s sequential at k=2 n=16).
+  Its setup times are within 5-15% of `timing.sh`'s. It can save the operator and the prolongation of each level,
+  and compare two such runs (same structure? largest differences): the quick check of a change of the setup, before
+  the validation above. Compile it against a `git archive` of HEAD for the "before" times.
 - **Kernel micro-benchmarks**: the matrices of a run can be exported with `-export mg -o <dir>` (`levelN_A.dat`,
   `levelN_P.dat`, `levelN_R.dat`, Matrix Market, 17 digits) and loaded with `Eigen::loadMarket` in a standalone
   program compiled with the flags of the build (`grep FLAGS build/build.ninja`): iterating on a kernel then takes
@@ -170,19 +182,80 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   with P_F (4.29 s) is a slow outlier (its solve, unchanged, too: 0.89 vs 0.74 s): the timers give -0.36 s. The
   couplings were a smaller part of `Build()` than the profile suggested (0.39 s for its whole neighbours loop): the
   rest of that loop (vectors growing per element, sort, a mutex per element, scattered accesses to the neighbours)
-  remains, see idea 3.
+  remains, see idea 2.
+
+- **Local Galerkin products in U-AMG** (2026-10-04): not bit-identical (sums in another order), iteration counts
+  unchanged. `src/Solver/Multigrid/UncondensedAMG/LocalMatrices.h`. A_TT is block-diagonal, so the condensed operator
+  is a sum of local matrices on the faces of the cells, `S = sum_T S_T`, and P_F sends the faces of a cell only to the
+  coarse faces of its aggregate (kept faces: injection; removed faces: smoothed reconstruction in the aggregate). So
+  `P^T S P = sum_T P_T^T S_T P_T` (P_T: the rows of P on the faces of T), a sum of dense local matrices S_K on the
+  aggregates. The coarsening passes go on with them, from one pass and one level to the next (`LocalOperator`, shared
+  by the levels): the operator of a level is only assembled at its end, for the smoothers and the coarse solver. The
+  block Jacobi of P_F uses the rows of the removed faces assembled from the local matrices, and only factorizes their
+  diagonal blocks (`BlockJacobi::SetupForIterationMatrix()`, also used with the global products: bit-identical there).
+  - The fine operator is decomposed once: `S_T(f,g) = S(f,g) / c`, where c is the number of cells containing both f
+    and g. Exact for c <= 2: the reassembled S is bit-identical to `FullFromLower(S)` (Cube-tet k=0 and 2, Cube-cart,
+    Square-tri k=3, polygonal meshes). Off the diagonal, c = 1 on the simplicial and Cartesian meshes; on the
+    polygonal meshes built with `-polymesh-fcs n`, ~2400 pairs of faces are shared by 2 cells at n=64: no fallback
+    needed. On the coarse levels, two coarse faces share at most one aggregate (one coarse face per pair of
+    neighbouring aggregates), but the local products don't rely on it.
+  - Used with `-face-prolong 1|2` (interface collapsing) and `-coarsening-prolong 3|4|5|6`; the other options keep the
+    global products (with `-face-prolong 3`, the faces are aggregated independently of the cells: P leaves the
+    aggregate).
+  - The coarse operators are now exactly symmetric (the global products were not, at the rounding level).
+  - Checks: on every pass of Cube-tet k=0 n=32 and k=2 n=16 and of 20 other configurations (Cube-cart, anisotropic,
+    Complex-tet, Heterog, Square-cart, biharmonic, k=1-3, `stri`, `-coarsening-prolong 3|4|5`, `-cs dpa|mn`,
+    `-face-prolong 2`, `-fcs i`, `-prolong 5`), the local product had the structure of the global one, and
+    `|diff| / sqrt(|d_i d_j|) <= 1.2e-15`; per coefficient, relative differences up to 4e-9 on cancelled coefficients,
+    as large as the global product's own asymmetry. Whole setup (`uamg_harness`): the operator and the prolongation of
+    every level have the same structure as before (same aggregates), `|diff| / sqrt(|d_i d_j|) <= 8e-15`. `ctest`
+    92/92; `amg_papers.sh`: identical iteration tables (even the 3-digit residuals); `solutions.sh`: `DIFF`,
+    `RESIDUALS-DIFF` in 2 cases, and one `ITERATIONS-DIFF`: the hybrid smoother in parallel, which gives 37 or 38
+    iterations from one run to the next, before too. Identical iteration counts also with `-fcs i`, `-cs mn`,
+    `-face-prolong 2`, `-prolong 5|6`, `-hp-cs p_h|h_p`, Cube-cart k=1, Square-tri k=1, `stri` k=3, Heterog k=1,
+    `poly` (`-polymesh-fcs c|n`) and the in-house `quad` mesh (`-face-prolong 3`, which keeps the global products, runs
+    for more than 10 minutes on Cube-tet k=0 n=16, before as after: not compared).
+  - Memory: the local matrices of a pass take about as much as S (k=2 n=16: 105 MB for the cells of the first pass).
+    Two buffers, reused from one pass to the next (see the first access to fresh memory, in Machine), freed at the end
+    of the setup.
+
+  The replaced operations took (all passes, sequential / 16 threads) 4.8 / 1.55 s at k=2 n=16 (`Pt*S` 1.99 / 0.42 s,
+  `(Pt*S)*P` 1.52 / 0.33 s, `FullFromLower(S)` 1.27 / 0.75 s, transposes 0.03 / 0.04 s) and 0.89 / 0.35 s at k=0 n=32.
+  Their replacements take 0.56 / 0.23 s at k=2 (products 0.29 / 0.12 s, decomposition of the fine operator 0.12 /
+  0.04 s, rows of the removed faces 0.07 / 0.03 s, assembly of the operators of the levels 0.06 / 0.03 s, block
+  Jacobi factorizations 0.02 / 0.01 s) and 0.59 / 0.20 s at k=0 (products 0.28 s, rows of the removed faces 0.15 s,
+  decomposition 0.11 s, assembly 0.04 s sequential).
+
+  Setup (`timing.sh`, best of 2), before -> after; the solve is unchanged:
+
+  | Case | Sequential | Parallel (16 threads) |
+  |---|---|---|
+  | Cube-tet k=0 n=32, P_F | 3.49 -> 3.20 s | 1.96 -> 1.71 s |
+  | Cube-tet k=0 n=32, Q_F^smooth / P_F^(0) / Q_F | 3.31 / 3.19 / 3.05 -> 2.95 / 2.82 / 2.62 s | 1.91 / 1.87 / 1.76 -> 1.64 / 1.62 / 1.50 s |
+  | Cube-cart-aniso100 n=64 | 4.45 -> 4.20 s | 2.63 -> 2.49 s |
+  | Cube-tet k=2 n=16 | 8.07 -> 3.68 s | 3.39 -> 1.78 s |
+
+  Cube-tet k=0 n=48 (16 threads, 2 runs each): setup 7.1-7.7 -> 6.2 s, solve unchanged (3.0 s), peak memory of the
+  whole run 4.32 -> 4.04 GB. At k=0, `P^T S P` was ~18% of the setup on 16 threads (~45% at k=2): the hybrid meshes
+  are now the largest part (idea 2).
+
+  How it was developed: a prototype computing both products in each pass (`uamg_harness`), then the decomposition
+  of the fine operator only, and the assembly only at the end of a level. A first prototype was 2.4x faster than the
+  global products at k=2 but slower at k=0: a heap allocation per cell (1x1 to 6x6 blocks at k=0), a sort per row in
+  the assembly, and the first access to ~400 MB of fresh memory per pass (page faults); reused buffers, rows written
+  in place (their lengths counted first) and plain loops instead of Eigen's dynamic-size products fixed it.
 
 ## Current profile (U-AMG, default OpenMP settings)
 
 | Case | Setup, sequential / parallel | Solve, sequential / parallel |
 |---|---|---|
-| Cube-tet k=0 n=32 | 3.4 / 1.7 s | 0.7-0.9 / 0.7-0.9 s |
-| Cube-cart-aniso100 n=64 | 4.3 / 2.6 s | 0.5 / 0.5 s |
-| Cube-tet k=2 n=16 | 7.8 / 3.2 s | 3.6 / 3.5 s |
+| Cube-tet k=0 n=32 | 3.2 / 1.7 s | 0.7-0.9 / 0.7-0.9 s |
+| Cube-cart-aniso100 n=64 | 4.2 / 2.5 s | 0.5 / 0.5 s |
+| Cube-tet k=2 n=16 | 3.7 / 1.8 s | 3.7 / 3.5 s |
 
 **The assembly (printed as "Assembly time", not in the Setup row) dominates the runs** (2026-10-04, `timing.sh`
-logs, sequential / 16 threads): Cube-tet k=2 n=16 178 / 38 s (setup 7.8 / 3.2 s); Cube-cart-aniso100 n=64 102 / 16 s
-(setup 4.3 / 2.6 s); Cube-tet k=0 n=32 5.1 / 1.4 s. Breakdown (timestamps of the assembly log, n halved):
+logs, sequential / 16 threads): Cube-tet k=2 n=16 178 / 38 s (setup 3.7 / 1.8 s); Cube-cart-aniso100 n=64 102 / 16 s
+(setup 4.2 / 2.5 s); Cube-tet k=0 n=32 5.1 / 1.4 s. Breakdown (timestamps of the assembly log, n halved):
 - The static condensation (`A_T_ndF^T * Solve_A_T_T(A_T_ndF)`, global product) takes 0.08 s: negligible.
 - k=2 (Cube-tet n=8, 27.5 s): computing the local matrices takes 26.9 s (~9 ms per element). Not profiled yet.
 - Cartesian meshes (Cube-cart n=32, 13.2 s, with or without `-aniso`): the right-hand side takes 12.5 s (0.1 s on a
@@ -192,7 +265,16 @@ logs, sequential / 16 threads): Cube-tet k=2 n=16 178 / 38 s (setup 7.8 / 3.2 s)
   rule (degree 8). Fewer points change the right-hand side at the level of the quadrature error (opt-in, or a
   decision); evaluating f once per point for all the basis functions is bit-identical (10x fewer evaluations at k=2).
 
-The breakdowns below were measured before the optimization of the hybrid meshes (see Done).
+The breakdowns below, except the first, were measured before the optimizations of the hybrid meshes and of the
+Galerkin products (see Done).
+
+- **Setup after the local Galerkin products** (2026-10-04, `uamg_harness` with timers, sequential / 16 threads).
+  k=2 n=16 (3.8 / 1.8 s): the coarsening passes take 2.7 / 1.3 s: building P_F 1.05 / 0.46 s (`Theta()` 0.53 /
+  0.29 s, `BlockJacobi::IterationMatrix()` 0.21 / 0.05 s, `J * Y` 0.11 / 0.05 s, row selections 0.09 / 0.05 s), the
+  local Galerkin products and their companions 0.56 / 0.23 s (see Done), the hybrid meshes 0.28 / 0.22 s; the rest
+  (chaining of P, `R = P^T`, smoothers, coarse solver) 1.1 / 0.5 s. k=0 n=32 (2.9 / 1.7 s): the passes take 2.7 /
+  1.3 s: hybrid meshes 1.17 / 0.67 s, building P_F 0.67 / 0.25 s, local Galerkin products and companions 0.59 / 0.20 s.
+  See the ideas 2 to 5.
 
 - **The solve barely benefits from the threads.** The sweeps of the default smoother (lexicographic Gauss-Seidel, as
   in the paper) are sequential; only the residual/`Ax` products and the intergrid transfers are parallel. Those are
@@ -226,7 +308,8 @@ The breakdowns below were measured before the optimization of the hybrid meshes 
   k=2. Sequential / 16 threads, over all passes: the pairwise algorithm itself (`PairwiseAggregation::Perform`) 0.14 /
   0.18 s at k=0 (4% / 9% of the setup), 0.01 s at k=2; the hybrid-mesh bookkeeping around it 1.66 / 0.91 s at k=0
   (43-44%), 0.62 / 0.51 s at k=2; the algebra (P_F, Galerkin products, chaining) 1.77 / 0.73 s at k=0, 7.5 / 2.8 s at
-  k=2 (sequential: `P^T*S` 2.0 s, `(P^T*S)*P` 1.6 s, `FullFromLower(S)` 1.5 s).
+  k=2 (sequential: `P^T*S` 2.0 s, `(P^T*S)*P` 1.6 s, `FullFromLower(S)` 1.5 s; replaced since by the local Galerkin
+  products, see Done).
 - **Eigen's own kernels are at the hardware limit: neither rewriting them nor BLAS/LAPACK would help** (micro-benchmark,
   2026-10-03, exported matrices of Cube-tet k=0 n=32 and k=2 n=16, flags of the build). Sparse matrix-vector product
   (`A`, `P`, `R` of levels 0-1): hand-written CSR loops (1 or 4 accumulators) take the same time as Eigen's, within the
@@ -246,23 +329,39 @@ The breakdowns below were measured before the optimization of the hybrid meshes 
    solve 8.9 s.) libgomp reads it at startup, so it cannot be set from `main()`: set it in the environment, e.g.
    `conda env config vars set OMP_WAIT_POLICY=passive -n fhhos4`, and document it. Measured before the optimization of
    the smoothers, after which 16 threads are no longer slower than 1 at k=2 (3.6 vs 3.7 s): re-measure.
-2. **Parallel transpose** — estimated, small effort, bit-identical (a transpose is exact). Replaces Eigen's sequential
-   transposes in `FullFromLower`, `UncondensedLevel::SetupRestriction` (`R = P^T`), `HybridAlgebraicMesh::Build()`
-   (column-major copy of `A_T_F`) and `SparseMatrixOps::Transpose`. They take 1.2 s of the 3.7 s of setup at k=2 and
-   0.25 s of the 2.1 s at k=0: if they scale like the product (5-7x on 8 cores), setup -30% at k=2, -10% at k=0.
-   `FullFromLower` only needs the transpose of the strictly lower part.
-3. **Flat data structures for the hybrid algebraic meshes** (`HybridAlgebraicMesh`) — estimated, medium-large
+2. **Flat data structures for the hybrid algebraic meshes** (`HybridAlgebraicMesh`) — estimated, medium-large
    effort, main lever at k=0 (the paper's case). Vectors of vectors, a mutex per element, a `std::map` of neighbours
-   per aggregate, copied vectors: building, coarsening and freeing the meshes take 0.9 s of the 2.1 s of setup at
-   k=0. CSR-like arrays and prefix sums (same numbering of the aggregates and coarse faces, so bit-identical) might
-   halve it: setup ~2.1 -> ~1.6 s. The pairwise aggregation itself (greedy, priority order) must stay sequential:
+   per aggregate, copied vectors: building and coarsening the meshes (`mesh.Build()` + `mesh.Coarsen()`) take 1.17 /
+   0.67 s of the 2.9 / 1.7 s of setup at k=0, sequential / 16 threads (`uamg_harness`, after the local Galerkin
+   products; 0.28 / 0.22 s of 3.8 / 1.8 s at k=2), plus freeing them. CSR-like arrays and prefix sums (same numbering
+   of the aggregates and coarse faces, so bit-identical) might halve it. The pairwise aggregation itself (greedy, priority order) must stay sequential:
    parallelizing it changes the aggregates. Measured breakdown, over all passes, k=0 n=32, sequential / 16 threads
    (2026-10-03, before the optimization of 2026-10-04 in Done, which made the auxiliary meshes 0.26 -> 0.05 s and
    `Build()` 0.55 -> 0.45 s sequential): neighbours loop of `Build()` 0.39 / 0.09 s, of which the extraction of the
    couplings was ~0.1 s; auxiliary coarse meshes 0.26 / 0.18 s; aggregates' neighbours (`std::map`/`set`) 0.23 / 0.04 s;
    `BuildQ_T`/`BuildQ_F` (triplets, 1 non-zero per row for most rows) 0.21 / 0.12 s; removed faces 0.17 / 0.04 s;
    interface collapsing (sequential) 0.16 / 0.19 s; freeing 0.10 / 0.16 s; other `Build()` steps 0.13 / 0.10 s.
-4. **Parallel smoother, as an option** — measured with the existing hybrid block Gauss-Seidel
+3. **`Theta()` without `SparseMatrix::block()`** — measured, small effort, bit-identical if the blocks and the solves
+   are the same. `HybridAlgebraicMesh::Theta()` (the reconstruction of P_F, `-A_TcTc^-1 A_TcFc` per coarse cell)
+   extracts its dense blocks with `block()`, which scans the row from its start for each face: 0.53 / 0.29 s of the
+   3.8 / 1.8 s of setup at k=2 (sequential / 16 threads: it scales poorly), 0.15 / 0.07 s at k=0 (`uamg_harness`,
+   2026-10-04). One pass over the rows of the cell, as in `BuildElementFaces()`, gives all the blocks; then a
+   parallel fill without triplets. `CouplingValue()` (`-fcs i`) and `BuildHighOrderTraceOnRemovedFaces()` do the same.
+4. **Local P_F** — estimated, medium effort, rounding-level differences. The rows of P_F on the removed faces only
+   involve the faces of their aggregate: `P(f,:) = (1-w) Y(f,:) - w D_f^-1 sum_{g!=f} S(f,g) Y(g,:)` (block Jacobi,
+   w = 2/3), with Y = the first row of Theta of the aggregate on the removed faces, the injection on the kept faces.
+   Computed per aggregate from the local matrices (`LocalMatrices`), they would replace the assembly of the rows of
+   the removed faces, `BlockJacobi::IterationMatrix()`, the product `J * Y` and the two row selections: 0.45 s
+   sequential at k=2 (J 0.21 s, `J * Y` 0.11 s, rows of the removed faces 0.07 s, selections 0.06 s), 0.39 s at k=0
+   (0.14, 0.07, 0.15, 0.03 s); ~0.15 / 0.12 s on 16 threads. They are also the rows the local Galerkin product reads
+   in P. The assembled P is still needed (chaining, `A_T_Fc = Q_T^T A_T_F P`).
+5. **Parallel transpose** — estimated, small effort, bit-identical (a transpose is exact). Replaces Eigen's sequential
+   transposes in `UncondensedLevel::SetupRestriction` (`R = P^T`, 0.24 s on 16 threads at k=2 in the old profile),
+   `HybridAlgebraicMesh::Build()` (column-major copy of `A_T_F`, 0.20 s), `SparseMatrixOps::Transpose` and
+   `FullFromLower`. Since the local Galerkin products, the last two are no longer in the default path (only with the
+   coarse `A_F_F` and the options that keep the global products). Re-measure: at most ~0.45 s of the 1.8 s of setup
+   at k=2 on 16 threads, less at k=0.
+6. **Parallel smoother, as an option** — measured with the existing hybrid block Gauss-Seidel
    (`-smoothers hbgs,hrbgs`, 16 threads, passive wait policy): k=2: 40 iterations instead of 35, solve 6.2 -> 3.3 s
    (smoothing 4.8 -> 1.5 s); k=0: 31 iterations instead of 28, solve 0.94 -> 1.40 s (slower: no gain on scalar
    rows). Changes the iteration counts and depends on the number of threads: opt-in only. At k=0, a scalar parallel
@@ -273,22 +372,6 @@ The breakdowns below were measured before the optimization of the hybrid meshes 
 
 Possible now that reordering the arithmetic operations is allowed (rejected so far because not bit-identical):
 
-- **Local Galerkin products in U-AMG** — estimated, large effort, the largest expected gain on the setup at k>=1. Each
-  pass computes `P^T S P` as a global sparse triple product, plus `FullFromLower(S)`: 5.1 s of the 7.8 s of setup
-  at k=2 n=16 and ~0.85 s of 3.4 s at k=0 n=32 (sequential). Since A_TT is block-diagonal, S = sum over the cells T of
-  local condensed matrices S_T, and P_F sends the faces of a cell only to the coarse faces of its aggregate (kept
-  faces: injection onto the collapsed interface; removed faces: reconstruction in the aggregate, smoothed by block
-  Jacobi on rows of S that only involve faces of the aggregate). So `P^T S P = sum_T P_T^T S_T P_T` with small dense
-  blocks (P_T: rows of P on the faces of T), and the result is again a sum of local matrices, one per aggregate: the
-  same holds for every following pass and level. Same operator, sums in another order (last-digit differences: check
-  the iteration counts; on Cartesian meshes, equal couplings may break ties differently in the aggregation). Dense
-  kernels instead of sparse index chasing, no transposes, parallel per aggregate without write conflicts; the local
-  matrices grow with the aggregates (measure the deep passes). Possible algebraic decomposition, to verify: two
-  distinct faces share at most one cell (one coarse face per pair of neighbouring aggregates after interface
-  collapsing), so each off-diagonal block S(f,g) comes from a single cell, and only the diagonal blocks S(f,f) sum two
-  cells: `S = sum_T S_T^off + D` (D block-diagonal), computable from the assembled S and the cell-face connectivity.
-  Not to be confused with condensing the coarse hybrid blocks (`A_F_Fc - A_T_Fc^T A_T_Tc^-1 A_T_Fc`), which replaces
-  `A_TT^-1` with `Q_T (Q_T^T A_TT Q_T)^-1 Q_T^T`: another operator.
 - **Shorter dependency chains in the sweeps** — estimated, small effort. In `BlockRowRhs` (forward block sweeps,
   row by row) the sum of a row is one chain of ~40 dependent subtractions at k=2 (3-4 cycles each): 2 to 4 partial
   sums would bring the forward sweep (~11 ms on the fine level, k=2 n=16) closer to the SpMV (~7-8 ms).
@@ -340,7 +423,7 @@ Other candidates:
   opt-in only, and the gain is modest. Not worth it on its own.
 - **Restriction without R** — measured (micro-benchmark, 2026-10-03): slower, saves memory only. `rc = P^T r` computed
   from the rows of P (row i adds `r_i P(i,:)` into rc, a scatter): R (= P^T, as many non-zeros as P) is then neither
-  stored (25 MB at k=0 n=32, 115 MB at k=2 n=16) nor transposed in the setup (`R = P^T`: 0.24 s at k=2, see idea 2).
+  stored (25 MB at k=0 n=32, 115 MB at k=2 n=16) nor transposed in the setup (`R = P^T`: 0.24 s at k=2, see idea 5).
   But the scatter is slower than Eigen's `R * r`: k=0, 2.9 vs 2.0 ms sequential, 2.0 vs 0.9 ms on 16 threads
   (per-thread coarse vectors, then summed); k=2, 6.6 vs 6.3 ms and 4.9 vs 3.4 ms. Consecutive fine faces add into the
   same coarse entries (a dependency through memory), and the parallel version pays for its buffers and their sum.
@@ -373,10 +456,6 @@ Other candidates:
   Not measured yet: profile those setups first.
 - C-AMG (`AggregAMG::GalerkinOperator`): sequential loop and triplets. Making it faster changes the U-AMG/C-AMG
   comparison of the paper (whose timings are tied to release 1.0 anyway).
-- `HybridAlgebraicMesh::Theta()` and `CouplingValue()` extract dense blocks with `SparseMatrix::block()`, which scans
-  the row from its start: the cost grows with the block size, i.e. with k.
-- `BlockJacobi::Setup()` factorizes all the diagonal blocks, while the prolongations 4 and 6 only need those of the
-  removed faces (0.02 s at k=0, 0.09 s sequential at k=2).
 - Memory: peak 1.33 GB for Cube-tet k=0 n=32 (whole run). The paper's n=64 extrapolates to 10-11 GB, too close to
   13 GB. Running the paper sizes here would first need a memory profile (probably the mesh and the assembly rather
   than the AMG: unverified).

@@ -30,7 +30,8 @@ private:
 	vector<int> _permQ;
 	vector<int> _rank;
 public:
-	void Setup(const SparseMatrix& A, int blockSize, DiagBlockSolveMethod method = DefaultMethod)
+	// With 'blocks', only the diagonal blocks i such that (*blocks)[i] are factorized (the others can't be solved).
+	void Setup(const SparseMatrix& A, int blockSize, DiagBlockSolveMethod method = DefaultMethod, const vector<bool>* blocks = nullptr)
 	{
 		_blockSize = blockSize;
 		_method = method;
@@ -46,6 +47,8 @@ public:
 		#pragma omp parallel for
 		for (BigNumber i = 0; i < nb; ++i)
 		{
+			if (blocks && !(*blocks)[i])
+				continue;
 			DenseMatrix Di = A.block(i * _blockSize, i * _blockSize, _blockSize, _blockSize);
 			Eigen::FullPivLU<DenseMatrix> lu(Di);
 			auto block = _blocks.middleCols(i * _blockSize, _blockSize);

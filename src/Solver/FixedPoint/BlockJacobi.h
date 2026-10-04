@@ -67,6 +67,15 @@ public:
 		this->SetupComputationalWork = nb * 2.0/3.0*pow(_blockSize, 3)*1e-6;
 	}
 
+	// Setup for IterationMatrix(blockRows) only: only the diagonal blocks of these block rows are factorized, and
+	// only these block rows of A are read (the others can be empty).
+	void SetupForIterationMatrix(const SparseMatrix& A, const vector<bool>& blockRows)
+	{
+		IterativeSolver::Setup(A);
+		assert(A.IsRowMajor);
+		this->diagBlockSolver.Setup(A, _blockSize, BlockDiagonalSolver::DefaultMethod, &blockRows);
+	}
+
 private:
 	IterationResult ExecuteOneIteration(const Vector& b, Vector& xOld, bool& xEquals0, bool computeResidual, bool computeAx, const IterationResult& oldResult) override
 	{
