@@ -182,7 +182,7 @@ public:
 		{
 			// Multigrid prolongation
 			SparseMatrix Q_T = BuildQ_T(initialFineMesh);
-			coarseMesh->Build(); // the coarse cells and faces are used by the reconstruction (Theta)
+			coarseMesh->BuildElementFaces(); // the coarse cells and faces are used by the reconstruction (Theta)
 			SparseMatrix* P = BuildProlongation(_multigridProlong, initialFineMesh, *this->OperatorMatrix, *coarseMesh, Q_T, &Q_F);
 			this->P = std::move(*P);
 			delete P;
@@ -355,8 +355,9 @@ public:
 			A_T_Fc_tmp = new SparseMatrix(SparseMatrixOps::Multiply(Q_Tt_A_T_F, *Q_F));
 		}
 
+		// The prolongation only uses its matrices and the faces of its elements (reconstruction, Theta())
 		HybridAlgebraicMesh auxCoarseMesh(A_T_Tc, A_T_Fc_tmp, nullptr, _cellBlockSize, _faceBlockSize, _strongCouplingThreshold);
-		auxCoarseMesh.Build();
+		auxCoarseMesh.BuildElementFaces();
 
 		/*ExportMatrix(Q_T, "Q_T", 0);
 		ExportMatrix(*Q_F, "Q_F", 0);

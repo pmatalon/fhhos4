@@ -10,10 +10,22 @@ struct HybridAlgebraicElement
 	BigNumber Number;
 	mutex Mutex;
 	vector<HybridAlgebraicFace*> Faces;
+	vector<double> FaceTraces; // trace of the block A_T_F(this element, Faces[i]), from which the couplings are computed
 	vector<pair<HybridAlgebraicElement*, double>> Neighbours;
 	vector<HybridAlgebraicElement*> StrongNeighbours; // sorted by descending strength (the strongest neighbour is first)
 	HybridElementAggregate* CoarseElement = nullptr;
 	int NElementsIAmStrongNeighbourOf = 0;
+
+	double FaceTrace(const HybridAlgebraicFace* face) const
+	{
+		for (int i = 0; i < Faces.size(); ++i)
+		{
+			if (face == Faces[i])
+				return FaceTraces[i];
+		}
+		assert(false);
+		return 0;
+	}
 };
 
 struct HybridElementAggregate;
@@ -131,56 +143,21 @@ public:
 		this->_strongCouplingThreshold = strongCouplingThreshold;
 	}
 
+	// Builds the elements and the faces, their adjacency and the couplings between neighbouring elements (used by the coarsening)
 	void Build()
 	{
-		const SparseMatrix& A_T_T = *this->A_T_T;
-		const SparseMatrix& A_T_F = *this->A_T_F;
-
-		BigNumber nElements = A_T_F.rows() / _cellBlockSize;
-		this->Elements = vector<HybridAlgebraicElement>(nElements);
-
-		BigNumber nFaces = A_T_F.cols() / _faceBlockSize;
-		this->Faces = vector<HybridAlgebraicFace>(nFaces);
-
-		//cout << nElements << " elements, " << nFaces << " faces found" << endl;
-
-		//-------------------------//
-		// Filling elements' faces //
-		//-------------------------//
-
-		#pragma omp parallel for
-		for (BigNumber elemNumber = 0; elemNumber < Elements.size(); ++elemNumber)
-		{
-			HybridAlgebraicElement& elem = Elements[elemNumber];
-			elem.Number = elemNumber;
-
-			for (int k = 0; k < _cellBlockSize; k++)
-			{
-				// RowMajor --> the following line iterates over the non-zeros of the elemNumber-th row.
-				for (SparseMatrix::InnerIterator it(A_T_F, elemNumber*_cellBlockSize + k); it; ++it)
-				{
-					BigNumber faceNumber = it.col() / _faceBlockSize;
-					HybridAlgebraicFace* face = &Faces[faceNumber];
-					if (find(elem.Faces.begin(), elem.Faces.end(), face) == elem.Faces.end())
-						elem.Faces.push_back(face);
-				}
-			}
-
-			if (elem.Faces.empty())
-				Utils::Error("Element " + to_string(elemNumber) + " has no face (no non-zero coefficient in row " + to_string(elemNumber) + " of A_TF)");
-		}
+		BuildElementFaces(true);
 
 		//-------------------------//
 		// Filling faces' elements //
 		//-------------------------//
 
-		ColMajorSparseMatrix A_T_F_ColMajor = A_T_F;
+		ColMajorSparseMatrix A_T_F_ColMajor = *this->A_T_F;
 
 		#pragma omp parallel for
 		for (BigNumber faceNumber = 0; faceNumber < Faces.size(); ++faceNumber)
 		{
 			HybridAlgebraicFace& face = Faces[faceNumber];
-			face.Number = faceNumber;
 
 			// ColMajor --> the following line iterates over the non-zeros of the faceNumber-th col.
 			for (ColMajorSparseMatrix::InnerIterator it(A_T_F_ColMajor, faceNumber*_faceBlockSize); it; ++it)
@@ -201,13 +178,14 @@ public:
 		for (BigNumber elemNumber = 0; elemNumber < Elements.size(); ++elemNumber)
 		{
 			HybridAlgebraicElement& elem = Elements[elemNumber];
-			for (HybridAlgebraicFace* face : elem.Faces)
+			for (int i = 0; i < elem.Faces.size(); ++i)
 			{
+				HybridAlgebraicFace* face = elem.Faces[i];
 				for (HybridAlgebraicElement* neighbour : face->Elements)
 				{
 					if (neighbour->Number != elem.Number)
 					{
-						double coupling = this->CouplingValue(elem, *neighbour, *face);
+						double coupling = this->CouplingValue(elem.FaceTraces[i], neighbour->FaceTrace(face));
 						elem.Neighbours.push_back({ neighbour, coupling });
 					}
 				}
@@ -233,6 +211,61 @@ public:
 				else
 					break;
 			}
+		}
+	}
+
+	// Builds the elements and the faces, and the faces of the elements: all the reconstruction (Theta()) needs.
+	// With computeFaceTraces, also the traces of the blocks of A_T_F, from which Build() computes the couplings.
+	void BuildElementFaces(bool computeFaceTraces = false)
+	{
+		const SparseMatrix& A_T_F = *this->A_T_F;
+
+		BigNumber nElements = A_T_F.rows() / _cellBlockSize;
+		this->Elements = vector<HybridAlgebraicElement>(nElements);
+
+		BigNumber nFaces = A_T_F.cols() / _faceBlockSize;
+		this->Faces = vector<HybridAlgebraicFace>(nFaces);
+
+		//cout << nElements << " elements, " << nFaces << " faces found" << endl;
+
+		#pragma omp parallel for
+		for (BigNumber faceNumber = 0; faceNumber < Faces.size(); ++faceNumber)
+			Faces[faceNumber].Number = faceNumber;
+
+		//-------------------------//
+		// Filling elements' faces //
+		//-------------------------//
+
+		#pragma omp parallel for
+		for (BigNumber elemNumber = 0; elemNumber < Elements.size(); ++elemNumber)
+		{
+			HybridAlgebraicElement& elem = Elements[elemNumber];
+			elem.Number = elemNumber;
+
+			for (int k = 0; k < _cellBlockSize; k++)
+			{
+				// RowMajor --> the following line iterates over the non-zeros of the elemNumber-th row.
+				for (SparseMatrix::InnerIterator it(A_T_F, elemNumber*_cellBlockSize + k); it; ++it)
+				{
+					BigNumber faceNumber = it.col() / _faceBlockSize;
+					HybridAlgebraicFace* face = &Faces[faceNumber];
+					auto faceIt = find(elem.Faces.begin(), elem.Faces.end(), face);
+					BigNumber localFaceNumber = faceIt - elem.Faces.begin();
+					if (faceIt == elem.Faces.end())
+					{
+						elem.Faces.push_back(face);
+						if (computeFaceTraces)
+							elem.FaceTraces.push_back(0);
+					}
+					// Diagonal coefficient (k, k) of the block: they come in the order of the rows,
+					// so the trace is summed in the same order as DenseMatrix::trace()
+					if (computeFaceTraces && it.col() - faceNumber*_faceBlockSize == k)
+						elem.FaceTraces[localFaceNumber] += it.value();
+				}
+			}
+
+			if (elem.Faces.empty())
+				Utils::Error("Element " + to_string(elemNumber) + " has no face (no non-zero coefficient in row " + to_string(elemNumber) + " of A_TF)");
 		}
 	}
 
@@ -404,16 +437,13 @@ private:
 		return e1->NElementsIAmStrongNeighbourOf < e2->NElementsIAmStrongNeighbourOf; // Sort by ascending number
 	}
 
-	double CouplingValue(const HybridAlgebraicElement& e1, const HybridAlgebraicElement& e2, const HybridAlgebraicFace& f)
+	// Coupling of an element e1 with its neighbour e2 through a face f, from the traces of the blocks A_T_F(e1, f) and A_T_F(e2, f)
+	double CouplingValue(double e1FaceTrace, double e2FaceTrace)
 	{
-		DenseMatrix couplingBlock = A_T_F->block(e1.Number*_cellBlockSize, f.Number*_faceBlockSize, _cellBlockSize, _faceBlockSize);
-		double coupling = couplingBlock.trace();
+		double coupling = e1FaceTrace;
 
-		//double e1Kappa = this->DiffusionCoeff(e1);
-		//double e2Kappa = this->DiffusionCoeff(e2);
 		double e1Kappa = abs(coupling);
-		DenseMatrix couplingBlock2 = A_T_F->block(e2.Number*_cellBlockSize, f.Number*_faceBlockSize, _cellBlockSize, _faceBlockSize);
-		double e2Kappa = abs(couplingBlock2.trace());
+		double e2Kappa = abs(e2FaceTrace);
 
 		double minKappa = min(e1Kappa, e2Kappa);
 		double maxKappa = max(e1Kappa, e2Kappa);
