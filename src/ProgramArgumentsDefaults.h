@@ -26,4 +26,5 @@ void ApplyProgramArgumentDefaults(ProgramArguments& args,
 	bool defaultTol2 = true,
 	bool defaultCycle = true,
 	bool defaultCoarseOperator = true,
-	bool defaultCoarseSolver = true);
+	bool defaultCoarseSolver = true,
+	bool defaultHPCoarseningStgy = true);

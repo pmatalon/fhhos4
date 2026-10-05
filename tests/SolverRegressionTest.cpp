@@ -134,6 +134,41 @@ TEST_P(GalerkinProlongationDefaultsTest, ExplicitMultigridRequiresGalerkinOperat
 
 INSTANTIATE_TEST_SUITE_P(Prolongation, GalerkinProlongationDefaultsTest, ::testing::Values(4, 5));
 
+// U-AMG at k >= 1: the default hp-coarsening strategy is p, then h. h only at k=0, and for the other solvers.
+//   ./bin/fhhos4 -geo square -mesh cart -mesher inhouse -k {0|1|2} -s {fcguamg|mg}
+class UAMGHPCoarseningDefaultsTest : public ::testing::TestWithParam<int>
+{
+};
+
+TEST_P(UAMGHPCoarseningDefaultsTest, PThenHAtHighOrder)
+{
+	int k = GetParam();
+	ProgramArguments uamg = SquareCartArgs(k, 16);
+	uamg.Solver.SolverCode = "fcguamg";
+	ApplyProgramArgumentDefaults(uamg);
+	EXPECT_TRUE(uamg.Solver.MG.HP_CS == (k == 0 ? HP_CoarsStgy::H_only : HP_CoarsStgy::P_then_H));
+
+	ProgramArguments mg = SquareCartArgs(k, 16);
+	mg.Solver.SolverCode = "mg";
+	ApplyProgramArgumentDefaults(mg);
+	EXPECT_TRUE(mg.Solver.MG.HP_CS == HP_CoarsStgy::H_only);
+}
+
+INSTANTIATE_TEST_SUITE_P(HPCoarsening, UAMGHPCoarseningDefaultsTest, ::testing::Values(0, 1, 2));
+
+// An explicit -hp-cs is kept.
+//   ./bin/fhhos4 -geo square -mesh cart -mesher inhouse -k 2 -s fcguamg -hp-cs h
+TEST(UAMGHPCoarseningDefaults, ExplicitStrategyKept)
+{
+	ProgramArguments args = SquareCartArgs(2, 16);
+	args.Solver.SolverCode = "fcguamg";
+	args.Solver.MG.HP_CS = HP_CoarsStgy::H_only;
+
+	ApplyProgramArgumentDefaults(args, true, true, true, true, true, false);
+
+	EXPECT_TRUE(args.Solver.MG.HP_CS == HP_CoarsStgy::H_only);
+}
+
 #ifdef CGAL_ENABLED
 namespace
 {
@@ -154,23 +189,28 @@ namespace
 // With -polymesh-fcs n (the fine faces are kept), neighbouring polygons can share several faces.
 // U-AMG listed such a neighbour once per shared face, and the ordering of the cells for the
 // pairwise aggregation then wrote past the end of its array (heap corruption, crash).
-//   ./bin/fhhos4 -geo square -mesh poly -polymesh-fcs n -k {0|1} -n 64 -s fcguamg -threads 1
-class PolygonalMeshUAMGTest : public ::testing::TestWithParam<int>
+// At k=1, with the default hp-coarsening (p, then h) and with the h-coarsening of the k=1 blocks (-hp-cs h).
+//   ./bin/fhhos4 -geo square -mesh poly -polymesh-fcs n -k {0|1} -n 64 -s fcguamg [-hp-cs h] -threads 1
+class PolygonalMeshUAMGTest : public ::testing::TestWithParam<std::tuple<int, bool>>
 {
 };
 
 TEST_P(PolygonalMeshUAMGTest, Converges)
 {
+	auto [k, hOnly] = GetParam();
 	SequentialExecution sequential;
-	ProgramArguments args = SquarePolyArgs(FaceCoarseningStrategy::None, GetParam(), 64);
+	ProgramArguments args = SquarePolyArgs(FaceCoarseningStrategy::None, k, 64);
 	args.Solver.SolverCode = "fcguamg";
+	if (hOnly)
+		args.Solver.MG.HP_CS = HP_CoarsStgy::H_only;
 
-	ProgramResults results = RunDiffusionHHO(args);
+	ProgramResults results = RunDiffusionHHO(args, true, !hOnly);
 	EXPECT_GT(results.IterationCount, 0);
 	EXPECT_LE(results.IterationCount, 30);
 }
 
-INSTANTIATE_TEST_SUITE_P(SquarePoly, PolygonalMeshUAMGTest, ::testing::Values(0, 1));
+INSTANTIATE_TEST_SUITE_P(SquarePoly, PolygonalMeshUAMGTest, ::testing::Values(
+	std::make_tuple(0, false), std::make_tuple(1, false), std::make_tuple(1, true)));
 
 // The default coarsening strategy of the geometric multigrid on polygonal meshes was the independent
 // remeshing by GMSH (-cs m), which these meshes, built by agglomeration, don't support: the default

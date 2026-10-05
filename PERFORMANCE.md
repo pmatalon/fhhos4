@@ -46,13 +46,15 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
 - **Reference cases** (U-AMG):
   - Cube-tet, k=0: `./bin/fhhos4 -geo cube -mesh tetra -k 0 -n 32 -s fcguamg -no-cache` (318k face unknowns)
   - Cube-cart-aniso100: `./bin/fhhos4 -geo cube -mesh cart -mesher inhouse -k 0 -n 64 -aniso 100 -s fcguamg -no-cache`
-  - High order: `./bin/fhhos4 -geo cube -mesh tetra -k 2 -n 16 -s fcguamg -no-cache` (262k face unknowns)
+  - High order: `./bin/fhhos4 -geo cube -mesh tetra -k 2 -n 16 -s fcguamg -hp-cs h -no-cache` (262k face unknowns).
+    `-hp-cs h`: the h-coarsening of the k=2 blocks, the default until 2026-10-05, on which the k=2 measurements of
+    this file were made. The default is now p_h (see Done).
   - The variants of Fig. 4.5 / Table 4.4: `-coarsening-prolong 6` (P_F, default), `4` (Q_F^smooth), `5` (P_F^(0)), `3` (Q_F).
 - **Profiling**: no sampling profiler, so temporary wall-clock timers around the steps, per multigrid level:
   `scripts/perf/Prof.h` (`PROF_START`/`PROF_STOP`, printed at exit). Include it in the files to instrument, never
   commit the instrumentation.
 - **Validation of a change**:
-  1. `ctest` (92 tests).
+  1. `ctest` (97 tests).
   2. `scripts/perf/amg_papers.sh <output dir> [binary]`: the AMG configurations of the papers, at reduced sizes (the
      paper sizes don't fit in 13 GB), 30 runs in ~6 minutes. Then `scripts/perf/fingerprint.sh <dir before> <dir after>`
      compares their iteration tables (iteration, inner iterations, residual): they must be identical.
@@ -244,6 +246,22 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   global products at k=2 but slower at k=0: a heap allocation per cell (1x1 to 6x6 blocks at k=0), a sort per row in
   the assembly, and the first access to ~400 MB of fresh memory per pass (page faults); reused buffers, rows written
   in place (their lengths counted first) and plain loops instead of Eigen's dynamic-size products fixed it.
+
+- **U-AMG at k >= 1: p-levels, then h, by default** (2026-10-05): `-hp-cs p_h` instead of `h` when k >= 1
+  (`ProgramArgumentsDefaults.cpp`). A change of the method, decided by the user: the h-coarsening of the degree-k
+  blocks transfers their higher modes by plain aggregation (identity blocks of Q_T, Q_F; trace of the constant
+  only), whereas p_h only h-coarsens at k=0, where the operators of the paper apply. The published U-AMG runs are
+  at k=0: `amg_papers.sh` gives identical iteration tables, except the commented-out k=3 biharmonic runs (outer
+  iterations 27 -> 27 and 35 -> 31, solve 6.6 -> 2.9 s and 3.6 -> 1.4 s with `-opt2 0` and `2`).
+  32 cases (`fcguamg`, 16 threads, one run each, logs in `build/bench_hp/`), setup + solve:
+  - Cartesian, triangular, polygonal, heterogeneous (2D/3D, k=1..3): 1.5-4x fewer iterations, 1.2-4x faster.
+  - Tetrahedral (Cube-tet, Complex-tet, Cube-tet-aniso20): same iterations (the k=0 U-AMG sets them), 1.2-3x
+    faster: operator complexity 1.5-1.7 -> 1.04-1.2. Cube-tet k=2 n=16: setup 1.8 -> 0.3 s, solve 3.4 -> 2.1 s.
+  - Anisotropic Cartesian (aniso100, 2D/3D): 0-5 more iterations, as fast or faster (cheaper cycle).
+  - Peak memory -10 to -25% (Cube-tet k=1 n=32: 4.27 -> 3.28 GB). Same growth of the iterations with n.
+
+  The high-order reference case of `timing.sh` keeps `-hp-cs h`, so that its series stays comparable: the k=2
+  measurements of this file (profile, ideas) concern that path, no longer the default.
 
 ## Current profile (U-AMG, default OpenMP settings)
 

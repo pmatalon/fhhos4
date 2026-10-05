@@ -368,6 +368,7 @@ void print_usage() {
 	cout << endl;
 	cout << "-hp-cs CODE" << endl;
 	cout << "      hp-coarsening strategy to build the coarse levels in the case of high-order." << endl;
+	cout << "      Default: h, except for uamg with k >= 1: p_h." << endl;
 	cout << "              h    - h only" << endl;
 	cout << "              p    - p only" << endl;
 	cout << "              p_h  - p, then h" << endl;
@@ -654,6 +655,7 @@ int main(int argc, char* argv[])
 	bool defaultCoarseSolver = true;
 	bool defaultTol2 = true;
 	bool defaultRelativeCellPolyDegree = true;
+	bool defaultHPCoarseningStgy = true;
 	int wLoops = -1; // -w, applied after the parsing so that -cycle does not override it
 
 	ProgramArguments args;
@@ -1283,6 +1285,7 @@ int main(int argc, char* argv[])
 			}
 			case OPT_HPConfig:
 			{
+				defaultHPCoarseningStgy = false;
 				int code = atoi(optarg);
 				if (code == 1)
 					args.Solver.MG.HP_CS = HP_CoarsStgy::H_only;
@@ -1347,6 +1350,7 @@ int main(int argc, char* argv[])
 			}
 			case OPT_HP_CS:
 			{
+				defaultHPCoarseningStgy = false;
 				string code = optarg;
 				if (code.compare("h") == 0)
 					args.Solver.MG.HP_CS = HP_CoarsStgy::H_only;
@@ -1593,7 +1597,7 @@ int main(int argc, char* argv[])
 	if (wLoops != -1)
 		args.Solver.MG.WLoops = wLoops;
 
-	ApplyProgramArgumentDefaults(args, defaultRelativeCellPolyDegree, defaultTol2, defaultCycle, defaultCoarseOperator, defaultCoarseSolver);
+	ApplyProgramArgumentDefaults(args, defaultRelativeCellPolyDegree, defaultTol2, defaultCycle, defaultCoarseOperator, defaultCoarseSolver, defaultHPCoarseningStgy);
 
 	//------------------------------------------//
 	//             Launch program               //

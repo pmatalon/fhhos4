@@ -34,7 +34,7 @@ ctest -E HPConfig                          # skip the slowest tests
 ./bin/fhhos4_tests --gtest_filter=*Kellogg*  # or filter the binary directly
 ```
 
-The full suite is 92 CTest cases and runs in about 3.5 minutes serially. The 8 `HPConfigTest` cases take about 2 minutes of it (~15 s each: N=128 with k=5 is the smallest size of the high-order paper); the other cases take less than 20 s each.
+The full suite is 97 CTest cases and runs in about 3.5 minutes serially. The 8 `HPConfigTest` cases take about 2 minutes of it (~15 s each: N=128 with k=5 is the smallest size of the high-order paper); the other cases take less than 20 s each.
 
 ## GMSH meshes: reproducibility
 
@@ -149,8 +149,11 @@ Regression tests for configurations that used to crash, and for the argument def
 
 - **`Prolongation/GalerkinProlongationDefaultsTest`** (4 cases: `-prolong {4|5}` × 2 tests) — no solve, only `ApplyProgramArgumentDefaults`. With the default solver, the prolongations that require the Galerkin operator enable it; with an explicit `-s mg` and no `-g 1`, they are rejected (death test, `EXIT_FAILURE`).
 
-- **`SquarePoly/PolygonalMeshUAMGTest.Converges`** (2 cases: k=0,1) — U-AMG on a polygonal mesh built with `-polymesh-fcs n` (the fine faces are kept), where neighbouring polygons share several faces. U-AMG listed such a neighbour once per shared face, and the ordering of the cells for the pairwise aggregation wrote past the end of its array (heap corruption, crash). Sequential. Assertion: converges in ≤ 30 iterations.
-  CLI: `./bin/fhhos4 -geo square -mesh poly -polymesh-fcs n -k {0|1} -n 64 -s fcguamg -threads 1`
+- **`HPCoarsening/UAMGHPCoarseningDefaultsTest.PThenHAtHighOrder`** (3 cases: k=0,1,2) and **`UAMGHPCoarseningDefaults.ExplicitStrategyKept`** (1 case) — no solve, only `ApplyProgramArgumentDefaults`. The default hp-coarsening strategy of U-AMG is p, then h (`-hp-cs p_h`) at k ≥ 1, h only at k=0; the other solvers (here `mg`) keep h only; an explicit `-hp-cs` is kept.
+  CLI: `./bin/fhhos4 -geo square -mesh cart -mesher inhouse -k {0|1|2} -s {fcguamg|mg} [-hp-cs h]`
+
+- **`SquarePoly/PolygonalMeshUAMGTest.Converges`** (3 cases: k=0, k=1 with the default hp-coarsening (p, then h) and with `-hp-cs h`) — U-AMG on a polygonal mesh built with `-polymesh-fcs n` (the fine faces are kept), where neighbouring polygons share several faces. U-AMG listed such a neighbour once per shared face, and the ordering of the cells for the pairwise aggregation wrote past the end of its array (heap corruption, crash). Sequential. Assertion: converges in ≤ 30 iterations.
+  CLI: `./bin/fhhos4 -geo square -mesh poly -polymesh-fcs n -k {0|1} -n 64 -s fcguamg [-hp-cs h] -threads 1`
 
 - **`SquarePoly/PolygonalMeshMultigridDefaultsTest.Converges`** (2 cases: k=0,1) — the geometric multigrid with its default options on a polygonal mesh. The default coarsening strategy was the independent remeshing by GMSH (`-cs m`), which these meshes, built by agglomeration, don't support: it is now the agglomeration coarsening (`-cs n`). Sequential. Assertions: that default, and convergence in ≤ 30 iterations.
   CLI: `./bin/fhhos4 -geo square -mesh poly -k {0|1} -n 64 -s mg -threads 1`
@@ -168,7 +171,7 @@ Unit tests of the parallel sparse matrix operations used in the setup of U-AMG (
 
 ## Coverage summary
 
-- 92 CTest cases total across the 8 files above, exercising `Program_Diffusion_HHO` (diffusion problems) and `Program_BiHarmonic_HHO` (biharmonic problem in mixed form), with the HHO discretization and static condensation.
+- 97 CTest cases total across the 8 files above, exercising `Program_Diffusion_HHO` (diffusion problems) and `Program_BiHarmonic_HHO` (biharmonic problem in mixed form), with the HHO discretization and static condensation.
 - Dimensions: 2D and 3D. No 1D coverage (the run helpers throw for it, consistent with `ENABLE_1D=OFF` by default).
 - Meshes: in-house `cart`, `stri`, `quad`, `stetra`; GMSH `cart`, `tri`, `tetra`, and a locally refined mesh; polygonal meshes (`poly`, CGAL) built from a GMSH Cartesian mesh, with and without interface collapsing (`-polymesh-fcs c|n`).
 - Coarsening strategies: standard, refinement (`-cs r`), independent remeshing (`-cs m`), agglomeration (`-cs n`).

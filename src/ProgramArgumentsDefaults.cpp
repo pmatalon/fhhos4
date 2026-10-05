@@ -8,7 +8,8 @@ void ApplyProgramArgumentDefaults(ProgramArguments& args,
 	bool defaultTol2,
 	bool defaultCycle,
 	bool defaultCoarseOperator,
-	bool defaultCoarseSolver)
+	bool defaultCoarseSolver,
+	bool defaultHPCoarseningStgy)
 {
 	//------------------------------------------//
 	//                 Problem                  //
@@ -342,6 +343,11 @@ void ApplyProgramArgumentDefaults(ProgramArguments& args,
 
 		if (defaultCycle)
 			args.Solver.MG.CycleLetter = 'K';
+
+		// k >= 1: p-levels down to k=0, then the h-coarsening of the paper, designed for k=0. The h-coarsening of the
+		// degree-k blocks (-hp-cs h) only transfers their higher modes by plain aggregation: never faster in the tests.
+		if (defaultHPCoarseningStgy && args.Discretization.PolyDegree > 1)
+			args.Solver.MG.HP_CS = HP_CoarsStgy::P_then_H;
 	}
 
 	if (args.Solver.SolverCode.compare("aggregamg") == 0 || args.Solver.PreconditionerCode.compare("aggregamg") == 0)
