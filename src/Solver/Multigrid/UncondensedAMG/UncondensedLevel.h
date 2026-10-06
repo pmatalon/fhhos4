@@ -43,6 +43,12 @@ public:
 	// of the coarsening passes are global sparse products.
 	LocalOperator* LocalOp = nullptr;
 
+	// Coordinate of the constant function 1 on the first basis function of each cell and face of this level, used to
+	// rescale the matrices before the h-coarsening (see CoarsenMesh()). Null if they are all 1: when they are given so,
+	// and on the levels built by h-coarsening, where the constants have coordinate 1 by construction.
+	const Vector* CellConstants = nullptr;
+	const Vector* FaceConstants = nullptr;
+
 public:
 	UncondensedLevel(int number, int degree, int cellBlockSize, int faceBlockSize, double strongCouplingThreshold, UAMGFaceProlongation faceProlong, UAMGProlongation coarseningProlong, UAMGProlongation mgProlong)
 		: Level(number)
@@ -97,6 +103,93 @@ public:
 				SetupDiscretizedOperator();
 		}
 
+		if (!CellConstants)
+		{
+			CoarsenInPasses(coarseningStgy, faceCoarseningStgy, requestedCoarseningFactor, coarsestPossibleMeshReached);
+			return;
+		}
+
+		// Correction of a restrictive assumption of the paper (D. A. Di Pietro, F. Hülsemann, P. Matalon, P. Mycek,
+		// U. Rüde, "Algebraic multigrid preconditioner for statically condensed systems arising from lowest-order hybrid
+		// discretizations", SISC 2023). Its Section 2 takes the DoFs as values ("one scalar value per cell and per
+		// face"), so that the coefficients 1 of Q_T, Q_F (3.3) and of the trace Π^f_c (after (3.7)) transfer the
+		// constant functions: a coarse cell or face takes the value of the fine ones it aggregates, the trace of a cell
+		// value on its faces is the same value. This only holds if the constant function 1 has the same coordinate c in
+		// all the cell and face bases. Otherwise (e.g. orthonormal bases: c = sqrt(|T|) on a cell, sqrt(|F|) on a face),
+		// the trace of the constant is c_F/c_T, not 1 (it is the geometric trace M_F^-1 M_FT of the h-multigrid that this
+		// prolongation mimics), and aggregating fine functions of different coordinates does not give a constant. The
+		// coarse spaces then lose the constants (more iterations), or, if c_F < c_T, the prolongation is amplified at
+		// each coarsening pass until it overflows.
+		// Correction: a change of coordinates on the first (constant) DoF of each cell and face block, z_0 = y_0 / c, in
+		// which the constant has coordinate 1 everywhere, as the paper assumes. The coarsening passes run on D A D
+		// (D = diag(c) on the first DoFs, 1 elsewhere), and the prolongation is brought back to the coordinates of this
+		// level, P = D_F P_z: the operator of this level, its smoothers and residuals stay in the caller's coordinates
+		// (the block smoothers are invariant by this scaling, and P^T A P = P_z^T (D_F A D_F) P_z). The coarse levels are
+		// in the coordinates z, where the constants have coordinate 1: they need no rescaling.
+		const SparseMatrix* levelA     = this->OperatorMatrix;
+		const SparseMatrix* levelA_T_T = this->A_T_T;
+		const SparseMatrix* levelA_T_F = this->A_T_F;
+		const SparseMatrix* levelA_F_F = this->A_F_F;
+		SparseMatrix scaledA     = ScaleConstantDoFs(*levelA,     *FaceConstants, _faceBlockSize, *FaceConstants, _faceBlockSize);
+		SparseMatrix scaledA_T_T = ScaleConstantDoFs(*levelA_T_T, *CellConstants, _cellBlockSize, *CellConstants, _cellBlockSize);
+		SparseMatrix scaledA_T_F = ScaleConstantDoFs(*levelA_T_F, *CellConstants, _cellBlockSize, *FaceConstants, _faceBlockSize);
+		SparseMatrix scaledA_F_F = levelA_F_F ? ScaleConstantDoFs(*levelA_F_F, *FaceConstants, _faceBlockSize, *FaceConstants, _faceBlockSize) : SparseMatrix();
+		this->OperatorMatrix = &scaledA;
+		this->A_T_T = &scaledA_T_T;
+		this->A_T_F = &scaledA_T_F;
+		this->A_F_F = levelA_F_F ? &scaledA_F_F : nullptr;
+
+		CoarsenInPasses(coarseningStgy, faceCoarseningStgy, requestedCoarseningFactor, coarsestPossibleMeshReached);
+
+		this->OperatorMatrix = levelA;
+		this->A_T_T = levelA_T_T;
+		this->A_T_F = levelA_T_F;
+		this->A_F_F = levelA_F_F;
+		if (LocalOp && LocalOp->Assembled == &scaledA)
+			LocalOp->Assembled = nullptr;
+		if (coarsestPossibleMeshReached)
+			return;
+
+		ScaleConstantRows(this->P, *FaceConstants, _faceBlockSize);
+		if (ComputeQ_F)
+			ScaleConstantRows(this->Q_F, *FaceConstants, _faceBlockSize);
+	}
+
+	// Copy of A whose coefficient (i, j) is multiplied by d_i d_j, d being the coordinate of the constant on the first
+	// DoF of each block of rows (resp. columns), and 1 on the other DoFs
+	static SparseMatrix ScaleConstantDoFs(const SparseMatrix& A, const Vector& rowConstants, int rowBlockSize, const Vector& colConstants, int colBlockSize)
+	{
+		SparseMatrix scaled = A;
+		BigNumber nRows = scaled.rows();
+		#pragma omp parallel for
+		for (BigNumber i = 0; i < nRows; ++i)
+		{
+			double d_i = i % rowBlockSize == 0 ? rowConstants[i / rowBlockSize] : 1;
+			for (SparseMatrix::InnerIterator it(scaled, i); it; ++it)
+			{
+				BigNumber j = it.col();
+				double d_j = j % colBlockSize == 0 ? colConstants[j / colBlockSize] : 1;
+				it.valueRef() *= d_i * d_j;
+			}
+		}
+		return scaled;
+	}
+
+	// Multiplies the row of the first DoF of each block by the coordinate of the constant
+	static void ScaleConstantRows(SparseMatrix& M, const Vector& constants, int blockSize)
+	{
+		BigNumber nBlocks = constants.rows();
+		#pragma omp parallel for
+		for (BigNumber b = 0; b < nBlocks; ++b)
+		{
+			for (SparseMatrix::InnerIterator it(M, b * blockSize); it; ++it)
+				it.valueRef() *= constants[b];
+		}
+	}
+
+	// The coarsening passes of the paper, until the requested coarsening factor is reached
+	void CoarsenInPasses(H_CoarsStgy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double requestedCoarseningFactor, bool& coarsestPossibleMeshReached)
+	{
 		SparseMatrix *auxP, *auxQ_F, *auxSchur;
 		HybridAlgebraicMesh *mesh, *coarseMesh;
 		const SparseMatrix* schur = this->OperatorMatrix;
@@ -714,7 +807,9 @@ private:
 		return SparseMatrixOps::SelectRows(isRemoved, removedFaceRows, keptFaceRows, _faceBlockSize, NonZeroCoefficients::ZeroThreshold);
 	}
 
-	// Cell prolongation Q_T with only one 1 coefficient per row
+	// Cell prolongation Q_T with only one 1 coefficient per row: (3.3a) of the paper. Like Q_F and the traces below, it
+	// preserves the constants only if they have the same coordinate in all the bases, a restrictive assumption of the
+	// paper that the rescaling of CoarsenMesh() makes hold.
 	SparseMatrix BuildQ_T(const HybridAlgebraicMesh& mesh)
 	{
 		DenseMatrix Id = DenseMatrix::Identity(_cellBlockSize, _cellBlockSize);
@@ -730,7 +825,7 @@ private:
 		return Q_T;
 	}
 
-	// Face prolongation FaceProlongation
+	// Face prolongation FaceProlongation: (3.3b-c) of the paper (same assumption as BuildQ_T())
 	SparseMatrix BuildQ_F(const HybridAlgebraicMesh& mesh)
 	{
 		bool enableAnisotropyManagement = false;
@@ -826,7 +921,7 @@ private:
 
 	SparseMatrix BuildTrace(const HybridAlgebraicMesh& mesh)
 	{
-		// Pi: average on both sides of each face
+		// Pi: average on both sides of each face. Trace of the constant 1: see BuildCoarseTraceOnFineRemovedFaces().
 		DenseMatrix traceOfConstant = DenseMatrix::Zero(_faceBlockSize, _cellBlockSize);
 		traceOfConstant(0, 0) = 1;
 
@@ -849,8 +944,13 @@ private:
 		return Pi;
 	}
 
+	// Trace Π^f_c of the paper (after (3.7)), from the coarse cells to the fine faces they contain
 	SparseMatrix BuildCoarseTraceOnFineRemovedFaces(const HybridAlgebraicMesh& mesh)
 	{
+		// Restrictive assumption of the paper: the trace of the constant is 1, i.e. the constant has the same coordinate
+		// c in the cell and face bases. In general, it is c_F/c_T (geometric trace M_F^-1 M_FT): CoarsenMesh() rescales
+		// the matrices so that c = 1 everywhere. Only the constant mode is transferred (k >= 1 with -hp-cs h: the higher
+		// modes of the faces are then only set by the smoothing of the prolongation).
 		DenseMatrix traceOfConstant = DenseMatrix::Zero(_faceBlockSize, _cellBlockSize);
 		traceOfConstant(0, 0) = 1;
 
@@ -867,6 +967,7 @@ private:
 		return Pi;
 	}
 
+	// Same assumption as BuildCoarseTraceOnFineRemovedFaces()
 	SparseMatrix BuildCoarseTraceOnFineFaces(const HybridAlgebraicMesh& mesh)
 	{
 		DenseMatrix traceOfConstant = DenseMatrix::Zero(_faceBlockSize, _cellBlockSize);
@@ -1050,7 +1151,12 @@ public:
 		{
 			UncondensedLevel* coarse = dynamic_cast<UncondensedLevel*>(this->CoarserLevel);
 			if (this->CoarserLevel->ComesFrom == CoarseningType::P)
+			{
 				coarse->SetupOperatorByBlockExtraction();
+				// The p-coarsening keeps the first (constant) DoF of each block: same coordinates of the constant
+				coarse->CellConstants = this->CellConstants;
+				coarse->FaceConstants = this->FaceConstants;
+			}
 			else
 			{
 				coarse->OperatorMatrix = &Ac;

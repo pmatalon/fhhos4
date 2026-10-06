@@ -34,7 +34,7 @@ ctest -E HPConfig                          # skip the slowest tests
 ./bin/fhhos4_tests --gtest_filter=*Kellogg*  # or filter the binary directly
 ```
 
-The full suite is 97 CTest cases and runs in about 3.5 minutes serially. The 8 `HPConfigTest` cases take about 2 minutes of it (~15 s each: N=128 with k=5 is the smallest size of the high-order paper); the other cases take less than 20 s each.
+The full suite is 103 CTest cases and runs in about 3.5 minutes serially. The 8 `HPConfigTest` cases take about 2 minutes of it (~15 s each: N=128 with k=5 is the smallest size of the high-order paper); the other cases take less than 20 s each.
 
 ## GMSH meshes: reproducibility
 
@@ -152,6 +152,9 @@ Regression tests for configurations that used to crash, and for the argument def
 - **`HPCoarsening/UAMGHPCoarseningDefaultsTest.PThenHAtHighOrder`** (3 cases: k=0,1,2) and **`UAMGHPCoarseningDefaults.ExplicitStrategyKept`** (1 case) — no solve, only `ApplyProgramArgumentDefaults`. The default hp-coarsening strategy of U-AMG is p, then h (`-hp-cs p_h`) at k ≥ 1, h only at k=0; the other solvers (here `mg`) keep h only; an explicit `-hp-cs` is kept.
   CLI: `./bin/fhhos4 -geo square -mesh cart -mesher inhouse -k {0|1|2} -s {fcguamg|mg} [-hp-cs h]`
 
+- **`Kellogg/UAMGConstantRescalingTest.Converges`** (6 cases: k=0,1 × orthonormal bases on the cells and faces, the cells only, the faces only) — U-AMG with bases where the constant function does not have coordinate 1 (orthonormal: √|T| on a cell, √|F| on a face), on the Kellogg problem with a mesh graded towards the center (`square4quadrants_tri_localref.geo`: cells 1e5 times smaller there). The coarsening of the 2023 AMG paper assumes that the constant has the same coordinate in all the bases (its Q_T, Q_F and trace Π have coefficients 1); `UncondensedLevel::CoarsenMesh()` rescales the constant modes to make it hold. Without it, FCG stopped at its 200 iterations, or the coarse operator overflowed (orthonormal faces only). Assertion: converges in ≤ 25 iterations (16-21 measured; 14-18 with the default bases).
+  CLI: `./bin/fhhos4 -geo 2D/square4quadrants_tri_localref.geo -tc kellogg -n 16 -k {0|1} -s fcguamg -e-ogb {3|1} -f-ogb {3|1} -no-cache`
+
 - **`SquarePoly/PolygonalMeshUAMGTest.Converges`** (3 cases: k=0, k=1 with the default hp-coarsening (p, then h) and with `-hp-cs h`) — U-AMG on a polygonal mesh built with `-polymesh-fcs n` (the fine faces are kept), where neighbouring polygons share several faces. U-AMG listed such a neighbour once per shared face, and the ordering of the cells for the pairwise aggregation wrote past the end of its array (heap corruption, crash). Sequential. Assertion: converges in ≤ 30 iterations.
   CLI: `./bin/fhhos4 -geo square -mesh poly -polymesh-fcs n -k {0|1} -n 64 -s fcguamg [-hp-cs h] -threads 1`
 
@@ -171,7 +174,7 @@ Unit tests of the parallel sparse matrix operations used in the setup of U-AMG (
 
 ## Coverage summary
 
-- 97 CTest cases total across the 8 files above, exercising `Program_Diffusion_HHO` (diffusion problems) and `Program_BiHarmonic_HHO` (biharmonic problem in mixed form), with the HHO discretization and static condensation.
+- 103 CTest cases total across the 8 files above, exercising `Program_Diffusion_HHO` (diffusion problems) and `Program_BiHarmonic_HHO` (biharmonic problem in mixed form), with the HHO discretization and static condensation.
 - Dimensions: 2D and 3D. No 1D coverage (the run helpers throw for it, consistent with `ENABLE_1D=OFF` by default).
 - Meshes: in-house `cart`, `stri`, `quad`, `stetra`; GMSH `cart`, `tri`, `tetra`, and a locally refined mesh; polygonal meshes (`poly`, CGAL) built from a GMSH Cartesian mesh, with and without interface collapsing (`-polymesh-fcs c|n`).
 - Coarsening strategies: standard, refinement (`-cs r`), independent remeshing (`-cs m`), agglomeration (`-cs n`).

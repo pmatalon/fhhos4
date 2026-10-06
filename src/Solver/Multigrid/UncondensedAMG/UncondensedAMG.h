@@ -16,6 +16,8 @@ private:
 	int _faceBlockSize;
 	double _strongCouplingThreshold;
 	LocalOperator _localOperator; // local matrices of the operators of the coarsening passes, during the setup
+	Vector _cellConstants; // coordinate of the constant function 1 on the first basis function of each cell and face
+	Vector _faceConstants; // (empty if they are all 1)
 public:
 
 	UncondensedAMG(int dim, int degree, int cellBlockSize, int faceBlockSize, double strongCouplingThreshold, UAMGFaceProlongation faceProlong, UAMGProlongation coarseningProlong, UAMGProlongation mgProlong, int nLevels = 0)
@@ -82,14 +84,29 @@ public:
 		Utils::FatalError("The method Setup(const SparseMatrix& A) cannot be used for this solver.");
 	}
 
-	void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F) override
+	// cellConstants, faceConstants: coordinate of the constant function 1 on the first basis function of each cell and
+	// face, the bases being hierarchical with a constant first function. Used to correct a restrictive assumption of
+	// the paper, for which they are all 1 (see UncondensedLevel::CoarsenMesh()).
+	void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F, const Vector& cellConstants, const Vector& faceConstants) override
 	{
+		if (cellConstants.rows() * _cellBlockSize != A_T_F.rows() || faceConstants.rows() * _faceBlockSize != A_T_F.cols())
+			Utils::FatalError("UncondensedAMG: one coordinate of the constant function is expected per cell (" + to_string(A_T_F.rows() / _cellBlockSize) + ") and per face (" + to_string(A_T_F.cols() / _faceBlockSize) + "), got " + to_string(cellConstants.rows()) + " and " + to_string(faceConstants.rows()) + ".");
+		if (!cellConstants.allFinite() || !faceConstants.allFinite() || (cellConstants.array() == 0).any() || (faceConstants.array() == 0).any())
+			Utils::FatalError("UncondensedAMG: the coordinates of the constant function must be finite and non-zero.");
+
 		this->_fineLevel = this->CreateFineLevel();
 		UncondensedLevel* fine = dynamic_cast<UncondensedLevel*>(this->_fineLevel);
 		fine->A_T_T = &A_T_T;
 		fine->A_T_F = &A_T_F;
 		fine->A_F_F = &A_F_F;
 		fine->LocalOp = &_localOperator;
+
+		// With the coordinates of the paper (all 1), no rescaling: the setup is unchanged
+		bool unitConstants = (cellConstants.array() == 1).all() && (faceConstants.array() == 1).all();
+		_cellConstants = unitConstants ? Vector() : cellConstants;
+		_faceConstants = unitConstants ? Vector() : faceConstants;
+		fine->CellConstants = unitConstants ? nullptr : &_cellConstants;
+		fine->FaceConstants = unitConstants ? nullptr : &_faceConstants;
 
 		if (Utils::IsRefinementStrategy(this->H_CS))
 			this->H_CS = H_CoarsStgy::MultiplePairwiseAggregation;

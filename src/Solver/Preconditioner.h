@@ -150,13 +150,13 @@ public:
 			_solver->Setup(A);
 	}
 
-	void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F)
+	void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F, const Vector& cellConstants, const Vector& faceConstants)
 	{
 		if (!_solver)
 			return;
 		IterativeSolver* iterSolver = dynamic_cast<IterativeSolver*>(_solver);
 		if (iterSolver)
-			iterSolver->Setup(A, A_T_T, A_T_F, A_F_F);
+			iterSolver->Setup(A, A_T_T, A_T_F, A_F_F, cellConstants, faceConstants);
 		else
 			_solver->Setup(A); // the matrix blocks are only used by iterative solvers
 	}

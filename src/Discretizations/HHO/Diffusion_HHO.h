@@ -744,6 +744,44 @@ public:
 		return &this->_hhoFaces[f->Number];
 	}
 
+	// Coordinate of the constant function 1 on the first basis function of each cell, and of each face of the system
+	// (non-Dirichlet), in the numbering of A_T_ndF's blocks: needed by U-AMG (see UncondensedLevel::CoarsenMesh()).
+	Vector CellConstantCoordinates()
+	{
+		Vector c = Vector::Ones(_mesh->Elements.size());
+		if (!FirstFunctionIsConstant(HHO->CellBasis))
+			return c;
+		#pragma omp parallel for
+		for (Element<Dim>* e : _mesh->Elements)
+			c[e->Number] = 1 / HHOElement(e)->CellBasis->LocalFunctions()[0]->Eval(RefPoint());
+		return c;
+	}
+	Vector FaceConstantCoordinates()
+	{
+		Vector c = Vector::Ones(HHO->nInteriorAndNeumannFaces);
+		if (!FirstFunctionIsConstant(HHO->FaceBasis))
+			return c;
+		#pragma omp parallel for
+		for (Face<Dim>* f : _mesh->Faces)
+		{
+			if (!f->HasDirichletBC())
+				c[f->Number] = 1 / HHOFace(f)->Basis->LocalFunctions()[0]->Eval(RefPoint());
+		}
+		return c;
+	}
+
+private:
+	// The bases of the elements and faces (orthogonalized or not) start with the same function as the reference basis
+	template <int BasisDim>
+	static bool FirstFunctionIsConstant(FunctionalBasis<BasisDim>* referenceBasis)
+	{
+		if (referenceBasis->LocalFunctions()[0]->GetDegree() == 0)
+			return true;
+		Utils::Warning("U-AMG expects bases whose first function is constant (not the case of the basis '" + referenceBasis->BasisCode() + "'): its coarse levels may not represent the constant functions.");
+		return false;
+	}
+
+public:
 	void DeleteHHOElements()
 	{
 		this->_hhoElements.clear();

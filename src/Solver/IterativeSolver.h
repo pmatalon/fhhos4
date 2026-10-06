@@ -38,7 +38,11 @@ public:
 		}
 	}
 
-	virtual void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F)
+	// Setup from the blocks of the uncondensed system of a hybrid discretization (A being the condensed one), and the
+	// coordinate of the constant function 1 on the first basis function of each cell (cellConstants) and each face of
+	// the system (faceConstants), the bases being hierarchical with a constant first function (see
+	// UncondensedLevel::CoarsenMesh()).
+	virtual void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F, const Vector& cellConstants, const Vector& faceConstants)
 	{
 		Utils::FatalError("This solver is not compatible with matrix blocks arising from a hybrid discretization.");
 	}

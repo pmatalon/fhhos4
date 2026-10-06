@@ -169,6 +169,38 @@ TEST(UAMGHPCoarseningDefaults, ExplicitStrategyKept)
 	EXPECT_TRUE(args.Solver.MG.HP_CS == HP_CoarsStgy::H_only);
 }
 
+// U-AMG with bases where the constant function does not have coordinate 1 (orthonormal: sqrt(|T|) on a cell, sqrt(|F|)
+// on a face), on a mesh graded towards the center (cells 1e5 times smaller there). The coarsening of the paper assumes
+// that the constant has the same coordinate in all the bases: without the rescaling of UncondensedLevel::CoarsenMesh(),
+// FCG stopped at its 200 iterations, or the coarse operator overflowed (orthonormal faces only). 14-18 iterations with
+// the default bases.
+//   ./bin/fhhos4 -geo 2D/square4quadrants_tri_localref.geo -tc kellogg -n 16 -k {0|1} -s fcguamg -e-ogb {3|1} -f-ogb {3|1} -no-cache
+class UAMGConstantRescalingTest : public ::testing::TestWithParam<std::tuple<int, int, int>>
+{
+};
+
+TEST_P(UAMGConstantRescalingTest, Converges)
+{
+	auto [k, elemOrthogonalization, faceOrthogonalization] = GetParam();
+	ProgramArguments args;
+	args.Problem.GeoCode = "2D/square4quadrants_tri_localref.geo";
+	args.Problem.TestCaseCode = "kellogg";
+	args.Discretization.N = 16;
+	args.Discretization.PolyDegree = k + 1;
+	args.Discretization.OrthogonalizeElemBasesCode = elemOrthogonalization;
+	args.Discretization.OrthogonalizeFaceBasesCode = faceOrthogonalization;
+	args.Solver.SolverCode = "fcguamg";
+	args.Actions.UseCache = false; // -no-cache
+
+	ProgramResults results = RunDiffusionHHO(args);
+	EXPECT_GT(results.IterationCount, 0);
+	EXPECT_LE(results.IterationCount, 25);
+}
+
+INSTANTIATE_TEST_SUITE_P(Kellogg, UAMGConstantRescalingTest, ::testing::Values(
+	std::make_tuple(0, 3, 3), std::make_tuple(0, 3, 1), std::make_tuple(0, 1, 3),
+	std::make_tuple(1, 3, 3), std::make_tuple(1, 3, 1), std::make_tuple(1, 1, 3)));
+
 #ifdef CGAL_ENABLED
 namespace
 {
