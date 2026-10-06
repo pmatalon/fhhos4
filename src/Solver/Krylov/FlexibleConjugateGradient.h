@@ -36,10 +36,10 @@ public:
 		this->SetupComputationalWork = this->Precond.SetupComputationalWork();
 	}
 
-	void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F, const Vector& cellConstants, const Vector& faceConstants) override
+	void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
 	{
 		IterativeSolver::Setup(A);
-		this->Precond.Setup(A, A_T_T, A_T_F, A_F_F, cellConstants, faceConstants);
+		this->Precond.Setup(A, A_T_T, A_T_F, A_F_F, cellInterpOfOne, faceInterpOfOne);
 		this->SetupComputationalWork = this->Precond.SetupComputationalWork();
 	}
 

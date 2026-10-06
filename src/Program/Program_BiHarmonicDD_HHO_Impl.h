@@ -108,16 +108,16 @@ void Program_BiHarmonicDD_HHO<Dim>::Execute(ProgramArguments& args)
 		if (iterativeSolver)
 		{
 			bool uamg = Utils::ProgramArgs.Solver.SolverCode.compare("uamg") == 0 || Utils::ProgramArgs.Solver.SolverCode.compare("fcguamg") == 0;
-			Vector cellConstants, faceConstants;
+			Vector cellInterpOfOne, faceInterpOfOne;
 			if (uamg)
 			{
-				cellConstants = biHarPb->DiffPb1().CellConstantCoordinates();
-				faceConstants = biHarPb->DiffPb1().FaceConstantCoordinates();
+				cellInterpOfOne = biHarPb->DiffPb1().CellInterpOfOne();
+				faceInterpOfOne = biHarPb->DiffPb1().FaceInterpOfOne();
 			}
 
 			setupTimer.Start();
 			if (uamg)
-				iterativeSolver->Setup(biHarPb->DiffPb1().A, biHarPb->DiffPb1().A_T_T, biHarPb->DiffPb1().A_T_ndF, biHarPb->DiffPb1().A_ndF_ndF, cellConstants, faceConstants);
+				iterativeSolver->Setup(biHarPb->DiffPb1().A, biHarPb->DiffPb1().A_T_T, biHarPb->DiffPb1().A_T_ndF, biHarPb->DiffPb1().A_ndF_ndF, cellInterpOfOne, faceInterpOfOne);
 			else
 				solver->Setup(biHarPb->DiffPb1().A);
 			setupTimer.Stop();

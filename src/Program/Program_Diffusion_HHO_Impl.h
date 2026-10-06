@@ -262,16 +262,16 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 			}
 
 			bool uamg = Utils::ProgramArgs.Solver.SolverCode.compare("uamg") == 0 || Utils::ProgramArgs.Solver.PreconditionerCode.compare("uamg") == 0;
-			Vector cellConstants, faceConstants;
+			Vector cellInterpOfOne, faceInterpOfOne;
 			if (uamg)
 			{
-				cellConstants = problem->CellConstantCoordinates();
-				faceConstants = problem->FaceConstantCoordinates();
+				cellInterpOfOne = problem->CellInterpOfOne();
+				faceInterpOfOne = problem->FaceInterpOfOne();
 			}
 
 			setupTimer.Start();
 			if (uamg)
-				iterativeSolver->Setup(problem->A, problem->A_T_T, problem->A_T_ndF, problem->A_ndF_ndF, cellConstants, faceConstants);
+				iterativeSolver->Setup(problem->A, problem->A_T_T, problem->A_T_ndF, problem->A_ndF_ndF, cellInterpOfOne, faceInterpOfOne);
 			else
 				solver->Setup(problem->A);
 			setupTimer.Stop();

@@ -744,44 +744,35 @@ public:
 		return &this->_hhoFaces[f->Number];
 	}
 
-	// Coordinate of the constant function 1 on the first basis function of each cell, and of each face of the system
-	// (non-Dirichlet), in the numbering of A_T_ndF's blocks: needed by U-AMG (see UncondensedLevel::CoarsenMesh()).
-	Vector CellConstantCoordinates()
+	// Interpolation of the function 1 on the cell bases, and on the bases of the faces of the system (non-Dirichlet),
+	// numbered as the rows and columns of A_T_ndF: needed by U-AMG (see UncondensedLevel::CoarsenMesh()).
+	// Hierarchical bases (the first function phi_0 is constant): 1 = (1/phi_0) phi_0, so the interpolation is
+	// (1/phi_0, 0, ..., 0) on each block, exactly (1 for the default bases, whereas the L2-projection divides two
+	// different computations of the measure and gives 1 up to rounding). Other bases: L2-projection.
+	Vector CellInterpOfOne()
 	{
-		Vector c = Vector::Ones(_mesh->Elements.size());
-		if (!FirstFunctionIsConstant(HHO->CellBasis))
-			return c;
+		if (!HHO->CellBasis->IsHierarchical())
+			return CellSpace.Project(Utils::ConstantFunctionOne);
+		Vector interp = Vector::Zero(HHO->nTotalCellUnknowns);
 		#pragma omp parallel for
 		for (Element<Dim>* e : _mesh->Elements)
-			c[e->Number] = 1 / HHOElement(e)->CellBasis->LocalFunctions()[0]->Eval(RefPoint());
-		return c;
+			interp[e->Number * HHO->nCellUnknowns] = 1 / HHOElement(e)->CellBasis->LocalFunctions()[0]->Eval(RefPoint());
+		return interp;
 	}
-	Vector FaceConstantCoordinates()
+	Vector FaceInterpOfOne()
 	{
-		Vector c = Vector::Ones(HHO->nInteriorAndNeumannFaces);
-		if (!FirstFunctionIsConstant(HHO->FaceBasis))
-			return c;
+		if (!HHO->FaceBasis->IsHierarchical())
+			return NonDirichletFaceSpace.Project(Utils::ConstantFunctionOne);
+		Vector interp = Vector::Zero(HHO->nTotalFaceUnknowns);
 		#pragma omp parallel for
 		for (Face<Dim>* f : _mesh->Faces)
 		{
 			if (!f->HasDirichletBC())
-				c[f->Number] = 1 / HHOFace(f)->Basis->LocalFunctions()[0]->Eval(RefPoint());
+				interp[f->Number * HHO->nFaceUnknowns] = 1 / HHOFace(f)->Basis->LocalFunctions()[0]->Eval(RefPoint());
 		}
-		return c;
+		return interp;
 	}
 
-private:
-	// The bases of the elements and faces (orthogonalized or not) start with the same function as the reference basis
-	template <int BasisDim>
-	static bool FirstFunctionIsConstant(FunctionalBasis<BasisDim>* referenceBasis)
-	{
-		if (referenceBasis->LocalFunctions()[0]->GetDegree() == 0)
-			return true;
-		Utils::Warning("U-AMG expects bases whose first function is constant (not the case of the basis '" + referenceBasis->BasisCode() + "'): its coarse levels may not represent the constant functions.");
-		return false;
-	}
-
-public:
 	void DeleteHHOElements()
 	{
 		this->_hhoElements.clear();

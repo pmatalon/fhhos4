@@ -39,10 +39,10 @@ public:
 	}
 
 	// Setup from the blocks of the uncondensed system of a hybrid discretization (A being the condensed one), and the
-	// coordinate of the constant function 1 on the first basis function of each cell (cellConstants) and each face of
-	// the system (faceConstants), the bases being hierarchical with a constant first function (see
-	// UncondensedLevel::CoarsenMesh()).
-	virtual void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F, const Vector& cellConstants, const Vector& faceConstants)
+	// interpolation of the function 1 on the polynomial bases of the cells (cellInterpOfOne, numbered as the rows of
+	// A_T_F) and of the faces of the system (faceInterpOfOne, numbered as the columns of A_T_F). The bases must be
+	// hierarchical with a constant first function (see UncondensedLevel::CoarsenMesh()).
+	virtual void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne)
 	{
 		Utils::FatalError("This solver is not compatible with matrix blocks arising from a hybrid discretization.");
 	}
