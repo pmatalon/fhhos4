@@ -175,7 +175,7 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 	HHOParameters<Dim>* hho = new HHOParameters<Dim>(mesh, args.Discretization.Stabilization, reconstructionBasis, cellBasis, faceBasis, args.Discretization.OrthogonalizeElemBasesCode, args.Discretization.OrthogonalizeFaceBasesCode);
 
 	bool saveMatrixBlocks = false;
-	if (args.Solver.SolverCode.compare("uamg") == 0 || args.Solver.PreconditionerCode.compare("uamg") == 0)
+	if (args.Solver.UsesUncondensedAMG())
 		saveMatrixBlocks = true;
 	else if (args.Problem.ComputeNormalDerivative && testCase->ExactSolution_Neumann)
 		saveMatrixBlocks = true;
@@ -261,7 +261,7 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 				};
 			}
 
-			bool uamg = Utils::ProgramArgs.Solver.SolverCode.compare("uamg") == 0 || Utils::ProgramArgs.Solver.PreconditionerCode.compare("uamg") == 0;
+			bool uamg = args.Solver.UsesUncondensedAMG();
 			Vector cellInterpOfOne, faceInterpOfOne;
 			if (uamg)
 			{

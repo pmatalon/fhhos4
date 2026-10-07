@@ -33,11 +33,15 @@ public:
 	SparseMatrix Ac;
 
 	// Set by UncondensedAMG, to skip the computations that the chosen options don't use:
-	// - the coarse blocks A_F_F, computed at each coarsening step;
+	// - the blocks A_F_F of the coarse levels, computed at each coarsening step, and the fine one (may be null);
 	// - the face prolongation Q_F chained over the coarsening steps.
 	// If not computed, the coarse level's A_F_F is null.
 	bool ComputeCoarseA_F_F = true;
 	bool ComputeQ_F = true;
+
+	// Set by UncondensedAMG: in the face prolongation FaceProlongation, the removed faces that belong to a coarse face
+	// take its value instead of the average of the faces of their coarse element (see BuildQ_F()).
+	bool ManageAnisotropy = true;
 
 	// Local matrices of the operator, shared by the levels (set by UncondensedAMG). If null, the Galerkin products
 	// of the coarsening passes are global sparse products.
@@ -243,7 +247,7 @@ public:
 			double nFine = initialFineMesh.A_T_F->cols();
 			double nCoarse = coarseMesh->A_T_F->cols();
 			actualCoarseningFactor = nFine / nCoarse;
-			cout << "\t\tCoarsening factor = " << actualCoarseningFactor << endl;
+			Utils::Log() << "\t\tCoarsening factor = " << actualCoarseningFactor << endl;
 			if (actualCoarseningFactor >= 10)
 				Utils::Warning("The coarsening seems a little too strong...");
 
@@ -769,8 +773,6 @@ public:
 	void SetupOperatorByBlockExtraction()
 	{
 		UncondensedLevel* fine = dynamic_cast<UncondensedLevel*>(FinerLevel);
-		if (!fine->A_F_F)
-			Utils::FatalError("UncondensedAMG: the p-coarsening requires the block A_F_F, which has not been computed on the finer level (see UncondensedAMG::CoarseA_F_FNeeded()).");
 
 		auto nElems = fine->A_T_F->rows() / fine->_cellBlockSize;
 		auto nFaces = fine->A_T_F->cols() / fine->_faceBlockSize;
@@ -778,7 +780,14 @@ public:
 		this->OperatorMatrix = ExtractCoarseMatrix(*this->FinerLevel->OperatorMatrix, nFaces, nFaces, fine->_faceBlockSize, fine->_faceBlockSize, this->_faceBlockSize, this->_faceBlockSize);
 		this->A_T_T = ExtractCoarseMatrix(*fine->A_T_T, nElems, nElems, fine->_cellBlockSize, fine->_cellBlockSize, this->_cellBlockSize, this->_cellBlockSize);
 		this->A_T_F = ExtractCoarseMatrix(*fine->A_T_F, nElems, nFaces, fine->_cellBlockSize, fine->_faceBlockSize, this->_cellBlockSize, this->_faceBlockSize);
-		this->A_F_F = ExtractCoarseMatrix(*fine->A_F_F, nFaces, nFaces, fine->_faceBlockSize, fine->_faceBlockSize, this->_faceBlockSize, this->_faceBlockSize);
+		// A_F_F: only for the options that use it (see UncondensedAMG::A_F_FNeeded())
+		this->A_F_F = nullptr;
+		if (ComputeCoarseA_F_F)
+		{
+			if (!fine->A_F_F)
+				Utils::FatalError("UncondensedAMG: the p-coarsening requires the block A_F_F, which has not been computed on the finer level (see UncondensedAMG::A_F_FNeeded()).");
+			this->A_F_F = ExtractCoarseMatrix(*fine->A_F_F, nFaces, nFaces, fine->_faceBlockSize, fine->_faceBlockSize, this->_faceBlockSize, this->_faceBlockSize);
+		}
 	}
 
 private:
@@ -850,7 +859,7 @@ private:
 		for (BigNumber faceNumber = 0; faceNumber < mesh.Faces.size(); ++faceNumber)
 		{
 			const HybridAlgebraicFace* face = &mesh.Faces[faceNumber];
-			if (face->IsRemovedOnCoarseMesh && (!Utils::ProgramArgs.Solver.MG.ManageAnisotropy || !face->CoarseFace))
+			if (face->IsRemovedOnCoarseMesh && (!ManageAnisotropy || !face->CoarseFace))
 			{
 				// Take the average value of the coarse element faces
 				HybridElementAggregate* elemAggreg = face->Elements[0]->CoarseElement;
@@ -1069,7 +1078,7 @@ private:
 		SparseMatrix A2(A.rows(), A.cols());
 		coeffs.Fill(A2);
 
-		cout << "A.nonZeros()=" << A.nonZeros() << ", A2.nonZeros()=" << A2.nonZeros() << endl;
+		Utils::Log() << "A.nonZeros()=" << A.nonZeros() << ", A2.nonZeros()=" << A2.nonZeros() << endl;
 
 		return A2;
 	}
@@ -1077,16 +1086,16 @@ private:
 public:
 	void OnStartSetup() override
 	{
-		cout << "\t\tk = " << this->PolynomialDegree() << endl;
-		cout << "\t\tMesh                : " << this->A_T_T->rows() / _cellBlockSize << " elements, " << this->A_T_F->cols() / _faceBlockSize << " faces";
+		Utils::Log() << "\t\tk = " << this->PolynomialDegree() << endl;
+		Utils::Log() << "\t\tMesh                : " << this->A_T_T->rows() / _cellBlockSize << " elements, " << this->A_T_F->cols() / _faceBlockSize << " faces";
 		if (!this->IsFinestLevel())
 		{
 			UncondensedLevel* fine = dynamic_cast<UncondensedLevel*>(this->FinerLevel);
 			double nFine = fine->A_T_F->cols();
 			double nCoarse = this->A_T_F->cols();
-			cout << ", coarsening factor = " << (nFine/nCoarse);
+			Utils::Log() << ", coarsening factor = " << (nFine/nCoarse);
 		}
-		cout << endl;
+		Utils::Log() << endl;
 	}
 
 	void SetupProlongation() override

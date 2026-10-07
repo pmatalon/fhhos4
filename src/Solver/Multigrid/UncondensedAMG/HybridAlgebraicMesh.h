@@ -1,4 +1,5 @@
 #pragma once
+#include <set>
 #include "../../../Utils/Utils.h"
 #include "../AggregAMG/AlgebraicMesh.h"
 using namespace std;
@@ -281,13 +282,13 @@ public:
 
 		if (elemCoarseningStgy == H_CoarsStgy::DoublePairwiseAggregation || elemCoarseningStgy == H_CoarsStgy::MultiplePairwiseAggregation)
 		{
-			cout << "\tElement pairwise aggregation" << endl;
+			Utils::Log() << "\tElement pairwise aggregation" << endl;
 			PairwiseAggregation<HybridAlgebraicElement, HybridElementAggregate> aggregProcess;
 			CoarseElements = aggregProcess.Perform(Elements, coarsestPossibleMeshReached);
 		}
 		else if (elemCoarseningStgy == H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours || elemCoarseningStgy == H_CoarsStgy::MultipleAgglomerationCoarseningByFaceNeighbours)
 		{
-			cout << "\tElement agglomeration" << endl;
+			Utils::Log() << "\tElement agglomeration" << endl;
 			AllNeighbourAggregation<HybridAlgebraicElement, HybridElementAggregate> aggregProcess;
 			CoarseElements = aggregProcess.Perform(Elements, coarsestPossibleMeshReached);
 		}
@@ -360,7 +361,7 @@ public:
 		if (faceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsing ||
 			faceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsingAndTryAggregInteriorToInterfaces)
 		{
-			cout << "\tInterface collapsing" << endl;
+			Utils::Log() << "\tInterface collapsing" << endl;
 
 			// Collapse faces interfacing two element aggregates.
 			for (HybridElementAggregate& coarseElem : CoarseElements)
@@ -384,7 +385,7 @@ public:
 
 		if (faceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsingAndTryAggregInteriorToInterfaces)
 		{
-			cout << "\tInterior faces agglomeration" << endl;
+			Utils::Log() << "\tInterior faces agglomeration" << endl;
 
 			// Agglomerate removed faces
 			for (HybridAlgebraicFace& face : Faces)

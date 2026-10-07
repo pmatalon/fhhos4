@@ -153,7 +153,7 @@ public:
 		}
 
 		if (this->PrintIterationResults)
-			cout << result << endl;
+			Utils::Log() << result << endl;
 
 
 		while (!StoppingCriteriaReached(result))
@@ -186,13 +186,13 @@ public:
 			this->IterationCount++;
 
 			if (this->PrintIterationResults)
-				cout << result << endl;
+				Utils::Log() << result << endl;
 		}
 
 		result.CopyInfoInto(LastIterationResult);
 
 		if (this->PrintIterationResults)
-			cout << endl;
+			Utils::Log() << endl;
 
 		this->SolvingComputationalWork = result.SolvingComputationalWork();
 		if (computeResidual)

@@ -31,7 +31,7 @@ public:
 
 	void CoarsenMesh(H_CoarsStgy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, FaceCollapsing bdryFaceCollapsing, double coarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override
 	{
-		cout << "\tBuild algebraic mesh" << endl;
+		Utils::Log() << "\tBuild algebraic mesh" << endl;
 
 		//ExportMatrix(*this->OperatorMatrix, "A", 0);
 
@@ -43,7 +43,7 @@ public:
 			// First pairwise aggregation //
 			//----------------------------//
 
-			cout << "\tPairwise aggregation 1" << endl;
+			Utils::Log() << "\tPairwise aggregation 1" << endl;
 			_mesh.PairWiseAggregate(coarsestPossibleMeshReached);
 			if (coarsestPossibleMeshReached)
 				return;
@@ -59,13 +59,13 @@ public:
 			// Second pairwise aggregation //
 			//-----------------------------//
 
-			cout << "\tBuild intermediary coarse mesh" << endl;
+			Utils::Log() << "\tBuild intermediary coarse mesh" << endl;
 
 			AlgebraicMesh coarseMesh(_blockSize, _strongCouplingThreshold);
 			coarseMesh.FinerMesh = &_mesh;
 			coarseMesh.Build(A1);
 
-			cout << "\tPairwise aggregation 2" << endl;
+			Utils::Log() << "\tPairwise aggregation 2" << endl;
 
 			coarseMesh.PairWiseAggregate(coarsestPossibleMeshReached);
 			if (coarsestPossibleMeshReached)
@@ -100,7 +100,7 @@ public:
 		}
 		else if (coarseningStgy == H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours)
 		{
-			cout << "\tElement agglomeration" << endl;
+			Utils::Log() << "\tElement agglomeration" << endl;
 			_mesh.AllNeighbourAggregate(coarsestPossibleMeshReached);
 			if (coarsestPossibleMeshReached)
 				return;
@@ -199,14 +199,14 @@ private:
 public:
 	void OnStartSetup() override
 	{
-		cout << "\t\tMesh                : " << this->NUnknowns() / _blockSize << " elements";
+		Utils::Log() << "\t\tMesh                : " << this->NUnknowns() / _blockSize << " elements";
 		if (!this->IsFinestLevel())
 		{
 			double nFine = this->FinerLevel->NUnknowns();
 			double nCoarse = this->NUnknowns();
-			cout << ", coarsening factor = " << (nFine/nCoarse);
+			Utils::Log() << ", coarsening factor = " << (nFine/nCoarse);
 		}
-		cout << endl;
+		Utils::Log() << endl;
 	}
 
 	Vector Prolong(Vector& coarseV) override

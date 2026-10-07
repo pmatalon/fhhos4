@@ -31,8 +31,7 @@ public:
 		if (info != Eigen::ComputationInfo::Success)
 		{
 			//cout << "----------------- A -------------------" << A << endl;
-			cout << "Error: SimplicialLDLT failed to execute with the code " << info << endl;
-			exit(EXIT_FAILURE);
+			Utils::FatalError("SimplicialLDLT failed to execute with the code " + to_string(info) + ".");
 		}
 	}
 

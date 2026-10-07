@@ -22,7 +22,7 @@ Most tests check the iteration counts of the numerical experiments of the papers
 - with the in-house meshes (2020 multigrid paper), the expected counts are **exactly** the paper's;
 - with GMSH meshes (the other papers), the current GMSH version produces slightly different meshes from the papers', so the counts can differ a little: the tests check the **current** counts, and give the paper's value next to each one (in the source, and in the failure message).
 
-The other assertions are a least-squares convergence-order slope, and (for two intentionally-broken configurations) a degradation or a death-test exit code.
+The other assertions are a least-squares convergence-order slope, and (for intentionally-broken configurations) a degradation, an exception (`fhhos4::Error`) or a death-test exit code (invalid arguments).
 
 ## How to run
 
@@ -172,16 +172,27 @@ Unit tests of the parallel sparse matrix operations used in the setup of U-AMG (
 - **`SparseMatrixOpsTest.FullFromLowerGivesSelfAdjointView`** (1 case) — `FullFromLower(S)` vs. Eigen's `S.selfadjointView<Eigen::Lower>()`.
 - **`SparseMatrixOpsTest.SelectRowsGivesCopiedRows`** (1 case) — `SelectRows` vs. the rows copied by `NonZeroCoefficients::CopyRows`.
 
+## `UAMGLibraryTest.cpp`
+
+Tests of the library `fhhos4_AMG` (`library/`), the U-AMG of fhhos4 for other codes (`fhhos4::Solver`, `#include <fhhos4>`).
+
+- **`UAMGLibraryProgram/UAMGLibraryProgramTest.SameAsProgram`** (14 cases: Square-tri n=16 k=0,1 and k=1 with orthonormal bases, Cube-tet n=8 k=0 with default and orthonormal bases, k=1 orthonormal, Cube-cart n=8 k=2 × `fcglibuamg`, `libuamg`) — the program runs U-AMG through the library (`Solver/LibraryUAMG.cpp`), as an external code calls it, and must get the iteration count and the L2 error (to 1e-6 relative) of the U-AMG compiled in it (`fcguamg`, `uamg`). The library gets the blocks without `A_FF`, as HArDCore3D gives them.
+  CLI: `./bin/fhhos4 -geo {square|cube} -mesh {tri|tetra|cart} -n {16|8} -k {0|1|2} -s {fcglibuamg|fcguamg|libuamg|uamg} [-e-ogb 3 -f-ogb 3] -no-cache`
+
+- **`UAMGLibraryProgram.NotAPreconditionerOfTheConjugateGradient`** (1 case) — `-s cglibuamg` is refused: the library gives U-AMG with its own Krylov method only (with the K-cycle, it is a non-linear preconditioner).
+
+- **`UAMGLibrary.*`** (8 cases) — the public API alone, on a hybrid system of degree 0 built in the test (Cartesian mesh of the unit square, random coefficients): it solves the system; computes `A` from the blocks (`SetupFromBlocks`), with full or lower-only symmetric blocks; works without `A_FF`; gives the same iterates on bases scaled by random factors, given the interpolation of 1; BiCGSTAB with a V-cycle; the cycles alone (`Krylov = "none"`); the errors (parameters not set or invalid, BiCGSTAB with the K-cycle, inputs inconsistent with the dimension and the degrees, non block-diagonal `A_TT`); and it prints nothing at verbosity 0, and leaves the number of threads and the format of `cout` unchanged.
+
 ## Coverage summary
 
-- 103 CTest cases total across the 8 files above, exercising `Program_Diffusion_HHO` (diffusion problems) and `Program_BiHarmonic_HHO` (biharmonic problem in mixed form), with the HHO discretization and static condensation.
+- 126 CTest cases total across the 9 files above, exercising `Program_Diffusion_HHO` (diffusion problems) and `Program_BiHarmonic_HHO` (biharmonic problem in mixed form), with the HHO discretization and static condensation, and the library `fhhos4_AMG`.
 - Dimensions: 2D and 3D. No 1D coverage (the run helpers throw for it, consistent with `ENABLE_1D=OFF` by default).
 - Meshes: in-house `cart`, `stri`, `quad`, `stetra`; GMSH `cart`, `tri`, `tetra`, and a locally refined mesh; polygonal meshes (`poly`, CGAL) built from a GMSH Cartesian mesh, with and without interface collapsing (`-polymesh-fcs c|n`).
 - Coarsening strategies: standard, refinement (`-cs r`), independent remeshing (`-cs m`), agglomeration (`-cs n`).
-- Solvers: `mg` (V-, W- and K-cycles), `fcgmg`, `uamg`, `aggregamg`, `fcguamg`, `fcgaggregamg`, `cg`/`fcg` preconditioned by `ch`/`lu`, `ch`, and the biharmonic FCG with or without the patch preconditioner. No coverage of `lu` or `cg` as main solvers, `eigencg`, `agmg` (external library), or `p_mg`.
+- Solvers: `mg` (V-, W- and K-cycles), `fcgmg`, `uamg`, `aggregamg`, `fcguamg`, `fcgaggregamg`, `libuamg`, `fcglibuamg`, `cg`/`fcg` preconditioned by `ch`/`lu`, `ch`, and the biharmonic FCG with or without the patch preconditioner. No coverage of `lu` or `cg` as main solvers, `eigencg`, `agmg` (external library), or `p_mg`.
 - Test cases (`-tc`/`-source`): the default `sine` test case, `kellogg`, a `-heterog` ratio sweep, `exp` (biharmonic), and one locally-refined-mesh case.
 - **Not covered**: DG/FEM discretizations, `-pb bihardd`, full-Neumann BCs, anisotropy, non-condensed systems.
-- Two tests *intentionally* document known, failing configurations (a death test in the 2022 file, a near-divergence in the 2020 file) drawn straight from the papers' own reproduction recipes — they are not bugs to silently "fix"; changing their behavior should be a deliberate, separate change.
+- Two tests *intentionally* document known, failing configurations (a divergence, `fhhos4::Error`, in the 2022 file, a near-divergence in the 2020 file) drawn straight from the papers' own reproduction recipes — they are not bugs to silently "fix"; changing their behavior should be a deliberate, separate change.
 - Papers with reproducibility docs but no corresponding tests yet: `2024_HHO_HDG_demo_framework.md`.
 
 ## Adding a test
@@ -193,4 +204,4 @@ Drop a new `*.cpp` file under `tests/` — it's picked up automatically by the C
 - `fhhos4_tests::SyncGlobalProgramState<Dim>(args)` — synchronizes global state (`Utils::ProgramArgs`, mesh directories, GMSH cache flags) that mesh-construction code reads directly; called automatically by the run helpers.
 - `fhhos4_tests::EstimateConvergenceOrder(h, errors)` — least-squares log-log slope, for convergence-order assertions.
 
-A run that's expected to diverge (`Utils::FatalError`) terminates the process, so wrap the call in GTest's `EXPECT_EXIT`/`ASSERT_EXIT` rather than a plain assertion.
+A run that's expected to diverge (`Utils::FatalError`) throws `fhhos4::Error`, so wrap the call in GTest's `EXPECT_THROW`/`ASSERT_THROW`. Invalid arguments (`argument_error()`, from `ApplyProgramArgumentDefaults`) still terminate the process: use `EXPECT_EXIT`/`ASSERT_EXIT` for them.

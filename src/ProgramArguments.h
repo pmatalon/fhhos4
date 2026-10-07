@@ -109,6 +109,13 @@ struct SolverArguments
 	bool BiHarReconstructBoundary = false;
 	int NeighbourhoodDepth = 1;
 	int PatchSize = 3;
+
+	// U-AMG, compiled in the program (uamg) or called through the library fhhos4_AMG (libuamg), as the solver or the
+	// preconditioner
+	bool UsesUncondensedAMG() const
+	{
+		return SolverCode == "uamg" || PreconditionerCode == "uamg" || SolverCode == "libuamg" || PreconditionerCode == "libuamg";
+	}
 };
 
 struct ExportArguments

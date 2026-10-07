@@ -37,6 +37,7 @@ public:
 	bool ApplyZeroMeanCondition = false;
 	bool EnforceCompatibilityCondition = false;
 	bool ExportComponents = false;
+	bool ExportIterationVectors = false; // the vectors of each step of the cycle, at each iteration (-export mgit)
 	bool DoNotCreateLevels = false;
 
 	Timer IntergridTransferTimer;
@@ -91,7 +92,7 @@ public:
 		if (DoNotCreateLevels)
 			return;
 
-		cout << "Setup..." << endl;
+		Utils::Log() << "Setup..." << endl;
 
 		if (!this->_fineLevel)
 			this->_fineLevel = this->CreateFineLevel();
@@ -214,7 +215,7 @@ public:
 			// Build coarse level
 			levelNumber++;
 			if (this->HP_CS != HP_CoarsStgy::H_only)
-				cout << "\tCreation of level " << levelNumber << " (" << (coarseningType == CoarseningType::H ? "h" : (coarseningType == CoarseningType::P ? "p" : "hp")) << "-coarsening)" << endl;
+				Utils::Log() << "\tCreation of level " << levelNumber << " (" << (coarseningType == CoarseningType::H ? "h" : (coarseningType == CoarseningType::P ? "p" : "hp")) << "-coarsening)" << endl;
 			Level* coarseLevel = CreateCoarseLevel(currentLevel, coarseningType, coarseDegree);
 			coarseLevel->ComesFrom = coarseningType;
 			coarseLevel->SetExportModule(this->Out);
@@ -301,11 +302,11 @@ public:
 			}
 		}*/
 
-		cout << endl;
-		cout << "\tLevels             : " << _nLevels << endl;
-		cout << "\tOperator complexity: " << operatorComplexity << endl;
-		cout << "\tGrid complexity    : " << gridComplexity << endl;
-		cout << endl;
+		Utils::Log() << endl;
+		Utils::Log() << "\tLevels             : " << _nLevels << endl;
+		Utils::Log() << "\tOperator complexity: " << operatorComplexity << endl;
+		Utils::Log() << "\tGrid complexity    : " << gridComplexity << endl;
+		Utils::Log() << endl;
 
 		if (this->WLoops > 1)
 			PrintCycleSchema();
@@ -337,7 +338,7 @@ protected:
 
 	void SetupCoarseSolver()
 	{
-		cout << "\t\tSetup coarse solver..." << endl;
+		Utils::Log() << "\t\tSetup coarse solver..." << endl;
 
 		Level* level = this->_fineLevel;
 		while (level->CoarserLevel != nullptr)
@@ -438,7 +439,7 @@ private:
 	{
 		const SparseMatrix& A = *level->OperatorMatrix;
 
-		if (Utils::ProgramArgs.Actions.Export.MultigridIterationVectors)
+		if (this->ExportIterationVectors)
 			level->ExportVector(b, "it" + to_string(this->IterationCount) + "_b");
 
 		if (level->IsCoarsestLevel())
@@ -451,7 +452,7 @@ private:
 		}
 		else
 		{
-			if (Utils::ProgramArgs.Actions.Export.MultigridIterationVectors)
+			if (this->ExportIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_beforePreSmoothing");
 
 			//---------------//
@@ -477,7 +478,7 @@ private:
 				r = b - A * x;                                                            result.AddWorkInFlops(Cost::DAXPY(A));
 			}
 			
-			if (Utils::ProgramArgs.Actions.Export.MultigridIterationVectors)
+			if (this->ExportIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPreSmoothing");
 
 			//auto flopPreSmoothAndRes = result.IterationComputationalWork() - flopBeforePreSmooth;
@@ -539,7 +540,7 @@ private:
 			// Coarse-grid correction //
 			//------------------------//
 
-			if (Utils::ProgramArgs.Actions.Export.MultigridIterationVectors)
+			if (this->ExportIterationVectors)
 			{
 				level->ExportVector(ec, "it" + to_string(this->IterationCount) + "_ce");
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol");
@@ -554,7 +555,7 @@ private:
 			                                                                          this->IntergridTransferCost += (level->ProlongCost() + Cost::AddVec(x))*1e-6;
 			IntergridTransferTimer.Pause();
 
-			if (Utils::ProgramArgs.Actions.Export.MultigridIterationVectors)
+			if (this->ExportIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_cgc");
 
 			//----------------//
@@ -593,7 +594,7 @@ private:
 				}
 			}
 
-			if (Utils::ProgramArgs.Actions.Export.MultigridIterationVectors)
+			if (this->ExportIterationVectors)
 				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPostSmoothing");
 
 			//auto flopPostSmooth = result.IterationComputationalWork() - flopBeforePostSmooth;
@@ -704,11 +705,11 @@ public:
 			else if (H_CS == H_CoarsStgy::DoublePairwiseAggregation)
 				os << "double pairwise aggregation [-cs dpa]" << endl;
 			else if (H_CS == H_CoarsStgy::MultiplePairwiseAggregation)
-				os << "multiple pairwise aggregation [-cs mpa -coarsening-factor " << Utils::ProgramArgs.Solver.MG.CoarseningFactor << "]" << endl;
+				os << "multiple pairwise aggregation [-cs mpa -coarsening-factor " << CoarseningFactor << "]" << endl;
 			else if (H_CS == H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours)
 				os << "agglomeration by face neighbours [-cs n]" << endl;
 			else if (H_CS == H_CoarsStgy::MultipleAgglomerationCoarseningByFaceNeighbours)
-				os << "multiple agglomeration by face neighbours [-cs mn -coarsening-factor " << Utils::ProgramArgs.Solver.MG.CoarseningFactor << "]" << endl;
+				os << "multiple agglomeration by face neighbours [-cs mn -coarsening-factor " << CoarseningFactor << "]" << endl;
 			else if (H_CS == H_CoarsStgy::AgglomerationCoarseningByMostCoplanarFaces)
 				os << "agglomeration by most coplanar faces [-cs mcf]" << endl;
 			else if (H_CS == H_CoarsStgy::AgglomerationCoarseningByClosestCenter)
@@ -785,10 +786,10 @@ public:
 		for (int levelNumber = 0; levelNumber < this->NumberOfLevels(); levelNumber++)
 		{
 			for (int stepLevel : schema)
-				cout << (stepLevel == levelNumber ? " o" : "  ");
-			cout << endl;
+				Utils::Log() << (stepLevel == levelNumber ? " o" : "  ");
+			Utils::Log() << endl;
 		}
-		cout << endl;
+		Utils::Log() << endl;
 	}
 
 private:

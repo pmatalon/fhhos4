@@ -30,8 +30,7 @@ public:
 		if (info != Eigen::ComputationInfo::Success)
 		{
 			//cout << "----------------- A -------------------" << A << endl;
-			cout << "Error: SparseLU failed to execute with the code " << info << ": " << _solver.lastErrorMessage() << endl;
-			exit(EXIT_FAILURE);
+			Utils::FatalError("SparseLU failed to execute with the code " + to_string(info) + ": " + _solver.lastErrorMessage());
 		}
 	}
 

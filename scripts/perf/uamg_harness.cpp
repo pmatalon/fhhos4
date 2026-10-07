@@ -91,12 +91,26 @@ int main(int argc, char** argv)
 	auto I = [&](const string& k) { return stoi(p.at(k)); };
 	auto D = [&](const string& k) { return stod(p.at(k)); };
 
-	Utils::ProgramArgs.Solver.MG.ManageAnisotropy = I("manageAniso");
-
 	SparseMatrix S = ReadSparse(dir + "/S.bin");
 	SparseMatrix A_T_T = ReadSparse(dir + "/A_T_T.bin");
 	SparseMatrix A_T_F = ReadSparse(dir + "/A_T_F.bin");
 	SparseMatrix A_F_F = ReadSparse(dir + "/A_F_F.bin");
+	// Dumps made before the interpolations of 1 were inputs: 1 on the first DoF of each block, as in the paper
+	Vector cellInterpOfOne, faceInterpOfOne;
+	if (ifstream(dir + "/cellInterpOfOne.bin"))
+	{
+		cellInterpOfOne = ReadVector(dir + "/cellInterpOfOne.bin");
+		faceInterpOfOne = ReadVector(dir + "/faceInterpOfOne.bin");
+	}
+	else
+	{
+		cellInterpOfOne = Vector::Zero(A_T_F.rows());
+		faceInterpOfOne = Vector::Zero(A_T_F.cols());
+		for (BigNumber i = 0; i < cellInterpOfOne.rows(); i += I("cellBS"))
+			cellInterpOfOne[i] = 1;
+		for (BigNumber i = 0; i < faceInterpOfOne.rows(); i += I("faceBS"))
+			faceInterpOfOne[i] = 1;
+	}
 
 	HarnessAMG mg(I("dim"), I("degree"), I("cellBS"), I("faceBS"), D("strong"), (UAMGFaceProlongation)I("faceProlong"),
 		(UAMGProlongation)I("coarseningProlong"), (UAMGProlongation)I("mgProlong"), I("nLevels"));
@@ -120,9 +134,10 @@ int main(int argc, char** argv)
 	mg.CoarseningFactor = D("coarseningFactor");
 	mg.CoarsePolyDegree = I("coarsePolyDegree");
 	mg.NumberOfMeshes = I("nMeshes");
+	mg.ManageAnisotropy = I("manageAniso");
 
 	auto start = chrono::steady_clock::now();
-	mg.Setup(S, A_T_T, A_T_F, A_F_F);
+	mg.Setup(S, A_T_T, A_T_F, A_F_F, cellInterpOfOne, faceInterpOfOne);
 	cout << "HARNESS setup " << chrono::duration<double>(chrono::steady_clock::now() - start).count() << " s, " << mg.NumberOfLevels() << " levels" << endl;
 
 	if (argc > 3)

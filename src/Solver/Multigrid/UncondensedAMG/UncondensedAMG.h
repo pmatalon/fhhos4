@@ -17,6 +17,8 @@ private:
 	double _strongCouplingThreshold;
 	LocalOperator _localOperator; // local matrices of the operators of the coarsening passes, during the setup
 public:
+	bool ManageAnisotropy = true; // see UncondensedLevel::ManageAnisotropy
+
 
 	UncondensedAMG(int dim, int degree, int cellBlockSize, int faceBlockSize, double strongCouplingThreshold, UAMGFaceProlongation faceProlong, UAMGProlongation coarseningProlong, UAMGProlongation mgProlong, int nLevels = 0)
 		: Multigrid(nLevels)
@@ -82,6 +84,7 @@ public:
 		Utils::FatalError("The method Setup(const SparseMatrix& A) cannot be used for this solver.");
 	}
 
+	// A_F_F: may be empty (0 x 0) if A_F_FNeeded() is false: the algorithm of the paper only uses A_T_T and A_T_F.
 	// cellInterpOfOne, faceInterpOfOne: interpolation of the function 1 on the polynomial bases of the cells and faces,
 	// numbered as the rows and columns of A_T_F. The bases must be hierarchical with a constant first function: the
 	// interpolation of 1 is then c on the first DoF of each block, 0 on the others. Used to correct a restrictive
@@ -97,7 +100,9 @@ public:
 		UncondensedLevel* fine = dynamic_cast<UncondensedLevel*>(this->_fineLevel);
 		fine->A_T_T = &A_T_T;
 		fine->A_T_F = &A_T_F;
-		fine->A_F_F = &A_F_F;
+		if (A_F_F.rows() == 0 && A_F_FNeeded())
+			Utils::FatalError("UncondensedAMG: the chosen options need the block A_F_F.");
+		fine->A_F_F = A_F_F.rows() > 0 ? &A_F_F : nullptr;
 		fine->LocalOp = &_localOperator;
 
 		// If the constant has coordinate 1 everywhere, as in the paper, no rescaling: the setup is unchanged
@@ -117,6 +122,11 @@ public:
 		_localOperator.Current.Free();
 		_localOperator.Next.Free();
 		_localOperator.Assembled = nullptr;
+
+		// The blocks are only read during the setup: the caller may free them (the library fhhos4_AMG does)
+		fine->A_T_T = nullptr;
+		fine->A_T_F = nullptr;
+		fine->A_F_F = nullptr;
 	}
 
 	Vector Solve(const Vector& b, string initialGuessCode) override
@@ -157,8 +167,9 @@ private:
 		return true;
 	}
 
-	// The coarse blocks A_F_F are not used by the algorithm of the paper (only A_T_T and A_T_F are), but by some options
-	bool CoarseA_F_FNeeded() const
+public:
+	// The blocks A_F_F are not used by the algorithm of the paper (only A_T_T and A_T_F are), but by some options
+	bool A_F_FNeeded() const
 	{
 		bool pLevelAfterHLevel = this->HP_CS == HP_CoarsStgy::H_then_P || this->HP_CS == HP_CoarsStgy::HP_then_P || this->HP_CS == HP_CoarsStgy::Alternate;
 		return pLevelAfterHLevel // the p-coarsening extracts its blocks from those of the finer level
@@ -166,6 +177,7 @@ private:
 			|| _coarseningProlong == UAMGProlongation::HighOrder || _multigridProlong == UAMGProlongation::HighOrder; // trace on the removed faces
 	}
 
+private:
 	// Q_F chained over the coarsening steps is used by the multigrid prolongation if it is not the chained coarsening prolongations,
 	// and by the coarse operator if it is not the Galerkin one
 	bool ChainedQ_FNeeded() const
@@ -176,8 +188,9 @@ private:
 	UncondensedLevel* CreateLevel(int number, int degree, int cellBlockSize, int faceBlockSize) const
 	{
 		UncondensedLevel* level = new UncondensedLevel(number, degree, cellBlockSize, faceBlockSize, _strongCouplingThreshold, _faceProlong, _coarseningProlong, _multigridProlong);
-		level->ComputeCoarseA_F_F = CoarseA_F_FNeeded();
+		level->ComputeCoarseA_F_F = A_F_FNeeded();
 		level->ComputeQ_F = ChainedQ_FNeeded();
+		level->ManageAnisotropy = ManageAnisotropy;
 		return level;
 	}
 

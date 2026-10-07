@@ -25,8 +25,7 @@ public:
 		if (info != Eigen::ComputationInfo::Success)
 		{
 			cout << "----------------- A -------------------" << A << endl;
-			cout << "Error: ConjugateGradient failed to execute with the code " << info << "." << endl;
-			exit(EXIT_FAILURE);
+			Utils::FatalError("BiCGSTAB failed to execute with the code " + to_string(info) + ".");
 		}
 		_solver.setTolerance(this->Tolerance);
 		_solver.setMaxIterations(this->MaxIterations);

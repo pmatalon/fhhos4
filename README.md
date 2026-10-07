@@ -15,6 +15,9 @@ Features:
 
 The numerical experiments of related papers can be reproduced following the instructions in the `reproducibility` folder.
 
+Other codes can use its algebraic multigrid for hybrid discretizations (U-AMG) through the shared library `fhhos4_AMG`:
+see [library/README.md](library/README.md).
+
 # Install
 
 This program depends on the following third-party software packages:
@@ -100,6 +103,9 @@ And to enable AGMG:
 ```bash
 cmake -DCMAKE_BUILD_TYPE=Release -DENABLE_AGMG=ON -DAGMG_DIR=<path>/agmg/AGMG_3.3.5-aca/SRC ..
 ```
+
+The build also produces the library `lib/libfhhos4_AMG.so` (see [library/README.md](library/README.md)); `cmake
+--install . --prefix <prefix>` installs it with its header and CMake package.
 
 ## 5. Launch help command to view arguments and examples
 

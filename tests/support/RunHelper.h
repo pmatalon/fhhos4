@@ -38,8 +38,8 @@ namespace fhhos4_tests
 
 	// Applies the same argument-defaulting cascade as the CLI (main.cpp), then runs the
 	// diffusion HHO problem in-process and returns the iteration count / L2 error.
-	// A documented divergence (Utils::FatalError) terminates the process (exit(EXIT_FAILURE));
-	// callers that expect that must wrap the call in GTest's ASSERT_EXIT/EXPECT_EXIT.
+	// A documented divergence (Utils::FatalError) throws fhhos4::Error: callers that expect it
+	// must wrap the call in GTest's ASSERT_THROW/EXPECT_THROW.
 	// Pass defaultCycle = false when the test sets the MG cycle itself (the CLI equivalent of
 	// -cycle); otherwise the defaults overwrite the pre/post-smoothing iterations. Same for
 	// defaultHPCoarseningStgy and the hp-coarsening strategy (-hp-cs).

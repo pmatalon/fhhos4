@@ -212,7 +212,7 @@ public:
 		int cpuTimeWidth = 10;
 		int remainingTimeWidth = 11;
 
-		cout.precision(2);
+		os.precision(2);
 		if (result.IterationNumber == 0)
 		{
 			// Label row 1

@@ -1,5 +1,6 @@
 #pragma once
 #include "Smoother.h"
+#include "SmootherFactory.h"
 #include "../Krylov/FlexibleConjugateGradient.h"
 #include "../../Utils/ExportModule.h"
 using namespace std;
@@ -55,62 +56,62 @@ public:
 
 	void Setup()
 	{
-		cout << "\tSetup level " << this->Number << endl;
+		Utils::Log() << "\tSetup level " << this->Number << endl;
 
 		OnStartSetup();
 
 		if (this->IsFinestLevel())
 		{
-			cout << "\t\tFine grid operator  : "; cout.flush();
-			cout << Utils::MatrixInfo(*this->OperatorMatrix, "A") << endl;
+			Utils::Log() << "\t\tFine grid operator  : "; Utils::Log().flush();
+			Utils::Log() << Utils::MatrixInfo(*this->OperatorMatrix, "A") << endl;
 		}
 		else
 		{
 			if (this->UseGalerkinOperator)
 			{
-				cout << "\t\tGalerkin operator   : "; cout.flush();
+				Utils::Log() << "\t\tGalerkin operator   : "; Utils::Log().flush();
 				if (!this->OperatorMatrix)
 					ComputeGalerkinOperator();
 			}
 			else
 			{
-				cout << "\t\tDiscretized operator: "; cout.flush();
+				Utils::Log() << "\t\tDiscretized operator: "; Utils::Log().flush();
 				SetupDiscretizedOperator();
 			}
-			cout << Utils::MatrixInfo(*this->OperatorMatrix, "A") << endl;
+			Utils::Log() << Utils::MatrixInfo(*this->OperatorMatrix, "A") << endl;
 		}
 
 		const SparseMatrix &A = *this->OperatorMatrix;
 
 		if (!this->IsCoarsestLevel())
 		{
-			cout << "\t\tProlongation        : "; cout.flush();
+			Utils::Log() << "\t\tProlongation        : "; Utils::Log().flush();
 			SetupProlongation();
 			if (this->P.rows() == 0)
-				cout << "matrix free" << endl;
+				Utils::Log() << "matrix free" << endl;
 			else
-				cout << Utils::MatrixInfo(this->P, "P") << endl;
+				Utils::Log() << Utils::MatrixInfo(this->P, "P") << endl;
 
-			cout << "\t\tRestriction         : "; cout.flush();
+			Utils::Log() << "\t\tRestriction         : "; Utils::Log().flush();
 			SetupRestriction();
 			if (this->R.rows() == 0)
-				cout << "matrix free" << endl;
+				Utils::Log() << "matrix free" << endl;
 			else
-				cout << Utils::MatrixInfo(this->R, "R") << endl;
+				Utils::Log() << Utils::MatrixInfo(this->R, "R") << endl;
 
-			cout << "\t\tPreSmoothing        : "; cout.flush();
+			Utils::Log() << "\t\tPreSmoothing        : "; Utils::Log().flush();
 			PreSmoother->Setup(A);
 			if (PreSmoother->Iterations() == 0)
-				cout << "none" << endl;
+				Utils::Log() << "none" << endl;
 			else
-				cout << PreSmoother->Iterations() << " iteration" << (PreSmoother->Iterations() > 1 ? "s" : "") << " of " << (*PreSmoother) << endl;
+				Utils::Log() << PreSmoother->Iterations() << " iteration" << (PreSmoother->Iterations() > 1 ? "s" : "") << " of " << (*PreSmoother) << endl;
 
-			cout << "\t\tPostSmoothing       : "; cout.flush();
+			Utils::Log() << "\t\tPostSmoothing       : "; Utils::Log().flush();
 			PostSmoother->Setup(A);
 			if (PostSmoother->Iterations() == 0)
-				cout << "none" << endl;
+				Utils::Log() << "none" << endl;
 			else
-				cout << PostSmoother->Iterations() << " iteration" << (PostSmoother->Iterations() > 1 ? "s" : "") << " of " << (*PostSmoother) << endl;
+				Utils::Log() << PostSmoother->Iterations() << " iteration" << (PostSmoother->Iterations() > 1 ? "s" : "") << " of " << (*PostSmoother) << endl;
 		}
 
 		if (ExportComponents)

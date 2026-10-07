@@ -5,6 +5,7 @@
 #include "Parallelism.h"
 #include "../Geometry/Point.h"
 #include "../ProgramArguments.h"
+#include "fhhos4_error.h"
 using namespace std;
 
 using RefFunction = function<double(const RefPoint&)>;
@@ -251,20 +252,27 @@ public:
 	inline static string BeginYellow = "\033[1;33m";
 	inline static string EndColor    = "\033[0m";
 
+	// Stream of the messages of the solvers (setup steps, warnings, iterations): cout, unless the library fhhos4_AMG
+	// redirects it according to its verbosity (library/Solver.cpp).
+	inline static ostream* LogStream = &cout;
+	static ostream& Log()
+	{
+		return *LogStream;
+	}
+
 	static void Error(string msg)
 	{
 		cout << Utils::BeginRed << "Error: " << msg << Utils::EndColor << endl;
 	}
-	static void FatalError(string msg)
+	// Throws fhhos4::Error: the program prints the message and exits with EXIT_FAILURE (main.cpp), the library passes
+	// it to the calling code. Never call it inside a parallel loop: an exception cannot leave it (the process aborts).
+	[[noreturn]] static void FatalError(string msg)
 	{
-		cout << Utils::BeginRed << "Error: " << msg << Utils::EndColor << endl;
-		cout << "------------------------- FAILURE -------------------------" << endl;
-		assert(false);
-		exit(EXIT_FAILURE);
+		throw fhhos4::Error(msg);
 	}
 	static void Warning(string msg)
 	{
-		Warning(cout, msg);
+		Warning(Log(), msg);
 	}
 	static void Warning(ostream& os, string msg)
 	{

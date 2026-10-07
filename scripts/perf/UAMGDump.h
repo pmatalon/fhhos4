@@ -5,13 +5,13 @@
 //
 //     #include "../../../../scripts/perf/UAMGDump.h"   // in UncondensedAMG.h, after the other includes
 //     ...
-//     void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F) override
+//     void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
 //     {
 //         UAMG_DUMP_INPUTS();   // first line: dumps and exits if FHHOS4_UAMG_DUMP is set
 //
 // then, from build/: FHHOS4_UAMG_DUMP=<existing dir> ./bin/fhhos4 <arguments of the run>
-// The directory receives S, A_T_T, A_T_F, A_F_F (binary, see WriteSparse) and params.txt (the parameters of the
-// multigrid). The program exits after the dump.
+// The directory receives S, A_T_T, A_T_F, A_F_F (binary, see WriteSparse), cellInterpOfOne, faceInterpOfOne (see
+// WriteVector) and params.txt (the parameters of the multigrid). The program exits after the dump.
 #include <cstdint>
 #include <cstdlib>
 #include <fstream>
@@ -55,6 +55,34 @@ inline SparseMatrix ReadSparse(const std::string& path)
 	return M;
 }
 
+inline void WriteVector(const Vector& v, const std::string& path)
+{
+	std::ofstream f(path, std::ios::binary);
+	int64_t n = v.rows();
+	f.write((const char*)&n, sizeof(n));
+	f.write((const char*)v.data(), n * sizeof(double));
+	if (!f)
+	{
+		std::cerr << "cannot write " << path << std::endl;
+		std::exit(1);
+	}
+}
+
+inline Vector ReadVector(const std::string& path)
+{
+	std::ifstream f(path, std::ios::binary);
+	if (!f)
+	{
+		std::cerr << "cannot read " << path << std::endl;
+		std::exit(1);
+	}
+	int64_t n;
+	f.read((char*)&n, sizeof(n));
+	Vector v(n);
+	f.read((char*)v.data(), n * sizeof(double));
+	return v;
+}
+
 // "key value" lines
 inline std::map<std::string, std::string> ReadParams(const std::string& path)
 {
@@ -66,7 +94,7 @@ inline std::map<std::string, std::string> ReadParams(const std::string& path)
 	return params;
 }
 
-// In UncondensedAMG::Setup(A, A_T_T, A_T_F, A_F_F)
+// In UncondensedAMG::Setup(A, A_T_T, A_T_F, A_F_F, cellInterpOfOne, faceInterpOfOne)
 #define UAMG_DUMP_INPUTS() \
 	if (const char* dumpDir = getenv("FHHOS4_UAMG_DUMP")) \
 	{ \
@@ -75,6 +103,8 @@ inline std::map<std::string, std::string> ReadParams(const std::string& path)
 		WriteSparse(A_T_T, d + "/A_T_T.bin"); \
 		WriteSparse(A_T_F, d + "/A_T_F.bin"); \
 		WriteSparse(A_F_F, d + "/A_F_F.bin"); \
+		WriteVector(cellInterpOfOne, d + "/cellInterpOfOne.bin"); \
+		WriteVector(faceInterpOfOne, d + "/faceInterpOfOne.bin"); \
 		std::ofstream p(d + "/params.txt"); \
 		p << "dim " << _dim << "\ndegree " << _degree << "\ncellBS " << _cellBlockSize << "\nfaceBS " << _faceBlockSize \
 		  << "\nstrong " << _strongCouplingThreshold << "\nfaceProlong " << (unsigned)_faceProlong \
@@ -88,7 +118,7 @@ inline std::map<std::string, std::string> ReadParams(const std::string& path)
 		  << "\nHP_CS " << (unsigned)this->HP_CS << "\nH_CS " << (unsigned)this->H_CS << "\nP_CS " << (unsigned)this->P_CS \
 		  << "\nfaceCoarsening " << (unsigned)this->FaceCoarseningStgy << "\nbdryFaceCollapsing " << (unsigned)this->BdryFaceCollapsing \
 		  << "\ncoarseningFactor " << this->CoarseningFactor << "\ncoarsePolyDegree " << this->CoarsePolyDegree \
-		  << "\nnMeshes " << this->NumberOfMeshes << "\nmanageAniso " << Utils::ProgramArgs.Solver.MG.ManageAnisotropy << std::endl; \
+		  << "\nnMeshes " << this->NumberOfMeshes << "\nmanageAniso " << this->ManageAnisotropy << std::endl; \
 		std::cout << "U-AMG inputs dumped to " << d << std::endl; \
 		std::exit(0); \
 	}

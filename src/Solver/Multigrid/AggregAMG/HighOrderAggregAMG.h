@@ -70,14 +70,14 @@ public:
 public:
 	void OnStartSetup() override
 	{
-		cout << "\t\tMesh                : " << this->NUnknowns() / _blockSize << " elements";
+		Utils::Log() << "\t\tMesh                : " << this->NUnknowns() / _blockSize << " elements";
 		if (!this->IsFinestLevel())
 		{
 			double nFine = this->FinerLevel->NUnknowns();
 			double nCoarse = this->NUnknowns();
-			cout << ", coarsening factor = " << (nFine/nCoarse);
+			Utils::Log() << ", coarsening factor = " << (nFine/nCoarse);
 		}
-		cout << endl;
+		Utils::Log() << endl;
 	}
 
 	void SetupProlongation() override

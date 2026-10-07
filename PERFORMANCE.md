@@ -263,6 +263,16 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   The high-order reference case of `timing.sh` keeps `-hp-cs h`, so that its series stays comparable: the k=2
   measurements of this file (profile, ideas) concern that path, no longer the default.
 
+- **Library `fhhos4_AMG`** (2026-10-07, `library/README.md`): no change of the results of the program (`amg_papers.sh`:
+  identical iteration tables, 30 runs; `ctest`). Changes of its paths: `Utils::FatalError()` throws instead of
+  `exit()` (no effect when nothing is thrown: not measured); the block `A_F_F` is optional and no longer extracted on the
+  p-levels when the options don't use it (default: the algorithm only uses `A_T_T` and `A_T_F`), which a client then
+  doesn't need to assemble. In HArDCore3D (`hho-diffusion -c 1 2`, sequential, tolerance 1e-12, solve wall time
+  including the client's assembly of `A_TT` and `A_TF`): 32^3 k=1 2.5 s (FCG + K-cycle, 19 iterations) vs 4.6 s for its
+  Jacobi-BiCGSTAB (260 iterations), k=2 8.3 vs 17.3 s, 48^3 k=1 9.5 vs 25.5 s; BiCGSTAB + V-cycle 4.0 / 13.3 / 18.4 s.
+  Beware of HArDCore3D's test case 1 (`sin(pi x) sin(pi y) sin(pi z)`, constant diffusion): the first eigenfunction of
+  the Laplacian, so a Krylov method converges in a few iterations, whatever the preconditioner.
+
 ## Current profile (U-AMG, default OpenMP settings)
 
 | Case | Setup, sequential / parallel | Solve, sequential / parallel |

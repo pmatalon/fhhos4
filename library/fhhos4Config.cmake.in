@@ -1,0 +1,8 @@
+@PACKAGE_INIT@
+
+# The public header of fhhos4::Solver includes Eigen
+include(CMakeFindDependencyMacro)
+find_dependency(Eigen3 NO_MODULE)
+
+include("${CMAKE_CURRENT_LIST_DIR}/fhhos4Targets.cmake")
+check_required_components(fhhos4)

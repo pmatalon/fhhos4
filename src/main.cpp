@@ -229,6 +229,9 @@ void print_usage() {
 	cout << "              mg            - Custom multigrid for HHO" << endl;
 	cout << "              p_mg          - p-Multigrid to be used on top of mg" << endl;
 	cout << "              uamg          - Uncondensed AMG (for hybrid discretizations with static condensation)" << endl;
+	cout << "              libuamg       - uamg called through the library fhhos4_AMG (library/), as by an external code." << endl;
+	cout << "                              Only the parameters of fhhos4::Solver apply (see library/include/fhhos4)." << endl;
+	cout << "                              'fcglibuamg' uses the FCG of the library (as fcguamg)." << endl;
 	cout << "              aggregamg     - In-house implementation of AGMG, without the outer Krylov iteration. Meant to be used with K-cycle and with FCG." << endl;
 	cout << "              hoaggregamg   - Algebraic p-multigrid on top of aggregamg" << endl;
 	cout << endl; 
@@ -643,7 +646,7 @@ void print_usage() {
 	cout << "----------------------------------------------------------------------" << endl;
 }
 
-int main(int argc, char* argv[])
+int Run(int argc, char* argv[])
 {
 	cout << "-------------------------- START --------------------------" << endl;
 	cout << "Version: " << VERSION_MAJOR << "." << VERSION_MINOR << "." << VERSION_BUGFIX << endl;
@@ -1627,6 +1630,10 @@ int main(int argc, char* argv[])
 	{
 		program->Start(args);
 	}
+	catch (const fhhos4::Error&) // Utils::FatalError(): handled by main()
+	{
+		throw;
+	}
 	catch (exception* e) // some exceptions of the code are thrown as pointers
 	{
 		string error(e->what());
@@ -1642,4 +1649,18 @@ int main(int argc, char* argv[])
 
 	cout << "----------------- SUCCESSFUL TERMINATION ----------------" << endl;
     return EXIT_SUCCESS;
+}
+
+int main(int argc, char* argv[])
+{
+	try
+	{
+		return Run(argc, argv);
+	}
+	catch (const fhhos4::Error& e) // Utils::FatalError()
+	{
+		cout << Utils::BeginRed << "Error: " << e.what() << Utils::EndColor << endl;
+		cout << "------------------------- FAILURE -------------------------" << endl;
+		return EXIT_FAILURE;
+	}
 }

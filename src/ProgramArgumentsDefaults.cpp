@@ -318,36 +318,12 @@ void ApplyProgramArgumentDefaults(ProgramArguments& args,
 		}
 	}
 
-	if (args.Solver.SolverCode.compare("uamg") == 0 || args.Solver.PreconditionerCode.compare("uamg") == 0)
+	if (args.Solver.UsesUncondensedAMG())
 	{
 		if (args.Discretization.Method.compare("dg") == 0)
 			argument_error("Multigrid only applicable on HHO discretization.");
 
-		if (args.Solver.MG.ProlongationCode == 0)
-			args.Solver.MG.UAMGMultigridProlong = UAMGProlongation::ChainedCoarseningProlongations;
-		else
-			args.Solver.MG.UAMGMultigridProlong = static_cast<UAMGProlongation>(args.Solver.MG.ProlongationCode);
-		args.Solver.MG.UAMGFaceProlong = args.Solver.MG.FaceProlongationCode == 0 ? UAMGFaceProlongation::BoundaryAggregatesInteriorAverage : static_cast<UAMGFaceProlongation>(args.Solver.MG.FaceProlongationCode);
-		args.Solver.MG.UAMGCoarseningProlong = args.Solver.MG.CoarseningProlongationCode == 0 ? UAMGProlongation::ReconstructSmoothedTraceOrInject : static_cast<UAMGProlongation>(args.Solver.MG.CoarseningProlongationCode);
-
-		if (args.Solver.MG.H_CS == H_CoarsStgy::None)
-			args.Solver.MG.H_CS = H_CoarsStgy::MultiplePairwiseAggregation;
-
-		if ((args.Solver.MG.H_CS == H_CoarsStgy::MultiplePairwiseAggregation ||
-			 args.Solver.MG.H_CS == H_CoarsStgy::MultipleAgglomerationCoarseningByFaceNeighbours)
-			&& args.Solver.MG.CoarseningFactor == 0)
-			args.Solver.MG.CoarseningFactor = 3.8;
-
-		if (defaultCoarseOperator)
-			args.Solver.MG.UseGalerkinOperator = true;
-
-		if (defaultCycle)
-			args.Solver.MG.CycleLetter = 'K';
-
-		// k >= 1: p-levels down to k=0, then the h-coarsening of the paper, designed for k=0. The h-coarsening of the
-		// degree-k blocks (-hp-cs h) only transfers their higher modes by plain aggregation: never faster in the tests.
-		if (defaultHPCoarseningStgy && args.Discretization.PolyDegree > 1)
-			args.Solver.MG.HP_CS = HP_CoarsStgy::P_then_H;
+		ApplyUncondensedAMGDefaults(args.Solver.MG, args.Discretization.PolyDegree - 1, defaultCoarseOperator, defaultCycle, defaultHPCoarseningStgy);
 	}
 
 	if (args.Solver.SolverCode.compare("aggregamg") == 0 || args.Solver.PreconditionerCode.compare("aggregamg") == 0)

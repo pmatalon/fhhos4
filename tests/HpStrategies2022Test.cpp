@@ -79,7 +79,7 @@ namespace
 TEST(HpStrategies2022, BasisNormalization_OrthonormalDiverges)
 {
 	ProgramArguments args = LocalRefArgs(/*elemBasisOrthogonalizeCode*/ 3, /*n*/ 32, "mg");
-	EXPECT_EXIT(RunDiffusionHHO(args), ::testing::ExitedWithCode(EXIT_FAILURE), "");
+	EXPECT_THROW(RunDiffusionHHO(args), fhhos4::Error);
 }
 
 //   ./bin/fhhos4 -geo square4quadrants_tri_localref -no-cache -tc square -cs r -k 1 -n 32 -e-ogb 1

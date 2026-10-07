@@ -75,7 +75,7 @@ public:
 		this->IterationCount = 0;
 
 		if (this->PrintIterationResults)
-			cout << result << endl;
+			Utils::Log() << result << endl;
 
 		while (!StoppingCriteriaReached(result))
 		{
@@ -158,13 +158,13 @@ public:
 			result.SetResidualNorm(r.norm());                         result.AddWorkInFlops(Cost::Norm(r));
 
 			if (this->PrintIterationResults)
-				cout << result << endl;
+				Utils::Log() << result << endl;
 		}
 
 		Clear(previousDirections);
 
 		if (this->PrintIterationResults)
-			cout << endl;
+			Utils::Log() << endl;
 
 		result.CopyInfoInto(this->LastIterationResult);
 		this->SolvingComputationalWork = result.SolvingComputationalWork();
