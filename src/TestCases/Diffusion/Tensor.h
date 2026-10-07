@@ -1,11 +1,18 @@
 #pragma once
+#include <atomic>
 #include "../../Utils/Types.h"
 using namespace std;
 
 template<int Dim>
 class Tensor
 {
+private:
+	inline static std::atomic<std::size_t> _nextId{ 0 };
 public:
+	// Unique in the process (shared by the copies, which have the same values): the key of the matrices that the
+	// reference shapes store for each tensor (see ReferenceCartesianShape). Not its address: the tensors of a test case are
+	// deleted at the end of each run, and those of a later run in the same process can be allocated at the same address.
+	std::size_t Id = _nextId++;
 	Eigen::Matrix<double, Dim, Dim> TensorMatrix;
 	double LargestEigenValue;
 	double SmallestEigenValue;

@@ -34,7 +34,7 @@ ctest -E HPConfig                          # skip the slowest tests
 ./bin/fhhos4_tests --gtest_filter=*Kellogg*  # or filter the binary directly
 ```
 
-The full suite is 103 CTest cases and runs in about 3.5 minutes serially. The 8 `HPConfigTest` cases take about 2 minutes of it (~15 s each: N=128 with k=5 is the smallest size of the high-order paper); the other cases take less than 20 s each.
+The full suite is 128 CTest cases and runs in about 3.5 minutes serially. The 8 `HPConfigTest` cases take about 2 minutes of it (~15 s each: N=128 with k=5 is the smallest size of the high-order paper); the other cases take less than 20 s each.
 
 ## GMSH meshes: reproducibility
 
@@ -183,9 +183,16 @@ Tests of the library `fhhos4_AMG` (`library/`), the U-AMG of fhhos4 for other co
 
 - **`UAMGLibrary.*`** (8 cases) — the public API alone, on a hybrid system of degree 0 built in the test (Cartesian mesh of the unit square, random coefficients): it solves the system; computes `A` from the blocks (`SetupFromBlocks`), with full or lower-only symmetric blocks; works without `A_FF`; gives the same iterates on bases scaled by random factors, given the interpolation of 1; BiCGSTAB with a V-cycle; the cycles alone (`Krylov = "none"`); the errors (parameters not set or invalid, BiCGSTAB with the K-cycle, inputs inconsistent with the dimension and the degrees, non block-diagonal `A_TT`); and it prints nothing at verbosity 0, and leaves the number of threads and the format of `cout` unchanged.
 
+## `ReferenceShapeCacheTest.cpp`
+
+Unit tests of the matrices that the reference shapes (static: one per process) compute once and store for each basis and each diffusion tensor (`src/Geometry/ReferenceShape.h`, `ReferenceCartesianShape.h`). They were keyed by the address of the basis or of the tensor, which are deleted at the end of each run: when the allocator gave a basis of a later run in the same process the address of a deleted one, it got its matrices. In the test binary, `UAMGLibraryProgramTest.SameAsProgram/Square_tri_n16_k1_libuamg` failed once in 4 runs of `--gtest_filter='UAMGLibrary*'` (2026-10-07): its k=1 face basis got the 1x1 mass matrix of the face basis of an earlier k=0 test, and U-AMG stalled at a convergence rate of 0.92 (200 iterations instead of 32). `ctest` runs each test in its own process and never showed it. The matrices are now keyed by a never-reused `Id` (`FunctionalBasis::Id`, `Tensor::Id`). The tests build the objects at the same address on purpose (placement new) instead of relying on the allocator, so that they fail every time without the fix.
+
+- **`ReferenceShapeCache.BasisAtTheAddressOfADeletedOne`** (1 case) — a Legendre basis of degree 1 at the address of a deleted one of degree 0 gets its own mass matrix, stiffness matrices and vector of integrals (2x2, not 1x1).
+- **`ReferenceShapeCache.TensorAtTheAddressOfADeletedOne`** (1 case) — a tensor K=2 at the address of a deleted tensor K=1 gets its own stiffness matrix (twice the other).
+
 ## Coverage summary
 
-- 126 CTest cases total across the 9 files above, exercising `Program_Diffusion_HHO` (diffusion problems) and `Program_BiHarmonic_HHO` (biharmonic problem in mixed form), with the HHO discretization and static condensation, and the library `fhhos4_AMG`.
+- 128 CTest cases total across the 10 files above, exercising `Program_Diffusion_HHO` (diffusion problems) and `Program_BiHarmonic_HHO` (biharmonic problem in mixed form), with the HHO discretization and static condensation, and the library `fhhos4_AMG`.
 - Dimensions: 2D and 3D. No 1D coverage (the run helpers throw for it, consistent with `ENABLE_1D=OFF` by default).
 - Meshes: in-house `cart`, `stri`, `quad`, `stetra`; GMSH `cart`, `tri`, `tetra`, and a locally refined mesh; polygonal meshes (`poly`, CGAL) built from a GMSH Cartesian mesh, with and without interface collapsing (`-polymesh-fcs c|n`).
 - Coarsening strategies: standard, refinement (`-cs r`), independent remeshing (`-cs m`), agglomeration (`-cs n`).

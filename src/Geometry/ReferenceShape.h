@@ -17,14 +17,16 @@ template <int Dim>
 class ReferenceShape : public GeometricShape<Dim>
 {
 private:
-	map<FunctionalBasis<Dim>*, DenseMatrix> _massMatrices;
-	map<FunctionalBasis<Dim>*, DenseMatrix> _cellReconstructMatrices;
+	// Keyed by FunctionalBasis::Id, not by the address of the basis: the reference shapes are static (they live as long as
+	// the process), and a basis allocated at the address of a deleted one would get its matrices (e.g. of another degree).
+	map<size_t, DenseMatrix> _massMatrices;
+	map<size_t, DenseMatrix> _cellReconstructMatrices;
 
-	map<FunctionalBasis<Dim>*, StiffnessMatrices> _stiffMatrices;
+	map<size_t, StiffnessMatrices> _stiffMatrices;
 
-	map<FunctionalBasis<Dim>*, OrthogonalBasis<Dim>*> _orthogBases;
+	map<size_t, OrthogonalBasis<Dim>*> _orthogBases;
 
-	map<FunctionalBasis<Dim>*, Vector> _integralVectors;
+	map<size_t, Vector> _integralVectors;
 public:
 	ReferenceShape() {}
 
@@ -74,7 +76,7 @@ public:
 
 	const DenseMatrix& StoredMassMatrix(FunctionalBasis<Dim>* basis) const
 	{
-		auto it = _massMatrices.find(basis);
+		auto it = _massMatrices.find(basis->Id);
 		if (it != _massMatrices.end())
 			return it->second;
 		Utils::FatalError("The mass matrix for this basis should be computed once and stored for this reference element ('" + Name() + "').");
@@ -83,7 +85,7 @@ public:
 
 	const DenseMatrix& StoredCellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis) const
 	{
-		auto it = _cellReconstructMatrices.find(cellBasis);
+		auto it = _cellReconstructMatrices.find(cellBasis->Id);
 		if (it != _cellReconstructMatrices.end())
 			return it->second;
 		Utils::FatalError("The cell-reconstruct mass matrix should be computed once and stored for this reference element ('" + Name() + "').");
@@ -92,7 +94,7 @@ public:
 
 	const StiffnessMatrices& StoredStiffnessMatrices(FunctionalBasis<Dim>* basis) const
 	{
-		auto it = _stiffMatrices.find(basis);
+		auto it = _stiffMatrices.find(basis->Id);
 		if (it != _stiffMatrices.end())
 			return it->second;
 		Utils::FatalError("The stiffness matrices should be computed once and stored for this reference element ('" + Name() + "').");
@@ -101,7 +103,7 @@ public:
 
 	const Vector& StoredIntegralVector(FunctionalBasis<Dim>* basis) const
 	{
-		auto it = _integralVectors.find(basis);
+		auto it = _integralVectors.find(basis->Id);
 		if (it != _integralVectors.end())
 			return it->second;
 		Utils::FatalError("The vector of integrals for this basis should be computed once and stored for this reference element ('" + Name() + "').");
@@ -110,20 +112,20 @@ public:
 
 	void ComputeAndStoreMassMatrix(FunctionalBasis<Dim>* basis)
 	{
-		if (_massMatrices.find(basis) == _massMatrices.end())
-			_massMatrices[basis] = this->ComputeAndReturnMassMatrix(basis);
+		if (_massMatrices.find(basis->Id) == _massMatrices.end())
+			_massMatrices[basis->Id] = this->ComputeAndReturnMassMatrix(basis);
 	}
 	
 	void ComputeAndStoreCellReconstructMassMatrix(FunctionalBasis<Dim>* cellBasis, FunctionalBasis<Dim>* reconstructBasis)
 	{
-		if (_cellReconstructMatrices.find(cellBasis) == _cellReconstructMatrices.end())
-			_cellReconstructMatrices[cellBasis] = this->ComputeAndReturnMassMatrix(cellBasis, reconstructBasis);
+		if (_cellReconstructMatrices.find(cellBasis->Id) == _cellReconstructMatrices.end())
+			_cellReconstructMatrices[cellBasis->Id] = this->ComputeAndReturnMassMatrix(cellBasis, reconstructBasis);
 	}
 
 	// Refer to http://arturo.imati.cnr.it/~marini/didattica/Metodi-engl/Intro2FEM.pdf (page 30)
 	void ComputeAndStoreStiffnessMatrices(FunctionalBasis<Dim>* basis)
 	{
-		if (_stiffMatrices.find(basis) == _stiffMatrices.end())
+		if (_stiffMatrices.find(basis->Id) == _stiffMatrices.end())
 		{
 			StiffnessMatrices stiff;
 			int t = 0;
@@ -143,14 +145,14 @@ public:
 				}
 #endif
 			}
-			_stiffMatrices[basis] = stiff;
+			_stiffMatrices[basis->Id] = stiff;
 		}
 	}
 
 	void ComputeAndStoreIntegralVector(FunctionalBasis<Dim>* basis)
 	{
-		if (_integralVectors.find(basis) == _integralVectors.end())
-			_integralVectors[basis] = this->ComputeIntegral(basis);
+		if (_integralVectors.find(basis->Id) == _integralVectors.end())
+			_integralVectors[basis->Id] = this->ComputeIntegral(basis);
 	}
 
 private:
@@ -189,13 +191,13 @@ public:
 	OrthogonalBasis<Dim>* Orthogonalize(FunctionalBasis<Dim>* basis, int orthogonalizationSweeps = 1, bool normalize = true)
 	{
 		OrthogonalBasis<Dim>* orthoBasis = new OrthogonalBasis<Dim>(basis, this, orthogonalizationSweeps, normalize);
-		_orthogBases[basis] = orthoBasis;
+		_orthogBases[basis->Id] = orthoBasis;
 		return orthoBasis;
 	}
 
 	OrthogonalBasis<Dim>* OrthogonalizedBasis(FunctionalBasis<Dim>* basis) const
 	{
-		auto it = _orthogBases.find(basis);
+		auto it = _orthogBases.find(basis->Id);
 		if (it != _orthogBases.end())
 			return it->second;
 		else

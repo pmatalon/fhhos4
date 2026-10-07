@@ -1,12 +1,20 @@
 #pragma once
+#include <atomic>
 #include "BasisFunction.h"
 
 template <int Dim>
 class FunctionalBasis
 {
+private:
+	inline static std::atomic<std::size_t> _nextId{ 0 };
 protected:
 	FunctionalBasis() {}
 public:
+	// Unique in the process, never reused: the key of the matrices that the reference shapes store for each basis (see
+	// ReferenceShape). Not its address: the bases are deleted at the end of each run (Program_*::Execute()), and a basis
+	// of a later run in the same process (the test suite) can be allocated at the address of a deleted one.
+	const std::size_t Id = _nextId++;
+
 	/*FunctionalBasis(int maxPolynomialDegree, bool usePolynomialSpaceQ)
 	{
 		maxPolynomialDegree = max(0, maxPolynomialDegree);

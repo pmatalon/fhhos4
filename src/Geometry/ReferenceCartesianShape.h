@@ -10,8 +10,8 @@ private:
 	// For DG
 	DenseMatrix _stiffnessMatrix;
 
-	// For HHO
-	map<const Tensor<Dim>*, DenseMatrix> _reconstructStiffnessMatrices;
+	// For HHO. Keyed by Tensor::Id, not by the address of the tensor (see ReferenceShape).
+	map<size_t, DenseMatrix> _reconstructStiffnessMatrices;
 
 public:
 	ReferenceCartesianShape() : ReferenceShape<Dim>() {}
@@ -83,7 +83,7 @@ public:
 
 	double ReconstructStiffnessTerm(const Tensor<Dim>& K, BasisFunction<Dim>* phi1, BasisFunction<Dim>* phi2)
 	{
-		auto it = _reconstructStiffnessMatrices.find(&K);
+		auto it = _reconstructStiffnessMatrices.find(K.Id);
 		if (it != _reconstructStiffnessMatrices.end())
 			return it->second(phi1->LocalNumber, phi2->LocalNumber);
 		else
@@ -92,8 +92,8 @@ public:
 
 	void ComputeAndStoreReconstructStiffnessMatrix(const Tensor<Dim>& K, FunctionalBasis<Dim>* basis)
 	{
-		if (_reconstructStiffnessMatrices.find(&K) == _reconstructStiffnessMatrices.end())
-			_reconstructStiffnessMatrices[&K] = ComputeAndReturnKStiffnessMatrix(K, basis);
+		if (_reconstructStiffnessMatrices.find(K.Id) == _reconstructStiffnessMatrices.end())
+			_reconstructStiffnessMatrices[K.Id] = ComputeAndReturnKStiffnessMatrix(K, basis);
 	}
 
 private:

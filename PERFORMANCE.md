@@ -21,8 +21,8 @@ Update it after measuring or optimizing something.
 
 ## Machine
 
-AMD Ryzen 7 7735HS (8 cores, 16 threads), 13 GB of RAM, WSL2. No `perf` in WSL2; `gdb` and `valgrind` are not
-installed but may be.
+AMD Ryzen 7 7735HS (8 cores, 16 threads), 13 GB of RAM, WSL2. No `perf` in WSL2; `valgrind` is installed (system,
+`/usr/bin/valgrind`, not in the conda env), `gdb` is not but may be.
 
 Memory: WSL can crash (the whole VM restarts). It crashed twice on 2026-10-04 during a measurement, cause not
 identified: once during runs of `timing.sh`, once during a build with two compilations in parallel (`Program.cpp`
@@ -54,7 +54,7 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   `scripts/perf/Prof.h` (`PROF_START`/`PROF_STOP`, printed at exit). Include it in the files to instrument, never
   commit the instrumentation.
 - **Validation of a change**:
-  1. `ctest` (103 tests).
+  1. `ctest` (128 tests).
   2. `scripts/perf/amg_papers.sh <output dir> [binary]`: the AMG configurations of the papers, at reduced sizes (the
      paper sizes don't fit in 13 GB), 30 runs in ~6 minutes. Then `scripts/perf/fingerprint.sh <dir before> <dir after>`
      compares their iteration tables (iteration, inner iterations, residual): they must be identical.
@@ -292,6 +292,11 @@ logs, sequential / 16 threads): Cube-tet k=2 n=16 178 / 38 s (setup 3.7 / 1.8 s)
   `PhysicalShape::InnerProductWithBasis` evaluates f again for each basis function; tetrahedra use Keast's default
   rule (degree 8). Fewer points change the right-hand side at the level of the quadrature error (opt-in, or a
   decision); evaluating f once per point for all the basis functions is bit-identical (10x fewer evaluations at k=2).
+- Basis ids (2026-10-07: the matrices stored by the reference shapes are keyed by `FunctionalBasis::Id`, an atomic
+  counter, instead of the address of the basis): assembly, setup and solve times unchanged on Cube-tet k=0 n=32,
+  k=2 n=16, Cube-cart k=2 n=24 and the cases of `timing.sh` (Cube-tet k=2 n=16, 16 threads, interleaved runs:
+  44.8 / 47.7 s before, 44.8 / 47.4 s after). Square-tri got faster: k=3 n=128 sequential 49-60 -> 39-43 s,
+  k=1 n=256 10.2 -> 9.7 s. Not explained (no work removed; the bases are 8 bytes larger: memory layout?).
 
 The breakdowns below, except the first, were measured before the optimizations of the hybrid meshes and of the
 Galerkin products (see Done).
