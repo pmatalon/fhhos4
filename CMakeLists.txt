@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 
 # The version of fhhos4, written here only: fhhos4_version.h, fhhos4::Version() and the CMake package are generated from
 # it. A release changes it, then gets the annotated tag v<version>.
-project(fhhos4 VERSION 1.2.0 LANGUAGES CXX)
+project(fhhos4 VERSION 1.3.0 LANGUAGES CXX)
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
