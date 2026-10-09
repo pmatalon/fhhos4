@@ -127,3 +127,22 @@ CGAL depends on GMP and MPFR; the conda `cgal` package normally pulls these in a
 ```bash
 conda install -n fhhos4 gmp mpfr
 ```
+
+
+# License
+
+Copyright (C) 2018-2022 CERFACS\
+Copyright (C) 2023-2026 Pierre Matalon
+
+fhhos4 is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General Public
+License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later
+version (`LGPL-3.0-or-later`): see [COPYING.LESSER](COPYING.LESSER), which supplements the GNU General Public License
+version 3 in [COPYING](COPYING).
+
+- The library `fhhos4_AMG` only depends on Eigen (MPL-2.0): codes under other licenses can link it (conditions in
+  section 4 of the LGPL). Modified versions of the library must be distributed under the LGPL.
+- The program `fhhos4` links GMSH (GPL-2.0-or-later) and CGAL (GPL-3.0-or-later for the packages it uses): built with
+  them (the default), it is distributed under the GNU GPL version 3 or later.
+- AGMG (`-DENABLE_AGMG=ON`) has its own license, not compatible with the GPL: do not distribute a program built with it.
+- The quadrature rules of Dunavant and Keast (`src/QuadratureRules/`) are code by John Burkardt, distributed under the
+  GNU LGPL.

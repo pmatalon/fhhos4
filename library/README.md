@@ -110,3 +110,9 @@ thread per physical core unless `OMP_NUM_THREADS` or OpenMP's binding is set: th
 `tests/UAMGLibraryTest.cpp`: the program runs U-AMG through the library (`-s libuamg`, `fcglibuamg`) and must get the
 results of the U-AMG compiled in it (`uamg`, `fcguamg`); the public API alone on a hybrid system built in the test
 (matrices computed by the library, scaled bases, BiCGSTAB, checks of the parameters and inputs, silence at verbosity 0).
+
+## License
+
+LGPL-3.0-or-later, like the rest of fhhos4 (see the main README). The library only depends on Eigen (MPL-2.0), not on
+the GPL dependencies of the program (GMSH, CGAL): codes under other licenses can link it, under the conditions of
+section 4 of the LGPL (in short: keep the license notices, and let the user replace the shared library).

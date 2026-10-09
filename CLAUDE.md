@@ -115,6 +115,14 @@ The program runs it with `-s libuamg|fcglibuamg` (`Solver/LibraryUAMG.cpp`, the 
 the public header: changing it doesn't recompile `Program.cpp`), which `tests/UAMGLibraryTest.cpp` compares with
 `uamg|fcguamg`.
 
+## License
+
+LGPL-3.0-or-later (`COPYING.LESSER`, `COPYING`; README section "License"). Copyright: CERFACS for 2018-2022, Pierre
+Matalon since 2023. The public headers (`library/include`), installed into other codes' prefixes, start with an
+`SPDX-License-Identifier` line and their copyright line; the other files have none. Code taken from elsewhere must be
+compatible with the license. The library must not depend on the GPL dependencies of the program (GMSH, CGAL): codes
+under other licenses link it.
+
 ## Troubleshooting
 
 - `cmake`/`make`/CGAL/Eigen not found → conda env not activated.
