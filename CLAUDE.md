@@ -131,7 +131,10 @@ SOVERSION (major.minor: adding a public member to `fhhos4::Solver` breaks the bi
 minor or major version). `fhhos4::Version()` (printed by the program at start) adds `git describe` when built from a
 clone: `cmake/GitVersion.cmake` regenerates `build/generated/Version.cpp` at each build, rewritten only when the commit
 changes; nothing else may depend on the commit (it would recompile `Program.cpp` at each commit). Release: change the
-version in `project()`, commit, then annotated tag `vX.Y.Z` (the tags before 1.3.0 are `Release_X.Y.Z`).
+version in `project()`, commit, then push an annotated tag `vX.Y.Z` (the tags before 1.3.0 are `Release_X.Y.Z`):
+`.github/workflows/release.yml` checks the tag against the version, builds, runs `ctest`, the installation and the
+library alone, then creates the GitHub release "Release X.Y.Z" (notes: the message of the tag). It pins GMSH, Eigen,
+CGAL and the compiler to the versions the tests were validated with: update them with the local environment.
 
 ## License
 

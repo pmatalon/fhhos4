@@ -1,0 +1,87 @@
+# Release: on the push of an annotated tag vX.Y.Z, where X.Y.Z is the version of project() in CMakeLists.txt, checks the
+# version, builds and tests fhhos4, then creates the GitHub release "Release X.Y.Z", whose notes are the message of the
+# tag. Run it by hand (Actions > Release > Run workflow) to check the build and the tests without releasing.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0} # login shell: activates the conda environment
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the history and the tags, for git describe (fhhos4::Version())
+
+      - name: Check the tag against the version
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(sed -nE 's/^project\(fhhos4 VERSION ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt)
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::The tag $GITHUB_REF_NAME doesn't match the version in CMakeLists.txt: project(fhhos4 VERSION $version)"
+            exit 1
+          fi
+          if [ "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$GITHUB_REF_NAME" --jq .object.type)" != tag ]; then
+            echo "::error::$GITHUB_REF_NAME is a lightweight tag: create it with git tag -a (its message is the release notes)"
+            exit 1
+          fi
+
+      # The versions the tests were validated with: the iteration counts with GMSH meshes depend on the version of GMSH
+      # (tests/README.md). Update them with the local environment (conda list -n fhhos4).
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: conda/environment.yml
+          create-args: >-
+            gmsh=4.15.2
+            eigen=5.0.1
+            cgal-cpp=5.6.1
+            cxx-compiler=1.11.0
+          cache-environment: true
+
+      - name: Build
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+          ./build/bin/fhhos4 -h | grep "^Version:"
+
+      - name: Tests
+        working-directory: build
+        run: ctest --output-on-failure
+
+      - name: Installation
+        run: |
+          cmake --install build --prefix "$RUNNER_TEMP/install"
+          mkdir "$RUNNER_TEMP/run" && cd "$RUNNER_TEMP/run"
+          "$RUNNER_TEMP/install/bin/fhhos4" -geo L_shape -mesh tri -n 8 -k 0 -s mg -no-cache
+
+      - name: Library alone (ENABLE_PROGRAM=OFF)
+        run: |
+          cmake -B build-library -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_PROGRAM=OFF
+          cmake --build build-library
+
+  release:
+    needs: build-and-test
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # The annotated tag itself (its message: the release notes)
+          git fetch --force origin "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
+          gh release create "$GITHUB_REF_NAME" --verify-tag --title "Release ${GITHUB_REF_NAME#v}" --notes-from-tag
