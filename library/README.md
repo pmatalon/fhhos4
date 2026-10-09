@@ -20,16 +20,22 @@ the blocks of the uncondensed system, before static condensation:
 
 ## Build and link
 
-The library is built with fhhos4 (target `fhhos4_AMG`, `build/lib/libfhhos4_AMG.so`, see the main README). Its
-calling code only needs Eigen, the same version as fhhos4's (see below). With CMake:
+The library is built with fhhos4 (target `fhhos4_AMG`, `build/lib/libfhhos4_AMG.so`, see the main README). Alone,
+it only needs Eigen, CMake and a C++17 compiler (no CGAL, GMSH, GoogleTest; ~45 s and 1.5 GB of RAM):
+
+```bash
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_PROGRAM=OFF ..
+```
+
+Its calling code only needs Eigen, the same version as fhhos4's (see below). With CMake:
 
 ```cmake
 find_package(fhhos4 REQUIRED)
 target_link_libraries(my_code PRIVATE fhhos4::AMG)
 ```
 
-and `-Dfhhos4_DIR=<fhhos4>/build` (from the build tree), or, after `cmake --install build --prefix <prefix>`,
-`-DCMAKE_PREFIX_PATH=<prefix>`. CMake puts the directory of the library in the RPATH of the executable.
+and `-Dfhhos4_DIR=<fhhos4>/build` (from the build tree), or, after `cmake --install build --prefix <prefix>
+[--component library]`, `-DCMAKE_PREFIX_PATH=<prefix>`. CMake puts the directory of the library in the RPATH of the executable.
 
 ## Version
 

@@ -22,5 +22,8 @@ arguments="$*"
 outfilename=${arguments//[[:blank:]]/}
 outfilename=${outfilename:4}
 
+# The data of fhhos4 (meshes), for a copy of the executable (outside its build directory or its installation)
+export FHHOS4_DATA_DIR=/home/algo/matalon/fhhos4/data
+
 # Call the program
 /scratch/algo/matalon/fhhos4 "$@" > /home/algo/matalon/fhhos4/out/${outfilename}.log

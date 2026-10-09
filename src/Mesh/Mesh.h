@@ -116,8 +116,8 @@ public:
 
 	static void SetDirectories()
 	{
-		MeshDirectory = FileSystem::RootPath() + "/data/meshes/";
-		CacheDirectory = FileSystem::RootPath() + "/data/cache/";
+		MeshDirectory = FileSystem::DataDirectory() + "/meshes/";
+		CacheDirectory = FileSystem::CacheDirectory() + "/";
 	}
 
 	double CoarseningFactor()

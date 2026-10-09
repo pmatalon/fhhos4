@@ -91,6 +91,7 @@ Build options (`cmake -D<OPTION>=ON|OFF ..`):
 | `ENABLE_TESTS` | ON | Test suite (`fhhos4_tests`, run with `ctest`). Turning it off saves little time with Ninja, more with Make. |
 | `ENABLE_GMSH` | ON | GMSH interface |
 | `ENABLE_CGAL` | ON | Polygonal meshes (2D only) |
+| `ENABLE_PROGRAM` | ON | The program `fhhos4` and its tests. OFF: the library `fhhos4_AMG` alone, which only needs Eigen |
 
 If you built GMSH from source instead of using the conda package, pass its location explicitly:
 
@@ -104,14 +105,30 @@ And to enable AGMG:
 cmake -DCMAKE_BUILD_TYPE=Release -DENABLE_AGMG=ON -DAGMG_DIR=<path>/agmg/AGMG_3.3.5-aca/SRC ..
 ```
 
-The build also produces the library `lib/libfhhos4_AMG.so` (see [library/README.md](library/README.md)); `cmake
---install . --prefix <prefix>` installs it with its header and CMake package.
+The build also produces the library `lib/libfhhos4_AMG.so` (see [library/README.md](library/README.md)).
 
-## 5. Launch help command to view arguments and examples
+## 5. (Optional) Install
+
+```bash
+cmake --install . --prefix <prefix>
+```
+
+installs the program (`bin/fhhos4`), the meshes (`share/fhhos4/meshes`), and the library with its headers and CMake
+package (`lib/`, `include/`). The program also runs from the build directory. `--component library` or `--component
+program` installs one part only.
+
+## 6. Launch help command to view arguments and examples
 
 ```bash
 ./bin/fhhos4 -h
 ```
+
+The program reads and writes:
+- the meshes (`-geo <name>`): `data/meshes`, found through `share/fhhos4/meshes` next to the directory of the executable
+  (in the build directory, a link to `data/meshes`; in the installation, a copy). The environment variable
+  `FHHOS4_DATA_DIR` replaces `share/fhhos4`.
+- the exported files: `./out` in the working directory, or `-o <directory>`.
+- the cache of the GMSH meshes: `$XDG_CACHE_HOME/fhhos4`, by default `~/.cache/fhhos4` (`-no-cache` to bypass it).
 
 
 # Troubleshooting

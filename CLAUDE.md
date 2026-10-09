@@ -37,6 +37,14 @@ CMake options (`-D<OPTION>=ON/OFF`):
 - `ENABLE_TESTS` (ON): build `fhhos4_tests`. Turning it off saves little time with Ninja
   (the tests compile in parallel with `Program.cpp`), more with Make.
 - `ENABLE_GMSH`, `ENABLE_CGAL` (ON, CGAL is only used in 2D), `ENABLE_AGMG` (OFF).
+- `ENABLE_PROGRAM` (ON): OFF builds the library `fhhos4_AMG` alone (needs only Eigen): the CMake file has a library
+  section, then the program's, skipped by `return()`.
+
+`cmake --install . --prefix <prefix> [--component library|program]`: program, meshes (`share/fhhos4/meshes`), library,
+headers, CMake package. No path of the sources is compiled in (`Utils/FileSystem.h`): the program finds the meshes
+from its own location (`<bin>/../share/fhhos4`, a link to `data/meshes` in the build tree; `FHHOS4_DATA_DIR`
+overrides; a data file not found is a `Utils::FatalError(FileSystem::DataFileNotFound(...))`, which tells how to set it), writes its exports in `./out` (working directory, `-o`), its GMSH mesh cache in `~/.cache/fhhos4`
+(`XDG_CACHE_HOME`), and its temporary files in the system's temporary directory, named after the process id.
 
 ## Test
 

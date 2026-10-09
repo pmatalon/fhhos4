@@ -186,20 +186,19 @@ private:
 			else if (FileSystem::FileExists(Mesh<Dim>::MeshDirectory + "3D/" + geoFile))
 				geoFile = Mesh<Dim>::MeshDirectory + "3D/" + geoFile;
 			else
-			{
-				Utils::Error("File not found: " + geoFile);
-				Utils::Error("File not found: " + Mesh<Dim>::MeshDirectory + geoFile);
-				Utils::FatalError("File not found: " + Mesh<Dim>::MeshDirectory + "2D/" + geoFile);
-				Utils::FatalError("File not found: " + Mesh<Dim>::MeshDirectory + "3D/" + geoFile);
-			}
+				Utils::FatalError(FileSystem::DataFileNotFound(geoFile, { geoFile, Mesh<Dim>::MeshDirectory + geoFile,
+					Mesh<Dim>::MeshDirectory + "2D/" + geoFile, Mesh<Dim>::MeshDirectory + "3D/" + geoFile }));
 		}
 		return geoFile;
 	}
 
+	// Copy of the GMSH script with N = n, in a temporary file (the meshes directory may be read-only). The relative paths
+	// of its Include statements, from the directory of the script, are made absolute.
 	static string SetN(string geoFile, BigNumber n)
 	{
 		assert(n > 0);
-		string geoFileWithN = FileSystem::Directory(geoFile) + "/" + FileSystem::FileNameWithoutExtension(geoFile) + "_N" + to_string(n) + ".tmp.geo";
+		string geoFileWithN = FileSystem::TemporaryFile(FileSystem::FileNameWithoutExtension(geoFile) + "_N" + to_string(n) + ".geo");
+		filesystem::path geoDirectory = filesystem::absolute(geoFile).parent_path();
 		ofstream gmshScriptWithN(geoFileWithN);
 
 		cout << "Opening file: " << geoFile << endl;
@@ -216,10 +215,19 @@ private:
 		string line;
 		while (getline(gmshScript, line))
 		{
+			size_t include = line.find_first_not_of(" \t");
 			if (line.find("N =") == 0 || line.find("N=") == 0)
 			{
 				NFound = true;
 				gmshScriptWithN << "N = " << n << ";\r" << endl;
+			}
+			else if (include != string::npos && line.compare(include, 9, "Include \"") == 0) // Include "file";
+			{
+				size_t begin = include + 9;
+				size_t end = line.find('"', begin);
+				if (end != string::npos && filesystem::path(line.substr(begin, end - begin)).is_relative())
+					line = line.substr(0, begin) + (geoDirectory / line.substr(begin, end - begin)).string() + line.substr(end);
+				gmshScriptWithN << line << endl;
 			}
 			else
 				gmshScriptWithN << line << endl;
@@ -692,7 +700,10 @@ protected:
 
 public:
 	virtual ~GMSHMesh()
-	{}
+	{
+		if (_mshFileIsTmp)
+			remove(_mshFilePath.c_str()); // if not already removed by an export
+	}
 
 	string Description() override
 	{
@@ -747,8 +758,11 @@ public:
 	{
 		cout << "Mesh refinement by splitting" << endl;
 
-		string coarse_mesh_tmp_file = "./temporary_coarse.msh";
-		string fine_mesh_tmp_file = "./temporary_fine.msh";
+		// One file per fine mesh, which keeps it until its destruction (or the end of the process)
+		static int nFineMeshes = 0;
+		nFineMeshes++;
+		string coarse_mesh_tmp_file = FileSystem::TemporaryFile("coarse.msh");
+		string fine_mesh_tmp_file = FileSystem::TemporaryFile("fine" + to_string(nFineMeshes) + ".msh");
 
 		// Save the current mesh in a temporary file, because the refinement will delete it
 		gmsh::write(coarse_mesh_tmp_file);
