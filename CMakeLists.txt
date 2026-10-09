@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(fhhos4 LANGUAGES CXX)
+# The version of fhhos4, written here only: fhhos4_version.h, fhhos4::Version() and the CMake package are generated from
+# it. A release changes it, then gets the annotated tag v<version>.
+project(fhhos4 VERSION 1.2.0 LANGUAGES CXX)
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
@@ -59,16 +61,37 @@ endif()
 # compiled with -fvisibility=hidden: only the public API (library/include/fhhos4) is exported, fhhos4's internals and
 # its copy of Eigen's functions stay private. Its own compile definitions and link libraries: the calling code only
 # needs Eigen.
-add_library(fhhos4_AMG SHARED library/Solver.cpp)
+add_library(fhhos4_AMG SHARED library/Solver.cpp ${CMAKE_BINARY_DIR}/generated/Version.cpp)
 add_library(fhhos4::Solver ALIAS fhhos4_AMG)
+# SOVERSION: binary compatibility within a minor version only, since adding a parameter (a public member) to
+# fhhos4::Solver changes its size.
 set_target_properties(fhhos4_AMG PROPERTIES
 	EXPORT_NAME AMG
 	CXX_VISIBILITY_PRESET hidden
 	VISIBILITY_INLINES_HIDDEN ON
-	LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+	LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib
+	VERSION ${PROJECT_VERSION}
+	SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
 target_include_directories(fhhos4_AMG
-	PUBLIC $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/library/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+	PUBLIC $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/library/include> $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/generated/include>
+		$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 	PRIVATE ${CMAKE_SOURCE_DIR}/src)
+
+# Version, used by the library and the program: the public header fhhos4_version.h, and the definition of
+# fhhos4::Version(), which adds the commit (git describe). The commit changes without CMake running again: Version.cpp
+# is regenerated at each build, but rewritten only when it changes, so a new commit recompiles this small file alone.
+configure_file(library/fhhos4_version.h.in ${CMAKE_BINARY_DIR}/generated/include/fhhos4_version.h @ONLY)
+find_package(Git QUIET)
+set(git_version_command ${CMAKE_COMMAND} -DSOURCE_DIR=${CMAKE_SOURCE_DIR} -DVERSION=${PROJECT_VERSION}
+	-DGIT_EXECUTABLE=${GIT_EXECUTABLE} -DOUTPUT=${CMAKE_BINARY_DIR}/generated/Version.cpp
+	-P ${CMAKE_SOURCE_DIR}/cmake/GitVersion.cmake)
+execute_process(COMMAND ${git_version_command}) # Version.cpp exists after the configuration
+add_custom_target(fhhos4_git_version
+	COMMAND ${git_version_command}
+	BYPRODUCTS ${CMAKE_BINARY_DIR}/generated/Version.cpp
+	COMMENT "Version: git describe"
+	VERBATIM)
+add_dependencies(fhhos4_AMG fhhos4_git_version)
 
 # Core library: everything except main.cpp, shared by the fhhos4 executable and the test executable.
 # Compile definitions/link libraries are set PUBLIC so both consumers see the exact same
@@ -228,13 +251,18 @@ endif()
 
 # CMake package of the library: find_package(fhhos4) then target_link_libraries(<target> fhhos4::AMG), from the
 # installation (cmake --install) or from this build tree (-Dfhhos4_DIR=<this build directory>).
+# find_package(fhhos4 1.2) accepts the versions 1.x with x >= 2: the source compatibility of the API (the binary
+# compatibility is the SOVERSION's).
 include(CMakePackageConfigHelpers)
 install(TARGETS fhhos4_AMG EXPORT fhhos4Targets LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
-install(FILES library/include/fhhos4 library/include/fhhos4_error.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(FILES library/include/fhhos4 library/include/fhhos4_error.h
+	${CMAKE_BINARY_DIR}/generated/include/fhhos4_version.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(EXPORT fhhos4Targets NAMESPACE fhhos4:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/fhhos4)
 configure_package_config_file(library/fhhos4Config.cmake.in ${CMAKE_BINARY_DIR}/fhhos4Config.cmake
 	INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/fhhos4)
-install(FILES ${CMAKE_BINARY_DIR}/fhhos4Config.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/fhhos4)
+write_basic_package_version_file(${CMAKE_BINARY_DIR}/fhhos4ConfigVersion.cmake COMPATIBILITY SameMajorVersion)
+install(FILES ${CMAKE_BINARY_DIR}/fhhos4Config.cmake ${CMAKE_BINARY_DIR}/fhhos4ConfigVersion.cmake
+	DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/fhhos4)
 export(EXPORT fhhos4Targets NAMESPACE fhhos4:: FILE ${CMAKE_BINARY_DIR}/fhhos4Targets.cmake)
 
 # Validation test suite (GoogleTest)

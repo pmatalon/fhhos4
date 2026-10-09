@@ -46,7 +46,7 @@ From `build/`:
 ctest --output-on-failure
 ```
 
-130 tests, ~4 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
+132 tests, ~4 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
 iteration counts of the papers in `reproducibility/` — see `tests/README.md`. Covers
 `Program_Diffusion_HHO` and `Program_BiHarmonic_HHO` (HHO, static condensation), 2D/3D,
 in-house, GMSH and polygonal meshes, and the library (`UAMGLibrary*`, ~15 s). Not covered: DG/FEM programs (disabled by default), `lu`/`cg`/`agmg`/`p_mg` solvers,
@@ -114,6 +114,16 @@ inside the library (`Krylov`: FCG by default, BiCGSTAB with a V/W-cycle only, or
 The program runs it with `-s libuamg|fcglibuamg` (`Solver/LibraryUAMG.cpp`, the only file of the program that includes
 the public header: changing it doesn't recompile `Program.cpp`), which `tests/UAMGLibraryTest.cpp` compares with
 `uamg|fcguamg`.
+
+## Version
+
+Set in `project()` (`CMakeLists.txt`) only; generated from it: the public header `fhhos4_version.h`
+(`FHHOS4_VERSION`...), the CMake package version (`find_package(fhhos4 1.2)`: same major version) and the library's
+SOVERSION (major.minor: adding a public member to `fhhos4::Solver` breaks the binary compatibility, so only in a new
+minor or major version). `fhhos4::Version()` (printed by the program at start) adds `git describe` when built from a
+clone: `cmake/GitVersion.cmake` regenerates `build/generated/Version.cpp` at each build, rewritten only when the commit
+changes; nothing else may depend on the commit (it would recompile `Program.cpp` at each commit). Release: change the
+version in `project()`, commit, then annotated tag `vX.Y.Z` (the tags before 1.3.0 are `Release_X.Y.Z`).
 
 ## License
 

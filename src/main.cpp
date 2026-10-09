@@ -1,6 +1,6 @@
 #include <getopt.h>
 #include <regex>
-#include "version.h"
+#include "fhhos4_version.h"
 #include "Program.h"
 #include "ProgramArgumentsDefaults.h"
 #include "Solver/FixedPoint/BlockDiagonalSolver.h"
@@ -650,7 +650,7 @@ void print_usage() {
 int Run(int argc, char* argv[])
 {
 	cout << "-------------------------- START --------------------------" << endl;
-	cout << "Version: " << VERSION_MAJOR << "." << VERSION_MINOR << "." << VERSION_BUGFIX << endl;
+	cout << "Version: " << fhhos4::Version() << endl;
 	cout << "Option -h for help." << endl;
 	Eigen::initParallel();
 

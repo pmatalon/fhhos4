@@ -393,6 +393,16 @@ TEST(UAMGLibrary, MultigridAlone)
 	EXPECT_LT(RelativeError(system, x), 1e-8);
 }
 
+// fhhos4::Version(), compiled in the library, starts with the version of the header: both come from project() in
+// CMakeLists.txt.
+TEST(UAMGLibrary, Version)
+{
+	std::string version = fhhos4::Version();
+	EXPECT_EQ(version.rfind(FHHOS4_VERSION, 0), 0u) << version;
+	EXPECT_EQ(std::string(FHHOS4_VERSION), std::to_string(FHHOS4_VERSION_MAJOR) + "." +
+		std::to_string(FHHOS4_VERSION_MINOR) + "." + std::to_string(FHHOS4_VERSION_PATCH));
+}
+
 TEST(UAMGLibrary, Errors)
 {
 	HybridSystem system(16);

@@ -31,6 +31,16 @@ target_link_libraries(my_code PRIVATE fhhos4::AMG)
 and `-Dfhhos4_DIR=<fhhos4>/build` (from the build tree), or, after `cmake --install build --prefix <prefix>`,
 `-DCMAKE_PREFIX_PATH=<prefix>`. CMake puts the directory of the library in the RPATH of the executable.
 
+## Version
+
+- `find_package(fhhos4 1.2 REQUIRED)` accepts the versions 1.x with x >= 2: the API stays source-compatible within a
+  major version.
+- Binary compatibility only within a minor version (`libfhhos4_AMG.so.1.2`): adding a parameter to `fhhos4::Solver`
+  changes its size. Rebuild the calling code when fhhos4 changes minor version.
+- `FHHOS4_VERSION` (`"1.2.0"`), `FHHOS4_VERSION_MAJOR`, `_MINOR`, `_PATCH`: the version of the header (`<fhhos4>`).
+- `fhhos4::Version()`: the version of the library, followed by the commit (`git describe`) when it was built from a git
+  clone, e.g. `1.3.0 (v1.3.0-12-gabc1234-dirty)`. Give it in bug reports.
+
 ## Use
 
 ```cpp

@@ -7,6 +7,7 @@
 #include <Eigen/Core>
 #include <Eigen/SparseCore>
 #include "fhhos4_error.h"
+#include "fhhos4_version.h"
 
 // fhhos4_AMG (short name: fhhos4): the algebraic multigrid of fhhos4 for hybrid discretizations (HHO, HDG...) of scalar
 // diffusion problems, the Uncondensed AMG (U-AMG) of
