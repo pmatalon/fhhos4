@@ -545,7 +545,8 @@ void print_usage() {
 	cout << endl;
 	cout << "-threads NUM" << endl;
 	cout << "      Max number of threads used for parallelism (default: 0)." << endl;
-	cout << "              0     - automatic: OMP_NUM_THREADS if set, otherwise the number of logical cores" << endl;
+	cout << "              0     - automatic: OMP_NUM_THREADS if set, otherwise the number of logical cores, and in the solver" << endl;
+	cout << "                      (setup and solve) the number of physical cores (no hyper-threading)" << endl;
 	cout << "              1     - sequential execution" << endl;
 	cout << "              other - requested number of threads" << endl;
 	cout << endl;

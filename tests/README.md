@@ -163,6 +163,8 @@ Regression tests for configurations that used to crash, and for the argument def
 
 - **`Sizes/ThreadLocalTest`** (18 cases: `ResultsFollowIterationOrder` and `CoeffsFillMatrix` × loop sizes {0, 3, 1000} × {1, 4, 16} threads) and **`ThreadLocalNestedTest.CoeffsFillMatrix`** (1 case) — unit tests of `ThreadLocal`/`ThreadLocalCoeffs` (`src/Utils/Parallelism.h`): with `schedule(static)`, the thread-local results taken in thread order follow the iteration order; every coefficient added in a parallel loop ends up in the matrix, including in a loop nested in another parallel loop (executed by the calling thread only).
 
+- **`SolverThreadsTest.PhysicalCoresByDefault`** (1 case) — the thread count of the solvers (`Parallelism::SolverThreads`, `src/Utils/Parallelism.h`): at most one thread per physical core by default (unless `OMP_NUM_THREADS` or OpenMP's binding is set), the program's thread count back after the solver, and an explicit `-threads` (`SetNThreads()`) applied to the solver too.
+
 ## `SparseMatrixOpsTest.cpp`
 
 Unit tests of the parallel sparse matrix operations used in the setup of U-AMG (`src/Utils/SparseMatrixOps.h`), on random matrices (with explicit zeros and empty rows), with 1, 3 and 8 threads. They must give exactly the same matrices as the Eigen operations they replace (same structure, same values bit for bit), so that the setup, hence the iteration counts, don't change.
@@ -181,7 +183,7 @@ Tests of the library `fhhos4_AMG` (`library/`), the U-AMG of fhhos4 for other co
 
 - **`UAMGLibraryProgram.NotAPreconditionerOfTheConjugateGradient`** (1 case) — `-s cglibuamg` is refused: the library gives U-AMG with its own Krylov method only (with the K-cycle, it is a non-linear preconditioner).
 
-- **`UAMGLibrary.*`** (8 cases) — the public API alone, on a hybrid system of degree 0 built in the test (Cartesian mesh of the unit square, random coefficients): it solves the system; computes `A` from the blocks (`SetupFromBlocks`), with full or lower-only symmetric blocks; works without `A_FF`; gives the same iterates on bases scaled by random factors, given the interpolation of 1; BiCGSTAB with a V-cycle; the cycles alone (`Krylov = "none"`); the errors (parameters not set or invalid, BiCGSTAB with the K-cycle, inputs inconsistent with the dimension and the degrees, non block-diagonal `A_TT`); and it prints nothing at verbosity 0, and leaves the number of threads and the format of `cout` unchanged.
+- **`UAMGLibrary.*`** (9 cases) — the public API alone, on a hybrid system of degree 0 built in the test (Cartesian mesh of the unit square, random coefficients), with the sequential smoothers (`bgs`, `rbgs`: the tests compare runs, and the default hybrid smoother varies from one run to the next): it solves the system; the default smoothers are the hybrid Gauss-Seidel on 4 threads, the sequential one on 1 thread; computes `A` from the blocks (`SetupFromBlocks`), with full or lower-only symmetric blocks; works without `A_FF`; gives the same iterates on bases scaled by random factors, given the interpolation of 1; BiCGSTAB with a V-cycle; the cycles alone (`Krylov = "none"`); the errors (parameters not set or invalid, BiCGSTAB with the K-cycle, inputs inconsistent with the dimension and the degrees, non block-diagonal `A_TT`); and it prints nothing at verbosity 0, and leaves the number of threads and the format of `cout` unchanged.
 
 ## `ReferenceShapeCacheTest.cpp`
 

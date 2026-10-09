@@ -234,6 +234,9 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 
 		Vector systemSolution;
 
+		// The solver on the physical cores only, by default (the assembly and the post-processing on all the logical cores)
+		Parallelism::SolverThreads solverThreads;
+
 		// Solver creation
 		int blockSizeForBlockSolver = args.Solver.BlockSize != -1 ? args.Solver.BlockSize : faceBasis->Size();
 
@@ -320,6 +323,7 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 			problem->ExportErrorToGMSH(iterativeSolver->ExactSolution - systemSolution, out);
 
 		delete solver;
+		solverThreads.End();
 
 		Vector hybridSolution;
 		Vector reconstructedSolution;

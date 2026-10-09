@@ -100,4 +100,5 @@ class GaussSeidelSmoother : public Smoother
 {
 public:
 	GaussSeidelSmoother(Direction direction, int nSmoothingIterations) : Smoother(new GaussSeidel(direction), nSmoothingIterations) {}
+	GaussSeidelSmoother(Direction direction, bool hybrid, int nSmoothingIterations) : Smoother(new GaussSeidel(direction, hybrid), nSmoothingIterations) {}
 };

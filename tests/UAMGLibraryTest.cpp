@@ -186,13 +186,16 @@ struct HybridSystem
 	}
 };
 
-// The solver for HybridSystem: degree 0 in 2D
+// The solver for HybridSystem: degree 0 in 2D. With the sequential smoothers: the default on several threads, the
+// hybrid one, varies from one run to the next (tested apart), and the tests compare runs.
 fhhos4::Solver ToySolver()
 {
 	fhhos4::Solver solver;
 	solver.Dimension = 2;
 	solver.FaceDegree = 0;
 	solver.Tolerance = 1e-10;
+	solver.PreSmoother = "bgs";
+	solver.PostSmoother = "rbgs";
 	return solver;
 }
 
@@ -316,6 +319,31 @@ TEST(UAMGLibrary, BiCGSTAB)
 	EXPECT_LT(RelativeError(system, x), 1e-8);
 }
 
+// The default smoothers: the hybrid Gauss-Seidel (parallel) with FCG on several threads, the sequential one otherwise
+TEST(UAMGLibrary, DefaultSmoothers)
+{
+	HybridSystem system(64);
+	for (int threads : { 4, 1 })
+	{
+		fhhos4::Solver uamg = ToySolver();
+		uamg.PreSmoother = "";
+		uamg.PostSmoother = "";
+		uamg.Threads = threads;
+		uamg.Verbosity = 2; // prints the smoothers
+		::testing::internal::CaptureStdout();
+		uamg.Setup(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne);
+		Eigen::VectorXd x = Eigen::VectorXd::Zero(system.b.size());
+		fhhos4::Result result = uamg.Solve(system.b, x);
+		std::string output = ::testing::internal::GetCapturedStdout();
+		EXPECT_EQ(output.find("Hybrid Gauss-Seidel (forward)") != std::string::npos, threads > 1) << threads << " threads";
+		EXPECT_EQ(output.find("Hybrid Gauss-Seidel (backward)") != std::string::npos, threads > 1) << threads << " threads";
+		EXPECT_NE(output.find("Gauss-Seidel (backward)"), std::string::npos);
+		EXPECT_TRUE(result.Converged);
+		EXPECT_LT(result.Iterations, 30);
+		EXPECT_LT(RelativeError(system, x), 1e-8);
+	}
+}
+
 // U-AMG alone (no FCG)
 TEST(UAMGLibrary, MultigridAlone)
 {
@@ -414,5 +442,8 @@ TEST(UAMGLibrary, LeavesTheCallerUnchanged)
 	EXPECT_NE(output.find("Setup"), std::string::npos);
 	EXPECT_EQ(std::cout.precision(), 7);
 	EXPECT_EQ(std::cout.flags(), flags);
+#ifdef _OPENMP
+	EXPECT_EQ(omp_get_max_threads(), threadsBefore); // Threads = 0: at most one per physical core during the calls only
+#endif
 	std::cout.precision(precision);
 }

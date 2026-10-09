@@ -72,10 +72,14 @@ public:
 		}
 		if (smootherCode.compare("hbgs") == 0)
 		{
+			if (blockSize == 1) // the scalar kernels are faster
+				return new GaussSeidelSmoother(Direction::Forward, true, nSmootherIterations);
 			return new BlockGaussSeidelSmoother(blockSize, Direction::Forward, true, nSmootherIterations);
 		}
 		if (smootherCode.compare("hrbgs") == 0)
 		{
+			if (blockSize == 1)
+				return new GaussSeidelSmoother(Direction::Backward, true, nSmootherIterations);
 			return new BlockGaussSeidelSmoother(blockSize, Direction::Backward, true, nSmootherIterations);
 		}
 

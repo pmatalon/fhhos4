@@ -38,10 +38,11 @@ namespace fhhos4
 				_savedCoutFlags = cout.flags();
 				_savedCoutPrecision = cout.precision();
 #ifdef _OPENMP
-				if (solver.Threads > 0)
+				int threads = solver.Threads > 0 ? solver.Threads : Parallelism::WithoutHyperThreads(omp_get_max_threads());
+				if (threads != omp_get_max_threads())
 				{
 					_savedThreads = omp_get_max_threads();
-					omp_set_num_threads(solver.Threads);
+					omp_set_num_threads(threads);
 				}
 #endif
 			}
@@ -186,6 +187,13 @@ namespace fhhos4
 			}
 		}
 
+		// The pre-smoother when Solver::PreSmoother is empty: the hybrid block Gauss-Seidel where it is faster than the
+		// sequential one (PERFORMANCE.md), i.e. on several threads, whatever the Krylov method
+		static string DefaultPreSmoother()
+		{
+			return Parallelism::NThreads() > 1 ? "hbgs" : "bgs";
+		}
+
 		// The arguments of the program fhhos4 that give the same multigrid
 		ProgramArguments Arguments(const Solver& s) const
 		{
@@ -198,8 +206,8 @@ namespace fhhos4
 			mg.WLoops = s.Cycle == 'W' ? 2 : 1;
 			mg.PreSmoothingIterations = s.PreSmoothingIterations;
 			mg.PostSmoothingIterations = s.PostSmoothingIterations;
-			mg.PreSmootherCode = s.PreSmoother;
-			mg.PostSmootherCode = s.PostSmoother;
+			mg.PreSmootherCode = !s.PreSmoother.empty() ? s.PreSmoother : DefaultPreSmoother();
+			mg.PostSmootherCode = !s.PostSmoother.empty() ? s.PostSmoother : "<symmetric smoother>"; // the program's: rbgs after bgs, hrbgs after hbgs...
 			mg.CoarseningFactor = s.CoarseningFactor;
 			mg.MatrixMaxSizeForCoarsestLevel = s.CoarseMatrixMaxSize;
 			mg.CoarseSolverCode = s.CoarseSolver;

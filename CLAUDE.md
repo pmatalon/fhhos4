@@ -46,7 +46,7 @@ From `build/`:
 ctest --output-on-failure
 ```
 
-128 tests, ~4 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
+130 tests, ~4 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
 iteration counts of the papers in `reproducibility/` — see `tests/README.md`. Covers
 `Program_Diffusion_HHO` and `Program_BiHarmonic_HHO` (HHO, static condensation), 2D/3D,
 in-house, GMSH and polygonal meshes, and the library (`UAMGLibrary*`, ~15 s). Not covered: DG/FEM programs (disabled by default), `lu`/`cg`/`agmg`/`p_mg` solvers,
@@ -96,7 +96,8 @@ Example invocations for specific experiments/figures live in `reproducibility/*.
 - `Utils/` — cross-cutting helpers (timers, export, types). `Utils::FatalError()` throws `fhhos4::Error` (`main()`
   prints it and exits with EXIT_FAILURE): never call it inside a parallel loop. The solvers print through `Utils::Log()`
   (cout, redirected by the library according to its verbosity). Parallel loops are plain OpenMP
-  (`#pragma omp parallel for`); `Parallelism.h` has the thread count and `ThreadLocal`/
+  (`#pragma omp parallel for`); `Parallelism.h` has the thread count (default: all logical cores, but one per
+  physical core in the solvers: `SolverThreads`, around the solver section of each program) and `ThreadLocal`/
   `ThreadLocalCoeffs` for per-thread results (e.g. the non-zeros of a matrix being assembled).
 
 ## Library (`library/`)

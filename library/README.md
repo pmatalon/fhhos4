@@ -78,7 +78,16 @@ setup refuses the K-cycle with it.
 The public members of `fhhos4::Solver` (see `include/fhhos4`), read by `Setup()` (`Tolerance` and `MaxIterations` by
 `Solve()`). The defaults are those of the program fhhos4 (`-s fcguamg`), used in the papers: FCG with tolerance 1e-8,
 K-cycle, one block Gauss-Seidel iteration before and after, coarsening factor 3.8, Cholesky on the coarsest level
-(<= 1000 rows). `Threads` sets the number of OpenMP threads during the calls (default: the current OpenMP setting).
+(<= 1000 rows). Except the smoothers on several threads: by default (`PreSmoother` and `PostSmoother` empty),
+`Setup()` then chooses the hybrid block Gauss-Seidel (`hbgs`, `hrbgs`: Gauss-Seidel in the rows of each thread, Jacobi
+between the threads; with the scalar kernels at k = 0), parallel, unlike the block Gauss-Seidel. It takes 0-6 more
+iterations with FCG (more with BiCGSTAB, which expects the same preconditioner at each iteration, whereas the hybrid
+smoother varies with the timing of the threads), which depend on the number of threads and vary slightly from one run
+to the next, but solves faster on 8 threads: with FCG, 15-20% at k = 0, 35-45% at k = 1, 2 (HArDCore3D's cubes and
+Voronoi mesh), 0-15% at k = 0 on fhhos4's meshes; with BiCGSTAB or the multigrid alone, 2-45% (see `PERFORMANCE.md`).
+On 1 thread it is slower: block Gauss-Seidel there.
+`Threads` sets the number of OpenMP threads during the calls (default: the current OpenMP setting, but at most one
+thread per physical core unless `OMP_NUM_THREADS` or OpenMP's binding is set: the hyperthreads slow the AMG down).
 `Verbosity`: 0 (default) prints nothing.
 
 ## Constraints
@@ -91,7 +100,7 @@ K-cycle, one block Gauss-Seidel iteration before and after, coarsening factor 3.
 - **Errors**: `fhhos4::Error` (a `std::runtime_error`). `Solve()` does not throw if the tolerance is not reached: see
   `Result::Converged`.
 - **Not thread-safe**: one `fhhos4::Solver` object must not be used by several threads at the same time. The library
-  parallelizes its own work with OpenMP; its solve phase is mostly sequential (Gauss-Seidel smoothing).
+  parallelizes its own work with OpenMP (on 1 thread, its solve phase is sequential Gauss-Seidel smoothing).
 
 ## Tests
 

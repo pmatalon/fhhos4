@@ -1,6 +1,6 @@
 #!/bin/bash
 # Setup and solve times of U-AMG on the reference cases of PERFORMANCE.md, sequential (-threads 1) and parallel
-# (-threads 0: all logical cores). Run nothing else meanwhile (no build): the noise is already about +-10%.
+# (-threads 0: all logical cores, and one thread per physical core in the solver). Run nothing else meanwhile (no build): the noise is already about +-10%.
 #
 # Usage (from build/, conda env activated): timing.sh <output dir> [fhhos4 binary, default: ./bin/fhhos4] [repetitions, default: 2]
 # Writes one log per run, timing.txt (one line per run) and best.txt (best elapsed setup and solve times of each case).

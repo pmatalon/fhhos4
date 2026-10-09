@@ -319,6 +319,37 @@ INSTANTIATE_TEST_SUITE_P(Sizes, ThreadLocalTest, ::testing::Combine(
 	::testing::Values<BigNumber>(0, 3, 1000),
 	::testing::Values(1, 4, 16)));
 
+// SolverThreads: by default, at most one thread per physical core in the solvers (unless OMP_NUM_THREADS or OpenMP's
+// binding is set), and the threads of the program back after them; a number of threads given to SetNThreads()
+// (-threads) applies to the solvers too.
+TEST(SolverThreadsTest, PhysicalCoresByDefault)
+{
+#ifdef _OPENMP
+	Parallelism::SetNThreads(0);
+	int nThreads = omp_get_max_threads();
+	int cores = Parallelism::PhysicalCores();
+#ifdef __linux__
+	EXPECT_GE(cores, 1);
+#endif
+	EXPECT_LE(cores, omp_get_num_procs());
+	{
+		Parallelism::SolverThreads solverThreads;
+		bool userSettings = getenv("OMP_NUM_THREADS") || omp_get_proc_bind() != omp_proc_bind_false;
+		EXPECT_EQ(omp_get_max_threads(), userSettings || cores == 0 ? nThreads : std::min(nThreads, cores));
+	}
+	EXPECT_EQ(omp_get_max_threads(), nThreads);
+
+	Parallelism::SetNThreads(3);
+	{
+		Parallelism::SolverThreads solverThreads;
+		EXPECT_EQ(omp_get_max_threads(), 3);
+	}
+	EXPECT_EQ(omp_get_max_threads(), 3);
+	Parallelism::SetNThreads(0);
+	EXPECT_EQ(omp_get_max_threads(), nThreads);
+#endif
+}
+
 // A parallel loop nested in another one runs on the calling thread only: a ThreadLocal created
 // inside the outer loop must have a value for it.
 TEST(ThreadLocalNestedTest, CoeffsFillMatrix)

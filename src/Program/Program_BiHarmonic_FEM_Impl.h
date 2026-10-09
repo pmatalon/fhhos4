@@ -115,6 +115,9 @@ void Program_BiHarmonic_FEM<Dim>::Execute(ProgramArguments& args)
 		cout << "-           Setup Laplacian solver           -" << endl;
 		cout << "----------------------------------------------" << endl;
 
+		// The solvers on the physical cores only, by default (the assembly and the post-processing on all the logical cores)
+		Parallelism::SolverThreads solverThreads;
+
 		int blockSizeForBlockSolver = args.Solver.BlockSize != -1 ? args.Solver.BlockSize : 1;
 		Solver* diffSolver = SolverFactory<Dim>::CreateSolver(args, nullptr, blockSizeForBlockSolver, out);
 
@@ -346,6 +349,7 @@ void Program_BiHarmonic_FEM<Dim>::Execute(ProgramArguments& args)
 		Vector theta_0 = biHarSolver->Solve(b);
 
 		delete biHarSolver;
+		solverThreads.End();
 
 		cout << "Compute solution..." << endl;
 		Vector lap, solution;

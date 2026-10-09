@@ -24,7 +24,7 @@ public:
 		_solver.CoarseningFactor = mg.CoarseningFactor;
 		_solver.CoarseMatrixMaxSize = mg.MatrixMaxSizeForCoarsestLevel;
 		_solver.CoarseSolver = mg.CoarseSolverCode;
-		_solver.Threads = 0; // the setting of the program (-threads)
+		_solver.Threads = Parallelism::NThreads(); // the setting of the program for its solvers (-threads, SolverThreads)
 		_solver.Verbosity = args.Solver.PrintIterationResults ? 2 : 1;
 	}
 

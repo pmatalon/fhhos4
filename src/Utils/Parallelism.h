@@ -1,8 +1,15 @@
 #pragma once
 #include <cassert>
+#include <cstdlib>
 #include <vector>
 #ifdef _OPENMP
 #include <omp.h>
+#endif
+#ifdef __linux__
+#include <sched.h>
+#include <fstream>
+#include <set>
+#include <string>
 #endif
 #include "NonZeroCoefficients.h"
 using namespace std;
@@ -17,15 +24,110 @@ using namespace std;
 // A parallel loop nested in another one is executed sequentially by the calling thread (OpenMP default).
 namespace Parallelism
 {
+	// Number of physical cores among the CPUs the calling thread may run on (its affinity: e.g. those of the job, of the
+	// MPI process), each core counted once whatever its number of hardware threads (hyper-threading): the number of
+	// distinct sets of CPUs sharing a core (thread_siblings_list, in /sys on Linux, whatever the numbering of the cores
+	// and packages). 0 if unknown: on other systems, if /sys can't be read, or beyond 1024 CPUs (CPU_SETSIZE).
+	inline int PhysicalCores()
+	{
+#ifdef __linux__
+		static const int cores = []()
+		{
+			cpu_set_t cpus;
+			if (sched_getaffinity(0, sizeof(cpus), &cpus) != 0)
+				return 0;
+			set<string> siblingSets;
+			for (int cpu = 0; cpu < CPU_SETSIZE; cpu++)
+			{
+				if (!CPU_ISSET(cpu, &cpus))
+					continue;
+				ifstream file("/sys/devices/system/cpu/cpu" + to_string(cpu) + "/topology/thread_siblings_list");
+				string siblings;
+				if (!getline(file, siblings) || siblings.empty())
+					return 0;
+				siblingSets.insert(siblings);
+			}
+			return (int)siblingSets.size();
+		}();
+		return cores;
+#else
+		return 0;
+#endif
+	}
+
+	// The automatic number of threads of the solvers, from the OpenMP setting openMPThreads (omp_get_max_threads():
+	// OMP_NUM_THREADS if set, otherwise the number of CPUs of the affinity): at most one thread per physical core,
+	// without hyper-threading, unless the user set OpenMP's number of threads (OMP_NUM_THREADS) or its binding
+	// (OMP_PROC_BIND, OMP_PLACES: the calling thread is then pinned to its place, whose CPUs aren't the process's).
+	// The hyperthreads slow the solvers down (memory-bound), whereas they speed up the assembly (compute-bound):
+	// PERFORMANCE.md.
+	inline int WithoutHyperThreads(int openMPThreads)
+	{
+#ifdef _OPENMP
+		if (getenv("OMP_NUM_THREADS") || omp_get_proc_bind() != omp_proc_bind_false)
+			return openMPThreads;
+#endif
+		int cores = PhysicalCores();
+		return cores > 0 ? min(openMPThreads, cores) : openMPThreads;
+	}
+
+	// The number of threads given to SetNThreads() (0: automatic)
+	inline int& RequestedNThreads()
+	{
+		static int nThreads = 0;
+		return nThreads;
+	}
+
 	// Sets the number of threads of the parallel loops (and of Eigen's internal parallelism).
-	// 0: back to the OpenMP default (OMP_NUM_THREADS if set, the number of cores otherwise).
+	// 0: back to the automatic default, the OpenMP default (OMP_NUM_THREADS if set, all the logical CPUs otherwise), and
+	// in the solvers (SolverThreads) at most one thread per physical core.
 	inline void SetNThreads(int nThreads)
 	{
+		RequestedNThreads() = nThreads;
 #ifdef _OPENMP
 		static const int defaultNThreads = omp_get_max_threads(); // initialized at the first call, before any change
 		omp_set_num_threads(nThreads > 0 ? nThreads : defaultNThreads);
 #endif
 	}
+
+	// While in scope (or until End()): the number of threads of the solvers, WithoutHyperThreads() unless a number of
+	// threads was given to SetNThreads() (-threads), which then applies to the solvers too
+	class SolverThreads
+	{
+	private:
+		int _savedNThreads = 0;
+	public:
+		SolverThreads()
+		{
+#ifdef _OPENMP
+			int nThreads = omp_get_max_threads();
+			int solverNThreads = RequestedNThreads() > 0 ? nThreads : WithoutHyperThreads(nThreads);
+			if (solverNThreads != nThreads)
+			{
+				_savedNThreads = nThreads;
+				omp_set_num_threads(solverNThreads);
+			}
+#endif
+		}
+
+		// Back to the number of threads before
+		void End()
+		{
+#ifdef _OPENMP
+			if (_savedNThreads > 0)
+				omp_set_num_threads(_savedNThreads);
+#endif
+			_savedNThreads = 0;
+		}
+
+		~SolverThreads()
+		{
+			End();
+		}
+
+		SolverThreads(const SolverThreads&) = delete;
+		SolverThreads& operator=(const SolverThreads&) = delete;
+	};
 
 	// Number of threads that would execute a parallel loop started by the calling thread
 	inline int NThreads()
@@ -46,6 +148,18 @@ namespace Parallelism
 		return omp_get_thread_num();
 #else
 		return 0;
+#endif
+	}
+
+	// Iterations [begin, end) of the calling thread when n iterations are split into contiguous chunks, one per thread of
+	// the current parallel region, in thread order ([0, n) outside a parallel region)
+	inline pair<BigNumber, BigNumber> ThreadChunk(BigNumber n)
+	{
+#ifdef _OPENMP
+		BigNumber thread = omp_get_thread_num(), nThreads = omp_get_num_threads();
+		return { n * thread / nThreads, n * (thread + 1) / nThreads };
+#else
+		return { 0, n };
 #endif
 	}
 

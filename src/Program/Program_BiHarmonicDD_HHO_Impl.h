@@ -92,6 +92,9 @@ void Program_BiHarmonicDD_HHO<Dim>::Execute(ProgramArguments& args)
 		cout << "-                   Solve linear system                  -" << endl;
 		cout << "----------------------------------------------------------" << endl;
 
+		// The solvers on the physical cores only, by default (the assembly and the post-processing on all the logical cores)
+		Parallelism::SolverThreads solverThreads;
+
 		int blockSizeForBlockSolver = args.Solver.BlockSize != -1 ? args.Solver.BlockSize : faceBasis->Size();
 
 		// Solve 1st diffusion biHarPb
@@ -171,6 +174,7 @@ void Program_BiHarmonicDD_HHO<Dim>::Execute(ProgramArguments& args)
 		totalTimer.Stop();
 
 		delete solver;
+		solverThreads.End();
 
 		//-----------------------------//
 		//       Solution export       //

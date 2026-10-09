@@ -35,7 +35,8 @@ namespace fhhos4
 	};
 
 	// Set the parameters, then call Setup(), then Solve(). The parameters are read by Setup() (Tolerance and
-	// MaxIterations by Solve()). The defaults are those of the program fhhos4 (-s fcguamg), used in the papers.
+	// MaxIterations by Solve()). The defaults are those of the program fhhos4 (-s fcguamg), used in the papers, except the
+	// smoother on several threads (PreSmoother).
 	// Not thread-safe: one object must not be used by several threads at the same time.
 	class FHHOS4_API Solver
 	{
@@ -61,15 +62,22 @@ namespace fhhos4
 		char Cycle = 'K';                  // 'V', 'W' or 'K' (K-cycle: each coarse level is solved by 2 iterations of FCG)
 		int PreSmoothingIterations = 1;
 		int PostSmoothingIterations = 1;
-		std::string PreSmoother = "bgs";   // block Gauss-Seidel, one block per face (other smoothers: fhhos4 -h, -smoothers)
-		std::string PostSmoother = "rbgs"; // block Gauss-Seidel, backward
+		// Smoothers (codes of fhhos4 -smoothers, see fhhos4 -h). PreSmoother empty (default): the faster one, chosen by
+		// Setup(): on several threads, "hbgs", the hybrid block Gauss-Seidel (Gauss-Seidel in the rows of each thread,
+		// Jacobi between the threads: parallel; the iterations then depend on the number of threads and vary slightly
+		// from one run to the next); on 1 thread, "bgs", the block Gauss-Seidel (sequential), one block per face.
+		// PostSmoother empty (default): the backward version of PreSmoother ("rbgs" after "bgs", "hrbgs" after "hbgs").
+		std::string PreSmoother;
+		std::string PostSmoother;
 		double CoarseningFactor = 3.8;     // target ratio of the numbers of cells of two successive h-levels
 		int CoarseMatrixMaxSize = 1000;    // the coarsening stops when the matrix has at most this many rows
 		std::string CoarseSolver = "ch";   // solver of the coarsest level: sparse Cholesky (fhhos4 -coarse-solver)
 
 		//-------------------- Execution -------------------//
 
-		int Threads = 0;   // number of OpenMP threads during the calls of the library; 0: the current OpenMP setting
+		int Threads = 0;   // number of OpenMP threads during the calls of the library; 0: the current OpenMP setting, but
+		                   // at most one thread per physical core (no hyper-threading) unless OMP_NUM_THREADS or OpenMP's
+		                   // binding (OMP_PROC_BIND, OMP_PLACES) is set
 		int Verbosity = 0; // 0: nothing; 1: one line per setup (number of levels, time) and per solve (iterations,
 		                   // residual, time); 2: all the messages of fhhos4, with the residual at each iteration
 

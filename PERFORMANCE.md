@@ -13,7 +13,9 @@ Update it after measuring or optimizing something.
   bit-identical. A change of the numerical method (another smoother, prolongation, precision...) must be an opt-in
   option, never the default. A bit-identical change is the easiest to validate (`solutions.sh`): prefer it when it
   costs nothing. The sign of a zero never counts (+0 and -0 are equal).
-- **Measure before and after**, sequential (`-threads 1`) and parallel (default: all logical cores), elapsed time,
+- **Measure before and after**, sequential (`-threads 1`) and parallel (default: all logical cores, 16 here, and since
+  2026-10-08 one thread per physical core, 8 here, in the solver; the solver measurements before that date used 16),
+  elapsed time,
   best of 2 runs. The noise is about ±10% (WSL2). Run nothing else meanwhile: no build, one heavy job at a time
   (13 GB of RAM).
 - The 2023 AMG paper reports **sequential** CPU times (§4.2, Fig. 4.5): parallel gains don't show there,
@@ -273,7 +275,101 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   Beware of HArDCore3D's test case 1 (`sin(pi x) sin(pi y) sin(pi z)`, constant diffusion): the first eigenfunction of
   the Laplacian, so a Krylov method converges in a few iterations, whatever the preconditioner.
 
-## Current profile (U-AMG, default OpenMP settings)
+- **Library: hybrid Gauss-Seidel by default on several threads** (2026-10-08, idea 6). The smoothers of
+  `fhhos4::Solver` default to empty: `Setup()` then chooses `hbgs`/`hrbgs` (Gauss-Seidel in the rows of each thread,
+  Jacobi between the threads) when `Krylov` is `fcg` and several threads run, `bgs`/`rbgs` otherwise. The program is
+  unchanged (`-smoothers bgs,rbgs`: the papers), and so are its library runs (`-s libuamg`, which pass the program's
+  smoothers). Done in two steps: at k >= 1 first, with the existing hybrid smoother; then at k = 0 too, once
+  `hbgs`/`hrbgs` with blocks of size 1 ran the scalar kernels of `GaussSeidel` (its hybrid mode, `HybridSweep()`:
+  the sequential kernels on the chunk of each thread; the residual computed apart, since the fused residual of the
+  sequential sweeps doesn't hold between chunks; from x = 0, the products by the values not computed yet are skipped,
+  as in the sequential sweeps; parallel above 20000 non-zeros). Before, they ran `BlockGaussSeidel`'s code with 1x1
+  blocks. The default sequential sweeps are unchanged (identical residual tables, `-threads 1`).
+
+  Solve wall time, `bgs,rbgs` -> `hbgs,hrbgs`, FCG + K-cycle (setup unchanged, 1-2 runs each). HArDCore3D:
+  `hho-diffusion -c 1 2 --solver_type fhhos4`, tolerance 1e-12, through a temporary override of the smoothers in the
+  library; fhhos4: `-s fcguamg`, tolerance 1e-8. First step (block code at k = 0, i.e. on the k=0 levels too):
+
+  | Case | 1 thread (`bgs`) | 8 threads | 16 threads |
+  |---|---|---|---|
+  | HArDCore3D 32^3 k=1 (19 its) | 1.08-1.10 s | 1.06-1.17 -> 0.72-0.74 s | 1.33-1.43 -> 0.97-1.22 s (20 its) |
+  | HArDCore3D 32^3 k=2 (26 its) | 4.61 s | 4.00-4.11 -> 2.44-2.75 s | 4.78-4.82 -> 2.95-3.66 s |
+  | HArDCore3D 48^3 k=1 (20 its) | 4.94 s | 4.19-4.59 -> 2.58 s | 4.17-4.22 -> 2.83-2.90 s |
+  | HArDCore3D voro-16 k=1 (16 its) | 0.73 s | 0.71-0.72 -> 0.48-0.49 s | |
+  | HArDCore3D voro-16 k=2 (20 -> 21 its) | 2.89 s | 2.71-2.76 -> 1.81-1.82 s | |
+  | fhhos4 Cube-tet k=1 n=16 (33 -> 38 its) | | 0.59-0.60 -> 0.46-0.47 s | 1.00-1.31 -> 0.65-0.70 s (37-39 its) |
+  | fhhos4 Cube-tet k=2 n=16 (33 -> 37-38 its) | | 1.77-1.85 -> 1.20-1.23 s | 2.01-2.10 -> 2.39-2.53 s (39 its) |
+
+  On 2 threads, HArDCore3D 32^3 k=2: 3.86 -> 3.15 s (26 its). The tetrahedral meshes of GMSH lose more iterations
+  (their face numbering has little locality: more couplings between the chunks of the threads). L2 errors of
+  HArDCore3D identical to the references (`bench_lib/quick_check.sh`, and its 4 runs on 8 threads). Not chosen:
+  - k = 0: the hybrid smoother runs the block code with 1x1 blocks, slower than the scalar `GaussSeidel`. HArDCore3D
+    48^3 k=0, 8 threads: 0.77 -> 0.86-0.94 s (32 -> 33 its); fhhos4 Cube-tet k=0 n=32: 16 threads 0.85-1.04 ->
+    0.97-1.30 s (28 -> 31 its), 1 thread 0.75 -> 1.64 s.
+  - 1 thread: the same sweeps in slower code (the products by the zero initial guess are not skipped, 1x1 blocks on
+    the k=0 levels): HArDCore3D 32^3 k=1 1.08 -> 1.45 s, voro-16 k=1 0.73 -> 0.93 s, 48^3 k=1 4.94 -> 5.50 s.
+  - BiCGSTAB + V-cycle: the hybrid smoother varies from one application to the next (timing of the threads), which
+    BiCGSTAB doesn't expect. 8 threads, 32^3 k=1: 26 -> 37-38 its (2.37 -> 1.78-1.83 s); k=2: 31 -> 49 its (8.03 ->
+    6.51 s). Faster, but not as a default.
+
+  Tried, no gain: hybrid on the levels with blocks, scalar sequential `GaussSeidel` on the k=0 levels of the p-then-h
+  hierarchy (8 threads: 32^3 k=1 0.68-0.70 s, k=2 2.28-2.33 s, 48^3 k=1 2.54-2.86 s, voro-16 k=1 0.53-0.57 s: within
+  the noise of the plain hybrid smoother).
+
+  Second step, with the scalar hybrid kernels at k = 0, 8 threads (the new default, see the next entry):
+
+  | Case | `bgs,rbgs` | `hbgs,hrbgs` |
+  |---|---|---|
+  | HArDCore3D 32^3 k=0 | 0.20 s (29 its) | 0.155-0.170 s (30-31 its) |
+  | HArDCore3D 48^3 k=0 | 0.75-0.78 s (32 its) | 0.63-0.64 s (33 its) (block code: 0.86-0.94 s) |
+  | HArDCore3D voro-16 k=0 | 0.090-0.095 s (21 its) | 0.074-0.077 s (21 its) |
+  | fhhos4 Cube-tet k=0 n=32 | 0.59 s (28 its) | 0.59-0.60 s (33-34 its) |
+  | fhhos4 Cube-cart-aniso100 n=64 | 0.42-0.43 s (9 its) | 0.44-0.46 s (11 its) |
+  | fhhos4 Square-tri k=0 n=512 (mesh from the cache) | 2.03 s (26 its) | 1.71-1.75 s (29 its) |
+  | HArDCore3D 32^3 k=1 | 1.06-1.10 s (19 its) | 0.61-0.65 s (19 its) (block code on the k=0 levels: 0.72-0.74 s) |
+  | HArDCore3D 32^3 k=2 | 4.00-4.11 s (26 its) | 2.29-2.35 s (26 its) (2.44-2.75 s) |
+  | HArDCore3D 48^3 k=1 | 4.19-4.59 s (20 its) | 2.29-2.32 s (20 its) (2.58 s) |
+  | HArDCore3D voro-16 k=1 / k=2 | 0.71 / 2.71-2.76 s (16 / 20 its) | 0.43-0.47 / 1.73 s (16 / 21 its) (0.48 / 1.81 s) |
+
+  Hence the default at k = 0 too: faster on HArDCore3D's meshes and on the 2D triangles, as fast on fhhos4's
+  tetrahedral and anisotropic meshes. Still not chosen on 1 thread (the hybrid sweeps then skip fewer products and
+  don't give the residual). L2 errors of HArDCore3D identical to the references and to its BiCGSTAB (k = 0..2, 1 and 8
+  threads).
+
+  Then whatever the Krylov method (the user's request: one default): with BiCGSTAB, which expects the same
+  preconditioner at each iteration, the hybrid smoother takes more iterations, but it is faster with every method
+  (HArDCore3D, 8 threads, `bgs,rbgs` -> `hbgs,hrbgs`): BiCGSTAB + V-cycle, 48^3 k=0 1.13 s (29 its) -> 1.04-1.11 s
+  (39-40 its), 32^3 k=1 2.55 s (26 its) -> 1.91 s (38 its); the multigrid alone (`Krylov = "none"`, K-cycle), 48^3
+  k=0 3.34 s (119 its) -> 2.18-2.23 s (124 its), 32^3 k=1 1.86 s (31 its) -> 1.02 s (32 its).
+
+- **The solver on one thread per physical core by default** (2026-10-08, the user's decision): the solvers run on at
+  most one thread per physical core (no hyper-threading), the rest of the program (mesh, assembly, post-processing)
+  on all the logical cores, the OpenMP default. In the program, the solver section of each program (creation, setup,
+  solve) is a `Parallelism::SolverThreads` scope; in the library, `Threads = 0` does the same during each call.
+  `Parallelism::WithoutHyperThreads()`: no cap if `OMP_NUM_THREADS` is set, nor with OpenMP's binding
+  (`OMP_PROC_BIND`, `OMP_PLACES`: libgomp then pins the main thread to its place at startup, so its affinity no longer
+  gives the cores of the process: checked), nor if the cores are unknown; an explicit `-threads N` applies to the
+  solver too. `Parallelism::PhysicalCores()`: the number of distinct `thread_siblings_list` among the CPUs of the
+  affinity mask (`/sys`, Linux; elsewhere 0, no cap), so it follows `taskset`, Slurm and MPI bindings (checked: 3 cores
+  for `taskset -c 0-5`, 4 for `taskset -c 0,2,4,6`). No portable API gives the physical cores (hwloc would, as a
+  dependency). Results unchanged (the default solvers don't depend on the number of threads; `ctest` 130/130).
+  Measured under WSL2 on this machine (on bare-metal Linux, the hyper-threading penalty of memory-bound code is often
+  smaller), 16 -> 8 threads:
+  - Solver, `bgs` (the program's default smoother): HArDCore3D 32^3 k=2, setup 1.8-2.1 -> 0.48-0.77 s, solve 4.8 ->
+    4.0-4.1 s; 32^3 k=1, setup 0.51-0.86 -> 0.41-0.45 s, solve 1.33-1.43 -> 1.06-1.17 s (slower than on 1 thread,
+    1.08 s, on 16 threads); fhhos4 Cube-tet k=0 n=32, solve 0.85-1.04 -> 0.59 s; Cube-tet k=1 n=16, solve 1.00-1.31 ->
+    0.59-0.60 s; k=2 n=16, 2.01-2.10 -> 1.77-1.85 s.
+  - Solver, `hbgs` (the library's default): HArDCore3D 32^3 k=1, setup 0.57-0.61 -> 0.43-0.48 s, solve 0.91 -> 0.68 s
+    (20 -> 19 its); 32^3 k=2, setup 0.62-0.77 -> 0.55-0.61 s, solve 3.18-3.41 -> 2.54-3.14 s; 48^3 k=0, solve 1.40-1.54
+    -> 0.72-0.91 s (setup 1.5-2.0 s both); 48^3 k=1, setup 1.96-2.83 -> 1.63 s, solve 2.99-3.18 -> 2.55 s.
+  - The assembly prefers all the logical cores where it is compute-bound, hence the split: Cube-cart-aniso100 n=64
+    (the quadrature of the right-hand side, see Current profile), 8 -> 16 threads, 26.9-29.2 -> 21.8-24.1 s in one
+    series, 21.8 -> 13.9 s in another (the machine's speed varies: CPU time per run +50% from one series to the next);
+    Cube-tet k=2 n=16, 44.7 s on 8 threads, 38.2 s on 16, 36.4 s by default (solve 1.92 s on 8, 2.31 s on 16, 1.85 s by
+    default).
+  `OMP_WAIT_POLICY=passive` (idea 1) was re-measured with these runs: slower.
+
+## Current profile (U-AMG; parallel: 16 threads, the default before 2026-10-08)
 
 | Case | Setup, sequential / parallel | Solve, sequential / parallel |
 |---|---|---|
@@ -309,8 +405,8 @@ Galerkin products (see Done).
   1.3 s: hybrid meshes 1.17 / 0.67 s, building P_F 0.67 / 0.25 s, local Galerkin products and companions 0.59 / 0.20 s.
   See the ideas 2 to 5.
 
-- **The solve barely benefits from the threads.** The sweeps of the default smoother (lexicographic Gauss-Seidel, as
-  in the paper) are sequential; only the residual/`Ax` products and the intergrid transfers are parallel. Those are
+- **The solve barely benefits from the threads** (except with the library's default hybrid smoother, see Done).
+  The sweeps of the default smoother (lexicographic Gauss-Seidel, as in the paper) are sequential; only the residual/`Ax` products and the intergrid transfers are parallel. Those are
   Eigen's: its row-major sparse matrix x vector product is already parallel (OpenMP, from 20000 non-zeros, dynamic
   schedule), so rewriting it adds no parallelism. And it is memory-bound: one thread already reads ~17.5 GB/s of the
   machine's ~35 GB/s, so the threads give at most ~2x on it (k=2, fine A: 7.4 -> 4.1 ms). Eigen's sequential
@@ -361,7 +457,10 @@ Galerkin products (see Done).
    (-12%), setup unchanged or slightly better; k=0: no notable change. (`OMP_WAIT_POLICY=active` is much worse:
    solve 8.9 s.) libgomp reads it at startup, so it cannot be set from `main()`: set it in the environment, e.g.
    `conda env config vars set OMP_WAIT_POLICY=passive -n fhhos4`, and document it. Measured before the optimization of
-   the smoothers, after which 16 threads are no longer slower than 1 at k=2 (3.6 vs 3.7 s): re-measure.
+   the smoothers, after which 16 threads are no longer slower than 1 at k=2 (3.6 vs 3.7 s): re-measure. Re-measured
+   through the library (2026-10-08, HArDCore3D 32^3 k=1, solve): slower. 16 threads, `bgs` 1.33-1.43 -> 1.34-1.44 s,
+   `hbgs` 0.97-1.22 -> 1.50-1.53 s; 8 threads, `bgs` 1.06-1.17 -> 1.20-1.22 s, `hbgs` 0.72-0.74 -> 1.08-1.11 s.
+   Probably dropped: the library can't set it anyway (read at the start of the process).
 2. **Flat data structures for the hybrid algebraic meshes** (`HybridAlgebraicMesh`) — estimated, medium-large
    effort, main lever at k=0 (the paper's case). Vectors of vectors, a mutex per element, a `std::map` of neighbours
    per aggregate, copied vectors: building and coarsening the meshes (`mesh.Build()` + `mesh.Coarsen()`) take 1.17 /
@@ -394,14 +493,17 @@ Galerkin products (see Done).
    `FullFromLower`. Since the local Galerkin products, the last two are no longer in the default path (only with the
    coarse `A_F_F` and the options that keep the global products). Re-measure: at most ~0.45 s of the 1.8 s of setup
    at k=2 on 16 threads, less at k=0.
-6. **Parallel smoother, as an option** — measured with the existing hybrid block Gauss-Seidel
-   (`-smoothers hbgs,hrbgs`, 16 threads, passive wait policy): k=2: 40 iterations instead of 35, solve 6.2 -> 3.3 s
-   (smoothing 4.8 -> 1.5 s); k=0: 31 iterations instead of 28, solve 0.94 -> 1.40 s (slower: no gain on scalar
-   rows). Changes the iteration counts and depends on the number of threads: opt-in only. At k=0, a scalar parallel
-   Gauss-Seidel (e.g. multicolour) would be needed; its gain is unknown. Measured before the optimization of the
-   smoothers, which made the sequential sweeps ~2x faster at k=2 (and the rows of the hybrid one too): re-measure.
-   The hybrid smoother also has a data race (see the exactness facts): a real Jacobi between the chunks (or a
-   colouring of the chunks' boundaries) would make it deterministic.
+6. **Parallel smoother** — the hybrid Gauss-Seidel (`hbgs,hrbgs`, scalar kernels at k = 0) is now the library's
+   default on several threads (see Done: solve -15 to -45% on HArDCore3D's meshes); the program keeps `bgs,rbgs` (it
+   changes the iteration counts and depends on the number of threads: opt-in only). What remains:
+   - fhhos4's tetrahedral meshes (GMSH numbering, little locality): the hybrid smoother loses 5-6 iterations at
+     k = 0 (28 -> 33-34) and gains nothing there. A multicolour Gauss-Seidel, or a renumbering of the chunks
+     (see "Renumbering the fine unknowns"), might do better; gain unknown.
+   - 1 thread: `BlockGaussSeidel::HybridSweep` could fall back to `Sweep` (bit-identical up to the sign of a zero,
+     with the products by the zero initial guess skipped), and the scalar one could fuse the residual: `hbgs` would
+     then cost nothing when a client runs it on 1 thread.
+   - Determinism: the hybrid smoothers have a data race (see the exactness facts): a real Jacobi between the chunks
+     (or a colouring of the chunks' boundaries) would make them deterministic, and usable with BiCGSTAB.
 
 Possible now that reordering the arithmetic operations is allowed (rejected so far because not bit-identical):
 

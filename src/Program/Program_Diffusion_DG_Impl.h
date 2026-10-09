@@ -80,6 +80,9 @@ void Program_Diffusion_DG<Dim>::Execute(ProgramArguments& args)
 		cout << "-                 Linear system solution                 -" << endl;
 		cout << "----------------------------------------------------------" << endl;
 
+		// The solver on the physical cores only, by default (the assembly and the post-processing on all the logical cores)
+		Parallelism::SolverThreads solverThreads;
+
 		// Solver creation
 		int blockSizeForBlockSolver = args.Solver.BlockSize != -1 ? args.Solver.BlockSize : problem->Basis->Size();
 		Solver* solver = SolverFactory<Dim>::CreateSolver(args, blockSizeForBlockSolver, out);
@@ -125,6 +128,7 @@ void Program_Diffusion_DG<Dim>::Execute(ProgramArguments& args)
 			mesh->ExportToGMSH_Elements(problem->Basis, iterativeSolver->ExactSolution - problem->SystemSolution, out.GetFilePathPrefix(), "error");
 
 		delete solver;
+		solverThreads.End();
 
 		//-----------------------------//
 		//       Solution export       //
