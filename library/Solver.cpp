@@ -4,6 +4,7 @@
 // ApplyProgramArgumentDefaults), from the same code (AlgebraicSolverFactory, ApplyUncondensedAMGDefaults).
 #include <chrono>
 #include <limits>
+#include <type_traits>
 #include "fhhos4"
 #include "ProgramArgumentsDefaults.h"
 #include "Solver/AlgebraicSolverFactory.h"
@@ -64,16 +65,50 @@ namespace fhhos4
 			return chrono::duration<double>(chrono::steady_clock::now() - start).count();
 		}
 
-		// Copy of a matrix of the calling code in fhhos4's format (row-major, fhhos4's index type, compressed)
-		template <typename SparseMatrixType>
-		SparseMatrix Copy(const SparseMatrixType& M, const string& name)
+		// A matrix of the calling code in fhhos4's format (row-major, fhhos4's index type, compressed): the caller's matrix
+		// itself if it has this format (no copy), a converted copy otherwise. Not copyable: it may point to its copy.
+		class InputMatrix
 		{
-			if (M.nonZeros() > (Eigen::Index)numeric_limits<SparseMatrixIndex>::max())
-				Utils::FatalError("fhhos4::Solver: " + name + " has too many non-zeros for the index type of fhhos4 (compile fhhos4 with -DSMALL_INDEX=OFF).");
-			SparseMatrix copy = M;
-			copy.makeCompressed();
-			return copy;
-		}
+		private:
+			SparseMatrix _copy; // empty if the caller's matrix is used
+			const SparseMatrix* _matrix;
+		public:
+			template <typename SparseMatrixType>
+			InputMatrix(const SparseMatrixType& M, const string& name)
+			{
+				if constexpr (is_same_v<SparseMatrixType, SparseMatrix>)
+				{
+					if (M.isCompressed())
+					{
+						_matrix = &M;
+						return;
+					}
+				}
+				if (M.nonZeros() > (Eigen::Index)numeric_limits<SparseMatrixIndex>::max())
+					Utils::FatalError("fhhos4::Solver: " + name + " has too many non-zeros for the index type of fhhos4 (compile fhhos4 with -DSMALL_INDEX=OFF).");
+				_copy = M;
+				_copy.makeCompressed();
+				_matrix = &_copy;
+			}
+			InputMatrix(const InputMatrix&) = delete;
+			InputMatrix& operator=(const InputMatrix&) = delete;
+
+			const SparseMatrix& Get() const
+			{
+				return *_matrix;
+			}
+
+			// The matrix to keep after the setup: the caller's matrix, or the copy, moved into storage
+			const SparseMatrix* Keep(SparseMatrix& storage)
+			{
+				if (_matrix == &_copy)
+				{
+					storage = std::move(_copy);
+					_matrix = &storage;
+				}
+				return _matrix;
+			}
+		};
 
 		// A_FT A_TT^{-1} A_TF, from the lower part of A_TT
 		SparseMatrix CellElimination(const SparseMatrix& A_TT, const SparseMatrix& A_TF, int cellBlockSize)
@@ -105,7 +140,8 @@ namespace fhhos4
 		int CellDegree = 0;
 		int CellBlockSize = 0;
 		int FaceBlockSize = 0;
-		SparseMatrix A; // the solvers keep a pointer to it
+		const SparseMatrix* A = nullptr; // the solvers keep a pointer to it: the caller's matrix, or OwnA
+		SparseMatrix OwnA;               // A if the library computes or converts it, empty otherwise
 		unique_ptr<UncondensedAMG> Multigrid;
 		unique_ptr<IterativeSolver> Krylov; // preconditioned by Multigrid; null if Solver::Krylov is "none"
 		bool IsSetUp = false;
@@ -216,27 +252,30 @@ namespace fhhos4
 			return args;
 		}
 
-		// A, A_FF: moved; null to compute them from the other matrices (not both)
-		void Setup(const Solver& s, SparseMatrix* A, SparseMatrix&& A_TT, SparseMatrix&& A_TF, SparseMatrix* A_FF, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne)
+		// A: kept until the next setup; null to compute it from the blocks. A_FF: null if not given (not with A null).
+		void Setup(const Solver& s, InputMatrix* A, const SparseMatrix& A_TT, const SparseMatrix& A_TF, const SparseMatrix* A_FF, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne)
 		{
 			auto start = chrono::steady_clock::now();
 			IsSetUp = false;
 			Krylov.reset();
 			Multigrid.reset();
+			this->A = nullptr;
+			OwnA = SparseMatrix();
 
 			ProgramArguments args = Arguments(s);
 			ExportModule out;
 			Multigrid.reset(AlgebraicSolverFactory::CreateUncondensedAMG(args, s.Dimension, s.FaceDegree, CellBlockSize, FaceBlockSize, FaceBlockSize, out, AlgebraicSolverFactory::AlgebraicCoarseSolvers(s.Dimension, out)));
 
-			SparseMatrix faceBlock; // empty if neither given nor needed (the algorithm of the paper only uses A_TT and A_TF)
-			if (A_FF)
-				faceBlock = std::move(*A_FF);
 			if (A)
-				this->A = std::move(*A);
+				this->A = A->Keep(OwnA);
 			else
-				this->A = CondensedMatrix(A_TT, A_TF, faceBlock, CellBlockSize);
+			{
+				OwnA = CondensedMatrix(A_TT, A_TF, *A_FF, CellBlockSize);
+				this->A = &OwnA;
+			}
+			SparseMatrix computedA_FF; // empty if A_FF is given, or not needed (the algorithm of the paper only uses A_TT and A_TF)
 			if (!A_FF && Multigrid->A_F_FNeeded())
-				faceBlock = FaceBlock(this->A, A_TT, A_TF, CellBlockSize);
+				computedA_FF = FaceBlock(*this->A, A_TT, A_TF, CellBlockSize);
 
 			// The Krylov method preconditioned by one cycle (SolverPreconditioner), as SolverFactory (-s fcguamg)
 			if (s.Krylov == "fcg")
@@ -254,7 +293,7 @@ namespace fhhos4
 			ActiveSolver()->PrintIterationResults = args.Solver.PrintIterationResults;
 
 			// The blocks are only read during the setup (UncondensedAMG::Setup())
-			ActiveSolver()->Setup(this->A, A_TT, A_TF, faceBlock, cellInterpOfOne, faceInterpOfOne);
+			ActiveSolver()->Setup(*this->A, A_TT, A_TF, A_FF ? *A_FF : computedA_FF, cellInterpOfOne, faceInterpOfOne);
 			IsSetUp = true;
 
 			if (s.Verbosity == 1)
@@ -269,8 +308,8 @@ namespace fhhos4
 
 		void CheckVectorSize(Eigen::Index size, const char* vector) const
 		{
-			if (size != A.rows())
-				Utils::FatalError(string("fhhos4::Solver: the vector ") + vector + " has " + to_string(size) + " rows, expected " + to_string(A.rows()) + " (the faces DoFs).");
+			if (size != A->rows())
+				Utils::FatalError(string("fhhos4::Solver: the vector ") + vector + " has " + to_string(size) + " rows, expected " + to_string(A->rows()) + " (the faces DoFs).");
 		}
 	};
 
@@ -296,12 +335,9 @@ namespace fhhos4
 	{
 		CallScope scope(*this);
 		_impl->CheckParameters(*this);
-		SparseMatrix copyA = Copy(A, "A");
-		SparseMatrix copyA_TT = Copy(A_TT, "A_TT");
-		SparseMatrix copyA_TF = Copy(A_TF, "A_TF");
-		SparseMatrix copyA_FF = Copy(A_FF, "A_FF");
-		_impl->CheckInputs(*this, &copyA, copyA_TT, copyA_TF, &copyA_FF, cellInterpOfOne, faceInterpOfOne);
-		_impl->Setup(*this, &copyA, std::move(copyA_TT), std::move(copyA_TF), &copyA_FF, cellInterpOfOne, faceInterpOfOne);
+		InputMatrix a(A, "A"), a_TT(A_TT, "A_TT"), a_TF(A_TF, "A_TF"), a_FF(A_FF, "A_FF");
+		_impl->CheckInputs(*this, &a.Get(), a_TT.Get(), a_TF.Get(), &a_FF.Get(), cellInterpOfOne, faceInterpOfOne);
+		_impl->Setup(*this, &a, a_TT.Get(), a_TF.Get(), &a_FF.Get(), cellInterpOfOne, faceInterpOfOne);
 	}
 
 	template <typename SparseMatrixType>
@@ -310,11 +346,9 @@ namespace fhhos4
 	{
 		CallScope scope(*this);
 		_impl->CheckParameters(*this);
-		SparseMatrix copyA = Copy(A, "A");
-		SparseMatrix copyA_TT = Copy(A_TT, "A_TT");
-		SparseMatrix copyA_TF = Copy(A_TF, "A_TF");
-		_impl->CheckInputs(*this, &copyA, copyA_TT, copyA_TF, nullptr, cellInterpOfOne, faceInterpOfOne);
-		_impl->Setup(*this, &copyA, std::move(copyA_TT), std::move(copyA_TF), nullptr, cellInterpOfOne, faceInterpOfOne);
+		InputMatrix a(A, "A"), a_TT(A_TT, "A_TT"), a_TF(A_TF, "A_TF");
+		_impl->CheckInputs(*this, &a.Get(), a_TT.Get(), a_TF.Get(), nullptr, cellInterpOfOne, faceInterpOfOne);
+		_impl->Setup(*this, &a, a_TT.Get(), a_TF.Get(), nullptr, cellInterpOfOne, faceInterpOfOne);
 	}
 
 	template <typename SparseMatrixType>
@@ -323,11 +357,9 @@ namespace fhhos4
 	{
 		CallScope scope(*this);
 		_impl->CheckParameters(*this);
-		SparseMatrix copyA_TT = Copy(A_TT, "A_TT");
-		SparseMatrix copyA_TF = Copy(A_TF, "A_TF");
-		SparseMatrix copyA_FF = Copy(A_FF, "A_FF");
-		_impl->CheckInputs(*this, nullptr, copyA_TT, copyA_TF, &copyA_FF, cellInterpOfOne, faceInterpOfOne);
-		_impl->Setup(*this, nullptr, std::move(copyA_TT), std::move(copyA_TF), &copyA_FF, cellInterpOfOne, faceInterpOfOne);
+		InputMatrix a_TT(A_TT, "A_TT"), a_TF(A_TF, "A_TF"), a_FF(A_FF, "A_FF");
+		_impl->CheckInputs(*this, nullptr, a_TT.Get(), a_TF.Get(), &a_FF.Get(), cellInterpOfOne, faceInterpOfOne);
+		_impl->Setup(*this, nullptr, a_TT.Get(), a_TF.Get(), &a_FF.Get(), cellInterpOfOne, faceInterpOfOne);
 	}
 
 	Result Solver::Solve(const Eigen::Ref<const Eigen::VectorXd>& b, Eigen::Ref<Eigen::VectorXd> x)

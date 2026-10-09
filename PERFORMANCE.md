@@ -369,6 +369,14 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
     default).
   `OMP_WAIT_POLICY=passive` (idea 1) was re-measured with these runs: slower.
 
+- **Library: row-major matrices read in place** (2026-10-09). `Setup()` copied every input matrix into fhhos4's format
+  (row-major, `int` indices, compressed), and kept the copy of `A` (the levels point to it). The matrices already in
+  this format are now read in place, and the solver keeps a reference to the caller's `A` (it must outlive the solver;
+  a temporary `A` doesn't compile); the others (column-major, `long`, not compressed) are still converted. Results
+  unchanged (`ctest` 131/131, HArDCore3D quick check: same L2 errors and iterations). The program's `-s fcglibuamg`
+  (fhhos4's matrices), Cube-cart k=1 n=32, 3 runs each: setup 0.348-0.365 -> 0.267-0.284 s, peak memory 941-943 ->
+  875-879 MB, as `-s fcguamg` (0.295 s, 872 MB). Unchanged for HArDCore3D, whose matrices are column-major.
+
 ## Current profile (U-AMG; parallel: 16 threads, the default before 2026-10-08)
 
 | Case | Setup, sequential / parallel | Solve, sequential / parallel |

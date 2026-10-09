@@ -9,6 +9,8 @@
 #include <sstream>
 #include <string>
 #include <tuple>
+#include <type_traits>
+#include <utility>
 #include <vector>
 #include <Eigen/SparseCholesky>
 #ifdef _OPENMP
@@ -303,6 +305,42 @@ TEST(UAMGLibrary, InvariantToTheScalingOfTheBases)
 	// y = S_F^{-1} x
 	EXPECT_LT((sF.cwiseProduct(y) - x).norm() / x.norm(), 1e-8);
 }
+
+// Row-major matrices with int indices, fhhos4's format: read in place if compressed, copied otherwise. Same solver as
+// with the column-major ones (converted).
+TEST(UAMGLibrary, RowMajorMatrices)
+{
+	HybridSystem system(64);
+	using RowMajorMatrix = Eigen::SparseMatrix<double, Eigen::RowMajor, int>;
+	RowMajorMatrix A = system.A, A_TT = system.A_TT, A_TF = system.A_TF, A_FF = system.A_FF;
+	RowMajorMatrix uncompressedA = A, uncompressedA_TT = A_TT, uncompressedA_TF = A_TF;
+	for (RowMajorMatrix* M : { &uncompressedA, &uncompressedA_TT, &uncompressedA_TF })
+		M->uncompress();
+
+	fhhos4::Solver colMajor = ToySolver(), inPlace = ToySolver(), fromBlocks = ToySolver(), uncompressed = ToySolver();
+	colMajor.Setup(system.A, system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+	inPlace.Setup(A, A_TT, A_TF, A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+	fromBlocks.SetupFromBlocks(A_TT, A_TF, A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+	uncompressed.Setup(uncompressedA, uncompressedA_TT, uncompressedA_TF, system.CellInterpOfOne, system.FaceInterpOfOne);
+
+	Eigen::VectorXd x = Eigen::VectorXd::Zero(system.b.size());
+	fhhos4::Result reference = colMajor.Solve(system.b, x);
+	for (fhhos4::Solver* solver : { &inPlace, &fromBlocks, &uncompressed })
+	{
+		Eigen::VectorXd y = Eigen::VectorXd::Zero(system.b.size());
+		EXPECT_EQ(solver->NumberOfLevels(), colMajor.NumberOfLevels());
+		EXPECT_EQ(solver->Solve(system.b, y).Iterations, reference.Iterations);
+		EXPECT_LT((y - x).norm() / x.norm(), 1e-9);
+	}
+}
+
+// Whether Setup() accepts an argument A of type AType: const Matrix& (a variable), Matrix (a temporary)
+template <typename AType, typename = void>
+struct SetupAccepts : std::false_type {};
+template <typename AType>
+struct SetupAccepts<AType, std::void_t<decltype(std::declval<fhhos4::Solver&>().Setup(std::declval<AType>(), std::declval<const HybridSystem::Matrix&>(), std::declval<const HybridSystem::Matrix&>(), Eigen::VectorXd(), Eigen::VectorXd()))>> : std::true_type {};
+static_assert(SetupAccepts<const HybridSystem::Matrix&>::value);
+static_assert(!SetupAccepts<HybridSystem::Matrix>::value, "the solver keeps a reference to A: a temporary A must not compile");
 
 // BiCGSTAB preconditioned by a V-cycle (linear)
 TEST(UAMGLibrary, BiCGSTAB)

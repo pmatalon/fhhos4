@@ -60,8 +60,11 @@ setup refuses the K-cycle with it.
   optional, as the algorithm does not use it: `Setup(A, A_TT, A_TF, A_FF, ...)`. Without `A`,
   `SetupFromBlocks(A_TT, A_TF, A_FF, ...)` computes it. The DoFs of each cell (resp. face) are contiguous, cells and
   faces in any order. `A_TT` and `A_FF` are read from their lower triangular part. `Eigen::SparseMatrix<double>`,
-  column- or row-major, `int` or `long` indices (all of the same type); they are copied, and may be freed after
-  `Setup()`.
+  column- or row-major, `int` or `long` indices (all of the same type). Row-major, compressed, with `int` indices
+  (fhhos4's index type, `long` if compiled with `-DSMALL_INDEX=OFF`), they are read in place, without copy; otherwise,
+  they are converted (copied). **The solver keeps a reference to `A`**: `A` must stay alive and unchanged until the
+  next `Setup()` or the destruction of the solver (a temporary `A` does not compile). The blocks are only read by
+  `Setup()`: they may be freed after it.
 - **The interpolation of the function 1** on the cell and face bases (`cellInterpOfOne`: one coefficient per row of
   `A_TF`; `faceInterpOfOne`: per column). The bases must be **hierarchical with a constant first function** `phi_0`:
   the interpolation of 1 is then `1/phi_0` on the first DoF of each cell or face, 0 on the others. It may vary (e.g.

@@ -103,7 +103,10 @@ namespace fhhos4
 		//   degree) with a constant first function phi_0: the interpolation of 1 is then 1/phi_0 on the first DoF of each
 		//   cell or face, 0 on the others. phi_0 may differ from one cell or face to another (e.g. L2-orthonormal bases).
 		// Supported matrices: Eigen::SparseMatrix<double, Eigen::ColMajor or Eigen::RowMajor, int or long> (all of the
-		// same type), compressed or not. They are copied: they may be freed after the setup.
+		// same type), compressed or not. Row-major, compressed, with int indices (fhhos4's, unless compiled with
+		// -DSMALL_INDEX=OFF: long), they are read in place; otherwise, converted (copied).
+		// The solver keeps a reference to A: A must stay alive and unchanged until the next setup or the destruction of
+		// the solver (not a temporary). The blocks are only read by the setup: they may be freed after it.
 		template <typename SparseMatrixType>
 		void Setup(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FF,
 		           const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne);
@@ -111,6 +114,14 @@ namespace fhhos4
 		template <typename SparseMatrixType>
 		void Setup(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF,
 		           const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne);
+
+		// A temporary A would be destroyed before the solves
+		template <typename SparseMatrixType>
+		void Setup(const SparseMatrixType&& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FF,
+		           const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne) = delete;
+		template <typename SparseMatrixType>
+		void Setup(const SparseMatrixType&& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF,
+		           const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne) = delete;
 
 		template <typename SparseMatrixType>
 		void SetupFromBlocks(const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FF,
