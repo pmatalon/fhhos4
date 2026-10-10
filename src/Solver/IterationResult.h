@@ -138,6 +138,15 @@ public:
 		}
 	}
 
+	// Replaces the residual norm already set for this iteration (e.g. by the true residual, in place of the one updated
+	// by a recurrence), with its convergence rate
+	void ReplaceResidualNorm(double rNorm)
+	{
+		if (PreviousNormalizedResidualNorm != -1)
+			this->_previousItConvRates.pop_back();
+		SetResidualNorm(rNorm);
+	}
+
 	void SetResidualAsB()
 	{
 		this->ResidualNorm = _bNorm;

@@ -277,10 +277,12 @@ namespace fhhos4
 			if (!A_FF && Multigrid->A_F_FNeeded())
 				computedA_FF = FaceBlock(*this->A, A_TT, A_TF, CellBlockSize);
 
-			// The Krylov method preconditioned by one cycle (SolverPreconditioner), as SolverFactory (-s fcguamg)
+			// The Krylov method preconditioned by one cycle (SolverPreconditioner), as SolverFactory (-s fcguamg), except
+			// the residual replacement: the tolerance applies to the true residual (Result::RelativeResidual = |b - Ax|/|b|)
 			if (s.Krylov == "fcg")
 			{
 				auto fcg = make_unique<FlexibleConjugateGradient>(1);
+				fcg->ResidualRecomputation = 20;
 				fcg->Precond = SolverPreconditioner(Multigrid.get());
 				Krylov = std::move(fcg);
 			}

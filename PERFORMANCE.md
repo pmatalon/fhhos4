@@ -377,6 +377,36 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   (fhhos4's matrices), Cube-cart k=1 n=32, 3 runs each: setup 0.348-0.365 -> 0.267-0.284 s, peak memory 941-943 ->
   875-879 MB, as `-s fcguamg` (0.295 s, 872 MB). Unchanged for HArDCore3D, whose matrices are column-major.
 
+- **Library in Disk++** (2026-10-09/10, measurement only; Disk++ patch uncommitted, backup and scripts in
+  `build/bench_lib/diskpp/`). Disk++'s `poisson_solver` and `poisson_tutorial` (u = exp(x) sin(pi x) sin(pi y)
+  [sin(pi z)], K = Id; the tutorial: sin^3), tolerance 1e-10 (set by the clients), against its default direct solver
+  (sequential MUMPS 5.8.2 + OpenBLAS; its time on 16 BLAS threads varies 2x from run to run: best of 16 threads / 1
+  thread kept). Solver wall time (the client's: input conversion + setup + solve), fhhos4 on 8 threads, residual
+  replacement every 20 iterations: 3D, tetrahedra 143k DoFs k=1 0.91 vs 1.73 s, 286k k=2 2.7 vs 6.3 s (60 its), 387k
+  k=0 3.0 vs 5.0 s; 1.16M k=1 10.1 s, MUMPS out of memory (> 7.5 GB); Cartesian 286k k=1 1.37 vs 7.85 s, 774k k=0 6.2
+  vs 20.5 s (1.8 vs 4.9 GB), 571k k=2 3.7 s, MUMPS out of memory. 2D: 0.8-1.2x on triangles (up to 1.57M DoFs),
+  1.0-1.8x on quadrangles, 1.4-2.2x on hexagons (MUMPS is efficient in 2D). At k=0 the setup is 3-4x the solve (2D triangles 785k DoFs: setup 3.6 s, solve 1.0 s at 1e-8;
+  Cartesian 3D 774k: 4.5 / 1.7 s). Iterations a bit above fhhos4's own meshes (Disk++ structured tetrahedra, 47k
+  faces, 1e-8: 34/36/49 at k=0/1/2 vs 26/33/33 on the GMSH cube n=16), same time per iteration (k=1: 0.80 s / 36 its
+  vs 0.83 s / 33 its in the program). With 1e-8: 3D 1.7-6.3x. The setup time printed at `Verbosity = 1` excludes the
+  conversion of the inputs (column-major: ~0.07 s for 4.3M non-zeros).
+  L2 errors vs MUMPS: <= 1e-6 relative everywhere (3D <= 3e-10), except 2D k=2 on fine meshes (L2 errors 3e-10 to
+  3e-11): up to 1.2% (quadrangles 8 k=2), at any tolerance. Cause: Disk++'s condensed matrix is symmetric only up to
+  rounding (|A - A^T|/|A| ~3e-16: local Schur complements) and fhhos4's FCG applies the lower triangle; MUMPS on the
+  lower-symmetrized matrix gives fhhos4's L2 errors (quadrangles 7 k=2: 7e-8). Against it, 1e-8 leaves up to 2.7e-4,
+  1e-10 1e-7..1e-6, 1e-12 no better (attainable true residual ~1e-11 in 2D, MUMPS 8e-12..3e-11). Logs `tol*/`.
+
+- **Library: residual replacement in the FCG** (2026-10-10, the user's request). `FlexibleConjugateGradient::
+  ResidualRecomputation` (0 in the program: its path unchanged; 20 in the library): the recursive residual is replaced
+  by `b - Ax` every N iterations and when the stopping criteria are met (`IterativeSolver::StoppingCriteriaMet`, the
+  criteria without the callback `OnIterationEnd`; `IterationResult::ReplaceResidualNorm`), and the loop condition
+  evaluates them again on it: the iterations continue if they are no longer met. Near the attainable accuracy, the
+  recurrence drifted from the true residual (Disk++ quadrangles 7 k=2, tolerance 1e-12: 8e-13 reported, 1.4e-11 true),
+  so `Result::RelativeResidual` is now the true residual; a tolerance below the attainable accuracy runs
+  `MaxIterations` (program's `-s fcglibuamg`, square cart n=64 k=2: 1e-13 met at 19 its, 1e-15 never, true residual
+  ~2e-14). It did not change the L2 errors of the Disk++ runs (see above: the gap was the asymmetry). Cost: one
+  matrix-vector product per 20 iterations and at convergence. `ctest` 132/132.
+
 ## Current profile (U-AMG; parallel: 16 threads, the default before 2026-10-08)
 
 | Case | Setup, sequential / parallel | Solve, sequential / parallel |

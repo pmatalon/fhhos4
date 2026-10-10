@@ -75,7 +75,10 @@ setup refuses the K-cycle with it.
   assembles from its local matrices (the rows of `A_TT` and `A_TF` each belong to one cell). `A_FF` (faces x faces) is
   optional, as the algorithm does not use it: `Setup(A, A_TT, A_TF, A_FF, ...)`. Without `A`,
   `SetupFromBlocks(A_TT, A_TF, A_FF, ...)` computes it. The DoFs of each cell (resp. face) are contiguous, cells and
-  faces in any order. `A_TT` and `A_FF` are read from their lower triangular part. `Eigen::SparseMatrix<double>`,
+  faces in any order. `A_TT` and `A_FF` are read from their lower triangular part, and the FCG applies `A` from its
+  lower triangular part: for an `A` symmetric up to rounding (e.g. assembled from local Schur complements), the
+  solution is that of its lower triangle, which differs from a direct solver's on the full `A` by ~cond(A) times the
+  asymmetry (Disk++'s 2D systems at k = 2, asymmetry 3e-16: up to 1% of L2 errors of 3e-11). `Eigen::SparseMatrix<double>`,
   column- or row-major, `int` or `long` indices (all of the same type). Row-major, compressed, with `int` indices
   (fhhos4's index type, `long` if compiled with `-DSMALL_INDEX=OFF`), they are read in place, without copy; otherwise,
   they are converted (copied). **The solver keeps a reference to `A`**: `A` must stay alive and unchanged until the
@@ -105,6 +108,11 @@ smoother varies with the timing of the threads), which depend on the number of t
 to the next, but solves faster on 8 threads: with FCG, 15-20% at k = 0, 35-45% at k = 1, 2 (HArDCore3D's cubes and
 Voronoi mesh), 0-15% at k = 0 on fhhos4's meshes; with BiCGSTAB or the multigrid alone, 2-45% (see `PERFORMANCE.md`).
 On 1 thread it is slower: block Gauss-Seidel there.
+The FCG also replaces its residual (updated by the recurrence) by the true residual `b - A x` every 20 iterations and
+when it meets the tolerance, then continues if the true residual does not: the tolerance applies to the true residual
+(`Result::RelativeResidual`). Near the attainable accuracy (~1e-11 relative on Disk++'s 2D systems at k = 2), the
+recurrence drifts from the true residual (8e-13 for a true 1.4e-11). A tolerance below the attainable accuracy is
+never met: `Solve()` then runs `MaxIterations` iterations, not converged.
 `Threads` sets the number of OpenMP threads during the calls (default: the current OpenMP setting, but at most one
 thread per physical core unless `OMP_NUM_THREADS` or OpenMP's binding is set: the hyperthreads slow the AMG down).
 `Verbosity`: 0 (default) prints nothing.

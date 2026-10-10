@@ -237,6 +237,12 @@ protected:
 		if (this->OnIterationEnd)
 			this->OnIterationEnd(result);
 
+		return StoppingCriteriaMet(result);
+	}
+
+	// The stopping criteria alone, without calling OnIterationEnd
+	bool StoppingCriteriaMet(const IterationResult& result) const
+	{
 		if (MaxIterations == 0)
 			return true;
 		if (IterationCount == 0)

@@ -17,6 +17,13 @@ public:
 	SolverPreconditioner Precond;
 	int Truncation; // max number of previous search direction to use for A-orthogonalization
 	bool Restart = false;
+	// Residual replacement: every ResidualRecomputation iterations, and when the stopping criteria are met, the residual
+	// updated by the recurrence (r -= alpha*Ad) is replaced by the true residual b - Ax, on which the stopping criteria
+	// are then evaluated (the iterations continue if they are no longer met). In finite precision, the recurrence drifts
+	// from the true residual near the attainable accuracy (~eps |A| |x|), below which the updated residual still
+	// decreases (as hypre's PCG options RecomputeResidualP and RecomputeResidual; van der Vorst and Ye, SIAM J. Sci.
+	// Comput. 22(3), 2000). 0: never (the program: the iteration counts of the papers).
+	int ResidualRecomputation = 0;
 
 	FlexibleConjugateGradient(int truncation = 1, bool restart = false)
 	{
@@ -156,6 +163,13 @@ public:
 
 			result.SetX(x);
 			result.SetResidualNorm(r.norm());                         result.AddWorkInFlops(Cost::Norm(r));
+
+			// Residual replacement (the loop condition then evaluates the stopping criteria on the true residual)
+			if (this->ResidualRecomputation > 0 && (this->IterationCount % this->ResidualRecomputation == 0 || StoppingCriteriaMet(result)))
+			{
+				r = b - A.selfadjointView<Eigen::Lower>() * x;        result.AddWorkInFlops(Cost::DAXPY(A));
+				result.ReplaceResidualNorm(r.norm());                 result.AddWorkInFlops(Cost::Norm(r));
+			}
 
 			if (this->PrintIterationResults)
 				Utils::Log() << result << endl;
