@@ -406,6 +406,113 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   `MaxIterations` (program's `-s fcglibuamg`, square cart n=64 k=2: 1e-13 met at 19 its, 1e-15 never, true residual
   ~2e-14). It did not change the L2 errors of the Disk++ runs (see above: the gap was the asymmetry). Cost: one
   matrix-vector product per 20 iterations and at convergence. `ctest` 132/132.
+- **GCR and U-AMG for non-symmetric matrices** (2026-10-10, measurement only). GCR(10) (`-s gcr*`, library
+  `Krylov = "gcr"`; its K-cycle iterates with GCR) on the symmetric matrices: 0-3 more iterations than FCG (Cube-tet
+  n=8 k=1: 32 -> 35; square tri n=64 k=0: 20 -> 22). `SetupNonsymmetric()` (as AGMG: prolongations from the symmetric
+  part, Galerkin `P^T A P`, LU on the coarsest level) on HArDCore3D's convection-diffusion (`hho-diff-advec-reac
+  --solver_type fhhos4`, uncommitted in the fork), 1 thread, tolerance 1e-12, L2 errors equal to BiCGSTAB's
+  everywhere (logs `HArDCore3D-release/build/runs_advec/advec_{16,32}.txt`; "solve" = HHO3D's solving time, with the
+  block assembly and the setup):
+
+  | Case (`-c`) | k | 16^3: BiCGSTAB / U-AMG its | 32^3: BiCGSTAB / U-AMG its | 32^3 solve: BiCGSTAB / U-AMG |
+  |---|---|---|---|---|
+  | `1 2 3 0` (anisotropic diffusion, advection (yz,xz,xy)) | 0 | 79 / 24 | 181 / 30 | 0.38 / 0.91 s |
+  | | 1 | 137 / 19 | 259 / 23 | 4.19 / 2.93 s |
+  | `1 1 5 0` (advection (1e5,0,0): dominated) | 0 | 32 / 26 | 64 / 27 | 0.16 / 0.73 s |
+  | | 1 | 32 / 10 | 64 / 19 | 1.16 / 2.44 s |
+
+  U-AMG: GCR(10) preconditioned by one K-cycle (GCR on the coarse levels), tolerance 1e-12 on the true residual.
+  BiCGSTAB: Eigen's, diagonal preconditioner, default tolerance (machine epsilon): not at equal tolerance, which favors
+  U-AMG. 32^3 k=1 `1 2 3 0`: U-AMG's 2.93-3.11 s = block assembly in `HHO3D::solve()` (sequential, ~0.55 s) + setup
+  1.09 s + solve 1.47 s; HArDCore3D's assembly: 11.8 s (1 thread). Symmetric reference (HHO_Diffusion `-c 1 2`, same
+  diffusion, 32^3 k=1, FCG): 13 iterations. Dominated case: h-robust at k=0 (26 -> 27), not at k=1 (10 -> 19).
+  **Diagnosis of the dominated case** (2026-10-10; systems exported from HArDCore3D, scratch driver
+  `build/bench_nonsym/driver.cpp` building U-AMG as the library does, logs `build/bench_nonsym/exp*.txt`): the
+  ordering of the faces for the Gauss-Seidel smoother. In HArDCore3D's numbering (|strict upper|/|strict lower| of the
+  condensed matrix 0.36-0.55), a sweep carries the transport only a few cells downstream; numbered along the flow
+  (sorted by x: nearly triangular, 3e-4, or 3300 decreasing: the backward post-smoothing sweep is then the downwind
+  one), U-AMG converges in 3-4 iterations at k=0 and k=1, 16^3 and 32^3 (32^3 k=1 solve 1.15 -> 0.23 s; setup 0.96 s).
+  Two levels (k=1 + exact solve of the p-level k=0): 7 -> 10 iterations in HArDCore3D's order, 4 -> 4 along x: the
+  k=1 modes only rely on the fine smoother, whereas at k=0 the first level is an aggregation along the flow, which
+  compensates (26-27, flat). Restarts don't matter (GCR without restart: 19 -> 17); more smoothing halves the
+  iterations without removing the growth (nu=2: 5 -> 9). Only the K-cycle converges in this case (V, W: no
+  convergence, with GCR or BiCGSTAB); the symmetric part alone (FCG) is harder than the system (50 -> 79: strongly
+  anisotropic, the upwind stabilization only on the faces normal to x). The diffusion-dominated case behaves like the
+  symmetric one (2 levels: 16 -> 17; V-cycle converges).
+- **Non-symmetric U-AMG: the matrix itself, averaged couplings, downwind order** (2026-10-11, the user's requests).
+  No symmetric part is formed: the same algorithm runs on the matrix (`UncondensedLevel::Symmetric` false, `A_F_T`
+  carried through the coarsening), without the optimizations of the symmetric case (lower triangular parts, Cholesky;
+  first with global Galerkin products, see the next entry): reconstruction `-A_TT^{-1} A_TF` (inverse of the static
+  condensation, LU), prolongation smoothing and Galerkin products with the matrix; couplings of the aggregation from the
+  averaged traces (tr A_TF(T,F) + tr A_FT(F,T))/2 (equal to the symmetric ones for a symmetric matrix); Gauss-Seidel
+  sweeps in the downwind order of each level (`Solver/Multigrid/DownwindOrder.h`; `SweepOrder` of `GaussSeidel`,
+  `BlockGaussSeidel`), pre- and post-smoothing. The non-symmetric path on a symmetric matrix gives exactly the
+  iterations of the symmetric one. HArDCore3D systems, scratch driver, 1 thread, iterations 16^3 -> 32^3
+  (`build/bench_nonsym/exp11_nosym.txt`, `exp13_avg.txt`):
+
+  | Case | first version (symmetric part) | row couplings (Notay), no order / + order | averaged couplings, no order / + order |
+  |---|---|---|---|
+  | dominated k=0 | 26 -> 27 | 38 -> 39 / 3 -> 4 | 19 -> 30 / 4 -> 4 |
+  | dominated k=1 | 10 -> 19 | 14 -> 20 / 3 -> 4 | 12 -> 14 / 3 -> 4 |
+  | diffusion-dominated k=0 | 24 -> 30 | 26 -> 36 / 26 -> 36 | 24 -> 29 / 24 -> 29 |
+  | diffusion-dominated k=1 | 19 -> 23 | 18 -> 23 / 18 -> 23 | 18 -> 23 / 18 -> 23 |
+
+  The row couplings (as Notay's strong couplings, from A_TF(T1,F) and A_FT(F,T2)) cost 20% at 32^3 in the
+  diffusion-dominated case at k=0 (asymmetry |A - A^T|/|A| = 0.14%), already with 2 levels (37 vs 30): the averaged
+  ones were kept (the user's choice). Setup cheaper than the first version (32^3 k=1: ~0.6 s instead of 1.05-1.45).
+  Cost of the order: an ordered sweep is slower (irregular accesses, no residual deduced from the sweep: one more
+  product per smoothing): ~0.09 s per iteration instead of ~0.06 (32^3 k=1); the topological sorts are sequential.
+  Hybrid smoother (chunks of the order per thread): 4 iterations on 4 and 8 threads (17 without the order). Next: a
+  cheaper topological sort; permuting the levels' matrices in the downwind order (locality, and the sweep kernels that
+  deduce the residual).
+- **Non-symmetric U-AMG setup: local Galerkin products and cheaper downwind order** (2026-10-11, the user's request:
+  "the setup is already costly enough"). (1) `LocalMatrices` for a non-symmetric operator: `Decompose()` reads the full
+  rows, `GalerkinProduct()` computes the full local matrices (no mirroring); exact (`tests/LocalMatricesTest.cpp`: equal
+  to the global `P^T S P` to 1e-12 on an operator with 50% asymmetry). (2) `DownwindOrder()`: couplings in CSR arrays
+  (computed once, no vector per row), upstream lists filled per thread by contiguous ranges of rows; same rule (fewest
+  unprocessed upstream faces, then smallest number), hence the same order. A breadth-first order (FIFO, 2-7x faster) was
+  tried and rejected: it puts all the faces without upstream ones first, and the hybrid smoother (chunks of the order
+  per thread) then took 31-40 iterations instead of 4 on 8 threads. Fine level of the 32^3 systems, 1 / 8 threads:
+  convection-dominated k=1 51 -> 41 ms / 42 -> 32 ms, k=0 41 -> 26 / 33 -> 24 ms, diffusion-dominated (no one-sided
+  coupling) 32 -> 24 / 14 -> 12 ms. Setup before (global products, previous order) -> after, minimum of 3 alternated
+  runs, library default smoothers (`build/bench_nonsym/bench_setup.sh`, `exp16_setup_before_after.txt`):
+
+  | 32^3 | 1 thread | 8 threads |
+  |---|---|---|
+  | diffusion-dominated k=0 | 0.579 -> 0.520 s (-10%) | 0.373 -> 0.323 s (-13%) |
+  | diffusion-dominated k=1 | 0.727 -> 0.620 s (-15%) | 0.457 -> 0.394 s (-14%) |
+  | convection-dominated k=0 | 0.466 -> 0.535 s (+15%) | 0.348 -> 0.376 s (+8%) |
+  | convection-dominated k=1 | 0.610 -> 0.658 s (+8%) | 0.443 -> 0.458 s (+3%) |
+
+  Iterations unchanged in the diffusion-dominated case; in the convection-dominated one, the rounding differences of
+  the products change the aggregation (without the order: 6 -> 5 levels at k=1, 30 -> 22 iterations at k=0), 3-5
+  iterations with the order either way. Same binary, local / global products, time of the coarsening passes
+  (prolongation + products) and setup, 1 thread: diffusion-dominated k=1 218 / 336 ms, 0.62 / 0.86 s;
+  convection-dominated k=1 221 / 217 ms, 0.66 / 0.62 s; k=0 221 / 204 ms, 0.51 / 0.43 s: in the convection-dominated
+  case the local products gain nothing in the passes (its coarse cells have slightly more faces: 4.43 vs 4.20 per cell
+  on the first coarse level), and the local path also assembles the operator of each level from the local matrices.
+- **Downwind order across the Péclet numbers** (2026-10-11, measurement only). The order is computed for every
+  non-symmetric matrix (never with `SetupSymmetric()`), on each level but the coarsest, and kept where some couplings
+  are one-sided: nothing to set by the user. Diffusion-dominated: it finds nothing (natural order), at the cost of the
+  couplings' pass, 24-25 ms on 1 thread / 12-13 ms on 8 threads on the fine level (32^3, k=1). Sweep without a new test
+  case: HArDCore3D's blocks `1 1 0 0` (diffusion Id) + gamma (`1 1 5 0` - `1 1 0 0`), i.e. the convection
+  gamma (1e5, 0, 0), recondensed by the scratch driver (`base=`, `gamma=`; `build/bench_nonsym/sweep_peclet.sh`,
+  `exp18_peclet.txt`), right-hand side A*1, 1 thread. 32^3, cell Péclet number gamma 3125; iterations and solve time,
+  order off / automatic (ordered levels):
+
+  | cell Péclet | k=0 | k=1 |
+  |---|---|---|
+  | 0.03-0.09 | 25-26 its / same (no level ordered) | 17 its / same (no level ordered) |
+  | 0.31 | 26 its 0.20 s / 28 its 0.25 s (3/3) | 19 its / same (0/4) |
+  | 0.94 | 27 its 0.20 s / 25 its 0.32 s (3/3) | 22 its 1.48 s / 22 its 1.38 s (2/4) |
+  | 3.1 | 26 its 0.17 s / 23 its 0.24 s | 19 its 1.30 s / 17 its 2.14 s (4/4) |
+  | 9.4 | 23 its 0.14 s / 17 its 0.19 s | 17 its 1.05 s / 13 its 1.39 s |
+  | 31 | 24 its 0.14 s / 10 its 0.10 s | 18 its 1.09 s / 8 its 0.83 s |
+  | 3125 | 24 its 0.19 s / 4 its 0.05 s | 18 its 1.10 s / 4 its 0.42 s |
+
+  In iterations the automatic order is right everywhere (equal or fewer from a cell Péclet number ~1, at most 2 more
+  around 0.3-0.6); in time it only pays from ~15-30, because an ordered sweep costs 1.7-1.9x a natural one (irregular
+  accesses; on the scalar levels, no residual deduced from the sweep: one more product per smoothing). See idea 7.
 
 ## Current profile (U-AMG; parallel: 16 threads, the default before 2026-10-08)
 
@@ -541,7 +648,32 @@ Galerkin products (see Done).
      with the products by the zero initial guess skipped), and the scalar one could fuse the residual: `hbgs` would
      then cost nothing when a client runs it on 1 thread.
    - Determinism: the hybrid smoothers have a data race (see the exactness facts): a real Jacobi between the chunks
-     (or a colouring of the chunks' boundaries) would make them deterministic, and usable with BiCGSTAB.
+     (or a colouring of the chunks' boundaries) would make them deterministic, and usable with BiCGSTAB. Measured
+     2026-10-12 on the non-symmetric path (GCR, K-cycle with GCR), where the race costs much more: HArDCore3D's
+     diffusion-dominated convection-diffusion, 48^3 k=1, 8 threads: 191 iterations instead of 26 (sequential); 48^3
+     k=0: 105 instead of 46. At 32^3 k=1, 4 threads (scratch driver, `build/bench_nonsym/exp19-23*.txt`): sequential
+     23, racy hybrid 26-36 (varies from run to run), a deterministic hybrid (other chunks read from a copy of x taken
+     before the sweep: temporary prototype, removed) 24 in every run; k=0: 29 / 30-34 / 31. Only GCR as both the outer
+     iteration and the K-cycle's is that sensitive (symmetric part: FCG/FCG 20 -> 20 with the racy hybrid, FCG/GCR 22
+     -> 22-23, GCR/FCG 20 -> 21, GCR/GCR 24 -> 30); mostly the post-smoothing (hybrid pre only 24-25, post only
+     27-29). The prototype's cost per iteration (a test per entry, without the same-pattern kernels): +20% at k=1,
+     +10% at k=0; total solve time about equal to the racy one's (fewer iterations), and reproducible. A proper version
+     would only read the copy in the rows that touch other chunks (the others keep the current kernels).
+7. **Renumbering the levels of a non-symmetric matrix in their downwind order** — measured in part, medium effort.
+   Instead of sweeping in the downwind order (`SweepOrder`), permute each level that gets an order once at the setup
+   (its operator, the rows of its prolongation and the columns of the finer one, the restrictions; the fine level's
+   vectors at the entry and exit of the solve): the smoothers then sweep in their natural order, with the locality and
+   the residual deduced from the sweep of the natural kernels, and `SweepOrder` goes away. Gain: an ordered iteration
+   costs 0.09-0.1 s at 32^3 k=1 (convection-dominated), a natural one ~0.06 s (the fine faces sorted along x before
+   the setup, scratch driver: 4 iterations at 0.056 s): ~0.04 s per iteration, and the order would pay in time from a
+   cell Péclet number ~1 instead of ~15-30 (see Done, "Downwind order across the Péclet numbers"). Cost, measured on
+   the 32^3 fine level, P A P^T: Eigen's generic permutation 470-500 ms at k=1 (18-32 ms at k=0): not usable; a
+   hand-written one (rows copied to their new position, columns relabeled and sorted per row, parallel; checked:
+   B x_new = (A x)_new to 1e-16) 135 ms on 1 thread / 28 ms on 8 threads at k=1, 9 / 3 ms at k=0. Sorting the columns
+   once per block row (same pattern for the rows of a face) should bring k=1 to ~40-50 ms on 1 thread (copying the
+   9.4M non-zeros is the floor; estimate), plus the coarse levels and the prolongations (~+20-30%). Only on the levels
+   that get an order (never symmetric or diffusion-dominated). Not done (the user's decision, 2026-10-11: keep it as a
+   possibility).
 
 Possible now that reordering the arithmetic operations is allowed (rejected so far because not bit-identical):
 

@@ -10,6 +10,10 @@ protected:
 	bool _hybrid = false; // see HybridSweep()
 	vector<SparseMatrixIndex> _diagPos; // position of the diagonal coefficient of each row in the arrays of the matrix
 public:
+	// If set, every sweep (forward or backward, pre- or post-smoothing) processes the rows in this order: the downwind
+	// order of a convection-dominated matrix (DownwindOrder()), which all the sweeps then follow
+	const vector<BigNumber>* SweepOrder = nullptr;
+
 	GaussSeidel() : GaussSeidel(Direction::Forward) {}
 
 	GaussSeidel(Direction direction, bool hybrid = false)
@@ -58,17 +62,17 @@ public:
 	}
 
 	// The residual is deduced from the products computed in the sweep (half of the matrix): not in the hybrid sweeps,
-	// whose rows don't all read the same values of x
+	// whose rows don't all read the same values of x, nor in the sweeps in SweepOrder
 	bool CanOptimizeResidualComputation() override
 	{
-		return !_hybrid;
+		return !_hybrid && !SweepOrder;
 	}
 
 private:
 	IterationResult ExecuteOneIteration(const Vector& b, Vector& x, bool& xEquals0, bool computeResidual, bool computeAx, const IterationResult& oldResult) override
 	{
 		IterationResult result(oldResult);
-		assert(!_hybrid || (!computeResidual && !computeAx)); // see CanOptimizeResidualComputation()
+		assert((!_hybrid && !SweepOrder) || (!computeResidual && !computeAx)); // see CanOptimizeResidualComputation()
 
 		const SparseMatrix& A = *this->Matrix;
 
@@ -127,7 +131,9 @@ private:
 		// x(new) = (L+D)^{-1} * (b-Ux)
 		if (!xEquals0)
 			result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
-		if (_hybrid)
+		if (SweepOrder)
+			OrderedSweep(b, x, xEquals0);
+		else if (_hybrid)
 			HybridSweep(b, x, xEquals0, false);
 		else
 			ForwardSweepKernel(b, x, xEquals0, nullptr);
@@ -141,7 +147,9 @@ private:
 		// x(new) = (D+U)^{-1} * (b-Lx)
 		if (!xEquals0)
 			result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
-		if (_hybrid)
+		if (SweepOrder)
+			OrderedSweep(b, x, xEquals0);
+		else if (_hybrid)
 			HybridSweep(b, x, xEquals0, true);
 		else
 			BackwardSweepKernel(b, x, xEquals0, nullptr);
@@ -343,6 +351,37 @@ private:
 				BackwardSweepKernel(b, x, xEquals0, nullptr, begin, end);
 			else
 				ForwardSweepKernel(b, x, xEquals0, nullptr, begin, end);
+		}
+	}
+
+	// Sweep in SweepOrder: x_i = (b_i - sum_{j != i} a_ij x_j) / a_ii, x_j being the new values of the rows already
+	// processed, the old ones of the others. Hybrid: each thread processes its own contiguous chunk of the order (see
+	// HybridSweep()).
+	void OrderedSweep(const Vector& b, Vector& x, bool xEquals0)
+	{
+		const SparseMatrix& A = *this->Matrix;
+		BigNumber n = A.rows();
+		if (xEquals0)
+			x = Vector::Zero(n);
+		const vector<BigNumber>& order = *SweepOrder;
+		const SparseMatrixIndex* outer = A.outerIndexPtr();
+		const SparseMatrixIndex* col = A.innerIndexPtr();
+		const double* val = A.valuePtr();
+		double* xp = x.data();
+		#pragma omp parallel if (_hybrid && A.nonZeros() > 20000)
+		{
+			auto [begin, end] = _hybrid ? Parallelism::ThreadChunk(n) : pair<BigNumber, BigNumber>(0, n);
+			for (BigNumber k = begin; k < end; ++k)
+			{
+				BigNumber i = order[k];
+				SparseMatrixIndex d = _diagPos[i];
+				double tmp = b[i];
+				for (SparseMatrixIndex p = outer[i]; p < d; ++p)
+					tmp -= val[p] * xp[col[p]];
+				for (SparseMatrixIndex p = d + 1; p < outer[i + 1]; ++p)
+					tmp -= val[p] * xp[col[p]];
+				xp[i] = tmp / val[d];
+			}
 		}
 	}
 

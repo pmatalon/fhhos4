@@ -66,6 +66,13 @@ enum class StoppingCriteria : unsigned
 	MaxIterations,
 };
 
+// Flexible Krylov method: FCG for symmetric positive definite matrices, GCR for the others (e.g. in the K-cycle)
+enum class KrylovMethod : unsigned
+{
+	FCG,
+	GCR
+};
+
 enum class CoarseningType : unsigned
 {
 	H,

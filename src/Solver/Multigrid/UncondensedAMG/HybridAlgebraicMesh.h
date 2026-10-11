@@ -12,6 +12,7 @@ struct HybridAlgebraicElement
 	mutex Mutex;
 	vector<HybridAlgebraicFace*> Faces;
 	vector<double> FaceTraces; // trace of the block A_T_F(this element, Faces[i]), from which the couplings are computed
+	vector<double> FaceToElementTraces; // non-symmetric matrix: trace of the block A_F_T(Faces[i], this element)
 	vector<pair<HybridAlgebraicElement*, double>> Neighbours;
 	vector<HybridAlgebraicElement*> StrongNeighbours; // sorted by descending strength (the strongest neighbour is first)
 	HybridElementAggregate* CoarseElement = nullptr;
@@ -19,10 +20,15 @@ struct HybridAlgebraicElement
 
 	double FaceTrace(const HybridAlgebraicFace* face) const
 	{
+		return FaceTraces[LocalFaceNumber(face)];
+	}
+
+	int LocalFaceNumber(const HybridAlgebraicFace* face) const
+	{
 		for (int i = 0; i < Faces.size(); ++i)
 		{
 			if (face == Faces[i])
-				return FaceTraces[i];
+				return i;
 		}
 		assert(false);
 		return 0;
@@ -120,6 +126,12 @@ public:
 	const SparseMatrix* A_T_T;
 	const SparseMatrix* A_T_F;
 	const SparseMatrix* A_F_F;
+	// Non-symmetric matrix (Symmetric false): the block A_F_T (faces x cells), from which, with A_T_F, the couplings are
+	// computed (Build()). Null if the matrix is symmetric (A_F_T = A_T_F^T).
+	const SparseMatrix* A_F_T = nullptr;
+	// Symmetric matrix: the blocks of A_T_T are factorized by Cholesky (they can be given by their lower triangular
+	// part), by LU otherwise
+	bool Symmetric = true;
 
 	vector<HybridAlgebraicElement> Elements;
 	vector<HybridAlgebraicFace> Faces;
@@ -186,7 +198,18 @@ public:
 				{
 					if (neighbour->Number != elem.Number)
 					{
-						double coupling = this->CouplingValue(elem.FaceTraces[i], neighbour->FaceTrace(face));
+						// Non-symmetric matrix: from the averages of the traces of the blocks A_T_F(e, face) and A_F_T(face, e)
+						// of each element (equal for a symmetric matrix). Measured on HArDCore3D's convection-diffusion: better
+						// than the couplings of the rows of the matrix (from A_T_F(elem, face) and A_F_T(face, neighbour), as
+						// Notay's strong couplings), which cost 20% more iterations in the diffusion-dominated case at k = 0.
+						double coupling;
+						if (A_F_T)
+						{
+							int j = neighbour->LocalFaceNumber(face);
+							coupling = this->CouplingValue(0.5 * (elem.FaceTraces[i] + elem.FaceToElementTraces[i]), 0.5 * (neighbour->FaceTraces[j] + neighbour->FaceToElementTraces[j]));
+						}
+						else
+							coupling = this->CouplingValue(elem.FaceTraces[i], neighbour->FaceTrace(face));
 						// A neighbour sharing several faces with elem (polygonal meshes built with -polymesh-fcs n) is
 						// listed once, with the sum of the couplings through these faces
 						auto it = find_if(elem.Neighbours.begin(), elem.Neighbours.end(), [neighbour](const pair<HybridAlgebraicElement*, double>& n) { return n.first == neighbour; });
@@ -222,7 +245,8 @@ public:
 	}
 
 	// Builds the elements and the faces, and the faces of the elements: all the reconstruction (Theta()) needs.
-	// With computeFaceTraces, also the traces of the blocks of A_T_F, from which Build() computes the couplings.
+	// With computeFaceTraces, also the traces of the blocks of A_T_F (and A_F_T), from which Build() computes the
+	// couplings.
 	void BuildElementFaces(bool computeFaceTraces = false)
 	{
 		const SparseMatrix& A_T_F = *this->A_T_F;
@@ -242,6 +266,10 @@ public:
 		//-------------------------//
 		// Filling elements' faces //
 		//-------------------------//
+
+		ColMajorSparseMatrix A_F_T_ColMajor; // non-symmetric matrix: the columns of the elements in A_F_T
+		if (computeFaceTraces && A_F_T)
+			A_F_T_ColMajor = *A_F_T;
 
 		#pragma omp parallel for
 		for (BigNumber elemNumber = 0; elemNumber < Elements.size(); ++elemNumber)
@@ -273,6 +301,26 @@ public:
 
 			if (elem.Faces.empty())
 				Utils::Error("Element " + to_string(elemNumber) + " has no face (no non-zero coefficient in row " + to_string(elemNumber) + " of A_TF)");
+
+			// Non-symmetric matrix: the traces of the blocks A_F_T(face, elem), from the columns of elem
+			if (computeFaceTraces && A_F_T)
+			{
+				elem.FaceToElementTraces = vector<double>(elem.Faces.size(), 0);
+				for (int k = 0; k < _cellBlockSize; k++)
+				{
+					// ColMajor --> the following line iterates over the non-zeros of the column elemNumber*_cellBlockSize + k
+					for (ColMajorSparseMatrix::InnerIterator it(A_F_T_ColMajor, elemNumber*_cellBlockSize + k); it; ++it)
+					{
+						BigNumber faceNumber = it.row() / _faceBlockSize;
+						if (it.row() - faceNumber*_faceBlockSize == k)
+						{
+							auto faceIt = find(elem.Faces.begin(), elem.Faces.end(), &Faces[faceNumber]);
+							if (faceIt != elem.Faces.end())
+								elem.FaceToElementTraces[faceIt - elem.Faces.begin()] += it.value();
+						}
+					}
+				}
+			}
 		}
 	}
 
@@ -417,7 +465,8 @@ public:
 			coarsestPossibleMeshReached = true;
 	}
 
-	// - A_{TT}^{-1} * A_{TF}
+	// - A_{TT}^{-1} * A_{TF}: the reconstruction of the cells from the faces, which undoes the static condensation (from the
+	// equations of the cells)
 	SparseMatrix Theta()
 	{
 		BigNumber nBlocks = A_T_T->rows() / _cellBlockSize;
@@ -426,12 +475,18 @@ public:
 		for (BigNumber i = 0; i < nBlocks; ++i)
 		{
 			DenseMatrix blockA_T_T = A_T_T->block(i * _cellBlockSize, i * _cellBlockSize, _cellBlockSize, _cellBlockSize);
-			auto solverA_T_T = blockA_T_T.llt();
-			for (HybridAlgebraicFace* f : this->Elements[i].Faces)
+			auto addBlocks = [&](const auto& solverA_T_T)
 			{
-				DenseMatrix blockA_T_F = A_T_F->block(i * _cellBlockSize, f->Number * _faceBlockSize, _cellBlockSize, _faceBlockSize);
-				coeffs.Local().Add(i * _cellBlockSize, f->Number * _faceBlockSize, -solverA_T_T.solve(blockA_T_F));
-			}
+				for (HybridAlgebraicFace* f : this->Elements[i].Faces)
+				{
+					DenseMatrix blockA_T_F = A_T_F->block(i * _cellBlockSize, f->Number * _faceBlockSize, _cellBlockSize, _faceBlockSize);
+					coeffs.Local().Add(i * _cellBlockSize, f->Number * _faceBlockSize, -solverA_T_T.solve(blockA_T_F));
+				}
+			};
+			if (Symmetric)
+				addBlocks(blockA_T_T.llt());
+			else
+				addBlocks(blockA_T_T.partialPivLu());
 		}
 		SparseMatrix theta(A_T_F->rows(), A_T_F->cols());
 		coeffs.Fill(theta);

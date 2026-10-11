@@ -62,6 +62,8 @@ struct MultigridArguments
 	int MatrixMaxSizeForCoarsestLevel = 1000;
 	char CycleLetter = 'V';
 	int WLoops = 1;
+	KrylovMethod KCycleKrylov = KrylovMethod::FCG; // GCR under -s gcr (ApplyProgramArgumentDefaults)
+	bool UAMGNonsymmetric = false; // -uamg-nonsym: U-AMG for a non-symmetric matrix (A_FT given), on the symmetric matrix
 	bool UseHigherOrderReconstruction = true;
 	bool UseHeterogeneousWeighting = true;
 	bool UseGalerkinOperator = false;

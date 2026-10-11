@@ -229,6 +229,15 @@ void ApplyProgramArgumentDefaults(ProgramArguments& args,
 		args.Solver.PreconditionerCode = args.Solver.SolverCode.substr(3, args.Solver.SolverCode.length() - 3);
 		args.Solver.SolverCode = "fcg";
 	}
+	else if (Utils::StartsWith(args.Solver.SolverCode, "gcr") && args.Solver.SolverCode.length() > 3)
+	{
+		args.Solver.PreconditionerCode = args.Solver.SolverCode.substr(3, args.Solver.SolverCode.length() - 3);
+		args.Solver.SolverCode = "gcr";
+	}
+
+	// The K-cycle iterates with the method of the outer iteration (Notay): GCR under GCR, FCG otherwise
+	if (args.Solver.SolverCode.compare("gcr") == 0)
+		args.Solver.MG.KCycleKrylov = KrylovMethod::GCR;
 
 #ifndef AGMG_ENABLED
 	if (args.Solver.SolverCode.compare("agmg") == 0)
@@ -324,7 +333,19 @@ void ApplyProgramArgumentDefaults(ProgramArguments& args,
 			argument_error("Multigrid only applicable on HHO discretization.");
 
 		ApplyUncondensedAMGDefaults(args.Solver.MG, args.Discretization.PolyDegree - 1, defaultCoarseOperator, defaultCycle, defaultHPCoarseningStgy);
+
+		// For a non-symmetric matrix: the K-cycle iterates with GCR, LU on the coarsest level, no FCG
+		if (args.Solver.MG.UAMGNonsymmetric)
+		{
+			if (args.Solver.SolverCode.compare("fcg") == 0)
+				argument_error("-uamg-nonsym: the flexible conjugate gradient requires a symmetric matrix. Use -s gcruamg (or gcrlibuamg).");
+			args.Solver.MG.KCycleKrylov = KrylovMethod::GCR;
+			if (defaultCoarseSolver)
+				args.Solver.MG.CoarseSolverCode = "lu";
+		}
 	}
+	else if (args.Solver.MG.UAMGNonsymmetric)
+		argument_error("-uamg-nonsym requires U-AMG: -s uamg, gcruamg, libuamg or gcrlibuamg.");
 
 	if (args.Solver.SolverCode.compare("aggregamg") == 0 || args.Solver.PreconditionerCode.compare("aggregamg") == 0)
 	{

@@ -80,8 +80,8 @@ TEST(SolverRegression, WCycleWithManyLevels)
 }
 
 // A direct solver as preconditioner was cast into an IterativeSolver, which made FCG segfault.
-// Being exact, it makes (F)CG converge in 1 iteration.
-//   ./bin/fhhos4 -geo square -mesh cart -mesher inhouse -k 1 -n 16 -s {cg|fcg} -preconditioner {ch|lu}
+// Being exact, it makes (F)CG and GCR converge in 1 iteration.
+//   ./bin/fhhos4 -geo square -mesh cart -mesher inhouse -k 1 -n 16 -s {cg|fcg|gcr} -preconditioner {ch|lu}
 class DirectPreconditionerTest : public ::testing::TestWithParam<std::tuple<std::string, std::string>>
 {
 };
@@ -99,8 +99,38 @@ TEST_P(DirectPreconditionerTest, ConvergesInOneIteration)
 }
 
 INSTANTIATE_TEST_SUITE_P(SquareCart, DirectPreconditionerTest, ::testing::Combine(
-	::testing::Values("cg", "fcg"),
+	::testing::Values("cg", "fcg", "gcr"),
 	::testing::Values("ch", "lu")));
+
+// GCR (for non-symmetric matrices) preconditioned by the AMGs with the K-cycle, which then iterates with GCR on the
+// coarse levels, on symmetric matrices: it minimizes the residual norm where FCG minimizes the energy norm of the error,
+// so it converges in about as many iterations as FCG (0 to 3 more measured, in 2D and 3D).
+//   ./bin/fhhos4 -geo square -mesh cart -mesher inhouse -k {0|1} -n 32 -s {fcg|gcr}{uamg|aggregamg}
+class GCRTest : public ::testing::TestWithParam<std::tuple<int, std::string>>
+{
+};
+
+TEST_P(GCRTest, AsFastAsFCG)
+{
+	auto [k, preconditionerCode] = GetParam();
+	auto run = [&](const std::string& krylov)
+	{
+		ProgramArguments args = SquareCartArgs(k, 32);
+		args.Solver.SolverCode = krylov + preconditionerCode;
+		return RunDiffusionHHO(args).IterationCount;
+	};
+	int fcg = run("fcg");
+	int gcr = run("gcr");
+	EXPECT_GT(gcr, 0);
+	EXPECT_LE(gcr, fcg + 3) << "FCG: " << fcg << " iterations";
+}
+
+INSTANTIATE_TEST_SUITE_P(SquareCart, GCRTest, ::testing::Values(
+	std::make_tuple(0, "uamg"), std::make_tuple(1, "uamg"), std::make_tuple(2, "uamg"), std::make_tuple(0, "aggregamg")),
+	[](const ::testing::TestParamInfo<GCRTest::ParamType>& info)
+	{
+		return "k" + std::to_string(std::get<0>(info.param)) + "_" + std::get<1>(info.param);
+	});
 
 // With the default solver, the prolongations requiring the Galerkin operator (-prolong 4, 5)
 // must enable it (with a warning), instead of failing (4) or running without it (5).

@@ -16,6 +16,10 @@ protected:
 	// For each block row, whether its rows have the same non-zero pattern (always the case for the HHO matrices)
 	vector<char> _samePattern;
 public:
+	// If set, every sweep (forward or backward, pre- or post-smoothing) processes the block rows in this order: the
+	// downwind order of a convection-dominated matrix (DownwindOrder()), which all the sweeps then follow
+	const vector<BigNumber>* SweepOrder = nullptr;
+
 	BlockGaussSeidel(int blockSize, Direction direction, bool hybrid)
 	{
 		this->_blockSize = blockSize;
@@ -139,6 +143,16 @@ private:
 	{
 		BigNumber nb = this->Matrix->rows() / _blockSize;
 		Vector tmp_x(_blockSize), tmp_xi(_blockSize); // work vectors for ProcessBlockRow()
+		if (SweepOrder)
+		{
+			// The block rows not processed yet are not the upper ones: from x = 0, all the off-diagonal blocks are
+			// multiplied (by zeros for those)
+			if (xEquals0)
+				x = Vector::Zero(this->Matrix->rows());
+			for (BigNumber i = 0; i < nb; ++i)
+				ProcessBlockRow((*SweepOrder)[i], b, x, tmp_x, tmp_xi, OffDiagonalBlocks::Both, true);
+			return;
+		}
 		OffDiagonalBlocks blocks = !xEquals0 ? OffDiagonalBlocks::Both : (backward ? OffDiagonalBlocks::Upper : OffDiagonalBlocks::Lower);
 		for (BigNumber i = 0; i < nb; ++i)
 			ProcessBlockRow(backward ? nb - i - 1 : i, b, x, tmp_x, tmp_xi, blocks, backward);
@@ -155,7 +169,10 @@ private:
 			Vector tmp_x(_blockSize), tmp_xi(_blockSize); // work vectors, allocated once per thread
 			#pragma omp for schedule(static)
 			for (BigNumber i = 0; i < nb; i++)
-				ProcessBlockRow(backward ? nb - i - 1 : i, b, x, tmp_x, tmp_xi, OffDiagonalBlocks::Both, backward);
+			{
+				BigNumber blockRow = SweepOrder ? (*SweepOrder)[i] : (backward ? nb - i - 1 : i);
+				ProcessBlockRow(blockRow, b, x, tmp_x, tmp_xi, OffDiagonalBlocks::Both, backward || SweepOrder);
+			}
 		}
 	}
 

@@ -2,6 +2,7 @@
 #include <mutex>
 #include "UncondensedLevel.h"
 #include "../Multigrid.h"
+#include "../../Direct/EigenSparseCholesky.h"
 using namespace std;
 
 class UncondensedAMG : public Multigrid
@@ -16,8 +17,10 @@ private:
 	int _faceBlockSize;
 	double _strongCouplingThreshold;
 	LocalOperator _localOperator; // local matrices of the operators of the coarsening passes, during the setup
+	bool _symmetric = true;       // set by Setup(): see UncondensedLevel::Symmetric
 public:
 	bool ManageAnisotropy = true; // see UncondensedLevel::ManageAnisotropy
+	bool DownwindOrdering = true; // see UncondensedLevel::DownwindOrdering
 
 
 	UncondensedAMG(int dim, int degree, int cellBlockSize, int faceBlockSize, double strongCouplingThreshold, UAMGFaceProlongation faceProlong, UAMGProlongation coarseningProlong, UAMGProlongation mgProlong, int nLevels = 0)
@@ -85,21 +88,38 @@ public:
 	}
 
 	// A_F_F: may be empty (0 x 0) if A_F_FNeeded() is false: the algorithm of the paper only uses A_T_T and A_T_F.
+	// A_F_T: empty (0 x 0) if the matrix is symmetric (A_F_T = A_T_F^T). Otherwise, the same algorithm runs on the
+	// matrix itself, all the blocks read in full (see UncondensedLevel::Symmetric): the couplings of the aggregation
+	// from the averaged traces of A_T_F and A_F_T, the reconstruction -A_T_T^{-1} A_T_F (inverse of the static
+	// condensation), the smoothing of the prolongation and the Galerkin coarse operators P^T A P with the matrix; then
+	// the Gauss-Seidel smoothers follow the downwind order of each level (see DownwindOrder()), the K-cycle must iterate
+	// with GCR, and the coarse solver must not be Cholesky.
 	// cellInterpOfOne, faceInterpOfOne: interpolation of the function 1 on the polynomial bases of the cells and faces,
 	// numbered as the rows and columns of A_T_F. The bases must be hierarchical with a constant first function: the
 	// interpolation of 1 is then c on the first DoF of each block, 0 on the others. Used to correct a restrictive
 	// assumption of the paper, where c = 1 everywhere (see UncondensedLevel::CoarsenMesh()).
-	void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
+	void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_T, const SparseMatrix& A_F_F, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
 	{
 		if (cellInterpOfOne.rows() != A_T_F.rows() || faceInterpOfOne.rows() != A_T_F.cols())
 			Utils::FatalError("UncondensedAMG: the interpolations of 1 on the cells and faces must have the sizes of the rows (" + to_string(A_T_F.rows()) + ") and columns (" + to_string(A_T_F.cols()) + ") of A_T_F, got " + to_string(cellInterpOfOne.rows()) + " and " + to_string(faceInterpOfOne.rows()) + ".");
 		CheckInterpOfOne(cellInterpOfOne, _cellBlockSize, "cell");
 		CheckInterpOfOne(faceInterpOfOne, _faceBlockSize, "face");
+		_symmetric = A_F_T.rows() == 0;
+		if (!_symmetric)
+		{
+			if (A_F_T.rows() != A_T_F.cols() || A_F_T.cols() != A_T_F.rows())
+				Utils::FatalError("UncondensedAMG: A_F_T must have the sizes of the transpose of A_T_F.");
+			if (this->Cycle == 'K' && this->KCycleKrylov != KrylovMethod::GCR)
+				Utils::FatalError("UncondensedAMG: the K-cycle of a non-symmetric matrix must iterate with GCR, not FCG.");
+			if (dynamic_cast<EigenSparseCholesky*>(this->CoarseSolver))
+				Utils::FatalError("UncondensedAMG: the Cholesky factorization cannot be the coarse solver of a non-symmetric matrix (use LU).");
+		}
 
 		this->_fineLevel = this->CreateFineLevel();
 		UncondensedLevel* fine = dynamic_cast<UncondensedLevel*>(this->_fineLevel);
 		fine->A_T_T = &A_T_T;
 		fine->A_T_F = &A_T_F;
+		fine->A_F_T = _symmetric ? nullptr : &A_F_T;
 		if (A_F_F.rows() == 0 && A_F_FNeeded())
 			Utils::FatalError("UncondensedAMG: the chosen options need the block A_F_F.");
 		fine->A_F_F = A_F_F.rows() > 0 ? &A_F_F : nullptr;
@@ -127,6 +147,7 @@ public:
 		fine->A_T_T = nullptr;
 		fine->A_T_F = nullptr;
 		fine->A_F_F = nullptr;
+		fine->A_F_T = nullptr;
 	}
 
 	Vector Solve(const Vector& b, string initialGuessCode) override
@@ -191,6 +212,8 @@ private:
 		level->ComputeCoarseA_F_F = A_F_FNeeded();
 		level->ComputeQ_F = ChainedQ_FNeeded();
 		level->ManageAnisotropy = ManageAnisotropy;
+		level->Symmetric = _symmetric;
+		level->DownwindOrdering = DownwindOrdering;
 		return level;
 	}
 

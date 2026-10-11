@@ -26,6 +26,8 @@ private:
 	size_t _capacity = 0;
 public:
 	int BlockSize = 1;
+	// Symmetric operator: only the lower triangular parts are read and computed, then mirrored
+	bool Symmetric = true;
 	vector<size_t> FacesStart;  // the faces of cell t are Faces[FacesStart[t]], ..., Faces[FacesStart[t+1] - 1]
 	vector<BigNumber> Faces;    // global numbers
 	vector<size_t> ValuesStart; // the matrix of cell t is stored column-major from ValuesStart[t]
@@ -40,6 +42,7 @@ public:
 		swap(_values, other._values);
 		swap(_capacity, other._capacity);
 		swap(BlockSize, other.BlockSize);
+		swap(Symmetric, other.Symmetric);
 		FacesStart.swap(other.FacesStart);
 		Faces.swap(other.Faces);
 		ValuesStart.swap(other.ValuesStart);
@@ -67,11 +70,12 @@ public:
 
 	// S = sum_T S_T on the cells of the mesh (whose faces' elements must be built): S_T(f, g) = S(f, g) / c, where c
 	// is the number of cells containing both f and g (1 or 2: two cells share at most one face on simplicial and
-	// Cartesian meshes, several on polygonal meshes built with -polymesh-fcs n). Exact for c <= 2. Only the lower
-	// triangular part of S is read (S is symmetric).
-	void Decompose(const SparseMatrix& S, const HybridAlgebraicMesh& mesh, int blockSize)
+	// Cartesian meshes, several on polygonal meshes built with -polymesh-fcs n). Exact for c <= 2. Symmetric S: only
+	// its lower triangular part is read.
+	void Decompose(const SparseMatrix& S, const HybridAlgebraicMesh& mesh, int blockSize, bool symmetric)
 	{
 		int bs = blockSize;
+		Symmetric = symmetric;
 		BigNumber nCells = mesh.Elements.size();
 		vector<int> nFaces(nCells);
 		for (BigNumber t = 0; t < nCells; ++t)
@@ -103,7 +107,7 @@ public:
 					for (SparseMatrix::InnerIterator it(S, i); it; ++it)
 					{
 						BigNumber j = it.col();
-						if (j > i)
+						if (symmetric && j > i)
 							continue;
 						int b = facePos[j / bs];
 						if (b < 0) // face of another cell
@@ -111,7 +115,8 @@ public:
 						int c = NCommonCells(f, mesh.Faces[j / bs], T);
 						double v = c == 1 ? it.value() : it.value() / c;
 						ST[(b * bs + j % bs) * N + a * bs + r] = v;
-						ST[(a * bs + r) * N + b * bs + j % bs] = v;
+						if (symmetric)
+							ST[(a * bs + r) * N + b * bs + j % bs] = v;
 					}
 				}
 			}
@@ -124,11 +129,12 @@ public:
 	// (the local matrices of the cells of the mesh) and P_T the rows of P on the faces of T. P_T is an injection on
 	// the kept faces (rows of the identity), and its rows on the removed faces are read in P: the face prolongations
 	// with interface collapsing (-face-prolong 1, 2) and the coarsening prolongations -coarsening-prolong 3 to 6
-	// send the faces of a cell only to the coarse faces of its aggregate. Exactly symmetric (lower triangular part
-	// mirrored).
+	// send the faces of a cell only to the coarse faces of its aggregate. Symmetric: exactly symmetric (lower
+	// triangular part mirrored).
 	void GalerkinProduct(const LocalMatrices& cellMatrices, const HybridAlgebraicMesh& mesh, const SparseMatrix& P)
 	{
 		int bs = cellMatrices.BlockSize;
+		bool symmetric = cellMatrices.Symmetric;
 		BigNumber nAggregs = mesh.CoarseElements.size();
 		vector<int> nCoarseFaces(nAggregs);
 		int maxM = 0;
@@ -145,6 +151,7 @@ public:
 			for (int B = 0; B < nCoarseFaces[k]; ++B)
 				faces[B] = mesh.CoarseElements[k].CoarseFaces[B]->Number;
 		});
+		Symmetric = symmetric;
 
 		struct Work
 		{
@@ -242,7 +249,7 @@ public:
 					}
 				}
 
-				// S_K += P_T^T W (lower triangular part)
+				// S_K += P_T^T W (symmetric: lower triangular part)
 				for (int q = 0; q < nr; ++q)
 				{
 					for (int kk = 0; kk < bs; ++kk)
@@ -255,7 +262,7 @@ public:
 							if (wj == 0)
 								continue;
 							double* SKcol = SK + j * M;
-							for (size_t i = j; i < M; ++i)
+							for (size_t i = symmetric ? j : 0; i < M; ++i)
 								SKcol[i] += Rtcol[i] * wj;
 						}
 					}
@@ -266,15 +273,18 @@ public:
 					{
 						size_t i = ab.second * bs + c;
 						size_t row = ab.first * bs + c;
-						for (size_t j = 0; j <= i; ++j)
+						for (size_t j = 0; j < (symmetric ? i + 1 : M); ++j)
 							SK[j * M + i] += W[j * N + row];
 					}
 				}
 			}
 
-			for (size_t j = 0; j < M; ++j)
-				for (size_t i = j + 1; i < M; ++i)
-					SK[i * M + j] = SK[j * M + i];
+			if (symmetric)
+			{
+				for (size_t j = 0; j < M; ++j)
+					for (size_t i = j + 1; i < M; ++i)
+						SK[i * M + j] = SK[j * M + i];
+			}
 			for (int B = 0; B < m; ++B)
 				w.coarseFacePos[K.CoarseFaces[B]->Number] = -1;
 		}

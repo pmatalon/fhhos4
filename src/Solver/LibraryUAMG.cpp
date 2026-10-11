@@ -7,12 +7,12 @@ private:
 	fhhos4::Solver _solver;
 public:
 	// The parameters of the library that correspond to the arguments of the program
-	LibraryUAMG(const ProgramArguments& args, int dim, int faceDegree, int cellDegree, bool useFCG)
+	LibraryUAMG(const ProgramArguments& args, int dim, int faceDegree, int cellDegree, const string& krylov)
 	{
 		_solver.Dimension = dim;
 		_solver.FaceDegree = faceDegree;
 		_solver.CellDegree = cellDegree;
-		_solver.Krylov = useFCG ? "fcg" : "none";
+		_solver.Krylov = krylov;
 		_solver.Tolerance = args.Solver.Tolerance;
 		_solver.MaxIterations = args.Solver.MaxIterations;
 		const MultigridArguments& mg = args.Solver.MG;
@@ -38,11 +38,14 @@ public:
 		os << "\t" << "Coarse solver           : " << s.CoarseSolver << " (matrix size <= " << s.CoarseMatrixMaxSize << ")";
 	}
 
-	void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
+	void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_T, const SparseMatrix& A_F_F, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
 	{
 		IterativeSolver::Setup(A);
 		// Without A_F_F, which the library computes from A: the setup of the codes that have A (e.g. HArDCore3D)
-		_solver.Setup(A, A_T_T, A_T_F, cellInterpOfOne, faceInterpOfOne);
+		if (A_F_T.rows() > 0)
+			_solver.SetupNonsymmetric(A, A_T_T, A_T_F, A_F_T, cellInterpOfOne, faceInterpOfOne);
+		else
+			_solver.SetupSymmetric(A, A_T_T, A_T_F, cellInterpOfOne, faceInterpOfOne);
 	}
 
 	void Solve(const Vector& b, Vector& x, bool xEquals0, bool computeResidual, bool computeAx) override
@@ -56,7 +59,7 @@ public:
 	}
 };
 
-IterativeSolver* CreateLibraryUAMG(const ProgramArguments& args, int dim, int faceDegree, int cellDegree, bool useFCG)
+IterativeSolver* CreateLibraryUAMG(const ProgramArguments& args, int dim, int faceDegree, int cellDegree, const string& krylov)
 {
-	return new LibraryUAMG(args, dim, faceDegree, cellDegree, useFCG);
+	return new LibraryUAMG(args, dim, faceDegree, cellDegree, krylov);
 }

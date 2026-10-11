@@ -42,7 +42,9 @@ public:
 	// interpolation of the function 1 on the polynomial bases of the cells (cellInterpOfOne, numbered as the rows of
 	// A_T_F) and of the faces of the system (faceInterpOfOne, numbered as the columns of A_T_F). The bases must be
 	// hierarchical with a constant first function (see UncondensedLevel::CoarsenMesh()).
-	virtual void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne)
+	// A_F_T: empty (0 x 0) if the matrix is symmetric (A_F_T = A_T_F^T); otherwise, the matrix is non-symmetric, and all
+	// the blocks are read in full.
+	virtual void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_T, const SparseMatrix& A_F_F, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne)
 	{
 		Utils::FatalError("This solver is not compatible with matrix blocks arising from a hybrid discretization.");
 	}

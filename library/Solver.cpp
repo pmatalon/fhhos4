@@ -110,25 +110,30 @@ namespace fhhos4
 			}
 		};
 
-		// A_FT A_TT^{-1} A_TF, from the lower part of A_TT
-		SparseMatrix CellElimination(const SparseMatrix& A_TT, const SparseMatrix& A_TF, int cellBlockSize)
+		// A_FT A_TT^{-1} A_TF. A_FT null: symmetric matrix, A_FT = A_TF^T, and A_TT read from its lower part.
+		SparseMatrix CellElimination(const SparseMatrix& A_TT, const SparseMatrix& A_TF, const SparseMatrix* A_FT, int cellBlockSize)
 		{
+			if (A_FT)
+			{
+				SparseMatrix invA_TT = Utils::InvertBlockDiagMatrix(A_TT, cellBlockSize);
+				return SparseMatrixOps::Multiply(*A_FT, SparseMatrixOps::Multiply(invA_TT, A_TF));
+			}
 			SparseMatrix invA_TT = Utils::InvertBlockDiagMatrix(SparseMatrixOps::FullFromLower(A_TT), cellBlockSize);
 			return SparseMatrixOps::Multiply(SparseMatrixOps::Transpose(A_TF), SparseMatrixOps::Multiply(invA_TT, A_TF));
 		}
 
-		// A = A_FF - A_FT A_TT^{-1} A_TF, from the lower parts of A_TT and A_FF
-		SparseMatrix CondensedMatrix(const SparseMatrix& A_TT, const SparseMatrix& A_TF, const SparseMatrix& A_FF, int cellBlockSize)
+		// A = A_FF - A_FT A_TT^{-1} A_TF. A_FT null: symmetric matrix, A_TT and A_FF read from their lower parts.
+		SparseMatrix CondensedMatrix(const SparseMatrix& A_TT, const SparseMatrix& A_TF, const SparseMatrix* A_FT, const SparseMatrix& A_FF, int cellBlockSize)
 		{
-			SparseMatrix A = SparseMatrixOps::FullFromLower(A_FF) - CellElimination(A_TT, A_TF, cellBlockSize);
+			SparseMatrix A = (A_FT ? A_FF : SparseMatrixOps::FullFromLower(A_FF)) - CellElimination(A_TT, A_TF, A_FT, cellBlockSize);
 			A.makeCompressed();
 			return A;
 		}
 
-		// A_FF = A + A_FT A_TT^{-1} A_TF, from the lower part of A_TT
-		SparseMatrix FaceBlock(const SparseMatrix& A, const SparseMatrix& A_TT, const SparseMatrix& A_TF, int cellBlockSize)
+		// A_FF = A + A_FT A_TT^{-1} A_TF. A_FT null: symmetric matrix, A_TT read from its lower part.
+		SparseMatrix FaceBlock(const SparseMatrix& A, const SparseMatrix& A_TT, const SparseMatrix& A_TF, const SparseMatrix* A_FT, int cellBlockSize)
 		{
-			SparseMatrix A_FF = A + CellElimination(A_TT, A_TF, cellBlockSize);
+			SparseMatrix A_FF = A + CellElimination(A_TT, A_TF, A_FT, cellBlockSize);
 			A_FF.makeCompressed();
 			return A_FF;
 		}
@@ -136,45 +141,56 @@ namespace fhhos4
 
 	struct Solver::Impl
 	{
-		// Set by Setup()
+		// Set by the setup
+		bool Symmetric = true; // the matrix is symmetric (SetupSymmetric...()), or not (SetupNonsymmetric...())
+		string Krylov;         // Solver::Krylov, or its default for the symmetry of the matrix
+		string CoarseSolver;   // Solver::CoarseSolver, or its default for the symmetry of the matrix
 		int CellDegree = 0;
 		int CellBlockSize = 0;
 		int FaceBlockSize = 0;
 		const SparseMatrix* A = nullptr; // the solvers keep a pointer to it: the caller's matrix, or OwnA
 		SparseMatrix OwnA;               // A if the library computes or converts it, empty otherwise
 		unique_ptr<UncondensedAMG> Multigrid;
-		unique_ptr<IterativeSolver> Krylov; // preconditioned by Multigrid; null if Solver::Krylov is "none"
+		unique_ptr<IterativeSolver> KrylovSolver; // preconditioned by Multigrid; null if Krylov is "none"
 		bool IsSetUp = false;
 
 		IterativeSolver* ActiveSolver() const
 		{
-			if (Krylov)
-				return Krylov.get();
+			if (KrylovSolver)
+				return KrylovSolver.get();
 			return Multigrid.get();
 		}
 
-		// Checks the parameters, and computes the block sizes
-		void CheckParameters(const Solver& s)
+		// Checks the parameters, and computes the block sizes and the Krylov method for the symmetry of the matrix
+		void CheckParameters(const Solver& s, bool symmetric)
 		{
 			if (s.Dimension != 2 && s.Dimension != 3)
-				Utils::FatalError("fhhos4::Solver: set Dimension (2 or 3) before Setup(), got " + to_string(s.Dimension) + ".");
+				Utils::FatalError("fhhos4::Solver: set Dimension (2 or 3) before the setup, got " + to_string(s.Dimension) + ".");
 			if (s.FaceDegree < 0)
-				Utils::FatalError("fhhos4::Solver: set FaceDegree (>= 0) before Setup(), got " + to_string(s.FaceDegree) + ".");
+				Utils::FatalError("fhhos4::Solver: set FaceDegree (>= 0) before the setup, got " + to_string(s.FaceDegree) + ".");
 			if (s.CellDegree < -1)
 				Utils::FatalError("fhhos4::Solver: CellDegree must be >= 0 (or -1: FaceDegree), got " + to_string(s.CellDegree) + ".");
 			if (s.Cycle != 'V' && s.Cycle != 'W' && s.Cycle != 'K')
 				Utils::FatalError(string("fhhos4::Solver: unknown Cycle '") + s.Cycle + "' (V, W or K).");
-			if (s.Krylov != "fcg" && s.Krylov != "bicgstab" && s.Krylov != "none")
-				Utils::FatalError("fhhos4::Solver: unknown Krylov method '" + s.Krylov + "' (fcg, bicgstab or none).");
+			if (s.Krylov != "" && s.Krylov != "fcg" && s.Krylov != "gcr" && s.Krylov != "bicgstab" && s.Krylov != "none")
+				Utils::FatalError("fhhos4::Solver: unknown Krylov method '" + s.Krylov + "' (fcg, gcr, bicgstab or none).");
 			if (s.Krylov == "bicgstab" && s.Cycle == 'K')
-				Utils::FatalError("fhhos4::Solver: BiCGSTAB is not flexible: it needs a linear preconditioner, a V- or W-cycle, not the K-cycle (non-linear: it solves the coarse levels with FCG iterations). Set Cycle to 'V' or 'W', or Krylov to \"fcg\".");
+				Utils::FatalError("fhhos4::Solver: BiCGSTAB is not flexible: it needs a linear preconditioner, a V- or W-cycle, not the K-cycle (non-linear: it solves the coarse levels with FCG or GCR iterations). Set Cycle to 'V' or 'W', or Krylov to \"fcg\" or \"gcr\".");
+			Symmetric = symmetric;
+			Krylov = !s.Krylov.empty() ? s.Krylov : (symmetric ? "fcg" : "gcr");
+			CoarseSolver = !s.CoarseSolver.empty() ? s.CoarseSolver : (symmetric ? "ch" : "lu");
+			if (!symmetric && Krylov == "fcg")
+				Utils::FatalError("fhhos4::Solver: the flexible conjugate gradient requires a symmetric matrix: set Krylov to \"gcr\" (or leave it empty) for a non-symmetric one.");
+			if (!symmetric && CoarseSolver == "ch")
+				Utils::FatalError("fhhos4::Solver: the Cholesky factorization requires a symmetric matrix: set CoarseSolver to \"lu\" (or leave it empty) for a non-symmetric one.");
 			CellDegree = s.CellDegree == -1 ? s.FaceDegree : s.CellDegree;
 			CellBlockSize = Utils::Binomial(CellDegree + s.Dimension, CellDegree);
 			FaceBlockSize = Utils::Binomial(s.FaceDegree + s.Dimension - 1, s.FaceDegree);
 		}
 
-		// The sizes and structure of the inputs, against the dimension and the degrees. A, A_FF: null if not given.
-		void CheckInputs(const Solver& s, const SparseMatrix* A, const SparseMatrix& A_TT, const SparseMatrix& A_TF, const SparseMatrix* A_FF, const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne) const
+		// The sizes and structure of the inputs, against the dimension and the degrees. A, A_FF: null if not given; A_FT:
+		// null if the matrix is symmetric.
+		void CheckInputs(const Solver& s, const SparseMatrix* A, const SparseMatrix& A_TT, const SparseMatrix& A_TF, const SparseMatrix* A_FT, const SparseMatrix* A_FF, const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne) const
 		{
 			string cellDoFs = to_string(CellBlockSize) + " DoFs per cell (CellDegree " + to_string(CellDegree) + ", Dimension " + to_string(s.Dimension) + ")";
 			string faceDoFs = to_string(FaceBlockSize) + " DoFs per face (FaceDegree " + to_string(s.FaceDegree) + ", Dimension " + to_string(s.Dimension) + ")";
@@ -187,6 +203,8 @@ namespace fhhos4
 				Utils::FatalError("fhhos4::Solver: the number of columns of A_TF (" + to_string(nFaceDoFs) + ") is not a multiple of the " + faceDoFs + ".");
 			if (A_TT.rows() != nCellDoFs || A_TT.cols() != nCellDoFs)
 				Utils::FatalError("fhhos4::Solver: A_TT is " + size(A_TT) + ", expected " + to_string(nCellDoFs) + " x " + to_string(nCellDoFs) + " (the rows of A_TF).");
+			if (A_FT && (A_FT->rows() != nFaceDoFs || A_FT->cols() != nCellDoFs))
+				Utils::FatalError("fhhos4::Solver: A_FT is " + size(*A_FT) + ", expected " + to_string(nFaceDoFs) + " x " + to_string(nCellDoFs) + " (the transpose of A_TF).");
 			if (A_FF && (A_FF->rows() != nFaceDoFs || A_FF->cols() != nFaceDoFs))
 				Utils::FatalError("fhhos4::Solver: A_FF is " + size(*A_FF) + ", expected " + to_string(nFaceDoFs) + " x " + to_string(nFaceDoFs) + " (the columns of A_TF).");
 			if (A && (A->rows() != nFaceDoFs || A->cols() != nFaceDoFs))
@@ -240,24 +258,26 @@ namespace fhhos4
 			MultigridArguments& mg = args.Solver.MG;
 			mg.CycleLetter = s.Cycle;
 			mg.WLoops = s.Cycle == 'W' ? 2 : 1;
+			mg.KCycleKrylov = Krylov == "gcr" || !Symmetric ? KrylovMethod::GCR : KrylovMethod::FCG; // GCR under GCR (Notay)
 			mg.PreSmoothingIterations = s.PreSmoothingIterations;
 			mg.PostSmoothingIterations = s.PostSmoothingIterations;
 			mg.PreSmootherCode = !s.PreSmoother.empty() ? s.PreSmoother : DefaultPreSmoother();
 			mg.PostSmootherCode = !s.PostSmoother.empty() ? s.PostSmoother : "<symmetric smoother>"; // the program's: rbgs after bgs, hrbgs after hbgs...
 			mg.CoarseningFactor = s.CoarseningFactor;
 			mg.MatrixMaxSizeForCoarsestLevel = s.CoarseMatrixMaxSize;
-			mg.CoarseSolverCode = s.CoarseSolver;
+			mg.CoarseSolverCode = CoarseSolver;
 			bool defaultCoarseOperator = true, defaultCycle = false, defaultHPCoarseningStgy = true;
 			ApplyUncondensedAMGDefaults(mg, s.FaceDegree, defaultCoarseOperator, defaultCycle, defaultHPCoarseningStgy);
 			return args;
 		}
 
-		// A: kept until the next setup; null to compute it from the blocks. A_FF: null if not given (not with A null).
-		void Setup(const Solver& s, InputMatrix* A, const SparseMatrix& A_TT, const SparseMatrix& A_TF, const SparseMatrix* A_FF, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne)
+		// A: kept until the next setup; null to compute it from the blocks. A_FT: null if the matrix is symmetric. A_FF: null
+		// if not given (not with A null).
+		void Setup(const Solver& s, InputMatrix* A, const SparseMatrix& A_TT, const SparseMatrix& A_TF, const SparseMatrix* A_FT, const SparseMatrix* A_FF, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne)
 		{
 			auto start = chrono::steady_clock::now();
 			IsSetUp = false;
-			Krylov.reset();
+			KrylovSolver.reset();
 			Multigrid.reset();
 			this->A = nullptr;
 			OwnA = SparseMatrix();
@@ -270,32 +290,41 @@ namespace fhhos4
 				this->A = A->Keep(OwnA);
 			else
 			{
-				OwnA = CondensedMatrix(A_TT, A_TF, *A_FF, CellBlockSize);
+				OwnA = CondensedMatrix(A_TT, A_TF, A_FT, *A_FF, CellBlockSize);
 				this->A = &OwnA;
 			}
 			SparseMatrix computedA_FF; // empty if A_FF is given, or not needed (the algorithm of the paper only uses A_TT and A_TF)
 			if (!A_FF && Multigrid->A_F_FNeeded())
-				computedA_FF = FaceBlock(*this->A, A_TT, A_TF, CellBlockSize);
+				computedA_FF = FaceBlock(*this->A, A_TT, A_TF, A_FT, CellBlockSize);
 
-			// The Krylov method preconditioned by one cycle (SolverPreconditioner), as SolverFactory (-s fcguamg), except
-			// the residual replacement: the tolerance applies to the true residual (Result::RelativeResidual = |b - Ax|/|b|)
-			if (s.Krylov == "fcg")
+			// The Krylov method preconditioned by one cycle (SolverPreconditioner), as SolverFactory (-s fcguamg, gcruamg),
+			// except the residual replacement: the tolerance applies to the true residual (Result::RelativeResidual =
+			// |b - Ax|/|b|)
+			if (Krylov == "fcg")
 			{
 				auto fcg = make_unique<FlexibleConjugateGradient>(1);
 				fcg->ResidualRecomputation = 20;
 				fcg->Precond = SolverPreconditioner(Multigrid.get());
-				Krylov = std::move(fcg);
+				KrylovSolver = std::move(fcg);
 			}
-			else if (s.Krylov == "bicgstab")
+			else if (Krylov == "gcr")
+			{
+				auto gcr = make_unique<GeneralizedConjugateResidual>();
+				gcr->ResidualReplacement = true;
+				gcr->Precond = SolverPreconditioner(Multigrid.get());
+				KrylovSolver = std::move(gcr);
+			}
+			else if (Krylov == "bicgstab")
 			{
 				auto bicgstab = make_unique<PreconditionedBiCGSTAB>();
 				bicgstab->Precond = SolverPreconditioner(Multigrid.get());
-				Krylov = std::move(bicgstab);
+				KrylovSolver = std::move(bicgstab);
 			}
 			ActiveSolver()->PrintIterationResults = args.Solver.PrintIterationResults;
 
 			// The blocks are only read during the setup (UncondensedAMG::Setup())
-			ActiveSolver()->Setup(*this->A, A_TT, A_TF, A_FF ? *A_FF : computedA_FF, cellInterpOfOne, faceInterpOfOne);
+			SparseMatrix symmetric; // empty A_FT: symmetric matrix
+			ActiveSolver()->Setup(*this->A, A_TT, A_TF, A_FT ? *A_FT : symmetric, A_FF ? *A_FF : computedA_FF, cellInterpOfOne, faceInterpOfOne);
 			IsSetUp = true;
 
 			if (s.Verbosity == 1)
@@ -305,7 +334,7 @@ namespace fhhos4
 		void CheckSetUp(const char* function) const
 		{
 			if (!IsSetUp)
-				Utils::FatalError(string("fhhos4::Solver::") + function + "(): Setup() must be called first (and succeed).");
+				Utils::FatalError(string("fhhos4::Solver::") + function + "(): a setup function must be called first (and succeed).");
 		}
 
 		void CheckVectorSize(Eigen::Index size, const char* vector) const
@@ -332,36 +361,69 @@ namespace fhhos4
 	Solver& Solver::operator=(Solver&&) noexcept = default;
 
 	template <typename SparseMatrixType>
-	void Solver::Setup(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FF,
-	                   const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
+	void Solver::SetupSymmetric(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FF,
+	                            const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
 	{
 		CallScope scope(*this);
-		_impl->CheckParameters(*this);
+		_impl->CheckParameters(*this, true);
 		InputMatrix a(A, "A"), a_TT(A_TT, "A_TT"), a_TF(A_TF, "A_TF"), a_FF(A_FF, "A_FF");
-		_impl->CheckInputs(*this, &a.Get(), a_TT.Get(), a_TF.Get(), &a_FF.Get(), cellInterpOfOne, faceInterpOfOne);
-		_impl->Setup(*this, &a, a_TT.Get(), a_TF.Get(), &a_FF.Get(), cellInterpOfOne, faceInterpOfOne);
+		_impl->CheckInputs(*this, &a.Get(), a_TT.Get(), a_TF.Get(), nullptr, &a_FF.Get(), cellInterpOfOne, faceInterpOfOne);
+		_impl->Setup(*this, &a, a_TT.Get(), a_TF.Get(), nullptr, &a_FF.Get(), cellInterpOfOne, faceInterpOfOne);
 	}
 
 	template <typename SparseMatrixType>
-	void Solver::Setup(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF,
-	                   const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
+	void Solver::SetupSymmetric(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF,
+	                            const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
 	{
 		CallScope scope(*this);
-		_impl->CheckParameters(*this);
+		_impl->CheckParameters(*this, true);
 		InputMatrix a(A, "A"), a_TT(A_TT, "A_TT"), a_TF(A_TF, "A_TF");
-		_impl->CheckInputs(*this, &a.Get(), a_TT.Get(), a_TF.Get(), nullptr, cellInterpOfOne, faceInterpOfOne);
-		_impl->Setup(*this, &a, a_TT.Get(), a_TF.Get(), nullptr, cellInterpOfOne, faceInterpOfOne);
+		_impl->CheckInputs(*this, &a.Get(), a_TT.Get(), a_TF.Get(), nullptr, nullptr, cellInterpOfOne, faceInterpOfOne);
+		_impl->Setup(*this, &a, a_TT.Get(), a_TF.Get(), nullptr, nullptr, cellInterpOfOne, faceInterpOfOne);
 	}
 
 	template <typename SparseMatrixType>
-	void Solver::SetupFromBlocks(const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FF,
-	                             const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
+	void Solver::SetupSymmetricFromBlocks(const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FF,
+	                                      const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
 	{
 		CallScope scope(*this);
-		_impl->CheckParameters(*this);
+		_impl->CheckParameters(*this, true);
 		InputMatrix a_TT(A_TT, "A_TT"), a_TF(A_TF, "A_TF"), a_FF(A_FF, "A_FF");
-		_impl->CheckInputs(*this, nullptr, a_TT.Get(), a_TF.Get(), &a_FF.Get(), cellInterpOfOne, faceInterpOfOne);
-		_impl->Setup(*this, nullptr, a_TT.Get(), a_TF.Get(), &a_FF.Get(), cellInterpOfOne, faceInterpOfOne);
+		_impl->CheckInputs(*this, nullptr, a_TT.Get(), a_TF.Get(), nullptr, &a_FF.Get(), cellInterpOfOne, faceInterpOfOne);
+		_impl->Setup(*this, nullptr, a_TT.Get(), a_TF.Get(), nullptr, &a_FF.Get(), cellInterpOfOne, faceInterpOfOne);
+	}
+
+	template <typename SparseMatrixType>
+	void Solver::SetupNonsymmetric(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FT, const SparseMatrixType& A_FF,
+	                               const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
+	{
+		CallScope scope(*this);
+		_impl->CheckParameters(*this, false);
+		InputMatrix a(A, "A"), a_TT(A_TT, "A_TT"), a_TF(A_TF, "A_TF"), a_FT(A_FT, "A_FT"), a_FF(A_FF, "A_FF");
+		_impl->CheckInputs(*this, &a.Get(), a_TT.Get(), a_TF.Get(), &a_FT.Get(), &a_FF.Get(), cellInterpOfOne, faceInterpOfOne);
+		_impl->Setup(*this, &a, a_TT.Get(), a_TF.Get(), &a_FT.Get(), &a_FF.Get(), cellInterpOfOne, faceInterpOfOne);
+	}
+
+	template <typename SparseMatrixType>
+	void Solver::SetupNonsymmetric(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FT,
+	                               const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
+	{
+		CallScope scope(*this);
+		_impl->CheckParameters(*this, false);
+		InputMatrix a(A, "A"), a_TT(A_TT, "A_TT"), a_TF(A_TF, "A_TF"), a_FT(A_FT, "A_FT");
+		_impl->CheckInputs(*this, &a.Get(), a_TT.Get(), a_TF.Get(), &a_FT.Get(), nullptr, cellInterpOfOne, faceInterpOfOne);
+		_impl->Setup(*this, &a, a_TT.Get(), a_TF.Get(), &a_FT.Get(), nullptr, cellInterpOfOne, faceInterpOfOne);
+	}
+
+	template <typename SparseMatrixType>
+	void Solver::SetupNonsymmetricFromBlocks(const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FT, const SparseMatrixType& A_FF,
+	                                         const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
+	{
+		CallScope scope(*this);
+		_impl->CheckParameters(*this, false);
+		InputMatrix a_TT(A_TT, "A_TT"), a_TF(A_TF, "A_TF"), a_FT(A_FT, "A_FT"), a_FF(A_FF, "A_FF");
+		_impl->CheckInputs(*this, nullptr, a_TT.Get(), a_TF.Get(), &a_FT.Get(), &a_FF.Get(), cellInterpOfOne, faceInterpOfOne);
+		_impl->Setup(*this, nullptr, a_TT.Get(), a_TF.Get(), &a_FT.Get(), &a_FF.Get(), cellInterpOfOne, faceInterpOfOne);
 	}
 
 	Result Solver::Solve(const Eigen::Ref<const Eigen::VectorXd>& b, Eigen::Ref<Eigen::VectorXd> x)
@@ -411,17 +473,30 @@ namespace fhhos4
 	// The supported matrices
 #define FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex) const Eigen::SparseMatrix<double, StorageOrder, StorageIndex>&
 #define FHHOS4_AMG_INSTANTIATE_SETUP(StorageOrder, StorageIndex) \
-	template void Solver::Setup<Eigen::SparseMatrix<double, StorageOrder, StorageIndex>>( \
+	template void Solver::SetupSymmetric<Eigen::SparseMatrix<double, StorageOrder, StorageIndex>>( \
 		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
 		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
 		const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&); \
-	template void Solver::Setup<Eigen::SparseMatrix<double, StorageOrder, StorageIndex>>( \
+	template void Solver::SetupSymmetric<Eigen::SparseMatrix<double, StorageOrder, StorageIndex>>( \
 		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
 		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
 		const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&); \
-	template void Solver::SetupFromBlocks<Eigen::SparseMatrix<double, StorageOrder, StorageIndex>>( \
+	template void Solver::SetupSymmetricFromBlocks<Eigen::SparseMatrix<double, StorageOrder, StorageIndex>>( \
 		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
 		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
+		const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&); \
+	template void Solver::SetupNonsymmetric<Eigen::SparseMatrix<double, StorageOrder, StorageIndex>>( \
+		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
+		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
+		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
+		const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&); \
+	template void Solver::SetupNonsymmetric<Eigen::SparseMatrix<double, StorageOrder, StorageIndex>>( \
+		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
+		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
+		const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&); \
+	template void Solver::SetupNonsymmetricFromBlocks<Eigen::SparseMatrix<double, StorageOrder, StorageIndex>>( \
+		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
+		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
 		const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&);
 
 	FHHOS4_AMG_INSTANTIATE_SETUP(Eigen::ColMajor, int)

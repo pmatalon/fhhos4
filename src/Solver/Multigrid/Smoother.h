@@ -33,6 +33,16 @@ public:
 			_solver->Setup(A);
 	}
 
+	// The order of the (block) rows in all the sweeps of the Gauss-Seidel smoothers (see DownwindOrder()); the other
+	// smoothers keep theirs
+	void SetSweepOrder(const vector<BigNumber>* order)
+	{
+		if (GaussSeidel* gs = dynamic_cast<GaussSeidel*>(_solver))
+			gs->SweepOrder = order;
+		else if (BlockGaussSeidel* bgs = dynamic_cast<BlockGaussSeidel*>(_solver))
+			bgs->SweepOrder = order;
+	}
+
 	bool CanOptimizeResidualComputation()
 	{
 		return _solver->CanOptimizeResidualComputation() && _solver->MaxIterations > 0;

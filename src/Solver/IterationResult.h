@@ -103,6 +103,18 @@ public:
 			ComputeError(x);
 		if (OnNewSolution)
 			OnNewSolution(*this, x);
+		StopTimers();
+	}
+
+	// Whether SetX() uses the iterate (error against the exact solution, callback). If not, a solver that doesn't form
+	// the iterate at each iteration (GCR) ends the iteration with StopTimers() instead.
+	bool NeedsX() const
+	{
+		return _computeError || OnNewSolution;
+	}
+
+	void StopTimers()
+	{
 		this->_solvingTimer.Stop();
 		this->_iterationTimer.Stop();
 	}

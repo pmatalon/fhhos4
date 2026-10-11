@@ -272,9 +272,21 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 				faceInterpOfOne = problem->FaceInterpOfOne();
 			}
 
+			// -uamg-nonsym: the blocks of a non-symmetric matrix, in full, with A_F_T = A_T_F^T
+			bool nonsymmetric = uamg && args.Solver.MG.UAMGNonsymmetric;
+			SparseMatrix A_T_T, A_ndF_T, A_ndF_ndF;
+			if (nonsymmetric)
+			{
+				A_T_T = SparseMatrixOps::FullFromLower(problem->A_T_T);
+				A_ndF_T = SparseMatrixOps::Transpose(problem->A_T_ndF);
+				A_ndF_ndF = SparseMatrixOps::FullFromLower(problem->A_ndF_ndF);
+			}
+
 			setupTimer.Start();
-			if (uamg)
-				iterativeSolver->Setup(problem->A, problem->A_T_T, problem->A_T_ndF, problem->A_ndF_ndF, cellInterpOfOne, faceInterpOfOne);
+			if (nonsymmetric)
+				iterativeSolver->Setup(problem->A, A_T_T, problem->A_T_ndF, A_ndF_T, A_ndF_ndF, cellInterpOfOne, faceInterpOfOne);
+			else if (uamg)
+				iterativeSolver->Setup(problem->A, problem->A_T_T, problem->A_T_ndF, SparseMatrix(), problem->A_ndF_ndF, cellInterpOfOne, faceInterpOfOne);
 			else
 				solver->Setup(problem->A);
 			setupTimer.Stop();

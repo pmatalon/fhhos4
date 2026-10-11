@@ -177,7 +177,7 @@ void Program_BiHarmonic_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults
 
 			lapSolverSetupTimer.Start();
 			if (uamg)
-				iterativeSolver->Setup(biHarPb->DiffPb().A, biHarPb->DiffPb().A_T_T, biHarPb->DiffPb().A_T_ndF, biHarPb->DiffPb().A_ndF_ndF, cellInterpOfOne, faceInterpOfOne);
+				iterativeSolver->Setup(biHarPb->DiffPb().A, biHarPb->DiffPb().A_T_T, biHarPb->DiffPb().A_T_ndF, SparseMatrix(), biHarPb->DiffPb().A_ndF_ndF, cellInterpOfOne, faceInterpOfOne);
 			else
 				diffSolver->Setup(biHarPb->DiffPb().A);
 			lapSolverSetupTimer.Stop();

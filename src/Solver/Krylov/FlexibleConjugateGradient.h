@@ -43,10 +43,12 @@ public:
 		this->SetupComputationalWork = this->Precond.SetupComputationalWork();
 	}
 
-	void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
+	void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_T, const SparseMatrix& A_F_F, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
 	{
+		if (A_F_T.rows() > 0)
+			Utils::FatalError("The flexible conjugate gradient requires a symmetric matrix: use GCR for a non-symmetric one.");
 		IterativeSolver::Setup(A);
-		this->Precond.Setup(A, A_T_T, A_T_F, A_F_F, cellInterpOfOne, faceInterpOfOne);
+		this->Precond.Setup(A, A_T_T, A_T_F, A_F_T, A_F_F, cellInterpOfOne, faceInterpOfOne);
 		this->SetupComputationalWork = this->Precond.SetupComputationalWork();
 	}
 

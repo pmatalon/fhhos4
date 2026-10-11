@@ -17,68 +17,51 @@ public:
 	static Solver* CreateSolver(const ProgramArguments& args, Diffusion_HHO<Dim>* problem, int blockSize, const ExportModule& out)
 	{
 		Solver* solver = nullptr;
-		bool libraryFCG = args.Solver.SolverCode.compare("fcglibuamg") == 0 || (args.Solver.SolverCode.compare("fcg") == 0 && args.Solver.PreconditionerCode.compare("libuamg") == 0);
-		if (!libraryFCG && (args.Solver.PreconditionerCode.compare("libuamg") == 0 || (args.Solver.SolverCode.rfind("cg", 0) == 0 && args.Solver.SolverCode.find("libuamg") != string::npos)))
-			Utils::FatalError("libuamg can only be used alone or with -s fcg (its FCG is inside the library): U-AMG is a non-linear preconditioner.");
-		if (args.Solver.SolverCode.compare("libuamg") == 0 || libraryFCG)
+		// U-AMG through the library: alone, or with the Krylov method of the library (fhhos4::Solver::Krylov)
+		string libraryKrylov; // empty if the library is not used
+		if (args.Solver.SolverCode.compare("libuamg") == 0)
+			libraryKrylov = "none";
+		else if ((args.Solver.SolverCode.compare("fcg") == 0 || args.Solver.SolverCode.compare("gcr") == 0) && args.Solver.PreconditionerCode.compare("libuamg") == 0)
+			libraryKrylov = args.Solver.SolverCode;
+		else if (args.Solver.SolverCode.compare("fcglibuamg") == 0 || args.Solver.SolverCode.compare("gcrlibuamg") == 0)
+			libraryKrylov = args.Solver.SolverCode.substr(0, 3);
+		if (libraryKrylov.empty() && (args.Solver.PreconditionerCode.compare("libuamg") == 0 || args.Solver.SolverCode.find("libuamg") != string::npos))
+			Utils::FatalError("libuamg can only be used alone or with -s fcg or gcr (their implementations are inside the library): U-AMG is a non-linear preconditioner.");
+		if (!libraryKrylov.empty())
 		{
 			if (!problem)
 				Utils::FatalError("The solver libuamg needs the HHO problem: it cannot be a coarse solver.");
-			solver = CreateLibraryUAMG(args, Dim, problem->HHO->FaceBasis->GetDegree(), problem->HHO->CellBasis->GetDegree(), libraryFCG);
+			solver = CreateLibraryUAMG(args, Dim, problem->HHO->FaceBasis->GetDegree(), problem->HHO->CellBasis->GetDegree(), libraryKrylov);
 		}
 		else if (args.Solver.SolverCode.compare("cg") == 0)
 		{
 			ConjugateGradient* cg = new ConjugateGradient();
-			if (!args.Solver.PreconditionerCode.empty() && args.Solver.PreconditionerCode.compare("default") != 0)
-			{
-				ProgramArguments precondArgs = args;
-				precondArgs.Solver.SolverCode = args.Solver.PreconditionerCode;
-				precondArgs.Solver.PreconditionerCode = "";
-				Solver* precondSolver = CreateSolver(precondArgs, problem, blockSize, out);
-				cg->Precond = SolverPreconditioner(precondSolver);
-			}
+			cg->Precond = CreatePreconditioner(args, args.Solver.PreconditionerCode, problem, blockSize, out);
 			solver = cg;
 		}
 		else if (args.Solver.SolverCode.rfind("cg", 0) == 0) // if SolverCode starts with "cg"
 		{
 			ConjugateGradient* cg = new ConjugateGradient();
-			string preconditionerCode = args.Solver.SolverCode.substr(2, args.Solver.SolverCode.length() - 2);
-			if (!preconditionerCode.empty())
-			{
-				ProgramArguments precondArgs = args;
-				precondArgs.Solver.SolverCode = preconditionerCode;
-				precondArgs.Solver.PreconditionerCode = "";
-				Solver* precondSolver = CreateSolver(precondArgs, problem, blockSize, out);
-				cg->Precond = SolverPreconditioner(precondSolver);
-			}
+			cg->Precond = CreatePreconditioner(args, args.Solver.SolverCode.substr(2), problem, blockSize, out);
 			solver = cg;
 		}
 		else if (args.Solver.SolverCode.compare("fcg") == 0)
 		{
 			FlexibleConjugateGradient* fcg = new FlexibleConjugateGradient(1);
-			if (!args.Solver.PreconditionerCode.empty() && args.Solver.PreconditionerCode.compare("default") != 0)
-			{
-				ProgramArguments precondArgs = args;
-				precondArgs.Solver.SolverCode = args.Solver.PreconditionerCode;
-				precondArgs.Solver.PreconditionerCode = "";
-				Solver* precondSolver = CreateSolver(precondArgs, problem, blockSize, out);
-				fcg->Precond = SolverPreconditioner(precondSolver);
-			}
+			fcg->Precond = CreatePreconditioner(args, args.Solver.PreconditionerCode, problem, blockSize, out);
 			solver = fcg;
 		}
 		else if (args.Solver.SolverCode.rfind("fcg", 0) == 0) // if SolverCode starts with "fcg"
 		{
 			FlexibleConjugateGradient* fcg = new FlexibleConjugateGradient(1);
-			string preconditionerCode = args.Solver.SolverCode.substr(3, args.Solver.SolverCode.length() - 3);
-			if (!preconditionerCode.empty())
-			{
-				ProgramArguments precondArgs = args;
-				precondArgs.Solver.SolverCode = preconditionerCode;
-				precondArgs.Solver.PreconditionerCode = "";
-				Solver* precondSolver = CreateSolver(precondArgs, problem, blockSize, out);
-				fcg->Precond = SolverPreconditioner(precondSolver);
-			}
+			fcg->Precond = CreatePreconditioner(args, args.Solver.SolverCode.substr(3), problem, blockSize, out);
 			solver = fcg;
+		}
+		else if (args.Solver.SolverCode.compare("gcr") == 0)
+		{
+			GeneralizedConjugateResidual* gcr = new GeneralizedConjugateResidual();
+			gcr->Precond = CreatePreconditioner(args, args.Solver.PreconditionerCode, problem, blockSize, out);
+			solver = gcr;
 		}
 		else if (args.Solver.SolverCode.compare("mg") == 0)
 		{
@@ -130,6 +113,17 @@ public:
 	}
 
 private:
+	// The preconditioner of a Krylov method: the solver of code precondCode (none if empty or "default")
+	static SolverPreconditioner CreatePreconditioner(const ProgramArguments& args, const string& precondCode, Diffusion_HHO<Dim>* problem, int blockSize, const ExportModule& out)
+	{
+		if (precondCode.empty() || precondCode.compare("default") == 0)
+			return SolverPreconditioner();
+		ProgramArguments precondArgs = args;
+		precondArgs.Solver.SolverCode = precondCode;
+		precondArgs.Solver.PreconditionerCode = "";
+		return SolverPreconditioner(CreateSolver(precondArgs, problem, blockSize, out));
+	}
+
 	static void SetMultigridParameters(Multigrid* mg, const ProgramArguments& args, int blockSize, const ExportModule& out)
 	{
 		AlgebraicSolverFactory::SetMultigridParameters(mg, args, Dim, blockSize, out, CoarseSolvers(out));

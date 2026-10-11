@@ -4,6 +4,7 @@
 #include "HybridAlgebraicMesh.h"
 #include "LocalMatrices.h"
 #include "../AggregAMG/AlgebraicMesh.h"
+#include "../DownwindOrder.h"
 #include "../Level.h"
 #include "../../../Utils/SparseMatrixOps.h"
 using namespace std;
@@ -22,6 +23,8 @@ public:
 	const SparseMatrix* A_T_T;
 	const SparseMatrix* A_T_F;
 	const SparseMatrix* A_F_F;
+	// Non-symmetric matrix: the block A_F_T (faces x cells); null if the matrix is symmetric (A_F_T = A_T_F^T)
+	const SparseMatrix* A_F_T = nullptr;
 private:
 	//SparseMatrix Q_T;
 	SparseMatrix Q_F;
@@ -29,8 +32,21 @@ private:
 	SparseMatrix A_T_Tc;
 	SparseMatrix A_T_Fc;
 	SparseMatrix A_F_Fc;
+	SparseMatrix A_F_Tc;
+	SparseMatrix _extractedA_F_T;     // A_F_T of a p-coarse level (SetupOperatorByBlockExtraction())
+	vector<BigNumber> _downwindOrder; // non-symmetric matrix: the order of the faces in the sweeps of the smoothers
 public:
 	SparseMatrix Ac;
+
+	// Set by UncondensedAMG. The same algorithm runs for a symmetric matrix or not; a symmetric one is optimized: the
+	// blocks A_T_T, A_T_F, A_F_F and the operator are read from their lower triangular part, the blocks of A_T_T are
+	// factorized by Cholesky (LU otherwise), the local Galerkin products (LocalOp) compute the lower triangular parts.
+	// Non-symmetric: all the blocks are read in full, A_F_T is given, the coarse operators are P^T A P (restriction P^T).
+	bool Symmetric = true;
+
+	// Set by UncondensedAMG: with a non-symmetric matrix, the Gauss-Seidel smoothers follow the downwind order of the
+	// operator (DownwindOrder()), in the pre- and post-smoothing
+	bool DownwindOrdering = true;
 
 	// Set by UncondensedAMG, to skip the computations that the chosen options don't use:
 	// - the blocks A_F_F of the coarse levels, computed at each coarsening step, and the fine one (may be null);
@@ -135,14 +151,17 @@ public:
 		const SparseMatrix* levelA_T_T = this->A_T_T;
 		const SparseMatrix* levelA_T_F = this->A_T_F;
 		const SparseMatrix* levelA_F_F = this->A_F_F;
+		const SparseMatrix* levelA_F_T = this->A_F_T;
 		SparseMatrix scaledA     = ScaleConstantDoFs(*levelA,     FaceInterpOfOne, _faceBlockSize, FaceInterpOfOne, _faceBlockSize);
 		SparseMatrix scaledA_T_T = ScaleConstantDoFs(*levelA_T_T, CellInterpOfOne, _cellBlockSize, CellInterpOfOne, _cellBlockSize);
 		SparseMatrix scaledA_T_F = ScaleConstantDoFs(*levelA_T_F, CellInterpOfOne, _cellBlockSize, FaceInterpOfOne, _faceBlockSize);
 		SparseMatrix scaledA_F_F = levelA_F_F ? ScaleConstantDoFs(*levelA_F_F, FaceInterpOfOne, _faceBlockSize, FaceInterpOfOne, _faceBlockSize) : SparseMatrix();
+		SparseMatrix scaledA_F_T = levelA_F_T ? ScaleConstantDoFs(*levelA_F_T, FaceInterpOfOne, _faceBlockSize, CellInterpOfOne, _cellBlockSize) : SparseMatrix();
 		this->OperatorMatrix = &scaledA;
 		this->A_T_T = &scaledA_T_T;
 		this->A_T_F = &scaledA_T_F;
 		this->A_F_F = levelA_F_F ? &scaledA_F_F : nullptr;
+		this->A_F_T = levelA_F_T ? &scaledA_F_T : nullptr;
 
 		CoarsenInPasses(coarseningStgy, faceCoarseningStgy, requestedCoarseningFactor, coarsestPossibleMeshReached);
 
@@ -150,6 +169,7 @@ public:
 		this->A_T_T = levelA_T_T;
 		this->A_T_F = levelA_T_F;
 		this->A_F_F = levelA_F_F;
+		this->A_F_T = levelA_F_T;
 		if (LocalOp && LocalOp->Assembled == &scaledA)
 			LocalOp->Assembled = nullptr;
 		if (coarsestPossibleMeshReached)
@@ -215,6 +235,8 @@ public:
 		double nCoarsenings = 0;
 
 		HybridAlgebraicMesh initialFineMesh(A_T_T, A_T_F, A_F_F, _cellBlockSize, _faceBlockSize, _strongCouplingThreshold);
+		initialFineMesh.A_F_T = A_F_T;
+		initialFineMesh.Symmetric = Symmetric;
 		mesh = &initialFineMesh;
 
 		while (!CoarseningCriteriaReached(coarseningStgy, requestedCoarseningFactor, nCoarsenings, actualCoarseningFactor))
@@ -275,6 +297,7 @@ public:
 				delete mesh->A_T_T;
 				delete mesh->A_T_F;
 				if (mesh->A_F_F) delete mesh->A_F_F;
+				if (mesh->A_F_T) delete mesh->A_F_T;
 				delete schur;
 				delete mesh;
 			}
@@ -292,6 +315,8 @@ public:
 			this->A_T_Fc = std::move(*coarseMesh->A_T_F);
 			if (coarseMesh->A_F_F)
 				this->A_F_Fc = std::move(*coarseMesh->A_F_F);
+			if (coarseMesh->A_F_T)
+				this->A_F_Tc = std::move(*coarseMesh->A_F_T);
 			if (LocalGalerkinProducts())
 			{
 				// The operator of the level is only assembled here (for the smoothers and the coarse solver)
@@ -313,10 +338,14 @@ public:
 			this->A_T_Tc = std::move(*coarseMesh->A_T_T);
 			SparseMatrix Pt = SparseMatrixOps::Transpose(this->P);
 			this->A_T_Fc = SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(SparseMatrixOps::Transpose(Q_T), *this->A_T_F), this->P);
+			if (!Symmetric)
+				this->A_F_Tc = SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(Pt, *this->A_F_T), Q_T);
 			if (ComputeCoarseA_F_F)
 				this->A_F_Fc = SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(Pt, *this->A_F_F), this->P);
 			this->Ac     = SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(Pt, *this->OperatorMatrix), this->P);
 		}
+		if (coarseMesh->A_F_T)
+			delete coarseMesh->A_F_T;
 		delete coarseMesh;
 		delete schur;
 	}
@@ -457,7 +486,7 @@ public:
 		// Local matrices of the operator, if they don't come from the previous coarsening pass
 		if (local && schur && LocalOp->Assembled != schur)
 		{
-			LocalOp->Current.Decompose(*schur, mesh, _faceBlockSize);
+			LocalOp->Current.Decompose(*schur, mesh, _faceBlockSize, Symmetric);
 			LocalOp->Assembled = schur;
 		}
 
@@ -490,18 +519,21 @@ public:
 
 		// Intermediate coarse operators
 		// The products are evaluated from left to right, and the symmetric matrices are given by their lower triangular part
+		// (non-symmetric: in full)
+		auto full = [this](const SparseMatrix& M) { return Symmetric ? SparseMatrixOps::FullFromLower(M) : M; };
 		SparseMatrix Q_Tt = SparseMatrixOps::Transpose(Q_T);
 		SparseMatrix Q_Tt_A_T_F = SparseMatrixOps::Multiply(Q_Tt, *mesh.A_T_F);
 		SparseMatrix* A_T_Tc = nullptr;
 		SparseMatrix* A_T_Fc_tmp = nullptr;
 		if (!onlyFacesUsed)
 		{
-			A_T_Tc     = new SparseMatrix(SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(Q_Tt, SparseMatrixOps::FullFromLower(*mesh.A_T_T)), Q_T));
+			A_T_Tc     = new SparseMatrix(SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(Q_Tt, full(*mesh.A_T_T)), Q_T));
 			A_T_Fc_tmp = new SparseMatrix(SparseMatrixOps::Multiply(Q_Tt_A_T_F, *Q_F));
 		}
 
 		// The prolongation only uses its matrices and the faces of its elements (reconstruction, Theta())
 		HybridAlgebraicMesh auxCoarseMesh(A_T_Tc, A_T_Fc_tmp, nullptr, _cellBlockSize, _faceBlockSize, _strongCouplingThreshold);
+		auxCoarseMesh.Symmetric = Symmetric;
 		auxCoarseMesh.BuildElementFaces();
 
 		/*ExportMatrix(Q_T, "Q_T", 0);
@@ -520,7 +552,7 @@ public:
 			Pt = SparseMatrixOps::Transpose(*P);
 		SparseMatrix* A_F_Fc = nullptr;
 		if (ComputeCoarseA_F_F)
-			A_F_Fc = new SparseMatrix(SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(Pt, SparseMatrixOps::FullFromLower(*mesh.A_F_F)), *P));
+			A_F_Fc = new SparseMatrix(SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(Pt, full(*mesh.A_F_F)), *P));
 		SparseMatrix* schurc = nullptr;
 		if (local)
 		{
@@ -529,9 +561,12 @@ public:
 			LocalOp->Assembled = nullptr;
 		}
 		else
-			schurc = new SparseMatrix(SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(Pt, SparseMatrixOps::FullFromLower(*schur)), *P));
+			schurc = new SparseMatrix(SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(Pt, full(*schur)), *P));
 
 		HybridAlgebraicMesh* coarseMesh = new HybridAlgebraicMesh(A_T_Tc, A_T_Fc, A_F_Fc, _cellBlockSize, _faceBlockSize, _strongCouplingThreshold);
+		coarseMesh->Symmetric = Symmetric;
+		if (!Symmetric)
+			coarseMesh->A_F_T = new SparseMatrix(SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(Pt, *mesh.A_F_T), Q_T));
 		
 		return { coarseMesh, P, Q_F, schurc, coarsestPossibleMeshReached };
 	}
@@ -625,7 +660,7 @@ public:
 					HybridFaceAggregate* cf = ce.CoarseFaces[cfLocalNumber];
 					A_Tc_F.block(0, cfLocalNumber*fbs, cbs, fbs) = coarseMesh.A_T_F->block(ce.Number*cbs, cf->Number*fbs, cbs, fbs);
 				}
-				DenseMatrix Theta_Tc = -A_Tc_Tc.llt().solve(A_Tc_F);
+				DenseMatrix Theta_Tc = Symmetric ? DenseMatrix(-A_Tc_Tc.llt().solve(A_Tc_F)) : DenseMatrix(-A_Tc_Tc.partialPivLu().solve(A_Tc_F));
 
 				// Matrix for minimization problem
 				DenseMatrix M(ce.FineElements.size()*cbs, ce.RemovedFineFaces.size()*fbs);
@@ -645,7 +680,7 @@ public:
 						HybridAlgebraicFace* ff = fe->Faces[ffLocalNumber];
 						A_Tf_F.block(0, ffLocalNumber*fbs, cbs, fbs) = mesh.A_T_F->block(fe->Number*cbs, ff->Number*fbs, cbs, fbs);
 					}
-					DenseMatrix Theta_Tf = -A_Tf_Tf.llt().solve(A_Tf_F);
+					DenseMatrix Theta_Tf = Symmetric ? DenseMatrix(-A_Tf_Tf.llt().solve(A_Tf_F)) : DenseMatrix(-A_Tf_Tf.partialPivLu().solve(A_Tf_F));
 					//cout << "Theta_Tf = " << endl << Theta_Tf << endl;
 					assert((Theta_Tf.array() > 0).all());
 
@@ -780,6 +815,13 @@ public:
 		this->OperatorMatrix = ExtractCoarseMatrix(*this->FinerLevel->OperatorMatrix, nFaces, nFaces, fine->_faceBlockSize, fine->_faceBlockSize, this->_faceBlockSize, this->_faceBlockSize);
 		this->A_T_T = ExtractCoarseMatrix(*fine->A_T_T, nElems, nElems, fine->_cellBlockSize, fine->_cellBlockSize, this->_cellBlockSize, this->_cellBlockSize);
 		this->A_T_F = ExtractCoarseMatrix(*fine->A_T_F, nElems, nFaces, fine->_cellBlockSize, fine->_faceBlockSize, this->_cellBlockSize, this->_faceBlockSize);
+		if (fine->A_F_T)
+		{
+			SparseMatrix* A_F_T = ExtractCoarseMatrix(*fine->A_F_T, nFaces, nElems, fine->_faceBlockSize, fine->_cellBlockSize, this->_faceBlockSize, this->_cellBlockSize);
+			_extractedA_F_T = std::move(*A_F_T);
+			delete A_F_T;
+			this->A_F_T = &_extractedA_F_T;
+		}
 		// A_F_F: only for the options that use it (see UncondensedAMG::A_F_FNeeded())
 		this->A_F_F = nullptr;
 		if (ComputeCoarseA_F_F)
@@ -1022,7 +1064,9 @@ private:
 				DenseMatrix faceMass     = mesh.A_F_F->block(faceNumber * _faceBlockSize, faceNumber * _faceBlockSize, _faceBlockSize, _faceBlockSize);
 				DenseMatrix cellFaceMass = mesh.A_T_F->block(elemNumber * _cellBlockSize, faceNumber * _faceBlockSize, _cellBlockSize, _faceBlockSize);
 				DenseMatrix cellMass     = mesh.A_T_T->block(elemNumber * _cellBlockSize, elemNumber * _cellBlockSize, _cellBlockSize, _cellBlockSize);
-				DenseMatrix trace = -faceMass.llt().solve(cellFaceMass.transpose());
+				// Non-symmetric matrix: the block A_F_T(face, elem) instead of A_T_F(elem, face)^T
+				DenseMatrix faceCellMass = mesh.A_F_T ? DenseMatrix(mesh.A_F_T->block(faceNumber * _faceBlockSize, elemNumber * _cellBlockSize, _faceBlockSize, _cellBlockSize)) : DenseMatrix(cellFaceMass.transpose());
+				DenseMatrix trace = Symmetric ? DenseMatrix(-faceMass.llt().solve(faceCellMass)) : DenseMatrix(-faceMass.partialPivLu().solve(faceCellMass));
 				//DenseMatrix trace = - cellFaceMass.transpose();
 				coeffsPi.Local().Add(faceNumber*_faceBlockSize, elemNumber*_cellBlockSize, trace);
 			}
@@ -1096,6 +1140,26 @@ public:
 			Utils::Log() << ", coarsening factor = " << (nFine/nCoarse);
 		}
 		Utils::Log() << endl;
+		SetupDownwindOrder();
+	}
+
+	// Non-symmetric matrix: the downwind order of the faces, followed by all the sweeps of the smoothers (pre- and
+	// post-smoothing) if some couplings are one-sided (convection), the natural order otherwise
+	void SetupDownwindOrder()
+	{
+		if (Symmetric || !DownwindOrdering || this->IsCoarsestLevel())
+			return;
+		BigNumber nOneSided, nCycleBreaks;
+		_downwindOrder = DownwindOrder(*this->OperatorMatrix, _faceBlockSize, FaceInterpOfOne, _strongCouplingThreshold, nOneSided, nCycleBreaks);
+		Utils::Log() << "\t\tDownwind order      : ";
+		if (_downwindOrder.empty())
+			Utils::Log() << "none (no one-sided coupling): natural order" << endl;
+		else
+		{
+			Utils::Log() << nOneSided << " one-sided couplings, " << nCycleBreaks << " cycles broken" << endl;
+			this->PreSmoother->SetSweepOrder(&_downwindOrder);
+			this->PostSmoother->SetSweepOrder(&_downwindOrder);
+		}
 	}
 
 	void SetupProlongation() override
@@ -1186,6 +1250,7 @@ public:
 				coarse->A_T_T = &A_T_Tc;
 				coarse->A_T_F = &A_T_Fc;
 				coarse->A_F_F = ComputeCoarseA_F_F ? &A_F_Fc : nullptr;
+				coarse->A_F_T = Symmetric ? nullptr : &A_F_Tc;
 			}
 		}
 	}

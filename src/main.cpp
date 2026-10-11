@@ -223,8 +223,10 @@ void print_usage() {
 	cout << "              cg            - Conjugate Gradient" << endl;
 	cout << "              eigencg       - Conjugate Gradient (Eigen library) with diagonal preconditioner" << endl;
 	cout << "              fcg           - Flexible Conjugate Gradient (truncation-restart: FCG(1))" << endl;
+	cout << "              gcr           - Generalized Conjugate Residual, restarted: GCR(10) (Notay's economical version, flexible," << endl;
+	cout << "                              for non-symmetric matrices). Its K-cycle iterates with GCR." << endl;
 	cout << "              bicgstab      - BiCGSTAB (Eigen library) with diagonal preconditioner" << endl;
-	cout << "        'cg' and 'fcg' can be suffixed with another solver to use it as a preconditioner. Ex: fcgmg" << endl;
+	cout << "        'cg', 'fcg' and 'gcr' can be suffixed with another solver to use it as a preconditioner. Ex: fcgmg" << endl;
 	cout << "      - Multigrid methods:" << endl;
 	cout << "              agmg          - Yvan Notay's AGMG solver" << endl;
 	cout << "              mg            - Custom multigrid for HHO" << endl;
@@ -232,13 +234,13 @@ void print_usage() {
 	cout << "              uamg          - Uncondensed AMG (for hybrid discretizations with static condensation)" << endl;
 	cout << "              libuamg       - uamg called through the library fhhos4_AMG (library/), as by an external code." << endl;
 	cout << "                              Only the parameters of fhhos4::Solver apply (see library/include/fhhos4)." << endl;
-	cout << "                              'fcglibuamg' uses the FCG of the library (as fcguamg)." << endl;
+	cout << "                              'fcglibuamg' ('gcrlibuamg') uses the FCG (GCR) of the library (as fcguamg, gcruamg)." << endl;
 	cout << "              aggregamg     - In-house implementation of AGMG, without the outer Krylov iteration. Meant to be used with K-cycle and with FCG." << endl;
 	cout << "              hoaggregamg   - Algebraic p-multigrid on top of aggregamg" << endl;
 	cout << endl; 
 	cout << "-prec CODE" << endl;
 	cout << "      Preconditioner." << endl;
-	cout << "      Must be used in conjonction with an outer solver defined by the argument -s ('-s cg' or '-s fcg' only)." << endl;
+	cout << "      Must be used in conjonction with an outer solver defined by the argument -s ('-s cg', '-s fcg' or '-s gcr' only)." << endl;
 	cout << "      The possible preconditioners are the same as for -s." << endl;
 	cout << endl;
 	cout << "-initial-guess CODE" << endl;
@@ -329,7 +331,8 @@ void print_usage() {
 	cout << "      The third number defines the value of which the number of smoothing iterations is increased or decreased at each coarse level," << endl;
 	cout << "      according to the arithmetic operation ('+', '-' or '*') that preceeds it." << endl;
 	cout << "      Example: \"V,1,1,+1\" performs (1,1) smoothing steps at the finer level, then (2,2) on the next one, then (3,3), etc." << endl;
-	cout << "      The K-cycle is usually meant to be used as a preconditioner for a Flexible Conjugate Gradient." << endl;
+	cout << "      The K-cycle is usually meant to be used as a preconditioner for a Flexible Conjugate Gradient (or GCR)." << endl;
+	cout << "      It iterates on the coarse levels with FCG, or with GCR under -s gcr." << endl;
 	cout << "      Example: \"-s fgcmg -cycle K,1,1\"." << endl;
 	cout << endl;
 	cout << "-w NUM" << endl;
@@ -438,6 +441,13 @@ void print_usage() {
 	cout << "-coarse-n NUM" << endl;
 	cout << "      If a refinement strategy is used, sets the mesh size of the coarse mesh." << endl;
 	cout << "      The chosen value will set the variable N defined at the beginning of the GMSH .geo file." << endl;
+	cout << endl;
+	cout << "-uamg-nonsym" << endl;
+	cout << "      U-AMG for a non-symmetric matrix, on the (symmetric) matrix of the problem, to test it: the blocks are given" << endl;
+	cout << "      in full, with A_FT = A_TF^T: the same algorithm, without the optimizations of the symmetric case (lower" << endl;
+	cout << "      triangular parts, Cholesky). The Gauss-Seidel smoothers follow the downwind order" << endl;
+	cout << "      of each level (none here: no convection), the K-cycle iterates with GCR, the default coarse solver is LU." << endl;
+	cout << "      Requires -s uamg, gcruamg, libuamg or gcrlibuamg." << endl;
 	cout << endl;
 	cout << "-coarsening-factor NUM" << endl;
 	cout << "      Requested coarsening factor for the coarsening strategies compatible." << endl;
@@ -742,6 +752,7 @@ int Run(int argc, char* argv[])
 		OPT_BoundaryFaceCollapsing,
 		OPT_ReEntrantCornerManagement,
 		OPT_CoarseningFactor,
+		OPT_UAMGNonsymmetric,
 		OPT_CoarseN,
 		OPT_ApproxL2ProjSubtriangulationMethod,
 		OPT_ApproxL2ProjNSubtriangulations,
@@ -842,6 +853,7 @@ int Run(int argc, char* argv[])
 		 { "coarse-solver", required_argument, NULL, OPT_CoarseSolver },
 		 { "rcm", required_argument, NULL, OPT_ReEntrantCornerManagement },
 		 { "coarsening-factor", required_argument, NULL, OPT_CoarseningFactor },
+		 { "uamg-nonsym", no_argument, NULL, OPT_UAMGNonsymmetric },
 		 { "coarse-n", required_argument, NULL, OPT_CoarseN },
 		 { "subtri-meth", required_argument, NULL, OPT_ApproxL2ProjSubtriangulationMethod },
 		 { "subtri", required_argument, NULL, OPT_ApproxL2ProjNSubtriangulations },
@@ -1480,6 +1492,9 @@ int Run(int argc, char* argv[])
 			}
 			case OPT_CoarseningFactor:
 				args.Solver.MG.CoarseningFactor = atof(optarg);
+				break;
+			case OPT_UAMGNonsymmetric:
+				args.Solver.MG.UAMGNonsymmetric = true;
 				break;
 			case OPT_CoarseN:
 				args.Solver.MG.CoarseN = stoul(optarg, nullptr, 0);

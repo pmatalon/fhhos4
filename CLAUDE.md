@@ -54,7 +54,7 @@ From `build/`:
 ctest --output-on-failure
 ```
 
-132 tests, ~4 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
+163 tests, ~4 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
 iteration counts of the papers in `reproducibility/` — see `tests/README.md`. Covers
 `Program_Diffusion_HHO` and `Program_BiHarmonic_HHO` (HHO, static condensation), 2D/3D,
 in-house, GMSH and polygonal meshes, and the library (`UAMGLibrary*`, ~15 s). Not covered: DG/FEM programs (disabled by default), `lu`/`cg`/`agmg`/`p_mg` solvers,
@@ -113,15 +113,21 @@ Example invocations for specific experiments/figures live in `reproducibility/*.
 `fhhos4_AMG` (short name fhhos4, the name client codes use): shared library giving U-AMG to other HHO codes (first
 target: HArDCore3D), see `library/README.md`. Public interface in `library/include/fhhos4` (`#include <fhhos4>`,
 namespace `fhhos4`, Eigen types, pimpl): `Solver` (parameters as public members; `Dimension` and `FaceDegree` must be
-set; `Setup()` from `A`, `A_TT`, `A_TF` (`A_FF` optional) and the interpolations of 1, `Solve()`), `Result`, and `Error`
-(in `fhhos4_error.h`, which `Utils.h` includes alone). Implementation `library/Solver.cpp`, compiled with
+set; `SetupSymmetric()` from `A`, `A_TT`, `A_TF` (`A_FF` optional) and the interpolations of 1, or `SetupNonsymmetric()`
+with `A_FT` too; `Solve()`), `Result`, and `Error` (in `fhhos4_error.h`, which `Utils.h` includes alone). Non-symmetric
+matrix (`UncondensedLevel::Symmetric` false, `A_F_T` given; program option `-uamg-nonsym` to test it on the symmetric
+matrices): the same algorithm on the matrix itself, without the optimizations of the symmetric case (lower triangular
+parts, Cholesky; the local Galerkin products compute full matrices); couplings from the averaged traces of `A_TF` and
+`A_FT`, Galerkin coarse operators `P^T A P`, Gauss-Seidel sweeps in the downwind order of each level
+(`Solver/Multigrid/DownwindOrder.h`, pre-
+and post-smoothing), K-cycle with GCR. Implementation `library/Solver.cpp`, compiled with
 `-fvisibility=hidden` (only the public API is exported). It builds the solver as the program does
 (`AlgebraicSolverFactory`, `ApplyUncondensedAMGDefaults`): its path must not include mesh or discretization headers,
 nor read the global `Utils::ProgramArgs`. U-AMG is a non-linear preconditioner with the K-cycle: the Krylov method is
-inside the library (`Krylov`: FCG by default, BiCGSTAB with a V/W-cycle only, or none), which gives no cycle alone.
-The program runs it with `-s libuamg|fcglibuamg` (`Solver/LibraryUAMG.cpp`, the only file of the program that includes
-the public header: changing it doesn't recompile `Program.cpp`), which `tests/UAMGLibraryTest.cpp` compares with
-`uamg|fcguamg`.
+inside the library (`Krylov`: FCG by default, GCR, BiCGSTAB with a V/W-cycle only, or none), which gives no cycle
+alone. The program runs it with `-s libuamg|fcglibuamg|gcrlibuamg` (`Solver/LibraryUAMG.cpp`, the only file of the
+program that includes the public header: changing it doesn't recompile `Program.cpp`), which `tests/UAMGLibraryTest.cpp`
+compares with `uamg|fcguamg|gcruamg`.
 
 ## Version
 

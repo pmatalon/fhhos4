@@ -4,6 +4,7 @@
 #include "Direct/EigenCholesky.h"
 #include "Krylov/ConjugateGradient.h"
 #include "Krylov/FlexibleConjugateGradient.h"
+#include "Krylov/GeneralizedConjugateResidual.h"
 #include "Multigrid/UncondensedAMG/UncondensedAMG.h"
 #include "Multigrid/AggregAMG/AggregAMG.h"
 #include "FixedPoint/BlockJacobi.h"
@@ -146,6 +147,7 @@ public:
 		mg->MatrixMaxSizeForCoarsestLevel = args.Solver.MG.MatrixMaxSizeForCoarsestLevel;
 		mg->Cycle = args.Solver.MG.CycleLetter;
 		mg->WLoops = args.Solver.MG.WLoops;
+		mg->KCycleKrylov = args.Solver.MG.KCycleKrylov;
 		mg->UseGalerkinOperator = args.Solver.MG.UseGalerkinOperator;
 		mg->PreSmootherCode = args.Solver.MG.PreSmootherCode;
 		mg->PostSmootherCode = args.Solver.MG.PostSmootherCode;

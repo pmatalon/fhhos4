@@ -16,6 +16,7 @@ public:
 	Solver* CoarseSolver = nullptr;
 	char Cycle = 'V';
 	int WLoops = 1; // 1 --> V-cycle, >= 2 --> W-cycle 
+	KrylovMethod KCycleKrylov = KrylovMethod::FCG; // the iterations of the K-cycle on the coarse levels
 	int MatrixMaxSizeForCoarsestLevel;
 	bool UseGalerkinOperator = false;
 	string PreSmootherCode = "bgs";
@@ -532,7 +533,7 @@ private:
 				else
 				{
 					//level->CoarserLevel->FCG->Solve(rc, ecEqualZero, ec);                    result.AddWorkInMFlops(level->CoarserLevel->FCG->SolvingComputationalWork);
-					ec = FCGForKCycle(level->CoarserLevel, rc, coarseResult);                      result.AddWorkInMFlops(coarseResult.SolvingComputationalWork());
+					ec = KrylovForKCycle(level->CoarserLevel, rc, coarseResult);                   result.AddWorkInMFlops(coarseResult.SolvingComputationalWork());
 				}
 			}
 
@@ -608,10 +609,14 @@ private:
 	}
 
 private:
-	Vector FCGForKCycle(Level* level, Vector& r, IterationResult& result)
+	// 1 or 2 iterations of FCG or GCR (KCycleKrylov) preconditioned by the cycle on this level: Notay, "An
+	// aggregation-based algebraic multigrid method", ETNA 37 (2010), Algorithm 3.2, step 4. The two methods differ by
+	// their inner products only: FCG minimizes the A-norm of the error, GCR the residual norm.
+	Vector KrylovForKCycle(Level* level, Vector& r, IterationResult& result)
 	{
 		//const SparseMatrix& A = *level->OperatorMatrix;
 		double t = 0.25;
+		bool gcr = this->KCycleKrylov == KrylovMethod::GCR;
 		Vector x;
 
 		// Apply multigrid preconditioner: c = Prec(r)
@@ -621,11 +626,11 @@ private:
 		IterationResult precResult1;
 		MultigridCycle(level, r, c, cEquals0, false, computeAc, precResult1);     result.AddWorkInMFlops(precResult1.SolvingComputationalWork());
 
-		// 1st iteration of FCG
+		// 1st iteration
 		//Vector v = A * c;                                                         result.AddWorkInFlops(Cost::MatVec(A));
 		Vector& v = precResult1.Ax; // v = A*c
-		double rho1 = c.dot(v);                                                   result.AddWorkInFlops(Cost::Dot(c));
-		double alpha1 = c.dot(r);                                                 result.AddWorkInFlops(Cost::Dot(c));
+		double rho1 = gcr ? v.squaredNorm() : c.dot(v);                           result.AddWorkInFlops(Cost::Dot(c));
+		double alpha1 = gcr ? v.dot(r) : c.dot(r);                                result.AddWorkInFlops(Cost::Dot(c));
 
 		double r_norm_old = r.norm();                                             result.AddWorkInFlops(Cost::Norm(r));
 		r -= (alpha1 / rho1) * v;                                                 result.AddWorkInFlops(Cost::VectorDAXPY(r));
@@ -643,12 +648,12 @@ private:
 			IterationResult precResult2;
 			MultigridCycle(level, r, d, dEquals0, false, computeAd, precResult2);  result.AddWorkInMFlops(precResult2.SolvingComputationalWork());
 
-			// 2nd iteration of FCG
+			// 2nd iteration
 			//Vector w = A * d;                                                     result.AddWorkInFlops(Cost::MatVec(A));
 			Vector& w = precResult2.Ax; // w = A*d
-			double gamma = d.dot(v);                                              result.AddWorkInFlops(Cost::Dot(d));
-			double beta = d.dot(w);                                               result.AddWorkInFlops(Cost::Dot(d));
-			double alpha2 = d.dot(r);                                             result.AddWorkInFlops(Cost::Dot(d));
+			double gamma = gcr ? w.dot(v) : d.dot(v);                             result.AddWorkInFlops(Cost::Dot(d));
+			double beta = gcr ? w.squaredNorm() : d.dot(w);                       result.AddWorkInFlops(Cost::Dot(d));
+			double alpha2 = gcr ? w.dot(r) : d.dot(r);                            result.AddWorkInFlops(Cost::Dot(d));
 			double rho2 = beta - gamma * gamma / rho1;
 			x = (alpha1/rho1 - gamma*alpha2/(rho1*rho2))*c + (alpha2 / rho2) * d; result.AddWorkInFlops(2*Cost::ConstantVec(x) + Cost::AddVec(x));
 		}
@@ -681,7 +686,10 @@ public:
 			(CoarseLevelChangeSmoothingOperator == '-' && CoarseLevelChangeSmoothingCoeff > 0) ||
 			(CoarseLevelChangeSmoothingOperator == '*' && CoarseLevelChangeSmoothingCoeff > 1))
 			os << "," << CoarseLevelChangeSmoothingOperator << CoarseLevelChangeSmoothingCoeff;
-		os << ")" << endl;
+		os << ")";
+		if (this->Cycle == 'K')
+			os << ", " << (this->KCycleKrylov == KrylovMethod::GCR ? "GCR" : "FCG") << " on the coarse levels";
+		os << endl;
 
 		if (this->HP_CS != HP_CoarsStgy::P_only)
 		{
