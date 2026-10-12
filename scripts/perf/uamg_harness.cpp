@@ -137,7 +137,7 @@ int main(int argc, char** argv)
 	mg.ManageAnisotropy = I("manageAniso");
 
 	auto start = chrono::steady_clock::now();
-	mg.Setup(S, A_T_T, A_T_F, A_F_F, cellInterpOfOne, faceInterpOfOne);
+	mg.Setup(S, A_T_T, A_T_F, SparseMatrix(), A_F_F, cellInterpOfOne, faceInterpOfOne);
 	cout << "HARNESS setup " << chrono::duration<double>(chrono::steady_clock::now() - start).count() << " s, " << mg.NumberOfLevels() << " levels" << endl;
 
 	if (argc > 3)

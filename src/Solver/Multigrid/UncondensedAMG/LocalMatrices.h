@@ -6,6 +6,7 @@
 #include <sys/mman.h>
 #endif
 #include "HybridAlgebraicMesh.h"
+#include "IndexLists.h"
 #include "../../../Utils/SparseMatrixOps.h"
 using namespace std;
 
@@ -74,36 +75,52 @@ public:
 	// its lower triangular part is read.
 	void Decompose(const SparseMatrix& S, const HybridAlgebraicMesh& mesh, int blockSize, bool symmetric)
 	{
+		IndexLists cellFaces, faceCells;
+		cellFaces.Allocate(mesh.Elements.size(), [&](BigNumber t) { return mesh.Elements[t].Faces.size(); });
+		faceCells.Allocate(mesh.Faces.size(), [&](BigNumber f) { return mesh.Faces[f].Elements.size(); });
+		#pragma omp parallel for
+		for (BigNumber t = 0; t < (BigNumber)mesh.Elements.size(); ++t)
+			for (int a = 0; a < cellFaces.Size(t); ++a)
+				cellFaces[t][a] = mesh.Elements[t].Faces[a]->Number;
+		#pragma omp parallel for
+		for (BigNumber f = 0; f < (BigNumber)mesh.Faces.size(); ++f)
+			for (int a = 0; a < faceCells.Size(f); ++a)
+				faceCells[f][a] = mesh.Faces[f].Elements[a]->Number;
+		Decompose(S, cellFaces, faceCells, blockSize, symmetric);
+	}
+
+	// Same, the mesh given by the faces of each cell and the cells of each face (increasing)
+	void Decompose(const SparseMatrix& S, const IndexLists& cellFaces, const IndexLists& faceCells, int blockSize, bool symmetric)
+	{
 		int bs = blockSize;
 		Symmetric = symmetric;
-		BigNumber nCells = mesh.Elements.size();
+		BigNumber nCells = cellFaces.Size();
 		vector<int> nFaces(nCells);
 		for (BigNumber t = 0; t < nCells; ++t)
-			nFaces[t] = mesh.Elements[t].Faces.size();
+			nFaces[t] = cellFaces.Size(t);
 		Allocate(bs, nCells, nFaces, [&](BigNumber t, BigNumber* faces)
 		{
-			for (int a = 0; a < nFaces[t]; ++a)
-				faces[a] = mesh.Elements[t].Faces[a]->Number;
+			copy(cellFaces[t], cellFaces[t] + nFaces[t], faces);
 		});
 
-		ThreadLocal<vector<int>> facePosTL((size_t)mesh.Faces.size(), -1); // local number of a face in the current cell
+		ThreadLocal<vector<int>> facePosTL((size_t)faceCells.Size(), -1); // local number of a face in the current cell
 		#pragma omp parallel for schedule(dynamic, 256)
 		for (BigNumber t = 0; t < nCells; ++t)
 		{
-			const HybridAlgebraicElement& T = mesh.Elements[t];
 			vector<int>& facePos = facePosTL.Local();
-			int n = T.Faces.size();
+			int n = nFaces[t];
+			const BigNumber* faces = cellFaces[t];
 			size_t N = n * bs;
 			for (int a = 0; a < n; ++a)
-				facePos[T.Faces[a]->Number] = a;
+				facePos[faces[a]] = a;
 			double* ST = Values(t);
 			fill(ST, ST + N * N, 0.0);
 			for (int a = 0; a < n; ++a)
 			{
-				const HybridAlgebraicFace& f = *T.Faces[a];
+				BigNumber f = faces[a];
 				for (int r = 0; r < bs; ++r)
 				{
-					BigNumber i = f.Number * bs + r;
+					BigNumber i = f * bs + r;
 					for (SparseMatrix::InnerIterator it(S, i); it; ++it)
 					{
 						BigNumber j = it.col();
@@ -112,7 +129,7 @@ public:
 						int b = facePos[j / bs];
 						if (b < 0) // face of another cell
 							continue;
-						int c = NCommonCells(f, mesh.Faces[j / bs], T);
+						int c = NCommonCells(f, j / bs, t, faceCells);
 						double v = c == 1 ? it.value() : it.value() / c;
 						ST[(b * bs + j % bs) * N + a * bs + r] = v;
 						if (symmetric)
@@ -121,7 +138,7 @@ public:
 				}
 			}
 			for (int a = 0; a < n; ++a)
-				facePos[T.Faces[a]->Number] = -1;
+				facePos[faces[a]] = -1;
 		}
 	}
 
@@ -133,14 +150,42 @@ public:
 	// triangular part mirrored).
 	void GalerkinProduct(const LocalMatrices& cellMatrices, const HybridAlgebraicMesh& mesh, const SparseMatrix& P)
 	{
+		BigNumber nAggregs = mesh.CoarseElements.size();
+		IndexLists aggregateCells, aggregateCoarseFaces;
+		aggregateCells.Allocate(nAggregs, [&](BigNumber k) { return mesh.CoarseElements[k].FineElements.size(); });
+		aggregateCoarseFaces.Allocate(nAggregs, [&](BigNumber k) { return mesh.CoarseElements[k].CoarseFaces.size(); });
+		#pragma omp parallel for
+		for (BigNumber k = 0; k < nAggregs; ++k)
+		{
+			for (int a = 0; a < aggregateCells.Size(k); ++a)
+				aggregateCells[k][a] = mesh.CoarseElements[k].FineElements[a]->Number;
+			for (int B = 0; B < aggregateCoarseFaces.Size(k); ++B)
+				aggregateCoarseFaces[k][B] = mesh.CoarseElements[k].CoarseFaces[B]->Number;
+		}
+		vector<char> faceRemoved(mesh.Faces.size());
+		vector<BigNumber> faceCoarseFace(mesh.Faces.size());
+		#pragma omp parallel for
+		for (BigNumber f = 0; f < (BigNumber)mesh.Faces.size(); ++f)
+		{
+			faceRemoved[f] = mesh.Faces[f].IsRemovedOnCoarseMesh;
+			faceCoarseFace[f] = mesh.Faces[f].CoarseFace ? mesh.Faces[f].CoarseFace->Number : -1;
+		}
+		GalerkinProduct(cellMatrices, aggregateCells, aggregateCoarseFaces, mesh.CoarseFaces.size(), faceRemoved, faceCoarseFace, P);
+	}
+
+	// Same, the aggregation given by the cells of each aggregate, the coarse faces of each aggregate, and for each face of
+	// the cells, whether it is removed (interior to its aggregate) and its coarse face (if it is not removed)
+	void GalerkinProduct(const LocalMatrices& cellMatrices, const IndexLists& aggregateCells, const IndexLists& aggregateCoarseFaces, BigNumber nAllCoarseFaces,
+	                     const vector<char>& faceRemoved, const vector<BigNumber>& faceCoarseFace, const SparseMatrix& P)
+	{
 		int bs = cellMatrices.BlockSize;
 		bool symmetric = cellMatrices.Symmetric;
-		BigNumber nAggregs = mesh.CoarseElements.size();
+		BigNumber nAggregs = aggregateCells.Size();
 		vector<int> nCoarseFaces(nAggregs);
 		int maxM = 0;
 		for (BigNumber k = 0; k < nAggregs; ++k)
 		{
-			nCoarseFaces[k] = mesh.CoarseElements[k].CoarseFaces.size();
+			nCoarseFaces[k] = aggregateCoarseFaces.Size(k);
 			maxM = max(maxM, nCoarseFaces[k]);
 		}
 		int maxN = 0;
@@ -148,8 +193,7 @@ public:
 			maxN = max(maxN, cellMatrices.NFaces(t));
 		Allocate(bs, nAggregs, nCoarseFaces, [&](BigNumber k, BigNumber* faces)
 		{
-			for (int B = 0; B < nCoarseFaces[k]; ++B)
-				faces[B] = mesh.CoarseElements[k].CoarseFaces[B]->Number;
+			copy(aggregateCoarseFaces[k], aggregateCoarseFaces[k] + nCoarseFaces[k], faces);
 		});
 		Symmetric = symmetric;
 
@@ -168,23 +212,23 @@ public:
 			Work& w = workTL.Local();
 			if (w.coarseFacePos.empty())
 			{
-				w.coarseFacePos.assign(mesh.CoarseFaces.size(), -1);
+				w.coarseFacePos.assign(nAllCoarseFaces, -1);
 				w.Rt.resize((size_t)maxM * bs * maxN * bs);
 				w.W.resize((size_t)maxN * bs * maxM * bs);
 			}
-			const HybridElementAggregate& K = mesh.CoarseElements[k];
+			const BigNumber* coarseFaces = aggregateCoarseFaces[k];
 			int m = nCoarseFaces[k];
 			size_t M = m * bs;
 			for (int B = 0; B < m; ++B)
-				w.coarseFacePos[K.CoarseFaces[B]->Number] = B;
+				w.coarseFacePos[coarseFaces[B]] = B;
 			double* SK = Values(k);
 			fill(SK, SK + M * M, 0.0);
 			double* Rt = w.Rt.data();
 			double* W = w.W.data();
 
-			for (const HybridAlgebraicElement* T : K.FineElements)
+			for (int kt = 0; kt < aggregateCells.Size(k); ++kt)
 			{
-				BigNumber t = T->Number;
+				BigNumber t = aggregateCells[k][kt];
 				int n = cellMatrices.NFaces(t);
 				size_t N = n * bs;
 				const BigNumber* faces = cellMatrices.CellFaces(t);
@@ -193,13 +237,12 @@ public:
 				w.kept.clear();
 				for (int a = 0; a < n; ++a)
 				{
-					const HybridAlgebraicFace& f = mesh.Faces[faces[a]];
-					if (f.IsRemovedOnCoarseMesh)
+					if (faceRemoved[faces[a]])
 						w.removed.push_back(a);
 					else
 					{
-						assert(w.coarseFacePos[f.CoarseFace->Number] >= 0);
-						w.kept.push_back({ a, w.coarseFacePos[f.CoarseFace->Number] });
+						assert(w.coarseFacePos[faceCoarseFace[faces[a]]] >= 0);
+						w.kept.push_back({ a, w.coarseFacePos[faceCoarseFace[faces[a]]] });
 					}
 				}
 				int nr = w.removed.size();
@@ -286,7 +329,7 @@ public:
 						SK[i * M + j] = SK[j * M + i];
 			}
 			for (int B = 0; B < m; ++B)
-				w.coarseFacePos[K.CoarseFaces[B]->Number] = -1;
+				w.coarseFacePos[coarseFaces[B]] = -1;
 		}
 	}
 
@@ -473,22 +516,25 @@ private:
 			setFaces(t, Faces.data() + FacesStart[t]);
 	}
 
-	// Number of cells containing the faces f and g of the cell T
-	static int NCommonCells(const HybridAlgebraicFace& f, const HybridAlgebraicFace& g, const HybridAlgebraicElement& T)
+	// Number of cells containing the faces f and g of the cell t
+	static int NCommonCells(BigNumber f, BigNumber g, BigNumber t, const IndexLists& faceCells)
 	{
-		if (&f == &g)
-			return f.Elements.size();
-		if (f.Elements.size() <= 2 && g.Elements.size() <= 2)
+		int nf = faceCells.Size(f), ng = faceCells.Size(g);
+		const BigNumber* F = faceCells[f];
+		const BigNumber* G = faceCells[g];
+		if (f == g)
+			return nf;
+		if (nf <= 2 && ng <= 2)
 		{
-			if (f.Elements.size() < 2 || g.Elements.size() < 2)
+			if (nf < 2 || ng < 2)
 				return 1;
-			const HybridAlgebraicElement* otherF = f.Elements[0] == &T ? f.Elements[1] : f.Elements[0];
-			const HybridAlgebraicElement* otherG = g.Elements[0] == &T ? g.Elements[1] : g.Elements[0];
+			BigNumber otherF = F[0] == t ? F[1] : F[0];
+			BigNumber otherG = G[0] == t ? G[1] : G[0];
 			return otherF == otherG ? 2 : 1;
 		}
 		int c = 0;
-		for (const HybridAlgebraicElement* e : f.Elements)
-			c += find(g.Elements.begin(), g.Elements.end(), e) != g.Elements.end();
+		for (int a = 0; a < nf; ++a)
+			c += find(G, G + ng, F[a]) != G + ng;
 		return c;
 	}
 };

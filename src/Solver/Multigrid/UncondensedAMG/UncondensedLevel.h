@@ -2,6 +2,7 @@
 #include <mutex>
 #include <unsupported/Eigen/SparseExtra>
 #include "HybridAlgebraicMesh.h"
+#include "CoarseningPass.h"
 #include "LocalMatrices.h"
 #include "../AggregAMG/AlgebraicMesh.h"
 #include "../DownwindOrder.h"
@@ -71,6 +72,11 @@ public:
 	Vector FaceInterpOfOne;
 
 public:
+	// The coarsening passes with the default options run on flat arrays (CoarseningPass, see FlatPassesApply()). False
+	// runs those of HybridAlgebraicMesh, which give the same results and implement the other options: the reference
+	// against which the tests check the flat passes.
+	inline static bool UseFlatPasses = true;
+
 	UncondensedLevel(int number, int degree, int cellBlockSize, int faceBlockSize, double strongCouplingThreshold, UAMGFaceProlongation faceProlong, UAMGProlongation coarseningProlong, UAMGProlongation mgProlong)
 		: Level(number)
 	{
@@ -228,6 +234,12 @@ public:
 	// The coarsening passes of the paper, until the requested coarsening factor is reached
 	void CoarsenInPasses(H_CoarsStgy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double requestedCoarseningFactor, bool& coarsestPossibleMeshReached)
 	{
+		if (FlatPassesApply(coarseningStgy, faceCoarseningStgy))
+		{
+			CoarsenInFlatPasses(coarseningStgy, requestedCoarseningFactor, coarsestPossibleMeshReached);
+			return;
+		}
+
 		SparseMatrix *auxP, *auxQ_F, *auxSchur;
 		HybridAlgebraicMesh *mesh, *coarseMesh;
 		const SparseMatrix* schur = this->OperatorMatrix;
@@ -348,6 +360,91 @@ public:
 			delete coarseMesh->A_F_T;
 		delete coarseMesh;
 		delete schur;
+	}
+
+	// The default options run the coarsening passes on flat arrays (CoarseningPass), with the same results
+	bool FlatPassesApply(H_CoarsStgy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy) const
+	{
+		return UseFlatPasses && LocalOp
+			&& _faceProlong == UAMGFaceProlongation::BoundaryAggregatesInteriorAverage
+			&& _coarseningProlong == UAMGProlongation::ReconstructSmoothedTraceOrInject
+			&& _multigridProlong == UAMGProlongation::ChainedCoarseningProlongations
+			&& (coarseningStgy == H_CoarsStgy::MultiplePairwiseAggregation || coarseningStgy == H_CoarsStgy::DoublePairwiseAggregation)
+			&& faceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsing
+			&& !ComputeCoarseA_F_F && !ComputeQ_F
+			&& BlockDiagonalSolver::DefaultMethod == DiagBlockSolveMethod::LU;
+	}
+
+	void CoarsenInFlatPasses(H_CoarsStgy coarseningStgy, double requestedCoarseningFactor, bool& coarsestPossibleMeshReached)
+	{
+		// The blocks of the current pass: those of the level, then those computed by the previous pass
+		const SparseMatrix* schur = this->OperatorMatrix;
+		const SparseMatrix* passA_T_T = this->A_T_T;
+		const SparseMatrix* passA_T_F = this->A_T_F;
+		const SparseMatrix* passA_F_T = this->A_F_T;
+		SparseMatrix A_T_Tc, A_T_Fc, A_F_Tc;
+		double actualCoarseningFactor = 0;
+		int nCoarsenings = 0;
+
+		while (!CoarseningCriteriaReached(coarseningStgy, requestedCoarseningFactor, nCoarsenings, actualCoarseningFactor))
+		{
+			CoarseningPass pass(_cellBlockSize, _faceBlockSize, Symmetric, _strongCouplingThreshold);
+			pass.Build(*passA_T_F, passA_F_T);
+			Utils::Log() << "\tElement pairwise aggregation" << endl;
+			if (pass.Aggregate())
+			{
+				coarsestPossibleMeshReached = true;
+				return;
+			}
+			Utils::Log() << "\tInterface collapsing" << endl;
+			if (pass.CollapseInterfaces())
+			{
+				coarsestPossibleMeshReached = true;
+				return;
+			}
+
+			// Local matrices of the operator, if they don't come from the previous coarsening pass
+			if (nCoarsenings == 0 && LocalOp->Assembled != schur)
+			{
+				LocalOp->Current.Decompose(*schur, pass.CellFaces, pass.FaceCells, _faceBlockSize, Symmetric);
+				LocalOp->Assembled = schur;
+			}
+
+			SparseMatrix passP, nextA_T_Tc, nextA_T_Fc, nextA_F_Tc;
+			pass.ComputeProlongation(*passA_T_T, *passA_T_F, LocalOp->Current, passP, nextA_T_Tc, nextA_T_Fc);
+			LocalOp->Next.GalerkinProduct(LocalOp->Current, pass.AggregateCells, pass.AggregateCoarseFaces, pass.NCoarseFaces, pass.FaceRemoved, pass.FaceCoarseFace, passP);
+			LocalOp->Current.Swap(LocalOp->Next);
+			LocalOp->Assembled = nullptr;
+			if (!Symmetric)
+				nextA_F_Tc = SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(SparseMatrixOps::Transpose(passP), *passA_F_T), pass.Q_T());
+
+			// Global prolongation operator
+			if (nCoarsenings == 0)
+				this->P = std::move(passP);
+			else
+				this->P = SparseMatrixOps::Multiply(this->P, passP);
+
+			actualCoarseningFactor = (double)this->A_T_F->cols() / (double)nextA_T_Fc.cols();
+			Utils::Log() << "\t\tCoarsening factor = " << actualCoarseningFactor << endl;
+			if (actualCoarseningFactor >= 10)
+				Utils::Warning("The coarsening seems a little too strong...");
+
+			A_T_Tc = std::move(nextA_T_Tc);
+			A_T_Fc = std::move(nextA_T_Fc);
+			A_F_Tc = std::move(nextA_F_Tc);
+			passA_T_T = &A_T_Tc;
+			passA_T_F = &A_T_Fc;
+			passA_F_T = Symmetric ? nullptr : &A_F_Tc;
+			nCoarsenings++;
+		}
+
+		this->A_T_Tc = std::move(A_T_Tc);
+		this->A_T_Fc = std::move(A_T_Fc);
+		if (!Symmetric)
+			this->A_F_Tc = std::move(A_F_Tc);
+		// The operator of the level is only assembled here (for the smoothers and the coarse solver)
+		this->Ac = LocalOp->Current.Assemble(this->A_T_Fc.cols() / _faceBlockSize);
+		LocalOp->Assembled = &this->Ac;
 	}
 
 	void UpdateGlobalCoarsening(HybridAlgebraicMesh& initialFineMesh, HybridAlgebraicMesh& currentMesh)
@@ -547,8 +644,8 @@ public:
 		SparseMatrix* A_T_Fc = new SparseMatrix(SparseMatrixOps::Multiply(Q_Tt_A_T_F, *P)); // Kills -prolong 1 or 2 because P is then very dense
 		//SparseMatrix* A_T_Fc = A_T_Fc_tmp;
 
-		SparseMatrix Pt;
-		if (ComputeCoarseA_F_F || !local)
+		SparseMatrix Pt; // for A_F_Fc, the global Galerkin product, and A_F_Tc (non-symmetric matrix)
+		if (ComputeCoarseA_F_F || !local || !Symmetric)
 			Pt = SparseMatrixOps::Transpose(*P);
 		SparseMatrix* A_F_Fc = nullptr;
 		if (ComputeCoarseA_F_F)

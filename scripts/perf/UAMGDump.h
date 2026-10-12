@@ -5,7 +5,7 @@
 //
 //     #include "../../../../scripts/perf/UAMGDump.h"   // in UncondensedAMG.h, after the other includes
 //     ...
-//     void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
+//     void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_T, const SparseMatrix& A_F_F, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
 //     {
 //         UAMG_DUMP_INPUTS();   // first line: dumps and exits if FHHOS4_UAMG_DUMP is set
 //
@@ -94,7 +94,7 @@ inline std::map<std::string, std::string> ReadParams(const std::string& path)
 	return params;
 }
 
-// In UncondensedAMG::Setup(A, A_T_T, A_T_F, A_F_F, cellInterpOfOne, faceInterpOfOne)
+// In UncondensedAMG::Setup(A, A_T_T, A_T_F, A_F_T, A_F_F, cellInterpOfOne, faceInterpOfOne) (symmetric matrices only: A_F_T is not dumped)
 #define UAMG_DUMP_INPUTS() \
 	if (const char* dumpDir = getenv("FHHOS4_UAMG_DUMP")) \
 	{ \

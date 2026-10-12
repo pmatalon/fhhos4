@@ -499,8 +499,20 @@ private:
 		return e1->NElementsIAmStrongNeighbourOf < e2->NElementsIAmStrongNeighbourOf; // Sort by ascending number
 	}
 
+	bool IsStronglyCoupled(const HybridAlgebraicElement& e, double coupling)
+	{
+		return IsStronglyCoupled(coupling, e.Neighbours[0].second, _strongCouplingThreshold);
+	}
+
+public:
+	// Strong coupling, relative to the strongest coupling of the element (the most negative)
+	static bool IsStronglyCoupled(double coupling, double strongestCoupling, double strongCouplingThreshold)
+	{
+		return coupling < 0 && coupling < strongCouplingThreshold * strongestCoupling;
+	}
+
 	// Coupling of an element e1 with its neighbour e2 through a face f, from the traces of the blocks A_T_F(e1, f) and A_T_F(e2, f)
-	double CouplingValue(double e1FaceTrace, double e2FaceTrace)
+	static double CouplingValue(double e1FaceTrace, double e2FaceTrace)
 	{
 		double coupling = e1FaceTrace;
 
@@ -512,11 +524,7 @@ private:
 
 		return coupling * (minKappa / maxKappa);
 	}
-
-	bool IsStronglyCoupled(const HybridAlgebraicElement& e, double coupling)
-	{
-		return coupling < 0 && coupling < _strongCouplingThreshold * e.Neighbours[0].second;
-	}
+private:
 
 	/*double DiffusionCoeff(const HybridAlgebraicElement& e)
 	{

@@ -56,7 +56,7 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   `scripts/perf/Prof.h` (`PROF_START`/`PROF_STOP`, printed at exit). Include it in the files to instrument, never
   commit the instrumentation.
 - **Validation of a change**:
-  1. `ctest` (128 tests).
+  1. `ctest` (181 tests).
   2. `scripts/perf/amg_papers.sh <output dir> [binary]`: the AMG configurations of the papers, at reduced sizes (the
      paper sizes don't fit in 13 GB), 30 runs in ~6 minutes. Then `scripts/perf/fingerprint.sh <dir before> <dir after>`
      compares their iteration tables (iteration, inner iterations, residual): they must be identical.
@@ -485,9 +485,10 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   | convection-dominated k=0 | 0.466 -> 0.535 s (+15%) | 0.348 -> 0.376 s (+8%) |
   | convection-dominated k=1 | 0.610 -> 0.658 s (+8%) | 0.443 -> 0.458 s (+3%) |
 
-  Iterations unchanged in the diffusion-dominated case; in the convection-dominated one, the rounding differences of
-  the products change the aggregation (without the order: 6 -> 5 levels at k=1, 30 -> 22 iterations at k=0), 3-5
-  iterations with the order either way. Same binary, local / global products, time of the coarsening passes
+  Iterations unchanged in the diffusion-dominated case; in the convection-dominated one, the aggregation changed
+  (without the order: 6 -> 5 levels at k=1, 30 -> 22 iterations at k=0), 3-5 iterations with the order either way.
+  Not the rounding of the products, as first thought, but a bug of this change, fixed on 2026-10-12 (see "Bug of the
+  non-symmetric path"): the coarse `A_F_T` was empty. Same binary, local / global products, time of the coarsening passes
   (prolongation + products) and setup, 1 thread: diffusion-dominated k=1 218 / 336 ms, 0.62 / 0.86 s;
   convection-dominated k=1 221 / 217 ms, 0.66 / 0.62 s; k=0 221 / 204 ms, 0.51 / 0.43 s: in the convection-dominated
   case the local products gain nothing in the passes (its coarse cells have slightly more faces: 4.43 vs 4.20 per cell
@@ -604,6 +605,81 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   against BiCGSTAB at 48^3 k=1 diffusion-dominated, ~1.9x convection-dominated. At k=0, BiCGSTAB is cheaper than the
   setup alone.
 
+- **Coarsening passes on flat arrays** (2026-10-12, idea 2 extended to the whole pass, the user's request: "Can we
+  significantly improve setup time?"). `src/Solver/Multigrid/UncondensedAMG/CoarseningPass.h`, used with the default
+  options (`UncondensedLevel::FlatPassesApply()`: `-face-prolong 1`, `-coarsening-prolong 6`, `-prolong 2`, `-cs
+  mpa|dpa`, interface collapsing, local Galerkin products, no coarse `A_F_F` nor chained `Q_F`, LU diagonal blocks);
+  the other options keep `HybridAlgebraicMesh`. Bit-identical.
+  - A pass: the faces of the cells (rows of A_T_F), the cells of the faces (its transpose) and the neighbours sorted by
+    coupling in CSR arrays (`IndexLists.h`), instead of vectors per element, face and aggregate, `std::map`s and
+    mutexes; the same sequential pairwise aggregation on them; the coarse faces numbered in parallel by their pair
+    (first aggregate, neighbour), the order of the interface collapsing. Then one parallel loop over the aggregates
+    computes A_T_Tc, row 0 of Theta, the rows of P_F on the removed faces (the row of the operator merged from the
+    local matrices of the two cells, its block Jacobi row, `J Y` in the order of the columns of J: idea 4, in the
+    exact order of the global products) and A_T_Fc = Q_T^T A_T_F P: no Q_T, Q_F, Pi, triplets, `block()`,
+    `IterationMatrix()` nor global products, and P is written by rows. The decomposition of the operator and the local
+    Galerkin products are those of `LocalMatrices` (flat versions, which the mesh versions call). The 1x1 blocks (all
+    the passes of `p_h`) reproduce the arithmetic of Eigen's 1x1 solves, which multiply by the inverse of the
+    diagonal: LLT `-((b * (1/sqrt(a))) * (1/sqrt(a)))`, PartialPivLU `-(b * (1/a))`, block Jacobi
+    `(s * (1/d)) * -omega`; the larger blocks call Eigen's (LLT, PartialPivLU, FullPivLU, reused per thread, and
+    `BlockDiagonalSolver::SolveLU()`).
+  - Checks: `uamg_harness compare` (operators and prolongations of all the levels, bit for bit) on Cube-tet k=0 n=32,
+    k=2 n=16 with `-hp-cs h` (blocks 10/6) and `p_h`, 1 and 4 threads; HArDCore3D's 32^3 and 16^3 systems (scratch
+    driver), symmetric (32^3, k=0, 1) and non-symmetric (diffusion- and convection-dominated, k=0, 1, with the downwind
+    order): the same iterations and residual to 17 digits; `amg_papers.sh`: identical iteration tables (30
+    runs); `ctest` 181/181, of which `tests/CoarseningPassTest.cpp` (13 cases: the program on 10 problems, sequential,
+    the same iterations and L2 error bit for bit with `UncondensedLevel::UseFlatPasses = false`; the levels of a
+    symmetric, rescaled and non-symmetric system).
+  - Setup, before -> after, best of 2 (`build/bench_setup/`: `harness_flat` and `driver_flat`, the same binary on both
+    paths, `FHHOS4_OLD_PASSES=1` for the old one; 4 threads: the library's `hbgs,hrbgs` in the driver):
+
+    | Case | 1 thread | 4 threads |
+    |---|---|---|
+    | Cube-tet k=0 n=32 (318k faces) | 3.03 -> 1.29 s (2.4x) | 1.81 -> 0.61 s (3.0x) |
+    | Cube-tet k=2 n=16, `p_h` (default) | 0.39 -> 0.23 s | 0.33 -> 0.12 s |
+    | Cube-tet k=2 n=16, `-hp-cs h` | 3.99 -> 2.78 s | 3.09 -> 1.56 s |
+    | HArDCore3D 32^3 k=0, symmetric | 0.51 -> 0.19 s (2.7x) | 0.37 -> 0.12 s (3.2x) |
+    | HArDCore3D 32^3 k=1, symmetric | 0.62 -> 0.28 s | 0.45 -> 0.19 s |
+    | HArDCore3D 32^3 k=0, non-symmetric (diffusion-dominated) | 0.54 -> 0.20 s | 0.39 -> 0.13 s |
+    | HArDCore3D 32^3 k=1, non-symmetric (diffusion-dominated) | 0.65 -> 0.36 s | 0.47 -> 0.24 s |
+
+    The program, its default threads (all logical cores, one per physical core in the solver), best of 2, before
+    (`bench_setup/fhhos4_head`) -> after (`bench_setup/program_bench.sh`, logs in `program/`; the same iterations, the
+    solve unchanged):
+
+    | Case | Setup | Solve |
+    |---|---|---|
+    | Cube-tet k=0 n=32 (28 its) | 1.90 -> 0.52 s (3.7x) | 0.70 s |
+    | Cube-cart-aniso100 n=64 (9 its) | 2.60 -> 0.53 s (4.9x) | 0.49 s |
+    | Square-tri k=0 n=256 (24 its) | 1.33 -> 0.28 s (4.8x) | 0.37-0.44 s |
+    | Cube-tet k=1 n=16, `p_h` (33 its) | 0.24 -> 0.09 s (2.7x) | 0.69 s |
+    | Cube-tet k=2 n=16, `-hp-cs h` (35 its) | 2.09 -> 1.35 s (1.5x) | 3.5 s |
+
+    At k=0 the setup is now shorter than the solve (HArDCore3D 32^3: 0.19 vs 0.24 s on 1 thread). At k=1, the
+    extraction of the p-level and the smoothers of the k=1 level (~0.1 s on 1 thread) are now a third of the setup.
+    The papers' runs (`amg_papers.sh`, default threads, one run each): Fig. 4.4 Cube-tet n=32 1.94 -> 0.56 s,
+    Cube-cart n=32 0.31 -> 0.08 s, Complex-tet n=4 0.56 -> 0.14 s, Heterog1e8 n=256 0.37 -> 0.07 s.
+  - What remains (Cube-tet k=0 n=32, 1 / 4 threads, timers of the prototype): the loop over the aggregates 0.39 /
+    0.11 s (latency of the accesses to the data of the fine level, in the numbering of the mesh: gathering the data of
+    an aggregate 0.13 s, merging the rows of the local matrices 0.13 s on 1 thread), chaining of P
+    (`Multiply(P, P_pass)`) 0.22 / 0.12 s, local Galerkin products 0.19 / 0.06 s, neighbours and couplings 0.11 /
+    0.05 s, interface collapsing 0.10 / 0.04 s, decomposition 0.08 / 0.03 s, pairwise aggregation (sequential) 0.05 s,
+    cells of the faces (sequential transposition) 0.03 s.
+  - How it was developed: a prototype of the whole pass, bit-identical at the first try (1.9x on 1 thread), then
+    without allocations in the loop over the aggregates (Eigen objects and buffers reused per thread, the rows merged
+    instead of sorted: 2.1x), then the 1x1 blocks without Eigen's dynamic-size solves (each a call to its blocked
+    triangular solve, with its blocking space: 2.4x).
+- **Bug of the non-symmetric path, fixed** (2026-10-12, found by the flat passes). With the local Galerkin products
+  (2026-10-11, `bbb8e073`), `UncondensedLevel::Coarsen()` only transposed P for the coarse `A_F_F` or the global
+  products, so the coarse `A_F_T = P^T A_F_T Q_T` was computed with an empty `Pt` (0 x 0): an empty matrix in Release
+  (an assertion in Debug). The passes after the first and the coarser levels then computed the couplings with the
+  traces of A_F_T as 0, i.e. from A_T_F alone, halved: the same aggregates for a symmetric matrix (`-uamg-nonsym`),
+  hence unnoticed by the tests. Fixed in both paths (`Pt` computed for a non-symmetric matrix). HArDCore3D's 32^3
+  systems, 1 thread: the same iterations with the downwind order (diffusion-dominated k=0 29, k=1 23;
+  convection-dominated k=0 4, k=1 4, with 6 levels instead of 5); without the order, convection-dominated k=0 22 -> 30
+  iterations, k=1 15 -> 15 (5 -> 6 levels): the "6 -> 5 levels, 30 -> 22 iterations" of the entry "Non-symmetric
+  U-AMG setup" were this bug. The averaged couplings, chosen by the user on 2026-10-11, had been measured before it.
+
 ## Current profile (U-AMG; parallel: 16 threads, the default before 2026-10-08)
 
 | Case | Setup, sequential / parallel | Solve, sequential / parallel |
@@ -611,6 +687,33 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
 | Cube-tet k=0 n=32 | 3.2 / 1.7 s | 0.7-0.9 / 0.7-0.9 s |
 | Cube-cart-aniso100 n=64 | 4.2 / 2.5 s | 0.5 / 0.5 s |
 | Cube-tet k=2 n=16 | 3.7 / 1.8 s | 3.7 / 3.5 s |
+
+**Setup breakdown before the flat passes** (2026-10-12, see "Coarsening passes on flat arrays" in Done for what
+remains; timers of `Prof.h` in a copy of `src/`, `build/bench_setup/`:
+`uamg_harness` on the dump of Cube-tet k=0 n=32, the scratch driver on HArDCore3D's 32^3 systems; logs in `logs/`).
+The setup is the h-coarsening passes of the first h-coarsened level, at any k: at k >= 1 (`p_h`), the p-levels only
+cost their extraction and smoothers, and the passes run on the k=0 level.
+- Cube-tet k=0 n=32 (318k faces), 1 / 4 threads: setup 3.57 / 1.94 s, of which level 0 3.30 / 1.77 s: 4 passes on
+  nearly the fine size (faces 1.45x, 2.22x, 3.45x, 5.57x fewer; tetrahedra share one face per pair). By step, all
+  levels: hybrid meshes 1.47 / 0.80 s (`Build()` 0.55 / 0.23, of which neighbours and couplings 0.36 / 0.12;
+  `Coarsen()` 0.85 / 0.52, of which the aggregates' neighbours (`std::map`) 0.28 / 0.11, removed faces 0.21 / 0.08,
+  pairwise aggregation 0.18 / 0.16 and interface collapsing 0.17 / 0.17, both sequential; auxiliary coarse meshes
+  0.08 / 0.05); P_F 0.73 / 0.32 s (`IterationMatrix()` 0.18 / 0.05, rows of the removed faces and their block Jacobi
+  0.17 / 0.07, `Theta()` 0.16 / 0.08, `J * Y` 0.09 / 0.04, `Pi`, `Pi * Theta`, row selections 0.12 / 0.06); local
+  Galerkin products 0.51 / 0.17 s (products 0.32, decomposition 0.15, assembly 0.04 on 1 thread); `BuildQ_F`,
+  `BuildQ_T` 0.24 / 0.15 s; the other products (`Q_T^T A_T_F`, `A_T_Tc`, `A_T_Fc`) 0.21 / 0.09 s; chaining of P
+  0.14 / 0.08 s; freeing the meshes and matrices of the passes 0.10 / 0.15 s; `R = P^T`, smoothers, coarse solver
+  0.04 / 0.04 s. Peak 0.6 GB.
+- HArDCore3D 32^3, symmetric path (driver, `sym=1`, FCG), 1 / 4 threads: k=0 (95k faces) setup 0.53 / 0.36 s for a
+  solve of 0.22 / 0.16 s, of which the 3 passes of level 0 0.45 s (1 thread); k=1 setup 0.71 / 0.45 s (solve 1.02 /
+  0.67 s): extraction of the p-level 0.05 / 0.03 s, smoothers 0.06 / 0.04 s, passes of the k=0 level 0.51 / 0.29 s.
+  Non-symmetric path (`diff_n32_k1`, 1 thread): 0.73 s, of which extraction 0.09 s, downwind orders 0.06 s, passes
+  0.44 s. fhhos4 Cube-tet k=2 n=16 (`p_h`, 1 thread): 0.46 s, of which smoothers and extraction 0.14 s, passes 0.30 s.
+- No step dominates (about 15 steps of 0.1-0.4 s on 1 thread), and none is arithmetic: a pass costs ~10 us per
+  element at level 0 (2.9 s for the 305k elements of the 4 passes), thousands of cycles for 4-10 faces, i.e.
+  vectors per element, face and aggregate, `std::map`s, mutexes, triplets sorted by `setFromTriplets`, `block()`
+  scans and the freeing of all of it. On 4 threads, the sequential parts (pairwise aggregation, interface collapsing,
+  freeing) take 0.48 of the 1.94 s. Hence idea 2, extended to the whole pass (done).
 
 **The assembly (printed as "Assembly time", not in the Setup row) dominates the runs** (2026-10-04, `timing.sh`
 logs, sequential / 16 threads): Cube-tet k=2 n=16 178 / 38 s (setup 3.7 / 1.8 s); Cube-cart-aniso100 n=64 102 / 16 s
@@ -696,8 +799,11 @@ Galerkin products (see Done).
    through the library (2026-10-08, HArDCore3D 32^3 k=1, solve): slower. 16 threads, `bgs` 1.33-1.43 -> 1.34-1.44 s,
    `hbgs` 0.97-1.22 -> 1.50-1.53 s; 8 threads, `bgs` 1.06-1.17 -> 1.20-1.22 s, `hbgs` 0.72-0.74 -> 1.08-1.11 s.
    Probably dropped: the library can't set it anyway (read at the start of the process).
-2. **Flat data structures for the hybrid algebraic meshes** (`HybridAlgebraicMesh`) — estimated, medium-large
-   effort, main lever at k=0 (the paper's case). Vectors of vectors, a mutex per element, a `std::map` of neighbours
+2. **Flat data structures for the hybrid algebraic meshes** (`HybridAlgebraicMesh`) — done for the default options
+   (2026-10-12, "Coarsening passes on flat arrays" in Done: setup 2.4x faster on 1 thread, 3x on 4, at k=0). Next
+   steps: the chaining of P and the locality of the loop over the aggregates (see what remains there); the other
+   options (`-coarsening-prolong 3|4|5`, `-face-prolong 2|3`, `-prolong` != 2, `-cs mn`) still run on
+   `HybridAlgebraicMesh`. The notes below are those of the estimate. Main lever at k=0 (the paper's case). Vectors of vectors, a mutex per element, a `std::map` of neighbours
    per aggregate, copied vectors: building and coarsening the meshes (`mesh.Build()` + `mesh.Coarsen()`) take 1.17 /
    0.67 s of the 2.9 / 1.7 s of setup at k=0, sequential / 16 threads (`uamg_harness`, after the local Galerkin
    products; 0.28 / 0.22 s of 3.8 / 1.8 s at k=2), plus freeing them. CSR-like arrays and prefix sums (same numbering
@@ -708,13 +814,22 @@ Galerkin products (see Done).
    couplings was ~0.1 s; auxiliary coarse meshes 0.26 / 0.18 s; aggregates' neighbours (`std::map`/`set`) 0.23 / 0.04 s;
    `BuildQ_T`/`BuildQ_F` (triplets, 1 non-zero per row for most rows) 0.21 / 0.12 s; removed faces 0.17 / 0.04 s;
    interface collapsing (sequential) 0.16 / 0.19 s; freeing 0.10 / 0.16 s; other `Build()` steps 0.13 / 0.10 s.
-3. **`Theta()` without `SparseMatrix::block()`** — measured, small effort, bit-identical if the blocks and the solves
-   are the same. `HybridAlgebraicMesh::Theta()` (the reconstruction of P_F, `-A_TcTc^-1 A_TcFc` per coarse cell)
+   Re-measured 2026-10-12 (see "Setup breakdown" in Current profile), and extended to the whole pass: at k=0, the
+   adjacency of the cells and faces is the pattern of A_T_F (CSR) and its transpose; the coarse faces numbered by a
+   parallel sort of the pairs of aggregates (the order of the interface collapsing: by the first aggregate, then the
+   neighbour); Q_T, Q_F, Pi and P_F (idea 4) written directly in CSR, without triplets; `Theta()` per aggregate (idea
+   3); buffers reused from one pass to the next instead of freed. That covers ~75% of the setup (meshes 1.47, P_F
+   0.73, Q_T/Q_F 0.24, products 0.21, freeing 0.10 of 3.57 s on 1 thread). Estimate, unverified: setup 2-3x faster on
+   1 thread, more on 4 threads (the sequential pairwise aggregation over flat arrays: a few tens of ms). Large effort,
+   in steps that can each be bit-identical (same aggregates, numbering and order of the sums).
+3. **`Theta()` without `SparseMatrix::block()`** — done in the flat passes (default options); the other options still
+   use `HybridAlgebraicMesh::Theta()`. Measured, small effort, bit-identical if the blocks and the solves are the same. `HybridAlgebraicMesh::Theta()` (the reconstruction of P_F, `-A_TcTc^-1 A_TcFc` per coarse cell)
    extracts its dense blocks with `block()`, which scans the row from its start for each face: 0.53 / 0.29 s of the
    3.8 / 1.8 s of setup at k=2 (sequential / 16 threads: it scales poorly), 0.15 / 0.07 s at k=0 (`uamg_harness`,
    2026-10-04). One pass over the rows of the cell, as in `BuildElementFaces()`, gives all the blocks; then a
    parallel fill without triplets. `CouplingValue()` (`-fcs i`) and `BuildHighOrderTraceOnRemovedFaces()` do the same.
-4. **Local P_F** — estimated, medium effort, rounding-level differences. The rows of P_F on the removed faces only
+4. **Local P_F** — done in the flat passes, bit-identical (the sums in the order of the global products). Estimated,
+   medium effort, rounding-level differences. The rows of P_F on the removed faces only
    involve the faces of their aggregate: `P(f,:) = (1-w) Y(f,:) - w D_f^-1 sum_{g!=f} S(f,g) Y(g,:)` (block Jacobi,
    w = 2/3), with Y = the first row of Theta of the aggregate on the removed faces, the injection on the kept faces.
    Computed per aggregate from the local matrices (`LocalMatrices`), they would replace the assembly of the rows of
@@ -778,6 +893,69 @@ Possible now that reordering the arithmetic operations is allowed (rejected so f
   otherwise), and check the iteration counts.
 
 Other candidates:
+
+- **Coarsening prolongation without its block-Jacobi smoothing** (`-coarsening-prolong 5`, P_F^(0), instead of the
+  default 6, P_F) — measured (2026-10-12), rejected (the user's decision: the anisotropic case worsens too much). It
+  skips `BlockJacobi::IterationMatrix()` and the product `J * Y` in each pass, and P gets sparser; the operator
+  complexity doesn't change (the pattern of the coarse operators comes from the aggregates). FCG + U-AMG, the program's
+  defaults otherwise, best of 2 (`build/bench_prolong/`, `summary.txt`), iterations and setup / solve / total ratios
+  P_F^(0) / P_F, 1 thread (4 threads):
+  - Cube-cart k=0 n=32: 15 -> 15 its, setup 0.91 (0.89), total 0.92 (0.91); Cube-tet k=0 n=32: 28 -> 29, setup 0.89
+    (0.90), solve 1.14, total 0.94 (0.96); Complex-tet n=4: 25 -> 25, total 0.88 (0.92); Cube-tet-aniso20 n=16: 62 ->
+    63, total 0.93 (0.96); Square-tri k=0 n=512: 26 -> 23, total 0.91 (0.95); Square-tri k=1 n=256: 17 -> 17, total
+    0.95 (0.94); Cube-tet k=1 n=16: 33 -> 33, total 1.03 (0.99); Cube-tet k=2 n=16 (4 threads): 33 -> 33, total 0.97;
+    Cube-cart k=1 n=16: 9 -> 9, 0.08-0.09 s either way;
+  - Cube-cart-aniso100 n=32: 9 -> 16 its, solve 1.98 (1.88), total 0.98 (1.05); Heterog1e8 n=256: 22 -> 27 its,
+    solve 1.21, total 1.00 (1.12).
+  Setup -5 to -15% at k=0 (at k >= 1, the passes run on the k=0 p-level only: -3 to -9%), total -4 to -12% on the
+  isotropic homogeneous cases, but the iterations nearly double on the strong anisotropy and grow by 23% on the
+  heterogeneous case, as in the paper's comparison of the variants.
+
+- **MUMPS on a larger coarsest level** — measured (2026-10-12), rejected for now: no gain on HArDCore3D's 32^3
+  systems. MUMPS 5.8.2 (sequential library, automatic ordering, OpenMP + OpenBLAS threads) as the coarse solver of the
+  scratch driver (`MumpsSolver` in `build/bench_nonsym/driver.cpp`, `driver_mumps`, linked to the conda env `diskpp`'s
+  MUMPS; analysis + factorization at the setup, a solve per visit; `SYM=1` on the symmetric path), against Eigen's
+  `SparseLU` / `SimplicialLDLT`; same iterations and residuals to 3-4 digits. The coarsening divides the size by
+  ~4-5 per level, so the coarsest-size limit (`MatrixMaxSizeForCoarsestLevel`, 1000) of 10000 / 30000 / 100000 removes
+  one / two levels / all the multigrid at k=0 (at k=1, the coarsest is then the p-level k=0). Setup + solve, best of 2,
+  4 threads (`build/bench_mumps/bench_coarse_mumps.sh`, `runs.txt`, `summarize_mumps.py`), relative to today's
+  (Eigen, <= 1000 rows):
+
+  | System | MUMPS, today's levels | MUMPS ~3200-3800 rows | MUMPS ~16600-18300 rows | MUMPS ~95000 rows | Eigen ~3200-3800 rows |
+  |---|---|---|---|---|---|
+  | diffusion-dominated k=0 (0.50 s) | 1.05 | 1.10 | 1.50 | 2.29 (direct solve) | 1.45 |
+  | diffusion-dominated k=1 (1.30 s) | 0.99 | 1.03 | 1.19 | 1.67 (17 its instead of 24) | 1.17 |
+  | convection-dominated k=0 (0.44 s) | 0.95 | 0.97 | 1.43 | 2.57 (direct solve) | 1.70 |
+  | convection-dominated k=1 (0.80 s) | 0.89 | 0.94 | 1.16 | 2.05 | 1.15 |
+  | symmetric part k=0, FCG (0.50 s) | 1.01 | 1.10 | 1.36 | 1.90 (direct solve) | 1.45 |
+  | symmetric part k=1, FCG (1.18 s) | 0.94 | 0.91 | 1.08 | 1.55 | 1.10 |
+
+  1 thread: the same picture (MUMPS ~3300 rows 0.96-1.13, ~17000 rows 1.15-1.41, direct 1.52-2.75). MUMPS factorizes
+  10-35x faster than Eigen (~3500 rows: 10-23 vs 40-275 ms; ~17000 rows: 0.15-0.24 s vs 2.6-8 s in an earlier sweep)
+  and solves 2-3x faster, but the levels a larger coarsest level removes are cheap (setup 0.01-0.04 s), whereas it
+  costs its factorization and a solve at each visit: the K-cycle visits the coarsest level 30-180 times per solve in the
+  diffusion-dominated cases, 0.8-1.2 ms per MUMPS solve at ~3300 rows, 3-5 ms at ~17000 (2-3x the time of solves back to
+  back: the factors are evicted between visits). MUMPS on the whole fine system at k=0: its factorization alone (0.9-1.4
+  s) exceeds U-AMG's setup + solve. It would matter if the coarsening stopped early on a large coarsest level, where
+  Eigen takes seconds; with today's levels, MUMPS is within the noise of Eigen (0.89-1.05).
+
+  In the program (a temporary `ENABLE_MUMPS` option, removed after the measurement: coarse solver `mumpsch`, LDL^T
+  without pivoting; MUMPS 5.7.3 from conda-forge's `mumps-seq`, without OpenMP: its threads are OpenBLAS's,
+  `OPENBLAS_NUM_THREADS` set to the number of threads; the input copied to MUMPS's coordinate format, 1-based, one
+  triangle when symmetric: it takes no CSR), FCG +
+  U-AMG with the default smoothers (`bgs,rbgs`), setup + solve relative to today's (`ch`, <= 1000 rows), one run
+  (2D, 4 threads: best of 3) (`build/bench_mumps/bench_program_mumps.sh`, `program/`, `parse_program_mumps.py`):
+
+  | Problem (today's setup + solve) | threads | MUMPS, today's levels | MUMPS, 1-2 levels less | MUMPS, 2-3 levels less |
+  |---|---|---|---|---|
+  | Cube-tet k=0 n=32 (4.71 / 3.10 s) | 1 / 4 | 1.08 / 1.07 | 9998 rows: 1.03-1.07 / 1.05-1.08 | 57111 rows: 1.53 / 1.84 |
+  | Cube-tet k=1 n=16 (1.11 / 0.96 s) | 1 / 4 | 1.00 / 1.01 | 7666 rows: 1.05-1.08 / 1.14-1.25 | 43656 rows: 1.17 / 1.43 |
+  | Square-tri k=0 n=512 (15.0 / 9.47 s) | 1 / 4 | 1.09 / 0.97 | 7169 rows: 1.02 / 0.93 | 28207 rows: 0.98 / 0.94 |
+  | Square-tri k=1 n=256 (4.38 / 3.13 s) | 1 / 4 | 0.93 / 0.96 | 7045 rows: 0.99 / 0.93 | 51859 rows: 1.07 / 1.05 |
+
+  The same iterations (+-1). In 3D, a larger coarsest level is slower; in 2D (where the fill-in of a sparse direct
+  solver is low), 0.93-0.94 on 4 threads at 7000-28000 rows, of which 0.96-0.97 come from MUMPS at today's size: at
+  the edge of the noise (runs within 3-10% of each other). Dropped (the user's decision).
 
 - **Several aggregations at once (one P_F and one Galerkin product per level instead of one per pass)** — measured
   with existing options (2026-10-03, sequential): rejected as a default, no gain at k=0. The default aggregates can't

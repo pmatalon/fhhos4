@@ -34,7 +34,7 @@ ctest -E HPConfig                          # skip the slowest tests
 ./bin/fhhos4_tests --gtest_filter=*Kellogg*  # or filter the binary directly
 ```
 
-The full suite is 168 CTest cases and runs in about 4 minutes serially. The 8 `HPConfigTest` cases take about 2 minutes of it (~15 s each: N=128 with k=5 is the smallest size of the high-order paper); the other cases take less than 20 s each.
+The full suite is 181 CTest cases and runs in about 5 minutes serially. The 8 `HPConfigTest` cases take about 2 minutes of it (~15 s each: N=128 with k=5 is the smallest size of the high-order paper); the other cases take less than 20 s each.
 
 ## GMSH meshes: reproducibility
 
@@ -214,7 +214,25 @@ Unit tests of the local Galerkin products of the coarsening passes of U-AMG (`sr
 LocalMatrices.h`), on a hybrid system of degree 0 on a 16 x 16 Cartesian mesh, coarsened once by pairwise aggregation
 with interface collapsing (2 cases: symmetric operator, read from its lower triangular part; non-symmetric one, cell-face
 couplings with asymmetry 0.5): the decomposition into local matrices of the cells reassembles the operator, and the sum
-of the local matrices of the aggregates is the global product `P^T S P` (to 1e-12 relative).
+of the local matrices of the aggregates is the global product `P^T S P` (to 1e-12 relative). The system is built in
+`support/CartesianHybridSystem.h`.
+
+## `CoarseningPassTest.cpp`
+
+Tests of the coarsening passes of U-AMG on flat arrays (`src/Solver/Multigrid/UncondensedAMG/CoarseningPass.h`), which
+run with the default options: they must build exactly the hierarchy of the reference implementation
+(`HybridAlgebraicMesh`, run with `UncondensedLevel::UseFlatPasses = false`).
+
+- **`CoarseningPassProgram/CoarseningPassProgramTest.SameAsReference`** (10 cases: Square-tri n=16 k=0,1, n=8 k=2 with
+  `-hp-cs h`; Square-poly n=32 k=0 with `-polymesh-fcs n` (neighbouring cells share several faces); Square4quadrants-cart
+  n=32 k=0 `-heterog 1e4`; Square-cart n=32 k=0 `-aniso 100`; Cube-tet n=8 k=0, k=1 with orthonormal bases; Cube-cart n=8
+  k=1 with `-hp-cs h`; Cube-tet n=8 k=0 with `-s gcruamg -uamg-nonsym`) — the same iteration count and L2 error, bit for
+  bit. Sequential: on several threads, the L2 error (an OpenMP reduction) and the polygonal meshes (their agglomeration)
+  vary from one run to the next.
+  CLI: `./bin/fhhos4 -geo cube -mesh cart -mesher inhouse -n 8 -k 1 -hp-cs h -s fcguamg -no-cache -threads 1` (etc.)
+- **`CoarseningPass.*`** (3 cases: symmetric system, with the constants of coordinates other than 1 (the rescaling of
+  the bases), non-symmetric system with asymmetry 0.5) — on the 32 x 32 system of `LocalMatricesTest.cpp`, on all the
+  threads: the operators and prolongations of all the levels are the same, bit for bit.
 
 ## `UAMGLibraryTest.cpp`
 

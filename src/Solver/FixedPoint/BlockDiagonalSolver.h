@@ -76,24 +76,28 @@ public:
 		if (_method == DiagBlockSolveMethod::Inverse)
 			x.derived().noalias() = Di * b;
 		else
-		{
-			// Same steps as Eigen::FullPivLU::solve(), without its temporaries
-			const int* P = &_permP[i * _blockSize];
-			const int* Q = &_permQ[i * _blockSize];
-			int rank = _rank[i];
-			// x = P b
-			for (int k = 0; k < _blockSize; k++)
-				x.row(P[k]) = b.row(k);
-			// x = L^-1 x
-			Di.template triangularView<Eigen::UnitLower>().solveInPlace(x);
-			// x = U^-1 x (non-singular part)
-			Di.topLeftCorner(rank, rank).template triangularView<Eigen::Upper>().solveInPlace(x.topRows(rank));
-			// x = Q x (via b)
-			for (int k = 0; k < rank; k++)
-				b.row(Q[k]) = x.row(k);
-			for (int k = rank; k < _blockSize; k++)
-				b.row(Q[k]).setZero();
-			x = b;
-		}
+			SolveLU(Di, &_permP[i * _blockSize], &_permQ[i * _blockSize], _rank[i], b, x);
+	}
+
+	// x = D^{-1} b, from the LU factors of D stored as by Eigen::FullPivLU (matrixLU(), the indices of permutationP()
+	// and permutationQ(), nonzeroPivots()). b is used as work space: its content is destroyed. x must not alias b.
+	template <class LU, class RhsT, class DestT>
+	static void SolveLU(const LU& Di, const int* P, const int* Q, int rank, Eigen::MatrixBase<RhsT>& b, Eigen::MatrixBase<DestT>& x)
+	{
+		int blockSize = Di.rows();
+		// Same steps as Eigen::FullPivLU::solve(), without its temporaries
+		// x = P b
+		for (int k = 0; k < blockSize; k++)
+			x.row(P[k]) = b.row(k);
+		// x = L^-1 x
+		Di.template triangularView<Eigen::UnitLower>().solveInPlace(x);
+		// x = U^-1 x (non-singular part)
+		Di.topLeftCorner(rank, rank).template triangularView<Eigen::Upper>().solveInPlace(x.topRows(rank));
+		// x = Q x (via b)
+		for (int k = 0; k < rank; k++)
+			b.row(Q[k]) = x.row(k);
+		for (int k = rank; k < blockSize; k++)
+			b.row(Q[k]).setZero();
+		x = b;
 	}
 };
