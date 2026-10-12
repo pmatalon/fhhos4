@@ -110,8 +110,9 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   iteration, nor in the later sweeps of a pre-smoother with several iterations, the second visit of a coarse level
   in a W-cycle, or the post-smoother.
 - **The hybrid smoothers** (`hbgs`, `hrbgs`: Gauss-Seidel inside the chunk of rows of each thread, Jacobi between
-  the chunks) give results that depend on the number of threads, and vary from one parallel run to the next: a
-  thread reads x while another one writes it.
+  the chunks) give results that depend on the number of threads, not on the run (since 2026-10-11: the values of the
+  other chunks from the start of the sweep, see Done; before, a thread read x while another one wrote it). On 1 thread
+  (and the scalar ones on a matrix of at most 20000 non-zeros), they are the sequential smoothers, bit for bit.
 
 ## Done
 
@@ -514,6 +515,95 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   around 0.3-0.6); in time it only pays from ~15-30, because an ordered sweep costs 1.7-1.9x a natural one (irregular
   accesses; on the scalar levels, no residual deduced from the sweep: one more product per smoothing). See idea 7.
 
+- **Deterministic hybrid Gauss-Seidel** (2026-10-12, idea 6, the user's request). The hybrid smoothers (`hbgs`,
+  `hrbgs`: scalar and block, natural order and `SweepOrder`; the library's default on several threads) are now
+  Gauss-Seidel in the chunk of rows of each thread and a true Jacobi between the chunks: a row reads the current values
+  of its chunk, and those of the other chunks from the start of the sweep (`src/Solver/FixedPoint/HybridChunks.h`).
+  Before, a thread read the other chunks while they were written: the results varied from run to run, which cost much
+  with GCR as the outer iteration and in the K-cycle: HArDCore3D's diffusion-dominated convection-diffusion
+  (`-c 1 2 3 0`), 48^3 k=1, 8 threads, 191 iterations instead of 26 (sequential); 48^3 k=0, 105 instead of 46 (only
+  GCR/GCR was that sensitive; on the symmetric part, FCG/FCG 20 -> 20). A prototype (the other chunks read in a copy
+  of x, a test per non-zero) had given 24 iterations in every run at 32^3 k=1 on 4 threads (racy: 26-36).
+  - Implementation: the chunks are contiguous ranges of positions of the sweep sequence (with `SweepOrder`, the chunk
+    of a column through the order). Only the boundary block rows (a non-zero in another chunk) need old values: their
+    non-zeros are described by ranges of positions in the row (external; internal before and after the diagonal
+    block: in the natural order, a chunk is a range of columns, so at most two external ranges and one internal range
+    on each side), found once per matrix, number of threads and order, at the setup (again if the number of threads
+    changes); in the natural order, a block row is interior if the first and last columns of its rows are in its
+    chunk. Before a sweep from x != 0, the threads copy the values of x of the exported block rows (those read by
+    another chunk; split evenly) into a vector with x's indexing, then a barrier; the boundary rows multiply their
+    external non-zeros by these old values, their internal ones by x. The interior rows keep the kernels of the
+    sequential sweeps. From x = 0: no copy, no barrier, and the boundary rows skip the products by the values not
+    computed yet, as the interior ones. On 1 thread, the sequential smoothers, bit for bit (the scalar one then also
+    deduces the residual from the sweep: the "1 thread" item of idea 6).
+  - Fraction of boundary rows / of external non-zeros, 4 chunks (8, 16): HArDCore3D's 32^3 fine level 13% / 3.2%
+    (31% / 7.3%, 65% / 15.7%); U-AMG's levels of ~17000 faces 31-34% / 7.5-8.4%, of ~3500 faces 70-78% / 19-21%;
+    fhhos4's Cube-tet n=32 (GMSH numbering) fine level 83% / 32% (92% / 43%), level 1 32% / 7.4%, level 2 63% / 15%.
+  - Poorly separated chunks: on Cube-tet, the Jacobi between the chunks diverges (FCG + U-AMG, `-smoothers
+    hbgs,hrbgs -threads 4`: k=0 n=32 and k=1 n=16 never converge; racy: 30-31 / 37-38 iterations; `bgs`: 28 / 33).
+    A level whose external non-zeros exceed 20% of its non-zeros (`HybridChunks::MaxExternalFraction`) runs the
+    sequential sweeps (the user's choice among three options): Cube-tet 28 / 33 iterations, as `bgs`. On 4 threads, it
+    applies to the levels of a few thousand faces (19-21%: HArDCore3D's convection-dominated k=0, 23 -> 22
+    iterations), never to the large levels of HArDCore3D's meshes. Rejected: the l1 hybrid Gauss-Seidel (Baker,
+    Falgout, Kolev, Yang, SIAM J. Sci. Comput. 33 (2011): the diagonal of each boundary row plus the sum of |a_ij| over
+    its external non-zeros; convergent for any SPD matrix and chunks): Cube-tet 35 / 72 iterations, HArDCore3D
+    diffusion-dominated +1, convection-dominated 15 -> 19 (natural order), 5 -> 10 (downwind order).
+  - Development (micro-benchmark of one sweep, HArDCore3D's 32^3 fine level, 4 threads, racy -> deterministic): a first
+    version summed the external products of each chunk's boundary rows before the barrier, row by row: backward sweep
+    k=1 6.6-7.6 -> 8.8 ms (sums 0.5-0.9 ms, gathering far values of x; the chunks between two others have twice the
+    boundary rows of those at the ends: 0.45 ms of waiting at the barrier), forward sweep from 0, k=0, 0.19 -> 0.25 ms
+    (the boundary rows multiplied the zeros not computed yet). The copy of the exported values instead: copy 0.005 /
+    0.015 ms (k=0 / k=1), barrier 0.003-0.01 ms, the sweep itself as fast as the racy one (k=0 0.31-0.32 vs 0.32-0.35
+    ms, k=1 6.7-6.8 vs 6.6-7.1 ms). Finding the boundary rows at the first sweep cost 1.3-2 ms (k=0) / 7-13 ms (k=1)
+    per smoother and fine level: moved to the setup.
+
+  Scratch driver (U-AMG built as the library does, GCR + K-cycle with GCR, HArDCore3D's 32^3 systems, smoothers
+  `hbgs,hrbgs`; `build/bench_det/bench_driver.sh`, `driver_runs_final2.txt`; prototype: `driver_runs_final.txt`),
+  iterations and solve time, racy / prototype / deterministic, 3 runs each (the prototype in a previous series; 3
+  threads in the logs):
+
+  | Case | 1 thread (`bgs,rbgs`) | 2 threads | 4 threads |
+  |---|---|---|---|
+  | diffusion-dominated k=0 | 29, 0.23 s | 31 / 31 / 31, 0.18-0.19 / 0.23-0.25 / 0.19-0.21 s | 30-33 / 31 / 31, 0.17-0.19 / 0.19-0.20 / 0.17-0.19 s |
+  | diffusion-dominated k=1 | 23, 1.40 s | 23-24 / 23 / 23, 0.96-1.02 / 1.32-1.35 / 0.94-1.01 s | 30-31 / 24 / 24, 0.98-1.04 / 1.02-1.12 / 0.81-0.86 s |
+  | convection-dominated k=0, natural order | 22, 0.16 s | 22 / 22 / 22, 0.13-0.14 / 0.15-0.16 / 0.14-0.15 s | 23 / 23 / 22, 0.11-0.13 / 0.14-0.15 / 0.11-0.12 s |
+  | convection-dominated k=1, natural order | 15, 0.90 s | 15 / 15 / 15, 0.59-0.63 / 0.83-0.94 / 0.54-0.61 s | 15 / 15 / 15, 0.47-0.50 / 0.57-0.65 / 0.45-0.56 s |
+  | convection-dominated k=0, downwind order | 4, 0.044 s | 5 / 5 / 5, 0.043-0.052 / 0.041-0.045 / 0.037-0.041 s | 5 / 5 / 5, 0.029-0.033 / 0.027-0.034 / 0.028-0.034 s |
+  | convection-dominated k=1, downwind order | 4, 0.37 s | 4 / 4 / 5, 0.22-0.25 / 0.23-0.24 / 0.28-0.31 s | 4 / 4 / 5, 0.16-0.18 / 0.16-0.18 / 0.20-0.21 s |
+
+  On 1 thread, the hybrid smoothers give exactly the results of `bgs,rbgs` (same iterations and residuals, 8 cases).
+  The deterministic ones give the same residual in every run; the racy ones varied. With the downwind order, k=1, one
+  more iteration on 2-4 threads (see idea 6). BiCGSTAB + V-cycle (diffusion-dominated, 4 threads): k=0 21 iterations
+  (sequential: 21; racy: 21-25), k=1 28 (sequential 27; racy 26-31). HArDCore3D's case at 48^3 k=1 (`-c 1 2 3 0`,
+  4 threads): 27 iterations, the same residual in 2 runs, solve 3.3-3.5 s (1 thread: 26 iterations, 5.8 s), setup
+  1.8-2.1 s, L2 error unchanged, peak 4.79 GB. Symmetric matrices, 4 threads, FCG: HArDCore3D's `hho-diffusion -c 1 2`
+  32^3, k=0 / 1 / 2: 30 / 19 / 26 iterations, as the racy version (3 runs each, the same residual in every run);
+  fhhos4 (`-smoothers hbgs,hrbgs -threads 4`), Cube-cart k=1 n=32: 10 iterations, solve 0.25-0.29 s (racy: 10,
+  0.25-0.26 s); Cube-tet k=0 n=32: 28, 0.58-0.74 s (racy 30-31, 0.57-0.58 s); Cube-tet k=1 n=16: 33, 0.62-0.69 s (racy
+  38, 0.46-0.51 s: the fine level is sequential). `ctest` 168/168 (the program's default `bgs,rbgs` is unchanged),
+  `quick_check.sh` OK.
+
+  Against HArDCore3D's own solver (`hho-diff-advec-reac --solver_type bicgstab|fhhos4`: Eigen's BiCGSTAB, diagonal
+  preconditioner, sequential, tolerance machine epsilon; fhhos4 1e-12), HArDCore3D's solving time (wall: for fhhos4,
+  the blocks A_TT, A_TF, A_FT assembled from triplets in `HHO3D::solve()`, sequential, the conversion of these
+  column-major inputs, the setup and the solve), one series (`build/bench_det/bench_speedup_det.sh`,
+  `speedup_table_det.py`), L2 errors equal everywhere:
+
+  | Case | BiCGSTAB | fhhos4 1 thread (setup + solve + other) | fhhos4 4 threads | speedup 1 / 4 threads |
+  |---|---|---|---|---|
+  | 32^3 k=1 diffusion-dominated | 211 its, 3.60 s | 23 its, 2.64 s (0.71 + 1.39 + 0.54) | 24 its, 1.90 s (0.53 + 0.82 + 0.55) | 1.36 / 1.89 |
+  | 48^3 k=1 diffusion-dominated | 289 its, 17.5 s | 26 its, 10.9 s (3.09 + 5.71 + 2.10) | 27 its, 8.23 s (2.06 + 3.42 + 2.75) | 1.61 / 2.13 |
+  | 32^3 k=1 convection-dominated | 61 its, 1.22 s | 4 its, 1.64 s (0.76 + 0.35 + 0.53) | 5 its, 1.35 s (0.56 + 0.21 + 0.58) | 0.74 / 0.90 |
+  | 48^3 k=1 convection-dominated | 87 its, 5.92 s | 5 its, 7.37 s (2.78 + 1.72 + 2.87) | 6 its, 5.50 s (1.99 + 1.09 + 2.42) | 0.80 / 1.08 |
+  | 32^3 k=0 diffusion / convection-dominated | 135 / 59 its, 0.29 / 0.17 s | 0.85 / 0.73 s | 0.74 / 0.48 s | 0.34 / 0.39, 0.23 / 0.35 |
+  | 48^3 k=0 diffusion / convection-dominated | 189 / 84 its, 1.79 / 0.90 s | 3.72 / 2.60 s | 2.65 / 2.02 s | 0.48 / 0.68, 0.35 / 0.45 |
+
+  From 1 to 4 threads, fhhos4's solve gets 1.6-1.7x faster at k=1, its setup 1.3-1.5x; the "other" part (the client's
+  sequential triplet assembly and the conversion of the inputs: 2.1-2.9 s at 48^3 k=1) doesn't, and is a third to half
+  of the time on 4 threads. Assembling the blocks in HArDCore3D's parallel assembly loop would give an estimated ~3x
+  against BiCGSTAB at 48^3 k=1 diffusion-dominated, ~1.9x convection-dominated. At k=0, BiCGSTAB is cheaper than the
+  setup alone.
+
 ## Current profile (U-AMG; parallel: 16 threads, the default before 2026-10-08)
 
 | Case | Setup, sequential / parallel | Solve, sequential / parallel |
@@ -644,21 +734,11 @@ Galerkin products (see Done).
    - fhhos4's tetrahedral meshes (GMSH numbering, little locality): the hybrid smoother loses 5-6 iterations at
      k = 0 (28 -> 33-34) and gains nothing there. A multicolour Gauss-Seidel, or a renumbering of the chunks
      (see "Renumbering the fine unknowns"), might do better; gain unknown.
-   - 1 thread: `BlockGaussSeidel::HybridSweep` could fall back to `Sweep` (bit-identical up to the sign of a zero,
-     with the products by the zero initial guess skipped), and the scalar one could fuse the residual: `hbgs` would
-     then cost nothing when a client runs it on 1 thread.
-   - Determinism: the hybrid smoothers have a data race (see the exactness facts): a real Jacobi between the chunks
-     (or a colouring of the chunks' boundaries) would make them deterministic, and usable with BiCGSTAB. Measured
-     2026-10-12 on the non-symmetric path (GCR, K-cycle with GCR), where the race costs much more: HArDCore3D's
-     diffusion-dominated convection-diffusion, 48^3 k=1, 8 threads: 191 iterations instead of 26 (sequential); 48^3
-     k=0: 105 instead of 46. At 32^3 k=1, 4 threads (scratch driver, `build/bench_nonsym/exp19-23*.txt`): sequential
-     23, racy hybrid 26-36 (varies from run to run), a deterministic hybrid (other chunks read from a copy of x taken
-     before the sweep: temporary prototype, removed) 24 in every run; k=0: 29 / 30-34 / 31. Only GCR as both the outer
-     iteration and the K-cycle's is that sensitive (symmetric part: FCG/FCG 20 -> 20 with the racy hybrid, FCG/GCR 22
-     -> 22-23, GCR/FCG 20 -> 21, GCR/GCR 24 -> 30); mostly the post-smoothing (hybrid pre only 24-25, post only
-     27-29). The prototype's cost per iteration (a test per entry, without the same-pattern kernels): +20% at k=1,
-     +10% at k=0; total solve time about equal to the racy one's (fewer iterations), and reproducible. A proper version
-     would only read the copy in the rows that touch other chunks (the others keep the current kernels).
+   - Determinism, and the sequential sweeps on 1 thread: done (see Done, "Deterministic hybrid Gauss-Seidel").
+   - In the downwind order, the transport crosses one chunk boundary per sweep (Jacobi between the chunks): 5
+     iterations instead of 4 at k=1 on 2-4 threads (HArDCore3D's convection-dominated case, 32^3; the racy version
+     sometimes read updated upstream values). Recovering it would need the threads to follow the flow from one chunk
+     to the next (a wavefront: less parallelism); not tried.
 7. **Renumbering the levels of a non-symmetric matrix in their downwind order** — measured in part, medium effort.
    Instead of sweeping in the downwind order (`SweepOrder`), permute each level that gets an order once at the setup
    (its operator, the rows of its prolongation and the columns of the finer one, the restrictions; the fine level's

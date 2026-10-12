@@ -1,6 +1,7 @@
 #pragma once
 #include "BlockSOR.h"
 #include "DiagonalBlockPositions.h"
+#include "HybridChunks.h"
 using namespace std;
 
 class GaussSeidel : public IterativeSolver
@@ -9,6 +10,7 @@ protected:
 	Direction _direction;
 	bool _hybrid = false; // see HybridSweep()
 	vector<SparseMatrixIndex> _diagPos; // position of the diagonal coefficient of each row in the arrays of the matrix
+	HybridChunks _chunks; // of the hybrid sweeps (see Chunks())
 public:
 	// If set, every sweep (forward or backward, pre- or post-smoothing) processes the rows in this order: the downwind
 	// order of a convection-dominated matrix (DownwindOrder()), which all the sweeps then follow
@@ -57,22 +59,26 @@ public:
 				Utils::FatalError("Gauss-Seidel: no diagonal coefficient in row " + to_string(i) + ".");
 		}
 		_diagPos = std::move(diagonal.Begin);
+		_chunks.Clear();
+		if (_hybrid)
+			Chunks();
 
 		this->SetupComputationalWork = 0;
 	}
 
-	// The residual is deduced from the products computed in the sweep (half of the matrix): not in the hybrid sweeps,
-	// whose rows don't all read the same values of x, nor in the sweeps in SweepOrder
+	// The residual is deduced from the products computed in the sweep (half of the matrix): not in the parallel hybrid
+	// sweeps, whose rows don't all read the same values of x (otherwise, they are the sequential ones), nor in the
+	// sweeps in SweepOrder
 	bool CanOptimizeResidualComputation() override
 	{
-		return !_hybrid && !SweepOrder;
+		return !SweepOrder && !(_hybrid && Chunks().Parallel());
 	}
 
 private:
 	IterationResult ExecuteOneIteration(const Vector& b, Vector& x, bool& xEquals0, bool computeResidual, bool computeAx, const IterationResult& oldResult) override
 	{
 		IterationResult result(oldResult);
-		assert((!_hybrid && !SweepOrder) || (!computeResidual && !computeAx)); // see CanOptimizeResidualComputation()
+		assert(CanOptimizeResidualComputation() || (!computeResidual && !computeAx));
 
 		const SparseMatrix& A = *this->Matrix;
 
@@ -131,10 +137,10 @@ private:
 		// x(new) = (L+D)^{-1} * (b-Ux)
 		if (!xEquals0)
 			result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
-		if (SweepOrder)
-			OrderedSweep(b, x, xEquals0);
-		else if (_hybrid)
+		if (_hybrid && Chunks().Parallel())
 			HybridSweep(b, x, xEquals0, false);
+		else if (SweepOrder)
+			OrderedSweep(b, x, xEquals0);
 		else
 			ForwardSweepKernel(b, x, xEquals0, nullptr);
 		                                                                          result.AddWorkInFlops(Cost::SpFWElimination(A));
@@ -147,10 +153,10 @@ private:
 		// x(new) = (D+U)^{-1} * (b-Lx)
 		if (!xEquals0)
 			result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
-		if (SweepOrder)
-			OrderedSweep(b, x, xEquals0);
-		else if (_hybrid)
+		if (_hybrid && Chunks().Parallel())
 			HybridSweep(b, x, xEquals0, true);
+		else if (SweepOrder)
+			OrderedSweep(b, x, xEquals0);
 		else
 			BackwardSweepKernel(b, x, xEquals0, nullptr);
 		                                                                          result.AddWorkInFlops(Cost::SpBWSubstitution(A));
@@ -333,55 +339,83 @@ private:
 		}
 	}
 
-	// Hybrid sweep: each thread sweeps its own contiguous chunk of rows (Gauss-Seidel), and reads the values of x of the
-	// other chunks as they are when it reads them (Jacobi between the chunks, up to the timing of the threads: x is read
-	// by a thread while another one writes it). The result depends on the number of threads and varies from one run to
-	// the next, as with BlockGaussSeidel's hybrid sweeps. From x = 0, the products by the values not computed yet in the
-	// sweep order are skipped: in the other chunks, those are then the old values (0), whatever the timing.
+	// The chunks of the hybrid sweeps: one per thread, on the matrices large enough to run in parallel. Set up with the
+	// matrix, again if the number of threads or SweepOrder changes.
+	const HybridChunks& Chunks()
+	{
+		int nChunks = this->Matrix->nonZeros() > 20000 ? Parallelism::NThreads() : 1;
+		if (!_chunks.IsSetUp(nChunks, SweepOrder))
+			_chunks.Setup(*this->Matrix, 1, SweepOrder, nChunks);
+		return _chunks;
+	}
+
+	// Hybrid sweep (see HybridChunks): each thread sweeps its own contiguous chunk of the rows (or of SweepOrder) by
+	// Gauss-Seidel, and reads the values of the other chunks from the start of the sweep (Jacobi between the chunks). The
+	// interior rows use the kernels of the sequential sweeps. The result depends on the number of threads, not on their
+	// timing. From x = 0, the products by the values of the other chunks and by those not computed yet are skipped, as
+	// in the sequential sweeps (except in SweepOrder, as in OrderedSweep()). Only if Chunks().Parallel().
 	void HybridSweep(const Vector& b, Vector& x, bool xEquals0, bool backward)
 	{
 		const SparseMatrix& A = *this->Matrix;
 		BigNumber n = A.rows();
-		if (xEquals0 && x.size() != n)
-			x = Vector::Zero(n); // read by the other chunks
-		#pragma omp parallel if (A.nonZeros() > 20000)
+		if (xEquals0 && (SweepOrder || x.size() != n))
+			x = Vector::Zero(n); // as OrderedSweep()
+		backward = backward && !SweepOrder; // all the sweeps follow SweepOrder
+		auto products = !xEquals0 || SweepOrder ? HybridChunks::InternalProducts::Both : (backward ? HybridChunks::InternalProducts::Upper : HybridChunks::InternalProducts::Lower);
+		const double* val = A.valuePtr();
+		#pragma omp parallel num_threads(_chunks.Count())
 		{
-			auto [begin, end] = Parallelism::ThreadChunk(n);
-			if (backward)
-				BackwardSweepKernel(b, x, xEquals0, nullptr, begin, end);
-			else
-				ForwardSweepKernel(b, x, xEquals0, nullptr, begin, end);
+			if (!xEquals0)
+			{
+				_chunks.SaveExported(x);
+				#pragma omp barrier
+			}
+			_chunks.ForEachChunk([&](int c)
+			{
+				_chunks.SweepChunk(c, backward,
+					[&](BigNumber begin, BigNumber end)
+					{
+						if (SweepOrder)
+							OrderedSweepKernel(b, x, begin, end);
+						else if (backward)
+							BackwardSweepKernel(b, x, xEquals0, nullptr, begin, end);
+						else
+							ForwardSweepKernel(b, x, xEquals0, nullptr, begin, end);
+					},
+					[&](BigNumber q, BigNumber i) { x[i] = _chunks.BoundaryRowRhs(c, q, i, 0, b, x, xEquals0, products) / val[_diagPos[i]]; });
+			});
 		}
 	}
 
 	// Sweep in SweepOrder: x_i = (b_i - sum_{j != i} a_ij x_j) / a_ii, x_j being the new values of the rows already
-	// processed, the old ones of the others. Hybrid: each thread processes its own contiguous chunk of the order (see
-	// HybridSweep()).
+	// processed, the old ones of the others
 	void OrderedSweep(const Vector& b, Vector& x, bool xEquals0)
 	{
-		const SparseMatrix& A = *this->Matrix;
-		BigNumber n = A.rows();
+		BigNumber n = this->Matrix->rows();
 		if (xEquals0)
 			x = Vector::Zero(n);
+		OrderedSweepKernel(b, x, 0, n);
+	}
+
+	// The same on the positions [begin, end) of SweepOrder only
+	void OrderedSweepKernel(const Vector& b, Vector& x, BigNumber begin, BigNumber end)
+	{
+		const SparseMatrix& A = *this->Matrix;
 		const vector<BigNumber>& order = *SweepOrder;
 		const SparseMatrixIndex* outer = A.outerIndexPtr();
 		const SparseMatrixIndex* col = A.innerIndexPtr();
 		const double* val = A.valuePtr();
 		double* xp = x.data();
-		#pragma omp parallel if (_hybrid && A.nonZeros() > 20000)
+		for (BigNumber k = begin; k < end; ++k)
 		{
-			auto [begin, end] = _hybrid ? Parallelism::ThreadChunk(n) : pair<BigNumber, BigNumber>(0, n);
-			for (BigNumber k = begin; k < end; ++k)
-			{
-				BigNumber i = order[k];
-				SparseMatrixIndex d = _diagPos[i];
-				double tmp = b[i];
-				for (SparseMatrixIndex p = outer[i]; p < d; ++p)
-					tmp -= val[p] * xp[col[p]];
-				for (SparseMatrixIndex p = d + 1; p < outer[i + 1]; ++p)
-					tmp -= val[p] * xp[col[p]];
-				xp[i] = tmp / val[d];
-			}
+			BigNumber i = order[k];
+			SparseMatrixIndex d = _diagPos[i];
+			double tmp = b[i];
+			for (SparseMatrixIndex p = outer[i]; p < d; ++p)
+				tmp -= val[p] * xp[col[p]];
+			for (SparseMatrixIndex p = d + 1; p < outer[i + 1]; ++p)
+				tmp -= val[p] * xp[col[p]];
+			xp[i] = tmp / val[d];
 		}
 	}
 

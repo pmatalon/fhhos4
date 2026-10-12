@@ -127,12 +127,16 @@ The public members of `fhhos4::Solver` (see `include/fhhos4`), read by the setup
 K-cycle, one block Gauss-Seidel iteration before and after, coarsening factor 3.8, Cholesky on the coarsest level
 (<= 1000 rows). Except the smoothers on several threads: by default (`PreSmoother` and `PostSmoother` empty),
 the setup then chooses the hybrid block Gauss-Seidel (`hbgs`, `hrbgs`: Gauss-Seidel in the rows of each thread, Jacobi
-between the threads; with the scalar kernels at k = 0), parallel, unlike the block Gauss-Seidel. It takes 0-6 more
-iterations with FCG (more with BiCGSTAB, which expects the same preconditioner at each iteration, whereas the hybrid
-smoother varies with the timing of the threads), which depend on the number of threads and vary slightly from one run
-to the next, but solves faster on 8 threads: with FCG, 15-20% at k = 0, 35-45% at k = 1, 2 (HArDCore3D's cubes and
-Voronoi mesh), 0-15% at k = 0 on fhhos4's meshes; with BiCGSTAB or the multigrid alone, 2-45% (see `PERFORMANCE.md`).
-On 1 thread it is slower: block Gauss-Seidel there.
+between the threads: a row reads the values of the other threads' rows from the start of the sweep; with the scalar
+kernels at k = 0), parallel, unlike the block Gauss-Seidel. Its results depend on the number of threads, not on the
+run. On a level where the rows of the threads are poorly separated (more than 20% of the non-zeros couple rows of
+different threads: a numbering without locality, such as GMSH's on fhhos4's tetrahedral meshes), it runs the
+sequential sweeps, as on 1 thread. It takes a few more iterations than the block Gauss-Seidel (0-6 with FCG, a few
+more with BiCGSTAB), but solves faster on several threads: with FCG on 8 threads, 15-20% at k = 0, 35-45% at k = 1, 2
+(HArDCore3D's cubes and Voronoi mesh); with BiCGSTAB or the multigrid alone, 2-45% (measured with an earlier version,
+whose iterations varied from run to run; see `PERFORMANCE.md`). With GCR (non-symmetric matrices), HArDCore3D's
+diffusion-dominated convection-diffusion at 48^3, k = 1: 27 iterations on 4 threads, 26 on 1, solve 3.3-3.5 s instead
+of 5.8 s.
 The FCG also replaces its residual (updated by the recurrence) by the true residual `b - A x` every 20 iterations and
 when it meets the tolerance (GCR: at each restart and when it meets the tolerance), then continues if the true
 residual does not: the tolerance applies to the true residual

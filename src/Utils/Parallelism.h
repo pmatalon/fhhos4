@@ -151,16 +151,27 @@ namespace Parallelism
 #endif
 	}
 
+	// Number of threads of the current parallel region (1 outside a parallel region)
+	inline int TeamSize()
+	{
+#ifdef _OPENMP
+		return omp_get_num_threads();
+#else
+		return 1;
+#endif
+	}
+
+	// Iterations [begin, end) of the chunk c when n iterations are split into nChunks contiguous chunks, in order
+	inline pair<BigNumber, BigNumber> Chunk(BigNumber n, BigNumber c, BigNumber nChunks)
+	{
+		return { n * c / nChunks, n * (c + 1) / nChunks };
+	}
+
 	// Iterations [begin, end) of the calling thread when n iterations are split into contiguous chunks, one per thread of
 	// the current parallel region, in thread order ([0, n) outside a parallel region)
 	inline pair<BigNumber, BigNumber> ThreadChunk(BigNumber n)
 	{
-#ifdef _OPENMP
-		BigNumber thread = omp_get_thread_num(), nThreads = omp_get_num_threads();
-		return { n * thread / nThreads, n * (thread + 1) / nThreads };
-#else
-		return { 0, n };
-#endif
+		return Chunk(n, ThreadNumber(), TeamSize());
 	}
 
 	// Max number of iterations processed by one thread in a parallel loop of n iterations (static schedule)

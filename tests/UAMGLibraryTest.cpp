@@ -257,7 +257,7 @@ struct HybridSystem
 };
 
 // The solver for HybridSystem: degree 0 in 2D. With the sequential smoothers: the default on several threads, the
-// hybrid one, varies from one run to the next (tested apart), and the tests compare runs.
+// hybrid one, depends on the number of threads (tested apart).
 fhhos4::Solver ToySolver()
 {
 	fhhos4::Solver solver;

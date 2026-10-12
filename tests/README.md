@@ -34,7 +34,7 @@ ctest -E HPConfig                          # skip the slowest tests
 ./bin/fhhos4_tests --gtest_filter=*Kellogg*  # or filter the binary directly
 ```
 
-The full suite is 163 CTest cases and runs in about 4 minutes serially. The 8 `HPConfigTest` cases take about 2 minutes of it (~15 s each: N=128 with k=5 is the smallest size of the high-order paper); the other cases take less than 20 s each.
+The full suite is 168 CTest cases and runs in about 4 minutes serially. The 8 `HPConfigTest` cases take about 2 minutes of it (~15 s each: N=128 with k=5 is the smallest size of the high-order paper); the other cases take less than 20 s each.
 
 ## GMSH meshes: reproducibility
 
@@ -188,6 +188,26 @@ matrix); invariant to the scaling of the constant modes; a circulating flow is b
 (triangular in the downwind order), one sweep in that order, forward or backward, sequential or hybrid, scalar or by
 blocks, solves the system.
 
+## `HybridGaussSeidelTest.cpp`
+
+Unit tests of the hybrid Gauss-Seidel sweeps (`hbgs`, `hrbgs`: `GaussSeidel` and `BlockGaussSeidel` with `hybrid`,
+`src/Solver/FixedPoint/HybridChunks.h`): Gauss-Seidel in the chunk of rows of each thread, Jacobi between the chunks,
+or the sequential sweeps if the chunks are poorly separated. On a non-symmetric, diagonally dominant matrix (9-point
+stencil on a 50 x 50 grid, with a distant coupling in one block row out of 5), scalar and in blocks of 3, in the
+natural order and in a `SweepOrder` shuffled in windows of 100 block rows, forward and backward, from x = 0 or not
+(5 cases):
+- **`HybridGaussSeidelTest.MatchesTheReference`** — on 4 threads, one sweep equals (to 1e-13 relative) a
+  straightforward implementation (each chunk swept by Gauss-Seidel on a copy of x taken before the sweep), which
+  differs from the sequential sweep.
+- **`HybridGaussSeidelTest.Deterministic`** — on 4 threads, 5 more runs give the same results, bit for bit.
+- **`HybridGaussSeidelTest.OneThreadIsSequential`** — on 1 thread, the sequential sweep, bit for bit, and in the scalar
+  case the residual deduced from the sweep, as in the sequential smoother.
+- **`HybridGaussSeidelTest.NumberOfThreadsChangesBetweenSolves`** — the same smoother on 4, 2, 4, 1, 3 threads: the
+  reference for each number of chunks (recomputed when it changes).
+- **`HybridGaussSeidelTest.SequentialIfPoorlySeparated`** — in a random `SweepOrder`, or in the natural order of the
+  matrix with its block rows randomly renumbered (most of the non-zeros between chunks), on 4 threads: the sequential
+  sweep, bit for bit.
+
 ## `LocalMatricesTest.cpp`
 
 Unit tests of the local Galerkin products of the coarsening passes of U-AMG (`src/Solver/Multigrid/UncondensedAMG/
@@ -210,7 +230,7 @@ Tests of the library `fhhos4_AMG` (`library/`), the U-AMG of fhhos4 for other co
 
 - **`UAMGNonsymmetricProgram.NotWithFCG`** (1 case) — `-uamg-nonsym` refuses `-s fcguamg` (FCG requires a symmetric matrix): death test (`EXIT_FAILURE`).
 
-- **`UAMGLibrary.*`** (14 cases) — the public API alone, on a hybrid system of degree 0 built in the test (Cartesian mesh of the unit square, random coefficients), with the sequential smoothers (`bgs`, `rbgs`: the tests compare runs, and the default hybrid smoother varies from one run to the next): it solves the system; the default smoothers are the hybrid Gauss-Seidel on 4 threads, the sequential one on 1 thread; computes `A` from the blocks (`SetupSymmetricFromBlocks`), with full or lower-only symmetric blocks; works without `A_FF`; gives the same levels, iteration count and solution with row-major matrices (fhhos4's format, read in place if compressed, copied otherwise) as with column-major ones; gives the same iterates on bases scaled by random factors, given the interpolation of 1; GCR (with the K-cycle, which then iterates with GCR); a non-symmetric system (advection-like couplings `A_FT != A_TF^T`, asymmetry 0.3 and 0.9: `SetupNonsymmetric()` with GCR, BiCGSTAB with a V-cycle, and from the blocks, against a sparse LU); the non-symmetric setup of a symmetric system (the iterations of the symmetric one); BiCGSTAB with a V-cycle; the cycles alone (`Krylov = "none"`); the errors (parameters not set or invalid, BiCGSTAB with the K-cycle, FCG or Cholesky with a non-symmetric matrix, `A_FT` of the wrong size, inputs inconsistent with the dimension and the degrees, non block-diagonal `A_TT`); it prints nothing at verbosity 0, and leaves the number of threads and the format of `cout` unchanged; `fhhos4::Version()` starts with the version of the header.
+- **`UAMGLibrary.*`** (14 cases) — the public API alone, on a hybrid system of degree 0 built in the test (Cartesian mesh of the unit square, random coefficients), with the sequential smoothers (`bgs`, `rbgs`: the default hybrid smoother depends on the number of threads): it solves the system; the default smoothers are the hybrid Gauss-Seidel on 4 threads, the sequential one on 1 thread; computes `A` from the blocks (`SetupSymmetricFromBlocks`), with full or lower-only symmetric blocks; works without `A_FF`; gives the same levels, iteration count and solution with row-major matrices (fhhos4's format, read in place if compressed, copied otherwise) as with column-major ones; gives the same iterates on bases scaled by random factors, given the interpolation of 1; GCR (with the K-cycle, which then iterates with GCR); a non-symmetric system (advection-like couplings `A_FT != A_TF^T`, asymmetry 0.3 and 0.9: `SetupNonsymmetric()` with GCR, BiCGSTAB with a V-cycle, and from the blocks, against a sparse LU); the non-symmetric setup of a symmetric system (the iterations of the symmetric one); BiCGSTAB with a V-cycle; the cycles alone (`Krylov = "none"`); the errors (parameters not set or invalid, BiCGSTAB with the K-cycle, FCG or Cholesky with a non-symmetric matrix, `A_FT` of the wrong size, inputs inconsistent with the dimension and the degrees, non block-diagonal `A_TT`); it prints nothing at verbosity 0, and leaves the number of threads and the format of `cout` unchanged; `fhhos4::Version()` starts with the version of the header.
 
 ## `ReferenceShapeCacheTest.cpp`
 

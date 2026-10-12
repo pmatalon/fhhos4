@@ -72,8 +72,9 @@ namespace fhhos4
 		int PostSmoothingIterations = 1;
 		// Smoothers (codes of fhhos4 -smoothers, see fhhos4 -h). PreSmoother empty (default): the faster one, chosen by
 		// the setup: on several threads, "hbgs", the hybrid block Gauss-Seidel (Gauss-Seidel in the rows of each thread,
-		// Jacobi between the threads: parallel; the iterations then depend on the number of threads and vary slightly
-		// from one run to the next); on 1 thread, "bgs", the block Gauss-Seidel (sequential), one block per face.
+		// Jacobi between the threads: parallel, except on the levels where the rows of the threads are poorly separated;
+		// the results then depend on the number of threads, not on the run); on 1 thread, "bgs", the block Gauss-Seidel
+		// (sequential: "hbgs" on 1 thread), one block per face.
 		// PostSmoother empty (default): the backward version of PreSmoother ("rbgs" after "bgs", "hrbgs" after "hbgs").
 		// Non-symmetric matrix (SetupNonsymmetric()): on a level with one-sided couplings (convection), the Gauss-Seidel
 		// smoothers keep their type, block size and number of sweeps, but not their direction: all their sweeps
