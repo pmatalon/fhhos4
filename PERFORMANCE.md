@@ -56,7 +56,7 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   `scripts/perf/Prof.h` (`PROF_START`/`PROF_STOP`, printed at exit). Include it in the files to instrument, never
   commit the instrumentation.
 - **Validation of a change**:
-  1. `ctest` (181 tests).
+  1. `ctest` (196 tests).
   2. `scripts/perf/amg_papers.sh <output dir> [binary]`: the AMG configurations of the papers, at reduced sizes (the
      paper sizes don't fit in 13 GB), 30 runs in ~6 minutes. Then `scripts/perf/fingerprint.sh <dir before> <dir after>`
      compares their iteration tables (iteration, inner iterations, residual): they must be identical.
@@ -680,6 +680,43 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   iterations, k=1 15 -> 15 (5 -> 6 levels): the "6 -> 5 levels, 30 -> 22 iterations" of the entry "Non-symmetric
   U-AMG setup" were this bug. The averaged couplings, chosen by the user on 2026-10-11, had been measured before it.
 
+- **Flat passes for the other options** (2026-10-13, the user's request: "start moving the other options"). The flat
+  passes (`UncondensedLevel::FlatPassesApply()`) now run with the face prolongations 1, 2 (`-face-prolong`), the
+  coarsening prolongations 3 to 6 (`-coarsening-prolong`: all those of the local Galerkin products), the aggregations
+  `-cs mpa|dpa|n|mn` (with all the neighbours: `CoarseningPass::Aggregate(true)`), the multigrid prolongations other
+  than 7 (`-prolong 1|3|4|5|6|8`, besides the default chained ones: the aggregation composed over the passes, then
+  `BuildProlongation()` on the fine mesh of the level, as before), the coarse `A_F_F` (p-levels after h-levels), the
+  chained `Q_F` (coarse operators `Q_F^T A Q_F`, not Galerkin) and `-diag-block-solve inv`. `BuildProlongation()` and
+  its traces now take a `FaceAggregation` (the removed faces, their aggregate, the cells of the faces), built from
+  `HybridAlgebraicMesh` or from the flat passes: one implementation for both. Bit-identical (`uamg_harness compare`,
+  `build/bench_setup/variant.sh`: every variant above on Cube-tet k=0 n=32 and k=2 n=16 `-hp-cs h`, and 24 small
+  dumps of `build/local-galerkin/dump/check/`: polygonal, biharmonic, k=1-3 meshes...). Setup, old -> flat, 4 threads,
+  one run each (indicative):
+
+  | Cube-tet k=0 n=32 | old -> flat | Cube-tet k=2 n=16, `-hp-cs h` | old -> flat |
+  |---|---|---|---|
+  | `-coarsening-prolong 3 / 4 / 5` | 1.86 / 1.81 / 1.87 -> 0.53 / 0.63 / 0.58 s | `-coarsening-prolong 3 / 4 / 5` | 1.53 / 2.87 / 1.97 -> 0.64 / 1.89 / 0.64 s |
+  | `-face-prolong 2` with 3 / 4 / 5 / 6 | 1.57 / 1.87 / 1.94 / 2.00 -> 0.41 / 0.59 / 0.51 / 0.61 s | `-diag-block-solve inv` with 6 / 4 | 3.08 / 2.77 -> 1.90 / 1.64 s |
+  | `-cs dpa / n / mn` | 2.04 / 1.65 / 1.56 -> 0.56 / 0.54 / 0.62 s | `-cs mn` | 2.93 -> 1.94 s |
+  | `-prolong 4 / 5 / 6 / 8` | 3.12 / 3.00 / 3.03 / 3.42 -> 1.37 / 1.30 / 1.25 / 2.08 s | `-prolong 6` | 5.84 -> 4.36 s |
+  | coarse operators `Q_F^T A Q_F` | 2.61 -> 1.05 s | `-hp-cs h_p -num-meshes 2` (coarse `A_F_F`) | 7.38 -> 6.12 s |
+
+  `amg_papers.sh`: identical iteration tables (30 runs); its runs of the variants of Fig. 4.5 (`-coarsening-prolong
+  3|4|5`, Cube-tet n=16 and Cube-cart-aniso100 n=32, default threads): setup 0.20-0.33 -> 0.05-0.07 s. `ctest` 196/196
+  (`CoarseningPassTest.cpp`: 28 cases).
+  The non-chained prolongations and the coarse `A_F_F` keep their global products (`P^T A P` of the level, `P^T A_F_F
+  P`): most of what remains of their setup. Still on `HybridAlgebraicMesh` only: the coarsening prolongations 1, 7, 8
+  (global Galerkin products in the passes), `-prolong 7`, the agglomeration of the removed faces (`-fcs i`) and
+  `-face-prolong 3`.
+  Found in the old path while comparing (both paths now behave the same): `-prolong 3` crashed (`free(): invalid
+  pointer`: `BuildProlongation()` returns the level's own `Q_F`, which was then moved into P and deleted; now copied,
+  `SetProlongation()`); `-prolong 9` returned an uninitialized pointer (its body is commented out; now an error).
+  `-prolong 1` makes the coarse blocks dense: a coarse face then belongs to more than two coarse cells, which the
+  interface collapsing doesn't handle (the old path crashed on the second level: faces left without coarse face, and a
+  data race on `CoarseElements` in its loop over the removed faces); the flat passes now stop with an error there. It
+  was already impractical: 431 s of setup on Cube-tet k=0 n=32 (2 levels). `-face-prolong 3` segfaults in the old path
+  (Cube-tet n=8), unchanged.
+
 ## Current profile (U-AMG; parallel: 16 threads, the default before 2026-10-08)
 
 | Case | Setup, sequential / parallel | Solve, sequential / parallel |
@@ -801,9 +838,9 @@ Galerkin products (see Done).
    Probably dropped: the library can't set it anyway (read at the start of the process).
 2. **Flat data structures for the hybrid algebraic meshes** (`HybridAlgebraicMesh`) — done for the default options
    (2026-10-12, "Coarsening passes on flat arrays" in Done: setup 2.4x faster on 1 thread, 3x on 4, at k=0). Next
-   steps: the chaining of P and the locality of the loop over the aggregates (see what remains there); the other
-   options (`-coarsening-prolong 3|4|5`, `-face-prolong 2|3`, `-prolong` != 2, `-cs mn`) still run on
-   `HybridAlgebraicMesh`. The notes below are those of the estimate. Main lever at k=0 (the paper's case). Vectors of vectors, a mutex per element, a `std::map` of neighbours
+   steps: the chaining of P and the locality of the loop over the aggregates (see what remains there). Most other
+   options followed on 2026-10-13 ("Flat passes for the other options"); still on `HybridAlgebraicMesh`:
+   `-coarsening-prolong 1|7|8`, `-prolong 7`, `-fcs i`, `-face-prolong 3`. The notes below are those of the estimate. Main lever at k=0 (the paper's case). Vectors of vectors, a mutex per element, a `std::map` of neighbours
    per aggregate, copied vectors: building and coarsening the meshes (`mesh.Build()` + `mesh.Coarsen()`) take 1.17 /
    0.67 s of the 2.9 / 1.7 s of setup at k=0, sequential / 16 threads (`uamg_harness`, after the local Galerkin
    products; 0.28 / 0.22 s of 3.8 / 1.8 s at k=2), plus freeing them. CSR-like arrays and prefix sums (same numbering

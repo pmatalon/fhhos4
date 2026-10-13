@@ -7,10 +7,11 @@
 #include "../../../Utils/SparseMatrixOps.h"
 using namespace std;
 
-// A coarsening pass of U-AMG with its default options, on flat arrays: pairwise aggregation of the cells, interface
-// collapsing, coarsening prolongation ReconstructSmoothedTraceOrInject (-coarsening-prolong 6) computed per aggregate
-// from the local matrices of the operator. Same aggregates, coarse faces and matrices as HybridAlgebraicMesh::Build(),
-// Coarsen() and UncondensedLevel::Coarsen() with these options (same numbering, sums in the same order).
+// A coarsening pass of U-AMG on flat arrays: aggregation of the cells (pairwise, or with all their neighbours),
+// interface collapsing, coarsening prolongation computed per aggregate from the local matrices of the operator
+// (-coarsening-prolong 3 to 6, -face-prolong 1, 2). Same aggregates, coarse faces and matrices as
+// HybridAlgebraicMesh::Build(), Coarsen() and UncondensedLevel::Coarsen() with these options (same numbering, sums in
+// the same order). See UncondensedLevel::FlatPassesApply().
 class CoarseningPass
 {
 private:
@@ -229,11 +230,12 @@ public:
 	}
 
 	//-------------------------------------------------------------//
-	//         Pairwise aggregation (PairwiseAggregation)           //
+	//  Aggregation (PairwiseAggregation, AllNeighbourAggregation)  //
 	//-------------------------------------------------------------//
 
-	// Returns true if the coarsest possible mesh is reached
-	bool Aggregate()
+	// Each cell not aggregated yet with its strongest available neighbour (pairwise aggregation), or with all its
+	// neighbours not aggregated yet (allNeighbours). Returns true if the coarsest possible mesh is reached.
+	bool Aggregate(bool allNeighbours = false)
 	{
 		vector<int> count = NStrongNeighbourOf;
 		CellAggregate.assign(NCells, -1);
@@ -281,7 +283,7 @@ public:
 			}
 		}
 
-		// Aggregation: each cell not aggregated yet with its strongest available neighbour
+		// Aggregation
 		NAggregates = 0;
 		AggregateCells.Start.assign(1, 0);
 		AggregateCells.Start.reserve(NCells + 1);
@@ -305,6 +307,24 @@ public:
 				continue;
 			addToAggregate(e);
 			remaining--;
+
+			if (allNeighbours)
+			{
+				for (int k = 0; k < NNeighbours[e]; ++k)
+				{
+					BigNumber n = Neighbours[e][k];
+					if (CellAggregate[n] < 0)
+					{
+						addToAggregate(n);
+						remaining--;
+					}
+				}
+				NAggregates++;
+				AggregateCells.Start.push_back(AggregateCells.Items.size());
+				if (remaining == 0)
+					break;
+				continue;
+			}
 
 			double min = 100000000;
 			BigNumber chosen = -1;
@@ -413,10 +433,11 @@ public:
 				AggregateCoarseFaces[k][i] = coarseFace(k, neighbours[k][i]);
 		}
 		FaceCoarseFace.assign(NFaces, -1);
-		bool faceOfOneCell = false;
-		#pragma omp parallel for reduction(||: faceOfOneCell)
+		bool faceOfOneCell = false, faceOfMoreCells = false;
+		#pragma omp parallel for reduction(||: faceOfOneCell, faceOfMoreCells)
 		for (BigNumber f = 0; f < NFaces; ++f)
 		{
+			faceOfMoreCells = faceOfMoreCells || FaceCells.Size(f) > 2;
 			if (FaceRemoved[f])
 				continue;
 			if (FaceCells.Size(f) >= 2)
@@ -427,6 +448,11 @@ public:
 		// As in HybridAlgebraicMesh::Coarsen(), a face of a single cell would get no coarse face
 		if (faceOfOneCell)
 			Utils::FatalError("UncondensedAMG: a face belongs to a single cell: it has no coarse face.");
+		// The blocks of a coarse level where the cells are coupled to the faces of non-neighbouring cells (e.g. with the
+		// multigrid prolongation ReconstructionTrace, -prolong 1): not a mesh, which the interface collapsing assumes
+		// (HybridAlgebraicMesh::Coarsen() left faces without coarse face, and crashed)
+		if (faceOfMoreCells)
+			Utils::FatalError("UncondensedAMG: a face belongs to more than two cells: the coarsening by interface collapsing is not possible on this level.");
 		return NCoarseFaces == 0;
 	}
 
@@ -434,12 +460,24 @@ public:
 	//    Prolongation and blocks of the coarse cells              //
 	//-------------------------------------------------------------//
 
-	// The prolongation P of the pass (ReconstructSmoothedTraceOrInject: injection on the kept faces; on the removed
-	// faces, the trace of the reconstruction -A_TcTc^-1 A_TcFc in their aggregate, smoothed by one block Jacobi
-	// iteration (omega = 2/3) on the operator S, given by its local matrices on the cells), and the blocks
-	// A_T_Tc = Q_T^T A_T_T Q_T, A_T_Fc = Q_T^T A_T_F P. All of them are computed per aggregate.
-	void ComputeProlongation(const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const LocalMatrices& S, SparseMatrix& P, SparseMatrix& A_T_Tc, SparseMatrix& A_T_Fc)
+	// The coarsening prolongation P of the pass, and the blocks A_T_Tc = Q_T^T A_T_T Q_T, A_T_Fc = Q_T^T A_T_F P, all
+	// computed per aggregate (as UncondensedLevel::BuildProlongation() and Coarsen()). P is the injection on the kept
+	// faces; on the removed faces, the face prolongation Q_F (FaceProlongation), Q_F smoothed by one block Jacobi
+	// iteration (omega = 2/3) on the operator S, given by its local matrices on the cells
+	// (FaceProlongationAndInteriorSmoothing), the trace of the reconstruction -A_TcTc^-1 A_TcFc in their aggregate
+	// (ReconstructTraceOrInject), or that trace smoothed by block Jacobi (ReconstructSmoothedTraceOrInject). Q_F: the
+	// coarse face of a kept face; on a removed face, the average of the coarse faces of its aggregate
+	// (BoundaryAggregatesInteriorAverage) or 0 (BoundaryAggregatesInteriorZero).
+	void ComputeProlongation(UAMGProlongation prolongation, UAMGFaceProlongation faceProlongation, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F,
+	                         const LocalMatrices& S, SparseMatrix& P, SparseMatrix& A_T_Tc, SparseMatrix& A_T_Fc)
 	{
+		assert(prolongation == UAMGProlongation::FaceProlongation || prolongation == UAMGProlongation::FaceProlongationAndInteriorSmoothing
+			|| prolongation == UAMGProlongation::ReconstructTraceOrInject || prolongation == UAMGProlongation::ReconstructSmoothedTraceOrInject);
+		assert(faceProlongation == UAMGFaceProlongation::BoundaryAggregatesInteriorAverage || faceProlongation == UAMGFaceProlongation::BoundaryAggregatesInteriorZero);
+		bool reconstruction = prolongation == UAMGProlongation::ReconstructTraceOrInject || prolongation == UAMGProlongation::ReconstructSmoothedTraceOrInject;
+		bool smoothing = prolongation == UAMGProlongation::FaceProlongationAndInteriorSmoothing || prolongation == UAMGProlongation::ReconstructSmoothedTraceOrInject;
+		bool averageOnRemovedFaces = faceProlongation == UAMGFaceProlongation::BoundaryAggregatesInteriorAverage;
+		bool inverseDiagonal = BlockDiagonalSolver::DefaultMethod == DiagBlockSolveMethod::Inverse;
 		int cbs = _cbs, fbs = _fbs;
 		const double omega = 2.0 / 3.0;
 		const double zero = NonZeroCoefficients::ZeroThreshold;
@@ -477,7 +515,7 @@ public:
 			Eigen::LLT<DenseMatrix> llt;
 			Eigen::PartialPivLU<DenseMatrix> plu;
 			Eigen::FullPivLU<DenseMatrix> lu;
-			DenseMatrix A_TcTc, rhs, x, Df, A_ij, jacobiBlock;
+			DenseMatrix A_TcTc, rhs, x, Df, inverseDf, A_ij, jacobiBlock;
 		};
 		ThreadLocal<Work> workTL;
 
@@ -606,13 +644,12 @@ public:
 							blockTT[i * cbs + j] = blockTT[j * cbs + i];
 
 				// Theta: row 0 of the reconstruction -A_TcTc^-1 A_TcFc in the aggregate, where A_TcFc = Q_T^T A_T_F Q_F
-				// (Q_F: the coarse face of a kept face, the average of the coarse faces of the aggregate on a removed face)
+				double average = 1.0 / m; // Q_F on the removed faces (BoundaryAggregatesInteriorAverage)
 				w.thetaCols.clear();
 				w.theta.clear();
-				if (!w.removed.empty())
+				if (!w.removed.empty() && reconstruction)
 				{
 					w.A_TcFc.assign(cbs * M, 0.0);
-					double average = 1.0 / m;
 					for (int i = 0; i < cbs; ++i)
 					{
 						for (size_t p = w.qtaStart[i]; p < w.qtaStart[i + 1]; ++p)
@@ -622,7 +659,7 @@ public:
 							double v = w.qta[p].second;
 							if (!FaceRemoved[f])
 								w.A_TcFc[(w.coarseFacePos[FaceCoarseFace[f]] * fbs + r) * cbs + i] += 1.0 * v;
-							else
+							else if (averageOnRemovedFaces)
 								for (int B = 0; B < m; ++B)
 									w.A_TcFc[(B * fbs + r) * cbs + i] += average * v;
 						}
@@ -688,10 +725,38 @@ public:
 					}
 				}
 
-				// Rows of P on the removed faces: J Y, where J is the block Jacobi iteration matrix of the operator on the
-				// row of the face, and Y the injection on the kept faces, Theta on the removed ones
+				// Rows of P on the removed faces
 				for (BigNumber f : w.removed)
 				{
+					removedRowsThread[f] = thread;
+					if (!smoothing)
+					{
+						// Q_F (FaceProlongation), or the trace of Theta on the constant mode (ReconstructTraceOrInject)
+						for (int r = 0; r < fbs; ++r)
+						{
+							removedRowStart[f * fbs + r] = rr.Cols.size();
+							if (prolongation == UAMGProlongation::FaceProlongation)
+							{
+								if (averageOnRemovedFaces)
+									for (int B = 0; B < m; ++B)
+									{
+										rr.Cols.push_back(cfs[B] * fbs + r);
+										rr.Values.push_back(average);
+									}
+							}
+							else if (r == 0)
+							{
+								rr.Cols.insert(rr.Cols.end(), w.thetaCols.begin(), w.thetaCols.end());
+								rr.Values.insert(rr.Values.end(), w.theta.begin(), w.theta.end());
+							}
+							removedRowEnd[f * fbs + r] = rr.Cols.size();
+						}
+						continue;
+					}
+
+					// J Y, where J is the block Jacobi iteration matrix of the operator on the row of the face, and Y the
+					// injection on the kept faces; on the removed ones, Q_F (FaceProlongationAndInteriorSmoothing) or the
+					// trace of Theta (ReconstructSmoothedTraceOrInject)
 					// Row of the operator: sum of the rows of the local matrices of the cells of f, in increasing order of the
 					// cells (LocalMatrices::Assemble()): their faces merged by increasing global number
 					w.occurrences.clear();
@@ -774,7 +839,8 @@ public:
 					int Bf = lower_bound(w.jBlocks.begin(), w.jBlocks.end(), f) - w.jBlocks.begin();
 					if (fbs == 1)
 					{
-						// The arithmetic of BlockDiagonalSolver::SolveLU() with a 1x1 block d: s * (1/d), 0 if d = 0 (rank 0)
+						// The arithmetic of BlockDiagonalSolver::SolveLU() with a 1x1 block d: s * (1/d), 0 if d = 0 (rank 0).
+						// With the inverse of the block (DiagBlockSolveMethod::Inverse), (1/d) * s: the same.
 						double d = br[Bf];
 						double inverse = 1.0 / d;
 						for (int Bg = 0; Bg < nBlocks; ++Bg)
@@ -794,6 +860,8 @@ public:
 						const int* permP = w.lu.permutationP().indices().data();
 						const int* permQ = w.lu.permutationQ().indices().data();
 						int rank = w.lu.nonzeroPivots();
+						if (inverseDiagonal)
+							w.inverseDf = w.lu.inverse();
 						for (int Bg = 0; Bg < nBlocks; ++Bg)
 						{
 							double* block = br + Bg * fbs * fbs;
@@ -808,7 +876,10 @@ public:
 								for (int c = 0; c < fbs; ++c)
 									for (int r = 0; r < fbs; ++r)
 										w.A_ij(r, c) = block[c * fbs + r];
-								BlockDiagonalSolver::SolveLU(w.lu.matrixLU(), permP, permQ, rank, w.A_ij, w.jacobiBlock);
+								if (inverseDiagonal)
+									w.jacobiBlock.noalias() = w.inverseDf * w.A_ij;
+								else
+									BlockDiagonalSolver::SolveLU(w.lu.matrixLU(), permP, permQ, rank, w.A_ij, w.jacobiBlock);
 								w.jacobiBlock *= -omega;
 								for (int c = 0; c < fbs; ++c)
 									for (int r = 0; r < fbs; ++r)
@@ -818,7 +889,6 @@ public:
 					}
 
 					// J_f Y, summed in the order of the columns of J_f
-					removedRowsThread[f] = thread;
 					for (int r = 0; r < fbs; ++r)
 					{
 						w.acc.assign(M, 0);
@@ -832,9 +902,15 @@ public:
 							int cg = c % fbs;
 							if (!FaceRemoved[g])
 								add(w.coarseFacePos[FaceCoarseFace[g]] * fbs + cg, 1.0 * j);
-							else if (cg == 0)
-								for (size_t x = 0; x < w.theta.size(); ++x)
-									add(local(w.thetaCols[x]), w.theta[x] * j);
+							else if (reconstruction)
+							{
+								if (cg == 0)
+									for (size_t x = 0; x < w.theta.size(); ++x)
+										add(local(w.thetaCols[x]), w.theta[x] * j);
+							}
+							else if (averageOnRemovedFaces)
+								for (int B = 0; B < m; ++B)
+									add(B * fbs + cg, average * j);
 						}
 						removedRowStart[f * fbs + r] = rr.Cols.size();
 						for (size_t L = 0; L < M; ++L)
@@ -909,6 +985,30 @@ public:
 				}
 				else
 					chunk.Add(FaceCoarseFace[f] * fbs + i % fbs, 1.0);
+				chunk.EndRow();
+			}
+		});
+	}
+
+	// The face prolongation Q_F: the coarse face of each kept face; on a removed face, the average of the coarse faces of
+	// its aggregate (BoundaryAggregatesInteriorAverage) or 0 (BoundaryAggregatesInteriorZero)
+	SparseMatrix Q_F(UAMGFaceProlongation faceProlongation) const
+	{
+		int fbs = _fbs;
+		return SparseMatrixOps::BuildByRows(NFaces * fbs, NCoarseFaces * fbs, fbs, [&](BigNumber firstRow, BigNumber lastRow, SparseMatrixOps::RowChunk& chunk)
+		{
+			for (BigNumber i = firstRow; i < lastRow; ++i)
+			{
+				BigNumber f = i / fbs;
+				if (!FaceRemoved[f])
+					chunk.Add(FaceCoarseFace[f] * fbs + i % fbs, 1.0);
+				else if (faceProlongation == UAMGFaceProlongation::BoundaryAggregatesInteriorAverage)
+				{
+					BigNumber K = CellAggregate[FaceCells[f][0]];
+					double average = 1.0 / AggregateCoarseFaces.Size(K);
+					for (int B = 0; B < AggregateCoarseFaces.Size(K); ++B)
+						chunk.Add(AggregateCoarseFaces[K][B] * fbs + i % fbs, average);
+				}
 				chunk.EndRow();
 			}
 		});

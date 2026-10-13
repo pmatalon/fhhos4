@@ -3,10 +3,12 @@
 // (HybridAlgebraicMesh, with UncondensedLevel::UseFlatPasses = false).
 // - CoarseningPassProgram: the program on HHO systems (simplicial, Cartesian and polygonal meshes, heterogeneous and
 //   anisotropic problems, k = 0 to 2, the h-coarsening of the degree-k blocks, orthonormal bases, the non-symmetric
-//   path on a symmetric matrix): same iteration count and L2 error, bit for bit. On 1 thread: on several, the L2 error
+//   path on a symmetric matrix, the coarsening prolongations 3 to 6, the face prolongations 1 and 2, the multigrid
+//   prolongations other than the chained ones, the aggregation with all the neighbours, the inverses of the diagonal
+//   blocks, p-levels after h-levels): same iteration count and L2 error, bit for bit. On 1 thread: on several, the L2 error
 //   (an OpenMP reduction) and the polygonal meshes (their agglomeration) vary from one run to the next.
 // - CoarseningPass: the operators and prolongations of all the levels, on a symmetric and a non-symmetric system built
-//   here, on all the threads.
+//   here, on all the threads; also with the coarse operators Q_F^T A Q_F (not Galerkin).
 #include <gtest/gtest.h>
 #include <cstring>
 #include <string>
@@ -44,6 +46,12 @@ struct FlatPassCase
 	double Heterogeneity = 1;          // -heterog
 	double Anisotropy = 1;             // -aniso
 	bool PolyMeshSharedFaces = false;  // -mesh poly -polymesh-fcs n: neighbouring cells share several faces
+	int CoarseningProlong = 0;         // -coarsening-prolong (0: default)
+	int FaceProlong = 0;               // -face-prolong (0: default)
+	bool DiagInverse = false;          // -diag-block-solve inv: the inverses of the diagonal blocks (block Jacobi of P_F)
+	int MeshesThenP = 0;               // -hp-cs h_p -num-meshes N: N meshes, then p-levels (the coarse A_F_F is computed)
+	int Prolong = 0;                   // -prolong: the multigrid prolongation (0: default, the chained coarsening prolongations)
+	bool AllNeighbours = false;        // -cs mn: each cell aggregated with all its neighbours
 };
 
 inline std::ostream& operator<<(std::ostream& os, const FlatPassCase& c)
@@ -80,10 +88,23 @@ TEST_P(CoarseningPassProgramTest, SameAsReference)
 		}
 		args.Solver.SolverCode = c.Nonsymmetric ? "gcruamg" : "fcguamg";
 		args.Solver.MG.UAMGNonsymmetric = c.Nonsymmetric;
+		args.Solver.MG.CoarseningProlongationCode = c.CoarseningProlong;
+		args.Solver.MG.FaceProlongationCode = c.FaceProlong;
+		args.Solver.MG.ProlongationCode = c.Prolong;
+		if (c.AllNeighbours)
+			args.Solver.MG.H_CS = H_CoarsStgy::MultipleAgglomerationCoarseningByFaceNeighbours;
 		if (c.HCoarseningOfBlocks)
 			args.Solver.MG.HP_CS = HP_CoarsStgy::H_only;
+		if (c.MeshesThenP > 0)
+		{
+			args.Solver.MG.HP_CS = HP_CoarsStgy::H_then_P;
+			args.Solver.MG.NumberOfMeshes = c.MeshesThenP;
+		}
 		args.Actions.UseCache = false;
-		return RunDiffusionHHO(args, true, !c.HCoarseningOfBlocks);
+		BlockDiagonalSolver::DefaultMethod = c.DiagInverse ? DiagBlockSolveMethod::Inverse : DiagBlockSolveMethod::LU;
+		ProgramResults results = RunDiffusionHHO(args, true, !c.HCoarseningOfBlocks && c.MeshesThenP == 0);
+		BlockDiagonalSolver::DefaultMethod = DiagBlockSolveMethod::LU;
+		return results;
 	};
 
 	ProgramResults reference;
@@ -105,6 +126,13 @@ std::vector<FlatPassCase> FlatPassCases()
 	cases.push_back({ "Square_tri_n16_k0", "square", "tri", "", 16, 0 });
 	cases.push_back({ "Square_tri_n16_k1", "square", "tri", "", 16, 1 });
 	cases.push_back({ "Square_tri_n8_k2_h", "square", "tri", "", 8, 2, true });
+	for (int coarseningProlong : { 3, 4, 6 })
+	{
+		FlatPassCase c = { "Square_tri_n16_k0_fp2_cp" + std::to_string(coarseningProlong), "square", "tri", "", 16, 0 };
+		c.FaceProlong = 2;
+		c.CoarseningProlong = coarseningProlong;
+		cases.push_back(c);
+	}
 	{
 		FlatPassCase c = { "Square_poly_n32_k0_sharedfaces", "square", "poly", "", 32, 0 };
 		c.PolyMeshSharedFaces = true;
@@ -132,6 +160,39 @@ std::vector<FlatPassCase> FlatPassCases()
 	{
 		FlatPassCase c = { "Cube_tetra_n8_k0_nonsym", "cube", "tetra", "", 8, 0 };
 		c.Nonsymmetric = true;
+		cases.push_back(c);
+	}
+	for (int coarseningProlong : { 3, 4, 5 })
+	{
+		FlatPassCase c = { "Cube_tetra_n8_k0_cp" + std::to_string(coarseningProlong), "cube", "tetra", "", 8, 0 };
+		c.CoarseningProlong = coarseningProlong;
+		cases.push_back(c);
+	}
+	{
+		FlatPassCase c = { "Cube_cart_n8_k1_h_cp4_diaginverse", "cube", "cart", "inhouse", 8, 1, true };
+		c.CoarseningProlong = 4;
+		c.DiagInverse = true;
+		cases.push_back(c);
+	}
+	{
+		FlatPassCase c = { "Cube_cart_n8_k1_2meshes_then_p", "cube", "cart", "inhouse", 8, 1 };
+		c.MeshesThenP = 2;
+		cases.push_back(c);
+	}
+	{
+		FlatPassCase c = { "Cube_tetra_n8_k0_mn", "cube", "tetra", "", 8, 0 };
+		c.AllNeighbours = true;
+		cases.push_back(c);
+	}
+	for (int prolong : { 3, 5, 6, 8 })
+	{
+		FlatPassCase c = { "Cube_tetra_n8_k0_prolong" + std::to_string(prolong), "cube", "tetra", "", 8, 0 };
+		c.Prolong = prolong;
+		cases.push_back(c);
+	}
+	{
+		FlatPassCase c = { "Cube_cart_n8_k1_h_prolong5", "cube", "cart", "inhouse", 8, 1, true };
+		c.Prolong = 5;
 		cases.push_back(c);
 	}
 #endif
@@ -169,8 +230,9 @@ namespace
 	}
 
 	// U-AMG as the library builds it, for the system (2D, degree 0), with the interpolations of 1 given (c = 1 or not)
-	void Setup(HierarchyAccess& amg, const CartesianHybridSystem& system, bool symmetric, double constantCoordinate)
+	void Setup(HierarchyAccess& amg, const CartesianHybridSystem& system, bool symmetric, double constantCoordinate, bool galerkin)
 	{
+		amg.UseGalerkinOperator = galerkin;
 		amg.MatrixMaxSizeForCoarsestLevel = 30;
 		amg.CoarseningFactor = 3.8;
 		amg.Cycle = 'K';
@@ -184,7 +246,7 @@ namespace
 		amg.Setup(system.S, system.A_TT, system.A_TF, symmetric ? SparseMatrix() : system.A_FT, SparseMatrix(), cellInterpOfOne, faceInterpOfOne);
 	}
 
-	void CheckLevels(double asymmetry, double constantCoordinate)
+	void CheckLevels(double asymmetry, double constantCoordinate, bool galerkin = true)
 	{
 		CartesianHybridSystem system(32, asymmetry);
 		bool symmetric = asymmetry == 0;
@@ -196,10 +258,10 @@ namespace
 		HierarchyAccess reference = create();
 		{
 			ReferencePasses referencePasses;
-			Setup(reference, system, symmetric, constantCoordinate);
+			Setup(reference, system, symmetric, constantCoordinate, galerkin);
 		}
 		HierarchyAccess flat = create();
-		Setup(flat, system, symmetric, constantCoordinate);
+		Setup(flat, system, symmetric, constantCoordinate, galerkin);
 
 		ASSERT_EQ(flat.NumberOfLevels(), reference.NumberOfLevels());
 		ASSERT_GE(reference.NumberOfLevels(), 3); // several coarsening passes and levels
@@ -227,4 +289,10 @@ TEST(CoarseningPass, SymmetricSystemRescaledBases)
 TEST(CoarseningPass, NonsymmetricSystem)
 {
 	CheckLevels(0.5, 1);
+}
+
+// The coarse operators Q_F^T A Q_F: the face prolongation chained over the coarsening passes
+TEST(CoarseningPass, NotGalerkin)
+{
+	CheckLevels(0, 1, false);
 }
