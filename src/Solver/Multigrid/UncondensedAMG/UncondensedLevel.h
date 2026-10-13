@@ -1092,26 +1092,27 @@ public:
 	}
 
 private:
+	// The first coarseBlockRows x coarseBlockCols coefficients of each block (hierarchical bases), without those of
+	// absolute value <= NonZeroCoefficients::ZeroThreshold. The rows keep the order of their columns.
 	static SparseMatrix* ExtractCoarseMatrix(const SparseMatrix& fineMatrix, BigNumber nBlockRows, BigNumber nBlockCols, int fineBlockRows, int fineBlockCols, int coarseBlockRows, int coarseBlockCols)
 	{
-		ThreadLocalCoeffs coeffs;
-		#pragma omp parallel for
-		for (BigNumber i = 0; i < nBlockRows; ++i)
+		return new SparseMatrix(SparseMatrixOps::BuildByRows(nBlockRows * coarseBlockRows, nBlockCols * coarseBlockCols, coarseBlockRows,
+			[&](BigNumber firstRow, BigNumber lastRow, SparseMatrixOps::RowChunk& chunk)
 		{
-			for (int k = 0; k < coarseBlockRows; k++)
+			for (BigNumber r = firstRow; r < lastRow; ++r)
 			{
+				BigNumber i = r / coarseBlockRows;
+				int k = r % coarseBlockRows;
 				for (RowMajorSparseMatrix::InnerIterator it(fineMatrix, i*fineBlockRows + k); it; ++it)
 				{
 					auto j = it.col() / fineBlockCols;
 					int l = it.col() - j * fineBlockCols;
-					if (l < coarseBlockCols)
-						coeffs.Local().Add(i*coarseBlockRows + k, j*coarseBlockCols + l, it.value());
+					if (l < coarseBlockCols && abs(it.value()) > NonZeroCoefficients::ZeroThreshold)
+						chunk.Add(j*coarseBlockCols + l, it.value());
 				}
+				chunk.EndRow();
 			}
-		}
-		SparseMatrix* coarseMatrix = new SparseMatrix(nBlockRows * coarseBlockRows, nBlockCols * coarseBlockCols);
-		coeffs.Fill(*coarseMatrix);
-		return coarseMatrix;
+		}));
 	}
 
 
@@ -1433,12 +1434,7 @@ public:
 			// nothing to do
 		}
 		else
-		{
-			double scalingFactor = 1.0;
-			//scalingFactor = 1.0 / 4.0;
-			R = (scalingFactor * P.transpose()).eval();
-			//R = scalingFactor * P.transpose();
-		}
+			R = SparseMatrixOps::Transpose(P);
 	}
 
 	Vector Prolong(Vector& vectorOnTheCoarserLevel) override

@@ -34,7 +34,7 @@ ctest -E HPConfig                          # skip the slowest tests
 ./bin/fhhos4_tests --gtest_filter=*Kellogg*  # or filter the binary directly
 ```
 
-The full suite is 196 CTest cases and runs in about 5 minutes serially. The 8 `HPConfigTest` cases take about 2 minutes of it (~15 s each: N=128 with k=5 is the smallest size of the high-order paper); the other cases take less than 20 s each.
+The full suite is 198 CTest cases and runs in about 5 minutes serially. The 8 `HPConfigTest` cases take about 2 minutes of it (~15 s each: N=128 with k=5 is the smallest size of the high-order paper); the other cases take less than 20 s each.
 
 ## GMSH meshes: reproducibility
 
@@ -173,6 +173,10 @@ Regression tests for configurations that used to crash, and for the argument def
 Unit tests of the parallel sparse matrix operations used in the setup of U-AMG (`src/Utils/SparseMatrixOps.h`), on random matrices (with explicit zeros and empty rows), with 1, 3 and 8 threads. They must give exactly the same matrices as the Eigen operations they replace (same structure, same values bit for bit), so that the setup, hence the iteration counts, don't change.
 
 - **`SparseMatrixOpsTest.MultiplyGivesEigenProduct`** (1 case) — `Multiply(A, B)` vs. Eigen's `A * B`.
+- **`SparseMatrixOpsTest.MultiplyWithInjectionRows`** (1 case) — the same, with rows of `A` made of a single 1 (the
+  injections of the prolongations of U-AMG), which `Multiply` copies from `B`.
+- **`SparseMatrixOpsTest.TransposeGivesEigenTranspose`** (1 case) — `Transpose(A)`, parallel from 20000 non-zeros, vs.
+  Eigen's `A.transpose()` (6000 x 2500 and 2500 x 6000 matrices, and a small one).
 - **`SparseMatrixOpsTest.TripleProductGivesEigenProduct`** (1 case) — the Galerkin product as computed in the U-AMG setup, vs. Eigen's `P.transpose() * S.selfadjointView<Eigen::Lower>() * P`.
 - **`SparseMatrixOpsTest.FullFromLowerGivesSelfAdjointView`** (1 case) — `FullFromLower(S)` vs. Eigen's `S.selfadjointView<Eigen::Lower>()`.
 - **`SparseMatrixOpsTest.SelectRowsGivesCopiedRows`** (1 case) — `SelectRows` vs. the rows copied by `NonZeroCoefficients::CopyRows`.

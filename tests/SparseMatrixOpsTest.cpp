@@ -58,6 +58,49 @@ TEST(SparseMatrixOpsTest, MultiplyGivesEigenProduct)
 	Parallelism::SetNThreads(0);
 }
 
+// The rows of A with a single coefficient 1 (an injection, as on the kept faces of the prolongations of U-AMG) give
+// the rows of B: a shortcut of Multiply(), which must give the same product
+TEST(SparseMatrixOpsTest, MultiplyWithInjectionRows)
+{
+	SparseMatrix A = RandomMatrix(500, 300, 6, 6);
+	for (BigNumber i = 0; i < A.rows(); i += 2) // every other row: a single 1 (or a single 2, every 10 rows)
+	{
+		SparseMatrix::InnerIterator it(A, i);
+		if (!it)
+			continue;
+		BigNumber j = it.col();
+		for (SparseMatrix::InnerIterator it2(A, i); it2; ++it2)
+			it2.valueRef() = 0;
+		A.coeffRef(i, j) = i % 10 == 0 ? 2.0 : 1.0;
+	}
+	A.prune(0.0);
+	A.makeCompressed();
+	SparseMatrix B = RandomMatrix(300, 400, 5, 7);
+	SparseMatrix expected = A * B;
+	for (int nThreads : NThreads)
+	{
+		Parallelism::SetNThreads(nThreads);
+		EXPECT_TRUE(Identical(SparseMatrixOps::Multiply(A, B), expected)) << nThreads << " threads";
+	}
+	Parallelism::SetNThreads(0);
+}
+
+// Transpose() is parallel from 20000 non-zeros: on a larger matrix, the same as Eigen's (explicit zeros kept)
+TEST(SparseMatrixOpsTest, TransposeGivesEigenTranspose)
+{
+	for (auto [n, m] : { std::pair<BigNumber, BigNumber>(6000, 2500), std::pair<BigNumber, BigNumber>(2500, 6000), std::pair<BigNumber, BigNumber>(300, 200) })
+	{
+		SparseMatrix A = RandomMatrix(n, m, 12, 8); // 61000, 26000 and 3000 non-zeros
+		SparseMatrix expected = SparseMatrix(A.transpose());
+		for (int nThreads : NThreads)
+		{
+			Parallelism::SetNThreads(nThreads);
+			EXPECT_TRUE(Identical(SparseMatrixOps::Transpose(A), expected)) << n << " x " << m << ", " << nThreads << " threads";
+		}
+	}
+	Parallelism::SetNThreads(0);
+}
+
 TEST(SparseMatrixOpsTest, TripleProductGivesEigenProduct)
 {
 	// Galerkin product as written in the U-AMG setup: P^T * S * P with S given by its lower triangular part

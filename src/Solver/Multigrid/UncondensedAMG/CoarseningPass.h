@@ -12,6 +12,14 @@ using namespace std;
 // (-coarsening-prolong 3 to 6, -face-prolong 1, 2). Same aggregates, coarse faces and matrices as
 // HybridAlgebraicMesh::Build(), Coarsen() and UncondensedLevel::Coarsen() with these options (same numbering, sums in
 // the same order). See UncondensedLevel::FlatPassesApply().
+// Hint to load the memory at address into the cache
+inline void Prefetch(const void* address)
+{
+#if defined(__GNUC__) || defined(__clang__)
+	__builtin_prefetch(address);
+#endif
+}
+
 class CoarseningPass
 {
 private:
@@ -126,45 +134,60 @@ public:
 			}
 		}
 
-		// Cells of the faces, from the first column of each face (HybridAlgebraicMesh::Build())
-		vector<int> nFaceCells(NFaces, 0);
-		vector<BigNumber> last(NFaces, -1);
-		for (BigNumber e = 0; e < NCells; ++e)
+		// Cells of the faces, from the first column of each face (HybridAlgebraicMesh::Build()): the cells with a non-zero
+		// in it, increasing
+		auto firstColumnFaces = [&](BigNumber e, vector<BigNumber>& faces)
 		{
+			faces.clear();
 			for (int k = 0; k < cbs; ++k)
-			{
 				for (SparseMatrix::InnerIterator it(A_T_F, e * cbs + k); it; ++it)
+					if (it.col() % fbs == 0 && (cbs == 1 || find(faces.begin(), faces.end(), it.col() / fbs) == faces.end()))
+						faces.push_back(it.col() / fbs);
+		};
+		vector<int> nFaceCells(NFaces, 0);
+		#pragma omp parallel
+		{
+			vector<BigNumber> faces;
+			#pragma omp for
+			for (BigNumber e = 0; e < NCells; ++e)
+			{
+				firstColumnFaces(e, faces);
+				for (BigNumber f : faces)
 				{
-					if (it.col() % fbs != 0)
-						continue;
-					BigNumber f = it.col() / fbs;
-					if (last[f] != e)
-					{
-						last[f] = e;
-						nFaceCells[f]++;
-					}
+					#pragma omp atomic
+					nFaceCells[f]++;
 				}
 			}
 		}
 		FaceCells.Allocate(NFaces, [&](BigNumber f) { return nFaceCells[f]; });
-		vector<BigNumber> pos(FaceCells.Start.begin(), FaceCells.Start.end() - 1);
-		fill(last.begin(), last.end(), -1);
-		for (BigNumber e = 0; e < NCells; ++e)
+		fill(nFaceCells.begin(), nFaceCells.end(), 0);
+		#pragma omp parallel
 		{
-			for (int k = 0; k < cbs; ++k)
+			vector<BigNumber> faces;
+			#pragma omp for
+			for (BigNumber e = 0; e < NCells; ++e)
 			{
-				for (SparseMatrix::InnerIterator it(A_T_F, e * cbs + k); it; ++it)
+				firstColumnFaces(e, faces);
+				for (BigNumber f : faces)
 				{
-					if (it.col() % fbs != 0)
-						continue;
-					BigNumber f = it.col() / fbs;
-					if (last[f] != e)
-					{
-						last[f] = e;
-						FaceCells.Items[pos[f]++] = e;
-					}
+					int q;
+					#pragma omp atomic capture
+					q = nFaceCells[f]++;
+					FaceCells[f][q] = e;
 				}
 			}
+		}
+		#pragma omp parallel for
+		for (BigNumber f = 0; f < NFaces; ++f)
+		{
+			BigNumber* cells = FaceCells[f];
+			if (FaceCells.Size(f) == 2)
+			{
+				if (cells[1] < cells[0])
+					swap(cells[0], cells[1]);
+			}
+			else if (FaceCells.Size(f) > 2)
+				sort(cells, cells + FaceCells.Size(f));
 		}
 
 		// Neighbours and couplings
@@ -237,49 +260,78 @@ public:
 	// neighbours not aggregated yet (allNeighbours). Returns true if the coarsest possible mesh is reached.
 	bool Aggregate(bool allNeighbours = false)
 	{
-		vector<int> count = NStrongNeighbourOf;
-		CellAggregate.assign(NCells, -1);
+		// The data of each cell, together: the cells are visited in the order of the aggregation, which has no locality
+		// in their numbering (each access to a cell is a cache miss), so they are also prefetched a few cells ahead
+		struct CellData
+		{
+			BigNumber NeighboursStart;
+			int NNeighbours;
+			int NStrong;
+			int Count;           // number of cells not aggregated yet of which the cell is a strong neighbour
+			BigNumber Aggregate; // -1 if not aggregated yet
+			bool Ordered;
+		};
+		vector<CellData> cells(NCells);
+		#pragma omp parallel for
+		for (BigNumber e = 0; e < NCells; ++e)
+			cells[e] = { Neighbours.Start[e], NNeighbours[e], NStrongNeighbours[e], NStrongNeighbourOf[e], -1, false };
+		const BigNumber* neighbours = Neighbours.Items.data();
+		const int ahead = 8;
+		// The cell order[i + 3*ahead], the neighbours of order[i + 2*ahead], their data for order[i + ahead]
+		auto prefetch = [&](const vector<BigNumber>& order, BigNumber i, BigNumber n, bool strongOnly)
+		{
+			if (i + 3 * ahead < n)
+				Prefetch(&cells[order[i + 3 * ahead]]);
+			if (i + 2 * ahead < n)
+				Prefetch(neighbours + cells[order[i + 2 * ahead]].NeighboursStart);
+			if (i + ahead < n)
+			{
+				const CellData& c = cells[order[i + ahead]];
+				for (int k = 0; k < (strongOnly ? c.NStrong : c.NNeighbours); ++k)
+					Prefetch(&cells[neighbours[c.NeighboursStart + k]]);
+			}
+		};
 
 		// Aggregation order: from a cell that is the strong neighbour of the fewest cells, the neighbours of the cells
 		// already ordered, each time by increasing number of cells of which they are a strong neighbour
 		vector<BigNumber> order(NCells);
-		vector<char> ordered(NCells, 0);
 		BigNumber start = 0;
 		for (BigNumber e = 0; e < NCells; ++e)
 		{
-			if (count[e] < count[start])
+			if (cells[e].Count < cells[start].Count)
 				start = e;
 		}
 		BigNumber nOrdered = 0;
 		order[nOrdered++] = start;
-		ordered[start] = 1;
+		cells[start].Ordered = true;
 		vector<BigNumber> unordered;
 		BigNumber nextUnordered = 0;
 		for (BigNumber i = 0; i < NCells; ++i)
 		{
 			if (i == nOrdered) // disconnected cells: continue from the first cell not ordered yet
 			{
-				while (ordered[nextUnordered])
+				while (cells[nextUnordered].Ordered)
 					nextUnordered++;
 				order[nOrdered++] = nextUnordered;
-				ordered[nextUnordered] = 1;
+				cells[nextUnordered].Ordered = true;
 			}
-			BigNumber e = order[i];
+			prefetch(order, i, nOrdered, false);
+			const CellData& c = cells[order[i]];
 			unordered.clear();
-			for (int k = 0; k < NNeighbours[e]; ++k)
+			for (int k = 0; k < c.NNeighbours; ++k)
 			{
-				BigNumber n = Neighbours[e][k];
-				if (!ordered[n])
+				BigNumber n = neighbours[c.NeighboursStart + k];
+				if (!cells[n].Ordered)
 					unordered.push_back(n);
 			}
 			if (unordered.empty())
 				continue;
 			// Same sort as PairwiseAggregation: same order of the equal counts
-			sort(unordered.begin(), unordered.end(), [&count](BigNumber n1, BigNumber n2) { return count[n1] < count[n2]; });
+			sort(unordered.begin(), unordered.end(), [&cells](BigNumber n1, BigNumber n2) { return cells[n1].Count < cells[n2].Count; });
 			for (BigNumber n : unordered)
 			{
 				order[nOrdered++] = n;
-				ordered[n] = 1;
+				cells[n].Ordered = true;
 			}
 		}
 
@@ -292,61 +344,66 @@ public:
 		auto addToAggregate = [&](BigNumber e)
 		{
 			AggregateCells.Items.push_back(e);
-			CellAggregate[e] = NAggregates;
-			for (int k = 0; k < NStrongNeighbours[e]; ++k)
+			CellData& c = cells[e];
+			c.Aggregate = NAggregates;
+			for (int k = 0; k < c.NStrong; ++k)
 			{
-				BigNumber n = Neighbours[e][k];
-				if (CellAggregate[n] < 0)
-					count[n]--;
+				CellData& n = cells[neighbours[c.NeighboursStart + k]];
+				if (n.Aggregate < 0)
+					n.Count--;
 			}
 		};
 		BigNumber remaining = NCells;
-		for (BigNumber e : order)
+		for (BigNumber i = 0; i < NCells; ++i)
 		{
-			if (CellAggregate[e] >= 0)
+			prefetch(order, i, NCells, !allNeighbours);
+			BigNumber e = order[i];
+			if (cells[e].Aggregate >= 0)
 				continue;
 			addToAggregate(e);
 			remaining--;
 
+			const CellData& c = cells[e];
 			if (allNeighbours)
 			{
-				for (int k = 0; k < NNeighbours[e]; ++k)
+				for (int k = 0; k < c.NNeighbours; ++k)
 				{
-					BigNumber n = Neighbours[e][k];
-					if (CellAggregate[n] < 0)
+					BigNumber n = neighbours[c.NeighboursStart + k];
+					if (cells[n].Aggregate < 0)
 					{
 						addToAggregate(n);
 						remaining--;
 					}
 				}
-				NAggregates++;
-				AggregateCells.Start.push_back(AggregateCells.Items.size());
-				if (remaining == 0)
-					break;
-				continue;
 			}
-
-			double min = 100000000;
-			BigNumber chosen = -1;
-			for (int k = 0; k < NStrongNeighbours[e]; ++k)
+			else
 			{
-				BigNumber n = Neighbours[e][k];
-				if (CellAggregate[n] < 0 && count[n] < min)
+				double min = 100000000;
+				BigNumber chosen = -1;
+				for (int k = 0; k < c.NStrong; ++k)
 				{
-					chosen = n;
-					min = count[n];
+					BigNumber n = neighbours[c.NeighboursStart + k];
+					if (cells[n].Aggregate < 0 && cells[n].Count < min)
+					{
+						chosen = n;
+						min = cells[n].Count;
+					}
 				}
-			}
-			if (chosen >= 0)
-			{
-				addToAggregate(chosen);
-				remaining--;
+				if (chosen >= 0)
+				{
+					addToAggregate(chosen);
+					remaining--;
+				}
 			}
 			NAggregates++;
 			AggregateCells.Start.push_back(AggregateCells.Items.size());
 			if (remaining == 0)
 				break;
 		}
+		CellAggregate.resize(NCells);
+		#pragma omp parallel for
+		for (BigNumber e = 0; e < NCells; ++e)
+			CellAggregate[e] = cells[e].Aggregate;
 
 		double coarseningRatio = (double)NCells / (double)NAggregates;
 		return coarseningRatio <= 1.01;

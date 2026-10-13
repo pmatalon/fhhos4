@@ -23,7 +23,8 @@ Update it after measuring or optimizing something.
 
 ## Machine
 
-AMD Ryzen 7 7735HS (8 cores, 16 threads), 13 GB of RAM, WSL2. No `perf` in WSL2; `valgrind` is installed (system,
+AMD Ryzen 7 7735HS (8 cores, 16 threads), 13 GB of RAM, WSL2, a laptop: on battery, everything is ~35% slower
+(2026-10-13); `cat /sys/class/power_supply/AC1/online` gives 1 when it is plugged in. No `perf` in WSL2; `valgrind` is installed (system,
 `/usr/bin/valgrind`, not in the conda env), `gdb` is not but may be.
 
 Memory: WSL can crash (the whole VM restarts). It crashed twice on 2026-10-04 during a measurement, cause not
@@ -56,7 +57,7 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   `scripts/perf/Prof.h` (`PROF_START`/`PROF_STOP`, printed at exit). Include it in the files to instrument, never
   commit the instrumentation.
 - **Validation of a change**:
-  1. `ctest` (196 tests).
+  1. `ctest` (198 tests).
   2. `scripts/perf/amg_papers.sh <output dir> [binary]`: the AMG configurations of the papers, at reduced sizes (the
      paper sizes don't fit in 13 GB), 30 runs in ~6 minutes. Then `scripts/perf/fingerprint.sh <dir before> <dir after>`
      compares their iteration tables (iteration, inner iterations, residual): they must be identical.
@@ -716,6 +717,49 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   data race on `CoarseElements` in its loop over the removed faces); the flat passes now stop with an error there. It
   was already impractical: 431 s of setup on Cube-tet k=0 n=32 (2 levels). `-face-prolong 3` segfaults in the old path
   (Cube-tet n=8), unchanged.
+
+- **Default options: the rest of the setup** (2026-10-13, the user's request: "improve the performance of the default
+  options"). Profile first (instrumented copies in `build/bench_setup2|3/`): after the flat passes, the setup of
+  Cube-tet k=0 n=32 on 8 threads was spread over ~15 steps of 0.01-0.09 s, of which 0.21 s sequential (Eigen's
+  transpose `R = P^T`, the pairwise aggregation, the cells of the faces); at k=1 (`p_h`, HArDCore3D 32^3, 8 threads,
+  0.17 s), the level k=1 took half of it: the setups of its two smoothers (0.063 s: each factorized the same diagonal
+  blocks and found the same hybrid chunks) and the extraction of the p-level (0.035 s, triplets). All bit-identical
+  (levels compared with `uamg_harness compare`, solves with the scratch driver's residuals to 17 digits, 1 and 8
+  threads, hybrid smoothers included):
+  - `SparseMatrixOps::Transpose()` in parallel (from 20000 non-zeros: each thread counts, then copies, a contiguous range
+    of rows: Eigen's result), used for `R = P^T` (`UncondensedLevel::SetupRestriction()`) and all the transposes of the
+    setup. `R = P^T` on 8 threads: 0.083 -> 0.014 s.
+  - The post-smoother reuses the setup of the pre-smoother when they are of the same kind on the same matrix
+    (`Smoother::Setup(A, preSmoother)`, `IterativeSolver::SetupFrom()`: `BlockGaussSeidel` copies the factorized
+    diagonal blocks, their positions and, with the same order, the hybrid chunks; `GaussSeidel` its diagonal and
+    chunks). k=1 level, 8 threads: post-smoother 0.03 -> 0.003 s.
+  - The p-level blocks extracted by rows (`ExtractCoarseMatrix()`: `BuildByRows`, no triplets): 0.035 -> 0.008 s.
+  - The cells of the faces in parallel (atomic counts, then the cells of each face sorted: 2 at most): 0.025 -> 0.011 s
+    on 8 threads (+0.005 s on 1 thread).
+  - The pairwise aggregation (sequential: its order defines the aggregates) with the data of each cell packed together
+    and prefetched a few cells ahead along the aggregation order: 0.053 -> 0.042 s (1 thread), 0.071 -> 0.053 s (8).
+  - `Multiply()`: a row of A made of a single 1 (the injections of the prolongations) copies the row of B. Chaining of
+    P on 8 threads: 0.092 -> 0.072 s.
+
+  Setup, before (`0831fb25`) -> after, plugged in, medians of 5 interleaved runs (`harness_flat`, `driver_flat`; the
+  step timings above were measured on battery, ~35% slower):
+
+  | Case | 1 thread | 8 threads |
+  |---|---|---|
+  | Cube-tet k=0 n=32 | 1.17 -> 1.15 s (-2%) | 0.47 -> 0.38 s (-20%) |
+  | HArDCore3D 32^3 k=0 | 0.173 -> 0.170 s (-2%) | 0.094 -> 0.081 s (-14%) |
+  | HArDCore3D 32^3 k=1 | 0.27 -> 0.23 s (-14%) | 0.17 -> 0.11 s (-36%) |
+
+  The program at its default threads, medians of 3, the same iterations (since `27ea0d44`, before the flat passes, in
+  parentheses): Cube-tet k=0 n=32 0.47 -> 0.39 s (1.90 s), Cube-tet k=1 n=16 0.089 -> 0.061 s (0.24 s), Square-tri k=0
+  n=256 0.24 -> 0.19 s (1.33 s), Cube-cart-aniso100 n=64 0.51 -> 0.46 s (2.60 s). `ctest` 198/198, `amg_papers.sh`:
+  identical iteration tables.
+
+  Sequential steps run slower when 8 threads are in use (Eigen's transpose alone: 0.046 s on 1 thread, 0.092 s on 8):
+  after a parallel region the other threads spin a while (libgomp), and, on battery, the clock of the cores drops
+  with their number. What remains (Cube-tet k=0 n=32, 8 threads): the loop over the aggregates 0.08 s, chaining of P
+  0.07 s, interface collapsing, decomposition, local Galerkin products, neighbours and couplings 0.05-0.06 s each,
+  the aggregation 0.05 s; on HArDCore3D's hexahedra, no step above 15% of the setup.
 
 ## Current profile (U-AMG; parallel: 16 threads, the default before 2026-10-08)
 

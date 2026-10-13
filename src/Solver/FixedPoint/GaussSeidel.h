@@ -66,6 +66,26 @@ public:
 		this->SetupComputationalWork = 0;
 	}
 
+	// The positions of the diagonal and, with the same order, the hybrid chunks of another Gauss-Seidel set up for A
+	bool SetupFrom(const SparseMatrix& A, const IterativeSolver& other) override
+	{
+		const GaussSeidel* o = dynamic_cast<const GaussSeidel*>(&other);
+		if (!o || o->Matrix != &A || this->ComputeExactSolution)
+			return false;
+		IterativeSolver::Setup(A);
+		_diagPos = o->_diagPos;
+		_chunks.Clear();
+		if (_hybrid)
+		{
+			if (o->_hybrid && o->SweepOrder == SweepOrder)
+				_chunks = o->_chunks;
+			else
+				Chunks();
+		}
+		this->SetupComputationalWork = 0;
+		return true;
+	}
+
 	// The residual is deduced from the products computed in the sweep (half of the matrix): not in the parallel hybrid
 	// sweeps, whose rows don't all read the same values of x (otherwise, they are the sequential ones), nor in the
 	// sweeps in SweepOrder

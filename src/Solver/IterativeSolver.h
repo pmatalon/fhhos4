@@ -27,6 +27,14 @@ public:
 
 	IterativeSolver() : Solver() {}
 
+	// Setup for A from that of other, if other is a solver of the same kind set up for A (e.g. the pre- and
+	// post-smoothers of a multigrid level): the result of Setup(A), at the cost of a copy. Returns false (and does
+	// nothing) if it can't.
+	virtual bool SetupFrom(const SparseMatrix& A, const IterativeSolver& other)
+	{
+		return false;
+	}
+
 	void Setup(const SparseMatrix& A) override
 	{
 		Solver::Setup(A);

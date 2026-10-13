@@ -77,6 +77,29 @@ public:
 		this->SetupComputationalWork = nb * 2.0/3.0*pow(_blockSize, 3)*1e-6;
 	}
 
+	// The factorized diagonal blocks, the positions of the blocks and, with the same order, the hybrid chunks of
+	// another block Gauss-Seidel set up for A with the same block size
+	bool SetupFrom(const SparseMatrix& A, const IterativeSolver& other) override
+	{
+		const BlockGaussSeidel* o = dynamic_cast<const BlockGaussSeidel*>(&other);
+		if (!o || o->Matrix != &A || o->_blockSize != _blockSize || this->ComputeExactSolution)
+			return false;
+		IterativeSolver::Setup(A);
+		diagBlockSolver = o->diagBlockSolver;
+		_diagBlock = o->_diagBlock;
+		_samePattern = o->_samePattern;
+		_chunks.Clear();
+		if (_hybrid)
+		{
+			if (o->_hybrid && o->SweepOrder == SweepOrder)
+				_chunks = o->_chunks;
+			else
+				Chunks();
+		}
+		this->SetupComputationalWork = o->SetupComputationalWork;
+		return true;
+	}
+
 private:
 	IterationResult ExecuteOneIteration(const Vector& b, Vector& x, bool& xEquals0, bool computeResidual, bool computeAx, const IterationResult& oldResult) override
 	{

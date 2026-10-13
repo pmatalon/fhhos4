@@ -107,7 +107,7 @@ public:
 				Utils::Log() << PreSmoother->Iterations() << " iteration" << (PreSmoother->Iterations() > 1 ? "s" : "") << " of " << (*PreSmoother) << endl;
 
 			Utils::Log() << "\t\tPostSmoothing       : "; Utils::Log().flush();
-			PostSmoother->Setup(A);
+			PostSmoother->Setup(A, *PreSmoother); // reuses the setup of the pre-smoother if they are of the same kind
 			if (PostSmoother->Iterations() == 0)
 				Utils::Log() << "none" << endl;
 			else

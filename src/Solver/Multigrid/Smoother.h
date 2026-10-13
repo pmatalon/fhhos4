@@ -33,6 +33,13 @@ public:
 			_solver->Setup(A);
 	}
 
+	// Same, reusing the setup of another smoother of A when it is of the same kind (the pre-smoother of the level)
+	void Setup(const SparseMatrix& A, const Smoother& setUpForA)
+	{
+		if (_solver->MaxIterations > 0 && !(setUpForA._solver->MaxIterations > 0 && _solver->SetupFrom(A, *setUpForA._solver)))
+			_solver->Setup(A);
+	}
+
 	// The order of the (block) rows in all the sweeps of the Gauss-Seidel smoothers (see DownwindOrder()); the other
 	// smoothers keep theirs
 	void SetSweepOrder(const vector<BigNumber>* order)

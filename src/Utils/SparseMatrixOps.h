@@ -87,6 +87,22 @@ namespace SparseMatrixOps
 			vector<pair<SparseMatrixIndex, double>>& row = rows.Local();
 			for (BigNumber i = firstRow; i < lastRow; ++i)
 			{
+				// A single coefficient 1 in the row of A (e.g. an injection in a prolongation): the row of B, exactly
+				SparseMatrix::InnerIterator a0(A, i);
+				bool singleOne = false;
+				if (a0 && a0.value() == 1.0)
+				{
+					SparseMatrix::InnerIterator a1 = a0;
+					++a1;
+					singleOne = !a1;
+				}
+				if (singleOne)
+				{
+					for (SparseMatrix::InnerIterator b(B, a0.col()); b; ++b)
+						chunk.Add(b.col(), b.value() * 1.0);
+					chunk.EndRow();
+					continue;
+				}
 				row.clear();
 				for (SparseMatrix::InnerIterator a(A, i); a; ++a)
 				{
@@ -113,9 +129,55 @@ namespace SparseMatrixOps
 		});
 	}
 
+	// A^T, with the same result as Eigen's: the coefficients of each row of A^T in the order of the rows of A, the explicit
+	// zeros kept. In parallel: each thread counts, then copies, the coefficients of a contiguous range of rows of A.
 	inline SparseMatrix Transpose(const SparseMatrix& A)
 	{
-		return SparseMatrix(A.transpose());
+		BigNumber nRows = A.rows(), nCols = A.cols();
+		int nChunks = (int)min((BigNumber)Parallelism::NThreads(), max(nRows, (BigNumber)1));
+		if (nChunks <= 1 || A.nonZeros() < 20000)
+			return SparseMatrix(A.transpose());
+		// count[c][j]: number of coefficients of column j in the rows of chunk c, then the position of the first of them
+		vector<vector<SparseMatrixIndex>> count(nChunks);
+		#pragma omp parallel for schedule(static, 1)
+		for (int c = 0; c < nChunks; ++c)
+		{
+			count[c].assign(nCols, 0);
+			auto [begin, end] = Parallelism::Chunk(nRows, c, nChunks);
+			for (BigNumber i = begin; i < end; ++i)
+				for (SparseMatrix::InnerIterator it(A, i); it; ++it)
+					count[c][it.col()]++;
+		}
+		SparseMatrix T(nCols, nRows);
+		T.resizeNonZeros(A.nonZeros());
+		SparseMatrixIndex* outer = T.outerIndexPtr();
+		outer[0] = 0;
+		for (BigNumber j = 0; j < nCols; ++j)
+		{
+			SparseMatrixIndex position = outer[j];
+			for (int c = 0; c < nChunks; ++c)
+			{
+				SparseMatrixIndex n = count[c][j];
+				count[c][j] = position;
+				position += n;
+			}
+			outer[j + 1] = position;
+		}
+		#pragma omp parallel for schedule(static, 1)
+		for (int c = 0; c < nChunks; ++c)
+		{
+			auto [begin, end] = Parallelism::Chunk(nRows, c, nChunks);
+			for (BigNumber i = begin; i < end; ++i)
+			{
+				for (SparseMatrix::InnerIterator it(A, i); it; ++it)
+				{
+					SparseMatrixIndex p = count[c][it.col()]++;
+					T.innerIndexPtr()[p] = i;
+					T.valuePtr()[p] = it.value();
+				}
+			}
+		}
+		return T;
 	}
 
 	// Symmetric matrix whose lower triangular part (diagonal included) is that of A: same matrix as
