@@ -803,6 +803,24 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
     epsilon): 32^3 k=0 0.51 s vs 0.36 s, 0.71x (0.82x); k=1 1.71 vs 3.22 s, 1.88x (2.64x); k=2 6.57 vs 14.25 s, 2.17x
     (2.67x); 48^3 k=0 1.90 vs 2.15 s, 1.13x (1.35x); k=1 killed by the watchdog (4.85 GB; the first series: 6.70 s vs
     19.97 s at 1e-12, 3.0x).
+  - Diffusion on 8 threads (2026-10-14, the user's question to choose the symmetric scheme of the integration; library
+    17e12386). Temporary build of `hho-diffusion` whose "solving time" is the wall time and whose BiCGSTAB stops at
+    1e-12 (`build/bench_speedup/bench_wall.sh`, logs `wall/`, one run each, ON BATTERY: the whole runs ~25% slower than
+    on 10-13, HArDCore3D's assembly included, and noisy). fhhos4 on 1 thread: everything sequential; on 8:
+    OMP_NUM_THREADS=8 and HArDCore3D's threads. BiCGSTAB is sequential (Eigen's column-major product): the 8-thread
+    speedup is against the faster of its two runs. L2 errors equal everywhere.
+
+    | Case | BiCGSTAB 1e-12, 1 / 8 threads | fhhos4 1 thread | fhhos4 8 threads | speedup 1 / 8 threads |
+    |---|---|---|---|---|
+    | 32^3 k=0 | 128 its, 0.37 / 0.32 s | 29 its, 0.56 s | 30 its, 0.39 s | 0.66x / 0.82x |
+    | 32^3 k=1 | 190 its, 3.60 / 3.64 s | 19 its, 2.06 s | 20 its, 1.26 s | 1.75x / 2.86x |
+    | 32^3 k=2 | 230 its, 19.19 / 15.44 s | 26 its, 7.85 s | 26 its, 3.99 s | 2.44x / 3.87x |
+    | 48^3 k=0 | 199 its, 2.44 (rerun 2.09) / 2.04 s | 32 its, 3.07 s (reruns 2.17, 2.33) | 33 its, 1.43 s | 0.79-0.96x / 1.43x |
+    | 48^3 k=1 | 324 its, 21.48 / 21.11 s | 20 its, 8.95 s | 20 its, 4.79 s | 2.40x / 4.41x |
+
+    32^3 k=2 and 48^3 k=1 (4.3-4.6 GB peak, in HArDCore3D: its BiCGSTAB runs too) with the watchdog at 3 GB
+    (`MINAVAIL_KB`), killed at 4 GB. Better than the diffusion-dominated convection-diffusion at k=1 (32^3: 1.51x /
+    2.74x, 48^3: 1.87x / 3.53x).
   - Disk++ (`run_all_1013.sh`, logs `~/code/diskpp/build/bench/logs_1013/`; client unchanged, not rebuilt), fhhos4 on 8
     threads against MUMPS (best of 8 threads / 1 thread), before -> after (2026-10-10: fhhos4 on 8 threads, MUMPS best of
     16 / 1): k=0, the setup 2-5x faster: triangles 0.8-0.9x -> 1.8-2.5x, quadrangles 1.0x -> 2.3-2.7x, hexagons 1.4x ->
