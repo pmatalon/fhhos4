@@ -143,7 +143,7 @@ public:
 		_localOperator.Next.Free();
 		_localOperator.Assembled = nullptr;
 
-		// The blocks are only read during the setup: the caller may free them (the library fhhos4_AMG does)
+		// The blocks are only read during the setup: the caller may free them (the library fhhos4 does)
 		fine->A_T_T = nullptr;
 		fine->A_T_F = nullptr;
 		fine->A_F_F = nullptr;

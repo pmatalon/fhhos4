@@ -37,7 +37,7 @@ public:
 	DiffusionTestCase<Dim>* TestCase;
 	SparseMatrix A;
 	Vector b;
-	// Set before Assemble(): the static condensation is left to the solver (-s libuamg: the library fhhos4_AMG, from
+	// Set before Assemble(): the static condensation is left to the solver (-s libuamg: the library fhhos4, from
 	// the blocks), which also computes the cell unknowns. Assemble() then keeps the blocks and B_T, B_ndF (RHS_T(),
 	// RHS_ndF()), and doesn't compute A and b.
 	bool CondensationBySolver = false;
@@ -597,7 +597,7 @@ public:
 		if (this->_staticCondensation && this->CondensationBySolver)
 		{
 			if (actions.LogAssembly)
-				cout << "Static condensation: by the solver (the library fhhos4_AMG)" << endl;
+				cout << "Static condensation: by the solver (the library fhhos4)" << endl;
 		}
 		else if (this->_staticCondensation)
 		{

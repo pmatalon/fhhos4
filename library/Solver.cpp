@@ -1,4 +1,4 @@
-// The shared library fhhos4_AMG: the algebraic multigrid of fhhos4 for hybrid discretizations (U-AMG), for the codes
+// The shared library fhhos4: the algebraic multigrid of fhhos4 for hybrid discretizations (U-AMG), for the codes
 // that discretize the problem themselves (include/fhhos4.h). Compiled with fhhos4's flags and -fvisibility=hidden: only
 // the classes of the public header are exported. The multigrid is built as in the program (SolverFactory,
 // ApplyProgramArgumentDefaults), from the same code (AlgebraicSolverFactory, ApplyUncondensedAMGDefaults).
@@ -317,7 +317,7 @@ namespace fhhos4
 			IsSetUp = true;
 
 			if (s.Verbosity == 1)
-				cout << "fhhos4_AMG: setup of " << Multigrid->NumberOfLevels() << " levels in " << Seconds(start) << " s" << endl;
+				cout << "fhhos4: setup of " << Multigrid->NumberOfLevels() << " levels in " << Seconds(start) << " s" << endl;
 		}
 
 		void CheckSetUp(const char* function) const
@@ -347,7 +347,7 @@ namespace fhhos4
 			return to_string(c.World) + "." + to_string(c.Major) + "." + to_string(c.Minor) + ", max alignment " + to_string(c.MaxAlignBytes) + " bytes, index of " + to_string(c.IndexSize) + " bytes";
 		};
 		if (host.World != library.World || host.Major != library.Major || host.Minor != library.Minor || host.MaxAlignBytes != library.MaxAlignBytes || host.IndexSize != library.IndexSize)
-			throw Error("fhhos4::Solver: the calling code and the library fhhos4_AMG are compiled with incompatible configurations of Eigen (calling code: Eigen " + toString(host) + "; library: Eigen " + toString(library) + "). Use the same version of Eigen, and the same -march (it sets the alignment).");
+			throw Error("fhhos4::Solver: the calling code and the library fhhos4 are compiled with incompatible configurations of Eigen (calling code: Eigen " + toString(host) + "; library: Eigen " + toString(library) + "). Use the same version of Eigen, and the same -march (it sets the alignment).");
 		_impl = make_unique<Impl>();
 	}
 
@@ -450,7 +450,7 @@ namespace fhhos4
 		result.RelativeResidual = solver->LastIterationResult.NormalizedResidualNorm;
 		result.Converged = result.RelativeResidual < Tolerance;
 		if (Verbosity == 1)
-			cout << "fhhos4_AMG: " << result.Iterations << " iterations, relative residual " << result.RelativeResidual << (result.Converged ? "" : " (not converged)") << ", " << Seconds(start) << " s" << endl;
+			cout << "fhhos4: " << result.Iterations << " iterations, relative residual " << result.RelativeResidual << (result.Converged ? "" : " (not converged)") << ", " << Seconds(start) << " s" << endl;
 		return result;
 	}
 

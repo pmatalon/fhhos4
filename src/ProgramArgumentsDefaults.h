@@ -13,7 +13,7 @@ inline void argument_error(string msg)
 }
 
 // The defaults of U-AMG (-s uamg, fcguamg, libuamg...) for the face degree k: part of ApplyProgramArgumentDefaults(),
-// also used by the library fhhos4_AMG (library/Solver.cpp). The booleans: see ApplyProgramArgumentDefaults().
+// also used by the library fhhos4 (library/Solver.cpp). The booleans: see ApplyProgramArgumentDefaults().
 inline void ApplyUncondensedAMGDefaults(MultigridArguments& mg, int k, bool defaultCoarseOperator = true, bool defaultCycle = true, bool defaultHPCoarseningStgy = true)
 {
 	if (mg.ProlongationCode == 0)

@@ -31,7 +31,7 @@ public:
 	void Serialize(ostream& os) const override
 	{
 		const fhhos4::Solver& s = _solver;
-		os << "U-AMG through the library fhhos4_AMG, Krylov method: " << s.Krylov << endl;
+		os << "U-AMG through the library fhhos4, Krylov method: " << s.Krylov << endl;
 		os << "\t" << "Cycle                   : " << s.Cycle << "(" << s.PreSmoothingIterations << "," << s.PostSmoothingIterations << ")" << endl;
 		os << "\t" << "Smoothers               : " << s.PreSmoother << ", " << s.PostSmoother << endl;
 		os << "\t" << "Coarsening factor       : " << s.CoarseningFactor << endl;

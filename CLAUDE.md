@@ -25,7 +25,7 @@ cmake -G Ninja -DCMAKE_BUILD_TYPE=Release ..
 ninja
 ```
 
-Produces `build/bin/fhhos4` (main solver), `build/bin/fhhos4_tests` (GTest suite) and `build/lib/libfhhos4_AMG.so`
+Produces `build/bin/fhhos4` (main solver), `build/bin/fhhos4_tests` (GTest suite) and `build/lib/libfhhos4.so`
 (U-AMG for other codes, see `library/`).
 Clean build ~2.5 min. Ninja runs at most `MAX_COMPILE_JOBS` (default 2) compilations in
 parallel: `Program.cpp` alone takes ~4 GB of RAM and ~2.5 min, and sets the build time.
@@ -37,7 +37,7 @@ CMake options (`-D<OPTION>=ON/OFF`):
 - `ENABLE_TESTS` (ON): build `fhhos4_tests`. Turning it off saves little time with Ninja
   (the tests compile in parallel with `Program.cpp`), more with Make.
 - `ENABLE_GMSH`, `ENABLE_CGAL` (ON, CGAL is only used in 2D), `ENABLE_AGMG` (OFF).
-- `ENABLE_PROGRAM` (ON): OFF builds the library `fhhos4_AMG` alone (needs only Eigen): the CMake file has a library
+- `ENABLE_PROGRAM` (ON): OFF builds the library `fhhos4` alone (needs only Eigen): the CMake file has a library
   section, then the program's, skipped by `return()`.
 
 `cmake --install . --prefix <prefix> [--component library|program]`: program, meshes (`share/fhhos4/meshes`), library,
@@ -110,8 +110,9 @@ Example invocations for specific experiments/figures live in `reproducibility/*.
 
 ## Library (`library/`)
 
-`fhhos4_AMG` (short name fhhos4, the name client codes use): shared library giving U-AMG to other HHO codes (first
-target: HArDCore3D), see `library/README.md`. Public interface in `library/include/fhhos4.h` (`#include <fhhos4>`, a
+`fhhos4` (shared library `libfhhos4.so`; CMake target `fhhos4_lib`, since `fhhos4` is the program; exported as
+`fhhos4::fhhos4`) gives U-AMG to other HHO codes (first target: HArDCore3D), see `README_library.md` (its rules: section
+"Documentation"). Public interface in `library/include/fhhos4.h` (`#include <fhhos4>`, a
 file that includes `fhhos4.h`, or `<fhhos4.h>`; namespace `fhhos4`, Eigen types, pimpl): `Solver` (parameters as
 public members; `Dimension`, `FaceDegree` and `CellDegree` must be set), `Result`, and `Error` (in `fhhos4_error.h`,
 which `Utils.h` includes alone). Two interfaces: the uncondensed system, the interface of choice
@@ -136,10 +137,51 @@ interface (`Diffusion_HHO::CondensationBySolver`: no static condensation in the 
 `-libuamg-condensed` (and for a full Neumann problem and the exports of the system or of the algebraic error), which
 `tests/UAMGLibraryTest.cpp` compares with `uamg|fcguamg|gcruamg`.
 
+### U-AMG: details and measurements (kept out of `README_library.md`)
+
+- Condensation by cells (setup from the blocks): computes the rows of `A` in the pattern of `A_FF`, completed (and
+  sorted) only in the rows where `A_FF` lacks couplings of the faces of a cell (zeros dropped by an assembly): 1.3x (1
+  thread) to 1.8x (8 threads) slower when all the rows are completed. HArDCore3D 32^3, k = 1 (285,696 face DoFs, 9.2 M
+  non-zeros in `A`): setup from the blocks 0.71-0.80 s vs 0.38-0.50 s from `A` on 1 thread, 0.25-0.35 s vs 0.17-0.29 s
+  on 8; same solve. The setups from the blocks keep the inverses of the blocks of `A_TT`, `A_TT^{-1} A_TF` and `A_FT`.
+- p-levels: `P_CS` Minus2 (k, k-2, ..., 0), blocks extracted (first coefficients of each block,
+  `SetupOperatorByBlockExtraction()`), prolongation = injection of the low modes. h-levels: multiple pairwise
+  aggregation (factor 3.8), interface collapsing, coarsening prolongation `ReconstructSmoothedTraceOrInject` (trace of
+  `-A_TcTc^{-1} A_TcFc` on the removed faces, smoothed by block Jacobi omega = 2/3), chained as multigrid prolongation.
+- Interpolation of 1: the AMG rescales the constant modes before the h-coarsening (`UncondensedLevel::CoarsenMesh()`):
+  without it, L2-orthonormal bases slow it down (Cube-tet n=16, k=0: 44 iterations instead of 26) or make it fail
+  (graded meshes).
+- Non-symmetric matrix: couplings from the averages of the traces of `A_TF(T, F)` and `A_FT(F, T)`; the couplings of
+  the rows of the matrix (as AGMG's strong couplings, from `A_TF(T1, F)` and `A_FT(F, T2)`) cost 20% more iterations
+  on HArDCore3D's diffusion-dominated convection-diffusion at k = 0, more without the downwind order. Reconstruction
+  `-A_TT^{-1} A_TF` by LU of the blocks; smoothing of the prolongations with the rows of the matrix; Galerkin `P^T A P`;
+  defaults GCR and LU (FCG and Cholesky refused). Downwind order (Bey & Wittum 1997, Hackbusch & Probst 1997): faces
+  sorted after those they are strongly and one-sidedly coupled to, cycles broken; natural order without one-sided
+  couplings; on a level with one-sided couplings all the Gauss-Seidel sweeps (backward, symmetric included) follow it,
+  Jacobi and SOR ignore it. HArDCore3D convection-dominated 32^3, k = 1: 16 iterations, 4 with it.
+- GCR: restarted every 10 iterations, Notay's economical version (ETNA 37, 2010, Algorithm 3.1); the K-cycle then
+  iterates with GCR. BiCGSTAB is not flexible: the setup refuses the K-cycle with it.
+- Default smoothers on several threads: hybrid block Gauss-Seidel (`hbgs`, `hrbgs`: Gauss-Seidel in the rows of each
+  thread, Jacobi between the threads; scalar kernels at k = 0), results depending on the number of threads, not on the
+  run; sequential sweeps on a level where more than 20% of the non-zeros couple rows of different threads (e.g. GMSH's
+  numbering on the tetrahedral meshes). 0-6 more iterations than the block Gauss-Seidel with FCG (a few more with
+  BiCGSTAB), but faster on 8 threads: 15-20% at k = 0, 35-45% at k = 1, 2 (HArDCore3D cubes and Voronoi); BiCGSTAB or
+  the multigrid alone 2-45% (earlier, non-deterministic version). GCR, HArDCore3D diffusion-dominated
+  convection-diffusion 48^3, k = 1: 27 iterations on 4 threads (26 on 1), solve 3.3-3.5 s instead of 5.8 s.
+- FCG replaces its recurrence residual by the true `b - A x` every 20 iterations and when it meets the tolerance (GCR:
+  at each restart and at the tolerance), then continues if the true one does not: the tolerance applies to the true
+  residual. Near the attainable accuracy (~1e-11 relative on Disk++'s 2D systems at k = 2) the recurrence drifts (8e-13
+  for a true 1.4e-11); a tolerance below it runs `MaxIterations`, not converged.
+- Symmetric condensed interface: FCG applies `A` from its lower triangle; for an `A` symmetric up to rounding (local
+  Schur complements), the solution differs from a direct solver's on the full `A` by ~cond(A) x asymmetry (Disk++ 2D,
+  k = 2, asymmetry 3e-16: up to 1% of L2 errors of 3e-11).
+- `Threads` default: at most one thread per physical core unless `OMP_NUM_THREADS` or OpenMP's binding is set (the
+  hyperthreads slow the AMG down). Release builds use the conda compilers' `-march=nocona`.
+
 ## Version
 
 Set in `project()` (`CMakeLists.txt`) only; generated from it: the public header `fhhos4_version.h`
-(`FHHOS4_VERSION`...), the CMake package version (`find_package(fhhos4 1.2)`: same major version) and the library's
+(`FHHOS4_VERSION`...), the CMake package version (`find_package(fhhos4 1.3)`: same major version) and the library's
 SOVERSION (major.minor: adding a public member to `fhhos4::Solver` breaks the binary compatibility, so only in a new
 minor or major version). `fhhos4::Version()` (printed by the program at start) adds `git describe` when built from a
 clone: `cmake/GitVersion.cmake` regenerates `build/generated/Version.cpp` at each build, rewritten only when the commit
@@ -148,6 +190,28 @@ version in `project()`, commit, then push an annotated tag `vX.Y.Z` (the tags be
 `.github/workflows/release.yml` checks the tag against the version, builds, runs `ctest`, the installation and the
 library alone, then creates the GitHub release "Release X.Y.Z" (notes: the message of the tag). It pins GMSH, Eigen,
 CGAL and the compiler to the versions the tests were validated with: update them with the local environment.
+
+## Documentation (README files)
+
+Three READMEs, each for its readers; keep them up to date in the same commit as the change they describe:
+- `README.md`: minimal. What fhhos4 is, its two parts (one paragraph each, linking to the two files below), and the
+  license. Nothing else.
+- `README_program.md`: the program, for its users (researchers running experiments): dependencies, conda environment,
+  build (options table: every `option()` of `CMakeLists.txt`), installation, where the program reads and writes,
+  troubleshooting.
+- `README_library.md`: the library, for the developers of client codes, who don't need the program or the sources:
+  the algorithm in a few lines (p-levels, then h-levels and how the blocks give the aggregation), the interfaces,
+  install from source (library alone), link (CMake package), use (examples of both interfaces, non-symmetric), inputs,
+  parameters, constraints, license, version (last). Rules:
+  - no details of the algorithm beyond that, no measurements, no client codes (HArDCore3D, Disk++), no internal
+    files (`PERFORMANCE.md`, tests): they go in "U-AMG: details and measurements" above or in `PERFORMANCE.md`;
+  - the parameters table gives the library's own defaults (`library/include/fhhos4.h` and `library/Solver.cpp`:
+    `Arguments()`, `CheckParameters()`, `DefaultPreSmoother()`), which differ from the program's (smoother on several
+    threads, true residual, the defaults of the non-symmetric case): read them in the code, never from the program;
+  - any change of the public interface (`library/include/*`: a setup or solve function, a parameter, its default or
+    its accepted values, an input requirement, an error) or of the library's build, install or CMake package updates
+    `README_library.md` and the comments of `fhhos4.h`, which document the same interface; a version change updates
+    its Version section.
 
 ## License
 

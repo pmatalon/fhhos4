@@ -3,7 +3,7 @@
 #include "../ProgramArguments.h"
 using namespace std;
 
-// U-AMG called through the library fhhos4_AMG (library/), as an external code calls it (fhhos4::Solver), to test the
+// U-AMG called through the library fhhos4 (library/), as an external code calls it (fhhos4::Solver), to test the
 // library against the U-AMG compiled in the program:
 // - -s libuamg: U-AMG alone (as -s uamg);
 // - -s fcglibuamg (or -s fcg -prec libuamg): the FCG of the library preconditioned by U-AMG (as -s fcguamg);

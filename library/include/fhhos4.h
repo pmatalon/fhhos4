@@ -8,7 +8,7 @@
 #include "fhhos4_error.h"
 #include "fhhos4_version.h"
 
-// fhhos4_AMG (short name: fhhos4): the algebraic multigrid of fhhos4 for hybrid discretizations (HHO, HDG...) of scalar
+// fhhos4: the algebraic multigrid of fhhos4 for hybrid discretizations (HHO, HDG...) of scalar
 // diffusion problems, the Uncondensed AMG (U-AMG) of
 //   D. A. Di Pietro, F. Hülsemann, P. Matalon, P. Mycek, U. Rüde, "Algebraic multigrid preconditioner for statically
 //   condensed systems arising from lowest-order hybrid discretizations", SIAM J. Sci. Comput. (2023),
@@ -24,14 +24,14 @@
 //   condensation in the calling code;
 // - the condensed system, to integrate the library with the least effort into a code that condenses statically
 //   already: Setup...() with A and the blocks, then Solve(b, x).
-// See library/README.md.
+// See README_library.md.
 //
 // The Krylov method preconditioned by the AMG is part of the library (Solver::Krylov), which does not give the multigrid
 // cycle alone: with the default K-cycle, the AMG is a non-linear preconditioner (it solves the coarse levels with inner
 // FCG or GCR iterations), which requires a flexible Krylov method: the flexible conjugate gradient (FCG, the default for
 // a symmetric matrix) or GCR.
 //
-// The class is compiled in the shared library fhhos4_AMG, with fhhos4's flags. Eigen objects cross
+// The class is compiled in the shared library fhhos4, with fhhos4's flags. Eigen objects cross
 // its boundary: the calling code must use the same version of Eigen and the same alignment settings (checked by the
 // constructor, which throws fhhos4::Error otherwise). The library never allocates memory that the calling code frees,
 // nor the other way around.
@@ -141,7 +141,7 @@ namespace fhhos4
 		// aggregation-based algebraic multigrid method", ETNA 37, 2010); the Gauss-Seidel smoothers follow the downwind
 		// order of each level (convection), in the pre- and post-smoothing; the K-cycle iterates with GCR. Krylov must not
 		// be "fcg", nor CoarseSolver "ch".
-		// See library/README.md.
+		// See README_library.md.
 		template <typename SparseMatrixType>
 		void SetupNonsymmetricFromBlocks(const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FT, const SparseMatrixType& A_FF,
 		                                 const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne);

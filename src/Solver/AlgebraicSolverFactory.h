@@ -15,7 +15,7 @@
 using namespace std;
 
 // The solvers that only need the matrix of the linear system (and, for U-AMG, the sizes of the polynomial bases): no
-// mesh, no discretization. Used by SolverFactory, and by the library fhhos4_AMG (library/), which must not depend on
+// mesh, no discretization. Used by SolverFactory, and by the library fhhos4 (library/), which must not depend on
 // the meshes and discretizations.
 class AlgebraicSolverFactory
 {

@@ -5,7 +5,7 @@
 
 // Part of the public header <fhhos4>, also included by the internals of fhhos4 (Utils::FatalError()) without the rest.
 
-// Symbols exported by the shared library fhhos4_AMG, which is compiled with -fvisibility=hidden: everything else
+// Symbols exported by the shared library fhhos4, which is compiled with -fvisibility=hidden: everything else
 // (fhhos4's internals, its copy of Eigen's functions) stays private to the library.
 #ifndef FHHOS4_API
 #define FHHOS4_API __attribute__((visibility("default")))

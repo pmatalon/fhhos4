@@ -113,14 +113,14 @@ struct SolverArguments
 	int NeighbourhoodDepth = 1;
 	int PatchSize = 3;
 
-	// U-AMG, compiled in the program (uamg) or called through the library fhhos4_AMG (libuamg), as the solver or the
+	// U-AMG, compiled in the program (uamg) or called through the library fhhos4 (libuamg), as the solver or the
 	// preconditioner
 	bool UsesUncondensedAMG() const
 	{
 		return SolverCode == "uamg" || PreconditionerCode == "uamg" || SolverCode == "libuamg" || PreconditionerCode == "libuamg";
 	}
 
-	// U-AMG called through the library fhhos4_AMG (-s libuamg, fcglibuamg, gcrlibuamg)
+	// U-AMG called through the library fhhos4 (-s libuamg, fcglibuamg, gcrlibuamg)
 	bool UsesLibraryUAMG() const
 	{
 		return SolverCode.find("libuamg") != string::npos || PreconditionerCode == "libuamg";

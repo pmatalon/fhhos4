@@ -252,7 +252,7 @@ public:
 	inline static string BeginYellow = "\033[1;33m";
 	inline static string EndColor    = "\033[0m";
 
-	// Stream of the messages of the solvers (setup steps, warnings, iterations): cout, unless the library fhhos4_AMG
+	// Stream of the messages of the solvers (setup steps, warnings, iterations): cout, unless the library fhhos4
 	// redirects it according to its verbosity (library/Solver.cpp).
 	inline static ostream* LogStream = &cout;
 	static ostream& Log()

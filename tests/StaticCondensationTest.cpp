@@ -1,4 +1,4 @@
-// Unit tests of the static condensation by cells (src/Solver/StaticCondensation.h), used by the library fhhos4_AMG
+// Unit tests of the static condensation by cells (src/Solver/StaticCondensation.h), used by the library fhhos4
 // to condense the uncondensed systems it is given: the condensed matrix must be bit for bit that of the global products
 // FullFromLower(A_FF) - Multiply(A_FT, Multiply(inv(A_TT), A_TF)) (inverses of the blocks in full), whatever the number
 // of threads, in the pattern of A_FF (one pass) or not (global products); the vectors must solve the uncondensed system.

@@ -15,7 +15,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # program options
-option(ENABLE_PROGRAM "Build the program fhhos4 and its tests. OFF: the library fhhos4_AMG alone, which only needs Eigen" ON)
+option(ENABLE_PROGRAM "Build the program fhhos4 and its tests. OFF: the library alone, which only needs Eigen" ON)
 option(ENABLE_GMSH "Build with the GMSH interface" ON)
 option(ENABLE_AGMG "Build with AGMG" OFF)
 option(ENABLE_CGAL "Build with CGAL" ON)
@@ -42,24 +42,25 @@ set(CMAKE_JOB_POOL_COMPILE compile_pool)
 # Pass -DCMAKE_VERBOSE_MAKEFILE=ON (or `cmake --build build -- VERBOSE=1`) to see full compiler commands
 
 #----------------------------------------------------------------------------------------------------------------------
-# Library fhhos4_AMG
+# Library fhhos4
 #----------------------------------------------------------------------------------------------------------------------
 # The AMG of fhhos4 for hybrid discretizations (U-AMG), for the codes that discretize the problem themselves
-# (library/README.md). Shared, and compiled with -fvisibility=hidden: only the public API (library/include/fhhos4.h) is
+# (README_library.md). Shared, and compiled with -fvisibility=hidden: only the public API (library/include/fhhos4.h) is
 # exported, fhhos4's internals and its copy of Eigen's functions stay private. Its own compile definitions and link
 # libraries: the calling code only needs Eigen.
-add_library(fhhos4_AMG SHARED library/Solver.cpp ${CMAKE_BINARY_DIR}/generated/Version.cpp)
-add_library(fhhos4::fhhos4 ALIAS fhhos4_AMG) # the name of the exported target (EXPORT_NAME)
+add_library(fhhos4_lib SHARED library/Solver.cpp ${CMAKE_BINARY_DIR}/generated/Version.cpp)
+add_library(fhhos4::fhhos4 ALIAS fhhos4_lib) # fhhos4_lib: the name of the target in this project (fhhos4 is the program); libfhhos4.so, fhhos4::fhhos4 outside
 # SOVERSION: binary compatibility within a minor version only, since adding a parameter (a public member) to
 # fhhos4::Solver changes its size.
-set_target_properties(fhhos4_AMG PROPERTIES
+set_target_properties(fhhos4_lib PROPERTIES
+	OUTPUT_NAME fhhos4
 	EXPORT_NAME fhhos4
 	CXX_VISIBILITY_PRESET hidden
 	VISIBILITY_INLINES_HIDDEN ON
 	LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib
 	VERSION ${PROJECT_VERSION}
 	SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
-target_include_directories(fhhos4_AMG
+target_include_directories(fhhos4_lib
 	PUBLIC $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/library/include> $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/generated/include>
 		$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 	PRIVATE ${CMAKE_SOURCE_DIR}/src)
@@ -84,10 +85,10 @@ add_custom_target(fhhos4_git_version
 	BYPRODUCTS ${CMAKE_BINARY_DIR}/generated/Version.cpp
 	COMMENT "Version: git describe"
 	VERBATIM)
-add_dependencies(fhhos4_AMG fhhos4_git_version)
+add_dependencies(fhhos4_lib fhhos4_git_version)
 
 if(SMALL_INDEX)
-	target_compile_definitions(fhhos4_AMG PRIVATE SMALL_INDEX)
+	target_compile_definitions(fhhos4_lib PRIVATE SMALL_INDEX)
 	message(STATUS "SMALL_INDEX: ON (int)")
 else()
 	message(STATUS "SMALL_INDEX: OFF (size_t)")
@@ -95,24 +96,24 @@ endif()
 
 # Include Eigen
 find_package(Eigen3 REQUIRED NO_MODULE)
-target_link_libraries(fhhos4_AMG PUBLIC Eigen3::Eigen)
+target_link_libraries(fhhos4_lib PUBLIC Eigen3::Eigen)
 
 # Include pthread
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
-target_link_libraries(fhhos4_AMG PRIVATE Threads::Threads)
+target_link_libraries(fhhos4_lib PRIVATE Threads::Threads)
 
 # Include OpenMP
 if(ENABLE_OPENMP)
 	find_package(OpenMP REQUIRED)
-	target_link_libraries(fhhos4_AMG PRIVATE OpenMP::OpenMP_CXX)
+	target_link_libraries(fhhos4_lib PRIVATE OpenMP::OpenMP_CXX)
 	message(STATUS "OpenMP enabled")
 else()
 	message(STATUS "OpenMP disabled: sequential execution.")
 endif()
 
 if(ENABLE_NATIVE_ARCH)
-	target_compile_options(fhhos4_AMG PRIVATE -march=native)
+	target_compile_options(fhhos4_lib PRIVATE -march=native)
 	message(STATUS "ENABLE_NATIVE_ARCH: ON (-march=native)")
 endif()
 
@@ -121,7 +122,7 @@ endif()
 # (-Dfhhos4_DIR=<this build directory>). find_package(fhhos4 1.2) accepts the versions 1.x with x >= 2: the source
 # compatibility of the API (the binary compatibility is the SOVERSION's).
 include(CMakePackageConfigHelpers)
-install(TARGETS fhhos4_AMG EXPORT fhhos4Targets LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT library)
+install(TARGETS fhhos4_lib EXPORT fhhos4Targets LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT library)
 install(FILES library/include/fhhos4 library/include/fhhos4.h library/include/fhhos4_error.h
 	${CMAKE_BINARY_DIR}/generated/include/fhhos4_version.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT library)
 install(EXPORT fhhos4Targets NAMESPACE fhhos4:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/fhhos4 COMPONENT library)
@@ -136,7 +137,7 @@ export(EXPORT fhhos4Targets NAMESPACE fhhos4:: FILE ${CMAKE_BINARY_DIR}/fhhos4Ta
 # Program fhhos4 and its tests
 #----------------------------------------------------------------------------------------------------------------------
 if(NOT ENABLE_PROGRAM)
-	message(STATUS "ENABLE_PROGRAM: OFF (the library fhhos4_AMG alone)")
+	message(STATUS "ENABLE_PROGRAM: OFF (the library alone)")
 	return()
 endif()
 
@@ -163,7 +164,7 @@ endif()
 # recompiled per translation unit).
 add_library(fhhos4_core STATIC ${OBJS} ${source_files})
 target_include_directories(fhhos4_core PUBLIC ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(fhhos4_core PUBLIC fhhos4_AMG) # -s libuamg, and fhhos4::Error
+target_link_libraries(fhhos4_core PUBLIC fhhos4_lib) # -s libuamg, and fhhos4::Error
 
 # Executable file
 add_executable(fhhos4 src/main.cpp)

@@ -232,7 +232,7 @@ void print_usage() {
 	cout << "              mg            - Custom multigrid for HHO" << endl;
 	cout << "              p_mg          - p-Multigrid to be used on top of mg" << endl;
 	cout << "              uamg          - Uncondensed AMG (for hybrid discretizations with static condensation)" << endl;
-	cout << "              libuamg       - uamg called through the library fhhos4_AMG (library/), as by an external code." << endl;
+	cout << "              libuamg       - uamg called through the library fhhos4 (library/), as by an external code." << endl;
 	cout << "                              Only the parameters of fhhos4::Solver apply (see library/include/fhhos4.h)." << endl;
 	cout << "                              The program gives it the uncondensed system: the library condenses it and computes" << endl;
 	cout << "                              the cell unknowns (see -libuamg-condensed)." << endl;

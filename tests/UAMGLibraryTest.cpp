@@ -1,4 +1,4 @@
-// Tests of the library fhhos4_AMG (library/), U-AMG for the codes that discretize the problem themselves.
+// Tests of the library fhhos4 (library/), U-AMG for the codes that discretize the problem themselves.
 // - UAMGLibraryProgram: the program runs U-AMG through the library (-s libuamg, fcglibuamg, gcrlibuamg), as an external
 //   code calls it, and must get the iteration counts and solutions of the U-AMG compiled in the program (uamg, fcguamg,
 //   gcruamg), including with L2-orthonormal bases, whose constant does not have coordinate 1. Through both interfaces of
