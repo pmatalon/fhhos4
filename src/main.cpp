@@ -453,11 +453,11 @@ void print_usage() {
 	cout << endl;
 	cout << "-libuamg-condensed" << endl;
 	cout << "      U-AMG through the library (-s libuamg, fcglibuamg, gcrlibuamg) from the condensed system: the program condenses" << endl;
-	cout << "      the system statically and gives the library the condensed matrix and the blocks (SetupSymmetric()," << endl;
-	cout << "      SetupNonsymmetric()), as the codes that condense already. By default, it gives the blocks of the uncondensed" << endl;
-	cout << "      system, and the library condenses it and computes the cell unknowns (SetupSymmetricFromBlocks()," << endl;
-	cout << "      SetupNonsymmetricFromBlocks(), Solve(b_T, b_F, x_T, x_F)); except for a full Neumann problem and the exports" << endl;
-	cout << "      of the linear system and of the algebraic error, which need the condensed system in the program." << endl;
+	cout << "      the system statically and gives the library the condensed matrix and the blocks" << endl;
+	cout << "      (SetupSymmetricCondensed(), SetupNonsymmetricCondensed()), as the codes that condense already. By default," << endl;
+	cout << "      it gives the blocks of the uncondensed system, and the library condenses it and computes the cell unknowns" << endl;
+	cout << "      (SetupSymmetric(), SetupNonsymmetric(), Solve(b_T, b_F, x_T, x_F)); except for a full Neumann problem and the" << endl;
+	cout << "      exports of the linear system and of the algebraic error, which need the condensed system in the program." << endl;
 	cout << endl;
 	cout << "-coarsening-factor NUM" << endl;
 	cout << "      Requested coarsening factor for the coarsening strategies compatible." << endl;

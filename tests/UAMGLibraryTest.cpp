@@ -132,7 +132,7 @@ INSTANTIATE_TEST_SUITE_P(UAMGLibraryProgram, UAMGLibraryProgramTest,
 // U-AMG for a non-symmetric matrix (-uamg-nonsym: A_FT = A_TF^T given, all the blocks in full) on the symmetric matrix:
 // it coarsens its symmetric part (itself) and computes the Galerkin products of the matrix, equal to the symmetric
 // ones up to rounding: the iteration count and solution of the symmetric U-AMG, with GCR. In the program (gcruamg) and
-// through the library (gcrlibuamg: SetupNonsymmetric()).
+// through the library (gcrlibuamg: SetupNonsymmetric(), and SetupNonsymmetricCondensed() with -libuamg-condensed).
 class UAMGNonsymmetricProgramTest : public ::testing::TestWithParam<LibraryCase>
 {
 };
@@ -297,7 +297,7 @@ TEST(UAMGLibrary, SolvesTheSystem)
 {
 	HybridSystem system(64);
 	fhhos4::Solver uamg = ToySolver();
-	uamg.SetupSymmetric(system.A, system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+	uamg.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
 	EXPECT_TRUE(uamg.IsSetUp());
 	EXPECT_GT(uamg.NumberOfLevels(), 2);
 
@@ -319,8 +319,8 @@ TEST(UAMGLibrary, CondensedMatrixComputedFromTheBlocks)
 {
 	HybridSystem system(64);
 	fhhos4::Solver withA = ToySolver(), withoutA = ToySolver();
-	withA.SetupSymmetric(system.A, system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
-	withoutA.SetupSymmetricFromBlocks(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+	withA.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+	withoutA.SetupSymmetric(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
 
 	Eigen::VectorXd x1 = Eigen::VectorXd::Zero(system.b.size()), x2 = x1;
 	fhhos4::Result r1 = withA.Solve(system.b, x1);
@@ -332,7 +332,7 @@ TEST(UAMGLibrary, CondensedMatrixComputedFromTheBlocks)
 	// Lower triangular parts only of the symmetric blocks
 	HybridSystem::Matrix A_TT = system.A_TT.triangularView<Eigen::Lower>(), A_FF = system.A_FF.triangularView<Eigen::Lower>();
 	fhhos4::Solver lower = ToySolver();
-	lower.SetupSymmetricFromBlocks(A_TT, system.A_TF, A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+	lower.SetupSymmetric(A_TT, system.A_TF, A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
 	Eigen::VectorXd x3 = Eigen::VectorXd::Zero(system.b.size());
 	EXPECT_EQ(lower.Solve(system.b, x3).Iterations, r1.Iterations);
 	EXPECT_LT((x3 - x1).norm() / x1.norm(), 1e-9);
@@ -372,9 +372,9 @@ TEST(UAMGLibrary, SolvesTheUncondensedSystem)
 
 		fhhos4::Solver uamg = ToySolver();
 		if (system.Symmetric)
-			uamg.SetupSymmetricFromBlocks(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+			uamg.SetupSymmetric(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
 		else
-			uamg.SetupNonsymmetricFromBlocks(system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+			uamg.SetupNonsymmetric(system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
 		Eigen::VectorXd x_T(nT), x_F = Eigen::VectorXd::Zero(nF);
 		fhhos4::Result result = uamg.Solve(b_T, b_F, x_T, x_F);
 		EXPECT_TRUE(result.Converged) << asymmetry;
@@ -408,15 +408,15 @@ TEST(UAMGLibrary, CondensedMatrix)
 		EXPECT_THROW(fromBlocks.CondensedMatrix(), fhhos4::Error); // before the setup
 		if (system.Symmetric)
 		{
-			inPlace.SetupSymmetric(A, A_TT, A_TF, system.CellInterpOfOne, system.FaceInterpOfOne);
-			converted.SetupSymmetric(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne);
-			fromBlocks.SetupSymmetricFromBlocks(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+			inPlace.SetupSymmetricCondensed(A, A_TT, A_TF, system.CellInterpOfOne, system.FaceInterpOfOne);
+			converted.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne);
+			fromBlocks.SetupSymmetric(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
 		}
 		else
 		{
-			inPlace.SetupNonsymmetric(A, A_TT, A_TF, A_FT, system.CellInterpOfOne, system.FaceInterpOfOne);
-			converted.SetupNonsymmetric(system.A, system.A_TT, system.A_TF, system.A_FT, system.CellInterpOfOne, system.FaceInterpOfOne);
-			fromBlocks.SetupNonsymmetricFromBlocks(system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+			inPlace.SetupNonsymmetricCondensed(A, A_TT, A_TF, A_FT, system.CellInterpOfOne, system.FaceInterpOfOne);
+			converted.SetupNonsymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FT, system.CellInterpOfOne, system.FaceInterpOfOne);
+			fromBlocks.SetupNonsymmetric(system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
 		}
 		EXPECT_EQ(&inPlace.CondensedMatrix(), &A) << asymmetry;
 		EXPECT_EQ((converted.CondensedMatrix() - A).norm(), 0) << asymmetry;
@@ -429,8 +429,8 @@ TEST(UAMGLibrary, WithoutTheFaceBlock)
 {
 	HybridSystem system(64);
 	fhhos4::Solver withA_FF = ToySolver(), withoutA_FF = ToySolver();
-	withA_FF.SetupSymmetric(system.A, system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
-	withoutA_FF.SetupSymmetric(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne);
+	withA_FF.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+	withoutA_FF.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne);
 
 	Eigen::VectorXd x1 = Eigen::VectorXd::Zero(system.b.size()), x2 = x1;
 	fhhos4::Result r1 = withA_FF.Solve(system.b, x1);
@@ -462,8 +462,8 @@ TEST(UAMGLibrary, InvariantToTheScalingOfTheBases)
 		solver->Tolerance = 1e-30; // never reached
 		solver->MaxIterations = 8;
 	}
-	uamgReference.SetupSymmetric(reference.A, reference.A_TT, reference.A_TF, reference.A_FF, reference.CellInterpOfOne, reference.FaceInterpOfOne);
-	uamgScaled.SetupSymmetric(scaled.A, scaled.A_TT, scaled.A_TF, scaled.A_FF, scaled.CellInterpOfOne, scaled.FaceInterpOfOne);
+	uamgReference.SetupSymmetricCondensed(reference.A, reference.A_TT, reference.A_TF, reference.A_FF, reference.CellInterpOfOne, reference.FaceInterpOfOne);
+	uamgScaled.SetupSymmetricCondensed(scaled.A, scaled.A_TT, scaled.A_TF, scaled.A_FF, scaled.CellInterpOfOne, scaled.FaceInterpOfOne);
 	EXPECT_EQ(uamgScaled.NumberOfLevels(), uamgReference.NumberOfLevels());
 
 	Eigen::VectorXd x = Eigen::VectorXd::Zero(reference.b.size()), y = x;
@@ -488,10 +488,10 @@ TEST(UAMGLibrary, RowMajorMatrices)
 		M->uncompress();
 
 	fhhos4::Solver colMajor = ToySolver(), inPlace = ToySolver(), fromBlocks = ToySolver(), uncompressed = ToySolver();
-	colMajor.SetupSymmetric(system.A, system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
-	inPlace.SetupSymmetric(A, A_TT, A_TF, A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
-	fromBlocks.SetupSymmetricFromBlocks(A_TT, A_TF, A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
-	uncompressed.SetupSymmetric(uncompressedA, uncompressedA_TT, uncompressedA_TF, system.CellInterpOfOne, system.FaceInterpOfOne);
+	colMajor.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+	inPlace.SetupSymmetricCondensed(A, A_TT, A_TF, A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+	fromBlocks.SetupSymmetric(A_TT, A_TF, A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+	uncompressed.SetupSymmetricCondensed(uncompressedA, uncompressedA_TT, uncompressedA_TF, system.CellInterpOfOne, system.FaceInterpOfOne);
 
 	Eigen::VectorXd x = Eigen::VectorXd::Zero(system.b.size());
 	fhhos4::Result reference = colMajor.Solve(system.b, x);
@@ -504,11 +504,11 @@ TEST(UAMGLibrary, RowMajorMatrices)
 	}
 }
 
-// Whether SetupSymmetric() accepts an argument A of type AType: const Matrix& (a variable), Matrix (a temporary)
+// Whether SetupSymmetricCondensed() accepts an argument A of type AType: const Matrix& (a variable), Matrix (a temporary)
 template <typename AType, typename = void>
 struct SetupAccepts : std::false_type {};
 template <typename AType>
-struct SetupAccepts<AType, std::void_t<decltype(std::declval<fhhos4::Solver&>().SetupSymmetric(std::declval<AType>(), std::declval<const HybridSystem::Matrix&>(), std::declval<const HybridSystem::Matrix&>(), Eigen::VectorXd(), Eigen::VectorXd()))>> : std::true_type {};
+struct SetupAccepts<AType, std::void_t<decltype(std::declval<fhhos4::Solver&>().SetupSymmetricCondensed(std::declval<AType>(), std::declval<const HybridSystem::Matrix&>(), std::declval<const HybridSystem::Matrix&>(), Eigen::VectorXd(), Eigen::VectorXd()))>> : std::true_type {};
 static_assert(SetupAccepts<const HybridSystem::Matrix&>::value);
 static_assert(!SetupAccepts<HybridSystem::Matrix>::value, "the solver keeps a reference to A: a temporary A must not compile");
 
@@ -519,7 +519,7 @@ TEST(UAMGLibrary, BiCGSTAB)
 	fhhos4::Solver uamg = ToySolver();
 	uamg.Krylov = "bicgstab";
 	uamg.Cycle = 'V';
-	uamg.SetupSymmetric(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne);
+	uamg.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne);
 	Eigen::VectorXd x = Eigen::VectorXd::Zero(system.b.size());
 	fhhos4::Result result = uamg.Solve(system.b, x);
 	EXPECT_TRUE(result.Converged);
@@ -533,7 +533,7 @@ TEST(UAMGLibrary, GCR)
 	HybridSystem system(64);
 	fhhos4::Solver uamg = ToySolver();
 	uamg.Krylov = "gcr";
-	uamg.SetupSymmetric(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne);
+	uamg.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne);
 	Eigen::VectorXd x = Eigen::VectorXd::Zero(system.b.size());
 	fhhos4::Result result = uamg.Solve(system.b, x);
 	EXPECT_TRUE(result.Converged);
@@ -553,7 +553,7 @@ TEST(UAMGLibrary, DefaultSmoothers)
 		uamg.Threads = threads;
 		uamg.Verbosity = 2; // prints the smoothers
 		::testing::internal::CaptureStdout();
-		uamg.SetupSymmetric(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne);
+		uamg.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne);
 		Eigen::VectorXd x = Eigen::VectorXd::Zero(system.b.size());
 		fhhos4::Result result = uamg.Solve(system.b, x);
 		std::string output = ::testing::internal::GetCapturedStdout();
@@ -572,13 +572,13 @@ TEST(UAMGLibrary, MultigridAlone)
 	HybridSystem system(64);
 	fhhos4::Solver uamg = ToySolver();
 	uamg.Krylov = "none";
-	uamg.SetupSymmetric(system.A, system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+	uamg.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
 	Eigen::VectorXd x = uamg.Solve(system.b);
 	EXPECT_LT(RelativeError(system, x), 1e-8);
 }
 
-// Non-symmetric system (SetupNonsymmetric): by default GCR, the K-cycle with GCR, LU on the coarsest level. Also
-// BiCGSTAB with a V-cycle, and the blocks only (the library computes A).
+// Non-symmetric system (SetupNonsymmetricCondensed()): by default GCR, the K-cycle with GCR, LU on the coarsest level.
+// Also BiCGSTAB with a V-cycle, and the blocks only (SetupNonsymmetric(): the library computes A).
 TEST(UAMGLibrary, NonsymmetricSystem)
 {
 	for (double asymmetry : { 0.3, 0.9 })
@@ -589,9 +589,9 @@ TEST(UAMGLibrary, NonsymmetricSystem)
 		fhhos4::Solver gcr = ToySolver(), bicgstab = ToySolver(), fromBlocks = ToySolver();
 		bicgstab.Krylov = "bicgstab";
 		bicgstab.Cycle = 'V';
-		gcr.SetupNonsymmetric(system.A, system.A_TT, system.A_TF, system.A_FT, system.CellInterpOfOne, system.FaceInterpOfOne);
-		bicgstab.SetupNonsymmetric(system.A, system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
-		fromBlocks.SetupNonsymmetricFromBlocks(system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+		gcr.SetupNonsymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FT, system.CellInterpOfOne, system.FaceInterpOfOne);
+		bicgstab.SetupNonsymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+		fromBlocks.SetupNonsymmetric(system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
 		EXPECT_GT(gcr.NumberOfLevels(), 2);
 
 		Eigen::VectorXd x = Eigen::VectorXd::Zero(system.b.size()), y = x, z = x;
@@ -610,16 +610,16 @@ TEST(UAMGLibrary, NonsymmetricSystem)
 	}
 }
 
-// SetupNonsymmetric() on a symmetric system (A_FT = A_TF^T): the coarsening of its symmetric part, the same as
-// SetupSymmetric()'s, and Galerkin coarse operators equal to the symmetric ones up to rounding: the same iterations
-// with GCR
+// SetupNonsymmetricCondensed() on a symmetric system (A_FT = A_TF^T): the coarsening of its symmetric part, the same
+// as SetupSymmetricCondensed()'s, and Galerkin coarse operators equal to the symmetric ones up to rounding: the same
+// iterations with GCR
 TEST(UAMGLibrary, NonsymmetricSetupOfASymmetricSystem)
 {
 	HybridSystem system(64);
 	fhhos4::Solver symmetric = ToySolver(), nonsymmetric = ToySolver();
 	symmetric.Krylov = "gcr";
-	symmetric.SetupSymmetric(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne);
-	nonsymmetric.SetupNonsymmetric(system.A, system.A_TT, system.A_TF, system.A_FT, system.CellInterpOfOne, system.FaceInterpOfOne);
+	symmetric.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne);
+	nonsymmetric.SetupNonsymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FT, system.CellInterpOfOne, system.FaceInterpOfOne);
 	EXPECT_EQ(nonsymmetric.NumberOfLevels(), symmetric.NumberOfLevels());
 
 	Eigen::VectorXd x = Eigen::VectorXd::Zero(system.b.size()), y = x;
@@ -650,9 +650,9 @@ TEST(UAMGLibrary, Errors)
 	Eigen::VectorXd b_T = Eigen::VectorXd::Ones(system.A_TT.rows()), x_T(system.A_TT.rows()), b_F = Eigen::VectorXd::Zero(system.b.size());
 	Eigen::VectorXd tooShortT = b_T.head(3), tooShortF = b_F.head(3);
 	fhhos4::Solver condensed = ToySolver(), uncondensed = ToySolver();
-	condensed.SetupSymmetric(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne);
+	condensed.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne);
 	EXPECT_THROW(condensed.Solve(b_T, b_F, x_T, x), fhhos4::Error);
-	uncondensed.SetupSymmetricFromBlocks(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+	uncondensed.SetupSymmetric(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
 	EXPECT_THROW(uncondensed.Solve(tooShortT, b_F, x_T, x), fhhos4::Error);
 	EXPECT_THROW(uncondensed.Solve(b_T, b_F, tooShortT, x), fhhos4::Error);
 	EXPECT_THROW(uncondensed.Solve(b_T, tooShortF, x_T, x), fhhos4::Error);
@@ -660,60 +660,60 @@ TEST(UAMGLibrary, Errors)
 
 	// Interpolations of 1 of the wrong size, or with a zero coefficient
 	Eigen::VectorXd tooShort = system.FaceInterpOfOne.head(10);
-	EXPECT_THROW(uamg.SetupSymmetric(system.A, system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, tooShort), fhhos4::Error);
+	EXPECT_THROW(uamg.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, tooShort), fhhos4::Error);
 	Eigen::VectorXd zero = system.CellInterpOfOne;
 	zero[3] = 0;
-	EXPECT_THROW(uamg.SetupSymmetric(system.A, system.A_TT, system.A_TF, system.A_FF, zero, system.FaceInterpOfOne), fhhos4::Error);
+	EXPECT_THROW(uamg.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FF, zero, system.FaceInterpOfOne), fhhos4::Error);
 	EXPECT_FALSE(uamg.IsSetUp());
 
 	// Blocks of inconsistent sizes
 	HybridSystem other(8);
-	EXPECT_THROW(uamg.SetupSymmetric(system.A, other.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
+	EXPECT_THROW(uamg.SetupSymmetricCondensed(system.A, other.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 
 	// Wrong degrees: 3 DoFs per cell, or 2 per face, in 2D
 	fhhos4::Solver cellDegree1 = ToySolver();
 	cellDegree1.CellDegree = 1;
-	EXPECT_THROW(cellDegree1.SetupSymmetric(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
+	EXPECT_THROW(cellDegree1.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 	fhhos4::Solver faceDegree1 = ToySolver();
 	faceDegree1.FaceDegree = 1;
-	EXPECT_THROW(faceDegree1.SetupSymmetric(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
+	EXPECT_THROW(faceDegree1.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 
 	// Parameters not set, or invalid
 	fhhos4::Solver noDimension = ToySolver();
 	noDimension.Dimension = -1;
-	EXPECT_THROW(noDimension.SetupSymmetric(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
+	EXPECT_THROW(noDimension.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 	fhhos4::Solver noFaceDegree = ToySolver();
 	noFaceDegree.FaceDegree = -1;
-	EXPECT_THROW(noFaceDegree.SetupSymmetric(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
+	EXPECT_THROW(noFaceDegree.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 	fhhos4::Solver noCellDegree = ToySolver();
 	noCellDegree.CellDegree = -1;
-	EXPECT_THROW(noCellDegree.SetupSymmetric(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
+	EXPECT_THROW(noCellDegree.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 	fhhos4::Solver wrongCycle = ToySolver();
 	wrongCycle.Cycle = 'X';
-	EXPECT_THROW(wrongCycle.SetupSymmetric(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
+	EXPECT_THROW(wrongCycle.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 	fhhos4::Solver wrongKrylov = ToySolver();
 	wrongKrylov.Krylov = "gmres";
-	EXPECT_THROW(wrongKrylov.SetupSymmetric(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
+	EXPECT_THROW(wrongKrylov.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 	fhhos4::Solver bicgstabKCycle = ToySolver(); // BiCGSTAB is not flexible: the K-cycle is not linear
 	bicgstabKCycle.Krylov = "bicgstab";
-	EXPECT_THROW(bicgstabKCycle.SetupSymmetric(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
+	EXPECT_THROW(bicgstabKCycle.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 
 	// Non-symmetric matrix: FCG or Cholesky refused, A_FT of the wrong size
 	fhhos4::Solver fcg = ToySolver();
 	fcg.Krylov = "fcg";
-	EXPECT_THROW(fcg.SetupNonsymmetric(system.A, system.A_TT, system.A_TF, system.A_FT, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
+	EXPECT_THROW(fcg.SetupNonsymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FT, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 	fhhos4::Solver cholesky = ToySolver();
 	cholesky.CoarseSolver = "ch";
-	EXPECT_THROW(cholesky.SetupNonsymmetric(system.A, system.A_TT, system.A_TF, system.A_FT, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
-	EXPECT_THROW(uamg.SetupNonsymmetric(system.A, system.A_TT, system.A_TF, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
+	EXPECT_THROW(cholesky.SetupNonsymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FT, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
+	EXPECT_THROW(uamg.SetupNonsymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 
 	// A_TT not block diagonal
 	HybridSystem::Matrix A_TT = system.A_TT;
 	A_TT.coeffRef(1, 0) = -1;
-	EXPECT_THROW(uamg.SetupSymmetric(system.A, A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
+	EXPECT_THROW(uamg.SetupSymmetricCondensed(system.A, A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 
 	// Vector of the wrong size
-	uamg.SetupSymmetric(system.A, system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+	uamg.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
 	Eigen::VectorXd wrongSize = Eigen::VectorXd::Zero(3);
 	EXPECT_THROW(uamg.Solve(system.b, wrongSize), fhhos4::Error);
 }
@@ -729,7 +729,7 @@ TEST(UAMGLibrary, LeavesTheCallerUnchanged)
 #endif
 
 	::testing::internal::CaptureStdout();
-	uamg.SetupSymmetric(system.A, system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+	uamg.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
 	Eigen::VectorXd x = uamg.Solve(system.b);
 	std::string output = ::testing::internal::GetCapturedStdout();
 	EXPECT_EQ(output, "");
@@ -744,7 +744,7 @@ TEST(UAMGLibrary, LeavesTheCallerUnchanged)
 	std::streamsize precision = std::cout.precision(7);
 	std::ios_base::fmtflags flags = std::cout.flags();
 	::testing::internal::CaptureStdout();
-	verbose.SetupSymmetric(system.A, system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+	verbose.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
 	verbose.Solve(system.b);
 	output = ::testing::internal::GetCapturedStdout();
 	EXPECT_NE(output.find("Setup"), std::string::npos);

@@ -43,17 +43,17 @@ public:
 		IterativeSolver::Setup(A);
 		// Without A_F_F, which the library computes from A: the setup of the codes that have A (e.g. HArDCore3D)
 		if (A_F_T.rows() > 0)
-			_solver.SetupNonsymmetric(A, A_T_T, A_T_F, A_F_T, cellInterpOfOne, faceInterpOfOne);
+			_solver.SetupNonsymmetricCondensed(A, A_T_T, A_T_F, A_F_T, cellInterpOfOne, faceInterpOfOne);
 		else
-			_solver.SetupSymmetric(A, A_T_T, A_T_F, cellInterpOfOne, faceInterpOfOne);
+			_solver.SetupSymmetricCondensed(A, A_T_T, A_T_F, cellInterpOfOne, faceInterpOfOne);
 	}
 
 	void SetupFromBlocks(const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_T, const SparseMatrix& A_F_F, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
 	{
 		if (A_F_T.rows() > 0)
-			_solver.SetupNonsymmetricFromBlocks(A_T_T, A_T_F, A_F_T, A_F_F, cellInterpOfOne, faceInterpOfOne);
+			_solver.SetupNonsymmetric(A_T_T, A_T_F, A_F_T, A_F_F, cellInterpOfOne, faceInterpOfOne);
 		else
-			_solver.SetupSymmetricFromBlocks(A_T_T, A_T_F, A_F_F, cellInterpOfOne, faceInterpOfOne);
+			_solver.SetupSymmetric(A_T_T, A_T_F, A_F_F, cellInterpOfOne, faceInterpOfOne);
 		IterativeSolver::Setup(_solver.CondensedMatrix());
 	}
 

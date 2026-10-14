@@ -116,10 +116,10 @@ Example invocations for specific experiments/figures live in `reproducibility/*.
 file that includes `fhhos4.h`, or `<fhhos4.h>`; namespace `fhhos4`, Eigen types, pimpl): `Solver` (parameters as
 public members; `Dimension`, `FaceDegree` and `CellDegree` must be set), `Result`, and `Error` (in `fhhos4_error.h`,
 which `Utils.h` includes alone). Two interfaces: the uncondensed system, the interface of choice
-(`SetupSymmetricFromBlocks()` from `A_TT`, `A_TF`, `A_FF` and the interpolations of 1, or `SetupNonsymmetricFromBlocks()`
-with `A_FT` too, then `Solve(b_T, b_F, x_T, x_F)`: the library condenses the system by cells, `StaticCondensation.h`,
-and computes the cell unknowns; `CondensedMatrix()`), and the condensed system, only to integrate the library with the
-least effort into codes that condense already (HArDCore3D, Disk++: `SetupSymmetric()`/`SetupNonsymmetric()` from `A`
+(`SetupSymmetric()` from `A_TT`, `A_TF`, `A_FF` and the interpolations of 1, or `SetupNonsymmetric()` with `A_FT` too,
+then `Solve(b_T, b_F, x_T, x_F)`: the library condenses the system by cells, `StaticCondensation.h`, and computes the
+cell unknowns; `CondensedMatrix()`), and the condensed system, only to integrate the library with the least effort into
+codes that condense already (HArDCore3D, Disk++: `SetupSymmetricCondensed()`/`SetupNonsymmetricCondensed()` from `A`
 and the blocks, `A_FF` optional, then `Solve(b, x)`). `fhhos4::SparseMatrix`: fhhos4's matrix type, its index type
 generated into `fhhos4_version.h` (`SMALL_INDEX`). Non-symmetric matrix (`UncondensedLevel::Symmetric` false, `A_F_T` given; program option
 `-uamg-nonsym` to test it on the symmetric matrices): the same algorithm on the matrix itself, without the optimizations of the symmetric case (lower triangular

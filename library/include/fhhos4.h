@@ -19,11 +19,11 @@
 //     [ A_FT  A_FF ] [x_F] = [b_F],
 // by static condensation: the AMG solves the condensed system A x_F = b, A = A_FF - A_FT A_TT^{-1} A_TF and
 // b = b_F - A_FT A_TT^{-1} b_T. Two interfaces:
-// - the uncondensed system, the interface of choice: Setup...FromBlocks() with the blocks, then
-//   Solve(b_T, b_F, x_T, x_F). The library condenses the system and computes the cell unknowns: no static
-//   condensation in the calling code;
+// - the uncondensed system, the interface of choice: SetupSymmetric() or SetupNonsymmetric() with the blocks, then
+//   Solve(b_T, b_F, x_T, x_F). The library condenses the system and computes the cell unknowns: no static condensation
+//   in the calling code;
 // - the condensed system, to integrate the library with the least effort into a code that condenses statically
-//   already: Setup...() with A and the blocks, then Solve(b, x).
+//   already: Setup...Condensed() with A and the blocks, then Solve(b, x).
 // See README_library.md.
 //
 // The Krylov method preconditioned by the AMG is part of the library (Solver::Krylov), which does not give the multigrid
@@ -64,7 +64,7 @@ namespace fhhos4
 		//--------------------- Solver ---------------------//
 
 		// The Krylov method preconditioned by one cycle of the AMG:
-		// - "" (default): "fcg" for a symmetric matrix (SetupSymmetric()), "gcr" otherwise (SetupNonsymmetric());
+		// - "" (default): "fcg" for a symmetric matrix (SetupSymmetric...()), "gcr" otherwise (SetupNonsymmetric...());
 		// - "fcg": flexible conjugate gradient (fhhos4 -s fcguamg), for a symmetric positive definite matrix;
 		// - "gcr": GCR(10), generalized conjugate residual restarted every 10 iterations, Notay's economical version
 		//   (fhhos4 -s gcruamg). Minimizes the residual norm: for any matrix;
@@ -86,7 +86,7 @@ namespace fhhos4
 		// the results then depend on the number of threads, not on the run); on 1 thread, "bgs", the block Gauss-Seidel
 		// (sequential: "hbgs" on 1 thread), one block per face.
 		// PostSmoother empty (default): the backward version of PreSmoother ("rbgs" after "bgs", "hrbgs" after "hbgs").
-		// Non-symmetric matrix (SetupNonsymmetric()): on a level with one-sided couplings (convection), the Gauss-Seidel
+		// Non-symmetric matrix (SetupNonsymmetric...()): on a level with one-sided couplings (convection), the Gauss-Seidel
 		// smoothers keep their type, block size and number of sweeps, but not their direction: all their sweeps
 		// (backward and symmetric ones included) follow the downwind order of the level. The other smoothers (Jacobi,
 		// SOR with a relaxation parameter) ignore it.
@@ -131,11 +131,11 @@ namespace fhhos4
 		// same type), compressed or not. Those of type SparseMatrix, compressed, are read in place; the others are
 		// converted (copied).
 		template <typename SparseMatrixType>
-		void SetupSymmetricFromBlocks(const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FF,
-		                              const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne);
+		void SetupSymmetric(const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FF,
+		                    const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne);
 
 		// Setup for a non-symmetric system (e.g. convection-diffusion), whose symmetric part is positive definite: as
-		// SetupSymmetricFromBlocks(), with the block A_FT (faces x cells) and all the blocks read in full: the same
+		// SetupSymmetric(), with the block A_FT (faces x cells) and all the blocks read in full: the same
 		// algorithm runs on the matrix itself. The couplings of the aggregation are computed from the averaged traces of
 		// the blocks of A_TF and A_FT; the coarse operators are the Galerkin products P^T A P (as AGMG: Y. Notay, "An
 		// aggregation-based algebraic multigrid method", ETNA 37, 2010); the Gauss-Seidel smoothers follow the downwind
@@ -143,10 +143,10 @@ namespace fhhos4
 		// be "fcg", nor CoarseSolver "ch".
 		// See README_library.md.
 		template <typename SparseMatrixType>
-		void SetupNonsymmetricFromBlocks(const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FT, const SparseMatrixType& A_FF,
-		                                 const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne);
+		void SetupNonsymmetric(const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FT, const SparseMatrixType& A_FF,
+		                       const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne);
 
-		// Solves the system, after SetupSymmetricFromBlocks() or SetupNonsymmetricFromBlocks(): condenses the right-hand
+		// Solves the system, after SetupSymmetric() or SetupNonsymmetric(): condenses the right-hand
 		// side, b = b_F - A_FT A_TT^{-1} b_T, solves A x_F = b, then computes x_T = A_TT^{-1} (b_T - A_TF x_F).
 		// x_F: the initial guess on input (e.g. zero), the solution on output; x_T: output. The result is that of
 		// A x_F = b. Does not throw if the solver has not converged after MaxIterations iterations: see the result.
@@ -156,43 +156,43 @@ namespace fhhos4
 		//---- Condensed system: to integrate the library into a code that condenses statically ----//
 
 		// Setup for a symmetric positive definite matrix, from the condensed matrix and the blocks: as
-		// SetupSymmetricFromBlocks(), with A (faces x faces), the condensed matrix A_FF - A_FT A_TT^{-1} A_TF, both
+		// SetupSymmetric(), with A (faces x faces), the condensed matrix A_FF - A_FT A_TT^{-1} A_TF, both
 		// triangles, and A_FF optional (the algorithm only uses A_TT and A_TF, whose rows each belong to one cell).
 		// The solver keeps a reference to A: A must stay alive and unchanged until the next setup or the destruction of
 		// the solver (not a temporary). The blocks are only read by the setup: they may be freed after it.
 		template <typename SparseMatrixType>
-		void SetupSymmetric(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FF,
-		                    const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne);
+		void SetupSymmetricCondensed(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FF,
+		                             const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne);
 
 		template <typename SparseMatrixType>
-		void SetupSymmetric(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF,
-		                    const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne);
-
-		// A temporary A would be destroyed before the solves
-		template <typename SparseMatrixType>
-		void SetupSymmetric(const SparseMatrixType&& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FF,
-		                    const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne) = delete;
-		template <typename SparseMatrixType>
-		void SetupSymmetric(const SparseMatrixType&& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF,
-		                    const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne) = delete;
-
-		// Setup for a non-symmetric matrix: as SetupNonsymmetricFromBlocks(), with the condensed matrix A (see
-		// SetupSymmetric()) and A_FF optional
-		template <typename SparseMatrixType>
-		void SetupNonsymmetric(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FT, const SparseMatrixType& A_FF,
-		                       const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne);
-
-		template <typename SparseMatrixType>
-		void SetupNonsymmetric(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FT,
-		                       const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne);
+		void SetupSymmetricCondensed(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF,
+		                             const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne);
 
 		// A temporary A would be destroyed before the solves
 		template <typename SparseMatrixType>
-		void SetupNonsymmetric(const SparseMatrixType&& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FT, const SparseMatrixType& A_FF,
-		                       const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne) = delete;
+		void SetupSymmetricCondensed(const SparseMatrixType&& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FF,
+		                             const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne) = delete;
 		template <typename SparseMatrixType>
-		void SetupNonsymmetric(const SparseMatrixType&& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FT,
-		                       const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne) = delete;
+		void SetupSymmetricCondensed(const SparseMatrixType&& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF,
+		                             const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne) = delete;
+
+		// Setup for a non-symmetric matrix: as SetupNonsymmetric(), with the condensed matrix A (see
+		// SetupSymmetricCondensed()) and A_FF optional
+		template <typename SparseMatrixType>
+		void SetupNonsymmetricCondensed(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FT, const SparseMatrixType& A_FF,
+		                                const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne);
+
+		template <typename SparseMatrixType>
+		void SetupNonsymmetricCondensed(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FT,
+		                                const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne);
+
+		// A temporary A would be destroyed before the solves
+		template <typename SparseMatrixType>
+		void SetupNonsymmetricCondensed(const SparseMatrixType&& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FT, const SparseMatrixType& A_FF,
+		                                const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne) = delete;
+		template <typename SparseMatrixType>
+		void SetupNonsymmetricCondensed(const SparseMatrixType&& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FT,
+		                                const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne) = delete;
 
 		// Solves the condensed system A x = b, after any setup. x: the initial guess on input (e.g. zero), the solution on
 		// output. Does not throw if the solver has not converged after MaxIterations iterations: see the result.
@@ -208,9 +208,9 @@ namespace fhhos4
 
 		//------------------------------------------------------------------//
 
-		// The condensed matrix A of the last setup, both triangles: computed by SetupSymmetricFromBlocks() and
-		// SetupNonsymmetricFromBlocks(), or given to SetupSymmetric() and SetupNonsymmetric() (converted to SparseMatrix if
-		// it has another type). Valid until the next setup or the destruction of the solver.
+		// The condensed matrix A of the last setup, both triangles: computed by SetupSymmetric() and SetupNonsymmetric(),
+		// or given to SetupSymmetricCondensed() and SetupNonsymmetricCondensed() (converted to SparseMatrix if it has
+		// another type). Valid until the next setup or the destruction of the solver.
 		const SparseMatrix& CondensedMatrix() const;
 
 		bool IsSetUp() const;

@@ -27,8 +27,8 @@ AMG, it builds its coarse levels from the blocks of the uncondensed system:
 
 | Interface | Setup | Solve | For |
 |---|---|---|---|
-| **Uncondensed system** | `SetupSymmetricFromBlocks()`, `SetupNonsymmetricFromBlocks()` | `Solve(b_T, b_F, x_T, x_F)` | New codes: assemble the hybrid system, nothing else. The library condenses it (in parallel) and computes the cell unknowns |
-| **Condensed system** | `SetupSymmetric()`, `SetupNonsymmetric()` | `Solve(b, x)` | Codes that condense statically already: least integration effort |
+| **Uncondensed system** | `SetupSymmetric()`, `SetupNonsymmetric()` | `Solve(b_T, b_F, x_T, x_F)` | New codes: assemble the hybrid system, nothing else. The library condenses it (in parallel) and computes the cell unknowns |
+| **Condensed system** | `SetupSymmetricCondensed()`, `SetupNonsymmetricCondensed()` | `Solve(b, x)` | Codes that condense statically already: least integration effort |
 
 Symmetric positive definite systems, and non-symmetric ones with a positive definite symmetric part
 (convection-diffusion). Krylov method included (FCG, GCR, BiCGSTAB). Parallel (OpenMP).
@@ -76,7 +76,7 @@ fhhos4::Solver solver;
 solver.Dimension = 3;  // to set
 solver.FaceDegree = k; // to set
 solver.CellDegree = k; // to set
-solver.SetupSymmetricFromBlocks(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne);
+solver.SetupSymmetric(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne);
 Eigen::VectorXd x_T(b_T.size()), x_F = Eigen::VectorXd::Zero(b_F.size());
 fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F); // flexible conjugate gradient preconditioned by the AMG
 ```
@@ -94,7 +94,7 @@ matrix with the blocks, and keep the code's own condensation of the right-hand s
 unknowns:
 
 ```cpp
-solver.SetupSymmetric(A, A_TT, A_TF, cellInterpOfOne, faceInterpOfOne);
+solver.SetupSymmetricCondensed(A, A_TT, A_TF, cellInterpOfOne, faceInterpOfOne);
 Eigen::VectorXd x = Eigen::VectorXd::Zero(b.size());
 fhhos4::Result result = solver.Solve(b, x); // the condensed system
 ```
@@ -106,9 +106,10 @@ uncondensed system.
 ### Non-symmetric matrices
 
 For a non-symmetric matrix (e.g. convection-diffusion), give also the block `A_FT` (faces x cells):
-`SetupNonsymmetricFromBlocks(A_TT, A_TF, A_FT, A_FF, ...)` then `Solve(b_T, b_F, x_T, x_F)`, or
-`SetupNonsymmetric(A, A_TT, A_TF, A_FT[, A_FF], ...)` then `Solve(b, x)`. The same algorithm runs on the matrix itself,
-with GCR instead of FCG and Gauss-Seidel smoothers that follow the direction of the flow (downwind order).
+`SetupNonsymmetric(A_TT, A_TF, A_FT, A_FF, ...)` then `Solve(b_T, b_F, x_T, x_F)`, or
+`SetupNonsymmetricCondensed(A, A_TT, A_TF, A_FT[, A_FF], ...)` then `Solve(b, x)`. The same algorithm runs on the
+matrix itself, with GCR instead of FCG and Gauss-Seidel smoothers that follow the direction of the flow (downwind
+order).
 
 ### Inputs
 

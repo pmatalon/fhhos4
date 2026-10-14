@@ -410,10 +410,10 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   matrix-vector product per 20 iterations and at convergence. `ctest` 132/132.
 - **GCR and U-AMG for non-symmetric matrices** (2026-10-10, measurement only). GCR(10) (`-s gcr*`, library
   `Krylov = "gcr"`; its K-cycle iterates with GCR) on the symmetric matrices: 0-3 more iterations than FCG (Cube-tet
-  n=8 k=1: 32 -> 35; square tri n=64 k=0: 20 -> 22). `SetupNonsymmetric()` (as AGMG: prolongations from the symmetric
-  part, Galerkin `P^T A P`, LU on the coarsest level) on HArDCore3D's convection-diffusion (`hho-diff-advec-reac
-  --solver_type fhhos4`, uncommitted in the fork), 1 thread, tolerance 1e-12, L2 errors equal to BiCGSTAB's
-  everywhere (logs `HArDCore3D-release/build/runs_advec/advec_{16,32}.txt`; "solve" = HHO3D's solving time, with the
+  n=8 k=1: 32 -> 35; square tri n=64 k=0: 20 -> 22). `SetupNonsymmetricCondensed()` (as AGMG: prolongations from the
+  symmetric part, Galerkin `P^T A P`, LU on the coarsest level) on HArDCore3D's convection-diffusion
+  (`hho-diff-advec-reac --solver_type fhhos4`, uncommitted in the fork), 1 thread, tolerance 1e-12, L2 errors equal to
+  BiCGSTAB's everywhere (logs `HArDCore3D-release/build/runs_advec/advec_{16,32}.txt`; "solve" = HHO3D's solving time, with the
   block assembly and the setup):
 
   | Case (`-c`) | k | 16^3: BiCGSTAB / U-AMG its | 32^3: BiCGSTAB / U-AMG its | 32^3 solve: BiCGSTAB / U-AMG |
@@ -495,7 +495,7 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   case the local products gain nothing in the passes (its coarse cells have slightly more faces: 4.43 vs 4.20 per cell
   on the first coarse level), and the local path also assembles the operator of each level from the local matrices.
 - **Downwind order across the Péclet numbers** (2026-10-11, measurement only). The order is computed for every
-  non-symmetric matrix (never with `SetupSymmetric()`), on each level but the coarsest, and kept where some couplings
+  non-symmetric matrix (never with `SetupSymmetric...()`), on each level but the coarsest, and kept where some couplings
   are one-sided: nothing to set by the user. Diffusion-dominated: it finds nothing (natural order), at the cost of the
   couplings' pass, 24-25 ms on 1 thread / 12-13 ms on 8 threads on the fine level (32^3, k=1). Sweep without a new test
   case: HArDCore3D's blocks `1 1 0 0` (diffusion Id) + gamma (`1 1 5 0` - `1 1 0 0`), i.e. the convection
@@ -823,7 +823,7 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   their assembly loop, and must still factorize A_TT and compute A_TT^{-1} A_TF per cell (the right-hand side, the
   recovery of the cell unknowns): skipping the Schur complement only skips one small dense product per cell, and the
   assembled A_FF has the pattern of A (32^3 k=1: 9,158,400 non-zeros both). The library then computes A with global
-  sparse products (`CondensedMatrix()`): `SetupNonsymmetricFromBlocks()` against `SetupNonsymmetric()`, HArDCore3D's
+  sparse products (`CondensedMatrix()`): `SetupNonsymmetric()` against `SetupNonsymmetricCondensed()`, HArDCore3D's
   32^3 k=1 diffusion-dominated system (`build/bench_nonsym/diff_n32_k1`, column-major inputs as the clients give them,
   `build/bench_schur/fromblocks.cpp`, 3 interleaved repetitions, on battery): setup 1 thread 0.46-0.57 -> 1.18-1.22 s,
   8 threads 0.17-0.28 -> 0.60-0.69 s; the same iterations (23 / 24), solve unchanged. A cell-wise computation in the

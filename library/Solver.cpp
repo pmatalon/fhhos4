@@ -356,8 +356,8 @@ namespace fhhos4
 	Solver& Solver::operator=(Solver&&) noexcept = default;
 
 	template <typename SparseMatrixType>
-	void Solver::SetupSymmetric(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FF,
-	                            const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
+	void Solver::SetupSymmetricCondensed(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FF,
+	                                     const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
 	{
 		CallScope scope(*this);
 		_impl->CheckParameters(*this, true);
@@ -367,8 +367,8 @@ namespace fhhos4
 	}
 
 	template <typename SparseMatrixType>
-	void Solver::SetupSymmetric(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF,
-	                            const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
+	void Solver::SetupSymmetricCondensed(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF,
+	                                     const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
 	{
 		CallScope scope(*this);
 		_impl->CheckParameters(*this, true);
@@ -378,8 +378,8 @@ namespace fhhos4
 	}
 
 	template <typename SparseMatrixType>
-	void Solver::SetupSymmetricFromBlocks(const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FF,
-	                                      const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
+	void Solver::SetupSymmetric(const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FF,
+	                            const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
 	{
 		CallScope scope(*this);
 		_impl->CheckParameters(*this, true);
@@ -389,8 +389,8 @@ namespace fhhos4
 	}
 
 	template <typename SparseMatrixType>
-	void Solver::SetupNonsymmetric(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FT, const SparseMatrixType& A_FF,
-	                               const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
+	void Solver::SetupNonsymmetricCondensed(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FT, const SparseMatrixType& A_FF,
+	                                        const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
 	{
 		CallScope scope(*this);
 		_impl->CheckParameters(*this, false);
@@ -400,8 +400,8 @@ namespace fhhos4
 	}
 
 	template <typename SparseMatrixType>
-	void Solver::SetupNonsymmetric(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FT,
-	                               const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
+	void Solver::SetupNonsymmetricCondensed(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FT,
+	                                        const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
 	{
 		CallScope scope(*this);
 		_impl->CheckParameters(*this, false);
@@ -411,8 +411,8 @@ namespace fhhos4
 	}
 
 	template <typename SparseMatrixType>
-	void Solver::SetupNonsymmetricFromBlocks(const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FT, const SparseMatrixType& A_FF,
-	                                         const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
+	void Solver::SetupNonsymmetric(const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FT, const SparseMatrixType& A_FF,
+	                               const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
 	{
 		CallScope scope(*this);
 		_impl->CheckParameters(*this, false);
@@ -459,7 +459,7 @@ namespace fhhos4
 	{
 		_impl->CheckSetUp("Solve");
 		if (!_impl->Condensation)
-			Utils::FatalError("fhhos4::Solver::Solve(b_T, b_F, x_T, x_F) solves the uncondensed system: it needs a setup from its blocks (SetupSymmetricFromBlocks() or SetupNonsymmetricFromBlocks()). After SetupSymmetric() or SetupNonsymmetric(), solve the condensed system with Solve(b, x).");
+			Utils::FatalError("fhhos4::Solver::Solve(b_T, b_F, x_T, x_F) solves the uncondensed system: it needs a setup from its blocks (SetupSymmetric() or SetupNonsymmetric()). After SetupSymmetricCondensed() or SetupNonsymmetricCondensed(), solve the condensed system with Solve(b, x).");
 		_impl->CheckCellVectorSize(b_T.rows(), "b_T");
 		_impl->CheckCellVectorSize(x_T.rows(), "x_T");
 		_impl->CheckVectorSize(b_F.rows(), "b_F");
@@ -494,28 +494,28 @@ namespace fhhos4
 	// The supported matrices
 #define FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex) const Eigen::SparseMatrix<double, StorageOrder, StorageIndex>&
 #define FHHOS4_AMG_INSTANTIATE_SETUP(StorageOrder, StorageIndex) \
+	template void Solver::SetupSymmetricCondensed<Eigen::SparseMatrix<double, StorageOrder, StorageIndex>>( \
+		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
+		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
+		const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&); \
+	template void Solver::SetupSymmetricCondensed<Eigen::SparseMatrix<double, StorageOrder, StorageIndex>>( \
+		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
+		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
+		const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&); \
 	template void Solver::SetupSymmetric<Eigen::SparseMatrix<double, StorageOrder, StorageIndex>>( \
 		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
-		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
+		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
 		const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&); \
-	template void Solver::SetupSymmetric<Eigen::SparseMatrix<double, StorageOrder, StorageIndex>>( \
+	template void Solver::SetupNonsymmetricCondensed<Eigen::SparseMatrix<double, StorageOrder, StorageIndex>>( \
+		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
 		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
 		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
 		const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&); \
-	template void Solver::SetupSymmetricFromBlocks<Eigen::SparseMatrix<double, StorageOrder, StorageIndex>>( \
+	template void Solver::SetupNonsymmetricCondensed<Eigen::SparseMatrix<double, StorageOrder, StorageIndex>>( \
 		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
-		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
+		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
 		const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&); \
 	template void Solver::SetupNonsymmetric<Eigen::SparseMatrix<double, StorageOrder, StorageIndex>>( \
-		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
-		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
-		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
-		const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&); \
-	template void Solver::SetupNonsymmetric<Eigen::SparseMatrix<double, StorageOrder, StorageIndex>>( \
-		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
-		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
-		const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&); \
-	template void Solver::SetupNonsymmetricFromBlocks<Eigen::SparseMatrix<double, StorageOrder, StorageIndex>>( \
 		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
 		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
 		const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&);
