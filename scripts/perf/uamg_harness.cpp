@@ -95,21 +95,18 @@ int main(int argc, char** argv)
 	SparseMatrix A_T_T = ReadSparse(dir + "/A_T_T.bin");
 	SparseMatrix A_T_F = ReadSparse(dir + "/A_T_F.bin");
 	SparseMatrix A_F_F = ReadSparse(dir + "/A_F_F.bin");
-	// Dumps made before the interpolations of 1 were inputs: 1 on the first DoF of each block, as in the paper
-	Vector cellInterpOfOne, faceInterpOfOne;
+	// Interpolations of 1, one coefficient per cell and face. Dumps made before 2026-10-14: one per DoF (the first of
+	// each block); before the interpolations of 1 were inputs: none (1 everywhere, as in the paper).
+	Vector cellInterpOfOne = Vector::Ones(A_T_F.rows() / I("cellBS"));
+	Vector faceInterpOfOne = Vector::Ones(A_T_F.cols() / I("faceBS"));
 	if (ifstream(dir + "/cellInterpOfOne.bin"))
 	{
-		cellInterpOfOne = ReadVector(dir + "/cellInterpOfOne.bin");
-		faceInterpOfOne = ReadVector(dir + "/faceInterpOfOne.bin");
-	}
-	else
-	{
-		cellInterpOfOne = Vector::Zero(A_T_F.rows());
-		faceInterpOfOne = Vector::Zero(A_T_F.cols());
-		for (BigNumber i = 0; i < cellInterpOfOne.rows(); i += I("cellBS"))
-			cellInterpOfOne[i] = 1;
-		for (BigNumber i = 0; i < faceInterpOfOne.rows(); i += I("faceBS"))
-			faceInterpOfOne[i] = 1;
+		Vector cell = ReadVector(dir + "/cellInterpOfOne.bin");
+		Vector face = ReadVector(dir + "/faceInterpOfOne.bin");
+		for (BigNumber b = 0; b < cellInterpOfOne.rows(); b++)
+			cellInterpOfOne[b] = cell[cell.rows() == A_T_F.rows() ? b * I("cellBS") : b];
+		for (BigNumber b = 0; b < faceInterpOfOne.rows(); b++)
+			faceInterpOfOne[b] = face[face.rows() == A_T_F.cols() ? b * I("faceBS") : b];
 	}
 
 	HarnessAMG mg(I("dim"), I("degree"), I("cellBS"), I("faceBS"), D("strong"), (UAMGFaceProlongation)I("faceProlong"),

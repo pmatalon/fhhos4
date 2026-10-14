@@ -12,7 +12,7 @@ using namespace std;
 // problems", Appl. Numer. Math. 23 (1997); W. Hackbusch, T. Probst, "Downwind Gauss-Seidel smoothing for convection
 // dominated problems", Numer. Linear Algebra Appl. 4 (1997).
 // The coupling of the block rows I and J is that of their first DoFs (the constant modes of the HHO face bases),
-// rescaled by the interpolation of 1 (c_I c_J a_IJ; c = 1 if interpOfOne is empty). J is upstream of I if their
+// rescaled by the interpolation of 1 (c_I c_J a_IJ, one coefficient per block row; c = 1 if interpOfOne is empty). J is upstream of I if their
 // coupling is, in the row of I:
 // - strong, as Notay's strong couplings (ETNA 37, 2010, Algorithm 2.1): -a_IJ >= threshold * max_K -a_IK;
 // - one-sided: (-a_IJ) - (-a_JI) >= threshold * max_K -a_IK. Without this condition, a symmetric matrix whose rows have
@@ -29,7 +29,7 @@ using namespace std;
 inline vector<BigNumber> DownwindOrder(const SparseMatrix& A, int blockSize, const Vector& interpOfOne, double threshold, BigNumber& nOneSided, BigNumber& nCycleBreaks)
 {
 	BigNumber nb = A.rows() / blockSize;
-	auto c = [&](BigNumber I) { return interpOfOne.rows() > 0 ? interpOfOne[I * blockSize] : 1.0; };
+	auto c = [&](BigNumber I) { return interpOfOne.rows() > 0 ? interpOfOne[I] : 1.0; };
 	const SparseMatrixIndex* outer = A.outerIndexPtr();
 	const SparseMatrixIndex* col = A.innerIndexPtr();
 	const double* val = A.valuePtr();

@@ -148,9 +148,9 @@ interface (`Diffusion_HHO::CondensationBySolver`: no static condensation in the 
   `SetupOperatorByBlockExtraction()`), prolongation = injection of the low modes. h-levels: multiple pairwise
   aggregation (factor 3.8), interface collapsing, coarsening prolongation `ReconstructSmoothedTraceOrInject` (trace of
   `-A_TcTc^{-1} A_TcFc` on the removed faces, smoothed by block Jacobi omega = 2/3), chained as multigrid prolongation.
-- Interpolation of 1: the AMG rescales the constant modes before the h-coarsening (`UncondensedLevel::CoarsenMesh()`):
-  without it, L2-orthonormal bases slow it down (Cube-tet n=16, k=0: 44 iterations instead of 26) or make it fail
-  (graded meshes).
+- Interpolation of 1 (one coefficient c per cell and per face, 1 = c phi_0; the same on the p-levels): the AMG rescales
+  the constant modes before the h-coarsening (`UncondensedLevel::CoarsenMesh()`): without it, L2-orthonormal bases slow
+  it down (Cube-tet n=16, k=0: 44 iterations instead of 26) or make it fail (graded meshes).
 - Non-symmetric matrix: couplings from the averages of the traces of `A_TF(T, F)` and `A_FT(F, T)`; the couplings of
   the rows of the matrix (as AGMG's strong couplings, from `A_TF(T1, F)` and `A_FT(F, T2)`) cost 20% more iterations
   on HArDCore3D's diffusion-dominated convection-diffusion at k = 0, more without the downwind order. Reconstruction

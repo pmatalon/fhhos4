@@ -98,10 +98,11 @@ public:
 	// of the coarsening passes are global sparse products.
 	LocalOperator* LocalOp = nullptr;
 
-	// Interpolation of the function 1 on the bases of the cells and faces of this level (hierarchical with the constant
-	// first: c on the first DoF of each block, 0 on the others), used to rescale the matrices before the h-coarsening
-	// (see CoarsenMesh()). Empty if c = 1 everywhere: when it is given so, and on the levels built by h-coarsening,
-	// where the constant has coordinate 1 by construction.
+	// Interpolation of the function 1 on the bases of the cells and faces of this level, one coefficient c per cell and
+	// per face (hierarchical bases with a constant first function phi_0: 1 = c phi_0), used to rescale the matrices
+	// before the h-coarsening (see CoarsenMesh()). The same on the p-coarse levels (same phi_0). Empty if c = 1
+	// everywhere: when it is given so, and on the levels built by h-coarsening, where the constant has coordinate 1 by
+	// construction.
 	Vector CellInterpOfOne;
 	Vector FaceInterpOfOne;
 
@@ -176,7 +177,7 @@ public:
 		// face"), so that the coefficients 1 of Q_T, Q_F (3.3) and of the trace Π^f_c (after (3.7)) transfer the
 		// constant functions: a coarse cell or face takes the value of the fine ones it aggregates, the trace of a cell
 		// value on its faces is the same value. This only holds if the constant function 1 has the same coordinate c in
-		// all the cell and face bases (c: first coefficient of the interpolation of 1 on each cell and face basis). Otherwise (e.g. orthonormal bases: c = sqrt(|T|) on a cell, sqrt(|F|) on a face),
+		// all the cell and face bases (c: the interpolation of 1 on each cell and face basis, 1 = c phi_0). Otherwise (e.g. orthonormal bases: c = sqrt(|T|) on a cell, sqrt(|F|) on a face),
 		// the trace of the constant is c_F/c_T, not 1 (it is the geometric trace M_F^-1 M_FT of the h-multigrid that this
 		// prolongation mimics), and aggregating fine functions of different coordinates does not give a constant. The
 		// coarse spaces then lose the constants (more iterations), or, if c_F < c_T, the prolongation is amplified at
@@ -220,8 +221,8 @@ public:
 			ScaleConstantRows(this->Q_F, FaceInterpOfOne, _faceBlockSize);
 	}
 
-	// Copy of A whose coefficient (i, j) is multiplied by d_i d_j, d being the interpolation of 1 (the coordinate c of
-	// the constant) on the first DoF of each block of rows (resp. columns), and 1 on the other DoFs
+	// Copy of A whose coefficient (i, j) is multiplied by d_i d_j, d being the interpolation of 1 of the block (the
+	// coordinate c of the constant) on the first DoF of each block of rows (resp. columns), and 1 on the other DoFs
 	static SparseMatrix ScaleConstantDoFs(const SparseMatrix& A, const Vector& rowInterpOfOne, int rowBlockSize, const Vector& colInterpOfOne, int colBlockSize)
 	{
 		SparseMatrix scaled = A;
@@ -229,40 +230,28 @@ public:
 		#pragma omp parallel for
 		for (BigNumber i = 0; i < nRows; ++i)
 		{
-			double d_i = i % rowBlockSize == 0 ? rowInterpOfOne[i] : 1;
+			double d_i = i % rowBlockSize == 0 ? rowInterpOfOne[i / rowBlockSize] : 1;
 			for (SparseMatrix::InnerIterator it(scaled, i); it; ++it)
 			{
 				BigNumber j = it.col();
-				double d_j = j % colBlockSize == 0 ? colInterpOfOne[j] : 1;
+				double d_j = j % colBlockSize == 0 ? colInterpOfOne[j / colBlockSize] : 1;
 				it.valueRef() *= d_i * d_j;
 			}
 		}
 		return scaled;
 	}
 
-	// Multiplies the row of the first DoF of each block by the interpolation of 1 there (the coordinate c of the constant)
+	// Multiplies the row of the first DoF of each block by the interpolation of 1 of the block (the coordinate c of the
+	// constant)
 	static void ScaleConstantRows(SparseMatrix& M, const Vector& interpOfOne, int blockSize)
 	{
-		BigNumber nBlocks = interpOfOne.rows() / blockSize;
+		BigNumber nBlocks = interpOfOne.rows();
 		#pragma omp parallel for
 		for (BigNumber b = 0; b < nBlocks; ++b)
 		{
 			for (SparseMatrix::InnerIterator it(M, b * blockSize); it; ++it)
-				it.valueRef() *= interpOfOne[b * blockSize];
+				it.valueRef() *= interpOfOne[b];
 		}
-	}
-
-	// Interpolation of 1 on the lower-degree bases of a p-coarse level: the first coarseBlockSize coefficients of each
-	// block (hierarchical bases)
-	static Vector TruncateBlocks(const Vector& v, int blockSize, int coarseBlockSize)
-	{
-		if (v.rows() == 0)
-			return Vector();
-		BigNumber nBlocks = v.rows() / blockSize;
-		Vector coarse(nBlocks * coarseBlockSize);
-		for (BigNumber b = 0; b < nBlocks; ++b)
-			coarse.segment(b * coarseBlockSize, coarseBlockSize) = v.segment(b * blockSize, coarseBlockSize);
-		return coarse;
 	}
 
 	// The coarsening passes of the paper, until the requested coarsening factor is reached
@@ -1497,9 +1486,9 @@ public:
 			if (this->CoarserLevel->ComesFrom == CoarseningType::P)
 			{
 				coarse->SetupOperatorByBlockExtraction();
-				// Interpolation of 1 on the lower-degree bases
-				coarse->CellInterpOfOne = TruncateBlocks(this->CellInterpOfOne, this->_cellBlockSize, coarse->_cellBlockSize);
-				coarse->FaceInterpOfOne = TruncateBlocks(this->FaceInterpOfOne, this->_faceBlockSize, coarse->_faceBlockSize);
+				// The lower-degree bases start with the same constant function
+				coarse->CellInterpOfOne = this->CellInterpOfOne;
+				coarse->FaceInterpOfOne = this->FaceInterpOfOne;
 			}
 			else
 			{

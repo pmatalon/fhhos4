@@ -27,8 +27,8 @@ AMG, it builds its coarse levels from the blocks of the uncondensed system:
 
 | Interface | Setup | Solve | For |
 |---|---|---|---|
-| **Uncondensed system** | `SetupSymmetric()`, `SetupNonsymmetric()` | `Solve(b_T, b_F, x_T, x_F)` | New codes: assemble the hybrid system, nothing else. The library condenses it (in parallel) and computes the cell unknowns |
-| **Condensed system** | `SetupSymmetricCondensed()`, `SetupNonsymmetricCondensed()` | `Solve(b, x)` | Codes that condense statically already: least integration effort |
+| **Uncondensed system** | `SetupSymmetric()`, `SetupNonsymmetric()` | `Solve(b_T, b_F, x_T, x_F)` | New codes: assemble the hybrid system, nothing else. The library condenses it and solves it for the face and cell unknowns |
+| **Condensed system** | `SetupSymmetricCondensed()`, `SetupNonsymmetricCondensed()` | `Solve(b, x)` | Codes that already condense the matrix: least integration effort |
 
 Symmetric positive definite systems, and non-symmetric ones with a positive definite symmetric part
 (convection-diffusion). Krylov method included (FCG, GCR, BiCGSTAB). Parallel (OpenMP).
@@ -36,8 +36,7 @@ Symmetric positive definite systems, and non-symmetric ones with a positive defi
 ## Install from source
 
 The library alone needs a C++17 compiler, CMake (>= 3.20), Ninja or Make, and
-[Eigen](https://eigen.tuxfamily.org) (no CGAL, GMSH, GoogleTest; ~45 s and 1.5 GB of RAM). With conda,
-`conda env create -f conda/environment.yml` provides all of them; otherwise install Eigen with your package manager.
+[Eigen](https://eigen.tuxfamily.org).
 
 ```bash
 git clone https://github.com/pmatalon/fhhos4.git && cd fhhos4
@@ -67,7 +66,7 @@ directory of the library in the RPATH of the executable.
 
 The public interface is `library/include/fhhos4.h` (`#include <fhhos4>`), documented in its comments.
 
-### The uncondensed system: the interface of choice
+### The uncondensed system (recommended)
 
 ```cpp
 #include <fhhos4>
@@ -120,10 +119,10 @@ order).
 - **Matrix types**: `Eigen::SparseMatrix<double>`, column- or row-major, `int` or `long` indices (all of the same
   type). Matrices of type `fhhos4::SparseMatrix` (row-major, fhhos4's index type), compressed, are read in place;
   the others are copied.
-- **The interpolation of the function 1** on the cell and face bases (`cellInterpOfOne`: one coefficient per row of
-  `A_TF`; `faceInterpOfOne`: per column). The bases must be **hierarchical with a constant first function** `phi_0`:
-  the interpolation of 1 is then `1/phi_0` on the first DoF of each cell or face, 0 on the others. `phi_0` may vary
-  from one cell or face to another (e.g. L2-orthonormal bases).
+- **The interpolation of the function 1** on the cell and face bases: one coefficient per cell (`cellInterpOfOne`, in
+  the order of the blocks of rows of `A_TF`) and per face (`faceInterpOfOne`, blocks of columns). The bases must be
+  **hierarchical with a constant first function** `phi_0`: `1 = c phi_0`, i.e. `c = 1/phi_0`, which may vary from one
+  cell or face to another (e.g. L2-orthonormal bases: `c = sqrt(|T|)` on a cell `T`); `c = 1` everywhere if `phi_0 = 1`.
 - **The dimension and the degrees**: `Dimension` (2 or 3), `FaceDegree` (k) and `CellDegree` (l) must be set. The setup checks
   the sizes and structure of the inputs against them (full polynomial spaces).
 

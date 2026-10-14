@@ -195,8 +195,8 @@ namespace fhhos4
 				Utils::FatalError("fhhos4::Solver: A_FF is " + size(*A_FF) + ", expected " + to_string(nFaceDoFs) + " x " + to_string(nFaceDoFs) + " (the columns of A_TF).");
 			if (A && (A->rows() != nFaceDoFs || A->cols() != nFaceDoFs))
 				Utils::FatalError("fhhos4::Solver: A is " + size(*A) + ", expected " + to_string(nFaceDoFs) + " x " + to_string(nFaceDoFs) + " (the columns of A_TF).");
-			if (cellInterpOfOne.rows() != nCellDoFs || faceInterpOfOne.rows() != nFaceDoFs)
-				Utils::FatalError("fhhos4::Solver: the interpolations of 1 on the cells and faces must have the sizes of the rows (" + to_string(nCellDoFs) + ") and columns (" + to_string(nFaceDoFs) + ") of A_TF, got " + to_string(cellInterpOfOne.rows()) + " and " + to_string(faceInterpOfOne.rows()) + ".");
+			if (cellInterpOfOne.rows() != nCellDoFs / CellBlockSize || faceInterpOfOne.rows() != nFaceDoFs / FaceBlockSize)
+				Utils::FatalError("fhhos4::Solver: the interpolations of 1 on the cells and faces must have one coefficient per cell (" + to_string(nCellDoFs / CellBlockSize) + ": the rows of A_TF, with " + cellDoFs + ") and per face (" + to_string(nFaceDoFs / FaceBlockSize) + ": the columns of A_TF, with " + faceDoFs + "), got " + to_string(cellInterpOfOne.rows()) + " and " + to_string(faceInterpOfOne.rows()) + ".");
 
 			// A_TT is block diagonal
 			for (BigNumber i = 0; i < A_TT.rows(); i++)
@@ -207,23 +207,16 @@ namespace fhhos4
 						Utils::FatalError("fhhos4::Solver: A_TT has a non-zero (" + to_string(i) + ", " + to_string(it.col()) + ") outside the diagonal blocks of the cells, with " + cellDoFs + ".");
 				}
 			}
-			// The interpolations of 1: non-zero on the first DoF of each cell or face, zero on the others
-			CheckInterpOfOne(cellInterpOfOne, CellBlockSize, "cell", cellDoFs);
-			CheckInterpOfOne(faceInterpOfOne, FaceBlockSize, "face", faceDoFs);
+			CheckInterpOfOne(cellInterpOfOne, "cell");
+			CheckInterpOfOne(faceInterpOfOne, "face");
 		}
 
-		static void CheckInterpOfOne(const Eigen::Ref<const Eigen::VectorXd>& interpOfOne, int blockSize, const string& entity, const string& blockDoFs)
+		static void CheckInterpOfOne(const Eigen::Ref<const Eigen::VectorXd>& interpOfOne, const string& entity)
 		{
-			for (Eigen::Index block = 0; block * blockSize < interpOfOne.rows(); block++)
+			for (Eigen::Index i = 0; i < interpOfOne.rows(); i++)
 			{
-				double c = interpOfOne[block * blockSize];
-				if (!std::isfinite(c) || c == 0)
-					Utils::FatalError("fhhos4::Solver: the interpolation of 1 on the " + entity + " bases is not finite and non-zero on the first DoF of the " + entity + " " + to_string(block) + ", with " + blockDoFs + ".");
-				for (int i = 1; i < blockSize; i++)
-				{
-					if (!(abs(interpOfOne[block * blockSize + i]) <= 1e-10 * abs(c)))
-						Utils::FatalError("fhhos4::Solver: the interpolation of 1 on the " + entity + " bases is not zero beyond the first DoF of the " + entity + " " + to_string(block) + ", with " + blockDoFs + ". The bases must be hierarchical, with a constant first function.");
-				}
+				if (!std::isfinite(interpOfOne[i]) || interpOfOne[i] == 0)
+					Utils::FatalError("fhhos4::Solver: the interpolation of 1 on the " + entity + " bases is not finite and non-zero on the " + entity + " " + to_string(i) + ".");
 			}
 		}
 

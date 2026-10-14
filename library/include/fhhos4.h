@@ -124,9 +124,10 @@ namespace fhhos4
 		//   contiguous, in the order of the rows (resp. columns) of A_TF. A_TT and A_FF are read from their lower
 		//   triangular part (full or lower-only matrices).
 		// - cellInterpOfOne, faceInterpOfOne: the interpolation of the function 1 on the polynomial bases of the cells and
-		//   faces (one coefficient per DoF, as the rows and columns of A_TF). The bases must be hierarchical (ordered by
-		//   degree) with a constant first function phi_0: the interpolation of 1 is then 1/phi_0 on the first DoF of each
-		//   cell or face, 0 on the others. phi_0 may differ from one cell or face to another (e.g. L2-orthonormal bases).
+		//   faces, one coefficient per cell and per face (in the order of the blocks of rows and columns of A_TF). The
+		//   bases must be hierarchical (ordered by degree) with a constant first function phi_0: 1 = c phi_0, i.e.
+		//   c = 1/phi_0. phi_0 may differ from one cell or face to another (e.g. L2-orthonormal bases: c = sqrt(|T|) on a
+		//   cell T); c = 1 everywhere if phi_0 = 1.
 		// Supported matrices: Eigen::SparseMatrix<double, Eigen::ColMajor or Eigen::RowMajor, int or long> (all of the
 		// same type), compressed or not. Those of type SparseMatrix, compressed, are read in place; the others are
 		// converted (copied).

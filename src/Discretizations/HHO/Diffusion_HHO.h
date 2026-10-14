@@ -754,30 +754,30 @@ public:
 	}
 
 	// Interpolation of the function 1 on the cell bases, and on the bases of the faces of the system (non-Dirichlet),
-	// numbered as the rows and columns of A_T_ndF: needed by U-AMG (see UncondensedLevel::CoarsenMesh()).
-	// Hierarchical bases (the first function phi_0 is constant): 1 = (1/phi_0) phi_0, so the interpolation is
-	// (1/phi_0, 0, ..., 0) on each block, exactly (1 for the default bases, whereas the L2-projection divides two
-	// different computations of the measure and gives 1 up to rounding). Other bases: L2-projection.
+	// one coefficient c per cell and per face (numbered as the blocks of rows and columns of A_T_ndF): needed by U-AMG
+	// (see UncondensedLevel::CoarsenMesh()). Hierarchical bases (the first function phi_0 is constant): 1 = c phi_0
+	// with c = 1/phi_0, exactly (1 for the default bases, whereas the L2-projection divides two different computations
+	// of the measure and gives 1 up to rounding). Other bases: the first coefficient of the L2-projection on each block.
 	Vector CellInterpOfOne()
 	{
 		if (!HHO->CellBasis->IsHierarchical())
-			return CellSpace.Project(Utils::ConstantFunctionOne);
-		Vector interp = Vector::Zero(HHO->nTotalCellUnknowns);
+			return FirstCoeffOfBlocks(CellSpace.Project(Utils::ConstantFunctionOne), HHO->nCellUnknowns, "cell");
+		Vector interp = Vector::Zero(HHO->nElements);
 		#pragma omp parallel for
 		for (Element<Dim>* e : _mesh->Elements)
-			interp[e->Number * HHO->nCellUnknowns] = 1 / HHOElement(e)->CellBasis->LocalFunctions()[0]->Eval(RefPoint());
+			interp[e->Number] = 1 / HHOElement(e)->CellBasis->LocalFunctions()[0]->Eval(RefPoint());
 		return interp;
 	}
 	Vector FaceInterpOfOne()
 	{
 		if (!HHO->FaceBasis->IsHierarchical())
-			return NonDirichletFaceSpace.Project(Utils::ConstantFunctionOne);
-		Vector interp = Vector::Zero(HHO->nTotalFaceUnknowns);
+			return FirstCoeffOfBlocks(NonDirichletFaceSpace.Project(Utils::ConstantFunctionOne), HHO->nFaceUnknowns, "face");
+		Vector interp = Vector::Zero(HHO->nInteriorAndNeumannFaces);
 		#pragma omp parallel for
 		for (Face<Dim>* f : _mesh->Faces)
 		{
 			if (!f->HasDirichletBC())
-				interp[f->Number * HHO->nFaceUnknowns] = 1 / HHOFace(f)->Basis->LocalFunctions()[0]->Eval(RefPoint());
+				interp[f->Number] = 1 / HHOFace(f)->Basis->LocalFunctions()[0]->Eval(RefPoint());
 		}
 		return interp;
 	}
@@ -1259,6 +1259,26 @@ public:
 	}
 
 private:
+	// The first coefficient of each block of the interpolation of 1 on non-hierarchical bases: the coordinate of the
+	// constant for U-AMG, if the others are zero
+	static Vector FirstCoeffOfBlocks(const Vector& interp, int blockSize, const string& entity)
+	{
+		Vector first(interp.rows() / blockSize);
+		bool constantFirst = true;
+		for (BigNumber b = 0; b < first.rows(); b++)
+		{
+			first[b] = interp[b * blockSize];
+			for (int j = 1; j < blockSize; j++)
+			{
+				if (!(abs(interp[b * blockSize + j]) <= 1e-6 * abs(first[b])))
+					constantFirst = false;
+			}
+		}
+		if (!constantFirst)
+			Utils::Warning("The interpolation of 1 on the " + entity + " bases is not zero beyond the first coefficient of each block: the bases are not hierarchical with the constant first, the coarse levels of U-AMG may not represent the constant functions.");
+		return first;
+	}
+
 	BigNumber FirstDOFGlobalNumber(Diff_HHOElement<Dim>* element)
 	{
 		return element->Number() * HHO->CellBasis->Size();
