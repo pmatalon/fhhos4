@@ -55,6 +55,7 @@ and `-Dfhhos4_DIR=<fhhos4>/build` (from the build tree), or, after `cmake --inst
 fhhos4::Solver solver;
 solver.Dimension = 3;  // to set
 solver.FaceDegree = k; // to set
+solver.CellDegree = k; // to set
 solver.SetupSymmetric(A, A_TT, A_TF, cellInterpOfOne, faceInterpOfOne);
 Eigen::VectorXd x = Eigen::VectorXd::Zero(b.size());
 fhhos4::Result result = solver.Solve(b, x); // flexible conjugate gradient preconditioned by the AMG
@@ -115,10 +116,10 @@ matrix; the K-cycle then iterates with GCR too). BiCGSTAB is not flexible: it re
   `sqrt|T|` for L2-orthonormal bases, whose constant is `1/sqrt|T|`): the AMG rescales the constant modes before
   coarsening. Without this rescaling, L2-orthonormal bases slow the AMG down (Cube-tet n=16, k=0: 44 iterations instead
   of 26) or make it fail (graded meshes).
-- **The dimension and the degrees**: `Dimension` and `FaceDegree` (k) must be set, `CellDegree` defaults to k. They
-  give the DoFs per face and per cell (full polynomial spaces: `C(k+d-1, d-1)` and `C(l+d, d)`), against which
-  the setup checks the sizes and structure of the inputs (block-diagonal `A_TT`, interpolation of 1 non-zero only on the
-  first DoF of each cell and face).
+- **The dimension and the degrees**: `Dimension`, `FaceDegree` (k) and `CellDegree` (l) must be set. They give the
+  DoFs per face and per cell (full polynomial spaces: `C(k+d-1, d-1)` and `C(l+d, d)`), against which the setup checks
+  the sizes and structure of the inputs (block-diagonal `A_TT`, interpolation of 1 non-zero only on the first DoF of
+  each cell and face).
 
 ### Parameters
 

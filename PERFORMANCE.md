@@ -818,6 +818,17 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
     `HybridChunks::MaxExternalFraction` (20%): these levels sweep sequentially (since `27ea0d44`). 2D, 4 -> 8 threads:
     slower (quadrangles 8 k=2 solve 5.95 -> 6.83 s). See Next ideas.
 
+- **Condensed matrix from the blocks, in the clients** (2026-10-14, measurement only; the user's question: "can we not
+  assemble the Schur complement in the case fhhos4 is used?"). No gain: HArDCore3D's schemes condense cell by cell in
+  their assembly loop, and must still factorize A_TT and compute A_TT^{-1} A_TF per cell (the right-hand side, the
+  recovery of the cell unknowns): skipping the Schur complement only skips one small dense product per cell, and the
+  assembled A_FF has the pattern of A (32^3 k=1: 9,158,400 non-zeros both). The library then computes A with global
+  sparse products (`CondensedMatrix()`): `SetupNonsymmetricFromBlocks()` against `SetupNonsymmetric()`, HArDCore3D's
+  32^3 k=1 diffusion-dominated system (`build/bench_nonsym/diff_n32_k1`, column-major inputs as the clients give them,
+  `build/bench_schur/fromblocks.cpp`, 3 interleaved repetitions, on battery): setup 1 thread 0.46-0.57 -> 1.18-1.22 s,
+  8 threads 0.17-0.28 -> 0.60-0.69 s; the same iterations (23 / 24), solve unchanged. A cell-wise computation in the
+  library would at best equal the clients' local products.
+
 ## Current profile (U-AMG; parallel: 16 threads, the default before 2026-10-08)
 
 | Case | Setup, sequential / parallel | Solve, sequential / parallel |

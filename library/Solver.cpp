@@ -156,7 +156,6 @@ namespace fhhos4
 		bool Symmetric = true; // the matrix is symmetric (SetupSymmetric...()), or not (SetupNonsymmetric...())
 		string Krylov;         // Solver::Krylov, or its default for the symmetry of the matrix
 		string CoarseSolver;   // Solver::CoarseSolver, or its default for the symmetry of the matrix
-		int CellDegree = 0;
 		int CellBlockSize = 0;
 		int FaceBlockSize = 0;
 		const SparseMatrix* A = nullptr; // the solvers keep a pointer to it: the caller's matrix, or OwnA
@@ -179,8 +178,8 @@ namespace fhhos4
 				Utils::FatalError("fhhos4::Solver: set Dimension (2 or 3) before the setup, got " + to_string(s.Dimension) + ".");
 			if (s.FaceDegree < 0)
 				Utils::FatalError("fhhos4::Solver: set FaceDegree (>= 0) before the setup, got " + to_string(s.FaceDegree) + ".");
-			if (s.CellDegree < -1)
-				Utils::FatalError("fhhos4::Solver: CellDegree must be >= 0 (or -1: FaceDegree), got " + to_string(s.CellDegree) + ".");
+			if (s.CellDegree < 0)
+				Utils::FatalError("fhhos4::Solver: set CellDegree (>= 0) before the setup, got " + to_string(s.CellDegree) + ".");
 			if (s.Cycle != 'V' && s.Cycle != 'W' && s.Cycle != 'K')
 				Utils::FatalError(string("fhhos4::Solver: unknown Cycle '") + s.Cycle + "' (V, W or K).");
 			if (s.Krylov != "" && s.Krylov != "fcg" && s.Krylov != "gcr" && s.Krylov != "bicgstab" && s.Krylov != "none")
@@ -194,8 +193,7 @@ namespace fhhos4
 				Utils::FatalError("fhhos4::Solver: the flexible conjugate gradient requires a symmetric matrix: set Krylov to \"gcr\" (or leave it empty) for a non-symmetric one.");
 			if (!symmetric && CoarseSolver == "ch")
 				Utils::FatalError("fhhos4::Solver: the Cholesky factorization requires a symmetric matrix: set CoarseSolver to \"lu\" (or leave it empty) for a non-symmetric one.");
-			CellDegree = s.CellDegree == -1 ? s.FaceDegree : s.CellDegree;
-			CellBlockSize = Utils::Binomial(CellDegree + s.Dimension, CellDegree);
+			CellBlockSize = Utils::Binomial(s.CellDegree + s.Dimension, s.CellDegree);
 			FaceBlockSize = Utils::Binomial(s.FaceDegree + s.Dimension - 1, s.FaceDegree);
 		}
 
@@ -203,7 +201,7 @@ namespace fhhos4
 		// null if the matrix is symmetric.
 		void CheckInputs(const Solver& s, const SparseMatrix* A, const SparseMatrix& A_TT, const SparseMatrix& A_TF, const SparseMatrix* A_FT, const SparseMatrix* A_FF, const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne) const
 		{
-			string cellDoFs = to_string(CellBlockSize) + " DoFs per cell (CellDegree " + to_string(CellDegree) + ", Dimension " + to_string(s.Dimension) + ")";
+			string cellDoFs = to_string(CellBlockSize) + " DoFs per cell (CellDegree " + to_string(s.CellDegree) + ", Dimension " + to_string(s.Dimension) + ")";
 			string faceDoFs = to_string(FaceBlockSize) + " DoFs per face (FaceDegree " + to_string(s.FaceDegree) + ", Dimension " + to_string(s.Dimension) + ")";
 			Eigen::Index nCellDoFs = A_TF.rows();
 			Eigen::Index nFaceDoFs = A_TF.cols();

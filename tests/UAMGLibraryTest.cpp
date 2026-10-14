@@ -263,6 +263,7 @@ fhhos4::Solver ToySolver()
 	fhhos4::Solver solver;
 	solver.Dimension = 2;
 	solver.FaceDegree = 0;
+	solver.CellDegree = 0;
 	solver.Tolerance = 1e-10;
 	solver.PreSmoother = "bgs";
 	solver.PostSmoother = "rbgs";
@@ -582,6 +583,9 @@ TEST(UAMGLibrary, Errors)
 	fhhos4::Solver noFaceDegree = ToySolver();
 	noFaceDegree.FaceDegree = -1;
 	EXPECT_THROW(noFaceDegree.SetupSymmetric(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
+	fhhos4::Solver noCellDegree = ToySolver();
+	noCellDegree.CellDegree = -1;
+	EXPECT_THROW(noCellDegree.SetupSymmetric(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 	fhhos4::Solver wrongCycle = ToySolver();
 	wrongCycle.Cycle = 'X';
 	EXPECT_THROW(wrongCycle.SetupSymmetric(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);

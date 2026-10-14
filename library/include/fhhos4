@@ -49,7 +49,7 @@ namespace fhhos4
 
 		int Dimension = -1;  // 2 or 3
 		int FaceDegree = -1; // k: degree of the polynomials on the faces
-		int CellDegree = -1; // degree of the polynomials in the cells; -1: same as FaceDegree
+		int CellDegree = -1; // l: degree of the polynomials in the cells (k - 1, k or k + 1 in HHO)
 
 		//--------------------- Solver ---------------------//
 
