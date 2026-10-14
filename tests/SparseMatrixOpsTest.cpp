@@ -101,6 +101,25 @@ TEST(SparseMatrixOpsTest, TransposeGivesEigenTranspose)
 	Parallelism::SetNThreads(0);
 }
 
+// The library's conversion of a compressed column-major input: Transpose() of its arrays read as row-major (a map of
+// its transpose) gives the matrix of Eigen's conversion
+TEST(SparseMatrixOpsTest, TransposeOfColumnMajorArraysGivesEigenConversion)
+{
+	for (auto [n, m] : { std::pair<BigNumber, BigNumber>(6000, 2500), std::pair<BigNumber, BigNumber>(2500, 6000), std::pair<BigNumber, BigNumber>(300, 200) })
+	{
+		Eigen::SparseMatrix<double, Eigen::ColMajor, SparseMatrixIndex> C = RandomMatrix(n, m, 12, 9);
+		C.makeCompressed();
+		SparseMatrix expected = C;
+		for (int nThreads : NThreads)
+		{
+			Parallelism::SetNThreads(nThreads);
+			Eigen::Map<const SparseMatrix> Ct(C.cols(), C.rows(), C.nonZeros(), C.outerIndexPtr(), C.innerIndexPtr(), C.valuePtr());
+			EXPECT_TRUE(Identical(SparseMatrixOps::Transpose(Ct), expected)) << n << " x " << m << ", " << nThreads << " threads";
+		}
+	}
+	Parallelism::SetNThreads(0);
+}
+
 TEST(SparseMatrixOpsTest, TripleProductGivesEigenProduct)
 {
 	// Galerkin product as written in the U-AMG setup: P^T * S * P with S given by its lower triangular part

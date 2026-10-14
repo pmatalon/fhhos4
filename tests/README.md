@@ -34,7 +34,7 @@ ctest -E HPConfig                          # skip the slowest tests
 ./bin/fhhos4_tests --gtest_filter=*Kellogg*  # or filter the binary directly
 ```
 
-The full suite is 198 CTest cases and runs in about 5 minutes serially. The 8 `HPConfigTest` cases take about 2 minutes of it (~15 s each: N=128 with k=5 is the smallest size of the high-order paper); the other cases take less than 20 s each.
+The full suite is 199 CTest cases and runs in about 5 minutes serially. The 8 `HPConfigTest` cases take about 2 minutes of it (~15 s each: N=128 with k=5 is the smallest size of the high-order paper); the other cases take less than 20 s each.
 
 ## GMSH meshes: reproducibility
 
@@ -177,6 +177,9 @@ Unit tests of the parallel sparse matrix operations used in the setup of U-AMG (
   injections of the prolongations of U-AMG), which `Multiply` copies from `B`.
 - **`SparseMatrixOpsTest.TransposeGivesEigenTranspose`** (1 case) — `Transpose(A)`, parallel from 20000 non-zeros, vs.
   Eigen's `A.transpose()` (6000 x 2500 and 2500 x 6000 matrices, and a small one).
+- **`SparseMatrixOpsTest.TransposeOfColumnMajorArraysGivesEigenConversion`** (1 case) — the library's conversion of a
+  compressed column-major input: `Transpose()` of its arrays read as a row-major `Eigen::Map` vs. Eigen's conversion to
+  row-major (the same sizes).
 - **`SparseMatrixOpsTest.TripleProductGivesEigenProduct`** (1 case) — the Galerkin product as computed in the U-AMG setup, vs. Eigen's `P.transpose() * S.selfadjointView<Eigen::Lower>() * P`.
 - **`SparseMatrixOpsTest.FullFromLowerGivesSelfAdjointView`** (1 case) — `FullFromLower(S)` vs. Eigen's `S.selfadjointView<Eigen::Lower>()`.
 - **`SparseMatrixOpsTest.SelectRowsGivesCopiedRows`** (1 case) — `SelectRows` vs. the rows copied by `NonZeroCoefficients::CopyRows`.

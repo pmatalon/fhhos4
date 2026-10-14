@@ -86,6 +86,17 @@ namespace fhhos4
 				}
 				if (M.nonZeros() > (Eigen::Index)numeric_limits<SparseMatrixIndex>::max())
 					Utils::FatalError("fhhos4::Solver: " + name + " has too many non-zeros for the index type of fhhos4 (compile fhhos4 with -DSMALL_INDEX=OFF).");
+				if constexpr (!SparseMatrixType::IsRowMajor && is_same_v<typename SparseMatrixType::StorageIndex, SparseMatrixIndex>)
+				{
+					if (M.isCompressed())
+					{
+						// The arrays of a compressed column-major matrix are those of its transpose in row-major, transposed
+						// again in parallel: the matrix of Eigen's conversion, which is sequential
+						_copy = SparseMatrixOps::Transpose(Eigen::Map<const SparseMatrix>(M.cols(), M.rows(), M.nonZeros(), M.outerIndexPtr(), M.innerIndexPtr(), M.valuePtr()));
+						_matrix = &_copy;
+						return;
+					}
+				}
 				_copy = M;
 				_copy.makeCompressed();
 				_matrix = &_copy;

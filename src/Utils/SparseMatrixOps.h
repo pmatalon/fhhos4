@@ -131,8 +131,11 @@ namespace SparseMatrixOps
 
 	// A^T, with the same result as Eigen's: the coefficients of each row of A^T in the order of the rows of A, the explicit
 	// zeros kept. In parallel: each thread counts, then copies, the coefficients of a contiguous range of rows of A.
-	inline SparseMatrix Transpose(const SparseMatrix& A)
+	// A: a SparseMatrix, or a map of row-major arrays (e.g. those of a column-major matrix, i.e. of its transpose).
+	template <class RowMajorSparseMatrix>
+	SparseMatrix Transpose(const RowMajorSparseMatrix& A)
 	{
+		static_assert(RowMajorSparseMatrix::IsRowMajor, "Transpose() iterates over the rows of A");
 		BigNumber nRows = A.rows(), nCols = A.cols();
 		int nChunks = (int)min((BigNumber)Parallelism::NThreads(), max(nRows, (BigNumber)1));
 		if (nChunks <= 1 || A.nonZeros() < 20000)
@@ -145,7 +148,7 @@ namespace SparseMatrixOps
 			count[c].assign(nCols, 0);
 			auto [begin, end] = Parallelism::Chunk(nRows, c, nChunks);
 			for (BigNumber i = begin; i < end; ++i)
-				for (SparseMatrix::InnerIterator it(A, i); it; ++it)
+				for (typename RowMajorSparseMatrix::InnerIterator it(A, i); it; ++it)
 					count[c][it.col()]++;
 		}
 		SparseMatrix T(nCols, nRows);
@@ -169,7 +172,7 @@ namespace SparseMatrixOps
 			auto [begin, end] = Parallelism::Chunk(nRows, c, nChunks);
 			for (BigNumber i = begin; i < end; ++i)
 			{
-				for (SparseMatrix::InnerIterator it(A, i); it; ++it)
+				for (typename RowMajorSparseMatrix::InnerIterator it(A, i); it; ++it)
 				{
 					SparseMatrixIndex p = count[c][it.col()]++;
 					T.innerIndexPtr()[p] = i;

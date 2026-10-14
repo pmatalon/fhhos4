@@ -57,7 +57,7 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   `scripts/perf/Prof.h` (`PROF_START`/`PROF_STOP`, printed at exit). Include it in the files to instrument, never
   commit the instrumentation.
 - **Validation of a change**:
-  1. `ctest` (198 tests).
+  1. `ctest` (199 tests).
   2. `scripts/perf/amg_papers.sh <output dir> [binary]`: the AMG configurations of the papers, at reduced sizes (the
      paper sizes don't fit in 13 GB), 30 runs in ~6 minutes. Then `scripts/perf/fingerprint.sh <dir before> <dir after>`
      compares their iteration tables (iteration, inner iterations, residual): they must be identical.
@@ -586,7 +586,9 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   `quick_check.sh` OK.
 
   Against HArDCore3D's own solver (`hho-diff-advec-reac --solver_type bicgstab|fhhos4`: Eigen's BiCGSTAB, diagonal
-  preconditioner, sequential, tolerance machine epsilon; fhhos4 1e-12), HArDCore3D's solving time (wall: for fhhos4,
+  preconditioner, sequential, tolerance 1e-12 in fact: the binary had been built with a `setTolerance(1e-12)` that
+  its source no longer has, estimated errors 2e-13 to 6e-13, see the entry "Speedups in the client codes, recomputed";
+  fhhos4 1e-12), HArDCore3D's solving time (wall: for fhhos4,
   the blocks A_TT, A_TF, A_FT assembled from triplets in `HHO3D::solve()`, sequential, the conversion of these
   column-major inputs, the setup and the solve), one series (`build/bench_det/bench_speedup_det.sh`,
   `speedup_table_det.py`), L2 errors equal everywhere:
@@ -761,6 +763,61 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   0.07 s, interface collapsing, decomposition, local Galerkin products, neighbours and couplings 0.05-0.06 s each,
   the aggregation 0.05 s; on HArDCore3D's hexahedra, no step above 15% of the setup.
 
+- **Speedups in the client codes, recomputed; parallel conversion of the column-major inputs** (2026-10-13, the user's
+  requests: "Recompute the speedups on hardcore3D and disk++", then "improve the assembly on hardcore3D, and use 8
+  threads instead of 4"). Plugged in, 8 threads (the solvers' default) and 1, one run each, the reference solver run in
+  the same session (`build/bench_speedup/`: scripts, logs, `table_h3d_v2.py`, `table_diskpp.py`).
+  - Library: `InputMatrix` converts a compressed column-major input (HArDCore3D's and Disk++'s matrices) with the
+    parallel `SparseMatrixOps::Transpose()` of its arrays read as row-major (`Eigen::Map`: its transpose), instead of
+    Eigen's sequential conversion; the same matrix (test `TransposeOfColumnMajorArraysGivesEigenConversion`). `Transpose()`
+    takes any row-major sparse matrix. `ctest` 199/199.
+  - HArDCore3D (uncommitted in the fork, the four schemes): A_TT, A_TF (and A_FT) are written directly in the compressed
+    column-major format of A, in parallel with HArDCore3D's `parallel_for` (columns of the cells for A_TT and A_FT, of
+    the faces for A_TF), instead of sequential triplets and `setFromTriplets()`. The same results (iterations and
+    residuals of `hho-diff-advec-reac` 16^3 k=0..2 on 1 and 8 threads, `quick_check.sh`).
+  - HArDCore3D's BiCGSTAB: the source runs it to machine epsilon (Eigen's default), but the `hho-diff-advec-reac` of the
+    previous measurements (built 2026-10-11) stopped at 1e-12; `hho-diffusion`'s ran to machine epsilon. Both are
+    given below; the comparison at the same tolerance (1e-12, as fhhos4) is the fair one (L2 errors equal everywhere).
+  - Convection-diffusion (`hho-diff-advec-reac`, wall "solving time" = setup + solve + other: the blocks, the
+    conversion and HArDCore3D's own part of the solve), fhhos4 on 8 threads (OMP_NUM_THREADS=8, HArDCore3D on its 16)
+    and 1 (all sequential, `-u 0`), speedups against BiCGSTAB at 1e-12 (against machine epsilon); before: this entry's
+    first series (old client and library, 1 / 4 threads), then the entry "deterministic hybrid" (2026-10-12):
+
+    | Case | BiCGSTAB 1e-12 | fhhos4 8 threads | speedup 1 / 8 threads | before, 1 / 4 threads | 2026-10-12 |
+    |---|---|---|---|---|---|
+    | 32^3 k=0 diffusion-dom. | 135 its, 0.32 s | 32 its, 0.35 s | 0.57 / 0.91 (0.80 / 1.29) | 0.52 / 0.94 | 0.34 / 0.39 |
+    | 32^3 k=0 convection-dom. | 59 its, 0.13 s | 6 its, 0.24 s | 0.33 / 0.54 (0.38 / 0.62) | 0.42 / 0.33 | 0.23 / 0.35 |
+    | 32^3 k=1 diffusion-dom. | 211 its, 3.51 s | 24 its, 1.28 s | 1.51 / 2.74 (2.25 / 4.10) | 1.57 / 2.20 | 1.36 / 1.89 |
+    | 32^3 k=1 convection-dom. | 61 its, 1.13 s | 5 its, 0.77 s | 0.98 / 1.47 (1.01 / 1.51) | 0.85 / 1.07 | 0.74 / 0.90 |
+    | 48^3 k=0 diffusion-dom. | 189 its, 1.86 s | 44 its, 1.51 s | 0.76 / 1.23 (1.16 / 1.89) | 0.84 / 1.22 | 0.48 / 0.68 |
+    | 48^3 k=0 convection-dom. | 84 its, 0.88 s | 6 its, 0.88 s | 0.62 / 1.00 (0.65 / 1.06) | 0.67 / 0.92 | 0.35 / 0.45 |
+    | 48^3 k=1 diffusion-dom. | 289 its, 17.65 s | 27 its, 5.00 s | 1.87 / 3.53 (2.75 / 5.20) | 1.83 / 2.92 | 1.61 / 2.13 |
+    | 48^3 k=1 convection-dom. | 87 its, 5.66 s | 6 its, 2.67 s | 0.85 / 2.12 (0.90 / 2.23) | 0.95 / 1.36 | 0.80 / 1.08 |
+
+    Attribution on 8 threads (setup + solve + other): 32^3 k=1 diffusion-dominated, old client and library 1.86 s
+    (0.25 + 0.87 + 0.73), new client 1.44 s (other 0.42), new library 1.28 s (other 0.28); convection-dominated 0.99 ->
+    0.78 -> 0.77 s; 48^3 k=1 convection-dominated, new client with the old library 4.96 s (other 2.76) -> 2.67 s (other
+    0.91): the conversion of A (~32M non-zeros) was most of it (old client: killed by the watchdog, 4.8 GB). On 1 thread
+    the client's blocks cost about the triplets (16^3 k=2: 0.62-0.66 vs 0.66-0.69 s).
+  - Diffusion (`hho-diffusion -c 1 2`, 1 thread: its "solving time" is CPU time), against BiCGSTAB at 1e-12 (machine
+    epsilon): 32^3 k=0 0.51 s vs 0.36 s, 0.71x (0.82x); k=1 1.71 vs 3.22 s, 1.88x (2.64x); k=2 6.57 vs 14.25 s, 2.17x
+    (2.67x); 48^3 k=0 1.90 vs 2.15 s, 1.13x (1.35x); k=1 killed by the watchdog (4.85 GB; the first series: 6.70 s vs
+    19.97 s at 1e-12, 3.0x).
+  - Disk++ (`run_all_1013.sh`, logs `~/code/diskpp/build/bench/logs_1013/`; client unchanged, not rebuilt), fhhos4 on 8
+    threads against MUMPS (best of 8 threads / 1 thread), before -> after (2026-10-10: fhhos4 on 8 threads, MUMPS best of
+    16 / 1): k=0, the setup 2-5x faster: triangles 0.8-0.9x -> 1.8-2.5x, quadrangles 1.0x -> 2.3-2.7x, hexagons 1.4x ->
+    2.9-3.2x, tetrahedra 1.0-1.7x -> 1.7-2.2x, Cartesian 2.2x -> 3.7x; k >= 1: triangles 0.8-1.2x -> 0.7-1.2x,
+    quadrangles 1.2-1.5x -> 1.2-1.7x, hexagons 1.8-2.2x -> 2.0-3.2x, tetrahedra 1.9-2.3x -> 1.1-1.5x, Cartesian k=1
+    5.7x -> 4.4x. On 1 thread, fhhos4 against MUMPS 1.1-1.5x (triangles), 1.5-2.0x (quadrangles), 1.9-3.1x (hexagons),
+    1.8-4.0x (tetrahedra), 2.9-7.9x (Cartesian). MUMPS was not run where it took more than ~5 GB (tetrahedra 5 k=1,
+    hexahedra 5 k=2, 6 k=0) and was killed on quadrangles 8 k=2.
+  - Disk++ at k >= 1: the solve on 8 threads is no faster than on 1 thread (same iterations), about 2x slower than with
+    the racy hybrid smoother of 2026-10-10 (hexahedra 5 k=1: 1.06-1.20 s against 0.61-0.66 s with the library of then,
+    16 iterations both). Disk++'s face numbering has little locality: on the two finest levels, 25% (tetrahedra), 40%
+    (triangles) and 57% / 67% (Cartesian, 4 / 8 chunks) of the non-zeros are external to the chunks of the threads, above
+    `HybridChunks::MaxExternalFraction` (20%): these levels sweep sequentially (since `27ea0d44`). 2D, 4 -> 8 threads:
+    slower (quadrangles 8 k=2 solve 5.95 -> 6.83 s). See Next ideas.
+
 ## Current profile (U-AMG; parallel: 16 threads, the default before 2026-10-08)
 
 | Case | Setup, sequential / parallel | Solve, sequential / parallel |
@@ -931,6 +988,12 @@ Galerkin products (see Done).
      k = 0 (28 -> 33-34) and gains nothing there. A multicolour Gauss-Seidel, or a renumbering of the chunks
      (see "Renumbering the fine unknowns"), might do better; gain unknown.
    - Determinism, and the sequential sweeps on 1 thread: done (see Done, "Deterministic hybrid Gauss-Seidel").
+   - Disk++'s meshes (2026-10-13, see Done, "Speedups in the client codes, recomputed"): 25-67% external non-zeros on
+     the two finest levels, so the deterministic hybrid sweeps fall back to the sequential ones there and the k >= 1
+     solve on 8 threads is no faster than on 1 (2x slower than the racy smoother of 2026-10-10). Estimated, medium
+     effort: in the library, chunks that follow the cells (e.g. the faces renumbered by their first cell in A_TF, the
+     cells of the clients being numbered with some locality), or a partition of the face graph; a renumbering changes
+     the sweeps, hence the iterations (the library's default may change; the program's path, `bgs`, is not concerned).
    - In the downwind order, the transport crosses one chunk boundary per sweep (Jacobi between the chunks): 5
      iterations instead of 4 at k=1 on 2-4 threads (HArDCore3D's convection-dominated case, 32^3; the racy version
      sometimes read updated upstream values). Recovering it would need the threads to follow the flow from one chunk
