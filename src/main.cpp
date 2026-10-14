@@ -233,7 +233,7 @@ void print_usage() {
 	cout << "              p_mg          - p-Multigrid to be used on top of mg" << endl;
 	cout << "              uamg          - Uncondensed AMG (for hybrid discretizations with static condensation)" << endl;
 	cout << "              libuamg       - uamg called through the library fhhos4_AMG (library/), as by an external code." << endl;
-	cout << "                              Only the parameters of fhhos4::Solver apply (see library/include/fhhos4)." << endl;
+	cout << "                              Only the parameters of fhhos4::Solver apply (see library/include/fhhos4.h)." << endl;
 	cout << "                              'fcglibuamg' ('gcrlibuamg') uses the FCG (GCR) of the library (as fcguamg, gcruamg)." << endl;
 	cout << "              aggregamg     - In-house implementation of AGMG, without the outer Krylov iteration. Meant to be used with K-cycle and with FCG." << endl;
 	cout << "              hoaggregamg   - Algebraic p-multigrid on top of aggregamg" << endl;

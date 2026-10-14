@@ -1,4 +1,4 @@
-#include "fhhos4"
+#include "fhhos4.h"
 #include "LibraryUAMG.h"
 
 class LibraryUAMG : public IterativeSolver

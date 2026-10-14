@@ -1,0 +1,204 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (C) 2026 Pierre Matalon
+#pragma once
+#include <memory>
+#include <string>
+#include <Eigen/Core>
+#include <Eigen/SparseCore>
+#include "fhhos4_error.h"
+#include "fhhos4_version.h"
+
+// fhhos4_AMG (short name: fhhos4): the algebraic multigrid of fhhos4 for hybrid discretizations (HHO, HDG...) of scalar
+// diffusion problems, the Uncondensed AMG (U-AMG) of
+//   D. A. Di Pietro, F. Hülsemann, P. Matalon, P. Mycek, U. Rüde, "Algebraic multigrid preconditioner for statically
+//   condensed systems arising from lowest-order hybrid discretizations", SIAM J. Sci. Comput. (2023),
+// extended to k >= 1.
+// Solves the statically condensed system A x = b (unknowns: the face DoFs), symmetric positive definite
+// (SetupSymmetric()) or not (SetupNonsymmetric(), e.g. convection-diffusion), from the blocks of the uncondensed system
+//     [ A_TT  A_TF ] [x_T]
+//     [ A_FT  A_FF ] [x_F]
+// with A = A_FF - A_FT A_TT^{-1} A_TF. See library/README.md.
+//
+// The Krylov method preconditioned by the AMG is part of the library (Solver::Krylov), which does not give the multigrid
+// cycle alone: with the default K-cycle, the AMG is a non-linear preconditioner (it solves the coarse levels with inner
+// FCG or GCR iterations), which requires a flexible Krylov method: the flexible conjugate gradient (FCG, the default for
+// a symmetric matrix) or GCR.
+//
+// The class is compiled in the shared library fhhos4_AMG, with fhhos4's flags. Eigen objects cross
+// its boundary: the calling code must use the same version of Eigen and the same alignment settings (checked by the
+// constructor, which throws fhhos4::Error otherwise). The library never allocates memory that the calling code frees,
+// nor the other way around.
+namespace fhhos4
+{
+	struct Result
+	{
+		int Iterations = 0;
+		double RelativeResidual = 0; // |b - A x| / |b|
+		bool Converged = false;      // RelativeResidual < Tolerance
+	};
+
+	// Set the parameters, then call a setup function, then Solve(). The parameters are read by the setup (Tolerance and
+	// MaxIterations by Solve()). The defaults are those of the program fhhos4 (-s fcguamg), used in the papers, except the
+	// smoother on several threads (PreSmoother).
+	// Not thread-safe: one object must not be used by several threads at the same time.
+	class FHHOS4_API Solver
+	{
+	public:
+		//------------- Discretization: to set -------------//
+
+		int Dimension = -1;  // 2 or 3
+		int FaceDegree = -1; // k: degree of the polynomials on the faces
+		int CellDegree = -1; // l: degree of the polynomials in the cells (k - 1, k or k + 1 in HHO)
+
+		//--------------------- Solver ---------------------//
+
+		// The Krylov method preconditioned by one cycle of the AMG:
+		// - "" (default): "fcg" for a symmetric matrix (SetupSymmetric()), "gcr" otherwise (SetupNonsymmetric());
+		// - "fcg": flexible conjugate gradient (fhhos4 -s fcguamg), for a symmetric positive definite matrix;
+		// - "gcr": GCR(10), generalized conjugate residual restarted every 10 iterations, Notay's economical version
+		//   (fhhos4 -s gcruamg). Minimizes the residual norm: for any matrix;
+		// - "bicgstab": Eigen's BiCGSTAB. Not flexible: it needs a linear preconditioner, a V- or W-cycle (not K);
+		// - "none": the cycles of the AMG alone, as a stationary iterative method (fhhos4 -s uamg): slower at k >= 1.
+		std::string Krylov;
+		double Tolerance = 1e-8; // stopping criterion of Solve(): |b - A x| / |b| < Tolerance
+		int MaxIterations = 200; // Solve() stops after MaxIterations iterations, converged or not
+
+		//-------------------- Multigrid -------------------//
+
+		char Cycle = 'K';                  // 'V', 'W' or 'K' (K-cycle: each coarse level is solved by 2 iterations of FCG,
+		                                   // or of GCR with Krylov "gcr" or a non-symmetric matrix)
+		int PreSmoothingIterations = 1;
+		int PostSmoothingIterations = 1;
+		// Smoothers (codes of fhhos4 -smoothers, see fhhos4 -h). PreSmoother empty (default): the faster one, chosen by
+		// the setup: on several threads, "hbgs", the hybrid block Gauss-Seidel (Gauss-Seidel in the rows of each thread,
+		// Jacobi between the threads: parallel, except on the levels where the rows of the threads are poorly separated;
+		// the results then depend on the number of threads, not on the run); on 1 thread, "bgs", the block Gauss-Seidel
+		// (sequential: "hbgs" on 1 thread), one block per face.
+		// PostSmoother empty (default): the backward version of PreSmoother ("rbgs" after "bgs", "hrbgs" after "hbgs").
+		// Non-symmetric matrix (SetupNonsymmetric()): on a level with one-sided couplings (convection), the Gauss-Seidel
+		// smoothers keep their type, block size and number of sweeps, but not their direction: all their sweeps
+		// (backward and symmetric ones included) follow the downwind order of the level. The other smoothers (Jacobi,
+		// SOR with a relaxation parameter) ignore it.
+		std::string PreSmoother;
+		std::string PostSmoother;
+		double CoarseningFactor = 3.8;     // target ratio of the numbers of cells of two successive h-levels
+		int CoarseMatrixMaxSize = 1000;    // the coarsening stops when the matrix has at most this many rows
+		std::string CoarseSolver;          // solver of the coarsest level (fhhos4 -coarse-solver); "" (default): sparse
+		                                   // Cholesky ("ch") for a symmetric matrix, sparse LU ("lu") otherwise
+
+		//-------------------- Execution -------------------//
+
+		int Threads = 0;   // number of OpenMP threads during the calls of the library; 0: the current OpenMP setting, but
+		                   // at most one thread per physical core (no hyper-threading) unless OMP_NUM_THREADS or OpenMP's
+		                   // binding (OMP_PROC_BIND, OMP_PLACES) is set
+		int Verbosity = 0; // 0: nothing; 1: one line per setup (number of levels, time) and per solve (iterations,
+		                   // residual, time); 2: all the messages of fhhos4, with the residual at each iteration
+
+		Solver()
+			: Solver(HostEigenConfiguration())
+		{}
+		~Solver();
+		Solver(Solver&&) noexcept;
+		Solver& operator=(Solver&&) noexcept;
+		Solver(const Solver&) = delete;
+		Solver& operator=(const Solver&) = delete;
+
+		// Setup for a symmetric positive definite matrix, from the condensed matrix and the blocks of the uncondensed system
+		// (A_FT = A_TF^T), without the DoFs of the Dirichlet faces.
+		// Checks the parameters, and the sizes and structure of the inputs against Dimension and the degrees.
+		// - A (faces x faces): the condensed matrix A_FF - A_FT A_TT^{-1} A_TF, both triangles.
+		// - A_TT (cells x cells), A_TF (cells x faces), A_FF (faces x faces): the DoFs of each cell (resp. face) are
+		//   contiguous, in the order of the rows (resp. columns) of A_TF. A_TT and A_FF are read from their lower
+		//   triangular part (full or lower-only matrices).
+		//   A_FF is optional: the algorithm only uses A_TT and A_TF, whose rows each belong to one cell.
+		//   SetupSymmetricFromBlocks() computes A from the blocks.
+		// - cellInterpOfOne, faceInterpOfOne: the interpolation of the function 1 on the polynomial bases of the cells and
+		//   faces (one coefficient per DoF, as the rows and columns of A_TF). The bases must be hierarchical (ordered by
+		//   degree) with a constant first function phi_0: the interpolation of 1 is then 1/phi_0 on the first DoF of each
+		//   cell or face, 0 on the others. phi_0 may differ from one cell or face to another (e.g. L2-orthonormal bases).
+		// Supported matrices: Eigen::SparseMatrix<double, Eigen::ColMajor or Eigen::RowMajor, int or long> (all of the
+		// same type), compressed or not. Row-major, compressed, with int indices (fhhos4's, unless compiled with
+		// -DSMALL_INDEX=OFF: long), they are read in place; otherwise, converted (copied).
+		// The solver keeps a reference to A: A must stay alive and unchanged until the next setup or the destruction of
+		// the solver (not a temporary). The blocks are only read by the setup: they may be freed after it.
+		template <typename SparseMatrixType>
+		void SetupSymmetric(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FF,
+		                    const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne);
+
+		template <typename SparseMatrixType>
+		void SetupSymmetric(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF,
+		                    const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne);
+
+		// A temporary A would be destroyed before the solves
+		template <typename SparseMatrixType>
+		void SetupSymmetric(const SparseMatrixType&& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FF,
+		                    const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne) = delete;
+		template <typename SparseMatrixType>
+		void SetupSymmetric(const SparseMatrixType&& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF,
+		                    const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne) = delete;
+
+		template <typename SparseMatrixType>
+		void SetupSymmetricFromBlocks(const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FF,
+		                              const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne);
+
+		// Setup for a non-symmetric matrix (e.g. convection-diffusion), whose symmetric part is positive definite: as
+		// SetupSymmetric(), with the block A_FT (faces x cells) and all the blocks read in full: the same algorithm runs on
+		// the matrix itself. The couplings of the aggregation are computed from the averaged traces of the blocks of A_TF
+		// and A_FT; the coarse operators are the Galerkin products P^T A P (as AGMG: Y. Notay, "An aggregation-based
+		// algebraic multigrid method", ETNA 37, 2010); the Gauss-Seidel smoothers follow the downwind order of each
+		// level (convection), in the pre- and post-smoothing; the K-cycle iterates with GCR. Krylov must not be "fcg",
+		// nor CoarseSolver "ch".
+		// See library/README.md.
+		template <typename SparseMatrixType>
+		void SetupNonsymmetric(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FT, const SparseMatrixType& A_FF,
+		                       const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne);
+
+		template <typename SparseMatrixType>
+		void SetupNonsymmetric(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FT,
+		                       const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne);
+
+		// A temporary A would be destroyed before the solves
+		template <typename SparseMatrixType>
+		void SetupNonsymmetric(const SparseMatrixType&& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FT, const SparseMatrixType& A_FF,
+		                       const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne) = delete;
+		template <typename SparseMatrixType>
+		void SetupNonsymmetric(const SparseMatrixType&& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FT,
+		                       const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne) = delete;
+
+		template <typename SparseMatrixType>
+		void SetupNonsymmetricFromBlocks(const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FT, const SparseMatrixType& A_FF,
+		                                 const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne);
+
+		// Solves A x = b. x: the initial guess on input (e.g. zero), the solution on output. Does not throw if the
+		// solver has not converged after MaxIterations iterations: see the result.
+		Result Solve(const Eigen::Ref<const Eigen::VectorXd>& b, Eigen::Ref<Eigen::VectorXd> x);
+
+		// Solves A x = b from x = 0
+		Eigen::VectorXd Solve(const Eigen::Ref<const Eigen::VectorXd>& b)
+		{
+			Eigen::VectorXd x = Eigen::VectorXd::Zero(b.rows());
+			Solve(b, x);
+			return x;
+		}
+
+		bool IsSetUp() const;
+		int NumberOfLevels() const;
+
+	private:
+		// The configuration of Eigen that determines the memory layout of its objects
+		struct EigenConfiguration
+		{
+			int World, Major, Minor, MaxAlignBytes, IndexSize;
+		};
+
+		static EigenConfiguration HostEigenConfiguration()
+		{
+			return { EIGEN_WORLD_VERSION, EIGEN_MAJOR_VERSION, EIGEN_MINOR_VERSION, EIGEN_MAX_ALIGN_BYTES, (int)sizeof(Eigen::Index) };
+		}
+
+		Solver(const EigenConfiguration& host);
+
+		struct Impl;
+		std::unique_ptr<Impl> _impl;
+	};
+}

@@ -1,11 +1,11 @@
 // The shared library fhhos4_AMG: the algebraic multigrid of fhhos4 for hybrid discretizations (U-AMG), for the codes
-// that discretize the problem themselves (include/fhhos4). Compiled with fhhos4's flags and -fvisibility=hidden: only
+// that discretize the problem themselves (include/fhhos4.h). Compiled with fhhos4's flags and -fvisibility=hidden: only
 // the classes of the public header are exported. The multigrid is built as in the program (SolverFactory,
 // ApplyProgramArgumentDefaults), from the same code (AlgebraicSolverFactory, ApplyUncondensedAMGDefaults).
 #include <chrono>
 #include <limits>
 #include <type_traits>
-#include "fhhos4"
+#include "fhhos4.h"
 #include "ProgramArgumentsDefaults.h"
 #include "Solver/AlgebraicSolverFactory.h"
 #include "Solver/Krylov/PreconditionedBiCGSTAB.h"

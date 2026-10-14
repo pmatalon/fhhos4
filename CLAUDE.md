@@ -111,9 +111,9 @@ Example invocations for specific experiments/figures live in `reproducibility/*.
 ## Library (`library/`)
 
 `fhhos4_AMG` (short name fhhos4, the name client codes use): shared library giving U-AMG to other HHO codes (first
-target: HArDCore3D), see `library/README.md`. Public interface in `library/include/fhhos4` (`#include <fhhos4>`,
-namespace `fhhos4`, Eigen types, pimpl): `Solver` (parameters as public members; `Dimension`, `FaceDegree` and
-`CellDegree` must be set; `SetupSymmetric()` from `A`, `A_TT`, `A_TF` (`A_FF` optional) and the interpolations of 1, or
+target: HArDCore3D), see `library/README.md`. Public interface in `library/include/fhhos4.h` (`#include <fhhos4>`, a
+file that includes `fhhos4.h`, or `<fhhos4.h>`; namespace `fhhos4`, Eigen types, pimpl): `Solver` (parameters as
+public members; `Dimension`, `FaceDegree` and `CellDegree` must be set; `SetupSymmetric()` from `A`, `A_TT`, `A_TF` (`A_FF` optional) and the interpolations of 1, or
 `SetupNonsymmetric()` with `A_FT` too; `Solve()`), `Result`, and `Error` (in `fhhos4_error.h`, which `Utils.h`
 includes alone). Non-symmetric matrix (`UncondensedLevel::Symmetric` false, `A_F_T` given; program option
 `-uamg-nonsym` to test it on the symmetric matrices): the same algorithm on the matrix itself, without the optimizations of the symmetric case (lower triangular

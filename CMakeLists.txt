@@ -45,15 +45,15 @@ set(CMAKE_JOB_POOL_COMPILE compile_pool)
 # Library fhhos4_AMG
 #----------------------------------------------------------------------------------------------------------------------
 # The AMG of fhhos4 for hybrid discretizations (U-AMG), for the codes that discretize the problem themselves
-# (library/README.md). Shared, and compiled with -fvisibility=hidden: only the public API (library/include/fhhos4) is
+# (library/README.md). Shared, and compiled with -fvisibility=hidden: only the public API (library/include/fhhos4.h) is
 # exported, fhhos4's internals and its copy of Eigen's functions stay private. Its own compile definitions and link
 # libraries: the calling code only needs Eigen.
 add_library(fhhos4_AMG SHARED library/Solver.cpp ${CMAKE_BINARY_DIR}/generated/Version.cpp)
-add_library(fhhos4::Solver ALIAS fhhos4_AMG)
+add_library(fhhos4::fhhos4 ALIAS fhhos4_AMG) # the name of the exported target (EXPORT_NAME)
 # SOVERSION: binary compatibility within a minor version only, since adding a parameter (a public member) to
 # fhhos4::Solver changes its size.
 set_target_properties(fhhos4_AMG PROPERTIES
-	EXPORT_NAME AMG
+	EXPORT_NAME fhhos4
 	CXX_VISIBILITY_PRESET hidden
 	VISIBILITY_INLINES_HIDDEN ON
 	LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib
@@ -111,12 +111,12 @@ if(ENABLE_NATIVE_ARCH)
 endif()
 
 # Installation (component library), and CMake package of the library: find_package(fhhos4) then
-# target_link_libraries(<target> fhhos4::AMG), from the installation (cmake --install) or from this build tree
+# target_link_libraries(<target> fhhos4::fhhos4), from the installation (cmake --install) or from this build tree
 # (-Dfhhos4_DIR=<this build directory>). find_package(fhhos4 1.2) accepts the versions 1.x with x >= 2: the source
 # compatibility of the API (the binary compatibility is the SOVERSION's).
 include(CMakePackageConfigHelpers)
 install(TARGETS fhhos4_AMG EXPORT fhhos4Targets LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT library)
-install(FILES library/include/fhhos4 library/include/fhhos4_error.h
+install(FILES library/include/fhhos4 library/include/fhhos4.h library/include/fhhos4_error.h
 	${CMAKE_BINARY_DIR}/generated/include/fhhos4_version.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT library)
 install(EXPORT fhhos4Targets NAMESPACE fhhos4:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/fhhos4 COMPONENT library)
 configure_package_config_file(library/fhhos4Config.cmake.in ${CMAKE_BINARY_DIR}/fhhos4Config.cmake

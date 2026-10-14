@@ -31,7 +31,7 @@ Its calling code only needs Eigen, the same version as fhhos4's (see below). Wit
 
 ```cmake
 find_package(fhhos4 REQUIRED)
-target_link_libraries(my_code PRIVATE fhhos4::AMG)
+target_link_libraries(my_code PRIVATE fhhos4::fhhos4)
 ```
 
 and `-Dfhhos4_DIR=<fhhos4>/build` (from the build tree), or, after `cmake --install build --prefix <prefix>
@@ -50,7 +50,7 @@ and `-Dfhhos4_DIR=<fhhos4>/build` (from the build tree), or, after `cmake --inst
 ## Use
 
 ```cpp
-#include <fhhos4>
+#include <fhhos4> // or <fhhos4.h>
 
 fhhos4::Solver solver;
 solver.Dimension = 3;  // to set
@@ -123,7 +123,7 @@ matrix; the K-cycle then iterates with GCR too). BiCGSTAB is not flexible: it re
 
 ### Parameters
 
-The public members of `fhhos4::Solver` (see `include/fhhos4`), read by the setup (`Tolerance` and `MaxIterations` by
+The public members of `fhhos4::Solver` (see `include/fhhos4.h`), read by the setup (`Tolerance` and `MaxIterations` by
 `Solve()`). The defaults are those of the program fhhos4 (`-s fcguamg`), used in the papers: FCG with tolerance 1e-8,
 K-cycle, one block Gauss-Seidel iteration before and after, coarsening factor 3.8, Cholesky on the coarsest level
 (<= 1000 rows). Except the smoothers on several threads: by default (`PreSmoother` and `PostSmoother` empty),
