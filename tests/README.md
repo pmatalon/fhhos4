@@ -34,7 +34,7 @@ ctest -E HPConfig                          # skip the slowest tests
 ./bin/fhhos4_tests --gtest_filter=*Kellogg*  # or filter the binary directly
 ```
 
-The full suite is 199 CTest cases and runs in about 5 minutes serially. The 8 `HPConfigTest` cases take about 2 minutes of it (~15 s each: N=128 with k=5 is the smallest size of the high-order paper); the other cases take less than 20 s each.
+The full suite is 206 CTest cases and runs in about 5 minutes serially. The 8 `HPConfigTest` cases take about 2 minutes of it (~15 s each: N=128 with k=5 is the smallest size of the high-order paper); the other cases take less than 20 s each.
 
 ## GMSH meshes: reproducibility
 
@@ -184,6 +184,22 @@ Unit tests of the parallel sparse matrix operations used in the setup of U-AMG (
 - **`SparseMatrixOpsTest.FullFromLowerGivesSelfAdjointView`** (1 case) — `FullFromLower(S)` vs. Eigen's `S.selfadjointView<Eigen::Lower>()`.
 - **`SparseMatrixOpsTest.SelectRowsGivesCopiedRows`** (1 case) — `SelectRows` vs. the rows copied by `NonZeroCoefficients::CopyRows`.
 
+## `StaticCondensationTest.cpp`
+
+Unit tests of the static condensation by cells (`src/Solver/StaticCondensation.h`), with which the library condenses
+the uncondensed systems it is given, on random systems of cells in a row (3 faces per cell, 3 or 4 DoFs per cell, 2 or 3
+per face), symmetric (lower triangular `A_TT`, `A_FF`) or not, with 1, 3 and 8 threads. The condensed matrix must be bit
+for bit that of the global products `FullFromLower(A_FF) - Multiply(A_FT, Multiply(inv(A_TT), A_TF))` (inverses of the
+blocks in full).
+
+- **`StaticCondensationTest.CondensedMatrixInThePatternOfTheFaceBlock`** (1 case) — `A_FF` with the couplings of the
+  faces of each cell (as HHO): the rows of `A` in its pattern.
+- **`StaticCondensationTest.CondensedMatrixOutsideThePatternOfTheFaceBlock`** (1 case) — `A_FF` without them (block
+  diagonal): every row completed by the columns of the product.
+- **`StaticCondensationTest.FaceBlock`** (1 case) — `A_FF = A + A_FT A_TT^{-1} A_TF` from `A`.
+- **`StaticCondensationTest.SolvesTheUncondensedSystem`** (1 case) — the condensed right-hand side and the cell unknowns
+  solve the uncondensed system (to 1e-13).
+
 ## `DownwindOrderTest.cpp`
 
 Unit tests of the downwind order of the Gauss-Seidel smoothers of U-AMG for a non-symmetric matrix
@@ -248,17 +264,19 @@ hierarchy of the reference implementation (`HybridAlgebraicMesh`, run with `Unco
 
 Tests of the library `fhhos4_AMG` (`library/`), the U-AMG of fhhos4 for other codes (`fhhos4::Solver`, `#include <fhhos4>`).
 
-- **`UAMGLibraryProgram/UAMGLibraryProgramTest.SameAsProgram`** (21 cases: Square-tri n=16 k=0,1 and k=1 with orthonormal bases, Cube-tet n=8 k=0 with default and orthonormal bases, k=1 orthonormal, Cube-cart n=8 k=2 × `fcglibuamg`, `gcrlibuamg`, `libuamg`) — the program runs U-AMG through the library (`Solver/LibraryUAMG.cpp`), as an external code calls it, and must get the iteration count and the L2 error (to 1e-6 relative) of the U-AMG compiled in it (`fcguamg`, `gcruamg`, `uamg`). The library gets the blocks without `A_FF`, as HArDCore3D gives them.
-  CLI: `./bin/fhhos4 -geo {square|cube} -mesh {tri|tetra|cart} -n {16|8} -k {0|1|2} -s {fcglibuamg|fcguamg|gcrlibuamg|gcruamg|libuamg|uamg} [-e-ogb 3 -f-ogb 3] -no-cache`
+- **`UAMGLibraryProgram/UAMGLibraryProgramTest.SameAsProgram`** (21 cases: Square-tri n=16 k=0,1 and k=1 with orthonormal bases, Cube-tet n=8 k=0 with default and orthonormal bases, k=1 orthonormal, Cube-cart n=8 k=2 × `fcglibuamg`, `gcrlibuamg`, `libuamg`) — the program runs U-AMG through the library (`Solver/LibraryUAMG.cpp`), as an external code calls it, and must get the iteration count and the L2 error (to 1e-6 relative) of the U-AMG compiled in it (`fcguamg`, `gcruamg`, `uamg`), through both interfaces of the library: the uncondensed system (default: the program gives the blocks and the right-hand sides of the cells and faces, `SetupSymmetricFromBlocks()` and `Solve(b_T, b_F, x_T, x_F)`: the library condenses the system and computes the cell unknowns) and the condensed one (`-libuamg-condensed`: the program condenses the system and gives `A` with the blocks without `A_FF`, as HArDCore3D and Disk++).
+  CLI: `./bin/fhhos4 -geo {square|cube} -mesh {tri|tetra|cart} -n {16|8} -k {0|1|2} -s {fcglibuamg|fcguamg|gcrlibuamg|gcruamg|libuamg|uamg} [-libuamg-condensed] [-e-ogb 3 -f-ogb 3] -no-cache`
 
 - **`UAMGLibraryProgram.NotAPreconditionerOfTheConjugateGradient`** (1 case) — `-s cglibuamg` is refused: the library gives U-AMG with its own Krylov method only (with the K-cycle, it is a non-linear preconditioner).
 
-- **`UAMGNonsymmetricProgram/UAMGNonsymmetricProgramTest.SameAsSymmetric`** (7 cases: the cases of `SameAsProgram`) — U-AMG for a non-symmetric matrix (`-uamg-nonsym`: `A_FT = A_TF^T` given, all the blocks in full) on the symmetric matrix of the problem, in the program (`gcruamg`) and through the library (`gcrlibuamg`: `SetupNonsymmetric()`). It coarsens the symmetric part of the matrix (the matrix itself) and computes the Galerkin products of the matrix, equal to the symmetric ones up to rounding: it must get the iteration count and the L2 error (to 1e-6 relative) of the symmetric U-AMG (`gcruamg`).
-  CLI: `./bin/fhhos4 -geo {square|cube} -mesh {tri|tetra|cart} -n {16|8} -k {0|1|2} -s {gcruamg|gcrlibuamg} [-uamg-nonsym] [-e-ogb 3 -f-ogb 3] -no-cache`
+- **`UAMGLibraryProgram.CondensedOptionRequiresTheLibrary`** (1 case) — `-libuamg-condensed` refuses `-s fcguamg`: death test (`EXIT_FAILURE`).
+
+- **`UAMGNonsymmetricProgram/UAMGNonsymmetricProgramTest.SameAsSymmetric`** (7 cases: the cases of `SameAsProgram`) — U-AMG for a non-symmetric matrix (`-uamg-nonsym`: `A_FT = A_TF^T` given, all the blocks in full) on the symmetric matrix of the problem, in the program (`gcruamg`) and through the library (`gcrlibuamg`: `SetupNonsymmetricFromBlocks()`, and `SetupNonsymmetric()` with `-libuamg-condensed`). It coarsens the symmetric part of the matrix (the matrix itself) and computes the Galerkin products of the matrix, equal to the symmetric ones up to rounding: it must get the iteration count and the L2 error (to 1e-6 relative) of the symmetric U-AMG (`gcruamg`).
+  CLI: `./bin/fhhos4 -geo {square|cube} -mesh {tri|tetra|cart} -n {16|8} -k {0|1|2} -s {gcruamg|gcrlibuamg} [-uamg-nonsym] [-libuamg-condensed] [-e-ogb 3 -f-ogb 3] -no-cache`
 
 - **`UAMGNonsymmetricProgram.NotWithFCG`** (1 case) — `-uamg-nonsym` refuses `-s fcguamg` (FCG requires a symmetric matrix): death test (`EXIT_FAILURE`).
 
-- **`UAMGLibrary.*`** (14 cases) — the public API alone, on a hybrid system of degree 0 built in the test (Cartesian mesh of the unit square, random coefficients), with the sequential smoothers (`bgs`, `rbgs`: the default hybrid smoother depends on the number of threads): it solves the system; the default smoothers are the hybrid Gauss-Seidel on 4 threads, the sequential one on 1 thread; computes `A` from the blocks (`SetupSymmetricFromBlocks`), with full or lower-only symmetric blocks; works without `A_FF`; gives the same levels, iteration count and solution with row-major matrices (fhhos4's format, read in place if compressed, copied otherwise) as with column-major ones; gives the same iterates on bases scaled by random factors, given the interpolation of 1; GCR (with the K-cycle, which then iterates with GCR); a non-symmetric system (advection-like couplings `A_FT != A_TF^T`, asymmetry 0.3 and 0.9: `SetupNonsymmetric()` with GCR, BiCGSTAB with a V-cycle, and from the blocks, against a sparse LU); the non-symmetric setup of a symmetric system (the iterations of the symmetric one); BiCGSTAB with a V-cycle; the cycles alone (`Krylov = "none"`); the errors (parameters not set or invalid, BiCGSTAB with the K-cycle, FCG or Cholesky with a non-symmetric matrix, `A_FT` of the wrong size, inputs inconsistent with the dimension and the degrees, non block-diagonal `A_TT`); it prints nothing at verbosity 0, and leaves the number of threads and the format of `cout` unchanged; `fhhos4::Version()` starts with the version of the header.
+- **`UAMGLibrary.*`** (16 cases) — the public API alone, on a hybrid system of degree 0 built in the test (Cartesian mesh of the unit square, random coefficients), with the sequential smoothers (`bgs`, `rbgs`: the default hybrid smoother depends on the number of threads): it solves the system; solves the uncondensed system after a setup from the blocks (`Solve(b_T, b_F, x_T, x_F)`, symmetric and not, against a sparse LU of the uncondensed matrix, and the faces solution of the condensed system); `CondensedMatrix()` returns the caller's own `A` when read in place, its conversion otherwise, the matrix computed from the blocks; the default smoothers are the hybrid Gauss-Seidel on 4 threads, the sequential one on 1 thread; computes `A` from the blocks (`SetupSymmetricFromBlocks`), with full or lower-only symmetric blocks; works without `A_FF`; gives the same levels, iteration count and solution with row-major matrices (fhhos4's format, read in place if compressed, copied otherwise) as with column-major ones; gives the same iterates on bases scaled by random factors, given the interpolation of 1; GCR (with the K-cycle, which then iterates with GCR); a non-symmetric system (advection-like couplings `A_FT != A_TF^T`, asymmetry 0.3 and 0.9: `SetupNonsymmetric()` with GCR, BiCGSTAB with a V-cycle, and from the blocks, against a sparse LU); the non-symmetric setup of a symmetric system (the iterations of the symmetric one); BiCGSTAB with a V-cycle; the cycles alone (`Krylov = "none"`); the errors (parameters not set or invalid, BiCGSTAB with the K-cycle, FCG or Cholesky with a non-symmetric matrix, `A_FT` of the wrong size, inputs inconsistent with the dimension and the degrees, non block-diagonal `A_TT`, `Solve(b_T, b_F, x_T, x_F)` after a setup from `A` or with vectors of the wrong sizes); it prints nothing at verbosity 0, and leaves the number of threads and the format of `cout` unchanged; `fhhos4::Version()` starts with the version of the header.
 
 ## `ReferenceShapeCacheTest.cpp`
 
@@ -269,7 +287,7 @@ Unit tests of the matrices that the reference shapes (static: one per process) c
 
 ## Coverage summary
 
-- 128 CTest cases total across the 10 files above, exercising `Program_Diffusion_HHO` (diffusion problems) and `Program_BiHarmonic_HHO` (biharmonic problem in mixed form), with the HHO discretization and static condensation, and the library `fhhos4_AMG`.
+- 206 CTest cases total across the 15 files above, exercising `Program_Diffusion_HHO` (diffusion problems) and `Program_BiHarmonic_HHO` (biharmonic problem in mixed form), with the HHO discretization and static condensation, and the library `fhhos4_AMG`.
 - Dimensions: 2D and 3D. No 1D coverage (the run helpers throw for it, consistent with `ENABLE_1D=OFF` by default).
 - Meshes: in-house `cart`, `stri`, `quad`, `stetra`; GMSH `cart`, `tri`, `tetra`, and a locally refined mesh; polygonal meshes (`poly`, CGAL) built from a GMSH Cartesian mesh, with and without interface collapsing (`-polymesh-fcs c|n`).
 - Coarsening strategies: standard, refinement (`-cs r`), independent remeshing (`-cs m`), agglomeration (`-cs n`).

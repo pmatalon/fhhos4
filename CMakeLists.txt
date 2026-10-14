@@ -67,6 +67,12 @@ target_include_directories(fhhos4_AMG
 # Version, used by the library and the program: the public header fhhos4_version.h, and the definition of
 # fhhos4::Version(), which adds the commit (git describe). The commit changes without CMake running again: Version.cpp
 # is regenerated at each build, but rewritten only when it changes, so a new commit recompiles this small file alone.
+# fhhos4_version.h also gives the index type of the sparse matrices (SMALL_INDEX, src/Utils/Types.h): fhhos4::SparseMatrix.
+if(SMALL_INDEX)
+	set(FHHOS4_SPARSE_INDEX int)
+else()
+	set(FHHOS4_SPARSE_INDEX intmax_t)
+endif()
 configure_file(library/fhhos4_version.h.in ${CMAKE_BINARY_DIR}/generated/include/fhhos4_version.h @ONLY)
 find_package(Git QUIET)
 set(git_version_command ${CMAKE_COMMAND} -DSOURCE_DIR=${CMAKE_SOURCE_DIR} -DVERSION=${PROJECT_VERSION}

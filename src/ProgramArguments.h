@@ -64,6 +64,7 @@ struct MultigridArguments
 	int WLoops = 1;
 	KrylovMethod KCycleKrylov = KrylovMethod::FCG; // GCR under -s gcr (ApplyProgramArgumentDefaults)
 	bool UAMGNonsymmetric = false; // -uamg-nonsym: U-AMG for a non-symmetric matrix (A_FT given), on the symmetric matrix
+	bool UAMGLibraryCondensed = false; // -libuamg-condensed: libuamg from the condensed matrix, not from the blocks
 	bool UseHigherOrderReconstruction = true;
 	bool UseHeterogeneousWeighting = true;
 	bool UseGalerkinOperator = false;
@@ -117,6 +118,12 @@ struct SolverArguments
 	bool UsesUncondensedAMG() const
 	{
 		return SolverCode == "uamg" || PreconditionerCode == "uamg" || SolverCode == "libuamg" || PreconditionerCode == "libuamg";
+	}
+
+	// U-AMG called through the library fhhos4_AMG (-s libuamg, fcglibuamg, gcrlibuamg)
+	bool UsesLibraryUAMG() const
+	{
+		return SolverCode.find("libuamg") != string::npos || PreconditionerCode == "libuamg";
 	}
 };
 

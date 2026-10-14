@@ -9,10 +9,13 @@
 #include "ProgramArgumentsDefaults.h"
 #include "Solver/AlgebraicSolverFactory.h"
 #include "Solver/Krylov/PreconditionedBiCGSTAB.h"
+#include "Solver/StaticCondensation.h"
 #include "Utils/SparseMatrixOps.h"
 
 namespace fhhos4
 {
+	static_assert(is_same_v<fhhos4::SparseMatrix, ::SparseMatrix>, "FHHOS4_SPARSE_INDEX (fhhos4_version.h) must be fhhos4's SparseMatrixIndex");
+
 	namespace
 	{
 		// Discards the messages (no stream buffer)
@@ -120,34 +123,6 @@ namespace fhhos4
 				return _matrix;
 			}
 		};
-
-		// A_FT A_TT^{-1} A_TF. A_FT null: symmetric matrix, A_FT = A_TF^T, and A_TT read from its lower part.
-		SparseMatrix CellElimination(const SparseMatrix& A_TT, const SparseMatrix& A_TF, const SparseMatrix* A_FT, int cellBlockSize)
-		{
-			if (A_FT)
-			{
-				SparseMatrix invA_TT = Utils::InvertBlockDiagMatrix(A_TT, cellBlockSize);
-				return SparseMatrixOps::Multiply(*A_FT, SparseMatrixOps::Multiply(invA_TT, A_TF));
-			}
-			SparseMatrix invA_TT = Utils::InvertBlockDiagMatrix(SparseMatrixOps::FullFromLower(A_TT), cellBlockSize);
-			return SparseMatrixOps::Multiply(SparseMatrixOps::Transpose(A_TF), SparseMatrixOps::Multiply(invA_TT, A_TF));
-		}
-
-		// A = A_FF - A_FT A_TT^{-1} A_TF. A_FT null: symmetric matrix, A_TT and A_FF read from their lower parts.
-		SparseMatrix CondensedMatrix(const SparseMatrix& A_TT, const SparseMatrix& A_TF, const SparseMatrix* A_FT, const SparseMatrix& A_FF, int cellBlockSize)
-		{
-			SparseMatrix A = (A_FT ? A_FF : SparseMatrixOps::FullFromLower(A_FF)) - CellElimination(A_TT, A_TF, A_FT, cellBlockSize);
-			A.makeCompressed();
-			return A;
-		}
-
-		// A_FF = A + A_FT A_TT^{-1} A_TF. A_FT null: symmetric matrix, A_TT read from its lower part.
-		SparseMatrix FaceBlock(const SparseMatrix& A, const SparseMatrix& A_TT, const SparseMatrix& A_TF, const SparseMatrix* A_FT, int cellBlockSize)
-		{
-			SparseMatrix A_FF = A + CellElimination(A_TT, A_TF, A_FT, cellBlockSize);
-			A_FF.makeCompressed();
-			return A_FF;
-		}
 	}
 
 	struct Solver::Impl
@@ -158,8 +133,10 @@ namespace fhhos4
 		string CoarseSolver;   // Solver::CoarseSolver, or its default for the symmetry of the matrix
 		int CellBlockSize = 0;
 		int FaceBlockSize = 0;
+		Eigen::Index NCellDoFs = 0;
 		const SparseMatrix* A = nullptr; // the solvers keep a pointer to it: the caller's matrix, or OwnA
 		SparseMatrix OwnA;               // A if the library computes or converts it, empty otherwise
+		unique_ptr<StaticCondensation> Condensation; // after a setup from the blocks: for Solve(b_T, b_F, x_T, x_F)
 		unique_ptr<UncondensedAMG> Multigrid;
 		unique_ptr<IterativeSolver> KrylovSolver; // preconditioned by Multigrid; null if Krylov is "none"
 		bool IsSetUp = false;
@@ -288,8 +265,10 @@ namespace fhhos4
 			IsSetUp = false;
 			KrylovSolver.reset();
 			Multigrid.reset();
+			Condensation.reset();
 			this->A = nullptr;
 			OwnA = SparseMatrix();
+			NCellDoFs = A_TF.rows();
 
 			ProgramArguments args = Arguments(s);
 			ExportModule out;
@@ -299,12 +278,13 @@ namespace fhhos4
 				this->A = A->Keep(OwnA);
 			else
 			{
-				OwnA = CondensedMatrix(A_TT, A_TF, A_FT, *A_FF, CellBlockSize);
+				Condensation = make_unique<StaticCondensation>(A_TT, A_TF, A_FT, CellBlockSize);
+				OwnA = Condensation->CondensedMatrix(*A_FF, Symmetric);
 				this->A = &OwnA;
 			}
 			SparseMatrix computedA_FF; // empty if A_FF is given, or not needed (the algorithm of the paper only uses A_TT and A_TF)
 			if (!A_FF && Multigrid->A_F_FNeeded())
-				computedA_FF = FaceBlock(*this->A, A_TT, A_TF, A_FT, CellBlockSize);
+				computedA_FF = StaticCondensation(A_TT, A_TF, A_FT, CellBlockSize).FaceBlock(*this->A);
 
 			// The Krylov method preconditioned by one cycle (SolverPreconditioner), as SolverFactory (-s fcguamg, gcruamg),
 			// except the residual replacement: the tolerance applies to the true residual (Result::RelativeResidual =
@@ -350,6 +330,12 @@ namespace fhhos4
 		{
 			if (size != A->rows())
 				Utils::FatalError(string("fhhos4::Solver: the vector ") + vector + " has " + to_string(size) + " rows, expected " + to_string(A->rows()) + " (the faces DoFs).");
+		}
+
+		void CheckCellVectorSize(Eigen::Index size, const char* vector) const
+		{
+			if (size != NCellDoFs)
+				Utils::FatalError(string("fhhos4::Solver: the vector ") + vector + " has " + to_string(size) + " rows, expected " + to_string(NCellDoFs) + " (the cells DoFs).");
 		}
 	};
 
@@ -466,6 +452,32 @@ namespace fhhos4
 		if (Verbosity == 1)
 			cout << "fhhos4_AMG: " << result.Iterations << " iterations, relative residual " << result.RelativeResidual << (result.Converged ? "" : " (not converged)") << ", " << Seconds(start) << " s" << endl;
 		return result;
+	}
+
+	Result Solver::Solve(const Eigen::Ref<const Eigen::VectorXd>& b_T, const Eigen::Ref<const Eigen::VectorXd>& b_F,
+	                     Eigen::Ref<Eigen::VectorXd> x_T, Eigen::Ref<Eigen::VectorXd> x_F)
+	{
+		_impl->CheckSetUp("Solve");
+		if (!_impl->Condensation)
+			Utils::FatalError("fhhos4::Solver::Solve(b_T, b_F, x_T, x_F) solves the uncondensed system: it needs a setup from its blocks (SetupSymmetricFromBlocks() or SetupNonsymmetricFromBlocks()). After SetupSymmetric() or SetupNonsymmetric(), solve the condensed system with Solve(b, x).");
+		_impl->CheckCellVectorSize(b_T.rows(), "b_T");
+		_impl->CheckCellVectorSize(x_T.rows(), "x_T");
+		_impl->CheckVectorSize(b_F.rows(), "b_F");
+		_impl->CheckVectorSize(x_F.rows(), "x_F");
+		CallScope scope(*this);
+
+		const StaticCondensation& condensation = *_impl->Condensation;
+		Vector invA_TT_b_T = condensation.SolveCells(b_T);
+		Vector b = condensation.CondensedRHS(b_F, invA_TT_b_T);
+		Result result = Solve(b, x_F);
+		x_T = condensation.CellUnknowns(invA_TT_b_T, x_F);
+		return result;
+	}
+
+	const SparseMatrix& Solver::CondensedMatrix() const
+	{
+		_impl->CheckSetUp("CondensedMatrix");
+		return *_impl->A;
 	}
 
 	bool Solver::IsSetUp() const

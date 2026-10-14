@@ -1,13 +1,13 @@
 #include "fhhos4.h"
 #include "LibraryUAMG.h"
 
-class LibraryUAMG : public IterativeSolver
+class LibraryUAMGImpl : public LibraryUAMG
 {
 private:
 	fhhos4::Solver _solver;
 public:
 	// The parameters of the library that correspond to the arguments of the program
-	LibraryUAMG(const ProgramArguments& args, int dim, int faceDegree, int cellDegree, const string& krylov)
+	LibraryUAMGImpl(const ProgramArguments& args, int dim, int faceDegree, int cellDegree, const string& krylov)
 	{
 		_solver.Dimension = dim;
 		_solver.FaceDegree = faceDegree;
@@ -48,6 +48,15 @@ public:
 			_solver.SetupSymmetric(A, A_T_T, A_T_F, cellInterpOfOne, faceInterpOfOne);
 	}
 
+	void SetupFromBlocks(const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_T, const SparseMatrix& A_F_F, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
+	{
+		if (A_F_T.rows() > 0)
+			_solver.SetupNonsymmetricFromBlocks(A_T_T, A_T_F, A_F_T, A_F_F, cellInterpOfOne, faceInterpOfOne);
+		else
+			_solver.SetupSymmetricFromBlocks(A_T_T, A_T_F, A_F_F, cellInterpOfOne, faceInterpOfOne);
+		IterativeSolver::Setup(_solver.CondensedMatrix());
+	}
+
 	void Solve(const Vector& b, Vector& x, bool xEquals0, bool computeResidual, bool computeAx) override
 	{
 		if (computeResidual || computeAx)
@@ -57,9 +66,17 @@ public:
 		this->IterationCount = result.Iterations;
 		this->LastIterationResult.NormalizedResidualNorm = result.RelativeResidual;
 	}
+
+	void Solve(const Vector& b_T, const Vector& b_F, Vector& x_T, Vector& x_F) override
+	{
+		x_T.resize(b_T.rows());
+		fhhos4::Result result = _solver.Solve(b_T, b_F, x_T, x_F);
+		this->IterationCount = result.Iterations;
+		this->LastIterationResult.NormalizedResidualNorm = result.RelativeResidual;
+	}
 };
 
-IterativeSolver* CreateLibraryUAMG(const ProgramArguments& args, int dim, int faceDegree, int cellDegree, const string& krylov)
+LibraryUAMG* CreateLibraryUAMG(const ProgramArguments& args, int dim, int faceDegree, int cellDegree, const string& krylov)
 {
-	return new LibraryUAMG(args, dim, faceDegree, cellDegree, krylov);
+	return new LibraryUAMGImpl(args, dim, faceDegree, cellDegree, krylov);
 }

@@ -827,7 +827,39 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   32^3 k=1 diffusion-dominated system (`build/bench_nonsym/diff_n32_k1`, column-major inputs as the clients give them,
   `build/bench_schur/fromblocks.cpp`, 3 interleaved repetitions, on battery): setup 1 thread 0.46-0.57 -> 1.18-1.22 s,
   8 threads 0.17-0.28 -> 0.60-0.69 s; the same iterations (23 / 24), solve unchanged. A cell-wise computation in the
-  library would at best equal the clients' local products.
+  library would at best equal the clients' local products (done the same day: +0.34 s / +0.1 s, next entry).
+
+- **Static condensation by cells in the library; the uncondensed interface** (2026-10-14, the user's requests: "do steps
+  1 and 2", the library condensing the system and computing the cell unknowns, the interface of choice; the clients
+  keep the condensed one). `src/Solver/StaticCondensation.h`, used by `Setup...FromBlocks()` and for `A_FF` from `A`:
+  - The constructor inverts the blocks of `A_TT` (`DenseMatrix::inverse()`) and computes `W = A_TT^{-1} A_TF` by cells
+    (the rows of a cell dense on the union of their columns), in parallel; the rows of `A = A_FF - A_FT W` are then
+    computed in two parallel passes (sizes, then values) in the pattern of `A_FF` read in full (the symmetric lower part
+    completed from its transpose, without forming the full `A_FF`), completed (and sorted) only in the rows where `A_FT W`
+    has other columns; the products of a cell use the positions of its columns once. Replaces
+    `InvertBlockDiagMatrix()`, two `Multiply()`, `FullFromLower(A_FF)` and Eigen's sequential subtraction.
+  - Bit for bit the global products with the inverses in full (`compare.cpp`, `tests/StaticCondensationTest.cpp`).
+    `Utils::InvertBlockDiagMatrix()`, used before, drops the coefficients of the inverses of absolute value <= 1e-15
+    (`NonZeroCoefficients::ZeroThreshold`): identical results on HArDCore3D's blocks, 1e-8 relative differences in `A`
+    on their symmetric part (smaller inverse coefficients). The drop is no longer used (the other calls are commented
+    out).
+  - The program's `A_FF` lacks some couplings of the faces of a cell (its assembly drops the coefficients <= 1e-15):
+    3 of 8 cases (Square-tri k=1, Cube-tet k=1, Cube-cart k=2, default bases) complete rows, hence the completion
+    instead of a fallback to the global products (first version, 2-5x slower).
+  - The condensation, HArDCore3D's 32^3 k=1 system (285,696 face DoFs, 9.2M non-zeros; `build/bench_schur/compare.cpp`,
+    best of 3, on battery), before -> after, 1 thread / 8 threads: non-symmetric 0.63-0.72 -> 0.26-0.30 s / 0.33 ->
+    0.05-0.07 s; symmetric part, lower `A_TT`, `A_FF`: 0.76-0.80 -> 0.33-0.34 s / 0.24-0.31 -> 0.07 s; full symmetric
+    blocks 0.87 -> 0.41-0.43 s / 0.24-0.28 -> 0.09-0.12 s; all the rows completed (diagonal `A_FF`): 0.53-0.61 ->
+    0.40 s / 0.21-0.23 -> 0.12 s.
+  - Setup of the library, from the blocks against from `A` (`fromblocks.cpp`, 3 alternated runs): 1 thread 1.18-1.22 s
+    -> 0.75-0.84 s against 0.41-0.49 s; 8 threads 0.60-0.69 s -> 0.26-0.31 s against 0.16-0.33 s. The same iterations;
+    `Solve(b_T, b_F, x_T, x_F)` gives the `x_F` of the condensed solve exactly (b_T = 0), `|A_TT x_T + A_TF x_F| / |A_TF
+    x_F|` 2e-16, `CondensedMatrix()` HArDCore3D's `A` to 6e-17.
+  - The program (`-s fcglibuamg`, uncondensed by default; `-libuamg-condensed`: the program condenses), Cube-cart
+    inhouse n=24 k=1, 8 threads: setup 0.117 s against 0.040 s, solve 0.22 s against 0.18 s (the right-hand side and
+    the cell unknowns inside), the assembly the same (3.7-3.96 s: the program's condensation is small there), total
+    the same (7.3-7.5 s); peak memory 413 MB against 389 MB (the library keeps `W`, `A_FT` and the inverses); the same L2
+    error.
 
 ## Current profile (U-AMG; parallel: 16 threads, the default before 2026-10-08)
 

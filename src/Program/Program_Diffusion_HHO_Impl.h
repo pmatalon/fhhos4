@@ -182,6 +182,14 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 
 	Diffusion_HHO<Dim>* problem = new Diffusion_HHO<Dim>(mesh, testCase, hho, args.Discretization.StaticCondensation, saveMatrixBlocks);
 
+	// U-AMG through the library (-s libuamg...): the program gives it the blocks of the uncondensed system, and the library
+	// condenses it and computes the cell unknowns (its interface of choice); unless -libuamg-condensed, or the program needs
+	// the condensed system: full Neumann problem (projection of b onto the image of A), export of the linear system or of
+	// the algebraic error (exact solution of the condensed system)
+	bool libraryCondenses = args.Solver.UsesLibraryUAMG() && !args.Solver.MG.UAMGLibraryCondensed && args.Discretization.StaticCondensation
+		&& testCase->BC.Type != PbBoundaryConditions::FullNeumann && !args.Actions.Export.LinearSystem && !args.Actions.Export.ErrorToGMSH;
+	problem->CondensationBySolver = libraryCondenses;
+
 	cout << endl;
 	cout << "----------------------------------------------------------" << endl;
 	cout << "-                       Assembly                         -" << endl;
@@ -204,7 +212,8 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 	assemblyTimer.Start();
 
 	problem->Assemble(args.Actions, out);
-	cout << "System storage: " << Utils::MemoryString(Utils::MemoryUsage(problem->A) + Utils::MemoryUsage(problem->b)) << endl;
+	if (!libraryCondenses)
+		cout << "System storage: " << Utils::MemoryString(Utils::MemoryUsage(problem->A) + Utils::MemoryUsage(problem->b)) << endl;
 
 	assemblyTimer.Stop();
 	cout << endl << "Assembly time: CPU = " << assemblyTimer.CPU() << ", elapsed = " << assemblyTimer.Elapsed() << endl;
@@ -233,6 +242,7 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 		}
 
 		Vector systemSolution;
+		Vector cellSolution; // computed by the library if libraryCondenses
 
 		// The solver on the physical cores only, by default (the assembly and the post-processing on all the logical cores)
 		Parallelism::SolverThreads solverThreads;
@@ -252,7 +262,7 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 		IterativeSolver* iterativeSolver = dynamic_cast<IterativeSolver*>(solver);
 		if (iterativeSolver)
 		{
-			iterativeSolver->ComputeExactSolution = Utils::ProgramArgs.Actions.Export.ErrorToGMSH || problem->A.rows() <= 2000;
+			iterativeSolver->ComputeExactSolution = !libraryCondenses && (Utils::ProgramArgs.Actions.Export.ErrorToGMSH || problem->A.rows() <= 2000);
 			if (args.Solver.ComputeIterL2Error && testCase->ExactSolution && args.Discretization.StaticCondensation)
 			{
 				iterativeSolver->OnNewSolution = [&problem, &testCase](IterationResult& result, const Vector& faceSolution)
@@ -282,8 +292,13 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 				A_ndF_ndF = SparseMatrixOps::FullFromLower(problem->A_ndF_ndF);
 			}
 
+			LibraryUAMG* library = libraryCondenses ? dynamic_cast<LibraryUAMG*>(solver) : nullptr;
 			setupTimer.Start();
-			if (nonsymmetric)
+			if (library && nonsymmetric)
+				library->SetupFromBlocks(A_T_T, problem->A_T_ndF, A_ndF_T, A_ndF_ndF, cellInterpOfOne, faceInterpOfOne);
+			else if (library)
+				library->SetupFromBlocks(problem->A_T_T, problem->A_T_ndF, SparseMatrix(), problem->A_ndF_ndF, cellInterpOfOne, faceInterpOfOne);
+			else if (nonsymmetric)
 				iterativeSolver->Setup(problem->A, A_T_T, problem->A_T_ndF, A_ndF_T, A_ndF_ndF, cellInterpOfOne, faceInterpOfOne);
 			else if (uamg)
 				iterativeSolver->Setup(problem->A, problem->A_T_T, problem->A_T_ndF, SparseMatrix(), problem->A_ndF_ndF, cellInterpOfOne, faceInterpOfOne);
@@ -293,7 +308,13 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 
 			cout << "Solving..." << endl;
 			solvingTimer.Start();
-			systemSolution = iterativeSolver->Solve(problem->b, args.Solver.InitialGuessCode);
+			if (library)
+			{
+				systemSolution = IterativeSolver::InitialGuess(args.Solver.InitialGuessCode, problem->RHS_ndF().rows());
+				library->Solve(problem->RHS_T(), problem->RHS_ndF(), cellSolution, systemSolution);
+			}
+			else
+				systemSolution = iterativeSolver->Solve(problem->b, args.Solver.InitialGuessCode);
 			solvingTimer.Stop();
 			cout << iterativeSolver->IterationCount << " iterations." << endl << endl;
 			if (results)
@@ -345,7 +366,9 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 			cout << "-                     Post-processing                    -" << endl;
 			cout << "----------------------------------------------------------" << endl;
 
-			if (args.Discretization.StaticCondensation)
+			if (libraryCondenses)
+				hybridSolution = problem->HybridCoeffs(cellSolution, systemSolution); // cell unknowns computed by the library
+			else if (args.Discretization.StaticCondensation)
 			{
 				cout << "Solving cell unknowns..." << endl;
 				hybridSolution = problem->HybridCoeffsBySolvingCellUnknowns(systemSolution);

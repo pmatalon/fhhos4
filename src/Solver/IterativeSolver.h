@@ -75,22 +75,22 @@ public:
 
 	virtual Vector Solve(const Vector& b, string initialGuessCode)
 	{
-		Vector x;
-		bool xEquals0 = false;
-		if (initialGuessCode.compare("0") == 0)
-		{
-			x = Vector::Zero(b.rows());
-			xEquals0 = true;
-		}
-		else if (initialGuessCode.compare("1") == 0)
-			x = Vector::Ones(b.rows());
-		else if (initialGuessCode.compare("rand") == 0)
-			x = Vector::Random(b.rows());
-		else
-			Utils::FatalError("Unknown initial guess code");
-
-		Solve(b, x, xEquals0);
+		Vector x = InitialGuess(initialGuessCode, b.rows());
+		Solve(b, x, initialGuessCode.compare("0") == 0);
 		return x;
+	}
+
+	// The initial guess of the code (-initial-guess): "0", "1" or "rand"
+	static Vector InitialGuess(const string& initialGuessCode, BigNumber size)
+	{
+		if (initialGuessCode.compare("0") == 0)
+			return Vector::Zero(size);
+		if (initialGuessCode.compare("1") == 0)
+			return Vector::Ones(size);
+		if (initialGuessCode.compare("rand") == 0)
+			return Vector::Random(size);
+		Utils::FatalError("Unknown initial guess code");
+		return Vector();
 	}
 
 	virtual void Solve(const Vector& b, Vector& x, bool xEquals0)

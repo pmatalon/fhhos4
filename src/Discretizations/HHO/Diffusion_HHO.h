@@ -37,6 +37,10 @@ public:
 	DiffusionTestCase<Dim>* TestCase;
 	SparseMatrix A;
 	Vector b;
+	// Set before Assemble(): the static condensation is left to the solver (-s libuamg: the library fhhos4_AMG, from
+	// the blocks), which also computes the cell unknowns. Assemble() then keeps the blocks and B_T, B_ndF (RHS_T(),
+	// RHS_ndF()), and doesn't compute A and b.
+	bool CondensationBySolver = false;
 
 	HHOCellSpace<Dim>             CellSpace;
 	HHOReconstructSpace<Dim>      ReconstructSpace;
@@ -590,7 +594,12 @@ public:
 		this->A_ndF_ndF = A_F_F.topLeftCorner(HHO->nTotalFaceUnknowns, HHO->nTotalFaceUnknowns);
 		Utils::Empty(A_F_F);
 
-		if (this->_staticCondensation)
+		if (this->_staticCondensation && this->CondensationBySolver)
+		{
+			if (actions.LogAssembly)
+				cout << "Static condensation: by the solver (the library fhhos4_AMG)" << endl;
+		}
+		else if (this->_staticCondensation)
 		{
 			if (actions.LogAssembly)
 				cout << "Static condensation..." << endl;
@@ -853,15 +862,38 @@ public:
 
 	Vector HybridCoeffsBySolvingCellUnknowns(const Vector& faceUnknowns, const Vector& dirichletCoeffs, const Vector& b_T)
 	{
+		return HybridCoeffs(SolveCellUnknowns(faceUnknowns, b_T), faceUnknowns, dirichletCoeffs);
+	}
+
+	// From the cell unknowns computed by the solver (CondensationBySolver)
+	Vector HybridCoeffs(const Vector& cellUnknowns, const Vector& faceUnknowns)
+	{
+		return HybridCoeffs(cellUnknowns, faceUnknowns, this->x_dF);
+	}
+
+	Vector HybridCoeffs(const Vector& cellUnknowns, const Vector& faceUnknowns, const Vector& dirichletCoeffs)
+	{
+		assert(cellUnknowns.rows() == HHO->nTotalCellUnknowns);
 		assert(faceUnknowns.rows() == HHO->nTotalFaceUnknowns);
 		assert(dirichletCoeffs.rows() == HHO->nDirichletCoeffs);
 
 		Vector hybridCoeffs = Vector(HHO->nTotalHybridCoeffs);
-		hybridCoeffs.head(HHO->nTotalCellUnknowns) = SolveCellUnknowns(faceUnknowns, b_T);
+		hybridCoeffs.head(HHO->nTotalCellUnknowns) = cellUnknowns;
 		hybridCoeffs.segment(HHO->nTotalCellUnknowns, HHO->nTotalFaceUnknowns) = faceUnknowns;
 		hybridCoeffs.tail(HHO->nDirichletCoeffs) = dirichletCoeffs; // Dirichlet boundary conditions
 
 		return hybridCoeffs;
+	}
+
+	// The right-hand side of the uncondensed system, without the Dirichlet unknowns: cells, non-Dirichlet faces
+	const Vector& RHS_T() const
+	{
+		return this->B_T;
+	}
+
+	const Vector& RHS_ndF() const
+	{
+		return this->B_ndF;
 	}
 
 	Vector HybridCoeffsByAddingDirichletCoeffs(const Vector& hybridUnknowns)

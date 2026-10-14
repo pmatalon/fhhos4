@@ -54,7 +54,7 @@ From `build/`:
 ctest --output-on-failure
 ```
 
-199 tests, ~5 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
+206 tests, ~5 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
 iteration counts of the papers in `reproducibility/` — see `tests/README.md`. Covers
 `Program_Diffusion_HHO` and `Program_BiHarmonic_HHO` (HHO, static condensation), 2D/3D,
 in-house, GMSH and polygonal meshes, and the library (`UAMGLibrary*`, ~15 s). Not covered: DG/FEM programs (disabled by default), `lu`/`cg`/`agmg`/`p_mg` solvers,
@@ -97,8 +97,8 @@ Example invocations for specific experiments/figures live in `reproducibility/*.
 - `Mesh/` — mesh data structures (Element, Face, Vertex, agglomeration).
 - `Discretizations/` — `DG/`, `FEM/`, `HHO/` discretization schemes.
 - `Solver/` — `Direct/`, `Krylov/`, `Multigrid/`, `FixedPoint/`, `BiHarmonic/`,
-  plus `SolverFactory.h` (needs the problem), `AlgebraicSolverFactory.h` (only the matrices: shared with the library)
-  and `LibraryUAMG.h/.cpp` (`-s libuamg`).
+  plus `SolverFactory.h` (needs the problem), `AlgebraicSolverFactory.h` (only the matrices: shared with the library),
+  `StaticCondensation.h` (algebraic, by cells: the library's) and `LibraryUAMG.h/.cpp` (`-s libuamg`).
 - `FunctionalBasis/`, `QuadratureRules/`, `Geometry/` — numerics building blocks.
 - `TestCases/` — analytic/benchmark problem definitions.
 - `Utils/` — cross-cutting helpers (timers, export, types). `Utils::FatalError()` throws `fhhos4::Error` (`main()`
@@ -113,9 +113,14 @@ Example invocations for specific experiments/figures live in `reproducibility/*.
 `fhhos4_AMG` (short name fhhos4, the name client codes use): shared library giving U-AMG to other HHO codes (first
 target: HArDCore3D), see `library/README.md`. Public interface in `library/include/fhhos4.h` (`#include <fhhos4>`, a
 file that includes `fhhos4.h`, or `<fhhos4.h>`; namespace `fhhos4`, Eigen types, pimpl): `Solver` (parameters as
-public members; `Dimension`, `FaceDegree` and `CellDegree` must be set; `SetupSymmetric()` from `A`, `A_TT`, `A_TF` (`A_FF` optional) and the interpolations of 1, or
-`SetupNonsymmetric()` with `A_FT` too; `Solve()`), `Result`, and `Error` (in `fhhos4_error.h`, which `Utils.h`
-includes alone). Non-symmetric matrix (`UncondensedLevel::Symmetric` false, `A_F_T` given; program option
+public members; `Dimension`, `FaceDegree` and `CellDegree` must be set), `Result`, and `Error` (in `fhhos4_error.h`,
+which `Utils.h` includes alone). Two interfaces: the uncondensed system, the interface of choice
+(`SetupSymmetricFromBlocks()` from `A_TT`, `A_TF`, `A_FF` and the interpolations of 1, or `SetupNonsymmetricFromBlocks()`
+with `A_FT` too, then `Solve(b_T, b_F, x_T, x_F)`: the library condenses the system by cells, `StaticCondensation.h`,
+and computes the cell unknowns; `CondensedMatrix()`), and the condensed system, only to integrate the library with the
+least effort into codes that condense already (HArDCore3D, Disk++: `SetupSymmetric()`/`SetupNonsymmetric()` from `A`
+and the blocks, `A_FF` optional, then `Solve(b, x)`). `fhhos4::SparseMatrix`: fhhos4's matrix type, its index type
+generated into `fhhos4_version.h` (`SMALL_INDEX`). Non-symmetric matrix (`UncondensedLevel::Symmetric` false, `A_F_T` given; program option
 `-uamg-nonsym` to test it on the symmetric matrices): the same algorithm on the matrix itself, without the optimizations of the symmetric case (lower triangular
 parts, Cholesky; the local Galerkin products compute full matrices); couplings from the averaged traces of `A_TF` and
 `A_FT`, Galerkin coarse operators `P^T A P`, Gauss-Seidel sweeps in the downwind order of each level
@@ -126,8 +131,10 @@ and post-smoothing), K-cycle with GCR. Implementation `library/Solver.cpp`, comp
 nor read the global `Utils::ProgramArgs`. U-AMG is a non-linear preconditioner with the K-cycle: the Krylov method is
 inside the library (`Krylov`: FCG by default, GCR, BiCGSTAB with a V/W-cycle only, or none), which gives no cycle
 alone. The program runs it with `-s libuamg|fcglibuamg|gcrlibuamg` (`Solver/LibraryUAMG.cpp`, the only file of the
-program that includes the public header: changing it doesn't recompile `Program.cpp`), which `tests/UAMGLibraryTest.cpp`
-compares with `uamg|fcguamg|gcruamg`.
+program that includes the public header: changing it doesn't recompile `Program.cpp`) through the uncondensed
+interface (`Diffusion_HHO::CondensationBySolver`: no static condensation in the program), or the condensed one with
+`-libuamg-condensed` (and for a full Neumann problem and the exports of the system or of the algebraic error), which
+`tests/UAMGLibraryTest.cpp` compares with `uamg|fcguamg|gcruamg`.
 
 ## Version
 

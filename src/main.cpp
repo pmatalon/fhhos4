@@ -234,6 +234,8 @@ void print_usage() {
 	cout << "              uamg          - Uncondensed AMG (for hybrid discretizations with static condensation)" << endl;
 	cout << "              libuamg       - uamg called through the library fhhos4_AMG (library/), as by an external code." << endl;
 	cout << "                              Only the parameters of fhhos4::Solver apply (see library/include/fhhos4.h)." << endl;
+	cout << "                              The program gives it the uncondensed system: the library condenses it and computes" << endl;
+	cout << "                              the cell unknowns (see -libuamg-condensed)." << endl;
 	cout << "                              'fcglibuamg' ('gcrlibuamg') uses the FCG (GCR) of the library (as fcguamg, gcruamg)." << endl;
 	cout << "              aggregamg     - In-house implementation of AGMG, without the outer Krylov iteration. Meant to be used with K-cycle and with FCG." << endl;
 	cout << "              hoaggregamg   - Algebraic p-multigrid on top of aggregamg" << endl;
@@ -448,6 +450,14 @@ void print_usage() {
 	cout << "      triangular parts, Cholesky). The Gauss-Seidel smoothers follow the downwind order" << endl;
 	cout << "      of each level (none here: no convection), the K-cycle iterates with GCR, the default coarse solver is LU." << endl;
 	cout << "      Requires -s uamg, gcruamg, libuamg or gcrlibuamg." << endl;
+	cout << endl;
+	cout << "-libuamg-condensed" << endl;
+	cout << "      U-AMG through the library (-s libuamg, fcglibuamg, gcrlibuamg) from the condensed system: the program condenses" << endl;
+	cout << "      the system statically and gives the library the condensed matrix and the blocks (SetupSymmetric()," << endl;
+	cout << "      SetupNonsymmetric()), as the codes that condense already. By default, it gives the blocks of the uncondensed" << endl;
+	cout << "      system, and the library condenses it and computes the cell unknowns (SetupSymmetricFromBlocks()," << endl;
+	cout << "      SetupNonsymmetricFromBlocks(), Solve(b_T, b_F, x_T, x_F)); except for a full Neumann problem and the exports" << endl;
+	cout << "      of the linear system and of the algebraic error, which need the condensed system in the program." << endl;
 	cout << endl;
 	cout << "-coarsening-factor NUM" << endl;
 	cout << "      Requested coarsening factor for the coarsening strategies compatible." << endl;
@@ -753,6 +763,7 @@ int Run(int argc, char* argv[])
 		OPT_ReEntrantCornerManagement,
 		OPT_CoarseningFactor,
 		OPT_UAMGNonsymmetric,
+		OPT_UAMGLibraryCondensed,
 		OPT_CoarseN,
 		OPT_ApproxL2ProjSubtriangulationMethod,
 		OPT_ApproxL2ProjNSubtriangulations,
@@ -854,6 +865,7 @@ int Run(int argc, char* argv[])
 		 { "rcm", required_argument, NULL, OPT_ReEntrantCornerManagement },
 		 { "coarsening-factor", required_argument, NULL, OPT_CoarseningFactor },
 		 { "uamg-nonsym", no_argument, NULL, OPT_UAMGNonsymmetric },
+		 { "libuamg-condensed", no_argument, NULL, OPT_UAMGLibraryCondensed },
 		 { "coarse-n", required_argument, NULL, OPT_CoarseN },
 		 { "subtri-meth", required_argument, NULL, OPT_ApproxL2ProjSubtriangulationMethod },
 		 { "subtri", required_argument, NULL, OPT_ApproxL2ProjNSubtriangulations },
@@ -1495,6 +1507,9 @@ int Run(int argc, char* argv[])
 				break;
 			case OPT_UAMGNonsymmetric:
 				args.Solver.MG.UAMGNonsymmetric = true;
+				break;
+			case OPT_UAMGLibraryCondensed:
+				args.Solver.MG.UAMGLibraryCondensed = true;
 				break;
 			case OPT_CoarseN:
 				args.Solver.MG.CoarseN = stoul(optarg, nullptr, 0);
