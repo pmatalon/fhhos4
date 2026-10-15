@@ -6,6 +6,12 @@ class SmootherFactory
 {
 
 public:
+	// The Chebyshev smoothers: symmetric, for a symmetric positive definite matrix
+	static bool IsChebyshev(const string& smootherCode)
+	{
+		return smootherCode == "cheb" || smootherCode == "bcheb" || smootherCode == "cheb4" || smootherCode == "bcheb4";
+	}
+
 	static Smoother* Create(string smootherCode, int nSmootherIterations, int blockSize, double omega)
 	{
 		if (smootherCode.compare("gs") == 0)
@@ -102,6 +108,15 @@ public:
 			return new BlockJacobiSmoother(blockSize, omega, nSmootherIterations);
 		if (smootherCode.compare("bj23") == 0)
 			return new BlockJacobiSmoother(blockSize, 2.0/3.0, nSmootherIterations);
+
+		if (smootherCode.compare("cheb") == 0)
+			return new ChebyshevSmoother(1, ChebyshevKind::First, nSmootherIterations);
+		if (smootherCode.compare("bcheb") == 0)
+			return new ChebyshevSmoother(blockSize, ChebyshevKind::First, nSmootherIterations);
+		if (smootherCode.compare("cheb4") == 0)
+			return new ChebyshevSmoother(1, ChebyshevKind::Fourth, nSmootherIterations);
+		if (smootherCode.compare("bcheb4") == 0)
+			return new ChebyshevSmoother(blockSize, ChebyshevKind::Fourth, nSmootherIterations);
 
 		Utils::FatalError("Unmanaged smoother code: '" + smootherCode + "'");
 		return nullptr;

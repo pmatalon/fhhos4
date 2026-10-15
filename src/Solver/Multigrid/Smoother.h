@@ -3,6 +3,7 @@
 #include "../FixedPoint/BlockGaussSeidel.h"
 #include "../FixedPoint/BlockJacobi.h"
 #include "../FixedPoint/GaussSeidel.h"
+#include "../FixedPoint/BlockChebyshev.h"
 using namespace std;
 
 class Smoother
@@ -111,6 +112,13 @@ class BlockGaussSeidelSmoother : public Smoother
 {
 public:
 	BlockGaussSeidelSmoother(int blockSize, Direction direction, bool hybrid, int nSmoothingIterations) : Smoother(new BlockGaussSeidel(blockSize, direction, hybrid), nSmoothingIterations) {}
+};
+
+// Number of smoothing iterations: the degree of the polynomial
+class ChebyshevSmoother : public Smoother
+{
+public:
+	ChebyshevSmoother(int blockSize, ChebyshevKind kind, int nSmoothingIterations) : Smoother(new BlockChebyshev(blockSize, kind), nSmoothingIterations) {}
 };
 
 class GaussSeidelSmoother : public Smoother

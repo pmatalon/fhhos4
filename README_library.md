@@ -37,8 +37,8 @@ and the two blocks of the right-hand side `b_T, b_F`.
 Through this interface, the condensed system is built internally and the system is solved for both the face and cell unknowns `x_T, x_F`.
 - The condensed system can also directly be passed to the solver (along with the blocks). The solver won't perform the condensation itself and solve for the face unknowns only.
 
-The second interface was made solely to make the integration of the `fhoos4` solver less involved in existing codes, which already assemble the condensed matrix and right-hand side, and recover the cell unknowns at the after solving the system.
-This way is less efficient than using the first interface, because both the external code and the `fhoos4` solver will invert the `A_TT` block.
+The second interface was made solely to make the integration of the `fhhos4` solver less involved in existing codes, which already assemble the condensed matrix and right-hand side, and recover the cell unknowns after solving the system.
+This way is less efficient than using the first interface, because both the external code and the `fhhos4` solver will invert the `A_TT` block.
 
 | Interface | Setup | Solve | For |
 |---|---|---|---|
@@ -152,9 +152,9 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 | `Tolerance` | `1e-8` | `Solve()` stops when the relative residual of the condensed system (the true one, `Result::RelativeResidual`) is below it |
 | `MaxIterations` | `200` | |
 | `Cycle` | `'K'` | `'V'`, `'W'` or `'K'` (K-cycle: a non-linear preconditioner, which requires FCG or GCR) |
-| `PreSmoothingIterations`, `PostSmoothingIterations` | `1`, `1` | |
-| `PreSmoother` | `""`: `"hbgs"` on several threads, `"bgs"` on 1 | Smoother codes of the program (`fhhos4 -h`, `-smoothers`). `"bgs"`: block Gauss-Seidel (one block per face); `"hbgs"`: its parallel (hybrid) version |
-| `PostSmoother` | `""`: the backward version of `PreSmoother` (`"rbgs"`, `"hrbgs"`) | |
+| `PreSmoothingIterations`, `PostSmoothingIterations` | `-1`, `-1`: the smoother's, `2` for Chebyshev (its degree), `1` otherwise | `>= 0` (`0`: none) |
+| `PreSmoother` | `""`: `"bcheb4"` for a symmetric matrix; for a non-symmetric one, `"hbgs"` on several threads, `"bgs"` on 1 | Smoother codes of the program (`fhhos4 -h`, `-smoothers`). `"bgs"`: block Gauss-Seidel (one block per face); `"hbgs"`: its parallel (hybrid) version; `"bcheb4"`, `"bcheb"`: block Chebyshev of the fourth or first kind (a polynomial in `D^-1 A`, `D` the block diagonal, whose degree is the number of smoothing iterations; parallel, with results that don't depend on the number of threads; symmetric matrices only) |
+| `PostSmoother` | `""`: the backward version of `PreSmoother` (`"rbgs"`, `"hrbgs"`), or `PreSmoother` itself if it is symmetric (Chebyshev) | |
 | `CoarseningFactor` | `3.8` | Ratio of the numbers of cells of two successive h-levels |
 | `CoarseMatrixMaxSize` | `1000` | The coarsening stops when the matrix has at most this many rows |
 | `CoarseSolver` | `""`: `"ch"` (sparse Cholesky) for a symmetric matrix, `"lu"` otherwise | |

@@ -260,8 +260,8 @@ struct HybridSystem
 	}
 };
 
-// The solver for HybridSystem: degree 0 in 2D. With the sequential smoothers: the default on several threads, the
-// hybrid one, depends on the number of threads (tested apart).
+// The solver for HybridSystem: degree 0 in 2D. With the sequential smoothers: the defaults depend on the number of
+// threads (tested apart).
 fhhos4::Solver ToySolver()
 {
 	fhhos4::Solver solver;
@@ -541,28 +541,69 @@ TEST(UAMGLibrary, GCR)
 	EXPECT_LT(RelativeError(system, x), 1e-8);
 }
 
-// The default smoothers: the hybrid Gauss-Seidel (parallel) with FCG on several threads, the sequential one otherwise
+// The default smoothers: the Chebyshev of the fourth kind of degree 2 for a symmetric matrix, the same results on 4 and
+// 1 threads; for a non-symmetric one, the hybrid Gauss-Seidel (parallel) on several threads, the sequential one on 1
 TEST(UAMGLibrary, DefaultSmoothers)
 {
+	for (bool symmetric : { true, false })
+	{
+		HybridSystem system = symmetric ? HybridSystem(64) : NonsymmetricSystem(64, 0.3);
+		Eigen::VectorXd onFourThreads;
+		for (int threads : { 4, 1 })
+		{
+			fhhos4::Solver uamg = ToySolver();
+			uamg.PreSmoother = "";
+			uamg.PostSmoother = "";
+			uamg.Threads = threads;
+			uamg.Verbosity = 2; // prints the smoothers
+			::testing::internal::CaptureStdout();
+			if (symmetric)
+				uamg.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne);
+			else
+				uamg.SetupNonsymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FT, system.CellInterpOfOne, system.FaceInterpOfOne);
+			Eigen::VectorXd x = Eigen::VectorXd::Zero(system.b.size());
+			fhhos4::Result result = uamg.Solve(system.b, x);
+			std::string output = ::testing::internal::GetCapturedStdout();
+			std::string description = std::string(symmetric ? "symmetric" : "non-symmetric") + ", " + std::to_string(threads) + " threads";
+			bool chebyshev = symmetric, hybrid = !symmetric && threads > 1;
+			EXPECT_EQ(output.find("PreSmoothing        : 2 iterations of Chebyshev (4th kind") != std::string::npos, chebyshev) << description;
+			EXPECT_EQ(output.find("PostSmoothing       : 2 iterations of Chebyshev (4th kind") != std::string::npos, chebyshev) << description;
+			EXPECT_EQ(output.find("1 iteration of Hybrid Gauss-Seidel (forward)") != std::string::npos, hybrid) << description;
+			EXPECT_EQ(output.find("1 iteration of Hybrid Gauss-Seidel (backward)") != std::string::npos, hybrid) << description;
+			EXPECT_EQ(output.find("1 iteration of Gauss-Seidel (backward)") != std::string::npos, !symmetric && threads == 1) << description;
+			EXPECT_TRUE(result.Converged) << description;
+			EXPECT_LT(result.Iterations, 30) << description;
+			EXPECT_LT(RelativeError(system, x), 1e-8) << description;
+			if (threads == 4)
+				onFourThreads = x;
+			else if (symmetric) // Chebyshev: the same results whatever the number of threads
+				EXPECT_TRUE((x.array() == onFourThreads.array()).all()) << description;
+		}
+	}
+}
+
+// The Chebyshev smoothers (first and fourth kind), of degree 2 by default, the post-smoother being the pre-smoother by
+// default
+TEST(UAMGLibrary, ChebyshevSmoothers)
+{
 	HybridSystem system(64);
-	for (int threads : { 4, 1 })
+	for (std::string smoother : { "bcheb", "bcheb4" })
 	{
 		fhhos4::Solver uamg = ToySolver();
-		uamg.PreSmoother = "";
+		uamg.PreSmoother = smoother;
 		uamg.PostSmoother = "";
-		uamg.Threads = threads;
 		uamg.Verbosity = 2; // prints the smoothers
 		::testing::internal::CaptureStdout();
 		uamg.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne);
 		Eigen::VectorXd x = Eigen::VectorXd::Zero(system.b.size());
 		fhhos4::Result result = uamg.Solve(system.b, x);
 		std::string output = ::testing::internal::GetCapturedStdout();
-		EXPECT_EQ(output.find("Hybrid Gauss-Seidel (forward)") != std::string::npos, threads > 1) << threads << " threads";
-		EXPECT_EQ(output.find("Hybrid Gauss-Seidel (backward)") != std::string::npos, threads > 1) << threads << " threads";
-		EXPECT_NE(output.find("Gauss-Seidel (backward)"), std::string::npos);
-		EXPECT_TRUE(result.Converged);
-		EXPECT_LT(result.Iterations, 30);
-		EXPECT_LT(RelativeError(system, x), 1e-8);
+		std::string kind = smoother == "bcheb" ? "1st kind" : "4th kind";
+		EXPECT_NE(output.find("PreSmoothing        : 2 iterations of Chebyshev (" + kind), std::string::npos) << smoother;
+		EXPECT_NE(output.find("PostSmoothing       : 2 iterations of Chebyshev (" + kind), std::string::npos) << smoother;
+		EXPECT_TRUE(result.Converged) << smoother;
+		EXPECT_LT(result.Iterations, 30) << smoother;
+		EXPECT_LT(RelativeError(system, x), 1e-8) << smoother;
 	}
 }
 
@@ -691,6 +732,9 @@ TEST(UAMGLibrary, Errors)
 	fhhos4::Solver wrongCycle = ToySolver();
 	wrongCycle.Cycle = 'X';
 	EXPECT_THROW(wrongCycle.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
+	fhhos4::Solver negativeSmoothing = ToySolver();
+	negativeSmoothing.PostSmoothingIterations = -2;
+	EXPECT_THROW(negativeSmoothing.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 	fhhos4::Solver wrongKrylov = ToySolver();
 	wrongKrylov.Krylov = "gmres";
 	EXPECT_THROW(wrongKrylov.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
@@ -705,6 +749,10 @@ TEST(UAMGLibrary, Errors)
 	fhhos4::Solver cholesky = ToySolver();
 	cholesky.CoarseSolver = "ch";
 	EXPECT_THROW(cholesky.SetupNonsymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FT, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
+	fhhos4::Solver chebyshev = ToySolver();
+	chebyshev.PreSmoother = "bcheb4";
+	chebyshev.PostSmoother = "";
+	EXPECT_THROW(chebyshev.SetupNonsymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FT, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 	EXPECT_THROW(uamg.SetupNonsymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 
 	// A_TT not block diagonal

@@ -34,7 +34,7 @@ ctest -E HPConfig                          # skip the slowest tests
 ./bin/fhhos4_tests --gtest_filter=*Kellogg*  # or filter the binary directly
 ```
 
-The full suite is 206 CTest cases and runs in about 5 minutes serially. The 8 `HPConfigTest` cases take about 2 minutes of it (~15 s each: N=128 with k=5 is the smallest size of the high-order paper); the other cases take less than 20 s each.
+The full suite is 210 CTest cases and runs in about 5 minutes serially. The 8 `HPConfigTest` cases take about 2 minutes of it (~15 s each: N=128 with k=5 is the smallest size of the high-order paper); the other cases take less than 20 s each.
 
 ## GMSH meshes: reproducibility
 
@@ -231,6 +231,21 @@ natural order and in a `SweepOrder` shuffled in windows of 100 block rows, forwa
   matrix with its block rows randomly renumbered (most of the non-zeros between chunks), on 4 threads: the sequential
   sweep, bit for bit.
 
+## `ChebyshevSmootherTest.cpp`
+
+Unit tests of the Chebyshev smoothers (`cheb`, `bcheb`, `cheb4`, `bcheb4`: `src/Solver/FixedPoint/BlockChebyshev.h`), on
+a symmetric, diagonally dominant matrix (9-point stencil, diagonal = sum of the absolute values of the row + 0.01: the
+spectrum of `D^-1 A` spreads on (0, 2)), scalar and in blocks of 3:
+- **`ChebyshevSmootherTest.ErrorPolynomial`** — on a 6 x 6 grid, for both kinds and degrees 1, 2, 3, 5, from x = 0 or
+  not: the iterate is `x* - p(D^-1 A)(x* - x_0)` (to 1e-11 relative), with `p` in closed form (`T_m` for the first kind
+  on `[lambdaMax/10, lambdaMax]`, `W_m(1 - 2 lambda/lambdaMax)/(2m+1)` for the fourth) on the generalized eigenvalues of
+  `(A, D)`, computed densely; the residual and `Ax` given by the smoother are those of the iterate; the Lanczos estimate
+  of `lambdaMax` is below the exact one, and within 5% of it.
+- **`ChebyshevSmootherTest.IndependentOfTheNumberOfThreads`** — on a 60 x 60 grid (above the 20000 non-zeros of the
+  parallel loops), degree 3: the same estimate, iterate and residual on 1 and 4 threads, bit for bit.
+- **`ChebyshevSmootherTest.NotPositiveDefinite`** — `-A` is refused by the setup (negative diagonal, scalar; negative
+  definite diagonal blocks).
+
 ## `LocalMatricesTest.cpp`
 
 Unit tests of the local Galerkin products of the coarsening passes of U-AMG (`src/Solver/Multigrid/UncondensedAMG/
@@ -276,7 +291,7 @@ Tests of the library `fhhos4` (`library/`), the U-AMG of fhhos4 for other codes 
 
 - **`UAMGNonsymmetricProgram.NotWithFCG`** (1 case) — `-uamg-nonsym` refuses `-s fcguamg` (FCG requires a symmetric matrix): death test (`EXIT_FAILURE`).
 
-- **`UAMGLibrary.*`** (16 cases) — the public API alone, on a hybrid system of degree 0 built in the test (Cartesian mesh of the unit square, random coefficients), with the sequential smoothers (`bgs`, `rbgs`: the default hybrid smoother depends on the number of threads): it solves the system; solves the uncondensed system after a setup from the blocks (`Solve(b_T, b_F, x_T, x_F)`, symmetric and not, against a sparse LU of the uncondensed matrix, and the faces solution of the condensed system); `CondensedMatrix()` returns the caller's own `A` when read in place, its conversion otherwise, the matrix computed from the blocks; the default smoothers are the hybrid Gauss-Seidel on 4 threads, the sequential one on 1 thread; computes `A` from the blocks (`SetupSymmetric`), with full or lower-only symmetric blocks; works without `A_FF`; gives the same levels, iteration count and solution with row-major matrices (fhhos4's format, read in place if compressed, copied otherwise) as with column-major ones; gives the same iterates on bases scaled by random factors, given the interpolation of 1; GCR (with the K-cycle, which then iterates with GCR); a non-symmetric system (advection-like couplings `A_FT != A_TF^T`, asymmetry 0.3 and 0.9: `SetupNonsymmetricCondensed()` with GCR, BiCGSTAB with a V-cycle, and from the blocks, against a sparse LU); the non-symmetric setup of a symmetric system (the iterations of the symmetric one); BiCGSTAB with a V-cycle; the cycles alone (`Krylov = "none"`); the errors (parameters not set or invalid, BiCGSTAB with the K-cycle, FCG or Cholesky with a non-symmetric matrix, `A_FT` of the wrong size, inputs inconsistent with the dimension and the degrees, non block-diagonal `A_TT`, `Solve(b_T, b_F, x_T, x_F)` after a setup from `A` or with vectors of the wrong sizes); it prints nothing at verbosity 0, and leaves the number of threads and the format of `cout` unchanged; `fhhos4::Version()` starts with the version of the header.
+- **`UAMGLibrary.*`** (17 cases) — the public API alone, on a hybrid system of degree 0 built in the test (Cartesian mesh of the unit square, random coefficients), with the sequential smoothers (`bgs`, `rbgs`: the default hybrid smoother depends on the number of threads): it solves the system; solves the uncondensed system after a setup from the blocks (`Solve(b_T, b_F, x_T, x_F)`, symmetric and not, against a sparse LU of the uncondensed matrix, and the faces solution of the condensed system); `CondensedMatrix()` returns the caller's own `A` when read in place, its conversion otherwise, the matrix computed from the blocks; the default smoothers are the Chebyshev of the fourth kind of degree 2 for a symmetric system (the same solution on 4 and 1 threads, bit for bit), and for a non-symmetric one the hybrid Gauss-Seidel on 4 threads, the sequential one on 1 thread; computes `A` from the blocks (`SetupSymmetric`), with full or lower-only symmetric blocks; works without `A_FF`; gives the same levels, iteration count and solution with row-major matrices (fhhos4's format, read in place if compressed, copied otherwise) as with column-major ones; gives the same iterates on bases scaled by random factors, given the interpolation of 1; GCR (with the K-cycle, which then iterates with GCR); a non-symmetric system (advection-like couplings `A_FT != A_TF^T`, asymmetry 0.3 and 0.9: `SetupNonsymmetricCondensed()` with GCR, BiCGSTAB with a V-cycle, and from the blocks, against a sparse LU); the non-symmetric setup of a symmetric system (the iterations of the symmetric one); BiCGSTAB with a V-cycle; the cycles alone (`Krylov = "none"`); the Chebyshev smoothers (`bcheb`, `bcheb4`, of degree 2 by default: printed as the pre- and post-smoothers, convergence); the errors (parameters not set or invalid (a negative number of smoothing iterations other than -1), BiCGSTAB with the K-cycle, FCG, Cholesky or a Chebyshev smoother with a non-symmetric matrix, `A_FT` of the wrong size, inputs inconsistent with the dimension and the degrees, non block-diagonal `A_TT`, `Solve(b_T, b_F, x_T, x_F)` after a setup from `A` or with vectors of the wrong sizes); it prints nothing at verbosity 0, and leaves the number of threads and the format of `cout` unchanged; `fhhos4::Version()` starts with the version of the header.
 
 ## `ReferenceShapeCacheTest.cpp`
 
@@ -287,7 +302,7 @@ Unit tests of the matrices that the reference shapes (static: one per process) c
 
 ## Coverage summary
 
-- 206 CTest cases total across the 15 files above, exercising `Program_Diffusion_HHO` (diffusion problems) and `Program_BiHarmonic_HHO` (biharmonic problem in mixed form), with the HHO discretization and static condensation, and the library `fhhos4`.
+- 210 CTest cases total across the 16 files above, exercising `Program_Diffusion_HHO` (diffusion problems) and `Program_BiHarmonic_HHO` (biharmonic problem in mixed form), with the HHO discretization and static condensation, and the library `fhhos4`.
 - Dimensions: 2D and 3D. No 1D coverage (the run helpers throw for it, consistent with `ENABLE_1D=OFF` by default).
 - Meshes: in-house `cart`, `stri`, `quad`, `stetra`; GMSH `cart`, `tri`, `tetra`, and a locally refined mesh; polygonal meshes (`poly`, CGAL) built from a GMSH Cartesian mesh, with and without interface collapsing (`-polymesh-fcs c|n`).
 - Coarsening strategies: standard, refinement (`-cs r`), independent remeshing (`-cs m`), agglomeration (`-cs n`).

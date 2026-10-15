@@ -50,7 +50,7 @@ namespace fhhos4
 
 	// Set the parameters, then call a setup function, then Solve(). The parameters are read by the setup (Tolerance and
 	// MaxIterations by Solve()). The defaults are those of the program fhhos4 (-s fcguamg), used in the papers, except the
-	// smoother on several threads (PreSmoother).
+	// smoothers on several threads (PreSmoother, and the number of its iterations).
 	// Not thread-safe: one object must not be used by several threads at the same time.
 	class FHHOS4_API Solver
 	{
@@ -78,14 +78,21 @@ namespace fhhos4
 
 		char Cycle = 'K';                  // 'V', 'W' or 'K' (K-cycle: each coarse level is solved by 2 iterations of FCG,
 		                                   // or of GCR with Krylov "gcr" or a non-symmetric matrix)
-		int PreSmoothingIterations = 1;
-		int PostSmoothingIterations = 1;
-		// Smoothers (codes of fhhos4 -smoothers, see fhhos4 -h). PreSmoother empty (default): the faster one, chosen by
-		// the setup: on several threads, "hbgs", the hybrid block Gauss-Seidel (Gauss-Seidel in the rows of each thread,
-		// Jacobi between the threads: parallel, except on the levels where the rows of the threads are poorly separated;
-		// the results then depend on the number of threads, not on the run); on 1 thread, "bgs", the block Gauss-Seidel
-		// (sequential: "hbgs" on 1 thread), one block per face.
-		// PostSmoother empty (default): the backward version of PreSmoother ("rbgs" after "bgs", "hrbgs" after "hbgs").
+		// Number of iterations of the pre- and post-smoothers (>= 0, 0: none); -1 (default): the smoother's, 2 for the
+		// Chebyshev smoothers (their degree), 1 for the others
+		int PreSmoothingIterations = -1;
+		int PostSmoothingIterations = -1;
+		// Smoothers (codes of fhhos4 -smoothers, see fhhos4 -h). PreSmoother empty (default): chosen by the setup:
+		// - for a symmetric matrix (SetupSymmetric...()), "bcheb4": the block Chebyshev of the fourth kind, a polynomial in
+		//   D^-1 A (D: the block diagonal, one block per face) whose degree is the number of smoothing iterations (each
+		//   one, a block Jacobi iteration with its own damping factor): parallel, and its results don't depend on the
+		//   number of threads ("bcheb": the first kind; symmetric matrices only);
+		// - for a non-symmetric matrix, on several threads, "hbgs": the hybrid block Gauss-Seidel (Gauss-Seidel in the
+		//   rows of each thread, Jacobi between the threads: parallel, except on the levels where the rows of the threads
+		//   are poorly separated; the results then depend on the number of threads, not on the run); on 1 thread, "bgs":
+		//   the block Gauss-Seidel (sequential: "hbgs" on 1 thread), one block per face.
+		// PostSmoother empty (default): the backward version of PreSmoother ("rbgs" after "bgs", "hrbgs" after "hbgs"),
+		// or PreSmoother itself if it is symmetric (Chebyshev).
 		// Non-symmetric matrix (SetupNonsymmetric...()): on a level with one-sided couplings (convection), the Gauss-Seidel
 		// smoothers keep their type, block size and number of sweeps, but not their direction: all their sweeps
 		// (backward and symmetric ones included) follow the downwind order of the level. The other smoothers (Jacobi,

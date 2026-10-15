@@ -170,6 +170,13 @@ namespace fhhos4
 				Utils::FatalError("fhhos4::Solver: the flexible conjugate gradient requires a symmetric matrix: set Krylov to \"gcr\" (or leave it empty) for a non-symmetric one.");
 			if (!symmetric && CoarseSolver == "ch")
 				Utils::FatalError("fhhos4::Solver: the Cholesky factorization requires a symmetric matrix: set CoarseSolver to \"lu\" (or leave it empty) for a non-symmetric one.");
+			if (s.PreSmoothingIterations < -1 || s.PostSmoothingIterations < -1)
+				Utils::FatalError("fhhos4::Solver: PreSmoothingIterations and PostSmoothingIterations must be >= 0, or -1 (the smoother's default), got " + to_string(s.PreSmoothingIterations) + " and " + to_string(s.PostSmoothingIterations) + ".");
+			for (const string& smoother : { s.PreSmoother, s.PostSmoother })
+			{
+				if (!symmetric && SmootherFactory::IsChebyshev(smoother))
+					Utils::FatalError("fhhos4::Solver: the Chebyshev smoother \"" + smoother + "\" requires a symmetric positive definite matrix: leave PreSmoother and PostSmoother empty for a non-symmetric one.");
+			}
 			CellBlockSize = Utils::Binomial(s.CellDegree + s.Dimension, s.CellDegree);
 			FaceBlockSize = Utils::Binomial(s.FaceDegree + s.Dimension - 1, s.FaceDegree);
 		}
@@ -220,11 +227,23 @@ namespace fhhos4
 			}
 		}
 
-		// The pre-smoother when Solver::PreSmoother is empty: the hybrid block Gauss-Seidel where it is faster than the
-		// sequential one (PERFORMANCE.md), i.e. on several threads, whatever the Krylov method
-		static string DefaultPreSmoother()
+		// The pre-smoother when Solver::PreSmoother is empty, whatever the Krylov method (PERFORMANCE.md): for a symmetric
+		// matrix, the block Chebyshev of the fourth kind, whatever the number of threads (the user's choice: the same
+		// results on any number of threads; on 1 thread, slower than the block Gauss-Seidel); for a non-symmetric one
+		// (Chebyshev requires a symmetric matrix), the hybrid block Gauss-Seidel on several threads, the block Gauss-Seidel
+		// on 1
+		string DefaultPreSmoother() const
 		{
+			if (Symmetric)
+				return "bcheb4";
 			return Parallelism::NThreads() > 1 ? "hbgs" : "bgs";
+		}
+
+		// The number of iterations of the smoother when Solver::Pre/PostSmoothingIterations is -1: the degree 2 for the
+		// Chebyshev smoothers (PERFORMANCE.md), 1 otherwise
+		static int DefaultSmoothingIterations(const string& smoother)
+		{
+			return SmootherFactory::IsChebyshev(smoother) ? 2 : 1;
 		}
 
 		// The arguments of the program fhhos4 that give the same multigrid
@@ -238,10 +257,11 @@ namespace fhhos4
 			mg.CycleLetter = s.Cycle;
 			mg.WLoops = s.Cycle == 'W' ? 2 : 1;
 			mg.KCycleKrylov = Krylov == "gcr" || !Symmetric ? KrylovMethod::GCR : KrylovMethod::FCG; // GCR under GCR (Notay)
-			mg.PreSmoothingIterations = s.PreSmoothingIterations;
-			mg.PostSmoothingIterations = s.PostSmoothingIterations;
 			mg.PreSmootherCode = !s.PreSmoother.empty() ? s.PreSmoother : DefaultPreSmoother();
-			mg.PostSmootherCode = !s.PostSmoother.empty() ? s.PostSmoother : "<symmetric smoother>"; // the program's: rbgs after bgs, hrbgs after hbgs...
+			mg.PostSmootherCode = !s.PostSmoother.empty() ? s.PostSmoother : "<symmetric smoother>"; // the program's: rbgs after bgs, hrbgs after hbgs, the same Chebyshev...
+			mg.PreSmoothingIterations = s.PreSmoothingIterations >= 0 ? s.PreSmoothingIterations : DefaultSmoothingIterations(mg.PreSmootherCode);
+			// PostSmoother empty: of the type of the pre-smoother
+			mg.PostSmoothingIterations = s.PostSmoothingIterations >= 0 ? s.PostSmoothingIterations : DefaultSmoothingIterations(!s.PostSmoother.empty() ? s.PostSmoother : mg.PreSmootherCode);
 			mg.CoarseningFactor = s.CoarseningFactor;
 			mg.MatrixMaxSizeForCoarsestLevel = s.CoarseMatrixMaxSize;
 			mg.CoarseSolverCode = CoarseSolver;

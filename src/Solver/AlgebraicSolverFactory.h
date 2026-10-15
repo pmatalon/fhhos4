@@ -170,7 +170,7 @@ public:
 		// Symmetric post-smoother
 		if (mg->PostSmootherCode == "<symmetric smoother>")
 		{
-			if (mg->PreSmootherCode == "bj23" || mg->PreSmootherCode == "bj" || mg->PreSmootherCode == "sgs" || mg->PreSmootherCode == "sbgs") // symmetric smoothers
+			if (mg->PreSmootherCode == "bj23" || mg->PreSmootherCode == "bj" || mg->PreSmootherCode == "sgs" || mg->PreSmootherCode == "sbgs" || SmootherFactory::IsChebyshev(mg->PreSmootherCode)) // symmetric smoothers (Chebyshev: symmetric in the A-inner product)
 				mg->PostSmootherCode = mg->PreSmootherCode;
 			else if (mg->PreSmootherCode == "gs")
 				mg->PostSmootherCode = "rgs";

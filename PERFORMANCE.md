@@ -879,6 +879,99 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
     the same (7.3-7.5 s); peak memory 413 MB against 389 MB (the library keeps `W`, `A_FT` and the inverses); the same L2
     error.
 
+- **Chebyshev smoothers** (2026-10-15, opt-in: `-smoothers bcheb4|bcheb|cheb4|cheb`, `BlockChebyshev.h`; the defaults
+  of the program and of the library are unchanged). A polynomial in `D^-1 A` (`D`: the block diagonal, one block per
+  face; the scalar diagonal for `cheb`, `cheb4`), whose degree is the number of smoothing iterations: the first kind on
+  `[lambdaMax/ratio, lambdaMax]` (`-cheb-ratio`, default 10), or the fourth kind (Lottes 2023: no lower bound).
+  `lambdaMax`: 10 Lanczos iterations (CG preconditioned by `D`) at the setup, times 1.1, shared by the pre- and
+  post-smoothers. Each iteration is one pass over the block rows (product by `A`, recurrence residual, block solve,
+  updates of the direction and of x), the rows independent: the results don't depend on the number of threads (bit
+  for bit, `ChebyshevSmootherTest`) nor on the numbering. Symmetric positive definite matrices only (the library
+  refuses it for a non-symmetric one). `fcguamg`, best of 2 (the iterations identical in both runs), plugged in;
+  the program (assembly on 16 threads, the solver on 1 or 8):
+
+  | Case | `bgs,rbgs` K(1,1) | `hbgs,hrbgs` K(1,1) | `bcheb4` K(2,2) | `bcheb` (ratio 10) K(2,2) |
+  |---|---|---|---|---|
+  | Cube-tet k=0 n=32, 1 / 8 threads | 0.76 / 0.65 s (28 its) | 0.75 / 0.60 s (28 / 27 its) | 1.04 / 0.46 s (24 its) | 0.97 / 0.44 s (22 its) |
+  | Cube-tet k=1 n=16 | 0.61 / 0.66 s (33) | 0.64 / 0.62 s (33) | 0.75 / 0.31 s (26) | 0.65 / 0.29 s (22) |
+  | Cube-tet k=2 n=16 | 2.04 / 1.86 s (33) | 2.04 / 1.84 s (33) | 2.39 / 1.01 s (32) | 2.12 / 0.88 s (28) |
+  | Cube-cart-aniso100 n=64 | 0.47 / 0.44 s (9) | 0.47 / 0.50 s (9 / 11) | 0.49 / 0.34 s (7) | 0.66 / 0.46 s (9) |
+  | Cube-cart (in-house) k=1 n=32 | 0.37 / 0.40 s (10) | 0.38 / 0.29 s (10) | 0.49 / 0.27 s (9) | 0.53 / 0.28 s (9) |
+
+  - On 8 threads, the degree 2 is the fastest smoother of the 5 cases: against `hbgs`, -25% at k=0 on the tetrahedra,
+    2x at k=1 and 1.8-2.1x at k=2, -30% on the anisotropic case (`bcheb4`), the same on the Cartesian k=1 mesh. On the
+    GMSH tetrahedra at k >= 1, `hbgs` runs the sequential sweeps (more than 20% of the non-zeros between the chunks
+    of the threads: 33 iterations, as fast on 8 threads as on 1); Chebyshev doesn't depend on the numbering.
+  - On 1 thread, 1.0-1.4x slower than `bgs` (two products by `A` per smoothing at degree 2, where a Gauss-Seidel
+    sweep reads the matrix once, with fewer iterations not enough to compensate).
+  - Setup: +0.05-0.15 s (the Lanczos iterations, 10 products by `A` per level): 1 thread, k=2 0.17 -> 0.30 s,
+    aniso100 1.11 -> 1.24 s.
+  - Degree 1 (4th kind: Jacobi with omega = 4/(3 lambdaMax)): 41-52 iterations on the tetrahedra, never the fastest;
+    degree 3: fewer iterations (19-24 on the tetrahedra, 7 on aniso100) but no faster than degree 2 (1 run each).
+  - First kind, ratio: 30 (Adams et al. 2003) loses on the Cartesian meshes (aniso100 14 iterations, Cartesian k=1
+    13, against 9 with 10), 3 on the tetrahedra (k=2: 34 against 28); 10 (PETSc's interval, `[0.1, 1.1]` x the
+    estimate) is the default. The 4th kind, without parameter, is the best on aniso100 (7 iterations), the first kind
+    (ratio 10) on the tetrahedra at k >= 1.
+
+  Logs and scripts: `build/bench_cheb/` (`bench.sh`: all the variants, 1 run; `bench2.sh`: the table, second run).
+
+  Then the library's default for a symmetric matrix (the user's decision, 2026-10-15): `bcheb4`, of degree 2
+  (`Pre/PostSmoothingIterations` now default to -1, the smoother's own number: 2 for Chebyshev, 1 otherwise), on any
+  number of threads: the same results whatever the number of threads, at the cost of the 1-thread solve (1.0-1.4x
+  slower than `bgs` in the table). For a non-symmetric matrix (Chebyshev requires a symmetric one), `hbgs` on several
+  threads and `bgs` on 1, as before. The program is unchanged (`-smoothers bgs,rbgs`, and `-s libuamg` passes the
+  program's smoothers).
+
+  In the client codes (2026-10-15, the user's request: the speedups on 8 threads), plugged in, one run each, the
+  reference solvers in the same session; the old default (`hbgs`) by preloading the library of HEAD (`LD_PRELOAD`:
+  the clients' RPATH precedes `LD_LIBRARY_PATH`), the new one (`bcheb4`, degree 2) the current library; checked: the
+  preloaded library is the one loaded (`LD_DEBUG`), and a variant logging its setup showed `bcheb4` of degree 2 on all
+  the levels in Disk++. Scripts, logs and tables: `build/bench_cheb/clients/`; Disk++'s logs in
+  `~/code/diskpp/build/bench/logs_1015{,_hbgs}/` (its solver timer added for the run, then removed). L2 errors equal to
+  the reference solvers' everywhere (HArDCore3D: identical digits; Disk++: as before, 1e-11 to 1e-6, 1e-4 on triangles
+  8 k=2, the limit of FCG on its matrix symmetric up to rounding).
+  - HArDCore3D `hho-diffusion -c 1 2` (wall "solving time": the blocks, the conversion, setup and solve), 8 threads,
+    against BiCGSTAB at 1e-12 (best of 1 / 8 threads; it is sequential); polyhedral meshes: Voronoi `voro-16`
+    (Voro-small-0, 4913 cells), prismatic duals `gdual_25x25x25` (Prysmatic-Cells-1, 9464 cells):
+
+    | Case | BiCGSTAB | `hbgs` | `bcheb4` | speedup, `hbgs` / `bcheb4` | `bcheb4` vs `hbgs` |
+    |---|---|---|---|---|---|
+    | cubes 32^3 k=0 | 0.27 s (128 its) | 0.30 s (30) | 0.31 s (26) | 0.90x / 0.87x | 0.97x |
+    | cubes 32^3 k=1 | 3.31 s (190) | 1.16 s (20) | 1.11 s (17) | 2.85x / 2.98x | 1.05x |
+    | cubes 32^3 k=2 | 14.17 s (230) | 3.76 s (26) | 3.85 s (24) | 3.77x / 3.68x | 0.98x |
+    | cubes 48^3 k=0 | 1.83 s (199) | 1.30 s (33) | 1.32 s (28) | 1.41x / 1.39x | 0.98x |
+    | cubes 48^3 k=1 | 20.06 s (324) | 4.30 s (20) | 4.18 s (18) | 4.67x / 4.80x | 1.03x |
+    | voro-16 k=0 | 0.15 s (84) | 0.20 s (22) | 0.15 s (19) | 0.75x / 1.00x | 1.33x |
+    | voro-16 k=1 | 1.67 s (109) | 0.80 s (16) | 0.74 s (15) | 2.09x / 2.26x | 1.08x |
+    | voro-16 k=2 | 7.70 s (137) | 2.80 s (21) | 2.36 s (19) | 2.75x / 3.26x | 1.19x |
+    | gdual_25 k=0 | 0.10 s (129) | 0.18 s (33) | 0.14 s (35) | 0.56x / 0.71x | 1.29x |
+    | gdual_25 k=1 | 1.47 s (173) | 0.78 s (31) | 0.79 s (32) | 1.88x / 1.86x | 0.99x |
+    | gdual_25 k=2 | 6.26 s (206) | 2.17 s (35) | 2.25 s (37) | 2.88x / 2.78x | 0.96x |
+
+    A tie on the cubes and the prismatic duals (within the noise; `hbgs` stays parallel on these numberings),
+    -15% at k=2 on the Voronoi mesh; the gains at k=0 are on runs of 0.1-0.2 s (the client prints 2 digits).
+  - Disk++ `poisson_solver` (the client's solver call: conversion, setup, solve; tolerance 1e-10), 8 threads, against
+    MUMPS (best of 8 / 1 threads); not the Cartesian meshes (`poisson_tutorial`, which no longer has fhhos4):
+
+    | Mesh | DoFs | MUMPS | `hbgs` | `bcheb4` | speedup, `hbgs` -> `bcheb4` | `bcheb4` vs `hbgs` |
+    |---|---|---|---|---|---|---|
+    | triangles 7 k=0 / 1 / 2 | 49k / 98k / 147k | 0.23 / 0.47 / 0.77 s | 0.11 / 0.47 / 0.79 s | 0.13 / 0.39 / 0.51 s | 1.97 / 0.99 / 0.98x -> 1.75 / 1.22 / 1.51x | 0.89 / 1.22 / 1.54x |
+    | triangles 8 k=0 / 1 / 2 | 196k / 392k / 588k | 0.92 / 2.06 / 3.15 s | 0.48 / 1.68 / 3.19 s | 0.51 / 1.44 / 2.36 s | 1.90 / 1.23 / 0.99x -> 1.79 / 1.43 / 1.34x | 0.94 / 1.17 / 1.35x |
+    | triangles 9 k=0 / 1 | 785k / 1.57M | 4.69 / 10.68 s | 2.23 / 7.42 s | 2.15 / 6.47 s | 2.10 / 1.44x -> 2.18 / 1.65x | 1.04 / 1.15x |
+    | quadrangles 7 k=0 / 1 / 2 | 131k / 261k / 392k | 0.75 / 1.65 / 2.42 s | 0.33 / 0.96 / 1.78 s | 0.29 / 0.72 / 1.20 s | 2.30 / 1.73 / 1.36x -> 2.60 / 2.31 / 2.02x | 1.13 / 1.34 / 1.49x |
+    | quadrangles 8 k=0 / 1 / 2 | 523k / 1.05M / 1.57M | 3.26 / 7.77 s / OOM | 1.35 / 3.97 / 7.32 s | 1.16 / 3.46 / 5.13 s | 2.41 / 1.96x -> 2.81 / 2.25x | 1.16 / 1.15 / 1.43x |
+    | hexagons 6 k=0 / 1 / 2 | 49k / 98k / 147k | 0.34 / 0.80 / 1.46 s | 0.12 / 0.28 / 0.47 s | 0.08 / 0.30 / 0.43 s | 2.82 / 2.84 / 3.13x -> 4.36 / 2.66 / 3.37x | 1.54 / 0.94 / 1.08x |
+    | hexagons 7 k=0 / 1 / 2 | 196k / 393k / 589k | 1.42 / 3.46 / 6.11 s | 0.56 / 1.01 / 2.28 s | 0.48 / 1.13 / 1.85 s | 2.55 / 3.42 / 2.68x -> 2.93 / 3.06 / 3.30x | 1.15 / 0.90 / 1.23x |
+    | tetrahedra 3 k=0 / 1 / 2 | 6k / 17k / 35k | 0.03 / 0.08 / 0.31 s | 0.02 / 0.12 / 0.41 s | 0.02 / 0.10 / 0.20 s | 1.62 / 0.70 / 0.77x -> 1.30 / 0.84 / 1.56x | 0.80 / 1.21 / 2.02x |
+    | tetrahedra 4 k=0 / 1 / 2 | 48k / 143k / 286k | 0.39 / 1.66 / 7.31 s | 0.29 / 1.31 / 3.61 s | 0.18 / 0.79 / 2.21 s | 1.35 / 1.27 / 2.03x -> 2.17 / 2.11 / 3.30x | 1.60 / 1.66 / 1.63x |
+    | tetrahedra 5 k=0 / 1 | 387k / 1.16M | 5.14 s / not run | 1.79 / 11.78 s | 1.71 / 7.96 s | 2.88x -> 3.01x | 1.05 / 1.48x |
+
+    `bcheb4` faster than `hbgs` in 23 of 28 cases: at k >= 1, 1.08-2.0x except the hexagons at k=1 (0.90-0.94x);
+    at k=0, 0.80-1.6x (slower on triangles 7-8 and the 6k-DoF tetrahedra). The largest gains where `hbgs` runs the
+    sequential sweeps (Disk++'s face numbering, see idea 6): tetrahedra 1.5-2.0x, quadrangles and triangles k=2
+    1.35-1.5x. The tetrahedra 3 and 4 have the same iteration counts with both smoothers (34 / 44 / 38 / 52): checked,
+    a coincidence (`bcheb4` logged on every level).
+
 ## Current profile (U-AMG; parallel: 16 threads, the default before 2026-10-08)
 
 | Case | Setup, sequential / parallel | Solve, sequential / parallel |
@@ -1042,9 +1135,15 @@ Galerkin products (see Done).
    `FullFromLower`. Since the local Galerkin products, the last two are no longer in the default path (only with the
    coarse `A_F_F` and the options that keep the global products). Re-measure: at most ~0.45 s of the 1.8 s of setup
    at k=2 on 16 threads, less at k=0.
-6. **Parallel smoother** — the hybrid Gauss-Seidel (`hbgs,hrbgs`, scalar kernels at k = 0) is now the library's
-   default on several threads (see Done: solve -15 to -45% on HArDCore3D's meshes); the program keeps `bgs,rbgs` (it
+6. **Parallel smoother** — the library's default is the block Chebyshev (`bcheb4`, degree 2) for a symmetric matrix,
+   and on several threads the hybrid Gauss-Seidel (`hbgs,hrbgs`, scalar kernels at k = 0; see Done: solve -15 to -45%
+   on HArDCore3D's meshes against `bgs`) for a non-symmetric one; the program keeps `bgs,rbgs` (it
    changes the iteration counts and depends on the number of threads: opt-in only). What remains:
+   - The Chebyshev smoothers (see Done, 2026-10-15): on 8 threads, faster than `hbgs` in the 5 cases measured in the
+     program (2x on the GMSH tetrahedra at k >= 1), independent of the numbering and of the number of threads, but
+     slower on 1 thread and for symmetric matrices only. Now the library's default for a symmetric matrix; in the
+     client codes on 8 threads (see Done): Disk++ 1.1-2.0x faster than `hbgs` at k >= 1 except the hexagons at k=1 (its
+     numbering defeats the hybrid sweeps), HArDCore3D a tie (cubes, prismatic duals) to 1.2x (Voronoi, k=2).
    - fhhos4's tetrahedral meshes (GMSH numbering, little locality): the hybrid smoother loses 5-6 iterations at
      k = 0 (28 -> 33-34) and gains nothing there. A multicolour Gauss-Seidel, or a renumbering of the chunks
      (see "Renumbering the fine unknowns"), might do better; gain unknown.

@@ -4,6 +4,7 @@
 #include "Program.h"
 #include "ProgramArgumentsDefaults.h"
 #include "Solver/FixedPoint/BlockDiagonalSolver.h"
+#include "Solver/FixedPoint/BlockChebyshev.h"
 #include "Utils/FileSystem.h"
 using namespace std;
 
@@ -282,6 +283,9 @@ void print_usage() {
 	cout << "              inv - multiplication by the inverses of the blocks, computed in the setup." << endl;
 	cout << "                    Slightly faster, but less accurate if the blocks are ill-conditioned." << endl;
 	cout << endl;
+	cout << "-cheb-ratio NUM" << endl;
+	cout << "      Ratio lambdaMax/lambdaMin of the interval of the Chebyshev smoothers of the 1st kind (cheb, bcheb). Default: 10." << endl;
+	cout << endl;
 	cout << "-restart NUM" << endl;
 	cout << "      Iteration period to restart the algorithm (so far, used in bihar-cg only). Use 0 to disable." << endl;
 	cout << endl;
@@ -374,6 +378,14 @@ void print_usage() {
 	cout << "              rabgs - Reverse Alternating Block Gauss-Seidel (starting with backward)" << endl;
 	cout << "              hbgs  - Hybrid Block Gauss-Seidel (parallelization of 'bgs')" << endl;
 	cout << "              hrbgs - Hybrid Reverse Block Gauss-Seidel (parallelization of 'rbgs')" << endl;
+	cout << "              cheb  - Chebyshev (1st kind) preconditioned by Jacobi: polynomial in D^-1 A, whose degree is the number of" << endl;
+	cout << "                      smoothing iterations (one product by A each), minimal on [lambdaMax/ratio, lambdaMax] (-cheb-ratio)." << endl;
+	cout << "                      lambdaMax (of D^-1 A) is estimated by 10 Lanczos iterations in the setup, times 1.1." << endl;
+	cout << "                      Parallel, and its results don't depend on the number of threads. Symmetric positive definite matrices." << endl;
+	cout << "              bcheb - Block Chebyshev (1st kind): the same, preconditioned by block Jacobi (one block per face)" << endl;
+	cout << "              cheb4 - Chebyshev of the 4th kind (Lottes 2023): minimizes sqrt(lambda/lambdaMax) |p(lambda)| on [0, lambdaMax]," << endl;
+	cout << "                      no lower bound to choose" << endl;
+	cout << "              bcheb4- Block Chebyshev of the 4th kind" << endl;
 	cout << endl;
 	cout << "-hp-cs CODE" << endl;
 	cout << "      hp-coarsening strategy to build the coarse levels in the case of high-order." << endl;
@@ -733,6 +745,7 @@ int Run(int argc, char* argv[])
 		OPT_Relaxation,
 		OPT_BlockSize,
 		OPT_DiagBlockSolve,
+		OPT_ChebyshevRatio,
 		OPT_Restart,
 		OPT_BiHarmonicSolver,
 		OPT_BiHarmonicPreconditioner,
@@ -835,6 +848,7 @@ int Run(int argc, char* argv[])
 		 { "relax", required_argument, NULL, OPT_Relaxation },
 		 { "block-size", required_argument, NULL, OPT_BlockSize },
 		 { "diag-block-solve", required_argument, NULL, OPT_DiagBlockSolve },
+		 { "cheb-ratio", required_argument, NULL, OPT_ChebyshevRatio },
 		 { "restart", required_argument, NULL, OPT_Restart },
 		 { "bihar-solver", required_argument, NULL, OPT_BiHarmonicSolver },
 		 { "bihar-prec", required_argument, NULL, OPT_BiHarmonicPreconditioner },
@@ -1190,6 +1204,11 @@ int Run(int argc, char* argv[])
 					argument_error("unknown -diag-block-solve code '" + code + "'. Check -diag-block-solve argument.");
 				break;
 			}
+			case OPT_ChebyshevRatio:
+				BlockChebyshev::DefaultRatio = atof(optarg);
+				if (!(BlockChebyshev::DefaultRatio > 1))
+					argument_error("-cheb-ratio argument must be > 1.");
+				break;
 			case OPT_Restart:
 				args.Solver.Restart = atoi(optarg);
 				break;

@@ -54,7 +54,7 @@ From `build/`:
 ctest --output-on-failure
 ```
 
-206 tests, ~5 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
+210 tests, ~5 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
 iteration counts of the papers in `reproducibility/` — see `tests/README.md`. Covers
 `Program_Diffusion_HHO` and `Program_BiHarmonic_HHO` (HHO, static condensation), 2D/3D,
 in-house, GMSH and polygonal meshes, and the library (`UAMGLibrary*`, ~15 s). Not covered: DG/FEM programs (disabled by default), `lu`/`cg`/`agmg`/`p_mg` solvers,
@@ -161,13 +161,21 @@ interface (`Diffusion_HHO::CondensationBySolver`: no static condensation in the 
   Jacobi and SOR ignore it. HArDCore3D convection-dominated 32^3, k = 1: 16 iterations, 4 with it.
 - GCR: restarted every 10 iterations, Notay's economical version (ETNA 37, 2010, Algorithm 3.1); the K-cycle then
   iterates with GCR. BiCGSTAB is not flexible: the setup refuses the K-cycle with it.
-- Default smoothers on several threads: hybrid block Gauss-Seidel (`hbgs`, `hrbgs`: Gauss-Seidel in the rows of each
+- Default smoothers: block Chebyshev of the fourth kind, degree 2, for a symmetric matrix (below); for a
+  non-symmetric one, on several threads, hybrid block Gauss-Seidel (`hbgs`, `hrbgs`: Gauss-Seidel in the rows of each
   thread, Jacobi between the threads; scalar kernels at k = 0), results depending on the number of threads, not on the
   run; sequential sweeps on a level where more than 20% of the non-zeros couple rows of different threads (e.g. GMSH's
   numbering on the tetrahedral meshes). 0-6 more iterations than the block Gauss-Seidel with FCG (a few more with
   BiCGSTAB), but faster on 8 threads: 15-20% at k = 0, 35-45% at k = 1, 2 (HArDCore3D cubes and Voronoi); BiCGSTAB or
   the multigrid alone 2-45% (earlier, non-deterministic version). GCR, HArDCore3D diffusion-dominated
   convection-diffusion 48^3, k = 1: 27 iterations on 4 threads (26 on 1), solve 3.3-3.5 s instead of 5.8 s.
+- Chebyshev smoothers (`bcheb4`, `bcheb`; `Solver/FixedPoint/BlockChebyshev.h`): symmetric matrices only (the library
+  refuses them otherwise); `lambdaMax` of `D^-1 A` by 10 Lanczos iterations at the setup. Faster than `hbgs` on 8
+  threads in the program (up to 2x on GMSH tetrahedra at k >= 1) and in Disk++ (1.1-2x at k >= 1), a tie in
+  HArDCore3D (up to 1.2x on Voronoi meshes), slower on 1 thread: `PERFORMANCE.md`. The library's
+  default for a symmetric matrix, on any number of threads (`bcheb4`, `Pre/PostSmoothingIterations` -1: degree 2; the
+  user's decision, 2026-10-15: the same results whatever the number of threads). The program keeps `bgs,rbgs` (the
+  papers).
 - FCG replaces its recurrence residual by the true `b - A x` every 20 iterations and when it meets the tolerance (GCR:
   at each restart and at the tolerance), then continues if the true one does not: the tolerance applies to the true
   residual. Near the attainable accuracy (~1e-11 relative on Disk++'s 2D systems at k = 2) the recurrence drifts (8e-13
