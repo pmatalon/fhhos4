@@ -1,29 +1,44 @@
 # fhhos4: the library
 
-The shared library `fhhos4` (`libfhhos4.so`) gives your code the algebraic multigrid of fhhos4 for the statically
-condensed systems of hybrid discretizations (HHO, HDG...) of scalar diffusion problems: the Uncondensed AMG (U-AMG) of
+The shared library `fhhos4` offers an algebraic multigrid method for the solution of linear systems 
+arising from hybrid discretizations (HHO, HDG...) of scalar diffusion and convection-diffusion problems, 
+of the form
+```
+[ A_TT  A_TF ] [x_T]   [b_T]
+[ A_FT  A_FF ] [x_F] = [b_F]
+```
+While the smoothers work on the condensed system (given by the elimination of the cell unknowns)
+```
+A = A_FF - A_FT A_TT^{-1} A_TF
+b = b_F  - A_FT A_TT^{-1} b_T
+```
+the aggregation method used for the construction of coarse levels requires the blocks of the uncondensed matrix
+(to recover the cell-to-cell connectivity amongst other things). Consequently, instead of giving only the condensed system like any black-box AMG method, 
+the blocks of the uncondensed matrix must in our case be passed to the solver.
+
+The multigrid hierarchy unfolds as follows:
+First, the high polynomial orders are handled by p-multigrid levels, successively reducing the order to the lowest one.
+Then, once the system is reduced to one unknown per cell and face, h-coarsening follows, based on the algorithm described in
 
 > D. A. Di Pietro, F. Hülsemann, P. Matalon, P. Mycek, U. Rüde, *Algebraic multigrid preconditioner for statically
 > condensed systems arising from lowest-order hybrid discretizations*, SIAM J. Sci. Comput., 2023.
 
-extended to any degree. The AMG solves the condensed system `A x_F = b` (the face unknowns), but, unlike a black-box
-AMG, it builds its coarse levels from the blocks of the uncondensed system:
+## Applicability
 
-```
-[ A_TT  A_TF ] [x_T]   [b_T]   cells        A = A_FF - A_FT A_TT^{-1} A_TF
-[ A_FT  A_FF ] [x_F] = [b_F]   faces        b = b_F  - A_FT A_TT^{-1} b_T
-```
+The solver typically applies to symmetric positive definite systems (e.g. diffusion)
+and non-symmetric ones (e.g. convection-diffusion, both diffusion- and convection-dominated).
+The polynomial bases used for the discretization **must be hierarchical** and ordered by degree for the p-multigrid part to work.
 
-- **p-levels** (degree k >= 1): the first levels lower the polynomial degree of the faces and cells (by 2 at each
-  level) down to 0, by keeping the low-degree modes of the hierarchical bases.
-- **h-levels** (degree 0): the cells are aggregated pairwise, each with its most strongly coupled neighbour, the
-  strength of the coupling of two neighbouring cells coming from the blocks `A_TF(T, F)` of both cells on their common
-  face (several passes per level, until the cells are `CoarseningFactor` times fewer). The faces inside an aggregate
-  are removed, those between two aggregates merged into one coarse face. The prolongation reconstructs the cell
-  unknowns of each aggregate from its coarse faces (`-A_TT^{-1} A_TF`, the inverse of the static condensation) and
-  takes their trace on the removed faces; the coarse operator is the Galerkin product.
+## How to use
 
-## Interfaces
+Two types of user interface are proposed. 
+- (Recommended) If the matrix is symmetric (resp. unsymmetric), pass the three (resp. four) blocks of the uncondensed matrix, namely `A_TT, A_TF, A_FF` (resp. +  `A_FT`)
+and the two blocks of the right-hand side `b_T, b_F`.
+Through this interface, the condensed system is built internally and the system is solved for both the face and cell unknowns `x_T, x_F`.
+- The condensed system can also directly be passed to the solver (along with the blocks). The solver won't perform the condensation itself and solve for the face unknowns only.
+
+The second interface was made solely to make the integration of the `fhoos4` solver less involved in existing codes, which already assemble the condensed matrix and right-hand side, and recover the cell unknowns at the after solving the system.
+This way is less efficient than using the first interface, because both the external code and the `fhoos4` solver will invert the `A_TT` block.
 
 | Interface | Setup | Solve | For |
 |---|---|---|---|
