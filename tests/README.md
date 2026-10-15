@@ -34,7 +34,7 @@ ctest -E HPConfig                          # skip the slowest tests
 ./bin/fhhos4_tests --gtest_filter=*Kellogg*  # or filter the binary directly
 ```
 
-The full suite is 210 CTest cases and runs in about 5 minutes serially. The 8 `HPConfigTest` cases take about 2 minutes of it (~15 s each: N=128 with k=5 is the smallest size of the high-order paper); the other cases take less than 20 s each.
+The full suite is 211 CTest cases and runs in about 5 minutes serially. The 8 `HPConfigTest` cases take about 2 minutes of it (~15 s each: N=128 with k=5 is the smallest size of the high-order paper); the other cases take less than 20 s each.
 
 ## GMSH meshes: reproducibility
 
@@ -140,6 +140,9 @@ Regression tests for configurations that used to crash, and for the argument def
 
 - **`SquareCart/ForwardPostSmootherTest.Converges`** (4 cases: `mg` with K-cycle, `fcgmg`, `uamg`, `aggregamg`) — a forward Gauss-Seidel post-smoother (`gs`, or `bgs` when the block size is 1) with a solver that needs the post-smoother to return `Ax` (K-cycle, FCG preconditioned by a multigrid). It used to return an empty `Ax` and FCG segfaulted. `-coarse-size 10` gives 6 levels, so that the K-cycle's FCG is actually used. Assertion: converges in ≤ 50 iterations.
   CLI: `./bin/fhhos4 -geo square -mesh cart -mesher inhouse -k 0 -n 64 -coarse-size 10 -smoothers gs,gs -s {mg -cycle K,1,1|fcgmg|uamg|aggregamg}`
+
+- **`SolverRegression.HybridGaussSeidelWithoutPostSmoothing`** (1 case) — the hybrid Gauss-Seidel (`hbgs,hrbgs`, scalar at k=0) with a K(1,0) cycle. A post-smoother without iterations is not set up, and the hybrid one read its null matrix when the cycle asked whether it computes the residual (segfault). Assertion: converges in ≤ 50 iterations.
+  CLI: `./bin/fhhos4 -geo square -mesh cart -mesher inhouse -k 0 -n 32 -s fcguamg -smoothers hbgs,hrbgs -cycle K,1,0`
 
 - **`SolverRegression.WCycleWithManyLevels`** (1 case) — W-cycle with 7 levels. The drawing of the cycle in the console had a fixed width and corrupted the heap. Assertion: converges in ≤ 20 iterations.
   CLI: `./bin/fhhos4 -geo square -mesh cart -mesher inhouse -s mg -cycle W,1,1 -k 0 -n 128 -coarse-size 10`
@@ -302,7 +305,7 @@ Unit tests of the matrices that the reference shapes (static: one per process) c
 
 ## Coverage summary
 
-- 210 CTest cases total across the 16 files above, exercising `Program_Diffusion_HHO` (diffusion problems) and `Program_BiHarmonic_HHO` (biharmonic problem in mixed form), with the HHO discretization and static condensation, and the library `fhhos4`.
+- 211 CTest cases total across the 16 files above, exercising `Program_Diffusion_HHO` (diffusion problems) and `Program_BiHarmonic_HHO` (biharmonic problem in mixed form), with the HHO discretization and static condensation, and the library `fhhos4`.
 - Dimensions: 2D and 3D. No 1D coverage (the run helpers throw for it, consistent with `ENABLE_1D=OFF` by default).
 - Meshes: in-house `cart`, `stri`, `quad`, `stetra`; GMSH `cart`, `tri`, `tetra`, and a locally refined mesh; polygonal meshes (`poly`, CGAL) built from a GMSH Cartesian mesh, with and without interface collapsing (`-polymesh-fcs c|n`).
 - Coarsening strategies: standard, refinement (`-cs r`), independent remeshing (`-cs m`), agglomeration (`-cs n`).

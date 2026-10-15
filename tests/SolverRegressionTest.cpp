@@ -61,6 +61,24 @@ TEST_P(ForwardPostSmootherTest, Converges)
 INSTANTIATE_TEST_SUITE_P(SquareCart, ForwardPostSmootherTest,
 	::testing::Values("mg", "fcgmg", "uamg", "aggregamg"));
 
+// A post-smoother without iterations is not set up: the hybrid Gauss-Seidel then read its null matrix when the cycle
+// asked whether it computes the residual (segfault).
+//   ./bin/fhhos4 -geo square -mesh cart -mesher inhouse -k 0 -n 32 -s fcguamg -smoothers hbgs,hrbgs -cycle K,1,0
+TEST(SolverRegression, HybridGaussSeidelWithoutPostSmoothing)
+{
+	ProgramArguments args = SquareCartArgs(0, 32);
+	args.Solver.SolverCode = "fcguamg";
+	args.Solver.MG.PreSmootherCode = "hbgs";
+	args.Solver.MG.PostSmootherCode = "hrbgs";
+	args.Solver.MG.CycleLetter = 'K';
+	args.Solver.MG.PreSmoothingIterations = 1;
+	args.Solver.MG.PostSmoothingIterations = 0;
+
+	ProgramResults results = RunDiffusionHHO(args, false);
+	EXPECT_GT(results.IterationCount, 0);
+	EXPECT_LE(results.IterationCount, 50);
+}
+
 // The drawing of the W-cycle in the console used a fixed width of 50 steps, and corrupted the
 // heap beyond (7 levels).
 //   ./bin/fhhos4 -geo square -mesh cart -mesher inhouse -s mg -cycle W,1,1 -k 0 -n 128 -coarse-size 10

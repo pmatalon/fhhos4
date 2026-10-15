@@ -53,7 +53,7 @@ public:
 
 	bool CanOptimizeResidualComputation()
 	{
-		return _solver->CanOptimizeResidualComputation() && _solver->MaxIterations > 0;
+		return _solver->MaxIterations > 0 && _solver->CanOptimizeResidualComputation(); // without iterations, no setup (the hybrid Gauss-Seidel's chunks need the matrix)
 	}
 
 	void Smooth(Vector& x, const Vector& b, bool& xEquals0)
