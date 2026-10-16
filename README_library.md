@@ -148,16 +148,16 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 
 | Parameter | Default | Values |
 |---|---|---|
-| `Krylov` | `""`: `"fcg"` for a symmetric matrix, `"gcr"` otherwise | `"fcg"` (flexible conjugate gradient), `"gcr"` (GCR(10), any matrix), `"bicgstab"` (V- or W-cycle only), `"none"` (the multigrid cycles alone) |
+| `Krylov` | `Krylov::Default`: `Krylov::FCG` for a symmetric matrix, `Krylov::GCR` otherwise | `fhhos4::Krylov`: `FCG` (flexible conjugate gradient), `GCR` (GCR(10), any matrix), `BiCGSTAB` (V- or W-cycle only), `None` (the multigrid cycles alone) |
 | `Tolerance` | `1e-8` | `Solve()` stops when the relative residual of the condensed system (the true one, `Result::RelativeResidual`) is below it |
 | `MaxIterations` | `200` | |
-| `Cycle` | `'K'` | `'V'`, `'W'` or `'K'` (K-cycle: a non-linear preconditioner, which requires FCG or GCR) |
+| `Cycle` | `Cycle::K` | `fhhos4::Cycle`: `V`, `W` or `K` (K-cycle: a non-linear preconditioner, which requires FCG or GCR) |
 | `PreSmoothingIterations`, `PostSmoothingIterations` | `-1`, `-1`: the smoother's, `2` for Chebyshev (its degree), `1` otherwise | `>= 0` (`0`: none) |
-| `PreSmoother` | `""`: `"bcheb4"` for a symmetric matrix; for a non-symmetric one, `"hbgs"` on several threads, `"bgs"` on 1 | Smoother codes of the program (`fhhos4 -h`, `-smoothers`). `"bgs"`: block Gauss-Seidel (one block per face); `"hbgs"`: its parallel (hybrid) version; `"bcheb4"`, `"bcheb"`: block Chebyshev of the fourth or first kind (a polynomial in `D^-1 A`, `D` the block diagonal, whose degree is the number of smoothing iterations; parallel, with results that don't depend on the number of threads; symmetric matrices only) |
-| `PostSmoother` | `""`: the backward version of `PreSmoother` (`"rbgs"`, `"hrbgs"`), or `PreSmoother` itself if it is symmetric (Chebyshev) | |
+| `PreSmoother` | `Smoother::Default`: `BlockChebyshevFourthKind` for a symmetric matrix; for a non-symmetric one, `HybridBlockGaussSeidel` on several threads, `BlockGaussSeidel` on 1 | `fhhos4::Smoother` (one block per face): `BlockGaussSeidel`, `BackwardBlockGaussSeidel`, `SymmetricBlockGaussSeidel` (sequential); `HybridBlockGaussSeidel`, `HybridBackwardBlockGaussSeidel` (their parallel versions); `DampedBlockJacobi` (damping factor 2/3); `BlockChebyshevFirstKind`, `BlockChebyshevFourthKind` (a polynomial in `D^-1 A`, `D` the block diagonal, whose degree is the number of smoothing iterations; parallel, with results that don't depend on the number of threads; symmetric matrices only) |
+| `PostSmoother` | `Smoother::Default`: the adjoint of `PreSmoother`, which makes the cycle symmetric: the other direction for Gauss-Seidel (`BackwardBlockGaussSeidel` after `BlockGaussSeidel` and the other way around, the same for the hybrid ones), `PreSmoother` itself if it is symmetric (Chebyshev, Jacobi, `SymmetricBlockGaussSeidel`) | The same as `PreSmoother` |
 | `CoarseningFactor` | `3.8` | Ratio of the numbers of cells of two successive h-levels |
 | `CoarseMatrixMaxSize` | `1000` | The coarsening stops when the matrix has at most this many rows |
-| `CoarseSolver` | `""`: `"ch"` (sparse Cholesky) for a symmetric matrix, `"lu"` otherwise | |
+| `CoarseSolver` | `CoarseSolver::Default`: `Cholesky` for a symmetric matrix, `LU` otherwise | `fhhos4::CoarseSolver`: `Cholesky`, `LU` (sparse factorizations) |
 | `Threads` | `0`: the OpenMP setting, but at most one thread per physical core unless `OMP_NUM_THREADS` or OpenMP's binding is set | |
 | `Verbosity` | `0`: silent | `1`: one line per setup and per solve; `2`: all the messages, with the residual at each iteration |
 

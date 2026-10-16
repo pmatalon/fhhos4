@@ -358,7 +358,7 @@ void ApplyProgramArgumentDefaults(ProgramArguments& args,
 			args.Solver.MG.H_CS = H_CoarsStgy::DoublePairwiseAggregation;
 
 		if (defaultCycle)
-			args.Solver.MG.CycleLetter = 'K';
+			args.Solver.MG.Cycle = CycleType::K;
 	}
 
 

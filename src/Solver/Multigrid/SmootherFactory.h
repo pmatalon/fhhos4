@@ -4,121 +4,153 @@ using namespace std;
 
 class SmootherFactory
 {
-
-public:
-	// The Chebyshev smoothers: symmetric, for a symmetric positive definite matrix
-	static bool IsChebyshev(const string& smootherCode)
+private:
+	// The codes of the smoothers (-smoothers, see fhhos4 -h); the first one of a smoother is its name
+	static const vector<pair<string, SmootherType>>& Codes()
 	{
-		return smootherCode == "cheb" || smootherCode == "bcheb" || smootherCode == "cheb4" || smootherCode == "bcheb4";
+		static const vector<pair<string, SmootherType>> codes = {
+			{ "j",      SmootherType::Jacobi },
+			{ "j23",    SmootherType::DampedJacobi },
+			{ "bj",     SmootherType::BlockJacobi },
+			{ "bj23",   SmootherType::DampedBlockJacobi },
+			{ "gs",     SmootherType::GaussSeidel },
+			{ "rgs",    SmootherType::BackwardGaussSeidel },
+			{ "sgs",    SmootherType::SymmetricGaussSeidel },
+			{ "ags",    SmootherType::AlternatingGaussSeidel },
+			{ "rags",   SmootherType::BackwardAlternatingGaussSeidel },
+			{ "sor",    SmootherType::SOR },
+			{ "rsor",   SmootherType::BackwardSOR },
+			{ "bgs",    SmootherType::BlockGaussSeidel },
+			{ "bsor",   SmootherType::BlockGaussSeidel },
+			{ "rbgs",   SmootherType::BackwardBlockGaussSeidel },
+			{ "rbsor",  SmootherType::BackwardBlockGaussSeidel },
+			{ "sbgs",   SmootherType::SymmetricBlockGaussSeidel },
+			{ "sbsor",  SmootherType::SymmetricBlockGaussSeidel },
+			{ "abgs",   SmootherType::AlternatingBlockGaussSeidel },
+			{ "absor",  SmootherType::AlternatingBlockGaussSeidel },
+			{ "rabgs",  SmootherType::BackwardAlternatingBlockGaussSeidel },
+			{ "rabsor", SmootherType::BackwardAlternatingBlockGaussSeidel },
+			{ "hbgs",   SmootherType::HybridBlockGaussSeidel },
+			{ "hrbgs",  SmootherType::HybridBackwardBlockGaussSeidel },
+			{ "cheb",   SmootherType::ChebyshevFirstKind },
+			{ "bcheb",  SmootherType::BlockChebyshevFirstKind },
+			{ "cheb4",  SmootherType::ChebyshevFourthKind },
+			{ "bcheb4", SmootherType::BlockChebyshevFourthKind }
+		};
+		return codes;
 	}
 
-	static Smoother* Create(string smootherCode, int nSmootherIterations, int blockSize, double omega)
+	// Block SOR, or block Gauss-Seidel if omega = 1 (Gauss-Seidel if the blocks are scalar)
+	static Smoother* BlockSOROrGaussSeidel(int blockSize, double omega, Direction direction, int nSmootherIterations)
 	{
-		if (smootherCode.compare("gs") == 0)
-			return new GaussSeidelSmoother(Direction::Forward, nSmootherIterations);
-		if (smootherCode.compare("rgs") == 0)
-			return new GaussSeidelSmoother(Direction::Backward, nSmootherIterations);
-		if (smootherCode.compare("sgs") == 0)
-			return new GaussSeidelSmoother(Direction::Symmetric, nSmootherIterations);
-		if (smootherCode.compare("ags") == 0)
-			return new GaussSeidelSmoother(Direction::AlternatingForwardFirst, nSmootherIterations);
-		if (smootherCode.compare("rags") == 0)
-			return new GaussSeidelSmoother(Direction::AlternatingBackwardFirst, nSmootherIterations);
+		if (blockSize == 1 && omega == 1)
+			return new GaussSeidelSmoother(direction, nSmootherIterations);
+		else if (omega == 1)
+			return new BlockGaussSeidelSmoother(blockSize, direction, false, nSmootherIterations);
+		else
+			return new BlockSORSmoother(blockSize, omega, direction, nSmootherIterations);
+	}
 
-		if (smootherCode.compare("sor") == 0)
+	static Smoother* HybridBlockGaussSeidel(int blockSize, Direction direction, int nSmootherIterations)
+	{
+		if (blockSize == 1) // the scalar kernels are faster
+			return new GaussSeidelSmoother(direction, true, nSmootherIterations);
+		return new BlockGaussSeidelSmoother(blockSize, direction, true, nSmootherIterations);
+	}
+
+public:
+	// The smoother of the code; false if the code is unknown
+	static bool FromCode(const string& code, SmootherType& smoother)
+	{
+		for (const auto& [c, s] : Codes())
 		{
-			if (omega == 1)
+			if (c == code)
+			{
+				smoother = s;
+				return true;
+			}
+		}
+		return false;
+	}
+
+	// The code of the smoother (for the messages)
+	static string Code(SmootherType smoother)
+	{
+		if (smoother == SmootherType::Default)
+			return "<symmetric smoother>";
+		for (const auto& [c, s] : Codes())
+		{
+			if (s == smoother)
+				return c;
+		}
+		return "<unknown smoother " + to_string((unsigned)smoother) + ">";
+	}
+
+	// The Chebyshev smoothers: symmetric, for a symmetric positive definite matrix
+	static bool IsChebyshev(SmootherType smoother)
+	{
+		return smoother == SmootherType::ChebyshevFirstKind || smoother == SmootherType::BlockChebyshevFirstKind ||
+		       smoother == SmootherType::ChebyshevFourthKind || smoother == SmootherType::BlockChebyshevFourthKind;
+	}
+
+	static Smoother* Create(SmootherType smoother, int nSmootherIterations, int blockSize, double omega)
+	{
+		switch (smoother)
+		{
+			case SmootherType::GaussSeidel:
 				return new GaussSeidelSmoother(Direction::Forward, nSmootherIterations);
-			else
-				return new BlockSORSmoother(1, omega, Direction::Forward, nSmootherIterations);
-		}
-		if (smootherCode.compare("rsor") == 0)
-		{
-			if (omega == 1)
+			case SmootherType::BackwardGaussSeidel:
 				return new GaussSeidelSmoother(Direction::Backward, nSmootherIterations);
-			else
-				return new BlockSORSmoother(1, omega, Direction::Backward, nSmootherIterations);
-		}
-
-		if (smootherCode.compare("bsor") == 0 || smootherCode.compare("bgs") == 0)
-		{
-			if (blockSize == 1 && omega == 1)
-				return new GaussSeidelSmoother(Direction::Forward, nSmootherIterations);
-			else if (omega == 1)
-				return new BlockGaussSeidelSmoother(blockSize, Direction::Forward, false, nSmootherIterations);
-			else
-				return new BlockSORSmoother(blockSize, omega, Direction::Forward, nSmootherIterations);
-		}
-		if (smootherCode.compare("rbsor") == 0 || smootherCode.compare("rbgs") == 0)
-		{
-			if (blockSize == 1 && omega == 1)
-				return new GaussSeidelSmoother(Direction::Backward, nSmootherIterations);
-			else if (omega == 1)
-				return new BlockGaussSeidelSmoother(blockSize, Direction::Backward, false, nSmootherIterations);
-			else
-				return new BlockSORSmoother(blockSize, omega, Direction::Backward, nSmootherIterations);
-		}
-		if (smootherCode.compare("absor") == 0 || smootherCode.compare("abgs") == 0)
-		{
-			if (blockSize == 1 && omega == 1)
-				return new GaussSeidelSmoother(Direction::AlternatingForwardFirst, nSmootherIterations);
-			else if (omega == 1)
-				return new BlockGaussSeidelSmoother(blockSize, Direction::AlternatingForwardFirst, false, nSmootherIterations);
-			else
-				return new BlockSORSmoother(blockSize, omega, Direction::AlternatingForwardFirst, nSmootherIterations);
-		}
-		if (smootherCode.compare("rabsor") == 0 || smootherCode.compare("rabgs") == 0)
-		{
-			if (blockSize == 1 && omega == 1)
-				return new GaussSeidelSmoother(Direction::AlternatingBackwardFirst, nSmootherIterations);
-			else if (omega == 1)
-				return new BlockGaussSeidelSmoother(blockSize, Direction::AlternatingBackwardFirst, false, nSmootherIterations);
-			else
-				return new BlockSORSmoother(blockSize, omega, Direction::AlternatingBackwardFirst, nSmootherIterations);
-		}
-		if (smootherCode.compare("hbgs") == 0)
-		{
-			if (blockSize == 1) // the scalar kernels are faster
-				return new GaussSeidelSmoother(Direction::Forward, true, nSmootherIterations);
-			return new BlockGaussSeidelSmoother(blockSize, Direction::Forward, true, nSmootherIterations);
-		}
-		if (smootherCode.compare("hrbgs") == 0)
-		{
-			if (blockSize == 1)
-				return new GaussSeidelSmoother(Direction::Backward, true, nSmootherIterations);
-			return new BlockGaussSeidelSmoother(blockSize, Direction::Backward, true, nSmootherIterations);
-		}
-
-
-		if (smootherCode.compare("sbsor") == 0 || smootherCode.compare("sbgs") == 0)
-		{
-			if (blockSize == 1 && omega == 1)
+			case SmootherType::SymmetricGaussSeidel:
 				return new GaussSeidelSmoother(Direction::Symmetric, nSmootherIterations);
-			else if (omega == 1)
-				return new BlockGaussSeidelSmoother(blockSize, Direction::Symmetric, false, nSmootherIterations);
-			else
-				return new BlockSORSmoother(blockSize, omega, Direction::Symmetric, nSmootherIterations);
+			case SmootherType::AlternatingGaussSeidel:
+				return new GaussSeidelSmoother(Direction::AlternatingForwardFirst, nSmootherIterations);
+			case SmootherType::BackwardAlternatingGaussSeidel:
+				return new GaussSeidelSmoother(Direction::AlternatingBackwardFirst, nSmootherIterations);
+
+			case SmootherType::SOR:
+				return BlockSOROrGaussSeidel(1, omega, Direction::Forward, nSmootherIterations);
+			case SmootherType::BackwardSOR:
+				return BlockSOROrGaussSeidel(1, omega, Direction::Backward, nSmootherIterations);
+
+			case SmootherType::BlockGaussSeidel:
+				return BlockSOROrGaussSeidel(blockSize, omega, Direction::Forward, nSmootherIterations);
+			case SmootherType::BackwardBlockGaussSeidel:
+				return BlockSOROrGaussSeidel(blockSize, omega, Direction::Backward, nSmootherIterations);
+			case SmootherType::SymmetricBlockGaussSeidel:
+				return BlockSOROrGaussSeidel(blockSize, omega, Direction::Symmetric, nSmootherIterations);
+			case SmootherType::AlternatingBlockGaussSeidel:
+				return BlockSOROrGaussSeidel(blockSize, omega, Direction::AlternatingForwardFirst, nSmootherIterations);
+			case SmootherType::BackwardAlternatingBlockGaussSeidel:
+				return BlockSOROrGaussSeidel(blockSize, omega, Direction::AlternatingBackwardFirst, nSmootherIterations);
+
+			case SmootherType::HybridBlockGaussSeidel:
+				return HybridBlockGaussSeidel(blockSize, Direction::Forward, nSmootherIterations);
+			case SmootherType::HybridBackwardBlockGaussSeidel:
+				return HybridBlockGaussSeidel(blockSize, Direction::Backward, nSmootherIterations);
+
+			case SmootherType::Jacobi:
+				return new BlockJacobiSmoother(1, omega, nSmootherIterations);
+			case SmootherType::DampedJacobi:
+				return new BlockJacobiSmoother(1, 2.0/3.0, nSmootherIterations);
+			case SmootherType::BlockJacobi:
+				return new BlockJacobiSmoother(blockSize, omega, nSmootherIterations);
+			case SmootherType::DampedBlockJacobi:
+				return new BlockJacobiSmoother(blockSize, 2.0/3.0, nSmootherIterations);
+
+			case SmootherType::ChebyshevFirstKind:
+				return new ChebyshevSmoother(1, ChebyshevKind::First, nSmootherIterations);
+			case SmootherType::BlockChebyshevFirstKind:
+				return new ChebyshevSmoother(blockSize, ChebyshevKind::First, nSmootherIterations);
+			case SmootherType::ChebyshevFourthKind:
+				return new ChebyshevSmoother(1, ChebyshevKind::Fourth, nSmootherIterations);
+			case SmootherType::BlockChebyshevFourthKind:
+				return new ChebyshevSmoother(blockSize, ChebyshevKind::Fourth, nSmootherIterations);
+
+			case SmootherType::Default: // resolved before (AlgebraicSolverFactory::SetMultigridParameters())
+				break;
 		}
-
-		if (smootherCode.compare("j") == 0)
-			return new BlockJacobiSmoother(1, omega, nSmootherIterations);
-		if (smootherCode.compare("j23") == 0)
-			return new BlockJacobiSmoother(1, 2.0/3.0, nSmootherIterations);
-		if (smootherCode.compare("bj") == 0)
-			return new BlockJacobiSmoother(blockSize, omega, nSmootherIterations);
-		if (smootherCode.compare("bj23") == 0)
-			return new BlockJacobiSmoother(blockSize, 2.0/3.0, nSmootherIterations);
-
-		if (smootherCode.compare("cheb") == 0)
-			return new ChebyshevSmoother(1, ChebyshevKind::First, nSmootherIterations);
-		if (smootherCode.compare("bcheb") == 0)
-			return new ChebyshevSmoother(blockSize, ChebyshevKind::First, nSmootherIterations);
-		if (smootherCode.compare("cheb4") == 0)
-			return new ChebyshevSmoother(1, ChebyshevKind::Fourth, nSmootherIterations);
-		if (smootherCode.compare("bcheb4") == 0)
-			return new ChebyshevSmoother(blockSize, ChebyshevKind::Fourth, nSmootherIterations);
-
-		Utils::FatalError("Unmanaged smoother code: '" + smootherCode + "'");
+		Utils::FatalError("Unmanaged smoother: '" + Code(smoother) + "'");
 		return nullptr;
 	}
 };

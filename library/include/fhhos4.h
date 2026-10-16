@@ -2,7 +2,6 @@
 // Copyright (C) 2026 Pierre Matalon
 #pragma once
 #include <memory>
-#include <string>
 #include <Eigen/Core>
 #include <Eigen/SparseCore>
 #include "fhhos4_error.h"
@@ -41,6 +40,56 @@ namespace fhhos4
 	// default). The input matrices of this type, compressed, are read in place; the others are converted (copied).
 	using SparseMatrix = Eigen::SparseMatrix<double, Eigen::RowMajor, FHHOS4_SPARSE_INDEX>;
 
+	// The Krylov method preconditioned by one cycle of the AMG (Solver::Krylov)
+	enum class Krylov
+	{
+		Default,  // FCG for a symmetric matrix (SetupSymmetric...()), GCR otherwise (SetupNonsymmetric...())
+		FCG,      // flexible conjugate gradient (fhhos4 -s fcguamg), for a symmetric positive definite matrix
+		GCR,      // GCR(10), generalized conjugate residual restarted every 10 iterations, Notay's economical version
+		          // (fhhos4 -s gcruamg). Minimizes the residual norm: for any matrix
+		BiCGSTAB, // Eigen's BiCGSTAB. Not flexible: it needs a linear preconditioner, a V- or W-cycle (not K)
+		None      // the cycles of the AMG alone, as a stationary iterative method (fhhos4 -s uamg): slower at k >= 1
+	};
+
+	// The multigrid cycle (Solver::Cycle)
+	enum class Cycle
+	{
+		V,
+		W,
+		K // K-cycle: each coarse level is solved by 2 iterations of FCG, or of GCR with Krylov::GCR or a non-symmetric
+		  // matrix. Non-linear: it requires a flexible Krylov method (FCG or GCR)
+	};
+
+	// The smoothers (Solver::PreSmoother and PostSmoother; fhhos4 -smoothers). The blocks: one per face. The Gauss-Seidel
+	// smoothers are sequential, except the hybrid ones.
+	enum class Smoother
+	{
+		Default,                        // chosen by the setup (see Solver::PreSmoother and PostSmoother)
+		BlockGaussSeidel,               // bgs
+		BackwardBlockGaussSeidel,       // rbgs
+		SymmetricBlockGaussSeidel,      // sbgs: forward then backward
+		HybridBlockGaussSeidel,         // hbgs: Gauss-Seidel in the rows of each thread, Jacobi between the threads:
+		                                // parallel, except on the levels where the rows of the threads are poorly
+		                                // separated; the results depend on the number of threads, not on the run. On 1
+		                                // thread: BlockGaussSeidel
+		HybridBackwardBlockGaussSeidel, // hrbgs
+		DampedBlockJacobi,              // bj23: block Jacobi damped by 2/3. Parallel
+		BlockChebyshevFirstKind,        // bcheb: block Chebyshev, a polynomial in D^-1 A (D: the block diagonal) whose
+		                                // degree is the number of smoothing iterations (each one, a block Jacobi
+		                                // iteration with its own damping factor), minimal on [lambdaMax/10, lambdaMax].
+		                                // Parallel, and its results don't depend on the number of threads. Symmetric
+		                                // positive definite matrices only
+		BlockChebyshevFourthKind        // bcheb4: the same, of the fourth kind (Lottes 2023): no lower bound to choose
+	};
+
+	// The solver of the coarsest level (Solver::CoarseSolver)
+	enum class CoarseSolver
+	{
+		Default,  // Cholesky for a symmetric matrix (SetupSymmetric...()), LU otherwise (SetupNonsymmetric...())
+		Cholesky, // sparse Cholesky factorization, for a symmetric positive definite matrix
+		LU        // sparse LU factorization
+	};
+
 	struct Result
 	{
 		int Iterations = 0;
@@ -50,7 +99,7 @@ namespace fhhos4
 
 	// Set the parameters, then call a setup function, then Solve(). The parameters are read by the setup (Tolerance and
 	// MaxIterations by Solve()). The defaults are those of the program fhhos4 (-s fcguamg), used in the papers, except the
-	// smoothers on several threads (PreSmoother, and the number of its iterations).
+	// smoothers (PreSmoother, and the number of its iterations).
 	// Not thread-safe: one object must not be used by several threads at the same time.
 	class FHHOS4_API Solver
 	{
@@ -63,46 +112,36 @@ namespace fhhos4
 
 		//--------------------- Solver ---------------------//
 
-		// The Krylov method preconditioned by one cycle of the AMG:
-		// - "" (default): "fcg" for a symmetric matrix (SetupSymmetric...()), "gcr" otherwise (SetupNonsymmetric...());
-		// - "fcg": flexible conjugate gradient (fhhos4 -s fcguamg), for a symmetric positive definite matrix;
-		// - "gcr": GCR(10), generalized conjugate residual restarted every 10 iterations, Notay's economical version
-		//   (fhhos4 -s gcruamg). Minimizes the residual norm: for any matrix;
-		// - "bicgstab": Eigen's BiCGSTAB. Not flexible: it needs a linear preconditioner, a V- or W-cycle (not K);
-		// - "none": the cycles of the AMG alone, as a stationary iterative method (fhhos4 -s uamg): slower at k >= 1.
-		std::string Krylov;
+		// The Krylov method preconditioned by one cycle of the AMG. Default: FCG for a symmetric matrix, GCR otherwise.
+		fhhos4::Krylov Krylov = fhhos4::Krylov::Default;
 		double Tolerance = 1e-8; // stopping criterion of Solve(): |b - A x| / |b| < Tolerance
 		int MaxIterations = 200; // Solve() stops after MaxIterations iterations, converged or not
 
 		//-------------------- Multigrid -------------------//
 
-		char Cycle = 'K';                  // 'V', 'W' or 'K' (K-cycle: each coarse level is solved by 2 iterations of FCG,
-		                                   // or of GCR with Krylov "gcr" or a non-symmetric matrix)
+		fhhos4::Cycle Cycle = fhhos4::Cycle::K;
 		// Number of iterations of the pre- and post-smoothers (>= 0, 0: none); -1 (default): the smoother's, 2 for the
 		// Chebyshev smoothers (their degree), 1 for the others
 		int PreSmoothingIterations = -1;
 		int PostSmoothingIterations = -1;
-		// Smoothers (codes of fhhos4 -smoothers, see fhhos4 -h). PreSmoother empty (default): chosen by the setup:
-		// - for a symmetric matrix (SetupSymmetric...()), "bcheb4": the block Chebyshev of the fourth kind, a polynomial in
-		//   D^-1 A (D: the block diagonal, one block per face) whose degree is the number of smoothing iterations (each
-		//   one, a block Jacobi iteration with its own damping factor): parallel, and its results don't depend on the
-		//   number of threads ("bcheb": the first kind; symmetric matrices only);
-		// - for a non-symmetric matrix, on several threads, "hbgs": the hybrid block Gauss-Seidel (Gauss-Seidel in the
-		//   rows of each thread, Jacobi between the threads: parallel, except on the levels where the rows of the threads
-		//   are poorly separated; the results then depend on the number of threads, not on the run); on 1 thread, "bgs":
-		//   the block Gauss-Seidel (sequential: "hbgs" on 1 thread), one block per face.
-		// PostSmoother empty (default): the backward version of PreSmoother ("rbgs" after "bgs", "hrbgs" after "hbgs"),
-		// or PreSmoother itself if it is symmetric (Chebyshev).
+		// Smoothers. PreSmoother Default: chosen by the setup:
+		// - for a symmetric matrix (SetupSymmetric...()), BlockChebyshevFourthKind: parallel, and its results don't depend
+		//   on the number of threads;
+		// - for a non-symmetric matrix (the Chebyshev smoothers require a symmetric one), HybridBlockGaussSeidel on
+		//   several threads (parallel), BlockGaussSeidel on 1.
+		// PostSmoother Default: the adjoint of PreSmoother, which makes the cycle symmetric: the sweep in the other
+		// direction for Gauss-Seidel (BackwardBlockGaussSeidel after BlockGaussSeidel, HybridBackwardBlockGaussSeidel after
+		// HybridBlockGaussSeidel, and the other way around), PreSmoother itself if it is symmetric (Chebyshev, Jacobi,
+		// SymmetricBlockGaussSeidel).
 		// Non-symmetric matrix (SetupNonsymmetric...()): on a level with one-sided couplings (convection), the Gauss-Seidel
 		// smoothers keep their type, block size and number of sweeps, but not their direction: all their sweeps
-		// (backward and symmetric ones included) follow the downwind order of the level. The other smoothers (Jacobi,
-		// SOR with a relaxation parameter) ignore it.
-		std::string PreSmoother;
-		std::string PostSmoother;
+		// (backward and symmetric ones included) follow the downwind order of the level. Jacobi ignores it.
+		fhhos4::Smoother PreSmoother = fhhos4::Smoother::Default;
+		fhhos4::Smoother PostSmoother = fhhos4::Smoother::Default;
 		double CoarseningFactor = 3.8;     // target ratio of the numbers of cells of two successive h-levels
 		int CoarseMatrixMaxSize = 1000;    // the coarsening stops when the matrix has at most this many rows
-		std::string CoarseSolver;          // solver of the coarsest level (fhhos4 -coarse-solver); "" (default): sparse
-		                                   // Cholesky ("ch") for a symmetric matrix, sparse LU ("lu") otherwise
+		// Solver of the coarsest level. Default: Cholesky for a symmetric matrix, LU otherwise.
+		fhhos4::CoarseSolver CoarseSolver = fhhos4::CoarseSolver::Default;
 
 		//-------------------- Execution -------------------//
 
@@ -148,7 +187,7 @@ namespace fhhos4
 		// the blocks of A_TF and A_FT; the coarse operators are the Galerkin products P^T A P (as AGMG: Y. Notay, "An
 		// aggregation-based algebraic multigrid method", ETNA 37, 2010); the Gauss-Seidel smoothers follow the downwind
 		// order of each level (convection), in the pre- and post-smoothing; the K-cycle iterates with GCR. Krylov must not
-		// be "fcg", nor CoarseSolver "ch".
+		// be FCG, nor CoarseSolver Cholesky, nor the smoothers Chebyshev.
 		// See README_library.md.
 		template <typename SparseMatrixType>
 		void SetupNonsymmetric(const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FT, const SparseMatrixType& A_FF,

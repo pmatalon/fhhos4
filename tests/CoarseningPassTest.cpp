@@ -235,10 +235,10 @@ namespace
 		amg.UseGalerkinOperator = galerkin;
 		amg.MatrixMaxSizeForCoarsestLevel = 30;
 		amg.CoarseningFactor = 3.8;
-		amg.Cycle = 'K';
+		amg.Cycle = CycleType::K;
 		amg.KCycleKrylov = symmetric ? KrylovMethod::FCG : KrylovMethod::GCR;
-		amg.PreSmootherCode = "bgs";
-		amg.PostSmootherCode = "rbgs";
+		amg.PreSmoother = SmootherType::BlockGaussSeidel;
+		amg.PostSmoother = SmootherType::BackwardBlockGaussSeidel;
 		Vector cellInterpOfOne = Vector::Constant(system.A_TF.rows(), constantCoordinate);
 		Vector faceInterpOfOne = Vector::Constant(system.A_TF.cols(), constantCoordinate);
 		for (BigNumber i = 0; i < faceInterpOfOne.rows(); i += 3)

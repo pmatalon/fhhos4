@@ -199,9 +199,9 @@ public:
 		Out.ExportMatrix(M, suffix);
 	}
 
-	virtual Smoother* CreateSmoother(string smootherCode, int nSmootherIterations, int blockSize, double omega)
+	virtual Smoother* CreateSmoother(SmootherType smoother, int nSmootherIterations, int blockSize, double omega)
 	{
-		return SmootherFactory::Create(smootherCode, nSmootherIterations, blockSize, omega);
+		return SmootherFactory::Create(smoother, nSmootherIterations, blockSize, omega);
 	}
 
 	virtual ~Level()

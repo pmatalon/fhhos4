@@ -5,6 +5,7 @@
 #include "ProgramArgumentsDefaults.h"
 #include "Solver/FixedPoint/BlockDiagonalSolver.h"
 #include "Solver/FixedPoint/BlockChebyshev.h"
+#include "Solver/Multigrid/SmootherFactory.h"
 #include "Utils/FileSystem.h"
 using namespace std;
 
@@ -361,8 +362,10 @@ void print_usage() {
 	cout << endl;
 	cout << "-smoothers CODE[,CODE]" << endl;
 	cout << "      Pre-smoother,post-smoother: \"bgs,rbgs\" for example." << endl;
-	cout << "      If only the pre-smoother is chosen, the post-smoother will be determined according the number of smoothing steps in the cycle" << endl;
-	cout << "      in order to ensure symmetry: if the pre-smoother is \"ags\", the post-smoother will also be \"ags\" if the number of smoothing steps is even, or \"rags\" if odd." << endl;
+	cout << "      If only the pre-smoother is chosen, the post-smoother is its adjoint, which makes the cycle symmetric: the other direction" << endl;
+	cout << "      for Gauss-Seidel and SOR (\"rbgs\" after \"bgs\", \"bgs\" after \"rbgs\"...), the pre-smoother itself if it is symmetric" << endl;
+	cout << "      (Jacobi, symmetric Gauss-Seidel, Chebyshev). For the alternating ones, it depends on the number of smoothing steps:" << endl;
+	cout << "      if the pre-smoother is \"ags\", the post-smoother will also be \"ags\" if the number of smoothing steps is even, or \"rags\" if odd." << endl;
 	cout << "              j     - Jacobi" << endl;
 	cout << "              gs    - Gauss-Seidel" << endl;
 	cout << "              rgs   - Reverse Gauss-Seidel" << endl;
@@ -1258,24 +1261,25 @@ int Run(int argc, char* argv[])
 					char cycleLetter = matches.str(1)[0];
 					if (cycleLetter == 'v' || cycleLetter == 'V')
 					{
-						args.Solver.MG.CycleLetter = 'V';
+						args.Solver.MG.Cycle = CycleType::V;
 						args.Solver.MG.WLoops = 1;
 					}
 					else if (cycleLetter == 'w' || cycleLetter == 'W')
 					{
-						args.Solver.MG.CycleLetter = 'W';
+						args.Solver.MG.Cycle = CycleType::W;
 						args.Solver.MG.WLoops = 2;
 					}
 					else if (cycleLetter == 'k' || cycleLetter == 'K')
 					{
-						args.Solver.MG.CycleLetter = 'K';
+						args.Solver.MG.Cycle = CycleType::K;
 						args.Solver.MG.WLoops = 1;
 					}
 					args.Solver.MG.PreSmoothingIterations = stoi(matches.str(2));
 					args.Solver.MG.PostSmoothingIterations = stoi(matches.str(3));
 					if (!matches.str(4).empty())
 					{
-						args.Solver.MG.CoarseLevelChangeSmoothingOperator = matches.str(5)[0];
+						char op = matches.str(5)[0];
+						args.Solver.MG.CoarseLevelChangeSmoothingOperator = op == '+' ? SmoothingChangeOperator::Add : op == '-' ? SmoothingChangeOperator::Subtract : SmoothingChangeOperator::Multiply;
 						args.Solver.MG.CoarseLevelChangeSmoothingCoeff = stoi(matches.str(6));
 					}
 				}
@@ -1382,16 +1386,17 @@ int Run(int argc, char* argv[])
 			{
 				string s(optarg);
 				auto pos = s.find(",");
+				string preCode = s.substr(0, pos);
+				if (!SmootherFactory::FromCode(preCode, args.Solver.MG.PreSmoother))
+					argument_error("unknown smoother '" + preCode + "'. Check -smoothers argument.");
 				if (pos != string::npos) // "," found
 				{
-					args.Solver.MG.PreSmootherCode = s.substr(0, s.find(","));
-					args.Solver.MG.PostSmootherCode = s.substr(pos + 1);
+					string postCode = s.substr(pos + 1);
+					if (!SmootherFactory::FromCode(postCode, args.Solver.MG.PostSmoother))
+						argument_error("unknown smoother '" + postCode + "'. Check -smoothers argument.");
 				}
 				else // "," not found
-				{
-					args.Solver.MG.PreSmootherCode = s;
-					args.Solver.MG.PostSmootherCode = "<symmetric smoother>";
-				}
+					args.Solver.MG.PostSmoother = SmootherType::Default;
 				break;
 			}
 			case OPT_HP_CS:

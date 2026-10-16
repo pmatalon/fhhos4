@@ -73,6 +73,51 @@ enum class KrylovMethod : unsigned
 	GCR
 };
 
+// Multigrid cycle (-cycle)
+enum class CycleType : unsigned
+{
+	V,
+	W, // Multigrid::WLoops loops
+	K  // each coarse level is solved by 2 iterations of a flexible Krylov method (Multigrid::KCycleKrylov)
+};
+
+// How the numbers of smoothing iterations change from a level to the next coarser one (-cycle V,1,1,+1)
+enum class SmoothingChangeOperator : unsigned
+{
+	Add,
+	Subtract,
+	Multiply
+};
+
+// The smoothers of the multigrid methods (-smoothers; their codes: SmootherFactory). The block versions have one block
+// per face (or cell); "relaxed": with the relaxation parameter (-relax, default 1).
+enum class SmootherType : unsigned
+{
+	Default, // post-smoother: the one that makes the cycle symmetric with the pre-smoother (-smoothers with one code)
+	Jacobi, // relaxed
+	DampedJacobi, // damping factor 2/3
+	BlockJacobi, // relaxed
+	DampedBlockJacobi, // damping factor 2/3
+	GaussSeidel,
+	BackwardGaussSeidel,
+	SymmetricGaussSeidel, // forward then backward
+	AlternatingGaussSeidel, // forward and backward alternately, starting with forward
+	BackwardAlternatingGaussSeidel, // the same, starting with backward
+	SOR, // relaxed Gauss-Seidel
+	BackwardSOR,
+	BlockGaussSeidel, // relaxed (block SOR)
+	BackwardBlockGaussSeidel,
+	SymmetricBlockGaussSeidel,
+	AlternatingBlockGaussSeidel,
+	BackwardAlternatingBlockGaussSeidel,
+	HybridBlockGaussSeidel, // Gauss-Seidel in the rows of each thread, Jacobi between the threads
+	HybridBackwardBlockGaussSeidel,
+	ChebyshevFirstKind, // preconditioned by Jacobi
+	BlockChebyshevFirstKind, // preconditioned by block Jacobi
+	ChebyshevFourthKind,
+	BlockChebyshevFourthKind
+};
+
 enum class CoarseningType : unsigned
 {
 	H,

@@ -35,7 +35,7 @@ inline void ApplyUncondensedAMGDefaults(MultigridArguments& mg, int k, bool defa
 		mg.UseGalerkinOperator = true;
 
 	if (defaultCycle)
-		mg.CycleLetter = 'K';
+		mg.Cycle = CycleType::K;
 
 	// k >= 1: p-levels down to k=0, then the h-coarsening of the paper, designed for k=0. The h-coarsening of the
 	// degree-k blocks (-hp-cs h) only transfers their higher modes by plain aggregation: never faster in the tests.

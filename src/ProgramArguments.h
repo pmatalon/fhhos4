@@ -60,7 +60,7 @@ struct MultigridArguments
 	UAMGProlongation UAMGMultigridProlong = UAMGProlongation::ReconstructTraceOrInject;
 	int NumberOfMeshes = 0;
 	int MatrixMaxSizeForCoarsestLevel = 1000;
-	char CycleLetter = 'V';
+	CycleType Cycle = CycleType::V;
 	int WLoops = 1;
 	KrylovMethod KCycleKrylov = KrylovMethod::FCG; // GCR under -s gcr (ApplyProgramArgumentDefaults)
 	bool UAMGNonsymmetric = false; // -uamg-nonsym: U-AMG for a non-symmetric matrix (A_FT given), on the symmetric matrix
@@ -68,12 +68,12 @@ struct MultigridArguments
 	bool UseHigherOrderReconstruction = true;
 	bool UseHeterogeneousWeighting = true;
 	bool UseGalerkinOperator = false;
-	string PreSmootherCode = "bgs";
-	string PostSmootherCode = "rbgs";
+	SmootherType PreSmoother = SmootherType::BlockGaussSeidel;
+	SmootherType PostSmoother = SmootherType::BackwardBlockGaussSeidel;
 	int PreSmoothingIterations = 1;
 	int PostSmoothingIterations = 1;
 	int CoarseLevelChangeSmoothingCoeff = 0;
-	char CoarseLevelChangeSmoothingOperator = '+';
+	SmoothingChangeOperator CoarseLevelChangeSmoothingOperator = SmoothingChangeOperator::Add;
 	HP_CoarsStgy HP_CS = HP_CoarsStgy::H_only;
 	H_CoarsStgy H_CS = H_CoarsStgy::None;
 	P_CoarsStgy P_CS = P_CoarsStgy::Minus2;

@@ -1,41 +1,47 @@
 #include "fhhos4.h"
 #include "LibraryUAMG.h"
+#include "LibraryParameters.h"
 
 class LibraryUAMGImpl : public LibraryUAMG
 {
 private:
 	fhhos4::Solver _solver;
+	MultigridArguments _mg;         // printed by Serialize(), with the codes of the program
+	optional<KrylovMethod> _krylov;
 public:
 	// The parameters of the library that correspond to the arguments of the program
-	LibraryUAMGImpl(const ProgramArguments& args, int dim, int faceDegree, int cellDegree, const string& krylov)
+	LibraryUAMGImpl(const ProgramArguments& args, int dim, int faceDegree, int cellDegree, optional<KrylovMethod> krylov)
+		: _mg(args.Solver.MG), _krylov(krylov)
 	{
 		_solver.Dimension = dim;
 		_solver.FaceDegree = faceDegree;
 		_solver.CellDegree = cellDegree;
-		_solver.Krylov = krylov;
+		if (!krylov)
+			_solver.Krylov = fhhos4::Krylov::None;
+		else
+			_solver.Krylov = *krylov == KrylovMethod::GCR ? fhhos4::Krylov::GCR : fhhos4::Krylov::FCG;
 		_solver.Tolerance = args.Solver.Tolerance;
 		_solver.MaxIterations = args.Solver.MaxIterations;
 		const MultigridArguments& mg = args.Solver.MG;
-		_solver.Cycle = mg.CycleLetter;
+		_solver.Cycle = LibraryParameters::LibraryCycle(mg.Cycle);
 		_solver.PreSmoothingIterations = mg.PreSmoothingIterations;
 		_solver.PostSmoothingIterations = mg.PostSmoothingIterations;
-		_solver.PreSmoother = mg.PreSmootherCode;
-		_solver.PostSmoother = mg.PostSmootherCode;
+		_solver.PreSmoother = LibraryParameters::LibrarySmoother(mg.PreSmoother);
+		_solver.PostSmoother = LibraryParameters::LibrarySmoother(mg.PostSmoother);
 		_solver.CoarseningFactor = mg.CoarseningFactor;
 		_solver.CoarseMatrixMaxSize = mg.MatrixMaxSizeForCoarsestLevel;
-		_solver.CoarseSolver = mg.CoarseSolverCode;
+		_solver.CoarseSolver = LibraryParameters::LibraryCoarseSolver(mg.CoarseSolverCode);
 		_solver.Threads = Parallelism::NThreads(); // the setting of the program for its solvers (-threads, SolverThreads)
 		_solver.Verbosity = args.Solver.PrintIterationResults ? 2 : 1;
 	}
 
 	void Serialize(ostream& os) const override
 	{
-		const fhhos4::Solver& s = _solver;
-		os << "U-AMG through the library fhhos4, Krylov method: " << s.Krylov << endl;
-		os << "\t" << "Cycle                   : " << s.Cycle << "(" << s.PreSmoothingIterations << "," << s.PostSmoothingIterations << ")" << endl;
-		os << "\t" << "Smoothers               : " << s.PreSmoother << ", " << s.PostSmoother << endl;
-		os << "\t" << "Coarsening factor       : " << s.CoarseningFactor << endl;
-		os << "\t" << "Coarse solver           : " << s.CoarseSolver << " (matrix size <= " << s.CoarseMatrixMaxSize << ")";
+		os << "U-AMG through the library fhhos4, Krylov method: " << (!_krylov ? "none" : *_krylov == KrylovMethod::GCR ? "gcr" : "fcg") << endl;
+		os << "\t" << "Cycle                   : " << (_mg.Cycle == CycleType::K ? "K" : _mg.Cycle == CycleType::W ? "W" : "V") << "(" << _mg.PreSmoothingIterations << "," << _mg.PostSmoothingIterations << ")" << endl;
+		os << "\t" << "Smoothers               : " << SmootherFactory::Code(_mg.PreSmoother) << ", " << SmootherFactory::Code(_mg.PostSmoother) << endl;
+		os << "\t" << "Coarsening factor       : " << _mg.CoarseningFactor << endl;
+		os << "\t" << "Coarse solver           : " << _mg.CoarseSolverCode << " (matrix size <= " << _mg.MatrixMaxSizeForCoarsestLevel << ")";
 	}
 
 	void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_T, const SparseMatrix& A_F_F, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
@@ -76,7 +82,7 @@ public:
 	}
 };
 
-LibraryUAMG* CreateLibraryUAMG(const ProgramArguments& args, int dim, int faceDegree, int cellDegree, const string& krylov)
+LibraryUAMG* CreateLibraryUAMG(const ProgramArguments& args, int dim, int faceDegree, int cellDegree, optional<KrylovMethod> krylov)
 {
 	return new LibraryUAMGImpl(args, dim, faceDegree, cellDegree, krylov);
 }

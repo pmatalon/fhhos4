@@ -42,12 +42,12 @@ TEST_P(ForwardPostSmootherTest, Converges)
 	ProgramArguments args = SquareCartArgs(0, 64);
 	args.Solver.SolverCode = solverCode;
 	args.Solver.MG.MatrixMaxSizeForCoarsestLevel = 10;
-	args.Solver.MG.PreSmootherCode = "gs";
-	args.Solver.MG.PostSmootherCode = "gs";
+	args.Solver.MG.PreSmoother = SmootherType::GaussSeidel;
+	args.Solver.MG.PostSmoother = SmootherType::GaussSeidel;
 	bool defaultCycle = true; // the AMGs default to the K-cycle
 	if (solverCode == "mg")
 	{
-		args.Solver.MG.CycleLetter = 'K';
+		args.Solver.MG.Cycle = CycleType::K;
 		args.Solver.MG.PreSmoothingIterations = 1;
 		args.Solver.MG.PostSmoothingIterations = 1;
 		defaultCycle = false;
@@ -68,9 +68,9 @@ TEST(SolverRegression, HybridGaussSeidelWithoutPostSmoothing)
 {
 	ProgramArguments args = SquareCartArgs(0, 32);
 	args.Solver.SolverCode = "fcguamg";
-	args.Solver.MG.PreSmootherCode = "hbgs";
-	args.Solver.MG.PostSmootherCode = "hrbgs";
-	args.Solver.MG.CycleLetter = 'K';
+	args.Solver.MG.PreSmoother = SmootherType::HybridBlockGaussSeidel;
+	args.Solver.MG.PostSmoother = SmootherType::HybridBackwardBlockGaussSeidel;
+	args.Solver.MG.Cycle = CycleType::K;
 	args.Solver.MG.PreSmoothingIterations = 1;
 	args.Solver.MG.PostSmoothingIterations = 0;
 
@@ -86,7 +86,7 @@ TEST(SolverRegression, WCycleWithManyLevels)
 {
 	ProgramArguments args = SquareCartArgs(0, 128);
 	args.Solver.SolverCode = "mg";
-	args.Solver.MG.CycleLetter = 'W';
+	args.Solver.MG.Cycle = CycleType::W;
 	args.Solver.MG.WLoops = 2;
 	args.Solver.MG.PreSmoothingIterations = 1;
 	args.Solver.MG.PostSmoothingIterations = 1;

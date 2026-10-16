@@ -109,7 +109,7 @@ public:
 		{
 			if (A_F_T.rows() != A_T_F.cols() || A_F_T.cols() != A_T_F.rows())
 				Utils::FatalError("UncondensedAMG: A_F_T must have the sizes of the transpose of A_T_F.");
-			if (this->Cycle == 'K' && this->KCycleKrylov != KrylovMethod::GCR)
+			if (this->Cycle == CycleType::K && this->KCycleKrylov != KrylovMethod::GCR)
 				Utils::FatalError("UncondensedAMG: the K-cycle of a non-symmetric matrix must iterate with GCR, not FCG.");
 			if (dynamic_cast<EigenSparseCholesky*>(this->CoarseSolver))
 				Utils::FatalError("UncondensedAMG: the Cholesky factorization cannot be the coarse solver of a non-symmetric matrix (use LU).");

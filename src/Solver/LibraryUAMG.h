@@ -1,4 +1,5 @@
 #pragma once
+#include <optional>
 #include "IterativeSolver.h"
 #include "../ProgramArguments.h"
 using namespace std;
@@ -30,5 +31,5 @@ public:
 	using IterativeSolver::Solve;
 };
 
-// krylov: fhhos4::Solver::Krylov ("fcg", "gcr" or "none").
-LibraryUAMG* CreateLibraryUAMG(const ProgramArguments& args, int dim, int faceDegree, int cellDegree, const string& krylov);
+// krylov: the Krylov method of the library (fhhos4::Solver::Krylov); none: the cycles of U-AMG alone.
+LibraryUAMG* CreateLibraryUAMG(const ProgramArguments& args, int dim, int faceDegree, int cellDegree, optional<KrylovMethod> krylov);

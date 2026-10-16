@@ -269,8 +269,8 @@ fhhos4::Solver ToySolver()
 	solver.FaceDegree = 0;
 	solver.CellDegree = 0;
 	solver.Tolerance = 1e-10;
-	solver.PreSmoother = "bgs";
-	solver.PostSmoother = "rbgs";
+	solver.PreSmoother = fhhos4::Smoother::BlockGaussSeidel;
+	solver.PostSmoother = fhhos4::Smoother::BackwardBlockGaussSeidel;
 	return solver;
 }
 
@@ -517,8 +517,8 @@ TEST(UAMGLibrary, BiCGSTAB)
 {
 	HybridSystem system(64);
 	fhhos4::Solver uamg = ToySolver();
-	uamg.Krylov = "bicgstab";
-	uamg.Cycle = 'V';
+	uamg.Krylov = fhhos4::Krylov::BiCGSTAB;
+	uamg.Cycle = fhhos4::Cycle::V;
 	uamg.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne);
 	Eigen::VectorXd x = Eigen::VectorXd::Zero(system.b.size());
 	fhhos4::Result result = uamg.Solve(system.b, x);
@@ -532,7 +532,7 @@ TEST(UAMGLibrary, GCR)
 {
 	HybridSystem system(64);
 	fhhos4::Solver uamg = ToySolver();
-	uamg.Krylov = "gcr";
+	uamg.Krylov = fhhos4::Krylov::GCR;
 	uamg.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne);
 	Eigen::VectorXd x = Eigen::VectorXd::Zero(system.b.size());
 	fhhos4::Result result = uamg.Solve(system.b, x);
@@ -552,8 +552,8 @@ TEST(UAMGLibrary, DefaultSmoothers)
 		for (int threads : { 4, 1 })
 		{
 			fhhos4::Solver uamg = ToySolver();
-			uamg.PreSmoother = "";
-			uamg.PostSmoother = "";
+			uamg.PreSmoother = fhhos4::Smoother::Default;
+			uamg.PostSmoother = fhhos4::Smoother::Default;
 			uamg.Threads = threads;
 			uamg.Verbosity = 2; // prints the smoothers
 			::testing::internal::CaptureStdout();
@@ -587,23 +587,52 @@ TEST(UAMGLibrary, DefaultSmoothers)
 TEST(UAMGLibrary, ChebyshevSmoothers)
 {
 	HybridSystem system(64);
-	for (std::string smoother : { "bcheb", "bcheb4" })
+	for (auto [smoother, kind] : { std::pair{ fhhos4::Smoother::BlockChebyshevFirstKind, "1st kind" }, { fhhos4::Smoother::BlockChebyshevFourthKind, "4th kind" } })
 	{
 		fhhos4::Solver uamg = ToySolver();
 		uamg.PreSmoother = smoother;
-		uamg.PostSmoother = "";
+		uamg.PostSmoother = fhhos4::Smoother::Default;
 		uamg.Verbosity = 2; // prints the smoothers
 		::testing::internal::CaptureStdout();
 		uamg.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne);
 		Eigen::VectorXd x = Eigen::VectorXd::Zero(system.b.size());
 		fhhos4::Result result = uamg.Solve(system.b, x);
 		std::string output = ::testing::internal::GetCapturedStdout();
-		std::string kind = smoother == "bcheb" ? "1st kind" : "4th kind";
-		EXPECT_NE(output.find("PreSmoothing        : 2 iterations of Chebyshev (" + kind), std::string::npos) << smoother;
-		EXPECT_NE(output.find("PostSmoothing       : 2 iterations of Chebyshev (" + kind), std::string::npos) << smoother;
-		EXPECT_TRUE(result.Converged) << smoother;
-		EXPECT_LT(result.Iterations, 30) << smoother;
-		EXPECT_LT(RelativeError(system, x), 1e-8) << smoother;
+		EXPECT_NE(output.find("PreSmoothing        : 2 iterations of Chebyshev (" + std::string(kind)), std::string::npos) << kind;
+		EXPECT_NE(output.find("PostSmoothing       : 2 iterations of Chebyshev (" + std::string(kind)), std::string::npos) << kind;
+		EXPECT_TRUE(result.Converged) << kind;
+		EXPECT_LT(result.Iterations, 30) << kind;
+		EXPECT_LT(RelativeError(system, x), 1e-8) << kind;
+	}
+}
+
+// The default post-smoother: the adjoint of the pre-smoother, which makes the cycle symmetric (here at k = 0: the
+// scalar kernels)
+TEST(UAMGLibrary, DefaultPostSmoother)
+{
+	HybridSystem system(32);
+	std::vector<std::pair<fhhos4::Smoother, std::string>> cases = {
+		{ fhhos4::Smoother::BlockGaussSeidel,               "Gauss-Seidel (backward)" },
+		{ fhhos4::Smoother::BackwardBlockGaussSeidel,       "Gauss-Seidel (forward)" },
+		{ fhhos4::Smoother::SymmetricBlockGaussSeidel,      "Symmetric Gauss-Seidel" },
+		{ fhhos4::Smoother::HybridBlockGaussSeidel,         "Hybrid Gauss-Seidel (backward)" },
+		{ fhhos4::Smoother::HybridBackwardBlockGaussSeidel, "Hybrid Gauss-Seidel (forward)" },
+		{ fhhos4::Smoother::DampedBlockJacobi,              "Jacobi (omega=2/3)" }
+	};
+	for (const auto& [preSmoother, postSmoother] : cases)
+	{
+		fhhos4::Solver uamg = ToySolver();
+		uamg.PreSmoother = preSmoother;
+		uamg.PostSmoother = fhhos4::Smoother::Default;
+		uamg.Verbosity = 2; // prints the smoothers
+		::testing::internal::CaptureStdout();
+		uamg.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne);
+		Eigen::VectorXd x = Eigen::VectorXd::Zero(system.b.size());
+		fhhos4::Result result = uamg.Solve(system.b, x);
+		std::string output = ::testing::internal::GetCapturedStdout();
+		EXPECT_NE(output.find("PostSmoothing       : 1 iteration of " + postSmoother), std::string::npos) << postSmoother;
+		EXPECT_TRUE(result.Converged) << postSmoother;
+		EXPECT_LT(RelativeError(system, x), 1e-8) << postSmoother;
 	}
 }
 
@@ -612,7 +641,7 @@ TEST(UAMGLibrary, MultigridAlone)
 {
 	HybridSystem system(64);
 	fhhos4::Solver uamg = ToySolver();
-	uamg.Krylov = "none";
+	uamg.Krylov = fhhos4::Krylov::None;
 	uamg.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
 	Eigen::VectorXd x = uamg.Solve(system.b);
 	EXPECT_LT(RelativeError(system, x), 1e-8);
@@ -628,8 +657,8 @@ TEST(UAMGLibrary, NonsymmetricSystem)
 		ASSERT_GT((system.A - HybridSystem::Matrix(system.A.transpose())).norm(), 0.1 * system.A.norm());
 
 		fhhos4::Solver gcr = ToySolver(), bicgstab = ToySolver(), fromBlocks = ToySolver();
-		bicgstab.Krylov = "bicgstab";
-		bicgstab.Cycle = 'V';
+		bicgstab.Krylov = fhhos4::Krylov::BiCGSTAB;
+		bicgstab.Cycle = fhhos4::Cycle::V;
 		gcr.SetupNonsymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FT, system.CellInterpOfOne, system.FaceInterpOfOne);
 		bicgstab.SetupNonsymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
 		fromBlocks.SetupNonsymmetric(system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
@@ -658,7 +687,7 @@ TEST(UAMGLibrary, NonsymmetricSetupOfASymmetricSystem)
 {
 	HybridSystem system(64);
 	fhhos4::Solver symmetric = ToySolver(), nonsymmetric = ToySolver();
-	symmetric.Krylov = "gcr";
+	symmetric.Krylov = fhhos4::Krylov::GCR;
 	symmetric.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne);
 	nonsymmetric.SetupNonsymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FT, system.CellInterpOfOne, system.FaceInterpOfOne);
 	EXPECT_EQ(nonsymmetric.NumberOfLevels(), symmetric.NumberOfLevels());
@@ -730,28 +759,28 @@ TEST(UAMGLibrary, Errors)
 	noCellDegree.CellDegree = -1;
 	EXPECT_THROW(noCellDegree.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 	fhhos4::Solver wrongCycle = ToySolver();
-	wrongCycle.Cycle = 'X';
+	wrongCycle.Cycle = static_cast<fhhos4::Cycle>(42); // out of the enum
 	EXPECT_THROW(wrongCycle.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 	fhhos4::Solver negativeSmoothing = ToySolver();
 	negativeSmoothing.PostSmoothingIterations = -2;
 	EXPECT_THROW(negativeSmoothing.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 	fhhos4::Solver wrongKrylov = ToySolver();
-	wrongKrylov.Krylov = "gmres";
+	wrongKrylov.Krylov = static_cast<fhhos4::Krylov>(42);
 	EXPECT_THROW(wrongKrylov.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 	fhhos4::Solver bicgstabKCycle = ToySolver(); // BiCGSTAB is not flexible: the K-cycle is not linear
-	bicgstabKCycle.Krylov = "bicgstab";
+	bicgstabKCycle.Krylov = fhhos4::Krylov::BiCGSTAB;
 	EXPECT_THROW(bicgstabKCycle.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 
 	// Non-symmetric matrix: FCG or Cholesky refused, A_FT of the wrong size
 	fhhos4::Solver fcg = ToySolver();
-	fcg.Krylov = "fcg";
+	fcg.Krylov = fhhos4::Krylov::FCG;
 	EXPECT_THROW(fcg.SetupNonsymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FT, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 	fhhos4::Solver cholesky = ToySolver();
-	cholesky.CoarseSolver = "ch";
+	cholesky.CoarseSolver = fhhos4::CoarseSolver::Cholesky;
 	EXPECT_THROW(cholesky.SetupNonsymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FT, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 	fhhos4::Solver chebyshev = ToySolver();
-	chebyshev.PreSmoother = "bcheb4";
-	chebyshev.PostSmoother = "";
+	chebyshev.PreSmoother = fhhos4::Smoother::BlockChebyshevFourthKind;
+	chebyshev.PostSmoother = fhhos4::Smoother::Default;
 	EXPECT_THROW(chebyshev.SetupNonsymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FT, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 	EXPECT_THROW(uamg.SetupNonsymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 

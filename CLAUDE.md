@@ -54,7 +54,7 @@ From `build/`:
 ctest --output-on-failure
 ```
 
-211 tests, ~5 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
+212 tests, ~5 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
 iteration counts of the papers in `reproducibility/` — see `tests/README.md`. Covers
 `Program_Diffusion_HHO` and `Program_BiHarmonic_HHO` (HHO, static condensation), 2D/3D,
 in-house, GMSH and polygonal meshes, and the library (`UAMGLibrary*`, ~15 s). Not covered: DG/FEM programs (disabled by default), `lu`/`cg`/`agmg`/`p_mg` solvers,
@@ -129,10 +129,13 @@ parts, Cholesky; the local Galerkin products compute full matrices); couplings f
 and post-smoothing), K-cycle with GCR. Implementation `library/Solver.cpp`, compiled with
 `-fvisibility=hidden` (only the public API is exported). It builds the solver as the program does
 (`AlgebraicSolverFactory`, `ApplyUncondensedAMGDefaults`): its path must not include mesh or discretization headers,
-nor read the global `Utils::ProgramArgs`. U-AMG is a non-linear preconditioner with the K-cycle: the Krylov method is
+nor read the global `Utils::ProgramArgs`. Its parameters with a choice are enums (`fhhos4::Krylov`, `Cycle`, `Smoother`,
+`CoarseSolver`; no strings), as the program's multigrid parameters (`SmootherType`, `CycleType` in `Utils/Types.h`; the
+CLI codes in `SmootherFactory`, the coarse solver stays a solver code): `Solver/LibraryParameters.h` maps them both
+ways (one table per parameter), for `library/Solver.cpp` and `LibraryUAMG.cpp`. U-AMG is a non-linear preconditioner with the K-cycle: the Krylov method is
 inside the library (`Krylov`: FCG by default, GCR, BiCGSTAB with a V/W-cycle only, or none), which gives no cycle
 alone. The program runs it with `-s libuamg|fcglibuamg|gcrlibuamg` (`Solver/LibraryUAMG.cpp`, the only file of the
-program that includes the public header: changing it doesn't recompile `Program.cpp`) through the uncondensed
+program that includes the public header, through `LibraryParameters.h`: changing it doesn't recompile `Program.cpp`) through the uncondensed
 interface (`Diffusion_HHO::CondensationBySolver`: no static condensation in the program), or the condensed one with
 `-libuamg-condensed` (and for a full Neumann problem and the exports of the system or of the algebraic error), which
 `tests/UAMGLibraryTest.cpp` compares with `uamg|fcguamg|gcruamg`.
@@ -173,7 +176,8 @@ interface (`Diffusion_HHO::CondensationBySolver`: no static condensation in the 
   refuses them otherwise); `lambdaMax` of `D^-1 A` by 10 Lanczos iterations at the setup. Faster than `hbgs` on 8
   threads in the program (up to 2x on GMSH tetrahedra at k >= 1) and in Disk++ (1.1-2x at k >= 1), a tie in
   HArDCore3D (up to 1.2x on Voronoi meshes), slower on 1 thread: `PERFORMANCE.md`. The library's
-  default for a symmetric matrix, on any number of threads (`bcheb4`, `Pre/PostSmoothingIterations` -1: degree 2; the
+  default for a symmetric matrix, on any number of threads (`Smoother::BlockChebyshevFourthKind`, `bcheb4` in the
+  program; `Pre/PostSmoothingIterations` -1: degree 2; the
   user's decision, 2026-10-15: the same results whatever the number of threads). The program keeps `bgs,rbgs` (the
   papers).
 - FCG replaces its recurrence residual by the true `b - A x` every 20 iterations and when it meets the tolerance (GCR:

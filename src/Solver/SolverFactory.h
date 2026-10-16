@@ -17,17 +17,23 @@ public:
 	static Solver* CreateSolver(const ProgramArguments& args, Diffusion_HHO<Dim>* problem, int blockSize, const ExportModule& out)
 	{
 		Solver* solver = nullptr;
-		// U-AMG through the library: alone, or with the Krylov method of the library (fhhos4::Solver::Krylov)
-		string libraryKrylov; // empty if the library is not used
-		if (args.Solver.SolverCode.compare("libuamg") == 0)
-			libraryKrylov = "none";
-		else if ((args.Solver.SolverCode.compare("fcg") == 0 || args.Solver.SolverCode.compare("gcr") == 0) && args.Solver.PreconditionerCode.compare("libuamg") == 0)
-			libraryKrylov = args.Solver.SolverCode;
-		else if (args.Solver.SolverCode.compare("fcglibuamg") == 0 || args.Solver.SolverCode.compare("gcrlibuamg") == 0)
-			libraryKrylov = args.Solver.SolverCode.substr(0, 3);
-		if (libraryKrylov.empty() && (args.Solver.PreconditionerCode.compare("libuamg") == 0 || args.Solver.SolverCode.find("libuamg") != string::npos))
+		// U-AMG through the library: alone (no Krylov method), or with the Krylov method of the library
+		// (fhhos4::Solver::Krylov)
+		const string& solverCode = args.Solver.SolverCode;
+		bool libraryPrec = args.Solver.PreconditionerCode.compare("libuamg") == 0;
+		bool library = true;
+		optional<KrylovMethod> libraryKrylov;
+		if (solverCode.compare("libuamg") == 0)
+			libraryKrylov = nullopt; // U-AMG alone
+		else if ((solverCode.compare("fcg") == 0 && libraryPrec) || solverCode.compare("fcglibuamg") == 0)
+			libraryKrylov = KrylovMethod::FCG;
+		else if ((solverCode.compare("gcr") == 0 && libraryPrec) || solverCode.compare("gcrlibuamg") == 0)
+			libraryKrylov = KrylovMethod::GCR;
+		else
+			library = false;
+		if (!library && (libraryPrec || solverCode.find("libuamg") != string::npos))
 			Utils::FatalError("libuamg can only be used alone or with -s fcg or gcr (their implementations are inside the library): U-AMG is a non-linear preconditioner.");
-		if (!libraryKrylov.empty())
+		if (library)
 		{
 			if (!problem)
 				Utils::FatalError("The solver libuamg needs the HHO problem: it cannot be a coarse solver.");

@@ -14,17 +14,17 @@ private:
 public:
 	ExportModule Out;
 	Solver* CoarseSolver = nullptr;
-	char Cycle = 'V';
+	CycleType Cycle = CycleType::V;
 	int WLoops = 1; // 1 --> V-cycle, >= 2 --> W-cycle 
 	KrylovMethod KCycleKrylov = KrylovMethod::FCG; // the iterations of the K-cycle on the coarse levels
 	int MatrixMaxSizeForCoarsestLevel;
 	bool UseGalerkinOperator = false;
-	string PreSmootherCode = "bgs";
-	string PostSmootherCode = "rbgs";
+	SmootherType PreSmoother = SmootherType::BlockGaussSeidel;
+	SmootherType PostSmoother = SmootherType::BackwardBlockGaussSeidel;
 	int PreSmoothingIterations = 1;
 	int PostSmoothingIterations = 1;
 	int CoarseLevelChangeSmoothingCoeff = 0;
-	char CoarseLevelChangeSmoothingOperator = '+';
+	SmoothingChangeOperator CoarseLevelChangeSmoothingOperator = SmoothingChangeOperator::Add;
 	int BlockSizeForBlockSmoothers = -1;
 	double RelaxationParameter = 1;
 	HP_CoarsStgy HP_CS = HP_CoarsStgy::H_only;
@@ -99,8 +99,8 @@ public:
 			this->_fineLevel = this->CreateFineLevel();
 
 		this->_fineLevel->OperatorMatrix = &A;
-		this->_fineLevel->PreSmoother = this->_fineLevel->CreateSmoother(PreSmootherCode, PreSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
-		this->_fineLevel->PostSmoother = this->_fineLevel->CreateSmoother(PostSmootherCode, PostSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
+		this->_fineLevel->PreSmoother = this->_fineLevel->CreateSmoother(PreSmoother, PreSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
+		this->_fineLevel->PostSmoother = this->_fineLevel->CreateSmoother(PostSmoother, PostSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
 		this->_fineLevel->ExportComponents = ExportComponents;
 		this->_fineLevel->SetExportModule(this->Out);
 
@@ -224,17 +224,17 @@ public:
 			// Smoothers on coarse level
 			int preSmoothingIterations = currentLevel->PreSmoother->Iterations();
 			int postSmoothingIterations = currentLevel->PostSmoother->Iterations();
-			if (CoarseLevelChangeSmoothingOperator == '+')
+			if (CoarseLevelChangeSmoothingOperator == SmoothingChangeOperator::Add)
 			{
 				preSmoothingIterations += CoarseLevelChangeSmoothingCoeff;
 				postSmoothingIterations += CoarseLevelChangeSmoothingCoeff;
 			}
-			else if (CoarseLevelChangeSmoothingOperator == '-')
+			else if (CoarseLevelChangeSmoothingOperator == SmoothingChangeOperator::Subtract)
 			{
 				preSmoothingIterations -= CoarseLevelChangeSmoothingCoeff;
 				postSmoothingIterations -= CoarseLevelChangeSmoothingCoeff;
 			}
-			else if (CoarseLevelChangeSmoothingOperator == '*')
+			else if (CoarseLevelChangeSmoothingOperator == SmoothingChangeOperator::Multiply)
 			{
 				preSmoothingIterations *= CoarseLevelChangeSmoothingCoeff;
 				postSmoothingIterations *= CoarseLevelChangeSmoothingCoeff;
@@ -244,14 +244,14 @@ public:
 
 
 			int blockSize = this->HP_CS == HP_CoarsStgy::H_only ? BlockSizeForBlockSmoothers : coarseLevel->BlockSizeForBlockSmoothers();
-			coarseLevel->PreSmoother  = coarseLevel->CreateSmoother( PreSmootherCode,  preSmoothingIterations, blockSize, RelaxationParameter);
-			coarseLevel->PostSmoother = coarseLevel->CreateSmoother(PostSmootherCode, postSmoothingIterations, blockSize, RelaxationParameter);
+			coarseLevel->PreSmoother  = coarseLevel->CreateSmoother( PreSmoother,  preSmoothingIterations, blockSize, RelaxationParameter);
+			coarseLevel->PostSmoother = coarseLevel->CreateSmoother(PostSmoother, postSmoothingIterations, blockSize, RelaxationParameter);
 
 			coarseLevel->UseGalerkinOperator = UseGalerkinOperator;
 			coarseLevel->ExportComponents = ExportComponents;
 
 			/*// FCG if K-cycle
-			if (this->Cycle == 'K')
+			if (this->Cycle == CycleType::K)
 			{
 				FlexibleConjugateGradient* fcg = new FlexibleConjugateGradient();
 				coarseLevel->FCG = fcg;
@@ -292,7 +292,7 @@ public:
 		this->InitializeCoarseSolver();
 		this->SetupCoarseSolver();
 
-		/*if (this->Cycle == 'K')
+		/*if (this->Cycle == CycleType::K)
 		{
 			Level* level = this->_fineLevel->CoarserLevel;
 			while (level)
@@ -509,7 +509,7 @@ private:
 			}
 
 			Vector ec;
-			if (this->Cycle == 'V' || this->Cycle == 'W')
+			if (this->Cycle == CycleType::V || this->Cycle == CycleType::W)
 			{
 				ec = Vector::Zero(rc.rows());
 				bool ecEquals0 = true;
@@ -521,7 +521,7 @@ private:
 						break;
 				}
 			}
-			else if (this->Cycle == 'K')
+			else if (this->Cycle == CycleType::K)
 			{
 				IterationResult coarseResult;
 				if (level->CoarserLevel->IsCoarsestLevel())
@@ -673,7 +673,7 @@ public:
 		BeginSerialize(os);
 
 		os << "\t" << "Cycle                   : ";
-		if (this->Cycle == 'K')
+		if (this->Cycle == CycleType::K)
 			os << "K";
 		else if (this->WLoops == 1)
 			os << "V";
@@ -682,12 +682,23 @@ public:
 		else
 			os << "W(" << this->WLoops << " loops)";
 		os << "(" << PreSmoothingIterations << "," << PostSmoothingIterations;
-		if ((CoarseLevelChangeSmoothingOperator == '+' && CoarseLevelChangeSmoothingCoeff > 0) ||
-			(CoarseLevelChangeSmoothingOperator == '-' && CoarseLevelChangeSmoothingCoeff > 0) ||
-			(CoarseLevelChangeSmoothingOperator == '*' && CoarseLevelChangeSmoothingCoeff > 1))
-			os << "," << CoarseLevelChangeSmoothingOperator << CoarseLevelChangeSmoothingCoeff;
+		switch (CoarseLevelChangeSmoothingOperator)
+		{
+			case SmoothingChangeOperator::Add:
+				if (CoarseLevelChangeSmoothingCoeff > 0)
+					os << ",+" << CoarseLevelChangeSmoothingCoeff;
+				break;
+			case SmoothingChangeOperator::Subtract:
+				if (CoarseLevelChangeSmoothingCoeff > 0)
+					os << ",-" << CoarseLevelChangeSmoothingCoeff;
+				break;
+			case SmoothingChangeOperator::Multiply:
+				if (CoarseLevelChangeSmoothingCoeff > 1)
+					os << ",*" << CoarseLevelChangeSmoothingCoeff;
+				break;
+		}
 		os << ")";
-		if (this->Cycle == 'K')
+		if (this->Cycle == CycleType::K)
 			os << ", " << (this->KCycleKrylov == KrylovMethod::GCR ? "GCR" : "FCG") << " on the coarse levels";
 		os << endl;
 
@@ -758,15 +769,15 @@ public:
 		}
 
 		//Level* level = this->CreateFineLevel();
-		Smoother* preSmoother = SmootherFactory::Create(PreSmootherCode, PreSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
-		Smoother* postSmoother = SmootherFactory::Create(PostSmootherCode, PostSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
+		Smoother* preSmoother = SmootherFactory::Create(PreSmoother, PreSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
+		Smoother* postSmoother = SmootherFactory::Create(PostSmoother, PostSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
 		os << "\t" << "Pre-smoothing           : " << *preSmoother << endl;
 		os << "\t" << "Post-smoothing          : " << *postSmoother;
 		os.flush();
 		//delete level;
 		delete preSmoother;
 		delete postSmoother;
-		if (PreSmootherCode.compare("bj") == 0 || PostSmootherCode.compare("bj") == 0)
+		if (PreSmoother == SmootherType::BlockJacobi || PostSmoother == SmootherType::BlockJacobi)
 		{
 			os << endl;
 			Utils::Warning("Note that without relaxation parameter, the (block) Jacobi iteration is not a smoother. You can use 'bj23' (under-relaxation parameter = 2/3) instead.");

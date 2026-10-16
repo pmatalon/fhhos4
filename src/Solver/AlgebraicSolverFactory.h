@@ -141,16 +141,66 @@ public:
 		return mg;
 	}
 
+	// The post-smoother that makes the cycle symmetric with the pre-smoother: its adjoint (in the A-inner product). For
+	// the alternating smoothers, it depends on the parity of the number of iterations: changeSmoothingCoeff must be 0.
+	static SmootherType AdjointSmoother(SmootherType preSmoother, int preSmoothingIterations, int changeSmoothingCoeff)
+	{
+		switch (preSmoother)
+		{
+			// Symmetric smoothers (Chebyshev: symmetric in the A-inner product)
+			case SmootherType::Jacobi:
+			case SmootherType::DampedJacobi:
+			case SmootherType::BlockJacobi:
+			case SmootherType::DampedBlockJacobi:
+			case SmootherType::SymmetricGaussSeidel:
+			case SmootherType::SymmetricBlockGaussSeidel:
+			case SmootherType::ChebyshevFirstKind:
+			case SmootherType::BlockChebyshevFirstKind:
+			case SmootherType::ChebyshevFourthKind:
+			case SmootherType::BlockChebyshevFourthKind:
+				return preSmoother;
+			// Gauss-Seidel and SOR: the sweep in the other direction
+			case SmootherType::GaussSeidel:                    return SmootherType::BackwardGaussSeidel;
+			case SmootherType::BackwardGaussSeidel:            return SmootherType::GaussSeidel;
+			case SmootherType::SOR:                            return SmootherType::BackwardSOR;
+			case SmootherType::BackwardSOR:                    return SmootherType::SOR;
+			case SmootherType::BlockGaussSeidel:               return SmootherType::BackwardBlockGaussSeidel;
+			case SmootherType::BackwardBlockGaussSeidel:       return SmootherType::BlockGaussSeidel;
+			case SmootherType::HybridBlockGaussSeidel:         return SmootherType::HybridBackwardBlockGaussSeidel;
+			case SmootherType::HybridBackwardBlockGaussSeidel: return SmootherType::HybridBlockGaussSeidel;
+			// Alternating smoothers: the same if the number of iterations is even, the reverse one if it is odd
+			case SmootherType::AlternatingGaussSeidel:
+			case SmootherType::BackwardAlternatingGaussSeidel:
+			case SmootherType::AlternatingBlockGaussSeidel:
+			case SmootherType::BackwardAlternatingBlockGaussSeidel:
+				if (changeSmoothingCoeff != 0)
+					Utils::FatalError("The automatic determination of the symmetric version of the smoother '" + SmootherFactory::Code(preSmoother) + "' is not implemented when the cycle is variable.");
+				if (preSmoothingIterations % 2 == 0)
+					return preSmoother;
+				switch (preSmoother)
+				{
+					case SmootherType::AlternatingGaussSeidel:         return SmootherType::BackwardAlternatingGaussSeidel;
+					case SmootherType::BackwardAlternatingGaussSeidel: return SmootherType::AlternatingGaussSeidel;
+					case SmootherType::AlternatingBlockGaussSeidel:    return SmootherType::BackwardAlternatingBlockGaussSeidel;
+					default:                                           return SmootherType::AlternatingBlockGaussSeidel;
+				}
+			case SmootherType::Default:
+				break;
+		}
+		Utils::FatalError("No pre-smoother to make the cycle symmetric with.");
+		return SmootherType::Default;
+	}
+
 	static void SetMultigridParameters(Multigrid* mg, const ProgramArguments& args, int dim, int blockSize, const ExportModule& out, const CoarseSolverFactory& createCoarseSolver)
 	{
 		mg->Out = ExportModule(out);
 		mg->MatrixMaxSizeForCoarsestLevel = args.Solver.MG.MatrixMaxSizeForCoarsestLevel;
-		mg->Cycle = args.Solver.MG.CycleLetter;
+		mg->Cycle = args.Solver.MG.Cycle;
 		mg->WLoops = args.Solver.MG.WLoops;
 		mg->KCycleKrylov = args.Solver.MG.KCycleKrylov;
 		mg->UseGalerkinOperator = args.Solver.MG.UseGalerkinOperator;
-		mg->PreSmootherCode = args.Solver.MG.PreSmootherCode;
-		mg->PostSmootherCode = args.Solver.MG.PostSmootherCode;
+		mg->PreSmoother = args.Solver.MG.PreSmoother;
+		mg->PostSmoother = args.Solver.MG.PostSmoother;
 		mg->PreSmoothingIterations = args.Solver.MG.PreSmoothingIterations;
 		mg->PostSmoothingIterations = args.Solver.MG.PostSmoothingIterations;
 		mg->RelaxationParameter = args.Solver.RelaxationParameter;
@@ -167,34 +217,9 @@ public:
 		mg->ExportComponents = args.Actions.Export.MultigridComponents;
 		mg->ExportIterationVectors = args.Actions.Export.MultigridIterationVectors;
 
-		// Symmetric post-smoother
-		if (mg->PostSmootherCode == "<symmetric smoother>")
-		{
-			if (mg->PreSmootherCode == "bj23" || mg->PreSmootherCode == "bj" || mg->PreSmootherCode == "sgs" || mg->PreSmootherCode == "sbgs" || SmootherFactory::IsChebyshev(mg->PreSmootherCode)) // symmetric smoothers (Chebyshev: symmetric in the A-inner product)
-				mg->PostSmootherCode = mg->PreSmootherCode;
-			else if (mg->PreSmootherCode == "gs")
-				mg->PostSmootherCode = "rgs";
-			else if (mg->PreSmootherCode == "bgs")
-				mg->PostSmootherCode = "rbgs";
-			else if (mg->PreSmootherCode == "hbgs")
-				mg->PostSmootherCode = "hrbgs";
-			else if (mg->PreSmootherCode == "ags" || mg->PreSmootherCode == "abgs" || mg->PreSmootherCode == "asor") // alternating smoothers
-			{
-				if (mg->CoarseLevelChangeSmoothingCoeff != 0)
-					Utils::FatalError("The automatic determination of the symmetric version of the smoother '" + mg->PreSmootherCode + "' is not implemented when the cycle is variable.");
-
-				if (mg->PreSmoothingIterations % 2 == 0) // even number of iterations
-				{
-					mg->PostSmootherCode = mg->PreSmootherCode;
-				}
-				else // odd number of iterations
-				{
-					mg->PostSmootherCode = "r" + mg->PreSmootherCode;
-				}
-			}
-			else
-				Utils::FatalError("The automatic determination of the symmetric version of the smoother '" + mg->PreSmootherCode + "' is not implemented. Please complete the post-smoother in the argument '-smoothers " + mg->PreSmootherCode + ",<post>'.");
-		}
+		// Symmetric post-smoother: the adjoint of the pre-smoother
+		if (mg->PostSmoother == SmootherType::Default)
+			mg->PostSmoother = AdjointSmoother(mg->PreSmoother, mg->PreSmoothingIterations, mg->CoarseLevelChangeSmoothingCoeff);
 
 		// Coarse solver
 		ProgramArguments argsCoarseSolver;
@@ -205,7 +230,7 @@ public:
 		if (Utils::EndsWith(args.Solver.MG.CoarseSolverCode, "aggregamg"))
 		{
 			argsCoarseSolver.Solver.MG.H_CS = H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours;
-			argsCoarseSolver.Solver.MG.CycleLetter = 'K';
+			argsCoarseSolver.Solver.MG.Cycle = CycleType::K;
 		}
 		else if (args.Solver.MG.CoarseSolverCode.compare("mg") == 0 || args.Solver.MG.CoarseSolverCode.compare("fcgmg") == 0)
 		{

@@ -25,7 +25,7 @@ namespace
 		args.Discretization.N = n;
 		args.Discretization.PolyDegree = k + 1;
 		args.Solver.SolverCode = "mg";
-		args.Solver.MG.CycleLetter = 'V';
+		args.Solver.MG.Cycle = CycleType::V;
 		args.Solver.MG.PreSmoothingIterations = 1;
 		args.Solver.MG.PostSmoothingIterations = 1;
 		return args;
@@ -74,7 +74,7 @@ TEST(HMultigrid2020, DegradesAsDocumented_StructuredTetra_K0)
 	args.Discretization.N = 16;
 	args.Discretization.PolyDegree = 1; // k = 0
 	args.Solver.SolverCode = "mg";
-	args.Solver.MG.CycleLetter = 'V';
+	args.Solver.MG.Cycle = CycleType::V;
 	args.Solver.MG.PreSmoothingIterations = 2;
 	args.Solver.MG.PostSmoothingIterations = 2;
 
@@ -105,7 +105,7 @@ TEST_P(KelloggTest, MatchesPaper)
 		args.Discretization.N = MeshSizes[i];
 		args.Discretization.PolyDegree = k + 1;
 		args.Solver.SolverCode = "mg";
-		args.Solver.MG.CycleLetter = 'V';
+		args.Solver.MG.Cycle = CycleType::V;
 		args.Solver.MG.PreSmoothingIterations = 1;
 		args.Solver.MG.PostSmoothingIterations = 1;
 
@@ -141,7 +141,7 @@ TEST_P(HeterogeneityRatioSweepTest, MatchesPaper)
 		args.Discretization.PolyDegree = k + 1;
 		args.Solver.SolverCode = "mg";
 		args.Solver.MG.UseGalerkinOperator = true;
-		args.Solver.MG.CycleLetter = 'V';
+		args.Solver.MG.Cycle = CycleType::V;
 		args.Solver.MG.PreSmoothingIterations = 0;
 		args.Solver.MG.PostSmoothingIterations = 3;
 

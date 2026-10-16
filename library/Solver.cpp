@@ -8,6 +8,7 @@
 #include "fhhos4.h"
 #include "ProgramArgumentsDefaults.h"
 #include "Solver/AlgebraicSolverFactory.h"
+#include "Solver/LibraryParameters.h"
 #include "Solver/Krylov/PreconditionedBiCGSTAB.h"
 #include "Solver/StaticCondensation.h"
 #include "Utils/SparseMatrixOps.h"
@@ -129,8 +130,8 @@ namespace fhhos4
 	{
 		// Set by the setup
 		bool Symmetric = true; // the matrix is symmetric (SetupSymmetric...()), or not (SetupNonsymmetric...())
-		string Krylov;         // Solver::Krylov, or its default for the symmetry of the matrix
-		string CoarseSolver;   // Solver::CoarseSolver, or its default for the symmetry of the matrix
+		fhhos4::Krylov Krylov = fhhos4::Krylov::FCG;                       // Solver::Krylov, or its default for the symmetry of the matrix
+		fhhos4::CoarseSolver CoarseSolver = fhhos4::CoarseSolver::Cholesky; // Solver::CoarseSolver, or its default for the symmetry of the matrix
 		int CellBlockSize = 0;
 		int FaceBlockSize = 0;
 		Eigen::Index NCellDoFs = 0;
@@ -138,7 +139,7 @@ namespace fhhos4
 		SparseMatrix OwnA;               // A if the library computes or converts it, empty otherwise
 		unique_ptr<StaticCondensation> Condensation; // after a setup from the blocks: for Solve(b_T, b_F, x_T, x_F)
 		unique_ptr<UncondensedAMG> Multigrid;
-		unique_ptr<IterativeSolver> KrylovSolver; // preconditioned by Multigrid; null if Krylov is "none"
+		unique_ptr<IterativeSolver> KrylovSolver; // preconditioned by Multigrid; null if Krylov is None
 		bool IsSetUp = false;
 
 		IterativeSolver* ActiveSolver() const
@@ -157,25 +158,34 @@ namespace fhhos4
 				Utils::FatalError("fhhos4::Solver: set FaceDegree (>= 0) before the setup, got " + to_string(s.FaceDegree) + ".");
 			if (s.CellDegree < 0)
 				Utils::FatalError("fhhos4::Solver: set CellDegree (>= 0) before the setup, got " + to_string(s.CellDegree) + ".");
-			if (s.Cycle != 'V' && s.Cycle != 'W' && s.Cycle != 'K')
-				Utils::FatalError(string("fhhos4::Solver: unknown Cycle '") + s.Cycle + "' (V, W or K).");
-			if (s.Krylov != "" && s.Krylov != "fcg" && s.Krylov != "gcr" && s.Krylov != "bicgstab" && s.Krylov != "none")
-				Utils::FatalError("fhhos4::Solver: unknown Krylov method '" + s.Krylov + "' (fcg, gcr, bicgstab or none).");
-			if (s.Krylov == "bicgstab" && s.Cycle == 'K')
-				Utils::FatalError("fhhos4::Solver: BiCGSTAB is not flexible: it needs a linear preconditioner, a V- or W-cycle, not the K-cycle (non-linear: it solves the coarse levels with FCG or GCR iterations). Set Cycle to 'V' or 'W', or Krylov to \"fcg\" or \"gcr\".");
+			switch (s.Krylov)
+			{
+				case fhhos4::Krylov::Default:
+					Krylov = symmetric ? fhhos4::Krylov::FCG : fhhos4::Krylov::GCR;
+					break;
+				case fhhos4::Krylov::FCG:
+				case fhhos4::Krylov::GCR:
+				case fhhos4::Krylov::BiCGSTAB:
+				case fhhos4::Krylov::None:
+					Krylov = s.Krylov;
+					break;
+				default:
+					Utils::FatalError("fhhos4::Solver: invalid Krylov (" + to_string((int)s.Krylov) + ").");
+			}
+			if (Krylov == fhhos4::Krylov::BiCGSTAB && s.Cycle == fhhos4::Cycle::K)
+				Utils::FatalError("fhhos4::Solver: BiCGSTAB is not flexible: it needs a linear preconditioner, a V- or W-cycle, not the K-cycle (non-linear: it solves the coarse levels with FCG or GCR iterations). Set Cycle to Cycle::V or Cycle::W, or Krylov to Krylov::FCG or Krylov::GCR.");
 			Symmetric = symmetric;
-			Krylov = !s.Krylov.empty() ? s.Krylov : (symmetric ? "fcg" : "gcr");
-			CoarseSolver = !s.CoarseSolver.empty() ? s.CoarseSolver : (symmetric ? "ch" : "lu");
-			if (!symmetric && Krylov == "fcg")
-				Utils::FatalError("fhhos4::Solver: the flexible conjugate gradient requires a symmetric matrix: set Krylov to \"gcr\" (or leave it empty) for a non-symmetric one.");
-			if (!symmetric && CoarseSolver == "ch")
-				Utils::FatalError("fhhos4::Solver: the Cholesky factorization requires a symmetric matrix: set CoarseSolver to \"lu\" (or leave it empty) for a non-symmetric one.");
+			CoarseSolver = s.CoarseSolver != fhhos4::CoarseSolver::Default ? s.CoarseSolver : (symmetric ? fhhos4::CoarseSolver::Cholesky : fhhos4::CoarseSolver::LU);
+			if (!symmetric && Krylov == fhhos4::Krylov::FCG)
+				Utils::FatalError("fhhos4::Solver: the flexible conjugate gradient requires a symmetric matrix: set Krylov to Krylov::GCR (or Default) for a non-symmetric one.");
+			if (!symmetric && CoarseSolver == fhhos4::CoarseSolver::Cholesky)
+				Utils::FatalError("fhhos4::Solver: the Cholesky factorization requires a symmetric matrix: set CoarseSolver to CoarseSolver::LU (or Default) for a non-symmetric one.");
 			if (s.PreSmoothingIterations < -1 || s.PostSmoothingIterations < -1)
 				Utils::FatalError("fhhos4::Solver: PreSmoothingIterations and PostSmoothingIterations must be >= 0, or -1 (the smoother's default), got " + to_string(s.PreSmoothingIterations) + " and " + to_string(s.PostSmoothingIterations) + ".");
-			for (const string& smoother : { s.PreSmoother, s.PostSmoother })
+			for (fhhos4::Smoother smoother : { s.PreSmoother, s.PostSmoother })
 			{
-				if (!symmetric && SmootherFactory::IsChebyshev(smoother))
-					Utils::FatalError("fhhos4::Solver: the Chebyshev smoother \"" + smoother + "\" requires a symmetric positive definite matrix: leave PreSmoother and PostSmoother empty for a non-symmetric one.");
+				if (!symmetric && SmootherFactory::IsChebyshev(LibraryParameters::ProgramSmoother(smoother)))
+					Utils::FatalError("fhhos4::Solver: the Chebyshev smoothers require a symmetric positive definite matrix: leave PreSmoother and PostSmoother Default for a non-symmetric one.");
 			}
 			CellBlockSize = Utils::Binomial(s.CellDegree + s.Dimension, s.CellDegree);
 			FaceBlockSize = Utils::Binomial(s.FaceDegree + s.Dimension - 1, s.FaceDegree);
@@ -232,16 +242,16 @@ namespace fhhos4
 		// results on any number of threads; on 1 thread, slower than the block Gauss-Seidel); for a non-symmetric one
 		// (Chebyshev requires a symmetric matrix), the hybrid block Gauss-Seidel on several threads, the block Gauss-Seidel
 		// on 1
-		string DefaultPreSmoother() const
+		SmootherType DefaultPreSmoother() const
 		{
 			if (Symmetric)
-				return "bcheb4";
-			return Parallelism::NThreads() > 1 ? "hbgs" : "bgs";
+				return SmootherType::BlockChebyshevFourthKind;
+			return Parallelism::NThreads() > 1 ? SmootherType::HybridBlockGaussSeidel : SmootherType::BlockGaussSeidel;
 		}
 
 		// The number of iterations of the smoother when Solver::Pre/PostSmoothingIterations is -1: the degree 2 for the
 		// Chebyshev smoothers (PERFORMANCE.md), 1 otherwise
-		static int DefaultSmoothingIterations(const string& smoother)
+		static int DefaultSmoothingIterations(SmootherType smoother)
 		{
 			return SmootherFactory::IsChebyshev(smoother) ? 2 : 1;
 		}
@@ -254,17 +264,17 @@ namespace fhhos4
 			args.Solver.MaxIterations = s.MaxIterations;
 			args.Solver.PrintIterationResults = s.Verbosity >= 2;
 			MultigridArguments& mg = args.Solver.MG;
-			mg.CycleLetter = s.Cycle;
-			mg.WLoops = s.Cycle == 'W' ? 2 : 1;
-			mg.KCycleKrylov = Krylov == "gcr" || !Symmetric ? KrylovMethod::GCR : KrylovMethod::FCG; // GCR under GCR (Notay)
-			mg.PreSmootherCode = !s.PreSmoother.empty() ? s.PreSmoother : DefaultPreSmoother();
-			mg.PostSmootherCode = !s.PostSmoother.empty() ? s.PostSmoother : "<symmetric smoother>"; // the program's: rbgs after bgs, hrbgs after hbgs, the same Chebyshev...
-			mg.PreSmoothingIterations = s.PreSmoothingIterations >= 0 ? s.PreSmoothingIterations : DefaultSmoothingIterations(mg.PreSmootherCode);
-			// PostSmoother empty: of the type of the pre-smoother
-			mg.PostSmoothingIterations = s.PostSmoothingIterations >= 0 ? s.PostSmoothingIterations : DefaultSmoothingIterations(!s.PostSmoother.empty() ? s.PostSmoother : mg.PreSmootherCode);
+			mg.Cycle = LibraryParameters::ProgramCycle(s.Cycle);
+			mg.WLoops = s.Cycle == fhhos4::Cycle::W ? 2 : 1;
+			mg.KCycleKrylov = Krylov == fhhos4::Krylov::GCR || !Symmetric ? KrylovMethod::GCR : KrylovMethod::FCG; // GCR under GCR (Notay)
+			mg.PreSmoother = s.PreSmoother != fhhos4::Smoother::Default ? LibraryParameters::ProgramSmoother(s.PreSmoother) : DefaultPreSmoother();
+			mg.PostSmoother = LibraryParameters::ProgramSmoother(s.PostSmoother); // Default: the program's, the adjoint of the pre-smoother (rbgs after bgs, the same Chebyshev...)
+			mg.PreSmoothingIterations = s.PreSmoothingIterations >= 0 ? s.PreSmoothingIterations : DefaultSmoothingIterations(mg.PreSmoother);
+			// PostSmoother Default: of the type of the pre-smoother
+			mg.PostSmoothingIterations = s.PostSmoothingIterations >= 0 ? s.PostSmoothingIterations : DefaultSmoothingIterations(mg.PostSmoother != SmootherType::Default ? mg.PostSmoother : mg.PreSmoother);
 			mg.CoarseningFactor = s.CoarseningFactor;
 			mg.MatrixMaxSizeForCoarsestLevel = s.CoarseMatrixMaxSize;
-			mg.CoarseSolverCode = CoarseSolver;
+			mg.CoarseSolverCode = LibraryParameters::ProgramCoarseSolver(CoarseSolver);
 			bool defaultCoarseOperator = true, defaultCycle = false, defaultHPCoarseningStgy = true;
 			ApplyUncondensedAMGDefaults(mg, s.FaceDegree, defaultCoarseOperator, defaultCycle, defaultHPCoarseningStgy);
 			return args;
@@ -302,21 +312,21 @@ namespace fhhos4
 			// The Krylov method preconditioned by one cycle (SolverPreconditioner), as SolverFactory (-s fcguamg, gcruamg),
 			// except the residual replacement: the tolerance applies to the true residual (Result::RelativeResidual =
 			// |b - Ax|/|b|)
-			if (Krylov == "fcg")
+			if (Krylov == fhhos4::Krylov::FCG)
 			{
 				auto fcg = make_unique<FlexibleConjugateGradient>(1);
 				fcg->ResidualRecomputation = 20;
 				fcg->Precond = SolverPreconditioner(Multigrid.get());
 				KrylovSolver = std::move(fcg);
 			}
-			else if (Krylov == "gcr")
+			else if (Krylov == fhhos4::Krylov::GCR)
 			{
 				auto gcr = make_unique<GeneralizedConjugateResidual>();
 				gcr->ResidualReplacement = true;
 				gcr->Precond = SolverPreconditioner(Multigrid.get());
 				KrylovSolver = std::move(gcr);
 			}
-			else if (Krylov == "bicgstab")
+			else if (Krylov == fhhos4::Krylov::BiCGSTAB)
 			{
 				auto bicgstab = make_unique<PreconditionedBiCGSTAB>();
 				bicgstab->Precond = SolverPreconditioner(Multigrid.get());
