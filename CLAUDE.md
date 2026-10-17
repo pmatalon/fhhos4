@@ -211,7 +211,7 @@ interface (`Diffusion_HHO::CondensationBySolver`: no static condensation in the 
 ## Version
 
 Set in `project()` (`CMakeLists.txt`) only; generated from it: the public header `fhhos4_version.h`
-(`FHHOS4_VERSION`...), the CMake package version (`find_package(fhhos4 1.3)`: same major version), the library's
+(`FHHOS4_VERSION`...), the CMake package version (`find_package(fhhos4 1.4)`: same major version), the library's
 SOVERSION (major.minor: adding a public member to `fhhos4::Solver` breaks the binary compatibility, so only in a new
 minor or major version) and the conda package's version (the recipe reads `project()` with `load_from_file`, an
 experimental feature of rattler-build: `--experimental`). `fhhos4::Version()` (printed by the program at start) adds
