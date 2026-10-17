@@ -53,9 +53,12 @@ the client's Eigen may differ from the library's, see "U-AMG: details and measur
 (`libstdcxx`, `libgcc`; the overlinking warning on `libgomp` is normal on conda-forge). `run_exports` pinned to
 major.minor, the SOVERSION. The program is not packaged (the name `fhhos4` is the library's: the clients install it).
 Linux only. Its tests: `conda/recipe/test`, a CMake client (version, a solve on a lowest-order hybrid system), compiled
-as is, with `-march=native` and with Eigen 3.4. The source is the clone (`path: ../..`, without the gitignored files):
-for conda-forge, the archive of the release tag (url and sha256) and the version written out. `variants.yaml`: local
-builds only.
+as is, with `-march=native` and with Eigen 3.4. The source is the clone (`path: ../..`, without the gitignored files).
+conda-forge: staged-recipes PR #35238 (2026-10-17), then the feedstock `conda-forge/fhhos4-feedstock` holds its own
+recipe, this one with the version written out and the archive of the release tag as source (url and sha256; its bot
+updates them at each release). Both take the test client from the sources (`files: source: conda/recipe/test/`): its
+changes reach conda-forge with the release; any other change of `recipe.yaml` goes to the feedstock too.
+`variants.yaml`: local builds only.
 
 ## Test
 
