@@ -1,6 +1,7 @@
 # Release: on the push of an annotated tag vX.Y.Z, where X.Y.Z is the version of project() in CMakeLists.txt, checks the
-# version, builds and tests fhhos4, then creates the GitHub release "Release X.Y.Z", whose notes are the message of the
-# tag. Run it by hand (Actions > Release > Run workflow) to check the build and the tests without releasing.
+# version, builds and tests fhhos4 and its conda package, then creates the GitHub release "Release X.Y.Z", whose notes
+# are the message of the tag. Run it by hand (Actions > Release > Run workflow) to check the build and the tests without
+# releasing.
 name: Release
 
 on:
@@ -70,8 +71,30 @@ jobs:
           cmake -B build-library -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_PROGRAM=OFF
           cmake --build build-library
 
+  # The conda package of the library (conda/recipe), with its tests: rattler-build pinned to the version the recipe was
+  # validated with
+  conda-package:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: rattler
+          create-args: >-
+            -c conda-forge
+            rattler-build=0.77.0
+
+      - name: Build and test
+        run: rattler-build build -r conda/recipe -c conda-forge --experimental --output-dir "$RUNNER_TEMP/conda"
+
   release:
-    needs: build-and-test
+    needs: [build-and-test, conda-package]
     if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     permissions:

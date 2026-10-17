@@ -66,6 +66,20 @@ Build options (`-D<OPTION>=ON|OFF`): `ENABLE_OPENMP` (ON: parallel), `ENABLE_NAT
 optimized for the CPU of the build machine, may not run on others), `SMALL_INDEX` (ON: `int` indices in
 `fhhos4::SparseMatrix`, `intmax_t` otherwise).
 
+### Conda package
+
+The recipe `conda/recipe` builds the conda package `fhhos4` (Linux), with [rattler-build](https://rattler.build)
+(`conda install -c conda-forge rattler-build`):
+
+```bash
+rattler-build build -r conda/recipe -c conda-forge --experimental   # the package in ./output
+conda install -c ./output -c conda-forge fhhos4
+```
+
+The package is the library alone. It depends on Eigen only (>= 3.4, see the constraints below), and a package of your
+code built with it requires the same minor version of `fhhos4` (see the version below). `find_package(fhhos4)` finds it
+in the environment. `--experimental`: the recipe reads the version from `CMakeLists.txt`.
+
 ## Link
 
 Your code needs Eigen 3.4 or 5.x (see the constraints below). With CMake:

@@ -46,6 +46,17 @@ from its own location (`<bin>/../share/fhhos4`, a link to `data/meshes` in the b
 overrides; a data file not found is a `Utils::FatalError(FileSystem::DataFileNotFound(...))`, which tells how to set it), writes its exports in `./out` (working directory, `-o`), its GMSH mesh cache in `~/.cache/fhhos4`
 (`XDG_CACHE_HOME`), and its temporary files in the system's temporary directory, named after the process id.
 
+Conda package `fhhos4`: the library alone (`conda/recipe/recipe.yaml`, rattler-build v1 recipe; `rattler-build build -r
+conda/recipe -c conda-forge --experimental`, ~1 min; rattler-build is in the conda env `rattler`, not `fhhos4`).
+`ENABLE_PROGRAM=OFF`, LGPL. Run dependencies: Eigen >= 3.4 (the user's decision, 2026-10-17: a minimum, no exact pin;
+the client's Eigen may differ from the library's, see "U-AMG: details and measurements"), and the compiler's runtime
+(`libstdcxx`, `libgcc`; the overlinking warning on `libgomp` is normal on conda-forge). `run_exports` pinned to
+major.minor, the SOVERSION. The program is not packaged (the name `fhhos4` is the library's: the clients install it).
+Linux only. Its tests: `conda/recipe/test`, a CMake client (version, a solve on a lowest-order hybrid system), compiled
+as is, with `-march=native` and with Eigen 3.4. The source is the clone (`path: ../..`, without the gitignored files):
+for conda-forge, the archive of the release tag (url and sha256) and the version written out. `variants.yaml`: local
+builds only.
+
 ## Test
 
 From `build/`:
@@ -200,15 +211,17 @@ interface (`Diffusion_HHO::CondensationBySolver`: no static condensation in the 
 ## Version
 
 Set in `project()` (`CMakeLists.txt`) only; generated from it: the public header `fhhos4_version.h`
-(`FHHOS4_VERSION`...), the CMake package version (`find_package(fhhos4 1.3)`: same major version) and the library's
+(`FHHOS4_VERSION`...), the CMake package version (`find_package(fhhos4 1.3)`: same major version), the library's
 SOVERSION (major.minor: adding a public member to `fhhos4::Solver` breaks the binary compatibility, so only in a new
-minor or major version). `fhhos4::Version()` (printed by the program at start) adds `git describe` when built from a
-clone: `cmake/GitVersion.cmake` regenerates `build/generated/Version.cpp` at each build, rewritten only when the commit
-changes; nothing else may depend on the commit (it would recompile `Program.cpp` at each commit). Release: change the
+minor or major version) and the conda package's version (the recipe reads `project()` with `load_from_file`, an
+experimental feature of rattler-build: `--experimental`). `fhhos4::Version()` (printed by the program at start) adds
+`git describe` when built from a clone: `cmake/GitVersion.cmake` regenerates `build/generated/Version.cpp` at each
+build, rewritten only when the commit changes; nothing else may depend on the commit (it would recompile `Program.cpp` at each commit). Release: change the
 version in `project()`, commit, then push an annotated tag `vX.Y.Z` (the tags before 1.3.0 are `Release_X.Y.Z`):
 `.github/workflows/release.yml` checks the tag against the version, builds, runs `ctest`, the installation and the
-library alone, then creates the GitHub release "Release X.Y.Z" (notes: the message of the tag). It pins GMSH, Eigen,
-CGAL and the compiler to the versions the tests were validated with: update them with the local environment.
+library alone, and in a parallel job the conda package with its tests, then creates the GitHub release "Release X.Y.Z"
+(notes: the message of the tag). It pins GMSH, Eigen, CGAL, the compiler and rattler-build to the versions the tests
+were validated with: update them with the local environment (envs `fhhos4` and `rattler`).
 
 ## Documentation (README files)
 
