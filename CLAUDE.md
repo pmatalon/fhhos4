@@ -221,7 +221,9 @@ version in `project()`, commit, then push an annotated tag `vX.Y.Z` (the tags be
 `.github/workflows/release.yml` checks the tag against the version, builds, runs `ctest`, the installation and the
 library alone, and in a parallel job the conda package with its tests, then creates the GitHub release "Release X.Y.Z"
 (notes: the message of the tag). It pins GMSH, Eigen, CGAL, the compiler and rattler-build to the versions the tests
-were validated with: update them with the local environment (envs `fhhos4` and `rattler`).
+were validated with: update them with the local environment (envs `fhhos4` and `rattler`). After a change of
+`release.yml` or of its pins, run it by hand on master (Actions > Release > Run workflow: no release) before pushing
+the tag; otherwise push the tag directly.
 
 ## Documentation (README files)
 
