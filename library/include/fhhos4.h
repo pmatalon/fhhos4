@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Pierre Matalon
 #pragma once
 #include <memory>
+#include <type_traits>
 #include <Eigen/Core>
 #include <Eigen/SparseCore>
 #include "fhhos4_error.h"
@@ -30,10 +31,10 @@
 // FCG or GCR iterations), which requires a flexible Krylov method: the flexible conjugate gradient (FCG, the default for
 // a symmetric matrix) or GCR.
 //
-// The class is compiled in the shared library fhhos4, with fhhos4's flags. Eigen objects cross
-// its boundary: the calling code must use the same version of Eigen and the same alignment settings (checked by the
-// constructor, which throws fhhos4::Error otherwise). The library never allocates memory that the calling code frees,
-// nor the other way around.
+// The class is compiled in the shared library fhhos4, with fhhos4's flags. Eigen objects cross its boundary: they must
+// have the same memory layout in the calling code and in the library, which holds for Eigen 3.4 and 5.x, whatever the
+// alignment settings (-march), with Eigen's default index type (checked by the constructor, which throws fhhos4::Error
+// otherwise). The library never allocates memory that the calling code frees, nor the other way around.
 namespace fhhos4
 {
 	// The sparse matrices of fhhos4: row-major, with the index type of its compilation (FHHOS4_SPARSE_INDEX: int by
@@ -152,7 +153,7 @@ namespace fhhos4
 		                   // residual, time); 2: all the messages of fhhos4, with the residual at each iteration
 
 		Solver()
-			: Solver(HostEigenConfiguration())
+			: Solver(EigenSample())
 		{}
 		~Solver();
 		Solver(Solver&&) noexcept;
@@ -264,18 +265,57 @@ namespace fhhos4
 		int NumberOfLevels() const;
 
 	private:
-		// The configuration of Eigen that determines the memory layout of its objects
-		struct EigenConfiguration
+		// The Eigen objects of the interface (the sparse matrices, Eigen::Ref of the vectors) must have the same memory
+		// layout in the calling code and in the library, compiled with their own versions of Eigen and flags. The
+		// constructor checks it: it compares their sizes, then reads with the library's Eigen samples built by the
+		// calling code.
+		struct EigenLayout
 		{
-			int World, Major, Minor, MaxAlignBytes, IndexSize;
+			int Version[3]; // of Eigen, for the error message
+			int IndexSize, MatrixSize, ConstVectorSize, VectorSize; // sizeof(Eigen::Index), of SparseMatrix, of the Eigen::Ref
+			bool VectorTriviallyCopyable; // Eigen::Ref<Eigen::VectorXd> is passed by value: how depends on it
 		};
 
-		static EigenConfiguration HostEigenConfiguration()
+		static EigenLayout HostEigenLayout()
 		{
-			return { EIGEN_WORLD_VERSION, EIGEN_MAJOR_VERSION, EIGEN_MINOR_VERSION, EIGEN_MAX_ALIGN_BYTES, (int)sizeof(Eigen::Index) };
+			using ConstVector = Eigen::Ref<const Eigen::VectorXd>;
+			using Vector = Eigen::Ref<Eigen::VectorXd>;
+			return {
+#ifdef EIGEN_PATCH_VERSION
+				{ EIGEN_MAJOR_VERSION, EIGEN_MINOR_VERSION, EIGEN_PATCH_VERSION }, // Eigen >= 5.0 (semantic versioning)
+#else
+				{ EIGEN_WORLD_VERSION, EIGEN_MAJOR_VERSION, EIGEN_MINOR_VERSION },
+#endif
+				(int)sizeof(Eigen::Index), (int)sizeof(SparseMatrix), (int)sizeof(ConstVector), (int)sizeof(Vector),
+				std::is_trivially_copyable<Vector>::value };
 		}
 
-		Solver(const EigenConfiguration& host);
+		// The values of the samples: a 2 x 3 matrix with the non-zeros (0, 0), (0, 2), (1, 1), and a vector of size 3
+		static double SampleValue(int i) { return 0.5 + i; }
+
+		struct EigenSample
+		{
+			SparseMatrix Matrix;
+			Eigen::VectorXd Vector;
+
+			EigenSample()
+				: Matrix(2, 3), Vector(3)
+			{
+				Matrix.insert(0, 0) = SampleValue(0);
+				Matrix.insert(0, 2) = SampleValue(1);
+				Matrix.insert(1, 1) = SampleValue(2);
+				Matrix.makeCompressed();
+				for (int i = 0; i < 3; i++)
+					Vector[i] = SampleValue(i);
+			}
+		};
+
+		Solver(EigenSample&& sample)
+			: Solver(HostEigenLayout(), sample.Matrix, sample.Vector, sample.Vector)
+		{}
+		// sampleVector last: passed according to the calling code's layout, it is read once the layouts are checked
+		Solver(const EigenLayout& host, const SparseMatrix& sampleMatrix, const Eigen::Ref<const Eigen::VectorXd>& sampleConstVector,
+		       Eigen::Ref<Eigen::VectorXd> sampleVector);
 
 		struct Impl;
 		std::unique_ptr<Impl> _impl;

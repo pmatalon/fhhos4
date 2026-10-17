@@ -189,6 +189,13 @@ interface (`Diffusion_HHO::CondensationBySolver`: no static condensation in the 
   k = 2, asymmetry 3e-16: up to 1% of L2 errors of 3e-11).
 - `Threads` default: at most one thread per physical core unless `OMP_NUM_THREADS` or OpenMP's binding is set (the
   hyperthreads slow the AMG down). Release builds use the conda compilers' `-march=nocona`.
+- Eigen across the interface (2026-10-17, replaces the comparison of the version and of `EIGEN_MAX_ALIGN_BYTES`): the
+  constructor compares the sizes of `Eigen::Index`, `SparseMatrix` and the two `Eigen::Ref`, and whether
+  `Ref<VectorXd>` (passed by value) is trivially copyable, then reads samples the header builds with the client's Eigen.
+  Eigen 3.4.0 and 5.0.1 have the same layouts (members, sizes, mangled names), and their aligned allocators differ,
+  harmless since no memory changes hands; nothing reads the client's data as aligned (`Ref` is unaligned by default).
+  Eigen 3.4 only lacked `saveMarketDense` (`Utils/ExportModule.h` writes the format itself). Eigen 5's legacy macros
+  say 3.5.0 (`EIGEN_WORLD_VERSION` stays 3; `EIGEN_PATCH_VERSION` exists from 5.0).
 
 ## Version
 

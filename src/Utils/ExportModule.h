@@ -1,6 +1,7 @@
 #pragma once
 #include <ios>
 #include <fstream>
+#include <limits>
 #include <unsupported/Eigen/SparseExtra>
 #include "Utils.h"
 #include "../Solver/IterationResult.h"
@@ -75,7 +76,15 @@ public:
 	void ExportMatrix(const DenseMatrix& M, string suffix) const
 	{
 		string filePath = GetDatFilePath(suffix);
-		Eigen::saveMarketDense(M, filePath);
+		// The format of Eigen::saveMarketDense(), which Eigen 3.4 lacks: Matrix Market array, column by column
+		ofstream file(filePath);
+		file.flags(ios_base::scientific);
+		file.precision(numeric_limits<double>::digits10 + 2);
+		file << "%%MatrixMarket matrix array real general\n" << M.rows() << " " << M.cols() << "\n";
+		for (Eigen::Index j = 0; j < M.cols(); j++)
+			for (Eigen::Index i = 0; i < M.rows(); i++)
+				file << M(i, j) << "\n";
+		file.close();
 		cout << "Matrix exported: " << filePath << endl;
 	}
 

@@ -51,7 +51,7 @@ Symmetric positive definite systems, and non-symmetric ones with a positive defi
 ## Install from source
 
 The library alone needs a C++17 compiler, CMake (>= 3.20), Ninja or Make, and
-[Eigen](https://eigen.tuxfamily.org).
+[Eigen](https://eigen.tuxfamily.org) 3.4 or 5.x.
 
 ```bash
 git clone https://github.com/pmatalon/fhhos4.git && cd fhhos4
@@ -62,12 +62,13 @@ cmake --install build --prefix <prefix>    # lib/, include/ and the CMake packag
 
 Without installing, the library is `build/lib/libfhhos4.so`.
 
-Build options (`-D<OPTION>=ON|OFF`): `ENABLE_OPENMP` (ON: parallel), `ENABLE_NATIVE_ARCH` (OFF: `-march=native`, see the
-constraints below), `SMALL_INDEX` (ON: `int` indices in `fhhos4::SparseMatrix`, `intmax_t` otherwise).
+Build options (`-D<OPTION>=ON|OFF`): `ENABLE_OPENMP` (ON: parallel), `ENABLE_NATIVE_ARCH` (OFF: `-march=native`:
+optimized for the CPU of the build machine, may not run on others), `SMALL_INDEX` (ON: `int` indices in
+`fhhos4::SparseMatrix`, `intmax_t` otherwise).
 
 ## Link
 
-Your code needs the same Eigen as the library (see the constraints below). With CMake:
+Your code needs Eigen 3.4 or 5.x (see the constraints below). With CMake:
 
 ```cmake
 find_package(fhhos4 REQUIRED)
@@ -165,10 +166,10 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 
 - **Symmetric positive definite** condensed system (`SetupSymmetric...()`), or non-symmetric with a positive definite
   symmetric part (`SetupNonsymmetric...()`): not the pure Neumann problem (singular).
-- **Same Eigen**: Eigen objects cross the boundary of the library, so your code must use the same version of Eigen and
-  the same alignment settings (the same `-march` family: with or without AVX). The constructor of `fhhos4::Solver`
-  checks it and throws otherwise. The library is built without `-march=native` by default: compile your code without
-  it too, or build the library with `-DENABLE_NATIVE_ARCH=ON`.
+- **Eigen 3.4 or 5.x**: Eigen objects cross the boundary of the library, so they must have the same memory layout in
+  your code and in the library. They do with Eigen 3.4 and 5.x, in any combination (your code may use another version
+  than the library), whatever the alignment settings (`-march`), with Eigen's default index type
+  (`EIGEN_DEFAULT_DENSE_INDEX_TYPE`). The constructor of `fhhos4::Solver` checks it and throws otherwise.
 - **Errors**: `fhhos4::Error` (a `std::runtime_error`). `Solve()` does not throw if the tolerance is not reached: see
   `Result::Converged`.
 - **Not thread-safe**: one `fhhos4::Solver` object must not be used by several threads at the same time. The library

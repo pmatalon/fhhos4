@@ -362,15 +362,34 @@ namespace fhhos4
 		}
 	};
 
-	Solver::Solver(const EigenConfiguration& host)
+	Solver::Solver(const EigenLayout& host, const SparseMatrix& sampleMatrix, const Eigen::Ref<const Eigen::VectorXd>& sampleConstVector,
+	               Eigen::Ref<Eigen::VectorXd> sampleVector)
 	{
-		EigenConfiguration library = HostEigenConfiguration(); // the configuration of the library's compilation
-		auto toString = [](const EigenConfiguration& c)
+		EigenLayout library = HostEigenLayout(); // the layout of the library's compilation
+		auto version = [](const EigenLayout& l) { return to_string(l.Version[0]) + "." + to_string(l.Version[1]) + "." + to_string(l.Version[2]); };
+		auto sizes = [](const EigenLayout& l)
 		{
-			return to_string(c.World) + "." + to_string(c.Major) + "." + to_string(c.Minor) + ", max alignment " + to_string(c.MaxAlignBytes) + " bytes, index of " + to_string(c.IndexSize) + " bytes";
+			return to_string(l.IndexSize) + ", " + to_string(l.MatrixSize) + ", " + to_string(l.ConstVectorSize) + ", " + to_string(l.VectorSize) + (l.VectorTriviallyCopyable ? ", trivially copyable" : "");
 		};
-		if (host.World != library.World || host.Major != library.Major || host.Minor != library.Minor || host.MaxAlignBytes != library.MaxAlignBytes || host.IndexSize != library.IndexSize)
-			throw Error("fhhos4::Solver: the calling code and the library fhhos4 are compiled with incompatible configurations of Eigen (calling code: Eigen " + toString(host) + "; library: Eigen " + toString(library) + "). Use the same version of Eigen, and the same -march (it sets the alignment).");
+		string incompatible = "fhhos4::Solver: the Eigen objects of the interface have different memory layouts in the calling code (Eigen " + version(host) + ") and in the library fhhos4 (Eigen " + version(library) + "): ";
+		string advice = ". Use Eigen 3.4 or 5.x, with its default index type (EIGEN_DEFAULT_DENSE_INDEX_TYPE).";
+		if (host.IndexSize != library.IndexSize || host.MatrixSize != library.MatrixSize || host.ConstVectorSize != library.ConstVectorSize ||
+		    host.VectorSize != library.VectorSize || host.VectorTriviallyCopyable != library.VectorTriviallyCopyable)
+			throw Error(incompatible + "sizes of Eigen::Index, SparseMatrix, Eigen::Ref<const Eigen::VectorXd>, Eigen::Ref<Eigen::VectorXd>: " + sizes(host) + " in the calling code, " + sizes(library) + " in the library" + advice);
+
+		// The same sizes: the samples (fhhos4.h), whose dimensions are checked before their arrays are read
+		const auto* outer = sampleMatrix.outerIndexPtr();
+		const auto* inner = sampleMatrix.innerIndexPtr();
+		const double* values = sampleMatrix.valuePtr();
+		bool sameMatrix = sampleMatrix.rows() == 2 && sampleMatrix.cols() == 3 && sampleMatrix.isCompressed() && sampleMatrix.nonZeros() == 3 &&
+		                  outer[0] == 0 && outer[1] == 2 && outer[2] == 3 && inner[0] == 0 && inner[1] == 2 && inner[2] == 1 &&
+		                  values[0] == SampleValue(0) && values[1] == SampleValue(1) && values[2] == SampleValue(2);
+		bool sameVectors = sampleConstVector.size() == 3 && sampleVector.size() == 3 && sampleConstVector.data() == sampleVector.data();
+		for (int i = 0; sameVectors && i < 3; i++)
+			sameVectors = sampleConstVector[i] == SampleValue(i) && sampleVector[i] == SampleValue(i);
+		if (!sameMatrix || !sameVectors)
+			throw Error(incompatible + "the library reads a different " + (sameMatrix ? "vector" : "sparse matrix") + " than the calling code built" + advice);
+
 		_impl = make_unique<Impl>();
 	}
 
