@@ -1,54 +1,6 @@
-# fhhos4: the library
+# the fhhos4 solver as an external library
 
-The shared library `fhhos4` offers an algebraic multigrid method for the solution of linear systems 
-arising from hybrid discretizations (HHO, HDG...) of scalar diffusion and convection-diffusion problems, 
-of the form
-```
-[ A_TT  A_TF ] [x_T]   [b_T]
-[ A_FT  A_FF ] [x_F] = [b_F]
-```
-While the smoothers work on the condensed system (given by the elimination of the cell unknowns)
-```
-A = A_FF - A_FT A_TT^{-1} A_TF
-b = b_F  - A_FT A_TT^{-1} b_T
-```
-the aggregation method used for the construction of coarse levels requires the blocks of the uncondensed matrix
-(to recover the cell-to-cell connectivity amongst other things). Consequently, instead of giving only the condensed system like any black-box AMG method, 
-the blocks of the uncondensed matrix must in our case be passed to the solver.
-
-The multigrid hierarchy unfolds as follows:
-First, the high polynomial orders are handled by p-multigrid levels, successively reducing the order to the lowest one.
-Then, once the system is reduced to one unknown per cell and face, h-coarsening follows, based on the algorithm described in
-
-> D. A. Di Pietro, F. Hülsemann, P. Matalon, P. Mycek, U. Rüde, *Algebraic multigrid preconditioner for statically
-> condensed systems arising from lowest-order hybrid discretizations*, SIAM J. Sci. Comput., 2023.
-
-## Applicability
-
-The solver typically applies to symmetric positive definite systems (e.g. diffusion)
-and non-symmetric ones (e.g. convection-diffusion, both diffusion- and convection-dominated).
-The polynomial bases used for the discretization **must be hierarchical** and ordered by degree for the p-multigrid part to work.
-
-## How to use
-
-Two types of user interface are proposed. 
-- **Interface 1** (Recommended): If the matrix is symmetric (resp. unsymmetric), pass the three (resp. four) blocks of the uncondensed matrix, namely `A_TT, A_TF, A_FF` (resp. +  `A_FT`)
-and the two blocks of the right-hand side `b_T, b_F`.
-Through this interface, the condensed system is built internally and the system is solved for both the face and cell unknowns `x_T, x_F`.
-- **Interface 2**: The condensed system can also directly be passed to the solver (along with the blocks). The solver won't perform the condensation itself and solve for the face unknowns only.
-
-The second interface was made solely to make the integration of the `fhhos4` solver less involved in existing codes, which already assemble the condensed matrix and right-hand side, and recover the cell unknowns after solving the system.
-This way is less efficient than using the first interface, because, at the very least both the external code and the `fhhos4` solver will invert the `A_TT` block.
-
-For existing codes, the recommendation is to begin with Interface 2 to try out the solver with the least integration effort, and then move on to Interface 2 for better performance. Interface 1 releaves your code from all matters linked to static condensation, including the recovering of the cell unknowns at the end. New codes should directly use Interface 1.
-
-| Interface | Setup | Solve | For |
-|---|---|---|---|
-| **Uncondensed system** | `SetupSymmetric()`, `SetupNonsymmetric()` | `Solve(b_T, b_F, x_T, x_F)` | New codes: assemble the hybrid system, nothing else. The library condenses it and solves it for the face and cell unknowns |
-| **Condensed system** | `SetupSymmetricCondensed()`, `SetupNonsymmetricCondensed()` | `Solve(b, x)` | Codes that already condense the matrix: least integration effort |
-
-Symmetric positive definite systems, and non-symmetric ones with a positive definite symmetric part
-(convection-diffusion). Krylov method included (FCG, GCR, BiCGSTAB). Parallel (OpenMP).
+# 1. Installation
 
 ## Install from source
 
@@ -94,11 +46,59 @@ target_link_libraries(my_code PRIVATE fhhos4::fhhos4)
 and `-DCMAKE_PREFIX_PATH=<prefix>` (installation), or `-Dfhhos4_DIR=<fhhos4>/build` (build tree). CMake puts the
 directory of the library in the RPATH of the executable.
 
-## Use
+# 2. The algorithm in a nutshell
 
-The public interface is `library/include/fhhos4.h` (`#include <fhhos4>`), documented in its comments.
+The shared library `fhhos4` offers an algebraic multigrid method for the solution of linear systems 
+arising from hybrid discretizations (HHO, HDG...) of scalar diffusion and convection-diffusion problems, 
+of the form
+```
+[ A_TT  A_TF ] [x_T]   [b_T]
+[ A_FT  A_FF ] [x_F] = [b_F]
+```
+While the smoothers work on the condensed system (given by the elimination of the cell unknowns)
+```
+A = A_FF - A_FT A_TT^{-1} A_TF
+b = b_F  - A_FT A_TT^{-1} b_T
+```
+the aggregation method used for the construction of coarse levels requires the blocks of the uncondensed matrix
+(to recover the cell-to-cell connectivity amongst other things). Consequently, instead of giving only the condensed system like any black-box AMG method, 
+the blocks of the uncondensed matrix must in our case be passed to the solver.
 
-### The uncondensed system (recommended)
+The multigrid hierarchy unfolds as follows:
+First, the high polynomial orders are handled by p-multigrid levels, successively reducing the order to the lowest one.
+Then, once the system is reduced to one unknown per cell and face, h-coarsening follows, based on the algorithm described in
+
+> D. A. Di Pietro, F. Hülsemann, P. Matalon, P. Mycek, U. Rüde, *Algebraic multigrid preconditioner for statically
+> condensed systems arising from lowest-order hybrid discretizations*, SIAM J. Sci. Comput., 2023.
+
+## Applicability
+
+The solver typically applies to symmetric positive definite systems (e.g. diffusion)
+and non-symmetric ones (e.g. convection-diffusion, both diffusion- and convection-dominated).
+The polynomial bases used for the discretization **must be hierarchical** and ordered by degree for the p-multigrid part to work.
+
+# 3. How to use
+
+Two types of user interface are proposed. 
+- **Interface 1** (Recommended): If the matrix is symmetric (resp. unsymmetric), pass the three (resp. four) blocks of the uncondensed matrix, namely `A_TT, A_TF, A_FF` (resp. +  `A_FT`)
+and the two blocks of the right-hand side `b_T, b_F`.
+Through this interface, the condensed system is built internally and the system is solved for both the face and cell unknowns `x_T, x_F`.
+- **Interface 2**: The condensed system can also directly be passed to the solver (along with the blocks). The solver won't perform the condensation itself and solve for the face unknowns only.
+
+The second interface was made solely to make the integration of the `fhhos4` solver less involved in existing codes, which already assemble the condensed matrix and right-hand side, and recover the cell unknowns after solving the system.
+This way is less efficient than using the first interface, because, at the very least, both the external code and the `fhhos4` solver will factorize the `A_TT` block.
+
+For existing codes, the recommendation is to begin with Interface 2 to try out the solver with the least integration effort, and then move on to Interface 2 for better performance. New codes should directly use Interface 1. Interface 1 releaves your code from all matters linked to static condensation, including the recovering of the cell unknowns at the end. 
+
+| Interface | Setup | Solve | For |
+|---|---|---|---|
+| **Uncondensed system** | `SetupSymmetric()`, `SetupNonsymmetric()` | `Solve(b_T, b_F, x_T, x_F)` | New codes: assemble the hybrid system, nothing else. The library condenses it and solves it for the face and cell unknowns |
+| **Condensed system** | `SetupSymmetricCondensed()`, `SetupNonsymmetricCondensed()` | `Solve(b, x)` | Codes that already condense the matrix: least integration effort |
+
+Symmetric positive definite systems, and non-symmetric ones with a positive definite symmetric part
+(convection-diffusion). Krylov method included (FCG, GCR, BiCGSTAB). Parallel (OpenMP).
+
+### Interface 1 (recommended)
 
 ```cpp
 #include <fhhos4>
@@ -118,7 +118,7 @@ solves the condensed system and computes the cell unknowns, `x_T = A_TT^{-1} (b_
 available for other uses: `CondensedMatrix()`. The setup builds the levels once: call `Solve()` for each right-hand
 side. The blocks may be freed after the setup.
 
-### The condensed system: to integrate the library into existing codes
+### Interface 2 (less effort for existing codes)
 
 For a code that condenses statically already (in its assembly loops), the least effort: give the library the condensed
 matrix with the blocks, and keep the code's own condensation of the right-hand side and computation of the cell
