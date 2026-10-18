@@ -60,6 +60,12 @@ updates them at each release). Both take the test client from the sources (`file
 changes reach conda-forge with the release; any other change of `recipe.yaml` goes to the feedstock too.
 `variants.yaml`: local builds only.
 
+Spack package `fhhos4`: the library alone too, in Spack's builtin repository (`spack/spack-packages`,
+`repos/spack_repo/builtin/packages/fhhos4/package.py`), not in this repository. `CMakePackage`, `ENABLE_PROGRAM=OFF`,
+`ENABLE_NATIVE_ARCH=OFF` (Spack sets the target's flags), variant `openmp` (default on), `eigen@3.4:`. No variant for
+the index type: `SMALL_INDEX=OFF` does not compile in 1.4.0. Its stand-alone test (`spack test run fhhos4`) builds and
+runs the conda test client `conda/recipe/test`, cached from the sources: moving it changes the package too (per version).
+
 ## Test
 
 From `build/`:
@@ -226,7 +232,9 @@ library alone, and in a parallel job the conda package with its tests, then crea
 (notes: the message of the tag). It pins GMSH, Eigen, CGAL, the compiler and rattler-build to the versions the tests
 were validated with: update them with the local environment (envs `fhhos4` and `rattler`). After a change of
 `release.yml` or of its pins, run it by hand on master (Actions > Release > Run workflow: no release) before pushing
-the tag; otherwise push the tag directly.
+the tag; otherwise push the tag directly. After the release, conda-forge's bot updates the feedstock; the Spack package
+needs a PR to spack-packages (`spack checksum --add-to-package fhhos4 X.Y.Z`, then `spack install --test=root` and
+`spack test run`).
 
 ## Documentation (README files)
 
