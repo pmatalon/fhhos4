@@ -23,14 +23,16 @@ jobs:
         with:
           fetch-depth: 0 # the history and the tags, for git describe (fhhos4::Version())
 
+      - name: Version
+        run: echo "VERSION=$(sed -nE 's/^project\(fhhos4 VERSION ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt)" >> "$GITHUB_ENV"
+
       - name: Check the tag against the version
         if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          version=$(sed -nE 's/^project\(fhhos4 VERSION ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt)
-          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
-            echo "::error::The tag $GITHUB_REF_NAME doesn't match the version in CMakeLists.txt: project(fhhos4 VERSION $version)"
+          if [ "$GITHUB_REF_NAME" != "v$VERSION" ]; then
+            echo "::error::The tag $GITHUB_REF_NAME doesn't match the version in CMakeLists.txt: project(fhhos4 VERSION $VERSION)"
             exit 1
           fi
           if [ "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$GITHUB_REF_NAME" --jq .object.type)" != tag ]; then
@@ -66,10 +68,16 @@ jobs:
           mkdir "$RUNNER_TEMP/run" && cd "$RUNNER_TEMP/run"
           "$RUNNER_TEMP/install/bin/fhhos4" -geo L_shape -mesh tri -n 8 -k 0 -s mg -no-cache
 
-      - name: Library alone (ENABLE_PROGRAM=OFF)
+      # With the default options, the library alone is the conda package's (job conda-package). Here with 64-bit indices,
+      # which the tests don't cover, then the test client of the conda package on its build tree.
+      - name: Library alone (ENABLE_PROGRAM=OFF), 64-bit indices (SMALL_INDEX=OFF)
         run: |
-          cmake -B build-library -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_PROGRAM=OFF
+          cmake -B build-library -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_PROGRAM=OFF -DSMALL_INDEX=OFF
           cmake --build build-library
+          cmake -S conda/recipe/test -B build-client -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -Dfhhos4_DIR="$PWD/build-library" -DEXPECTED_VERSION="$VERSION"
+          cmake --build build-client
+          ./build-client/fhhos4_client
 
   # The conda package of the library (conda/recipe), with its tests: rattler-build pinned to the version the recipe was
   # validated with

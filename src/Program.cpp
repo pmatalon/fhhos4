@@ -38,7 +38,7 @@ void ProgramDim<Dim>::Start(ProgramArguments& args)
 #ifdef SMALL_INDEX
 	cout << "Index type: int" << endl;
 #else
-	cout << "Index type: size_t" << endl;
+	cout << "Index type: intmax_t" << endl;
 #endif
 	cout << "Shared memory parallelism: " << (Parallelism::NThreads() == 1 ? "sequential execution" : to_string(Parallelism::NThreads()) + " threads") << endl;
 	cout << endl;

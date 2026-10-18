@@ -8,11 +8,12 @@
 #include <Eigen/Sparse>
 #include <Eigen/Dense>
 
+// BigNumber is signed in both cases: the code encodes states as negative numbers (e.g. -1: not aggregated yet)
 #ifdef SMALL_INDEX
 using BigNumber = int;
 using SparseMatrixIndex = int;
 #else
-using BigNumber = std::size_t;
+using BigNumber = intmax_t;
 using SparseMatrixIndex = intmax_t; // in Eigen, default value is int, but it is not sufficient for big matrices
 #endif // SMALL_INDEX
 

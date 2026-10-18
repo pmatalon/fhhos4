@@ -91,7 +91,7 @@ if(SMALL_INDEX)
 	target_compile_definitions(fhhos4_lib PRIVATE SMALL_INDEX)
 	message(STATUS "SMALL_INDEX: ON (int)")
 else()
-	message(STATUS "SMALL_INDEX: OFF (size_t)")
+	message(STATUS "SMALL_INDEX: OFF (intmax_t)")
 endif()
 
 # Include Eigen

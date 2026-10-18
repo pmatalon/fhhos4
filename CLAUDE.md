@@ -63,7 +63,8 @@ changes reach conda-forge with the release; any other change of `recipe.yaml` go
 Spack package `fhhos4`: the library alone too, in Spack's builtin repository (`spack/spack-packages`,
 `repos/spack_repo/builtin/packages/fhhos4/package.py`), not in this repository. `CMakePackage`, `ENABLE_PROGRAM=OFF`,
 `ENABLE_NATIVE_ARCH=OFF` (Spack sets the target's flags), variant `openmp` (default on), `eigen@3.4:`. No variant for
-the index type: `SMALL_INDEX=OFF` does not compile in 1.4.0. Its stand-alone test (`spack test run fhhos4`) builds and
+the index type: `SMALL_INDEX=OFF` does not compile in 1.4.0 (fixed after it): add one (`int64`, `when=` the
+next version) with the next version. Its stand-alone test (`spack test run fhhos4`) builds and
 runs the conda test client `conda/recipe/test`, cached from the sources: moving it changes the package too (per version).
 
 ## Test
@@ -78,7 +79,9 @@ ctest --output-on-failure
 iteration counts of the papers in `reproducibility/` — see `tests/README.md`. Covers
 `Program_Diffusion_HHO` and `Program_BiHarmonic_HHO` (HHO, static condensation), 2D/3D,
 in-house, GMSH and polygonal meshes, and the library (`UAMGLibrary*`, ~15 s). Not covered: DG/FEM programs (disabled by default), `lu`/`cg`/`agmg`/`p_mg` solvers,
-1D, anisotropic cases.
+1D, anisotropic cases, `SMALL_INDEX=OFF` (64-bit indices; the release workflow only builds the library with it and
+runs the conda test client: after a change of index or state handling, build it apart with `-Wtype-limits` and run
+the tests there).
 
 ## Performance
 
@@ -228,11 +231,11 @@ experimental feature of rattler-build: `--experimental`). `fhhos4::Version()` (p
 build, rewritten only when the commit changes; nothing else may depend on the commit (it would recompile `Program.cpp` at each commit). Release: change the
 version in `project()`, commit, then push an annotated tag `vX.Y.Z` (the tags before 1.3.0 are `Release_X.Y.Z`):
 `.github/workflows/release.yml` checks the tag against the version, builds, runs `ctest`, the installation and the
-library alone, and in a parallel job the conda package with its tests, then creates the GitHub release "Release X.Y.Z"
-(notes: the message of the tag). It pins GMSH, Eigen, CGAL, the compiler and rattler-build to the versions the tests
-were validated with: update them with the local environment (envs `fhhos4` and `rattler`). After a change of
-`release.yml` or of its pins, run it by hand on master (Actions > Release > Run workflow: no release) before pushing
-the tag; otherwise push the tag directly. After the release, conda-forge's bot updates the feedstock; the Spack package
+library alone with 64-bit indices (`SMALL_INDEX=OFF`) and the conda test client, and in a parallel job the conda
+package with its tests, then creates the GitHub release "Release X.Y.Z" (notes: the message of the tag). It pins GMSH,
+Eigen, CGAL, the compiler and rattler-build to the versions the tests were validated with: update them with the local
+environment (envs `fhhos4` and `rattler`). After a change of `release.yml` or of its pins, run it by hand on master
+(Actions > Release > Run workflow: no release) before pushing the tag; otherwise push the tag directly. After the release, conda-forge's bot updates the feedstock; the Spack package
 needs a PR to spack-packages (`spack checksum --add-to-package fhhos4 X.Y.Z`, then `spack install --test=root` and
 `spack test run`).
 
