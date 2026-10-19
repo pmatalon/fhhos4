@@ -1007,6 +1007,23 @@ cost their extraction and smoothers, and the passes run on the k=0 level.
   scans and the freeing of all of it. On 4 threads, the sequential parts (pairwise aggregation, interface collapsing,
   freeing) take 0.48 of the 1.94 s. Hence idea 2, extended to the whole pass (done).
 
+**Solve at k=2 through the library, default smoother (Chebyshev of the 4th kind, degree 2)** (2026-10-19; NGSolve's HDG
+systems exported to `build-python/profile/`, the public API driven by `driver.cpp`, wall-clock timers of `Prof.h` in a
+copy of the sources (`tree/`), callgrind on 1 thread; `PCoarsening::ToZero`, so k=2 -> 0 directly, as `Minus2`).
+- Cube-tet 27k cells (313k face DoFs, 12.7M non-zeros, blocks 6x6), 42 iterations: solve 3.18 s on 1 thread, 1.52 s on
+  8. The fine level's smoothing is 88% / 80% of it (pre 1.20 / 0.50 s, post 1.60 / 0.71 s); the coarse levels (K-cycle)
+  0.35 / 0.21 s, the transfers 0.08 / 0.07 s. Per iteration, the fine level does 5 products by A (pre-smoother from 0:
+  2, with the residual; post-smoother: 3, with A x for FCG) and 4 sweeps of block solves: one SpMV 8.4 / 4.4 ms (8
+  threads: 34.5 GB/s, the machine's bandwidth), one block-solve sweep 3.6 / 0.93 ms (Eigen's LU solves of the 6x6
+  blocks: ~20% of the instructions of the run, callgrind). So 42 + 14.5 + ~10 ms (vector updates) per iteration on 1
+  thread, 22 + 3.7 + ~3 ms on 8. Lanczos (10 iterations) 143 / 67 ms of the setup (1.43 / 0.48 s).
+- Square-tri 189k cells (848k face DoFs, 12.7M non-zeros, blocks 3x3), 16 iterations: solve 2.72 s on 1 thread, 1.32 s
+  on 8. Fine smoothing 1.72 / 0.67 s, coarse levels 1.22 / 0.63 s (31-45%: the k=0 p-level has 1/3 of the fine rows,
+  visited twice per iteration by the K-cycle). One SpMV 11.1 / 5.5 ms, one block-solve sweep 11.3 / 3.0 ms: on 3x3
+  blocks, Eigen's LU solves cost as much as the product by A. Lanczos 0.30 / 0.13 s of the setup (2.24 / 1.01 s).
+- Against NGSolve's BDDC + CG on 8 threads (Cube-tet k=2: 22 ms per iteration vs U-AMG's 35 ms): see the ideas
+  "Inverse diagonal blocks" and "Block CSR storage" below, the two levers this profile sizes.
+
 **The assembly (printed as "Assembly time", not in the Setup row) dominates the runs** (2026-10-04, `timing.sh`
 logs, sequential / 16 threads): Cube-tet k=2 n=16 178 / 38 s (setup 3.7 / 1.8 s); Cube-cart-aniso100 n=64 102 / 16 s
 (setup 4.2 / 2.5 s); Cube-tet k=0 n=32 5.1 / 1.4 s. Breakdown (timestamps of the assembly log, n halved):
@@ -1185,7 +1202,10 @@ Possible now that reordering the arithmetic operations is allowed (rejected so f
   level at k=2, i.e. ~0.15 s of the 3.7 s solve). The scalar `GaussSeidel` already computes its residual this way.
 - **Block CSR storage for k>=1** — estimated, large effort. One column index per block instead of one per
   coefficient (12 -> ~8 bytes per non-zero at k=2) and dense block-vector products (vectorizable): the solve kernels
-  are memory-bound, so maybe -20-30% on the sweeps, residuals and intergrid transfers at k>=1.
+  are memory-bound, so maybe -20-30% on the sweeps, residuals and intergrid transfers at k>=1. Sized by the profile
+  of 2026-10-19 (Chebyshev, 8 threads, the fine SpMV at the machine's bandwidth): 5 fine products per iteration are
+  61% of an iteration at k=2 in 3D (12 -> 8.1 bytes per non-zero with 6x6 blocks: solve ~-18%), 33% in 2D (3x3: 8.4
+  bytes, ~-10%; the coarse levels, block size 1, are 31% there).
 - **`-DENABLE_NATIVE_ARCH=ON`** (AVX2, FMA) — to measure. FMA and wider vectors change the rounding (now allowed);
   the binary then only runs on CPUs like the build machine's.
 - **Inverse diagonal blocks** in the block smoothers (`DiagBlockSolveMethod::Inverse`, an existing option of
@@ -1194,7 +1214,31 @@ Possible now that reordering the arithmetic operations is allowed (rejected so f
   1.1 ms, fine sweeps x1.11-1.24, level-1 sweeps x1.06-1.13 (~5% of the solve); results differ by ~1e-16 (relative).
   Using the inverse of the diagonal is allowed, but the LU solve also handles singular blocks (rank < block size),
   which an inverse doesn't: choose the method per block (inverse if `FullPivLU::rcond()` is large enough, LU
-  otherwise), and check the iteration counts.
+  otherwise), and check the iteration counts. In the Chebyshev smoother (the library's default; profile of
+  2026-10-19 above): 4 block-solve sweeps per iteration on the fine level, 22% of its smoothing at k=2 in 3D (3.6 ms
+  per sweep on 1 thread), ~40% in 2D (3x3 blocks: 11.3 ms per sweep, as much as an SpMV); also 10 sweeps in the
+  Lanczos of the setup. Estimate: solve -13% / -7% (Cube-tet k=2, 1 / 8 threads), -22% / -12% (Square-tri k=2).
+
+From the comparison with NGSolve's BDDC (2026-10-19; results in `CLAUDE.md`, "Python module"; profile above), U-AMG
+1.2-2x faster at k=1, 1.1-1.5x slower at k=2 on 8 threads, where its iterations cost 1.15-1.75x more:
+
+- **Single precision for the multigrid hierarchy** — new, estimated, a change of the method: opt-in only. The cycle
+  (operators, prolongations, smoothers' blocks) stored and applied in float, FCG and its residuals in double (a
+  preconditioner only needs a few digits; FCG is flexible). The solve is bound by the memory bandwidth on 8 threads
+  (the fine SpMV at 34.5 GB/s): half the bytes per value, up to ~1.5-2x on the solve with block CSR. The risk is the
+  iteration count (rounding in the Galerkin products, the Chebyshev bounds): prototype on the exported systems
+  (`build-python/profile/`) before any code in the library.
+- **Fewer Lanczos iterations for lambdaMax** — estimated, small effort, changes the Chebyshev coefficients (a decision:
+  the iteration counts may move). 10 iterations, 143 / 67 ms of the setup (1 / 8 threads) at k=2 in 3D, 0.30 / 0.13 s
+  in 2D (10-14%). The inverse diagonal blocks would make each iteration cheaper anyway.
+- **The coarse levels in 2D** — measured, not explored: 31-45% of the solve at k=2 (the k=0 p-level has 1/3 of the
+  fine rows, and the K-cycle visits it twice per iteration). Its SpMV scales 1.6x on 8 threads, its diagonal sweep not
+  at all (0.15 -> 0.21 ms). Options (all changing the method, opt-in): a V-cycle below the first coarse level, or
+  Minus2-like intermediate p-levels, which don't exist at k=2.
+- **The copies of the interface** — measured: in the NGSolve integration, SciPy's extraction of the four blocks
+  (sequential slicing) and the module's conversion to Eigen matrices cost 0.07-0.52 s and 0.1-0.25 s, 10-20% of
+  U-AMG's total. A CSR view of the whole uncondensed matrix with the DoFs of each cell and face, read in place, and
+  the blocks extracted by one parallel pass in the library: a separate task (the interface).
 
 Other candidates:
 
