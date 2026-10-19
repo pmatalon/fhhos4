@@ -90,7 +90,7 @@ Through this interface, the condensed system is built internally and the system 
 The second interface was made solely to make the integration of the `fhhos4` solver less involved in existing codes, which already assemble the condensed matrix and right-hand side, and recover the cell unknowns after solving the system.
 This way is less efficient than using the first interface, because, at the very least, both the external code and the `fhhos4` solver will factorize the `A_TT` block.
 
-For existing codes, the recommendation is to begin with Interface 2 to try out the solver with the least integration effort, and then move on to Interface 2 for better performance. New codes should directly use Interface 1. Interface 1 releaves your code from all matters linked to static condensation, including the recovering of the cell unknowns at the end. 
+For existing codes, the recommendation is to begin with Interface 2 to try out the solver with the least integration effort, and then move on to Interface 1 for better performance. New codes should directly use Interface 1. Interface 1 relieves your code from all matters linked to static condensation, including the recovering of the cell unknowns at the end. 
 
 | Interface | Setup | Solve | For |
 |---|---|---|---|

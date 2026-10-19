@@ -286,10 +286,12 @@ Three READMEs, each for its readers; keep them up to date in the same commit as 
 - `README_program.md`: the program, for its users (researchers running experiments): dependencies, conda environment,
   build (options table: every `option()` of `CMakeLists.txt`), installation, where the program reads and writes,
   troubleshooting.
-- `README_library.md`: the library, for the developers of client codes, who don't need the program or the sources:
-  the algorithm in a few lines (p-levels, then h-levels and how the blocks give the aggregation), the interfaces,
-  install from source (library alone), link (CMake package), use (examples of both interfaces, non-symmetric), inputs,
-  parameters, constraints, license, version (last). Rules:
+- `README_library.md`: the library, for the developers of client codes, who don't need the program or the sources. Its
+  numbered sections (the user's structure, 2026-10-18): 1. Installation (install from source, the library alone; the
+  conda package; link, CMake package), 2. The algorithm in a nutshell (in a few lines: p-levels, then h-levels and how
+  the blocks give the aggregation; applicability), 3. How to use (the two interfaces, "Interface 1" the uncondensed
+  system, recommended, and "Interface 2" the condensed one, with examples; non-symmetric; Python; inputs, parameters,
+  constraints, license, version last). Rules:
   - no details of the algorithm beyond that, no measurements, no client codes (HArDCore3D, Disk++), no internal
     files (`PERFORMANCE.md`, tests): they go in "U-AMG: details and measurements" above or in `PERFORMANCE.md`;
   - the parameters table gives the library's own defaults (`library/include/fhhos4.h` and `library/Solver.cpp`:
