@@ -28,6 +28,7 @@ option(ENABLE_FEM "Build the FEM programs (-discr fem)" OFF)
 option(ENABLE_TESTS "Build the test suite (fhhos4_tests). Turn off to save its compilation time during development." ON)
 option(ENABLE_OPENMP "Use OpenMP for the parallel loops (and Eigen's internal parallelism)" ON)
 option(ENABLE_NATIVE_ARCH "Optimize for the CPU of the build machine (-march=native: AVX2, FMA...). The binary may not run on other CPUs." OFF)
+option(ENABLE_PYTHON "Build the Python module of the library (fhhos4, with nanobind) and its tests" OFF)
 
 set(EXECUTABLE_OUTPUT_PATH bin/)
 include(GNUInstallDirs)
@@ -132,6 +133,23 @@ write_basic_package_version_file(${CMAKE_BINARY_DIR}/fhhos4ConfigVersion.cmake C
 install(FILES ${CMAKE_BINARY_DIR}/fhhos4Config.cmake ${CMAKE_BINARY_DIR}/fhhos4ConfigVersion.cmake
 	DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/fhhos4 COMPONENT library)
 export(EXPORT fhhos4Targets NAMESPACE fhhos4:: FILE ${CMAKE_BINARY_DIR}/fhhos4Targets.cmake)
+
+# Python module of the library (library/python): the module fhhos4 in <build>/python, linked to libfhhos4.so (build
+# tree only for now: not installed). Its test (ctest -R Python) runs with that directory in PYTHONPATH.
+if(ENABLE_PYTHON)
+	find_package(Python 3.9 REQUIRED COMPONENTS Interpreter Development.Module)
+	execute_process(COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
+		OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE nanobind_ROOT)
+	find_package(nanobind CONFIG REQUIRED)
+	nanobind_add_module(fhhos4_python NB_STATIC library/python/fhhos4_python.cpp)
+	set_target_properties(fhhos4_python PROPERTIES OUTPUT_NAME fhhos4 LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/python)
+	target_link_libraries(fhhos4_python PRIVATE fhhos4_lib)
+	message(STATUS "ENABLE_PYTHON: ON (module fhhos4 for ${Python_EXECUTABLE})")
+
+	enable_testing()
+	add_test(NAME PythonModule COMMAND ${Python_EXECUTABLE} ${CMAKE_SOURCE_DIR}/library/python/tests/test_module.py)
+	set_tests_properties(PythonModule PROPERTIES ENVIRONMENT PYTHONPATH=${CMAKE_BINARY_DIR}/python)
+endif()
 
 #----------------------------------------------------------------------------------------------------------------------
 # Program fhhos4 and its tests

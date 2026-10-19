@@ -39,6 +39,7 @@ CMake options (`-D<OPTION>=ON/OFF`):
 - `ENABLE_GMSH`, `ENABLE_CGAL` (ON, CGAL is only used in 2D), `ENABLE_AGMG` (OFF).
 - `ENABLE_PROGRAM` (ON): OFF builds the library `fhhos4` alone (needs only Eigen): the CMake file has a library
   section, then the program's, skipped by `return()`.
+- `ENABLE_PYTHON` (OFF): the Python module of the library (`library/python`, see "Python module" below).
 
 `cmake --install . --prefix <prefix> [--component library|program]`: program, meshes (`share/fhhos4/meshes`), library,
 headers, CMake package. No path of the sources is compiled in (`Utils/FileSystem.h`): the program finds the meshes
@@ -162,6 +163,41 @@ program that includes the public header, through `LibraryParameters.h`: changing
 interface (`Diffusion_HHO::CondensationBySolver`: no static condensation in the program), or the condensed one with
 `-libuamg-condensed` (and for a full Neumann problem and the exports of the system or of the algebraic error), which
 `tests/UAMGLibraryTest.cpp` compares with `uamg|fcguamg|gcruamg`.
+
+### Python module
+
+`library/python/fhhos4_python.cpp`: the module `fhhos4` (nanobind, `NB_STATIC`), the public API with the C++ names (the
+user's decision, 2026-10-18: one documentation), on SciPy's matrices (copied to `fhhos4::SparseMatrix` by nanobind's
+caster) and NumPy's vectors (`Eigen::Ref`: read in place; the outputs `noconvert()`, float64 only). `PySolver` derives
+from `fhhos4::Solver` and owns the `A` of the condensed setups on the heap (the library keeps a reference to it), replaced
+only after a successful setup: the checks of a setup run before it resets the previous one, which still reads its `A`.
+The setups and solves release the GIL. Built with `-DENABLE_PYTHON=ON` (in the library section of `CMakeLists.txt`,
+also with `ENABLE_PROGRAM=OFF`) into `<build>/python`, not installed (pip/conda packaging: after the validation, the
+user's decision). Its test, `ctest -R Python` (`PythonModule`: `library/python/tests/test_module.py`, the toy system of
+`UAMGLibraryTest.cpp` against SciPy's direct solver). No NGSolve in the repository (the user's decision, 2026-10-19: no
+new dependency): its test is `~/code/fhhos4-ngsolve/test_ngsolve.py`, run by hand.
+Environment: conda env `fhhos4-python` (python 3.12, numpy, scipy, nanobind, cmake, ninja, cxx-compiler, eigen 5.0.1;
+NGSolve from pip, not on conda-forge), build directory `build-python` (`-DENABLE_PROGRAM=OFF -DENABLE_PYTHON=ON`, ~1 min).
+
+NGSolve (6.2.2608; first target of the module; DOLFINx after work on MPI in fhhos4, the user's decision): its HDG
+(`L2 * FacetFESpace`, primal, SPD) fits the uncondensed interface. `test_ngsolve.py` (outside the repository) extracts the blocks itself (the
+user's decision: outside the library): `condense=False` (with `condense=True`, `a.mat` keeps only the Schur complement,
+the cell blocks are not stored), NGSolve's default numbering (cells then faces, contiguous blocks in order; checked:
+`L2(..., all_dofs_together=False)` breaks it), Dirichlet faces removed (`fes.FreeDofs()`: all or none of a face's DoFs).
+phi_0 = 1 (interpolation of 1: ones). Bases not ordered by degree (2D cell k=3: degrees 0 1 2 3 1 2 3 2 3 3; 3D faces
+too; Q^k on quads/hexes, Q-degrees not ordered either): `PCoarsening::ToZero` (sorting by degree: not yet, the user's
+decision). Solution = NGSolve's sparse Cholesky to 1e-12..1e-14 (2D, 3D, k = 1..3, l = k + 1). Iterations (tolerance
+1e-8, 2026-10-19), U-AMG `bcheb4` / `bgs` / NGSolve's BDDC + CG, penalty alpha/h: Square-tri 3708 cells, alpha = 4k^2
+(NGSolve's tutorial): k=1 11/14/12, k=2 14/19/15, k=3 18/22/19; alpha = 10(k+1)^2: 24-29 / 32-36 / 21-30. Cube-tet 3937
+cells, alpha = 5(k+1)^2: k=1 24/28/28, k=2 39/44/45, k=3 46/53/55 (alpha = 4 at k=1 is not SPD in 3D: the Chebyshev
+setup refuses it). The counts follow the penalty for both solvers.
+Times against NGSolve's BDDC + its CG (2026-10-19, `build-python/bench/`, not in the repository; the same configured
+tolerance 1e-8, each solver its own norm, the user's decision: BDDC's true residuals 6e-8..1.4e-6, U-AMG's <= 1e-8;
+straight to degree 0; k = 3 skipped, the user's decision): BDDC / U-AMG setup + solve on 8 threads, Square-tri
+(alpha = 4k^2) 92k-370k cells: k=1 1.27-1.33, k=2 0.80-0.90; Cube-tet (alpha = 5(k+1)^2): k=1 25k cells 1.17, 69k cells
+1.96 (BDDC's setup 1.70 s vs 0.43 s), k=2 9k-27k cells 0.67-0.76. 1 thread: the same trends. BDDC with an AMG coarse
+solver (`coarsetype="h1amg"`) always slower (51-91 iterations); NGSolve's sparse Cholesky a tie in 2D, 6x slower than
+U-AMG in 3D at 25k cells. The Python extraction of the blocks: 0.07-0.52 s, 10-20% of U-AMG's total.
 
 ### U-AMG: details and measurements (kept out of `README_library.md`)
 

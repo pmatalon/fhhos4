@@ -18,7 +18,7 @@ Without installing, the library is `build/lib/libfhhos4.so`.
 
 Build options (`-D<OPTION>=ON|OFF`): `ENABLE_OPENMP` (ON: parallel), `ENABLE_NATIVE_ARCH` (OFF: `-march=native`:
 optimized for the CPU of the build machine, may not run on others), `SMALL_INDEX` (ON: `int` indices in
-`fhhos4::SparseMatrix`, `intmax_t` otherwise).
+`fhhos4::SparseMatrix`, `intmax_t` otherwise), `ENABLE_PYTHON` (OFF: the Python module, see [Python](#python)).
 
 ### Conda package
 
@@ -143,6 +143,40 @@ For a non-symmetric matrix (e.g. convection-diffusion), give also the block `A_F
 `SetupNonsymmetricCondensed(A, A_TT, A_TF, A_FT[, A_FF], ...)` then `Solve(b, x)`. The same algorithm runs on the
 matrix itself, with GCR instead of FCG and Gauss-Seidel smoothers that follow the direction of the flow (downwind
 order).
+
+### Python
+
+The Python module `fhhos4` has the same interface, with the same names, on SciPy's sparse matrices and NumPy's vectors.
+It needs Python (>= 3.9), [nanobind](https://nanobind.readthedocs.io), NumPy and SciPy, and is built with the library
+(not installed yet: use it from the build tree):
+
+```bash
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_PROGRAM=OFF -DENABLE_PYTHON=ON
+cmake --build build
+export PYTHONPATH=$PWD/build/python    # the module fhhos4
+ctest --test-dir build                 # its tests
+```
+
+```python
+import numpy as np
+import fhhos4
+
+solver = fhhos4.Solver()
+solver.Dimension = 3   # to set
+solver.FaceDegree = k  # to set
+solver.CellDegree = k  # to set
+solver.SetupSymmetric(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne)  # scipy.sparse matrices, NumPy vectors
+x_T, x_F = np.zeros(b_T.size), np.zeros(b_F.size)
+result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
+```
+
+- The parameters are attributes, the enums of `fhhos4.h` classes of the module: `solver.Krylov = fhhos4.Krylov.GCR`.
+- The matrices are converted (copied) to CSR, the format of the library, if they have another one. The vectors are read
+  in place; the output vectors (`x_T`, `x_F`, `x` of `Solve(b, x)`) must be NumPy vectors of `float64`, written in
+  place. `Solve(b)` returns `x`. `CondensedMatrix()` returns a copy (`scipy.sparse.csr_matrix`).
+- The setups from the condensed matrix keep their own copy of `A`: `A` may be freed after the setup.
+- The errors raise `fhhos4.Error`, a `RuntimeError`.
+- The setups and solves release the GIL.
 
 ### Inputs
 

@@ -303,6 +303,12 @@ Unit tests of the matrices that the reference shapes (static: one per process) c
 - **`ReferenceShapeCache.BasisAtTheAddressOfADeletedOne`** (1 case) — a Legendre basis of degree 1 at the address of a deleted one of degree 0 gets its own mass matrix, stiffness matrices and vector of integrals (2x2, not 1x1).
 - **`ReferenceShapeCache.TensorAtTheAddressOfADeletedOne`** (1 case) — a tensor K=2 at the address of a deleted tensor K=1 gets its own stiffness matrix (twice the other).
 
+## Python module (`library/python/tests`)
+
+Not in `fhhos4_tests`: a ctest test of a build with `-DENABLE_PYTHON=ON` (e.g. `-DENABLE_PROGRAM=OFF`, which builds the library and the module alone), run with `<build>/python` in `PYTHONPATH`. A Python script (no pytest), exit code 0 when it passes.
+
+- **`PythonModule`** (`test_module.py`, 8 checks) — the module on the hybrid system of degree 0 of `UAMGLibraryTest.cpp`, rebuilt with SciPy (n=32: 1984 face DoFs, so that the AMG has several levels; at n=16 the fine level is the coarsest one): the uncondensed and condensed setups, symmetric and not, against SciPy's direct solver (relative error < 1e-8); `CondensedMatrix()`; the solver keeps its own copy of `A` (the caller's deleted after the setup); a setup that fails keeps the previous one; CSC, COO and int64 indices accepted; the parameters and enums; the errors (`fhhos4.Error`, a `RuntimeError`; float32 output vectors refused).
+
 ## Coverage summary
 
 - 212 CTest cases total across the 16 files above, exercising `Program_Diffusion_HHO` (diffusion problems) and `Program_BiHarmonic_HHO` (biharmonic problem in mixed form), with the HHO discretization and static condensation, and the library `fhhos4`.

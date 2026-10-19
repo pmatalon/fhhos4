@@ -80,6 +80,7 @@ Build options (`cmake -D<OPTION>=ON|OFF ..`):
 | `ENABLE_AGMG` | OFF | AGMG solver (`-s agmg`, see below) |
 | `ENABLE_OPENMP` | ON | Shared-memory parallelism |
 | `ENABLE_NATIVE_ARCH` | OFF | `-march=native`: optimized for the CPU of the build machine, may not run on others |
+| `ENABLE_PYTHON` | OFF | The Python module of the library (see `README_library.md`); needs Python, nanobind, NumPy and SciPy |
 | `SMALL_INDEX` | ON | `int` indices in the sparse matrices (`intmax_t` otherwise) |
 
 If you built GMSH from source instead of using the conda package, pass its location explicitly:
