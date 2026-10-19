@@ -42,6 +42,17 @@ private:
 		return cycles;
 	}
 
+	static const Table<fhhos4::PCoarsening, P_CoarsStgy>& PCoarsenings()
+	{
+		static const Table<fhhos4::PCoarsening, P_CoarsStgy> pCoarsenings = {
+			{ fhhos4::PCoarsening::Minus2,    P_CoarsStgy::Minus2 },
+			{ fhhos4::PCoarsening::Minus1,    P_CoarsStgy::Minus1 },
+			{ fhhos4::PCoarsening::DivideBy2, P_CoarsStgy::DivideBy2 },
+			{ fhhos4::PCoarsening::ToZero,    P_CoarsStgy::DirectToLow }
+		};
+		return pCoarsenings;
+	}
+
 	// The coarse solvers of the library (Default: chosen by the library) and their codes in the program
 	// (-coarse-solver)
 	static const Table<fhhos4::CoarseSolver, string>& CoarseSolvers()
@@ -92,6 +103,11 @@ public:
 		return ToProgram(Cycles(), cycle, "Cycle");
 	}
 
+	static P_CoarsStgy ProgramPCoarsening(fhhos4::PCoarsening pCoarsening)
+	{
+		return ToProgram(PCoarsenings(), pCoarsening, "PCoarsening");
+	}
+
 	// The code of the coarse solver (not Default)
 	static string ProgramCoarseSolver(fhhos4::CoarseSolver coarseSolver)
 	{
@@ -111,6 +127,11 @@ public:
 	static fhhos4::Cycle LibraryCycle(CycleType cycle)
 	{
 		return *ToLibrary(Cycles(), cycle);
+	}
+
+	static fhhos4::PCoarsening LibraryPCoarsening(P_CoarsStgy pCoarsening)
+	{
+		return *ToLibrary(PCoarsenings(), pCoarsening);
 	}
 
 	static fhhos4::CoarseSolver LibraryCoarseSolver(const string& coarseSolverCode)

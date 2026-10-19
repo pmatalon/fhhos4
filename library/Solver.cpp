@@ -266,6 +266,7 @@ namespace fhhos4
 			MultigridArguments& mg = args.Solver.MG;
 			mg.Cycle = LibraryParameters::ProgramCycle(s.Cycle);
 			mg.WLoops = s.Cycle == fhhos4::Cycle::W ? 2 : 1;
+			mg.P_CS = LibraryParameters::ProgramPCoarsening(s.PCoarsening);
 			mg.KCycleKrylov = Krylov == fhhos4::Krylov::GCR || !Symmetric ? KrylovMethod::GCR : KrylovMethod::FCG; // GCR under GCR (Notay)
 			mg.PreSmoother = s.PreSmoother != fhhos4::Smoother::Default ? LibraryParameters::ProgramSmoother(s.PreSmoother) : DefaultPreSmoother();
 			mg.PostSmoother = LibraryParameters::ProgramSmoother(s.PostSmoother); // Default: the program's, the adjoint of the pre-smoother (rbgs after bgs, the same Chebyshev...)

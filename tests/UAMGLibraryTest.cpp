@@ -37,6 +37,7 @@ struct LibraryCase
 	int N;
 	int K;
 	int BasesOrthogonalization; // -e-ogb and -f-ogb; -1 for the defaults
+	P_CoarsStgy PCoarsening = P_CoarsStgy::Minus2; // -p-cs
 };
 
 inline std::ostream& operator<<(std::ostream& os, const LibraryCase& c)
@@ -60,6 +61,7 @@ ProgramResults RunCase(const LibraryCase& c, const std::string& solverCode, bool
 		args.Discretization.OrthogonalizeFaceBasesCode = c.BasesOrthogonalization;
 	}
 	args.Solver.SolverCode = solverCode;
+	args.Solver.MG.P_CS = c.PCoarsening;
 	args.Solver.MG.UAMGNonsymmetric = nonsymmetric;
 	args.Solver.MG.UAMGLibraryCondensed = libraryCondensed;
 	args.Actions.UseCache = false;
@@ -112,6 +114,8 @@ std::vector<LibraryCase> LibraryCases()
 	cases.push_back({ "Square_tri_n16_k0", "square", "tri", "", 16, 0, -1 });
 	cases.push_back({ "Square_tri_n16_k1", "square", "tri", "", 16, 1, -1 });
 	cases.push_back({ "Square_tri_n16_k1_orthonormal", "square", "tri", "", 16, 1, 3 });
+	// The p-coarsening straight to degree 0 (PCoarsening::ToZero), which differs from the default from k = 3
+	cases.push_back({ "Square_tri_n16_k3_pcs0", "square", "tri", "", 16, 3, -1, P_CoarsStgy::DirectToLow });
 #endif
 #ifdef ENABLE_3D
 	cases.push_back({ "Cube_tetra_n8_k0", "cube", "tetra", "", 8, 0, -1 });
@@ -761,6 +765,9 @@ TEST(UAMGLibrary, Errors)
 	fhhos4::Solver wrongCycle = ToySolver();
 	wrongCycle.Cycle = static_cast<fhhos4::Cycle>(42); // out of the enum
 	EXPECT_THROW(wrongCycle.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
+	fhhos4::Solver wrongPCoarsening = ToySolver();
+	wrongPCoarsening.PCoarsening = static_cast<fhhos4::PCoarsening>(42);
+	EXPECT_THROW(wrongPCoarsening.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 	fhhos4::Solver negativeSmoothing = ToySolver();
 	negativeSmoothing.PostSmoothingIterations = -2;
 	EXPECT_THROW(negativeSmoothing.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);

@@ -24,6 +24,7 @@ public:
 		_solver.MaxIterations = args.Solver.MaxIterations;
 		const MultigridArguments& mg = args.Solver.MG;
 		_solver.Cycle = LibraryParameters::LibraryCycle(mg.Cycle);
+		_solver.PCoarsening = LibraryParameters::LibraryPCoarsening(mg.P_CS);
 		_solver.PreSmoothingIterations = mg.PreSmoothingIterations;
 		_solver.PostSmoothingIterations = mg.PostSmoothingIterations;
 		_solver.PreSmoother = LibraryParameters::LibrarySmoother(mg.PreSmoother);

@@ -76,6 +76,8 @@ Then, once the system is reduced to one unknown per cell and face, h-coarsening 
 The solver typically applies to symmetric positive definite systems (e.g. diffusion)
 and non-symmetric ones (e.g. convection-diffusion, both diffusion- and convection-dominated).
 The polynomial bases used for the discretization **must be hierarchical** and ordered by degree for the p-multigrid part to work.
+Bases not ordered by degree, but whose first function is constant, work with the p-coarsening straight to the lowest
+order (`PCoarsening::ToZero`).
 
 # 3. How to use
 
@@ -153,7 +155,8 @@ order).
   the others are copied.
 - **The interpolation of the function 1** on the cell and face bases: one coefficient per cell (`cellInterpOfOne`, in
   the order of the blocks of rows of `A_TF`) and per face (`faceInterpOfOne`, blocks of columns). The bases must be
-  **hierarchical with a constant first function** `phi_0`: `1 = c phi_0`, i.e. `c = 1/phi_0`, which may vary from one
+  **hierarchical** (ordered by degree, except with `PCoarsening::ToZero`) **with a constant first function** `phi_0`:
+  `1 = c phi_0`, i.e. `c = 1/phi_0`, which may vary from one
   cell or face to another (e.g. L2-orthonormal bases: `c = sqrt(|T|)` on a cell `T`); `c = 1` everywhere if `phi_0 = 1`.
 - **The dimension and the degrees**: `Dimension` (2 or 3), `FaceDegree` (k) and `CellDegree` (l) must be set. The setup checks
   the sizes and structure of the inputs against them (full polynomial spaces).
@@ -169,6 +172,7 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 | `Tolerance` | `1e-8` | `Solve()` stops when the relative residual of the condensed system (the true one, `Result::RelativeResidual`) is below it |
 | `MaxIterations` | `200` | |
 | `Cycle` | `Cycle::K` | `fhhos4::Cycle`: `V`, `W` or `K` (K-cycle: a non-linear preconditioner, which requires FCG or GCR) |
+| `PCoarsening` | `PCoarsening::Minus2` | `fhhos4::PCoarsening`, the degrees of the p-levels from `FaceDegree` k down to 0: `Minus2` (k, k-2, ..., 0), `Minus1` (k, k-1, ..., 0), `DivideBy2` (k, k/2, ..., 0), `ToZero` (k, 0: the only p-level keeps the first function of each block, for bases not ordered by degree; usually more iterations at k >= 3) |
 | `PreSmoothingIterations`, `PostSmoothingIterations` | `-1`, `-1`: the smoother's, `2` for Chebyshev (its degree), `1` otherwise | `>= 0` (`0`: none) |
 | `PreSmoother` | `Smoother::Default`: `BlockChebyshevFourthKind` for a symmetric matrix; for a non-symmetric one, `HybridBlockGaussSeidel` on several threads, `BlockGaussSeidel` on 1 | `fhhos4::Smoother` (one block per face): `BlockGaussSeidel`, `BackwardBlockGaussSeidel`, `SymmetricBlockGaussSeidel` (sequential); `HybridBlockGaussSeidel`, `HybridBackwardBlockGaussSeidel` (their parallel versions); `DampedBlockJacobi` (damping factor 2/3); `BlockChebyshevFirstKind`, `BlockChebyshevFourthKind` (a polynomial in `D^-1 A`, `D` the block diagonal, whose degree is the number of smoothing iterations; parallel, with results that don't depend on the number of threads; symmetric matrices only) |
 | `PostSmoother` | `Smoother::Default`: the adjoint of `PreSmoother`, which makes the cycle symmetric: the other direction for Gauss-Seidel (`BackwardBlockGaussSeidel` after `BlockGaussSeidel` and the other way around, the same for the hybrid ones), `PreSmoother` itself if it is symmetric (Chebyshev, Jacobi, `SymmetricBlockGaussSeidel`) | The same as `PreSmoother` |

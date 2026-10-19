@@ -75,7 +75,7 @@ From `build/`:
 ctest --output-on-failure
 ```
 
-212 tests, ~5 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
+216 tests, ~5 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
 iteration counts of the papers in `reproducibility/` — see `tests/README.md`. Covers
 `Program_Diffusion_HHO` and `Program_BiHarmonic_HHO` (HHO, static condensation), 2D/3D,
 in-house, GMSH and polygonal meshes, and the library (`UAMGLibrary*`, ~15 s). Not covered: DG/FEM programs (disabled by default), `lu`/`cg`/`agmg`/`p_mg` solvers,
@@ -152,8 +152,8 @@ parts, Cholesky; the local Galerkin products compute full matrices); couplings f
 and post-smoothing), K-cycle with GCR. Implementation `library/Solver.cpp`, compiled with
 `-fvisibility=hidden` (only the public API is exported). It builds the solver as the program does
 (`AlgebraicSolverFactory`, `ApplyUncondensedAMGDefaults`): its path must not include mesh or discretization headers,
-nor read the global `Utils::ProgramArgs`. Its parameters with a choice are enums (`fhhos4::Krylov`, `Cycle`, `Smoother`,
-`CoarseSolver`; no strings), as the program's multigrid parameters (`SmootherType`, `CycleType` in `Utils/Types.h`; the
+nor read the global `Utils::ProgramArgs`. Its parameters with a choice are enums (`fhhos4::Krylov`, `Cycle`, `PCoarsening`,
+`Smoother`, `CoarseSolver`; no strings), as the program's multigrid parameters (`SmootherType`, `CycleType`, `P_CoarsStgy` in `Utils/Types.h`; the
 CLI codes in `SmootherFactory`, the coarse solver stays a solver code): `Solver/LibraryParameters.h` maps them both
 ways (one table per parameter), for `library/Solver.cpp` and `LibraryUAMG.cpp`. U-AMG is a non-linear preconditioner with the K-cycle: the Krylov method is
 inside the library (`Krylov`: FCG by default, GCR, BiCGSTAB with a V/W-cycle only, or none), which gives no cycle
@@ -171,7 +171,10 @@ interface (`Diffusion_HHO::CondensationBySolver`: no static condensation in the 
   non-zeros in `A`): setup from the blocks 0.71-0.80 s vs 0.38-0.50 s from `A` on 1 thread, 0.25-0.35 s vs 0.17-0.29 s
   on 8; same solve. The setups from the blocks keep the inverses of the blocks of `A_TT`, `A_TT^{-1} A_TF` and `A_FT`.
 - p-levels: `P_CS` Minus2 (k, k-2, ..., 0), blocks extracted (first coefficients of each block,
-  `SetupOperatorByBlockExtraction()`), prolongation = injection of the low modes. h-levels: multiple pairwise
+  `SetupOperatorByBlockExtraction()`), prolongation = injection of the low modes. `PCoarsening::ToZero` (`-p-cs =0`, k then 0,
+  for bases not ordered by degree, e.g. NGSolve's): more iterations from k = 3 (FCG, 2026-10-19; `bgs,rbgs` / `bcheb4`):
+  Square-tri n=64 k=3 10 -> 19 / 14 -> 27, k=4 9 -> 21 / 14 -> 30, k=5 7 -> 23 / 11 -> 32; Cube-tet n=8 k=3 29 -> 37 /
+  50 -> 60. h-levels: multiple pairwise
   aggregation (factor 3.8), interface collapsing, coarsening prolongation `ReconstructSmoothedTraceOrInject` (trace of
   `-A_TcTc^{-1} A_TcFc` on the removed faces, smoothed by block Jacobi omega = 2/3), chained as multigrid prolongation.
 - Interpolation of 1 (one coefficient c per cell and per face, 1 = c phi_0; the same on the p-levels): the AMG rescales

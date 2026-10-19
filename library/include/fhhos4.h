@@ -61,6 +61,18 @@ namespace fhhos4
 		  // matrix. Non-linear: it requires a flexible Krylov method (FCG or GCR)
 	};
 
+	// The p-coarsening (Solver::PCoarsening): the degrees of the p-levels, from FaceDegree down to 0, before the h-levels
+	// (aggregation) of degree 0. A p-level of degree d keeps the first functions of each block of the finer level: those
+	// of the polynomials of degree <= d if the bases are ordered by degree.
+	enum class PCoarsening
+	{
+		Minus2,    // k, k - 2, ..., 0 (fhhos4 -p-cs -2)
+		Minus1,    // k, k - 1, ..., 0 (-p-cs -1)
+		DivideBy2, // k, k / 2, ..., 0 (-p-cs /2)
+		ToZero     // k, 0 (-p-cs =0): the only p-level keeps the first function of each block, the constant one: for bases
+		           // not ordered by degree. Usually more iterations than the others at k >= 3
+	};
+
 	// The smoothers (Solver::PreSmoother and PostSmoother; fhhos4 -smoothers). The blocks: one per face. The Gauss-Seidel
 	// smoothers are sequential, except the hybrid ones.
 	enum class Smoother
@@ -121,6 +133,7 @@ namespace fhhos4
 		//-------------------- Multigrid -------------------//
 
 		fhhos4::Cycle Cycle = fhhos4::Cycle::K;
+		fhhos4::PCoarsening PCoarsening = fhhos4::PCoarsening::Minus2; // the degrees of the p-levels (k >= 1)
 		// Number of iterations of the pre- and post-smoothers (>= 0, 0: none); -1 (default): the smoother's, 2 for the
 		// Chebyshev smoothers (their degree), 1 for the others
 		int PreSmoothingIterations = -1;
@@ -172,9 +185,9 @@ namespace fhhos4
 		//   triangular part (full or lower-only matrices).
 		// - cellInterpOfOne, faceInterpOfOne: the interpolation of the function 1 on the polynomial bases of the cells and
 		//   faces, one coefficient per cell and per face (in the order of the blocks of rows and columns of A_TF). The
-		//   bases must be hierarchical (ordered by degree) with a constant first function phi_0: 1 = c phi_0, i.e.
-		//   c = 1/phi_0. phi_0 may differ from one cell or face to another (e.g. L2-orthonormal bases: c = sqrt(|T|) on a
-		//   cell T); c = 1 everywhere if phi_0 = 1.
+		//   bases must be hierarchical (ordered by degree; not needed with PCoarsening::ToZero) with a constant first
+		//   function phi_0: 1 = c phi_0, i.e. c = 1/phi_0. phi_0 may differ from one cell or face to another (e.g.
+		//   L2-orthonormal bases: c = sqrt(|T|) on a cell T); c = 1 everywhere if phi_0 = 1.
 		// Supported matrices: Eigen::SparseMatrix<double, Eigen::ColMajor or Eigen::RowMajor, int or long> (all of the
 		// same type), compressed or not. Those of type SparseMatrix, compressed, are read in place; the others are
 		// converted (copied).
