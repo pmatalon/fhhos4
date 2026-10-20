@@ -169,16 +169,19 @@ private:
 	// assembly), whose coefficients are then 0 + sign (A_FT W)(i, j), as in the sum of the global products
 	SparseMatrix AddProduct(const SparseMatrix& M, bool lower, int sign) const
 	{
-		assert(M.rows() == _A_FT.rows() && M.cols() == _W.cols());
-		BigNumber n = M.rows();
+		// M may have fewer rows than A_FT (read in full): the others are empty (the faces of other processes, see
+		// DistributedStaticCondensation)
+		assert((M.rows() == _A_FT.rows() || (M.rows() < _A_FT.rows() && !lower)) && M.cols() == _W.cols());
+		BigNumber n = _A_FT.rows();
+		BigNumber nRowsOfM = M.rows();
 		SparseMatrix Mt; // lower: row i of Mt, column i of M, whose part under the diagonal gives the part of row i above it
 		if (lower)
 			Mt = SparseMatrixOps::Transpose(M);
 		// The row i of M in full: [begin1, end1) in M, [begin2, end2) in Mt (empty if !lower)
 		auto rowOfM = [&](BigNumber i, SparseMatrixIndex& begin1, SparseMatrixIndex& end1, SparseMatrixIndex& begin2, SparseMatrixIndex& end2)
 		{
-			begin1 = M.outerIndexPtr()[i];
-			end1 = M.outerIndexPtr()[i + 1];
+			begin1 = i < nRowsOfM ? M.outerIndexPtr()[i] : 0;
+			end1 = i < nRowsOfM ? M.outerIndexPtr()[i + 1] : 0;
 			begin2 = end2 = 0;
 			if (lower)
 			{

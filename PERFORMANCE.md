@@ -82,6 +82,8 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   Its setup times are within 5-15% of `timing.sh`'s. It can save the operator and the prolongation of each level,
   and compare two such runs (same structure? largest differences): the quick check of a change of the setup, before
   the validation above. Compile it against a `git archive` of HEAD for the "before" times.
+- **On several processes (MPI)**: `scripts/perf/scaling_mpi.sh <output dir> <arguments>` (from `build-mpi/`), see
+  "Distributed memory (MPI)" below.
 - **Kernel micro-benchmarks**: the matrices of a run can be exported with `-export mg -o <dir>` (`levelN_A.dat`,
   `levelN_P.dat`, `levelN_R.dat`, Matrix Market, 17 digits) and loaded with `Eigen::loadMarket` in a standalone
   program compiled with the flags of the build (`grep FLAGS build/build.ninja`): iterating on a kernel then takes
@@ -997,6 +999,42 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   `ExtractSymmetricBlocks()`, 0.17-0.32 s on 8 threads, 0.42-0.64 s on 1, for 28-40M non-zeros (vs SciPy's slicing
   0.5-0.9 s and the conversion to Eigen 0.25-0.6 s). The first runs of each case, old before new, gave the new solves
   2-10% slower: the order of the runs (new first: the same times).
+
+## Distributed memory (MPI)
+
+U-AMG on several processes (`ENABLE_MPI`, see CLAUDE.md "MPI"). Measure with `scripts/perf/scaling_mpi.sh` (from
+`build-mpi/`): processes x threads, bound to cores (`mpiexec -bind-to core:<threads>`), best of 2. The program assembles
+the whole system on every process (memory: ~1.1 GB per process at Cube-tet k=0 n=32, hence at most 4 processes there
+on this machine). On one process, the code is the sequential one: `solutions.sh` against the commit before MPI, 68 OK
+(2026-10-20).
+
+2026-10-20, through the library (`-s fcglibuamg -smoothers bcheb4,bcheb4`: the library's default smoother), plugged in,
+elapsed setup / solve (s), iterations:
+
+| Case | 1 x 1 | 1 x 8 (OpenMP) | 2 x 1 | 2 x 4 | 4 x 1 | 4 x 2 | 8 x 1 |
+|---|---|---|---|---|---|---|---|
+| Cube-tet k=0 n=32 | 1.27 / 1.39, 41 it | 0.50 / 0.68 | 0.81 / 0.91 | 0.58 / 0.63 | 0.48 / 0.66, 43 it | 0.49 / 0.63 | - |
+| Cube-tet k=2 n=12 | 0.44 / 0.94, 52 it | 0.15 / 0.49 | 0.29 / 0.64 | 0.21 / 0.46 | 0.17 / 0.52 | 0.18 / 0.50 | 0.14 / 0.49 |
+
+- The solve: MPI as fast as OpenMP on the 8 cores (about 2x on 4 or 8 of them): the memory bandwidth of the laptop. The
+  per-process aggregation costs 0-2 iterations here.
+- The setup at k=2 on 2 processes was slower than on 1 (0.48 vs 0.42 s): the distributed condensation, 0.31 s, of
+  which 0.08 s of condensation and four copies of the matrix (each ~0.05 s, mostly the page faults of fresh memory):
+  the extension of `A_FF` to the ghost rows, the global columns, the sum of the rows of the ghosts on their owners
+  (triplets, sequential), the split into `Diag` and `Offd`. Now: `StaticCondensation` takes `A_FF` without the ghost
+  rows, and `DistributedMatrix::AssembleFromLocalRows()` builds `Diag` and `Offd` from the local rows and the received
+  ones (only the rows of the ghosts converted and sent): 0.17 s, setup 0.48 -> 0.29 s (2 processes), 0.26 -> 0.17 s (4),
+  0.21 -> 0.14 s (8). The coarsening passes take a few ms (k=2 n=12: their h-levels are small).
+
+Next ideas:
+1. **The assembly of the program distributed** (each process its cells and those of its faces): the memory per process,
+   for larger cases, then the scaling on more processes (another machine).
+2. **The halo exchanges**: persistent buffers and requests, and the product of `Diag` while the ghosts are exchanged
+   (overlap): not measured, probably small on one node.
+3. **The coarse levels on fewer processes**: on many processes the reductions of the K-cycle on the coarse levels, and the
+   gathered coarsest level, cost latency; agglomerate the levels with few rows per process (as hypre, AGMG).
+4. `AssembleFromLocalRows()` still sorts the rows of both `Diag` and `Offd` (two passes on the rows); `BuildByRows()`
+   copies each matrix twice (chunks, then the matrix).
 
 ## Current profile (U-AMG; parallel: 16 threads, the default before 2026-10-08)
 

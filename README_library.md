@@ -18,7 +18,9 @@ Without installing, the library is `build/lib/libfhhos4.so`.
 
 Build options (`-D<OPTION>=ON|OFF`): `ENABLE_OPENMP` (ON: parallel), `ENABLE_NATIVE_ARCH` (OFF: `-march=native`:
 optimized for the CPU of the build machine, may not run on others), `SMALL_INDEX` (ON: `int` indices in
-`fhhos4::SparseMatrix`, `intmax_t` otherwise), `ENABLE_PYTHON` (OFF: the Python module, see [Python](#python)).
+`fhhos4::SparseMatrix`, `intmax_t` otherwise), `ENABLE_PYTHON` (OFF: the Python module, see [Python](#python)),
+`ENABLE_MPI` (OFF: the solver on several processes, see [Several processes](#several-processes-mpi); needs MPI, and
+your code is then compiled and linked with MPI too; not with `ENABLE_PYTHON` yet).
 
 ### Conda package
 
@@ -44,7 +46,8 @@ target_link_libraries(my_code PRIVATE fhhos4::fhhos4)
 ```
 
 and `-DCMAKE_PREFIX_PATH=<prefix>` (installation), or `-Dfhhos4_DIR=<fhhos4>/build` (build tree). CMake puts the
-directory of the library in the RPATH of the executable.
+directory of the library in the RPATH of the executable. A library compiled with MPI brings MPI along
+(`MPI::MPI_CXX`).
 
 # 2. The algorithm in a nutshell
 
@@ -99,7 +102,8 @@ For existing codes, the recommendation is to begin with Interface 2 to try out t
 | **Condensed system** | `SetupSymmetricCondensed()`, `SetupNonsymmetricCondensed()` | `Solve(b, x)` | Codes that already condense the matrix: least integration effort |
 
 Symmetric positive definite systems, and non-symmetric ones with a positive definite symmetric part
-(convection-diffusion). Krylov method included (FCG, GCR, BiCGSTAB). Parallel (OpenMP).
+(convection-diffusion). Krylov method included (FCG, GCR, BiCGSTAB). Parallel (OpenMP), and on several processes (MPI,
+see [Several processes](#several-processes-mpi)).
 
 ### Interface 1 (recommended)
 
@@ -147,6 +151,44 @@ For a non-symmetric matrix (e.g. convection-diffusion), give also the block `A_F
 matrix itself, with GCR instead of FCG and Gauss-Seidel smoothers that follow the direction of the flow (downwind
 order). `SetupNonsymmetric()` keeps a reference to `A_FT`, which each `Solve(b_T, b_F, x_T, x_F)` reads
 (`b_F - A_FT A_TT^{-1} b_T`): keep it alive and unchanged until the next setup.
+
+### Several processes (MPI)
+
+Compiled with MPI (`-DENABLE_MPI=ON`; `FHHOS4_MPI` is then 1), a solver works on the processes of its communicator,
+`Comm`, which must be set (no default):
+
+- `MPI_COMM_SELF`: the system of each process, solved by it alone, as without MPI;
+- a communicator of several processes: one system distributed by rows over them. Every setup and solve is then
+  collective: called by all the processes of `Comm`, with the same parameters.
+
+The distributed system: each process owns cells and faces, numbered contiguously in rank order (the cells of the
+process of rank 0 first, then those of rank 1...; the same for the faces), and gives the rows of its own:
+
+```cpp
+solver.Comm = MPI_COMM_WORLD; // to set
+// A_TT, A_TF: the rows of the cells of the process; A_FF: the rows of its faces, in full (both triangles).
+// The columns of A_TF and A_FF: the faces of the process, then its ghosts (the faces of other processes that its rows
+// reference), whose global numbers are faceGhosts, in their local order.
+solver.SetupSymmetric(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne, fhhos4::GhostNumbers(nGhosts, faceGhosts));
+fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F); // the vectors of the cells and faces of the process
+```
+
+- **The faces of a process**: its own faces first, in the order of the rows of `A_FF`, then its ghosts, in any order:
+  one numbering for the columns of `A_TF` and `A_FF`, whose ghosts are all the faces of other processes in these rows
+  (those of its cells, and those coupled to its faces in `A_FF` through the cells of other processes). This is the
+  local numbering of DOLFINx's index maps, and of the columns of PETSc's and hypre's distributed matrices.
+- **Each face belongs to a process that owns one of its cells**, e.g. the one of the smaller rank; a face has at most
+  two cells.
+- The vectors (`b_T`, `b_F`, `x_T`, `x_F`, the interpolations of 1): the cells and faces of the process. `Result`: of
+  the whole system.
+- The algorithm: each process aggregates its own cells (the faces between processes are kept); the coarsest level is
+  gathered on every process, which solves it. The number of iterations may change slightly with the number of
+  processes.
+- Available on several processes: the uncondensed symmetric system (`SetupSymmetric()`), with all the parameters but
+  `Krylov::BiCGSTAB`; the Gauss-Seidel smoothers are Gauss-Seidel in each process (the hybrid ones: in each thread),
+  Jacobi between the processes. Not yet: `SetupNonsymmetric()`, the condensed interface (`Setup...Condensed()`),
+  `CondensedMatrix()`, the Python module.
+- The errors of the inputs are raised on all the processes.
 
 ### Python
 
@@ -264,7 +306,8 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 | `CoarseningFactor` | `3.8` | Ratio of the numbers of cells of two successive h-levels |
 | `CoarseMatrixMaxSize` | `1000` | The coarsening stops when the matrix has at most this many rows |
 | `CoarseSolver` | `CoarseSolver::Default`: `Cholesky` for a symmetric matrix, `LU` otherwise | `fhhos4::CoarseSolver`: `Cholesky`, `LU` (sparse factorizations) |
-| `Threads` | `0`: the OpenMP setting, but at most one thread per physical core unless `OMP_NUM_THREADS` or OpenMP's binding is set | |
+| `Threads` | `0`: the OpenMP setting, but at most one thread per physical core unless `OMP_NUM_THREADS` or OpenMP's binding is set (on several processes: the cores divided among the processes of `Comm` that run on the same CPUs) | |
+| `Comm` | (MPI only) none: to set | `MPI_COMM_SELF`, or the communicator of the processes of a distributed system |
 | `Verbosity` | `0`: silent | `1`: one line per setup and per solve; `2`: all the messages, with the residual at each iteration |
 
 ## Constraints
@@ -281,6 +324,8 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
   `Result::Converged`.
 - **Not thread-safe**: one `fhhos4::Solver` object must not be used by several threads at the same time. The library
   parallelizes its own work with OpenMP.
+- **MPI**: the calling code initializes MPI (the library calls MPI from the main thread only: `MPI_THREAD_FUNNELED`),
+  and `Comm` stays valid while the solver is used.
 
 ## License
 

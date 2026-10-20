@@ -3,6 +3,7 @@
 #include <unsupported/Eigen/SparseExtra>
 #include "HybridAlgebraicMesh.h"
 #include "CoarseningPass.h"
+#include "DistributedPass.h"
 #include "LocalMatrices.h"
 #include "../AggregAMG/AlgebraicMesh.h"
 #include "../DownwindOrder.h"
@@ -70,8 +71,19 @@ private:
 	SparseMatrix A_F_Tc;
 	SparseMatrix _extractedA_F_T;     // A_F_T of a p-coarse level (SetupOperatorByBlockExtraction())
 	vector<BigNumber> _downwindOrder; // non-symmetric matrix: the order of the faces in the sweeps of the smoothers
+	// On several processes (see FaceMap): the faces of A_T_Fc (the FaceMap of the coarser level), the coarse operator
+	// (that of the coarser level), and the operator of a p-coarse level
+	shared_ptr<const IndexMap> _coarseFaceMap;
+	DistributedMatrix _distributedAc;
+	DistributedMatrix _extractedOperator;
+	SparseMatrix _extractedA_T_T, _extractedA_T_F;
 public:
 	SparseMatrix Ac;
+
+	// On several processes (MPI, DistributedOperator set): the local numbers of the faces of the columns of A_T_F, i.e.
+	// of the faces of the cells of the process: its own faces (those of the rows of the operator), then the others
+	// (ghosts). The cells of A_T_T and A_T_F are all owned. Null on one process.
+	shared_ptr<const IndexMap> FaceMap;
 
 	// Set by UncondensedAMG. The same algorithm runs for a symmetric matrix or not; a symmetric one is optimized: the
 	// blocks A_T_T, A_T_F, A_F_F and the operator are read from their lower triangular part, the blocks of A_T_T are
@@ -129,6 +141,8 @@ public:
 
 	BigNumber NUnknowns() override
 	{
+		if (FaceMap)
+			return FaceMap->GlobalSize * _faceBlockSize; // of all the processes
 		return A_T_F->cols();
 	}
 
@@ -156,6 +170,12 @@ public:
 	{
 		noCoarserMeshProvided = false;
 		coarsestPossibleMeshReached = false;
+
+		if (this->IsDistributed())
+		{
+			CoarsenMeshDistributed(coarseningStgy, faceCoarseningStgy, requestedCoarseningFactor, coarsestPossibleMeshReached);
+			return;
+		}
 
 		if (!this->OperatorMatrix)
 		{
@@ -252,6 +272,153 @@ public:
 			for (SparseMatrix::InnerIterator it(M, b * blockSize); it; ++it)
 				it.valueRef() *= interpOfOne[b];
 		}
+	}
+
+	//------------------------------------------------------------------------------------------------------------------//
+	//                                        On several processes (MPI)                                                //
+	//------------------------------------------------------------------------------------------------------------------//
+
+	// CoarsenMesh() on several processes: the flat coarsening passes (CoarsenInDistributedPasses()), with the default
+	// options only, after the rescaling of the constants as on one process
+	void CoarsenMeshDistributed(H_CoarsStgy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double requestedCoarseningFactor, bool& coarsestPossibleMeshReached)
+	{
+		if (!FlatPassesApply(coarseningStgy, faceCoarseningStgy) || _multigridProlong != UAMGProlongation::ChainedCoarseningProlongations || ComputeCoarseA_F_F || ComputeQ_F)
+			Utils::FatalError("UncondensedAMG: on several processes, only the default coarsening runs (pairwise aggregation, interface collapsing, coarsening prolongations 3 to 6, chained as multigrid prolongation).");
+		if (!Symmetric)
+			Utils::FatalError("UncondensedAMG: non-symmetric matrices are not solved on several processes yet.");
+
+		if (CellInterpOfOne.rows() == 0)
+		{
+			CoarsenInDistributedPasses(coarseningStgy, requestedCoarseningFactor, coarsestPossibleMeshReached);
+			return;
+		}
+
+		// The rescaling of CoarsenMesh(): the operator's columns of the ghost faces need their interpolations of 1
+		const DistributedMatrix* levelA = this->DistributedOperator;
+		const SparseMatrix* levelA_T_T = this->A_T_T;
+		const SparseMatrix* levelA_T_F = this->A_T_F;
+		Vector ownedFaceInterpOfOne = FaceInterpOfOne.head(FaceMap->NOwned);
+		Vector ghostFaceInterpOfOne(levelA->ColMap->NGhosts());
+		levelA->ColMap->UpdateGhosts(ownedFaceInterpOfOne.data(), ghostFaceInterpOfOne.data(), 1);
+		DistributedMatrix scaledA;
+		scaledA.RowMap = levelA->RowMap;
+		scaledA.ColMap = levelA->ColMap;
+		scaledA.RowBlockSize = levelA->RowBlockSize;
+		scaledA.ColBlockSize = levelA->ColBlockSize;
+		scaledA.Diag = ScaleConstantDoFs(levelA->Diag, ownedFaceInterpOfOne, _faceBlockSize, ownedFaceInterpOfOne, _faceBlockSize);
+		scaledA.Offd = ScaleConstantDoFs(levelA->Offd, ownedFaceInterpOfOne, _faceBlockSize, ghostFaceInterpOfOne, _faceBlockSize);
+		SparseMatrix scaledA_T_T = ScaleConstantDoFs(*levelA_T_T, CellInterpOfOne, _cellBlockSize, CellInterpOfOne, _cellBlockSize);
+		SparseMatrix scaledA_T_F = ScaleConstantDoFs(*levelA_T_F, CellInterpOfOne, _cellBlockSize, FaceInterpOfOne, _faceBlockSize);
+		this->DistributedOperator = &scaledA;
+		this->OperatorMatrix = &scaledA.Diag;
+		this->A_T_T = &scaledA_T_T;
+		this->A_T_F = &scaledA_T_F;
+
+		CoarsenInDistributedPasses(coarseningStgy, requestedCoarseningFactor, coarsestPossibleMeshReached);
+
+		this->DistributedOperator = levelA;
+		this->OperatorMatrix = &levelA->Diag;
+		this->A_T_T = levelA_T_T;
+		this->A_T_F = levelA_T_F;
+		if (LocalOp->AssembledDistributed == &scaledA)
+			LocalOp->AssembledDistributed = nullptr;
+		if (coarsestPossibleMeshReached)
+			return;
+
+		ScaleConstantRows(this->DistributedP.Diag, ownedFaceInterpOfOne, _faceBlockSize);
+		ScaleConstantRows(this->DistributedP.Offd, ownedFaceInterpOfOne, _faceBlockSize);
+	}
+
+	// CoarsenInFlatPasses() on several processes: each process aggregates its cells (see DistributedPass), the coarse
+	// faces between processes are numbered by their owners, the local matrices of the operator are those of the cells
+	// of the process (their faces: those of FaceMap). The prolongations of the passes are chained on all the local faces
+	// (the faces between processes are kept: their rows are injections, known on both sides), then the rows of the
+	// faces of the process make the distributed prolongation of the level.
+	void CoarsenInDistributedPasses(H_CoarsStgy coarseningStgy, double requestedCoarseningFactor, bool& coarsestPossibleMeshReached)
+	{
+		int fbs = _faceBlockSize;
+		const SparseMatrix* passA_T_T = this->A_T_T;
+		const SparseMatrix* passA_T_F = this->A_T_F;
+		shared_ptr<const IndexMap> passFaceMap = this->FaceMap;
+		SparseMatrix A_T_Tc, A_T_Fc;
+		SparseMatrix P; // the chained prolongations, rows of all the local faces of the level
+		double actualCoarseningFactor = 0;
+		int nCoarsenings = 0;
+		bool allNeighbours = coarseningStgy == H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours || coarseningStgy == H_CoarsStgy::MultipleAgglomerationCoarseningByFaceNeighbours;
+
+		while (!CoarseningCriteriaReached(coarseningStgy, requestedCoarseningFactor, nCoarsenings, actualCoarseningFactor))
+		{
+			CoarseningPass pass(_cellBlockSize, fbs, Symmetric, _strongCouplingThreshold);
+			pass.Build(*passA_T_F, nullptr);
+			DistributedPass distributed(pass, *passFaceMap);
+			distributed.FindRemoteCells();
+			Utils::Log() << (allNeighbours ? "\tElement agglomeration" : "\tElement pairwise aggregation") << " (on each process)" << endl;
+			if (pass.Aggregate(allNeighbours))
+			{
+				coarsestPossibleMeshReached = true;
+				return;
+			}
+			distributed.AddRemoteAggregates();
+			Utils::Log() << "\tInterface collapsing" << endl;
+			if (pass.CollapseInterfaces())
+			{
+				coarsestPossibleMeshReached = true;
+				return;
+			}
+			distributed.NumberCoarseFaces();
+
+			// Local matrices of the operator, if they don't come from the previous coarsening pass: of the cells of the
+			// process, from the rows of its faces (those of the other processes fetched)
+			if (nCoarsenings == 0 && LocalOp->AssembledDistributed != this->DistributedOperator)
+			{
+				SparseMatrix S = DistributedPass::LocalFaceRows(*this->DistributedOperator, *passFaceMap, fbs);
+				LocalOp->Current.Decompose(S, pass.CellFaces, pass.FaceCells, fbs, Symmetric);
+			}
+
+			SparseMatrix passP, nextA_T_Tc, nextA_T_Fc;
+			pass.ComputeProlongation(_coarseningProlong, _faceProlong, *passA_T_T, *passA_T_F, LocalOp->Current, passP, nextA_T_Tc, nextA_T_Fc);
+			LocalOp->Next.GalerkinProduct(LocalOp->Current, pass.AggregateCells, pass.AggregateCoarseFaces, pass.NCoarseFaces, pass.FaceRemoved, pass.FaceCoarseFace, passP);
+			LocalOp->Current.Swap(LocalOp->Next);
+			LocalOp->Assembled = nullptr;
+			LocalOp->AssembledDistributed = nullptr;
+
+			// The coarse faces renumbered as in CoarseFaceMap (owned, then ghosts)
+			const vector<BigNumber>& position = distributed.CoarseFacePosition;
+			BigNumber nCoarseFaces = distributed.CoarseFaceMap->NLocal();
+			auto renumber = [&position](BigNumber cf) { return position[cf]; };
+			passP = DistributedMatrix::RenumberColumns(passP, renumber, nCoarseFaces * fbs, fbs);
+			nextA_T_Fc = DistributedMatrix::RenumberColumns(nextA_T_Fc, renumber, nCoarseFaces * fbs, fbs);
+			for (BigNumber& f : LocalOp->Current.Faces)
+				f = position[f];
+
+			if (nCoarsenings == 0)
+				P = std::move(passP);
+			else
+				P = SparseMatrixOps::Multiply(P, passP);
+
+			actualCoarseningFactor = (double)this->FaceMap->GlobalSize / (double)distributed.CoarseFaceMap->GlobalSize;
+			Utils::Log() << "\t\tCoarsening factor = " << actualCoarseningFactor << endl;
+			if (actualCoarseningFactor >= 10)
+				Utils::Warning("The coarsening seems a little too strong...");
+
+			A_T_Tc = std::move(nextA_T_Tc);
+			A_T_Fc = std::move(nextA_T_Fc);
+			passA_T_T = &A_T_Tc;
+			passA_T_F = &A_T_Fc;
+			passFaceMap = distributed.CoarseFaceMap;
+			nCoarsenings++;
+		}
+
+		this->A_T_Tc = std::move(A_T_Tc);
+		this->A_T_Fc = std::move(A_T_Fc);
+		_coarseFaceMap = passFaceMap;
+		// The operator of the level, assembled once (the rows of the coarse faces of other processes added to theirs)
+		SparseMatrix localRows = LocalOp->Current.Assemble(_coarseFaceMap->NLocal());
+		_distributedAc = DistributedMatrix::AssembleFromLocalRows(_coarseFaceMap, localRows, fbs);
+		LocalOp->AssembledDistributed = &_distributedAc;
+		// The prolongation: the rows of the faces of the process
+		auto rows = make_shared<const IndexMap>(this->FaceMap->WithoutGhosts());
+		this->DistributedP = DistributedMatrix::FromLocalColumns(rows, _coarseFaceMap, SparseMatrix(P.topRows(rows->NOwned * fbs)), fbs, fbs);
 	}
 
 	// The coarsening passes of the paper, until the requested coarsening factor is reached
@@ -1056,6 +1223,11 @@ public:
 	void SetupOperatorByBlockExtraction()
 	{
 		UncondensedLevel* fine = dynamic_cast<UncondensedLevel*>(FinerLevel);
+		if (fine->IsDistributed())
+		{
+			SetupOperatorByBlockExtractionDistributed(*fine);
+			return;
+		}
 
 		auto nElems = fine->A_T_F->rows() / fine->_cellBlockSize;
 		auto nFaces = fine->A_T_F->cols() / fine->_faceBlockSize;
@@ -1078,6 +1250,34 @@ public:
 				Utils::FatalError("UncondensedAMG: the p-coarsening requires the block A_F_F, which has not been computed on the finer level (see UncondensedAMG::A_F_FNeeded()).");
 			this->A_F_F = ExtractCoarseMatrix(*fine->A_F_F, nFaces, nFaces, fine->_faceBlockSize, fine->_faceBlockSize, this->_faceBlockSize, this->_faceBlockSize);
 		}
+	}
+
+	// On several processes: the same blocks of the rows of the process, the same faces (FaceMap, and the columns of the
+	// operator)
+	void SetupOperatorByBlockExtractionDistributed(const UncondensedLevel& fine)
+	{
+		if (ComputeCoarseA_F_F || fine.A_F_T)
+			Utils::FatalError("UncondensedAMG: on several processes, the p-coarsening runs without the blocks A_F_F and A_F_T.");
+		const DistributedMatrix& fineA = *fine.DistributedOperator;
+		int ffbs = fine._faceBlockSize, fcbs = fine._cellBlockSize;
+		BigNumber nElems = fine.A_T_F->rows() / fcbs;
+		BigNumber nOwnedFaces = fineA.RowMap->NOwned, nGhostFaces = fineA.ColMap->NGhosts();
+		auto extract = [](SparseMatrix* M) { SparseMatrix copy = std::move(*M); delete M; return copy; };
+		_extractedOperator.RowMap = fineA.RowMap;
+		_extractedOperator.ColMap = fineA.ColMap;
+		_extractedOperator.RowBlockSize = _faceBlockSize;
+		_extractedOperator.ColBlockSize = _faceBlockSize;
+		_extractedOperator.Diag = extract(ExtractCoarseMatrix(fineA.Diag, nOwnedFaces, nOwnedFaces, ffbs, ffbs, _faceBlockSize, _faceBlockSize));
+		_extractedOperator.Offd = extract(ExtractCoarseMatrix(fineA.Offd, nOwnedFaces, nGhostFaces, ffbs, ffbs, _faceBlockSize, _faceBlockSize));
+		this->DistributedOperator = &_extractedOperator;
+		this->OperatorMatrix = &_extractedOperator.Diag;
+		_extractedA_T_T = extract(ExtractCoarseMatrix(*fine.A_T_T, nElems, nElems, fcbs, fcbs, _cellBlockSize, _cellBlockSize));
+		_extractedA_T_F = extract(ExtractCoarseMatrix(*fine.A_T_F, nElems, fine.FaceMap->NLocal(), fcbs, ffbs, _cellBlockSize, _faceBlockSize));
+		this->A_T_T = &_extractedA_T_T;
+		this->A_T_F = &_extractedA_T_F;
+		this->A_F_F = nullptr;
+		this->A_F_T = nullptr;
+		this->FaceMap = fine.FaceMap;
 	}
 
 private:
@@ -1382,12 +1582,15 @@ public:
 	void OnStartSetup() override
 	{
 		Utils::Log() << "\t\tk = " << this->PolynomialDegree() << endl;
-		Utils::Log() << "\t\tMesh                : " << this->A_T_T->rows() / _cellBlockSize << " elements, " << this->A_T_F->cols() / _faceBlockSize << " faces";
+		// On several processes: the cells and faces of all of them
+		BigNumber nElements = Communicator::Current().Sum((BigNumber)this->A_T_T->rows() / _cellBlockSize);
+		BigNumber nFaces = this->NUnknowns() / _faceBlockSize;
+		Utils::Log() << "\t\tMesh                : " << nElements << " elements, " << nFaces << " faces";
 		if (!this->IsFinestLevel())
 		{
 			UncondensedLevel* fine = dynamic_cast<UncondensedLevel*>(this->FinerLevel);
-			double nFine = fine->A_T_F->cols();
-			double nCoarse = this->A_T_F->cols();
+			double nFine = fine->NUnknowns();
+			double nCoarse = this->NUnknowns();
 			Utils::Log() << ", coarsening factor = " << (nFine/nCoarse);
 		}
 		Utils::Log() << endl;
@@ -1422,6 +1625,8 @@ public:
 		{
 			// nothing to do
 		}
+		else if (this->IsDistributed())
+			this->DistributedP.SetupTransposed();
 		else
 			R = SparseMatrixOps::Transpose(P);
 	}
@@ -1489,6 +1694,16 @@ public:
 				// The lower-degree bases start with the same constant function
 				coarse->CellInterpOfOne = this->CellInterpOfOne;
 				coarse->FaceInterpOfOne = this->FaceInterpOfOne;
+			}
+			else if (this->IsDistributed())
+			{
+				coarse->DistributedOperator = &_distributedAc;
+				coarse->OperatorMatrix = &_distributedAc.Diag;
+				coarse->A_T_T = &A_T_Tc;
+				coarse->A_T_F = &A_T_Fc;
+				coarse->A_F_F = nullptr;
+				coarse->A_F_T = nullptr;
+				coarse->FaceMap = _coarseFaceMap;
 			}
 			else
 			{

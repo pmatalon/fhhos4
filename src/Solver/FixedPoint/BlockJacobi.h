@@ -69,6 +69,16 @@ public:
 
 	// Setup for IterationMatrix(blockRows) only: only the diagonal blocks of these block rows are factorized, and
 	// only these block rows of A are read (the others can be empty).
+	// On several processes: the blocks of the rows of the process; the values of the other processes in the products
+	// (see SweepRhs())
+	void Setup(const DistributedMatrix& A) override
+	{
+		SetDistributedMatrix(A);
+		auto nb = A.Diag.rows() / _blockSize;
+		this->diagBlockSolver.Setup(A.Diag, _blockSize);
+		this->SetupComputationalWork = nb * 2.0/3.0*pow(_blockSize, 3)*1e-6;
+	}
+
 	void SetupForIterationMatrix(const SparseMatrix& A, const vector<bool>& blockRows)
 	{
 		IterativeSolver::Setup(A);
@@ -87,16 +97,19 @@ private:
 		auto nb = A.rows() / _blockSize;
 
 		Vector xNew(xOld.rows());
+		Vector distributedRhs;
+		const Vector& rhs = SweepRhs(b, xOld, xEquals0, distributedRhs); // on several processes, b - Offd xOld
 
 		#pragma omp parallel
 		{
 			Vector tmp_x(_blockSize); // work vector, allocated once per thread
 			#pragma omp for
 			for (BigNumber i = 0; i < nb; i++)
-				ProcessBlockRow(i, b, xOld, xNew, tmp_x);
+				ProcessBlockRow(i, rhs, xOld, xNew, tmp_x);
 		}
 
 		xOld.swap(xNew);
+		xEquals0 = false;
 		result.SetX(xOld);
 		result.AddWorkInFlops(2 * A.nonZeros() + nb * pow(_blockSize, 2));
 		return result;

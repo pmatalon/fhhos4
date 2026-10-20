@@ -40,6 +40,7 @@ CMake options (`-D<OPTION>=ON/OFF`):
 - `ENABLE_PROGRAM` (ON): OFF builds the library `fhhos4` alone (needs only Eigen): the CMake file has a library
   section, then the program's, skipped by `return()`.
 - `ENABLE_PYTHON` (OFF): the Python module of the library (`library/python`, see "Python module" below).
+- `ENABLE_MPI` (OFF): the library and the program on several processes (see "MPI" below).
 
 `cmake --install . --prefix <prefix> [--component library|program]`: program, meshes (`share/fhhos4/meshes`), library,
 headers, CMake package. No path of the sources is compiled in (`Utils/FileSystem.h`): the program finds the meshes
@@ -288,6 +289,48 @@ read in place; before: SciPy's slicing and the conversion to Eigen): U-AMG's tot
   build their blocks row-major (the same parallel builders, by rows), its symmetric `A` through `TransposedView()`, its
   non-symmetric `SysMat` through `ToCSR()`; Disk++: `RowMajor` on its `ATT`/`ATF`, `TransposedView(assm.LHS)`. Same
   iterations; bitwise results with `ToCSR()`, the errors at 1e-10 relative with `TransposedView()` (its `A^T`).
+
+## MPI (`ENABLE_MPI`, off by default)
+
+Distributed memory (the user's decisions, 2026-10-20): the target is U-AMG in the library (DOLFINx after); the program
+is its test bed. MPI from the conda env (`mpich`, installed in `fhhos4`, not in `conda/environment.yml`). Build dirs:
+`build-mpi-lib` (`-DENABLE_PROGRAM=OFF -DENABLE_MPI=ON`, ~1 min: the library and `fhhos4_mpi_tests`, the fast loop),
+`build-mpi` (the program too).
+- `Utils/Communicator.h`: the MPI calls, the only file with `#ifdef MPI_ENABLED` but `Solver/LibraryUAMG.cpp` (the
+  library's `Comm`; public macro: `FHHOS4_MPI` in `fhhos4_version.h`, `library/Solver.cpp`).
+  `Communicator` (reductions, `AllToAll` for the setups, `Neighbours` for the halos), `Communicator::Current()` (the
+  communicator of the reductions of the solvers: `MPI_COMM_WORLD` in the program, the solver's in a library call,
+  `CallScope`), `Parallel::Dot/Norm/SquaredNorm` (on one process: Eigen's, bit for bit), `MPIEnvironment` (main();
+  `MPI_Finalize()` at exit only in the initializing process, not in GTest's death-test forks).
+  `Parallelism::SharingProcesses()`: the processes of a node with the same affinity (mpiexec without binding) divide
+  the default threads (OpenMP and solvers; the library: per `Comm`).
+- **On one process, nothing distributed is built: the sequential code runs** (same results). On several:
+  `Utils/IndexMap.h` (contiguous ownership in rank order, ghosts in any order, halo: `UpdateGhosts`,
+  `AddGhostsToOwners`, `Forward/ReverseExchange`), `Utils/DistributedMatrix.h` (rows owned, `Diag` + `Offd` (ghost
+  columns): the smoothers work on `Diag`; `MultiplyTransposed` for the restriction; `GatherOnAll` for the coarse
+  solver, replicated; `FetchGhostRows`, `AssembleFromLocalRows`: the rows of the ghosts added to their owners').
+- Solvers: `Solver::Distributed`, `Setup(const DistributedMatrix&)` (FatalError unless overridden: FCG, GCR, Multigrid,
+  Chebyshev, block Jacobi, (block) Gauss-Seidel = Gauss-Seidel in the process, Jacobi between them (`SweepRhs()`),
+  Cholesky/LU gathered); `IterativeSolver::SetDistributedMatrix()`; the blocks setup `Setup(A, A_T_T, A_T_F (local
+  columns), faceMap, interps)`; `Level::DistributedOperator`, `DistributedP`. FCG applies the full matrix (not the lower
+  triangle) on several processes.
+- U-AMG: `UncondensedLevel::CoarsenInDistributedPasses()` with `DistributedPass.h`: each process aggregates its cells,
+  remote cells/aggregates of the interface faces exchanged by the faces' halo, coarse faces between two processes owned
+  by the smaller rank (numbered by request/reply), passes renumbered (owned, then ghosts), prolongations chained
+  locally (interface faces are kept: injection rows known on both sides), operator assembled once per level. Only the
+  default options (flat passes, chained prolongation, symmetric, no `A_F_F`). Ghost faces may belong to no local cell
+  (couplings of `A_FF`): `CoarseningPass::NOwnedFaces`. All global decisions (coarsening ratio, errors) reduced.
+- Library: `Solver::Comm` (no default with MPI: the user), `SetupSymmetric(..., GhostNumbers faceGhosts)` (local columns:
+  own faces then ghosts, one numbering for `A_TF` and `A_FF`, `A_FF` in full), `DistributedStaticCondensation.h`,
+  `CollectiveCheck()` (errors of the inputs on all the processes). Not yet: non-symmetric (after the symmetric case: the
+  user), condensed interface, `CondensedMatrix()`, Python (CMake refuses `ENABLE_PYTHON` with `ENABLE_MPI`).
+- Program (`Program_Diffusion_HHO_Impl.h`, `Program/DistributedHybridSystem.h`): GMSH meshes only, partitioned by GMSH
+  (`GMSHMesh::PartitionElements()`, rank 0, broadcast); the mesh built by rank 0 first (cache); the system assembled by
+  every process (replicated, not distributed yet), its rows extracted (faces owned by the smaller rank of their cells),
+  the solution gathered; `CheckDistributedArguments()` lists what is refused.
+- Tests: `fhhos4_mpi_tests` (`tests/MPI`, own `main()`, `ctest -R MPI_np`: 1-4 processes; `tests/support/
+  PartitionedSystem.h`); `ctest -R ProgramMPI` (the program under `mpiexec`, L2 errors); in an MPI build,
+  `fhhos4_tests` uses `tests/MPI/main.cpp` (MPI initialized), `ToySolver()` sets `Comm = MPI_COMM_SELF`.
 
 ## Version
 

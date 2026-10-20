@@ -49,7 +49,19 @@ public:
 	void Setup(const SparseMatrix& A) override
 	{
 		IterativeSolver::Setup(A);
+		SetupLocal(A);
+	}
 
+	// On several processes: Gauss-Seidel in the rows of the process, Jacobi between the processes (see SweepRhs())
+	void Setup(const DistributedMatrix& A) override
+	{
+		SetDistributedMatrix(A);
+		SetupLocal(A.Diag);
+	}
+
+private:
+	void SetupLocal(const SparseMatrix& A)
+	{
 		// The rows are sorted by column index: the diagonal coefficient separates the strictly lower and upper parts
 		DiagonalBlockPositions diagonal;
 		diagonal.Setup(A, 1);
@@ -66,13 +78,31 @@ public:
 		this->SetupComputationalWork = 0;
 	}
 
+public:
 	// The positions of the diagonal and, with the same order, the hybrid chunks of another Gauss-Seidel set up for A
 	bool SetupFrom(const SparseMatrix& A, const IterativeSolver& other) override
 	{
 		const GaussSeidel* o = dynamic_cast<const GaussSeidel*>(&other);
-		if (!o || o->Matrix != &A || this->ComputeExactSolution)
+		if (!o || o->Matrix != &A || o->Distributed || this->ComputeExactSolution)
 			return false;
 		IterativeSolver::Setup(A);
+		CopySetup(*o);
+		return true;
+	}
+
+	bool SetupFrom(const DistributedMatrix& A, const IterativeSolver& other) override
+	{
+		const GaussSeidel* o = dynamic_cast<const GaussSeidel*>(&other);
+		if (!o || o->Distributed != &A || this->ComputeExactSolution)
+			return false;
+		SetDistributedMatrix(A);
+		CopySetup(*o);
+		return true;
+	}
+
+private:
+	void CopySetup(const GaussSeidel* o)
+	{
 		_diagPos = o->_diagPos;
 		_chunks.Clear();
 		if (_hybrid)
@@ -83,15 +113,20 @@ public:
 				Chunks();
 		}
 		this->SetupComputationalWork = 0;
-		return true;
 	}
 
+	void CopySetup(const GaussSeidel& o)
+	{
+		CopySetup(&o);
+	}
+
+public:
 	// The residual is deduced from the products computed in the sweep (half of the matrix): not in the parallel hybrid
 	// sweeps, whose rows don't all read the same values of x (otherwise, they are the sequential ones), nor in the
-	// sweeps in SweepOrder
+	// sweeps in SweepOrder, nor on several processes
 	bool CanOptimizeResidualComputation() override
 	{
-		return !SweepOrder && !(_hybrid && Chunks().Parallel());
+		return !this->Distributed && !SweepOrder && !(_hybrid && Chunks().Parallel());
 	}
 
 private:
@@ -151,9 +186,11 @@ private:
 		return result;
 	}
 
-	void ForwardSweep(const Vector& b, Vector& x, bool& xEquals0, IterationResult& result)
+	void ForwardSweep(const Vector& givenB, Vector& x, bool& xEquals0, IterationResult& result)
 	{
 		const SparseMatrix& A = *this->Matrix;
+		Vector distributedRhs;
+		const Vector& b = SweepRhs(givenB, x, xEquals0, distributedRhs);
 		// x(new) = (L+D)^{-1} * (b-Ux)
 		if (!xEquals0)
 			result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
@@ -167,9 +204,11 @@ private:
 		xEquals0 = false;
 	}
 
-	void BackwardSweep(const Vector& b, Vector& x, bool& xEquals0, IterationResult& result)
+	void BackwardSweep(const Vector& givenB, Vector& x, bool& xEquals0, IterationResult& result)
 	{
 		const SparseMatrix& A = *this->Matrix;
+		Vector distributedRhs;
+		const Vector& b = SweepRhs(givenB, x, xEquals0, distributedRhs);
 		// x(new) = (D+U)^{-1} * (b-Lx)
 		if (!xEquals0)
 			result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));

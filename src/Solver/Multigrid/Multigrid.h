@@ -93,12 +93,27 @@ public:
 		if (DoNotCreateLevels)
 			return;
 
+		SetupLevels(A, nullptr);
+	}
+
+	// On several processes: the levels distributed by rows (see Level::DistributedOperator)
+	void Setup(const DistributedMatrix& A) override
+	{
+		SetDistributedMatrix(A);
+		SetupLevels(A.Diag, &A);
+	}
+
+private:
+	// The levels of the fine operator A, distributed (distributedA, A being its block Diag) or not (null)
+	void SetupLevels(const SparseMatrix& A, const DistributedMatrix* distributedA)
+	{
 		Utils::Log() << "Setup..." << endl;
 
 		if (!this->_fineLevel)
 			this->_fineLevel = this->CreateFineLevel();
 
 		this->_fineLevel->OperatorMatrix = &A;
+		this->_fineLevel->DistributedOperator = distributedA;
 		this->_fineLevel->PreSmoother = this->_fineLevel->CreateSmoother(PreSmoother, PreSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
 		this->_fineLevel->PostSmoother = this->_fineLevel->CreateSmoother(PostSmoother, PostSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
 		this->_fineLevel->ExportComponents = ExportComponents;
@@ -110,7 +125,7 @@ public:
 		int levelNumber = 0;
 		int numberOfMeshes = 1;
 		double operatorComplexity = 0;
-		double fineNNZ = (double)this->_fineLevel->OperatorMatrix->nonZeros();
+		double fineNNZ = (double)this->_fineLevel->OperatorNonZeros();
 		double gridComplexity = 0;
 		double fineNUnknowns = (double)this->_fineLevel->NUnknowns();
 
@@ -277,7 +292,7 @@ public:
 			// Setup fine level
 			currentLevel->Setup();
 
-			operatorComplexity += currentLevel->OperatorMatrix->nonZeros() / fineNNZ;
+			operatorComplexity += currentLevel->OperatorNonZeros() / fineNNZ;
 			gridComplexity += currentLevel->NUnknowns() / fineNUnknowns;
 
 			currentLevel = coarseLevel;
@@ -286,7 +301,7 @@ public:
 		_nLevels = levelNumber + 1;
 		currentLevel->Setup();
 
-		operatorComplexity += currentLevel->OperatorMatrix->nonZeros() / fineNNZ;
+		operatorComplexity += currentLevel->OperatorNonZeros() / fineNNZ;
 		gridComplexity += currentLevel->NUnknowns() / fineNUnknowns;
 
 		this->InitializeCoarseSolver();
@@ -345,7 +360,10 @@ protected:
 		while (level->CoarserLevel != nullptr)
 			level = level->CoarserLevel;
 
-		this->CoarseSolver->Setup(*level->OperatorMatrix);
+		if (level->IsDistributed())
+			this->CoarseSolver->Setup(*level->DistributedOperator);
+		else
+			this->CoarseSolver->Setup(*level->OperatorMatrix);
 	}
 
 private:
@@ -476,7 +494,7 @@ private:
 				// Smooth
 				level->PreSmoother->Smooth(x, b, xEquals0);                               result.AddWorkInMFlops(level->PreSmoother->SolvingComputationalWork());
 				// Residual computation
-				r = b - A * x;                                                            result.AddWorkInFlops(Cost::DAXPY(A));
+				r = level->ResidualOf(b, x);                                              result.AddWorkInFlops(Cost::DAXPY(A));
 			}
 			
 			if (this->ExportIterationVectors)
@@ -583,7 +601,7 @@ private:
 				if (computeAx)
 				{
 					// Residual computation
-					result.Ax = A * x;                                                result.AddWorkInFlops(Cost::MatVec(A));
+					result.Ax = level->Apply(x);                                      result.AddWorkInFlops(Cost::MatVec(A));
 					if (computeResidual)
 					{
 						result.Residual = b - result.Ax;                              result.AddWorkInFlops(Cost::AddVec(b));
@@ -591,7 +609,7 @@ private:
 				}
 				else if (computeResidual)
 				{
-					result.Residual = b - A*x;                                        result.AddWorkInFlops(Cost::DAXPY(A));
+					result.Residual = level->ResidualOf(b, x);                        result.AddWorkInFlops(Cost::DAXPY(A));
 				}
 			}
 
@@ -629,12 +647,12 @@ private:
 		// 1st iteration
 		//Vector v = A * c;                                                         result.AddWorkInFlops(Cost::MatVec(A));
 		Vector& v = precResult1.Ax; // v = A*c
-		double rho1 = gcr ? v.squaredNorm() : c.dot(v);                           result.AddWorkInFlops(Cost::Dot(c));
-		double alpha1 = gcr ? v.dot(r) : c.dot(r);                                result.AddWorkInFlops(Cost::Dot(c));
+		double rho1 = gcr ? Parallel::SquaredNorm(v) : Parallel::Dot(c, v);       result.AddWorkInFlops(Cost::Dot(c));
+		double alpha1 = gcr ? Parallel::Dot(v, r) : Parallel::Dot(c, r);          result.AddWorkInFlops(Cost::Dot(c));
 
-		double r_norm_old = r.norm();                                             result.AddWorkInFlops(Cost::Norm(r));
+		double r_norm_old = Parallel::Norm(r);                                    result.AddWorkInFlops(Cost::Norm(r));
 		r -= (alpha1 / rho1) * v;                                                 result.AddWorkInFlops(Cost::VectorDAXPY(r));
-		double r_norm_new = r.norm();                                             result.AddWorkInFlops(Cost::Norm(r));
+		double r_norm_new = Parallel::Norm(r);                                    result.AddWorkInFlops(Cost::Norm(r));
 		if (r_norm_new <= t * r_norm_old)
 		{
 			x = (alpha1 / rho1) * c;                                              result.AddWorkInFlops(Cost::ConstantVec(x));
@@ -651,9 +669,9 @@ private:
 			// 2nd iteration
 			//Vector w = A * d;                                                     result.AddWorkInFlops(Cost::MatVec(A));
 			Vector& w = precResult2.Ax; // w = A*d
-			double gamma = gcr ? w.dot(v) : d.dot(v);                             result.AddWorkInFlops(Cost::Dot(d));
-			double beta = gcr ? w.squaredNorm() : d.dot(w);                       result.AddWorkInFlops(Cost::Dot(d));
-			double alpha2 = gcr ? w.dot(r) : d.dot(r);                            result.AddWorkInFlops(Cost::Dot(d));
+			double gamma = gcr ? Parallel::Dot(w, v) : Parallel::Dot(d, v);       result.AddWorkInFlops(Cost::Dot(d));
+			double beta = gcr ? Parallel::SquaredNorm(w) : Parallel::Dot(d, w);   result.AddWorkInFlops(Cost::Dot(d));
+			double alpha2 = gcr ? Parallel::Dot(w, r) : Parallel::Dot(d, r);      result.AddWorkInFlops(Cost::Dot(d));
 			double rho2 = beta - gamma * gamma / rho1;
 			x = (alpha1/rho1 - gamma*alpha2/(rho1*rho2))*c + (alpha2 / rho2) * d; result.AddWorkInFlops(2*Cost::ConstantVec(x) + Cost::AddVec(x));
 		}

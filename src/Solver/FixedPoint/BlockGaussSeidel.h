@@ -65,7 +65,19 @@ public:
 	void Setup(const SparseMatrix& A) override
 	{
 		IterativeSolver::Setup(A);
+		SetupLocal(A);
+	}
 
+	// On several processes: Gauss-Seidel in the rows of the process, Jacobi between the processes (see SweepRhs())
+	void Setup(const DistributedMatrix& A) override
+	{
+		SetDistributedMatrix(A);
+		SetupLocal(A.Diag);
+	}
+
+private:
+	void SetupLocal(const SparseMatrix& A)
+	{
 		auto nb = A.rows() / _blockSize;
 		this->diagBlockSolver.Setup(A, _blockSize);
 		_diagBlock.Setup(A, _blockSize);
@@ -77,14 +89,32 @@ public:
 		this->SetupComputationalWork = nb * 2.0/3.0*pow(_blockSize, 3)*1e-6;
 	}
 
+public:
 	// The factorized diagonal blocks, the positions of the blocks and, with the same order, the hybrid chunks of
 	// another block Gauss-Seidel set up for A with the same block size
 	bool SetupFrom(const SparseMatrix& A, const IterativeSolver& other) override
 	{
 		const BlockGaussSeidel* o = dynamic_cast<const BlockGaussSeidel*>(&other);
-		if (!o || o->Matrix != &A || o->_blockSize != _blockSize || this->ComputeExactSolution)
+		if (!o || o->Matrix != &A || o->Distributed || o->_blockSize != _blockSize || this->ComputeExactSolution)
 			return false;
 		IterativeSolver::Setup(A);
+		CopySetup(*o);
+		return true;
+	}
+
+	bool SetupFrom(const DistributedMatrix& A, const IterativeSolver& other) override
+	{
+		const BlockGaussSeidel* o = dynamic_cast<const BlockGaussSeidel*>(&other);
+		if (!o || o->Distributed != &A || o->_blockSize != _blockSize || this->ComputeExactSolution)
+			return false;
+		SetDistributedMatrix(A);
+		CopySetup(*o);
+		return true;
+	}
+
+private:
+	void CopySetup(const BlockGaussSeidel* o)
+	{
 		diagBlockSolver = o->diagBlockSolver;
 		_diagBlock = o->_diagBlock;
 		_samePattern = o->_samePattern;
@@ -97,10 +127,13 @@ public:
 				Chunks();
 		}
 		this->SetupComputationalWork = o->SetupComputationalWork;
-		return true;
 	}
 
-private:
+	void CopySetup(const BlockGaussSeidel& o)
+	{
+		CopySetup(&o);
+	}
+
 	IterationResult ExecuteOneIteration(const Vector& b, Vector& x, bool& xEquals0, bool computeResidual, bool computeAx, const IterationResult& oldResult) override
 	{
 		IterationResult result(oldResult);
@@ -167,8 +200,10 @@ private:
 	// rows not processed yet multiply zeros (the upper ones in a forward sweep, the lower ones in a backward sweep)
 	enum class OffDiagonalBlocks { Both, Lower, Upper };
 
-	void Sweep(const Vector& b, Vector& x, bool backward, bool xEquals0)
+	void Sweep(const Vector& givenB, Vector& x, bool backward, bool xEquals0)
 	{
+		Vector distributedRhs;
+		const Vector& b = SweepRhs(givenB, x, xEquals0, distributedRhs);
 		BigNumber nb = this->Matrix->rows() / _blockSize;
 		Vector tmp_x(_blockSize), tmp_xi(_blockSize); // work vectors for ProcessBlockRow()
 		if (SweepOrder && xEquals0)
@@ -207,13 +242,15 @@ private:
 	// timing; on one thread, or if the chunks are poorly separated (HybridChunks::Parallel()), it is Sweep(). From x = 0,
 	// the products by the values of the other chunks and by those not computed yet are skipped, as in Sweep() (except in
 	// SweepOrder).
-	void HybridSweep(const Vector& b, Vector& x, bool backward, bool xEquals0)
+	void HybridSweep(const Vector& givenB, Vector& x, bool backward, bool xEquals0)
 	{
 		if (!Chunks().Parallel())
 		{
-			Sweep(b, x, backward, xEquals0);
+			Sweep(givenB, x, backward, xEquals0);
 			return;
 		}
+		Vector distributedRhs;
+		const Vector& b = SweepRhs(givenB, x, xEquals0, distributedRhs);
 		BigNumber n = this->Matrix->rows();
 		if (xEquals0 && (SweepOrder || x.size() != n))
 			x = Vector::Zero(n); // as Sweep()

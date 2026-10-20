@@ -11,7 +11,8 @@ This program depends on the following third-party software packages:
 - GMSH (version 4.9.5 or later)
 
 and optionally
-- AGMG (version 3.3.5 or later).
+- AGMG (version 3.3.5 or later),
+- MPI (e.g. MPICH or Open MPI), to run on several processes.
 
 Eigen and CGAL are provided through a conda environment (`conda/environment.yml`). GMSH is also available in that environment, but can alternatively be built from source if you need a specific version.
 
@@ -80,7 +81,8 @@ Build options (`cmake -D<OPTION>=ON|OFF ..`):
 | `ENABLE_AGMG` | OFF | AGMG solver (`-s agmg`, see below) |
 | `ENABLE_OPENMP` | ON | Shared-memory parallelism |
 | `ENABLE_NATIVE_ARCH` | OFF | `-march=native`: optimized for the CPU of the build machine, may not run on others |
-| `ENABLE_PYTHON` | OFF | The Python module of the library (see `README_library.md`); needs Python, nanobind and NumPy (SciPy for its tests) |
+| `ENABLE_PYTHON` | OFF | The Python module of the library (see `README_library.md`); needs Python, nanobind and NumPy (SciPy for its tests). Not with `ENABLE_MPI` yet |
+| `ENABLE_MPI` | OFF | Distributed-memory parallelism: the program and the library on several processes (see [Several processes](#7-optional-several-processes-mpi)); needs MPI |
 | `SMALL_INDEX` | ON | `int` indices in the sparse matrices (`intmax_t` otherwise) |
 
 If you built GMSH from source instead of using the conda package, pass its location explicitly:
@@ -120,6 +122,32 @@ The program reads and writes:
 - the exported files: `./out` in the working directory, or `-o <directory>`.
 - the cache of the GMSH meshes: `$XDG_CACHE_HOME/fhhos4`, by default `~/.cache/fhhos4` (`-no-cache` to bypass it).
 
+### 7. (Optional) Several processes (MPI)
+
+Built with `-DENABLE_MPI=ON` (MPI from the environment, e.g. `conda install -n fhhos4 -c conda-forge mpich`), the
+program runs on several processes with `mpiexec`, with OpenMP threads in each process:
+
+```bash
+mpiexec -n 4 ./bin/fhhos4 -geo cube -mesh tetra -n 16 -k 1 -s fcglibuamg
+```
+
+- The threads of each process: by default, the CPUs of the processes that run on the same ones (those of a node,
+  unless `mpiexec` binds them to distinct cores) divided among them, and in the solvers one per physical core divided
+  among them; `OMP_NUM_THREADS` or `-threads` set them (e.g. `OMP_NUM_THREADS=2 mpiexec -n 4 -bind-to core:2 ...` with
+  MPICH).
+- The mesh is built by every process (the first one first: it writes GMSH's cache, which the others read), then
+  partitioned by GMSH (METIS) into one part per process. The system is assembled by every process, then solved by U-AMG
+  distributed by rows: each process owns the cells of its part and the faces between them, and the faces between two
+  processes belong to the one of smaller rank. Each process aggregates its own cells: the number of iterations may
+  change slightly with the number of processes. The solution is then gathered on every process for the
+  post-processing. The messages are printed by the first process; the errors, by the one where they occur.
+- Available: the diffusion problem discretized by HHO (`-pb diff -discr hho`), with static condensation, on GMSH meshes
+  (`-mesher gmsh`, GMSH's by default for some meshes, e.g. `-mesh tetra`); U-AMG, symmetric, through the library
+  (`-s fcglibuamg`, `libuamg`, `gcrlibuamg`) or the program's (`-s fcguamg`, `uamg`, `gcruamg`), with its default
+  options and the smoothers block Gauss-Seidel (Gauss-Seidel in each process, Jacobi between them), block Jacobi and
+  block Chebyshev. Refused: the other meshers, problems, discretizations and solvers, the exports, `-uamg-nonsym`,
+  `-libuamg-condensed`, initial guesses other than 0.
+- On one process (`mpiexec -n 1`, or without `mpiexec`), the program is the one compiled without MPI.
 
 ## Troubleshooting
 

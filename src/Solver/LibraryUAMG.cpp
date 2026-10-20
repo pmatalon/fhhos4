@@ -2,6 +2,7 @@
 #include "LibraryUAMG.h"
 #include "LibraryParameters.h"
 #include "../Utils/BorrowedSparseMatrix.h"
+#include "../Utils/Communicator.h"
 
 class LibraryUAMGImpl : public LibraryUAMG
 {
@@ -36,6 +37,9 @@ public:
 		_solver.CoarseSolver = LibraryParameters::LibraryCoarseSolver(mg.CoarseSolverCode);
 		_solver.Threads = Parallelism::NThreads(); // the setting of the program for its solvers (-threads, SolverThreads)
 		_solver.Verbosity = args.Solver.PrintIterationResults ? 2 : 1;
+#if FHHOS4_MPI
+		_solver.Comm = MPI_COMM_SELF; // the system of the program on one process; SetupFromDistributedBlocks(): all of them
+#endif
 	}
 
 	void Serialize(ostream& os) const override
@@ -66,6 +70,14 @@ public:
 		fhhos4::CSRView A = _solver.CondensedMatrix();
 		_condensedMatrix.Borrow(A.Rows, A.Cols, A.RowPointers, A.ColumnIndices, A.Values);
 		IterativeSolver::Setup(_condensedMatrix);
+	}
+
+	void SetupFromDistributedBlocks(const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F, const vector<int64_t>& faceGhosts, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
+	{
+#ifdef MPI_ENABLED
+		_solver.Comm = Communicator::Current().Comm();
+#endif
+		_solver.SetupSymmetric(A_T_T, A_T_F, A_F_F, cellInterpOfOne, faceInterpOfOne, fhhos4::GhostNumbers(faceGhosts.size(), faceGhosts.data()));
 	}
 
 	void Solve(const Vector& b, Vector& x, bool xEquals0, bool computeResidual, bool computeAx) override

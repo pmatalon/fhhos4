@@ -161,6 +161,23 @@ public:
 			_solver->Setup(A); // the matrix blocks are only used by iterative solvers
 	}
 
+	void Setup(const DistributedMatrix& A)
+	{
+		if (_solver)
+			_solver->Setup(A);
+	}
+
+	void Setup(const DistributedMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, shared_ptr<const IndexMap> faceMap, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne)
+	{
+		if (!_solver)
+			return;
+		IterativeSolver* iterSolver = dynamic_cast<IterativeSolver*>(_solver);
+		if (iterSolver)
+			iterSolver->Setup(A, A_T_T, A_T_F, faceMap, cellInterpOfOne, faceInterpOfOne);
+		else
+			_solver->Setup(A);
+	}
+
 	Vector Apply(const Vector& r) override
 	{
 		if (_solver)

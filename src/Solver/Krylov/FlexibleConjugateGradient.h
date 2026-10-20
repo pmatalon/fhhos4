@@ -52,6 +52,21 @@ public:
 		this->SetupComputationalWork = this->Precond.SetupComputationalWork();
 	}
 
+	// On several processes: A is read in full (both triangles)
+	void Setup(const DistributedMatrix& A) override
+	{
+		SetDistributedMatrix(A);
+		this->Precond.Setup(A);
+		this->SetupComputationalWork = this->Precond.SetupComputationalWork();
+	}
+
+	void Setup(const DistributedMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, shared_ptr<const IndexMap> faceMap, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
+	{
+		SetDistributedMatrix(A);
+		this->Precond.Setup(A, A_T_T, A_T_F, faceMap, cellInterpOfOne, faceInterpOfOne);
+		this->SetupComputationalWork = this->Precond.SetupComputationalWork();
+	}
+
 public:
 	void Solve(const Vector& b, Vector& x, bool xEquals0, bool computeResidual, bool computeAx) override
 	{
@@ -77,8 +92,8 @@ public:
 		}
 		else
 		{
-			r = b - A.selfadjointView<Eigen::Lower>() * x;            result.AddWorkInFlops(Cost::DAXPY(A));
-			result.SetResidualNorm(r.norm());                         result.AddWorkInFlops(Cost::Norm(r));
+			r = ResidualOfSymmetric(b, x);                            result.AddWorkInFlops(Cost::DAXPY(A));
+			result.SetResidualNorm(Parallel::Norm(r));                result.AddWorkInFlops(Cost::Norm(r));
 		}
 
 		this->IterationCount = 0;
@@ -118,7 +133,7 @@ public:
 				double dk_dot_Adk = directionk.d_dot_Ad;
 
 				// A-orthogonalization
-				double z_dot_Adk = z.dot(Adk);                        result.AddWorkInFlops(Cost::Dot(z));
+				double z_dot_Adk = Parallel::Dot(z, Adk);             result.AddWorkInFlops(Cost::Dot(z));
 				*d -= (z_dot_Adk / dk_dot_Adk) * dk;                  result.AddWorkInFlops(Cost::VectorDAXPY(*d));
 
 				if (Precond.CanOptimizeResidualComputation())
@@ -126,18 +141,20 @@ public:
 					*Ad -= (z_dot_Adk / dk_dot_Adk) * Adk;            result.AddWorkInFlops(Cost::VectorDAXPY(*d));
 				}
 			}
-			assert(d->norm() > 0);
-
 			if (!Ad)
 			{
-				Ad = new Vector(A.selfadjointView<Eigen::Lower>() * (*d));  result.AddWorkInFlops(Cost::MatVec(A));
+				if (this->Distributed)
+					Ad = new Vector(*this->Distributed * (*d));
+				else
+					Ad = new Vector(A.selfadjointView<Eigen::Lower>() * (*d));
+				                                                      result.AddWorkInFlops(Cost::MatVec(A));
 			}
 
-			double d_dot_Ad = d->dot(*Ad);                            result.AddWorkInFlops(Cost::Dot(*d));
+			double d_dot_Ad = Parallel::Dot(*d, *Ad);                 result.AddWorkInFlops(Cost::Dot(*d));
 			assert(d_dot_Ad != 0);
 
 			// Step length in the direction of research
-			double alpha = r.dot(*d) / d_dot_Ad;                      result.AddWorkInFlops(Cost::Dot(r));
+			double alpha = Parallel::Dot(r, *d) / d_dot_Ad;           result.AddWorkInFlops(Cost::Dot(r));
 
 			// Moving from the current solution to the next
 			// by taking the step in the direction of research
@@ -164,13 +181,13 @@ public:
 			this->IterationCount++;
 
 			result.SetX(x);
-			result.SetResidualNorm(r.norm());                         result.AddWorkInFlops(Cost::Norm(r));
+			result.SetResidualNorm(Parallel::Norm(r));                result.AddWorkInFlops(Cost::Norm(r));
 
 			// Residual replacement (the loop condition then evaluates the stopping criteria on the true residual)
 			if (this->ResidualRecomputation > 0 && (this->IterationCount % this->ResidualRecomputation == 0 || StoppingCriteriaMet(result)))
 			{
-				r = b - A.selfadjointView<Eigen::Lower>() * x;        result.AddWorkInFlops(Cost::DAXPY(A));
-				result.ReplaceResidualNorm(r.norm());                 result.AddWorkInFlops(Cost::Norm(r));
+				r = ResidualOfSymmetric(b, x);                        result.AddWorkInFlops(Cost::DAXPY(A));
+				result.ReplaceResidualNorm(Parallel::Norm(r));        result.AddWorkInFlops(Cost::Norm(r));
 			}
 
 			if (this->PrintIterationResults)
@@ -187,6 +204,14 @@ public:
 	}
 
 private:
+	// b - A x, A read from its lower triangular part (symmetric), or in full on several processes
+	Vector ResidualOfSymmetric(const Vector& b, const Vector& x) const
+	{
+		if (this->Distributed)
+			return b - *this->Distributed * x;
+		return b - this->Matrix->selfadjointView<Eigen::Lower>() * x;
+	}
+
 	void Clear(list<Direction>& previousDirections)
 	{
 		for (Direction& directionk : previousDirections)

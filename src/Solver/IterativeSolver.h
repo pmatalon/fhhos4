@@ -27,6 +27,8 @@ public:
 
 	IterativeSolver() : Solver() {}
 
+	using Solver::Setup; // the distributed one, among the overloads below
+
 	// Setup for A from that of other, if other is a solver of the same kind set up for A (e.g. the pre- and
 	// post-smoothers of a multigrid level): the result of Setup(A), at the cost of a copy. Returns false (and does
 	// nothing) if it can't.
@@ -45,6 +47,66 @@ public:
 			this->_directSolver.compute(colMajorA);
 		}
 	}
+
+	// Same as SetupFrom() on several processes
+	virtual bool SetupFrom(const DistributedMatrix& A, const IterativeSolver& other)
+	{
+		return false;
+	}
+
+	// Setup on several processes from the blocks of the uncondensed system of a hybrid discretization (see the
+	// sequential one above), symmetric, distributed by rows: A (faces x faces) the rows of the faces of the process;
+	// A_T_T and A_T_F the rows of its cells, the columns of A_T_F numbered in faceMap (its faces, then the other faces of
+	// its cells, the ghosts); the interpolations of 1 on its cells and faces.
+	virtual void Setup(const DistributedMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, shared_ptr<const IndexMap> faceMap, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne)
+	{
+		Utils::FatalError("This solver is not compatible with matrix blocks arising from a hybrid discretization on several processes.");
+	}
+
+	// b - A x, with the matrix of the setup (distributed or not)
+	Vector ResidualOf(const Vector& b, const Vector& x) const
+	{
+		if (this->Distributed)
+			return b - *this->Distributed * x;
+		return b - *this->Matrix * x;
+	}
+
+	// A x, with the matrix of the setup (distributed or not)
+	Vector MatVec(const Vector& x) const
+	{
+		if (this->Distributed)
+			return *this->Distributed * x;
+		return *this->Matrix * x;
+	}
+
+protected:
+	// On several processes, the right-hand side of a sweep of a relaxation method (Gauss-Seidel, Jacobi) on the rows of
+	// the process (Diag): b - Offd x, with the values of x of the other processes from the start of the sweep (Jacobi
+	// between the processes, Gauss-Seidel within each one, as the hybrid smoothers between threads); b on one process, or
+	// from x = 0. buffer: its storage. Collective on the halo.
+	const Vector& SweepRhs(const Vector& b, const Vector& x, bool xEquals0, Vector& buffer) const
+	{
+		if (!this->Distributed || xEquals0)
+			return b;
+		Vector ghosts = this->Distributed->GhostValues(x);
+		buffer = b;
+		if (this->Distributed->Offd.nonZeros() > 0)
+			buffer.noalias() -= this->Distributed->Offd * ghosts;
+		return buffer;
+	}
+
+	// The part of the setup on several processes common to the iterative solvers: A distributed by rows (Matrix: its
+	// block Diag). The vectors of the solves are then the rows of the process. Each solver that runs on several
+	// processes overrides Setup(const DistributedMatrix&) and calls it.
+	void SetDistributedMatrix(const DistributedMatrix& A)
+	{
+		if (this->ComputeExactSolution)
+			Utils::FatalError("The exact solution of the linear system (algebraic error) is not computed on several processes.");
+		Solver::Setup(A.Diag);
+		this->Distributed = &A;
+	}
+
+public:
 
 	// Setup from the blocks of the uncondensed system of a hybrid discretization (A being the condensed one), and the
 	// interpolation of the function 1 on the polynomial bases of the cells (cellInterpOfOne, one coefficient per cell,
@@ -124,7 +186,7 @@ public:
 					this->Residual = b;
 				else
 				{
-					this->Residual = b - A * x;                              result.AddWorkInFlops(Cost::DAXPY(A));
+					this->Residual = ResidualOf(b, x);                       result.AddWorkInFlops(Cost::DAXPY(A));
 				}
 			}
 			else if (computeResidual && computeAx)
@@ -136,7 +198,7 @@ public:
 				}
 				else
 				{
-					this->Ax = A * x;                                        result.AddWorkInFlops(Cost::MatVec(A));
+					this->Ax = MatVec(x);                                    result.AddWorkInFlops(Cost::MatVec(A));
 					this->Residual = b - this->Ax;                           result.AddWorkInFlops(Cost::AddVec(b));
 				}
 			}
@@ -146,7 +208,7 @@ public:
 					this->Ax = Vector::Zero(b.rows());
 				else
 				{
-					this->Ax = A * x;                                        result.AddWorkInFlops(Cost::MatVec(A));
+					this->Ax = MatVec(x);                                    result.AddWorkInFlops(Cost::MatVec(A));
 				}
 			}
 			return;
@@ -158,8 +220,8 @@ public:
 				result.SetResidualAsB();
 			else
 			{
-				this->Residual = b - A * x;                                          result.AddWorkInFlops(Cost::DAXPY(A));
-				result.SetResidualNorm(this->Residual.norm());                       result.AddWorkInFlops(Cost::Norm(b));
+				this->Residual = ResidualOf(b, x);                                   result.AddWorkInFlops(Cost::DAXPY(A));
+				result.SetResidualNorm(Parallel::Norm(this->Residual));              result.AddWorkInFlops(Cost::Norm(b));
 			}
 		}
 
@@ -174,8 +236,8 @@ public:
 				result = ExecuteOneIteration(b, x, xEquals0, false, false, result);
 				if (!result.IsResidualSet() && (StoppingCrit == StoppingCriteria::NormalizedResidual || StoppingCrit == StoppingCriteria::Stagnation))
 				{
-					this->Residual = b - A * x;                                          result.AddWorkInFlops(Cost::DAXPY(A));
-					result.SetResidualNorm(this->Residual.norm());                       result.AddWorkInFlops(Cost::Norm(b));
+					this->Residual = ResidualOf(b, x);                                   result.AddWorkInFlops(Cost::DAXPY(A));
+					result.SetResidualNorm(Parallel::Norm(this->Residual));              result.AddWorkInFlops(Cost::Norm(b));
 				}                                      
 			}
 			else
@@ -191,7 +253,7 @@ public:
 				{
 					result = ExecuteOneIteration(b, x, xEquals0, true, computeAx, result);
 					assert(result.Residual.rows() > 0);
-					result.SetResidualNorm(result.Residual.norm());                                                result.AddWorkInFlops(Cost::Norm(b));
+					result.SetResidualNorm(Parallel::Norm(result.Residual));                                       result.AddWorkInFlops(Cost::Norm(b));
 				}
 			}
 			this->IterationCount++;

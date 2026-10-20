@@ -29,6 +29,7 @@ option(ENABLE_TESTS "Build the test suite (fhhos4_tests). Turn off to save its c
 option(ENABLE_OPENMP "Use OpenMP for the parallel loops (and Eigen's internal parallelism)" ON)
 option(ENABLE_NATIVE_ARCH "Optimize for the CPU of the build machine (-march=native: AVX2, FMA...). The binary may not run on other CPUs." OFF)
 option(ENABLE_PYTHON "Build the Python module of the library (fhhos4, with nanobind) and its tests" OFF)
+option(ENABLE_MPI "MPI parallelism (distributed memory) of the library and the program, on several processes (mpiexec). OFF: a single process" OFF)
 
 set(EXECUTABLE_OUTPUT_PATH bin/)
 include(GNUInstallDirs)
@@ -75,6 +76,12 @@ if(SMALL_INDEX)
 else()
 	set(FHHOS4_SPARSE_INDEX intmax_t)
 endif()
+# fhhos4_version.h also says whether the library is compiled with MPI (FHHOS4_MPI): its public header then includes mpi.h
+if(ENABLE_MPI)
+	set(FHHOS4_MPI 1)
+else()
+	set(FHHOS4_MPI 0)
+endif()
 configure_file(library/fhhos4_version.h.in ${CMAKE_BINARY_DIR}/generated/include/fhhos4_version.h @ONLY)
 find_package(Git QUIET)
 set(git_version_command ${CMAKE_COMMAND} -DSOURCE_DIR=${CMAKE_SOURCE_DIR} -DVERSION=${PROJECT_VERSION}
@@ -98,6 +105,16 @@ endif()
 # Include Eigen
 find_package(Eigen3 REQUIRED NO_MODULE)
 target_link_libraries(fhhos4_lib PUBLIC Eigen3::Eigen)
+
+# Include MPI (optional): public, since the public header includes mpi.h (fhhos4::Solver::Comm)
+if(ENABLE_MPI)
+	find_package(MPI REQUIRED COMPONENTS CXX)
+	target_link_libraries(fhhos4_lib PUBLIC MPI::MPI_CXX)
+	target_compile_definitions(fhhos4_lib PRIVATE MPI_ENABLED)
+	message(STATUS "MPI enabled (MPI ${MPI_CXX_VERSION})")
+else()
+	message(STATUS "MPI disabled: a single process. Add -DENABLE_MPI=ON to enable it.")
+endif()
 
 # Include pthread
 set(THREADS_PREFER_PTHREAD_FLAG ON)
@@ -137,6 +154,9 @@ export(EXPORT fhhos4Targets NAMESPACE fhhos4:: FILE ${CMAKE_BINARY_DIR}/fhhos4Ta
 # Python module of the library (library/python): the module fhhos4 in <build>/python, linked to libfhhos4.so (build
 # tree only for now: not installed). Its test (ctest -R Python) runs with that directory in PYTHONPATH.
 if(ENABLE_PYTHON)
+	if(ENABLE_MPI)
+		message(FATAL_ERROR "ENABLE_PYTHON: the Python module of the library compiled with MPI (ENABLE_MPI) is not available yet.")
+	endif()
 	find_package(Python 3.9 REQUIRED COMPONENTS Interpreter Development.Module)
 	execute_process(COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
 		OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE nanobind_ROOT)
@@ -149,6 +169,32 @@ if(ENABLE_PYTHON)
 	enable_testing()
 	add_test(NAME PythonModule COMMAND ${Python_EXECUTABLE} ${CMAKE_SOURCE_DIR}/library/python/tests/test_module.py)
 	set_tests_properties(PythonModule PROPERTIES ENVIRONMENT PYTHONPATH=${CMAKE_BINARY_DIR}/python)
+endif()
+
+# The tests of the library on several processes (tests/MPI, their own main()), with the library's code only (src/
+# headers and libfhhos4.so, not the program): one ctest test per number of processes, each run by mpiexec, with 2
+# threads per process
+if(ENABLE_MPI AND ENABLE_TESTS)
+	enable_testing()
+	find_package(GTest REQUIRED)
+	file(GLOB mpi_test_source_files CONFIGURE_DEPENDS tests/MPI/*.cpp)
+	add_executable(fhhos4_mpi_tests ${mpi_test_source_files})
+	target_include_directories(fhhos4_mpi_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests)
+	target_compile_definitions(fhhos4_mpi_tests PRIVATE MPI_ENABLED)
+	if(SMALL_INDEX)
+		target_compile_definitions(fhhos4_mpi_tests PRIVATE SMALL_INDEX)
+	endif()
+	target_link_libraries(fhhos4_mpi_tests PRIVATE fhhos4_lib GTest::gtest Threads::Threads)
+	if(ENABLE_OPENMP)
+		target_link_libraries(fhhos4_mpi_tests PRIVATE OpenMP::OpenMP_CXX)
+	endif()
+	if(ENABLE_NATIVE_ARCH)
+		target_compile_options(fhhos4_mpi_tests PRIVATE -march=native)
+	endif()
+	foreach(np 1 2 3 4)
+		add_test(NAME MPI_np${np} COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${np} ${MPIEXEC_PREFLAGS} $<TARGET_FILE:fhhos4_mpi_tests> ${MPIEXEC_POSTFLAGS})
+		set_tests_properties(MPI_np${np} PROPERTIES ENVIRONMENT OMP_NUM_THREADS=2 TIMEOUT 600 PROCESSORS ${np})
+	endforeach()
 endif()
 
 #----------------------------------------------------------------------------------------------------------------------
@@ -246,6 +292,11 @@ if(ENABLE_AGMG)
 	target_compile_definitions(fhhos4_core PUBLIC AGMG_ENABLED)
 endif()
 
+# MPI: linked through fhhos4_lib
+if(ENABLE_MPI)
+	target_compile_definitions(fhhos4_core PUBLIC MPI_ENABLED)
+endif()
+
 # Include Eigen
 target_link_libraries(fhhos4_core PUBLIC Eigen3::Eigen)
 
@@ -341,11 +392,44 @@ if(ENABLE_TESTS)
 		CONFIGURE_DEPENDS
 		tests/*.cpp
 	)
+	list(FILTER test_source_files EXCLUDE REGEX "/tests/MPI/")
+	if(ENABLE_MPI)
+		# The main() of the MPI tests: MPI initialized (one process, without mpiexec)
+		list(APPEND test_source_files ${CMAKE_SOURCE_DIR}/tests/MPI/main.cpp)
+	endif()
 	add_executable(fhhos4_tests ${test_source_files})
 	target_include_directories(fhhos4_tests PRIVATE ${CMAKE_SOURCE_DIR}/tests)
-	target_link_libraries(fhhos4_tests PRIVATE fhhos4_core GTest::gtest_main)
+	if(ENABLE_MPI)
+		target_link_libraries(fhhos4_tests PRIVATE fhhos4_core GTest::gtest)
+	else()
+		target_link_libraries(fhhos4_tests PRIVATE fhhos4_core GTest::gtest_main)
+	endif()
 	gtest_discover_tests(fhhos4_tests)
 	message(STATUS "ENABLE_TESTS: ON")
+
+	# The program on several processes (MPI): GMSH meshes, U-AMG through the library (uncondensed system) and the
+	# program's (its condensed system), the L2 errors of one process. -no-cache: no concurrent writes of GMSH's cache by
+	# the tests run in parallel.
+	if(ENABLE_MPI)
+		set(mpi_program_cases
+			"2D_k1_fcglibuamg|3|-geo square -mesh tri -mesher gmsh -n 32 -k 1 -s fcglibuamg|L2 Error = 4.48e-04"
+			"2D_k2_fcguamg|4|-geo square -mesh tri -mesher gmsh -n 32 -k 2 -s fcguamg -smoothers hbgs,hrbgs|L2 Error = 1.23e-05"
+			"3D_k0_fcguamg|2|-geo cube -mesh tetra -n 8 -k 0 -s fcguamg|L2 Error = 7.18e-01"
+			"3D_k2_fcglibuamg|4|-geo cube -mesh tetra -n 4 -k 2 -s fcglibuamg|L2 Error = 9.83e-02"
+			"InHouseMeshRefused|2|-geo square -mesh tri -mesher inhouse -n 8 -k 0 -s fcglibuamg|the meshes are GMSH's only")
+		foreach(case ${mpi_program_cases})
+			string(REPLACE "|" ";" fields "${case}")
+			list(GET fields 0 name)
+			list(GET fields 1 np)
+			list(GET fields 2 arguments)
+			list(GET fields 3 expected)
+			separate_arguments(arguments)
+			add_test(NAME ProgramMPI_${name}_np${np} COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${np} ${MPIEXEC_PREFLAGS} $<TARGET_FILE:fhhos4> ${arguments} -no-cache ${MPIEXEC_POSTFLAGS}
+				WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+			set_tests_properties(ProgramMPI_${name}_np${np} PROPERTIES PASS_REGULAR_EXPRESSION "${expected}" ENVIRONMENT OMP_NUM_THREADS=2 TIMEOUT 600 PROCESSORS ${np})
+		endforeach()
+	endif()
+
 else()
 	message(STATUS "ENABLE_TESTS: OFF")
 endif()

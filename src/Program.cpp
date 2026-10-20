@@ -41,6 +41,13 @@ void ProgramDim<Dim>::Start(ProgramArguments& args)
 	cout << "Index type: intmax_t" << endl;
 #endif
 	cout << "Shared memory parallelism: " << (Parallelism::NThreads() == 1 ? "sequential execution" : to_string(Parallelism::NThreads()) + " threads") << endl;
+	const Communicator& world = Communicator::Current();
+	if (world.IsDistributed())
+	{
+		cout << "Distributed memory parallelism: " << world.Size() << " processes (MPI)" << endl;
+		if (args.Problem.Equation != EquationType::Diffusion || args.Discretization.Method.compare("hho") != 0)
+			Utils::FatalError("On several processes (MPI), the problem is the diffusion discretized by HHO only (-pb diff -discr hho).");
+	}
 	cout << endl;
 
 	if (args.Problem.Equation == EquationType::Diffusion)

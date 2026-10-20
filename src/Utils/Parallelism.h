@@ -61,14 +61,32 @@ namespace Parallelism
 	// (OMP_PROC_BIND, OMP_PLACES: the calling thread is then pinned to its place, whose CPUs aren't the process's).
 	// The hyperthreads slow the solvers down (memory-bound), whereas they speed up the assembly (compute-bound):
 	// PERFORMANCE.md.
-	inline int WithoutHyperThreads(int openMPThreads)
+	// sharingProcesses: the processes (MPI) that run on the same CPUs (see SharingProcesses()), among which the cores are
+	// divided.
+	inline int WithoutHyperThreads(int openMPThreads, int sharingProcesses)
 	{
 #ifdef _OPENMP
 		if (getenv("OMP_NUM_THREADS") || omp_get_proc_bind() != omp_proc_bind_false)
 			return openMPThreads;
 #endif
 		int cores = PhysicalCores();
+		if (cores > 0 && sharingProcesses > 1)
+			cores = max(1, cores / sharingProcesses);
 		return cores > 0 ? min(openMPThreads, cores) : openMPThreads;
+	}
+
+	// The number of processes of the program (MPI) that run on the same CPUs as this one: those of the node whose
+	// affinity is the same (all of them if mpiexec doesn't bind the processes to cores; 1 if it binds them to distinct
+	// cores). Set by the MPI initialization of the program (MPIEnvironment); 1 by default.
+	inline int& SharingProcesses()
+	{
+		static int n = 1;
+		return n;
+	}
+
+	inline int WithoutHyperThreads(int openMPThreads)
+	{
+		return WithoutHyperThreads(openMPThreads, SharingProcesses());
 	}
 
 	// The number of threads given to SetNThreads() (0: automatic)

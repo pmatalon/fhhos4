@@ -7,6 +7,7 @@
 #endif
 #include "HybridAlgebraicMesh.h"
 #include "IndexLists.h"
+#include "../../../Utils/DistributedMatrix.h"
 #include "../../../Utils/SparseMatrixOps.h"
 using namespace std;
 
@@ -546,4 +547,5 @@ struct LocalOperator
 	LocalMatrices Current;
 	LocalMatrices Next;                     // buffer for those of the next coarsening pass
 	const SparseMatrix* Assembled = nullptr; // the matrix equal to the sum of Current, if it has been assembled
+	const DistributedMatrix* AssembledDistributed = nullptr; // the same on several processes
 };

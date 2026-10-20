@@ -6,6 +6,96 @@
 #include "../FunctionalBasis/FunctionalBasisFactory.h"
 #include "../Solver/SolverFactory.h"
 #include "../Utils/ExportModule.h"
+#include "DistributedHybridSystem.h"
+
+// On several processes (MPI): the options available (the others are refused). The mesh is built by every process, and
+// partitioned by GMSH; the system is assembled by every process, and solved by U-AMG distributed by rows (each process
+// the rows of its cells and faces); the solution is then gathered on every process for the post-processing.
+inline void CheckDistributedArguments(const ProgramArguments& args)
+{
+	auto refuse = [](const string& what) { Utils::FatalError("On several processes (MPI), " + what + "."); };
+	const ExportArguments& e = args.Actions.Export;
+	if (args.Discretization.Mesher.compare("gmsh") != 0)
+		refuse("the meshes are GMSH's only (-mesher gmsh)");
+	if (!args.Solver.UsesUncondensedAMG())
+		refuse("the solver is U-AMG only: -s fcglibuamg, libuamg, fcguamg or uamg (and gcr...)");
+	if (args.Solver.MG.UAMGNonsymmetric)
+		refuse("non-symmetric matrices are not solved yet (-uamg-nonsym)");
+	if (args.Solver.MG.UAMGLibraryCondensed)
+		refuse("the library is given the uncondensed system (no -libuamg-condensed)");
+	if (!args.Discretization.StaticCondensation)
+		refuse("the system is statically condensed");
+	if (args.Solver.InitialGuessCode.compare("0") != 0)
+		refuse("the initial guess is 0");
+	if (args.Solver.ComputeIterL2Error || args.Problem.ComputeNormalDerivative || args.Actions.UnitTests)
+		refuse("the L2 error at each iteration, the normal derivative and the unit tests are not computed");
+	if (e.LinearSystem || e.AssemblyTermMatrices || e.MeshToMatlab || e.MultigridComponents || e.MultigridIterationVectors || e.SolutionVectors
+		|| e.SolutionToGMSH || e.ExactSolutionToGMSH || e.ErrorToGMSH || e.AbsErrorToGMSH || e.SourceToGMSH || e.Iterations || e.IterationResiduals || e.IterationL2Errors)
+		refuse("nothing is exported");
+}
+
+// On several processes: the system assembled by every process (problem), distributed by rows: the cells of each process
+// given by the partition of the mesh (elementRanks), each face owned by the process of the smaller rank of its cells.
+// U-AMG through the library (libraryCondenses: the uncondensed system, symmetric; the library condenses it and computes
+// the cell unknowns), or the program's (iterativeSolver, on its condensed system). The solution of the faces
+// (systemSolution) and, with the library, of the cells (cellSolution): of the whole system, on every process.
+template <int Dim>
+void SolveDistributed(Diffusion_HHO<Dim>& problem, Mesh<Dim>* mesh, const vector<int>& elementRanks, IterativeSolver* iterativeSolver, bool libraryCondenses, int faceBlockSize,
+                      Timer& setupTimer, Timer& solvingTimer, Vector& systemSolution, Vector& cellSolution)
+{
+	const Communicator& world = Communicator::Current();
+	int fbs = faceBlockSize;
+	int cbs = problem.HHO->nCellUnknowns;
+	BigNumber nFaces = problem.A_T_ndF.cols() / fbs; // the faces of the system (not the Dirichlet ones)
+	vector<int> cellRanks(mesh->Elements.size()), faceRanks(nFaces, world.Size());
+	for (Element<Dim>* e : mesh->Elements)
+		cellRanks[e->Number] = elementRanks[e->Number];
+	for (Face<Dim>* f : mesh->Faces)
+	{
+		if (f->Number >= nFaces)
+			continue;
+		faceRanks[f->Number] = elementRanks[f->Element1->Number];
+		if (f->Element2)
+			faceRanks[f->Number] = min(faceRanks[f->Number], elementRanks[f->Element2->Number]);
+	}
+	SparseMatrix fullA_FF = SparseMatrixOps::FullFromLower(problem.A_ndF_ndF);
+	DistributedHybridSystem system(world, cellRanks, faceRanks, problem.A_T_ndF, fullA_FF, cbs, fbs);
+	cout << "Distributed system: " << system.Cells->GlobalSize << " cells and " << system.Faces->GlobalSize << " faces on " << world.Size() << " processes (" << world.Min(system.Faces->NOwned) << " to " << world.Max(system.Faces->NOwned) << " faces per process)" << endl;
+
+	SparseMatrix A_TT = system.CellBlocks(problem.A_T_T);
+	SparseMatrix A_TF = system.Rows(problem.A_T_ndF, true, true, true);
+	Vector cellInterpOfOne = system.Own(problem.CellInterpOfOne(), true, 1);
+	Vector faceInterpOfOne = system.Own(problem.FaceInterpOfOne(), false, 1);
+	if (libraryCondenses)
+	{
+		LibraryUAMG* library = dynamic_cast<LibraryUAMG*>(iterativeSolver);
+		SparseMatrix A_FF = system.Rows(fullA_FF, false, true, true);
+		setupTimer.Start();
+		library->SetupFromDistributedBlocks(A_TT, A_TF, A_FF, system.GhostFaces(), cellInterpOfOne, faceInterpOfOne);
+		setupTimer.Stop();
+		Vector b_T = system.Own(problem.RHS_T(), true, cbs), b_F = system.Own(problem.RHS_ndF(), false, fbs);
+		Vector x_T(b_T.rows()), x_F = Vector::Zero(b_F.rows());
+		cout << "Solving..." << endl;
+		solvingTimer.Start();
+		library->Solve(b_T, b_F, x_T, x_F);
+		solvingTimer.Stop();
+		systemSolution = system.Gather(x_F, false, fbs);
+		cellSolution = system.Gather(x_T, true, cbs);
+	}
+	else
+	{
+		DistributedMatrix A = DistributedMatrix::FromGlobalColumns(system.Faces, *system.Faces, system.Rows(SparseMatrixOps::FullFromLower(problem.A), false, true, false), fbs, fbs);
+		setupTimer.Start();
+		iterativeSolver->Setup(A, A_TT, A_TF, system.FaceMap, cellInterpOfOne, faceInterpOfOne);
+		setupTimer.Stop();
+		Vector b = system.Own(problem.b, false, fbs);
+		cout << "Solving..." << endl;
+		solvingTimer.Start();
+		Vector x = iterativeSolver->Solve(b);
+		solvingTimer.Stop();
+		systemSolution = system.Gather(x, false, fbs);
+	}
+}
 
 template <int Dim>
 void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults* results)
@@ -34,7 +124,27 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 	cout << "-                   Mesh construction                     -" << endl;
 	cout << "-----------------------------------------------------------" << endl;
 
+	// On several processes: the mesh of the first one first (it writes it in GMSH's cache, which the others read), then
+	// its partition by GMSH
+	const Communicator& world = Communicator::Current();
+	bool distributed = world.IsDistributed();
+	if (distributed)
+		CheckDistributedArguments(args);
+	if (distributed && !world.IsRoot())
+		world.Barrier();
 	Mesh<Dim>* mesh = MeshFactory<Dim>::BuildMesh(args, testCase);
+	if (distributed && world.IsRoot())
+		world.Barrier();
+	vector<int> elementRanks; // the process of each element, by number
+	if (distributed)
+	{
+		if (world.IsRoot())
+		{
+			cout << "Partition of the mesh into " << world.Size() << " parts by GMSH..." << endl;
+			elementRanks = dynamic_cast<GMSHMesh<Dim>*>(mesh)->PartitionElements(world.Size());
+		}
+		world.Broadcast(elementRanks);
+	}
 	if (args.Discretization.Mesher.compare("gmsh") == 0)
 		GMSHMesh<Dim>::CloseGMSH();
 
@@ -260,7 +370,17 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 		cout << "Solver: " << *solver << endl << endl;
 
 		IterativeSolver* iterativeSolver = dynamic_cast<IterativeSolver*>(solver);
-		if (iterativeSolver)
+		if (distributed)
+		{
+			if (!iterativeSolver)
+				Utils::FatalError("On several processes, the solver is U-AMG.");
+			iterativeSolver->ComputeExactSolution = false;
+			SolveDistributed(*problem, mesh, elementRanks, iterativeSolver, libraryCondenses, faceBasis->Size(), setupTimer, solvingTimer, systemSolution, cellSolution);
+			cout << iterativeSolver->IterationCount << " iterations." << endl << endl;
+			if (results)
+				results->IterationCount = iterativeSolver->IterationCount;
+		}
+		else if (iterativeSolver)
 		{
 			iterativeSolver->ComputeExactSolution = !libraryCondenses && (Utils::ProgramArgs.Actions.Export.ErrorToGMSH || problem->A.rows() <= 2000);
 			if (args.Solver.ComputeIterL2Error && testCase->ExactSolution && args.Discretization.StaticCondensation)

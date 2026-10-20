@@ -8,6 +8,9 @@
 #include <Eigen/SparseCore>
 #include "fhhos4_error.h"
 #include "fhhos4_version.h"
+#if FHHOS4_MPI
+#include <mpi.h>
+#endif
 
 // fhhos4: the algebraic multigrid of fhhos4 for hybrid discretizations (HHO, HDG...) of scalar
 // diffusion problems, the Uncondensed AMG (U-AMG) of
@@ -40,6 +43,11 @@
 // The functions compiled in the shared library fhhos4 take arrays only (views): the Eigen objects of this header (the
 // Eigen matrices converted to views, the Eigen::Ref of the vectors) are those of the calling code, compiled with its
 // own version of Eigen. The library never allocates memory that the calling code frees, nor the other way around.
+//
+// Compiled with MPI (FHHOS4_MPI, -DENABLE_MPI=ON), a Solver works on the processes of its communicator (Solver::Comm),
+// on a system distributed by rows: each process gives the rows of its own cells and faces, the columns of the faces
+// numbered locally, its own faces first, then the other faces of its cells (its ghosts), whose global numbers it gives
+// too (GhostNumbers). See the setups below, and README_library.md.
 namespace fhhos4
 {
 	// The index type of the sparse matrices of the library: int (32 bits), or 64 bits if fhhos4 is compiled with
@@ -157,6 +165,22 @@ namespace fhhos4
 		std::unique_ptr<Impl> _impl;
 	};
 
+	// On several processes (MPI): the global numbers of the ghosts of a process (the faces of its rows owned by other
+	// processes), in the order of their local numbers (after those of its own faces), read in place. The global numbers:
+	// the faces of the process of rank 0 first, then those of the process of rank 1, etc., each process's in the order
+	// of its local numbers (so that the faces of each process are numbered contiguously). Any order of the ghosts, no
+	// repetition.
+	struct GhostNumbers
+	{
+		std::int64_t Count = 0;
+		const std::int64_t* Numbers = nullptr; // Count
+
+		GhostNumbers() = default;
+		GhostNumbers(std::int64_t count, const std::int64_t* numbers)
+			: Count(count), Numbers(numbers)
+		{}
+	};
+
 	// The Krylov method preconditioned by one cycle of the AMG (Solver::Krylov)
 	enum class Krylov
 	{
@@ -164,7 +188,8 @@ namespace fhhos4
 		FCG,      // flexible conjugate gradient (fhhos4 -s fcguamg), for a symmetric positive definite matrix
 		GCR,      // GCR(10), generalized conjugate residual restarted every 10 iterations, Notay's economical version
 		          // (fhhos4 -s gcruamg). Minimizes the residual norm: for any matrix
-		BiCGSTAB, // Eigen's BiCGSTAB. Not flexible: it needs a linear preconditioner, a V- or W-cycle (not K)
+		BiCGSTAB, // Eigen's BiCGSTAB. Not flexible: it needs a linear preconditioner, a V- or W-cycle (not K). Not on
+		          // several processes (MPI)
 		None      // the cycles of the AMG alone, as a stationary iterative method (fhhos4 -s uamg): slower at k >= 1
 	};
 
@@ -190,7 +215,8 @@ namespace fhhos4
 	};
 
 	// The smoothers (Solver::PreSmoother and PostSmoother; fhhos4 -smoothers). The blocks: one per face. The Gauss-Seidel
-	// smoothers are sequential, except the hybrid ones.
+	// smoothers are sequential, except the hybrid ones. On several processes (MPI), they are Gauss-Seidel in each
+	// process (each thread for the hybrid ones), Jacobi between the processes.
 	enum class Smoother
 	{
 		Default,                        // chosen by the setup (see Solver::PreSmoother and PostSmoother)
@@ -277,9 +303,19 @@ namespace fhhos4
 
 		int Threads = 0;   // number of OpenMP threads during the calls of the library; 0: the current OpenMP setting, but
 		                   // at most one thread per physical core (no hyper-threading) unless OMP_NUM_THREADS or OpenMP's
-		                   // binding (OMP_PROC_BIND, OMP_PLACES) is set
+		                   // binding (OMP_PROC_BIND, OMP_PLACES) is set. On several processes (MPI): the cores divided
+		                   // among the processes of Comm that run on the same CPUs (not bound to distinct cores)
 		int Verbosity = 0; // 0: nothing; 1: one line per setup (number of levels, time) and per solve (iterations,
-		                   // residual, time); 2: all the messages of fhhos4, with the residual at each iteration
+		                   // residual, time); 2: all the messages of fhhos4, with the residual at each iteration.
+		                   // On several processes: the messages of the process of rank 0.
+
+#if FHHOS4_MPI
+		// The processes of the solver (the library is compiled with MPI): to set, no default. MPI_COMM_SELF: the system of
+		// each process, solved by it alone, as without MPI. A communicator of several processes: one system distributed by
+		// rows over them (see SetupSymmetric()); every setup and solve is then collective, called by all the processes of
+		// the communicator, with the same parameters.
+		MPI_Comm Comm = MPI_COMM_NULL;
+#endif
 
 		Solver();
 		~Solver();
@@ -308,14 +344,23 @@ namespace fhhos4
 		// A_TT (cells x cells), A_TF (cells x faces), A_FF (faces x faces): the DoFs of each cell (resp. face) are
 		// contiguous, in the order of the rows (resp. columns) of A_TF. A_TT and A_FF are read from their lower triangular
 		// part (full or lower-only matrices).
+		// On several processes (Comm), each one gives the rows of its own cells and faces: A_TT and A_TF the rows of its
+		// cells, A_FF those of its faces, in full (both triangles); the columns of A_TF and A_FF are numbered locally,
+		// in one numbering of the faces of the process: its own faces (those of the rows of A_FF, in their order), then
+		// its ghosts, the other faces of its rows (of its cells, and those coupled to its faces in A_FF through the cells
+		// of other processes), whose global numbers are faceGhosts; the interpolations of 1 on its cells and faces. Each
+		// face belongs to a process that owns one of its cells (e.g. the one of the smaller rank). Then Solve() with the
+		// vectors of the cells and faces of the process. On one process, faceGhosts is empty.
 		void SetupSymmetric(const CSRView& A_TT, const CSRView& A_TF, const CSRView& A_FF,
-		                    const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
+		                    const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne,
+		                    const GhostNumbers& faceGhosts = GhostNumbers())
 		{
-			Setup(true, nullptr, A_TT, A_TF, nullptr, &A_FF, In(cellInterpOfOne), In(faceInterpOfOne));
+			Setup(true, nullptr, A_TT, A_TF, nullptr, &A_FF, In(cellInterpOfOne), In(faceInterpOfOne), faceGhosts);
 		}
 
 		// Setup for a non-symmetric system (e.g. convection-diffusion), whose symmetric part is positive definite: as
-		// SetupSymmetric(), with the block A_FT (faces x cells) and all the blocks read in full: the same
+		// SetupSymmetric() (on one process only, for now), with the block A_FT (faces x cells) and all the blocks read in
+		// full: the same
 		// algorithm runs on the matrix itself. The couplings of the aggregation are computed from the averaged traces of
 		// the blocks of A_TF and A_FT; the coarse operators are the Galerkin products P^T A P (as AGMG: Y. Notay, "An
 		// aggregation-based algebraic multigrid method", ETNA 37, 2010); the Gauss-Seidel smoothers follow the downwind
@@ -328,13 +373,14 @@ namespace fhhos4
 		void SetupNonsymmetric(const CSRView& A_TT, const CSRView& A_TF, const CSRView& A_FT, const CSRView& A_FF,
 		                       const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
 		{
-			Setup(false, nullptr, A_TT, A_TF, &A_FT, &A_FF, In(cellInterpOfOne), In(faceInterpOfOne));
+			Setup(false, nullptr, A_TT, A_TF, &A_FT, &A_FF, In(cellInterpOfOne), In(faceInterpOfOne), GhostNumbers());
 		}
 
 		// Solves the system, after SetupSymmetric() or SetupNonsymmetric(): condenses the right-hand
 		// side, b = b_F - A_FT A_TT^{-1} b_T, solves A x_F = b, then computes x_T = A_TT^{-1} (b_T - A_TF x_F).
 		// x_F: the initial guess on input (e.g. zero), the solution on output; x_T: output. The result is that of
 		// A x_F = b. Does not throw if the solver has not converged after MaxIterations iterations: see the result.
+		// On several processes: the vectors of the cells and faces of the process; the result, of the whole system.
 		Result Solve(const Eigen::Ref<const Eigen::VectorXd>& b_T, const Eigen::Ref<const Eigen::VectorXd>& b_F,
 		             Eigen::Ref<Eigen::VectorXd> x_T, Eigen::Ref<Eigen::VectorXd> x_F)
 		{
@@ -342,6 +388,7 @@ namespace fhhos4
 		}
 
 		//---- Condensed system: to integrate the library into a code that condenses statically ----//
+		// On one process only (on several, give the uncondensed system: SetupSymmetric()).
 
 		// Setup for a symmetric positive definite matrix, from the condensed matrix and the blocks: as
 		// SetupSymmetric(), with A (faces x faces), the condensed matrix A_FF - A_FT A_TT^{-1} A_TF, both
@@ -351,13 +398,13 @@ namespace fhhos4
 		void SetupSymmetricCondensed(const CSRView& A, const CSRView& A_TT, const CSRView& A_TF, const CSRView& A_FF,
 		                             const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
 		{
-			Setup(true, &A, A_TT, A_TF, nullptr, &A_FF, In(cellInterpOfOne), In(faceInterpOfOne));
+			Setup(true, &A, A_TT, A_TF, nullptr, &A_FF, In(cellInterpOfOne), In(faceInterpOfOne), GhostNumbers());
 		}
 
 		void SetupSymmetricCondensed(const CSRView& A, const CSRView& A_TT, const CSRView& A_TF,
 		                             const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
 		{
-			Setup(true, &A, A_TT, A_TF, nullptr, nullptr, In(cellInterpOfOne), In(faceInterpOfOne));
+			Setup(true, &A, A_TT, A_TF, nullptr, nullptr, In(cellInterpOfOne), In(faceInterpOfOne), GhostNumbers());
 		}
 
 		// Setup for a non-symmetric matrix: as SetupNonsymmetric(), with the condensed matrix A (see
@@ -365,13 +412,13 @@ namespace fhhos4
 		void SetupNonsymmetricCondensed(const CSRView& A, const CSRView& A_TT, const CSRView& A_TF, const CSRView& A_FT, const CSRView& A_FF,
 		                                const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
 		{
-			Setup(false, &A, A_TT, A_TF, &A_FT, &A_FF, In(cellInterpOfOne), In(faceInterpOfOne));
+			Setup(false, &A, A_TT, A_TF, &A_FT, &A_FF, In(cellInterpOfOne), In(faceInterpOfOne), GhostNumbers());
 		}
 
 		void SetupNonsymmetricCondensed(const CSRView& A, const CSRView& A_TT, const CSRView& A_TF, const CSRView& A_FT,
 		                                const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
 		{
-			Setup(false, &A, A_TT, A_TF, &A_FT, nullptr, In(cellInterpOfOne), In(faceInterpOfOne));
+			Setup(false, &A, A_TT, A_TF, &A_FT, nullptr, In(cellInterpOfOne), In(faceInterpOfOne), GhostNumbers());
 		}
 
 		// Solves the condensed system A x = b, after any setup. x: the initial guess on input (e.g. zero), the solution on
@@ -393,7 +440,7 @@ namespace fhhos4
 
 		// The condensed matrix A of the last setup, both triangles: computed by SetupSymmetric() and SetupNonsymmetric(),
 		// or the one given to SetupSymmetricCondensed() and SetupNonsymmetricCondensed(). Valid until the next setup or the
-		// destruction of the solver. As an Eigen matrix: CondensedMatrix().EigenMap().
+		// destruction of the solver. As an Eigen matrix: CondensedMatrix().EigenMap(). On one process only.
 		CSRView CondensedMatrix() const;
 
 		bool IsSetUp() const;
@@ -414,9 +461,11 @@ namespace fhhos4
 		}
 
 		// The setups. A: null for SetupSymmetric() and SetupNonsymmetric(); A_FT: null for a symmetric matrix; A_FF: null
-		// if not given.
+		// if not given; faceGhosts: on several processes.
 		void Setup(bool symmetric, const CSRView* A, const CSRView& A_TT, const CSRView& A_TF, const CSRView* A_FT, const CSRView* A_FF,
-		           detail::ConstVectorView cellInterpOfOne, detail::ConstVectorView faceInterpOfOne);
+		           detail::ConstVectorView cellInterpOfOne, detail::ConstVectorView faceInterpOfOne, const GhostNumbers& faceGhosts);
+		void SetupDistributed(bool symmetric, const CSRView* A, const CSRView& A_TT, const CSRView& A_TF, const CSRView* A_FT, const CSRView* A_FF,
+		                      detail::ConstVectorView cellInterpOfOne, detail::ConstVectorView faceInterpOfOne, const GhostNumbers& faceGhosts);
 		Result SolveCondensed(detail::ConstVectorView b, detail::VectorView x);
 		Result SolveUncondensed(detail::ConstVectorView b_T, detail::ConstVectorView b_F, detail::VectorView x_T, detail::VectorView x_F);
 	};

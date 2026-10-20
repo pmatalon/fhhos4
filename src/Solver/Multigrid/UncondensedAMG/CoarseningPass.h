@@ -4,6 +4,7 @@
 #include "HybridAlgebraicMesh.h"
 #include "LocalMatrices.h"
 #include "../../FixedPoint/BlockDiagonalSolver.h"
+#include "../../../Utils/Communicator.h"
 #include "../../../Utils/SparseMatrixOps.h"
 using namespace std;
 
@@ -31,6 +32,9 @@ private:
 public:
 	BigNumber NCells = 0;
 	BigNumber NFaces = 0;
+	// On several processes (DistributedPass): the faces from NOwnedFaces are those of other processes, which may belong
+	// to none of the cells of the pass (couplings of the operator); -1: all the faces are owned (one process)
+	BigNumber NOwnedFaces = -1;
 	IndexLists CellFaces;            // faces of each cell, in the order of their first non-zero in the rows of A_T_F
 	vector<double> FaceTraces;       // for each item of CellFaces, the trace of the block A_T_F(cell, face)
 	vector<double> FaceToCellTraces; // non-symmetric matrix: for each item of CellFaces, the trace of A_F_T(face, cell)
@@ -53,6 +57,9 @@ public:
 	BigNumber NCoarseFaces = 0;
 	vector<BigNumber> FaceCoarseFace; // coarse face of each kept face (-1 for the removed faces)
 	IndexLists AggregateCoarseFaces;  // coarse faces of each aggregate, increasing
+	// The two aggregates of each coarse face (CollapseInterfaces()): the first one, then the second one, greater (an
+	// aggregate of another process on several processes, see DistributedPass)
+	vector<pair<BigNumber, BigNumber>> CoarseFaceAggregates;
 
 	CoarseningPass(int cellBlockSize, int faceBlockSize, bool symmetric, double strongCouplingThreshold)
 		: _cbs(cellBlockSize), _fbs(faceBlockSize), _symmetric(symmetric), _strongCouplingThreshold(strongCouplingThreshold)
@@ -271,6 +278,15 @@ public:
 			BigNumber Aggregate; // -1 if not aggregated yet
 			bool Ordered;
 		};
+		const Communicator& comm = Communicator::Current(); // on several processes, each one aggregates its own cells
+		if (NCells == 0)
+		{
+			NAggregates = 0;
+			AggregateCells.Start.assign(1, 0);
+			AggregateCells.Items.clear();
+			CellAggregate.clear();
+			return CoarsestMeshReached(comm);
+		}
 		vector<CellData> cells(NCells);
 		#pragma omp parallel for
 		for (BigNumber e = 0; e < NCells; ++e)
@@ -405,7 +421,13 @@ public:
 		for (BigNumber e = 0; e < NCells; ++e)
 			CellAggregate[e] = cells[e].Aggregate;
 
-		double coarseningRatio = (double)NCells / (double)NAggregates;
+		return CoarsestMeshReached(comm);
+	}
+
+	// The coarsening ratio of the aggregation (of all the processes) is too small
+	bool CoarsestMeshReached(const Communicator& comm) const
+	{
+		double coarseningRatio = (double)comm.Sum(NCells) / (double)comm.Sum(NAggregates);
 		return coarseningRatio <= 1.01;
 	}
 
@@ -483,11 +505,15 @@ public:
 			return firstCoarseFace[lo] + (lower_bound(upper, upper + nUpper[lo], hi) - upper);
 		};
 		AggregateCoarseFaces.Allocate(NAggregates, [&](BigNumber k) { return nNeighbours[k]; });
+		CoarseFaceAggregates.resize(NCoarseFaces);
 		#pragma omp parallel for
 		for (BigNumber k = 0; k < NAggregates; ++k)
 		{
 			for (int i = 0; i < nNeighbours[k]; ++i)
 				AggregateCoarseFaces[k][i] = coarseFace(k, neighbours[k][i]);
+			const BigNumber* upper = neighbours[k] + nNeighbours[k] - nUpper[k];
+			for (int i = 0; i < nUpper[k]; ++i)
+				CoarseFaceAggregates[firstCoarseFace[k] + i] = { k, upper[i] };
 		}
 		FaceCoarseFace.assign(NFaces, -1);
 		bool faceOfOneCell = false, faceOfMoreCells = false;
@@ -499,18 +525,20 @@ public:
 				continue;
 			if (FaceCells.Size(f) >= 2)
 				FaceCoarseFace[f] = coarseFace(CellAggregate[FaceCells[f][0]], CellAggregate[FaceCells[f][1]]);
-			else
+			else if (FaceCells.Size(f) == 1 || NOwnedFaces < 0 || f < NOwnedFaces) // a face of another process may belong to none of the cells
 				faceOfOneCell = true;
 		}
-		// As in HybridAlgebraicMesh::Coarsen(), a face of a single cell would get no coarse face
-		if (faceOfOneCell)
+		// As in HybridAlgebraicMesh::Coarsen(), a face of a single cell would get no coarse face (on several processes:
+		// the errors of all of them)
+		const Communicator& comm = Communicator::Current();
+		if (comm.Any(faceOfOneCell))
 			Utils::FatalError("UncondensedAMG: a face belongs to a single cell: it has no coarse face.");
 		// The blocks of a coarse level where the cells are coupled to the faces of non-neighbouring cells (e.g. with the
 		// multigrid prolongation ReconstructionTrace, -prolong 1): not a mesh, which the interface collapsing assumes
 		// (HybridAlgebraicMesh::Coarsen() left faces without coarse face, and crashed)
-		if (faceOfMoreCells)
+		if (comm.Any(faceOfMoreCells))
 			Utils::FatalError("UncondensedAMG: a face belongs to more than two cells: the coarsening by interface collapsing is not possible on this level.");
-		return NCoarseFaces == 0;
+		return comm.Sum(NCoarseFaces) == 0;
 	}
 
 	//-------------------------------------------------------------//
@@ -1040,7 +1068,7 @@ public:
 					for (size_t p = removedRowStart[i]; p < removedRowEnd[i]; ++p)
 						chunk.Add(rr.Cols[p], rr.Values[p]);
 				}
-				else
+				else if (FaceCoarseFace[f] >= 0) // not a face of another process without cell in the pass (empty row)
 					chunk.Add(FaceCoarseFace[f] * fbs + i % fbs, 1.0);
 				chunk.EndRow();
 			}

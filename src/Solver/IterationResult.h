@@ -1,6 +1,7 @@
 #pragma once
 #include "../Utils/Timer.h"
 #include "../Utils/Cost.h"
+#include "../Utils/Communicator.h"
 using namespace std;
 
 class IterationResult
@@ -94,7 +95,7 @@ public:
 
 	void SetB(const Vector& b)
 	{
-		this->_bNorm = b.norm();
+		this->_bNorm = Parallel::Norm(b);
 	}
 
 	void SetX(const Vector& x)

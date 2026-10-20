@@ -271,6 +271,9 @@ struct HybridSystem
 fhhos4::Solver ToySolver()
 {
 	fhhos4::Solver solver;
+#if FHHOS4_MPI
+	solver.Comm = MPI_COMM_SELF;
+#endif
 	solver.Dimension = 2;
 	solver.FaceDegree = 0;
 	solver.CellDegree = 0;

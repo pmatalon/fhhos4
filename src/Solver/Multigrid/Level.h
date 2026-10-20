@@ -10,6 +10,9 @@ class Level
 public:
 	int Number;
 	const SparseMatrix* OperatorMatrix = nullptr;
+	// On several processes (MPI): the operator distributed by rows (OperatorMatrix is then its block Diag); null on one
+	// process
+	const DistributedMatrix* DistributedOperator = nullptr;
 	bool UseGalerkinOperator = false;
 private:
 	SparseMatrix _galerkinOperator;
@@ -31,6 +34,9 @@ protected:
 	ExportModule Out;
 	SparseMatrix R;
 	SparseMatrix P;
+	// On several processes: the prolongation, its rows the owned unknowns of this level, its columns those of the coarser
+	// level; the restriction is its transpose (MultiplyTransposed())
+	DistributedMatrix DistributedP;
 
 public:
 	Level(int number)
@@ -41,6 +47,43 @@ public:
 	bool IsFinestLevel()
 	{
 		return this->FinerLevel == nullptr;
+	}
+
+	bool IsDistributed() const
+	{
+		return this->DistributedOperator != nullptr;
+	}
+
+	// b - A x, A x with the operator (distributed or not)
+	Vector ResidualOf(const Vector& b, const Vector& x) const
+	{
+		if (this->DistributedOperator)
+			return b - *this->DistributedOperator * x;
+		return b - *this->OperatorMatrix * x;
+	}
+
+	Vector Apply(const Vector& x) const
+	{
+		if (this->DistributedOperator)
+			return *this->DistributedOperator * x;
+		return *this->OperatorMatrix * x;
+	}
+
+	// The number of non-zeros of the operator (of all the processes)
+	BigNumber OperatorNonZeros() const
+	{
+		if (this->DistributedOperator)
+			return this->DistributedOperator->GlobalNonZeros();
+		return this->OperatorMatrix->nonZeros();
+	}
+
+	string OperatorInfo() const
+	{
+		if (!this->DistributedOperator)
+			return Utils::MatrixInfo(*this->OperatorMatrix, "A");
+		const DistributedMatrix& A = *this->DistributedOperator;
+		BigNumber nnz = A.GlobalNonZeros();
+		return "size(A)=" + to_string(A.GlobalRows()) + "x" + to_string(A.GlobalCols()) + ", \tnnz(A)=" + to_string(nnz) + " on " + to_string(A.Comm().Size()) + " processes";
 	}
 
 	bool IsCoarsestLevel()
@@ -63,7 +106,7 @@ public:
 		if (this->IsFinestLevel())
 		{
 			Utils::Log() << "\t\tFine grid operator  : "; Utils::Log().flush();
-			Utils::Log() << Utils::MatrixInfo(*this->OperatorMatrix, "A") << endl;
+			Utils::Log() << OperatorInfo() << endl;
 		}
 		else
 		{
@@ -78,7 +121,7 @@ public:
 				Utils::Log() << "\t\tDiscretized operator: "; Utils::Log().flush();
 				SetupDiscretizedOperator();
 			}
-			Utils::Log() << Utils::MatrixInfo(*this->OperatorMatrix, "A") << endl;
+			Utils::Log() << OperatorInfo() << endl;
 		}
 
 		const SparseMatrix &A = *this->OperatorMatrix;
@@ -87,33 +130,45 @@ public:
 		{
 			Utils::Log() << "\t\tProlongation        : "; Utils::Log().flush();
 			SetupProlongation();
-			if (this->P.rows() == 0)
+			if (this->IsDistributed())
+				Utils::Log() << (this->DistributedP.Diag.rows() == 0 && this->P.rows() == 0 ? "matrix free" : "distributed") << endl;
+			else if (this->P.rows() == 0)
 				Utils::Log() << "matrix free" << endl;
 			else
 				Utils::Log() << Utils::MatrixInfo(this->P, "P") << endl;
 
 			Utils::Log() << "\t\tRestriction         : "; Utils::Log().flush();
 			SetupRestriction();
-			if (this->R.rows() == 0)
+			if (this->IsDistributed())
+				Utils::Log() << (this->DistributedP.Diag.rows() == 0 && this->R.rows() == 0 ? "matrix free" : "transpose of the prolongation") << endl;
+			else if (this->R.rows() == 0)
 				Utils::Log() << "matrix free" << endl;
 			else
 				Utils::Log() << Utils::MatrixInfo(this->R, "R") << endl;
 
 			Utils::Log() << "\t\tPreSmoothing        : "; Utils::Log().flush();
-			PreSmoother->Setup(A);
+			if (this->IsDistributed())
+				PreSmoother->Setup(*this->DistributedOperator);
+			else
+				PreSmoother->Setup(A);
 			if (PreSmoother->Iterations() == 0)
 				Utils::Log() << "none" << endl;
 			else
 				Utils::Log() << PreSmoother->Iterations() << " iteration" << (PreSmoother->Iterations() > 1 ? "s" : "") << " of " << (*PreSmoother) << endl;
 
 			Utils::Log() << "\t\tPostSmoothing       : "; Utils::Log().flush();
-			PostSmoother->Setup(A, *PreSmoother); // reuses the setup of the pre-smoother if they are of the same kind
+			if (this->IsDistributed())
+				PostSmoother->Setup(*this->DistributedOperator, *PreSmoother);
+			else
+				PostSmoother->Setup(A, *PreSmoother); // reuses the setup of the pre-smoother if they are of the same kind
 			if (PostSmoother->Iterations() == 0)
 				Utils::Log() << "none" << endl;
 			else
 				Utils::Log() << PostSmoother->Iterations() << " iteration" << (PostSmoother->Iterations() > 1 ? "s" : "") << " of " << (*PostSmoother) << endl;
 		}
 
+		if (ExportComponents && this->IsDistributed())
+			Utils::FatalError("The export of the multigrid's matrices is not available on several processes.");
 		if (ExportComponents)
 		{
 			this->ExportMatrix(A, "A");
@@ -139,23 +194,31 @@ public:
 
 	virtual Vector Restrict(Vector& vectorOnThisLevel)
 	{
+		if (this->IsDistributed())
+			return this->DistributedP.MultiplyTransposed(vectorOnThisLevel);
 		Vector coarseVector = R * vectorOnThisLevel;
 		return coarseVector;
 	}
 
 	virtual Flops RestrictCost()
 	{
+		if (this->IsDistributed())
+			return 2 * this->DistributedP.LocalNonZeros();
 		return 2 * R.nonZeros();
 	}
 
 	virtual Vector Prolong(Vector& vectorOnTheCoarserLevel)
 	{
+		if (this->IsDistributed())
+			return this->DistributedP * vectorOnTheCoarserLevel;
 		Vector vectorOnThisLevel = P * vectorOnTheCoarserLevel;
 		return vectorOnThisLevel;
 	}
 
 	virtual Flops ProlongCost()
 	{
+		if (this->IsDistributed())
+			return 2 * this->DistributedP.LocalNonZeros();
 		return 2 * P.nonZeros();
 	}
 

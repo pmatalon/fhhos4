@@ -9,6 +9,7 @@ private:
 	// Eigen's sparse Cholesky requires a column-major matrix type.
 	// Memory: SimplicialLDLT only keeps the factors (it makes a temporary permuted copy of the matrix in compute()).
 	Eigen::SimplicialLDLT<ColMajorSparseMatrix> _solver;
+	SparseMatrix _gathered; // on several processes: the whole matrix
 
 public:
 	EigenSparseCholesky() : Solver() {}
@@ -35,8 +36,26 @@ public:
 		}
 	}
 
+	// On several processes (a coarse solver): the matrix gathered on every process, each one factorizes it and solves
+	// the whole system (redundantly), and keeps its rows
+	void Setup(const DistributedMatrix& A) override
+	{
+		_gathered = A.GatherOnAll();
+		Setup(_gathered);
+		this->Distributed = &A;
+	}
+
 	Vector Solve(const Vector& b) override
 	{
+		if (this->Distributed)
+		{
+			const DistributedMatrix& A = *this->Distributed;
+			vector<double> local(b.data(), b.data() + b.rows());
+			vector<double> all = A.Comm().AllGatherV(local);
+			Vector x = _solver.solve(Eigen::Map<const Vector>(all.data(), all.size()));
+			this->SolvingComputationalWork = 0;
+			return x.segment(A.RowMap->Begin * A.RowBlockSize, b.rows());
+		}
 		Vector x = _solver.solve(b);
 		this->SolvingComputationalWork = Cost::CholeskySolve(_solver.matrixL())*1e-6;
 		return x;

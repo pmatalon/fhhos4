@@ -167,6 +167,39 @@ public:
 		return d;
 	}
 
+	// On several processes: the partition of the elements by GMSH (METIS) into nParts parts, the part (0 to nParts - 1) of
+	// each element, by element number. The model of GMSH must still be open (before CloseGMSH()); it is unpartitioned
+	// after.
+	vector<int> PartitionElements(int nParts)
+	{
+		vector<int> part(this->Elements.size(), nParts == 1 ? 0 : -1);
+		if (nParts == 1)
+			return part;
+		gmsh::option::setNumber("Mesh.PartitionCreateTopology", 0);
+		gmsh::option::setNumber("Mesh.PartitionCreatePhysicals", 0);
+		gmsh::model::mesh::partition(nParts);
+		gmsh::vectorpair entities;
+		gmsh::model::getEntities(entities, Dim);
+		for (auto [dim, tag] : entities)
+		{
+			vector<int> partitions;
+			gmsh::model::getPartitions(dim, tag, partitions);
+			if (partitions.empty())
+				continue;
+			vector<int> types;
+			vector<vector<size_t>> elementTags, nodeTags;
+			gmsh::model::mesh::getElements(types, elementTags, nodeTags, dim, tag);
+			for (const vector<size_t>& tags : elementTags)
+				for (size_t t : tags)
+					part[GetElementFromGMSHTag(t)->Number] = partitions[0] - 1;
+		}
+		gmsh::model::mesh::unpartition();
+		for (int p : part)
+			if (p < 0 || p >= nParts)
+				Utils::FatalError("GMSH's partition misses elements.");
+		return part;
+	}
+
 	static void CloseGMSH()
 	{
 		gmsh::finalize();

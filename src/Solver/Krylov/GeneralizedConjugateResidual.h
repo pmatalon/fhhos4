@@ -44,6 +44,20 @@ public:
 		this->SetupComputationalWork = this->Precond.SetupComputationalWork();
 	}
 
+	void Setup(const DistributedMatrix& A) override
+	{
+		SetDistributedMatrix(A);
+		this->Precond.Setup(A);
+		this->SetupComputationalWork = this->Precond.SetupComputationalWork();
+	}
+
+	void Setup(const DistributedMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, shared_ptr<const IndexMap> faceMap, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
+	{
+		SetDistributedMatrix(A);
+		this->Precond.Setup(A, A_T_T, A_T_F, faceMap, cellInterpOfOne, faceInterpOfOne);
+		this->SetupComputationalWork = this->Precond.SetupComputationalWork();
+	}
+
 	void Solve(const Vector& b, Vector& x, bool xEquals0, bool computeResidual, bool computeAx) override
 	{
 		const SparseMatrix& A = *this->Matrix;
@@ -63,8 +77,8 @@ public:
 		}
 		else
 		{
-			r = b - A * x;                                            result.AddWorkInFlops(Cost::DAXPY(A));
-			result.SetResidualNorm(r.norm());                         result.AddWorkInFlops(Cost::Norm(r));
+			r = ResidualOf(b, x);                                     result.AddWorkInFlops(Cost::DAXPY(A));
+			result.SetResidualNorm(Parallel::Norm(r));                result.AddWorkInFlops(Cost::Norm(r));
 		}
 
 		this->IterationCount = 0;
@@ -91,28 +105,28 @@ public:
 			else
 			{
 				Z[j] = Precond.Apply(r);                              result.AddWorkInMFlops(Precond.SolvingComputationalWork());
-				C[j] = A * Z[j];                                      result.AddWorkInFlops(Cost::MatVec(A));
+				C[j] = MatVec(Z[j]);                                  result.AddWorkInFlops(Cost::MatVec(A));
 			}
 
 			// Orthonormalization of c_j against the previous c_i (modified Gram-Schmidt)
 			for (int i = 0; i < j; i++)
 			{
-				Gamma(i, j) = C[i].dot(C[j]);                         result.AddWorkInFlops(Cost::Dot(C[j]));
+				Gamma(i, j) = Parallel::Dot(C[i], C[j]);              result.AddWorkInFlops(Cost::Dot(C[j]));
 				C[j] -= Gamma(i, j) * C[i];                           result.AddWorkInFlops(Cost::VectorDAXPY(C[j]));
 			}
-			Gamma(j, j) = C[j].norm();                                result.AddWorkInFlops(Cost::Norm(C[j]));
+			Gamma(j, j) = Parallel::Norm(C[j]);                       result.AddWorkInFlops(Cost::Norm(C[j]));
 			assert(Gamma(j, j) > 0);
 			C[j] /= Gamma(j, j);                                      result.AddWorkInFlops(Cost::ConstantVec(C[j]));
 
 			// Minimization of the residual norm along c_j
-			a[j] = C[j].dot(r);                                       result.AddWorkInFlops(Cost::Dot(r));
+			a[j] = Parallel::Dot(C[j], r);                            result.AddWorkInFlops(Cost::Dot(r));
 			r -= a[j] * C[j];                                         result.AddWorkInFlops(Cost::VectorDAXPY(r));
 			j++;
 
 			//---------- End of iteration ----------//
 			this->IterationCount++;
 
-			result.SetResidualNorm(r.norm());                         result.AddWorkInFlops(Cost::Norm(r));
+			result.SetResidualNorm(Parallel::Norm(r));                result.AddWorkInFlops(Cost::Norm(r));
 
 			if (j == Restart || StoppingCriteriaMet(result))
 			{
@@ -123,8 +137,8 @@ public:
 				// Residual replacement (the loop condition then evaluates the stopping criteria on the true residual)
 				if (this->ResidualReplacement)
 				{
-					r = b - A * x;                                    result.AddWorkInFlops(Cost::DAXPY(A));
-					result.ReplaceResidualNorm(r.norm());             result.AddWorkInFlops(Cost::Norm(r));
+					r = ResidualOf(b, x);                             result.AddWorkInFlops(Cost::DAXPY(A));
+					result.ReplaceResidualNorm(Parallel::Norm(r));    result.AddWorkInFlops(Cost::Norm(r));
 				}
 				result.SetX(x);
 			}

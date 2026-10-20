@@ -11,6 +11,7 @@
 #include "Solver/AlgebraicSolverFactory.h"
 #include "Solver/LibraryParameters.h"
 #include "Solver/Krylov/PreconditionedBiCGSTAB.h"
+#include "Solver/DistributedStaticCondensation.h"
 #include "Solver/StaticCondensation.h"
 #include "Utils/BorrowedSparseMatrix.h"
 #include "Utils/SparseMatrixOps.h"
@@ -28,9 +29,10 @@ namespace fhhos4
 			return stream;
 		}
 
-		// During a call of the library: fhhos4's messages (Utils::Log()) according to the verbosity, and the number of
-		// threads (Solver::Threads and Verbosity; the helpers: 0 and 0). Restores them at the end, with the format of cout,
-		// which printing the iterations changes.
+		// During a call of the library: fhhos4's messages (Utils::Log()) according to the verbosity (on several processes,
+		// those of the process of rank 0), the number of threads (Solver::Threads and Verbosity; the helpers: 0 and 0), and
+		// the processes of the solver (Communicator::Current(): one by default). Restores them at the end, with the format
+		// of cout, which printing the iterations changes.
 		class CallScope
 		{
 		private:
@@ -38,20 +40,24 @@ namespace fhhos4
 			ios_base::fmtflags _savedCoutFlags;
 			streamsize _savedCoutPrecision;
 			int _savedThreads = 0;
+			CurrentCommunicator _comm;
 		public:
-			CallScope(const Solver& solver)
-				: CallScope(solver.Threads, solver.Verbosity)
+			// sharingProcesses: the processes of comm that run on the same CPUs as this one (Parallelism::SharingProcesses()),
+			// among which the automatic number of threads divides the cores
+			CallScope(const Solver& solver, const Communicator& comm, int sharingProcesses)
+				: CallScope(solver.Threads, solver.Verbosity, comm, sharingProcesses)
 			{}
 
-			CallScope(int threads, int verbosity)
+			CallScope(int threads, int verbosity, const Communicator& comm = Communicator(), int sharingProcesses = 1)
+				: _comm(comm)
 			{
 				_savedLog = Utils::LogStream;
-				Utils::LogStream = verbosity >= 2 ? &cout : &NullStream();
+				Utils::LogStream = verbosity >= 2 && comm.IsRoot() ? &cout : &NullStream();
 				_savedCoutFlags = cout.flags();
 				_savedCoutPrecision = cout.precision();
 #ifdef _OPENMP
 				if (threads <= 0)
-					threads = Parallelism::WithoutHyperThreads(omp_get_max_threads());
+					threads = Parallelism::WithoutHyperThreads(omp_get_max_threads(), sharingProcesses);
 				if (threads != omp_get_max_threads())
 				{
 					_savedThreads = omp_get_max_threads();
@@ -125,6 +131,34 @@ namespace fhhos4
 			static const SparseMatrixIndex noRows[1] = { 0 }; // the RowPointers of a matrix without rows, if null
 			return make_unique<BorrowedSparseMatrix>(M.Rows, M.Cols, M.RowPointers ? M.RowPointers : noRows, M.ColumnIndices, M.Values);
 		}
+
+		// Runs check() on all the processes of comm: if it throws on one of them, all of them throw (an error on one
+		// process alone would leave the others waiting in the next collective call), with the message of the first
+		// process where it threw
+		template <class Check>
+		void CollectiveCheck(const Communicator& comm, Check check)
+		{
+			if (!comm.IsDistributed())
+			{
+				check();
+				return;
+			}
+			string message;
+			try
+			{
+				check();
+			}
+			catch (const fhhos4::Error& e)
+			{
+				message = e.what();
+			}
+			int failedRank = comm.Min(message.empty() ? comm.Size() : comm.Rank());
+			if (failedRank == comm.Size())
+				return;
+			vector<char> text(message.begin(), message.end());
+			comm.Broadcast(text, failedRank);
+			Utils::FatalError(string(text.begin(), text.end()) + (comm.Size() > 1 ? " (on the process " + to_string(failedRank) + ")" : ""));
+		}
 	}
 
 	struct Solver::Impl
@@ -144,6 +178,33 @@ namespace fhhos4
 		unique_ptr<UncondensedAMG> Multigrid;
 		unique_ptr<IterativeSolver> KrylovSolver; // preconditioned by Multigrid; null if Krylov is None
 		bool IsSetUp = false;
+
+		// The processes of the solver (Solver::Comm with MPI; one otherwise), and, on several processes, the faces of the
+		// cells of the process (owned, then ghosts), the condensation and the condensed matrix, distributed
+		Communicator Comm;
+		int SharingProcesses = 1; // of Comm on the node of this process (see CallScope)
+		shared_ptr<const IndexMap> Faces;
+		unique_ptr<DistributedStaticCondensation> DistributedCondensation;
+		DistributedMatrix DistributedA;
+		Eigen::Index NFaceDoFs = 0; // of the process
+
+		bool IsDistributed() const
+		{
+			return Comm.IsDistributed();
+		}
+
+		// The communicator of the solver, from Solver::Comm (mandatory with MPI)
+		void SetCommunicator(const Solver& s)
+		{
+#if FHHOS4_MPI
+			if (s.Comm == MPI_COMM_NULL)
+				Utils::FatalError("fhhos4::Solver: set Comm (the library is compiled with MPI): MPI_COMM_SELF for the system of each process, or the communicator of the processes of a distributed system.");
+			Comm = Communicator(s.Comm);
+#else
+			Comm = Communicator();
+#endif
+			SharingProcesses = Comm.SharingProcesses();
+		}
 
 		IterativeSolver* ActiveSolver() const
 		{
@@ -290,19 +351,14 @@ namespace fhhos4
 		void Setup(const Solver& s, unique_ptr<BorrowedSparseMatrix> A, const SparseMatrix& A_TT, const SparseMatrix& A_TF, unique_ptr<BorrowedSparseMatrix> A_FT, const SparseMatrix* A_FF, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne)
 		{
 			auto start = chrono::steady_clock::now();
-			IsSetUp = false;
-			KrylovSolver.reset();
-			Multigrid.reset();
-			Condensation.reset();
-			this->A = nullptr;
-			OwnA = SparseMatrix();
+			Reset();
 			GivenA = std::move(A);
 			GivenA_FT = std::move(A_FT);
 			NCellDoFs = A_TF.rows();
+			NFaceDoFs = A_TF.cols();
 
 			ProgramArguments args = Arguments(s);
-			ExportModule out;
-			Multigrid.reset(AlgebraicSolverFactory::CreateUncondensedAMG(args, s.Dimension, s.FaceDegree, CellBlockSize, FaceBlockSize, FaceBlockSize, out, AlgebraicSolverFactory::AlgebraicCoarseSolvers(s.Dimension, out)));
+			CreateSolvers(args, s);
 
 			if (GivenA)
 				this->A = GivenA.get();
@@ -316,9 +372,59 @@ namespace fhhos4
 			if (!A_FF && Multigrid->A_F_FNeeded())
 				computedA_FF = StaticCondensation(A_TT, A_TF, GivenA_FT.get(), CellBlockSize).FaceBlock(*this->A);
 
-			// The Krylov method preconditioned by one cycle (SolverPreconditioner), as SolverFactory (-s fcguamg, gcruamg),
-			// except the residual replacement: the tolerance applies to the true residual (Result::RelativeResidual =
-			// |b - Ax|/|b|)
+			// The blocks are only read during the setup (UncondensedAMG::Setup())
+			SparseMatrix symmetric; // empty A_FT: symmetric matrix
+			ActiveSolver()->Setup(*this->A, A_TT, A_TF, GivenA_FT ? *GivenA_FT : symmetric, A_FF ? *A_FF : computedA_FF, cellInterpOfOne, faceInterpOfOne);
+			if (!Condensation)
+				GivenA_FT.reset(); // read by the setup only
+			IsSetUp = true;
+
+			if (s.Verbosity == 1)
+				cout << "fhhos4: setup of " << Multigrid->NumberOfLevels() << " levels in " << Seconds(start) << " s" << endl;
+		}
+
+		// On several processes: from the blocks of the uncondensed system (symmetric), the rows of the process (see
+		// Solver::SetupSymmetric()), A_FF in full
+		void SetupDistributed(const Solver& s, const SparseMatrix& A_TT, const SparseMatrix& A_TF, const SparseMatrix& A_FF, shared_ptr<const IndexMap> faces, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne)
+		{
+			auto start = chrono::steady_clock::now();
+			Reset();
+			Faces = faces;
+			NCellDoFs = A_TF.rows();
+			NFaceDoFs = A_FF.rows();
+
+			ProgramArguments args = Arguments(s);
+			CreateSolvers(args, s);
+
+			DistributedCondensation = make_unique<DistributedStaticCondensation>(A_TT, A_TF, faces, CellBlockSize, FaceBlockSize);
+			DistributedA = DistributedCondensation->CondensedMatrix(A_FF);
+			ActiveSolver()->Setup(DistributedA, A_TT, A_TF, faces, cellInterpOfOne, faceInterpOfOne);
+			IsSetUp = true;
+
+			if (s.Verbosity == 1 && Comm.IsRoot())
+				cout << "fhhos4: setup of " << Multigrid->NumberOfLevels() << " levels on " << Comm.Size() << " processes in " << Seconds(start) << " s" << endl;
+		}
+
+		void Reset()
+		{
+			IsSetUp = false;
+			KrylovSolver.reset();
+			Multigrid.reset();
+			Condensation.reset();
+			DistributedCondensation.reset();
+			DistributedA = DistributedMatrix();
+			Faces.reset();
+			this->A = nullptr;
+			OwnA = SparseMatrix();
+		}
+
+		// The multigrid, and the Krylov method preconditioned by one cycle (SolverPreconditioner), as SolverFactory (-s
+		// fcguamg, gcruamg), except the residual replacement: the tolerance applies to the true residual
+		// (Result::RelativeResidual = |b - Ax|/|b|)
+		void CreateSolvers(const ProgramArguments& args, const Solver& s)
+		{
+			ExportModule out;
+			Multigrid.reset(AlgebraicSolverFactory::CreateUncondensedAMG(args, s.Dimension, s.FaceDegree, CellBlockSize, FaceBlockSize, FaceBlockSize, out, AlgebraicSolverFactory::AlgebraicCoarseSolvers(s.Dimension, out)));
 			if (Krylov == fhhos4::Krylov::FCG)
 			{
 				auto fcg = make_unique<FlexibleConjugateGradient>(1);
@@ -340,16 +446,6 @@ namespace fhhos4
 				KrylovSolver = std::move(bicgstab);
 			}
 			ActiveSolver()->PrintIterationResults = args.Solver.PrintIterationResults;
-
-			// The blocks are only read during the setup (UncondensedAMG::Setup())
-			SparseMatrix symmetric; // empty A_FT: symmetric matrix
-			ActiveSolver()->Setup(*this->A, A_TT, A_TF, GivenA_FT ? *GivenA_FT : symmetric, A_FF ? *A_FF : computedA_FF, cellInterpOfOne, faceInterpOfOne);
-			if (!Condensation)
-				GivenA_FT.reset(); // read by the setup only
-			IsSetUp = true;
-
-			if (s.Verbosity == 1)
-				cout << "fhhos4: setup of " << Multigrid->NumberOfLevels() << " levels in " << Seconds(start) << " s" << endl;
 		}
 
 		void CheckSetUp(const char* function) const
@@ -360,14 +456,14 @@ namespace fhhos4
 
 		void CheckVectorSize(Eigen::Index size, const char* vector) const
 		{
-			if (size != A->rows())
-				Utils::FatalError(string("fhhos4::Solver: the vector ") + vector + " has " + to_string(size) + " rows, expected " + to_string(A->rows()) + " (the faces DoFs).");
+			if (size != NFaceDoFs)
+				Utils::FatalError(string("fhhos4::Solver: the vector ") + vector + " has " + to_string(size) + " rows, expected " + to_string(NFaceDoFs) + " (the faces DoFs" + (IsDistributed() ? " of the process" : "") + ").");
 		}
 
 		void CheckCellVectorSize(Eigen::Index size, const char* vector) const
 		{
 			if (size != NCellDoFs)
-				Utils::FatalError(string("fhhos4::Solver: the vector ") + vector + " has " + to_string(size) + " rows, expected " + to_string(NCellDoFs) + " (the cells DoFs).");
+				Utils::FatalError(string("fhhos4::Solver: the vector ") + vector + " has " + to_string(size) + " rows, expected " + to_string(NCellDoFs) + " (the cells DoFs" + (IsDistributed() ? " of the process" : "") + ").");
 		}
 	};
 
@@ -380,9 +476,17 @@ namespace fhhos4
 	Solver& Solver::operator=(Solver&&) noexcept = default;
 
 	void Solver::Setup(bool symmetric, const CSRView* A, const CSRView& A_TT, const CSRView& A_TF, const CSRView* A_FT, const CSRView* A_FF,
-	                   detail::ConstVectorView cellInterpOfOne, detail::ConstVectorView faceInterpOfOne)
+	                   detail::ConstVectorView cellInterpOfOne, detail::ConstVectorView faceInterpOfOne, const GhostNumbers& faceGhosts)
 	{
-		CallScope scope(*this);
+		_impl->SetCommunicator(*this);
+		CallScope scope(*this, _impl->Comm, _impl->SharingProcesses);
+		if (_impl->IsDistributed())
+		{
+			SetupDistributed(symmetric, A, A_TT, A_TF, A_FT, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhosts);
+			return;
+		}
+		if (faceGhosts.Count != 0)
+			Utils::FatalError("fhhos4::Solver: faceGhosts on one process (Comm): the ghosts are the faces of other processes.");
 		_impl->CheckParameters(*this, symmetric);
 		// The inputs, read in place, checked before the previous setup is replaced
 		unique_ptr<BorrowedSparseMatrix> a = A ? Borrow(*A, "A") : nullptr;
@@ -394,18 +498,66 @@ namespace fhhos4
 		_impl->Setup(*this, std::move(a), *a_TT, *a_TF, std::move(a_FT), a_FF.get(), cellOne, faceOne);
 	}
 
+	// On several processes, the parameters are those of the process of rank 0 (the same on all of them)
+	void Solver::SetupDistributed(bool symmetric, const CSRView* A, const CSRView& A_TT, const CSRView& A_TF, const CSRView* A_FT, const CSRView* A_FF,
+	                              detail::ConstVectorView cellInterpOfOne, detail::ConstVectorView faceInterpOfOne, const GhostNumbers& faceGhosts)
+	{
+		const Communicator& comm = _impl->Comm;
+		unique_ptr<BorrowedSparseMatrix> a_TT, a_TF, a_FF;
+		shared_ptr<const IndexMap> faces;
+		CollectiveCheck(comm, [&]()
+		{
+			if (!symmetric)
+				Utils::FatalError("fhhos4::Solver: non-symmetric systems are not solved on several processes yet (SetupNonsymmetric()).");
+			if (A)
+				Utils::FatalError("fhhos4::Solver: on several processes, give the uncondensed system (SetupSymmetric()), not the condensed one.");
+			_impl->CheckParameters(*this, symmetric);
+			if (faceGhosts.Count < 0 || (faceGhosts.Count > 0 && !faceGhosts.Numbers))
+				Utils::FatalError("fhhos4::Solver: faceGhosts: a negative Count, or no Numbers.");
+			a_TT = Borrow(A_TT, "A_TT");
+			a_TF = Borrow(A_TF, "A_TF");
+			a_FF = Borrow(*A_FF, "A_FF");
+		});
+		int cbs = _impl->CellBlockSize, fbs = _impl->FaceBlockSize;
+		CollectiveCheck(comm, [&]()
+		{
+			auto size = [](const SparseMatrix& M) { return to_string(M.rows()) + " x " + to_string(M.cols()); };
+			if (a_TF->rows() % cbs != 0 || a_TT->rows() != a_TF->rows() || a_TT->cols() != a_TT->rows())
+				Utils::FatalError("fhhos4::Solver: on several processes, A_TT (" + size(*a_TT) + ") and A_TF (" + size(*a_TF) + ") have the rows of the cells of the process (" + to_string(cbs) + " DoFs per cell), A_TT the same columns.");
+			if (a_FF->rows() % fbs != 0 || a_FF->cols() != a_TF->cols() || a_FF->cols() != a_FF->rows() + faceGhosts.Count * fbs)
+				Utils::FatalError("fhhos4::Solver: on several processes, A_FF (" + size(*a_FF) + ") has the rows of the faces of the process (" + to_string(fbs) + " DoFs per face), and A_FF and A_TF (" + size(*a_TF) + ") the columns of the faces of the process then of its " + to_string(faceGhosts.Count) + " ghosts (faceGhosts).");
+			if (cellInterpOfOne.Size != a_TF->rows() / cbs || faceInterpOfOne.Size != a_FF->rows() / fbs)
+				Utils::FatalError("fhhos4::Solver: on several processes, the interpolations of 1 have the cells (" + to_string(a_TF->rows() / cbs) + ") and faces (" + to_string(a_FF->rows() / fbs) + ") of the process, got " + to_string(cellInterpOfOne.Size) + " and " + to_string(faceInterpOfOne.Size) + ".");
+			// A_TT is block diagonal
+			for (BigNumber i = 0; i < a_TT->rows(); i++)
+				for (SparseMatrix::InnerIterator it(*a_TT, i); it; ++it)
+					if (it.col() / cbs != i / cbs && it.value() != 0)
+						Utils::FatalError("fhhos4::Solver: A_TT has a non-zero (" + to_string(i) + ", " + to_string(it.col()) + ") outside the diagonal blocks of the cells.");
+			Impl::CheckInterpOfOne(Eigen::Map<const Vector>(cellInterpOfOne.Data, cellInterpOfOne.Size), "cell");
+			Impl::CheckInterpOfOne(Eigen::Map<const Vector>(faceInterpOfOne.Data, faceInterpOfOne.Size), "face");
+		});
+		// The faces of the process and its ghosts (collective, checks the ghosts on all the processes)
+		IndexMap owners(comm, a_FF->rows() / fbs);
+		faces = make_shared<const IndexMap>(IndexMap::InOrder(owners, vector<BigNumber>(faceGhosts.Numbers, faceGhosts.Numbers + faceGhosts.Count)));
+		Eigen::Map<const Vector> cellOne(cellInterpOfOne.Data, cellInterpOfOne.Size), faceOne(faceInterpOfOne.Data, faceInterpOfOne.Size);
+		_impl->SetupDistributed(*this, *a_TT, *a_TF, *a_FF, faces, cellOne, faceOne);
+	}
+
 	Result Solver::SolveCondensed(detail::ConstVectorView b, detail::VectorView x)
 	{
 		_impl->CheckSetUp("Solve");
-		_impl->CheckVectorSize(b.Size, "b");
-		_impl->CheckVectorSize(x.Size, "x");
-		CallScope scope(*this);
+		CallScope scope(*this, _impl->Comm, _impl->SharingProcesses);
+		CollectiveCheck(_impl->Comm, [&]()
+		{
+			_impl->CheckVectorSize(b.Size, "b");
+			_impl->CheckVectorSize(x.Size, "x");
+		});
 		auto start = chrono::steady_clock::now();
 
 		Result result;
 		Vector rhs = Eigen::Map<const Vector>(b.Data, b.Size);
 		Eigen::Map<Vector> callerX(x.Data, x.Size);
-		if (rhs.norm() == 0)
+		if (Parallel::Norm(rhs) == 0)
 		{
 			callerX.setZero();
 			result.Converged = true;
@@ -413,7 +565,7 @@ namespace fhhos4
 		}
 
 		Vector solution = callerX;
-		bool xEquals0 = (solution.array() == 0).all(); // skips the products by the initial guess, as the program does
+		bool xEquals0 = _impl->Comm.All((solution.array() == 0).all()); // skips the products by the initial guess, as the program does
 		IterativeSolver* solver = _impl->ActiveSolver();
 		solver->Tolerance = Tolerance;
 		solver->MaxIterations = MaxIterations;
@@ -423,7 +575,7 @@ namespace fhhos4
 		result.Iterations = solver->IterationCount;
 		result.RelativeResidual = solver->LastIterationResult.NormalizedResidualNorm;
 		result.Converged = result.RelativeResidual < Tolerance;
-		if (Verbosity == 1)
+		if (Verbosity == 1 && _impl->Comm.IsRoot())
 			cout << "fhhos4: " << result.Iterations << " iterations, relative residual " << result.RelativeResidual << (result.Converged ? "" : " (not converged)") << ", " << Seconds(start) << " s" << endl;
 		return result;
 	}
@@ -431,13 +583,26 @@ namespace fhhos4
 	Result Solver::SolveUncondensed(detail::ConstVectorView b_T, detail::ConstVectorView b_F, detail::VectorView x_T, detail::VectorView x_F)
 	{
 		_impl->CheckSetUp("Solve");
-		if (!_impl->Condensation)
+		if (!_impl->Condensation && !_impl->DistributedCondensation)
 			Utils::FatalError("fhhos4::Solver::Solve(b_T, b_F, x_T, x_F) solves the uncondensed system: it needs a setup from its blocks (SetupSymmetric() or SetupNonsymmetric()). After SetupSymmetricCondensed() or SetupNonsymmetricCondensed(), solve the condensed system with Solve(b, x).");
-		_impl->CheckCellVectorSize(b_T.Size, "b_T");
-		_impl->CheckCellVectorSize(x_T.Size, "x_T");
-		_impl->CheckVectorSize(b_F.Size, "b_F");
-		_impl->CheckVectorSize(x_F.Size, "x_F");
-		CallScope scope(*this);
+		CallScope scope(*this, _impl->Comm, _impl->SharingProcesses);
+		CollectiveCheck(_impl->Comm, [&]()
+		{
+			_impl->CheckCellVectorSize(b_T.Size, "b_T");
+			_impl->CheckCellVectorSize(x_T.Size, "x_T");
+			_impl->CheckVectorSize(b_F.Size, "b_F");
+			_impl->CheckVectorSize(x_F.Size, "x_F");
+		});
+
+		if (_impl->DistributedCondensation)
+		{
+			const DistributedStaticCondensation& condensation = *_impl->DistributedCondensation;
+			Vector invA_TT_b_T = condensation.SolveCells(Eigen::Map<const Vector>(b_T.Data, b_T.Size));
+			Vector b = condensation.CondensedRHS(Eigen::Map<const Vector>(b_F.Data, b_F.Size), invA_TT_b_T);
+			Result result = SolveCondensed({ b.data(), b.size() }, x_F);
+			Eigen::Map<Vector>(x_T.Data, x_T.Size) = condensation.CellUnknowns(invA_TT_b_T, Eigen::Map<const Vector>(x_F.Data, x_F.Size));
+			return result;
+		}
 
 		const StaticCondensation& condensation = *_impl->Condensation;
 		Vector invA_TT_b_T = condensation.SolveCells(Eigen::Map<const Vector>(b_T.Data, b_T.Size));
@@ -450,6 +615,8 @@ namespace fhhos4
 	CSRView Solver::CondensedMatrix() const
 	{
 		_impl->CheckSetUp("CondensedMatrix");
+		if (_impl->IsDistributed())
+			Utils::FatalError("fhhos4::Solver::CondensedMatrix(): not available on several processes.");
 		const SparseMatrix& A = *_impl->A;
 		return CSRView(A.rows(), A.cols(), A.outerIndexPtr(), A.innerIndexPtr(), A.valuePtr());
 	}

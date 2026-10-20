@@ -150,6 +150,64 @@ public:
 		fine->A_F_T = nullptr;
 	}
 
+	void Setup(const DistributedMatrix& A) override
+	{
+		Utils::FatalError("The method Setup(const DistributedMatrix& A) cannot be used for this solver.");
+	}
+
+	// On several processes (MPI): the blocks distributed by rows (see IterativeSolver), symmetric. The same algorithm,
+	// where each process aggregates its own cells (UncondensedLevel::CoarsenInDistributedPasses()), with the default
+	// options only. Each face must belong to a process that owns one of its cells. The blocks are only read by the setup.
+	void Setup(const DistributedMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, shared_ptr<const IndexMap> faceMap, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
+	{
+		const Communicator& comm = A.Comm();
+		const IndexMap& faces = *faceMap;
+		bool invalid = A.RowBlockSize != _faceBlockSize || A.RowMap->Offsets != faces.Offsets || A_T_F.cols() != faces.NLocal() * _faceBlockSize
+			|| A_T_F.rows() % _cellBlockSize != 0 || A_T_T.rows() != A_T_F.rows() || A_T_T.cols() != A_T_T.rows()
+			|| cellInterpOfOne.rows() != A_T_F.rows() / _cellBlockSize || faceInterpOfOne.rows() != faces.NOwned;
+		if (comm.Any(invalid))
+			Utils::FatalError("UncondensedAMG: on several processes, the blocks must have the rows of the cells and faces of each process, the same faces in the operator and in A_T_F, and the interpolations of 1 on the cells and faces of the process.");
+		bool zeroOrInfinite = !cellInterpOfOne.allFinite() || (cellInterpOfOne.array() == 0).any() || !faceInterpOfOne.allFinite() || (faceInterpOfOne.array() == 0).any();
+		if (comm.Any(zeroOrInfinite))
+			Utils::FatalError("UncondensedAMG: the interpolations of 1 on the cells and faces must be finite and non-zero.");
+		if (A_F_FNeeded())
+			Utils::FatalError("UncondensedAMG: on several processes, the options that need the block A_F_F are not available.");
+		if (this->HP_CS != HP_CoarsStgy::H_only && this->HP_CS != HP_CoarsStgy::P_then_H)
+			Utils::FatalError("UncondensedAMG: on several processes, only the p-coarsening then the h-coarsening (or the h-coarsening alone) are available.");
+		_symmetric = true;
+
+		this->_fineLevel = this->CreateFineLevel();
+		UncondensedLevel* fine = dynamic_cast<UncondensedLevel*>(this->_fineLevel);
+		fine->A_T_T = &A_T_T;
+		fine->A_T_F = &A_T_F;
+		fine->A_F_T = nullptr;
+		fine->A_F_F = nullptr;
+		fine->FaceMap = faceMap;
+		fine->LocalOp = &_localOperator;
+
+		// The interpolations of 1 on the faces of the cells of the process (the ghosts of FaceMap too)
+		bool scaling = (cellInterpOfOne.array() != 1).any() || (faceInterpOfOne.array() != 1).any();
+		if (comm.Any(scaling))
+		{
+			fine->CellInterpOfOne = cellInterpOfOne;
+			fine->FaceInterpOfOne = faces.WithGhosts(faceInterpOfOne, 1);
+		}
+
+		if (Utils::IsRefinementStrategy(this->H_CS))
+			this->H_CS = H_CoarsStgy::MultiplePairwiseAggregation;
+		if (this->H_CS == H_CoarsStgy::MultiplePairwiseAggregation && this->CoarseningFactor == 0)
+			this->CoarseningFactor = 3.8;
+
+		Multigrid::Setup(A);
+
+		_localOperator.Current.Free();
+		_localOperator.Next.Free();
+		_localOperator.Assembled = nullptr;
+		_localOperator.AssembledDistributed = nullptr;
+		fine->A_T_T = nullptr;
+		fine->A_T_F = nullptr;
+	}
+
 	Vector Solve(const Vector& b, string initialGuessCode) override
 	{
 		if (initialGuessCode.compare("smooth") == 0)

@@ -80,6 +80,20 @@ public:
 	void Setup(const SparseMatrix& A) override
 	{
 		IterativeSolver::Setup(A);
+		SetupBlocks(A);
+	}
+
+	// On several processes: the diagonal blocks of the rows of the process (in Diag), and the estimate of lambdaMax of
+	// the whole matrix
+	void Setup(const DistributedMatrix& A) override
+	{
+		SetDistributedMatrix(A);
+		SetupBlocks(A.Diag);
+	}
+
+private:
+	void SetupBlocks(const SparseMatrix& A)
+	{
 		if (!A.isCompressed())
 			Utils::FatalError("The Chebyshev smoothers require a compressed matrix (see Eigen's makeCompressed()).");
 
@@ -100,7 +114,7 @@ public:
 				positiveDiagonal = positiveDiagonal && a_ii > 0;
 				_invDiag[i] = 1 / a_ii;
 			}
-			if (!positiveDiagonal)
+			if (!Communicator::Current().All(positiveDiagonal))
 				Utils::FatalError("The Chebyshev smoothers require a symmetric positive definite matrix: non-positive diagonal coefficient.");
 		}
 		else
@@ -112,20 +126,40 @@ public:
 		this->SetupComputationalWork = (nb * 2.0/3.0*pow(_blockSize, 3) + EigenvalueEstimateIterations * lanczosIteration) * 1e-6;
 	}
 
+public:
+
 	// The diagonal blocks and the estimate of lambdaMax of another Chebyshev smoother set up for A with the same block
 	// size, whatever its kind
 	bool SetupFrom(const SparseMatrix& A, const IterativeSolver& other) override
 	{
 		const BlockChebyshev* o = dynamic_cast<const BlockChebyshev*>(&other);
-		if (!o || o->Matrix != &A || o->_blockSize != _blockSize || this->ComputeExactSolution)
+		if (!o || o->Matrix != &A || o->Distributed || o->_blockSize != _blockSize || this->ComputeExactSolution)
 			return false;
 		IterativeSolver::Setup(A);
-		_diagBlockSolver = o->_diagBlockSolver;
-		_invDiag = o->_invDiag;
-		_lambdaMaxEstimate = o->_lambdaMaxEstimate;
-		this->SetupComputationalWork = o->SetupComputationalWork;
+		CopySetup(*o);
 		return true;
 	}
+
+	bool SetupFrom(const DistributedMatrix& A, const IterativeSolver& other) override
+	{
+		const BlockChebyshev* o = dynamic_cast<const BlockChebyshev*>(&other);
+		if (!o || o->Distributed != &A || o->_blockSize != _blockSize || this->ComputeExactSolution)
+			return false;
+		SetDistributedMatrix(A);
+		CopySetup(*o);
+		return true;
+	}
+
+private:
+	void CopySetup(const BlockChebyshev& o)
+	{
+		_diagBlockSolver = o._diagBlockSolver;
+		_invDiag = o._invDiag;
+		_lambdaMaxEstimate = o._lambdaMaxEstimate;
+		this->SetupComputationalWork = o.SetupComputationalWork;
+	}
+
+public:
 
 	bool CanOptimizeResidualComputation() override
 	{
@@ -238,6 +272,8 @@ private:
 	//   dOut_I = a dIn_I + c D_I^-1 r_I     if dOut (a dIn_I omitted if dIn is null),
 	//   x_I = dIn_I (xEquals0) or x_I += dIn_I   if x.
 	// rIn may be r (in place). v must be neither r nor dOut nor x.
+	// On several processes, A v is Diag v + Offd vGhosts, with the values of v of the ghosts of the column map (halo
+	// exchange).
 	void Pass(const double* v, const double* rIn, double* r, const double* dIn, double* dOut, double a, double c, double* x, bool xEquals0)
 	{
 		const SparseMatrix& A = *this->Matrix;
@@ -245,6 +281,23 @@ private:
 		const SparseMatrixIndex* col = A.innerIndexPtr();
 		const double* val = A.valuePtr();
 		BigNumber nb = A.rows() / _blockSize;
+		// Off-process columns (none on one process)
+		Vector vGhosts;
+		const SparseMatrixIndex* offdOuter = nullptr;
+		const SparseMatrixIndex* offdCol = nullptr;
+		const double* offdVal = nullptr;
+		if (this->Distributed && v)
+		{
+			vGhosts = this->Distributed->GhostValues(v);
+			const SparseMatrix& offd = this->Distributed->Offd;
+			if (offd.nonZeros() > 0)
+			{
+				offdOuter = offd.outerIndexPtr();
+				offdCol = offd.innerIndexPtr();
+				offdVal = offd.valuePtr();
+			}
+		}
+		const double* vg = vGhosts.data();
 
 		if (_blockSize == 1)
 		{
@@ -259,6 +312,9 @@ private:
 					{
 						for (SparseMatrixIndex p = outer[i]; p < outer[i + 1]; p++)
 							r_i -= val[p] * v[col[p]];
+						if (offdOuter)
+							for (SparseMatrixIndex p = offdOuter[i]; p < offdOuter[i + 1]; p++)
+								r_i -= offdVal[p] * vg[offdCol[p]];
 						r[i] = r_i;
 					}
 					if (dOut)
@@ -285,6 +341,9 @@ private:
 						{
 							for (SparseMatrixIndex p = outer[i]; p < outer[i + 1]; p++)
 								r_i -= val[p] * v[col[p]];
+							if (offdOuter)
+								for (SparseMatrixIndex p = offdOuter[i]; p < offdOuter[i + 1]; p++)
+									r_i -= offdVal[p] * vg[offdCol[p]];
 							r[i] = r_i;
 						}
 						r_I[k] = r_i;
@@ -337,11 +396,13 @@ private:
 	{
 		const SparseMatrix& A = *this->Matrix;
 		BigNumber n = A.rows();
+		// On several processes: the global numbers of the rows, the products with the distributed matrix
+		BigNumber firstRow = this->Distributed ? this->Distributed->RowMap->Begin * this->Distributed->RowBlockSize : 0;
 		Vector r(n), z(n), p, Ap(n);
 		for (BigNumber i = 0; i < n; i++)
-			r[i] = PseudoRandom(i);
+			r[i] = PseudoRandom(firstRow + i);
 		ApplyInverseDiagonal(r, z);
-		double rz = r.dot(z);
+		double rz = Parallel::Dot(r, z);
 		if (!(rz > 0))
 			Utils::FatalError("The Chebyshev smoothers require a symmetric positive definite matrix: its diagonal blocks are not positive definite.");
 		double rz0 = rz;
@@ -349,8 +410,11 @@ private:
 		vector<double> alpha, beta;
 		for (int j = 0; j < EigenvalueEstimateIterations; j++)
 		{
-			Ap.noalias() = A * p;
-			double pAp = p.dot(Ap);
+			if (this->Distributed)
+				Ap = *this->Distributed * p;
+			else
+				Ap.noalias() = A * p;
+			double pAp = Parallel::Dot(p, Ap);
 			if (!(pAp > 0))
 				Utils::FatalError("The Chebyshev smoothers require a symmetric positive definite matrix: p^T A p = " + to_string(pAp) + " in the estimation of its largest eigenvalue.");
 			alpha.push_back(rz / pAp);
@@ -358,7 +422,7 @@ private:
 				break;
 			r -= alpha.back() * Ap;
 			ApplyInverseDiagonal(r, z);
-			double rzNext = r.dot(z);
+			double rzNext = Parallel::Dot(r, z);
 			if (!(rzNext > 1e-28 * rz0)) // invariant Krylov subspace: the eigenvalues of the tridiagonal matrix are exact
 				break;
 			beta.push_back(rzNext / rz);

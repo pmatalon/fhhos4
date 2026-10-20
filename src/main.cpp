@@ -1,5 +1,7 @@
 #include <getopt.h>
+#include <chrono>
 #include <regex>
+#include <thread>
 #include "fhhos4_version.h"
 #include "Program.h"
 #include "ProgramArgumentsDefaults.h"
@@ -7,6 +9,7 @@
 #include "Solver/FixedPoint/BlockChebyshev.h"
 #include "Solver/Multigrid/SmootherFactory.h"
 #include "Utils/FileSystem.h"
+#include "Utils/Communicator.h"
 using namespace std;
 
 
@@ -1708,14 +1711,33 @@ int Run(int argc, char* argv[])
 
 int main(int argc, char* argv[])
 {
+	// On several processes (mpiexec), the messages of the first one only; the errors of all of them (stderr)
+	MPIEnvironment mpi(argc, argv);
+	const Communicator& world = mpi.World();
+	CurrentCommunicator current(world);
+	if (!world.IsRoot())
+		cout.rdbuf(nullptr);
 	try
 	{
 		return Run(argc, argv);
 	}
 	catch (const fhhos4::Error& e) // Utils::FatalError()
 	{
-		cout << Utils::BeginRed << "Error: " << e.what() << Utils::EndColor << endl;
-		cout << "------------------------- FAILURE -------------------------" << endl;
+		if (world.IsRoot())
+		{
+			cout << Utils::BeginRed << "Error: " << e.what() << Utils::EndColor << endl;
+			cout << "------------------------- FAILURE -------------------------" << endl;
+		}
+		else
+			cerr << Utils::BeginRed << "Error (process " << world.Rank() << "): " << e.what() << Utils::EndColor << endl;
+		// An error usually occurs on all the processes: the first one prints it and ends all of them; the others wait,
+		// so that they don't end it before (they end all of them if the error is theirs alone)
+		if (world.IsDistributed())
+		{
+			if (!world.IsRoot())
+				this_thread::sleep_for(chrono::seconds(2));
+			MPIEnvironment::Abort(EXIT_FAILURE);
+		}
 		return EXIT_FAILURE;
 	}
 }
