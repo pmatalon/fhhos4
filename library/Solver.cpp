@@ -4,6 +4,7 @@
 // ApplyProgramArgumentDefaults), from the same code (AlgebraicSolverFactory, ApplyUncondensedAMGDefaults).
 #include <chrono>
 #include <limits>
+#include <tuple>
 #include <type_traits>
 #include "fhhos4.h"
 #include "ProgramArgumentsDefaults.h"
@@ -11,11 +12,12 @@
 #include "Solver/LibraryParameters.h"
 #include "Solver/Krylov/PreconditionedBiCGSTAB.h"
 #include "Solver/StaticCondensation.h"
+#include "Utils/BorrowedSparseMatrix.h"
 #include "Utils/SparseMatrixOps.h"
 
 namespace fhhos4
 {
-	static_assert(is_same_v<fhhos4::SparseMatrix, ::SparseMatrix>, "FHHOS4_SPARSE_INDEX (fhhos4_version.h) must be fhhos4's SparseMatrixIndex");
+	static_assert(is_same_v<fhhos4::SparseMatrix, ::SparseMatrix> && is_same_v<SparseIndex, SparseMatrixIndex>, "FHHOS4_SPARSE_INDEX (fhhos4_version.h) must be fhhos4's SparseMatrixIndex");
 
 	namespace
 	{
@@ -27,7 +29,8 @@ namespace fhhos4
 		}
 
 		// During a call of the library: fhhos4's messages (Utils::Log()) according to the verbosity, and the number of
-		// threads of the parameters. Restores them at the end, with the format of cout, which printing the iterations changes.
+		// threads (Solver::Threads and Verbosity; the helpers: 0 and 0). Restores them at the end, with the format of cout,
+		// which printing the iterations changes.
 		class CallScope
 		{
 		private:
@@ -37,13 +40,18 @@ namespace fhhos4
 			int _savedThreads = 0;
 		public:
 			CallScope(const Solver& solver)
+				: CallScope(solver.Threads, solver.Verbosity)
+			{}
+
+			CallScope(int threads, int verbosity)
 			{
 				_savedLog = Utils::LogStream;
-				Utils::LogStream = solver.Verbosity >= 2 ? &cout : &NullStream();
+				Utils::LogStream = verbosity >= 2 ? &cout : &NullStream();
 				_savedCoutFlags = cout.flags();
 				_savedCoutPrecision = cout.precision();
 #ifdef _OPENMP
-				int threads = solver.Threads > 0 ? solver.Threads : Parallelism::WithoutHyperThreads(omp_get_max_threads());
+				if (threads <= 0)
+					threads = Parallelism::WithoutHyperThreads(omp_get_max_threads());
 				if (threads != omp_get_max_threads())
 				{
 					_savedThreads = omp_get_max_threads();
@@ -69,61 +77,54 @@ namespace fhhos4
 			return chrono::duration<double>(chrono::steady_clock::now() - start).count();
 		}
 
-		// A matrix of the calling code in fhhos4's format (row-major, fhhos4's index type, compressed): the caller's matrix
-		// itself if it has this format (no copy), a converted copy otherwise. Not copyable: it may point to its copy.
-		class InputMatrix
+		// The CSR format of a view: RowPointers[0] = 0 and non-decreasing, the columns in [0, Cols) and strictly increasing
+		// in each row (no duplicates), the sizes and the number of non-zeros within the index type of the library. One
+		// parallel pass on the indices.
+		template <typename RowPointer, typename Column>
+		void CheckCSR(const BasicCSRView<RowPointer, Column>& M, const string& name)
 		{
-		private:
-			SparseMatrix _copy; // empty if the caller's matrix is used
-			const SparseMatrix* _matrix;
-		public:
-			template <typename SparseMatrixType>
-			InputMatrix(const SparseMatrixType& M, const string& name)
+			string matrix = "fhhos4: the matrix " + name + " (" + to_string(M.Rows) + " x " + to_string(M.Cols) + ")";
+			if (M.Rows < 0 || M.Cols < 0)
+				Utils::FatalError(matrix + " has a negative size.");
+			if (!M.RowPointers)
 			{
-				if constexpr (is_same_v<SparseMatrixType, SparseMatrix>)
-				{
-					if (M.isCompressed())
-					{
-						_matrix = &M;
-						return;
-					}
-				}
-				if (M.nonZeros() > (Eigen::Index)numeric_limits<SparseMatrixIndex>::max())
-					Utils::FatalError("fhhos4::Solver: " + name + " has too many non-zeros for the index type of fhhos4 (compile fhhos4 with -DSMALL_INDEX=OFF).");
-				if constexpr (!SparseMatrixType::IsRowMajor && is_same_v<typename SparseMatrixType::StorageIndex, SparseMatrixIndex>)
-				{
-					if (M.isCompressed())
-					{
-						// The arrays of a compressed column-major matrix are those of its transpose in row-major, transposed
-						// again in parallel: the matrix of Eigen's conversion, which is sequential
-						_copy = SparseMatrixOps::Transpose(Eigen::Map<const SparseMatrix>(M.cols(), M.rows(), M.nonZeros(), M.outerIndexPtr(), M.innerIndexPtr(), M.valuePtr()));
-						_matrix = &_copy;
-						return;
-					}
-				}
-				_copy = M;
-				_copy.makeCompressed();
-				_matrix = &_copy;
+				if (M.Rows > 0)
+					Utils::FatalError(matrix + " has no RowPointers.");
+				return;
 			}
-			InputMatrix(const InputMatrix&) = delete;
-			InputMatrix& operator=(const InputMatrix&) = delete;
+			std::int64_t nnz = M.RowPointers[M.Rows];
+			if (M.RowPointers[0] != 0 || nnz < 0)
+				Utils::FatalError(matrix + " is not in the CSR format: RowPointers[0] = " + to_string(M.RowPointers[0]) + " (0 expected), RowPointers[Rows] = " + to_string(nnz) + ".");
+			if (nnz > 0 && (!M.ColumnIndices || !M.Values))
+				Utils::FatalError(matrix + " has non-zeros, but no ColumnIndices or Values.");
+			constexpr std::int64_t maxIndex = numeric_limits<SparseMatrixIndex>::max();
+			if (M.Rows > maxIndex || M.Cols > maxIndex || nnz > maxIndex)
+				Utils::FatalError(matrix + " has too many rows, columns or non-zeros (" + to_string(nnz) + ") for the index type of the library (compile fhhos4 with -DSMALL_INDEX=OFF).");
+			std::int64_t firstInvalidRow = M.Rows;
+			#pragma omp parallel for reduction(min:firstInvalidRow) schedule(static)
+			for (std::int64_t i = 0; i < M.Rows; ++i)
+			{
+				std::int64_t begin = M.RowPointers[i], end = M.RowPointers[i + 1];
+				bool valid = begin <= end && end <= nnz;
+				for (std::int64_t p = begin; valid && p < end; ++p)
+				{
+					std::int64_t col = M.ColumnIndices[p];
+					valid = col >= 0 && col < M.Cols && (p == begin || col > (std::int64_t)M.ColumnIndices[p - 1]);
+				}
+				if (!valid)
+					firstInvalidRow = min(firstInvalidRow, i);
+			}
+			if (firstInvalidRow < M.Rows)
+				Utils::FatalError(matrix + " is not in the CSR format: in its row " + to_string(firstInvalidRow) + ", the columns are not strictly increasing (duplicates or unsorted: e.g. SciPy's sum_duplicates() sorts them and sums the duplicates), or outside [0, " + to_string(M.Cols) + "), or RowPointers decrease.");
+		}
 
-			const SparseMatrix& Get() const
-			{
-				return *_matrix;
-			}
-
-			// The matrix to keep after the setup: the caller's matrix, or the copy, moved into storage
-			const SparseMatrix* Keep(SparseMatrix& storage)
-			{
-				if (_matrix == &_copy)
-				{
-					storage = std::move(_copy);
-					_matrix = &storage;
-				}
-				return _matrix;
-			}
-		};
+		// The matrix of a view, read in place, after CheckCSR()
+		unique_ptr<BorrowedSparseMatrix> Borrow(const CSRView& M, const string& name)
+		{
+			CheckCSR(M, name);
+			static const SparseMatrixIndex noRows[1] = { 0 }; // the RowPointers of a matrix without rows, if null
+			return make_unique<BorrowedSparseMatrix>(M.Rows, M.Cols, M.RowPointers ? M.RowPointers : noRows, M.ColumnIndices, M.Values);
+		}
 	}
 
 	struct Solver::Impl
@@ -135,8 +136,10 @@ namespace fhhos4
 		int CellBlockSize = 0;
 		int FaceBlockSize = 0;
 		Eigen::Index NCellDoFs = 0;
-		const SparseMatrix* A = nullptr; // the solvers keep a pointer to it: the caller's matrix, or OwnA
-		SparseMatrix OwnA;               // A if the library computes or converts it, empty otherwise
+		const SparseMatrix* A = nullptr;       // the solvers keep a pointer to it: GivenA, or OwnA
+		unique_ptr<BorrowedSparseMatrix> GivenA; // the caller's A, read in place (Setup...Condensed())
+		SparseMatrix OwnA;                     // A if the library computes it, empty otherwise
+		unique_ptr<BorrowedSparseMatrix> GivenA_FT; // the caller's A_FT, read in place by Condensation (SetupNonsymmetric())
 		unique_ptr<StaticCondensation> Condensation; // after a setup from the blocks: for Solve(b_T, b_F, x_T, x_F)
 		unique_ptr<UncondensedAMG> Multigrid;
 		unique_ptr<IterativeSolver> KrylovSolver; // preconditioned by Multigrid; null if Krylov is None
@@ -281,9 +284,10 @@ namespace fhhos4
 			return args;
 		}
 
-		// A: kept until the next setup; null to compute it from the blocks. A_FT: null if the matrix is symmetric. A_FF: null
-		// if not given (not with A null).
-		void Setup(const Solver& s, InputMatrix* A, const SparseMatrix& A_TT, const SparseMatrix& A_TF, const SparseMatrix* A_FT, const SparseMatrix* A_FF, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne)
+		// A: the caller's condensed matrix, kept until the next setup; null to compute it from the blocks. A_FT: null if the
+		// matrix is symmetric; kept until the next setup if the solves read it (uncondensed system). A_FF: null if not given
+		// (not with A null).
+		void Setup(const Solver& s, unique_ptr<BorrowedSparseMatrix> A, const SparseMatrix& A_TT, const SparseMatrix& A_TF, unique_ptr<BorrowedSparseMatrix> A_FT, const SparseMatrix* A_FF, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne)
 		{
 			auto start = chrono::steady_clock::now();
 			IsSetUp = false;
@@ -292,23 +296,25 @@ namespace fhhos4
 			Condensation.reset();
 			this->A = nullptr;
 			OwnA = SparseMatrix();
+			GivenA = std::move(A);
+			GivenA_FT = std::move(A_FT);
 			NCellDoFs = A_TF.rows();
 
 			ProgramArguments args = Arguments(s);
 			ExportModule out;
 			Multigrid.reset(AlgebraicSolverFactory::CreateUncondensedAMG(args, s.Dimension, s.FaceDegree, CellBlockSize, FaceBlockSize, FaceBlockSize, out, AlgebraicSolverFactory::AlgebraicCoarseSolvers(s.Dimension, out)));
 
-			if (A)
-				this->A = A->Keep(OwnA);
+			if (GivenA)
+				this->A = GivenA.get();
 			else
 			{
-				Condensation = make_unique<StaticCondensation>(A_TT, A_TF, A_FT, CellBlockSize);
+				Condensation = make_unique<StaticCondensation>(A_TT, A_TF, GivenA_FT.get(), CellBlockSize);
 				OwnA = Condensation->CondensedMatrix(*A_FF, Symmetric);
 				this->A = &OwnA;
 			}
 			SparseMatrix computedA_FF; // empty if A_FF is given, or not needed (the algorithm of the paper only uses A_TT and A_TF)
 			if (!A_FF && Multigrid->A_F_FNeeded())
-				computedA_FF = StaticCondensation(A_TT, A_TF, A_FT, CellBlockSize).FaceBlock(*this->A);
+				computedA_FF = StaticCondensation(A_TT, A_TF, GivenA_FT.get(), CellBlockSize).FaceBlock(*this->A);
 
 			// The Krylov method preconditioned by one cycle (SolverPreconditioner), as SolverFactory (-s fcguamg, gcruamg),
 			// except the residual replacement: the tolerance applies to the true residual (Result::RelativeResidual =
@@ -337,7 +343,9 @@ namespace fhhos4
 
 			// The blocks are only read during the setup (UncondensedAMG::Setup())
 			SparseMatrix symmetric; // empty A_FT: symmetric matrix
-			ActiveSolver()->Setup(*this->A, A_TT, A_TF, A_FT ? *A_FT : symmetric, A_FF ? *A_FF : computedA_FF, cellInterpOfOne, faceInterpOfOne);
+			ActiveSolver()->Setup(*this->A, A_TT, A_TF, GivenA_FT ? *GivenA_FT : symmetric, A_FF ? *A_FF : computedA_FF, cellInterpOfOne, faceInterpOfOne);
+			if (!Condensation)
+				GivenA_FT.reset(); // read by the setup only
 			IsSetUp = true;
 
 			if (s.Verbosity == 1)
@@ -363,131 +371,54 @@ namespace fhhos4
 		}
 	};
 
-	Solver::Solver(const EigenLayout& host, const SparseMatrix& sampleMatrix, const Eigen::Ref<const Eigen::VectorXd>& sampleConstVector,
-	               Eigen::Ref<Eigen::VectorXd> sampleVector)
-	{
-		EigenLayout library = HostEigenLayout(); // the layout of the library's compilation
-		auto version = [](const EigenLayout& l) { return to_string(l.Version[0]) + "." + to_string(l.Version[1]) + "." + to_string(l.Version[2]); };
-		auto sizes = [](const EigenLayout& l)
-		{
-			return to_string(l.IndexSize) + ", " + to_string(l.MatrixSize) + ", " + to_string(l.ConstVectorSize) + ", " + to_string(l.VectorSize) + (l.VectorTriviallyCopyable ? ", trivially copyable" : "");
-		};
-		string incompatible = "fhhos4::Solver: the Eigen objects of the interface have different memory layouts in the calling code (Eigen " + version(host) + ") and in the library fhhos4 (Eigen " + version(library) + "): ";
-		string advice = ". Use Eigen 3.4 or 5.x, with its default index type (EIGEN_DEFAULT_DENSE_INDEX_TYPE).";
-		if (host.IndexSize != library.IndexSize || host.MatrixSize != library.MatrixSize || host.ConstVectorSize != library.ConstVectorSize ||
-		    host.VectorSize != library.VectorSize || host.VectorTriviallyCopyable != library.VectorTriviallyCopyable)
-			throw Error(incompatible + "sizes of Eigen::Index, SparseMatrix, Eigen::Ref<const Eigen::VectorXd>, Eigen::Ref<Eigen::VectorXd>: " + sizes(host) + " in the calling code, " + sizes(library) + " in the library" + advice);
-
-		// The same sizes: the samples (fhhos4.h), whose dimensions are checked before their arrays are read
-		const auto* outer = sampleMatrix.outerIndexPtr();
-		const auto* inner = sampleMatrix.innerIndexPtr();
-		const double* values = sampleMatrix.valuePtr();
-		bool sameMatrix = sampleMatrix.rows() == 2 && sampleMatrix.cols() == 3 && sampleMatrix.isCompressed() && sampleMatrix.nonZeros() == 3 &&
-		                  outer[0] == 0 && outer[1] == 2 && outer[2] == 3 && inner[0] == 0 && inner[1] == 2 && inner[2] == 1 &&
-		                  values[0] == SampleValue(0) && values[1] == SampleValue(1) && values[2] == SampleValue(2);
-		bool sameVectors = sampleConstVector.size() == 3 && sampleVector.size() == 3 && sampleConstVector.data() == sampleVector.data();
-		for (int i = 0; sameVectors && i < 3; i++)
-			sameVectors = sampleConstVector[i] == SampleValue(i) && sampleVector[i] == SampleValue(i);
-		if (!sameMatrix || !sameVectors)
-			throw Error(incompatible + "the library reads a different " + (sameMatrix ? "vector" : "sparse matrix") + " than the calling code built" + advice);
-
-		_impl = make_unique<Impl>();
-	}
+	Solver::Solver()
+		: _impl(make_unique<Impl>())
+	{}
 
 	Solver::~Solver() = default;
 	Solver::Solver(Solver&&) noexcept = default;
 	Solver& Solver::operator=(Solver&&) noexcept = default;
 
-	template <typename SparseMatrixType>
-	void Solver::SetupSymmetricCondensed(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FF,
-	                                     const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
+	void Solver::Setup(bool symmetric, const CSRView* A, const CSRView& A_TT, const CSRView& A_TF, const CSRView* A_FT, const CSRView* A_FF,
+	                   detail::ConstVectorView cellInterpOfOne, detail::ConstVectorView faceInterpOfOne)
 	{
 		CallScope scope(*this);
-		_impl->CheckParameters(*this, true);
-		InputMatrix a(A, "A"), a_TT(A_TT, "A_TT"), a_TF(A_TF, "A_TF"), a_FF(A_FF, "A_FF");
-		_impl->CheckInputs(*this, &a.Get(), a_TT.Get(), a_TF.Get(), nullptr, &a_FF.Get(), cellInterpOfOne, faceInterpOfOne);
-		_impl->Setup(*this, &a, a_TT.Get(), a_TF.Get(), nullptr, &a_FF.Get(), cellInterpOfOne, faceInterpOfOne);
+		_impl->CheckParameters(*this, symmetric);
+		// The inputs, read in place, checked before the previous setup is replaced
+		unique_ptr<BorrowedSparseMatrix> a = A ? Borrow(*A, "A") : nullptr;
+		unique_ptr<BorrowedSparseMatrix> a_TT = Borrow(A_TT, "A_TT"), a_TF = Borrow(A_TF, "A_TF");
+		unique_ptr<BorrowedSparseMatrix> a_FT = A_FT ? Borrow(*A_FT, "A_FT") : nullptr;
+		unique_ptr<BorrowedSparseMatrix> a_FF = A_FF ? Borrow(*A_FF, "A_FF") : nullptr;
+		Eigen::Map<const Vector> cellOne(cellInterpOfOne.Data, cellInterpOfOne.Size), faceOne(faceInterpOfOne.Data, faceInterpOfOne.Size);
+		_impl->CheckInputs(*this, a.get(), *a_TT, *a_TF, a_FT.get(), a_FF.get(), cellOne, faceOne);
+		_impl->Setup(*this, std::move(a), *a_TT, *a_TF, std::move(a_FT), a_FF.get(), cellOne, faceOne);
 	}
 
-	template <typename SparseMatrixType>
-	void Solver::SetupSymmetricCondensed(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF,
-	                                     const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
-	{
-		CallScope scope(*this);
-		_impl->CheckParameters(*this, true);
-		InputMatrix a(A, "A"), a_TT(A_TT, "A_TT"), a_TF(A_TF, "A_TF");
-		_impl->CheckInputs(*this, &a.Get(), a_TT.Get(), a_TF.Get(), nullptr, nullptr, cellInterpOfOne, faceInterpOfOne);
-		_impl->Setup(*this, &a, a_TT.Get(), a_TF.Get(), nullptr, nullptr, cellInterpOfOne, faceInterpOfOne);
-	}
-
-	template <typename SparseMatrixType>
-	void Solver::SetupSymmetric(const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FF,
-	                            const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
-	{
-		CallScope scope(*this);
-		_impl->CheckParameters(*this, true);
-		InputMatrix a_TT(A_TT, "A_TT"), a_TF(A_TF, "A_TF"), a_FF(A_FF, "A_FF");
-		_impl->CheckInputs(*this, nullptr, a_TT.Get(), a_TF.Get(), nullptr, &a_FF.Get(), cellInterpOfOne, faceInterpOfOne);
-		_impl->Setup(*this, nullptr, a_TT.Get(), a_TF.Get(), nullptr, &a_FF.Get(), cellInterpOfOne, faceInterpOfOne);
-	}
-
-	template <typename SparseMatrixType>
-	void Solver::SetupNonsymmetricCondensed(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FT, const SparseMatrixType& A_FF,
-	                                        const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
-	{
-		CallScope scope(*this);
-		_impl->CheckParameters(*this, false);
-		InputMatrix a(A, "A"), a_TT(A_TT, "A_TT"), a_TF(A_TF, "A_TF"), a_FT(A_FT, "A_FT"), a_FF(A_FF, "A_FF");
-		_impl->CheckInputs(*this, &a.Get(), a_TT.Get(), a_TF.Get(), &a_FT.Get(), &a_FF.Get(), cellInterpOfOne, faceInterpOfOne);
-		_impl->Setup(*this, &a, a_TT.Get(), a_TF.Get(), &a_FT.Get(), &a_FF.Get(), cellInterpOfOne, faceInterpOfOne);
-	}
-
-	template <typename SparseMatrixType>
-	void Solver::SetupNonsymmetricCondensed(const SparseMatrixType& A, const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FT,
-	                                        const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
-	{
-		CallScope scope(*this);
-		_impl->CheckParameters(*this, false);
-		InputMatrix a(A, "A"), a_TT(A_TT, "A_TT"), a_TF(A_TF, "A_TF"), a_FT(A_FT, "A_FT");
-		_impl->CheckInputs(*this, &a.Get(), a_TT.Get(), a_TF.Get(), &a_FT.Get(), nullptr, cellInterpOfOne, faceInterpOfOne);
-		_impl->Setup(*this, &a, a_TT.Get(), a_TF.Get(), &a_FT.Get(), nullptr, cellInterpOfOne, faceInterpOfOne);
-	}
-
-	template <typename SparseMatrixType>
-	void Solver::SetupNonsymmetric(const SparseMatrixType& A_TT, const SparseMatrixType& A_TF, const SparseMatrixType& A_FT, const SparseMatrixType& A_FF,
-	                               const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
-	{
-		CallScope scope(*this);
-		_impl->CheckParameters(*this, false);
-		InputMatrix a_TT(A_TT, "A_TT"), a_TF(A_TF, "A_TF"), a_FT(A_FT, "A_FT"), a_FF(A_FF, "A_FF");
-		_impl->CheckInputs(*this, nullptr, a_TT.Get(), a_TF.Get(), &a_FT.Get(), &a_FF.Get(), cellInterpOfOne, faceInterpOfOne);
-		_impl->Setup(*this, nullptr, a_TT.Get(), a_TF.Get(), &a_FT.Get(), &a_FF.Get(), cellInterpOfOne, faceInterpOfOne);
-	}
-
-	Result Solver::Solve(const Eigen::Ref<const Eigen::VectorXd>& b, Eigen::Ref<Eigen::VectorXd> x)
+	Result Solver::SolveCondensed(detail::ConstVectorView b, detail::VectorView x)
 	{
 		_impl->CheckSetUp("Solve");
-		_impl->CheckVectorSize(b.rows(), "b");
-		_impl->CheckVectorSize(x.rows(), "x");
+		_impl->CheckVectorSize(b.Size, "b");
+		_impl->CheckVectorSize(x.Size, "x");
 		CallScope scope(*this);
 		auto start = chrono::steady_clock::now();
 
 		Result result;
-		Vector rhs = b;
+		Vector rhs = Eigen::Map<const Vector>(b.Data, b.Size);
+		Eigen::Map<Vector> callerX(x.Data, x.Size);
 		if (rhs.norm() == 0)
 		{
-			x.setZero();
+			callerX.setZero();
 			result.Converged = true;
 			return result;
 		}
 
-		Vector solution = x;
+		Vector solution = callerX;
 		bool xEquals0 = (solution.array() == 0).all(); // skips the products by the initial guess, as the program does
 		IterativeSolver* solver = _impl->ActiveSolver();
 		solver->Tolerance = Tolerance;
 		solver->MaxIterations = MaxIterations;
 		solver->Solve(rhs, solution, xEquals0);
-		x = solution;
+		callerX = solution;
 
 		result.Iterations = solver->IterationCount;
 		result.RelativeResidual = solver->LastIterationResult.NormalizedResidualNorm;
@@ -497,30 +428,30 @@ namespace fhhos4
 		return result;
 	}
 
-	Result Solver::Solve(const Eigen::Ref<const Eigen::VectorXd>& b_T, const Eigen::Ref<const Eigen::VectorXd>& b_F,
-	                     Eigen::Ref<Eigen::VectorXd> x_T, Eigen::Ref<Eigen::VectorXd> x_F)
+	Result Solver::SolveUncondensed(detail::ConstVectorView b_T, detail::ConstVectorView b_F, detail::VectorView x_T, detail::VectorView x_F)
 	{
 		_impl->CheckSetUp("Solve");
 		if (!_impl->Condensation)
 			Utils::FatalError("fhhos4::Solver::Solve(b_T, b_F, x_T, x_F) solves the uncondensed system: it needs a setup from its blocks (SetupSymmetric() or SetupNonsymmetric()). After SetupSymmetricCondensed() or SetupNonsymmetricCondensed(), solve the condensed system with Solve(b, x).");
-		_impl->CheckCellVectorSize(b_T.rows(), "b_T");
-		_impl->CheckCellVectorSize(x_T.rows(), "x_T");
-		_impl->CheckVectorSize(b_F.rows(), "b_F");
-		_impl->CheckVectorSize(x_F.rows(), "x_F");
+		_impl->CheckCellVectorSize(b_T.Size, "b_T");
+		_impl->CheckCellVectorSize(x_T.Size, "x_T");
+		_impl->CheckVectorSize(b_F.Size, "b_F");
+		_impl->CheckVectorSize(x_F.Size, "x_F");
 		CallScope scope(*this);
 
 		const StaticCondensation& condensation = *_impl->Condensation;
-		Vector invA_TT_b_T = condensation.SolveCells(b_T);
-		Vector b = condensation.CondensedRHS(b_F, invA_TT_b_T);
-		Result result = Solve(b, x_F);
-		x_T = condensation.CellUnknowns(invA_TT_b_T, x_F);
+		Vector invA_TT_b_T = condensation.SolveCells(Eigen::Map<const Vector>(b_T.Data, b_T.Size));
+		Vector b = condensation.CondensedRHS(Eigen::Map<const Vector>(b_F.Data, b_F.Size), invA_TT_b_T);
+		Result result = SolveCondensed({ b.data(), b.size() }, x_F);
+		Eigen::Map<Vector>(x_T.Data, x_T.Size) = condensation.CellUnknowns(invA_TT_b_T, Eigen::Map<const Vector>(x_F.Data, x_F.Size));
 		return result;
 	}
 
-	const SparseMatrix& Solver::CondensedMatrix() const
+	CSRView Solver::CondensedMatrix() const
 	{
 		_impl->CheckSetUp("CondensedMatrix");
-		return *_impl->A;
+		const SparseMatrix& A = *_impl->A;
+		return CSRView(A.rows(), A.cols(), A.outerIndexPtr(), A.innerIndexPtr(), A.valuePtr());
 	}
 
 	bool Solver::IsSetUp() const
@@ -534,37 +465,247 @@ namespace fhhos4
 		return _impl->Multigrid->NumberOfLevels();
 	}
 
-	// The supported matrices
-#define FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex) const Eigen::SparseMatrix<double, StorageOrder, StorageIndex>&
-#define FHHOS4_AMG_INSTANTIATE_SETUP(StorageOrder, StorageIndex) \
-	template void Solver::SetupSymmetricCondensed<Eigen::SparseMatrix<double, StorageOrder, StorageIndex>>( \
-		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
-		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
-		const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&); \
-	template void Solver::SetupSymmetricCondensed<Eigen::SparseMatrix<double, StorageOrder, StorageIndex>>( \
-		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
-		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
-		const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&); \
-	template void Solver::SetupSymmetric<Eigen::SparseMatrix<double, StorageOrder, StorageIndex>>( \
-		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
-		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
-		const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&); \
-	template void Solver::SetupNonsymmetricCondensed<Eigen::SparseMatrix<double, StorageOrder, StorageIndex>>( \
-		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
-		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
-		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
-		const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&); \
-	template void Solver::SetupNonsymmetricCondensed<Eigen::SparseMatrix<double, StorageOrder, StorageIndex>>( \
-		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
-		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
-		const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&); \
-	template void Solver::SetupNonsymmetric<Eigen::SparseMatrix<double, StorageOrder, StorageIndex>>( \
-		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
-		FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), FHHOS4_AMG_MATRIX(StorageOrder, StorageIndex), \
-		const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&);
+	//------------------------------------------------------------------------------------------------------------------//
+	//                       Helpers: the inputs of the setups from other formats (copies)                            //
+	//------------------------------------------------------------------------------------------------------------------//
 
-	FHHOS4_AMG_INSTANTIATE_SETUP(Eigen::ColMajor, int)
-	FHHOS4_AMG_INSTANTIATE_SETUP(Eigen::RowMajor, int)
-	FHHOS4_AMG_INSTANTIATE_SETUP(Eigen::ColMajor, long)
-	FHHOS4_AMG_INSTANTIATE_SETUP(Eigen::RowMajor, long)
+	struct CSRMatrix::Impl
+	{
+		SparseMatrix Matrix;
+	};
+
+	CSRMatrix::CSRMatrix() = default;
+	CSRMatrix::CSRMatrix(unique_ptr<Impl> impl)
+		: _impl(std::move(impl))
+	{}
+	CSRMatrix::~CSRMatrix() = default;
+	CSRMatrix::CSRMatrix(CSRMatrix&&) noexcept = default;
+	CSRMatrix& CSRMatrix::operator=(CSRMatrix&&) noexcept = default;
+
+	CSRView CSRMatrix::View() const&
+	{
+		if (!_impl)
+			return CSRView();
+		const SparseMatrix& M = _impl->Matrix;
+		return CSRView(M.rows(), M.cols(), M.outerIndexPtr(), M.innerIndexPtr(), M.valuePtr());
+	}
+
+	namespace
+	{
+		CSRMatrix Own(SparseMatrix&& M)
+		{
+			auto impl = make_unique<CSRMatrix::Impl>();
+			impl->Matrix = std::move(M);
+			impl->Matrix.makeCompressed();
+			return CSRMatrix(std::move(impl));
+		}
+
+		// The lists: Count >= 0, Offsets[0] = 0 and non-decreasing, the DoFs in [0, n). Returns their number of DoFs.
+		template <typename Index>
+		BigNumber CheckDoFLists(const DoFLists<Index>& lists, std::int64_t n, const string& name)
+		{
+			string error = "fhhos4: the DoF lists of the " + name + " (" + to_string(lists.Count) + ")";
+			if (lists.Count < 0)
+				Utils::FatalError(error + ": negative Count.");
+			if (lists.Count == 0)
+				return 0;
+			if (!lists.Offsets)
+				Utils::FatalError(error + " have no Offsets.");
+			if (lists.Offsets[0] != 0)
+				Utils::FatalError(error + ": Offsets[0] = " + to_string(lists.Offsets[0]) + " (0 expected).");
+			for (std::int64_t i = 0; i < lists.Count; ++i)
+			{
+				if (lists.Offsets[i + 1] < lists.Offsets[i])
+					Utils::FatalError(error + ": the Offsets decrease at " + to_string(i) + ".");
+			}
+			std::int64_t nDoFs = lists.Offsets[lists.Count];
+			if (nDoFs > 0 && !lists.DoFs)
+				Utils::FatalError(error + " have no DoFs.");
+			if (nDoFs > numeric_limits<SparseMatrixIndex>::max())
+				Utils::FatalError(error + " have too many DoFs (" + to_string(nDoFs) + ") for the index type of the library (compile fhhos4 with -DSMALL_INDEX=OFF).");
+			std::int64_t firstInvalid = nDoFs;
+			#pragma omp parallel for reduction(min:firstInvalid) schedule(static)
+			for (std::int64_t p = 0; p < nDoFs; ++p)
+			{
+				if (lists.DoFs[p] < 0 || lists.DoFs[p] >= n)
+					firstInvalid = min(firstInvalid, p);
+			}
+			if (firstInvalid < nDoFs)
+				Utils::FatalError(error + ": the DoF " + to_string(lists.DoFs[firstInvalid]) + " (DoFs[" + to_string(firstInvalid) + "]) is outside [0, " + to_string(n) + ").");
+			return nDoFs;
+		}
+
+		// The DoFs of the global numbering: of a cell, of a face, or of none
+		enum class DoFKind : uint8_t { None, Cell, Face };
+
+		// The rows of M whose global indices are rows[0..nRows), in this order, restricted to the columns of the kind
+		// columnKind, renumbered by their positions in their lists. lower: only the columns whose position is <= that of
+		// the row (the lower triangular part of a diagonal block). M: after CheckCSR().
+		template <typename RowPointer, typename Column, typename Index>
+		SparseMatrix ExtractBlock(const BasicCSRView<RowPointer, Column>& M, const Index* rows, BigNumber nRows, const vector<SparseMatrixIndex>& position, const vector<DoFKind>& kind, DoFKind columnKind, BigNumber nCols, bool lower)
+		{
+			ThreadLocal<vector<pair<SparseMatrixIndex, double>>> rowsOfThreads;
+			return SparseMatrixOps::BuildByRows(nRows, nCols, 1, [&](BigNumber firstRow, BigNumber lastRow, SparseMatrixOps::RowChunk& chunk)
+			{
+				vector<pair<SparseMatrixIndex, double>>& row = rowsOfThreads.Local();
+				for (BigNumber i = firstRow; i < lastRow; ++i)
+				{
+					std::int64_t g = rows[i];
+					row.clear();
+					for (std::int64_t p = M.RowPointers[g]; p < (std::int64_t)M.RowPointers[g + 1]; ++p)
+					{
+						std::int64_t col = M.ColumnIndices[p];
+						if (kind[col] == columnKind && (!lower || position[col] <= (SparseMatrixIndex)i))
+							row.push_back({ position[col], M.Values[p] });
+					}
+					auto byColumn = [](const pair<SparseMatrixIndex, double>& x, const pair<SparseMatrixIndex, double>& y) { return x.first < y.first; };
+					if (!is_sorted(row.begin(), row.end(), byColumn)) // the lists don't follow the global numbering
+						sort(row.begin(), row.end(), byColumn);
+					for (const pair<SparseMatrixIndex, double>& coeff : row)
+						chunk.Add(coeff.first, coeff.second);
+					chunk.EndRow();
+				}
+			});
+		}
+
+		template <typename RowPointer, typename Column, typename Index>
+		HybridBlocks ExtractBlocks(const BasicCSRView<RowPointer, Column>& M, const DoFLists<Index>& cells, const DoFLists<Index>& faces, bool symmetric)
+		{
+			CallScope scope(0, 0);
+			if (M.Rows != M.Cols)
+				Utils::FatalError("fhhos4: the global matrix M (" + to_string(M.Rows) + " x " + to_string(M.Cols) + ") must be square.");
+			CheckCSR(M, "M");
+			BigNumber nT = CheckDoFLists(cells, M.Rows, "cells");
+			BigNumber nF = CheckDoFLists(faces, M.Rows, "faces");
+
+			// The position of each DoF of M in the cells (resp. faces) DoFs: in the order of the lists
+			vector<SparseMatrixIndex> position(M.Rows, -1);
+			vector<DoFKind> kind(M.Rows, DoFKind::None);
+			for (auto [lists, nDoFs, k] : { tuple{ &cells, nT, DoFKind::Cell }, { &faces, nF, DoFKind::Face } })
+			{
+				for (BigNumber p = 0; p < nDoFs; ++p)
+				{
+					std::int64_t g = lists->DoFs[p];
+					if (kind[g] != DoFKind::None)
+						Utils::FatalError("fhhos4: the DoF " + to_string(g) + " of the global matrix is in two lists (of the cells or faces).");
+					kind[g] = k;
+					position[g] = p;
+				}
+			}
+
+			HybridBlocks blocks;
+			blocks.A_TT = Own(ExtractBlock(M, cells.DoFs, nT, position, kind, DoFKind::Cell, nT, symmetric));
+			blocks.A_TF = Own(ExtractBlock(M, cells.DoFs, nT, position, kind, DoFKind::Face, nF, false));
+			if (!symmetric)
+				blocks.A_FT = Own(ExtractBlock(M, faces.DoFs, nF, position, kind, DoFKind::Cell, nT, false));
+			blocks.A_FF = Own(ExtractBlock(M, faces.DoFs, nF, position, kind, DoFKind::Face, nF, symmetric));
+			return blocks;
+		}
+
+		void CheckVectorSize(std::int64_t size, std::int64_t expected, const string& vector, const string& of)
+		{
+			if (size != expected)
+				Utils::FatalError("fhhos4: the vector " + vector + " has " + to_string(size) + " rows, expected " + to_string(expected) + " (" + of + ").");
+		}
+	}
+
+	template <typename RowPointer, typename Column, typename Index>
+	HybridBlocks ExtractSymmetricBlocks(const BasicCSRView<RowPointer, Column>& M, const DoFLists<Index>& cells, const DoFLists<Index>& faces)
+	{
+		return ExtractBlocks(M, cells, faces, true);
+	}
+
+	template <typename RowPointer, typename Column, typename Index>
+	HybridBlocks ExtractNonsymmetricBlocks(const BasicCSRView<RowPointer, Column>& M, const DoFLists<Index>& cells, const DoFLists<Index>& faces)
+	{
+		return ExtractBlocks(M, cells, faces, false);
+	}
+
+	template <typename RowPointer, typename Column>
+	CSRMatrix ToCSR(const BasicCSRView<RowPointer, Column>& M)
+	{
+		CallScope scope(0, 0);
+		CheckCSR(M, "M");
+		SparseMatrix copy(M.Rows, M.Cols);
+		BigNumber nnz = M.NonZeros();
+		copy.resizeNonZeros(nnz);
+		SparseMatrixIndex* rowPointers = copy.outerIndexPtr();
+		SparseMatrixIndex* columns = copy.innerIndexPtr();
+		double* values = copy.valuePtr();
+		#pragma omp parallel for schedule(static)
+		for (BigNumber i = 0; i <= (BigNumber)M.Rows; ++i)
+			rowPointers[i] = M.RowPointers[i];
+		#pragma omp parallel for schedule(static)
+		for (BigNumber p = 0; p < nnz; ++p)
+		{
+			columns[p] = M.ColumnIndices[p];
+			values[p] = M.Values[p];
+		}
+		return Own(std::move(copy));
+	}
+
+	namespace detail
+	{
+		template <typename Index>
+		CSRMatrix Transpose(const BasicCSRView<Index, Index>& M)
+		{
+			CallScope scope(0, 0);
+			CheckCSR(M, "M");
+			Eigen::Map<const Eigen::SparseMatrix<double, Eigen::RowMajor, Index>> arrays(M.Rows, M.Cols, M.NonZeros(), M.RowPointers, M.ColumnIndices, M.Values);
+			return Own(SparseMatrixOps::Transpose(arrays));
+		}
+
+		template <typename Index>
+		void Gather(ConstVectorView x, const DoFLists<Index>& cells, const DoFLists<Index>& faces, VectorView x_T, VectorView x_F)
+		{
+			CallScope scope(0, 0);
+			BigNumber nT = CheckDoFLists(cells, x.Size, "cells");
+			BigNumber nF = CheckDoFLists(faces, x.Size, "faces");
+			CheckVectorSize(x_T.Size, nT, "x_T", "the DoFs of the cells");
+			CheckVectorSize(x_F.Size, nF, "x_F", "the DoFs of the faces");
+			#pragma omp parallel for schedule(static)
+			for (BigNumber p = 0; p < nT; ++p)
+				x_T.Data[p] = x.Data[cells.DoFs[p]];
+			#pragma omp parallel for schedule(static)
+			for (BigNumber p = 0; p < nF; ++p)
+				x_F.Data[p] = x.Data[faces.DoFs[p]];
+		}
+
+		template <typename Index>
+		void Scatter(ConstVectorView x_T, ConstVectorView x_F, const DoFLists<Index>& cells, const DoFLists<Index>& faces, VectorView x)
+		{
+			CallScope scope(0, 0);
+			BigNumber nT = CheckDoFLists(cells, x.Size, "cells");
+			BigNumber nF = CheckDoFLists(faces, x.Size, "faces");
+			CheckVectorSize(x_T.Size, nT, "x_T", "the DoFs of the cells");
+			CheckVectorSize(x_F.Size, nF, "x_F", "the DoFs of the faces");
+			#pragma omp parallel for schedule(static)
+			for (BigNumber p = 0; p < nT; ++p)
+				x.Data[cells.DoFs[p]] = x_T.Data[p];
+			#pragma omp parallel for schedule(static)
+			for (BigNumber p = 0; p < nF; ++p)
+				x.Data[faces.DoFs[p]] = x_F.Data[p];
+		}
+	}
+
+	// The index types of the helpers: std::int32_t or std::int64_t for each array
+#define FHHOS4_INSTANTIATE_EXTRACTION(RowPointer, Column, Index) \
+	template HybridBlocks ExtractSymmetricBlocks<RowPointer, Column, Index>(const BasicCSRView<RowPointer, Column>&, const DoFLists<Index>&, const DoFLists<Index>&); \
+	template HybridBlocks ExtractNonsymmetricBlocks<RowPointer, Column, Index>(const BasicCSRView<RowPointer, Column>&, const DoFLists<Index>&, const DoFLists<Index>&);
+#define FHHOS4_INSTANTIATE_CSR(RowPointer, Column) \
+	template CSRMatrix ToCSR<RowPointer, Column>(const BasicCSRView<RowPointer, Column>&); \
+	FHHOS4_INSTANTIATE_EXTRACTION(RowPointer, Column, std::int32_t) \
+	FHHOS4_INSTANTIATE_EXTRACTION(RowPointer, Column, std::int64_t)
+
+	FHHOS4_INSTANTIATE_CSR(std::int32_t, std::int32_t)
+	FHHOS4_INSTANTIATE_CSR(std::int32_t, std::int64_t)
+	FHHOS4_INSTANTIATE_CSR(std::int64_t, std::int32_t)
+	FHHOS4_INSTANTIATE_CSR(std::int64_t, std::int64_t)
+
+	template CSRMatrix detail::Transpose<std::int32_t>(const BasicCSRView<std::int32_t, std::int32_t>&);
+	template CSRMatrix detail::Transpose<std::int64_t>(const BasicCSRView<std::int64_t, std::int64_t>&);
+	template void detail::Gather<std::int32_t>(detail::ConstVectorView, const DoFLists<std::int32_t>&, const DoFLists<std::int32_t>&, detail::VectorView, detail::VectorView);
+	template void detail::Gather<std::int64_t>(detail::ConstVectorView, const DoFLists<std::int64_t>&, const DoFLists<std::int64_t>&, detail::VectorView, detail::VectorView);
+	template void detail::Scatter<std::int32_t>(detail::ConstVectorView, detail::ConstVectorView, const DoFLists<std::int32_t>&, const DoFLists<std::int32_t>&, detail::VectorView);
+	template void detail::Scatter<std::int64_t>(detail::ConstVectorView, detail::ConstVectorView, const DoFLists<std::int64_t>&, const DoFLists<std::int64_t>&, detail::VectorView);
 }

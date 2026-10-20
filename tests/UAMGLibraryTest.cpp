@@ -6,7 +6,9 @@
 //   condensed one (-libuamg-condensed: the program condenses it).
 // - UAMGLibrary: the public API alone (<fhhos4>), on a hybrid system built here.
 #include <gtest/gtest.h>
+#include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <random>
 #include <sstream>
 #include <string>
@@ -193,14 +195,14 @@ TEST(UAMGLibraryProgram, CondensedOptionRequiresTheLibrary)
 
 // Hybrid system of degree 0 on the n x n Cartesian mesh of the unit square: in each cell T, of coefficient a_T, the
 // local matrix couples the cell DoF to each of its 4 faces with the weight a_T (the constants are in its kernel).
-// The DoFs of the boundary faces (Dirichlet) are eliminated. Column-major matrices with int indices, as Eigen's
-// default (and HArDCore3D's).
+// The DoFs of the boundary faces (Dirichlet) are eliminated. Matrices in the format of the library
+// (fhhos4::SparseMatrix: row-major, its index type), read in place.
 // Non-symmetric with asymmetry > 0, like an advection in the direction (1, 1): the cell-face coupling is
 // -a_T (1 + asymmetry s) in A_TF and -a_T (1 - asymmetry s) in A_FT, s = 1 on the right and top faces of the cell (the
 // outflow), -1 on the others. The symmetric part is the symmetric system: positive definite.
 struct HybridSystem
 {
-	using Matrix = Eigen::SparseMatrix<double>;
+	using Matrix = fhhos4::SparseMatrix;
 	Matrix A_TT, A_TF, A_FT, A_FF, A; // A: the condensed matrix
 	Eigen::VectorXd CellInterpOfOne, FaceInterpOfOne, b;
 	bool Symmetric;
@@ -278,15 +280,19 @@ fhhos4::Solver ToySolver()
 	return solver;
 }
 
+// Column-major matrices, for Eigen's direct solvers
+using ColMajorMatrix = Eigen::SparseMatrix<double>;
+
 // Relative error of x against the direct solution
 double RelativeError(const HybridSystem& system, const Eigen::VectorXd& x)
 {
 	Eigen::VectorXd exact;
+	ColMajorMatrix A = system.A;
 	if (system.Symmetric)
-		exact = Eigen::SimplicialLDLT<HybridSystem::Matrix>(system.A).solve(system.b);
+		exact = Eigen::SimplicialLDLT<ColMajorMatrix>(A).solve(system.b);
 	else
 	{
-		Eigen::SparseLU<HybridSystem::Matrix> direct(system.A);
+		Eigen::SparseLU<ColMajorMatrix> direct(A);
 		exact = direct.solve(system.b);
 	}
 	return (x - exact).norm() / exact.norm();
@@ -335,6 +341,8 @@ TEST(UAMGLibrary, CondensedMatrixComputedFromTheBlocks)
 
 	// Lower triangular parts only of the symmetric blocks
 	HybridSystem::Matrix A_TT = system.A_TT.triangularView<Eigen::Lower>(), A_FF = system.A_FF.triangularView<Eigen::Lower>();
+	A_TT.makeCompressed();
+	A_FF.makeCompressed();
 	fhhos4::Solver lower = ToySolver();
 	lower.SetupSymmetric(A_TT, system.A_TF, A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
 	Eigen::VectorXd x3 = Eigen::VectorXd::Zero(system.b.size());
@@ -342,8 +350,8 @@ TEST(UAMGLibrary, CondensedMatrixComputedFromTheBlocks)
 	EXPECT_LT((x3 - x1).norm() / x1.norm(), 1e-9);
 }
 
-// The matrix of the uncondensed system [A_TT A_TF; A_FT A_FF]
-HybridSystem::Matrix UncondensedMatrix(const HybridSystem& system)
+// The matrix of the uncondensed system [A_TT A_TF; A_FT A_FF] (column-major, for Eigen's direct solvers)
+ColMajorMatrix UncondensedMatrix(const HybridSystem& system)
 {
 	std::vector<Eigen::Triplet<double>> triplets;
 	auto add = [&](const HybridSystem::Matrix& M, int firstRow, int firstCol)
@@ -357,7 +365,7 @@ HybridSystem::Matrix UncondensedMatrix(const HybridSystem& system)
 	add(system.A_TF, 0, nT);
 	add(system.A_FT, nT, 0);
 	add(system.A_FF, nT, nT);
-	HybridSystem::Matrix M(nT + system.A_FF.rows(), nT + system.A_FF.cols());
+	ColMajorMatrix M(nT + system.A_FF.rows(), nT + system.A_FF.cols());
 	M.setFromTriplets(triplets.begin(), triplets.end());
 	return M;
 }
@@ -372,7 +380,7 @@ TEST(UAMGLibrary, SolvesTheUncondensedSystem)
 		Eigen::VectorXd b_T = Eigen::VectorXd::Random(nT), b_F = Eigen::VectorXd::Random(nF);
 		Eigen::VectorXd b(nT + nF);
 		b << b_T, b_F;
-		Eigen::VectorXd exact = Eigen::SparseLU<HybridSystem::Matrix>(UncondensedMatrix(system)).solve(b);
+		Eigen::VectorXd exact = Eigen::SparseLU<ColMajorMatrix>(UncondensedMatrix(system)).solve(b);
 
 		fhhos4::Solver uamg = ToySolver();
 		if (system.Symmetric)
@@ -400,31 +408,28 @@ TEST(UAMGLibrary, SolvesTheUncondensedSystem)
 	}
 }
 
-// CondensedMatrix(): the matrix given to the setup (the caller's own if read in place, converted otherwise), or the
-// one computed from the blocks
+// CondensedMatrix(): the matrix given to the setup (the caller's own, read in place), or the one computed from the blocks
 TEST(UAMGLibrary, CondensedMatrix)
 {
 	for (double asymmetry : { 0.0, 0.3 })
 	{
 		HybridSystem system = NonsymmetricSystem(16, asymmetry);
-		fhhos4::SparseMatrix A = system.A, A_TT = system.A_TT, A_TF = system.A_TF, A_FT = system.A_FT, A_FF = system.A_FF;
-		fhhos4::Solver inPlace = ToySolver(), converted = ToySolver(), fromBlocks = ToySolver();
+		fhhos4::Solver given = ToySolver(), fromBlocks = ToySolver();
 		EXPECT_THROW(fromBlocks.CondensedMatrix(), fhhos4::Error); // before the setup
 		if (system.Symmetric)
 		{
-			inPlace.SetupSymmetricCondensed(A, A_TT, A_TF, system.CellInterpOfOne, system.FaceInterpOfOne);
-			converted.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne);
+			given.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne);
 			fromBlocks.SetupSymmetric(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
 		}
 		else
 		{
-			inPlace.SetupNonsymmetricCondensed(A, A_TT, A_TF, A_FT, system.CellInterpOfOne, system.FaceInterpOfOne);
-			converted.SetupNonsymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FT, system.CellInterpOfOne, system.FaceInterpOfOne);
+			given.SetupNonsymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FT, system.CellInterpOfOne, system.FaceInterpOfOne);
 			fromBlocks.SetupNonsymmetric(system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
 		}
-		EXPECT_EQ(&inPlace.CondensedMatrix(), &A) << asymmetry;
-		EXPECT_EQ((converted.CondensedMatrix() - A).norm(), 0) << asymmetry;
-		EXPECT_LT((fromBlocks.CondensedMatrix() - A).norm(), 1e-14 * A.norm()) << asymmetry;
+		fhhos4::CSRView A = given.CondensedMatrix();
+		EXPECT_EQ(A.Values, system.A.valuePtr()) << asymmetry;
+		EXPECT_EQ(A.RowPointers, system.A.outerIndexPtr()) << asymmetry;
+		EXPECT_LT((fromBlocks.CondensedMatrix().EigenMap() - system.A).norm(), 1e-14 * system.A.norm()) << asymmetry;
 	}
 }
 
@@ -480,31 +485,173 @@ TEST(UAMGLibrary, InvariantToTheScalingOfTheBases)
 	EXPECT_LT((sF.cwiseProduct(y) - x).norm() / x.norm(), 1e-8);
 }
 
-// Row-major matrices with int indices, fhhos4's format: read in place if compressed, copied otherwise. Same solver as
-// with the column-major ones (converted).
-TEST(UAMGLibrary, RowMajorMatrices)
+// The matrices in other formats, through the helpers: column-major ones converted by ToCSR() (a copy), or viewed by
+// TransposedView() (no copy: symmetric matrices), 64-bit indices converted by ToCSR(): the same solver as with the
+// matrices in the format of the library. Uncompressed matrices refused.
+TEST(UAMGLibrary, OtherFormats)
 {
 	HybridSystem system(64);
-	using RowMajorMatrix = Eigen::SparseMatrix<double, Eigen::RowMajor, int>;
-	RowMajorMatrix A = system.A, A_TT = system.A_TT, A_TF = system.A_TF, A_FF = system.A_FF;
-	RowMajorMatrix uncompressedA = A, uncompressedA_TT = A_TT, uncompressedA_TF = A_TF;
-	for (RowMajorMatrix* M : { &uncompressedA, &uncompressedA_TT, &uncompressedA_TF })
-		M->uncompress();
+	ColMajorMatrix colMajorA = system.A, colMajorA_TT = system.A_TT, colMajorA_TF = system.A_TF, colMajorA_FF = system.A_FF;
+	fhhos4::CSRMatrix A = fhhos4::ToCSR(colMajorA), A_TT = fhhos4::ToCSR(colMajorA_TT), A_TF = fhhos4::ToCSR(colMajorA_TF);
+	using LongMatrix = Eigen::SparseMatrix<double, Eigen::RowMajor, std::int64_t>;
+	LongMatrix longA_FF = system.A_FF;
+	fhhos4::CSRMatrix A_FF = fhhos4::ToCSR(longA_FF);
+	EXPECT_EQ((A.View().EigenMap() - system.A).norm(), 0);
+	EXPECT_EQ((A_FF.View().EigenMap() - system.A_FF).norm(), 0);
 
-	fhhos4::Solver colMajor = ToySolver(), inPlace = ToySolver(), fromBlocks = ToySolver(), uncompressed = ToySolver();
-	colMajor.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
-	inPlace.SetupSymmetricCondensed(A, A_TT, A_TF, A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+	fhhos4::Solver native = ToySolver(), converted = ToySolver(), fromBlocks = ToySolver(), transposedViews = ToySolver();
+	native.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+	converted.SetupSymmetricCondensed(A, A_TT, A_TF, A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
 	fromBlocks.SetupSymmetric(A_TT, A_TF, A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
-	uncompressed.SetupSymmetricCondensed(uncompressedA, uncompressedA_TT, uncompressedA_TF, system.CellInterpOfOne, system.FaceInterpOfOne);
+	// The symmetric ones viewed in place (A_TF is not square: converted)
+	transposedViews.SetupSymmetricCondensed(fhhos4::TransposedView(colMajorA), fhhos4::TransposedView(colMajorA_TT), A_TF, fhhos4::TransposedView(colMajorA_FF), system.CellInterpOfOne, system.FaceInterpOfOne);
+	EXPECT_EQ(transposedViews.CondensedMatrix().Values, colMajorA.valuePtr());
 
 	Eigen::VectorXd x = Eigen::VectorXd::Zero(system.b.size());
-	fhhos4::Result reference = colMajor.Solve(system.b, x);
-	for (fhhos4::Solver* solver : { &inPlace, &fromBlocks, &uncompressed })
+	fhhos4::Result reference = native.Solve(system.b, x);
+	for (fhhos4::Solver* solver : { &converted, &fromBlocks, &transposedViews })
 	{
 		Eigen::VectorXd y = Eigen::VectorXd::Zero(system.b.size());
-		EXPECT_EQ(solver->NumberOfLevels(), colMajor.NumberOfLevels());
+		EXPECT_EQ(solver->NumberOfLevels(), native.NumberOfLevels());
 		EXPECT_EQ(solver->Solve(system.b, y).Iterations, reference.Iterations);
 		EXPECT_LT((y - x).norm() / x.norm(), 1e-9);
+	}
+
+	HybridSystem::Matrix uncompressed = system.A;
+	uncompressed.uncompress();
+	EXPECT_THROW(fhhos4::CSRView view(uncompressed), fhhos4::Error);
+	EXPECT_THROW(fhhos4::ToCSR(uncompressed), fhhos4::Error);
+}
+
+// The global matrix of the system, in its own numbering (here: the hybrid system with the DoFs of the boundary faces,
+// scrambled), with 64-bit row pointers: ExtractSymmetricBlocks() and ExtractNonsymmetricBlocks() give the blocks of the
+// lists, Gather() and Scatter() the vectors: the same solver and solution as from the blocks.
+TEST(UAMGLibrary, BlocksOfTheGlobalMatrix)
+{
+	for (double asymmetry : { 0.0, 0.3 })
+	{
+		HybridSystem system = NonsymmetricSystem(32, asymmetry);
+		std::int64_t nT = system.A_TT.rows(), nF = system.A_FF.rows(), nD = 50; // nD Dirichlet DoFs, coupled to everything
+		std::int64_t n = nT + nF + nD;
+		// The global numbering: a random permutation of (cells, faces, Dirichlet DoFs)
+		std::vector<std::int64_t> global(n);
+		for (std::int64_t i = 0; i < n; i++)
+			global[i] = i;
+		std::shuffle(global.begin(), global.end(), std::mt19937(7));
+		std::vector<Eigen::Triplet<double>> triplets;
+		auto add = [&](const HybridSystem::Matrix& M, std::int64_t firstRow, std::int64_t firstCol)
+		{
+			for (int k = 0; k < M.outerSize(); k++)
+				for (HybridSystem::Matrix::InnerIterator it(M, k); it; ++it)
+					triplets.emplace_back(global[firstRow + it.row()], global[firstCol + it.col()], it.value());
+		};
+		add(system.A_TT, 0, 0);
+		add(system.A_TF, 0, nT);
+		add(system.A_FT, nT, 0);
+		add(system.A_FF, nT, nT);
+		for (std::int64_t d = nT + nF; d < n; d++) // the Dirichlet DoFs: coupled to themselves and to a cell and a face
+		{
+			triplets.emplace_back(global[d], global[d], 1.0);
+			triplets.emplace_back(global[d], global[d % nT], 0.5);
+			triplets.emplace_back(global[d % nT], global[d], 0.5);
+			triplets.emplace_back(global[d], global[nT + d % nF], 0.5);
+			triplets.emplace_back(global[nT + d % nF], global[d], 0.5);
+		}
+		Eigen::SparseMatrix<double, Eigen::RowMajor, std::int64_t> M64(n, n);
+		M64.setFromTriplets(triplets.begin(), triplets.end());
+		std::vector<std::int32_t> columns(M64.innerIndexPtr(), M64.innerIndexPtr() + M64.nonZeros()); // 32-bit columns
+		fhhos4::BasicCSRView<std::int64_t, std::int32_t> M(n, n, M64.outerIndexPtr(), columns.data(), M64.valuePtr());
+
+		// One DoF per cell and per face (degree 0), in the order of the blocks
+		std::vector<std::int64_t> cellOffsets(nT + 1), cellDoFs(nT), faceOffsets(nF + 1), faceDoFs(nF);
+		for (std::int64_t i = 0; i <= nT; i++)
+			cellOffsets[i] = i;
+		for (std::int64_t i = 0; i <= nF; i++)
+			faceOffsets[i] = i;
+		for (std::int64_t i = 0; i < nT; i++)
+			cellDoFs[i] = global[i];
+		for (std::int64_t i = 0; i < nF; i++)
+			faceDoFs[i] = global[nT + i];
+		fhhos4::DoFLists<std::int64_t> cells{ nT, cellOffsets.data(), cellDoFs.data() }, faces{ nF, faceOffsets.data(), faceDoFs.data() };
+
+		fhhos4::HybridBlocks blocks = system.Symmetric ? fhhos4::ExtractSymmetricBlocks(M, cells, faces) : fhhos4::ExtractNonsymmetricBlocks(M, cells, faces);
+		if (system.Symmetric)
+		{
+			HybridSystem::Matrix lowerA_TT = system.A_TT.triangularView<Eigen::Lower>(), lowerA_FF = system.A_FF.triangularView<Eigen::Lower>();
+			EXPECT_EQ((blocks.A_TT.View().EigenMap() - lowerA_TT).norm(), 0);
+			EXPECT_EQ((blocks.A_FF.View().EigenMap() - lowerA_FF).norm(), 0);
+			EXPECT_EQ(blocks.A_FT.View().Rows, 0);
+		}
+		else
+		{
+			EXPECT_EQ((blocks.A_TT.View().EigenMap() - system.A_TT).norm(), 0);
+			EXPECT_EQ((blocks.A_FT.View().EigenMap() - system.A_FT).norm(), 0);
+			EXPECT_EQ((blocks.A_FF.View().EigenMap() - system.A_FF).norm(), 0);
+		}
+		EXPECT_EQ((blocks.A_TF.View().EigenMap() - system.A_TF).norm(), 0);
+
+		// The vectors: b in the global numbering (zero on the Dirichlet DoFs: homogeneous conditions)
+		Eigen::VectorXd b_T = Eigen::VectorXd::Random(nT), b_F = Eigen::VectorXd::Random(nF), b = Eigen::VectorXd::Zero(n);
+		fhhos4::Scatter(b_T, b_F, cells, faces, b);
+		Eigen::VectorXd gathered_T(nT), gathered_F(nF);
+		fhhos4::Gather(b, cells, faces, gathered_T, gathered_F);
+		EXPECT_TRUE(gathered_T == b_T && gathered_F == b_F);
+
+		fhhos4::Solver fromGlobal = ToySolver(), fromBlocks = ToySolver();
+		if (system.Symmetric)
+		{
+			fromGlobal.SetupSymmetric(blocks.A_TT, blocks.A_TF, blocks.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+			fromBlocks.SetupSymmetric(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+		}
+		else
+		{
+			fromGlobal.SetupNonsymmetric(blocks.A_TT, blocks.A_TF, blocks.A_FT, blocks.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+			fromBlocks.SetupNonsymmetric(system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+		}
+		Eigen::VectorXd x_T(nT), x_F = Eigen::VectorXd::Zero(nF), y_T(nT), y_F = Eigen::VectorXd::Zero(nF);
+		fhhos4::Result r = fromBlocks.Solve(b_T, b_F, x_T, x_F);
+		fhhos4::Result s = fromGlobal.Solve(b_T, b_F, y_T, y_F);
+		EXPECT_TRUE(r.Converged) << asymmetry;
+		EXPECT_EQ(s.Iterations, r.Iterations) << asymmetry;
+		EXPECT_TRUE(y_T == x_T && y_F == x_F) << asymmetry;
+
+		// The solution in the global numbering: the Dirichlet DoFs unchanged
+		Eigen::VectorXd x = Eigen::VectorXd::Constant(n, 2.0);
+		fhhos4::Scatter(y_T, y_F, cells, faces, x);
+		for (std::int64_t d = nT + nF; d < n; d++)
+			EXPECT_EQ(x[global[d]], 2.0);
+		EXPECT_EQ(x[global[0]], y_T[0]);
+		EXPECT_EQ(x[global[nT]], y_F[0]);
+	}
+}
+
+// The inputs not in the CSR format are refused, before the previous setup is replaced
+TEST(UAMGLibrary, CSRFormat)
+{
+	HybridSystem system(16);
+	fhhos4::Solver uamg = ToySolver();
+	uamg.SetupSymmetric(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+	Eigen::VectorXd x = uamg.Solve(system.b);
+
+	const HybridSystem::Matrix& A_TF = system.A_TF;
+	std::vector<int> rowPointers(A_TF.outerIndexPtr(), A_TF.outerIndexPtr() + A_TF.rows() + 1);
+	std::vector<int> columns(A_TF.innerIndexPtr(), A_TF.innerIndexPtr() + A_TF.nonZeros());
+	auto setupWith = [&](const std::vector<int>& p, const std::vector<int>& c)
+	{
+		fhhos4::CSRView view(A_TF.rows(), A_TF.cols(), p.data(), c.data(), A_TF.valuePtr());
+		uamg.SetupSymmetric(system.A_TT, view, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+	};
+	EXPECT_NO_THROW(setupWith(rowPointers, columns));
+	std::vector<int> unsorted = columns, duplicate = columns, outside = columns, shifted = rowPointers;
+	std::swap(unsorted[0], unsorted[1]);
+	duplicate[1] = duplicate[0];
+	outside[5] = A_TF.cols();
+	shifted[0] = 1;
+	for (auto [p, c] : { std::pair{ &rowPointers, &unsorted }, { &rowPointers, &duplicate }, { &rowPointers, &outside }, { &shifted, &columns } })
+	{
+		EXPECT_THROW(setupWith(*p, *c), fhhos4::Error);
+		EXPECT_TRUE(uamg.IsSetUp());
+		EXPECT_LT((uamg.Solve(system.b) - x).norm(), 1e-12 * x.norm());
 	}
 }
 
@@ -515,6 +662,7 @@ template <typename AType>
 struct SetupAccepts<AType, std::void_t<decltype(std::declval<fhhos4::Solver&>().SetupSymmetricCondensed(std::declval<AType>(), std::declval<const HybridSystem::Matrix&>(), std::declval<const HybridSystem::Matrix&>(), Eigen::VectorXd(), Eigen::VectorXd()))>> : std::true_type {};
 static_assert(SetupAccepts<const HybridSystem::Matrix&>::value);
 static_assert(!SetupAccepts<HybridSystem::Matrix>::value, "the solver keeps a reference to A: a temporary A must not compile");
+static_assert(!SetupAccepts<fhhos4::CSRMatrix>::value, "the view of a temporary CSRMatrix must not compile");
 
 // BiCGSTAB preconditioned by a V-cycle (linear)
 TEST(UAMGLibrary, BiCGSTAB)
@@ -794,6 +942,7 @@ TEST(UAMGLibrary, Errors)
 	// A_TT not block diagonal
 	HybridSystem::Matrix A_TT = system.A_TT;
 	A_TT.coeffRef(1, 0) = -1;
+	A_TT.makeCompressed();
 	EXPECT_THROW(uamg.SetupSymmetricCondensed(system.A, A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 
 	// Vector of the wrong size

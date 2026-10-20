@@ -972,6 +972,32 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
     1.35-1.5x. The tetrahedra 3 and 4 have the same iteration counts with both smoothers (34 / 44 / 38 / 52): checked,
     a coincidence (`bcheb4` logged on every level).
 
+- **The inputs of the library read in place** (2026-10-19, the interface redesign: `CSRView`, `BorrowedSparseMatrix`,
+  the copying helpers; see `README_library.md`). NGSolve's HDG through the Python module (`build-python/bench/`:
+  `run_iface.sh`, `summary_iface.py`, `profile_extraction.py`; on AC power), U-AMG only, best of 2, old = HEAD (SciPy's
+  slicing of `a.mat.CSR()` into the blocks, then the module's conversion to Eigen in the setup) vs new
+  (`ExtractSymmetricBlocks()` on NGSolve's arrays read in place: uint64 row pointers, int32 columns), interleaved.
+  Same iterations, solutions bitwise identical (`test_ngsolve.py`). Extraction + setup, and U-AMG's total (extraction
+  + setup + solve), 8 threads (1 thread):
+
+  | Case | cells / face DoFs | extraction + setup | total |
+  |---|---|---|---|
+  | Square-tri k=1 | 92k / 276k | 0.44 -> 0.37 s (0.84 -> 0.69) | 0.78 -> 0.73 s (1.55 -> 1.39) |
+  | Square-tri k=1 | 370k / 1.1M | 2.28 -> 1.79 s (4.02 -> 3.44) | 4.05 -> 3.59 s (7.51 -> 6.97) |
+  | Square-tri k=2 | 92k / 415k | 1.22 -> 0.71 s (1.77 -> 1.39) | 1.87 -> 1.38 s (3.05 -> 2.68) |
+  | Square-tri k=2 | 189k / 848k | 2.44 -> 1.50 s (4.53 -> 3.16) | 3.86 -> 3.05 s (7.43 -> 6.13) |
+  | Cube-tet k=1 | 25k / 147k | 0.31 -> 0.19 s (0.50 -> 0.41) | 0.72 -> 0.62 s (1.29 -> 1.22) |
+  | Cube-tet k=1 | 69k / 400k | 1.16 -> 0.61 s (1.74 -> 1.41) | 2.33 -> 1.82 s (4.24 -> 3.99) |
+  | Cube-tet k=2 | 9k / 103k | 0.43 -> 0.21 s (0.65 -> 0.47) | 0.92 -> 0.75 s (1.74 -> 1.60) |
+  | Cube-tet k=2 | 27k / 313k | 1.46 -> 0.70 s (2.21 -> 1.92) | 3.04 -> 2.30 s (5.55 -> 5.20) |
+
+  The total, the solves included: -6 to -26% (8 threads), -5 to -17% (1 thread). The cost of the interface in it:
+  26-43% -> 11-21% on 8 threads, 15-31% -> 8-16% on 1 thread, of which the script's conversion of NGSolve's
+  `FreeDofs()` to NumPy (an element by element copy, 0.09-0.31 s, in both versions) and the library's
+  `ExtractSymmetricBlocks()`, 0.17-0.32 s on 8 threads, 0.42-0.64 s on 1, for 28-40M non-zeros (vs SciPy's slicing
+  0.5-0.9 s and the conversion to Eigen 0.25-0.6 s). The first runs of each case, old before new, gave the new solves
+  2-10% slower: the order of the runs (new first: the same times).
+
 ## Current profile (U-AMG; parallel: 16 threads, the default before 2026-10-08)
 
 | Case | Setup, sequential / parallel | Solve, sequential / parallel |
@@ -1220,7 +1246,10 @@ Possible now that reordering the arithmetic operations is allowed (rejected so f
   Lanczos of the setup. Estimate: solve -13% / -7% (Cube-tet k=2, 1 / 8 threads), -22% / -12% (Square-tri k=2).
 
 From the comparison with NGSolve's BDDC (2026-10-19; results in `CLAUDE.md`, "Python module"; profile above), U-AMG
-1.2-2x faster at k=1, 1.1-1.5x slower at k=2 on 8 threads, where its iterations cost 1.15-1.75x more:
+1.2-2x faster at k=1, 1.1-1.5x slower at k=2 on 8 threads, where its iterations cost 1.15-1.75x more (with the new
+interface, setup + solve: 1.3-2.2x faster at k=1, a tie to 1.35x slower at k=2, 1.2-1.45x slower at k=3 with the bases
+sorted by degree, though with 40-45% fewer iterations; end to end 1.1-1.8x faster at k=1, 1.15-1.45x slower at k=2,
+1.35-1.55x slower at k=3):
 
 - **Single precision for the multigrid hierarchy** — new, estimated, a change of the method: opt-in only. The cycle
   (operators, prolongations, smoothers' blocks) stored and applied in float, FCG and its residuals in double (a
@@ -1235,10 +1264,12 @@ From the comparison with NGSolve's BDDC (2026-10-19; results in `CLAUDE.md`, "Py
   fine rows, and the K-cycle visits it twice per iteration). Its SpMV scales 1.6x on 8 threads, its diagonal sweep not
   at all (0.15 -> 0.21 ms). Options (all changing the method, opt-in): a V-cycle below the first coarse level, or
   Minus2-like intermediate p-levels, which don't exist at k=2.
-- **The copies of the interface** — measured: in the NGSolve integration, SciPy's extraction of the four blocks
-  (sequential slicing) and the module's conversion to Eigen matrices cost 0.07-0.52 s and 0.1-0.25 s, 10-20% of
-  U-AMG's total. A CSR view of the whole uncondensed matrix with the DoFs of each cell and face, read in place, and
-  the blocks extracted by one parallel pass in the library: a separate task (the interface).
+- **The extraction of the blocks from a global matrix** (`ExtractSymmetricBlocks()`, after the interface redesign:
+  "The inputs of the library read in place" in Done): 0.17-0.32 s on 8 threads for 28-40M non-zeros, only 1.8-2.5x
+  faster than on 1 thread. It reads the rows of the cells twice (`A_TT`, then `A_TF`: one `BuildByRows` per block), and
+  `BuildByRows` writes each block twice (its chunks, then their concatenation); the map of the DoFs is filled
+  sequentially. Expected: one pass on the rows of the cells for both blocks, written once (counts, then the
+  values), about 2x. Bit-identical. Worth it for the frameworks that assemble one matrix (NGSolve, PETSc's AIJ).
 
 Other candidates:
 

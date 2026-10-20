@@ -1,5 +1,6 @@
 # Tests of the Python module fhhos4 (library/python) on a hybrid system of degree 0 built here (Cartesian mesh of the
-# unit square, random coefficients: HybridSystem of tests/UAMGLibraryTest.cpp), against SciPy's direct solver.
+# unit square, random coefficients: HybridSystem of tests/UAMGLibraryTest.cpp), against SciPy's direct solver. The
+# SciPy matrices of the system: CSR with int32 indices, the format of the library, read in place.
 # Run by ctest (PythonModule), with the build's python directory in PYTHONPATH.
 import gc
 import sys
@@ -41,6 +42,7 @@ class HybridSystem:
         self.A_FF = coo(FF, (nFaces, nFaces))
         invDiag = sp.diags(1 / self.A_TT.diagonal())
         self.A = (self.A_FF - self.A_FT @ invDiag @ self.A_TF).tocsr()
+        self.A.sort_indices()  # SciPy's products don't sort the columns: the CSR format of the library requires it
         self.CellInterpOfOne = np.ones(nCells)
         self.FaceInterpOfOne = np.ones(nFaces)
         self.b_T = np.ones(nCells)  # unit source in the cells
@@ -64,6 +66,11 @@ def RelativeError(x, reference):
     return np.linalg.norm(x - reference) / np.linalg.norm(reference)
 
 
+def ToSciPy(M):
+    """A copy of a fhhos4.CSRMatrix as a SciPy matrix"""
+    return sp.csr_matrix((M.Values.copy(), M.ColumnIndices.copy(), M.RowPointers.copy()), shape=(M.Rows, M.Cols))
+
+
 def test_uncondensed_symmetric():
     system = HybridSystem(32)
     solver = ToySolver()
@@ -74,14 +81,18 @@ def test_uncondensed_symmetric():
     assert result.Converged and 0 < result.Iterations < 50, result
     x = spla.spsolve(system.Uncondensed(), np.concatenate([system.b_T, system.b_F]))
     assert RelativeError(np.concatenate([x_T, x_F]), x) < 1e-8
-    # The condensed matrix computed by the library
-    assert abs(solver.CondensedMatrix() - system.A).max() < 1e-12 * abs(system.A).max()
+    # The condensed matrix computed by the library (a copy)
+    assert abs(ToSciPy(solver.CondensedMatrix()) - system.A).max() < 1e-12 * abs(system.A).max()
 
 
 def test_uncondensed_nonsymmetric():
     system = HybridSystem(32, asymmetry=0.3)
     solver = ToySolver()
-    solver.SetupNonsymmetric(system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+    A_FT = system.A_FT.copy()
+    solver.SetupNonsymmetric(system.A_TT, system.A_TF, A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+    # The solves read A_FT: the solver keeps its arrays, the caller's object may go
+    del A_FT
+    gc.collect()
     x_T, x_F = np.zeros(system.b_T.size), np.zeros(system.b_F.size)
     result = solver.Solve(system.b_T, system.b_F, x_T, x_F)
     assert result.Converged, result
@@ -94,12 +105,12 @@ def test_condensed():
     solver = ToySolver()
     A = system.A.copy()
     solver.SetupSymmetricCondensed(A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne)
-    # The solver owns its copy of A: the caller's may go
+    # Read in place: the solver keeps the arrays of A, the caller's object may go
     del A
     gc.collect()
     x = solver.Solve(system.b)
     assert RelativeError(x, spla.spsolve(system.A.tocsc(), system.b)) < 1e-8
-    # In place, from an initial guess, with A_FF
+    # From an initial guess, with A_FF
     solver.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
     y = np.zeros(system.b.size)
     result = solver.Solve(system.b, y)
@@ -117,7 +128,9 @@ def test_condensed_nonsymmetric():
 def test_failed_setup_keeps_the_previous_one():
     system = HybridSystem(32)
     solver = ToySolver()
-    solver.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne)
+    A = system.A.copy()
+    solver.SetupSymmetricCondensed(A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne)
+    del A
     x = solver.Solve(system.b)
     other = HybridSystem(8)
     try:
@@ -129,15 +142,89 @@ def test_failed_setup_keeps_the_previous_one():
     assert RelativeError(solver.Solve(system.b), x) < 1e-12
 
 
+def ExpectTypeError(f, what):
+    try:
+        f()
+        assert False, what + " accepted"
+    except TypeError:
+        pass
+
+
 def test_other_formats():
-    # CSC and COO matrices (converted to CSR), int64 indices
+    # Read in place: CSR matrices of int32 indices (the index type of the library). Refused: the other formats and index
+    # types, which the helpers convert (copies) or view (TransposedView(): symmetric CSC matrices).
     system = HybridSystem(32)
     solver = ToySolver()
-    A_TF = system.A_TF.tocsc()
-    A_TF.indices, A_TF.indptr = A_TF.indices.astype(np.int64), A_TF.indptr.astype(np.int64)
-    solver.SetupSymmetric(system.A_TT.tocoo(), A_TF, system.A_FF.tocsc(), system.CellInterpOfOne, system.FaceInterpOfOne)
     x_T, x_F = np.zeros(system.b_T.size), np.zeros(system.b_F.size)
-    assert solver.Solve(system.b_T, system.b_F, x_T, x_F).Converged
+    csc, coo = system.A_FF.tocsc(), system.A_FF.tocoo()
+    int64 = system.A_TF.copy()
+    int64.indices, int64.indptr = int64.indices.astype(np.int64), int64.indptr.astype(np.int64)
+    for A_TF, A_FF, what in [(system.A_TF, csc, "a CSC matrix"), (system.A_TF, coo, "a COO matrix"), (int64, system.A_FF, "int64 indices")]:
+        ExpectTypeError(lambda: solver.SetupSymmetric(system.A_TT, A_TF, A_FF, system.CellInterpOfOne, system.FaceInterpOfOne), what)
+    assert not solver.IsSetUp()
+    # Converted, or viewed
+    solver.SetupSymmetric(system.A_TT, fhhos4.ToCSR(int64), fhhos4.ToCSR(csc), system.CellInterpOfOne, system.FaceInterpOfOne)
+    reference = solver.Solve(system.b_T, system.b_F, x_T, x_F)
+    y_T, y_F = np.zeros(system.b_T.size), np.zeros(system.b_F.size)
+    solver.SetupSymmetric(system.A_TT, system.A_TF, fhhos4.TransposedView(csc), system.CellInterpOfOne, system.FaceInterpOfOne)
+    assert solver.Solve(system.b_T, system.b_F, y_T, y_F).Iterations == reference.Iterations
+    assert RelativeError(y_F, x_F) < 1e-12
+    # A CSRView of NumPy arrays
+    A = system.A_TF
+    view = fhhos4.CSRView(A.shape[0], A.shape[1], A.indptr, A.indices, A.data)
+    solver.SetupSymmetric(system.A_TT, view, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+    y_T, y_F = np.zeros(system.b_T.size), np.zeros(system.b_F.size)
+    assert solver.Solve(system.b_T, system.b_F, y_T, y_F).Iterations == reference.Iterations
+
+
+def test_blocks_of_the_global_matrix():
+    # The global matrix in its own numbering: the hybrid system with Dirichlet DoFs, scrambled, with NGSolve's index
+    # types (uint64 row pointers, int32 columns). ExtractSymmetricBlocks() and ExtractNonsymmetricBlocks() give the
+    # blocks of the lists, Gather() and Scatter() the vectors.
+    for asymmetry in [0.0, 0.3]:
+        system = HybridSystem(32, asymmetry)
+        nT, nF, nD = system.A_TT.shape[0], system.A_FF.shape[0], 40
+        n = nT + nF + nD
+        rng = np.random.default_rng(7)
+        perm = rng.permutation(n)  # perm[i]: the global number of the i-th DoF of (cells, faces, Dirichlet)
+        D = sp.random(nD, nT + nF, density=0.01, random_state=1, format="csr")  # couplings with the Dirichlet DoFs
+        M = sp.bmat([[system.A_TT, system.A_TF, D[:, :nT].T], [system.A_FT, system.A_FF, D[:, nT:].T], [D[:, :nT], D[:, nT:], sp.eye(nD)]]).tocsr()
+        P = sp.csr_matrix((np.ones(n), (perm, np.arange(n))), shape=(n, n))
+        M = (P @ M @ P.T).tocsr()
+        M.sort_indices()
+        view = fhhos4.CSRView(n, n, M.indptr.astype(np.uint64), M.indices.astype(np.int32), M.data)
+        cells = fhhos4.DoFLists(nT, np.arange(nT + 1), perm[:nT])
+        faces = fhhos4.DoFLists(nF, np.arange(nF + 1), perm[nT:nT + nF])
+        solver = ToySolver()
+        if asymmetry == 0:
+            blocks = fhhos4.ExtractSymmetricBlocks(view, cells, faces)
+            assert abs(ToSciPy(blocks.A_TT) - sp.tril(system.A_TT)).max() == 0
+            assert abs(ToSciPy(blocks.A_FF) - sp.tril(system.A_FF)).max() == 0
+            assert blocks.A_FT.Rows == 0
+            solver.SetupSymmetric(blocks.A_TT, blocks.A_TF, blocks.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+        else:
+            blocks = fhhos4.ExtractNonsymmetricBlocks(view, cells, faces)
+            assert abs(ToSciPy(blocks.A_FT) - system.A_FT).max() == 0
+            solver.SetupNonsymmetric(blocks.A_TT, blocks.A_TF, blocks.A_FT, blocks.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+        assert abs(ToSciPy(blocks.A_TF) - system.A_TF).max() == 0
+        # The global vectors: b (homogeneous Dirichlet conditions), and the solution x (the Dirichlet values unchanged)
+        b = np.zeros(n)
+        fhhos4.Scatter(system.b_T, system.b_F, cells, faces, b)
+        b_T, b_F = np.zeros(nT), np.zeros(nF)
+        fhhos4.Gather(b, cells, faces, b_T, b_F)
+        assert (b_T == system.b_T).all() and (b_F == system.b_F).all()
+        x_T, x_F = np.zeros(nT), np.zeros(nF)
+        assert solver.Solve(b_T, b_F, x_T, x_F).Converged
+        x = np.full(n, 2.0)
+        fhhos4.Scatter(x_T, x_F, cells, faces, x)
+        assert (x[perm[nT + nF:]] == 2.0).all()
+        reference = spla.spsolve(system.Uncondensed(), np.concatenate([system.b_T, system.b_F]))
+        assert RelativeError(x[perm[:nT + nF]], reference) < 1e-8
+        # The arrays of a block keep it alive
+        values = blocks.A_TF.Values
+        del blocks
+        gc.collect()
+        assert (values == system.A_TF.data).all()
 
 
 def test_parameters():
@@ -160,14 +247,19 @@ def test_errors():
     except fhhos4.Error as e:
         assert "Dimension" in str(e)
     assert isinstance(fhhos4.Error("message"), RuntimeError)
-    # Output vectors: float64 only, not converted (they would not be written)
+    # Vectors: float64 only, not converted
     solver = ToySolver()
     solver.SetupSymmetric(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+    ExpectTypeError(lambda: solver.Solve(system.b_T, system.b_F, np.zeros(system.b_T.size, dtype=np.float32), np.zeros(system.b_F.size)), "a float32 output")
+    ExpectTypeError(lambda: solver.Solve(system.b_T.astype(np.float32), system.b_F, np.zeros(system.b_T.size), np.zeros(system.b_F.size)), "a float32 input")
+    # Not in the CSR format: unsorted columns
+    A = system.A_TF.copy()
+    A.indices[[0, 1]] = A.indices[[1, 0]]
     try:
-        solver.Solve(system.b_T, system.b_F, np.zeros(system.b_T.size, dtype=np.float32), np.zeros(system.b_F.size))
-        assert False, "float32 output accepted"
-    except TypeError:
-        pass
+        solver.SetupSymmetric(system.A_TT, A, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+        assert False, "unsorted columns accepted"
+    except fhhos4.Error as e:
+        assert "CSR" in str(e)
 
 
 if __name__ == "__main__":

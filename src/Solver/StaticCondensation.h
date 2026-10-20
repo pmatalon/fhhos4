@@ -17,21 +17,24 @@ using namespace std;
 // (Utils::InvertBlockDiagMatrix(), used before, drops their coefficients of absolute value <= 1e-15: 1e-8 relative
 // differences in A on the symmetric part of HArDCore3D's 32^3 k=1 convection-diffusion system).
 // Symmetric system (A_FT not given): A_TT and A_FF are read from their lower triangular parts, and A_FT = A_TF^T.
+// Non-symmetric system: A_FT is read in place, by the constructor and by CondensedRHS() (not copied): it must stay alive
+// and unchanged until the destruction of the object.
 class StaticCondensation
 {
 private:
-	int _blockSize;          // DoFs per cell
-	vector<double> _invA_TT; // inverses of the blocks of A_TT, column-major, one after the other
-	SparseMatrix _W;         // A_TT^{-1} A_TF
-	SparseMatrix _A_FT;
+	int _blockSize;                // DoFs per cell
+	vector<double> _invA_TT;       // inverses of the blocks of A_TT, column-major, one after the other
+	SparseMatrix _W;               // A_TT^{-1} A_TF
+	SparseMatrix _transposedA_TF;  // A_FT of a symmetric system; empty otherwise
+	const SparseMatrix& _A_FT;     // the caller's, or _transposedA_TF
 public:
 	// A_FT: null if the system is symmetric
 	StaticCondensation(const SparseMatrix& A_TT, const SparseMatrix& A_TF, const SparseMatrix* A_FT, int cellBlockSize)
-		: _blockSize(cellBlockSize)
+		: _blockSize(cellBlockSize), _transposedA_TF(A_FT ? SparseMatrix() : SparseMatrixOps::Transpose(A_TF)),
+		  _A_FT(A_FT ? *A_FT : _transposedA_TF)
 	{
 		assert(A_TT.rows() == A_TF.rows() && A_TT.rows() % cellBlockSize == 0);
 		bool symmetric = !A_FT;
-		_A_FT = symmetric ? SparseMatrixOps::Transpose(A_TF) : *A_FT;
 		BigNumber nCells = A_TT.rows() / cellBlockSize;
 		int nT = cellBlockSize;
 
@@ -117,6 +120,10 @@ public:
 			}
 		}
 	}
+
+	// Not copyable: _A_FT may refer to a member
+	StaticCondensation(const StaticCondensation&) = delete;
+	StaticCondensation& operator=(const StaticCondensation&) = delete;
 
 	// A = A_FF - A_FT A_TT^{-1} A_TF, both triangles. lower: A_FF read from its lower triangular part (symmetric system).
 	SparseMatrix CondensedMatrix(const SparseMatrix& A_FF, bool lower) const

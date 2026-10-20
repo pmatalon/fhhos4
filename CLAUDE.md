@@ -76,7 +76,7 @@ From `build/`:
 ctest --output-on-failure
 ```
 
-216 tests, ~5 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
+221 tests, ~5 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
 iteration counts of the papers in `reproducibility/` — see `tests/README.md`. Covers
 `Program_Diffusion_HHO` and `Program_BiHarmonic_HHO` (HHO, static condensation), 2D/3D,
 in-house, GMSH and polygonal meshes, and the library (`UAMGLibrary*`, ~15 s). Not covered: DG/FEM programs (disabled by default), `lu`/`cg`/`agmg`/`p_mg` solvers,
@@ -137,15 +137,27 @@ Example invocations for specific experiments/figures live in `reproducibility/*.
 `fhhos4` (shared library `libfhhos4.so`; CMake target `fhhos4_lib`, since `fhhos4` is the program; exported as
 `fhhos4::fhhos4`) gives U-AMG to other HHO codes (first target: HArDCore3D), see `README_library.md` (its rules: section
 "Documentation"). Public interface in `library/include/fhhos4.h` (`#include <fhhos4>`, a
-file that includes `fhhos4.h`, or `<fhhos4.h>`; namespace `fhhos4`, Eigen types, pimpl): `Solver` (parameters as
+file that includes `fhhos4.h`, or `<fhhos4.h>`; namespace `fhhos4`, pimpl): `Solver` (parameters as
 public members; `Dimension`, `FaceDegree` and `CellDegree` must be set), `Result`, and `Error` (in `fhhos4_error.h`,
 which `Utils.h` includes alone). Two interfaces: the uncondensed system, the interface of choice
 (`SetupSymmetric()` from `A_TT`, `A_TF`, `A_FF` and the interpolations of 1, or `SetupNonsymmetric()` with `A_FT` too,
 then `Solve(b_T, b_F, x_T, x_F)`: the library condenses the system by cells, `StaticCondensation.h`, and computes the
 cell unknowns; `CondensedMatrix()`), and the condensed system, only to integrate the library with the least effort into
 codes that condense already (HArDCore3D, Disk++: `SetupSymmetricCondensed()`/`SetupNonsymmetricCondensed()` from `A`
-and the blocks, `A_FF` optional, then `Solve(b, x)`). `fhhos4::SparseMatrix`: fhhos4's matrix type, its index type
-generated into `fhhos4_version.h` (`SMALL_INDEX`). Non-symmetric matrix (`UncondensedLevel::Symmetric` false, `A_F_T` given; program option
+and the blocks, `A_FF` optional, then `Solve(b, x)`). Inputs (the user's decisions, 2026-10-19): read in place, never
+copied nor converted by the setups and solves: the matrices as `CSRView` (CSR arrays of the library's index type
+`SparseIndex`, generated into `fhhos4_version.h` from `SMALL_INDEX`; `fhhos4::SparseMatrix`, the Eigen row-major type,
+converts to it; checked by one parallel pass, `CheckCSR()`), which the solvers read as `BorrowedSparseMatrix`
+(`Utils/BorrowedSparseMatrix.h`: a `SparseMatrix` pointing Eigen's protected members to the caller's arrays); the
+library keeps `A` (condensed setups) and `A_FT` (`SetupNonsymmetric()`: `StaticCondensation` reads it at each solve).
+Other formats through helpers that copy, so that the copies stay visible in the calling code: `ExtractSymmetricBlocks()`/
+`ExtractNonsymmetricBlocks()` (a global matrix + `DoFLists` of the cells and faces, any index types, one parallel pass:
+`SparseMatrixOps::BuildByRows`), `Gather()`/`Scatter()`, `ToCSR()` (index types; column-major: the parallel
+`SparseMatrixOps::Transpose`); `TransposedView()` (no copy: a symmetric column-major matrix as its transpose). Their
+results: `CSRMatrix`, owned by the library. The compiled functions take plain types only (views, `detail::` vector
+views): the Eigen overloads and conversions are inline in the header, compiled with the client's Eigen; no C interface
+(the user's decision: a PETSc preconditioner would be C++, as PETSc's PCHPDDM and PCAMGX; MATNEST blocks read in place,
+AIJ + index sets through `ExtractSymmetricBlocks()`). Non-symmetric matrix (`UncondensedLevel::Symmetric` false, `A_F_T` given; program option
 `-uamg-nonsym` to test it on the symmetric matrices): the same algorithm on the matrix itself, without the optimizations of the symmetric case (lower triangular
 parts, Cholesky; the local Galerkin products compute full matrices); couplings from the averaged traces of `A_TF` and
 `A_FT`, Galerkin coarse operators `P^T A P`, Gauss-Seidel sweeps in the downwind order of each level
@@ -167,11 +179,14 @@ interface (`Diffusion_HHO::CondensationBySolver`: no static condensation in the 
 ### Python module
 
 `library/python/fhhos4_python.cpp`: the module `fhhos4` (nanobind, `NB_STATIC`), the public API with the C++ names (the
-user's decision, 2026-10-18: one documentation), on SciPy's matrices (copied to `fhhos4::SparseMatrix` by nanobind's
-caster) and NumPy's vectors (`Eigen::Ref`: read in place; the outputs `noconvert()`, float64 only). `PySolver` derives
-from `fhhos4::Solver` and owns the `A` of the condensed setups on the heap (the library keeps a reference to it), replaced
-only after a successful setup: the checks of a setup run before it resets the previous one, which still reads its `A`.
-The setups and solves release the GIL. Built with `-DENABLE_PYTHON=ON` (in the library section of `CMakeLists.txt`,
+user's decision, 2026-10-18: one documentation), on NumPy arrays read in place, as the library reads its inputs (never
+copied nor converted: `nb::try_cast` without conversion; the vectors `noconvert()`, float64 only): the matrices as
+`CSRView` (`PyCSRView`: the arrays of any index types, int32/int64, uint64 read as int64, and their Python owners),
+`CSRMatrix` (arrays exposed as read-only NumPy views that keep it alive), or any object with `indptr`, `indices`,
+`data`, `shape` and `format` "csr" (SciPy, duck-typed: SciPy is not needed, only by the test). `PySolver` derives from
+`fhhos4::Solver` and keeps the views the solves read (`A`, `A_FT`), replaced only after a successful setup: the checks
+of a setup run before it resets the previous one, which still reads them. `CondensedMatrix()`: a copy (`ToCSR()`). The
+setups, solves and helpers release the GIL. Built with `-DENABLE_PYTHON=ON` (in the library section of `CMakeLists.txt`,
 also with `ENABLE_PROGRAM=OFF`) into `<build>/python`, not installed (pip/conda packaging: after the validation, the
 user's decision). Its test, `ctest -R Python` (`PythonModule`: `library/python/tests/test_module.py`, the toy system of
 `UAMGLibraryTest.cpp` against SciPy's direct solver). No NGSolve in the repository (the user's decision, 2026-10-19: no
@@ -180,14 +195,19 @@ Environment: conda env `fhhos4-python` (python 3.12, numpy, scipy, nanobind, cma
 NGSolve from pip, not on conda-forge), build directory `build-python` (`-DENABLE_PROGRAM=OFF -DENABLE_PYTHON=ON`, ~1 min).
 
 NGSolve (6.2.2608; first target of the module; DOLFINx after work on MPI in fhhos4, the user's decision): its HDG
-(`L2 * FacetFESpace`, primal, SPD) fits the uncondensed interface. `test_ngsolve.py` (outside the repository) extracts the blocks itself (the
-user's decision: outside the library): `condense=False` (with `condense=True`, `a.mat` keeps only the Schur complement,
-the cell blocks are not stored), NGSolve's default numbering (cells then faces, contiguous blocks in order; checked:
-`L2(..., all_dofs_together=False)` breaks it), Dirichlet faces removed (`fes.FreeDofs()`: all or none of a face's DoFs).
-phi_0 = 1 (interpolation of 1: ones). Bases not ordered by degree (2D cell k=3: degrees 0 1 2 3 1 2 3 2 3 3; 3D faces
-too; Q^k on quads/hexes, Q-degrees not ordered either): `PCoarsening::ToZero` (sorting by degree: not yet, the user's
-decision). Solution = NGSolve's sparse Cholesky to 1e-12..1e-14 (2D, 3D, k = 1..3, l = k + 1). Iterations (tolerance
-1e-8, 2026-10-19), U-AMG `bcheb4` / `bgs` / NGSolve's BDDC + CG, penalty alpha/h: Square-tri 3708 cells, alpha = 4k^2
+(`L2 * FacetFESpace`, primal, SPD) fits the uncondensed interface. `test_ngsolve.py` (outside the repository): `a.mat.CSR()`
+(views of NGSolve's arrays: uint64 row pointers, int32 columns, read in place), the DoF lists from `GetDofNrs()`, the
+Dirichlet faces left out (`fes.FreeDofs()`: all or none of a face's DoFs), `ExtractSymmetricBlocks()`, `Gather()`,
+`Scatter()`; `condense=False` (with `condense=True`, `a.mat` keeps only the Schur complement, the cell blocks are not
+stored). Solutions bitwise those of the former extraction by SciPy (2026-10-19). NGSolve's sparse Cholesky (the
+reference) is not deterministic: its error varies at 1e-14 from run to run.
+phi_0 = 1 (interpolation of 1: ones). Bases not ordered by degree (Dubiner's order: 2D cell k=3: degrees 0 1 2 3 1 2 3 2
+3 3; 3D cells and faces too, 2D faces ordered; Q^k on quads/hexes, Q-degrees not ordered either): since 2026-10-20 (the
+user's decision) the DoF lists sort the DoFs of each cell and face by degree (`ByDegree()`: the degrees measured by
+least-squares fits of `GetFE().CalcShape()`, the same order on every element), default p-coarsening: k <= 2 unchanged,
+k=3 21 / 69 iterations instead of 44 / 96 with `ToZero` (Square-tri 940 / Cube-tet 1259 cells, tolerance 1e-12), k=4
+23 / 59. Solution = NGSolve's sparse Cholesky to 1e-11..1e-14 (2D, 3D, k = l = 1..4; k = 1, l = 2). Iterations with `ToZero`
+(tolerance 1e-8, 2026-10-19), U-AMG `bcheb4` / `bgs` / NGSolve's BDDC + CG, penalty alpha/h: Square-tri 3708 cells, alpha = 4k^2
 (NGSolve's tutorial): k=1 11/14/12, k=2 14/19/15, k=3 18/22/19; alpha = 10(k+1)^2: 24-29 / 32-36 / 21-30. Cube-tet 3937
 cells, alpha = 5(k+1)^2: k=1 24/28/28, k=2 39/44/45, k=3 46/53/55 (alpha = 4 at k=1 is not SPD in 3D: the Chebyshev
 setup refuses it). The counts follow the penalty for both solvers.
@@ -195,9 +215,16 @@ Times against NGSolve's BDDC + its CG (2026-10-19, `build-python/bench/`, not in
 tolerance 1e-8, each solver its own norm, the user's decision: BDDC's true residuals 6e-8..1.4e-6, U-AMG's <= 1e-8;
 straight to degree 0; k = 3 skipped, the user's decision): BDDC / U-AMG setup + solve on 8 threads, Square-tri
 (alpha = 4k^2) 92k-370k cells: k=1 1.27-1.33, k=2 0.80-0.90; Cube-tet (alpha = 5(k+1)^2): k=1 25k cells 1.17, 69k cells
-1.96 (BDDC's setup 1.70 s vs 0.43 s), k=2 9k-27k cells 0.67-0.76. 1 thread: the same trends. BDDC with an AMG coarse
+1.96 (BDDC's setup 1.70 s vs 0.43 s), k=2 9k-27k cells 0.67-0.76. 1 thread: the same trends. With the new interface (2026-10-19,
+`run_bddc.sh`, `summary_bddc.py`, the same session, best of 2), 8 threads: setup + solve k=1 1.35-1.39 (2D),
+1.34-2.22 (3D), k=2 0.96-1.02 (2D), 0.74-0.92 (3D); end to end (U-AMG: uncondensed assembly + extraction + setup + solve;
+BDDC: condensed assembly + its setup + CG + cell unknowns) k=1 1.11-1.82, k=2 0.69-0.87 (1 thread: 1.16-1.92,
+0.73-0.95). At k=2 the solve is the gap (16 vs 13-14 iterations in 2D, 42-43 vs 49-52 in 3D, but costlier ones). k=3 (sorted by degree, 2026-10-20,
+`run_k3.sh`): setup + solve 0.81-0.85 (2D), 0.69-0.70 (3D), end to end 0.64-0.75 (1 thread: 0.61-0.78), with fewer
+iterations (10 vs 18 in 2D, 32-35 vs 54-64 in 3D). BDDC with an AMG coarse
 solver (`coarsetype="h1amg"`) always slower (51-91 iterations); NGSolve's sparse Cholesky a tie in 2D, 6x slower than
-U-AMG in 3D at 25k cells. The Python extraction of the blocks: 0.07-0.52 s, 10-20% of U-AMG's total.
+U-AMG in 3D at 25k cells. The extraction of the blocks (2026-10-19, `ExtractSymmetricBlocks()` on NGSolve's arrays
+read in place; before: SciPy's slicing and the conversion to Eigen): U-AMG's total -5 to -26%, `PERFORMANCE.md`.
 
 ### U-AMG: details and measurements (kept out of `README_library.md`)
 
@@ -205,7 +232,8 @@ U-AMG in 3D at 25k cells. The Python extraction of the blocks: 0.07-0.52 s, 10-2
   sorted) only in the rows where `A_FF` lacks couplings of the faces of a cell (zeros dropped by an assembly): 1.3x (1
   thread) to 1.8x (8 threads) slower when all the rows are completed. HArDCore3D 32^3, k = 1 (285,696 face DoFs, 9.2 M
   non-zeros in `A`): setup from the blocks 0.71-0.80 s vs 0.38-0.50 s from `A` on 1 thread, 0.25-0.35 s vs 0.17-0.29 s
-  on 8; same solve. The setups from the blocks keep the inverses of the blocks of `A_TT`, `A_TT^{-1} A_TF` and `A_FT`.
+  on 8; same solve. The setups from the blocks keep the inverses of the blocks of `A_TT` and `A_TT^{-1} A_TF`, and
+  read `A_FT` at each solve: the transpose of `A_TF` (symmetric), or the caller's in place (non-symmetric).
 - p-levels: `P_CS` Minus2 (k, k-2, ..., 0), blocks extracted (first coefficients of each block,
   `SetupOperatorByBlockExtraction()`), prolongation = injection of the low modes. `PCoarsening::ToZero` (`-p-cs =0`, k then 0,
   for bases not ordered by degree, e.g. NGSolve's): more iterations from k = 3 (FCG, 2026-10-19; `bgs,rbgs` / `bcheb4`):
@@ -251,13 +279,15 @@ U-AMG in 3D at 25k cells. The Python extraction of the blocks: 0.07-0.52 s, 10-2
   k = 2, asymmetry 3e-16: up to 1% of L2 errors of 3e-11).
 - `Threads` default: at most one thread per physical core unless `OMP_NUM_THREADS` or OpenMP's binding is set (the
   hyperthreads slow the AMG down). Release builds use the conda compilers' `-march=nocona`.
-- Eigen across the interface (2026-10-17, replaces the comparison of the version and of `EIGEN_MAX_ALIGN_BYTES`): the
-  constructor compares the sizes of `Eigen::Index`, `SparseMatrix` and the two `Eigen::Ref`, and whether
-  `Ref<VectorXd>` (passed by value) is trivially copyable, then reads samples the header builds with the client's Eigen.
-  Eigen 3.4.0 and 5.0.1 have the same layouts (members, sizes, mangled names), and their aligned allocators differ,
-  harmless since no memory changes hands; nothing reads the client's data as aligned (`Ref` is unaligned by default).
-  Eigen 3.4 only lacked `saveMarketDense` (`Utils/ExportModule.h` writes the format itself). Eigen 5's legacy macros
-  say 3.5.0 (`EIGEN_WORLD_VERSION` stays 3; `EIGEN_PATCH_VERSION` exists from 5.0).
+- Eigen and the interface (2026-10-19, replaces the layout check of 2026-10-17): no Eigen object crosses the
+  boundary of the library, any version of Eigen in the client. `BorrowedSparseMatrix` relies on the protected members of
+  Eigen's `SparseMatrix` and `CompressedStorage`, the same in Eigen 3.4.0 and 5.0.1 (`tests/BorrowedSparseMatrixTest.cpp`;
+  checked under valgrind with both). Eigen 3.4 only lacked `saveMarketDense` (`Utils/ExportModule.h` writes the format
+  itself). Eigen 5's legacy macros say 3.5.0 (`EIGEN_WORLD_VERSION` stays 3; `EIGEN_PATCH_VERSION` exists from 5.0).
+- Client codes with column-major matrices (2026-10-19, the user: minimal changes in the clients): HArDCore3D's bindings
+  build their blocks row-major (the same parallel builders, by rows), its symmetric `A` through `TransposedView()`, its
+  non-symmetric `SysMat` through `ToCSR()`; Disk++: `RowMajor` on its `ATT`/`ATF`, `TransposedView(assm.LHS)`. Same
+  iterations; bitwise results with `ToCSR()`, the errors at 1e-10 relative with `TransposedView()` (its `A^T`).
 
 ## Version
 

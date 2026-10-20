@@ -1,11 +1,13 @@
 #include "fhhos4.h"
 #include "LibraryUAMG.h"
 #include "LibraryParameters.h"
+#include "../Utils/BorrowedSparseMatrix.h"
 
 class LibraryUAMGImpl : public LibraryUAMG
 {
 private:
 	fhhos4::Solver _solver;
+	BorrowedSparseMatrix _condensedMatrix; // the library's, after SetupFromBlocks(): the matrix of the solver
 	MultigridArguments _mg;         // printed by Serialize(), with the codes of the program
 	optional<KrylovMethod> _krylov;
 public:
@@ -61,7 +63,9 @@ public:
 			_solver.SetupNonsymmetric(A_T_T, A_T_F, A_F_T, A_F_F, cellInterpOfOne, faceInterpOfOne);
 		else
 			_solver.SetupSymmetric(A_T_T, A_T_F, A_F_F, cellInterpOfOne, faceInterpOfOne);
-		IterativeSolver::Setup(_solver.CondensedMatrix());
+		fhhos4::CSRView A = _solver.CondensedMatrix();
+		_condensedMatrix.Borrow(A.Rows, A.Cols, A.RowPointers, A.ColumnIndices, A.Values);
+		IterativeSolver::Setup(_condensedMatrix);
 	}
 
 	void Solve(const Vector& b, Vector& x, bool xEquals0, bool computeResidual, bool computeAx) override
