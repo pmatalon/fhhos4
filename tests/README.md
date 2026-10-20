@@ -313,9 +313,11 @@ Unit tests of the matrices that the reference shapes (static: one per process) c
 
 ## Python module (`library/python/tests`)
 
-Not in `fhhos4_tests`: a ctest test of a build with `-DENABLE_PYTHON=ON` (e.g. `-DENABLE_PROGRAM=OFF`, which builds the library and the module alone), run with `<build>/python` in `PYTHONPATH`. A Python script (no pytest), exit code 0 when it passes.
+Not in `fhhos4_tests`: a ctest test of a build with `-DENABLE_PYTHON=ON` (e.g. `-DENABLE_PROGRAM=OFF`, which builds the library and the module alone), run with `<build>/python` in `PYTHONPATH`. A Python script (no pytest), exit code 0 when it passes. In a build with `-DENABLE_MPI=ON` too, they need mpi4py (exit code 77 without it: skipped).
 
 - **`PythonModule`** (`test_module.py`, 9 checks) — the module on the hybrid system of degree 0 of `UAMGLibraryTest.cpp`, rebuilt with SciPy (n=32: 1984 face DoFs, so that the AMG has several levels; at n=16 the fine level is the coarsest one), whose CSR matrices (int32 indices) are read in place: the uncondensed and condensed setups, symmetric and not, against SciPy's direct solver (relative error < 1e-8); `CondensedMatrix()` (a copy); the solver keeps the arrays of `A` and of `A_FT` (non-symmetric uncondensed setup) that the solves read (the caller's objects deleted after the setup); a setup that fails keeps the previous one; CSC, COO and int64 indices refused (`TypeError`), then converted by `ToCSR()` or viewed by `TransposedView()`, and a `CSRView` of NumPy arrays; the blocks of a global matrix (with Dirichlet DoFs, scrambled, NGSolve's index types: uint64 row pointers, int32 columns) by `ExtractSymmetricBlocks()` and `ExtractNonsymmetricBlocks()`, `Gather()`, `Scatter()`, and the arrays of a `CSRMatrix` that keep it alive; the parameters and enums; the errors (`fhhos4.Error`, a `RuntimeError`; float32 vectors refused; unsorted columns refused).
+  In an MPI build, its solvers on `Comm = MPI.COMM_SELF`.
+- **`PythonModuleMPI_np2`, `PythonModuleMPI_np4`** (`test_module_mpi.py` under `mpiexec`, 2 checks; MPI builds only) — the same hybrid system (n=48) distributed by rows: cells in horizontal strips, each face owned by the smaller rank of its cells, the ghost faces in reverse order, `Comm = MPI.COMM_WORLD` and `faceGhosts`; the gathered solution against SciPy's direct solver on the whole system (relative error < 1e-8); a wrong input on one process raises `fhhos4.Error` on all of them. `test_empty_process`: the same with the process of rank 0 owning no cell nor face.
 
 ## Coverage summary
 

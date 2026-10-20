@@ -192,8 +192,15 @@ also with `ENABLE_PROGRAM=OFF`) into `<build>/python`, not installed (pip/conda 
 user's decision). Its test, `ctest -R Python` (`PythonModule`: `library/python/tests/test_module.py`, the toy system of
 `UAMGLibraryTest.cpp` against SciPy's direct solver). No NGSolve in the repository (the user's decision, 2026-10-19: no
 new dependency): its test is `~/code/fhhos4-ngsolve/test_ngsolve.py`, run by hand.
+With MPI (`FHHOS4_MPI`): `Solver.Comm` from an mpi4py communicator (`py2f()`, `MPI_Comm_f2c`; refused if MPI is not
+initialized; the getter returns the Python object), mandatory as in C++; `SetupSymmetric(..., faceGhosts=None)` (int64
+array read in place, `ToGhostNumbers()`); `fhhos4.WithMPI`. Tests: `PythonModule` sets `Comm = MPI.COMM_SELF` (exit code
+77, skipped, without mpi4py); `PythonModuleMPI_np2`/`_np4` (`test_module_mpi.py`, under `mpiexec`: the toy system
+distributed by strips, also with an empty rank 0, against SciPy; an input error on one process raised on all).
 Environment: conda env `fhhos4-python` (python 3.12, numpy, scipy, nanobind, cmake, ninja, cxx-compiler, eigen 5.0.1;
-NGSolve from pip, not on conda-forge), build directory `build-python` (`-DENABLE_PROGRAM=OFF -DENABLE_PYTHON=ON`, ~1 min).
+mpich 5.0.1 and mpi4py 4.1.2; NGSolve from pip, not on conda-forge), build directories `build-python`
+(`-DENABLE_PROGRAM=OFF -DENABLE_PYTHON=ON`, ~1 min) and `build-python-mpi` (the same with `-DENABLE_MPI=ON
+-DENABLE_TESTS=OFF`: no GTest in that env; the GTest MPI tests run in `build-mpi-lib`, env `fhhos4`).
 
 NGSolve (6.2.2608; first target of the module; DOLFINx after work on MPI in fhhos4, the user's decision): its HDG
 (`L2 * FacetFESpace`, primal, SPD) fits the uncondensed interface. `test_ngsolve.py` (outside the repository): `a.mat.CSR()`
@@ -226,6 +233,29 @@ iterations (10 vs 18 in 2D, 32-35 vs 54-64 in 3D). BDDC with an AMG coarse
 solver (`coarsetype="h1amg"`) always slower (51-91 iterations); NGSolve's sparse Cholesky a tie in 2D, 6x slower than
 U-AMG in 3D at 25k cells. The extraction of the blocks (2026-10-19, `ExtractSymmetricBlocks()` on NGSolve's arrays
 read in place; before: SciPy's slicing and the conversion to Eigen): U-AMG's total -5 to -26%, `PERFORMANCE.md`.
+NGSolve with MPI (2026-10-20): `~/code/fhhos4-ngsolve/test_ngsolve_mpi.py` (outside the repository, run by hand under
+`mpiexec` with `build-python-mpi/python`; `--large`: the larger meshes), the mesh distributed by NGSolve itself
+(`GenerateMesh().Distribute(comm)` on rank 0, `netgen.meshing.Mesh.Receive(comm)` on the others; mpi4py imported
+first: the pip NGSolve loads MPI at run time, `USE_MPI4PY` False but mpi4py communicators accepted), its HDG assembled
+in parallel. NGSolve 6.2.2608: rank 0 holds no element (`ParallelMetis()`: P - 1 METIS parts, partition = part + 1;
+netgen's master since 89b4cae4, 2026-10-02, unreleased: `Distribute(comm, root_participates=True)` by default, rank 0
+gets a part too; the script does not depend on it), and all of NGSolve's communicators include it (`mesh.comm`,
+`ParallelDofs().comm`, the matrices': no subcommunicator of the other processes); no ghost cells; only facet DoFs are
+shared, never a Dirichlet one; `fes.ParallelDofs().Proc2Dof(p)`: the shared DoFs in the same order on both processes (checked by the
+facets' centres); `a.mat.local_mat` and `f.vec.local_vec` sub-assembled (a shared facet's row: the local contributions
+only). The script: cells = the local elements, faces = the free facets, owned by the smaller rank; global numbers by
+exscan, sent aligned with `Proc2Dof(p)`; the face-face entries (global columns) and right-hand side of the shared rows
+sent to their owner; ghosts: the other local facets, then the faces of the neighbours' cells; int32 CSR (SciPy); the
+solution back into the GridFunction (shared faces from their owner, CUMULATED). Against NGSolve's sparse Cholesky on
+the mesh regenerated on rank 0 (integrals of u and u^2) and `inverse="masterinverse"` (its parallel direct solver,
+DoF by DoF): 11 cases x 1-4 processes pass, integrals 5e-16 to 5e-12, DoFs 6e-14 to 3.6e-12 (Square-tri maxh 0.05,
+Cube-tet 0.15 at tolerance 1e-12: k = l = 1, 2, 3, and k = 1, l = 2 in 2D; Square-tri 0.015, Cube-tet 0.07 at 1e-10:
+k = l = 1, 2). Iterations on 1 / 2 / 3 / 4 processes the same but Square-tri 0.05 k=1 34/34/33/33, k=3 21/18/18/18,
+Cube-tet 0.15 k=1 48/48/49/49, k=3 69/69/68/68, Square-tri 0.015 k=1 28/28/28/30, Cube-tet 0.07 k=2 74/74/74/75 (on 2
+processes, one holds everything: NGSolve's local numbering, the distributed path). Setup, Cube-tet 0.07 k=2, 2 threads
+per process: 0.27-0.38 / 0.43-0.48 / 0.27-0.30 / 0.23-0.25 s (the C++ client `mpi/ngsolve_mpi.cpp` on the exported
+system, RCB: 0.29 / 0.27 / 0.21 s on 1 / 2 / 3). Time the collective calls after a barrier: otherwise the empty rank 0
+waits inside the setup for the others' preparation of the inputs (1.4-1.8 s measured on 2 processes).
 
 ### U-AMG: details and measurements (kept out of `README_library.md`)
 
@@ -322,8 +352,9 @@ is its test bed. MPI from the conda env (`mpich`, installed in `fhhos4`, not in 
   (couplings of `A_FF`): `CoarseningPass::NOwnedFaces`. All global decisions (coarsening ratio, errors) reduced.
 - Library: `Solver::Comm` (no default with MPI: the user), `SetupSymmetric(..., GhostNumbers faceGhosts)` (local columns:
   own faces then ghosts, one numbering for `A_TF` and `A_FF`, `A_FF` in full), `DistributedStaticCondensation.h`,
-  `CollectiveCheck()` (errors of the inputs on all the processes). Not yet: non-symmetric (after the symmetric case: the
-  user), condensed interface, `CondensedMatrix()`, Python (CMake refuses `ENABLE_PYTHON` with `ENABLE_MPI`).
+  `CollectiveCheck()` (errors of the inputs on all the processes). A process may own nothing (NGSolve 6.2.2608's rank 0). Not
+  yet: non-symmetric (after the symmetric case: the user), condensed interface, `CondensedMatrix()`. Python: section
+  "Python module" (with NGSolve's own distribution).
 - Program (`Program_Diffusion_HHO_Impl.h`, `Program/DistributedHybridSystem.h`): GMSH meshes only, partitioned by GMSH
   (`GMSHMesh::PartitionElements()`, rank 0, broadcast); the mesh built by rank 0 first (cache); the system assembled by
   every process (replicated, not distributed yet), its rows extracted (faces owned by the smaller rank of their cells),

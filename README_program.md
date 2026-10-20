@@ -81,7 +81,7 @@ Build options (`cmake -D<OPTION>=ON|OFF ..`):
 | `ENABLE_AGMG` | OFF | AGMG solver (`-s agmg`, see below) |
 | `ENABLE_OPENMP` | ON | Shared-memory parallelism |
 | `ENABLE_NATIVE_ARCH` | OFF | `-march=native`: optimized for the CPU of the build machine, may not run on others |
-| `ENABLE_PYTHON` | OFF | The Python module of the library (see `README_library.md`); needs Python, nanobind and NumPy (SciPy for its tests). Not with `ENABLE_MPI` yet |
+| `ENABLE_PYTHON` | OFF | The Python module of the library (see `README_library.md`); needs Python, nanobind and NumPy (SciPy for its tests); with `ENABLE_MPI`, mpi4py too |
 | `ENABLE_MPI` | OFF | Distributed-memory parallelism: the program and the library on several processes (see [Several processes](#7-optional-several-processes-mpi)); needs MPI |
 | `SMALL_INDEX` | ON | `int` indices in the sparse matrices (`intmax_t` otherwise) |
 

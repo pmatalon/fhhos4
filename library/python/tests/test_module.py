@@ -9,6 +9,22 @@ import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 import fhhos4
 
+# The module compiled with MPI: the solvers of these tests on one process (Comm = MPI.COMM_SELF), MPI initialized by
+# mpi4py (skipped without it)
+if fhhos4.WithMPI:
+    try:
+        from mpi4py import MPI
+    except ImportError:
+        print("The module is compiled with MPI, and mpi4py is not installed: skipped")
+        sys.exit(77)
+
+
+def NewSolver():
+    solver = fhhos4.Solver()
+    if fhhos4.WithMPI:
+        solver.Comm = MPI.COMM_SELF
+    return solver
+
 
 class HybridSystem:
     """Hybrid system of degree 0 on an n x n Cartesian mesh, interior faces only. asymmetry: A_FT != A_TF^T."""
@@ -54,7 +70,7 @@ class HybridSystem:
 
 
 def ToySolver():
-    solver = fhhos4.Solver()
+    solver = NewSolver()
     solver.Dimension = 2
     solver.FaceDegree = 0
     solver.CellDegree = 0
@@ -240,7 +256,7 @@ def test_parameters():
 def test_errors():
     system = HybridSystem(8)
     # Dimension not set
-    solver = fhhos4.Solver()
+    solver = NewSolver()
     try:
         solver.SetupSymmetric(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
         assert False, "Dimension not set accepted"

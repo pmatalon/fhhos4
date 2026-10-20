@@ -20,7 +20,7 @@ Build options (`-D<OPTION>=ON|OFF`): `ENABLE_OPENMP` (ON: parallel), `ENABLE_NAT
 optimized for the CPU of the build machine, may not run on others), `SMALL_INDEX` (ON: `int` indices in
 `fhhos4::SparseMatrix`, `intmax_t` otherwise), `ENABLE_PYTHON` (OFF: the Python module, see [Python](#python)),
 `ENABLE_MPI` (OFF: the solver on several processes, see [Several processes](#several-processes-mpi); needs MPI, and
-your code is then compiled and linked with MPI too; not with `ENABLE_PYTHON` yet).
+your code is then compiled and linked with MPI too; the Python module then needs mpi4py).
 
 ### Conda package
 
@@ -178,7 +178,7 @@ fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F); // the vectors of the 
   (those of its cells, and those coupled to its faces in `A_FF` through the cells of other processes). This is the
   local numbering of DOLFINx's index maps, and of the columns of PETSc's and hypre's distributed matrices.
 - **Each face belongs to a process that owns one of its cells**, e.g. the one of the smaller rank; a face has at most
-  two cells.
+  two cells. A process may own no cell nor face (empty matrices and vectors): it still calls the setups and solves.
 - The vectors (`b_T`, `b_F`, `x_T`, `x_F`, the interpolations of 1): the cells and faces of the process. `Result`: of
   the whole system.
 - The algorithm: each process aggregates its own cells (the faces between processes are kept); the coarsest level is
@@ -187,7 +187,8 @@ fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F); // the vectors of the 
 - Available on several processes: the uncondensed symmetric system (`SetupSymmetric()`), with all the parameters but
   `Krylov::BiCGSTAB`; the Gauss-Seidel smoothers are Gauss-Seidel in each process (the hybrid ones: in each thread),
   Jacobi between the processes. Not yet: `SetupNonsymmetric()`, the condensed interface (`Setup...Condensed()`),
-  `CondensedMatrix()`, the Python module.
+  `CondensedMatrix()`.
+- In Python: see [Python](#python).
 - The errors of the inputs are raised on all the processes.
 
 ### Python
@@ -234,6 +235,23 @@ result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
   dofs)` (NumPy arrays of the same integer dtype), `Gather()`, `Scatter()`, `ToCSR()`, `TransposedView()`.
 - The errors raise `fhhos4.Error`, a `RuntimeError`.
 - The setups, solves and helpers release the GIL.
+- Compiled with MPI (`-DENABLE_MPI=ON` too; `fhhos4.WithMPI` is then `True`), the module needs
+  [mpi4py](https://mpi4py.readthedocs.io), built with the same MPI as the library, and imported first (it initializes
+  MPI). `solver.Comm`: an mpi4py communicator (`MPI.COMM_SELF`, `MPI.COMM_WORLD`, or its Fortran handle
+  `comm.py2f()`), to set, as in C++ (see [Several processes](#several-processes-mpi)). On several processes,
+  `SetupSymmetric(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhosts)`: `faceGhosts`, the global numbers of
+  the ghost faces, a NumPy array of `int64` read in place (`None` by default: no ghosts).
+
+  ```python
+  from mpi4py import MPI  # first: initializes MPI
+  import fhhos4
+
+  solver = fhhos4.Solver()
+  solver.Comm = MPI.COMM_WORLD  # to set
+  ...
+  solver.SetupSymmetric(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhosts)  # the rows of the process
+  result = solver.Solve(b_T, b_F, x_T, x_F)  # the vectors of the cells and faces of the process
+  ```
 
 ### Inputs
 

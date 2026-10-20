@@ -349,8 +349,9 @@ namespace fhhos4
 		// in one numbering of the faces of the process: its own faces (those of the rows of A_FF, in their order), then
 		// its ghosts, the other faces of its rows (of its cells, and those coupled to its faces in A_FF through the cells
 		// of other processes), whose global numbers are faceGhosts; the interpolations of 1 on its cells and faces. Each
-		// face belongs to a process that owns one of its cells (e.g. the one of the smaller rank). Then Solve() with the
-		// vectors of the cells and faces of the process. On one process, faceGhosts is empty.
+		// face belongs to a process that owns one of its cells (e.g. the one of the smaller rank); a process may own no
+		// cell nor face. Then Solve() with the vectors of the cells and faces of the process. On one process, faceGhosts
+		// is empty.
 		void SetupSymmetric(const CSRView& A_TT, const CSRView& A_TF, const CSRView& A_FF,
 		                    const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne,
 		                    const GhostNumbers& faceGhosts = GhostNumbers())

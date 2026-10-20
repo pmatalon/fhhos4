@@ -154,9 +154,6 @@ export(EXPORT fhhos4Targets NAMESPACE fhhos4:: FILE ${CMAKE_BINARY_DIR}/fhhos4Ta
 # Python module of the library (library/python): the module fhhos4 in <build>/python, linked to libfhhos4.so (build
 # tree only for now: not installed). Its test (ctest -R Python) runs with that directory in PYTHONPATH.
 if(ENABLE_PYTHON)
-	if(ENABLE_MPI)
-		message(FATAL_ERROR "ENABLE_PYTHON: the Python module of the library compiled with MPI (ENABLE_MPI) is not available yet.")
-	endif()
 	find_package(Python 3.9 REQUIRED COMPONENTS Interpreter Development.Module)
 	execute_process(COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
 		OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE nanobind_ROOT)
@@ -167,8 +164,17 @@ if(ENABLE_PYTHON)
 	message(STATUS "ENABLE_PYTHON: ON (module fhhos4 for ${Python_EXECUTABLE})")
 
 	enable_testing()
+	# Compiled with MPI, the tests need mpi4py (skipped without it: exit code 77)
 	add_test(NAME PythonModule COMMAND ${Python_EXECUTABLE} ${CMAKE_SOURCE_DIR}/library/python/tests/test_module.py)
-	set_tests_properties(PythonModule PROPERTIES ENVIRONMENT PYTHONPATH=${CMAKE_BINARY_DIR}/python)
+	set_tests_properties(PythonModule PROPERTIES ENVIRONMENT PYTHONPATH=${CMAKE_BINARY_DIR}/python SKIP_RETURN_CODE 77)
+	if(ENABLE_MPI)
+		foreach(np 2 4)
+			add_test(NAME PythonModuleMPI_np${np} COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${np} ${MPIEXEC_PREFLAGS} ${Python_EXECUTABLE}
+				${CMAKE_SOURCE_DIR}/library/python/tests/test_module_mpi.py ${MPIEXEC_POSTFLAGS})
+			set_tests_properties(PythonModuleMPI_np${np} PROPERTIES ENVIRONMENT "PYTHONPATH=${CMAKE_BINARY_DIR}/python;OMP_NUM_THREADS=2"
+				SKIP_RETURN_CODE 77 TIMEOUT 600 PROCESSORS ${np})
+		endforeach()
+	endif()
 endif()
 
 # The tests of the library on several processes (tests/MPI, their own main()), with the library's code only (src/

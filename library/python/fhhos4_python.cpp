@@ -3,6 +3,7 @@
 // contiguous, is refused). The matrices: a CSRView of NumPy arrays, a CSRMatrix, or any object with the attributes
 // indptr, indices, data, shape and format "csr" (SciPy's CSR matrices: SciPy itself is not needed); the vectors: NumPy
 // vectors of float64. See README_library.md.
+// Compiled with MPI (FHHOS4_MPI): Solver.Comm, from an mpi4py communicator, and the ghost faces of SetupSymmetric().
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -199,6 +200,7 @@ namespace
 	struct PySolver : fhhos4::Solver
 	{
 		std::vector<PyCSRView> Kept;
+		nb::object CommObject = nb::none(); // the Python object of Comm (MPI)
 
 		// setup(): the setup of the library, on the views, without the GIL. kept: the views the solves read.
 		template <typename Setup>
@@ -211,6 +213,34 @@ namespace
 			Kept = std::move(kept);
 		}
 	};
+
+	// The global numbers of the ghost faces (SetupSymmetric() on several processes): an int64 NumPy array, read in place
+	// (only by the setup), or None (no ghosts)
+	fhhos4::GhostNumbers ToGhostNumbers(nb::handle ghosts)
+	{
+		if (ghosts.is_none())
+			return fhhos4::GhostNumbers();
+		bool is64;
+		size_t size;
+		const void* data = IndexArray(ghosts, "faceGhosts", is64, size);
+		if (!is64)
+			throw nb::type_error("fhhos4: faceGhosts must be an array of int64 (global numbers), not converted");
+		return fhhos4::GhostNumbers(size, (const std::int64_t*)data);
+	}
+
+#if FHHOS4_MPI
+	// The communicator of an mpi4py communicator (MPI.COMM_WORLD...), through its Fortran handle (py2f()), or of a
+	// Fortran handle. MPI must be initialized (by mpi4py).
+	MPI_Comm ToComm(nb::handle comm)
+	{
+		int initialized = 0;
+		MPI_Initialized(&initialized);
+		if (!initialized)
+			throw fhhos4::Error("fhhos4: MPI is not initialized: import mpi4py (from mpi4py import MPI) before setting Solver.Comm.");
+		nb::object handle = nb::hasattr(comm, "py2f") ? comm.attr("py2f")() : nb::borrow(comm);
+		return MPI_Comm_f2c(nb::cast<MPI_Fint>(handle));
+	}
+#endif
 
 	// The arrays of a CSRMatrix, as read-only NumPy arrays that keep it alive
 	template <typename T>
@@ -227,6 +257,7 @@ NB_MODULE(fhhos4, m)
 
 	nb::exception<fhhos4::Error>(m, "Error", PyExc_RuntimeError);
 	m.def("Version", &fhhos4::Version, "The version of the library, with the commit when built from a clone");
+	m.attr("WithMPI") = (bool)FHHOS4_MPI; // compiled with MPI: Solver.Comm to set
 
 	nb::enum_<fhhos4::Krylov>(m, "Krylov")
 		.value("Default", fhhos4::Krylov::Default)
@@ -375,15 +406,21 @@ NB_MODULE(fhhos4, m)
 		// Execution
 		.def_rw("Threads", &fhhos4::Solver::Threads)
 		.def_rw("Verbosity", &fhhos4::Solver::Verbosity)
+#if FHHOS4_MPI
+		// The processes of the solver: an mpi4py communicator (MPI.COMM_SELF, MPI.COMM_WORLD...), to set
+		.def_prop_rw("Comm", [](const PySolver& s) { return s.CommObject; },
+			[](PySolver& s, nb::handle comm) { s.Comm = ToComm(comm); s.CommObject = nb::borrow(comm); })
+#endif
 
-		// Uncondensed system
-		.def("SetupSymmetric", [](PySolver& s, nb::handle A_TT, nb::handle A_TF, nb::handle A_FF, const ConstVector& cellInterpOfOne, const ConstVector& faceInterpOfOne)
+		// Uncondensed system. faceGhosts: on several processes, the global numbers of the ghost faces (int64 array)
+		.def("SetupSymmetric", [](PySolver& s, nb::handle A_TT, nb::handle A_TF, nb::handle A_FF, const ConstVector& cellInterpOfOne, const ConstVector& faceInterpOfOne, nb::handle faceGhosts)
 			{
 				PyCSRView a_TT = ToView(A_TT, "A_TT"), a_TF = ToView(A_TF, "A_TF"), a_FF = ToView(A_FF, "A_FF");
 				fhhos4::CSRView tt = a_TT.Native("A_TT"), tf = a_TF.Native("A_TF"), ff = a_FF.Native("A_FF");
-				s.Run([&] { s.SetupSymmetric(tt, tf, ff, cellInterpOfOne, faceInterpOfOne); }, {});
+				fhhos4::GhostNumbers ghosts = ToGhostNumbers(faceGhosts);
+				s.Run([&] { s.SetupSymmetric(tt, tf, ff, cellInterpOfOne, faceInterpOfOne, ghosts); }, {});
 			},
-			"A_TT"_a, "A_TF"_a, "A_FF"_a, "cellInterpOfOne"_a.noconvert(), "faceInterpOfOne"_a.noconvert())
+			"A_TT"_a, "A_TF"_a, "A_FF"_a, "cellInterpOfOne"_a.noconvert(), "faceInterpOfOne"_a.noconvert(), "faceGhosts"_a = nb::none())
 		.def("SetupNonsymmetric", [](PySolver& s, nb::handle A_TT, nb::handle A_TF, nb::handle A_FT, nb::handle A_FF, const ConstVector& cellInterpOfOne, const ConstVector& faceInterpOfOne)
 			{
 				PyCSRView a_TT = ToView(A_TT, "A_TT"), a_TF = ToView(A_TF, "A_TF"), a_FT = ToView(A_FT, "A_FT"), a_FF = ToView(A_FF, "A_FF");
