@@ -208,21 +208,20 @@ public:
 		// level, P = D_F P_z: the operator of this level, its smoothers and residuals stay in the caller's coordinates
 		// (the block smoothers are invariant by this scaling, and P^T A P = P_z^T (D_F A D_F) P_z). The coarse levels are
 		// in the coordinates z, where the constants have coordinate 1: they need no rescaling.
+		// HarmonicExtensionOrInject converts no cell value into face values (S doesn't depend on the bases of the cells):
+		// A_T_T, which it doesn't use, is not rescaled; the rescaling of the cells only enters the couplings of the
+		// aggregation (the traces of the blocks of A_T_F, A_F_T).
 		const SparseMatrix* levelA     = this->OperatorMatrix;
 		const SparseMatrix* levelA_T_T = this->A_T_T;
 		const SparseMatrix* levelA_T_F = this->A_T_F;
 		const SparseMatrix* levelA_F_F = this->A_F_F;
 		const SparseMatrix* levelA_F_T = this->A_F_T;
-		SparseMatrix scaledA     = ScaleConstantDoFs(*levelA,     FaceInterpOfOne, _faceBlockSize, FaceInterpOfOne, _faceBlockSize);
-		SparseMatrix scaledA_T_T = ScaleConstantDoFs(*levelA_T_T, CellInterpOfOne, _cellBlockSize, CellInterpOfOne, _cellBlockSize);
-		SparseMatrix scaledA_T_F = ScaleConstantDoFs(*levelA_T_F, CellInterpOfOne, _cellBlockSize, FaceInterpOfOne, _faceBlockSize);
-		SparseMatrix scaledA_F_F = levelA_F_F ? ScaleConstantDoFs(*levelA_F_F, FaceInterpOfOne, _faceBlockSize, FaceInterpOfOne, _faceBlockSize) : SparseMatrix();
-		SparseMatrix scaledA_F_T = levelA_F_T ? ScaleConstantDoFs(*levelA_F_T, FaceInterpOfOne, _faceBlockSize, CellInterpOfOne, _cellBlockSize) : SparseMatrix();
-		this->OperatorMatrix = &scaledA;
-		this->A_T_T = &scaledA_T_T;
-		this->A_T_F = &scaledA_T_F;
-		this->A_F_F = levelA_F_F ? &scaledA_F_F : nullptr;
-		this->A_F_T = levelA_F_T ? &scaledA_F_T : nullptr;
+		SparseMatrix scaledA, scaledA_T_T, scaledA_T_F, scaledA_F_F, scaledA_F_T;
+		this->OperatorMatrix = ScaledConstantDoFs(levelA,     FaceInterpOfOne, _faceBlockSize, FaceInterpOfOne, _faceBlockSize, scaledA);
+		this->A_T_T          = UsesCellBlocks() ? ScaledConstantDoFs(levelA_T_T, CellInterpOfOne, _cellBlockSize, CellInterpOfOne, _cellBlockSize, scaledA_T_T) : levelA_T_T;
+		this->A_T_F          = ScaledConstantDoFs(levelA_T_F, CellInterpOfOne, _cellBlockSize, FaceInterpOfOne, _faceBlockSize, scaledA_T_F);
+		this->A_F_F          = ScaledConstantDoFs(levelA_F_F, FaceInterpOfOne, _faceBlockSize, FaceInterpOfOne, _faceBlockSize, scaledA_F_F);
+		this->A_F_T          = ScaledConstantDoFs(levelA_F_T, FaceInterpOfOne, _faceBlockSize, CellInterpOfOne, _cellBlockSize, scaledA_F_T);
 
 		CoarsenInPasses(coarseningStgy, faceCoarseningStgy, requestedCoarseningFactor, coarsestPossibleMeshReached);
 
@@ -243,22 +242,33 @@ public:
 
 	// Copy of A whose coefficient (i, j) is multiplied by d_i d_j, d being the interpolation of 1 of the block (the
 	// coordinate c of the constant) on the first DoF of each block of rows (resp. columns), and 1 on the other DoFs
+	// (an empty vector: 1 everywhere)
 	static SparseMatrix ScaleConstantDoFs(const SparseMatrix& A, const Vector& rowInterpOfOne, int rowBlockSize, const Vector& colInterpOfOne, int colBlockSize)
 	{
 		SparseMatrix scaled = A;
 		BigNumber nRows = scaled.rows();
+		bool rows = rowInterpOfOne.rows() > 0, cols = colInterpOfOne.rows() > 0;
 		#pragma omp parallel for
 		for (BigNumber i = 0; i < nRows; ++i)
 		{
-			double d_i = i % rowBlockSize == 0 ? rowInterpOfOne[i / rowBlockSize] : 1;
+			double d_i = rows && i % rowBlockSize == 0 ? rowInterpOfOne[i / rowBlockSize] : 1;
 			for (SparseMatrix::InnerIterator it(scaled, i); it; ++it)
 			{
 				BigNumber j = it.col();
-				double d_j = j % colBlockSize == 0 ? colInterpOfOne[j / colBlockSize] : 1;
+				double d_j = cols && j % colBlockSize == 0 ? colInterpOfOne[j / colBlockSize] : 1;
 				it.valueRef() *= d_i * d_j;
 			}
 		}
 		return scaled;
+	}
+
+	// A rescaled by ScaleConstantDoFs() into storage, or A itself if both interpolations are empty (or A null)
+	static const SparseMatrix* ScaledConstantDoFs(const SparseMatrix* A, const Vector& rowInterpOfOne, int rowBlockSize, const Vector& colInterpOfOne, int colBlockSize, SparseMatrix& storage)
+	{
+		if (!A || (rowInterpOfOne.rows() == 0 && colInterpOfOne.rows() == 0))
+			return A;
+		storage = ScaleConstantDoFs(*A, rowInterpOfOne, rowBlockSize, colInterpOfOne, colBlockSize);
+		return &storage;
 	}
 
 	// Multiplies the row of the first DoF of each block by the interpolation of 1 of the block (the coordinate c of the
@@ -283,7 +293,7 @@ public:
 	void CoarsenMeshDistributed(H_CoarsStgy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double requestedCoarseningFactor, bool& coarsestPossibleMeshReached)
 	{
 		if (!FlatPassesApply(coarseningStgy, faceCoarseningStgy) || _multigridProlong != UAMGProlongation::ChainedCoarseningProlongations || ComputeCoarseA_F_F || ComputeQ_F)
-			Utils::FatalError("UncondensedAMG: on several processes, only the default coarsening runs (pairwise aggregation, interface collapsing, coarsening prolongations 3 to 6, chained as multigrid prolongation).");
+			Utils::FatalError("UncondensedAMG: on several processes, only the default coarsening runs (pairwise aggregation, interface collapsing, coarsening prolongations 3 to 6 or 10, chained as multigrid prolongation).");
 		if (!Symmetric)
 			Utils::FatalError("UncondensedAMG: non-symmetric matrices are not solved on several processes yet.");
 
@@ -307,12 +317,11 @@ public:
 		scaledA.ColBlockSize = levelA->ColBlockSize;
 		scaledA.Diag = ScaleConstantDoFs(levelA->Diag, ownedFaceInterpOfOne, _faceBlockSize, ownedFaceInterpOfOne, _faceBlockSize);
 		scaledA.Offd = ScaleConstantDoFs(levelA->Offd, ownedFaceInterpOfOne, _faceBlockSize, ghostFaceInterpOfOne, _faceBlockSize);
-		SparseMatrix scaledA_T_T = ScaleConstantDoFs(*levelA_T_T, CellInterpOfOne, _cellBlockSize, CellInterpOfOne, _cellBlockSize);
-		SparseMatrix scaledA_T_F = ScaleConstantDoFs(*levelA_T_F, CellInterpOfOne, _cellBlockSize, FaceInterpOfOne, _faceBlockSize);
+		SparseMatrix scaledA_T_T, scaledA_T_F;
 		this->DistributedOperator = &scaledA;
 		this->OperatorMatrix = &scaledA.Diag;
-		this->A_T_T = &scaledA_T_T;
-		this->A_T_F = &scaledA_T_F;
+		this->A_T_T = UsesCellBlocks() ? ScaledConstantDoFs(levelA_T_T, CellInterpOfOne, _cellBlockSize, CellInterpOfOne, _cellBlockSize, scaledA_T_T) : levelA_T_T;
+		this->A_T_F = ScaledConstantDoFs(levelA_T_F, CellInterpOfOne, _cellBlockSize, FaceInterpOfOne, _faceBlockSize, scaledA_T_F);
 
 		CoarsenInDistributedPasses(coarseningStgy, requestedCoarseningFactor, coarsestPossibleMeshReached);
 
@@ -337,7 +346,7 @@ public:
 	void CoarsenInDistributedPasses(H_CoarsStgy coarseningStgy, double requestedCoarseningFactor, bool& coarsestPossibleMeshReached)
 	{
 		int fbs = _faceBlockSize;
-		const SparseMatrix* passA_T_T = this->A_T_T;
+		const SparseMatrix* passA_T_T = UsesCellBlocks() ? this->A_T_T : nullptr; // null with HarmonicExtensionOrInject
 		const SparseMatrix* passA_T_F = this->A_T_F;
 		shared_ptr<const IndexMap> passFaceMap = this->FaceMap;
 		SparseMatrix A_T_Tc, A_T_Fc;
@@ -376,7 +385,7 @@ public:
 			}
 
 			SparseMatrix passP, nextA_T_Tc, nextA_T_Fc;
-			pass.ComputeProlongation(_coarseningProlong, _faceProlong, *passA_T_T, *passA_T_F, LocalOp->Current, passP, nextA_T_Tc, nextA_T_Fc);
+			pass.ComputeProlongation(_coarseningProlong, _faceProlong, passA_T_T, *passA_T_F, LocalOp->Current, passP, nextA_T_Tc, nextA_T_Fc);
 			LocalOp->Next.GalerkinProduct(LocalOp->Current, pass.AggregateCells, pass.AggregateCoarseFaces, pass.NCoarseFaces, pass.FaceRemoved, pass.FaceCoarseFace, passP);
 			LocalOp->Current.Swap(LocalOp->Next);
 			LocalOp->Assembled = nullptr;
@@ -403,7 +412,7 @@ public:
 
 			A_T_Tc = std::move(nextA_T_Tc);
 			A_T_Fc = std::move(nextA_T_Fc);
-			passA_T_T = &A_T_Tc;
+			passA_T_T = UsesCellBlocks() ? &A_T_Tc : nullptr;
 			passA_T_F = &A_T_Fc;
 			passFaceMap = distributed.CoarseFaceMap;
 			nCoarsenings++;
@@ -567,7 +576,7 @@ public:
 	{
 		// The blocks of the current pass: those of the level, then those computed by the previous pass
 		const SparseMatrix* schur = this->OperatorMatrix;
-		const SparseMatrix* passA_T_T = this->A_T_T;
+		const SparseMatrix* passA_T_T = UsesCellBlocks() ? this->A_T_T : nullptr; // null with HarmonicExtensionOrInject
 		const SparseMatrix* passA_T_F = this->A_T_F;
 		const SparseMatrix* passA_F_T = this->A_F_T;
 		const SparseMatrix* passA_F_F = this->A_F_F;
@@ -608,7 +617,7 @@ public:
 			}
 
 			SparseMatrix passP, nextA_T_Tc, nextA_T_Fc, nextA_F_Tc, nextA_F_Fc;
-			pass.ComputeProlongation(_coarseningProlong, _faceProlong, *passA_T_T, *passA_T_F, LocalOp->Current, passP, nextA_T_Tc, nextA_T_Fc);
+			pass.ComputeProlongation(_coarseningProlong, _faceProlong, passA_T_T, *passA_T_F, LocalOp->Current, passP, nextA_T_Tc, nextA_T_Fc);
 			LocalOp->Next.GalerkinProduct(LocalOp->Current, pass.AggregateCells, pass.AggregateCoarseFaces, pass.NCoarseFaces, pass.FaceRemoved, pass.FaceCoarseFace, passP);
 			LocalOp->Current.Swap(LocalOp->Next);
 			LocalOp->Assembled = nullptr;
@@ -676,7 +685,7 @@ public:
 			A_T_Fc = std::move(nextA_T_Fc);
 			A_F_Tc = std::move(nextA_F_Tc);
 			A_F_Fc = std::move(nextA_F_Fc);
-			passA_T_T = &A_T_Tc;
+			passA_T_T = UsesCellBlocks() ? &A_T_Tc : nullptr;
 			passA_T_F = &A_T_Fc;
 			passA_F_T = Symmetric ? nullptr : &A_F_Tc;
 			passA_F_F = ComputeCoarseA_F_F ? &A_F_Fc : nullptr;
@@ -854,8 +863,26 @@ public:
 	{
 		bool interfaceCollapsing = _faceProlong == UAMGFaceProlongation::BoundaryAggregatesInteriorAverage || _faceProlong == UAMGFaceProlongation::BoundaryAggregatesInteriorZero;
 		bool localProlongation = _coarseningProlong == UAMGProlongation::FaceProlongation || _coarseningProlong == UAMGProlongation::FaceProlongationAndInteriorSmoothing
-			|| _coarseningProlong == UAMGProlongation::ReconstructTraceOrInject || _coarseningProlong == UAMGProlongation::ReconstructSmoothedTraceOrInject;
+			|| _coarseningProlong == UAMGProlongation::ReconstructTraceOrInject || _coarseningProlong == UAMGProlongation::ReconstructSmoothedTraceOrInject
+			|| _coarseningProlong == UAMGProlongation::HarmonicExtensionOrInject;
 		return LocalOp && interfaceCollapsing && localProlongation;
+	}
+
+	// The coarsening prolongation HarmonicExtensionOrInject converts no cell value into face values: it doesn't use the
+	// blocks A_T_T (of this level, of the coarse levels). The interpolations of 1 on the cells still enter the
+	// couplings of the aggregation (see CoarsenMesh()).
+	bool UsesCellBlocks() const
+	{
+		return _coarseningProlong != UAMGProlongation::HarmonicExtensionOrInject;
+	}
+
+	// HarmonicExtensionOrInject is only implemented in the flat coarsening passes, as coarsening prolongation chained
+	// over the passes (checked by UncondensedAMG::Setup(), the coarsening options known)
+	void CheckHarmonicExtension(H_CoarsStgy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy) const
+	{
+		if (_coarseningProlong == UAMGProlongation::HarmonicExtensionOrInject
+			&& (!FlatPassesApply(coarseningStgy, faceCoarseningStgy) || _multigridProlong != UAMGProlongation::ChainedCoarseningProlongations))
+			Utils::FatalError("UncondensedAMG: the coarsening prolongation " + to_string((unsigned)UAMGProlongation::HarmonicExtensionOrInject) + " (-coarsening-prolong) runs with the pairwise aggregation or the agglomeration (-cs mpa, dpa, n, mn), the interface collapsing (-fcs c, -face-prolong 1, 2), the Galerkin operator, and the chained coarsening prolongations as multigrid prolongation (-prolong 2).");
 	}
 
 	// Returns <coarseMesh, P, Q_F, schurc, coarsestPossibleMeshReached>.
@@ -1233,7 +1260,8 @@ public:
 		auto nFaces = fine->A_T_F->cols() / fine->_faceBlockSize;
 
 		this->OperatorMatrix = ExtractCoarseMatrix(*this->FinerLevel->OperatorMatrix, nFaces, nFaces, fine->_faceBlockSize, fine->_faceBlockSize, this->_faceBlockSize, this->_faceBlockSize);
-		this->A_T_T = ExtractCoarseMatrix(*fine->A_T_T, nElems, nElems, fine->_cellBlockSize, fine->_cellBlockSize, this->_cellBlockSize, this->_cellBlockSize);
+		// HarmonicExtensionOrInject: no A_T_T (UsesCellBlocks())
+		this->A_T_T = UsesCellBlocks() ? ExtractCoarseMatrix(*fine->A_T_T, nElems, nElems, fine->_cellBlockSize, fine->_cellBlockSize, this->_cellBlockSize, this->_cellBlockSize) : nullptr;
 		this->A_T_F = ExtractCoarseMatrix(*fine->A_T_F, nElems, nFaces, fine->_cellBlockSize, fine->_faceBlockSize, this->_cellBlockSize, this->_faceBlockSize);
 		if (fine->A_F_T)
 		{
@@ -1271,9 +1299,10 @@ public:
 		_extractedOperator.Offd = extract(ExtractCoarseMatrix(fineA.Offd, nOwnedFaces, nGhostFaces, ffbs, ffbs, _faceBlockSize, _faceBlockSize));
 		this->DistributedOperator = &_extractedOperator;
 		this->OperatorMatrix = &_extractedOperator.Diag;
-		_extractedA_T_T = extract(ExtractCoarseMatrix(*fine.A_T_T, nElems, nElems, fcbs, fcbs, _cellBlockSize, _cellBlockSize));
+		if (UsesCellBlocks())
+			_extractedA_T_T = extract(ExtractCoarseMatrix(*fine.A_T_T, nElems, nElems, fcbs, fcbs, _cellBlockSize, _cellBlockSize));
 		_extractedA_T_F = extract(ExtractCoarseMatrix(*fine.A_T_F, nElems, fine.FaceMap->NLocal(), fcbs, ffbs, _cellBlockSize, _faceBlockSize));
-		this->A_T_T = &_extractedA_T_T;
+		this->A_T_T = UsesCellBlocks() ? &_extractedA_T_T : nullptr;
 		this->A_T_F = &_extractedA_T_F;
 		this->A_F_F = nullptr;
 		this->A_F_T = nullptr;
@@ -1583,7 +1612,7 @@ public:
 	{
 		Utils::Log() << "\t\tk = " << this->PolynomialDegree() << endl;
 		// On several processes: the cells and faces of all of them
-		BigNumber nElements = Communicator::Current().Sum((BigNumber)this->A_T_T->rows() / _cellBlockSize);
+		BigNumber nElements = Communicator::Current().Sum((BigNumber)this->A_T_F->rows() / _cellBlockSize);
 		BigNumber nFaces = this->NUnknowns() / _faceBlockSize;
 		Utils::Log() << "\t\tMesh                : " << nElements << " elements, " << nFaces << " faces";
 		if (!this->IsFinestLevel())
@@ -1699,7 +1728,7 @@ public:
 			{
 				coarse->DistributedOperator = &_distributedAc;
 				coarse->OperatorMatrix = &_distributedAc.Diag;
-				coarse->A_T_T = &A_T_Tc;
+				coarse->A_T_T = UsesCellBlocks() ? &A_T_Tc : nullptr;
 				coarse->A_T_F = &A_T_Fc;
 				coarse->A_F_F = nullptr;
 				coarse->A_F_T = nullptr;
@@ -1708,7 +1737,7 @@ public:
 			else
 			{
 				coarse->OperatorMatrix = &Ac;
-				coarse->A_T_T = &A_T_Tc;
+				coarse->A_T_T = UsesCellBlocks() ? &A_T_Tc : nullptr;
 				coarse->A_T_F = &A_T_Fc;
 				coarse->A_F_F = ComputeCoarseA_F_F ? &A_F_Fc : nullptr;
 				coarse->A_F_T = Symmetric ? nullptr : &A_F_Tc;

@@ -28,6 +28,7 @@ public:
 		const MultigridArguments& mg = args.Solver.MG;
 		_solver.Cycle = LibraryParameters::LibraryCycle(mg.Cycle);
 		_solver.PCoarsening = LibraryParameters::LibraryPCoarsening(mg.P_CS);
+		_solver.Prolongation = LibraryParameters::LibraryProlongation(mg.UAMGCoarseningProlong);
 		_solver.PreSmoothingIterations = mg.PreSmoothingIterations;
 		_solver.PostSmoothingIterations = mg.PostSmoothingIterations;
 		_solver.PreSmoother = LibraryParameters::LibrarySmoother(mg.PreSmoother);
@@ -47,6 +48,7 @@ public:
 		os << "U-AMG through the library fhhos4, Krylov method: " << (!_krylov ? "none" : *_krylov == KrylovMethod::GCR ? "gcr" : "fcg") << endl;
 		os << "\t" << "Cycle                   : " << (_mg.Cycle == CycleType::K ? "K" : _mg.Cycle == CycleType::W ? "W" : "V") << "(" << _mg.PreSmoothingIterations << "," << _mg.PostSmoothingIterations << ")" << endl;
 		os << "\t" << "Smoothers               : " << SmootherFactory::Code(_mg.PreSmoother) << ", " << SmootherFactory::Code(_mg.PostSmoother) << endl;
+		os << "\t" << "Coarsening prolongation : " << (unsigned)_mg.UAMGCoarseningProlong << endl;
 		os << "\t" << "Coarsening factor       : " << _mg.CoarseningFactor << endl;
 		os << "\t" << "Coarse solver           : " << _mg.CoarseSolverCode << " (matrix size <= " << _mg.MatrixMaxSizeForCoarsestLevel << ")";
 	}

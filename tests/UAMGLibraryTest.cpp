@@ -40,6 +40,7 @@ struct LibraryCase
 	int K;
 	int BasesOrthogonalization; // -e-ogb and -f-ogb; -1 for the defaults
 	P_CoarsStgy PCoarsening = P_CoarsStgy::Minus2; // -p-cs
+	int CoarseningProlong = 0;                     // -coarsening-prolong (0: the default)
 };
 
 inline std::ostream& operator<<(std::ostream& os, const LibraryCase& c)
@@ -64,6 +65,7 @@ ProgramResults RunCase(const LibraryCase& c, const std::string& solverCode, bool
 	}
 	args.Solver.SolverCode = solverCode;
 	args.Solver.MG.P_CS = c.PCoarsening;
+	args.Solver.MG.CoarseningProlongationCode = c.CoarseningProlong;
 	args.Solver.MG.UAMGNonsymmetric = nonsymmetric;
 	args.Solver.MG.UAMGLibraryCondensed = libraryCondensed;
 	args.Actions.UseCache = false;
@@ -118,11 +120,14 @@ std::vector<LibraryCase> LibraryCases()
 	cases.push_back({ "Square_tri_n16_k1_orthonormal", "square", "tri", "", 16, 1, 3 });
 	// The p-coarsening straight to degree 0 (PCoarsening::ToZero), which differs from the default from k = 3
 	cases.push_back({ "Square_tri_n16_k3_pcs0", "square", "tri", "", 16, 3, -1, P_CoarsStgy::DirectToLow });
+	// The coarsening prolongation HarmonicExtensionOrInject (Prolongation::HarmonicExtension in the library)
+	cases.push_back({ "Square_tri_n16_k1_orthonormal_harmonic", "square", "tri", "", 16, 1, 3, P_CoarsStgy::Minus2, (int)UAMGProlongation::HarmonicExtensionOrInject });
 #endif
 #ifdef ENABLE_3D
 	cases.push_back({ "Cube_tetra_n8_k0", "cube", "tetra", "", 8, 0, -1 });
 	cases.push_back({ "Cube_tetra_n8_k0_orthonormal", "cube", "tetra", "", 8, 0, 3 });
 	cases.push_back({ "Cube_tetra_n8_k1_orthonormal", "cube", "tetra", "", 8, 1, 3 });
+	cases.push_back({ "Cube_tetra_n8_k0_orthonormal_harmonic", "cube", "tetra", "", 8, 0, 3, P_CoarsStgy::Minus2, (int)UAMGProlongation::HarmonicExtensionOrInject });
 	cases.push_back({ "Cube_cart_n8_k2", "cube", "cart", "inhouse", 8, 2, -1 });
 #endif
 	return cases;
@@ -455,7 +460,9 @@ TEST(UAMGLibrary, WithoutTheFaceBlock)
 // The bases scaled by arbitrary factors (the constant no longer has coordinate 1): with the interpolation of 1, U-AMG
 // builds the same coarse levels, and the iterates are those of the unscaled system in the scaled bases (up to the
 // rounding errors). Fixed number of iterations: the stopping criterion, on the residual of each system, differs.
-TEST(UAMGLibrary, InvariantToTheScalingOfTheBases)
+// The scaling of the bases given by the interpolations of 1: the same aggregates (the couplings of the rescaled
+// matrices), and the same iterates (the scaled ones)
+void ExpectInvariantToTheScalingOfTheBases(fhhos4::Prolongation prolongation)
 {
 	int n = 64;
 	HybridSystem reference(n);
@@ -473,6 +480,7 @@ TEST(UAMGLibrary, InvariantToTheScalingOfTheBases)
 	{
 		solver->Tolerance = 1e-30; // never reached
 		solver->MaxIterations = 8;
+		solver->Prolongation = prolongation;
 	}
 	uamgReference.SetupSymmetricCondensed(reference.A, reference.A_TT, reference.A_TF, reference.A_FF, reference.CellInterpOfOne, reference.FaceInterpOfOne);
 	uamgScaled.SetupSymmetricCondensed(scaled.A, scaled.A_TT, scaled.A_TF, scaled.A_FF, scaled.CellInterpOfOne, scaled.FaceInterpOfOne);
@@ -486,6 +494,31 @@ TEST(UAMGLibrary, InvariantToTheScalingOfTheBases)
 	EXPECT_LT(RelativeError(reference, x), 1e-3); // beyond the first iterations: the comparison is meaningful
 	// y = S_F^{-1} x
 	EXPECT_LT((sF.cwiseProduct(y) - x).norm() / x.norm(), 1e-8);
+}
+
+TEST(UAMGLibrary, InvariantToTheScalingOfTheBases)
+{
+	ExpectInvariantToTheScalingOfTheBases(fhhos4::Prolongation::Reconstruction);
+}
+
+// Prolongation::HarmonicExtension (the default) converts no cell value into face values: invariant too, and it solves
+// the system
+TEST(UAMGLibrary, HarmonicExtension)
+{
+	EXPECT_TRUE(fhhos4::Solver().Prolongation == fhhos4::Prolongation::HarmonicExtension);
+	ExpectInvariantToTheScalingOfTheBases(fhhos4::Prolongation::HarmonicExtension);
+
+	HybridSystem system(64);
+	fhhos4::Solver reconstruction = ToySolver(), harmonic = ToySolver();
+	harmonic.Prolongation = fhhos4::Prolongation::HarmonicExtension;
+	for (fhhos4::Solver* solver : { &reconstruction, &harmonic })
+		solver->SetupSymmetric(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+	EXPECT_EQ(harmonic.NumberOfLevels(), reconstruction.NumberOfLevels()); // the same aggregates
+	Eigen::VectorXd x = Eigen::VectorXd::Zero(system.b.size());
+	fhhos4::Result result = harmonic.Solve(system.b, x);
+	EXPECT_TRUE(result.Converged);
+	EXPECT_LT(result.Iterations, 30);
+	EXPECT_LT(RelativeError(system, x), 1e-8);
 }
 
 // The matrices in other formats, through the helpers: column-major ones converted by ToCSR() (a copy), or viewed by
@@ -919,6 +952,9 @@ TEST(UAMGLibrary, Errors)
 	fhhos4::Solver wrongPCoarsening = ToySolver();
 	wrongPCoarsening.PCoarsening = static_cast<fhhos4::PCoarsening>(42);
 	EXPECT_THROW(wrongPCoarsening.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
+	fhhos4::Solver wrongProlongation = ToySolver();
+	wrongProlongation.Prolongation = static_cast<fhhos4::Prolongation>(42);
+	EXPECT_THROW(wrongProlongation.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 	fhhos4::Solver negativeSmoothing = ToySolver();
 	negativeSmoothing.PostSmoothingIterations = -2;
 	EXPECT_THROW(negativeSmoothing.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);

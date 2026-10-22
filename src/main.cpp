@@ -529,7 +529,10 @@ void print_usage() {
 	cout <<                    "cell-reconstruction + trace + smoothing for interior faces, injection for boundary faces" << endl;
 	cout << endl;
 	cout << "-coarsening-prolong NUM" << endl;
-	cout << "      Intermediate prolongation operator used to build the coarse levels in 'uamg'. Same possble values as -prolong." << endl;
+	cout << "      Intermediate prolongation operator used to build the coarse levels in 'uamg'. Same possble values as -prolong, and:" << endl;
+	cout << "              " << (unsigned)UAMGProlongation::HarmonicExtensionOrInject << " - ";
+	cout <<                    "local solve of the rows of the operator for interior faces (harmonic extension: 4 with omega = 1), injection" << endl;
+	cout << "                   for boundary faces. No cell value (the blocks A_TT are not used). Only with -prolong 2." << endl;
 	cout << endl;
 	cout << "-face-prolong NUM" << endl;
 	cout << "      Intermediate face prolongation operator used in 'uamg'." << endl;
@@ -1323,7 +1326,7 @@ int Run(int argc, char* argv[])
 			case OPT_CoarseningProlongationCode:
 			{
 				int prolongationCode = atoi(optarg);
-				if (prolongationCode < 1 || prolongationCode > 9)
+				if (prolongationCode < 1 || prolongationCode > 10)
 					argument_error("unknown prolongation code. Check -coarsening-prolong argument.");
 				args.Solver.MG.CoarseningProlongationCode = prolongationCode;
 				break;

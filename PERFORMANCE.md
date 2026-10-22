@@ -1000,6 +1000,54 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   0.5-0.9 s and the conversion to Eigen 0.25-0.6 s). The first runs of each case, old before new, gave the new solves
   2-10% slower: the order of the runs (new first: the same times).
 
+- **Coarsening prolongation without cell values, `HarmonicExtensionOrInject`** (2026-10-22, the user's question: remove
+  the interpolations of 1 with a prolongation that converts no cell value into face values; `-coarsening-prolong 10`,
+  `Prolongation::HarmonicExtension` in the library, its default since the same day (the user's decision); the program
+  keeps P_F, the papers'). On the removed faces of an
+  aggregate, the local solve of their rows of S, the kept faces injected: the paper's Q_F^smooth (or P_F) with
+  omega = 1 (one removed face per pairwise aggregate: its block Jacobi row with omega = 1 is the exact local solve;
+  several removed faces, e.g. polygons sharing several faces: a dense LU). It skips Theta per aggregate (A_TcFc with the
+  averages, the factorization of A_TcTc, its solves), the coarse A_TT (not computed nor kept for the next pass), the
+  rescaling of A_TT and its extraction on the p-levels. The cells' interpolation of 1 still rescales A_TF for the
+  couplings: the same aggregates as P_F. Logs and scripts: `build/bench_harmonic/` (`table_program.py`,
+  `table_clients.py`); the clients through the library, recompiled (the new member of `fhhos4::Solver`), with a
+  temporary switch (backed up and restored, `backup/`). Plugged in.
+  - The program (FCG + U-AMG, best of 3, iterations P_F -> new, setup 1 / 8 threads): Cube-tet k=0 n=32 28 -> 28,
+    -5% / -1% (orthonormal bases: -2% / -8%); Cube-tet k=1 n=16 33 -> 33, -3% / -7%; k=2 n=16 33 -> 33, 0% / -3%; k=2
+    `-hp-cs h` 35 -> 34, 2.32 -> 2.24 s / 0.76 -> 0.72 s (-4% / -5%); Square-tri k=0 n=256 24 -> 23, -7% / +1%;
+    Cube-tet-aniso20 n=16 62 -> 59, -7% / -4%; Kellogg graded n=16 k=0, 1 (default and orthonormal bases) 19 -> 18,
+    14 -> 15, 21 -> 21, 17 -> 17; but Cube-cart-aniso100 n=32 9 -> 11 (total +1% / +4%) and Heterog1e8 n=256 22 -> 28
+    (total +8% / +15%). Iterations only (8 threads): Heterog n=128 1e2 / 1e4 / 1e8 19 -> 20, 23 -> 21, 24 -> 21;
+    n=256 1e2 / 1e4 / 1e6 22 -> 22, 22 -> 23, 22 -> 26; k=1 n=128 1e8 17 -> 19; Cube-cart k=0 aniso 100 n=16 9 -> 10,
+    aniso 10 / 1000 n=32 11 -> 11, 12 -> 11; k=1 aniso 100 n=16 16 -> 16.
+  - HArDCore3D 32^3 (orthonormal bases), setup 1 / 8 threads: hho-diffusion k=0 26 -> 26 its, -10% / -5%; k=1
+    17 -> 17, -1% / +6%; hho-diff-advec-reac diffusion-dominated k=0 29 -> 29 (8 threads 32 -> 31), -3% / -8%, k=1
+    23 -> 22, -6% / -1%; convection-dominated k=0 4 -> 3, k=1 4 -> 4.
+  - Disk++ (phi_0 = 1), setup 1 / 8 threads: triangles level 8 k=0 26 -> 30, -11% / -13%; k=1, 2 22, 25 its unchanged,
+    -2..-8%; quadrangles level 7 19 -> 20, 14 -> 15, 17 -> 17; hexagons level 6 15, 12, 15 unchanged; tetrahedra
+    level 3 27, 34, 44 unchanged, level 4 k=0 38 -> 35, k=1 40 -> 40. Setup between -28% and +9% (mostly -2..-13%),
+    setup + solve between -18% and +16%, mostly within 5%.
+  - The cells' interpolation of 1 replaced by ones (HArDCore3D, its orthonormal cell bases; P_F -> the new one, true c
+    in parentheses): on its uniform cubes, P_F 26 -> 59 (k=0), 17 -> 33 (k=1), advection 29 -> 60, 23 -> 39 (its trace
+    Pi needs c_F/c_T), the new one unchanged (one size of cell: the couplings are only scaled). On cells of different
+    sizes (1 thread): Voronoi voro-16 k=0 32 (19) vs 22 (19), k=1 18 (15) vs 15 (15); Tetgen cube.6 k=0 49 (43) vs 45
+    (41), k=1 55 (49) vs 49 (49); random hexahedra gcube.3 k=0 61 (48) vs 46 (44). The toy system of the Python test
+    (n=64) with random cell factors 10^U(-a, a), a = 0.5 / 1 / 2: P_F 59 / 108 / 153 (24), the new one 24 / 26 / 31
+    (24). The new prolongation doesn't need the cells' interpolation of 1; the aggregation does a little (the couplings
+    read A_TF, scaled by the cell bases): 0-4 more iterations at k=0, none at k >= 1 here.
+  Setup: -0..-16% in most cases (Theta was a small part of the flat passes: 1x1 blocks at degree 0); iterations: the
+  same within 1-2 in most cases, up to +6 (heterogeneous, n=256) or -3 in others.
+  - Then the rows of S on the removed faces added directly into the local system, from the local matrices of their
+    cells (rounding-level differences allowed: no merge of the rows of S, which sorts the faces of the two cells for
+    the sums of P_F in the order of the global products). The setup profile (instrumented copy of `src/` and the
+    harness `build/bench_mf/harness` on the dumps of `build/local-galerkin/dump`, 1 thread; P_F -> the new one): Cube-tet
+    k=0 n=32 1.16 -> 0.99 s (the per-aggregate loop 0.36 -> 0.23 s); k=2 n=16 `p_h` 0.204 -> 0.162 s; k=2 `-hp-cs h`
+    2.50 -> 2.25 s. Without Theta, the per-aggregate loop is dominated by Q_T^T A_T_F, A_T_Fc and the gathering of
+    the aggregates' data. The program (best of 3, `build/bench_harmonic/program2`), setup 1 / 8 threads, the same
+    iterations as above: Cube-tet k=0 n=32 1.050 -> 0.939 s (-11%) / -6%; k=1 n=16 -10% / -9%; k=2 n=16 (8) -5%;
+    `-hp-cs h` -3% / -7%; Square-tri k=0 n=256 -17% / -8%; Cube-cart-aniso100 -11% / -5%; Heterog1e8 -13% / -2%;
+    Kellogg graded k=1 orthonormal -21% (1 thread).
+
 ## Distributed memory (MPI)
 
 U-AMG on several processes (`ENABLE_MPI`, see CLAUDE.md "MPI"). Measure with `scripts/perf/scaling_mpi.sh` (from
@@ -1408,6 +1456,16 @@ Other candidates:
   (per-thread coarse vectors, then summed); k=2, 6.6 vs 6.3 ms and 4.9 vs 3.4 ms. Consecutive fine faces add into the
   same coarse entries (a dependency through memory), and the parallel version pays for its buffers and their sum.
   Keep R, unless memory runs short. This is not matrix-free: P is still stored (see the next item).
+- **Transfers by the prolongations of the passes, P not chained** — measured potential (2026-10-22, the setup profile
+  above): the chained P of a level (`SparseMatrixOps::Multiply(P, passP)` at each pass) and R = P^T are only used by
+  the transfers of the solve (the coarse operators come from the local Galerkin products, pass by pass, and need the
+  passes' P only). Their cost, 1 thread: chaining 0.13 s of 1.0-1.16 s at k=0 n=32 (11-13%), 0.015 s of 0.16-0.20 s
+  at k=2 `p_h` (8-9%), 0.76-0.79 s of 2.25-2.50 s at k=2 `-hp-cs h` (31-35%); R = P^T 0.02 s (2%), 0.002 s, 0.13 s
+  (5%). And the chained P has 29% (k=0: 2.11M vs 1.64M non-zeros for the 3 passes of level 0) to 78% (`-hp-cs h`:
+  9.6M vs 5.4M) more non-zeros than the passes' P together: applying the factors one after the other, P_1 (P_2
+  (P_3 e)), and their transposes, would read fewer coefficients (but 3 sparse products per transfer, with intermediate
+  vectors). Estimate: setup -10..-40% (1 thread), the solve's transfers (2-5% of the solve) -20..-40%. Rounding-level
+  differences: check the papers' iteration counts. Not with MPI at first (`DistributedP` is built from the chained P).
 - **Matrix-free prolongation** (P not stored, applied from its factors) — estimated, medium effort, small gain.
   Structure of P_F (`-prolong 6`, `BuildProlongation`): P = E_K Q_F + E_R J Y, with Y = E_R Π Θ + E_K Q_F. E_K and
   E_R select the rows of the kept faces (41-43% of the fine faces; Q_F injects the coarse face: 1 non-zero per row)

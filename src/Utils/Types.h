@@ -200,17 +200,25 @@ enum class GMG_P_Restriction : unsigned
 	P_Transpose = 2
 };
 
+// The prolongations of U-AMG: the coarsening prolongation of each pass (-coarsening-prolong) and the multigrid
+// prolongation of a level (-prolong). Their use: development (experiments), the 2023 AMG paper
+// (reproducibility/2023_AMG_for_hybrid_methods.md), the library fhhos4 (fhhos4::Prolongation).
 enum class UAMGProlongation : unsigned
 {
-	ReconstructionTrace = 1,
-	ChainedCoarseningProlongations = 2,
-	FaceProlongation = 3,
-	FaceProlongationAndInteriorSmoothing = 4,
-	ReconstructTraceOrInject = 5,
-	ReconstructSmoothedTraceOrInject = 6,
-	FindInteriorThatReconstructs = 7,
-	HighOrder = 8,
-	ReconstructionTranspose2Steps = 9
+	ReconstructionTrace = 1,                  // development use
+	ChainedCoarseningProlongations = 2,       // used in the paper: the multigrid prolongation (-prolong 2, the default),
+	                                          // the coarsening prolongations chained
+	FaceProlongation = 3,                     // used in the paper (Q_F)
+	FaceProlongationAndInteriorSmoothing = 4, // used in the paper (Q_F^smooth)
+	ReconstructTraceOrInject = 5,             // used in the paper (P_F^(0))
+	ReconstructSmoothedTraceOrInject = 6,     // used in the paper (P_F, the program's default); library
+	                                          // (Prolongation::Reconstruction)
+	FindInteriorThatReconstructs = 7,         // development use
+	HighOrder = 8,                            // development use
+	ReconstructionTranspose2Steps = 9,        // development use
+	// Coarsening prolongation only: injection on the kept faces, local solve of their rows of the operator on the
+	// removed faces (FaceProlongationAndInteriorSmoothing with omega = 1). See CoarseningPass::ComputeProlongation().
+	HarmonicExtensionOrInject = 10            // library (Prolongation::HarmonicExtension, its default)
 };
 
 enum class UAMGFaceProlongation : unsigned

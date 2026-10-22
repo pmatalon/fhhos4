@@ -276,6 +276,9 @@ NB_MODULE(fhhos4, m)
 		.value("Minus1", fhhos4::PCoarsening::Minus1)
 		.value("DivideBy2", fhhos4::PCoarsening::DivideBy2)
 		.value("ToZero", fhhos4::PCoarsening::ToZero);
+	nb::enum_<fhhos4::Prolongation>(m, "Prolongation")
+		.value("Reconstruction", fhhos4::Prolongation::Reconstruction)
+		.value("HarmonicExtension", fhhos4::Prolongation::HarmonicExtension);
 
 	nb::enum_<fhhos4::Smoother>(m, "Smoother")
 		.value("Default", fhhos4::Smoother::Default)
@@ -400,6 +403,7 @@ NB_MODULE(fhhos4, m)
 		.def_rw("PostSmoothingIterations", &fhhos4::Solver::PostSmoothingIterations)
 		.def_rw("PreSmoother", &fhhos4::Solver::PreSmoother)
 		.def_rw("PostSmoother", &fhhos4::Solver::PostSmoother)
+		.def_rw("Prolongation", &fhhos4::Solver::Prolongation)
 		.def_rw("CoarseningFactor", &fhhos4::Solver::CoarseningFactor)
 		.def_rw("CoarseMatrixMaxSize", &fhhos4::Solver::CoarseMatrixMaxSize)
 		.def_rw("CoarseSolver", &fhhos4::Solver::CoarseSolver)

@@ -214,6 +214,18 @@ namespace fhhos4
 		           // not ordered by degree. Usually more iterations than the others at k >= 3
 	};
 
+	// The prolongation of the h-coarsening (Solver::Prolongation): the faces of the boundary of an aggregate of cells take
+	// the value of their coarse face; the faces interior to it (removed on the coarse level) get theirs from them:
+	enum class Prolongation
+	{
+		HarmonicExtension, // the default: the solution of their rows of the condensed matrix, the faces of the boundary
+		                   // given. No value of the cells, whose bases then only enter the choice of the aggregates; a
+		                   // shorter setup (fhhos4 -coarsening-prolong 10)
+		Reconstruction     // the paper's: the value of the coarse cell, reconstructed from its faces (the inverse of the
+		                   // static condensation), then one damped Jacobi iteration of the condensed matrix on these
+		                   // faces (fhhos4 -coarsening-prolong 6, the program's default)
+	};
+
 	// The smoothers (Solver::PreSmoother and PostSmoother; fhhos4 -smoothers). The blocks: one per face. The Gauss-Seidel
 	// smoothers are sequential, except the hybrid ones. On several processes (MPI), they are Gauss-Seidel in each
 	// process (each thread for the hybrid ones), Jacobi between the processes.
@@ -254,7 +266,7 @@ namespace fhhos4
 
 	// Set the parameters, then call a setup function, then Solve(). The parameters are read by the setup (Tolerance and
 	// MaxIterations by Solve()). The defaults are those of the program fhhos4 (-s fcguamg), used in the papers, except the
-	// smoothers (PreSmoother, and the number of its iterations).
+	// smoothers (PreSmoother, and the number of its iterations) and the prolongation (Prolongation).
 	// Not thread-safe: one object must not be used by several threads at the same time.
 	class FHHOS4_API Solver
 	{
@@ -294,6 +306,8 @@ namespace fhhos4
 		// (backward and symmetric ones included) follow the downwind order of the level. Jacobi ignores it.
 		fhhos4::Smoother PreSmoother = fhhos4::Smoother::Default;
 		fhhos4::Smoother PostSmoother = fhhos4::Smoother::Default;
+		// The prolongation of the h-coarsening: from the faces of the boundary of each aggregate to its interior faces
+		fhhos4::Prolongation Prolongation = fhhos4::Prolongation::HarmonicExtension;
 		double CoarseningFactor = 3.8;     // target ratio of the numbers of cells of two successive h-levels
 		int CoarseMatrixMaxSize = 1000;    // the coarsening stops when the matrix has at most this many rows
 		// Solver of the coarsest level. Default: Cholesky for a symmetric matrix, LU otherwise.

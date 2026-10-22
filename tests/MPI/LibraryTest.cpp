@@ -34,7 +34,7 @@ namespace
 
 // The uncondensed system distributed by rows, through the interface of the library: the ghost faces numbered in reverse
 // order of their global numbers (any order). The solution of the system on one process.
-TEST(DistributedLibrary, UncondensedSystem)
+void ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation)
 {
 	int n = 60;
 	CartesianHybridSystem global(n, 0);
@@ -48,6 +48,7 @@ TEST(DistributedLibrary, UncondensedSystem)
 	int expectedIterations;
 	{
 		fhhos4::Solver solver = CartesianSolver(MPI_COMM_SELF);
+		solver.Prolongation = prolongation;
 		solver.SetupSymmetric(system.Global.A_TT, system.Global.A_TF, system.Global.A_FF, Vector::Ones(global.A_TT.rows()), Vector::Ones(global.S.rows()));
 		expectedIterations = solver.Solve(b_T, b_F, expectedX_T, expectedX_F).Iterations;
 	}
@@ -86,6 +87,7 @@ TEST(DistributedLibrary, UncondensedSystem)
 	vector<int64_t> ghosts(ghostFaces.begin(), ghostFaces.end());
 
 	fhhos4::Solver solver = CartesianSolver(World().Comm());
+	solver.Prolongation = prolongation;
 	solver.SetupSymmetric(A_TT, A_TF, A_FF, Vector::Ones(cells.NOwned), Vector::Ones(faces.NOwned), fhhos4::GhostNumbers(ghosts.size(), ghosts.data()));
 	Vector x_T(cells.NOwned), x_F = Vector::Zero(faces.NOwned);
 	fhhos4::Result result = solver.Solve(b_T.segment(cells.Begin, cells.NOwned), b_F.segment(faces.Begin, faces.NOwned), x_T, x_F);
@@ -99,6 +101,17 @@ TEST(DistributedLibrary, UncondensedSystem)
 	EXPECT_LE((allX_T - expectedX_T).norm(), 1e-8 * expectedX_T.norm());
 	if (World().IsRoot())
 		cout << "\t" << World().Size() << " processes: " << result.Iterations << " iterations (" << expectedIterations << " on one)" << endl;
+}
+
+TEST(DistributedLibrary, UncondensedSystem)
+{
+	ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::Reconstruction);
+}
+
+// Prolongation::HarmonicExtension: the local solves of the removed faces in the aggregates of each process
+TEST(DistributedLibrary, UncondensedSystemHarmonicExtension)
+{
+	ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::HarmonicExtension);
 }
 
 // The inputs are checked on all the processes: an error on one of them is an error on all of them

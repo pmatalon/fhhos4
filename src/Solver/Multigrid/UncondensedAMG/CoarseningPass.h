@@ -10,9 +10,9 @@ using namespace std;
 
 // A coarsening pass of U-AMG on flat arrays: aggregation of the cells (pairwise, or with all their neighbours),
 // interface collapsing, coarsening prolongation computed per aggregate from the local matrices of the operator
-// (-coarsening-prolong 3 to 6, -face-prolong 1, 2). Same aggregates, coarse faces and matrices as
+// (-coarsening-prolong 3 to 6, 10, -face-prolong 1, 2). Same aggregates, coarse faces and matrices as
 // HybridAlgebraicMesh::Build(), Coarsen() and UncondensedLevel::Coarsen() with these options (same numbering, sums in
-// the same order). See UncondensedLevel::FlatPassesApply().
+// the same order), except 10 (HarmonicExtensionOrInject), only implemented here. See UncondensedLevel::FlatPassesApply().
 // Hint to load the memory at address into the cache
 inline void Prefetch(const void* address)
 {
@@ -550,15 +550,23 @@ public:
 	// faces; on the removed faces, the face prolongation Q_F (FaceProlongation), Q_F smoothed by one block Jacobi
 	// iteration (omega = 2/3) on the operator S, given by its local matrices on the cells
 	// (FaceProlongationAndInteriorSmoothing), the trace of the reconstruction -A_TcTc^-1 A_TcFc in their aggregate
-	// (ReconstructTraceOrInject), or that trace smoothed by block Jacobi (ReconstructSmoothedTraceOrInject). Q_F: the
-	// coarse face of a kept face; on a removed face, the average of the coarse faces of its aggregate
+	// (ReconstructTraceOrInject), that trace smoothed by block Jacobi (ReconstructSmoothedTraceOrInject), or the local
+	// solve of their rows of S, S_RR^-1 (-S_RK Y), where R are the removed faces of the aggregate, K the kept faces of its
+	// cells and Y their injection (HarmonicExtensionOrInject): the discrete harmonic extension of the values of the kept
+	// faces, i.e. FaceProlongationAndInteriorSmoothing with omega = 1 when the aggregate has one removed face (pairwise
+	// aggregation). It converts no cell value into face values: it uses neither A_T_T (null) nor the blocks of the
+	// coarse cells (A_T_Tc is left empty), and it doesn't depend on the bases of the cells (S is the condensed operator).
+	// Q_F: the coarse face of a kept face; on a removed face, the average of the coarse faces of its aggregate
 	// (BoundaryAggregatesInteriorAverage) or 0 (BoundaryAggregatesInteriorZero).
-	void ComputeProlongation(UAMGProlongation prolongation, UAMGFaceProlongation faceProlongation, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F,
+	void ComputeProlongation(UAMGProlongation prolongation, UAMGFaceProlongation faceProlongation, const SparseMatrix* A_T_T, const SparseMatrix& A_T_F,
 	                         const LocalMatrices& S, SparseMatrix& P, SparseMatrix& A_T_Tc, SparseMatrix& A_T_Fc)
 	{
 		assert(prolongation == UAMGProlongation::FaceProlongation || prolongation == UAMGProlongation::FaceProlongationAndInteriorSmoothing
-			|| prolongation == UAMGProlongation::ReconstructTraceOrInject || prolongation == UAMGProlongation::ReconstructSmoothedTraceOrInject);
+			|| prolongation == UAMGProlongation::ReconstructTraceOrInject || prolongation == UAMGProlongation::ReconstructSmoothedTraceOrInject
+			|| prolongation == UAMGProlongation::HarmonicExtensionOrInject);
 		assert(faceProlongation == UAMGFaceProlongation::BoundaryAggregatesInteriorAverage || faceProlongation == UAMGFaceProlongation::BoundaryAggregatesInteriorZero);
+		bool harmonic = prolongation == UAMGProlongation::HarmonicExtensionOrInject;
+		assert(harmonic || A_T_T);
 		bool reconstruction = prolongation == UAMGProlongation::ReconstructTraceOrInject || prolongation == UAMGProlongation::ReconstructSmoothedTraceOrInject;
 		bool smoothing = prolongation == UAMGProlongation::FaceProlongationAndInteriorSmoothing || prolongation == UAMGProlongation::ReconstructSmoothedTraceOrInject;
 		bool averageOnRemovedFaces = faceProlongation == UAMGFaceProlongation::BoundaryAggregatesInteriorAverage;
@@ -568,7 +576,7 @@ public:
 		const double zero = NonZeroCoefficients::ZeroThreshold;
 		DenseMatrix oneMinusOmegaIdentity = (1 - omega) * DenseMatrix::Identity(fbs, fbs);
 
-		vector<double> blocksTT((size_t)NAggregates * cbs * cbs); // the blocks of A_T_Tc, row-major
+		vector<double> blocksTT(harmonic ? 0 : (size_t)NAggregates * cbs * cbs); // the blocks of A_T_Tc, row-major
 		// Rows of P on the removed faces, stored by the thread that computes them
 		struct RemovedRows
 		{
@@ -597,6 +605,7 @@ public:
 			vector<int> sorted, cursor;                   // local numbers of the faces of each occurrence, by global number
 			vector<size_t> sortedStart;
 			vector<BigNumber> jBlocks;
+			vector<double> S_RR, B_RK;                    // HarmonicExtensionOrInject: S_RR and -S_RK Y, column-major
 			Eigen::LLT<DenseMatrix> llt;
 			Eigen::PartialPivLU<DenseMatrix> plu;
 			Eigen::FullPivLU<DenseMatrix> lu;
@@ -628,6 +637,86 @@ public:
 				{
 					w.acc[L] = v;
 					w.touched[L] = 1;
+				}
+			};
+			// The row of S on the face f: the sum of the rows of the local matrices of the cells of f, in increasing order
+			// of the cells (LocalMatrices::Assemble()), their faces merged by increasing global number. Its faces in
+			// w.jBlocks, the blocks S(f, g) in w.blockRow (fbs x fbs, column-major, one after the other).
+			auto mergeRow = [&](BigNumber f)
+			{
+				w.occurrences.clear();
+				w.sorted.clear();
+				w.sortedStart.assign(1, 0);
+				for (int q = 0; q < FaceCells.Size(f); ++q)
+				{
+					BigNumber t = FaceCells[f][q];
+					const BigNumber* tFaces = S.CellFaces(t);
+					int n = S.NFaces(t);
+					int a = find(tFaces, tFaces + n, f) - tFaces;
+					assert(a < n);
+					w.occurrences.push_back({ t, a });
+					size_t s0 = w.sorted.size();
+					for (int b = 0; b < n; ++b) // insertion sort (the faces are usually sorted already)
+					{
+						size_t p = w.sorted.size();
+						w.sorted.push_back(b);
+						while (p > s0 && tFaces[w.sorted[p - 1]] > tFaces[b])
+						{
+							w.sorted[p] = w.sorted[p - 1];
+							p--;
+						}
+						w.sorted[p] = b;
+					}
+					w.sortedStart.push_back(w.sorted.size());
+				}
+				int nOcc = w.occurrences.size();
+				w.cursor.assign(nOcc, 0);
+				w.jBlocks.clear();
+				w.blockRow.resize(fbs * fbs * w.sorted.size());
+				double* br = w.blockRow.data();
+				while (true)
+				{
+					BigNumber g = 0;
+					bool found = false;
+					for (int q = 0; q < nOcc; ++q)
+					{
+						size_t pq = w.sortedStart[q] + w.cursor[q];
+						if (pq < w.sortedStart[q + 1])
+						{
+							BigNumber gq = S.CellFaces(w.occurrences[q].first)[w.sorted[pq]];
+							if (!found || gq < g)
+								g = gq;
+							found = true;
+						}
+					}
+					if (!found)
+						break;
+					int B = w.jBlocks.size();
+					w.jBlocks.push_back(g);
+					bool first = true;
+					for (int q = 0; q < nOcc; ++q)
+					{
+						size_t pq = w.sortedStart[q] + w.cursor[q];
+						BigNumber t = w.occurrences[q].first;
+						if (pq < w.sortedStart[q + 1] && S.CellFaces(t)[w.sorted[pq]] == g)
+						{
+							int a = w.occurrences[q].second;
+							int b = w.sorted[pq];
+							size_t n = (size_t)S.NFaces(t) * fbs;
+							const double* St = S.Values(t);
+							for (int c = 0; c < fbs; ++c)
+								for (int r = 0; r < fbs; ++r)
+								{
+									double v = St[(b * fbs + c) * n + a * fbs + r];
+									if (first)
+										br[(B * fbs + c) * fbs + r] = v;
+									else
+										br[(B * fbs + c) * fbs + r] += v;
+								}
+							first = false;
+							w.cursor[q]++;
+						}
+					}
 				}
 			};
 			for (BigNumber K = firstRow / cbs; K < lastRow / cbs; ++K)
@@ -706,27 +795,31 @@ public:
 					w.qtaStart.push_back(w.qta.size());
 				}
 
-				// A_T_Tc: sum of the blocks of the cells (symmetric: of their lower triangular parts)
-				double* blockTT = blocksTT.data() + (size_t)K * cbs * cbs;
-				fill(blockTT, blockTT + cbs * cbs, 0.0);
-				for (BigNumber e : w.cells)
+				// A_T_Tc: sum of the blocks of the cells (symmetric: of their lower triangular parts). Not with
+				// HarmonicExtensionOrInject.
+				double* blockTT = harmonic ? nullptr : blocksTT.data() + (size_t)K * cbs * cbs;
+				if (!harmonic)
 				{
-					for (int i = 0; i < cbs; ++i)
+					fill(blockTT, blockTT + cbs * cbs, 0.0);
+					for (BigNumber e : w.cells)
 					{
-						for (SparseMatrix::InnerIterator it(A_T_T, e * cbs + i); it; ++it)
+						for (int i = 0; i < cbs; ++i)
 						{
-							int j = it.col() - e * cbs;
-							assert(j >= 0 && j < cbs);
-							if (_symmetric && j > i)
-								continue;
-							blockTT[i * cbs + j] += it.value();
+							for (SparseMatrix::InnerIterator it(*A_T_T, e * cbs + i); it; ++it)
+							{
+								int j = it.col() - e * cbs;
+								assert(j >= 0 && j < cbs);
+								if (_symmetric && j > i)
+									continue;
+								blockTT[i * cbs + j] += it.value();
+							}
 						}
 					}
+					if (_symmetric)
+						for (int i = 0; i < cbs; ++i)
+							for (int j = i + 1; j < cbs; ++j)
+								blockTT[i * cbs + j] = blockTT[j * cbs + i];
 				}
-				if (_symmetric)
-					for (int i = 0; i < cbs; ++i)
-						for (int j = i + 1; j < cbs; ++j)
-							blockTT[i * cbs + j] = blockTT[j * cbs + i];
 
 				// Theta: row 0 of the reconstruction -A_TcTc^-1 A_TcFc in the aggregate, where A_TcFc = Q_T^T A_T_F Q_F
 				double average = 1.0 / m; // Q_F on the removed faces (BoundaryAggregatesInteriorAverage)
@@ -811,202 +904,212 @@ public:
 				}
 
 				// Rows of P on the removed faces
-				for (BigNumber f : w.removed)
+				if (harmonic && !w.removed.empty())
 				{
-					removedRowsThread[f] = thread;
-					if (!smoothing)
+					// S_RR X = -S_RK Y: the rows of S on the removed faces R of the aggregate, whose other faces are the kept
+					// faces of its cells, injected (Y) into the coarse faces of the aggregate. The rows of the local
+					// matrices of the cells of each removed face added directly into S_RR and -S_RK Y (no merge of the
+					// rows of S: any order of the sums).
+					int nR = w.removed.size();
+					size_t n = (size_t)nR * fbs;
+					w.S_RR.assign(n * n, 0.0);
+					w.B_RK.assign(n * M, 0.0);
+					for (int a = 0; a < nR; ++a)
 					{
-						// Q_F (FaceProlongation), or the trace of Theta on the constant mode (ReconstructTraceOrInject)
-						for (int r = 0; r < fbs; ++r)
+						BigNumber f = w.removed[a];
+						for (int q = 0; q < FaceCells.Size(f); ++q)
 						{
-							removedRowStart[f * fbs + r] = rr.Cols.size();
-							if (prolongation == UAMGProlongation::FaceProlongation)
+							BigNumber t = FaceCells[f][q];
+							const BigNumber* tFaces = S.CellFaces(t);
+							int nt = S.NFaces(t);
+							int af = find(tFaces, tFaces + nt, f) - tFaces;
+							assert(af < nt);
+							size_t ld = (size_t)nt * fbs;
+							// The block S_t(f, g) of the column-major local matrix: its coefficient (r, c) at block[c * ld + r]
+							const double* rowF = S.Values(t) + (size_t)af * fbs;
+							for (int b = 0; b < nt; ++b)
 							{
-								if (averageOnRemovedFaces)
-									for (int B = 0; B < m; ++B)
-									{
-										rr.Cols.push_back(cfs[B] * fbs + r);
-										rr.Values.push_back(average);
-									}
-							}
-							else if (r == 0)
-							{
-								rr.Cols.insert(rr.Cols.end(), w.thetaCols.begin(), w.thetaCols.end());
-								rr.Values.insert(rr.Values.end(), w.theta.begin(), w.theta.end());
-							}
-							removedRowEnd[f * fbs + r] = rr.Cols.size();
-						}
-						continue;
-					}
-
-					// J Y, where J is the block Jacobi iteration matrix of the operator on the row of the face, and Y the
-					// injection on the kept faces; on the removed ones, Q_F (FaceProlongationAndInteriorSmoothing) or the
-					// trace of Theta (ReconstructSmoothedTraceOrInject)
-					// Row of the operator: sum of the rows of the local matrices of the cells of f, in increasing order of the
-					// cells (LocalMatrices::Assemble()): their faces merged by increasing global number
-					w.occurrences.clear();
-					w.sorted.clear();
-					w.sortedStart.assign(1, 0);
-					for (int q = 0; q < FaceCells.Size(f); ++q)
-					{
-						BigNumber t = FaceCells[f][q];
-						const BigNumber* tFaces = S.CellFaces(t);
-						int n = S.NFaces(t);
-						int a = find(tFaces, tFaces + n, f) - tFaces;
-						assert(a < n);
-						w.occurrences.push_back({ t, a });
-						size_t s0 = w.sorted.size();
-						for (int b = 0; b < n; ++b) // insertion sort (the faces are usually sorted already)
-						{
-							size_t p = w.sorted.size();
-							w.sorted.push_back(b);
-							while (p > s0 && tFaces[w.sorted[p - 1]] > tFaces[b])
-							{
-								w.sorted[p] = w.sorted[p - 1];
-								p--;
-							}
-							w.sorted[p] = b;
-						}
-						w.sortedStart.push_back(w.sorted.size());
-					}
-					int nOcc = w.occurrences.size();
-					w.cursor.assign(nOcc, 0);
-					w.jBlocks.clear();
-					w.blockRow.resize(fbs * fbs * w.sorted.size());
-					double* br = w.blockRow.data();
-					while (true)
-					{
-						BigNumber g = 0;
-						bool found = false;
-						for (int q = 0; q < nOcc; ++q)
-						{
-							size_t pq = w.sortedStart[q] + w.cursor[q];
-							if (pq < w.sortedStart[q + 1])
-							{
-								BigNumber gq = S.CellFaces(w.occurrences[q].first)[w.sorted[pq]];
-								if (!found || gq < g)
-									g = gq;
-								found = true;
-							}
-						}
-						if (!found)
-							break;
-						int B = w.jBlocks.size();
-						w.jBlocks.push_back(g);
-						bool first = true;
-						for (int q = 0; q < nOcc; ++q)
-						{
-							size_t pq = w.sortedStart[q] + w.cursor[q];
-							BigNumber t = w.occurrences[q].first;
-							if (pq < w.sortedStart[q + 1] && S.CellFaces(t)[w.sorted[pq]] == g)
-							{
-								int a = w.occurrences[q].second;
-								int b = w.sorted[pq];
-								size_t n = (size_t)S.NFaces(t) * fbs;
-								const double* St = S.Values(t);
-								for (int c = 0; c < fbs; ++c)
-									for (int r = 0; r < fbs; ++r)
-									{
-										double v = St[(b * fbs + c) * n + a * fbs + r];
-										if (first)
-											br[(B * fbs + c) * fbs + r] = v;
-										else
-											br[(B * fbs + c) * fbs + r] += v;
-									}
-								first = false;
-								w.cursor[q]++;
+								BigNumber g = tFaces[b];
+								const double* block = rowF + (size_t)b * fbs * ld;
+								if (FaceRemoved[g]) // a face of the cells of a removed face, removed: in the same aggregate
+								{
+									int bR = g == f ? a : find(w.removed.begin(), w.removed.end(), g) - w.removed.begin();
+									assert(bR < nR);
+									for (int c = 0; c < fbs; ++c)
+										for (int r = 0; r < fbs; ++r)
+											w.S_RR[(bR * fbs + c) * n + a * fbs + r] += block[c * ld + r];
+								}
+								else
+								{
+									size_t L = (size_t)w.coarseFacePos[FaceCoarseFace[g]] * fbs;
+									for (int c = 0; c < fbs; ++c)
+										for (int r = 0; r < fbs; ++r)
+											w.B_RK[(L + c) * n + a * fbs + r] -= block[c * ld + r];
+								}
 							}
 						}
 					}
-					int nBlocks = w.jBlocks.size();
-
-					// Block Jacobi: J_f = [ -omega D_f^-1 S_fg ... (1-omega) I ... ] (BlockJacobi::IterationMatrix())
-					int Bf = lower_bound(w.jBlocks.begin(), w.jBlocks.end(), f) - w.jBlocks.begin();
-					if (fbs == 1)
+					// X, in B_RK. One removed face of 1 DoF (pairwise aggregation at k = 0): a division, 0 if the diagonal
+					// coefficient d is 0, as the block Jacobi row of FaceProlongationAndInteriorSmoothing. Otherwise, a
+					// rank-revealing LU (S_RR is small: the removed faces of an aggregate).
+					if (n == 1)
 					{
-						// The arithmetic of BlockDiagonalSolver::SolveLU() with a 1x1 block d: s * (1/d), 0 if d = 0 (rank 0).
-						// With the inverse of the block (DiagBlockSolveMethod::Inverse), (1/d) * s: the same.
-						double d = br[Bf];
+						double d = w.S_RR[0];
 						double inverse = 1.0 / d;
-						for (int Bg = 0; Bg < nBlocks; ++Bg)
-						{
-							if (Bg == Bf)
-								br[Bg] = oneMinusOmegaIdentity(0, 0);
-							else
-								br[Bg] = (d == 0 ? 0.0 : br[Bg] * inverse) * -omega;
-						}
+						for (size_t L = 0; L < M; ++L)
+							w.B_RK[L] = d == 0 ? 0.0 : w.B_RK[L] * inverse;
 					}
 					else
 					{
-						for (int c = 0; c < fbs; ++c)
-							for (int r = 0; r < fbs; ++r)
-								w.Df(r, c) = br[(Bf * fbs + c) * fbs + r];
-						w.lu.compute(w.Df);
-						const int* permP = w.lu.permutationP().indices().data();
-						const int* permQ = w.lu.permutationQ().indices().data();
-						int rank = w.lu.nonzeroPivots();
-						if (inverseDiagonal)
-							w.inverseDf = w.lu.inverse();
-						for (int Bg = 0; Bg < nBlocks; ++Bg)
+						Eigen::Map<DenseMatrix> S_RR(w.S_RR.data(), n, n), B_RK(w.B_RK.data(), n, M);
+						w.lu.compute(S_RR);
+						B_RK = w.lu.solve(B_RK).eval();
+					}
+					for (int a = 0; a < nR; ++a)
+					{
+						BigNumber f = w.removed[a];
+						removedRowsThread[f] = thread;
+						for (int r = 0; r < fbs; ++r)
 						{
-							double* block = br + Bg * fbs * fbs;
-							if (Bg == Bf)
+							removedRowStart[f * fbs + r] = rr.Cols.size();
+							for (size_t L = 0; L < M; ++L)
 							{
-								for (int c = 0; c < fbs; ++c)
-									for (int r = 0; r < fbs; ++r)
-										block[c * fbs + r] = oneMinusOmegaIdentity(r, c);
+								double v = w.B_RK[L * n + a * fbs + r];
+								if (abs(v) > zero)
+								{
+									rr.Cols.push_back(cfs[L / fbs] * fbs + L % fbs);
+									rr.Values.push_back(v);
+								}
 							}
-							else
-							{
-								for (int c = 0; c < fbs; ++c)
-									for (int r = 0; r < fbs; ++r)
-										w.A_ij(r, c) = block[c * fbs + r];
-								if (inverseDiagonal)
-									w.jacobiBlock.noalias() = w.inverseDf * w.A_ij;
-								else
-									BlockDiagonalSolver::SolveLU(w.lu.matrixLU(), permP, permQ, rank, w.A_ij, w.jacobiBlock);
-								w.jacobiBlock *= -omega;
-								for (int c = 0; c < fbs; ++c)
-									for (int r = 0; r < fbs; ++r)
-										block[c * fbs + r] = w.jacobiBlock(r, c);
-							}
+							removedRowEnd[f * fbs + r] = rr.Cols.size();
 						}
 					}
-
-					// J_f Y, summed in the order of the columns of J_f
-					for (int r = 0; r < fbs; ++r)
+				}
+				else
+				{
+					for (BigNumber f : w.removed)
 					{
-						w.acc.assign(M, 0);
-						w.touched.assign(M, 0);
-						for (int c = 0; c < nBlocks * fbs; ++c)
+						removedRowsThread[f] = thread;
+						if (!smoothing)
 						{
-							double j = br[c * fbs + r];
-							if (!(abs(j) > zero))
-								continue;
-							BigNumber g = w.jBlocks[c / fbs];
-							int cg = c % fbs;
-							if (!FaceRemoved[g])
-								add(w.coarseFacePos[FaceCoarseFace[g]] * fbs + cg, 1.0 * j);
-							else if (reconstruction)
+							// Q_F (FaceProlongation), or the trace of Theta on the constant mode (ReconstructTraceOrInject)
+							for (int r = 0; r < fbs; ++r)
 							{
-								if (cg == 0)
-									for (size_t x = 0; x < w.theta.size(); ++x)
-										add(local(w.thetaCols[x]), w.theta[x] * j);
+								removedRowStart[f * fbs + r] = rr.Cols.size();
+								if (prolongation == UAMGProlongation::FaceProlongation)
+								{
+									if (averageOnRemovedFaces)
+										for (int B = 0; B < m; ++B)
+										{
+											rr.Cols.push_back(cfs[B] * fbs + r);
+											rr.Values.push_back(average);
+										}
+								}
+								else if (r == 0)
+								{
+									rr.Cols.insert(rr.Cols.end(), w.thetaCols.begin(), w.thetaCols.end());
+									rr.Values.insert(rr.Values.end(), w.theta.begin(), w.theta.end());
+								}
+								removedRowEnd[f * fbs + r] = rr.Cols.size();
 							}
-							else if (averageOnRemovedFaces)
-								for (int B = 0; B < m; ++B)
-									add(B * fbs + cg, average * j);
+							continue;
 						}
-						removedRowStart[f * fbs + r] = rr.Cols.size();
-						for (size_t L = 0; L < M; ++L)
+
+						// J Y, where J is the block Jacobi iteration matrix of the operator on the row of the face, and Y the
+						// injection on the kept faces; on the removed ones, Q_F (FaceProlongationAndInteriorSmoothing) or the
+						// trace of Theta (ReconstructSmoothedTraceOrInject)
+						mergeRow(f);
+						double* br = w.blockRow.data();
+						int nBlocks = w.jBlocks.size();
+
+						// Block Jacobi: J_f = [ -omega D_f^-1 S_fg ... (1-omega) I ... ] (BlockJacobi::IterationMatrix())
+						int Bf = lower_bound(w.jBlocks.begin(), w.jBlocks.end(), f) - w.jBlocks.begin();
+						if (fbs == 1)
 						{
-							if (w.touched[L] && abs(w.acc[L]) > zero)
+							// The arithmetic of BlockDiagonalSolver::SolveLU() with a 1x1 block d: s * (1/d), 0 if d = 0 (rank 0).
+							// With the inverse of the block (DiagBlockSolveMethod::Inverse), (1/d) * s: the same.
+							double d = br[Bf];
+							double inverse = 1.0 / d;
+							for (int Bg = 0; Bg < nBlocks; ++Bg)
 							{
-								rr.Cols.push_back(cfs[L / fbs] * fbs + L % fbs);
-								rr.Values.push_back(w.acc[L]);
+								if (Bg == Bf)
+									br[Bg] = oneMinusOmegaIdentity(0, 0);
+								else
+									br[Bg] = (d == 0 ? 0.0 : br[Bg] * inverse) * -omega;
 							}
 						}
-						removedRowEnd[f * fbs + r] = rr.Cols.size();
+						else
+						{
+							for (int c = 0; c < fbs; ++c)
+								for (int r = 0; r < fbs; ++r)
+									w.Df(r, c) = br[(Bf * fbs + c) * fbs + r];
+							w.lu.compute(w.Df);
+							const int* permP = w.lu.permutationP().indices().data();
+							const int* permQ = w.lu.permutationQ().indices().data();
+							int rank = w.lu.nonzeroPivots();
+							if (inverseDiagonal)
+								w.inverseDf = w.lu.inverse();
+							for (int Bg = 0; Bg < nBlocks; ++Bg)
+							{
+								double* block = br + Bg * fbs * fbs;
+								if (Bg == Bf)
+								{
+									for (int c = 0; c < fbs; ++c)
+										for (int r = 0; r < fbs; ++r)
+											block[c * fbs + r] = oneMinusOmegaIdentity(r, c);
+								}
+								else
+								{
+									for (int c = 0; c < fbs; ++c)
+										for (int r = 0; r < fbs; ++r)
+											w.A_ij(r, c) = block[c * fbs + r];
+									if (inverseDiagonal)
+										w.jacobiBlock.noalias() = w.inverseDf * w.A_ij;
+									else
+										BlockDiagonalSolver::SolveLU(w.lu.matrixLU(), permP, permQ, rank, w.A_ij, w.jacobiBlock);
+									w.jacobiBlock *= -omega;
+									for (int c = 0; c < fbs; ++c)
+										for (int r = 0; r < fbs; ++r)
+											block[c * fbs + r] = w.jacobiBlock(r, c);
+								}
+							}
+						}
+
+						// J_f Y, summed in the order of the columns of J_f
+						for (int r = 0; r < fbs; ++r)
+						{
+							w.acc.assign(M, 0);
+							w.touched.assign(M, 0);
+							for (int c = 0; c < nBlocks * fbs; ++c)
+							{
+								double j = br[c * fbs + r];
+								if (!(abs(j) > zero))
+									continue;
+								BigNumber g = w.jBlocks[c / fbs];
+								int cg = c % fbs;
+								if (!FaceRemoved[g])
+									add(w.coarseFacePos[FaceCoarseFace[g]] * fbs + cg, 1.0 * j);
+								else if (reconstruction)
+								{
+									if (cg == 0)
+										for (size_t x = 0; x < w.theta.size(); ++x)
+											add(local(w.thetaCols[x]), w.theta[x] * j);
+								}
+								else if (averageOnRemovedFaces)
+									for (int B = 0; B < m; ++B)
+										add(B * fbs + cg, average * j);
+							}
+							removedRowStart[f * fbs + r] = rr.Cols.size();
+							for (size_t L = 0; L < M; ++L)
+							{
+								if (w.touched[L] && abs(w.acc[L]) > zero)
+								{
+									rr.Cols.push_back(cfs[L / fbs] * fbs + L % fbs);
+									rr.Values.push_back(w.acc[L]);
+								}
+							}
+							removedRowEnd[f * fbs + r] = rr.Cols.size();
+						}
 					}
 				}
 
@@ -1037,21 +1140,25 @@ public:
 			}
 		});
 
-		// A_T_Tc
-		A_T_Tc = SparseMatrix(NAggregates * cbs, NAggregates * cbs);
-		A_T_Tc.resizeNonZeros((size_t)NAggregates * cbs * cbs);
-		#pragma omp parallel for
-		for (BigNumber i = 0; i < NAggregates * cbs; ++i)
+		// A_T_Tc (empty with HarmonicExtensionOrInject)
+		A_T_Tc = SparseMatrix();
+		if (!harmonic)
 		{
-			BigNumber K = i / cbs;
-			A_T_Tc.outerIndexPtr()[i + 1] = (i + 1) * cbs;
-			for (int j = 0; j < cbs; ++j)
+			A_T_Tc = SparseMatrix(NAggregates * cbs, NAggregates * cbs);
+			A_T_Tc.resizeNonZeros((size_t)NAggregates * cbs * cbs);
+			#pragma omp parallel for
+			for (BigNumber i = 0; i < NAggregates * cbs; ++i)
 			{
-				A_T_Tc.innerIndexPtr()[i * cbs + j] = K * cbs + j;
-				A_T_Tc.valuePtr()[i * cbs + j] = blocksTT[(size_t)i * cbs + j];
+				BigNumber K = i / cbs;
+				A_T_Tc.outerIndexPtr()[i + 1] = (i + 1) * cbs;
+				for (int j = 0; j < cbs; ++j)
+				{
+					A_T_Tc.innerIndexPtr()[i * cbs + j] = K * cbs + j;
+					A_T_Tc.valuePtr()[i * cbs + j] = blocksTT[(size_t)i * cbs + j];
+				}
 			}
+			A_T_Tc.outerIndexPtr()[0] = 0;
 		}
-		A_T_Tc.outerIndexPtr()[0] = 0;
 
 		// P: injection on the kept faces
 		vector<RemovedRows*> stores;

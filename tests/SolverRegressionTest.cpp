@@ -227,20 +227,27 @@ class UAMGConstantRescalingTest : public ::testing::TestWithParam<std::tuple<int
 {
 };
 
+namespace
+{
+	ProgramArguments KelloggLocalRefArgs(int k, int elemOrthogonalization, int faceOrthogonalization)
+	{
+		ProgramArguments args;
+		args.Problem.GeoCode = "2D/square4quadrants_tri_localref.geo";
+		args.Problem.TestCaseCode = "kellogg";
+		args.Discretization.N = 16;
+		args.Discretization.PolyDegree = k + 1;
+		args.Discretization.OrthogonalizeElemBasesCode = elemOrthogonalization;
+		args.Discretization.OrthogonalizeFaceBasesCode = faceOrthogonalization;
+		args.Solver.SolverCode = "fcguamg";
+		args.Actions.UseCache = false; // -no-cache
+		return args;
+	}
+}
+
 TEST_P(UAMGConstantRescalingTest, Converges)
 {
 	auto [k, elemOrthogonalization, faceOrthogonalization] = GetParam();
-	ProgramArguments args;
-	args.Problem.GeoCode = "2D/square4quadrants_tri_localref.geo";
-	args.Problem.TestCaseCode = "kellogg";
-	args.Discretization.N = 16;
-	args.Discretization.PolyDegree = k + 1;
-	args.Discretization.OrthogonalizeElemBasesCode = elemOrthogonalization;
-	args.Discretization.OrthogonalizeFaceBasesCode = faceOrthogonalization;
-	args.Solver.SolverCode = "fcguamg";
-	args.Actions.UseCache = false; // -no-cache
-
-	ProgramResults results = RunDiffusionHHO(args);
+	ProgramResults results = RunDiffusionHHO(KelloggLocalRefArgs(k, elemOrthogonalization, faceOrthogonalization));
 	EXPECT_GT(results.IterationCount, 0);
 	EXPECT_LE(results.IterationCount, 25);
 }
@@ -248,6 +255,42 @@ TEST_P(UAMGConstantRescalingTest, Converges)
 INSTANTIATE_TEST_SUITE_P(Kellogg, UAMGConstantRescalingTest, ::testing::Values(
 	std::make_tuple(0, 3, 3), std::make_tuple(0, 3, 1), std::make_tuple(0, 1, 3),
 	std::make_tuple(1, 3, 3), std::make_tuple(1, 3, 1), std::make_tuple(1, 1, 3)));
+
+// The coarsening prolongation HarmonicExtensionOrInject (-coarsening-prolong 10): on the faces interior to an aggregate,
+// the local solve of their rows of the operator, which converts no cell value into face values (no trace of the coarse
+// cells, whose coefficients 1 assume the same coordinate of the constant in the cell and face bases). The problem of
+// UAMGConstantRescalingTest, with its bases and the default ones.
+//   ./bin/fhhos4 -geo 2D/square4quadrants_tri_localref.geo -tc kellogg -n 16 -k {0|1} -s fcguamg -coarsening-prolong 10 -e-ogb {3|1} -f-ogb {3|1} -no-cache
+class UAMGHarmonicExtensionTest : public ::testing::TestWithParam<std::tuple<int, int, int>>
+{
+};
+
+TEST_P(UAMGHarmonicExtensionTest, Converges)
+{
+	auto [k, elemOrthogonalization, faceOrthogonalization] = GetParam();
+	ProgramArguments args = KelloggLocalRefArgs(k, elemOrthogonalization, faceOrthogonalization);
+	args.Solver.MG.CoarseningProlongationCode = (int)UAMGProlongation::HarmonicExtensionOrInject;
+
+	ProgramResults results = RunDiffusionHHO(args);
+	EXPECT_GT(results.IterationCount, 0);
+	EXPECT_LE(results.IterationCount, 25);
+}
+
+INSTANTIATE_TEST_SUITE_P(Kellogg, UAMGHarmonicExtensionTest, ::testing::Values(
+	std::make_tuple(0, 1, 1), std::make_tuple(0, 3, 3), std::make_tuple(0, 3, 1), std::make_tuple(0, 1, 3),
+	std::make_tuple(1, 1, 1), std::make_tuple(1, 3, 3), std::make_tuple(1, 3, 1), std::make_tuple(1, 1, 3)));
+
+// HarmonicExtensionOrInject is a coarsening prolongation, chained over the passes: refused with another multigrid
+// prolongation.
+//   ./bin/fhhos4 -geo square -mesh cart -mesher inhouse -k 0 -n 16 -s fcguamg -coarsening-prolong 10 -prolong 6
+TEST(UAMGHarmonicExtension, OnlyChained)
+{
+	ProgramArguments args = SquareCartArgs(0, 16);
+	args.Solver.SolverCode = "fcguamg";
+	args.Solver.MG.CoarseningProlongationCode = (int)UAMGProlongation::HarmonicExtensionOrInject;
+	args.Solver.MG.ProlongationCode = (int)UAMGProlongation::ReconstructSmoothedTraceOrInject;
+	EXPECT_THROW(RunDiffusionHHO(args), fhhos4::Error);
+}
 
 #ifdef CGAL_ENABLED
 namespace
@@ -291,6 +334,31 @@ TEST_P(PolygonalMeshUAMGTest, Converges)
 
 INSTANTIATE_TEST_SUITE_P(SquarePoly, PolygonalMeshUAMGTest, ::testing::Values(
 	std::make_tuple(0, false), std::make_tuple(1, false), std::make_tuple(1, true)));
+
+// HarmonicExtensionOrInject on the same meshes: an aggregate of two polygons that share several faces has several
+// removed faces, coupled to each other, whose rows are solved together (at k=1 with -hp-cs h: blocks of 2 DoFs).
+//   ./bin/fhhos4 -geo square -mesh poly -polymesh-fcs n -k {0|1} -n 64 -s fcguamg -coarsening-prolong 10 [-hp-cs h] -threads 1
+class PolygonalMeshHarmonicExtensionTest : public ::testing::TestWithParam<std::tuple<int, bool>>
+{
+};
+
+TEST_P(PolygonalMeshHarmonicExtensionTest, Converges)
+{
+	auto [k, hOnly] = GetParam();
+	SequentialExecution sequential;
+	ProgramArguments args = SquarePolyArgs(FaceCoarseningStrategy::None, k, 64);
+	args.Solver.SolverCode = "fcguamg";
+	args.Solver.MG.CoarseningProlongationCode = (int)UAMGProlongation::HarmonicExtensionOrInject;
+	if (hOnly)
+		args.Solver.MG.HP_CS = HP_CoarsStgy::H_only;
+
+	ProgramResults results = RunDiffusionHHO(args, true, !hOnly);
+	EXPECT_GT(results.IterationCount, 0);
+	EXPECT_LE(results.IterationCount, 30);
+}
+
+INSTANTIATE_TEST_SUITE_P(SquarePoly, PolygonalMeshHarmonicExtensionTest, ::testing::Values(
+	std::make_tuple(0, false), std::make_tuple(1, true)));
 
 // The default coarsening strategy of the geometric multigrid on polygonal meshes was the independent
 // remeshing by GMSH (-cs m), which these meshes, built by agglomeration, don't support: the default

@@ -62,6 +62,8 @@ public:
 			os << "ReconstructTraceOrInject ";
 		else if (_coarseningProlong == UAMGProlongation::ReconstructSmoothedTraceOrInject)
 			os << "ReconstructSmoothedTraceOrInject ";
+		else if (_coarseningProlong == UAMGProlongation::HarmonicExtensionOrInject)
+			os << "HarmonicExtensionOrInject ";
 		os << "[-coarsening-prolong " << (unsigned)_coarseningProlong << "]" << endl;
 
 		os << "\t" << "Multigrid prolongation  : ";
@@ -97,7 +99,9 @@ public:
 	// cellInterpOfOne, faceInterpOfOne: interpolation of the function 1 on the polynomial bases of the cells and faces,
 	// one coefficient c per cell and per face (numbered as the blocks of rows and columns of A_T_F). The bases must be
 	// hierarchical with a constant first function phi_0: 1 = c phi_0. Used to correct a restrictive assumption of the
-	// paper, where c = 1 everywhere (see UncondensedLevel::CoarsenMesh()).
+	// paper, where c = 1 everywhere (see UncondensedLevel::CoarsenMesh()). The coarsening prolongation
+	// HarmonicExtensionOrInject doesn't use A_T_T, and cellInterpOfOne only enters the couplings of the aggregation
+	// (see UncondensedLevel::UsesCellBlocks()).
 	void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_T, const SparseMatrix& A_F_F, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
 	{
 		if (cellInterpOfOne.rows() != A_T_F.rows() / _cellBlockSize || faceInterpOfOne.rows() != A_T_F.cols() / _faceBlockSize)
@@ -136,6 +140,7 @@ public:
 			this->H_CS = H_CoarsStgy::MultiplePairwiseAggregation;
 		if (this->H_CS == H_CoarsStgy::MultiplePairwiseAggregation && this->CoarseningFactor == 0)
 			this->CoarseningFactor = 3.8;
+		fine->CheckHarmonicExtension(this->H_CS, this->FaceCoarseningStgy);
 
 		Multigrid::Setup(A);
 
@@ -197,6 +202,7 @@ public:
 			this->H_CS = H_CoarsStgy::MultiplePairwiseAggregation;
 		if (this->H_CS == H_CoarsStgy::MultiplePairwiseAggregation && this->CoarseningFactor == 0)
 			this->CoarseningFactor = 3.8;
+		fine->CheckHarmonicExtension(this->H_CS, this->FaceCoarseningStgy);
 
 		Multigrid::Setup(A);
 

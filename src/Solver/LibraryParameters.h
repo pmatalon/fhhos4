@@ -53,6 +53,17 @@ private:
 		return pCoarsenings;
 	}
 
+	// The prolongations of the h-coarsening of the library, the coarsening prolongations of the program
+	// (-coarsening-prolong; the multigrid prolongation chains them)
+	static const Table<fhhos4::Prolongation, UAMGProlongation>& Prolongations()
+	{
+		static const Table<fhhos4::Prolongation, UAMGProlongation> prolongations = {
+			{ fhhos4::Prolongation::Reconstruction,    UAMGProlongation::ReconstructSmoothedTraceOrInject },
+			{ fhhos4::Prolongation::HarmonicExtension, UAMGProlongation::HarmonicExtensionOrInject }
+		};
+		return prolongations;
+	}
+
 	// The coarse solvers of the library (Default: chosen by the library) and their codes in the program
 	// (-coarse-solver)
 	static const Table<fhhos4::CoarseSolver, string>& CoarseSolvers()
@@ -108,6 +119,11 @@ public:
 		return ToProgram(PCoarsenings(), pCoarsening, "PCoarsening");
 	}
 
+	static UAMGProlongation ProgramProlongation(fhhos4::Prolongation prolongation)
+	{
+		return ToProgram(Prolongations(), prolongation, "Prolongation");
+	}
+
 	// The code of the coarse solver (not Default)
 	static string ProgramCoarseSolver(fhhos4::CoarseSolver coarseSolver)
 	{
@@ -132,6 +148,14 @@ public:
 	static fhhos4::PCoarsening LibraryPCoarsening(P_CoarsStgy pCoarsening)
 	{
 		return *ToLibrary(PCoarsenings(), pCoarsening);
+	}
+
+	static fhhos4::Prolongation LibraryProlongation(UAMGProlongation coarseningProlongation)
+	{
+		optional<fhhos4::Prolongation> prolongation = ToLibrary(Prolongations(), coarseningProlongation);
+		if (!prolongation)
+			Utils::FatalError("The library fhhos4 has no coarsening prolongation " + to_string((unsigned)coarseningProlongation) + " (-coarsening-prolong): " + to_string((unsigned)UAMGProlongation::ReconstructSmoothedTraceOrInject) + " or " + to_string((unsigned)UAMGProlongation::HarmonicExtensionOrInject) + ".");
+		return *prolongation;
 	}
 
 	static fhhos4::CoarseSolver LibraryCoarseSolver(const string& coarseSolverCode)

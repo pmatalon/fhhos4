@@ -116,6 +116,24 @@ def test_uncondensed_nonsymmetric():
     assert RelativeError(np.concatenate([x_T, x_F]), x) < 1e-8
 
 
+def test_prolongations():
+    # Both prolongations (HarmonicExtension: the default), symmetric and non-symmetric
+    for prolongation, asymmetry in ((p, a) for p in (fhhos4.Prolongation.HarmonicExtension, fhhos4.Prolongation.Reconstruction) for a in (0.0, 0.3)):
+        system = HybridSystem(32, asymmetry)
+        solver = ToySolver()
+        solver.Prolongation = prolongation
+        if asymmetry == 0:
+            solver.SetupSymmetric(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+        else:
+            solver.SetupNonsymmetric(system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+        assert solver.NumberOfLevels() > 1
+        x_T, x_F = np.zeros(system.b_T.size), np.zeros(system.b_F.size)
+        result = solver.Solve(system.b_T, system.b_F, x_T, x_F)
+        assert result.Converged and result.Iterations < 50, result
+        x = spla.spsolve(system.Uncondensed(), np.concatenate([system.b_T, system.b_F]))
+        assert RelativeError(np.concatenate([x_T, x_F]), x) < 1e-8
+
+
 def test_condensed():
     system = HybridSystem(32)
     solver = ToySolver()
@@ -247,6 +265,7 @@ def test_parameters():
     solver = fhhos4.Solver()
     assert solver.Krylov == fhhos4.Krylov.Default and solver.Cycle == fhhos4.Cycle.K
     assert solver.PCoarsening == fhhos4.PCoarsening.Minus2 and solver.Tolerance == 1e-8
+    assert solver.Prolongation == fhhos4.Prolongation.HarmonicExtension
     solver.PCoarsening = fhhos4.PCoarsening.ToZero
     solver.PreSmoother = fhhos4.Smoother.BlockGaussSeidel
     assert solver.PCoarsening == fhhos4.PCoarsening.ToZero and solver.PreSmoother == fhhos4.Smoother.BlockGaussSeidel

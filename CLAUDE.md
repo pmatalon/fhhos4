@@ -77,7 +77,7 @@ From `build/`:
 ctest --output-on-failure
 ```
 
-221 tests, ~5 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
+241 tests, ~5 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
 iteration counts of the papers in `reproducibility/` — see `tests/README.md`. Covers
 `Program_Diffusion_HHO` and `Program_BiHarmonic_HHO` (HHO, static condensation), 2D/3D,
 in-house, GMSH and polygonal meshes, and the library (`UAMGLibrary*`, ~15 s). Not covered: DG/FEM programs (disabled by default), `lu`/`cg`/`agmg`/`p_mg` solvers,
@@ -167,7 +167,7 @@ and post-smoothing), K-cycle with GCR. Implementation `library/Solver.cpp`, comp
 `-fvisibility=hidden` (only the public API is exported). It builds the solver as the program does
 (`AlgebraicSolverFactory`, `ApplyUncondensedAMGDefaults`): its path must not include mesh or discretization headers,
 nor read the global `Utils::ProgramArgs`. Its parameters with a choice are enums (`fhhos4::Krylov`, `Cycle`, `PCoarsening`,
-`Smoother`, `CoarseSolver`; no strings), as the program's multigrid parameters (`SmootherType`, `CycleType`, `P_CoarsStgy` in `Utils/Types.h`; the
+`Smoother`, `Prolongation`, `CoarseSolver`; no strings), as the program's multigrid parameters (`SmootherType`, `CycleType`, `P_CoarsStgy`, `UAMGProlongation` in `Utils/Types.h`; the
 CLI codes in `SmootherFactory`, the coarse solver stays a solver code): `Solver/LibraryParameters.h` maps them both
 ways (one table per parameter), for `library/Solver.cpp` and `LibraryUAMG.cpp`. U-AMG is a non-linear preconditioner with the K-cycle: the Krylov method is
 inside the library (`Krylov`: FCG by default, GCR, BiCGSTAB with a V/W-cycle only, or none), which gives no cycle
@@ -275,6 +275,17 @@ waits inside the setup for the others' preparation of the inputs (1.4-1.8 s meas
 - Interpolation of 1 (one coefficient c per cell and per face, 1 = c phi_0; the same on the p-levels): the AMG rescales
   the constant modes before the h-coarsening (`UncondensedLevel::CoarsenMesh()`): without it, L2-orthonormal bases slow
   it down (Cube-tet n=16, k=0: 44 iterations instead of 26) or make it fail (graded meshes).
+- Coarsening prolongation `HarmonicExtensionOrInject` (`-coarsening-prolong 10`, `Prolongation::HarmonicExtension`;
+  2026-10-22; the library's default, the user's decision; the program keeps P_F, the papers'): the removed faces of an aggregate by the local solve of their rows of S, the kept faces injected
+  (the paper's Q_F^smooth or P_F with omega = 1; several removed faces: a dense LU, `CoarseningPass::ComputeProlongation()`).
+  No cell value: no Theta, no coarse `A_TT` (null on the coarse levels, not rescaled nor extracted for the p-levels:
+  `UncondensedLevel::UsesCellBlocks()`); flat passes and chained only (`CheckHarmonicExtension()`, at the setup). The
+  cells' interpolation of 1 still rescales `A_TF` for the couplings (the aggregates of P_F). The rows of S on the removed
+  faces are added directly into the local system (no merge of the rows, any order of the sums). Measured
+  (`PERFORMANCE.md`): setup -3..-21% (1 thread), -2..-9% (8 threads), iterations within 1-2 mostly (up to +6 on
+  Heterog1e8 n=256, -3 elsewhere); with ones for the cells, 0-4 more iterations at k=0 (P_F: up to x2.3); the faces'
+  interpolation stays needed (`Q_F`'s injections). The chained P of a level costs 11-35% of the setup (next idea in
+  `PERFORMANCE.md`).
 - Non-symmetric matrix: couplings from the averages of the traces of `A_TF(T, F)` and `A_FT(F, T)`; the couplings of
   the rows of the matrix (as AGMG's strong couplings, from `A_TF(T1, F)` and `A_FT(F, T2)`) cost 20% more iterations
   on HArDCore3D's diffusion-dominated convection-diffusion at k = 0, more without the downwind order. Reconstruction
@@ -400,7 +411,8 @@ Three READMEs, each for its readers; keep them up to date in the same commit as 
     files (`PERFORMANCE.md`, tests): they go in "U-AMG: details and measurements" above or in `PERFORMANCE.md`;
   - the parameters table gives the library's own defaults (`library/include/fhhos4.h` and `library/Solver.cpp`:
     `Arguments()`, `CheckParameters()`, `DefaultPreSmoother()`), which differ from the program's (smoother on several
-    threads, true residual, the defaults of the non-symmetric case): read them in the code, never from the program;
+    threads, true residual, the prolongation, the defaults of the non-symmetric case): read them in the code, never
+    from the program;
   - any change of the public interface (`library/include/*`: a setup or solve function, a parameter, its default or
     its accepted values, an input requirement, an error) or of the library's build, install or CMake package updates
     `README_library.md` and the comments of `fhhos4.h`, which document the same interface; a version change updates
