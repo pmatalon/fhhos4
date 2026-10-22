@@ -269,6 +269,9 @@ of the local matrices of the aggregates is the global product `P^T S P` (to 1e-1
 Tests of the coarsening passes of U-AMG on flat arrays (`src/Solver/Multigrid/UncondensedAMG/CoarseningPass.h`), which
 run with the default options and most others (`UncondensedLevel::FlatPassesApply()`): they must build exactly the
 hierarchy of the reference implementation (`HybridAlgebraicMesh`, run with `UncondensedLevel::UseFlatPasses = false`).
+These comparisons keep the product P of the prolongations of the passes, as the reference
+(`UncondensedLevel::KeepPassProlongations = false`); the last two items test the transfers by the prolongations of the
+passes, which replace P on the levels with blocks of faces of at least 2 DoFs.
 
 - **`CoarseningPassProgram/CoarseningPassProgramTest.SameAsReference`** (24 cases) — the same iteration count and L2
   error, bit for bit: Square-tri n=16 k=0,1, n=8 k=2 with `-hp-cs h`, n=16 k=0 with `-face-prolong 2` and
@@ -283,6 +286,14 @@ hierarchy of the reference implementation (`HybridAlgebraicMesh`, run with `Unco
   the bases), non-symmetric system with asymmetry 0.5, the coarse operators `Q_F^T A Q_F` (not Galerkin)) — on the
   32 x 32 system of `LocalMatricesTest.cpp`, on all the threads: the operators and prolongations of all the levels are
   the same, bit for bit.
+- **`CoarseningPass.PassProlongations*`** (3 cases: symmetric, rescaled bases, non-symmetric) — on the same system
+  (degree 0: the prolongations of the passes forced, `PassProlongationsMinFaceBlockSize = 1`), with the new
+  prolongation, the transfers by the prolongations of the passes against P: the same levels and operators, bit for bit,
+  P not computed, the prolongation and restriction of random vectors equal to 1e-13 relative, on all the threads.
+- **`PassProlongationsProgram/PassProlongationsProgramTest.SameAsChained`** (5 cases: Square-tri n=16 k=1, Cube-tet n=8
+  k=0 with orthonormal bases, with `-s gcruamg -uamg-nonsym`, with `-coarsening-prolong 10`, Cube-cart n=8 k=1 with
+  `-hp-cs h`; the prolongations of the passes forced at degree 0) — the program with the transfers by the prolongations
+  of the passes and with P: the same iteration count, the L2 error to 1e-8 relative. Sequential.
 
 ## `UAMGLibraryTest.cpp`
 

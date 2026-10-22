@@ -130,21 +130,11 @@ public:
 		{
 			Utils::Log() << "\t\tProlongation        : "; Utils::Log().flush();
 			SetupProlongation();
-			if (this->IsDistributed())
-				Utils::Log() << (this->DistributedP.Diag.rows() == 0 && this->P.rows() == 0 ? "matrix free" : "distributed") << endl;
-			else if (this->P.rows() == 0)
-				Utils::Log() << "matrix free" << endl;
-			else
-				Utils::Log() << Utils::MatrixInfo(this->P, "P") << endl;
+			Utils::Log() << ProlongationInfo() << endl;
 
 			Utils::Log() << "\t\tRestriction         : "; Utils::Log().flush();
 			SetupRestriction();
-			if (this->IsDistributed())
-				Utils::Log() << (this->DistributedP.Diag.rows() == 0 && this->R.rows() == 0 ? "matrix free" : "transpose of the prolongation") << endl;
-			else if (this->R.rows() == 0)
-				Utils::Log() << "matrix free" << endl;
-			else
-				Utils::Log() << Utils::MatrixInfo(this->R, "R") << endl;
+			Utils::Log() << RestrictionInfo() << endl;
 
 			Utils::Log() << "\t\tPreSmoothing        : "; Utils::Log().flush();
 			if (this->IsDistributed())
@@ -174,16 +164,35 @@ public:
 			this->ExportMatrix(A, "A");
 			
 			if (!this->IsCoarsestLevel())
-			{
-				this->ExportMatrix(P, "P");
-				this->ExportMatrix(R, "R");
-			}
+				ExportTransfers();
 		}
 
 		//if (FCG)
 			//FCG->Setup(A);
 
 		OnEndSetup();
+	}
+
+	// The printouts of the setup: the prolongation and the restriction
+	virtual string ProlongationInfo()
+	{
+		if (this->IsDistributed())
+			return this->DistributedP.Diag.rows() == 0 && this->P.rows() == 0 ? "matrix free" : "distributed";
+		return this->P.rows() == 0 ? "matrix free" : Utils::MatrixInfo(this->P, "P");
+	}
+
+	virtual string RestrictionInfo()
+	{
+		if (this->IsDistributed())
+			return this->DistributedP.Diag.rows() == 0 && this->R.rows() == 0 ? "matrix free" : "transpose of the prolongation";
+		return this->R.rows() == 0 ? "matrix free" : Utils::MatrixInfo(this->R, "R");
+	}
+
+	// The export of the prolongation and the restriction (-export mg)
+	virtual void ExportTransfers()
+	{
+		this->ExportMatrix(P, "P");
+		this->ExportMatrix(R, "R");
 	}
 
 	void ComputeGalerkinOperator()

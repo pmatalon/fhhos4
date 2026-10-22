@@ -77,8 +77,25 @@ private:
 	DistributedMatrix _distributedAc;
 	DistributedMatrix _extractedOperator;
 	SparseMatrix _extractedA_T_T, _extractedA_T_F;
+	// The prolongations of the coarsening passes of this level, P_1 (the faces of this level) to P_n (KeepPassProlongations),
+	// their transposes, and the intermediate vectors of the transfers (_transferBuffers[i]: the faces of the pass i,
+	// i = 1..n-1). Empty if the transfers use P (the product).
+	vector<SparseMatrix> _passP;
+	vector<SparseMatrix> _passR;
+	vector<Vector> _transferBuffers;
 public:
 	SparseMatrix Ac;
+
+	// The transfers of the levels built by the flat coarsening passes (on one process, with the chained coarsening
+	// prolongations), whose faces have at least PassProlongationsMinFaceBlockSize DoFs, apply the prolongations of the
+	// passes one after the other, P_1 (P_2 (... P_n e)), and their transposes, R_n (... (R_1 r)), instead of their
+	// product P: the same transfers up to rounding. With blocks (k = 2, -hp-cs h), P costs a third of the setup and has
+	// 80% more non-zeros than the factors: setup -32..-43%, transfers -26..-29%. At degree 0 (all the h-levels of the
+	// default p-then-h coarsening), the factors save the product (setup -3..-14%) but have many rows of one non-zero
+	// (the injections), and slow the transfers down (+27..+68%): P (PERFORMANCE.md). False: P everywhere, as the passes
+	// of HybridAlgebraicMesh (the reference of the tests).
+	inline static bool KeepPassProlongations = true;
+	inline static int PassProlongationsMinFaceBlockSize = 2;
 
 	// On several processes (MPI, DistributedOperator set): the local numbers of the faces of the columns of A_T_F, i.e.
 	// of the faces of the cells of the process: its own faces (those of the rows of the operator), then the others
@@ -235,7 +252,8 @@ public:
 		if (coarsestPossibleMeshReached)
 			return;
 
-		ScaleConstantRows(this->P, FaceInterpOfOne, _faceBlockSize);
+		// P = D_F P_z: the rows of P, or of the first prolongation of the passes (KeepPassProlongations)
+		ScaleConstantRows(_passP.empty() ? this->P : _passP[0], FaceInterpOfOne, _faceBlockSize);
 		if (ComputeQ_F)
 			ScaleConstantRows(this->Q_F, FaceInterpOfOne, _faceBlockSize);
 	}
@@ -574,6 +592,7 @@ public:
 
 	void CoarsenInFlatPasses(H_CoarsStgy coarseningStgy, double requestedCoarseningFactor, bool& coarsestPossibleMeshReached)
 	{
+		_passP.clear();
 		// The blocks of the current pass: those of the level, then those computed by the previous pass
 		const SparseMatrix* schur = this->OperatorMatrix;
 		const SparseMatrix* passA_T_T = UsesCellBlocks() ? this->A_T_T : nullptr; // null with HarmonicExtensionOrInject
@@ -600,12 +619,14 @@ public:
 			if (pass.Aggregate(allNeighbours))
 			{
 				coarsestPossibleMeshReached = true;
+				_passP.clear(); // no coarser level from these passes
 				return;
 			}
 			Utils::Log() << "\tInterface collapsing" << endl;
 			if (pass.CollapseInterfaces())
 			{
 				coarsestPossibleMeshReached = true;
+				_passP.clear(); // no coarser level from these passes
 				return;
 			}
 
@@ -641,7 +662,9 @@ public:
 			}
 			if (chained)
 			{
-				if (nCoarsenings == 0)
+				if (KeepPassProlongations && _faceBlockSize >= PassProlongationsMinFaceBlockSize)
+					_passP.push_back(std::move(passP)); // not chained: see KeepPassProlongations
+				else if (nCoarsenings == 0)
 					this->P = std::move(passP);
 				else
 					this->P = SparseMatrixOps::Multiply(this->P, passP);
@@ -1656,8 +1679,51 @@ public:
 		}
 		else if (this->IsDistributed())
 			this->DistributedP.SetupTransposed();
+		else if (!_passP.empty())
+		{
+			// R = P^T = P_n^T ... P_1^T: the transposes of the prolongations of the passes (R_i = P_i^T, fewer non-zeros
+			// than R), applied from the fine side (Restrict()). The intermediate vectors of the transfers: buffers.
+			_passR.resize(_passP.size());
+			for (size_t i = 0; i < _passP.size(); i++)
+				_passR[i] = SparseMatrixOps::Transpose(_passP[i]);
+			_transferBuffers.resize(_passP.size());
+			for (size_t i = 1; i < _passP.size(); i++)
+				_transferBuffers[i].resize(_passP[i].rows());
+		}
 		else
 			R = SparseMatrixOps::Transpose(P);
+	}
+
+	string ProlongationInfo() override
+	{
+		if (_passP.empty())
+			return Level::ProlongationInfo();
+		BigNumber nnz = 0;
+		for (const SparseMatrix& P_i : _passP)
+			nnz += P_i.nonZeros();
+		return "the prolongations of the " + to_string(_passP.size()) + " coarsening passes, size(P_1)=" + to_string(_passP.front().rows()) + "x" + to_string(_passP.front().cols())
+			+ ", ..., size(P_" + to_string(_passP.size()) + ")=" + to_string(_passP.back().rows()) + "x" + to_string(_passP.back().cols()) + ", nnz=" + to_string(nnz);
+	}
+
+	string RestrictionInfo() override
+	{
+		if (_passP.empty())
+			return Level::RestrictionInfo();
+		return "their transposes";
+	}
+
+	void ExportTransfers() override
+	{
+		if (_passP.empty())
+		{
+			Level::ExportTransfers();
+			return;
+		}
+		for (size_t i = 0; i < _passP.size(); i++)
+		{
+			this->ExportMatrix(_passP[i], "P" + to_string(i + 1));
+			this->ExportMatrix(_passR[i], "R" + to_string(i + 1));
+		}
 	}
 
 	Vector Prolong(Vector& vectorOnTheCoarserLevel) override
@@ -1673,6 +1739,17 @@ public:
 			for (BigNumber i = 0; i < nFaces; i++)
 				vectorOnThisLevel.segment(i*nHigherDegreeUnknowns, nLowerDegreeUnknowns) = vectorOnTheCoarserLevel.segment(i*nLowerDegreeUnknowns, nLowerDegreeUnknowns);
 			return vectorOnThisLevel;
+		}
+		else if (!_passP.empty())
+		{
+			// P_1 (P_2 (... P_n e)): e_{i-1} = P_i e_i, from the coarse vector e_n
+			const Vector* e = &vectorOnTheCoarserLevel;
+			for (size_t i = _passP.size() - 1; i > 0; i--)
+			{
+				_transferBuffers[i].noalias() = _passP[i] * *e;
+				e = &_transferBuffers[i];
+			}
+			return _passP[0] * *e;
 		}
 		else
 			return Level::Prolong(vectorOnTheCoarserLevel);
@@ -1692,6 +1769,17 @@ public:
 				vectorOnTheCoarserLevel.segment(i*nLowerDegreeUnknowns, nLowerDegreeUnknowns) = vectorOnThisLevel.segment(i*nHigherDegreeUnknowns, nLowerDegreeUnknowns);
 			return vectorOnTheCoarserLevel;
 		}
+		else if (!_passR.empty())
+		{
+			// R_n (... (R_1 r)): r_i = R_i r_{i-1}, from the vector r_0 of this level
+			const Vector* r = &vectorOnThisLevel;
+			for (size_t i = 0; i + 1 < _passR.size(); i++)
+			{
+				_transferBuffers[i + 1].noalias() = _passR[i] * *r;
+				r = &_transferBuffers[i + 1];
+			}
+			return _passR.back() * *r;
+		}
 		else
 			return Level::Restrict(vectorOnThisLevel);
 	}
@@ -1700,6 +1788,8 @@ public:
 	{
 		if (this->CoarserLevel->ComesFrom == CoarseningType::P)
 			return 0;
+		else if (!_passP.empty())
+			return PassesCost(_passP);
 		else
 			return Level::ProlongCost();
 	}
@@ -1708,8 +1798,18 @@ public:
 	{
 		if (this->CoarserLevel->ComesFrom == CoarseningType::P)
 			return 0;
+		else if (!_passR.empty())
+			return PassesCost(_passR);
 		else
 			return Level::RestrictCost();
+	}
+
+	static Flops PassesCost(const vector<SparseMatrix>& factors)
+	{
+		Flops cost = 0;
+		for (const SparseMatrix& M : factors)
+			cost += 2 * M.nonZeros();
+		return cost;
 	}
 
 	void OnEndSetup() override

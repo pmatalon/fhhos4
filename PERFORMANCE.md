@@ -1048,6 +1048,38 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
     `-hp-cs h` -3% / -7%; Square-tri k=0 n=256 -17% / -8%; Cube-cart-aniso100 -11% / -5%; Heterog1e8 -13% / -2%;
     Kellogg graded k=1 orthonormal -21% (1 thread).
 
+- **Transfers by the prolongations of the passes, P not chained** (2026-10-22, the user's request: "Let's do it now";
+  `UncondensedLevel::KeepPassProlongations`, `PassProlongationsMinFaceBlockSize`). The levels built by the flat passes
+  on one process keep the prolongations of their passes, P_1 ... P_n, instead of their product P (a
+  `SparseMatrixOps::Multiply()` per pass), and apply them one after the other: P_1 (P_2 (... P_n e)) for the
+  prolongation, R_n (... (R_1 r)) for the restriction, with R_i = P_i^T stored (the parallel transpose; the scatter
+  P_i^T r was measured slower) and the intermediate vectors kept by the level. The Galerkin products are unchanged (the
+  same operators, bit for bit), the transfers equal to rounding (`CoarseningPassTest`), the papers' iteration counts
+  unchanged. The harness on the dumps (`build/bench_mf/run_transfers.sh`, `table_transfers.py`; best of 2; P / the
+  passes; the multigrid alone as the solver, to 1e-8, so many transfers):
+
+  | System | Threads | Setup (s) | 100 transfers (s) | Solve (s) | Peak memory (GB) |
+  |---|---|---|---|---|---|
+  | Cube-tet k=0 n=32, P_F | 1 | 1.135 / 1.017 (-10%) | 0.636 / 0.809 (+27%) | 2.40 / 2.70 (+13%) | 0.23 / 0.20 |
+  | Cube-tet k=0 n=32, P_F | 8 | 0.376 / 0.350 (-7%) | 0.202 / 0.326 (+62%) | 1.90 / 2.00 (+5%) | 0.25 / 0.23 |
+  | Cube-tet k=0 n=32, new prolongation | 1 | 1.045 / 0.922 (-12%) | 0.611 / 0.854 (+40%) | 2.30 / 2.50 (+9%) | 0.23 / 0.20 |
+  | Cube-tet k=0 n=32, new prolongation | 8 | 0.370 / 0.357 (-3%) | 0.190 / 0.319 (+68%) | 1.80 / 2.00 (+11%) | 0.24 / 0.23 |
+  | Cube-tet k=2 n=16 `p_h`, new prolongation | 1 | 0.175 / 0.151 (-14%) | 0.080 / 0.104 (+30%) | 8.20 / 8.20 | 0.40 / 0.40 |
+  | Cube-tet k=2 n=16 `p_h`, new prolongation | 8 | 0.073 / 0.071 (-3%) | 0.038 / 0.059 (+55%) | 7.10 / 7.30 (+3%) | 0.40 / 0.40 |
+  | Cube-tet k=2 n=16 `-hp-cs h`, P_F | 1 | 2.563 / 1.730 (-32%) | 1.592 / 1.153 (-28%) | 15.9 / 15.0 (-6%) | 0.95 / 0.81 |
+  | Cube-tet k=2 n=16 `-hp-cs h`, P_F | 8 | 0.862 / 0.540 (-37%) | 0.706 / 0.500 (-29%) | 13.2 / 12.7 (-4%) | 1.06 / 0.88 |
+  | Cube-tet k=2 n=16 `-hp-cs h`, new prolongation | 1 | 2.232 / 1.460 (-35%) | 1.618 / 1.198 (-26%) | 16.0 / 15.3 (-4%) | 0.93 / 0.82 |
+  | Cube-tet k=2 n=16 `-hp-cs h`, new prolongation | 8 | 0.848 / 0.487 (-43%) | 0.710 / 0.508 (-28%) | 13.5 / 13.1 (-3%) | 1.07 / 0.85 |
+
+  With blocks (6 DoFs per face), P has 78% more non-zeros than the factors (9.6M vs 5.4M) and its product costs a third
+  of the setup: everything gains. At degree 0, P has only 29% more (2.11M vs 1.64M), and the factors have 570k rows,
+  many of one non-zero, against 318k for P (the restriction: 327k against 57k): the transfers lose more than the setup
+  gains, in an iterative solve. Hence the factors from blocks of 2 DoFs only (`PassProlongationsMinFaceBlockSize`): at
+  degree 0, all the h-levels of the default p-then-h coarsening, P as before (next idea 0).
+  The program, Cube-tet k=2 n=16 `-hp-cs h` (`build/bench_harmonic/program3` against `program2`, the same day), setup
+  1 / 8 threads, P_F: 2.28 -> 1.57 s (-31%) / 0.75 -> 0.51 s (-33%); the new prolongation: 2.20 -> 1.47 s (-33%) /
+  0.70 -> 0.46 s (-34%); the solve -1..-4%; the same iterations (35, 34).
+
 ## Distributed memory (MPI)
 
 U-AMG on several processes (`ENABLE_MPI`, see CLAUDE.md "MPI"). Measure with `scripts/perf/scaling_mpi.sh` (from
@@ -1212,6 +1244,13 @@ Galerkin products (see Done).
 
 ## Next ideas, by expected gain
 
+0. **Faster transfers by the prolongations of the passes at degree 0** — estimated, medium effort. Since 2026-10-22 the
+   levels with blocks keep the prolongations of their passes (see "Transfers by the prolongations of the passes" in
+   Done); at degree 0 their sparse products are slower than P's (+27..+68%), because the factors have many rows of one
+   non-zero (the injections of the kept faces) and the restriction runs over all the coarse faces of each pass (327k
+   rows against 57k for R at k=0 n=32). A kernel per pass: the kept faces as an index array (a gather for the
+   prolongation, a sum for the restriction), the removed rows in CSR, and the passes applied in one parallel region,
+   could make them win there too: the setup -3..-14% of the product, and 22% fewer non-zeros read.
 1. **`OMP_WAIT_POLICY=passive`** — measured, no code, results unchanged. k=2 (16 threads): solve 7.0-7.3 -> 6.2-6.3 s
    (-12%), setup unchanged or slightly better; k=0: no notable change. (`OMP_WAIT_POLICY=active` is much worse:
    solve 8.9 s.) libgomp reads it at startup, so it cannot be set from `main()`: set it in the environment, e.g.
@@ -1456,16 +1495,6 @@ Other candidates:
   (per-thread coarse vectors, then summed); k=2, 6.6 vs 6.3 ms and 4.9 vs 3.4 ms. Consecutive fine faces add into the
   same coarse entries (a dependency through memory), and the parallel version pays for its buffers and their sum.
   Keep R, unless memory runs short. This is not matrix-free: P is still stored (see the next item).
-- **Transfers by the prolongations of the passes, P not chained** — measured potential (2026-10-22, the setup profile
-  above): the chained P of a level (`SparseMatrixOps::Multiply(P, passP)` at each pass) and R = P^T are only used by
-  the transfers of the solve (the coarse operators come from the local Galerkin products, pass by pass, and need the
-  passes' P only). Their cost, 1 thread: chaining 0.13 s of 1.0-1.16 s at k=0 n=32 (11-13%), 0.015 s of 0.16-0.20 s
-  at k=2 `p_h` (8-9%), 0.76-0.79 s of 2.25-2.50 s at k=2 `-hp-cs h` (31-35%); R = P^T 0.02 s (2%), 0.002 s, 0.13 s
-  (5%). And the chained P has 29% (k=0: 2.11M vs 1.64M non-zeros for the 3 passes of level 0) to 78% (`-hp-cs h`:
-  9.6M vs 5.4M) more non-zeros than the passes' P together: applying the factors one after the other, P_1 (P_2
-  (P_3 e)), and their transposes, would read fewer coefficients (but 3 sparse products per transfer, with intermediate
-  vectors). Estimate: setup -10..-40% (1 thread), the solve's transfers (2-5% of the solve) -20..-40%. Rounding-level
-  differences: check the papers' iteration counts. Not with MPI at first (`DistributedP` is built from the chained P).
 - **Matrix-free prolongation** (P not stored, applied from its factors) — estimated, medium effort, small gain.
   Structure of P_F (`-prolong 6`, `BuildProlongation`): P = E_K Q_F + E_R J Y, with Y = E_R Π Θ + E_K Q_F. E_K and
   E_R select the rows of the kept faces (41-43% of the fine faces; Q_F injects the coarse face: 1 non-zero per row)

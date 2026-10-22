@@ -77,7 +77,7 @@ From `build/`:
 ctest --output-on-failure
 ```
 
-241 tests, ~5 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
+249 tests, ~5 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
 iteration counts of the papers in `reproducibility/` — see `tests/README.md`. Covers
 `Program_Diffusion_HHO` and `Program_BiHarmonic_HHO` (HHO, static condensation), 2D/3D,
 in-house, GMSH and polygonal meshes, and the library (`UAMGLibrary*`, ~15 s). Not covered: DG/FEM programs (disabled by default), `lu`/`cg`/`agmg`/`p_mg` solvers,
@@ -284,8 +284,13 @@ waits inside the setup for the others' preparation of the inputs (1.4-1.8 s meas
   faces are added directly into the local system (no merge of the rows, any order of the sums). Measured
   (`PERFORMANCE.md`): setup -3..-21% (1 thread), -2..-9% (8 threads), iterations within 1-2 mostly (up to +6 on
   Heterog1e8 n=256, -3 elsewhere); with ones for the cells, 0-4 more iterations at k=0 (P_F: up to x2.3); the faces'
-  interpolation stays needed (`Q_F`'s injections). The chained P of a level costs 11-35% of the setup (next idea in
-  `PERFORMANCE.md`).
+  interpolation stays needed (`Q_F`'s injections).
+- Transfers by the prolongations of the passes (2026-10-22): on the levels of the flat passes, on one process, whose
+  faces have blocks of at least 2 DoFs (`UncondensedLevel::PassProlongationsMinFaceBlockSize`), the prolongations of
+  the passes are kept and applied one after the other (and their transposes), without their product P: with
+  `-hp-cs h` at k=2, setup -32..-43%, transfers -26..-29%. At degree 0 (all the h-levels by default) the factors make the
+  transfers slower (many one-non-zero rows): P. `KeepPassProlongations = false`: P everywhere (the reference of
+  `CoarseningPassTest`).
 - Non-symmetric matrix: couplings from the averages of the traces of `A_TF(T, F)` and `A_FT(F, T)`; the couplings of
   the rows of the matrix (as AGMG's strong couplings, from `A_TF(T1, F)` and `A_FT(F, T2)`) cost 20% more iterations
   on HArDCore3D's diffusion-dominated convection-diffusion at k = 0, more without the downwind order. Reconstruction

@@ -9,6 +9,9 @@
 //   (an OpenMP reduction) and the polygonal meshes (their agglomeration) vary from one run to the next.
 // - CoarseningPass: the operators and prolongations of all the levels, on a symmetric and a non-symmetric system built
 //   here, on all the threads; also with the coarse operators Q_F^T A Q_F (not Galerkin).
+// The flat passes then keep the product P of their prolongations, as the reference (UncondensedLevel::
+// KeepPassProlongations = false). PassProlongations: the transfers by the prolongations of the passes (the default)
+// against P: the same operators, the same transfers up to rounding, the same iterations.
 #include <gtest/gtest.h>
 #include <cstring>
 #include <string>
@@ -25,6 +28,22 @@ namespace
 	{
 		ReferencePasses() { UncondensedLevel::UseFlatPasses = false; }
 		~ReferencePasses() { UncondensedLevel::UseFlatPasses = true; }
+	};
+
+	// The levels keep the product P of the prolongations of their passes during its lifetime, as the reference
+	struct ChainedProlongations
+	{
+		ChainedProlongations() { UncondensedLevel::KeepPassProlongations = false; }
+		~ChainedProlongations() { UncondensedLevel::KeepPassProlongations = true; }
+	};
+
+	// The levels keep the prolongations of their passes during its lifetime, also at degree 0 (by default, from blocks of
+	// 2 DoFs only)
+	struct PassProlongationsAtDegree0
+	{
+		int MinBlockSize = UncondensedLevel::PassProlongationsMinFaceBlockSize;
+		PassProlongationsAtDegree0() { UncondensedLevel::PassProlongationsMinFaceBlockSize = 1; }
+		~PassProlongationsAtDegree0() { UncondensedLevel::PassProlongationsMinFaceBlockSize = MinBlockSize; }
 	};
 }
 
@@ -107,6 +126,7 @@ TEST_P(CoarseningPassProgramTest, SameAsReference)
 		return results;
 	};
 
+	ChainedProlongations chained;
 	ProgramResults reference;
 	{
 		ReferencePasses referencePasses;
@@ -255,6 +275,7 @@ namespace
 			return HierarchyAccess(2, 0, 1, 1, 0.25, UAMGFaceProlongation::BoundaryAggregatesInteriorAverage,
 				UAMGProlongation::ReconstructSmoothedTraceOrInject, UAMGProlongation::ChainedCoarseningProlongations);
 		};
+		ChainedProlongations chained;
 		HierarchyAccess reference = create();
 		{
 			ReferencePasses referencePasses;
@@ -296,3 +317,142 @@ TEST(CoarseningPass, NotGalerkin)
 {
 	CheckLevels(0, 1, false);
 }
+
+//------------------------------------------------------------------------------------------------------------------//
+//                     The transfers by the prolongations of the passes (KeepPassProlongations)                      //
+//------------------------------------------------------------------------------------------------------------------//
+
+namespace
+{
+	// The prolongations of the passes against their product P: the same levels and operators (the Galerkin products use
+	// the passes' prolongations either way), the same transfers up to rounding. At degree 0: the passes' prolongations
+	// forced.
+	void CheckPassProlongations(double asymmetry, double constantCoordinate)
+	{
+		PassProlongationsAtDegree0 atDegree0;
+		CartesianHybridSystem system(32, asymmetry);
+		bool symmetric = asymmetry == 0;
+		auto create = []()
+		{
+			return HierarchyAccess(2, 0, 1, 1, 0.25, UAMGFaceProlongation::BoundaryAggregatesInteriorAverage,
+				UAMGProlongation::HarmonicExtensionOrInject, UAMGProlongation::ChainedCoarseningProlongations);
+		};
+		HierarchyAccess chained = create();
+		{
+			ChainedProlongations chainedProlongations;
+			Setup(chained, system, symmetric, constantCoordinate, true);
+		}
+		HierarchyAccess passes = create();
+		Setup(passes, system, symmetric, constantCoordinate, true);
+
+		ASSERT_EQ(passes.NumberOfLevels(), chained.NumberOfLevels());
+		ASSERT_GE(chained.NumberOfLevels(), 3);
+		Level* c = chained.Fine();
+		Level* p = passes.Fine();
+		for (int n = 0; c; n++, c = c->CoarserLevel, p = p->CoarserLevel)
+		{
+			EXPECT_TRUE(BitIdentical(*p->OperatorMatrix, *c->OperatorMatrix)) << "operator of level " << n;
+			if (!c->CoarserLevel)
+				continue;
+			EXPECT_EQ(LevelAccess::GetP(p).nonZeros(), 0) << "level " << n << ": P not computed";
+			EXPECT_GT(p->ProlongCost(), 0);
+			Vector e = Vector::LinSpaced(c->CoarserLevel->OperatorMatrix->rows(), -1, 2).array().sin();
+			Vector r = Vector::LinSpaced(c->OperatorMatrix->rows(), 0, 3).array().cos();
+			Vector Pe = c->Prolong(e), passesPe = p->Prolong(e);
+			Vector Rr = c->Restrict(r), passesRr = p->Restrict(r);
+			EXPECT_LE((passesPe - Pe).norm(), 1e-13 * Pe.norm()) << "prolongation of level " << n;
+			EXPECT_LE((passesRr - Rr).norm(), 1e-13 * Rr.norm()) << "restriction of level " << n;
+		}
+	}
+}
+
+TEST(CoarseningPass, PassProlongations)
+{
+	CheckPassProlongations(0, 1);
+}
+
+TEST(CoarseningPass, PassProlongationsRescaledBases)
+{
+	CheckPassProlongations(0, 0.5);
+}
+
+TEST(CoarseningPass, PassProlongationsNonsymmetric)
+{
+	CheckPassProlongations(0.5, 1);
+}
+
+// The program: the same iterations with the transfers by the prolongations of the passes as with P (also at degree 0,
+// forced). On 1 thread.
+//   ./bin/fhhos4 -geo square -mesh tri -n 16 -k 1 -s fcguamg -no-cache -threads 1 (etc.)
+class PassProlongationsProgramTest : public ::testing::TestWithParam<FlatPassCase>
+{
+};
+
+TEST_P(PassProlongationsProgramTest, SameAsChained)
+{
+	FlatPassCase c = GetParam();
+	SequentialExecution sequential;
+	PassProlongationsAtDegree0 atDegree0;
+	auto run = [&]()
+	{
+		ProgramArguments args;
+		args.Problem.GeoCode = c.Geo;
+		args.Discretization.MeshCode = c.Mesh;
+		if (!c.Mesher.empty())
+			args.Discretization.Mesher = c.Mesher;
+		args.Discretization.N = c.N;
+		args.Discretization.PolyDegree = c.K + 1;
+		if (c.Orthonormal)
+		{
+			args.Discretization.OrthogonalizeElemBasesCode = 3;
+			args.Discretization.OrthogonalizeFaceBasesCode = 3;
+		}
+		args.Solver.SolverCode = c.Nonsymmetric ? "gcruamg" : "fcguamg";
+		args.Solver.MG.UAMGNonsymmetric = c.Nonsymmetric;
+		args.Solver.MG.CoarseningProlongationCode = c.CoarseningProlong;
+		if (c.HCoarseningOfBlocks)
+			args.Solver.MG.HP_CS = HP_CoarsStgy::H_only;
+		args.Actions.UseCache = false;
+		return RunDiffusionHHO(args, true, !c.HCoarseningOfBlocks);
+	};
+	ProgramResults chained;
+	{
+		ChainedProlongations chainedProlongations;
+		chained = run();
+	}
+	ProgramResults passes = run();
+	EXPECT_GT(chained.IterationCount, 0);
+	EXPECT_LT(chained.IterationCount, 200);
+	EXPECT_EQ(passes.IterationCount, chained.IterationCount);
+	EXPECT_NEAR(passes.L2Error, chained.L2Error, 1e-8 * chained.L2Error);
+}
+
+std::vector<FlatPassCase> PassProlongationsCases()
+{
+	std::vector<FlatPassCase> cases;
+#ifdef ENABLE_2D
+	cases.push_back({ "Square_tri_n16_k1", "square", "tri", "", 16, 1 });
+#endif
+#ifdef ENABLE_3D
+	{
+		FlatPassCase c = { "Cube_tetra_n8_k0_orthonormal", "cube", "tetra", "", 8, 0 };
+		c.Orthonormal = true;
+		cases.push_back(c);
+	}
+	cases.push_back({ "Cube_cart_n8_k1_h", "cube", "cart", "inhouse", 8, 1, true });
+	{
+		FlatPassCase c = { "Cube_tetra_n8_k0_nonsym", "cube", "tetra", "", 8, 0 };
+		c.Nonsymmetric = true;
+		cases.push_back(c);
+	}
+	{
+		FlatPassCase c = { "Cube_tetra_n8_k0_cp10", "cube", "tetra", "", 8, 0 };
+		c.CoarseningProlong = 10;
+		cases.push_back(c);
+	}
+#endif
+	return cases;
+}
+
+INSTANTIATE_TEST_SUITE_P(PassProlongationsProgram, PassProlongationsProgramTest, ::testing::ValuesIn(PassProlongationsCases()),
+	[](const ::testing::TestParamInfo<FlatPassCase>& info) { return info.param.Name; });
