@@ -320,6 +320,13 @@ namespace fhhos4
 		// double precision. Only for a symmetric matrix, on one process, with the Chebyshev smoothers (the defaults);
 		// otherwise the levels are in double, as with false.
 		bool MixedPrecision = true;
+		// The operator of the levels whose faces have several DoFs (FaceDegree >= 1) stored by blocks (block CSR: one
+		// column index per block of coupled faces instead of one per coefficient) for the smoothers and the cycle: their
+		// passes over the matrix are 1.4-2.5x faster. Always so in mixed precision (MixedPrecision; no copy: instead of
+		// the copy in single precision). In double precision (MixedPrecision false), with true: at the cost of a copy of
+		// the condensed matrix A (about 2/3 of its memory). The Chebyshev smoothers (the defaults), on one process;
+		// otherwise in CSR.
+		bool BlockCSRStorage = false;
 
 		//-------------------- Execution -------------------//
 

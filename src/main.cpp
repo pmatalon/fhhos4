@@ -486,6 +486,12 @@ void print_usage() {
 	cout << "      h-levels, a non-symmetric matrix, smoothers other than Chebyshev, several processes, the exports of the" << endl;
 	cout << "      multigrid), the levels are in double. The library's default (fhhos4::Solver::MixedPrecision)." << endl;
 	cout << endl;
+	cout << "-uamg-bcsr" << endl;
+	cout << "      U-AMG in double precision with the operators of the levels whose faces have several DoFs (k >= 1) also" << endl;
+	cout << "      stored by blocks (block CSR: one column index per block of coupled faces) for the smoothers and the cycle:" << endl;
+	cout << "      faster passes over the matrices, at the cost of a copy of them. Always so in mixed precision (-uamg-mixed)." << endl;
+	cout << "      The Chebyshev smoothers (-smoothers bcheb4, bcheb), one process. fhhos4::Solver::BlockCSRStorage." << endl;
+	cout << endl;
 	cout << "-coarsening-factor NUM" << endl;
 	cout << "      Requested coarsening factor for the coarsening strategies compatible." << endl;
 	cout << "              Independent remeshing         (-cs m  ): coarsening factor H/h, default 2" << endl;
@@ -796,6 +802,7 @@ int Run(int argc, char* argv[])
 		OPT_UAMGNonsymmetric,
 		OPT_UAMGLibraryCondensed,
 		OPT_UAMGMixedPrecision,
+		OPT_UAMGBlockCSRStorage,
 		OPT_CoarseN,
 		OPT_ApproxL2ProjSubtriangulationMethod,
 		OPT_ApproxL2ProjNSubtriangulations,
@@ -900,6 +907,7 @@ int Run(int argc, char* argv[])
 		 { "uamg-nonsym", no_argument, NULL, OPT_UAMGNonsymmetric },
 		 { "libuamg-condensed", no_argument, NULL, OPT_UAMGLibraryCondensed },
 		 { "uamg-mixed", no_argument, NULL, OPT_UAMGMixedPrecision },
+		 { "uamg-bcsr", no_argument, NULL, OPT_UAMGBlockCSRStorage },
 		 { "coarse-n", required_argument, NULL, OPT_CoarseN },
 		 { "subtri-meth", required_argument, NULL, OPT_ApproxL2ProjSubtriangulationMethod },
 		 { "subtri", required_argument, NULL, OPT_ApproxL2ProjNSubtriangulations },
@@ -1554,6 +1562,9 @@ int Run(int argc, char* argv[])
 				break;
 			case OPT_UAMGMixedPrecision:
 				args.Solver.MG.UAMGMixedPrecision = true;
+				break;
+			case OPT_UAMGBlockCSRStorage:
+				args.Solver.MG.UAMGBlockCSRStorage = true;
 				break;
 			case OPT_CoarseN:
 				args.Solver.MG.CoarseN = stoul(optarg, nullptr, 0);

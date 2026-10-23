@@ -256,6 +256,21 @@ spectrum of `D^-1 A` spreads on (0, 2)), scalar and in blocks of 3:
   parallel loops), degree 3: the same estimate, iterate and residual on 1 and 4 threads, bit for bit.
 - **`ChebyshevSmootherTest.NotPositiveDefinite`** — `-A` is refused by the setup (negative diagonal, scalar; negative
   definite diagonal blocks).
+- **`ChebyshevSmootherTest.BlockCSR`** — the matrix stored by blocks (`SetupBlockCSR()`, block sizes 2, 3, 6 compiled
+  for, 7 at run time), degree 3: the estimate of `lambdaMax`, the iterate, the residual and `Ax` of the CSR setup, to
+  rounding (1e-13 and 1e-12 relative: the passes sum in the same order, Lanczos' products not); in single precision,
+  those of the CSR setup in single precision to 1e-5.
+
+## `BlockSparseMatrixTest.cpp`
+
+Unit tests of the block CSR storage (`src/Utils/BlockSparseMatrix.h`), on random sparse matrices of dense blocks (each
+block row coupled to itself and to 4 random blocks), whose product must be the CSR matrix's summed row by row in the order
+of the columns with one accumulator (as the smoothers' CSR kernels; Eigen 5's product uses two), bit for bit:
+- **`BlockSparseMatrixTest.UniformBlocks`** — blocks of 1, 2, 3, 4, 5, 6, 7, 10, 15 DoFs (the sizes compiled for and
+  others), on 1 and 4 threads; no zero added to full blocks.
+- **`BlockSparseMatrixTest.VariableBlocks`** — blocks of 1 to 6 DoFs (variable degrees); the diagonal blocks.
+- **`BlockSparseMatrixTest.MissingCoefficients`** — 30% of the coefficients missing: stored as zeros.
+- **`BlockSparseMatrixTest.SinglePrecision`** — in float (sums in double): the product to 1e-6.
 
 ## `LocalMatricesTest.cpp`
 
@@ -310,6 +325,12 @@ Tests of the library `fhhos4` (`library/`), the U-AMG of fhhos4 for other codes 
 
 - **`UAMGNonsymmetricProgram/UAMGNonsymmetricProgramTest.SameAsSymmetric`** (10 cases: the cases of `SameAsProgram`) — U-AMG for a non-symmetric matrix (`-uamg-nonsym`: `A_FT = A_TF^T` given, all the blocks in full) on the symmetric matrix of the problem, in the program (`gcruamg`) and through the library (`gcrlibuamg`: `SetupNonsymmetric()`, and `SetupNonsymmetricCondensed()` with `-libuamg-condensed`). It coarsens the symmetric part of the matrix (the matrix itself) and computes the Galerkin products of the matrix, equal to the symmetric ones up to rounding: it must get the iteration count and the L2 error (to 1e-6 relative) of the symmetric U-AMG (`gcruamg`).
   CLI: `./bin/fhhos4 -geo {square|cube} -mesh {tri|tetra|cart} -n {16|8} -k {0|1|2|3} -s {gcruamg|gcrlibuamg} [-p-cs =0] [-uamg-nonsym] [-libuamg-condensed] [-e-ogb 3 -f-ogb 3] -no-cache`
+
+- **`UAMGBlockCSRProgram/UAMGBlockCSRProgramTest.SameAsCSR`** (10 cases: the cases of `SameAsProgram`) — the operators
+  of the levels whose faces have several DoFs in block CSR in double (`-uamg-bcsr`, the library's `BlockCSRStorage`), with
+  the Chebyshev smoothers of the fourth kind of degree 2: in the program (`fcguamg`) and through both interfaces of the
+  library (`fcglibuamg`, with and without `-libuamg-condensed`), the iteration count of the CSR storage and its L2 error
+  (to 1e-10 relative; the estimates of `lambdaMax` differ at rounding).
 
 - **`UAMGMixedPrecisionProgram/UAMGMixedPrecisionProgramTest.SameInProgramAndLibrary`** (30 cases: the cases of `SameAsProgram` × `fcguamg`, `gcruamg`, `uamg`) — the levels of U-AMG in single precision (`-uamg-mixed`, the library's `MixedPrecision`), with the Chebyshev smoothers of the fourth kind of degree 2 (the library's default for a symmetric matrix; the single precision supports only them): in the program and through both interfaces of the library (`fcglibuamg`..., with and without `-libuamg-condensed`), the same iteration count and L2 error (to 1e-6 relative); against the levels in double (the same levels: the setup computes in double), the iteration count within 1 (equal in the 30 cases) and the same L2 error (to 1e-6 relative). `uamg`: the cycles alone, each one on the residual of the current solution, in double.
 

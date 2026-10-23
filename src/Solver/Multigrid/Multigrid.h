@@ -520,7 +520,6 @@ private:
 	void CycleIn(Level* level, const VectorOf<T>& b, VectorOf<T>& x, bool& xEquals0, VectorOf<T>* residual, VectorOf<T>* Ax, IterationResult& result)
 	{
 		constexpr bool single = std::is_same_v<T, float>;
-		const SparseMatrixOf<T>& A = *level->template OperatorOf<T>();
 
 		if constexpr (!single)
 		{
@@ -568,7 +567,7 @@ private:
 				// Smooth
 				level->PreSmoother->Smooth(x, b, xEquals0);                               result.AddWorkInMFlops(level->PreSmoother->SolvingComputationalWork());
 				// Residual computation
-				r = level->ResidualOf(b, x);                                              result.AddWorkInFlops(Cost::DAXPY(A));
+				r = level->ResidualOf(b, x);                                              result.AddWorkInFlops(Cost::DAXPY(level->template LocalOperatorNonZeros<T>()));
 			}
 			
 			if constexpr (!single)
@@ -687,7 +686,7 @@ private:
 				if (Ax)
 				{
 					// Residual computation
-					*Ax = level->Apply(x);                                            result.AddWorkInFlops(Cost::MatVec(A));
+					*Ax = level->Apply(x);                                            result.AddWorkInFlops(Cost::SpMatVec(level->template LocalOperatorNonZeros<T>()));
 					if (residual)
 					{
 						*residual = b - *Ax;                                          result.AddWorkInFlops(Cost::AddVec(b));
@@ -695,7 +694,7 @@ private:
 				}
 				else if (residual)
 				{
-					*residual = level->ResidualOf(b, x);                              result.AddWorkInFlops(Cost::DAXPY(A));
+					*residual = level->ResidualOf(b, x);                              result.AddWorkInFlops(Cost::DAXPY(level->template LocalOperatorNonZeros<T>()));
 				}
 			}
 

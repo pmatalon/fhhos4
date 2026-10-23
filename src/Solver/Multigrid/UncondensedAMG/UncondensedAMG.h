@@ -19,9 +19,15 @@ private:
 	LocalOperator _localOperator; // local matrices of the operators of the coarsening passes, during the setup
 	bool _symmetric = true;       // set by Setup(): see UncondensedLevel::Symmetric
 	FloatSparseMatrix _singleA;   // levels in single precision: the operator of the finest level (its smoothers, the cycle)
+	bool _blockCSR = false;       // the levels whose faces have several DoFs store their operator in block CSR
 public:
 	bool ManageAnisotropy = true; // see UncondensedLevel::ManageAnisotropy
 	bool DownwindOrdering = true; // see UncondensedLevel::DownwindOrdering
+	// In double precision, the operator of the cycle of the levels whose faces have several DoFs also stored by blocks
+	// (block CSR, see UncondensedLevel::BlockCSRStorage): faster smoothers, at the cost of a copy of the matrix (about 2/3
+	// of its memory). In mixed precision (MixedPrecision), always (no copy: instead of their CSR copy in float). The
+	// Chebyshev smoothers, on one process; otherwise in CSR (the reason printed).
+	bool BlockCSRStorage = false;
 
 
 	UncondensedAMG(int dim, int degree, int cellBlockSize, int faceBlockSize, double strongCouplingThreshold, UAMGFaceProlongation faceProlong, UAMGProlongation coarseningProlong, UAMGProlongation mgProlong, int nLevels = 0)
@@ -138,6 +144,8 @@ public:
 			this->_fineLevel = NewFineLevel();
 		}
 		UncondensedLevel* fine = dynamic_cast<UncondensedLevel*>(this->_fineLevel);
+		_blockCSR = this->_mixedPrecision || (BlockCSRStorage && BlockCSRApplies());
+		fine->BlockCSRStorage = _blockCSR;
 
 		// If the constant has coordinate 1 everywhere, as in the paper, no rescaling: the setup is unchanged
 		if ((cellInterpOfOne.array() != 1).any() || (faceInterpOfOne.array() != 1).any())
@@ -152,8 +160,9 @@ public:
 		fine->A_F_T = _symmetric ? nullptr : &A_F_T;
 		fine->A_F_F = A_F_F.rows() > 0 ? &A_F_F : nullptr;
 		// The levels in single precision: the copy of the operator of the finest level, the only one (the setup reads A in
-		// double, which stays the matrix of the outer Krylov method and of the residuals)
-		if (this->_mixedPrecision)
+		// double, which stays the matrix of the outer Krylov method and of the residuals), in block CSR if its faces have
+		// several DoFs (UncondensedLevel::OnStartSetup()), in CSR otherwise
+		if (this->_mixedPrecision && !(_blockCSR && _faceBlockSize > 1))
 		{
 			_singleA = SparseMatrixOps::Cast<float>(A);
 			fine->SingleOperatorMatrix = &_singleA;
@@ -204,7 +213,10 @@ public:
 		_symmetric = true;
 		if (this->MixedPrecision)
 			Utils::Log() << "\tLevels in double precision: the mixed precision does not support several processes" << endl;
+		if (BlockCSRStorage)
+			Utils::Log() << "\tOperators in CSR: the block CSR storage does not support several processes" << endl;
 		this->_mixedPrecision = false;
+		_blockCSR = false;
 
 		this->_fineLevel = NewFineLevel();
 		UncondensedLevel* fine = dynamic_cast<UncondensedLevel*>(this->_fineLevel);
@@ -270,8 +282,7 @@ private:
 	{
 		auto smootherSupports = [this](SmootherType type, int iterations)
 		{
-			unique_ptr<Smoother> smoother(SmootherFactory::Create(type, iterations, this->BlockSizeForBlockSmoothers, this->RelaxationParameter));
-			return smoother->SupportsSinglePrecision();
+			return unique_ptr<Smoother>(SmootherFactory::Create(type, iterations, this->BlockSizeForBlockSmoothers, this->RelaxationParameter))->SupportsSinglePrecision();
 		};
 		string unsupported;
 		if (!_symmetric)
@@ -287,6 +298,22 @@ private:
 		if (!unsupported.empty())
 			Utils::Log() << "\tLevels in double precision: the mixed precision does not support " << unsupported << endl;
 		return unsupported.empty();
+	}
+
+	// The block CSR storage in double (BlockCSRStorage): with smoothers that support it (Chebyshev); otherwise in CSR (the
+	// reason printed)
+	bool BlockCSRApplies() const
+	{
+		if (_faceBlockSize == 1) // no level has blocks
+			return false;
+		auto smootherSupports = [this](SmootherType type, int iterations)
+		{
+			return unique_ptr<Smoother>(SmootherFactory::Create(type, iterations, this->BlockSizeForBlockSmoothers, this->RelaxationParameter))->SupportsBlockCSR();
+		};
+		bool applies = smootherSupports(this->PreSmoother, this->PreSmoothingIterations) && smootherSupports(this->PostSmoother, this->PostSmoothingIterations);
+		if (!applies)
+			Utils::Log() << "\tOperators in CSR: the block CSR storage requires smoothers that support it (the Chebyshev smoothers)" << endl;
+		return applies;
 	}
 
 	// The finest level, in the precision of the levels, with the local matrices of the operators
@@ -306,6 +333,7 @@ private:
 		else
 			level = new UncondensedLevelOf<double>(number, degree, cellBlockSize, faceBlockSize, _strongCouplingThreshold, _faceProlong, _coarseningProlong, _multigridProlong);
 		level->ComputeCoarseA_F_F = A_F_FNeeded();
+		level->BlockCSRStorage = _blockCSR;
 		level->ComputeQ_F = ChainedQ_FNeeded();
 		level->ManageAnisotropy = ManageAnisotropy;
 		level->Symmetric = _symmetric;

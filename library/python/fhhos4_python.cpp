@@ -408,6 +408,7 @@ NB_MODULE(fhhos4, m)
 		.def_rw("CoarseMatrixMaxSize", &fhhos4::Solver::CoarseMatrixMaxSize)
 		.def_rw("CoarseSolver", &fhhos4::Solver::CoarseSolver)
 		.def_rw("MixedPrecision", &fhhos4::Solver::MixedPrecision)
+		.def_rw("BlockCSRStorage", &fhhos4::Solver::BlockCSRStorage)
 		// Execution
 		.def_rw("Threads", &fhhos4::Solver::Threads)
 		.def_rw("Verbosity", &fhhos4::Solver::Verbosity)

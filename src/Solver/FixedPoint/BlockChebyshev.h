@@ -52,6 +52,9 @@ private:
 	Precision<double> _double;
 	Precision<float> _single;
 	const FloatSparseMatrix* _singleMatrix = nullptr; // the matrix in single precision (SetupSinglePrecision())
+	// The matrix stored by blocks (block CSR, SetupBlockCSR()), in double or in single precision; null: in CSR
+	const BlockSparseMatrix<double>* _blockMatrix = nullptr;
+	const BlockSparseMatrix<float>* _singleBlockMatrix = nullptr;
 
 	template <typename T>
 	Precision<T>& In()
@@ -78,6 +81,28 @@ private:
 			return *_singleMatrix;
 		else
 			return *this->Matrix;
+	}
+
+	template <typename T>
+	const BlockSparseMatrix<T>* BlockMatrixOf() const
+	{
+		if constexpr (std::is_same_v<T, float>)
+			return _singleBlockMatrix;
+		else
+			return _blockMatrix;
+	}
+
+	// The numbers of rows and of non-zeros (stored coefficients) of the matrix in precision T, in CSR or block CSR
+	template <typename T>
+	BigNumber Rows() const
+	{
+		return BlockMatrixOf<T>() ? BlockMatrixOf<T>()->Rows() : MatrixOf<T>().rows();
+	}
+
+	template <typename T>
+	BigNumber NonZeros() const
+	{
+		return BlockMatrixOf<T>() ? BlockMatrixOf<T>()->NonZeros() : MatrixOf<T>().nonZeros();
 	}
 public:
 
@@ -117,6 +142,7 @@ public:
 	void Setup(const SparseMatrix& A) override
 	{
 		IterativeSolver::Setup(A);
+		_blockMatrix = nullptr;
 		SetupBlocks(A);
 	}
 
@@ -138,6 +164,28 @@ public:
 	void SetupSinglePrecision(const FloatSparseMatrix& A) override
 	{
 		_singleMatrix = &A;
+		_singleBlockMatrix = nullptr;
+		SetupBlocks(A);
+	}
+
+	// The matrix stored by blocks (block CSR, the blocks of the block size of the smoother: of size > 1), in double or
+	// in single precision (one process): the same iterations, faster passes (PassBlocks())
+	bool SupportsBlockCSR() const override
+	{
+		return !this->Distributed;
+	}
+
+	void SetupBlockCSR(const BlockSparseMatrix<double>& A) override
+	{
+		this->Matrix = nullptr;
+		_blockMatrix = &A;
+		SetupBlocks(A);
+	}
+
+	void SetupBlockCSR(const BlockSparseMatrix<float>& A) override
+	{
+		_singleMatrix = nullptr;
+		_singleBlockMatrix = &A;
 		SetupBlocks(A);
 	}
 
@@ -150,7 +198,6 @@ private:
 		if (!A.isCompressed())
 			Utils::FatalError("The Chebyshev smoothers require a compressed matrix (see Eigen's makeCompressed()).");
 
-		BigNumber nb = A.rows() / _blockSize;
 		if (_blockSize == 1)
 		{
 			VectorOf<T>& invDiag = In<T>().InvDiag;
@@ -173,11 +220,25 @@ private:
 		}
 		else
 			_diagBlockSolver.Setup(A, _blockSize);
+		EstimateLambdaMaxAndCost<T>();
+	}
 
+	template <typename T>
+	void SetupBlocks(const BlockSparseMatrix<T>& A)
+	{
+		if (_blockSize == 1 || A.BlockSize != _blockSize)
+			Utils::FatalError("The block CSR storage of a Chebyshev smoother requires blocks of its block size (" + to_string(_blockSize) + ", > 1), got " + to_string(A.BlockSize) + ".");
+		_diagBlockSolver.Setup(A, _blockSize);
+		EstimateLambdaMaxAndCost<T>();
+	}
+
+	template <typename T>
+	void EstimateLambdaMaxAndCost()
+	{
 		_lambdaMaxEstimate = EstimateLambdaMax<T>();
-
-		Flops lanczosIteration = Cost::MatVec(A) + 2 * _blockSize * A.rows() + 10 * A.rows();
-		this->SetupComputationalWork = (nb * 2.0/3.0*pow(_blockSize, 3) + EigenvalueEstimateIterations * lanczosIteration) * 1e-6;
+		BigNumber n = Rows<T>();
+		Flops lanczosIteration = Cost::SpMatVec(NonZeros<T>()) + 2 * _blockSize * n + 10 * n;
+		this->SetupComputationalWork = (n / _blockSize * 2.0/3.0*pow(_blockSize, 3) + EigenvalueEstimateIterations * lanczosIteration) * 1e-6;
 	}
 
 public:
@@ -190,6 +251,7 @@ public:
 		if (!o || o->Matrix != &A || o->Distributed || o->_blockSize != _blockSize || this->ComputeExactSolution)
 			return false;
 		IterativeSolver::Setup(A);
+		_blockMatrix = nullptr;
 		CopySetup(*o);
 		return true;
 	}
@@ -200,6 +262,29 @@ public:
 		if (!o || o->_singleMatrix != &A || o->_blockSize != _blockSize || this->ComputeExactSolution)
 			return false;
 		_singleMatrix = &A;
+		_singleBlockMatrix = nullptr;
+		CopySetup(*o);
+		return true;
+	}
+
+	bool SetupBlockCSRFrom(const BlockSparseMatrix<double>& A, const IterativeSolver& other) override
+	{
+		const BlockChebyshev* o = dynamic_cast<const BlockChebyshev*>(&other);
+		if (!o || o->_blockMatrix != &A || o->_blockSize != _blockSize || this->ComputeExactSolution)
+			return false;
+		this->Matrix = nullptr;
+		_blockMatrix = &A;
+		CopySetup(*o);
+		return true;
+	}
+
+	bool SetupBlockCSRFrom(const BlockSparseMatrix<float>& A, const IterativeSolver& other) override
+	{
+		const BlockChebyshev* o = dynamic_cast<const BlockChebyshev*>(&other);
+		if (!o || o->_singleBlockMatrix != &A || o->_blockSize != _blockSize || this->ComputeExactSolution)
+			return false;
+		_singleMatrix = nullptr;
+		_singleBlockMatrix = &A;
 		CopySetup(*o);
 		return true;
 	}
@@ -253,7 +338,7 @@ public:
 
 	void SolveInSinglePrecision(const FloatVector& b, FloatVector& x, bool xEquals0, FloatVector* residual, FloatVector* Ax) override
 	{
-		assert(this->MaxIterations > 0 && _singleMatrix);
+		assert(this->MaxIterations > 0 && (_singleMatrix || _singleBlockMatrix));
 		Flops flops = Iterate(b, x, xEquals0, residual, Ax);
 		this->IterationCount = this->MaxIterations;
 		this->SolvingComputationalWork = flops * 1e-6;
@@ -265,9 +350,8 @@ private:
 	template <typename T>
 	Flops Iterate(const VectorOf<T>& b, VectorOf<T>& x, bool xEquals0, VectorOf<T>* residual, VectorOf<T>* Ax)
 	{
-		const SparseMatrixOf<T>& A = MatrixOf<T>();
 		Precision<T>& W = In<T>();
-		BigNumber n = A.rows();
+		BigNumber n = Rows<T>();
 		int m = this->MaxIterations;
 		if (xEquals0 && x.rows() != n)
 			x.resize(n);
@@ -278,7 +362,7 @@ private:
 		W.d.resize(n);
 		W.dNext.resize(n);
 		W.r.resize(n);
-		Flops matVec = Cost::SpMatVec(A.nonZeros());
+		Flops matVec = Cost::SpMatVec(NonZeros<T>());
 		Flops update = (2 * _blockSize + 3) * n; // D^-1 r and the linear combination of d
 		Flops flops = 0;
 
@@ -361,6 +445,14 @@ private:
 	template <typename T>
 	void Pass(const T* v, const T* rIn, T* r, const T* dIn, T* dOut, double a, double c, T* x, bool xEquals0)
 	{
+		if (const BlockSparseMatrix<T>* blocks = BlockMatrixOf<T>())
+		{
+			DispatchBlockSize(blocks->BlockSize, [&](auto size)
+			{
+				PassBlocks<T, decltype(size)::value>(*blocks, v, rIn, r, dIn, dOut, a, c, x, xEquals0);
+			});
+			return;
+		}
 		const SparseMatrixOf<T>& A = MatrixOf<T>();
 		const SparseMatrixIndex* outer = A.outerIndexPtr();
 		const SparseMatrixIndex* col = A.innerIndexPtr();
@@ -452,18 +544,61 @@ private:
 		}
 	}
 
+	// Pass() on the matrix stored by blocks: the same operations by block rows, the same results; B the block size if
+	// it is known at compile time (DispatchBlockSize()), 0 otherwise
+	template <typename T, int B>
+	void PassBlocks(const BlockSparseMatrix<T>& A, const T* v, const T* rIn, T* r, const T* dIn, T* dOut, double a, double c, T* x, bool xEquals0)
+	{
+		const int bs = B > 0 ? B : _blockSize;
+		BigNumber nb = A.NBlocks();
+		#pragma omp parallel if (A.NonZeros() > 20000)
+		{
+			VectorOf<T> r_I(bs), z_I(bs); // work vectors, allocated once per thread
+			double acc[B > 0 ? B : BlockSparseMatrix<T>::MaxBlockSize];
+			#pragma omp for
+			for (BigNumber I = 0; I < nb; I++)
+			{
+				BigNumber i0 = I * bs;
+				if (v)
+				{
+					A.template RowResidual<B>(I, v, rIn, acc);
+					for (int k = 0; k < bs; k++)
+					{
+						r[i0 + k] = (T)acc[k];
+						r_I[k] = (T)acc[k];
+					}
+				}
+				else if (dOut)
+				{
+					for (int k = 0; k < bs; k++)
+						r_I[k] = rIn[i0 + k];
+				}
+				if (dOut)
+				{
+					_diagBlockSolver.Solve(I, r_I, z_I); // r_I destroyed
+					for (int k = 0; k < bs; k++)
+						dOut[i0 + k] = (T)((dIn ? a * dIn[i0 + k] : 0) + c * z_I[k]);
+				}
+				if (x)
+				{
+					for (int k = 0; k < bs; k++)
+						x[i0 + k] = xEquals0 ? dIn[i0 + k] : x[i0 + k] + dIn[i0 + k];
+				}
+			}
+		}
+	}
+
 	// z = D^-1 r, in precision T
 	template <typename T>
 	void ApplyInverseDiagonal(const VectorOf<T>& r, VectorOf<T>& z) const
 	{
-		const SparseMatrixOf<T>& A = MatrixOf<T>();
 		if (_blockSize == 1)
 		{
 			z = In<T>().InvDiag.cwiseProduct(r);
 			return;
 		}
-		BigNumber nb = A.rows() / _blockSize;
-		#pragma omp parallel if (A.nonZeros() > 20000)
+		BigNumber nb = Rows<T>() / _blockSize;
+		#pragma omp parallel if (NonZeros<T>() > 20000)
 		{
 			VectorOf<T> r_I(_blockSize), z_I(_blockSize);
 			#pragma omp for
@@ -484,8 +619,7 @@ private:
 	template <typename T>
 	double EstimateLambdaMax() const
 	{
-		const SparseMatrixOf<T>& A = MatrixOf<T>();
-		BigNumber n = A.rows();
+		BigNumber n = Rows<T>();
 		// On several processes: the global numbers of the rows, the products with the distributed matrix
 		BigNumber firstRow = this->Distributed ? this->Distributed->RowMap->Begin * this->Distributed->RowBlockSize : 0;
 		VectorOf<T> r(n), z(n), p, Ap(n);
@@ -500,15 +634,17 @@ private:
 		vector<double> alpha, beta;
 		for (int j = 0; j < EigenvalueEstimateIterations; j++)
 		{
-			if constexpr (std::is_same_v<T, double>)
+			if (const BlockSparseMatrix<T>* blocks = BlockMatrixOf<T>())
+				blocks->Multiply(p.data(), Ap.data());
+			else if constexpr (std::is_same_v<T, double>)
 			{
 				if (this->Distributed)
 					Ap = *this->Distributed * p;
 				else
-					Ap.noalias() = A * p;
+					Ap.noalias() = *this->Matrix * p;
 			}
 			else
-				Ap.noalias() = A * p;
+				Ap.noalias() = *_singleMatrix * p;
 			double pAp = Parallel::Dot(p, Ap);
 			if (!(pAp > 0))
 				Utils::FatalError("The Chebyshev smoothers require a symmetric positive definite matrix: p^T A p = " + to_string(pAp) + " in the estimation of its largest eigenvalue.");

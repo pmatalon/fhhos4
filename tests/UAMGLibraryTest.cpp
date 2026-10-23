@@ -6,6 +6,7 @@
 //   condensed one (-libuamg-condensed: the program condenses it).
 // - UAMGMixedPrecisionProgram: mixed precision (-uamg-mixed: the levels in single precision), in the program and through
 //   the library.
+// - UAMGBlockCSRProgram: the operators in block CSR in double (-uamg-bcsr), in the program and through the library.
 // - UAMGLibrary: the public API alone (<fhhos4>), on a hybrid system built here.
 #include <gtest/gtest.h>
 #include <algorithm>
@@ -52,9 +53,9 @@ inline std::ostream& operator<<(std::ostream& os, const LibraryCase& c)
 
 // The program on the case with the solver solverCode. nonsymmetric: -uamg-nonsym; libraryCondensed: -libuamg-condensed;
 // chebyshev: the Chebyshev smoothers of the fourth kind, degree 2 (the library's default for a symmetric matrix), instead
-// of the program's; mixedPrecision: -uamg-mixed.
+// of the program's; mixedPrecision: -uamg-mixed; blockCSR: -uamg-bcsr.
 ProgramResults RunCase(const LibraryCase& c, const std::string& solverCode, bool nonsymmetric = false, bool libraryCondensed = false,
-                       bool chebyshev = false, bool mixedPrecision = false)
+                       bool chebyshev = false, bool mixedPrecision = false, bool blockCSR = false)
 {
 	ProgramArguments args;
 	args.Problem.GeoCode = c.Geo;
@@ -81,6 +82,7 @@ ProgramResults RunCase(const LibraryCase& c, const std::string& solverCode, bool
 		args.Solver.MG.PostSmoothingIterations = 2;
 	}
 	args.Solver.MG.UAMGMixedPrecision = mixedPrecision;
+	args.Solver.MG.UAMGBlockCSRStorage = blockCSR;
 	args.Actions.UseCache = false;
 	return RunDiffusionHHO(args);
 }
@@ -213,6 +215,30 @@ INSTANTIATE_TEST_SUITE_P(UAMGMixedPrecisionProgram, UAMGMixedPrecisionProgramTes
 	{
 		return std::get<0>(info.param).Name + "_" + std::get<1>(info.param);
 	});
+
+// The operators in block CSR in double (-uamg-bcsr; with the Chebyshev smoothers, which support it): the same iterations
+// and solutions as in CSR (to rounding: Lanczos' estimates of lambdaMax), in the program (fcguamg) and through both
+// interfaces of the library (fcglibuamg, with and without -libuamg-condensed)
+class UAMGBlockCSRProgramTest : public ::testing::TestWithParam<LibraryCase>
+{
+};
+
+TEST_P(UAMGBlockCSRProgramTest, SameAsCSR)
+{
+	LibraryCase c = GetParam();
+	ProgramResults csr = RunCase(c, "fcguamg", false, false, true);
+	EXPECT_LT(csr.IterationCount, 200);
+	for (auto [code, libraryCondensed] : { std::pair{ "fcguamg", false }, { "fcglibuamg", false }, { "fcglibuamg", true } })
+	{
+		ProgramResults blockCSR = RunCase(c, code, false, libraryCondensed, true, false, true);
+		std::string label = std::string(code) + " -uamg-bcsr" + (libraryCondensed ? " -libuamg-condensed" : "");
+		EXPECT_EQ(blockCSR.IterationCount, csr.IterationCount) << label;
+		EXPECT_NEAR(blockCSR.L2Error, csr.L2Error, 1e-10 * csr.L2Error) << label;
+	}
+}
+
+INSTANTIATE_TEST_SUITE_P(UAMGBlockCSRProgram, UAMGBlockCSRProgramTest, ::testing::ValuesIn(LibraryCases()),
+	[](const ::testing::TestParamInfo<LibraryCase>& info) { return info.param.Name; });
 
 // -uamg-nonsym refuses FCG (symmetric matrices only)
 #ifdef ENABLE_2D

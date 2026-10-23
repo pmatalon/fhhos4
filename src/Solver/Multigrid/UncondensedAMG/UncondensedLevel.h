@@ -103,6 +103,11 @@ public:
 	// take its value instead of the average of the faces of their coarse element (see BuildQ_F()).
 	bool ManageAnisotropy = true;
 
+	// Set by UncondensedAMG: the operator of the cycle of the levels whose faces have several DoFs (but the coarsest)
+	// stored by blocks (block CSR, Level::BlockOperator), in the precision of the levels (OnStartSetup()): with the levels
+	// in single precision (instead of their CSR copy in float), or in double (UncondensedAMG::BlockCSRStorage: a copy)
+	bool BlockCSRStorage = false;
+
 	// Interpolation of the function 1 on the bases of the cells and faces of this level, one coefficient c per cell and
 	// per face (hierarchical bases with a constant first function phi_0: 1 = c phi_0), used to rescale the matrices
 	// before the h-coarsening (see CoarsenMesh()). The same on the p-coarse levels (same phi_0). Empty if c = 1
@@ -289,6 +294,7 @@ private:
 	// input of the setup of the coarser levels; in single precision, also rounded: the operator of the cycle)
 	SparseMatrix _extractedA, _extractedA_T_T, _extractedA_T_F, _extractedA_F_F, _extractedA_F_T;
 	FloatSparseMatrix _singleExtractedA;
+	BlockSparseMatrix<T> _blockOperator; // the operator of the cycle in block CSR (BlockCSRStorage)
 	vector<BigNumber> _downwindOrder; // non-symmetric matrix: the order of the faces in the sweeps of the smoothers
 	// On several processes (see FaceMap): the faces of A_T_Fc (the FaceMap of the coarser level), the coarse operator
 	// (that of the coarser level), and the operator of a p-coarse level
@@ -1353,8 +1359,11 @@ public:
 		this->OperatorMatrix = &_extractedA;
 		if constexpr (std::is_same_v<T, float>)
 		{
-			_singleExtractedA = SparseMatrixOps::Cast<float>(_extractedA);
-			this->SingleOperatorMatrix = &_singleExtractedA;
+			if (!UsesBlockCSR()) // otherwise in block CSR (OnStartSetup())
+			{
+				_singleExtractedA = SparseMatrixOps::Cast<float>(_extractedA);
+				this->SingleOperatorMatrix = &_singleExtractedA;
+			}
 		}
 		// HarmonicExtensionOrInject: no A_T_T (UsesCellBlocks())
 		if (UsesCellBlocks())
@@ -1721,6 +1730,23 @@ public:
 		}
 		Utils::Log() << endl;
 		SetupDownwindOrder();
+
+		// The operator of the cycle in block CSR, from the operator in double (that of the setup), or from the one in
+		// single precision on the h-levels in single precision (which have no other)
+		if (UsesBlockCSR() && !this->IsCoarsestLevel())
+		{
+			if (this->OperatorMatrix)
+				_blockOperator = BlockSparseMatrix<T>::FromCSR(*this->OperatorMatrix, _faceBlockSize);
+			else
+				_blockOperator = BlockSparseMatrix<T>::FromCSR(*this->SingleOperatorMatrix, _faceBlockSize);
+			this->template BlockOperatorOf<T>() = &_blockOperator;
+		}
+	}
+
+	// The operator of the cycle of this level in block CSR (its faces have several DoFs)
+	bool UsesBlockCSR() const
+	{
+		return BlockCSRStorage && _faceBlockSize > 1 && !this->IsDistributed();
 	}
 
 	// Non-symmetric matrix: the downwind order of the faces, followed by all the sweeps of the smoothers (pre- and

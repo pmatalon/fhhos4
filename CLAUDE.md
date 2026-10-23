@@ -77,7 +77,7 @@ From `build/`:
 ctest --output-on-failure
 ```
 
-281 tests, ~5 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
+296 tests, ~5 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
 iteration counts of the papers in `reproducibility/` — see `tests/README.md`. Covers
 `Program_Diffusion_HHO` and `Program_BiHarmonic_HHO` (HHO, static condensation), 2D/3D,
 in-house, GMSH and polygonal meshes, and the library (`UAMGLibrary*`, ~15 s). Not covered: DG/FEM programs (disabled by default), `lu`/`cg`/`agmg`/`p_mg` solvers,
@@ -364,6 +364,16 @@ processes; the adapter's `times["setup"]` is measured after one).
   chained prolongations and the Galerkin operators, no option needing `A_F_F` (p-levels after h-levels), the Chebyshev
   smoothers, no zero-mean/compatibility conditions nor exports; otherwise the levels are in double (the reason
   logged). Measurements: `PERFORMANCE.md`.
+- Block CSR storage (2026-10-23; `Utils/BlockSparseMatrix.h`; `Solver::BlockCSRStorage` in double, default false, the
+  user's decision; always with the mixed precision; the program's `-uamg-bcsr`): the operator of the cycle of the
+  levels whose faces have several DoFs (but the coarsest) stored by dense blocks, column-major, one column index per
+  block (`Level::BlockOperator`/`SingleBlockOperator`, built by `UncondensedLevelOf::OnStartSetup()` from the operator
+  in double; in mixed precision instead of the CSR copy in float, in double a copy). Used by the Chebyshev smoothers
+  (`BlockChebyshev::PassBlocks()`, Lanczos) and `Level::ResidualOf()/Apply()`. Block sizes per block row
+  (`BlockStart`: variable degrees, a future need, the user), all the same today; kernels templated on the block size,
+  instances for 2, 3, 4, 5, 6, 10, 15 (`DispatchBlockSize()`, once per pass) and a run-time-size one (any, variable): the
+  run-time sizes alone gave no gain (prototype, `PERFORMANCE.md`). The passes sum in the order of the CSR ones; Lanczos'
+  products differ (Eigen 5's sparse product sums with two accumulators): results equal to rounding, the same iterations.
 - GCR: restarted every 10 iterations, Notay's economical version (ETNA 37, 2010, Algorithm 3.1); the K-cycle then
   iterates with GCR. BiCGSTAB is not flexible: the setup refuses the K-cycle with it.
 - Default smoothers: block Chebyshev of the fourth kind, degree 2, for a symmetric matrix (below); for a

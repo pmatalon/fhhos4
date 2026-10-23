@@ -37,6 +37,7 @@ public:
 		_solver.CoarseMatrixMaxSize = mg.MatrixMaxSizeForCoarsestLevel;
 		_solver.CoarseSolver = LibraryParameters::LibraryCoarseSolver(mg.CoarseSolverCode);
 		_solver.MixedPrecision = mg.UAMGMixedPrecision; // the program's default: double (the papers)
+		_solver.BlockCSRStorage = mg.UAMGBlockCSRStorage;
 		_solver.Threads = Parallelism::NThreads(); // the setting of the program for its solvers (-threads, SolverThreads)
 		_solver.Verbosity = args.Solver.PrintIterationResults ? 2 : 1;
 #if FHHOS4_MPI

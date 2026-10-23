@@ -138,6 +138,7 @@ public:
 		SetMultigridParameters(mg, args, dim, blockSize, out, createCoarseSolver);
 		mg->CoarsePolyDegree = 0;
 		mg->ManageAnisotropy = args.Solver.MG.ManageAnisotropy;
+		mg->BlockCSRStorage = args.Solver.MG.UAMGBlockCSRStorage;
 		return mg;
 	}
 

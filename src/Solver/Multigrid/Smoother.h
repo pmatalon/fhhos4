@@ -56,6 +56,21 @@ public:
 			_solver->SetupSinglePrecision(A);
 	}
 
+	// The matrix stored by blocks (block CSR), in double or in single precision (see SupportsBlockCSR())
+	template <typename T>
+	void Setup(const BlockSparseMatrix<T>& A)
+	{
+		if (_solver->MaxIterations > 0)
+			_solver->SetupBlockCSR(A);
+	}
+
+	template <typename T>
+	void Setup(const BlockSparseMatrix<T>& A, const Smoother& setUpForA)
+	{
+		if (_solver->MaxIterations > 0 && !(setUpForA._solver->MaxIterations > 0 && _solver->SetupBlockCSRFrom(A, *setUpForA._solver)))
+			_solver->SetupBlockCSR(A);
+	}
+
 	// On several processes
 	void Setup(const DistributedMatrix& A)
 	{
@@ -83,6 +98,12 @@ public:
 	bool SupportsSinglePrecision() const
 	{
 		return _solver->MaxIterations == 0 || _solver->SupportsSinglePrecision();
+	}
+
+	// The matrix stored by blocks (block CSR)
+	bool SupportsBlockCSR() const
+	{
+		return _solver->MaxIterations == 0 || _solver->SupportsBlockCSR();
 	}
 
 	bool CanOptimizeResidualComputation()

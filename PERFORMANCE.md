@@ -1351,12 +1351,37 @@ Possible now that reordering the arithmetic operations is allowed (rejected so f
   `r_I = U_I (x_old - x_new)` (in exact arithmetic, since `D_I x_I(new) = b_I - L_I x(new) - U_I x(old)`); from
   x = 0, `r_I = -U_I x(new)`: half of the matrix instead of the full `b - A*x` (~8 ms per pre-smoothing on the fine
   level at k=2, i.e. ~0.15 s of the 3.7 s solve). The scalar `GaussSeidel` already computes its residual this way.
-- **Block CSR storage for k>=1** — estimated, large effort. One column index per block instead of one per
+- **Block CSR storage for k>=1** — done (2026-10-23, below; `Utils/BlockSparseMatrix.h`, always with the mixed
+  precision, `BlockCSRStorage` / `-uamg-bcsr` in double). One column index per block instead of one per
   coefficient (12 -> ~8 bytes per non-zero at k=2) and dense block-vector products (vectorizable): the solve kernels
   are memory-bound, so maybe -20-30% on the sweeps, residuals and intergrid transfers at k>=1. Sized by the profile
   of 2026-10-19 (Chebyshev, 8 threads, the fine SpMV at the machine's bandwidth): 5 fine products per iteration are
   61% of an iteration at k=2 in 3D (12 -> 8.1 bytes per non-zero with 6x6 blocks: solve ~-18%), 33% in 2D (3x3: 8.4
   bytes, ~-10%; the coarse levels, block size 1, are 31% there).
+  Prototype (2026-10-23, `build-python/profile/bcsr/bcsr_bench.cpp`, not in the repository; the condensed matrix of
+  the library on the exported NGSolve systems, library flags (no `-march`), median of 30): one block per pair of
+  coupled faces, column-major, one column index per block. The blocks are full (no stored zero): float 4.13 (6x6) /
+  4.53 (3x3) bytes per non-zero instead of 8.1-8.3 (double 8.1-8.5 instead of 12.1-12.3). The same summation order:
+  results bitwise those of CSR. 8 threads, float (the mixed precision), CSR -> block CSR with the block size known at
+  compile time (one instance per size, chosen by a switch once per call): product 3D k=2 3.32 -> 1.37 ms (x2.43), 2D
+  k=2 3.88 -> 1.81 ms (x2.14); the Chebyshev pass (`BlockChebyshev::Pass()`: residual, D^-1, updates) with the LU
+  solves of the blocks 4.21 -> 2.49 ms (x1.69) / 7.37 -> 4.95 ms (x1.49), with their inverses 1.99 ms (x2.11) / 2.91
+  ms (x2.53). 1 thread: pass x1.74 (LU) / x2.57 (inverses) in 3D, x1.21 / x3.03 in 2D. Double, 8 threads: pass
+  x1.42-1.59 (3D), x1.37-1.68 (2D). The block size read at run time (loops bounded by it): pass x1.07 (3D, LU) and
+  x1.02 (2D): no gain without the compile-time sizes. `-march=native`: the same on 8 threads. Building the blocks from
+  the double CSR, 8 threads: 57-68 ms against 12 ms for the float CSR copy (unoptimized: a sort per block row;
+  the first row of a block row gives its block columns when the blocks are full). Estimated from the 4 fine passes
+  per iteration: 3D k=2 27k cells 32 -> ~24 ms per iteration (inverses; ~25 with LU), 2D k=2 189k 76 -> ~58 ms
+  (inverses; ~66 with LU); BDDC / U-AMG end to end 0.79 -> ~0.9 (3D k=2), 0.81 -> ~0.88 (2D k=2).
+  In the library (2026-10-23, LU solves of the blocks as before; `bench/run_bcsr.sh`, `summary_bcsr.py 8`: the 12
+  NGSolve cases, 8 threads, the three modes alternated, best of 2): the same iterations in all the cases and modes.
+  Solve per iteration against double CSR: double block CSR x0.74-0.94, mixed precision (block CSR) x0.62-0.89 (mostly
+  0.64-0.77; it was x0.72-1.02 in CSR): 3D k=2 27k cells 36.5 -> 30.4 / 24.8 ms, 2D k=2 189k 84.7 -> 79.3 / 65.5 ms,
+  3D k=3 6k 26.7 -> 19.7 / 16.6 ms. Setup: double block CSR +0.02..+0.22 s (the copy), mixed precision unchanged (the
+  blocks instead of the CSR copy in float). BDDC / U-AMG end to end, double CSR -> mixed precision: 2D k=1 0.92-0.96
+  -> 0.99-1.08, k=2 0.61-0.77 -> 0.69-0.84, k=3 0.49-0.65 -> 0.65-0.66; 3D k=1 0.92-1.63 -> 1.07-1.83, k=2 0.63-0.72 ->
+  0.77-0.91, k=3 0.49-0.58 -> 0.66-0.73. Next: the inverses of the diagonal blocks in the Chebyshev passes (2D: the LU
+  solves of the 3x3 blocks cost as much as the product).
 - **`-DENABLE_NATIVE_ARCH=ON`** (AVX2, FMA) — to measure. FMA and wider vectors change the rounding (now allowed);
   the binary then only runs on CPUs like the build machine's.
 - **Inverse diagonal blocks** in the block smoothers (`DiagBlockSolveMethod::Inverse`, an existing option of

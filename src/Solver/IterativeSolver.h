@@ -1,6 +1,7 @@
 #pragma once
 #include "Solver.h"
 #include "IterationResult.h"
+#include "../Utils/BlockSparseMatrix.h"
 using namespace std;
 
 class IterativeSolver : public Solver
@@ -129,6 +130,27 @@ public:
 	}
 	// As SetupFrom()
 	virtual bool SetupSinglePrecisionFrom(const FloatSparseMatrix& A, const IterativeSolver& other)
+	{
+		return false;
+	}
+
+	// The matrix stored by blocks (block CSR, see BlockSparseMatrix), in double or in single precision (as
+	// SetupSinglePrecision()): the solvers that support it (the smoothers of U-AMG), instead of Setup()
+	virtual bool SupportsBlockCSR() const { return false; }
+	virtual void SetupBlockCSR(const BlockSparseMatrix<double>& A)
+	{
+		Utils::FatalError("This solver does not support the block CSR storage.");
+	}
+	virtual void SetupBlockCSR(const BlockSparseMatrix<float>& A)
+	{
+		Utils::FatalError("This solver does not support the block CSR storage.");
+	}
+	// As SetupFrom()
+	virtual bool SetupBlockCSRFrom(const BlockSparseMatrix<double>& A, const IterativeSolver& other)
+	{
+		return false;
+	}
+	virtual bool SetupBlockCSRFrom(const BlockSparseMatrix<float>& A, const IterativeSolver& other)
 	{
 		return false;
 	}

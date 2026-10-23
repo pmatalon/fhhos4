@@ -7,6 +7,7 @@
 #include <vector>
 #include <Eigen/Eigenvalues>
 #include "Solver/FixedPoint/BlockChebyshev.h"
+#include "Utils/SparseMatrixOps.h"
 
 namespace
 {
@@ -219,4 +220,45 @@ TEST(ChebyshevSmootherTest, NotPositiveDefinite)
 	auto block = std::make_unique<BlockChebyshev>(3, ChebyshevKind::Fourth);
 	block->MaxIterations = 2;
 	EXPECT_THROW(block->Setup(negativeBlocks), fhhos4::Error);
+}
+
+// The matrix stored by blocks (block CSR, SetupBlockCSR()): the same lambdaMax, iterate, residual and A x as in CSR, to
+// rounding (block sizes compiled for: 2, 3, 6; at run time: 7). The passes sum in the same order, but Lanczos' products
+// differ: Eigen 5's sparse product sums with two accumulators, and in single precision in float.
+TEST(ChebyshevSmootherTest, BlockCSR)
+{
+	for (int blockSize : { 2, 3, 6, 7 })
+	{
+		SparseMatrix A = SPDMatrix(blockSize, 30);
+		Vector b = Vector::LinSpaced(A.rows(), -1, 1);
+		Vector x0 = Vector::LinSpaced(A.rows(), 2, -3).array().sin().matrix();
+		std::string description = "block size " + std::to_string(blockSize);
+
+		auto csr = CreateChebyshev(A, blockSize, ChebyshevKind::Fourth, 3);
+		BlockSparseMatrix<double> blocks = BlockSparseMatrix<double>::FromCSR(A, blockSize);
+		auto bcsr = std::make_unique<BlockChebyshev>(blockSize, ChebyshevKind::Fourth);
+		bcsr->StoppingCrit = StoppingCriteria::MaxIterations;
+		bcsr->MaxIterations = 3;
+		bcsr->PrintIterationResults = false;
+		ASSERT_TRUE(bcsr->SupportsBlockCSR());
+		bcsr->SetupBlockCSR(blocks);
+		EXPECT_NEAR(bcsr->LambdaMaxEstimate(), csr->LambdaMaxEstimate(), 1e-13 * csr->LambdaMaxEstimate()) << description;
+		Vector x[2] = { x0, x0 };
+		csr->Solve(b, x[0], false, true, true);
+		bcsr->Solve(b, x[1], false, true, true);
+		EXPECT_LT((x[1] - x[0]).norm() / x[0].norm(), 1e-12) << description;
+		EXPECT_LT((bcsr->Residual - csr->Residual).norm() / csr->Residual.norm(), 1e-12) << description;
+		EXPECT_LT((bcsr->Ax - csr->Ax).norm() / csr->Ax.norm(), 1e-12) << description;
+
+		// Single precision
+		FloatSparseMatrix singleA = SparseMatrixOps::Cast<float>(A);
+		BlockSparseMatrix<float> singleBlocks = BlockSparseMatrix<float>::FromCSR(A, blockSize);
+		csr->SetupSinglePrecision(singleA);
+		bcsr->SetupBlockCSR(singleBlocks);
+		FloatVector singleB = b.cast<float>(), y[2] = { x0.cast<float>(), x0.cast<float>() }, residual[2];
+		csr->SolveInSinglePrecision(singleB, y[0], false, &residual[0], nullptr);
+		bcsr->SolveInSinglePrecision(singleB, y[1], false, &residual[1], nullptr);
+		EXPECT_LT((y[1] - y[0]).norm() / y[0].norm(), 1e-5) << description;
+		EXPECT_LT((residual[1] - residual[0]).norm() / residual[0].norm(), 1e-5) << description;
+	}
 }

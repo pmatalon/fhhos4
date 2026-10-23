@@ -1,4 +1,5 @@
 #pragma once
+#include "../../Utils/BlockSparseMatrix.h"
 #include "../../Utils/Types.h"
 #include "../../Utils/Parallelism.h"
 using namespace std;
@@ -37,9 +38,28 @@ public:
 	template <typename T>
 	void Setup(const SparseMatrixOf<T>& A, int blockSize, DiagBlockSolveMethod method = DefaultMethod, const vector<bool>* blocks = nullptr)
 	{
+		SetupFromBlocks<T>(A.rows() / blockSize, blockSize, method, blocks, [&](BigNumber i)
+		{
+			Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> DiT = A.block(i * blockSize, i * blockSize, blockSize, blockSize);
+			return DenseMatrix(DiT.template cast<double>());
+		});
+	}
+
+	// The same from a matrix stored by blocks of blockSize (all of them)
+	template <typename T>
+	void Setup(const BlockSparseMatrix<T>& A, int blockSize, DiagBlockSolveMethod method = DefaultMethod)
+	{
+		assert(A.BlockSize == blockSize);
+		SetupFromBlocks<T>(A.NBlocks(), blockSize, method, nullptr, [&](BigNumber i) { return A.DiagonalBlock(i); });
+	}
+
+private:
+	// diagonalBlock(i): the diagonal block i, in double
+	template <typename T, class DiagonalBlock>
+	void SetupFromBlocks(BigNumber nb, int blockSize, DiagBlockSolveMethod method, const vector<bool>* blocks, DiagonalBlock diagonalBlock)
+	{
 		_blockSize = blockSize;
 		_method = method;
-		BigNumber nb = A.rows() / blockSize;
 		Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& blocksT = BlocksIn<T>();
 		blocksT.resize(blockSize, nb * blockSize);
 		if (_method == DiagBlockSolveMethod::LU)
@@ -54,8 +74,7 @@ public:
 		{
 			if (blocks && !(*blocks)[i])
 				continue;
-			Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> DiT = A.block(i * _blockSize, i * _blockSize, _blockSize, _blockSize);
-			DenseMatrix Di = DiT.template cast<double>();
+			DenseMatrix Di = diagonalBlock(i);
 			Eigen::FullPivLU<DenseMatrix> lu(Di);
 			auto block = blocksT.middleCols(i * _blockSize, _blockSize);
 			if (_method == DiagBlockSolveMethod::Inverse)
@@ -73,6 +92,7 @@ public:
 		}
 	}
 
+public:
 	// x = D_i^{-1} b (b can have several columns), in the precision of b and x (that of the matrix of the setup).
 	// b is used as work space: its content is destroyed. x must not alias b.
 	template <class RhsT, class DestT>

@@ -342,6 +342,7 @@ namespace fhhos4
 			mg.MatrixMaxSizeForCoarsestLevel = s.CoarseMatrixMaxSize;
 			mg.CoarseSolverCode = LibraryParameters::ProgramCoarseSolver(CoarseSolver);
 			mg.UAMGMixedPrecision = s.MixedPrecision;
+			mg.UAMGBlockCSRStorage = s.BlockCSRStorage;
 			bool defaultCoarseOperator = true, defaultCycle = false, defaultHPCoarseningStgy = true;
 			ApplyUncondensedAMGDefaults(mg, s.FaceDegree, defaultCoarseOperator, defaultCycle, defaultHPCoarseningStgy);
 			return args;
