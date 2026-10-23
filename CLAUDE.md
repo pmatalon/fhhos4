@@ -377,7 +377,10 @@ processes; the adapter's `times["setup"]` is measured after one).
   The Chebyshev smoother applies the inverses of its diagonal blocks (`DiagBlockSolveMethod::Inverse`, computed in
   double; `ApplyInverseBlock()`, fused in the passes; the user's decision: in the smoothers, never in the static
   condensation, whose explicit inverses would limit the accuracy of the discretization): solve -3..-17% per iteration,
-  the same iterations; the other block smoothers and the coarsening's block Jacobi keep the LU solves.
+  the same iterations. So do the other block smoothers, Gauss-Seidel (hybrid too), SOR and Jacobi
+  (`BlockDiagonalSolver::SmootherMethod`; program with `bgs,rbgs`: solve x0.87-0.88, the papers' iteration counts
+  unchanged); the block Jacobi smoothing of the coarsening's prolongations keeps the LU solves (`DefaultMethod`);
+  `-diag-block-solve lu|inv` forces both.
 - GCR: restarted every 10 iterations, Notay's economical version (ETNA 37, 2010, Algorithm 3.1); the K-cycle then
   iterates with GCR. BiCGSTAB is not flexible: the setup refuses the K-cycle with it.
 - Default smoothers: block Chebyshev of the fourth kind, degree 2, for a symmetric matrix (below); for a

@@ -8,8 +8,9 @@ enum class DiagBlockSolveMethod : unsigned
 {
 	// The LU factorizations (with full pivoting) of the blocks are computed in the setup: each solve is a real (triangular) solve.
 	LU,
-	// The inverses of the blocks are computed in the setup: each solve is then a small matrix-vector product.
-	// Slightly faster (up to ~20% on the whole smoothing), but less accurate if the blocks are ill-conditioned.
+	// The inverses of the blocks are computed in the setup (by their LU factorizations: the solves of the identity, also
+	// for a singular block): each solve is then a small matrix-vector product. Faster (up to ~20% on the whole smoothing),
+	// but less accurate if the blocks are ill-conditioned.
 	Inverse
 };
 
@@ -18,6 +19,11 @@ enum class DiagBlockSolveMethod : unsigned
 class BlockDiagonalSolver
 {
 public:
+	// The method of the block smoothers (Gauss-Seidel, SOR, Jacobi; Chebyshev always the inverses): their rounding doesn't
+	// limit the accuracy of the solution, the smoothers being a part of the preconditioner
+	inline static DiagBlockSolveMethod SmootherMethod = DiagBlockSolveMethod::Inverse;
+	// The method of the other uses: the block Jacobi smoothing of the prolongations of U-AMG (in the setup, whose
+	// rounding enters the coarse operators)
 	inline static DiagBlockSolveMethod DefaultMethod = DiagBlockSolveMethod::LU;
 
 private:

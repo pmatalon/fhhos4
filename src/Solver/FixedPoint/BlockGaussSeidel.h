@@ -79,7 +79,7 @@ private:
 	void SetupLocal(const SparseMatrix& A)
 	{
 		auto nb = A.rows() / _blockSize;
-		this->diagBlockSolver.Setup(A, _blockSize);
+		this->diagBlockSolver.Setup(A, _blockSize, BlockDiagonalSolver::SmootherMethod);
 		_diagBlock.Setup(A, _blockSize);
 		SetupSamePattern();
 		_chunks.Clear();

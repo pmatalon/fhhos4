@@ -1392,8 +1392,14 @@ Possible now that reordering the arithmetic operations is allowed (rejected so f
   3D k=1 1.21-2.00, k=2 0.82-0.93, k=3 0.70-0.78.
 - **`-DENABLE_NATIVE_ARCH=ON`** (AVX2, FMA) — to measure. FMA and wider vectors change the rounding (now allowed);
   the binary then only runs on CPUs like the build machine's.
-- **Inverse diagonal blocks** in the block smoothers (`DiagBlockSolveMethod::Inverse`, an existing option of
-  `BlockDiagonalSolver`, not the default): the solve of a 6x6 block becomes a matrix-vector product, without the
+- **Inverse diagonal blocks** in the block smoothers — done (2026-10-23, the user's decision: in all the block smoothers,
+  not in the block Jacobi smoothing of the prolongations nor in the static condensation): Chebyshev fused in its passes
+  (see "Block CSR storage"), Gauss-Seidel (also hybrid), SOR and Jacobi by `BlockDiagonalSolver::SmootherMethod =
+  Inverse` (`-diag-block-solve lu|inv` forces both uses). `FullPivLU::inverse()` is the LU solve of the identity: a
+  singular block gives the map of the LU solve, as before. The test suite unchanged (the papers' iteration counts, with
+  `bgs,rbgs`); the program with `bgs,rbgs` (fcguamg, 8 threads, best of 3 interleaved): Square-tri n=64 k=2 18
+  iterations, solve 0.768 -> 0.671 s (x0.87), Cube-tet n=8 k=2 32 iterations, 1.854 -> 1.630 s (x0.88).
+  Before (`DiagBlockSolveMethod::Inverse`, an existing option of `BlockDiagonalSolver`, not the default): the solve of a 6x6 block becomes a matrix-vector product, without the
   chain of divisions of the LU solve. Measured (micro-benchmark, k=2 n=16): block solves of a fine sweep 3.2-3.8 ->
   1.1 ms, fine sweeps x1.11-1.24, level-1 sweeps x1.06-1.13 (~5% of the solve); results differ by ~1e-16 (relative).
   Using the inverse of the diagonal is allowed, but the LU solve also handles singular blocks (rank < block size),

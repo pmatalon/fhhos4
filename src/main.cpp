@@ -282,10 +282,12 @@ void print_usage() {
 	cout << "      By default, the value is adapted to the space dimension and the polynomial order of the discretization." << endl;
 	cout << endl;
 	cout << "-diag-block-solve CODE" << endl;
-	cout << "      How the block versions of Jacobi, Gauss-Seidel, SOR solve the systems with the diagonal blocks." << endl;
-	cout << "              lu  - solve with the LU factorizations of the blocks, computed in the setup (default)." << endl;
+	cout << "      How the block versions of Jacobi, Gauss-Seidel, SOR solve the systems with the diagonal blocks, as smoothers" << endl;
+	cout << "      and in the block Jacobi smoothing of the prolongations of U-AMG. By default, the smoothers multiply by the" << endl;
+	cout << "      inverses, the prolongations use the LU factorizations. The Chebyshev smoothers always use the inverses." << endl;
+	cout << "              lu  - solve with the LU factorizations of the blocks, computed in the setup." << endl;
 	cout << "              inv - multiplication by the inverses of the blocks, computed in the setup." << endl;
-	cout << "                    Slightly faster, but less accurate if the blocks are ill-conditioned." << endl;
+	cout << "                    Faster, but less accurate if the blocks are ill-conditioned." << endl;
 	cout << endl;
 	cout << "-cheb-ratio NUM" << endl;
 	cout << "      Ratio lambdaMax/lambdaMin of the interval of the Chebyshev smoothers of the 1st kind (cheb, bcheb). Default: 10." << endl;
@@ -1225,9 +1227,9 @@ int Run(int argc, char* argv[])
 			{
 				string code = optarg;
 				if (code.compare("inv") == 0)
-					BlockDiagonalSolver::DefaultMethod = DiagBlockSolveMethod::Inverse;
+					BlockDiagonalSolver::SmootherMethod = BlockDiagonalSolver::DefaultMethod = DiagBlockSolveMethod::Inverse;
 				else if (code.compare("lu") == 0)
-					BlockDiagonalSolver::DefaultMethod = DiagBlockSolveMethod::LU;
+					BlockDiagonalSolver::SmootherMethod = BlockDiagonalSolver::DefaultMethod = DiagBlockSolveMethod::LU;
 				else
 					argument_error("unknown -diag-block-solve code '" + code + "'. Check -diag-block-solve argument.");
 				break;

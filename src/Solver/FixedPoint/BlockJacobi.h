@@ -62,7 +62,7 @@ public:
 			this->_rowMajorA = A;
 
 		auto nb = A.rows() / _blockSize;
-		this->diagBlockSolver.Setup(A, _blockSize);
+		this->diagBlockSolver.Setup(A, _blockSize, BlockDiagonalSolver::SmootherMethod);
 
 		this->SetupComputationalWork = nb * 2.0/3.0*pow(_blockSize, 3)*1e-6;
 	}
@@ -75,7 +75,7 @@ public:
 	{
 		SetDistributedMatrix(A);
 		auto nb = A.Diag.rows() / _blockSize;
-		this->diagBlockSolver.Setup(A.Diag, _blockSize);
+		this->diagBlockSolver.Setup(A.Diag, _blockSize, BlockDiagonalSolver::SmootherMethod);
 		this->SetupComputationalWork = nb * 2.0/3.0*pow(_blockSize, 3)*1e-6;
 	}
 
