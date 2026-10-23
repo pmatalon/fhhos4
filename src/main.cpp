@@ -477,6 +477,15 @@ void print_usage() {
 	cout << "      (SetupSymmetric(), SetupNonsymmetric(), Solve(b_T, b_F, x_T, x_F)); except for a full Neumann problem and the" << endl;
 	cout << "      exports of the linear system and of the algebraic error, which need the condensed system in the program." << endl;
 	cout << endl;
+	cout << "-uamg-mixed" << endl;
+	cout << "      U-AMG in mixed precision (-s uamg, fcguamg, gcruamg, libuamg, fcglibuamg, gcrlibuamg): the matrices of the" << endl;
+	cout << "      levels (operators, transfers, smoothers) stored and the cycles run in single precision" << endl;
+	cout << "      (float), but the coarsest solve; the setup computes in double (the same levels, rounded), the Krylov method," << endl;
+	cout << "      the matrix, the residuals and the solution are in double. Faster cycles. With the options that it doesn't" << endl;
+	cout << "      support (other than the flat coarsening passes with the chained coarsening prolongations, p-levels after" << endl;
+	cout << "      h-levels, a non-symmetric matrix, smoothers other than Chebyshev, several processes, the exports of the" << endl;
+	cout << "      multigrid), the levels are in double. The library's default (fhhos4::Solver::MixedPrecision)." << endl;
+	cout << endl;
 	cout << "-coarsening-factor NUM" << endl;
 	cout << "      Requested coarsening factor for the coarsening strategies compatible." << endl;
 	cout << "              Independent remeshing         (-cs m  ): coarsening factor H/h, default 2" << endl;
@@ -786,6 +795,7 @@ int Run(int argc, char* argv[])
 		OPT_CoarseningFactor,
 		OPT_UAMGNonsymmetric,
 		OPT_UAMGLibraryCondensed,
+		OPT_UAMGMixedPrecision,
 		OPT_CoarseN,
 		OPT_ApproxL2ProjSubtriangulationMethod,
 		OPT_ApproxL2ProjNSubtriangulations,
@@ -889,6 +899,7 @@ int Run(int argc, char* argv[])
 		 { "coarsening-factor", required_argument, NULL, OPT_CoarseningFactor },
 		 { "uamg-nonsym", no_argument, NULL, OPT_UAMGNonsymmetric },
 		 { "libuamg-condensed", no_argument, NULL, OPT_UAMGLibraryCondensed },
+		 { "uamg-mixed", no_argument, NULL, OPT_UAMGMixedPrecision },
 		 { "coarse-n", required_argument, NULL, OPT_CoarseN },
 		 { "subtri-meth", required_argument, NULL, OPT_ApproxL2ProjSubtriangulationMethod },
 		 { "subtri", required_argument, NULL, OPT_ApproxL2ProjNSubtriangulations },
@@ -1540,6 +1551,9 @@ int Run(int argc, char* argv[])
 				break;
 			case OPT_UAMGLibraryCondensed:
 				args.Solver.MG.UAMGLibraryCondensed = true;
+				break;
+			case OPT_UAMGMixedPrecision:
+				args.Solver.MG.UAMGMixedPrecision = true;
 				break;
 			case OPT_CoarseN:
 				args.Solver.MG.CoarseN = stoul(optarg, nullptr, 0);

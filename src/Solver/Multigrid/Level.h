@@ -13,6 +13,10 @@ public:
 	// On several processes (MPI): the operator distributed by rows (OperatorMatrix is then its block Diag); null on one
 	// process
 	const DistributedMatrix* DistributedOperator = nullptr;
+	// Mixed precision: the operator of a level in single precision (U-AMG, Multigrid::MixedPrecision), whose smoothers
+	// and transfers are in single precision; OperatorMatrix is then null, but on the finest level (the matrix of the
+	// solver, in double) and on the coarsest one (a copy in double, for the coarse solver). Null otherwise.
+	const FloatSparseMatrix* SingleOperatorMatrix = nullptr;
 	bool UseGalerkinOperator = false;
 private:
 	SparseMatrix _galerkinOperator;
@@ -34,6 +38,7 @@ protected:
 	ExportModule Out;
 	SparseMatrix R;
 	SparseMatrix P;
+	FloatSparseMatrix SingleR, SingleP; // a level in single precision (SingleOperatorMatrix): its transfers
 	// On several processes: the prolongation, its rows the owned unknowns of this level, its columns those of the coarser
 	// level; the restriction is its transpose (MultiplyTransposed())
 	DistributedMatrix DistributedP;
@@ -54,6 +59,39 @@ public:
 		return this->DistributedOperator != nullptr;
 	}
 
+	bool InSinglePrecision() const
+	{
+		return this->SingleOperatorMatrix != nullptr;
+	}
+
+	// The operator, the prolongation and the restriction in precision T (float: a level in single precision)
+	template <typename T>
+	const SparseMatrixOf<T>*& OperatorOf()
+	{
+		if constexpr (std::is_same_v<T, float>)
+			return this->SingleOperatorMatrix;
+		else
+			return this->OperatorMatrix;
+	}
+
+	template <typename T>
+	SparseMatrixOf<T>& ProlongationOf()
+	{
+		if constexpr (std::is_same_v<T, float>)
+			return this->SingleP;
+		else
+			return this->P;
+	}
+
+	template <typename T>
+	SparseMatrixOf<T>& RestrictionOf()
+	{
+		if constexpr (std::is_same_v<T, float>)
+			return this->SingleR;
+		else
+			return this->R;
+	}
+
 	// b - A x, A x with the operator (distributed or not)
 	Vector ResidualOf(const Vector& b, const Vector& x) const
 	{
@@ -69,18 +107,33 @@ public:
 		return *this->OperatorMatrix * x;
 	}
 
+	// A level in single precision
+	FloatVector ResidualOf(const FloatVector& b, const FloatVector& x) const
+	{
+		return b - *this->SingleOperatorMatrix * x;
+	}
+
+	FloatVector Apply(const FloatVector& x) const
+	{
+		return *this->SingleOperatorMatrix * x;
+	}
+
 	// The number of non-zeros of the operator (of all the processes)
 	BigNumber OperatorNonZeros() const
 	{
 		if (this->DistributedOperator)
 			return this->DistributedOperator->GlobalNonZeros();
+		if (!this->OperatorMatrix)
+			return this->SingleOperatorMatrix->nonZeros();
 		return this->OperatorMatrix->nonZeros();
 	}
 
 	string OperatorInfo() const
 	{
+		if (!this->OperatorMatrix && this->SingleOperatorMatrix)
+			return Utils::MatrixInfo(*this->SingleOperatorMatrix, "A") + " (single precision)";
 		if (!this->DistributedOperator)
-			return Utils::MatrixInfo(*this->OperatorMatrix, "A");
+			return Utils::MatrixInfo(*this->OperatorMatrix, "A") + (this->SingleOperatorMatrix ? " (and in single precision)" : "");
 		const DistributedMatrix& A = *this->DistributedOperator;
 		BigNumber nnz = A.GlobalNonZeros();
 		return "size(A)=" + to_string(A.GlobalRows()) + "x" + to_string(A.GlobalCols()) + ", \tnnz(A)=" + to_string(nnz) + " on " + to_string(A.Comm().Size()) + " processes";
@@ -113,7 +166,7 @@ public:
 			if (this->UseGalerkinOperator)
 			{
 				Utils::Log() << "\t\tGalerkin operator   : "; Utils::Log().flush();
-				if (!this->OperatorMatrix)
+				if (!this->OperatorMatrix && !this->SingleOperatorMatrix)
 					ComputeGalerkinOperator();
 			}
 			else
@@ -123,8 +176,6 @@ public:
 			}
 			Utils::Log() << OperatorInfo() << endl;
 		}
-
-		const SparseMatrix &A = *this->OperatorMatrix;
 
 		if (!this->IsCoarsestLevel())
 		{
@@ -139,8 +190,10 @@ public:
 			Utils::Log() << "\t\tPreSmoothing        : "; Utils::Log().flush();
 			if (this->IsDistributed())
 				PreSmoother->Setup(*this->DistributedOperator);
+			else if (this->InSinglePrecision())
+				PreSmoother->Setup(*this->SingleOperatorMatrix);
 			else
-				PreSmoother->Setup(A);
+				PreSmoother->Setup(*this->OperatorMatrix);
 			if (PreSmoother->Iterations() == 0)
 				Utils::Log() << "none" << endl;
 			else
@@ -149,19 +202,21 @@ public:
 			Utils::Log() << "\t\tPostSmoothing       : "; Utils::Log().flush();
 			if (this->IsDistributed())
 				PostSmoother->Setup(*this->DistributedOperator, *PreSmoother);
+			else if (this->InSinglePrecision())
+				PostSmoother->Setup(*this->SingleOperatorMatrix, *PreSmoother);
 			else
-				PostSmoother->Setup(A, *PreSmoother); // reuses the setup of the pre-smoother if they are of the same kind
+				PostSmoother->Setup(*this->OperatorMatrix, *PreSmoother); // reuses the setup of the pre-smoother if they are of the same kind
 			if (PostSmoother->Iterations() == 0)
 				Utils::Log() << "none" << endl;
 			else
 				Utils::Log() << PostSmoother->Iterations() << " iteration" << (PostSmoother->Iterations() > 1 ? "s" : "") << " of " << (*PostSmoother) << endl;
 		}
 
-		if (ExportComponents && this->IsDistributed())
-			Utils::FatalError("The export of the multigrid's matrices is not available on several processes.");
+		if (ExportComponents && (this->IsDistributed() || this->InSinglePrecision()))
+			Utils::FatalError("The export of the multigrid's matrices is not available on several processes nor in single precision.");
 		if (ExportComponents)
 		{
-			this->ExportMatrix(A, "A");
+			this->ExportMatrix(*this->OperatorMatrix, "A");
 			
 			if (!this->IsCoarsestLevel())
 				ExportTransfers();
@@ -178,6 +233,8 @@ public:
 	{
 		if (this->IsDistributed())
 			return this->DistributedP.Diag.rows() == 0 && this->P.rows() == 0 ? "matrix free" : "distributed";
+		if (this->SingleP.rows() > 0)
+			return Utils::MatrixInfo(this->SingleP, "P");
 		return this->P.rows() == 0 ? "matrix free" : Utils::MatrixInfo(this->P, "P");
 	}
 
@@ -185,6 +242,8 @@ public:
 	{
 		if (this->IsDistributed())
 			return this->DistributedP.Diag.rows() == 0 && this->R.rows() == 0 ? "matrix free" : "transpose of the prolongation";
+		if (this->SingleR.rows() > 0)
+			return Utils::MatrixInfo(this->SingleR, "R");
 		return this->R.rows() == 0 ? "matrix free" : Utils::MatrixInfo(this->R, "R");
 	}
 
@@ -209,11 +268,16 @@ public:
 		return coarseVector;
 	}
 
+	virtual FloatVector Restrict(FloatVector& vectorOnThisLevel)
+	{
+		return SingleR * vectorOnThisLevel;
+	}
+
 	virtual Flops RestrictCost()
 	{
 		if (this->IsDistributed())
 			return 2 * this->DistributedP.LocalNonZeros();
-		return 2 * R.nonZeros();
+		return 2 * (R.nonZeros() + SingleR.nonZeros()); // one of them is empty
 	}
 
 	virtual Vector Prolong(Vector& vectorOnTheCoarserLevel)
@@ -224,11 +288,16 @@ public:
 		return vectorOnThisLevel;
 	}
 
+	virtual FloatVector Prolong(FloatVector& vectorOnTheCoarserLevel)
+	{
+		return SingleP * vectorOnTheCoarserLevel;
+	}
+
 	virtual Flops ProlongCost()
 	{
 		if (this->IsDistributed())
 			return 2 * this->DistributedP.LocalNonZeros();
-		return 2 * P.nonZeros();
+		return 2 * (P.nonZeros() + SingleP.nonZeros()); // one of them is empty
 	}
 
 	// Used for full Neumann boundary conditions. Fixes the constant in order to have a well-posed problem.
@@ -243,6 +312,8 @@ public:
 	{
 		if (this->OperatorMatrix)
 			return this->OperatorMatrix->rows();
+		else if (this->SingleOperatorMatrix)
+			return this->SingleOperatorMatrix->rows();
 		else if (!this->IsFinestLevel())
 			return this->FinerLevel->P.cols();
 		Utils::FatalError("Level::NUnknowns() must be overridden to use this level");

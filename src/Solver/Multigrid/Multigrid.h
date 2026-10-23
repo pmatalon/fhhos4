@@ -1,5 +1,6 @@
 #pragma once
 #include "../IterativeSolver.h"
+#include "../../Utils/SparseMatrixOps.h"
 #include "SmootherFactory.h"
 #include "Level.h"
 using namespace std;
@@ -8,15 +9,24 @@ class Multigrid : public IterativeSolver
 {
 protected:
 	Level* _fineLevel = nullptr;
+	bool _mixedPrecision = false; // the levels in single precision (MixedPrecision, if the subclass supports it)
 private:
 	bool _automaticNumberOfLevels;
 	int _nLevels;
+	SparseMatrix _coarseOperator;  // levels in single precision: the coarsest operator in double, for the coarse solver
 public:
 	ExportModule Out;
 	Solver* CoarseSolver = nullptr;
 	CycleType Cycle = CycleType::V;
 	int WLoops = 1; // 1 --> V-cycle, >= 2 --> W-cycle 
 	KrylovMethod KCycleKrylov = KrylovMethod::FCG; // the iterations of the K-cycle on the coarse levels
+	// Mixed precision (U-AMG only; otherwise ignored): the matrices of the levels stored and the cycles run in single
+	// precision. The operators, transfers and smoothers of the levels in float (the setup in double, its results rounded
+	// when stored), the vectors of the cycle in float, its sums and dot products in double, the coarsest solve in double
+	// (on a copy of the coarsest operator). Out of the cycle, in double: the matrix of the solver (A x for the outer Krylov method), the residuals
+	// (each cycle corrects the residual of the current x: iterative refinement), x. With the options that the single
+	// precision doesn't support (see UncondensedAMG::MixedPrecisionApplies()), the levels are in double.
+	bool MixedPrecision = false;
 	int MatrixMaxSizeForCoarsestLevel;
 	bool UseGalerkinOperator = false;
 	SmootherType PreSmoother = SmootherType::BlockGaussSeidel;
@@ -363,7 +373,14 @@ protected:
 		if (level->IsDistributed())
 			this->CoarseSolver->Setup(*level->DistributedOperator);
 		else
+		{
+			if (!level->OperatorMatrix) // a level in single precision (not the finest): its operator in double
+			{
+				_coarseOperator = SparseMatrixOps::Cast<double>(*level->SingleOperatorMatrix);
+				level->OperatorMatrix = &_coarseOperator;
+			}
 			this->CoarseSolver->Setup(*level->OperatorMatrix);
+		}
 	}
 
 private:
@@ -449,30 +466,87 @@ private:
 	{
 		IterationResult result(oldResult);
 
-		MultigridCycle(this->_fineLevel, b, x, xEquals0, computeResidual, computeAx, result);
+		if (_mixedPrecision)
+			MixedPrecisionCycle(b, x, xEquals0, computeResidual, computeAx, result);
+		else
+			MultigridCycle(this->_fineLevel, b, x, xEquals0, computeResidual, computeAx, result);
 		result.SetX(x);
 		return result;
 	}
 
 	void MultigridCycle(Level* level, const Vector& b, Vector& x, bool& xEquals0, bool computeResidual, bool computeAx, IterationResult& result)
 	{
-		const SparseMatrix& A = *level->OperatorMatrix;
+		CycleIn<double>(level, b, x, xEquals0, computeResidual ? &result.Residual : nullptr, computeAx ? &result.Ax : nullptr, result);
+	}
 
-		if (this->ExportIterationVectors)
-			level->ExportVector(b, "it" + to_string(this->IterationCount) + "_b");
+private:
+	// Mixed precision: one cycle in single precision on the residual r = b - A x (b if x = 0), in double with the matrix of
+	// the solver, its correction e added to x (x = e if x = 0); the residual and A x in double (A full: a parallel product)
+	void MixedPrecisionCycle(const Vector& b, Vector& x, bool& xEquals0, bool computeResidual, bool computeAx, IterationResult& result)
+	{
+		const SparseMatrix& A = *this->_fineLevel->OperatorMatrix;
+		BigNumber n = b.rows();
+		Vector r;
+		if (!xEquals0)
+		{
+			r = b - A * x;                                                         result.AddWorkInFlops(Cost::DAXPY(A));
+		}
+		const Vector& rhs = xEquals0 ? b : r;
+		FloatVector rSingle(n), eSingle;
+		#pragma omp parallel for if (n > 20000)
+		for (BigNumber i = 0; i < n; i++)
+			rSingle[i] = (float)rhs[i];
+		bool eSingleEquals0 = true;
+		CycleIn<float>(this->_fineLevel, rSingle, eSingle, eSingleEquals0, nullptr, nullptr, result);
+		if (xEquals0)
+			x.resize(n);
+		#pragma omp parallel for if (n > 20000)
+		for (BigNumber i = 0; i < n; i++)
+			x[i] = xEquals0 ? (double)eSingle[i] : x[i] + eSingle[i];
+		xEquals0 = false;
+		if (computeAx || computeResidual)
+		{
+			result.Ax = A * x;                                                     result.AddWorkInFlops(Cost::MatVec(A));
+			if (computeResidual)
+			{
+				result.Residual = b - result.Ax;                                   result.AddWorkInFlops(Cost::AddVec(b));
+			}
+		}
+	}
+
+	// The cycle on the level in precision T: double, or float (the levels set up in single precision, the coarsest solve
+	// in double); the residual and A x after the post-smoothing in residual and Ax if not null
+	template <typename T>
+	void CycleIn(Level* level, const VectorOf<T>& b, VectorOf<T>& x, bool& xEquals0, VectorOf<T>* residual, VectorOf<T>* Ax, IterationResult& result)
+	{
+		constexpr bool single = std::is_same_v<T, float>;
+		const SparseMatrixOf<T>& A = *level->template OperatorOf<T>();
+
+		if constexpr (!single)
+		{
+			if (this->ExportIterationVectors)
+				level->ExportVector(b, "it" + to_string(this->IterationCount) + "_b");
+		}
 
 		if (level->IsCoarsestLevel())
 		{
 			                                                                         CoarseSolverTimer.Start();
-			x = CoarseSolver->Solve(b);                                              result.AddWorkInMFlops(CoarseSolver->SolvingComputationalWork);
+			if constexpr (single)
+				x = CoarseSolver->Solve(Vector(b.template cast<double>())).template cast<float>();
+			else
+				x = CoarseSolver->Solve(b);
+			                                                                         result.AddWorkInMFlops(CoarseSolver->SolvingComputationalWork);
 			                                                                         CoarseSolverTimer.Pause();
 																					 CoarseSolverCost += CoarseSolver->SolvingComputationalWork;
 			xEquals0 = false;
 		}
 		else
 		{
-			if (this->ExportIterationVectors)
-				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_beforePreSmoothing");
+			if constexpr (!single)
+			{
+				if (this->ExportIterationVectors)
+					level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_beforePreSmoothing");
+			}
 
 			//---------------//
 			// Pre-smoothing //
@@ -480,14 +554,14 @@ private:
 
 			//auto flopBeforePreSmooth = result.IterationComputationalWork();
 
-			Vector r;
+			VectorOf<T> r;
 			if (level->PreSmoother->CanOptimizeResidualComputation())
 			{
 				// Smooth and compute residual
 				level->PreSmoother->SmoothAndComputeResidualOrAx(x, b, xEquals0, true, false);    result.AddWorkInMFlops(level->PreSmoother->SolvingComputationalWork());
 				
 				// Move residual vector
-				r = level->PreSmoother->Residual();
+				r = level->PreSmoother->template TakeResidual<T>();
 			}
 			else
 			{
@@ -497,8 +571,11 @@ private:
 				r = level->ResidualOf(b, x);                                              result.AddWorkInFlops(Cost::DAXPY(A));
 			}
 			
-			if (this->ExportIterationVectors)
-				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPreSmoothing");
+			if constexpr (!single)
+			{
+				if (this->ExportIterationVectors)
+					level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPreSmoothing");
+			}
 
 			//auto flopPreSmoothAndRes = result.IterationComputationalWork() - flopBeforePreSmooth;
 			//cout << "- flopPreSmoothAndRes = " << flopPreSmoothAndRes << endl;
@@ -510,7 +587,7 @@ private:
 			auto flopBeforeRestrict = result.IterationComputationalWork();
 			IntergridTransferTimer.Start();
 
-			Vector rc = level->Restrict(r);                                               result.AddWorkInFlops(level->RestrictCost());
+			VectorOf<T> rc = level->Restrict(r);                                          result.AddWorkInFlops(level->RestrictCost());
 			                                                                              this->IntergridTransferCost += level->RestrictCost()*1e-6;
 			IntergridTransferTimer.Pause();
 			auto flopRestrict = result.IterationComputationalWork() - flopBeforeRestrict;
@@ -521,20 +598,23 @@ private:
 			// Residual equation Ae=r solved on the coarse grid //
 			//--------------------------------------------------//
 
-			if (this->EnforceCompatibilityCondition)
+			if constexpr (!single)
 			{
-				level->CoarserLevel->EnforceCompatibilityCondition(rc);                   result.AddWorkInFlops(level->EnforceCompatibilityConditionCost(rc));
+				if (this->EnforceCompatibilityCondition)
+				{
+					level->CoarserLevel->EnforceCompatibilityCondition(rc);               result.AddWorkInFlops(level->EnforceCompatibilityConditionCost(rc));
+				}
 			}
 
-			Vector ec;
+			VectorOf<T> ec;
 			if (this->Cycle == CycleType::V || this->Cycle == CycleType::W)
 			{
-				ec = Vector::Zero(rc.rows());
+				ec = VectorOf<T>::Zero(rc.rows());
 				bool ecEquals0 = true;
 				for (int i = 0; i < this->WLoops; ++i)
 				{
 					IterationResult coarseResult;
-					MultigridCycle(level->CoarserLevel, rc, ec, ecEquals0, false, false, coarseResult);   result.AddWorkInMFlops(coarseResult.SolvingComputationalWork());
+					CycleIn<T>(level->CoarserLevel, rc, ec, ecEquals0, nullptr, nullptr, coarseResult);   result.AddWorkInMFlops(coarseResult.SolvingComputationalWork());
 					if (level->CoarserLevel->IsCoarsestLevel())
 						break;
 				}
@@ -545,13 +625,13 @@ private:
 				if (level->CoarserLevel->IsCoarsestLevel())
 				{
 					bool ecEquals0 = true;
-					MultigridCycle(level->CoarserLevel, rc, ec, ecEquals0, false, false, coarseResult); // exact solution
+					CycleIn<T>(level->CoarserLevel, rc, ec, ecEquals0, nullptr, nullptr, coarseResult); // exact solution
 					                                                                               result.AddWorkInMFlops(coarseResult.SolvingComputationalWork());
 				}
 				else
 				{
 					//level->CoarserLevel->FCG->Solve(rc, ecEqualZero, ec);                    result.AddWorkInMFlops(level->CoarserLevel->FCG->SolvingComputationalWork);
-					ec = KrylovForKCycle(level->CoarserLevel, rc, coarseResult);                   result.AddWorkInMFlops(coarseResult.SolvingComputationalWork());
+					ec = KrylovForKCycle<T>(level->CoarserLevel, rc, coarseResult);                result.AddWorkInMFlops(coarseResult.SolvingComputationalWork());
 				}
 			}
 
@@ -559,12 +639,15 @@ private:
 			// Coarse-grid correction //
 			//------------------------//
 
-			if (this->ExportIterationVectors)
+			if constexpr (!single)
 			{
-				level->ExportVector(ec, "it" + to_string(this->IterationCount) + "_ce");
-				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol");
-				Vector cgc = level->Prolong(ec);
-				level->ExportVector(cgc, "it" + to_string(this->IterationCount) + "_cgc");
+				if (this->ExportIterationVectors)
+				{
+					level->ExportVector(ec, "it" + to_string(this->IterationCount) + "_ce");
+					level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol");
+					Vector cgc = level->Prolong(ec);
+					level->ExportVector(cgc, "it" + to_string(this->IterationCount) + "_cgc");
+				}
 			}
 
 			// Prolongation
@@ -574,8 +657,11 @@ private:
 			                                                                          this->IntergridTransferCost += (level->ProlongCost() + Cost::AddVec(x))*1e-6;
 			IntergridTransferTimer.Pause();
 
-			if (this->ExportIterationVectors)
-				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_cgc");
+			if constexpr (!single)
+			{
+				if (this->ExportIterationVectors)
+					level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_cgc");
+			}
 
 			//----------------//
 			// Post-smoothing //
@@ -585,95 +671,100 @@ private:
 
 			//auto flopBeforePostSmooth = result.IterationComputationalWork();
 
-			if (level->PostSmoother->CanOptimizeResidualComputation() && (computeResidual || computeAx))
+			if (level->PostSmoother->CanOptimizeResidualComputation() && (residual || Ax))
 			{
 				// Smooth and compute residual
-				level->PostSmoother->SmoothAndComputeResidualOrAx(x, b, xEquals0, computeResidual, computeAx);    result.AddWorkInMFlops(level->PostSmoother->SolvingComputationalWork());
-				if (computeResidual)
-					result.Residual = level->PostSmoother->Residual();
-				if (computeAx)
-					result.Ax = level->PostSmoother->Ax();
+				level->PostSmoother->SmoothAndComputeResidualOrAx(x, b, xEquals0, residual != nullptr, Ax != nullptr);    result.AddWorkInMFlops(level->PostSmoother->SolvingComputationalWork());
+				if (residual)
+					*residual = level->PostSmoother->template TakeResidual<T>();
+				if (Ax)
+					*Ax = level->PostSmoother->template TakeAx<T>();
 			}
 			else
 			{
 				// Smooth
 				level->PostSmoother->Smooth(x, b, xEquals0);                          result.AddWorkInMFlops(level->PostSmoother->SolvingComputationalWork());
-				if (computeAx)
+				if (Ax)
 				{
 					// Residual computation
-					result.Ax = level->Apply(x);                                      result.AddWorkInFlops(Cost::MatVec(A));
-					if (computeResidual)
+					*Ax = level->Apply(x);                                            result.AddWorkInFlops(Cost::MatVec(A));
+					if (residual)
 					{
-						result.Residual = b - result.Ax;                              result.AddWorkInFlops(Cost::AddVec(b));
+						*residual = b - *Ax;                                          result.AddWorkInFlops(Cost::AddVec(b));
 					}
 				}
-				else if (computeResidual)
+				else if (residual)
 				{
-					result.Residual = level->ResidualOf(b, x);                        result.AddWorkInFlops(Cost::DAXPY(A));
+					*residual = level->ResidualOf(b, x);                              result.AddWorkInFlops(Cost::DAXPY(A));
 				}
 			}
 
-			if (this->ExportIterationVectors)
-				level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPostSmoothing");
+			if constexpr (!single)
+			{
+				if (this->ExportIterationVectors)
+					level->ExportVector(x, "it" + to_string(this->IterationCount) + "_sol_afterPostSmoothing");
+			}
 
 			//auto flopPostSmooth = result.IterationComputationalWork() - flopBeforePostSmooth;
 			//cout << "- flopPostSmooth = " << flopPostSmooth << endl;
 
-			if (this->ApplyZeroMeanCondition)
+			if constexpr (!single)
 			{
-				level->ApplyZeroMeanCondition(x);                                     result.AddWorkInFlops(level->ApplyZeroMeanConditionCost(x));
+				if (this->ApplyZeroMeanCondition)
+				{
+					level->ApplyZeroMeanCondition(x);                                 result.AddWorkInFlops(level->ApplyZeroMeanConditionCost(x));
+				}
 			}
 		}
 	}
 
-private:
 	// 1 or 2 iterations of FCG or GCR (KCycleKrylov) preconditioned by the cycle on this level: Notay, "An
 	// aggregation-based algebraic multigrid method", ETNA 37 (2010), Algorithm 3.2, step 4. The two methods differ by
-	// their inner products only: FCG minimizes the A-norm of the error, GCR the residual norm.
-	Vector KrylovForKCycle(Level* level, Vector& r, IterationResult& result)
+	// their inner products only: FCG minimizes the A-norm of the error, GCR the residual norm. In precision T (the dot
+	// products in double).
+	template <typename T>
+	VectorOf<T> KrylovForKCycle(Level* level, VectorOf<T>& r, IterationResult& result)
 	{
 		//const SparseMatrix& A = *level->OperatorMatrix;
 		double t = 0.25;
 		bool gcr = this->KCycleKrylov == KrylovMethod::GCR;
-		Vector x;
+		VectorOf<T> x;
 
 		// Apply multigrid preconditioner: c = Prec(r)
-		Vector c = Vector::Zero(r.rows());
+		VectorOf<T> c = VectorOf<T>::Zero(r.rows());
 		bool cEquals0 = true;
-		bool computeAc = true;
 		IterationResult precResult1;
-		MultigridCycle(level, r, c, cEquals0, false, computeAc, precResult1);     result.AddWorkInMFlops(precResult1.SolvingComputationalWork());
+		VectorOf<T> v; // v = A*c
+		CycleIn<T>(level, r, c, cEquals0, nullptr, &v, precResult1);             result.AddWorkInMFlops(precResult1.SolvingComputationalWork());
 
 		// 1st iteration
 		//Vector v = A * c;                                                         result.AddWorkInFlops(Cost::MatVec(A));
-		Vector& v = precResult1.Ax; // v = A*c
 		double rho1 = gcr ? Parallel::SquaredNorm(v) : Parallel::Dot(c, v);       result.AddWorkInFlops(Cost::Dot(c));
 		double alpha1 = gcr ? Parallel::Dot(v, r) : Parallel::Dot(c, r);          result.AddWorkInFlops(Cost::Dot(c));
 
 		double r_norm_old = Parallel::Norm(r);                                    result.AddWorkInFlops(Cost::Norm(r));
-		r -= (alpha1 / rho1) * v;                                                 result.AddWorkInFlops(Cost::VectorDAXPY(r));
+		r -= T(alpha1 / rho1) * v;                                                result.AddWorkInFlops(Cost::VectorDAXPY(r));
 		double r_norm_new = Parallel::Norm(r);                                    result.AddWorkInFlops(Cost::Norm(r));
 		if (r_norm_new <= t * r_norm_old)
 		{
-			x = (alpha1 / rho1) * c;                                              result.AddWorkInFlops(Cost::ConstantVec(x));
+			x = T(alpha1 / rho1) * c;                                             result.AddWorkInFlops(Cost::ConstantVec(x));
 		}
 		else
 		{
 			// Apply multigrid preconditioner: d = Prec(r)
-			Vector d = Vector::Zero(r.rows());
+			VectorOf<T> d = VectorOf<T>::Zero(r.rows());
 			bool dEquals0 = true;
-			bool computeAd = true;
 			IterationResult precResult2;
-			MultigridCycle(level, r, d, dEquals0, false, computeAd, precResult2);  result.AddWorkInMFlops(precResult2.SolvingComputationalWork());
+			VectorOf<T> w; // w = A*d
+			CycleIn<T>(level, r, d, dEquals0, nullptr, &w, precResult2);         result.AddWorkInMFlops(precResult2.SolvingComputationalWork());
 
 			// 2nd iteration
 			//Vector w = A * d;                                                     result.AddWorkInFlops(Cost::MatVec(A));
-			Vector& w = precResult2.Ax; // w = A*d
 			double gamma = gcr ? Parallel::Dot(w, v) : Parallel::Dot(d, v);       result.AddWorkInFlops(Cost::Dot(d));
 			double beta = gcr ? Parallel::SquaredNorm(w) : Parallel::Dot(d, w);   result.AddWorkInFlops(Cost::Dot(d));
 			double alpha2 = gcr ? Parallel::Dot(w, r) : Parallel::Dot(d, r);      result.AddWorkInFlops(Cost::Dot(d));
 			double rho2 = beta - gamma * gamma / rho1;
-			x = (alpha1/rho1 - gamma*alpha2/(rho1*rho2))*c + (alpha2 / rho2) * d; result.AddWorkInFlops(2*Cost::ConstantVec(x) + Cost::AddVec(x));
+			x = T(alpha1/rho1 - gamma*alpha2/(rho1*rho2))*c + T(alpha2 / rho2) * d; result.AddWorkInFlops(2*Cost::ConstantVec(x) + Cost::AddVec(x));
 		}
 		return x;
 	}

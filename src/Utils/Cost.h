@@ -25,7 +25,8 @@ public:
 		return 2 * nnz;
 	}
 	// Sparse Matrix Vector multiplication
-	static Flops MatVec(const SparseMatrix& A)
+	template <typename T> // a matrix of any scalar type (the levels of U-AMG in single precision)
+	static Flops MatVec(const SparseMatrixOf<T>& A)
 	{
 		return SpMatVec(A.nonZeros());
 	}
@@ -35,7 +36,8 @@ public:
 	{
 		return 2 * nnz;
 	}
-	static Flops DAXPY(const SparseMatrix& A)
+	template <typename T> // a matrix of any scalar type (the levels of U-AMG in single precision)
+	static Flops DAXPY(const SparseMatrixOf<T>& A)
 	{
 		return DAXPY(A.nonZeros());
 	}
@@ -53,31 +55,36 @@ public:
 		return 2 * rows;
 	}
 	// Dense dot product
-	static Flops Dot(const Vector& v)
+	template <typename Derived> // a vector of any scalar type (the cycle in single precision)
+	static Flops Dot(const Eigen::MatrixBase<Derived>& v)
 	{
 		return Dot(v.rows());
 	}
 
 	// Norm
-	static Flops Norm(const Vector& v)
+	template <typename Derived> // a vector of any scalar type (the cycle in single precision)
+	static Flops Norm(const Eigen::MatrixBase<Derived>& v)
 	{
 		return Dot(v);
 	}
 
 	// Vector aX+Y
-	static Flops VectorDAXPY(const Vector& v)
+	template <typename Derived> // a vector of any scalar type (the cycle in single precision)
+	static Flops VectorDAXPY(const Eigen::MatrixBase<Derived>& v)
 	{
 		return 2 * v.rows();
 	}
 
 	// Vector x+y
-	static Flops AddVec(const Vector& v)
+	template <typename Derived> // a vector of any scalar type (the cycle in single precision)
+	static Flops AddVec(const Eigen::MatrixBase<Derived>& v)
 	{
 		return v.rows();
 	}
 
 	// Vector alpha*v
-	static Flops ConstantVec(const Vector& v)
+	template <typename Derived> // a vector of any scalar type (the cycle in single precision)
+	static Flops ConstantVec(const Eigen::MatrixBase<Derived>& v)
 	{
 		return v.rows();
 	}

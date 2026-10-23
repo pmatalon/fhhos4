@@ -340,8 +340,10 @@ public:
 
 	// Assembled matrix (nFaces faces), or only its block rows of the faces f such that (*rows)[f] (the others are
 	// empty). Each row is the sum of the rows of the local matrices that contain it, in the order of the cells.
-	// The rows are sorted by column; the explicit zeros are kept.
-	SparseMatrix Assemble(BigNumber nFaces, const vector<bool>* rows = nullptr) const
+	// The rows are sorted by column; the explicit zeros are kept. In precision T (float: the operators of the levels of
+	// U-AMG in single precision), the sums in double.
+	template <typename T = double>
+	SparseMatrixOf<T> Assemble(BigNumber nFaces, const vector<bool>* rows = nullptr) const
 	{
 		int bs = BlockSize;
 		BigNumber nCells = NCells();
@@ -432,14 +434,14 @@ public:
 		for (BigNumber i = 0; i < nFaces * bs; ++i)
 			rowStart[i + 1] += rowStart[i];
 
-		SparseMatrix M(nFaces * bs, nFaces * bs);
+		SparseMatrixOf<T> M(nFaces * bs, nFaces * bs);
 		M.resizeNonZeros(rowStart[nFaces * bs]);
 		copy(rowStart.begin(), rowStart.end(), M.outerIndexPtr());
 		SparseMatrixIndex* cols = M.innerIndexPtr();
-		double* values = M.valuePtr();
 		#pragma omp parallel
 		{
 			vector<int> cursor;
+			vector<double> sums; // in single precision: the values of the rows of the face, rounded once summed
 			#pragma omp for schedule(dynamic, 1024)
 			for (BigNumber f = 0; f < nFaces; ++f)
 			{
@@ -447,6 +449,17 @@ public:
 					continue;
 				const pair<BigNumber, int>* o = occ.data() + occStart[f];
 				SparseMatrixIndex rowLength = rowStart[f * bs + 1] - rowStart[f * bs];
+				// The value of the coefficient at position pos in M: values[pos - offset]
+				double* values;
+				SparseMatrixIndex offset = 0;
+				if constexpr (std::is_same_v<T, double>)
+					values = M.valuePtr();
+				else
+				{
+					sums.resize((size_t)rowLength * bs);
+					values = sums.data();
+					offset = rowStart[f * bs];
+				}
 				SparseMatrixIndex p = 0; // position of the current block in the row
 				int nBlocks = 0;
 				BigNumber lastG = 0;
@@ -472,13 +485,15 @@ public:
 							if (first)
 							{
 								cols[pos + c] = g * bs + c;
-								values[pos + c] = v;
+								values[pos + c - offset] = v;
 							}
 							else
-								values[pos + c] += v;
+								values[pos + c - offset] += v;
 						}
 					}
 				});
+				if constexpr (!std::is_same_v<T, double>)
+					copy(sums.begin(), sums.end(), M.valuePtr() + rowStart[f * bs]);
 			}
 		}
 		return M;
@@ -545,7 +560,7 @@ private:
 struct LocalOperator
 {
 	LocalMatrices Current;
-	LocalMatrices Next;                     // buffer for those of the next coarsening pass
-	const SparseMatrix* Assembled = nullptr; // the matrix equal to the sum of Current, if it has been assembled
+	LocalMatrices Next;              // buffer for those of the next coarsening pass
+	const void* Assembled = nullptr; // the matrix equal to the sum of Current (of any precision), if it has been assembled
 	const DistributedMatrix* AssembledDistributed = nullptr; // the same on several processes
 };

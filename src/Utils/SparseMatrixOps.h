@@ -131,15 +131,17 @@ namespace SparseMatrixOps
 
 	// A^T, with the same result as Eigen's: the coefficients of each row of A^T in the order of the rows of A, the explicit
 	// zeros kept. In parallel: each thread counts, then copies, the coefficients of a contiguous range of rows of A.
-	// A: a SparseMatrix, or a map of row-major arrays (e.g. those of a column-major matrix, i.e. of its transpose).
+	// A: a SparseMatrix (of any scalar type), or a map of row-major arrays (e.g. those of a column-major matrix, i.e. of
+	// its transpose).
 	template <class RowMajorSparseMatrix>
-	SparseMatrix Transpose(const RowMajorSparseMatrix& A)
+	SparseMatrixOf<typename RowMajorSparseMatrix::Scalar> Transpose(const RowMajorSparseMatrix& A)
 	{
 		static_assert(RowMajorSparseMatrix::IsRowMajor, "Transpose() iterates over the rows of A");
+		using Result = SparseMatrixOf<typename RowMajorSparseMatrix::Scalar>;
 		BigNumber nRows = A.rows(), nCols = A.cols();
 		int nChunks = (int)min((BigNumber)Parallelism::NThreads(), max(nRows, (BigNumber)1));
 		if (nChunks <= 1 || A.nonZeros() < 20000)
-			return SparseMatrix(A.transpose());
+			return Result(A.transpose());
 		// count[c][j]: number of coefficients of column j in the rows of chunk c, then the position of the first of them
 		vector<vector<SparseMatrixIndex>> count(nChunks);
 		#pragma omp parallel for schedule(static, 1)
@@ -151,7 +153,7 @@ namespace SparseMatrixOps
 				for (typename RowMajorSparseMatrix::InnerIterator it(A, i); it; ++it)
 					count[c][it.col()]++;
 		}
-		SparseMatrix T(nCols, nRows);
+		Result T(nCols, nRows);
 		T.resizeNonZeros(A.nonZeros());
 		SparseMatrixIndex* outer = T.outerIndexPtr();
 		outer[0] = 0;
@@ -226,5 +228,29 @@ namespace SparseMatrixOps
 				chunk.EndRow();
 			}
 		});
+	}
+
+	// A in precision U (e.g. the matrices of the levels of U-AMG in single precision): its structure copied, its values
+	// rounded, in parallel (Eigen's cast() inserts the non-zeros one by one)
+	template <typename U, typename T>
+	SparseMatrixOf<U> Cast(const SparseMatrixOf<T>& A)
+	{
+		if (!A.isCompressed())
+			return A.template cast<U>();
+		SparseMatrixOf<U> M(A.rows(), A.cols());
+		M.resizeNonZeros(A.nonZeros());
+		copy(A.outerIndexPtr(), A.outerIndexPtr() + A.outerSize() + 1, M.outerIndexPtr());
+		const SparseMatrixIndex* inner = A.innerIndexPtr();
+		const T* values = A.valuePtr();
+		SparseMatrixIndex* MInner = M.innerIndexPtr();
+		U* MValues = M.valuePtr();
+		BigNumber nnz = A.nonZeros();
+		#pragma omp parallel for if (nnz > 20000)
+		for (BigNumber p = 0; p < nnz; p++)
+		{
+			MInner[p] = inner[p];
+			MValues[p] = (U)values[p];
+		}
+		return M;
 	}
 }

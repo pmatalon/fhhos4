@@ -18,6 +18,7 @@ private:
 	double _strongCouplingThreshold;
 	LocalOperator _localOperator; // local matrices of the operators of the coarsening passes, during the setup
 	bool _symmetric = true;       // set by Setup(): see UncondensedLevel::Symmetric
+	FloatSparseMatrix _singleA;   // levels in single precision: the operator of the finest level (its smoothers, the cycle)
 public:
 	bool ManageAnisotropy = true; // see UncondensedLevel::ManageAnisotropy
 	bool DownwindOrdering = true; // see UncondensedLevel::DownwindOrdering
@@ -119,15 +120,24 @@ public:
 				Utils::FatalError("UncondensedAMG: the Cholesky factorization cannot be the coarse solver of a non-symmetric matrix (use LU).");
 		}
 
-		this->_fineLevel = this->CreateFineLevel();
-		UncondensedLevel* fine = dynamic_cast<UncondensedLevel*>(this->_fineLevel);
-		fine->A_T_T = &A_T_T;
-		fine->A_T_F = &A_T_F;
-		fine->A_F_T = _symmetric ? nullptr : &A_F_T;
 		if (A_F_F.rows() == 0 && A_F_FNeeded())
 			Utils::FatalError("UncondensedAMG: the chosen options need the block A_F_F.");
-		fine->A_F_F = A_F_F.rows() > 0 ? &A_F_F : nullptr;
-		fine->LocalOp = &_localOperator;
+
+		if (Utils::IsRefinementStrategy(this->H_CS))
+			this->H_CS = H_CoarsStgy::MultiplePairwiseAggregation;
+		if (this->H_CS == H_CoarsStgy::MultiplePairwiseAggregation && this->CoarseningFactor == 0)
+			this->CoarseningFactor = 3.8;
+
+		// Mixed precision: the levels in single precision if requested and possible, otherwise in double
+		this->_mixedPrecision = this->MixedPrecision;
+		this->_fineLevel = NewFineLevel();
+		if (this->_mixedPrecision && !MixedPrecisionApplies(dynamic_cast<const UncondensedLevel&>(*this->_fineLevel)))
+		{
+			delete this->_fineLevel;
+			this->_mixedPrecision = false;
+			this->_fineLevel = NewFineLevel();
+		}
+		UncondensedLevel* fine = dynamic_cast<UncondensedLevel*>(this->_fineLevel);
 
 		// If the constant has coordinate 1 everywhere, as in the paper, no rescaling: the setup is unchanged
 		if ((cellInterpOfOne.array() != 1).any() || (faceInterpOfOne.array() != 1).any())
@@ -135,18 +145,30 @@ public:
 			fine->CellInterpOfOne = cellInterpOfOne;
 			fine->FaceInterpOfOne = faceInterpOfOne;
 		}
-
-		if (Utils::IsRefinementStrategy(this->H_CS))
-			this->H_CS = H_CoarsStgy::MultiplePairwiseAggregation;
-		if (this->H_CS == H_CoarsStgy::MultiplePairwiseAggregation && this->CoarseningFactor == 0)
-			this->CoarseningFactor = 3.8;
 		fine->CheckHarmonicExtension(this->H_CS, this->FaceCoarseningStgy);
+
+		fine->A_T_T = &A_T_T;
+		fine->A_T_F = &A_T_F;
+		fine->A_F_T = _symmetric ? nullptr : &A_F_T;
+		fine->A_F_F = A_F_F.rows() > 0 ? &A_F_F : nullptr;
+		// The levels in single precision: the copy of the operator of the finest level, the only one (the setup reads A in
+		// double, which stays the matrix of the outer Krylov method and of the residuals)
+		if (this->_mixedPrecision)
+		{
+			_singleA = SparseMatrixOps::Cast<float>(A);
+			fine->SingleOperatorMatrix = &_singleA;
+		}
 
 		Multigrid::Setup(A);
 
 		_localOperator.Current.Free();
 		_localOperator.Next.Free();
 		_localOperator.Assembled = nullptr;
+		if (this->_mixedPrecision)
+		{
+			for (Level* level = fine->CoarserLevel; level; level = level->CoarserLevel)
+				dynamic_cast<UncondensedLevelOf<float>*>(level)->ReleaseOperatorInDouble();
+		}
 
 		// The blocks are only read during the setup: the caller may free them (the library fhhos4 does)
 		fine->A_T_T = nullptr;
@@ -180,15 +202,17 @@ public:
 		if (this->HP_CS != HP_CoarsStgy::H_only && this->HP_CS != HP_CoarsStgy::P_then_H)
 			Utils::FatalError("UncondensedAMG: on several processes, only the p-coarsening then the h-coarsening (or the h-coarsening alone) are available.");
 		_symmetric = true;
+		if (this->MixedPrecision)
+			Utils::Log() << "\tLevels in double precision: the mixed precision does not support several processes" << endl;
+		this->_mixedPrecision = false;
 
-		this->_fineLevel = this->CreateFineLevel();
+		this->_fineLevel = NewFineLevel();
 		UncondensedLevel* fine = dynamic_cast<UncondensedLevel*>(this->_fineLevel);
 		fine->A_T_T = &A_T_T;
 		fine->A_T_F = &A_T_F;
 		fine->A_F_T = nullptr;
 		fine->A_F_F = nullptr;
 		fine->FaceMap = faceMap;
-		fine->LocalOp = &_localOperator;
 
 		// The interpolations of 1 on the faces of the cells of the process (the ghosts of FaceMap too)
 		bool scaling = (cellInterpOfOne.array() != 1).any() || (faceInterpOfOne.array() != 1).any();
@@ -238,9 +262,49 @@ private:
 		return _multigridProlong != UAMGProlongation::ChainedCoarseningProlongations || !this->UseGalerkinOperator;
 	}
 
+	// Mixed precision: the levels in single precision run the default options (UncondensedLevel::MixedPrecisionApplies(),
+	// the Galerkin operators, without the options that need A_F_F, e.g. p-levels after h-levels; a symmetric matrix on
+	// one process) and smoothers that have a single precision version (Chebyshev), without the zero-mean and
+	// compatibility conditions nor the exports of the multigrid. Otherwise the levels are in double (the reason printed).
+	bool MixedPrecisionApplies(const UncondensedLevel& fine) const
+	{
+		auto smootherSupports = [this](SmootherType type, int iterations)
+		{
+			unique_ptr<Smoother> smoother(SmootherFactory::Create(type, iterations, this->BlockSizeForBlockSmoothers, this->RelaxationParameter));
+			return smoother->SupportsSinglePrecision();
+		};
+		string unsupported;
+		if (!_symmetric)
+			unsupported = "a non-symmetric matrix";
+		else if (!fine.MixedPrecisionApplies(this->H_CS, this->FaceCoarseningStgy) || !this->UseGalerkinOperator || A_F_FNeeded())
+			unsupported = "the coarsening options other than the flat passes with the chained coarsening prolongations, the Galerkin operators and the p-levels before the h-levels";
+		else if (this->ApplyZeroMeanCondition || this->EnforceCompatibilityCondition)
+			unsupported = "the zero-mean and compatibility conditions";
+		else if (this->ExportComponents || this->ExportIterationVectors)
+			unsupported = "the exports of the multigrid";
+		else if (!smootherSupports(this->PreSmoother, this->PreSmoothingIterations) || !smootherSupports(this->PostSmoother, this->PostSmoothingIterations))
+			unsupported = "smoothers without a single precision version (the Chebyshev smoothers have one)";
+		if (!unsupported.empty())
+			Utils::Log() << "\tLevels in double precision: the mixed precision does not support " << unsupported << endl;
+		return unsupported.empty();
+	}
+
+	// The finest level, in the precision of the levels, with the local matrices of the operators
+	Level* NewFineLevel()
+	{
+		UncondensedLevel* fine = dynamic_cast<UncondensedLevel*>(this->CreateFineLevel());
+		fine->LocalOp = &_localOperator;
+		return fine;
+	}
+
+	// A level in the precision of the levels (_mixedPrecision)
 	UncondensedLevel* CreateLevel(int number, int degree, int cellBlockSize, int faceBlockSize) const
 	{
-		UncondensedLevel* level = new UncondensedLevel(number, degree, cellBlockSize, faceBlockSize, _strongCouplingThreshold, _faceProlong, _coarseningProlong, _multigridProlong);
+		UncondensedLevel* level;
+		if (this->_mixedPrecision)
+			level = new UncondensedLevelOf<float>(number, degree, cellBlockSize, faceBlockSize, _strongCouplingThreshold, _faceProlong, _coarseningProlong, _multigridProlong);
+		else
+			level = new UncondensedLevelOf<double>(number, degree, cellBlockSize, faceBlockSize, _strongCouplingThreshold, _faceProlong, _coarseningProlong, _multigridProlong);
 		level->ComputeCoarseA_F_F = A_F_FNeeded();
 		level->ComputeQ_F = ChainedQ_FNeeded();
 		level->ManageAnisotropy = ManageAnisotropy;

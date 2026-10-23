@@ -266,7 +266,8 @@ namespace fhhos4
 
 	// Set the parameters, then call a setup function, then Solve(). The parameters are read by the setup (Tolerance and
 	// MaxIterations by Solve()). The defaults are those of the program fhhos4 (-s fcguamg), used in the papers, except the
-	// smoothers (PreSmoother, and the number of its iterations) and the prolongation (Prolongation).
+	// smoothers (PreSmoother, and the number of its iterations), the prolongation (Prolongation) and the precision of the
+	// levels (MixedPrecision).
 	// Not thread-safe: one object must not be used by several threads at the same time.
 	class FHHOS4_API Solver
 	{
@@ -312,6 +313,13 @@ namespace fhhos4
 		int CoarseMatrixMaxSize = 1000;    // the coarsening stops when the matrix has at most this many rows
 		// Solver of the coarsest level. Default: Cholesky for a symmetric matrix, LU otherwise.
 		fhhos4::CoarseSolver CoarseSolver = fhhos4::CoarseSolver::Default;
+		// Mixed precision: the matrices of the levels of the AMG (operators, transfers, smoothers) stored and its cycles
+		// run in single precision (float), but the coarsest solve: half the memory of the levels, faster cycles. The setup
+		// computes in double (the same levels, rounded), and the Krylov method, the matrix A, the residuals and the
+		// solution stay in double: the tolerance can be that of the double precision, usually in the iterations of the
+		// double precision. Only for a symmetric matrix, on one process, with the Chebyshev smoothers (the defaults);
+		// otherwise the levels are in double, as with false.
+		bool MixedPrecision = true;
 
 		//-------------------- Execution -------------------//
 

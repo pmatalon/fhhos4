@@ -23,20 +23,25 @@ private:
 	int _blockSize = 0;
 	DiagBlockSolveMethod _method = DiagBlockSolveMethod::LU;
 	// blockSize x (nBlocks * blockSize): the i-th block is the inverse of D_i (Inverse),
-	// or its LU factors, as stored by Eigen::FullPivLU (LU)
+	// or its LU factors, as stored by Eigen::FullPivLU (LU). In double, or in single precision (a matrix in single
+	// precision: the solves of float vectors).
 	DenseMatrix _blocks;
+	Eigen::MatrixXf _singleBlocks;
 	// LU: row and column permutations (P and Q such that D_i = P^-1 L U Q^-1), and rank of each block
 	vector<int> _permP;
 	vector<int> _permQ;
 	vector<int> _rank;
 public:
 	// With 'blocks', only the diagonal blocks i such that (*blocks)[i] are factorized (the others can't be solved).
-	void Setup(const SparseMatrix& A, int blockSize, DiagBlockSolveMethod method = DefaultMethod, const vector<bool>* blocks = nullptr)
+	// A in precision T: the factorizations in double, stored in T (float: for the solves of float vectors).
+	template <typename T>
+	void Setup(const SparseMatrixOf<T>& A, int blockSize, DiagBlockSolveMethod method = DefaultMethod, const vector<bool>* blocks = nullptr)
 	{
 		_blockSize = blockSize;
 		_method = method;
 		BigNumber nb = A.rows() / blockSize;
-		_blocks = DenseMatrix(blockSize, nb * blockSize);
+		Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& blocksT = BlocksIn<T>();
+		blocksT.resize(blockSize, nb * blockSize);
 		if (_method == DiagBlockSolveMethod::LU)
 		{
 			_permP = vector<int>(nb * blockSize);
@@ -49,14 +54,15 @@ public:
 		{
 			if (blocks && !(*blocks)[i])
 				continue;
-			DenseMatrix Di = A.block(i * _blockSize, i * _blockSize, _blockSize, _blockSize);
+			Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> DiT = A.block(i * _blockSize, i * _blockSize, _blockSize, _blockSize);
+			DenseMatrix Di = DiT.template cast<double>();
 			Eigen::FullPivLU<DenseMatrix> lu(Di);
-			auto block = _blocks.middleCols(i * _blockSize, _blockSize);
+			auto block = blocksT.middleCols(i * _blockSize, _blockSize);
 			if (_method == DiagBlockSolveMethod::Inverse)
-				block = lu.inverse();
+				block = DenseMatrix(lu.inverse()).template cast<T>();
 			else
 			{
-				block = lu.matrixLU();
+				block = lu.matrixLU().template cast<T>();
 				for (int k = 0; k < _blockSize; k++)
 				{
 					_permP[i * _blockSize + k] = lu.permutationP().indices()(k);
@@ -67,17 +73,38 @@ public:
 		}
 	}
 
-	// x = D_i^{-1} b (b can have several columns).
+	// x = D_i^{-1} b (b can have several columns), in the precision of b and x (that of the matrix of the setup).
 	// b is used as work space: its content is destroyed. x must not alias b.
 	template <class RhsT, class DestT>
 	void Solve(BigNumber i, Eigen::MatrixBase<RhsT>& b, Eigen::MatrixBase<DestT>& x) const
 	{
-		auto Di = _blocks.middleCols(i * _blockSize, _blockSize);
+		if constexpr (std::is_same_v<typename RhsT::Scalar, float>)
+			Solve(_singleBlocks, i, b, x);
+		else
+			Solve(_blocks, i, b, x);
+	}
+
+private:
+	template <typename T>
+	Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& BlocksIn()
+	{
+		if constexpr (std::is_same_v<T, float>)
+			return _singleBlocks;
+		else
+			return _blocks;
+	}
+
+	template <class Blocks, class RhsT, class DestT>
+	void Solve(const Blocks& blocks, BigNumber i, Eigen::MatrixBase<RhsT>& b, Eigen::MatrixBase<DestT>& x) const
+	{
+		auto Di = blocks.middleCols(i * _blockSize, _blockSize);
 		if (_method == DiagBlockSolveMethod::Inverse)
 			x.derived().noalias() = Di * b;
 		else
 			SolveLU(Di, &_permP[i * _blockSize], &_permQ[i * _blockSize], _rank[i], b, x);
 	}
+
+public:
 
 	// x = D^{-1} b, from the LU factors of D stored as by Eigen::FullPivLU (matrixLU(), the indices of permutationP()
 	// and permutationQ(), nonzeroPivots()). b is used as work space: its content is destroyed. x must not alias b.

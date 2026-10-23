@@ -432,6 +432,29 @@ namespace Parallel
 		return std::sqrt(comm.Sum(x.squaredNorm()));
 	}
 
+	// The same for vectors in single precision (the cycle of U-AMG in single precision): Eigen's products of blocks of
+	// 1024 coefficients, summed in double
+	inline double Dot(const FloatVector& x, const FloatVector& y)
+	{
+		double dot = 0;
+		for (BigNumber i = 0; i < x.rows(); i += 1024)
+		{
+			BigNumber m = std::min<BigNumber>(1024, x.rows() - i);
+			dot += x.segment(i, m).dot(y.segment(i, m));
+		}
+		return Communicator::Current().Sum(dot);
+	}
+
+	inline double SquaredNorm(const FloatVector& x)
+	{
+		return Dot(x, x);
+	}
+
+	inline double Norm(const FloatVector& x)
+	{
+		return std::sqrt(SquaredNorm(x));
+	}
+
 	// The global number of rows of a vector distributed by rows
 	inline BigNumber Rows(const Vector& x)
 	{

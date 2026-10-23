@@ -40,8 +40,45 @@ private:
 	double _lambdaMaxEstimate = 0; // Lanczos estimate of the largest eigenvalue of D^-1 A (0 before the setup)
 
 	BlockDiagonalSolver _diagBlockSolver; // blocks of size > 1
-	Vector _invDiag;                      // blocks of size 1: the inverses of the diagonal coefficients
-	Vector _d, _dNext, _r;                // work vectors of the iterations, kept from one call to the next
+
+	// The inverses of the diagonal coefficients (blocks of size 1) and the work vectors of the iterations (kept from one
+	// call to the next), in precision T: double, or float (a matrix in single precision, SetupSinglePrecision())
+	template <typename T>
+	struct Precision
+	{
+		VectorOf<T> InvDiag;
+		VectorOf<T> d, dNext, r;
+	};
+	Precision<double> _double;
+	Precision<float> _single;
+	const FloatSparseMatrix* _singleMatrix = nullptr; // the matrix in single precision (SetupSinglePrecision())
+
+	template <typename T>
+	Precision<T>& In()
+	{
+		if constexpr (std::is_same_v<T, float>)
+			return _single;
+		else
+			return _double;
+	}
+
+	template <typename T>
+	const Precision<T>& In() const
+	{
+		if constexpr (std::is_same_v<T, float>)
+			return _single;
+		else
+			return _double;
+	}
+
+	template <typename T>
+	const SparseMatrixOf<T>& MatrixOf() const
+	{
+		if constexpr (std::is_same_v<T, float>)
+			return *_singleMatrix;
+		else
+			return *this->Matrix;
+	}
 public:
 
 	BlockChebyshev(int blockSize, ChebyshevKind kind, double ratio = DefaultRatio)
@@ -91,8 +128,24 @@ public:
 		SetupBlocks(A.Diag);
 	}
 
+	// Mixed precision (one process): the same with the matrix in single precision, for the iterations in single
+	// precision (SolveInSinglePrecision()), the sums of the passes in double
+	bool SupportsSinglePrecision() const override
+	{
+		return !this->Distributed;
+	}
+
+	void SetupSinglePrecision(const FloatSparseMatrix& A) override
+	{
+		_singleMatrix = &A;
+		SetupBlocks(A);
+	}
+
 private:
-	void SetupBlocks(const SparseMatrix& A)
+	// The setup with A in precision T: the inverse diagonal (blocks of size 1) or the factorizations of the blocks
+	// (computed in double, stored in T), the estimate of lambdaMax (Lanczos in T, the dot products in double)
+	template <typename T>
+	void SetupBlocks(const SparseMatrixOf<T>& A)
 	{
 		if (!A.isCompressed())
 			Utils::FatalError("The Chebyshev smoothers require a compressed matrix (see Eigen's makeCompressed()).");
@@ -100,19 +153,20 @@ private:
 		BigNumber nb = A.rows() / _blockSize;
 		if (_blockSize == 1)
 		{
-			_invDiag = Vector(A.rows());
+			VectorOf<T>& invDiag = In<T>().InvDiag;
+			invDiag = VectorOf<T>(A.rows());
 			bool positiveDiagonal = true;
 			#pragma omp parallel for reduction(&&:positiveDiagonal)
 			for (BigNumber i = 0; i < A.rows(); i++)
 			{
 				double a_ii = 0;
-				for (RowMajorSparseMatrix::InnerIterator it(A, i); it; ++it)
+				for (typename SparseMatrixOf<T>::InnerIterator it(A, i); it; ++it)
 				{
 					if (it.col() == i)
 						a_ii = it.value();
 				}
 				positiveDiagonal = positiveDiagonal && a_ii > 0;
-				_invDiag[i] = 1 / a_ii;
+				invDiag[i] = (T)(1 / a_ii);
 			}
 			if (!Communicator::Current().All(positiveDiagonal))
 				Utils::FatalError("The Chebyshev smoothers require a symmetric positive definite matrix: non-positive diagonal coefficient.");
@@ -120,7 +174,7 @@ private:
 		else
 			_diagBlockSolver.Setup(A, _blockSize);
 
-		_lambdaMaxEstimate = EstimateLambdaMax();
+		_lambdaMaxEstimate = EstimateLambdaMax<T>();
 
 		Flops lanczosIteration = Cost::MatVec(A) + 2 * _blockSize * A.rows() + 10 * A.rows();
 		this->SetupComputationalWork = (nb * 2.0/3.0*pow(_blockSize, 3) + EigenvalueEstimateIterations * lanczosIteration) * 1e-6;
@@ -140,6 +194,16 @@ public:
 		return true;
 	}
 
+	bool SetupSinglePrecisionFrom(const FloatSparseMatrix& A, const IterativeSolver& other) override
+	{
+		const BlockChebyshev* o = dynamic_cast<const BlockChebyshev*>(&other);
+		if (!o || o->_singleMatrix != &A || o->_blockSize != _blockSize || this->ComputeExactSolution)
+			return false;
+		_singleMatrix = &A;
+		CopySetup(*o);
+		return true;
+	}
+
 	bool SetupFrom(const DistributedMatrix& A, const IterativeSolver& other) override
 	{
 		const BlockChebyshev* o = dynamic_cast<const BlockChebyshev*>(&other);
@@ -154,7 +218,8 @@ private:
 	void CopySetup(const BlockChebyshev& o)
 	{
 		_diagBlockSolver = o._diagBlockSolver;
-		_invDiag = o._invDiag;
+		_double.InvDiag = o._double.InvDiag;
+		_single.InvDiag = o._single.InvDiag;
 		_lambdaMaxEstimate = o._lambdaMaxEstimate;
 		this->SetupComputationalWork = o.SetupComputationalWork;
 	}
@@ -180,7 +245,28 @@ public:
 		}
 		assert(this->StoppingCrit == StoppingCriteria::MaxIterations); // a smoother only: a fixed polynomial
 
-		const SparseMatrix& A = *this->Matrix;
+		this->Residual = Vector();
+		Flops flops = Iterate(b, x, xEquals0, computeResidual ? &this->Residual : nullptr, computeAx ? &this->Ax : nullptr);
+		this->IterationCount = this->MaxIterations;
+		this->SolvingComputationalWork = flops * 1e-6;
+	}
+
+	void SolveInSinglePrecision(const FloatVector& b, FloatVector& x, bool xEquals0, FloatVector* residual, FloatVector* Ax) override
+	{
+		assert(this->MaxIterations > 0 && _singleMatrix);
+		Flops flops = Iterate(b, x, xEquals0, residual, Ax);
+		this->IterationCount = this->MaxIterations;
+		this->SolvingComputationalWork = flops * 1e-6;
+	}
+
+private:
+	// The m = MaxIterations iterations in precision T (Solve()); the residual (that of the recurrence) and A x in residual
+	// and Ax if not null. Returns the flops.
+	template <typename T>
+	Flops Iterate(const VectorOf<T>& b, VectorOf<T>& x, bool xEquals0, VectorOf<T>* residual, VectorOf<T>* Ax)
+	{
+		const SparseMatrixOf<T>& A = MatrixOf<T>();
+		Precision<T>& W = In<T>();
 		BigNumber n = A.rows();
 		int m = this->MaxIterations;
 		if (xEquals0 && x.rows() != n)
@@ -189,43 +275,40 @@ public:
 		vector<double> a, c;
 		Coefficients(m, a, c);
 
-		_d.resize(n);
-		_dNext.resize(n);
-		_r.resize(n);
-		this->Residual = Vector();
-		Flops matVec = Cost::MatVec(A);
+		W.d.resize(n);
+		W.dNext.resize(n);
+		W.r.resize(n);
+		Flops matVec = Cost::SpMatVec(A.nonZeros());
 		Flops update = (2 * _blockSize + 3) * n; // D^-1 r and the linear combination of d
 		Flops flops = 0;
 
-		const double* r = b.data(); // r_k (b while x = 0)
+		const T* r = b.data(); // r_k (b while x = 0)
 		if (xEquals0)
 		{
-			Pass(nullptr, b.data(), nullptr, nullptr, _d.data(), 0, c[0], nullptr, false);                         flops += update;
+			Pass<T>(nullptr, b.data(), nullptr, nullptr, W.d.data(), 0, c[0], nullptr, false);                         flops += update;
 		}
 		else
 		{
-			Pass(x.data(), b.data(), _r.data(), nullptr, _d.data(), 0, c[0], nullptr, false);                      flops += matVec + update;
-			r = _r.data();
+			Pass<T>(x.data(), b.data(), W.r.data(), nullptr, W.d.data(), 0, c[0], nullptr, false);                     flops += matVec + update;
+			r = W.r.data();
 		}
 		for (int k = 1; k < m; k++)
 		{
-			Pass(_d.data(), r, _r.data(), _d.data(), _dNext.data(), a[k], c[k], x.data(), xEquals0);              flops += matVec + update + n;
-			r = _r.data();
+			Pass<T>(W.d.data(), r, W.r.data(), W.d.data(), W.dNext.data(), a[k], c[k], x.data(), xEquals0);            flops += matVec + update + n;
+			r = W.r.data();
 			xEquals0 = false;
-			_d.swap(_dNext);
+			W.d.swap(W.dNext);
 		}
-		bool residual = computeResidual || computeAx;
-		Pass(residual ? _d.data() : nullptr, r, _r.data(), _d.data(), nullptr, 0, 0, x.data(), xEquals0);         flops += (residual ? matVec : 0) + n;
+		bool computeResidual = residual || Ax;
+		Pass<T>(computeResidual ? W.d.data() : nullptr, r, W.r.data(), W.d.data(), nullptr, 0, 0, x.data(), xEquals0); flops += (computeResidual ? matVec : 0) + n;
 
-		if (computeAx)
+		if (Ax)
 		{
-			this->Ax = b - _r;                                                                                    flops += n;
+			*Ax = b - W.r;                                                                                        flops += n;
 		}
-		if (computeResidual)
-			this->Residual = std::move(_r);
-
-		this->IterationCount = m;
-		this->SolvingComputationalWork = flops * 1e-6;
+		if (residual)
+			*residual = std::move(W.r);
+		return flops;
 	}
 
 private:
@@ -274,34 +357,39 @@ private:
 	// rIn may be r (in place). v must be neither r nor dOut nor x.
 	// On several processes, A v is Diag v + Offd vGhosts, with the values of v of the ghosts of the column map (halo
 	// exchange).
-	void Pass(const double* v, const double* rIn, double* r, const double* dIn, double* dOut, double a, double c, double* x, bool xEquals0)
+	// In precision T: the matrix and the vectors in T, the sums in double (in single precision: rounded when stored).
+	template <typename T>
+	void Pass(const T* v, const T* rIn, T* r, const T* dIn, T* dOut, double a, double c, T* x, bool xEquals0)
 	{
-		const SparseMatrix& A = *this->Matrix;
+		const SparseMatrixOf<T>& A = MatrixOf<T>();
 		const SparseMatrixIndex* outer = A.outerIndexPtr();
 		const SparseMatrixIndex* col = A.innerIndexPtr();
-		const double* val = A.valuePtr();
+		const T* val = A.valuePtr();
 		BigNumber nb = A.rows() / _blockSize;
-		// Off-process columns (none on one process)
+		// Off-process columns (none on one process; the single precision is on one process only)
 		Vector vGhosts;
 		const SparseMatrixIndex* offdOuter = nullptr;
 		const SparseMatrixIndex* offdCol = nullptr;
 		const double* offdVal = nullptr;
-		if (this->Distributed && v)
+		if constexpr (std::is_same_v<T, double>)
 		{
-			vGhosts = this->Distributed->GhostValues(v);
-			const SparseMatrix& offd = this->Distributed->Offd;
-			if (offd.nonZeros() > 0)
+			if (this->Distributed && v)
 			{
-				offdOuter = offd.outerIndexPtr();
-				offdCol = offd.innerIndexPtr();
-				offdVal = offd.valuePtr();
+				vGhosts = this->Distributed->GhostValues(v);
+				const SparseMatrix& offd = this->Distributed->Offd;
+				if (offd.nonZeros() > 0)
+				{
+					offdOuter = offd.outerIndexPtr();
+					offdCol = offd.innerIndexPtr();
+					offdVal = offd.valuePtr();
+				}
 			}
 		}
 		const double* vg = vGhosts.data();
 
 		if (_blockSize == 1)
 		{
-			const double* invDiag = _invDiag.data();
+			const T* invDiag = In<T>().InvDiag.data();
 			#pragma omp parallel for if (A.nonZeros() > 20000)
 			for (BigNumber i = 0; i < nb; i++)
 			{
@@ -311,14 +399,14 @@ private:
 					if (v)
 					{
 						for (SparseMatrixIndex p = outer[i]; p < outer[i + 1]; p++)
-							r_i -= val[p] * v[col[p]];
+							r_i -= (double)val[p] * v[col[p]];
 						if (offdOuter)
 							for (SparseMatrixIndex p = offdOuter[i]; p < offdOuter[i + 1]; p++)
 								r_i -= offdVal[p] * vg[offdCol[p]];
-						r[i] = r_i;
+						r[i] = (T)r_i;
 					}
 					if (dOut)
-						dOut[i] = (dIn ? a * dIn[i] : 0) + c * (invDiag[i] * r_i);
+						dOut[i] = (T)((dIn ? a * dIn[i] : 0) + c * (invDiag[i] * r_i));
 				}
 				if (x)
 					x[i] = xEquals0 ? dIn[i] : x[i] + dIn[i];
@@ -328,7 +416,7 @@ private:
 		{
 			#pragma omp parallel if (A.nonZeros() > 20000)
 			{
-				Vector r_I(_blockSize), z_I(_blockSize); // work vectors, allocated once per thread
+				VectorOf<T> r_I(_blockSize), z_I(_blockSize); // work vectors, allocated once per thread
 				#pragma omp for
 				for (BigNumber I = 0; I < nb; I++)
 				{
@@ -340,19 +428,19 @@ private:
 						if (v)
 						{
 							for (SparseMatrixIndex p = outer[i]; p < outer[i + 1]; p++)
-								r_i -= val[p] * v[col[p]];
+								r_i -= (double)val[p] * v[col[p]];
 							if (offdOuter)
 								for (SparseMatrixIndex p = offdOuter[i]; p < offdOuter[i + 1]; p++)
 									r_i -= offdVal[p] * vg[offdCol[p]];
-							r[i] = r_i;
+							r[i] = (T)r_i;
 						}
-						r_I[k] = r_i;
+						r_I[k] = (T)r_i;
 					}
 					if (dOut)
 					{
 						_diagBlockSolver.Solve(I, r_I, z_I); // r_I destroyed
 						for (int k = 0; k < _blockSize; k++)
-							dOut[i0 + k] = (dIn ? a * dIn[i0 + k] : 0) + c * z_I[k];
+							dOut[i0 + k] = (T)((dIn ? a * dIn[i0 + k] : 0) + c * z_I[k]);
 					}
 					if (x)
 					{
@@ -364,19 +452,20 @@ private:
 		}
 	}
 
-	// z = D^-1 r
-	void ApplyInverseDiagonal(const Vector& r, Vector& z) const
+	// z = D^-1 r, in precision T
+	template <typename T>
+	void ApplyInverseDiagonal(const VectorOf<T>& r, VectorOf<T>& z) const
 	{
-		const SparseMatrix& A = *this->Matrix;
+		const SparseMatrixOf<T>& A = MatrixOf<T>();
 		if (_blockSize == 1)
 		{
-			z = _invDiag.cwiseProduct(r);
+			z = In<T>().InvDiag.cwiseProduct(r);
 			return;
 		}
 		BigNumber nb = A.rows() / _blockSize;
 		#pragma omp parallel if (A.nonZeros() > 20000)
 		{
-			Vector r_I(_blockSize), z_I(_blockSize);
+			VectorOf<T> r_I(_blockSize), z_I(_blockSize);
 			#pragma omp for
 			for (BigNumber I = 0; I < nb; I++)
 			{
@@ -391,14 +480,15 @@ private:
 	// tridiagonal matrix is given by the coefficients of the conjugate gradient preconditioned by D (Saad, Iterative
 	// Methods for Sparse Linear Systems, 2nd ed., 2003, §6.7.3). Its largest eigenvalue approaches lambdaMax from below.
 	// Pseudo-random start vector, a function of the index only: the estimate is the same in every run, whatever the
-	// number of threads.
+	// number of threads. In precision T (the dot products in double).
+	template <typename T>
 	double EstimateLambdaMax() const
 	{
-		const SparseMatrix& A = *this->Matrix;
+		const SparseMatrixOf<T>& A = MatrixOf<T>();
 		BigNumber n = A.rows();
 		// On several processes: the global numbers of the rows, the products with the distributed matrix
 		BigNumber firstRow = this->Distributed ? this->Distributed->RowMap->Begin * this->Distributed->RowBlockSize : 0;
-		Vector r(n), z(n), p, Ap(n);
+		VectorOf<T> r(n), z(n), p, Ap(n);
 		for (BigNumber i = 0; i < n; i++)
 			r[i] = PseudoRandom(firstRow + i);
 		ApplyInverseDiagonal(r, z);
@@ -410,8 +500,13 @@ private:
 		vector<double> alpha, beta;
 		for (int j = 0; j < EigenvalueEstimateIterations; j++)
 		{
-			if (this->Distributed)
-				Ap = *this->Distributed * p;
+			if constexpr (std::is_same_v<T, double>)
+			{
+				if (this->Distributed)
+					Ap = *this->Distributed * p;
+				else
+					Ap.noalias() = A * p;
+			}
 			else
 				Ap.noalias() = A * p;
 			double pAp = Parallel::Dot(p, Ap);
@@ -420,25 +515,25 @@ private:
 			alpha.push_back(rz / pAp);
 			if (j == EigenvalueEstimateIterations - 1)
 				break;
-			r -= alpha.back() * Ap;
+			r -= T(alpha.back()) * Ap;
 			ApplyInverseDiagonal(r, z);
 			double rzNext = Parallel::Dot(r, z);
 			if (!(rzNext > 1e-28 * rz0)) // invariant Krylov subspace: the eigenvalues of the tridiagonal matrix are exact
 				break;
 			beta.push_back(rzNext / rz);
-			p = z + beta.back() * p;
+			p = z + T(beta.back()) * p;
 			rz = rzNext;
 		}
 
 		int m = alpha.size();
-		DenseMatrix T = DenseMatrix::Zero(m, m);
+		DenseMatrix tridiagonal = DenseMatrix::Zero(m, m);
 		for (int j = 0; j < m; j++)
 		{
-			T(j, j) = 1 / alpha[j] + (j > 0 ? beta[j - 1] / alpha[j - 1] : 0);
+			tridiagonal(j, j) = 1 / alpha[j] + (j > 0 ? beta[j - 1] / alpha[j - 1] : 0);
 			if (j > 0)
-				T(j, j - 1) = T(j - 1, j) = sqrt(beta[j - 1]) / alpha[j - 1];
+				tridiagonal(j, j - 1) = tridiagonal(j - 1, j) = sqrt(beta[j - 1]) / alpha[j - 1];
 		}
-		Eigen::SelfAdjointEigenSolver<DenseMatrix> eigenSolver(T, Eigen::EigenvaluesOnly);
+		Eigen::SelfAdjointEigenSolver<DenseMatrix> eigenSolver(tridiagonal, Eigen::EigenvaluesOnly);
 		return eigenSolver.eigenvalues().maxCoeff();
 	}
 

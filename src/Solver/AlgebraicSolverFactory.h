@@ -216,6 +216,7 @@ public:
 		mg->CoarseningFactor = args.Solver.MG.CoarseningFactor;
 		mg->ExportComponents = args.Actions.Export.MultigridComponents;
 		mg->ExportIterationVectors = args.Actions.Export.MultigridIterationVectors;
+		mg->MixedPrecision = args.Solver.MG.UAMGMixedPrecision;
 
 		// Symmetric post-smoother: the adjoint of the pre-smoother
 		if (mg->PostSmoother == SmootherType::Default)

@@ -120,6 +120,25 @@ public:
 		Utils::FatalError("This solver is not compatible with matrix blocks arising from a hybrid discretization.");
 	}
 
+	// Mixed precision: a solver usable in single precision (the smoothers of the levels of U-AMG in single precision,
+	// Multigrid::MixedPrecision), set up with a matrix in single precision (instead of Setup()).
+	virtual bool SupportsSinglePrecision() const { return false; }
+	virtual void SetupSinglePrecision(const FloatSparseMatrix& A)
+	{
+		Utils::FatalError("This solver has no single precision version.");
+	}
+	// As SetupFrom()
+	virtual bool SetupSinglePrecisionFrom(const FloatSparseMatrix& A, const IterativeSolver& other)
+	{
+		return false;
+	}
+	// As Solve(b, x, xEquals0, computeResidual, computeAx), in single precision: the residual and A x in residual and Ax
+	// if not null
+	virtual void SolveInSinglePrecision(const FloatVector& b, FloatVector& x, bool xEquals0, FloatVector* residual, FloatVector* Ax)
+	{
+		Utils::FatalError("This solver has no single precision version.");
+	}
+
 	virtual bool CanOptimizeResidualComputation()
 	{
 		return false;

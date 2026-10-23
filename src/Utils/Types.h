@@ -30,6 +30,15 @@ using DenseMatrix = Eigen::MatrixXd;
 
 using Vector = Eigen::VectorXd;
 
+// Mixed precision: the matrices and vectors of the levels of U-AMG in single precision (Multigrid::MixedPrecision);
+// the levels and the cycle are templated on the scalar type T (double or float)
+template <typename T>
+using VectorOf = Eigen::Matrix<T, Eigen::Dynamic, 1>;
+template <typename T>
+using SparseMatrixOf = Eigen::SparseMatrix<T, Eigen::RowMajor, SparseMatrixIndex>;
+using FloatVector = VectorOf<float>;
+using FloatSparseMatrix = SparseMatrixOf<float>;
+
 template<int Dim>
 using DimVector = Eigen::Matrix<double, Dim, 1>;
 

@@ -45,9 +45,11 @@ struct FaceAggregation
 	}
 };
 
+// A level of U-AMG: the part that doesn't depend on the precision of its matrices (UncondensedLevelOf<T>), the options,
+// the sizes of the blocks and the interpolations of 1
 class UncondensedLevel : public Level
 {
-private:
+protected:
 	UAMGFaceProlongation _faceProlong = UAMGFaceProlongation::FaceAggregates;
 	UAMGProlongation _coarseningProlong = UAMGProlongation::FaceProlongation;
 	UAMGProlongation _multigridProlong = UAMGProlongation::ReconstructSmoothedTraceOrInject;
@@ -56,36 +58,6 @@ private:
 	int _faceBlockSize;
 	double _strongCouplingThreshold;
 public:
-	const SparseMatrix* A_T_T;
-	const SparseMatrix* A_T_F;
-	const SparseMatrix* A_F_F;
-	// Non-symmetric matrix: the block A_F_T (faces x cells); null if the matrix is symmetric (A_F_T = A_T_F^T)
-	const SparseMatrix* A_F_T = nullptr;
-private:
-	//SparseMatrix Q_T;
-	SparseMatrix Q_F;
-
-	SparseMatrix A_T_Tc;
-	SparseMatrix A_T_Fc;
-	SparseMatrix A_F_Fc;
-	SparseMatrix A_F_Tc;
-	SparseMatrix _extractedA_F_T;     // A_F_T of a p-coarse level (SetupOperatorByBlockExtraction())
-	vector<BigNumber> _downwindOrder; // non-symmetric matrix: the order of the faces in the sweeps of the smoothers
-	// On several processes (see FaceMap): the faces of A_T_Fc (the FaceMap of the coarser level), the coarse operator
-	// (that of the coarser level), and the operator of a p-coarse level
-	shared_ptr<const IndexMap> _coarseFaceMap;
-	DistributedMatrix _distributedAc;
-	DistributedMatrix _extractedOperator;
-	SparseMatrix _extractedA_T_T, _extractedA_T_F;
-	// The prolongations of the coarsening passes of this level, P_1 (the faces of this level) to P_n (KeepPassProlongations),
-	// their transposes, and the intermediate vectors of the transfers (_transferBuffers[i]: the faces of the pass i,
-	// i = 1..n-1). Empty if the transfers use P (the product).
-	vector<SparseMatrix> _passP;
-	vector<SparseMatrix> _passR;
-	vector<Vector> _transferBuffers;
-public:
-	SparseMatrix Ac;
-
 	// The transfers of the levels built by the flat coarsening passes (on one process, with the chained coarsening
 	// prolongations), whose faces have at least PassProlongationsMinFaceBlockSize DoFs, apply the prolongations of the
 	// passes one after the other, P_1 (P_2 (... P_n e)), and their transposes, R_n (... (R_1 r)), instead of their
@@ -96,6 +68,14 @@ public:
 	// of HybridAlgebraicMesh (the reference of the tests).
 	inline static bool KeepPassProlongations = true;
 	inline static int PassProlongationsMinFaceBlockSize = 2;
+
+	// The blocks of the matrix of the level, in double whatever the precision of the levels (they are only read by the
+	// setup)
+	const SparseMatrix* A_T_T;
+	const SparseMatrix* A_T_F;
+	const SparseMatrix* A_F_F;
+	// Non-symmetric matrix: the block A_F_T (faces x cells); null if the matrix is symmetric (A_F_T = A_T_F^T)
+	const SparseMatrix* A_F_T = nullptr;
 
 	// On several processes (MPI, DistributedOperator set): the local numbers of the faces of the columns of A_T_F, i.e.
 	// of the faces of the cells of the process: its own faces (those of the rows of the operator), then the others
@@ -123,10 +103,6 @@ public:
 	// take its value instead of the average of the faces of their coarse element (see BuildQ_F()).
 	bool ManageAnisotropy = true;
 
-	// Local matrices of the operator, shared by the levels (set by UncondensedAMG). If null, the Galerkin products
-	// of the coarsening passes are global sparse products.
-	LocalOperator* LocalOp = nullptr;
-
 	// Interpolation of the function 1 on the bases of the cells and faces of this level, one coefficient c per cell and
 	// per face (hierarchical bases with a constant first function phi_0: 1 = c phi_0), used to rescale the matrices
 	// before the h-coarsening (see CoarsenMesh()). The same on the p-coarse levels (same phi_0). Empty if c = 1
@@ -135,7 +111,10 @@ public:
 	Vector CellInterpOfOne;
 	Vector FaceInterpOfOne;
 
-public:
+	// Local matrices of the operator, shared by the levels (set by UncondensedAMG). If null, the Galerkin products
+	// of the coarsening passes are global sparse products.
+	LocalOperator* LocalOp = nullptr;
+
 	// The coarsening passes with the default options run on flat arrays (CoarseningPass, see FlatPassesApply()). False
 	// runs those of HybridAlgebraicMesh, which give the same results and implement the other options: the reference
 	// against which the tests check the flat passes.
@@ -183,6 +162,177 @@ public:
 		return _faceBlockSize;
 	}
 
+	// Mixed precision: the levels in single precision (UncondensedLevelOf<float>) run the flat coarsening passes with the
+	// chained coarsening prolongations (and, checked by UncondensedAMG, the Galerkin operators, the p-levels before the
+	// h-levels only, on one process, for a symmetric matrix)
+	bool MixedPrecisionApplies(H_CoarsStgy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy) const
+	{
+		return FlatPassesApply(coarseningStgy, faceCoarseningStgy) && _multigridProlong == UAMGProlongation::ChainedCoarseningProlongations;
+	}
+
+	// Copy of A whose coefficient (i, j) is multiplied by d_i d_j, d being the interpolation of 1 of the block (the
+	// coordinate c of the constant) on the first DoF of each block of rows (resp. columns), and 1 on the other DoFs
+	// (an empty vector: 1 everywhere)
+	static SparseMatrix ScaleConstantDoFs(const SparseMatrix& A, const Vector& rowInterpOfOne, int rowBlockSize, const Vector& colInterpOfOne, int colBlockSize)
+	{
+		SparseMatrix scaled = A;
+		BigNumber nRows = scaled.rows();
+		bool rows = rowInterpOfOne.rows() > 0, cols = colInterpOfOne.rows() > 0;
+		#pragma omp parallel for
+		for (BigNumber i = 0; i < nRows; ++i)
+		{
+			double d_i = rows && i % rowBlockSize == 0 ? rowInterpOfOne[i / rowBlockSize] : 1;
+			for (SparseMatrix::InnerIterator it(scaled, i); it; ++it)
+			{
+				BigNumber j = it.col();
+				double d_j = cols && j % colBlockSize == 0 ? colInterpOfOne[j / colBlockSize] : 1;
+				it.valueRef() *= d_i * d_j;
+			}
+		}
+		return scaled;
+	}
+
+	// A rescaled by ScaleConstantDoFs() into storage, or A itself if both interpolations are empty (or A null)
+	static const SparseMatrix* ScaledConstantDoFs(const SparseMatrix* A, const Vector& rowInterpOfOne, int rowBlockSize, const Vector& colInterpOfOne, int colBlockSize, SparseMatrix& storage)
+	{
+		if (!A || (rowInterpOfOne.rows() == 0 && colInterpOfOne.rows() == 0))
+			return A;
+		storage = ScaleConstantDoFs(*A, rowInterpOfOne, rowBlockSize, colInterpOfOne, colBlockSize);
+		return &storage;
+	}
+
+	// Multiplies the row of the first DoF of each block by the interpolation of 1 of the block (the coordinate c of the
+	// constant). M of any precision.
+	template <typename S>
+	static void ScaleConstantRows(SparseMatrixOf<S>& M, const Vector& interpOfOne, int blockSize)
+	{
+		BigNumber nBlocks = interpOfOne.rows();
+		#pragma omp parallel for
+		for (BigNumber b = 0; b < nBlocks; ++b)
+		{
+			for (typename SparseMatrixOf<S>::InnerIterator it(M, b * blockSize); it; ++it)
+				it.valueRef() *= interpOfOne[b];
+		}
+	}
+
+	bool CoarseningCriteriaReached(H_CoarsStgy coarseningStgy, double requestedCoarseningRatio, int nCoarseningsPerformed, double coarseningRatio)
+	{
+		if (coarseningStgy == H_CoarsStgy::DoublePairwiseAggregation)
+			return nCoarseningsPerformed == 2;
+		if (coarseningStgy == H_CoarsStgy::MultiplePairwiseAggregation)
+			return coarseningRatio >= requestedCoarseningRatio;
+		if (coarseningStgy == H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours)
+			return nCoarseningsPerformed == 1; // only 1 pass of coarsening
+		if (coarseningStgy == H_CoarsStgy::MultipleAgglomerationCoarseningByFaceNeighbours)
+			return coarseningRatio >= requestedCoarseningRatio;
+		return nCoarseningsPerformed == 1;
+	}
+
+	// The coarsening passes run on flat arrays (CoarseningPass), with the same results, with the local Galerkin products
+	// (interface collapsing, coarsening prolongations 3 to 6), the aggregations of the cells, and the multigrid
+	// prolongations other than FindInteriorThatReconstructs (which needs HybridAlgebraicMesh)
+	bool FlatPassesApply(H_CoarsStgy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy) const
+	{
+		return UseFlatPasses && LocalGalerkinProducts()
+			&& _multigridProlong != UAMGProlongation::FindInteriorThatReconstructs && _multigridProlong != UAMGProlongation::ReconstructionTranspose2Steps
+			&& (coarseningStgy == H_CoarsStgy::MultiplePairwiseAggregation || coarseningStgy == H_CoarsStgy::DoublePairwiseAggregation
+				|| coarseningStgy == H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours || coarseningStgy == H_CoarsStgy::MultipleAgglomerationCoarseningByFaceNeighbours)
+			&& faceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsing;
+	}
+
+	// The Galerkin products of the coarsening passes are computed locally (see LocalMatrices) if the coarsening
+	// prolongation sends the faces of a cell only to the coarse faces of its aggregate: with the face prolongations
+	// with interface collapsing, and the coarsening prolongations made of the face prolongation on the kept faces.
+	bool LocalGalerkinProducts() const
+	{
+		bool interfaceCollapsing = _faceProlong == UAMGFaceProlongation::BoundaryAggregatesInteriorAverage || _faceProlong == UAMGFaceProlongation::BoundaryAggregatesInteriorZero;
+		bool localProlongation = _coarseningProlong == UAMGProlongation::FaceProlongation || _coarseningProlong == UAMGProlongation::FaceProlongationAndInteriorSmoothing
+			|| _coarseningProlong == UAMGProlongation::ReconstructTraceOrInject || _coarseningProlong == UAMGProlongation::ReconstructSmoothedTraceOrInject
+			|| _coarseningProlong == UAMGProlongation::HarmonicExtensionOrInject;
+		return LocalOp && interfaceCollapsing && localProlongation;
+	}
+
+	// The coarsening prolongation HarmonicExtensionOrInject converts no cell value into face values: it doesn't use the
+	// blocks A_T_T (of this level, of the coarse levels). The interpolations of 1 on the cells still enter the
+	// couplings of the aggregation (see CoarsenMesh()).
+	bool UsesCellBlocks() const
+	{
+		return _coarseningProlong != UAMGProlongation::HarmonicExtensionOrInject;
+	}
+
+	// HarmonicExtensionOrInject is only implemented in the flat coarsening passes, as coarsening prolongation chained
+	// over the passes (checked by UncondensedAMG::Setup(), the coarsening options known)
+	void CheckHarmonicExtension(H_CoarsStgy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy) const
+	{
+		if (_coarseningProlong == UAMGProlongation::HarmonicExtensionOrInject
+			&& (!FlatPassesApply(coarseningStgy, faceCoarseningStgy) || _multigridProlong != UAMGProlongation::ChainedCoarseningProlongations))
+			Utils::FatalError("UncondensedAMG: the coarsening prolongation " + to_string((unsigned)UAMGProlongation::HarmonicExtensionOrInject) + " (-coarsening-prolong) runs with the pairwise aggregation or the agglomeration (-cs mpa, dpa, n, mn), the interface collapsing (-fcs c, -face-prolong 1, 2), the Galerkin operator, and the chained coarsening prolongations as multigrid prolongation (-prolong 2).");
+	}
+};
+
+// A level of U-AMG, the matrices of its cycle (operator, transfers, smoothers) in precision T: double, or float
+// (Multigrid::MixedPrecision, see MixedPrecisionApplies()). The setup is the same in both: in double (the blocks, the
+// local matrices of the operator and the prolongations of the coarsening passes, the operators of the p-levels: the same
+// aggregates and coarse matrices), its results stored in T as they are produced (the coarse operator assembled in T).
+template <typename T>
+class UncondensedLevelOf : public UncondensedLevel
+{
+private:
+	//SparseMatrix Q_T;
+	SparseMatrix Q_F;
+
+	SparseMatrix A_T_Tc;
+	SparseMatrix A_T_Fc;
+	SparseMatrix A_F_Fc;
+	SparseMatrix A_F_Tc;
+	// The blocks of a p-coarse level (SetupOperatorByBlockExtraction()), and its operator on one process (in double, the
+	// input of the setup of the coarser levels; in single precision, also rounded: the operator of the cycle)
+	SparseMatrix _extractedA, _extractedA_T_T, _extractedA_T_F, _extractedA_F_F, _extractedA_F_T;
+	FloatSparseMatrix _singleExtractedA;
+	vector<BigNumber> _downwindOrder; // non-symmetric matrix: the order of the faces in the sweeps of the smoothers
+	// On several processes (see FaceMap): the faces of A_T_Fc (the FaceMap of the coarser level), the coarse operator
+	// (that of the coarser level), and the operator of a p-coarse level
+	shared_ptr<const IndexMap> _coarseFaceMap;
+	DistributedMatrix _distributedAc;
+	DistributedMatrix _extractedOperator;
+	// The prolongations of the coarsening passes of this level, P_1 (the faces of this level) to P_n (KeepPassProlongations),
+	// their transposes, and the intermediate vectors of the transfers (_transferBuffers[i]: the faces of the pass i,
+	// i = 1..n-1). Empty if the transfers use P (the product).
+	vector<SparseMatrixOf<T>> _passP;
+	vector<SparseMatrixOf<T>> _passR;
+	vector<VectorOf<T>> _transferBuffers;
+
+	// The operator (its pointer), the prolongation and the restriction of this level in precision T
+	const SparseMatrixOf<T>*& Op() { return this->template OperatorOf<T>(); }
+	SparseMatrixOf<T>& Prolongation() { return this->template ProlongationOf<T>(); }
+	SparseMatrixOf<T>& Restriction() { return this->template RestrictionOf<T>(); }
+
+	// A matrix of the setup in precision T: moved in double, rounded in single precision
+	static SparseMatrixOf<T> InPrecision(SparseMatrix&& M)
+	{
+		if constexpr (std::is_same_v<T, double>)
+			return std::move(M);
+		else
+			return SparseMatrixOps::Cast<T>(M);
+	}
+public:
+	SparseMatrixOf<T> Ac;
+
+	UncondensedLevelOf(int number, int degree, int cellBlockSize, int faceBlockSize, double strongCouplingThreshold, UAMGFaceProlongation faceProlong, UAMGProlongation coarseningProlong, UAMGProlongation mgProlong)
+		: UncondensedLevel(number, degree, cellBlockSize, faceBlockSize, strongCouplingThreshold, faceProlong, coarseningProlong, mgProlong)
+	{}
+
+	// Mixed precision: after the setup, the operator in double of a p-level in single precision (the input of the setup
+	// of the coarser levels) is not needed, but on the coarsest level (the coarse solver's)
+	void ReleaseOperatorInDouble()
+	{
+		if (std::is_same_v<T, float> && this->OperatorMatrix == &_extractedA && !this->IsCoarsestLevel())
+		{
+			this->OperatorMatrix = nullptr;
+			_extractedA = SparseMatrix();
+		}
+	}
+
 	void CoarsenMesh(H_CoarsStgy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, FaceCollapsing bdryFaceCollapsing, double requestedCoarseningFactor, bool& noCoarserMeshProvided, bool& coarsestPossibleMeshReached) override
 	{
 		noCoarserMeshProvided = false;
@@ -190,16 +340,20 @@ public:
 
 		if (this->IsDistributed())
 		{
-			CoarsenMeshDistributed(coarseningStgy, faceCoarseningStgy, requestedCoarseningFactor, coarsestPossibleMeshReached);
+			if constexpr (std::is_same_v<T, double>) // not in single precision (UncondensedAMG)
+				CoarsenMeshDistributed(coarseningStgy, faceCoarseningStgy, requestedCoarseningFactor, coarsestPossibleMeshReached);
 			return;
 		}
 
-		if (!this->OperatorMatrix)
+		if constexpr (std::is_same_v<T, double>) // a level in single precision has its (Galerkin) operator
 		{
-			if (this->UseGalerkinOperator)
-				ComputeGalerkinOperator();
-			else
-				SetupDiscretizedOperator();
+			if (!this->OperatorMatrix)
+			{
+				if (this->UseGalerkinOperator)
+					ComputeGalerkinOperator();
+				else
+					SetupDiscretizedOperator();
+			}
 		}
 
 		if (CellInterpOfOne.rows() == 0)
@@ -253,53 +407,9 @@ public:
 			return;
 
 		// P = D_F P_z: the rows of P, or of the first prolongation of the passes (KeepPassProlongations)
-		ScaleConstantRows(_passP.empty() ? this->P : _passP[0], FaceInterpOfOne, _faceBlockSize);
+		ScaleConstantRows(_passP.empty() ? Prolongation() : _passP[0], FaceInterpOfOne, _faceBlockSize);
 		if (ComputeQ_F)
 			ScaleConstantRows(this->Q_F, FaceInterpOfOne, _faceBlockSize);
-	}
-
-	// Copy of A whose coefficient (i, j) is multiplied by d_i d_j, d being the interpolation of 1 of the block (the
-	// coordinate c of the constant) on the first DoF of each block of rows (resp. columns), and 1 on the other DoFs
-	// (an empty vector: 1 everywhere)
-	static SparseMatrix ScaleConstantDoFs(const SparseMatrix& A, const Vector& rowInterpOfOne, int rowBlockSize, const Vector& colInterpOfOne, int colBlockSize)
-	{
-		SparseMatrix scaled = A;
-		BigNumber nRows = scaled.rows();
-		bool rows = rowInterpOfOne.rows() > 0, cols = colInterpOfOne.rows() > 0;
-		#pragma omp parallel for
-		for (BigNumber i = 0; i < nRows; ++i)
-		{
-			double d_i = rows && i % rowBlockSize == 0 ? rowInterpOfOne[i / rowBlockSize] : 1;
-			for (SparseMatrix::InnerIterator it(scaled, i); it; ++it)
-			{
-				BigNumber j = it.col();
-				double d_j = cols && j % colBlockSize == 0 ? colInterpOfOne[j / colBlockSize] : 1;
-				it.valueRef() *= d_i * d_j;
-			}
-		}
-		return scaled;
-	}
-
-	// A rescaled by ScaleConstantDoFs() into storage, or A itself if both interpolations are empty (or A null)
-	static const SparseMatrix* ScaledConstantDoFs(const SparseMatrix* A, const Vector& rowInterpOfOne, int rowBlockSize, const Vector& colInterpOfOne, int colBlockSize, SparseMatrix& storage)
-	{
-		if (!A || (rowInterpOfOne.rows() == 0 && colInterpOfOne.rows() == 0))
-			return A;
-		storage = ScaleConstantDoFs(*A, rowInterpOfOne, rowBlockSize, colInterpOfOne, colBlockSize);
-		return &storage;
-	}
-
-	// Multiplies the row of the first DoF of each block by the interpolation of 1 of the block (the coordinate c of the
-	// constant)
-	static void ScaleConstantRows(SparseMatrix& M, const Vector& interpOfOne, int blockSize)
-	{
-		BigNumber nBlocks = interpOfOne.rows();
-		#pragma omp parallel for
-		for (BigNumber b = 0; b < nBlocks; ++b)
-		{
-			for (SparseMatrix::InnerIterator it(M, b * blockSize); it; ++it)
-				it.valueRef() *= interpOfOne[b];
-		}
 	}
 
 	//------------------------------------------------------------------------------------------------------------------//
@@ -307,7 +417,7 @@ public:
 	//------------------------------------------------------------------------------------------------------------------//
 
 	// CoarsenMesh() on several processes: the flat coarsening passes (CoarsenInDistributedPasses()), with the default
-	// options only, after the rescaling of the constants as on one process
+	// options only, after the rescaling of the constants as on one process. In double only.
 	void CoarsenMeshDistributed(H_CoarsStgy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double requestedCoarseningFactor, bool& coarsestPossibleMeshReached)
 	{
 		if (!FlatPassesApply(coarseningStgy, faceCoarseningStgy) || _multigridProlong != UAMGProlongation::ChainedCoarseningProlongations || ComputeCoarseA_F_F || ComputeQ_F)
@@ -452,11 +562,14 @@ public:
 	void CoarsenInPasses(H_CoarsStgy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double requestedCoarseningFactor, bool& coarsestPossibleMeshReached)
 	{
 		if (FlatPassesApply(coarseningStgy, faceCoarseningStgy))
-		{
 			CoarsenInFlatPasses(coarseningStgy, requestedCoarseningFactor, coarsestPossibleMeshReached);
-			return;
-		}
+		else if constexpr (std::is_same_v<T, double>) // the levels in single precision run the flat passes (MixedPrecisionApplies())
+			CoarsenInMeshPasses(coarseningStgy, faceCoarseningStgy, requestedCoarseningFactor, coarsestPossibleMeshReached);
+	}
 
+	// The coarsening passes of HybridAlgebraicMesh (the options other than those of the flat passes). In double only.
+	void CoarsenInMeshPasses(H_CoarsStgy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double requestedCoarseningFactor, bool& coarsestPossibleMeshReached)
+	{
 		SparseMatrix *auxP, *auxQ_F, *auxSchur;
 		HybridAlgebraicMesh *mesh, *coarseMesh;
 		const SparseMatrix* schur = this->OperatorMatrix;
@@ -578,28 +691,18 @@ public:
 		delete schur;
 	}
 
-	// The coarsening passes run on flat arrays (CoarseningPass), with the same results, with the local Galerkin products
-	// (interface collapsing, coarsening prolongations 3 to 6), the aggregations of the cells, and the multigrid
-	// prolongations other than FindInteriorThatReconstructs (which needs HybridAlgebraicMesh)
-	bool FlatPassesApply(H_CoarsStgy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy) const
-	{
-		return UseFlatPasses && LocalGalerkinProducts()
-			&& _multigridProlong != UAMGProlongation::FindInteriorThatReconstructs && _multigridProlong != UAMGProlongation::ReconstructionTranspose2Steps
-			&& (coarseningStgy == H_CoarsStgy::MultiplePairwiseAggregation || coarseningStgy == H_CoarsStgy::DoublePairwiseAggregation
-				|| coarseningStgy == H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours || coarseningStgy == H_CoarsStgy::MultipleAgglomerationCoarseningByFaceNeighbours)
-			&& faceCoarseningStgy == FaceCoarseningStrategy::InterfaceCollapsing;
-	}
-
 	void CoarsenInFlatPasses(H_CoarsStgy coarseningStgy, double requestedCoarseningFactor, bool& coarsestPossibleMeshReached)
 	{
 		_passP.clear();
-		// The blocks of the current pass: those of the level, then those computed by the previous pass
+		// The blocks of the current pass: those of the level, then those computed by the previous pass. The operator in
+		// double: null on the h-levels in single precision, whose local matrices are those of the finer level's last pass.
 		const SparseMatrix* schur = this->OperatorMatrix;
 		const SparseMatrix* passA_T_T = UsesCellBlocks() ? this->A_T_T : nullptr; // null with HarmonicExtensionOrInject
 		const SparseMatrix* passA_T_F = this->A_T_F;
 		const SparseMatrix* passA_F_T = this->A_F_T;
 		const SparseMatrix* passA_F_F = this->A_F_F;
 		SparseMatrix A_T_Tc, A_T_Fc, A_F_Tc, A_F_Fc;
+		SparseMatrix chainedP; // the product of the prolongations of the passes (in double: that of the setup)
 		double actualCoarseningFactor = 0;
 		int nCoarsenings = 0;
 
@@ -631,7 +734,7 @@ public:
 			}
 
 			// Local matrices of the operator, if they don't come from the previous coarsening pass
-			if (nCoarsenings == 0 && LocalOp->Assembled != schur)
+			if (nCoarsenings == 0 && LocalOp->Assembled != (schur ? (const void*)schur : (const void*)Op()))
 			{
 				LocalOp->Current.Decompose(*schur, pass.CellFaces, pass.FaceCells, _faceBlockSize, Symmetric);
 				LocalOp->Assembled = schur;
@@ -663,11 +766,11 @@ public:
 			if (chained)
 			{
 				if (KeepPassProlongations && _faceBlockSize >= PassProlongationsMinFaceBlockSize)
-					_passP.push_back(std::move(passP)); // not chained: see KeepPassProlongations
+					_passP.push_back(InPrecision(std::move(passP))); // not chained: see KeepPassProlongations
 				else if (nCoarsenings == 0)
-					this->P = std::move(passP);
+					chainedP = std::move(passP);
 				else
-					this->P = SparseMatrixOps::Multiply(this->P, passP);
+					chainedP = SparseMatrixOps::Multiply(chainedP, passP);
 			}
 			else
 			{
@@ -717,53 +820,58 @@ public:
 
 		if (!chained)
 		{
-			// Multigrid prolongation, on the fine mesh of the level (as at the end of CoarsenInPasses())
-			FaceAggregation faces;
-			faces.NCells = fineCellAggregate.size();
-			faces.NAggregates = A_T_Tc.rows() / _cellBlockSize;
-			faces.IsRemoved.resize(fineFaceState.size());
-			faces.RemovedFaceAggregate.resize(fineFaceState.size());
-			for (BigNumber f = 0; f < (BigNumber)fineFaceState.size(); ++f)
+			if constexpr (std::is_same_v<T, double>) // the levels in single precision chain the coarsening prolongations
 			{
-				faces.IsRemoved[f] = fineFaceState[f] < 0;
-				faces.RemovedFaceAggregate[f] = fineFaceState[f] < 0 ? -1 - fineFaceState[f] : -1;
-			}
-			faces.FaceCells = std::move(fineFaceCells);
-			SparseMatrix Q_T(faces.NCells * _cellBlockSize, faces.NAggregates * _cellBlockSize);
-			Q_T.resizeNonZeros(faces.NCells * _cellBlockSize);
-			for (BigNumber i = 0; i < faces.NCells * _cellBlockSize; ++i)
-			{
-				Q_T.outerIndexPtr()[i + 1] = i + 1;
-				Q_T.innerIndexPtr()[i] = fineCellAggregate[i / _cellBlockSize] * _cellBlockSize + i % _cellBlockSize;
-				Q_T.valuePtr()[i] = 1;
-			}
-			Q_T.outerIndexPtr()[0] = 0;
-			HybridAlgebraicMesh coarseMesh(&A_T_Tc, &A_T_Fc, ComputeCoarseA_F_F ? &A_F_Fc : nullptr, _cellBlockSize, _faceBlockSize, _strongCouplingThreshold);
-			coarseMesh.Symmetric = Symmetric;
-			coarseMesh.A_F_T = Symmetric ? nullptr : &A_F_Tc;
-			coarseMesh.BuildElementFaces(); // the coarse cells and faces are used by the reconstruction (Theta)
-			SparseMatrix* P = BuildProlongation(_multigridProlong, faces, *this->A_T_T, *this->A_T_F, this->A_F_F, this->A_F_T, this->OperatorMatrix, coarseMesh, Q_T, &Q_F);
-			SetProlongation(P);
+				// Multigrid prolongation, on the fine mesh of the level (as at the end of CoarsenInPasses())
+				FaceAggregation faces;
+				faces.NCells = fineCellAggregate.size();
+				faces.NAggregates = A_T_Tc.rows() / _cellBlockSize;
+				faces.IsRemoved.resize(fineFaceState.size());
+				faces.RemovedFaceAggregate.resize(fineFaceState.size());
+				for (BigNumber f = 0; f < (BigNumber)fineFaceState.size(); ++f)
+				{
+					faces.IsRemoved[f] = fineFaceState[f] < 0;
+					faces.RemovedFaceAggregate[f] = fineFaceState[f] < 0 ? -1 - fineFaceState[f] : -1;
+				}
+				faces.FaceCells = std::move(fineFaceCells);
+				SparseMatrix Q_T(faces.NCells * _cellBlockSize, faces.NAggregates * _cellBlockSize);
+				Q_T.resizeNonZeros(faces.NCells * _cellBlockSize);
+				for (BigNumber i = 0; i < faces.NCells * _cellBlockSize; ++i)
+				{
+					Q_T.outerIndexPtr()[i + 1] = i + 1;
+					Q_T.innerIndexPtr()[i] = fineCellAggregate[i / _cellBlockSize] * _cellBlockSize + i % _cellBlockSize;
+					Q_T.valuePtr()[i] = 1;
+				}
+				Q_T.outerIndexPtr()[0] = 0;
+				HybridAlgebraicMesh coarseMesh(&A_T_Tc, &A_T_Fc, ComputeCoarseA_F_F ? &A_F_Fc : nullptr, _cellBlockSize, _faceBlockSize, _strongCouplingThreshold);
+				coarseMesh.Symmetric = Symmetric;
+				coarseMesh.A_F_T = Symmetric ? nullptr : &A_F_Tc;
+				coarseMesh.BuildElementFaces(); // the coarse cells and faces are used by the reconstruction (Theta)
+				SparseMatrix* P = BuildProlongation(_multigridProlong, faces, *this->A_T_T, *this->A_T_F, this->A_F_F, this->A_F_T, this->OperatorMatrix, coarseMesh, Q_T, &Q_F);
+				SetProlongation(P);
 
-			this->A_T_Tc = std::move(A_T_Tc);
-			SparseMatrix Pt = SparseMatrixOps::Transpose(this->P);
-			this->A_T_Fc = SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(SparseMatrixOps::Transpose(Q_T), *this->A_T_F), this->P);
-			if (!Symmetric)
-				this->A_F_Tc = SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(Pt, *this->A_F_T), Q_T);
-			if (ComputeCoarseA_F_F)
-				this->A_F_Fc = SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(Pt, *this->A_F_F), this->P);
-			this->Ac     = SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(Pt, *this->OperatorMatrix), this->P);
+				this->A_T_Tc = std::move(A_T_Tc);
+				SparseMatrix Pt = SparseMatrixOps::Transpose(this->P);
+				this->A_T_Fc = SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(SparseMatrixOps::Transpose(Q_T), *this->A_T_F), this->P);
+				if (!Symmetric)
+					this->A_F_Tc = SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(Pt, *this->A_F_T), Q_T);
+				if (ComputeCoarseA_F_F)
+					this->A_F_Fc = SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(Pt, *this->A_F_F), this->P);
+				this->Ac     = SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(Pt, *this->OperatorMatrix), this->P);
+			}
 			return;
 		}
 
+		if (_passP.empty())
+			Prolongation() = InPrecision(std::move(chainedP));
 		this->A_T_Tc = std::move(A_T_Tc);
 		this->A_T_Fc = std::move(A_T_Fc);
 		if (!Symmetric)
 			this->A_F_Tc = std::move(A_F_Tc);
 		if (ComputeCoarseA_F_F)
 			this->A_F_Fc = std::move(A_F_Fc);
-		// The operator of the level is only assembled here (for the smoothers and the coarse solver)
-		this->Ac = LocalOp->Current.Assemble(this->A_T_Fc.cols() / _faceBlockSize);
+		// The operator of the level is only assembled here (for the smoothers and the coarse solver), in precision T
+		this->Ac = LocalOp->Current.template Assemble<T>(this->A_T_Fc.cols() / _faceBlockSize);
 		LocalOp->Assembled = &this->Ac;
 	}
 
@@ -862,51 +970,6 @@ public:
 		aggreg.RemovedFineFaces = removedFineFaces;
 	}
 
-
-	bool CoarseningCriteriaReached(H_CoarsStgy coarseningStgy, double requestedCoarseningRatio, int nCoarseningsPerformed, double coarseningRatio)
-	{
-		if (coarseningStgy == H_CoarsStgy::DoublePairwiseAggregation)
-			return nCoarseningsPerformed == 2;
-		if (coarseningStgy == H_CoarsStgy::MultiplePairwiseAggregation)
-			return coarseningRatio >= requestedCoarseningRatio;
-		if (coarseningStgy == H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours)
-			return nCoarseningsPerformed == 1; // only 1 pass of coarsening
-		if (coarseningStgy == H_CoarsStgy::MultipleAgglomerationCoarseningByFaceNeighbours)
-			return coarseningRatio >= requestedCoarseningRatio;
-		return nCoarseningsPerformed == 1;
-	}
-
-
-
-
-	// The Galerkin products of the coarsening passes are computed locally (see LocalMatrices) if the coarsening
-	// prolongation sends the faces of a cell only to the coarse faces of its aggregate: with the face prolongations
-	// with interface collapsing, and the coarsening prolongations made of the face prolongation on the kept faces.
-	bool LocalGalerkinProducts() const
-	{
-		bool interfaceCollapsing = _faceProlong == UAMGFaceProlongation::BoundaryAggregatesInteriorAverage || _faceProlong == UAMGFaceProlongation::BoundaryAggregatesInteriorZero;
-		bool localProlongation = _coarseningProlong == UAMGProlongation::FaceProlongation || _coarseningProlong == UAMGProlongation::FaceProlongationAndInteriorSmoothing
-			|| _coarseningProlong == UAMGProlongation::ReconstructTraceOrInject || _coarseningProlong == UAMGProlongation::ReconstructSmoothedTraceOrInject
-			|| _coarseningProlong == UAMGProlongation::HarmonicExtensionOrInject;
-		return LocalOp && interfaceCollapsing && localProlongation;
-	}
-
-	// The coarsening prolongation HarmonicExtensionOrInject converts no cell value into face values: it doesn't use the
-	// blocks A_T_T (of this level, of the coarse levels). The interpolations of 1 on the cells still enter the
-	// couplings of the aggregation (see CoarsenMesh()).
-	bool UsesCellBlocks() const
-	{
-		return _coarseningProlong != UAMGProlongation::HarmonicExtensionOrInject;
-	}
-
-	// HarmonicExtensionOrInject is only implemented in the flat coarsening passes, as coarsening prolongation chained
-	// over the passes (checked by UncondensedAMG::Setup(), the coarsening options known)
-	void CheckHarmonicExtension(H_CoarsStgy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy) const
-	{
-		if (_coarseningProlong == UAMGProlongation::HarmonicExtensionOrInject
-			&& (!FlatPassesApply(coarseningStgy, faceCoarseningStgy) || _multigridProlong != UAMGProlongation::ChainedCoarseningProlongations))
-			Utils::FatalError("UncondensedAMG: the coarsening prolongation " + to_string((unsigned)UAMGProlongation::HarmonicExtensionOrInject) + " (-coarsening-prolong) runs with the pairwise aggregation or the agglomeration (-cs mpa, dpa, n, mn), the interface collapsing (-fcs c, -face-prolong 1, 2), the Galerkin operator, and the chained coarsening prolongations as multigrid prolongation (-prolong 2).");
-	}
 
 	// Returns <coarseMesh, P, Q_F, schurc, coarsestPossibleMeshReached>.
 	// With the local Galerkin products, schur is null after the first coarsening pass of the level, and schurc is
@@ -1265,32 +1328,43 @@ public:
 		SparseMatrix* schur = new SparseMatrix(*A_F_F - (A_T_F->transpose()) * (inv_A_T_T) * (*A_T_F));
 		this->OperatorMatrix = schur;*/
 
-		UncondensedLevel* fine = dynamic_cast<UncondensedLevel*>(this->FinerLevel);
-		this->OperatorMatrix = new SparseMatrix(SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(SparseMatrixOps::Transpose(fine->Q_F), *(fine->OperatorMatrix)), fine->Q_F));
+		if constexpr (std::is_same_v<T, double>) // the levels in single precision have the Galerkin operator
+		{
+			UncondensedLevelOf* fine = dynamic_cast<UncondensedLevelOf*>(this->FinerLevel);
+			this->OperatorMatrix = new SparseMatrix(SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(SparseMatrixOps::Transpose(fine->Q_F), *(fine->OperatorMatrix)), fine->Q_F));
+		}
 	}
 
 public:
 	void SetupOperatorByBlockExtraction()
 	{
-		UncondensedLevel* fine = dynamic_cast<UncondensedLevel*>(FinerLevel);
+		UncondensedLevelOf* fine = dynamic_cast<UncondensedLevelOf*>(FinerLevel);
 		if (fine->IsDistributed())
 		{
-			SetupOperatorByBlockExtractionDistributed(*fine);
+			if constexpr (std::is_same_v<T, double>) // not in single precision (UncondensedAMG)
+				SetupOperatorByBlockExtractionDistributed(*fine);
 			return;
 		}
 
 		auto nElems = fine->A_T_F->rows() / fine->_cellBlockSize;
 		auto nFaces = fine->A_T_F->cols() / fine->_faceBlockSize;
 
-		this->OperatorMatrix = ExtractCoarseMatrix(*this->FinerLevel->OperatorMatrix, nFaces, nFaces, fine->_faceBlockSize, fine->_faceBlockSize, this->_faceBlockSize, this->_faceBlockSize);
+		_extractedA = ExtractCoarseMatrix(*fine->OperatorMatrix, nFaces, nFaces, fine->_faceBlockSize, fine->_faceBlockSize, this->_faceBlockSize, this->_faceBlockSize);
+		this->OperatorMatrix = &_extractedA;
+		if constexpr (std::is_same_v<T, float>)
+		{
+			_singleExtractedA = SparseMatrixOps::Cast<float>(_extractedA);
+			this->SingleOperatorMatrix = &_singleExtractedA;
+		}
 		// HarmonicExtensionOrInject: no A_T_T (UsesCellBlocks())
-		this->A_T_T = UsesCellBlocks() ? ExtractCoarseMatrix(*fine->A_T_T, nElems, nElems, fine->_cellBlockSize, fine->_cellBlockSize, this->_cellBlockSize, this->_cellBlockSize) : nullptr;
-		this->A_T_F = ExtractCoarseMatrix(*fine->A_T_F, nElems, nFaces, fine->_cellBlockSize, fine->_faceBlockSize, this->_cellBlockSize, this->_faceBlockSize);
+		if (UsesCellBlocks())
+			_extractedA_T_T = ExtractCoarseMatrix(*fine->A_T_T, nElems, nElems, fine->_cellBlockSize, fine->_cellBlockSize, this->_cellBlockSize, this->_cellBlockSize);
+		this->A_T_T = UsesCellBlocks() ? &_extractedA_T_T : nullptr;
+		_extractedA_T_F = ExtractCoarseMatrix(*fine->A_T_F, nElems, nFaces, fine->_cellBlockSize, fine->_faceBlockSize, this->_cellBlockSize, this->_faceBlockSize);
+		this->A_T_F = &_extractedA_T_F;
 		if (fine->A_F_T)
 		{
-			SparseMatrix* A_F_T = ExtractCoarseMatrix(*fine->A_F_T, nFaces, nElems, fine->_faceBlockSize, fine->_cellBlockSize, this->_faceBlockSize, this->_cellBlockSize);
-			_extractedA_F_T = std::move(*A_F_T);
-			delete A_F_T;
+			_extractedA_F_T = ExtractCoarseMatrix(*fine->A_F_T, nFaces, nElems, fine->_faceBlockSize, fine->_cellBlockSize, this->_faceBlockSize, this->_cellBlockSize);
 			this->A_F_T = &_extractedA_F_T;
 		}
 		// A_F_F: only for the options that use it (see UncondensedAMG::A_F_FNeeded())
@@ -1299,13 +1373,14 @@ public:
 		{
 			if (!fine->A_F_F)
 				Utils::FatalError("UncondensedAMG: the p-coarsening requires the block A_F_F, which has not been computed on the finer level (see UncondensedAMG::A_F_FNeeded()).");
-			this->A_F_F = ExtractCoarseMatrix(*fine->A_F_F, nFaces, nFaces, fine->_faceBlockSize, fine->_faceBlockSize, this->_faceBlockSize, this->_faceBlockSize);
+			_extractedA_F_F = ExtractCoarseMatrix(*fine->A_F_F, nFaces, nFaces, fine->_faceBlockSize, fine->_faceBlockSize, this->_faceBlockSize, this->_faceBlockSize);
+			this->A_F_F = &_extractedA_F_F;
 		}
 	}
 
 	// On several processes: the same blocks of the rows of the process, the same faces (FaceMap, and the columns of the
-	// operator)
-	void SetupOperatorByBlockExtractionDistributed(const UncondensedLevel& fine)
+	// operator). In double only.
+	void SetupOperatorByBlockExtractionDistributed(const UncondensedLevelOf& fine)
 	{
 		if (ComputeCoarseA_F_F || fine.A_F_T)
 			Utils::FatalError("UncondensedAMG: on several processes, the p-coarsening runs without the blocks A_F_F and A_F_T.");
@@ -1313,18 +1388,17 @@ public:
 		int ffbs = fine._faceBlockSize, fcbs = fine._cellBlockSize;
 		BigNumber nElems = fine.A_T_F->rows() / fcbs;
 		BigNumber nOwnedFaces = fineA.RowMap->NOwned, nGhostFaces = fineA.ColMap->NGhosts();
-		auto extract = [](SparseMatrix* M) { SparseMatrix copy = std::move(*M); delete M; return copy; };
 		_extractedOperator.RowMap = fineA.RowMap;
 		_extractedOperator.ColMap = fineA.ColMap;
 		_extractedOperator.RowBlockSize = _faceBlockSize;
 		_extractedOperator.ColBlockSize = _faceBlockSize;
-		_extractedOperator.Diag = extract(ExtractCoarseMatrix(fineA.Diag, nOwnedFaces, nOwnedFaces, ffbs, ffbs, _faceBlockSize, _faceBlockSize));
-		_extractedOperator.Offd = extract(ExtractCoarseMatrix(fineA.Offd, nOwnedFaces, nGhostFaces, ffbs, ffbs, _faceBlockSize, _faceBlockSize));
+		_extractedOperator.Diag = ExtractCoarseMatrix(fineA.Diag, nOwnedFaces, nOwnedFaces, ffbs, ffbs, _faceBlockSize, _faceBlockSize);
+		_extractedOperator.Offd = ExtractCoarseMatrix(fineA.Offd, nOwnedFaces, nGhostFaces, ffbs, ffbs, _faceBlockSize, _faceBlockSize);
 		this->DistributedOperator = &_extractedOperator;
 		this->OperatorMatrix = &_extractedOperator.Diag;
 		if (UsesCellBlocks())
-			_extractedA_T_T = extract(ExtractCoarseMatrix(*fine.A_T_T, nElems, nElems, fcbs, fcbs, _cellBlockSize, _cellBlockSize));
-		_extractedA_T_F = extract(ExtractCoarseMatrix(*fine.A_T_F, nElems, fine.FaceMap->NLocal(), fcbs, ffbs, _cellBlockSize, _faceBlockSize));
+			_extractedA_T_T = ExtractCoarseMatrix(*fine.A_T_T, nElems, nElems, fcbs, fcbs, _cellBlockSize, _cellBlockSize);
+		_extractedA_T_F = ExtractCoarseMatrix(*fine.A_T_F, nElems, fine.FaceMap->NLocal(), fcbs, ffbs, _cellBlockSize, _faceBlockSize);
 		this->A_T_T = UsesCellBlocks() ? &_extractedA_T_T : nullptr;
 		this->A_T_F = &_extractedA_T_F;
 		this->A_F_F = nullptr;
@@ -1335,9 +1409,9 @@ public:
 private:
 	// The first coarseBlockRows x coarseBlockCols coefficients of each block (hierarchical bases), without those of
 	// absolute value <= NonZeroCoefficients::ZeroThreshold. The rows keep the order of their columns.
-	static SparseMatrix* ExtractCoarseMatrix(const SparseMatrix& fineMatrix, BigNumber nBlockRows, BigNumber nBlockCols, int fineBlockRows, int fineBlockCols, int coarseBlockRows, int coarseBlockCols)
+	static SparseMatrix ExtractCoarseMatrix(const SparseMatrix& fineMatrix, BigNumber nBlockRows, BigNumber nBlockCols, int fineBlockRows, int fineBlockCols, int coarseBlockRows, int coarseBlockCols)
 	{
-		return new SparseMatrix(SparseMatrixOps::BuildByRows(nBlockRows * coarseBlockRows, nBlockCols * coarseBlockCols, coarseBlockRows,
+		return SparseMatrixOps::BuildByRows(nBlockRows * coarseBlockRows, nBlockCols * coarseBlockCols, coarseBlockRows,
 			[&](BigNumber firstRow, BigNumber lastRow, SparseMatrixOps::RowChunk& chunk)
 		{
 			for (BigNumber r = firstRow; r < lastRow; ++r)
@@ -1353,7 +1427,7 @@ private:
 				}
 				chunk.EndRow();
 			}
-		}));
+		});
 	}
 
 
@@ -1691,7 +1765,7 @@ public:
 				_transferBuffers[i].resize(_passP[i].rows());
 		}
 		else
-			R = SparseMatrixOps::Transpose(P);
+			Restriction() = SparseMatrixOps::Transpose(Prolongation());
 	}
 
 	string ProlongationInfo() override
@@ -1699,7 +1773,7 @@ public:
 		if (_passP.empty())
 			return Level::ProlongationInfo();
 		BigNumber nnz = 0;
-		for (const SparseMatrix& P_i : _passP)
+		for (const SparseMatrixOf<T>& P_i : _passP)
 			nnz += P_i.nonZeros();
 		return "the prolongations of the " + to_string(_passP.size()) + " coarsening passes, size(P_1)=" + to_string(_passP.front().rows()) + "x" + to_string(_passP.front().cols())
 			+ ", ..., size(P_" + to_string(_passP.size()) + ")=" + to_string(_passP.back().rows()) + "x" + to_string(_passP.back().cols()) + ", nnz=" + to_string(nnz);
@@ -1719,23 +1793,60 @@ public:
 			Level::ExportTransfers();
 			return;
 		}
-		for (size_t i = 0; i < _passP.size(); i++)
+		if constexpr (std::is_same_v<T, double>) // no export in single precision (Level::Setup())
 		{
-			this->ExportMatrix(_passP[i], "P" + to_string(i + 1));
-			this->ExportMatrix(_passR[i], "R" + to_string(i + 1));
+			for (size_t i = 0; i < _passP.size(); i++)
+			{
+				this->ExportMatrix(_passP[i], "P" + to_string(i + 1));
+				this->ExportMatrix(_passR[i], "R" + to_string(i + 1));
+			}
 		}
 	}
 
+	// The transfers of the vectors of the precision of the level
 	Vector Prolong(Vector& vectorOnTheCoarserLevel) override
+	{
+		if constexpr (std::is_same_v<T, double>)
+			return ProlongIn(vectorOnTheCoarserLevel);
+		else
+			Utils::FatalError("UncondensedAMG: a level in single precision transfers vectors in single precision.");
+	}
+
+	FloatVector Prolong(FloatVector& vectorOnTheCoarserLevel) override
+	{
+		if constexpr (std::is_same_v<T, float>)
+			return ProlongIn(vectorOnTheCoarserLevel);
+		else
+			Utils::FatalError("UncondensedAMG: a level in double precision transfers vectors in double precision.");
+	}
+
+	Vector Restrict(Vector& vectorOnThisLevel) override
+	{
+		if constexpr (std::is_same_v<T, double>)
+			return RestrictIn(vectorOnThisLevel);
+		else
+			Utils::FatalError("UncondensedAMG: a level in single precision transfers vectors in single precision.");
+	}
+
+	FloatVector Restrict(FloatVector& vectorOnThisLevel) override
+	{
+		if constexpr (std::is_same_v<T, float>)
+			return RestrictIn(vectorOnThisLevel);
+		else
+			Utils::FatalError("UncondensedAMG: a level in double precision transfers vectors in double precision.");
+	}
+
+private:
+	VectorOf<T> ProlongIn(VectorOf<T>& vectorOnTheCoarserLevel)
 	{
 		if (this->CoarserLevel->ComesFrom == CoarseningType::P)
 		{
 			// This is possible only if the basis is hierarchical
-			UncondensedLevel* coarseLevel = dynamic_cast<UncondensedLevel*>(CoarserLevel);
+			UncondensedLevelOf* coarseLevel = dynamic_cast<UncondensedLevelOf*>(CoarserLevel);
 			auto nHigherDegreeUnknowns = this->_faceBlockSize;
 			auto nLowerDegreeUnknowns = coarseLevel->_faceBlockSize;
 			auto nFaces = vectorOnTheCoarserLevel.rows() / nLowerDegreeUnknowns;
-			Vector vectorOnThisLevel = Vector::Zero(nFaces * nHigherDegreeUnknowns);
+			VectorOf<T> vectorOnThisLevel = VectorOf<T>::Zero(nFaces * nHigherDegreeUnknowns);
 			for (BigNumber i = 0; i < nFaces; i++)
 				vectorOnThisLevel.segment(i*nHigherDegreeUnknowns, nLowerDegreeUnknowns) = vectorOnTheCoarserLevel.segment(i*nLowerDegreeUnknowns, nLowerDegreeUnknowns);
 			return vectorOnThisLevel;
@@ -1743,28 +1854,30 @@ public:
 		else if (!_passP.empty())
 		{
 			// P_1 (P_2 (... P_n e)): e_{i-1} = P_i e_i, from the coarse vector e_n
-			const Vector* e = &vectorOnTheCoarserLevel;
-			for (size_t i = _passP.size() - 1; i > 0; i--)
+			const vector<SparseMatrixOf<T>>& passP = _passP;
+			vector<VectorOf<T>>& buffers = _transferBuffers;
+			const VectorOf<T>* e = &vectorOnTheCoarserLevel;
+			for (size_t i = passP.size() - 1; i > 0; i--)
 			{
-				_transferBuffers[i].noalias() = _passP[i] * *e;
-				e = &_transferBuffers[i];
+				buffers[i].noalias() = passP[i] * *e;
+				e = &buffers[i];
 			}
-			return _passP[0] * *e;
+			return passP[0] * *e;
 		}
 		else
 			return Level::Prolong(vectorOnTheCoarserLevel);
 	}
 
-	Vector Restrict(Vector& vectorOnThisLevel) override
+	VectorOf<T> RestrictIn(VectorOf<T>& vectorOnThisLevel)
 	{
 		if (this->CoarserLevel->ComesFrom == CoarseningType::P)
 		{
 			// This makes sense only if the basis is hierarchical and orthogonal
-			UncondensedLevel* coarseLevel = dynamic_cast<UncondensedLevel*>(CoarserLevel);
+			UncondensedLevelOf* coarseLevel = dynamic_cast<UncondensedLevelOf*>(CoarserLevel);
 			auto nHigherDegreeUnknowns = this->_faceBlockSize;
 			auto nLowerDegreeUnknowns = coarseLevel->_faceBlockSize;
 			auto nFaces = vectorOnThisLevel.rows() / nHigherDegreeUnknowns;
-			Vector vectorOnTheCoarserLevel(nFaces * nLowerDegreeUnknowns);
+			VectorOf<T> vectorOnTheCoarserLevel(nFaces * nLowerDegreeUnknowns);
 			for (BigNumber i = 0; i < nFaces; i++)
 				vectorOnTheCoarserLevel.segment(i*nLowerDegreeUnknowns, nLowerDegreeUnknowns) = vectorOnThisLevel.segment(i*nHigherDegreeUnknowns, nLowerDegreeUnknowns);
 			return vectorOnTheCoarserLevel;
@@ -1772,18 +1885,21 @@ public:
 		else if (!_passR.empty())
 		{
 			// R_n (... (R_1 r)): r_i = R_i r_{i-1}, from the vector r_0 of this level
-			const Vector* r = &vectorOnThisLevel;
-			for (size_t i = 0; i + 1 < _passR.size(); i++)
+			const vector<SparseMatrixOf<T>>& passR = _passR;
+			vector<VectorOf<T>>& buffers = _transferBuffers;
+			const VectorOf<T>* r = &vectorOnThisLevel;
+			for (size_t i = 0; i + 1 < passR.size(); i++)
 			{
-				_transferBuffers[i + 1].noalias() = _passR[i] * *r;
-				r = &_transferBuffers[i + 1];
+				buffers[i + 1].noalias() = passR[i] * *r;
+				r = &buffers[i + 1];
 			}
-			return _passR.back() * *r;
+			return passR.back() * *r;
 		}
 		else
 			return Level::Restrict(vectorOnThisLevel);
 	}
 
+public:
 	Flops ProlongCost() override
 	{
 		if (this->CoarserLevel->ComesFrom == CoarseningType::P)
@@ -1804,10 +1920,10 @@ public:
 			return Level::RestrictCost();
 	}
 
-	static Flops PassesCost(const vector<SparseMatrix>& factors)
+	static Flops PassesCost(const vector<SparseMatrixOf<T>>& factors)
 	{
 		Flops cost = 0;
-		for (const SparseMatrix& M : factors)
+		for (const SparseMatrixOf<T>& M : factors)
 			cost += 2 * M.nonZeros();
 		return cost;
 	}
@@ -1816,7 +1932,7 @@ public:
 	{
 		if (this->CoarserLevel)
 		{
-			UncondensedLevel* coarse = dynamic_cast<UncondensedLevel*>(this->CoarserLevel);
+			UncondensedLevelOf* coarse = dynamic_cast<UncondensedLevelOf*>(this->CoarserLevel);
 			if (this->CoarserLevel->ComesFrom == CoarseningType::P)
 			{
 				coarse->SetupOperatorByBlockExtraction();
@@ -1836,7 +1952,7 @@ public:
 			}
 			else
 			{
-				coarse->OperatorMatrix = &Ac;
+				coarse->Op() = &Ac;
 				coarse->A_T_T = UsesCellBlocks() ? &A_T_Tc : nullptr;
 				coarse->A_T_F = &A_T_Fc;
 				coarse->A_F_F = ComputeCoarseA_F_F ? &A_F_Fc : nullptr;
@@ -1845,9 +1961,12 @@ public:
 		}
 	}
 
-	~UncondensedLevel()
+	~UncondensedLevelOf()
 	{
-		if (!this->IsFinestLevel() && !this->UseGalerkinOperator)
-			delete OperatorMatrix;
+		if constexpr (std::is_same_v<T, double>) // the operator of SetupDiscretizedOperator()
+		{
+			if (!this->IsFinestLevel() && !this->UseGalerkinOperator)
+				delete OperatorMatrix;
+		}
 	}
 };

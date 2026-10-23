@@ -325,6 +325,7 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 | `CoarseningFactor` | `3.8` | Ratio of the numbers of cells of two successive h-levels |
 | `CoarseMatrixMaxSize` | `1000` | The coarsening stops when the matrix has at most this many rows |
 | `CoarseSolver` | `CoarseSolver::Default`: `Cholesky` for a symmetric matrix, `LU` otherwise | `fhhos4::CoarseSolver`: `Cholesky`, `LU` (sparse factorizations) |
+| `MixedPrecision` | `true` | Mixed precision: the matrices of the levels of the AMG (operators, transfers, smoothers) stored and its cycles run in single precision (`float`), but the coarsest solve: half the memory of the levels, faster cycles. The setup computes in double (the same levels, rounded), and the Krylov method, the matrix, the residuals and the solution stay in double: the tolerance can be that of the double precision, usually in the iterations of the double precision. Only for a symmetric matrix, on one process, with the Chebyshev smoothers (the defaults); otherwise the levels are in double, as with `false` |
 | `Threads` | `0`: the OpenMP setting, but at most one thread per physical core unless `OMP_NUM_THREADS` or OpenMP's binding is set (on several processes: the cores divided among the processes of `Comm` that run on the same CPUs) | |
 | `Comm` | (MPI only) none: to set | `MPI_COMM_SELF`, or the communicator of the processes of a distributed system |
 | `Verbosity` | `0`: silent | `1`: one line per setup and per solve; `2`: all the messages, with the residual at each iteration |

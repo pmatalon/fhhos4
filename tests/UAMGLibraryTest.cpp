@@ -4,6 +4,8 @@
 //   gcruamg), including with L2-orthonormal bases, whose constant does not have coordinate 1. Through both interfaces of
 //   the library: the uncondensed system (default: the library condenses it and computes the cell unknowns) and the
 //   condensed one (-libuamg-condensed: the program condenses it).
+// - UAMGMixedPrecisionProgram: mixed precision (-uamg-mixed: the levels in single precision), in the program and through
+//   the library.
 // - UAMGLibrary: the public API alone (<fhhos4>), on a hybrid system built here.
 #include <gtest/gtest.h>
 #include <algorithm>
@@ -48,8 +50,11 @@ inline std::ostream& operator<<(std::ostream& os, const LibraryCase& c)
 	return os << c.Name;
 }
 
-// The program on the case with the solver solverCode. nonsymmetric: -uamg-nonsym; libraryCondensed: -libuamg-condensed.
-ProgramResults RunCase(const LibraryCase& c, const std::string& solverCode, bool nonsymmetric = false, bool libraryCondensed = false)
+// The program on the case with the solver solverCode. nonsymmetric: -uamg-nonsym; libraryCondensed: -libuamg-condensed;
+// chebyshev: the Chebyshev smoothers of the fourth kind, degree 2 (the library's default for a symmetric matrix), instead
+// of the program's; mixedPrecision: -uamg-mixed.
+ProgramResults RunCase(const LibraryCase& c, const std::string& solverCode, bool nonsymmetric = false, bool libraryCondensed = false,
+                       bool chebyshev = false, bool mixedPrecision = false)
 {
 	ProgramArguments args;
 	args.Problem.GeoCode = c.Geo;
@@ -68,6 +73,14 @@ ProgramResults RunCase(const LibraryCase& c, const std::string& solverCode, bool
 	args.Solver.MG.CoarseningProlongationCode = c.CoarseningProlong;
 	args.Solver.MG.UAMGNonsymmetric = nonsymmetric;
 	args.Solver.MG.UAMGLibraryCondensed = libraryCondensed;
+	if (chebyshev)
+	{
+		args.Solver.MG.PreSmoother = SmootherType::BlockChebyshevFourthKind;
+		args.Solver.MG.PostSmoother = SmootherType::Default;
+		args.Solver.MG.PreSmoothingIterations = 2;
+		args.Solver.MG.PostSmoothingIterations = 2;
+	}
+	args.Solver.MG.UAMGMixedPrecision = mixedPrecision;
 	args.Actions.UseCache = false;
 	return RunDiffusionHHO(args);
 }
@@ -165,6 +178,41 @@ TEST_P(UAMGNonsymmetricProgramTest, SameAsSymmetric)
 
 INSTANTIATE_TEST_SUITE_P(UAMGNonsymmetricProgram, UAMGNonsymmetricProgramTest, ::testing::ValuesIn(LibraryCases()),
 	[](const ::testing::TestParamInfo<LibraryCase>& info) { return info.param.Name; });
+
+// Mixed precision (-uamg-mixed: the levels in single precision; with the Chebyshev smoothers, which have a single
+// precision version): the same iterations and solutions in the program (uamg, fcguamg, gcruamg) and through both interfaces of the library
+// (libuamg...), and those in double: the same levels (the setup in double), the iterations within 1 (equal here), the
+// same L2 error up to the tolerance
+class UAMGMixedPrecisionProgramTest : public ::testing::TestWithParam<std::tuple<LibraryCase, std::string>>
+{
+};
+
+TEST_P(UAMGMixedPrecisionProgramTest, SameInProgramAndLibrary)
+{
+	auto [c, programCode] = GetParam();
+	std::string libraryCode = programCode;
+	libraryCode.replace(libraryCode.find("uamg"), 4, "libuamg");
+
+	ProgramResults doublePrecision = RunCase(c, programCode, false, false, true, false);
+	ProgramResults program = RunCase(c, programCode, false, false, true, true);
+	EXPECT_LT(program.IterationCount, 200); // converged (default maximum: 200)
+	EXPECT_NEAR(program.IterationCount, doublePrecision.IterationCount, 1) << programCode;
+	EXPECT_NEAR(program.L2Error, doublePrecision.L2Error, 1e-6 * doublePrecision.L2Error) << programCode;
+	for (bool libraryCondensed : { false, true })
+	{
+		ProgramResults library = RunCase(c, libraryCode, false, libraryCondensed, true, true);
+		std::string label = libraryCode + (libraryCondensed ? " -libuamg-condensed" : "") + " vs " + programCode + ", -uamg-mixed";
+		EXPECT_EQ(library.IterationCount, program.IterationCount) << label;
+		EXPECT_NEAR(library.L2Error, program.L2Error, 1e-6 * program.L2Error) << label;
+	}
+}
+
+INSTANTIATE_TEST_SUITE_P(UAMGMixedPrecisionProgram, UAMGMixedPrecisionProgramTest,
+	::testing::Combine(::testing::ValuesIn(LibraryCases()), ::testing::Values("fcguamg", "gcruamg", "uamg")),
+	[](const ::testing::TestParamInfo<UAMGMixedPrecisionProgramTest::ParamType>& info)
+	{
+		return std::get<0>(info.param).Name + "_" + std::get<1>(info.param);
+	});
 
 // -uamg-nonsym refuses FCG (symmetric matrices only)
 #ifdef ENABLE_2D
@@ -833,6 +881,51 @@ TEST(UAMGLibrary, MultigridAlone)
 	uamg.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
 	Eigen::VectorXd x = uamg.Solve(system.b);
 	EXPECT_LT(RelativeError(system, x), 1e-8);
+}
+
+// Mixed precision (MixedPrecision, the default: the levels in single precision), with the Chebyshev smoothers (the
+// default for a symmetric matrix): the Krylov methods and the cycles alone (each one on the residual of the current x,
+// in double) reach the tolerance of the double precision, in the iterations of the double precision (within 1). With
+// the options that the mixed precision doesn't support (here the Gauss-Seidel smoothers), the levels are in double:
+// the same solution.
+TEST(UAMGLibrary, MixedPrecision)
+{
+	HybridSystem system(64);
+	for (fhhos4::Krylov krylov : { fhhos4::Krylov::FCG, fhhos4::Krylov::GCR, fhhos4::Krylov::BiCGSTAB, fhhos4::Krylov::None })
+	{
+		int iterations[2];
+		for (bool mixed : { false, true })
+		{
+			std::string label = "Krylov " + std::to_string((int)krylov) + (mixed ? ", mixed precision" : ", double precision");
+			fhhos4::Solver uamg = ToySolver();
+			uamg.PreSmoother = fhhos4::Smoother::Default;
+			uamg.PostSmoother = fhhos4::Smoother::Default;
+			uamg.Krylov = krylov;
+			if (krylov == fhhos4::Krylov::BiCGSTAB)
+				uamg.Cycle = fhhos4::Cycle::V;
+			uamg.MixedPrecision = mixed;
+			uamg.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+			Eigen::VectorXd x = Eigen::VectorXd::Zero(system.b.size());
+			fhhos4::Result result = uamg.Solve(system.b, x);
+			EXPECT_TRUE(result.Converged) << label;
+			EXPECT_LT(result.RelativeResidual, 1e-10) << label;
+			EXPECT_LT(RelativeError(system, x), 1e-8) << label;
+			iterations[mixed] = result.Iterations;
+			// Non-zero initial guess: x is the solution already
+			EXPECT_LE(uamg.Solve(system.b, x).Iterations, 1) << label;
+		}
+		EXPECT_NEAR(iterations[1], iterations[0], 1) << "Krylov " << (int)krylov;
+	}
+
+	Eigen::VectorXd solutions[2];
+	for (bool mixed : { false, true })
+	{
+		fhhos4::Solver uamg = ToySolver(); // block Gauss-Seidel
+		uamg.MixedPrecision = mixed;
+		uamg.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+		solutions[mixed] = uamg.Solve(system.b);
+	}
+	EXPECT_EQ(solutions[1], solutions[0]);
 }
 
 // Non-symmetric system (SetupNonsymmetricCondensed()): by default GCR, the K-cycle with GCR, LU on the coarsest level.

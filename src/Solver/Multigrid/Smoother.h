@@ -11,6 +11,7 @@ class Smoother
 protected:
 	IterativeSolver* _solver;
 	int _nSmoothingIterations;
+	FloatVector _singleResidual, _singleAx; // the residual and A x of the last smoothing in single precision
 
 public:
 
@@ -41,6 +42,20 @@ public:
 			_solver->Setup(A);
 	}
 
+	// Mixed precision: with the matrix in single precision, for the smoothing of float vectors (see
+	// SupportsSinglePrecision())
+	void Setup(const FloatSparseMatrix& A)
+	{
+		if (_solver->MaxIterations > 0)
+			_solver->SetupSinglePrecision(A);
+	}
+
+	void Setup(const FloatSparseMatrix& A, const Smoother& setUpForA)
+	{
+		if (_solver->MaxIterations > 0 && !(setUpForA._solver->MaxIterations > 0 && _solver->SetupSinglePrecisionFrom(A, *setUpForA._solver)))
+			_solver->SetupSinglePrecision(A);
+	}
+
 	// On several processes
 	void Setup(const DistributedMatrix& A)
 	{
@@ -64,6 +79,12 @@ public:
 			bgs->SweepOrder = order;
 	}
 
+	// Mixed precision: the smoother in single precision (a smoother without iterations needs nothing)
+	bool SupportsSinglePrecision() const
+	{
+		return _solver->MaxIterations == 0 || _solver->SupportsSinglePrecision();
+	}
+
 	bool CanOptimizeResidualComputation()
 	{
 		return _solver->MaxIterations > 0 && _solver->CanOptimizeResidualComputation(); // without iterations, no setup (the hybrid Gauss-Seidel's chunks need the matrix)
@@ -79,6 +100,41 @@ public:
 	{
 		_solver->Solve(b, x, xEquals0, computeResidual, computeAx);
 		xEquals0 = false;
+	}
+
+	// The same in single precision
+	void Smooth(FloatVector& x, const FloatVector& b, bool& xEquals0)
+	{
+		if (_solver->MaxIterations > 0)
+			_solver->SolveInSinglePrecision(b, x, xEquals0, nullptr, nullptr);
+		else if (xEquals0)
+			x = FloatVector::Zero(b.rows());
+		xEquals0 = false;
+	}
+
+	void SmoothAndComputeResidualOrAx(FloatVector& x, const FloatVector& b, bool& xEquals0, bool computeResidual, bool computeAx)
+	{
+		_solver->SolveInSinglePrecision(b, x, xEquals0, computeResidual ? &_singleResidual : nullptr, computeAx ? &_singleAx : nullptr);
+		xEquals0 = false;
+	}
+
+	// The residual and A x of the last smoothing, in precision T
+	template <typename T>
+	VectorOf<T>&& TakeResidual()
+	{
+		if constexpr (std::is_same_v<T, float>)
+			return std::move(_singleResidual);
+		else
+			return Residual();
+	}
+
+	template <typename T>
+	VectorOf<T>&& TakeAx()
+	{
+		if constexpr (std::is_same_v<T, float>)
+			return std::move(_singleAx);
+		else
+			return Ax();
 	}
 
 	friend ostream& operator<<(ostream& os, const Smoother& s)

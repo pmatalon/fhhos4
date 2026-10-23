@@ -65,7 +65,8 @@ public:
 	//   Matrices   //
 	//--------------//
 
-	static string MatrixInfo(const SparseMatrix& M, string name)
+	template <class Matrix> // a sparse matrix of any scalar type
+	static string MatrixInfo(const Matrix& M, string name)
 	{
 		double density = (double)M.nonZeros() / (M.rows() * M.cols()) * 100;
 		//double roundedDensity = (int)(density * 10.0) / 10.0;

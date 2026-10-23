@@ -1369,6 +1369,12 @@ Possible now that reordering the arithmetic operations is allowed (rejected so f
   2026-10-19 above): 4 block-solve sweeps per iteration on the fine level, 22% of its smoothing at k=2 in 3D (3.6 ms
   per sweep on 1 thread), ~40% in 2D (3x3 blocks: 11.3 ms per sweep, as much as an SpMV); also 10 sweeps in the
   Lanczos of the setup. Estimate: solve -13% / -7% (Cube-tet k=2, 1 / 8 threads), -22% / -12% (Square-tri k=2).
+  Measured end to end (2026-10-22, the library with `DefaultMethod = Inverse` in a copy of the sources,
+  `~/code/fhhos4-variants/inverse-blocks`, through the NGSolve adapter, `~/code/fhhos4-ngsolve/bench/`, NGSolve's HDG,
+  12 cases k = 1-3, best of 2): the same iterations; on 1 thread the solve -16% (2D k=2 92k cells, 1.29 -> 1.08 s) and
+  -12% (3D k=2 27k cells, 3.20 -> 2.82 s), the setup unchanged; on 8 threads no consistent gain (solve x0.86-1.27,
+  mostly within +-7%, the noise between runs): the solve is bound by the bandwidth there (the fine products), not by
+  the block solves. Worth it for the runs on few threads; the singular blocks still to handle (see above).
 
 From the comparison with NGSolve's BDDC (2026-10-19; results in `CLAUDE.md`, "Python module"; profile above), U-AMG
 1.2-2x faster at k=1, 1.1-1.5x slower at k=2 on 8 threads, where its iterations cost 1.15-1.75x more (with the new
@@ -1376,12 +1382,50 @@ interface, setup + solve: 1.3-2.2x faster at k=1, a tie to 1.35x slower at k=2, 
 sorted by degree, though with 40-45% fewer iterations; end to end 1.1-1.8x faster at k=1, 1.15-1.45x slower at k=2,
 1.35-1.55x slower at k=3):
 
-- **Single precision for the multigrid hierarchy** — new, estimated, a change of the method: opt-in only. The cycle
+- **Single precision for the multigrid hierarchy** — done (2026-10-23, below), the library's default
+  (`MixedPrecision`), opt-in in the program (`-uamg-mixed`). The cycle
   (operators, prolongations, smoothers' blocks) stored and applied in float, FCG and its residuals in double (a
   preconditioner only needs a few digits; FCG is flexible). The solve is bound by the memory bandwidth on 8 threads
   (the fine SpMV at 34.5 GB/s): half the bytes per value, up to ~1.5-2x on the solve with block CSR. The risk is the
   iteration count (rounding in the Galerkin products, the Chebyshev bounds): prototype on the exported systems
   (`build-python/profile/`) before any code in the library.
+  Convergence measured by emulation (2026-10-23; a copy of the sources, `~/code/fhhos4-variants/float-cycle`,
+  `FHHOS4_FLOAT_CYCLE=1`): every value the cycle would store in float rounded to float (the operators of the levels,
+  the fine one as a copy for the smoothing, the transfers and passes' prolongations, the smoothers' blocks, the
+  cycle's vectors at the output of each kernel and in the K-cycle's inner FCG), the arithmetic and the dot products in
+  double; the outer FCG/GCR (vectors, A z: the fused A x of the post-smoother disabled on the fine level) and the
+  coarsest solve in double. One cycle's output moves by 1.1e-7 (K) / 7e-8 (V) relative. Iterations: the same in the 12
+  NGSolve cases (k = 1-3, 2D/3D, Chebyshev, the library's defaults), and in 39 of 40 hard program runs with FCG/GCR,
+  the program's (bgs,rbgs, P_F) and the library's settings (bcheb4, -coarsening-prolong 10): Square4quadrants
+  heterog 1e8 k=0-2, Square-cart aniso 100 and 1e4 k=0-1, Kellogg on the locally refined mesh k=0-1 (also orthonormal
+  bases), Square-poly k=0-1, Square-tri k=2-3, Cube-tet n=16 k=0-2, non-symmetric (-uamg-nonsym, GCR); the other one
+  -1 (Square-poly k=0, library settings, 25 -> 24). The test suite: 47 failures, all expected: the multigrid alone as
+  the solver (40: -s mg, uamg, libuamg, aggregamg; the emulation rounds the iterate itself there, a real
+  implementation would keep it and its residual in double, defect correction) and exact comparisons at 1e-11-1e-12
+  (7: Chebyshev's error polynomial, pass prolongations, hybrid Gauss-Seidel against its reference, one-sweep downwind
+  solve). The fine level's x in the cycle, its passes and the vectors: no effect on the convergence at float precision.
+  First implementation (2026-10-23, `~/code/fhhos4-variants/mixed-precision`, not in the repository): the cycle
+  templated, the levels set up in double then copied in float (+0.05-0.34 s of setup with Eigen's `cast<float>()`,
+  replaced by a copy of the structure); A z for FCG in double after the cycle (FCG's own `selfadjointView` product is
+  sequential: a first version that left it to FCG lost the gain). Same iterations, solve x0.68-1.03.
+  In the repository (2026-10-23): the levels' matrices produced in float (`UncondensedLevelOf<float>`): the setup of
+  the double precision, its results stored in float as they are produced (the coarse operators assembled in float
+  from the local matrices, the transfers rounded), the only copy the finest operator in float (CLAUDE.md, "U-AMG:
+  details and measurements"); each cycle on the residual of the current x in double (iterative refinement: the cycles
+  alone too). A version that set the levels up in float from float copies of the blocks changed the aggregates where
+  the couplings nearly tie (2D k=1 92k and k=3 92k: +1 iteration; the program's Square-tri n=16 k=0 with the cycles
+  alone: 32 iterations instead of 29, a convergence rate 0.60 instead of 0.56) and saved no setup time. The double path
+  bitwise HEAD's (12 NGSolve solves: FCG, GCR, V/W preconditioner). NGSolve's HDG (`bench/run_single.sh TAG=single2`,
+  `summary_single.py 8 single2`: the 12 cases of the BDDC comparison, 8 threads, double and float alternated, best of
+  2): the same iterations in all the cases (also at tolerance 1e-12 on the meshes of `test_ngsolve.py`, k = 1-4, and in
+  the 30 program runs of `UAMGMixedPrecisionProgram`); solve x0.72-1.02 (mostly 0.79-0.89; 2D k=2 92k cells 52 -> 37
+  ms per iteration, 3D k=2 27k 36 -> 32); the library's setup x0.89-1.14 (mean 0.99: unchanged); end to end -4..-20%
+  but 3D k=3 9k (+7%, the solve a tie); BDDC / U-AMG double -> float 2D k=1 0.87-0.98 -> 0.98-1.10, k=2 0.62-0.74 ->
+  0.77-0.81, k=3 0.52-0.60 -> 0.60-0.66; 3D k=1 0.89-1.57 -> 1.05-1.73, k=2 0.62-0.76 -> 0.68-0.79, k=3 0.52-0.59 ->
+  0.53-0.55. CSR in float saves 4 of the 12 bytes per non-zero (the column index stays), FCG's A z and vectors stay in
+  double: the larger gains need the block storage. Stationary use (`Krylov::None`): the defect b - A x and the residual
+  each cost a fine product in double per iteration (one could be saved: the residual of an iteration is the defect of
+  the next).
 - **Fewer Lanczos iterations for lambdaMax** — estimated, small effort, changes the Chebyshev coefficients (a decision:
   the iteration counts may move). 10 iterations, 143 / 67 ms of the setup (1 / 8 threads) at k=2 in 3D, 0.30 / 0.13 s
   in 2D (10-14%). The inverse diagonal blocks would make each iteration cheaper anyway.
@@ -1389,6 +1433,27 @@ sorted by degree, though with 40-45% fewer iterations; end to end 1.1-1.8x faste
   fine rows, and the K-cycle visits it twice per iteration). Its SpMV scales 1.6x on 8 threads, its diagonal sweep not
   at all (0.15 -> 0.21 ms). Options (all changing the method, opt-in): a V-cycle below the first coarse level, or
   Minus2-like intermediate p-levels, which don't exist at k=2.
+- **`PCoarsening::Minus1`** (k, k-1, ..., 0) — measured 2026-10-22 (NGSolve's HDG through the adapter, 8 threads, bases
+  sorted by degree): 40-50% fewer iterations than the default `Minus2` (3D k=2 27k cells 42 -> 25, k=3 35 -> 22; 2D
+  k=2 16 -> 8), but no faster: each K-cycle iteration costs 1.8-1.9x (3D k=2 37 -> 65 ms, 2D k=2 101 -> 191 ms): the
+  K-cycle visits the second level twice per iteration, and with `Minus1` it is the degree k-1, almost as costly as the
+  fine level (3D k=2: 3x3 blocks, 1/4 of the fine non-zeros; 2D: 2x2, 4/9), where `Minus2` gives degree 0 at k=2 (1/36
+  in 3D); the levels below are visited 4x instead of 2x. Totals -2% to +7%. With a V-cycle: iterations doubled
+  (49-52); W-cycle no better than K.
+- **V-cycle on the p-levels, K-cycle on the h-levels** (`CycleType::VK`, 2026-10-23; a patch,
+  `~/code/fhhos4-variants/vk-cycle.patch`, not kept): to get Minus1's convergence without its double visits. Measured
+  (NGSolve's HDG through the adapter, 8 threads, a warm-up, 2 runs; solve times): it doesn't keep Minus1's convergence
+  (3D k=2: 25 -> 35 iterations, Minus2 + K: 42; k=3: 22 -> 35): most of Minus1's gain comes from the K-cycle's double
+  visits of the p-levels. Iterations ~20% cheaper, ~15% more numerous. 3D: k=1 1.35 -> 1.26 s (-6%), k=2 1.53 -> 1.56-1.71
+  (+3-10%), k=3 1.32-1.45 -> 1.20-1.24 s (-10%, with Minus2); 2D much worse (iterations x1.6-3: k=2 16 -> 26, k=3 10 -> 31;
+  solve +33-68%: the degree-0 level, visited once, is too weak a correction). No robust gain: not kept.
+- **The library's parameters, no code change** (2026-10-23, NGSolve's HDG through the adapter, `bench/params_sweep.py`,
+  8 threads, a warm-up, best of 2, setup + solve at tolerance 1e-8; 2D k=2 189k, k=3 92k, 3D k=1 69k, k=2 27k, k=3 9k
+  cells): Chebyshev degree 1,1: iterations x1.6-2 (3D k=2 42 -> 71), each ~30% cheaper: +12-19%; 1,2: +2-18%; 3,3:
+  fewer iterations (3D k=3 35 -> 24), each 30-35% costlier: 3D k=3 -6%, 2D k=3 -2%, 3D k=2 -1%, 3D k=1 +4%, 2D k=2
+  +19%; `CoarseningFactor` 8 (one level fewer): -3% to +1%. The defaults are at the optimum: closing the gap with BDDC
+  (iterations 1.5-3.5x costlier at k >= 2: 5 passes of the fine matrix and 4 block sweeps per iteration, bound by the
+  bandwidth on 8 threads, against one pass and cache-resident local solves for BDDC) takes fewer bytes per fine pass.
 - **The extraction of the blocks from a global matrix** (`ExtractSymmetricBlocks()`, after the interface redesign:
   "The inputs of the library read in place" in Done): 0.17-0.32 s on 8 threads for 28-40M non-zeros, only 1.8-2.5x
   faster than on 1 thread. It reads the rows of the cells twice (`A_TT`, then `A_TF`: one `BuildByRows` per block), and

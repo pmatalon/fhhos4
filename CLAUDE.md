@@ -77,7 +77,7 @@ From `build/`:
 ctest --output-on-failure
 ```
 
-249 tests, ~5 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
+280 tests, ~5 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
 iteration counts of the papers in `reproducibility/` — see `tests/README.md`. Covers
 `Program_Diffusion_HHO` and `Program_BiHarmonic_HHO` (HHO, static condensation), 2D/3D,
 in-house, GMSH and polygonal meshes, and the library (`UAMGLibrary*`, ~15 s). Not covered: DG/FEM programs (disabled by default), `lu`/`cg`/`agmg`/`p_mg` solvers,
@@ -175,7 +175,8 @@ alone. The program runs it with `-s libuamg|fcglibuamg|gcrlibuamg` (`Solver/Libr
 program that includes the public header, through `LibraryParameters.h`: changing it doesn't recompile `Program.cpp`) through the uncondensed
 interface (`Diffusion_HHO::CondensationBySolver`: no static condensation in the program), or the condensed one with
 `-libuamg-condensed` (and for a full Neumann problem and the exports of the system or of the algebraic error), which
-`tests/UAMGLibraryTest.cpp` compares with `uamg|fcguamg|gcruamg`.
+`tests/UAMGLibraryTest.cpp` compares with `uamg|fcguamg|gcruamg`. Mixed precision, the levels in single precision
+(`MixedPrecision`, default true; the program's `-uamg-mixed`, off: the papers): see "U-AMG: details and measurements".
 
 ### Python module
 
@@ -191,7 +192,8 @@ setups, solves and helpers release the GIL. Built with `-DENABLE_PYTHON=ON` (in 
 also with `ENABLE_PROGRAM=OFF`) into `<build>/python`, not installed (pip/conda packaging: after the validation, the
 user's decision). Its test, `ctest -R Python` (`PythonModule`: `library/python/tests/test_module.py`, the toy system of
 `UAMGLibraryTest.cpp` against SciPy's direct solver). No NGSolve in the repository (the user's decision, 2026-10-19: no
-new dependency): its test is `~/code/fhhos4-ngsolve/test_ngsolve.py`, run by hand.
+new dependency): its integration is outside it, `~/code/fhhos4-ngsolve/fhhos4_ngsolve.py` (see NGSolve below), with
+its tests `test_ngsolve.py` and `test_ngsolve_mpi.py`, run by hand.
 With MPI (`FHHOS4_MPI`): `Solver.Comm` from an mpi4py communicator (`py2f()`, `MPI_Comm_f2c`; refused if MPI is not
 initialized; the getter returns the Python object), mandatory as in C++; `SetupSymmetric(..., faceGhosts=None)` (int64
 array read in place, `ToGhostNumbers()`); `fhhos4.WithMPI`. Tests: `PythonModule` sets `Comm = MPI.COMM_SELF` (exit code
@@ -200,19 +202,31 @@ distributed by strips, also with an empty rank 0, against SciPy; an input error 
 Environment: conda env `fhhos4-python` (python 3.12, numpy, scipy, nanobind, cmake, ninja, cxx-compiler, eigen 5.0.1;
 mpich 5.0.1 and mpi4py 4.1.2; NGSolve from pip, not on conda-forge), build directories `build-python`
 (`-DENABLE_PROGRAM=OFF -DENABLE_PYTHON=ON`, ~1 min) and `build-python-mpi` (the same with `-DENABLE_MPI=ON
--DENABLE_TESTS=OFF`: no GTest in that env; the GTest MPI tests run in `build-mpi-lib`, env `fhhos4`).
+-DENABLE_TESTS=OFF`: no GTest in that env; the GTest MPI tests run in `build-mpi-lib`, env `fhhos4`). For NGSolve on
+several processes: env `fhhos4-python-openmpi` (the same with openmpi 5.0.11 instead of mpich, and NGSolve 6.2.2608 from
+pip; with MPICH, NGSolve's own communication is broken, see NGSolve below), build directory `build-python-openmpi` (the
+options of `build-python-mpi`; `ctest -R Python` passes, `OMPI_MCA_rmaps_base_oversubscribe=1`).
 
 NGSolve (6.2.2608; first target of the module; DOLFINx after work on MPI in fhhos4, the user's decision): its HDG
-(`L2 * FacetFESpace`, primal, SPD) fits the uncondensed interface. `test_ngsolve.py` (outside the repository): `a.mat.CSR()`
-(views of NGSolve's arrays: uint64 row pointers, int32 columns, read in place), the DoF lists from `GetDofNrs()`, the
-Dirichlet faces left out (`fes.FreeDofs()`: all or none of a face's DoFs), `ExtractSymmetricBlocks()`, `Gather()`,
-`Scatter()`; `condense=False` (with `condense=True`, `a.mat` keeps only the Schur complement, the cell blocks are not
-stored). Solutions bitwise those of the former extraction by SciPy (2026-10-19). NGSolve's sparse Cholesky (the
-reference) is not deterministic: its error varies at 1e-14 from run to run.
+(`L2 * FacetFESpace`, primal, SPD) fits the uncondensed interface. The adapter (2026-10-22, outside the repository):
+`fhhos4_ngsolve.UAMG(a, freedofs=None, **parameters)` (the parameters: `fhhos4.Solver`'s), an NGSolve `BaseMatrix`, the
+inverse of `a.mat`: `gfu.vec.data = UAMG(a) * f.vec`, zero on the non-free DoFs as `a.mat.Inverse(freedofs)` (the
+Dirichlet lifting is the caller's, `+=` works), setup at construction (a new matrix: a new `UAMG`), attributes `result`,
+`solver`, `times`; an inverse, not a preconditioner (`pre=`): U-AMG has its Krylov method. Refused: `condense=True`
+(`a.mat` keeps only the Schur complement, the cell blocks are not stored), other spaces, complex, variable orders,
+elements other than simplices; symmetric from the form's flag (`BilinearForm(..., symmetric=True)`, `a.flags`), otherwise
+non-symmetric (`ExtractNonsymmetricBlocks()`, GCR; one process only). On one process: the DoF lists from the elements'
+DoFs (`V.Elements(VOL)`, `F.Elements(VOL)` and `el.facets`: 7x faster than `GetDofNrs()` by facet), the Dirichlet faces
+left out (`FreeDofs()`: all or none of a face's DoFs), `ExtractSymmetricBlocks()` on `a.mat.CSR()` (views of NGSolve's
+arrays: uint64 row pointers, int32 columns, read in place), `Gather()`, `Scatter()`. Solutions bitwise those of the
+former test script (and of the extraction by SciPy, 2026-10-19). `test_ngsolve.py`: 19 checks, also the lifting, a
+convection-diffusion (GCR, against UMFPACK) and the refusals. NGSolve's sparse Cholesky (the reference) is not
+deterministic: its error varies at 1e-14 from run to run.
 phi_0 = 1 (interpolation of 1: ones). Bases not ordered by degree (Dubiner's order: 2D cell k=3: degrees 0 1 2 3 1 2 3 2
 3 3; 3D cells and faces too, 2D faces ordered; Q^k on quads/hexes, Q-degrees not ordered either): since 2026-10-20 (the
-user's decision) the DoF lists sort the DoFs of each cell and face by degree (`ByDegree()`: the degrees measured by
-least-squares fits of `GetFE().CalcShape()`, the same order on every element), default p-coarsening: k <= 2 unchanged,
+user's decision) the DoF lists sort the DoFs of each cell and face by degree (`ByDegree()`, `Basis()`: the degrees
+measured by least-squares fits of `GetFE().CalcShape()`, the same order on every element; also the value of phi_0, the
+interpolations of 1 = 1/phi_0), default p-coarsening: k <= 2 unchanged,
 k=3 21 / 69 iterations instead of 44 / 96 with `ToZero` (Square-tri 940 / Cube-tet 1259 cells, tolerance 1e-12), k=4
 23 / 59. Solution = NGSolve's sparse Cholesky to 1e-11..1e-14 (2D, 3D, k = l = 1..4; k = 1, l = 2). Iterations with `ToZero`
 (tolerance 1e-8, 2026-10-19), U-AMG `bcheb4` / `bgs` / NGSolve's BDDC + CG, penalty alpha/h: Square-tri 3708 cells, alpha = 4k^2
@@ -233,8 +247,24 @@ iterations (10 vs 18 in 2D, 32-35 vs 54-64 in 3D). BDDC with an AMG coarse
 solver (`coarsetype="h1amg"`) always slower (51-91 iterations); NGSolve's sparse Cholesky a tie in 2D, 6x slower than
 U-AMG in 3D at 25k cells. The extraction of the blocks (2026-10-19, `ExtractSymmetricBlocks()` on NGSolve's arrays
 read in place; before: SciPy's slicing and the conversion to Eigen): U-AMG's total -5 to -26%, `PERFORMANCE.md`.
+Through the adapter (2026-10-22, `~/code/fhhos4-ngsolve/bench/`: `bench_bddc.py`, `run.sh`, `summary.py`; the same cases,
+meshes and tolerances; BDDC's form with `symmetric=True` now, faster than above, e.g. 2D k=3 92k cells 2.04 -> 1.53 s;
+8 threads, best of 2), end to end, BDDC / U-AMG's inverse: 2D k=1 0.94-1.02, k=2 0.67-0.75, k=3 0.55-0.63; 3D k=1
+0.86-1.66, k=2 0.67-0.77, k=3 0.47-0.56; U-AMG's true residuals 10-200x smaller (3e-9..8e-9 vs 4e-8..1.1e-6). The
+adapter's preparation 0.03-0.05 s (NGSolve's default numbering checked on a sample: the DoF tables without loop over the
+elements, 0.51 -> 0.05 s at 92k cells; the BitArrays through `Projector`: `np.array()` reads them bit by bit, 0.1 s per
+million). Its preconditioner mode (`UAMG(a, preconditioner=True)`: one V- or W-cycle, `Krylov.None`, `MaxIterations` 1;
+symmetric and linear to 1e-16) in NGSolve's CG on the uncondensed system: slower than the inverse in all the cases,
+BDDC / it 0.21-1.07 (V-cycle), 0.36-1.30 (W-cycle). V-cycle iterations 1.2-5x those of the K-cycle (2D k=3: 53 vs 10),
+the W-cycle's close to them. Per iteration (`bench/iteration_cost.py`, 2D k=2 92k / 3D k=2 27k cells, 8 threads): the
+inverse 41 / 44 ms (one K-cycle 37 / 37 ms, FCG's product by the condensed matrix and vectors; the cells eliminated
+once before the solve, reconstructed once after); the preconditioner mode 55-60 ms: NGSolve's product by the
+uncondensed matrix (cells included) 9 / 11 ms, the cells eliminated and reconstructed 8 / 5 ms and the adapter's copies
+of all the DoFs and Python 7 / 8 ms at every iteration, and the cycle: a V-cycle 30 / 36 ms, barely cheaper than the
+K-cycle (the fine level dominates both). For composition (block preconditioners, the caller's Krylov method), not for
+one solve.
 NGSolve with MPI (2026-10-20): `~/code/fhhos4-ngsolve/test_ngsolve_mpi.py` (outside the repository, run by hand under
-`mpiexec` with `build-python-mpi/python`; `--large`: the larger meshes), the mesh distributed by NGSolve itself
+`mpiexec` with `build-python-openmpi/python`; `--large`: the larger meshes), the mesh distributed by NGSolve itself
 (`GenerateMesh().Distribute(comm)` on rank 0, `netgen.meshing.Mesh.Receive(comm)` on the others; mpi4py imported
 first: the pip NGSolve loads MPI at run time, `USE_MPI4PY` False but mpi4py communicators accepted), its HDG assembled
 in parallel. NGSolve 6.2.2608: rank 0 holds no element (`ParallelMetis()`: P - 1 METIS parts, partition = part + 1;
@@ -243,19 +273,32 @@ gets a part too; the script does not depend on it), and all of NGSolve's communi
 `ParallelDofs().comm`, the matrices': no subcommunicator of the other processes); no ghost cells; only facet DoFs are
 shared, never a Dirichlet one; `fes.ParallelDofs().Proc2Dof(p)`: the shared DoFs in the same order on both processes (checked by the
 facets' centres); `a.mat.local_mat` and `f.vec.local_vec` sub-assembled (a shared facet's row: the local contributions
-only). The script: cells = the local elements, faces = the free facets, owned by the smaller rank; global numbers by
-exscan, sent aligned with `Proc2Dof(p)`; the face-face entries (global columns) and right-hand side of the shared rows
-sent to their owner; ghosts: the other local facets, then the faces of the neighbours' cells; int32 CSR (SciPy); the
-solution back into the GridFunction (shared faces from their owner, CUMULATED). Against NGSolve's sparse Cholesky on
-the mesh regenerated on rank 0 (integrals of u and u^2) and `inverse="masterinverse"` (its parallel direct solver,
-DoF by DoF): 11 cases x 1-4 processes pass, integrals 5e-16 to 5e-12, DoFs 6e-14 to 3.6e-12 (Square-tri maxh 0.05,
-Cube-tet 0.15 at tolerance 1e-12: k = l = 1, 2, 3, and k = 1, l = 2 in 2D; Square-tri 0.015, Cube-tet 0.07 at 1e-10:
-k = l = 1, 2). Iterations on 1 / 2 / 3 / 4 processes the same but Square-tri 0.05 k=1 34/34/33/33, k=3 21/18/18/18,
-Cube-tet 0.15 k=1 48/48/49/49, k=3 69/69/68/68, Square-tri 0.015 k=1 28/28/28/30, Cube-tet 0.07 k=2 74/74/74/75 (on 2
-processes, one holds everything: NGSolve's local numbering, the distributed path). Setup, Cube-tet 0.07 k=2, 2 threads
-per process: 0.27-0.38 / 0.43-0.48 / 0.27-0.30 / 0.23-0.25 s (the C++ client `mpi/ngsolve_mpi.cpp` on the exported
-system, RCB: 0.29 / 0.27 / 0.21 s on 1 / 2 / 3). Time the collective calls after a barrier: otherwise the empty rank 0
-waits inside the setup for the others' preparation of the inputs (1.4-1.8 s measured on 2 processes).
+only). The adapter on a distributed mesh (`a.mat` a `ParallelMatrix`; the communicator `mesh.comm.mpi4py`; 2026-10-22,
+before: the test script's own glue, the same iterations in all the cases): cells = the local elements, faces = the free
+facets, the master of a shared facet from `ParallelDofs().MasterDofs()` (= the smaller rank); the blocks extracted from
+`a.mat.local_mat` (`ExtractNonsymmetricBlocks()`, faces: the own ones, then the others); global numbers by exscan, sent
+to the neighbours aligned with `Proc2Dof(p)`; the face-face entries (global columns) of the rows of the other shared
+facets sent to their master, which merges them into its rows (only those rows; the others: the extracted arrays, by
+slices); ghosts: the other local facets, then the faces of the received rows; at each solve, a DISTRIBUTED right-hand
+side completed on the masters, the solution CUMULATED from them. All by mpi4py (tag 23; the library uses 7101/7102 on
+the same communicator), not by NGSolve's communication: NGSolve 6.2.2608's pip wheel (its run-time MPI wrapper) with
+MPICH (conda-forge 4.3.2 and 5.0.1) is broken as soon as a process has two neighbours (4 processes; fine on 3, one
+neighbour each): `Cumulate()` without the others' values, its CG + Jacobi preconditioner does not converge (2000
+iterations, error 0.8), `GridFunction.Set()` then `masterinverse` corrupts the heap (`malloc(): unaligned tcache chunk`);
+all fine with OpenMPI 5.0.11 (2026-10-22, an NGSolve-only script). The adapter's local stages run in `Collective()`: an
+error on one process raised on all, none waits in a collective call. Against NGSolve's sparse Cholesky on the mesh
+regenerated on rank 0 (integrals of u and u^2) and `inverse="masterinverse"` (its parallel direct solver, DoF by DoF),
+with OpenMPI (2026-10-22, the library's default prolongation since 59f28f69): 11 cases x 1-4 processes pass, integrals
+2e-16 to 6.2e-12, DoFs 3.5e-14 to 8.2e-12 (Square-tri maxh 0.05, Cube-tet 0.15 at tolerance 1e-12: k = l = 1, 2, 3, and
+k = 1, l = 2 in 2D; Square-tri 0.015, Cube-tet 0.07 at 1e-10: k = l = 1, 2); also a right-hand side CUMULATED (the same
+solution), the Dirichlet lifting (2D k=2: 30/30/30/32 iterations, 3D: 71), a non-symmetric form refused. Iterations on
+1 / 2 / 3 / 4 processes the same but Square-tri 0.05 k=1 34/34/33/33, k=3 21/18/18/18, k=1 l=2 33/33/33/32, Cube-tet
+0.15 k=1 48/48/49/48, k=3 69/69/68/68, Square-tri 0.015 k=1 30/30/28/30, k=2 29/29/29/31 (on 2 processes, one holds
+everything: NGSolve's local numbering, the distributed path). Cube-tet 0.07 k=2 (74 iterations), 2 threads per process:
+`UAMG()` 0.43 / 0.73 / 0.54 / 0.40 s, of which the setup 0.25 / 0.38 / 0.30 / 0.21 s (the preparation on one process:
+0.09 s; on several, 0.18-0.34 s: the full blocks extracted, the exchanges). Time the collective calls after a barrier:
+otherwise the empty rank 0 waits inside the setup for the others' preparation of the inputs (1.4-1.8 s measured on 2
+processes; the adapter's `times["setup"]` is measured after one).
 
 ### U-AMG: details and measurements (kept out of `README_library.md`)
 
@@ -299,6 +342,26 @@ waits inside the setup for the others' preparation of the inputs (1.4-1.8 s meas
   sorted after those they are strongly and one-sidedly coupled to, cycles broken; natural order without one-sided
   couplings; on a level with one-sided couplings all the Gauss-Seidel sweeps (backward, symmetric included) follow it,
   Jacobi and SOR ignore it. HArDCore3D convection-dominated 32^3, k = 1: 16 iterations, 4 with it.
+- Mixed precision, the levels in single precision (2026-10-23; `Solver::MixedPrecision`, the library's default, the
+  user's decision and name: both precisions are used; `Multigrid::MixedPrecision`, the program's `-uamg-mixed`, off):
+  the setup is that of the double precision (the blocks, couplings, local matrices of the operators, prolongations of
+  the passes, operators of the p-levels: in double, the same aggregates and coarse matrices), its results stored in
+  float as they are produced: the coarse operators assembled in float (`LocalMatrices::Assemble<T>()`), the transfers and the p-levels' operators rounded
+  (`SparseMatrixOps::Cast`), the smoothers set up from the float operators (`BlockChebyshev`, `BlockDiagonalSolver`:
+  factorizations in double, stored in float). `UncondensedLevelOf<T>` (T: the precision of the cycle's matrices; the
+  non-template base `UncondensedLevel` holds the options, the blocks and `LocalOp`), `Multigrid::CycleIn<T>`; the
+  double instantiation is bitwise the former code. A first version built the levels from float blocks (copies of the
+  fine `A_T_F`): the couplings rounded changed the aggregates where couplings nearly tie (Square-tri n=16 k=0, the
+  cycles alone: 32 iterations instead of 29); since the setup in double, the iterations are those of the double
+  precision. The only copy: the finest operator in float (`UncondensedAMG::_singleA`); the p-levels' operators in
+  double are released after the setup, the coarsest copied in double for the coarse solver (`Level::
+  SingleOperatorMatrix`; `OperatorMatrix` on the finest and coarsest levels only). Out of the cycle, in double: `A`
+  (A x for the outer Krylov method: a parallel full product, FCG's own being sequential), the residuals and x: each
+  cycle corrects the residual of the current x (iterative refinement: `Krylov::None`, non-zero initial guesses).
+  Supported (`UncondensedAMG::MixedPrecisionApplies()`): a symmetric matrix on one process, the flat passes with the
+  chained prolongations and the Galerkin operators, no option needing `A_F_F` (p-levels after h-levels), the Chebyshev
+  smoothers, no zero-mean/compatibility conditions nor exports; otherwise the levels are in double (the reason
+  logged). Measurements: `PERFORMANCE.md`.
 - GCR: restarted every 10 iterations, Notay's economical version (ETNA 37, 2010, Algorithm 3.1); the K-cycle then
   iterates with GCR. BiCGSTAB is not flexible: the setup refuses the K-cycle with it.
 - Default smoothers: block Chebyshev of the fourth kind, degree 2, for a symmetric matrix (below); for a
@@ -416,8 +479,8 @@ Three READMEs, each for its readers; keep them up to date in the same commit as 
     files (`PERFORMANCE.md`, tests): they go in "U-AMG: details and measurements" above or in `PERFORMANCE.md`;
   - the parameters table gives the library's own defaults (`library/include/fhhos4.h` and `library/Solver.cpp`:
     `Arguments()`, `CheckParameters()`, `DefaultPreSmoother()`), which differ from the program's (smoother on several
-    threads, true residual, the prolongation, the defaults of the non-symmetric case): read them in the code, never
-    from the program;
+    threads, true residual, the prolongation, the precision of the levels, the defaults of the non-symmetric case):
+    read them in the code, never from the program;
   - any change of the public interface (`library/include/*`: a setup or solve function, a parameter, its default or
     its accepted values, an input requirement, an error) or of the library's build, install or CMake package updates
     `README_library.md` and the comments of `fhhos4.h`, which document the same interface; a version change updates
