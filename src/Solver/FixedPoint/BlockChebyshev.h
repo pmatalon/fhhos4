@@ -39,7 +39,11 @@ private:
 	double _ratio;
 	double _lambdaMaxEstimate = 0; // Lanczos estimate of the largest eigenvalue of D^-1 A (0 before the setup)
 
-	BlockDiagonalSolver _diagBlockSolver; // blocks of size > 1
+	// Blocks of size > 1: their inverses (DiagBlockSolveMethod::Inverse, computed in double), applied by a small product in
+	// the passes (ApplyInverseBlock()): in block CSR, passes 1.7x faster than with the LU solves in 2D (3x3 blocks), 1.25x
+	// in 3D (6x6; PERFORMANCE.md). Their rounding doesn't limit the accuracy of the solution: the smoother is a part of
+	// the preconditioner (the outer Krylov method checks the true residual); the blocks of an SPD matrix are invertible.
+	BlockDiagonalSolver _diagBlockSolver;
 
 	// The inverses of the diagonal coefficients (blocks of size 1) and the work vectors of the iterations (kept from one
 	// call to the next), in precision T: double, or float (a matrix in single precision, SetupSinglePrecision())
@@ -219,7 +223,7 @@ private:
 				Utils::FatalError("The Chebyshev smoothers require a symmetric positive definite matrix: non-positive diagonal coefficient.");
 		}
 		else
-			_diagBlockSolver.Setup(A, _blockSize);
+			_diagBlockSolver.Setup(A, _blockSize, DiagBlockSolveMethod::Inverse);
 		EstimateLambdaMaxAndCost<T>();
 	}
 
@@ -228,7 +232,7 @@ private:
 	{
 		if (_blockSize == 1 || A.BlockSize != _blockSize)
 			Utils::FatalError("The block CSR storage of a Chebyshev smoother requires blocks of its block size (" + to_string(_blockSize) + ", > 1), got " + to_string(A.BlockSize) + ".");
-		_diagBlockSolver.Setup(A, _blockSize);
+		_diagBlockSolver.Setup(A, _blockSize, DiagBlockSolveMethod::Inverse);
 		EstimateLambdaMaxAndCost<T>();
 	}
 
@@ -508,7 +512,8 @@ private:
 		{
 			#pragma omp parallel if (A.nonZeros() > 20000)
 			{
-				VectorOf<T> r_I(_blockSize), z_I(_blockSize); // work vectors, allocated once per thread
+				vector<T> r_I(_blockSize); // work vectors, allocated once per thread
+				vector<double> z_I(_blockSize);
 				#pragma omp for
 				for (BigNumber I = 0; I < nb; I++)
 				{
@@ -530,7 +535,7 @@ private:
 					}
 					if (dOut)
 					{
-						_diagBlockSolver.Solve(I, r_I, z_I); // r_I destroyed
+						ApplyInverseBlock<T, 0>(I, r_I.data(), z_I.data());
 						for (int k = 0; k < _blockSize; k++)
 							dOut[i0 + k] = (T)((dIn ? a * dIn[i0 + k] : 0) + c * z_I[k]);
 					}
@@ -553,8 +558,8 @@ private:
 		BigNumber nb = A.NBlocks();
 		#pragma omp parallel if (A.NonZeros() > 20000)
 		{
-			VectorOf<T> r_I(bs), z_I(bs); // work vectors, allocated once per thread
-			double acc[B > 0 ? B : BlockSparseMatrix<T>::MaxBlockSize];
+			T r_I[B > 0 ? B : BlockSparseMatrix<T>::MaxBlockSize];
+			double acc[B > 0 ? B : BlockSparseMatrix<T>::MaxBlockSize], z_I[B > 0 ? B : BlockSparseMatrix<T>::MaxBlockSize];
 			#pragma omp for
 			for (BigNumber I = 0; I < nb; I++)
 			{
@@ -575,7 +580,7 @@ private:
 				}
 				if (dOut)
 				{
-					_diagBlockSolver.Solve(I, r_I, z_I); // r_I destroyed
+					ApplyInverseBlock<T, B>(I, r_I, z_I);
 					for (int k = 0; k < bs; k++)
 						dOut[i0 + k] = (T)((dIn ? a * dIn[i0 + k] : 0) + c * z_I[k]);
 				}
@@ -585,6 +590,24 @@ private:
 						x[i0 + k] = xEquals0 ? dIn[i0 + k] : x[i0 + k] + dIn[i0 + k];
 				}
 			}
+		}
+	}
+
+	// z_I = D_I^-1 r_I by the inverse of the diagonal block I (blocks of size > 1), summed in double in the order of the
+	// columns of the inverse; B: the block size if it is known at compile time, 0 otherwise
+	template <typename T, int B>
+	inline void ApplyInverseBlock(BigNumber I, const T* r_I, double* z_I) const
+	{
+		const int bs = B > 0 ? B : _blockSize;
+		const T* inverse = _diagBlockSolver.template Block<T>(I);
+		for (int k = 0; k < bs; k++)
+			z_I[k] = 0;
+		for (int l = 0; l < bs; l++)
+		{
+			double r_l = r_I[l];
+			const T* column = inverse + l * bs;
+			for (int k = 0; k < bs; k++)
+				z_I[k] += (double)column[k] * r_l;
 		}
 	}
 
@@ -600,13 +623,13 @@ private:
 		BigNumber nb = Rows<T>() / _blockSize;
 		#pragma omp parallel if (NonZeros<T>() > 20000)
 		{
-			VectorOf<T> r_I(_blockSize), z_I(_blockSize);
+			vector<double> z_I(_blockSize);
 			#pragma omp for
 			for (BigNumber I = 0; I < nb; I++)
 			{
-				r_I = r.segment(I * _blockSize, _blockSize);
-				_diagBlockSolver.Solve(I, r_I, z_I);
-				z.segment(I * _blockSize, _blockSize) = z_I;
+				ApplyInverseBlock<T, 0>(I, r.data() + I * _blockSize, z_I.data());
+				for (int k = 0; k < _blockSize; k++)
+					z[I * _blockSize + k] = (T)z_I[k];
 			}
 		}
 	}

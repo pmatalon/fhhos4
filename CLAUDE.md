@@ -374,6 +374,10 @@ processes; the adapter's `times["setup"]` is measured after one).
   instances for 2, 3, 4, 5, 6, 10, 15 (`DispatchBlockSize()`, once per pass) and a run-time-size one (any, variable): the
   run-time sizes alone gave no gain (prototype, `PERFORMANCE.md`). The passes sum in the order of the CSR ones; Lanczos'
   products differ (Eigen 5's sparse product sums with two accumulators): results equal to rounding, the same iterations.
+  The Chebyshev smoother applies the inverses of its diagonal blocks (`DiagBlockSolveMethod::Inverse`, computed in
+  double; `ApplyInverseBlock()`, fused in the passes; the user's decision: in the smoothers, never in the static
+  condensation, whose explicit inverses would limit the accuracy of the discretization): solve -3..-17% per iteration,
+  the same iterations; the other block smoothers and the coarsening's block Jacobi keep the LU solves.
 - GCR: restarted every 10 iterations, Notay's economical version (ETNA 37, 2010, Algorithm 3.1); the K-cycle then
   iterates with GCR. BiCGSTAB is not flexible: the setup refuses the K-cycle with it.
 - Default smoothers: block Chebyshev of the fourth kind, degree 2, for a symmetric matrix (below); for a

@@ -1380,8 +1380,16 @@ Possible now that reordering the arithmetic operations is allowed (rejected so f
   3D k=3 6k 26.7 -> 19.7 / 16.6 ms. Setup: double block CSR +0.02..+0.22 s (the copy), mixed precision unchanged (the
   blocks instead of the CSR copy in float). BDDC / U-AMG end to end, double CSR -> mixed precision: 2D k=1 0.92-0.96
   -> 0.99-1.08, k=2 0.61-0.77 -> 0.69-0.84, k=3 0.49-0.65 -> 0.65-0.66; 3D k=1 0.92-1.63 -> 1.07-1.83, k=2 0.63-0.72 ->
-  0.77-0.91, k=3 0.49-0.58 -> 0.66-0.73. Next: the inverses of the diagonal blocks in the Chebyshev passes (2D: the LU
-  solves of the 3x3 blocks cost as much as the product).
+  0.77-0.91, k=3 0.49-0.58 -> 0.66-0.73.
+  Then the inverses of the diagonal blocks in the Chebyshev smoother only (2026-10-23, the user's decision: the
+  smoothers, not the static condensation; `BlockChebyshev::ApplyInverseBlock()`, summed in double, fused in the passes,
+  the block size known at compile time in block CSR; Lanczos too; the block Jacobi smoothing of the coarsening
+  prolongations and the Gauss-Seidel smoothers keep the LU solves): the same iterations and accuracy (NGSolve's HDG
+  against its direct solver, k = 1-4). `bench/run_bcsr.sh TAG=inv` against the LU run: solve per iteration in mixed
+  precision x0.83-0.97 (mostly 0.83-0.90), in double CSR x0.86-1.08. Against the double CSR with LU of the morning:
+  mixed precision per iteration 3D k=2 27k 36.5 -> 22.9 ms, 2D k=2 189k 84.7 -> 55.9 ms, 2D k=3 47k 59.6 -> 32.0 ms.
+  BDDC / U-AMG end to end, mixed precision (the best BDDC of the run): 2D k=1 1.11-1.21, k=2 0.82-0.91, k=3 0.68-0.71;
+  3D k=1 1.21-2.00, k=2 0.82-0.93, k=3 0.70-0.78.
 - **`-DENABLE_NATIVE_ARCH=ON`** (AVX2, FMA) — to measure. FMA and wider vectors change the rounding (now allowed);
   the binary then only runs on CPUs like the build machine's.
 - **Inverse diagonal blocks** in the block smoothers (`DiagBlockSolveMethod::Inverse`, an existing option of

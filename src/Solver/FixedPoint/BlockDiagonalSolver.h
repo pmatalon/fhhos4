@@ -104,6 +104,16 @@ public:
 			Solve(_blocks, i, b, x);
 	}
 
+	// The stored block i in precision T (column-major): its inverse (DiagBlockSolveMethod::Inverse) or its LU factors
+	template <typename T>
+	const T* Block(BigNumber i) const
+	{
+		if constexpr (std::is_same_v<T, float>)
+			return _singleBlocks.data() + i * _blockSize * _blockSize;
+		else
+			return _blocks.data() + i * _blockSize * _blockSize;
+	}
+
 private:
 	template <typename T>
 	Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& BlocksIn()
