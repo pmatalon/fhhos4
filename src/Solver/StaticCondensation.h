@@ -1,6 +1,7 @@
 #pragma once
 #include <algorithm>
 #include "../Utils/SparseMatrixOps.h"
+#include "../Utils/Utils.h"
 using namespace std;
 
 // Static condensation of the cell unknowns of a hybrid system, computed by cells, in parallel. The system
@@ -8,14 +9,15 @@ using namespace std;
 //     [ A_FT  A_FF ] [x_F] = [b_F],    A_TT block diagonal (one block of cellBlockSize rows per cell),
 // becomes A x_F = b, with A = A_FF - A_FT A_TT^{-1} A_TF and b = b_F - A_FT A_TT^{-1} b_T; then
 // x_T = A_TT^{-1} b_T - A_TT^{-1} A_TF x_F.
-// The constructor inverts the blocks of A_TT and computes W = A_TT^{-1} A_TF, whose rows of a cell are dense on the
-// union of the columns of its rows in A_TF (the faces of the cell). The rows of A are then computed in the pattern of
-// A_FF (no separate sum), completed in the rows where A_FT W has other columns (couplings of faces that are zero in A_FF,
-// e.g. dropped by its assembly), sorted only there. Bit for bit the results of the global products
-// FullFromLower(A_FF) - Multiply(A_FT, Multiply(inv(A_TT), A_TF)) (FullFromLower for a symmetric system), which
-// compute each coefficient in the same order, with inv(A_TT) the inverses of the blocks (DenseMatrix::inverse()) in full
-// (Utils::InvertBlockDiagMatrix(), used before, drops their coefficients of absolute value <= 1e-15: 1e-8 relative
-// differences in A on the symmetric part of HArDCore3D's 32^3 k=1 convection-diffusion system).
+// The constructor factorizes the blocks of A_TT (Cholesky for a symmetric system, as the program's condensation; LU with
+// partial pivoting otherwise) and computes W = A_TT^{-1} A_TF by their solves, whose rows of a cell are dense on the
+// union of the columns of its rows in A_TF (the faces of the cell); the solves of A_TT^{-1} b_T use the factorizations
+// too. Explicit inverses are not used: their rounding errors grow with the condition number of the blocks and would
+// limit the attainable accuracy of the discrete solution. The rows of A are then computed in the pattern of A_FF (no
+// separate sum), completed in the rows where A_FT W has other columns (couplings of faces that are zero in A_FF, e.g.
+// dropped by its assembly), sorted only there. Bit for bit the results of the global product
+// FullFromLower(A_FF) - Multiply(A_FT, W) (FullFromLower for a symmetric system), which computes each coefficient in
+// the same order.
 // Symmetric system (A_FT not given): A_TT and A_FF are read from their lower triangular parts, and A_FT = A_TF^T.
 // Non-symmetric system: A_FT is read in place, by the constructor and by CondensedRHS() (not copied): it must stay alive
 // and unchanged until the destruction of the object.
@@ -23,14 +25,18 @@ class StaticCondensation
 {
 private:
 	int _blockSize;                // DoFs per cell
-	vector<double> _invA_TT;       // inverses of the blocks of A_TT, column-major, one after the other
+	bool _symmetric;
+	// The factorizations of the blocks of A_TT, column-major, one after the other: Cholesky (the factor L in the lower
+	// triangular part) for a symmetric system, LU with partial pivoting otherwise (with the row permutation of each block)
+	vector<double> _factors;
+	vector<int> _permutations;
 	SparseMatrix _W;               // A_TT^{-1} A_TF
 	SparseMatrix _transposedA_TF;  // A_FT of a symmetric system; empty otherwise
 	const SparseMatrix& _A_FT;     // the caller's, or _transposedA_TF
 public:
 	// A_FT: null if the system is symmetric
 	StaticCondensation(const SparseMatrix& A_TT, const SparseMatrix& A_TF, const SparseMatrix* A_FT, int cellBlockSize)
-		: _blockSize(cellBlockSize), _transposedA_TF(A_FT ? SparseMatrix() : SparseMatrixOps::Transpose(A_TF)),
+		: _blockSize(cellBlockSize), _symmetric(!A_FT), _transposedA_TF(A_FT ? SparseMatrix() : SparseMatrixOps::Transpose(A_TF)),
 		  _A_FT(A_FT ? *A_FT : _transposedA_TF)
 	{
 		assert(A_TT.rows() == A_TF.rows() && A_TT.rows() % cellBlockSize == 0);
@@ -74,10 +80,13 @@ public:
 			outer[i + 1] += outer[i];
 		_W.resizeNonZeros(outer[A_TF.rows()]);
 
-		// Inverses of the blocks of A_TT and values of W
-		_invA_TT.resize(nCells * nT * nT);
+		// Factorizations of the blocks of A_TT and values of W
+		_factors.resize(nCells * nT * nT);
+		if (!symmetric)
+			_permutations.resize(nCells * nT);
 		ThreadLocal<DenseMatrix> rowsOfA_TF;
-		#pragma omp parallel for
+		BigNumber notPositiveDefinite = nCells; // the first cell whose block is not (symmetric system)
+		#pragma omp parallel for reduction(min: notPositiveDefinite)
 		for (BigNumber T = 0; T < nCells; ++T)
 		{
 			BigNumber first = T * nT;
@@ -94,8 +103,6 @@ public:
 						block(c, r) = it.value();
 				}
 			}
-			DenseMatrix inv = block.inverse(); // as Utils::InvertBlockDiagMatrix()
-			copy(inv.data(), inv.data() + nT * nT, _invA_TT.begin() + T * nT * nT);
 
 			vector<SparseMatrixIndex>& cols = columns.Local();
 			cellColumns(T, cols);
@@ -105,20 +112,43 @@ public:
 			for (int r = 0; r < nT; ++r)
 				for (SparseMatrix::InnerIterator it(A_TF, first + r); it; ++it)
 					R(r, lower_bound(cols.begin(), cols.end(), it.col()) - cols.begin()) = it.value();
+
+			Eigen::Map<DenseMatrix> factor(_factors.data() + T * nT * nT, nT, nT);
+			DenseMatrix W_T;
+			if (!CellSolve(block, R, factor, symmetric ? nullptr : _permutations.data() + T * nT, W_T))
+				notPositiveDefinite = min(notPositiveDefinite, T);
 			for (int r = 0; r < nT; ++r)
 			{
 				SparseMatrixIndex k = outer[first + r];
 				for (int j = 0; j < m; ++j)
 				{
-					// The order of Multiply(invA_TT, A_TF): the columns c of the row of invA_TT
-					double w = 0;
-					for (int c = 0; c < nT; ++c)
-						w += R(c, j) * inv(r, c);
 					_W.innerIndexPtr()[k + j] = cols[j];
-					_W.valuePtr()[k + j] = w;
+					_W.valuePtr()[k + j] = W_T(r, j);
 				}
 			}
 		}
+		if (notPositiveDefinite < nCells)
+			Utils::FatalError("fhhos4::Solver: the block of A_TT of the cell " + to_string(notPositiveDefinite) + " is not positive definite (symmetric system: the Cholesky factorization of the blocks of A_TT).");
+	}
+
+	// W_T = A_TT_T^{-1} R by the factorization of the block A_TT_T: Cholesky (permutation null), its factor written in
+	// factor, or LU with partial pivoting, its factors in factor and its row permutation in permutation. Returns false if
+	// the Cholesky factorization fails (the block is not positive definite). Also used by the tests, as the reference.
+	static bool CellSolve(const DenseMatrix& block, const DenseMatrix& R, Eigen::Map<DenseMatrix>& factor, int* permutation, DenseMatrix& W_T)
+	{
+		if (!permutation)
+		{
+			Eigen::LLT<DenseMatrix> llt(block);
+			factor = llt.matrixLLT();
+			W_T = llt.solve(R);
+			return llt.info() == Eigen::Success;
+		}
+		Eigen::PartialPivLU<DenseMatrix> lu(block);
+		factor = lu.matrixLU();
+		for (int k = 0; k < block.rows(); ++k)
+			permutation[k] = lu.permutationP().indices()(k);
+		W_T = lu.solve(R);
+		return true;
 	}
 
 	// Not copyable: _A_FT may refer to a member
@@ -137,7 +167,7 @@ public:
 		return AddProduct(A, false, 1);
 	}
 
-	// A_TT^{-1} b_T
+	// A_TT^{-1} b_T, by the factorizations of the blocks (the steps of Eigen's LLT::solve() and PartialPivLU::solve())
 	Vector SolveCells(const Vector& b_T) const
 	{
 		int nT = _blockSize;
@@ -145,8 +175,23 @@ public:
 		#pragma omp parallel for
 		for (BigNumber T = 0; T < (BigNumber)b_T.rows() / nT; ++T)
 		{
-			Eigen::Map<const DenseMatrix> inv(_invA_TT.data() + T * nT * nT, nT, nT);
-			y.segment(T * nT, nT) = inv * b_T.segment(T * nT, nT);
+			Eigen::Map<const DenseMatrix> factor(_factors.data() + T * nT * nT, nT, nT);
+			auto y_T = y.segment(T * nT, nT);
+			auto b = b_T.segment(T * nT, nT);
+			if (_symmetric)
+			{
+				y_T = b;
+				factor.triangularView<Eigen::Lower>().solveInPlace(y_T);
+				factor.triangularView<Eigen::Lower>().adjoint().solveInPlace(y_T);
+			}
+			else
+			{
+				const int* permutation = _permutations.data() + T * nT;
+				for (int k = 0; k < nT; ++k)
+					y_T(permutation[k]) = b(k);
+				factor.triangularView<Eigen::UnitLower>().solveInPlace(y_T);
+				factor.triangularView<Eigen::Upper>().solveInPlace(y_T);
+			}
 		}
 		return y;
 	}

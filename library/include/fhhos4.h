@@ -365,7 +365,8 @@ namespace fhhos4
 		// Solve(b_T, b_F, x_T, x_F) needs: the blocks may be freed after the setup.
 		// A_TT (cells x cells), A_TF (cells x faces), A_FF (faces x faces): the DoFs of each cell (resp. face) are
 		// contiguous, in the order of the rows (resp. columns) of A_TF. A_TT and A_FF are read from their lower triangular
-		// part (full or lower-only matrices).
+		// part (full or lower-only matrices). The blocks of A_TT (one per cell) must be positive definite: they are
+		// factorized by Cholesky (fhhos4::Error otherwise).
 		// On several processes (Comm), each one gives the rows of its own cells and faces: A_TT and A_TF the rows of its
 		// cells, A_FF those of its faces, in full (both triangles); the columns of A_TF and A_FF are numbered locally,
 		// in one numbering of the faces of the process: its own faces (those of the rows of A_FF, in their order), then

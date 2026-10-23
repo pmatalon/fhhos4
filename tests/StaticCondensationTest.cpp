@@ -1,8 +1,11 @@
 // Unit tests of the static condensation by cells (src/Solver/StaticCondensation.h), used by the library fhhos4
-// to condense the uncondensed systems it is given: the condensed matrix must be bit for bit that of the global products
-// FullFromLower(A_FF) - Multiply(A_FT, Multiply(inv(A_TT), A_TF)) (inverses of the blocks in full), whatever the number
-// of threads, in the pattern of A_FF (one pass) or not (global products); the vectors must solve the uncondensed system.
+// to condense the uncondensed systems it is given: the condensed matrix must be bit for bit that of the global product
+// FullFromLower(A_FF) - Multiply(A_FT, W), W = A_TT^{-1} A_TF by the factorizations of the blocks (Cholesky, or LU for a
+// non-symmetric system), whatever the number of threads, in the pattern of A_FF (one pass) or not (global products);
+// the vectors must solve the uncondensed system; a symmetric system whose block of A_TT is not positive definite is
+// refused.
 #include <gtest/gtest.h>
+#include <algorithm>
 #include <cstring>
 #include <random>
 #include <vector>
@@ -74,7 +77,8 @@ namespace
 			}
 		}
 
-		// A_FT A_TT^{-1} A_TF with the global products, the inverses of the blocks in full
+		// A_FT A_TT^{-1} A_TF with the global product A_FT W, W = A_TT^{-1} A_TF by the factorizations of the blocks
+		// (StaticCondensation::CellSolve()), on the columns of the rows of each cell in A_TF
 		SparseMatrix CellElimination(bool symmetric) const
 		{
 			SparseMatrix fullA_TT = symmetric ? SparseMatrixOps::FullFromLower(A_TT) : A_TT;
@@ -83,15 +87,28 @@ namespace
 			for (BigNumber T = 0; T < (BigNumber)A_TT.rows() / nT; T++)
 			{
 				DenseMatrix block = fullA_TT.block(T * nT, T * nT, nT, nT);
-				DenseMatrix inv = block.inverse();
+				std::vector<SparseMatrixIndex> cols;
 				for (int i = 0; i < nT; i++)
-					for (int j = 0; j < nT; j++)
-						t.push_back({ (SparseMatrixIndex)(T * nT + i), (SparseMatrixIndex)(T * nT + j), inv(i, j) });
+					for (SparseMatrix::InnerIterator it(A_TF, T * nT + i); it; ++it)
+						cols.push_back(it.col());
+				std::sort(cols.begin(), cols.end());
+				cols.erase(std::unique(cols.begin(), cols.end()), cols.end());
+				DenseMatrix R = DenseMatrix::Zero(nT, cols.size());
+				for (int i = 0; i < nT; i++)
+					for (SparseMatrix::InnerIterator it(A_TF, T * nT + i); it; ++it)
+						R(i, std::lower_bound(cols.begin(), cols.end(), it.col()) - cols.begin()) = it.value();
+				DenseMatrix factorStorage(nT, nT), W_T;
+				Eigen::Map<DenseMatrix> factor(factorStorage.data(), nT, nT);
+				std::vector<int> permutation(nT);
+				EXPECT_TRUE(StaticCondensation::CellSolve(block, R, factor, symmetric ? nullptr : permutation.data(), W_T));
+				for (int i = 0; i < nT; i++)
+					for (int j = 0; j < (int)cols.size(); j++)
+						t.push_back({ (SparseMatrixIndex)(T * nT + i), cols[j], W_T(i, j) });
 			}
-			SparseMatrix invA_TT(A_TT.rows(), A_TT.cols());
-			invA_TT.setFromTriplets(t.begin(), t.end());
+			SparseMatrix W(A_TF.rows(), A_TF.cols());
+			W.setFromTriplets(t.begin(), t.end());
 			SparseMatrix A_FTsym = symmetric ? SparseMatrixOps::Transpose(A_TF) : A_FT;
-			return SparseMatrixOps::Multiply(A_FTsym, SparseMatrixOps::Multiply(invA_TT, A_TF));
+			return SparseMatrixOps::Multiply(A_FTsym, W);
 		}
 
 		SparseMatrix CondensedMatrix(bool symmetric) const
@@ -186,4 +203,13 @@ TEST(StaticCondensationTest, SolvesTheUncondensedSystem)
 		Vector b = condensation.CondensedRHS(b_F, invA_TT_b_T);
 		EXPECT_LT((A * x_F - b).norm() / b.norm(), 1e-13);
 	}
+}
+
+// A symmetric system whose block of A_TT is not positive definite: refused (the Cholesky factorization of its blocks)
+TEST(StaticCondensationTest, NotPositiveDefiniteBlock)
+{
+	BlockSystem system(10, 4, 3, true, true, 5);
+	SparseMatrix A_TT = system.A_TT;
+	A_TT.coeffRef(4 * 7, 4 * 7) = -1; // the first diagonal coefficient of the block of the cell 7
+	EXPECT_THROW(StaticCondensation(A_TT, system.A_TF, nullptr, system.CellBlockSize), fhhos4::Error);
 }

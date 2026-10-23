@@ -333,7 +333,9 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 ## Constraints
 
 - **Symmetric positive definite** condensed system (`SetupSymmetric...()`), or non-symmetric with a positive definite
-  symmetric part (`SetupNonsymmetric...()`): not the pure Neumann problem (singular).
+  symmetric part (`SetupNonsymmetric...()`): not the pure Neumann problem (singular). With `SetupSymmetric()`, the blocks
+  of `A_TT` (one per cell) must be positive definite: the library factorizes them by Cholesky (LU with
+  `SetupNonsymmetric()`).
 - **Eigen 3.4 or 5.x** in your code, for the header `<fhhos4>`. No Eigen object crosses the boundary of the library:
   its compiled functions take arrays (views), which the header builds from your Eigen matrices and vectors, with your
   version of Eigen and your flags (any version, any alignment settings).

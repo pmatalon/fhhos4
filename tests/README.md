@@ -198,8 +198,8 @@ Unit tests of the parallel sparse matrix operations used in the setup of U-AMG (
 Unit tests of the static condensation by cells (`src/Solver/StaticCondensation.h`), with which the library condenses
 the uncondensed systems it is given, on random systems of cells in a row (3 faces per cell, 3 or 4 DoFs per cell, 2 or 3
 per face), symmetric (lower triangular `A_TT`, `A_FF`) or not, with 1, 3 and 8 threads. The condensed matrix must be bit
-for bit that of the global products `FullFromLower(A_FF) - Multiply(A_FT, Multiply(inv(A_TT), A_TF))` (inverses of the
-blocks in full).
+for bit that of the global product `FullFromLower(A_FF) - Multiply(A_FT, W)`, `W = A_TT^{-1} A_TF` by the
+factorizations of the blocks (Cholesky, LU for a non-symmetric system; `StaticCondensation::CellSolve()`).
 
 - **`StaticCondensationTest.CondensedMatrixInThePatternOfTheFaceBlock`** (1 case) — `A_FF` with the couplings of the
   faces of each cell (as HHO): the rows of `A` in its pattern.
@@ -208,6 +208,8 @@ blocks in full).
 - **`StaticCondensationTest.FaceBlock`** (1 case) — `A_FF = A + A_FT A_TT^{-1} A_TF` from `A`.
 - **`StaticCondensationTest.SolvesTheUncondensedSystem`** (1 case) — the condensed right-hand side and the cell unknowns
   solve the uncondensed system (to 1e-13).
+- **`StaticCondensationTest.NotPositiveDefiniteBlock`** (1 case) — a symmetric system whose block of `A_TT` is not
+  positive definite is refused (`fhhos4::Error`).
 
 ## `DownwindOrderTest.cpp`
 

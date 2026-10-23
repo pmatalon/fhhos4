@@ -77,7 +77,7 @@ From `build/`:
 ctest --output-on-failure
 ```
 
-280 tests, ~5 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
+281 tests, ~5 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
 iteration counts of the papers in `reproducibility/` — see `tests/README.md`. Covers
 `Program_Diffusion_HHO` and `Program_BiHarmonic_HHO` (HHO, static condensation), 2D/3D,
 in-house, GMSH and polygonal meshes, and the library (`UAMGLibrary*`, ~15 s). Not covered: DG/FEM programs (disabled by default), `lu`/`cg`/`agmg`/`p_mg` solvers,
@@ -228,7 +228,7 @@ user's decision) the DoF lists sort the DoFs of each cell and face by degree (`B
 measured by least-squares fits of `GetFE().CalcShape()`, the same order on every element; also the value of phi_0, the
 interpolations of 1 = 1/phi_0), default p-coarsening: k <= 2 unchanged,
 k=3 21 / 69 iterations instead of 44 / 96 with `ToZero` (Square-tri 940 / Cube-tet 1259 cells, tolerance 1e-12), k=4
-23 / 59. Solution = NGSolve's sparse Cholesky to 1e-11..1e-14 (2D, 3D, k = l = 1..4; k = 1, l = 2). Iterations with `ToZero`
+23 / 59. Solution = NGSolve's sparse Cholesky to 1e-13..1e-14 (2D, 3D, k = l = 1..4; k = 1, l = 2; 1e-11..1e-12 at k = 3-4 before the library factorized the blocks of `A_TT` instead of inverting them, 2026-10-23). Iterations with `ToZero`
 (tolerance 1e-8, 2026-10-19), U-AMG `bcheb4` / `bgs` / NGSolve's BDDC + CG, penalty alpha/h: Square-tri 3708 cells, alpha = 4k^2
 (NGSolve's tutorial): k=1 11/14/12, k=2 14/19/15, k=3 18/22/19; alpha = 10(k+1)^2: 24-29 / 32-36 / 21-30. Cube-tet 3937
 cells, alpha = 5(k+1)^2: k=1 24/28/28, k=2 39/44/45, k=3 46/53/55 (alpha = 4 at k=1 is not SPD in 3D: the Chebyshev
@@ -306,8 +306,10 @@ processes; the adapter's `times["setup"]` is measured after one).
   sorted) only in the rows where `A_FF` lacks couplings of the faces of a cell (zeros dropped by an assembly): 1.3x (1
   thread) to 1.8x (8 threads) slower when all the rows are completed. HArDCore3D 32^3, k = 1 (285,696 face DoFs, 9.2 M
   non-zeros in `A`): setup from the blocks 0.71-0.80 s vs 0.38-0.50 s from `A` on 1 thread, 0.25-0.35 s vs 0.17-0.29 s
-  on 8; same solve. The setups from the blocks keep the inverses of the blocks of `A_TT` and `A_TT^{-1} A_TF`, and
-  read `A_FT` at each solve: the transpose of `A_TF` (symmetric), or the caller's in place (non-symmetric).
+  on 8; same solve. The setups from the blocks keep the factorizations of the blocks of `A_TT` (Cholesky, LU with
+  partial pivoting for a non-symmetric system; not their inverses, the user's decision 2026-10-23: their rounding
+  would limit the attainable accuracy of the discretization) and `A_TT^{-1} A_TF`, and read `A_FT` at each solve: the
+  transpose of `A_TF` (symmetric), or the caller's in place (non-symmetric).
 - p-levels: `P_CS` Minus2 (k, k-2, ..., 0), blocks extracted (first coefficients of each block,
   `SetupOperatorByBlockExtraction()`), prolongation = injection of the low modes. `PCoarsening::ToZero` (`-p-cs =0`, k then 0,
   for bases not ordered by degree, e.g. NGSolve's): more iterations from k = 3 (FCG, 2026-10-19; `bgs,rbgs` / `bcheb4`):
