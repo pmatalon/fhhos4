@@ -271,6 +271,9 @@ NB_MODULE(fhhos4, m)
 		.value("W", fhhos4::Cycle::W)
 		.value("K", fhhos4::Cycle::K);
 
+	nb::enum_<fhhos4::PolynomialSpace>(m, "PolynomialSpace")
+		.value("P", fhhos4::PolynomialSpace::P)
+		.value("Q", fhhos4::PolynomialSpace::Q);
 	nb::enum_<fhhos4::PCoarsening>(m, "PCoarsening")
 		.value("Minus2", fhhos4::PCoarsening::Minus2)
 		.value("Minus1", fhhos4::PCoarsening::Minus1)
@@ -392,6 +395,7 @@ NB_MODULE(fhhos4, m)
 		.def_rw("Dimension", &fhhos4::Solver::Dimension)
 		.def_rw("FaceDegree", &fhhos4::Solver::FaceDegree)
 		.def_rw("CellDegree", &fhhos4::Solver::CellDegree)
+		.def_rw("PolynomialSpace", &fhhos4::Solver::PolynomialSpace)
 		// Solver
 		.def_rw("Krylov", &fhhos4::Solver::Krylov)
 		.def_rw("Tolerance", &fhhos4::Solver::Tolerance)

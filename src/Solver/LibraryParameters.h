@@ -64,6 +64,16 @@ private:
 		return prolongations;
 	}
 
+	// The polynomial spaces of the library, the program's -poly-space (UsePolynomialSpaceQ)
+	static const Table<fhhos4::PolynomialSpace, bool>& PolynomialSpaces()
+	{
+		static const Table<fhhos4::PolynomialSpace, bool> polynomialSpaces = {
+			{ fhhos4::PolynomialSpace::P, false },
+			{ fhhos4::PolynomialSpace::Q, true }
+		};
+		return polynomialSpaces;
+	}
+
 	// The coarse solvers of the library (Default: chosen by the library) and their codes in the program
 	// (-coarse-solver)
 	static const Table<fhhos4::CoarseSolver, string>& CoarseSolvers()
@@ -124,6 +134,12 @@ public:
 		return ToProgram(Prolongations(), prolongation, "Prolongation");
 	}
 
+	// UsePolynomialSpaceQ
+	static bool ProgramPolynomialSpace(fhhos4::PolynomialSpace polynomialSpace)
+	{
+		return ToProgram(PolynomialSpaces(), polynomialSpace, "PolynomialSpace");
+	}
+
 	// The code of the coarse solver (not Default)
 	static string ProgramCoarseSolver(fhhos4::CoarseSolver coarseSolver)
 	{
@@ -156,6 +172,11 @@ public:
 		if (!prolongation)
 			Utils::FatalError("The library fhhos4 has no coarsening prolongation " + to_string((unsigned)coarseningProlongation) + " (-coarsening-prolong): " + to_string((unsigned)UAMGProlongation::ReconstructSmoothedTraceOrInject) + " or " + to_string((unsigned)UAMGProlongation::HarmonicExtensionOrInject) + ".");
 		return *prolongation;
+	}
+
+	static fhhos4::PolynomialSpace LibraryPolynomialSpace(bool usePolynomialSpaceQ)
+	{
+		return *ToLibrary(PolynomialSpaces(), usePolynomialSpaceQ);
 	}
 
 	static fhhos4::CoarseSolver LibraryCoarseSolver(const string& coarseSolverCode)

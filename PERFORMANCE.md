@@ -1080,6 +1080,14 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   1 / 8 threads, P_F: 2.28 -> 1.57 s (-31%) / 0.75 -> 0.51 s (-33%); the new prolongation: 2.20 -> 1.47 s (-33%) /
   0.70 -> 0.46 s (-34%); the solve -1..-4%; the same iterations (35, 34).
 
+- **Block CSR kernels for the faces of Q^k in 3D** (2026-10-23, with the polynomial space Q, `PolynomialSpace::Q`):
+  `DispatchBlockSize()` instances for blocks of 9 and 16 DoFs (Q^2 and Q^3 on quadrilateral faces; 4, Q^1, existed).
+  NGSolve's HDG on mapped hexahedra through the adapter (`~/code/fhhos4-ngsolve/bench/bench_q_dispatch.py`), the
+  library's defaults (mixed precision, block CSR), 8 threads, best of 3 interleaved, against the run-time sizes: 16^3
+  cells k=2 (11520 faces, 26 iterations) 13.65 -> 12.42 ms per iteration (-9%), 10^3 cells k=3 (2700 faces, 20
+  iterations) 9.81 -> 8.99 ms (-8%); the same iterations, the setup unchanged. The whole iteration: the passes of the
+  fine level gain more (the coarse levels and FCG's product in double are unchanged).
+
 ## Distributed memory (MPI)
 
 U-AMG on several processes (`ENABLE_MPI`, see CLAUDE.md "MPI"). Measure with `scripts/perf/scaling_mpi.sh` (from

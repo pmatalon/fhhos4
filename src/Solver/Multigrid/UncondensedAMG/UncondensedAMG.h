@@ -13,6 +13,7 @@ private:
 	UAMGProlongation _multigridProlong = UAMGProlongation::ReconstructSmoothedTraceOrInject;
 	int _dim;
 	int _degree;
+	bool _polynomialSpaceQ; // the cells and faces have bases of Q^k (hierarchical: Q^d first), not P^k: the p-levels' blocks
 	int _cellBlockSize;
 	int _faceBlockSize;
 	double _strongCouplingThreshold;
@@ -30,11 +31,12 @@ public:
 	bool BlockCSRStorage = false;
 
 
-	UncondensedAMG(int dim, int degree, int cellBlockSize, int faceBlockSize, double strongCouplingThreshold, UAMGFaceProlongation faceProlong, UAMGProlongation coarseningProlong, UAMGProlongation mgProlong, int nLevels = 0)
+	UncondensedAMG(int dim, int degree, bool polynomialSpaceQ, int cellBlockSize, int faceBlockSize, double strongCouplingThreshold, UAMGFaceProlongation faceProlong, UAMGProlongation coarseningProlong, UAMGProlongation mgProlong, int nLevels = 0)
 		: Multigrid(nLevels)
 	{
 		this->_dim = dim;
 		this->_degree = degree;
+		this->_polynomialSpaceQ = polynomialSpaceQ;
 		this->_cellBlockSize = cellBlockSize;
 		this->_faceBlockSize = faceBlockSize;
 		this->_strongCouplingThreshold = strongCouplingThreshold;
@@ -357,8 +359,8 @@ protected:
 		UncondensedLevel* coarse;
 		if (coarseningType == CoarseningType::P)
 		{
-			int coarseCellBlockSize = Utils::Binomial(coarseDegree + _dim    , coarseDegree);
-			int coarseFaceBlockSize = Utils::Binomial(coarseDegree + _dim - 1, coarseDegree);
+			int coarseCellBlockSize = Utils::PolynomialSpaceDimension(_dim    , coarseDegree, _polynomialSpaceQ);
+			int coarseFaceBlockSize = Utils::PolynomialSpaceDimension(_dim - 1, coarseDegree, _polynomialSpaceQ);
 			coarse = CreateLevel(fine->Number + 1, coarseDegree, coarseCellBlockSize, coarseFaceBlockSize);
 		}
 		else

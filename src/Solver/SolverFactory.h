@@ -101,7 +101,7 @@ public:
 		}
 		else if (args.Solver.SolverCode.compare("uamg") == 0)
 		{
-			solver = AlgebraicSolverFactory::CreateUncondensedAMG(args, Dim, problem->HHO->FaceBasis->GetDegree(), problem->HHO->nCellUnknowns, problem->HHO->nFaceUnknowns, blockSize, out, CoarseSolvers(out));
+			solver = AlgebraicSolverFactory::CreateUncondensedAMG(args, Dim, problem->HHO->FaceBasis->GetDegree(), args.Discretization.UsePolynomialSpaceQ, problem->HHO->nCellUnknowns, problem->HHO->nFaceUnknowns, blockSize, out, CoarseSolvers(out));
 		}
 		else
 			solver = CreateSolver(args, blockSize, out);

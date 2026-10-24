@@ -272,7 +272,7 @@ namespace
 		bool symmetric = asymmetry == 0;
 		auto create = []()
 		{
-			return HierarchyAccess(2, 0, 1, 1, 0.25, UAMGFaceProlongation::BoundaryAggregatesInteriorAverage,
+			return HierarchyAccess(2, 0, false, 1, 1, 0.25, UAMGFaceProlongation::BoundaryAggregatesInteriorAverage,
 				UAMGProlongation::ReconstructSmoothedTraceOrInject, UAMGProlongation::ChainedCoarseningProlongations);
 		};
 		ChainedProlongations chained;
@@ -334,7 +334,7 @@ namespace
 		bool symmetric = asymmetry == 0;
 		auto create = []()
 		{
-			return HierarchyAccess(2, 0, 1, 1, 0.25, UAMGFaceProlongation::BoundaryAggregatesInteriorAverage,
+			return HierarchyAccess(2, 0, false, 1, 1, 0.25, UAMGFaceProlongation::BoundaryAggregatesInteriorAverage,
 				UAMGProlongation::HarmonicExtensionOrInject, UAMGProlongation::ChainedCoarseningProlongations);
 		};
 		HierarchyAccess chained = create();

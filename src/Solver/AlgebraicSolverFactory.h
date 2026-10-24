@@ -132,9 +132,9 @@ public:
 
 	// U-AMG for a hybrid discretization of face degree faceDegree in dimension dim, with cellBlockSize (resp.
 	// faceBlockSize) DoFs per cell (resp. face)
-	static UncondensedAMG* CreateUncondensedAMG(const ProgramArguments& args, int dim, int faceDegree, int cellBlockSize, int faceBlockSize, int blockSize, const ExportModule& out, const CoarseSolverFactory& createCoarseSolver)
+	static UncondensedAMG* CreateUncondensedAMG(const ProgramArguments& args, int dim, int faceDegree, bool polynomialSpaceQ, int cellBlockSize, int faceBlockSize, int blockSize, const ExportModule& out, const CoarseSolverFactory& createCoarseSolver)
 	{
-		UncondensedAMG* mg = new UncondensedAMG(dim, faceDegree, cellBlockSize, faceBlockSize, 0.25, args.Solver.MG.UAMGFaceProlong, args.Solver.MG.UAMGCoarseningProlong, args.Solver.MG.UAMGMultigridProlong, args.Solver.MG.Levels);
+		UncondensedAMG* mg = new UncondensedAMG(dim, faceDegree, polynomialSpaceQ, cellBlockSize, faceBlockSize, 0.25, args.Solver.MG.UAMGFaceProlong, args.Solver.MG.UAMGCoarseningProlong, args.Solver.MG.UAMGMultigridProlong, args.Solver.MG.Levels);
 		SetMultigridParameters(mg, args, dim, blockSize, out, createCoarseSolver);
 		mg->CoarsePolyDegree = 0;
 		mg->ManageAnisotropy = args.Solver.MG.ManageAnisotropy;

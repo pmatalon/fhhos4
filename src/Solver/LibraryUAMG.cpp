@@ -19,6 +19,7 @@ public:
 		_solver.Dimension = dim;
 		_solver.FaceDegree = faceDegree;
 		_solver.CellDegree = cellDegree;
+		_solver.PolynomialSpace = LibraryParameters::LibraryPolynomialSpace(args.Discretization.UsePolynomialSpaceQ);
 		if (!krylov)
 			_solver.Krylov = fhhos4::Krylov::None;
 		else

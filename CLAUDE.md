@@ -77,7 +77,7 @@ From `build/`:
 ctest --output-on-failure
 ```
 
-296 tests, ~5 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
+322 tests, ~8 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
 iteration counts of the papers in `reproducibility/` — see `tests/README.md`. Covers
 `Program_Diffusion_HHO` and `Program_BiHarmonic_HHO` (HHO, static condensation), 2D/3D,
 in-house, GMSH and polygonal meshes, and the library (`UAMGLibrary*`, ~15 s). Not covered: DG/FEM programs (disabled by default), `lu`/`cg`/`agmg`/`p_mg` solvers,
@@ -147,7 +147,8 @@ Example invocations for specific experiments/figures live in `reproducibility/*.
 `fhhos4::fhhos4`) gives U-AMG to other HHO codes (first target: HArDCore3D), see `README_library.md` (its rules: section
 "Documentation"). Public interface in `library/include/fhhos4.h` (`#include <fhhos4>`, a
 file that includes `fhhos4.h`, or `<fhhos4.h>`; namespace `fhhos4`, pimpl): `Solver` (parameters as
-public members; `Dimension`, `FaceDegree` and `CellDegree` must be set), `Result`, and `Error` (in `fhhos4_error.h`,
+public members; `Dimension`, `FaceDegree` and `CellDegree` must be set; `PolynomialSpace`: P (default) or Q, the block
+sizes of the cells, faces and p-levels), `Result`, and `Error` (in `fhhos4_error.h`,
 which `Utils.h` includes alone). Two interfaces: the uncondensed system, the interface of choice
 (`SetupSymmetric()` from `A_TT`, `A_TF`, `A_FF` and the interpolations of 1, or `SetupNonsymmetric()` with `A_FT` too,
 then `Solve(b_T, b_F, x_T, x_F)`: the library condenses the system by cells, `StaticCondensation.h`, and computes the
@@ -222,7 +223,10 @@ inverse of `a.mat`: `gfu.vec.data = UAMG(a) * f.vec`, zero on the non-free DoFs 
 Dirichlet lifting is the caller's, `+=` works), setup at construction (a new matrix: a new `UAMG`), attributes `result`,
 `solver`, `times`; an inverse, not a preconditioner (`pre=`): U-AMG has its Krylov method. Refused: `condense=True`
 (`a.mat` keeps only the Schur complement, the cell blocks are not stored), other spaces, complex, variable orders,
-elements other than simplices; symmetric from the form's flag (`BilinearForm(..., symmetric=True)`, `a.flags`), otherwise
+elements other than simplices, quadrilaterals and hexahedra, mixed element types (2026-10-23: Q^k on quadrilaterals and
+hexahedra, `PolynomialSpace.Q`, the degrees measured in Q, the largest partial degree; `test_ngsolve.py` 33 checks:
+mapped structured meshes, Square-quad 1024 cells k=1-4 30/29/15/14 iterations, k=1 l=2 24, Cube-hex 1000 cells k=1-3
+32/41/32, against NGSolve's sparse Cholesky to 1e-12..1e-14, the lifting and convection-diffusion too); symmetric from the form's flag (`BilinearForm(..., symmetric=True)`, `a.flags`), otherwise
 non-symmetric (`ExtractNonsymmetricBlocks()`, GCR; one process only). On one process: the DoF lists from the elements'
 DoFs (`V.Elements(VOL)`, `F.Elements(VOL)` and `el.facets`: 7x faster than `GetDofNrs()` by facet), the Dirichlet faces
 left out (`FreeDofs()`: all or none of a face's DoFs), `ExtractSymmetricBlocks()` on `a.mat.CSR()` (views of NGSolve's

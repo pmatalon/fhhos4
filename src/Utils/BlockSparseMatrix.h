@@ -8,10 +8,10 @@
 using namespace std;
 
 // Calls f(std::integral_constant<int, B>()) with B = blockSize if the kernels are compiled for this size (the faces of
-// degree 1 to 4 in 2D and 3D: 2, 3, 4, 5, 6, 10, 15), with B = 0 otherwise (the sizes read at run time, any of them,
-// also different from a block to another). With the size known at compile time, the products of the small blocks are
-// unrolled and vectorized: the kernels of block CSR are 1.5-2.5x faster than in CSR, without it no faster
-// (PERFORMANCE.md).
+// degree 1 to 4: 2, 3, 4, 5 in 2D, 3, 6, 10, 15 in 3D, and of degree 1 to 3 in Q^k in 3D: 4, 9, 16), with B = 0
+// otherwise (the sizes read at run time, any of them, also different from a block to another). With the size known at
+// compile time, the products of the small blocks are unrolled and vectorized: the kernels of block CSR are 1.5-2.5x
+// faster than in CSR, without it no faster (PERFORMANCE.md).
 template <class F>
 void DispatchBlockSize(int blockSize, F f)
 {
@@ -22,8 +22,10 @@ void DispatchBlockSize(int blockSize, F f)
 		case 4:  f(integral_constant<int, 4>());  return;
 		case 5:  f(integral_constant<int, 5>());  return;
 		case 6:  f(integral_constant<int, 6>());  return;
+		case 9:  f(integral_constant<int, 9>());  return;
 		case 10: f(integral_constant<int, 10>()); return;
 		case 15: f(integral_constant<int, 15>()); return;
+		case 16: f(integral_constant<int, 16>()); return;
 		default: f(integral_constant<int, 0>());  return;
 	}
 }

@@ -41,6 +41,18 @@ public:
 		return 1;
 	}
 
+	// The dimension of the space P^degree of the polynomials of degree at most degree in dim variables, or of Q^degree
+	// (largest partial degree at most degree) if polynomialSpaceQ
+	static int PolynomialSpaceDimension(int dim, int degree, bool polynomialSpaceQ)
+	{
+		if (!polynomialSpaceQ)
+			return Binomial(degree + dim, degree);
+		int n = 1;
+		for (int i = 0; i < dim; i++)
+			n *= degree + 1;
+		return n;
+	}
+
 	static int Factorial(int n)
 	{
 		int f = 1;

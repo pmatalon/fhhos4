@@ -38,7 +38,7 @@ namespace
 			mg.CoarseSolverCode = "ch";
 			ApplyUncondensedAMGDefaults(mg, faceDegree, true, false, true);
 			ExportModule out;
-			Multigrid.reset(AlgebraicSolverFactory::CreateUncondensedAMG(args, dim, faceDegree, cellBlockSize, faceBlockSize, faceBlockSize, out, AlgebraicSolverFactory::AlgebraicCoarseSolvers(dim, out)));
+			Multigrid.reset(AlgebraicSolverFactory::CreateUncondensedAMG(args, dim, faceDegree, false, cellBlockSize, faceBlockSize, faceBlockSize, out, AlgebraicSolverFactory::AlgebraicCoarseSolvers(dim, out)));
 			FCG = make_unique<FlexibleConjugateGradient>(1);
 			FCG->ResidualRecomputation = 20;
 			FCG->Precond = SolverPreconditioner(Multigrid.get());

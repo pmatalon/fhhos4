@@ -79,6 +79,8 @@ Then, once the system is reduced to one unknown per cell and face, h-coarsening 
 The solver typically applies to symmetric positive definite systems (e.g. diffusion)
 and non-symmetric ones (e.g. convection-diffusion, both diffusion- and convection-dominated).
 The polynomial bases used for the discretization **must be hierarchical** and ordered by degree for the p-multigrid part to work.
+The polynomial spaces are P^k (simplices, polytopes), or Q^k (quadrilaterals, hexahedra: `PolynomialSpace::Q`), in the
+cells and on the faces.
 Bases not ordered by degree, but whose first function is constant, work with the p-coarsening straight to the lowest
 order (`PCoarsening::ToZero`), or better, reordered by degree: e.g. in the DoF lists of `ExtractSymmetricBlocks()`
 (see [Other formats](#other-formats-the-helpers)), at no extra cost.
@@ -114,6 +116,7 @@ fhhos4::Solver solver;
 solver.Dimension = 3;  // to set
 solver.FaceDegree = k; // to set
 solver.CellDegree = k; // to set
+// solver.PolynomialSpace = fhhos4::PolynomialSpace::Q; // bases of Q^k instead of P^k
 solver.SetupSymmetric(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne);
 Eigen::VectorXd x_T(b_T.size()), x_F = Eigen::VectorXd::Zero(b_F.size());
 fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F); // flexible conjugate gradient preconditioned by the AMG
@@ -212,6 +215,7 @@ solver = fhhos4.Solver()
 solver.Dimension = 3   # to set
 solver.FaceDegree = k  # to set
 solver.CellDegree = k  # to set
+# solver.PolynomialSpace = fhhos4.PolynomialSpace.Q  # bases of Q^k instead of P^k
 solver.SetupSymmetric(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne)  # e.g. scipy.sparse.csr_array, NumPy vectors
 x_T, x_F = np.zeros(b_T.size), np.zeros(b_F.size)
 result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
@@ -268,11 +272,13 @@ result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
   visible in your code.
 - **The interpolation of the function 1** on the cell and face bases: one coefficient per cell (`cellInterpOfOne`, in
   the order of the blocks of rows of `A_TF`) and per face (`faceInterpOfOne`, blocks of columns). The bases must be
-  **hierarchical** (ordered by degree, except with `PCoarsening::ToZero`) **with a constant first function** `phi_0`:
+  **hierarchical** (ordered by degree: for each d, the first functions of a block span P^d, or Q^d whose degree is the
+  largest partial degree; except with `PCoarsening::ToZero`) **with a constant first function** `phi_0`:
   `1 = c phi_0`, i.e. `c = 1/phi_0`, which may vary from one
   cell or face to another (e.g. L2-orthonormal bases: `c = sqrt(|T|)` on a cell `T`); `c = 1` everywhere if `phi_0 = 1`.
-- **The dimension and the degrees**: `Dimension` (2 or 3), `FaceDegree` (k) and `CellDegree` (l) must be set. The setup checks
-  the sizes and structure of the inputs against them (full polynomial spaces).
+- **The dimension and the degrees**: `Dimension` (2 or 3), `FaceDegree` (k) and `CellDegree` (l) must be set, and
+  `PolynomialSpace` for bases of Q^k. The setup checks the sizes and structure of the inputs against them (full
+  polynomial spaces: P^l in the cells and P^k on the faces, or Q^l and Q^k).
 
 ### Other formats: the helpers
 
@@ -313,6 +319,7 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 
 | Parameter | Default | Values |
 |---|---|---|
+| `PolynomialSpace` | `PolynomialSpace::P` | `fhhos4::PolynomialSpace`, the space of the bases of the cells and faces: `P` (P^l and P^k: the polynomials of degree at most l, k), `Q` (Q^l and Q^k: of degree at most l, k in each variable, on quadrilaterals and hexahedra) |
 | `Krylov` | `Krylov::Default`: `Krylov::FCG` for a symmetric matrix, `Krylov::GCR` otherwise | `fhhos4::Krylov`: `FCG` (flexible conjugate gradient), `GCR` (GCR(10), any matrix), `BiCGSTAB` (V- or W-cycle only), `None` (the multigrid cycles alone) |
 | `Tolerance` | `1e-8` | `Solve()` stops when the relative residual of the condensed system (the true one, `Result::RelativeResidual`) is below it |
 | `MaxIterations` | `200` | |

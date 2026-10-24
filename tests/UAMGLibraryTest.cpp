@@ -44,6 +44,7 @@ struct LibraryCase
 	int BasesOrthogonalization; // -e-ogb and -f-ogb; -1 for the defaults
 	P_CoarsStgy PCoarsening = P_CoarsStgy::Minus2; // -p-cs
 	int CoarseningProlong = 0;                     // -coarsening-prolong (0: the default)
+	bool PolynomialSpaceQ = false;                 // -poly-space q
 };
 
 inline std::ostream& operator<<(std::ostream& os, const LibraryCase& c)
@@ -64,6 +65,7 @@ ProgramResults RunCase(const LibraryCase& c, const std::string& solverCode, bool
 		args.Discretization.Mesher = c.Mesher;
 	args.Discretization.N = c.N;
 	args.Discretization.PolyDegree = c.K + 1;
+	args.Discretization.UsePolynomialSpaceQ = c.PolynomialSpaceQ;
 	if (c.BasesOrthogonalization != -1)
 	{
 		args.Discretization.OrthogonalizeElemBasesCode = c.BasesOrthogonalization;
@@ -137,6 +139,8 @@ std::vector<LibraryCase> LibraryCases()
 	cases.push_back({ "Square_tri_n16_k3_pcs0", "square", "tri", "", 16, 3, -1, P_CoarsStgy::DirectToLow });
 	// The coarsening prolongation HarmonicExtensionOrInject (Prolongation::HarmonicExtension in the library)
 	cases.push_back({ "Square_tri_n16_k1_orthonormal_harmonic", "square", "tri", "", 16, 1, 3, P_CoarsStgy::Minus2, (int)UAMGProlongation::HarmonicExtensionOrInject });
+	// The space Q (-poly-space q, PolynomialSpace::Q in the library): blocks of Q^k, and a p-level Q^1 at k = 3
+	cases.push_back({ "Square_cart_n16_k3_Q", "square", "cart", "inhouse", 16, 3, -1, P_CoarsStgy::Minus2, 0, true });
 #endif
 #ifdef ENABLE_3D
 	cases.push_back({ "Cube_tetra_n8_k0", "cube", "tetra", "", 8, 0, -1 });
@@ -144,8 +148,19 @@ std::vector<LibraryCase> LibraryCases()
 	cases.push_back({ "Cube_tetra_n8_k1_orthonormal", "cube", "tetra", "", 8, 1, 3 });
 	cases.push_back({ "Cube_tetra_n8_k0_orthonormal_harmonic", "cube", "tetra", "", 8, 0, 3, P_CoarsStgy::Minus2, (int)UAMGProlongation::HarmonicExtensionOrInject });
 	cases.push_back({ "Cube_cart_n8_k2", "cube", "cart", "inhouse", 8, 2, -1 });
+	cases.push_back({ "Cube_cart_n8_k2_Q", "cube", "cart", "inhouse", 8, 2, -1, P_CoarsStgy::Minus2, 0, true });
 #endif
 	return cases;
+}
+
+// Q^3 in 3D: faces of 16 DoFs (the kernels of block CSR for this size, in double and in single precision), and a p-level
+// Q^1 between Q^3 and Q^0. Only in the suites of block CSR, with one Krylov method: the assembly of the program is
+// long (the reconstruction in Q^3 + P^4: 2.5 s for 125 cells, the solve 0.01 s). n = 5: on the mesh n = 4, the traces
+// of the solution vanish on all the faces (the condensed right-hand side is rounding noise, which the condensations of
+// the program and of the library don't round alike).
+std::vector<LibraryCase> HighDegreeQCases()
+{
+	return { { "Cube_cart_n5_k3_Q", "cube", "cart", "inhouse", 5, 3, -1, P_CoarsStgy::Minus2, 0, true } };
 }
 
 INSTANTIATE_TEST_SUITE_P(UAMGLibraryProgram, UAMGLibraryProgramTest,
@@ -209,6 +224,15 @@ TEST_P(UAMGMixedPrecisionProgramTest, SameInProgramAndLibrary)
 	}
 }
 
+#ifdef ENABLE_3D
+INSTANTIATE_TEST_SUITE_P(UAMGMixedPrecisionProgramQ, UAMGMixedPrecisionProgramTest,
+	::testing::Combine(::testing::ValuesIn(HighDegreeQCases()), ::testing::Values("fcguamg")),
+	[](const ::testing::TestParamInfo<UAMGMixedPrecisionProgramTest::ParamType>& info)
+	{
+		return std::get<0>(info.param).Name + "_" + std::get<1>(info.param);
+	});
+#endif
+
 INSTANTIATE_TEST_SUITE_P(UAMGMixedPrecisionProgram, UAMGMixedPrecisionProgramTest,
 	::testing::Combine(::testing::ValuesIn(LibraryCases()), ::testing::Values("fcguamg", "gcruamg", "uamg")),
 	[](const ::testing::TestParamInfo<UAMGMixedPrecisionProgramTest::ParamType>& info)
@@ -239,6 +263,10 @@ TEST_P(UAMGBlockCSRProgramTest, SameAsCSR)
 
 INSTANTIATE_TEST_SUITE_P(UAMGBlockCSRProgram, UAMGBlockCSRProgramTest, ::testing::ValuesIn(LibraryCases()),
 	[](const ::testing::TestParamInfo<LibraryCase>& info) { return info.param.Name; });
+#ifdef ENABLE_3D
+INSTANTIATE_TEST_SUITE_P(UAMGBlockCSRProgramQ, UAMGBlockCSRProgramTest, ::testing::ValuesIn(HighDegreeQCases()),
+	[](const ::testing::TestParamInfo<LibraryCase>& info) { return info.param.Name; });
+#endif
 
 // -uamg-nonsym refuses FCG (symmetric matrices only)
 #ifdef ENABLE_2D
@@ -1054,6 +1082,10 @@ TEST(UAMGLibrary, Errors)
 	fhhos4::Solver faceDegree1 = ToySolver();
 	faceDegree1.FaceDegree = 1;
 	EXPECT_THROW(faceDegree1.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
+	// Degree 0 in Q: 1 DoF per cell and per face, as in P
+	fhhos4::Solver q = ToySolver();
+	q.PolynomialSpace = fhhos4::PolynomialSpace::Q;
+	EXPECT_NO_THROW(q.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne));
 
 	// Parameters not set, or invalid
 	fhhos4::Solver noDimension = ToySolver();
@@ -1074,6 +1106,9 @@ TEST(UAMGLibrary, Errors)
 	fhhos4::Solver wrongProlongation = ToySolver();
 	wrongProlongation.Prolongation = static_cast<fhhos4::Prolongation>(42);
 	EXPECT_THROW(wrongProlongation.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
+	fhhos4::Solver wrongPolynomialSpace = ToySolver();
+	wrongPolynomialSpace.PolynomialSpace = static_cast<fhhos4::PolynomialSpace>(42);
+	EXPECT_THROW(wrongPolynomialSpace.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 	fhhos4::Solver negativeSmoothing = ToySolver();
 	negativeSmoothing.PostSmoothingIterations = -2;
 	EXPECT_THROW(negativeSmoothing.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);

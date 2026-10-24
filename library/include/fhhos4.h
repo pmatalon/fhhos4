@@ -202,9 +202,17 @@ namespace fhhos4
 		  // matrix. Non-linear: it requires a flexible Krylov method (FCG or GCR)
 	};
 
+	// The polynomial space of the bases of the cells and faces (Solver::PolynomialSpace)
+	enum class PolynomialSpace
+	{
+		P, // P^k: the polynomials of degree at most k; (k + n)! / (k! n!) functions in n variables
+		Q  // Q^k: the polynomials of degree at most k in each variable (tensor products, on quadrilaterals and hexahedra);
+		   // (k + 1)^n functions in n variables
+	};
+
 	// The p-coarsening (Solver::PCoarsening): the degrees of the p-levels, from FaceDegree down to 0, before the h-levels
 	// (aggregation) of degree 0. A p-level of degree d keeps the first functions of each block of the finer level: those
-	// of the polynomials of degree <= d if the bases are ordered by degree.
+	// of the polynomials of degree <= d (P^d, or Q^d: see PolynomialSpace) if the bases are ordered by degree.
 	enum class PCoarsening
 	{
 		Minus2,    // k, k - 2, ..., 0 (fhhos4 -p-cs -2)
@@ -277,6 +285,9 @@ namespace fhhos4
 		int Dimension = -1;  // 2 or 3
 		int FaceDegree = -1; // k: degree of the polynomials on the faces
 		int CellDegree = -1; // l: degree of the polynomials in the cells (k - 1, k or k + 1 in HHO)
+		// The polynomial space of the cells and faces, P^l and P^k, or Q^l and Q^k: their numbers of DoFs, and those of the
+		// p-levels
+		fhhos4::PolynomialSpace PolynomialSpace = fhhos4::PolynomialSpace::P;
 
 		//--------------------- Solver ---------------------//
 
@@ -361,9 +372,10 @@ namespace fhhos4
 		//   the indices);
 		// - cellInterpOfOne, faceInterpOfOne: the interpolation of the function 1 on the polynomial bases of the cells and
 		//   faces, one coefficient per cell and per face (in the order of the blocks of rows and columns of A_TF). The
-		//   bases must be hierarchical (ordered by degree; not needed with PCoarsening::ToZero) with a constant first
-		//   function phi_0: 1 = c phi_0, i.e. c = 1/phi_0. phi_0 may differ from one cell or face to another (e.g.
-		//   L2-orthonormal bases: c = sqrt(|T|) on a cell T); c = 1 everywhere if phi_0 = 1.
+		//   bases must be hierarchical (ordered by degree: for each d, the first functions span P^d, or Q^d whose degree is
+		//   the largest partial degree; not needed with PCoarsening::ToZero) with a constant first function phi_0:
+		//   1 = c phi_0, i.e. c = 1/phi_0. phi_0 may differ from one cell or face to another (e.g. L2-orthonormal bases:
+		//   c = sqrt(|T|) on a cell T); c = 1 everywhere if phi_0 = 1.
 
 		//----------- Uncondensed system: the interface of choice -----------//
 

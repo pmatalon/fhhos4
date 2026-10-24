@@ -167,6 +167,7 @@ namespace fhhos4
 		bool Symmetric = true; // the matrix is symmetric (SetupSymmetric...()), or not (SetupNonsymmetric...())
 		fhhos4::Krylov Krylov = fhhos4::Krylov::FCG;                       // Solver::Krylov, or its default for the symmetry of the matrix
 		fhhos4::CoarseSolver CoarseSolver = fhhos4::CoarseSolver::Cholesky; // Solver::CoarseSolver, or its default for the symmetry of the matrix
+		bool PolynomialSpaceQ = false; // Solver::PolynomialSpace
 		int CellBlockSize = 0;
 		int FaceBlockSize = 0;
 		Eigen::Index NCellDoFs = 0;
@@ -251,16 +252,18 @@ namespace fhhos4
 				if (!symmetric && SmootherFactory::IsChebyshev(LibraryParameters::ProgramSmoother(smoother)))
 					Utils::FatalError("fhhos4::Solver: the Chebyshev smoothers require a symmetric positive definite matrix: leave PreSmoother and PostSmoother Default for a non-symmetric one.");
 			}
-			CellBlockSize = Utils::Binomial(s.CellDegree + s.Dimension, s.CellDegree);
-			FaceBlockSize = Utils::Binomial(s.FaceDegree + s.Dimension - 1, s.FaceDegree);
+			PolynomialSpaceQ = LibraryParameters::ProgramPolynomialSpace(s.PolynomialSpace);
+			CellBlockSize = Utils::PolynomialSpaceDimension(s.Dimension, s.CellDegree, PolynomialSpaceQ);
+			FaceBlockSize = Utils::PolynomialSpaceDimension(s.Dimension - 1, s.FaceDegree, PolynomialSpaceQ);
 		}
 
 		// The sizes and structure of the inputs, against the dimension and the degrees. A, A_FF: null if not given; A_FT:
 		// null if the matrix is symmetric.
 		void CheckInputs(const Solver& s, const SparseMatrix* A, const SparseMatrix& A_TT, const SparseMatrix& A_TF, const SparseMatrix* A_FT, const SparseMatrix* A_FF, const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne) const
 		{
-			string cellDoFs = to_string(CellBlockSize) + " DoFs per cell (CellDegree " + to_string(s.CellDegree) + ", Dimension " + to_string(s.Dimension) + ")";
-			string faceDoFs = to_string(FaceBlockSize) + " DoFs per face (FaceDegree " + to_string(s.FaceDegree) + ", Dimension " + to_string(s.Dimension) + ")";
+			string space = string(", PolynomialSpace ") + (PolynomialSpaceQ ? "Q" : "P");
+			string cellDoFs = to_string(CellBlockSize) + " DoFs per cell (CellDegree " + to_string(s.CellDegree) + ", Dimension " + to_string(s.Dimension) + space + ")";
+			string faceDoFs = to_string(FaceBlockSize) + " DoFs per face (FaceDegree " + to_string(s.FaceDegree) + ", Dimension " + to_string(s.Dimension) + space + ")";
 			Eigen::Index nCellDoFs = A_TF.rows();
 			Eigen::Index nFaceDoFs = A_TF.cols();
 			auto size = [](const SparseMatrix& M) { return to_string(M.rows()) + " x " + to_string(M.cols()); };
@@ -427,7 +430,7 @@ namespace fhhos4
 		void CreateSolvers(const ProgramArguments& args, const Solver& s)
 		{
 			ExportModule out;
-			Multigrid.reset(AlgebraicSolverFactory::CreateUncondensedAMG(args, s.Dimension, s.FaceDegree, CellBlockSize, FaceBlockSize, FaceBlockSize, out, AlgebraicSolverFactory::AlgebraicCoarseSolvers(s.Dimension, out)));
+			Multigrid.reset(AlgebraicSolverFactory::CreateUncondensedAMG(args, s.Dimension, s.FaceDegree, PolynomialSpaceQ, CellBlockSize, FaceBlockSize, FaceBlockSize, out, AlgebraicSolverFactory::AlgebraicCoarseSolvers(s.Dimension, out)));
 			if (Krylov == fhhos4::Krylov::FCG)
 			{
 				auto fcg = make_unique<FlexibleConjugateGradient>(1);
