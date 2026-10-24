@@ -78,47 +78,24 @@ private:
 private:
 	LegendreBasis2D() {}
 public:
-	LegendreBasis2D(int maxPolynomialDegree, bool usePolynomialSpaceQ)
+	LegendreBasis2D(int maxPolynomialDegree, bool usePolynomialSpaceQ) :
+		LegendreBasis2D(usePolynomialSpaceQ ? TensorPartialDegrees2D(max(0, maxPolynomialDegree), 0) : TensorPartialDegrees2D(0, max(0, maxPolynomialDegree)))
+	{}
+
+	// The basis of the tensor polynomials of these partial degrees, in their order (see TensorPartialDegrees2D())
+	explicit LegendreBasis2D(const vector<array<int, 2>>& partialDegrees)
 	{
-		maxPolynomialDegree = max(0, maxPolynomialDegree);
+		int maxPolynomialDegree = 0;
+		for (const array<int, 2>& d : partialDegrees)
+			maxPolynomialDegree = max({ maxPolynomialDegree, d[0], d[1] });
 
 		_legendre1D.reserve(maxPolynomialDegree + 1);
 		for (int i = 0; i <= maxPolynomialDegree; i++)
 			_legendre1D.emplace_back(i);
 
-		if (usePolynomialSpaceQ)
-		{
-			_localFunctions.reserve((maxPolynomialDegree + 1) * (maxPolynomialDegree + 1));
-			int functionNumber = 0;
-			for (int j = 0; j <= maxPolynomialDegree; j++)
-			{
-				for (int i = 0; i <= maxPolynomialDegree; i++)
-				{
-					Legendre1D& polyX = _legendre1D[i];
-					Legendre1D& polyY = _legendre1D[j];
-					_localFunctions.emplace_back(functionNumber, &polyX, &polyY);
-					functionNumber++;
-				}
-			}
-		}
-		else
-		{
-			int nFunctions = Utils::Binomial(maxPolynomialDegree + 2, maxPolynomialDegree);
-			_localFunctions.reserve(nFunctions);
-			int functionNumber = 0;
-			for (int degree = 0; degree <= maxPolynomialDegree; degree++)
-			{
-				for (int j = 0; j <= degree; j++)
-				{
-					int i = degree - j;
-					Legendre1D& polyX = _legendre1D[i];
-					Legendre1D& polyY = _legendre1D[j];
-					_localFunctions.emplace_back(functionNumber, &polyX, &polyY);
-					functionNumber++;
-				}
-			}
-			assert(nFunctions == _localFunctions.size());
-		}
+		_localFunctions.reserve(partialDegrees.size());
+		for (const array<int, 2>& d : partialDegrees)
+			_localFunctions.emplace_back((int)_localFunctions.size(), &_legendre1D[d[0]], &_legendre1D[d[1]]);
 	}
 
 	vector<BasisFunction<2>*> LocalFunctions() override
@@ -145,8 +122,10 @@ public:
 		return new LegendreBasis2D(degree, UsePolynomialSpaceQ());
 	}
 
+	// The basis of the same space (P or Q) of degree degree
 	FunctionalBasis<2>* CreateLowerDegreeBasis(int degree) override
 	{
+		bool q = UsePolynomialSpaceQ();
 		LegendreBasis2D* lowerBasis = new LegendreBasis2D();
 		for (Legendre1D& phi : _legendre1D)
 		{
@@ -155,7 +134,7 @@ public:
 		}
 		for (TensorPolynomial2D& tp : _localFunctions)
 		{
-			if (tp.GetDegree() <= degree)
+			if ((q ? tp.GetQDegree() : tp.GetDegree()) <= degree)
 				lowerBasis->_localFunctions.push_back(tp);
 		}
 		return lowerBasis;
@@ -172,55 +151,24 @@ private:
 private:
 	LegendreBasis3D() {}
 public:
-	LegendreBasis3D(int maxPolynomialDegree, bool usePolynomialSpaceQ)
+	LegendreBasis3D(int maxPolynomialDegree, bool usePolynomialSpaceQ) :
+		LegendreBasis3D(usePolynomialSpaceQ ? TensorPartialDegrees3D(max(0, maxPolynomialDegree), 0) : TensorPartialDegrees3D(0, max(0, maxPolynomialDegree)))
+	{}
+
+	// The basis of the tensor polynomials of these partial degrees, in their order (see TensorPartialDegrees3D())
+	explicit LegendreBasis3D(const vector<array<int, 3>>& partialDegrees)
 	{
-		maxPolynomialDegree = max(0, maxPolynomialDegree);
+		int maxPolynomialDegree = 0;
+		for (const array<int, 3>& d : partialDegrees)
+			maxPolynomialDegree = max({ maxPolynomialDegree, d[0], d[1], d[2] });
 
 		_legendre1D.reserve(maxPolynomialDegree + 1);
 		for (int i = 0; i <= maxPolynomialDegree; i++)
 			_legendre1D.emplace_back(i);
 
-		if (usePolynomialSpaceQ)
-		{
-			_localFunctions.reserve(pow(maxPolynomialDegree + 1, 3));
-			int functionNumber = 0;
-			for (int k = 0; k <= maxPolynomialDegree; k++)
-			{
-				for (int j = 0; j <= maxPolynomialDegree; j++)
-				{
-					for (int i = 0; i <= maxPolynomialDegree; i++)
-					{
-						Legendre1D& polyX = _legendre1D[i];
-						Legendre1D& polyY = _legendre1D[j];
-						Legendre1D& polyZ = _legendre1D[k];
-						_localFunctions.emplace_back(functionNumber, &polyX, &polyY, &polyZ);
-						functionNumber++;
-					}
-				}
-			}
-		}
-		else
-		{
-			int nFunctions = Utils::Binomial(maxPolynomialDegree + 3, maxPolynomialDegree);
-			_localFunctions.reserve(nFunctions);
-			int functionNumber = 0;
-			for (int degree = 0; degree <= maxPolynomialDegree; degree++)
-			{
-				for (int degZ = 0; degZ <= degree; degZ++)
-				{
-					for (int degY = 0; degY <= degree - degZ; degY++)
-					{
-						int degX = degree - degZ - degY;
-						Legendre1D& polyX = _legendre1D[degX];
-						Legendre1D& polyY = _legendre1D[degY];
-						Legendre1D& polyZ = _legendre1D[degZ];
-						_localFunctions.emplace_back(functionNumber, &polyX, &polyY, &polyZ);
-						functionNumber++;
-					}
-				}
-			}
-			assert(nFunctions == _localFunctions.size());
-		}
+		_localFunctions.reserve(partialDegrees.size());
+		for (const array<int, 3>& d : partialDegrees)
+			_localFunctions.emplace_back((int)_localFunctions.size(), &_legendre1D[d[0]], &_legendre1D[d[1]], &_legendre1D[d[2]]);
 	}
 
 	vector<BasisFunction<3>*> LocalFunctions() override
@@ -247,8 +195,10 @@ public:
 		return new LegendreBasis3D(degree, UsePolynomialSpaceQ());
 	}
 
+	// The basis of the same space (P or Q) of degree degree
 	FunctionalBasis<3>* CreateLowerDegreeBasis(int degree) override
 	{
+		bool q = UsePolynomialSpaceQ();
 		LegendreBasis3D* lowerBasis = new LegendreBasis3D();
 		for (Legendre1D& phi : _legendre1D)
 		{
@@ -257,7 +207,7 @@ public:
 		}
 		for (TensorPolynomial3D& tp : _localFunctions)
 		{
-			if (tp.GetDegree() <= degree)
+			if ((q ? tp.GetQDegree() : tp.GetDegree()) <= degree)
 				lowerBasis->_localFunctions.push_back(tp);
 		}
 		return lowerBasis;

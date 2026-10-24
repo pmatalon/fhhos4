@@ -116,7 +116,12 @@ public:
 				this->ReconstructionBasis = new OrthogonalBasisOnCstJacShape<Dim>(refShapeOrthogBasis, shapeCstJac->DetJacobian(), hho->OrthonormalizeElemBases());
 			else
 				this->ReconstructionBasis = new OrthogonalBasis<Dim>(HHO->ReconstructionBasis, this->MeshElement->Shape(), hho->NElemOrthogonalizations(), hho->OrthonormalizeElemBases());
-			this->CellBasis = this->ReconstructionBasis->CreateLowerDegreeBasis(HHO->CellBasis->GetDegree());
+			// The cell basis: if hierarchical, the first functions of the reconstruction basis (P^l in P^{k+1}, Q^l in
+			// Q^l + P^{k+1}), as in the assembly below
+			if (HasHierarchichalBasis())
+				this->CellBasis = this->ReconstructionBasis->CreateBasisOfFirstFunctions(HHO->CellBasis->Size());
+			else
+				this->CellBasis = this->ReconstructionBasis->CreateLowerDegreeBasis(HHO->CellBasis->GetDegree());
 		}
 		else
 		{

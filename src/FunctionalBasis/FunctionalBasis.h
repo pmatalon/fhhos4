@@ -206,6 +206,8 @@ public:
 	virtual int    Size()           const = 0;
 	virtual FunctionalBasis<Dim>* CreateSameBasisForDegree(int degree) = 0;
 	virtual FunctionalBasis<Dim>* CreateLowerDegreeBasis  (int degree) = 0;
+	// The basis of the first n functions: for a hierarchical basis, that of a smaller space (see Diff_HHOElement::InitHHO())
+	virtual FunctionalBasis<Dim>* CreateBasisOfFirstFunctions(int n) { assert(false); return nullptr; }
 
 	virtual bool UsePolynomialSpaceQ() const 
 	{

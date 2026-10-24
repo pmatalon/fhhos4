@@ -278,7 +278,12 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 	int faceDegree = k;
 	int cellDegree = k + args.Discretization.RelativeCellPolyDegree;
 
-	FunctionalBasis<Dim>* reconstructionBasis = FunctionalBasisFactory<Dim>::Create(args.Discretization.ElemBasisCode, reconstructDegree, args.Discretization.UsePolynomialSpaceQ);
+	// In Q (cells Q^l, faces Q^k, l <= k), the reconstruction space is Q^l + P^{k+1}: it contains the cell space (stability),
+	// and the normal derivatives of its functions on the faces are in Q^k(F), their Laplacians in Q^l (consistency: the
+	// reconstruction of the interpolate of a function of this space is the function). Q^{k+1} is not consistent.
+	FunctionalBasis<Dim>* reconstructionBasis = args.Discretization.UsePolynomialSpaceQ ?
+		FunctionalBasisFactory<Dim>::CreateQPlusP(args.Discretization.ElemBasisCode, cellDegree, reconstructDegree) :
+		FunctionalBasisFactory<Dim>::Create(args.Discretization.ElemBasisCode, reconstructDegree, false);
 	FunctionalBasis<Dim>* cellBasis = FunctionalBasisFactory<Dim>::Create(args.Discretization.ElemBasisCode, cellDegree, args.Discretization.UsePolynomialSpaceQ);
 	FunctionalBasis<Dim - 1>* faceBasis = FunctionalBasisFactory<Dim-1>::Create(args.Discretization.FaceBasisCode, faceDegree, args.Discretization.UsePolynomialSpaceQ);
 

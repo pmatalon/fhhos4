@@ -52,6 +52,12 @@ A-priori convergence of the HHO discretization, independent of any solver study:
 - **`SquareQuad/ConvergenceOrderTest.MatchesTheoreticalOrder`** (1 case: `quad`, k=0) — the same, on the in-house quadrilateral mesh (trapezoids, `-stretch 0.5` by default), whose elements had no physical part: the assembly crashed. Only k=0: the quadrilateral elements use the polynomials of the reference square mapped by the bilinear map, which are not polynomials on a trapezoid, and the orders k≥1 don't converge at their theoretical rates.
   CLI: `./bin/fhhos4 -geo square -mesh quad -mesher inhouse -s ch -k 0 -n {8|16|32}`
 
+- **`Square/ConvergenceOrderQTest.MatchesTheoreticalOrder`** (4 cases: k=0..3) — HHO in Q (`-poly-space q`: cells and faces Q^k, the reconstruction in Q^k + P^(k+1)) on the Cartesian mesh: the orders of P. Before 2026-10-23 (the reconstruction in Q^(k+1), not consistent with the faces Q^k, and the bases of Q not ordered by degree), it didn't converge for k ≥ 1.
+  CLI: `./bin/fhhos4 -geo square -mesh cart -mesher inhouse -poly-space q -s ch -k {0..3} -n {8|16|32}`
+
+- **`{Square,Cube}/ExactnessQTest.ReproducesASolutionOfQ2`** (4 cases: 2D, 3D × the default bases (Legendre), the monomials orthogonalized on each cell) — the solution of `-source poly`, x(1-x)y(1-y) (times z(1-z) in 3D), is in Q^2: HHO in Q reproduces it at k=2. With the orthogonalized bases, the cell basis is made of the first functions of the reconstruction basis. Assertion: L2 error < 1e-12.
+  CLI: `./bin/fhhos4 -geo {square|cube} -mesh cart -mesher inhouse -poly-space q -source poly -s ch -k 2 -n 2 [-e-basis monomials -e-ogb 1]`
+
 ## `HMultigrid2020Test.cpp`
 
 Validates *"An h-multigrid method for Hybrid High-Order discretizations"* (Di Pietro, Hulsemann, Matalon, Mycek, Rude, Ruiz, SIAM J. Sci. Comput. 2021) — see `reproducibility/2020_MG_for_HHO.md`.

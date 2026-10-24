@@ -151,6 +151,17 @@ void ApplyProgramArgumentDefaults(ProgramArguments& args,
 			Utils::Warning("HHO loses one degree of approximation with the 'hdg' stabilization. With '-stab hdg', you should use '-kc 1'.");
 	}
 
+	// The space Q (Program_Diffusion_HHO: the reconstruction in Q^l + P^{k+1})
+	if (args.Discretization.Method.compare("hho") == 0 && args.Discretization.UsePolynomialSpaceQ)
+	{
+		if (args.Problem.Equation != EquationType::Diffusion)
+			argument_error("-poly-space q: HHO in Q is only implemented for the diffusion problem.");
+		if (args.Discretization.MeshCode.compare("cart") != 0)
+			argument_error("-poly-space q requires a Cartesian mesh (-mesh cart).");
+		if (args.Discretization.RelativeCellPolyDegree > 0)
+			argument_error("-poly-space q: no consistent reconstruction for cells of degree k + 1 and faces of degree k in Q. Use -kc 0 or -1.");
+	}
+
 	// Elem polynomial bases
 	if (args.Discretization.Method.compare("fem") == 0)
 	{
@@ -271,6 +282,9 @@ void ApplyProgramArgumentDefaults(ProgramArguments& args,
 			Utils::RequiresNestedHierarchy(args.Solver.MG.GMG_H_Prolong) &&
 			args.Solver.MG.GMG_H_Prolong != GMG_H_Prolongation::Default)
 			argument_error("The coarsening by independent remeshing is only applicable with the non-nested versions of the multigrid (-prolong " + to_string((unsigned)GMG_H_Prolongation::CellInterp_ExactL2proj_Trace) + ", " + to_string((unsigned)GMG_H_Prolongation::CellInterp_ApproxL2proj_Trace) + " or " + to_string((unsigned)GMG_H_Prolongation::CellInterp_FinerApproxL2proj_Trace) + ").");
+
+		if (args.Discretization.UsePolynomialSpaceQ && (args.Solver.SolverCode.compare("p_mg") == 0 || args.Solver.PreconditionerCode.compare("p_mg") == 0 || args.Solver.MG.HP_CS != HP_CoarsStgy::H_only))
+			argument_error("-poly-space q: the geometric multigrid with p-levels is not implemented in Q (its problems of lower degrees).");
 
 		if (args.Solver.SolverCode.compare("p_mg") == 0 && defaultCoarseSolver)
 			args.Solver.MG.CoarseSolverCode = "mg";

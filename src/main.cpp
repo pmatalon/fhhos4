@@ -199,7 +199,8 @@ void print_usage() {
 	cout << "-poly-space CODE" << endl;
 	cout << "      Polynomial space." << endl;
 	cout << "               p - space P (default)" << endl;
-	cout << "               q - space Q of tensor polynomials (when d=2 or 3)" << endl;
+	cout << "               q - space Q of tensor polynomials (when d=2 or 3). HHO: diffusion on Cartesian meshes," << endl;
+	cout << "                   -kc 0 or -1; the reconstruction in Q^(k+kc) + P^(k+1)" << endl;
 	cout << endl;
 	cout << "-pen NUM" << endl;
 	cout << "      Penalization coefficient in DG (default: -1 = automatic)." << endl;

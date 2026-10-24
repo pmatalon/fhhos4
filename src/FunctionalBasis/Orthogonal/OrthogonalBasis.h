@@ -69,6 +69,14 @@ public:
 		return lowerBasis;
 	}
 
+	FunctionalBasis<Dim>* CreateBasisOfFirstFunctions(int n) override
+	{
+		OrthogonalBasis* firstBasis = new OrthogonalBasis();
+		firstBasis->_originalBasis = _originalBasis;
+		firstBasis->_localFunctions.assign(_localFunctions.begin(), _localFunctions.begin() + n);
+		return firstBasis;
+	}
+
 	bool IsHierarchical()      const override { return _originalBasis->IsHierarchical(); }
 	int  GetDegree()           const override { return _originalBasis->GetDegree(); }
 	int  Size()                const override { return (int)_localFunctions.size(); }

@@ -52,6 +52,13 @@ public:
 		return lowerBasis;
 	}
 
+	FunctionalBasis<Dim>* CreateBasisOfFirstFunctions(int n) override
+	{
+		OrthogonalBasisOnCstJacShape* firstBasis = new OrthogonalBasisOnCstJacShape();
+		firstBasis->_localFunctions.assign(_localFunctions.begin(), _localFunctions.begin() + n);
+		return firstBasis;
+	}
+
 	int  Size()                const override { return (int)_localFunctions.size(); }
 	string BasisCode()         const override { assert(false); return ""; }
 	bool IsHierarchical()      const override { assert(false); return false; }

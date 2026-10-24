@@ -124,7 +124,15 @@ Example invocations for specific experiments/figures live in `reproducibility/*.
 - `Solver/` — `Direct/`, `Krylov/`, `Multigrid/`, `FixedPoint/`, `BiHarmonic/`,
   plus `SolverFactory.h` (needs the problem), `AlgebraicSolverFactory.h` (only the matrices: shared with the library),
   `StaticCondensation.h` (algebraic, by cells: the library's) and `LibraryUAMG.h/.cpp` (`-s libuamg`).
-- `FunctionalBasis/`, `QuadratureRules/`, `Geometry/` — numerics building blocks.
+- `FunctionalBasis/`, `QuadratureRules/`, `Geometry/` — numerics building blocks. The tensor bases (monomials,
+  Legendre) span Q^q + P^p (`TensorPolynomial.h`): P^k, Q^k (`-poly-space q`) ordered by largest partial degree (the
+  first (d+1)^dim span Q^d: hierarchical in Q, what the p-levels of U-AMG need; P^k keeps its order), and their sum.
+  HHO in Q (2026-10-23; before, it didn't converge for k >= 1: a reconstruction in Q^{k+1}, inconsistent with the faces
+  Q^k, and the bases of Q not ordered, against the element's "cell basis = first functions of the reconstruction
+  basis"): the reconstruction in Q^l + P^{k+1} (`FunctionalBasisFactory::CreateQPlusP()`: contains the cell space,
+  normal derivatives in Q^k(F), Laplacians in Q^l), diffusion only, Cartesian meshes, `-kc 0|-1` (no consistent
+  reconstruction for Q^{k+1} cells), monomials or Legendre, no geometric p-multigrid; the orders of P, exact on Q^2
+  solutions at k = 2 (`HHOConvergenceTest`).
 - `TestCases/` — analytic/benchmark problem definitions.
 - `Utils/` — cross-cutting helpers (timers, export, types). `Utils::FatalError()` throws `fhhos4::Error` (`main()`
   prints it and exits with EXIT_FAILURE): never call it inside a parallel loop. The solvers print through `Utils::Log()`
