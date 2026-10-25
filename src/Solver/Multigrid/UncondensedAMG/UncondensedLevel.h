@@ -103,6 +103,11 @@ public:
 	// take its value instead of the average of the faces of their coarse element (see BuildQ_F()).
 	bool ManageAnisotropy = true;
 
+	// Set by UncondensedAMG: the faces of a single cell (the boundary of the domain in the system, e.g. Neumann faces)
+	// removed by the coarsening (false), or collapsed into one coarse face per aggregate (see
+	// CoarseningPass::CollapseBoundaryFaces)
+	bool CollapseBoundaryFaces = false;
+
 	// Set by UncondensedAMG: the operator of the cycle of the levels whose faces have several DoFs (but the coarsest)
 	// stored by blocks (block CSR, Level::BlockOperator), in the precision of the levels (OnStartSetup()): with the levels
 	// in single precision (instead of their CSR copy in float), or in double (UncondensedAMG::BlockCSRStorage: a copy)
@@ -492,6 +497,7 @@ public:
 		while (!CoarseningCriteriaReached(coarseningStgy, requestedCoarseningFactor, nCoarsenings, actualCoarseningFactor))
 		{
 			CoarseningPass pass(_cellBlockSize, fbs, Symmetric, _strongCouplingThreshold);
+			pass.CollapseBoundaryFaces = CollapseBoundaryFaces;
 			pass.Build(*passA_T_F, nullptr);
 			DistributedPass distributed(pass, *passFaceMap);
 			distributed.FindRemoteCells();
@@ -722,6 +728,7 @@ public:
 		while (!CoarseningCriteriaReached(coarseningStgy, requestedCoarseningFactor, nCoarsenings, actualCoarseningFactor))
 		{
 			CoarseningPass pass(_cellBlockSize, _faceBlockSize, Symmetric, _strongCouplingThreshold);
+			pass.CollapseBoundaryFaces = CollapseBoundaryFaces;
 			pass.Build(*passA_T_F, passA_F_T);
 			bool allNeighbours = coarseningStgy == H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours || coarseningStgy == H_CoarsStgy::MultipleAgglomerationCoarseningByFaceNeighbours;
 			Utils::Log() << (allNeighbours ? "\tElement agglomeration" : "\tElement pairwise aggregation") << endl;
@@ -995,6 +1002,7 @@ public:
 		if (!onlyFacesUsed)
 		{
 			mesh.Build();
+			mesh.CollapseBoundaryFaces = CollapseBoundaryFaces;
 			mesh.Coarsen(elemCoarseningStgy, faceCoarseningStgy, coarsestPossibleMeshReached);
 			if (coarsestPossibleMeshReached)
 				return { nullptr, nullptr, nullptr, nullptr, coarsestPossibleMeshReached };

@@ -161,12 +161,6 @@ public:
 		return AddProduct(A_FF, lower, -1);
 	}
 
-	// A_FF = A + A_FT A_TT^{-1} A_TF, A read in full
-	SparseMatrix FaceBlock(const SparseMatrix& A) const
-	{
-		return AddProduct(A, false, 1);
-	}
-
 	// A_TT^{-1} b_T, by the factorizations of the blocks (the steps of Eigen's LLT::solve() and PartialPivLU::solve())
 	Vector SolveCells(const Vector& b_T) const
 	{
@@ -219,9 +213,11 @@ private:
 		assert((M.rows() == _A_FT.rows() || (M.rows() < _A_FT.rows() && !lower)) && M.cols() == _W.cols());
 		BigNumber n = _A_FT.rows();
 		BigNumber nRowsOfM = M.rows();
-		SparseMatrix Mt; // lower: row i of Mt, column i of M, whose part under the diagonal gives the part of row i above it
+		// lower: row i of Mt, the part of column i of M under the diagonal, gives the part of row i above it (only that part
+		// transposed: M may be given in full)
+		SparseMatrix Mt;
 		if (lower)
-			Mt = SparseMatrixOps::Transpose(M);
+			Mt = SparseMatrixOps::TransposeIf(M, [](BigNumber i, SparseMatrixIndex j) { return j < (SparseMatrixIndex)i; });
 		// The row i of M in full: [begin1, end1) in M, [begin2, end2) in Mt (empty if !lower)
 		auto rowOfM = [&](BigNumber i, SparseMatrixIndex& begin1, SparseMatrixIndex& end1, SparseMatrixIndex& begin2, SparseMatrixIndex& end2)
 		{
@@ -231,7 +227,7 @@ private:
 			if (lower)
 			{
 				end1 = upper_bound(M.innerIndexPtr() + begin1, M.innerIndexPtr() + end1, (SparseMatrixIndex)i) - M.innerIndexPtr();
-				begin2 = upper_bound(Mt.innerIndexPtr() + Mt.outerIndexPtr()[i], Mt.innerIndexPtr() + Mt.outerIndexPtr()[i + 1], (SparseMatrixIndex)i) - Mt.innerIndexPtr();
+				begin2 = Mt.outerIndexPtr()[i];
 				end2 = Mt.outerIndexPtr()[i + 1];
 			}
 		};
@@ -289,6 +285,7 @@ private:
 
 		ThreadLocal<vector<double>> products;
 		ThreadLocal<vector<SparseMatrixIndex>> cellPositions; // of the columns of the current cell in the row of S
+		ThreadLocal<vector<double>> cellProducts;             // the products on these columns, contiguous
 		ThreadLocal<vector<pair<SparseMatrixIndex, double>>> completedRows;
 		#pragma omp parallel for schedule(dynamic, 1024)
 		for (BigNumber i = 0; i < n; ++i)
@@ -296,6 +293,7 @@ private:
 			vector<SparseMatrixIndex>& pos = positions.Local();
 			vector<double>& p = products.Local();
 			vector<SparseMatrixIndex>& cellPos = cellPositions.Local();
+			vector<double>& cellP = cellProducts.Local();
 
 			// The row of M, completed by the other columns of A_FT W (zeros of M), sorted
 			SparseMatrixIndex begin1, end1, begin2, end2;
@@ -332,23 +330,32 @@ private:
 			for (SparseMatrixIndex k = 0; k < size; ++k)
 				pos[cols[k]] = k;
 
-			// (A_FT W)(i, :), in the order of Multiply(A_FT, W): the columns c of the row of A_FT, then the columns of W
+			// (A_FT W)(i, :), in the order of Multiply(A_FT, W): the columns c of the row of A_FT, then the columns of W.
+			// The columns c of a cell (contiguous in the row of A_FT) have rows of W on the same columns: their products
+			// are summed on these columns gathered from p, contiguous, then scattered back (the same sums, in the same order)
 			p.assign(size, 0.0);
-			BigNumber currentCell = (BigNumber)-1;
-			for (SparseMatrix::InnerIterator a(_A_FT, i); a; ++a)
+			for (SparseMatrix::InnerIterator a(_A_FT, i); a; )
 			{
+				BigNumber cell = a.col() / _blockSize;
 				SparseMatrixIndex start = _W.outerIndexPtr()[a.col()];
 				SparseMatrixIndex m = _W.outerIndexPtr()[a.col() + 1] - start;
-				if ((BigNumber)a.col() / _blockSize != currentCell) // the rows of W of a cell have the same columns
-				{
-					currentCell = a.col() / _blockSize;
-					cellPos.resize(m);
-					for (SparseMatrixIndex j = 0; j < m; ++j)
-						cellPos[j] = pos[_W.innerIndexPtr()[start + j]];
-				}
-				const double* w = _W.valuePtr() + start;
+				cellPos.resize(m);
+				cellP.resize(m);
 				for (SparseMatrixIndex j = 0; j < m; ++j)
-					p[cellPos[j]] += w[j] * a.value();
+				{
+					cellPos[j] = pos[_W.innerIndexPtr()[start + j]];
+					cellP[j] = p[cellPos[j]];
+				}
+				double* sums = cellP.data();
+				for (; a && (BigNumber)a.col() / _blockSize == cell; ++a)
+				{
+					const double* w = _W.valuePtr() + _W.outerIndexPtr()[a.col()];
+					double value = a.value();
+					for (SparseMatrixIndex j = 0; j < m; ++j)
+						sums[j] += w[j] * value;
+				}
+				for (SparseMatrixIndex j = 0; j < m; ++j)
+					p[cellPos[j]] = sums[j];
 			}
 			for (SparseMatrixIndex k = 0; k < size; ++k)
 			{

@@ -1088,6 +1088,88 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   iterations) 9.81 -> 8.99 ms (-8%); the same iterations, the setup unchanged. The whole iteration: the passes of the
   fine level gain more (the coarse levels and FCG's product in double are unchanged).
 
+- **The clients on the uncondensed interface** (2026-10-24, the user's request before dropping the condensed setups:
+  "not build the condensed matrix, nor recompute the cell unknowns"; the client code uncommitted there). HArDCore3D
+  (`hho-diffusion`, `hho-diff-advec-reac`): no local condensation (LU, Schur complement, triplets of `GlobMat` and
+  `ScBeMat`) in the assembly, which builds `A_TT`, `A_TF` (`A_FT`) and `A_FF` in full (the library's condensation
+  completes the rows of a lower-only `A_FF`, slower) in parallel, by blocks of rows; the Dirichlet lifting on the
+  uncondensed right-hand side; the cell unknowns from `Solve(b_T, b_F, x_T, x_F)`. Disk++ (`poisson_solver`): `A_FF`
+  and `b_F` in its `LHS` and `RHS`, no `static_condensation()` per cell, and no expansion loop (which recomputed every
+  element contribution to decondense). The same iterations (Disk++ tetrahedra 4 k=1: 40 -> 41), the same errors (to
+  the tolerance), also with non-homogeneous Dirichlet data. `build/bench_iface1/` (`before/`: the clients on the
+  condensed interface, the same library), plugged in, one run each:
+
+  | Case | Wall 1 thread (s) | Wall 8 threads (s) | Peak memory (GB) |
+  |---|---|---|---|
+  | HArDCore3D diffusion 32^3 k=1 | 19.4 / 19.4 | 6.15 / 5.32 (-13%) | 1.31 / 0.98 |
+  | HArDCore3D diffusion 32^3 k=2 | 109 / 105 (-4%) | 27.2 / 24.2 (-11%) | 4.36 / 2.86 |
+  | HArDCore3D advection 32^3 k=1 | 17.9 / 16.0 (-11%) | 7.62 / 6.60 (-13%) | 1.22 / 1.01 |
+  | HArDCore3D advection 32^3 k=2 | 75.9 / 68.3 (-10%) | 32.1 / 27.0 (-16%) | 3.63 / 2.69 |
+  | Disk++ quadrangles 7 k=2 | 13.0 / 11.0 (-15%) | 12.8 / 10.3 (-19%) | 0.81 / 0.88 |
+  | Disk++ hexagons 7 k=2 | 36.5 / 28.8 (-21%) | 32.4 / 29.2 (-10%) | 2.02 / 1.80 |
+  | Disk++ tetrahedra 4 k=1 | 6.36 / 4.94 (-22%) | 5.88 / 4.86 (-17%) | 0.33 / 0.32 |
+  | Disk++ tetrahedra 4 k=2 | 15.6 / 13.2 (-16%) | 14.1 / 11.6 (-18%) | 0.87 / 1.07 |
+
+  HArDCore3D at k=0: unchanged. Disk++, all 10 cases (2D levels 7-8, tetrahedra 4-5, k=0-2): -13..-22% (1 thread),
+  -10..-22% (8 threads); its solve + expansion 2-5x faster (tetrahedra 4 k=2 8 threads: 4.00 -> 1.62 s). Memory: the
+  clients' condensed matrices (and HArDCore3D's copies of them) are gone, but the library now holds `A` next to the
+  client's `A_FF` during the setup: Disk++ +4..+22% where the face matrices dominate (tetrahedra k=2), -10% on
+  hexagons. The condensation is now in the library's setup, slower than the clients' local condensation: 1 thread,
+  Disk++ k=2 +0.7..+1.2 s (tetrahedra 4: 0.35 -> 1.26 s), HArDCore3D 32^3 +0.4 s (k=1) / +2 s (k=2); 8 threads +0.1..
+  +0.35 s (Disk++); profiled and reduced the same day (next entry).
+  HArDCore3D rewritten the same day (the user: "too involved"; reuse the local blocks): the uncondensed blocks in place
+  of the condensed ones in upstream's own assembly (`MatF`, `invATT_ATF`, `cell_source`, `ScRHS` -> `GlobMat`, `ScBeMat`,
+  `GlobRHS`, `ScRHS` by its triplets), `A_TT` and `A_FT` by triplets in `solve()`: 75 / 71 lines instead of 170 / 213,
+  the same results. 32^3, against the condensed integration (`build/bench_iface1/bench3`, with the next entry):
+  diffusion k=1 / k=2 wall 1 thread 19.8 / 110 -> 19.9 / 112 s, 8 threads 7.06 / 29.5 -> 6.41 / 29.3 s; advection
+  18.3 / 77.5 -> 18.5 / 80.5 s, 7.80 / 33.2 -> 8.21 / 36.4 s; peak memory +11..+23% (diffusion k=2 4.36 -> 4.81 GB):
+  the client keeps its triplet assembly, `GlobMat`, its copy `A` and `ScBeMat`, the library adds its `A` and `W`. The
+  gains of the table above came from the parallel builders of the blocks, without `GlobMat`, `ScBeMat`, triplets.
+  2026-10-25, the final client code (the user: dedicated block matrices, not the condensed system's variables; the
+  clients' macros only around what needs the library): HArDCore3D assembles `A_TT`, `A_TF` (`A_FT`), `A_FF` directly
+  on the unknowns, the columns of the Dirichlet faces in `A_TD`, `A_FD` (moved to the right-hand sides in `solve()`),
+  its triplets from the stored local matrices in its sequential loop (reserved; diffusion: released once merged);
+  Disk++ assembles `ATT`, `ATF`, `AFF`, `RHS_T`, `RHS_F` in its assembler. The same iterations and errors. Re-measured
+  against the condensed integration of 2026-10-24 rebuilt with the current library (`build/bench_condensed/`:
+  `bench_h3d.sh`, `bench_diskpp.sh`, `summary.py`; one run each, wall time end to end, condensed / uncondensed):
+
+  | Case | Wall 1 thread (s) | Wall 8 threads (s) | Peak memory (GB) |
+  |---|---|---|---|
+  | HArDCore3D diffusion 32^3 k=1 | 20.1 / 19.5 (-3%) | 6.57 / 6.38 (-3%) | 1.25 / 0.94 |
+  | HArDCore3D diffusion 32^3 k=2 | 115 / 107 (-7%) | 28.5 / 26.4 (-7%) | 4.16 / 2.71 |
+  | HArDCore3D advection 32^3 k=1 | 18.2 / 17.0 (-6%) | 8.09 / 8.16 (+1%) | 1.16 / 1.07 |
+  | HArDCore3D advection 32^3 k=2 | 78.2 / 72.5 (-7%) | 35.2 / 33.1 (-6%) | 3.46 / 3.25 |
+  | Disk++ quadrangles 7 k=2 | 13.7 / 11.4 (-17%) | 13.0 / 10.4 (-20%) | 0.79 / 0.85 |
+  | Disk++ hexagons 7 k=2 | 34.0 / 29.4 (-13%) | 33.0 / 27.7 (-16%) | 1.86 / 1.74 |
+  | Disk++ tetrahedra 4 k=1 | 6.22 / 5.03 (-19%) | 5.83 / 4.71 (-19%) | 0.32 / 0.31 |
+  | Disk++ tetrahedra 4 k=2 | 15.4 / 13.1 (-15%) | 14.3 / 11.7 (-18%) | 0.84 / 0.99 |
+
+  HArDCore3D k=0: -1..+8% (2.4-4.9 s runs, noise). Disk++, all 10 cases: -13..-33% (1 thread), -16..-24% (8 threads).
+  A first version of this client code (the blocks on all the faces, restricted by Eigen slices in `solve()`, the
+  triplets per cell then merged, not reserved) exceeded 4.5 GB on diffusion k=2 (stopped by the watchdog): the
+  triplets held twice, vectors grown without `reserve()`, the full and restricted matrices together.
+
+- **Static condensation by cells: the products of a cell gathered** (2026-10-24, the user: "it's not normal that our
+  condensation costs more than the clients'"). `StaticCondensation::AddProduct()`, which computes the rows of
+  `A = A_FF - A_FT W`: the products of a row accumulated one coefficient at a time in a scattered vector
+  (`p[cellPos[j]] += w[j] * a`: 3 ns per multiply-add) -> per cell of the row, its columns gathered into a dense
+  vector, its rows of `W` added there, then scattered back: the same sums in the same order, bit for bit
+  (`StaticCondensationTest`, and against the former code in `build/bench_cond/cond.cpp`). `A_FF` read from its lower
+  part: only its strictly lower part transposed (`SparseMatrixOps::TransposeIf()`), instead of all of it (the clients
+  give it in full). The harness `build/bench_cond/cond` (HArDCore3D's structure: Cartesian hexahedra, 6 faces per cell,
+  random SPD local matrices), 24^3 k=2 (238,464 rows, 15.1M non-zeros), `CondensedMatrix()`, 1 / 8 threads: `A_FF`
+  in full 0.55 -> 0.24 s / 0.080 -> 0.048 s; lower part 0.78-0.86 -> 0.41-0.44 s / 0.165 -> 0.112 s; a client's
+  local Schur complements 0.15-0.21 s / 0.02-0.045 s. Disk++, the library's setup from the blocks, 1 / 8 threads:
+  tetrahedra 4 k=2 1.26 -> 0.87 s / 0.40 -> 0.33 s, quadrangles 7 k=2 1.11 -> 0.92 s / 0.39 -> 0.35 s (from `A`:
+  0.28 / 0.13 s and 0.47 / 0.19 s). Breakdown after (Disk++ tetrahedra 4 k=2, 1 thread): transpose of `A_TF` 0.05 s,
+  factorizations and `W` 0.12 s, strictly lower transpose 0.09 s, sizes 0.035 s, values 0.27 s, against 0.33 s saved
+  by Disk++ without its local condensation. Tried, no gain (within the noise, 3 interleaved runs): the merge of the
+  sorted columns instead of the position array, no integer division per coefficient, the sums in registers by blocks
+  of 4 columns, the rows ordered by their first cell (`W` reused across faces), software prefetch of `W`. What
+  remains is memory traffic (~1 GB at 24^3 k=2: `A_FF` read, `A` written as a new matrix, `W` read once per face of
+  each cell). Further steps would change the interface: read a full symmetric `A_FF` as such (no transpose, -0.1 s),
+  or let the library overwrite `A_FF` with `A` (no second face matrix: also the peak memory).
+
 ## Distributed memory (MPI)
 
 U-AMG on several processes (`ENABLE_MPI`, see CLAUDE.md "MPI"). Measure with `scripts/perf/scaling_mpi.sh` (from

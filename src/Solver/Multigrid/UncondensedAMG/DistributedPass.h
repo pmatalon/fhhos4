@@ -138,8 +138,9 @@ public:
 		pass.FaceCells = std::move(faceCells);
 	}
 
-	// After Pass.CollapseInterfaces(): the global numbers of the coarse faces. A process numbers its coarse faces, in
-	// their order in the pass, and asks for the others (of the processes of smaller rank) to their owners. CoarseFaceMap:
+	// After Pass.CollapseInterfaces(): the global numbers of the coarse faces. A process numbers its coarse faces (those
+	// of the boundaries of its aggregates included), in their order in the pass, and asks for the others (of the
+	// processes of smaller rank) to their owners. CoarseFaceMap:
 	// the coarse faces of the aggregates of the process; CoarseFacePosition: their local numbers.
 	void NumberCoarseFaces()
 	{

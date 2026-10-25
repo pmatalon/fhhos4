@@ -12,11 +12,10 @@ using namespace std;
 // The library does not give the cycle alone (U-AMG is a non-linear preconditioner, that requires a flexible Krylov
 // method): libuamg cannot be the preconditioner of another solver of the program. The options of the program that fhhos4::Solver doesn't have
 // keep their default values.
-// The two interfaces of the library (library/include/fhhos4.h):
-// - the uncondensed system, by default: SetupFromBlocks() and Solve(b_T, b_F, x_T, x_F). The library condenses the
-//   system and computes the cell unknowns;
-// - the condensed system (-libuamg-condensed, or when the program needs it, see Program_Diffusion_HHO): the program
-//   condenses the system, then Setup(A, blocks...) and Solve(b), as the codes that condense statically already.
+// The library is set up from the blocks of the uncondensed system (library/include/fhhos4.h): SetupFromBlocks(), then
+// Solve(b_T, b_F, x_T, x_F): the library condenses the system and computes the cell unknowns. When the program needs the
+// condensed system (see Program_Diffusion_HHO): Setup(A, blocks...), the same setup from the blocks (A ignored), then
+// Solve(b) on the condensed matrix of the library.
 // Defined in LibraryUAMG.cpp, the only file of the program that includes the public header of the library: changing it
 // doesn't recompile Program.cpp.
 class LibraryUAMG : public IterativeSolver

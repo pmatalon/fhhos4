@@ -360,8 +360,8 @@ void ApplyProgramArgumentDefaults(ProgramArguments& args,
 	}
 	else if (args.Solver.MG.UAMGNonsymmetric)
 		argument_error("-uamg-nonsym requires U-AMG: -s uamg, gcruamg, libuamg or gcrlibuamg.");
-	if (args.Solver.MG.UAMGLibraryCondensed && !args.Solver.UsesLibraryUAMG())
-		argument_error("-libuamg-condensed requires U-AMG through the library: -s libuamg, fcglibuamg or gcrlibuamg.");
+	if (args.Solver.MG.UAMGCollapseBoundaryFaces && (!args.Solver.UsesUncondensedAMG() || args.Solver.UsesLibraryUAMG()))
+		argument_error("-uamg-bfc requires U-AMG in the program: -s uamg, fcguamg or gcruamg (not an option of the library).");
 
 	if (args.Solver.SolverCode.compare("aggregamg") == 0 || args.Solver.PreconditionerCode.compare("aggregamg") == 0)
 	{

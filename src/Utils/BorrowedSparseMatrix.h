@@ -3,7 +3,7 @@
 #include "Types.h"
 
 // A SparseMatrix (row-major, compressed) whose arrays belong to another code, read in place: the inputs of the library
-// fhhos4 (fhhos4::CSRView), which the solvers read as const SparseMatrix&. Eigen's SparseMatrix always owns its arrays:
+// fhhos4 (the arrays of its Eigen matrices), which the solvers read as const SparseMatrix&. Eigen's SparseMatrix always owns its arrays:
 // while it borrows the caller's, this class points the protected members of Eigen's SparseMatrix to them, and keeps its
 // own (empty) arrays aside, which it gives back before Eigen's destructor runs: Eigen frees its own arrays only.
 // To use as a const SparseMatrix& only: changing the matrix (resize, assignment, insertion, makeCompressed...) would

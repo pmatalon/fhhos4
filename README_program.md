@@ -146,7 +146,7 @@ mpiexec -n 4 ./bin/fhhos4 -geo cube -mesh tetra -n 16 -k 1 -s fcglibuamg
   (`-s fcglibuamg`, `libuamg`, `gcrlibuamg`) or the program's (`-s fcguamg`, `uamg`, `gcruamg`), with its default
   options and the smoothers block Gauss-Seidel (Gauss-Seidel in each process, Jacobi between them), block Jacobi and
   block Chebyshev. Refused: the other meshers, problems, discretizations and solvers, the exports, `-uamg-nonsym`,
-  `-libuamg-condensed`, initial guesses other than 0.
+  initial guesses other than 0.
 - On one process (`mpiexec -n 1`, or without `mpiexec`), the program is the one compiled without MPI.
 
 ## Troubleshooting

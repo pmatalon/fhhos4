@@ -241,7 +241,9 @@ void print_usage() {
 	cout << "              libuamg       - uamg called through the library fhhos4 (library/), as by an external code." << endl;
 	cout << "                              Only the parameters of fhhos4::Solver apply (see library/include/fhhos4.h)." << endl;
 	cout << "                              The program gives it the uncondensed system: the library condenses it and computes" << endl;
-	cout << "                              the cell unknowns (see -libuamg-condensed)." << endl;
+	cout << "                              the cell unknowns; for a full Neumann problem and the exports of the linear system" << endl;
+	cout << "                              and of the algebraic error, the program condenses the right-hand side and the" << endl;
+	cout << "                              library solves the condensed system (Solve(b, x))." << endl;
 	cout << "                              'fcglibuamg' ('gcrlibuamg') uses the FCG (GCR) of the library (as fcguamg, gcruamg)." << endl;
 	cout << "              aggregamg     - In-house implementation of AGMG, without the outer Krylov iteration. Meant to be used with K-cycle and with FCG." << endl;
 	cout << "              hoaggregamg   - Algebraic p-multigrid on top of aggregamg" << endl;
@@ -472,14 +474,6 @@ void print_usage() {
 	cout << "      of each level (none here: no convection), the K-cycle iterates with GCR, the default coarse solver is LU." << endl;
 	cout << "      Requires -s uamg, gcruamg, libuamg or gcrlibuamg." << endl;
 	cout << endl;
-	cout << "-libuamg-condensed" << endl;
-	cout << "      U-AMG through the library (-s libuamg, fcglibuamg, gcrlibuamg) from the condensed system: the program condenses" << endl;
-	cout << "      the system statically and gives the library the condensed matrix and the blocks" << endl;
-	cout << "      (SetupSymmetricCondensed(), SetupNonsymmetricCondensed()), as the codes that condense already. By default," << endl;
-	cout << "      it gives the blocks of the uncondensed system, and the library condenses it and computes the cell unknowns" << endl;
-	cout << "      (SetupSymmetric(), SetupNonsymmetric(), Solve(b_T, b_F, x_T, x_F)); except for a full Neumann problem and the" << endl;
-	cout << "      exports of the linear system and of the algebraic error, which need the condensed system in the program." << endl;
-	cout << endl;
 	cout << "-uamg-mixed" << endl;
 	cout << "      U-AMG in mixed precision (-s uamg, fcguamg, gcruamg, libuamg, fcglibuamg, gcrlibuamg): the matrices of the" << endl;
 	cout << "      levels (operators, transfers, smoothers) stored and the cycles run in single precision" << endl;
@@ -494,6 +488,12 @@ void print_usage() {
 	cout << "      stored by blocks (block CSR: one column index per block of coupled faces) for the smoothers and the cycle:" << endl;
 	cout << "      faster passes over the matrices, at the cost of a copy of them. Always so in mixed precision (-uamg-mixed)." << endl;
 	cout << "      The Chebyshev smoothers (-smoothers bcheb4, bcheb), one process. fhhos4::Solver::BlockCSRStorage." << endl;
+	cout << endl;
+	cout << "-uamg-bfc" << endl;
+	cout << "      U-AMG in the program (-s uamg, fcguamg, gcruamg): the faces of the boundary of the domain in the system" << endl;
+	cout << "      (of a single cell: Neumann, Robin) collapsed into one coarse face per aggregate, as the interfaces between" << endl;
+	cout << "      aggregates. Default (and the library's): removed by the coarsening, as the faces interior to an aggregate" << endl;
+	cout << "      (their coarse values given by the prolongation)." << endl;
 	cout << endl;
 	cout << "-coarsening-factor NUM" << endl;
 	cout << "      Requested coarsening factor for the coarsening strategies compatible." << endl;
@@ -803,9 +803,9 @@ int Run(int argc, char* argv[])
 		OPT_ReEntrantCornerManagement,
 		OPT_CoarseningFactor,
 		OPT_UAMGNonsymmetric,
-		OPT_UAMGLibraryCondensed,
 		OPT_UAMGMixedPrecision,
 		OPT_UAMGBlockCSRStorage,
+		OPT_UAMGCollapseBoundaryFaces,
 		OPT_CoarseN,
 		OPT_ApproxL2ProjSubtriangulationMethod,
 		OPT_ApproxL2ProjNSubtriangulations,
@@ -908,9 +908,9 @@ int Run(int argc, char* argv[])
 		 { "rcm", required_argument, NULL, OPT_ReEntrantCornerManagement },
 		 { "coarsening-factor", required_argument, NULL, OPT_CoarseningFactor },
 		 { "uamg-nonsym", no_argument, NULL, OPT_UAMGNonsymmetric },
-		 { "libuamg-condensed", no_argument, NULL, OPT_UAMGLibraryCondensed },
 		 { "uamg-mixed", no_argument, NULL, OPT_UAMGMixedPrecision },
 		 { "uamg-bcsr", no_argument, NULL, OPT_UAMGBlockCSRStorage },
+		 { "uamg-bfc", no_argument, NULL, OPT_UAMGCollapseBoundaryFaces },
 		 { "coarse-n", required_argument, NULL, OPT_CoarseN },
 		 { "subtri-meth", required_argument, NULL, OPT_ApproxL2ProjSubtriangulationMethod },
 		 { "subtri", required_argument, NULL, OPT_ApproxL2ProjNSubtriangulations },
@@ -1560,14 +1560,14 @@ int Run(int argc, char* argv[])
 			case OPT_UAMGNonsymmetric:
 				args.Solver.MG.UAMGNonsymmetric = true;
 				break;
-			case OPT_UAMGLibraryCondensed:
-				args.Solver.MG.UAMGLibraryCondensed = true;
-				break;
 			case OPT_UAMGMixedPrecision:
 				args.Solver.MG.UAMGMixedPrecision = true;
 				break;
 			case OPT_UAMGBlockCSRStorage:
 				args.Solver.MG.UAMGBlockCSRStorage = true;
+				break;
+			case OPT_UAMGCollapseBoundaryFaces:
+				args.Solver.MG.UAMGCollapseBoundaryFaces = true;
 				break;
 			case OPT_CoarseN:
 				args.Solver.MG.CoarseN = stoul(optarg, nullptr, 0);

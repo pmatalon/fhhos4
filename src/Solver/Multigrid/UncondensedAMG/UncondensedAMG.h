@@ -23,6 +23,7 @@ private:
 	bool _blockCSR = false;       // the levels whose faces have several DoFs store their operator in block CSR
 public:
 	bool ManageAnisotropy = true; // see UncondensedLevel::ManageAnisotropy
+	bool CollapseBoundaryFaces = false; // see UncondensedLevel::CollapseBoundaryFaces (-uamg-bfc)
 	bool DownwindOrdering = true; // see UncondensedLevel::DownwindOrdering
 	// In double precision, the operator of the cycle of the levels whose faces have several DoFs also stored by blocks
 	// (block CSR, see UncondensedLevel::BlockCSRStorage): faster smoothers, at the cost of a copy of the matrix (about 2/3
@@ -338,6 +339,7 @@ private:
 		level->BlockCSRStorage = _blockCSR;
 		level->ComputeQ_F = ChainedQ_FNeeded();
 		level->ManageAnisotropy = ManageAnisotropy;
+		level->CollapseBoundaryFaces = CollapseBoundaryFaces;
 		level->Symmetric = _symmetric;
 		level->DownwindOrdering = DownwindOrdering;
 		return level;

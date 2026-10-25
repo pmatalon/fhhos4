@@ -21,8 +21,6 @@ inline void CheckDistributedArguments(const ProgramArguments& args)
 		refuse("the solver is U-AMG only: -s fcglibuamg, libuamg, fcguamg or uamg (and gcr...)");
 	if (args.Solver.MG.UAMGNonsymmetric)
 		refuse("non-symmetric matrices are not solved yet (-uamg-nonsym)");
-	if (args.Solver.MG.UAMGLibraryCondensed)
-		refuse("the library is given the uncondensed system (no -libuamg-condensed)");
 	if (!args.Discretization.StaticCondensation)
 		refuse("the system is statically condensed");
 	if (args.Solver.InitialGuessCode.compare("0") != 0)
@@ -298,10 +296,10 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 	Diffusion_HHO<Dim>* problem = new Diffusion_HHO<Dim>(mesh, testCase, hho, args.Discretization.StaticCondensation, saveMatrixBlocks);
 
 	// U-AMG through the library (-s libuamg...): the program gives it the blocks of the uncondensed system, and the library
-	// condenses it and computes the cell unknowns (its interface of choice); unless -libuamg-condensed, or the program needs
-	// the condensed system: full Neumann problem (projection of b onto the image of A), export of the linear system or of
-	// the algebraic error (exact solution of the condensed system)
-	bool libraryCondenses = args.Solver.UsesLibraryUAMG() && !args.Solver.MG.UAMGLibraryCondensed && args.Discretization.StaticCondensation
+	// condenses it and computes the cell unknowns; unless the program needs the condensed system: full Neumann problem
+	// (projection of b onto the image of A), export of the linear system or of the algebraic error (exact solution of the
+	// condensed system), then solved by the library on its condensed matrix (LibraryUAMG::Setup())
+	bool libraryCondenses = args.Solver.UsesLibraryUAMG() && args.Discretization.StaticCondensation
 		&& testCase->BC.Type != PbBoundaryConditions::FullNeumann && !args.Actions.Export.LinearSystem && !args.Actions.Export.ErrorToGMSH;
 	problem->CondensationBySolver = libraryCondenses;
 

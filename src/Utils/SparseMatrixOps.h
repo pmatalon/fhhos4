@@ -129,19 +129,15 @@ namespace SparseMatrixOps
 		});
 	}
 
-	// A^T, with the same result as Eigen's: the coefficients of each row of A^T in the order of the rows of A, the explicit
-	// zeros kept. In parallel: each thread counts, then copies, the coefficients of a contiguous range of rows of A.
-	// A: a SparseMatrix (of any scalar type), or a map of row-major arrays (e.g. those of a column-major matrix, i.e. of
-	// its transpose).
-	template <class RowMajorSparseMatrix>
-	SparseMatrixOf<typename RowMajorSparseMatrix::Scalar> Transpose(const RowMajorSparseMatrix& A)
+	// The transpose of the coefficients (i, j) of A for which keep(i, j), in the order of Transpose(). In parallel: each
+	// thread counts, then copies, the coefficients of a contiguous range of rows of A.
+	template <class RowMajorSparseMatrix, class Keep>
+	SparseMatrixOf<typename RowMajorSparseMatrix::Scalar> TransposeIf(const RowMajorSparseMatrix& A, Keep keep)
 	{
-		static_assert(RowMajorSparseMatrix::IsRowMajor, "Transpose() iterates over the rows of A");
+		static_assert(RowMajorSparseMatrix::IsRowMajor, "TransposeIf() iterates over the rows of A");
 		using Result = SparseMatrixOf<typename RowMajorSparseMatrix::Scalar>;
 		BigNumber nRows = A.rows(), nCols = A.cols();
 		int nChunks = (int)min((BigNumber)Parallelism::NThreads(), max(nRows, (BigNumber)1));
-		if (nChunks <= 1 || A.nonZeros() < 20000)
-			return Result(A.transpose());
 		// count[c][j]: number of coefficients of column j in the rows of chunk c, then the position of the first of them
 		vector<vector<SparseMatrixIndex>> count(nChunks);
 		#pragma omp parallel for schedule(static, 1)
@@ -151,10 +147,10 @@ namespace SparseMatrixOps
 			auto [begin, end] = Parallelism::Chunk(nRows, c, nChunks);
 			for (BigNumber i = begin; i < end; ++i)
 				for (typename RowMajorSparseMatrix::InnerIterator it(A, i); it; ++it)
-					count[c][it.col()]++;
+					if (keep(i, it.col()))
+						count[c][it.col()]++;
 		}
 		Result T(nCols, nRows);
-		T.resizeNonZeros(A.nonZeros());
 		SparseMatrixIndex* outer = T.outerIndexPtr();
 		outer[0] = 0;
 		for (BigNumber j = 0; j < nCols; ++j)
@@ -168,6 +164,7 @@ namespace SparseMatrixOps
 			}
 			outer[j + 1] = position;
 		}
+		T.resizeNonZeros(outer[nCols]);
 		#pragma omp parallel for schedule(static, 1)
 		for (int c = 0; c < nChunks; ++c)
 		{
@@ -176,6 +173,8 @@ namespace SparseMatrixOps
 			{
 				for (typename RowMajorSparseMatrix::InnerIterator it(A, i); it; ++it)
 				{
+					if (!keep(i, it.col()))
+						continue;
 					SparseMatrixIndex p = count[c][it.col()]++;
 					T.innerIndexPtr()[p] = i;
 					T.valuePtr()[p] = it.value();
@@ -183,6 +182,19 @@ namespace SparseMatrixOps
 			}
 		}
 		return T;
+	}
+
+	// A^T, with the same result as Eigen's: the coefficients of each row of A^T in the order of the rows of A, the explicit
+	// zeros kept. In parallel (TransposeIf()).
+	// A: a SparseMatrix (of any scalar type), or a map of row-major arrays (e.g. those of a column-major matrix, i.e. of
+	// its transpose).
+	template <class RowMajorSparseMatrix>
+	SparseMatrixOf<typename RowMajorSparseMatrix::Scalar> Transpose(const RowMajorSparseMatrix& A)
+	{
+		static_assert(RowMajorSparseMatrix::IsRowMajor, "Transpose() iterates over the rows of A");
+		if (Parallelism::NThreads() <= 1 || A.rows() <= 1 || A.nonZeros() < 20000)
+			return SparseMatrixOf<typename RowMajorSparseMatrix::Scalar>(A.transpose());
+		return TransposeIf(A, [](BigNumber, SparseMatrixIndex) { return true; });
 	}
 
 	// Symmetric matrix whose lower triangular part (diagonal included) is that of A: same matrix as

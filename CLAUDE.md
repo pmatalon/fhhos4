@@ -77,7 +77,7 @@ From `build/`:
 ctest --output-on-failure
 ```
 
-322 tests, ~8 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
+326 tests, ~8 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
 iteration counts of the papers in `reproducibility/` — see `tests/README.md`. Covers
 `Program_Diffusion_HHO` and `Program_BiHarmonic_HHO` (HHO, static condensation), 2D/3D,
 in-house, GMSH and polygonal meshes, and the library (`UAMGLibrary*`, ~15 s). Not covered: DG/FEM programs (disabled by default), `lu`/`cg`/`agmg`/`p_mg` solvers,
@@ -149,23 +149,31 @@ Example invocations for specific experiments/figures live in `reproducibility/*.
 file that includes `fhhos4.h`, or `<fhhos4.h>`; namespace `fhhos4`, pimpl): `Solver` (parameters as
 public members; `Dimension`, `FaceDegree` and `CellDegree` must be set; `PolynomialSpace`: P (default) or Q, the block
 sizes of the cells, faces and p-levels), `Result`, and `Error` (in `fhhos4_error.h`,
-which `Utils.h` includes alone). Two interfaces: the uncondensed system, the interface of choice
-(`SetupSymmetric()` from `A_TT`, `A_TF`, `A_FF` and the interpolations of 1, or `SetupNonsymmetric()` with `A_FT` too,
-then `Solve(b_T, b_F, x_T, x_F)`: the library condenses the system by cells, `StaticCondensation.h`, and computes the
-cell unknowns; `CondensedMatrix()`), and the condensed system, only to integrate the library with the least effort into
-codes that condense already (HArDCore3D, Disk++: `SetupSymmetricCondensed()`/`SetupNonsymmetricCondensed()` from `A`
-and the blocks, `A_FF` optional, then `Solve(b, x)`). Inputs (the user's decisions, 2026-10-19): read in place, never
-copied nor converted by the setups and solves: the matrices as `CSRView` (CSR arrays of the library's index type
-`SparseIndex`, generated into `fhhos4_version.h` from `SMALL_INDEX`; `fhhos4::SparseMatrix`, the Eigen row-major type,
-converts to it; checked by one parallel pass, `CheckCSR()`), which the solvers read as `BorrowedSparseMatrix`
-(`Utils/BorrowedSparseMatrix.h`: a `SparseMatrix` pointing Eigen's protected members to the caller's arrays); the
-library keeps `A` (condensed setups) and `A_FT` (`SetupNonsymmetric()`: `StaticCondensation` reads it at each solve).
-Other formats through helpers that copy, so that the copies stay visible in the calling code: `ExtractSymmetricBlocks()`/
-`ExtractNonsymmetricBlocks()` (a global matrix + `DoFLists` of the cells and faces, any index types, one parallel pass:
-`SparseMatrixOps::BuildByRows`), `Gather()`/`Scatter()`, `ToCSR()` (index types; column-major: the parallel
-`SparseMatrixOps::Transpose`); `TransposedView()` (no copy: a symmetric column-major matrix as its transpose). Their
-results: `CSRMatrix`, owned by the library. The compiled functions take plain types only (views, `detail::` vector
-views): the Eigen overloads and conversions are inline in the header, compiled with the client's Eigen; no C interface
+which `Utils.h` includes alone). One interface, the uncondensed system: `SetupSymmetric()` from `A_TT`, `A_TF`, `A_FF`
+and the interpolations of 1, or `SetupNonsymmetric()` with `A_FT` too, then `Solve(b_T, b_F, x_T, x_F)`: the library
+condenses the system by cells, `StaticCondensation.h`, and computes the cell unknowns; `CondensedMatrix()`, and
+`Solve(b, x)` on it (right-hand sides condensed by the caller). The setups from the caller's condensed matrix
+(`Setup...Condensed()`, for the codes that condensed already) were removed (the user's decision, 2026-10-25: the
+clients moved to the uncondensed system, one interface to maintain). Inputs (the user's decisions, 2026-10-19): read in place, never
+copied nor converted by the setups and solves: the matrices as Eigen matrices only (the user's decision, 2026-10-25:
+users see and manage Eigen matrices only, "even if they lose a little performance"): `fhhos4::SparseMatrix` (Eigen
+row-major, of the library's index type `SparseIndex`, generated into `fhhos4_version.h` from `SMALL_INDEX`) or an
+Eigen map of one (`fhhos4::SparseMatrixMap`), the setups templates on `Eigen::SparseCompressedBase<Derived>` (a wrong
+format: a `static_assert` naming the Eigen conversion `fhhos4::SparseMatrix B = A;`; a temporary `Eigen::SparseMatrix`
+refused by a deleted overload where the solver keeps it: `A_FT`); checked by one parallel pass, `CheckCSR()`;
+the solvers read them as `BorrowedSparseMatrix` (`Utils/BorrowedSparseMatrix.h`: a `SparseMatrix` pointing Eigen's
+protected members to the caller's arrays); the library keeps `A_FT` (`SetupNonsymmetric()`: `StaticCondensation` reads
+it at each solve). Other Eigen formats: converted by Eigen in the calling code (visible
+copies); `TransposedView()` (no copy: a symmetric column-major matrix as its transpose, an Eigen map);
+`ExtractSymmetricBlocks()`/`ExtractNonsymmetricBlocks()` (a global Eigen row-major matrix + `DoFLists` of the cells and
+faces, index types int32/int64, one parallel pass: `SparseMatrixOps::BuildByRows`; Eigen blocks, `HybridBlocks`, copied
+from the library's arrays), `Gather()`/`Scatter()`; `CondensedMatrix()`: an Eigen map. The implementation types are in
+`fhhos4::detail` (never in a signature the user calls, nor in the docs): `BasicCSRView`/`CSRView` (the arrays given to
+the compiled functions), `CSRMatrix` (owned by the library), the compiled helpers (`detail::ExtractSymmetricBlocks()`
+on any index types, also mixed, `detail::ToCSR()`, `detail::Transpose()`), used by the Python module; the raw-view
+`Solver::Setup()` and `CondensedMatrixView()` protected (the Python module's `PySolver` derives from `Solver`). The
+compiled functions take plain types only (views, `detail::` vector views): the Eigen functions are inline in the
+header, compiled with the client's Eigen; no C interface
 (the user's decision: a PETSc preconditioner would be C++, as PETSc's PCHPDDM and PCAMGX; MATNEST blocks read in place,
 AIJ + index sets through `ExtractSymmetricBlocks()`). Non-symmetric matrix (`UncondensedLevel::Symmetric` false, `A_F_T` given; program option
 `-uamg-nonsym` to test it on the symmetric matrices): the same algorithm on the matrix itself, without the optimizations of the symmetric case (lower triangular
@@ -181,10 +189,11 @@ CLI codes in `SmootherFactory`, the coarse solver stays a solver code): `Solver/
 ways (one table per parameter), for `library/Solver.cpp` and `LibraryUAMG.cpp`. U-AMG is a non-linear preconditioner with the K-cycle: the Krylov method is
 inside the library (`Krylov`: FCG by default, GCR, BiCGSTAB with a V/W-cycle only, or none), which gives no cycle
 alone. The program runs it with `-s libuamg|fcglibuamg|gcrlibuamg` (`Solver/LibraryUAMG.cpp`, the only file of the
-program that includes the public header, through `LibraryParameters.h`: changing it doesn't recompile `Program.cpp`) through the uncondensed
-interface (`Diffusion_HHO::CondensationBySolver`: no static condensation in the program), or the condensed one with
-`-libuamg-condensed` (and for a full Neumann problem and the exports of the system or of the algebraic error), which
-`tests/UAMGLibraryTest.cpp` compares with `uamg|fcguamg|gcruamg`. Mixed precision, the levels in single precision
+program that includes the public header, through `LibraryParameters.h`: changing it doesn't recompile `Program.cpp`) on
+the uncondensed system (`Diffusion_HHO::CondensationBySolver`: no static condensation in the program); for a full
+Neumann problem and the exports of the system or of the algebraic error, the program condenses the system, sets the
+library up from the blocks and solves the condensed system by `Solve(b, x)` (`LibraryUAMG::Setup()`; tested through
+`-export lsys`), which `tests/UAMGLibraryTest.cpp` compares with `uamg|fcguamg|gcruamg`. Mixed precision, the levels in single precision
 (`MixedPrecision`, default true; the program's `-uamg-mixed`, off: the papers): see "U-AMG: details and measurements".
 
 ### Python module
@@ -321,7 +330,25 @@ processes; the adapter's `times["setup"]` is measured after one).
   on 8; same solve. The setups from the blocks keep the factorizations of the blocks of `A_TT` (Cholesky, LU with
   partial pivoting for a non-symmetric system; not their inverses, the user's decision 2026-10-23: their rounding
   would limit the attainable accuracy of the discretization) and `A_TT^{-1} A_TF`, and read `A_FT` at each solve: the
-  transpose of `A_TF` (symmetric), or the caller's in place (non-symmetric).
+  transpose of `A_TF` (symmetric), or the caller's in place (non-symmetric). The products of a row of `A_FT W` (2026-10-24):
+  the columns of each cell gathered into a dense vector, its rows of `W` summed there, then scattered back (the same
+  sums in the same order, bit for bit; the former scattered accumulation: 3 ns per multiply-add, 2.3x slower); `A_FF`
+  read from its lower part: only its strictly lower part transposed (the clients give it in full). What remains (24^3
+  hexahedra k = 2, 1 thread: 0.07 s constructor, 0.2 s values pass, 0.1 s transpose vs 0.15-0.2 s for a client's local
+  Schur complements) is memory traffic: `A` written as a new matrix (the inputs are read in place), `W` read once per
+  face of each cell; reordering the rows, prefetching, register blocking: no gain (`build/bench_cond/`).
+- Boundary faces in the system (Neumann, Robin: faces of a single cell; 2026-10-24; before, any of them stopped the
+  setup: "a face belongs to a single cell"): removed by the coarsening, as the faces interior to an aggregate (their
+  coarse values from the prolongation), the default and the library's (the user's decision, 2026-10-25). Program option
+  `-uamg-bfc` (`UncondensedAMG::CollapseBoundaryFaces`, not in the library): kept, those of an aggregate collapsed into
+  one coarse face of the aggregate alone (`CoarseFaceAggregates` (k, -1)), numbered after its interfaces, owned by the
+  aggregate's process. Both in the flat passes and in `HybridAlgebraicMesh::Coarsen()`, bit for bit the same
+  (`CoarseningPassTest` `*_mixed*`). Iterations (`build/bench_neumann/`) collapse / removal: program 2D cart and tri
+  equal or +1; HArDCore3D Cartesian equal, Tetgen tetrahedra +10..+17% (k=0 44 / 38), Voronoi +1..+2 (once 28 / 20);
+  Disk++ (structured meshes) equal or -1..-2. Pure Neumann (singular): not through interface 1 (no kernel handling in
+  U-AMG; a client's pinned DoF zeroes a column of `A_TF`, whose face then has no cell once the p-level extraction
+  drops the zeros); the condensed interface (removed 2026-10-25) + the client's pin worked (HArDCore3D: errors =
+  BiCGSTAB). The program's full Neumann test case (`-tc fullneumann`) crashes in its assembly (any solver, 2026-10-25).
 - p-levels: `P_CS` Minus2 (k, k-2, ..., 0), blocks extracted (first coefficients of each block,
   `SetupOperatorByBlockExtraction()`), prolongation = injection of the low modes. `PCoarsening::ToZero` (`-p-cs =0`, k then 0,
   for bases not ordered by degree, e.g. NGSolve's): more iterations from k = 3 (FCG, 2026-10-19; `bgs,rbgs` / `bcheb4`):
@@ -415,9 +442,6 @@ processes; the adapter's `times["setup"]` is measured after one).
   at each restart and at the tolerance), then continues if the true one does not: the tolerance applies to the true
   residual. Near the attainable accuracy (~1e-11 relative on Disk++'s 2D systems at k = 2) the recurrence drifts (8e-13
   for a true 1.4e-11); a tolerance below it runs `MaxIterations`, not converged.
-- Symmetric condensed interface: FCG applies `A` from its lower triangle; for an `A` symmetric up to rounding (local
-  Schur complements), the solution differs from a direct solver's on the full `A` by ~cond(A) x asymmetry (Disk++ 2D,
-  k = 2, asymmetry 3e-16: up to 1% of L2 errors of 3e-11).
 - `Threads` default: at most one thread per physical core unless `OMP_NUM_THREADS` or OpenMP's binding is set (the
   hyperthreads slow the AMG down). Release builds use the conda compilers' `-march=nocona`.
 - Eigen and the interface (2026-10-19, replaces the layout check of 2026-10-17): no Eigen object crosses the
@@ -425,10 +449,15 @@ processes; the adapter's `times["setup"]` is measured after one).
   Eigen's `SparseMatrix` and `CompressedStorage`, the same in Eigen 3.4.0 and 5.0.1 (`tests/BorrowedSparseMatrixTest.cpp`;
   checked under valgrind with both). Eigen 3.4 only lacked `saveMarketDense` (`Utils/ExportModule.h` writes the format
   itself). Eigen 5's legacy macros say 3.5.0 (`EIGEN_WORLD_VERSION` stays 3; `EIGEN_PATCH_VERSION` exists from 5.0).
-- Client codes with column-major matrices (2026-10-19, the user: minimal changes in the clients): HArDCore3D's bindings
-  build their blocks row-major (the same parallel builders, by rows), its symmetric `A` through `TransposedView()`, its
-  non-symmetric `SysMat` through `ToCSR()`; Disk++: `RowMajor` on its `ATT`/`ATF`, `TransposedView(assm.LHS)`. Same
-  iterations; bitwise results with `ToCSR()`, the errors at 1e-10 relative with `TransposedView()` (its `A^T`).
+- Client codes (2026-10-25, the user: reuse the clients' local matrices and assembly loops, respect their structure,
+  but dedicated block matrices, never the condensed system's variables; the clients' macros only around what needs
+  the library, the include and the solver calls): HArDCore3D assembles `A_TT`, `A_TF`, `A_FT`, `A_FF`, `b_T`, `b_F`
+  (Eigen row-major members: `fhhos4::SparseMatrix` with `int` indices) in its own loops directly on the unknowns, the
+  columns of the Dirichlet faces in `A_TD`, `A_FD` (moved to the right-hand sides beside its Dirichlet treatment;
+  without them, the copies of slices: diffusion 32^3 k=2 above 4.5 GB, 2.7 GB with them), then
+  `SetupSymmetric(A_TT, A_TF, A_FF, ...)` /
+  `SetupNonsymmetric(A_TT, A_TF, A_FT, A_FF, ...)`; Disk++'s assembler assembles `ATT`, `ATF`, `AFF`, `RHS_T`, `RHS_F`
+  (the faces in system, the Dirichlet values moved to the right-hand sides).
 
 ## MPI (`ENABLE_MPI`, off by default)
 
@@ -463,7 +492,7 @@ is its test bed. MPI from the conda env (`mpich`, installed in `fhhos4`, not in 
 - Library: `Solver::Comm` (no default with MPI: the user), `SetupSymmetric(..., GhostNumbers faceGhosts)` (local columns:
   own faces then ghosts, one numbering for `A_TF` and `A_FF`, `A_FF` in full), `DistributedStaticCondensation.h`,
   `CollectiveCheck()` (errors of the inputs on all the processes). A process may own nothing (NGSolve 6.2.2608's rank 0). Not
-  yet: non-symmetric (after the symmetric case: the user), condensed interface, `CondensedMatrix()`. Python: section
+  yet: non-symmetric (after the symmetric case: the user), `CondensedMatrix()`. Python: section
   "Python module" (with NGSolve's own distribution).
 - Program (`Program_Diffusion_HHO_Impl.h`, `Program/DistributedHybridSystem.h`): GMSH meshes only, partitioned by GMSH
   (`GMSHMesh::PartitionElements()`, rank 0, broadcast); the mesh built by rank 0 first (cache); the system assembled by
@@ -503,9 +532,9 @@ Three READMEs, each for its readers; keep them up to date in the same commit as 
 - `README_library.md`: the library, for the developers of client codes, who don't need the program or the sources. Its
   numbered sections (the user's structure, 2026-10-18): 1. Installation (install from source, the library alone; the
   conda package; link, CMake package), 2. The algorithm in a nutshell (in a few lines: p-levels, then h-levels and how
-  the blocks give the aggregation; applicability), 3. How to use (the two interfaces, "Interface 1" the uncondensed
-  system, recommended, and "Interface 2" the condensed one, with examples; non-symmetric; Python; inputs, parameters,
-  constraints, license, version last). Rules:
+  the blocks give the aggregation; applicability), 3. How to use (the uncondensed system, with an example; non-symmetric;
+  several processes; Python; inputs, parameters, constraints, license, version last; until 2026-10-25 also "Interface
+  2", the condensed system, removed). Rules:
   - no details of the algorithm beyond that, no measurements, no client codes (HArDCore3D, Disk++), no internal
     files (`PERFORMANCE.md`, tests): they go in "U-AMG: details and measurements" above or in `PERFORMANCE.md`;
   - the parameters table gives the library's own defaults (`library/include/fhhos4.h` and `library/Solver.cpp`:

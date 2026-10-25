@@ -139,6 +139,7 @@ public:
 		mg->CoarsePolyDegree = 0;
 		mg->ManageAnisotropy = args.Solver.MG.ManageAnisotropy;
 		mg->BlockCSRStorage = args.Solver.MG.UAMGBlockCSRStorage;
+		mg->CollapseBoundaryFaces = args.Solver.MG.UAMGCollapseBoundaryFaces;
 		return mg;
 	}
 

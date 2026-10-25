@@ -8,7 +8,7 @@ class LibraryUAMGImpl : public LibraryUAMG
 {
 private:
 	fhhos4::Solver _solver;
-	BorrowedSparseMatrix _condensedMatrix; // the library's, after SetupFromBlocks(): the matrix of the solver
+	BorrowedSparseMatrix _condensedMatrix; // the library's: the matrix of the solver
 	MultigridArguments _mg;         // printed by Serialize(), with the codes of the program
 	optional<KrylovMethod> _krylov;
 public:
@@ -56,14 +56,11 @@ public:
 		os << "\t" << "Coarse solver           : " << _mg.CoarseSolverCode << " (matrix size <= " << _mg.MatrixMaxSizeForCoarsestLevel << ")";
 	}
 
+	// The program solves the condensed system (Solve(b)): the setup from the blocks, A computed by the library (equal to
+	// the program's up to rounding)
 	void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_T, const SparseMatrix& A_F_F, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
 	{
-		IterativeSolver::Setup(A);
-		// Without A_F_F, which the library computes from A: the setup of the codes that have A (e.g. HArDCore3D)
-		if (A_F_T.rows() > 0)
-			_solver.SetupNonsymmetricCondensed(A, A_T_T, A_T_F, A_F_T, cellInterpOfOne, faceInterpOfOne);
-		else
-			_solver.SetupSymmetricCondensed(A, A_T_T, A_T_F, cellInterpOfOne, faceInterpOfOne);
+		SetupFromBlocks(A_T_T, A_T_F, A_F_T, A_F_F, cellInterpOfOne, faceInterpOfOne);
 	}
 
 	void SetupFromBlocks(const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_T, const SparseMatrix& A_F_F, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
@@ -72,8 +69,8 @@ public:
 			_solver.SetupNonsymmetric(A_T_T, A_T_F, A_F_T, A_F_F, cellInterpOfOne, faceInterpOfOne);
 		else
 			_solver.SetupSymmetric(A_T_T, A_T_F, A_F_F, cellInterpOfOne, faceInterpOfOne);
-		fhhos4::CSRView A = _solver.CondensedMatrix();
-		_condensedMatrix.Borrow(A.Rows, A.Cols, A.RowPointers, A.ColumnIndices, A.Values);
+		fhhos4::SparseMatrixMap A = _solver.CondensedMatrix();
+		_condensedMatrix.Borrow(A.rows(), A.cols(), A.outerIndexPtr(), A.innerIndexPtr(), A.valuePtr());
 		IterativeSolver::Setup(_condensedMatrix);
 	}
 

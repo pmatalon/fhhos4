@@ -134,46 +134,41 @@ def test_prolongations():
         assert RelativeError(np.concatenate([x_T, x_F]), x) < 1e-8
 
 
-def test_condensed():
-    system = HybridSystem(32)
-    solver = ToySolver()
-    A = system.A.copy()
-    solver.SetupSymmetricCondensed(A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne)
-    # Read in place: the solver keeps the arrays of A, the caller's object may go
-    del A
-    gc.collect()
-    x = solver.Solve(system.b)
-    assert RelativeError(x, spla.spsolve(system.A.tocsc(), system.b)) < 1e-8
-    # From an initial guess, with A_FF
-    solver.SetupSymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
-    y = np.zeros(system.b.size)
-    result = solver.Solve(system.b, y)
-    assert result.Converged and RelativeError(y, x) < 1e-8
-
-
-def test_condensed_nonsymmetric():
-    system = HybridSystem(32, asymmetry=0.3)
-    solver = ToySolver()
-    solver.SetupNonsymmetricCondensed(system.A, system.A_TT, system.A_TF, system.A_FT, system.CellInterpOfOne, system.FaceInterpOfOne)
-    x = solver.Solve(system.b)
-    assert RelativeError(x, spla.spsolve(system.A.tocsc(), system.b)) < 1e-8
+def test_condensed_system():
+    # Solve(b) on the condensed matrix of the library, after the setups from the blocks
+    for asymmetry in (0.0, 0.3):
+        system = HybridSystem(32, asymmetry)
+        solver = ToySolver()
+        if asymmetry == 0:
+            solver.SetupSymmetric(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+        else:
+            solver.SetupNonsymmetric(system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+        x = solver.Solve(system.b)
+        assert RelativeError(x, spla.spsolve(system.A.tocsc(), system.b)) < 1e-8
+        # From an initial guess
+        y = np.zeros(system.b.size)
+        result = solver.Solve(system.b, y)
+        assert result.Converged and RelativeError(y, x) < 1e-8
 
 
 def test_failed_setup_keeps_the_previous_one():
-    system = HybridSystem(32)
+    system = HybridSystem(32, asymmetry=0.3)
     solver = ToySolver()
-    A = system.A.copy()
-    solver.SetupSymmetricCondensed(A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne)
-    del A
-    x = solver.Solve(system.b)
+    A_FT = system.A_FT.copy()
+    solver.SetupNonsymmetric(system.A_TT, system.A_TF, A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+    del A_FT
+    x_T, x_F = np.zeros(system.b_T.size), np.zeros(system.b_F.size)
+    solver.Solve(system.b_T, system.b_F, x_T, x_F)
     other = HybridSystem(8)
     try:
-        solver.SetupSymmetricCondensed(other.A, system.A_TT, system.A_TF, system.CellInterpOfOne, system.FaceInterpOfOne)
-        assert False, "A of the wrong size accepted"
+        solver.SetupNonsymmetric(system.A_TT, system.A_TF, system.A_FT, other.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+        assert False, "A_FF of the wrong size accepted"
     except fhhos4.Error:
         pass
     gc.collect()
-    assert RelativeError(solver.Solve(system.b), x) < 1e-12
+    y_T, y_F = np.zeros(system.b_T.size), np.zeros(system.b_F.size)
+    solver.Solve(system.b_T, system.b_F, y_T, y_F)
+    assert RelativeError(np.concatenate([y_T, y_F]), np.concatenate([x_T, x_F])) < 1e-12
 
 
 def ExpectTypeError(f, what):

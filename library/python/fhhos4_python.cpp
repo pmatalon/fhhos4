@@ -1,6 +1,7 @@
 // The Python module fhhos4 (nanobind): the API of the library (library/include/fhhos4.h), with the same names, on NumPy
 // arrays read in place, as the library reads its inputs: never copied nor converted (an array of another dtype, or not
-// contiguous, is refused). The matrices: a CSRView of NumPy arrays, a CSRMatrix, or any object with the attributes
+// contiguous, is refused). The matrices (no Eigen in Python, the arrays of the library's implementation): a CSRView of
+// NumPy arrays, a CSRMatrix (the result of the helpers that copy, as ToCSR()), or any object with the attributes
 // indptr, indices, data, shape and format "csr" (SciPy's CSR matrices: SciPy itself is not needed); the vectors: NumPy
 // vectors of float64. See README_library.md.
 // Compiled with MPI (FHHOS4_MPI): Solver.Comm, from an mpi4py communicator, and the ghost faces of SetupSymmetric().
@@ -80,10 +81,10 @@ namespace
 		}
 
 		// The view of a CSRMatrix (its Python object: owner), as its arrays
-		PyCSRView(const fhhos4::CSRMatrix& M, nb::handle owner)
+		PyCSRView(const fhhos4::detail::CSRMatrix& M, nb::handle owner)
 			: Owners{ nb::borrow(owner) }
 		{
-			fhhos4::CSRView v = M.View();
+			fhhos4::detail::CSRView v = M.View();
 			Rows = v.Rows;
 			Cols = v.Cols;
 			RowPointers = v.RowPointers;
@@ -93,7 +94,7 @@ namespace
 		}
 
 		template <typename RowPointer, typename Column>
-		fhhos4::BasicCSRView<RowPointer, Column> View() const
+		fhhos4::detail::BasicCSRView<RowPointer, Column> View() const
 		{
 			return { Rows, Cols, (const RowPointer*)RowPointers, (const Column*)ColumnIndices, Values };
 		}
@@ -108,7 +109,7 @@ namespace
 		}
 
 		// The view of the setups: the index type of the library
-		fhhos4::CSRView Native(const char* name) const
+		fhhos4::detail::CSRView Native(const char* name) const
 		{
 			constexpr bool library64 = sizeof(fhhos4::SparseIndex) == 8;
 			if (RowPointers64 != library64 || Columns64 != library64)
@@ -140,8 +141,8 @@ namespace
 	{
 		if (nb::isinstance<PyCSRView>(M))
 			return nb::cast<const PyCSRView&>(M);
-		if (nb::isinstance<fhhos4::CSRMatrix>(M))
-			return PyCSRView(nb::cast<const fhhos4::CSRMatrix&>(M), M);
+		if (nb::isinstance<fhhos4::detail::CSRMatrix>(M))
+			return PyCSRView(nb::cast<const fhhos4::detail::CSRMatrix&>(M), M);
 		if (HasArrays(M))
 		{
 			std::string format = Format(M);
@@ -194,13 +195,26 @@ namespace
 		return f(cells.Lists<std::int32_t>(), faces.Lists<std::int32_t>());
 	}
 
-	// fhhos4::Solver, which also keeps the views of the matrices that the solves read (A of the setups from the condensed
-	// matrix, A_FT of SetupNonsymmetric()): their arrays stay alive until the next setup. Replaced only after a successful
+	// fhhos4::Solver, which also keeps the views of the matrices that the solves read (A_FT of SetupNonsymmetric()): their
+	// arrays stay alive until the next setup. Replaced only after a successful
 	// setup: a setup that fails (on its checks) keeps the previous one, which still reads them.
 	struct PySolver : fhhos4::Solver
 	{
 		std::vector<PyCSRView> Kept;
 		nb::object CommObject = nb::none(); // the Python object of Comm (MPI)
+
+		// The setups of the library on the views of the arrays (fhhos4::Solver::Setup())
+		void SetupViews(bool symmetric, const fhhos4::detail::CSRView& A_TT, const fhhos4::detail::CSRView& A_TF, const fhhos4::detail::CSRView* A_FT,
+		                const fhhos4::detail::CSRView& A_FF, const ConstVector& cellInterpOfOne, const ConstVector& faceInterpOfOne,
+		                const fhhos4::GhostNumbers& faceGhosts = fhhos4::GhostNumbers())
+		{
+			Setup(symmetric, A_TT, A_TF, A_FT, A_FF, In(cellInterpOfOne), In(faceInterpOfOne), faceGhosts);
+		}
+
+		fhhos4::detail::CSRView CondensedView() const
+		{
+			return CondensedMatrixView();
+		}
 
 		// setup(): the setup of the library, on the views, without the GIL. kept: the views the solves read.
 		template <typename Setup>
@@ -244,7 +258,7 @@ namespace
 
 	// The arrays of a CSRMatrix, as read-only NumPy arrays that keep it alive
 	template <typename T>
-	nb::ndarray<nb::numpy, const T, nb::ndim<1>> ArrayOf(const fhhos4::CSRMatrix& M, const T* data, std::int64_t size)
+	nb::ndarray<nb::numpy, const T, nb::ndim<1>> ArrayOf(const fhhos4::detail::CSRMatrix& M, const T* data, std::int64_t size)
 	{
 		size_t shape[1] = { (size_t)size };
 		return nb::ndarray<nb::numpy, const T, nb::ndim<1>>(data, 1, shape, nb::find(M));
@@ -316,23 +330,23 @@ NB_MODULE(fhhos4, m)
 		.def_ro("Rows", &PyCSRView::Rows)
 		.def_ro("Cols", &PyCSRView::Cols);
 
-	nb::class_<fhhos4::CSRMatrix>(m, "CSRMatrix", "A matrix in the CSR format of the library, owned by the library: the result of the helpers that copy")
-		.def_prop_ro("Rows", [](const fhhos4::CSRMatrix& M) { return M.View().Rows; })
-		.def_prop_ro("Cols", [](const fhhos4::CSRMatrix& M) { return M.View().Cols; })
+	nb::class_<fhhos4::detail::CSRMatrix>(m, "CSRMatrix", "A matrix in the CSR format of the library, owned by the library: the result of the helpers that copy")
+		.def_prop_ro("Rows", [](const fhhos4::detail::CSRMatrix& M) { return M.View().Rows; })
+		.def_prop_ro("Cols", [](const fhhos4::detail::CSRMatrix& M) { return M.View().Cols; })
 		// Read-only NumPy arrays of the library's memory, which keep the matrix alive
-		.def_prop_ro("RowPointers", [](const fhhos4::CSRMatrix& M) { fhhos4::CSRView v = M.View(); return ArrayOf(M, v.RowPointers, v.RowPointers ? v.Rows + 1 : 0); })
-		.def_prop_ro("ColumnIndices", [](const fhhos4::CSRMatrix& M) { fhhos4::CSRView v = M.View(); return ArrayOf(M, v.ColumnIndices, v.NonZeros()); })
-		.def_prop_ro("Values", [](const fhhos4::CSRMatrix& M) { fhhos4::CSRView v = M.View(); return ArrayOf(M, v.Values, v.NonZeros()); });
+		.def_prop_ro("RowPointers", [](const fhhos4::detail::CSRMatrix& M) { fhhos4::detail::CSRView v = M.View(); return ArrayOf(M, v.RowPointers, v.RowPointers ? v.Rows + 1 : 0); })
+		.def_prop_ro("ColumnIndices", [](const fhhos4::detail::CSRMatrix& M) { fhhos4::detail::CSRView v = M.View(); return ArrayOf(M, v.ColumnIndices, v.NonZeros()); })
+		.def_prop_ro("Values", [](const fhhos4::detail::CSRMatrix& M) { fhhos4::detail::CSRView v = M.View(); return ArrayOf(M, v.Values, v.NonZeros()); });
 
 	nb::class_<PyDoFLists>(m, "DoFLists", "The DoFs of each cell (or face) in the numbering of a global matrix: NumPy arrays read in place")
 		.def(nb::init<std::int64_t, nb::handle, nb::handle>(), "count"_a, "offsets"_a, "dofs"_a)
 		.def_ro("Count", &PyDoFLists::Count);
 
-	nb::class_<fhhos4::HybridBlocks>(m, "HybridBlocks", "The blocks of a hybrid system, owned by the library")
-		.def_prop_ro("A_TT", [](const fhhos4::HybridBlocks& b) -> const fhhos4::CSRMatrix& { return b.A_TT; }, nb::rv_policy::reference_internal)
-		.def_prop_ro("A_TF", [](const fhhos4::HybridBlocks& b) -> const fhhos4::CSRMatrix& { return b.A_TF; }, nb::rv_policy::reference_internal)
-		.def_prop_ro("A_FT", [](const fhhos4::HybridBlocks& b) -> const fhhos4::CSRMatrix& { return b.A_FT; }, nb::rv_policy::reference_internal)
-		.def_prop_ro("A_FF", [](const fhhos4::HybridBlocks& b) -> const fhhos4::CSRMatrix& { return b.A_FF; }, nb::rv_policy::reference_internal);
+	nb::class_<fhhos4::detail::HybridBlocks>(m, "HybridBlocks", "The blocks of a hybrid system, owned by the library")
+		.def_prop_ro("A_TT", [](const fhhos4::detail::HybridBlocks& b) -> const fhhos4::detail::CSRMatrix& { return b.A_TT; }, nb::rv_policy::reference_internal)
+		.def_prop_ro("A_TF", [](const fhhos4::detail::HybridBlocks& b) -> const fhhos4::detail::CSRMatrix& { return b.A_TF; }, nb::rv_policy::reference_internal)
+		.def_prop_ro("A_FT", [](const fhhos4::detail::HybridBlocks& b) -> const fhhos4::detail::CSRMatrix& { return b.A_FT; }, nb::rv_policy::reference_internal)
+		.def_prop_ro("A_FF", [](const fhhos4::detail::HybridBlocks& b) -> const fhhos4::detail::CSRMatrix& { return b.A_FF; }, nb::rv_policy::reference_internal);
 
 	//------------------------------------------------ Helpers -----------------------------------------------//
 
@@ -340,14 +354,14 @@ NB_MODULE(fhhos4, m)
 		{
 			PyCSRView view = ToView(M, "M");
 			nb::gil_scoped_release release;
-			return view.Visit([&](auto v) { return VisitLists(cells, faces, [&](auto c, auto f) { return fhhos4::ExtractSymmetricBlocks(v, c, f); }); });
+			return view.Visit([&](auto v) { return VisitLists(cells, faces, [&](auto c, auto f) { return fhhos4::detail::ExtractSymmetricBlocks(v, c, f); }); });
 		}, "M"_a, "cells"_a, "faces"_a, "A copy: the blocks of the uncondensed system, from its global matrix, for SetupSymmetric()");
 
 	m.def("ExtractNonsymmetricBlocks", [](nb::handle M, const PyDoFLists& cells, const PyDoFLists& faces)
 		{
 			PyCSRView view = ToView(M, "M");
 			nb::gil_scoped_release release;
-			return view.Visit([&](auto v) { return VisitLists(cells, faces, [&](auto c, auto f) { return fhhos4::ExtractNonsymmetricBlocks(v, c, f); }); });
+			return view.Visit([&](auto v) { return VisitLists(cells, faces, [&](auto c, auto f) { return fhhos4::detail::ExtractNonsymmetricBlocks(v, c, f); }); });
 		}, "M"_a, "cells"_a, "faces"_a, "A copy: the four blocks of the uncondensed system, from its global matrix, for SetupNonsymmetric()");
 
 	m.def("Gather", [](const ConstVector& x, const PyDoFLists& cells, const PyDoFLists& faces, Vector x_T, Vector x_F)
@@ -374,7 +388,7 @@ NB_MODULE(fhhos4, m)
 			}
 			PyCSRView view = ToView(M, "M");
 			nb::gil_scoped_release release;
-			return view.Visit([](auto v) { return fhhos4::ToCSR(v); });
+			return view.Visit([](auto v) { return fhhos4::detail::ToCSR(v); });
 		}, "M"_a, "A copy: M in the CSR format of the library (from other index types, or from a CSC matrix)");
 
 	m.def("TransposedView", [](nb::handle A)
@@ -422,20 +436,20 @@ NB_MODULE(fhhos4, m)
 			[](PySolver& s, nb::handle comm) { s.Comm = ToComm(comm); s.CommObject = nb::borrow(comm); })
 #endif
 
-		// Uncondensed system. faceGhosts: on several processes, the global numbers of the ghost faces (int64 array)
+		// Setups from the blocks of the system. faceGhosts: on several processes, the global numbers of the ghost faces (int64 array)
 		.def("SetupSymmetric", [](PySolver& s, nb::handle A_TT, nb::handle A_TF, nb::handle A_FF, const ConstVector& cellInterpOfOne, const ConstVector& faceInterpOfOne, nb::handle faceGhosts)
 			{
 				PyCSRView a_TT = ToView(A_TT, "A_TT"), a_TF = ToView(A_TF, "A_TF"), a_FF = ToView(A_FF, "A_FF");
-				fhhos4::CSRView tt = a_TT.Native("A_TT"), tf = a_TF.Native("A_TF"), ff = a_FF.Native("A_FF");
+				fhhos4::detail::CSRView tt = a_TT.Native("A_TT"), tf = a_TF.Native("A_TF"), ff = a_FF.Native("A_FF");
 				fhhos4::GhostNumbers ghosts = ToGhostNumbers(faceGhosts);
-				s.Run([&] { s.SetupSymmetric(tt, tf, ff, cellInterpOfOne, faceInterpOfOne, ghosts); }, {});
+				s.Run([&] { s.SetupViews(true, tt, tf, nullptr, ff, cellInterpOfOne, faceInterpOfOne, ghosts); }, {});
 			},
 			"A_TT"_a, "A_TF"_a, "A_FF"_a, "cellInterpOfOne"_a.noconvert(), "faceInterpOfOne"_a.noconvert(), "faceGhosts"_a = nb::none())
 		.def("SetupNonsymmetric", [](PySolver& s, nb::handle A_TT, nb::handle A_TF, nb::handle A_FT, nb::handle A_FF, const ConstVector& cellInterpOfOne, const ConstVector& faceInterpOfOne)
 			{
 				PyCSRView a_TT = ToView(A_TT, "A_TT"), a_TF = ToView(A_TF, "A_TF"), a_FT = ToView(A_FT, "A_FT"), a_FF = ToView(A_FF, "A_FF");
-				fhhos4::CSRView tt = a_TT.Native("A_TT"), tf = a_TF.Native("A_TF"), ft = a_FT.Native("A_FT"), ff = a_FF.Native("A_FF");
-				s.Run([&] { s.SetupNonsymmetric(tt, tf, ft, ff, cellInterpOfOne, faceInterpOfOne); }, { a_FT });
+				fhhos4::detail::CSRView tt = a_TT.Native("A_TT"), tf = a_TF.Native("A_TF"), ft = a_FT.Native("A_FT"), ff = a_FF.Native("A_FF");
+				s.Run([&] { s.SetupViews(false, tt, tf, &ft, ff, cellInterpOfOne, faceInterpOfOne); }, { a_FT });
 			},
 			"A_TT"_a, "A_TF"_a, "A_FT"_a, "A_FF"_a, "cellInterpOfOne"_a.noconvert(), "faceInterpOfOne"_a.noconvert())
 		// x_T, x_F: NumPy vectors of float64, written in place (x_F: the initial guess on input)
@@ -443,35 +457,7 @@ NB_MODULE(fhhos4, m)
 			{ return s.Solve(b_T, b_F, x_T, x_F); },
 			"b_T"_a.noconvert(), "b_F"_a.noconvert(), "x_T"_a.noconvert(), "x_F"_a.noconvert(), noGIL)
 
-		// Condensed system
-		.def("SetupSymmetricCondensed", [](PySolver& s, nb::handle A, nb::handle A_TT, nb::handle A_TF, nb::handle A_FF, const ConstVector& cellInterpOfOne, const ConstVector& faceInterpOfOne)
-			{
-				PyCSRView a = ToView(A, "A"), a_TT = ToView(A_TT, "A_TT"), a_TF = ToView(A_TF, "A_TF"), a_FF = ToView(A_FF, "A_FF");
-				fhhos4::CSRView aa = a.Native("A"), tt = a_TT.Native("A_TT"), tf = a_TF.Native("A_TF"), ff = a_FF.Native("A_FF");
-				s.Run([&] { s.SetupSymmetricCondensed(aa, tt, tf, ff, cellInterpOfOne, faceInterpOfOne); }, { a });
-			},
-			"A"_a, "A_TT"_a, "A_TF"_a, "A_FF"_a, "cellInterpOfOne"_a.noconvert(), "faceInterpOfOne"_a.noconvert())
-		.def("SetupSymmetricCondensed", [](PySolver& s, nb::handle A, nb::handle A_TT, nb::handle A_TF, const ConstVector& cellInterpOfOne, const ConstVector& faceInterpOfOne)
-			{
-				PyCSRView a = ToView(A, "A"), a_TT = ToView(A_TT, "A_TT"), a_TF = ToView(A_TF, "A_TF");
-				fhhos4::CSRView aa = a.Native("A"), tt = a_TT.Native("A_TT"), tf = a_TF.Native("A_TF");
-				s.Run([&] { s.SetupSymmetricCondensed(aa, tt, tf, cellInterpOfOne, faceInterpOfOne); }, { a });
-			},
-			"A"_a, "A_TT"_a, "A_TF"_a, "cellInterpOfOne"_a.noconvert(), "faceInterpOfOne"_a.noconvert())
-		.def("SetupNonsymmetricCondensed", [](PySolver& s, nb::handle A, nb::handle A_TT, nb::handle A_TF, nb::handle A_FT, nb::handle A_FF, const ConstVector& cellInterpOfOne, const ConstVector& faceInterpOfOne)
-			{
-				PyCSRView a = ToView(A, "A"), a_TT = ToView(A_TT, "A_TT"), a_TF = ToView(A_TF, "A_TF"), a_FT = ToView(A_FT, "A_FT"), a_FF = ToView(A_FF, "A_FF");
-				fhhos4::CSRView aa = a.Native("A"), tt = a_TT.Native("A_TT"), tf = a_TF.Native("A_TF"), ft = a_FT.Native("A_FT"), ff = a_FF.Native("A_FF");
-				s.Run([&] { s.SetupNonsymmetricCondensed(aa, tt, tf, ft, ff, cellInterpOfOne, faceInterpOfOne); }, { a });
-			},
-			"A"_a, "A_TT"_a, "A_TF"_a, "A_FT"_a, "A_FF"_a, "cellInterpOfOne"_a.noconvert(), "faceInterpOfOne"_a.noconvert())
-		.def("SetupNonsymmetricCondensed", [](PySolver& s, nb::handle A, nb::handle A_TT, nb::handle A_TF, nb::handle A_FT, const ConstVector& cellInterpOfOne, const ConstVector& faceInterpOfOne)
-			{
-				PyCSRView a = ToView(A, "A"), a_TT = ToView(A_TT, "A_TT"), a_TF = ToView(A_TF, "A_TF"), a_FT = ToView(A_FT, "A_FT");
-				fhhos4::CSRView aa = a.Native("A"), tt = a_TT.Native("A_TT"), tf = a_TF.Native("A_TF"), ft = a_FT.Native("A_FT");
-				s.Run([&] { s.SetupNonsymmetricCondensed(aa, tt, tf, ft, cellInterpOfOne, faceInterpOfOne); }, { a });
-			},
-			"A"_a, "A_TT"_a, "A_TF"_a, "A_FT"_a, "cellInterpOfOne"_a.noconvert(), "faceInterpOfOne"_a.noconvert())
+		// The condensed system A x = b (A: CondensedMatrix()), after a setup
 		// x: a NumPy vector of float64, written in place (the initial guess on input)
 		.def("Solve", [](PySolver& s, const ConstVector& b, Vector x) { return s.Solve(b, x); },
 			"b"_a.noconvert(), "x"_a.noconvert(), noGIL)
@@ -479,7 +465,7 @@ NB_MODULE(fhhos4, m)
 		.def("Solve", [](PySolver& s, const ConstVector& b) { return s.Solve(b); }, "b"_a.noconvert(), noGIL)
 
 		// A copy of the condensed matrix (fhhos4.CSRMatrix)
-		.def("CondensedMatrix", [](const PySolver& s) { return fhhos4::ToCSR(s.CondensedMatrix()); })
+		.def("CondensedMatrix", [](const PySolver& s) { return fhhos4::detail::ToCSR(s.CondensedView()); })
 		.def("IsSetUp", &fhhos4::Solver::IsSetUp)
 		.def("NumberOfLevels", &fhhos4::Solver::NumberOfLevels);
 }

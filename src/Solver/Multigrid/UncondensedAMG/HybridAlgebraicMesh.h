@@ -132,6 +132,9 @@ public:
 	// Symmetric matrix: the blocks of A_T_T are factorized by Cholesky (they can be given by their lower triangular
 	// part), by LU otherwise
 	bool Symmetric = true;
+	// The faces of a single element: removed (false), or collapsed into one coarse face per aggregate (see
+	// CoarseningPass::CollapseBoundaryFaces)
+	bool CollapseBoundaryFaces = false;
 
 	vector<HybridAlgebraicElement> Elements;
 	vector<HybridAlgebraicFace> Faces;
@@ -346,7 +349,8 @@ public:
 		if (coarsestPossibleMeshReached)
 			return;
 		
-		// Removal of faces shared by elements in the same aggregate.
+		// Removal of faces shared by elements in the same aggregate, and of the faces of a single element unless
+		// CollapseBoundaryFaces (see CoarseningPass::CollapseInterfaces()).
 		// Determination of the faces of the aggregates.
 		#pragma omp parallel for
 		for (BigNumber coarseElemNumber = 0; coarseElemNumber < CoarseElements.size(); ++coarseElemNumber)
@@ -357,6 +361,13 @@ public:
 				HybridAlgebraicElement* elem1 = coarseElem.FineElements[i];
 				for (HybridAlgebraicFace* face : elem1->Faces)
 				{
+					if (face->Elements.size() == 1 && !CollapseBoundaryFaces)
+					{
+						face->IsRemovedOnCoarseMesh = true;
+						coarseElem.RemovedFineFaces.push_back(face);
+						face->CoarseElements.push_back(&coarseElem);
+						continue;
+					}
 					for (int j = i + 1; j < coarseElem.FineElements.size(); j++)
 					{
 						HybridAlgebraicElement* elem2 = coarseElem.FineElements[j];
@@ -427,6 +438,21 @@ public:
 						coarseElem.CoarseFaces.push_back(coarseFace);
 						neighbour->CoarseFaces.push_back(coarseFace);
 					}
+				}
+				// With CollapseBoundaryFaces, the boundary of the aggregate in the system (its faces of a single element, e.g.
+				// Neumann faces), collapsed into one coarse face of the aggregate alone, after its interfaces (see
+				// CoarseningPass::CollapseInterfaces())
+				vector<HybridAlgebraicFace*> boundaryFaces;
+				for (HybridAlgebraicFace* face : coarseElem.FineFaces)
+					if (face->Elements.size() == 1)
+						boundaryFaces.push_back(face);
+				if (!boundaryFaces.empty())
+				{
+					CoarseFaces.emplace_back(CoarseFaces.size(), boundaryFaces);
+					HybridFaceAggregate* coarseFace = &CoarseFaces.back();
+					for (HybridAlgebraicFace* fineFace : boundaryFaces)
+						fineFace->CoarseFace = coarseFace;
+					coarseElem.CoarseFaces.push_back(coarseFace);
 				}
 			}
 		}

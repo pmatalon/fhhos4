@@ -2,8 +2,9 @@
 // run with the default options: they must build exactly the hierarchy of the reference implementation
 // (HybridAlgebraicMesh, with UncondensedLevel::UseFlatPasses = false).
 // - CoarseningPassProgram: the program on HHO systems (simplicial, Cartesian and polygonal meshes, heterogeneous and
-//   anisotropic problems, k = 0 to 2, the h-coarsening of the degree-k blocks, orthonormal bases, the non-symmetric
-//   path on a symmetric matrix, the coarsening prolongations 3 to 6, the face prolongations 1 and 2, the multigrid
+//   anisotropic problems, mixed Dirichlet-Neumann conditions (faces of a single cell in the system), k = 0 to 2, the
+//   h-coarsening of the degree-k blocks, orthonormal bases, the non-symmetric path on a symmetric matrix, the
+//   coarsening prolongations 3 to 6, the face prolongations 1 and 2, the multigrid
 //   prolongations other than the chained ones, the aggregation with all the neighbours, the inverses of the diagonal
 //   blocks, p-levels after h-levels): same iteration count and L2 error, bit for bit. On 1 thread: on several, the L2 error
 //   (an OpenMP reduction) and the polygonal meshes (their agglomeration) vary from one run to the next.
@@ -71,6 +72,8 @@ struct FlatPassCase
 	int MeshesThenP = 0;               // -hp-cs h_p -num-meshes N: N meshes, then p-levels (the coarse A_F_F is computed)
 	int Prolong = 0;                   // -prolong: the multigrid prolongation (0: default, the chained coarsening prolongations)
 	bool AllNeighbours = false;        // -cs mn: each cell aggregated with all its neighbours
+	std::string BC;                    // -bc ("": the default, Dirichlet; m: mixed Dirichlet-Neumann)
+	bool CollapseBoundaryFaces = false; // -uamg-bfc: the Neumann faces collapsed into one coarse face per aggregate
 };
 
 inline std::ostream& operator<<(std::ostream& os, const FlatPassCase& c)
@@ -93,6 +96,9 @@ TEST_P(CoarseningPassProgramTest, SameAsReference)
 		args.Problem.GeoCode = c.Geo;
 		args.Problem.HeterogeneityRatio = c.Heterogeneity;
 		args.Problem.AnisotropyRatio = c.Anisotropy;
+		if (!c.BC.empty())
+			args.Problem.BCCode = c.BC;
+		args.Solver.MG.UAMGCollapseBoundaryFaces = c.CollapseBoundaryFaces;
 		args.Discretization.MeshCode = c.Mesh;
 		if (!c.Mesher.empty())
 			args.Discretization.Mesher = c.Mesher;
@@ -166,6 +172,28 @@ std::vector<FlatPassCase> FlatPassCases()
 	{
 		FlatPassCase c = { "Square_cart_n32_k0_aniso100", "square", "cart", "inhouse", 32, 0 };
 		c.Anisotropy = 100;
+		cases.push_back(c);
+	}
+	// Mixed Dirichlet-Neumann conditions: the Neumann faces, of a single cell, removed by the first pass, or collapsed
+	// into one coarse face per aggregate (-uamg-bfc)
+	for (bool collapse : { false, true })
+	{
+		for (int k : { 0, 1 })
+		{
+			FlatPassCase c = { "Square_tri_n16_k" + std::to_string(k) + "_mixed" + (collapse ? "_bfc" : ""), "square", "tri", "", 16, k };
+			c.BC = "m";
+			c.CollapseBoundaryFaces = collapse;
+			cases.push_back(c);
+		}
+		FlatPassCase c = { "Square_cart_n32_k0_mixed" + std::string(collapse ? "_bfc" : ""), "square", "cart", "inhouse", 32, 0 };
+		c.BC = "m";
+		c.CollapseBoundaryFaces = collapse;
+		cases.push_back(c);
+	}
+	{
+		FlatPassCase c = { "Square_tri_n16_k0_mixed_cp6", "square", "tri", "", 16, 0 };
+		c.BC = "m";
+		c.CoarseningProlong = 6;
 		cases.push_back(c);
 	}
 #endif

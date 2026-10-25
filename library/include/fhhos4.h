@@ -17,17 +17,13 @@
 //   D. A. Di Pietro, F. Hülsemann, P. Matalon, P. Mycek, U. Rüde, "Algebraic multigrid preconditioner for statically
 //   condensed systems arising from lowest-order hybrid discretizations", SIAM J. Sci. Comput. (2023),
 // extended to k >= 1.
-// Solves a hybrid system (cell and face unknowns), symmetric positive definite (SetupSymmetric...()) or not
-// (SetupNonsymmetric...(), e.g. convection-diffusion),
+// Solves a hybrid system (cell and face unknowns), symmetric positive definite (SetupSymmetric()) or not
+// (SetupNonsymmetric(), e.g. convection-diffusion),
 //     [ A_TT  A_TF ] [x_T]   [b_T]
 //     [ A_FT  A_FF ] [x_F] = [b_F],
 // by static condensation: the AMG solves the condensed system A x_F = b, A = A_FF - A_FT A_TT^{-1} A_TF and
-// b = b_F - A_FT A_TT^{-1} b_T. Two interfaces:
-// - the uncondensed system, the interface of choice: SetupSymmetric() or SetupNonsymmetric() with the blocks, then
-//   Solve(b_T, b_F, x_T, x_F). The library condenses the system and computes the cell unknowns: no static condensation
-//   in the calling code;
-// - the condensed system, to integrate the library with the least effort into a code that condenses statically
-//   already: Setup...Condensed() with A and the blocks, then Solve(b, x).
+// b = b_F - A_FT A_TT^{-1} b_T: SetupSymmetric() or SetupNonsymmetric() with the blocks, then Solve(b_T, b_F, x_T, x_F).
+// The library condenses the system and computes the cell unknowns: no static condensation in the calling code.
 // See README_library.md.
 //
 // The Krylov method preconditioned by the AMG is part of the library (Solver::Krylov), which does not give the multigrid
@@ -35,14 +31,16 @@
 // FCG or GCR iterations), which requires a flexible Krylov method: the flexible conjugate gradient (FCG, the default for
 // a symmetric matrix) or GCR.
 //
-// The inputs are read in place, never copied nor converted: the sparse matrices in the CSR format of the library
-// (CSRView: row-major, with the index type SparseIndex), the vectors as arrays of doubles. The helpers at the end of
-// this file convert the other formats (other index types, column-major matrices, the global matrix of the system
-// instead of its blocks): they copy them. Assembling the matrices in the format of the library avoids the copies.
+// The inputs are Eigen objects, read in place, never copied nor converted: the sparse matrices in the format of the
+// library, fhhos4::SparseMatrix (row-major, with the index type SparseIndex) or an Eigen::Map of one, the vectors as
+// Eigen vectors. Another Eigen sparse matrix (column-major, another index type) converts by Eigen, a copy in the
+// calling code: fhhos4::SparseMatrix B = A; (a symmetric column-major one: TransposedView(), no copy). Assembling the
+// matrices in the format of the library avoids the copies. The helpers at the end of this file extract the blocks
+// from the global matrix of the system (copies).
 //
-// The functions compiled in the shared library fhhos4 take arrays only (views): the Eigen objects of this header (the
-// Eigen matrices converted to views, the Eigen::Ref of the vectors) are those of the calling code, compiled with its
-// own version of Eigen. The library never allocates memory that the calling code frees, nor the other way around.
+// The functions compiled in the shared library fhhos4 take arrays only: the Eigen objects of this header are those of
+// the calling code, compiled with its own version of Eigen (the inline functions of this header give their arrays to
+// the library). The library never allocates memory that the calling code frees, nor the other way around.
 //
 // Compiled with MPI (FHHOS4_MPI, -DENABLE_MPI=ON), a Solver works on the processes of its communicator (Solver::Comm),
 // on a system distributed by rows: each process gives the rows of its own cells and faces, the columns of the faces
@@ -54,9 +52,13 @@ namespace fhhos4
 	// -DSMALL_INDEX=OFF
 	using SparseIndex = FHHOS4_SPARSE_INDEX;
 
-	// The sparse matrices of the library as Eigen matrices: row-major, with the index type SparseIndex. Compressed, they
-	// convert to a CSRView without copy.
+	// The sparse matrices of the library: Eigen's, row-major, with the index type SparseIndex, compressed. The setups
+	// read them in place, or an Eigen::Map of one (SparseMatrixMap), e.g. of the arrays of another code.
 	using SparseMatrix = Eigen::SparseMatrix<double, Eigen::RowMajor, SparseIndex>;
+
+	// A sparse matrix in the format of the library on arrays it doesn't own (no copy): e.g. TransposedView(),
+	// Solver::CondensedMatrix()
+	using SparseMatrixMap = Eigen::Map<const SparseMatrix>;
 
 	namespace detail
 	{
@@ -74,96 +76,80 @@ namespace fhhos4
 		};
 	}
 
-	// A sparse matrix in the CSR format (compressed sparse row), not owned: the arrays of the calling code, read in place.
-	// The non-zeros of the row i are (ColumnIndices[p], Values[p]) for RowPointers[i] <= p < RowPointers[i + 1], with
-	// RowPointers[0] = 0 and the columns strictly increasing in each row (no duplicates). RowPointer and Column:
-	// std::int32_t or std::int64_t, independently; the setups take a CSRView, the index type of the library for both.
-	template <typename RowPointer, typename Column>
-	struct BasicCSRView
+	// The implementation: the arrays given to the compiled functions, and what they return (the Python module uses them
+	// too, on the arrays of NumPy)
+	namespace detail
 	{
-		static_assert((std::is_same<RowPointer, std::int32_t>::value || std::is_same<RowPointer, std::int64_t>::value) &&
-		              (std::is_same<Column, std::int32_t>::value || std::is_same<Column, std::int64_t>::value),
-		              "fhhos4::BasicCSRView: the indices are std::int32_t or std::int64_t");
-
-		std::int64_t Rows = 0;
-		std::int64_t Cols = 0;
-		const RowPointer* RowPointers = nullptr; // Rows + 1
-		const Column* ColumnIndices = nullptr;   // RowPointers[Rows]
-		const double* Values = nullptr;          // RowPointers[Rows]
-
-		BasicCSRView() = default;
-
-		BasicCSRView(std::int64_t rows, std::int64_t cols, const RowPointer* rowPointers, const Column* columnIndices, const double* values)
-			: Rows(rows), Cols(cols), RowPointers(rowPointers), ColumnIndices(columnIndices), Values(values)
-		{}
-
-		// The arrays of an Eigen sparse matrix (Eigen::SparseMatrix, or an Eigen::Map of one): compressed, row-major, with
-		// these index types, e.g. fhhos4::SparseMatrix for a CSRView. A column-major matrix stores its transpose: see
-		// ToCSR() (a copy) and TransposedView() (no copy, for a symmetric matrix).
-		template <typename Derived>
-		BasicCSRView(const Eigen::SparseCompressedBase<Derived>& M)
+		// A sparse matrix in the CSR format (compressed sparse row), not owned: arrays read in place. The non-zeros of the
+		// row i are (ColumnIndices[p], Values[p]) for RowPointers[i] <= p < RowPointers[i + 1], with RowPointers[0] = 0 and
+		// the columns strictly increasing in each row (no duplicates). RowPointer and Column: std::int32_t or
+		// std::int64_t, independently.
+		template <typename RowPointer, typename Column>
+		struct BasicCSRView
 		{
-			constexpr bool rowMajor = Derived::IsRowMajor;
-			constexpr bool sameIndices = std::is_same<typename Derived::StorageIndex, RowPointer>::value && std::is_same<typename Derived::StorageIndex, Column>::value;
-			static_assert(rowMajor, "fhhos4: a column-major matrix stores its transpose. Convert it with fhhos4::ToCSR() (a copy), or, if it is symmetric, view it with fhhos4::TransposedView() (no copy).");
-			static_assert(sameIndices, "fhhos4: the index type of the matrix is not that of the view (fhhos4::SparseIndex for a CSRView). Use fhhos4::SparseMatrix, or convert the matrix with fhhos4::ToCSR() (a copy).");
-			static_assert(std::is_same<typename Derived::Scalar, double>::value, "fhhos4: matrices of doubles only");
-			if constexpr (rowMajor && sameIndices)
+			static_assert((std::is_same<RowPointer, std::int32_t>::value || std::is_same<RowPointer, std::int64_t>::value) &&
+			              (std::is_same<Column, std::int32_t>::value || std::is_same<Column, std::int64_t>::value),
+			              "fhhos4: the indices are std::int32_t or std::int64_t");
+
+			std::int64_t Rows = 0;
+			std::int64_t Cols = 0;
+			const RowPointer* RowPointers = nullptr; // Rows + 1
+			const Column* ColumnIndices = nullptr;   // RowPointers[Rows]
+			const double* Values = nullptr;          // RowPointers[Rows]
+
+			BasicCSRView() = default;
+
+			BasicCSRView(std::int64_t rows, std::int64_t cols, const RowPointer* rowPointers, const Column* columnIndices, const double* values)
+				: Rows(rows), Cols(cols), RowPointers(rowPointers), ColumnIndices(columnIndices), Values(values)
+			{}
+
+			std::int64_t NonZeros() const
 			{
-				if (!M.isCompressed())
-					throw Error("fhhos4: the Eigen matrix is not compressed: call its makeCompressed() first.");
-				Rows = M.rows();
-				Cols = M.cols();
-				RowPointers = M.outerIndexPtr();
-				ColumnIndices = M.innerIndexPtr();
-				Values = M.valuePtr();
+				return RowPointers ? (std::int64_t)RowPointers[Rows] : 0;
 			}
-		}
+		};
 
-		// Not of a temporary matrix: the view would outlive it
-		template <typename Derived>
-		BasicCSRView(const Eigen::SparseCompressedBase<Derived>&&) = delete;
+		// The matrices of the setups: the index type of the library
+		using CSRView = BasicCSRView<SparseIndex, SparseIndex>;
 
-		std::int64_t NonZeros() const
+		// The arrays of an Eigen sparse matrix (compressed, row-major, of doubles, with the indices Index), read in place
+		template <typename Index, typename Derived>
+		BasicCSRView<Index, Index> View(const Eigen::SparseCompressedBase<Derived>& M)
 		{
-			return RowPointers ? (std::int64_t)RowPointers[Rows] : 0;
+			if (!M.isCompressed())
+				throw Error("fhhos4: the Eigen matrix is not compressed: call its makeCompressed() first.");
+			return BasicCSRView<Index, Index>(M.rows(), M.cols(), M.outerIndexPtr(), M.innerIndexPtr(), M.valuePtr());
 		}
 
-		// The view as an Eigen matrix (RowPointer and Column of the same type), e.g. CondensedMatrix().EigenMap()
-		Eigen::Map<const Eigen::SparseMatrix<double, Eigen::RowMajor, RowPointer>> EigenMap() const
+		// A sparse matrix in the CSR format of the library, owned by the library (allocated and freed by it): the result of
+		// the compiled helpers that copy
+		class FHHOS4_API CSRMatrix
 		{
-			static_assert(std::is_same<RowPointer, Column>::value, "fhhos4: EigenMap() needs row pointers and columns of the same type");
-			return Eigen::Map<const Eigen::SparseMatrix<double, Eigen::RowMajor, RowPointer>>(Rows, Cols, NonZeros(), RowPointers, ColumnIndices, Values);
+		public:
+			struct Impl; // defined in the library
+
+			CSRMatrix();
+			explicit CSRMatrix(std::unique_ptr<Impl> impl);
+			~CSRMatrix();
+			CSRMatrix(CSRMatrix&&) noexcept;
+			CSRMatrix& operator=(CSRMatrix&&) noexcept;
+			CSRMatrix(const CSRMatrix&) = delete;
+			CSRMatrix& operator=(const CSRMatrix&) = delete;
+
+			CSRView View() const&; // 0 x 0 if empty
+			CSRView View() const&& = delete;
+
+		private:
+			std::unique_ptr<Impl> _impl;
+		};
+
+		// A copy, owned by the calling code: an Eigen matrix
+		inline SparseMatrix ToEigen(const CSRMatrix& M)
+		{
+			CSRView v = M.View();
+			return SparseMatrix(SparseMatrixMap(v.Rows, v.Cols, v.NonZeros(), v.RowPointers, v.ColumnIndices, v.Values));
 		}
-	};
-
-	// The matrices of the setups: the index type of the library
-	using CSRView = BasicCSRView<SparseIndex, SparseIndex>;
-
-	// A sparse matrix in the CSR format of the library, owned by the library (allocated and freed by it): the result of
-	// the helpers that copy (ToCSR(), ExtractSymmetricBlocks()...). Converts to a CSRView, valid while the object lives
-	// (not of a temporary).
-	class FHHOS4_API CSRMatrix
-	{
-	public:
-		struct Impl; // defined in the library
-
-		CSRMatrix();
-		explicit CSRMatrix(std::unique_ptr<Impl> impl);
-		~CSRMatrix();
-		CSRMatrix(CSRMatrix&&) noexcept;
-		CSRMatrix& operator=(CSRMatrix&&) noexcept;
-		CSRMatrix(const CSRMatrix&) = delete;
-		CSRMatrix& operator=(const CSRMatrix&) = delete;
-
-		CSRView View() const&; // 0 x 0 if empty
-		CSRView View() const&& = delete;
-		operator CSRView() const& { return View(); }
-		operator CSRView() const&& = delete;
-
-	private:
-		std::unique_ptr<Impl> _impl;
-	};
+	}
 
 	// On several processes (MPI): the global numbers of the ghosts of a process (the faces of its rows owned by other
 	// processes), in the order of their local numbers (after those of its own faces), read in place. The global numbers:
@@ -365,11 +351,11 @@ namespace fhhos4
 		Solver& operator=(const Solver&) = delete;
 
 		// The inputs of the setups:
-		// - the matrices (CSRView): read in place, in the CSR format of the library, never copied. An Eigen matrix
-		//   (compressed, row-major, with the index type SparseIndex: fhhos4::SparseMatrix) converts to a CSRView, a
-		//   CSRMatrix too; other formats: see the helpers at the end of this file (they copy). Not temporaries. The setups
-		//   check the sizes and structure of the inputs against Dimension and the degrees, and the CSR format (one pass on
-		//   the indices);
+		// - the matrices: Eigen sparse matrices in the format of the library, fhhos4::SparseMatrix (compressed, row-major,
+		//   with the index type SparseIndex) or an Eigen::Map of one (SparseMatrixMap), read in place, never copied. Other
+		//   Eigen matrices convert by Eigen, a copy: fhhos4::SparseMatrix B = A; (a symmetric column-major one:
+		//   TransposedView(A), no copy). The setups check the sizes and structure of the inputs against Dimension and the
+		//   degrees, and their CSR arrays (one pass on the indices);
 		// - cellInterpOfOne, faceInterpOfOne: the interpolation of the function 1 on the polynomial bases of the cells and
 		//   faces, one coefficient per cell and per face (in the order of the blocks of rows and columns of A_TF). The
 		//   bases must be hierarchical (ordered by degree: for each d, the first functions span P^d, or Q^d whose degree is
@@ -377,7 +363,7 @@ namespace fhhos4
 		//   1 = c phi_0, i.e. c = 1/phi_0. phi_0 may differ from one cell or face to another (e.g. L2-orthonormal bases:
 		//   c = sqrt(|T|) on a cell T); c = 1 everywhere if phi_0 = 1.
 
-		//----------- Uncondensed system: the interface of choice -----------//
+		//----------------------------- Setups and solves -----------------------------//
 
 		// Setup for a symmetric positive definite system, from its blocks (A_FT = A_TF^T), without the DoFs of the
 		// Dirichlet faces. Computes the condensed matrix A = A_FF - A_FT A_TT^{-1} A_TF (CondensedMatrix()), and keeps what
@@ -394,11 +380,12 @@ namespace fhhos4
 		// face belongs to a process that owns one of its cells (e.g. the one of the smaller rank); a process may own no
 		// cell nor face. Then Solve() with the vectors of the cells and faces of the process. On one process, faceGhosts
 		// is empty.
-		void SetupSymmetric(const CSRView& A_TT, const CSRView& A_TF, const CSRView& A_FF,
+		template <typename TT, typename TF, typename FF>
+		void SetupSymmetric(const Eigen::SparseCompressedBase<TT>& A_TT, const Eigen::SparseCompressedBase<TF>& A_TF, const Eigen::SparseCompressedBase<FF>& A_FF,
 		                    const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne,
 		                    const GhostNumbers& faceGhosts = GhostNumbers())
 		{
-			Setup(true, nullptr, A_TT, A_TF, nullptr, &A_FF, In(cellInterpOfOne), In(faceInterpOfOne), faceGhosts);
+			Setup(true, View(A_TT), View(A_TF), nullptr, View(A_FF), In(cellInterpOfOne), In(faceInterpOfOne), faceGhosts);
 		}
 
 		// Setup for a non-symmetric system (e.g. convection-diffusion), whose symmetric part is positive definite: as
@@ -410,14 +397,21 @@ namespace fhhos4
 		// order of each level (convection), in the pre- and post-smoothing; the K-cycle iterates with GCR. Krylov must not
 		// be FCG, nor CoarseSolver Cholesky, nor the smoothers Chebyshev.
 		// The solver keeps a reference to A_FT, read by each Solve(b_T, b_F, x_T, x_F) (b_F - A_FT A_TT^{-1} b_T): A_FT must
-		// stay alive and unchanged until the next setup or the destruction of the solver. The other blocks may be freed
-		// after the setup.
+		// stay alive and unchanged until the next setup or the destruction of the solver (not a temporary matrix). The
+		// other blocks may be freed after the setup.
 		// See README_library.md.
-		void SetupNonsymmetric(const CSRView& A_TT, const CSRView& A_TF, const CSRView& A_FT, const CSRView& A_FF,
+		template <typename TT, typename TF, typename FT, typename FF>
+		void SetupNonsymmetric(const Eigen::SparseCompressedBase<TT>& A_TT, const Eigen::SparseCompressedBase<TF>& A_TF, const Eigen::SparseCompressedBase<FT>& A_FT,
+		                       const Eigen::SparseCompressedBase<FF>& A_FF,
 		                       const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
 		{
-			Setup(false, nullptr, A_TT, A_TF, &A_FT, &A_FF, In(cellInterpOfOne), In(faceInterpOfOne), GhostNumbers());
+			detail::CSRView a_FT = View(A_FT);
+			Setup(false, View(A_TT), View(A_TF), &a_FT, View(A_FF), In(cellInterpOfOne), In(faceInterpOfOne), GhostNumbers());
 		}
+
+		template <typename TT, typename TF, typename FF, int Options, typename Index>
+		void SetupNonsymmetric(const Eigen::SparseCompressedBase<TT>&, const Eigen::SparseCompressedBase<TF>&, Eigen::SparseMatrix<double, Options, Index>&& A_FT,
+		                       const Eigen::SparseCompressedBase<FF>&, const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&) = delete;
 
 		// Solves the system, after SetupSymmetric() or SetupNonsymmetric(): condenses the right-hand
 		// side, b = b_F - A_FT A_TT^{-1} b_T, solves A x_F = b, then computes x_T = A_TT^{-1} (b_T - A_TF x_F).
@@ -430,41 +424,8 @@ namespace fhhos4
 			return SolveUncondensed(In(b_T), In(b_F), Out(x_T), Out(x_F));
 		}
 
-		//---- Condensed system: to integrate the library into a code that condenses statically ----//
-		// On one process only (on several, give the uncondensed system: SetupSymmetric()).
-
-		// Setup for a symmetric positive definite matrix, from the condensed matrix and the blocks: as
-		// SetupSymmetric(), with A (faces x faces), the condensed matrix A_FF - A_FT A_TT^{-1} A_TF, both
-		// triangles, and A_FF optional (the algorithm only uses A_TT and A_TF, whose rows each belong to one cell).
-		// The solver keeps a reference to A: A must stay alive and unchanged until the next setup or the destruction of
-		// the solver. The blocks are only read by the setup: they may be freed after it.
-		void SetupSymmetricCondensed(const CSRView& A, const CSRView& A_TT, const CSRView& A_TF, const CSRView& A_FF,
-		                             const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
-		{
-			Setup(true, &A, A_TT, A_TF, nullptr, &A_FF, In(cellInterpOfOne), In(faceInterpOfOne), GhostNumbers());
-		}
-
-		void SetupSymmetricCondensed(const CSRView& A, const CSRView& A_TT, const CSRView& A_TF,
-		                             const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
-		{
-			Setup(true, &A, A_TT, A_TF, nullptr, nullptr, In(cellInterpOfOne), In(faceInterpOfOne), GhostNumbers());
-		}
-
-		// Setup for a non-symmetric matrix: as SetupNonsymmetric(), with the condensed matrix A (see
-		// SetupSymmetricCondensed()) and A_FF optional. A_FT is only read by the setup, as the other blocks.
-		void SetupNonsymmetricCondensed(const CSRView& A, const CSRView& A_TT, const CSRView& A_TF, const CSRView& A_FT, const CSRView& A_FF,
-		                                const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
-		{
-			Setup(false, &A, A_TT, A_TF, &A_FT, &A_FF, In(cellInterpOfOne), In(faceInterpOfOne), GhostNumbers());
-		}
-
-		void SetupNonsymmetricCondensed(const CSRView& A, const CSRView& A_TT, const CSRView& A_TF, const CSRView& A_FT,
-		                                const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
-		{
-			Setup(false, &A, A_TT, A_TF, &A_FT, nullptr, In(cellInterpOfOne), In(faceInterpOfOne), GhostNumbers());
-		}
-
-		// Solves the condensed system A x = b, after any setup. x: the initial guess on input (e.g. zero), the solution on
+		// Solves the condensed system A x = b (A = A_FF - A_FT A_TT^{-1} A_TF: CondensedMatrix() on one process), after a
+		// setup, e.g. for right-hand sides condensed by the calling code. x: the initial guess on input (e.g. zero), the solution on
 		// output. Does not throw if the solver has not converged after MaxIterations iterations: see the result.
 		Result Solve(const Eigen::Ref<const Eigen::VectorXd>& b, Eigen::Ref<Eigen::VectorXd> x)
 		{
@@ -481,17 +442,23 @@ namespace fhhos4
 
 		//------------------------------------------------------------------//
 
-		// The condensed matrix A of the last setup, both triangles: computed by SetupSymmetric() and SetupNonsymmetric(),
-		// or the one given to SetupSymmetricCondensed() and SetupNonsymmetricCondensed(). Valid until the next setup or the
-		// destruction of the solver. As an Eigen matrix: CondensedMatrix().EigenMap(). On one process only.
-		CSRView CondensedMatrix() const;
+		// The condensed matrix A of the last setup, both triangles, computed by SetupSymmetric() or SetupNonsymmetric().
+		// Valid until the next setup or the destruction of the solver. On one process only.
+		SparseMatrixMap CondensedMatrix() const
+		{
+			detail::CSRView A = CondensedMatrixView();
+			return SparseMatrixMap(A.Rows, A.Cols, A.NonZeros(), A.RowPointers, A.ColumnIndices, A.Values);
+		}
 
 		bool IsSetUp() const;
 		int NumberOfLevels() const;
 
-	private:
-		struct Impl;
-		std::unique_ptr<Impl> _impl;
+	protected:
+		// The implementation of the setups, on the arrays of the matrices (also for the Python module). A_FT: null for a
+		// symmetric matrix; faceGhosts: on several processes.
+		void Setup(bool symmetric, const detail::CSRView& A_TT, const detail::CSRView& A_TF, const detail::CSRView* A_FT, const detail::CSRView& A_FF,
+		           detail::ConstVectorView cellInterpOfOne, detail::ConstVectorView faceInterpOfOne, const GhostNumbers& faceGhosts);
+		detail::CSRView CondensedMatrixView() const;
 
 		static detail::ConstVectorView In(const Eigen::Ref<const Eigen::VectorXd>& v)
 		{
@@ -503,11 +470,24 @@ namespace fhhos4
 			return { v.data(), (std::int64_t)v.size() };
 		}
 
-		// The setups. A: null for SetupSymmetric() and SetupNonsymmetric(); A_FT: null for a symmetric matrix; A_FF: null
-		// if not given; faceGhosts: on several processes.
-		void Setup(bool symmetric, const CSRView* A, const CSRView& A_TT, const CSRView& A_TF, const CSRView* A_FT, const CSRView* A_FF,
-		           detail::ConstVectorView cellInterpOfOne, detail::ConstVectorView faceInterpOfOne, const GhostNumbers& faceGhosts);
-		void SetupDistributed(bool symmetric, const CSRView* A, const CSRView& A_TT, const CSRView& A_TF, const CSRView* A_FT, const CSRView* A_FF,
+	private:
+		struct Impl;
+		std::unique_ptr<Impl> _impl;
+
+		// The arrays of a matrix given to a setup: an Eigen sparse matrix in the format of the library, read in place
+		template <typename Derived>
+		static detail::CSRView View(const Eigen::SparseCompressedBase<Derived>& M)
+		{
+			constexpr bool format = Derived::IsRowMajor && std::is_same<typename Derived::StorageIndex, SparseIndex>::value;
+			static_assert(format, "fhhos4: the matrices are given in the format of the library: fhhos4::SparseMatrix (row-major, with the index type fhhos4::SparseIndex), or an Eigen::Map of one. Convert this one by Eigen (a copy): fhhos4::SparseMatrix B = A; or, if it is symmetric and column-major, view it with fhhos4::TransposedView(A) (no copy).");
+			static_assert(std::is_same<typename Derived::Scalar, double>::value, "fhhos4: matrices of doubles only");
+			if constexpr (format)
+				return detail::View<SparseIndex>(M);
+			else
+				return detail::CSRView();
+		}
+
+		void SetupDistributed(bool symmetric, const detail::CSRView& A_TT, const detail::CSRView& A_TF, const detail::CSRView* A_FT, const detail::CSRView& A_FF,
 		                      detail::ConstVectorView cellInterpOfOne, detail::ConstVectorView faceInterpOfOne, const GhostNumbers& faceGhosts);
 		Result SolveCondensed(detail::ConstVectorView b, detail::VectorView x);
 		Result SolveUncondensed(detail::ConstVectorView b_T, detail::ConstVectorView b_F, detail::VectorView x_T, detail::VectorView x_F);
@@ -529,33 +509,71 @@ namespace fhhos4
 		const Index* DoFs = nullptr;    // Offsets[Count]
 	};
 
-	// The blocks of a hybrid system, owned by the library: see ExtractSymmetricBlocks()
+	// The blocks of a hybrid system: see ExtractSymmetricBlocks()
 	struct HybridBlocks
 	{
-		CSRMatrix A_TT, A_TF, A_FT, A_FF; // A_FT: empty (0 x 0) for a symmetric system
+		SparseMatrix A_TT, A_TF, A_FT, A_FF; // A_FT: empty (0 x 0) for a symmetric system
 	};
-
-	// A copy: the blocks of the uncondensed system, extracted from its global matrix M (square, in the CSR format, of any
-	// index types), for SetupSymmetric(): A_TT, A_TF, A_FF, in one parallel pass (two on the rows of M). The cells (resp.
-	// faces) in the order of their lists, the DoFs of each in the order of its list (e.g. reordered by degree); the DoFs
-	// in no list are dropped (e.g. those of the Dirichlet faces: move their contribution to the right-hand side first).
-	// Each DoF in one list at most. Symmetric matrix: A_TT and A_FF lower triangular (what SetupSymmetric() reads).
-	template <typename RowPointer, typename Column, typename Index>
-	FHHOS4_API HybridBlocks ExtractSymmetricBlocks(const BasicCSRView<RowPointer, Column>& M, const DoFLists<Index>& cells, const DoFLists<Index>& faces);
-
-	// A copy: as ExtractSymmetricBlocks(), the four blocks in full, for SetupNonsymmetric()
-	template <typename RowPointer, typename Column, typename Index>
-	FHHOS4_API HybridBlocks ExtractNonsymmetricBlocks(const BasicCSRView<RowPointer, Column>& M, const DoFLists<Index>& cells, const DoFLists<Index>& faces);
 
 	namespace detail
 	{
+		// The blocks in the arrays of the library
+		struct HybridBlocks
+		{
+			CSRMatrix A_TT, A_TF, A_FT, A_FF;
+		};
+
+		template <typename RowPointer, typename Column, typename Index>
+		FHHOS4_API HybridBlocks ExtractSymmetricBlocks(const BasicCSRView<RowPointer, Column>& M, const DoFLists<Index>& cells, const DoFLists<Index>& faces);
+		template <typename RowPointer, typename Column, typename Index>
+		FHHOS4_API HybridBlocks ExtractNonsymmetricBlocks(const BasicCSRView<RowPointer, Column>& M, const DoFLists<Index>& cells, const DoFLists<Index>& faces);
 		template <typename Index>
 		FHHOS4_API void Gather(ConstVectorView x, const DoFLists<Index>& cells, const DoFLists<Index>& faces, VectorView x_T, VectorView x_F);
 		template <typename Index>
 		FHHOS4_API void Scatter(ConstVectorView x_T, ConstVectorView x_F, const DoFLists<Index>& cells, const DoFLists<Index>& faces, VectorView x);
+		// A copy: M in the CSR format of the library, from other index types
+		template <typename RowPointer, typename Column>
+		FHHOS4_API CSRMatrix ToCSR(const BasicCSRView<RowPointer, Column>& M);
 		// A copy: M^T in the CSR format of the library
 		template <typename Index>
 		FHHOS4_API CSRMatrix Transpose(const BasicCSRView<Index, Index>& M);
+
+		// The blocks copied into Eigen matrices
+		inline fhhos4::HybridBlocks ToEigen(const HybridBlocks& blocks)
+		{
+			return { ToEigen(blocks.A_TT), ToEigen(blocks.A_TF), ToEigen(blocks.A_FT), ToEigen(blocks.A_FF) };
+		}
+
+		// The arrays of the global matrix M of the helpers: compressed, row-major, of doubles, with the indices
+		// std::int32_t or std::int64_t
+		template <typename Derived>
+		BasicCSRView<typename Derived::StorageIndex, typename Derived::StorageIndex> GlobalMatrixView(const Eigen::SparseCompressedBase<Derived>& M)
+		{
+			return View<typename Derived::StorageIndex>(M);
+		}
+	}
+
+	// A copy: the blocks of the uncondensed system, extracted from its global matrix M (square), for SetupSymmetric():
+	// A_TT, A_TF, A_FF, in one parallel pass (two on the rows of M). M: an Eigen sparse matrix, compressed, row-major, with
+	// the index type std::int32_t or std::int64_t (e.g. an Eigen::Map of the arrays of another code). The cells (resp.
+	// faces) in the order of their lists, the DoFs of each in the order of its list (e.g. reordered by degree); the DoFs
+	// in no list are dropped (e.g. those of the Dirichlet faces: move their contribution to the right-hand side first).
+	// Each DoF in one list at most. Symmetric matrix: A_TT and A_FF lower triangular (what SetupSymmetric() reads).
+	template <typename Derived, typename Index>
+	HybridBlocks ExtractSymmetricBlocks(const Eigen::SparseCompressedBase<Derived>& M, const DoFLists<Index>& cells, const DoFLists<Index>& faces)
+	{
+		static_assert(Derived::IsRowMajor, "fhhos4::ExtractSymmetricBlocks(): a row-major matrix (convert a column-major one by Eigen, a copy)");
+		static_assert(std::is_same<typename Derived::Scalar, double>::value, "fhhos4: matrices of doubles only");
+		return detail::ToEigen(detail::ExtractSymmetricBlocks(detail::GlobalMatrixView(M), cells, faces));
+	}
+
+	// A copy: as ExtractSymmetricBlocks(), the four blocks in full, for SetupNonsymmetric()
+	template <typename Derived, typename Index>
+	HybridBlocks ExtractNonsymmetricBlocks(const Eigen::SparseCompressedBase<Derived>& M, const DoFLists<Index>& cells, const DoFLists<Index>& faces)
+	{
+		static_assert(Derived::IsRowMajor, "fhhos4::ExtractNonsymmetricBlocks(): a row-major matrix (convert a column-major one by Eigen, a copy)");
+		static_assert(std::is_same<typename Derived::Scalar, double>::value, "fhhos4: matrices of doubles only");
+		return detail::ToEigen(detail::ExtractNonsymmetricBlocks(detail::GlobalMatrixView(M), cells, faces));
 	}
 
 	// A copy: the vectors of the cells and faces DoFs (e.g. b_T and b_F) from a vector x in the numbering of the global
@@ -576,40 +594,25 @@ namespace fhhos4
 		detail::Scatter<Index>({ x_T.data(), (std::int64_t)x_T.size() }, { x_F.data(), (std::int64_t)x_F.size() }, cells, faces, { x.data(), (std::int64_t)x.size() });
 	}
 
-	// A copy: M in the CSR format of the library, from other index types
-	template <typename RowPointer, typename Column>
-	FHHOS4_API CSRMatrix ToCSR(const BasicCSRView<RowPointer, Column>& M);
-
-	// A copy: an Eigen sparse matrix (compressed) in the CSR format of the library: a row-major one of another index type,
-	// or a column-major one (transposed in parallel)
+	// No copy: A^T in the format of the library, a map of the arrays of a column-major matrix A (compressed, with the
+	// index type SparseIndex), which is A itself if A is symmetric, up to the rounding errors of its assembly (its
+	// asymmetry): for the symmetric inputs of the setups (A_TT, A_FF, and A of a symmetric system) stored column-major.
+	// Not of a temporary.
 	template <typename Derived>
-	CSRMatrix ToCSR(const Eigen::SparseCompressedBase<Derived>& M)
+	SparseMatrixMap TransposedView(const Eigen::SparseCompressedBase<Derived>& A)
 	{
-		using Index = typename Derived::StorageIndex;
-		static_assert(std::is_same<typename Derived::Scalar, double>::value, "fhhos4: matrices of doubles only");
-		if (!M.isCompressed())
-			throw Error("fhhos4::ToCSR(): the Eigen matrix is not compressed: call its makeCompressed() first.");
-		if constexpr (Derived::IsRowMajor)
-			return ToCSR(BasicCSRView<Index, Index>(M.rows(), M.cols(), M.outerIndexPtr(), M.innerIndexPtr(), M.valuePtr()));
-		else // the arrays of the transpose
-			return detail::Transpose(BasicCSRView<Index, Index>(M.cols(), M.rows(), M.outerIndexPtr(), M.innerIndexPtr(), M.valuePtr()));
-	}
-
-	// No copy: the CSR view of A^T, from the arrays of a column-major matrix A (compressed, with the index type
-	// SparseIndex), which is A itself if A is symmetric, up to the rounding errors of its assembly (its asymmetry): for
-	// the symmetric inputs of the setups (A_TT, A_FF, and A of a symmetric system) stored column-major. Not of a
-	// temporary.
-	template <typename Derived>
-	CSRView TransposedView(const Eigen::SparseCompressedBase<Derived>& A)
-	{
-		static_assert(!Derived::IsRowMajor, "fhhos4::TransposedView(): for a column-major matrix (a row-major one converts to a CSRView itself)");
-		static_assert(std::is_same<typename Derived::StorageIndex, SparseIndex>::value, "fhhos4::TransposedView(): the index type of the matrix is not fhhos4::SparseIndex: convert it with fhhos4::ToCSR() (a copy)");
+		constexpr bool format = !Derived::IsRowMajor && std::is_same<typename Derived::StorageIndex, SparseIndex>::value;
+		static_assert(!Derived::IsRowMajor, "fhhos4::TransposedView(): for a column-major matrix (give a row-major one in the format of the library as it is)");
+		static_assert(std::is_same<typename Derived::StorageIndex, SparseIndex>::value, "fhhos4::TransposedView(): the index type of the matrix is not fhhos4::SparseIndex: convert it by Eigen (a copy): fhhos4::SparseMatrix B = A;");
 		static_assert(std::is_same<typename Derived::Scalar, double>::value, "fhhos4: matrices of doubles only");
 		if (!A.isCompressed())
 			throw Error("fhhos4::TransposedView(): the Eigen matrix is not compressed: call its makeCompressed() first.");
-		return CSRView(A.cols(), A.rows(), A.outerIndexPtr(), A.innerIndexPtr(), A.valuePtr());
+		if constexpr (format)
+			return SparseMatrixMap(A.cols(), A.rows(), A.nonZeros(), A.outerIndexPtr(), A.innerIndexPtr(), A.valuePtr());
+		else
+			return SparseMatrixMap(0, 0, 0, nullptr, nullptr, nullptr);
 	}
 
 	template <typename Derived>
-	CSRView TransposedView(const Eigen::SparseCompressedBase<Derived>&&) = delete;
+	SparseMatrixMap TransposedView(const Eigen::SparseCompressedBase<Derived>&&) = delete;
 }

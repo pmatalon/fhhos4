@@ -168,20 +168,6 @@ TEST(StaticCondensationTest, CondensedMatrixOutsideThePatternOfTheFaceBlock)
 	Parallelism::SetNThreads(0);
 }
 
-// A_FF = A + A_FT A_TT^{-1} A_TF, from the condensed matrix A (read in full)
-TEST(StaticCondensationTest, FaceBlock)
-{
-	for (bool symmetric : { true, false })
-	{
-		BlockSystem system(300, 4, 3, symmetric, true, 3);
-		StaticCondensation condensation(system.A_TT, system.A_TF, symmetric ? nullptr : &system.A_FT, system.CellBlockSize);
-		SparseMatrix A = condensation.CondensedMatrix(system.A_FF, symmetric);
-		SparseMatrix expected = A + system.CellElimination(symmetric);
-		expected.makeCompressed();
-		EXPECT_TRUE(Identical(condensation.FaceBlock(A), expected)) << (symmetric ? "symmetric" : "non-symmetric");
-	}
-}
-
 // The right-hand side of the condensed system and the cell unknowns solve the uncondensed system
 TEST(StaticCondensationTest, SolvesTheUncondensedSystem)
 {

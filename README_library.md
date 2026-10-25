@@ -78,6 +78,8 @@ Then, once the system is reduced to one unknown per cell and face, h-coarsening 
 
 The solver typically applies to symmetric positive definite systems (e.g. diffusion)
 and non-symmetric ones (e.g. convection-diffusion, both diffusion- and convection-dominated).
+Boundary conditions: Dirichlet (their faces out of the system), Neumann and Robin (their faces in the system), mixed;
+not the pure Neumann problem (singular, see [Constraints](#constraints)).
 The polynomial bases used for the discretization **must be hierarchical** and ordered by degree for the p-multigrid part to work.
 The polynomial spaces are P^k (simplices, polytopes), or Q^k (quadrilaterals, hexahedra: `PolynomialSpace::Q`), in the
 cells and on the faces.
@@ -87,27 +89,16 @@ order (`PCoarsening::ToZero`), or better, reordered by degree: e.g. in the DoF l
 
 # 3. How to use
 
-Two types of user interface are proposed. 
-- **Interface 1** (Recommended): If the matrix is symmetric (resp. unsymmetric), pass the three (resp. four) blocks of the uncondensed matrix, namely `A_TT, A_TF, A_FF` (resp. +  `A_FT`)
-and the two blocks of the right-hand side `b_T, b_F`.
-Through this interface, the condensed system is built internally and the system is solved for both the face and cell unknowns `x_T, x_F`.
-- **Interface 2**: The condensed system can also directly be passed to the solver (along with the blocks). The solver won't perform the condensation itself and solve for the face unknowns only.
-
-The second interface was made solely to make the integration of the `fhhos4` solver less involved in existing codes, which already assemble the condensed matrix and right-hand side, and recover the cell unknowns after solving the system.
-This way is less efficient than using the first interface, because, at the very least, both the external code and the `fhhos4` solver will factorize the `A_TT` block.
-
-For existing codes, the recommendation is to begin with Interface 2 to try out the solver with the least integration effort, and then move on to Interface 1 for better performance. New codes should directly use Interface 1. Interface 1 relieves your code from all matters linked to static condensation, including the recovering of the cell unknowns at the end. 
-
-| Interface | Setup | Solve | For |
-|---|---|---|---|
-| **Uncondensed system** | `SetupSymmetric()`, `SetupNonsymmetric()` | `Solve(b_T, b_F, x_T, x_F)` | New codes: assemble the hybrid system, nothing else. The library condenses it and solves it for the face and cell unknowns |
-| **Condensed system** | `SetupSymmetricCondensed()`, `SetupNonsymmetricCondensed()` | `Solve(b, x)` | Codes that already condense the matrix: least integration effort |
+Pass the blocks of the uncondensed matrix, `A_TT, A_TF, A_FF` for a symmetric system (and `A_FT` for a non-symmetric
+one), and the two blocks of the right-hand side `b_T, b_F`. The library condenses the system and solves it for both the
+cell and face unknowns `x_T, x_F`: your code has nothing to do with static condensation, nor with the recovery of the
+cell unknowns.
 
 Symmetric positive definite systems, and non-symmetric ones with a positive definite symmetric part
 (convection-diffusion). Krylov method included (FCG, GCR, BiCGSTAB). Parallel (OpenMP), and on several processes (MPI,
 see [Several processes](#several-processes-mpi)).
 
-### Interface 1 (recommended)
+### Symmetric systems
 
 ```cpp
 #include <fhhos4>
@@ -123,34 +114,18 @@ fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F); // flexible conjugate 
 ```
 
 Your code assembles the uncondensed system, without the DoFs of the Dirichlet faces (moved to the right-hand side:
-`b_T -= A_TD x_D`, `b_F -= A_FD x_D`), and nothing else: no static condensation. The blocks are read in place, in the
-CSR format of the library: `fhhos4::SparseMatrix` (Eigen, row-major, compressed), or a `fhhos4::CSRView` of your own
-arrays (see [Inputs](#inputs); other formats: the helpers, which copy them). The library condenses the system,
+`b_T -= A_TD x_D`, `b_F -= A_FD x_D`), and nothing else: no static condensation. The blocks are Eigen matrices, read
+in place, in the format of the library: `fhhos4::SparseMatrix` (row-major, compressed), or an Eigen map of your own
+arrays (see [Inputs](#inputs); the other Eigen matrices convert by Eigen, a copy). The library condenses the system,
 solves the condensed system and computes the cell unknowns, `x_T = A_TT^{-1} (b_T - A_TF x_F)`. The condensed matrix is
-available for other uses: `CondensedMatrix()`. The setup builds the levels once: call `Solve()` for each right-hand
-side. The blocks may be freed after the setup.
-
-### Interface 2 (less effort for existing codes)
-
-For a code that condenses statically already (in its assembly loops), the least effort: give the library the condensed
-matrix with the blocks, and keep the code's own condensation of the right-hand side and computation of the cell
-unknowns:
-
-```cpp
-solver.SetupSymmetricCondensed(A, A_TT, A_TF, cellInterpOfOne, faceInterpOfOne);
-Eigen::VectorXd x = Eigen::VectorXd::Zero(b.size());
-fhhos4::Result result = solver.Solve(b, x); // the condensed system
-```
-
-**The solver keeps a reference to `A`** (read in place): `A` must stay alive and unchanged until the next setup or the
-destruction of the solver (a temporary `A` does not compile). The blocks may be freed after the setup. A new code should
-use the uncondensed system.
+available for other uses: `CondensedMatrix()` (an Eigen map), and `Solve(b, x)` solves the condensed system for a
+right-hand side `b` condensed by your code. The setup builds the levels once: call `Solve()` for each right-hand side.
+The blocks may be freed after the setup.
 
 ### Non-symmetric matrices
 
 For a non-symmetric matrix (e.g. convection-diffusion), give also the block `A_FT` (faces x cells):
-`SetupNonsymmetric(A_TT, A_TF, A_FT, A_FF, ...)` then `Solve(b_T, b_F, x_T, x_F)`, or
-`SetupNonsymmetricCondensed(A, A_TT, A_TF, A_FT[, A_FF], ...)` then `Solve(b, x)`. The same algorithm runs on the
+`SetupNonsymmetric(A_TT, A_TF, A_FT, A_FF, ...)` then `Solve(b_T, b_F, x_T, x_F)`. The same algorithm runs on the
 matrix itself, with GCR instead of FCG and Gauss-Seidel smoothers that follow the direction of the flow (downwind
 order). `SetupNonsymmetric()` keeps a reference to `A_FT`, which each `Solve(b_T, b_F, x_T, x_F)` reads
 (`b_F - A_FT A_TT^{-1} b_T`): keep it alive and unchanged until the next setup.
@@ -189,15 +164,15 @@ fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F); // the vectors of the 
   processes.
 - Available on several processes: the uncondensed symmetric system (`SetupSymmetric()`), with all the parameters but
   `Krylov::BiCGSTAB`; the Gauss-Seidel smoothers are Gauss-Seidel in each process (the hybrid ones: in each thread),
-  Jacobi between the processes. Not yet: `SetupNonsymmetric()`, the condensed interface (`Setup...Condensed()`),
-  `CondensedMatrix()`.
+  Jacobi between the processes. Not yet: `SetupNonsymmetric()`, `CondensedMatrix()`.
 - In Python: see [Python](#python).
 - The errors of the inputs are raised on all the processes.
 
 ### Python
 
 The Python module `fhhos4` has the same interface, with the same names, on NumPy arrays read in place, as the library
-reads its inputs: never copied nor converted. It needs Python (>= 3.9), [nanobind](https://nanobind.readthedocs.io) and
+reads its inputs: never copied nor converted (with its own matrix types, Python having no Eigen: `fhhos4.CSRView`,
+`fhhos4.CSRMatrix`, below). It needs Python (>= 3.9), [nanobind](https://nanobind.readthedocs.io) and
 NumPy (SciPy is optional), and is built with the library (not installed yet: use it from the build tree):
 
 ```bash
@@ -232,8 +207,8 @@ result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
   `sum_duplicates()`, in place).
 - The vectors: NumPy vectors of `float64`, read (outputs: written) in place; another dtype raises `TypeError`.
   `Solve(b)` returns `x`.
-- The solver keeps the arrays that the solves read alive: those of `A` (setups from the condensed matrix) and of `A_FT`
-  (`SetupNonsymmetric()`). `CondensedMatrix()` returns a copy (`fhhos4.CSRMatrix`). The arrays of a `fhhos4.CSRMatrix`
+- The solver keeps the arrays that the solves read alive: those of `A_FT` (`SetupNonsymmetric()`). `CondensedMatrix()`
+  returns a copy (`fhhos4.CSRMatrix`). The arrays of a `fhhos4.CSRMatrix`
   (`RowPointers`, `ColumnIndices`, `Values`) are read-only NumPy views of the library's memory, which keep it alive.
 - The helpers have the same names: `ExtractSymmetricBlocks(M, cells, faces)` with `fhhos4.DoFLists(count, offsets,
   dofs)` (NumPy arrays of the same integer dtype), `Gather()`, `Scatter()`, `ToCSR()`, `TransposedView()`.
@@ -261,15 +236,14 @@ result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
 
 - **The blocks** `A_TT` (cells x cells), `A_TF` (cells x faces), `A_FF` (faces x faces), and `A_FT` (faces x cells) for
   a non-symmetric matrix. The DoFs of each cell (resp. face) are contiguous, cells and faces in any order. In a
-  symmetric system, `A_TT` and `A_FF` are read from their lower triangular part. With the condensed interface, `A`
-  (both triangles), and `A_FF` is optional.
-- **The format of the matrices**: CSR (compressed sparse row), with the index type of the library (`fhhos4::SparseIndex`:
-  `int`, or 64 bits with `-DSMALL_INDEX=OFF`) for the row pointers and the columns, the columns strictly increasing in
-  each row (sorted, no duplicates; checked). The setups take a `fhhos4::CSRView(rows, cols, rowPointers,
-  columnIndices, values)` of your arrays; `fhhos4::SparseMatrix` (Eigen, row-major, with this index type), compressed,
-  converts to it. **The matrices are read in place, never copied nor converted**: assemble them in this format. The
-  other formats go through the helpers below, which copy them (except `TransposedView()`), so that the copies stay
-  visible in your code.
+  symmetric system, `A_TT` and `A_FF` are read from their lower triangular part.
+- **The format of the matrices**: Eigen sparse matrices, compressed, row-major, with the index type of the library
+  (`fhhos4::SparseIndex`: `int`, or 64 bits with `-DSMALL_INDEX=OFF`): `fhhos4::SparseMatrix`, or an Eigen map of your
+  own CSR arrays, `fhhos4::SparseMatrixMap(rows, cols, nonZeros, rowPointers, columnIndices, values)`, the columns
+  strictly increasing in each row (sorted, no duplicates; checked). **The matrices are read in place, never copied nor
+  converted**: assemble them in this format. Any other Eigen sparse matrix converts by Eigen, in one line, a copy that
+  stays visible in your code: `fhhos4::SparseMatrix B = A;` (see below). A wrong format does not compile, with a
+  message that says how to convert.
 - **The interpolation of the function 1** on the cell and face bases: one coefficient per cell (`cellInterpOfOne`, in
   the order of the blocks of rows of `A_TF`) and per face (`faceInterpOfOne`, blocks of columns). The bases must be
   **hierarchical** (ordered by degree: for each d, the first functions of a block span P^d, or Q^d whose degree is the
@@ -282,21 +256,21 @@ result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
 
 ### Other formats: the helpers
 
-| Your matrices | Helper | |
+| Your matrices | How | |
 |---|---|---|
+| Column-major (Eigen's default), or another index type | `fhhos4::SparseMatrix B = A;` (Eigen's conversion) | A copy |
+| Column-major and symmetric (`A_TT`, `A_FF`, or `A` of a symmetric system) | `TransposedView(A)`: `A^T` as an Eigen map of the arrays of `A`, which is `A`, up to the rounding errors of its assembly | No copy |
+| Your own CSR arrays, with the index type of the library | `fhhos4::SparseMatrixMap(rows, cols, nonZeros, rowPointers, columnIndices, values)` | No copy |
 | The global matrix of the system (the cells and faces DoFs in your numbering, the Dirichlet DoFs included) | `ExtractSymmetricBlocks(M, cells, faces)`, `ExtractNonsymmetricBlocks(M, cells, faces)`; `Gather()` and `Scatter()` for the vectors | Copies |
-| Other index types (64 bits with the 32-bit library, or row pointers and columns of different types) | `ToCSR(M)` | A copy |
-| Column-major (Eigen's default, SciPy's CSC) | `ToCSR(M)` (transposed in parallel) | A copy |
-| Column-major and symmetric (`A_TT`, `A_FF`, or `A` of a symmetric system) | `TransposedView(A)`: the CSR view of `A^T`, which is `A`, up to the rounding errors of its assembly | No copy |
 
-The copies are `fhhos4::CSRMatrix` objects, owned by the library, which convert to a `CSRView` (valid while the object
-lives). From a global matrix (e.g. assembled by a framework in its own numbering):
+The copies are Eigen matrices of your code (`fhhos4::SparseMatrix`). From a global matrix (e.g. assembled by a framework
+in its own numbering):
 
 ```cpp
 // The DoFs of each cell (resp. face) in the numbering of M: those of the i-th are DoFs[Offsets[i]], ...,
 // DoFs[Offsets[i + 1] - 1], in the order of its basis; the DoFs in no list (e.g. of the Dirichlet faces) are dropped
 fhhos4::DoFLists<std::int64_t> cells{ nCells, cellOffsets, cellDoFs }, faces{ nFaces, faceOffsets, faceDoFs };
-fhhos4::BasicCSRView<std::int64_t, std::int32_t> M(n, n, rowPointers, columns, values); // any index types
+Eigen::Map<const Eigen::SparseMatrix<double, Eigen::RowMajor, std::int64_t>> M(n, n, nnz, rowPointers, columns, values);
 fhhos4::HybridBlocks blocks = fhhos4::ExtractSymmetricBlocks(M, cells, faces); // A_TT, A_TF, A_FF: one parallel pass
 solver.SetupSymmetric(blocks.A_TT, blocks.A_TF, blocks.A_FF, cellInterpOfOne, faceInterpOfOne);
 fhhos4::Gather(b, cells, faces, b_T, b_F); // b: in the numbering of M
@@ -304,8 +278,8 @@ solver.Solve(b_T, b_F, x_T, x_F);
 fhhos4::Scatter(x_T, x_F, cells, faces, x); // the DoFs of x in no list unchanged (e.g. the Dirichlet values)
 ```
 
-- `M`: the whole matrix (both triangles), square, in the CSR format (any index types: `std::int32_t` or `std::int64_t`,
-  independently).
+- `M`: the whole matrix (both triangles), square, an Eigen row-major matrix (or a map of your arrays) with the index type
+  `std::int32_t` or `std::int64_t`.
 - The lists: `std::int32_t` or `std::int64_t`; each DoF in one list at most. The order of the lists gives the order of
   the blocks, and that of the DoFs of each cell or face the order of its basis (reorder them, e.g. by degree, here).
 - The Dirichlet DoFs, in no list: move their contribution to the right-hand side first (`b - M x_D`).
@@ -340,16 +314,15 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 
 ## Constraints
 
-- **Symmetric positive definite** condensed system (`SetupSymmetric...()`), or non-symmetric with a positive definite
-  symmetric part (`SetupNonsymmetric...()`): not the pure Neumann problem (singular). With `SetupSymmetric()`, the blocks
+- **Symmetric positive definite** condensed system (`SetupSymmetric()`), or non-symmetric with a positive definite
+  symmetric part (`SetupNonsymmetric()`): not the pure Neumann problem (singular). With `SetupSymmetric()`, the blocks
   of `A_TT` (one per cell) must be positive definite: the library factorizes them by Cholesky (LU with
   `SetupNonsymmetric()`).
 - **Eigen 3.4 or 5.x** in your code, for the header `<fhhos4>`. No Eigen object crosses the boundary of the library:
   its compiled functions take arrays (views), which the header builds from your Eigen matrices and vectors, with your
   version of Eigen and your flags (any version, any alignment settings).
-- **The matrices read in place by the solves**: `A` of the setups from the condensed matrix, `A_FT` of
-  `SetupNonsymmetric()`. Keep them alive and unchanged until the next setup or the destruction of the solver. The
-  others are only read by the setup.
+- **The matrix read in place by the solves**: `A_FT` of `SetupNonsymmetric()`. Keep it alive and unchanged until the
+  next setup or the destruction of the solver. The others are only read by the setup.
 - **Errors**: `fhhos4::Error` (a `std::runtime_error`). `Solve()` does not throw if the tolerance is not reached: see
   `Result::Converged`.
 - **Not thread-safe**: one `fhhos4::Solver` object must not be used by several threads at the same time. The library

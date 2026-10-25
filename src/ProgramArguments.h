@@ -64,9 +64,9 @@ struct MultigridArguments
 	int WLoops = 1;
 	KrylovMethod KCycleKrylov = KrylovMethod::FCG; // GCR under -s gcr (ApplyProgramArgumentDefaults)
 	bool UAMGNonsymmetric = false; // -uamg-nonsym: U-AMG for a non-symmetric matrix (A_FT given), on the symmetric matrix
-	bool UAMGLibraryCondensed = false; // -libuamg-condensed: libuamg from the condensed matrix, not from the blocks
 	bool UAMGMixedPrecision = false; // -uamg-mixed: the levels of U-AMG in single precision (Multigrid::MixedPrecision)
 	bool UAMGBlockCSRStorage = false; // -uamg-bcsr: U-AMG's operators in block CSR in double (UncondensedAMG::BlockCSRStorage)
+	bool UAMGCollapseBoundaryFaces = false; // -uamg-bfc: U-AMG's coarse faces of the boundary (UncondensedAMG::CollapseBoundaryFaces)
 	bool UseHigherOrderReconstruction = true;
 	bool UseHeterogeneousWeighting = true;
 	bool UseGalerkinOperator = false;
