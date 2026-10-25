@@ -308,19 +308,6 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 	cout << "-                       Assembly                         -" << endl;
 	cout << "----------------------------------------------------------" << endl;
 
-	// If full Neumann, check compatibility condition
-	if (testCase->BC.Type == PbBoundaryConditions::FullNeumann)
-	{
-		// Compatibility condition: (f|1) + <neumann|1> = 0
-		double integralF = problem->CellSpace.Integral(testCase->SourceFunction);
-		double integralN = problem->BoundarySpace.Integral(testCase->BC.NeumannFunction);
-		if (abs(integralF + integralN) < Utils::NumericalZero)
-			cout << "Compatibility condition: (f|1) + <neumann|1> = " << (integralF + integralN) << endl;
-		else
-			Utils::Error("Compatibility condition not respected: (f|1) + <neumann|1> = " + to_string(integralF + integralN));
-		cout << endl;
-	}
-
 	Timer assemblyTimer;
 	assemblyTimer.Start();
 
@@ -330,6 +317,19 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 
 	assemblyTimer.Stop();
 	cout << endl << "Assembly time: CPU = " << assemblyTimer.CPU() << ", elapsed = " << assemblyTimer.Elapsed() << endl;
+
+	// If full Neumann, check compatibility condition (after the assembly: the discrete spaces are built by it)
+	if (testCase->BC.Type == PbBoundaryConditions::FullNeumann)
+	{
+		// Compatibility condition: (f|1) + <neumann|1> = 0
+		double integralF = problem->CellSpace.Integral(testCase->SourceFunction);
+		double integralN = problem->BoundarySpace.Integral(testCase->BC.NeumannFunction);
+		cout << endl;
+		if (abs(integralF + integralN) < Utils::NumericalZero)
+			cout << "Compatibility condition: (f|1) + <neumann|1> = " << (integralF + integralN) << endl;
+		else
+			Utils::Error("Compatibility condition not respected: (f|1) + <neumann|1> = " + to_string(integralF + integralN));
+	}
 
 	//------------------------------------//
 	//       Linear system solution       //
@@ -385,7 +385,9 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 		}
 		else if (iterativeSolver)
 		{
-			iterativeSolver->ComputeExactSolution = !libraryCondenses && (Utils::ProgramArgs.Actions.Export.ErrorToGMSH || problem->A.rows() <= 2000);
+			// (no exact solution of a full Neumann problem: its matrix is singular)
+			iterativeSolver->ComputeExactSolution = !libraryCondenses && testCase->BC.Type != PbBoundaryConditions::FullNeumann
+				&& (Utils::ProgramArgs.Actions.Export.ErrorToGMSH || problem->A.rows() <= 2000);
 			if (args.Solver.ComputeIterL2Error && testCase->ExactSolution && args.Discretization.StaticCondensation)
 			{
 				iterativeSolver->OnNewSolution = [&problem, &testCase](IterationResult& result, const Vector& faceSolution)
@@ -476,7 +478,12 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 		SolverFactory<Dim>::PrintStats(solver, setupTimer, solvingTimer, totalTimer);
 
 		if (args.Actions.Export.ErrorToGMSH && iterativeSolver)
-			problem->ExportErrorToGMSH(iterativeSolver->ExactSolution - systemSolution, out);
+		{
+			if (iterativeSolver->ComputeExactSolution)
+				problem->ExportErrorToGMSH(iterativeSolver->ExactSolution - systemSolution, out);
+			else
+				Utils::Warning("No exact solution of the linear system: the algebraic error is not exported.");
+		}
 
 		delete solver;
 		solverThreads.End();

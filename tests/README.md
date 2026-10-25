@@ -34,7 +34,7 @@ ctest -E HPConfig                          # skip the slowest tests
 ./bin/fhhos4_tests --gtest_filter=*Kellogg*  # or filter the binary directly
 ```
 
-The full suite is 212 CTest cases and runs in about 5 minutes serially. The 8 `HPConfigTest` cases take about 2 minutes of it (~15 s each: N=128 with k=5 is the smallest size of the high-order paper); the other cases take less than 20 s each.
+The full suite is 331 CTest cases and runs in about 8 minutes serially. The 8 `HPConfigTest` cases take about 2 minutes of it (~15 s each: N=128 with k=5 is the smallest size of the high-order paper); the other cases take less than 20 s each.
 
 ## GMSH meshes: reproducibility
 
@@ -57,6 +57,14 @@ A-priori convergence of the HHO discretization, independent of any solver study:
 
 - **`{Square,Cube}/ExactnessQTest.ReproducesASolutionOfQ2`** (4 cases: 2D, 3D × the default bases (Legendre), the monomials orthogonalized on each cell) — the solution of `-source poly`, x(1-x)y(1-y) (times z(1-z) in 3D), is in Q^2: HHO in Q reproduces it at k=2. With the orthogonalized bases, the cell basis is made of the first functions of the reconstruction basis. Assertion: L2 error < 1e-12.
   CLI: `./bin/fhhos4 -geo {square|cube} -mesh cart -mesher inhouse -poly-space q -source poly -s ch -k 2 -n 2 [-e-basis monomials -e-ogb 1]`
+
+## `FullNeumannTest.cpp`
+
+The full Neumann problem (`-tc fullneumann`, 2D only): a singular system, solved up to a constant (the program projects the right-hand side onto the image of the matrix and translates the solution to the average of the exact one). Untested before 2026-10-25, it crashed since 2022-07 (42f1004e: the compatibility condition was computed by the discrete spaces of the problem before the assembly that builds them), and its compatibility condition was wrong on the Cartesian meshes (the integrals of a function on the faces of a `CartesianShape` ignored their orientation).
+
+- **`CartesianFaceIntegral.FollowsTheOrientation`** (1 case) — the integral of a linear function on the faces of Cartesian elements, 2D (vertical, horizontal edges) and 3D (the three orientations), away from the origin. Assertion: exact to 1e-14.
+- **`Square/FullNeumannTest.ConvergesAndSolversAgree`** (4 cases: `{tri (GMSH), cart (in-house)} × k=0,1`) — the L2 error converges at the theoretical rate (h² for k=0, h^(k+2) for k≥1; direct solver, n=8,16,32; slope within ±0.3) and equals the current value at n=32 (within 1%); at n=32, where the multigrid methods have several levels, the geometric multigrid (`mg`, which applies the zero-mean and compatibility conditions on its levels), U-AMG in the program (`fcguamg`) and through the library (`fcglibuamg`, on the condensed system) converge and give the direct solver's L2 error (within 1e-4 relative).
+  CLI: `./bin/fhhos4 -geo square -tc fullneumann -mesh {tri|cart -mesher inhouse} -k {0|1} -n {8|16|32} -s {ch|mg|fcguamg|fcglibuamg} -no-cache`
 
 ## `HMultigrid2020Test.cpp`
 
@@ -369,14 +377,14 @@ Not in `fhhos4_tests`: a ctest test of a build with `-DENABLE_PYTHON=ON` (e.g. `
 
 ## Coverage summary
 
-- 221 CTest cases total across the 17 files above, exercising `Program_Diffusion_HHO` (diffusion problems) and `Program_BiHarmonic_HHO` (biharmonic problem in mixed form), with the HHO discretization and static condensation, and the library `fhhos4`.
+- 331 CTest cases total across the 19 files above, exercising `Program_Diffusion_HHO` (diffusion problems) and `Program_BiHarmonic_HHO` (biharmonic problem in mixed form), with the HHO discretization and static condensation, and the library `fhhos4`.
 - Dimensions: 2D and 3D. No 1D coverage (the run helpers throw for it, consistent with `ENABLE_1D=OFF` by default).
 - Meshes: in-house `cart`, `stri`, `quad`, `stetra`; GMSH `cart`, `tri`, `tetra`, and a locally refined mesh; polygonal meshes (`poly`, CGAL) built from a GMSH Cartesian mesh, with and without interface collapsing (`-polymesh-fcs c|n`).
 - Polynomial spaces: P, and Q (`-poly-space q`) on Cartesian meshes (convergence, U-AMG in the program and through the library).
 - Coarsening strategies: standard, refinement (`-cs r`), independent remeshing (`-cs m`), agglomeration (`-cs n`).
 - Solvers: `mg` (V-, W- and K-cycles), `fcgmg`, `uamg`, `aggregamg`, `fcguamg`, `fcgaggregamg`, `gcruamg`, `gcraggregamg`, `libuamg`, `fcglibuamg`, `gcrlibuamg`, `cg`/`fcg`/`gcr` preconditioned by `ch`/`lu`, `ch`, and the biharmonic FCG with or without the patch preconditioner. No coverage of `lu` or `cg` as main solvers, `eigencg`, `agmg` (external library), or `p_mg`.
-- Test cases (`-tc`/`-source`): the default `sine` test case, `kellogg`, a `-heterog` ratio sweep, `exp` (biharmonic), and one locally-refined-mesh case.
-- **Not covered**: DG/FEM discretizations, `-pb bihardd`, full-Neumann BCs, anisotropy, non-condensed systems.
+- Test cases (`-tc`/`-source`): the default `sine` test case, `fullneumann` (2D, singular system), `kellogg`, a `-heterog` ratio sweep, `exp` (biharmonic), and one locally-refined-mesh case.
+- **Not covered**: DG/FEM discretizations, `-pb bihardd`, full-Neumann BCs in 3D (no such test case), anisotropy, non-condensed systems.
 - Two tests *intentionally* document known, failing configurations (a divergence, `fhhos4::Error`, in the 2022 file, a near-divergence in the 2020 file) drawn straight from the papers' own reproduction recipes — they are not bugs to silently "fix"; changing their behavior should be a deliberate, separate change.
 - Papers with reproducibility docs but no corresponding tests yet: `2024_HHO_HDG_demo_framework.md`.
 

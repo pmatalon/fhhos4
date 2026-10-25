@@ -537,7 +537,11 @@ public:
 
 	double Integral(DomFunction func) const override
 	{
-		if (ShapeDim == 1)
+		// The integrals below are over [x1, x2] x [y1, y2] x [z1, z2]: those of the elements. A face is mapped from the
+		// reference shape (ConvertToDomain() follows its orientation).
+		if (ShapeDim < DomainDim)
+			return PhysicalShapeWithConstantJacobian<ShapeDim>::Integral(func);
+		else if (ShapeDim == 1)
 		{
 			double x1 = this->Origin->X;
 			double x2 = this->Origin->X + this->WidthX;

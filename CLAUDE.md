@@ -77,10 +77,10 @@ From `build/`:
 ctest --output-on-failure
 ```
 
-326 tests, ~8 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
+331 tests, ~8 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
 iteration counts of the papers in `reproducibility/` — see `tests/README.md`. Covers
 `Program_Diffusion_HHO` and `Program_BiHarmonic_HHO` (HHO, static condensation), 2D/3D,
-in-house, GMSH and polygonal meshes, and the library (`UAMGLibrary*`, ~15 s). Not covered: DG/FEM programs (disabled by default), `lu`/`cg`/`agmg`/`p_mg` solvers,
+in-house, GMSH and polygonal meshes, the full Neumann problem (`FullNeumann*`, 2D), and the library (`UAMGLibrary*`, ~15 s). Not covered: DG/FEM programs (disabled by default), `lu`/`cg`/`agmg`/`p_mg` solvers,
 1D, anisotropic cases, `SMALL_INDEX=OFF` (64-bit indices; the release workflow only builds the library with it and
 runs the conda test client: after a change of index or state handling, build it apart with `-Wtype-limits` and run
 the tests there).
@@ -348,7 +348,7 @@ processes; the adapter's `times["setup"]` is measured after one).
   Disk++ (structured meshes) equal or -1..-2. Pure Neumann (singular): not through interface 1 (no kernel handling in
   U-AMG; a client's pinned DoF zeroes a column of `A_TF`, whose face then has no cell once the p-level extraction
   drops the zeros); the condensed interface (removed 2026-10-25) + the client's pin worked (HArDCore3D: errors =
-  BiCGSTAB). The program's full Neumann test case (`-tc fullneumann`) crashes in its assembly (any solver, 2026-10-25).
+  BiCGSTAB). The program's full Neumann test case (`-tc fullneumann`, 2D; fixed 2026-10-25: it crashed since 42f1004e, 2022, the compatibility check read the discrete spaces before the assembly that builds them; `tests/FullNeumannTest.cpp`): singular system, the program condenses it and projects b onto Im(A), the library solves it by `Solve(b, x)`; U-AMG has no kernel handling (only the geometric multigrid applies the zero-mean and compatibility conditions), its singular coarsest matrix is factorized with a tiny pivot: fine at the default tolerance up to n=32 (`fcguamg` = `fcglibuamg`), but `fcglibuamg` erratic beyond (tri n=64 k=2: 198 iterations vs 21 for `fcguamg`; with `-coarse-solver lu`, not converged, L2 error 0.22), `fcguamg` unaffected by luck of the rounding.
 - p-levels: `P_CS` Minus2 (k, k-2, ..., 0), blocks extracted (first coefficients of each block,
   `SetupOperatorByBlockExtraction()`), prolongation = injection of the low modes. `PCoarsening::ToZero` (`-p-cs =0`, k then 0,
   for bases not ordered by degree, e.g. NGSolve's): more iterations from k = 3 (FCG, 2026-10-19; `bgs,rbgs` / `bcheb4`):

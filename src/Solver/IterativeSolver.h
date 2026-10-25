@@ -46,6 +46,12 @@ public:
 			// Copy: A is row-major, SparseLU needs column-major. Freed at the end of this block.
 			ColMajorSparseMatrix colMajorA = A;
 			this->_directSolver.compute(colMajorA);
+			// A singular matrix: no exact solution (solving from a failed factorization reads uninitialized memory)
+			if (this->_directSolver.info() != Eigen::Success)
+			{
+				Utils::Warning("The direct solver could not factorize the matrix: the algebraic error is not computed.");
+				this->ComputeExactSolution = false;
+			}
 		}
 	}
 
