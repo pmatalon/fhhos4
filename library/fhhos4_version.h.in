@@ -22,6 +22,6 @@
 namespace fhhos4
 {
 	// Version of the library: FHHOS4_VERSION, followed by the commit it was built from (git describe) when it was built
-	// from a git clone, e.g. "1.4.0 (v1.4.0-12-gabc1234-dirty)".
+	// from a git clone, e.g. "1.5.0 (v1.5.0-12-gabc1234-dirty)".
 	FHHOS4_API const char* Version();
 }

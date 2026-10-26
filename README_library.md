@@ -338,10 +338,9 @@ of section 4 of the LGPL (in short: keep the license notices, and let the user r
 
 ## Version
 
-- `find_package(fhhos4 1.4 REQUIRED)` accepts the versions 1.x with x >= 4: the API stays source-compatible within a
-  major version.
-- Binary compatibility only within a minor version (`libfhhos4.so.1.4`): adding a parameter to `fhhos4::Solver`
+- `find_package(fhhos4 1.5 REQUIRED)` accepts the versions 1.x with x >= 5.
+- Binary compatibility only within a minor version (`libfhhos4.so.1.5`): adding a parameter to `fhhos4::Solver`
   changes its size. Rebuild your code when fhhos4 changes minor version.
-- `FHHOS4_VERSION` (`"1.4.0"`), `FHHOS4_VERSION_MAJOR`, `_MINOR`, `_PATCH`: the version of the header (`<fhhos4>`).
+- `FHHOS4_VERSION` (`"1.5.0"`), `FHHOS4_VERSION_MAJOR`, `_MINOR`, `_PATCH`: the version of the header (`<fhhos4>`).
 - `fhhos4::Version()`: the version of the library, followed by the commit (`git describe`) when it was built from a git
-  clone, e.g. `1.4.0 (v1.4.0-12-gabc1234-dirty)`. Give it in bug reports.
+  clone, e.g. `1.5.0 (v1.5.0-12-gabc1234-dirty)`. Give it in bug reports.

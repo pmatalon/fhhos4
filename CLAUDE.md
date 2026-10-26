@@ -147,7 +147,7 @@ program's (ADR-0008). Its path must not include mesh or discretization headers, 
 ## Version
 
 Set in `project()` (`CMakeLists.txt`) only; generated from it: the public header `fhhos4_version.h`
-(`FHHOS4_VERSION`...), the CMake package version (`find_package(fhhos4 1.4)`: same major version), the library's
+(`FHHOS4_VERSION`...), the CMake package version (`find_package(fhhos4 1.5)`: same major version), the library's
 SOVERSION (major.minor: adding a public member to `fhhos4::Solver` breaks the binary compatibility, so only in a new
 minor or major version) and the conda package's version. `fhhos4::Version()` (printed by the program at start) adds
 `git describe` when built from a clone: `cmake/GitVersion.cmake` regenerates `build/generated/Version.cpp` at each
