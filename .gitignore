@@ -278,3 +278,4 @@ Makefile
 /out/
 
 .DS_Store
+/.scratch/

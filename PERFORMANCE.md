@@ -20,6 +20,10 @@ Update it after measuring or optimizing something.
   (13 GB of RAM).
 - The 2023 AMG paper reports **sequential** CPU times (§4.2, Fig. 4.5): parallel gains don't show there,
   sequential ones do.
+- **Comparisons with other solvers** (BDDC, BiCGSTAB, MUMPS...) keep the same configured tolerance for both (each
+  solver its own norm), even when U-AMG's true residuals end up much smaller: a user who changes solvers keeps the
+  tolerance. A looser tolerance for U-AMG is never a speedup; the gains come from cheaper or fewer iterations, or a
+  cheaper setup.
 
 ## Machine
 
@@ -1720,3 +1724,101 @@ Other candidates:
 - Memory: peak 1.33 GB for Cube-tet k=0 n=32 (whole run). The paper's n=64 extrapolates to 10-11 GB, too close to
   13 GB. Running the paper sizes here would first need a memory profile (probably the mesh and the assembly rather
   than the AMG: unverified).
+
+## Measurements moved from CLAUDE.md (2026-10-26)
+
+Kept as they were written there; some repeat entries of "Done" in another form.
+
+### U-AMG's design choices
+
+- **Condensation by cells, completed rows**: computing `A` in the pattern of `A_FF`, completed only where `A_FF` lacks
+  couplings, vs all the rows completed: 1.3x (1 thread) to 1.8x (8 threads) slower when all are completed.
+  HArDCore3D 32^3, k = 1 (285,696 face DoFs, 9.2 M non-zeros in `A`): setup from the blocks 0.71-0.80 s vs 0.38-0.50 s
+  from `A` on 1 thread, 0.25-0.35 s vs 0.17-0.29 s on 8; same solve. The products of a row of `A_FT W` gathered per
+  cell (2026-10-24): the former scattered accumulation cost 3 ns per multiply-add, 2.3x slower. What remains (24^3
+  hexahedra k = 2, 1 thread: 0.07 s constructor, 0.2 s values pass, 0.1 s transpose vs 0.15-0.2 s for a client's local
+  Schur complements) is memory traffic; reordering the rows, prefetching, register blocking: no gain
+  (`build/bench_cond/`).
+- **Boundary faces, collapsed (`-uamg-bfc`) / removed** (2026-10-24, `build/bench_neumann/`): program 2D cart and tri
+  equal or +1; HArDCore3D Cartesian equal, Tetgen tetrahedra +10..+17% (k=0 44 / 38), Voronoi +1..+2 (once 28 / 20);
+  Disk++ (structured meshes) equal or -1..-2. HArDCore3D pure Neumann through the former condensed interface + the
+  client's pin: errors = BiCGSTAB.
+- **Full Neumann test case** (`-tc fullneumann`, 2D): fine at the default tolerance up to n=32 (`fcguamg` =
+  `fcglibuamg`), but `fcglibuamg` erratic beyond (tri n=64 k=2: 198 iterations vs 21 for `fcguamg`; with
+  `-coarse-solver lu`, not converged, L2 error 0.22), `fcguamg` unaffected by luck of the rounding.
+- **`PCoarsening::ToZero`** vs Minus2 (FCG, 2026-10-19; `bgs,rbgs` / `bcheb4`): Square-tri n=64 k=3 10 -> 19 / 14 -> 27,
+  k=4 9 -> 21 / 14 -> 30, k=5 7 -> 23 / 11 -> 32; Cube-tet n=8 k=3 29 -> 37 / 50 -> 60.
+- **Interpolation of 1**: without the rescaling of the constant modes, L2-orthonormal bases slow U-AMG down (Cube-tet
+  n=16, k=0: 44 iterations instead of 26) or make it fail (graded meshes).
+- **`HarmonicExtensionOrInject`** vs P_F: setup -3..-21% (1 thread), -2..-9% (8 threads), iterations within 1-2 mostly
+  (up to +6 on Heterog1e8 n=256, -3 elsewhere); with ones for the cells, 0-4 more iterations at k=0 (P_F: up to x2.3).
+- **Transfers by the prolongations of the passes**: with `-hp-cs h` at k=2, setup -32..-43%, transfers -26..-29%.
+- **Non-symmetric couplings**: the couplings of the rows of the matrix (as AGMG's strong couplings) cost 20% more
+  iterations than the averaged traces on HArDCore3D's diffusion-dominated convection-diffusion at k = 0, more without
+  the downwind order. HArDCore3D convection-dominated 32^3, k = 1: 16 iterations, 4 with the downwind order.
+- **Hybrid block Gauss-Seidel** (non-symmetric default on several threads): 0-6 more iterations than the block
+  Gauss-Seidel with FCG (a few more with BiCGSTAB), but faster on 8 threads: 15-20% at k = 0, 35-45% at k = 1, 2
+  (HArDCore3D cubes and Voronoi); BiCGSTAB or the multigrid alone 2-45% (earlier, non-deterministic version). GCR,
+  HArDCore3D diffusion-dominated convection-diffusion 48^3, k = 1: 27 iterations on 4 threads (26 on 1), solve 3.3-3.5 s
+  instead of 5.8 s.
+- **Chebyshev smoothers**: faster than `hbgs` on 8 threads in the program (up to 2x on GMSH tetrahedra at k >= 1) and in
+  Disk++ (1.1-2x at k >= 1), a tie in HArDCore3D (up to 1.2x on Voronoi meshes), slower on 1 thread.
+- **Inverse diagonal blocks** in the Chebyshev smoother: solve -3..-17% per iteration, the same iterations; in the
+  other block smoothers, program with `bgs,rbgs`: solve x0.87-0.88, the papers' iteration counts unchanged.
+- **FCG near the attainable accuracy** (~1e-11 relative on Disk++'s 2D systems at k = 2): the recurrence drifts (8e-13
+  for a true 1.4e-11).
+
+### NGSolve
+
+Through the test scripts (2026-10-19/20), then through the adapter (2026-10-22). Benchmark scripts outside the
+repository.
+
+- **Accuracy**: solution = NGSolve's sparse Cholesky to 1e-13..1e-14 (2D, 3D, k = l = 1..4; k = 1, l = 2;
+  1e-11..1e-12 at k = 3-4 before the library factorized the blocks of `A_TT` instead of inverting them, 2026-10-23).
+  Q^k (`test_ngsolve.py`, 33 checks): mapped structured meshes, Square-quad 1024 cells k=1-4 30/29/15/14 iterations,
+  k=1 l=2 24, Cube-hex 1000 cells k=1-3 32/41/32, against NGSolve's sparse Cholesky to 1e-12..1e-14.
+- **Bases sorted by degree** (2026-10-20), default p-coarsening: k <= 2 unchanged, k=3 21 / 69 iterations instead of
+  44 / 96 with `ToZero` (Square-tri 940 / Cube-tet 1259 cells, tolerance 1e-12), k=4 23 / 59.
+- **Iterations with `ToZero`** (tolerance 1e-8, 2026-10-19), U-AMG `bcheb4` / `bgs` / NGSolve's BDDC + CG, penalty
+  alpha/h: Square-tri 3708 cells, alpha = 4k^2 (NGSolve's tutorial): k=1 11/14/12, k=2 14/19/15, k=3 18/22/19;
+  alpha = 10(k+1)^2: 24-29 / 32-36 / 21-30. Cube-tet 3937 cells, alpha = 5(k+1)^2: k=1 24/28/28, k=2 39/44/45, k=3
+  46/53/55 (alpha = 4 at k=1 is not SPD in 3D: the Chebyshev setup refuses it). The counts follow the penalty for both
+  solvers.
+- **Times against BDDC + its CG** (2026-10-19, the same configured tolerance 1e-8, each solver its own norm: BDDC's true
+  residuals 6e-8..1.4e-6, U-AMG's <= 1e-8; straight to degree 0; k = 3 skipped): BDDC / U-AMG setup + solve on 8
+  threads, Square-tri (alpha = 4k^2) 92k-370k cells: k=1 1.27-1.33, k=2 0.80-0.90; Cube-tet (alpha = 5(k+1)^2): k=1
+  25k cells 1.17, 69k cells 1.96 (BDDC's setup 1.70 s vs 0.43 s), k=2 9k-27k cells 0.67-0.76. 1 thread: the same
+  trends. With the new interface (2026-10-19, `run_bddc.sh`, `summary_bddc.py`, the same session, best of 2), 8
+  threads: setup + solve k=1 1.35-1.39 (2D), 1.34-2.22 (3D), k=2 0.96-1.02 (2D), 0.74-0.92 (3D); end to end (U-AMG:
+  uncondensed assembly + extraction + setup + solve; BDDC: condensed assembly + its setup + CG + cell unknowns) k=1
+  1.11-1.82, k=2 0.69-0.87 (1 thread: 1.16-1.92, 0.73-0.95). At k=2 the solve is the gap (16 vs 13-14 iterations in
+  2D, 42-43 vs 49-52 in 3D, but costlier ones). k=3 (sorted by degree, 2026-10-20, `run_k3.sh`): setup + solve
+  0.81-0.85 (2D), 0.69-0.70 (3D), end to end 0.64-0.75 (1 thread: 0.61-0.78), with fewer iterations (10 vs 18 in 2D,
+  32-35 vs 54-64 in 3D). BDDC with an AMG coarse solver (`coarsetype="h1amg"`) always slower (51-91 iterations);
+  NGSolve's sparse Cholesky a tie in 2D, 6x slower than U-AMG in 3D at 25k cells.
+- **The extraction of the blocks** (2026-10-19, `ExtractSymmetricBlocks()` on NGSolve's arrays read in place; before:
+  SciPy's slicing and the conversion to Eigen): U-AMG's total -5 to -26%.
+- **Through the adapter** (2026-10-22, `bench_bddc.py`, `run.sh`, `summary.py`; the same cases, meshes and tolerances;
+  BDDC's form with `symmetric=True` now, faster than above, e.g. 2D k=3 92k cells 2.04 -> 1.53 s; 8 threads, best of
+  2), end to end, BDDC / U-AMG's inverse: 2D k=1 0.94-1.02, k=2 0.67-0.75, k=3 0.55-0.63; 3D k=1 0.86-1.66, k=2
+  0.67-0.77, k=3 0.47-0.56; U-AMG's true residuals 10-200x smaller (3e-9..8e-9 vs 4e-8..1.1e-6). The adapter's
+  preparation 0.03-0.05 s (the DoF tables without loop over the elements: 0.51 -> 0.05 s at 92k cells).
+- **Preconditioner mode** in NGSolve's CG on the uncondensed system: slower than the inverse in all the cases, BDDC /
+  it 0.21-1.07 (V-cycle), 0.36-1.30 (W-cycle). V-cycle iterations 1.2-5x those of the K-cycle (2D k=3: 53 vs 10), the
+  W-cycle's close to them. Per iteration (`bench/iteration_cost.py`, 2D k=2 92k / 3D k=2 27k cells, 8 threads): the
+  inverse 41 / 44 ms (one K-cycle 37 / 37 ms, FCG's product by the condensed matrix and vectors; the cells eliminated
+  once before the solve, reconstructed once after); the preconditioner mode 55-60 ms: NGSolve's product by the
+  uncondensed matrix (cells included) 9 / 11 ms, the cells eliminated and reconstructed 8 / 5 ms and the adapter's
+  copies of all the DoFs and Python 7 / 8 ms at every iteration, and the cycle: a V-cycle 30 / 36 ms, barely cheaper
+  than the K-cycle (the fine level dominates both).
+- **With MPI** (OpenMPI, 2026-10-22, the library's default prolongation): against NGSolve's sparse Cholesky on the mesh
+  regenerated on rank 0 (integrals of u and u^2) and `inverse="masterinverse"`, 11 cases x 1-4 processes pass,
+  integrals 2e-16 to 6.2e-12, DoFs 3.5e-14 to 8.2e-12 (Square-tri maxh 0.05, Cube-tet 0.15 at tolerance 1e-12: k = l =
+  1, 2, 3, and k = 1, l = 2 in 2D; Square-tri 0.015, Cube-tet 0.07 at 1e-10: k = l = 1, 2); also a right-hand side
+  CUMULATED (the same solution), the Dirichlet lifting (2D k=2: 30/30/30/32 iterations, 3D: 71). Iterations on 1 / 2 /
+  3 / 4 processes the same but Square-tri 0.05 k=1 34/34/33/33, k=3 21/18/18/18, k=1 l=2 33/33/33/32, Cube-tet 0.15 k=1
+  48/48/49/48, k=3 69/69/68/68, Square-tri 0.015 k=1 30/30/28/30, k=2 29/29/29/31 (on 2 processes, one holds
+  everything: NGSolve's local numbering, the distributed path). Cube-tet 0.07 k=2 (74 iterations), 2 threads per
+  process: `UAMG()` 0.43 / 0.73 / 0.54 / 0.40 s, of which the setup 0.25 / 0.38 / 0.30 / 0.21 s (the preparation on one
+  process: 0.09 s; on several, 0.18-0.34 s: the full blocks extracted, the exchanges). Without a barrier before the
+  setup, the empty rank 0 waited 1.4-1.8 s inside it on 2 processes.
