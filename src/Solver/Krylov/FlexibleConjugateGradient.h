@@ -60,10 +60,10 @@ public:
 		this->SetupComputationalWork = this->Precond.SetupComputationalWork();
 	}
 
-	void Setup(const DistributedMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, shared_ptr<const IndexMap> faceMap, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
+	void Setup(const DistributedMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_T, shared_ptr<const IndexMap> faceMap, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
 	{
 		SetDistributedMatrix(A);
-		this->Precond.Setup(A, A_T_T, A_T_F, faceMap, cellInterpOfOne, faceInterpOfOne);
+		this->Precond.Setup(A, A_T_T, A_T_F, A_F_T, faceMap, cellInterpOfOne, faceInterpOfOne);
 		this->SetupComputationalWork = this->Precond.SetupComputationalWork();
 	}
 

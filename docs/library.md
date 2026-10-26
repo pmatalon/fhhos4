@@ -28,7 +28,8 @@ For the library's users: `README_library.md`. This file is for changing the libr
   keeps it (`A_FT`). Checked by one parallel pass, `CheckCSR()`.
 - The solvers read the inputs as `BorrowedSparseMatrix` (`Utils/BorrowedSparseMatrix.h`: a `SparseMatrix` pointing
   Eigen's protected members to the caller's arrays). The library keeps `A_FT` (`SetupNonsymmetric()`:
-  `StaticCondensation` reads it at each solve).
+  `StaticCondensation` reads it at each solve); on several processes it computes its own from it (`docs/mpi.md`), but
+  the rule for the caller stays the same.
 - Helpers, documented as copies but one: `TransposedView()` (no copy: a symmetric column-major matrix as its transpose,
   an Eigen map); `ExtractSymmetricBlocks()`/`ExtractNonsymmetricBlocks()` (a global Eigen row-major matrix + `DoFLists`
   of the cells and faces, index types int32/int64, one parallel pass: `SparseMatrixOps::BuildByRows`; Eigen blocks,

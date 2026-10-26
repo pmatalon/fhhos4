@@ -123,10 +123,7 @@ public:
 		{
 			if (A_F_T.rows() != A_T_F.cols() || A_F_T.cols() != A_T_F.rows())
 				Utils::FatalError("UncondensedAMG: A_F_T must have the sizes of the transpose of A_T_F.");
-			if (this->Cycle == CycleType::K && this->KCycleKrylov != KrylovMethod::GCR)
-				Utils::FatalError("UncondensedAMG: the K-cycle of a non-symmetric matrix must iterate with GCR, not FCG.");
-			if (dynamic_cast<EigenSparseCholesky*>(this->CoarseSolver))
-				Utils::FatalError("UncondensedAMG: the Cholesky factorization cannot be the coarse solver of a non-symmetric matrix (use LU).");
+			CheckNonsymmetricOptions();
 		}
 
 		if (A_F_F.rows() == 0 && A_F_FNeeded())
@@ -194,18 +191,22 @@ public:
 		Utils::FatalError("The method Setup(const DistributedMatrix& A) cannot be used for this solver.");
 	}
 
-	// On several processes (MPI): the blocks distributed by rows (see IterativeSolver), symmetric. The same algorithm,
-	// where each process aggregates its own cells (UncondensedLevel::CoarsenInDistributedPasses()), with the default
-	// options only. Each face must belong to a process that owns one of its cells. The blocks are only read by the setup.
-	void Setup(const DistributedMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, shared_ptr<const IndexMap> faceMap, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
+	// On several processes (MPI): the blocks distributed by rows (see IterativeSolver). The same algorithm, where each
+	// process aggregates its own cells (UncondensedLevel::CoarsenInDistributedPasses()), with the default options only.
+	// Each face must belong to a process that owns one of its cells. The blocks are only read by the setup.
+	void Setup(const DistributedMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_T, shared_ptr<const IndexMap> faceMap, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
 	{
 		const Communicator& comm = A.Comm();
 		const IndexMap& faces = *faceMap;
+		_symmetric = comm.All(A_F_T.rows() == 0 && A_F_T.cols() == 0);
 		bool invalid = A.RowBlockSize != _faceBlockSize || A.RowMap->Offsets != faces.Offsets || A_T_F.cols() != faces.NLocal() * _faceBlockSize
 			|| A_T_F.rows() % _cellBlockSize != 0 || A_T_T.rows() != A_T_F.rows() || A_T_T.cols() != A_T_T.rows()
-			|| cellInterpOfOne.rows() != A_T_F.rows() / _cellBlockSize || faceInterpOfOne.rows() != faces.NOwned;
+			|| cellInterpOfOne.rows() != A_T_F.rows() / _cellBlockSize || faceInterpOfOne.rows() != faces.NOwned
+			|| (!_symmetric && (A_F_T.rows() != A_T_F.cols() || A_F_T.cols() != A_T_F.rows()));
 		if (comm.Any(invalid))
-			Utils::FatalError("UncondensedAMG: on several processes, the blocks must have the rows of the cells and faces of each process, the same faces in the operator and in A_T_F, and the interpolations of 1 on the cells and faces of the process.");
+			Utils::FatalError("UncondensedAMG: on several processes, the blocks must have the rows of the cells and faces of each process, the same faces in the operator and in A_T_F (and A_F_T: those of the cells of the process), and the interpolations of 1 on the cells and faces of the process.");
+		if (!_symmetric)
+			CheckNonsymmetricOptions();
 		bool zeroOrInfinite = !cellInterpOfOne.allFinite() || (cellInterpOfOne.array() == 0).any() || !faceInterpOfOne.allFinite() || (faceInterpOfOne.array() == 0).any();
 		if (comm.Any(zeroOrInfinite))
 			Utils::FatalError("UncondensedAMG: the interpolations of 1 on the cells and faces must be finite and non-zero.");
@@ -213,7 +214,6 @@ public:
 			Utils::FatalError("UncondensedAMG: on several processes, the options that need the block A_F_F are not available.");
 		if (this->HP_CS != HP_CoarsStgy::H_only && this->HP_CS != HP_CoarsStgy::P_then_H)
 			Utils::FatalError("UncondensedAMG: on several processes, only the p-coarsening then the h-coarsening (or the h-coarsening alone) are available.");
-		_symmetric = true;
 		if (this->MixedPrecision)
 			Utils::Log() << "\tLevels in double precision: the mixed precision does not support several processes" << endl;
 		if (BlockCSRStorage)
@@ -225,7 +225,7 @@ public:
 		UncondensedLevel* fine = dynamic_cast<UncondensedLevel*>(this->_fineLevel);
 		fine->A_T_T = &A_T_T;
 		fine->A_T_F = &A_T_F;
-		fine->A_F_T = nullptr;
+		fine->A_F_T = _symmetric ? nullptr : &A_F_T;
 		fine->A_F_F = nullptr;
 		fine->FaceMap = faceMap;
 
@@ -251,6 +251,7 @@ public:
 		_localOperator.AssembledDistributed = nullptr;
 		fine->A_T_T = nullptr;
 		fine->A_T_F = nullptr;
+		fine->A_F_T = nullptr;
 	}
 
 	Vector Solve(const Vector& b, string initialGuessCode) override
@@ -259,7 +260,16 @@ public:
 			Utils::Warning("Smooth initial guess unmanaged in AMG.");
 		return Multigrid::Solve(b, initialGuessCode);
 	}
-	
+
+	// The options that need a symmetric matrix
+	void CheckNonsymmetricOptions() const
+	{
+		if (this->Cycle == CycleType::K && this->KCycleKrylov != KrylovMethod::GCR)
+			Utils::FatalError("UncondensedAMG: the K-cycle of a non-symmetric matrix must iterate with GCR, not FCG.");
+		if (dynamic_cast<EigenSparseCholesky*>(this->CoarseSolver))
+			Utils::FatalError("UncondensedAMG: the Cholesky factorization cannot be the coarse solver of a non-symmetric matrix (use LU).");
+	}
+
 	// The blocks A_F_F are not used by the algorithm of the paper (only A_T_T and A_T_F are), but by some options
 	bool A_F_FNeeded() const
 	{

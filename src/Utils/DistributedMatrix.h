@@ -254,6 +254,37 @@ public:
 		return ghostRows;
 	}
 
+	// The rows of all the local entities of rowMap (the ownership of RowMap: its owned ones, then its ghosts, whose rows
+	// are fetched from their owners), with their columns of the local entities of colMap (the others dropped), numbered
+	// locally in colMap. Collective.
+	SparseMatrix RowsWithGhosts(const IndexMap& rowMap, const IndexMap& colMap) const
+	{
+		SparseMatrix owned = GlobalColumns();
+		SparseMatrix ghosts = FetchGhostRows(rowMap, owned, RowBlockSize);
+		int cbs = ColBlockSize;
+		BigNumber nOwnedRows = owned.rows();
+		ThreadLocal<vector<pair<SparseMatrixIndex, double>>> rowsTL;
+		return SparseMatrixOps::BuildByRows(rowMap.NLocal() * RowBlockSize, colMap.NLocal() * cbs, 1, [&](BigNumber firstRow, BigNumber lastRow, SparseMatrixOps::RowChunk& chunk)
+		{
+			vector<pair<SparseMatrixIndex, double>>& row = rowsTL.Local();
+			for (BigNumber i = firstRow; i < lastRow; ++i)
+			{
+				row.clear();
+				const SparseMatrix& M = i < nOwnedRows ? owned : ghosts;
+				for (SparseMatrix::InnerIterator it(M, i < nOwnedRows ? i : i - nOwnedRows); it; ++it)
+				{
+					BigNumber c = colMap.Local(it.col() / cbs);
+					if (c >= 0)
+						row.push_back({ (SparseMatrixIndex)(c * cbs + it.col() % cbs), it.value() });
+				}
+				sort(row.begin(), row.end(), [](const auto& x, const auto& y) { return x.first < y.first; });
+				for (const auto& coeff : row)
+					chunk.Add(coeff.first, coeff.second);
+				chunk.EndRow();
+			}
+		});
+	}
+
 	// The operator assembled by the processes from the rows of their local entities in map (owned, then ghosts), with
 	// columns local in map: a square operator on the entities of map, distributed by rows. The rows of the ghosts are
 	// sent to their owners, which add them to theirs; the blocks Diag and Offd built in one pass on the rows. Collective.

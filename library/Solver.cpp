@@ -375,9 +375,10 @@ namespace fhhos4
 				cout << "fhhos4: setup of " << Multigrid->NumberOfLevels() << " levels in " << Seconds(start) << " s" << endl;
 		}
 
-		// On several processes: from the blocks of the uncondensed system (symmetric), the rows of the process (see
-		// Solver::SetupSymmetric()), A_FF in full
-		void SetupDistributed(const Solver& s, const SparseMatrix& A_TT, const SparseMatrix& A_TF, const SparseMatrix& A_FF, shared_ptr<const IndexMap> faces, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne)
+		// On several processes: from the blocks of the uncondensed system, the rows of the process (see
+		// Solver::SetupSymmetric()), A_FF in full; A_FT on the rows of all the faces of faces and the columns of the cells
+		// of the process (DistributedStaticCondensation), empty if the system is symmetric
+		void SetupDistributed(const Solver& s, const SparseMatrix& A_TT, const SparseMatrix& A_TF, SparseMatrix A_FT, const SparseMatrix& A_FF, shared_ptr<const IndexMap> faces, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne)
 		{
 			auto start = chrono::steady_clock::now();
 			Reset();
@@ -388,9 +389,9 @@ namespace fhhos4
 			ProgramArguments args = Arguments(s);
 			CreateSolvers(args, s);
 
-			DistributedCondensation = make_unique<DistributedStaticCondensation>(A_TT, A_TF, faces, CellBlockSize, FaceBlockSize);
+			DistributedCondensation = make_unique<DistributedStaticCondensation>(A_TT, A_TF, std::move(A_FT), faces, CellBlockSize, FaceBlockSize);
 			DistributedA = DistributedCondensation->CondensedMatrix(A_FF);
-			ActiveSolver()->Setup(DistributedA, A_TT, A_TF, faces, cellInterpOfOne, faceInterpOfOne);
+			ActiveSolver()->Setup(DistributedA, A_TT, A_TF, DistributedCondensation->A_FT(), faces, cellInterpOfOne, faceInterpOfOne);
 			IsSetUp = true;
 
 			if (s.Verbosity == 1 && Comm.IsRoot())
@@ -467,17 +468,18 @@ namespace fhhos4
 	Solver& Solver::operator=(Solver&&) noexcept = default;
 
 	void Solver::Setup(bool symmetric, const CSRView& A_TT, const CSRView& A_TF, const CSRView* A_FT, const CSRView& A_FF,
-	                   detail::ConstVectorView cellInterpOfOne, detail::ConstVectorView faceInterpOfOne, const GhostNumbers& faceGhosts)
+	                   detail::ConstVectorView cellInterpOfOne, detail::ConstVectorView faceInterpOfOne, const GhostNumbers& faceGhosts,
+	                   const GhostNumbers& cellGhosts)
 	{
 		_impl->SetCommunicator(*this);
 		CallScope scope(*this, _impl->Comm, _impl->SharingProcesses);
 		if (_impl->IsDistributed())
 		{
-			SetupDistributed(symmetric, A_TT, A_TF, A_FT, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhosts);
+			SetupDistributed(symmetric, A_TT, A_TF, A_FT, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhosts, cellGhosts);
 			return;
 		}
-		if (faceGhosts.Count != 0)
-			Utils::FatalError("fhhos4::Solver: faceGhosts on one process (Comm): the ghosts are the faces of other processes.");
+		if (faceGhosts.Count != 0 || cellGhosts.Count != 0)
+			Utils::FatalError("fhhos4::Solver: faceGhosts or cellGhosts on one process (Comm): the ghosts are the faces and cells of other processes.");
 		_impl->CheckParameters(*this, symmetric);
 		// The inputs, read in place, checked before the previous setup is replaced
 		unique_ptr<BorrowedSparseMatrix> a_TT = Borrow(A_TT, "A_TT"), a_TF = Borrow(A_TF, "A_TF");
@@ -490,20 +492,24 @@ namespace fhhos4
 
 	// On several processes, the parameters are those of the process of rank 0 (the same on all of them)
 	void Solver::SetupDistributed(bool symmetric, const CSRView& A_TT, const CSRView& A_TF, const CSRView* A_FT, const CSRView& A_FF,
-	                              detail::ConstVectorView cellInterpOfOne, detail::ConstVectorView faceInterpOfOne, const GhostNumbers& faceGhosts)
+	                              detail::ConstVectorView cellInterpOfOne, detail::ConstVectorView faceInterpOfOne, const GhostNumbers& faceGhosts,
+	                              const GhostNumbers& cellGhosts)
 	{
 		const Communicator& comm = _impl->Comm;
-		unique_ptr<BorrowedSparseMatrix> a_TT, a_TF, a_FF;
+		unique_ptr<BorrowedSparseMatrix> a_TT, a_TF, a_FT, a_FF;
 		shared_ptr<const IndexMap> faces;
 		CollectiveCheck(comm, [&]()
 		{
-			if (!symmetric)
-				Utils::FatalError("fhhos4::Solver: non-symmetric systems are not solved on several processes yet (SetupNonsymmetric()).");
 			_impl->CheckParameters(*this, symmetric);
-			if (faceGhosts.Count < 0 || (faceGhosts.Count > 0 && !faceGhosts.Numbers))
-				Utils::FatalError("fhhos4::Solver: faceGhosts: a negative Count, or no Numbers.");
+			for (auto [ghosts, name] : { pair(&faceGhosts, "faceGhosts"), pair(&cellGhosts, "cellGhosts") })
+				if (ghosts->Count < 0 || (ghosts->Count > 0 && !ghosts->Numbers))
+					Utils::FatalError(string("fhhos4::Solver: ") + name + ": a negative Count, or no Numbers.");
+			if (symmetric && cellGhosts.Count != 0)
+				Utils::FatalError("fhhos4::Solver: cellGhosts are the ghost cells of A_FT, for a non-symmetric system only (SetupNonsymmetric()).");
 			a_TT = Borrow(A_TT, "A_TT");
 			a_TF = Borrow(A_TF, "A_TF");
+			if (A_FT)
+				a_FT = Borrow(*A_FT, "A_FT");
 			a_FF = Borrow(A_FF, "A_FF");
 		});
 		int cbs = _impl->CellBlockSize, fbs = _impl->FaceBlockSize;
@@ -514,6 +520,8 @@ namespace fhhos4
 				Utils::FatalError("fhhos4::Solver: on several processes, A_TT (" + size(*a_TT) + ") and A_TF (" + size(*a_TF) + ") have the rows of the cells of the process (" + to_string(cbs) + " DoFs per cell), A_TT the same columns.");
 			if (a_FF->rows() % fbs != 0 || a_FF->cols() != a_TF->cols() || a_FF->cols() != a_FF->rows() + faceGhosts.Count * fbs)
 				Utils::FatalError("fhhos4::Solver: on several processes, A_FF (" + size(*a_FF) + ") has the rows of the faces of the process (" + to_string(fbs) + " DoFs per face), and A_FF and A_TF (" + size(*a_TF) + ") the columns of the faces of the process then of its " + to_string(faceGhosts.Count) + " ghosts (faceGhosts).");
+			if (a_FT && (a_FT->rows() != a_FF->rows() || a_FT->cols() != a_TF->rows() + cellGhosts.Count * cbs))
+				Utils::FatalError("fhhos4::Solver: on several processes, A_FT (" + size(*a_FT) + ") has the rows of the faces of the process (those of A_FF, " + size(*a_FF) + "), and the columns of the cells of the process (the rows of A_TF, " + size(*a_TF) + ") then of its " + to_string(cellGhosts.Count) + " ghost cells (cellGhosts).");
 			if (cellInterpOfOne.Size != a_TF->rows() / cbs || faceInterpOfOne.Size != a_FF->rows() / fbs)
 				Utils::FatalError("fhhos4::Solver: on several processes, the interpolations of 1 have the cells (" + to_string(a_TF->rows() / cbs) + ") and faces (" + to_string(a_FF->rows() / fbs) + ") of the process, got " + to_string(cellInterpOfOne.Size) + " and " + to_string(faceInterpOfOne.Size) + ".");
 			// A_TT is block diagonal
@@ -527,8 +535,18 @@ namespace fhhos4
 		// The faces of the process and its ghosts (collective, checks the ghosts on all the processes)
 		IndexMap owners(comm, a_FF->rows() / fbs);
 		faces = make_shared<const IndexMap>(IndexMap::InOrder(owners, vector<BigNumber>(faceGhosts.Numbers, faceGhosts.Numbers + faceGhosts.Count)));
+		// Non-symmetric: A_FT on the rows of all the faces of the process's cells (those of other processes fetched from
+		// them) and the columns of these cells, what the condensation of these cells and their aggregation read (collective,
+		// checks the ghost cells on all the processes)
+		SparseMatrix localA_FT;
+		if (!symmetric)
+		{
+			IndexMap cellOwners(comm, a_TF->rows() / cbs);
+			auto cells = make_shared<const IndexMap>(IndexMap::InOrder(cellOwners, vector<BigNumber>(cellGhosts.Numbers, cellGhosts.Numbers + cellGhosts.Count)));
+			localA_FT = DistributedMatrix::FromLocalColumns(make_shared<const IndexMap>(owners), cells, *a_FT, fbs, cbs).RowsWithGhosts(*faces, cellOwners);
+		}
 		Eigen::Map<const Vector> cellOne(cellInterpOfOne.Data, cellInterpOfOne.Size), faceOne(faceInterpOfOne.Data, faceInterpOfOne.Size);
-		_impl->SetupDistributed(*this, *a_TT, *a_TF, *a_FF, faces, cellOne, faceOne);
+		_impl->SetupDistributed(*this, *a_TT, *a_TF, std::move(localA_FT), *a_FF, faces, cellOne, faceOne);
 	}
 
 	Result Solver::SolveCondensed(detail::ConstVectorView b, detail::VectorView x)

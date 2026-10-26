@@ -1200,6 +1200,11 @@ elapsed setup / solve (s), iterations:
   ones (only the rows of the ghosts converted and sent): 0.17 s, setup 0.48 -> 0.29 s (2 processes), 0.26 -> 0.17 s (4),
   0.21 -> 0.14 s (8). The coarsening passes take a few ms (k=2 n=12: their h-levels are small).
 
+2026-10-26, non-symmetric (`SetupNonsymmetric()`, GCR, block Gauss-Seidel in the downwind order of each process, Jacobi
+between them; `DistributedLibrary.NonsymmetricUncondensedSystem`: Cartesian 60x60, k=0, partitioned in blocks),
+iterations on 2 / 3 / 4 processes (one process, the same renumbered system): asymmetry 0.3: 16-17 (16); 0.9
+(convection-dominated): 10 / 6 / 6 (10 / 9 / 9). The Jacobi coupling between the processes costs nothing here.
+
 Next ideas:
 1. **The assembly of the program distributed** (each process its cells and those of its faces): the memory per process,
    for larger cases, then the scaling on more processes (another machine).

@@ -23,26 +23,33 @@ MPI from the conda env (`mpich`, installed in `fhhos4`, not in `conda/environmen
   `Utils/IndexMap.h` (contiguous ownership in rank order, ghosts in any order, halo: `UpdateGhosts`,
   `AddGhostsToOwners`, `Forward/ReverseExchange`), `Utils/DistributedMatrix.h` (rows owned, `Diag` + `Offd` (ghost
   columns): the smoothers work on `Diag`; `MultiplyTransposed` for the restriction; `GatherOnAll` for the coarse
-  solver, replicated; `FetchGhostRows`, `AssembleFromLocalRows`: the rows of the ghosts added to their owners').
+  solver, replicated; `FetchGhostRows`, `RowsWithGhosts` (the rows of the ghosts fetched, the columns of another map),
+  `AssembleFromLocalRows`: the rows of the ghosts added to their owners').
 - Solvers: `Solver::Distributed`, `Setup(const DistributedMatrix&)` (FatalError unless overridden: FCG, GCR, Multigrid,
   Chebyshev, block Jacobi, (block) Gauss-Seidel = Gauss-Seidel in the process, Jacobi between them (`SweepRhs()`),
   Cholesky/LU gathered); `IterativeSolver::SetDistributedMatrix()`; the blocks setup `Setup(A, A_T_T, A_T_F (local
-  columns), faceMap, interps)`; `Level::DistributedOperator`, `DistributedP`. FCG applies the full matrix (not the lower
+  columns), A_F_T (empty if symmetric), faceMap, interps)`; `Level::DistributedOperator`, `DistributedP`. FCG applies the full matrix (not the lower
   triangle) on several processes.
 - U-AMG: `UncondensedLevel::CoarsenInDistributedPasses()` with `DistributedPass.h`: each process aggregates its cells,
   remote cells/aggregates of the interface faces exchanged by the faces' halo, coarse faces between two processes owned
   by the smaller rank (numbered by request/reply), passes renumbered (owned, then ghosts), prolongations chained
   locally (interface faces are kept: injection rows known on both sides), operator assembled once per level. Only the
-  default options (flat passes, chained prolongation, symmetric, no `A_F_F`). Ghost faces may belong to no local cell
+  default options (flat passes, chained prolongation, no `A_F_F`). Non-symmetric: `A_F_T` on the rows of all the local
+  faces and the columns of the cells of the process (what its cells read: couplings, `P^T A_F_T Q_T`), the downwind
+  order of the faces of each process (`Diag`; Jacobi between the processes). Ghost faces may belong to no local cell
   (couplings of `A_FF`): `CoarseningPass::NOwnedFaces`. All global decisions (coarsening ratio, errors) reduced.
 - Library: `Solver::Comm` (no default), `SetupSymmetric(..., GhostNumbers faceGhosts)` (local columns: own faces then
-  ghosts, one numbering for `A_TF` and `A_FF`, `A_FF` in full), `DistributedStaticCondensation.h`, `CollectiveCheck()`
-  (errors of the inputs on all the processes). A process may own nothing (NGSolve 6.2.2608's rank 0). Not yet:
-  non-symmetric, `CondensedMatrix()`. Python: `docs/python.md`.
+  ghosts, one numbering for `A_TF` and `A_FF`, `A_FF` in full), `SetupNonsymmetric(..., faceGhosts, cellGhosts)`
+  (`A_FT`: rows of the own faces, columns own cells then ghost cells; turned once by the setup into the rows of all
+  the local faces, the columns of the own cells: `RowsWithGhosts`, kept by the condensation, which then runs as the
+  symmetric one), `DistributedStaticCondensation.h`, `CollectiveCheck()` (errors of the inputs on all the processes). A
+  process may own nothing (NGSolve 6.2.2608's rank 0). Not yet: `CondensedMatrix()`. Python: `docs/python.md`.
 - Program (`Program_Diffusion_HHO_Impl.h`, `Program/DistributedHybridSystem.h`): GMSH meshes only, partitioned by GMSH
   (`GMSHMesh::PartitionElements()`, rank 0, broadcast); the mesh built by rank 0 first (cache); the system assembled by
   every process (replicated, not distributed yet), its rows extracted (faces owned by the smaller rank of their cells),
-  the solution gathered; `CheckDistributedArguments()` lists what is refused.
+  the solution gathered; `CheckDistributedArguments()` lists what is refused. `-uamg-nonsym`: `A_F_T` from the rows of
+  the faces (`FromGlobalColumns()`: the ghost cells), local columns for the library, `RowsWithGhosts()` for the
+  program's U-AMG.
 
 ## Tests
 

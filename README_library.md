@@ -157,14 +157,19 @@ fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F); // the vectors of the 
   local numbering of DOLFINx's index maps, and of the columns of PETSc's and hypre's distributed matrices.
 - **Each face belongs to a process that owns one of its cells**, e.g. the one of the smaller rank; a face has at most
   two cells. A process may own no cell nor face (empty matrices and vectors): it still calls the setups and solves.
+- **Non-symmetric**: `SetupNonsymmetric(A_TT, A_TF, A_FT, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhosts,
+  cellGhosts)`, with `A_TT` and `A_FF` in full; `A_FT`: the rows of the faces of the process, its columns the cells of
+  the process (in the order of the rows of `A_TT`), then its ghost cells, in any order (the cells of other processes
+  in these rows), whose global numbers are `cellGhosts` (numbered as the faces: those of rank 0 first...). On each
+  process, the Gauss-Seidel smoothers follow the downwind order of its own faces.
 - The vectors (`b_T`, `b_F`, `x_T`, `x_F`, the interpolations of 1): the cells and faces of the process. `Result`: of
   the whole system.
 - The algorithm: each process aggregates its own cells (the faces between processes are kept); the coarsest level is
   gathered on every process, which solves it. The number of iterations may change slightly with the number of
   processes.
-- Available on several processes: the uncondensed symmetric system (`SetupSymmetric()`), with all the parameters but
-  `Krylov::BiCGSTAB`; the Gauss-Seidel smoothers are Gauss-Seidel in each process (the hybrid ones: in each thread),
-  Jacobi between the processes. Not yet: `SetupNonsymmetric()`, `CondensedMatrix()`.
+- Available on several processes: the uncondensed system (`SetupSymmetric()`, `SetupNonsymmetric()`), with all the
+  parameters but `Krylov::BiCGSTAB`; the Gauss-Seidel smoothers are Gauss-Seidel in each process (the hybrid ones: in
+  each thread), Jacobi between the processes. Not yet: `CondensedMatrix()`.
 - In Python: see [Python](#python).
 - The errors of the inputs are raised on all the processes.
 
@@ -219,7 +224,8 @@ result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
   MPI). `solver.Comm`: an mpi4py communicator (`MPI.COMM_SELF`, `MPI.COMM_WORLD`, or its Fortran handle
   `comm.py2f()`), to set, as in C++ (see [Several processes](#several-processes-mpi)). On several processes,
   `SetupSymmetric(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhosts)`: `faceGhosts`, the global numbers of
-  the ghost faces, a NumPy array of `int64` read in place (`None` by default: no ghosts).
+  the ghost faces, a NumPy array of `int64` read in place (`None` by default: no ghosts); `SetupNonsymmetric(A_TT, A_TF,
+  A_FT, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhosts, cellGhosts)`, `cellGhosts` likewise.
 
   ```python
   from mpi4py import MPI  # first: initializes MPI

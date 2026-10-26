@@ -19,8 +19,6 @@ inline void CheckDistributedArguments(const ProgramArguments& args)
 		refuse("the meshes are GMSH's only (-mesher gmsh)");
 	if (!args.Solver.UsesUncondensedAMG())
 		refuse("the solver is U-AMG only: -s fcglibuamg, libuamg, fcguamg or uamg (and gcr...)");
-	if (args.Solver.MG.UAMGNonsymmetric)
-		refuse("non-symmetric matrices are not solved yet (-uamg-nonsym)");
 	if (!args.Discretization.StaticCondensation)
 		refuse("the system is statically condensed");
 	if (args.Solver.InitialGuessCode.compare("0") != 0)
@@ -34,12 +32,14 @@ inline void CheckDistributedArguments(const ProgramArguments& args)
 
 // On several processes: the system assembled by every process (problem), distributed by rows: the cells of each process
 // given by the partition of the mesh (elementRanks), each face owned by the process of the smaller rank of its cells.
-// U-AMG through the library (libraryCondenses: the uncondensed system, symmetric; the library condenses it and computes
-// the cell unknowns), or the program's (iterativeSolver, on its condensed system). The solution of the faces
-// (systemSolution) and, with the library, of the cells (cellSolution): of the whole system, on every process.
+// U-AMG through the library (libraryCondenses: the uncondensed system; the library condenses it and computes the cell
+// unknowns), or the program's (iterativeSolver, on its condensed system). nonsymmetric (-uamg-nonsym): the blocks of a
+// non-symmetric matrix, in full, with A_F_T = A_T_F^T. The solution of the faces (systemSolution) and, with the
+// library, of the cells (cellSolution): of the whole system, on every process. A: the condensed operator of the program's
+// U-AMG, owned by the caller (the solver keeps a pointer to it).
 template <int Dim>
-void SolveDistributed(Diffusion_HHO<Dim>& problem, Mesh<Dim>* mesh, const vector<int>& elementRanks, IterativeSolver* iterativeSolver, bool libraryCondenses, int faceBlockSize,
-                      Timer& setupTimer, Timer& solvingTimer, Vector& systemSolution, Vector& cellSolution)
+void SolveDistributed(Diffusion_HHO<Dim>& problem, Mesh<Dim>* mesh, const vector<int>& elementRanks, IterativeSolver* iterativeSolver, bool libraryCondenses, bool nonsymmetric, int faceBlockSize,
+                      Timer& setupTimer, Timer& solvingTimer, DistributedMatrix& A, Vector& systemSolution, Vector& cellSolution)
 {
 	const Communicator& world = Communicator::Current();
 	int fbs = faceBlockSize;
@@ -60,16 +60,22 @@ void SolveDistributed(Diffusion_HHO<Dim>& problem, Mesh<Dim>* mesh, const vector
 	DistributedHybridSystem system(world, cellRanks, faceRanks, problem.A_T_ndF, fullA_FF, cbs, fbs);
 	cout << "Distributed system: " << system.Cells->GlobalSize << " cells and " << system.Faces->GlobalSize << " faces on " << world.Size() << " processes (" << world.Min(system.Faces->NOwned) << " to " << world.Max(system.Faces->NOwned) << " faces per process)" << endl;
 
-	SparseMatrix A_TT = system.CellBlocks(problem.A_T_T);
+	SparseMatrix A_TT = system.CellBlocks(nonsymmetric ? SparseMatrixOps::FullFromLower(problem.A_T_T) : problem.A_T_T);
 	SparseMatrix A_TF = system.Rows(problem.A_T_ndF, true, true, true);
+	// A_F_T: the rows of the faces of the process, the columns of the cells (ghost cells: those of its faces)
+	DistributedMatrix A_FT;
+	if (nonsymmetric)
+		A_FT = DistributedMatrix::FromGlobalColumns(system.Faces, *system.Cells, system.Rows(SparseMatrixOps::Transpose(problem.A_T_ndF), false, false, false), fbs, cbs);
 	Vector cellInterpOfOne = system.Own(problem.CellInterpOfOne(), true, 1);
 	Vector faceInterpOfOne = system.Own(problem.FaceInterpOfOne(), false, 1);
 	if (libraryCondenses)
 	{
 		LibraryUAMG* library = dynamic_cast<LibraryUAMG*>(iterativeSolver);
 		SparseMatrix A_FF = system.Rows(fullA_FF, false, true, true);
+		SparseMatrix localA_FT = nonsymmetric ? A_FT.LocalColumns() : SparseMatrix(); // kept alive until the solve
+		vector<int64_t> ghostCells = nonsymmetric ? vector<int64_t>(A_FT.ColMap->Ghosts.begin(), A_FT.ColMap->Ghosts.end()) : vector<int64_t>();
 		setupTimer.Start();
-		library->SetupFromDistributedBlocks(A_TT, A_TF, A_FF, system.GhostFaces(), cellInterpOfOne, faceInterpOfOne);
+		library->SetupFromDistributedBlocks(A_TT, A_TF, localA_FT, A_FF, system.GhostFaces(), ghostCells, cellInterpOfOne, faceInterpOfOne);
 		setupTimer.Stop();
 		Vector b_T = system.Own(problem.RHS_T(), true, cbs), b_F = system.Own(problem.RHS_ndF(), false, fbs);
 		Vector x_T(b_T.rows()), x_F = Vector::Zero(b_F.rows());
@@ -82,9 +88,10 @@ void SolveDistributed(Diffusion_HHO<Dim>& problem, Mesh<Dim>* mesh, const vector
 	}
 	else
 	{
-		DistributedMatrix A = DistributedMatrix::FromGlobalColumns(system.Faces, *system.Faces, system.Rows(SparseMatrixOps::FullFromLower(problem.A), false, true, false), fbs, fbs);
+		A = DistributedMatrix::FromGlobalColumns(system.Faces, *system.Faces, system.Rows(SparseMatrixOps::FullFromLower(problem.A), false, true, false), fbs, fbs);
 		setupTimer.Start();
-		iterativeSolver->Setup(A, A_TT, A_TF, system.FaceMap, cellInterpOfOne, faceInterpOfOne);
+		SparseMatrix localA_FT = nonsymmetric ? A_FT.RowsWithGhosts(*system.FaceMap, *system.Cells) : SparseMatrix();
+		iterativeSolver->Setup(A, A_TT, A_TF, localA_FT, system.FaceMap, cellInterpOfOne, faceInterpOfOne);
 		setupTimer.Stop();
 		Vector b = system.Own(problem.b, false, fbs);
 		cout << "Solving..." << endl;
@@ -356,6 +363,7 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 
 		Vector systemSolution;
 		Vector cellSolution; // computed by the library if libraryCondenses
+		DistributedMatrix distributedA; // on several processes, the operator of the program's U-AMG
 
 		// The solver on the physical cores only, by default (the assembly and the post-processing on all the logical cores)
 		Parallelism::SolverThreads solverThreads;
@@ -378,7 +386,7 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 			if (!iterativeSolver)
 				Utils::FatalError("On several processes, the solver is U-AMG.");
 			iterativeSolver->ComputeExactSolution = false;
-			SolveDistributed(*problem, mesh, elementRanks, iterativeSolver, libraryCondenses, faceBasis->Size(), setupTimer, solvingTimer, systemSolution, cellSolution);
+			SolveDistributed(*problem, mesh, elementRanks, iterativeSolver, libraryCondenses, args.Solver.MG.UAMGNonsymmetric, faceBasis->Size(), setupTimer, solvingTimer, distributedA, systemSolution, cellSolution);
 			cout << iterativeSolver->IterationCount << " iterations." << endl << endl;
 			if (results)
 				results->IterationCount = iterativeSolver->IterationCount;

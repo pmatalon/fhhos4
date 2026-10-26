@@ -420,6 +420,8 @@ if(ENABLE_TESTS)
 		set(mpi_program_cases
 			"2D_k1_fcglibuamg|3|-geo square -mesh tri -mesher gmsh -n 32 -k 1 -s fcglibuamg|L2 Error = 4.48e-04"
 			"2D_k2_fcguamg|4|-geo square -mesh tri -mesher gmsh -n 32 -k 2 -s fcguamg -smoothers hbgs,hrbgs|L2 Error = 1.23e-05"
+			"2D_k1_gcrlibuamg_nonsym|3|-geo square -mesh tri -mesher gmsh -n 32 -k 1 -s gcrlibuamg -uamg-nonsym|L2 Error = 4.48e-04"
+			"2D_k2_gcruamg_nonsym|4|-geo square -mesh tri -mesher gmsh -n 32 -k 2 -s gcruamg -uamg-nonsym -smoothers hbgs,hrbgs|L2 Error = 1.23e-05"
 			"3D_k0_fcguamg|2|-geo cube -mesh tetra -n 8 -k 0 -s fcguamg|L2 Error = 7.18e-01"
 			"3D_k2_fcglibuamg|4|-geo cube -mesh tetra -n 4 -k 2 -s fcglibuamg|L2 Error = 9.83e-02"
 			"InHouseMeshRefused|2|-geo square -mesh tri -mesher inhouse -n 8 -k 0 -s fcglibuamg|the meshes are GMSH's only")

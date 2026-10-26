@@ -4,7 +4,7 @@
 // NumPy arrays, a CSRMatrix (the result of the helpers that copy, as ToCSR()), or any object with the attributes
 // indptr, indices, data, shape and format "csr" (SciPy's CSR matrices: SciPy itself is not needed); the vectors: NumPy
 // vectors of float64. See README_library.md.
-// Compiled with MPI (FHHOS4_MPI): Solver.Comm, from an mpi4py communicator, and the ghost faces of SetupSymmetric().
+// Compiled with MPI (FHHOS4_MPI): Solver.Comm, from an mpi4py communicator, and the ghost faces (and cells) of the setups.
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -206,9 +206,9 @@ namespace
 		// The setups of the library on the views of the arrays (fhhos4::Solver::Setup())
 		void SetupViews(bool symmetric, const fhhos4::detail::CSRView& A_TT, const fhhos4::detail::CSRView& A_TF, const fhhos4::detail::CSRView* A_FT,
 		                const fhhos4::detail::CSRView& A_FF, const ConstVector& cellInterpOfOne, const ConstVector& faceInterpOfOne,
-		                const fhhos4::GhostNumbers& faceGhosts = fhhos4::GhostNumbers())
+		                const fhhos4::GhostNumbers& faceGhosts = fhhos4::GhostNumbers(), const fhhos4::GhostNumbers& cellGhosts = fhhos4::GhostNumbers())
 		{
-			Setup(symmetric, A_TT, A_TF, A_FT, A_FF, In(cellInterpOfOne), In(faceInterpOfOne), faceGhosts);
+			Setup(symmetric, A_TT, A_TF, A_FT, A_FF, In(cellInterpOfOne), In(faceInterpOfOne), faceGhosts, cellGhosts);
 		}
 
 		fhhos4::detail::CSRView CondensedView() const
@@ -228,17 +228,17 @@ namespace
 		}
 	};
 
-	// The global numbers of the ghost faces (SetupSymmetric() on several processes): an int64 NumPy array, read in place
-	// (only by the setup), or None (no ghosts)
-	fhhos4::GhostNumbers ToGhostNumbers(nb::handle ghosts)
+	// The global numbers of the ghost faces or cells (the setups on several processes): an int64 NumPy array, read in
+	// place (only by the setup), or None (no ghosts)
+	fhhos4::GhostNumbers ToGhostNumbers(nb::handle ghosts, const char* name)
 	{
 		if (ghosts.is_none())
 			return fhhos4::GhostNumbers();
 		bool is64;
 		size_t size;
-		const void* data = IndexArray(ghosts, "faceGhosts", is64, size);
+		const void* data = IndexArray(ghosts, name, is64, size);
 		if (!is64)
-			throw nb::type_error("fhhos4: faceGhosts must be an array of int64 (global numbers), not converted");
+			throw nb::type_error((std::string("fhhos4: ") + name + " must be an array of int64 (global numbers), not converted").c_str());
 		return fhhos4::GhostNumbers(size, (const std::int64_t*)data);
 	}
 
@@ -436,22 +436,24 @@ NB_MODULE(fhhos4, m)
 			[](PySolver& s, nb::handle comm) { s.Comm = ToComm(comm); s.CommObject = nb::borrow(comm); })
 #endif
 
-		// Setups from the blocks of the system. faceGhosts: on several processes, the global numbers of the ghost faces (int64 array)
+		// Setups from the blocks of the system. faceGhosts, cellGhosts: on several processes, the global numbers of the ghost
+		// faces and cells (int64 arrays)
 		.def("SetupSymmetric", [](PySolver& s, nb::handle A_TT, nb::handle A_TF, nb::handle A_FF, const ConstVector& cellInterpOfOne, const ConstVector& faceInterpOfOne, nb::handle faceGhosts)
 			{
 				PyCSRView a_TT = ToView(A_TT, "A_TT"), a_TF = ToView(A_TF, "A_TF"), a_FF = ToView(A_FF, "A_FF");
 				fhhos4::detail::CSRView tt = a_TT.Native("A_TT"), tf = a_TF.Native("A_TF"), ff = a_FF.Native("A_FF");
-				fhhos4::GhostNumbers ghosts = ToGhostNumbers(faceGhosts);
+				fhhos4::GhostNumbers ghosts = ToGhostNumbers(faceGhosts, "faceGhosts");
 				s.Run([&] { s.SetupViews(true, tt, tf, nullptr, ff, cellInterpOfOne, faceInterpOfOne, ghosts); }, {});
 			},
 			"A_TT"_a, "A_TF"_a, "A_FF"_a, "cellInterpOfOne"_a.noconvert(), "faceInterpOfOne"_a.noconvert(), "faceGhosts"_a = nb::none())
-		.def("SetupNonsymmetric", [](PySolver& s, nb::handle A_TT, nb::handle A_TF, nb::handle A_FT, nb::handle A_FF, const ConstVector& cellInterpOfOne, const ConstVector& faceInterpOfOne)
+		.def("SetupNonsymmetric", [](PySolver& s, nb::handle A_TT, nb::handle A_TF, nb::handle A_FT, nb::handle A_FF, const ConstVector& cellInterpOfOne, const ConstVector& faceInterpOfOne, nb::handle faceGhosts, nb::handle cellGhosts)
 			{
 				PyCSRView a_TT = ToView(A_TT, "A_TT"), a_TF = ToView(A_TF, "A_TF"), a_FT = ToView(A_FT, "A_FT"), a_FF = ToView(A_FF, "A_FF");
 				fhhos4::detail::CSRView tt = a_TT.Native("A_TT"), tf = a_TF.Native("A_TF"), ft = a_FT.Native("A_FT"), ff = a_FF.Native("A_FF");
-				s.Run([&] { s.SetupViews(false, tt, tf, &ft, ff, cellInterpOfOne, faceInterpOfOne); }, { a_FT });
+				fhhos4::GhostNumbers fGhosts = ToGhostNumbers(faceGhosts, "faceGhosts"), cGhosts = ToGhostNumbers(cellGhosts, "cellGhosts");
+				s.Run([&] { s.SetupViews(false, tt, tf, &ft, ff, cellInterpOfOne, faceInterpOfOne, fGhosts, cGhosts); }, { a_FT });
 			},
-			"A_TT"_a, "A_TF"_a, "A_FT"_a, "A_FF"_a, "cellInterpOfOne"_a.noconvert(), "faceInterpOfOne"_a.noconvert())
+			"A_TT"_a, "A_TF"_a, "A_FT"_a, "A_FF"_a, "cellInterpOfOne"_a.noconvert(), "faceInterpOfOne"_a.noconvert(), "faceGhosts"_a = nb::none(), "cellGhosts"_a = nb::none())
 		// x_T, x_F: NumPy vectors of float64, written in place (x_F: the initial guess on input)
 		.def("Solve", [](PySolver& s, const ConstVector& b_T, const ConstVector& b_F, Vector x_T, Vector x_F)
 			{ return s.Solve(b_T, b_F, x_T, x_F); },

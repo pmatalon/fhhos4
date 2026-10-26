@@ -26,10 +26,11 @@ public:
 	virtual void SetupFromBlocks(const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_T, const SparseMatrix& A_F_F, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) = 0;
 
 	// On several processes (the program's MPI_COMM_WORLD): from the rows of the cells and faces of the process (see
-	// fhhos4::Solver::SetupSymmetric()), symmetric: A_T_T, A_T_F (columns: the faces of the process, then its ghosts,
-	// whose global numbers are faceGhosts), A_F_F (the rows of its faces, in full), the interpolations of 1 on its cells
-	// and faces. Then Solve(b_T, b_F, x_T, x_F) with the vectors of the process.
-	virtual void SetupFromDistributedBlocks(const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F, const vector<int64_t>& faceGhosts, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) = 0;
+	// fhhos4::Solver::SetupSymmetric() and SetupNonsymmetric()): A_T_T, A_T_F (columns: the faces of the process, then its
+	// ghosts, whose global numbers are faceGhosts), A_F_T (empty on all the processes if the matrix is symmetric; columns:
+	// the cells of the process, then its ghost cells, cellGhosts), A_F_F (the rows of its faces, in full), the
+	// interpolations of 1 on its cells and faces. Then Solve(b_T, b_F, x_T, x_F) with the vectors of the process.
+	virtual void SetupFromDistributedBlocks(const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_T, const SparseMatrix& A_F_F, const vector<int64_t>& faceGhosts, const vector<int64_t>& cellGhosts, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) = 0;
 
 	// Solves the uncondensed system, after SetupFromBlocks(). x_F: the initial guess on input.
 	virtual void Solve(const Vector& b_T, const Vector& b_F, Vector& x_T, Vector& x_F) = 0;

@@ -84,7 +84,7 @@ TEST(DistributedUAMG, CartesianSystem)
 		UAMGWithFCG solver(2, 0, 1, 1, 1e-10);
 		Vector cellOnes = Vector::Ones(system.Cells->NOwned), faceOnes = Vector::Ones(system.Faces->NOwned);
 		SparseMatrix A_TF = system.A_TF.LocalColumns();
-		solver.FCG->Setup(system.S, system.A_TT, A_TF, system.A_TF.ColMap, cellOnes, faceOnes);
+		solver.FCG->Setup(system.S, system.A_TT, A_TF, SparseMatrix(), system.A_TF.ColMap, cellOnes, faceOnes);
 		Vector localB = b.segment(system.Faces->Begin, system.Faces->NOwned);
 		Vector x = static_cast<IterativeSolver&>(*solver.FCG).Solve(localB);
 		int iterations = solver.FCG->IterationCount;

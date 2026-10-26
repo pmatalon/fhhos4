@@ -32,12 +32,41 @@ namespace
 	}
 }
 
-// The uncondensed system distributed by rows, through the interface of the library: the ghost faces numbered in reverse
-// order of their global numbers (any order). The solution of the system on one process.
-void ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation)
+// The entities of the columns of the rows not owned in owners (the ghosts), in reverse order of their global numbers
+// (any order)
+vector<BigNumber> ReversedGhosts(std::initializer_list<const SparseMatrix*> rows, const IndexMap& owners)
+{
+	vector<BigNumber> ghosts;
+	for (const SparseMatrix* M : rows)
+		for (BigNumber p = 0; p < (BigNumber)M->nonZeros(); p++)
+			if (!owners.IsOwned(M->innerIndexPtr()[p]))
+				ghosts.push_back(M->innerIndexPtr()[p]);
+	sort(ghosts.begin(), ghosts.end());
+	ghosts.erase(unique(ghosts.begin(), ghosts.end()), ghosts.end());
+	reverse(ghosts.begin(), ghosts.end());
+	return ghosts;
+}
+
+// The rows with their columns numbered locally: the entities owned in owners, then the ghosts in their order
+SparseMatrix LocalColumns(const SparseMatrix& rows, const IndexMap& owners, const vector<BigNumber>& ghosts)
+{
+	auto local = [&](BigNumber e) -> BigNumber
+	{
+		if (owners.IsOwned(e))
+			return e - owners.Begin;
+		auto it = find(ghosts.begin(), ghosts.end(), e);
+		return it == ghosts.end() ? -1 : owners.NOwned + (it - ghosts.begin());
+	};
+	return DistributedMatrix::RenumberColumns(rows, local, owners.NOwned + ghosts.size(), 1);
+}
+
+// The uncondensed system distributed by rows, through the interface of the library: the ghost faces and cells numbered
+// in reverse order of their global numbers (any order). The solution of the system on one process. Non-symmetric if
+// asymmetry != 0.
+void ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double asymmetry = 0)
 {
 	int n = 60;
-	CartesianHybridSystem global(n, 0);
+	CartesianHybridSystem global(n, asymmetry);
 	PartitionedSystem system(global, n, PartitionShape::Blocks, World());
 	const IndexMap& faces = *system.Faces;
 	const IndexMap& cells = *system.Cells;
@@ -49,46 +78,30 @@ void ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation)
 	{
 		fhhos4::Solver solver = CartesianSolver(MPI_COMM_SELF);
 		solver.Prolongation = prolongation;
-		solver.SetupSymmetric(system.Global.A_TT, system.Global.A_TF, system.Global.A_FF, Vector::Ones(global.A_TT.rows()), Vector::Ones(global.S.rows()));
+		Vector cellOnes = Vector::Ones(global.A_TT.rows()), faceOnes = Vector::Ones(global.S.rows());
+		if (asymmetry == 0)
+			solver.SetupSymmetric(system.Global.A_TT, system.Global.A_TF, system.Global.A_FF, cellOnes, faceOnes);
+		else
+			solver.SetupNonsymmetric(system.Global.A_TT, system.Global.A_TF, system.Global.A_FT, system.Global.A_FF, cellOnes, faceOnes);
 		expectedIterations = solver.Solve(b_T, b_F, expectedX_T, expectedX_F).Iterations;
 	}
 
-	// The faces of the rows of the process (of A_TF and A_FF): its own, then the others, in reverse order of their global
-	// numbers
-	vector<BigNumber> ghostFaces;
+	// The faces of the rows of the process (of A_TF and A_FF): its own, then the others; the cells of A_FT: the same
 	SparseMatrix ownA_TF = system.Global.A_TF.middleRows(cells.Begin, cells.NOwned);
 	SparseMatrix ownA_FF = system.Global.A_FF.middleRows(faces.Begin, faces.NOwned);
-	for (const SparseMatrix* M : { &ownA_TF, &ownA_FF })
-	{
-		for (BigNumber p = 0; p < (BigNumber)M->nonZeros(); p++)
-		{
-			BigNumber f = M->innerIndexPtr()[p];
-			if (!faces.IsOwned(f))
-				ghostFaces.push_back(f);
-		}
-	}
-	sort(ghostFaces.begin(), ghostFaces.end());
-	ghostFaces.erase(unique(ghostFaces.begin(), ghostFaces.end()), ghostFaces.end());
-	reverse(ghostFaces.begin(), ghostFaces.end());
-	auto localFace = [&](BigNumber f) -> BigNumber
-	{
-		if (faces.IsOwned(f))
-			return f - faces.Begin;
-		auto it = find(ghostFaces.begin(), ghostFaces.end(), f);
-		return it == ghostFaces.end() ? -1 : faces.NOwned + (it - ghostFaces.begin());
-	};
-	BigNumber nLocalFaces = faces.NOwned + ghostFaces.size();
-	auto localColumns = [&](const SparseMatrix& rows)
-	{
-		return DistributedMatrix::RenumberColumns(rows, localFace, nLocalFaces, 1);
-	};
-	fhhos4::SparseMatrix A_TT = system.A_TT, A_TF = localColumns(ownA_TF);
-	fhhos4::SparseMatrix A_FF = localColumns(ownA_FF);
-	vector<int64_t> ghosts(ghostFaces.begin(), ghostFaces.end());
+	SparseMatrix ownA_FT = system.Global.A_FT.middleRows(faces.Begin, faces.NOwned);
+	vector<BigNumber> ghostFaces = ReversedGhosts({ &ownA_TF, &ownA_FF }, faces), ghostCells = ReversedGhosts({ &ownA_FT }, cells);
+	fhhos4::SparseMatrix A_TT = system.A_TT, A_TF = LocalColumns(ownA_TF, faces, ghostFaces);
+	fhhos4::SparseMatrix A_FF = LocalColumns(ownA_FF, faces, ghostFaces), A_FT = LocalColumns(ownA_FT, cells, ghostCells);
+	vector<int64_t> faceGhosts(ghostFaces.begin(), ghostFaces.end()), cellGhosts(ghostCells.begin(), ghostCells.end());
 
 	fhhos4::Solver solver = CartesianSolver(World().Comm());
 	solver.Prolongation = prolongation;
-	solver.SetupSymmetric(A_TT, A_TF, A_FF, Vector::Ones(cells.NOwned), Vector::Ones(faces.NOwned), fhhos4::GhostNumbers(ghosts.size(), ghosts.data()));
+	Vector cellOnes = Vector::Ones(cells.NOwned), faceOnes = Vector::Ones(faces.NOwned);
+	if (asymmetry == 0)
+		solver.SetupSymmetric(A_TT, A_TF, A_FF, cellOnes, faceOnes, fhhos4::GhostNumbers(faceGhosts.size(), faceGhosts.data()));
+	else
+		solver.SetupNonsymmetric(A_TT, A_TF, A_FT, A_FF, cellOnes, faceOnes, fhhos4::GhostNumbers(faceGhosts.size(), faceGhosts.data()), fhhos4::GhostNumbers(cellGhosts.size(), cellGhosts.data()));
 	Vector x_T(cells.NOwned), x_F = Vector::Zero(faces.NOwned);
 	fhhos4::Result result = solver.Solve(b_T.segment(cells.Begin, cells.NOwned), b_F.segment(faces.Begin, faces.NOwned), x_T, x_F);
 
@@ -112,6 +125,17 @@ TEST(DistributedLibrary, UncondensedSystem)
 TEST(DistributedLibrary, UncondensedSystemHarmonicExtension)
 {
 	ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::HarmonicExtension);
+}
+
+// SetupNonsymmetric(): A_FT with the ghost cells of its rows; 0.9: convection-dominated (the downwind order of each
+// process)
+TEST(DistributedLibrary, NonsymmetricUncondensedSystem)
+{
+	for (double asymmetry : { 0.3, 0.9 })
+	{
+		ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::Reconstruction, asymmetry);
+		ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::HarmonicExtension, asymmetry);
+	}
 }
 
 // The inputs are checked on all the processes: an error on one of them is an error on all of them

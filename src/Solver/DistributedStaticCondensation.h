@@ -4,23 +4,33 @@
 #include "../Utils/DistributedMatrix.h"
 using namespace std;
 
-// The static condensation of a symmetric hybrid system distributed by rows over the processes (see StaticCondensation):
-// each process owns cells and faces; A_TT and A_TF are the rows of its cells, the columns of A_TF numbered in Faces (its
+// The static condensation of a hybrid system distributed by rows over the processes (see StaticCondensation): each
+// process owns cells and faces; A_TT and A_TF are the rows of its cells, the columns of A_TF numbered in Faces (its
 // faces, then the other faces of its cells: the ghosts); A_FF the rows of its faces, in full (both triangles), with the
-// same columns. Each process condenses its cells (StaticCondensation); the contributions of a cell to the faces of other
-// processes (their rows of A, their right-hand side) are added to their owners'.
+// same columns. Non-symmetric system: A_FT on the rows of all the faces of Faces (owned, then ghosts) and the columns of
+// the cells of the process (DistributedMatrix::RowsWithGhosts()). Each process condenses its cells
+// (StaticCondensation); the contributions of a cell to the faces of other processes (their rows of A, their right-hand
+// side) are added to their owners'.
 class DistributedStaticCondensation
 {
 private:
 	shared_ptr<const IndexMap> _faces;
 	int _faceBlockSize;
-	StaticCondensation _local; // the cells of the process: its A_FT = A_TF^T has the rows of all its local faces
+	SparseMatrix _A_FT; // empty if the system is symmetric
+	StaticCondensation _local; // the cells of the process, on the rows of all its local faces (A_FT = A_TF^T if symmetric)
 
 public:
-	DistributedStaticCondensation(const SparseMatrix& A_TT, const SparseMatrix& A_TF, shared_ptr<const IndexMap> faces, int cellBlockSize, int faceBlockSize)
-		: _faces(faces), _faceBlockSize(faceBlockSize), _local(A_TT, A_TF, nullptr, cellBlockSize)
+	// A_FT: empty if the system is symmetric
+	DistributedStaticCondensation(const SparseMatrix& A_TT, const SparseMatrix& A_TF, SparseMatrix A_FT, shared_ptr<const IndexMap> faces, int cellBlockSize, int faceBlockSize)
+		: _faces(faces), _faceBlockSize(faceBlockSize), _A_FT(std::move(A_FT)), _local(A_TT, A_TF, _A_FT.rows() > 0 ? &_A_FT : nullptr, cellBlockSize)
 	{
 		assert(A_TF.cols() == faces->NLocal() * faceBlockSize);
+	}
+
+	// A_FT on the local faces (empty if the system is symmetric), for the setup of U-AMG
+	const SparseMatrix& A_FT() const
+	{
+		return _A_FT;
 	}
 
 	DistributedStaticCondensation(const DistributedStaticCondensation&) = delete;

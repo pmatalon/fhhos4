@@ -45,7 +45,8 @@
 // Compiled with MPI (FHHOS4_MPI, -DENABLE_MPI=ON), a Solver works on the processes of its communicator (Solver::Comm),
 // on a system distributed by rows: each process gives the rows of its own cells and faces, the columns of the faces
 // numbered locally, its own faces first, then the other faces of its cells (its ghosts), whose global numbers it gives
-// too (GhostNumbers). See the setups below, and README_library.md.
+// too (GhostNumbers); the same for the columns of the cells of A_FT (non-symmetric). See the setups below, and
+// README_library.md.
 namespace fhhos4
 {
 	// The index type of the sparse matrices of the library: int (32 bits), or 64 bits if fhhos4 is compiled with
@@ -151,11 +152,11 @@ namespace fhhos4
 		}
 	}
 
-	// On several processes (MPI): the global numbers of the ghosts of a process (the faces of its rows owned by other
-	// processes), in the order of their local numbers (after those of its own faces), read in place. The global numbers:
-	// the faces of the process of rank 0 first, then those of the process of rank 1, etc., each process's in the order
-	// of its local numbers (so that the faces of each process are numbered contiguously). Any order of the ghosts, no
-	// repetition.
+	// On several processes (MPI): the global numbers of the ghosts of a process (the faces, or cells, of its rows owned by
+	// other processes), in the order of their local numbers (after those of its own faces, or cells), read in place. The
+	// global numbers: the faces of the process of rank 0 first, then those of the process of rank 1, etc., each process's
+	// in the order of its local numbers (so that the faces of each process are numbered contiguously). Any order of the
+	// ghosts, no repetition.
 	struct GhostNumbers
 	{
 		std::int64_t Count = 0;
@@ -389,8 +390,7 @@ namespace fhhos4
 		}
 
 		// Setup for a non-symmetric system (e.g. convection-diffusion), whose symmetric part is positive definite: as
-		// SetupSymmetric() (on one process only, for now), with the block A_FT (faces x cells) and all the blocks read in
-		// full: the same
+		// SetupSymmetric(), with the block A_FT (faces x cells) and all the blocks read in full: the same
 		// algorithm runs on the matrix itself. The couplings of the aggregation are computed from the averaged traces of
 		// the blocks of A_TF and A_FT; the coarse operators are the Galerkin products P^T A P (as AGMG: Y. Notay, "An
 		// aggregation-based algebraic multigrid method", ETNA 37, 2010); the Gauss-Seidel smoothers follow the downwind
@@ -399,19 +399,25 @@ namespace fhhos4
 		// The solver keeps a reference to A_FT, read by each Solve(b_T, b_F, x_T, x_F) (b_F - A_FT A_TT^{-1} b_T): A_FT must
 		// stay alive and unchanged until the next setup or the destruction of the solver (not a temporary matrix). The
 		// other blocks may be freed after the setup.
+		// On several processes (Comm), as SetupSymmetric(), A_TT and A_FF read in full, and A_FT the rows of the faces of
+		// the process, its columns numbered locally: the cells of the process (those of the rows of A_TT, in their order),
+		// then its ghost cells, the other cells of its rows (of other processes), whose global numbers are cellGhosts (as
+		// faceGhosts: the cells of the process of rank 0 first, etc.). On one process, faceGhosts and cellGhosts are empty.
 		// See README_library.md.
 		template <typename TT, typename TF, typename FT, typename FF>
 		void SetupNonsymmetric(const Eigen::SparseCompressedBase<TT>& A_TT, const Eigen::SparseCompressedBase<TF>& A_TF, const Eigen::SparseCompressedBase<FT>& A_FT,
 		                       const Eigen::SparseCompressedBase<FF>& A_FF,
-		                       const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne)
+		                       const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne,
+		                       const GhostNumbers& faceGhosts = GhostNumbers(), const GhostNumbers& cellGhosts = GhostNumbers())
 		{
 			detail::CSRView a_FT = View(A_FT);
-			Setup(false, View(A_TT), View(A_TF), &a_FT, View(A_FF), In(cellInterpOfOne), In(faceInterpOfOne), GhostNumbers());
+			Setup(false, View(A_TT), View(A_TF), &a_FT, View(A_FF), In(cellInterpOfOne), In(faceInterpOfOne), faceGhosts, cellGhosts);
 		}
 
 		template <typename TT, typename TF, typename FF, int Options, typename Index>
 		void SetupNonsymmetric(const Eigen::SparseCompressedBase<TT>&, const Eigen::SparseCompressedBase<TF>&, Eigen::SparseMatrix<double, Options, Index>&& A_FT,
-		                       const Eigen::SparseCompressedBase<FF>&, const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&) = delete;
+		                       const Eigen::SparseCompressedBase<FF>&, const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&,
+		                       const GhostNumbers& = GhostNumbers(), const GhostNumbers& = GhostNumbers()) = delete;
 
 		// Solves the system, after SetupSymmetric() or SetupNonsymmetric(): condenses the right-hand
 		// side, b = b_F - A_FT A_TT^{-1} b_T, solves A x_F = b, then computes x_T = A_TT^{-1} (b_T - A_TF x_F).
@@ -455,9 +461,10 @@ namespace fhhos4
 
 	protected:
 		// The implementation of the setups, on the arrays of the matrices (also for the Python module). A_FT: null for a
-		// symmetric matrix; faceGhosts: on several processes.
+		// symmetric matrix; faceGhosts, cellGhosts (A_FT): on several processes.
 		void Setup(bool symmetric, const detail::CSRView& A_TT, const detail::CSRView& A_TF, const detail::CSRView* A_FT, const detail::CSRView& A_FF,
-		           detail::ConstVectorView cellInterpOfOne, detail::ConstVectorView faceInterpOfOne, const GhostNumbers& faceGhosts);
+		           detail::ConstVectorView cellInterpOfOne, detail::ConstVectorView faceInterpOfOne, const GhostNumbers& faceGhosts,
+		           const GhostNumbers& cellGhosts = GhostNumbers());
 		detail::CSRView CondensedMatrixView() const;
 
 		static detail::ConstVectorView In(const Eigen::Ref<const Eigen::VectorXd>& v)
@@ -488,7 +495,8 @@ namespace fhhos4
 		}
 
 		void SetupDistributed(bool symmetric, const detail::CSRView& A_TT, const detail::CSRView& A_TF, const detail::CSRView* A_FT, const detail::CSRView& A_FF,
-		                      detail::ConstVectorView cellInterpOfOne, detail::ConstVectorView faceInterpOfOne, const GhostNumbers& faceGhosts);
+		                      detail::ConstVectorView cellInterpOfOne, detail::ConstVectorView faceInterpOfOne, const GhostNumbers& faceGhosts,
+		                      const GhostNumbers& cellGhosts);
 		Result SolveCondensed(detail::ConstVectorView b, detail::VectorView x);
 		Result SolveUncondensed(detail::ConstVectorView b_T, detail::ConstVectorView b_F, detail::VectorView x_T, detail::VectorView x_F);
 	};

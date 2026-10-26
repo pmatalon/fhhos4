@@ -223,35 +223,4 @@ public:
 		for (BigNumber cf = 0; cf < pass.NCoarseFaces; cf++)
 			CoarseFacePosition[cf] = CoarseFaceMap->Local(global[cf]);
 	}
-
-	// The rows of S (distributed by rows, square on the faces) of all the local faces of the pass (FaceMap: owned, then
-	// ghosts, whose rows are fetched from their owners), with their columns of the local faces (the others dropped),
-	// numbered locally in FaceMap
-	static SparseMatrix LocalFaceRows(const DistributedMatrix& S, const IndexMap& faceMap, int blockSize)
-	{
-		SparseMatrix owned = S.GlobalColumns();
-		SparseMatrix ghosts = DistributedMatrix::FetchGhostRows(faceMap, owned, blockSize);
-		int bs = blockSize;
-		BigNumber nOwnedRows = owned.rows();
-		ThreadLocal<vector<pair<SparseMatrixIndex, double>>> rowsTL;
-		return SparseMatrixOps::BuildByRows(faceMap.NLocal() * bs, faceMap.NLocal() * bs, 1, [&](BigNumber firstRow, BigNumber lastRow, SparseMatrixOps::RowChunk& chunk)
-		{
-			vector<pair<SparseMatrixIndex, double>>& row = rowsTL.Local();
-			for (BigNumber i = firstRow; i < lastRow; ++i)
-			{
-				row.clear();
-				const SparseMatrix& M = i < nOwnedRows ? owned : ghosts;
-				for (SparseMatrix::InnerIterator it(M, i < nOwnedRows ? i : i - nOwnedRows); it; ++it)
-				{
-					BigNumber f = faceMap.Local(it.col() / bs);
-					if (f >= 0)
-						row.push_back({ (SparseMatrixIndex)(f * bs + it.col() % bs), it.value() });
-				}
-				sort(row.begin(), row.end(), [](const auto& x, const auto& y) { return x.first < y.first; });
-				for (const auto& coeff : row)
-					chunk.Add(coeff.first, coeff.second);
-				chunk.EndRow();
-			}
-		});
-	}
 };

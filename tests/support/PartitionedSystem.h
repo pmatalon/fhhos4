@@ -10,7 +10,7 @@ namespace fhhos4_tests
 	// of processes not greater than its square root)
 	enum class PartitionShape { Strips, Blocks };
 
-	// The Cartesian system of n x n cells (CartesianHybridSystem, symmetric) partitioned among the processes of comm,
+	// The Cartesian system of n x n cells (CartesianHybridSystem) partitioned among the processes of comm,
 	// renumbered so that each process owns contiguous cells and faces: the cells of the processes in rank order (in the
 	// order of the system on each one), each face owned by the process of its first cell (the smaller rank of its cells).
 	// Global: the renumbered system, on every process; the distributed blocks: the rows of the process.
@@ -19,7 +19,7 @@ namespace fhhos4_tests
 		Communicator Self; // a single process
 		struct
 		{
-			SparseMatrix A_TT, A_TF, A_FF, S;
+			SparseMatrix A_TT, A_TF, A_FT, A_FF, S;
 		} Global;
 		shared_ptr<const IndexMap> Cells, Faces; // the ownership, without ghosts
 		SparseMatrix A_TT;                       // the cells of the process
@@ -47,6 +47,7 @@ namespace fhhos4_tests
 			std::vector<BigNumber> newCell = Renumbering(cellRank, P), newFace = Renumbering(faceRank, P);
 			Global.A_TT = Permute(system.A_TT, newCell, newCell);
 			Global.A_TF = Permute(system.A_TF, newCell, newFace);
+			Global.A_FT = Permute(system.A_FT, newFace, newCell);
 			Global.A_FF = Permute(system.A_FF, newFace, newFace);
 			Global.S = Permute(system.S, newFace, newFace);
 

@@ -62,10 +62,12 @@ public:
 	}
 
 	// Setup on several processes from the blocks of the uncondensed system of a hybrid discretization (see the
-	// sequential one above), symmetric, distributed by rows: A (faces x faces) the rows of the faces of the process;
+	// sequential one above), distributed by rows: A (faces x faces) the rows of the faces of the process;
 	// A_T_T and A_T_F the rows of its cells, the columns of A_T_F numbered in faceMap (its faces, then the other faces of
-	// its cells, the ghosts); the interpolations of 1 on its cells and faces.
-	virtual void Setup(const DistributedMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, shared_ptr<const IndexMap> faceMap, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne)
+	// its cells, the ghosts); A_F_T empty if the matrix is symmetric, otherwise the rows of all the faces of faceMap and
+	// the columns of the cells of the process (DistributedMatrix::RowsWithGhosts()); the interpolations of 1 on its cells
+	// and faces.
+	virtual void Setup(const DistributedMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_T, shared_ptr<const IndexMap> faceMap, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne)
 	{
 		Utils::FatalError("This solver is not compatible with matrix blocks arising from a hybrid discretization on several processes.");
 	}
