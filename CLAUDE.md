@@ -54,7 +54,8 @@ CMake options (`-D<OPTION>=ON/OFF`):
 - `ENABLE_PROGRAM` (ON): OFF builds the library `fhhos4` alone (needs only Eigen): the CMake file has a library
   section, then the program's, skipped by `return()`.
 - `ENABLE_PYTHON` (OFF): the Python module of the library (`library/python`).
-- `ENABLE_MPI` (OFF): the library and the program on several processes.
+- `ENABLE_MPI` (OFF): the library and the program on several processes; needs MUMPS (the coarse solver, ADR-0021).
+- `ENABLE_MUMPS` (OFF; always with `ENABLE_MPI`): MUMPS on one process too (`CoarseSolver::MUMPS`, `mumpsch|mumpslu`).
 
 `cmake --install . --prefix <prefix> [--component library|program]`: program, meshes (`share/fhhos4/meshes`), library,
 headers, CMake package. No path of the sources is compiled in (`Utils/FileSystem.h`): the program finds the meshes
@@ -71,7 +72,7 @@ From `build/`:
 ctest --output-on-failure
 ```
 
-331 tests, ~8 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
+332 tests, ~8 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
 iteration counts of the papers in `reproducibility/` — see `tests/README.md`. Covers
 `Program_Diffusion_HHO` and `Program_BiHarmonic_HHO` (HHO, static condensation), 2D/3D,
 in-house, GMSH and polygonal meshes, the full Neumann problem (`FullNeumann*`, 2D), and the library (`UAMGLibrary*`,

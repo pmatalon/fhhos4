@@ -801,6 +801,37 @@ TEST(UAMGLibrary, GCR)
 	EXPECT_LT(RelativeError(system, x), 1e-8);
 }
 
+// CoarseSolver::MUMPS: the iterations of Eigen's factorizations, symmetric (LDL^T) and non-symmetric (LU); refused if
+// compiled without MUMPS
+TEST(UAMGLibrary, MUMPSCoarseSolver)
+{
+	for (bool symmetric : { true, false })
+	{
+		HybridSystem system = symmetric ? HybridSystem(64) : NonsymmetricSystem(64, 0.3);
+		auto setup = [&system](fhhos4::Solver& solver)
+		{
+			if (system.Symmetric)
+				solver.SetupSymmetric(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+			else
+				solver.SetupNonsymmetric(system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+		};
+		fhhos4::Solver eigen = ToySolver(), mumps = ToySolver();
+		mumps.CoarseSolver = fhhos4::CoarseSolver::MUMPS;
+#ifdef MUMPS_ENABLED
+		setup(eigen);
+		setup(mumps);
+		Eigen::VectorXd x = Eigen::VectorXd::Zero(system.b.size()), y = x;
+		fhhos4::Result r = eigen.Solve(system.b, x);
+		fhhos4::Result s = mumps.Solve(system.b, y);
+		EXPECT_TRUE(s.Converged);
+		EXPECT_EQ(s.Iterations, r.Iterations) << "symmetric " << symmetric;
+		EXPECT_LT(RelativeError(system, y), 1e-8);
+#else
+		EXPECT_THROW(setup(mumps), fhhos4::Error);
+#endif
+	}
+}
+
 // The default smoothers: the Chebyshev of the fourth kind of degree 2 for a symmetric matrix, the same results on 4 and
 // 1 threads; for a non-symmetric one, the hybrid Gauss-Seidel (parallel) on several threads, the sequential one on 1
 TEST(UAMGLibrary, DefaultSmoothers)

@@ -244,12 +244,15 @@ namespace fhhos4
 		BlockChebyshevFourthKind        // bcheb4: the same, of the fourth kind (Lottes 2023): no lower bound to choose
 	};
 
-	// The solver of the coarsest level (Solver::CoarseSolver)
+	// The solver of the coarsest level (Solver::CoarseSolver). On several processes (MPI), the factorizations are MUMPS's,
+	// distributed over the processes.
 	enum class CoarseSolver
 	{
 		Default,  // Cholesky for a symmetric matrix (SetupSymmetric...()), LU otherwise (SetupNonsymmetric...())
 		Cholesky, // sparse Cholesky factorization, for a symmetric positive definite matrix
-		LU        // sparse LU factorization
+		LU,       // sparse LU factorization
+		MUMPS     // MUMPS's sparse factorization: LDL^T for a symmetric matrix (positive definite), LU otherwise. Needs
+		          // the library compiled with MUMPS (ENABLE_MUMPS; always with MPI)
 	};
 
 	struct Result

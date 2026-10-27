@@ -80,7 +80,9 @@ private:
 	{
 		static const Table<fhhos4::CoarseSolver, string> coarseSolvers = {
 			{ fhhos4::CoarseSolver::Cholesky, "ch" },
-			{ fhhos4::CoarseSolver::LU,       "lu" }
+			{ fhhos4::CoarseSolver::LU,       "lu" },
+			{ fhhos4::CoarseSolver::MUMPS,    "mumpsch" },
+			{ fhhos4::CoarseSolver::MUMPS,    "mumpslu" }
 		};
 		return coarseSolvers;
 	}
@@ -140,9 +142,11 @@ public:
 		return ToProgram(PolynomialSpaces(), polynomialSpace, "PolynomialSpace");
 	}
 
-	// The code of the coarse solver (not Default)
-	static string ProgramCoarseSolver(fhhos4::CoarseSolver coarseSolver)
+	// The code of the coarse solver (not Default); MUMPS: its factorization for the symmetry of the matrix
+	static string ProgramCoarseSolver(fhhos4::CoarseSolver coarseSolver, bool symmetric)
 	{
+		if (coarseSolver == fhhos4::CoarseSolver::MUMPS)
+			return symmetric ? "mumpsch" : "mumpslu";
 		return ToProgram(CoarseSolvers(), coarseSolver, "CoarseSolver");
 	}
 
@@ -183,7 +187,7 @@ public:
 	{
 		optional<fhhos4::CoarseSolver> coarseSolver = ToLibrary(CoarseSolvers(), coarseSolverCode);
 		if (!coarseSolver)
-			Utils::FatalError("The library fhhos4 has no coarse solver '" + coarseSolverCode + "' (-coarse-solver): ch or lu.");
+			Utils::FatalError("The library fhhos4 has no coarse solver '" + coarseSolverCode + "' (-coarse-solver): ch, lu, mumpsch or mumpslu.");
 		return *coarseSolver;
 	}
 };

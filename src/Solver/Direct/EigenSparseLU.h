@@ -1,5 +1,6 @@
 #pragma once
 #include "../Solver.h"
+#include "MUMPS.h"
 using namespace std;
 
 class EigenSparseLU : public Solver
@@ -9,19 +10,20 @@ private:
 	// as column pointers and silently factorizes a wrong matrix when the sparsity pattern is not symmetric.
 	// Memory: besides the L and U factors, SparseLU keeps its own (column-permuted) copy of the matrix.
 	Eigen::SparseLU<ColMajorSparseMatrix> _solver;
-	SparseMatrix _gathered; // on several processes: the whole matrix
+	unique_ptr<MUMPSSolver> _distributed; // on several processes
 
 public:
 	EigenSparseLU() : Solver() {}
 
 	void Serialize(ostream& os) const override
 	{
-		os << "LU factorization (Eigen library)";
+		os << "LU factorization (Eigen library; on several processes: MUMPS's)";
 	}
 
 	void Setup(const SparseMatrix& A) override
 	{
 		Solver::Setup(A);
+		_distributed.reset();
 		//_solver.isSymmetric(true);
 		// Copy: A is row-major, SparseLU needs column-major (see above). Freed at the end of this function.
 		ColMajorSparseMatrix colMajorA = A;
@@ -35,26 +37,19 @@ public:
 		}
 	}
 
-	// On several processes (a coarse solver): the matrix gathered on every process, each one factorizes it and solves
-	// the whole system (redundantly), and keeps its rows
+	// On several processes (a coarse solver): MUMPS's LU, distributed. Collective.
 	void Setup(const DistributedMatrix& A) override
 	{
-		_gathered = A.GatherOnAll();
-		Setup(_gathered);
+		_distributed = make_unique<MUMPSSolver>(false);
+		_distributed->Setup(A);
+		this->Matrix = &A.Diag;
 		this->Distributed = &A;
 	}
 
 	Vector Solve(const Vector& b) override
 	{
-		if (this->Distributed)
-		{
-			const DistributedMatrix& A = *this->Distributed;
-			vector<double> local(b.data(), b.data() + b.rows());
-			vector<double> all = A.Comm().AllGatherV(local);
-			Vector x = _solver.solve(Eigen::Map<const Vector>(all.data(), all.size()));
-			this->SolvingComputationalWork = 0;
-			return x.segment(A.RowMap->Begin * A.RowBlockSize, b.rows());
-		}
+		if (_distributed)
+			return _distributed->Solve(b);
 		Vector x = _solver.solve(b);
 		this->SolvingComputationalWork = 0;//Cost::LUSolve(_solver.matrixL()., _solver.matrixU()); TODO
 		return x;

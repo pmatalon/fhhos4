@@ -5,7 +5,11 @@ Open work: `.scratch/mpi/`. Measurements: `PERFORMANCE.md` "Distributed memory (
 
 ## Build and environment
 
-MPI from the conda env (`mpich`, installed in `fhhos4`, not in `conda/environment.yml`). Build directories:
+MPI and MUMPS from the conda env (installed in `fhhos4`, not in `conda/environment.yml`: `mpich`, and
+`conda install -c conda-forge "mumps-mpi=5.8.2" "_openmp_mutex=*=*_gnu"`: the pin keeps GNU's OpenMP, which MUMPS's
+build with OpenBLAS would replace by LLVM's; MUMPS then uses BLIS and netlib's LAPACK: with several threads per
+process, set `BLIS_NUM_THREADS=1`, since BLIS takes `OMP_NUM_THREADS` and creates its threads at each of MUMPS's small
+calls, see `PERFORMANCE.md`). Build directories:
 `build-mpi-lib` (`-DENABLE_PROGRAM=OFF -DENABLE_MPI=ON`, ~1 min: the library and `fhhos4_mpi_tests`, the fast loop),
 `build-mpi` (the program too).
 
@@ -13,7 +17,8 @@ MPI from the conda env (`mpich`, installed in `fhhos4`, not in `conda/environmen
 
 - `Utils/Communicator.h`: the MPI calls, the only file with `#ifdef MPI_ENABLED` but `Solver/LibraryUAMG.cpp` (the
   library's `Comm`; public macro: `FHHOS4_MPI` in `fhhos4_version.h`, `library/Solver.cpp`). `Communicator`
-  (reductions, `AllToAll` for the setups, `Neighbours` for the halos), `Communicator::Current()` (the communicator of
+  (reductions, `AllToAll` for the setups, `Neighbours` for the halos, `FortranHandle()` for MUMPS),
+  `Communicator::Current()` (the communicator of
   the reductions of the solvers: `MPI_COMM_WORLD` in the program, the solver's in a library call, `CallScope`),
   `Parallel::Dot/Norm/SquaredNorm` (on one process: Eigen's, bit for bit), `MPIEnvironment` (main(); `MPI_Finalize()`
   at exit only in the initializing process, not in GTest's death-test forks).
@@ -22,12 +27,13 @@ MPI from the conda env (`mpich`, installed in `fhhos4`, not in `conda/environmen
 - On one process, nothing distributed is built: the sequential code runs (same results). On several:
   `Utils/IndexMap.h` (contiguous ownership in rank order, ghosts in any order, halo: `UpdateGhosts`,
   `AddGhostsToOwners`, `Forward/ReverseExchange`), `Utils/DistributedMatrix.h` (rows owned, `Diag` + `Offd` (ghost
-  columns): the smoothers work on `Diag`; `MultiplyTransposed` for the restriction; `GatherOnAll` for the coarse
-  solver, replicated; `FetchGhostRows`, `RowsWithGhosts` (the rows of the ghosts fetched, the columns of another map),
+  columns): the smoothers work on `Diag`; `MultiplyTransposed` for the restriction; `FetchGhostRows`, `RowsWithGhosts` (the rows of the ghosts fetched, the columns of another map),
   `AssembleFromLocalRows`: the rows of the ghosts added to their owners').
 - Solvers: `Solver::Distributed`, `Setup(const DistributedMatrix&)` (FatalError unless overridden: FCG, GCR, Multigrid,
   Chebyshev, block Jacobi, (block) Gauss-Seidel = Gauss-Seidel in the process, Jacobi between them (`SweepRhs()`),
-  Cholesky/LU gathered); `IterativeSolver::SetDistributedMatrix()`; the blocks setup `Setup(A, A_T_T, A_T_F (local
+  Cholesky/LU by MUMPS (ADR-0021; `Solver/Direct/MUMPS.h`: each process gives its rows of the matrix and of the
+  right-hand side; the solution, as MUMPS distributes it, goes to the owners of its rows by an `IndexMap` whose ghosts
+  are the rows held for other processes, built at the first solve)); `IterativeSolver::SetDistributedMatrix()`; the blocks setup `Setup(A, A_T_T, A_T_F (local
   columns), A_F_T (empty if symmetric), faceMap, interps)`; `Level::DistributedOperator`, `DistributedP`. FCG applies the full matrix (not the lower
   triangle) on several processes.
 - U-AMG: `UncondensedLevel::CoarsenInDistributedPasses()` with `DistributedPass.h`: each process aggregates its cells,
@@ -53,6 +59,7 @@ MPI from the conda env (`mpich`, installed in `fhhos4`, not in `conda/environmen
 
 ## Tests
 
-`fhhos4_mpi_tests` (`tests/MPI`, own `main()`, `ctest -R MPI_np`: 1-4 processes; `tests/support/PartitionedSystem.h`);
+`fhhos4_mpi_tests` (`tests/MPI`, own `main()`, `ctest -R MPI_np`: 1-4 processes; `tests/support/PartitionedSystem.h`;
+`MUMPSTest.cpp`: the coarse solver alone, with an empty first process, MUMPS's host);
 `ctest -R ProgramMPI` (the program under `mpiexec`, L2 errors); in an MPI build, `fhhos4_tests` uses
 `tests/MPI/main.cpp` (MPI initialized), `ToySolver()` sets `Comm = MPI_COMM_SELF`.

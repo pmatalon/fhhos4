@@ -1205,13 +1205,36 @@ between them; `DistributedLibrary.NonsymmetricUncondensedSystem`: Cartesian 60x6
 iterations on 2 / 3 / 4 processes (one process, the same renumbered system): asymmetry 0.3: 16-17 (16); 0.9
 (convection-dominated): 10 / 6 / 6 (10 / 9 / 9). The Jacobi coupling between the processes costs nothing here.
 
+2026-10-27, the coarsest level by MUMPS, distributed (ADR-0021), against the commit before (the whole coarsest matrix
+gathered on every process, each one factorizing it with Eigen), plugged in; MUMPS 5.8.2 of conda-forge (`mumps-mpi`,
+mpich build, BLIS 2.0 (pthreads) and netlib's LAPACK: see `docs/mpi.md`); `scaling_mpi.sh` (`-s fcglibuamg -smoothers
+bcheb4,bcheb4`, best of 2), elapsed setup / solve (s), gathered -> MUMPS (`build/bench_mumps_mpi/`):
+
+| Case | 2 x 1 | 4 x 1 | 4 x 2 |
+|---|---|---|---|
+| Cube-tet k=0 n=32 (41 / 43 / 43 it) | 0.81 / 0.87 -> 0.87 / 1.08 | 0.50 / 0.70 -> 0.52 / 0.84 | 0.49 / 0.65 -> 0.48 / 1.26 |
+| Cube-tet k=2 n=12 (52 it) | 0.24 / 0.58 -> 0.25 / 0.72 | 0.14 / 0.47 -> 0.15 / 0.68 | 0.17 / 0.46 -> 0.19 / 1.75 |
+
+- The same iterations and L2 errors; the setup within the noise; the solve slower: on a few processes of one node, the
+  replicated solve of a small coarsest matrix (<= 1000 rows) takes ~30 us, MUMPS's distributed one ~1 ms (Square-tri
+  k=1 n=64, 4 x 1, V-cycle: 31 iterations, solve 0.032 -> 0.067-0.075 s). On one process (`-coarse-solver mumpsch`
+  against `ch`, K-cycle, 15 iterations): 0.049 -> 0.072 s, ~0.2 ms more per solve.
+- 4 x 2: BLIS takes `OMP_NUM_THREADS` and creates its threads at each call, for MUMPS's small dense blocks.
+  `BLIS_NUM_THREADS=1`: Cube-tet k=2 n=12 solve 1.74 -> 0.78 s; k=2 n=8 0.76 -> 0.39 s (gathered: 0.145 s). MUMPS's
+  own threads (ICNTL(16)=1, one thread): 0.39 -> 0.36 s, not kept. conda-forge's MUMPS builds all require the OpenMP
+  build of OpenBLAS, which brings LLVM's OpenMP: not in the env (it would change fhhos4's own OpenMP).
+- What MUMPS changes is the growth with the number of processes, not measurable here: the coarsest level keeps the faces
+  between processes, so its size grows with their number, and the gathered matrix, its factorization and the
+  all-gathers of its right-hand side were on every process.
+
 Next ideas:
 1. **The assembly of the program distributed** (each process its cells and those of its faces): the memory per process,
    for larger cases, then the scaling on more processes (another machine).
 2. **The halo exchanges**: persistent buffers and requests, and the product of `Diag` while the ghosts are exchanged
    (overlap): not measured, probably small on one node.
 3. **The coarse levels on fewer processes**: on many processes the reductions of the K-cycle on the coarse levels, and the
-   gathered coarsest level, cost latency; agglomerate the levels with few rows per process (as hypre, AGMG).
+   coarsest level (MUMPS on all the processes), cost latency; agglomerate the levels with few rows per process (as
+   hypre, AGMG), and factorize the coarsest level on a subset of the processes.
 4. `AssembleFromLocalRows()` still sorts the rows of both `Diag` and `Offd` (two passes on the rows); `BuildByRows()`
    copies each matrix twice (chunks, then the matrix).
 

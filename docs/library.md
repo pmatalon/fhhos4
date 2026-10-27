@@ -45,8 +45,8 @@ For the library's users: `README_library.md`. This file is for changing the libr
 - Parameters with a choice are enums (`fhhos4::Krylov`, `Cycle`, `PCoarsening`, `Smoother`, `Prolongation`,
   `CoarseSolver`; no strings), as the program's multigrid parameters (`SmootherType`, `CycleType`, `P_CoarsStgy`,
   `UAMGProlongation` in `Utils/Types.h`; the CLI codes in `SmootherFactory`, the coarse solver stays a solver code):
-  `Solver/LibraryParameters.h` maps them both ways (one table per parameter), for `library/Solver.cpp` and
-  `LibraryUAMG.cpp`.
+  `Solver/LibraryParameters.h` maps them both ways (one table per parameter; `CoarseSolver::MUMPS`: `mumpsch` or
+  `mumpslu` for the symmetry of the matrix), for `library/Solver.cpp` and `LibraryUAMG.cpp`.
 
 ## In the program
 

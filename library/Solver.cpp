@@ -343,7 +343,7 @@ namespace fhhos4
 			mg.PostSmoothingIterations = s.PostSmoothingIterations >= 0 ? s.PostSmoothingIterations : DefaultSmoothingIterations(mg.PostSmoother != SmootherType::Default ? mg.PostSmoother : mg.PreSmoother);
 			mg.CoarseningFactor = s.CoarseningFactor;
 			mg.MatrixMaxSizeForCoarsestLevel = s.CoarseMatrixMaxSize;
-			mg.CoarseSolverCode = LibraryParameters::ProgramCoarseSolver(CoarseSolver);
+			mg.CoarseSolverCode = LibraryParameters::ProgramCoarseSolver(CoarseSolver, Symmetric);
 			mg.UAMGMixedPrecision = s.MixedPrecision;
 			mg.UAMGBlockCSRStorage = s.BlockCSRStorage;
 			bool defaultCoarseOperator = true, defaultCycle = false, defaultHPCoarseningStgy = true;

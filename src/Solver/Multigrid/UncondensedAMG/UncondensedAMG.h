@@ -3,6 +3,7 @@
 #include "UncondensedLevel.h"
 #include "../Multigrid.h"
 #include "../../Direct/EigenSparseCholesky.h"
+#include "../../Direct/MUMPS.h"
 using namespace std;
 
 class UncondensedAMG : public Multigrid
@@ -266,7 +267,8 @@ public:
 	{
 		if (this->Cycle == CycleType::K && this->KCycleKrylov != KrylovMethod::GCR)
 			Utils::FatalError("UncondensedAMG: the K-cycle of a non-symmetric matrix must iterate with GCR, not FCG.");
-		if (dynamic_cast<EigenSparseCholesky*>(this->CoarseSolver))
+		MUMPSSolver* mumps = dynamic_cast<MUMPSSolver*>(this->CoarseSolver);
+		if (dynamic_cast<EigenSparseCholesky*>(this->CoarseSolver) || (mumps && mumps->SPD))
 			Utils::FatalError("UncondensedAMG: the Cholesky factorization cannot be the coarse solver of a non-symmetric matrix (use LU).");
 	}
 

@@ -82,7 +82,8 @@ Build options (`cmake -D<OPTION>=ON|OFF ..`):
 | `ENABLE_OPENMP` | ON | Shared-memory parallelism |
 | `ENABLE_NATIVE_ARCH` | OFF | `-march=native`: optimized for the CPU of the build machine, may not run on others |
 | `ENABLE_PYTHON` | OFF | The Python module of the library (see `README_library.md`); needs Python, nanobind and NumPy (SciPy for its tests); with `ENABLE_MPI`, mpi4py too |
-| `ENABLE_MPI` | OFF | Distributed-memory parallelism: the program and the library on several processes (see [Several processes](#7-optional-several-processes-mpi)); needs MPI |
+| `ENABLE_MPI` | OFF | Distributed-memory parallelism: the program and the library on several processes (see [Several processes](#7-optional-several-processes-mpi)); needs MPI and MUMPS (the coarse solver) |
+| `ENABLE_MUMPS` | OFF | MUMPS's factorizations on one process too (`-coarse-solver mumpsch\|mumpslu`, `-s mumpsch\|mumpslu`); always with `ENABLE_MPI`; without it, needs MUMPS's sequential version (e.g. `conda install -n fhhos4 -c conda-forge mumps-seq`) |
 | `SMALL_INDEX` | ON | `int` indices in the sparse matrices (`intmax_t` otherwise) |
 
 If you built GMSH from source instead of using the conda package, pass its location explicitly:
@@ -124,8 +125,9 @@ The program reads and writes:
 
 ### 7. (Optional) Several processes (MPI)
 
-Built with `-DENABLE_MPI=ON` (MPI from the environment, e.g. `conda install -n fhhos4 -c conda-forge mpich`), the
-program runs on several processes with `mpiexec`, with OpenMP threads in each process:
+Built with `-DENABLE_MPI=ON` (MPI and MUMPS from the environment, e.g.
+`conda install -n fhhos4 -c conda-forge mpich mumps-mpi`), the program runs on several processes with `mpiexec`, with
+OpenMP threads in each process:
 
 ```bash
 mpiexec -n 4 ./bin/fhhos4 -geo cube -mesh tetra -n 16 -k 1 -s fcglibuamg

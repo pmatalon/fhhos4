@@ -311,7 +311,8 @@ NB_MODULE(fhhos4, m)
 	nb::enum_<fhhos4::CoarseSolver>(m, "CoarseSolver")
 		.value("Default", fhhos4::CoarseSolver::Default)
 		.value("Cholesky", fhhos4::CoarseSolver::Cholesky)
-		.value("LU", fhhos4::CoarseSolver::LU);
+		.value("LU", fhhos4::CoarseSolver::LU)
+		.value("MUMPS", fhhos4::CoarseSolver::MUMPS);
 
 	nb::class_<fhhos4::Result>(m, "Result")
 		.def_ro("Iterations", &fhhos4::Result::Iterations)

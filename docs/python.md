@@ -42,11 +42,13 @@ empty rank 0, symmetric or not, against SciPy; an input error on one process rai
 
 ## Environments and build directories
 
-- Conda env `fhhos4-python` (python 3.12, numpy, scipy, nanobind, cmake, ninja, cxx-compiler, eigen 5.0.1; mpich 5.0.1
-  and mpi4py 4.1.2; NGSolve from pip, not on conda-forge), not the `fhhos4` env.
+- Conda env `fhhos4-python` (python 3.12, numpy, scipy, nanobind, cmake, ninja, cxx-compiler, eigen 5.0.1; mpich 5.0.1,
+  mpi4py 4.1.2 and MUMPS 5.8.2, installed as in `docs/mpi.md`; NGSolve from pip, not on conda-forge), not the `fhhos4`
+  env.
 - `build-python` (`-DENABLE_PROGRAM=OFF -DENABLE_PYTHON=ON`, ~1 min); `build-python-mpi` (the same with
   `-DENABLE_MPI=ON -DENABLE_TESTS=OFF`: no GTest in that env; the GTest MPI tests run in `build-mpi-lib`, env `fhhos4`).
 - For NGSolve on several processes: env `fhhos4-python-openmpi` (the same with openmpi 5.0.11 instead of mpich, and
-  NGSolve 6.2.2608 from pip: NGSolve's runs on several processes use OpenMPI), build directory
+  NGSolve 6.2.2608 from pip: NGSolve's runs on several processes use OpenMPI; not MUMPS yet: its configuration needs
+  `mumps-mpi`'s openmpi build), build directory
   `build-python-openmpi` (the options of `build-python-mpi`; `ctest -R Python` passes with
   `OMPI_MCA_rmaps_base_oversubscribe=1`).

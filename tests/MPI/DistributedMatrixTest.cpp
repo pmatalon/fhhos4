@@ -122,7 +122,7 @@ TEST(IndexMap, HaloExchanges)
 	}
 }
 
-TEST(DistributedMatrix, ProductsAndGather)
+TEST(DistributedMatrix, Products)
 {
 	IndexMap owners(World(), NOwned());
 	BigNumber n = owners.GlobalSize;
@@ -136,10 +136,6 @@ TEST(DistributedMatrix, ProductsAndGather)
 	Vector y = dA * x.segment(owners.Begin, owners.NOwned);
 	Vector expected = (A * x).segment(owners.Begin, owners.NOwned);
 	EXPECT_LE((y - expected).norm(), 1e-14 * expected.norm());
-
-	SparseMatrix gathered = dA.GatherOnAll();
-	EXPECT_EQ(gathered.nonZeros(), A.nonZeros());
-	EXPECT_EQ((SparseMatrix(gathered - A)).norm(), 0);
 
 	SparseMatrix local = dA.LocalColumns();
 	EXPECT_EQ(local.rows(), owners.NOwned);

@@ -43,6 +43,26 @@ public:
 	MPI_Comm Comm() const { return _comm; }
 #endif
 
+	// The Fortran handle of the communicator, for MUMPS; without MPI, MUMPS's USE_COMM_WORLD (its sequential version)
+	int FortranHandle() const
+	{
+#ifdef MPI_ENABLED
+		return MPI_Comm_c2f(_comm);
+#else
+		return -987654;
+#endif
+	}
+
+	// Whether MPI is finalized (no MPI call after it); false without MPI
+	static bool Finalized()
+	{
+		int finalized = 0;
+#ifdef MPI_ENABLED
+		MPI_Finalized(&finalized);
+#endif
+		return finalized != 0;
+	}
+
 	int Rank() const { return _rank; }
 	int Size() const { return _size; }
 	bool IsDistributed() const { return _size > 1; }

@@ -30,6 +30,7 @@ option(ENABLE_OPENMP "Use OpenMP for the parallel loops (and Eigen's internal pa
 option(ENABLE_NATIVE_ARCH "Optimize for the CPU of the build machine (-march=native: AVX2, FMA...). The binary may not run on other CPUs." OFF)
 option(ENABLE_PYTHON "Build the Python module of the library (fhhos4, with nanobind) and its tests" OFF)
 option(ENABLE_MPI "MPI parallelism (distributed memory) of the library and the program, on several processes (mpiexec). OFF: a single process" OFF)
+option(ENABLE_MUMPS "MUMPS's sparse factorizations (coarse solver CoarseSolver::MUMPS, -coarse-solver mumpsch|mumpslu). Always with ENABLE_MPI: the coarse solver on several processes" OFF)
 
 set(EXECUTABLE_OUTPUT_PATH bin/)
 include(GNUInstallDirs)
@@ -116,6 +117,30 @@ else()
 	message(STATUS "MPI disabled: a single process. Add -DENABLE_MPI=ON to enable it.")
 endif()
 
+# Include MUMPS: the coarse solver on several processes (mandatory with MPI), optional on one. Private: only the compiled
+# code includes dmumps_c.h. MUMPS has no CMake package: its header and its library (libdmumps, which links its own
+# dependencies; libdmumps_seq: the sequential library of conda-forge's mumps-seq), or -DMUMPS_INCLUDE_DIR, -DMUMPS_LIBRARY.
+if(ENABLE_MPI OR ENABLE_MUMPS)
+	if(ENABLE_MPI)
+		set(mumps_names dmumps)
+	else()
+		set(mumps_names dmumps_seq dmumps)
+	endif()
+	find_path(MUMPS_INCLUDE_DIR dmumps_c.h)
+	find_library(MUMPS_LIBRARY NAMES ${mumps_names})
+	if(NOT MUMPS_INCLUDE_DIR OR NOT MUMPS_LIBRARY)
+		message(FATAL_ERROR "MUMPS not found (dmumps_c.h, lib${mumps_names}.so): it is needed by ENABLE_MPI (the coarse solver on several processes) and ENABLE_MUMPS. Install it (conda-forge: mumps-mpi with MPI, mumps-seq without), or pass -DMUMPS_INCLUDE_DIR=<dir of dmumps_c.h> -DMUMPS_LIBRARY=<path>/libdmumps.so.")
+	endif()
+	add_library(MUMPS::MUMPS INTERFACE IMPORTED)
+	target_include_directories(MUMPS::MUMPS INTERFACE ${MUMPS_INCLUDE_DIR})
+	target_link_libraries(MUMPS::MUMPS INTERFACE ${MUMPS_LIBRARY})
+	target_compile_definitions(MUMPS::MUMPS INTERFACE MUMPS_ENABLED)
+	target_link_libraries(fhhos4_lib PRIVATE MUMPS::MUMPS)
+	message(STATUS "MUMPS enabled (${MUMPS_LIBRARY})")
+else()
+	message(STATUS "MUMPS disabled. Add -DENABLE_MUMPS=ON to enable it.")
+endif()
+
 # Include pthread
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
@@ -190,7 +215,7 @@ if(ENABLE_MPI AND ENABLE_TESTS)
 	if(SMALL_INDEX)
 		target_compile_definitions(fhhos4_mpi_tests PRIVATE SMALL_INDEX)
 	endif()
-	target_link_libraries(fhhos4_mpi_tests PRIVATE fhhos4_lib GTest::gtest Threads::Threads)
+	target_link_libraries(fhhos4_mpi_tests PRIVATE fhhos4_lib MUMPS::MUMPS GTest::gtest Threads::Threads)
 	if(ENABLE_OPENMP)
 		target_link_libraries(fhhos4_mpi_tests PRIVATE OpenMP::OpenMP_CXX)
 	endif()
@@ -301,6 +326,11 @@ endif()
 # MPI: linked through fhhos4_lib
 if(ENABLE_MPI)
 	target_compile_definitions(fhhos4_core PUBLIC MPI_ENABLED)
+endif()
+
+# MUMPS: private in fhhos4_lib
+if(TARGET MUMPS::MUMPS)
+	target_link_libraries(fhhos4_core PUBLIC MUMPS::MUMPS)
 endif()
 
 # Include Eigen

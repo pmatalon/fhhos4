@@ -2,6 +2,7 @@
 #include <functional>
 #include "Direct/EigenLU.h"
 #include "Direct/EigenCholesky.h"
+#include "Direct/MUMPS.h"
 #include "Krylov/ConjugateGradient.h"
 #include "Krylov/FlexibleConjugateGradient.h"
 #include "Krylov/GeneralizedConjugateResidual.h"
@@ -38,6 +39,10 @@ public:
 			solver = new EigenSparseLU();
 		else if (args.Solver.SolverCode.compare("ch") == 0)
 			solver = new EigenSparseCholesky();
+		else if (args.Solver.SolverCode.compare("mumpslu") == 0)
+			solver = new MUMPSSolver(false);
+		else if (args.Solver.SolverCode.compare("mumpsch") == 0)
+			solver = new MUMPSSolver(true);
 		else if (args.Solver.SolverCode.compare("j") == 0)
 			solver = new BlockJacobi(1, args.Solver.RelaxationParameter);
 		else if (args.Solver.SolverCode.compare("gs") == 0)

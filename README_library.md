@@ -19,8 +19,12 @@ Without installing, the library is `build/lib/libfhhos4.so`.
 Build options (`-D<OPTION>=ON|OFF`): `ENABLE_OPENMP` (ON: parallel), `ENABLE_NATIVE_ARCH` (OFF: `-march=native`:
 optimized for the CPU of the build machine, may not run on others), `SMALL_INDEX` (ON: `int` indices in
 `fhhos4::SparseMatrix`, `intmax_t` otherwise), `ENABLE_PYTHON` (OFF: the Python module, see [Python](#python)),
-`ENABLE_MPI` (OFF: the solver on several processes, see [Several processes](#several-processes-mpi); needs MPI, and
-your code is then compiled and linked with MPI too; the Python module then needs mpi4py).
+`ENABLE_MPI` (OFF: the solver on several processes, see [Several processes](#several-processes-mpi); needs MPI and
+[MUMPS](https://mumps-solver.org) (its MPI version, e.g. conda-forge's `mumps-mpi`), and your code is then compiled and
+linked with MPI too; the Python module then needs mpi4py), `ENABLE_MUMPS` (OFF: the coarse solver
+`CoarseSolver::MUMPS` on one process; always with `ENABLE_MPI`; without it, needs MUMPS's sequential version, e.g.
+conda-forge's `mumps-seq`). MUMPS is found from its header `dmumps_c.h` and its library `libdmumps`, or given by
+`-DMUMPS_INCLUDE_DIR=<dir> -DMUMPS_LIBRARY=<path>/libdmumps.so`.
 
 ### Conda package
 
@@ -165,8 +169,8 @@ fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F); // the vectors of the 
 - The vectors (`b_T`, `b_F`, `x_T`, `x_F`, the interpolations of 1): the cells and faces of the process. `Result`: of
   the whole system.
 - The algorithm: each process aggregates its own cells (the faces between processes are kept); the coarsest level is
-  gathered on every process, which solves it. The number of iterations may change slightly with the number of
-  processes.
+  factorized and solved by MUMPS on all the processes, distributed. The number of iterations may change slightly with
+  the number of processes.
 - Available on several processes: the uncondensed system (`SetupSymmetric()`, `SetupNonsymmetric()`), with all the
   parameters but `Krylov::BiCGSTAB`; the Gauss-Seidel smoothers are Gauss-Seidel in each process (the hybrid ones: in
   each thread), Jacobi between the processes. Not yet: `CondensedMatrix()`.
@@ -311,7 +315,7 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 | `Prolongation` | `Prolongation::HarmonicExtension` | `fhhos4::Prolongation`, how the h-coarsening gives the faces interior to an aggregate of cells their values, from those of the faces of its boundary: `HarmonicExtension` (the solution of their rows of the condensed matrix, the faces of the boundary given: no value of the cells; a shorter setup), `Reconstruction` (the article's: the value of the coarse cell, reconstructed from its faces, then one damped Jacobi iteration of the condensed matrix on these faces) |
 | `CoarseningFactor` | `3.8` | Ratio of the numbers of cells of two successive h-levels |
 | `CoarseMatrixMaxSize` | `1000` | The coarsening stops when the matrix has at most this many rows |
-| `CoarseSolver` | `CoarseSolver::Default`: `Cholesky` for a symmetric matrix, `LU` otherwise | `fhhos4::CoarseSolver`: `Cholesky`, `LU` (sparse factorizations) |
+| `CoarseSolver` | `CoarseSolver::Default`: `Cholesky` for a symmetric matrix, `LU` otherwise | `fhhos4::CoarseSolver`: `Cholesky`, `LU` (sparse factorizations: Eigen's on one process, MUMPS's on several), `MUMPS` (MUMPS's on one process too: LDL^T for a symmetric matrix, LU otherwise; needs the library compiled with MUMPS) |
 | `MixedPrecision` | `true` | Mixed precision: the matrices of the levels of the AMG (operators, transfers, smoothers) stored and its cycles run in single precision (`float`), but the coarsest solve: half the memory of the levels, faster cycles. The setup computes in double (the same levels, rounded), and the Krylov method, the matrix, the residuals and the solution stay in double: the tolerance can be that of the double precision, usually in the iterations of the double precision. Only for a symmetric matrix, on one process, with the Chebyshev smoothers (the defaults); otherwise the levels are in double, as with `false` |
 | `BlockCSRStorage` | `false` | The operator of the levels whose faces have several DoFs (`FaceDegree >= 1`) stored by blocks (block CSR: one column index per block of coupled faces instead of one per coefficient) for the smoothers and the cycle: passes over the matrix 1.4-2.5x faster. Always so in mixed precision (`MixedPrecision`, the default: no copy). In double precision, `true`: at the cost of a copy of the condensed matrix (about 2/3 of its memory). With the Chebyshev smoothers (the defaults), on one process; otherwise in CSR |
 | `Threads` | `0`: the OpenMP setting, but at most one thread per physical core unless `OMP_NUM_THREADS` or OpenMP's binding is set (on several processes: the cores divided among the processes of `Comm` that run on the same CPUs) | |
@@ -339,7 +343,9 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 ## License
 
 LGPL-3.0-or-later, like the rest of fhhos4 (see [README.md](README.md)). The library only depends on Eigen (MPL-2.0),
-not on the GPL dependencies of the program (GMSH, CGAL): codes under other licenses can link it, under the conditions
+and, compiled with MPI or `ENABLE_MUMPS`, on MPI and MUMPS (CeCILL-C, compatible with the LGPL; MUMPS's own
+dependencies depend on its build: conda-forge's `mumps-mpi` brings ParMETIS, whose license forbids commercial use), not
+on the GPL dependencies of the program (GMSH, CGAL): codes under other licenses can link it, under the conditions
 of section 4 of the LGPL (in short: keep the license notices, and let the user replace the shared library).
 
 ## Version

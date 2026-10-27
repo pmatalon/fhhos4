@@ -217,8 +217,10 @@ void print_usage() {
 	cout << "      If a preconditioner is used, this corresponds to the outer iteration (CG for instance)." << endl;
 	cout << "      The preconditioner is defined using argument -prec." << endl;
 	cout << "      - Direct methods:" << endl;
-	cout << "              lu            - LU factorization (Eigen library)" << endl;
-	cout << "              ch            - Cholesky factorization (Eigen library)" << endl;
+	cout << "              lu            - LU factorization (Eigen library; on several processes: MUMPS's, distributed)" << endl;
+	cout << "              ch            - Cholesky factorization (Eigen library; on several processes: MUMPS's LDL^T, distributed)" << endl;
+	cout << "              mumpslu       - LU factorization (MUMPS: compiled with ENABLE_MUMPS or ENABLE_MPI)" << endl;
+	cout << "              mumpsch       - LDL^T factorization of a symmetric positive definite matrix (MUMPS)" << endl;
 	cout << "      - Fixed-point iterative methods:" << endl;
 	cout << "              [b]j          - [Block] Jacobi. Use argument -relax to change the relaxation parameter." << endl;
 	cout << "              [b]j23        - [Block] Jacobi with 2/3 as relaxation parameter." << endl;

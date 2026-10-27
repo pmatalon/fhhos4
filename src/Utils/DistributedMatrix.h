@@ -198,29 +198,6 @@ public:
 		});
 	}
 
-	// The whole matrix on every process (global rows and columns), e.g. for a coarse solver. Collective.
-	SparseMatrix GatherOnAll() const
-	{
-		SparseMatrix local = GlobalColumns();
-		vector<int> counts;
-		vector<SparseMatrixIndex> rowSizes(local.rows());
-		for (BigNumber i = 0; i < local.rows(); i++)
-			rowSizes[i] = local.outerIndexPtr()[i + 1] - local.outerIndexPtr()[i];
-		vector<SparseMatrixIndex> allRowSizes = Comm().AllGatherV(rowSizes);
-		vector<SparseMatrixIndex> cols(local.innerIndexPtr(), local.innerIndexPtr() + local.nonZeros());
-		vector<double> values(local.valuePtr(), local.valuePtr() + local.nonZeros());
-		vector<SparseMatrixIndex> allCols = Comm().AllGatherV(cols);
-		vector<double> allValues = Comm().AllGatherV(values);
-		SparseMatrix M(GlobalRows(), GlobalCols());
-		M.resizeNonZeros(allCols.size());
-		M.outerIndexPtr()[0] = 0;
-		for (BigNumber i = 0; i < (BigNumber)allRowSizes.size(); i++)
-			M.outerIndexPtr()[i + 1] = M.outerIndexPtr()[i] + allRowSizes[i];
-		copy(allCols.begin(), allCols.end(), M.innerIndexPtr());
-		copy(allValues.begin(), allValues.end(), M.valuePtr());
-		return M;
-	}
-
 	//-------------------------------------------------------------------//
 	//              Rows exchanged between the processes                 //
 	//-------------------------------------------------------------------//

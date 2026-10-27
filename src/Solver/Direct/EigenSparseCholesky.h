@@ -1,5 +1,6 @@
 #pragma once
 #include "../Solver.h"
+#include "MUMPS.h"
 #include <Eigen/SparseCholesky>
 using namespace std;
 
@@ -9,19 +10,20 @@ private:
 	// Eigen's sparse Cholesky requires a column-major matrix type.
 	// Memory: SimplicialLDLT only keeps the factors (it makes a temporary permuted copy of the matrix in compute()).
 	Eigen::SimplicialLDLT<ColMajorSparseMatrix> _solver;
-	SparseMatrix _gathered; // on several processes: the whole matrix
+	unique_ptr<MUMPSSolver> _distributed; // on several processes
 
 public:
 	EigenSparseCholesky() : Solver() {}
 
 	void Serialize(ostream& os) const override
 	{
-		os << "Cholesky factorization (Eigen library)";
+		os << "Cholesky factorization (Eigen library; on several processes: MUMPS's LDL^T)";
 	}
 
 	void Setup(const SparseMatrix& A) override
 	{
 		Solver::Setup(A);
+		_distributed.reset();
 		// Copy: A is row-major, SimplicialLDLT needs column-major. Freed at the end of this function.
 		// Since A is symmetric, we copy its transpose: it is the same matrix, and the transpose of
 		// a row-major matrix is column-major, so the entries are copied in order.
@@ -36,26 +38,19 @@ public:
 		}
 	}
 
-	// On several processes (a coarse solver): the matrix gathered on every process, each one factorizes it and solves
-	// the whole system (redundantly), and keeps its rows
+	// On several processes (a coarse solver): MUMPS's LDL^T, distributed. Collective.
 	void Setup(const DistributedMatrix& A) override
 	{
-		_gathered = A.GatherOnAll();
-		Setup(_gathered);
+		_distributed = make_unique<MUMPSSolver>(true);
+		_distributed->Setup(A);
+		this->Matrix = &A.Diag;
 		this->Distributed = &A;
 	}
 
 	Vector Solve(const Vector& b) override
 	{
-		if (this->Distributed)
-		{
-			const DistributedMatrix& A = *this->Distributed;
-			vector<double> local(b.data(), b.data() + b.rows());
-			vector<double> all = A.Comm().AllGatherV(local);
-			Vector x = _solver.solve(Eigen::Map<const Vector>(all.data(), all.size()));
-			this->SolvingComputationalWork = 0;
-			return x.segment(A.RowMap->Begin * A.RowBlockSize, b.rows());
-		}
+		if (_distributed)
+			return _distributed->Solve(b);
 		Vector x = _solver.solve(b);
 		this->SolvingComputationalWork = Cost::CholeskySolve(_solver.matrixL())*1e-6;
 		return x;
