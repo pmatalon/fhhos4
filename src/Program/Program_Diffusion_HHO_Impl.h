@@ -613,12 +613,12 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 	//       Deallocation       //
 	//--------------------------//
 
-	delete mesh;
-	delete cellBasis;
-	delete faceBasis;
-	delete reconstructionBasis;
-	delete hho;
 	delete problem;
+	delete hho;
+	delete faceBasis;
+	delete cellBasis;
+	delete reconstructionBasis;
+	delete mesh;
 	delete testCase;
 	GaussLegendre::Free();
 }

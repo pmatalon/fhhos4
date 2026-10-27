@@ -155,9 +155,9 @@ void Program_Diffusion_DG<Dim>::Execute(ProgramArguments& args)
 	//       Deallocation       //
 	//--------------------------//
 
-	delete mesh;
-	delete basis;
 	delete problem;
+	delete basis;
+	delete mesh;
 	delete testCase;
 	GaussLegendre::Free();
 }

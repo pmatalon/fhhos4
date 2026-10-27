@@ -386,9 +386,9 @@ void Program_BiHarmonic_FEM<Dim>::Execute(ProgramArguments& args)
 	//       Deallocation       //
 	//--------------------------//
 
-	delete mesh;
-	delete basis;
 	delete biHarPb;
+	delete basis;
+	delete mesh;
 	delete testCase;
 	GaussLegendre::Free();
 }

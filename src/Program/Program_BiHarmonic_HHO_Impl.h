@@ -660,12 +660,12 @@ void Program_BiHarmonic_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults
 	//       Deallocation       //
 	//--------------------------//
 
-	delete mesh;
-	delete cellBasis;
-	delete faceBasis;
-	delete reconstructionBasis;
-	delete hho;
 	delete biHarPb;
+	delete hho;
+	delete faceBasis;
+	delete cellBasis;
+	delete reconstructionBasis;
+	delete mesh;
 	delete testCase;
 	GaussLegendre::Free();
 }
