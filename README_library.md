@@ -83,7 +83,7 @@ Then, once the system is reduced to one unknown per cell and face, h-coarsening 
 The solver typically applies to symmetric positive definite systems (e.g. diffusion)
 and non-symmetric ones (e.g. convection-diffusion, both diffusion- and convection-dominated).
 Boundary conditions: Dirichlet (their faces out of the system), Neumann and Robin (their faces in the system), mixed;
-not the pure Neumann problem (singular, see [Constraints](#constraints)).
+the pure Neumann problem (singular: `SingularMatrix`, symmetric systems).
 The polynomial bases used for the discretization **must be hierarchical** and ordered by degree for the p-multigrid part to work.
 The polynomial spaces are P^k (simplices, polytopes), or Q^k (quadrilaterals, hexahedra: `PolynomialSpace::Q`), in the
 cells and on the faces.
@@ -304,6 +304,7 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 | Parameter | Default | Values |
 |---|---|---|
 | `PolynomialSpace` | `PolynomialSpace::P` | `fhhos4::PolynomialSpace`, the space of the bases of the cells and faces: `P` (P^l and P^k: the polynomials of degree at most l, k), `Q` (Q^l and Q^k: of degree at most l, k in each variable, on quadrilaterals and hexahedra) |
+| `SingularMatrix` | `false` | `true`: the matrix is singular, its kernel spanned by the interpolation of 1 (the constants), e.g. the pure Neumann problem; `SetupSymmetric()` only. The setup checks that the interpolation of 1 is in the kernel (an error otherwise: a Dirichlet face in the system, or a wrong interpolation of 1); each solve projects the condensed right-hand side onto the image of the matrix (at `Verbosity >= 1`, a message if the component removed is more than rounding: incompatible data). The solution is defined up to a multiple of the interpolation of 1 (a constant): shift it to the normalization you want (e.g. zero mean) |
 | `Krylov` | `Krylov::Default`: `Krylov::FCG` for a symmetric matrix, `Krylov::GCR` otherwise | `fhhos4::Krylov`: `FCG` (flexible conjugate gradient), `GCR` (GCR(10), any matrix), `BiCGSTAB` (V- or W-cycle only), `None` (the multigrid cycles alone) |
 | `Tolerance` | `1e-8` | `Solve()` stops when the relative residual of the condensed system (the true one, `Result::RelativeResidual`) is below it |
 | `MaxIterations` | `200` | |
@@ -324,8 +325,9 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 
 ## Constraints
 
-- **Symmetric positive definite** condensed system (`SetupSymmetric()`), or non-symmetric with a positive definite
-  symmetric part (`SetupNonsymmetric()`): not the pure Neumann problem (singular). With `SetupSymmetric()`, the blocks
+- **Symmetric positive definite** condensed system (`SetupSymmetric()`), or semi-definite with the interpolation of 1
+  as kernel (`SingularMatrix`: the pure Neumann problem), or non-symmetric with a positive definite symmetric part
+  (`SetupNonsymmetric()`). With `SetupSymmetric()`, the blocks
   of `A_TT` (one per cell) must be positive definite: the library factorizes them by Cholesky (LU with
   `SetupNonsymmetric()`).
 - **Eigen 3.4 or 5.x** in your code, for the header `<fhhos4>`. No Eigen object crosses the boundary of the library:

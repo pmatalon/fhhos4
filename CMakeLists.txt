@@ -454,6 +454,8 @@ if(ENABLE_TESTS)
 			"2D_k2_gcruamg_nonsym|4|-geo square -mesh tri -mesher gmsh -n 32 -k 2 -s gcruamg -uamg-nonsym -smoothers hbgs,hrbgs|L2 Error = 1.23e-05"
 			"3D_k0_fcguamg|2|-geo cube -mesh tetra -n 8 -k 0 -s fcguamg|L2 Error = 7.18e-01"
 			"3D_k2_fcglibuamg|4|-geo cube -mesh tetra -n 4 -k 2 -s fcglibuamg|L2 Error = 9.83e-02"
+			"2D_k2_fcglibuamg_fullneumann|3|-geo square -tc fullneumann -mesh tri -mesher gmsh -n 32 -k 2 -s fcglibuamg -tol 1e-11|L2 Error = 5.35e-09"
+			"2D_k2_fcguamg_fullneumann|4|-geo square -tc fullneumann -mesh tri -mesher gmsh -n 32 -k 2 -s fcguamg -tol 1e-11|L2 Error = 5.35e-09"
 			"InHouseMeshRefused|2|-geo square -mesh tri -mesher inhouse -n 8 -k 0 -s fcglibuamg|the meshes are GMSH's only")
 		foreach(case ${mpi_program_cases})
 			string(REPLACE "|" ";" fields "${case}")

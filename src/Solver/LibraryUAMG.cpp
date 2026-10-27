@@ -13,13 +13,14 @@ private:
 	optional<KrylovMethod> _krylov;
 public:
 	// The parameters of the library that correspond to the arguments of the program
-	LibraryUAMGImpl(const ProgramArguments& args, int dim, int faceDegree, int cellDegree, optional<KrylovMethod> krylov)
+	LibraryUAMGImpl(const ProgramArguments& args, int dim, int faceDegree, int cellDegree, optional<KrylovMethod> krylov, bool singularMatrix)
 		: _mg(args.Solver.MG), _krylov(krylov)
 	{
 		_solver.Dimension = dim;
 		_solver.FaceDegree = faceDegree;
 		_solver.CellDegree = cellDegree;
 		_solver.PolynomialSpace = LibraryParameters::LibraryPolynomialSpace(args.Discretization.UsePolynomialSpaceQ);
+		_solver.SingularMatrix = singularMatrix;
 		if (!krylov)
 			_solver.Krylov = fhhos4::Krylov::None;
 		else
@@ -105,7 +106,7 @@ public:
 	}
 };
 
-LibraryUAMG* CreateLibraryUAMG(const ProgramArguments& args, int dim, int faceDegree, int cellDegree, optional<KrylovMethod> krylov)
+LibraryUAMG* CreateLibraryUAMG(const ProgramArguments& args, int dim, int faceDegree, int cellDegree, optional<KrylovMethod> krylov, bool singularMatrix)
 {
-	return new LibraryUAMGImpl(args, dim, faceDegree, cellDegree, krylov);
+	return new LibraryUAMGImpl(args, dim, faceDegree, cellDegree, krylov, singularMatrix);
 }

@@ -1774,6 +1774,24 @@ Kept as they were written there; some repeat entries of "Done" in another form.
 - **Full Neumann test case** (`-tc fullneumann`, 2D): fine at the default tolerance up to n=32 (`fcguamg` =
   `fcglibuamg`), but `fcglibuamg` erratic beyond (tri n=64 k=2: 198 iterations vs 21 for `fcguamg`; with
   `-coarse-solver lu`, not converged, L2 error 0.22), `fcguamg` unaffected by luck of the rounding.
+  With the kernel handling (`SingularMatrix`, 2026-10-27, `build/bench_lib/neumann/`): tri k=2 n=64 21 iterations
+  through the library (198 before), = `fcguamg`; n=128 21 (default tolerance). At tolerance 1e-12, before the
+  projection of the cycle's output, the library's true residual grew from 3.7e-12 (x1.5 per iteration: the kernel
+  component of the iterates) and the solve stopped at 200 iterations (n=128); with it, a plateau at 1.3e-12 (146
+  iterations; 28 at 1e-11), the attainable accuracy of the true residual there (the program's FCG follows its
+  recurrence residual: 30), both at the L2 error of the direct solver. n=64 at 1e-11: the same iterations in the
+  program and the library (tri k=0/1/2: 27/21/28, cart k=0/1: 23/15; `mg` 11/16/20, 12/10). The toy system of
+  `UAMGLibrary.SingularMatrix` (n=64, pure Neumann): NaN residual without it. On 1 to 4 processes (`build-mpi`, tri
+  GMSH n=64 k=2, 1e-11, `-smoothers` default bgs,rbgs): 28 iterations, L2 error 3.31e-10 = direct, through the library
+  (before: refused, the program condensed the full Neumann system itself) and the program. The toy system distributed
+  (`DistributedLibrary.SingularMatrix`, n=60): Reconstruction 18 on one process, 19 on 2 and 4, 15 on 3;
+  HarmonicExtension 14 on one and 3, 18-19 on 2 and 4 (the regular system: 18-19).
+- **HArDCore3D pure Neumann** (`hho-diffusion -b N -c 1 2`, 4 threads, 2026-10-27, `build/bench_lib/clients_1027/neumann/`):
+  fhhos4 (1e-12) vs HArDCore3D's BiCGSTAB (DoF 0 pinned): gcube16 k0/1/2, k1l0: 24/17/26/20 vs 183/295/370/302 iterations;
+  tet4 k0/1/2: 39/53/66 vs 258/396/526; voro10 k1: 20 vs 282. Its discrete Neumann data are incompatible (relative
+  component along the kernel: gcube k0 3.9e-4, k1 1.9e-7, k2 < 1e-10; tet4 k0 7.9e-3, k1 6.1e-5): fhhos4 projects, the
+  pin puts it on one equation, so the errors differ where it is large (gcube k0 L2 0.0044 vs 0.022, tet4 k0 0.043 vs
+  0.35; tet4 k1 0.0108 vs 0.0097, energy equal) and are equal where it is not (gcube k2: 0.00142038 both).
 - **`PCoarsening::ToZero`** vs Minus2 (FCG, 2026-10-19; `bgs,rbgs` / `bcheb4`): Square-tri n=64 k=3 10 -> 19 / 14 -> 27,
   k=4 9 -> 21 / 14 -> 30, k=5 7 -> 23 / 11 -> 32; Cube-tet n=8 k=3 29 -> 37 / 50 -> 60.
 - **Interpolation of 1**: without the rescaling of the constant modes, L2-orthonormal bases slow U-AMG down (Cube-tet

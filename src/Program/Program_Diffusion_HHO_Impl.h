@@ -303,11 +303,12 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 	Diffusion_HHO<Dim>* problem = new Diffusion_HHO<Dim>(mesh, testCase, hho, args.Discretization.StaticCondensation, saveMatrixBlocks);
 
 	// U-AMG through the library (-s libuamg...): the program gives it the blocks of the uncondensed system, and the library
-	// condenses it and computes the cell unknowns; unless the program needs the condensed system: full Neumann problem
-	// (projection of b onto the image of A), export of the linear system or of the algebraic error (exact solution of the
-	// condensed system), then solved by the library on its condensed matrix (LibraryUAMG::Setup())
+	// condenses it and computes the cell unknowns (full Neumann problem: the library projects b onto the image of A,
+	// SingularMatrix); unless the program needs the condensed system: export of the linear system or of the algebraic
+	// error (exact solution of the condensed system), then solved by the library on its condensed matrix
+	// (LibraryUAMG::Setup())
 	bool libraryCondenses = args.Solver.UsesLibraryUAMG() && args.Discretization.StaticCondensation
-		&& testCase->BC.Type != PbBoundaryConditions::FullNeumann && !args.Actions.Export.LinearSystem && !args.Actions.Export.ErrorToGMSH;
+		&& !args.Actions.Export.LinearSystem && !args.Actions.Export.ErrorToGMSH;
 	problem->CondensationBySolver = libraryCondenses;
 
 	cout << endl;
@@ -350,7 +351,7 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 		cout << "----------------------------------------------------------" << endl;
 
 
-		if (testCase->BC.Type == PbBoundaryConditions::FullNeumann)
+		if (testCase->BC.Type == PbBoundaryConditions::FullNeumann && !libraryCondenses) // otherwise, by the library
 		{
 			NumericImageEnforcer imageEnforcer(&problem->SkeletonSpace);
 			imageEnforcer.Setup();

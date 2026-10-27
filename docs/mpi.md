@@ -49,7 +49,9 @@ calls, see `PERFORMANCE.md`). Build directories:
   (`A_FT`: rows of the own faces, columns own cells then ghost cells; turned once by the setup into the rows of all
   the local faces, the columns of the own cells: `RowsWithGhosts`, kept by the condensation, which then runs as the
   symmetric one), `DistributedStaticCondensation.h`, `CollectiveCheck()` (errors of the inputs on all the processes). A
-  process may own nothing (NGSolve 6.2.2608's rank 0). Not yet: `CondensedMatrix()`. Python: `docs/python.md`.
+  process may own nothing (NGSolve 6.2.2608's rank 0). `SingularMatrix`: the kernel on the own faces, the dot products
+  global, the pinned DoF of the coarsest level on one process (`docs/uamg.md`). Not yet: `CondensedMatrix()`. Python:
+  `docs/python.md`.
 - Program (`Program_Diffusion_HHO_Impl.h`, `Program/DistributedHybridSystem.h`): GMSH meshes only, partitioned by GMSH
   (`GMSHMesh::PartitionElements()`, rank 0, broadcast); the mesh built by rank 0 first (cache); the system assembled by
   every process (replicated, not distributed yet), its rows extracted (faces owned by the smaller rank of their cells),

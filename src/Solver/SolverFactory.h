@@ -37,7 +37,7 @@ public:
 		{
 			if (!problem)
 				Utils::FatalError("The solver libuamg needs the HHO problem: it cannot be a coarse solver.");
-			solver = CreateLibraryUAMG(args, Dim, problem->HHO->FaceBasis->GetDegree(), problem->HHO->CellBasis->GetDegree(), libraryKrylov);
+			solver = CreateLibraryUAMG(args, Dim, problem->HHO->FaceBasis->GetDegree(), problem->HHO->CellBasis->GetDegree(), libraryKrylov, IsFullNeumann(problem));
 		}
 		else if (args.Solver.SolverCode.compare("cg") == 0)
 		{
@@ -101,7 +101,9 @@ public:
 		}
 		else if (args.Solver.SolverCode.compare("uamg") == 0)
 		{
-			solver = AlgebraicSolverFactory::CreateUncondensedAMG(args, Dim, problem->HHO->FaceBasis->GetDegree(), args.Discretization.UsePolynomialSpaceQ, problem->HHO->nCellUnknowns, problem->HHO->nFaceUnknowns, blockSize, out, CoarseSolvers(out));
+			UncondensedAMG* uamg = AlgebraicSolverFactory::CreateUncondensedAMG(args, Dim, problem->HHO->FaceBasis->GetDegree(), args.Discretization.UsePolynomialSpaceQ, problem->HHO->nCellUnknowns, problem->HHO->nFaceUnknowns, blockSize, out, CoarseSolvers(out));
+			uamg->SingularMatrix = IsFullNeumann(problem);
+			solver = uamg;
 		}
 		else
 			solver = CreateSolver(args, blockSize, out);
@@ -119,6 +121,12 @@ public:
 	}
 
 private:
+	// The singular system of the full Neumann problem: its kernel spanned by the interpolation of 1
+	static bool IsFullNeumann(Diffusion_HHO<Dim>* problem)
+	{
+		return problem->TestCase->BC.Type == PbBoundaryConditions::FullNeumann;
+	}
+
 	// The preconditioner of a Krylov method: the solver of code precondCode (none if empty or "default")
 	static SolverPreconditioner CreatePreconditioner(const ProgramArguments& args, const string& precondCode, Diffusion_HHO<Dim>* problem, int blockSize, const ExportModule& out)
 	{

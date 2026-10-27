@@ -4,6 +4,7 @@
 #include "../Multigrid.h"
 #include "../../Direct/EigenSparseCholesky.h"
 #include "../../Direct/MUMPS.h"
+#include "../../Direct/SingularSolver.h"
 using namespace std;
 
 class UncondensedAMG : public Multigrid
@@ -22,6 +23,8 @@ private:
 	bool _symmetric = true;       // set by Setup(): see UncondensedLevel::Symmetric
 	FloatSparseMatrix _singleA;   // levels in single precision: the operator of the finest level (its smoothers, the cycle)
 	bool _blockCSR = false;       // the levels whose faces have several DoFs store their operator in block CSR
+	bool _singular = false;       // SingularMatrix, at the setup
+	Vector _kernel;               // _singular: the interpolation of 1 on the faces of the finest level (of the process), normalized
 public:
 	bool ManageAnisotropy = true; // see UncondensedLevel::ManageAnisotropy
 	bool CollapseBoundaryFaces = false; // see UncondensedLevel::CollapseBoundaryFaces (-uamg-bfc)
@@ -31,6 +34,13 @@ public:
 	// of its memory). In mixed precision (MixedPrecision), always (no copy: instead of their CSR copy in float). The
 	// Chebyshev smoothers, on one process; otherwise in CSR (the reason printed).
 	bool BlockCSRStorage = false;
+	// The matrix is singular, its kernel spanned by the interpolation of 1 (the constants: a pure Neumann problem),
+	// symmetric: the coarsest level, whose kernel is its own interpolation of 1 (P z_c = z_f, see
+	// UncondensedLevel::CoarsenMesh()), is solved by SingularSolver. The residuals of the other levels stay in the image
+	// of their matrices (z^T A = 0) up to the rounding errors, which the coarsest solve removes: no projection on them
+	// (the levels in single precision are kept). The output of each cycle is projected orthogonally to the kernel (see
+	// ExecuteOneIteration()). The right-hand side must be in the image of the matrix.
+	bool SingularMatrix = false;
 
 
 	UncondensedAMG(int dim, int degree, bool polynomialSpaceQ, int cellBlockSize, int faceBlockSize, double strongCouplingThreshold, UAMGFaceProlongation faceProlong, UAMGProlongation coarseningProlong, UAMGProlongation mgProlong, int nLevels = 0)
@@ -168,6 +178,8 @@ public:
 			_singleA = SparseMatrixOps::Cast<float>(A);
 			fine->SingleOperatorMatrix = &_singleA;
 		}
+		_singular = SingularMatrix;
+		_kernel = _singular ? SingularSolver::Kernel(faceInterpOfOne, _faceBlockSize, A.rows()) : Vector();
 
 		Multigrid::Setup(A);
 
@@ -243,6 +255,8 @@ public:
 		if (this->H_CS == H_CoarsStgy::MultiplePairwiseAggregation && this->CoarseningFactor == 0)
 			this->CoarseningFactor = 3.8;
 		fine->CheckHarmonicExtension(this->H_CS, this->FaceCoarseningStgy);
+		_singular = SingularMatrix;
+		_kernel = _singular ? SingularSolver::Kernel(faceInterpOfOne, _faceBlockSize, A.LocalRows()) : Vector();
 
 		Multigrid::Setup(A);
 
@@ -253,6 +267,39 @@ public:
 		fine->A_T_T = nullptr;
 		fine->A_T_F = nullptr;
 		fine->A_F_T = nullptr;
+	}
+
+	// SingularMatrix: the coarse solver wrapped by SingularSolver, with the interpolation of 1 of the coarsest level
+	void InitializeCoarseSolver() override
+	{
+		Multigrid::InitializeCoarseSolver();
+		if (!_singular)
+			return;
+		Level* level = this->_fineLevel;
+		while (level->CoarserLevel)
+			level = level->CoarserLevel;
+		SingularSolver* singular = dynamic_cast<SingularSolver*>(this->CoarseSolver);
+		if (!singular)
+		{
+			singular = new SingularSolver(this->CoarseSolver);
+			this->CoarseSolver = singular;
+		}
+		UncondensedLevel& coarsest = dynamic_cast<UncondensedLevel&>(*level);
+		singular->SetKernel(coarsest.FaceInterpOfOne, coarsest.FaceBlockSize());
+	}
+
+	// SingularMatrix: the output of the cycle projected orthogonally to the kernel. The kernel component added by the
+	// smoothers, invisible to A, would accumulate in the iterates of the Krylov method until the rounding errors of A x
+	// on it stall the convergence at small tolerances.
+	IterationResult ExecuteOneIteration(const Vector& b, Vector& x, bool& xEquals0, bool computeResidual, bool computeAx, const IterationResult& oldResult) override
+	{
+		IterationResult result = Multigrid::ExecuteOneIteration(b, x, xEquals0, computeResidual, computeAx, oldResult);
+		if (_singular)
+		{
+			x -= Parallel::Dot(x, _kernel) * _kernel;
+			result.SetX(x);
+		}
+		return result;
 	}
 
 	Vector Solve(const Vector& b, string initialGuessCode) override

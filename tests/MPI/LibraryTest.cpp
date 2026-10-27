@@ -62,11 +62,12 @@ SparseMatrix LocalColumns(const SparseMatrix& rows, const IndexMap& owners, cons
 
 // The uncondensed system distributed by rows, through the interface of the library: the ghost faces and cells numbered
 // in reverse order of their global numbers (any order). The solution of the system on one process. Non-symmetric if
-// asymmetry != 0.
-void ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double asymmetry = 0)
+// asymmetry != 0. singular: the pure Neumann system (SingularMatrix; the right-hand side incompatible: projected),
+// the solutions compared up to the kernel (the constants).
+void ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double asymmetry = 0, bool singular = false)
 {
 	int n = 60;
-	CartesianHybridSystem global(n, asymmetry);
+	CartesianHybridSystem global(n, asymmetry, singular);
 	PartitionedSystem system(global, n, PartitionShape::Blocks, World());
 	const IndexMap& faces = *system.Faces;
 	const IndexMap& cells = *system.Cells;
@@ -78,6 +79,7 @@ void ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double 
 	{
 		fhhos4::Solver solver = CartesianSolver(MPI_COMM_SELF);
 		solver.Prolongation = prolongation;
+		solver.SingularMatrix = singular;
 		Vector cellOnes = Vector::Ones(global.A_TT.rows()), faceOnes = Vector::Ones(global.S.rows());
 		if (asymmetry == 0)
 			solver.SetupSymmetric(system.Global.A_TT, system.Global.A_TF, system.Global.A_FF, cellOnes, faceOnes);
@@ -97,6 +99,7 @@ void ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double 
 
 	fhhos4::Solver solver = CartesianSolver(World().Comm());
 	solver.Prolongation = prolongation;
+	solver.SingularMatrix = singular;
 	Vector cellOnes = Vector::Ones(cells.NOwned), faceOnes = Vector::Ones(faces.NOwned);
 	if (asymmetry == 0)
 		solver.SetupSymmetric(A_TT, A_TF, A_FF, cellOnes, faceOnes, fhhos4::GhostNumbers(faceGhosts.size(), faceGhosts.data()));
@@ -106,10 +109,18 @@ void ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double 
 	fhhos4::Result result = solver.Solve(b_T.segment(cells.Begin, cells.NOwned), b_F.segment(faces.Begin, faces.NOwned), x_T, x_F);
 
 	EXPECT_TRUE(result.Converged);
-	EXPECT_LE(result.Iterations, expectedIterations + 4);
+	// singular: with HarmonicExtension, 14 iterations on one process (and on 3), 18-19 on 2 and 4, as the regular system
+	EXPECT_LE(result.Iterations, expectedIterations + (singular ? 6 : 4));
 	if (World().Size() == 1)
 		EXPECT_EQ(result.Iterations, expectedIterations);
 	Vector allX_T = Gathered(x_T), allX_F = Gathered(x_F);
+	if (singular)
+	{
+		// The difference without its component along the kernel (the interpolation of 1: ones)
+		double shift = ((allX_T - expectedX_T).sum() + (allX_F - expectedX_F).sum()) / (allX_T.rows() + allX_F.rows());
+		allX_T.array() -= shift;
+		allX_F.array() -= shift;
+	}
 	EXPECT_LE((allX_F - expectedX_F).norm(), 1e-8 * expectedX_F.norm());
 	EXPECT_LE((allX_T - expectedX_T).norm(), 1e-8 * expectedX_T.norm());
 	if (World().IsRoot())
@@ -136,6 +147,13 @@ TEST(DistributedLibrary, NonsymmetricUncondensedSystem)
 		ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::Reconstruction, asymmetry);
 		ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::HarmonicExtension, asymmetry);
 	}
+}
+
+// SingularMatrix: the pinned DoF of the coarsest level on one process, its column among the ghosts of the others
+TEST(DistributedLibrary, SingularMatrix)
+{
+	ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::Reconstruction, 0, true);
+	ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::HarmonicExtension, 0, true);
 }
 
 // The inputs are checked on all the processes: an error on one of them is an error on all of them

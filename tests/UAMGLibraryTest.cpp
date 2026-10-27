@@ -300,6 +300,8 @@ TEST(UAMGNonsymmetricProgram, NotWithFCG)
 // Non-symmetric with asymmetry > 0, like an advection in the direction (1, 1): the cell-face coupling is
 // -a_T (1 + asymmetry s) in A_TF and -a_T (1 - asymmetry s) in A_FT, s = 1 on the right and top faces of the cell (the
 // outflow), -1 on the others. The symmetric part is the symmetric system: positive definite.
+// With boundaryFaces, the 4n boundary faces are in the system (pure Neumann), numbered after the interior ones: the
+// matrix is singular, its kernel spanned by the interpolation of 1.
 struct HybridSystem
 {
 	using Matrix = fhhos4::SparseMatrix;
@@ -308,15 +310,16 @@ struct HybridSystem
 	bool Symmetric;
 
 	// cellScaling, faceScaling: the cell (resp. face) basis function is multiplied by these factors
-	HybridSystem(int n, const Eigen::VectorXd& cellScaling = Eigen::VectorXd(), const Eigen::VectorXd& faceScaling = Eigen::VectorXd(), double asymmetry = 0)
+	HybridSystem(int n, const Eigen::VectorXd& cellScaling = Eigen::VectorXd(), const Eigen::VectorXd& faceScaling = Eigen::VectorXd(), double asymmetry = 0, bool boundaryFaces = false)
 	{
 		Symmetric = asymmetry == 0;
 		int nCells = n * n;
 		// Interior faces: vertical ones (between the cells (i, j) and (i+1, j)), then horizontal ones
 		int nVertical = (n - 1) * n;
-		int nFaces = 2 * nVertical;
+		int nFaces = 2 * nVertical + (boundaryFaces ? 4 * n : 0);
 		auto vertical = [n](int i, int j) { return j * (n - 1) + i; };              // between (i, j) and (i+1, j)
 		auto horizontal = [n, nVertical](int i, int j) { return nVertical + j * n + i; }; // between (i, j) and (i, j+1)
+		auto boundary = [n, nVertical](int side, int i) { return 2 * nVertical + side * n + i; }; // left, right, bottom, top
 
 		std::mt19937 generator(42);
 		std::uniform_real_distribution<double> coefficient(1, 10);
@@ -337,6 +340,13 @@ struct HybridSystem
 				if (i < n - 1) faces.push_back({ vertical(i, j), 1 });
 				if (j > 0)     faces.push_back({ horizontal(i, j - 1), -1 });
 				if (j < n - 1) faces.push_back({ horizontal(i, j), 1 });
+				if (boundaryFaces)
+				{
+					if (i == 0)     faces.push_back({ boundary(0, j), -1 });
+					if (i == n - 1) faces.push_back({ boundary(1, j), 1 });
+					if (j == 0)     faces.push_back({ boundary(2, i), -1 });
+					if (j == n - 1) faces.push_back({ boundary(3, i), 1 });
+				}
 				for (auto [F, s] : faces)
 				{
 					TF.emplace_back(T, F, -a * (1 + asymmetry * s) * sT[T] * sF[F]);
@@ -502,6 +512,49 @@ TEST(UAMGLibrary, SolvesTheUncondensedSystem)
 		EXPECT_LE(uamg.Solve(b_T, b_F, y_T, x_F).Iterations, 1);
 		EXPECT_LT((y_T - x_T).norm() / x_T.norm(), 1e-9);
 	}
+}
+
+// The pure Neumann problem (SingularMatrix): the kernel is spanned by the interpolation of 1, the bases scaled at
+// random. With a compatible right-hand side (the image of a vector x*), the solution is x* up to a multiple of the
+// kernel; with an incompatible one, that of its projection onto the image of the matrix.
+TEST(UAMGLibrary, SingularMatrix)
+{
+	int n = 64, nCells = n * n, nFaces = 2 * (n - 1) * n + 4 * n;
+	std::mt19937 generator(7);
+	std::uniform_real_distribution<double> scaling(0.5, 2);
+	Eigen::VectorXd cellScaling = Eigen::VectorXd::NullaryExpr(nCells, [&]() { return scaling(generator); });
+	Eigen::VectorXd faceScaling = Eigen::VectorXd::NullaryExpr(nFaces, [&]() { return scaling(generator); });
+	HybridSystem system(n, cellScaling, faceScaling, 0, true);
+	Eigen::VectorXd z(nCells + nFaces);
+	z << system.CellInterpOfOne, system.FaceInterpOfOne;
+	auto withoutKernel = [&z](const Eigen::VectorXd& v) { return Eigen::VectorXd(v - v.dot(z) / z.dot(z) * z); };
+
+	Eigen::VectorXd exact = withoutKernel(Eigen::VectorXd::Random(nCells + nFaces));
+	Eigen::VectorXd b_T = system.A_TT * exact.head(nCells) + system.A_TF * exact.tail(nFaces);
+	Eigen::VectorXd b_F = system.A_FT * exact.head(nCells) + system.A_FF * exact.tail(nFaces);
+
+	fhhos4::Solver uamg = ToySolver();
+	uamg.SingularMatrix = true;
+	uamg.SetupSymmetric(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+	for (double incompatibility : { 0.0, 1e-3 })
+	{
+		Eigen::VectorXd rhs_F = b_F + incompatibility * b_F.norm() / system.FaceInterpOfOne.norm() * system.FaceInterpOfOne;
+		Eigen::VectorXd x_T(nCells), x_F = Eigen::VectorXd::Zero(nFaces);
+		fhhos4::Result result = uamg.Solve(b_T, rhs_F, x_T, x_F);
+		EXPECT_TRUE(result.Converged) << incompatibility;
+		EXPECT_LT(result.Iterations, 30) << incompatibility;
+		Eigen::VectorXd x(nCells + nFaces);
+		x << x_T, x_F;
+		EXPECT_LT(withoutKernel(x - exact).norm() / exact.norm(), 1e-8) << incompatibility;
+	}
+
+	// A matrix that is not singular on the interpolation of 1 (Dirichlet faces out of the system), or not symmetric:
+	// an error
+	HybridSystem dirichlet(16);
+	fhhos4::Solver notSingular = ToySolver();
+	notSingular.SingularMatrix = true;
+	EXPECT_THROW(notSingular.SetupSymmetric(dirichlet.A_TT, dirichlet.A_TF, dirichlet.A_FF, dirichlet.CellInterpOfOne, dirichlet.FaceInterpOfOne), fhhos4::Error);
+	EXPECT_THROW(uamg.SetupNonsymmetric(system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 }
 
 // CondensedMatrix(): the condensed matrix computed from the blocks

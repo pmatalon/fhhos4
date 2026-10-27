@@ -37,5 +37,6 @@ public:
 	using IterativeSolver::Solve;
 };
 
-// krylov: the Krylov method of the library (fhhos4::Solver::Krylov); none: the cycles of U-AMG alone.
-LibraryUAMG* CreateLibraryUAMG(const ProgramArguments& args, int dim, int faceDegree, int cellDegree, optional<KrylovMethod> krylov);
+// krylov: the Krylov method of the library (fhhos4::Solver::Krylov); none: the cycles of U-AMG alone. singularMatrix:
+// fhhos4::Solver::SingularMatrix (the full Neumann problem).
+LibraryUAMG* CreateLibraryUAMG(const ProgramArguments& args, int dim, int faceDegree, int cellDegree, optional<KrylovMethod> krylov, bool singularMatrix);

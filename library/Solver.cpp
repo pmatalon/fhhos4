@@ -176,6 +176,8 @@ namespace fhhos4
 		int FaceBlockSize = 0;
 		Eigen::Index NCellDoFs = 0;
 		SparseMatrix A; // the condensed matrix, computed by the setup (on one process): the solvers keep a pointer to it
+		bool Singular = false; // Solver::SingularMatrix, at the setup
+		Vector Kernel;  // Singular: the interpolation of 1 on the faces (of the process), normalized (the kernel of A)
 		unique_ptr<BorrowedSparseMatrix> GivenA_FT; // the caller's A_FT, read in place by Condensation (SetupNonsymmetric())
 		unique_ptr<StaticCondensation> Condensation; // after a setup from the blocks: for Solve(b_T, b_F, x_T, x_F)
 		unique_ptr<UncondensedAMG> Multigrid;
@@ -247,6 +249,8 @@ namespace fhhos4
 				Utils::FatalError("fhhos4::Solver: the flexible conjugate gradient requires a symmetric matrix: set Krylov to Krylov::GCR (or Default) for a non-symmetric one.");
 			if (!symmetric && CoarseSolver == fhhos4::CoarseSolver::Cholesky)
 				Utils::FatalError("fhhos4::Solver: the Cholesky factorization requires a symmetric matrix: set CoarseSolver to CoarseSolver::LU (or Default) for a non-symmetric one.");
+			if (!symmetric && s.SingularMatrix)
+				Utils::FatalError("fhhos4::Solver: SingularMatrix requires a symmetric matrix (SetupSymmetric()): the kernel of the transpose of a non-symmetric matrix is not the interpolation of 1 in general.");
 			if (s.PreSmoothingIterations < -1 || s.PostSmoothingIterations < -1)
 				Utils::FatalError("fhhos4::Solver: PreSmoothingIterations and PostSmoothingIterations must be >= 0, or -1 (the smoother's default), got " + to_string(s.PreSmoothingIterations) + " and " + to_string(s.PostSmoothingIterations) + ".");
 			for (fhhos4::Smoother smoother : { s.PreSmoother, s.PostSmoother })
@@ -365,6 +369,8 @@ namespace fhhos4
 
 			Condensation = make_unique<StaticCondensation>(A_TT, A_TF, GivenA_FT.get(), CellBlockSize);
 			A = Condensation->CondensedMatrix(A_FF, Symmetric);
+			if (s.SingularMatrix)
+				SetKernel(faceInterpOfOne);
 
 			// The blocks are only read during the setup (UncondensedAMG::Setup())
 			SparseMatrix symmetric; // empty A_FT: symmetric matrix
@@ -391,6 +397,8 @@ namespace fhhos4
 
 			DistributedCondensation = make_unique<DistributedStaticCondensation>(A_TT, A_TF, std::move(A_FT), faces, CellBlockSize, FaceBlockSize);
 			DistributedA = DistributedCondensation->CondensedMatrix(A_FF);
+			if (s.SingularMatrix)
+				SetKernel(faceInterpOfOne);
 			ActiveSolver()->Setup(DistributedA, A_TT, A_TF, DistributedCondensation->A_FT(), faces, cellInterpOfOne, faceInterpOfOne);
 			IsSetUp = true;
 
@@ -398,9 +406,28 @@ namespace fhhos4
 				cout << "fhhos4: setup of " << Multigrid->NumberOfLevels() << " levels on " << Comm.Size() << " processes in " << Seconds(start) << " s" << endl;
 		}
 
+		// Solver::SingularMatrix: the kernel of A, the interpolation of 1 on the faces (c on the first DoF of each face, 0
+		// on the others; on several processes, those of the process), checked: A z = 0 up to the rounding errors.
+		// Otherwise the projections of the right-hand sides would silently solve another problem (e.g. a Dirichlet face in
+		// the system, or a wrong interpolation of 1).
+		void SetKernel(const Vector& faceInterpOfOne)
+		{
+			Singular = true;
+			Kernel = SingularSolver::Kernel(faceInterpOfOne, FaceBlockSize, NFaceDoFs);
+			double relative;
+			if (IsDistributed())
+				relative = Parallel::Norm(DistributedA * Kernel) / sqrt(Comm.Sum(DistributedA.Diag.squaredNorm() + DistributedA.Offd.squaredNorm()));
+			else
+				relative = Vector(A.selfadjointView<Eigen::Lower>() * Kernel).norm() / A.norm(); // A: lower triangular part
+			if (!(relative < 1e-8))
+				Utils::FatalError("fhhos4::Solver: SingularMatrix, but the interpolation of 1 is not in the kernel of the matrix (|A z| / (|A| |z|) = " + to_string(relative) + ", z: the interpolation of 1 on the faces): is there a Dirichlet face in the system, or is the interpolation of 1 wrong?");
+		}
+
 		void Reset()
 		{
 			IsSetUp = false;
+			Singular = false;
+			Kernel.resize(0);
 			KrylovSolver.reset();
 			Multigrid.reset();
 			Condensation.reset();
@@ -417,6 +444,7 @@ namespace fhhos4
 		{
 			ExportModule out;
 			Multigrid.reset(AlgebraicSolverFactory::CreateUncondensedAMG(args, s.Dimension, s.FaceDegree, PolynomialSpaceQ, CellBlockSize, FaceBlockSize, FaceBlockSize, out, AlgebraicSolverFactory::AlgebraicCoarseSolvers(s.Dimension, out)));
+			Multigrid->SingularMatrix = s.SingularMatrix;
 			if (Krylov == fhhos4::Krylov::FCG)
 			{
 				auto fcg = make_unique<FlexibleConjugateGradient>(1);
@@ -562,6 +590,14 @@ namespace fhhos4
 
 		Result result;
 		Vector rhs = Eigen::Map<const Vector>(b.Data, b.Size);
+		if (_impl->Singular)
+		{
+			// The right-hand side projected onto the image of A (orthogonal to its kernel)
+			double component = Parallel::Dot(rhs, _impl->Kernel), norm = Parallel::Norm(rhs);
+			if (Verbosity >= 1 && _impl->Comm.IsRoot() && abs(component) > 1e-10 * norm)
+				cout << "fhhos4: the right-hand side is not in the image of the singular matrix: its component along the kernel removed (relative size " << abs(component) / norm << ")" << endl;
+			rhs -= component * _impl->Kernel;
+		}
 		Eigen::Map<Vector> callerX(x.Data, x.Size);
 		if (Parallel::Norm(rhs) == 0)
 		{

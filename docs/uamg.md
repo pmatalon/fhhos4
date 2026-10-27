@@ -23,14 +23,30 @@ face of the aggregate alone (`CoarseFaceAggregates` (k, -1)), numbered after its
 process. Both in the flat passes and in `HybridAlgebraicMesh::Coarsen()`, bit for bit the same (`CoarseningPassTest`
 `*_mixed*`).
 
-Singular systems: U-AMG has no kernel handling (only the geometric multigrid applies the zero-mean and compatibility
-conditions).
-- Pure Neumann does not work through the uncondensed interface: a client's pinned DoF zeroes a column of `A_TF`, whose
-  face then has no cell once the p-level extraction drops the zeros.
-- The program's full Neumann test case (`-tc fullneumann`, 2D, `tests/FullNeumannTest.cpp`): the program condenses
-  the system and projects b onto Im(A), the library solves it by `Solve(b, x)`. The singular coarsest matrix is
-  factorized with a tiny pivot: fine at the default tolerance up to n=32, erratic beyond with `fcglibuamg` (see
-  `PERFORMANCE.md`).
+Singular systems (`UncondensedAMG::SingularMatrix`, the library's `Solver::SingularMatrix`, set by the program for
+`-tc fullneumann`; symmetric): the kernel is the interpolation of 1, z = c on the first DoF of each face
+block, 0 on the others (`SingularSolver::Kernel()`). No new input: the hierarchical bases with a constant phi_0 make the
+higher-order coefficients of 1 zero. On each level, the kernel is the level's own interpolation of 1 (1 on the
+h-levels, where the constant has coordinate 1: P z_c = z_f).
+- The coarsest level: `SingularSolver` wraps the coarse solver, its matrix pinned on the DoF of largest |z_i| (row and
+  column of the identity) before the factorization; each solve projects its right-hand side onto Im(A), zeroes the
+  pinned DoF and projects the solution. Without it, the factorization meets a pivot of the order of the rounding errors,
+  and the kernel component of the coarse corrections ruins FCG. The kernel is known: no threshold to detect a null
+  pivot (MUMPS's `ICNTL(24)`/`CNTL(3)` would need one; Eigen's `SimplicialLDLT` and `SparseLU` only stop on an exactly
+  zero pivot), and the same code for all the coarse solvers. On several processes: the DoF of largest |z_i| on the
+  smallest rank that has it; its owner pins its row and its column of `Diag`, the processes that have it as a ghost
+  zero its column of `Offd`; the dot products are `Parallel::Dot`.
+- The finest level: the output of each cycle projected orthogonally to z (`UncondensedAMG::ExecuteOneIteration()`): the
+  smoothers' kernel components would accumulate in the iterates until the rounding errors of A x stall the true
+  residual at small tolerances.
+- No projection on the intermediate levels: their residuals stay in Im(A) up to rounding (z^T A = 0, R = P^T), so the
+  levels in single precision are kept. (The geometric multigrid's per-level hooks `ApplyZeroMeanCondition`/
+  `EnforceCompatibilityCondition` are in double only.)
+- The library checks |A z| / (|A| |z|) < 1e-8 at the setup (an error otherwise), and projects the condensed right-hand
+  side of each solve onto Im(A). The solution is returned up to a multiple of z: the client shifts it (the library has
+  no integrals of the basis functions to compute a mean).
+- Pinning a DoF in the client instead does not work through the uncondensed interface: it zeroes a column of `A_TF`,
+  whose face then has no cell once the p-level extraction drops the zeros.
 
 ## p-levels
 

@@ -69,18 +69,20 @@ class FullNeumannTest : public ::testing::TestWithParam<std::tuple<std::string, 
 };
 
 // The L2 error converges at the theoretical rate (h^2 for k=0, h^(k+2) for k>=1; direct solver), and the solvers give
-// the same solution at n = 32, where the multigrid methods have several levels: the geometric multigrid (which applies
-// the zero-mean and compatibility conditions on its levels), U-AMG in the program and through the library (on the
-// condensed system).
-//   ./bin/fhhos4 -geo square -tc fullneumann -mesh {tri|cart -mesher inhouse} -k {0|1} -n {8|16|32} -s ch -no-cache
-//   ./bin/fhhos4 -geo square -tc fullneumann -mesh {tri|cart -mesher inhouse} -k {0|1} -n 32 -s {mg|fcguamg|fcglibuamg} -no-cache
+// the same solution at n = 64, where the multigrid methods have several levels (tolerance 1e-11: at k = 2, the L2 error
+// at the default tolerance is that of the solver): the geometric multigrid (which applies the zero-mean and
+// compatibility conditions on its levels), U-AMG in the program and through the library (on the condensed system),
+// with their kernel handling (SingularMatrix: without it, the singular coarsest matrix was factorized with a tiny pivot,
+// and tri k=2 took 198 iterations through the library).
+//   ./bin/fhhos4 -geo square -tc fullneumann -mesh {tri|cart -mesher inhouse} -k {0|1|2} -n {8|16|32|64} -s ch -no-cache
+//   ./bin/fhhos4 -geo square -tc fullneumann -mesh {tri|cart -mesher inhouse} -k {0|1|2} -n 64 -s {mg|fcguamg|fcglibuamg} -tol 1e-11 -no-cache
 TEST_P(FullNeumannTest, ConvergesAndSolversAgree)
 {
 	auto [meshCode, mesher, k, expectedError] = GetParam();
 
 	std::vector<double> h;
 	std::vector<double> errors;
-	for (int n : { 8, 16, 32 })
+	for (int n : { 8, 16, 32, 64 })
 	{
 		ProgramResults results = RunDiffusionHHO(FullNeumannArgs(meshCode, mesher, k, n, "ch"));
 		ASSERT_GT(results.L2Error, 0);
@@ -90,15 +92,16 @@ TEST_P(FullNeumannTest, ConvergesAndSolversAgree)
 	double order = EstimateConvergenceOrder(h, errors);
 	double expectedOrder = (k == 0) ? 2.0 : static_cast<double>(k + 2);
 	EXPECT_NEAR(order, expectedOrder, 0.3);
+	EXPECT_NEAR(errors[2], expectedError, 0.01 * expectedError); // n = 32
 
 	double directError = errors.back();
-	EXPECT_NEAR(directError, expectedError, 0.01 * expectedError);
-
 	for (std::string solverCode : { "mg", "fcguamg", "fcglibuamg" })
 	{
-		ProgramResults results = RunDiffusionHHO(FullNeumannArgs(meshCode, mesher, k, 32, solverCode));
+		ProgramArguments args = FullNeumannArgs(meshCode, mesher, k, 64, solverCode);
+		args.Solver.Tolerance = 1e-11;
+		ProgramResults results = RunDiffusionHHO(args);
 		EXPECT_GT(results.IterationCount, 1) << solverCode; // several levels
-		EXPECT_LT(results.IterationCount, 200) << solverCode; // converged (default maximum: 200)
+		EXPECT_LT(results.IterationCount, 40) << solverCode;
 		EXPECT_NEAR(results.L2Error, directError, 1e-4 * directError) << solverCode;
 	}
 }
@@ -107,6 +110,7 @@ INSTANTIATE_TEST_SUITE_P(Square, FullNeumannTest,
 	::testing::Values(
 		std::make_tuple(std::string("tri"), std::string(""), 0, 5.67e-4),
 		std::make_tuple(std::string("tri"), std::string(""), 1, 1.65e-6),
+		std::make_tuple(std::string("tri"), std::string(""), 2, 5.35e-9),
 		std::make_tuple(std::string("cart"), std::string("inhouse"), 0, 5.27e-4),
 		std::make_tuple(std::string("cart"), std::string("inhouse"), 1, 3.26e-6)),
 	[](const ::testing::TestParamInfo<FullNeumannTest::ParamType>& info)

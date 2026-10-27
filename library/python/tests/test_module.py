@@ -261,12 +261,13 @@ def test_parameters():
     assert solver.Krylov == fhhos4.Krylov.Default and solver.Cycle == fhhos4.Cycle.K
     assert solver.PCoarsening == fhhos4.PCoarsening.Minus2 and solver.Tolerance == 1e-8
     assert solver.Prolongation == fhhos4.Prolongation.HarmonicExtension
-    assert solver.PolynomialSpace == fhhos4.PolynomialSpace.P
+    assert solver.PolynomialSpace == fhhos4.PolynomialSpace.P and not solver.SingularMatrix
     solver.PCoarsening = fhhos4.PCoarsening.ToZero
     solver.PreSmoother = fhhos4.Smoother.BlockGaussSeidel
     solver.PolynomialSpace = fhhos4.PolynomialSpace.Q
+    solver.SingularMatrix = True
     assert solver.PCoarsening == fhhos4.PCoarsening.ToZero and solver.PreSmoother == fhhos4.Smoother.BlockGaussSeidel
-    assert solver.PolynomialSpace == fhhos4.PolynomialSpace.Q
+    assert solver.PolynomialSpace == fhhos4.PolynomialSpace.Q and solver.SingularMatrix
     assert fhhos4.Version().startswith("1.")
 
 

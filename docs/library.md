@@ -52,9 +52,11 @@ For the library's users: `README_library.md`. This file is for changing the libr
 
 `-s libuamg|fcglibuamg|gcrlibuamg` (`Solver/LibraryUAMG.cpp`, the only file of the program that includes the public
 header, through `LibraryParameters.h`) runs the library on the uncondensed system (`Diffusion_HHO::CondensationBySolver`:
-no static condensation in the program). For a full Neumann problem and the exports of the system or of the algebraic
-error, the program condenses the system, sets the library up from the blocks and solves the condensed system by
-`Solve(b, x)` (`LibraryUAMG::Setup()`; tested through `-export lsys`). `tests/UAMGLibraryTest.cpp` compares it with
+no static condensation in the program). For the exports of the system or of the algebraic error, the program
+condenses the system, sets the library up from the blocks and solves the condensed system by `Solve(b, x)`
+(`LibraryUAMG::Setup()`; tested through `-export lsys`). The full Neumann problem: `SingularMatrix`
+(`SolverFactory::IsFullNeumann()`, also for `-s uamg`), the library projects b (the program does when it condenses);
+on several processes too (see `docs/uamg.md`). `tests/UAMGLibraryTest.cpp` compares it with
 `uamg|fcguamg|gcruamg`. `-uamg-nonsym` runs the non-symmetric path on the symmetric matrices; `-uamg-mixed` and
 `-uamg-bcsr` the mixed precision and the block CSR storage (off in the program: the papers).
 

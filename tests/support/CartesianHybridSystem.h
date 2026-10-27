@@ -6,16 +6,18 @@ namespace fhhos4_tests
 {
 	// Hybrid system of degree 0 on the n x n Cartesian mesh of the unit square (interior faces), as in
 	// UAMGLibraryTest.cpp: cell coefficients a_T, cell-face couplings -a_T (1 + asymmetry s) in A_TF and
-	// -a_T (1 - asymmetry s) in A_FT (s = 1 on the right and top faces of the cell)
+	// -a_T (1 - asymmetry s) in A_FT (s = 1 on the right and top faces of the cell). With boundaryFaces, the 4n boundary
+	// faces in the system too (pure Neumann): singular, its kernel the constants.
 	struct CartesianHybridSystem
 	{
 		SparseMatrix A_TT, A_TF, A_FT, A_FF, S; // S: the condensed operator A_FF - A_FT A_TT^-1 A_TF
 
-		CartesianHybridSystem(int n, double asymmetry)
+		CartesianHybridSystem(int n, double asymmetry, bool boundaryFaces = false)
 		{
 			int nVertical = (n - 1) * n;
 			auto vertical = [n](int i, int j) { return j * (n - 1) + i; };
 			auto horizontal = [n, nVertical](int i, int j) { return nVertical + j * n + i; };
+			auto boundary = [n, nVertical](int side, int i) { return 2 * nVertical + side * n + i; }; // left, right, bottom, top
 			std::vector<Eigen::Triplet<double, SparseMatrixIndex>> TT, TF, FT, FF;
 			for (int j = 0; j < n; j++)
 			{
@@ -29,6 +31,13 @@ namespace fhhos4_tests
 					if (i < n - 1) faces.push_back({ vertical(i, j), 1 });
 					if (j > 0)     faces.push_back({ horizontal(i, j - 1), -1 });
 					if (j < n - 1) faces.push_back({ horizontal(i, j), 1 });
+					if (boundaryFaces)
+					{
+						if (i == 0)     faces.push_back({ boundary(0, j), -1 });
+						if (i == n - 1) faces.push_back({ boundary(1, j), 1 });
+						if (j == 0)     faces.push_back({ boundary(2, i), -1 });
+						if (j == n - 1) faces.push_back({ boundary(3, i), 1 });
+					}
 					for (auto [F, s] : faces)
 					{
 						TF.push_back({ T, F, -a * (1 + asymmetry * s) });
@@ -37,7 +46,7 @@ namespace fhhos4_tests
 					}
 				}
 			}
-			int nCells = n * n, nFaces = 2 * nVertical;
+			int nCells = n * n, nFaces = 2 * nVertical + (boundaryFaces ? 4 * n : 0);
 			A_TT.resize(nCells, nCells);
 			A_TT.setFromTriplets(TT.begin(), TT.end());
 			A_TF.resize(nCells, nFaces);

@@ -278,6 +278,13 @@ namespace fhhos4
 		// The polynomial space of the cells and faces, P^l and P^k, or Q^l and Q^k: their numbers of DoFs, and those of the
 		// p-levels
 		fhhos4::PolynomialSpace PolynomialSpace = fhhos4::PolynomialSpace::P;
+		// The matrix is singular, its kernel spanned by the interpolation of 1 (cellInterpOfOne, faceInterpOfOne: the
+		// constant functions), e.g. the pure Neumann problem: SetupSymmetric() only. The setup checks that
+		// the interpolation of 1 is in the kernel; each solve projects the condensed right-hand side onto the image of the
+		// matrix (the data of a pure Neumann problem are compatible up to the rounding or quadrature errors; at Verbosity
+		// >= 1, a message if the component removed is larger). The solution is defined up to a multiple of the
+		// interpolation of 1 (a constant): shift it to the normalization you want (e.g. zero mean).
+		bool SingularMatrix = false;
 
 		//--------------------- Solver ---------------------//
 
