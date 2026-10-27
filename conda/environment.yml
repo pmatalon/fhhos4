@@ -10,3 +10,7 @@ dependencies:
   - cmake
   - make
   - ninja
+  - mpich
+  - mumps-mpi
+  # Keeps GNU's OpenMP: MUMPS's build with OpenBLAS would replace it by LLVM's
+  - _openmp_mutex=*=*_gnu

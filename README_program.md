@@ -12,9 +12,9 @@ This program depends on the following third-party software packages:
 
 and optionally
 - AGMG (version 3.3.5 or later),
-- MPI (e.g. MPICH or Open MPI), to run on several processes.
+- MPI (e.g. MPICH or Open MPI) and MUMPS, to run on several processes.
 
-Eigen and CGAL are provided through a conda environment (`conda/environment.yml`). GMSH is also available in that environment, but can alternatively be built from source if you need a specific version.
+Eigen and CGAL are provided through a conda environment (`conda/environment.yml`), as are MPICH and MUMPS. GMSH is also available in that environment, but can alternatively be built from source if you need a specific version.
 
 ### 1. Create and activate the conda environment
 
@@ -125,9 +125,8 @@ The program reads and writes:
 
 ### 7. (Optional) Several processes (MPI)
 
-Built with `-DENABLE_MPI=ON` (MPI and MUMPS from the environment, e.g.
-`conda install -n fhhos4 -c conda-forge mpich mumps-mpi`), the program runs on several processes with `mpiexec`, with
-OpenMP threads in each process:
+Built with `-DENABLE_MPI=ON` (MPI and MUMPS from the environment: the conda environment has MPICH and MUMPS), the
+program runs on several processes with `mpiexec`, with OpenMP threads in each process:
 
 ```bash
 mpiexec -n 4 ./bin/fhhos4 -geo cube -mesh tetra -n 16 -k 1 -s fcglibuamg

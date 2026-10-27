@@ -27,8 +27,8 @@ CGAL, GMSH, GTest, the compiler, cmake, make):
 conda activate fhhos4
 ```
 
-If the env doesn't exist yet: `conda env create -f conda/environment.yml`. Other envs and build directories: MPI
-`docs/mpi.md`, Python `docs/python.md`.
+If the env doesn't exist yet: `conda env create -f conda/environment.yml` (MPI and MUMPS included). Build directories:
+MPI `docs/mpi.md`; Python, its env and build directories: `docs/python.md`.
 
 ## Build
 

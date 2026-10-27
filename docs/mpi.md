@@ -5,13 +5,12 @@ Open work: `.scratch/mpi/`. Measurements: `PERFORMANCE.md` "Distributed memory (
 
 ## Build and environment
 
-MPI and MUMPS from the conda env (installed in `fhhos4`, not in `conda/environment.yml`: `mpich`, and
-`conda install -c conda-forge "mumps-mpi=5.8.2" "_openmp_mutex=*=*_gnu"`: the pin keeps GNU's OpenMP, which MUMPS's
-build with OpenBLAS would replace by LLVM's; MUMPS then uses BLIS and netlib's LAPACK: with several threads per
-process, set `BLIS_NUM_THREADS=1`, since BLIS takes `OMP_NUM_THREADS` and creates its threads at each of MUMPS's small
-calls, see `PERFORMANCE.md`). Build directories:
-`build-mpi-lib` (`-DENABLE_PROGRAM=OFF -DENABLE_MPI=ON`, ~1 min: the library and `fhhos4_mpi_tests`, the fast loop),
-`build-mpi` (the program too).
+MPI and MUMPS from the conda env `fhhos4` (`conda/environment.yml`: `mpich`, `mumps-mpi` and `_openmp_mutex=*=*_gnu`:
+the pin keeps GNU's OpenMP, which MUMPS's build with OpenBLAS would replace by LLVM's; MUMPS then uses BLIS and
+netlib's LAPACK: with several threads per process, set `BLIS_NUM_THREADS=1`, since BLIS takes `OMP_NUM_THREADS` and
+creates its threads at each of MUMPS's small calls, see `PERFORMANCE.md`). Build directories: `build-mpi-lib`
+(`-DENABLE_PROGRAM=OFF -DENABLE_MPI=ON`, ~1 min: the library and `fhhos4_mpi_tests`, the fast loop), `build-mpi` (the
+program too).
 
 ## Code
 
