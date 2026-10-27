@@ -109,20 +109,23 @@ int main(int argc, char** argv)
 			faceInterpOfOne[b] = face[face.rows() == A_T_F.cols() ? b * I("faceBS") : b];
 	}
 
-	HarnessAMG mg(I("dim"), I("degree"), I("cellBS"), I("faceBS"), D("strong"), (UAMGFaceProlongation)I("faceProlong"),
+	bool polySpaceQ = p.count("polySpaceQ") && I("polySpaceQ"); // absent from the dumps made before Q
+	HarnessAMG mg(I("dim"), I("degree"), polySpaceQ, I("cellBS"), I("faceBS"), D("strong"), (UAMGFaceProlongation)I("faceProlong"),
 		(UAMGProlongation)I("coarseningProlong"), (UAMGProlongation)I("mgProlong"), I("nLevels"));
 	mg.MatrixMaxSizeForCoarsestLevel = I("maxSizeCoarsest");
-	mg.Cycle = p.at("cycle")[0];
+	char cycle = p.at("cycle")[0];
+	mg.Cycle = cycle == 'K' ? CycleType::K : cycle == 'W' ? CycleType::W : CycleType::V;
 	mg.WLoops = I("wLoops");
 	mg.UseGalerkinOperator = I("galerkin");
-	mg.PreSmootherCode = p.at("preSmoother");
-	mg.PostSmootherCode = p.at("postSmoother");
+	SmootherFactory::FromCode(p.at("preSmoother"), mg.PreSmoother);
+	SmootherFactory::FromCode(p.at("postSmoother"), mg.PostSmoother);
 	mg.PreSmoothingIterations = I("preIt");
 	mg.PostSmoothingIterations = I("postIt");
 	mg.RelaxationParameter = D("omega");
 	mg.BlockSizeForBlockSmoothers = I("blockSize");
 	mg.CoarseLevelChangeSmoothingCoeff = I("clcCoeff");
-	mg.CoarseLevelChangeSmoothingOperator = p.at("clcOp")[0];
+	char clcOp = p.at("clcOp")[0];
+	mg.CoarseLevelChangeSmoothingOperator = clcOp == '*' ? SmoothingChangeOperator::Multiply : clcOp == '-' ? SmoothingChangeOperator::Subtract : SmoothingChangeOperator::Add;
 	mg.HP_CS = (HP_CoarsStgy)I("HP_CS");
 	mg.H_CS = (H_CoarsStgy)I("H_CS");
 	mg.P_CS = (P_CoarsStgy)I("P_CS");

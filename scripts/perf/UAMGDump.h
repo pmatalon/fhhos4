@@ -106,15 +106,15 @@ inline std::map<std::string, std::string> ReadParams(const std::string& path)
 		WriteVector(cellInterpOfOne, d + "/cellInterpOfOne.bin"); \
 		WriteVector(faceInterpOfOne, d + "/faceInterpOfOne.bin"); \
 		std::ofstream p(d + "/params.txt"); \
-		p << "dim " << _dim << "\ndegree " << _degree << "\ncellBS " << _cellBlockSize << "\nfaceBS " << _faceBlockSize \
+		p << "dim " << _dim << "\ndegree " << _degree << "\npolySpaceQ " << _polynomialSpaceQ << "\ncellBS " << _cellBlockSize << "\nfaceBS " << _faceBlockSize \
 		  << "\nstrong " << _strongCouplingThreshold << "\nfaceProlong " << (unsigned)_faceProlong \
 		  << "\ncoarseningProlong " << (unsigned)_coarseningProlong << "\nmgProlong " << (unsigned)_multigridProlong \
 		  << "\nnLevels " << this->NumberOfLevels() << "\nmaxSizeCoarsest " << this->MatrixMaxSizeForCoarsestLevel \
-		  << "\ncycle " << this->Cycle << "\nwLoops " << this->WLoops << "\ngalerkin " << this->UseGalerkinOperator \
-		  << "\npreSmoother " << this->PreSmootherCode << "\npostSmoother " << this->PostSmootherCode \
+		  << "\ncycle " << "VWK"[(unsigned)this->Cycle] << "\nwLoops " << this->WLoops << "\ngalerkin " << this->UseGalerkinOperator \
+		  << "\npreSmoother " << SmootherFactory::Code(this->PreSmoother) << "\npostSmoother " << SmootherFactory::Code(this->PostSmoother) \
 		  << "\npreIt " << this->PreSmoothingIterations << "\npostIt " << this->PostSmoothingIterations \
 		  << "\nomega " << this->RelaxationParameter << "\nblockSize " << this->BlockSizeForBlockSmoothers \
-		  << "\nclcCoeff " << this->CoarseLevelChangeSmoothingCoeff << "\nclcOp " << this->CoarseLevelChangeSmoothingOperator \
+		  << "\nclcCoeff " << this->CoarseLevelChangeSmoothingCoeff << "\nclcOp " << "+-*"[(unsigned)this->CoarseLevelChangeSmoothingOperator] \
 		  << "\nHP_CS " << (unsigned)this->HP_CS << "\nH_CS " << (unsigned)this->H_CS << "\nP_CS " << (unsigned)this->P_CS \
 		  << "\nfaceCoarsening " << (unsigned)this->FaceCoarseningStgy << "\nbdryFaceCollapsing " << (unsigned)this->BdryFaceCollapsing \
 		  << "\ncoarseningFactor " << this->CoarseningFactor << "\ncoarsePolyDegree " << this->CoarsePolyDegree \
