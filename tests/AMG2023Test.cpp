@@ -22,7 +22,7 @@ class AMGCubeTetTest : public ::testing::TestWithParam<std::tuple<std::string, s
 {
 };
 
-//   ./bin/fhhos4 -geo cube -mesh tetra -k 0 -n {16|32} -s {fcguamg|fcgaggregamg} -no-cache
+//   ./bin/fhhos4 -geo cube -mesh tetra -k 0 -n {16|32} -s {fcguamg|fcgaggregamg} -smoothers bgs -no-cache
 TEST_P(AMGCubeTetTest, IterationCounts)
 {
 	auto [solverCode, expected] = GetParam();
@@ -35,6 +35,7 @@ TEST_P(AMGCubeTetTest, IterationCounts)
 		args.Discretization.N = e.N;
 		args.Discretization.PolyDegree = 1; // k = 0
 		args.Solver.SolverCode = solverCode;
+		args.Solver.MG.PreSmoother = SmootherType::BlockGaussSeidel; // the paper's (-smoothers bgs)
 		args.Actions.UseCache = false; // -no-cache
 
 		ProgramResults results = RunDiffusionHHO(args);

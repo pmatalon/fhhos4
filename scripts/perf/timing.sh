@@ -29,13 +29,13 @@ run() {
 	done
 }
 
-run "Cube-tet k0 n32 cp6"      -geo cube -mesh tetra -k 0 -n 32 -s fcguamg -coarsening-prolong 6
-run "Cube-tet k0 n32 cp4"      -geo cube -mesh tetra -k 0 -n 32 -s fcguamg -coarsening-prolong 4
-run "Cube-tet k0 n32 cp5"      -geo cube -mesh tetra -k 0 -n 32 -s fcguamg -coarsening-prolong 5
-run "Cube-tet k0 n32 cp3"      -geo cube -mesh tetra -k 0 -n 32 -s fcguamg -coarsening-prolong 3
-run "Cube-cart-aniso100 n64"   -geo cube -mesh cart -mesher inhouse -k 0 -n 64 -aniso 100 -s fcguamg
+run "Cube-tet k0 n32 cp6"      -geo cube -mesh tetra -k 0 -n 32 -s fcguamg -coarsening-prolong 6 -smoothers bgs
+run "Cube-tet k0 n32 cp4"      -geo cube -mesh tetra -k 0 -n 32 -s fcguamg -coarsening-prolong 4 -smoothers bgs
+run "Cube-tet k0 n32 cp5"      -geo cube -mesh tetra -k 0 -n 32 -s fcguamg -coarsening-prolong 5 -smoothers bgs
+run "Cube-tet k0 n32 cp3"      -geo cube -mesh tetra -k 0 -n 32 -s fcguamg -coarsening-prolong 3 -smoothers bgs
+run "Cube-cart-aniso100 n64"   -geo cube -mesh cart -mesher inhouse -k 0 -n 64 -aniso 100 -s fcguamg -smoothers bgs
 # -hp-cs h: the hp-coarsening of the measurements recorded in PERFORMANCE.md (the default is p_h since 2026-10-05)
-run "Cube-tet k2 n16"          -geo cube -mesh tetra -k 2 -n 16 -s fcguamg -hp-cs h
+run "Cube-tet k2 n16"          -geo cube -mesh tetra -k 2 -n 16 -s fcguamg -hp-cs h -smoothers bgs
 
 # Best of the repetitions, per case and number of threads
 awk -F'|' '{ key = $1 "|" $2; split($4, s, " "); split($5, t, " ");

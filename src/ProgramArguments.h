@@ -70,8 +70,10 @@ struct MultigridArguments
 	bool UseHigherOrderReconstruction = true;
 	bool UseHeterogeneousWeighting = true;
 	bool UseGalerkinOperator = false;
-	SmootherType PreSmoother = SmootherType::BlockGaussSeidel;
-	SmootherType PostSmoother = SmootherType::BackwardBlockGaussSeidel;
+	// Default (no -smoothers): set by ApplyProgramArgumentDefaults() (block Chebyshev for U-AMG on a symmetric matrix,
+	// block Gauss-Seidel otherwise); the post-smoother: the adjoint of the pre-smoother
+	SmootherType PreSmoother = SmootherType::Default;
+	SmootherType PostSmoother = SmootherType::Default;
 	int PreSmoothingIterations = 1;
 	int PostSmoothingIterations = 1;
 	int CoarseLevelChangeSmoothingCoeff = 0;

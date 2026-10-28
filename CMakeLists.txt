@@ -444,8 +444,9 @@ if(ENABLE_TESTS)
 	message(STATUS "ENABLE_TESTS: ON")
 
 	# The program on several processes (MPI): GMSH meshes, U-AMG through the library (uncondensed system) and the
-	# program's (its condensed system), the L2 errors of one process. -no-cache: no concurrent writes of GMSH's cache by
-	# the tests run in parallel.
+	# program's (its condensed system), the L2 errors of one process; 3D k=2, also its iterations (the default
+	# Chebyshev smoother: the same on any number of processes; Gauss-Seidel stagnated). -no-cache: no concurrent
+	# writes of GMSH's cache by the tests run in parallel.
 	if(ENABLE_MPI)
 		set(mpi_program_cases
 			"2D_k1_fcglibuamg|3|-geo square -mesh tri -mesher gmsh -n 32 -k 1 -s fcglibuamg|L2 Error = 4.48e-04"
@@ -453,7 +454,7 @@ if(ENABLE_TESTS)
 			"2D_k1_gcrlibuamg_nonsym|3|-geo square -mesh tri -mesher gmsh -n 32 -k 1 -s gcrlibuamg -uamg-nonsym|L2 Error = 4.48e-04"
 			"2D_k2_gcruamg_nonsym|4|-geo square -mesh tri -mesher gmsh -n 32 -k 2 -s gcruamg -uamg-nonsym -smoothers hbgs,hrbgs|L2 Error = 1.23e-05"
 			"3D_k0_fcguamg|2|-geo cube -mesh tetra -n 8 -k 0 -s fcguamg|L2 Error = 7.18e-01"
-			"3D_k2_fcglibuamg|4|-geo cube -mesh tetra -n 4 -k 2 -s fcglibuamg|L2 Error = 9.83e-02"
+			"3D_k2_fcglibuamg|4|-geo cube -mesh tetra -n 4 -k 2 -s fcglibuamg|\n26 iterations.*L2 Error = 9.83e-02"
 			"2D_k2_fcglibuamg_fullneumann|3|-geo square -tc fullneumann -mesh tri -mesher gmsh -n 32 -k 2 -s fcglibuamg -tol 1e-11|L2 Error = 5.35e-09"
 			"2D_k2_fcguamg_fullneumann|4|-geo square -tc fullneumann -mesh tri -mesher gmsh -n 32 -k 2 -s fcguamg -tol 1e-11|L2 Error = 5.35e-09"
 			"InHouseMeshRefused|2|-geo square -mesh tri -mesher inhouse -n 8 -k 0 -s fcglibuamg|the meshes are GMSH's only")

@@ -24,33 +24,33 @@ run() {
 
 # Figure 4.2 / Table 4.2: test cases x solvers (paper size in parentheses), and Figure 4.4
 for s in fcguamg fcgaggregamg; do
-	run "Cube-cart n32 (128) $s"          -geo cube -mesh cart -mesher inhouse -k 0 -n 32 -s $s
-	run "Cube-tet n16 (64) $s"            -geo cube -mesh tetra -k 0 -n 16 -s $s
-	run "Complex-tet n4 (16) $s"          -geo platewith4holes -k 0 -n 4 -s $s
-	run "Heterog1e8 n256 (2048) $s"       -geo square4quadrants -k 0 -n 256 -heterog 1e8 -s $s
-	run "Cube-cart-aniso100 n32 (128) $s" -geo cube -mesh cart -mesher inhouse -k 0 -n 32 -aniso 100 -s $s
-	run "Cube-tet-aniso20 n16 (64) $s"    -geo cube -mesh tetra -k 0 -n 16 -aniso 20 -s $s
-	run "Fig4.4 Cube-tet n32 $s"          -geo cube -mesh tetra -k 0 -n 32 -s $s
+	run "Cube-cart n32 (128) $s"          -geo cube -mesh cart -mesher inhouse -k 0 -n 32 -s $s -smoothers bgs
+	run "Cube-tet n16 (64) $s"            -geo cube -mesh tetra -k 0 -n 16 -s $s -smoothers bgs
+	run "Complex-tet n4 (16) $s"          -geo platewith4holes -k 0 -n 4 -s $s -smoothers bgs
+	run "Heterog1e8 n256 (2048) $s"       -geo square4quadrants -k 0 -n 256 -heterog 1e8 -s $s -smoothers bgs
+	run "Cube-cart-aniso100 n32 (128) $s" -geo cube -mesh cart -mesher inhouse -k 0 -n 32 -aniso 100 -s $s -smoothers bgs
+	run "Cube-tet-aniso20 n16 (64) $s"    -geo cube -mesh tetra -k 0 -n 16 -aniso 20 -s $s -smoothers bgs
+	run "Fig4.4 Cube-tet n32 $s"          -geo cube -mesh tetra -k 0 -n 32 -s $s -smoothers bgs
 done
 
 # Section 4.3.3 / Table 4.3: coarsening strategies
 for cs in mpa dpa; do
-	run "Cube-tet n16 fcguamg -cs $cs" -geo cube -mesh tetra -k 0 -n 16 -s fcguamg -cs $cs
+	run "Cube-tet n16 fcguamg -cs $cs" -geo cube -mesh tetra -k 0 -n 16 -s fcguamg -cs $cs -smoothers bgs
 done
 
 # Table 4.4: coarsening prolongations
 for cp in 3 4 5 6; do
-	run "Cube-tet n16 fcguamg -coarsening-prolong $cp"           -geo cube -mesh tetra -k 0 -n 16 -s fcguamg -coarsening-prolong $cp
-	run "Cube-cart-aniso100 n32 fcguamg -coarsening-prolong $cp" -geo cube -mesh cart -mesher inhouse -k 0 -n 32 -aniso 100 -s fcguamg -coarsening-prolong $cp
+	run "Cube-tet n16 fcguamg -coarsening-prolong $cp"           -geo cube -mesh tetra -k 0 -n 16 -s fcguamg -coarsening-prolong $cp -smoothers bgs
+	run "Cube-cart-aniso100 n32 fcguamg -coarsening-prolong $cp" -geo cube -mesh cart -mesher inhouse -k 0 -n 32 -aniso 100 -s fcguamg -coarsening-prolong $cp -smoothers bgs
 done
 
 # Biharmonic paper, Tables 1-3 (U-AMG for the Laplacian problems)
 for n in 8 16; do
 	for p in s no; do
-		run "Bihar cube-tet n$n -bihar-prec $p fcguamg" -pb bihar -geo cube -source exp -mesh tetra -not-compute-errors -s fcguamg -hp-cs p_h -nbh-depth 2 -bihar-prec-solver bicgstab -tol 1e-8 -k 0 -bihar-prec $p -n $n
+		run "Bihar cube-tet n$n -bihar-prec $p fcguamg" -pb bihar -geo cube -source exp -mesh tetra -not-compute-errors -s fcguamg -hp-cs p_h -nbh-depth 2 -bihar-prec-solver bicgstab -tol 1e-8 -k 0 -bihar-prec $p -n $n -smoothers bgs
 	done
 done
 # Biharmonic paper, commented-out "Heuristics" (k=3)
 for o in 0 2; do
-	run "Bihar square-tri k3 n32 -opt2 $o fcguamg" -pb bihar -geo square -source poly -s fcguamg -mesh tri -cs r -k 3 -n 32 -tol 1e-8 -bihar-prec p -nbh-depth 2 -opt2 $o
+	run "Bihar square-tri k3 n32 -opt2 $o fcguamg" -pb bihar -geo square -source poly -s fcguamg -mesh tri -cs r -k 3 -n 32 -tol 1e-8 -bihar-prec p -nbh-depth 2 -opt2 $o -smoothers bgs
 done

@@ -85,7 +85,7 @@ class CoarseningPassProgramTest : public ::testing::TestWithParam<FlatPassCase>
 {
 };
 
-// E.g. Cube_cart_n8_k1_h: ./bin/fhhos4 -geo cube -mesh cart -mesher inhouse -n 8 -k 1 -hp-cs h -s fcguamg -no-cache -threads 1
+// E.g. Cube_cart_n8_k1_h: ./bin/fhhos4 -geo cube -mesh cart -mesher inhouse -n 8 -k 1 -hp-cs h -s fcguamg -smoothers bgs -no-cache -threads 1
 TEST_P(CoarseningPassProgramTest, SameAsReference)
 {
 	FlatPassCase c = GetParam();
@@ -112,6 +112,7 @@ TEST_P(CoarseningPassProgramTest, SameAsReference)
 			args.Discretization.OrthogonalizeFaceBasesCode = 3;
 		}
 		args.Solver.SolverCode = c.Nonsymmetric ? "gcruamg" : "fcguamg";
+		args.Solver.MG.PreSmoother = SmootherType::BlockGaussSeidel; // -smoothers bgs
 		args.Solver.MG.UAMGNonsymmetric = c.Nonsymmetric;
 		args.Solver.MG.CoarseningProlongationCode = c.CoarseningProlong;
 		args.Solver.MG.FaceProlongationCode = c.FaceProlong;
@@ -411,7 +412,7 @@ TEST(CoarseningPass, PassProlongationsNonsymmetric)
 
 // The program: the same iterations with the transfers by the prolongations of the passes as with P (also at degree 0,
 // forced). On 1 thread.
-//   ./bin/fhhos4 -geo square -mesh tri -n 16 -k 1 -s fcguamg -no-cache -threads 1 (etc.)
+//   ./bin/fhhos4 -geo square -mesh tri -n 16 -k 1 -s fcguamg -smoothers bgs -no-cache -threads 1 (etc.)
 class PassProlongationsProgramTest : public ::testing::TestWithParam<FlatPassCase>
 {
 };
@@ -436,6 +437,7 @@ TEST_P(PassProlongationsProgramTest, SameAsChained)
 			args.Discretization.OrthogonalizeFaceBasesCode = 3;
 		}
 		args.Solver.SolverCode = c.Nonsymmetric ? "gcruamg" : "fcguamg";
+		args.Solver.MG.PreSmoother = SmootherType::BlockGaussSeidel; // -smoothers bgs
 		args.Solver.MG.UAMGNonsymmetric = c.Nonsymmetric;
 		args.Solver.MG.CoarseningProlongationCode = c.CoarseningProlong;
 		if (c.HCoarseningOfBlocks)

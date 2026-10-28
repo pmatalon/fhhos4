@@ -2,7 +2,8 @@
 D. A. Di Pietro, F. Hülsemann, P. Matalon, P. Mycek, U. Rüde, *SIAM Journal on Scientific Computing*, 2023
 
 
-The experiments can be reproduced with release 1.0.
+The experiments can be reproduced with release 1.0. U-AMG smooths with block Gauss-Seidel (``-smoothers bgs``), its
+default up to release 1.4 (block Chebyshev since 1.5).
 ### Figure 4.2 and Table 4.2
 
 Execute the following command line
@@ -27,7 +28,7 @@ where ``[[test_case]]`` corresponds to
 and ``[[solver]]`` corresponds to
 ```bash
 # U-AMG
--s fcguamg
+-s fcguamg -smoothers bgs
 # C-AMG
 -s fcgaggregamg
 # AGMG
@@ -42,21 +43,21 @@ and ``[[solver]]`` corresponds to
 Details of the adaptive multiple coarsening strategy of U-AMG for the test
 case Cube-tet.
 ```bash
-> fhhos4 -geo cube -mesh tetra -k 0 -n 64 -s fcguamg
+> fhhos4 -geo cube -mesh tetra -k 0 -n 64 -s fcguamg -smoothers bgs
 ```
 ### Section 4.3.3 (Table 4.4 of the submitted version)
 Details of the fixed double coarsening strategy of U-AMG for the test case
 Cube-tet.
 Important parameter: ``-cs dpa``.
 ```bash
-> fhhos4 -geo cube -mesh tetra -k 0 -n 64 -s fcguamg -cs dpa
+> fhhos4 -geo cube -mesh tetra -k 0 -n 64 -s fcguamg -smoothers bgs -cs dpa
 ```
 ### Table 4.3
 ```bash
 # U-AMG (multiple coarsening)
-> fhhos4 -geo cube -mesh tetra -k 0 -n 64 -s fcguamg -cs mpa
+> fhhos4 -geo cube -mesh tetra -k 0 -n 64 -s fcguamg -smoothers bgs -cs mpa
 # U-AMG (double coarsening)
-> fhhos4 -geo cube -mesh tetra -k 0 -n 64 -s fcguamg -cs dpa
+> fhhos4 -geo cube -mesh tetra -k 0 -n 64 -s fcguamg -smoothers bgs -cs dpa
 # C-AMG
 > fhhos4 -geo cube -mesh tetra -k 0 -n 64 -s fcgaggregamg
 # AGMG
@@ -66,15 +67,15 @@ Important parameter: ``-cs dpa``.
 Important parameter: ``-coarsening-prolong {3|4|5|6}``.
 ```bash
 # Cube-tet
-> fhhos4 -geo cube -mesh tetra -k 0 -n 64 -s fcguamg -coarsening-prolong 6
-> fhhos4 -geo cube -mesh tetra -k 0 -n 64 -s fcguamg -coarsening-prolong 4
-> fhhos4 -geo cube -mesh tetra -k 0 -n 64 -s fcguamg -coarsening-prolong 5
-> fhhos4 -geo cube -mesh tetra -k 0 -n 64 -s fcguamg -coarsening-prolong 3
+> fhhos4 -geo cube -mesh tetra -k 0 -n 64 -s fcguamg -smoothers bgs -coarsening-prolong 6
+> fhhos4 -geo cube -mesh tetra -k 0 -n 64 -s fcguamg -smoothers bgs -coarsening-prolong 4
+> fhhos4 -geo cube -mesh tetra -k 0 -n 64 -s fcguamg -smoothers bgs -coarsening-prolong 5
+> fhhos4 -geo cube -mesh tetra -k 0 -n 64 -s fcguamg -smoothers bgs -coarsening-prolong 3
 # Cube-cart-aniso100
-> fhhos4 -geo cube -mesh cart -mesher inhouse -k 0 -n 128 -aniso 100 -s fcguamg -coarsening-prolong 6
-> fhhos4 -geo cube -mesh cart -mesher inhouse -k 0 -n 128 -aniso 100 -s fcguamg -coarsening-prolong 4
-> fhhos4 -geo cube -mesh cart -mesher inhouse -k 0 -n 128 -aniso 100 -s fcguamg -coarsening-prolong 5
-> fhhos4 -geo cube -mesh cart -mesher inhouse -k 0 -n 128 -aniso 100 -s fcguamg -coarsening-prolong 3
+> fhhos4 -geo cube -mesh cart -mesher inhouse -k 0 -n 128 -aniso 100 -s fcguamg -smoothers bgs -coarsening-prolong 6
+> fhhos4 -geo cube -mesh cart -mesher inhouse -k 0 -n 128 -aniso 100 -s fcguamg -smoothers bgs -coarsening-prolong 4
+> fhhos4 -geo cube -mesh cart -mesher inhouse -k 0 -n 128 -aniso 100 -s fcguamg -smoothers bgs -coarsening-prolong 5
+> fhhos4 -geo cube -mesh cart -mesher inhouse -k 0 -n 128 -aniso 100 -s fcguamg -smoothers bgs -coarsening-prolong 3
 ```
 ### Figure 4.4
 Same commands as for Table 4.4, also with the solver ``-s fcgaggregamg``.

@@ -376,6 +376,8 @@ void print_usage() {
 	cout << "      for Gauss-Seidel and SOR (\"rbgs\" after \"bgs\", \"bgs\" after \"rbgs\"...), the pre-smoother itself if it is symmetric" << endl;
 	cout << "      (Jacobi, symmetric Gauss-Seidel, Chebyshev). For the alternating ones, it depends on the number of smoothing steps:" << endl;
 	cout << "      if the pre-smoother is \"ags\", the post-smoother will also be \"ags\" if the number of smoothing steps is even, or \"rags\" if odd." << endl;
+	cout << "      Default: \"bcheb4\" for U-AMG on a symmetric matrix (the library's: its results don't depend on the numbers of threads" << endl;
+	cout << "      and processes), with the cycle K,2,2 if -cycle is not given; \"bgs\" otherwise (-uamg-nonsym, the other multigrids)." << endl;
 	cout << "              j     - Jacobi" << endl;
 	cout << "              gs    - Gauss-Seidel" << endl;
 	cout << "              rgs   - Reverse Gauss-Seidel" << endl;

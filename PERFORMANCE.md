@@ -50,10 +50,11 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
 - **Times**: `scripts/perf/timing.sh <output dir> [binary]` runs the reference cases below, sequential (`-threads 1`)
   and parallel (`-threads 0`), twice each, and writes the best times in `best.txt`. They come from the `Setup` and
   `Solving` rows (`Elapsed time` column) of the table printed after the solve.
-- **Reference cases** (U-AMG):
-  - Cube-tet, k=0: `./bin/fhhos4 -geo cube -mesh tetra -k 0 -n 32 -s fcguamg -no-cache` (318k face unknowns)
-  - Cube-cart-aniso100: `./bin/fhhos4 -geo cube -mesh cart -mesher inhouse -k 0 -n 64 -aniso 100 -s fcguamg -no-cache`
-  - High order: `./bin/fhhos4 -geo cube -mesh tetra -k 2 -n 16 -s fcguamg -hp-cs h -no-cache` (262k face unknowns).
+- **Reference cases** (U-AMG, with the smoother of the measurements below, block Gauss-Seidel: the default is block
+  Chebyshev since 2026-10-28):
+  - Cube-tet, k=0: `./bin/fhhos4 -geo cube -mesh tetra -k 0 -n 32 -s fcguamg -smoothers bgs -no-cache` (318k face unknowns)
+  - Cube-cart-aniso100: `./bin/fhhos4 -geo cube -mesh cart -mesher inhouse -k 0 -n 64 -aniso 100 -s fcguamg -smoothers bgs -no-cache`
+  - High order: `./bin/fhhos4 -geo cube -mesh tetra -k 2 -n 16 -s fcguamg -smoothers bgs -hp-cs h -no-cache` (262k face unknowns).
     `-hp-cs h`: the h-coarsening of the k=2 blocks, the default until 2026-10-05, on which the k=2 measurements of
     this file were made. The default is now p_h (see Done).
   - The variants of Fig. 4.5 / Table 4.4: `-coarsening-prolong 6` (P_F, default), `4` (Q_F^smooth), `5` (P_F^(0)), `3` (Q_F).
@@ -1226,6 +1227,27 @@ bcheb4,bcheb4`, best of 2), elapsed setup / solve (s), gathered -> MUMPS (`build
 - What MUMPS changes is the growth with the number of processes, not measurable here: the coarsest level keeps the faces
   between processes, so its size grows with their number, and the gathered matrix, its factorization and the
   all-gathers of its right-hand side were on every process.
+
+2026-10-28, the smoothers on several processes (`OMP_NUM_THREADS=2`, the distributed mesh of the program), Cube-tet,
+iterations on 1 / 2 / 4 processes (`-s fcglibuamg`):
+
+| Case | `bgs` | `bcheb4`, degree 1 | l1-`bgs` theta = 1/2 (prototype) |
+|---|---|---|---|
+| k=2 n=8 | 32 / 200 / 200 | 50 / 50 / 50 | 32 / 61 / 62 |
+| k=1 n=8 | 32 / 32 / 58 | 42 / 43 / 42 | 32 / - / 37 |
+| k=0 n=8 | 24 / 24 / 30 | - | - |
+
+- `bgs` on several processes: Gauss-Seidel in each process, Jacobi between them. At k=2 its forward then backward
+  sweep (power iteration) multiplies the energy norm of the error by 0.991 on 1 process, 1.207 on 2, 1.420 on 4 (the
+  point Gauss-Seidel of the k=0 levels: 0.968): the symmetric cycle is not positive definite, FCG stagnates and U-AMG
+  alone diverges (rate 1.08 on 2 processes, 0.89 on 1). The operators (A_c = R A P, R = P^T), the coarse solve and the
+  cycle's repeatability are exact. 2D (square tri n=32, k=1, 2): 14-18 iterations on 1-4 processes.
+- l1-Gauss-Seidel (Baker et al. 2011; the diagonal of the rows coupled to other processes shifted by theta times the
+  sum of their off-process |a_ij|; positive definite M + M^T - A from theta = 1/2): converges, theta = 1 (hypre's)
+  84 / 86 at k=2; 2D k=2 17 -> 19 on 4 processes. Not kept: the default became block Chebyshev, the same iterations on
+  any number of processes (ADR-0017).
+- The new default (`bcheb4`, degree 2, K(2,2)), `fcglibuamg` and `fcguamg`: k=2 n=4 26 iterations on 1, 2, 3, 4
+  processes (`bgs`: 26 / 47 / 200 / 119); k=2 n=8 30 on 1-4 (`bgs`: 32 / 200 / 200 / 200). The same L2 errors.
 
 Next ideas:
 1. **The assembly of the program distributed** (each process its cells and those of its faces): the memory per process,

@@ -206,7 +206,8 @@ public:
 		mg->WLoops = args.Solver.MG.WLoops;
 		mg->KCycleKrylov = args.Solver.MG.KCycleKrylov;
 		mg->UseGalerkinOperator = args.Solver.MG.UseGalerkinOperator;
-		mg->PreSmoother = args.Solver.MG.PreSmoother;
+		// Default: the arguments of the internal solvers (the coarse solver's...), not set by ApplyProgramArgumentDefaults()
+		mg->PreSmoother = args.Solver.MG.PreSmoother != SmootherType::Default ? args.Solver.MG.PreSmoother : SmootherType::BlockGaussSeidel;
 		mg->PostSmoother = args.Solver.MG.PostSmoother;
 		mg->PreSmoothingIterations = args.Solver.MG.PreSmoothingIterations;
 		mg->PostSmoothingIterations = args.Solver.MG.PostSmoothingIterations;

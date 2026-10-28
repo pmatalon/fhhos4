@@ -123,7 +123,7 @@ INSTANTIATE_TEST_SUITE_P(SquareCart, DirectPreconditionerTest, ::testing::Combin
 // GCR (for non-symmetric matrices) preconditioned by the AMGs with the K-cycle, which then iterates with GCR on the
 // coarse levels, on symmetric matrices: it minimizes the residual norm where FCG minimizes the energy norm of the error,
 // so it converges in about as many iterations as FCG (0 to 3 more measured, in 2D and 3D).
-//   ./bin/fhhos4 -geo square -mesh cart -mesher inhouse -k {0|1} -n 32 -s {fcg|gcr}{uamg|aggregamg}
+//   ./bin/fhhos4 -geo square -mesh cart -mesher inhouse -k {0|1} -n 32 -s {fcg|gcr}{uamg|aggregamg} -smoothers bgs
 class GCRTest : public ::testing::TestWithParam<std::tuple<int, std::string>>
 {
 };
@@ -135,6 +135,7 @@ TEST_P(GCRTest, AsFastAsFCG)
 	{
 		ProgramArguments args = SquareCartArgs(k, 32);
 		args.Solver.SolverCode = krylov + preconditionerCode;
+		args.Solver.MG.PreSmoother = SmootherType::BlockGaussSeidel; // -smoothers bgs
 		return RunDiffusionHHO(args).IterationCount;
 	};
 	int fcg = run("fcg");
@@ -217,12 +218,43 @@ TEST(UAMGHPCoarseningDefaults, ExplicitStrategyKept)
 	EXPECT_TRUE(args.Solver.MG.HP_CS == HP_CoarsStgy::H_only);
 }
 
+// The default smoothers: for U-AMG on a symmetric matrix, the library's block Chebyshev of degree 2 (its post-smoother
+// the same), whose results don't depend on the numbers of threads and processes; the degree of an explicit -cycle is
+// kept; block Gauss-Seidel for a non-symmetric matrix and the other multigrids; an explicit -smoothers is kept.
+//   ./bin/fhhos4 -geo square -mesh cart -mesher inhouse -k 1 -s {fcguamg [-cycle K,1,1]|gcruamg -uamg-nonsym|mg|fcguamg -smoothers bgs}
+TEST(UAMGSmootherDefaults, ChebyshevOnSymmetricMatrices)
+{
+	auto defaults = [](const std::string& solverCode, auto set, bool defaultCycle = true)
+	{
+		ProgramArguments args = SquareCartArgs(1, 16);
+		args.Solver.SolverCode = solverCode;
+		set(args);
+		ApplyProgramArgumentDefaults(args, true, true, defaultCycle);
+		return args.Solver.MG;
+	};
+	auto none = [](ProgramArguments&) {};
+	MultigridArguments uamg = defaults("fcguamg", none);
+	EXPECT_TRUE(uamg.PreSmoother == SmootherType::BlockChebyshevFourthKind);
+	EXPECT_TRUE(uamg.PostSmoother == SmootherType::Default); // the adjoint: the same
+	EXPECT_EQ(uamg.PreSmoothingIterations, 2);
+	EXPECT_EQ(uamg.PostSmoothingIterations, 2);
+
+	MultigridArguments cycle = defaults("fcguamg", [](ProgramArguments& a) { a.Solver.MG.Cycle = CycleType::K; }, false);
+	EXPECT_TRUE(cycle.PreSmoother == SmootherType::BlockChebyshevFourthKind);
+	EXPECT_EQ(cycle.PreSmoothingIterations, 1);
+
+	MultigridArguments nonsym = defaults("gcruamg", [](ProgramArguments& a) { a.Solver.MG.UAMGNonsymmetric = true; });
+	EXPECT_TRUE(nonsym.PreSmoother == SmootherType::BlockGaussSeidel);
+	EXPECT_TRUE(defaults("mg", none).PreSmoother == SmootherType::BlockGaussSeidel);
+	EXPECT_TRUE(defaults("fcguamg", [](ProgramArguments& a) { a.Solver.MG.PreSmoother = SmootherType::BlockGaussSeidel; }).PreSmoother == SmootherType::BlockGaussSeidel);
+}
+
 // U-AMG with bases where the constant function does not have coordinate 1 (orthonormal: sqrt(|T|) on a cell, sqrt(|F|)
 // on a face), on a mesh graded towards the center (cells 1e5 times smaller there). The coarsening of the paper assumes
 // that the constant has the same coordinate in all the bases: without the rescaling of UncondensedLevel::CoarsenMesh(),
 // FCG stopped at its 200 iterations, or the coarse operator overflowed (orthonormal faces only). 14-18 iterations with
 // the default bases.
-//   ./bin/fhhos4 -geo 2D/square4quadrants_tri_localref.geo -tc kellogg -n 16 -k {0|1} -s fcguamg -e-ogb {3|1} -f-ogb {3|1} -no-cache
+//   ./bin/fhhos4 -geo 2D/square4quadrants_tri_localref.geo -tc kellogg -n 16 -k {0|1} -s fcguamg -smoothers bgs -e-ogb {3|1} -f-ogb {3|1} -no-cache
 class UAMGConstantRescalingTest : public ::testing::TestWithParam<std::tuple<int, int, int>>
 {
 };
@@ -239,6 +271,7 @@ namespace
 		args.Discretization.OrthogonalizeElemBasesCode = elemOrthogonalization;
 		args.Discretization.OrthogonalizeFaceBasesCode = faceOrthogonalization;
 		args.Solver.SolverCode = "fcguamg";
+		args.Solver.MG.PreSmoother = SmootherType::BlockGaussSeidel; // -smoothers bgs
 		args.Actions.UseCache = false; // -no-cache
 		return args;
 	}
@@ -260,7 +293,7 @@ INSTANTIATE_TEST_SUITE_P(Kellogg, UAMGConstantRescalingTest, ::testing::Values(
 // the local solve of their rows of the operator, which converts no cell value into face values (no trace of the coarse
 // cells, whose coefficients 1 assume the same coordinate of the constant in the cell and face bases). The problem of
 // UAMGConstantRescalingTest, with its bases and the default ones.
-//   ./bin/fhhos4 -geo 2D/square4quadrants_tri_localref.geo -tc kellogg -n 16 -k {0|1} -s fcguamg -coarsening-prolong 10 -e-ogb {3|1} -f-ogb {3|1} -no-cache
+//   ./bin/fhhos4 -geo 2D/square4quadrants_tri_localref.geo -tc kellogg -n 16 -k {0|1} -s fcguamg -smoothers bgs -coarsening-prolong 10 -e-ogb {3|1} -f-ogb {3|1} -no-cache
 class UAMGHarmonicExtensionTest : public ::testing::TestWithParam<std::tuple<int, int, int>>
 {
 };
@@ -313,7 +346,7 @@ namespace
 // U-AMG listed such a neighbour once per shared face, and the ordering of the cells for the
 // pairwise aggregation then wrote past the end of its array (heap corruption, crash).
 // At k=1, with the default hp-coarsening (p, then h) and with the h-coarsening of the k=1 blocks (-hp-cs h).
-//   ./bin/fhhos4 -geo square -mesh poly -polymesh-fcs n -k {0|1} -n 64 -s fcguamg [-hp-cs h] -threads 1
+//   ./bin/fhhos4 -geo square -mesh poly -polymesh-fcs n -k {0|1} -n 64 -s fcguamg -smoothers bgs [-hp-cs h] -threads 1
 class PolygonalMeshUAMGTest : public ::testing::TestWithParam<std::tuple<int, bool>>
 {
 };
@@ -324,6 +357,7 @@ TEST_P(PolygonalMeshUAMGTest, Converges)
 	SequentialExecution sequential;
 	ProgramArguments args = SquarePolyArgs(FaceCoarseningStrategy::None, k, 64);
 	args.Solver.SolverCode = "fcguamg";
+	args.Solver.MG.PreSmoother = SmootherType::BlockGaussSeidel; // -smoothers bgs
 	if (hOnly)
 		args.Solver.MG.HP_CS = HP_CoarsStgy::H_only;
 
@@ -337,7 +371,7 @@ INSTANTIATE_TEST_SUITE_P(SquarePoly, PolygonalMeshUAMGTest, ::testing::Values(
 
 // HarmonicExtensionOrInject on the same meshes: an aggregate of two polygons that share several faces has several
 // removed faces, coupled to each other, whose rows are solved together (at k=1 with -hp-cs h: blocks of 2 DoFs).
-//   ./bin/fhhos4 -geo square -mesh poly -polymesh-fcs n -k {0|1} -n 64 -s fcguamg -coarsening-prolong 10 [-hp-cs h] -threads 1
+//   ./bin/fhhos4 -geo square -mesh poly -polymesh-fcs n -k {0|1} -n 64 -s fcguamg -smoothers bgs -coarsening-prolong 10 [-hp-cs h] -threads 1
 class PolygonalMeshHarmonicExtensionTest : public ::testing::TestWithParam<std::tuple<int, bool>>
 {
 };
@@ -348,6 +382,7 @@ TEST_P(PolygonalMeshHarmonicExtensionTest, Converges)
 	SequentialExecution sequential;
 	ProgramArguments args = SquarePolyArgs(FaceCoarseningStrategy::None, k, 64);
 	args.Solver.SolverCode = "fcguamg";
+	args.Solver.MG.PreSmoother = SmootherType::BlockGaussSeidel; // -smoothers bgs
 	args.Solver.MG.CoarseningProlongationCode = (int)UAMGProlongation::HarmonicExtensionOrInject;
 	if (hOnly)
 		args.Solver.MG.HP_CS = HP_CoarsStgy::H_only;

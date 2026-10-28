@@ -29,7 +29,9 @@ program too).
   columns): the smoothers work on `Diag`; `MultiplyTransposed` for the restriction; `FetchGhostRows`, `RowsWithGhosts` (the rows of the ghosts fetched, the columns of another map),
   `AssembleFromLocalRows`: the rows of the ghosts added to their owners').
 - Solvers: `Solver::Distributed`, `Setup(const DistributedMatrix&)` (FatalError unless overridden: FCG, GCR, Multigrid,
-  Chebyshev, block Jacobi, (block) Gauss-Seidel = Gauss-Seidel in the process, Jacobi between them (`SweepRhs()`),
+  Chebyshev, block Jacobi, (block) Gauss-Seidel = Gauss-Seidel in the process, Jacobi between them (`SweepRhs()`: not
+  a contraction in the energy norm when the couplings between the processes are strong, e.g. 3D k=2, where FCG
+  stagnates; the default smoother is Chebyshev, ADR-0017),
   Cholesky/LU by MUMPS (ADR-0021; `Solver/Direct/MUMPS.h`: each process gives its rows of the matrix and of the
   right-hand side; the solution, as MUMPS distributes it, goes to the owners of its rows by an `IndexMap` whose ghosts
   are the rows held for other processes, built at the first solve)); `IterativeSolver::SetDistributedMatrix()`; the blocks setup `Setup(A, A_T_T, A_T_F (local
@@ -85,6 +87,6 @@ program too).
 
 `fhhos4_mpi_tests` (`tests/MPI`, own `main()`, `ctest -R MPI_np`: 1-4 processes; `tests/support/PartitionedSystem.h`;
 `MUMPSTest.cpp`: the coarse solver alone, with an empty first process, MUMPS's host);
-`ctest -R ProgramMPI` (the program under `mpiexec`, L2 errors; `ProgramMPI_PartitionCache_*`: a partition written,
+`ctest -R ProgramMPI` (the program under `mpiexec`, L2 errors; 3D k=2 also the iterations of one process; `ProgramMPI_PartitionCache_*`: a partition written,
 read by the next run, refused for another number of processes, in `build-mpi/test_partition_cache`); in an MPI build, `fhhos4_tests` uses
 `tests/MPI/main.cpp` (MPI initialized), `ToySolver()` sets `Comm = MPI_COMM_SELF`.

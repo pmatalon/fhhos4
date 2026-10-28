@@ -43,12 +43,12 @@ Fig. 7
 Tables 1, 2, 3
 ```bash
 -pb bihar -geo square -source exp -mesh cart -cs r -s ch -nbh-depth 8 -tol 1e-8 -bihar-prec {s|no} -k {0,1,2,3} -n {32,64,128,256,512} 
--pb bihar -geo cube -source exp -mesh tetra -not-compute-errors -s fcguamg -hp-cs p_h -nbh-depth 2 -bihar-prec-solver bicgstab -tol 1e-8 -k 0 -bihar-prec {s|no} -n {8,16,32,64} 
+-pb bihar -geo cube -source exp -mesh tetra -not-compute-errors -s fcguamg -smoothers bgs -hp-cs p_h -nbh-depth 2 -bihar-prec-solver bicgstab -tol 1e-8 -k 0 -bihar-prec {s|no} -n {8,16,32,64} 
 ```
 <!-- -pb bihar -geo {disk|magnetism2} -tc default -mesh poly -polymesh-bfc c -polymesh-n-pass 2 -s ch -nbh-depth 8 -tol 1e-8 -k 0 -n {64,128,256,512,1024}  -->
 
 <!-- 
 ### Heuristics
 ```bash
--pb bihar -geo square -source poly -s fcguamg -mesh tri -cs r -k 3 -n 32 -tol 1e-8 -bihar-prec p -nbh-depth 2 -export iter -opt2 {0|2} 
+-pb bihar -geo square -source poly -s fcguamg -smoothers bgs -mesh tri -cs r -k 3 -n 32 -tol 1e-8 -bihar-prec p -nbh-depth 2 -export iter -opt2 {0|2} 
 ``` -->

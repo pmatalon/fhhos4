@@ -135,8 +135,9 @@ program `-uamg-bcsr`.
 ## Smoothers
 
 - Default: block Chebyshev of the fourth kind, degree 2, for a symmetric matrix (ADR-0017;
-  `Smoother::BlockChebyshevFourthKind`, `bcheb4` in the program; `Pre/PostSmoothingIterations` -1: degree 2); the
-  program keeps `bgs,rbgs`.
+  `Smoother::BlockChebyshevFourthKind`, `bcheb4` in the program; `Pre/PostSmoothingIterations` -1: degree 2), also in
+  the program (`SmootherType::Default` resolved by `ApplyProgramArgumentDefaults()`: `bcheb4`, K(2,2) without
+  `-cycle`); `bgs,rbgs` for `-uamg-nonsym` and the program's other multigrids.
 - Chebyshev (`bcheb4`, `bcheb`; `Solver/FixedPoint/BlockChebyshev.h`): symmetric matrices only (the library refuses
   them otherwise); `lambdaMax` of `D^-1 A` by 10 Lanczos iterations at the setup.
 - Non-symmetric matrix on several threads: hybrid block Gauss-Seidel (`hbgs`, `hrbgs`; ADR-0018; scalar kernels at

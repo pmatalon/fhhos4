@@ -54,8 +54,8 @@ inline std::ostream& operator<<(std::ostream& os, const LibraryCase& c)
 
 // The program on the case with the solver solverCode. nonsymmetric: -uamg-nonsym; exportSystem: -export lsys (the program
 // solves the condensed system), into a temporary directory; chebyshev: the Chebyshev smoothers of the fourth kind,
-// degree 2 (the library's default for a symmetric matrix), instead of the program's; mixedPrecision: -uamg-mixed;
-// blockCSR: -uamg-bcsr.
+// degree 2 (the default for a symmetric matrix), otherwise block Gauss-Seidel (-smoothers bgs); mixedPrecision:
+// -uamg-mixed; blockCSR: -uamg-bcsr.
 ProgramResults RunCase(const LibraryCase& c, const std::string& solverCode, bool nonsymmetric = false, bool exportSystem = false,
                        bool chebyshev = false, bool mixedPrecision = false, bool blockCSR = false)
 {
@@ -88,6 +88,8 @@ ProgramResults RunCase(const LibraryCase& c, const std::string& solverCode, bool
 		args.Solver.MG.PreSmoothingIterations = 2;
 		args.Solver.MG.PostSmoothingIterations = 2;
 	}
+	else
+		args.Solver.MG.PreSmoother = SmootherType::BlockGaussSeidel; // -smoothers bgs
 	args.Solver.MG.UAMGMixedPrecision = mixedPrecision;
 	args.Solver.MG.UAMGBlockCSRStorage = blockCSR;
 	args.Actions.UseCache = false;

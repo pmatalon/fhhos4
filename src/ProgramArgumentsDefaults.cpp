@@ -357,9 +357,19 @@ void ApplyProgramArgumentDefaults(ProgramArguments& args,
 			if (defaultCoarseSolver)
 				args.Solver.MG.CoarseSolverCode = "lu";
 		}
+		// For a symmetric matrix, the library's smoother (ADR-0017): block Chebyshev of the fourth kind, degree 2, whose
+		// results don't depend on the numbers of threads and processes
+		else if (args.Solver.MG.PreSmoother == SmootherType::Default)
+		{
+			args.Solver.MG.PreSmoother = SmootherType::BlockChebyshevFourthKind;
+			if (defaultCycle)
+				args.Solver.MG.PreSmoothingIterations = args.Solver.MG.PostSmoothingIterations = 2;
+		}
 	}
 	else if (args.Solver.MG.UAMGNonsymmetric)
 		argument_error("-uamg-nonsym requires U-AMG: -s uamg, gcruamg, libuamg or gcrlibuamg.");
+	if (args.Solver.MG.PreSmoother == SmootherType::Default)
+		args.Solver.MG.PreSmoother = SmootherType::BlockGaussSeidel;
 	if (args.Solver.MG.UAMGCollapseBoundaryFaces && (!args.Solver.UsesUncondensedAMG() || args.Solver.UsesLibraryUAMG()))
 		argument_error("-uamg-bfc requires U-AMG in the program: -s uamg, fcguamg or gcruamg (not an option of the library).");
 

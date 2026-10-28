@@ -115,7 +115,7 @@ class BiharCubeTetTest : public ::testing::TestWithParam<std::tuple<std::string,
 {
 };
 
-//   ./bin/fhhos4 -pb bihar -geo cube -source exp -mesh tetra -not-compute-errors -s fcguamg -hp-cs p_h -nbh-depth 2 -bihar-prec-solver bicgstab -tol 1e-8 -k 0 -bihar-prec {s|no} -n 8 -no-cache
+//   ./bin/fhhos4 -pb bihar -geo cube -source exp -mesh tetra -not-compute-errors -s fcguamg -smoothers bgs -hp-cs p_h -nbh-depth 2 -bihar-prec-solver bicgstab -tol 1e-8 -k 0 -bihar-prec {s|no} -n 8 -no-cache
 TEST_P(BiharCubeTetTest, IterationCounts)
 {
 	auto [preconditionerCode, e] = GetParam();
@@ -127,6 +127,7 @@ TEST_P(BiharCubeTetTest, IterationCounts)
 	args.Discretization.N = e.N;
 	args.Discretization.PolyDegree = 1; // k = 0
 	args.Solver.SolverCode = "fcguamg";
+	args.Solver.MG.PreSmoother = SmootherType::BlockGaussSeidel; // -smoothers bgs
 	args.Solver.MG.HP_CS = HP_CoarsStgy::P_then_H; // -hp-cs p_h
 	args.Solver.NeighbourhoodDepth = 2;
 	args.Solver.BiHarmonicPrecSolverCode = "bicgstab";

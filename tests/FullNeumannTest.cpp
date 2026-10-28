@@ -75,7 +75,7 @@ class FullNeumannTest : public ::testing::TestWithParam<std::tuple<std::string, 
 // with their kernel handling (SingularMatrix: without it, the singular coarsest matrix was factorized with a tiny pivot,
 // and tri k=2 took 198 iterations through the library).
 //   ./bin/fhhos4 -geo square -tc fullneumann -mesh {tri|cart -mesher inhouse} -k {0|1|2} -n {8|16|32|64} -s ch -no-cache
-//   ./bin/fhhos4 -geo square -tc fullneumann -mesh {tri|cart -mesher inhouse} -k {0|1|2} -n 64 -s {mg|fcguamg|fcglibuamg} -tol 1e-11 -no-cache
+//   ./bin/fhhos4 -geo square -tc fullneumann -mesh {tri|cart -mesher inhouse} -k {0|1|2} -n 64 -s {mg|fcguamg|fcglibuamg} -smoothers bgs -tol 1e-11 -no-cache
 TEST_P(FullNeumannTest, ConvergesAndSolversAgree)
 {
 	auto [meshCode, mesher, k, expectedError] = GetParam();
@@ -99,6 +99,7 @@ TEST_P(FullNeumannTest, ConvergesAndSolversAgree)
 	{
 		ProgramArguments args = FullNeumannArgs(meshCode, mesher, k, 64, solverCode);
 		args.Solver.Tolerance = 1e-11;
+		args.Solver.MG.PreSmoother = SmootherType::BlockGaussSeidel;
 		ProgramResults results = RunDiffusionHHO(args);
 		EXPECT_GT(results.IterationCount, 1) << solverCode; // several levels
 		EXPECT_LT(results.IterationCount, 40) << solverCode;

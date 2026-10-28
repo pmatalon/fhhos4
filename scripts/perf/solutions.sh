@@ -65,13 +65,13 @@ check() {
 }
 
 # U-AMG, default smoothers (bgs/rbgs), per face block size
-check -geo cube -mesh tetra -k 0 -n 16 -s fcguamg
-check -geo cube -mesh tetra -k 1 -n 8 -s fcguamg
-check -geo cube -mesh tetra -k 2 -n 8 -s fcguamg
-check -geo cube -mesh tetra -k 3 -n 4 -s fcguamg
-check -geo square -mesh tri -k 2 -n 32 -s fcguamg
-check -geo square -mesh tri -k 6 -n 8 -s fcguamg
-check -geo cube -mesh cart -mesher inhouse -k 1 -n 8 -aniso 100 -s fcguamg
+check -geo cube -mesh tetra -k 0 -n 16 -s fcguamg -smoothers bgs
+check -geo cube -mesh tetra -k 1 -n 8 -s fcguamg -smoothers bgs
+check -geo cube -mesh tetra -k 2 -n 8 -s fcguamg -smoothers bgs
+check -geo cube -mesh tetra -k 3 -n 4 -s fcguamg -smoothers bgs
+check -geo square -mesh tri -k 2 -n 32 -s fcguamg -smoothers bgs
+check -geo square -mesh tri -k 6 -n 8 -s fcguamg -smoothers bgs
+check -geo cube -mesh cart -mesher inhouse -k 1 -n 8 -aniso 100 -s fcguamg -smoothers bgs
 # Other smoothers and cycles
 check -geo cube -mesh tetra -k 2 -n 8 -s fcguamg -smoothers hbgs,hrbgs
 check -geo cube -mesh tetra -k 0 -n 16 -s fcguamg -smoothers sgs
@@ -80,18 +80,18 @@ check -geo cube -mesh tetra -k 0 -n 16 -s fcguamg -smoothers ags
 check -geo cube -mesh tetra -k 1 -n 8 -s fcguamg -smoothers abgs
 check -geo cube -mesh tetra -k 1 -n 8 -s fcguamg -smoothers rbgs,bgs
 check -geo cube -mesh tetra -k 2 -n 8 -s fcguamg -smoothers rbgs,bgs
-check -geo cube -mesh tetra -k 0 -n 16 -s fcguamg -cycle V,2,2
-check -geo cube -mesh tetra -k 1 -n 8 -s fcguamg -cycle W,2,1
-check -geo cube -mesh tetra -k 0 -n 16 -s uamg
+check -geo cube -mesh tetra -k 0 -n 16 -s fcguamg -cycle V,2,2 -smoothers bgs
+check -geo cube -mesh tetra -k 1 -n 8 -s fcguamg -cycle W,2,1 -smoothers bgs
+check -geo cube -mesh tetra -k 0 -n 16 -s uamg -smoothers bgs
 check -geo cube -mesh tetra -k 2 -n 8 -s fcguamg -smoothers bsor,rbsor -relax 1.2
 check -geo cube -mesh tetra -k 1 -n 8 -s fcguamg -smoothers sbsor,sbsor -relax 0.9
 # Exact zeros in the right-hand side (-source one: 2D only)
-check -geo square -mesh tri -k 0 -n 32 -s fcguamg -source one
+check -geo square -mesh tri -k 0 -n 32 -s fcguamg -source one -smoothers bgs
 check -geo square -mesh tri -k 0 -n 32 -s fcguamg -source one -smoothers rgs,gs
-check -geo square -mesh tri -k 2 -n 16 -s fcguamg -source one
+check -geo square -mesh tri -k 2 -n 16 -s fcguamg -source one -smoothers bgs
 check -geo square -mesh tri -k 3 -n 16 -s fcguamg -source one -smoothers rbgs,bgs
 check -geo square -mesh tri -k 5 -n 8 -s fcguamg -source one -smoothers rbgs,bgs
-check -geo square -mesh tri -k 7 -n 4 -s fcguamg -source one
+check -geo square -mesh tri -k 7 -n 4 -s fcguamg -source one -smoothers bgs
 # Other multigrids
 check -geo cube -mesh tetra -k 0 -n 16 -s fcgaggregamg
 check -geo cube -mesh tetra -k 1 -n 8 -s fcgaggregamg

@@ -150,8 +150,9 @@ mpiexec -n 4 ./bin/fhhos4 -geo cube -mesh tetra -n 16 -k 1 -s fcglibuamg
 - Available: the diffusion problem discretized by HHO (`-pb diff -discr hho`), with static condensation, on GMSH meshes
   (`-mesher gmsh`, GMSH's by default for some meshes, e.g. `-mesh tetra`); U-AMG through the library
   (`-s fcglibuamg`, `libuamg`, `gcrlibuamg`) or the program's (`-s fcguamg`, `uamg`, `gcruamg`), also with
-  `-uamg-nonsym`, with its default options and the smoothers block Gauss-Seidel (Gauss-Seidel in each process, Jacobi
-  between them), block Jacobi and block Chebyshev. Refused: the other meshers, problems, discretizations and solvers,
+  `-uamg-nonsym`, with its default options and the smoothers block Chebyshev (the default for a symmetric matrix, whose
+  results don't depend on the number of processes), block Jacobi and block Gauss-Seidel (Gauss-Seidel in each process,
+  Jacobi between them: it can converge much more slowly than on one process, or stagnate, e.g. in 3D at k=2). Refused: the other meshers, problems, discretizations and solvers,
   the exports, initial guesses other than 0.
 - On one process (`mpiexec -n 1`, or without `mpiexec`), the program is the one compiled without MPI.
 

@@ -64,7 +64,7 @@ The full Neumann problem (`-tc fullneumann`, 2D only): a singular system, solved
 
 - **`CartesianFaceIntegral.FollowsTheOrientation`** (1 case) — the integral of a linear function on the faces of Cartesian elements, 2D (vertical, horizontal edges) and 3D (the three orientations), away from the origin. Assertion: exact to 1e-14.
 - **`Square/FullNeumannTest.ConvergesAndSolversAgree`** (5 cases: `tri (GMSH) × k=0,1,2`, `cart (in-house) × k=0,1`) — the L2 error converges at the theoretical rate (h² for k=0, h^(k+2) for k≥1; direct solver, n=8,16,32,64; slope within ±0.3) and equals the current value at n=32 (within 1%); at n=64, where the multigrid methods have several levels, at tolerance 1e-11 (at k=2 the L2 error at the default tolerance is that of the solver), the geometric multigrid (`mg`, which applies the zero-mean and compatibility conditions on its levels), U-AMG in the program (`fcguamg`) and through the library (`fcglibuamg`, on the condensed system), both with `SingularMatrix`, converge in fewer than 40 iterations and give the direct solver's L2 error (within 1e-4 relative). Without the kernel handling, tri k=2 took 198 iterations through the library (the singular coarsest matrix factorized with a tiny pivot).
-  CLI: `./bin/fhhos4 -geo square -tc fullneumann -mesh {tri|cart -mesher inhouse} -k {0|1|2} -n {8|16|32|64} -s ch -no-cache`, then `-n 64 -s {mg|fcguamg|fcglibuamg} -tol 1e-11`
+  CLI: `./bin/fhhos4 -geo square -tc fullneumann -mesh {tri|cart -mesher inhouse} -k {0|1|2} -n {8|16|32|64} -s ch -no-cache`, then `-n 64 -s {mg|fcguamg|fcglibuamg} -smoothers bgs -tol 1e-11`
 
 ## `HMultigrid2020Test.cpp`
 
@@ -115,7 +115,7 @@ CLI: `./bin/fhhos4 -geo square -mesh tri -s mg -cs {m|n} -prolong {7|9} [-subtri
 Validates *"Algebraic multigrid preconditioner for statically condensed systems arising from lowest-order hybrid discretizations"* (Di Pietro, Hulsemann, Matalon, Mycek, Rude, SIAM J. Sci. Comput. 2023) — see `reproducibility/2023_AMG_for_hybrid_methods.md`. GMSH meshes. Reference: the CSV files of the accepted version (`Results/`).
 
 - **`Cube/AMGCubeTetTest.IterationCounts`** (2 cases) — Figure 4.4, Cube-tet, k=0, n=16,32, FCG preconditioned by U-AMG (`-s fcguamg`, `cube_fcgcamg.csv`) or C-AMG (`-s fcgaggregamg`, `cube_fcgaggregamg.csv`). AGMG, the third solver of the comparison, is an external library that is not built by default.
-  CLI: `./bin/fhhos4 -geo cube -mesh tetra -k 0 -n {16|32} -s {fcguamg|fcgaggregamg} -no-cache`
+  CLI: `./bin/fhhos4 -geo cube -mesh tetra -k 0 -n {16|32} -s {fcguamg|fcgaggregamg} -smoothers bgs -no-cache`
   Expected: U-AMG → 26, 28 (paper: 26, 28) · C-AMG → 23, 25 (paper: 22, 25).
 
 ## `HpStrategies2022Test.cpp`
@@ -145,7 +145,7 @@ Validates *"Iterative solution to the biharmonic equation in mixed form discreti
   Expected: 6, 13 for k=0 and k=1.
 
 - **`Cube/BiharCubeTetTest.IterationCounts`** (2 cases: `{s, no}`) — Table 3: cube, unstructured tetrahedral mesh, k=0, first mesh size (n=8: 3411 elements, 3373 in the paper), neighbourhood depth 2, Laplacian problems solved by FCG preconditioned by U-AMG.
-  CLI: `./bin/fhhos4 -pb bihar -geo cube -source exp -mesh tetra -not-compute-errors -s fcguamg -hp-cs p_h -nbh-depth 2 -bihar-prec-solver bicgstab -tol 1e-8 -k 0 -bihar-prec {s|no} -n 8 -no-cache`
+  CLI: `./bin/fhhos4 -pb bihar -geo cube -source exp -mesh tetra -not-compute-errors -s fcguamg -smoothers bgs -hp-cs p_h -nbh-depth 2 -bihar-prec-solver bicgstab -tol 1e-8 -k 0 -bihar-prec {s|no} -n 8 -no-cache`
   Expected: 14 preconditioned, 29 not preconditioned (paper: identical).
 
 ## `SolverRegressionTest.cpp`
@@ -165,24 +165,27 @@ Regression tests for configurations that used to crash, and for the argument def
   CLI: `./bin/fhhos4 -geo square -mesh cart -mesher inhouse -k 1 -n 16 -s {cg|fcg|gcr} -preconditioner {ch|lu}`
 
 - **`SquareCart/GCRTest.AsFastAsFCG`** (4 cases: `uamg` at k=0,1,2, `aggregamg` at k=0) — GCR (`-s gcr`, for non-symmetric matrices) preconditioned by the AMGs with the K-cycle, which then iterates with GCR on the coarse levels, on the symmetric matrices of the diffusion problem. GCR minimizes the residual norm where FCG minimizes the energy norm of the error: 0 to 3 more iterations measured, in 2D and 3D. Assertion: converges, in at most 3 more iterations than FCG.
-  CLI: `./bin/fhhos4 -geo square -mesh cart -mesher inhouse -k {0|1|2} -n 32 -s {fcg|gcr}{uamg|aggregamg}`
+  CLI: `./bin/fhhos4 -geo square -mesh cart -mesher inhouse -k {0|1|2} -n 32 -s {fcg|gcr}{uamg|aggregamg} -smoothers bgs`
 
 - **`Prolongation/GalerkinProlongationDefaultsTest`** (4 cases: `-prolong {4|5}` × 2 tests) — no solve, only `ApplyProgramArgumentDefaults`. With the default solver, the prolongations that require the Galerkin operator enable it; with an explicit `-s mg` and no `-g 1`, they are rejected (death test, `EXIT_FAILURE`).
 
 - **`HPCoarsening/UAMGHPCoarseningDefaultsTest.PThenHAtHighOrder`** (3 cases: k=0,1,2) and **`UAMGHPCoarseningDefaults.ExplicitStrategyKept`** (1 case) — no solve, only `ApplyProgramArgumentDefaults`. The default hp-coarsening strategy of U-AMG is p, then h (`-hp-cs p_h`) at k ≥ 1, h only at k=0; the other solvers (here `mg`) keep h only; an explicit `-hp-cs` is kept.
   CLI: `./bin/fhhos4 -geo square -mesh cart -mesher inhouse -k {0|1|2} -s {fcguamg|mg} [-hp-cs h]`
 
+- **`UAMGSmootherDefaults.ChebyshevOnSymmetricMatrices`** (1 case) — no solve, only `ApplyProgramArgumentDefaults`. The default smoothers of U-AMG on a symmetric matrix are the library's, block Chebyshev of the fourth kind (`bcheb4`, the post-smoother the same), of degree 2 (K(2,2)), whose results don't depend on the numbers of threads and processes; the degree of an explicit `-cycle` is kept; block Gauss-Seidel for a non-symmetric matrix (`-uamg-nonsym`) and the other multigrids (`mg`); an explicit `-smoothers` is kept. The tests of U-AMG above and below set `-smoothers bgs`, the papers' smoother (the default up to release 1.4), unless they say otherwise.
+  CLI: `./bin/fhhos4 -geo square -mesh cart -mesher inhouse -k 1 -s {fcguamg [-cycle K,1,1]|gcruamg -uamg-nonsym|mg|fcguamg -smoothers bgs}`
+
 - **`Kellogg/UAMGConstantRescalingTest.Converges`** (6 cases: k=0,1 × orthonormal bases on the cells and faces, the cells only, the faces only) — U-AMG with bases where the constant function does not have coordinate 1 (orthonormal: √|T| on a cell, √|F| on a face), on the Kellogg problem with a mesh graded towards the center (`square4quadrants_tri_localref.geo`: cells 1e5 times smaller there). The coarsening of the 2023 AMG paper assumes that the constant has the same coordinate in all the bases (its Q_T, Q_F and trace Π have coefficients 1); `UncondensedLevel::CoarsenMesh()` rescales the constant modes to make it hold. Without it, FCG stopped at its 200 iterations, or the coarse operator overflowed (orthonormal faces only). Assertion: converges in ≤ 25 iterations (16-21 measured; 14-18 with the default bases).
 
 - **`Kellogg/UAMGHarmonicExtensionTest.Converges`** (8 cases: k=0,1 × the default bases, orthonormal bases on the cells and faces, the cells only, the faces only) — the coarsening prolongation `-coarsening-prolong 10` (`HarmonicExtensionOrInject`): on the faces interior to an aggregate, the local solve of their rows of the operator, the kept faces injected (the paper's `Q_F^smooth` with ω = 1). It converts no cell value into face values (no trace Π of the coarse cells), and uses no `A_TT`. The problem of `UAMGConstantRescalingTest`. Assertion: converges in ≤ 25 iterations.
 
 - **`UAMGHarmonicExtension.OnlyChained`** (1 case) — `-coarsening-prolong 10` with another multigrid prolongation than the chained coarsening prolongations (`-prolong 6`) is refused (`fhhos4::Error`): it is only implemented in the flat coarsening passes, chained.
-  CLI: `./bin/fhhos4 -geo 2D/square4quadrants_tri_localref.geo -tc kellogg -n 16 -k {0|1} -s fcguamg -e-ogb {3|1} -f-ogb {3|1} -no-cache`
+  CLI: `./bin/fhhos4 -geo 2D/square4quadrants_tri_localref.geo -tc kellogg -n 16 -k {0|1} -s fcguamg -smoothers bgs [-coarsening-prolong 10] -e-ogb {3|1} -f-ogb {3|1} -no-cache`
 
 - **`SquarePoly/PolygonalMeshUAMGTest.Converges`** (3 cases: k=0, k=1 with the default hp-coarsening (p, then h) and with `-hp-cs h`) — U-AMG on a polygonal mesh built with `-polymesh-fcs n` (the fine faces are kept), where neighbouring polygons share several faces. U-AMG listed such a neighbour once per shared face, and the ordering of the cells for the pairwise aggregation wrote past the end of its array (heap corruption, crash). Sequential. Assertion: converges in ≤ 30 iterations.
 
 - **`SquarePoly/PolygonalMeshHarmonicExtensionTest.Converges`** (2 cases: k=0, and k=1 with `-hp-cs h`) — `-coarsening-prolong 10` on the same meshes, where an aggregate of two polygons that share several faces has several removed faces, coupled to each other: their rows are solved together (a dense LU; at k=1 with `-hp-cs h`, blocks of 2 DoFs). Sequential. Assertion: converges in ≤ 30 iterations.
-  CLI: `./bin/fhhos4 -geo square -mesh poly -polymesh-fcs n -k {0|1} -n 64 -s fcguamg [-hp-cs h] -threads 1`
+  CLI: `./bin/fhhos4 -geo square -mesh poly -polymesh-fcs n -k {0|1} -n 64 -s fcguamg -smoothers bgs [-coarsening-prolong 10] [-hp-cs h] -threads 1`
 
 - **`SquarePoly/PolygonalMeshMultigridDefaultsTest.Converges`** (2 cases: k=0,1) — the geometric multigrid with its default options on a polygonal mesh. The default coarsening strategy was the independent remeshing by GMSH (`-cs m`), which these meshes, built by agglomeration, don't support: it is now the agglomeration coarsening (`-cs n`). Sequential. Assertions: that default, and convergence in ≤ 30 iterations.
   CLI: `./bin/fhhos4 -geo square -mesh poly -k {0|1} -n 64 -s mg -threads 1`
@@ -314,7 +317,7 @@ passes, which replace P on the levels with blocks of faces of at least 2 DoFs.
   Cube-cart n=8 k=1 with `-hp-cs h` (and `-coarsening-prolong 4 -diag-block-solve inv`, `-prolong 5`), with
   `-hp-cs h_p -num-meshes 2` (the coarse `A_FF` of the p-levels). Sequential: on several threads, the L2 error (an
   OpenMP reduction) and the polygonal meshes (their agglomeration) vary from one run to the next.
-  CLI: `./bin/fhhos4 -geo cube -mesh cart -mesher inhouse -n 8 -k 1 -hp-cs h -s fcguamg -no-cache -threads 1` (etc.)
+  CLI: `./bin/fhhos4 -geo cube -mesh cart -mesher inhouse -n 8 -k 1 -hp-cs h -s fcguamg -smoothers bgs -no-cache -threads 1` (etc.)
 - **`CoarseningPass.*`** (4 cases: symmetric system, with the constants of coordinates other than 1 (the rescaling of
   the bases), non-symmetric system with asymmetry 0.5, the coarse operators `Q_F^T A Q_F` (not Galerkin)) — on the
   32 x 32 system of `LocalMatricesTest.cpp`, on all the threads: the operators and prolongations of all the levels are
@@ -333,12 +336,12 @@ passes, which replace P on the levels with blocks of faces of at least 2 DoFs.
 Tests of the library `fhhos4` (`library/`), the U-AMG of fhhos4 for other codes (`fhhos4::Solver`, `#include <fhhos4>`).
 
 - **`UAMGLibraryProgram/UAMGLibraryProgramTest.SameAsProgram`** (36 cases: Square-tri n=16 k=0,1, k=1 with orthonormal bases, with orthonormal bases and `-coarsening-prolong 10` (`Prolongation::HarmonicExtension` in the library), and k=3 with the p-coarsening straight to degree 0 (`-p-cs =0`, `PCoarsening::ToZero` in the library: it differs from the default from k = 3), Cube-tet n=8 k=0 with default and orthonormal bases, with orthonormal bases and `-coarsening-prolong 10`, k=1 orthonormal, Cube-cart n=8 k=2, and in Q (`-poly-space q`, `PolynomialSpace::Q` in the library: blocks of Q^k, a p-level Q^1 at k = 3) Square-cart n=16 k=3, Cube-cart n=8 k=2 × `fcglibuamg`, `gcrlibuamg`, `libuamg`) — the program runs U-AMG through the library (`Solver/LibraryUAMG.cpp`), as an external code calls it, and must get the iteration count and the L2 error (to 1e-6 relative) of the U-AMG compiled in it (`fcguamg`, `gcruamg`, `uamg`), on the uncondensed system (the program gives the blocks and the right-hand sides of the cells and faces, `SetupSymmetric()` and `Solve(b_T, b_F, x_T, x_F)`: the library condenses the system and computes the cell unknowns) and on the condensed one (`-export lsys`, into a temporary directory: the program needs the condensed system, sets the library up from the blocks and solves by `Solve(b, x)`).
-  CLI: `./bin/fhhos4 -geo {square|cube} -mesh {tri|tetra|cart} -n {16|8} -k {0|1|2|3} -s {fcglibuamg|fcguamg|gcrlibuamg|gcruamg|libuamg|uamg} [-p-cs =0] [-poly-space q] [-export lsys] [-e-ogb 3 -f-ogb 3] -no-cache`
+  CLI: `./bin/fhhos4 -geo {square|cube} -mesh {tri|tetra|cart} -n {16|8} -k {0|1|2|3} -s {fcglibuamg|fcguamg|gcrlibuamg|gcruamg|libuamg|uamg} [-p-cs =0] [-poly-space q] [-export lsys] [-e-ogb 3 -f-ogb 3] -smoothers bgs -no-cache`
 
 - **`UAMGLibraryProgram.NotAPreconditionerOfTheConjugateGradient`** (1 case) — `-s cglibuamg` is refused: the library gives U-AMG with its own Krylov method only (with the K-cycle, it is a non-linear preconditioner).
 
 - **`UAMGNonsymmetricProgram/UAMGNonsymmetricProgramTest.SameAsSymmetric`** (12 cases: the cases of `SameAsProgram`) — U-AMG for a non-symmetric matrix (`-uamg-nonsym`: `A_FT = A_TF^T` given, all the blocks in full) on the symmetric matrix of the problem, in the program (`gcruamg`) and through the library (`gcrlibuamg`: `SetupNonsymmetric()`, on the uncondensed system and with `-export lsys` on the condensed one). It coarsens the symmetric part of the matrix (the matrix itself) and computes the Galerkin products of the matrix, equal to the symmetric ones up to rounding: it must get the iteration count and the L2 error (to 1e-6 relative) of the symmetric U-AMG (`gcruamg`).
-  CLI: `./bin/fhhos4 -geo {square|cube} -mesh {tri|tetra|cart} -n {16|8} -k {0|1|2|3} -s {gcruamg|gcrlibuamg} [-p-cs =0] [-uamg-nonsym] [-export lsys] [-e-ogb 3 -f-ogb 3] -no-cache`
+  CLI: `./bin/fhhos4 -geo {square|cube} -mesh {tri|tetra|cart} -n {16|8} -k {0|1|2|3} -s {gcruamg|gcrlibuamg} [-p-cs =0] [-uamg-nonsym] [-export lsys] [-e-ogb 3 -f-ogb 3] -smoothers bgs -no-cache`
 
 - **`UAMGBlockCSRProgram/UAMGBlockCSRProgramTest.SameAsCSR`** (12 cases: the cases of `SameAsProgram`; and `UAMGBlockCSRProgramQ`, 1 case: Cube-cart n=5 k=3 in Q, faces of 16 DoFs and a p-level Q^1, only here and in `UAMGMixedPrecisionProgramQ` with `fcguamg`: the assembly of the program in Q^3 is long, 2.5 s for its 125 cells; n=5: on the mesh n=4 the traces of the solution vanish on all the faces, and the condensed right-hand side is rounding noise) — the operators
   of the levels whose faces have several DoFs in block CSR in double (`-uamg-bcsr`, the library's `BlockCSRStorage`), with
