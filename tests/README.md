@@ -58,6 +58,15 @@ A-priori convergence of the HHO discretization, independent of any solver study:
 - **`{Square,Cube}/ExactnessQTest.ReproducesASolutionOfQ2`** (4 cases: 2D, 3D × the default bases (Legendre), the monomials orthogonalized on each cell) — the solution of `-source poly`, x(1-x)y(1-y) (times z(1-z) in 3D), is in Q^2: HHO in Q reproduces it at k=2. With the orthogonalized bases, the cell basis is made of the first functions of the reconstruction basis. Assertion: L2 error < 1e-12.
   CLI: `./bin/fhhos4 -geo {square|cube} -mesh cart -mesher inhouse -poly-space q -source poly -s ch -k 2 -n 2 [-e-basis monomials -e-ogb 1]`
 
+- **`Cube/GMSHCartesianCubeTest.SameAsInHouse`** (3 cases: k=0,1,2) — GMSH's Cartesian cube (hexahedra) is the in-house one: the same L2 error (within 1e-6 relative; GMSH's coordinates are exact to ~1e-12 only). It failed from 2022 to 2026-10-28: its quadrilateral faces were refused, the corners of its hexahedra and faces taken in an order of GMSH's nodes that no longer held, and the sides of the faces in their elements (their outer normals) not set.
+  CLI: `./bin/fhhos4 -geo cube -mesh cart -mesher {gmsh|inhouse} -s ch -k {0|1|2} -n 8 -no-cache`
+
+- **`Cube/CubeMixedConditionsTest.Converges`** (2 cases: GMSH's `tetra`, `cart`) — the mixed conditions of the cube (`-bc m`): Dirichlet on its bottom face (z = 0, the boundary part `bottomBoundary` of `cube.inc.geo`), Neumann on the others. The test case had no boundary functions (`std::bad_function_call`), and the faces of GMSH's cube no name, so all were Neumann (a singular system: 200 iterations). No exact solution: FCG preconditioned by U-AMG through the library, k=1, n=8. Assertion: fewer than 40 iterations (26 and 8).
+  CLI: `./bin/fhhos4 -geo cube -mesh {tetra|cart} -mesher gmsh -bc m -s fcglibuamg -k 1 -n 8 -no-cache`
+
+- **`CubeMixedConditions.RefusedWithoutBoundaryParts`** (1 case) — the in-house cube has no boundary parts, so all its faces would be Dirichlet: `-bc m` is refused (`Mesh::SetBoundaryConditions()`: mixed conditions with no Neumann or no Dirichlet face, on all the processes; also a GMSH mesh in cache older than its `.geo` file). Assertion: `fhhos4::Error`.
+  CLI: `./bin/fhhos4 -geo cube -mesh cart -mesher inhouse -bc m -k 1 -n 8`
+
 ## `FullNeumannTest.cpp`
 
 The full Neumann problem (`-tc fullneumann`, 2D only): a singular system, solved up to a constant (the program projects the right-hand side onto the image of the matrix and translates the solution to the average of the exact one). Untested before 2026-10-25, it crashed since 2022-07 (42f1004e: the compatibility condition was computed by the discrete spaces of the problem before the assembly that builds them), and its compatibility condition was wrong on the Cartesian meshes (the integrals of a function on the faces of a `CartesianShape` ignored their orientation).

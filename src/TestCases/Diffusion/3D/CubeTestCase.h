@@ -55,6 +55,8 @@ public:
 		{
 			this->BC.Type = PbBoundaryConditions::MixedDirichletNeumann;
 			this->BC.BoundaryConditionPartition = BoundaryConditions::MixedConditionsExample;
+			this->BC.DirichletFunction = BoundaryConditions::Homogeneous;
+			this->BC.NeumannFunction = BoundaryConditions::Homogeneous;
 			this->BC.Description = "Mixed Neumann-Dirichlet";
 		}
 

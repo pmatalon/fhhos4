@@ -1968,26 +1968,22 @@ inline Element<3>* GMSHMesh<3>::CreateElement(int elemType, const vector<size_t>
 	}
 	else if (elemType == GMSH_Hexahedron && this->FileNamePart().compare("gmsh_cart") == 0)
 	{
-		size_t elemNodeIndex = 8 * elemIndex;
-		Vertex* v1 = GetVertexFromGMSHTag(elementNodes[elemNodeIndex]);     // (0, 1, 1)
-		Vertex* v2 = GetVertexFromGMSHTag(elementNodes[elemNodeIndex + 1]); // (0, 1, 0)
-		Vertex* v3 = GetVertexFromGMSHTag(elementNodes[elemNodeIndex + 2]); // (1, 1, 0)
-		Vertex* v4 = GetVertexFromGMSHTag(elementNodes[elemNodeIndex + 3]); // (1, 1, 1)
-		Vertex* v5 = GetVertexFromGMSHTag(elementNodes[elemNodeIndex + 4]); // (0, 0, 1)
-		Vertex* v6 = GetVertexFromGMSHTag(elementNodes[elemNodeIndex + 5]); // (0, 0, 0)
-		Vertex* v7 = GetVertexFromGMSHTag(elementNodes[elemNodeIndex + 6]); // (1, 0, 0)
-		Vertex* v8 = GetVertexFromGMSHTag(elementNodes[elemNodeIndex + 7]); // (1, 0, 1)
+		// The corners by their side of the center (front: +x, right: +y, top: +z), whatever GMSH's order of the nodes:
+		// corners[x + 2y + 4z]
+		Vertex* nodes[8];
+		double cx = 0, cy = 0, cz = 0;
+		for (int i = 0; i < 8; i++)
+		{
+			nodes[i] = GetVertexFromGMSHTag(elementNodes[8 * elemIndex + i]);
+			cx += nodes[i]->X / 8;
+			cy += nodes[i]->Y / 8;
+			cz += nodes[i]->Z / 8;
+		}
+		Vertex* corners[8];
+		for (Vertex* v : nodes)
+			corners[(v->X > cx) + 2 * (v->Y > cy) + 4 * (v->Z > cz)] = v;
 
-		Vertex* backLeftBottomCorner = v6;
-		Vertex* frontLeftBottomCorner = v7;
-		Vertex* backRightBottomCorner = v2;
-		Vertex* backLeftTopCorner = v5;
-		Vertex* frontLeftTopCorner = v8;
-		Vertex* backRightTopCorner = v1;
-		Vertex* frontRightBottomCorner = v3;
-		Vertex* frontRightTopCorner = v4;
-
-		_parallelepipedElements[start + elemIndex] = ParallelepipedElement(0, backLeftBottomCorner, frontLeftBottomCorner, backRightBottomCorner, backLeftTopCorner, frontLeftTopCorner, backRightTopCorner, frontRightBottomCorner, frontRightTopCorner);
+		_parallelepipedElements[start + elemIndex] = ParallelepipedElement(0, corners[0], corners[1], corners[2], corners[4], corners[5], corners[6], corners[3], corners[7]);
 		e = &_parallelepipedElements[start + elemIndex];
 	}
 	else
@@ -2129,6 +2125,8 @@ inline void GMSHMesh<3>::AllocateContiguousMemoryForFaces(GMSHFaceTypes faceType
 
 	if (faceType == GMSHFaceTypes::GMSH_TriangleFace)
 		this->_triangularFaces.reserve(numberOfFaces);
+	else if (faceType == GMSHFaceTypes::GMSH_QuadrilateralFace)
+		this->_rectangularFaces.reserve(numberOfFaces);
 	else
 		Utils::FatalError("GMSH element type not managed.");
 }
@@ -2225,83 +2223,40 @@ inline void GMSHMesh<3>::CreateFaces(int elemType, BigNumber& faceNumber)
 		}
 		else if (faceType == GMSHFaceTypes::GMSH_QuadrilateralFace && this->FileNamePart().compare("gmsh_cart") == 0)
 		{
-			Vertex* v1 = vertices[0]; // (0, 1, 1)
-			Vertex* v2 = vertices[1]; // (1, 1, 1)
-			Vertex* v3 = vertices[2]; // (1, 1, 0)
-			Vertex* v4 = vertices[3]; // (0, 1, 0)
+			// The plane of the face: its normal axis, along which it is flat (GMSH's coordinates are exact to ~1e-12 only)
+			int normalAxis;
+			(Vect<3>(vertices[0], vertices[1]).cwiseAbs() + Vect<3>(vertices[0], vertices[2]).cwiseAbs()).minCoeff(&normalAxis);
+			CartesianShapeOrientation orientation = normalAxis == 0 ? CartesianShapeOrientation::InYOZ : (normalAxis == 1 ? CartesianShapeOrientation::InXOZ : CartesianShapeOrientation::InXOY);
 
-			CartesianShapeOrientation orientation = CartesianShapeOrientation::None;
-			Vertex* origin;
-			Vertex* vertex1;
-			Vertex* vertex2;
-			Vertex* vertex3;
-
-			DimVector<3> v12 = Vect<3>(v1, v2);
-			DimVector<3> v13 = Vect<3>(v1, v3);
-			//DimVector<3> normal = Vect<3>(v2, v1).cross(Vect<3>(v3, v1));
-			DimVector<3> unitX; unitX << 1, 0, 0;
-			DimVector<3> unitY; unitY << 0, 1, 0;
-			DimVector<3> unitZ; unitZ << 0, 0, 1;
-			if (abs(v12.dot(unitX)) < 1e-14 && abs(v13.dot(unitX)) < 1e-14)
-			{
-				orientation = CartesianShapeOrientation::InYOZ;
-			}
-			else if (abs(v12.dot(unitY)) < 1e-14 && abs(v13.dot(unitY)) < 1e-14)
-			{
-				orientation = CartesianShapeOrientation::InXOZ;
-				origin = v4;
-				vertex1 = v3;
-				vertex2 = v1;
-				vertex3 = v2;
-			}
-			else if (abs(v12.dot(unitZ)) < 1e-14 && abs(v13.dot(unitZ)) < 1e-14)
-			{
-				orientation = CartesianShapeOrientation::InXOY;
-			}
-			else
-				assert(false);
-
-			DimVector<3> OV1; OV1 << v1->X, v1->Y, v1->Z;
-			DimVector<3> OV2; OV2 << v2->X, v2->Y, v2->Z;
-			DimVector<3> OV3; OV3 << v3->X, v3->Y, v3->Z;
-			DimVector<3> OV4; OV4 << v4->X, v4->Y, v4->Z;
-
-			double minNorm = min({OV1.norm(), OV2.norm(), OV3.norm(), OV4.norm()});
-			if (minNorm == OV1.norm())
-			{
-				origin = v1;
-				vertex1 = v4;
-				vertex2 = v2;
-				vertex3 = v3;
-			}
-			else if (minNorm == OV2.norm())
-			{
-				origin = v2;
-				vertex1 = v3;
-				vertex2 = v1;
-				vertex3 = v4;
-			}
-			else if (minNorm == OV3.norm())
-			{
-				origin = v3;
-				vertex1 = v2;
-				vertex2 = v4;
-				vertex3 = v1;
-			}
-			else if (minNorm == OV4.norm())
-			{
-				origin = v4;
-				vertex1 = v1;
-				vertex2 = v3;
-				vertex3 = v2;
-			}
-			else
-				assert(false);
+			// As RectangularFace takes them: the corner of smallest coordinates, its neighbour along the first axis of the
+			// plane, its neighbour along the second one, the opposite corner (whatever the direction of the cycle)
+			auto smallerCorner = [](MeshVertex<3>* a, MeshVertex<3>* b) { return a->X + a->Y + a->Z < b->X + b->Y + b->Z; };
+			int o = min_element(vertices.begin(), vertices.end(), smallerCorner) - vertices.begin();
+			Vertex* origin = vertices[o];
+			Vertex* vertex1 = vertices[(o + 1) % 4];
+			Vertex* vertex2 = vertices[(o + 3) % 4];
+			Vertex* vertex3 = vertices[(o + 2) % 4];
+			int firstAxis = orientation == CartesianShapeOrientation::InYOZ ? 1 : 0;
+			if (abs(Vect<3>(origin, vertex1)[firstAxis]) < abs(Vect<3>(origin, vertex2)[firstAxis]))
+				swap(vertex1, vertex2);
 
 			if (neighbours.size() == 1)
-				face = new RectangularFace(faceNumber++, origin, vertex1, vertex2, vertex3, neighbours[0], orientation);
+				this->_rectangularFaces.emplace_back(faceNumber++, origin, vertex1, vertex2, vertex3, neighbours[0], orientation);
 			else if (neighbours.size() == 2)
-				face = new RectangularFace(faceNumber++, origin, vertex1, vertex2, vertex3, neighbours[0], neighbours[1], orientation);
+				this->_rectangularFaces.emplace_back(faceNumber++, origin, vertex1, vertex2, vertex3, neighbours[0], neighbours[1], orientation);
+			else
+				assert(false);
+			face = &this->_rectangularFaces.back();
+
+			// The side of each element the face is on, which gives its outer normal: the side of smaller coordinates if the
+			// origin of the face is nearer to the back left bottom corner of the element than to its front right top one
+			for (Element<3>* e : neighbours)
+			{
+				ParallelepipedElement* p = dynamic_cast<ParallelepipedElement*>(e);
+				bool smallerSide = abs(Vect<3>(origin, p->BackLeftBottomCorner)[normalAxis]) < abs(Vect<3>(origin, p->FrontRightTopCorner)[normalAxis]);
+				Face<3>*& side = normalAxis == 0 ? (smallerSide ? p->BackFace : p->FrontFace) : (normalAxis == 1 ? (smallerSide ? p->LeftFace : p->RightFace) : (smallerSide ? p->BottomFace : p->TopFace));
+				side = face;
+			}
 		}
 		else
 			assert(false);
@@ -2353,12 +2308,13 @@ inline Face<2>* GMSHMesh<2>::GetBoundaryFaceFromGMSHNodes(int faceType, const ve
 template<>
 inline Face<3>* GMSHMesh<3>::GetBoundaryFaceFromGMSHNodes(int faceType, const vector<size_t>& faceNodes, size_t& faceNodeIndex)
 {
-	assert(faceType == GMSHElementTypes::GMSH_Triangle);
+	assert(faceType == GMSHElementTypes::GMSH_Triangle || faceType == GMSHElementTypes::GMSH_Quadrilateral);
 
+	// (three vertices identify a quadrilateral too)
 	MeshVertex<3>* v1 = (MeshVertex<3>*)GetVertexFromGMSHTag(faceNodes[faceNodeIndex]);
 	MeshVertex<3>* v2 = (MeshVertex<3>*)GetVertexFromGMSHTag(faceNodes[faceNodeIndex + 1]);
 	MeshVertex<3>* v3 = (MeshVertex<3>*)GetVertexFromGMSHTag(faceNodes[faceNodeIndex + 2]);
-	faceNodeIndex += 3;
+	faceNodeIndex += faceType == GMSHElementTypes::GMSH_Triangle ? 3 : 4;
 
 	for (Face<3>* f : v1->Faces)
 	{

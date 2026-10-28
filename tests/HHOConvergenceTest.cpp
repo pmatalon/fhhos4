@@ -134,4 +134,67 @@ INSTANTIATE_TEST_SUITE_P(Square, ExactnessQTest, ::testing::Combine(::testing::V
 
 #ifdef ENABLE_3D
 INSTANTIATE_TEST_SUITE_P(Cube, ExactnessQTest, ::testing::Combine(::testing::Values(std::string("cube")), ::testing::Bool()));
+
+//------------------------------------------- GMSH's cube -------------------------------------------//
+
+namespace
+{
+	ProgramArguments CubeArgs(const std::string& meshCode, const std::string& mesher, int k, const std::string& solverCode)
+	{
+		ProgramArguments args;
+		args.Problem.GeoCode = "cube";
+		args.Discretization.Mesher = mesher;
+		args.Discretization.MeshCode = meshCode;
+		args.Discretization.N = 8;
+		args.Discretization.PolyDegree = k + 1;
+		args.Solver.SolverCode = solverCode;
+		args.Actions.UseCache = false;
+		return args;
+	}
+}
+
+// GMSH's Cartesian cube (hexahedra) is the in-house one: the same L2 error. It failed since 2022: its quadrilateral
+// faces were refused, the corners of its hexahedra and faces taken in an order of GMSH's nodes that no longer held, the
+// sides of the faces in their elements (their outer normals) not set, and its coordinates are exact to ~1e-12 only.
+//   ./bin/fhhos4 -geo cube -mesh cart -mesher {gmsh|inhouse} -s ch -k {0|1|2} -n 8 -no-cache
+class GMSHCartesianCubeTest : public ::testing::TestWithParam<int>
+{
+};
+
+TEST_P(GMSHCartesianCubeTest, SameAsInHouse)
+{
+	int k = GetParam();
+	double gmshError = RunDiffusionHHO(CubeArgs("cart", "gmsh", k, "ch")).L2Error;
+	double inHouseError = RunDiffusionHHO(CubeArgs("cart", "inhouse", k, "ch")).L2Error;
+	ASSERT_GT(inHouseError, 0);
+	EXPECT_NEAR(gmshError, inHouseError, 1e-6 * inHouseError);
+}
+
+INSTANTIATE_TEST_SUITE_P(Cube, GMSHCartesianCubeTest, ::testing::Values(0, 1, 2));
+
+// The mixed conditions of the cube (-bc m): Dirichlet on its bottom face (z = 0, "bottomBoundary"), Neumann on the
+// others. The test case had no boundary functions (std::bad_function_call), and the faces of GMSH's cube no name: all
+// Neumann, a singular system (200 iterations). No exact solution: the iterations only.
+//   ./bin/fhhos4 -geo cube -mesh {tetra|cart} -mesher gmsh -bc m -s fcglibuamg -k 1 -n 8 -no-cache
+class CubeMixedConditionsTest : public ::testing::TestWithParam<std::string>
+{
+};
+
+TEST_P(CubeMixedConditionsTest, Converges)
+{
+	ProgramArguments args = CubeArgs(GetParam(), "gmsh", 1, "fcglibuamg");
+	args.Problem.BCCode = "m";
+	EXPECT_LT(RunDiffusionHHO(args).IterationCount, 40);
+}
+
+INSTANTIATE_TEST_SUITE_P(Cube, CubeMixedConditionsTest, ::testing::Values(std::string("tetra"), std::string("cart")));
+
+// The in-house cube has no boundary parts: all its faces would be Dirichlet. Refused (Mesh::SetBoundaryConditions()).
+//   ./bin/fhhos4 -geo cube -mesh cart -mesher inhouse -bc m -k 1 -n 8
+TEST(CubeMixedConditions, RefusedWithoutBoundaryParts)
+{
+	ProgramArguments args = CubeArgs("cart", "inhouse", 1, "ch");
+	args.Problem.BCCode = "m";
+	EXPECT_THROW(RunDiffusionHHO(args), fhhos4::Error);
+}
 #endif // ENABLE_3D

@@ -52,7 +52,7 @@ Physical Line(11) = {11};
 Physical Line(12) = {12};
 Physical Surface(1) = {1};
 Physical Surface(4) = {4};
-Physical Surface(5) = {5};
+Physical Surface("bottomBoundary", 5) = {5}; // z = 0: Dirichlet in the mixed conditions (-bc m)
 Physical Surface(2) = {2};
 Physical Surface(6) = {6};
 Physical Surface(3) = {3};

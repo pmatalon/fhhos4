@@ -376,8 +376,19 @@ public:
 			boundary->Condition = bc->BoundaryConditionPartition(boundary);
 			boundary->ConditionFunction = boundary->Condition == BoundaryConditionType::Neumann ? bc->NeumannFunction : bc->DirichletFunction;
 		}
-		
+
 		FillDirichletAndNeumannFaceLists(forceRefillLists);
+
+		// The boundary parts of the mesh must be those of the test case (e.g. "bottomBoundary"): otherwise all its faces
+		// are of one kind
+		if (bc->Type == PbBoundaryConditions::MixedDirichletNeumann)
+		{
+			const Communicator& comm = Communicator::Current();
+			bool anyDirichlet = comm.Any(!this->DirichletFaces.empty());
+			bool anyNeumann = comm.Any(!this->NeumannFaces.empty());
+			if (!anyDirichlet || !anyNeumann)
+				Utils::FatalError("The mixed boundary conditions (-bc m: " + bc->Description + ") need Dirichlet and Neumann faces, but no boundary face is " + (anyDirichlet ? "Neumann" : "Dirichlet") + ": the boundary parts of this mesh are not those of the test case. The in-house cube has none: use -mesher gmsh. A GMSH mesh in cache may be older than its .geo file: use -no-cache, or delete it from the cache.");
+		}
 	}
 
 	void ExportToMatlab(string outputDirectory)

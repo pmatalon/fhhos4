@@ -72,7 +72,7 @@ From `build/`:
 ctest --output-on-failure
 ```
 
-335 tests, ~8 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
+341 tests, ~8 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
 iteration counts of the papers in `reproducibility/` — see `tests/README.md`. Covers
 `Program_Diffusion_HHO` and `Program_BiHarmonic_HHO` (HHO, static condensation), 2D/3D,
 in-house, GMSH and polygonal meshes, the full Neumann problem (`FullNeumann*`, 2D), and the library (`UAMGLibrary*`,
