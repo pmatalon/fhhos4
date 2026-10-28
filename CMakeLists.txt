@@ -468,6 +468,26 @@ if(ENABLE_TESTS)
 				WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 			set_tests_properties(ProgramMPI_${name}_np${np} PROPERTIES PASS_REGULAR_EXPRESSION "${expected}" ENVIRONMENT OMP_NUM_THREADS=2 TIMEOUT 600 PROCESSORS ${np})
 		endforeach()
+
+		# The partition of the mesh kept in the cache (-cache-dir, the tests' own): written by a run, read by the next one
+		# on as many processes; refused when it has another number of parts (here, copied under the name of 3 parts)
+		set(partition_cache ${CMAKE_BINARY_DIR}/test_partition_cache)
+		set(partition_arguments -geo square -mesh tri -mesher gmsh -n 32 -k 1 -s fcguamg -cache-dir ${partition_cache})
+		add_test(NAME ProgramMPI_PartitionCache_Clean COMMAND ${CMAKE_COMMAND} -E rm -rf ${partition_cache})
+		add_test(NAME ProgramMPI_PartitionCache_Write_np2 COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS} $<TARGET_FILE:fhhos4> ${partition_arguments} ${MPIEXEC_POSTFLAGS})
+		add_test(NAME ProgramMPI_PartitionCache_Read_np2 COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS} $<TARGET_FILE:fhhos4> ${partition_arguments} ${MPIEXEC_POSTFLAGS})
+		add_test(NAME ProgramMPI_PartitionCache_Copy COMMAND ${CMAKE_COMMAND} -E copy_directory ${partition_cache}/square_tri_N32_2parts ${partition_cache}/square_tri_N32_3parts)
+		add_test(NAME ProgramMPI_PartitionCache_OtherNumber_np3 COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 3 ${MPIEXEC_PREFLAGS} $<TARGET_FILE:fhhos4> ${partition_arguments} ${MPIEXEC_POSTFLAGS})
+		set_tests_properties(ProgramMPI_PartitionCache_Clean PROPERTIES FIXTURES_SETUP PartitionCacheClean)
+		set_tests_properties(ProgramMPI_PartitionCache_Write_np2 PROPERTIES FIXTURES_REQUIRED PartitionCacheClean FIXTURES_SETUP PartitionCacheWritten
+			PASS_REGULAR_EXPRESSION "into 2 parts by GMSH.*L2 Error = 4.48e-04" PROCESSORS 2)
+		set_tests_properties(ProgramMPI_PartitionCache_Read_np2 PROPERTIES FIXTURES_REQUIRED PartitionCacheWritten FIXTURES_SETUP PartitionCacheRead
+			PASS_REGULAR_EXPRESSION "into 2 parts read from the cache.*L2 Error = 4.48e-04" PROCESSORS 2)
+		set_tests_properties(ProgramMPI_PartitionCache_Copy PROPERTIES FIXTURES_REQUIRED PartitionCacheRead FIXTURES_SETUP PartitionCacheCopied)
+		set_tests_properties(ProgramMPI_PartitionCache_OtherNumber_np3 PROPERTIES FIXTURES_REQUIRED PartitionCacheCopied
+			PASS_REGULAR_EXPRESSION "has 2 parts, but the program runs on 3 processes" PROCESSORS 3)
+		set_tests_properties(ProgramMPI_PartitionCache_Write_np2 ProgramMPI_PartitionCache_Read_np2 ProgramMPI_PartitionCache_OtherNumber_np3 PROPERTIES
+			ENVIRONMENT OMP_NUM_THREADS=2 TIMEOUT 600)
 	endif()
 
 else()

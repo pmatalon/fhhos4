@@ -5,6 +5,7 @@
 #include "../Utils/Parallelism.h"
 #include "../Utils/MatlabScript.h"
 #include "../Utils/FileSystem.h"
+#include "../Utils/Communicator.h"
 #include "../TestCases/TestCase.h"
 using namespace std;
 
@@ -554,7 +555,7 @@ protected:
 		if ((!this->DirichletFaces.empty() || !this->NeumannFaces.empty()) && !forceRefillLists)
 			return;
 
-		if (this->BoundaryFaces.empty())
+		if (this->BoundaryFaces.empty() && !Communicator::Current().IsDistributed()) // (the part of a process may have none)
 			Utils::FatalError("No boundary faces!");
 
 		this->DirichletFaces.clear();

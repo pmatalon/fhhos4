@@ -175,4 +175,5 @@ struct ProgramArguments
 	DiscretizationArguments Discretization;
 	SolverArguments Solver;
 	string OutputDirectory = "./out";
+	string CacheDirectory; // -cache-dir (empty: FileSystem::CacheDirectory())
 };

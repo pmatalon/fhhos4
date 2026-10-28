@@ -51,15 +51,33 @@ program too).
   process may own nothing (NGSolve 6.2.2608's rank 0). `SingularMatrix`: the kernel on the own faces, the dot products
   global, the pinned DoF of the coarsest level on one process (`docs/uamg.md`). Not yet: `CondensedMatrix()`. Python:
   `docs/python.md`.
-- Program (`Program_Diffusion_HHO_Impl.h`, `Program/DistributedHybridSystem.h`): GMSH meshes only, partitioned by GMSH
-  (`GMSHMesh::PartitionElements()`, rank 0, broadcast); the whole mesh built by every process (rank 0 first: cache);
-  faces owned by the smaller rank of their cells (`FaceRanks()`). `Diffusion_HHO::Restrict()` (`RestrictToProcess()`):
-  each process computes the local matrices (`InitHHO()`, `Assemble()`, right-hand side, the program's condensation) of
-  its cells and of the other cells of its faces only (`Elements()`: its rows complete, no exchange), in the numbering
-  of the whole mesh (the HHO faces: all of them), its rows extracted (`DistributedHybridSystem`); the solution gathered,
-  post-processed on its cells (`OwnElements()`), the sums reduced (L2 error, `HHOCellSpace`/`HHOReconstructSpace`,
-  `ZeroMeanEnforcer`, `NumericImageEnforcer`: the full Neumann right-hand side of the program's U-AMG projected on the
-  rows of the process); `CheckDistributedArguments()` lists what is refused. `-uamg-nonsym`: `A_F_T` from the rows of
+- Program (`Program_Diffusion_HHO_Impl.h`, `Program/DistributedHybridSystem.h`): GMSH meshes only. The mesh of each
+  process is its part (`GMSHMesh`, built when `Communicator::Current()` is distributed). The partition (`OpenPart()`:
+  METIS, `Mesh.PartitionCreateGhostCells`, GMSH's split files `part_<rank + 1>.msh`) is kept in the cache directory
+  (`-cache-dir`; shared by the nodes, unlike the temporary one), `<mesh cache name>_<P>parts`: read by the next runs on
+  P processes (rank 0 then doesn't load the model); otherwise rank 0 loads the whole model (cache or generation),
+  partitions it, writes it in `..._tmp<pid>` and renames it (atomic: no run reads an incomplete partition; if another
+  run renamed first, its partition is kept), or deletes it after all have read their part (`-no-cache`). Collective
+  checks: a partition with another number of parts, a part not found (the directory not shared). Each process opens
+  its part, and keeps the ghost cells of GMSH (those sharing a node with a cell of the part) that share a face with one
+  (`KeepGhostsOfFaces()`, `removeElements()` before `Build()`); in a part, the nodes are on entities of all dimensions,
+  the entities of other parts empty. `ExchangeGhosts()` (after `Build()`, one request/reply to the processes of the
+  ghosts, by GMSH tag): the global numbers of the cells (`ElementGlobalNumbers`, `ElementRanks`), the physical part of
+  the ghosts (none in the files), and which of their faces with one cell in the part are on the boundary of the domain
+  (with their boundary part): the others lie between the ghost and a cell of another part (interior faces with no
+  `Element2`). Faces are identified between processes by the GMSH tags of their vertices (`FaceKey`), and oriented by
+  them in a part (`OrientAlikeOnAllProcesses()`: the sign of the odd functions of the face bases, otherwise set by the
+  first cell of the face, which differs between processes). `GlobalFaceNumbers()` (after the numbering of the faces
+  by the problem, before the assembly): the faces of the system owned by the smaller rank of their cells, numbered
+  by exclusive scan; the others asked to their process, first those of the cells of the process (both cells of such a
+  face are in the part), then those of ghosts only, to the process of the ghost. `Diffusion_HHO::Restrict()`: the
+  local matrices on all the cells of the part (the rows of its cells and faces complete, no exchange), the
+  post-processing on its cells (`OwnElements()`), the sums reduced (L2 error, `HHOCellSpace`/`HHOReconstructSpace` and
+  its measure, `HHOBoundarySpace::Integral()` on the boundary faces of its cells, `ZeroMeanEnforcer`,
+  `NumericImageEnforcer`: the full Neumann right-hand side of the program's U-AMG projected on the rows of the
+  process); `H()`, the regularity, the average h: of the whole mesh. `DistributedHybridSystem`: its rows in the global
+  numbers; the solution of the faces of its rows (among which those of its cells) by a ghost update of `FaceMap`
+  (`Local()`). `CheckDistributedArguments()` lists what is refused. `-uamg-nonsym`: `A_F_T` from the rows of
   the faces (`FromGlobalColumns()`: the ghost cells), local columns for the library, `RowsWithGhosts()` for the
   program's U-AMG.
 
@@ -67,5 +85,6 @@ program too).
 
 `fhhos4_mpi_tests` (`tests/MPI`, own `main()`, `ctest -R MPI_np`: 1-4 processes; `tests/support/PartitionedSystem.h`;
 `MUMPSTest.cpp`: the coarse solver alone, with an empty first process, MUMPS's host);
-`ctest -R ProgramMPI` (the program under `mpiexec`, L2 errors); in an MPI build, `fhhos4_tests` uses
+`ctest -R ProgramMPI` (the program under `mpiexec`, L2 errors; `ProgramMPI_PartitionCache_*`: a partition written,
+read by the next run, refused for another number of processes, in `build-mpi/test_partition_cache`); in an MPI build, `fhhos4_tests` uses
 `tests/MPI/main.cpp` (MPI initialized), `ToySolver()` sets `Comm = MPI_COMM_SELF`.

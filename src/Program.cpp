@@ -20,6 +20,8 @@ void ProgramDim<Dim>::InitGlobalState(const ProgramArguments& args)
 {
 	Utils::ProgramArgs = args;
 	Mesh<Dim>::SetDirectories();
+	if (!args.CacheDirectory.empty())
+		Mesh<Dim>::CacheDirectory = args.CacheDirectory + "/";
 	GMSHMesh<Dim>::GMSHLogEnabled = args.Actions.GMSHLogEnabled;
 	GMSHMesh<Dim>::UseCache = args.Actions.UseCache;
 }

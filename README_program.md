@@ -121,7 +121,8 @@ The program reads and writes:
   (in the build directory, a link to `data/meshes`; in the installation, a copy). The environment variable
   `FHHOS4_DATA_DIR` replaces `share/fhhos4`.
 - the exported files: `./out` in the working directory, or `-o <directory>`.
-- the cache of the GMSH meshes: `$XDG_CACHE_HOME/fhhos4`, by default `~/.cache/fhhos4` (`-no-cache` to bypass it).
+- the cache of the GMSH meshes: `$XDG_CACHE_HOME/fhhos4`, by default `~/.cache/fhhos4`, or `-cache-dir <directory>`
+  (`-no-cache` to bypass it). On several processes, it also keeps the partitions of the meshes (see below).
 
 ### 7. (Optional) Several processes (MPI)
 
@@ -136,12 +137,16 @@ mpiexec -n 4 ./bin/fhhos4 -geo cube -mesh tetra -n 16 -k 1 -s fcglibuamg
   unless `mpiexec` binds them to distinct cores) divided among them, and in the solvers one per physical core divided
   among them; `OMP_NUM_THREADS` or `-threads` set them (e.g. `OMP_NUM_THREADS=2 mpiexec -n 4 -bind-to core:2 ...` with
   MPICH).
-- The mesh is built by every process (the first one first: it writes GMSH's cache, which the others read), then
-  partitioned by GMSH (METIS) into one part per process. The system is solved by U-AMG distributed by rows: each process
-  owns the cells of its part and the faces between them, and the faces between two processes belong to the one of
-  smaller rank; it assembles its rows, from the local matrices of its cells and of the other cells of its faces. Each
-  process aggregates its own cells: the number of iterations may change slightly with the number of processes. The
-  solution is then gathered on every process, and each one post-processes its cells (the L2 error is summed over all). The messages are printed by the first process; the errors, by the one where they occur.
+- The mesh is partitioned by GMSH (METIS) into one part per process, by the first process, which loads the whole mesh.
+  The partition is kept in the cache directory, `<mesh>_<number of processes>parts`: the next runs on as many
+  processes read it, and the first process doesn't load the mesh (a partition made for another number of processes is
+  refused: delete its directory). On several nodes, the cache directory must be shared by them: `-cache-dir`, e.g. on
+  the scratch of a cluster. With `-no-cache`, the partition is written there, then deleted. Each process builds its
+  part only: its cells and the other cells of their faces. The system is solved by U-AMG distributed by rows: each process owns the
+  cells of its part and the faces between them, and the faces between two processes belong to the one of smaller rank;
+  it assembles its rows, from the local matrices of its cells and of the other cells of their faces. Each process
+  aggregates its own cells: the number of iterations may change slightly with the number of processes. Each process
+  then post-processes its cells (the L2 error is summed over all). The messages are printed by the first process; the errors, by the one where they occur.
 - Available: the diffusion problem discretized by HHO (`-pb diff -discr hho`), with static condensation, on GMSH meshes
   (`-mesher gmsh`, GMSH's by default for some meshes, e.g. `-mesh tetra`); U-AMG through the library
   (`-s fcglibuamg`, `libuamg`, `gcrlibuamg`) or the program's (`-s fcguamg`, `uamg`, `gcruamg`), also with

@@ -10,8 +10,10 @@ MPI (2026-10-20) targets U-AMG in the library, for DOLFINx (where MPI is mandato
 - Each process aggregates its own cells: the iteration counts may vary with the number of processes.
 - The program assembles the matrix by recomputing rather than communicating: each process computes the local
   matrices of its own cells and of the other cells of its faces (a layer of ghost cells), so that the rows of its faces
-  are complete with no exchange. The library, which receives rows and has no mesh, adds the rows of the ghosts to their
-  owners.
+  are complete with no exchange. Its mesh is that part only, read from GMSH's partitioned files (one per process, with
+  GMSH's ghost cells, of which it keeps those across its faces); what the files lack (the global numbers, the physical
+  parts and the boundary faces of the ghosts) is asked to their processes. The library, which receives rows and has no
+  mesh, adds the rows of the ghosts to their owners.
 - The library's layout is DOLFINx's, PETSc's and hypre's: each process gives the rows of its own cells and faces, the
   columns numbered locally (own, then ghosts), with the global numbers of its ghosts.
 - `Solver::Comm` has no default (ADR-0005).

@@ -35,7 +35,8 @@ private:
 	vector<Diff_HHOFace<Dim>> _hhoFaces;
 
 	bool _restricted = false; // Restrict()
-	vector<Element<Dim>*> _elements, _ownElements;
+	vector<Element<Dim>*> _ownElements;
+	vector<Face<Dim>*> _ownBoundaryFaces;
 public:
 	Mesh<Dim>* _mesh;
 	DiffusionTestCase<Dim>* TestCase;
@@ -89,21 +90,19 @@ public:
 		this->_mesh->RenumberFacesInOrder_IntNeumDirich();
 	}
 
-	// On several processes, before Assemble(): the local matrices computed on elements only (the cells of the process and
-	// the other cells of its faces, whose rows are then complete), the post-processing on ownElements (its cells), the sums
-	// over the elements on ownElements, reduced over the processes. The vectors of the problem keep the numbers of the
-	// whole mesh (0 or not computed elsewhere). The HHO faces are those of the whole mesh.
-	void Restrict(vector<Element<Dim>*> elements, vector<Element<Dim>*> ownElements)
+	// On several processes, before Assemble(), the mesh being the part of the process (its cells and the other cells of
+	// their faces, whose rows are then complete: GMSHMesh): the post-processing on ownElements (its cells), the sums on
+	// them (and on their faces on the boundary), reduced over the processes
+	void Restrict(vector<Element<Dim>*> ownElements)
 	{
 		_restricted = true;
-		_elements = std::move(elements);
 		_ownElements = std::move(ownElements);
-	}
-
-	// The elements of the computations (all those of the mesh unless Restrict())
-	const vector<Element<Dim>*>& Elements() const
-	{
-		return _restricted ? _elements : _mesh->Elements;
+		vector<char> own(_mesh->Elements.size(), 0);
+		for (Element<Dim>* e : _ownElements)
+			own[e->Number] = 1;
+		for (Face<Dim>* f : _mesh->BoundaryFaces)
+			if (own[f->Element1->Number])
+				_ownBoundaryFaces.push_back(f);
 	}
 
 	const vector<Element<Dim>*>& OwnElements() const
@@ -283,7 +282,7 @@ public:
 		nCoeffs_localElemMatrices += nCoeffs_P; // P (reconstructor)
 		size_t localElemMatricesMemory = nCoeffs_localElemMatrices * sizeof(double);
 
-		const vector<Element<Dim>*>& elements = Elements();
+		const vector<Element<Dim>*>& elements = mesh->Elements;
 		size_t totalElemLocalMatricesMemory = elements.size() * localElemMatricesMemory;
 
 		// Face local matrices
@@ -525,7 +524,7 @@ public:
 		if (!this->_staticCondensation || this->_saveMatrixBlocks)
 			A_T_T_Coeffs.Reserve(elements.size() * nCoeffs_A_T_T);
 		A_T_F_Coeffs.Reserve(elements.size() * nCoeffs_A_T_F);
-		A_F_F_Coeffs.Reserve(mesh->Faces.size() * elements.size() / mesh->Elements.size() * nCoeffs_A_F_F); // (the faces of the elements, roughly)
+		A_F_F_Coeffs.Reserve(mesh->Faces.size() * nCoeffs_A_F_F);
 
 		BigNumber nnzApproximate = elements.size() * nCoeffs_A_T;
 		NonZeroCoefficients consistencyCoeffs(actions.Export.AssemblyTermMatrices ? nnzApproximate : 0);
@@ -731,10 +730,10 @@ public:
 		InitHHO_Faces();
 		InitHHO_Elements(assembleLocalMatrices);
 
-		CellSpace             = HHOCellSpace            (_mesh, HHO, _hhoElements, Elements(), OwnElements());
+		CellSpace             = HHOCellSpace            (_mesh, HHO, _hhoElements, _mesh->Elements, OwnElements());
 		ReconstructSpace      = HHOReconstructSpace     (_mesh, HHO, _hhoElements, OwnElements(), OwnElements());
 		SkeletonSpace         = HHOSkeletonSpace        (_mesh, HHO, _hhoFaces);
-		BoundarySpace         = HHOBoundarySpace        (_mesh, HHO, _hhoFaces);
+		BoundarySpace         = HHOBoundarySpace        (_mesh, HHO, _hhoFaces, _restricted ? _ownBoundaryFaces : _mesh->BoundaryFaces);
 		DirichletSpace        = HHODirichletSpace       (_mesh, HHO, _hhoFaces);
 		NeumannSpace          = HHONeumannSpace         (_mesh, HHO, _hhoFaces);
 		NonDirichletFaceSpace = HHONonDirichletFaceSpace(_mesh, HHO, _hhoFaces);
@@ -761,7 +760,7 @@ public:
 		_hhoElements = vector<Diff_HHOElement<Dim>>(this->_mesh->Elements.size());
 
 		#pragma omp parallel for
-		for (Element<Dim>* e : Elements())
+		for (Element<Dim>* e : this->_mesh->Elements)
 		{
 			_hhoElements[e->Number].MeshElement = e;
 
@@ -792,7 +791,7 @@ public:
 			return FirstCoeffOfBlocks(CellSpace.Project(Utils::ConstantFunctionOne), HHO->nCellUnknowns, "cell");
 		Vector interp = Vector::Zero(HHO->nElements);
 		#pragma omp parallel for
-		for (Element<Dim>* e : Elements())
+		for (Element<Dim>* e : _mesh->Elements)
 			interp[e->Number] = 1 / HHOElement(e)->CellBasis->LocalFunctions()[0]->Eval(RefPoint());
 		return interp;
 	}

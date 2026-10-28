@@ -62,7 +62,7 @@ headers, CMake package. No path of the sources is compiled in (`Utils/FileSystem
 from its own location (`<bin>/../share/fhhos4`, a link to `data/meshes` in the build tree; `FHHOS4_DATA_DIR`
 overrides; a data file not found is a `Utils::FatalError(FileSystem::DataFileNotFound(...))`, which tells how to set
 it), writes its exports in `./out` (working directory, `-o`), its GMSH mesh cache in `~/.cache/fhhos4`
-(`XDG_CACHE_HOME`), and its temporary files in the system's temporary directory, named after the process id.
+(`XDG_CACHE_HOME`, `-cache-dir`; on several processes also the partitions of the meshes), and its temporary files in the system's temporary directory, named after the process id.
 
 ## Test
 

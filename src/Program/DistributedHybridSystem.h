@@ -3,36 +3,34 @@
 #include "../Utils/DistributedMatrix.h"
 using namespace std;
 
-// On several processes (MPI): the hybrid system, in the numbering of the whole mesh, whose rows of the cells and faces of
-// each process are assembled by it (the others may be missing), distributed by rows for the solver. The cells of each
-// process are given by a partition (GMSH's); each face belongs to the process of the smaller rank among those of its
-// cells. The cells and faces are renumbered so that each process owns contiguous ones, in rank order (in their order on
-// each process): the global numbers of the distributed blocks.
+// On several processes (MPI): the hybrid system of the part of the mesh of each process (its cells and the other cells
+// of their faces: GMSHMesh), in its local numbering, whose rows of its cells and faces are complete (the others may be
+// missing), distributed by rows for the solver. Each cell and face has a global number, those of each process
+// contiguous, in rank order: the global numbers of the distributed blocks.
 class DistributedHybridSystem
 {
 public:
 	const Communicator& Comm;
 	int CellBlockSize;
 	int FaceBlockSize;
-	vector<BigNumber> NewCell, NewFace; // the new numbers of the cells and faces
+	vector<BigNumber> NewCell, NewFace; // the global numbers of the cells and faces of the system of the process
 	shared_ptr<const IndexMap> Cells;   // their ownership, without ghosts
 	shared_ptr<const IndexMap> Faces;
-	shared_ptr<const IndexMap> FaceMap; // the faces of the rows of the process: its own, then the others (by increasing new number)
+	shared_ptr<const IndexMap> FaceMap; // the faces of the rows of the process: its own, then the others (by increasing global number)
 
-	// cellRank, faceRank: the process of each cell and face, by number; A_T_F, A_F_F: the blocks (their rows of the
-	// process), to find the faces of the process's rows (the faces of its cells, and those coupled to its faces through
-	// the cells of other processes)
-	DistributedHybridSystem(const Communicator& comm, const vector<int>& cellRank, const vector<int>& faceRank, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F, int cellBlockSize, int faceBlockSize)
-		: Comm(comm), CellBlockSize(cellBlockSize), FaceBlockSize(faceBlockSize)
+	// cellNumbers, faceNumbers: the global numbers of the cells and faces of the process, by local number, nOwnCells and
+	// nOwnFaces of which are its own; A_T_F, A_F_F: the blocks (their rows of the process), to find the faces of the
+	// process's rows (the faces of its cells, and those coupled to its faces through the cells of other processes)
+	DistributedHybridSystem(const Communicator& comm, vector<BigNumber> cellNumbers, BigNumber nOwnCells, vector<BigNumber> faceNumbers, BigNumber nOwnFaces,
+	                        const SparseMatrix& A_T_F, const SparseMatrix& A_F_F, int cellBlockSize, int faceBlockSize)
+		: Comm(comm), CellBlockSize(cellBlockSize), FaceBlockSize(faceBlockSize), NewCell(std::move(cellNumbers)), NewFace(std::move(faceNumbers))
 	{
-		NewCell = Renumbering(cellRank, comm.Size());
-		NewFace = Renumbering(faceRank, comm.Size());
-		Cells = make_shared<const IndexMap>(comm, (BigNumber)count(cellRank.begin(), cellRank.end(), comm.Rank()));
-		Faces = make_shared<const IndexMap>(comm, (BigNumber)count(faceRank.begin(), faceRank.end(), comm.Rank()));
+		Cells = make_shared<const IndexMap>(comm, nOwnCells);
+		Faces = make_shared<const IndexMap>(comm, nOwnFaces);
 		vector<BigNumber> ghosts;
-		for (BigNumber T = 0; T < (BigNumber)cellRank.size(); T++)
+		for (BigNumber T = 0; T < (BigNumber)NewCell.size(); T++)
 		{
-			if (cellRank[T] != comm.Rank())
+			if (!Cells->IsOwned(NewCell[T]))
 				continue;
 			for (int k = 0; k < cellBlockSize; k++)
 				for (SparseMatrix::InnerIterator it(A_T_F, T * cellBlockSize + k); it; ++it)
@@ -42,9 +40,9 @@ public:
 						ghosts.push_back(f);
 				}
 		}
-		for (BigNumber F = 0; F < (BigNumber)faceRank.size(); F++)
+		for (BigNumber F = 0; F < (BigNumber)NewFace.size(); F++)
 		{
-			if (faceRank[F] != comm.Rank())
+			if (!Faces->IsOwned(NewFace[F]))
 				continue;
 			for (int k = 0; k < faceBlockSize; k++)
 				for (SparseMatrix::InnerIterator it(A_F_F, F * faceBlockSize + k); it; ++it)
@@ -57,7 +55,7 @@ public:
 		FaceMap = make_shared<const IndexMap>(*Faces, std::move(ghosts));
 	}
 
-	// The rows of M of the cells (rowBlockSize = CellBlockSize) or faces of the process, in their new order, the columns
+	// The rows of M of the cells (rowBlockSize = CellBlockSize) or faces of the process, in their global order, the columns
 	// of the faces (colsAreFaces) or of the cells renumbered: global (local false), or in FaceMap (local true)
 	SparseMatrix Rows(const SparseMatrix& M, bool rowsAreCells, bool colsAreFaces, bool local) const
 	{
@@ -70,7 +68,7 @@ public:
 		for (BigNumber i = 0; i < (BigNumber)newRow.size(); i++)
 			if (rowMap.IsOwned(newRow[i]))
 				oldRow[newRow[i] - rowMap.Begin] = i;
-		BigNumber nCols = local ? FaceMap->NLocal() * cbs : (BigNumber)newCol.size() * cbs;
+		BigNumber nCols = (local ? FaceMap->NLocal() : (colsAreFaces ? Faces : Cells)->GlobalSize) * cbs;
 		ThreadLocal<vector<pair<SparseMatrixIndex, double>>> rowsTL;
 		return SparseMatrixOps::BuildByRows(rowMap.NOwned * rbs, nCols, 1, [&](BigNumber firstRow, BigNumber lastRow, SparseMatrixOps::RowChunk& chunk)
 		{
@@ -113,16 +111,20 @@ public:
 		return own;
 	}
 
-	// The whole vector, in the original numbering, on every process, from the values of the cells or faces of each
-	// process. Collective.
-	Vector Gather(const Vector& own, bool cells, int blockSize) const
+	// The vector of the cells or faces of the process (by local number), from the values of its own ones: those of the
+	// faces of its rows (FaceMap: among which the faces of its cells) from their processes, the others 0. Collective.
+	Vector Local(const Vector& own, bool cells, int blockSize) const
 	{
-		const vector<BigNumber>& newNumber = cells ? NewCell : NewFace;
-		vector<double> values(own.data(), own.data() + own.rows());
-		vector<double> all = Comm.AllGatherV(values);
-		Vector v(newNumber.size() * blockSize);
-		for (BigNumber i = 0; i < (BigNumber)newNumber.size(); i++)
-			v.segment(i * blockSize, blockSize) = Eigen::Map<const Vector>(all.data() + newNumber[i] * blockSize, blockSize);
+		const vector<BigNumber>& globalNumber = cells ? NewCell : NewFace;
+		const IndexMap& map = cells ? *Cells : *FaceMap;
+		Vector withGhosts = cells ? own : FaceMap->WithGhosts(own, blockSize);
+		Vector v = Vector::Zero(globalNumber.size() * blockSize);
+		for (BigNumber i = 0; i < (BigNumber)globalNumber.size(); i++)
+		{
+			BigNumber j = map.Local(globalNumber[i]);
+			if (j >= 0)
+				v.segment(i * blockSize, blockSize) = withGhosts.segment(j * blockSize, blockSize);
+		}
 		return v;
 	}
 
@@ -130,20 +132,5 @@ public:
 	vector<int64_t> GhostFaces() const
 	{
 		return vector<int64_t>(FaceMap->Ghosts.begin(), FaceMap->Ghosts.end());
-	}
-
-private:
-	// The new numbers: by rank, then in the old order
-	static vector<BigNumber> Renumbering(const vector<int>& rank, int nRanks)
-	{
-		vector<BigNumber> next(nRanks + 1, 0);
-		for (int r : rank)
-			next[r + 1]++;
-		for (int r = 0; r < nRanks; r++)
-			next[r + 1] += next[r];
-		vector<BigNumber> renumbering(rank.size());
-		for (size_t i = 0; i < rank.size(); i++)
-			renumbering[i] = next[rank[i]]++;
-		return renumbering;
 	}
 };

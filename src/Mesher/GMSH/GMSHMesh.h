@@ -1,6 +1,8 @@
 #pragma once
+#include <array>
 #include <gmsh.h>
 #include "../../Mesh/PolyhedralMesh.h"
+#include "../../Utils/Communicator.h"
 #ifdef ENABLE_2D
 	#include "../InHouse/Square_TriangularMesh.h"
 #endif
@@ -40,6 +42,9 @@ protected:
 
 	map<size_t, Element<Dim>*> _elementExternalNumbers;
 	map<size_t, MeshVertex<Dim>*> _vertexExternalNumbers;
+	vector<size_t> _vertexTags;    // the GMSH tag of each vertex, by number
+	bool _part = false;            // the part of a process (OpenPart())
+	map<size_t, int> _ghostRanks;  // in a part, the process of each ghost cell kept, by GMSH tag
 	double _h = -1;
 	double _average_h = -1;
 	double _regularity = 1;
@@ -50,6 +55,12 @@ private:
 public:
 	inline static bool GMSHLogEnabled = false;
 	inline static bool UseCache = true;
+
+	// On several processes (MPI), the part of the mesh of the process (GMSH's partition): its own elements and the other
+	// elements of their faces (the ghosts). The process of each element and its global number (contiguous by process, in
+	// rank order), by number. Empty on one process.
+	vector<int> ElementRanks;
+	vector<BigNumber> ElementGlobalNumbers;
 
 	GMSHMesh(TestCase<Dim>* testCase, string gmshFile, string description, string fileNamePart, BigNumber n = 0, bool buildMesh = true)
 		: PolyhedralMesh<Dim>()
@@ -69,12 +80,23 @@ public:
 
 		ManageGMSHLog();
 
+		// On several processes: the partition of the mesh (OpenPart()), in the cache if a previous run made it for as many
+		// processes (the first process then doesn't load the mesh)
+		const Communicator& comm = Communicator::Current();
+		string inCache = Mesh<Dim>::CacheDirectory + _geometryDescription + (n == 0 ? "" : "_N" + to_string(n));
+		string partition = inCache + "_" + to_string(comm.Size()) + "parts";
+		bool partitionInCache = comm.IsDistributed() && UseCache && comm.Any(comm.IsRoot() && filesystem::exists(partition));
+
 		bool tmpGeoFileCreated = false;
 		string mshFile;
 		string extension = FileSystem::Extension(gmshFile);
-		if (extension.compare("geo") == 0)
+		if (comm.IsDistributed() && (!comm.IsRoot() || partitionInCache))
 		{
-			string mshFileInCache = Mesh<Dim>::CacheDirectory + _geometryDescription + (n == 0 ? "" : "_N" + to_string(n)) + ".msh";
+			// only its part (OpenPart())
+		}
+		else if (extension.compare("geo") == 0)
+		{
+			string mshFileInCache = inCache + ".msh";
 
 			if (UseCache && FileSystem::FileExists(mshFileInCache))
 			{
@@ -126,8 +148,12 @@ public:
 		else
 			Utils::FatalError("Unknown file extension: '" + extension + "'. Only .geo and .msh allowed.");
 
+		if (comm.IsDistributed())
+			OpenPart(comm, partition, partitionInCache);
 		if (buildMesh)
 			Build();
+		if (comm.IsDistributed())
+			ExchangeGhosts(comm);
 	}
 
 	GMSHMesh(TestCase<Dim>* testCase, string geoFile, string description, string fileNamePart, string geometryDescription, BigNumber N = 0) :
@@ -167,37 +193,39 @@ public:
 		return d;
 	}
 
-	// On several processes: the partition of the elements by GMSH (METIS) into nParts parts, the part (0 to nParts - 1) of
-	// each element, by element number. The model of GMSH must still be open (before CloseGMSH()); it is unpartitioned
-	// after.
-	vector<int> PartitionElements(int nParts)
+	// On several processes, after the numbering of the faces by the problem: the global numbers of the faces of number
+	// < nFaces (those of the system), contiguous by process in rank order, each face belonging to the smaller process of
+	// its elements; nOwned: those of the process. The others are asked to their process: first the faces of its elements
+	// (both elements of such a face are in the part), then those of ghosts only, to the process of the ghost (which by
+	// then knows the numbers of all the faces of its elements). Collective.
+	vector<BigNumber> GlobalFaceNumbers(BigNumber nFaces, BigNumber& nOwned)
 	{
-		vector<int> part(this->Elements.size(), nParts == 1 ? 0 : -1);
-		if (nParts == 1)
-			return part;
-		gmsh::option::setNumber("Mesh.PartitionCreateTopology", 0);
-		gmsh::option::setNumber("Mesh.PartitionCreatePhysicals", 0);
-		gmsh::model::mesh::partition(nParts);
-		gmsh::vectorpair entities;
-		gmsh::model::getEntities(entities, Dim);
-		for (auto [dim, tag] : entities)
+		const Communicator& comm = Communicator::Current();
+		int rank = comm.Rank();
+		auto isOwn = [&](Element<Dim>* e) { return e && ElementRanks[e->Number] == rank; };
+		auto faceRank = [&](Face<Dim>* f) { return min(ElementRanks[f->Element1->Number], f->Element2 ? ElementRanks[f->Element2->Number] : rank); };
+		vector<Face<Dim>*> faces(nFaces); // by number
+		for (Face<Dim>* f : this->Faces)
+			if (f->Number < nFaces)
+				faces[f->Number] = f;
+		vector<Face<Dim>*> owned, ofOwnElements, ofGhostsOnly;
+		for (Face<Dim>* f : faces)
 		{
-			vector<int> partitions;
-			gmsh::model::getPartitions(dim, tag, partitions);
-			if (partitions.empty())
-				continue;
-			vector<int> types;
-			vector<vector<size_t>> elementTags, nodeTags;
-			gmsh::model::mesh::getElements(types, elementTags, nodeTags, dim, tag);
-			for (const vector<size_t>& tags : elementTags)
-				for (size_t t : tags)
-					part[GetElementFromGMSHTag(t)->Number] = partitions[0] - 1;
+			if (!isOwn(f->Element1) && !isOwn(f->Element2))
+				ofGhostsOnly.push_back(f);
+			else if (faceRank(f) == rank)
+				owned.push_back(f);
+			else
+				ofOwnElements.push_back(f);
 		}
-		gmsh::model::mesh::unpartition();
-		for (int p : part)
-			if (p < 0 || p >= nParts)
-				Utils::FatalError("GMSH's partition misses elements.");
-		return part;
+		nOwned = owned.size();
+		BigNumber begin = comm.ExclusiveScan(nOwned);
+		vector<BigNumber> global(nFaces, -1);
+		for (BigNumber i = 0; i < nOwned; i++)
+			global[owned[i]->Number] = begin + i;
+		AskFaceNumbers(comm, ofOwnElements, faceRank, global);
+		AskFaceNumbers(comm, ofGhostsOnly, [&](Face<Dim>* f) { return ElementRanks[f->Element1->Number]; }, global);
+		return global;
 	}
 
 	static void CloseGMSH()
@@ -289,6 +317,312 @@ private:
 			gmsh::option::setNumber("General.Terminal", 0);
 	}
 
+	// On several processes: the mesh partitioned by GMSH (METIS) into one part per process, with ghost cells (the cells of
+	// other parts that share a node with the part), in GMSH's split files in the directory partition (in the cache
+	// directory, which must be shared by the nodes: -cache-dir), by the first process unless inCache. Kept for the next
+	// runs on as many processes (written in a temporary directory renamed once complete: a run never reads an incomplete
+	// partition), or deleted with -no-cache. Each process opens its part, and keeps the ghost cells that share a face
+	// with its cells.
+	void OpenPart(const Communicator& comm, string partition, bool inCache)
+	{
+		vector<char> path;
+		if (comm.IsRoot() && inCache)
+			cout << "Partition of the mesh into " << comm.Size() << " parts read from the cache: " << partition << endl;
+		else if (comm.IsRoot())
+		{
+			cout << "Partition of the mesh into " << comm.Size() << " parts by GMSH..." << endl;
+			gmsh::option::setNumber("Mesh.PartitionCreateTopology", 0);
+			gmsh::option::setNumber("Mesh.PartitionCreatePhysicals", 0);
+			gmsh::option::setNumber("Mesh.PartitionCreateGhostCells", 1);
+			gmsh::option::setNumber("Mesh.PartitionSplitMeshFiles", 1);
+			gmsh::model::mesh::partition(comm.Size());
+			string written = partition + "_tmp" + to_string(getpid());
+			filesystem::create_directories(written);
+			gmsh::write(written + "/part.msh"); // one file per part: part_1.msh, part_2.msh...
+			error_code error;
+			if (!UseCache)
+				partition = written;
+			else
+				filesystem::rename(written, partition, error);
+			if (error && filesystem::exists(partition)) // written by a run at the same time: kept
+				filesystem::remove_all(written);
+			else if (error)
+				Utils::FatalError("Unable to rename " + written + " to " + partition + ": " + error.message());
+		}
+		if (comm.IsRoot())
+			path.assign(partition.begin(), partition.end());
+		comm.Broadcast(path);
+		partition.assign(path.begin(), path.end());
+
+		string file = partition + "/part_" + to_string(comm.Rank() + 1) + ".msh";
+		bool found = FileSystem::FileExists(file);
+		gmsh::clear();
+		if (found)
+			gmsh::open(file);
+		int nParts = found ? gmsh::model::getNumberOfPartitions() : comm.Size();
+		int otherNParts = comm.Max(nParts != comm.Size() ? nParts : 0);
+		if (otherNParts > 0)
+			Utils::FatalError("The partition of the mesh in " + partition + " (from a previous run) has " + to_string(otherNParts) + " parts, but the program runs on " + to_string(comm.Size()) + " processes. Delete this directory.");
+		if (comm.Any(!found))
+			Utils::FatalError((found ? "Some processes cannot read the partition of the mesh in " + partition : file + " not found") + ". On several nodes, the cache directory must be shared by them (-cache-dir, e.g. on the scratch of a cluster).");
+		if (!UseCache)
+		{
+			comm.Barrier(); // (all have read their part)
+			if (comm.IsRoot())
+				filesystem::remove_all(partition);
+		}
+		_part = true;
+		KeepGhostsOfFaces();
+	}
+
+	// In the part of a process: the ghost cells that share no face with a cell of the part are removed from GMSH's model;
+	// the process of the others is kept (_ghostRanks)
+	void KeepGhostsOfFaces()
+	{
+		gmsh::vectorpair entities;
+		gmsh::model::getEntities(entities, Dim);
+		vector<FaceKey> ownFaces;
+		vector<int> ghostEntities;
+		for (auto [dim, tag] : entities)
+		{
+			vector<size_t> ghosts;
+			vector<int> parts;
+			gmsh::model::mesh::getGhostElements(dim, tag, ghosts, parts);
+			for (size_t i = 0; i < ghosts.size(); i++)
+				_ghostRanks[ghosts[i]] = parts[i] - 1;
+			if (!ghosts.empty())
+			{
+				ghostEntities.push_back(tag);
+				continue;
+			}
+			vector<int> types;
+			gmsh::model::mesh::getElementTypes(types, dim, tag);
+			for (int type : types)
+			{
+				int n;
+				vector<size_t> nodes = FaceNodes(type, tag, n);
+				for (size_t i = 0; i < nodes.size(); i += n)
+					ownFaces.push_back(Key(&nodes[i], n));
+			}
+		}
+		sort(ownFaces.begin(), ownFaces.end());
+		for (int tag : ghostEntities)
+		{
+			vector<size_t> removed;
+			vector<int> types;
+			gmsh::model::mesh::getElementTypes(types, Dim, tag);
+			for (int type : types)
+			{
+				vector<size_t> elements, elementNodes;
+				gmsh::model::mesh::getElementsByType(type, elements, elementNodes, tag);
+				int n;
+				vector<size_t> nodes = FaceNodes(type, tag, n);
+				size_t nFaces = nodes.size() / n / elements.size();
+				for (size_t e = 0; e < elements.size(); e++)
+				{
+					bool ofOwnFace = false;
+					for (size_t f = 0; f < nFaces && !ofOwnFace; f++)
+						ofOwnFace = binary_search(ownFaces.begin(), ownFaces.end(), Key(&nodes[(e * nFaces + f) * n], n));
+					if (!ofOwnFace)
+					{
+						removed.push_back(elements[e]);
+						_ghostRanks.erase(elements[e]);
+					}
+				}
+			}
+			gmsh::model::mesh::removeElements(Dim, tag, removed); // (still in GMSH's list of the ghosts: not to be read after)
+		}
+	}
+
+	// On several processes, after Build(): the global numbers of the elements (own: contiguous by process; ghosts: given
+	// by their process), the physical part of the ghosts and those of their faces with one element in the part that are
+	// on the boundary of the domain (with their boundary part), asked to the process of each ghost: the others lie
+	// between the ghost and an element of another part (not in this one). _h, the regularity and the average h: those of
+	// the whole mesh.
+	void ExchangeGhosts(const Communicator& comm)
+	{
+		int rank = comm.Rank();
+		ElementRanks.assign(this->Elements.size(), rank);
+		for (Element<Dim>* e : this->Elements)
+		{
+			auto it = _ghostRanks.find(e->Id);
+			if (it != _ghostRanks.end())
+				ElementRanks[e->Number] = it->second;
+		}
+		BigNumber nOwned = count(ElementRanks.begin(), ElementRanks.end(), rank);
+		BigNumber next = comm.ExclusiveScan(nOwned);
+		ElementGlobalNumbers.assign(this->Elements.size(), -1);
+		double sum_h = 0;
+		vector<vector<BigNumber>> requests(comm.Size());
+		vector<vector<Element<Dim>*>> asked(comm.Size());
+		for (Element<Dim>* e : this->Elements)
+		{
+			int r = ElementRanks[e->Number];
+			if (r == rank)
+			{
+				if (!e->PhysicalPart)
+					Utils::FatalError("Element " + to_string(e->Id) + " has no physical part. Check GMSH file.");
+				ElementGlobalNumbers[e->Number] = next++;
+				sum_h += e->Diameter();
+			}
+			else
+			{
+				requests[r].push_back(e->Id);
+				asked[r].push_back(e);
+			}
+		}
+
+		// Reply for each element asked: its number, its physical part, its number of faces on the boundary of the domain,
+		// then for each of them its key and its boundary part (-1: none)
+		vector<vector<BigNumber>> received = comm.AllToAll(requests);
+		vector<vector<BigNumber>> replies(comm.Size());
+		for (int r = 0; r < comm.Size(); r++)
+		{
+			vector<BigNumber>& reply = replies[r];
+			for (BigNumber tag : received[r])
+			{
+				Element<Dim>* e = GetElementFromGMSHTag(tag);
+				reply.push_back(ElementGlobalNumbers[e->Number]);
+				reply.push_back(e->PhysicalPart->Id);
+				size_t nBoundaryFaces = reply.size();
+				reply.push_back(0);
+				for (Face<Dim>* f : e->Faces)
+				{
+					if (!f->IsDomainBoundary)
+						continue;
+					FaceKey key = Key(f);
+					reply.insert(reply.end(), key.begin(), key.end());
+					reply.push_back(f->BoundaryPart ? f->BoundaryPart->Id : -1);
+					reply[nBoundaryFaces]++;
+				}
+			}
+		}
+		vector<vector<BigNumber>> answers = comm.AllToAll(replies);
+		for (int r = 0; r < comm.Size(); r++)
+		{
+			const BigNumber* a = answers[r].data();
+			for (Element<Dim>* e : asked[r])
+			{
+				ElementGlobalNumbers[e->Number] = *a++;
+				e->PhysicalPart = this->GetPhysicalGroup(*a++);
+				const BigNumber* boundaryFaces = a + 1;
+				a = boundaryFaces + *a * (KeySize + 1);
+				for (Face<Dim>* f : e->Faces)
+				{
+					if (f->Element2) // (between two elements of the part)
+						continue;
+					FaceKey key = Key(f);
+					f->IsDomainBoundary = false;
+					f->BoundaryPart = nullptr;
+					for (const BigNumber* b = boundaryFaces; b < a; b += KeySize + 1)
+					{
+						if (equal(key.begin(), key.end(), b))
+						{
+							f->IsDomainBoundary = true;
+							f->BoundaryPart = b[KeySize] < 0 ? nullptr : this->GetBoundaryGroup(b[KeySize]);
+						}
+					}
+				}
+			}
+		}
+		this->BoundaryFaces.clear();
+		this->InteriorFaces.clear();
+		this->FillBoundaryAndInteriorFaceLists();
+
+		_h = comm.Max(_h);
+		_regularity = comm.Min(_regularity);
+		_average_h = comm.Sum(sum_h) / comm.Sum(nOwned);
+	}
+
+	// A face known by several processes: the GMSH tags of its vertices, sorted (then 0)
+	static constexpr int KeySize = 4;
+	using FaceKey = array<BigNumber, KeySize>;
+
+	static FaceKey Key(const size_t* nodeTags, int nNodes)
+	{
+		FaceKey key{};
+		copy(nodeTags, nodeTags + nNodes, key.begin());
+		sort(key.begin(), key.begin() + nNodes);
+		return key;
+	}
+
+	FaceKey Key(Face<Dim>* f) const
+	{
+		vector<size_t> tags;
+		for (Vertex* v : f->Vertices())
+			tags.push_back(_vertexTags[v->Number]);
+		return Key(tags.data(), tags.size());
+	}
+
+	// The face whose vertices have the GMSH tags of key (nullptr if none)
+	Face<Dim>* FaceWithKey(const BigNumber* key)
+	{
+		vector<MeshVertex<Dim>*> vertices;
+		for (int i = 0; i < KeySize && key[i] != 0; i++)
+		{
+			MeshVertex<Dim>* v = GetVertexFromGMSHTag(key[i]);
+			if (!v)
+				return nullptr;
+			vertices.push_back(v);
+		}
+		return vertices.empty() ? nullptr : this->ExistingFaceWithVertices(vertices);
+	}
+
+	// The global numbers (global, by face number) of faces, asked to the process owner(f) of each, which knows them.
+	// Collective.
+	template <class Owner>
+	void AskFaceNumbers(const Communicator& comm, const vector<Face<Dim>*>& faces, Owner owner, vector<BigNumber>& global)
+	{
+		vector<vector<BigNumber>> requests(comm.Size());
+		vector<vector<Face<Dim>*>> asked(comm.Size());
+		for (Face<Dim>* f : faces)
+		{
+			int r = owner(f);
+			FaceKey key = Key(f);
+			requests[r].insert(requests[r].end(), key.begin(), key.end());
+			asked[r].push_back(f);
+		}
+		vector<vector<BigNumber>> received = comm.AllToAll(requests);
+		vector<vector<BigNumber>> replies(comm.Size());
+		for (int r = 0; r < comm.Size(); r++)
+		{
+			for (size_t q = 0; q < received[r].size(); q += KeySize)
+			{
+				Face<Dim>* f = FaceWithKey(&received[r][q]);
+				replies[r].push_back(f && f->Number < (BigNumber)global.size() ? global[f->Number] : -1);
+			}
+		}
+		vector<vector<BigNumber>> answers = comm.AllToAll(replies);
+		bool unknown = false;
+		for (int r = 0; r < comm.Size(); r++)
+		{
+			for (size_t q = 0; q < asked[r].size(); q++)
+			{
+				global[asked[r][q]->Number] = answers[r][q];
+				unknown = unknown || answers[r][q] < 0;
+			}
+		}
+		if (comm.Any(unknown))
+			Utils::FatalError("GMSHMesh: a face of the system is unknown to the process asked for its number.");
+	}
+
+	// Defined at the end of the file for each Dim: the GMSH tags of the vertices of the faces of the elements of type
+	// elemType of the entity tag (-1: all), by element (in GMSH's order), nFaceNodes per face
+	static vector<size_t> FaceNodes(int elemType, int tag, int& nFaceNodes) { assert(false); return {}; }
+
+	// In the part of a process: the vertices of a face (in the order of a cycle) in an order that depends only on their
+	// GMSH tags, the same on all the processes, which then orient the face (and its basis) alike: from the smallest tag,
+	// towards the smaller of its two neighbours in the cycle. Elsewhere, the order of the first element of the face.
+	void OrientAlikeOnAllProcesses(vector<MeshVertex<Dim>*>& vertices) const
+	{
+		if (!_part)
+			return;
+		auto smallerTag = [this](MeshVertex<Dim>* a, MeshVertex<Dim>* b) { return _vertexTags[a->Number] < _vertexTags[b->Number]; };
+		rotate(vertices.begin(), min_element(vertices.begin(), vertices.end(), smallerTag), vertices.end());
+		if (vertices.size() > 2 && smallerTag(vertices.back(), vertices[1]))
+			reverse(vertices.begin() + 1, vertices.end());
+	}
+
 	void Build()
 	{
 		//-----------------//
@@ -297,6 +631,9 @@ private:
 
 		const int DefaultPhyGroup = -1;
 
+		// The part of a process (OpenPart()): its nodes are on entities of all dimensions, the entities of the other parts
+		// are empty, the ghost cells have no physical group (given by their process, ExchangeGhosts()), and the nodes of
+		// some geometric points are in other parts
 		if (this->PhysicalParts.empty())
 		{
 			this->PhysicalParts = GetPhysicalGroups();
@@ -320,7 +657,7 @@ private:
 		vector<double> parametricCoord;
 		bool returnParametricCoord = false;
 		bool includeBoundary = true;
-		gmsh::model::mesh::getNodes(nodeTags, coord, parametricCoord, Dim, -1, includeBoundary, returnParametricCoord);
+		gmsh::model::mesh::getNodes(nodeTags, coord, parametricCoord, _part ? -1 : Dim, -1, includeBoundary, returnParametricCoord);
 
 		// If .geo file, the mesh hasn't been generated
 		if (nodeTags.empty())
@@ -334,6 +671,7 @@ private:
 			{
 				MeshVertex<Dim>* v = new MeshVertex<Dim>(vertexNumber, coord[3 * i], coord[3 * i + 1], coord[3 * i + 2]);
 				_vertexExternalNumbers.insert({ nodeTags[i], v });
+				_vertexTags.push_back(nodeTags[i]);
 				this->Vertices.push_back(v);
 				vertexNumber++;
 			}
@@ -378,6 +716,8 @@ private:
 				Utils::Warning("Multiple mesh vertices have been found for the geometric point " + to_string(pointTag) + ". Using the first one.");
 			
 			MeshVertex<Dim>* v = GetVertexFromGMSHTag(nodeTags[0]);
+			if (!v && _part)
+				continue;
 			if (!v)
 				Utils::Warning("The GMSH node of tag " + to_string(nodeTags[0]) + " corresponding to the geometric point " + to_string(pointTag) + " has not been found in the node list given by GMSH.");
 			this->_geometricVertices.insert(v);
@@ -473,7 +813,7 @@ private:
 			if (physicalTags.empty())
 			{
 				physicalPart = this->GetPhysicalGroup(DefaultPhyGroup);
-				if (!physicalPart)
+				if (!physicalPart && !_part)
 					Utils::FatalError("Entity " + to_string(entityTag) + " has no physical part. Check GMSH file.");
 			}
 			else
@@ -501,6 +841,8 @@ private:
 			vector<vector<size_t>> elemNodeTags;
 			gmsh::model::mesh::getElements(entityElementTypes, elementTags, elemNodeTags, Dim, entityTag);
 
+			if (entityElementTypes.empty() && _part)
+				continue;
 			if (entityElementTypes.empty())
 				Utils::FatalError("No element type returned by GMSH for entity " + to_string(entityTag) + "!");
 
@@ -1681,11 +2023,20 @@ inline void GMSHMesh<2>::AllocateContiguousMemoryForFaces(GMSHFaceTypes faceType
 }
 
 template <>
-inline void GMSHMesh<2>::CreateFaces(int elemType, BigNumber& faceNumber)
+inline vector<size_t> GMSHMesh<2>::FaceNodes(int elemType, int tag, int& nFaceNodes)
 {
 	vector<size_t> edgeNodes;
 	bool onlyPrimaryNodes = true;
-	gmsh::model::mesh::getElementEdgeNodes(elemType, edgeNodes, -1, onlyPrimaryNodes);
+	gmsh::model::mesh::getElementEdgeNodes(elemType, edgeNodes, tag, onlyPrimaryNodes);
+	nFaceNodes = 2;
+	return edgeNodes;
+}
+
+template <>
+inline void GMSHMesh<2>::CreateFaces(int elemType, BigNumber& faceNumber)
+{
+	int nFaceNodes;
+	vector<size_t> edgeNodes = FaceNodes(elemType, -1, nFaceNodes);
 
 	AllocateContiguousMemoryForFaces(GMSHFaceTypes::GMSH_SegmentFace, edgeNodes.size() / 2);
 
@@ -1697,6 +2048,10 @@ inline void GMSHMesh<2>::CreateFaces(int elemType, BigNumber& faceNumber)
 			Utils::FatalError("No GMSH node of tag " + to_string(edgeNodes[j]));
 		if (!v2)
 			Utils::FatalError("No GMSH node of tag " + to_string(edgeNodes[j + 1]));
+		vector<MeshVertex<2>*> ends = { v1, v2 };
+		OrientAlikeOnAllProcesses(ends);
+		v1 = ends[0];
+		v2 = ends[1];
 
 		bool edgeAlreadyExists = false;
 		for (Face<2>* f : v1->Faces)
@@ -1779,26 +2134,25 @@ inline void GMSHMesh<3>::AllocateContiguousMemoryForFaces(GMSHFaceTypes faceType
 }
 
 template <>
-inline void GMSHMesh<3>::CreateFaces(int elemType, BigNumber& faceNumber)
+inline vector<size_t> GMSHMesh<3>::FaceNodes(int elemType, int tag, int& nFaceNodes)
 {
-	GMSHFaceTypes faceType;
-	int nFaceVertices = -1;
-	if (elemType == GMSHElementTypes::GMSH_Tetrahedron)
-	{
-		faceType = GMSHFaceTypes::GMSH_TriangleFace;
-		nFaceVertices = 3;
-	}
-	else if (elemType == GMSHElementTypes::GMSH_Hexahedron)
-	{
-		faceType = GMSHFaceTypes::GMSH_QuadrilateralFace;
-		nFaceVertices = 4;
-	}
-	else
-		assert(false);
+	if (elemType != GMSHElementTypes::GMSH_Tetrahedron && elemType != GMSHElementTypes::GMSH_Hexahedron)
+		Utils::FatalError("GMSH element type not managed.");
+	GMSHFaceTypes faceType = elemType == GMSHElementTypes::GMSH_Tetrahedron ? GMSHFaceTypes::GMSH_TriangleFace : GMSHFaceTypes::GMSH_QuadrilateralFace;
+	nFaceNodes = faceType; // (the number of vertices of the face)
 
 	vector<size_t> faceNodes;
 	bool onlyPrimaryNodes = true;
-	gmsh::model::mesh::getElementFaceNodes(elemType, faceType, faceNodes, -1, onlyPrimaryNodes);
+	gmsh::model::mesh::getElementFaceNodes(elemType, faceType, faceNodes, tag, onlyPrimaryNodes);
+	return faceNodes;
+}
+
+template <>
+inline void GMSHMesh<3>::CreateFaces(int elemType, BigNumber& faceNumber)
+{
+	int nFaceVertices;
+	vector<size_t> faceNodes = FaceNodes(elemType, -1, nFaceVertices);
+	GMSHFaceTypes faceType = (GMSHFaceTypes)nFaceVertices;
 
 	AllocateContiguousMemoryForFaces(faceType, faceNodes.size() / nFaceVertices);
 
@@ -1810,6 +2164,7 @@ inline void GMSHMesh<3>::CreateFaces(int elemType, BigNumber& faceNumber)
 			MeshVertex<3>* v = (MeshVertex<3>*)GetVertexFromGMSHTag(faceNodes[j+k]);
 			vertices[k] = v;
 		}
+		OrientAlikeOnAllProcesses(vertices);
 
 		// Check if a face with those vertices already exists
 		bool faceAlreadyExists = false;

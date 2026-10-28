@@ -47,7 +47,10 @@ public:
 
 	double Measure() override
 	{
-		return _mesh->Measure();
+		double measure = 0;
+		for (Element<Dim>* e : *_ownElements)
+			measure += e->Measure();
+		return Communicator::Current().Sum(measure);
 	}
 
 	Vector InnerProdWithBasis(DomFunction func) override
