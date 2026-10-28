@@ -38,14 +38,18 @@ public:
 
 	void Setup()
 	{
-		Vector one = CoefficientsOfFunctionOne();
-		double normOne = sqrt(one.dot(one));
+		Setup(CoefficientsOfFunctionOne());
+	}
+	// From the coefficients of 1: on several processes, those of the process (the vectors too: the dot products reduced)
+	void Setup(Vector one)
+	{
+		double normOne = sqrt(Parallel::Dot(one, one));
 		_nOne = std::move(one);
 		_nOne /= normOne;
 	}
 	double OrthogonalityFactor(const Vector& b)
 	{
-		return b.dot(_nOne);
+		return Parallel::Dot(b, _nOne);
 	}
 	bool Check(const Vector& b)
 	{

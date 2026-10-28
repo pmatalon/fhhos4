@@ -46,9 +46,10 @@ public:
 		_nipw1 /= _discreteSpace->Measure(); // (1|1) = measure
 	}
 
+	// (on several processes, the dot product reduced: x and the space are those of the elements of the process)
 	double OrthogonalityFactor(const Vector& x)
 	{
-		return x.dot(_nipw1);
+		return Parallel::Dot(x, _nipw1);
 	}
 
 	void Enforce(Vector& x)

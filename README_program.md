@@ -137,11 +137,11 @@ mpiexec -n 4 ./bin/fhhos4 -geo cube -mesh tetra -n 16 -k 1 -s fcglibuamg
   among them; `OMP_NUM_THREADS` or `-threads` set them (e.g. `OMP_NUM_THREADS=2 mpiexec -n 4 -bind-to core:2 ...` with
   MPICH).
 - The mesh is built by every process (the first one first: it writes GMSH's cache, which the others read), then
-  partitioned by GMSH (METIS) into one part per process. The system is assembled by every process, then solved by U-AMG
-  distributed by rows: each process owns the cells of its part and the faces between them, and the faces between two
-  processes belong to the one of smaller rank. Each process aggregates its own cells: the number of iterations may
-  change slightly with the number of processes. The solution is then gathered on every process for the
-  post-processing. The messages are printed by the first process; the errors, by the one where they occur.
+  partitioned by GMSH (METIS) into one part per process. The system is solved by U-AMG distributed by rows: each process
+  owns the cells of its part and the faces between them, and the faces between two processes belong to the one of
+  smaller rank; it assembles its rows, from the local matrices of its cells and of the other cells of its faces. Each
+  process aggregates its own cells: the number of iterations may change slightly with the number of processes. The
+  solution is then gathered on every process, and each one post-processes its cells (the L2 error is summed over all). The messages are printed by the first process; the errors, by the one where they occur.
 - Available: the diffusion problem discretized by HHO (`-pb diff -discr hho`), with static condensation, on GMSH meshes
   (`-mesher gmsh`, GMSH's by default for some meshes, e.g. `-mesh tetra`); U-AMG through the library
   (`-s fcglibuamg`, `libuamg`, `gcrlibuamg`) or the program's (`-s fcguamg`, `uamg`, `gcruamg`), also with

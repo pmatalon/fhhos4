@@ -3,10 +3,11 @@
 #include "../Utils/DistributedMatrix.h"
 using namespace std;
 
-// On several processes (MPI): the hybrid system assembled by every process (the whole system), distributed by rows for
-// the solver. The cells of each process are given by a partition (GMSH's); each face belongs to the process of the
-// smaller rank among those of its cells. The cells and faces are renumbered so that each process owns contiguous ones,
-// in rank order (in their order on each process): the global numbers of the distributed blocks.
+// On several processes (MPI): the hybrid system, in the numbering of the whole mesh, whose rows of the cells and faces of
+// each process are assembled by it (the others may be missing), distributed by rows for the solver. The cells of each
+// process are given by a partition (GMSH's); each face belongs to the process of the smaller rank among those of its
+// cells. The cells and faces are renumbered so that each process owns contiguous ones, in rank order (in their order on
+// each process): the global numbers of the distributed blocks.
 class DistributedHybridSystem
 {
 public:
@@ -18,8 +19,9 @@ public:
 	shared_ptr<const IndexMap> Faces;
 	shared_ptr<const IndexMap> FaceMap; // the faces of the rows of the process: its own, then the others (by increasing new number)
 
-	// cellRank, faceRank: the process of each cell and face, by number; A_T_F, A_F_F: the whole blocks, to find the faces
-	// of the process's rows (the faces of its cells, and those coupled to its faces through the cells of other processes)
+	// cellRank, faceRank: the process of each cell and face, by number; A_T_F, A_F_F: the blocks (their rows of the
+	// process), to find the faces of the process's rows (the faces of its cells, and those coupled to its faces through
+	// the cells of other processes)
 	DistributedHybridSystem(const Communicator& comm, const vector<int>& cellRank, const vector<int>& faceRank, const SparseMatrix& A_T_F, const SparseMatrix& A_F_F, int cellBlockSize, int faceBlockSize)
 		: Comm(comm), CellBlockSize(cellBlockSize), FaceBlockSize(faceBlockSize)
 	{

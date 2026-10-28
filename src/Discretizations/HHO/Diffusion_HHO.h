@@ -17,6 +17,7 @@
 #include "Diffusion_HHOMatrix.h"
 #include "../../TestCases/Diffusion/DiffusionTestCase.h"
 #include "../../Utils/ExportModule.h"
+#include "../../Utils/Communicator.h"
 using namespace std;
 
 template <int Dim>
@@ -32,6 +33,9 @@ private:
 
 	vector<Diff_HHOElement<Dim>> _hhoElements;
 	vector<Diff_HHOFace<Dim>> _hhoFaces;
+
+	bool _restricted = false; // Restrict()
+	vector<Element<Dim>*> _elements, _ownElements;
 public:
 	Mesh<Dim>* _mesh;
 	DiffusionTestCase<Dim>* TestCase;
@@ -85,6 +89,28 @@ public:
 		this->_mesh->RenumberFacesInOrder_IntNeumDirich();
 	}
 
+	// On several processes, before Assemble(): the local matrices computed on elements only (the cells of the process and
+	// the other cells of its faces, whose rows are then complete), the post-processing on ownElements (its cells), the sums
+	// over the elements on ownElements, reduced over the processes. The vectors of the problem keep the numbers of the
+	// whole mesh (0 or not computed elsewhere). The HHO faces are those of the whole mesh.
+	void Restrict(vector<Element<Dim>*> elements, vector<Element<Dim>*> ownElements)
+	{
+		_restricted = true;
+		_elements = std::move(elements);
+		_ownElements = std::move(ownElements);
+	}
+
+	// The elements of the computations (all those of the mesh unless Restrict())
+	const vector<Element<Dim>*>& Elements() const
+	{
+		return _restricted ? _elements : _mesh->Elements;
+	}
+
+	const vector<Element<Dim>*>& OwnElements() const
+	{
+		return _restricted ? _ownElements : _mesh->Elements;
+	}
+
 	Diffusion_HHO<Dim>* GetProblemOnCoarserMesh()
 	{
 		HHOParameters<Dim>* coarseHHO = new HHOParameters<Dim>(this->_mesh->CoarseMesh, HHO->Stabilization, HHO->ReconstructionBasis, HHO->CellBasis, HHO->FaceBasis, HHO->OrthogonalizeElemBasesCode, HHO->OrthogonalizeFaceBasesCode);
@@ -127,15 +153,16 @@ public:
 		double normExactSolution = 0;
 
 		#pragma omp parallel for reduction(+:absoluteError, normExactSolution)
-		for (Element<Dim>* e : this->_mesh->Elements)
+		for (Element<Dim>* e : OwnElements())
 		{
 			auto approximate = HHOElement(e)->ReconstructionBasis->GetApproximateFunction(reconstructedSolution, e->Number * HHO->nReconstructUnknowns);
 			absoluteError += e->L2ErrorPow2(approximate, exactSolution);
 			normExactSolution += e->Integral([exactSolution](const DomPoint& p) { return pow(exactSolution(p), 2); });
 		}
 
-		absoluteError = sqrt(absoluteError);
-		normExactSolution = sqrt(normExactSolution);
+		const Communicator& comm = Communicator::Current();
+		absoluteError = sqrt(comm.Sum(absoluteError));
+		normExactSolution = sqrt(comm.Sum(normExactSolution));
 		return normExactSolution != 0 ? absoluteError / normExactSolution : absoluteError;
 	}
 
@@ -256,7 +283,8 @@ public:
 		nCoeffs_localElemMatrices += nCoeffs_P; // P (reconstructor)
 		size_t localElemMatricesMemory = nCoeffs_localElemMatrices * sizeof(double);
 
-		size_t totalElemLocalMatricesMemory = mesh->Elements.size() * localElemMatricesMemory;
+		const vector<Element<Dim>*>& elements = Elements();
+		size_t totalElemLocalMatricesMemory = elements.size() * localElemMatricesMemory;
 
 		// Face local matrices
 		int nCoeffs_Mass = pow(HHO->nFaceUnknowns, 2);
@@ -269,9 +297,9 @@ public:
 
 
 		size_t localNonZeroVectorMemory = nCoeffs_A_T * NonZeroCoefficients::SizeOfNonZero();
-		size_t globalNonZeroVectorMemory = mesh->Elements.size() * localNonZeroVectorMemory;
+		size_t globalNonZeroVectorMemory = elements.size() * localNonZeroVectorMemory;
 
-		size_t sparseMatrixMemory = Utils::SparseMatrixMemoryUsage(mesh->Elements.size() * nCoeffs_A_T);
+		size_t sparseMatrixMemory = Utils::SparseMatrixMemoryUsage(elements.size() * nCoeffs_A_T);
 
 		size_t requiredMemory = totalElemLocalMatricesMemory + totalFaceLocalMatricesMemory + Utils::VectorMemoryUsage(HHO->nTotalHybridUnknowns) + globalNonZeroVectorMemory + sparseMatrixMemory;
 
@@ -296,7 +324,7 @@ public:
 		if (!actions.Export.AssemblyTermMatrices)
 		{
 			#pragma omp parallel for
-			for (Element<Dim>* element : mesh->Elements)
+			for (Element<Dim>* element : elements)
 				HHOElement(element)->DeleteUselessMatricesAfterAssembly(); // Acons, Astab
 		}
 
@@ -356,7 +384,7 @@ public:
 		};
 
 		ThreadLocal<AssemblyResult> threadResults;
-		BigNumber chunkSize = Parallelism::ChunkSize(mesh->Elements.size());
+		BigNumber chunkSize = Parallelism::ChunkSize(elements.size());
 
 		if (actions.LogAssembly)
 			cout << "\tParallel recovery of the non-zero coefficients in chunks (allocation of " + to_string(Parallelism::NThreads()) + "x" + Utils::MemoryString(chunkSize * localNonZeroVectorMemory) + " = " + Utils::MemoryString(globalNonZeroVectorMemory) + ")" << endl;
@@ -383,7 +411,7 @@ public:
 		}
 
 		#pragma omp parallel for
-		for (Element<Dim>* e : mesh->Elements)
+		for (Element<Dim>* e : elements)
 		{
 			Diff_HHOElement<Dim>* element = HHOElement(e);
 			AssemblyResult& local = threadResults.Local();
@@ -471,7 +499,7 @@ public:
 			cout << "\tDelete now useless local matrices" << endl;
 
 		#pragma omp parallel for
-		for (Element<Dim>* element : mesh->Elements)
+		for (Element<Dim>* element : elements)
 			HHOElement(element)->DeleteUselessMatricesAfterAssembly();
 
 		if (this->TestCase->BC.Type != PbBoundaryConditions::FullNeumann && 
@@ -495,11 +523,11 @@ public:
 		A_T_F_Block<Dim> A_T_F_Coeffs(HHO->nCellUnknowns, HHO->nFaceUnknowns);
 		A_F_F_Block<Dim> A_F_F_Coeffs(HHO->nFaceUnknowns);
 		if (!this->_staticCondensation || this->_saveMatrixBlocks)
-			A_T_T_Coeffs.Reserve(mesh->Elements.size() * nCoeffs_A_T_T);
-		A_T_F_Coeffs.Reserve(mesh->Elements.size() * nCoeffs_A_T_F);
-		A_F_F_Coeffs.Reserve(mesh->Faces.size() * nCoeffs_A_F_F);
+			A_T_T_Coeffs.Reserve(elements.size() * nCoeffs_A_T_T);
+		A_T_F_Coeffs.Reserve(elements.size() * nCoeffs_A_T_F);
+		A_F_F_Coeffs.Reserve(mesh->Faces.size() * elements.size() / mesh->Elements.size() * nCoeffs_A_F_F); // (the faces of the elements, roughly)
 
-		BigNumber nnzApproximate = mesh->Elements.size() * nCoeffs_A_T;
+		BigNumber nnzApproximate = elements.size() * nCoeffs_A_T;
 		NonZeroCoefficients consistencyCoeffs(actions.Export.AssemblyTermMatrices ? nnzApproximate : 0);
 		NonZeroCoefficients stabilizationCoeffs(actions.Export.AssemblyTermMatrices ? nnzApproximate : 0);
 		NonZeroCoefficients reconstructionCoeffs(actions.Export.AssemblyTermMatrices ? nnzApproximate : 0);
@@ -703,8 +731,8 @@ public:
 		InitHHO_Faces();
 		InitHHO_Elements(assembleLocalMatrices);
 
-		CellSpace             = HHOCellSpace            (_mesh, HHO, _hhoElements);
-		ReconstructSpace      = HHOReconstructSpace     (_mesh, HHO, _hhoElements);
+		CellSpace             = HHOCellSpace            (_mesh, HHO, _hhoElements, Elements(), OwnElements());
+		ReconstructSpace      = HHOReconstructSpace     (_mesh, HHO, _hhoElements, OwnElements(), OwnElements());
 		SkeletonSpace         = HHOSkeletonSpace        (_mesh, HHO, _hhoFaces);
 		BoundarySpace         = HHOBoundarySpace        (_mesh, HHO, _hhoFaces);
 		DirichletSpace        = HHODirichletSpace       (_mesh, HHO, _hhoFaces);
@@ -733,7 +761,7 @@ public:
 		_hhoElements = vector<Diff_HHOElement<Dim>>(this->_mesh->Elements.size());
 
 		#pragma omp parallel for
-		for (Element<Dim>* e : this->_mesh->Elements)
+		for (Element<Dim>* e : Elements())
 		{
 			_hhoElements[e->Number].MeshElement = e;
 
@@ -764,7 +792,7 @@ public:
 			return FirstCoeffOfBlocks(CellSpace.Project(Utils::ConstantFunctionOne), HHO->nCellUnknowns, "cell");
 		Vector interp = Vector::Zero(HHO->nElements);
 		#pragma omp parallel for
-		for (Element<Dim>* e : _mesh->Elements)
+		for (Element<Dim>* e : Elements())
 			interp[e->Number] = 1 / HHOElement(e)->CellBasis->LocalFunctions()[0]->Eval(RefPoint());
 		return interp;
 	}
@@ -922,9 +950,9 @@ public:
 	Vector ReconstructHigherOrderApproximationFromHybridCoeffs(const Vector& hybridCoeffs)
 	{
 		assert(hybridCoeffs.rows() == HHO->nTotalHybridCoeffs);
-		Vector reconstruction(HHO->nElements * HHO->nReconstructUnknowns);
+		Vector reconstruction = Vector::Zero(HHO->nElements * HHO->nReconstructUnknowns);
 		#pragma omp parallel for
-		for (Element<Dim>* e : this->_mesh->Elements)
+		for (Element<Dim>* e : OwnElements())
 		{
 			Diff_HHOElement<Dim>* elem = HHOElement(e);
 

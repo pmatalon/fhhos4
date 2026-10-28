@@ -1,7 +1,7 @@
 #pragma once
 #include "IDiscreteSpace.h"
 #include "../Diff_HHOElement.h"
-#include "../../../Utils/Parallelism.h"
+#include "../../../Utils/Communicator.h"
 
 
 template<int Dim>
@@ -11,16 +11,24 @@ private:
 	const Mesh<Dim>* _mesh = nullptr;
 	vector<Diff_HHOElement<Dim>>* _hhoElements = nullptr;
 	HHOParameters<Dim>* HHO = nullptr;
+	const vector<Element<Dim>*>* _elements = nullptr;    // those of the computations of the process (the vectors are 0 elsewhere)
+	const vector<Element<Dim>*>* _ownElements = nullptr; // those of the sums, reduced over the processes
 
 public:
 	HHOCellSpace()
 	{}
 
 	HHOCellSpace(const Mesh<Dim>* mesh, HHOParameters<Dim>* hho, vector<Diff_HHOElement<Dim>>& hhoElements)
+		: HHOCellSpace(mesh, hho, hhoElements, mesh->Elements, mesh->Elements)
+	{}
+
+	HHOCellSpace(const Mesh<Dim>* mesh, HHOParameters<Dim>* hho, vector<Diff_HHOElement<Dim>>& hhoElements, const vector<Element<Dim>*>& elements, const vector<Element<Dim>*>& ownElements)
 	{
 		HHO = hho;
 		_mesh = mesh;
 		_hhoElements = &hhoElements;
+		_elements = &elements;
+		_ownElements = &ownElements;
 	}
 
 	Diff_HHOElement<Dim>* HHOElement(Element<Dim>* e)
@@ -44,9 +52,9 @@ public:
 
 	Vector InnerProdWithBasis(DomFunction func) override
 	{
-		Vector innerProds = Vector(Dimension());
+		Vector innerProds = Vector::Zero(Dimension());
 		#pragma omp parallel for
-		for (Element<Dim>* e : this->_mesh->Elements)
+		for (Element<Dim>* e : *_elements)
 		{
 			Diff_HHOElement<Dim>* elem = HHOElement(e);
 			BigNumber i = e->Number * HHO->nCellUnknowns;
@@ -63,9 +71,9 @@ public:
 		if (HHO->OrthonormalizeElemBases())
 			return v;
 		
-		Vector res(v.rows());
+		Vector res = Vector::Zero(v.rows());
 		#pragma omp parallel for
-		for (Element<Dim>* e : this->_mesh->Elements)
+		for (Element<Dim>* e : *_elements)
 		{
 			BigNumber i = e->Number * HHO->nCellUnknowns;
 			res.segment(i, HHO->nCellUnknowns) = HHOElement(e)->ApplyCellMassMatrix(v.segment(i, HHO->nCellUnknowns));
@@ -80,9 +88,9 @@ public:
 		if (HHO->OrthonormalizeElemBases())
 			return v;
 
-		Vector res(v.rows());
+		Vector res = Vector::Zero(v.rows());
 		#pragma omp parallel for
-		for (Element<Dim>* e : this->_mesh->Elements)
+		for (Element<Dim>* e : *_elements)
 		{
 			BigNumber i = e->Number * HHO->nCellUnknowns;
 			res.segment(i, HHO->nCellUnknowns) = HHOElement(e)->SolveCellMassMatrix(v.segment(i, HHO->nCellUnknowns));
@@ -92,9 +100,9 @@ public:
 	
 	Vector Project(DomFunction func) override
 	{
-		Vector vectorOfDoFs = Vector(Dimension());
+		Vector vectorOfDoFs = Vector::Zero(Dimension());
 		#pragma omp parallel for
-		for (Element<Dim>* e : this->_mesh->Elements)
+		for (Element<Dim>* e : *_elements)
 			vectorOfDoFs.segment(e->Number * HHO->nCellUnknowns, HHO->nCellUnknowns) = HHOElement(e)->ProjectOnCellBasis(func);
 		return vectorOfDoFs;
 	}
@@ -109,12 +117,12 @@ public:
 
 		double total = 0;
 		#pragma omp parallel for reduction(+:total)
-		for (Element<Dim>* e : _mesh->Elements)
+		for (Element<Dim>* e : *_ownElements)
 		{
 			BigNumber i = e->Number * HHO->nCellUnknowns;
 			total += v1.segment(i, HHO->nCellUnknowns).dot(HHOElement(e)->ApplyCellMassMatrix(v2.segment(i, HHO->nCellUnknowns)));
 		}
-		return total;
+		return Communicator::Current().Sum(total);
 	}
 
 	double Integral(const Vector& cellCoeffs) override
@@ -123,21 +131,21 @@ public:
 
 		double total = 0;
 		#pragma omp parallel for reduction(+:total)
-		for (Element<Dim>* e : _mesh->Elements)
+		for (Element<Dim>* e : *_ownElements)
 		{
 			auto i = e->Number * HHO->nCellUnknowns;
 			total += HHOElement(e)->IntegralCell(cellCoeffs.segment(i, HHO->nCellUnknowns));
 		}
-		return total;
+		return Communicator::Current().Sum(total);
 	}
 
 	double Integral(DomFunction func) override
 	{
 		double total = 0;
 		#pragma omp parallel for reduction(+:total)
-		for (Element<Dim>* e : _mesh->Elements)
+		for (Element<Dim>* e : *_ownElements)
 			total += e->Integral(func);
-		return total;
+		return Communicator::Current().Sum(total);
 	}
 
 	//----------------------------------//
@@ -148,9 +156,9 @@ public:
 	{
 		assert(b_T.rows() == Dimension());
 
-		Vector result(b_T.rows());
+		Vector result = Vector::Zero(b_T.rows());
 		#pragma omp parallel for
-		for (Element<Dim>* e : this->_mesh->Elements)
+		for (Element<Dim>* e : *_elements)
 		{
 			auto i = e->Number * HHO->nCellUnknowns;
 			result.segment(i, HHO->nCellUnknowns) = HHOElement(e)->AttSolver.solve(b_T.segment(i, HHO->nCellUnknowns));
@@ -160,9 +168,9 @@ public:
 
 	SparseMatrix Solve_A_T_T(const SparseMatrix& A_T_ndF)
 	{
-		ThreadLocalCoeffs coeffs(this->_mesh->Elements.size(), HHO->nCellUnknowns * HHO->nCellUnknowns);
+		ThreadLocalCoeffs coeffs(_elements->size(), HHO->nCellUnknowns * HHO->nCellUnknowns);
 		#pragma omp parallel for
-		for (Element<Dim>* e : this->_mesh->Elements)
+		for (Element<Dim>* e : *_elements)
 		{
 			auto i = e->Number * HHO->nCellUnknowns;
 			for (auto f : e->Faces)

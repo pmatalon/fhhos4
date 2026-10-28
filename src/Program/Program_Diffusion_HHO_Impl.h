@@ -9,8 +9,9 @@
 #include "DistributedHybridSystem.h"
 
 // On several processes (MPI): the options available (the others are refused). The mesh is built by every process, and
-// partitioned by GMSH; the system is assembled by every process, and solved by U-AMG distributed by rows (each process
-// the rows of its cells and faces); the solution is then gathered on every process for the post-processing.
+// partitioned by GMSH; each process computes the local matrices of its cells and of the other cells of its faces (the
+// rows of its cells and faces are then complete), and the system is solved by U-AMG distributed by rows (each process
+// the rows of its cells and faces); the solution is then gathered on every process, and post-processed on its cells.
 inline void CheckDistributedArguments(const ProgramArguments& args)
 {
 	auto refuse = [](const string& what) { Utils::FatalError("On several processes (MPI), " + what + "."); };
@@ -30,24 +31,12 @@ inline void CheckDistributedArguments(const ProgramArguments& args)
 		refuse("nothing is exported");
 }
 
-// On several processes: the system assembled by every process (problem), distributed by rows: the cells of each process
-// given by the partition of the mesh (elementRanks), each face owned by the process of the smaller rank of its cells.
-// U-AMG through the library (libraryCondenses: the uncondensed system; the library condenses it and computes the cell
-// unknowns), or the program's (iterativeSolver, on its condensed system). nonsymmetric (-uamg-nonsym): the blocks of a
-// non-symmetric matrix, in full, with A_F_T = A_T_F^T. The solution of the faces (systemSolution) and, with the
-// library, of the cells (cellSolution): of the whole system, on every process. A: the condensed operator of the program's
-// U-AMG, owned by the caller (the solver keeps a pointer to it).
+// On several processes, the process of each face of the system (not the Dirichlet ones), by number: the smaller rank of
+// its cells (elementRanks: the process of each element, by number). After the numbering of the faces by the problem.
 template <int Dim>
-void SolveDistributed(Diffusion_HHO<Dim>& problem, Mesh<Dim>* mesh, const vector<int>& elementRanks, IterativeSolver* iterativeSolver, bool libraryCondenses, bool nonsymmetric, int faceBlockSize,
-                      Timer& setupTimer, Timer& solvingTimer, DistributedMatrix& A, Vector& systemSolution, Vector& cellSolution)
+vector<int> FaceRanks(const Mesh<Dim>* mesh, const vector<int>& elementRanks, BigNumber nFaces)
 {
-	const Communicator& world = Communicator::Current();
-	int fbs = faceBlockSize;
-	int cbs = problem.HHO->nCellUnknowns;
-	BigNumber nFaces = problem.A_T_ndF.cols() / fbs; // the faces of the system (not the Dirichlet ones)
-	vector<int> cellRanks(mesh->Elements.size()), faceRanks(nFaces, world.Size());
-	for (Element<Dim>* e : mesh->Elements)
-		cellRanks[e->Number] = elementRanks[e->Number];
+	vector<int> faceRanks(nFaces);
 	for (Face<Dim>* f : mesh->Faces)
 	{
 		if (f->Number >= nFaces)
@@ -56,8 +45,51 @@ void SolveDistributed(Diffusion_HHO<Dim>& problem, Mesh<Dim>* mesh, const vector
 		if (f->Element2)
 			faceRanks[f->Number] = min(faceRanks[f->Number], elementRanks[f->Element2->Number]);
 	}
+	return faceRanks;
+}
+
+// On several processes, before the assembly: the computations of the problem restricted to the cells of the process and
+// the other cells of its faces, the post-processing to its cells (Diffusion_HHO::Restrict())
+template <int Dim>
+void RestrictToProcess(Diffusion_HHO<Dim>& problem, const Mesh<Dim>* mesh, const vector<int>& elementRanks, const vector<int>& faceRanks, int rank)
+{
+	vector<char> ofOwnFace(mesh->Elements.size(), 0);
+	for (Face<Dim>* f : mesh->Faces)
+	{
+		if (f->Number < (BigNumber)faceRanks.size() && faceRanks[f->Number] == rank)
+		{
+			ofOwnFace[f->Element1->Number] = 1;
+			if (f->Element2)
+				ofOwnFace[f->Element2->Number] = 1;
+		}
+	}
+	vector<Element<Dim>*> elements, own;
+	for (Element<Dim>* e : mesh->Elements)
+	{
+		if (elementRanks[e->Number] == rank)
+			own.push_back(e);
+		if (elementRanks[e->Number] == rank || ofOwnFace[e->Number])
+			elements.push_back(e);
+	}
+	problem.Restrict(std::move(elements), std::move(own));
+}
+
+// On several processes: the system assembled by each process on its rows (problem), distributed by rows: the cells of
+// each process given by the partition of the mesh (elementRanks), each face owned by the process of faceRanks.
+// U-AMG through the library (libraryCondenses: the uncondensed system; the library condenses it and computes the cell
+// unknowns), or the program's (iterativeSolver, on its condensed system). nonsymmetric (-uamg-nonsym): the blocks of a
+// non-symmetric matrix, in full, with A_F_T = A_T_F^T. The solution of the faces (systemSolution) and, with the
+// library, of the cells (cellSolution): of the whole system, on every process. A: the condensed operator of the program's
+// U-AMG, owned by the caller (the solver keeps a pointer to it).
+template <int Dim>
+void SolveDistributed(Diffusion_HHO<Dim>& problem, const vector<int>& elementRanks, const vector<int>& faceRanks, IterativeSolver* iterativeSolver, bool libraryCondenses, bool nonsymmetric, int faceBlockSize,
+                      Timer& setupTimer, Timer& solvingTimer, DistributedMatrix& A, Vector& systemSolution, Vector& cellSolution)
+{
+	const Communicator& world = Communicator::Current();
+	int fbs = faceBlockSize;
+	int cbs = problem.HHO->nCellUnknowns;
 	SparseMatrix fullA_FF = SparseMatrixOps::FullFromLower(problem.A_ndF_ndF);
-	DistributedHybridSystem system(world, cellRanks, faceRanks, problem.A_T_ndF, fullA_FF, cbs, fbs);
+	DistributedHybridSystem system(world, elementRanks, faceRanks, problem.A_T_ndF, fullA_FF, cbs, fbs);
 	cout << "Distributed system: " << system.Cells->GlobalSize << " cells and " << system.Faces->GlobalSize << " faces on " << world.Size() << " processes (" << world.Min(system.Faces->NOwned) << " to " << world.Max(system.Faces->NOwned) << " faces per process)" << endl;
 
 	SparseMatrix A_TT = system.CellBlocks(nonsymmetric ? SparseMatrixOps::FullFromLower(problem.A_T_T) : problem.A_T_T);
@@ -94,6 +126,12 @@ void SolveDistributed(Diffusion_HHO<Dim>& problem, Mesh<Dim>* mesh, const vector
 		iterativeSolver->Setup(A, A_TT, A_TF, localA_FT, system.FaceMap, cellInterpOfOne, faceInterpOfOne);
 		setupTimer.Stop();
 		Vector b = system.Own(problem.b, false, fbs);
+		if (problem.TestCase->BC.Type == PbBoundaryConditions::FullNeumann) // onto the image of A (on one process, by Execute())
+		{
+			NumericImageEnforcer imageEnforcer;
+			imageEnforcer.Setup(system.Own(problem.SkeletonSpace.Project(Utils::ConstantFunctionOne), false, fbs));
+			imageEnforcer.ProjectOntoImage(b);
+		}
 		cout << "Solving..." << endl;
 		solvingTimer.Start();
 		Vector x = iterativeSolver->Solve(b);
@@ -311,6 +349,15 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 		&& !args.Actions.Export.LinearSystem && !args.Actions.Export.ErrorToGMSH;
 	problem->CondensationBySolver = libraryCondenses;
 
+	vector<int> faceRanks; // on several processes, the process of each face of the system
+	if (distributed)
+	{
+		faceRanks = FaceRanks(mesh, elementRanks, hho->nInteriorAndNeumannFaces);
+		RestrictToProcess(*problem, mesh, elementRanks, faceRanks, world.Rank());
+		BigNumber nElements = problem->Elements().size();
+		cout << "Local matrices per process: of its cells and of the other cells of its faces, " << world.Min(nElements) << " to " << world.Max(nElements) << " elements (" << mesh->Elements.size() << " in the mesh)" << endl;
+	}
+
 	cout << endl;
 	cout << "----------------------------------------------------------" << endl;
 	cout << "-                       Assembly                         -" << endl;
@@ -351,7 +398,7 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 		cout << "----------------------------------------------------------" << endl;
 
 
-		if (testCase->BC.Type == PbBoundaryConditions::FullNeumann && !libraryCondenses) // otherwise, by the library
+		if (testCase->BC.Type == PbBoundaryConditions::FullNeumann && !libraryCondenses && !distributed) // otherwise, by the library or SolveDistributed()
 		{
 			NumericImageEnforcer imageEnforcer(&problem->SkeletonSpace);
 			imageEnforcer.Setup();
@@ -387,7 +434,7 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 			if (!iterativeSolver)
 				Utils::FatalError("On several processes, the solver is U-AMG.");
 			iterativeSolver->ComputeExactSolution = false;
-			SolveDistributed(*problem, mesh, elementRanks, iterativeSolver, libraryCondenses, args.Solver.MG.UAMGNonsymmetric, faceBasis->Size(), setupTimer, solvingTimer, distributedA, systemSolution, cellSolution);
+			SolveDistributed(*problem, elementRanks, faceRanks, iterativeSolver, libraryCondenses, args.Solver.MG.UAMGNonsymmetric, faceBasis->Size(), setupTimer, solvingTimer, distributedA, systemSolution, cellSolution);
 			cout << iterativeSolver->IterationCount << " iterations." << endl << endl;
 			if (results)
 				results->IterationCount = iterativeSolver->IterationCount;

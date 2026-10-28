@@ -52,9 +52,14 @@ program too).
   global, the pinned DoF of the coarsest level on one process (`docs/uamg.md`). Not yet: `CondensedMatrix()`. Python:
   `docs/python.md`.
 - Program (`Program_Diffusion_HHO_Impl.h`, `Program/DistributedHybridSystem.h`): GMSH meshes only, partitioned by GMSH
-  (`GMSHMesh::PartitionElements()`, rank 0, broadcast); the mesh built by rank 0 first (cache); the system assembled by
-  every process (replicated, not distributed yet), its rows extracted (faces owned by the smaller rank of their cells),
-  the solution gathered; `CheckDistributedArguments()` lists what is refused. `-uamg-nonsym`: `A_F_T` from the rows of
+  (`GMSHMesh::PartitionElements()`, rank 0, broadcast); the whole mesh built by every process (rank 0 first: cache);
+  faces owned by the smaller rank of their cells (`FaceRanks()`). `Diffusion_HHO::Restrict()` (`RestrictToProcess()`):
+  each process computes the local matrices (`InitHHO()`, `Assemble()`, right-hand side, the program's condensation) of
+  its cells and of the other cells of its faces only (`Elements()`: its rows complete, no exchange), in the numbering
+  of the whole mesh (the HHO faces: all of them), its rows extracted (`DistributedHybridSystem`); the solution gathered,
+  post-processed on its cells (`OwnElements()`), the sums reduced (L2 error, `HHOCellSpace`/`HHOReconstructSpace`,
+  `ZeroMeanEnforcer`, `NumericImageEnforcer`: the full Neumann right-hand side of the program's U-AMG projected on the
+  rows of the process); `CheckDistributedArguments()` lists what is refused. `-uamg-nonsym`: `A_F_T` from the rows of
   the faces (`FromGlobalColumns()`: the ghost cells), local columns for the library, `RowsWithGhosts()` for the
   program's U-AMG.
 

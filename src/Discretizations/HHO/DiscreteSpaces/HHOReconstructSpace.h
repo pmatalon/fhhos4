@@ -1,7 +1,7 @@
 #pragma once
 #include "IDiscreteSpace.h"
 #include "../Diff_HHOElement.h"
-#include "../../../Utils/Parallelism.h"
+#include "../../../Utils/Communicator.h"
 
 
 template<int Dim>
@@ -11,16 +11,24 @@ private:
 	const Mesh<Dim>* _mesh = nullptr;
 	vector<Diff_HHOElement<Dim>>* _hhoElements = nullptr;
 	HHOParameters<Dim>* HHO = nullptr;
+	const vector<Element<Dim>*>* _elements = nullptr;    // those of the computations of the process (the vectors are 0 elsewhere)
+	const vector<Element<Dim>*>* _ownElements = nullptr; // those of the sums, reduced over the processes
 
 public:
 	HHOReconstructSpace()
 	{}
 
 	HHOReconstructSpace(const Mesh<Dim>* mesh, HHOParameters<Dim>* hho, vector<Diff_HHOElement<Dim>>& hhoElements)
+		: HHOReconstructSpace(mesh, hho, hhoElements, mesh->Elements, mesh->Elements)
+	{}
+
+	HHOReconstructSpace(const Mesh<Dim>* mesh, HHOParameters<Dim>* hho, vector<Diff_HHOElement<Dim>>& hhoElements, const vector<Element<Dim>*>& elements, const vector<Element<Dim>*>& ownElements)
 	{
 		HHO = hho;
 		_mesh = mesh;
 		_hhoElements = &hhoElements;
+		_elements = &elements;
+		_ownElements = &ownElements;
 	}
 
 	Diff_HHOElement<Dim>* HHOElement(Element<Dim>* e)
@@ -44,9 +52,9 @@ public:
 
 	Vector InnerProdWithBasis(DomFunction func) override
 	{
-		Vector innerProds = Vector(Dimension());
+		Vector innerProds = Vector::Zero(Dimension());
 		#pragma omp parallel for
-		for (Element<Dim>* e : this->_mesh->Elements)
+		for (Element<Dim>* e : *_elements)
 		{
 			Diff_HHOElement<Dim>* elem = HHOElement(e);
 			BigNumber i = e->Number * HHO->nReconstructUnknowns;
@@ -63,9 +71,9 @@ public:
 		if (HHO->OrthonormalizeElemBases())
 			return v;
 
-		Vector res(v.rows());
+		Vector res = Vector::Zero(v.rows());
 		#pragma omp parallel for
-		for (Element<Dim>* e : this->_mesh->Elements)
+		for (Element<Dim>* e : *_elements)
 		{
 			BigNumber i = e->Number * HHO->nReconstructUnknowns;
 			res.segment(i, HHO->nReconstructUnknowns) = HHOElement(e)->ApplyReconstructMassMatrix(v.segment(i, HHO->nReconstructUnknowns));
@@ -80,9 +88,9 @@ public:
 		if (HHO->OrthonormalizeElemBases())
 			return v;
 
-		Vector res(v.rows());
+		Vector res = Vector::Zero(v.rows());
 		#pragma omp parallel for
-		for (Element<Dim>* e : this->_mesh->Elements)
+		for (Element<Dim>* e : *_elements)
 		{
 			BigNumber i = e->Number * HHO->nReconstructUnknowns;
 			res.segment(i, HHO->nReconstructUnknowns) = HHOElement(e)->SolveReconstructMassMatrix(v.segment(i, HHO->nReconstructUnknowns));
@@ -92,9 +100,9 @@ public:
 	
 	Vector Project(DomFunction func) override
 	{
-		Vector vectorOfDoFs = Vector(Dimension());
+		Vector vectorOfDoFs = Vector::Zero(Dimension());
 		#pragma omp parallel for
-		for (Element<Dim>* e : this->_mesh->Elements)
+		for (Element<Dim>* e : *_elements)
 		{
 			BigNumber i = e->Number * HHO->nReconstructUnknowns;
 			vectorOfDoFs.segment(i, HHO->nReconstructUnknowns) = HHOElement(e)->ProjectOnReconstructBasis(func);
@@ -112,12 +120,12 @@ public:
 
 		double total = 0;
 		#pragma omp parallel for reduction(+:total)
-		for (Element<Dim>* e : _mesh->Elements)
+		for (Element<Dim>* e : *_ownElements)
 		{
 			BigNumber i = e->Number * HHO->nReconstructUnknowns;
 			total += v1.segment(i, HHO->nReconstructUnknowns).dot(HHOElement(e)->ApplyReconstructMassMatrix(v2.segment(i, HHO->nReconstructUnknowns)));
 		}
-		return total;
+		return Communicator::Current().Sum(total);
 	}
 
 	double Integral(const Vector& reconstructedCoeffs) override
@@ -126,21 +134,21 @@ public:
 
 		double total = 0;
 		#pragma omp parallel for reduction(+:total)
-		for (Element<Dim>* e : _mesh->Elements)
+		for (Element<Dim>* e : *_ownElements)
 		{
 			auto i = e->Number * HHO->nReconstructUnknowns;
 			total += HHOElement(e)->IntegralReconstruct(reconstructedCoeffs.segment(i, HHO->nReconstructUnknowns));
 		}
-		return total;
+		return Communicator::Current().Sum(total);
 	}
 
 	double Integral(DomFunction func) override
 	{
 		double total = 0;
 		#pragma omp parallel for reduction(+:total)
-		for (Element<Dim>* e : _mesh->Elements)
+		for (Element<Dim>* e : *_ownElements)
 			total += e->Integral(func);
-		return total;
+		return Communicator::Current().Sum(total);
 	}
 
 	/*
