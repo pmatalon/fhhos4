@@ -1304,7 +1304,8 @@ partly freed after; a step can reuse the memory freed by the previous ones, e.g.
   on 2 or 4, beyond the machine. On one process, by extrapolation: under 5 GB up to k=0 n ~ 55, k=1 n ~ 36; in the
   ~8 GB available (the rest: the IDE, the sessions) up to k=0 n ~ 60, k=1 n ~ 40.
 
-2026-10-29, `Acons` and `Astab` deleted cell by cell in `InitHHO_Elements()` (unless the assembly terms are exported),
+2026-10-29, `Acons` and `Astab` deleted cell by cell in `InitHHO_Elements()` (since then in the loop of the assembly,
+below; unless the assembly terms are exported),
 instead of in a loop after all the cells: the next cells of a thread reuse their memory, whereas deleted after all the
 cells they left holes in the heap (~4 KB per cell at k=1), resident until the end. Peak per process (sum over the
 processes), MB, before -> after; the same iterations and L2 errors:
@@ -1317,12 +1318,26 @@ processes), MB, before -> after; the same iterations and L2 errors:
 - k=1 n=32, one process: every step from the local matrices on is ~700 MB lower. By extrapolation, under 5 GB on one
   process k=1 up to n ~ 38 (36 before), in the ~8 GB available n ~ 44 (40); k=1 n=48 would take ~8.5 GB.
 
+2026-10-29, the local matrices of each cell computed in the loop of the assembly (`Diff_HHOElement::AssembleLocalMatrices()`
+in `Diffusion_HHO::Assemble()`), where `A` of the cell is deleted too when nothing reads it after (`KeepCellOperators`:
+false with U-AMG, unless the normal derivative; `SolveCellUnknownsMatrix()` reads it: the geometric multigrid, the normal
+derivative, the biharmonic problem). Peak per process (sum over the processes), MB, before -> after (`/usr/bin/time`);
+the same iterations and L2 errors, the same assembly times (k=1 n=32 29.0 / 30.4 s, k=0 n=48 6.1 / 5.8 s):
+
+| Case | 1 process | 2 processes | 4 processes |
+|---|---|---|---|
+| k=1 n=32 | 2684 -> 2485 (-7%) | 1735 (3454) -> 1595 (3179) (-8%) | 942 (3730) -> 858 (3416) (-9%) |
+| k=0 n=48 | 2991 -> 2910 (-3%) | - | 942 (3719) -> 900 (3576) (-4%) |
+
+- k=1 n=32, one process: 200 of the 333 MB of the cells' `A`; the rest stays as holes between the `P` kept. Since
+  2026-10-28: 3376 -> 2485 MB (-26%). By extrapolation, k=1 under 5 GB on one process up to n ~ 40, in the ~8 GB
+  available n ~ 46; k=1 n=48 would take ~7.7 GB.
+
 Next ideas:
 1. **The memory per process** (2026-10-28 above), by expected gain:
-   - What stays under both transients and every later step, on any number of processes: `A` of each cell (2 KB at k=1,
-     12% of the heap's peak), which a U-AMG run seems not to read after the assembly (the cell unknowns come from the
-     global blocks; to check: the normal derivative, the biharmonic and the geometric multigrid read it). `Acons` and
-     `Astab`: done (2026-10-29 above).
+   - `A`, `Acons` and `Astab` of the cells: done (2026-10-29 above). What stays of the local matrices: `P` (1.25 KB per
+     cell at k=1, read by the post-processing) and the holes between them (~130 MB at k=1 n=32); one allocation for the
+     `P` of all the cells would remove the holes.
    - The two transients together: the assembly of the global blocks (fill them from the per-thread lists, without the
      aggregated copy; avoid the conversions between row- and column-major) and the static condensation (by cells,
      `StaticCondensation.h`, the library's: `A` in the pattern of `A_F_F`, without the product nor the conversions).

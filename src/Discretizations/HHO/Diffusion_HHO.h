@@ -46,6 +46,9 @@ public:
 	// the blocks), which also computes the cell unknowns. Assemble() then keeps the blocks and B_T, B_ndF (RHS_T(),
 	// RHS_ndF()), and doesn't compute A and b.
 	bool CondensationBySolver = false;
+	// Set before Assemble(): false deletes the operator A of each cell once assembled (read after the assembly only by
+	// SolveCellUnknownsMatrix(): the geometric multigrid, the normal derivative, the biharmonic problem)
+	bool KeepCellOperators = true;
 
 	HHOCellSpace<Dim>             CellSpace;
 	HHOReconstructSpace<Dim>      ReconstructSpace;
@@ -318,7 +321,7 @@ public:
 
 		if (actions.LogAssembly)
 			cout << "\tCompute local matrices (allocation of " + Utils::MemoryString(totalElemLocalMatricesMemory) + ")" << endl;
-		this->InitHHO(true, actions.Export.AssemblyTermMatrices);
+		this->InitHHO(false); // the local matrices of each cell computed in the loop of the assembly, below
 
 		// Notations:
 		// 
@@ -407,6 +410,7 @@ public:
 		{
 			Diff_HHOElement<Dim>* element = HHOElement(e);
 			AssemblyResult& local = threadResults.Local();
+			element->AssembleLocalMatrices();
 
 			if (!this->_staticCondensation || this->_saveMatrixBlocks)
 			{
@@ -481,6 +485,13 @@ public:
 					local.ReconstructionCoeffs.AddBlock(i, j, element->P, 0, element->FirstDOFNumber(face), HHO->nReconstructUnknowns, HHO->nFaceUnknowns);
 				}
 			}
+
+			// Deleted in the iteration: the next cells of the thread reuse their memory (deleted after all the cells, they
+			// left holes in the heap between the matrices kept)
+			if (!actions.Export.AssemblyTermMatrices)
+				element->DeleteUselessMatricesAfterAssembly(); // Acons, Astab
+			if (!KeepCellOperators)
+				Utils::Empty(element->A);
 		}
 		
 		//-----------------------------------//
@@ -718,10 +729,10 @@ public:
 	//------------------------------//
 	//           Init HHO           //
 	//------------------------------//
-	void InitHHO(bool assembleLocalMatrices = true, bool keepTermMatrices = true)
+	void InitHHO(bool assembleLocalMatrices = true)
 	{
 		InitHHO_Faces();
-		InitHHO_Elements(assembleLocalMatrices, keepTermMatrices);
+		InitHHO_Elements(assembleLocalMatrices);
 
 		CellSpace             = HHOCellSpace            (_mesh, HHO, _hhoElements, _mesh->Elements, OwnElements());
 		ReconstructSpace      = HHOReconstructSpace     (_mesh, HHO, _hhoElements, OwnElements(), OwnElements());
@@ -745,9 +756,7 @@ public:
 			_hhoFaces[f->Number].InitHHO(HHO);
 		}
 	}
-	// keepTermMatrices: false deletes Acons and Astab of each cell once its A is computed, in the same iteration: the next
-	// cells of the thread reuse their memory (deleted after all the cells, they left holes in the heap)
-	void InitHHO_Elements(bool assembleLocalMatrices = true, bool keepTermMatrices = true)
+	void InitHHO_Elements(bool assembleLocalMatrices = true)
 	{
 		if (!_hhoElements.empty())
 			Utils::Warning("The HHO elements of this problem have already been initialized.");
@@ -763,8 +772,6 @@ public:
 				_hhoElements[e->Number].Faces.push_back(&this->_hhoFaces[f->Number]);
 
 			_hhoElements[e->Number].InitHHO(HHO, assembleLocalMatrices);
-			if (!keepTermMatrices)
-				_hhoElements[e->Number].DeleteUselessMatricesAfterAssembly();
 		}
 	}
 

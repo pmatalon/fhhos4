@@ -140,18 +140,18 @@ public:
 		//this->ComputeAndSaveQuadraturePoints();
 
 		if (assembleLocalMatrix)
-		{
-			this->AssembleReconstructionAndConsistencyMatrices();
-			this->AssembleStabilizationMatrix(true, hho->Stabilization);
+			AssembleLocalMatrices();
+	}
 
-			//int nTotalFaceUnknowns = this->Faces.size() * hho->nFaceUnknowns;
+	// P, Acons, Astab, A and the factorization of the cell block of A
+	void AssembleLocalMatrices()
+	{
+		this->AssembleReconstructionAndConsistencyMatrices();
+		this->AssembleStabilizationMatrix(true, HHO->Stabilization);
 
-			this->A = Acons + Astab;
-			auto Att = A.topLeftCorner(hho->nCellUnknowns, hho->nCellUnknowns);
-			//auto Aff = A.bottomRightCorner(nTotalFaceUnknowns, nTotalFaceUnknowns);
-			//auto Atf = A.topRightCorner(nCellUnknowns, nTotalFaceUnknowns);
-			this->AttSolver = Att.llt();
-		}
+		this->A = Acons + Astab;
+		auto Att = A.topLeftCorner(HHO->nCellUnknowns, HHO->nCellUnknowns);
+		this->AttSolver = Att.llt();
 	}
 
 	bool HasOrthogonalBasis() const

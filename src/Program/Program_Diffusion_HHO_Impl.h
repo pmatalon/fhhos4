@@ -295,6 +295,8 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 	bool libraryCondenses = args.Solver.UsesLibraryUAMG() && args.Discretization.StaticCondensation
 		&& !args.Actions.Export.LinearSystem && !args.Actions.Export.ErrorToGMSH;
 	problem->CondensationBySolver = libraryCondenses;
+	// U-AMG reads the global blocks only: the operators of the cells are deleted once assembled
+	problem->KeepCellOperators = !args.Solver.UsesUncondensedAMG() || args.Problem.ComputeNormalDerivative;
 
 	// On several processes: the post-processing on the cells of the process, the global numbers of the faces of the system
 	GMSHMesh<Dim>* part = distributed ? dynamic_cast<GMSHMesh<Dim>*>(mesh) : nullptr;
