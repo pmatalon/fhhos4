@@ -1281,10 +1281,17 @@ partly freed after; a step can reuse the memory freed by the previous ones, e.g.
   (x1.15-1.31): the binary and libraries (56-60 MB per process), the ghost cells (n=48 on 4: 136k cells per process for
   132k own) and the copies of `SolveDistributed()`.
 - The mesh: ~2.5 KB per cell (on one process, with GMSH's model, freed but kept by the heap); `Mesh storage` prints
-  about half. The local matrices: 2.4 KB per cell at k=0, 13.9 KB at k=1 (67% of the peak of one process): what the
-  cells keep after the assembly (`A` and `P` of each cell, `Acons` and `Astab` freed but their small blocks kept by the
-  heap, the orthogonalized bases of the cells, the quadrature points saved by the shapes, freed only by the geometric
-  multigrid's `DeleteUselessMatricesAfterMultigridSetup()`).
+  about half. The local matrices: 2.4 KB per cell at k=0, 13.9 KB at k=1 (67% of the peak of one process), with the
+  per-thread lists of the non-zeros of the global blocks (k=1 n=32: 368 MB) and the heap's fragmentation (16 threads).
+  The dense matrices of a cell at k=1: `A`, `Acons`, `Astab` (2 KB each) and `P` (1.25 KB); `Acons` and `Astab` are
+  freed after the assembly.
+- The heap (valgrind's massif, k=1 n=16, one process, `-threads 1`; `build-mpi/mem_mpi/massif.k1n16`): its peak, 399 MB
+  (resident: 531 MB with 16 threads, of which 57 MB of binary and libraries), is in the static condensation: the sparse
+  blocks and their copies (`A_F_F`'s block of the non-Dirichlet faces, the conversions between row- and column-major)
+  35%, the product of the Schur complement 12%, `A` and `P` of the cells 19%, the mesh 16% (~800 B per face, ~820 B per
+  cell), the orthogonalized bases of the faces 3%. The assembly of the global blocks peaks at 391 MB, almost as high
+  (the aggregated list of the non-zeros 13%, the blocks being filled, a conversion): lowering only one of the two
+  transients barely lowers the peak.
 - On several processes at k=1, the peak is in `SolveDistributed()`: the distributed system and the operator of U-AMG
   (`FullFromLower()` of A_FF and of A, `Rows()`, `FromGlobalColumns()`): +624 MB per process on 2 processes, of which
   360 MB stay (the distributed copies, beside the program's blocks).
@@ -1298,12 +1305,18 @@ partly freed after; a step can reuse the memory freed by the previous ones, e.g.
   ~8 GB available (the rest: the IDE, the sessions) up to k=0 n ~ 60, k=1 n ~ 40.
 
 Next ideas:
-1. **The memory per process** (2026-10-28 above), by size: the local matrices kept by the cells after the assembly
-   (k=1 n=32: 2.26 of the 3.38 GB of one process; keep only what the post-processing needs, free the quadrature points
-   of the shapes after the assembly), the mesh (~2.5 KB per cell), the transient of the static condensation (+655 MB at
-   k=1 n=32), and on several processes the copies of `SolveDistributed()` (+624 MB per process at k=1 n=32 on 2
-   processes, its peak: the full copies of `FullFromLower()`, the distributed blocks kept beside the program's). Then
-   the scaling on more processes (another machine).
+1. **The memory per process** (2026-10-28 above), by expected gain:
+   - What stays under both transients and every later step, on any number of processes: `A` of each cell, which a
+     U-AMG run seems not to read after the assembly (the cell unknowns come from the global blocks; to check: the
+     normal derivative, the biharmonic and the geometric multigrid read it), and `Acons` and `Astab` kept apart until
+     the end of the assembly (only the exports and the biharmonic read them): 12% of the heap's peak for `A`.
+   - The two transients together: the assembly of the global blocks (fill them from the per-thread lists, without the
+     aggregated copy; avoid the conversions between row- and column-major) and the static condensation (by cells,
+     `StaticCondensation.h`, the library's: `A` in the pattern of `A_F_F`, without the product nor the conversions).
+   - On several processes, the copies of `SolveDistributed()` (+624 MB per process at k=1 n=32 on 2 processes, its
+     peak): the full copies of `FullFromLower()`, the distributed blocks kept beside the program's.
+   - The mesh (~2.5 KB per cell; ~800 B per face, ~820 B per cell in the heap).
+   Then the scaling on more processes (another machine).
 2. **The halo exchanges**: persistent buffers and requests, and the product of `Diag` while the ghosts are exchanged
    (overlap): not measured, probably small on one node.
 3. **The coarse levels on fewer processes**: on many processes the reductions of the K-cycle on the coarse levels, and the
