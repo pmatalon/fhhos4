@@ -89,6 +89,9 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   the validation above. Compile it against a `git archive` of HEAD for the "before" times.
 - **On several processes (MPI)**: `scripts/perf/scaling_mpi.sh <output dir> <arguments>` (from `build-mpi/`), see
   "Distributed memory (MPI)" below.
+- **Memory per process**: `scripts/perf/Mem.h` (`MemPoint("label")` at the steps to measure: the resident memory and its
+  peak since the previous point, per process, on stderr; temporary instrumentation, never committed). Run the cases
+  sequentially, under a watchdog on the sum of the processes' resident memory.
 - **Kernel micro-benchmarks**: the matrices of a run can be exported with `-export mg -o <dir>` (`levelN_A.dat`,
   `levelN_P.dat`, `levelN_R.dat`, Matrix Market, 17 digits) and loaded with `Eigen::loadMarket` in a standalone
   program compiled with the flags of the build (`grep FLAGS build/build.ninja`): iterating on a kernel then takes
@@ -1178,10 +1181,10 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
 ## Distributed memory (MPI)
 
 U-AMG on several processes (`ENABLE_MPI`, see CLAUDE.md "MPI"). Measure with `scripts/perf/scaling_mpi.sh` (from
-`build-mpi/`): processes x threads, bound to cores (`mpiexec -bind-to core:<threads>`), best of 2. The program assembles
-the whole system on every process (memory: ~1.1 GB per process at Cube-tet k=0 n=32, hence at most 4 processes there
-on this machine). On one process, the code is the sequential one: `solutions.sh` against the commit before MPI, 68 OK
-(2026-10-20).
+`build-mpi/`): processes x threads, bound to cores (`mpiexec -bind-to core:<threads>`), best of 2. Each process builds
+its part of the mesh (GMSH's partition, kept in the cache) and assembles its cells and the other cells of its faces: the
+memory per process falls with the number of processes (2026-10-28 below). On one process, the code is the sequential
+one: `solutions.sh` against the commit before MPI, 68 OK (2026-10-20).
 
 2026-10-20, through the library (`-s fcglibuamg -smoothers bcheb4,bcheb4`: the library's default smoother), plugged in,
 elapsed setup / solve (s), iterations:
@@ -1249,9 +1252,58 @@ iterations on 1 / 2 / 4 processes (`-s fcglibuamg`):
 - The new default (`bcheb4`, degree 2, K(2,2)), `fcglibuamg` and `fcguamg`: k=2 n=4 26 iterations on 1, 2, 3, 4
   processes (`bgs`: 26 / 47 / 200 / 119); k=2 n=8 30 on 1-4 (`bgs`: 32 / 200 / 200 / 200). The same L2 errors.
 
+2026-10-28, the memory per process with the distributed mesh (each process its part of the mesh, its cells and the
+other cells of its faces), Cube-tet, `-s fcguamg` (block Chebyshev), the default threads (unbound: the processes share
+the 16 logical cores), `scripts/perf/Mem.h` at the steps of the program, under a watchdog at 4.8 GB in total
+(`build-mpi/mem_mpi/`). Peak per process (sum over the processes), MB:
+
+| Case | 1 process | 2 processes | 4 processes |
+|---|---|---|---|
+| k=0 n=16 (22.9k cells) | 202 | 152 (303) | 118 (467) |
+| k=1 n=16 | 531 | 362 (722) | 225 (894) |
+| k=0 n=32 (163k cells, 318k faces) | 1041 | 644 (1284) | 362 (1442) |
+| k=1 n=32 (955k face unknowns; 26 / 27 / 27 it) | 3376 | 2092 (4177) | 1112 (4428) |
+| k=0 n=48 (527k cells, 1.04M faces; 25 / 26 / 26 it) | 3149 | 1798 (3591) | 963 (3829) |
+
+What each step adds to a process (MB; rank 1 on several processes; +: the peak of the step above the memory before it,
+partly freed after; a step can reuse the memory freed by the previous ones, e.g. the setup at k=1 on 4 processes):
+
+| Case, processes | Mesh | Local matrices | Assembly, condensation | Distributed system, operator | U-AMG setup | Peak in |
+|---|---|---|---|---|---|---|
+| k=0 n=48, 1 | 1295 | 1242 | +261 | - | +452 | the setup |
+| k=0 n=48, 2 | 680 | 627 | +142 | +220 | +191 | the setup |
+| k=0 n=48, 4 | 373 | 303 | +67 | +116 | +88 | the setup |
+| k=1 n=32, 1 | 402 | 2262 | +655 | - | +175 | the condensation |
+| k=1 n=32, 2 | 224 | 1060 | +457 | +624 | +84 | the distributed operator |
+| k=1 n=32, 4 | 122 | 518 | +240 | +334 | +11 | the distributed operator |
+
+- The peak per process at 2 / 4 processes: 57% / 31% of one process's at k=0 n=48, 62% / 33% at k=1 n=32. The sum grows
+  (x1.15-1.31): the binary and libraries (56-60 MB per process), the ghost cells (n=48 on 4: 136k cells per process for
+  132k own) and the copies of `SolveDistributed()`.
+- The mesh: ~2.5 KB per cell (on one process, with GMSH's model, freed but kept by the heap); `Mesh storage` prints
+  about half. The local matrices: 2.4 KB per cell at k=0, 13.9 KB at k=1 (67% of the peak of one process): what the
+  cells keep after the assembly (`A` and `P` of each cell, `Acons` and `Astab` freed but their small blocks kept by the
+  heap, the orthogonalized bases of the cells, the quadrature points saved by the shapes, freed only by the geometric
+  multigrid's `DeleteUselessMatricesAfterMultigridSetup()`).
+- On several processes at k=1, the peak is in `SolveDistributed()`: the distributed system and the operator of U-AMG
+  (`FullFromLower()` of A_FF and of A, `Rows()`, `FromGlobalColumns()`): +624 MB per process on 2 processes, of which
+  360 MB stay (the distributed copies, beside the program's blocks).
+- GMSH on rank 0, first run on P processes (the whole mesh loaded from the cache and partitioned): peak +100 MB at
+  n=32, +309 MB at n=48 (0.6 KB per cell); the generation (first run of a mesh, on one process): +94 / +279 MB. Below
+  the later peak of rank 0, and its memory reused by the mesh (rank 0's peak within 10 MB of the others'). The next runs
+  (the partition read from the cache): +3 MB. It would set rank 0's peak beyond ~10 processes at k=0.
+- The largest cases under 5 GB in total: k=0 n=48 (1, 2, 4 processes: 3.1-3.8 GB), k=1 n=32 (3.4-4.4 GB). The memory
+  is proportional to the cells (n=32 -> 48: x3.14 for x3.23 cells): k=1 n=48 would take ~11 GB on one process, ~14 GB
+  on 2 or 4, beyond the machine. On one process, by extrapolation: under 5 GB up to k=0 n ~ 55, k=1 n ~ 36; in the
+  ~8 GB available (the rest: the IDE, the sessions) up to k=0 n ~ 60, k=1 n ~ 40.
+
 Next ideas:
-1. **The assembly of the program distributed** (each process its cells and those of its faces): the memory per process,
-   for larger cases, then the scaling on more processes (another machine).
+1. **The memory per process** (2026-10-28 above), by size: the local matrices kept by the cells after the assembly
+   (k=1 n=32: 2.26 of the 3.38 GB of one process; keep only what the post-processing needs, free the quadrature points
+   of the shapes after the assembly), the mesh (~2.5 KB per cell), the transient of the static condensation (+655 MB at
+   k=1 n=32), and on several processes the copies of `SolveDistributed()` (+624 MB per process at k=1 n=32 on 2
+   processes, its peak: the full copies of `FullFromLower()`, the distributed blocks kept beside the program's). Then
+   the scaling on more processes (another machine).
 2. **The halo exchanges**: persistent buffers and requests, and the product of `Diag` while the ghosts are exchanged
    (overlap): not measured, probably small on one node.
 3. **The coarse levels on fewer processes**: on many processes the reductions of the K-cycle on the coarse levels, and the

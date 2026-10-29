@@ -1,7 +1,7 @@
 #!/bin/bash
 # Scaling of the distributed U-AMG (MPI): processes x threads per process, the processes bound to their cores (MPICH's
 # -bind-to core:<threads>), elapsed setup and solve times (best of 2) and iterations. Run nothing else meanwhile.
-# Each process holds the whole mesh and system (the program's assembly is not distributed): mind the memory.
+# Mind the memory: PERFORMANCE.md "Distributed memory (MPI)" gives the peak per process of the program.
 #
 # Usage (from build-mpi/, conda env activated): scaling_mpi.sh <output dir> <arguments of fhhos4...>
 # CONFIGS: the configurations "processes,threads" (default: "1,1 1,8 2,1 2,4 4,1 4,2 8,1").
