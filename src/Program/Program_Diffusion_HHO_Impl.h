@@ -604,6 +604,8 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 
 					error = problem->L2ErrorNormalDerivative(testCase->ExactSolution_Neumann, normalDerivative);
 					cout << endl << "L2 Error (normal derivative) (new) = " << std::scientific << error << endl;
+					if (results)
+						results->NormalDerivativeL2Error = error;
 
 				}
 				else

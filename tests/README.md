@@ -34,7 +34,7 @@ ctest -E HPConfig                          # skip the slowest tests
 ./bin/fhhos4_tests --gtest_filter=*Kellogg*  # or filter the binary directly
 ```
 
-The full suite is 332 CTest cases and runs in about 8 minutes serially. The 8 `HPConfigTest` cases take about 2 minutes of it (~15 s each: N=128 with k=5 is the smallest size of the high-order paper); the other cases take less than 20 s each.
+The full suite is 349 CTest cases and runs in about 8 minutes serially. The 8 `HPConfigTest` cases take about 2 minutes of it (~15 s each: N=128 with k=5 is the smallest size of the high-order paper); the other cases take less than 20 s each.
 
 ## GMSH meshes: reproducibility
 
@@ -152,6 +152,9 @@ Validates *"Iterative solution to the biharmonic equation in mixed form discreti
 - **`Square/BiharSquarePolyTest.ConvergenceOrderAndIterationCounts`** (2 cases: k=0,1) — Figs. 3-5: square, polygonal mesh (agglomeration of a GMSH Cartesian mesh, interfaces collapsed), n=16,32, sequential. The paper plots the errors: the L2 error should converge at the same rate as on the Cartesian mesh (h² for k=0, h^(k+2) for k≥1; assertion: least-squares slope within ±0.3), and the iteration counts are the current ones (not reported in the paper).
   CLI: `./bin/fhhos4 -pb bihar -geo square -source exp -s ch -bihar-prec s -nbh-depth 8 -bihar-prec-solver bicgstab -mesh poly -polymesh-init cart -polymesh-n-pass 1 -polymesh-fcs c -k {0|1} -n {16|32} -tol 1e-10 -threads 1 -no-cache`
   Expected: 6, 13 for k=0 and k=1.
+
+- **`Square/NormalDerivativeTest.ConvergenceOrder`** (8 cases: `{cart, tri} × {ch, fcguamg} × k=0,1`) — Fig. 2: the discrete normal derivative (formula (25) of the paper) of the solution of the Laplacian, u = sin(4πx)sin(4πy), on the Cartesian (in-house) and Delaunay (GMSH) meshes, n=16,32. Its relative L2 error on the boundary (printed `(new)`, the paper's measure) should converge in O(h^(k+1)), as in the paper (assertion: least-squares slope within ±0.3; current slopes: k=0 0.99 / 0.95, k=1 2.20 / 1.97). With U-AMG, the operators of the cells must survive the assembly (`KeepCellOperators`).
+  CLI: `./bin/fhhos4 -pb diff -geo square -source sine -mesh {cart|tri} -s {ch|fcguamg} -normalder -k {0|1} -n {16|32} -no-cache`
 
 - **`Cube/BiharCubeTetTest.IterationCounts`** (2 cases: `{s, no}`) — Table 3: cube, unstructured tetrahedral mesh, k=0, first mesh size (n=8: 3411 elements, 3373 in the paper), neighbourhood depth 2, Laplacian problems solved by FCG preconditioned by U-AMG.
   CLI: `./bin/fhhos4 -pb bihar -geo cube -source exp -mesh tetra -not-compute-errors -s fcguamg -smoothers bgs -hp-cs p_h -nbh-depth 2 -bihar-prec-solver bicgstab -tol 1e-8 -k 0 -bihar-prec {s|no} -n 8 -no-cache`
@@ -389,7 +392,7 @@ Not in `fhhos4_tests`: a ctest test of a build with `-DENABLE_PYTHON=ON` (e.g. `
 
 ## Coverage summary
 
-- 332 CTest cases total across the 19 files above, exercising `Program_Diffusion_HHO` (diffusion problems) and `Program_BiHarmonic_HHO` (biharmonic problem in mixed form), with the HHO discretization and static condensation, and the library `fhhos4`.
+- 349 CTest cases total across the 19 files above, exercising `Program_Diffusion_HHO` (diffusion problems) and `Program_BiHarmonic_HHO` (biharmonic problem in mixed form), with the HHO discretization and static condensation, and the library `fhhos4`.
 - Dimensions: 2D and 3D. No 1D coverage (the run helpers throw for it, consistent with `ENABLE_1D=OFF` by default).
 - Meshes: in-house `cart`, `stri`, `quad`, `stetra`; GMSH `cart`, `tri`, `tetra`, and a locally refined mesh; polygonal meshes (`poly`, CGAL) built from a GMSH Cartesian mesh, with and without interface collapsing (`-polymesh-fcs c|n`).
 - Polynomial spaces: P, and Q (`-poly-space q`) on Cartesian meshes (convergence, U-AMG in the program and through the library).

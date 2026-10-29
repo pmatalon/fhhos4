@@ -4,7 +4,8 @@
 //
 // The meshes are built by GMSH. The tests check the current iteration counts; the paper's values
 // (Tables 1 and 3 of revision 2) are given for comparison, and are all reproduced except one.
-// On the polygonal meshes (Figs. 3-5), they check the convergence order of the L2 error.
+// On the polygonal meshes (Figs. 3-5), they check the convergence order of the L2 error, and that of
+// the discrete normal derivative of a Laplacian's solution (Fig. 2).
 // To keep the suite fast, only the smallest mesh sizes and k = 0, 1 are tested.
 #include <gtest/gtest.h>
 #include <string>
@@ -54,6 +55,46 @@ INSTANTIATE_TEST_SUITE_P(Square, BiharSquareCartTest, ::testing::Values(
 	// N=32: 30 iterations, as in the paper, when the mesh is loaded from the GMSH cache, whose vertex
 	// coordinates differ by ~1e-14 (see tests/README.md): the unpreconditioned FCG is sensitive to it.
 	std::make_tuple(std::string("no"), 1, std::vector<ExpectedIterations>{ { 32, 28, 30 }, { 64, 36, 36 } })));
+
+// Fig. 2: the discrete normal derivative (Section 4, formula (25)) of the solution of the Laplacian,
+// u = sin(4 pi x) sin(4 pi y) (-source sine), on Cartesian and Delaunay (GMSH) meshes. Its relative
+// L2 error on the boundary, printed "(new)" by the program, converges in O(h^(k+1)) (the paper's
+// figure gives the slopes only); current slopes on n=16,32: k=0 0.99 / 0.95, k=1 2.20 / 1.97. With
+// U-AMG, the program keeps the operators of the cells after the assembly (KeepCellOperators): the
+// normal derivative reads them.
+class NormalDerivativeTest : public ::testing::TestWithParam<std::tuple<std::string, std::string, int>> // mesh, solver, k
+{
+};
+
+//   ./bin/fhhos4 -pb diff -geo square -source sine -mesh {cart|tri} -s {ch|fcguamg} -normalder -k {0|1} -n {16|32} -no-cache
+TEST_P(NormalDerivativeTest, ConvergenceOrder)
+{
+	auto [meshCode, solverCode, k] = GetParam();
+
+	std::vector<double> h;
+	std::vector<double> errors;
+	for (int N : { 16, 32 })
+	{
+		ProgramArguments args;
+		args.Problem.GeoCode = "square";
+		args.Problem.SourceCode = "sine";
+		args.Problem.ComputeNormalDerivative = true;
+		args.Discretization.MeshCode = meshCode;
+		args.Discretization.N = N;
+		args.Discretization.PolyDegree = k + 1;
+		args.Solver.SolverCode = solverCode;
+		args.Actions.UseCache = false; // -no-cache
+
+		ProgramResults results = RunDiffusionHHO(args);
+		ASSERT_GT(results.NormalDerivativeL2Error, 0) << "N=" << N;
+		h.push_back(1.0 / N);
+		errors.push_back(results.NormalDerivativeL2Error);
+	}
+	EXPECT_NEAR(EstimateConvergenceOrder(h, errors), k + 1, 0.3);
+}
+
+INSTANTIATE_TEST_SUITE_P(Square, NormalDerivativeTest, ::testing::Combine(
+	::testing::Values(std::string("cart"), std::string("tri")), ::testing::Values(std::string("ch"), std::string("fcguamg")), ::testing::Values(0, 1)));
 
 #ifdef CGAL_ENABLED
 // Figs. 3-5: square, polygonal mesh (agglomeration of a GMSH Cartesian mesh). The paper plots the

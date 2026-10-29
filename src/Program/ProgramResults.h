@@ -7,4 +7,5 @@ struct ProgramResults
 {
 	int IterationCount = -1;
 	double L2Error = -1;
+	double NormalDerivativeL2Error = -1; // -normalder: relative L2 error on the boundary
 };

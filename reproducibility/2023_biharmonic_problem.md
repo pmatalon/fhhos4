@@ -10,6 +10,8 @@ Fig. 2
 ```bash
 -pb diff -geo square -source sine -s ch -mesh {cart|tri} -normalder -k {0|1|2|3} -n {16|32|64|128|256|512}
 ```
+The error of the figure is the one printed `L2 Error (normal derivative) (new)` (relative, on the boundary, against the
+exact normal derivative).
 <!-- 
 ### Well-posedness
 ```bash
