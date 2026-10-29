@@ -318,14 +318,7 @@ public:
 
 		if (actions.LogAssembly)
 			cout << "\tCompute local matrices (allocation of " + Utils::MemoryString(totalElemLocalMatricesMemory) + ")" << endl;
-		this->InitHHO();
-
-		if (!actions.Export.AssemblyTermMatrices)
-		{
-			#pragma omp parallel for
-			for (Element<Dim>* element : elements)
-				HHOElement(element)->DeleteUselessMatricesAfterAssembly(); // Acons, Astab
-		}
+		this->InitHHO(true, actions.Export.AssemblyTermMatrices);
 
 		// Notations:
 		// 
@@ -725,10 +718,10 @@ public:
 	//------------------------------//
 	//           Init HHO           //
 	//------------------------------//
-	void InitHHO(bool assembleLocalMatrices = true)
+	void InitHHO(bool assembleLocalMatrices = true, bool keepTermMatrices = true)
 	{
 		InitHHO_Faces();
-		InitHHO_Elements(assembleLocalMatrices);
+		InitHHO_Elements(assembleLocalMatrices, keepTermMatrices);
 
 		CellSpace             = HHOCellSpace            (_mesh, HHO, _hhoElements, _mesh->Elements, OwnElements());
 		ReconstructSpace      = HHOReconstructSpace     (_mesh, HHO, _hhoElements, OwnElements(), OwnElements());
@@ -752,7 +745,9 @@ public:
 			_hhoFaces[f->Number].InitHHO(HHO);
 		}
 	}
-	void InitHHO_Elements(bool assembleLocalMatrices = true)
+	// keepTermMatrices: false deletes Acons and Astab of each cell once its A is computed, in the same iteration: the next
+	// cells of the thread reuse their memory (deleted after all the cells, they left holes in the heap)
+	void InitHHO_Elements(bool assembleLocalMatrices = true, bool keepTermMatrices = true)
 	{
 		if (!_hhoElements.empty())
 			Utils::Warning("The HHO elements of this problem have already been initialized.");
@@ -768,6 +763,8 @@ public:
 				_hhoElements[e->Number].Faces.push_back(&this->_hhoFaces[f->Number]);
 
 			_hhoElements[e->Number].InitHHO(HHO, assembleLocalMatrices);
+			if (!keepTermMatrices)
+				_hhoElements[e->Number].DeleteUselessMatricesAfterAssembly();
 		}
 	}
 
