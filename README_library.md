@@ -1,4 +1,4 @@
-# the fhhos4 solver as an external library
+# The fhhos4 solver as an external library
 
 # 1. Installation
 
@@ -16,29 +16,21 @@ cmake --install build --prefix <prefix>    # lib/, include/ and the CMake packag
 
 Without installing, the library is `build/lib/libfhhos4.so`.
 
-Build options (`-D<OPTION>=ON|OFF`): `ENABLE_OPENMP` (ON: parallel), `ENABLE_NATIVE_ARCH` (OFF: `-march=native`:
-optimized for the CPU of the build machine, may not run on others), `SMALL_INDEX` (ON: `int` indices in
-`fhhos4::SparseMatrix`, `intmax_t` otherwise), `ENABLE_PYTHON` (OFF: the Python module, see [Python](#python)),
-`ENABLE_MPI` (OFF: the solver on several processes, see [Several processes](#several-processes-mpi); needs MPI and
-[MUMPS](https://mumps-solver.org) (its MPI version, e.g. conda-forge's `mumps-mpi`), and your code is then compiled and
-linked with MPI too; the Python module then needs mpi4py), `ENABLE_MUMPS` (OFF: the coarse solver
-`CoarseSolver::MUMPS` on one process; always with `ENABLE_MPI`; without it, needs MUMPS's sequential version, e.g.
-conda-forge's `mumps-seq`). MUMPS is found from its header `dmumps_c.h` and its library `libdmumps`, or given by
-`-DMUMPS_INCLUDE_DIR=<dir> -DMUMPS_LIBRARY=<path>/libdmumps.so`.
+Build options (`cmake -D<OPTION>=<value>`):
 
-### Conda package
+| Option | Default | Effect |
+|---|---|---|
+| `ENABLE_OPENMP` | `ON` | Parallel (OpenMP) |
+| `ENABLE_NATIVE_ARCH` | `OFF` | `-march=native`: optimized for the CPU of the build machine, may not run on others |
+| `SMALL_INDEX` | `ON` | `int` indices in `fhhos4::SparseMatrix` (`intmax_t` otherwise) |
+| `ENABLE_PYTHON` | `OFF` | The Python module, see [Python](#python) |
+| `ENABLE_MPI` | `OFF` | The solver on several processes, see [Several processes](#several-processes-mpi). Needs MPI and [MUMPS](https://mumps-solver.org) (its MPI version, e.g. conda-forge's `mumps-mpi`); your code is then compiled and linked with MPI too, and the Python module needs mpi4py |
+| `ENABLE_MUMPS` | `OFF` | The coarse solver `CoarseSolver::MUMPS` on one process; always on with `ENABLE_MPI`. Without MPI, needs MUMPS's sequential version, e.g. conda-forge's `mumps-seq` |
+| `MUMPS_INCLUDE_DIR`, `MUMPS_LIBRARY` | found | MUMPS is found from its header `dmumps_c.h` and its library `libdmumps`, or given by `-DMUMPS_INCLUDE_DIR=<dir> -DMUMPS_LIBRARY=<path>/libdmumps.so` |
 
-The recipe `conda/recipe` builds the conda package `fhhos4` (Linux), with [rattler-build](https://rattler.build)
-(`conda install -c conda-forge rattler-build`):
+### Conda and Spack packages
 
-```bash
-rattler-build build -r conda/recipe -c conda-forge --experimental   # the package in ./output
-conda install -c ./output -c conda-forge fhhos4
-```
-
-The package is the library alone. It depends on Eigen only (>= 3.4, see the constraints below), and a package of your
-code built with it requires the same minor version of `fhhos4` (see the version below). `find_package(fhhos4)` finds it
-in the environment. `--experimental`: the recipe reads the version from `CMakeLists.txt`.
+Coming soon.
 
 ## Link
 
@@ -58,15 +50,15 @@ directory of the library in the RPATH of the executable. A library compiled with
 The shared library `fhhos4` offers an algebraic multigrid method for the solution of linear systems 
 arising from hybrid discretizations (HHO, HDG...) of scalar diffusion and convection-diffusion problems, 
 of the form
-```
-[ A_TT  A_TF ] [x_T]   [b_T]
-[ A_FT  A_FF ] [x_F] = [b_F]
-```
+$$
+\begin{pmatrix} A_{TT} & A_{TF} \\ A_{FT} & A_{FF} \end{pmatrix}
+\begin{pmatrix} x_T \\ x_F \end{pmatrix} =
+\begin{pmatrix} b_T \\ b_F \end{pmatrix}
+$$
 While the smoothers work on the condensed system (given by the elimination of the cell unknowns)
-```
-A = A_FF - A_FT A_TT^{-1} A_TF
-b = b_F  - A_FT A_TT^{-1} b_T
-```
+$$
+A = A_{FF} - A_{FT} A_{TT}^{-1} A_{TF}, \qquad b = b_F - A_{FT} A_{TT}^{-1} b_T
+$$
 the aggregation method used for the construction of coarse levels requires the blocks of the uncondensed matrix
 (to recover the cell-to-cell connectivity amongst other things). Consequently, instead of giving only the condensed system like any black-box AMG method, 
 the blocks of the uncondensed matrix must in our case be passed to the solver.
