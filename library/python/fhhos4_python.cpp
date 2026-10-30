@@ -271,13 +271,12 @@ NB_MODULE(fhhos4, m)
 
 	nb::exception<fhhos4::Error>(m, "Error", PyExc_RuntimeError);
 	m.def("Version", &fhhos4::Version, "The version of the library, with the commit when built from a clone");
-	m.attr("WithMPI") = (bool)FHHOS4_MPI; // compiled with MPI: Solver.Comm to set
+	m.attr("WithMPI") = (bool)FHHOS4_MPI; // compiled with MPI: Solver.Comm (not set: one process)
 
 	nb::enum_<fhhos4::Krylov>(m, "Krylov")
 		.value("Default", fhhos4::Krylov::Default)
 		.value("FCG", fhhos4::Krylov::FCG)
 		.value("GCR", fhhos4::Krylov::GCR)
-		.value("BiCGSTAB", fhhos4::Krylov::BiCGSTAB)
 		.value("None", fhhos4::Krylov::None);
 
 	nb::enum_<fhhos4::Cycle>(m, "Cycle")
@@ -433,7 +432,7 @@ NB_MODULE(fhhos4, m)
 		.def_rw("Threads", &fhhos4::Solver::Threads)
 		.def_rw("Verbosity", &fhhos4::Solver::Verbosity)
 #if FHHOS4_MPI
-		// The processes of the solver: an mpi4py communicator (MPI.COMM_SELF, MPI.COMM_WORLD...), to set
+		// The processes of the solver: an mpi4py communicator (MPI.COMM_SELF, MPI.COMM_WORLD...); not set: one process
 		.def_prop_rw("Comm", [](const PySolver& s) { return s.CommObject; },
 			[](PySolver& s, nb::handle comm) { s.Comm = ToComm(comm); s.CommObject = nb::borrow(comm); })
 #endif

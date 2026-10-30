@@ -16,5 +16,5 @@ MPI (2026-10-20) targets U-AMG in the library, for DOLFINx (where MPI is mandato
   mesh, adds the rows of the ghosts to their owners.
 - The library's layout is DOLFINx's, PETSc's and hypre's: each process gives the rows of its own cells and faces, the
   columns numbered locally (own, then ghosts), with the global numbers of its ghosts.
-- `Solver::Comm` has no default (ADR-0005).
+- `Solver::Comm` not set: one process, with no MPI call (ADR-0005).
 - Non-symmetric systems on several processes come after the symmetric case is complete.

@@ -45,7 +45,8 @@ program too).
   faces and the columns of the cells of the process (what its cells read: couplings, `P^T A_F_T Q_T`), the downwind
   order of the faces of each process (`Diag`; Jacobi between the processes). Ghost faces may belong to no local cell
   (couplings of `A_FF`): `CoarseningPass::NOwnedFaces`. All global decisions (coarsening ratio, errors) reduced.
-- Library: `Solver::Comm` (no default), `SetupSymmetric(..., GhostNumbers faceGhosts)` (local columns: own faces then
+- Library: `Solver::Comm` (not set: one process, no MPI call; `MUMPS` then needs MPI initialized; forgotten on several
+  processes: `ForgottenComm()` ends the errors of distributed inputs, ghosts or `A_FF` with more columns than rows), `SetupSymmetric(..., GhostNumbers faceGhosts)` (local columns: own faces then
   ghosts, one numbering for `A_TF` and `A_FF`, `A_FF` in full), `SetupNonsymmetric(..., faceGhosts, cellGhosts)`
   (`A_FT`: rows of the own faces, columns own cells then ghost cells; turned once by the setup into the rows of all
   the local faces, the columns of the own cells: `RowsWithGhosts`, kept by the condensation, which then runs as the
@@ -89,4 +90,4 @@ program too).
 `MUMPSTest.cpp`: the coarse solver alone, with an empty first process, MUMPS's host);
 `ctest -R ProgramMPI` (the program under `mpiexec`, L2 errors; 3D k=2 also the iterations of one process; `ProgramMPI_PartitionCache_*`: a partition written,
 read by the next run, refused for another number of processes, in `build-mpi/test_partition_cache`); in an MPI build, `fhhos4_tests` uses
-`tests/MPI/main.cpp` (MPI initialized), `ToySolver()` sets `Comm = MPI_COMM_SELF`.
+`tests/MPI/main.cpp` (MPI initialized), `ToySolver()` without `Comm`.

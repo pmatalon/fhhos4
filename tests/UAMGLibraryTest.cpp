@@ -383,9 +383,6 @@ struct HybridSystem
 fhhos4::Solver ToySolver()
 {
 	fhhos4::Solver solver;
-#if FHHOS4_MPI
-	solver.Comm = MPI_COMM_SELF;
-#endif
 	solver.Dimension = 2;
 	solver.FaceDegree = 0;
 	solver.CellDegree = 0;
@@ -827,21 +824,6 @@ static_assert(SetupAccepts<const HybridSystem::Matrix&>::value);
 static_assert(!SetupAccepts<HybridSystem::Matrix>::value, "the solver keeps a reference to A_FT: a temporary A_FT must not compile");
 static_assert(SetupAccepts<fhhos4::SparseMatrixMap>::value, "a temporary map owns no array: it may be given");
 
-// BiCGSTAB preconditioned by a V-cycle (linear)
-TEST(UAMGLibrary, BiCGSTAB)
-{
-	HybridSystem system(64);
-	fhhos4::Solver uamg = ToySolver();
-	uamg.Krylov = fhhos4::Krylov::BiCGSTAB;
-	uamg.Cycle = fhhos4::Cycle::V;
-	uamg.SetupSymmetric(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
-	Eigen::VectorXd x = Eigen::VectorXd::Zero(system.b.size());
-	fhhos4::Result result = uamg.Solve(system.b, x);
-	EXPECT_TRUE(result.Converged);
-	EXPECT_LT(result.Iterations, 30);
-	EXPECT_LT(RelativeError(system, x), 1e-8);
-}
-
 // GCR preconditioned by the K-cycle, which then iterates with GCR on the coarse levels: for any matrix, here symmetric
 TEST(UAMGLibrary, GCR)
 {
@@ -1001,7 +983,7 @@ TEST(UAMGLibrary, MultigridAlone)
 TEST(UAMGLibrary, MixedPrecision)
 {
 	HybridSystem system(64);
-	for (fhhos4::Krylov krylov : { fhhos4::Krylov::FCG, fhhos4::Krylov::GCR, fhhos4::Krylov::BiCGSTAB, fhhos4::Krylov::None })
+	for (fhhos4::Krylov krylov : { fhhos4::Krylov::FCG, fhhos4::Krylov::GCR, fhhos4::Krylov::None })
 	{
 		int iterations[2];
 		for (bool mixed : { false, true })
@@ -1011,8 +993,6 @@ TEST(UAMGLibrary, MixedPrecision)
 			uamg.PreSmoother = fhhos4::Smoother::Default;
 			uamg.PostSmoother = fhhos4::Smoother::Default;
 			uamg.Krylov = krylov;
-			if (krylov == fhhos4::Krylov::BiCGSTAB)
-				uamg.Cycle = fhhos4::Cycle::V;
 			uamg.MixedPrecision = mixed;
 			uamg.SetupSymmetric(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
 			Eigen::VectorXd x = Eigen::VectorXd::Zero(system.b.size());
@@ -1038,8 +1018,7 @@ TEST(UAMGLibrary, MixedPrecision)
 	EXPECT_EQ(solutions[1], solutions[0]);
 }
 
-// Non-symmetric system (SetupNonsymmetric()): by default GCR, the K-cycle with GCR, LU on the coarsest level. Also
-// BiCGSTAB with a V-cycle.
+// Non-symmetric system (SetupNonsymmetric()): by default GCR, the K-cycle with GCR, LU on the coarsest level
 TEST(UAMGLibrary, NonsymmetricSystem)
 {
 	for (double asymmetry : { 0.3, 0.9 })
@@ -1047,23 +1026,15 @@ TEST(UAMGLibrary, NonsymmetricSystem)
 		HybridSystem system = NonsymmetricSystem(64, asymmetry);
 		ASSERT_GT((system.A - HybridSystem::Matrix(system.A.transpose())).norm(), 0.1 * system.A.norm());
 
-		fhhos4::Solver gcr = ToySolver(), bicgstab = ToySolver();
-		bicgstab.Krylov = fhhos4::Krylov::BiCGSTAB;
-		bicgstab.Cycle = fhhos4::Cycle::V;
+		fhhos4::Solver gcr = ToySolver();
 		gcr.SetupNonsymmetric(system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
-		bicgstab.SetupNonsymmetric(system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
 		EXPECT_GT(gcr.NumberOfLevels(), 2);
 
-		Eigen::VectorXd x = Eigen::VectorXd::Zero(system.b.size()), y = x;
-		fhhos4::Result r = gcr.Solve(system.b, x);
-		fhhos4::Result s = bicgstab.Solve(system.b, y);
-		for (const fhhos4::Result& result : { r, s })
-		{
-			EXPECT_TRUE(result.Converged);
-			EXPECT_LT(result.Iterations, 30);
-		}
+		Eigen::VectorXd x = Eigen::VectorXd::Zero(system.b.size());
+		fhhos4::Result result = gcr.Solve(system.b, x);
+		EXPECT_TRUE(result.Converged);
+		EXPECT_LT(result.Iterations, 30);
 		EXPECT_LT(RelativeError(system, x), 1e-8);
-		EXPECT_LT(RelativeError(system, y), 1e-8);
 	}
 }
 
@@ -1165,9 +1136,6 @@ TEST(UAMGLibrary, Errors)
 	fhhos4::Solver wrongKrylov = ToySolver();
 	wrongKrylov.Krylov = static_cast<fhhos4::Krylov>(42);
 	EXPECT_THROW(wrongKrylov.SetupSymmetric(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
-	fhhos4::Solver bicgstabKCycle = ToySolver(); // BiCGSTAB is not flexible: the K-cycle is not linear
-	bicgstabKCycle.Krylov = fhhos4::Krylov::BiCGSTAB;
-	EXPECT_THROW(bicgstabKCycle.SetupSymmetric(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 
 	// Non-symmetric matrix: FCG or Cholesky refused, A_FT of the wrong size
 	fhhos4::Solver fcg = ToySolver();

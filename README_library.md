@@ -99,7 +99,7 @@ cell and face unknowns `x_T, x_F`: your code has nothing to do with static conde
 cell unknowns.
 
 Symmetric positive definite systems, and non-symmetric ones with a positive definite symmetric part
-(convection-diffusion). Krylov method included (FCG, GCR, BiCGSTAB). Parallel (OpenMP), and on several processes (MPI,
+(convection-diffusion). Krylov method included (FCG, GCR). Parallel (OpenMP), and on several processes (MPI,
 see [Several processes](#several-processes-mpi)).
 
 ### Symmetric systems
@@ -137,9 +137,12 @@ order). `SetupNonsymmetric()` keeps a reference to `A_FT`, which each `Solve(b_T
 ### Several processes (MPI)
 
 Compiled with MPI (`-DENABLE_MPI=ON`; `FHHOS4_MPI` is then 1), a solver works on the processes of its communicator,
-`Comm`, which must be set (no default):
+`Comm`:
 
-- `MPI_COMM_SELF`: the system of each process, solved by it alone, as without MPI;
+- not set (`MPI_COMM_NULL`, the default) or `MPI_COMM_SELF`: the system of the calling process, solved by it alone, as
+  without MPI. Not set, the solver makes no MPI call: a code that doesn't use MPI needs no change, MPI not even
+  initialized (but for `CoarseSolver::MUMPS`, which needs it). Forgotten for a distributed system, the setup refuses
+  its inputs (ghosts, `A_FF` with more columns than rows) and says to set `Comm`;
 - a communicator of several processes: one system distributed by rows over them. Every setup and solve is then
   collective: called by all the processes of `Comm`, with the same parameters.
 
@@ -147,7 +150,7 @@ The distributed system: each process owns cells and faces, numbered contiguously
 process of rank 0 first, then those of rank 1...; the same for the faces), and gives the rows of its own:
 
 ```cpp
-solver.Comm = MPI_COMM_WORLD; // to set
+solver.Comm = MPI_COMM_WORLD;
 // A_TT, A_TF: the rows of the cells of the process; A_FF: the rows of its faces, in full (both triangles).
 // The columns of A_TF and A_FF: the faces of the process, then its ghosts (the faces of other processes that its rows
 // reference), whose global numbers are faceGhosts, in their local order.
@@ -172,8 +175,8 @@ fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F); // the vectors of the 
   factorized and solved by MUMPS on all the processes, distributed. The number of iterations may change slightly with
   the number of processes.
 - Available on several processes: the uncondensed system (`SetupSymmetric()`, `SetupNonsymmetric()`), with all the
-  parameters but `Krylov::BiCGSTAB`; the Gauss-Seidel smoothers are Gauss-Seidel in each process (the hybrid ones: in
-  each thread), Jacobi between the processes. Not yet: `CondensedMatrix()`.
+  parameters; the Gauss-Seidel smoothers are Gauss-Seidel in each process (the hybrid ones: in each thread), Jacobi
+  between the processes. Not yet: `CondensedMatrix()`.
 - In Python: see [Python](#python).
 - The errors of the inputs are raised on all the processes.
 
@@ -223,20 +226,21 @@ result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
   dofs)` (NumPy arrays of the same integer dtype), `Gather()`, `Scatter()`, `ToCSR()`, `TransposedView()`.
 - The errors raise `fhhos4.Error`, a `RuntimeError`.
 - The setups, solves and helpers release the GIL.
-- Compiled with MPI (`-DENABLE_MPI=ON` too; `fhhos4.WithMPI` is then `True`), the module needs
+- Compiled with MPI (`-DENABLE_MPI=ON` too; `fhhos4.WithMPI` is then `True`), `solver.Comm` not set: one process, as
+  in C++ (see [Several processes](#several-processes-mpi)). To set it, the module needs
   [mpi4py](https://mpi4py.readthedocs.io), built with the same MPI as the library, and imported first (it initializes
   MPI). `solver.Comm`: an mpi4py communicator (`MPI.COMM_SELF`, `MPI.COMM_WORLD`, or its Fortran handle
-  `comm.py2f()`), to set, as in C++ (see [Several processes](#several-processes-mpi)). On several processes,
-  `SetupSymmetric(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhosts)`: `faceGhosts`, the global numbers of
-  the ghost faces, a NumPy array of `int64` read in place (`None` by default: no ghosts); `SetupNonsymmetric(A_TT, A_TF,
-  A_FT, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhosts, cellGhosts)`, `cellGhosts` likewise.
+  `comm.py2f()`). On several processes, `SetupSymmetric(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne,
+  faceGhosts)`: `faceGhosts`, the global numbers of the ghost faces, a NumPy array of `int64` read in place (`None` by
+  default: no ghosts); `SetupNonsymmetric(A_TT, A_TF, A_FT, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhosts,
+  cellGhosts)`, `cellGhosts` likewise.
 
   ```python
   from mpi4py import MPI  # first: initializes MPI
   import fhhos4
 
   solver = fhhos4.Solver()
-  solver.Comm = MPI.COMM_WORLD  # to set
+  solver.Comm = MPI.COMM_WORLD
   ...
   solver.SetupSymmetric(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhosts)  # the rows of the process
   result = solver.Solve(b_T, b_F, x_T, x_F)  # the vectors of the cells and faces of the process
@@ -305,7 +309,7 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 |---|---|---|
 | `PolynomialSpace` | `PolynomialSpace::P` | `fhhos4::PolynomialSpace`, the space of the bases of the cells and faces: `P` (P^l and P^k: the polynomials of degree at most l, k), `Q` (Q^l and Q^k: of degree at most l, k in each variable, on quadrilaterals and hexahedra) |
 | `SingularMatrix` | `false` | `true`: the matrix is singular, its kernel spanned by the interpolation of 1 (the constants), e.g. the pure Neumann problem; `SetupSymmetric()` only. The setup checks that the interpolation of 1 is in the kernel (an error otherwise: a Dirichlet face in the system, or a wrong interpolation of 1); each solve projects the condensed right-hand side onto the image of the matrix (at `Verbosity >= 1`, a message if the component removed is more than rounding: incompatible data). The solution is defined up to a multiple of the interpolation of 1 (a constant): shift it to the normalization you want (e.g. zero mean) |
-| `Krylov` | `Krylov::Default`: `Krylov::FCG` for a symmetric matrix, `Krylov::GCR` otherwise | `fhhos4::Krylov`: `FCG` (flexible conjugate gradient), `GCR` (GCR(10), any matrix), `BiCGSTAB` (V- or W-cycle only), `None` (the multigrid cycles alone) |
+| `Krylov` | `Krylov::Default`: `Krylov::FCG` for a symmetric matrix, `Krylov::GCR` otherwise | `fhhos4::Krylov`: `FCG` (flexible conjugate gradient), `GCR` (GCR(10), any matrix), `None` (the multigrid cycles alone) |
 | `Tolerance` | `1e-8` | `Solve()` stops when the relative residual of the condensed system (the true one, `Result::RelativeResidual`) is below it |
 | `MaxIterations` | `200` | |
 | `Cycle` | `Cycle::K` | `fhhos4::Cycle`: `V`, `W` or `K` (K-cycle: a non-linear preconditioner, which requires FCG or GCR) |
@@ -320,7 +324,7 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 | `MixedPrecision` | `true` | Mixed precision: the matrices of the levels of the AMG (operators, transfers, smoothers) stored and its cycles run in single precision (`float`), but the coarsest solve: half the memory of the levels, faster cycles. The setup computes in double (the same levels, rounded), and the Krylov method, the matrix, the residuals and the solution stay in double: the tolerance can be that of the double precision, usually in the iterations of the double precision. Only for a symmetric matrix, on one process, with the Chebyshev smoothers (the defaults); otherwise the levels are in double, as with `false` |
 | `BlockCSRStorage` | `false` | The operator of the levels whose faces have several DoFs (`FaceDegree >= 1`) stored by blocks (block CSR: one column index per block of coupled faces instead of one per coefficient) for the smoothers and the cycle: passes over the matrix 1.4-2.5x faster. Always so in mixed precision (`MixedPrecision`, the default: no copy). In double precision, `true`: at the cost of a copy of the condensed matrix (about 2/3 of its memory). With the Chebyshev smoothers (the defaults), on one process; otherwise in CSR |
 | `Threads` | `0`: the OpenMP setting, but at most one thread per physical core unless `OMP_NUM_THREADS` or OpenMP's binding is set (on several processes: the cores divided among the processes of `Comm` that run on the same CPUs) | |
-| `Comm` | (MPI only) none: to set | `MPI_COMM_SELF`, or the communicator of the processes of a distributed system |
+| `Comm` | (MPI only) `MPI_COMM_NULL`: not set, one process, no MPI call (MPI may not be initialized, but for `CoarseSolver::MUMPS`) | `MPI_COMM_SELF` (one process), or the communicator of the processes of a distributed system |
 | `Verbosity` | `0`: silent | `1`: one line per setup and per solve; `2`: all the messages, with the residual at each iteration |
 
 ## Constraints

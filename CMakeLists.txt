@@ -189,9 +189,9 @@ if(ENABLE_PYTHON)
 	message(STATUS "ENABLE_PYTHON: ON (module fhhos4 for ${Python_EXECUTABLE})")
 
 	enable_testing()
-	# Compiled with MPI, the tests need mpi4py (skipped without it: exit code 77)
 	add_test(NAME PythonModule COMMAND ${Python_EXECUTABLE} ${CMAKE_SOURCE_DIR}/library/python/tests/test_module.py)
-	set_tests_properties(PythonModule PROPERTIES ENVIRONMENT PYTHONPATH=${CMAKE_BINARY_DIR}/python SKIP_RETURN_CODE 77)
+	set_tests_properties(PythonModule PROPERTIES ENVIRONMENT PYTHONPATH=${CMAKE_BINARY_DIR}/python)
+	# The distributed tests need mpi4py (skipped without it: exit code 77)
 	if(ENABLE_MPI)
 		foreach(np 2 4)
 			add_test(NAME PythonModuleMPI_np${np} COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${np} ${MPIEXEC_PREFLAGS} ${Python_EXECUTABLE}

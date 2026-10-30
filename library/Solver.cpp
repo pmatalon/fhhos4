@@ -10,7 +10,6 @@
 #include "ProgramArgumentsDefaults.h"
 #include "Solver/AlgebraicSolverFactory.h"
 #include "Solver/LibraryParameters.h"
-#include "Solver/Krylov/PreconditionedBiCGSTAB.h"
 #include "Solver/DistributedStaticCondensation.h"
 #include "Solver/StaticCondensation.h"
 #include "Utils/BorrowedSparseMatrix.h"
@@ -163,6 +162,22 @@ namespace fhhos4
 			comm.Broadcast(text, failedRank);
 			Utils::FatalError(string(text.begin(), text.end()) + (comm.Size() > 1 ? " (on the process " + to_string(failedRank) + ")" : ""));
 		}
+
+		// The end of the errors of the inputs of a distributed system given on one process: Comm forgotten, if it is not set
+		// and MPI runs several processes
+		string ForgottenComm(const Solver& s)
+		{
+#if FHHOS4_MPI
+			int initialized = 0, finalized = 0, size = 1;
+			MPI_Initialized(&initialized);
+			MPI_Finalized(&finalized);
+			if (s.Comm == MPI_COMM_NULL && initialized && !finalized)
+				MPI_Comm_size(MPI_COMM_WORLD, &size);
+			if (size > 1)
+				return " Comm is not set, and MPI_COMM_WORLD has " + to_string(size) + " processes: for a system distributed over them, set Comm to their communicator (e.g. MPI_COMM_WORLD).";
+#endif
+			return "";
+		}
 	}
 
 	struct Solver::Impl
@@ -198,13 +213,16 @@ namespace fhhos4
 			return Comm.IsDistributed();
 		}
 
-		// The communicator of the solver, from Solver::Comm (mandatory with MPI)
+		// The communicator of the solver: Solver::Comm with MPI; one process if it is not set, with no MPI call (MPI may
+		// not be initialized), but MUMPS's, compiled with MPI
 		void SetCommunicator(const Solver& s)
 		{
 #if FHHOS4_MPI
-			if (s.Comm == MPI_COMM_NULL)
-				Utils::FatalError("fhhos4::Solver: set Comm (the library is compiled with MPI): MPI_COMM_SELF for the system of each process, or the communicator of the processes of a distributed system.");
-			Comm = Communicator(s.Comm);
+			int initialized = 0;
+			MPI_Initialized(&initialized); // allowed before MPI_Init()
+			if (s.Comm == MPI_COMM_NULL && s.CoarseSolver == fhhos4::CoarseSolver::MUMPS && !initialized)
+				Utils::FatalError("fhhos4::Solver: CoarseSolver::MUMPS needs MPI initialized (MPI_Init()): the library is compiled with MPI, and so is its MUMPS.");
+			Comm = s.Comm == MPI_COMM_NULL ? Communicator() : Communicator(s.Comm);
 #else
 			Comm = Communicator();
 #endif
@@ -234,15 +252,12 @@ namespace fhhos4
 					break;
 				case fhhos4::Krylov::FCG:
 				case fhhos4::Krylov::GCR:
-				case fhhos4::Krylov::BiCGSTAB:
 				case fhhos4::Krylov::None:
 					Krylov = s.Krylov;
 					break;
 				default:
 					Utils::FatalError("fhhos4::Solver: invalid Krylov (" + to_string((int)s.Krylov) + ").");
 			}
-			if (Krylov == fhhos4::Krylov::BiCGSTAB && s.Cycle == fhhos4::Cycle::K)
-				Utils::FatalError("fhhos4::Solver: BiCGSTAB is not flexible: it needs a linear preconditioner, a V- or W-cycle, not the K-cycle (non-linear: it solves the coarse levels with FCG or GCR iterations). Set Cycle to Cycle::V or Cycle::W, or Krylov to Krylov::FCG or Krylov::GCR.");
 			Symmetric = symmetric;
 			CoarseSolver = s.CoarseSolver != fhhos4::CoarseSolver::Default ? s.CoarseSolver : (symmetric ? fhhos4::CoarseSolver::Cholesky : fhhos4::CoarseSolver::LU);
 			if (!symmetric && Krylov == fhhos4::Krylov::FCG)
@@ -459,12 +474,6 @@ namespace fhhos4
 				gcr->Precond = SolverPreconditioner(Multigrid.get());
 				KrylovSolver = std::move(gcr);
 			}
-			else if (Krylov == fhhos4::Krylov::BiCGSTAB)
-			{
-				auto bicgstab = make_unique<PreconditionedBiCGSTAB>();
-				bicgstab->Precond = SolverPreconditioner(Multigrid.get());
-				KrylovSolver = std::move(bicgstab);
-			}
 			ActiveSolver()->PrintIterationResults = args.Solver.PrintIterationResults;
 		}
 
@@ -507,12 +516,14 @@ namespace fhhos4
 			return;
 		}
 		if (faceGhosts.Count != 0 || cellGhosts.Count != 0)
-			Utils::FatalError("fhhos4::Solver: faceGhosts or cellGhosts on one process (Comm): the ghosts are the faces and cells of other processes.");
+			Utils::FatalError("fhhos4::Solver: faceGhosts or cellGhosts on one process (Comm): the ghosts are the faces and cells of other processes." + ForgottenComm(*this));
 		_impl->CheckParameters(*this, symmetric);
 		// The inputs, read in place, checked before the previous setup is replaced
 		unique_ptr<BorrowedSparseMatrix> a_TT = Borrow(A_TT, "A_TT"), a_TF = Borrow(A_TF, "A_TF");
 		unique_ptr<BorrowedSparseMatrix> a_FT = A_FT ? Borrow(*A_FT, "A_FT") : nullptr;
 		unique_ptr<BorrowedSparseMatrix> a_FF = Borrow(A_FF, "A_FF");
+		if (a_FF->cols() > a_FF->rows()) // the columns of ghost faces: the rows of a process of a distributed system
+			Utils::FatalError("fhhos4::Solver: A_FF (" + to_string(a_FF->rows()) + " x " + to_string(a_FF->cols()) + ") has more columns than rows: on one process (Comm), it is square." + ForgottenComm(*this));
 		Eigen::Map<const Vector> cellOne(cellInterpOfOne.Data, cellInterpOfOne.Size), faceOne(faceInterpOfOne.Data, faceInterpOfOne.Size);
 		_impl->CheckInputs(*this, *a_TT, *a_TF, a_FT.get(), *a_FF, cellOne, faceOne);
 		_impl->Setup(*this, *a_TT, *a_TF, std::move(a_FT), *a_FF, cellOne, faceOne);

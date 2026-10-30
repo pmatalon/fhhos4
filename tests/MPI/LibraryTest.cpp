@@ -173,7 +173,26 @@ TEST(DistributedLibrary, CollectiveErrors)
 		faceOnes = Vector::Ones(system.Faces->NOwned + 1);
 	fhhos4::Solver solver = CartesianSolver(World().Comm());
 	EXPECT_THROW(solver.SetupSymmetric(A_TT, A_TF, A_FF, cellOnes, faceOnes, fhhos4::GhostNumbers(ghosts.size(), ghosts.data())), fhhos4::Error);
-	// Without Comm
-	fhhos4::Solver noComm = CartesianSolver(MPI_COMM_NULL);
-	EXPECT_THROW(noComm.SetupSymmetric(A_TT, A_TF, A_FF, cellOnes, faceOnes, fhhos4::GhostNumbers(ghosts.size(), ghosts.data())), fhhos4::Error);
+	// Without Comm: each process alone, which refuses the inputs of a distributed system, the ghosts or the columns of
+	// ghost faces in A_FF (here those of A_TF: none on rank 0, which owns the faces between the processes), and tells to
+	// set Comm
+	if (!ghosts.empty())
+	{
+		fhhos4::Solver noComm = CartesianSolver(MPI_COMM_NULL);
+		for (bool withGhosts : { true, false })
+		{
+			try
+			{
+				if (withGhosts)
+					noComm.SetupSymmetric(A_TT, A_TF, A_FF, cellOnes, faceOnes, fhhos4::GhostNumbers(ghosts.size(), ghosts.data()));
+				else
+					noComm.SetupSymmetric(A_TT, A_TF, A_FF, cellOnes, faceOnes);
+				ADD_FAILURE() << "a distributed system accepted without Comm";
+			}
+			catch (const fhhos4::Error& e)
+			{
+				EXPECT_NE(string(e.what()).find("set Comm"), string::npos) << e.what();
+			}
+		}
+	}
 }

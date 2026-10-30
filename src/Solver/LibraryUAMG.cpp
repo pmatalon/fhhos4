@@ -42,9 +42,7 @@ public:
 		_solver.BlockCSRStorage = mg.UAMGBlockCSRStorage;
 		_solver.Threads = Parallelism::NThreads(); // the setting of the program for its solvers (-threads, SolverThreads)
 		_solver.Verbosity = args.Solver.PrintIterationResults ? 2 : 1;
-#if FHHOS4_MPI
-		_solver.Comm = MPI_COMM_SELF; // the system of the program on one process; SetupFromDistributedBlocks(): all of them
-#endif
+		// Comm not set: the system of the program on one process; SetupFromDistributedBlocks(): all of them
 	}
 
 	void Serialize(ostream& os) const override

@@ -126,7 +126,7 @@ program `-uamg-bcsr`.
 ## Krylov methods
 
 - GCR: restarted every 10 iterations, Notay's economical version (ETNA 37, 2010, Algorithm 3.1); the K-cycle then
-  iterates with GCR. BiCGSTAB is not flexible: the setup refuses the K-cycle with it.
+  iterates with GCR.
 - FCG replaces its recurrence residual by the true `b - A x` every 20 iterations (library; 0 in the program) and when it
   meets the tolerance (GCR: at each restart and at the tolerance), then continues if the true one does not: the
   tolerance applies to the true residual. Near the attainable accuracy the recurrence drifts; a tolerance below it runs

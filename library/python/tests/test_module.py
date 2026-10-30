@@ -9,21 +9,8 @@ import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 import fhhos4
 
-# The module compiled with MPI: the solvers of these tests on one process (Comm = MPI.COMM_SELF), MPI initialized by
-# mpi4py (skipped without it)
-if fhhos4.WithMPI:
-    try:
-        from mpi4py import MPI
-    except ImportError:
-        print("The module is compiled with MPI, and mpi4py is not installed: skipped")
-        sys.exit(77)
-
-
-def NewSolver():
-    solver = fhhos4.Solver()
-    if fhhos4.WithMPI:
-        solver.Comm = MPI.COMM_SELF
-    return solver
+# The module compiled with MPI: the solvers of these tests without Comm, on one process, MPI not initialized (a client
+# that doesn't use MPI)
 
 
 class HybridSystem:
@@ -70,7 +57,7 @@ class HybridSystem:
 
 
 def ToySolver():
-    solver = NewSolver()
+    solver = fhhos4.Solver()
     solver.Dimension = 2
     solver.FaceDegree = 0
     solver.CellDegree = 0
@@ -274,7 +261,7 @@ def test_parameters():
 def test_errors():
     system = HybridSystem(8)
     # Dimension not set
-    solver = NewSolver()
+    solver = fhhos4.Solver()
     try:
         solver.SetupSymmetric(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
         assert False, "Dimension not set accepted"
@@ -294,6 +281,15 @@ def test_errors():
         assert False, "unsorted columns accepted"
     except fhhos4.Error as e:
         assert "CSR" in str(e)
+    # Compiled with MPI, MUMPS needs MPI initialized (not by these tests)
+    if fhhos4.WithMPI:
+        solver = ToySolver()
+        solver.CoarseSolver = fhhos4.CoarseSolver.MUMPS
+        try:
+            solver.SetupSymmetric(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+            assert False, "MUMPS without MPI initialized accepted"
+        except fhhos4.Error as e:
+            assert "MPI_Init" in str(e)
 
 
 if __name__ == "__main__":

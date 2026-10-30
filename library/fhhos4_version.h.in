@@ -16,7 +16,8 @@
 #define FHHOS4_SPARSE_INDEX @FHHOS4_SPARSE_INDEX@
 
 // 1 if fhhos4 is compiled with MPI (-DENABLE_MPI=ON): fhhos4::Solver then works on the processes of an MPI communicator
-// (Solver::Comm), and the calling code must be compiled and linked with MPI. 0 otherwise.
+// (Solver::Comm; not set: on the calling process alone), and the calling code is compiled and linked with MPI (fhhos4.h
+// includes mpi.h; the CMake package brings it). 0 otherwise.
 #define FHHOS4_MPI @FHHOS4_MPI@
 
 namespace fhhos4

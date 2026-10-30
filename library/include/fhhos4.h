@@ -42,11 +42,11 @@
 // the calling code, compiled with its own version of Eigen (the inline functions of this header give their arrays to
 // the library). The library never allocates memory that the calling code frees, nor the other way around.
 //
-// Compiled with MPI (FHHOS4_MPI, -DENABLE_MPI=ON), a Solver works on the processes of its communicator (Solver::Comm),
-// on a system distributed by rows: each process gives the rows of its own cells and faces, the columns of the faces
-// numbered locally, its own faces first, then the other faces of its cells (its ghosts), whose global numbers it gives
-// too (GhostNumbers); the same for the columns of the cells of A_FT (non-symmetric). See the setups below, and
-// README_library.md.
+// Compiled with MPI (FHHOS4_MPI, -DENABLE_MPI=ON), a Solver works on the processes of its communicator (Solver::Comm;
+// without it, on the calling process alone, as without MPI), on a system distributed by rows: each process gives the
+// rows of its own cells and faces, the columns of the faces numbered locally, its own faces first, then the other faces
+// of its cells (its ghosts), whose global numbers it gives too (GhostNumbers); the same for the columns of the cells of
+// A_FT (non-symmetric). See the setups below, and README_library.md.
 namespace fhhos4
 {
 	// The index type of the sparse matrices of the library: int (32 bits), or 64 bits if fhhos4 is compiled with
@@ -175,8 +175,6 @@ namespace fhhos4
 		FCG,      // flexible conjugate gradient (fhhos4 -s fcguamg), for a symmetric positive definite matrix
 		GCR,      // GCR(10), generalized conjugate residual restarted every 10 iterations, Notay's economical version
 		          // (fhhos4 -s gcruamg). Minimizes the residual norm: for any matrix
-		BiCGSTAB, // Eigen's BiCGSTAB. Not flexible: it needs a linear preconditioner, a V- or W-cycle (not K). Not on
-		          // several processes (MPI)
 		None      // the cycles of the AMG alone, as a stationary iterative method (fhhos4 -s uamg): slower at k >= 1
 	};
 
@@ -347,10 +345,12 @@ namespace fhhos4
 		                   // On several processes: the messages of the process of rank 0.
 
 #if FHHOS4_MPI
-		// The processes of the solver (the library is compiled with MPI): to set, no default. MPI_COMM_SELF: the system of
-		// each process, solved by it alone, as without MPI. A communicator of several processes: one system distributed by
-		// rows over them (see SetupSymmetric()); every setup and solve is then collective, called by all the processes of
-		// the communicator, with the same parameters.
+		// The processes of the solver (the library is compiled with MPI). MPI_COMM_NULL (the default: not set) or
+		// MPI_COMM_SELF: the system of the calling process, solved by it alone, as without MPI; not set, the solver makes no
+		// MPI call (MPI may not be initialized), but CoarseSolver::MUMPS needs MPI initialized; forgotten for a distributed
+		// system, the setup refuses its inputs (ghosts, A_FF with more columns than rows) and says to set Comm. A
+		// communicator of several processes: one system distributed by rows over them (see SetupSymmetric()); every setup
+		// and solve is then collective, called by all the processes of the communicator, with the same parameters.
 		MPI_Comm Comm = MPI_COMM_NULL;
 #endif
 
