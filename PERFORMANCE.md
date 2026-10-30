@@ -1907,6 +1907,14 @@ Kept as they were written there; some repeat entries of "Done" in another form.
   component along the kernel: gcube k0 3.9e-4, k1 1.9e-7, k2 < 1e-10; tet4 k0 7.9e-3, k1 6.1e-5): fhhos4 projects, the
   pin puts it on one equation, so the errors differ where it is large (gcube k0 L2 0.0044 vs 0.022, tet4 k0 0.043 vs
   0.35; tet4 k1 0.0108 vs 0.0097, energy equal) and are equal where it is not (gcube k2: 0.00142038 both).
+- **Disk++ pure Neumann** (`poisson_solver`, all boundaries Neumann, u = exp(x) sin(pi x) sin(pi y) [sin(pi z)], 1e-10,
+  4 threads, 2026-10-30, `~/code/diskpp/build/bench/logs_neumann_1030/`; its direct solver has no pure Neumann
+  treatment, so against the Dirichlet problem of the same u): iterations Neumann / Dirichlet, triangles level 4 k0/1/2
+  2/18/21 vs 2/18/21, quadrangles k1 11 vs 11, hexagons k1 14 vs 9, tetrahedra level 2 k0/1/2 2/29/42 vs 2/25/33.
+  Energy errors of the same order as the Dirichlet ones (triangles k2 2.92e-4 vs 2.86e-4, tetrahedra k2 2.55e-2 vs
+  2.09e-2), and of order k+1 under refinement (triangles level 4 -> 5: k1 ratio 3.98, k2 7.98; tetrahedra level 2 ->
+  3, k1: 4.08). Relative component of the data along the kernel removed: triangles k0 7.9e-5, k1 6.7e-8; tetrahedra
+  k0 1.6e-3, k1 2.0e-4, k2 2.1e-6.
 - **`PCoarsening::ToZero`** vs Minus2 (FCG, 2026-10-19; `bgs,rbgs` / `bcheb4`): Square-tri n=64 k=3 10 -> 19 / 14 -> 27,
   k=4 9 -> 21 / 14 -> 30, k=5 7 -> 23 / 11 -> 32; Cube-tet n=8 k=3 29 -> 37 / 50 -> 60.
 - **Interpolation of 1**: without the rescaling of the constant modes, L2-orthonormal bases slow U-AMG down (Cube-tet
