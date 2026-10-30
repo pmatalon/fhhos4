@@ -50,15 +50,15 @@ directory of the library in the RPATH of the executable. A library compiled with
 The shared library `fhhos4` offers an algebraic multigrid method for the solution of linear systems 
 arising from hybrid discretizations (HHO, HDG...) of scalar diffusion and convection-diffusion problems, 
 of the form
-$$
-\begin{pmatrix} A_{TT} & A_{TF} \\ A_{FT} & A_{FF} \end{pmatrix}
-\begin{pmatrix} x_T \\ x_F \end{pmatrix} =
-\begin{pmatrix} b_T \\ b_F \end{pmatrix}
-$$
+```
+[ A_TT  A_TF ] [x_T]   [b_T]
+[ A_FT  A_FF ] [x_F] = [b_F]
+```
 While the smoothers work on the condensed system (given by the elimination of the cell unknowns)
-$$
-A = A_{FF} - A_{FT} A_{TT}^{-1} A_{TF}, \qquad b = b_F - A_{FT} A_{TT}^{-1} b_T
-$$
+```
+A = A_FF - A_FT A_TT^{-1} A_TF
+b = b_F  - A_FT A_TT^{-1} b_T
+```
 the aggregation method used for the construction of coarse levels requires the blocks of the uncondensed matrix
 (to recover the cell-to-cell connectivity amongst other things). Consequently, instead of giving only the condensed system like any black-box AMG method, 
 the blocks of the uncondensed matrix must in our case be passed to the solver.
