@@ -9,7 +9,7 @@ The library alone needs a C++17 compiler, CMake (>= 3.20), Ninja or Make, and
 
 ```bash
 git clone https://github.com/pmatalon/fhhos4.git && cd fhhos4
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_PROGRAM=OFF
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 cmake --install build --prefix <prefix>    # lib/, include/ and the CMake package
 ```
@@ -188,7 +188,7 @@ reads its inputs: never copied nor converted (with its own matrix types, Python 
 NumPy (SciPy is optional), and is built with the library (not installed yet: use it from the build tree):
 
 ```bash
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_PROGRAM=OFF -DENABLE_PYTHON=ON
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_PYTHON=ON
 cmake --build build
 export PYTHONPATH=$PWD/build/python    # the module fhhos4
 ctest --test-dir build                 # its tests (they need SciPy)

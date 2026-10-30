@@ -59,7 +59,7 @@ With the `fhhos4` conda environment activated:
 ```bash
 cd <path-to-fhhos4>
 mkdir build && cd build
-cmake -G Ninja -DCMAKE_BUILD_TYPE=Release ..
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_PROGRAM=ON ..
 ninja
 ```
 
@@ -77,7 +77,7 @@ Build options (`cmake -D<OPTION>=ON|OFF ..`):
 | `ENABLE_TESTS` | ON | Test suite (`fhhos4_tests`, run with `ctest`). Turning it off saves little time with Ninja, more with Make. |
 | `ENABLE_GMSH` | ON | GMSH interface |
 | `ENABLE_CGAL` | ON | Polygonal meshes (2D only) |
-| `ENABLE_PROGRAM` | ON | The program `fhhos4` and its tests. OFF: the library alone, which only needs Eigen |
+| `ENABLE_PROGRAM` | OFF | The program `fhhos4` and its tests: set it ON. OFF (the default, for the users of the library): the library alone, which only needs Eigen |
 | `ENABLE_AGMG` | OFF | AGMG solver (`-s agmg`, see below) |
 | `ENABLE_OPENMP` | ON | Shared-memory parallelism |
 | `ENABLE_NATIVE_ARCH` | OFF | `-march=native`: optimized for the CPU of the build machine, may not run on others |
@@ -89,13 +89,13 @@ Build options (`cmake -D<OPTION>=ON|OFF ..`):
 If you built GMSH from source instead of using the conda package, pass its location explicitly:
 
 ```bash
-cmake -DCMAKE_BUILD_TYPE=Release -DGMSH_API=<path>/gmsh/gmsh-4.9.5-source/api -DGMSH_LIB=<path>/gmsh/gmsh-4.9.5-source/build/libgmsh.so ..
+cmake -DCMAKE_BUILD_TYPE=Release -DENABLE_PROGRAM=ON -DGMSH_API=<path>/gmsh/gmsh-4.9.5-source/api -DGMSH_LIB=<path>/gmsh/gmsh-4.9.5-source/build/libgmsh.so ..
 ```
 
 And to enable AGMG:
 
 ```bash
-cmake -DCMAKE_BUILD_TYPE=Release -DENABLE_AGMG=ON -DAGMG_DIR=<path>/agmg/AGMG_3.3.5-aca/SRC ..
+cmake -DCMAKE_BUILD_TYPE=Release -DENABLE_PROGRAM=ON -DENABLE_AGMG=ON -DAGMG_DIR=<path>/agmg/AGMG_3.3.5-aca/SRC ..
 ```
 
 The build also produces the library `lib/libfhhos4.so` (see [README_library.md](README_library.md)).

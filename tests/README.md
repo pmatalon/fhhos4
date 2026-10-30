@@ -1,6 +1,6 @@
 # tests
 
-This directory contains the validation test suite for `fhhos4`, built as a single GoogleTest binary (`fhhos4_tests`). It is wired up at the end of the top-level `CMakeLists.txt`:
+This directory contains the validation test suite for `fhhos4`, built as a single GoogleTest binary (`fhhos4_tests`, with `-DENABLE_PROGRAM=ON`). It is wired up at the end of the top-level `CMakeLists.txt`:
 
 ```cmake
 enable_testing()

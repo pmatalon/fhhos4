@@ -35,7 +35,7 @@ MPI `docs/mpi.md`; Python, its env and build directories: `docs/python.md`.
 ```bash
 conda activate fhhos4
 cd build          # or: mkdir build && cd build
-cmake -G Ninja -DCMAKE_BUILD_TYPE=Release ..
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_PROGRAM=ON ..
 ninja
 ```
 
@@ -51,8 +51,9 @@ CMake options (`-D<OPTION>=ON/OFF`):
 - `ENABLE_TESTS` (ON): build `fhhos4_tests`. Turning it off saves little time with Ninja
   (the tests compile in parallel with `Program.cpp`), more with Make.
 - `ENABLE_GMSH`, `ENABLE_CGAL` (ON, CGAL is only used in 2D), `ENABLE_AGMG` (OFF).
-- `ENABLE_PROGRAM` (ON): OFF builds the library `fhhos4` alone (needs only Eigen): the CMake file has a library
-  section, then the program's, skipped by `return()`.
+- `ENABLE_PROGRAM` (OFF, the default of the library's users): ON for the program and its tests (a new build directory
+  needs it; the existing ones keep their cached value). OFF builds the library `fhhos4` alone (needs only Eigen): the
+  CMake file has a library section, then the program's, skipped by `return()`.
 - `ENABLE_PYTHON` (OFF): the Python module of the library (`library/python`).
 - `ENABLE_MPI` (OFF): the library and the program on several processes; needs MUMPS (the coarse solver, ADR-0021).
 - `ENABLE_MUMPS` (OFF; always with `ENABLE_MPI`): MUMPS on one process too (`CoarseSolver::MUMPS`, `mumpsch|mumpslu`).

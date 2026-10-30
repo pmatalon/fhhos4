@@ -54,7 +54,7 @@ jobs:
 
       - name: Build
         run: |
-          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_PROGRAM=ON
           cmake --build build
           ./build/bin/fhhos4 -h | grep "^Version:"
 

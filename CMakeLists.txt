@@ -15,7 +15,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # program options
-option(ENABLE_PROGRAM "Build the program fhhos4 and its tests. OFF: the library alone, which only needs Eigen" ON)
+option(ENABLE_PROGRAM "Build the program fhhos4 and its tests. OFF (default, for the users of the library): the library alone, which only needs Eigen" OFF)
 option(ENABLE_GMSH "Build with the GMSH interface" ON)
 option(ENABLE_AGMG "Build with AGMG" OFF)
 option(ENABLE_CGAL "Build with CGAL" ON)
@@ -232,7 +232,7 @@ endif()
 # Program fhhos4 and its tests
 #----------------------------------------------------------------------------------------------------------------------
 if(NOT ENABLE_PROGRAM)
-	message(STATUS "ENABLE_PROGRAM: OFF (the library alone)")
+	message(STATUS "ENABLE_PROGRAM: OFF (the library alone; -DENABLE_PROGRAM=ON: the program and its tests)")
 	return()
 endif()
 
