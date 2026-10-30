@@ -34,7 +34,10 @@ program too: `-DENABLE_PROGRAM=ON`).
   stagnates; the default smoother is Chebyshev, ADR-0017),
   Cholesky/LU by MUMPS (ADR-0021; `Solver/Direct/MUMPS.h`: each process gives its rows of the matrix and of the
   right-hand side; the solution, as MUMPS distributes it, goes to the owners of its rows by an `IndexMap` whose ghosts
-  are the rows held for other processes, built at the first solve)); `IterativeSolver::SetDistributedMatrix()`; the blocks setup `Setup(A, A_T_T, A_T_F (local
+  are the rows held for other processes, built at the first solve; `INFOG(1) = -9`, its estimate of its working space
+  too small, e.g. MUMPS 5.7.3 on 3 processes: `ICNTL(14)` doubled and the factorization again, up to 4 times; not
+  deterministic on several processes, the solutions differ at the rounding level from run to run));
+  `IterativeSolver::SetDistributedMatrix()`; the blocks setup `Setup(A, A_T_T, A_T_F (local
   columns), A_F_T (empty if symmetric), faceMap, interps)`; `Level::DistributedOperator`, `DistributedP`. FCG applies the full matrix (not the lower
   triangle) on several processes.
 - U-AMG: `UncondensedLevel::CoarsenInDistributedPasses()` with `DistributedPass.h`: each process aggregates its cells,

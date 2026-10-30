@@ -141,7 +141,17 @@ private:
 		_id.jcn_loc = _jcn.data();
 		_id.a_loc = _a.data();
 		_id.job = 4; // analysis and factorization
-		Run("the factorization");
+		for (int attempt = 1; ; attempt++)
+		{
+			dmumps_c(&_id);
+			// INFOG(1) = -9: MUMPS's estimate of its working space too small (e.g. MUMPS 5.7.3 on 3 processes): more space
+			// (ICNTL(14), the percentage added to the estimate) and the factorization again, as MUMPS's guide says
+			if (_id.infog[0] != -9 || attempt == 5)
+				break;
+			_id.icntl[13] = max(2 * _id.icntl[13], 40);
+			_id.job = 2; // the factorization, on the same analysis
+		}
+		Check("the factorization");
 		this->SetupComputationalWork = _id.rinfog[2] * 1e-6; // RINFOG(3): the flops of the elimination
 
 		_nSolution = _id.info[22]; // INFO(23)
@@ -162,6 +172,11 @@ private:
 	void Run(const string& what)
 	{
 		dmumps_c(&_id);
+		Check(what);
+	}
+
+	void Check(const string& what) const
+	{
 		if (_id.infog[0] < 0)
 			Utils::FatalError("MUMPS: " + what + " failed with INFOG(1) = " + to_string(_id.infog[0]) + ", INFOG(2) = " + to_string(_id.infog[1]) + " (see MUMPS's user guide).");
 	}

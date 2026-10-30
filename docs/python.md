@@ -48,7 +48,8 @@ empty rank 0, symmetric or not, against SciPy; an input error on one process rai
 - `build-python` (`-DENABLE_PROGRAM=OFF -DENABLE_PYTHON=ON`, ~1 min); `build-python-mpi` (the same with
   `-DENABLE_MPI=ON -DENABLE_TESTS=OFF`: no GTest in that env; the GTest MPI tests run in `build-mpi-lib`, env `fhhos4`).
 - For NGSolve on several processes: env `fhhos4-python-openmpi` (the same with openmpi 5.0.11 instead of mpich, and
-  NGSolve 6.2.2608 from pip: NGSolve's runs on several processes use OpenMPI; not MUMPS yet: its configuration needs
-  `mumps-mpi`'s openmpi build), build directory
+  NGSolve 6.2.2608 from pip: NGSolve's runs on several processes use OpenMPI; MUMPS 5.7.3: `mumps-mpi=5.7.3
+  openmpi=5.0.11 _openmp_mutex=*=*_gnu libblas=*=*blis liblapack=*=*netlib`, since its OpenMPI builds 5.8.x require
+  OpenBLAS's OpenMP build, i.e. LLVM's OpenMP), build directory
   `build-python-openmpi` (the options of `build-python-mpi`; `ctest -R Python` passes with
   `OMPI_MCA_rmaps_base_oversubscribe=1`).
