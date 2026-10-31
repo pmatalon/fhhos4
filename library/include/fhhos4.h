@@ -527,7 +527,7 @@ namespace fhhos4
 		const Index* DoFs = nullptr;    // Offsets[Count]
 	};
 
-	// The blocks of a hybrid system: see ExtractSymmetricBlocks()
+	// The blocks of a hybrid system: see ExtractBlocksSym()
 	struct HybridBlocks
 	{
 		SparseMatrix A_TT, A_TF, A_FT, A_FF; // A_FT: empty (0 x 0) for a symmetric system
@@ -542,9 +542,9 @@ namespace fhhos4
 		};
 
 		template <typename RowPointer, typename Column, typename Index>
-		FHHOS4_API HybridBlocks ExtractSymmetricBlocks(const BasicCSRView<RowPointer, Column>& M, const DoFLists<Index>& cells, const DoFLists<Index>& faces);
+		FHHOS4_API HybridBlocks ExtractBlocksSym(const BasicCSRView<RowPointer, Column>& M, const DoFLists<Index>& cells, const DoFLists<Index>& faces);
 		template <typename RowPointer, typename Column, typename Index>
-		FHHOS4_API HybridBlocks ExtractNonsymmetricBlocks(const BasicCSRView<RowPointer, Column>& M, const DoFLists<Index>& cells, const DoFLists<Index>& faces);
+		FHHOS4_API HybridBlocks ExtractBlocksNonSym(const BasicCSRView<RowPointer, Column>& M, const DoFLists<Index>& cells, const DoFLists<Index>& faces);
 		template <typename Index>
 		FHHOS4_API void Gather(ConstVectorView x, const DoFLists<Index>& cells, const DoFLists<Index>& faces, VectorView x_T, VectorView x_F);
 		template <typename Index>
@@ -578,24 +578,24 @@ namespace fhhos4
 	// in no list are dropped (e.g. those of the Dirichlet faces: move their contribution to the right-hand side first).
 	// Each DoF in one list at most. Symmetric matrix: A_TT and A_FF lower triangular (what SetupSym() reads).
 	template <typename Derived, typename Index>
-	HybridBlocks ExtractSymmetricBlocks(const Eigen::SparseCompressedBase<Derived>& M, const DoFLists<Index>& cells, const DoFLists<Index>& faces)
+	HybridBlocks ExtractBlocksSym(const Eigen::SparseCompressedBase<Derived>& M, const DoFLists<Index>& cells, const DoFLists<Index>& faces)
 	{
-		static_assert(Derived::IsRowMajor, "fhhos4::ExtractSymmetricBlocks(): a row-major matrix (convert a column-major one by Eigen, a copy)");
+		static_assert(Derived::IsRowMajor, "fhhos4::ExtractBlocksSym(): a row-major matrix (convert a column-major one by Eigen, a copy)");
 		static_assert(std::is_same<typename Derived::Scalar, double>::value, "fhhos4: matrices of doubles only");
-		return detail::ToEigen(detail::ExtractSymmetricBlocks(detail::GlobalMatrixView(M), cells, faces));
+		return detail::ToEigen(detail::ExtractBlocksSym(detail::GlobalMatrixView(M), cells, faces));
 	}
 
-	// A copy: as ExtractSymmetricBlocks(), the four blocks in full, for SetupNonSym()
+	// A copy: as ExtractBlocksSym(), the four blocks in full, for SetupNonSym()
 	template <typename Derived, typename Index>
-	HybridBlocks ExtractNonsymmetricBlocks(const Eigen::SparseCompressedBase<Derived>& M, const DoFLists<Index>& cells, const DoFLists<Index>& faces)
+	HybridBlocks ExtractBlocksNonSym(const Eigen::SparseCompressedBase<Derived>& M, const DoFLists<Index>& cells, const DoFLists<Index>& faces)
 	{
-		static_assert(Derived::IsRowMajor, "fhhos4::ExtractNonsymmetricBlocks(): a row-major matrix (convert a column-major one by Eigen, a copy)");
+		static_assert(Derived::IsRowMajor, "fhhos4::ExtractBlocksNonSym(): a row-major matrix (convert a column-major one by Eigen, a copy)");
 		static_assert(std::is_same<typename Derived::Scalar, double>::value, "fhhos4: matrices of doubles only");
-		return detail::ToEigen(detail::ExtractNonsymmetricBlocks(detail::GlobalMatrixView(M), cells, faces));
+		return detail::ToEigen(detail::ExtractBlocksNonSym(detail::GlobalMatrixView(M), cells, faces));
 	}
 
 	// A copy: the vectors of the cells and faces DoFs (e.g. b_T and b_F) from a vector x in the numbering of the global
-	// matrix (b), with the lists of ExtractSymmetricBlocks()
+	// matrix (b), with the lists of ExtractBlocksSym()
 	template <typename Index>
 	void Gather(const Eigen::Ref<const Eigen::VectorXd>& x, const DoFLists<Index>& cells, const DoFLists<Index>& faces,
 	            Eigen::Ref<Eigen::VectorXd> x_T, Eigen::Ref<Eigen::VectorXd> x_F)

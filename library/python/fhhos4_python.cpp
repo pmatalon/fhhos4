@@ -350,18 +350,18 @@ NB_MODULE(fhhos4, m)
 
 	//------------------------------------------------ Helpers -----------------------------------------------//
 
-	m.def("ExtractSymmetricBlocks", [](nb::handle M, const PyDoFLists& cells, const PyDoFLists& faces)
+	m.def("ExtractBlocksSym", [](nb::handle M, const PyDoFLists& cells, const PyDoFLists& faces)
 		{
 			PyCSRView view = ToView(M, "M");
 			nb::gil_scoped_release release;
-			return view.Visit([&](auto v) { return VisitLists(cells, faces, [&](auto c, auto f) { return fhhos4::detail::ExtractSymmetricBlocks(v, c, f); }); });
+			return view.Visit([&](auto v) { return VisitLists(cells, faces, [&](auto c, auto f) { return fhhos4::detail::ExtractBlocksSym(v, c, f); }); });
 		}, "M"_a, "cells"_a, "faces"_a, "A copy: the blocks of the uncondensed system, from its global matrix, for SetupSym()");
 
-	m.def("ExtractNonsymmetricBlocks", [](nb::handle M, const PyDoFLists& cells, const PyDoFLists& faces)
+	m.def("ExtractBlocksNonSym", [](nb::handle M, const PyDoFLists& cells, const PyDoFLists& faces)
 		{
 			PyCSRView view = ToView(M, "M");
 			nb::gil_scoped_release release;
-			return view.Visit([&](auto v) { return VisitLists(cells, faces, [&](auto c, auto f) { return fhhos4::detail::ExtractNonsymmetricBlocks(v, c, f); }); });
+			return view.Visit([&](auto v) { return VisitLists(cells, faces, [&](auto c, auto f) { return fhhos4::detail::ExtractBlocksNonSym(v, c, f); }); });
 		}, "M"_a, "cells"_a, "faces"_a, "A copy: the four blocks of the uncondensed system, from its global matrix, for SetupNonSym()");
 
 	m.def("Gather", [](const ConstVector& x, const PyDoFLists& cells, const PyDoFLists& faces, Vector x_T, Vector x_F)

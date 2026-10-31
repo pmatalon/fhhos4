@@ -679,7 +679,7 @@ TEST(UAMGLibrary, OtherFormats)
 }
 
 // The global matrix of the system, in its own numbering (here: the hybrid system with the DoFs of the boundary faces,
-// scrambled), with 64-bit indices: ExtractSymmetricBlocks() and ExtractNonsymmetricBlocks() give the blocks of the lists
+// scrambled), with 64-bit indices: ExtractBlocksSym() and ExtractBlocksNonSym() give the blocks of the lists
 // (also the compiled ones that the Python module calls, with 64-bit row pointers and 32-bit columns), Gather() and
 // Scatter() the vectors: the same solver and solution as from the blocks.
 TEST(UAMGLibrary, BlocksOfTheGlobalMatrix)
@@ -730,8 +730,8 @@ TEST(UAMGLibrary, BlocksOfTheGlobalMatrix)
 			faceDoFs[i] = global[nT + i];
 		fhhos4::DoFLists<std::int64_t> cells{ nT, cellOffsets.data(), cellDoFs.data() }, faces{ nF, faceOffsets.data(), faceDoFs.data() };
 
-		fhhos4::HybridBlocks blocks = system.Symmetric ? fhhos4::ExtractSymmetricBlocks(M64, cells, faces) : fhhos4::ExtractNonsymmetricBlocks(M64, cells, faces);
-		fhhos4::HybridBlocks mixed = fhhos4::detail::ToEigen(system.Symmetric ? fhhos4::detail::ExtractSymmetricBlocks(M, cells, faces) : fhhos4::detail::ExtractNonsymmetricBlocks(M, cells, faces));
+		fhhos4::HybridBlocks blocks = system.Symmetric ? fhhos4::ExtractBlocksSym(M64, cells, faces) : fhhos4::ExtractBlocksNonSym(M64, cells, faces);
+		fhhos4::HybridBlocks mixed = fhhos4::detail::ToEigen(system.Symmetric ? fhhos4::detail::ExtractBlocksSym(M, cells, faces) : fhhos4::detail::ExtractBlocksNonSym(M, cells, faces));
 		for (const fhhos4::HybridBlocks* b : { &blocks, &mixed })
 		{
 			if (system.Symmetric)

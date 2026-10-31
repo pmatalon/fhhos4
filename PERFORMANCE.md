@@ -986,7 +986,7 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   the copying helpers; see `README_library.md`). NGSolve's HDG through the Python module (`build-python/bench/`:
   `run_iface.sh`, `summary_iface.py`, `profile_extraction.py`; on AC power), U-AMG only, best of 2, old = HEAD (SciPy's
   slicing of `a.mat.CSR()` into the blocks, then the module's conversion to Eigen in the setup) vs new
-  (`ExtractSymmetricBlocks()` on NGSolve's arrays read in place: uint64 row pointers, int32 columns), interleaved.
+  (`ExtractBlocksSym()` on NGSolve's arrays read in place: uint64 row pointers, int32 columns), interleaved.
   Same iterations, solutions bitwise identical (`test_ngsolve.py`). Extraction + setup, and U-AMG's total (extraction
   + setup + solve), 8 threads (1 thread):
 
@@ -1004,7 +1004,7 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   The total, the solves included: -6 to -26% (8 threads), -5 to -17% (1 thread). The cost of the interface in it:
   26-43% -> 11-21% on 8 threads, 15-31% -> 8-16% on 1 thread, of which the script's conversion of NGSolve's
   `FreeDofs()` to NumPy (an element by element copy, 0.09-0.31 s, in both versions) and the library's
-  `ExtractSymmetricBlocks()`, 0.17-0.32 s on 8 threads, 0.42-0.64 s on 1, for 28-40M non-zeros (vs SciPy's slicing
+  `ExtractBlocksSym()`, 0.17-0.32 s on 8 threads, 0.42-0.64 s on 1, for 28-40M non-zeros (vs SciPy's slicing
   0.5-0.9 s and the conversion to Eigen 0.25-0.6 s). The first runs of each case, old before new, gave the new solves
   2-10% slower: the order of the runs (new first: the same times).
 
@@ -1730,7 +1730,7 @@ sorted by degree, though with 40-45% fewer iterations; end to end 1.1-1.8x faste
   +19%; `CoarseningFactor` 8 (one level fewer): -3% to +1%. The defaults are at the optimum: closing the gap with BDDC
   (iterations 1.5-3.5x costlier at k >= 2: 5 passes of the fine matrix and 4 block sweeps per iteration, bound by the
   bandwidth on 8 threads, against one pass and cache-resident local solves for BDDC) takes fewer bytes per fine pass.
-- **The extraction of the blocks from a global matrix** (`ExtractSymmetricBlocks()`, after the interface redesign:
+- **The extraction of the blocks from a global matrix** (`ExtractBlocksSym()`, after the interface redesign:
   "The inputs of the library read in place" in Done): 0.17-0.32 s on 8 threads for 28-40M non-zeros, only 1.8-2.5x
   faster than on 1 thread. It reads the rows of the cells twice (`A_TT`, then `A_TF`: one `BuildByRows` per block), and
   `BuildByRows` writes each block twice (its chunks, then their concatenation); the map of the DoFs is filled
@@ -1965,7 +1965,7 @@ repository.
   0.81-0.85 (2D), 0.69-0.70 (3D), end to end 0.64-0.75 (1 thread: 0.61-0.78), with fewer iterations (10 vs 18 in 2D,
   32-35 vs 54-64 in 3D). BDDC with an AMG coarse solver (`coarsetype="h1amg"`) always slower (51-91 iterations);
   NGSolve's sparse Cholesky a tie in 2D, 6x slower than U-AMG in 3D at 25k cells.
-- **The extraction of the blocks** (2026-10-19, `ExtractSymmetricBlocks()` on NGSolve's arrays read in place; before:
+- **The extraction of the blocks** (2026-10-19, `ExtractBlocksSym()` on NGSolve's arrays read in place; before:
   SciPy's slicing and the conversion to Eigen): U-AMG's total -5 to -26%.
 - **Through the adapter** (2026-10-22, `bench_bddc.py`, `run.sh`, `summary.py`; the same cases, meshes and tolerances;
   BDDC's form with `symmetric=True` now, faster than above, e.g. 2D k=3 92k cells 2.04 -> 1.53 s; 8 threads, best of

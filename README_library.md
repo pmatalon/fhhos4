@@ -80,7 +80,7 @@ The polynomial bases used for the discretization **must be hierarchical** and or
 The polynomial spaces are P^k (simplices, polytopes), or Q^k (quadrilaterals, hexahedra: `PolynomialSpace::Q`), in the
 cells and on the faces.
 Bases not ordered by degree, but whose first function is constant, work with the p-coarsening straight to the lowest
-order (`PCoarsening::ToZero`), or better, reordered by degree: e.g. in the DoF lists of `ExtractSymmetricBlocks()`
+order (`PCoarsening::ToZero`), or better, reordered by degree: e.g. in the DoF lists of `ExtractBlocksSym()`
 (see [Other formats](#other-formats-the-helpers)), at no extra cost.
 
 # 3. How to use
@@ -214,7 +214,7 @@ result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
 - The solver keeps the arrays that the solves read alive: those of `A_FT` (`SetupNonSym()`). `CondensedMatrix()`
   returns a copy (`fhhos4.CSRMatrix`). The arrays of a `fhhos4.CSRMatrix`
   (`RowPointers`, `ColumnIndices`, `Values`) are read-only NumPy views of the library's memory, which keep it alive.
-- The helpers have the same names: `ExtractSymmetricBlocks(M, cells, faces)` with `fhhos4.DoFLists(count, offsets,
+- The helpers have the same names: `ExtractBlocksSym(M, cells, faces)` with `fhhos4.DoFLists(count, offsets,
   dofs)` (NumPy arrays of the same integer dtype), `Gather()`, `Scatter()`, `ToCSR()`, `TransposedView()`.
 - The errors raise `fhhos4.Error`, a `RuntimeError`.
 - The setups, solves and helpers release the GIL.
@@ -267,7 +267,7 @@ result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
 | Column-major (Eigen's default), or another index type | `fhhos4::SparseMatrix B = A;` (Eigen's conversion) | A copy |
 | Column-major and symmetric (`A_TT`, `A_FF`, or `A` of a symmetric system) | `TransposedView(A)`: `A^T` as an Eigen map of the arrays of `A`, which is `A`, up to the rounding errors of its assembly | No copy |
 | Your own CSR arrays, with the index type of the library | `fhhos4::SparseMatrixMap(rows, cols, nonZeros, rowPointers, columnIndices, values)` | No copy |
-| The global matrix of the system (the cells and faces DoFs in your numbering, the Dirichlet DoFs included) | `ExtractSymmetricBlocks(M, cells, faces)`, `ExtractNonsymmetricBlocks(M, cells, faces)`; `Gather()` and `Scatter()` for the vectors | Copies |
+| The global matrix of the system (the cells and faces DoFs in your numbering, the Dirichlet DoFs included) | `ExtractBlocksSym(M, cells, faces)`, `ExtractBlocksNonSym(M, cells, faces)`; `Gather()` and `Scatter()` for the vectors | Copies |
 
 The copies are Eigen matrices of your code (`fhhos4::SparseMatrix`). From a global matrix (e.g. assembled by a framework
 in its own numbering):
@@ -277,7 +277,7 @@ in its own numbering):
 // DoFs[Offsets[i + 1] - 1], in the order of its basis; the DoFs in no list (e.g. of the Dirichlet faces) are dropped
 fhhos4::DoFLists<std::int64_t> cells{ nCells, cellOffsets, cellDoFs }, faces{ nFaces, faceOffsets, faceDoFs };
 Eigen::Map<const Eigen::SparseMatrix<double, Eigen::RowMajor, std::int64_t>> M(n, n, nnz, rowPointers, columns, values);
-fhhos4::HybridBlocks blocks = fhhos4::ExtractSymmetricBlocks(M, cells, faces); // A_TT, A_TF, A_FF: one parallel pass
+fhhos4::HybridBlocks blocks = fhhos4::ExtractBlocksSym(M, cells, faces); // A_TT, A_TF, A_FF: one parallel pass
 solver.SetupSym(blocks.A_TT, blocks.A_TF, blocks.A_FF, cellInterpOfOne, faceInterpOfOne);
 fhhos4::Gather(b, cells, faces, b_T, b_F); // b: in the numbering of M
 solver.Solve(b_T, b_F, x_T, x_F);
@@ -289,8 +289,8 @@ fhhos4::Scatter(x_T, x_F, cells, faces, x); // the DoFs of x in no list unchange
 - The lists: `std::int32_t` or `std::int64_t`; each DoF in one list at most. The order of the lists gives the order of
   the blocks, and that of the DoFs of each cell or face the order of its basis (reorder them, e.g. by degree, here).
 - The Dirichlet DoFs, in no list: move their contribution to the right-hand side first (`b - M x_D`).
-- `ExtractSymmetricBlocks()` gives the lower triangular parts of `A_TT` and `A_FF` (what `SetupSym()` reads),
-  `ExtractNonsymmetricBlocks()` the four blocks in full.
+- `ExtractBlocksSym()` gives the lower triangular parts of `A_TT` and `A_FF` (what `SetupSym()` reads),
+  `ExtractBlocksNonSym()` the four blocks in full.
 
 ### Parameters
 

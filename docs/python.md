@@ -9,7 +9,7 @@ What NGSolve showed, likely true of other frameworks:
 - Its arrays read in place as they are: uint64 row pointers and int32 columns (`a.mat.CSR()`), hence the index types
   of `PyCSRView`.
 - Bases not ordered by degree (e.g. Dubiner's order): the caller sorts the DoFs of each cell and face by degree in the
-  DoF lists of `ExtractSymmetricBlocks()`, otherwise the p-levels silently use the wrong low-order space
+  DoF lists of `ExtractBlocksSym()`, otherwise the p-levels silently use the wrong low-order space
   (`PCoarsening::ToZero` is the fallback, slower from k = 3). phi_0 may differ from 1: the interpolations of 1 are
   1/phi_0.
 - On several processes: a process may own nothing (NGSolve's rank 0 holds no element), and the framework's matrices

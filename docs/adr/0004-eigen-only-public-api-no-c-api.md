@@ -8,5 +8,5 @@ Eigen, so no Eigen object crosses the compiled boundary.
 ## Considered Options
 
 - A C interface (rejected 2026-10-19): a PETSc preconditioner would be a C++ file, like PETSc's own PCHPDDM and
-  PCAMGX; MATNEST blocks are read in place, AIJ plus index sets go through `ExtractSymmetricBlocks()`.
+  PCAMGX; MATNEST blocks are read in place, AIJ plus index sets go through `ExtractBlocksSym()`.
 - Raw CSR views in the public API (2026-10-19 to 10-25): kept only for the Python module, behind protected members.

@@ -195,7 +195,7 @@ def test_other_formats():
 
 def test_blocks_of_the_global_matrix():
     # The global matrix in its own numbering: the hybrid system with Dirichlet DoFs, scrambled, with NGSolve's index
-    # types (uint64 row pointers, int32 columns). ExtractSymmetricBlocks() and ExtractNonsymmetricBlocks() give the
+    # types (uint64 row pointers, int32 columns). ExtractBlocksSym() and ExtractBlocksNonSym() give the
     # blocks of the lists, Gather() and Scatter() the vectors.
     for asymmetry in [0.0, 0.3]:
         system = HybridSystem(32, asymmetry)
@@ -213,13 +213,13 @@ def test_blocks_of_the_global_matrix():
         faces = fhhos4.DoFLists(nF, np.arange(nF + 1), perm[nT:nT + nF])
         solver = ToySolver()
         if asymmetry == 0:
-            blocks = fhhos4.ExtractSymmetricBlocks(view, cells, faces)
+            blocks = fhhos4.ExtractBlocksSym(view, cells, faces)
             assert abs(ToSciPy(blocks.A_TT) - sp.tril(system.A_TT)).max() == 0
             assert abs(ToSciPy(blocks.A_FF) - sp.tril(system.A_FF)).max() == 0
             assert blocks.A_FT.Rows == 0
             solver.SetupSym(blocks.A_TT, blocks.A_TF, blocks.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
         else:
-            blocks = fhhos4.ExtractNonsymmetricBlocks(view, cells, faces)
+            blocks = fhhos4.ExtractBlocksNonSym(view, cells, faces)
             assert abs(ToSciPy(blocks.A_FT) - system.A_FT).max() == 0
             solver.SetupNonSym(blocks.A_TT, blocks.A_TF, blocks.A_FT, blocks.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
         assert abs(ToSciPy(blocks.A_TF) - system.A_TF).max() == 0

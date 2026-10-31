@@ -833,13 +833,13 @@ namespace fhhos4
 	namespace detail
 	{
 		template <typename RowPointer, typename Column, typename Index>
-		HybridBlocks ExtractSymmetricBlocks(const BasicCSRView<RowPointer, Column>& M, const DoFLists<Index>& cells, const DoFLists<Index>& faces)
+		HybridBlocks ExtractBlocksSym(const BasicCSRView<RowPointer, Column>& M, const DoFLists<Index>& cells, const DoFLists<Index>& faces)
 		{
 			return ExtractBlocks(M, cells, faces, true);
 		}
 
 		template <typename RowPointer, typename Column, typename Index>
-		HybridBlocks ExtractNonsymmetricBlocks(const BasicCSRView<RowPointer, Column>& M, const DoFLists<Index>& cells, const DoFLists<Index>& faces)
+		HybridBlocks ExtractBlocksNonSym(const BasicCSRView<RowPointer, Column>& M, const DoFLists<Index>& cells, const DoFLists<Index>& faces)
 		{
 			return ExtractBlocks(M, cells, faces, false);
 		}
@@ -911,8 +911,8 @@ namespace fhhos4
 
 	// The index types of the helpers: std::int32_t or std::int64_t for each array
 #define FHHOS4_INSTANTIATE_EXTRACTION(RowPointer, Column, Index) \
-	template detail::HybridBlocks detail::ExtractSymmetricBlocks<RowPointer, Column, Index>(const BasicCSRView<RowPointer, Column>&, const DoFLists<Index>&, const DoFLists<Index>&); \
-	template detail::HybridBlocks detail::ExtractNonsymmetricBlocks<RowPointer, Column, Index>(const BasicCSRView<RowPointer, Column>&, const DoFLists<Index>&, const DoFLists<Index>&);
+	template detail::HybridBlocks detail::ExtractBlocksSym<RowPointer, Column, Index>(const BasicCSRView<RowPointer, Column>&, const DoFLists<Index>&, const DoFLists<Index>&); \
+	template detail::HybridBlocks detail::ExtractBlocksNonSym<RowPointer, Column, Index>(const BasicCSRView<RowPointer, Column>&, const DoFLists<Index>&, const DoFLists<Index>&);
 #define FHHOS4_INSTANTIATE_CSR(RowPointer, Column) \
 	template CSRMatrix detail::ToCSR<RowPointer, Column>(const BasicCSRView<RowPointer, Column>&); \
 	FHHOS4_INSTANTIATE_EXTRACTION(RowPointer, Column, std::int32_t) \
