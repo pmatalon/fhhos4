@@ -65,6 +65,9 @@ public:
 	// as the faces interior to an aggregate (their coarse values from the prolongation); true, kept and those of an
 	// aggregate collapsed into one coarse face (see CollapseInterfaces())
 	bool CollapseBoundaryFaces = false;
+	// The number of components of the unknown (UncondensedAMG::VectorComponents): the constants are the first
+	// VectorComponents DoFs of each block, those of the removed faces given by the reconstruction (ComputeProlongation())
+	int VectorComponents = 1;
 
 	CoarseningPass(int cellBlockSize, int faceBlockSize, bool symmetric, double strongCouplingThreshold)
 		: _cbs(cellBlockSize), _fbs(faceBlockSize), _symmetric(symmetric), _strongCouplingThreshold(strongCouplingThreshold)
@@ -593,7 +596,7 @@ public:
 		bool smoothing = prolongation == UAMGProlongation::FaceProlongationAndInteriorSmoothing || prolongation == UAMGProlongation::ReconstructSmoothedTraceOrInject;
 		bool averageOnRemovedFaces = faceProlongation == UAMGFaceProlongation::BoundaryAggregatesInteriorAverage;
 		bool inverseDiagonal = BlockDiagonalSolver::DefaultMethod == DiagBlockSolveMethod::Inverse;
-		int cbs = _cbs, fbs = _fbs;
+		int cbs = _cbs, fbs = _fbs, nc = VectorComponents;
 		const double omega = 2.0 / 3.0;
 		const double zero = NonZeroCoefficients::ZeroThreshold;
 		DenseMatrix oneMinusOmegaIdentity = (1 - omega) * DenseMatrix::Identity(fbs, fbs);
@@ -617,8 +620,8 @@ public:
 			vector<SparseMatrixIndex> qtaPos;            // position of a column in the current row of Q_T^T A_T_F
 			vector<int> coarseFacePos;                    // local number of a coarse face in the aggregate
 			vector<BigNumber> cells, removed;
-			vector<SparseMatrixIndex> thetaCols;          // row 0 of Theta of the aggregate
-			vector<double> theta;
+			vector<vector<SparseMatrixIndex>> thetaCols;  // the rows of Theta of the aggregate on the constants (one per component)
+			vector<vector<double>> theta;
 			vector<double> acc;
 			vector<char> touched;
 			vector<double> A_TcFc;                        // cbs x m*fbs, column-major
@@ -843,10 +846,16 @@ public:
 								blockTT[i * cbs + j] = blockTT[j * cbs + i];
 				}
 
-				// Theta: row 0 of the reconstruction -A_TcTc^-1 A_TcFc in the aggregate, where A_TcFc = Q_T^T A_T_F Q_F
+				// Theta: the rows 0 to nc - 1 (the constants) of the reconstruction -A_TcTc^-1 A_TcFc in the aggregate, where
+				// A_TcFc = Q_T^T A_T_F Q_F
 				double average = 1.0 / m; // Q_F on the removed faces (BoundaryAggregatesInteriorAverage)
-				w.thetaCols.clear();
-				w.theta.clear();
+				w.thetaCols.resize(nc);
+				w.theta.resize(nc);
+				for (int k = 0; k < nc; ++k)
+				{
+					w.thetaCols[k].clear();
+					w.theta[k].clear();
+				}
 				if (!w.removed.empty() && reconstruction)
 				{
 					w.A_TcFc.assign(cbs * M, 0.0);
@@ -883,8 +892,8 @@ public:
 							double t = -x;
 							if (abs(t) > zero)
 							{
-								w.thetaCols.push_back(cfs[B]);
-								w.theta.push_back(t);
+								w.thetaCols[0].push_back(cfs[B]);
+								w.theta[0].push_back(t);
 							}
 						}
 					}
@@ -901,13 +910,16 @@ public:
 									for (int i = 0; i < cbs; ++i)
 										w.rhs(i, j) = w.A_TcFc[(B * fbs + j) * cbs + i];
 								w.x = solverA_TcTc.solve(w.rhs);
-								for (int j = 0; j < fbs; ++j)
+								for (int k = 0; k < nc; ++k)
 								{
-									double t = -w.x(0, j);
-									if (abs(t) > zero)
+									for (int j = 0; j < fbs; ++j)
 									{
-										w.thetaCols.push_back(cfs[B] * fbs + j);
-										w.theta.push_back(t);
+										double t = -w.x(k, j);
+										if (abs(t) > zero)
+										{
+											w.thetaCols[k].push_back(cfs[B] * fbs + j);
+											w.theta[k].push_back(t);
+										}
 									}
 								}
 							}
@@ -1014,7 +1026,7 @@ public:
 						removedRowsThread[f] = thread;
 						if (!smoothing)
 						{
-							// Q_F (FaceProlongation), or the trace of Theta on the constant mode (ReconstructTraceOrInject)
+							// Q_F (FaceProlongation), or the trace of Theta on the constant modes (ReconstructTraceOrInject)
 							for (int r = 0; r < fbs; ++r)
 							{
 								removedRowStart[f * fbs + r] = rr.Cols.size();
@@ -1027,10 +1039,10 @@ public:
 											rr.Values.push_back(average);
 										}
 								}
-								else if (r == 0)
+								else if (r < nc)
 								{
-									rr.Cols.insert(rr.Cols.end(), w.thetaCols.begin(), w.thetaCols.end());
-									rr.Values.insert(rr.Values.end(), w.theta.begin(), w.theta.end());
+									rr.Cols.insert(rr.Cols.end(), w.thetaCols[r].begin(), w.thetaCols[r].end());
+									rr.Values.insert(rr.Values.end(), w.theta[r].begin(), w.theta[r].end());
 								}
 								removedRowEnd[f * fbs + r] = rr.Cols.size();
 							}
@@ -1113,9 +1125,9 @@ public:
 									add(w.coarseFacePos[FaceCoarseFace[g]] * fbs + cg, 1.0 * j);
 								else if (reconstruction)
 								{
-									if (cg == 0)
-										for (size_t x = 0; x < w.theta.size(); ++x)
-											add(local(w.thetaCols[x]), w.theta[x] * j);
+									if (cg < nc)
+										for (size_t x = 0; x < w.theta[cg].size(); ++x)
+											add(local(w.thetaCols[cg][x]), w.theta[cg][x] * j);
 								}
 								else if (averageOnRemovedFaces)
 									for (int B = 0; B < m; ++B)

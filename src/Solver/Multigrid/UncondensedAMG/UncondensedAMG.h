@@ -24,7 +24,7 @@ private:
 	FloatSparseMatrix _singleA;   // levels in single precision: the operator of the finest level (its smoothers, the cycle)
 	bool _blockCSR = false;       // the levels whose faces have several DoFs store their operator in block CSR
 	bool _singular = false;       // SingularMatrix, at the setup
-	Vector _kernel;               // _singular: the interpolation of 1 on the faces of the finest level (of the process), normalized
+	vector<Vector> _kernel;       // _singular: the interpolation of 1 on the faces of the finest level (of the process), on each component, normalized
 public:
 	bool ManageAnisotropy = true; // see UncondensedLevel::ManageAnisotropy
 	bool CollapseBoundaryFaces = false; // see UncondensedLevel::CollapseBoundaryFaces (-uamg-bfc)
@@ -34,11 +34,11 @@ public:
 	// of its memory). In mixed precision (MixedPrecision), always (no copy: instead of their CSR copy in float). The
 	// Chebyshev smoothers, on one process; otherwise in CSR (the reason printed).
 	bool BlockCSRStorage = false;
-	// The matrix is singular, its kernel spanned by the interpolation of 1 (the constants: a pure Neumann problem),
-	// symmetric: the coarsest level, whose kernel is its own interpolation of 1 (P z_c = z_f, see
-	// UncondensedLevel::CoarsenMesh()), is solved by SingularSolver. The residuals of the other levels stay in the image
-	// of their matrices (z^T A = 0) up to the rounding errors, which the coarsest solve removes: no projection on them
-	// (the levels in single precision are kept). The output of each cycle is projected orthogonally to the kernel (see
+	// The matrix is singular, its kernel spanned by the interpolation of 1 (the constants: a pure Neumann problem; with
+	// VectorComponents n, the constant of each component), symmetric: the coarsest level, whose kernel is its own
+	// interpolation of 1 (P z_c = z_f, see UncondensedLevel::CoarsenMesh()), is solved by SingularSolver. The residuals of
+	// the other levels stay in the image of their matrices (z^T A = 0) up to the rounding errors, which the coarsest
+	// solve removes: no projection on them (the levels in single precision are kept). The output of each cycle is projected orthogonally to the kernel (see
 	// ExecuteOneIteration()). The right-hand side must be in the image of the matrix.
 	bool SingularMatrix = false;
 	// The number of components of the unknown (fhhos4::Solver::VectorComponents) n: the blocks of the cells and faces
@@ -184,7 +184,7 @@ public:
 			fine->SingleOperatorMatrix = &_singleA;
 		}
 		_singular = SingularMatrix;
-		_kernel = _singular ? SingularSolver::Kernel(faceInterpOfOne, _faceBlockSize, A.rows()) : Vector();
+		_kernel = _singular ? SingularSolver::Kernel(faceInterpOfOne, _faceBlockSize, A.rows(), VectorComponents) : vector<Vector>();
 
 		Multigrid::Setup(A);
 
@@ -261,7 +261,7 @@ public:
 			this->CoarseningFactor = 3.8;
 		fine->CheckHarmonicExtension(this->H_CS, this->FaceCoarseningStgy);
 		_singular = SingularMatrix;
-		_kernel = _singular ? SingularSolver::Kernel(faceInterpOfOne, _faceBlockSize, A.LocalRows()) : Vector();
+		_kernel = _singular ? SingularSolver::Kernel(faceInterpOfOne, _faceBlockSize, A.LocalRows(), VectorComponents) : vector<Vector>();
 
 		Multigrid::Setup(A);
 
@@ -290,7 +290,7 @@ public:
 			this->CoarseSolver = singular;
 		}
 		UncondensedLevel& coarsest = dynamic_cast<UncondensedLevel&>(*level);
-		singular->SetKernel(coarsest.FaceInterpOfOne, coarsest.FaceBlockSize());
+		singular->SetKernel(coarsest.FaceInterpOfOne, coarsest.FaceBlockSize(), VectorComponents);
 	}
 
 	// SingularMatrix: the output of the cycle projected orthogonally to the kernel. The kernel component added by the
@@ -301,7 +301,7 @@ public:
 		IterationResult result = Multigrid::ExecuteOneIteration(b, x, xEquals0, computeResidual, computeAx, oldResult);
 		if (_singular)
 		{
-			x -= Parallel::Dot(x, _kernel) * _kernel;
+			SingularSolver::Project(x, _kernel);
 			result.SetX(x);
 		}
 		return result;

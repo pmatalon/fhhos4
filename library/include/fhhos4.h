@@ -203,8 +203,9 @@ namespace fhhos4
 		Minus2,    // k, k - 2, ..., 0 (fhhos4 -p-cs -2)
 		Minus1,    // k, k - 1, ..., 0 (-p-cs -1)
 		DivideBy2, // k, k / 2, ..., 0 (-p-cs /2)
-		ToZero     // k, 0 (-p-cs =0): the only p-level keeps the first function of each block, the constant one: for bases
-		           // not ordered by degree. Usually more iterations than the others at k >= 3
+		ToZero     // k, 0 (-p-cs =0): the only p-level keeps the first function of each block, the constant one (the
+		           // first VectorComponents): for bases not ordered by degree. Usually more iterations than the others at
+		           // k >= 3
 	};
 
 	// The prolongation of the h-coarsening (Solver::Prolongation): the faces of the boundary of an aggregate of cells take
@@ -281,14 +282,16 @@ namespace fhhos4
 		// unit vector, interleaved by component (array of structures): phi_i e_c is the DoF n i + c of the block. The
 		// interpolations of 1 stay those of the scalar bases, one coefficient per cell and per face. The coarse levels
 		// keep the n constants of each block (the translations), not the rotations: the rigid body modes of elasticity
-		// are not in them. With n >= 2: not SingularMatrix, nor Prolongation::Reconstruction.
+		// are not in them.
 		int VectorComponents = 1;
 		// The matrix is singular, its kernel spanned by the interpolation of 1 (cellInterpOfOne, faceInterpOfOne: the
-		// constant functions), e.g. the pure Neumann problem: SetupSym() only. The setup checks that
-		// the interpolation of 1 is in the kernel; each solve projects the condensed right-hand side onto the image of the
-		// matrix (the data of a pure Neumann problem are compatible up to the rounding or quadrature errors; at Verbosity
-		// >= 1, a message if the component removed is larger). The solution is defined up to a multiple of the
-		// interpolation of 1 (a constant): shift it to the normalization you want (e.g. zero mean).
+		// constant functions; with VectorComponents n, the constant of each component: the n translations, e.g. the pure
+		// Neumann vector Laplacian, not elasticity, whose kernel has the rotations too), e.g. the pure Neumann problem:
+		// SetupSym() only. The setup checks that the interpolation of 1 is in the kernel; each solve projects the condensed
+		// right-hand side onto the image of the matrix (the data of a pure Neumann problem are compatible up to the
+		// rounding or quadrature errors; at Verbosity >= 1, a message if the component removed is larger). The solution is
+		// defined up to a multiple of the interpolation of 1 (a constant; one per component): shift it to the
+		// normalization you want (e.g. zero mean).
 		bool SingularMatrix = false;
 
 		//--------------------- Solver ---------------------//

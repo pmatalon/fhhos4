@@ -307,8 +307,8 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 | Parameter | Default | Values |
 |---|---|---|
 | `PolynomialSpace` | `PolynomialSpace::P` | `fhhos4::PolynomialSpace`, the space of the bases of the cells and faces: `P` (P^l and P^k: the polynomials of degree at most l, k), `Q` (Q^l and Q^k: of degree at most l, k in each variable, on quadrilaterals and hexahedra) |
-| `VectorComponents` | `1` | `>= 1`: the number of components of the unknown, e.g. `Dimension` for the vector Laplacian, interleaved in each block (see [Inputs](#inputs)). With `2` or more: not `SingularMatrix`, nor `Prolongation::Reconstruction` |
-| `SingularMatrix` | `false` | `true`: the matrix is singular, its kernel spanned by the interpolation of 1 (the constants), e.g. the pure Neumann problem; `SetupSym()` only. The setup checks that the interpolation of 1 is in the kernel (an error otherwise: a Dirichlet face in the system, or a wrong interpolation of 1); each solve projects the condensed right-hand side onto the image of the matrix (at `Verbosity >= 1`, a message if the component removed is more than rounding: incompatible data). The solution is defined up to a multiple of the interpolation of 1 (a constant): shift it to the normalization you want (e.g. zero mean) |
+| `VectorComponents` | `1` | `>= 1`: the number of components of the unknown, e.g. `Dimension` for the vector Laplacian, interleaved in each block (see [Inputs](#inputs)) |
+| `SingularMatrix` | `false` | `true`: the matrix is singular, its kernel spanned by the interpolation of 1 (the constants; with `VectorComponents` `n`, the constant of each component: the translations, e.g. the pure Neumann vector Laplacian, not elasticity, whose kernel has the rotations too), e.g. the pure Neumann problem; `SetupSym()` only. The setup checks that the interpolation of 1 is in the kernel (an error otherwise: a Dirichlet face in the system, or a wrong interpolation of 1); each solve projects the condensed right-hand side onto the image of the matrix (at `Verbosity >= 1`, a message if the component removed is more than rounding: incompatible data). The solution is defined up to a multiple of the interpolation of 1 (a constant, one per component): shift it to the normalization you want (e.g. zero mean) |
 | `Krylov` | `Krylov::Default`: `Krylov::FCG` for a symmetric matrix, `Krylov::GCR` otherwise | `fhhos4::Krylov`: `FCG` (flexible conjugate gradient), `GCR` (GCR(10), any matrix), `None` (the multigrid cycles alone) |
 | `Tolerance` | `1e-8` | `Solve()` stops when the relative residual of the condensed system (the true one, `Result::RelativeResidual`) is below it |
 | `MaxIterations` | `200` | |
@@ -330,7 +330,7 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 ## Constraints
 
 - **Symmetric positive definite** condensed system (`SetupSym()`), or semi-definite with the interpolation of 1
-  as kernel (`SingularMatrix`: the pure Neumann problem), or non-symmetric with a positive definite symmetric part
+  (of each component) as kernel (`SingularMatrix`: the pure Neumann problem), or non-symmetric with a positive definite symmetric part
   (`SetupNonSym()`). With `SetupSym()`, the blocks
   of `A_TT` (one per cell) must be positive definite: the library factorizes them by Cholesky (LU with
   `SetupNonSym()`).

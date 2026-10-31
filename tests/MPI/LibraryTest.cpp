@@ -64,8 +64,8 @@ SparseMatrix LocalColumns(const SparseMatrix& rows, const IndexMap& owners, cons
 // The uncondensed system distributed by rows, through the interface of the library: the ghost faces and cells numbered
 // in reverse order of their global numbers (any order). The solution of the system on one process. Non-symmetric if
 // asymmetry != 0. singular: the pure Neumann system (SingularMatrix; the right-hand side incompatible: projected),
-// the solutions compared up to the kernel (the constants). components: the system on each of them (the blocks ⊗ I_n,
-// VectorComponents = n; the ghosts are the same faces and cells).
+// the solutions compared up to the kernel (the constants, of each component). components: the system on each of them
+// (the blocks ⊗ I_n, VectorComponents = n; the ghosts are the same faces and cells).
 void ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double asymmetry = 0, bool singular = false, int components = 1)
 {
 	int n = 60;
@@ -123,10 +123,11 @@ void ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double 
 	Vector allX_T = Gathered(x_T), allX_F = Gathered(x_F);
 	if (singular)
 	{
-		// The difference without its component along the kernel (the interpolation of 1: ones)
-		double shift = ((allX_T - expectedX_T).sum() + (allX_F - expectedX_F).sum()) / (allX_T.rows() + allX_F.rows());
-		allX_T.array() -= shift;
-		allX_F.array() -= shift;
+		// The difference without its component along the kernel (the interpolation of 1: ones, on each component: the
+		// rows of the vectors reshaped by component)
+		Vector shift = ((allX_T - expectedX_T).reshaped(c, allX_T.rows() / c).rowwise().sum() + (allX_F - expectedX_F).reshaped(c, allX_F.rows() / c).rowwise().sum()) / double((allX_T.rows() + allX_F.rows()) / c);
+		allX_T.reshaped(c, allX_T.rows() / c).colwise() -= shift;
+		allX_F.reshaped(c, allX_F.rows() / c).colwise() -= shift;
 	}
 	EXPECT_LE((allX_F - expectedX_F).norm(), 1e-8 * expectedX_F.norm());
 	EXPECT_LE((allX_T - expectedX_T).norm(), 1e-8 * expectedX_T.norm());
@@ -156,11 +157,14 @@ TEST(DistributedLibrary, NonsymmetricUncondensedSystem)
 	}
 }
 
-// A vector-valued unknown (VectorComponents): the blocks of each process ⊗ I_n, the ghosts unchanged, symmetric or not
+// A vector-valued unknown (VectorComponents): the blocks of each process ⊗ I_n, the ghosts unchanged, symmetric or not,
+// with both prolongations; singular: a pinned DoF per component on the coarsest level
 TEST(DistributedLibrary, VectorComponents)
 {
 	ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::HarmonicExtension, 0, false, 2);
 	ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::HarmonicExtension, 0.3, false, 3);
+	ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::Reconstruction, 0, false, 2);
+	ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::HarmonicExtension, 0, true, 2);
 }
 
 // SingularMatrix: the pinned DoF of the coarsest level on one process, its column among the ghosts of the others

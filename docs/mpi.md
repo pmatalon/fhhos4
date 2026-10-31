@@ -55,7 +55,7 @@ program too: `-DENABLE_PROGRAM=ON`).
   the local faces, the columns of the own cells: `RowsWithGhosts`, kept by the condensation, which then runs as the
   symmetric one), `DistributedStaticCondensation.h`, `CollectiveCheck()` (errors of the inputs on all the processes). A
   process may own nothing (NGSolve 6.2.2608's rank 0). `SingularMatrix`: the kernel on the own faces, the dot products
-  global, the pinned DoF of the coarsest level on one process (`docs/uamg.md`). Not yet: `CondensedMatrix()`. Python:
+  global, the pinned DoF of the coarsest level (one per component) on one process (`docs/uamg.md`). Not yet: `CondensedMatrix()`. Python:
   `docs/python.md`.
 - Program (`Program_Diffusion_HHO_Impl.h`, `Program/DistributedHybridSystem.h`): GMSH meshes only. The mesh of each
   process is its part (`GMSHMesh`, built when `Communicator::Current()` is distributed). The partition (`OpenPart()`:

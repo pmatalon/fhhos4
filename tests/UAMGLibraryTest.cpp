@@ -651,9 +651,10 @@ Blocks Kron(const Blocks& blocks, const Eigen::MatrixXd& C_TT, const Eigen::Matr
 
 // A vector-valued system of n identical components, the scalar blocks ⊗ I_n (VectorComponents = n), with the same
 // right-hand side on each: the iterations and the solution of the scalar system, on each component (the same levels,
-// given CoarseMatrixMaxSize times n, the same transfers and smoothers on each component). The bases scaled at random: the n constants of each block are
-// rescaled. At degree 0 and with faces of degree 1 (a second face function, coupled to no cell: a p-level), symmetric
-// or not.
+// given CoarseMatrixMaxSize times n, the same transfers and smoothers on each component). The bases scaled at random:
+// the n constants of each block are rescaled. At degree 0 and with faces of degree 1 (a second face function, coupled
+// to no cell: a p-level), symmetric or not, with both prolongations (Reconstruction: the n constants of the coarse cell
+// on the removed faces).
 TEST(UAMGLibrary, VectorComponents)
 {
 	int n = 32;
@@ -669,6 +670,7 @@ TEST(UAMGLibrary, VectorComponents)
 		firstFaceFunction << 1, 0;
 		faceFunctions << 1, 0, 0, 2;
 		for (int faceDegree : { 0, 1 })
+		for (fhhos4::Prolongation prolongation : { fhhos4::Prolongation::HarmonicExtension, fhhos4::Prolongation::Reconstruction })
 		{
 			Blocks scalar = faceDegree == 0 ? degree0 : Kron(degree0, one, firstFaceFunction, faceFunctions);
 			Eigen::VectorXd b_T = Eigen::VectorXd::Random(scalar.A_TT.rows()), b_F = Eigen::VectorXd::Random(scalar.A_FF.rows());
@@ -676,6 +678,7 @@ TEST(UAMGLibrary, VectorComponents)
 			{
 				fhhos4::Solver uamg = ToySolver();
 				uamg.FaceDegree = faceDegree;
+				uamg.Prolongation = prolongation;
 				uamg.VectorComponents = components;
 				uamg.CoarseMatrixMaxSize *= components; // the coarsening stops on the rows: the same levels
 				if (system.Symmetric)
@@ -691,7 +694,7 @@ TEST(UAMGLibrary, VectorComponents)
 			EXPECT_TRUE(reference.Converged);
 			for (int components : { 2, 3 })
 			{
-				std::string label = "asymmetry " + std::to_string(asymmetry) + ", faces of degree " + std::to_string(faceDegree) + ", " + std::to_string(components) + " components";
+				std::string label = "asymmetry " + std::to_string(asymmetry) + ", faces of degree " + std::to_string(faceDegree) + ", " + (prolongation == fhhos4::Prolongation::Reconstruction ? "Reconstruction" : "HarmonicExtension") + ", " + std::to_string(components) + " components";
 				Eigen::MatrixXd I = Eigen::MatrixXd::Identity(components, components);
 				Eigen::VectorXd y_T, y_F;
 				fhhos4::Result result = solve(Kron(scalar, I, I, I), components, y_T, y_F);
@@ -703,9 +706,58 @@ TEST(UAMGLibrary, VectorComponents)
 	}
 }
 
+// SingularMatrix with n components: the kernel of the n constants (the pure Neumann system ⊗ I_n), n pinned DoFs on the
+// coarsest level, the right-hand side projected on each component: the iterations and the solution of the scalar
+// system, on each component, with a compatible and an incompatible right-hand side, with both prolongations
+TEST(UAMGLibrary, SingularVectorComponents)
+{
+	int n = 32, nCells = n * n, nFaces = 2 * (n - 1) * n + 4 * n;
+	std::mt19937 generator(5);
+	std::uniform_real_distribution<double> scaling(0.5, 2);
+	Eigen::VectorXd cellScaling = Eigen::VectorXd::NullaryExpr(nCells, [&]() { return scaling(generator); });
+	Eigen::VectorXd faceScaling = Eigen::VectorXd::NullaryExpr(nFaces, [&]() { return scaling(generator); });
+	HybridSystem system(n, cellScaling, faceScaling, 0, true);
+	Blocks scalar{ system.A_TT, system.A_TF, system.A_FT, system.A_FF };
+	Eigen::VectorXd b_T = Eigen::VectorXd::Random(nCells), b_F = Eigen::VectorXd::Random(nFaces);
+	b_T -= b_T.dot(system.CellInterpOfOne) / system.CellInterpOfOne.squaredNorm() * system.CellInterpOfOne; // compatible:
+	b_F -= b_F.dot(system.FaceInterpOfOne) / system.FaceInterpOfOne.squaredNorm() * system.FaceInterpOfOne; // z^T b = 0
+	for (fhhos4::Prolongation prolongation : { fhhos4::Prolongation::HarmonicExtension, fhhos4::Prolongation::Reconstruction })
+	for (double incompatibility : { 0.0, 1e-3 })
+	{
+		Eigen::VectorXd rhs_F = b_F + incompatibility * b_F.norm() / system.FaceInterpOfOne.norm() * system.FaceInterpOfOne;
+		auto solve = [&](const Blocks& blocks, int components, Eigen::VectorXd& x_T, Eigen::VectorXd& x_F)
+		{
+			fhhos4::Solver uamg = ToySolver();
+			uamg.SingularMatrix = true;
+			uamg.Prolongation = prolongation;
+			uamg.VectorComponents = components;
+			uamg.CoarseMatrixMaxSize *= components;
+			uamg.SetupSym(blocks.A_TT, blocks.A_TF, blocks.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+			x_T.resize(blocks.A_TT.rows());
+			x_F = Eigen::VectorXd::Zero(blocks.A_FF.rows());
+			return uamg.Solve(OnEachComponent(b_T, components), OnEachComponent(rhs_F, components), x_T, x_F);
+		};
+		Eigen::VectorXd x_T, x_F;
+		fhhos4::Result reference = solve(scalar, 1, x_T, x_F);
+		EXPECT_TRUE(reference.Converged);
+		for (int components : { 2, 3 })
+		{
+			std::string label = std::string(prolongation == fhhos4::Prolongation::Reconstruction ? "Reconstruction" : "HarmonicExtension") + ", incompatibility " + std::to_string(incompatibility) + ", " + std::to_string(components) + " components";
+			Eigen::MatrixXd I = Eigen::MatrixXd::Identity(components, components);
+			Eigen::VectorXd y_T, y_F;
+			fhhos4::Result result = solve(Kron(scalar, I, I, I), components, y_T, y_F);
+			EXPECT_TRUE(result.Converged) << label;
+			EXPECT_EQ(result.Iterations, reference.Iterations) << label;
+			EXPECT_LT((y_T - OnEachComponent(x_T, components)).norm() / y_T.norm(), 1e-9) << label;
+			EXPECT_LT((y_F - OnEachComponent(x_F, components)).norm() / y_F.norm(), 1e-9) << label;
+		}
+	}
+}
+
 // The components coupled (the blocks ⊗ C, C symmetric positive definite, not diagonal), with the default parameters
-// (the Chebyshev smoothers, the levels in single precision, in block CSR on the h-levels too: blocks of 2 DoFs): the
-// solution of the direct solver. And the errors.
+// (the Chebyshev smoothers, the levels in single precision, in block CSR on the h-levels too: blocks of 2 DoFs), and with
+// Prolongation::Reconstruction (the rows of the n constants of the reconstruction, coupled): the solution of the direct
+// solver. And the errors.
 TEST(UAMGLibrary, CoupledComponents)
 {
 	HybridSystem system(64);
@@ -718,26 +770,26 @@ TEST(UAMGLibrary, CoupledComponents)
 	uamg.CellDegree = 0;
 	uamg.VectorComponents = 2;
 	uamg.Tolerance = 1e-10;
-	uamg.SetupSym(coupled.A_TT, coupled.A_TF, coupled.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+	auto setup = [&](fhhos4::Solver& solver) { solver.SetupSym(coupled.A_TT, coupled.A_TF, coupled.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne); };
 	Eigen::VectorXd b = Eigen::VectorXd::Random(coupled.A_FF.rows());
-	Eigen::VectorXd x = Eigen::VectorXd::Zero(b.size());
-	fhhos4::Result result = uamg.Solve(b, x);
-	EXPECT_TRUE(result.Converged);
-	EXPECT_LT(result.Iterations, 30);
 	ColMajorMatrix A = Kron(system.A, C); // the condensed matrix: A ⊗ C
 	Eigen::VectorXd exact = Eigen::SimplicialLDLT<ColMajorMatrix>(A).solve(b);
-	EXPECT_LT((x - exact).norm() / exact.norm(), 1e-8);
+	for (fhhos4::Prolongation prolongation : { fhhos4::Prolongation::HarmonicExtension, fhhos4::Prolongation::Reconstruction })
+	{
+		uamg.Prolongation = prolongation;
+		setup(uamg);
+		Eigen::VectorXd x = Eigen::VectorXd::Zero(b.size());
+		fhhos4::Result result = uamg.Solve(b, x);
+		EXPECT_TRUE(result.Converged);
+		EXPECT_LT(result.Iterations, 30);
+		EXPECT_LT((x - exact).norm() / exact.norm(), 1e-8);
+	}
 
-	// Errors: VectorComponents < 1; with several, SingularMatrix or Prolongation::Reconstruction; VectorComponents forgotten (the
-	// interpolations of 1 have one coefficient per cell and face, not per component)
-	auto setup = [&](fhhos4::Solver& solver) { solver.SetupSym(coupled.A_TT, coupled.A_TF, coupled.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne); };
-	fhhos4::Solver noComponent = ToySolver(), singular = ToySolver(), reconstruction = ToySolver(), forgotten = ToySolver();
+	// Errors: VectorComponents < 1; VectorComponents forgotten (the interpolations of 1 have one coefficient per cell and
+	// face, not per component)
+	fhhos4::Solver noComponent = ToySolver(), forgotten = ToySolver();
 	noComponent.VectorComponents = 0;
-	singular.VectorComponents = 2;
-	singular.SingularMatrix = true;
-	reconstruction.VectorComponents = 2;
-	reconstruction.Prolongation = fhhos4::Prolongation::Reconstruction;
-	for (fhhos4::Solver* solver : { &noComponent, &singular, &reconstruction, &forgotten })
+	for (fhhos4::Solver* solver : { &noComponent, &forgotten })
 		EXPECT_THROW(setup(*solver), fhhos4::Error);
 }
 

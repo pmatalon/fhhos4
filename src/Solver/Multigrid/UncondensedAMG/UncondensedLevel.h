@@ -508,6 +508,7 @@ public:
 		{
 			CoarseningPass pass(_cellBlockSize, fbs, Symmetric, _strongCouplingThreshold);
 			pass.CollapseBoundaryFaces = CollapseBoundaryFaces;
+			pass.VectorComponents = VectorComponents;
 			pass.Build(*passA_T_F, passA_F_T);
 			DistributedPass distributed(pass, *passFaceMap);
 			distributed.FindRemoteCells();
@@ -747,6 +748,7 @@ public:
 		{
 			CoarseningPass pass(_cellBlockSize, _faceBlockSize, Symmetric, _strongCouplingThreshold);
 			pass.CollapseBoundaryFaces = CollapseBoundaryFaces;
+			pass.VectorComponents = VectorComponents;
 			pass.Build(*passA_T_F, passA_F_T);
 			bool allNeighbours = coarseningStgy == H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours || coarseningStgy == H_CoarsStgy::MultipleAgglomerationCoarseningByFaceNeighbours;
 			Utils::Log() << (allNeighbours ? "\tElement agglomeration" : "\tElement pairwise aggregation") << endl;
@@ -1628,10 +1630,11 @@ private:
 	{
 		// Restrictive assumption of the paper: the trace of the constant is 1, i.e. the constant has the same coordinate
 		// c in the cell and face bases. In general, it is c_F/c_T (geometric trace M_F^-1 M_FT): CoarsenMesh() rescales
-		// the matrices so that c = 1 everywhere. Only the constant mode is transferred (k >= 1 with -hp-cs h: the higher
-		// modes of the faces are then only set by the smoothing of the prolongation).
+		// the matrices so that c = 1 everywhere. Only the constant modes are transferred, one per component (k >= 1 with
+		// -hp-cs h: the higher modes of the faces are then only set by the smoothing of the prolongation).
 		DenseMatrix traceOfConstant = DenseMatrix::Zero(_faceBlockSize, _cellBlockSize);
-		traceOfConstant(0, 0) = 1;
+		for (int k = 0; k < VectorComponents; ++k)
+			traceOfConstant(k, k) = 1;
 
 		BigNumber nFaces = faces.IsRemoved.size();
 		ThreadLocalCoeffs coeffsPi;

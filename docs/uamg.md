@@ -25,12 +25,13 @@ process. Both in the flat passes and in `HybridAlgebraicMesh::Coarsen()`, bit fo
 
 Singular systems (`UncondensedAMG::SingularMatrix`, the library's `Solver::SingularMatrix`, set by the program for
 `-tc fullneumann`; symmetric): the kernel is the interpolation of 1, z = c on the first DoF of each face
-block, 0 on the others (`SingularSolver::Kernel()`). No new input: the hierarchical bases with a constant phi_0 make the
+block, 0 on the others (`SingularSolver::Kernel()`); with n components, n vectors z_k, c on the DoF k of each block (see
+Vector-valued unknowns). No new input: the hierarchical bases with a constant phi_0 make the
 higher-order coefficients of 1 zero. On each level, the kernel is the level's own interpolation of 1 (1 on the
 h-levels, where the constant has coordinate 1: P z_c = z_f).
-- The coarsest level: `SingularSolver` wraps the coarse solver, its matrix pinned on the DoF of largest |z_i| (row and
-  column of the identity) before the factorization; each solve projects its right-hand side onto Im(A), zeroes the
-  pinned DoF and projects the solution. Without it, the factorization meets a pivot of the order of the rounding errors,
+- The coarsest level: `SingularSolver` wraps the coarse solver, its matrix pinned on the DoF of largest |z_i| of each
+  vector of the kernel (row and column of the identity) before the factorization; each solve projects its right-hand
+  side onto Im(A), zeroes the pinned DoFs and projects the solution. Without it, the factorization meets a pivot of the order of the rounding errors,
   and the kernel component of the coarse corrections ruins FCG. The kernel is known: no threshold to detect a null
   pivot (MUMPS's `ICNTL(24)`/`CNTL(3)` would need one; Eigen's `SimplicialLDLT` and `SparseLU` only stop on an exactly
   zero pivot), and the same code for all the coarse solvers. On several processes: the DoF of largest |z_i| on the
@@ -84,12 +85,14 @@ case. The constants are the first n DoFs of each block: the rescaling by the int
 block, that of the scalar basis) applies to them (`UncondensedLevel::VectorComponents`, `ScaleConstantDoFs()`,
 `ScaleConstantRows()`). The couplings of the aggregation are the traces of the blocks of `A_TF`, summed over the
 components; the h-levels have n DoFs per face (the block smoothers, block CSR). The coarse levels hold the n constants
-(the translations), not the rotations: the near-kernel of elasticity is not in them. Refused with n >= 2 (the library's
-`CheckParameters()`): `SingularMatrix` (a kernel of n vectors), `Prolongation::Reconstruction` (its trace of the
-reconstruction fills the first DoF of each removed face only, `CoarseningPass`). Checked by
-`UAMGLibrary.VectorComponents`: the blocks ⊗ I_n give the scalar iterations and solution on each component
-(`CoarseMatrixMaxSize` times n: it counts rows); on several processes, `DistributedLibrary.VectorComponents` (the blocks
-of each process ⊗ I_n, the ghosts unchanged).
+(the translations), not the rotations: the near-kernel of elasticity is not in them. `SingularMatrix`: the kernel of the
+n constants, a pinned DoF for each on the coarsest level (`SingularSolver`): the pure Neumann vector Laplacian, not
+elasticity (its kernel has the rotations). `Prolongation::Reconstruction`: the n rows of the constants of the
+reconstruction of the coarse cell go to the n constants of each removed face (`CoarseningPass::ComputeProlongation()`;
+coupled components: coupled rows). Checked by `UAMGLibrary.VectorComponents` and `SingularVectorComponents`: the blocks
+⊗ I_n give the scalar iterations and solution on each component, with both prolongations (`CoarseMatrixMaxSize` times
+n: it counts rows); `CoupledComponents`, the blocks ⊗ C: the direct solution; on several processes,
+`DistributedLibrary.VectorComponents` (the blocks of each process ⊗ I_n, the ghosts unchanged; singular too).
 
 ## Non-symmetric matrices
 

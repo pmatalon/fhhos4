@@ -192,7 +192,7 @@ namespace fhhos4
 		Eigen::Index NCellDoFs = 0;
 		SparseMatrix A; // the condensed matrix, computed by the setup (on one process): the solvers keep a pointer to it
 		bool Singular = false; // Solver::SingularMatrix, at the setup
-		Vector Kernel;  // Singular: the interpolation of 1 on the faces (of the process), normalized (the kernel of A)
+		vector<Vector> Kernel; // Singular: the interpolation of 1 on the faces (of the process), on each component, normalized (the kernel of A)
 		unique_ptr<BorrowedSparseMatrix> GivenA_FT; // the caller's A_FT, read in place by Condensation (SetupNonSym())
 		unique_ptr<StaticCondensation> Condensation; // after a setup from the blocks: for Solve(b_T, b_F, x_T, x_F)
 		unique_ptr<UncondensedAMG> Multigrid;
@@ -275,11 +275,6 @@ namespace fhhos4
 			}
 			if (s.VectorComponents < 1)
 				Utils::FatalError("fhhos4::Solver: VectorComponents must be >= 1 (1 for a scalar problem), got " + to_string(s.VectorComponents) + ".");
-			// shortcut: no kernel of n translations, no reconstruction of the n constants, with n >= 2: add them if a client needs them
-			if (s.VectorComponents > 1 && s.SingularMatrix)
-				Utils::FatalError("fhhos4::Solver: SingularMatrix is not available with several VectorComponents.");
-			if (s.VectorComponents > 1 && s.Prolongation == fhhos4::Prolongation::Reconstruction)
-				Utils::FatalError("fhhos4::Solver: Prolongation::Reconstruction is not available with several VectorComponents: leave the default, Prolongation::HarmonicExtension.");
 			PolynomialSpaceQ = LibraryParameters::ProgramPolynomialSpace(s.PolynomialSpace);
 			CellBlockSize = s.VectorComponents * Utils::PolynomialSpaceDimension(s.Dimension, s.CellDegree, PolynomialSpaceQ);
 			FaceBlockSize = s.VectorComponents * Utils::PolynomialSpaceDimension(s.Dimension - 1, s.FaceDegree, PolynomialSpaceQ);
@@ -392,7 +387,7 @@ namespace fhhos4
 			Condensation = make_unique<StaticCondensation>(A_TT, A_TF, GivenA_FT.get(), CellBlockSize);
 			A = Condensation->CondensedMatrix(A_FF, Symmetric);
 			if (s.SingularMatrix)
-				SetKernel(faceInterpOfOne);
+				SetKernel(faceInterpOfOne, s.VectorComponents);
 
 			// The blocks are only read during the setup (UncondensedAMG::Setup())
 			SparseMatrix symmetric; // empty A_FT: symmetric matrix
@@ -420,7 +415,7 @@ namespace fhhos4
 			DistributedCondensation = make_unique<DistributedStaticCondensation>(A_TT, A_TF, std::move(A_FT), faces, CellBlockSize, FaceBlockSize);
 			DistributedA = DistributedCondensation->CondensedMatrix(A_FF);
 			if (s.SingularMatrix)
-				SetKernel(faceInterpOfOne);
+				SetKernel(faceInterpOfOne, s.VectorComponents);
 			ActiveSolver()->Setup(DistributedA, A_TT, A_TF, DistributedCondensation->A_FT(), faces, cellInterpOfOne, faceInterpOfOne);
 			IsSetUp = true;
 
@@ -428,28 +423,31 @@ namespace fhhos4
 				cout << "fhhos4: setup of " << Multigrid->NumberOfLevels() << " levels on " << Comm.Size() << " processes in " << Seconds(start) << " s" << endl;
 		}
 
-		// Solver::SingularMatrix: the kernel of A, the interpolation of 1 on the faces (c on the first DoF of each face, 0
-		// on the others; on several processes, those of the process), checked: A z = 0 up to the rounding errors.
-		// Otherwise the projections of the right-hand sides would silently solve another problem (e.g. a Dirichlet face in
-		// the system, or a wrong interpolation of 1).
-		void SetKernel(const Vector& faceInterpOfOne)
+		// Solver::SingularMatrix: the kernel of A, the interpolation of 1 on the faces of each component (c on the DoF k of
+		// each face for the component k, 0 on the others; on several processes, those of the process), checked: A z = 0 up
+		// to the rounding errors. Otherwise the projections of the right-hand sides would silently solve another problem
+		// (e.g. a Dirichlet face in the system, or a wrong interpolation of 1).
+		void SetKernel(const Vector& faceInterpOfOne, int components)
 		{
 			Singular = true;
-			Kernel = SingularSolver::Kernel(faceInterpOfOne, FaceBlockSize, NFaceDoFs);
-			double relative;
-			if (IsDistributed())
-				relative = Parallel::Norm(DistributedA * Kernel) / sqrt(Comm.Sum(DistributedA.Diag.squaredNorm() + DistributedA.Offd.squaredNorm()));
-			else
-				relative = Vector(A.selfadjointView<Eigen::Lower>() * Kernel).norm() / A.norm(); // A: lower triangular part
-			if (!(relative < 1e-8))
-				Utils::FatalError("fhhos4::Solver: SingularMatrix, but the interpolation of 1 is not in the kernel of the matrix (|A z| / (|A| |z|) = " + to_string(relative) + ", z: the interpolation of 1 on the faces): is there a Dirichlet face in the system, or is the interpolation of 1 wrong?");
+			Kernel = SingularSolver::Kernel(faceInterpOfOne, FaceBlockSize, NFaceDoFs, components);
+			for (const Vector& z : Kernel)
+			{
+				double relative;
+				if (IsDistributed())
+					relative = Parallel::Norm(DistributedA * z) / sqrt(Comm.Sum(DistributedA.Diag.squaredNorm() + DistributedA.Offd.squaredNorm()));
+				else
+					relative = Vector(A.selfadjointView<Eigen::Lower>() * z).norm() / A.norm(); // A: lower triangular part
+				if (!(relative < 1e-8))
+					Utils::FatalError("fhhos4::Solver: SingularMatrix, but the interpolation of 1 is not in the kernel of the matrix (|A z| / (|A| |z|) = " + to_string(relative) + ", z: the interpolation of 1 on the faces" + (components > 1 ? ", on a component" : "") + "): is there a Dirichlet face in the system, or is the interpolation of 1 wrong?");
+			}
 		}
 
 		void Reset()
 		{
 			IsSetUp = false;
 			Singular = false;
-			Kernel.resize(0);
+			Kernel.clear();
 			KrylovSolver.reset();
 			Multigrid.reset();
 			Condensation.reset();
@@ -612,10 +610,10 @@ namespace fhhos4
 		if (_impl->Singular)
 		{
 			// The right-hand side projected onto the image of A (orthogonal to its kernel)
-			double component = Parallel::Dot(rhs, _impl->Kernel), norm = Parallel::Norm(rhs);
-			if (Verbosity >= 1 && _impl->Comm.IsRoot() && abs(component) > 1e-10 * norm)
-				cout << "fhhos4: the right-hand side is not in the image of the singular matrix: its component along the kernel removed (relative size " << abs(component) / norm << ")" << endl;
-			rhs -= component * _impl->Kernel;
+			double norm = Parallel::Norm(rhs);
+			double component = SingularSolver::Project(rhs, _impl->Kernel);
+			if (Verbosity >= 1 && _impl->Comm.IsRoot() && component > 1e-10 * norm)
+				cout << "fhhos4: the right-hand side is not in the image of the singular matrix: its component along the kernel removed (relative size " << component / norm << ")" << endl;
 		}
 		Eigen::Map<Vector> callerX(x.Data, x.Size);
 		if (Parallel::Norm(rhs) == 0)
