@@ -17,7 +17,8 @@ For the library's users: `README_library.md`. This file is for changing the libr
 ## Interface
 
 - `Solver`: parameters as public members; `Dimension`, `FaceDegree` and `CellDegree` must be set; `PolynomialSpace`: P
-  (default) or Q, which gives the block sizes of the cells, faces and p-levels. `Result`, `Error`.
+  (default) or Q, which gives the block sizes of the cells, faces and p-levels; `VectorComponents` (default 1)
+  multiplies them (a vector-valued unknown, interleaved: see `docs/uamg.md`). `Result`, `Error`.
 - `SetupSym()` from `A_TT`, `A_TF`, `A_FF` and the interpolations of 1, or `SetupNonSym()` with `A_FT` too,
   then `Solve(b_T, b_F, x_T, x_F)`: the library condenses the system by cells (`StaticCondensation.h`) and computes the
   cell unknowns. `CondensedMatrix()`, and `Solve(b, x)` on it (right-hand sides condensed by the caller).

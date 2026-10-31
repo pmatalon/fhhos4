@@ -12,8 +12,8 @@
 #include <mpi.h>
 #endif
 
-// fhhos4: the algebraic multigrid of fhhos4 for hybrid discretizations (HHO, HDG...) of scalar
-// diffusion problems, the Uncondensed AMG (U-AMG) of
+// fhhos4: the algebraic multigrid of fhhos4 for hybrid discretizations (HHO, HDG...) of diffusion problems, scalar or
+// vector-valued (Solver::VectorComponents, e.g. the vector Laplacian), the Uncondensed AMG (U-AMG) of
 //   D. A. Di Pietro, F. Hülsemann, P. Matalon, P. Mycek, U. Rüde, "Algebraic multigrid preconditioner for statically
 //   condensed systems arising from lowest-order hybrid discretizations", SIAM J. Sci. Comput. (2023),
 // extended to k >= 1.
@@ -276,6 +276,13 @@ namespace fhhos4
 		// The polynomial space of the cells and faces, P^l and P^k, or Q^l and Q^k: their numbers of DoFs, and those of the
 		// p-levels
 		fhhos4::PolynomialSpace PolynomialSpace = fhhos4::PolynomialSpace::P;
+		// The number of components of the unknown (>= 1): 1 for a scalar problem, n for a vector-valued one (e.g. the
+		// vector Laplacian, n = Dimension). The DoFs of each cell and face block are those of the scalar basis times each
+		// unit vector, interleaved by component (array of structures): phi_i e_c is the DoF n i + c of the block. The
+		// interpolations of 1 stay those of the scalar bases, one coefficient per cell and per face. The coarse levels
+		// keep the n constants of each block (the translations), not the rotations: the rigid body modes of elasticity
+		// are not in them. With n >= 2: not SingularMatrix, nor Prolongation::Reconstruction.
+		int VectorComponents = 1;
 		// The matrix is singular, its kernel spanned by the interpolation of 1 (cellInterpOfOne, faceInterpOfOne: the
 		// constant functions), e.g. the pure Neumann problem: SetupSym() only. The setup checks that
 		// the interpolation of 1 is in the kernel; each solve projects the condensed right-hand side onto the image of the
@@ -365,8 +372,8 @@ namespace fhhos4
 		// - the matrices: Eigen sparse matrices in the format of the library, fhhos4::SparseMatrix (compressed, row-major,
 		//   with the index type SparseIndex) or an Eigen::Map of one (SparseMatrixMap), read in place, never copied. Other
 		//   Eigen matrices convert by Eigen, a copy: fhhos4::SparseMatrix B = A; (a symmetric column-major one:
-		//   TransposedView(A), no copy). The setups check the sizes and structure of the inputs against Dimension and the
-		//   degrees, and their CSR arrays (one pass on the indices);
+		//   TransposedView(A), no copy). The setups check the sizes and structure of the inputs against Dimension, the
+		//   degrees and VectorComponents, and their CSR arrays (one pass on the indices);
 		// - cellInterpOfOne, faceInterpOfOne: the interpolation of the function 1 on the polynomial bases of the cells and
 		//   faces, one coefficient per cell and per face (in the order of the blocks of rows and columns of A_TF). The
 		//   bases must be hierarchical (ordered by degree: for each d, the first functions span P^d, or Q^d whose degree is

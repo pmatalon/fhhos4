@@ -22,6 +22,10 @@ The space the bases span: P (total degree) or Q (largest partial degree).
 **Hierarchical basis**:
 A basis whose first functions span the polynomials of lower degree, the constant first.
 
+**Vector components**:
+The scalar fields of a vector-valued unknown (e.g. the n components of a displacement). Each cell and face block holds
+the scalar basis times each unit vector, interleaved by component: phi_i e_c is the DoF n i + c of the block.
+
 **Interpolation of 1**:
 The coefficient c of each cell and each face such that the constant function 1 = c phi_0, phi_0 being the first basis
 function.

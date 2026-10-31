@@ -410,6 +410,7 @@ NB_MODULE(fhhos4, m)
 		.def_rw("FaceDegree", &fhhos4::Solver::FaceDegree)
 		.def_rw("CellDegree", &fhhos4::Solver::CellDegree)
 		.def_rw("PolynomialSpace", &fhhos4::Solver::PolynomialSpace)
+		.def_rw("VectorComponents", &fhhos4::Solver::VectorComponents)
 		.def_rw("SingularMatrix", &fhhos4::Solver::SingularMatrix)
 		// Solver
 		.def_rw("Krylov", &fhhos4::Solver::Krylov)

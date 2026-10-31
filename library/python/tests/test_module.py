@@ -103,6 +103,25 @@ def test_uncondensed_nonsymmetric():
     assert RelativeError(np.concatenate([x_T, x_F]), x) < 1e-8
 
 
+def test_components():
+    """The scalar system on each of 2 components (the blocks kron I_2: interleaved), with the same right-hand side on
+    each: the iterations and the solution of the scalar system"""
+    system = HybridSystem(32)
+    kron = lambda M: sp.kron(M, sp.identity(2), format="csr")
+    scalar, vector = ToySolver(), ToySolver()
+    vector.VectorComponents = 2
+    for solver in (scalar, vector):
+        solver.PreSmoother = fhhos4.Smoother.BlockGaussSeidel  # no estimate of lambdaMax: the same smoothing
+    scalar.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+    vector.SetupSym(kron(system.A_TT), kron(system.A_TF), kron(system.A_FF), system.CellInterpOfOne, system.FaceInterpOfOne)
+    x_T, x_F = np.zeros(system.b_T.size), np.zeros(system.b_F.size)
+    y_T, y_F = np.zeros(2 * system.b_T.size), np.zeros(2 * system.b_F.size)
+    r = scalar.Solve(system.b_T, system.b_F, x_T, x_F)
+    s = vector.Solve(np.repeat(system.b_T, 2), np.repeat(system.b_F, 2), y_T, y_F)
+    assert r.Converged and s.Iterations == r.Iterations, (r, s)
+    assert RelativeError(y_T, np.repeat(x_T, 2)) < 1e-9 and RelativeError(y_F, np.repeat(x_F, 2)) < 1e-9
+
+
 def test_prolongations():
     # Both prolongations (HarmonicExtension: the default), symmetric and non-symmetric
     for prolongation, asymmetry in ((p, a) for p in (fhhos4.Prolongation.HarmonicExtension, fhhos4.Prolongation.Reconstruction) for a in (0.0, 0.3)):
@@ -248,7 +267,7 @@ def test_parameters():
     assert solver.Krylov == fhhos4.Krylov.Default and solver.Cycle == fhhos4.Cycle.K
     assert solver.PCoarsening == fhhos4.PCoarsening.Minus2 and solver.Tolerance == 1e-8
     assert solver.Prolongation == fhhos4.Prolongation.HarmonicExtension
-    assert solver.PolynomialSpace == fhhos4.PolynomialSpace.P and not solver.SingularMatrix
+    assert solver.PolynomialSpace == fhhos4.PolynomialSpace.P and not solver.SingularMatrix and solver.VectorComponents == 1
     solver.PCoarsening = fhhos4.PCoarsening.ToZero
     solver.PreSmoother = fhhos4.Smoother.BlockGaussSeidel
     solver.PolynomialSpace = fhhos4.PolynomialSpace.Q

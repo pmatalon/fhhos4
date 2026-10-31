@@ -41,6 +41,11 @@ public:
 	// (the levels in single precision are kept). The output of each cycle is projected orthogonally to the kernel (see
 	// ExecuteOneIteration()). The right-hand side must be in the image of the matrix.
 	bool SingularMatrix = false;
+	// The number of components of the unknown (fhhos4::Solver::VectorComponents) n: the blocks of the cells and faces
+	// hold the scalar basis times each unit vector, interleaved (phi_i e_c is the DoF n i + c of the block), the block
+	// sizes given to the constructor included. The first n DoFs of each block are the constants (see
+	// UncondensedLevel::VectorComponents).
+	int VectorComponents = 1;
 
 
 	UncondensedAMG(int dim, int degree, bool polynomialSpaceQ, int cellBlockSize, int faceBlockSize, double strongCouplingThreshold, UAMGFaceProlongation faceProlong, UAMGProlongation coarseningProlong, UAMGProlongation mgProlong, int nLevels = 0)
@@ -401,6 +406,7 @@ private:
 		level->CollapseBoundaryFaces = CollapseBoundaryFaces;
 		level->Symmetric = _symmetric;
 		level->DownwindOrdering = DownwindOrdering;
+		level->VectorComponents = VectorComponents;
 		return level;
 	}
 
@@ -420,8 +426,8 @@ protected:
 		UncondensedLevel* coarse;
 		if (coarseningType == CoarseningType::P)
 		{
-			int coarseCellBlockSize = Utils::PolynomialSpaceDimension(_dim    , coarseDegree, _polynomialSpaceQ);
-			int coarseFaceBlockSize = Utils::PolynomialSpaceDimension(_dim - 1, coarseDegree, _polynomialSpaceQ);
+			int coarseCellBlockSize = VectorComponents * Utils::PolynomialSpaceDimension(_dim    , coarseDegree, _polynomialSpaceQ);
+			int coarseFaceBlockSize = VectorComponents * Utils::PolynomialSpaceDimension(_dim - 1, coarseDegree, _polynomialSpaceQ);
 			coarse = CreateLevel(fine->Number + 1, coarseDegree, coarseCellBlockSize, coarseFaceBlockSize);
 		}
 		else

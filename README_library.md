@@ -48,8 +48,8 @@ directory of the library in the RPATH of the executable. A library compiled with
 # 2. The algorithm in a nutshell
 
 The shared library `fhhos4` offers an algebraic multigrid method for the solution of linear systems 
-arising from hybrid discretizations (HHO, HDG...) of scalar diffusion and convection-diffusion problems, 
-of the form
+arising from hybrid discretizations (HHO, HDG...) of diffusion and convection-diffusion problems, scalar or
+vector-valued, of the form
 ```
 [ A_TT  A_TF ] [x_T]   [b_T]
 [ A_FT  A_FF ] [x_F] = [b_F]
@@ -76,6 +76,9 @@ The solver typically applies to symmetric positive definite systems (e.g. diffus
 and non-symmetric ones (e.g. convection-diffusion, both diffusion- and convection-dominated).
 Boundary conditions: Dirichlet (their faces out of the system), Neumann and Robin (their faces in the system), mixed;
 the pure Neumann problem (singular: `SingularMatrix`, symmetric systems).
+Vector-valued unknowns (`VectorComponents`), e.g. the vector Laplacian: the coarse levels keep the constants of each
+component (the translations), not the rotations, which elasticity problems need on their coarse levels (not validated
+there).
 The polynomial bases used for the discretization **must be hierarchical** and ordered by degree for the p-multigrid part to work.
 The polynomial spaces are P^k (simplices, polytopes), or Q^k (quadrilaterals, hexahedra: `PolynomialSpace::Q`), in the
 cells and on the faces.
@@ -104,6 +107,7 @@ solver.Dimension = 3;  // to set
 solver.FaceDegree = k; // to set
 solver.CellDegree = k; // to set
 // solver.PolynomialSpace = fhhos4::PolynomialSpace::Q; // bases of Q^k instead of P^k
+// solver.VectorComponents = 3; // a vector-valued unknown of 3 components (see Inputs)
 solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne);
 Eigen::VectorXd x_T(b_T.size()), x_F = Eigen::VectorXd::Zero(b_F.size());
 fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F); // flexible conjugate gradient preconditioned by the AMG
@@ -258,7 +262,10 @@ result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
   cell or face to another (e.g. L2-orthonormal bases: `c = sqrt(|T|)` on a cell `T`); `c = 1` everywhere if `phi_0 = 1`.
 - **The dimension and the degrees**: `Dimension` (2 or 3), `FaceDegree` (k) and `CellDegree` (l) must be set, and
   `PolynomialSpace` for bases of Q^k. The setup checks the sizes and structure of the inputs against them (full
-  polynomial spaces: P^l in the cells and P^k on the faces, or Q^l and Q^k).
+  polynomial spaces: P^l in the cells and P^k on the faces, or Q^l and Q^k; times `VectorComponents`).
+- **A vector-valued unknown** of `n` components: `VectorComponents = n`. Each cell and face block holds the scalar basis
+  times each unit vector, **interleaved by component** (array of structures): `phi_i e_c` is the DoF `n i + c` of the
+  block. The interpolations of 1 stay those of the scalar bases, one coefficient per cell and per face.
 
 ### Other formats: the helpers
 
@@ -300,6 +307,7 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 | Parameter | Default | Values |
 |---|---|---|
 | `PolynomialSpace` | `PolynomialSpace::P` | `fhhos4::PolynomialSpace`, the space of the bases of the cells and faces: `P` (P^l and P^k: the polynomials of degree at most l, k), `Q` (Q^l and Q^k: of degree at most l, k in each variable, on quadrilaterals and hexahedra) |
+| `VectorComponents` | `1` | `>= 1`: the number of components of the unknown, e.g. `Dimension` for the vector Laplacian, interleaved in each block (see [Inputs](#inputs)). With `2` or more: not `SingularMatrix`, nor `Prolongation::Reconstruction` |
 | `SingularMatrix` | `false` | `true`: the matrix is singular, its kernel spanned by the interpolation of 1 (the constants), e.g. the pure Neumann problem; `SetupSym()` only. The setup checks that the interpolation of 1 is in the kernel (an error otherwise: a Dirichlet face in the system, or a wrong interpolation of 1); each solve projects the condensed right-hand side onto the image of the matrix (at `Verbosity >= 1`, a message if the component removed is more than rounding: incompatible data). The solution is defined up to a multiple of the interpolation of 1 (a constant): shift it to the normalization you want (e.g. zero mean) |
 | `Krylov` | `Krylov::Default`: `Krylov::FCG` for a symmetric matrix, `Krylov::GCR` otherwise | `fhhos4::Krylov`: `FCG` (flexible conjugate gradient), `GCR` (GCR(10), any matrix), `None` (the multigrid cycles alone) |
 | `Tolerance` | `1e-8` | `Solve()` stops when the relative residual of the condensed system (the true one, `Result::RelativeResidual`) is below it |

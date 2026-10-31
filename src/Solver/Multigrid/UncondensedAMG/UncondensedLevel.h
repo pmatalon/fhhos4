@@ -121,6 +121,10 @@ public:
 	Vector CellInterpOfOne;
 	Vector FaceInterpOfOne;
 
+	// Set by UncondensedAMG: the number of components of the unknown (UncondensedAMG::VectorComponents), whose constants
+	// are the first VectorComponents DoFs of each block, each of coordinate c (the interpolation of 1 of the block)
+	int VectorComponents = 1;
+
 	// Local matrices of the operator, shared by the levels (set by UncondensedAMG). If null, the Galerkin products
 	// of the coarsening passes are global sparse products.
 	LocalOperator* LocalOp = nullptr;
@@ -181,21 +185,22 @@ public:
 	}
 
 	// Copy of A whose coefficient (i, j) is multiplied by d_i d_j, d being the interpolation of 1 of the block (the
-	// coordinate c of the constant) on the first DoF of each block of rows (resp. columns), and 1 on the other DoFs
-	// (an empty vector: 1 everywhere)
-	static SparseMatrix ScaleConstantDoFs(const SparseMatrix& A, const Vector& rowInterpOfOne, int rowBlockSize, const Vector& colInterpOfOne, int colBlockSize)
+	// coordinate c of the constant) on the first VectorComponents DoFs of each block of rows (resp. columns), and 1 on the
+	// other DoFs (an empty vector: 1 everywhere)
+	SparseMatrix ScaleConstantDoFs(const SparseMatrix& A, const Vector& rowInterpOfOne, int rowBlockSize, const Vector& colInterpOfOne, int colBlockSize) const
 	{
 		SparseMatrix scaled = A;
 		BigNumber nRows = scaled.rows();
 		bool rows = rowInterpOfOne.rows() > 0, cols = colInterpOfOne.rows() > 0;
+		int n = VectorComponents;
 		#pragma omp parallel for
 		for (BigNumber i = 0; i < nRows; ++i)
 		{
-			double d_i = rows && i % rowBlockSize == 0 ? rowInterpOfOne[i / rowBlockSize] : 1;
+			double d_i = rows && i % rowBlockSize < n ? rowInterpOfOne[i / rowBlockSize] : 1;
 			for (SparseMatrix::InnerIterator it(scaled, i); it; ++it)
 			{
 				BigNumber j = it.col();
-				double d_j = cols && j % colBlockSize == 0 ? colInterpOfOne[j / colBlockSize] : 1;
+				double d_j = cols && j % colBlockSize < n ? colInterpOfOne[j / colBlockSize] : 1;
 				it.valueRef() *= d_i * d_j;
 			}
 		}
@@ -203,7 +208,7 @@ public:
 	}
 
 	// A rescaled by ScaleConstantDoFs() into storage, or A itself if both interpolations are empty (or A null)
-	static const SparseMatrix* ScaledConstantDoFs(const SparseMatrix* A, const Vector& rowInterpOfOne, int rowBlockSize, const Vector& colInterpOfOne, int colBlockSize, SparseMatrix& storage)
+	const SparseMatrix* ScaledConstantDoFs(const SparseMatrix* A, const Vector& rowInterpOfOne, int rowBlockSize, const Vector& colInterpOfOne, int colBlockSize, SparseMatrix& storage) const
 	{
 		if (!A || (rowInterpOfOne.rows() == 0 && colInterpOfOne.rows() == 0))
 			return A;
@@ -211,17 +216,19 @@ public:
 		return &storage;
 	}
 
-	// Multiplies the row of the first DoF of each block by the interpolation of 1 of the block (the coordinate c of the
-	// constant). M of any precision.
+	// Multiplies the rows of the first VectorComponents DoFs of each block by the interpolation of 1 of the block (the
+	// coordinate c of the constant). M of any precision.
 	template <typename S>
-	static void ScaleConstantRows(SparseMatrixOf<S>& M, const Vector& interpOfOne, int blockSize)
+	void ScaleConstantRows(SparseMatrixOf<S>& M, const Vector& interpOfOne, int blockSize) const
 	{
 		BigNumber nBlocks = interpOfOne.rows();
+		int n = VectorComponents;
 		#pragma omp parallel for
 		for (BigNumber b = 0; b < nBlocks; ++b)
 		{
-			for (typename SparseMatrixOf<S>::InnerIterator it(M, b * blockSize); it; ++it)
-				it.valueRef() *= interpOfOne[b];
+			for (int c = 0; c < n; ++c)
+				for (typename SparseMatrixOf<S>::InnerIterator it(M, b * blockSize + c); it; ++it)
+					it.valueRef() *= interpOfOne[b];
 		}
 	}
 
@@ -384,7 +391,8 @@ public:
 		// prolongation mimics), and aggregating fine functions of different coordinates does not give a constant. The
 		// coarse spaces then lose the constants (more iterations), or, if c_F < c_T, the prolongation is amplified at
 		// each coarsening pass until it overflows.
-		// Correction: a change of coordinates on the first (constant) DoF of each cell and face block, z_0 = y_0 / c, in
+		// Correction: a change of coordinates on the first (constant) DoF of each cell and face block (the first
+		// VectorComponents DoFs: the constant of each component), z_0 = y_0 / c, in
 		// which the constant has coordinate 1 everywhere, as the paper assumes. The coarsening passes run on D A D
 		// (D = diag(c) on the first DoFs, 1 elsewhere), and the prolongation is brought back to the coordinates of this
 		// level, P = D_F P_z: the operator of this level, its smoothers and residuals stay in the caller's coordinates

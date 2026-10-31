@@ -1915,6 +1915,14 @@ Kept as they were written there; some repeat entries of "Done" in another form.
   2.09e-2), and of order k+1 under refinement (triangles level 4 -> 5: k1 ratio 3.98, k2 7.98; tetrahedra level 2 ->
   3, k1: 4.08). Relative component of the data along the kernel removed: triangles k0 7.9e-5, k1 6.7e-8; tetrahedra
   k0 1.6e-3, k1 2.0e-4, k2 2.1e-6.
+- **Disk++ vector Laplacian** (`vector_laplacian -s fhhos4`: `VectorComponents = Dimension`, the library's defaults,
+  1e-10, the default threads, on AC, 2026-10-31, `~/code/diskpp/build/bench_vector/`; structured meshes of the unit square,
+  n^2 squares of 2 triangles, and of the unit cube, n^3 cubes of 6 tetrahedra; the app's u, Dirichlet everywhere): the
+  L2 errors of its direct solver (sequential MUMPS on the condensed system) to the printed digits, of order k+2
+  (triangles k1: ratios 8.1-8.3, k2: 15.8-16.0). Iterations, triangles n=16/32/64/128: k0 17/18/25/23, k1 17/18/18/18, k2 19/20/20/21; tetrahedra
+  n=4/8/12/16: k0 15/22/25/26, k1 22/26/27/28, k2 29/33/35 (n=16 k=2 not run: memory). Disk++'s solver time (setup and
+  solve) and peak RSS against the direct solver: triangles n=64 k2 0.20 s / 281 MB vs 0.27 s / 413 MB; tetrahedra n=8
+  k1 0.25 s / 268 MB vs 1.00 s / 796 MB, k2 0.99 s / 1.04 GB vs 4.78 s / 2.13 GB.
 - **`PCoarsening::ToZero`** vs Minus2 (FCG, 2026-10-19; `bgs,rbgs` / `bcheb4`): Square-tri n=64 k=3 10 -> 19 / 14 -> 27,
   k=4 9 -> 21 / 14 -> 30, k=5 7 -> 23 / 11 -> 32; Cube-tet n=8 k=3 29 -> 37 / 50 -> 60.
 - **Interpolation of 1**: without the rescaling of the constant modes, L2-orthonormal bases slow U-AMG down (Cube-tet

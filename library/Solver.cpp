@@ -273,16 +273,23 @@ namespace fhhos4
 				if (!symmetric && SmootherFactory::IsChebyshev(LibraryParameters::ProgramSmoother(smoother)))
 					Utils::FatalError("fhhos4::Solver: the Chebyshev smoothers require a symmetric positive definite matrix: leave PreSmoother and PostSmoother Default for a non-symmetric one.");
 			}
+			if (s.VectorComponents < 1)
+				Utils::FatalError("fhhos4::Solver: VectorComponents must be >= 1 (1 for a scalar problem), got " + to_string(s.VectorComponents) + ".");
+			// shortcut: no kernel of n translations, no reconstruction of the n constants, with n >= 2: add them if a client needs them
+			if (s.VectorComponents > 1 && s.SingularMatrix)
+				Utils::FatalError("fhhos4::Solver: SingularMatrix is not available with several VectorComponents.");
+			if (s.VectorComponents > 1 && s.Prolongation == fhhos4::Prolongation::Reconstruction)
+				Utils::FatalError("fhhos4::Solver: Prolongation::Reconstruction is not available with several VectorComponents: leave the default, Prolongation::HarmonicExtension.");
 			PolynomialSpaceQ = LibraryParameters::ProgramPolynomialSpace(s.PolynomialSpace);
-			CellBlockSize = Utils::PolynomialSpaceDimension(s.Dimension, s.CellDegree, PolynomialSpaceQ);
-			FaceBlockSize = Utils::PolynomialSpaceDimension(s.Dimension - 1, s.FaceDegree, PolynomialSpaceQ);
+			CellBlockSize = s.VectorComponents * Utils::PolynomialSpaceDimension(s.Dimension, s.CellDegree, PolynomialSpaceQ);
+			FaceBlockSize = s.VectorComponents * Utils::PolynomialSpaceDimension(s.Dimension - 1, s.FaceDegree, PolynomialSpaceQ);
 		}
 
 		// The sizes and structure of the inputs, against the dimension and the degrees. A_FT: null if the matrix is
 		// symmetric.
 		void CheckInputs(const Solver& s, const SparseMatrix& A_TT, const SparseMatrix& A_TF, const SparseMatrix* A_FT, const SparseMatrix& A_FF, const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne) const
 		{
-			string space = string(", PolynomialSpace ") + (PolynomialSpaceQ ? "Q" : "P");
+			string space = string(", PolynomialSpace ") + (PolynomialSpaceQ ? "Q" : "P") + (s.VectorComponents > 1 ? ", VectorComponents " + to_string(s.VectorComponents) : "");
 			string cellDoFs = to_string(CellBlockSize) + " DoFs per cell (CellDegree " + to_string(s.CellDegree) + ", Dimension " + to_string(s.Dimension) + space + ")";
 			string faceDoFs = to_string(FaceBlockSize) + " DoFs per face (FaceDegree " + to_string(s.FaceDegree) + ", Dimension " + to_string(s.Dimension) + space + ")";
 			Eigen::Index nCellDoFs = A_TF.rows();
@@ -460,6 +467,7 @@ namespace fhhos4
 			ExportModule out;
 			Multigrid.reset(AlgebraicSolverFactory::CreateUncondensedAMG(args, s.Dimension, s.FaceDegree, PolynomialSpaceQ, CellBlockSize, FaceBlockSize, FaceBlockSize, out, AlgebraicSolverFactory::AlgebraicCoarseSolvers(s.Dimension, out)));
 			Multigrid->SingularMatrix = s.SingularMatrix;
+			Multigrid->VectorComponents = s.VectorComponents;
 			if (Krylov == fhhos4::Krylov::FCG)
 			{
 				auto fcg = make_unique<FlexibleConjugateGradient>(1);

@@ -74,6 +74,23 @@ h-levels, where the constant has coordinate 1: P z_c = z_f).
   by default) the factors make the transfers slower (many one-non-zero rows): P. `KeepPassProlongations = false`: P
   everywhere (the reference of `CoarseningPassTest`).
 
+## Vector-valued unknowns
+
+`UncondensedAMG::VectorComponents` (`fhhos4::Solver::VectorComponents`, the library only: the program has no
+vector-valued discretization) = n: each cell and face block holds the scalar basis times each unit vector, interleaved (phi_i e_c
+is the DoF n i + c), so that the first n dim(P^d) DoFs of a block span (P^d)^n: the block sizes of all the levels are
+n times the scalar ones (`CreateCoarseLevel()`), and the p-levels extract the first DoFs of each block as in the scalar
+case. The constants are the first n DoFs of each block: the rescaling by the interpolation of 1 (one coefficient per
+block, that of the scalar basis) applies to them (`UncondensedLevel::VectorComponents`, `ScaleConstantDoFs()`,
+`ScaleConstantRows()`). The couplings of the aggregation are the traces of the blocks of `A_TF`, summed over the
+components; the h-levels have n DoFs per face (the block smoothers, block CSR). The coarse levels hold the n constants
+(the translations), not the rotations: the near-kernel of elasticity is not in them. Refused with n >= 2 (the library's
+`CheckParameters()`): `SingularMatrix` (a kernel of n vectors), `Prolongation::Reconstruction` (its trace of the
+reconstruction fills the first DoF of each removed face only, `CoarseningPass`). Checked by
+`UAMGLibrary.VectorComponents`: the blocks ⊗ I_n give the scalar iterations and solution on each component
+(`CoarseMatrixMaxSize` times n: it counts rows); on several processes, `DistributedLibrary.VectorComponents` (the blocks
+of each process ⊗ I_n, the ghosts unchanged).
+
 ## Non-symmetric matrices
 
 `UncondensedLevel::Symmetric` false, `A_F_T` given (ADR-0007): couplings from the averages of the traces of

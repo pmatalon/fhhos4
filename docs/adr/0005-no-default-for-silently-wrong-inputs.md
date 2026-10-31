@@ -15,6 +15,9 @@ with vectors: the kernel is the near-kernel the solver already has (the interpol
 kernel given apart would have to equal it; for elasticity, the rigid body modes, and a kernel that is a part of them
 (sliding conditions) would need vectors then (ADR-0020).
 
+`VectorComponents` defaults to 1 (a scalar unknown): forgotten for a vector-valued one, the interpolations of 1 (one
+coefficient per cell and face) have the wrong size for the blocks, and the setup refuses them.
+
 `Comm` (with MPI) had no default from 2026-10-20 to 2026-10-30. Not set, it now means one process, with no MPI call
 (the user: the conda and Spack packages are built with MPI by default, and a code that doesn't use MPI must not have to
 set it). Not silently wrong: forgetting it on several processes is caught, the setup on one process refusing the
