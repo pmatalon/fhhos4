@@ -58,7 +58,7 @@ int main()
 	solver.Dimension = 2;
 	solver.FaceDegree = 0;
 	solver.CellDegree = 0;
-	solver.SetupSymmetric(A_TT, A_TF, A_FF, Eigen::VectorXd::Ones(nCells), Eigen::VectorXd::Ones(nFaces));
+	solver.SetupSym(A_TT, A_TF, A_FF, Eigen::VectorXd::Ones(nCells), Eigen::VectorXd::Ones(nFaces));
 
 	Eigen::VectorXd b_T = Eigen::VectorXd::Ones(nCells) / nCells, b_F = Eigen::VectorXd::Zero(nFaces);
 	Eigen::VectorXd x_T(nCells), x_F = Eigen::VectorXd::Zero(nFaces);

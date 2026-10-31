@@ -65,9 +65,9 @@ public:
 	void SetupFromBlocks(const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_T, const SparseMatrix& A_F_F, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
 	{
 		if (A_F_T.rows() > 0)
-			_solver.SetupNonsymmetric(A_T_T, A_T_F, A_F_T, A_F_F, cellInterpOfOne, faceInterpOfOne);
+			_solver.SetupNonSym(A_T_T, A_T_F, A_F_T, A_F_F, cellInterpOfOne, faceInterpOfOne);
 		else
-			_solver.SetupSymmetric(A_T_T, A_T_F, A_F_F, cellInterpOfOne, faceInterpOfOne);
+			_solver.SetupSym(A_T_T, A_T_F, A_F_F, cellInterpOfOne, faceInterpOfOne);
 		fhhos4::SparseMatrixMap A = _solver.CondensedMatrix();
 		_condensedMatrix.Borrow(A.rows(), A.cols(), A.outerIndexPtr(), A.innerIndexPtr(), A.valuePtr());
 		IterativeSolver::Setup(_condensedMatrix);
@@ -80,9 +80,9 @@ public:
 #endif
 		fhhos4::GhostNumbers faces(faceGhosts.size(), faceGhosts.data()), cells(cellGhosts.size(), cellGhosts.data());
 		if (Communicator::Current().All(A_F_T.rows() == 0 && A_F_T.cols() == 0))
-			_solver.SetupSymmetric(A_T_T, A_T_F, A_F_F, cellInterpOfOne, faceInterpOfOne, faces);
+			_solver.SetupSym(A_T_T, A_T_F, A_F_F, cellInterpOfOne, faceInterpOfOne, faces);
 		else
-			_solver.SetupNonsymmetric(A_T_T, A_T_F, A_F_T, A_F_F, cellInterpOfOne, faceInterpOfOne, faces, cells);
+			_solver.SetupNonSym(A_T_T, A_T_F, A_F_T, A_F_F, cellInterpOfOne, faceInterpOfOne, faces, cells);
 	}
 
 	void Solve(const Vector& b, Vector& x, bool xEquals0, bool computeResidual, bool computeAx) override

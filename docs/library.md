@@ -18,7 +18,7 @@ For the library's users: `README_library.md`. This file is for changing the libr
 
 - `Solver`: parameters as public members; `Dimension`, `FaceDegree` and `CellDegree` must be set; `PolynomialSpace`: P
   (default) or Q, which gives the block sizes of the cells, faces and p-levels. `Result`, `Error`.
-- `SetupSymmetric()` from `A_TT`, `A_TF`, `A_FF` and the interpolations of 1, or `SetupNonsymmetric()` with `A_FT` too,
+- `SetupSym()` from `A_TT`, `A_TF`, `A_FF` and the interpolations of 1, or `SetupNonSym()` with `A_FT` too,
   then `Solve(b_T, b_F, x_T, x_F)`: the library condenses the system by cells (`StaticCondensation.h`) and computes the
   cell unknowns. `CondensedMatrix()`, and `Solve(b, x)` on it (right-hand sides condensed by the caller).
 - Matrices: `fhhos4::SparseMatrix` (Eigen row-major, of the library's index type `SparseIndex`, generated into
@@ -27,7 +27,7 @@ For the library's users: `README_library.md`. This file is for changing the libr
   `fhhos4::SparseMatrix B = A;`; a temporary `Eigen::SparseMatrix` is refused by a deleted overload where the solver
   keeps it (`A_FT`). Checked by one parallel pass, `CheckCSR()`.
 - The solvers read the inputs as `BorrowedSparseMatrix` (`Utils/BorrowedSparseMatrix.h`: a `SparseMatrix` pointing
-  Eigen's protected members to the caller's arrays). The library keeps `A_FT` (`SetupNonsymmetric()`:
+  Eigen's protected members to the caller's arrays). The library keeps `A_FT` (`SetupNonSym()`:
   `StaticCondensation` reads it at each solve); on several processes it computes its own from it (`docs/mpi.md`), but
   the rule for the caller stays the same.
 - Helpers, documented as copies but one: `TransposedView()` (no copy: a symmetric column-major matrix as its transpose,
@@ -68,8 +68,8 @@ on several processes too (see `docs/uamg.md`). `tests/UAMGLibraryTest.cpp` compa
 - Assemble into dedicated global matrices and vectors named as the blocks (`A_TT`, `A_TF`, `A_FT`, `A_FF`, `b_T`,
   `b_F`), never into the condensed system's variables: the assembly code must show that it assembles the blocks. Watch
   the memory: reserve, release, no restricted copies.
-- The data prepared as if fhhos4 were the only solver; the solver part minimal: `SetupSymmetric(A_TT, A_TF, A_FF,
-  ...)` or `SetupNonsymmetric(A_TT, A_TF, A_FT, A_FF, ...)`, then `Solve(b_T, b_F, x_T, x_F)`.
+- The data prepared as if fhhos4 were the only solver; the solver part minimal: `SetupSym(A_TT, A_TF, A_FF,
+  ...)` or `SetupNonSym(A_TT, A_TF, A_FT, A_FF, ...)`, then `Solve(b_T, b_F, x_T, x_F)`.
 - No new parallel builders, adjacency lambdas or helper machinery in the client.
 - The client's macros only around what does not compile without fhhos4: the include and the solver calls (with
   `#else`: an error, exit). The solver option and the block assembly stay unguarded.

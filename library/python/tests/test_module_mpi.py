@@ -84,10 +84,10 @@ def DistributedSystem(emptyRank0, asymmetry=0.0):
     localA_TT = A_TT[ownCells][:, ownCells].tocsr()
     localA_TT.sort_indices()
     if asymmetry == 0:
-        solver.SetupSymmetric(localA_TT, faceColumns(rowsTF), faceColumns(rowsFF), np.ones(nOwnCells), np.ones(nOwnFaces), ghosts)
+        solver.SetupSym(localA_TT, faceColumns(rowsTF), faceColumns(rowsFF), np.ones(nOwnCells), np.ones(nOwnFaces), ghosts)
     else:
         localA_FT = localColumns(rowsFT, cellGhosts, cellBegin, nOwnCells)
-        solver.SetupNonsymmetric(localA_TT, faceColumns(rowsTF), localA_FT, faceColumns(rowsFF), np.ones(nOwnCells), np.ones(nOwnFaces), ghosts, cellGhosts)
+        solver.SetupNonSym(localA_TT, faceColumns(rowsTF), localA_FT, faceColumns(rowsFF), np.ones(nOwnCells), np.ones(nOwnFaces), ghosts, cellGhosts)
     assert solver.IsSetUp() and solver.NumberOfLevels() > 1
     x_T, x_F = np.zeros(nOwnCells), np.zeros(nOwnFaces)
     result = solver.Solve(b_T[ownCells].copy(), b_F[ownFaces].copy(), x_T, x_F)
@@ -98,7 +98,7 @@ def DistributedSystem(emptyRank0, asymmetry=0.0):
     # An error on one process only is raised on all of them
     wrong = np.ones(nOwnFaces + (1 if rank == P - 1 else 0))
     try:
-        solver.SetupSymmetric(localA_TT, faceColumns(rowsTF), faceColumns(rowsFF), np.ones(nOwnCells), wrong, ghosts)
+        solver.SetupSym(localA_TT, faceColumns(rowsTF), faceColumns(rowsFF), np.ones(nOwnCells), wrong, ghosts)
         assert False, "a wrong interpolation of 1 accepted"
     except fhhos4.Error:
         pass
@@ -114,7 +114,7 @@ def test_empty_process():
 
 
 def test_nonsymmetric_system():
-    """SetupNonsymmetric(): A_FT with the ghost cells of its rows (cellGhosts)"""
+    """SetupNonSym(): A_FT with the ghost cells of its rows (cellGhosts)"""
     DistributedSystem(emptyRank0=False, asymmetry=0.3)
     DistributedSystem(emptyRank0=True, asymmetry=0.3)
 

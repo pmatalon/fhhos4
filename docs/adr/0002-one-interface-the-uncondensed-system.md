@@ -1,6 +1,6 @@
 # One library interface: the uncondensed system
 
-The library takes the blocks of the uncondensed system (`SetupSymmetric()`, `SetupNonsymmetric()`) and condenses it
+The library takes the blocks of the uncondensed system (`SetupSym()`, `SetupNonSym()`) and condenses it
 itself, cell by cell; `Solve(b_T, b_F, x_T, x_F)` returns the cell unknowns too. U-AMG needs the blocks anyway (the
 couplings and the coarse levels come from `A_TF`), so the condensed matrix alone is not enough.
 

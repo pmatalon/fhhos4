@@ -34,8 +34,8 @@ toy system of `UAMGLibraryTest.cpp` against SciPy's direct solver).
 ## With MPI (`FHHOS4_MPI`)
 
 `Solver.Comm` from an mpi4py communicator (`py2f()`, `MPI_Comm_f2c`; refused if MPI is not initialized; the getter
-returns the Python object), not set: one process, as in C++; `SetupSymmetric(..., faceGhosts=None)`,
-`SetupNonsymmetric(..., faceGhosts=None, cellGhosts=None)` (int64 arrays read in place, `ToGhostNumbers()`);
+returns the Python object), not set: one process, as in C++; `SetupSym(..., faceGhosts=None)`,
+`SetupNonSym(..., faceGhosts=None, cellGhosts=None)` (int64 arrays read in place, `ToGhostNumbers()`);
 `fhhos4.WithMPI`. Tests: `PythonModule` without `Comm` nor mpi4py (MPI not initialized: `CoarseSolver.MUMPS` refused);
 `PythonModuleMPI_np2`/`_np4` (`test_module_mpi.py`, under `mpiexec`: the toy system distributed by strips, also with an
 empty rank 0, symmetric or not, against SciPy; an input error on one process raised on all).

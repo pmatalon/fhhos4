@@ -420,7 +420,7 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   matrix-vector product per 20 iterations and at convergence. `ctest` 132/132.
 - **GCR and U-AMG for non-symmetric matrices** (2026-10-10, measurement only). GCR(10) (`-s gcr*`, library
   `Krylov = "gcr"`; its K-cycle iterates with GCR) on the symmetric matrices: 0-3 more iterations than FCG (Cube-tet
-  n=8 k=1: 32 -> 35; square tri n=64 k=0: 20 -> 22). `SetupNonsymmetricCondensed()` (as AGMG: prolongations from the
+  n=8 k=1: 32 -> 35; square tri n=64 k=0: 20 -> 22). `SetupNonSymCondensed()` (as AGMG: prolongations from the
   symmetric part, Galerkin `P^T A P`, LU on the coarsest level) on HArDCore3D's convection-diffusion
   (`hho-diff-advec-reac --solver_type fhhos4`, uncommitted in the fork), 1 thread, tolerance 1e-12, L2 errors equal to
   BiCGSTAB's everywhere (logs `HArDCore3D-release/build/runs_advec/advec_{16,32}.txt`; "solve" = HHO3D's solving time, with the
@@ -505,7 +505,7 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   case the local products gain nothing in the passes (its coarse cells have slightly more faces: 4.43 vs 4.20 per cell
   on the first coarse level), and the local path also assembles the operator of each level from the local matrices.
 - **Downwind order across the Péclet numbers** (2026-10-11, measurement only). The order is computed for every
-  non-symmetric matrix (never with `SetupSymmetric...()`), on each level but the coarsest, and kept where some couplings
+  non-symmetric matrix (never with `SetupSym...()`), on each level but the coarsest, and kept where some couplings
   are one-sided: nothing to set by the user. Diffusion-dominated: it finds nothing (natural order), at the cost of the
   couplings' pass, 24-25 ms on 1 thread / 12-13 ms on 8 threads on the fine level (32^3, k=1). Sweep without a new test
   case: HArDCore3D's blocks `1 1 0 0` (diffusion Id) + gamma (`1 1 5 0` - `1 1 0 0`), i.e. the convection
@@ -851,7 +851,7 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   their assembly loop, and must still factorize A_TT and compute A_TT^{-1} A_TF per cell (the right-hand side, the
   recovery of the cell unknowns): skipping the Schur complement only skips one small dense product per cell, and the
   assembled A_FF has the pattern of A (32^3 k=1: 9,158,400 non-zeros both). The library then computes A with global
-  sparse products (`CondensedMatrix()`): `SetupNonsymmetric()` against `SetupNonsymmetricCondensed()`, HArDCore3D's
+  sparse products (`CondensedMatrix()`): `SetupNonSym()` against `SetupNonSymCondensed()`, HArDCore3D's
   32^3 k=1 diffusion-dominated system (`build/bench_nonsym/diff_n32_k1`, column-major inputs as the clients give them,
   `build/bench_schur/fromblocks.cpp`, 3 interleaved repetitions, on battery): setup 1 thread 0.46-0.57 -> 1.18-1.22 s,
   8 threads 0.17-0.28 -> 0.60-0.69 s; the same iterations (23 / 24), solve unchanged. A cell-wise computation in the
@@ -1204,7 +1204,7 @@ elapsed setup / solve (s), iterations:
   ones (only the rows of the ghosts converted and sent): 0.17 s, setup 0.48 -> 0.29 s (2 processes), 0.26 -> 0.17 s (4),
   0.21 -> 0.14 s (8). The coarsening passes take a few ms (k=2 n=12: their h-levels are small).
 
-2026-10-26, non-symmetric (`SetupNonsymmetric()`, GCR, block Gauss-Seidel in the downwind order of each process, Jacobi
+2026-10-26, non-symmetric (`SetupNonSym()`, GCR, block Gauss-Seidel in the downwind order of each process, Jacobi
 between them; `DistributedLibrary.NonsymmetricUncondensedSystem`: Cartesian 60x60, k=0, partitioned in blocks),
 iterations on 2 / 3 / 4 processes (one process, the same renumbered system): asymmetry 0.3: 16-17 (16); 0.9
 (convection-dominated): 10 / 6 / 6 (10 / 9 / 9). The Jacobi coupling between the processes costs nothing here.

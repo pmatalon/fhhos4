@@ -139,8 +139,8 @@ Example invocations for specific experiments/figures live in `reproducibility/*.
 ## Library (`library/`)
 
 `libfhhos4` gives U-AMG to other HHO codes (`README_library.md` for its users; its code: `docs/library.md`). Public
-interface `library/include/fhhos4.h`: `Solver` (parameters as public members), `SetupSymmetric()`/
-`SetupNonsymmetric()` from the blocks of the uncondensed system (ADR-0002), then `Solve(b_T, b_F, x_T, x_F)`. Inputs
+interface `library/include/fhhos4.h`: `Solver` (parameters as public members), `SetupSym()`/
+`SetupNonSym()` from the blocks of the uncondensed system (ADR-0002), then `Solve(b_T, b_F, x_T, x_F)`. Inputs
 are Eigen matrices only (ADR-0004), read in place, never copied (ADR-0003); inputs whose wrong value silently breaks
 the solver have no default (ADR-0005); the Krylov method is inside (ADR-0006); the library's defaults are not the
 program's (ADR-0008). Its path must not include mesh or discretization headers, nor read `Utils::ProgramArgs`

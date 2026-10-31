@@ -17,12 +17,12 @@
 //   D. A. Di Pietro, F. Hülsemann, P. Matalon, P. Mycek, U. Rüde, "Algebraic multigrid preconditioner for statically
 //   condensed systems arising from lowest-order hybrid discretizations", SIAM J. Sci. Comput. (2023),
 // extended to k >= 1.
-// Solves a hybrid system (cell and face unknowns), symmetric positive definite (SetupSymmetric()) or not
-// (SetupNonsymmetric(), e.g. convection-diffusion),
+// Solves a hybrid system (cell and face unknowns), symmetric positive definite (SetupSym()) or not
+// (SetupNonSym(), e.g. convection-diffusion),
 //     [ A_TT  A_TF ] [x_T]   [b_T]
 //     [ A_FT  A_FF ] [x_F] = [b_F],
 // by static condensation: the AMG solves the condensed system A x_F = b, A = A_FF - A_FT A_TT^{-1} A_TF and
-// b = b_F - A_FT A_TT^{-1} b_T: SetupSymmetric() or SetupNonsymmetric() with the blocks, then Solve(b_T, b_F, x_T, x_F).
+// b = b_F - A_FT A_TT^{-1} b_T: SetupSym() or SetupNonSym() with the blocks, then Solve(b_T, b_F, x_T, x_F).
 // The library condenses the system and computes the cell unknowns: no static condensation in the calling code.
 // See README_library.md.
 //
@@ -171,7 +171,7 @@ namespace fhhos4
 	// The Krylov method preconditioned by one cycle of the AMG (Solver::Krylov)
 	enum class Krylov
 	{
-		Default,  // FCG for a symmetric matrix (SetupSymmetric...()), GCR otherwise (SetupNonsymmetric...())
+		Default,  // FCG for a symmetric matrix (SetupSym...()), GCR otherwise (SetupNonSym...())
 		FCG,      // flexible conjugate gradient (fhhos4 -s fcguamg), for a symmetric positive definite matrix
 		GCR,      // GCR(10), generalized conjugate residual restarted every 10 iterations, Notay's economical version
 		          // (fhhos4 -s gcruamg). Minimizes the residual norm: for any matrix
@@ -246,7 +246,7 @@ namespace fhhos4
 	// distributed over the processes.
 	enum class CoarseSolver
 	{
-		Default,  // Cholesky for a symmetric matrix (SetupSymmetric...()), LU otherwise (SetupNonsymmetric...())
+		Default,  // Cholesky for a symmetric matrix (SetupSym...()), LU otherwise (SetupNonSym...())
 		Cholesky, // sparse Cholesky factorization, for a symmetric positive definite matrix
 		LU,       // sparse LU factorization
 		MUMPS     // MUMPS's sparse factorization: LDL^T for a symmetric matrix (positive definite), LU otherwise. Needs
@@ -277,7 +277,7 @@ namespace fhhos4
 		// p-levels
 		fhhos4::PolynomialSpace PolynomialSpace = fhhos4::PolynomialSpace::P;
 		// The matrix is singular, its kernel spanned by the interpolation of 1 (cellInterpOfOne, faceInterpOfOne: the
-		// constant functions), e.g. the pure Neumann problem: SetupSymmetric() only. The setup checks that
+		// constant functions), e.g. the pure Neumann problem: SetupSym() only. The setup checks that
 		// the interpolation of 1 is in the kernel; each solve projects the condensed right-hand side onto the image of the
 		// matrix (the data of a pure Neumann problem are compatible up to the rounding or quadrature errors; at Verbosity
 		// >= 1, a message if the component removed is larger). The solution is defined up to a multiple of the
@@ -300,7 +300,7 @@ namespace fhhos4
 		int PreSmoothingIterations = -1;
 		int PostSmoothingIterations = -1;
 		// Smoothers. PreSmoother Default: chosen by the setup:
-		// - for a symmetric matrix (SetupSymmetric...()), BlockChebyshevFourthKind: parallel, and its results don't depend
+		// - for a symmetric matrix (SetupSym...()), BlockChebyshevFourthKind: parallel, and its results don't depend
 		//   on the number of threads;
 		// - for a non-symmetric matrix (the Chebyshev smoothers require a symmetric one), HybridBlockGaussSeidel on
 		//   several threads (parallel), BlockGaussSeidel on 1.
@@ -308,7 +308,7 @@ namespace fhhos4
 		// direction for Gauss-Seidel (BackwardBlockGaussSeidel after BlockGaussSeidel, HybridBackwardBlockGaussSeidel after
 		// HybridBlockGaussSeidel, and the other way around), PreSmoother itself if it is symmetric (Chebyshev, Jacobi,
 		// SymmetricBlockGaussSeidel).
-		// Non-symmetric matrix (SetupNonsymmetric...()): on a level with one-sided couplings (convection), the Gauss-Seidel
+		// Non-symmetric matrix (SetupNonSym...()): on a level with one-sided couplings (convection), the Gauss-Seidel
 		// smoothers keep their type, block size and number of sweeps, but not their direction: all their sweeps
 		// (backward and symmetric ones included) follow the downwind order of the level. Jacobi ignores it.
 		fhhos4::Smoother PreSmoother = fhhos4::Smoother::Default;
@@ -349,7 +349,7 @@ namespace fhhos4
 		// MPI_COMM_SELF: the system of the calling process, solved by it alone, as without MPI; not set, the solver makes no
 		// MPI call (MPI may not be initialized), but CoarseSolver::MUMPS needs MPI initialized; forgotten for a distributed
 		// system, the setup refuses its inputs (ghosts, A_FF with more columns than rows) and says to set Comm. A
-		// communicator of several processes: one system distributed by rows over them (see SetupSymmetric()); every setup
+		// communicator of several processes: one system distributed by rows over them (see SetupSym()); every setup
 		// and solve is then collective, called by all the processes of the communicator, with the same parameters.
 		MPI_Comm Comm = MPI_COMM_NULL;
 #endif
@@ -392,7 +392,7 @@ namespace fhhos4
 		// cell nor face. Then Solve() with the vectors of the cells and faces of the process. On one process, faceGhosts
 		// is empty.
 		template <typename TT, typename TF, typename FF>
-		void SetupSymmetric(const Eigen::SparseCompressedBase<TT>& A_TT, const Eigen::SparseCompressedBase<TF>& A_TF, const Eigen::SparseCompressedBase<FF>& A_FF,
+		void SetupSym(const Eigen::SparseCompressedBase<TT>& A_TT, const Eigen::SparseCompressedBase<TF>& A_TF, const Eigen::SparseCompressedBase<FF>& A_FF,
 		                    const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne,
 		                    const GhostNumbers& faceGhosts = GhostNumbers())
 		{
@@ -400,7 +400,7 @@ namespace fhhos4
 		}
 
 		// Setup for a non-symmetric system (e.g. convection-diffusion), whose symmetric part is positive definite: as
-		// SetupSymmetric(), with the block A_FT (faces x cells) and all the blocks read in full: the same
+		// SetupSym(), with the block A_FT (faces x cells) and all the blocks read in full: the same
 		// algorithm runs on the matrix itself. The couplings of the aggregation are computed from the averaged traces of
 		// the blocks of A_TF and A_FT; the coarse operators are the Galerkin products P^T A P (as AGMG: Y. Notay, "An
 		// aggregation-based algebraic multigrid method", ETNA 37, 2010); the Gauss-Seidel smoothers follow the downwind
@@ -409,13 +409,13 @@ namespace fhhos4
 		// The solver keeps a reference to A_FT, read by each Solve(b_T, b_F, x_T, x_F) (b_F - A_FT A_TT^{-1} b_T): A_FT must
 		// stay alive and unchanged until the next setup or the destruction of the solver (not a temporary matrix). The
 		// other blocks may be freed after the setup.
-		// On several processes (Comm), as SetupSymmetric(), A_TT and A_FF read in full, and A_FT the rows of the faces of
+		// On several processes (Comm), as SetupSym(), A_TT and A_FF read in full, and A_FT the rows of the faces of
 		// the process, its columns numbered locally: the cells of the process (those of the rows of A_TT, in their order),
 		// then its ghost cells, the other cells of its rows (of other processes), whose global numbers are cellGhosts (as
 		// faceGhosts: the cells of the process of rank 0 first, etc.). On one process, faceGhosts and cellGhosts are empty.
 		// See README_library.md.
 		template <typename TT, typename TF, typename FT, typename FF>
-		void SetupNonsymmetric(const Eigen::SparseCompressedBase<TT>& A_TT, const Eigen::SparseCompressedBase<TF>& A_TF, const Eigen::SparseCompressedBase<FT>& A_FT,
+		void SetupNonSym(const Eigen::SparseCompressedBase<TT>& A_TT, const Eigen::SparseCompressedBase<TF>& A_TF, const Eigen::SparseCompressedBase<FT>& A_FT,
 		                       const Eigen::SparseCompressedBase<FF>& A_FF,
 		                       const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne,
 		                       const GhostNumbers& faceGhosts = GhostNumbers(), const GhostNumbers& cellGhosts = GhostNumbers())
@@ -425,11 +425,11 @@ namespace fhhos4
 		}
 
 		template <typename TT, typename TF, typename FF, int Options, typename Index>
-		void SetupNonsymmetric(const Eigen::SparseCompressedBase<TT>&, const Eigen::SparseCompressedBase<TF>&, Eigen::SparseMatrix<double, Options, Index>&& A_FT,
+		void SetupNonSym(const Eigen::SparseCompressedBase<TT>&, const Eigen::SparseCompressedBase<TF>&, Eigen::SparseMatrix<double, Options, Index>&& A_FT,
 		                       const Eigen::SparseCompressedBase<FF>&, const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&,
 		                       const GhostNumbers& = GhostNumbers(), const GhostNumbers& = GhostNumbers()) = delete;
 
-		// Solves the system, after SetupSymmetric() or SetupNonsymmetric(): condenses the right-hand
+		// Solves the system, after SetupSym() or SetupNonSym(): condenses the right-hand
 		// side, b = b_F - A_FT A_TT^{-1} b_T, solves A x_F = b, then computes x_T = A_TT^{-1} (b_T - A_TF x_F).
 		// x_F: the initial guess on input (e.g. zero), the solution on output; x_T: output. The result is that of
 		// A x_F = b. Does not throw if the solver has not converged after MaxIterations iterations: see the result.
@@ -458,7 +458,7 @@ namespace fhhos4
 
 		//------------------------------------------------------------------//
 
-		// The condensed matrix A of the last setup, both triangles, computed by SetupSymmetric() or SetupNonsymmetric().
+		// The condensed matrix A of the last setup, both triangles, computed by SetupSym() or SetupNonSym().
 		// Valid until the next setup or the destruction of the solver. On one process only.
 		SparseMatrixMap CondensedMatrix() const
 		{
@@ -571,12 +571,12 @@ namespace fhhos4
 		}
 	}
 
-	// A copy: the blocks of the uncondensed system, extracted from its global matrix M (square), for SetupSymmetric():
+	// A copy: the blocks of the uncondensed system, extracted from its global matrix M (square), for SetupSym():
 	// A_TT, A_TF, A_FF, in one parallel pass (two on the rows of M). M: an Eigen sparse matrix, compressed, row-major, with
 	// the index type std::int32_t or std::int64_t (e.g. an Eigen::Map of the arrays of another code). The cells (resp.
 	// faces) in the order of their lists, the DoFs of each in the order of its list (e.g. reordered by degree); the DoFs
 	// in no list are dropped (e.g. those of the Dirichlet faces: move their contribution to the right-hand side first).
-	// Each DoF in one list at most. Symmetric matrix: A_TT and A_FF lower triangular (what SetupSymmetric() reads).
+	// Each DoF in one list at most. Symmetric matrix: A_TT and A_FF lower triangular (what SetupSym() reads).
 	template <typename Derived, typename Index>
 	HybridBlocks ExtractSymmetricBlocks(const Eigen::SparseCompressedBase<Derived>& M, const DoFLists<Index>& cells, const DoFLists<Index>& faces)
 	{
@@ -585,7 +585,7 @@ namespace fhhos4
 		return detail::ToEigen(detail::ExtractSymmetricBlocks(detail::GlobalMatrixView(M), cells, faces));
 	}
 
-	// A copy: as ExtractSymmetricBlocks(), the four blocks in full, for SetupNonsymmetric()
+	// A copy: as ExtractSymmetricBlocks(), the four blocks in full, for SetupNonSym()
 	template <typename Derived, typename Index>
 	HybridBlocks ExtractNonsymmetricBlocks(const Eigen::SparseCompressedBase<Derived>& M, const DoFLists<Index>& cells, const DoFLists<Index>& faces)
 	{

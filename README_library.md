@@ -104,7 +104,7 @@ solver.Dimension = 3;  // to set
 solver.FaceDegree = k; // to set
 solver.CellDegree = k; // to set
 // solver.PolynomialSpace = fhhos4::PolynomialSpace::Q; // bases of Q^k instead of P^k
-solver.SetupSymmetric(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne);
+solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne);
 Eigen::VectorXd x_T(b_T.size()), x_F = Eigen::VectorXd::Zero(b_F.size());
 fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F); // flexible conjugate gradient preconditioned by the AMG
 ```
@@ -121,9 +121,9 @@ The blocks may be freed after the setup.
 ### Non-symmetric matrices
 
 For a non-symmetric matrix (e.g. convection-diffusion), give also the block `A_FT` (faces x cells):
-`SetupNonsymmetric(A_TT, A_TF, A_FT, A_FF, ...)` then `Solve(b_T, b_F, x_T, x_F)`. The same algorithm runs on the
+`SetupNonSym(A_TT, A_TF, A_FT, A_FF, ...)` then `Solve(b_T, b_F, x_T, x_F)`. The same algorithm runs on the
 matrix itself, with GCR instead of FCG and Gauss-Seidel smoothers that follow the direction of the flow (downwind
-order). `SetupNonsymmetric()` keeps a reference to `A_FT`, which each `Solve(b_T, b_F, x_T, x_F)` reads
+order). `SetupNonSym()` keeps a reference to `A_FT`, which each `Solve(b_T, b_F, x_T, x_F)` reads
 (`b_F - A_FT A_TT^{-1} b_T`): keep it alive and unchanged until the next setup.
 
 ### Several processes (MPI)
@@ -146,7 +146,7 @@ solver.Comm = MPI_COMM_WORLD;
 // A_TT, A_TF: the rows of the cells of the process; A_FF: the rows of its faces, in full (both triangles).
 // The columns of A_TF and A_FF: the faces of the process, then its ghosts (the faces of other processes that its rows
 // reference), whose global numbers are faceGhosts, in their local order.
-solver.SetupSymmetric(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne, fhhos4::GhostNumbers(nGhosts, faceGhosts));
+solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne, fhhos4::GhostNumbers(nGhosts, faceGhosts));
 fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F); // the vectors of the cells and faces of the process
 ```
 
@@ -156,7 +156,7 @@ fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F); // the vectors of the 
   local numbering of DOLFINx's index maps, and of the columns of PETSc's and hypre's distributed matrices.
 - **Each face belongs to a process that owns one of its cells**, e.g. the one of the smaller rank; a face has at most
   two cells. A process may own no cell nor face (empty matrices and vectors): it still calls the setups and solves.
-- **Non-symmetric**: `SetupNonsymmetric(A_TT, A_TF, A_FT, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhosts,
+- **Non-symmetric**: `SetupNonSym(A_TT, A_TF, A_FT, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhosts,
   cellGhosts)`, with `A_TT` and `A_FF` in full; `A_FT`: the rows of the faces of the process, its columns the cells of
   the process (in the order of the rows of `A_TT`), then its ghost cells, in any order (the cells of other processes
   in these rows), whose global numbers are `cellGhosts` (numbered as the faces: those of rank 0 first...). On each
@@ -166,7 +166,7 @@ fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F); // the vectors of the 
 - The algorithm: each process aggregates its own cells (the faces between processes are kept); the coarsest level is
   factorized and solved by MUMPS on all the processes, distributed. The number of iterations may change slightly with
   the number of processes.
-- Available on several processes: the uncondensed system (`SetupSymmetric()`, `SetupNonsymmetric()`), with all the
+- Available on several processes: the uncondensed system (`SetupSym()`, `SetupNonSym()`), with all the
   parameters; the Gauss-Seidel smoothers are Gauss-Seidel in each process (the hybrid ones: in each thread), Jacobi
   between the processes. Not yet: `CondensedMatrix()`.
 - In Python: see [Python](#python).
@@ -195,7 +195,7 @@ solver.Dimension = 3   # to set
 solver.FaceDegree = k  # to set
 solver.CellDegree = k  # to set
 # solver.PolynomialSpace = fhhos4.PolynomialSpace.Q  # bases of Q^k instead of P^k
-solver.SetupSymmetric(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne)  # e.g. scipy.sparse.csr_array, NumPy vectors
+solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne)  # e.g. scipy.sparse.csr_array, NumPy vectors
 x_T, x_F = np.zeros(b_T.size), np.zeros(b_F.size)
 result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
 ```
@@ -211,7 +211,7 @@ result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
   `sum_duplicates()`, in place).
 - The vectors: NumPy vectors of `float64`, read (outputs: written) in place; another dtype raises `TypeError`.
   `Solve(b)` returns `x`.
-- The solver keeps the arrays that the solves read alive: those of `A_FT` (`SetupNonsymmetric()`). `CondensedMatrix()`
+- The solver keeps the arrays that the solves read alive: those of `A_FT` (`SetupNonSym()`). `CondensedMatrix()`
   returns a copy (`fhhos4.CSRMatrix`). The arrays of a `fhhos4.CSRMatrix`
   (`RowPointers`, `ColumnIndices`, `Values`) are read-only NumPy views of the library's memory, which keep it alive.
 - The helpers have the same names: `ExtractSymmetricBlocks(M, cells, faces)` with `fhhos4.DoFLists(count, offsets,
@@ -222,9 +222,9 @@ result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
   in C++ (see [Several processes](#several-processes-mpi)). To set it, the module needs
   [mpi4py](https://mpi4py.readthedocs.io), built with the same MPI as the library, and imported first (it initializes
   MPI). `solver.Comm`: an mpi4py communicator (`MPI.COMM_SELF`, `MPI.COMM_WORLD`, or its Fortran handle
-  `comm.py2f()`). On several processes, `SetupSymmetric(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne,
+  `comm.py2f()`). On several processes, `SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne,
   faceGhosts)`: `faceGhosts`, the global numbers of the ghost faces, a NumPy array of `int64` read in place (`None` by
-  default: no ghosts); `SetupNonsymmetric(A_TT, A_TF, A_FT, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhosts,
+  default: no ghosts); `SetupNonSym(A_TT, A_TF, A_FT, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhosts,
   cellGhosts)`, `cellGhosts` likewise.
 
   ```python
@@ -234,7 +234,7 @@ result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
   solver = fhhos4.Solver()
   solver.Comm = MPI.COMM_WORLD
   ...
-  solver.SetupSymmetric(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhosts)  # the rows of the process
+  solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhosts)  # the rows of the process
   result = solver.Solve(b_T, b_F, x_T, x_F)  # the vectors of the cells and faces of the process
   ```
 
@@ -278,7 +278,7 @@ in its own numbering):
 fhhos4::DoFLists<std::int64_t> cells{ nCells, cellOffsets, cellDoFs }, faces{ nFaces, faceOffsets, faceDoFs };
 Eigen::Map<const Eigen::SparseMatrix<double, Eigen::RowMajor, std::int64_t>> M(n, n, nnz, rowPointers, columns, values);
 fhhos4::HybridBlocks blocks = fhhos4::ExtractSymmetricBlocks(M, cells, faces); // A_TT, A_TF, A_FF: one parallel pass
-solver.SetupSymmetric(blocks.A_TT, blocks.A_TF, blocks.A_FF, cellInterpOfOne, faceInterpOfOne);
+solver.SetupSym(blocks.A_TT, blocks.A_TF, blocks.A_FF, cellInterpOfOne, faceInterpOfOne);
 fhhos4::Gather(b, cells, faces, b_T, b_F); // b: in the numbering of M
 solver.Solve(b_T, b_F, x_T, x_F);
 fhhos4::Scatter(x_T, x_F, cells, faces, x); // the DoFs of x in no list unchanged (e.g. the Dirichlet values)
@@ -289,7 +289,7 @@ fhhos4::Scatter(x_T, x_F, cells, faces, x); // the DoFs of x in no list unchange
 - The lists: `std::int32_t` or `std::int64_t`; each DoF in one list at most. The order of the lists gives the order of
   the blocks, and that of the DoFs of each cell or face the order of its basis (reorder them, e.g. by degree, here).
 - The Dirichlet DoFs, in no list: move their contribution to the right-hand side first (`b - M x_D`).
-- `ExtractSymmetricBlocks()` gives the lower triangular parts of `A_TT` and `A_FF` (what `SetupSymmetric()` reads),
+- `ExtractSymmetricBlocks()` gives the lower triangular parts of `A_TT` and `A_FF` (what `SetupSym()` reads),
   `ExtractNonsymmetricBlocks()` the four blocks in full.
 
 ### Parameters
@@ -300,7 +300,7 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 | Parameter | Default | Values |
 |---|---|---|
 | `PolynomialSpace` | `PolynomialSpace::P` | `fhhos4::PolynomialSpace`, the space of the bases of the cells and faces: `P` (P^l and P^k: the polynomials of degree at most l, k), `Q` (Q^l and Q^k: of degree at most l, k in each variable, on quadrilaterals and hexahedra) |
-| `SingularMatrix` | `false` | `true`: the matrix is singular, its kernel spanned by the interpolation of 1 (the constants), e.g. the pure Neumann problem; `SetupSymmetric()` only. The setup checks that the interpolation of 1 is in the kernel (an error otherwise: a Dirichlet face in the system, or a wrong interpolation of 1); each solve projects the condensed right-hand side onto the image of the matrix (at `Verbosity >= 1`, a message if the component removed is more than rounding: incompatible data). The solution is defined up to a multiple of the interpolation of 1 (a constant): shift it to the normalization you want (e.g. zero mean) |
+| `SingularMatrix` | `false` | `true`: the matrix is singular, its kernel spanned by the interpolation of 1 (the constants), e.g. the pure Neumann problem; `SetupSym()` only. The setup checks that the interpolation of 1 is in the kernel (an error otherwise: a Dirichlet face in the system, or a wrong interpolation of 1); each solve projects the condensed right-hand side onto the image of the matrix (at `Verbosity >= 1`, a message if the component removed is more than rounding: incompatible data). The solution is defined up to a multiple of the interpolation of 1 (a constant): shift it to the normalization you want (e.g. zero mean) |
 | `Krylov` | `Krylov::Default`: `Krylov::FCG` for a symmetric matrix, `Krylov::GCR` otherwise | `fhhos4::Krylov`: `FCG` (flexible conjugate gradient), `GCR` (GCR(10), any matrix), `None` (the multigrid cycles alone) |
 | `Tolerance` | `1e-8` | `Solve()` stops when the relative residual of the condensed system (the true one, `Result::RelativeResidual`) is below it |
 | `MaxIterations` | `200` | |
@@ -321,15 +321,15 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 
 ## Constraints
 
-- **Symmetric positive definite** condensed system (`SetupSymmetric()`), or semi-definite with the interpolation of 1
+- **Symmetric positive definite** condensed system (`SetupSym()`), or semi-definite with the interpolation of 1
   as kernel (`SingularMatrix`: the pure Neumann problem), or non-symmetric with a positive definite symmetric part
-  (`SetupNonsymmetric()`). With `SetupSymmetric()`, the blocks
+  (`SetupNonSym()`). With `SetupSym()`, the blocks
   of `A_TT` (one per cell) must be positive definite: the library factorizes them by Cholesky (LU with
-  `SetupNonsymmetric()`).
+  `SetupNonSym()`).
 - **Eigen 3.4 or 5.x** in your code, for the header `<fhhos4>`. No Eigen object crosses the boundary of the library:
   its compiled functions take arrays (views), which the header builds from your Eigen matrices and vectors, with your
   version of Eigen and your flags (any version, any alignment settings).
-- **The matrix read in place by the solves**: `A_FT` of `SetupNonsymmetric()`. Keep it alive and unchanged until the
+- **The matrix read in place by the solves**: `A_FT` of `SetupNonSym()`. Keep it alive and unchanged until the
   next setup or the destruction of the solver. The others are only read by the setup.
 - **Errors**: `fhhos4::Error` (a `std::runtime_error`). `Solve()` does not throw if the tolerance is not reached: see
   `Result::Converged`.

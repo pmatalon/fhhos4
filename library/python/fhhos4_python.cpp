@@ -195,7 +195,7 @@ namespace
 		return f(cells.Lists<std::int32_t>(), faces.Lists<std::int32_t>());
 	}
 
-	// fhhos4::Solver, which also keeps the views of the matrices that the solves read (A_FT of SetupNonsymmetric()): their
+	// fhhos4::Solver, which also keeps the views of the matrices that the solves read (A_FT of SetupNonSym()): their
 	// arrays stay alive until the next setup. Replaced only after a successful
 	// setup: a setup that fails (on its checks) keeps the previous one, which still reads them.
 	struct PySolver : fhhos4::Solver
@@ -355,14 +355,14 @@ NB_MODULE(fhhos4, m)
 			PyCSRView view = ToView(M, "M");
 			nb::gil_scoped_release release;
 			return view.Visit([&](auto v) { return VisitLists(cells, faces, [&](auto c, auto f) { return fhhos4::detail::ExtractSymmetricBlocks(v, c, f); }); });
-		}, "M"_a, "cells"_a, "faces"_a, "A copy: the blocks of the uncondensed system, from its global matrix, for SetupSymmetric()");
+		}, "M"_a, "cells"_a, "faces"_a, "A copy: the blocks of the uncondensed system, from its global matrix, for SetupSym()");
 
 	m.def("ExtractNonsymmetricBlocks", [](nb::handle M, const PyDoFLists& cells, const PyDoFLists& faces)
 		{
 			PyCSRView view = ToView(M, "M");
 			nb::gil_scoped_release release;
 			return view.Visit([&](auto v) { return VisitLists(cells, faces, [&](auto c, auto f) { return fhhos4::detail::ExtractNonsymmetricBlocks(v, c, f); }); });
-		}, "M"_a, "cells"_a, "faces"_a, "A copy: the four blocks of the uncondensed system, from its global matrix, for SetupNonsymmetric()");
+		}, "M"_a, "cells"_a, "faces"_a, "A copy: the four blocks of the uncondensed system, from its global matrix, for SetupNonSym()");
 
 	m.def("Gather", [](const ConstVector& x, const PyDoFLists& cells, const PyDoFLists& faces, Vector x_T, Vector x_F)
 		{
@@ -439,7 +439,7 @@ NB_MODULE(fhhos4, m)
 
 		// Setups from the blocks of the system. faceGhosts, cellGhosts: on several processes, the global numbers of the ghost
 		// faces and cells (int64 arrays)
-		.def("SetupSymmetric", [](PySolver& s, nb::handle A_TT, nb::handle A_TF, nb::handle A_FF, const ConstVector& cellInterpOfOne, const ConstVector& faceInterpOfOne, nb::handle faceGhosts)
+		.def("SetupSym", [](PySolver& s, nb::handle A_TT, nb::handle A_TF, nb::handle A_FF, const ConstVector& cellInterpOfOne, const ConstVector& faceInterpOfOne, nb::handle faceGhosts)
 			{
 				PyCSRView a_TT = ToView(A_TT, "A_TT"), a_TF = ToView(A_TF, "A_TF"), a_FF = ToView(A_FF, "A_FF");
 				fhhos4::detail::CSRView tt = a_TT.Native("A_TT"), tf = a_TF.Native("A_TF"), ff = a_FF.Native("A_FF");
@@ -447,7 +447,7 @@ NB_MODULE(fhhos4, m)
 				s.Run([&] { s.SetupViews(true, tt, tf, nullptr, ff, cellInterpOfOne, faceInterpOfOne, ghosts); }, {});
 			},
 			"A_TT"_a, "A_TF"_a, "A_FF"_a, "cellInterpOfOne"_a.noconvert(), "faceInterpOfOne"_a.noconvert(), "faceGhosts"_a = nb::none())
-		.def("SetupNonsymmetric", [](PySolver& s, nb::handle A_TT, nb::handle A_TF, nb::handle A_FT, nb::handle A_FF, const ConstVector& cellInterpOfOne, const ConstVector& faceInterpOfOne, nb::handle faceGhosts, nb::handle cellGhosts)
+		.def("SetupNonSym", [](PySolver& s, nb::handle A_TT, nb::handle A_TF, nb::handle A_FT, nb::handle A_FF, const ConstVector& cellInterpOfOne, const ConstVector& faceInterpOfOne, nb::handle faceGhosts, nb::handle cellGhosts)
 			{
 				PyCSRView a_TT = ToView(A_TT, "A_TT"), a_TF = ToView(A_TF, "A_TF"), a_FT = ToView(A_FT, "A_FT"), a_FF = ToView(A_FF, "A_FF");
 				fhhos4::detail::CSRView tt = a_TT.Native("A_TT"), tf = a_TF.Native("A_TF"), ft = a_FT.Native("A_FT"), ff = a_FF.Native("A_FF");

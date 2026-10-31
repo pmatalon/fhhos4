@@ -82,9 +82,9 @@ void ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double 
 		solver.SingularMatrix = singular;
 		Vector cellOnes = Vector::Ones(global.A_TT.rows()), faceOnes = Vector::Ones(global.S.rows());
 		if (asymmetry == 0)
-			solver.SetupSymmetric(system.Global.A_TT, system.Global.A_TF, system.Global.A_FF, cellOnes, faceOnes);
+			solver.SetupSym(system.Global.A_TT, system.Global.A_TF, system.Global.A_FF, cellOnes, faceOnes);
 		else
-			solver.SetupNonsymmetric(system.Global.A_TT, system.Global.A_TF, system.Global.A_FT, system.Global.A_FF, cellOnes, faceOnes);
+			solver.SetupNonSym(system.Global.A_TT, system.Global.A_TF, system.Global.A_FT, system.Global.A_FF, cellOnes, faceOnes);
 		expectedIterations = solver.Solve(b_T, b_F, expectedX_T, expectedX_F).Iterations;
 	}
 
@@ -102,9 +102,9 @@ void ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double 
 	solver.SingularMatrix = singular;
 	Vector cellOnes = Vector::Ones(cells.NOwned), faceOnes = Vector::Ones(faces.NOwned);
 	if (asymmetry == 0)
-		solver.SetupSymmetric(A_TT, A_TF, A_FF, cellOnes, faceOnes, fhhos4::GhostNumbers(faceGhosts.size(), faceGhosts.data()));
+		solver.SetupSym(A_TT, A_TF, A_FF, cellOnes, faceOnes, fhhos4::GhostNumbers(faceGhosts.size(), faceGhosts.data()));
 	else
-		solver.SetupNonsymmetric(A_TT, A_TF, A_FT, A_FF, cellOnes, faceOnes, fhhos4::GhostNumbers(faceGhosts.size(), faceGhosts.data()), fhhos4::GhostNumbers(cellGhosts.size(), cellGhosts.data()));
+		solver.SetupNonSym(A_TT, A_TF, A_FT, A_FF, cellOnes, faceOnes, fhhos4::GhostNumbers(faceGhosts.size(), faceGhosts.data()), fhhos4::GhostNumbers(cellGhosts.size(), cellGhosts.data()));
 	Vector x_T(cells.NOwned), x_F = Vector::Zero(faces.NOwned);
 	fhhos4::Result result = solver.Solve(b_T.segment(cells.Begin, cells.NOwned), b_F.segment(faces.Begin, faces.NOwned), x_T, x_F);
 
@@ -138,7 +138,7 @@ TEST(DistributedLibrary, UncondensedSystemHarmonicExtension)
 	ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::HarmonicExtension);
 }
 
-// SetupNonsymmetric(): A_FT with the ghost cells of its rows; 0.9: convection-dominated (the downwind order of each
+// SetupNonSym(): A_FT with the ghost cells of its rows; 0.9: convection-dominated (the downwind order of each
 // process)
 TEST(DistributedLibrary, NonsymmetricUncondensedSystem)
 {
@@ -172,7 +172,7 @@ TEST(DistributedLibrary, CollectiveErrors)
 	if (World().Rank() == World().Size() - 1)
 		faceOnes = Vector::Ones(system.Faces->NOwned + 1);
 	fhhos4::Solver solver = CartesianSolver(World().Comm());
-	EXPECT_THROW(solver.SetupSymmetric(A_TT, A_TF, A_FF, cellOnes, faceOnes, fhhos4::GhostNumbers(ghosts.size(), ghosts.data())), fhhos4::Error);
+	EXPECT_THROW(solver.SetupSym(A_TT, A_TF, A_FF, cellOnes, faceOnes, fhhos4::GhostNumbers(ghosts.size(), ghosts.data())), fhhos4::Error);
 	// Without Comm: each process alone, which refuses the inputs of a distributed system, the ghosts or the columns of
 	// ghost faces in A_FF (here those of A_TF: none on rank 0, which owns the faces between the processes), and tells to
 	// set Comm
@@ -184,9 +184,9 @@ TEST(DistributedLibrary, CollectiveErrors)
 			try
 			{
 				if (withGhosts)
-					noComm.SetupSymmetric(A_TT, A_TF, A_FF, cellOnes, faceOnes, fhhos4::GhostNumbers(ghosts.size(), ghosts.data()));
+					noComm.SetupSym(A_TT, A_TF, A_FF, cellOnes, faceOnes, fhhos4::GhostNumbers(ghosts.size(), ghosts.data()));
 				else
-					noComm.SetupSymmetric(A_TT, A_TF, A_FF, cellOnes, faceOnes);
+					noComm.SetupSym(A_TT, A_TF, A_FF, cellOnes, faceOnes);
 				ADD_FAILURE() << "a distributed system accepted without Comm";
 			}
 			catch (const fhhos4::Error& e)

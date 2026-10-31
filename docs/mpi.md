@@ -49,8 +49,8 @@ program too: `-DENABLE_PROGRAM=ON`).
   order of the faces of each process (`Diag`; Jacobi between the processes). Ghost faces may belong to no local cell
   (couplings of `A_FF`): `CoarseningPass::NOwnedFaces`. All global decisions (coarsening ratio, errors) reduced.
 - Library: `Solver::Comm` (not set: one process, no MPI call; `MUMPS` then needs MPI initialized; forgotten on several
-  processes: `ForgottenComm()` ends the errors of distributed inputs, ghosts or `A_FF` with more columns than rows), `SetupSymmetric(..., GhostNumbers faceGhosts)` (local columns: own faces then
-  ghosts, one numbering for `A_TF` and `A_FF`, `A_FF` in full), `SetupNonsymmetric(..., faceGhosts, cellGhosts)`
+  processes: `ForgottenComm()` ends the errors of distributed inputs, ghosts or `A_FF` with more columns than rows), `SetupSym(..., GhostNumbers faceGhosts)` (local columns: own faces then
+  ghosts, one numbering for `A_TF` and `A_FF`, `A_FF` in full), `SetupNonSym(..., faceGhosts, cellGhosts)`
   (`A_FT`: rows of the own faces, columns own cells then ghost cells; turned once by the setup into the rows of all
   the local faces, the columns of the own cells: `RowsWithGhosts`, kept by the condensation, which then runs as the
   symmetric one), `DistributedStaticCondensation.h`, `CollectiveCheck()` (errors of the inputs on all the processes). A

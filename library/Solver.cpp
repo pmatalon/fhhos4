@@ -183,7 +183,7 @@ namespace fhhos4
 	struct Solver::Impl
 	{
 		// Set by the setup
-		bool Symmetric = true; // the matrix is symmetric (SetupSymmetric()), or not (SetupNonsymmetric())
+		bool Symmetric = true; // the matrix is symmetric (SetupSym()), or not (SetupNonSym())
 		fhhos4::Krylov Krylov = fhhos4::Krylov::FCG;                       // Solver::Krylov, or its default for the symmetry of the matrix
 		fhhos4::CoarseSolver CoarseSolver = fhhos4::CoarseSolver::Cholesky; // Solver::CoarseSolver, or its default for the symmetry of the matrix
 		bool PolynomialSpaceQ = false; // Solver::PolynomialSpace
@@ -193,7 +193,7 @@ namespace fhhos4
 		SparseMatrix A; // the condensed matrix, computed by the setup (on one process): the solvers keep a pointer to it
 		bool Singular = false; // Solver::SingularMatrix, at the setup
 		Vector Kernel;  // Singular: the interpolation of 1 on the faces (of the process), normalized (the kernel of A)
-		unique_ptr<BorrowedSparseMatrix> GivenA_FT; // the caller's A_FT, read in place by Condensation (SetupNonsymmetric())
+		unique_ptr<BorrowedSparseMatrix> GivenA_FT; // the caller's A_FT, read in place by Condensation (SetupNonSym())
 		unique_ptr<StaticCondensation> Condensation; // after a setup from the blocks: for Solve(b_T, b_F, x_T, x_F)
 		unique_ptr<UncondensedAMG> Multigrid;
 		unique_ptr<IterativeSolver> KrylovSolver; // preconditioned by Multigrid; null if Krylov is None
@@ -265,7 +265,7 @@ namespace fhhos4
 			if (!symmetric && CoarseSolver == fhhos4::CoarseSolver::Cholesky)
 				Utils::FatalError("fhhos4::Solver: the Cholesky factorization requires a symmetric matrix: set CoarseSolver to CoarseSolver::LU (or Default) for a non-symmetric one.");
 			if (!symmetric && s.SingularMatrix)
-				Utils::FatalError("fhhos4::Solver: SingularMatrix requires a symmetric matrix (SetupSymmetric()): the kernel of the transpose of a non-symmetric matrix is not the interpolation of 1 in general.");
+				Utils::FatalError("fhhos4::Solver: SingularMatrix requires a symmetric matrix (SetupSym()): the kernel of the transpose of a non-symmetric matrix is not the interpolation of 1 in general.");
 			if (s.PreSmoothingIterations < -1 || s.PostSmoothingIterations < -1)
 				Utils::FatalError("fhhos4::Solver: PreSmoothingIterations and PostSmoothingIterations must be >= 0, or -1 (the smoother's default), got " + to_string(s.PreSmoothingIterations) + " and " + to_string(s.PostSmoothingIterations) + ".");
 			for (fhhos4::Smoother smoother : { s.PreSmoother, s.PostSmoother })
@@ -397,7 +397,7 @@ namespace fhhos4
 		}
 
 		// On several processes: from the blocks of the uncondensed system, the rows of the process (see
-		// Solver::SetupSymmetric()), A_FF in full; A_FT on the rows of all the faces of faces and the columns of the cells
+		// Solver::SetupSym()), A_FF in full; A_FT on the rows of all the faces of faces and the columns of the cells
 		// of the process (DistributedStaticCondensation), empty if the system is symmetric
 		void SetupDistributed(const Solver& s, const SparseMatrix& A_TT, const SparseMatrix& A_TF, SparseMatrix A_FT, const SparseMatrix& A_FF, shared_ptr<const IndexMap> faces, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne)
 		{
@@ -544,7 +544,7 @@ namespace fhhos4
 				if (ghosts->Count < 0 || (ghosts->Count > 0 && !ghosts->Numbers))
 					Utils::FatalError(string("fhhos4::Solver: ") + name + ": a negative Count, or no Numbers.");
 			if (symmetric && cellGhosts.Count != 0)
-				Utils::FatalError("fhhos4::Solver: cellGhosts are the ghost cells of A_FT, for a non-symmetric system only (SetupNonsymmetric()).");
+				Utils::FatalError("fhhos4::Solver: cellGhosts are the ghost cells of A_FT, for a non-symmetric system only (SetupNonSym()).");
 			a_TT = Borrow(A_TT, "A_TT");
 			a_TF = Borrow(A_TF, "A_TF");
 			if (A_FT)

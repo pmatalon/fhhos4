@@ -26,7 +26,7 @@ public:
 	virtual void SetupFromBlocks(const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_T, const SparseMatrix& A_F_F, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) = 0;
 
 	// On several processes (the program's MPI_COMM_WORLD): from the rows of the cells and faces of the process (see
-	// fhhos4::Solver::SetupSymmetric() and SetupNonsymmetric()): A_T_T, A_T_F (columns: the faces of the process, then its
+	// fhhos4::Solver::SetupSym() and SetupNonSym()): A_T_T, A_T_F (columns: the faces of the process, then its
 	// ghosts, whose global numbers are faceGhosts), A_F_T (empty on all the processes if the matrix is symmetric; columns:
 	// the cells of the process, then its ghost cells, cellGhosts), A_F_F (the rows of its faces, in full), the
 	// interpolations of 1 on its cells and faces. Then Solve(b_T, b_F, x_T, x_F) with the vectors of the process.
