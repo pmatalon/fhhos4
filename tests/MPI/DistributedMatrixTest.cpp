@@ -167,6 +167,41 @@ TEST(DistributedMatrix, TransposedProductWithBlocks)
 	EXPECT_LE((yc - expectedC).norm(), 1e-14 * expectedC.norm());
 }
 
+// The products in single precision (Cast<float>()): the double ones, to the rounding of the matrix, the vector and the
+// sums (|fl(A x) - A x| <= gamma |A| |x|)
+TEST(DistributedMatrix, ProductsInSinglePrecision)
+{
+	auto withinRounding = [](const FloatVector& y, const Vector& expected, const Vector& absAx)
+	{
+		return (y.cast<double>() - expected).norm() <= 1e-6 * absAx.norm();
+	};
+	IndexMap owners(World(), NOwned());
+	BigNumber n = owners.GlobalSize;
+	SparseMatrix A = Laplacian(n);
+	DistributedMatrix dA = DistributedMatrix::FromGlobalColumns(make_shared<const IndexMap>(owners), owners, Rows(A, owners.Begin, owners.NOwned), 1, 1);
+	DistributedMatrixOf<float> sA = dA.Cast<float>();
+	EXPECT_EQ(sA.GlobalNonZeros(), A.nonZeros());
+	Vector x = TestVector(n);
+	FloatVector y = sA * FloatVector(x.segment(owners.Begin, owners.NOwned).cast<float>());
+	Vector absAx = SparseMatrix(A.cwiseAbs()) * x.cwiseAbs();
+	EXPECT_TRUE(withinRounding(y, (A * x).segment(owners.Begin, owners.NOwned), absAx.segment(owners.Begin, owners.NOwned)));
+
+	int bs = 3;
+	IndexMap fine(World(), NOwned());
+	BigNumber nCoarse = (fine.GlobalSize + 1) / 2;
+	IndexMap coarse(World(), nCoarse / World().Size() + (World().Rank() < nCoarse % World().Size() ? 1 : 0));
+	SparseMatrix P = PairwiseProlongation(fine.GlobalSize, bs);
+	DistributedMatrixOf<float> sP = DistributedMatrix::FromGlobalColumns(make_shared<const IndexMap>(fine), coarse, Rows(P, fine.Begin * bs, fine.NOwned * bs), bs, bs).Cast<float>();
+	sP.SetupTransposed();
+	Vector xc = TestVector(nCoarse * bs);
+	FloatVector yf = sP * FloatVector(xc.segment(coarse.Begin * bs, coarse.NOwned * bs).cast<float>());
+	EXPECT_TRUE(withinRounding(yf, (P * xc).segment(fine.Begin * bs, fine.NOwned * bs), (P * xc).segment(fine.Begin * bs, fine.NOwned * bs))); // P >= 0, x > 0
+	Vector xf = TestVector(fine.GlobalSize * bs);
+	FloatVector yc = sP.MultiplyTransposed(FloatVector(xf.segment(fine.Begin * bs, fine.NOwned * bs).cast<float>()));
+	Vector expectedC = (P.transpose() * xf).segment(coarse.Begin * bs, coarse.NOwned * bs);
+	EXPECT_TRUE(withinRounding(yc, expectedC, expectedC));
+}
+
 TEST(Communicator, Reductions)
 {
 	const Communicator& comm = World();

@@ -9,23 +9,31 @@ using namespace std;
 // split into the columns of the entities it owns in ColMap (Diag) and those of its ghosts in ColMap (Offd, the columns
 // in the order of the ghosts, by blocks of ColBlockSize). For a square operator (RowMap and ColMap with the same
 // ownership), Diag is the square block of the process: the smoothers work on it.
-class DistributedMatrix
+// In precision T: double (DistributedMatrix), or float (mixed precision: the matrices of the cycle of U-AMG, see
+// Multigrid::MixedPrecision), whose products are in float. The constructions are in double (they return a
+// DistributedMatrix), then Cast<float>().
+template <typename T>
+class DistributedMatrixOf;
+using DistributedMatrix = DistributedMatrixOf<double>;
+
+template <typename T>
+class DistributedMatrixOf
 {
 public:
 	shared_ptr<const IndexMap> RowMap;
 	shared_ptr<const IndexMap> ColMap;
 	int RowBlockSize = 1;
 	int ColBlockSize = 1;
-	SparseMatrix Diag;
-	SparseMatrix Offd;
+	SparseMatrixOf<T> Diag;
+	SparseMatrixOf<T> Offd;
 
 private:
 	// The transposes of Diag and Offd, for MultiplyTransposed() (SetupTransposed())
-	SparseMatrix _diagT;
-	SparseMatrix _offdT;
+	SparseMatrixOf<T> _diagT;
+	SparseMatrixOf<T> _offdT;
 
 public:
-	DistributedMatrix() {}
+	DistributedMatrixOf() {}
 
 	const Communicator& Comm() const { return *RowMap->Comm; }
 	BigNumber LocalRows() const { return Diag.rows(); }
@@ -33,6 +41,20 @@ public:
 	BigNumber GlobalCols() const { return ColMap->GlobalSize * ColBlockSize; }
 	BigNumber LocalNonZeros() const { return Diag.nonZeros() + Offd.nonZeros(); }
 	BigNumber GlobalNonZeros() const { return Comm().Sum(LocalNonZeros()); }
+
+	// The matrix in precision U: Diag and Offd rounded, the maps shared (not the transposes: SetupTransposed())
+	template <typename U>
+	DistributedMatrixOf<U> Cast() const
+	{
+		DistributedMatrixOf<U> M;
+		M.RowMap = RowMap;
+		M.ColMap = ColMap;
+		M.RowBlockSize = RowBlockSize;
+		M.ColBlockSize = ColBlockSize;
+		M.Diag = SparseMatrixOps::Cast<U>(Diag);
+		M.Offd = SparseMatrixOps::Cast<U>(Offd);
+		return M;
+	}
 
 	//-------------------------------------------------------------------//
 	//                          Construction                             //
@@ -462,32 +484,32 @@ public:
 	//-------------------------------------------------------------------//
 
 	// The values of the ghosts of ColMap for the owned values x (halo exchange). Collective on the halo.
-	Vector GhostValues(const Vector& x) const
+	VectorOf<T> GhostValues(const VectorOf<T>& x) const
 	{
 		assert(x.rows() == ColMap->NOwned * ColBlockSize);
 		return GhostValues(x.data());
 	}
 
 	// Same, x of size ColMap->NOwned * ColBlockSize
-	Vector GhostValues(const double* x) const
+	VectorOf<T> GhostValues(const T* x) const
 	{
-		Vector ghosts(ColMap->NGhosts() * ColBlockSize);
+		VectorOf<T> ghosts(ColMap->NGhosts() * ColBlockSize);
 		ColMap->UpdateGhosts(x, ghosts.data(), ColBlockSize);
 		return ghosts;
 	}
 
 	// y = A x (x: the owned values of the column entities). Collective on the halo.
-	void Multiply(const Vector& x, Vector& y) const
+	void Multiply(const VectorOf<T>& x, VectorOf<T>& y) const
 	{
-		Vector ghosts = GhostValues(x);
+		VectorOf<T> ghosts = GhostValues(x);
 		y.noalias() = Diag * x;
 		if (Offd.cols() > 0)
 			y.noalias() += Offd * ghosts;
 	}
 
-	Vector operator*(const Vector& x) const
+	VectorOf<T> operator*(const VectorOf<T>& x) const
 	{
-		Vector y(Diag.rows());
+		VectorOf<T> y(Diag.rows());
 		Multiply(x, y);
 		return y;
 	}
@@ -501,11 +523,11 @@ public:
 
 	// y = A^T x (x: the owned rows; y: the owned values of the column entities): the contributions to the ghost columns
 	// are added to their owners. SetupTransposed() first. Collective on the halo.
-	Vector MultiplyTransposed(const Vector& x) const
+	VectorOf<T> MultiplyTransposed(const VectorOf<T>& x) const
 	{
 		assert(_diagT.rows() == Diag.cols() && _offdT.rows() == Offd.cols());
-		Vector y = _diagT * x;
-		Vector ghosts = _offdT * x;
+		VectorOf<T> y = _diagT * x;
+		VectorOf<T> ghosts = _offdT * x;
 		ColMap->AddGhostsToOwners(ghosts.data(), y.data(), ColBlockSize);
 		return y;
 	}
