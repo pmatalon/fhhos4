@@ -151,14 +151,23 @@ method of your code, on the face unknowns only: set `Krylov` to `Krylov::None` a
 solver.Krylov = fhhos4::Krylov::None; // before the setup
 solver.MaxIterations = 1;             // one cycle per Solve()
 solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne);
-fhhos4::SparseMatrixMap A = solver.CondensedMatrix();
+fhhos4::SparseMatrixMap A = solver.CondensedMatrix(); // the condensed matrix
 Eigen::VectorXd b(b_F.size());
-solver.CondenseRHS(b_T, b_F, b);
-// your Krylov method on A x_F = b, with the preconditioner z = M^{-1} r:
-z.setZero();
-solver.Solve(r, z);
-// then, from its solution x_F:
-solver.SolveCellUnknowns(b_T, x_F, x_T);
+solver.CondenseRHS(b_T, b_F, b);                       // the condensed right-hand side
+
+// Your Krylov method on A x_F = b, e.g. a flexible conjugate gradient (skeleton)
+Eigen::VectorXd x_F = Eigen::VectorXd::Zero(b.size()), r = b, z(b.size()), p, Ap;
+while (r.norm() > tolerance * b.norm())
+{
+    z.setZero();
+    solver.Solve(r, z); // the preconditioner, z = M^{-1} r: one cycle
+    p = ...;            // the new search direction, from z
+    Ap = A * p;         // the matrix-vector product (Eigen)
+    ...                 // the updates of x_F and r
+}
+
+Eigen::VectorXd x_T(b_T.size());
+solver.SolveCellUnknowns(b_T, x_F, x_T);               // the cell unknowns
 ```
 
 The default K-cycle is non-linear: your Krylov method must be flexible (flexible conjugate gradient, FGMRES, GCR).
