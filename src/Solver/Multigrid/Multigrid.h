@@ -482,15 +482,16 @@ protected:
 
 private:
 	// Mixed precision: one cycle in single precision on the residual r = b - A x (b if x = 0), in double with the matrix of
-	// the solver, its correction e added to x (x = e if x = 0); the residual and A x in double (A full: a parallel product)
+	// the solver, its correction e added to x (x = e if x = 0); the residual and A x in double (A full: a parallel product;
+	// on several processes, the distributed operator)
 	void MixedPrecisionCycle(const Vector& b, Vector& x, bool& xEquals0, bool computeResidual, bool computeAx, IterationResult& result)
 	{
-		const SparseMatrix& A = *this->_fineLevel->OperatorMatrix;
+		Level& fine = *this->_fineLevel;
 		BigNumber n = b.rows();
 		Vector r;
 		if (!xEquals0)
 		{
-			r = b - A * x;                                                         result.AddWorkInFlops(Cost::DAXPY(A));
+			r = fine.ResidualOf(b, x);                                             result.AddWorkInFlops(Cost::DAXPY(fine.LocalOperatorNonZeros<double>()));
 		}
 		const Vector& rhs = xEquals0 ? b : r;
 		FloatVector rSingle(n), eSingle;
@@ -507,7 +508,7 @@ private:
 		xEquals0 = false;
 		if (computeAx || computeResidual)
 		{
-			result.Ax = A * x;                                                     result.AddWorkInFlops(Cost::MatVec(A));
+			result.Ax = fine.Apply(x);                                             result.AddWorkInFlops(Cost::SpMatVec(fine.LocalOperatorNonZeros<double>()));
 			if (computeResidual)
 			{
 				result.Residual = b - result.Ax;                                   result.AddWorkInFlops(Cost::AddVec(b));

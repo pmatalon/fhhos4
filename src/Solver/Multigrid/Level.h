@@ -17,6 +17,9 @@ public:
 	// and transfers are in single precision; OperatorMatrix is then null, but on the finest level (the matrix of the
 	// solver, in double) and on the coarsest one (a copy in double, for the coarse solver). Null otherwise.
 	const FloatSparseMatrix* SingleOperatorMatrix = nullptr;
+	// The same on several processes: the operator in single precision distributed by rows (SingleOperatorMatrix is then
+	// its block Diag), DistributedOperator null but on the finest and coarsest levels
+	const DistributedMatrixOf<float>* SingleDistributedOperator = nullptr;
 	// The operator of the cycle stored by blocks (block CSR, BlockSparseMatrix), in double or in single precision: the
 	// smoothers and the products of the cycle in that precision use it instead of the CSR matrix, which may then be
 	// null (single precision). U-AMG: the levels whose faces have several DoFs (UncondensedLevel::BlockCSRStorage).
@@ -46,8 +49,9 @@ protected:
 	SparseMatrix P;
 	FloatSparseMatrix SingleR, SingleP; // a level in single precision (SingleOperatorMatrix): its transfers
 	// On several processes: the prolongation, its rows the owned unknowns of this level, its columns those of the coarser
-	// level; the restriction is its transpose (MultiplyTransposed())
+	// level; the restriction is its transpose (MultiplyTransposed()). In single precision: SingleDistributedP.
 	DistributedMatrix DistributedP;
+	DistributedMatrixOf<float> SingleDistributedP;
 
 public:
 	Level(int number)
@@ -62,7 +66,7 @@ public:
 
 	bool IsDistributed() const
 	{
-		return this->DistributedOperator != nullptr;
+		return this->DistributedOperator != nullptr || this->SingleDistributedOperator != nullptr;
 	}
 
 	bool InSinglePrecision() const
@@ -87,6 +91,24 @@ public:
 			return this->SingleBlockOperator;
 		else
 			return this->BlockOperator;
+	}
+
+	template <typename T>
+	const DistributedMatrixOf<T>*& DistributedOperatorOf()
+	{
+		if constexpr (std::is_same_v<T, float>)
+			return this->SingleDistributedOperator;
+		else
+			return this->DistributedOperator;
+	}
+
+	template <typename T>
+	DistributedMatrixOf<T>& DistributedProlongationOf()
+	{
+		if constexpr (std::is_same_v<T, float>)
+			return this->SingleDistributedP;
+		else
+			return this->DistributedP;
 	}
 
 	template <typename T>
@@ -129,6 +151,8 @@ public:
 	// A level in single precision
 	FloatVector ResidualOf(const FloatVector& b, const FloatVector& x) const
 	{
+		if (this->SingleDistributedOperator)
+			return b - *this->SingleDistributedOperator * x;
 		if (this->SingleBlockOperator)
 			return b - *this->SingleBlockOperator * x;
 		return b - *this->SingleOperatorMatrix * x;
@@ -136,6 +160,8 @@ public:
 
 	FloatVector Apply(const FloatVector& x) const
 	{
+		if (this->SingleDistributedOperator)
+			return *this->SingleDistributedOperator * x;
 		if (this->SingleBlockOperator)
 			return *this->SingleBlockOperator * x;
 		return *this->SingleOperatorMatrix * x;
@@ -145,6 +171,8 @@ public:
 	template <typename T>
 	BigNumber LocalOperatorNonZeros()
 	{
+		if (const DistributedMatrixOf<T>* distributed = this->template DistributedOperatorOf<T>())
+			return distributed->LocalNonZeros();
 		if (const BlockSparseMatrix<T>* blocks = this->template BlockOperatorOf<T>())
 			return blocks->NonZeros();
 		return this->template OperatorOf<T>()->nonZeros();
@@ -155,6 +183,8 @@ public:
 	{
 		if (this->DistributedOperator)
 			return this->DistributedOperator->GlobalNonZeros();
+		if (this->SingleDistributedOperator)
+			return this->SingleDistributedOperator->GlobalNonZeros();
 		if (this->OperatorMatrix)
 			return this->OperatorMatrix->nonZeros();
 		if (this->SingleOperatorMatrix)
@@ -164,6 +194,13 @@ public:
 
 	string OperatorInfo() const
 	{
+		if (this->IsDistributed())
+		{
+			auto info = [](const auto& A) { return "size(A)=" + to_string(A.GlobalRows()) + "x" + to_string(A.GlobalCols()) + ", \tnnz(A)=" + to_string(A.GlobalNonZeros()) + " on " + to_string(A.Comm().Size()) + " processes"; };
+			if (!this->DistributedOperator)
+				return info(*this->SingleDistributedOperator) + " (single precision)";
+			return info(*this->DistributedOperator) + (this->SingleDistributedOperator ? " (and in single precision)" : "");
+		}
 		string blocks;
 		if (this->SingleBlockOperator)
 			blocks = "in block CSR (blocks of " + to_string(this->SingleBlockOperator->BlockSize) + ")";
@@ -176,15 +213,9 @@ public:
 		}
 		if (!this->OperatorMatrix)
 			return Utils::MatrixInfo(*this->SingleOperatorMatrix, "A") + " (single precision" + (blocks.empty() ? "" : ", " + blocks) + ")";
-		if (!this->DistributedOperator)
-		{
-			string single = this->SingleOperatorMatrix || this->SingleBlockOperator ? "in single precision" : "";
-			string also = single.empty() ? blocks : (blocks.empty() ? single : single + " " + blocks);
-			return Utils::MatrixInfo(*this->OperatorMatrix, "A") + (also.empty() ? "" : " (and " + also + ")");
-		}
-		const DistributedMatrix& A = *this->DistributedOperator;
-		BigNumber nnz = A.GlobalNonZeros();
-		return "size(A)=" + to_string(A.GlobalRows()) + "x" + to_string(A.GlobalCols()) + ", \tnnz(A)=" + to_string(nnz) + " on " + to_string(A.Comm().Size()) + " processes";
+		string single = this->SingleOperatorMatrix || this->SingleBlockOperator ? "in single precision" : "";
+		string also = single.empty() ? blocks : (blocks.empty() ? single : single + " " + blocks);
+		return Utils::MatrixInfo(*this->OperatorMatrix, "A") + (also.empty() ? "" : " (and " + also + ")");
 	}
 
 	bool IsCoarsestLevel()
@@ -288,7 +319,7 @@ public:
 	virtual string ProlongationInfo()
 	{
 		if (this->IsDistributed())
-			return this->DistributedP.Diag.rows() == 0 && this->P.rows() == 0 ? "matrix free" : "distributed";
+			return this->DistributedP.Diag.rows() == 0 && this->SingleDistributedP.Diag.rows() == 0 && this->P.rows() == 0 ? "matrix free" : "distributed";
 		if (this->SingleP.rows() > 0)
 			return Utils::MatrixInfo(this->SingleP, "P");
 		return this->P.rows() == 0 ? "matrix free" : Utils::MatrixInfo(this->P, "P");
@@ -297,7 +328,7 @@ public:
 	virtual string RestrictionInfo()
 	{
 		if (this->IsDistributed())
-			return this->DistributedP.Diag.rows() == 0 && this->R.rows() == 0 ? "matrix free" : "transpose of the prolongation";
+			return this->DistributedP.Diag.rows() == 0 && this->SingleDistributedP.Diag.rows() == 0 && this->R.rows() == 0 ? "matrix free" : "transpose of the prolongation";
 		if (this->SingleR.rows() > 0)
 			return Utils::MatrixInfo(this->SingleR, "R");
 		return this->R.rows() == 0 ? "matrix free" : Utils::MatrixInfo(this->R, "R");
@@ -326,13 +357,15 @@ public:
 
 	virtual FloatVector Restrict(FloatVector& vectorOnThisLevel)
 	{
+		if (this->IsDistributed())
+			return this->SingleDistributedP.MultiplyTransposed(vectorOnThisLevel);
 		return SingleR * vectorOnThisLevel;
 	}
 
 	virtual Flops RestrictCost()
 	{
 		if (this->IsDistributed())
-			return 2 * this->DistributedP.LocalNonZeros();
+			return 2 * (this->DistributedP.LocalNonZeros() + this->SingleDistributedP.LocalNonZeros()); // one of them is empty
 		return 2 * (R.nonZeros() + SingleR.nonZeros()); // one of them is empty
 	}
 
@@ -346,13 +379,15 @@ public:
 
 	virtual FloatVector Prolong(FloatVector& vectorOnTheCoarserLevel)
 	{
+		if (this->IsDistributed())
+			return this->SingleDistributedP * vectorOnTheCoarserLevel;
 		return SingleP * vectorOnTheCoarserLevel;
 	}
 
 	virtual Flops ProlongCost()
 	{
 		if (this->IsDistributed())
-			return 2 * this->DistributedP.LocalNonZeros();
+			return 2 * (this->DistributedP.LocalNonZeros() + this->SingleDistributedP.LocalNonZeros()); // one of them is empty
 		return 2 * (P.nonZeros() + SingleP.nonZeros()); // one of them is empty
 	}
 
