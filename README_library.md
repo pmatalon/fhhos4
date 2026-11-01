@@ -1,5 +1,24 @@
 # The fhhos4 solver as an external library
 
+1. [Installation](#1-installation)
+   - [Install from source](#install-from-source)
+     - [Conda and Spack packages](#conda-and-spack-packages)
+   - [Link](#link)
+2. [The algorithm in a nutshell](#2-the-algorithm-in-a-nutshell)
+   - [Applicability](#applicability)
+3. [How to use](#3-how-to-use)
+   - [Symmetric systems](#symmetric-systems)
+   - [Non-symmetric matrices](#non-symmetric-matrices)
+   - [As a preconditioner](#as-a-preconditioner)
+   - [Several processes (MPI)](#several-processes-mpi)
+   - [Python](#python)
+   - [Inputs](#inputs)
+   - [Other matrix formats: provided helpers](#other-matrix-formats-provided-helpers)
+   - [Parameters](#parameters)
+   - [Constraints](#constraints)
+   - [License](#license)
+   - [Version](#version)
+
 # 1. Installation
 
 ## Install from source
@@ -93,7 +112,7 @@ The polynomial spaces are P^k (simplices, polytopes), or Q^k (quadrilaterals, he
 cells and on the faces.
 Bases not ordered by degree, but whose first function is constant, work with the p-coarsening straight to the lowest
 order (`PCoarsening::ToZero`), or better, reordered by degree: e.g. in the DoF lists of `ExtractBlocksSym()`
-(see [Other matrix formats](#other-formats-the-helpers)), at no extra cost.
+(see [Other matrix formats](#other-matrix-formats-provided-helpers)), at no extra cost.
 
 # 3. How to use
 
