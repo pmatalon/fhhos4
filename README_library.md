@@ -2,13 +2,13 @@
 
 1. [Installation](#1-installation)
    - [Install from source](#install-from-source)
-     - [Conda and Spack packages](#conda-and-spack-packages)
+   - [Conda and Spack packages](#conda-and-spack-packages)
    - [Link](#link)
 2. [The algorithm in a nutshell](#2-the-algorithm-in-a-nutshell)
    - [Applicability](#applicability)
 3. [How to use](#3-how-to-use)
    - [Symmetric systems](#symmetric-systems)
-   - [Non-symmetric matrices](#non-symmetric-matrices)
+   - [Non-symmetric systems](#non-symmetric-systems)
    - [As a preconditioner](#as-a-preconditioner)
    - [Several processes (MPI)](#several-processes-mpi)
    - [Python](#python)
@@ -56,13 +56,11 @@ Build options (`cmake -D<OPTION>=<value>`):
 | `ENABLE_MUMPS` | `OFF` | The coarse solver `CoarseSolver::MUMPS` on one process; always on with `ENABLE_MPI`. Without MPI, needs MUMPS's sequential version, e.g. conda-forge's `mumps-seq` |
 | `MUMPS_INCLUDE_DIR`, `MUMPS_LIBRARY` | found | MUMPS is found from its header `dmumps_c.h` and its library `libdmumps`, or given by `-DMUMPS_INCLUDE_DIR=<dir> -DMUMPS_LIBRARY=<path>/libdmumps.so` |
 
-### Conda and Spack packages
+## Conda and Spack packages
 
-Coming soon.
+Coming soon. Currently waiting for review by the Conda and Spack maintainers.
 
 ## Link
-
-Your code needs Eigen 3.4 or 5.x (see the constraints below). With CMake:
 
 ```cmake
 find_package(fhhos4 REQUIRED)
@@ -150,31 +148,30 @@ available for other uses: `CondensedMatrix()` (an Eigen map), and `Solve(b, x)` 
 right-hand side `b` condensed by your code or by `CondenseRHS()` (see [As a preconditioner](#as-a-preconditioner)). The setup builds the levels once: call `Solve()` for each right-hand side.
 The blocks may be freed after the setup.
 
-### Non-symmetric matrices
+### Non-symmetric systems
 
-For a non-symmetric matrix (e.g. convection-diffusion), give also the block `A_FT` (faces x cells):
-`SetupNonSym(A_TT, A_TF, A_FT, A_FF, ...)` then `Solve(b_T, b_F, x_T, x_F)`. The same algorithm runs on the
-matrix itself, with GCR instead of FCG and Gauss-Seidel smoothers that follow the direction of the flow (downwind
-order). `SetupNonSym()` keeps a reference to `A_FT`, which each `Solve(b_T, b_F, x_T, x_F)` reads
-(`b_F - A_FT A_TT^{-1} b_T`): keep it alive and unchanged until the next setup.
+For a non-symmetric matrix (e.g. convection-diffusion), give also the block `A_FT` by using the `SetupNonSym` function.
+```cpp
+solver.SetupNonSym(A_TT, A_TF, A_FT, A_FF, cellInterpOfOne, faceInterpOfOne);
+```
+The same algorithm runs, with GCR instead of FCG, and Gauss-Seidel smoothers that follow the direction of the flow (downwind
+order).
 
 ### As a preconditioner
 
-The library includes everything to use U-AMG as a solver, Krylov method included. It can also precondition a Krylov
-method of your code, on the face unknowns only: set `Krylov` to `Krylov::None` and `MaxIterations` to `1`, and
-`Solve(r, z)`, from `z = 0`, applies one cycle. Your Krylov method then works on the condensed system: its matrix is
-`CondensedMatrix()` (on one process), its right-hand side `CondenseRHS(b_T, b_F, b)`, and
-`SolveCellUnknowns(b_T, x_F, x_T)` computes the cell unknowns from its solution `x_F`.
+The library includes everything to use it as a solver, Krylov method included. 
+However, it can also precondition an external Krylov
+method working on the condensed system:
 
 ```cpp
-solver.Krylov = fhhos4::Krylov::None; // before the setup
-solver.MaxIterations = 1;             // one cycle per Solve()
+solver.Krylov = fhhos4::Krylov::None;                 // disable Krylov method in fhhos4
+solver.MaxIterations = 1;                             // one cycle per application
 solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne);
-fhhos4::SparseMatrixMap A = solver.CondensedMatrix(); // the condensed matrix
+fhhos4::SparseMatrixMap A = solver.CondensedMatrix(); // get the condensed matrix computed by fhhos4
 Eigen::VectorXd b(b_F.size());
-solver.CondenseRHS(b_T, b_F, b);                       // the condensed right-hand side
+solver.CondenseRHS(b_T, b_F, b);                      // b: the condensed right-hand side
 
-// Your Krylov method on A x_F = b, e.g. a flexible conjugate gradient (skeleton)
+// Your Krylov method on A x_F = b
 Eigen::VectorXd x_F = Eigen::VectorXd::Zero(b.size()), r = b, z(b.size()), p, Ap;
 while (r.norm() > tolerance * b.norm())
 {
@@ -186,11 +183,11 @@ while (r.norm() > tolerance * b.norm())
 }
 
 Eigen::VectorXd x_T(b_T.size());
-solver.SolveCellUnknowns(b_T, x_F, x_T);               // the cell unknowns
+solver.SolveCellUnknowns(b_T, x_F, x_T); // use fhhos4 to solve the cell unknowns at the end
 ```
 
-The default K-cycle is non-linear: your Krylov method must be flexible (flexible conjugate gradient, FGMRES, GCR).
-V- and W-cycles (`Cycle`) work with any Krylov method (CG, GMRES), but are not recommended: they perform poorly.
+The default K-cycle is non-linear, which means that your Krylov method **must be flexible** (FCG, FGMRES, GCR).
+V- and W-cycles work with any Krylov method (CG, GMRES), but are not recommended for performance reasons.
 
 ### Several processes (MPI)
 
@@ -370,19 +367,19 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 | `PolynomialSpace` | `PolynomialSpace::P` | Space of the cell and face bases: <ul><li>`P`: degree at most k</li><li>`Q`: degree at most k in each variable (quadrilaterals, hexahedra)</li></ul> |
 | `VectorComponents` | `1` | `>= 1`: components of the unknown, interleaved in each block (see [Inputs](#inputs)) |
 | `SingularMatrix` | `false` | `true`: the kernel is the interpolation of 1 of each component (pure Neumann; translations, not rotations). `SetupSym()` only. The solution is defined up to that kernel |
-| `Krylov` | `Krylov::Default`: `FCG` if symmetric, else `GCR` | <ul><li>`FCG`: flexible conjugate gradient</li><li>`GCR`: restarted GCR, any matrix</li><li>`None`: multigrid cycles alone (e.g. [as a preconditioner](#as-a-preconditioner))</li></ul> |
-| `Restart` | `-1`: `1` for FCG, `10` for GCR | `>= 1`: search directions stored (two face vectors each). Fewer save memory; GCR may then need more iterations |
+| `Krylov` | `FCG` if symmetric, `GCR` if non-symmetric | <ul><li>`FCG`: flexible conjugate gradient</li><li>`GCR`: restarted GCR, any matrix</li><li>`None`: multigrid cycles alone (e.g. [as a preconditioner](#as-a-preconditioner))</li></ul> |
+| `Restart` | `1` for FCG, `10` for GCR | `>= 1`: search directions stored (two face vectors each). Fewer save memory; GCR may then need more iterations |
 | `Tolerance` | `1e-8` | Relative residual of the condensed system at which `Solve()` stops |
 | `MaxIterations` | `200` | |
 | `Cycle` | `Cycle::K` | <ul><li>`V`</li><li>`W`</li><li>`K`: non-linear: a Krylov method around it must be flexible (FCG, GCR, FGMRES)</li></ul> |
 | `PCoarsening` | `PCoarsening::Minus2` | Degrees of the p-levels, from `FaceDegree` k: <ul><li>`Minus2`: k, k-2, ..., 0</li><li>`Minus1`: k, k-1, ..., 0</li><li>`ToZero`: k, 0, for bases not ordered by degree (more iterations from k = 3)</li></ul> |
-| `PreSmoothingIterations`, `PostSmoothingIterations` | `-1`: `2` for Chebyshev (its degree), else `1` | `>= 0` (`0`: none) |
+| `PreSmoothingIterations`, `PostSmoothingIterations` | `2` for Chebyshev (its degree), else `1` | Any value `>= 0` (`0`: none) |
 | `PreSmoother` | `Smoother::Default`: `BlockChebyshevFourthKind` if symmetric, else `HybridBlockGaussSeidel` (`BlockGaussSeidel` on 1 thread) | One block per face: <ul><li>`BlockGaussSeidel`, `BackwardBlockGaussSeidel`, `SymmetricBlockGaussSeidel`: sequential</li><li>`HybridBlockGaussSeidel`, `HybridBackwardBlockGaussSeidel`: parallel</li><li>`DampedBlockJacobi`: damping 2/3</li><li>`BlockChebyshevFirstKind`, `BlockChebyshevFourthKind`: parallel, symmetric matrices only</li></ul> |
 | `PostSmoother` | `Smoother::Default`: the adjoint of `PreSmoother` (symmetric cycle) | Same as `PreSmoother` |
 | `Prolongation` | `Prolongation::HarmonicExtension` | Values of the faces interior to an aggregate: <ul><li>`HarmonicExtension`: solve their rows of the condensed matrix (shorter setup)</li><li>`Reconstruction`: the article's, from the coarse cell, then one damped Jacobi iteration</li></ul> |
 | `CoarseningFactor` | `3.8` | Ratio of the numbers of cells of two successive h-levels |
 | `CoarseMatrixMaxSize` | `1000` | Maximum number of rows of the coarsest matrix |
-| `CoarseSolver` | `CoarseSolver::Default`: `Cholesky` if symmetric, else `LU` | <ul><li>`Cholesky`, `LU`: Eigen's on one process, MUMPS's on several</li><li>`MUMPS`: MUMPS's on one process too (library compiled with MUMPS)</li></ul> |
+| `CoarseSolver` | `Cholesky` if symmetric, `LU` if non-symmetric | <ul><li>`Cholesky`, `LU`: Eigen's on one process, MUMPS's on several</li><li>`MUMPS`: MUMPS's on one process too</li></ul> |
 | `MixedPrecision` | `true` | Levels stored and cycled in single precision (half the memory, faster); the Krylov method, residuals and solution stay in double. Symmetric matrix, one process, Chebyshev smoothers only; otherwise ignored |
 | `BlockCSRStorage` | `false` | Level operators stored by blocks of faces when `FaceDegree >= 1` (faster smoothing). Always so in mixed precision; in double, costs a copy of the condensed matrix. Chebyshev smoothers, one process only |
 | `Threads` | `0`: OpenMP's setting, at most one per physical core unless `OMP_NUM_THREADS` or OpenMP's binding is set (shared among the processes on the same CPUs) | Number of threads |
