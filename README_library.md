@@ -8,11 +8,14 @@ The library alone needs a C++17 compiler, CMake (>= 3.20), Ninja or Make, and
 [Eigen](https://eigen.tuxfamily.org) 3.4 or 5.x.
 
 ```bash
-git clone https://github.com/pmatalon/fhhos4.git && cd fhhos4
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+git clone --branch v1.4.0 --depth 1 https://github.com/pmatalon/fhhos4.git && cd fhhos4
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_PROGRAM=OFF
 cmake --build build
 cmake --install build --prefix <prefix>    # lib/, include/ and the CMake package
 ```
+
+`v1.4.0` is the latest release. Between releases, this file on `master` describes the development version (clone
+without `--branch`); the release's is [README_library.md at v1.4.0](https://github.com/pmatalon/fhhos4/blob/v1.4.0/README_library.md).
 
 Without installing, the library is `build/lib/libfhhos4.so`.
 
