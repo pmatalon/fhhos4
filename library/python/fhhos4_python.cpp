@@ -465,6 +465,11 @@ NB_MODULE(fhhos4, m)
 		// x: a NumPy vector of float64, written in place (the initial guess on input)
 		.def("Solve", [](PySolver& s, const ConstVector& b, Vector x) { return s.Solve(b, x); },
 			"b"_a.noconvert(), "x"_a.noconvert(), noGIL)
+		// b, x_T: NumPy vectors of float64, written in place
+		.def("CondenseRHS", [](PySolver& s, const ConstVector& b_T, const ConstVector& b_F, Vector b) { s.CondenseRHS(b_T, b_F, b); },
+			"b_T"_a.noconvert(), "b_F"_a.noconvert(), "b"_a.noconvert(), noGIL)
+		.def("SolveCellUnknowns", [](PySolver& s, const ConstVector& b_T, const ConstVector& x_F, Vector x_T) { s.SolveCellUnknowns(b_T, x_F, x_T); },
+			"b_T"_a.noconvert(), "x_F"_a.noconvert(), "x_T"_a.noconvert(), noGIL)
 
 		// A copy of the condensed matrix (fhhos4.CSRMatrix)
 		.def("CondensedMatrix", [](const PySolver& s) { return fhhos4::detail::ToCSR(s.CondensedView()); })

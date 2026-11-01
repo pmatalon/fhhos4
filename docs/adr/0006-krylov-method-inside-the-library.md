@@ -4,6 +4,6 @@ With the K-cycle, U-AMG is a non-linear preconditioner: paired with CG or anothe
 library runs its own Krylov method (`Krylov`: FCG by default, GCR, or none; BiCGSTAB, with a V- or W-cycle only, was
 removed on 2026-10-30: it was for testing only) and exposes no `Apply()` nor preconditioner adapter (removed
 2026-10-06), so that its users cannot fall into that trap.
-`Krylov::None` with one V- or W-cycle is linear: that is how a caller composes it with its own method. One K-cycle
-(`Krylov::None`, `MaxIterations = 1`, zero initial guess) is not forbidden: it preconditions a flexible method of the
-caller (FCG, FGMRES).
+`Krylov::None` with `MaxIterations = 1` (zero initial guess) is one cycle: that is how a caller preconditions its own
+Krylov method, on the condensed system (`CondenseRHS()`, `SolveCellUnknowns()`): a flexible one with the K-cycle; V-
+and W-cycles are linear, for any method, but perform poorly.

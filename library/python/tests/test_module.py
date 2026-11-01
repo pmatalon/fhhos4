@@ -152,6 +152,14 @@ def test_condensed_system():
         x = np.zeros(system.b.size)
         result = solver.Solve(system.b, x)
         assert result.Converged and RelativeError(x, spla.spsolve(system.A.tocsc(), system.b)) < 1e-8
+        # CondenseRHS(), and SolveCellUnknowns() from the faces solution: those of Solve(b_T, b_F, x_T, x_F)
+        b = np.empty(system.b.size)
+        solver.CondenseRHS(system.b_T, system.b_F, b)
+        assert RelativeError(b, system.b) < 1e-14
+        x_T, x_F, y_T = np.empty(system.b_T.size), np.zeros(system.b_F.size), np.empty(system.b_T.size)
+        solver.Solve(system.b_T, system.b_F, x_T, x_F)
+        solver.SolveCellUnknowns(system.b_T, x_F, y_T)
+        assert RelativeError(y_T, x_T) < 1e-14
 
 
 def test_failed_setup_keeps_the_previous_one():

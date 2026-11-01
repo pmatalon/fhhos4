@@ -22,6 +22,8 @@ For the library's users: `README_library.md`. This file is for changing the libr
 - `SetupSym()` from `A_TT`, `A_TF`, `A_FF` and the interpolations of 1, or `SetupNonSym()` with `A_FT` too,
   then `Solve(b_T, b_F, x_T, x_F)`: the library condenses the system by cells (`StaticCondensation.h`) and computes the
   cell unknowns. `CondensedMatrix()`, and `Solve(b, x)` on it (right-hand sides condensed by the caller).
+  `CondenseRHS()` and `SolveCellUnknowns()` (the steps of `Solve(b_T, b_F, x_T, x_F)`, `StaticCondensation`): for a
+  Krylov method of the caller on the condensed system, preconditioned by one cycle (`Krylov::None`, `MaxIterations = 1`).
 - Matrices: `fhhos4::SparseMatrix` (Eigen row-major, of the library's index type `SparseIndex`, generated into
   `fhhos4_version.h` from `SMALL_INDEX`) or an Eigen map of one (`fhhos4::SparseMatrixMap`). The setups are templates on
   `Eigen::SparseCompressedBase<Derived>`: a wrong format is a `static_assert` naming the Eigen conversion

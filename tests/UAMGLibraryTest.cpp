@@ -573,6 +573,56 @@ TEST(UAMGLibrary, CondensedMatrix)
 	}
 }
 
+// The AMG as the preconditioner of a Krylov method of the calling code on the condensed system: CondenseRHS(), one
+// K-cycle per iteration (Krylov::None, MaxIterations 1, zero initial guess) in a flexible conjugate gradient
+// (Polak-Ribiere), then SolveCellUnknowns(): the solution of Solve(b_T, b_F, x_T, x_F)
+TEST(UAMGLibrary, PreconditionerOfAnExternalKrylovMethod)
+{
+	HybridSystem system(64);
+	Eigen::Index nT = system.A_TT.rows(), nF = system.A_FF.rows();
+	Eigen::VectorXd b_T = Eigen::VectorXd::Random(nT), b_F = Eigen::VectorXd::Random(nF);
+	fhhos4::Solver uamg = ToySolver(), preconditioner = ToySolver();
+	preconditioner.Krylov = fhhos4::Krylov::None;
+	preconditioner.MaxIterations = 1;
+	for (fhhos4::Solver* solver : { &uamg, &preconditioner })
+		solver->SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+	Eigen::VectorXd x_T(nT), x_F = Eigen::VectorXd::Zero(nF);
+	ASSERT_TRUE(uamg.Solve(b_T, b_F, x_T, x_F).Converged);
+
+	Eigen::VectorXd b(nF);
+	preconditioner.CondenseRHS(b_T, b_F, b);
+	EXPECT_LT((b - (b_F - system.A_FT * system.A_TT.diagonal().cwiseInverse().cwiseProduct(b_T))).norm(), 1e-14 * b.norm());
+
+	fhhos4::SparseMatrixMap A = preconditioner.CondensedMatrix();
+	auto precondition = [&](const Eigen::VectorXd& r)
+	{
+		Eigen::VectorXd z = Eigen::VectorXd::Zero(nF);
+		EXPECT_EQ(preconditioner.Solve(r, z).Iterations, 1);
+		return z;
+	};
+	Eigen::VectorXd y_F = Eigen::VectorXd::Zero(nF), r = b, z = precondition(r), p = z;
+	double rz = r.dot(z);
+	int iterations = 0;
+	for (; r.norm() > 1e-10 * b.norm() && iterations < 30; iterations++)
+	{
+		Eigen::VectorXd Ap = A * p, previousR = r;
+		double alpha = rz / p.dot(Ap);
+		y_F += alpha * p;
+		r -= alpha * Ap;
+		z = precondition(r);
+		double beta = z.dot(r - previousR) / rz;
+		rz = r.dot(z);
+		p = z + beta * p;
+	}
+	EXPECT_LT(iterations, 30);
+	EXPECT_LT((y_F - x_F).norm() / x_F.norm(), 1e-8);
+
+	// The cell unknowns of the faces solution: those of Solve(b_T, b_F, x_T, x_F)
+	Eigen::VectorXd y_T(nT);
+	preconditioner.SolveCellUnknowns(b_T, x_F, y_T);
+	EXPECT_LT((y_T - x_T).norm() / x_T.norm(), 1e-14);
+}
+
 // The bases scaled by arbitrary factors (the constant no longer has coordinate 1): with the interpolation of 1, U-AMG
 // builds the same coarse levels, and the iterates are those of the unscaled system in the scaled bases (up to the
 // rounding errors). Fixed number of iterations: the stopping criterion, on the residual of each system, differs.

@@ -502,6 +502,15 @@ namespace fhhos4
 			if (size != NCellDoFs)
 				Utils::FatalError(string("fhhos4::Solver: the vector ") + vector + " has " + to_string(size) + " rows, expected " + to_string(NCellDoFs) + " (the cells DoFs" + (IsDistributed() ? " of the process" : "") + ").");
 		}
+
+		// Calls f on the static condensation of the setup, distributed or not (the same functions)
+		template <typename F>
+		auto WithCondensation(F f) const
+		{
+			if (DistributedCondensation)
+				return f(*DistributedCondensation);
+			return f(*Condensation);
+		}
 	};
 
 	Solver::Solver()
@@ -653,22 +662,46 @@ namespace fhhos4
 			_impl->CheckVectorSize(x_F.Size, "x_F");
 		});
 
-		if (_impl->DistributedCondensation)
+		return _impl->WithCondensation([&](const auto& condensation)
 		{
-			const DistributedStaticCondensation& condensation = *_impl->DistributedCondensation;
 			Vector invA_TT_b_T = condensation.SolveCells(Eigen::Map<const Vector>(b_T.Data, b_T.Size));
 			Vector b = condensation.CondensedRHS(Eigen::Map<const Vector>(b_F.Data, b_F.Size), invA_TT_b_T);
 			Result result = SolveCondensed({ b.data(), b.size() }, x_F);
 			Eigen::Map<Vector>(x_T.Data, x_T.Size) = condensation.CellUnknowns(invA_TT_b_T, Eigen::Map<const Vector>(x_F.Data, x_F.Size));
 			return result;
-		}
+		});
+	}
 
-		const StaticCondensation& condensation = *_impl->Condensation;
-		Vector invA_TT_b_T = condensation.SolveCells(Eigen::Map<const Vector>(b_T.Data, b_T.Size));
-		Vector b = condensation.CondensedRHS(Eigen::Map<const Vector>(b_F.Data, b_F.Size), invA_TT_b_T);
-		Result result = SolveCondensed({ b.data(), b.size() }, x_F);
-		Eigen::Map<Vector>(x_T.Data, x_T.Size) = condensation.CellUnknowns(invA_TT_b_T, Eigen::Map<const Vector>(x_F.Data, x_F.Size));
-		return result;
+	void Solver::CondenseRHSView(detail::ConstVectorView b_T, detail::ConstVectorView b_F, detail::VectorView b)
+	{
+		_impl->CheckSetUp("CondenseRHS");
+		CallScope scope(*this, _impl->Comm, _impl->SharingProcesses);
+		CollectiveCheck(_impl->Comm, [&]()
+		{
+			_impl->CheckCellVectorSize(b_T.Size, "b_T");
+			_impl->CheckVectorSize(b_F.Size, "b_F");
+			_impl->CheckVectorSize(b.Size, "b");
+		});
+		Eigen::Map<Vector>(b.Data, b.Size) = _impl->WithCondensation([&](const auto& condensation)
+		{
+			return condensation.CondensedRHS(Eigen::Map<const Vector>(b_F.Data, b_F.Size), condensation.SolveCells(Eigen::Map<const Vector>(b_T.Data, b_T.Size)));
+		});
+	}
+
+	void Solver::SolveCellUnknownsView(detail::ConstVectorView b_T, detail::ConstVectorView x_F, detail::VectorView x_T)
+	{
+		_impl->CheckSetUp("SolveCellUnknowns");
+		CallScope scope(*this, _impl->Comm, _impl->SharingProcesses);
+		CollectiveCheck(_impl->Comm, [&]()
+		{
+			_impl->CheckCellVectorSize(b_T.Size, "b_T");
+			_impl->CheckVectorSize(x_F.Size, "x_F");
+			_impl->CheckCellVectorSize(x_T.Size, "x_T");
+		});
+		Eigen::Map<Vector>(x_T.Data, x_T.Size) = _impl->WithCondensation([&](const auto& condensation)
+		{
+			return condensation.CellUnknowns(condensation.SolveCells(Eigen::Map<const Vector>(b_T.Data, b_T.Size)), Eigen::Map<const Vector>(x_F.Data, x_F.Size));
+		});
 	}
 
 	CSRView Solver::CondensedMatrixView() const

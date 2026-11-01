@@ -128,7 +128,7 @@ in place, in the format of the library: `fhhos4::SparseMatrix` (row-major, compr
 arrays (see [Inputs](#inputs); the other Eigen matrices convert by Eigen, a copy). The library condenses the system,
 solves the condensed system and computes the cell unknowns, `x_T = A_TT^{-1} (b_T - A_TF x_F)`. The condensed matrix is
 available for other uses: `CondensedMatrix()` (an Eigen map), and `Solve(b, x)` solves the condensed system for a
-right-hand side `b` condensed by your code. The setup builds the levels once: call `Solve()` for each right-hand side.
+right-hand side `b` condensed by your code or by `CondenseRHS()` (see [As a preconditioner](#as-a-preconditioner)). The setup builds the levels once: call `Solve()` for each right-hand side.
 The blocks may be freed after the setup.
 
 ### Non-symmetric matrices
@@ -138,6 +138,31 @@ For a non-symmetric matrix (e.g. convection-diffusion), give also the block `A_F
 matrix itself, with GCR instead of FCG and Gauss-Seidel smoothers that follow the direction of the flow (downwind
 order). `SetupNonSym()` keeps a reference to `A_FT`, which each `Solve(b_T, b_F, x_T, x_F)` reads
 (`b_F - A_FT A_TT^{-1} b_T`): keep it alive and unchanged until the next setup.
+
+### As a preconditioner
+
+The library includes everything to use U-AMG as a solver, Krylov method included. It can also precondition a Krylov
+method of your code, on the face unknowns only: set `Krylov` to `Krylov::None` and `MaxIterations` to `1`, and
+`Solve(r, z)`, from `z = 0`, applies one cycle. Your Krylov method then works on the condensed system: its matrix is
+`CondensedMatrix()` (on one process), its right-hand side `CondenseRHS(b_T, b_F, b)`, and
+`SolveCellUnknowns(b_T, x_F, x_T)` computes the cell unknowns from its solution `x_F`.
+
+```cpp
+solver.Krylov = fhhos4::Krylov::None; // before the setup
+solver.MaxIterations = 1;             // one cycle per Solve()
+solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne);
+fhhos4::SparseMatrixMap A = solver.CondensedMatrix();
+Eigen::VectorXd b(b_F.size());
+solver.CondenseRHS(b_T, b_F, b);
+// your Krylov method on A x_F = b, with the preconditioner z = M^{-1} r:
+z.setZero();
+solver.Solve(r, z);
+// then, from its solution x_F:
+solver.SolveCellUnknowns(b_T, x_F, x_T);
+```
+
+The default K-cycle is non-linear: your Krylov method must be flexible (flexible conjugate gradient, FGMRES, GCR).
+V- and W-cycles (`Cycle`) work with any Krylov method (CG, GMRES), but are not recommended: they perform poorly.
 
 ### Several processes (MPI)
 
@@ -317,7 +342,7 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 | `PolynomialSpace` | `PolynomialSpace::P` | Space of the cell and face bases: <ul><li>`P`: degree at most k</li><li>`Q`: degree at most k in each variable (quadrilaterals, hexahedra)</li></ul> |
 | `VectorComponents` | `1` | `>= 1`: components of the unknown, interleaved in each block (see [Inputs](#inputs)) |
 | `SingularMatrix` | `false` | `true`: the kernel is the interpolation of 1 of each component (pure Neumann; translations, not rotations). `SetupSym()` only. The solution is defined up to that kernel |
-| `Krylov` | `Krylov::Default`: `FCG` if symmetric, else `GCR` | <ul><li>`FCG`: flexible conjugate gradient</li><li>`GCR`: restarted GCR, any matrix</li><li>`None`: multigrid cycles alone</li></ul> |
+| `Krylov` | `Krylov::Default`: `FCG` if symmetric, else `GCR` | <ul><li>`FCG`: flexible conjugate gradient</li><li>`GCR`: restarted GCR, any matrix</li><li>`None`: multigrid cycles alone (e.g. [as a preconditioner](#as-a-preconditioner))</li></ul> |
 | `Restart` | `-1`: `1` for FCG, `10` for GCR | `>= 1`: search directions stored (two face vectors each). Fewer save memory; GCR may then need more iterations |
 | `Tolerance` | `1e-8` | Relative residual of the condensed system at which `Solve()` stops |
 | `MaxIterations` | `200` | |

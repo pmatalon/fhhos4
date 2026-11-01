@@ -28,9 +28,10 @@
 //
 // The Krylov method preconditioned by the AMG is part of the library (Solver::Krylov): with the default K-cycle, the AMG
 // is a non-linear preconditioner (it solves the coarse levels with inner FCG or GCR iterations), which requires a
-// flexible Krylov method: the flexible conjugate gradient (FCG, the default for a symmetric matrix) or GCR. To
-// precondition your own Krylov method, solve with Krylov::None, MaxIterations = 1 and a zero initial guess (one cycle):
-// Cycle::V or W for a non-flexible method (CG, GMRES), K only for a flexible one (FCG, FGMRES).
+// flexible Krylov method: the flexible conjugate gradient (FCG, the default for a symmetric matrix) or GCR. It can also
+// precondition a Krylov method of the calling code on the condensed system (CondensedMatrix(), CondenseRHS(), then
+// SolveCellUnknowns()): Krylov::None, MaxIterations = 1, and Solve(r, z) with z zero, one cycle. With the K-cycle, that
+// method must be flexible (FCG, FGMRES); V- and W-cycles allow any method (CG, GMRES), but perform poorly.
 //
 // The inputs are Eigen objects, read in place, never copied nor converted: the sparse matrices in the format of the
 // library, fhhos4::SparseMatrix (row-major, with the index type SparseIndex) or an Eigen::Map of one, the vectors as
@@ -176,7 +177,8 @@ namespace fhhos4
 		FCG,      // flexible conjugate gradient, FCG(Restart) (fhhos4 -s fcguamg), for a symmetric positive definite matrix
 		GCR,      // GCR(Restart), generalized conjugate residual restarted every Restart iterations, Notay's economical
 		          // version (fhhos4 -s gcruamg). Minimizes the residual norm: for any matrix
-		None      // the cycles of the AMG alone, as a stationary iterative method (fhhos4 -s uamg): slower at k >= 1
+		None      // the cycles of the AMG alone, as a stationary iterative method (fhhos4 -s uamg): slower at k >= 1. With
+		          // MaxIterations = 1: one cycle, the preconditioner of a Krylov method of the calling code
 	};
 
 	// The multigrid cycle (Solver::Cycle)
@@ -462,6 +464,22 @@ namespace fhhos4
 			return SolveCondensed(In(b), Out(x));
 		}
 
+		// The right-hand side of the condensed system, b = b_F - A_FT A_TT^{-1} b_T, after a setup: for a Krylov method of
+		// the calling code on the condensed system, preconditioned by Solve(r, z). b: output.
+		void CondenseRHS(const Eigen::Ref<const Eigen::VectorXd>& b_T, const Eigen::Ref<const Eigen::VectorXd>& b_F,
+		                 Eigen::Ref<Eigen::VectorXd> b)
+		{
+			CondenseRHSView(In(b_T), In(b_F), Out(b));
+		}
+
+		// The cell unknowns x_T = A_TT^{-1} (b_T - A_TF x_F), after a setup, from the solution x_F of the condensed system
+		// (e.g. by a Krylov method of the calling code). x_T: output.
+		void SolveCellUnknowns(const Eigen::Ref<const Eigen::VectorXd>& b_T, const Eigen::Ref<const Eigen::VectorXd>& x_F,
+		                       Eigen::Ref<Eigen::VectorXd> x_T)
+		{
+			SolveCellUnknownsView(In(b_T), In(x_F), Out(x_T));
+		}
+
 		//------------------------------------------------------------------//
 
 		// The condensed matrix A of the last setup, both triangles, computed by SetupSym() or SetupNonSym().
@@ -515,6 +533,8 @@ namespace fhhos4
 		                      const GhostNumbers& cellGhosts);
 		Result SolveCondensed(detail::ConstVectorView b, detail::VectorView x);
 		Result SolveUncondensed(detail::ConstVectorView b_T, detail::ConstVectorView b_F, detail::VectorView x_T, detail::VectorView x_F);
+		void CondenseRHSView(detail::ConstVectorView b_T, detail::ConstVectorView b_F, detail::VectorView b);
+		void SolveCellUnknownsView(detail::ConstVectorView b_T, detail::ConstVectorView x_F, detail::VectorView x_T);
 	};
 
 	//------------------------------------------------------------------------------------------------------------------//
