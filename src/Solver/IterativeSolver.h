@@ -141,6 +141,15 @@ public:
 	{
 		return false;
 	}
+	// On several processes: the matrix in single precision distributed by rows
+	virtual void SetupSinglePrecision(const DistributedMatrixOf<float>& A)
+	{
+		Utils::FatalError("This solver has no single precision version on several processes.");
+	}
+	virtual bool SetupSinglePrecisionFrom(const DistributedMatrixOf<float>& A, const IterativeSolver& other)
+	{
+		return false;
+	}
 
 	// The matrix stored by blocks (block CSR, see BlockSparseMatrix), in double or in single precision (as
 	// SetupSinglePrecision()): the solvers that support it (the smoothers of U-AMG), instead of Setup()

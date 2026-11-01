@@ -84,6 +84,19 @@ public:
 			_solver->Setup(A);
 	}
 
+	// Mixed precision on several processes
+	void Setup(const DistributedMatrixOf<float>& A)
+	{
+		if (_solver->MaxIterations > 0)
+			_solver->SetupSinglePrecision(A);
+	}
+
+	void Setup(const DistributedMatrixOf<float>& A, const Smoother& setUpForA)
+	{
+		if (_solver->MaxIterations > 0 && !(setUpForA._solver->MaxIterations > 0 && _solver->SetupSinglePrecisionFrom(A, *setUpForA._solver)))
+			_solver->SetupSinglePrecision(A);
+	}
+
 	// The order of the (block) rows in all the sweeps of the Gauss-Seidel smoothers (see DownwindOrder()); the other
 	// smoothers keep theirs
 	void SetSweepOrder(const vector<BigNumber>* order)

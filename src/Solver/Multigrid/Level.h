@@ -267,7 +267,9 @@ public:
 			Utils::Log() << RestrictionInfo() << endl;
 
 			Utils::Log() << "\t\tPreSmoothing        : "; Utils::Log().flush();
-			if (this->IsDistributed())
+			if (this->SingleDistributedOperator)
+				PreSmoother->Setup(*this->SingleDistributedOperator);
+			else if (this->DistributedOperator)
 				PreSmoother->Setup(*this->DistributedOperator);
 			else if (this->SingleBlockOperator)
 				PreSmoother->Setup(*this->SingleBlockOperator);
@@ -283,7 +285,9 @@ public:
 				Utils::Log() << PreSmoother->Iterations() << " iteration" << (PreSmoother->Iterations() > 1 ? "s" : "") << " of " << (*PreSmoother) << endl;
 
 			Utils::Log() << "\t\tPostSmoothing       : "; Utils::Log().flush();
-			if (this->IsDistributed())
+			if (this->SingleDistributedOperator)
+				PostSmoother->Setup(*this->SingleDistributedOperator, *PreSmoother);
+			else if (this->DistributedOperator)
 				PostSmoother->Setup(*this->DistributedOperator, *PreSmoother);
 			else if (this->SingleBlockOperator)
 				PostSmoother->Setup(*this->SingleBlockOperator, *PreSmoother);

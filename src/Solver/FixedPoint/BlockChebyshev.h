@@ -56,6 +56,8 @@ private:
 	Precision<double> _double;
 	Precision<float> _single;
 	const FloatSparseMatrix* _singleMatrix = nullptr; // the matrix in single precision (SetupSinglePrecision())
+	// On several processes, the matrix in single precision distributed by rows (_singleMatrix: its block Diag); null on one
+	const DistributedMatrixOf<float>* _singleDistributed = nullptr;
 	// The matrix stored by blocks (block CSR, SetupBlockCSR()), in double or in single precision; null: in CSR
 	const BlockSparseMatrix<double>* _blockMatrix = nullptr;
 	const BlockSparseMatrix<float>* _singleBlockMatrix = nullptr;
@@ -85,6 +87,16 @@ private:
 			return *_singleMatrix;
 		else
 			return *this->Matrix;
+	}
+
+	// The distributed matrix in precision T (null on one process)
+	template <typename T>
+	const DistributedMatrixOf<T>* DistributedOf() const
+	{
+		if constexpr (std::is_same_v<T, float>)
+			return _singleDistributed;
+		else
+			return this->Distributed;
 	}
 
 	template <typename T>
@@ -158,18 +170,28 @@ public:
 		SetupBlocks(A.Diag);
 	}
 
-	// Mixed precision (one process): the same with the matrix in single precision, for the iterations in single
-	// precision (SolveInSinglePrecision()), the sums of the passes in double
+	// Mixed precision: the same with the matrix in single precision, for the iterations in single precision
+	// (SolveInSinglePrecision()), the sums of the passes in double
 	bool SupportsSinglePrecision() const override
 	{
-		return !this->Distributed;
+		return true;
 	}
 
 	void SetupSinglePrecision(const FloatSparseMatrix& A) override
 	{
 		_singleMatrix = &A;
+		_singleDistributed = nullptr;
 		_singleBlockMatrix = nullptr;
 		SetupBlocks(A);
+	}
+
+	// On several processes, as Setup(const DistributedMatrix&)
+	void SetupSinglePrecision(const DistributedMatrixOf<float>& A) override
+	{
+		_singleMatrix = &A.Diag;
+		_singleDistributed = &A;
+		_singleBlockMatrix = nullptr;
+		SetupBlocks(A.Diag);
 	}
 
 	// The matrix stored by blocks (block CSR, the blocks of the block size of the smoother: of size > 1), in double or
@@ -189,6 +211,7 @@ public:
 	void SetupBlockCSR(const BlockSparseMatrix<float>& A) override
 	{
 		_singleMatrix = nullptr;
+		_singleDistributed = nullptr;
 		_singleBlockMatrix = &A;
 		SetupBlocks(A);
 	}
@@ -263,9 +286,22 @@ public:
 	bool SetupSinglePrecisionFrom(const FloatSparseMatrix& A, const IterativeSolver& other) override
 	{
 		const BlockChebyshev* o = dynamic_cast<const BlockChebyshev*>(&other);
-		if (!o || o->_singleMatrix != &A || o->_blockSize != _blockSize || this->ComputeExactSolution)
+		if (!o || o->_singleMatrix != &A || o->_singleDistributed || o->_blockSize != _blockSize || this->ComputeExactSolution)
 			return false;
 		_singleMatrix = &A;
+		_singleDistributed = nullptr;
+		_singleBlockMatrix = nullptr;
+		CopySetup(*o);
+		return true;
+	}
+
+	bool SetupSinglePrecisionFrom(const DistributedMatrixOf<float>& A, const IterativeSolver& other) override
+	{
+		const BlockChebyshev* o = dynamic_cast<const BlockChebyshev*>(&other);
+		if (!o || o->_singleDistributed != &A || o->_blockSize != _blockSize || this->ComputeExactSolution)
+			return false;
+		_singleMatrix = &A.Diag;
+		_singleDistributed = &A;
 		_singleBlockMatrix = nullptr;
 		CopySetup(*o);
 		return true;
@@ -288,6 +324,7 @@ public:
 		if (!o || o->_singleBlockMatrix != &A || o->_blockSize != _blockSize || this->ComputeExactSolution)
 			return false;
 		_singleMatrix = nullptr;
+		_singleDistributed = nullptr;
 		_singleBlockMatrix = &A;
 		CopySetup(*o);
 		return true;
@@ -462,26 +499,24 @@ private:
 		const SparseMatrixIndex* col = A.innerIndexPtr();
 		const T* val = A.valuePtr();
 		BigNumber nb = A.rows() / _blockSize;
-		// Off-process columns (none on one process; the single precision is on one process only)
-		Vector vGhosts;
+		// Off-process columns (none on one process)
+		VectorOf<T> vGhosts;
 		const SparseMatrixIndex* offdOuter = nullptr;
 		const SparseMatrixIndex* offdCol = nullptr;
-		const double* offdVal = nullptr;
-		if constexpr (std::is_same_v<T, double>)
+		const T* offdVal = nullptr;
+		const DistributedMatrixOf<T>* distributed = DistributedOf<T>();
+		if (distributed && v)
 		{
-			if (this->Distributed && v)
+			vGhosts = distributed->GhostValues(v);
+			const SparseMatrixOf<T>& offd = distributed->Offd;
+			if (offd.nonZeros() > 0)
 			{
-				vGhosts = this->Distributed->GhostValues(v);
-				const SparseMatrix& offd = this->Distributed->Offd;
-				if (offd.nonZeros() > 0)
-				{
-					offdOuter = offd.outerIndexPtr();
-					offdCol = offd.innerIndexPtr();
-					offdVal = offd.valuePtr();
-				}
+				offdOuter = offd.outerIndexPtr();
+				offdCol = offd.innerIndexPtr();
+				offdVal = offd.valuePtr();
 			}
 		}
-		const double* vg = vGhosts.data();
+		const T* vg = vGhosts.data();
 
 		if (_blockSize == 1)
 		{
@@ -498,7 +533,7 @@ private:
 							r_i -= (double)val[p] * v[col[p]];
 						if (offdOuter)
 							for (SparseMatrixIndex p = offdOuter[i]; p < offdOuter[i + 1]; p++)
-								r_i -= offdVal[p] * vg[offdCol[p]];
+								r_i -= (double)offdVal[p] * vg[offdCol[p]];
 						r[i] = (T)r_i;
 					}
 					if (dOut)
@@ -528,7 +563,7 @@ private:
 								r_i -= (double)val[p] * v[col[p]];
 							if (offdOuter)
 								for (SparseMatrixIndex p = offdOuter[i]; p < offdOuter[i + 1]; p++)
-									r_i -= offdVal[p] * vg[offdCol[p]];
+									r_i -= (double)offdVal[p] * vg[offdCol[p]];
 							r[i] = (T)r_i;
 						}
 						r_I[k] = (T)r_i;
@@ -644,7 +679,8 @@ private:
 	{
 		BigNumber n = Rows<T>();
 		// On several processes: the global numbers of the rows, the products with the distributed matrix
-		BigNumber firstRow = this->Distributed ? this->Distributed->RowMap->Begin * this->Distributed->RowBlockSize : 0;
+		const DistributedMatrixOf<T>* distributed = DistributedOf<T>();
+		BigNumber firstRow = distributed ? distributed->RowMap->Begin * distributed->RowBlockSize : 0;
 		VectorOf<T> r(n), z(n), p, Ap(n);
 		for (BigNumber i = 0; i < n; i++)
 			r[i] = PseudoRandom(firstRow + i);
@@ -659,15 +695,10 @@ private:
 		{
 			if (const BlockSparseMatrix<T>* blocks = BlockMatrixOf<T>())
 				blocks->Multiply(p.data(), Ap.data());
-			else if constexpr (std::is_same_v<T, double>)
-			{
-				if (this->Distributed)
-					Ap = *this->Distributed * p;
-				else
-					Ap.noalias() = *this->Matrix * p;
-			}
+			else if (distributed)
+				Ap = *distributed * p;
 			else
-				Ap.noalias() = *_singleMatrix * p;
+				Ap.noalias() = MatrixOf<T>() * p;
 			double pAp = Parallel::Dot(p, Ap);
 			if (!(pAp > 0))
 				Utils::FatalError("The Chebyshev smoothers require a symmetric positive definite matrix: p^T A p = " + to_string(pAp) + " in the estimation of its largest eigenvalue.");
