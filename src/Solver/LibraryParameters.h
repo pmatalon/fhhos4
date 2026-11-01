@@ -45,10 +45,9 @@ private:
 	static const Table<fhhos4::PCoarsening, P_CoarsStgy>& PCoarsenings()
 	{
 		static const Table<fhhos4::PCoarsening, P_CoarsStgy> pCoarsenings = {
-			{ fhhos4::PCoarsening::Minus2,    P_CoarsStgy::Minus2 },
-			{ fhhos4::PCoarsening::Minus1,    P_CoarsStgy::Minus1 },
-			{ fhhos4::PCoarsening::DivideBy2, P_CoarsStgy::DivideBy2 },
-			{ fhhos4::PCoarsening::ToZero,    P_CoarsStgy::DirectToLow }
+			{ fhhos4::PCoarsening::Minus2, P_CoarsStgy::Minus2 },
+			{ fhhos4::PCoarsening::Minus1, P_CoarsStgy::Minus1 },
+			{ fhhos4::PCoarsening::ToZero, P_CoarsStgy::DirectToLow }
 		};
 		return pCoarsenings;
 	}
@@ -167,7 +166,10 @@ public:
 
 	static fhhos4::PCoarsening LibraryPCoarsening(P_CoarsStgy pCoarsening)
 	{
-		return *ToLibrary(PCoarsenings(), pCoarsening);
+		optional<fhhos4::PCoarsening> libraryPCoarsening = ToLibrary(PCoarsenings(), pCoarsening);
+		if (!libraryPCoarsening)
+			Utils::FatalError("The library fhhos4 has no p-coarsening strategy /2 (-p-cs): -2, -1 or =0.");
+		return *libraryPCoarsening;
 	}
 
 	static fhhos4::Prolongation LibraryProlongation(UAMGProlongation coarseningProlongation)

@@ -290,7 +290,6 @@ NB_MODULE(fhhos4, m)
 	nb::enum_<fhhos4::PCoarsening>(m, "PCoarsening")
 		.value("Minus2", fhhos4::PCoarsening::Minus2)
 		.value("Minus1", fhhos4::PCoarsening::Minus1)
-		.value("DivideBy2", fhhos4::PCoarsening::DivideBy2)
 		.value("ToZero", fhhos4::PCoarsening::ToZero);
 	nb::enum_<fhhos4::Prolongation>(m, "Prolongation")
 		.value("Reconstruction", fhhos4::Prolongation::Reconstruction)

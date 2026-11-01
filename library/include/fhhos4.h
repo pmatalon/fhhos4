@@ -200,12 +200,10 @@ namespace fhhos4
 	// of the polynomials of degree <= d (P^d, or Q^d: see PolynomialSpace) if the bases are ordered by degree.
 	enum class PCoarsening
 	{
-		Minus2,    // k, k - 2, ..., 0 (fhhos4 -p-cs -2)
-		Minus1,    // k, k - 1, ..., 0 (-p-cs -1)
-		DivideBy2, // k, k / 2, ..., 0 (-p-cs /2)
-		ToZero     // k, 0 (-p-cs =0): the only p-level keeps the first function of each block, the constant one (the
-		           // first VectorComponents): for bases not ordered by degree. Usually more iterations than the others at
-		           // k >= 3
+		Minus2, // k, k - 2, ..., 0 (fhhos4 -p-cs -2)
+		Minus1, // k, k - 1, ..., 0 (-p-cs -1)
+		ToZero  // k, 0 (-p-cs =0): the only p-level keeps the first function of each block, the constant one (the first
+		        // VectorComponents): for bases not ordered by degree. Usually more iterations than the others at k >= 3
 	};
 
 	// The prolongation of the h-coarsening (Solver::Prolongation): the faces of the boundary of an aggregate of cells take
