@@ -11,7 +11,7 @@ using namespace std;
 // ownership), Diag is the square block of the process: the smoothers work on it.
 // In precision T: double (DistributedMatrix), or float (mixed precision: the matrices of the cycle of U-AMG, see
 // Multigrid::MixedPrecision), whose products are in float. The constructions are in double (they return a
-// DistributedMatrix), then Cast<float>().
+// DistributedMatrix), then Cast<float>(), but AssembleFromLocalRows() (stored in T).
 template <typename T>
 class DistributedMatrixOf;
 using DistributedMatrix = DistributedMatrixOf<double>;
@@ -287,7 +287,8 @@ public:
 	// The operator assembled by the processes from the rows of their local entities in map (owned, then ghosts), with
 	// columns local in map: a square operator on the entities of map, distributed by rows. The rows of the ghosts are
 	// sent to their owners, which add them to theirs; the blocks Diag and Offd built in one pass on the rows. Collective.
-	static DistributedMatrix AssembleFromLocalRows(shared_ptr<const IndexMap> map, const SparseMatrix& localRows, int blockSize)
+	// The sums in double, the operator stored in T.
+	static DistributedMatrixOf AssembleFromLocalRows(shared_ptr<const IndexMap> map, const SparseMatrix& localRows, int blockSize)
 	{
 		const IndexMap& m = *map;
 		int bs = blockSize;
@@ -379,7 +380,7 @@ public:
 		// The rows: the local ones plus the received ones, sorted (the duplicates summed), split
 		ThreadLocal<vector<pair<SparseMatrixIndex, double>>> rowsTL;
 		ThreadLocal<vector<pair<SparseMatrixIndex, double>>> offdTL;
-		DistributedMatrix M;
+		DistributedMatrixOf M;
 		M.RowMap = owners;
 		M.ColMap = colMap;
 		M.RowBlockSize = bs;
@@ -409,7 +410,7 @@ public:
 			}
 		};
 		SparseMatrixIndex nAllCols = nOwnedCols + cm.NGhosts() * bs;
-		M.Diag = SparseMatrixOps::BuildByRows(nOwnedRows, nOwnedCols, 1, [&](BigNumber firstRow, BigNumber lastRow, SparseMatrixOps::RowChunk& chunk)
+		M.Diag = SparseMatrixOps::BuildByRows<T>(nOwnedRows, nOwnedCols, 1, [&](BigNumber firstRow, BigNumber lastRow, SparseMatrixOps::RowChunk& chunk)
 		{
 			vector<pair<SparseMatrixIndex, double>>& row = rowsTL.Local();
 			for (BigNumber i = firstRow; i < lastRow; ++i)
@@ -419,7 +420,7 @@ public:
 				chunk.EndRow();
 			}
 		});
-		M.Offd = SparseMatrixOps::BuildByRows(nOwnedRows, cm.NGhosts() * bs, 1, [&](BigNumber firstRow, BigNumber lastRow, SparseMatrixOps::RowChunk& chunk)
+		M.Offd = SparseMatrixOps::BuildByRows<T>(nOwnedRows, cm.NGhosts() * bs, 1, [&](BigNumber firstRow, BigNumber lastRow, SparseMatrixOps::RowChunk& chunk)
 		{
 			vector<pair<SparseMatrixIndex, double>>& row = offdTL.Local();
 			for (BigNumber i = firstRow; i < lastRow; ++i)

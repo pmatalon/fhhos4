@@ -339,8 +339,8 @@ namespace fhhos4
 		// run in single precision (float), but the coarsest solve: half the memory of the levels, faster cycles. The setup
 		// computes in double (the same levels, rounded), and the Krylov method, the matrix A, the residuals and the
 		// solution stay in double: the tolerance can be that of the double precision, usually in the iterations of the
-		// double precision. Only for a symmetric matrix, on one process, with the Chebyshev smoothers (the defaults);
-		// otherwise the levels are in double, as with false.
+		// double precision. Only for a symmetric matrix, with the Chebyshev smoothers (the defaults), in CSR on several
+		// processes (see BlockCSRStorage); otherwise the levels are in double, as with false.
 		bool MixedPrecision = true;
 		// The operator of the levels whose faces have several DoFs (FaceDegree >= 1) stored by blocks (block CSR: one
 		// column index per block of coupled faces instead of one per coefficient) for the smoothers and the cycle: their

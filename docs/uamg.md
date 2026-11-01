@@ -120,9 +120,10 @@ ADR-0010. `Solver::MixedPrecision` (library default true), `Multigrid::MixedPrec
 - Out of the cycle, in double: `A` (A x for the outer Krylov method: a parallel full product, FCG's own being
   sequential), the residuals and x: each cycle corrects the residual of the current x (iterative refinement:
   `Krylov::None`, non-zero initial guesses).
-- Supported (`UncondensedAMG::MixedPrecisionApplies()`): a symmetric matrix on one process, the flat passes with the
-  chained prolongations and the Galerkin operators, no option needing `A_F_F` (p-levels after h-levels), the Chebyshev
-  smoothers, no zero-mean/compatibility conditions nor exports; otherwise the levels are in double (the reason logged).
+- Supported (`UncondensedAMG::MixedPrecisionApplies()`): a symmetric matrix (on several processes too, in CSR:
+  `docs/mpi.md`), the flat passes with the chained prolongations and the Galerkin operators, no option needing `A_F_F`
+  (p-levels after h-levels), the Chebyshev smoothers, no zero-mean/compatibility conditions nor exports; otherwise the
+  levels are in double (the reason logged).
 
 ## Block CSR storage
 

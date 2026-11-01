@@ -562,5 +562,5 @@ struct LocalOperator
 	LocalMatrices Current;
 	LocalMatrices Next;              // buffer for those of the next coarsening pass
 	const void* Assembled = nullptr; // the matrix equal to the sum of Current (of any precision), if it has been assembled
-	const DistributedMatrix* AssembledDistributed = nullptr; // the same on several processes
+	const void* AssembledDistributed = nullptr; // the same on several processes (a distributed matrix of any precision)
 };

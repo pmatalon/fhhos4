@@ -14,6 +14,7 @@ private:
 	bool _automaticNumberOfLevels;
 	int _nLevels;
 	SparseMatrix _coarseOperator;  // levels in single precision: the coarsest operator in double, for the coarse solver
+	DistributedMatrix _coarseDistributedOperator; // the same on several processes
 public:
 	ExportModule Out;
 	Solver* CoarseSolver = nullptr;
@@ -371,7 +372,15 @@ protected:
 			level = level->CoarserLevel;
 
 		if (level->IsDistributed())
+		{
+			if (!level->DistributedOperator) // a level in single precision (not the finest): its operator in double
+			{
+				_coarseDistributedOperator = level->SingleDistributedOperator->Cast<double>();
+				level->DistributedOperator = &_coarseDistributedOperator;
+				level->OperatorMatrix = &_coarseDistributedOperator.Diag;
+			}
 			this->CoarseSolver->Setup(*level->DistributedOperator);
+		}
 		else
 		{
 			if (!level->OperatorMatrix) // a level in single precision (not the finest): its operator in double

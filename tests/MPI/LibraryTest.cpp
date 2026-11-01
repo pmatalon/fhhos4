@@ -65,8 +65,10 @@ SparseMatrix LocalColumns(const SparseMatrix& rows, const IndexMap& owners, cons
 // in reverse order of their global numbers (any order). The solution of the system on one process. Non-symmetric if
 // asymmetry != 0. singular: the pure Neumann system (SingularMatrix; the right-hand side incompatible: projected),
 // the solutions compared up to the kernel (the constants, of each component). components: the system on each of them
-// (the blocks ⊗ I_n, VectorComponents = n; the ghosts are the same faces and cells).
-void ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double asymmetry = 0, bool singular = false, int components = 1)
+// (the blocks ⊗ I_n, VectorComponents = n; the ghosts are the same faces and cells). mixedPrecision: MixedPrecision of
+// both solvers (the default: true). Returns the iterations on the processes; setupLog: the printouts of their setup
+// (Verbosity 2, on the root process) if not null.
+int ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double asymmetry = 0, bool singular = false, int components = 1, bool mixedPrecision = true, string* setupLog = nullptr)
 {
 	int n = 60;
 	CartesianHybridSystem global(n, asymmetry, singular);
@@ -84,6 +86,7 @@ void ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double 
 		solver.Prolongation = prolongation;
 		solver.SingularMatrix = singular;
 		solver.VectorComponents = c;
+		solver.MixedPrecision = mixedPrecision;
 		Vector cellOnes = Vector::Ones(global.A_TT.rows()), faceOnes = Vector::Ones(global.S.rows());
 		fhhos4::SparseMatrix A_TT = OnEachComponent(system.Global.A_TT, c), A_TF = OnEachComponent(system.Global.A_TF, c);
 		fhhos4::SparseMatrix A_FT = OnEachComponent(system.Global.A_FT, c), A_FF = OnEachComponent(system.Global.A_FF, c);
@@ -107,11 +110,22 @@ void ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double 
 	solver.Prolongation = prolongation;
 	solver.SingularMatrix = singular;
 	solver.VectorComponents = c;
+	solver.MixedPrecision = mixedPrecision;
 	Vector cellOnes = Vector::Ones(cells.NOwned), faceOnes = Vector::Ones(faces.NOwned);
+	if (setupLog)
+	{
+		solver.Verbosity = 2;
+		testing::internal::CaptureStdout();
+	}
 	if (asymmetry == 0)
 		solver.SetupSym(A_TT, A_TF, A_FF, cellOnes, faceOnes, fhhos4::GhostNumbers(faceGhosts.size(), faceGhosts.data()));
 	else
 		solver.SetupNonSym(A_TT, A_TF, A_FT, A_FF, cellOnes, faceOnes, fhhos4::GhostNumbers(faceGhosts.size(), faceGhosts.data()), fhhos4::GhostNumbers(cellGhosts.size(), cellGhosts.data()));
+	if (setupLog)
+	{
+		*setupLog = testing::internal::GetCapturedStdout();
+		solver.Verbosity = 0;
+	}
 	Vector x_T(c * cells.NOwned), x_F = Vector::Zero(c * faces.NOwned);
 	fhhos4::Result result = solver.Solve(b_T.segment(c * cells.Begin, c * cells.NOwned), b_F.segment(c * faces.Begin, c * faces.NOwned), x_T, x_F);
 
@@ -133,6 +147,7 @@ void ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double 
 	EXPECT_LE((allX_T - expectedX_T).norm(), 1e-8 * expectedX_T.norm());
 	if (World().IsRoot())
 		cout << "\t" << World().Size() << " processes: " << result.Iterations << " iterations (" << expectedIterations << " on one)" << endl;
+	return result.Iterations;
 }
 
 TEST(DistributedLibrary, UncondensedSystem)
@@ -172,6 +187,24 @@ TEST(DistributedLibrary, SingularMatrix)
 {
 	ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::Reconstruction, 0, true);
 	ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::HarmonicExtension, 0, true);
+}
+
+// Mixed precision (the default: the levels in single precision, in CSR on several processes) and in double: the same
+// iterations within 1, as on one process (UAMGMixedPrecisionProgram); the levels in single precision on the processes
+TEST(DistributedLibrary, MixedPrecision)
+{
+	for (int components : { 1, 2 })
+	{
+		string setupLog;
+		int mixed = ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::Reconstruction, 0, false, components, true, &setupLog);
+		int inDouble = ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::Reconstruction, 0, false, components, false);
+		EXPECT_LE(abs(mixed - inDouble), 1) << components << " components";
+		if (World().IsRoot())
+		{
+			EXPECT_EQ(setupLog.find("Levels in double precision"), string::npos) << setupLog;
+			EXPECT_NE(setupLog.find("single precision)"), string::npos) << setupLog;
+		}
+	}
 }
 
 // The inputs are checked on all the processes: an error on one of them is an error on all of them

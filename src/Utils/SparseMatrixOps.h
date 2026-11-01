@@ -33,9 +33,10 @@ namespace SparseMatrixOps
 	// Builds the nRows x nCols matrix whose rows are computed by computeRows(firstRow, lastRow, chunk), which must add to
 	// the chunk the non-zeros of the rows firstRow, ..., lastRow - 1, in this order, sorted by column, and call
 	// chunk.EndRow() after each row. The rows are split into chunks processed in parallel. The chunk boundaries are
-	// multiples of rowBlockSize, so that computeRows can process whole blocks of rows.
-	template <class ComputeRows>
-	SparseMatrix BuildByRows(BigNumber nRows, BigNumber nCols, int rowBlockSize, ComputeRows computeRows)
+	// multiples of rowBlockSize, so that computeRows can process whole blocks of rows. The values stored in precision T
+	// (float: rounded).
+	template <typename T = double, class ComputeRows>
+	SparseMatrixOf<T> BuildByRows(BigNumber nRows, BigNumber nCols, int rowBlockSize, ComputeRows computeRows)
 	{
 		assert(nRows % rowBlockSize == 0);
 		BigNumber nBlocks = nRows / rowBlockSize;
@@ -56,7 +57,7 @@ namespace SparseMatrixOps
 		for (BigNumber c = 0; c < nChunks; ++c)
 			chunkOffsets[c + 1] = chunkOffsets[c] + chunks[c].Cols.size();
 
-		SparseMatrix M(nRows, nCols);
+		SparseMatrixOf<T> M(nRows, nCols);
 		M.resizeNonZeros(chunkOffsets[nChunks]);
 		#pragma omp parallel for schedule(dynamic)
 		for (BigNumber c = 0; c < nChunks; ++c)

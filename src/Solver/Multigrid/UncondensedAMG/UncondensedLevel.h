@@ -309,10 +309,12 @@ private:
 	BlockSparseMatrix<T> _blockOperator; // the operator of the cycle in block CSR (BlockCSRStorage)
 	vector<BigNumber> _downwindOrder; // non-symmetric matrix: the order of the faces in the sweeps of the smoothers
 	// On several processes (see FaceMap): the faces of A_T_Fc (the FaceMap of the coarser level), the coarse operator
-	// (that of the coarser level), and the operator of a p-coarse level
+	// (that of the coarser level, in precision T), and the operator of a p-coarse level (in double, the input of the
+	// setup of the coarser levels; in single precision, also rounded: the operator of the cycle)
 	shared_ptr<const IndexMap> _coarseFaceMap;
-	DistributedMatrix _distributedAc;
+	DistributedMatrixOf<T> _distributedAc;
 	DistributedMatrix _extractedOperator;
+	DistributedMatrixOf<float> _singleExtractedOperator;
 	// The prolongations of the coarsening passes of this level, P_1 (the faces of this level) to P_n (KeepPassProlongations),
 	// their transposes, and the intermediate vectors of the transfers (_transferBuffers[i]: the faces of the pass i,
 	// i = 1..n-1). Empty if the transfers use P (the product).
@@ -324,6 +326,7 @@ private:
 	const SparseMatrixOf<T>*& Op() { return this->template OperatorOf<T>(); }
 	SparseMatrixOf<T>& Prolongation() { return this->template ProlongationOf<T>(); }
 	SparseMatrixOf<T>& Restriction() { return this->template RestrictionOf<T>(); }
+	DistributedMatrixOf<T>& DistributedProlongation() { return this->template DistributedProlongationOf<T>(); }
 
 	// A matrix of the setup in precision T: moved in double, rounded in single precision
 	static SparseMatrixOf<T> InPrecision(SparseMatrix&& M)
@@ -332,6 +335,14 @@ private:
 			return std::move(M);
 		else
 			return SparseMatrixOps::Cast<T>(M);
+	}
+
+	static DistributedMatrixOf<T> InPrecision(DistributedMatrix&& M)
+	{
+		if constexpr (std::is_same_v<T, double>)
+			return std::move(M);
+		else
+			return M.Cast<T>();
 	}
 public:
 	SparseMatrixOf<T> Ac;
@@ -344,10 +355,18 @@ public:
 	// of the coarser levels) is not needed, but on the coarsest level (the coarse solver's)
 	void ReleaseOperatorInDouble()
 	{
-		if (std::is_same_v<T, float> && this->OperatorMatrix == &_extractedA && !this->IsCoarsestLevel())
+		if (!std::is_same_v<T, float> || this->IsCoarsestLevel())
+			return;
+		if (this->OperatorMatrix == &_extractedA)
 		{
 			this->OperatorMatrix = nullptr;
 			_extractedA = SparseMatrix();
+		}
+		else if (this->DistributedOperator == &_extractedOperator)
+		{
+			this->DistributedOperator = nullptr;
+			this->OperatorMatrix = nullptr;
+			_extractedOperator = DistributedMatrix();
 		}
 	}
 
@@ -358,8 +377,7 @@ public:
 
 		if (this->IsDistributed())
 		{
-			if constexpr (std::is_same_v<T, double>) // not in single precision (UncondensedAMG)
-				CoarsenMeshDistributed(coarseningStgy, faceCoarseningStgy, requestedCoarseningFactor, coarsestPossibleMeshReached);
+			CoarsenMeshDistributed(coarseningStgy, faceCoarseningStgy, requestedCoarseningFactor, coarsestPossibleMeshReached);
 			return;
 		}
 
@@ -436,7 +454,8 @@ public:
 	//------------------------------------------------------------------------------------------------------------------//
 
 	// CoarsenMesh() on several processes: the flat coarsening passes (CoarsenInDistributedPasses()), with the default
-	// options only, after the rescaling of the constants as on one process. In double only.
+	// options only, after the rescaling of the constants as on one process (the finest level and the p-levels, which have
+	// their operator in double).
 	void CoarsenMeshDistributed(H_CoarsStgy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy, double requestedCoarseningFactor, bool& coarsestPossibleMeshReached)
 	{
 		if (!FlatPassesApply(coarseningStgy, faceCoarseningStgy) || _multigridProlong != UAMGProlongation::ChainedCoarseningProlongations || ComputeCoarseA_F_F || ComputeQ_F)
@@ -482,8 +501,8 @@ public:
 		if (coarsestPossibleMeshReached)
 			return;
 
-		ScaleConstantRows(this->DistributedP.Diag, ownedFaceInterpOfOne, _faceBlockSize);
-		ScaleConstantRows(this->DistributedP.Offd, ownedFaceInterpOfOne, _faceBlockSize);
+		ScaleConstantRows(DistributedProlongation().Diag, ownedFaceInterpOfOne, _faceBlockSize);
+		ScaleConstantRows(DistributedProlongation().Offd, ownedFaceInterpOfOne, _faceBlockSize);
 	}
 
 	// CoarsenInFlatPasses() on several processes: each process aggregates its cells (see DistributedPass), the coarse
@@ -528,8 +547,10 @@ public:
 			distributed.NumberCoarseFaces();
 
 			// Local matrices of the operator, if they don't come from the previous coarsening pass: of the cells of the
-			// process, from the rows of its faces (those of the other processes fetched)
-			if (nCoarsenings == 0 && LocalOp->AssembledDistributed != this->DistributedOperator)
+			// process, from the rows of its faces (those of the other processes fetched). The operator in double: null on
+			// the h-levels in single precision, whose local matrices are those of the finer level's last pass.
+			const DistributedMatrix* A = this->DistributedOperator;
+			if (nCoarsenings == 0 && LocalOp->AssembledDistributed != (A ? (const void*)A : (const void*)this->SingleDistributedOperator))
 			{
 				SparseMatrix S = this->DistributedOperator->RowsWithGhosts(*passFaceMap, *passFaceMap);
 				LocalOp->Current.Decompose(S, pass.CellFaces, pass.FaceCells, fbs, Symmetric);
@@ -580,13 +601,16 @@ public:
 		this->A_T_Fc = std::move(A_T_Fc);
 		this->A_F_Tc = std::move(A_F_Tc);
 		_coarseFaceMap = passFaceMap;
-		// The operator of the level, assembled once (the rows of the coarse faces of other processes added to theirs)
-		SparseMatrix localRows = LocalOp->Current.Assemble(_coarseFaceMap->NLocal());
-		_distributedAc = DistributedMatrix::AssembleFromLocalRows(_coarseFaceMap, localRows, fbs);
+		// The operator of the level, assembled once (the rows of the coarse faces of other processes added to theirs), in
+		// precision T: its local rows in double, freed after the assembly
+		{
+			SparseMatrix localRows = LocalOp->Current.Assemble(_coarseFaceMap->NLocal());
+			_distributedAc = DistributedMatrixOf<T>::AssembleFromLocalRows(_coarseFaceMap, localRows, fbs);
+		}
 		LocalOp->AssembledDistributed = &_distributedAc;
 		// The prolongation: the rows of the faces of the process
 		auto rows = make_shared<const IndexMap>(this->FaceMap->WithoutGhosts());
-		this->DistributedP = DistributedMatrix::FromLocalColumns(rows, _coarseFaceMap, SparseMatrix(P.topRows(rows->NOwned * fbs)), fbs, fbs);
+		DistributedProlongation() = InPrecision(DistributedMatrix::FromLocalColumns(rows, _coarseFaceMap, SparseMatrix(P.topRows(rows->NOwned * fbs)), fbs, fbs));
 	}
 
 	// The coarsening passes of the paper, until the requested coarsening factor is reached
@@ -1375,8 +1399,7 @@ public:
 		UncondensedLevelOf* fine = dynamic_cast<UncondensedLevelOf*>(FinerLevel);
 		if (fine->IsDistributed())
 		{
-			if constexpr (std::is_same_v<T, double>) // not in single precision (UncondensedAMG)
-				SetupOperatorByBlockExtractionDistributed(*fine);
+			SetupOperatorByBlockExtractionDistributed(*fine);
 			return;
 		}
 
@@ -1416,7 +1439,7 @@ public:
 	}
 
 	// On several processes: the same blocks of the rows of the process, the same faces (FaceMap, and the columns of the
-	// operator). In double only.
+	// operator), from those of the finer level in double (the finest level or a p-level).
 	void SetupOperatorByBlockExtractionDistributed(const UncondensedLevelOf& fine)
 	{
 		if (ComputeCoarseA_F_F)
@@ -1433,6 +1456,12 @@ public:
 		_extractedOperator.Offd = ExtractCoarseMatrix(fineA.Offd, nOwnedFaces, nGhostFaces, ffbs, ffbs, _faceBlockSize, _faceBlockSize);
 		this->DistributedOperator = &_extractedOperator;
 		this->OperatorMatrix = &_extractedOperator.Diag;
+		if constexpr (std::is_same_v<T, float>)
+		{
+			_singleExtractedOperator = _extractedOperator.Cast<float>();
+			this->SingleDistributedOperator = &_singleExtractedOperator;
+			this->SingleOperatorMatrix = &_singleExtractedOperator.Diag;
+		}
 		if (UsesCellBlocks())
 			_extractedA_T_T = ExtractCoarseMatrix(*fine.A_T_T, nElems, nElems, fcbs, fcbs, _cellBlockSize, _cellBlockSize);
 		_extractedA_T_F = ExtractCoarseMatrix(*fine.A_T_F, nElems, fine.FaceMap->NLocal(), fcbs, ffbs, _cellBlockSize, _faceBlockSize);
@@ -1809,7 +1838,7 @@ public:
 			// nothing to do
 		}
 		else if (this->IsDistributed())
-			this->DistributedP.SetupTransposed();
+			DistributedProlongation().SetupTransposed();
 		else if (!_passP.empty())
 		{
 			// R = P^T = P_n^T ... P_1^T: the transposes of the prolongations of the passes (R_i = P_i^T, fewer non-zeros
@@ -1999,8 +2028,8 @@ public:
 			}
 			else if (this->IsDistributed())
 			{
-				coarse->DistributedOperator = &_distributedAc;
-				coarse->OperatorMatrix = &_distributedAc.Diag;
+				coarse->template DistributedOperatorOf<T>() = &_distributedAc;
+				coarse->Op() = &_distributedAc.Diag;
 				coarse->A_T_T = UsesCellBlocks() ? &A_T_Tc : nullptr;
 				coarse->A_T_F = &A_T_Fc;
 				coarse->A_F_F = nullptr;

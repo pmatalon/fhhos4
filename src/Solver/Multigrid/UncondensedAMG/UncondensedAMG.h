@@ -22,6 +22,7 @@ private:
 	LocalOperator _localOperator; // local matrices of the operators of the coarsening passes, during the setup
 	bool _symmetric = true;       // set by Setup(): see UncondensedLevel::Symmetric
 	FloatSparseMatrix _singleA;   // levels in single precision: the operator of the finest level (its smoothers, the cycle)
+	DistributedMatrixOf<float> _singleDistributedA; // the same on several processes
 	bool _blockCSR = false;       // the levels whose faces have several DoFs store their operator in block CSR
 	bool _singular = false;       // SingularMatrix, at the setup
 	vector<Vector> _kernel;       // _singular: the interpolation of 1 on the faces of the finest level (of the process), on each component, normalized
@@ -191,11 +192,7 @@ public:
 		_localOperator.Current.Free();
 		_localOperator.Next.Free();
 		_localOperator.Assembled = nullptr;
-		if (this->_mixedPrecision)
-		{
-			for (Level* level = fine->CoarserLevel; level; level = level->CoarserLevel)
-				dynamic_cast<UncondensedLevelOf<float>*>(level)->ReleaseOperatorInDouble();
-		}
+		ReleaseOperatorsInDouble();
 
 		// The blocks are only read during the setup: the caller may free them (the library fhhos4 does)
 		fine->A_T_T = nullptr;
@@ -232,14 +229,19 @@ public:
 			Utils::FatalError("UncondensedAMG: on several processes, the options that need the block A_F_F are not available.");
 		if (this->HP_CS != HP_CoarsStgy::H_only && this->HP_CS != HP_CoarsStgy::P_then_H)
 			Utils::FatalError("UncondensedAMG: on several processes, only the p-coarsening then the h-coarsening (or the h-coarsening alone) are available.");
-		if (this->MixedPrecision)
-			Utils::Log() << "\tLevels in double precision: the mixed precision does not support several processes" << endl;
 		if (BlockCSRStorage)
 			Utils::Log() << "\tOperators in CSR: the block CSR storage does not support several processes" << endl;
-		this->_mixedPrecision = false;
 		_blockCSR = false;
 
+		// Mixed precision: as on one process, in CSR
+		this->_mixedPrecision = this->MixedPrecision;
 		this->_fineLevel = NewFineLevel();
+		if (this->_mixedPrecision && !MixedPrecisionApplies(dynamic_cast<const UncondensedLevel&>(*this->_fineLevel)))
+		{
+			delete this->_fineLevel;
+			this->_mixedPrecision = false;
+			this->_fineLevel = NewFineLevel();
+		}
 		UncondensedLevel* fine = dynamic_cast<UncondensedLevel*>(this->_fineLevel);
 		fine->A_T_T = &A_T_T;
 		fine->A_T_F = &A_T_F;
@@ -260,6 +262,14 @@ public:
 		if (this->H_CS == H_CoarsStgy::MultiplePairwiseAggregation && this->CoarseningFactor == 0)
 			this->CoarseningFactor = 3.8;
 		fine->CheckHarmonicExtension(this->H_CS, this->FaceCoarseningStgy);
+		// The levels in single precision: the copy of the operator of the finest level (A stays that of the setup, of the
+		// outer Krylov method and of the residuals)
+		if (this->_mixedPrecision)
+		{
+			_singleDistributedA = A.Cast<float>();
+			fine->SingleDistributedOperator = &_singleDistributedA;
+			fine->SingleOperatorMatrix = &_singleDistributedA.Diag;
+		}
 		_singular = SingularMatrix;
 		_kernel = _singular ? SingularSolver::Kernel(faceInterpOfOne, _faceBlockSize, A.LocalRows(), VectorComponents) : vector<Vector>();
 
@@ -269,6 +279,7 @@ public:
 		_localOperator.Next.Free();
 		_localOperator.Assembled = nullptr;
 		_localOperator.AssembledDistributed = nullptr;
+		ReleaseOperatorsInDouble();
 		fine->A_T_T = nullptr;
 		fine->A_T_F = nullptr;
 		fine->A_F_T = nullptr;
@@ -342,8 +353,8 @@ private:
 	}
 
 	// Mixed precision: the levels in single precision run the default options (UncondensedLevel::MixedPrecisionApplies(),
-	// the Galerkin operators, without the options that need A_F_F, e.g. p-levels after h-levels; a symmetric matrix on
-	// one process) and smoothers that have a single precision version (Chebyshev), without the zero-mean and
+	// the Galerkin operators, without the options that need A_F_F, e.g. p-levels after h-levels; a symmetric matrix; in
+	// CSR on several processes) and smoothers that have a single precision version (Chebyshev), without the zero-mean and
 	// compatibility conditions nor the exports of the multigrid. Otherwise the levels are in double (the reason printed).
 	bool MixedPrecisionApplies(const UncondensedLevel& fine) const
 	{
@@ -381,6 +392,15 @@ private:
 		if (!applies)
 			Utils::Log() << "\tOperators in CSR: the block CSR storage requires smoothers that support it (the Chebyshev smoothers)" << endl;
 		return applies;
+	}
+
+	// Mixed precision, after the setup: the operators in double of the p-levels released (see ReleaseOperatorInDouble())
+	void ReleaseOperatorsInDouble()
+	{
+		if (!this->_mixedPrecision)
+			return;
+		for (Level* level = this->_fineLevel->CoarserLevel; level; level = level->CoarserLevel)
+			dynamic_cast<UncondensedLevelOf<float>*>(level)->ReleaseOperatorInDouble();
 	}
 
 	// The finest level, in the precision of the levels, with the local matrices of the operators
