@@ -9,9 +9,10 @@ For use in shared memory only, you'll need
 - CMake (>= 3.20),
 - Ninja or Make,
 - [Eigen](https://eigen.tuxfamily.org) 3.4 or 5.x.
+
 For distributed memory, you'll also need
 - MPI
-- MUMPS
+- [MUMPS](https://mumps-solver.org)  (e.g. conda-forge's `mumps-mpi`)
 
 ```bash
 git clone --branch v1.4.0 --depth 1 https://github.com/pmatalon/fhhos4.git && cd fhhos4
@@ -32,7 +33,7 @@ Build options (`cmake -D<OPTION>=<value>`):
 | `ENABLE_NATIVE_ARCH` | `OFF` | `-march=native`: optimized for the CPU of the build machine, may not run on others |
 | `SMALL_INDEX` | `ON` | `int` indices in `fhhos4::SparseMatrix` (`intmax_t` otherwise) |
 | `ENABLE_PYTHON` | `OFF` | The Python module, see [Python](#python) |
-| `ENABLE_MPI` | `OFF` | The solver on several processes, see [Several processes](#several-processes-mpi). Needs MPI and [MUMPS](https://mumps-solver.org) (its MPI version, e.g. conda-forge's `mumps-mpi`); your code is then compiled and linked with MPI too, and the Python module needs mpi4py |
+| `ENABLE_MPI` | `OFF` | The solver on several processes, see [Several processes](#several-processes-mpi). Needs MPI and the MPI version of [MUMPS](https://mumps-solver.org); your code is then compiled and linked with MPI too, and the Python module needs mpi4py |
 | `ENABLE_MUMPS` | `OFF` | The coarse solver `CoarseSolver::MUMPS` on one process; always on with `ENABLE_MPI`. Without MPI, needs MUMPS's sequential version, e.g. conda-forge's `mumps-seq` |
 | `MUMPS_INCLUDE_DIR`, `MUMPS_LIBRARY` | found | MUMPS is found from its header `dmumps_c.h` and its library `libdmumps`, or given by `-DMUMPS_INCLUDE_DIR=<dir> -DMUMPS_LIBRARY=<path>/libdmumps.so` |
 
@@ -92,7 +93,7 @@ The polynomial spaces are P^k (simplices, polytopes), or Q^k (quadrilaterals, he
 cells and on the faces.
 Bases not ordered by degree, but whose first function is constant, work with the p-coarsening straight to the lowest
 order (`PCoarsening::ToZero`), or better, reordered by degree: e.g. in the DoF lists of `ExtractBlocksSym()`
-(see [Other formats](#other-formats-the-helpers)), at no extra cost.
+(see [Other matrix formats](#other-formats-the-helpers)), at no extra cost.
 
 # 3. How to use
 
@@ -111,9 +112,9 @@ see [Several processes](#several-processes-mpi)).
 #include <fhhos4>
 
 fhhos4::Solver solver;
-solver.Dimension = 3;  // to set
-solver.FaceDegree = k; // to set
-solver.CellDegree = k; // to set
+solver.Dimension = 3;  // space dimension
+solver.FaceDegree = k; // polynomial degree in the faces
+solver.CellDegree = k; // polynomial degree in the cells
 // solver.PolynomialSpace = fhhos4::PolynomialSpace::Q; // bases of Q^k instead of P^k
 // solver.VectorComponents = 3; // a vector-valued unknown of 3 components (see Inputs)
 solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne);
@@ -203,9 +204,9 @@ import numpy as np
 import fhhos4
 
 solver = fhhos4.Solver()
-solver.Dimension = 3   # to set
-solver.FaceDegree = k  # to set
-solver.CellDegree = k  # to set
+solver.Dimension = 3   # space dimension
+solver.FaceDegree = k  # polynomial degree in the faces
+solver.CellDegree = k  # polynomial degree in the cells
 # solver.PolynomialSpace = fhhos4.PolynomialSpace.Q  # bases of Q^k instead of P^k
 solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne)  # e.g. scipy.sparse.csr_array, NumPy vectors
 x_T, x_F = np.zeros(b_T.size), np.zeros(b_F.size)
@@ -274,14 +275,14 @@ result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
   times each unit vector, **interleaved by component** (array of structures): `phi_i e_c` is the DoF `n i + c` of the
   block. The interpolations of 1 stay those of the scalar bases, one coefficient per cell and per face.
 
-### Other formats: the helpers
+### Other matrix formats: provided helpers
 
-| Your matrices | How | |
+| Your matrices | How to convert | Makes a copy? |
 |---|---|---|
-| Column-major (Eigen's default), or another index type | `fhhos4::SparseMatrix B = A;` (Eigen's conversion) | A copy |
-| Column-major and symmetric (`A_TT`, `A_FF`, or `A` of a symmetric system) | `TransposedView(A)`: `A^T` as an Eigen map of the arrays of `A`, which is `A`, up to the rounding errors of its assembly | No copy |
-| Your own CSR arrays, with the index type of the library | `fhhos4::SparseMatrixMap(rows, cols, nonZeros, rowPointers, columnIndices, values)` | No copy |
-| The global matrix of the system (the cells and faces DoFs in your numbering, the Dirichlet DoFs included) | `ExtractBlocksSym(M, cells, faces)`, `ExtractBlocksNonSym(M, cells, faces)`; `Gather()` and `Scatter()` for the vectors | Copies |
+| Column-major (Eigen's default), or another index type | `fhhos4::SparseMatrix B = A;` (Eigen's conversion) | Yes |
+| Column-major and symmetric (`A_TT`, `A_FF`, or `A` of a symmetric system) | `TransposedView(A)`: `A^T` as an Eigen map of the arrays of `A`, which is `A`, up to the rounding errors of its assembly | No |
+| Your own CSR arrays, with the index type of the library | `fhhos4::SparseMatrixMap(rows, cols, nonZeros, rowPointers, columnIndices, values)` | No |
+| The global matrix of the system (the cells and faces DoFs in your numbering, the Dirichlet DoFs included) | `ExtractBlocksSym(M, cells, faces)`, `ExtractBlocksNonSym(M, cells, faces)`; `Gather()` and `Scatter()` for the vectors | Yes |
 
 The copies are Eigen matrices of your code (`fhhos4::SparseMatrix`). From a global matrix (e.g. assembled by a framework
 in its own numbering):
