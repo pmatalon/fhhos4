@@ -321,7 +321,7 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 | `Restart` | `-1`: `1` for FCG, `10` for GCR | `>= 1`: search directions stored (two face vectors each). Fewer save memory; GCR may then need more iterations |
 | `Tolerance` | `1e-8` | Relative residual of the condensed system at which `Solve()` stops |
 | `MaxIterations` | `200` | |
-| `Cycle` | `Cycle::K` | <ul><li>`V`</li><li>`W`</li><li>`K`: requires FCG or GCR</li></ul> |
+| `Cycle` | `Cycle::K` | <ul><li>`V`</li><li>`W`</li><li>`K`: non-linear: a Krylov method around it must be flexible (FCG, GCR, FGMRES)</li></ul> |
 | `PCoarsening` | `PCoarsening::Minus2` | Degrees of the p-levels, from `FaceDegree` k: <ul><li>`Minus2`: k, k-2, ..., 0</li><li>`Minus1`: k, k-1, ..., 0</li><li>`ToZero`: k, 0, for bases not ordered by degree (more iterations from k = 3)</li></ul> |
 | `PreSmoothingIterations`, `PostSmoothingIterations` | `-1`: `2` for Chebyshev (its degree), else `1` | `>= 0` (`0`: none) |
 | `PreSmoother` | `Smoother::Default`: `BlockChebyshevFourthKind` if symmetric, else `HybridBlockGaussSeidel` (`BlockGaussSeidel` on 1 thread) | One block per face: <ul><li>`BlockGaussSeidel`, `BackwardBlockGaussSeidel`, `SymmetricBlockGaussSeidel`: sequential</li><li>`HybridBlockGaussSeidel`, `HybridBackwardBlockGaussSeidel`: parallel</li><li>`DampedBlockJacobi`: damping 2/3</li><li>`BlockChebyshevFirstKind`, `BlockChebyshevFourthKind`: parallel, symmetric matrices only</li></ul> |

@@ -26,10 +26,11 @@
 // The library condenses the system and computes the cell unknowns: no static condensation in the calling code.
 // See README_library.md.
 //
-// The Krylov method preconditioned by the AMG is part of the library (Solver::Krylov), which does not give the multigrid
-// cycle alone: with the default K-cycle, the AMG is a non-linear preconditioner (it solves the coarse levels with inner
-// FCG or GCR iterations), which requires a flexible Krylov method: the flexible conjugate gradient (FCG, the default for
-// a symmetric matrix) or GCR.
+// The Krylov method preconditioned by the AMG is part of the library (Solver::Krylov): with the default K-cycle, the AMG
+// is a non-linear preconditioner (it solves the coarse levels with inner FCG or GCR iterations), which requires a
+// flexible Krylov method: the flexible conjugate gradient (FCG, the default for a symmetric matrix) or GCR. To
+// precondition your own Krylov method, solve with Krylov::None, MaxIterations = 1 and a zero initial guess (one cycle):
+// Cycle::V or W for a non-flexible method (CG, GMRES), K only for a flexible one (FCG, FGMRES).
 //
 // The inputs are Eigen objects, read in place, never copied nor converted: the sparse matrices in the format of the
 // library, fhhos4::SparseMatrix (row-major, with the index type SparseIndex) or an Eigen::Map of one, the vectors as
@@ -184,7 +185,7 @@ namespace fhhos4
 		V,
 		W,
 		K // K-cycle: each coarse level is solved by 2 iterations of FCG, or of GCR with Krylov::GCR or a non-symmetric
-		  // matrix. Non-linear: it requires a flexible Krylov method (FCG or GCR)
+		  // matrix. Non-linear: a Krylov method around it must be flexible (FCG, GCR, FGMRES)
 	};
 
 	// The polynomial space of the bases of the cells and faces (Solver::PolynomialSpace)
