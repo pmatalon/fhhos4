@@ -998,6 +998,32 @@ TEST(UAMGLibrary, GCR)
 	EXPECT_LT(RelativeError(system, x), 1e-8);
 }
 
+// Restart: the number of directions stored by FCG (truncated, 1 by default) and GCR (restarted, 10 by default). 3
+// converges, not as the default. Not GCR(1) nor GCR(2): the minimal residual method stagnates on this system.
+TEST(UAMGLibrary, Restart)
+{
+	HybridSystem system(64);
+	for (fhhos4::Krylov krylov : { fhhos4::Krylov::FCG, fhhos4::Krylov::GCR })
+	{
+		SCOPED_TRACE(krylov == fhhos4::Krylov::FCG ? "FCG" : "GCR");
+		fhhos4::Result results[2];
+		for (int restart : { -1, 3 })
+		{
+			fhhos4::Solver uamg = ToySolver();
+			uamg.Krylov = krylov;
+			uamg.Restart = restart;
+			uamg.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+			Eigen::VectorXd x = Eigen::VectorXd::Zero(system.b.size());
+			fhhos4::Result result = uamg.Solve(system.b, x);
+			EXPECT_TRUE(result.Converged);
+			EXPECT_LT(result.Iterations, 40);
+			EXPECT_LT(RelativeError(system, x), 1e-8);
+			results[restart > 0] = result;
+		}
+		EXPECT_TRUE(results[0].Iterations != results[1].Iterations || results[0].RelativeResidual != results[1].RelativeResidual);
+	}
+}
+
 // CoarseSolver::MUMPS: the iterations of Eigen's factorizations, symmetric (LDL^T) and non-symmetric (LU); refused if
 // compiled without MUMPS
 TEST(UAMGLibrary, MUMPSCoarseSolver)
@@ -1298,6 +1324,9 @@ TEST(UAMGLibrary, Errors)
 	fhhos4::Solver wrongKrylov = ToySolver();
 	wrongKrylov.Krylov = static_cast<fhhos4::Krylov>(42);
 	EXPECT_THROW(wrongKrylov.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
+	fhhos4::Solver noRestart = ToySolver();
+	noRestart.Restart = 0;
+	EXPECT_THROW(noRestart.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 
 	// Non-symmetric matrix: FCG or Cholesky refused, A_FT of the wrong size
 	fhhos4::Solver fcg = ToySolver();

@@ -265,6 +265,9 @@ def test_parameters():
     assert solver.PCoarsening == fhhos4.PCoarsening.Minus2 and solver.Tolerance == 1e-8
     assert solver.Prolongation == fhhos4.Prolongation.HarmonicExtension
     assert solver.PolynomialSpace == fhhos4.PolynomialSpace.P and not solver.SingularMatrix and solver.VectorComponents == 1
+    assert solver.Restart == -1
+    solver.Restart = 5
+    assert solver.Restart == 5
     solver.PCoarsening = fhhos4.PCoarsening.ToZero
     solver.PreSmoother = fhhos4.Smoother.BlockGaussSeidel
     solver.PolynomialSpace = fhhos4.PolynomialSpace.Q

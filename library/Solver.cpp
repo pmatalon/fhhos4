@@ -266,6 +266,8 @@ namespace fhhos4
 				Utils::FatalError("fhhos4::Solver: the Cholesky factorization requires a symmetric matrix: set CoarseSolver to CoarseSolver::LU (or Default) for a non-symmetric one.");
 			if (!symmetric && s.SingularMatrix)
 				Utils::FatalError("fhhos4::Solver: SingularMatrix requires a symmetric matrix (SetupSym()): the kernel of the transpose of a non-symmetric matrix is not the interpolation of 1 in general.");
+			if (s.Restart < 1 && s.Restart != -1)
+				Utils::FatalError("fhhos4::Solver: Restart must be >= 1, or -1 (the Krylov method's default), got " + to_string(s.Restart) + ".");
 			if (s.PreSmoothingIterations < -1 || s.PostSmoothingIterations < -1)
 				Utils::FatalError("fhhos4::Solver: PreSmoothingIterations and PostSmoothingIterations must be >= 0, or -1 (the smoother's default), got " + to_string(s.PreSmoothingIterations) + " and " + to_string(s.PostSmoothingIterations) + ".");
 			for (fhhos4::Smoother smoother : { s.PreSmoother, s.PostSmoother })
@@ -468,14 +470,14 @@ namespace fhhos4
 			Multigrid->VectorComponents = s.VectorComponents;
 			if (Krylov == fhhos4::Krylov::FCG)
 			{
-				auto fcg = make_unique<FlexibleConjugateGradient>(1);
+				auto fcg = make_unique<FlexibleConjugateGradient>(s.Restart > 0 ? s.Restart : 1);
 				fcg->ResidualRecomputation = 20;
 				fcg->Precond = SolverPreconditioner(Multigrid.get());
 				KrylovSolver = std::move(fcg);
 			}
 			else if (Krylov == fhhos4::Krylov::GCR)
 			{
-				auto gcr = make_unique<GeneralizedConjugateResidual>();
+				auto gcr = s.Restart > 0 ? make_unique<GeneralizedConjugateResidual>(s.Restart) : make_unique<GeneralizedConjugateResidual>();
 				gcr->ResidualReplacement = true;
 				gcr->Precond = SolverPreconditioner(Multigrid.get());
 				KrylovSolver = std::move(gcr);

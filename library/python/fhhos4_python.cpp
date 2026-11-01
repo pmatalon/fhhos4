@@ -414,6 +414,7 @@ NB_MODULE(fhhos4, m)
 		.def_rw("SingularMatrix", &fhhos4::Solver::SingularMatrix)
 		// Solver
 		.def_rw("Krylov", &fhhos4::Solver::Krylov)
+		.def_rw("Restart", &fhhos4::Solver::Restart)
 		.def_rw("Tolerance", &fhhos4::Solver::Tolerance)
 		.def_rw("MaxIterations", &fhhos4::Solver::MaxIterations)
 		// Multigrid

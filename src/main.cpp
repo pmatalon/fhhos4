@@ -298,7 +298,8 @@ void print_usage() {
 	cout << "      Ratio lambdaMax/lambdaMin of the interval of the Chebyshev smoothers of the 1st kind (cheb, bcheb). Default: 10." << endl;
 	cout << endl;
 	cout << "-restart NUM" << endl;
-	cout << "      Iteration period to restart the algorithm (so far, used in bihar-cg only). Use 0 to disable." << endl;
+	cout << "      Iteration period to restart the algorithm (bihar-cg), or the library's Restart (-s libuamg: the directions stored" << endl;
+	cout << "      by FCG and GCR). Use 0 to disable (bihar-cg), or for the library's default." << endl;
 	cout << endl;
 	cout << "-iter-l2" << endl;
 	cout << "      Computes the L2-error at each iteration of the solver (when the solution is known)." << endl;

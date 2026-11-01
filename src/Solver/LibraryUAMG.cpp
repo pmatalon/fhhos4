@@ -27,6 +27,8 @@ public:
 			_solver.Krylov = *krylov == KrylovMethod::GCR ? fhhos4::Krylov::GCR : fhhos4::Krylov::FCG;
 		_solver.Tolerance = args.Solver.Tolerance;
 		_solver.MaxIterations = args.Solver.MaxIterations;
+		if (args.Solver.Restart > 0)
+			_solver.Restart = args.Solver.Restart;
 		const MultigridArguments& mg = args.Solver.MG;
 		_solver.Cycle = LibraryParameters::LibraryCycle(mg.Cycle);
 		_solver.PCoarsening = LibraryParameters::LibraryPCoarsening(mg.P_CS);

@@ -172,9 +172,9 @@ namespace fhhos4
 	enum class Krylov
 	{
 		Default,  // FCG for a symmetric matrix (SetupSym...()), GCR otherwise (SetupNonSym...())
-		FCG,      // flexible conjugate gradient (fhhos4 -s fcguamg), for a symmetric positive definite matrix
-		GCR,      // GCR(10), generalized conjugate residual restarted every 10 iterations, Notay's economical version
-		          // (fhhos4 -s gcruamg). Minimizes the residual norm: for any matrix
+		FCG,      // flexible conjugate gradient, FCG(Restart) (fhhos4 -s fcguamg), for a symmetric positive definite matrix
+		GCR,      // GCR(Restart), generalized conjugate residual restarted every Restart iterations, Notay's economical
+		          // version (fhhos4 -s gcruamg). Minimizes the residual norm: for any matrix
 		None      // the cycles of the AMG alone, as a stationary iterative method (fhhos4 -s uamg): slower at k >= 1
 	};
 
@@ -298,6 +298,11 @@ namespace fhhos4
 
 		// The Krylov method preconditioned by one cycle of the AMG. Default: FCG for a symmetric matrix, GCR otherwise.
 		fhhos4::Krylov Krylov = fhhos4::Krylov::Default;
+		// The number of search directions the Krylov method stores (>= 1), two vectors of the size of the face DoFs each:
+		// GCR restarts every Restart iterations; FCG A-orthogonalizes each new direction against the last Restart ones
+		// (truncated). -1 (default): 1 for FCG, 10 for GCR. Ignored with Krylov::None. Fewer directions take less memory,
+		// but GCR with a small Restart may need more iterations, or stagnate (GCR(1) is the minimal residual method).
+		int Restart = -1;
 		double Tolerance = 1e-8; // stopping criterion of Solve(): |b - A x| / |b| < Tolerance
 		int MaxIterations = 200; // Solve() stops after MaxIterations iterations, converged or not
 
