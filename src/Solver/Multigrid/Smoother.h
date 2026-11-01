@@ -56,19 +56,20 @@ public:
 			_solver->SetupSinglePrecision(A);
 	}
 
-	// The matrix stored by blocks (block CSR), in double or in single precision (see SupportsBlockCSR())
+	// The matrix stored by blocks (block CSR), in double or in single precision (see SupportsBlockCSR()); on several
+	// processes, distributed: the distributed matrix whose block Diag A stores (null on one process)
 	template <typename T>
-	void Setup(const BlockSparseMatrix<T>& A)
+	void Setup(const BlockSparseMatrix<T>& A, const DistributedMatrixOf<T>* distributed)
 	{
 		if (_solver->MaxIterations > 0)
-			_solver->SetupBlockCSR(A);
+			_solver->SetupBlockCSR(A, distributed);
 	}
 
 	template <typename T>
-	void Setup(const BlockSparseMatrix<T>& A, const Smoother& setUpForA)
+	void Setup(const BlockSparseMatrix<T>& A, const DistributedMatrixOf<T>* distributed, const Smoother& setUpForA)
 	{
-		if (_solver->MaxIterations > 0 && !(setUpForA._solver->MaxIterations > 0 && _solver->SetupBlockCSRFrom(A, *setUpForA._solver)))
-			_solver->SetupBlockCSR(A);
+		if (_solver->MaxIterations > 0 && !(setUpForA._solver->MaxIterations > 0 && _solver->SetupBlockCSRFrom(A, distributed, *setUpForA._solver)))
+			_solver->SetupBlockCSR(A, distributed);
 	}
 
 	// On several processes

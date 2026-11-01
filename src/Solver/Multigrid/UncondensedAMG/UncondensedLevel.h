@@ -1458,9 +1458,11 @@ public:
 		this->OperatorMatrix = &_extractedOperator.Diag;
 		if constexpr (std::is_same_v<T, float>)
 		{
-			_singleExtractedOperator = _extractedOperator.Cast<float>();
+			// Diag in block CSR if UsesBlockCSR() (OnStartSetup()), in CSR otherwise
+			_singleExtractedOperator = _extractedOperator.Cast<float>(!UsesBlockCSR());
 			this->SingleDistributedOperator = &_singleExtractedOperator;
-			this->SingleOperatorMatrix = &_singleExtractedOperator.Diag;
+			if (!UsesBlockCSR())
+				this->SingleOperatorMatrix = &_singleExtractedOperator.Diag;
 		}
 		if (UsesCellBlocks())
 			_extractedA_T_T = ExtractCoarseMatrix(*fine.A_T_T, nElems, nElems, fcbs, fcbs, _cellBlockSize, _cellBlockSize);
@@ -1792,7 +1794,7 @@ public:
 		SetupDownwindOrder();
 
 		// The operator of the cycle in block CSR, from the operator in double (that of the setup), or from the one in
-		// single precision on the h-levels in single precision (which have no other)
+		// single precision on the h-levels in single precision (which have no other); on several processes, their Diag
 		if (UsesBlockCSR() && !this->IsCoarsestLevel())
 		{
 			if (this->OperatorMatrix)
@@ -1806,7 +1808,7 @@ public:
 	// The operator of the cycle of this level in block CSR (its faces have several DoFs)
 	bool UsesBlockCSR() const
 	{
-		return BlockCSRStorage && _faceBlockSize > 1 && !this->IsDistributed();
+		return BlockCSRStorage && _faceBlockSize > 1;
 	}
 
 	// Non-symmetric matrix: the downwind order of the faces, followed by all the sweeps of the smoothers (pre- and

@@ -120,8 +120,8 @@ ADR-0010. `Solver::MixedPrecision` (library default true), `Multigrid::MixedPrec
 - Out of the cycle, in double: `A` (A x for the outer Krylov method: a parallel full product, FCG's own being
   sequential), the residuals and x: each cycle corrects the residual of the current x (iterative refinement:
   `Krylov::None`, non-zero initial guesses).
-- Supported (`UncondensedAMG::MixedPrecisionApplies()`): a symmetric matrix (on several processes too, in CSR:
-  `docs/mpi.md`), the flat passes with the chained prolongations and the Galerkin operators, no option needing `A_F_F`
+- Supported (`UncondensedAMG::MixedPrecisionApplies()`): a symmetric matrix (on several processes too: `docs/mpi.md`),
+  the flat passes with the chained prolongations and the Galerkin operators, no option needing `A_F_F`
   (p-levels after h-levels), the Chebyshev smoothers, no zero-mean/compatibility conditions nor exports; otherwise the
   levels are in double (the reason logged).
 
@@ -133,7 +133,7 @@ program `-uamg-bcsr`.
   column-major, one column index per block (`Level::BlockOperator`/`SingleBlockOperator`, built by
   `UncondensedLevelOf::OnStartSetup()` from the operator in double; in mixed precision instead of the CSR copy in float,
   in double a copy). Used by the Chebyshev smoothers (`BlockChebyshev::PassBlocks()`, Lanczos) and
-  `Level::ResidualOf()/Apply()`.
+  `Level::ResidualOf()/Apply()`. On several processes, `Diag` (`Offd`, whose columns are ghosts, stays in CSR).
 - Block sizes per block row (`BlockStart`: variable degrees, a future need), all the same today; kernels templated on
   the block size, instances for 2, 3, 4, 5, 6, 9, 10, 15, 16 (`DispatchBlockSize()`, once per pass) and a run-time-size
   one (any, variable).

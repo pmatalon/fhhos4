@@ -167,6 +167,7 @@ public:
 	void Setup(const DistributedMatrix& A) override
 	{
 		SetDistributedMatrix(A);
+		_blockMatrix = nullptr;
 		SetupBlocks(A.Diag);
 	}
 
@@ -195,23 +196,25 @@ public:
 	}
 
 	// The matrix stored by blocks (block CSR, the blocks of the block size of the smoother: of size > 1), in double or
-	// in single precision (one process): the same iterations, faster passes (PassBlocks())
+	// in single precision; on several processes, the block Diag of distributed: the same iterations, faster passes
+	// (PassBlocks())
 	bool SupportsBlockCSR() const override
 	{
-		return !this->Distributed;
+		return true;
 	}
 
-	void SetupBlockCSR(const BlockSparseMatrix<double>& A) override
+	void SetupBlockCSR(const BlockSparseMatrix<double>& A, const DistributedMatrix* distributed) override
 	{
 		this->Matrix = nullptr;
+		this->Distributed = distributed;
 		_blockMatrix = &A;
 		SetupBlocks(A);
 	}
 
-	void SetupBlockCSR(const BlockSparseMatrix<float>& A) override
+	void SetupBlockCSR(const BlockSparseMatrix<float>& A, const DistributedMatrixOf<float>* distributed) override
 	{
 		_singleMatrix = nullptr;
-		_singleDistributed = nullptr;
+		_singleDistributed = distributed;
 		_singleBlockMatrix = &A;
 		SetupBlocks(A);
 	}
@@ -307,24 +310,25 @@ public:
 		return true;
 	}
 
-	bool SetupBlockCSRFrom(const BlockSparseMatrix<double>& A, const IterativeSolver& other) override
+	bool SetupBlockCSRFrom(const BlockSparseMatrix<double>& A, const DistributedMatrix* distributed, const IterativeSolver& other) override
 	{
 		const BlockChebyshev* o = dynamic_cast<const BlockChebyshev*>(&other);
-		if (!o || o->_blockMatrix != &A || o->_blockSize != _blockSize || this->ComputeExactSolution)
+		if (!o || o->_blockMatrix != &A || o->Distributed != distributed || o->_blockSize != _blockSize || this->ComputeExactSolution)
 			return false;
 		this->Matrix = nullptr;
+		this->Distributed = distributed;
 		_blockMatrix = &A;
 		CopySetup(*o);
 		return true;
 	}
 
-	bool SetupBlockCSRFrom(const BlockSparseMatrix<float>& A, const IterativeSolver& other) override
+	bool SetupBlockCSRFrom(const BlockSparseMatrix<float>& A, const DistributedMatrixOf<float>* distributed, const IterativeSolver& other) override
 	{
 		const BlockChebyshev* o = dynamic_cast<const BlockChebyshev*>(&other);
-		if (!o || o->_singleBlockMatrix != &A || o->_blockSize != _blockSize || this->ComputeExactSolution)
+		if (!o || o->_singleBlockMatrix != &A || o->_singleDistributed != distributed || o->_blockSize != _blockSize || this->ComputeExactSolution)
 			return false;
 		_singleMatrix = nullptr;
-		_singleDistributed = nullptr;
+		_singleDistributed = distributed;
 		_singleBlockMatrix = &A;
 		CopySetup(*o);
 		return true;
@@ -481,24 +485,11 @@ private:
 	//   x_I = dIn_I (xEquals0) or x_I += dIn_I   if x.
 	// rIn may be r (in place). v must be neither r nor dOut nor x.
 	// On several processes, A v is Diag v + Offd vGhosts, with the values of v of the ghosts of the column map (halo
-	// exchange).
+	// exchange), each row summed in the order of its columns, Diag then Offd.
 	// In precision T: the matrix and the vectors in T, the sums in double (in single precision: rounded when stored).
 	template <typename T>
 	void Pass(const T* v, const T* rIn, T* r, const T* dIn, T* dOut, double a, double c, T* x, bool xEquals0)
 	{
-		if (const BlockSparseMatrix<T>* blocks = BlockMatrixOf<T>())
-		{
-			DispatchBlockSize(blocks->BlockSize, [&](auto size)
-			{
-				PassBlocks<T, decltype(size)::value>(*blocks, v, rIn, r, dIn, dOut, a, c, x, xEquals0);
-			});
-			return;
-		}
-		const SparseMatrixOf<T>& A = MatrixOf<T>();
-		const SparseMatrixIndex* outer = A.outerIndexPtr();
-		const SparseMatrixIndex* col = A.innerIndexPtr();
-		const T* val = A.valuePtr();
-		BigNumber nb = A.rows() / _blockSize;
 		// Off-process columns (none on one process)
 		VectorOf<T> vGhosts;
 		const SparseMatrixIndex* offdOuter = nullptr;
@@ -517,6 +508,20 @@ private:
 			}
 		}
 		const T* vg = vGhosts.data();
+
+		if (const BlockSparseMatrix<T>* blocks = BlockMatrixOf<T>())
+		{
+			DispatchBlockSize(blocks->BlockSize, [&](auto size)
+			{
+				PassBlocks<T, decltype(size)::value>(*blocks, offdOuter, offdCol, offdVal, vg, v, rIn, r, dIn, dOut, a, c, x, xEquals0);
+			});
+			return;
+		}
+		const SparseMatrixOf<T>& A = MatrixOf<T>();
+		const SparseMatrixIndex* outer = A.outerIndexPtr();
+		const SparseMatrixIndex* col = A.innerIndexPtr();
+		const T* val = A.valuePtr();
+		BigNumber nb = A.rows() / _blockSize;
 
 		if (_blockSize == 1)
 		{
@@ -585,9 +590,10 @@ private:
 	}
 
 	// Pass() on the matrix stored by blocks: the same operations by block rows, the same results; B the block size if
-	// it is known at compile time (DispatchBlockSize()), 0 otherwise
+	// it is known at compile time (DispatchBlockSize()), 0 otherwise. On several processes, A is Diag, and offdOuter,
+	// offdCol, offdVal the CSR arrays of Offd (null if it is empty), vg the values of v of the ghosts.
 	template <typename T, int B>
-	void PassBlocks(const BlockSparseMatrix<T>& A, const T* v, const T* rIn, T* r, const T* dIn, T* dOut, double a, double c, T* x, bool xEquals0)
+	void PassBlocks(const BlockSparseMatrix<T>& A, const SparseMatrixIndex* offdOuter, const SparseMatrixIndex* offdCol, const T* offdVal, const T* vg, const T* v, const T* rIn, T* r, const T* dIn, T* dOut, double a, double c, T* x, bool xEquals0)
 	{
 		const int bs = B > 0 ? B : _blockSize;
 		BigNumber nb = A.NBlocks();
@@ -602,6 +608,10 @@ private:
 				if (v)
 				{
 					A.template RowResidual<B>(I, v, rIn, acc);
+					if (offdOuter)
+						for (int k = 0; k < bs; k++)
+							for (SparseMatrixIndex p = offdOuter[i0 + k]; p < offdOuter[i0 + k + 1]; p++)
+								acc[k] -= (double)offdVal[p] * vg[offdCol[p]];
 					for (int k = 0; k < bs; k++)
 					{
 						r[i0 + k] = (T)acc[k];
@@ -693,10 +703,10 @@ private:
 		vector<double> alpha, beta;
 		for (int j = 0; j < EigenvalueEstimateIterations; j++)
 		{
-			if (const BlockSparseMatrix<T>* blocks = BlockMatrixOf<T>())
+			if (distributed)
+				Ap = distributed->Multiply(p, BlockMatrixOf<T>());
+			else if (const BlockSparseMatrix<T>* blocks = BlockMatrixOf<T>())
 				blocks->Multiply(p.data(), Ap.data());
-			else if (distributed)
-				Ap = *distributed * p;
 			else
 				Ap.noalias() = MatrixOf<T>() * p;
 			double pAp = Parallel::Dot(p, Ap);

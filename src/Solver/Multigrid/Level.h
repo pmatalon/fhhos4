@@ -22,7 +22,8 @@ public:
 	const DistributedMatrixOf<float>* SingleDistributedOperator = nullptr;
 	// The operator of the cycle stored by blocks (block CSR, BlockSparseMatrix), in double or in single precision: the
 	// smoothers and the products of the cycle in that precision use it instead of the CSR matrix, which may then be
-	// null (single precision). U-AMG: the levels whose faces have several DoFs (UncondensedLevel::BlockCSRStorage).
+	// null (single precision). On several processes, the block Diag of the distributed operator (whose Diag may then be
+	// empty: single precision). U-AMG: the levels whose faces have several DoFs (UncondensedLevel::BlockCSRStorage).
 	// Null otherwise.
 	const BlockSparseMatrix<double>* BlockOperator = nullptr;
 	const BlockSparseMatrix<float>* SingleBlockOperator = nullptr;
@@ -133,7 +134,7 @@ public:
 	Vector ResidualOf(const Vector& b, const Vector& x) const
 	{
 		if (this->DistributedOperator)
-			return b - *this->DistributedOperator * x;
+			return b - this->DistributedOperator->Multiply(x, this->BlockOperator);
 		if (this->BlockOperator)
 			return b - *this->BlockOperator * x;
 		return b - *this->OperatorMatrix * x;
@@ -142,7 +143,7 @@ public:
 	Vector Apply(const Vector& x) const
 	{
 		if (this->DistributedOperator)
-			return *this->DistributedOperator * x;
+			return this->DistributedOperator->Multiply(x, this->BlockOperator);
 		if (this->BlockOperator)
 			return *this->BlockOperator * x;
 		return *this->OperatorMatrix * x;
@@ -152,7 +153,7 @@ public:
 	FloatVector ResidualOf(const FloatVector& b, const FloatVector& x) const
 	{
 		if (this->SingleDistributedOperator)
-			return b - *this->SingleDistributedOperator * x;
+			return b - this->SingleDistributedOperator->Multiply(x, this->SingleBlockOperator);
 		if (this->SingleBlockOperator)
 			return b - *this->SingleBlockOperator * x;
 		return b - *this->SingleOperatorMatrix * x;
@@ -161,7 +162,7 @@ public:
 	FloatVector Apply(const FloatVector& x) const
 	{
 		if (this->SingleDistributedOperator)
-			return *this->SingleDistributedOperator * x;
+			return this->SingleDistributedOperator->Multiply(x, this->SingleBlockOperator);
 		if (this->SingleBlockOperator)
 			return *this->SingleBlockOperator * x;
 		return *this->SingleOperatorMatrix * x;
@@ -171,10 +172,11 @@ public:
 	template <typename T>
 	BigNumber LocalOperatorNonZeros()
 	{
-		if (const DistributedMatrixOf<T>* distributed = this->template DistributedOperatorOf<T>())
-			return distributed->LocalNonZeros();
+		const DistributedMatrixOf<T>* distributed = this->template DistributedOperatorOf<T>();
 		if (const BlockSparseMatrix<T>* blocks = this->template BlockOperatorOf<T>())
-			return blocks->NonZeros();
+			return blocks->NonZeros() + (distributed ? distributed->Offd.nonZeros() : 0);
+		if (distributed)
+			return distributed->LocalNonZeros();
 		return this->template OperatorOf<T>()->nonZeros();
 	}
 
@@ -194,18 +196,20 @@ public:
 
 	string OperatorInfo() const
 	{
-		if (this->IsDistributed())
-		{
-			auto info = [](const auto& A) { return "size(A)=" + to_string(A.GlobalRows()) + "x" + to_string(A.GlobalCols()) + ", \tnnz(A)=" + to_string(A.GlobalNonZeros()) + " on " + to_string(A.Comm().Size()) + " processes"; };
-			if (!this->DistributedOperator)
-				return info(*this->SingleDistributedOperator) + " (single precision)";
-			return info(*this->DistributedOperator) + (this->SingleDistributedOperator ? " (and in single precision)" : "");
-		}
 		string blocks;
 		if (this->SingleBlockOperator)
 			blocks = "in block CSR (blocks of " + to_string(this->SingleBlockOperator->BlockSize) + ")";
 		else if (this->BlockOperator)
 			blocks = "in block CSR (blocks of " + to_string(this->BlockOperator->BlockSize) + ")";
+		string single = this->InSinglePrecision() ? "in single precision" : "";
+		string also = single.empty() ? blocks : (blocks.empty() ? single : single + " " + blocks);
+		if (this->IsDistributed())
+		{
+			auto info = [](const auto& A) { return "size(A)=" + to_string(A.GlobalRows()) + "x" + to_string(A.GlobalCols()) + ", \tnnz(A)=" + to_string(A.GlobalNonZeros()) + " on " + to_string(A.Comm().Size()) + " processes"; };
+			if (!this->DistributedOperator) // an h-level in single precision: Diag in CSR
+				return info(*this->SingleDistributedOperator) + " (single precision" + (blocks.empty() ? "" : ", " + blocks) + ")";
+			return info(*this->DistributedOperator) + (also.empty() ? "" : " (and " + also + ")");
+		}
 		if (!this->OperatorMatrix && !this->SingleOperatorMatrix)
 		{
 			const BlockSparseMatrix<float>& A = *this->SingleBlockOperator;
@@ -213,8 +217,6 @@ public:
 		}
 		if (!this->OperatorMatrix)
 			return Utils::MatrixInfo(*this->SingleOperatorMatrix, "A") + " (single precision" + (blocks.empty() ? "" : ", " + blocks) + ")";
-		string single = this->SingleOperatorMatrix || this->SingleBlockOperator ? "in single precision" : "";
-		string also = single.empty() ? blocks : (blocks.empty() ? single : single + " " + blocks);
 		return Utils::MatrixInfo(*this->OperatorMatrix, "A") + (also.empty() ? "" : " (and " + also + ")");
 	}
 
@@ -267,16 +269,17 @@ public:
 			Utils::Log() << RestrictionInfo() << endl;
 
 			Utils::Log() << "\t\tPreSmoothing        : "; Utils::Log().flush();
-			if (this->SingleDistributedOperator)
+			// In single precision first, by blocks first (Diag on several processes)
+			if (this->SingleBlockOperator)
+				PreSmoother->Setup(*this->SingleBlockOperator, this->SingleDistributedOperator);
+			else if (this->SingleDistributedOperator)
 				PreSmoother->Setup(*this->SingleDistributedOperator);
-			else if (this->DistributedOperator)
-				PreSmoother->Setup(*this->DistributedOperator);
-			else if (this->SingleBlockOperator)
-				PreSmoother->Setup(*this->SingleBlockOperator);
 			else if (this->SingleOperatorMatrix)
 				PreSmoother->Setup(*this->SingleOperatorMatrix);
 			else if (this->BlockOperator)
-				PreSmoother->Setup(*this->BlockOperator);
+				PreSmoother->Setup(*this->BlockOperator, this->DistributedOperator);
+			else if (this->DistributedOperator)
+				PreSmoother->Setup(*this->DistributedOperator);
 			else
 				PreSmoother->Setup(*this->OperatorMatrix);
 			if (PreSmoother->Iterations() == 0)
@@ -285,16 +288,16 @@ public:
 				Utils::Log() << PreSmoother->Iterations() << " iteration" << (PreSmoother->Iterations() > 1 ? "s" : "") << " of " << (*PreSmoother) << endl;
 
 			Utils::Log() << "\t\tPostSmoothing       : "; Utils::Log().flush();
-			if (this->SingleDistributedOperator)
+			if (this->SingleBlockOperator)
+				PostSmoother->Setup(*this->SingleBlockOperator, this->SingleDistributedOperator, *PreSmoother);
+			else if (this->SingleDistributedOperator)
 				PostSmoother->Setup(*this->SingleDistributedOperator, *PreSmoother);
-			else if (this->DistributedOperator)
-				PostSmoother->Setup(*this->DistributedOperator, *PreSmoother);
-			else if (this->SingleBlockOperator)
-				PostSmoother->Setup(*this->SingleBlockOperator, *PreSmoother);
 			else if (this->SingleOperatorMatrix)
 				PostSmoother->Setup(*this->SingleOperatorMatrix, *PreSmoother);
 			else if (this->BlockOperator)
-				PostSmoother->Setup(*this->BlockOperator, *PreSmoother);
+				PostSmoother->Setup(*this->BlockOperator, this->DistributedOperator, *PreSmoother);
+			else if (this->DistributedOperator)
+				PostSmoother->Setup(*this->DistributedOperator, *PreSmoother);
 			else
 				PostSmoother->Setup(*this->OperatorMatrix, *PreSmoother); // reuses the setup of the pre-smoother if they are of the same kind
 			if (PostSmoother->Iterations() == 0)

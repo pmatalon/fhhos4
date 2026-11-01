@@ -229,11 +229,8 @@ public:
 			Utils::FatalError("UncondensedAMG: on several processes, the options that need the block A_F_F are not available.");
 		if (this->HP_CS != HP_CoarsStgy::H_only && this->HP_CS != HP_CoarsStgy::P_then_H)
 			Utils::FatalError("UncondensedAMG: on several processes, only the p-coarsening then the h-coarsening (or the h-coarsening alone) are available.");
-		if (BlockCSRStorage)
-			Utils::Log() << "\tOperators in CSR: the block CSR storage does not support several processes" << endl;
-		_blockCSR = false;
 
-		// Mixed precision: as on one process, in CSR
+		// Mixed precision and block CSR (the block Diag of each process): as on one process
 		this->_mixedPrecision = this->MixedPrecision;
 		this->_fineLevel = NewFineLevel();
 		if (this->_mixedPrecision && !MixedPrecisionApplies(dynamic_cast<const UncondensedLevel&>(*this->_fineLevel)))
@@ -243,6 +240,8 @@ public:
 			this->_fineLevel = NewFineLevel();
 		}
 		UncondensedLevel* fine = dynamic_cast<UncondensedLevel*>(this->_fineLevel);
+		_blockCSR = this->_mixedPrecision || (BlockCSRStorage && BlockCSRApplies());
+		fine->BlockCSRStorage = _blockCSR;
 		fine->A_T_T = &A_T_T;
 		fine->A_T_F = &A_T_F;
 		fine->A_F_T = _symmetric ? nullptr : &A_F_T;
@@ -263,12 +262,14 @@ public:
 			this->CoarseningFactor = 3.8;
 		fine->CheckHarmonicExtension(this->H_CS, this->FaceCoarseningStgy);
 		// The levels in single precision: the copy of the operator of the finest level (A stays that of the setup, of the
-		// outer Krylov method and of the residuals)
+		// outer Krylov method and of the residuals), Diag in block CSR if its faces have several DoFs (as on one process)
 		if (this->_mixedPrecision)
 		{
-			_singleDistributedA = A.Cast<float>();
+			bool diagInCSR = !(_blockCSR && _faceBlockSize > 1);
+			_singleDistributedA = A.Cast<float>(diagInCSR);
 			fine->SingleDistributedOperator = &_singleDistributedA;
-			fine->SingleOperatorMatrix = &_singleDistributedA.Diag;
+			if (diagInCSR)
+				fine->SingleOperatorMatrix = &_singleDistributedA.Diag;
 		}
 		_singular = SingularMatrix;
 		_kernel = _singular ? SingularSolver::Kernel(faceInterpOfOne, _faceBlockSize, A.LocalRows(), VectorComponents) : vector<Vector>();
@@ -353,9 +354,9 @@ private:
 	}
 
 	// Mixed precision: the levels in single precision run the default options (UncondensedLevel::MixedPrecisionApplies(),
-	// the Galerkin operators, without the options that need A_F_F, e.g. p-levels after h-levels; a symmetric matrix; in
-	// CSR on several processes) and smoothers that have a single precision version (Chebyshev), without the zero-mean and
-	// compatibility conditions nor the exports of the multigrid. Otherwise the levels are in double (the reason printed).
+	// the Galerkin operators, without the options that need A_F_F, e.g. p-levels after h-levels; a symmetric matrix) and
+	// smoothers that have a single precision version (Chebyshev), without the zero-mean and compatibility conditions nor
+	// the exports of the multigrid. Otherwise the levels are in double (the reason printed).
 	bool MixedPrecisionApplies(const UncondensedLevel& fine) const
 	{
 		auto smootherSupports = [this](SmootherType type, int iterations)

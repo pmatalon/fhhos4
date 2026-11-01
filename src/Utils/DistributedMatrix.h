@@ -1,5 +1,6 @@
 #pragma once
 #include <memory>
+#include "BlockSparseMatrix.h"
 #include "IndexMap.h"
 #include "SparseMatrixOps.h"
 using namespace std;
@@ -8,7 +9,8 @@ using namespace std;
 // itself). Each process holds the rows of the entities it owns in RowMap (blocks of RowBlockSize rows per entity),
 // split into the columns of the entities it owns in ColMap (Diag) and those of its ghosts in ColMap (Offd, the columns
 // in the order of the ghosts, by blocks of ColBlockSize). For a square operator (RowMap and ColMap with the same
-// ownership), Diag is the square block of the process: the smoothers work on it.
+// ownership), Diag is the square block of the process: the smoothers work on it; it may be stored by blocks apart (block
+// CSR, U-AMG's Level::BlockOperator), Diag then empty (Cast()) and the products given the blocks (Multiply()).
 // In precision T: double (DistributedMatrix), or float (mixed precision: the matrices of the cycle of U-AMG, see
 // Multigrid::MixedPrecision), whose products are in float. The constructions are in double (they return a
 // DistributedMatrix), then Cast<float>(), but AssembleFromLocalRows() (stored in T).
@@ -42,16 +44,18 @@ public:
 	BigNumber LocalNonZeros() const { return Diag.nonZeros() + Offd.nonZeros(); }
 	BigNumber GlobalNonZeros() const { return Comm().Sum(LocalNonZeros()); }
 
-	// The matrix in precision U: Diag and Offd rounded, the maps shared (not the transposes: SetupTransposed())
+	// The matrix in precision U: Diag and Offd rounded, the maps shared (not the transposes: SetupTransposed()); withDiag
+	// false: Diag left empty (stored by blocks apart)
 	template <typename U>
-	DistributedMatrixOf<U> Cast() const
+	DistributedMatrixOf<U> Cast(bool withDiag = true) const
 	{
 		DistributedMatrixOf<U> M;
 		M.RowMap = RowMap;
 		M.ColMap = ColMap;
 		M.RowBlockSize = RowBlockSize;
 		M.ColBlockSize = ColBlockSize;
-		M.Diag = SparseMatrixOps::Cast<U>(Diag);
+		if (withDiag)
+			M.Diag = SparseMatrixOps::Cast<U>(Diag);
 		M.Offd = SparseMatrixOps::Cast<U>(Offd);
 		return M;
 	}
@@ -499,20 +503,24 @@ public:
 		return ghosts;
 	}
 
-	// y = A x (x: the owned values of the column entities). Collective on the halo.
-	void Multiply(const VectorOf<T>& x, VectorOf<T>& y) const
+	// A x (x: the owned values of the column entities), with Diag stored by blocks in diagBlocks if not null (Diag then
+	// not read). Collective on the halo.
+	VectorOf<T> Multiply(const VectorOf<T>& x, const BlockSparseMatrix<T>* diagBlocks) const
 	{
 		VectorOf<T> ghosts = GhostValues(x);
-		y.noalias() = Diag * x;
+		VectorOf<T> y;
+		if (diagBlocks)
+			y = *diagBlocks * x;
+		else
+			y.noalias() = Diag * x;
 		if (Offd.cols() > 0)
 			y.noalias() += Offd * ghosts;
+		return y;
 	}
 
 	VectorOf<T> operator*(const VectorOf<T>& x) const
 	{
-		VectorOf<T> y(Diag.rows());
-		Multiply(x, y);
-		return y;
+		return Multiply(x, nullptr);
 	}
 
 	// For MultiplyTransposed()

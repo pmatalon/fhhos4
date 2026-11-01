@@ -241,7 +241,7 @@ TEST(ChebyshevSmootherTest, BlockCSR)
 		bcsr->MaxIterations = 3;
 		bcsr->PrintIterationResults = false;
 		ASSERT_TRUE(bcsr->SupportsBlockCSR());
-		bcsr->SetupBlockCSR(blocks);
+		bcsr->SetupBlockCSR(blocks, nullptr);
 		EXPECT_NEAR(bcsr->LambdaMaxEstimate(), csr->LambdaMaxEstimate(), 1e-13 * csr->LambdaMaxEstimate()) << description;
 		Vector x[2] = { x0, x0 };
 		csr->Solve(b, x[0], false, true, true);
@@ -254,7 +254,7 @@ TEST(ChebyshevSmootherTest, BlockCSR)
 		FloatSparseMatrix singleA = SparseMatrixOps::Cast<float>(A);
 		BlockSparseMatrix<float> singleBlocks = BlockSparseMatrix<float>::FromCSR(A, blockSize);
 		csr->SetupSinglePrecision(singleA);
-		bcsr->SetupBlockCSR(singleBlocks);
+		bcsr->SetupBlockCSR(singleBlocks, nullptr);
 		FloatVector singleB = b.cast<float>(), y[2] = { x0.cast<float>(), x0.cast<float>() }, residual[2];
 		csr->SolveInSinglePrecision(singleB, y[0], false, &residual[0], nullptr);
 		bcsr->SolveInSinglePrecision(singleB, y[1], false, &residual[1], nullptr);

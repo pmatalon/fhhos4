@@ -65,10 +65,10 @@ SparseMatrix LocalColumns(const SparseMatrix& rows, const IndexMap& owners, cons
 // in reverse order of their global numbers (any order). The solution of the system on one process. Non-symmetric if
 // asymmetry != 0. singular: the pure Neumann system (SingularMatrix; the right-hand side incompatible: projected),
 // the solutions compared up to the kernel (the constants, of each component). components: the system on each of them
-// (the blocks ⊗ I_n, VectorComponents = n; the ghosts are the same faces and cells). mixedPrecision: MixedPrecision of
-// both solvers (the default: true). Returns the iterations on the processes; setupLog: the printouts of their setup
-// (Verbosity 2, on the root process) if not null.
-int ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double asymmetry = 0, bool singular = false, int components = 1, bool mixedPrecision = true, string* setupLog = nullptr)
+// (the blocks ⊗ I_n, VectorComponents = n; the ghosts are the same faces and cells). mixedPrecision, blockCSR:
+// MixedPrecision and BlockCSRStorage of both solvers (the defaults: true, false). Returns the iterations on the
+// processes; setupLog: the printouts of their setup (Verbosity 2, on the root process) if not null.
+int ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double asymmetry = 0, bool singular = false, int components = 1, bool mixedPrecision = true, string* setupLog = nullptr, bool blockCSR = false)
 {
 	int n = 60;
 	CartesianHybridSystem global(n, asymmetry, singular);
@@ -87,6 +87,7 @@ int ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double a
 		solver.SingularMatrix = singular;
 		solver.VectorComponents = c;
 		solver.MixedPrecision = mixedPrecision;
+		solver.BlockCSRStorage = blockCSR;
 		Vector cellOnes = Vector::Ones(global.A_TT.rows()), faceOnes = Vector::Ones(global.S.rows());
 		fhhos4::SparseMatrix A_TT = OnEachComponent(system.Global.A_TT, c), A_TF = OnEachComponent(system.Global.A_TF, c);
 		fhhos4::SparseMatrix A_FT = OnEachComponent(system.Global.A_FT, c), A_FF = OnEachComponent(system.Global.A_FF, c);
@@ -111,6 +112,7 @@ int ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double a
 	solver.SingularMatrix = singular;
 	solver.VectorComponents = c;
 	solver.MixedPrecision = mixedPrecision;
+	solver.BlockCSRStorage = blockCSR;
 	Vector cellOnes = Vector::Ones(cells.NOwned), faceOnes = Vector::Ones(faces.NOwned);
 	if (setupLog)
 	{
@@ -189,7 +191,7 @@ TEST(DistributedLibrary, SingularMatrix)
 	ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::HarmonicExtension, 0, true);
 }
 
-// Mixed precision (the default: the levels in single precision, in CSR on several processes) and in double: the same
+// Mixed precision (the default: the levels in single precision, in block CSR with 2 components) and in double: the same
 // iterations within 1, as on one process (UAMGMixedPrecisionProgram); the levels in single precision on the processes
 TEST(DistributedLibrary, MixedPrecision)
 {
@@ -203,8 +205,22 @@ TEST(DistributedLibrary, MixedPrecision)
 		{
 			EXPECT_EQ(setupLog.find("Levels in double precision"), string::npos) << setupLog;
 			EXPECT_NE(setupLog.find("single precision)"), string::npos) << setupLog;
+			if (components == 2)
+				EXPECT_NE(setupLog.find("single precision, in block CSR (blocks of 2))"), string::npos) << setupLog;
 		}
 	}
+}
+
+// The block CSR storage in double (BlockCSRStorage; 2 components: blocks of 2 on all the levels but the coarsest) and
+// CSR: the same iterations on 1-4 processes, the levels in block CSR on the processes
+TEST(DistributedLibrary, BlockCSR)
+{
+	string setupLog;
+	int blocks = ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::Reconstruction, 0, false, 2, false, &setupLog, true);
+	int csr = ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::Reconstruction, 0, false, 2, false);
+	EXPECT_EQ(blocks, csr);
+	if (World().IsRoot())
+		EXPECT_NE(setupLog.find("(and in block CSR (blocks of 2))"), string::npos) << setupLog;
 }
 
 // The inputs are checked on all the processes: an error on one of them is an error on all of them

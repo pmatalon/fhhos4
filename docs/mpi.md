@@ -48,11 +48,15 @@ program too: `-DENABLE_PROGRAM=ON`).
   faces and the columns of the cells of the process (what its cells read: couplings, `P^T A_F_T Q_T`), the downwind
   order of the faces of each process (`Diag`; Jacobi between the processes). Ghost faces may belong to no local cell
   (couplings of `A_FF`): `CoarseningPass::NOwnedFaces`. All global decisions (coarsening ratio, errors) reduced.
-  Mixed precision as on one process, in CSR: `DistributedMatrixOf<float>` (`Cast<float>()`; the constructions in double
+  Mixed precision as on one process: `DistributedMatrixOf<float>` (`Cast<float>()`; the constructions in double
   but `AssembleFromLocalRows<T>()`, its sums in double), `Level::SingleDistributedOperator`/`SingleDistributedP`; the
   finest level's float copy of the caller's matrix, the p-levels' operators in double until the end of the setup, the
   h-levels' assembled in float (`LocalOp->AssembledDistributed` designates it: their local matrices come from the
   finer level's last pass), the coarsest cast back to double for MUMPS (`Multigrid::_coarseDistributedOperator`).
+  Block CSR (`docs/uamg.md`) as on one process, for `Diag`: `Level::BlockOperator`/`SingleBlockOperator` next to the
+  distributed operator (its `Offd`, maps), the products `Multiply(x, diagBlocks)`, `BlockChebyshev::PassBlocks()` with
+  the rows of `Offd` (the sums in the order of CSR: the same results); the float copies of the finest and p-levels'
+  operators without `Diag` (`Cast<float>(false)`), the h-levels' keep theirs (assembled).
 - Library: `Solver::Comm` (not set: one process, no MPI call; `MUMPS` then needs MPI initialized; forgotten on several
   processes: `ForgottenComm()` ends the errors of distributed inputs, ghosts or `A_FF` with more columns than rows), `SetupSym(..., GhostNumbers faceGhosts)` (local columns: own faces then
   ghosts, one numbering for `A_TF` and `A_FF`, `A_FF` in full), `SetupNonSym(..., faceGhosts, cellGhosts)`

@@ -152,22 +152,24 @@ public:
 	}
 
 	// The matrix stored by blocks (block CSR, see BlockSparseMatrix), in double or in single precision (as
-	// SetupSinglePrecision()): the solvers that support it (the smoothers of U-AMG), instead of Setup()
+	// SetupSinglePrecision()): the solvers that support it (the smoothers of U-AMG), instead of Setup(). On several
+	// processes, distributed: the matrix distributed by rows whose block Diag A stores (its Offd and ghosts; its Diag is
+	// not read); null on one process.
 	virtual bool SupportsBlockCSR() const { return false; }
-	virtual void SetupBlockCSR(const BlockSparseMatrix<double>& A)
+	virtual void SetupBlockCSR(const BlockSparseMatrix<double>& A, const DistributedMatrix* distributed)
 	{
 		Utils::FatalError("This solver does not support the block CSR storage.");
 	}
-	virtual void SetupBlockCSR(const BlockSparseMatrix<float>& A)
+	virtual void SetupBlockCSR(const BlockSparseMatrix<float>& A, const DistributedMatrixOf<float>* distributed)
 	{
 		Utils::FatalError("This solver does not support the block CSR storage.");
 	}
 	// As SetupFrom()
-	virtual bool SetupBlockCSRFrom(const BlockSparseMatrix<double>& A, const IterativeSolver& other)
+	virtual bool SetupBlockCSRFrom(const BlockSparseMatrix<double>& A, const DistributedMatrix* distributed, const IterativeSolver& other)
 	{
 		return false;
 	}
-	virtual bool SetupBlockCSRFrom(const BlockSparseMatrix<float>& A, const IterativeSolver& other)
+	virtual bool SetupBlockCSRFrom(const BlockSparseMatrix<float>& A, const DistributedMatrixOf<float>* distributed, const IterativeSolver& other)
 	{
 		return false;
 	}
