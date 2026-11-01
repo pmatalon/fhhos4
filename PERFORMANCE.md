@@ -1333,6 +1333,35 @@ the same iterations and L2 errors, the same assembly times (k=1 n=32 29.0 / 30.4
   2026-10-28: 3376 -> 2485 MB (-26%). By extrapolation, k=1 under 5 GB on one process up to n ~ 40, in the ~8 GB
   available n ~ 46; k=1 n=48 would take ~7.7 GB.
 
+2026-11-01, the block CSR storage and the mixed precision on several processes (`.scratch/mpi/issues/10`: `Diag` in
+block CSR, `Offd` in CSR; `b05b0ac5`): NGSolve's HDG systems (`~/code/fhhos4-ngsolve/mpi/ngsolve_mpi`, its cells by
+recursive coordinate bisection; the library's defaults but `MIXED`/`BCSR`, tolerance 1e-12), double CSR / double block
+CSR / mixed precision (block CSR) interleaved, bound to the cores, `BLIS_NUM_THREADS=1`, plugged in, best of 2; setup /
+solve (s), solve per iteration (ms) and its ratio to double CSR (of the time: below 1, faster;
+`build-mpi/bench_bcsr_mpi/`):
+
+| Case, processes x threads | Double CSR | Double block CSR | Mixed precision |
+|---|---|---|---|
+| Cube-tet k=2 11.4k cells (blocks of 6, 88 it), 1 x 8 | 0.13 / 1.29, 14.7 | 0.18 / 0.97, 11.0 (x0.75) | 0.12 / 0.91, 10.3 (x0.70) |
+| 2 x 4 | 0.21 / 1.36, 15.4 | 0.21 / 1.15, 13.0 (x0.84) | 0.21 / 1.08, 12.3 (x0.79) |
+| 4 x 2 | 0.18 / 1.50, 17.0 | 0.18 / 1.19, 13.5 (x0.79) | 0.18 / 1.11, 12.6 (x0.74) |
+| 4 x 1 | 0.17 / 1.45, 16.5 | 0.18 / 1.15, 13.0 (x0.79) | 0.15 / 1.07, 12.2 (x0.74) |
+| Cube-tet k=1 (blocks of 3, 55 it), 1 x 8 | 0.05 / 0.30, 5.4 | 0.06 / 0.28, 5.1 (x0.96) | 0.05 / 0.24, 4.3 (x0.80) |
+| 2 x 4 | 0.08 / 0.53, 9.7 | 0.08 / 0.41, 7.5 (x0.77) | 0.08 / 0.44, 8.0 (x0.83) |
+| 4 x 2 | 0.07 / 0.51, 9.2 | 0.07 / 0.45, 8.2 (x0.89) | 0.07 / 0.45, 8.3 (x0.90) |
+| 4 x 1 | 0.06 / 0.45, 8.3 | 0.06 / 0.41, 7.4 (x0.90) | 0.05 / 0.40, 7.3 (x0.89) |
+
+- The same iterations and accuracy in all the modes and on any number of processes (|x - x_NGSolve| / |x_NGSolve| =
+  4.2-4.4e-13 at k=1, 8.5-8.7e-13 at k=2).
+- k=2, solve per iteration: mixed precision x0.74-0.79 on 2 and 4 processes, x0.70 on one; double block CSR
+  x0.79-0.84 (x0.75). A little less than on one process: `Offd`, the halo exchanges and MUMPS's coarsest solve don't
+  shrink. Setup: mixed precision within the noise, double block CSR +0.00-0.05 s (the copy).
+- k=1 (4-10 ms per iteration, noisier): x0.77-0.90 on several processes, the coarsest solve a larger part (on one
+  process, 1 x 8: 5.4 ms per iteration; on 2 x 4: 9.7).
+- Without `BLIS_NUM_THREADS=1`, the same runs with several threads per process (`results_blis_default_threads.txt`):
+  2 x 4 solve 16-17 s at k=2 (x12) and 19-21 s at k=1 (x38), 4 x 2 1.8-2.2 s at k=2 (x1.5) and 1.1-1.2 s at k=1
+  (x2.4), in all the modes (MUMPS's BLIS, see 2026-10-27 above).
+
 Next ideas:
 1. **The memory per process** (2026-10-28 above), by expected gain:
    - `A`, `Acons` and `Astab` of the cells: done (2026-10-29 above). What stays of the local matrices: `P` (1.25 KB per
