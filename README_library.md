@@ -232,6 +232,10 @@ fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F); // the vectors of the 
 - Available on several processes: the uncondensed system (`SetupSym()`, `SetupNonSym()`), with all the
   parameters; the Gauss-Seidel smoothers are Gauss-Seidel in each process (the hybrid ones: in each thread), Jacobi
   between the processes. Not yet: `CondensedMatrix()`.
+- **Threads**: with several threads per process, give MUMPS's BLAS one thread (e.g. `BLIS_NUM_THREADS=1` with
+  conda-forge's MUMPS, which uses BLIS; `OPENBLAS_NUM_THREADS=1`, `MKL_NUM_THREADS=1` for others): a threaded BLAS
+  (BLIS starts its threads at each call) makes the many small products of the coarsest solves much slower. MUMPS
+  itself runs on one thread (its matrix is small). The same for `CoarseSolver::MUMPS` on one process.
 - In Python: see [Python](#python).
 - The errors of the inputs are raised on all the processes.
 

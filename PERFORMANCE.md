@@ -1360,7 +1360,21 @@ solve (s), solve per iteration (ms) and its ratio to double CSR (of the time: be
   process, 1 x 8: 5.4 ms per iteration; on 2 x 4: 9.7).
 - Without `BLIS_NUM_THREADS=1`, the same runs with several threads per process (`results_blis_default_threads.txt`):
   2 x 4 solve 16-17 s at k=2 (x12) and 19-21 s at k=1 (x38), 4 x 2 1.8-2.2 s at k=2 (x1.5) and 1.1-1.2 s at k=1
-  (x2.4), in all the modes (MUMPS's BLIS, see 2026-10-27 above).
+  (x2.4), in all the modes. Why (k=1, 2 x 4, an `LD_PRELOAD` shim counting `pthread_create`, `dmumps_c` and MUMPS's
+  `dgemm_`/`dtrsm_`, `bench_bcsr_mpi/diag/`): 99% of the solve in MUMPS's solves, 124 of them for 55 iterations (the
+  K-cycle reaches the coarsest level ~2.3 times per iteration), 159 ms each instead of 1.6 ms. Each makes ~54 level-3
+  BLAS calls on small fronts, 5 us each on one thread; BLIS (pthreads) starts its threads at every call: alone
+  (`OMP_NUM_THREADS=1 BLIS_NUM_THREADS=4`) 0.19 ms per call, 12 ms per solve (x7). And MUMPS (OpenMP) makes 22-36% of
+  these calls inside its parallel regions, up to 3 at once, each starting 3 BLIS threads that wait actively at their
+  barriers on the 4 cores of the process: ~5 ms per call. `OMP_WAIT_POLICY=passive` doesn't help (145 ms per solve),
+  unbound processes do partly (51 ms). The rest of the iteration is unchanged: the ratio is larger where it is cheap
+  (k=1).
+- Then MUMPS on one OpenMP thread (`ICNTL(16) = 1`, `Solver/Direct/MUMPS.h`), against before, interleaved, best of 2
+  (`bench_bcsr_mpi/icntl16/`), solve (s), the same iterations and accuracy: with BLIS's default threads, 2 x 4 k=2
+  16.4 -> 3.16 (5.2x faster), k=1 20.6 -> 2.44 (8.4x); 4 x 2 k=2 1.84 -> 1.87, k=1 1.24 -> 1.31 (the nesting mattered
+  little on 2 threads). With `BLIS_NUM_THREADS=1`: 1.11 -> 1.10, 0.45 -> 0.44, 1.16 -> 1.16, 0.51 -> 0.45. What stays
+  with BLIS's threads (1.6-5.6x slower than with one) is its threads started at each call: `BLIS_NUM_THREADS=1` in
+  `README_library.md` and `README_program.md`.
 
 Next ideas:
 1. **The memory per process** (2026-10-28 above), by expected gain:

@@ -32,7 +32,8 @@ program too: `-DENABLE_PROGRAM=ON`).
   Chebyshev, block Jacobi, (block) Gauss-Seidel = Gauss-Seidel in the process, Jacobi between them (`SweepRhs()`: not
   a contraction in the energy norm when the couplings between the processes are strong, e.g. 3D k=2, where FCG
   stagnates; the default smoother is Chebyshev, ADR-0017),
-  Cholesky/LU by MUMPS (ADR-0021; `Solver/Direct/MUMPS.h`: each process gives its rows of the matrix and of the
+  Cholesky/LU by MUMPS (ADR-0021; `Solver/Direct/MUMPS.h`: on one OpenMP thread (`ICNTL(16)`: its BLAS calls from
+  several threads, each threaded by BLIS, oversubscribed the cores); each process gives its rows of the matrix and of the
   right-hand side; the solution, as MUMPS distributes it, goes to the owners of its rows by an `IndexMap` whose ghosts
   are the rows held for other processes, built at the first solve; `INFOG(1) = -9`, its estimate of its working space
   too small, e.g. MUMPS 5.7.3 on 3 processes: `ICNTL(14)` doubled and the factorization again, up to 4 times; not

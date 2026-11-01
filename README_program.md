@@ -135,8 +135,10 @@ mpiexec -n 4 ./bin/fhhos4 -geo cube -mesh tetra -n 16 -k 1 -s fcglibuamg
 
 - The threads of each process: by default, the CPUs of the processes that run on the same ones (those of a node,
   unless `mpiexec` binds them to distinct cores) divided among them, and in the solvers one per physical core divided
-  among them; `OMP_NUM_THREADS` or `-threads` set them (e.g. `OMP_NUM_THREADS=2 mpiexec -n 4 -bind-to core:2 ...` with
-  MPICH).
+  among them; `OMP_NUM_THREADS` or `-threads` set them (e.g. `OMP_NUM_THREADS=2 BLIS_NUM_THREADS=1 mpiexec -n 4
+  -bind-to core:2 ...` with MPICH). With several threads per process, set `BLIS_NUM_THREADS=1`: the BLAS of the conda
+  environment's MUMPS, BLIS, otherwise starts threads at each of the many small products of the coarsest solves, which
+  are then much slower.
 - The mesh is partitioned by GMSH (METIS) into one part per process, by the first process, which loads the whole mesh.
   The partition is kept in the cache directory, `<mesh>_<number of processes>parts`: the next runs on as many
   processes read it, and the first process doesn't load the mesh (a partition made for another number of processes is

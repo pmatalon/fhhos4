@@ -132,6 +132,9 @@ private:
 		Run("the initialization");
 		_initialized = true;
 		_id.icntl[0] = -1; _id.icntl[1] = -1; _id.icntl[2] = -1; _id.icntl[3] = 0; // silent
+		// ICNTL(16): MUMPS on one OpenMP thread. Its BLAS calls from several threads, each threaded again by the BLAS (e.g.
+		// BLIS, which starts its threads at each call), oversubscribed the cores: 100x slower solves (PERFORMANCE.md)
+		_id.icntl[15] = 1;
 		_id.icntl[17] = 3;  // ICNTL(18): the entries given by each process
 		_id.icntl[19] = 10; // ICNTL(20): the right-hand side given by each process
 		_id.icntl[20] = 1;  // ICNTL(21): the solution left distributed
