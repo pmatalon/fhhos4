@@ -141,7 +141,7 @@ def test_prolongations():
 
 
 def test_condensed_system():
-    # Solve(b) on the condensed matrix of the library, after the setups from the blocks
+    # Solve(b, x) on the condensed matrix of the library, after the setups from the blocks
     for asymmetry in (0.0, 0.3):
         system = HybridSystem(32, asymmetry)
         solver = ToySolver()
@@ -149,12 +149,9 @@ def test_condensed_system():
             solver.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
         else:
             solver.SetupNonSym(system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
-        x = solver.Solve(system.b)
-        assert RelativeError(x, spla.spsolve(system.A.tocsc(), system.b)) < 1e-8
-        # From an initial guess
-        y = np.zeros(system.b.size)
-        result = solver.Solve(system.b, y)
-        assert result.Converged and RelativeError(y, x) < 1e-8
+        x = np.zeros(system.b.size)
+        result = solver.Solve(system.b, x)
+        assert result.Converged and RelativeError(x, spla.spsolve(system.A.tocsc(), system.b)) < 1e-8
 
 
 def test_failed_setup_keeps_the_previous_one():

@@ -465,8 +465,6 @@ NB_MODULE(fhhos4, m)
 		// x: a NumPy vector of float64, written in place (the initial guess on input)
 		.def("Solve", [](PySolver& s, const ConstVector& b, Vector x) { return s.Solve(b, x); },
 			"b"_a.noconvert(), "x"_a.noconvert(), noGIL)
-		// Solves A x = b from x = 0, and returns x
-		.def("Solve", [](PySolver& s, const ConstVector& b) { return s.Solve(b); }, "b"_a.noconvert(), noGIL)
 
 		// A copy of the condensed matrix (fhhos4.CSRMatrix)
 		.def("CondensedMatrix", [](const PySolver& s) { return fhhos4::detail::ToCSR(s.CondensedView()); })

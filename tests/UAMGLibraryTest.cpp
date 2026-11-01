@@ -948,7 +948,8 @@ TEST(UAMGLibrary, CSRFormat)
 	HybridSystem system(16);
 	fhhos4::Solver uamg = ToySolver();
 	uamg.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
-	Eigen::VectorXd x = uamg.Solve(system.b);
+	Eigen::VectorXd x = Eigen::VectorXd::Zero(system.b.size());
+	uamg.Solve(system.b, x);
 
 	const HybridSystem::Matrix& A_TF = system.A_TF;
 	std::vector<int> rowPointers(A_TF.outerIndexPtr(), A_TF.outerIndexPtr() + A_TF.rows() + 1);
@@ -968,7 +969,9 @@ TEST(UAMGLibrary, CSRFormat)
 	{
 		EXPECT_THROW(setupWith(*p, *c), fhhos4::Error);
 		EXPECT_TRUE(uamg.IsSetUp());
-		EXPECT_LT((uamg.Solve(system.b) - x).norm(), 1e-12 * x.norm());
+		Eigen::VectorXd y = Eigen::VectorXd::Zero(system.b.size());
+		uamg.Solve(system.b, y);
+		EXPECT_LT((y - x).norm(), 1e-12 * x.norm());
 	}
 }
 
@@ -1128,7 +1131,8 @@ TEST(UAMGLibrary, MultigridAlone)
 	fhhos4::Solver uamg = ToySolver();
 	uamg.Krylov = fhhos4::Krylov::None;
 	uamg.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
-	Eigen::VectorXd x = uamg.Solve(system.b);
+	Eigen::VectorXd x = Eigen::VectorXd::Zero(system.b.size());
+	EXPECT_TRUE(uamg.Solve(system.b, x).Converged);
 	EXPECT_LT(RelativeError(system, x), 1e-8);
 }
 
@@ -1170,7 +1174,8 @@ TEST(UAMGLibrary, MixedPrecision)
 		fhhos4::Solver uamg = ToySolver(); // block Gauss-Seidel
 		uamg.MixedPrecision = mixed;
 		uamg.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
-		solutions[mixed] = uamg.Solve(system.b);
+		solutions[mixed] = Eigen::VectorXd::Zero(system.b.size());
+		uamg.Solve(system.b, solutions[mixed]);
 	}
 	EXPECT_EQ(solutions[1], solutions[0]);
 }
@@ -1331,7 +1336,8 @@ TEST(UAMGLibrary, LeavesTheCallerUnchanged)
 
 	::testing::internal::CaptureStdout();
 	uamg.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
-	Eigen::VectorXd x = uamg.Solve(system.b);
+	Eigen::VectorXd x = Eigen::VectorXd::Zero(system.b.size());
+	uamg.Solve(system.b, x);
 	std::string output = ::testing::internal::GetCapturedStdout();
 	EXPECT_EQ(output, "");
 
@@ -1346,7 +1352,8 @@ TEST(UAMGLibrary, LeavesTheCallerUnchanged)
 	std::ios_base::fmtflags flags = std::cout.flags();
 	::testing::internal::CaptureStdout();
 	verbose.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
-	verbose.Solve(system.b);
+	x.setZero();
+	verbose.Solve(system.b, x);
 	output = ::testing::internal::GetCapturedStdout();
 	EXPECT_NE(output.find("Setup"), std::string::npos);
 	EXPECT_EQ(std::cout.precision(), 7);

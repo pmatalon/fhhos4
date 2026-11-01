@@ -214,7 +214,6 @@ result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
   `fhhos4.TransposedView(A)`. The CSR format of the library requires sorted columns (SciPy: `sort_indices()`, or
   `sum_duplicates()`, in place).
 - The vectors: NumPy vectors of `float64`, read (outputs: written) in place; another dtype raises `TypeError`.
-  `Solve(b)` returns `x`.
 - The solver keeps the arrays that the solves read alive: those of `A_FT` (`SetupNonSym()`). `CondensedMatrix()`
   returns a copy (`fhhos4.CSRMatrix`). The arrays of a `fhhos4.CSRMatrix`
   (`RowPointers`, `ColumnIndices`, `Values`) are read-only NumPy views of the library's memory, which keep it alive.

@@ -458,14 +458,6 @@ namespace fhhos4
 			return SolveCondensed(In(b), Out(x));
 		}
 
-		// Solves A x = b from x = 0
-		Eigen::VectorXd Solve(const Eigen::Ref<const Eigen::VectorXd>& b)
-		{
-			Eigen::VectorXd x = Eigen::VectorXd::Zero(b.rows());
-			Solve(b, x);
-			return x;
-		}
-
 		//------------------------------------------------------------------//
 
 		// The condensed matrix A of the last setup, both triangles, computed by SetupSym() or SetupNonSym().
