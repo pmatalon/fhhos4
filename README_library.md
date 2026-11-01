@@ -4,8 +4,14 @@
 
 ## Install from source
 
-The library alone needs a C++17 compiler, CMake (>= 3.20), Ninja or Make, and
-[Eigen](https://eigen.tuxfamily.org) 3.4 or 5.x.
+For use in shared memory only, you'll need
+- a C++17 compiler,
+- CMake (>= 3.20),
+- Ninja or Make,
+- [Eigen](https://eigen.tuxfamily.org) 3.4 or 5.x.
+For distributed memory, you'll also need
+- MPI
+- MUMPS
 
 ```bash
 git clone --branch v1.4.0 --depth 1 https://github.com/pmatalon/fhhos4.git && cd fhhos4
@@ -14,8 +20,7 @@ cmake --build build
 cmake --install build --prefix <prefix>    # lib/, include/ and the CMake package
 ```
 
-`v1.4.0` is the latest release. Between releases, this file on `master` describes the development version (clone
-without `--branch`); the release's is [README_library.md at v1.4.0](https://github.com/pmatalon/fhhos4/blob/v1.4.0/README_library.md).
+`v1.4.0` is the latest release. Between releases, this README file on `master` describes the development version; the release's is [README_library.md at v1.4.0](https://github.com/pmatalon/fhhos4/blob/v1.4.0/README_library.md).
 
 Without installing, the library is `build/lib/libfhhos4.so`.
 
