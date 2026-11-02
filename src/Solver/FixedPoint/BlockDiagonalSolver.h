@@ -80,25 +80,39 @@ private:
 		{
 			if (blocks && !(*blocks)[i])
 				continue;
-			DenseMatrix Di = diagonalBlock(i);
-			Eigen::FullPivLU<DenseMatrix> lu(Di);
-			auto block = blocksT.middleCols(i * _blockSize, _blockSize);
-			if (_method == DiagBlockSolveMethod::Inverse)
-				block = DenseMatrix(lu.inverse()).template cast<T>();
-			else
+			Factorize<T>(i, diagonalBlock(i));
+		}
+	}
+
+	template <typename T>
+	void Factorize(BigNumber i, const DenseMatrix& Di)
+	{
+		Eigen::FullPivLU<DenseMatrix> lu(Di);
+		auto block = BlocksIn<T>().middleCols(i * _blockSize, _blockSize);
+		if (_method == DiagBlockSolveMethod::Inverse)
+			block = DenseMatrix(lu.inverse()).template cast<T>();
+		else
+		{
+			block = lu.matrixLU().template cast<T>();
+			for (int k = 0; k < _blockSize; k++)
 			{
-				block = lu.matrixLU().template cast<T>();
-				for (int k = 0; k < _blockSize; k++)
-				{
-					_permP[i * _blockSize + k] = lu.permutationP().indices()(k);
-					_permQ[i * _blockSize + k] = lu.permutationQ().indices()(k);
-				}
-				_rank[i] = lu.nonzeroPivots();
+				_permP[i * _blockSize + k] = lu.permutationP().indices()(k);
+				_permQ[i * _blockSize + k] = lu.permutationQ().indices()(k);
 			}
+			_rank[i] = lu.nonzeroPivots();
 		}
 	}
 
 public:
+	// After a setup in double: the blocks i of 'blocks' factorized again, D_i being diagonalBlock(i) (in double)
+	template <class DiagonalBlock>
+	void Refactorize(const vector<BigNumber>& blocks, DiagonalBlock diagonalBlock)
+	{
+		#pragma omp parallel for
+		for (BigNumber q = 0; q < (BigNumber)blocks.size(); q++)
+			Factorize<double>(blocks[q], diagonalBlock(blocks[q]));
+	}
+
 	// x = D_i^{-1} b (b can have several columns), in the precision of b and x (that of the matrix of the setup).
 	// b is used as work space: its content is destroyed. x must not alias b.
 	template <class RhsT, class DestT>

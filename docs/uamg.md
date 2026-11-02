@@ -165,3 +165,10 @@ program `-uamg-bcsr`.
 - Non-symmetric matrix on several threads: hybrid block Gauss-Seidel (`hbgs`, `hrbgs`; ADR-0018; scalar kernels at
   k = 0; `Solver/FixedPoint/HybridChunks.h`), sequential sweeps on a level where more than 20% of the non-zeros couple
   rows of different threads (`HybridChunks::MaxExternalFraction`; e.g. GMSH's numbering on the tetrahedral meshes).
+- Jacobi between the parts (the chunks of the hybrid sweeps, the processes) is not a contraction at k = 2 in 3D under
+  that threshold: the cycle diverges. l1 shift (`BlockGaussSeidel::L1Theta`, program `-gs-l1`, default 0; block
+  Gauss-Seidel only, not the scalar one of k = 0, nor the library): the rows coupled to other parts get theta
+  sum_j |a_ij| over those couplings (`HybridChunks::AddExternalAbsoluteSums()`, the rows of `Offd`) on their diagonal,
+  in the factorized blocks (refactorized when the chunks change: `SetupL1Shift()`), and times the old x_i in the
+  right-hand side (`SweepRhs()`). theta = 1/2: M + M^T - A >= D for a symmetric A, whatever the parts. No row is
+  shifted on one thread and one process.

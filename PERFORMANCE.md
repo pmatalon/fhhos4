@@ -1376,6 +1376,37 @@ solve (s), solve per iteration (ms) and its ratio to double CSR (of the time: be
   with BLIS's threads (1.6-5.6x slower than with one) is its threads started at each call: `BLIS_NUM_THREADS=1` in
   `README_library.md` and `README_program.md`.
 
+2026-11-01, the block Gauss-Seidel with Jacobi between the parts (threads of the hybrid sweeps, processes) diverges at
+k=2 in 3D; its l1 shift (`-gs-l1`, `BlockGaussSeidel::L1Theta`, opt-in: `docs/uamg.md`, Smoothers), same binary, theta
+0 -> 1/2, iterations (200: the maximum), Cube-tet (GMSH), `OMP_NUM_THREADS=2` on several processes
+(`build-mpi/nonsym_stagnation/`):
+
+| Case | 1 process, 1 thread | theta 0 | theta 1/2 |
+|---|---|---|---|
+| n=8 k=2 `fcguamg -smoothers hbgs,hrbgs`, 2 threads | 32 | 200 | 78 |
+| n=8 k=2 `gcruamg -uamg-nonsym -smoothers hbgs,hrbgs`, 2 threads | 34 | 200 | 94 |
+| the same, 4 and 8 threads (the sweeps sequential: > 20% between chunks) | 34 | 34 | 34 |
+| n=8 k=2 `fcguamg -smoothers bgs`, 2 / 4 processes | 32 | 200 / 200 | 61 / 62 |
+| n=8 k=2 `gcruamg -uamg-nonsym`, 2 / 4 processes | 34 | 176 / 200 | 67 / 68 |
+| n=4 k=2 `gcruamg -uamg-nonsym`, 4 processes / 2 threads | - | 160 / 200 | 56 / 61 |
+| n=8 k=1 `fcguamg -smoothers bgs` / `gcruamg -uamg-nonsym`, 4 processes | 35 | 58 / 59 | 37 / 38 |
+| Square-tri n=32 k=2 `gcruamg -uamg-nonsym -smoothers hbgs,hrbgs`, 4 processes / 2 threads | 17 | 19 / 19 | 21 / 20 |
+| Square-tri n=32 k=1 `gcruamg -uamg-nonsym`, 3 processes | - | 15 | 15 |
+
+GCR doesn't save the theta 0 runs (`gcruamg` 176 / 200 on 2 / 4 processes): the cycle itself diverges. Through the
+library (`gcrlibuamg`), theta has no effect: its own copy of `L1Theta` (`-fvisibility=hidden`). The library's
+non-symmetric path with theta (its sources compiled into a scratch driver, `build/bench_l1/driver`), HArDCore3D's
+Cartesian k=1 systems (`build/bench_nonsym/`), its default smoothers (`hbgs` on several threads), tolerance 1e-12,
+plugged in, iterations and solve time (s), theta 0 -> 1/2 (a time ratio above 1: slower):
+
+| System | 1 thread | 2 threads | 4 threads | 8 threads |
+|---|---|---|---|---|
+| 16^3 convection-dominated | 3 | 4 -> 6 | 4 -> 7 | 5 -> 7 |
+| 32^3 convection-dominated | 4 | 5 -> 7 (0.24 -> 0.39 s, x1.62) | 5 -> 7 (0.19 -> 0.28 s, x1.53) | 5 -> 7 (0.17 -> 0.27 s, x1.53) |
+| 32^3 diffusion-dominated | 22 | 22 -> 23 (0.88 -> 0.92 s) | 23 -> 23 | 23 -> 24 (0.87 -> 0.91 s) |
+
+Where the hybrid sweeps converge (k <= 1, Cartesian numbering), the shift costs iterations: convection-dominated 5 -> 7.
+
 Next ideas:
 1. **The memory per process** (2026-10-28 above), by expected gain:
    - `A`, `Acons` and `Astab` of the cells: done (2026-10-29 above). What stays of the local matrices: `P` (1.25 KB per

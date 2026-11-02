@@ -17,10 +17,19 @@ protected:
 	// For each block row, whether its rows have the same non-zero pattern (always the case for the HHO matrices)
 	vector<char> _samePattern;
 	HybridChunks _chunks; // of the hybrid sweeps (see Chunks())
+	// The l1 shift (L1Theta) of each row in the factorized diagonal blocks; empty: none
+	Vector _l1Shift;
 public:
 	// If set, every sweep (forward or backward, pre- or post-smoothing) processes the block rows in this order: the
 	// downwind order of a convection-dominated matrix (DownwindOrder()), which all the sweeps then follow
 	const vector<BigNumber>* SweepOrder = nullptr;
+
+	// Gauss-Seidel within each part (the process, the chunk of a thread in the hybrid sweeps), Jacobi between them: for a
+	// symmetric A, M + M^T - A = D - O (O: the couplings between the parts) can be indefinite, and the cycle then
+	// diverges (3D, k = 2). l1 shift (Baker et al., SISC 2011), only on the rows coupled to other parts: their diagonal
+	// blocks D_I + theta diag(sum_j |O_ij|), and theta sum_j |O_ij| x_i(old) added to the right-hand side. From
+	// theta = 1/2, M + M^T - A >= D, whatever the parts. 0: none (-gs-l1). On one thread and one process, no row is shifted.
+	inline static double L1Theta = 0;
 
 	BlockGaussSeidel(int blockSize, Direction direction, bool hybrid)
 	{
@@ -56,6 +65,8 @@ public:
 
 		if (_direction != Direction::Symmetric || _blockSize != 1)
 			os << ")";
+		if (L1Theta != 0)
+			os << ", l1 shift between the parts (theta=" << L1Theta << ")";
 	}
 
 	//------------------------------------------------//
@@ -80,11 +91,14 @@ private:
 	{
 		auto nb = A.rows() / _blockSize;
 		this->diagBlockSolver.Setup(A, _blockSize, BlockDiagonalSolver::SmootherMethod);
+		_l1Shift = Vector();
 		_diagBlock.Setup(A, _blockSize);
 		SetupSamePattern();
 		_chunks.Clear();
 		if (_hybrid)
 			Chunks();
+		else
+			SetupL1Shift();
 
 		this->SetupComputationalWork = nb * 2.0/3.0*pow(_blockSize, 3)*1e-6;
 	}
@@ -116,6 +130,7 @@ private:
 	void CopySetup(const BlockGaussSeidel* o)
 	{
 		diagBlockSolver = o->diagBlockSolver;
+		_l1Shift = o->_l1Shift;
 		_diagBlock = o->_diagBlock;
 		_samePattern = o->_samePattern;
 		_chunks.Clear();
@@ -126,6 +141,8 @@ private:
 			else
 				Chunks();
 		}
+		else
+			SetupL1Shift(); // without the shift of o's chunks
 		this->SetupComputationalWork = o->SetupComputationalWork;
 	}
 
@@ -203,7 +220,7 @@ private:
 	void Sweep(const Vector& givenB, Vector& x, bool backward, bool xEquals0)
 	{
 		Vector distributedRhs;
-		const Vector& b = SweepRhs(givenB, x, xEquals0, distributedRhs);
+		const Vector& b = SweepRhs(givenB, x, xEquals0, distributedRhs, &_l1Shift);
 		BigNumber nb = this->Matrix->rows() / _blockSize;
 		Vector tmp_x(_blockSize), tmp_xi(_blockSize); // work vectors for ProcessBlockRow()
 		if (SweepOrder && xEquals0)
@@ -250,7 +267,7 @@ private:
 			return;
 		}
 		Vector distributedRhs;
-		const Vector& b = SweepRhs(givenB, x, xEquals0, distributedRhs);
+		const Vector& b = SweepRhs(givenB, x, xEquals0, distributedRhs, &_l1Shift);
 		BigNumber n = this->Matrix->rows();
 		if (xEquals0 && (SweepOrder || x.size() != n))
 			x = Vector::Zero(n); // as Sweep()
@@ -285,8 +302,51 @@ private:
 	{
 		int nChunks = Parallelism::NThreads();
 		if (!_chunks.IsSetUp(nChunks, SweepOrder))
+		{
 			_chunks.Setup(*this->Matrix, _blockSize, SweepOrder, nChunks);
+			SetupL1Shift();
+		}
 		return _chunks;
+	}
+
+	// The l1 shift (L1Theta) of the rows coupled to other processes, and to other chunks if the hybrid sweeps run in
+	// parallel; the diagonal blocks whose shift changes factorized again
+	void SetupL1Shift()
+	{
+		if (L1Theta == 0 && _l1Shift.size() == 0)
+			return;
+		const SparseMatrix& A = *this->Matrix;
+		Vector shift = Vector::Zero(A.rows());
+		if (L1Theta != 0)
+		{
+			if (this->Distributed)
+			{
+				const SparseMatrix& O = this->Distributed->Offd;
+				#pragma omp parallel for
+				for (BigNumber i = 0; i < O.rows(); i++)
+				{
+					for (SparseMatrix::InnerIterator it(O, i); it; ++it)
+						shift[i] += abs(it.value());
+				}
+			}
+			if (_hybrid && _chunks.Parallel())
+				_chunks.AddExternalAbsoluteSums(shift);
+			shift *= L1Theta;
+		}
+		Vector old = _l1Shift.size() > 0 ? _l1Shift : Vector::Zero(A.rows());
+		vector<BigNumber> changed;
+		for (BigNumber I = 0; I < A.rows() / _blockSize; I++)
+		{
+			if ((shift.segment(I * _blockSize, _blockSize).array() != old.segment(I * _blockSize, _blockSize).array()).any())
+				changed.push_back(I);
+		}
+		diagBlockSolver.Refactorize(changed, [&](BigNumber I)
+		{
+			DenseMatrix D = A.block(I * _blockSize, I * _blockSize, _blockSize, _blockSize);
+			D.diagonal() += shift.segment(I * _blockSize, _blockSize);
+			return D;
+		});
+		_l1Shift = (shift.array() != 0).any() ? shift : Vector();
 	}
 
 	void SetupSamePattern()

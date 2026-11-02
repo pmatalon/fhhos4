@@ -27,6 +27,7 @@
 #include "fhhos4"
 #include "support/Kronecker.h"
 #include "support/RunHelper.h"
+#include "Solver/FixedPoint/BlockGaussSeidel.h"
 
 using namespace fhhos4_tests;
 
@@ -290,6 +291,32 @@ TEST(UAMGNonsymmetricProgram, NotWithFCG)
 	EXPECT_EXIT(ApplyProgramArgumentDefaults(args), ::testing::ExitedWithCode(EXIT_FAILURE), "");
 }
 
+#endif
+
+// The hybrid block Gauss-Seidel on 2 threads (Jacobi between their chunks) with the l1 shift of the rows coupled to the
+// other chunk (-gs-l1 0.5): 61 iterations; without it, the cycle diverges at k = 2 (GCR stopped at its 200; 34 on one
+// thread, sequential)
+//   ./bin/fhhos4 -geo cube -mesh tetra -n 4 -k 2 -s gcruamg -uamg-nonsym -smoothers hbgs,hrbgs -threads 2 -gs-l1 0.5 -no-cache
+#ifdef ENABLE_3D
+TEST(UAMGNonsymmetricProgram, HybridGaussSeidelL1Shift)
+{
+	ProgramArguments args;
+	args.Problem.GeoCode = "cube";
+	args.Discretization.MeshCode = "tetra";
+	args.Discretization.N = 4;
+	args.Discretization.PolyDegree = 3;
+	args.Solver.SolverCode = "gcruamg";
+	args.Solver.MG.UAMGNonsymmetric = true;
+	args.Solver.MG.PreSmoother = SmootherType::HybridBlockGaussSeidel;
+	args.Solver.MG.PostSmoother = SmootherType::HybridBackwardBlockGaussSeidel;
+	args.Actions.UseCache = false;
+	struct TwoThreadsL1Shift // while in scope
+	{
+		TwoThreadsL1Shift() { Parallelism::SetNThreads(2); BlockGaussSeidel::L1Theta = 0.5; }
+		~TwoThreadsL1Shift() { Parallelism::SetNThreads(0); BlockGaussSeidel::L1Theta = 0; }
+	} scope;
+	EXPECT_EQ(RunDiffusionHHO(args).IterationCount, 61);
+}
 #endif
 
 //------------------------------------------------------------------------------------------------------------------//

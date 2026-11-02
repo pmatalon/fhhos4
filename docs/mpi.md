@@ -31,7 +31,8 @@ program too: `-DENABLE_PROGRAM=ON`).
 - Solvers: `Solver::Distributed`, `Setup(const DistributedMatrix&)` (FatalError unless overridden: FCG, GCR, Multigrid,
   Chebyshev, block Jacobi, (block) Gauss-Seidel = Gauss-Seidel in the process, Jacobi between them (`SweepRhs()`: not
   a contraction in the energy norm when the couplings between the processes are strong, e.g. 3D k=2, where FCG
-  stagnates; the default smoother is Chebyshev, ADR-0017),
+  stagnates; the default smoother is Chebyshev, ADR-0017; `-gs-l1 0.5`, the block Gauss-Seidel's l1 shift of the rows
+  coupled to other processes, makes it one: `docs/uamg.md`, Smoothers),
   Cholesky/LU by MUMPS (ADR-0021; `Solver/Direct/MUMPS.h`: on one OpenMP thread (`ICNTL(16)`: its BLAS calls from
   several threads, each threaded by BLIS, oversubscribed the cores); each process gives its rows of the matrix and of the
   right-hand side; the solution, as MUMPS distributes it, goes to the owners of its rows by an `IndexMap` whose ghosts

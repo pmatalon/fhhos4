@@ -7,6 +7,7 @@
 #include "ProgramArgumentsDefaults.h"
 #include "Solver/FixedPoint/BlockDiagonalSolver.h"
 #include "Solver/FixedPoint/BlockChebyshev.h"
+#include "Solver/FixedPoint/BlockGaussSeidel.h"
 #include "Solver/Multigrid/SmootherFactory.h"
 #include "Utils/FileSystem.h"
 #include "Utils/Communicator.h"
@@ -296,6 +297,12 @@ void print_usage() {
 	cout << endl;
 	cout << "-cheb-ratio NUM" << endl;
 	cout << "      Ratio lambdaMax/lambdaMin of the interval of the Chebyshev smoothers of the 1st kind (cheb, bcheb). Default: 10." << endl;
+	cout << endl;
+	cout << "-gs-l1 NUM" << endl;
+	cout << "      l1 shift theta of the block Gauss-Seidel smoothers (bgs, hbgs...) on the rows coupled to other threads (hybrid" << endl;
+	cout << "      sweeps) or processes, with which they are Jacobi: theta sum_j |a_ij| over these couplings added to the diagonal" << endl;
+	cout << "      (and theta sum_j |a_ij| x_i to the right-hand side). From 1/2, convergent whatever the parts (symmetric matrix)." << endl;
+	cout << "      No effect on one thread and one process, nor on the library (-s *libuamg). Default: 0 (none)." << endl;
 	cout << endl;
 	cout << "-restart NUM" << endl;
 	cout << "      Iteration period to restart the algorithm (bihar-cg), or the library's Restart (-s libuamg: the directions stored" << endl;
@@ -785,6 +792,7 @@ int Run(int argc, char* argv[])
 		OPT_BlockSize,
 		OPT_DiagBlockSolve,
 		OPT_ChebyshevRatio,
+		OPT_GaussSeidelL1,
 		OPT_Restart,
 		OPT_BiHarmonicSolver,
 		OPT_BiHarmonicPreconditioner,
@@ -891,6 +899,7 @@ int Run(int argc, char* argv[])
 		 { "block-size", required_argument, NULL, OPT_BlockSize },
 		 { "diag-block-solve", required_argument, NULL, OPT_DiagBlockSolve },
 		 { "cheb-ratio", required_argument, NULL, OPT_ChebyshevRatio },
+		 { "gs-l1", required_argument, NULL, OPT_GaussSeidelL1 },
 		 { "restart", required_argument, NULL, OPT_Restart },
 		 { "bihar-solver", required_argument, NULL, OPT_BiHarmonicSolver },
 		 { "bihar-prec", required_argument, NULL, OPT_BiHarmonicPreconditioner },
@@ -1253,6 +1262,11 @@ int Run(int argc, char* argv[])
 				BlockChebyshev::DefaultRatio = atof(optarg);
 				if (!(BlockChebyshev::DefaultRatio > 1))
 					argument_error("-cheb-ratio argument must be > 1.");
+				break;
+			case OPT_GaussSeidelL1:
+				BlockGaussSeidel::L1Theta = atof(optarg);
+				if (!(BlockGaussSeidel::L1Theta >= 0))
+					argument_error("-gs-l1 argument must be >= 0.");
 				break;
 			case OPT_Restart:
 				args.Solver.Restart = atoi(optarg);

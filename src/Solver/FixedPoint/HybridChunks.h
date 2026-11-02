@@ -259,6 +259,31 @@ public:
 		}
 	}
 
+	// sums[i] += sum_j |a_ij| over the external non-zeros of the row i (in other chunks; none in the interior block rows),
+	// in the order of the row
+	void AddExternalAbsoluteSums(Vector& sums) const
+	{
+		const double* val = _A->valuePtr();
+		#pragma omp parallel for
+		for (int c = 0; c < Count(); c++)
+		{
+			const Chunk& chunk = _chunks[c];
+			BigNumber nBoundary = chunk.Boundary.size();
+			for (BigNumber q = 0; q < nBoundary; q++)
+			{
+				for (BigNumber i = BlockRow(chunk.Boundary[q]) * _blockSize, r = q * _blockSize; r < (q + 1) * _blockSize; i++, r++)
+				{
+					SparseMatrixIndex start = _A->outerIndexPtr()[i];
+					for (BigNumber j = chunk.RangeBegin[r]; j < chunk.LowerBegin[r]; j++)
+					{
+						for (SparseMatrixIndex p = start + chunk.Ranges[j].first; p < start + chunk.Ranges[j].second; p++)
+							sums[i] += abs(val[p]);
+					}
+				}
+			}
+		}
+	}
+
 	// b_i - sum_j a_ij x_j over the j outside the diagonal block, for the row i = blockRow * blockSize + k of the boundary
 	// block row q of the chunk c: the external products with the old values (SaveExported(); none if xEquals0: x = 0),
 	// the internal ones selected by 'products' with the current values of x

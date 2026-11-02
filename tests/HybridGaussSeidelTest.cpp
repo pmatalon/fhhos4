@@ -1,6 +1,6 @@
 // Unit tests of the hybrid Gauss-Seidel sweeps (GaussSeidel and BlockGaussSeidel with hybrid = true, HybridChunks):
 // Gauss-Seidel in the chunk of each thread, Jacobi between the chunks, hence deterministic; the sequential sweeps if the
-// chunks are poorly separated.
+// chunks are poorly separated; the l1 shift of the rows of the block sweeps coupled to other chunks.
 #include <gtest/gtest.h>
 #include <algorithm>
 #include <memory>
@@ -88,11 +88,18 @@ namespace
 
 	// Reference: the sweep sequence (the natural order, or order) split into nChunks contiguous chunks; in each chunk, a
 	// block Gauss-Seidel sweep (backward: decreasing positions; never with an order, which all the sweeps follow) that
-	// reads the values of the other chunks in x0
-	Vector ReferenceSweep(const SparseMatrix& A, int blockSize, const Vector& b, const Vector& x0, const std::vector<BigNumber>* order, int nChunks, bool backward)
+	// reads the values of the other chunks in x0. l1 shift theta: s_i = theta sum_j |a_ij| over the j of the other
+	// chunks, added to the diagonal, and s_i x0_i to the right-hand side.
+	Vector ReferenceSweep(const SparseMatrix& A, int blockSize, const Vector& b, const Vector& x0, const std::vector<BigNumber>* order, int nChunks, bool backward, double theta = 0)
 	{
 		BigNumber nb = A.rows() / blockSize;
 		backward = backward && !order;
+		std::vector<int> chunkOf(nb);
+		for (int c = 0; c < nChunks; c++)
+		{
+			for (BigNumber position = nb * c / nChunks; position < nb * (c + 1) / nChunks; position++)
+				chunkOf[order ? (*order)[position] : position] = c;
+		}
 		Vector x = x0;
 		for (int c = 0; c < nChunks; c++)
 		{
@@ -107,12 +114,20 @@ namespace
 				DenseMatrix D = DenseMatrix::Zero(blockSize, blockSize);
 				for (int k = 0; k < blockSize; k++)
 				{
+					double shift = 0;
 					for (SparseMatrix::InnerIterator it(A, I * blockSize + k); it; ++it)
 					{
 						if ((BigNumber)it.col() / blockSize == I)
 							D(k, it.col() % blockSize) = it.value();
 						else
 							rhs[k] -= it.value() * y[it.col()];
+						if (chunkOf[it.col() / blockSize] != c)
+							shift += theta * std::abs(it.value());
+					}
+					if (theta != 0)
+					{
+						D(k, k) += shift;
+						rhs[k] += shift * y[I * blockSize + k];
 					}
 				}
 				y.segment(I * blockSize, blockSize) = D.fullPivLu().solve(rhs);
@@ -173,6 +188,14 @@ namespace
 	public:
 		Threads(int n) { Parallelism::SetNThreads(n); }
 		~Threads() { Parallelism::SetNThreads(0); }
+	};
+
+	// BlockGaussSeidel::L1Theta while in scope
+	class WithL1Theta
+	{
+	public:
+		WithL1Theta(double theta) { BlockGaussSeidel::L1Theta = theta; }
+		~WithL1Theta() { BlockGaussSeidel::L1Theta = 0; }
 	};
 
 	// Runs test(A, blockSize, order, direction, b, x0, xEquals0, description) on every case: scalar and blocks, natural
@@ -268,6 +291,38 @@ TEST(HybridGaussSeidelTest, NumberOfThreadsChangesBetweenSolves)
 			Vector reference = ReferenceSweep(A, blockSize, b, x0, nullptr, nThreads, false);
 			EXPECT_LT(MaxDiff(Sweep(*gs, b, x0, false), reference), 1e-13 * reference.lpNorm<Eigen::Infinity>()) << "block size " << blockSize << ", " << nThreads << " threads";
 		}
+	}
+}
+
+// The l1 shift (BlockGaussSeidel::L1Theta) of the block rows coupled to other chunks, on 4 threads; when the number of
+// threads changes between two solves, the shifted blocks follow it (none on 1 thread: the sequential sweep)
+TEST(HybridGaussSeidelTest, L1Shift)
+{
+	WithL1Theta theta(0.5);
+	{
+		Threads threads(4);
+		ForEachCase([](const SparseMatrix& A, int blockSize, const std::vector<BigNumber>* order, Direction direction, const Vector& b, const Vector& x0, bool xEquals0, const std::string& description)
+		{
+			if (blockSize == 1) // the scalar Gauss-Seidel has no shift
+				return;
+			bool backward = direction == Direction::Backward;
+			Vector reference = ReferenceSweep(A, blockSize, b, x0, order, 4, backward, 0.5);
+			Vector x = Sweep(*CreateGaussSeidel(A, blockSize, true, direction, order), b, x0, xEquals0);
+			EXPECT_LT(MaxDiff(x, reference), 1e-13 * reference.lpNorm<Eigen::Infinity>()) << description;
+			// The test discriminates: the sweep without the shift differs from the reference
+			Vector unshifted = ReferenceSweep(A, blockSize, b, x0, order, 4, backward);
+			EXPECT_GT(MaxDiff(unshifted, reference), 1e-6 * reference.lpNorm<Eigen::Infinity>()) << description;
+		});
+	}
+	SparseMatrix A = TestMatrix(3);
+	Vector b = Vector::LinSpaced(A.rows(), -1, 1);
+	Vector x0 = Vector::LinSpaced(A.rows(), 2, -3).array().sin().matrix();
+	auto gs = CreateGaussSeidel(A, 3, true, Direction::Forward, nullptr);
+	for (int nThreads : { 4, 2, 1, 4 })
+	{
+		Threads threads(nThreads);
+		Vector reference = ReferenceSweep(A, 3, b, x0, nullptr, nThreads, false, 0.5);
+		EXPECT_LT(MaxDiff(Sweep(*gs, b, x0, false), reference), 1e-13 * reference.lpNorm<Eigen::Infinity>()) << nThreads << " threads";
 	}
 }
 
