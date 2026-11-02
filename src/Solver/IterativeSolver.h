@@ -92,12 +92,13 @@ protected:
 	// On several processes, the right-hand side of a sweep of a relaxation method (Gauss-Seidel, Jacobi) on the rows of
 	// the process (Diag): b - Offd x, with the values of x of the other processes from the start of the sweep (Jacobi
 	// between the processes, Gauss-Seidel within each one, as the hybrid smoothers between threads); b on one process, or
-	// from x = 0. With an l1 shift (BlockGaussSeidel::L1Theta: not empty), + l1Shift .* x. buffer: its storage.
+	// from x = 0. With l1 terms (l1 Gauss-Seidel, BlockGaussSeidel::L1Theta: not empty), + l1Terms .* x. buffer: its
+	// storage.
 	// Collective on the halo.
-	const Vector& SweepRhs(const Vector& b, const Vector& x, bool xEquals0, Vector& buffer, const Vector* l1Shift = nullptr) const
+	const Vector& SweepRhs(const Vector& b, const Vector& x, bool xEquals0, Vector& buffer, const Vector* l1Terms = nullptr) const
 	{
-		bool shifted = l1Shift && l1Shift->size() > 0;
-		if ((!this->Distributed && !shifted) || xEquals0)
+		bool l1 = l1Terms && l1Terms->size() > 0;
+		if ((!this->Distributed && !l1) || xEquals0)
 			return b;
 		buffer = b;
 		if (this->Distributed)
@@ -106,8 +107,8 @@ protected:
 			if (this->Distributed->Offd.nonZeros() > 0)
 				buffer.noalias() -= this->Distributed->Offd * ghosts;
 		}
-		if (shifted)
-			buffer += l1Shift->cwiseProduct(x);
+		if (l1)
+			buffer += l1Terms->cwiseProduct(x);
 		return buffer;
 	}
 

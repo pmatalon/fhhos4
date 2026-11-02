@@ -1,22 +1,29 @@
-# Deterministic hybrid Gauss-Seidel with an l1 shift, sequential where threads share too much
+# Deterministic hybrid Gauss-Seidel, in l1 Gauss-Seidel by default, sequential where threads share too much
 
-For a non-symmetric matrix on several threads the default smoothers are hybrid block Gauss-Seidel (`hbgs`, `hrbgs`):
-Gauss-Seidel in the rows of each thread, Jacobi between the threads through a copy of the values the others read, so
-the results depend on the number of threads but not on the run (2026-10-12). A level where more than 20% of the
-non-zeros couple rows of different threads sweeps sequentially.
+For a non-symmetric matrix on several threads the smoothers are hybrid block Gauss-Seidel: Gauss-Seidel in the rows of
+each thread, Jacobi between the threads through a copy of the values the others read, so the results depend on the
+number of threads but not on the run (2026-10-12). A level where more than 20% of the non-zeros couple rows of
+different threads sweeps sequentially.
 
-Since 2026-11-02 the rows coupled to other threads (and processes) have an l1 shift, theta = 1/2 (half the sum of the
-|a_ij| of these couplings on their diagonal): under the 20% threshold, Jacobi between the threads diverged at k = 2 in
-3D (Cube-tet n=8 k=2, 2 threads: 200 iterations, 34 on one; with the shift 94). It costs where the plain hybrid sweeps
-converged: HArDCore3D 32^3 k=1 convection-dominated 5 -> 7 iterations, diffusion-dominated +0-1.
+Since 2026-11-02 the default is the l1 hybrid block Gauss-Seidel (`L1HybridBlockGaussSeidel`, `l1hbgs`), a smoother of
+its own: the rows coupled to other threads and processes in l1 Gauss-Seidel (theta = 1/2: half the sum of the |a_ij| of
+these couplings on their diagonal), convergent whatever the parts. Under the 20% threshold, the plain hybrid sweeps
+diverged at k = 2 in 3D (Cube-tet n=8 k=2, 2 threads: 200 iterations, 34 on one; l1: 94), and so did Jacobi between
+processes. The plain hybrid one (`HybridBlockGaussSeidel`) stays, with its former meaning: where it converges it takes
+fewer iterations (HArDCore3D, 4 threads: convection-dominated 4 -> 7, 8 -> 11, tetrahedra 9 -> 14 with l1; diffusion
++0-2). A smoother rather than a parameter: an explicit choice keeps its meaning, only the default changes; as hypre
+and MFEM, which have l1-Gauss-Seidel as its own relaxation type.
 
 ## Considered Options
 
 - The racy version (threads reading each other's values as they change): with GCR, 191 iterations instead of 26 on
   8 threads (HArDCore3D 48^3, k = 1).
 - Jacobi between the threads everywhere: diverged on GMSH's tetrahedra (32% of the non-zeros between threads).
-- l1-Gauss-Seidel (Baker et al. 2011), the full shift (theta = 1): tetrahedra 35/72 iterations instead of 28/33,
-  convection 5 -> 10.
-- No shift (until 2026-11-02): diverges at k = 2 in 3D, as above.
-- The rows between threads by colours (a true Gauss-Seidel, a barrier per colour): not tried; the next option if the
-  shift's iterations cost too much.
+- l1-Gauss-Seidel with the full l1 term (theta = 1, Baker et al. 2011, hypre): tetrahedra 35/72 iterations instead of
+  28/33, convection 5 -> 10.
+- The plain hybrid one by default: diverges at k = 2 in 3D, as above.
+- A boolean parameter for l1 (as Trilinos/Ifpack2's `relaxation: use l1`): would change the meaning of an explicit
+  `HybridBlockGaussSeidel`.
+- The l1 terms only where the diagonal is not large enough (Ifpack2's eta, hypre's truncated variant): not tried yet;
+  could recover the iterations where the plain one converges.
+- The rows between threads by colours (a true Gauss-Seidel, a barrier per colour): not tried.

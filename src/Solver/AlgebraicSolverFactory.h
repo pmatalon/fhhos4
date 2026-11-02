@@ -175,6 +175,8 @@ public:
 			case SmootherType::BackwardBlockGaussSeidel:       return SmootherType::BlockGaussSeidel;
 			case SmootherType::HybridBlockGaussSeidel:         return SmootherType::HybridBackwardBlockGaussSeidel;
 			case SmootherType::HybridBackwardBlockGaussSeidel: return SmootherType::HybridBlockGaussSeidel;
+			case SmootherType::L1HybridBlockGaussSeidel:         return SmootherType::L1HybridBackwardBlockGaussSeidel;
+			case SmootherType::L1HybridBackwardBlockGaussSeidel: return SmootherType::L1HybridBlockGaussSeidel;
 			// Alternating smoothers: the same if the number of iterations is even, the reverse one if it is odd
 			case SmootherType::AlternatingGaussSeidel:
 			case SmootherType::BackwardAlternatingGaussSeidel:

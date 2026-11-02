@@ -32,6 +32,8 @@ private:
 			{ "rabsor", SmootherType::BackwardAlternatingBlockGaussSeidel },
 			{ "hbgs",   SmootherType::HybridBlockGaussSeidel },
 			{ "hrbgs",  SmootherType::HybridBackwardBlockGaussSeidel },
+			{ "l1hbgs", SmootherType::L1HybridBlockGaussSeidel },
+			{ "l1hrbgs", SmootherType::L1HybridBackwardBlockGaussSeidel },
 			{ "cheb",   SmootherType::ChebyshevFirstKind },
 			{ "bcheb",  SmootherType::BlockChebyshevFirstKind },
 			{ "cheb4",  SmootherType::ChebyshevFourthKind },
@@ -51,11 +53,12 @@ private:
 			return new BlockSORSmoother(blockSize, omega, direction, nSmootherIterations);
 	}
 
-	static Smoother* HybridBlockGaussSeidel(int blockSize, Direction direction, int nSmootherIterations)
+	// l1: the rows coupled to other threads or processes in l1 Gauss-Seidel (blocks only: the scalar Gauss-Seidel has none)
+	static Smoother* HybridBlockGaussSeidel(int blockSize, Direction direction, int nSmootherIterations, bool l1 = false)
 	{
 		if (blockSize == 1) // the scalar kernels are faster
 			return new GaussSeidelSmoother(direction, true, nSmootherIterations);
-		return new BlockGaussSeidelSmoother(blockSize, direction, true, nSmootherIterations);
+		return new BlockGaussSeidelSmoother(blockSize, direction, true, nSmootherIterations, l1);
 	}
 
 public:
@@ -128,6 +131,10 @@ public:
 				return HybridBlockGaussSeidel(blockSize, Direction::Forward, nSmootherIterations);
 			case SmootherType::HybridBackwardBlockGaussSeidel:
 				return HybridBlockGaussSeidel(blockSize, Direction::Backward, nSmootherIterations);
+			case SmootherType::L1HybridBlockGaussSeidel:
+				return HybridBlockGaussSeidel(blockSize, Direction::Forward, nSmootherIterations, true);
+			case SmootherType::L1HybridBackwardBlockGaussSeidel:
+				return HybridBlockGaussSeidel(blockSize, Direction::Backward, nSmootherIterations, true);
 
 			case SmootherType::Jacobi:
 				return new BlockJacobiSmoother(1, omega, nSmootherIterations);

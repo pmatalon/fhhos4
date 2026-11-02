@@ -25,6 +25,8 @@ private:
 			{ fhhos4::Smoother::SymmetricBlockGaussSeidel,      SmootherType::SymmetricBlockGaussSeidel },
 			{ fhhos4::Smoother::HybridBlockGaussSeidel,         SmootherType::HybridBlockGaussSeidel },
 			{ fhhos4::Smoother::HybridBackwardBlockGaussSeidel, SmootherType::HybridBackwardBlockGaussSeidel },
+			{ fhhos4::Smoother::L1HybridBlockGaussSeidel,         SmootherType::L1HybridBlockGaussSeidel },
+			{ fhhos4::Smoother::L1HybridBackwardBlockGaussSeidel, SmootherType::L1HybridBackwardBlockGaussSeidel },
 			{ fhhos4::Smoother::DampedBlockJacobi,              SmootherType::DampedBlockJacobi },
 			{ fhhos4::Smoother::BlockChebyshevFirstKind,        SmootherType::BlockChebyshevFirstKind },
 			{ fhhos4::Smoother::BlockChebyshevFourthKind,       SmootherType::BlockChebyshevFourthKind }

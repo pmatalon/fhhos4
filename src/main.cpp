@@ -299,10 +299,10 @@ void print_usage() {
 	cout << "      Ratio lambdaMax/lambdaMin of the interval of the Chebyshev smoothers of the 1st kind (cheb, bcheb). Default: 10." << endl;
 	cout << endl;
 	cout << "-gs-l1 NUM" << endl;
-	cout << "      l1 shift theta of the block Gauss-Seidel smoothers (bgs, hbgs...) on the rows coupled to other threads (hybrid" << endl;
-	cout << "      sweeps) or processes, with which they are Jacobi: theta sum_j |a_ij| over these couplings added to the diagonal" << endl;
-	cout << "      (and theta sum_j |a_ij| x_i to the right-hand side). From 1/2, convergent whatever the parts (symmetric matrix)." << endl;
-	cout << "      No effect on one thread and one process; the library (-s *libuamg) keeps its default. Default: 0.5 (0: none)." << endl;
+	cout << "      theta of the l1 Gauss-Seidel smoothers (l1hbgs, l1hrbgs) on the rows coupled to other threads (hybrid sweeps)" << endl;
+	cout << "      or processes, with which they are Jacobi: theta sum_j |a_ij| over these couplings added to the diagonal (and" << endl;
+	cout << "      theta sum_j |a_ij| x_i to the right-hand side). From 1/2, convergent whatever the parts (symmetric matrix). No" << endl;
+	cout << "      effect on one thread and one process; the library (-s *libuamg) keeps its default. Default: 0.5." << endl;
 	cout << endl;
 	cout << "-restart NUM" << endl;
 	cout << "      Iteration period to restart the algorithm (bihar-cg), or the library's Restart (-s libuamg: the directions stored" << endl;
@@ -401,6 +401,9 @@ void print_usage() {
 	cout << "              rabgs - Reverse Alternating Block Gauss-Seidel (starting with backward)" << endl;
 	cout << "              hbgs  - Hybrid Block Gauss-Seidel (parallelization of 'bgs')" << endl;
 	cout << "              hrbgs - Hybrid Reverse Block Gauss-Seidel (parallelization of 'rbgs')" << endl;
+	cout << "              l1hbgs - l1 Hybrid Block Gauss-Seidel: 'hbgs', the rows coupled to other threads or processes in l1" << endl;
+	cout << "                      Gauss-Seidel (-gs-l1): convergent whatever the parts. Default of -uamg-nonsym" << endl;
+	cout << "              l1hrbgs - l1 Hybrid Reverse Block Gauss-Seidel" << endl;
 	cout << "              cheb  - Chebyshev (1st kind) preconditioned by Jacobi: polynomial in D^-1 A, whose degree is the number of" << endl;
 	cout << "                      smoothing iterations (one product by A each), minimal on [lambdaMax/ratio, lambdaMax] (-cheb-ratio)." << endl;
 	cout << "                      lambdaMax (of D^-1 A) is estimated by 10 Lanczos iterations in the setup, times 1.1." << endl;

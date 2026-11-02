@@ -330,13 +330,13 @@ namespace fhhos4
 		// The pre-smoother when Solver::PreSmoother is empty, whatever the Krylov method (PERFORMANCE.md): for a symmetric
 		// matrix, the block Chebyshev of the fourth kind, whatever the number of threads (the user's choice: the same
 		// results on any number of threads; on 1 thread, slower than the block Gauss-Seidel); for a non-symmetric one
-		// (Chebyshev requires a symmetric matrix), the hybrid block Gauss-Seidel on several threads, the block Gauss-Seidel
-		// on 1
+		// (Chebyshev requires a symmetric matrix), the l1 hybrid block Gauss-Seidel (ADR-0018): convergent whatever the
+		// numbers of threads and processes; on 1 thread and 1 process, the sequential block Gauss-Seidel
 		SmootherType DefaultPreSmoother() const
 		{
 			if (Symmetric)
 				return SmootherType::BlockChebyshevFourthKind;
-			return Parallelism::NThreads() > 1 ? SmootherType::HybridBlockGaussSeidel : SmootherType::BlockGaussSeidel;
+			return SmootherType::L1HybridBlockGaussSeidel;
 		}
 
 		// The number of iterations of the smoother when Solver::Pre/PostSmoothingIterations is -1: the degree 2 for the

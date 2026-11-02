@@ -6,8 +6,8 @@ threads in most cases (up to 2x on GMSH tetrahedra at k >= 1), slower on 1 threa
 even on one process, so that a run gives the same results on any number of processes: on several, Gauss-Seidel is
 Jacobi between them, which diverged (3D, k=2: FCG stagnated at 200 iterations, 32 on one process; Chebyshev 50 on 1, 2
 and 4). The papers' block Gauss-Seidel stays an option (`-smoothers bgs`), which the tests and `reproducibility/` set;
-since 2026-11-02 it has the l1 shift between the processes (ADR-0018): it converges there (61 iterations on 2 and 4),
-its results still depending on the partition.
+its l1 version (`-smoothers l1hbgs`, ADR-0018) converges on several processes (61 iterations on 2 and 4), its results
+still depending on the partition.
 
 ## Considered Options
 

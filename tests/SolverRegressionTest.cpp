@@ -220,7 +220,8 @@ TEST(UAMGHPCoarseningDefaults, ExplicitStrategyKept)
 
 // The default smoothers: for U-AMG on a symmetric matrix, the library's block Chebyshev of degree 2 (its post-smoother
 // the same), whose results don't depend on the numbers of threads and processes; the degree of an explicit -cycle is
-// kept; block Gauss-Seidel for a non-symmetric matrix and the other multigrids; an explicit -smoothers is kept.
+// kept; the library's l1 hybrid block Gauss-Seidel for a non-symmetric matrix, block Gauss-Seidel for the other
+// multigrids; an explicit -smoothers is kept.
 //   ./bin/fhhos4 -geo square -mesh cart -mesher inhouse -k 1 -s {fcguamg [-cycle K,1,1]|gcruamg -uamg-nonsym|mg|fcguamg -smoothers bgs}
 TEST(UAMGSmootherDefaults, ChebyshevOnSymmetricMatrices)
 {
@@ -244,7 +245,7 @@ TEST(UAMGSmootherDefaults, ChebyshevOnSymmetricMatrices)
 	EXPECT_EQ(cycle.PreSmoothingIterations, 1);
 
 	MultigridArguments nonsym = defaults("gcruamg", [](ProgramArguments& a) { a.Solver.MG.UAMGNonsymmetric = true; });
-	EXPECT_TRUE(nonsym.PreSmoother == SmootherType::BlockGaussSeidel);
+	EXPECT_TRUE(nonsym.PreSmoother == SmootherType::L1HybridBlockGaussSeidel);
 	EXPECT_TRUE(defaults("mg", none).PreSmoother == SmootherType::BlockGaussSeidel);
 	EXPECT_TRUE(defaults("fcguamg", [](ProgramArguments& a) { a.Solver.MG.PreSmoother = SmootherType::BlockGaussSeidel; }).PreSmoother == SmootherType::BlockGaussSeidel);
 }

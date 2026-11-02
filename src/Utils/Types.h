@@ -122,6 +122,8 @@ enum class SmootherType : unsigned
 	BackwardAlternatingBlockGaussSeidel,
 	HybridBlockGaussSeidel, // Gauss-Seidel in the rows of each thread, Jacobi between the threads
 	HybridBackwardBlockGaussSeidel,
+	L1HybridBlockGaussSeidel, // the same, the rows coupled to other threads or processes in l1 Gauss-Seidel (BlockGaussSeidel::L1Theta)
+	L1HybridBackwardBlockGaussSeidel,
 	ChebyshevFirstKind, // preconditioned by Jacobi
 	BlockChebyshevFirstKind, // preconditioned by block Jacobi
 	ChebyshevFourthKind,

@@ -223,9 +223,8 @@ namespace fhhos4
 
 	// The smoothers (Solver::PreSmoother and PostSmoother; fhhos4 -smoothers). The blocks: one per face. The Gauss-Seidel
 	// smoothers are sequential, except the hybrid ones. On several processes (MPI), they are Gauss-Seidel in each
-	// process (each thread for the hybrid ones), Jacobi between the processes. The rows coupled to other threads or
-	// processes have their diagonal increased by half the sum of the |a_ij| of these couplings (l1 shift), which keeps
-	// the smoothers convergent whatever the partition; none on 1 thread and 1 process.
+	// process (each thread for the hybrid ones), Jacobi between the processes (and the threads): this can diverge (e.g. in
+	// 3D, degree >= 2), except in the l1 ones.
 	enum class Smoother
 	{
 		Default,                        // chosen by the setup (see Solver::PreSmoother and PostSmoother)
@@ -237,6 +236,12 @@ namespace fhhos4
 		                                // separated; the results depend on the number of threads, not on the run. On 1
 		                                // thread: BlockGaussSeidel
 		HybridBackwardBlockGaussSeidel, // hrbgs
+		L1HybridBlockGaussSeidel,       // l1hbgs: HybridBlockGaussSeidel in l1 Gauss-Seidel (Baker et al., SISC 2011): the
+		                                // diagonal of the rows coupled to other threads or processes increased by half
+		                                // the sum of the |a_ij| of these couplings, which keeps it convergent whatever the
+		                                // partition. On 1 thread and 1 process: BlockGaussSeidel. At degree 0 (scalar
+		                                // blocks): HybridBlockGaussSeidel
+		L1HybridBackwardBlockGaussSeidel, // l1hrbgs
 		DampedBlockJacobi,              // bj23: block Jacobi damped by 2/3. Parallel
 		BlockChebyshevFirstKind,        // bcheb: block Chebyshev, a polynomial in D^-1 A (D: the block diagonal) whose
 		                                // degree is the number of smoothing iterations (each one, a block Jacobi
@@ -320,12 +325,14 @@ namespace fhhos4
 		// Smoothers. PreSmoother Default: chosen by the setup:
 		// - for a symmetric matrix (SetupSym...()), BlockChebyshevFourthKind: parallel, and its results don't depend
 		//   on the number of threads;
-		// - for a non-symmetric matrix (the Chebyshev smoothers require a symmetric one), HybridBlockGaussSeidel on
-		//   several threads (parallel), BlockGaussSeidel on 1.
+		// - for a non-symmetric matrix (the Chebyshev smoothers require a symmetric one), L1HybridBlockGaussSeidel:
+		//   parallel, convergent whatever the numbers of threads and processes. For convection-dominated problems,
+		//   HybridBlockGaussSeidel usually takes fewer iterations; keep the l1 one if the iterations stall, e.g. in 3D at
+		//   degree 2 or more, or on several processes.
 		// PostSmoother Default: the adjoint of PreSmoother, which makes the cycle symmetric: the sweep in the other
 		// direction for Gauss-Seidel (BackwardBlockGaussSeidel after BlockGaussSeidel, HybridBackwardBlockGaussSeidel after
-		// HybridBlockGaussSeidel, and the other way around), PreSmoother itself if it is symmetric (Chebyshev, Jacobi,
-		// SymmetricBlockGaussSeidel).
+		// HybridBlockGaussSeidel, L1HybridBackwardBlockGaussSeidel after L1HybridBlockGaussSeidel, and the other way
+		// around), PreSmoother itself if it is symmetric (Chebyshev, Jacobi, SymmetricBlockGaussSeidel).
 		// Non-symmetric matrix (SetupNonSym...()): on a level with one-sided couplings (convection), the Gauss-Seidel
 		// smoothers keep their type, block size and number of sweeps, but not their direction: all their sweeps
 		// (backward and symmetric ones included) follow the downwind order of the level. Jacobi ignores it.

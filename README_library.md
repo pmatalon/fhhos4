@@ -155,7 +155,12 @@ For a non-symmetric matrix (e.g. convection-diffusion), give also the block `A_F
 solver.SetupNonSym(A_TT, A_TF, A_FT, A_FF, cellInterpOfOne, faceInterpOfOne);
 ```
 The same algorithm runs, with GCR instead of FCG, and Gauss-Seidel smoothers that follow the direction of the flow (downwind
-order).
+order). The default smoother, `L1HybridBlockGaussSeidel`, converges whatever the numbers of threads and processes. For
+convection-dominated problems, `HybridBlockGaussSeidel` usually takes fewer iterations; keep the default if the
+iterations stall, e.g. in 3D at degree 2 or more, or on several processes:
+```cpp
+solver.PreSmoother = fhhos4::Smoother::HybridBlockGaussSeidel;
+```
 
 ### As a preconditioner
 
@@ -231,8 +236,8 @@ fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F); // the vectors of the 
   the number of processes.
 - Available on several processes: the uncondensed system (`SetupSym()`, `SetupNonSym()`), with all the
   parameters; the Gauss-Seidel smoothers are Gauss-Seidel in each process (the hybrid ones: in each thread), Jacobi
-  between the processes, the diagonal of the rows coupled to other processes or threads increased by half the sum of
-  the |a_ij| of these couplings (which keeps them convergent whatever the partition). Not yet: `CondensedMatrix()`.
+  between the processes, which can diverge (e.g. in 3D at degree 2 or more), except in the l1 ones (the default).
+  Not yet: `CondensedMatrix()`.
 - **Threads**: with several threads per process, give MUMPS's BLAS one thread (e.g. `BLIS_NUM_THREADS=1` with
   conda-forge's MUMPS, which uses BLIS; `OPENBLAS_NUM_THREADS=1`, `MKL_NUM_THREADS=1` for others): a threaded BLAS
   (BLIS starts its threads at each call) makes the many small products of the coarsest solves much slower. MUMPS
@@ -379,7 +384,7 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 | `Cycle` | `Cycle::K` | <ul><li>`V`</li><li>`W`</li><li>`K`: non-linear: a Krylov method around it must be flexible (FCG, GCR, FGMRES)</li></ul> |
 | `PCoarsening` | `PCoarsening::Minus2` | Degrees of the p-levels, from `FaceDegree` k: <ul><li>`Minus2`: k, k-2, ..., 0</li><li>`Minus1`: k, k-1, ..., 0</li><li>`ToZero`: k, 0, for bases not ordered by degree (more iterations from k = 3)</li></ul> |
 | `PreSmoothingIterations`, `PostSmoothingIterations` | `2` for Chebyshev (its degree), else `1` | Any value `>= 0` (`0`: none) |
-| `PreSmoother` | `Smoother::Default`: `BlockChebyshevFourthKind` if symmetric, else `HybridBlockGaussSeidel` (`BlockGaussSeidel` on 1 thread) | One block per face: <ul><li>`BlockGaussSeidel`, `BackwardBlockGaussSeidel`, `SymmetricBlockGaussSeidel`: sequential</li><li>`HybridBlockGaussSeidel`, `HybridBackwardBlockGaussSeidel`: parallel</li><li>`DampedBlockJacobi`: damping 2/3</li><li>`BlockChebyshevFirstKind`, `BlockChebyshevFourthKind`: parallel, symmetric matrices only</li></ul> |
+| `PreSmoother` | `Smoother::Default`: `BlockChebyshevFourthKind` if symmetric, else `L1HybridBlockGaussSeidel` | One block per face: <ul><li>`BlockGaussSeidel`, `BackwardBlockGaussSeidel`, `SymmetricBlockGaussSeidel`: sequential</li><li>`HybridBlockGaussSeidel`, `HybridBackwardBlockGaussSeidel`: parallel</li><li>`L1HybridBlockGaussSeidel`, `L1HybridBackwardBlockGaussSeidel`: parallel, l1 Gauss-Seidel (the diagonal of the rows coupled to other threads or processes increased by half the sum of the \|a_ij\| of these couplings): convergent whatever the numbers of threads and processes</li><li>`DampedBlockJacobi`: damping 2/3</li><li>`BlockChebyshevFirstKind`, `BlockChebyshevFourthKind`: parallel, symmetric matrices only</li></ul> |
 | `PostSmoother` | `Smoother::Default`: the adjoint of `PreSmoother` (symmetric cycle) | Same as `PreSmoother` |
 | `Prolongation` | `Prolongation::HarmonicExtension` | Values of the faces interior to an aggregate: <ul><li>`HarmonicExtension`: solve their rows of the condensed matrix (shorter setup)</li><li>`Reconstruction`: the article's, from the coarse cell, then one damped Jacobi iteration</li></ul> |
 | `CoarseningFactor` | `3.8` | Ratio of the numbers of cells of two successive h-levels |

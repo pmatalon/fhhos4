@@ -110,10 +110,10 @@ The multigrid levels stored and applied in single precision, the outer Krylov me
 **Hybrid smoother**:
 Gauss-Seidel within the rows of each thread, Jacobi between the threads.
 
-**l1 shift**:
-The diagonal of the rows of a Gauss-Seidel sweep coupled to other threads or processes (with which it is Jacobi)
-increased by theta times the sum of the absolute values of these couplings, and the right-hand side by theta times
-that sum times the old value.
+**l1 Gauss-Seidel** (l1 smoother, Baker et al. 2011):
+Gauss-Seidel whose rows coupled to other threads or processes (with which it is Jacobi) have their l1 term, theta
+times the sum of the absolute values of these couplings, added to their diagonal, and times the old value to their
+right-hand side.
 
 **Owner**:
 The process that holds a face's row in a distributed system: the smaller rank among its cells' processes.

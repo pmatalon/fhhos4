@@ -348,7 +348,8 @@ void ApplyProgramArgumentDefaults(ProgramArguments& args,
 
 		ApplyUncondensedAMGDefaults(args.Solver.MG, args.Discretization.PolyDegree - 1, defaultCoarseOperator, defaultCycle, defaultHPCoarseningStgy);
 
-		// For a non-symmetric matrix: the K-cycle iterates with GCR, LU on the coarsest level, no FCG
+		// For a non-symmetric matrix: the K-cycle iterates with GCR, LU on the coarsest level, no FCG; the library's
+		// smoother, the l1 hybrid block Gauss-Seidel (ADR-0018), the sequential block Gauss-Seidel on 1 thread and 1 process
 		if (args.Solver.MG.UAMGNonsymmetric)
 		{
 			if (args.Solver.SolverCode.compare("fcg") == 0)
@@ -356,6 +357,8 @@ void ApplyProgramArgumentDefaults(ProgramArguments& args,
 			args.Solver.MG.KCycleKrylov = KrylovMethod::GCR;
 			if (defaultCoarseSolver)
 				args.Solver.MG.CoarseSolverCode = "lu";
+			if (args.Solver.MG.PreSmoother == SmootherType::Default)
+				args.Solver.MG.PreSmoother = SmootherType::L1HybridBlockGaussSeidel;
 		}
 		// For a symmetric matrix, the library's smoother (ADR-0017): block Chebyshev of the fourth kind, degree 2, whose
 		// results don't depend on the numbers of threads and processes

@@ -302,6 +302,8 @@ NB_MODULE(fhhos4, m)
 		.value("SymmetricBlockGaussSeidel", fhhos4::Smoother::SymmetricBlockGaussSeidel)
 		.value("HybridBlockGaussSeidel", fhhos4::Smoother::HybridBlockGaussSeidel)
 		.value("HybridBackwardBlockGaussSeidel", fhhos4::Smoother::HybridBackwardBlockGaussSeidel)
+		.value("L1HybridBlockGaussSeidel", fhhos4::Smoother::L1HybridBlockGaussSeidel)
+		.value("L1HybridBackwardBlockGaussSeidel", fhhos4::Smoother::L1HybridBackwardBlockGaussSeidel)
 		.value("DampedBlockJacobi", fhhos4::Smoother::DampedBlockJacobi)
 		.value("BlockChebyshevFirstKind", fhhos4::Smoother::BlockChebyshevFirstKind)
 		.value("BlockChebyshevFourthKind", fhhos4::Smoother::BlockChebyshevFourthKind);

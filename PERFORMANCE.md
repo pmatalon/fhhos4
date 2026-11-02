@@ -1377,8 +1377,8 @@ solve (s), solve per iteration (ms) and its ratio to double CSR (of the time: be
   `README_library.md` and `README_program.md`.
 
 2026-11-01, the block Gauss-Seidel with Jacobi between the parts (threads of the hybrid sweeps, processes) diverges at
-k=2 in 3D; its l1 shift (`-gs-l1`, `BlockGaussSeidel::L1Theta`, opt-in that day, the default (1/2) since 2026-11-02, also
-in the library: `docs/uamg.md`, Smoothers), same binary, theta
+k=2 in 3D; in l1 Gauss-Seidel (`-gs-l1`, `BlockGaussSeidel::L1Theta`, opt-in that day; since 2026-11-02 the smoother
+`l1hbgs`, the default for a non-symmetric matrix, also in the library: `docs/uamg.md`, Smoothers), same binary, theta
 0 -> 1/2, iterations (200: the maximum), Cube-tet (GMSH), `OMP_NUM_THREADS=2` on several processes
 (`build-mpi/nonsym_stagnation/`):
 
@@ -1407,6 +1407,13 @@ plugged in, iterations and solve time (s), theta 0 -> 1/2 (a time ratio above 1:
 | 32^3 diffusion-dominated | 22 | 22 -> 23 (0.88 -> 0.92 s) | 23 -> 23 | 23 -> 24 (0.87 -> 0.91 s) |
 
 Where the hybrid sweeps converge (k <= 1, Cartesian numbering), the shift costs iterations: convection-dominated 5 -> 7.
+
+2026-11-02, l1 Gauss-Seidel (theta = 1/2) in HArDCore3D (its harness `build/bench_iface1/compare_h3d_after.sh`, the three
+sections: 50 runs, 4 threads, gcube16 / tet4 / voro10, k = 0-2), against theta 0 (a copy of the library that sets it
+to 0, preloaded: `build/bench_l1/theta0/`), the same executables: all converge, the L2 errors identical in all 50, the
+iterations identical in 40 (the symmetric runs: Chebyshev; k = 0: the scalar Gauss-Seidel, no shift); more in the 10
+non-symmetric runs at k >= 1, none of which diverged without it: convection-dominated gcube16 k=1 4 -> 7 (3 runs), k=2
+8 -> 11 and 7 -> 11, tet4 k=1 9 -> 14; diffusion-dominated 25 -> 26, 16 -> 17, 15 -> 17, 14 -> 16.
 
 Next ideas:
 1. **The memory per process** (2026-10-28 above), by expected gain:

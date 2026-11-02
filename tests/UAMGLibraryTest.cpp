@@ -27,7 +27,6 @@
 #include "fhhos4"
 #include "support/Kronecker.h"
 #include "support/RunHelper.h"
-#include "Solver/FixedPoint/BlockGaussSeidel.h"
 
 using namespace fhhos4_tests;
 
@@ -293,12 +292,12 @@ TEST(UAMGNonsymmetricProgram, NotWithFCG)
 
 #endif
 
-// The hybrid block Gauss-Seidel on 2 threads (Jacobi between their chunks) with the default l1 shift of the rows coupled
-// to the other chunk (-gs-l1 0.5): 61 iterations; without it (-gs-l1 0), the cycle diverges at k = 2 (GCR stopped at its
-// 200; 34 on one thread, sequential)
-//   ./bin/fhhos4 -geo cube -mesh tetra -n 4 -k 2 -s gcruamg -uamg-nonsym -smoothers hbgs,hrbgs -threads 2 -no-cache
+// The default smoothers of -uamg-nonsym, the l1 hybrid block Gauss-Seidel (l1hbgs, l1hrbgs), on 2 threads (Jacobi
+// between their chunks, the rows coupled to the other chunk in l1 Gauss-Seidel): 61 iterations; the hybrid one
+// (-smoothers hbgs,hrbgs) diverges at k = 2 (GCR stopped at its 200; 34 on one thread, sequential)
+//   ./bin/fhhos4 -geo cube -mesh tetra -n 4 -k 2 -s gcruamg -uamg-nonsym -threads 2 -no-cache
 #ifdef ENABLE_3D
-TEST(UAMGNonsymmetricProgram, HybridGaussSeidelL1Shift)
+TEST(UAMGNonsymmetricProgram, L1HybridGaussSeidel)
 {
 	ProgramArguments args;
 	args.Problem.GeoCode = "cube";
@@ -307,10 +306,10 @@ TEST(UAMGNonsymmetricProgram, HybridGaussSeidelL1Shift)
 	args.Discretization.PolyDegree = 3;
 	args.Solver.SolverCode = "gcruamg";
 	args.Solver.MG.UAMGNonsymmetric = true;
-	args.Solver.MG.PreSmoother = SmootherType::HybridBlockGaussSeidel;
-	args.Solver.MG.PostSmoother = SmootherType::HybridBackwardBlockGaussSeidel;
 	args.Actions.UseCache = false;
-	EXPECT_EQ(BlockGaussSeidel::L1Theta, 0.5);
+	ProgramArguments defaults = args;
+	ApplyProgramArgumentDefaults(defaults);
+	EXPECT_TRUE(defaults.Solver.MG.PreSmoother == SmootherType::L1HybridBlockGaussSeidel);
 	struct TwoThreads // while in scope
 	{
 		TwoThreads() { Parallelism::SetNThreads(2); }
@@ -1134,7 +1133,8 @@ TEST(UAMGLibrary, MUMPSCoarseSolver)
 }
 
 // The default smoothers: the Chebyshev of the fourth kind of degree 2 for a symmetric matrix, the same results on 4 and
-// 1 threads; for a non-symmetric one, the hybrid Gauss-Seidel (parallel) on several threads, the sequential one on 1
+// 1 threads; for a non-symmetric one, the l1 hybrid Gauss-Seidel on any number of threads (here at k = 0: the scalar
+// hybrid Gauss-Seidel, which has no l1 terms; on 1 thread, the sequential sweep)
 TEST(UAMGLibrary, DefaultSmoothers)
 {
 	for (bool symmetric : { true, false })
@@ -1157,12 +1157,11 @@ TEST(UAMGLibrary, DefaultSmoothers)
 			fhhos4::Result result = uamg.Solve(system.b, x);
 			std::string output = ::testing::internal::GetCapturedStdout();
 			std::string description = std::string(symmetric ? "symmetric" : "non-symmetric") + ", " + std::to_string(threads) + " threads";
-			bool chebyshev = symmetric, hybrid = !symmetric && threads > 1;
+			bool chebyshev = symmetric, hybrid = !symmetric;
 			EXPECT_EQ(output.find("PreSmoothing        : 2 iterations of Chebyshev (4th kind") != std::string::npos, chebyshev) << description;
 			EXPECT_EQ(output.find("PostSmoothing       : 2 iterations of Chebyshev (4th kind") != std::string::npos, chebyshev) << description;
 			EXPECT_EQ(output.find("1 iteration of Hybrid Gauss-Seidel (forward)") != std::string::npos, hybrid) << description;
 			EXPECT_EQ(output.find("1 iteration of Hybrid Gauss-Seidel (backward)") != std::string::npos, hybrid) << description;
-			EXPECT_EQ(output.find("1 iteration of Gauss-Seidel (backward)") != std::string::npos, !symmetric && threads == 1) << description;
 			EXPECT_TRUE(result.Converged) << description;
 			EXPECT_LT(result.Iterations, 30) << description;
 			EXPECT_LT(RelativeError(system, x), 1e-8) << description;
@@ -1209,6 +1208,8 @@ TEST(UAMGLibrary, DefaultPostSmoother)
 		{ fhhos4::Smoother::SymmetricBlockGaussSeidel,      "Symmetric Gauss-Seidel" },
 		{ fhhos4::Smoother::HybridBlockGaussSeidel,         "Hybrid Gauss-Seidel (backward)" },
 		{ fhhos4::Smoother::HybridBackwardBlockGaussSeidel, "Hybrid Gauss-Seidel (forward)" },
+		{ fhhos4::Smoother::L1HybridBlockGaussSeidel,         "Hybrid Gauss-Seidel (backward)" }, // scalar: no l1 terms
+		{ fhhos4::Smoother::L1HybridBackwardBlockGaussSeidel, "Hybrid Gauss-Seidel (forward)" },
 		{ fhhos4::Smoother::DampedBlockJacobi,              "Jacobi (omega=2/3)" }
 	};
 	for (const auto& [preSmoother, postSmoother] : cases)

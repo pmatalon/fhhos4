@@ -159,16 +159,17 @@ program `-uamg-bcsr`.
 - Default: block Chebyshev of the fourth kind, degree 2, for a symmetric matrix (ADR-0017;
   `Smoother::BlockChebyshevFourthKind`, `bcheb4` in the program; `Pre/PostSmoothingIterations` -1: degree 2), also in
   the program (`SmootherType::Default` resolved by `ApplyProgramArgumentDefaults()`: `bcheb4`, K(2,2) without
-  `-cycle`); `bgs,rbgs` for `-uamg-nonsym` and the program's other multigrids.
+  `-cycle`). For a non-symmetric matrix, l1 hybrid block Gauss-Seidel (`L1HybridBlockGaussSeidel`, `l1hbgs,l1hrbgs`,
+  ADR-0018), also for `-uamg-nonsym`; `bgs,rbgs` for the program's other multigrids.
 - Chebyshev (`bcheb4`, `bcheb`; `Solver/FixedPoint/BlockChebyshev.h`): symmetric matrices only (the library refuses
   them otherwise); `lambdaMax` of `D^-1 A` by 10 Lanczos iterations at the setup.
-- Non-symmetric matrix on several threads: hybrid block Gauss-Seidel (`hbgs`, `hrbgs`; ADR-0018; scalar kernels at
-  k = 0; `Solver/FixedPoint/HybridChunks.h`), sequential sweeps on a level where more than 20% of the non-zeros couple
-  rows of different threads (`HybridChunks::MaxExternalFraction`; e.g. GMSH's numbering on the tetrahedral meshes).
+- Hybrid block Gauss-Seidel (`hbgs`, `hrbgs`; ADR-0018; scalar kernels at k = 0; `Solver/FixedPoint/HybridChunks.h`):
+  sequential sweeps on a level where more than 20% of the non-zeros couple rows of different threads
+  (`HybridChunks::MaxExternalFraction`; e.g. GMSH's numbering on the tetrahedral meshes).
 - Jacobi between the parts (the chunks of the hybrid sweeps, the processes) is not a contraction at k = 2 in 3D under
-  that threshold: the cycle diverges. l1 shift (ADR-0018; `BlockGaussSeidel::L1Theta`, default 1/2, also in the
-  library; program `-gs-l1`, 0: none; block Gauss-Seidel only, not the scalar one of k = 0): the rows coupled to other
-  parts get theta sum_j |a_ij| over those couplings (`HybridChunks::AddExternalAbsoluteSums()`, the rows of `Offd`) on
-  their diagonal, in the factorized blocks (refactorized when the chunks change: `SetupL1Shift()`), and times the old
-  x_i in the right-hand side (`SweepRhs()`). theta = 1/2: M + M^T - A >= D for a symmetric A, whatever the parts. No row is
-  shifted on one thread and one process.
+  that threshold: the cycle diverges. l1 Gauss-Seidel (`l1hbgs`, `l1hrbgs`: `BlockGaussSeidel` with `l1`; ADR-0018;
+  block sweeps only, not the scalar ones of k = 0): the rows coupled to other parts get their l1 term, theta
+  sum_j |a_ij| over those couplings (`HybridChunks::AddExternalAbsoluteSums()`, the rows of `Offd`), on their diagonal,
+  in the factorized blocks (refactorized when the chunks change: `SetupL1Terms()`), and times the old x_i in the
+  right-hand side (`SweepRhs()`). theta: `BlockGaussSeidel::L1Theta`, 1/2 (program `-gs-l1`): M + M^T - A >= D for a
+  symmetric A, whatever the parts. No row has an l1 term on one thread and one process.
