@@ -302,7 +302,7 @@ void print_usage() {
 	cout << "      l1 shift theta of the block Gauss-Seidel smoothers (bgs, hbgs...) on the rows coupled to other threads (hybrid" << endl;
 	cout << "      sweeps) or processes, with which they are Jacobi: theta sum_j |a_ij| over these couplings added to the diagonal" << endl;
 	cout << "      (and theta sum_j |a_ij| x_i to the right-hand side). From 1/2, convergent whatever the parts (symmetric matrix)." << endl;
-	cout << "      No effect on one thread and one process, nor on the library (-s *libuamg). Default: 0 (none)." << endl;
+	cout << "      No effect on one thread and one process; the library (-s *libuamg) keeps its default. Default: 0.5 (0: none)." << endl;
 	cout << endl;
 	cout << "-restart NUM" << endl;
 	cout << "      Iteration period to restart the algorithm (bihar-cg), or the library's Restart (-s libuamg: the directions stored" << endl;

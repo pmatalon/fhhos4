@@ -28,8 +28,9 @@ public:
 	// symmetric A, M + M^T - A = D - O (O: the couplings between the parts) can be indefinite, and the cycle then
 	// diverges (3D, k = 2). l1 shift (Baker et al., SISC 2011), only on the rows coupled to other parts: their diagonal
 	// blocks D_I + theta diag(sum_j |O_ij|), and theta sum_j |O_ij| x_i(old) added to the right-hand side. From
-	// theta = 1/2, M + M^T - A >= D, whatever the parts. 0: none (-gs-l1). On one thread and one process, no row is shifted.
-	inline static double L1Theta = 0;
+	// theta = 1/2 (the default), M + M^T - A >= D, whatever the parts. 0: none (-gs-l1 0). On one thread and one process,
+	// no row is shifted.
+	inline static double L1Theta = 0.5;
 
 	BlockGaussSeidel(int blockSize, Direction direction, bool hybrid)
 	{

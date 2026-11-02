@@ -193,9 +193,10 @@ namespace
 	// BlockGaussSeidel::L1Theta while in scope
 	class WithL1Theta
 	{
+		double _saved = BlockGaussSeidel::L1Theta;
 	public:
 		WithL1Theta(double theta) { BlockGaussSeidel::L1Theta = theta; }
-		~WithL1Theta() { BlockGaussSeidel::L1Theta = 0; }
+		~WithL1Theta() { BlockGaussSeidel::L1Theta = _saved; }
 	};
 
 	// Runs test(A, blockSize, order, direction, b, x0, xEquals0, description) on every case: scalar and blocks, natural
@@ -226,9 +227,11 @@ namespace
 	}
 }
 
-// Gauss-Seidel in the chunks, Jacobi between them (a straightforward implementation), on 4 threads
+// Gauss-Seidel in the chunks, Jacobi between them (a straightforward implementation), on 4 threads; without the l1
+// shift of the block sweeps (see L1Shift)
 TEST(HybridGaussSeidelTest, MatchesTheReference)
 {
+	WithL1Theta noShift(0);
 	Threads threads(4);
 	ForEachCase([](const SparseMatrix& A, int blockSize, const std::vector<BigNumber>* order, Direction direction, const Vector& b, const Vector& x0, bool xEquals0, const std::string& description)
 	{
@@ -276,9 +279,10 @@ TEST(HybridGaussSeidelTest, OneThreadIsSequential)
 	});
 }
 
-// The chunks follow the number of threads, which can change between two solves
+// The chunks follow the number of threads, which can change between two solves (without the l1 shift: see L1Shift)
 TEST(HybridGaussSeidelTest, NumberOfThreadsChangesBetweenSolves)
 {
+	WithL1Theta noShift(0);
 	for (int blockSize : { 1, 3 })
 	{
 		SparseMatrix A = TestMatrix(blockSize);
@@ -294,8 +298,9 @@ TEST(HybridGaussSeidelTest, NumberOfThreadsChangesBetweenSolves)
 	}
 }
 
-// The l1 shift (BlockGaussSeidel::L1Theta) of the block rows coupled to other chunks, on 4 threads; when the number of
-// threads changes between two solves, the shifted blocks follow it (none on 1 thread: the sequential sweep)
+// The l1 shift (BlockGaussSeidel::L1Theta, 1/2 by default) of the block rows coupled to other chunks, on 4 threads;
+// when the number of threads changes between two solves, the shifted blocks follow it (none on 1 thread: the
+// sequential sweep)
 TEST(HybridGaussSeidelTest, L1Shift)
 {
 	WithL1Theta theta(0.5);

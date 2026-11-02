@@ -1377,7 +1377,8 @@ solve (s), solve per iteration (ms) and its ratio to double CSR (of the time: be
   `README_library.md` and `README_program.md`.
 
 2026-11-01, the block Gauss-Seidel with Jacobi between the parts (threads of the hybrid sweeps, processes) diverges at
-k=2 in 3D; its l1 shift (`-gs-l1`, `BlockGaussSeidel::L1Theta`, opt-in: `docs/uamg.md`, Smoothers), same binary, theta
+k=2 in 3D; its l1 shift (`-gs-l1`, `BlockGaussSeidel::L1Theta`, opt-in that day, the default (1/2) since 2026-11-02, also
+in the library: `docs/uamg.md`, Smoothers), same binary, theta
 0 -> 1/2, iterations (200: the maximum), Cube-tet (GMSH), `OMP_NUM_THREADS=2` on several processes
 (`build-mpi/nonsym_stagnation/`):
 

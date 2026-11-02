@@ -231,7 +231,8 @@ fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F); // the vectors of the 
   the number of processes.
 - Available on several processes: the uncondensed system (`SetupSym()`, `SetupNonSym()`), with all the
   parameters; the Gauss-Seidel smoothers are Gauss-Seidel in each process (the hybrid ones: in each thread), Jacobi
-  between the processes. Not yet: `CondensedMatrix()`.
+  between the processes, the diagonal of the rows coupled to other processes or threads increased by half the sum of
+  the |a_ij| of these couplings (which keeps them convergent whatever the partition). Not yet: `CondensedMatrix()`.
 - **Threads**: with several threads per process, give MUMPS's BLAS one thread (e.g. `BLIS_NUM_THREADS=1` with
   conda-forge's MUMPS, which uses BLIS; `OPENBLAS_NUM_THREADS=1`, `MKL_NUM_THREADS=1` for others): a threaded BLAS
   (BLIS starts its threads at each call) makes the many small products of the coarsest solves much slower. MUMPS

@@ -293,10 +293,10 @@ TEST(UAMGNonsymmetricProgram, NotWithFCG)
 
 #endif
 
-// The hybrid block Gauss-Seidel on 2 threads (Jacobi between their chunks) with the l1 shift of the rows coupled to the
-// other chunk (-gs-l1 0.5): 61 iterations; without it, the cycle diverges at k = 2 (GCR stopped at its 200; 34 on one
-// thread, sequential)
-//   ./bin/fhhos4 -geo cube -mesh tetra -n 4 -k 2 -s gcruamg -uamg-nonsym -smoothers hbgs,hrbgs -threads 2 -gs-l1 0.5 -no-cache
+// The hybrid block Gauss-Seidel on 2 threads (Jacobi between their chunks) with the default l1 shift of the rows coupled
+// to the other chunk (-gs-l1 0.5): 61 iterations; without it (-gs-l1 0), the cycle diverges at k = 2 (GCR stopped at its
+// 200; 34 on one thread, sequential)
+//   ./bin/fhhos4 -geo cube -mesh tetra -n 4 -k 2 -s gcruamg -uamg-nonsym -smoothers hbgs,hrbgs -threads 2 -no-cache
 #ifdef ENABLE_3D
 TEST(UAMGNonsymmetricProgram, HybridGaussSeidelL1Shift)
 {
@@ -310,10 +310,11 @@ TEST(UAMGNonsymmetricProgram, HybridGaussSeidelL1Shift)
 	args.Solver.MG.PreSmoother = SmootherType::HybridBlockGaussSeidel;
 	args.Solver.MG.PostSmoother = SmootherType::HybridBackwardBlockGaussSeidel;
 	args.Actions.UseCache = false;
-	struct TwoThreadsL1Shift // while in scope
+	EXPECT_EQ(BlockGaussSeidel::L1Theta, 0.5);
+	struct TwoThreads // while in scope
 	{
-		TwoThreadsL1Shift() { Parallelism::SetNThreads(2); BlockGaussSeidel::L1Theta = 0.5; }
-		~TwoThreadsL1Shift() { Parallelism::SetNThreads(0); BlockGaussSeidel::L1Theta = 0; }
+		TwoThreads() { Parallelism::SetNThreads(2); }
+		~TwoThreads() { Parallelism::SetNThreads(0); }
 	} scope;
 	EXPECT_EQ(RunDiffusionHHO(args).IterationCount, 61);
 }

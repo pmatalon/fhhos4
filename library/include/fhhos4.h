@@ -223,7 +223,9 @@ namespace fhhos4
 
 	// The smoothers (Solver::PreSmoother and PostSmoother; fhhos4 -smoothers). The blocks: one per face. The Gauss-Seidel
 	// smoothers are sequential, except the hybrid ones. On several processes (MPI), they are Gauss-Seidel in each
-	// process (each thread for the hybrid ones), Jacobi between the processes.
+	// process (each thread for the hybrid ones), Jacobi between the processes. The rows coupled to other threads or
+	// processes have their diagonal increased by half the sum of the |a_ij| of these couplings (l1 shift), which keeps
+	// the smoothers convergent whatever the partition; none on 1 thread and 1 process.
 	enum class Smoother
 	{
 		Default,                        // chosen by the setup (see Solver::PreSmoother and PostSmoother)

@@ -154,8 +154,8 @@ mpiexec -n 4 ./bin/fhhos4 -geo cube -mesh tetra -n 16 -k 1 -s fcglibuamg
   (`-s fcglibuamg`, `libuamg`, `gcrlibuamg`) or the program's (`-s fcguamg`, `uamg`, `gcruamg`), also with
   `-uamg-nonsym`, with its default options and the smoothers block Chebyshev (the default for a symmetric matrix, whose
   results don't depend on the number of processes), block Jacobi and block Gauss-Seidel (Gauss-Seidel in each process,
-  Jacobi between them: it can converge much more slowly than on one process, or stagnate, e.g. in 3D at k=2; `-gs-l1 0.5`
-  shifts the rows coupled to other processes, and converges, more slowly than on one process). Refused: the other meshers, problems, discretizations and solvers,
+  Jacobi between them, with the l1 shift of the rows coupled to other processes (`-gs-l1`, default 0.5; 0 can stagnate,
+  e.g. in 3D at k=2): it converges more slowly than on one process). Refused: the other meshers, problems, discretizations and solvers,
   the exports, initial guesses other than 0.
 - On one process (`mpiexec -n 1`, or without `mpiexec`), the program is the one compiled without MPI.
 
