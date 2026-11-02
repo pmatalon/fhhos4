@@ -1,4 +1,4 @@
-# The fhhos4 solver as an external library
+# The fhhos4 multigrid solver as an external library
 
 1. [Installation](#1-installation)
    - [Install from source](#install-from-source)
@@ -9,15 +9,15 @@
 3. [How to use](#3-how-to-use)
    - [Symmetric systems](#symmetric-systems)
    - [Non-symmetric systems](#non-symmetric-systems)
-   - [As a preconditioner](#as-a-preconditioner)
-   - [Several processes (MPI)](#several-processes-mpi)
-   - [Python](#python)
+   - [Use as a preconditioner](#use-as-a-preconditioner)
+   - [With MPI](#with-mpi)
+   - [The Python interface](#the-python-interface)
    - [Inputs](#inputs)
-   - [Other matrix formats: provided helpers](#other-matrix-formats-provided-helpers)
+   - [Other matrix formats](#other-matrix-formats)
    - [Parameters](#parameters)
    - [Constraints](#constraints)
-   - [License](#license)
-   - [Version](#version)
+4. [License](#license)
+5. [Version](#version)
 
 # 1. Installation
 
@@ -162,7 +162,7 @@ iterations stall, e.g. in 3D at degree 2 or more, or on several processes:
 solver.PreSmoother = fhhos4::Smoother::HybridBlockGaussSeidel;
 ```
 
-### As a preconditioner
+### Use as a preconditioner
 
 The library includes everything to use it as a solver, Krylov method included. 
 However, it can also precondition an external Krylov
@@ -194,17 +194,15 @@ solver.SolveCellUnknowns(b_T, x_F, x_T); // use fhhos4 to solve the cell unknown
 The default K-cycle is non-linear, which means that your Krylov method **must be flexible** (FCG, FGMRES, GCR).
 V- and W-cycles work with any Krylov method (CG, GMRES), but are not recommended for performance reasons.
 
-### Several processes (MPI)
+### With MPI
 
-Compiled with MPI (`-DENABLE_MPI=ON`; `FHHOS4_MPI` is then 1), a solver works on the processes of its communicator,
+Compiled with MPI (`-DENABLE_MPI=ON`), the solver works on the processes of its communicator,
 `Comm`:
 
 - not set (`MPI_COMM_NULL`, the default) or `MPI_COMM_SELF`: the system of the calling process, solved by it alone, as
   without MPI. Not set, the solver makes no MPI call: a code that doesn't use MPI needs no change, MPI not even
-  initialized (but for `CoarseSolver::MUMPS`, which needs it). Forgotten for a distributed system, the setup refuses
-  its inputs (ghosts, `A_FF` with more columns than rows) and says to set `Comm`;
-- a communicator of several processes: one system distributed by rows over them. Every setup and solve is then
-  collective: called by all the processes of `Comm`, with the same parameters.
+  initialized (but for `CoarseSolver::MUMPS`, which needs it).
+- a communicator of several processes: the system is distributed by rows.
 
 The distributed system: each process owns cells and faces, numbered contiguously in rank order (the cells of the
 process of rank 0 first, then those of rank 1...; the same for the faces), and gives the rows of its own:
@@ -245,7 +243,7 @@ fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F); // the vectors of the 
 - In Python: see [Python](#python).
 - The errors of the inputs are raised on all the processes.
 
-### Python
+### The Python interface
 
 The Python module `fhhos4` has the same interface, with the same names, on NumPy arrays read in place, as the library
 reads its inputs: never copied nor converted (with its own matrix types, Python having no Eigen: `fhhos4.CSRView`,
@@ -335,7 +333,9 @@ result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
   times each unit vector, **interleaved by component** (array of structures): `phi_i e_c` is the DoF `n i + c` of the
   block. The interpolations of 1 stay those of the scalar bases, one coefficient per cell and per face.
 
-### Other matrix formats: provided helpers
+### Other matrix formats
+
+`fhhos4` provides the following helper functions to convert your matrices to the format `fhhos4` expects.
 
 | Your matrices | How to convert | Makes a copy? |
 |---|---|---|
@@ -415,7 +415,7 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 - **MPI**: the calling code initializes MPI (the library calls MPI from the main thread only: `MPI_THREAD_FUNNELED`),
   and `Comm` stays valid while the solver is used.
 
-## License
+# License
 
 LGPL-3.0-or-later, like the rest of fhhos4 (see [README.md](README.md)). The library only depends on Eigen (MPL-2.0),
 and, compiled with MPI or `ENABLE_MUMPS`, on MPI and MUMPS (CeCILL-C, compatible with the LGPL; MUMPS's own
@@ -423,7 +423,7 @@ dependencies depend on its build: conda-forge's `mumps-mpi` brings ParMETIS, who
 on the GPL dependencies of the program (GMSH, CGAL): codes under other licenses can link it, under the conditions
 of section 4 of the LGPL (in short: keep the license notices, and let the user replace the shared library).
 
-## Version
+# Version
 
 - `find_package(fhhos4 1.5 REQUIRED)` accepts the versions 1.x with x >= 5.
 - Binary compatibility only within a minor version (`libfhhos4.so.1.5`): adding a parameter to `fhhos4::Solver`
