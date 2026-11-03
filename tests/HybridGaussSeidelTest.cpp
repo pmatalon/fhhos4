@@ -149,7 +149,7 @@ namespace
 		std::unique_ptr<IterativeSolver> gs;
 		if (blockSize == 1)
 		{
-			GaussSeidel* scalar = new GaussSeidel(direction, hybrid);
+			GaussSeidel* scalar = new GaussSeidel(direction, hybrid, l1);
 			scalar->SweepOrder = order;
 			gs.reset(scalar);
 		}
@@ -304,19 +304,17 @@ TEST(HybridGaussSeidelTest, NumberOfThreadsChangesBetweenSolves)
 	}
 }
 
-// The l1 Gauss-Seidel of the block sweeps (L1HybridBlockGaussSeidel: the l1 terms, BlockGaussSeidel::L1Theta, of the
-// block rows coupled to other chunks), on 4 threads; when the number of threads changes between two solves, the blocks
+// The l1 Gauss-Seidel (L1HybridBlockGaussSeidel: the l1 terms, IterativeSolver::L1Theta, of the (block) rows coupled to
+// other chunks), scalar and in blocks, on 4 threads; when the number of threads changes between two solves, the blocks
 // with l1 terms follow it (none on 1 thread: the sequential sweep)
 TEST(HybridGaussSeidelTest, L1GaussSeidel)
 {
-	double theta = BlockGaussSeidel::L1Theta;
+	double theta = IterativeSolver::L1Theta;
 	EXPECT_EQ(theta, 0.5);
 	{
 		Threads threads(4);
 		ForEachCase([theta](const SparseMatrix& A, int blockSize, const std::vector<BigNumber>* order, Direction direction, const Vector& b, const Vector& x0, bool xEquals0, const std::string& description)
 		{
-			if (blockSize == 1) // the scalar Gauss-Seidel has no l1 terms
-				return;
 			bool backward = direction == Direction::Backward;
 			Vector reference = ReferenceSweep(A, blockSize, b, x0, order, 4, backward, theta);
 			Vector x = Sweep(*CreateGaussSeidel(A, blockSize, true, direction, order, true), b, x0, xEquals0);
@@ -423,7 +421,7 @@ TEST(HybridGaussSeidelTest, SinglePrecision)
 		FloatVector singleB = b.cast<float>(), singleX0 = x0.cast<float>();
 		for (bool hybrid : { true, false })
 		{
-			bool l1 = blockSize > 1 && hybrid;
+			bool l1 = hybrid;
 			std::string label = description + (hybrid ? ", hybrid" : "") + (l1 ? ", l1" : "");
 			Vector reference = Sweep(*CreateGaussSeidel(A, blockSize, hybrid, direction, order, l1), b, x0, xEquals0);
 			auto csr = NewGaussSeidel(blockSize, hybrid, direction, order, l1);

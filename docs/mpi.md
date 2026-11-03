@@ -103,6 +103,7 @@ program too: `-DENABLE_PROGRAM=ON`).
 
 `fhhos4_mpi_tests` (`tests/MPI`, own `main()`, `ctest -R MPI_np`: 1-4 processes; `tests/support/PartitionedSystem.h`;
 `MUMPSTest.cpp`: the coarse solver alone, with an empty first process, MUMPS's host);
-`ctest -R ProgramMPI` (the program under `mpiexec`, L2 errors; 3D k=2 also the iterations of one process; `ProgramMPI_PartitionCache_*`: a partition written,
+`ctest -R ProgramMPI` (the program under `mpiexec`, L2 errors; 3D k=2 also the iterations of one process; 3D k=0
+`-uamg-nonsym` its 28 iterations on 4 processes, 200 without the l1 terms of the scalar sweeps; `ProgramMPI_PartitionCache_*`: a partition written,
 read by the next run, refused for another number of processes, in `build-mpi/test_partition_cache`); in an MPI build, `fhhos4_tests` uses
 `tests/MPI/main.cpp` (MPI initialized), `ToySolver()` without `Comm`.

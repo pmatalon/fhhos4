@@ -14,7 +14,7 @@ protected:
 	int _blockSize;
 	Direction _direction;
 	bool _hybrid = false;
-	bool _l1 = false; // l1 Gauss-Seidel (see L1Theta)
+	bool _l1 = false; // l1 Gauss-Seidel (see IterativeSolver::L1Theta)
 
 	BlockDiagonalSolver diagBlockSolver; // solves the systems with the diagonal blocks
 	DiagonalBlockPositions _diagBlock;   // positions of the diagonal block in each row (in CSR)
@@ -27,14 +27,6 @@ public:
 	// If set, every sweep (forward or backward, pre- or post-smoothing) processes the block rows in this order: the
 	// downwind order of a convection-dominated matrix (DownwindOrder()), which all the sweeps then follow
 	const vector<BigNumber>* SweepOrder = nullptr;
-
-	// Gauss-Seidel within each part (the process, the chunk of a thread in the hybrid sweeps), Jacobi between them: for a
-	// symmetric A, M + M^T - A = D - O (O: the couplings between the parts) can be indefinite, and the cycle then
-	// diverges (3D, k = 2). l1 Gauss-Seidel (l1: Baker et al., SISC 2011), on the rows coupled to other parts: their
-	// diagonal blocks D_I + theta diag(sum_j |O_ij|), and theta sum_j |O_ij| x_i(old) added to the right-hand side (the
-	// l1 terms). From theta = 1/2 (the default), M + M^T - A >= D, whatever the parts (-gs-l1). On one thread and one
-	// process, no row has an l1 term: the sequential block Gauss-Seidel.
-	inline static double L1Theta = 0.5;
 
 	BlockGaussSeidel(int blockSize, Direction direction, bool hybrid, bool l1 = false)
 	{
@@ -444,28 +436,15 @@ private:
 		if (theta == 0 && _l1Terms.size() == 0)
 			return;
 		BigNumber n = Rows<T>();
-		Vector terms = Vector::Zero(n);
-		if (theta != 0)
+		Vector terms = L1Terms<T>(theta, [&](Vector& sums)
 		{
-			if (const DistributedMatrixOf<T>* distributed = DistributedOf<T>())
-			{
-				const SparseMatrixOf<T>& O = distributed->Offd;
-				#pragma omp parallel for
-				for (BigNumber i = 0; i < O.rows(); i++)
-				{
-					for (typename SparseMatrixOf<T>::InnerIterator it(O, i); it; ++it)
-						terms[i] += abs(it.value());
-				}
-			}
-			if (_hybrid && _chunks.Parallel())
-			{
-				if (const BlockSparseMatrix<T>* blocks = BlockMatrixOf<T>())
-					_chunks.AddExternalAbsoluteSums(*blocks, terms);
-				else
-					_chunks.AddExternalAbsoluteSums(MatrixOf<T>(), terms);
-			}
-			terms *= theta;
-		}
+			if (!_hybrid || !_chunks.Parallel())
+				return;
+			if (const BlockSparseMatrix<T>* blocks = BlockMatrixOf<T>())
+				_chunks.AddExternalAbsoluteSums(*blocks, sums);
+			else
+				_chunks.AddExternalAbsoluteSums(MatrixOf<T>(), sums);
+		});
 		Vector old = _l1Terms.size() > 0 ? _l1Terms : Vector::Zero(n);
 		vector<BigNumber> changed;
 		for (BigNumber I = 0; I < n / _blockSize; I++)

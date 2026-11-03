@@ -53,11 +53,11 @@ private:
 			return new BlockSORSmoother(blockSize, omega, direction, nSmootherIterations);
 	}
 
-	// l1: the rows coupled to other threads or processes in l1 Gauss-Seidel (blocks only: the scalar Gauss-Seidel has none)
+	// l1: the rows coupled to other threads or processes in l1 Gauss-Seidel
 	static Smoother* HybridBlockGaussSeidel(int blockSize, Direction direction, int nSmootherIterations, bool l1 = false)
 	{
 		if (blockSize == 1) // the scalar kernels are faster
-			return new GaussSeidelSmoother(direction, true, nSmootherIterations);
+			return new GaussSeidelSmoother(direction, true, nSmootherIterations, l1);
 		return new BlockGaussSeidelSmoother(blockSize, direction, true, nSmootherIterations, l1);
 	}
 

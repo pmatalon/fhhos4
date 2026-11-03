@@ -1376,6 +1376,39 @@ solve (s), solve per iteration (ms) and its ratio to double CSR (of the time: be
   with BLIS's threads (1.6-5.6x slower than with one) is its threads started at each call: `BLIS_NUM_THREADS=1` in
   `README_library.md` and `README_program.md`.
 
+2026-11-03, the Gauss-Seidel smoothers in block CSR and in mixed precision on several processes (`e06adaaa`): the
+program (`build-mpi/gs_mixed_mpi/bench.sh`), Cube-tet n=16, double CSR / double block CSR (`-uamg-bcsr`) / mixed
+precision (`-uamg-mixed`) interleaved, bound to the cores, `BLIS_NUM_THREADS=1`, plugged in, best of 2; solve (s) and its
+time ratio to double CSR (below 1: faster). The same iterations in the three modes everywhere:
+
+| Case, processes x threads | Iterations | Double CSR | Double block CSR | Mixed precision |
+|---|---|---|---|---|
+| k=2 `gcruamg -uamg-nonsym` (l1 hybrid block Gauss-Seidel), 1 x 8 | 35 | 1.652 | 1.631 (x0.99) | 1.195 (x0.72) |
+| 2 x 4 | 64 | 2.342 | 2.188 (x0.93) | 1.688 (x0.72) |
+| 4 x 2 | 90 | 2.559 | 2.267 (x0.89) | 1.800 (x0.70) |
+| 4 x 1 | 66 | 1.812 | 1.610 (x0.89) | 1.261 (x0.70) |
+| k=1 `gcruamg -uamg-nonsym`, 1 x 8 | 34 | 0.660 | 0.686 (x1.04) | 0.460 (x0.70) |
+| 2 x 4 | 38 | 0.595 | 0.632 (x1.06) | 0.482 (x0.81) |
+| 4 x 2 | 49 | 0.614 | 0.611 (x1.00) | 0.523 (x0.85) |
+| 4 x 1 | 43 | 0.511 | 0.512 (x1.00) | 0.395 (x0.77) |
+| k=2 `fcguamg -smoothers bgs`, 1 x 8 | 33 | 1.704 | 1.543 (x0.91) | 1.276 (x0.75) |
+| 2 x 4, 4 x 2, 4 x 1 | 200 (not converged) | 7.320, 5.754, 5.321 | x0.96, x0.90, x0.91 | x0.65, x0.62, x0.65 |
+| k=0 `gcruamg -uamg-nonsym` (scalar hybrid Gauss-Seidel), 1 x 8 | 28 | 0.635 | - | 0.567 (x0.89) |
+| 2 x 4, 4 x 2, 4 x 1 | 200 (not converged) | 3.839, 4.003, 3.095 | - | x0.87, x0.86, x0.84 |
+
+- The mixed precision gains as on one process (k=2 x0.70-0.72, k=1 x0.70-0.85): `Offd` and the halo exchanges stay in
+  CSR, the coarsest solve in double. The block CSR alone x0.89-1.06.
+- Not converged in 200 iterations, in all the modes: the plain block Gauss-Seidel (`bgs`) at k=2 between processes (as
+  in `.scratch/uamg/issues/08`, the reason of l1), and the k=0 non-symmetric path (`-uamg-nonsym` on this symmetric
+  matrix: the scalar hybrid Gauss-Seidel, which has no l1 terms) on 2 and 4 processes: GCR stagnates at a relative
+  residual of 3.7e-2 (28 iterations on one process); the same with `base-mpi/bin/fhhos4` of 2026-10-27 (its plain
+  Gauss-Seidel): not a regression. The l1 hybrid block Gauss-Seidel's iterations grow with the processes at k=2
+  (35 -> 64-90).
+- Then the scalar sweeps in l1 Gauss-Seidel too (`GaussSeidel` with `l1`, `l1hbgs` at k=0): Cube-tet n=32 k=0
+  `-uamg-nonsym` 200 (stagnated) -> 29 / 30 / 29 iterations on 2 x 4 / 4 x 2 / 4 x 1 (28 on 1 x 8, unchanged); n=16
+  2 x 4 117 -> 26. k=1 and k=2 on several processes: the same iterations (k=2 65 / 90 / 66, k=1 38 / 50 / 43): their
+  k=0 levels below the p-coarsening were not the cause of their growth.
+
 2026-11-01, the block Gauss-Seidel with Jacobi between the parts (threads of the hybrid sweeps, processes) diverges at
 k=2 in 3D; in l1 Gauss-Seidel (`-gs-l1`, `BlockGaussSeidel::L1Theta`, opt-in that day; since 2026-11-02 the smoother
 `l1hbgs`, the default for a non-symmetric matrix, also in the library: `docs/uamg.md`, Smoothers), same binary, theta
@@ -1757,6 +1790,20 @@ Possible now that reordering the arithmetic operations is allowed (rejected so f
   The block CSR alone gains little (x0.92-0.99, against x0.74-0.94 for Chebyshev); likely cause, not measured: a sweep
   sums each row in one chain of dependent operations (see "Shorter dependency chains in the sweeps"), which fewer bytes
   per non-zero don't shorten.
+  HArDCore3D (`hho-diff-advec-reac`, the library's defaults for its non-symmetric systems: the l1 hybrid block
+  Gauss-Seidel; `build/gs_mixed/h3d/ab.sh`): the library of 2703e7ee preloaded (the levels in double: `MixedPrecision`
+  did not apply to `SetupNonSym()`) against the new default (mixed precision), plugged in. The 14 runs of
+  `compare_h3d_after.sh`'s advection section (gcube16 k=0-2, `M0`, tet4, voro10; diffusion-dominated `-c 1 2 3 0` and
+  convection-dominated `-c 1 1 5 0`; 4 threads): the same iterations, the same L2 and energy errors (to the 6 digits
+  printed). gcube32, 8 threads, best of 2, HArDCore3D's "Solving time" (wall: the library's setup and solve): the same
+  iterations and errors; diffusion-dominated k=1 (24 it) 1.15 -> 0.87 s (x0.76), k=2 (29 it) 2.87 -> 2.08 s (x0.72);
+  convection-dominated k=1 (7 it) 0.64 -> 0.46 s (x0.72), k=2 (12 it) 1.61 -> 1.42 s (x0.88). Peak memory unchanged
+  (3.4 GB at k=2: the assembly's).
+  Then the scalar sweeps of degree 0 in l1 Gauss-Seidel too (the fix of k=0 on several processes, see "Distributed
+  memory"), the same A/B against `e06adaaa` (`build/gs_mixed/h3d/ab_k0.sh`; one process, the l1 terms of the chunks of
+  the threads): the same errors; iterations +0 in 9 of the 14 small runs, +1-2 in 4 (gcube16 k=0 26 -> 27, k=1 18 -> 19,
+  `M0` k=1 7 -> 9), gcube16 k=0 convection-dominated 4 -> 8; gcube32 the same but convection-dominated k=1 7 -> 8; the
+  solve times within the noise (best of 2: 0.88 / 0.88, 2.17 / 2.13, 0.54 / 0.49, 1.39 / 1.46 s).
 
 From the comparison with NGSolve's BDDC (2026-10-19; results in `CLAUDE.md`, "Python module"; profile above), U-AMG
 1.2-2x faster at k=1, 1.1-1.5x slower at k=2 on 8 threads, where its iterations cost 1.15-1.75x more (with the new

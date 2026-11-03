@@ -229,5 +229,5 @@ class GaussSeidelSmoother : public Smoother
 {
 public:
 	GaussSeidelSmoother(Direction direction, int nSmoothingIterations) : Smoother(new GaussSeidel(direction), nSmoothingIterations) {}
-	GaussSeidelSmoother(Direction direction, bool hybrid, int nSmoothingIterations) : Smoother(new GaussSeidel(direction, hybrid), nSmoothingIterations) {}
+	GaussSeidelSmoother(Direction direction, bool hybrid, int nSmoothingIterations, bool l1 = false) : Smoother(new GaussSeidel(direction, hybrid, l1), nSmoothingIterations) {}
 };

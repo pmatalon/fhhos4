@@ -177,9 +177,11 @@ program `-uamg-bcsr`.
   sequential sweeps on a level where more than 20% of the non-zeros couple rows of different threads
   (`HybridChunks::MaxExternalFraction`; e.g. GMSH's numbering on the tetrahedral meshes).
 - Jacobi between the parts (the chunks of the hybrid sweeps, the processes) is not a contraction at k = 2 in 3D under
-  that threshold: the cycle diverges. l1 Gauss-Seidel (`l1hbgs`, `l1hrbgs`: `BlockGaussSeidel` with `l1`; ADR-0018;
-  block sweeps only, not the scalar ones of k = 0): the rows coupled to other parts get their l1 term, theta
-  sum_j |a_ij| over those couplings (`HybridChunks::AddExternalAbsoluteSums()`, the rows of `Offd`), on their diagonal,
-  in the factorized blocks (refactorized when the chunks change: `SetupL1Terms()`), and times the old x_i in the
-  right-hand side (`SweepRhs()`). theta: `BlockGaussSeidel::L1Theta`, 1/2 (program `-gs-l1`): M + M^T - A >= D for a
-  symmetric A, whatever the parts. No row has an l1 term on one thread and one process.
+  that threshold: the cycle diverges; nor at k = 0 on several processes (Cube-tet n=32, 2 processes: GCR stagnates at
+  3.7e-2). l1 Gauss-Seidel (`l1hbgs`, `l1hrbgs`: `BlockGaussSeidel` with `l1`, and `GaussSeidel` with `l1` at k = 0;
+  ADR-0018): the rows coupled to other parts get their l1 term, theta sum_j |a_ij| over those couplings
+  (`IterativeSolver::L1Terms()`: the rows of `Offd`, `HybridChunks::AddExternalAbsoluteSums()`), on their diagonal (in
+  the factorized blocks, refactorized when the chunks change: `SetupL1Terms()`; in the scalar kernels,
+  `GaussSeidel::Diagonal()`), and times the old x_i in the right-hand side (`SweepRhs()`). theta:
+  `IterativeSolver::L1Theta`, 1/2 (program `-gs-l1`): M + M^T - A >= D for a symmetric A, whatever the parts. No row
+  has an l1 term on one thread and one process.

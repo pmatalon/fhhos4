@@ -11,8 +11,11 @@ class GaussSeidel : public IterativeSolver
 protected:
 	Direction _direction;
 	bool _hybrid = false; // see HybridSweep()
+	bool _l1 = false;     // l1 Gauss-Seidel (see IterativeSolver::L1Theta)
 	vector<SparseMatrixIndex> _diagPos; // position of the diagonal coefficient of each row in the arrays of the matrix
 	HybridChunks _chunks; // of the hybrid sweeps (see Chunks())
+	// The l1 term of each row (see L1Theta), added to its diagonal coefficient; empty: none
+	Vector _l1Terms;
 public:
 	// If set, every sweep (forward or backward, pre- or post-smoothing) processes the rows in this order: the downwind
 	// order of a convection-dominated matrix (DownwindOrder()), which all the sweeps then follow
@@ -20,14 +23,17 @@ public:
 
 	GaussSeidel() : GaussSeidel(Direction::Forward) {}
 
-	GaussSeidel(Direction direction, bool hybrid = false)
+	GaussSeidel(Direction direction, bool hybrid = false, bool l1 = false)
 	{
 		this->_direction = direction;
 		this->_hybrid = hybrid;
+		this->_l1 = l1;
 	}
 
 	virtual void Serialize(ostream& os) const override
 	{
+		if (_l1)
+			os << "l1 ";
 		if (_hybrid)
 			os << "Hybrid ";
 		if (_direction == Direction::Forward)
@@ -94,9 +100,12 @@ private:
 				Utils::FatalError("Gauss-Seidel: no diagonal coefficient in row " + to_string(i) + ".");
 		}
 		_diagPos = std::move(diagonal.Begin);
+		_l1Terms = Vector();
 		_chunks.Clear();
 		if (_hybrid)
 			Chunks();
+		else
+			SetupL1Terms();
 
 		this->SetupComputationalWork = 0;
 	}
@@ -143,14 +152,44 @@ private:
 	{
 		_diagPos = o->_diagPos;
 		_chunks.Clear();
+		if (_hybrid && o->_hybrid && o->SweepOrder == SweepOrder)
+			_chunks = o->_chunks;
 		if (_hybrid)
-		{
-			if (o->_hybrid && o->SweepOrder == SweepOrder)
-				_chunks = o->_chunks;
-			else
-				Chunks();
-		}
+			Chunks();
+		SetupL1Terms(); // those of this smoother (o's: l1 or not, its chunks or not)
 		this->SetupComputationalWork = 0;
+	}
+
+	// The l1 terms (L1Theta, if l1) of the rows coupled to other processes, and to other chunks if the hybrid sweeps run
+	// in parallel
+	void SetupL1Terms()
+	{
+		if (InSinglePrecision())
+			SetupL1Terms<float>();
+		else
+			SetupL1Terms<double>();
+	}
+
+	template <typename T>
+	void SetupL1Terms()
+	{
+		_l1Terms = Vector();
+		if (!_l1)
+			return;
+		Vector terms = L1Terms<T>(L1Theta, [&](Vector& sums)
+		{
+			if (_hybrid && _chunks.Parallel())
+				_chunks.AddExternalAbsoluteSums(MatrixOf<T>(), sums);
+		});
+		if ((terms.array() != 0).any())
+			_l1Terms = std::move(terms);
+	}
+
+	// The diagonal coefficient of the row i (at the position d of the arrays of the matrix), with its l1 term
+	template <typename T>
+	double Diagonal(const T* val, SparseMatrixIndex d, BigNumber i) const
+	{
+		return _l1Terms.size() > 0 ? val[d] + _l1Terms[i] : val[d];
 	}
 
 public:
@@ -246,7 +285,7 @@ private:
 	{
 		const SparseMatrixOf<T>& A = MatrixOf<T>();
 		VectorOf<T> distributedRhs;
-		const VectorOf<T>& b = SweepRhs(givenB, x, xEquals0, distributedRhs, DistributedOf<T>());
+		const VectorOf<T>& b = SweepRhs(givenB, x, xEquals0, distributedRhs, DistributedOf<T>(), &_l1Terms);
 		// x(new) = (L+D)^{-1} * (b-Ux)
 		if (!xEquals0)
 			result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
@@ -265,7 +304,7 @@ private:
 	{
 		const SparseMatrixOf<T>& A = MatrixOf<T>();
 		VectorOf<T> distributedRhs;
-		const VectorOf<T>& b = SweepRhs(givenB, x, xEquals0, distributedRhs, DistributedOf<T>());
+		const VectorOf<T>& b = SweepRhs(givenB, x, xEquals0, distributedRhs, DistributedOf<T>(), &_l1Terms);
 		// x(new) = (D+U)^{-1} * (b-Lx)
 		if (!xEquals0)
 			result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
@@ -422,7 +461,7 @@ private:
 			}
 			for (SparseMatrixIndex p = outer[i]; p < d; ++p) // x_j, j < i: new values
 				tmp -= (double)val[p] * xp[col[p]];
-			xp[i] = (T)(tmp / val[d]);
+			xp[i] = (T)(tmp / Diagonal(val, d, i));
 		}
 	}
 
@@ -459,7 +498,7 @@ private:
 			}
 			for (SparseMatrixIndex p = d + 1; p < outer[i + 1]; ++p) // x_j, j > i: new values
 				tmp -= (double)val[p] * xp[col[p]];
-			xp[i] = (T)(tmp / val[d]);
+			xp[i] = (T)(tmp / Diagonal(val, d, i));
 		}
 	}
 
@@ -474,6 +513,7 @@ private:
 				_chunks.Setup(*_singleMatrix, 1, SweepOrder, nChunks);
 			else
 				_chunks.Setup(*this->Matrix, 1, SweepOrder, nChunks);
+			SetupL1Terms();
 		}
 		return _chunks;
 	}
@@ -512,7 +552,7 @@ private:
 						else
 							ForwardSweepKernel(b, x, xEquals0, (VectorOf<T>*)nullptr, begin, end);
 					},
-					[&](BigNumber q, BigNumber i) { x[i] = (T)(_chunks.BoundaryRowRhs(A, c, q, i, 0, b, x, xEquals0, products) / val[_diagPos[i]]); });
+					[&](BigNumber q, BigNumber i) { x[i] = (T)(_chunks.BoundaryRowRhs(A, c, q, i, 0, b, x, xEquals0, products) / Diagonal(val, _diagPos[i], i)); });
 			});
 		}
 	}
@@ -547,7 +587,7 @@ private:
 				tmp -= (double)val[p] * xp[col[p]];
 			for (SparseMatrixIndex p = d + 1; p < outer[i + 1]; ++p)
 				tmp -= (double)val[p] * xp[col[p]];
-			xp[i] = (T)(tmp / val[d]);
+			xp[i] = (T)(tmp / Diagonal(val, d, i));
 		}
 	}
 

@@ -9,7 +9,11 @@ Since 2026-11-02 the default is the l1 hybrid block Gauss-Seidel (`L1HybridBlock
 its own: the rows coupled to other threads and processes in l1 Gauss-Seidel (theta = 1/2: half the sum of the |a_ij| of
 these couplings on their diagonal), convergent whatever the parts. Under the 20% threshold, the plain hybrid sweeps
 diverged at k = 2 in 3D (Cube-tet n=8 k=2, 2 threads: 200 iterations, 34 on one; l1: 94), and so did Jacobi between
-processes. The plain hybrid one (`HybridBlockGaussSeidel`) stays, with its former meaning: where it converges it takes
+processes. Since 2026-11-03 the scalar sweeps of degree 0 too (`GaussSeidel` with `l1`): Jacobi between processes
+stagnated there on the finest level (Cube-tet n=32 k=0, `-uamg-nonsym`, 2 and 4 processes: GCR at 3.7e-2 after 200
+iterations; l1: 29-30, 28 on one process); on the k=0 levels below a p-coarsening it changed nothing on several
+processes (k=1 and k=2: the same iterations with and without). Its cost on one process, the l1 terms of the threads'
+chunks (HArDCore3D, 4-8 threads): +0-2 iterations, 4 -> 8 at k=0 convection-dominated, times within the noise. The plain hybrid one (`HybridBlockGaussSeidel`) stays, with its former meaning: where it converges it takes
 fewer iterations (HArDCore3D, 4 threads: convection-dominated 4 -> 7, 8 -> 11, tetrahedra 9 -> 14 with l1; diffusion
 +0-2). A smoother rather than a parameter: an explicit choice keeps its meaning, only the default changes; as hypre
 and MFEM, which have l1-Gauss-Seidel as its own relaxation type.

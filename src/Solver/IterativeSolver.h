@@ -63,6 +63,29 @@ protected:
 		return BlockMatrixOf<T>() ? BlockMatrixOf<T>()->NonZeros() : MatrixOf<T>().nonZeros();
 	}
 
+	// l1 Gauss-Seidel (see L1Theta): theta sum_j |a_ij| over the couplings of each row i to other processes (Offd) and to
+	// the other parts that addExternal(sums) adds (the other chunks of the hybrid sweeps), with the matrix in precision T
+	template <typename T, class AddExternal>
+	Vector L1Terms(double theta, AddExternal addExternal) const
+	{
+		Vector terms = Vector::Zero(Rows<T>());
+		if (theta == 0)
+			return terms;
+		if (const DistributedMatrixOf<T>* distributed = DistributedOf<T>())
+		{
+			const SparseMatrixOf<T>& O = distributed->Offd;
+			#pragma omp parallel for
+			for (BigNumber i = 0; i < O.rows(); i++)
+			{
+				for (typename SparseMatrixOf<T>::InnerIterator it(O, i); it; ++it)
+					terms[i] += abs(it.value());
+			}
+		}
+		addExternal(terms);
+		terms *= theta;
+		return terms;
+	}
+
 	// The matrix of the setup in one storage, the others null (the Gauss-Seidel smoothers)
 	void SetStorage(const SparseMatrix* A, const FloatSparseMatrix* singleA, const BlockSparseMatrix<double>* blocks, const BlockSparseMatrix<float>* singleBlocks, const DistributedMatrix* distributed, const DistributedMatrixOf<float>* singleDistributed)
 	{
@@ -110,6 +133,15 @@ public:
 	Vector Residual;
 	Vector Ax;
 	IterationResult LastIterationResult;
+
+	// Gauss-Seidel within each part (the process, the chunk of a thread in the hybrid sweeps), Jacobi between them: for a
+	// symmetric A, M + M^T - A = D - O (O: the couplings between the parts) can be indefinite, and the cycle then
+	// diverges (3D, k = 2 in blocks, k = 0 on several processes). l1 Gauss-Seidel (l1: Baker et al., SISC 2011), on the
+	// rows coupled to other parts: their diagonal (blocks) D_I + theta diag(sum_j |O_ij|), and theta sum_j |O_ij| x_i(old)
+	// added to the right-hand side (the l1 terms). From theta = 1/2 (the default), M + M^T - A >= D, whatever the parts
+	// (-gs-l1). On one thread and one process, no row has an l1 term: the sequential Gauss-Seidel. BlockGaussSeidel and
+	// GaussSeidel with l1.
+	inline static double L1Theta = 0.5;
 
 	IterativeSolver() : Solver() {}
 
@@ -177,7 +209,7 @@ protected:
 	// On several processes, the right-hand side of a sweep of a relaxation method (Gauss-Seidel, Jacobi) on the rows of
 	// the process (Diag): b - Offd x, with the values of x of the other processes from the start of the sweep (Jacobi
 	// between the processes, Gauss-Seidel within each one, as the hybrid smoothers between threads); b on one process, or
-	// from x = 0. With l1 terms (l1 Gauss-Seidel, BlockGaussSeidel::L1Theta: not empty), + l1Terms .* x. buffer: its
+	// from x = 0. With l1 terms (l1 Gauss-Seidel, L1Theta: not empty), + l1Terms .* x. buffer: its
 	// storage. distributed: the distributed matrix (null on one process), in precision T (float: the l1 terms added in
 	// double).
 	// Collective on the halo.

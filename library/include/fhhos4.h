@@ -239,8 +239,8 @@ namespace fhhos4
 		L1HybridBlockGaussSeidel,       // l1hbgs: HybridBlockGaussSeidel in l1 Gauss-Seidel (Baker et al., SISC 2011): the
 		                                // diagonal of the rows coupled to other threads or processes increased by half
 		                                // the sum of the |a_ij| of these couplings, which keeps it convergent whatever the
-		                                // partition. On 1 thread and 1 process: BlockGaussSeidel. At degree 0 (scalar
-		                                // blocks): HybridBlockGaussSeidel
+		                                // partition (also at degree 0, the scalar blocks). On 1 thread and 1 process:
+		                                // BlockGaussSeidel
 		L1HybridBackwardBlockGaussSeidel, // l1hrbgs
 		DampedBlockJacobi,              // bj23: block Jacobi damped by 2/3. Parallel
 		BlockChebyshevFirstKind,        // bcheb: block Chebyshev, a polynomial in D^-1 A (D: the block diagonal) whose
