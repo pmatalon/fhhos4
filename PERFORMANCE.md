@@ -1699,10 +1699,69 @@ Possible now that reordering the arithmetic operations is allowed (rejected so f
 - **Shorter dependency chains in the sweeps** — estimated, small effort. In `BlockRowRhs` (forward block sweeps,
   row by row) the sum of a row is one chain of ~40 dependent subtractions at k=2 (3-4 cycles each): 2 to 4 partial
   sums would bring the forward sweep (~11 ms on the fine level, k=2 n=16) closer to the SpMV (~7-8 ms).
-- **Residual of the block pre-smoother from the sweep** — estimated, small effort. After a forward sweep,
-  `r_I = U_I (x_old - x_new)` (in exact arithmetic, since `D_I x_I(new) = b_I - L_I x(new) - U_I x(old)`); from
-  x = 0, `r_I = -U_I x(new)`: half of the matrix instead of the full `b - A*x` (~8 ms per pre-smoothing on the fine
-  level at k=2, i.e. ~0.15 s of the 3.7 s solve). The scalar `GaussSeidel` already computes its residual this way.
+- **Residual of the block pre-smoother from the sweep** — tried (2026-11-03), not kept: its premise does not hold
+  (half of the matrix is not half of the memory traffic), the pre-smoother gains nothing; the only gain, on several
+  threads, came from FCG's A d (FCG's own A d in parallel, below, gets it directly). The code, on 8e8a146e:
+  `build/gs_resid/residual-from-sweep.patch` (not in the repository; with a test, `ResidualFromTheSweep`, and its
+  docs). `BlockGaussSeidel` deduced the residual and A x from its last sweep, as `GaussSeidel`
+  (`CanOptimizeResidualComputation()`: one process, the natural order, the sequential sweeps, no l1 term; CSR and
+  block CSR, double and float): `r_I = P_I (x_old - x_new)`, `P_I` the blocks of the block rows processed after I
+  (`U_I` forward, `L_I` backward); `P_I x_old` from the partial sums of the sweep's right-hand side (after the lower
+  blocks, `b_I - L_I x`: the sweep unchanged, bit for bit), then `P x_new` subtracted in a parallel pass
+  (`SubtractOffDiagonalProducts()`). The cycle skipped its `b - A x` after the pre-smoothing, and the multigrid's
+  `CanOptimizeResidualComputation()` (the fine post-smoother's) became true with `bgs`: FCG took A x from the cycle
+  (the post-smoother's; in mixed precision the cycle's product in double, parallel) instead of its own symmetric
+  product (`selfadjointView`, sequential). The same iterations (ctest 395/395, MPI 22/22); the residuals of the
+  iterations the same to the 3 digits printed.
+  Kernels (`build/gs_resid/bench/`, not in the repository; the fine matrix of Cube-tet n=10 k=2 exported by
+  `-export mg`: 69,696 rows, 2.75M non-zeros; 1 thread, medians): "half of the matrix" is not half of the memory
+  traffic. In CSR the two halves of each row are interleaved, and the whole matrix is streamed anyway: Eigen's product
+  2.05 ms, its product by `triangularView<StrictlyUpper>()` 2.05 ms, the pass over the upper (or lower) blocks row by
+  row 2.02-2.05 ms (2.5 ms with the rows of a block row read together). In block CSR the halves are contiguous within a
+  block row: double 1.28 ms against 1.27 ms for the block product (with a software prefetch of the next block row's
+  chunk ~0.93 ms: not kept, tuned to this machine), float 0.50 against 0.70 ms (2D k=2, blocks of 3: double 1.65-1.91
+  against 1.60 ms, float 0.95-1.0 against 1.18 ms). Three first versions were slower on 1 thread (solve +4..+18%):
+  `P_I x_old` summed apart in the sweep (two passes over each row: the backward sweep +0.8 ms); the block size
+  dispatched at each block row in the pass (2.3-2.5 ms in double block CSR); the block CSR kernel by ranges around the
+  diagonal block instead of a test per block (the plain sweeps from x = 0 +13..+25%).
+  Attribution (the same binary, with and without, by temporary environment switches, with the pass dispatched at each
+  block row; best of 2, solve time ratios, below 1: faster): Cube-tet n=16 k=2 on 8 threads, the pre-smoother's
+  residual alone x1.02 (CSR), x1.00 (double block CSR), x0.99 (mixed precision), with FCG's A x from the cycle x0.96,
+  x0.93, x0.85; on 1 thread (Cube-tet n=10 k=2, Square-tri n=128 k=2), all of it: CSR x0.98-0.99, the block storages
+  x1.03-1.10.
+  Final (`build/gs_resid/measure.sh`, not in the repository: the binary of 8e8a146e, built before its commit (version
+  string `e06adaaa-dirty`), against the new one, interleaved, best of 2, plugged in; `fcguamg -smoothers bgs`, k=2;
+  solve (s) and its time ratio, below 1: faster), the same iterations:
+
+  | Case | Threads | Iterations | Double CSR | Double block CSR | Mixed precision |
+  |---|---|---|---|---|---|
+  | Cube-tet n=10 | 1 | 34 | 0.448 -> 0.467 (x1.04) | 0.430 -> 0.424 (x0.99) | 0.334 -> 0.316 (x0.95) |
+  | Square-tri n=128 | 1 | 19 | 0.411 -> 0.398 (x0.97) | 0.388 -> 0.376 (x0.97) | 0.332 -> 0.345 (x1.04) |
+  | Cube-tet n=16 | 8 | 33 | 1.752 -> 1.586 (x0.91) | 1.702 -> 1.402 (x0.82) | 1.322 -> 1.141 (x0.86) |
+
+  On 1 thread within the noise (one pass over the matrix replaced by another), on 8 threads faster (FCG's product
+  parallel). The real "half of the matrix" needs no pass at all (next idea).
+- **Residual from the block sweep without the extra pass (symmetric matrices)** — estimated from the measurements
+  above, medium effort, on top of the patch above. The pass `P x_new` after the sweep costs about one product by A
+  (CSR: ~2 ms per smoothing at Cube-tet n=10 k=2 on 1 thread; the two of an iteration, pre and post, ~4 of its
+  ~13 ms). For a symmetric A,
+  `U_I x_new = sum_{J>I} A_JI^T x_J`: scattered from the lower blocks of each later block row J right after the solve
+  of x_J, while the sweep has them in cache: no pass at all, up to ~-30% of the solve on 1 thread, less the scatter's
+  flops in the sequential sweep. Needs the smoother to know the matrix symmetric (the non-symmetric ones use it too:
+  `-uamg-nonsym`, the library's `SetupNonSym()`); the Galerkin operators are symmetric to rounding only, which is
+  enough for a residual.
+- **The block size dispatched once per sweep in `BlockGaussSeidel`** — estimated, small effort. The sweeps dispatch it
+  at each block row (`ProcessBlockRow()` -> `DispatchBlockSize()` -> `BlockRowRhs()`); in the residual pass of the
+  patch above, dispatching it once per pass took the double block CSR pass from 2.3-2.5 to 1.3 ms (1 thread). The same
+  in the sweeps may help the block CSR sweeps (a sweep from x = 0, which skips the upper blocks, 2.2-2.8 ms against
+  1.8-2.0 ms for a full one in double block CSR).
+- **FCG's own A d in parallel** — estimated from the attribution above, small effort; not the priority (2026-11-03).
+  When the multigrid doesn't return A x (its fine post-smoother is a Gauss-Seidel that doesn't deduce it: `bgs` and
+  the parallel hybrid sweeps; Chebyshev does), FCG computes `A.selfadjointView<Eigen::Lower>() * d`
+  (`FlexibleConjugateGradient.h`), sequential in Eigen. Taking A x from the cycle instead gave x0.96 (CSR), x0.93
+  (double block CSR), x0.85 (mixed precision) on Cube-tet n=16 k=2, 8 threads; a parallel product (the full matrix,
+  row-major, or a parallel symmetric one) should give most of it, for every such smoother. The full matrix is not
+  bitwise symmetric (the Galerkin operators, above): its product changes FCG at rounding level (as the patch did).
 - **Block CSR storage for k>=1** — done (2026-10-23, below; `Utils/BlockSparseMatrix.h`, always with the mixed
   precision, `BlockCSRStorage` / `-uamg-bcsr` in double). One column index per block instead of one per
   coefficient (12 -> ~8 bytes per non-zero at k=2) and dense block-vector products (vectorizable): the solve kernels
